@@ -14,6 +14,32 @@
           }
         ]
       }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/scripts/hook-audit.sh\"",
+            "timeout": 10,
+            "async": true,
+            "statusMessage": "写入 WorkLoom 审计账本"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/scripts/hook-audit.sh\"",
+            "timeout": 10,
+            "async": true,
+            "statusMessage": "写入 WorkLoom 回合回执"
+          }
+        ]
+      }
     ]
   }
 }

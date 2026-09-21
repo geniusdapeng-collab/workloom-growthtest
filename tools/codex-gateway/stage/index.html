@@ -3,8 +3,8 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>WorkLoom 数字人团队工作台（P0 实验）</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <title>WorkLoom 数字人团队工作台（P1 实验）</title>
+    <link rel="stylesheet" href="/stage/styles.css" />
   </head>
   <body>
     <div class="stars" aria-hidden="true"></div>
@@ -29,7 +29,7 @@
       <aside class="panel sessions">
         <div class="panel-head">
           <h2>Codex 线程</h2>
-          <span class="panel-hint">P1 接入</span>
+          <span class="panel-hint">P2 接入 Codex 线程</span>
         </div>
         <div class="session-placeholder">
           <p>这里将显示与 Codex 对齐的会话/任务线程。</p>
@@ -76,10 +76,10 @@
     </footer>
 
     <div class="disclaimer">
-      P0 只读实验：所有运行态/审批/KPI 均为模拟夹具（<code>dataMode=mock</code>）；能力/员工/围栏/管线来自仓内代码事实。
-      写操作（审批、派遣、Run 启动）将在 P1 经能力网关的围栏 → 人审 → 五元事件 → 回执链路开放。
+      P1 治理实验：能力/员工/围栏/管线来自仓内代码事实；围栏裁决复用真实 <code>fence-engine</code>，审批与 Run 状态写入 append-only 账本。
+      执行器当前为<b>显式模拟</b>（<code>dataMode=simulated</code>，回执为 <code>workloom-sim://</code>），真实连接器接入见计划 P3；模拟结果不得当作真实平台成功。
     </div>
 
-    <script src="./app.js"></script>
+    <script src="/stage/app.js"></script>
   </body>
 </html>

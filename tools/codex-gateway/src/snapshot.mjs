@@ -21,7 +21,11 @@ export function loadFixture() {
 }
 
 function runStateForAgent(runs, agentId) {
-  const active = runs.find((run) => run.agentId === agentId && ["running", "waiting_approval", "paused"].includes(run.state));
+  const active = runs.find(
+    (run) =>
+      (run.agentId === agentId || run.ownerAgentId === agentId) &&
+      ["running", "waiting_approval", "paused"].includes(run.state),
+  );
   if (!active) return null;
   return active;
 }
@@ -34,17 +38,22 @@ function statusFromRun(run) {
   return null;
 }
 
-export function buildSnapshot({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), now = new Date().toISOString() } = {}) {
+export function buildSnapshot({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), store = null, now = new Date().toISOString() } = {}) {
   const fixture = loadFixture();
   const employees = catalog.capabilities.filter((capability) => capability.kind === "employee");
-  const runs = fixture.runs ?? [];
-  const approvals = (fixture.approvals ?? []).filter((approval) => approval.status === "pending");
+  const storeRuns = store?.listRuns?.() ?? [];
+  const storeApprovals = store?.listApprovals?.({ status: "pending" }) ?? [];
+  const hasLiveState = storeRuns.length > 0 || storeApprovals.length > 0;
+  const runs = hasLiveState ? storeRuns : fixture.runs ?? [];
+  const approvals = hasLiveState ? storeApprovals : (fixture.approvals ?? []).filter((approval) => approval.status === "pending");
+  const dataMode = hasLiveState ? "simulated" : "mock";
 
   const agents = employees.map((employee) => {
     const fixtureAgent = fixture.agents?.[employee.presetKey] ?? {};
     const activeRun = runStateForAgent(runs, employee.id);
-    const status = statusFromRun(activeRun) ?? fixtureAgent.status ?? (employee.nightShift ? "idle" : "offline");
-    const agentApprovals = approvals.filter((approval) => approval.requestedBy === employee.id);
+    // 有真实（P1：显式模拟执行）状态时，不再用夹具状态/战绩冒充在岗与绩效，避免真假混层。
+    const status = statusFromRun(activeRun) ?? (hasLiveState ? (employee.nightShift ? "idle" : "offline") : fixtureAgent.status ?? (employee.nightShift ? "idle" : "offline"));
+    const agentApprovals = approvals.filter((approval) => approval.ownerAgentId === employee.id || approval.requestedBy === employee.id);
     return {
       id: employee.id,
       presetKey: employee.presetKey,
@@ -64,12 +73,12 @@ export function buildSnapshot({ repoRoot = resolveRepoRoot(), catalog = generate
       progress: activeRun?.progress ?? null,
       pendingApprovals: agentApprovals.map((approval) => approval.approvalId),
       stats: {
-        actions30: fixtureAgent.actions30 ?? 0,
-        approvals30: fixtureAgent.approvals30 ?? 0,
-        receipts30: fixtureAgent.receipts30 ?? 0,
+        actions30: hasLiveState ? 0 : fixtureAgent.actions30 ?? 0,
+        approvals30: hasLiveState ? 0 : fixtureAgent.approvals30 ?? 0,
+        receipts30: hasLiveState ? 0 : fixtureAgent.receipts30 ?? 0,
       },
       codexThreadId: null,
-      dataMode: "mock",
+      dataMode,
     };
   });
 
@@ -79,7 +88,7 @@ export function buildSnapshot({ repoRoot = resolveRepoRoot(), catalog = generate
       ...run,
       displayName: run.displayName ?? capability?.displayName ?? run.capabilityId,
       risk: capability?.risk ?? { level: "review", source: "unknown" },
-      dataMode: "mock",
+      dataMode: run.dataMode ?? dataMode,
     };
   });
 
@@ -92,11 +101,13 @@ export function buildSnapshot({ repoRoot = resolveRepoRoot(), catalog = generate
       productId: catalog.repo.productId,
     },
     generatedAt: now,
-    cursor: `mock:${fixture.runs?.length ?? 0}:${fixture.approvals?.length ?? 0}`,
-    dataMode: "mock",
+    cursor: hasLiveState ? `store:${store?.lastEventId ?? "E-0"}` : `mock:${fixture.runs?.length ?? 0}:${fixture.approvals?.length ?? 0}`,
+    dataMode,
     factsSource: "bundles/*（代码事实）",
-    stateSource: "tools/codex-gateway/fixtures/mock-state.json",
-    note: "P0 实验：能力/员工来自代码事实，运行态/审批/KPI/额度来自模拟夹具；接入真实 tRPC 与事件总线见 docs/CODEX-WORKBENCH-PLAN.md 的 P1。",
+    stateSource: hasLiveState ? "data/codex-gateway（P1 Run/Approval JSONL，执行器为显式模拟）" : "tools/codex-gateway/fixtures/mock-state.json",
+    note: hasLiveState
+      ? "P1 实验：能力/员工来自代码事实，Run/审批来自网关 append-only 存储；执行器为显式模拟（workloom-sim:// 回执），真实连接器接入见计划 P3。"
+      : "P0 实验：能力/员工来自代码事实，运行态/审批/KPI/额度来自模拟夹具；接入真实 tRPC 与事件总线见 docs/CODEX-WORKBENCH-PLAN.md 的 P1。",
     night: fixture.night ?? { status: "off", range: "22:00–08:00" },
     counts: {
       agents: agents.length,
@@ -111,8 +122,9 @@ export function buildSnapshot({ repoRoot = resolveRepoRoot(), catalog = generate
     agents,
     runs: runsWithNames,
     approvals,
-    kpi: fixture.kpi ?? [],
-    quota: fixture.quota ?? [],
+    // 有真实（P1：显式模拟执行）状态时，不把夹具 KPI/额度混进同一视图；P3 接真实指标后再填。
+    kpi: hasLiveState ? [] : fixture.kpi ?? [],
+    quota: hasLiveState ? [] : fixture.quota ?? [],
     capabilities: {
       summary: catalog.summary,
       pipelines: catalog.capabilities.filter((capability) => capability.kind === "pipeline").map((pipeline) => ({

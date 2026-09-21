@@ -40,11 +40,23 @@
 
 ### P1：治理闭环
 
+**状态（2026-09-22）：已完成并通过真机验收**——详见 [`tools/codex-gateway/ACCEPTANCE.md`](../tools/codex-gateway/ACCEPTANCE.md) §P1。
+
 - Run 协议：`run_start/status/tail/cancel`，状态含 `waiting_approval`，`completed` 必须有 receipt。
 - 审批：`approval_list/decide`（三手势），接 review-console / 实验 approval adapter；过期与篡改 fail-closed。
 - 围栏：所有写工具先调 `fence-engine` 纯函数判定（block > review > auto）。
 - 审计：Codex hooks（PreToolUse / PostToolUse / Stop / SessionStart）→ 网关 append → 五元事件（先本地哈希链 JSONL，后接 workdata）。
 - 验收：一个 G9 或 G12 场景端到端；block 直接终止；无回执标"未核实"。
+
+真机实测补充（2026-09-22）：
+
+1. Codex 会把 `readOnlyHint:false` 的 MCP 工具视为需要审批；`codex exec` 默认策略 `never` 会在 Codex 层
+   直接拒绝（未进入网关）。交互式场景保持这一层；无人值守场景可对 `workloom-core` 设
+   `default_tools_approval_mode="auto"`，但**网关内部的 G9/G12 人审仍强制**，不因 Codex 层放行而降级。
+2. 围栏上下文缺失（如未提供 `account_daily_published`）会触发规则求值异常并按 fail-closed block；
+   `run_start` 返回的 `fence.evalErrors` 必须展示给调用方，由其补齐上下文后重试，禁止伪造上下文。
+3. 策略桥复用 `apps/server/src/trpc/router.ts` 对 G*/G-GEO* 的裸 YAML 装载口径；
+   `loadFencePack` 的 R 号 zod 校验不适用于 growth 线，不能强改基座。
 
 ### P2：数字人工作台
 

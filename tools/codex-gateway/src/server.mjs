@@ -18,6 +18,7 @@ import { extname, join, normalize, resolve } from "node:path";
 import { gatewayFile, resolveRepoRoot } from "./paths.mjs";
 import { generateCatalog, findCapability, searchCapabilities } from "./catalog.mjs";
 import { DEFAULT_STAGE_PORT, buildSnapshot, demoEvent, snapshotEvent } from "./snapshot.mjs";
+import { createRunService } from "./runs.mjs";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -62,6 +63,31 @@ function sendText(request, response, status, text, contentType = "text/plain; ch
   response.end(text);
 }
 
+function readJsonBody(request, limitBytes = 1024 * 1024) {
+  return new Promise((resolve, reject) => {
+    let size = 0;
+    const chunks = [];
+    request.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > limitBytes) {
+        reject(new Error("请求体超过 1MB 限制"));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on("end", () => {
+      if (!chunks.length) return resolve({});
+      try {
+        resolve(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+      } catch (error) {
+        reject(new Error(`JSON 解析失败：${error instanceof Error ? error.message : String(error)}`));
+      }
+    });
+    request.on("error", reject);
+  });
+}
+
 function safeJoin(root, candidate) {
   const target = resolve(join(root, normalize(candidate).replace(/^(\.\.(\/|\\|$))+/, "")));
   return target.startsWith(resolve(root)) ? target : null;
@@ -83,8 +109,10 @@ function serveStageFile(request, response, pathname) {
   response.end(readFileSync(target));
 }
 
-export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }) } = {}) {
-  const snapshot = () => buildSnapshot({ repoRoot, catalog });
+export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), runService = null } = {}) {
+  const service = runService ?? createRunService({ repoRoot, catalog });
+  const store = service.store;
+  const snapshot = () => buildSnapshot({ repoRoot, catalog, store });
 
   return createServer((request, response) => {
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
@@ -95,7 +123,34 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
       response.end();
       return;
     }
-    if (request.method !== "GET") {
+    const method = request.method ?? "GET";
+
+    // ---------- 写路径（P1：Run / Approval；所有裁决在 runService 内 fail-closed） ----------
+    if (method === "POST" && pathname === "/runs") {
+      readJsonBody(request)
+        .then((body) => service.startRun(body))
+        .then((result) => sendJson(request, response, 200, result))
+        .catch((error) => sendJson(request, response, 400, { error: error.code ?? "RUN_START_FAILED", message: error.message }));
+      return;
+    }
+    if (method === "POST" && pathname.startsWith("/runs/") && pathname.endsWith("/cancel")) {
+      const runId = pathname.slice("/runs/".length, -"/cancel".length);
+      readJsonBody(request)
+        .then((body) => service.cancelRun({ runId, ...body }))
+        .then((result) => sendJson(request, response, 200, result))
+        .catch((error) => sendJson(request, response, 400, { error: error.code ?? "RUN_CANCEL_FAILED", message: error.message }));
+      return;
+    }
+    if (method === "POST" && pathname.startsWith("/approvals/") && pathname.endsWith("/decide")) {
+      const approvalId = pathname.slice("/approvals/".length, -"/decide".length);
+      readJsonBody(request)
+        .then((body) => service.decideApproval({ approvalId, ...body }))
+        .then((result) => sendJson(request, response, 200, result))
+        .catch((error) => sendJson(request, response, 400, { error: error.code ?? "APPROVAL_DECIDE_FAILED", message: error.message }));
+      return;
+    }
+
+    if (method !== "GET") {
       sendJson(request, response, 405, { error: "METHOD_NOT_ALLOWED" });
       return;
     }
@@ -105,7 +160,7 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
         ok: true,
         service: "workloom-codex-gateway",
         version: "0.1.0",
-        mode: "read-only",
+        mode: "governed",
         repo: catalog.repo,
         counts: catalog.summary,
         warnings: catalog.warnings.length,
@@ -147,6 +202,38 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
       return;
     }
 
+    if (pathname === "/runs") {
+      sendJson(request, response, 200, { runs: service.listRuns() });
+      return;
+    }
+    if (pathname.startsWith("/runs/") && pathname.endsWith("/tail")) {
+      const runId = pathname.slice("/runs/".length, -"/tail".length);
+      sendJson(request, response, 200, { runId, events: service.tailRun(runId, Number(url.searchParams.get("limit") ?? 50)) });
+      return;
+    }
+    if (pathname.startsWith("/runs/")) {
+      const runId = pathname.slice("/runs/".length);
+      const run = service.getRun(runId);
+      if (!run) {
+        sendJson(request, response, 404, { error: "RUN_NOT_FOUND", runId });
+        return;
+      }
+      sendJson(request, response, 200, run);
+      return;
+    }
+    if (pathname === "/approvals") {
+      sendJson(request, response, 200, { approvals: service.listApprovals({ status: url.searchParams.get("status") ?? undefined }) });
+      return;
+    }
+    if (pathname === "/ledger/verify") {
+      sendJson(request, response, 200, service.verifyLedger());
+      return;
+    }
+    if (pathname === "/ledger") {
+      sendJson(request, response, 200, { events: store.listLedger({ since: url.searchParams.get("since") ?? undefined }) });
+      return;
+    }
+
     if (pathname === "/stage/stream") {
       response.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",
@@ -164,10 +251,29 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
       const current = snapshot();
       send(snapshotEvent(current));
 
+      const eventNameOf = (event) => {
+        const action = String(event?.decision?.action ?? "");
+        if (action.startsWith("approval.")) return action;
+        if (action === "run.completed") return "run.completed";
+        if (action === "run.blocked") return "run.blocked";
+        if (action === "run.cancelled") return "run.cancelled";
+        if (action.startsWith("run.step")) return "run.progress";
+        if (action === "run.started") return "run.started";
+        return "stage.event";
+      };
+      let lastEventId = url.searchParams.get("since") ?? store.lastEventId ?? null;
+      const tailTimer = setInterval(() => {
+        const pending = store.listLedger({ since: lastEventId ?? undefined });
+        for (const event of pending) {
+          send({ event: eventNameOf(event), data: { ...event, dataMode: "simulated" } });
+          lastEventId = event.event_id;
+        }
+      }, 1000);
+
       const demo = url.searchParams.get("demo") === "1";
       let index = 0;
       let demoTimer = null;
-      if (demo) {
+      if (demo && !store.listLedger().length) {
         demoTimer = setInterval(() => {
           send(demoEvent(current, index));
           index += 1;
@@ -180,6 +286,7 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
       const heartbeat = setInterval(() => response.write(`: ping ${Date.now()}\n\n`), 15000);
       const cleanup = () => {
         clearInterval(heartbeat);
+        clearInterval(tailTimer);
         if (demoTimer) clearInterval(demoTimer);
       };
       request.on("close", cleanup);
@@ -196,9 +303,10 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
   });
 }
 
-export function startGateway({ port = Number(process.env.WORKLOOM_GATEWAY_PORT ?? DEFAULT_STAGE_PORT), host = process.env.WORKLOOM_GATEWAY_HOST ?? "127.0.0.1", repoRoot = resolveRepoRoot() } = {}) {
+export function startGateway({ port = Number(process.env.WORKLOOM_GATEWAY_PORT ?? DEFAULT_STAGE_PORT), host = process.env.WORKLOOM_GATEWAY_HOST ?? "127.0.0.1", repoRoot = resolveRepoRoot(), runService = null } = {}) {
   const catalog = generateCatalog({ repoRoot });
-  const server = createGateway({ repoRoot, catalog });
+  const service = runService ?? createRunService({ repoRoot, catalog });
+  const server = createGateway({ repoRoot, catalog, runService: service });
   return new Promise((resolvePromise, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {
@@ -207,6 +315,7 @@ export function startGateway({ port = Number(process.env.WORKLOOM_GATEWAY_PORT ?
       resolvePromise({
         server,
         catalog,
+        runService: service,
         url: `http://${host}:${actualPort}`,
         stageUrl: `http://${host}:${actualPort}/stage`,
         close: () => new Promise((resolveClose) => server.close(() => resolveClose())),

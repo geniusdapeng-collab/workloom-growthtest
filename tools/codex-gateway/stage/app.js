@@ -18,6 +18,7 @@ const escapeHtml = (value) =>
 
 let snapshot = null;
 const tickerItems = [];
+let firstRender = true;
 
 function renderStats(data) {
   const items = [
@@ -87,7 +88,11 @@ function renderApprovals(data) {
         <div class="title">${escapeHtml(approval.gate ?? "人工审批")} · ${escapeHtml(approval.risk)}</div>
         <div class="desc">${escapeHtml(approval.summary)}</div>
         <div class="row"><span>${escapeHtml(approval.objectRef)}</span><span>${escapeHtml(approval.approvalId)}</span></div>
-        <div class="gestures"><button disabled>批准</button><button disabled>修改</button><button disabled>驳回</button></div>
+        <div class="gestures">
+          <button data-decide="approve" data-approval="${escapeHtml(approval.approvalId)}">批准</button>
+          <button data-decide="edit" data-approval="${escapeHtml(approval.approvalId)}">修改</button>
+          <button data-decide="reject" data-approval="${escapeHtml(approval.approvalId)}">驳回</button>
+        </div>
       </div>`,
     )
     .join("");
@@ -102,12 +107,17 @@ function renderRuns(data) {
         <div class="desc">${escapeHtml(run.state)} · ${escapeHtml(run.currentStep ?? "-")} · ${escapeHtml(run.dataMode)}</div>
         <div class="progress"><i style="width:${progress}%"></i></div>
         <div class="row"><span>${escapeHtml(run.runId)}</span><span>${progress}% · ${escapeHtml(run.cost?.amount ?? 0)} ${escapeHtml(run.cost?.unit ?? "")}</span></div>
+        ${!["completed", "blocked", "cancelled", "failed"].includes(run.state) ? `<div class="gestures"><button data-cancel="${escapeHtml(run.runId)}">取消 Run</button></div>` : ""}
       </div>`;
     })
     .join("");
 }
 
 function renderKpi(data) {
+  if (!data.kpi.length && !data.quota.length) {
+    el("kpi").innerHTML = '<div class="card"><div class="desc">暂无真实 KPI / 额度（P3 接入真实 tRPC 与账本投影后展示）；当前不展示模拟数值。</div></div>';
+    return;
+  }
   const kpi = data.kpi
     .map((item) => `<div class="card"><span>${escapeHtml(item.name)}</span><span class="v">${escapeHtml(item.value)}${escapeHtml(item.unit)}</span></div>`)
     .join("");
@@ -138,11 +148,71 @@ function renderSnapshot(data) {
   renderApprovals(data);
   renderRuns(data);
   renderKpi(data);
-  pushTicker("工作台快照已加载（模拟数据）");
+  if (firstRender) {
+    firstRender = false;
+    pushTicker(`工作台快照已加载（${data.dataMode}）`);
+  }
 }
 
+async function refresh() {
+  const response = await fetch("/stage/snapshot");
+  if (response.ok) renderSnapshot(await response.json());
+}
+
+async function decideApproval(approvalId, gesture) {
+  let body = { gesture };
+  if (gesture === "edit") {
+    const value = window.prompt("请输入修改后的新值（JSON 或文本）：");
+    if (value === null) return;
+    try {
+      body.editedAfter = JSON.parse(value);
+    } catch {
+      body.editedAfter = value;
+    }
+  }
+  if (gesture === "reject") {
+    const reason = window.prompt("请输入驳回原因（必填）：");
+    if (!reason) return;
+    body.reasonEnum = "operator_rejected";
+    body.reasonText = reason;
+  }
+  if (gesture !== "reject" && !window.confirm(`确认${gesture === "approve" ? "批准" : "修改后批准"}该事项？`)) return;
+  const response = await fetch(`/approvals/${encodeURIComponent(approvalId)}/decide`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const result = await response.json();
+  if (!response.ok) window.alert(`裁决失败：${result.message ?? result.error}`);
+  await refresh();
+}
+
+async function cancelRun(runId) {
+  if (!window.confirm(`确认取消 ${runId}？`)) return;
+  const response = await fetch(`/runs/${encodeURIComponent(runId)}/cancel`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ reason: "cancelled_from_stage" }),
+  });
+  if (!response.ok) {
+    const result = await response.json();
+    window.alert(`取消失败：${result.message ?? result.error}`);
+  }
+  await refresh();
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLElement)) return;
+  const approvalId = target.dataset.approval;
+  const decide = target.dataset.decide;
+  if (approvalId && decide) void decideApproval(approvalId, decide);
+  const runId = target.dataset.cancel;
+  if (runId) void cancelRun(runId);
+});
+
 function connect() {
-  const source = new EventSource("./stream?demo=1");
+  const source = new EventSource("/stage/stream?demo=1");
   source.addEventListener("open", () => {
     el("connection").textContent = "已连接";
     el("connection").className = "pill";
@@ -161,6 +231,23 @@ function connect() {
     pushTicker(`待审批：${data.displayName}（${data.capabilityId}）`);
   });
   source.addEventListener("stage.heartbeat", () => {});
+  source.addEventListener("stage.event", () => void refresh());
+  source.addEventListener("run.started", () => void refresh());
+  source.addEventListener("run.completed", (event) => {
+    const data = JSON.parse(event.data);
+    pushTicker(`${data.object?.id ?? "Run"} 已完成（回执 ${data.receipt?.synced ? "已核验" : "未核验"}）`);
+    void refresh();
+  });
+  source.addEventListener("run.blocked", (event) => {
+    const data = JSON.parse(event.data);
+    pushTicker(`${data.object?.id ?? "Run"} 被围栏熔断`);
+    void refresh();
+  });
+  source.addEventListener("approval.decided", (event) => {
+    const data = JSON.parse(event.data);
+    pushTicker(`审批已裁决：${data.decision?.after?.gesture ?? ""}`);
+    void refresh();
+  });
 }
 
 connect();

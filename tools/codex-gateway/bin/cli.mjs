@@ -17,6 +17,7 @@ import { findCapability, generateCatalog, searchCapabilities } from "../src/cata
 import { DEFAULT_STAGE_PORT, buildSnapshot, shortContext } from "../src/snapshot.mjs";
 import { runMcpStdio } from "../src/mcp.mjs";
 import { startGateway } from "../src/server.mjs";
+import { createRunService } from "../src/runs.mjs";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -45,6 +46,29 @@ function printHumanCapability(capability) {
   if (capability.summary) console.log(`  ${capability.summary}`);
 }
 
+function parseJsonArg(value, label) {
+  if (value === undefined || value === true) return undefined;
+  try {
+    return JSON.parse(String(value));
+  } catch (error) {
+    throw new Error(`${label} 不是合法 JSON：${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function readStdin() {
+  return new Promise((resolve) => {
+    let data = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => {
+      data += chunk;
+    });
+    process.stdin.on("end", () => resolve(data));
+  });
+}
+
+/** 当前进程内已创建的服务：统一在退出前关闭策略桥，避免子进程持有管道导致 CLI 无法退出。 */
+let activeService = null;
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const [command, subcommand] = args._;
@@ -52,7 +76,7 @@ async function main() {
   const repoRoot = resolveRepoRoot(cwd);
 
   if (!command || command === "help" || command === "--help") {
-    console.log("workloom-gateway：catalog | stage | doctor | context | mcp");
+    console.log("workloom-gateway：catalog | stage | run | approval | ledger | audit | doctor | context | mcp");
     return 0;
   }
 
@@ -62,6 +86,10 @@ async function main() {
   }
 
   const catalog = generateCatalog({ repoRoot });
+  const service = command === "run" || command === "approval" || command === "ledger" || command === "audit" || command === "doctor"
+    ? createRunService({ repoRoot, catalog })
+    : null;
+  activeService = service;
 
   if (command === "catalog" && subcommand === "list") {
     const capabilities = searchCapabilities(catalog, {
@@ -91,7 +119,9 @@ async function main() {
   }
 
   if (command === "stage" && subcommand === "snapshot") {
-    const snapshot = buildSnapshot({ repoRoot, catalog });
+    const snapshotService = createRunService({ repoRoot, catalog });
+    const snapshot = buildSnapshot({ repoRoot, catalog, store: snapshotService.store });
+    snapshotService.close();
     console.log(JSON.stringify(snapshot, null, 2));
     return 0;
   }
@@ -113,9 +143,111 @@ async function main() {
   }
 
   if (command === "context") {
-    const snapshot = buildSnapshot({ repoRoot, catalog });
+    const contextService = createRunService({ repoRoot, catalog });
+    const snapshot = buildSnapshot({ repoRoot, catalog, store: contextService.store });
+    contextService.close();
     const additionalContext = shortContext(snapshot);
     console.log(JSON.stringify({ additionalContext, systemMessage: `WorkLoom 工作台已就绪：${snapshot.counts.agents} 个数字员工，${snapshot.counts.pendingApprovals} 项待审批（${snapshot.dataMode}）` }, null, 2));
+    return 0;
+  }
+
+  if (command === "run" && subcommand === "start") {
+    const capabilityId = args._[2] ?? args.capability;
+    const result = await service.startRun({
+      capabilityId,
+      params: parseJsonArg(args.params, "--params") ?? {},
+      action: args.action,
+      objectType: args["object-type"],
+      objectId: args["object-id"],
+      effect: args.effect,
+      context: parseJsonArg(args.context, "--context") ?? {},
+      idempotencyKey: args["idempotency-key"],
+    });
+    console.log(JSON.stringify(result, null, 2));
+    service.close();
+    return result.run?.state === "blocked" ? 3 : 0;
+  }
+  if (command === "run" && subcommand === "list") {
+    console.log(JSON.stringify({ runs: service.listRuns() }, null, 2));
+    service.close();
+    return 0;
+  }
+  if (command === "run" && subcommand === "status") {
+    const run = service.getRun(args._[2] ?? args.runId);
+    if (!run) {
+      console.error(`未找到 Run：${args._[2] ?? "(空)"}`);
+      service.close();
+      return 2;
+    }
+    console.log(JSON.stringify(run, null, 2));
+    service.close();
+    return 0;
+  }
+  if (command === "run" && subcommand === "tail") {
+    console.log(JSON.stringify({ runId: args._[2] ?? args.runId, events: service.tailRun(args._[2] ?? args.runId, Number(args.limit ?? 50)) }, null, 2));
+    service.close();
+    return 0;
+  }
+  if (command === "run" && subcommand === "cancel") {
+    const result = service.cancelRun({ runId: args._[2] ?? args.runId, reason: args.reason });
+    console.log(JSON.stringify(result, null, 2));
+    service.close();
+    return 0;
+  }
+  if (command === "approval" && subcommand === "list") {
+    console.log(JSON.stringify({ approvals: service.listApprovals({ status: args.status }) }, null, 2));
+    service.close();
+    return 0;
+  }
+  if (command === "approval" && subcommand === "decide") {
+    const result = await service.decideApproval({
+      approvalId: args._[2] ?? args.approvalId,
+      gesture: {
+        type: args.gesture,
+        reasonEnum: args["reason-enum"],
+        reasonText: args["reason-text"],
+        editedAfter: parseJsonArg(args["edited-after"], "--edited-after"),
+      },
+      role: args.role ?? "owner",
+    });
+    console.log(JSON.stringify(result, null, 2));
+    service.close();
+    return 0;
+  }
+  if (command === "ledger" && subcommand === "verify") {
+    const result = service.verifyLedger();
+    console.log(JSON.stringify(result, null, 2));
+    service.close();
+    return result.ok ? 0 : 1;
+  }
+  if (command === "ledger" && subcommand === "tail") {
+    console.log(JSON.stringify({ events: service.store.listLedger({ since: args.since }).slice(-Number(args.limit ?? 20)) }, null, 2));
+    service.close();
+    return 0;
+  }
+  if (command === "audit") {
+    const raw = await readStdin();
+    let payload = {};
+    try {
+      payload = raw.trim() ? JSON.parse(raw) : {};
+    } catch {
+      payload = { raw: raw.slice(0, 2000), parseError: true };
+    }
+    const eventName = String(payload.hook_event_name ?? args.source ?? "codex-hook");
+    const event = service.store.appendLedger({
+      who: { type: "system", id: "codex-hooks", version: "p1" },
+      context: {
+        tenant_id: "growthtest",
+        workspace_id: catalog.repo.defaultBundle || "geo-growth",
+        time: new Date().toISOString(),
+        channel: "codex-hook",
+      },
+      object: { type: "codex_event", id: String(payload.session_id ?? payload.turn_id ?? eventName) },
+      decision: { action: `codex.${eventName}`, after: { tool: payload.tool_name, cwd: payload.cwd } },
+      rule_impact: [],
+    });
+    console.log(JSON.stringify({ ok: true, eventId: event.event_id, action: event.decision.action }));
+    service.close();
     return 0;
   }
 
@@ -131,6 +263,18 @@ async function main() {
     checks.push({ name: "stage-page", ok: existsSync(gatewayRoot("stage", "index.html")), detail: "stage/index.html" });
     checks.push({ name: "plugin-manifest", ok: existsSync(join(repoRoot, "plugins", "workloom-workbench", ".codex-plugin", "plugin.json")), detail: "plugins/workloom-workbench" });
     checks.push({ name: "plugin-marketplace", ok: existsSync(join(repoRoot, ".agents", "plugins", "marketplace.json")), detail: ".agents/plugins/marketplace.json" });
+    let policyOk = false;
+    let policyDetail = "unavailable";
+    try {
+      const packs = await service.policy.packs();
+      policyOk = packs.activeRules > 0;
+      policyDetail = `${packs.packs.length} 包 / ${packs.activeRules} 规则`;
+    } catch (error) {
+      policyDetail = error instanceof Error ? error.message : String(error);
+    }
+    checks.push({ name: "policy-bridge", ok: policyOk, detail: policyDetail });
+    const ledger = service.verifyLedger();
+    checks.push({ name: "ledger-chain", ok: ledger.ok, detail: ledger.ok ? `${ledger.total} 条 / ${String(ledger.lastHash).slice(0, 12)}…` : `broken at ${ledger.brokenAt}` });
     const failed = checks.filter((check) => !check.ok);
     if (args.json) {
       console.log(JSON.stringify({ ok: failed.length === 0, checks, warnings: catalog.warnings, unparsed: catalog.unparsed }, null, 2));
@@ -147,9 +291,11 @@ async function main() {
 
 main()
   .then((code) => {
+    activeService?.close();
     if (typeof code === "number") process.exitCode = code;
   })
   .catch((error) => {
+    activeService?.close();
     console.error(error instanceof Error ? error.stack ?? error.message : String(error));
     process.exitCode = 1;
   });

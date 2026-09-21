@@ -33,3 +33,22 @@ sh plugins/workloom-workbench/scripts/start-mcp.sh
 ## P0 边界
 
 只读。没有 run/approval 写工具；不会启动任务、不会审批、不会写业务数据。
+
+## P1：写工具的 Codex 层授权（真机实测结论）
+
+P1 起网关提供受控写工具（`workloom_run_start` / `workloom_approval_decide` / `workloom_run_cancel` 等），
+它们被注解为 `readOnlyHint:false`。Codex 会按 MCP 审批策略处理：
+
+- **交互式 Codex（推荐）**：保持默认或设 `default_tools_approval_mode="writes"`，让 Codex 在会话里弹审批；人批准后才调用网关。
+- **无人值守（codex exec/CI）**：`codex exec` 默认审批策略是 `never`，写工具会被 Codex 层直接拒绝
+  （实测报错：`MCP tool call requires approval, but approval policy is never`）。
+  如确实需要无人值守跑通，可显式配置：
+
+  ```toml
+  [mcp_servers.workloom-core]
+  default_tools_approval_mode = "auto"
+  ```
+
+  这样 Codex 层不再拦截，但**网关内部的围栏与人审仍然强制生效**：G9 公网发布、G12 加投等会进入
+  `waiting_approval`，必须由人调用 `workloom_approval_decide`（或在工作台三手势）后才继续。
+  严禁把 `auto` 用在"绕过网关围栏"的工具上；网关的围栏/审批/回执才是强制边界，Codex 审批策略只是第一道门。
