@@ -17,6 +17,7 @@ import { installConfirmationHandler, type ConfirmationHandler } from "./confirma
 import { resolveGate, type GateVerdict } from "./gates.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { createPortraitRuntime, type PortraitRuntimeOptions } from "./portrait-runtime.js";
+import { installVendorConfigIsolatorBridge, installVendorPhaseDiagnosticsBridge } from "./vendor-compat.js";
 
 /** vendor 引擎暴露的最小结构（HyperrealitySystem 实例方法） */
 interface HyperrealitySystemLike {
@@ -166,6 +167,14 @@ export class VideoStudio {
     };
 
     const uninstall = installConfirmationHandler(handler);
+    /**
+     * 注入依赖保活（vendor ConfigIsolator 会摊平类实例，见 vendor-compat.ts）：
+     * 必须在本实例装配之前打上，否则注入的 LLM 引擎在隔离后变成"空心对象"，
+     * 链路最开头的创意主题生成器会静默降级成规则兜底（真机 2026-09-22 事故）。
+     */
+    const uninstallIsolator = installVendorConfigIsolatorBridge();
+    /** 阶段异常栈诊断：Phase 3/3.5 失败时把栈写进 run 日志（vendor 只打 message，真机无法定位行号） */
+    const uninstallPhaseDiagnostics = installVendorPhaseDiagnosticsBridge({ log });
 
     // 与 vendor CLI（app/commands/preproduction.js）保持同一装配口径
     process.env.STORMAXE_TOTAL_DEADLINE_MS =
@@ -256,6 +265,8 @@ export class VideoStudio {
       });
       throw err;
     } finally {
+      uninstallPhaseDiagnostics();
+      uninstallIsolator();
       uninstall();
     }
   }

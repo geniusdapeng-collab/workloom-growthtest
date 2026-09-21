@@ -1,0 +1,421 @@
+/**
+ * shot-spec.ts —— 镜头卡字段规范（内容镜 25 字段 / 片头 30 字段）与交付闸
+ *
+ * 真机背景（2026-09-22 审计 VID-1019）：
+ *  1. 管线产出的**内容镜头 `prompt` 为空**（`productionEngine.prompts[].prompt === ''`）：
+ *     `index.js:1519-1533` 的"按 25 字段重算 prompt"依赖 `shot.fields`，而标准镜头卡里没有该字段，
+ *     重算被跳过 → `DualArraySync` 把空 `prompt` 覆盖到 prompts 数组。只有片头镜头在
+ *     `_optimizeOpeningTitle` 后被重新组装，所以 S1 有 prompt、其余为空。
+ *  2. 我方出片工具当时用自写短提示词（400–900 字）直接提交，既低于 `prompt-length.js` 的
+ *     `REFINED_MIN=1200`，也**丢掉片头 5 个专属字段**（片头规则在渲染接缝失效）。
+ *
+ * 本模块把"规范"完全交给 vendor 唯一真源，不在 TS 层复制任何字面值：
+ *  · 字段规范      ← `engines/field-standardizer.js`（CRITICAL_FIELDS / standardizeShot / validateShot）
+ *  · 组装器        ← `engines/production-engine/agents/prompt-fusion-agent.js`（_assembleStandardPrompt）
+ *  · 交付闸        ← `engines/production-engine/agents/prompt-delivery-guard.js`（verify：25/30 字段 + 长度 + 台词 + 锚点）
+ *  · 长度口径      ← `config/prompt-length.js`（TARGET_MIN/TARGET_MAX/HARD_MAX/REFINED_MIN）
+ */
+import { existsSync, readFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, resolve as resolvePath } from "node:path";
+import { fileURLToPath } from "node:url";
+
+export interface FieldSpec {
+  p0: string[];
+  p1: string[];
+  p2: string[];
+  p3: string[];
+  common: string[];
+  opening: string[];
+  /** 片头专属 5 字段（第 26–30 字段） */
+  openingExclusive: string[];
+  lengths: { targetMin: number; targetMax: number; hardMax: number; refinedMin: number };
+}
+
+export interface ShotSpecReport {
+  shotId: string;
+  isOpening: boolean;
+  durationSec: number;
+  /** 交付用提示词（序号+独立行排版） */
+  prompt: string;
+  /** pipeline = 直接复用管线定稿；assembled = 由 25/30 字段按 vendor 组装器重建 */
+  promptSource: "pipeline" | "assembled";
+  charCount: number;
+  /** 25 字段里为空的（P0/P1/P2/P3） */
+  missingSpecFields: string[];
+  /** 片头专属 5 字段里为空的 */
+  missingOpeningFields: string[];
+  /** vendor PromptDeliveryGuard 判定 */
+  delivery: { pass: boolean; issues: string[] };
+  degraded: boolean;
+  degradeReason: string;
+  /** 内容红线命中（实验车道：科幻/微观等与 brief 无关的意象） */
+  redlines: string[];
+}
+
+export interface PrepareOptions {
+  /** 画幅（写入【约束】段），默认 9:16 */
+  ratio?: string;
+  /** 分辨率（写入【约束】段），默认 1080x1920（竖版） */
+  resolution?: string;
+  /**
+   * 内容红线词表（默认取自 vendor `field-standardizer` 的 scene 禁词 + 本车道补充观察到的漂移词）。
+   * 命中即判不合格，除非在 `allowRedlines` 中显式放行。
+   */
+  redlineWords?: string[];
+  allowRedlines?: string[];
+  log?: (line: string) => void;
+}
+
+/**
+ * 【约束】段画幅归一。
+ *
+ * 真机发现（2026-09-22）：`PromptFusionAgent` 构造 `FieldContentRefiner` 时**硬编码**
+ * `constraintTemplate: '16:9画幅，8K分辨率，24fps，MP4格式'`；只有当平台蓝图被判为
+ * 社媒营销包（`isSocialCommerce(profile)`）时才改用 `constraintTemplateOf(profile)`。
+ * 我们的竖版 9:16 项目在电影叙事画像下会拿到 16:9 的【约束】，与实际提交参数矛盾
+ * （API 层 ratio 仍按 9:16 出片，但提示词自相矛盾）。这里按**实际提交参数**归一该段。
+ */
+export function normalizeConstraintSegment(
+  prompt: string,
+  ratio: string,
+  resolution: string
+): { prompt: string; changed: boolean; from: string | null } {
+  const match = prompt.match(/【约束】([^\n|]*)/);
+  if (!match) return { prompt, changed: false, from: null };
+  const current = match[1]?.trim() ?? "";
+  const target = `${ratio}画幅，${resolution}，24fps，MP4格式`;
+  if (current.includes(`${ratio}画幅`)) return { prompt, changed: false, from: current };
+  return {
+    prompt: prompt.replace(match[0], `【约束】${target}`),
+    changed: true,
+    from: current
+  };
+}
+
+/** 供应商常用 "1080p"/"720p" 口径 → 具体像素（按画幅推导；已是 WxH 的原样返回） */
+export function resolutionToPixels(resolution: string, ratio: string): string {
+  if (/^\d+\s*[x×]\s*\d+$/.test(resolution)) return resolution.replace(/\s*[x×]\s*/, "x");
+  const match = resolution.match(/^(\d+)p$/i);
+  if (!match) return resolution;
+  const short = Number(match[1]);
+  const [w, h] = ratio.split(":").map(Number);
+  if (!w || !h) return `${short}x${short}`;
+  const long = Math.round((short * Math.max(w, h)) / Math.min(w, h));
+  return w >= h ? `${long}x${short}` : `${short}x${long}`;
+}
+
+interface VendorFieldStandardizer {
+  CRITICAL_FIELDS: {
+    p0: string[]; p1: string[]; p2: string[]; p3: string[];
+    common: string[]; opening: string[]; content: string[];
+  };
+  standardizeShot(shot: Record<string, unknown>): Record<string, unknown>;
+  validateShot(shot: Record<string, unknown>, options?: Record<string, unknown>): {
+    passed: boolean; errors: string[]; warnings: string[]; p0Missing: number; p1Missing: number; promptLength: number;
+  };
+  isOpeningShot(shot: Record<string, unknown>): boolean;
+  FIELD_NAME_CN: Record<string, string>;
+}
+
+interface VendorFusionAgent {
+  _assembleStandardPrompt(shot: Record<string, unknown>, fields: Record<string, unknown>, ratio: string): string;
+  _parseUnifiedDialogueString(dialogueStr: string): Array<Record<string, unknown>>;
+}
+
+interface VendorDeliveryGuard {
+  verify(promptText: string, shot: Record<string, unknown>): {
+    pass: boolean; issues: string[]; fieldCount?: number; charCount?: number;
+  };
+}
+
+const FALLBACK_OPENING_EXCLUSIVE = [
+  "title_content", "subtitle_content", "title_animation", "title_font_design", "opening_audio_design"
+];
+
+/** 实验车道补充红线：真机里出现过的、与行业 brief 无关的意象（vendor 禁词表之外） */
+const EXTRA_REDLINE_WORDS = ["细胞质", "核糖体", "微管", "显微镜", "量子", "黑洞", "元宇宙", "数据空间"];
+
+let vendorCache: {
+  standardizer: VendorFieldStandardizer;
+  fusionCtor: new (options?: Record<string, unknown>) => VendorFusionAgent;
+  guardCtor: new () => VendorDeliveryGuard;
+  spec: FieldSpec;
+} | null = null;
+
+function repoRoot(): string {
+  const here = dirname(fileURLToPath(import.meta.url));
+  return resolvePath(here, "../../..");
+}
+
+function vendorRequire(): NodeRequire {
+  return createRequire(resolvePath(repoRoot(), "package.json"));
+}
+
+function vendorPath(relative: string): string {
+  return resolvePath(repoRoot(), "vendor/supermickey/hyperreality-system", relative);
+}
+
+/** 从 vendor 源码里解析片头专属 5 字段（避免在 TS 层复制规范字面值） */
+function readOpeningExclusive(standardizerPath: string): string[] {
+  try {
+    const source = readFileSync(standardizerPath, "utf8");
+    const match = source.match(/const openingExclusiveFields = \[([^\]]+)\]/);
+    if (!match) return FALLBACK_OPENING_EXCLUSIVE;
+    const body = match[1] ?? "";
+    const keys = [...body.matchAll(/'([^']+)'|"([^"]+)"/g)]
+      .map((m) => m[1] ?? m[2])
+      .filter((key): key is string => Boolean(key));
+    return keys.length > 0 ? keys : FALLBACK_OPENING_EXCLUSIVE;
+  } catch {
+    return FALLBACK_OPENING_EXCLUSIVE;
+  }
+}
+
+function loadVendor() {
+  if (vendorCache) return vendorCache;
+  const req = vendorRequire();
+  const standardizerPath = vendorPath("engines/field-standardizer.js");
+  if (!existsSync(standardizerPath)) {
+    throw new Error(`字段规范真源缺失：${standardizerPath}（vendor 只读基线不在位）`);
+  }
+  const standardizer = req(standardizerPath) as VendorFieldStandardizer;
+  const lengthCfg = req(vendorPath("config/prompt-length.js")) as {
+    TARGET_MIN: number; TARGET_MAX: number; HARD_MAX: number; REFINED_MIN: number;
+  };
+  const fusionMod = req(vendorPath("engines/production-engine/agents/prompt-fusion-agent.js")) as {
+    PromptFusionAgent: new (options?: Record<string, unknown>) => VendorFusionAgent;
+  };
+  const guardMod = req(vendorPath("engines/production-engine/agents/prompt-delivery-guard.js")) as {
+    PromptDeliveryGuard: new () => VendorDeliveryGuard;
+  };
+
+  const spec: FieldSpec = {
+    p0: [...standardizer.CRITICAL_FIELDS.p0],
+    p1: [...standardizer.CRITICAL_FIELDS.p1],
+    p2: [...standardizer.CRITICAL_FIELDS.p2],
+    p3: [...standardizer.CRITICAL_FIELDS.p3],
+    common: [...standardizer.CRITICAL_FIELDS.common],
+    opening: [...standardizer.CRITICAL_FIELDS.opening],
+    openingExclusive: readOpeningExclusive(standardizerPath),
+    lengths: {
+      targetMin: lengthCfg.TARGET_MIN,
+      targetMax: lengthCfg.TARGET_MAX,
+      hardMax: lengthCfg.HARD_MAX,
+      refinedMin: lengthCfg.REFINED_MIN
+    }
+  };
+  vendorCache = {
+    standardizer,
+    fusionCtor: fusionMod.PromptFusionAgent,
+    guardCtor: guardMod.PromptDeliveryGuard,
+    spec
+  };
+  return vendorCache;
+}
+
+/** 字段规范快照（25 字段 + 片头 5 专属 + 长度口径），全部来自 vendor 真源 */
+export function fieldSpec(): FieldSpec {
+  return loadVendor().spec;
+}
+
+/** 25 字段的完整键列表（含 common 之外的 P0–P3 与片头 two title 字段） */
+export function specFieldKeys(includeOpeningExtras = false): string[] {
+  const spec = fieldSpec();
+  const keys = [...spec.p0, ...spec.p1, ...spec.p2, ...spec.p3, ...spec.opening];
+  return includeOpeningExtras ? [...keys, ...spec.openingExclusive] : keys;
+}
+
+function isEmptyValue(value: unknown): boolean {
+  if (value === undefined || value === null) return true;
+  if (typeof value === "string") return value.trim() === "";
+  if (Array.isArray(value)) return value.length === 0;
+  if (typeof value === "object") return Object.keys(value as Record<string, unknown>).length === 0;
+  return false;
+}
+
+/**
+ * 台词块归一：把镜头卡里的台词数据整理成 vendor 交付格式 `dialogueBlocks`。
+ *
+ * 为什么必须做（真机 2026-09-22）：组装器只在 `shot.dialogueBlocks` 存在时渲染
+ * 「【台词】[Ns-Ms] 角色 触发, 情绪副词 说:"…"」；否则走旧回退把 `dialogue` 数组
+ * `String()` 成 `[object Object]`，被交付闸判「台词格式不规范」。而 vendor 的标准镜头卡
+ * （`standardizeShot` 产物）里根本没有 `dialogueBlocks` 键——台词在管线里注定丢失。
+ * 这里优先复用 vendor 自己的 `_parseUnifiedDialogueString`（`SPEAKER|TYPE|EMOTION|TEXT|LIP_SYNC:YES`）。
+ */
+export function normalizeDialogueBlocks(
+  card: Record<string, unknown>,
+  fusion: Pick<VendorFusionAgent, "_parseUnifiedDialogueString">
+): Array<Record<string, unknown>> {
+  const explicit = card.dialogueBlocks;
+  if (Array.isArray(explicit) && explicit.length > 0) {
+    return explicit as Array<Record<string, unknown>>;
+  }
+  const dialogue = card.dialogue;
+  const entries: unknown[] = Array.isArray(dialogue) ? dialogue : dialogue ? [dialogue] : [];
+  const blocks: Array<Record<string, unknown>> = [];
+  for (const entry of entries) {
+    if (typeof entry === "string") {
+      const parsed = fusion._parseUnifiedDialogueString(entry);
+      if (parsed.length > 0) blocks.push(...parsed);
+      else if (entry.trim()) blocks.push({ speaker: "角色", line: entry.trim(), emotion: "平静地", trigger: "看向对方" });
+      continue;
+    }
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    const text = typeof record.text === "string" ? record.text : typeof record.line === "string" ? record.line : "";
+    if (!text.trim()) continue;
+    if (text.includes("|")) {
+      const parsed = fusion._parseUnifiedDialogueString(text);
+      if (parsed.length > 0) {
+        blocks.push(...parsed.map((block) => ({
+          trigger: record.trigger ?? "看向对方",
+          ...block
+        })));
+        continue;
+      }
+    }
+    blocks.push({
+      speaker: record.speaker ?? "角色",
+      line: text.trim(),
+      emotion: record.emotion ?? "平静地",
+      trigger: record.trigger ?? "看向对方"
+    });
+  }
+  return blocks;
+}
+
+/**
+ * 把镜头卡准备成"可交付的提示词 + 规范报告"。
+ *
+ * 规则（不劣化优先）：
+ *  1. 管线定稿 `prompt` 若已达标（过 vendor 交付闸）→ 直接复用（promptSource=pipeline）；
+ *  2. 否则用 vendor 组装器按 25/30 字段重建（promptSource=assembled）；
+ *  3. 两条路径都要过 vendor 交付闸；不过则如实列出 issues（调用方不得提交）。
+ */
+export function prepareShotPrompt(
+  card: Record<string, unknown>,
+  options: PrepareOptions = {}
+): ShotSpecReport {
+  const { standardizer, fusionCtor, guardCtor, spec } = loadVendor();
+  const ratio = options.ratio ?? "9:16";
+  const resolution = resolutionToPixels(
+    options.resolution ?? (ratio === "9:16" ? "1080x1920" : "1920x1080"),
+    ratio
+  );
+  const log = options.log ?? (() => undefined);
+  const std = standardizer.standardizeShot(card) as Record<string, unknown>;
+  const isOpening = Boolean(standardizer.isOpeningShot(std)) || std.sceneType === "opening";
+  const shotId = String(std.shotId ?? card.shotId ?? "");
+  const durationSec = Number(std.duration ?? card.duration ?? 0) || 0;
+
+  const fields: Record<string, unknown> = {};
+  /**
+   * 取值口径：标准化产物优先，但它可能把合法输入"标准化成空"——
+   * 例如 `normalizeTimeline` 对字符串时间轴返回 `[]`（真机 2026-09-22 实测）。
+   * 因此统一走 `effective()`：标准值为空时回落到原始镜头卡取值。
+   */
+  const effective = (key: string): unknown => {
+    const normalized = std[key];
+    if (!isEmptyValue(normalized)) return normalized;
+    const raw = (card as Record<string, unknown>)[key];
+    return isEmptyValue(raw) ? undefined : raw;
+  };
+  for (const key of specFieldKeys(true)) {
+    const value = effective(key);
+    if (!isEmptyValue(value)) fields[key] = value;
+  }
+
+  const guard = new guardCtor();
+  const fusion = new fusionCtor({ semanticRefinement: false });
+  const dialogueBlocks = normalizeDialogueBlocks(card, fusion);
+  const assemblyShot: Record<string, unknown> = dialogueBlocks.length > 0
+    ? { ...std, dialogueBlocks }
+    : std;
+
+  const pipelinePrompt = typeof std.prompt === "string" ? std.prompt.trim() : "";
+  let prompt = "";
+  let promptSource: ShotSpecReport["promptSource"] = "assembled";
+  if (pipelinePrompt) {
+    const verdict = guard.verify(pipelinePrompt, assemblyShot);
+    if (verdict.pass) {
+      prompt = pipelinePrompt;
+      promptSource = "pipeline";
+    }
+  }
+  if (!prompt) {
+    prompt = fusion._assembleStandardPrompt(assemblyShot, fields, ratio);
+  }
+  const constraint = normalizeConstraintSegment(prompt, ratio, resolution);
+  if (constraint.changed) {
+    log(
+      `[shot-spec] ${shotId} 【约束】画幅归一：${constraint.from || "（空）"} → ${ratio}画幅，${resolution}`
+      + "（vendor 在电影叙事画像下硬编码 16:9，按实际提交参数纠正）"
+    );
+    prompt = constraint.prompt;
+  }
+
+  const delivery = guard.verify(prompt, assemblyShot);
+  const missingSpecFields = [...spec.p0, ...spec.p1, ...spec.p2, ...spec.p3]
+    .filter((key) => isEmptyValue(effective(key)));
+  const missingOpeningFields = isOpening
+    ? spec.openingExclusive.filter((key) => isEmptyValue(effective(key)))
+    : [];
+
+  const redlineWords = options.redlineWords
+    ?? [...EXTRA_REDLINE_WORDS];
+  const allow = new Set(options.allowRedlines ?? []);
+  const haystack = [
+    std.scene, std.sceneDescription, std.action, std.character, std.costume, std.props, std.dialogue, std.title, std.subtitle
+  ]
+    .map((value) => (typeof value === "string" ? value : JSON.stringify(value ?? "")))
+    .join(" ");
+  const redlines = redlineWords.filter((word) => word && haystack.includes(word) && !allow.has(word));
+
+  if (redlines.length > 0) {
+    log(`[shot-spec] ${shotId} 命中内容红线：${redlines.join("、")}（提交前必须处理或显式放行）`);
+  }
+
+  return {
+    shotId,
+    isOpening,
+    durationSec,
+    prompt,
+    promptSource,
+    charCount: prompt.length,
+    missingSpecFields,
+    missingOpeningFields,
+    delivery: { pass: delivery.pass, issues: delivery.issues },
+    degraded: Boolean(std.degraded),
+    degradeReason: String(std.degradeReason ?? ""),
+    redlines
+  };
+}
+
+/** 规范报告的 Markdown 表格（出片报告 / 审计报告共用） */
+export function shotSpecMarkdown(reports: ShotSpecReport[]): string {
+  const spec = fieldSpec();
+  const lines = [
+    `> 字段规范来源：vendor field-standardizer（25 字段 = P0 ${spec.p0.length} + P1 ${spec.p1.length} + P2 ${spec.p2.length} + P3 ${spec.p3.length}；片头 +${spec.openingExclusive.length} 专属 = 30）；`
+    + `长度口径 ${spec.lengths.refinedMin}–${spec.lengths.hardMax} 字（目标 ${spec.lengths.targetMin}–${spec.lengths.targetMax}）`,
+    "",
+    "| 镜头 | 类型 | 字数 | 来源 | 25字段缺 | 片头5字段缺 | 交付闸 | 红线 |",
+    "|---|---|---:|---|---:|---:|---|---|",
+    ...reports.map((r) =>
+      `| ${r.shotId} | ${r.isOpening ? "片头(30)" : "内容(25)"} | ${r.charCount} | ${r.promptSource} | `
+      + `${r.missingSpecFields.length}${r.missingSpecFields.length ? `（${r.missingSpecFields.slice(0, 3).join("、")}${r.missingSpecFields.length > 3 ? "…" : ""}）` : ""} | `
+      + `${r.isOpening ? r.missingOpeningFields.length : "—"} | `
+      + `${r.delivery.pass ? "pass" : `fail(${r.delivery.issues.length})`} | ${r.redlines.length ? r.redlines.join("、") : "—"} |`
+    ),
+    ""
+  ];
+  const problems = reports.filter((r) => !r.delivery.pass || r.redlines.length > 0 || r.missingSpecFields.length > 0);
+  if (problems.length > 0) {
+    lines.push("**未通过明细**", "");
+    for (const r of problems) {
+      lines.push(`- ${r.shotId}：${[...r.delivery.issues, ...r.redlines.map((w) => `内容红线命中「${w}」`)].join("；") || `缺字段 ${r.missingSpecFields.join("、")}`}`);
+    }
+    lines.push("");
+  }
+  return lines.join("\n");
+}

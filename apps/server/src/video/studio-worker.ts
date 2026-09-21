@@ -13,7 +13,7 @@
  *      本工作器以 run 注册表 aborted 位实现同等中止语义（轮询每拍检查）。
  */
 import path from "node:path";
-import { existsSync, readFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { GatewayEventSink, poolFromEnv } from "@workloom/base/model-router";
@@ -64,6 +64,51 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, "../../../..");
 /** 运行产物根（checkpoints/characters/confirmations）：默认仓库根 .vm-work/ */
 const WORK_DIR = process.env.HR_WORK_DIR ?? path.resolve(here, "../../../..", ".vm-work");
+
+/**
+ * 运行日志 tee（2026-09-22 真机审计需求）：
+ * 预生产的 vendor 环节日志此前只进服务端 stdout（TTY），run 结束即丢，事后无法逐环节审计。
+ * 这里在 run 期间把 console 输出旁路落盘到 `.vm-work/logs/<projectId>.log`（原样透传，不改语义），
+ * 供 `scripts/tools/pipeline-audit.mts` 逐环节核对"是否正常产出/是否流转".
+ */
+function teeRunLogs(projectId: string): () => void {
+  const logDir = path.join(WORK_DIR, "logs");
+  const logFile = path.join(logDir, `${projectId}.log`);
+  try {
+    mkdirSync(logDir, { recursive: true });
+  } catch {
+    return () => undefined;
+  }
+  const methods = ["log", "warn", "error"] as const;
+  const originals = methods.map((m) => console[m]);
+  const write = (level: string, args: unknown[]) => {
+    const line = args
+      .map((a) => (typeof a === "string" ? a : a instanceof Error ? `${a.name}: ${a.message}` : (() => {
+        try {
+          return JSON.stringify(a);
+        } catch {
+          return String(a);
+        }
+      })()))
+      .join(" ");
+    try {
+      appendFileSync(logFile, `[${new Date().toISOString()}] ${level} ${line}\n`, "utf8");
+    } catch {
+      /* 日志落盘失败不影响运行 */
+    }
+  };
+  methods.forEach((m, i) => {
+    (console as unknown as Record<string, unknown>)[m] = (...args: unknown[]) => {
+      write(m.toUpperCase(), args);
+      (originals[i] as (...a: unknown[]) => void).apply(console, args);
+    };
+  });
+  return () => {
+    methods.forEach((m, i) => {
+      (console as unknown as Record<string, unknown>)[m] = originals[i];
+    });
+  };
+}
 
 /** 工作器系统身份（事件归因；网关段① human/system 无额外校验） */
 const WORKER_ACTOR = { id: "video-studio", type: "system" } as const;
@@ -291,6 +336,9 @@ export function startRun(scope: Scope, input: RunInput): string {
     maxCharactersPerShot: 1,
     log: (line) => console.log(line),
   });
+  /** run 期间的全部 console 输出落盘（逐环节审计证据；run 结束摘除） */
+  const restoreRunLogs = teeRunLogs(input.projectId);
+  console.log(`[studio-worker] run 日志开始落盘：${path.join(WORK_DIR, "logs", `${input.projectId}.log`)}`);
 
   const entry: RunEntry = {
     runId: newId("RUN"),
@@ -438,6 +486,7 @@ export function startRun(scope: Scope, input: RunInput): string {
       entry.status = "failed";
       entry.error = err instanceof Error ? err.message : String(err);
     } finally {
+      restoreRunLogs();
       uninstallPortraitBinding();
       entry.finishedAt = new Date().toISOString();
     }

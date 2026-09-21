@@ -1,0 +1,159 @@
+import { describe, expect, it } from "vitest";
+import {
+  fieldSpec,
+  normalizeConstraintSegment,
+  prepareShotPrompt,
+  resolutionToPixels,
+  shotSpecMarkdown
+} from "./shot-spec.js";
+
+/** 25 字段的完整内容镜卡片（字段值取自真机形态，长度足够过交付闸） */
+function contentCard(shotId = "S2"): Record<string, unknown> {
+  const long = (label: string) => `${label}：`.padEnd(1) + "细写".repeat(30);
+  return {
+    shotId,
+    sceneType: "establishing",
+    duration: 5,
+    director_instruction: "好莱坞电影级质感，写实风格，8K超高清，自然光造型，克制运镜",
+    constraint: "9:16画幅，1080x1920，24fps，MP4，无文字无水印无字幕",
+    baseline: "8K分辨率，电影级质感，写实，细节丰富，锐利对焦",
+    scene: `${long("苏州园林清晨薄雾与明轩临水")}，白墙灰瓦，池面倒影完整，石板路湿润反光`,
+    lighting: `${long("主光为侧后方晨光穿过窗棂")}，补光来自水面反射，整体明亮清晰`,
+    camera_movement: `${long("0-2s 缓慢横移，2-5s 轻微下压贴近水面")}，稳定器运动，无抖动`,
+    composition: `${long("竖版构图，水面占下半幅，亭台与倒影上下对称")}，主体居中偏上`,
+    color_palette: `${long("墨绿与冷灰为主，暖木色点缀")}，中等饱和度，柔和对比`,
+    depth_of_field: `${long("焦点落在明轩檐角与水面倒影")}，中等景深，前景适度虚化`,
+    character: "旁白: human, 画外音, 无实体形象；住客: human, 年轻中性, 轻装, 背影跟拍",
+    costume: `${long("住客身着浅色亚麻衬衫与深色长裤")}，面料质感真实`,
+    makeup: "素颜或淡妆，妆容自然真实，肤色健康",
+    action: `${long("住客沿回廊缓步而行，指尖轻触木质栏杆")}，动作自然连贯`,
+    props: `${long("檐下风铃、石阶青苔、池边落叶")}，材质真实，位置符合实景`,
+    portraits: ["image://characters/char_002/portraits/char_002-front.png"],
+    /** vendor 交付格式：dialogueBlocks → 【台词】[Ns-Ms] 角色 触发, 情绪副词 说:"…" */
+    dialogueBlocks: [{ speaker: "旁白", line: "园林的清晨，先醒的是水。", emotion: "平静地", trigger: "看向水面" }],
+    dialogue: [{ speaker: "旁白", text: "园林的清晨，先醒的是水。" }],
+    timeline: `${long("0-2s 建立空间关系，2-4s 推进到水面倒影")}，5s 收束于亭台轮廓`,
+    mood: `${long("安静、通透、有呼吸感")}，眼神与呼吸保持平稳，肩颈放松`,
+    pacing: "整体：沉稳中等节奏；开头：平缓引入；中段：自然推进；结尾：平稳收尾",
+    transition: "自然切换，无特效转场，前后镜光线衔接",
+    audio: `${long("环境底噪：水声、鸟鸣、远处人声")}，无明显配乐干扰`,
+    negative: "no text anywhere in frame, no watermark, no logo, no subtitle, no blur, no distortion",
+    bright_constraint: "bright lighting, well-lit scene, clear visibility",
+    character_constraint: "只出现指定角色，禁止其他人物入镜",
+    consistency: "保持角色形象、服装与园林空间跨镜头一致",
+    title: "",
+    subtitle: ""
+  };
+}
+
+/** 片头卡片：25 字段 + 主/副标题 + 5 专属字段（= 30 字段体系） */
+function openingCard(): Record<string, unknown> {
+  return {
+    ...contentCard("S1"),
+    sceneType: "opening",
+    title: "苏州南园宾馆",
+    subtitle: "唯一可以入住的苏州园林",
+    title_content: "苏州南园宾馆：唯一可以入住的苏州园林",
+    subtitle_content: "十全街 · 明轩 · 丽夕阁 · 237 间客房",
+    title_animation: "0-1.5s 光点自门楣汇聚成形，1.5-4s 标题定住，4-5s 与晨雾一同淡出",
+    title_font_design: "宋体骨架的现代衬线体，冷白字身，边缘极淡暖金光晕，字距舒展",
+    opening_audio_design: "0-1s 环境先入（鸟鸣与水声），1s 一记木质钟声，随后低声弦乐铺底"
+  };
+}
+
+describe("字段规范真源", () => {
+  it("从 vendor 读取 25/30 字段与长度口径（不在 TS 层复制字面值）", () => {
+    const spec = fieldSpec();
+    expect(spec.p0).toHaveLength(12);
+    expect(spec.p1).toHaveLength(7);
+    expect(spec.p2).toHaveLength(4);
+    expect(spec.p3).toHaveLength(2);
+    expect(spec.openingExclusive).toHaveLength(5);
+    expect(spec.lengths.refinedMin).toBeGreaterThan(0);
+    expect(spec.lengths.hardMax).toBeGreaterThanOrEqual(3000);
+  });
+
+  it("【约束】画幅归一：纠正 vendor 在叙事画像下硬编码的 16:9", () => {
+    const prompt = "01.【约束】16:9画幅，8K分辨率，24fps，MP4格式。\n02.【场景】园林";
+    const fixed = normalizeConstraintSegment(prompt, "9:16", "1080x1920");
+    expect(fixed.changed).toBe(true);
+    expect(fixed.prompt).toContain("【约束】9:16画幅，1080x1920，24fps，MP4格式");
+    // 已是目标画幅时不重复改写
+    const again = normalizeConstraintSegment(fixed.prompt, "9:16", "1080x1920");
+    expect(again.changed).toBe(false);
+  });
+
+  it("分辨率口径：1080p + 画幅 → 具体像素", () => {
+    expect(resolutionToPixels("1080p", "9:16")).toBe("1080x1920");
+    expect(resolutionToPixels("1080p", "16:9")).toBe("1920x1080");
+    expect(resolutionToPixels("720p", "9:16")).toBe("720x1280");
+    expect(resolutionToPixels("1080x1920", "9:16")).toBe("1080x1920");
+  });
+});
+
+describe("镜头卡交付闸（vendor PromptDeliveryGuard 为准）", () => {
+  it("内容镜头（25 字段齐备）组装出的提示词通过交付闸", () => {
+    const report = prepareShotPrompt(contentCard());
+    expect(report.isOpening).toBe(false);
+    expect(report.missingSpecFields).toEqual([]);
+    expect(report.charCount).toBeGreaterThanOrEqual(fieldSpec().lengths.refinedMin);
+    expect(report.charCount).toBeLessThanOrEqual(fieldSpec().lengths.hardMax);
+    expect(report.delivery.issues).toEqual([]);
+    expect(report.delivery.pass).toBe(true);
+  });
+
+  it("片头镜头缺 5 个专属字段 → 交付闸判 fail（片头 30 字段规则可执行）", () => {
+    const bare = contentCard("S1");
+    bare.sceneType = "opening";
+    const report = prepareShotPrompt(bare);
+    expect(report.isOpening).toBe(true);
+    expect(report.missingOpeningFields.sort()).toEqual(fieldSpec().openingExclusive.slice().sort());
+    expect(report.delivery.pass).toBe(false);
+    expect(report.delivery.issues.join("；")).toContain("片头专属字段");
+  });
+
+  it("片头镜头 30 字段齐备 → 提示词含 5 个片头段落且过闸", () => {
+    const report = prepareShotPrompt(openingCard());
+    expect(report.isOpening).toBe(true);
+    expect(report.missingOpeningFields).toEqual([]);
+    for (const label of ["【主标题内容】", "【副标题内容】", "【标题动画设计】", "【标题字体设计】", "【开场音频设计】"]) {
+      expect(report.prompt).toContain(label);
+    }
+    expect(report.delivery.pass).toBe(true);
+  });
+
+  it("缺 P0 字段（如 scene）→ 交付闸 fail 并列出缺字段", () => {
+    const broken = contentCard();
+    delete broken.scene;
+    const report = prepareShotPrompt(broken);
+    expect(report.missingSpecFields).toContain("scene");
+    expect(report.delivery.pass).toBe(false);
+  });
+
+  it("已达标的管线定稿 prompt 直接复用（不重复组装）", () => {
+    const assembled = prepareShotPrompt(contentCard());
+    const withPrompt = { ...contentCard(), prompt: assembled.prompt };
+    const report = prepareShotPrompt(withPrompt);
+    expect(report.promptSource).toBe("pipeline");
+    expect(report.prompt).toBe(assembled.prompt);
+    expect(report.delivery.pass).toBe(true);
+  });
+
+  it("内容红线：科幻/微观意象命中即不合格，可显式放行", () => {
+    const drifted = contentCard();
+    drifted.scene = "显微镜下细胞质，推入1927年蒋公馆雕花红木桌椅";
+    const hit = prepareShotPrompt(drifted);
+    expect(hit.redlines.length).toBeGreaterThan(0);
+
+    const allowed = prepareShotPrompt(drifted, { allowRedlines: hit.redlines });
+    expect(allowed.redlines).toEqual([]);
+  });
+
+  it("规范报告渲染成 Markdown（含片头/内容类型与未通过明细）", () => {
+    const reports = [prepareShotPrompt(contentCard("S2")), prepareShotPrompt(openingCard())];
+    const md = shotSpecMarkdown(reports);
+    expect(md).toContain("片头(30)");
+    expect(md).toContain("内容(25)");
+    expect(md).toContain("字段规范来源");
+  });
+});

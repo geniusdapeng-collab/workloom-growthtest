@@ -20,6 +20,80 @@ import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PortraitIndex } from "./portrait-runtime.js";
 
+/**
+ * 注入依赖保活桥（2026-09-22 真机根因）
+ *
+ * 现象：新 run 的日志里，**链路最开头**的创意主题生成器报
+ *   `[CreativeThemeGenerator] ⚠️ LLM 字段提取失败: LLM 引擎无可用调用方法`
+ * 随后主题退化成规则兜底值（类型=艺术实验 / 主题=记忆的碎片 / 时长=50秒），
+ * 整片随之漂移成与 brief 无关的艺术实验叙事。
+ *
+ * 根因：`HyperrealitySystem` 构造函数第一件事是 `ConfigIsolator.isolate(options)`。
+ * 它先试 `structuredClone`（类实例含私有字段/方法会抛错），失败后退化为 `_manualDeepClone`，
+ * 而后者把**任何对象**都摊平成普通对象 —— 宿主注入的 LLM 引擎实例因此丢掉
+ * `reason/chat/generate` 等方法，只剩一个"真值但空心"的对象。
+ * `_resolveLLMEngine()` 又优先返回这个注入值，于是 `CreativeThemeGenerator` 拿到的
+ * 是一个没有可调用方法的引擎（其它 BaseAgent 子类自己 new vendor LLMEngine 才侥幸正常）。
+ *
+ * 处理：把隔离器的"深拷贝"收窄为**只拷贝纯数据**——函数与类实例按引用透传
+ * （Map/Set/Date/RegExp 等内建对象保持原样），既保住隔离语义（配置对象仍是副本），
+ * 又不破坏注入的协作对象。vendor 目录只读，运行时打补丁。
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+function clonePreservingServices<T>(value: T, seen = new WeakMap<object, unknown>()): T {
+  if (value === null || typeof value !== "object") return value;
+  if (typeof value === "function") return value;
+  if (Array.isArray(value)) {
+    if (seen.has(value)) return seen.get(value) as T;
+    const out: unknown[] = [];
+    seen.set(value, out);
+    for (const item of value) out.push(clonePreservingServices(item, seen));
+    return out as unknown as T;
+  }
+  if (!isPlainObject(value)) {
+    // 类实例 / Map / Set / Date / RegExp / 流等：按引用透传（保活）
+    return value;
+  }
+  if (seen.has(value)) return seen.get(value) as T;
+  const out: Record<string, unknown> = {};
+  seen.set(value, out);
+  for (const [key, item] of Object.entries(value)) out[key] = clonePreservingServices(item, seen);
+  return out as unknown as T;
+}
+
+export function installVendorConfigIsolatorBridge(): () => void {
+  try {
+    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+    const isolatorPath = resolvePath(
+      repoRoot,
+      "vendor/supermickey/hyperreality-system/utils/config-isolator.js"
+    );
+    if (!existsSync(isolatorPath)) return () => undefined;
+    const mod = vendorRequire(isolatorPath) as {
+      ConfigIsolator?: { isolate?: (config: unknown) => unknown };
+    };
+    const isolator = mod?.ConfigIsolator;
+    if (!isolator || typeof isolator.isolate !== "function") return () => undefined;
+    const original = isolator.isolate;
+    isolator.isolate = function patchedIsolate(config: unknown) {
+      if (!config || typeof config !== "object") return original(config);
+      const clone = clonePreservingServices(config);
+      return clone;
+    };
+    return () => {
+      isolator.isolate = original;
+    };
+  } catch {
+    return () => undefined;
+  }
+}
+
 export function installVendorRenderCompatBridge(): () => void {
   try {
     const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
@@ -193,5 +267,64 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
   } catch (err) {
     log(`[vendor-compat] 定妆照绑定桥注入失败（不影响其它桥）：${err instanceof Error ? err.message : String(err)}`);
     return () => undefined;
+  }
+}
+
+/**
+ * 阶段异常栈诊断桥（2026-09-22）
+ *
+ * 真机现象：Phase 3（逐镜提示词融合）抛出 `Assignment to constant variable.`，
+ * 但 vendor 的 catch 只打 `e.message`（`phase-3-prompt-fusion.js:200`），丢掉栈帧 →
+ * 生产环境无法定位文件与行号；结果是 6 个镜头全部退回未融合的规则 Prompt
+ * （`prompt` 字段为空、字段退化为 FieldGuard 默认模板）。
+ *
+ * 本桥在阶段执行体外包一层：异常时把 `err.stack` 完整写进 run 日志（行为不变——仍向上抛，
+ * 由 vendor catch 决定降级），让下一次真机运行能直接读到行号。Phase 3.5 字段质检的
+ * `tl.match is not a function` / `result.reports is not iterable` 也一并捕获。
+ */
+export interface PhaseDiagnosticsBridgeOptions {
+  /** 需要带栈诊断的阶段模块（相对 vendor/supermickey/hyperreality-system 的路径 → 导出类名） */
+  phases?: Array<{ path: string; exportName: string }>;
+  log?: (line: string) => void;
+}
+
+const DEFAULT_PHASE_TARGETS: Array<{ path: string; exportName: string }> = [
+  { path: "engines/production-engine/phases/phase-3-prompt-fusion.js", exportName: "Phase3PromptFusion" },
+  { path: "engines/production-engine/phases/phase-3-5-field-quality.js", exportName: "Phase35FieldQuality" }
+];
+
+export function installVendorPhaseDiagnosticsBridge(options: PhaseDiagnosticsBridgeOptions = {}): () => void {
+  const log = options.log ?? ((line: string) => console.warn(line));
+  const phases = options.phases ?? DEFAULT_PHASE_TARGETS;
+  const restores: Array<() => void> = [];
+  try {
+    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+    for (const phase of phases) {
+      const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system", phase.path);
+      if (!existsSync(file)) continue;
+      const mod = vendorRequire(file) as Record<string, unknown>;
+      const ctor = mod?.[phase.exportName] as { prototype?: Record<string, unknown> } | undefined;
+      const prototype = ctor?.prototype;
+      if (!prototype || typeof prototype.execute !== "function") continue;
+      const original = prototype.execute as (state: unknown) => Promise<unknown>;
+      prototype.execute = async function patchedExecute(this: unknown, state: unknown) {
+        try {
+          return await original.call(this, state);
+        } catch (err) {
+          const error = err instanceof Error ? err : new Error(String(err));
+          log(`[vendor-compat] ${phase.exportName} 抛出异常：${error.message}`);
+          log(`[vendor-compat] ${phase.exportName} 栈：${(error.stack ?? "").split("\n").slice(0, 12).join(" ← ")}`);
+          throw err;
+        }
+      };
+      restores.push(() => {
+        prototype.execute = original;
+      });
+    }
+    return () => restores.forEach((restore) => restore());
+  } catch (err) {
+    log(`[vendor-compat] 阶段诊断桥注入失败（不影响其它桥）：${err instanceof Error ? err.message : String(err)}`);
+    return () => restores.forEach((restore) => restore());
   }
 }
