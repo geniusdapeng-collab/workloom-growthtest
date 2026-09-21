@@ -42,11 +42,29 @@ app.get("/health", (c) => c.json({ ok: true, service: "workloom-im-server" }));
 
 /** tRPC v11 over HTTP（fetch adapter；httpBatchLink 由客户端侧决定） */
 app.all("/trpc/*", async (c) => {
+  const startedAt = Date.now();
   const res = await fetchRequestHandler({
     endpoint: "/trpc",
     req: c.req.raw,
     router: appRouter,
     createContext: () => createContext(c.req.raw),
+    /**
+     * 2026-09-21 真机修复（可观测性）：此前未注册 onError，tRPC 内部异常只回给客户端，
+     * 服务端日志里什么都没有——真机上「require is not defined」这类 500 只能靠客户端提示反推。
+     * 统一落一条结构化错误日志（含过程名/耗时/错误码），让 bootstrap 捕获的 server.log 能自证故障。
+     */
+    onError({ error, path, type, input }) {
+      const code = (error as { code?: string }).code ?? "INTERNAL_SERVER_ERROR";
+      const elapsed = Date.now() - startedAt;
+      const inputSummary = (() => {
+        try {
+          const text = JSON.stringify(input ?? null);
+          return text && text.length > 200 ? `${text.slice(0, 200)}…` : text;
+        } catch { return "<unserializable>"; }
+      })();
+      console.error(`[trpc-error] ${type} ${path ?? "<unknown>"} code=${code} ${elapsed}ms message=${error.message} input=${inputSummary}`);
+      if (code === "INTERNAL_SERVER_ERROR" && error.stack) console.error(error.stack);
+    },
   });
   return res;
 });

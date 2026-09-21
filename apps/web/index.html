@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- HUD 数字 Orbitron + 编号等宽 JetBrains Mono（设计规范 §3；与原型 V4.0 同源引入） -->
-    <link
-      href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=JetBrains+Mono:wght@400;700&display=swap"
-      rel="stylesheet"
-    />
+    <!-- 2026-09-21 真机修复：随包客户端不得依赖外部 CDN。原 Google Fonts 外链
+         （fonts.googleapis.com）在离线/受限网络下必然失败或超时，页面先以回退字体
+         渲染再重排，表现为「字体/页面间歇性异常」。字体栈本身已有完整回退
+         （--wl-font-sans: PingFang SC…；--wl-font-mono: ui-monospace, SFMono-Regular…），
+         故直接移除外链，不改变排版口径。 -->
     <title data-workloom-product-title>数字员工 B 端工作台</title>
   </head>
   <body>

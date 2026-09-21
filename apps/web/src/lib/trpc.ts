@@ -49,7 +49,14 @@ export function setRefreshToken(token: string): void { localStorage.setItem(REFR
  * 进入配置引导（/onboarding）时才引导正式登录。游客令牌由 accounts.auth.guestEnter
  * 签发（readonly 角色；服务端 writeProcedure 403 一切写操作——体验全程零写入）。 */
 const GUEST_KEY = storageKey("guest");
-export function isGuest(): boolean { return !LOCAL_FULL && localStorage.getItem(GUEST_KEY) === "1"; }
+/**
+ * 2026-09-21 真机修复（升级路径）：游客标记描述的是「当前令牌就是游客令牌」，与构建口径无关。
+ * 旧实现写成 `!LOCAL_FULL && guestFlag`，于是本机全量客户端（VITE_WORKLOOM_LOCAL_FULL=1）
+ * 会把上一次装机残留的游客令牌（role=readonly）误判为正式会话：
+ * ensureDemoLogin → `if (!isGuest() && await validateStoredSession()) return;` 直接返回，
+ * 令牌不升级 → 派活/推进/审批/模式切换继续 403。改为只认令牌标记，游客令牌必然被升级。
+ */
+export function isGuest(): boolean { return localStorage.getItem(GUEST_KEY) === "1"; }
 export function clearGuestFlag(): void { localStorage.removeItem(GUEST_KEY); }
 
 function setGuestToken(token: string): void {
