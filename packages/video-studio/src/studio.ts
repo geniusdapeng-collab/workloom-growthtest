@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 import { installConfirmationHandler, type ConfirmationHandler } from "./confirmation.js";
 import { resolveGate, type GateVerdict } from "./gates.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
+import { createPortraitRuntime, type PortraitRuntimeOptions } from "./portrait-runtime.js";
 
 /** vendor 引擎暴露的最小结构（HyperrealitySystem 实例方法） */
 interface HyperrealitySystemLike {
@@ -59,6 +60,11 @@ export type EventSink = (event: {
   payload?: Record<string, unknown>;
 }) => void | Promise<void>;
 
+/** 定妆照真实出图配置（StudioConfig.portraits 口径；workDir/projectId 由 studio 运行期补齐） */
+export type StudioPortraitConfig =
+  | (Omit<PortraitRuntimeOptions, "workDir" | "projectId" | "log"> & { enabled?: true })
+  | { enabled: false };
+
 export interface StudioConfig {
   llm: WorkloomLLMEngine;
   /** 项目工作目录（checkpoints / characters / confirmations 等运行产物根） */
@@ -68,6 +74,19 @@ export interface StudioConfig {
   /** 总截止（毫秒），默认 1 小时，与 vendor 默认一致 */
   totalDeadlineMs?: number;
   llmTimeoutMs?: number;
+  /**
+   * 定妆照真实出图（火山方舟 Seedream）。缺省或 `enabled:false` 时保持 vendor 默认：
+   * interactive + spec（只出规格包，不出图）——那是"等人确认"的旧口径，全自动预生产必须开启。
+   */
+  portraits?: StudioPortraitConfig;
+  /**
+   * 渲染移交宿主 render-operator（融合设计 §6：vendor 只做预生产，渲染由 render-operator
+   * 按 G8 围栏提交）。true 时 vendor Layer 3 只做校验不提交 —— 避免同一批镜头被
+   * vendor 与宿主各提交一次、双份烧额度。
+   */
+  deferRender?: boolean;
+  /** 运行期日志（默认 console.log） */
+  log?: (line: string) => void;
 }
 
 export interface RunInput {
@@ -111,6 +130,7 @@ export class VideoStudio {
    */
   async runPreproduction(input: RunInput): Promise<PreproductionResult> {
     const { cfg } = this;
+    const log = cfg.log ?? ((line: string) => console.log(line));
     const require = createRequire(import.meta.url);
     const { HyperrealitySystem } = require(resolveVendorEntry()) as {
       HyperrealitySystem: HyperrealitySystemCtor;
@@ -151,9 +171,35 @@ export class VideoStudio {
     process.env.STORMAXE_TOTAL_DEADLINE_MS =
       process.env.STORMAXE_TOTAL_DEADLINE_MS ?? String(cfg.totalDeadlineMs ?? 3_600_000);
 
+    /**
+     * 项目产物目录：checkpoints / characters / 渲染输出一律收在同一 workDir 下。
+     * vendor 的三个引擎各自读 `options.<engine>.charactersDir`（顶层 charactersDir 不生效），
+     * 必须逐个显式下发，否则引擎回落到 vendor 仓库自带的 characters/，定妆照与绑定清单会对不上。
+     */
+    const charactersDir = path.join(cfg.workDir, "characters", input.projectId);
+    const renderOutputDir = path.join(cfg.workDir, "video-output", input.projectId);
+
+    /**
+     * 定妆照真实出图（2026-09-21 真机修复）：不开则 vendor 停在 interactive+spec →
+     * completedPortraits=0 → 渲染门 BINDING_MANIFEST_INVALID。
+     */
+    const portraitCfg = cfg.portraits;
+    const portraitRuntime = portraitCfg && portraitCfg.enabled !== false && portraitCfg.apiKey
+      ? createPortraitRuntime({
+          ...portraitCfg,
+          workDir: cfg.workDir,
+          projectId: input.projectId,
+          log
+        })
+      : null;
+    if (portraitCfg && portraitCfg.enabled !== false && !portraitCfg.apiKey) {
+      log("[studio] 定妆照真实出图未启用：缺少图像模型密钥（保持 vendor 规格包口径，不出图）");
+    }
+
     const system = new HyperrealitySystem({
       llmEngine: cfg.llm,
       productionEngine: {
+        charactersDir,
         agentConfig: {
           enableLLMAgents: true,
           llmTimeout: cfg.llmTimeoutMs ?? 180_000,
@@ -166,12 +212,34 @@ export class VideoStudio {
           enableResume: true
         }
       },
-      charactersDir: path.join(cfg.workDir, "characters", input.projectId)
+      scriptEngine: { charactersDir },
+      renderingEngine: { charactersDir, outputDir: renderOutputDir },
+      charactersDir
     });
 
     await emit({ kind: "pipeline.started", projectId: input.projectId, runId: null });
     try {
-      const result = await system.create(input.intent, input.metadata ?? {}, {});
+      /**
+       * vendor create 的第三参是"运行期开关"（batchMode/portraitExecutor/portraitRuntime/dryRun/skipRender）。
+       * deferRender=true 时 Layer 3 不提交（渲染由宿主 render-operator 走 G8 围栏提交），
+       * 避免 vendor 与宿主对同一批镜头各提交一次、双份烧额度。
+       */
+      const createOptions: Record<string, unknown> = {};
+      if (cfg.deferRender === true) createOptions.skipRender = true;
+      if (portraitRuntime) {
+        createOptions.batchMode = true;
+        createOptions.portraitExecutor = "api";
+        createOptions.portraitRuntime = portraitRuntime;
+        const modelName = portraitCfg && portraitCfg.enabled !== false ? portraitCfg.model : "未指定模型";
+        log(`[studio] 定妆照真实出图已启用（${modelName}，产物根 ${charactersDir}）`);
+      }
+      const result = await system.create(input.intent, input.metadata ?? {}, createOptions);
+      if (portraitRuntime) {
+        const index = portraitRuntime.snapshot();
+        const characters = Object.keys(index.characters).length;
+        const products = Object.keys(index.products).length;
+        log(`[studio] 定妆照索引落盘：${portraitRuntime.indexPath()}（角色 ${characters} / 商品 ${products}）`);
+      }
       await emit({
         kind: result.success ? "pipeline.finished" : "pipeline.failed",
         projectId: input.projectId,
