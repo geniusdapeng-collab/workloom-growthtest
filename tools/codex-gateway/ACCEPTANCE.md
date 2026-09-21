@@ -94,3 +94,22 @@ codex exec -C <growthtest> -s read-only --skip-git-repo-check --json \
 6. **KPI/额度真假混层**：切到 `simulated` 后仍显示夹具 KPI/额度。**处置**：有真实状态时隐藏夹具指标，显示"暂无真实 KPI/额度"。
 7. **`loadFencePack` 不兼容 G*/G-GEO* 规则号**：其 zod 只接受 R 号，直接抛错。**处置**：策略桥复用 `apps/server/src/trpc/router.ts` 的裸 YAML + `fenceRulesOf` 口径，不改基座。
 8. **CLI 子进程泄漏**：doctor 创建策略桥后未关闭，CLI 无法退出。**处置**：统一 `activeService` 退出清理。
+
+---
+
+## P2 验收记录（React 工作台页，2026-09-22）
+
+- 新增 `apps/web/src/pages/codex-workbench/CodexWorkbench.tsx`，并在受管 `App.tsx` 注册路由 `/codex-workbench`（实验副本内允许；不回流基座）。
+- 页面内容：真实数据模式徽章、73 员工/在岗/待输入/阻塞/待审批/Run 计数、内嵌 `http://127.0.0.1:4310/stage` 数字人工作台；网关未启动时显示明确错误与启动命令。
+- 验证：`pnpm -C apps/web typecheck` 通过；Vite dev（WEB_PORT=3620，proxy→SERVER_PORT=9397）真机打开 `/codex-workbench`，Chrome 无障碍树确认：外层页面计数 73/25/1/0/2/2，内嵌舞台 `dataMode=real`、真实 ticker（visibility-watcher / company-ceo / review-analyst 等）、theater 待决 captain 1 / chairman 2。
+- 边界：该页只读；写操作仍由 Codex 或数字人工作台经能力网关发起（先围栏、后人审、五元事件、回执）。
+
+## P3 验收记录（真实数据接入，2026-09-22）
+
+- **独立业务库**：在本地 Postgres 55432 实例上创建 `workloom_growthtest`（与同实例的 growth 库隔离）；`.env` 本地生成（gitignored，复用本机凭据，改库名与端口 SERVER_PORT=9397 / WEB_PORT=3620，不打印任何密钥）。
+- **迁移与种子**：`pnpm db:migrate` 应用 38 个迁移文件；`pnpm db:seed` 灌入 27 名数字员工（组合上岗 73 岗）、77 条围栏、77 个技能、60 条五元事件（哈希链）、3 项待批请示、14 个触发器、夜班班次与双域演示数据。
+- **真实 tRPC**：growthtest server 运行在 127.0.0.1:9397；`auth.loginAs`（geo-growth / MEM-G01）→ `roster.list` 返回 73 名真实员工（online/status/stats/fenceBindings）→ `captain.theater` 返回 14 条真实 ticker、`mode=trial`、`pendingByTier={l2_captain:1,l4_chairman:2}`。
+- **网关投影**：`WORKLOOM_TRPC_URL=http://127.0.0.1:9397/trpc`；`/stage/snapshot` 返回 `dataMode=real`，`sources={roster:real,theater:real,runs:simulated,approvals:simulated}`，73 员工 / 25 在岗 / 46 离线；真实 ticker 渲染到工作台。
+- **计数口径分离**：网关审批（P1 store，2 项）与业务待决（真实 tRPC，3 项）是两套来源，已在 `counts.pendingApprovalsSource` / `counts.theaterPendingSource` 与工作台统计卡（“网关审批”/“业务待决（真实）”）显式分列，禁止混用。
+- **真实模型触发验收**：`codex exec` 只读调用一次 `workloom_stage_snapshot`；模型报告 `dataMode=real`、73 员工、25 在岗、2 网关待审批、`theater.mode=trial`、`pendingByTier l2=1/l4=2`，并主动指出两套审批计数不同源——该问题已按上一条修复。
+- **未覆盖（P4 继续）**：真实平台连接器（发布/投放/渲染仍为显式模拟）、写路径落业务库（P1 写网关 append-only JSONL；接 workdata/RLS 为 P4）、多租户与生产部署。

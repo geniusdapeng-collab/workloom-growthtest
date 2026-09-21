@@ -14,10 +14,11 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { gatewayRoot, resolveRepoRoot } from "../src/paths.mjs";
 import { findCapability, generateCatalog, searchCapabilities } from "../src/catalog.mjs";
-import { DEFAULT_STAGE_PORT, buildSnapshot, shortContext } from "../src/snapshot.mjs";
+import { DEFAULT_STAGE_PORT, buildProjection, shortContext } from "../src/snapshot.mjs";
 import { runMcpStdio } from "../src/mcp.mjs";
 import { startGateway } from "../src/server.mjs";
 import { createRunService } from "../src/runs.mjs";
+import { createLiveSource } from "../src/live-source.mjs";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -120,7 +121,7 @@ async function main() {
 
   if (command === "stage" && subcommand === "snapshot") {
     const snapshotService = createRunService({ repoRoot, catalog });
-    const snapshot = buildSnapshot({ repoRoot, catalog, store: snapshotService.store });
+    const snapshot = await buildProjection({ repoRoot, catalog, store: snapshotService.store, liveSource: createLiveSource() });
     snapshotService.close();
     console.log(JSON.stringify(snapshot, null, 2));
     return 0;
@@ -144,7 +145,7 @@ async function main() {
 
   if (command === "context") {
     const contextService = createRunService({ repoRoot, catalog });
-    const snapshot = buildSnapshot({ repoRoot, catalog, store: contextService.store });
+    const snapshot = await buildProjection({ repoRoot, catalog, store: contextService.store, liveSource: createLiveSource() });
     contextService.close();
     const additionalContext = shortContext(snapshot);
     console.log(JSON.stringify({ additionalContext, systemMessage: `WorkLoom 工作台已就绪：${snapshot.counts.agents} 个数字员工，${snapshot.counts.pendingApprovals} 项待审批（${snapshot.dataMode}）` }, null, 2));

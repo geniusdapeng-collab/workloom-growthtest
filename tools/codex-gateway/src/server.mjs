@@ -17,8 +17,9 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { extname, join, normalize, resolve } from "node:path";
 import { gatewayFile, resolveRepoRoot } from "./paths.mjs";
 import { generateCatalog, findCapability, searchCapabilities } from "./catalog.mjs";
-import { DEFAULT_STAGE_PORT, buildSnapshot, demoEvent, snapshotEvent } from "./snapshot.mjs";
+import { DEFAULT_STAGE_PORT, buildProjection, demoEvent, snapshotEvent } from "./snapshot.mjs";
 import { createRunService } from "./runs.mjs";
+import { createLiveSource } from "./live-source.mjs";
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -109,12 +110,12 @@ function serveStageFile(request, response, pathname) {
   response.end(readFileSync(target));
 }
 
-export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), runService = null } = {}) {
+export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), runService = null, liveSource = null } = {}) {
   const service = runService ?? createRunService({ repoRoot, catalog });
   const store = service.store;
-  const snapshot = () => buildSnapshot({ repoRoot, catalog, store });
+  const snapshot = () => buildProjection({ repoRoot, catalog, store, liveSource });
 
-  return createServer((request, response) => {
+  return createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", `http://${request.headers.host ?? "127.0.0.1"}`);
     const pathname = decodeURIComponent(url.pathname);
 
@@ -198,7 +199,7 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
     }
 
     if (pathname === "/stage/snapshot") {
-      sendJson(request, response, 200, snapshot());
+      sendJson(request, response, 200, await snapshot());
       return;
     }
 
@@ -248,7 +249,7 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
         response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
       };
 
-      const current = snapshot();
+      const current = await snapshot();
       send(snapshotEvent(current));
 
       const eventNameOf = (event) => {
@@ -303,10 +304,11 @@ export function createGateway({ repoRoot = resolveRepoRoot(), catalog = generate
   });
 }
 
-export function startGateway({ port = Number(process.env.WORKLOOM_GATEWAY_PORT ?? DEFAULT_STAGE_PORT), host = process.env.WORKLOOM_GATEWAY_HOST ?? "127.0.0.1", repoRoot = resolveRepoRoot(), runService = null } = {}) {
+export function startGateway({ port = Number(process.env.WORKLOOM_GATEWAY_PORT ?? DEFAULT_STAGE_PORT), host = process.env.WORKLOOM_GATEWAY_HOST ?? "127.0.0.1", repoRoot = resolveRepoRoot(), runService = null, liveSource = undefined } = {}) {
   const catalog = generateCatalog({ repoRoot });
   const service = runService ?? createRunService({ repoRoot, catalog });
-  const server = createGateway({ repoRoot, catalog, runService: service });
+  const live = liveSource === undefined ? createLiveSource() : liveSource;
+  const server = createGateway({ repoRoot, catalog, runService: service, liveSource: live });
   return new Promise((resolvePromise, reject) => {
     server.once("error", reject);
     server.listen(port, host, () => {

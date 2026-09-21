@@ -144,6 +144,89 @@ export function snapshotEvent(snapshot) {
   };
 }
 
+function liveStatusOf(agent, liveAgent) {
+  if (liveAgent?.status === "needs_input" || liveAgent?.status === "blocked") return liveAgent.status;
+  if (liveAgent?.online === true) return "working";
+  if (liveAgent?.readonly === true) return "idle";
+  return "offline";
+}
+
+/**
+ * P3 投影：在 P0/P1 快照之上叠加真实 roster/theater。
+ * - roster/theater = real（来自本地 server 的 tRPC 只读查询）
+ * - Run/审批 = store 中的数据（P1 为显式模拟执行，逐项 dataMode=simulated）
+ * live 失败时保留原投影并记录 live.error，不阻塞页面。
+ */
+export async function buildProjection({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), store = null, liveSource = null, now = new Date().toISOString() } = {}) {
+  const base = buildSnapshot({ repoRoot, catalog, store, now });
+  if (!liveSource) return base;
+  const live = await liveSource.load();
+  base.live = { ok: live.ok, url: live.url, fetchedAt: live.fetchedAt, ...(live.ok ? {} : { error: live.error }) };
+  if (!live.ok) return base;
+
+  const rosterAgents = live.roster?.agents ?? [];
+  const byPreset = new Map();
+  for (const agent of rosterAgents) {
+    const key = agent.presetKey ?? String(agent.id ?? "").replace(/^agt-/, "").replace(/-ws-[0-9a-z-]+$/i, "");
+    if (key) byPreset.set(key, agent);
+  }
+
+  base.agents = base.agents.map((agent) => {
+    const liveAgent = byPreset.get(agent.presetKey);
+    if (!liveAgent) return agent;
+    const liveStatus = liveStatusOf(agent, liveAgent);
+    const status = agent.pendingApprovals?.length ? "needs_input" : agent.currentRunId ? liveStatus : liveStatus;
+    return {
+      ...agent,
+      name: liveAgent.name ?? agent.name,
+      alias: liveAgent.alias ?? agent.alias,
+      status,
+      online: Boolean(liveAgent.online),
+      readonly: Boolean(liveAgent.readonly),
+      fenceBindings: liveAgent.fenceBindings ?? agent.fenceBindings,
+      highRisk: liveAgent.highRisk ?? agent.highRisk,
+      nightShift: liveAgent.nightShift ?? agent.nightShift,
+      skills: liveAgent.skills ?? agent.skills,
+      stats: liveAgent.stats ? {
+        actions30: liveAgent.stats.actions30 ?? liveAgent.stats.actions ?? 0,
+        approvals30: liveAgent.stats.approvals30 ?? 0,
+        receipts30: liveAgent.stats.receipts30 ?? 0,
+      } : agent.stats,
+      liveStatus: liveAgent.status ?? null,
+      dataMode: "real",
+    };
+  });
+  base.dataMode = "real";
+  base.sources = {
+    roster: "real",
+    theater: "real",
+    runs: base.runs.length ? (base.runs.every((run) => run.dataMode === "simulated") ? "simulated" : "mixed") : "none",
+    approvals: base.approvals.length ? (base.approvals.every((approval) => approval.dataMode === "simulated") ? "simulated" : "mixed") : "none",
+  };
+  base.ticker = (live.theater?.ticker ?? []).slice(0, 20);
+  base.theater = {
+    mode: live.theater?.mode ?? null,
+    ceoName: live.theater?.ceoName ?? null,
+    pendingByTier: live.theater?.pendingByTier ?? null,
+    pendingTotal: live.theater?.pendingByTier ? Object.values(live.theater.pendingByTier).reduce((sum, count) => sum + Number(count ?? 0), 0) : null,
+  };
+  base.note = "P3 实验：数字员工/在岗/ticker 来自真实 tRPC（roster/theater），执行中的 Run 与审批为 P1 显式模拟执行；两类数据逐项标注 dataMode。";
+  base.counts = {
+    ...base.counts,
+    agents: base.agents.length,
+    working: base.agents.filter((agent) => agent.status === "working").length,
+    needsInput: base.agents.filter((agent) => agent.status === "needs_input").length,
+    blocked: base.agents.filter((agent) => agent.status === "blocked").length,
+    idle: base.agents.filter((agent) => agent.status === "idle").length,
+    offline: base.agents.filter((agent) => agent.status === "offline").length,
+    pendingApprovals: base.counts.pendingApprovals,
+    pendingApprovalsSource: "gateway-store（P1 模拟执行）",
+    theaterPending: base.theater.pendingTotal,
+    theaterPendingSource: "real-tRPC（业务真实待决）",
+  };
+  return base;
+}
+
 export function demoEvent(snapshot, index) {
   const runs = snapshot.runs ?? [];
   if (!runs.length) {

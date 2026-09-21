@@ -30,6 +30,7 @@ import { useEffect, useState } from "react";
 import Observability from "./pages/observability/Observability";
 import { useAskRailPadding } from "./lib/useAskRail";
 import Workspaces from "./pages/accounts/Workspaces";
+import CodexWorkbench from "./pages/codex-workbench/CodexWorkbench";
 import {
   NavigationAccessBoundary,
   NavigationAccessProvider,
@@ -130,6 +131,7 @@ function Shell() {
       <Route path="/agents" element={<P8 />} />
       <Route path="/agents/:agentId" element={<P8 />} />
       <Route path="/portfolio" element={<Portfolio />} />
+      <Route path="/codex-workbench" element={<CodexWorkbench />} />
       <Route path="/events" element={<Observability view="events" />} />
       <Route path="/event-ledger" element={<Navigate to="/events" replace />} />
       <Route path="/models" element={<Observability view="models" />} />

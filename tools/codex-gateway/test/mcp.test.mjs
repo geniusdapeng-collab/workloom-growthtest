@@ -16,7 +16,7 @@ test("MCP handler：握手、工具、资源", async () => {
   const repoRoot = resolveRepoRoot();
   const catalog = generateCatalog({ repoRoot });
   const service = createRunService({ repoRoot, catalog, store: createStore({ dataDir: mkdtempSync(join(tmpdir(), "workloom-gw-mcp-")) }), policy: createFakePolicy() });
-  const handler = createMcpHandler({ repoRoot, catalog, runService: service });
+  const handler = createMcpHandler({ repoRoot, catalog, runService: service, liveSource: null });
   const init = await handler.handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { clientInfo: { name: "test" } } });
   assert.equal(init.result.serverInfo.name, "workloom-codex-gateway");
   assert.ok(init.result.capabilities.tools);

@@ -19,7 +19,7 @@ function makeService(verdicts) {
 
 test("HTTP 网关：health / catalog / snapshot / stage 页面 / SSE", async (t) => {
   const service = makeService({});
-  const instance = await startGateway({ port: 0, repoRoot: resolveRepoRoot(), runService: service });
+  const instance = await startGateway({ port: 0, repoRoot: resolveRepoRoot(), runService: service, liveSource: null });
   t.after(() => instance.close());
   t.after(() => service.close());
 
@@ -55,7 +55,7 @@ test("HTTP 网关：health / catalog / snapshot / stage 页面 / SSE", async (t)
 
 test("静态资源路径穿越被拒绝", async (t) => {
   const service = makeService({});
-  const instance = await startGateway({ port: 0, repoRoot: resolveRepoRoot(), runService: service });
+  const instance = await startGateway({ port: 0, repoRoot: resolveRepoRoot(), runService: service, liveSource: null });
   t.after(() => instance.close());
   t.after(() => service.close());
   const response = await fetch(`${instance.url}/stage/../../product.manifest.json`);
@@ -64,7 +64,7 @@ test("静态资源路径穿越被拒绝", async (t) => {
 
 test("P1 写路径：经 HTTP 走完 review → approve → completed", async (t) => {
   const service = makeService({});
-  const instance = await startGateway({ port: 0, repoRoot: resolveRepoRoot(), runService: service });
+  const instance = await startGateway({ port: 0, repoRoot: resolveRepoRoot(), runService: service, liveSource: null });
   t.after(() => instance.close());
   t.after(() => service.close());
 

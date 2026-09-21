@@ -26,7 +26,8 @@ function renderStats(data) {
     ["在岗", data.counts.working, "人"],
     ["待输入", data.counts.needsInput, "人"],
     ["阻塞", data.counts.blocked, "人"],
-    ["待审批", data.counts.pendingApprovals, "项"],
+    ["网关审批", data.counts.pendingApprovals, "项"],
+    ...(data.counts.theaterPending != null ? [["业务待决（真实）", data.counts.theaterPending, "项"]] : []),
     ["运行 Run", data.counts.activeRuns, "个"],
   ];
   el("stats").innerHTML = items
@@ -139,9 +140,23 @@ function renderSnapshot(data) {
   el("workspace").textContent = `${data.workspace.name} · ${data.workspace.id}`;
   el("mode-badge").textContent = `数据模式：${data.dataMode}`;
   el("mode-badge").className = `badge ${data.dataMode === "real" ? "badge-ok" : "badge-warn"}`;
-  el("night-pill").textContent = `夜班 ${data.night.status} · ${data.night.range}`;
+  const pendingTiers = data.theater?.pendingByTier
+    ? Object.entries(data.theater.pendingByTier)
+        .map(([tier, count]) => `${tier.replace(/^l\d+_/, "")} ${count}`)
+        .join(" / ")
+    : "";
+  el("night-pill").textContent = `夜班 ${data.night.status} · ${data.night.range}${pendingTiers ? ` · 待决 ${pendingTiers}` : ""}`;
+  el("connection").textContent = data.dataMode === "real" ? "真实数据" : data.dataMode === "simulated" ? "模拟执行" : "演示数据";
+  el("connection").className = `pill ${data.dataMode === "real" ? "" : "pill-off"}`;
   el("cursor").textContent = `cursor ${data.cursor} · ${new Date(data.generatedAt).toLocaleString("zh-CN", { hour12: false })}`;
   el("stage-note").textContent = data.note;
+  if (Array.isArray(data.ticker) && data.ticker.length && tickerItems.length === 0) {
+    for (const item of data.ticker.slice(0, 10)) {
+      tickerItems.push(`${item.who ?? ""} · ${item.action ?? ""}`);
+    }
+    const doubled = [...tickerItems, ...tickerItems];
+    el("ticker").innerHTML = doubled.map((text) => `<span>◆ ${escapeHtml(text)}</span>`).join("");
+  }
   renderStats(data);
   renderPipelines(data);
   renderAgents(data);

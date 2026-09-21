@@ -11,8 +11,9 @@
 import { createInterface } from "node:readline";
 import { resolveRepoRoot } from "./paths.mjs";
 import { generateCatalog, findCapability, searchCapabilities } from "./catalog.mjs";
-import { DEFAULT_STAGE_PORT, buildSnapshot } from "./snapshot.mjs";
+import { DEFAULT_STAGE_PORT, buildProjection } from "./snapshot.mjs";
 import { createRunService } from "./runs.mjs";
+import { createLiveSource } from "./live-source.mjs";
 
 const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = { name: "workloom-codex-gateway", version: "0.1.0" };
@@ -144,10 +145,11 @@ function toolText(payload, isError = false) {
   return { content: [{ type: "text", text }], ...(isError ? { isError: true } : {}) };
 }
 
-export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), env = process.env, runService = null } = {}) {
+export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = generateCatalog({ repoRoot }), env = process.env, runService = null, liveSource = undefined } = {}) {
   const port = Number(env.WORKLOOM_GATEWAY_PORT ?? DEFAULT_STAGE_PORT);
   const stageUrl = `http://127.0.0.1:${port}/stage`;
   const service = runService ?? createRunService({ repoRoot, catalog });
+  const live = liveSource === undefined ? createLiveSource() : liveSource;
 
   async function callTool(name, args = {}) {
     switch (name) {
@@ -161,7 +163,7 @@ export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = gener
         return toolText(capability);
       }
       case "workloom_stage_snapshot":
-        return toolText(buildSnapshot({ repoRoot, catalog, store: service.store }));
+        return toolText(await buildProjection({ repoRoot, catalog, store: service.store, liveSource: live }));
       case "workloom_stage_url":
         return toolText({ url: stageUrl, openIn: "Codex 内置浏览器（Cmd+Shift+B）", dataMode: "mock", note: "P0 工作台为只读投影；写操作在 P1 经网关围栏与审批后开放。" });
       case "workloom_health":
@@ -216,7 +218,7 @@ export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = gener
         : uri === "workloom://catalog"
           ? catalog
           : uri === "workloom://stage/snapshot"
-            ? buildSnapshot({ repoRoot, catalog, store: service.store })
+            ? await buildProjection({ repoRoot, catalog, store: service.store, liveSource: live })
             : null;
       if (!payload) return { jsonrpc: "2.0", id, error: { code: -32602, message: `未知资源：${uri}` } };
       return { jsonrpc: "2.0", id, result: { contents: [{ uri, mimeType: "application/json", text: JSON.stringify(payload, null, 2) }] } };
