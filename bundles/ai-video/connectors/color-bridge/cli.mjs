@@ -112,6 +112,7 @@ function printHuman(command, result) {
   if (command === "best") {
     const r = result;
     line(`结论：${r.verdict === "graded" ? `已调色（选中 ${r.winnerLabel}）` : "无需调色（原片不动，未产出文件）"}`);
+    if (r.recipe) line(`配方：${r.recipe}${r.recipeContext ? ` · ${r.recipeContext.genre} · ${r.recipeContext.scene}` : ""}`);
     line(`理由：${r.reason ?? `最佳候选比原片高 ${r.improvement} 分（阈值 ${r.minImprovement}）`}`);
     line("");
     line("候选得分（基准 100 = 原片）");
@@ -229,6 +230,9 @@ async function main() {
         output: flags.out ? needPath(flags.out, "--out") : null,
         sampleAt: flags.at ? String(flags.at).split(",").map(Number) : null,
         minImprovement: flags["min-improvement"] === undefined ? 2 : Number(flags["min-improvement"]),
+        recipe: flags.recipe ? String(flags.recipe) : null,
+        genre: flags.genre ? String(flags.genre) : null,
+        platform: flags.platform ? String(flags.platform) : null,
         bins,
       });
       break;
@@ -274,6 +278,7 @@ async function main() {
         "  grade   --in <file> --out <file> [--profile <p>] [--lut <cube>] [--intensity 0..1] [--corrections-json <json>]",
         "                                        [--auto]  自动校正（曝光/饱和/偏色，先校正后创作）",
         "  best    --in <file> [--out <file>] [--at a,b] [--min-improvement 2]",
+        "                                  可加 [--recipe <id>] / [--genre <题材>] / [--platform <平台>] 走配方驱动",
         "                                  候选择优+画质打分；判「无需调色」时不产出文件（do no harm）",
         "  match   --ref <file> --in <file> [--in <file>...] --out-dir <dir> [--profile <p>]",
         "  compare --before <file> --after <file> [--at s] --out <png>",

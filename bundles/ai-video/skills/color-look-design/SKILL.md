@@ -35,6 +35,15 @@ color-cli recipes --platform 小红书 --keyword 美妆 # 按平台+关键词匹
 color-cli recipes --id food-appetite            # 取具体配方
 ```
 
+**配方直接喂给择优**（推荐姿势）：先判定题材，再让候选池围绕该配方生成——
+
+```bash
+color-cli best --in clip.mp4 --out graded.mp4 --genre 美食      # 配方驱动：题材决定方向，画质分决定力度与动不动
+color-cli best --in clip.mp4 --out graded.mp4 --recipe food-appetite
+```
+
+工具侧对应 `colorwrite.best` 的 `genre` / `recipe_id` / `platform` 参数：候选池会围绕该配方的 look 与建议强度（±0.2 三档 + 配方 LUT）生成，再与通用候选一起打分择优。
+
 工具：`colorread.recipes`（返回 profile / LUT 绝对路径 / 建议强度 / 目标区间 / 平台 / 避免事项）。
 返回的 `targets` 已经包含该题材对 YAVG/SATAVG 的**收窄覆盖**（例如美食允许 55–85 的饱和、纪录片只允许 35–60）。
 

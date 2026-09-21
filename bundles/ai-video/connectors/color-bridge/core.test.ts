@@ -288,7 +288,9 @@ describe.runIf(hasFfmpeg)("真实 ffmpeg 端到端", () => {
     execFileSync(bins.ffmpeg, [
       "-hide_banner", "-v", "error", "-y",
       // 低对比、无彩的灰阶渐变：模拟"未调色的相机原片"
-      "-f", "lavfi", "-i", "gradients=size=320x240:c0=0x303030:c1=0x707070:duration=3:rate=15",
+      // 静态低对比夹具（luma 72→80、无彩）：确定性输出，任何对比度提升都明显胜出
+      "-f", "lavfi", "-i", "color=c=0x505050:size=320x240:duration=3:rate=15",
+      "-vf", "geq=lum='72+8*X/W':cb=128:cr=128",
       "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", flat,
     ]);
     const out = path.join(dir, "flat-best.mp4");
@@ -307,4 +309,18 @@ describe.runIf(hasFfmpeg)("真实 ffmpeg 端到端", () => {
     expect((result.finalScore.reasons.contrastRatio as number)).toBeGreaterThanOrEqual(1);
     expect((result.finalScore.reasons.clipDeltaPct as number)).toBeLessThanOrEqual(0.5);
   }, 240_000);
+
+  it("配方驱动：给出题材后候选池包含该配方的强度梯度与 LUT，并在结果里回报所用配方", async () => {
+    const out = path.join(dir, "recipe-best.mp4");
+    const result = await best({
+      input: source, output: out, sampleAt: [1], genre: "美食",
+      candidates: [{ id: "natural@0.5", label: "natural", spec: { profile: "natural", intensity: 0.5 } }],
+      bins,
+    });
+    const ids = result.candidates.map((c) => c.id);
+    expect(result.recipe).toBe("food-appetite");
+    expect(ids).toContain("recipe:food-appetite@0.65");
+    expect(ids).toContain("recipe-lut:food-appetite");
+    expect(result.recipeContext?.genre).toContain("美食");
+  }, 180_000);
 });
