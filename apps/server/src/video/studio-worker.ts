@@ -13,6 +13,7 @@
  *      本工作器以 run 注册表 aborted 位实现同等中止语义（轮询每拍检查）。
  */
 import path from "node:path";
+import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { GatewayEventSink, poolFromEnv } from "@workloom/base/model-router";
@@ -23,11 +24,15 @@ import {
   VideoStudio,
   WorkloomLLMEngine,
   installVendorEngineBridge,
+  installVendorPortraitBindingBridge,
+  installVendorRenderCompatBridge,
   type ApprovalCallback,
   type EventSink,
   type GateKey,
   type GateVerdict,
+  type PortraitIndex,
   type RunInput,
+  type StudioPortraitConfig,
 } from "@hyperreality/video-studio";
 
 /* ================= 可配项（环境变量） ================= */
@@ -55,6 +60,8 @@ const AUTO_GATES = new Set(
 );
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+/** 仓库根（apps/server/src/video → 上溯四级）：参考图相对路径按此解析 */
+const REPO_ROOT = path.resolve(here, "../../../..");
 /** 运行产物根（checkpoints/characters/confirmations）：默认仓库根 .vm-work/ */
 const WORK_DIR = process.env.HR_WORK_DIR ?? path.resolve(here, "../../../..", ".vm-work");
 
@@ -184,6 +191,60 @@ async function pollApproval(
 interface Scope { tenantId: string; workspaceId: string }
 
 /**
+ * 从 brief 的 metadata 收集真实参考图（产品所有者给到的实拍图）。
+ * 支持两种登记口径：字符串路径，或情报档案对象 `{ localPath | path | url }`；
+ * 只接受本地可读路径（远端 URL 需先落地，避免出图阶段访问不到）。
+ */
+function collectReferenceImages(metadata?: Record<string, unknown>): string[] {
+  const products = Array.isArray(metadata?.products) ? (metadata!.products as Array<Record<string, unknown>>) : [];
+  const out: string[] = [];
+  for (const product of products) {
+    const manifest = (product?.referenceManifest ?? product?.reference_manifest) as
+      | Record<string, unknown>
+      | undefined;
+    const images = (manifest?.reference_images ?? manifest?.referenceImages) as unknown;
+    if (!Array.isArray(images)) continue;
+    for (const image of images) {
+      if (typeof image === "string" && image.trim()) {
+        out.push(image.trim());
+        continue;
+      }
+      if (image && typeof image === "object") {
+        const record = image as Record<string, unknown>;
+        const local = record.localPath ?? record.path ?? (typeof record.url === "string" && !/^https?:/i.test(record.url) ? record.url : null);
+        if (typeof local === "string" && local.trim()) out.push(local.trim());
+      }
+    }
+  }
+  return Array.from(new Set(out));
+}
+
+/** 定妆照出图配置（缺密钥则显式关闭：保持 vendor 规格包口径，不假装出图） */
+function portraitConfig(metadata?: Record<string, unknown>): StudioPortraitConfig {
+  const apiKey = (process.env.VOLCENGINE_ARK_API_KEY ?? process.env.ARK_API_KEY ?? "").trim();
+  const model = (process.env.ARK_IMAGE_MODEL ?? process.env.SEEDREAM_MODEL ?? "").trim();
+  const enabled = (process.env.HR_PORTRAIT_ENABLED ?? "1") !== "0";
+  if (!enabled || !apiKey || !model) {
+    return { enabled: false };
+  }
+  const anchors = (process.env.HR_PORTRAIT_ANCHORS ?? "")
+    .split(",").map((value) => value.trim()).filter(Boolean);
+  return {
+    enabled: true,
+    apiKey,
+    model,
+    baseUrl: process.env.ARK_BASE_URL?.trim(),
+    size: process.env.ARK_IMAGE_SIZE?.trim(),
+    timeoutMs: Number(process.env.HR_PORTRAIT_TIMEOUT_MS ?? 240_000),
+    maxReferenceImages: 4,
+    /** 参考图相对仓库根解析（brief 里登记的是 var/media/... 相对路径） */
+    referenceImages: collectReferenceImages(metadata).map((image) =>
+      path.isAbsolute(image) ? image : path.join(REPO_ROOT, image)),
+    characterAnchorImages: anchors.map((image) => (path.isAbsolute(image) ? image : path.join(REPO_ROOT, image))),
+  };
+}
+
+/**
  * 异步启动一条预生产流水线（不阻塞 tRPC 响应；失败只反映在注册表投影）
  * @throws StudioWorkerError LLM_MISSING —— LLM_* 四环境变量未配齐（禁止静默降级）
  */
@@ -210,6 +271,26 @@ export function startRun(scope: Scope, input: RunInput): string {
    * 不桥接就会出现「LLM引擎返回失败: API Key 未配置」→ 预生产在 Layer 1 直接失败。
    */
   installVendorEngineBridge(llm);
+  // 逐镜渲染的入参归一（空 portraits 数组会以 characterRef.split 崩溃，见 vendor-compat.ts）
+  installVendorRenderCompatBridge();
+  /**
+   * 定妆照绑定桥：把「定妆照集」回填成渲染认得 `characterRef`（真机 2026-09-21：
+   * vendor 只写 portraitBindings，渲染侧读 characterRef，中间断线 → 出了图也报
+   * BINDING_MANIFEST_INVALID）。索引跑完预生产才落盘，故用惰性读取。
+   */
+  const portraitIndexPath = path.join(WORK_DIR, "characters", input.projectId, "portrait-index.json");
+  const uninstallPortraitBinding = installVendorPortraitBindingBridge({
+    resolveIndex: () => {
+      try {
+        if (!existsSync(portraitIndexPath)) return null;
+        return JSON.parse(readFileSync(portraitIndexPath, "utf8")) as PortraitIndex;
+      } catch {
+        return null;
+      }
+    },
+    maxCharactersPerShot: 1,
+    log: (line) => console.log(line),
+  });
 
   const entry: RunEntry = {
     runId: newId("RUN"),
@@ -339,6 +420,9 @@ export function startRun(scope: Scope, input: RunInput): string {
     onApproval,
     onEvent,
     totalDeadlineMs: TOTAL_DEADLINE_MS,
+    deferRender: (process.env.HR_DEFER_RENDER ?? "1") !== "0",
+    portraits: portraitConfig(input.metadata),
+    log: (line) => console.log(line),
   });
 
   // 异步执行：不阻塞 tRPC 响应；终态只写注册表投影（生命周期事件由 onEvent 落库）
@@ -354,6 +438,7 @@ export function startRun(scope: Scope, input: RunInput): string {
       entry.status = "failed";
       entry.error = err instanceof Error ? err.message : String(err);
     } finally {
+      uninstallPortraitBinding();
       entry.finishedAt = new Date().toISOString();
     }
   })();

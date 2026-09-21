@@ -3,6 +3,8 @@
  */
 export * from "./gates.js";
 export * from "./llm-adapter.js";
+export * from "./portrait-runtime.js";
+export * from "./vendor-compat.js";
 export * from "./confirmation.js";
 export * from "./studio.js";
 export * from "./render-scripts.js";
