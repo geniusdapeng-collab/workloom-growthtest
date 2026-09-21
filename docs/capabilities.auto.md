@@ -1,7 +1,7 @@
 # workloom-ai-acquisition · 能力导览（人类版）
 
-> WorkLoom 获客系统 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）
-> 本文件由 `node scripts/generate-capabilities.mjs` 从代码事实**自动生成**（2026-09-19），
+> AI超增长 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）
+> 本文件由 `node scripts/generate-capabilities.mjs` 从代码事实**自动生成**（2026-09-21），
 > 请勿手改——能力变更后重跑生成器即可。Agent 版机器清单见 docs/capability-map.md。
 
 ## 🚀 5 分钟体验路径

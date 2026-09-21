@@ -3,7 +3,7 @@
   "product": {
     "productId": "workloom-ai-growth",
     "role": "industry",
-    "repository": "workloom-ai/WorkLoom-growth",
+    "repository": "workloom-ai/workloom-growthtest",
     "includePlatformOps": false
   },
   "npmVersion": "11.17.0",
@@ -32,7 +32,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "fdf0f1df1bc46715442e18b630604fd453fd9811c1db9506fa372b6231958307"
+      "sha256": "a8a41dbc718abb2782e5e364817c30f80979bd1a911d4ac4de1db4f66cdb3d64"
     },
     {
       "path": "packages/audit-engine/package.json",
@@ -68,7 +68,7 @@
     },
     {
       "path": "product.manifest.json",
-      "sha256": "1aa6bf2b967cf3e7f88f024ff913a3633fb17737a54c3f495872f6c56b008df9"
+      "sha256": "7105f95b2bd444049cabe9be8f15de7a5b51db39c6e3b2570c057ce6f06e38da"
     },
     {
       "path": "scripts/pack-nm-merge.mjs",

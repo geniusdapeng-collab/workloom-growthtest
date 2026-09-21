@@ -72,7 +72,7 @@ async function callGateway(prompt: string): Promise<string> {
     body: JSON.stringify({
       model,
       messages: [
-        { role: "system", content: "你是 WorkLoom 获客用增系统的资深运营。回答必须：判断有依据、证据标强度、边界该请示就请示、产出可直接使用。" },
+        { role: "system", content: "你是 AI超增长的资深运营。回答必须：判断有依据、证据标强度、边界该请示就请示、产出可直接使用。" },
         { role: "user", content: prompt },
       ],
     }),

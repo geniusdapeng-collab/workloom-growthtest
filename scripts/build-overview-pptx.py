@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""build-overview-pptx.py · 《WorkLoom 获客系统 · 业务全景介绍》PPT 生成器（给人类开发者）
+"""build-overview-pptx.py · 《AI超增长 · 业务全景介绍》PPT 生成器（给人类开发者）
 视角：业务 + 客户。产出 docs/system-overview.pptx（16:9，糖果系，13 页）。
 用法：python3 scripts/build-overview-pptx.py
 """
@@ -47,7 +47,7 @@ def bullets(s, x, y, w, h, items, size=15, gap=6):
 # ① 封面
 s = slide(dark=True)
 text(s, 1, 2.0, 11.3, 3.6, [
-    ("WorkLoom 获客系统", 48, WHITE, True, PP_ALIGN.CENTER),
+    ("AI超增长", 48, WHITE, True, PP_ALIGN.CENTER),
     ("短视频社媒营销 × GEO × 获客五环", 22, WHITE, False, PP_ALIGN.CENTER),
     ("把获客从玄学，变成一门可测量、可追溯、可归因的生意", 18, WHITE, False, PP_ALIGN.CENTER),
     ("—— 给开发者的业务全景介绍 ——", 14, RGBColor(0xFF, 0xD6, 0xDE), False, PP_ALIGN.CENTER),
@@ -65,7 +65,7 @@ bullets(s, 0.9, 1.5, 11.5, 4.2, [
 
 # ③ 系统是什么
 s = slide()
-text(s, 0.8, 0.45, 11.7, 0.9, [("WorkLoom 获客系统是什么", 30, MAIN, True)])
+text(s, 0.8, 0.45, 11.7, 0.9, [("AI超增长是什么", 30, MAIN, True)])
 text(s, 0.9, 1.4, 11.5, 1.2, [
     ("一支 AI 获客班组住进商家的通讯录：找人群、做内容、接询盘、跟线索、算成交。", 19, TEXT, True),
     ("商家只做三件事：定方向、拍板、收钱。", 19, MAIN, True),

@@ -2,16 +2,16 @@
   "schemaVersion": "workloom.product/v1",
   "productId": "workloom-ai-growth",
   "role": "industry",
-  "displayName": "WorkLoom 获客增长系统（实验车道）",
+  "displayName": "AI超增长",
   "packageName": "workloom-ai-acquisition",
-  "repository": "workloom-ai/WorkLoom-growth",
+  "repository": "workloom-ai/workloom-growthtest",
   "defaultBundle": "geo-growth",
   "demoWorkspaceSlug": "geo-growth",
   "demoMemberNo": "MEM-G01",
   "release": {
     "appId": "com.geniusdapeng.workloomgrowth",
     "channel": "stable",
-    "artifactPrefix": "WorkLoom 获客增长系统",
+    "artifactPrefix": "AI超增长",
     "website": "apps/site"
   },
   "desktop": {

@@ -1,7 +1,7 @@
 {
   "schemaVersion": "workloom.acceptance-profile/v2",
-  "repo": "workloom-ai/WorkLoom-growth",
-  "productName": "WorkLoom 获客增长系统（实验车道）",
+  "repo": "workloom-ai/workloom-growthtest",
+  "productName": "AI超增长",
   "lane": "industry",
   "primaryBundle": "geo-growth",
   "workspaceId": null,

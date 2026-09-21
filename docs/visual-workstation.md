@@ -1,6 +1,6 @@
 # 视觉工位部署与运行手册（Compositor）
 
-> 定位：给获客增长系统的「视觉设计师」数字员工配一台 Mac 工位。
+> 定位：给 AI超增长的「视觉设计师」数字员工配一台 Mac 工位。
 > 技术事实：渲染内核复用上游 Compositor 源码（MIT），本仓以 headless 方式调用；
 > 固定版本 **Compositor v1.0.4**（2026-09-18 发布，MIT，上游 `robbietilton/Compositor`）。
 
