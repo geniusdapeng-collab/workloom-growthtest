@@ -42,7 +42,23 @@ const GATE_MAP: Record<string, GateKey> = {
   // 预生产最终确认
   preproduction: "G7_FINAL",
   "preproduction-final": "G7_FINAL",
-  final: "G7_FINAL"
+  final: "G7_FINAL",
+  /**
+   * 真机补登（2026-09-21）：vendor 在定妆照阶段上报的 gate 类型是
+   * `portrait-generation`，旧映射表没有它 → resolveGate 返回 UNKNOWN，
+   * 自动放行表（AUTO_GATES 按 G1..G7 判定）覆盖不到，整条管线就停在那里等人审。
+   * 这里把已知的 vendor 变体补进映射；UNKNOWN 仍然保留给真正未知的类型（不静默放行）。
+   */
+  "portrait-generation": "G5_PORTRAIT",
+  "portrait-set-generation": "G5_PORTRAIT",
+  "prompt-fusion": "G6_PROMPT",
+  "prompt-package": "G6_PROMPT",
+  "render-script": "G7_FINAL",
+  "preproduction-finalize": "G7_FINAL",
+  "theme-generation": "G2_THEME",
+  "requirement-alignment": "G3_INSIGHT",
+  "prd-generation": "G4_PRD",
+  "dossier-generation": "G1_DOSSIER"
 };
 
 export function resolveGate(vendorType: string): GateKey {

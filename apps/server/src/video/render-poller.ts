@@ -13,6 +13,11 @@ import { gatewayAppendOnClient } from "@workloom/base/workdata";
 import {
   MockGenProvider, genPoolFromEnv, type GenProvider,
 } from "@workloom/base/model-router";
+import { newId } from "@workloom/shared";
+import { videoGenPool } from "./gen/providers.js";
+import { downloadToMediaStore, registerFinalCut } from "./gen/ingest.js";
+import { findModelByProviderModel } from "./gen/catalog.js";
+import { recordRenderCost, usdCnyRate } from "./gen/cost.js";
 
 interface Scope { tenantId: string; workspaceId: string }
 
@@ -22,6 +27,9 @@ interface OpenJob {
   script_id: string;
   project_id: string;
   provider: string | null;
+  provider_model: string | null;
+  est_cny: string | null;
+  est_usd: string | null;
 }
 
 export interface PollReport {
@@ -29,7 +37,11 @@ export interface PollReport {
   done: number;
   failed: number;
   running: number;
-  details: Array<{ jobId: string; status: string; uri?: string; error?: string }>;
+  ingested: number;
+  details: Array<{
+    jobId: string; status: string; uri?: string; error?: string;
+    assetId?: string; ingestError?: string; costError?: string;
+  }>;
 }
 
 /** 生成供应商解析：提交事件留痕优先；mock 前缀回退；缺省 seedance（首选） */
@@ -48,15 +60,23 @@ export async function pollRenderJobs(
   app: pg.Pool,
   gateway: pg.Pool,
   scope: Scope,
-  opts: { limit?: number; pool?: Map<string, GenProvider> } = {},
+  opts: {
+    limit?: number;
+    pool?: Map<string, GenProvider>;
+    /** 成片入库开关（默认 true；测试可关） */
+    ingest?: boolean;
+    fetchImpl?: typeof fetch;
+  } = {},
 ): Promise<PollReport> {
-  const realPool = opts.pool ?? genPoolFromEnv();
+  // 生成池：基座 provider（Kling/即梦等）与视频接缝 provider（Ark 带参数 / Higgsfield / MuAPI）合并，
+  // 后者优先（同 providerId 时以视频接缝实现为准：带参数与报价口径）。
+  const realPool = opts.pool ?? new Map<string, GenProvider>([...genPoolFromEnv(), ...videoGenPool()]);
   const mockPool = new Map<string, GenProvider>([
     ["seedance", new MockGenProvider("seedance")],
     ["kling", new MockGenProvider("kling")],
     ["jimeng", new MockGenProvider("jimeng")],
   ]);
-  const report: PollReport = { checked: 0, done: 0, failed: 0, running: 0, details: [] };
+  const report: PollReport = { checked: 0, done: 0, failed: 0, running: 0, ingested: 0, details: [] };
 
   const client = await app.connect();
   let jobs: OpenJob[];
@@ -67,7 +87,7 @@ export async function pollRenderJobs(
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
     // 开放任务 + 提交事件留痕的供应商（event 回放取 provider，无留痕回退推断）
     const rows = await client.query<OpenJob>(
-      `SELECT j.id, j.task_id, j.script_id, j.project_id,
+      `SELECT j.id, j.task_id, j.script_id, j.project_id, j.provider_model, j.est_cny, j.est_usd,
               (SELECT e.payload->'decision'->'after'->>'provider'
                  FROM biz_events e
                 WHERE e.workspace_id=j.workspace_id
@@ -106,13 +126,63 @@ export async function pollRenderJobs(
 
     if (result.status === "succeeded" || result.status === "failed") {
       const done = result.status === "succeeded";
+
+      /* ---- ① 成片入库（T-2026-0921-0002）：下载 → sha256 → video_assets（sha256 幂等去重） ---- */
+      let ingested: { assetId: string; localPath: string; sha256: string; bytes: number } | null = null;
+      let ingestError: string | null = null;
+      if (done && result.uri && opts.ingest !== false) {
+        try {
+          const media = await downloadToMediaStore(result.uri, {
+            workspaceId: scope.workspaceId,
+            fetchImpl: opts.fetchImpl,
+          });
+          const reg = await registerFinalCut(app, gateway, scope, {
+            assetId: newId("VA"),
+            projectId: job.project_id,
+            sha256: media.sha256,
+            sourceUrl: result.uri,
+            localRelPath: media.relPath,
+            provider: provider.providerId,
+            providerModel: job.provider_model ?? "",
+            jobId: job.id,
+            scriptId: job.script_id,
+            seconds: result.actualUnits ?? null,
+            by: "render-poller",
+          });
+          ingested = { assetId: reg.assetId, localPath: media.relPath, sha256: media.sha256, bytes: media.bytes };
+        } catch (err) {
+          // 入库失败不推翻"生成成功"事实（产物仍在供应商侧 7 天）；失败原因进事件与报告，可重试
+          ingestError = err instanceof Error ? err.message : String(err);
+        }
+      }
+
+      /* ---- ② 实际成本（目录价 × 实际秒数；未核价 → 0 元入账并标 pricing=unknown） ---- */
+      const catalogModel = job.provider
+        ? findModelByProviderModel(provider.providerId, job.provider_model ?? "")
+        : null;
+      const actualUnits = result.actualUnits ?? null;
+      let actualUsd: number | null = null;
+      let actualCny: number | null = null;
+      let pricingMode: "catalog" | "unknown" = "unknown";
+      if (done && catalogModel?.pricing?.usd != null && actualUnits !== null) {
+        actualUsd = Math.round(catalogModel.pricing.usd * actualUnits * 10000) / 10000;
+        actualCny = Math.round(actualUsd * usdCnyRate() * 100) / 100;
+        pricingMode = "catalog";
+      }
+
       try {
         await gw.query("BEGIN");
         await gw.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
         await gw.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
         await gw.query(
-          `UPDATE render_jobs SET status=$3, result_url=$4 WHERE id=$1 AND workspace_id=$2`,
-          [job.id, scope.workspaceId, done ? "done" : "failed", result.uri ?? null],
+          `UPDATE render_jobs
+              SET status=$3, result_url=$4, asset_id=COALESCE($5, asset_id),
+                  actual_seconds=$6, actual_usd=$7, actual_cny=$8, updated_at=now()
+            WHERE id=$1 AND workspace_id=$2`,
+          [
+            job.id, scope.workspaceId, done ? "done" : "failed", result.uri ?? null,
+            ingested?.assetId ?? null, actualUnits, actualUsd, actualCny,
+          ],
         );
         await gatewayAppendOnClient(gw, { ...scope, actor: { id: "render-poller", type: "system" } }, {
           who: { type: "system", id: "render-poller" },
@@ -123,7 +193,15 @@ export async function pollRenderJobs(
             after: {
               task_id: job.task_id, provider: provider.providerId,
               result_url: result.uri ?? null, error: result.error ?? null,
-              actual_seconds: result.actualUnits ?? null,
+              actual_seconds: actualUnits,
+              est_cny: job.est_cny === null ? null : Number(job.est_cny),
+              actual_usd: actualUsd, actual_cny: actualCny, pricing: pricingMode,
+              asset_id: ingested?.assetId ?? null,
+              local_path: ingested?.localPath ?? null,
+              /** 入库结果三态：ok / 失败原因 / 未尝试（mock 或已入库） */
+              ingest: done
+                ? (ingestError ? { ok: false, error: ingestError } : ingested ? { ok: true, bytes: ingested.bytes } : { ok: false, error: "无产物 URL 或入库已关闭" })
+                : null,
             },
             basis: [done ? "轮询回填：渲染成功（异步任务制第二步）" : `轮询回填：渲染失败（${result.error ?? "未知原因"}；不静默）`],
           },
@@ -141,8 +219,35 @@ export async function pollRenderJobs(
         await gw.query("ROLLBACK").catch(() => undefined);
         throw err;
       }
+
+      /* ---- ③ 成本入账（幂等键 render:<jobId>；失败不推翻已完成事实，但必须留痕） ---- */
+      let costError: string | null = null;
+      if (done) {
+        try {
+          await recordRenderCost(app, gateway, scope, {
+            jobId: job.id,
+            projectId: job.project_id,
+            amountCny: actualCny ?? 0,
+            usd: actualUsd,
+            provider: provider.providerId,
+            providerModel: job.provider_model ?? "",
+            seconds: actualUnits,
+            mock: job.task_id.startsWith("mock-"),
+            by: "render-poller",
+          });
+        } catch (err) {
+          costError = err instanceof Error ? err.message : String(err);
+          console.error(`[render-poller] 成本入账失败 job=${job.id}：${costError}`);
+        }
+      }
+
       if (done) report.done += 1; else report.failed += 1;
-      report.details.push({ jobId: job.id, status: done ? "done" : "failed", uri: result.uri, error: result.error });
+      if (ingested) report.ingested += 1;
+      report.details.push({
+        jobId: job.id, status: done ? "done" : "failed", uri: result.uri,
+        error: result.error, assetId: ingested?.assetId,
+        ingestError: ingestError ?? undefined, costError: costError ?? undefined,
+      });
     } else {
       // 仍在生成：状态推进 rendering（幂等）
       await app.query(

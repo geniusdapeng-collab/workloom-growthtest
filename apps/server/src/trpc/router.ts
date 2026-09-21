@@ -3584,10 +3584,8 @@ const captainRouter = router({
         [scope.workspaceId],
       );
       const agents = await client.query<{ id: string; preset_key: string; name: string; alias: string | null }>(
-        // 欢迎仪式与团队舞台必须拿到完整编制：固定 12 曾静默裁掉大型 Bundle 成员，
-        // 改成 64 后组合编制（geo-growth + ai-video + hotel = 72 人）仍被裁掉 8 人
-        // （2026-09-21 产品所有者真机反馈"团队舞台没有展示全面"）。这里不再设上限。
-        `SELECT id, preset_key, name, alias FROM agents WHERE workspace_id=$1 AND status='ready' ORDER BY id`,
+        // 欢迎仪式必须拿到完整编制；固定 12 会静默裁掉大型 Bundle 的成员。
+        `SELECT id, preset_key, name, alias FROM agents WHERE workspace_id=$1 AND status='ready' ORDER BY id LIMIT 64`,
         [scope.workspaceId],
       );
       const grades = await client.query<{ agent_id: string; grade: string }>(

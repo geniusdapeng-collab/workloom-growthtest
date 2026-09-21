@@ -17,7 +17,6 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { gatewayAppendOnClient } from "@workloom/base/workdata";
-import { makeReadableId, newId } from "@workloom/shared";
 import {
   approve as approveRenderScript,
   listByProject as listRenderScripts,
@@ -26,13 +25,16 @@ import {
   type RenderScriptRow,
 } from "@workloom/base/asset-cms";
 import { judge, type RuntimeRule } from "@workloom/base/fence-engine";
-import {
-  GEN_CHAIN, GatewayEventSink, checkRenderBudget, genPoolFromEnv, planTierToPlanId, routeGenSubmit,
-} from "@workloom/base/model-router";
+import { checkRenderBudget, planTierToPlanId } from "@workloom/base/model-router";
 import { PlatformSchema } from "@workloom/base/publish-rpa";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../trpc/context.js";
 import { accountingRouter } from "./accounting.js";
 import { pollRenderJobs } from "./render-poller.js";
+import { defaultVideoModelId, getModel, listModels } from "./gen/catalog.js";
+import { checkCostCaps, costCaps, estimateCost, renderSpendCny, usdCnyRate } from "./gen/cost.js";
+import { submitGenJob } from "./gen/submit.js";
+import { createPublishTask, executePublishTask, fenceOverrideEnabled } from "./gen/publish.js";
+import { mediaUrl } from "./gen/ingest.js";
 /** PollReport 类型再导出（web 端 AppRouter 类型可移植性，TS2883） */
 export type { PollReport } from "./render-poller.js";
 import { dealRouter } from "./deal.js";
@@ -246,7 +248,20 @@ const renderRouter = router({
     .input(z.object({
       scriptId: z.string().min(1),
       mode: z.enum(["manual", "batch", "auto"]),
-      /** 预计渲染秒数（额度台账计量基准；默认 30s） */
+      /** 模型目录 id（缺省取 WORKLOOM_VIDEO_DEFAULT_MODEL 或目录首个可用视频模型） */
+      modelId: z.string().min(1).optional(),
+      /** 成片时长（秒）；缺省回退 estimatedSeconds，并夹紧到模型 limits（回报 clamped） */
+      durationSec: z.number().int().min(1).max(120).optional(),
+      aspectRatio: z.string().max(16).optional(),
+      resolution: z.string().max(16).optional(),
+      generateAudio: z.boolean().optional(),
+      /** 图生视频首帧（URL；后续接资产库时由 assetId 解析） */
+      firstFrameUrl: z.string().url().optional(),
+      /** 参考图（定妆照等，最多 4 张） */
+      referenceImageUrls: z.array(z.string().url()).max(4).optional(),
+      /** 幂等键（缺省按脚本+模型+时长+模式生成，防重复点击重复扣费） */
+      idempotencyKey: z.string().max(200).optional(),
+      /** 预计渲染秒数（额度台账计量基准；兼容旧调用，默认 30s） */
       estimatedSeconds: z.number().int().min(1).max(600).default(30),
       /** 超套餐额度时显式确认按量实扣（v3.0 渲染台账 G8 前置预算闸） */
       allowOverage: z.boolean().default(false),
@@ -297,6 +312,18 @@ const renderRouter = router({
       }
 
       // v3.0 渲染额度台账：套餐秒数配额 G8 前置预算闸（用量=render.submit 事件投影，不重算）
+      // ── 模型与时长解析（T-2026-0921-0002）：目录取模 + 时长夹紧到模型上限（回报 clamped，不静默） ──
+      const modelId = input.modelId?.trim() || process.env.WORKLOOM_VIDEO_DEFAULT_MODEL?.trim() || defaultVideoModelId();
+      const chosen = getModel(modelId);
+      if (!chosen) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `模型目录中不存在「${modelId}」（video.gen.catalog 可查可用清单）` });
+      }
+      const requestedSeconds = input.durationSec ?? input.estimatedSeconds;
+      const maxSeconds = chosen.limits?.durationSec?.max ?? 15;
+      const minSeconds = chosen.limits?.durationSec?.min ?? 4;
+      const durationSec = Math.min(maxSeconds, Math.max(minSeconds, Math.round(requestedSeconds)));
+      const clamped = durationSec !== Math.round(requestedSeconds);
+
       const monthStart = new Date();
       monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
       const usageRows = await scopedQuery<{ total: string | null }>(
@@ -311,95 +338,65 @@ const renderRouter = router({
       const budget = checkRenderBudget({
         plan: planTierToPlanId(ctx.identity.plan),
         usedSeconds,
-        requestSeconds: input.estimatedSeconds,
+        requestSeconds: durationSec,
         allowOverage: input.allowOverage,
       });
       if (!budget.allowed) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: budget.reason ?? "渲染额度不足" });
       }
 
-      // v3.0 多模态生成池：mock/真实同构——真实走 Seedance 异步任务制提交（降级链留痕）
-      const mock = !process.env.VOLCENGINE_ARK_API_KEY;
-      let taskId: string | null;
-      let genProviderId = "seedance";
-      if (mock) {
-        taskId = `mock-${newId("seedance")}`;
-      } else {
-        const gen = await routeGenSubmit(
-          {
-            /**
-             * 2026-09-20 三合一真机测试修复：真实 Seedance 提交必须带**脚本正文**。
-             * 旧实现只送 `render_script:<key> v<version>`，模型拿不到任何画面信息（等于拍空白）。
-             * 这里送脚本正文（截断 1500 字，控制 token 成本），并保留脚本标识便于账本对账。
-             */
-            prompt: `${String(script.md ?? "").slice(0, 1500)}\n\n（脚本 ${script.script_key} v${script.version}）`,
-            estimatedUnits: input.estimatedSeconds,
-            refId: script.id,
-          },
-          [...GEN_CHAIN],
-          genPoolFromEnv(),
-          new GatewayEventSink(getGatewayPool(), scope, { id: "render-operator" }),
-        );
-        if (gen.kind !== "submitted") {
-          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "渲染供应商全链不可用（gen.degraded 已留痕），请稍后重试" });
-        }
-        taskId = gen.taskId!;
-        genProviderId = gen.providerId ?? "seedance";
+      // ── 成本上限闸（T-2026-0921-0002）：秒数配额之外再压一道"真金白银"闸（USD/CNY） ──
+      const est = estimateCost(chosen, { seconds: durationSec });
+      const spend = await renderSpendCny(app, scope);
+      const capCheck = checkCostCaps({
+        spentDayCny: spend.day, spentMonthCny: spend.month, estCny: est.cny, caps: costCaps(),
+      });
+      if (!capCheck.allowed) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: capCheck.reason ?? "渲染成本超出上限" });
       }
-      const jobId = newId("RJ");
-      const client = await app.connect();
-      try {
-        // D16（#1/A）：render_jobs 行、脚本状态推进、提交事件同一事务同一 COMMIT
-        await client.query("BEGIN");
-        await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-        await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-        await client.query(
-          `INSERT INTO render_jobs (id, workspace_id, project_id, script_id, script_version, task_id, status)
-           VALUES ($1,$2,$3,$4,$5,$6,'submitted')`,
-          [jobId, scope.workspaceId, script.project_id, script.id, script.version, taskId],
-        );
-        await client.query(
-          `UPDATE render_scripts SET status='submitted' WHERE workspace_id=$1 AND id=$2`,
-          [scope.workspaceId, script.id],
-        );
-        await gatewayAppendOnClient(client, {
-          ...scope, actor: { id: ctx.identity.memberNo, type: "human" },
-        }, {
-          who: { type: "human", id: ctx.identity.memberNo },
-          context: {
-            tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
-            time: new Date().toISOString(), channel: "inapp",
-          },
-          object: { type: "render_script", id: script.id },
-          decision: {
-            action: "render.submit",
-            after: {
-              jobId, taskId, mock, mode: input.mode,
-              scriptKey: script.script_key, version: script.version, projectId: script.project_id,
-              estimated_seconds: input.estimatedSeconds,
-              budget_overage_seconds: budget.overageSeconds,
-              provider: genProviderId,
-            },
-            basis: [mock
-              ? "G8 已过，Seedance 提交（mock：无 VOLCENGINE_ARK_API_KEY，不触真实渲染不烧额度）"
-              : "G8 已过，Seedance 提交（§6 渲染提交，烧额度门已审）"],
-          },
-          rule_impact: verdict.impacts,
-          /**
-           * 2026-09-20 真机测试修复：提交事件带回执位三态——
-           * 真实提交=「已执行但尚无外部回执」（synced:false，等轮询回填）；mock=同样标未核实。
-           * 真正的成片回执由 render-poller 在 render.complete 时写 synced:true + 成片 URL。
-           */
-          receipt: { synced: false },
-        });
-        await client.query("COMMIT");
-      } catch (err) {
-        await client.query("ROLLBACK").catch(() => undefined);
-        throw err;
-      } finally {
-        client.release();
-      }
-      return { jobId, taskId, mock, level: verdict.level, budget: { usedSeconds, overageSeconds: budget.overageSeconds } };
+
+      // ── 提交（唯一写入口 submitGenJob）：幂等键去重 + 供应商降级链 + 参数 + 报价 + D16 同事务 ──
+      const submitted = await submitGenJob({
+        app,
+        gateway: getGatewayPool(),
+        scope,
+        actor: ctx.identity.memberNo,
+        script: {
+          id: script.id, project_id: script.project_id, shot_id: script.shot_id,
+          script_key: script.script_key, version: script.version, status: script.status,
+          md: script.md, fields: script.fields as Record<string, unknown> | null,
+        },
+        modelId,
+        mode: input.mode,
+        params: {
+          durationSec,
+          aspectRatio: input.aspectRatio,
+          resolution: input.resolution,
+          generateAudio: input.generateAudio,
+          firstFrameUrl: input.firstFrameUrl,
+          referenceImageUrls: input.referenceImageUrls,
+        },
+        /** 幂等键：同脚本 + 同模型 + 同时长 + 同模式重复点击不会重复扣费 */
+        idempotencyKey: input.idempotencyKey?.trim() || `render:${script.id}:${chosen.id}:${durationSec}:${input.mode}`,
+        fenceLevel: verdict.level,
+        fenceImpacts: verdict.impacts,
+        budgetOverageSeconds: budget.overageSeconds,
+      });
+
+      return {
+        jobId: submitted.jobId,
+        taskId: submitted.taskId,
+        mock: submitted.mock,
+        provider: submitted.provider,
+        providerModel: submitted.providerModel,
+        estUsd: submitted.estUsd,
+        estCny: submitted.estCny,
+        deduped: submitted.deduped,
+        durationSec,
+        clamped,
+        level: verdict.level,
+        budget: { usedSeconds, overageSeconds: budget.overageSeconds },
+      };
     }),
 
   /** 渲染轮询回填（v3.0 异步任务制第二步）：submitted/rendering → done/failed + render.complete/failed 事件 */
@@ -411,6 +408,31 @@ const renderRouter = router({
 });
 
 /* ================= publish：全平台 RPA 发布（§7，G9） ================= */
+
+/**
+ * G9 围栏上下文（T-2026-0921-0002 修复）：
+ * 基线规则 G9a 读 `context.platform_first_use`、G9b 读 `context.account_daily_published`；
+ * 旧实现未提供这两个值 → 求值异常 → fail-closed（block），发布任务永远建不出来。
+ * 这里按"该账号当日已成功发布数"和"该账号在该平台是否已成功发布过"补齐上下文。
+ */
+async function publishFenceContext(
+  app: AppPool, scope: Scope, accountId: string, platform: string,
+): Promise<{ account_daily_published: number; platform_first_use: boolean }> {
+  const rows = await scopedQuery<{ day: string; ever: string }>(
+    app, scope,
+    `SELECT
+       (SELECT count(*) FROM publish_tasks
+         WHERE workspace_id=$1 AND account_id=$2 AND status='succeeded'
+           AND executed_at >= (date_trunc('day', now() AT TIME ZONE 'Asia/Shanghai') AT TIME ZONE 'Asia/Shanghai'))::text AS day,
+       (SELECT count(*) FROM publish_tasks
+         WHERE workspace_id=$1 AND account_id=$2 AND platform=$3 AND status='succeeded')::text AS ever`,
+    [scope.workspaceId, accountId, platform],
+  );
+  return {
+    account_daily_published: Number(rows[0]?.day ?? 0),
+    platform_first_use: Number(rows[0]?.ever ?? 0) === 0,
+  };
+}
 
 const publishRouter = router({
   /**
@@ -432,11 +454,12 @@ const publishRouter = router({
       const scope = scopeOf(ctx.identity);
       const app = getAppPool();
       const { rules, defaultLevel } = await loadActiveRules(app, scope);
-      const taskId = newId("PT");
+      const fenceContext = await publishFenceContext(app, scope, input.accountId, input.platform);
       const verdict = judge({
-        object: { type: "publish_task", id: taskId },
+        object: { type: "publish_task", id: "PT-new" },
         action: "publish.execute",
         params: { platform: input.platform, accountId: input.accountId, scheduleAt: input.scheduleAt ?? null },
+        context: fenceContext,
       }, rules, defaultLevel);
       if (verdict.level === "block") {
         throw new TRPCError({
@@ -444,49 +467,82 @@ const publishRouter = router({
           message: `G9 围栏熔断：${verdict.triggeredBy.join("；") || "publish.execute 命中 block 规则"}（公网发布必审基线）`,
         });
       }
-      const client = await app.connect();
-      try {
-        // D16（#1/A）：发布任务行与入队事件同一事务同一 COMMIT
-        await client.query("BEGIN");
-        await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-        await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-        await client.query(
-          `INSERT INTO publish_tasks
-             (id, workspace_id, platform, account_id, asset_id, video_path, cover_path, caption, tags, schedule_at, status, created_by)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::timestamptz,'pending',$11)`,
-          [
-            taskId, scope.workspaceId, input.platform, input.accountId, input.assetId ?? null,
-            input.videoPath, input.coverPath ?? null, input.caption,
-            JSON.stringify(input.tags), input.scheduleAt ?? null, ctx.identity.memberNo,
-          ],
-        );
-        await gatewayAppendOnClient(client, {
-          ...scope, actor: { id: ctx.identity.memberNo, type: "human" },
-        }, {
-          who: { type: "human", id: ctx.identity.memberNo },
-          context: {
-            tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
-            time: new Date().toISOString(), channel: "inapp",
-          },
-          object: { type: "publish_task", id: taskId },
-          decision: {
-            action: "publish.task.create",
-            after: {
-              taskId, platform: input.platform, accountId: input.accountId,
-              scheduleAt: input.scheduleAt ?? null, fenceLevel: verdict.level,
+      // 唯一写入点（gen/publish.createPublishTask）：行与事件同一事务
+      const created = await createPublishTask(app, getGatewayPool(), scope, {
+        platform: input.platform,
+        accountId: input.accountId,
+        assetId: input.assetId ?? null,
+        videoPath: input.videoPath,
+        coverPath: input.coverPath ?? null,
+        caption: input.caption,
+        tags: input.tags,
+        scheduleAt: input.scheduleAt ?? null,
+        origin: "manual",
+        by: ctx.identity.memberNo,
+      });
+      return { taskId: created.taskId, level: verdict.level };
+    }),
+
+  /**
+   * 发布执行（T-2026-0921-0002）：G9 复核 → 日上限 → 适配器（本进程为 dry-run 驱动）。
+   * 真实平台上传需桌面端 Playwright 驱动 + 用户本人登录态；本接口只把"执行机制"跑通并留痕，
+   * 回执固定 synced:false + driver:"dry-run"（不冒充真实发布，不变量 9）。
+   * 测试开关 PUBLISH_TEST_FENCE_OVERRIDE=1（仅非 production + dry-run 生效）用于把机制跑通，
+   * 生效力时后续追加 publish.test_override 事件留痕。
+   */
+  run: writeProcedure
+    .input(z.object({ taskId: z.string().min(1), dailyLimit: z.number().int().min(1).max(20).optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      const app = getAppPool();
+      const { rules, defaultLevel } = await loadActiveRules(app, scope);
+      const taskRows = await scopedQuery<{ account_id: string; platform: string }>(
+        app, scope,
+        `SELECT account_id, platform FROM publish_tasks WHERE workspace_id=$1 AND id=$2`,
+        [scope.workspaceId, input.taskId],
+      );
+      const task = taskRows[0];
+      const fenceContext = task
+        ? await publishFenceContext(app, scope, task.account_id, task.platform)
+        : { account_daily_published: 0, platform_first_use: true };
+      let overrideUsed = false;
+      const fencePrecheck = (judgeInput: Parameters<typeof judge>[0]) => {
+        const verdict = judge({ ...judgeInput, context: { ...(judgeInput.context ?? {}), ...fenceContext } }, rules, defaultLevel);
+        if (verdict.level !== "auto" && fenceOverrideEnabled()) {
+          overrideUsed = true;
+          return { ...verdict, level: "auto" as const };
+        }
+        return verdict;
+      };
+      const outcome = await executePublishTask(app, getGatewayPool(), scope, input.taskId, {
+        fencePrecheck, dailyLimit: input.dailyLimit,
+      });
+      if (overrideUsed && outcome.kind === "executed") {
+        const client = await getGatewayPool().connect();
+        try {
+          await client.query("BEGIN");
+          await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+          await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+          await gatewayAppendOnClient(client, { ...scope, actor: { id: ctx.identity.memberNo, type: "human" } }, {
+            who: { type: "human", id: ctx.identity.memberNo },
+            context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },
+            object: { type: "publish_task", id: input.taskId },
+            decision: {
+              action: "publish.test_override",
+              after: { taskId: input.taskId, driver: outcome.driver, override: true, calls: outcome.calls?.slice(0, 12) ?? [] },
+              basis: ["测试专用围栏放行（PUBLISH_TEST_FENCE_OVERRIDE=1，非 production）：仅用于验证发布执行机制，dry-run 回执已标 synced:false"],
             },
-            basis: [`发布任务入队（§7；G9 预检 ${verdict.level}，执行时 runner 复核，非 auto 挂起待审）`],
-          },
-          rule_impact: verdict.impacts,
-        });
-        await client.query("COMMIT");
-      } catch (err) {
-        await client.query("ROLLBACK").catch(() => undefined);
-        throw err;
-      } finally {
-        client.release();
+            rule_impact: [],
+          });
+          await client.query("COMMIT");
+        } catch (err) {
+          await client.query("ROLLBACK").catch(() => undefined);
+          throw err;
+        } finally {
+          client.release();
+        }
       }
-      return { taskId, level: verdict.level };
+      return { ...outcome, overrideUsed };
     }),
 });
 
@@ -540,10 +596,128 @@ const commentsRouter = router({
     }),
 });
 
+/* ================= gen：模型目录 / 报价 / 任务 / 成片（T-2026-0921-0002） ================= */
+
+const genRouter = router({
+  /**
+   * 模型目录：默认只列"运行时可提交"的模型（wired + 密钥就绪）；
+   * includeUnavailable=true 可看全量（含 catalog-only，UI 明确标注"未接入"）。
+   */
+  catalog: protectedProcedure
+    .input(z.object({
+      kind: z.enum(["video", "image", "audio"]).optional(),
+      mode: z.enum(["t2v", "i2v", "r2v", "v2v", "t2i", "i2i", "lipsync", "audio"]).optional(),
+      includeUnavailable: z.boolean().default(false),
+      limit: z.number().int().min(1).max(200).default(60),
+    }).optional())
+    .query(({ input }) => ({
+      models: listModels({
+        kind: input?.kind,
+        mode: input?.mode,
+        onlyAvailable: !(input?.includeUnavailable ?? false),
+      }).slice(0, input?.limit ?? 60),
+      usdCnyRate: usdCnyRate(),
+      caps: costCaps(),
+    })),
+
+  /** 报价 + 上限闸预览（提交前看钱；不写库） */
+  estimate: protectedProcedure
+    .input(z.object({
+      modelId: z.string().min(1),
+      seconds: z.number().int().min(1).max(120).optional(),
+      images: z.number().int().min(1).max(20).optional(),
+    }))
+    .query(async ({ ctx, input }) => {
+      const model = getModel(input.modelId);
+      if (!model) throw new TRPCError({ code: "BAD_REQUEST", message: `模型目录中不存在「${input.modelId}」` });
+      const estimate = estimateCost(model, { seconds: input.seconds, images: input.images });
+      const scope = scopeOf(ctx.identity);
+      const spend = await renderSpendCny(getAppPool(), scope);
+      const caps = costCaps();
+      const gate = checkCostCaps({
+        spentDayCny: spend.day, spentMonthCny: spend.month, estCny: estimate.cny, caps,
+      });
+      return {
+        model: {
+          id: model.id, name: model.name, provider: model.provider, tier: model.tier,
+          modes: model.modes, limits: model.limits ?? null,
+          available: model.availability === "wired", notes: model.notes ?? null,
+        },
+        estimate,
+        spend: { dayCny: spend.day, monthCny: spend.month, caps },
+        allowed: gate.allowed,
+        reason: gate.reason ?? null,
+      };
+    }),
+
+  /** 任务队列（工作室页数据源）：模型/成本/状态/成片播放地址 */
+  jobs: protectedProcedure
+    .input(z.object({
+      projectId: z.string().min(1).optional(),
+      limit: z.number().int().min(1).max(100).default(30),
+    }))
+    .query(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      const rows = await scopedQuery<{
+        id: string; project_id: string; script_id: string; script_version: number;
+        task_id: string | null; status: string; provider: string | null; provider_model: string | null;
+        est_usd: string | null; est_cny: string | null; actual_usd: string | null; actual_cny: string | null;
+        est_seconds: number | null; actual_seconds: number | null; mock: boolean; asset_id: string | null;
+        result_url: string | null; idempotency_key: string | null; created_at: string; updated_at: string;
+        script_key: string | null; local_path: string | null; asset_kind: string | null;
+      }>(
+        getAppPool(), scope,
+        `SELECT j.id, j.project_id, j.script_id, j.script_version, j.task_id, j.status,
+                j.provider, j.provider_model, j.est_usd, j.est_cny, j.actual_usd, j.actual_cny,
+                j.est_seconds, j.actual_seconds, j.mock, j.asset_id, j.result_url, j.idempotency_key,
+                j.created_at, j.updated_at,
+                s.script_key, a.meta->>'localPath' AS local_path, a.kind AS asset_kind
+           FROM render_jobs j
+           LEFT JOIN render_scripts s ON s.id = j.script_id AND s.workspace_id = j.workspace_id
+           LEFT JOIN video_assets a ON a.id = j.asset_id AND a.workspace_id = j.workspace_id
+          WHERE j.workspace_id = $1 AND ($2::text IS NULL OR j.project_id = $2)
+          ORDER BY j.created_at DESC
+          LIMIT $3`,
+        [scope.workspaceId, input.projectId ?? null, input.limit],
+      );
+      return rows.map((r) => ({
+        ...r,
+        est_usd: r.est_usd === null ? null : Number(r.est_usd),
+        est_cny: r.est_cny === null ? null : Number(r.est_cny),
+        actual_usd: r.actual_usd === null ? null : Number(r.actual_usd),
+        actual_cny: r.actual_cny === null ? null : Number(r.actual_cny),
+        /** 已入库成片 → 签名播放入口；未入库 → 供应商原始 URL（7 天内有效，UI 标注） */
+        playUrl: r.local_path ? mediaUrl(r.local_path) : (r.result_url ?? null),
+        playUrlKind: r.local_path ? "library" as const : (r.result_url ? "provider" as const : null),
+      }));
+    }),
+
+  /** 成片播放/下载签名 URL（仅已入库成片；TTL 可调） */
+  mediaUrl: protectedProcedure
+    .input(z.object({ jobId: z.string().min(1), ttlSec: z.number().int().min(60).max(86_400).default(3600) }))
+    .query(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      const rows = await scopedQuery<{ local_path: string | null; asset_id: string | null }>(
+        getAppPool(), scope,
+        `SELECT a.meta->>'localPath' AS local_path, j.asset_id
+           FROM render_jobs j
+           LEFT JOIN video_assets a ON a.id = j.asset_id AND a.workspace_id = j.workspace_id
+          WHERE j.workspace_id = $1 AND j.id = $2`,
+        [scope.workspaceId, input.jobId],
+      );
+      const localPath = rows[0]?.local_path ?? null;
+      if (!localPath) {
+        throw new TRPCError({ code: "NOT_FOUND", message: `任务 ${input.jobId} 的成片尚未入库（先跑 video.render.poll 完成回填与入库）` });
+      }
+      return { url: mediaUrl(localPath, input.ttlSec), expiresInSec: input.ttlSec };
+    }),
+});
+
 export const videoRouter = router({
   studio: studioRouter,
   cms: cmsRouter,
   render: renderRouter,
+  gen: genRouter,
   publish: publishRouter,
   metrics: metricsRouter,
   comments: commentsRouter,

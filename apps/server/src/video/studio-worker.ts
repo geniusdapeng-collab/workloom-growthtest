@@ -23,6 +23,7 @@ import {
   VideoStudio,
   WorkloomLLMEngine,
   installVendorEngineBridge,
+  installVendorRenderCompatBridge,
   type ApprovalCallback,
   type EventSink,
   type GateKey,
@@ -210,6 +211,8 @@ export function startRun(scope: Scope, input: RunInput): string {
    * 不桥接就会出现「LLM引擎返回失败: API Key 未配置」→ 预生产在 Layer 1 直接失败。
    */
   installVendorEngineBridge(llm);
+  // 逐镜渲染的入参归一（空 portraits 数组会以 characterRef.split 崩溃，见 vendor-compat.ts）
+  installVendorRenderCompatBridge();
 
   const entry: RunEntry = {
     runId: newId("RUN"),
