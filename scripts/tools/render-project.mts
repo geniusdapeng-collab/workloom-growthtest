@@ -22,8 +22,14 @@
  *
  * 输出：每镜的 job/task/asset/localPath 汇总 JSON（stdout 的 SUMMARY 行），供拼接/调色环节消费。
  */
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
-import { basename, extname, isAbsolute, resolve } from "node:path";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
+import {
+  fieldSpec,
+  prepareShotPrompt,
+  shotSpecMarkdown,
+  type ShotSpecReport
+} from "../../packages/video-studio/src/index.js";
 
 const API = process.env.WORKLOOM_API ?? "http://127.0.0.1:8787";
 const TOKEN = process.env.WORKLOOM_TOKEN ?? "";
@@ -160,10 +166,7 @@ function loadRefFiles(spec: string): string[] {
 }
 
 /**
- * 组装逐镜渲染正文（Seedance 提示词的唯一来源）。
- * 优先用预生产定稿的 `prompt` 正文；为空时**必须**从 25/30 字段复原——
- * 真机 2026-09-21 实测：VID-1018 的 `shots.json` 里 5 镜有 4 镜 `prompt` 为空字符串，
- * 直接取用会提交空提示词（白烧额度）。
+ * 旧的自写组装器（保留导出供回归对比；提交路径已改走 `shot-spec` 的 vendor 规范组装）。
  */
 export function composePrompt(shot: ShotCard): string {
   const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
@@ -204,6 +207,21 @@ export function composePrompt(shot: ShotCard): string {
   push("负面", [text(shot.negative), text(shot.negativeConstraints)].filter(Boolean).join("；"));
   if (finalized) lines.push(`补充：${finalized}`);
   return lines.join("\n");
+}
+
+/**
+ * 新提交路径：vendor 规范组装 + 交付闸。
+ * 详见 `packages/video-studio/src/shot-spec.ts`（25/30 字段、长度口径、台词速率、情绪可见性）。
+ */
+export function composePromptBySpec(
+  shot: ShotCard,
+  options: { aspect: string; resolution: string; log?: (line: string) => void }
+): ShotSpecReport {
+  return prepareShotPrompt(shot as unknown as Record<string, unknown>, {
+    ratio: options.aspect,
+    resolution: options.resolution,
+    log: options.log
+  });
 }
 
 function dataUrl(file: string): string {
@@ -253,6 +271,8 @@ const resolution = arg("--resolution", "1080p");
 const modelId = arg("--model", "doubao-seedance-2-5");
 const only = arg("--only").split(",").map((s) => s.trim()).filter(Boolean);
 const dryRun = flag("--dry-run");
+/** 交付闸未过的镜头默认拒绝提交（避免把不合规提示词烧成额度）；显式放行需带此开关 */
+const allowSpecFail = flag("--allow-spec-fail");
 const workDir = resolve(REPO_ROOT, process.env.HR_WORK_DIR ?? ".vm-work");
 const refFiles = loadRefFiles(arg("--refs", "var/media/references/suzhou-nanyuan"));
 const portraitIndex = loadPortraitIndex(projectId, workDir);
@@ -268,6 +288,16 @@ interface ShotResult {
   scriptId: string;
   seconds: number;
   references: number;
+  spec?: {
+    isOpening: boolean;
+    charCount: number;
+    promptSource: string;
+    deliveryPass: boolean;
+    deliveryIssues: string[];
+    missingFields: string[];
+    missingOpeningFields: string[];
+    redlines: string[];
+  };
   jobId?: string;
   taskId?: string;
   mock?: boolean;
@@ -278,6 +308,7 @@ interface ShotResult {
 }
 
 const results: ShotResult[] = [];
+const specReports: ShotSpecReport[] = [];
 const pending = new Map<string, ShotResult>();
 
 for (const shot of shots) {
@@ -289,11 +320,46 @@ for (const shot of shots) {
   const row: ShotResult = { shotId: shot.shotId, scriptKey, scriptId: scriptKey, seconds, references: references.length };
   results.push(row);
 
-  const promptText = composePrompt(shot);
-  if (!promptText) {
-    row.error = "镜头卡既无 prompt 正文、也无法从字段复原";
-    console.error(`⛔ ${shot.shotId}：${row.error}`);
-    continue;
+  /**
+   * 定妆照字段回填（机械修复）：vendor 的 25 字段含 `portraits`，但管线里该字段常为空
+   * （portrait-resolver 只写 `prompt.portraitBindings`）。这里用定妆照索引把**真实产物**
+   * 回填进镜头卡：既满足交付闸的【定妆照】字段，也让渲染拿到同一批锚点图。
+   */
+  const cardWithPortraits: ShotCard = { ...shot };
+  if (!Array.isArray(cardWithPortraits.portraits) || (cardWithPortraits.portraits as unknown[]).length === 0) {
+    const productPortraits = portraitIndex?.products
+      ? Object.values(portraitIndex.products)
+          .map((entry) => entry.files?.front ?? Object.values(entry.files ?? {})[0])
+          .filter((file): file is string => Boolean(file))
+          .slice(0, 2)
+      : [];
+    const fallback = productPortraits.length > 0 ? productPortraits : venue;
+    if (fallback.length > 0) cardWithPortraits.portraits = fallback;
+  }
+
+  const specReport = composePromptBySpec(cardWithPortraits, { aspect, resolution, log: (line) => console.log(line) });
+  specReports.push(specReport);
+  row.spec = {
+    isOpening: specReport.isOpening,
+    charCount: specReport.charCount,
+    promptSource: specReport.promptSource,
+    deliveryPass: specReport.delivery.pass,
+    deliveryIssues: specReport.delivery.issues,
+    missingFields: specReport.missingSpecFields,
+    missingOpeningFields: specReport.missingOpeningFields,
+    redlines: specReport.redlines
+  };
+  const promptText = specReport.prompt;
+  if (!specReport.delivery.pass || specReport.redlines.length > 0) {
+    row.error = `镜头卡未过交付闸：${[
+      ...specReport.delivery.issues,
+      ...specReport.redlines.map((word) => `内容红线「${word}」`)
+    ].join("；")}`;
+    if (!allowSpecFail) {
+      console.error(`⛔ ${shot.shotId}：${row.error}（默认拒绝提交；--allow-spec-fail 可越过）`);
+      continue;
+    }
+    console.warn(`⚠️ ${shot.shotId}：${row.error}（--allow-spec-fail 已显式放行）`);
   }
   const md = [
     `# ${projectId} · ${shot.shotId}`,
@@ -312,7 +378,11 @@ for (const shot of shots) {
   ].join("\n");
 
   if (dryRun) {
-    console.log(`[dry-run] ${shot.shotId} ${seconds}s refs=${references.map((f) => basename(f)).join("+") || "无"} prompt=${promptText.length}字`);
+    console.log(
+      `[dry-run] ${shot.shotId} ${seconds}s refs=${references.map((f) => basename(f)).join("+") || "无"}`
+      + ` prompt=${promptText.length}字 source=${specReport.promptSource}`
+      + ` 交付闸=${specReport.delivery.pass ? "pass" : "fail"} 字段体系=${specReport.isOpening ? "片头30" : "内容25"}`
+    );
     continue;
   }
 
@@ -398,4 +468,40 @@ for (let round = 0; round < POLL_ROUNDS && pending.size > 0 && !dryRun; round +=
   }
 }
 
-console.log(`SUMMARY ${JSON.stringify({ projectId, totalSeconds, shots: results })}`);
+/* ---------- 报告落盘：镜头卡规范表 + 出片汇总（供 pipeline-audit 消费） ---------- */
+if (specReports.length > 0) {
+  const specMd = [
+    `# 出片镜头卡规范报告 · ${projectId}`,
+    "",
+    `- 画幅：${aspect} / ${resolution}；总时长目标：${totalSeconds}s`,
+    `- 字段规范真源：vendor field-standardizer + PromptDeliveryGuard（25 字段内容镜 / 30 字段片头）`,
+    `- 交付闸：${specReports.filter((r) => r.delivery.pass).length}/${specReports.length} 通过`
+    + `（未过：${specReports.filter((r) => !r.delivery.pass).map((r) => r.shotId).join("、") || "无"}）`,
+    "",
+    shotSpecMarkdown(specReports)
+  ].join("\n");
+  const outDir = dirname(resolve(REPO_ROOT, shotsFile));
+  const specPath = resolve(REPO_ROOT, arg("--spec-report", `${outDir}/render-spec-report.md`));
+  writeFileSync(specPath, specMd, "utf8");
+  console.log(`镜头卡规范报告：${specPath}`);
+}
+
+const summary = {
+  projectId,
+  totalSeconds,
+  aspect,
+  resolution,
+  modelId,
+  generatedAt: new Date().toISOString(),
+  spec: {
+    total: specReports.length,
+    passed: specReports.filter((r) => r.delivery.pass).length,
+    openingShots: specReports.filter((r) => r.isOpening).length,
+    fieldSpec: fieldSpec().lengths
+  },
+  shots: results
+};
+const summaryPath = resolve(REPO_ROOT, arg("--summary-out", `${dirname(resolve(REPO_ROOT, shotsFile))}/render-summary.json`));
+writeFileSync(summaryPath, `${JSON.stringify(summary, null, 2)}\n`, "utf8");
+console.log(`出片汇总：${summaryPath}`);
+console.log(`SUMMARY ${JSON.stringify(summary)}`);
