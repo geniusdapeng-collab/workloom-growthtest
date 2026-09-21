@@ -18,13 +18,25 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
+import { existsSync } from "node:fs";
 import YAML from "yaml";
 import { fenceRulesOf, judge, type FenceLevel, type JudgeInput, type RuntimeRule } from "@workloom/base/fence-engine";
-import { registerWriteActions } from "@workloom/base/workdata";
+import { gatewayAppend, registerWriteActions } from "@workloom/base/workdata";
+import { getGatewayPool } from "@workloom/db";
 import { assertApproverRole, validateGesture, ApprovalError, type GestureInput } from "@workloom/base/review-console";
 import { parseBusinessEvent } from "@workloom/shared";
 
 const repoRoot = process.env.WORKLOOM_REPO_ROOT ?? process.cwd();
+
+// 本地 .env（gitignored）提供 DATABASE_GATEWAY_URL 等；仅实验机使用。
+const envPath = new URL("../../../.env", import.meta.url).pathname;
+if (existsSync(envPath)) {
+  try {
+    process.loadEnvFile(envPath);
+  } catch (error) {
+    process.stderr.write(`[policy-bridge] 加载 .env 失败：${error instanceof Error ? error.message : String(error)}\n`);
+  }
+}
 
 function listFiles(dir: string, suffix: string): string[] {
   try {
@@ -132,6 +144,14 @@ async function handle(message: { id?: unknown; method?: string; params?: Record<
       case "validateEvent": {
         const event = parseBusinessEvent(params.event ?? {});
         reply(id, { ok: true, eventId: event.event_id });
+        return;
+      }
+      case "appendEvent": {
+        const ctx = (params.ctx ?? {}) as { tenantId?: string; workspaceId?: string; actor?: { id: string; type: "human" | "agent" | "system"; version?: string } };
+        const draft = params.draft as Parameters<typeof gatewayAppend>[2];
+        if (!ctx.tenantId || !ctx.workspaceId || !ctx.actor || !draft) throw new Error("appendEvent 缺少 ctx.tenantId/workspaceId/actor 或 draft");
+        const result = await gatewayAppend(getGatewayPool(), { tenantId: ctx.tenantId, workspaceId: ctx.workspaceId, actor: ctx.actor }, draft);
+        reply(id, { ok: true, eventId: result.eventId, hash: (result as { hash?: string }).hash ?? null, piiHits: result.piiHits ?? 0 });
         return;
       }
       default:

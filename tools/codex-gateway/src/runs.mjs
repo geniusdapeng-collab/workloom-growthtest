@@ -19,6 +19,7 @@ import { findCapability } from "./catalog.mjs";
 import { createPolicyClient } from "./policy-client.mjs";
 import { createStore } from "./store.mjs";
 import { resolveRepoRoot } from "./paths.mjs";
+import { createDbMirror } from "./mirror.mjs";
 
 export const RUN_STATES = ["queued", "running", "waiting_approval", "completed", "blocked", "failed", "cancelled", "paused"];
 const TERMINAL = new Set(["completed", "blocked", "failed", "cancelled"]);
@@ -91,10 +92,22 @@ export function createRunService({
   catalog,
   policy = createPolicyClient({ repoRoot }),
   store = createStore({ dataDir: defaultDataDir(repoRoot) }),
+  mirror = undefined,
   now = () => new Date(),
   approvalTtlMs = 2 * 60 * 60 * 1000,
 } = {}) {
   if (!catalog) throw new RunServiceError("CATALOG_REQUIRED", "createRunService 需要 catalog");
+
+  const dbMirror = mirror !== undefined
+    ? mirror
+    : process.env.WORKLOOM_DB_MIRROR === "1"
+      ? createDbMirror({
+          policy,
+          tenantId: process.env.WORKLOOM_DB_TENANT ?? "tenant-demo",
+          workspaceId: process.env.WORKLOOM_DB_WORKSPACE ?? "ws-geo",
+          dataDir: store.dataDir,
+        })
+      : null;
 
   const workspaceId = catalog.repo.defaultBundle || "geo-growth";
   const tenantId = "growthtest";
@@ -123,6 +136,16 @@ export function createRunService({
 
   function append(record) {
     return store.appendRun({ ...record, updatedAt: now().toISOString() });
+  }
+
+  async function mirrorRun(run) {
+    if (!dbMirror || !run) return run;
+    try {
+      const summary = await dbMirror.mirrorRun(store, run.runId);
+      return append({ ...run, dbMirror: summary });
+    } catch (error) {
+      return append({ ...run, dbMirror: { ok: false, error: error instanceof Error ? error.message : String(error) } });
+    }
   }
 
   function executeSimulated(run, { editedAfter } = {}) {
@@ -247,7 +270,7 @@ export function createRunService({
       });
     } catch (error) {
       const failed = blockRun(store.getRun(runId), { level: "block", impacts: [], triggeredBy: [`策略桥不可用：${error.message}`], evalErrors: [error.message] }, "POLICY_UNAVAILABLE");
-      return { run: failed, approval: null, fence: failed.fence };
+      return { run: await mirrorRun(failed), approval: null, fence: failed.fence };
     }
 
     store.appendLedger(ledgerBase(store.getRun(runId), "run.started", {
@@ -256,14 +279,14 @@ export function createRunService({
     }));
 
     if (verdict.level === "block") {
-      return { run: blockRun(store.getRun(runId), verdict, "FENCE_BLOCK"), approval: null, fence: verdict };
+      return { run: await mirrorRun(blockRun(store.getRun(runId), verdict, "FENCE_BLOCK")), approval: null, fence: verdict };
     }
     if (verdict.level === "review") {
       const { approval, run } = createApproval(store.getRun(runId), capability, verdict);
-      return { run, approval, fence: verdict };
+      return { run: await mirrorRun(run), approval, fence: verdict };
     }
     const run = executeSimulated(append({ ...store.getRun(runId), fence: verdict }));
-    return { run, approval: null, fence: verdict };
+    return { run: await mirrorRun(run), approval: null, fence: verdict };
   }
 
   async function decideApproval(input = {}) {
@@ -305,10 +328,10 @@ export function createRunService({
     if (gesture.type === "reject") {
       const cancelled = append({ ...run, state: "cancelled", cancelReason: gesture.reasonText ?? gesture.reasonEnum ?? "rejected", finishedAt: now().toISOString() });
       store.appendLedger(ledgerBase(cancelled, "run.cancelled", { after: { reason: "approval_rejected" }, links: [approvalId] }));
-      return { approval: decided, run: cancelled };
+      return { approval: decided, run: await mirrorRun(cancelled) };
     }
     const executed = executeSimulated(append({ ...run, fence: run.fence, editedAfter: gesture.editedAfter }), { editedAfter: gesture.editedAfter });
-    return { approval: decided, run: executed };
+    return { approval: decided, run: await mirrorRun(executed) };
   }
 
   function cancelRun(input = {}) {

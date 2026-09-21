@@ -113,3 +113,15 @@ codex exec -C <growthtest> -s read-only --skip-git-repo-check --json \
 - **计数口径分离**：网关审批（P1 store，2 项）与业务待决（真实 tRPC，3 项）是两套来源，已在 `counts.pendingApprovalsSource` / `counts.theaterPendingSource` 与工作台统计卡（“网关审批”/“业务待决（真实）”）显式分列，禁止混用。
 - **真实模型触发验收**：`codex exec` 只读调用一次 `workloom_stage_snapshot`；模型报告 `dataMode=real`、73 员工、25 在岗、2 网关待审批、`theater.mode=trial`、`pendingByTier l2=1/l4=2`，并主动指出两套审批计数不同源——该问题已按上一条修复。
 - **未覆盖（P4 继续）**：真实平台连接器（发布/投放/渲染仍为显式模拟）、写路径落业务库（P1 写网关 append-only JSONL；接 workdata/RLS 为 P4）、多租户与生产部署。
+
+## P4 验收记录（真实业务库五元事件镜像，2026-09-22）
+
+- **实现**：策略桥新增 `appendEvent`，调用真实 `getGatewayPool()` + `gatewayAppend()`（权限校验 → PII 脱敏 → 高风险授权 → 同一 RLS 事务落库）；网关把每次 Run 的本地账本事件镜像进 `biz_events`，本地 event_id 与 DB event_id 的映射 append 到 `data/codex-gateway/mirror.jsonl`，失败不静默（`dbMirror.failed` 与 mirror.jsonl 均留痕）。
+- **CLI 真机验收**：`WORKLOOM_DB_MIRROR=1` 下跑 G9 全闭环；`run.started/approval.asked` 2/2、批准后累计 14/14 事件镜像成功（DB E-9100…E-9113），`biz_events` 60→74；`pnpm db:verify-chain`：2 个 workspace 段 / 205 条事件、六项检查全绿。
+- **真实模型终验**：`codex exec -p workloomtest --approve-for-me` 执行 `run_start → approval_decide → run_status`；Run `RUN-mubj6tmi-f6dac3` completed、`receipt.synced=true`、`dbMirror={ok:true,total:8,mirrored:8,failed:0}`，DB 事件 E-9114…E-9121；`biz_events` 74→82，`db:verify-chain` 213 条事件全绿。模型明确声明本次为模拟执行（`workloom-sim://`），不是真实小红书发布。
+- **P4 真机发现并修复**：首次镜像 0/14，原因是策略桥客户端未暴露 `appendEvent`（`policy.appendEvent is not a function`）；失败被如实写入 mirror.jsonl，未伪装成功。补齐客户端方法后复测 14/14、8/8 通过。
+- **P4 剩余（未覆盖）**：
+  - 真实平台连接器（发布/投放/渲染仍是显式模拟执行，等待连接器与考试院）；
+  - 审批写回业务库 `approvals` 表（当前人审在网关 store；DB 侧仅镜像事件）；
+  - MCP 工具 allow/deny 策略、hooks 信任审查与插件 marketplace 安装的真机验收；
+  - 多租户/多工作区切换、生产部署与发布门禁。

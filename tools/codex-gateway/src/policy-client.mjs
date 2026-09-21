@@ -92,6 +92,7 @@ export function createPolicyClient({ repoRoot = resolveRepoRoot(), timeoutMs = 2
     judge: (input) => call("judge", { input }),
     validateGesture: (gesture, role = "owner") => call("gesture", { gesture, role }),
     validateEvent: (event) => call("validateEvent", { event }),
+    appendEvent: ({ ctx, draft }) => call("appendEvent", { ctx, draft }, 30000),
     packs: () => call("packs", {}),
     ping: () => call("ping", {}),
     close: () => {
