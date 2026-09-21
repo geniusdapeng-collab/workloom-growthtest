@@ -20,7 +20,19 @@ growthtest 是 `none-in-none-out` 隔离副本：基座内容不下发、本仓�
    ```
 
 2. 在 Codex 插件页安装 `workloom-workbench`；或直接用本仓 `plugins/workloom-workbench/.codex-plugin/plugin.json` 做本地开发验证。
-3. 第一次加载后，hooks 需要信任审查：在 CLI 用 `/hooks`，或在桌面端按提示确认。未信任前 hook 不会运行。
+3. 安装 MCP 启动器到 PATH（真机取证：Codex 启动插件 MCP 时 cwd=项目目录且不提供 PLUGIN_ROOT，所以不能用相对路径）：
+
+   ```bash
+   sh plugins/workloom-workbench/scripts/install-launcher.sh
+   ```
+
+   它会把 `workloom-workbench-mcp` 写入 `~/.local/bin`（Codex 的 PATH 已包含），并在插件根写入 `repo-root.txt`。
+4. 重启 Codex（或刷新插件），让插件 MCP server 用启动器重新拉起。
+5. 第一次加载后，hooks 需要信任审查：在 CLI 用 `/hooks`，或在桌面端按提示确认。未信任前 hook 不会运行。
+
+> 平台行为（2026-09-22 实测）：插件 MCP 启动时 `PLUGIN_ROOT`/`CLAUDE_PLUGIN_ROOT` 未设置、cwd 是项目目录；
+> 相对命令会报 `No such file or directory`，`$PLUGIN_ROOT` 路径会握手失败。官方便携格式目前只支持远程 HTTPS MCP；
+> 本地 stdio 需要 PATH 启动器或绝对路径（见本目录 `scripts/install-launcher.sh`）。
 
 ## 手工验证 MCP（不依赖 Codex）
 

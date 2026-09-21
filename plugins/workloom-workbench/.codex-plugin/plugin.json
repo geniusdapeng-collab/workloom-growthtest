@@ -1,28 +1,37 @@
 {
   "name": "workloom-workbench",
-  "version": "0.1.0",
-  "description": "把 WorkLoom 的数字员工、技能、管线与治理能力接入 Codex：能力目录、只读数字人工作台、受控执行入口（P0 只读）。",
+  "version": "0.1.2+codex.20260921174925",
+  "description": "\u628a WorkLoom \u7684\u6570\u5b57\u5458\u5de5\u3001\u6280\u80fd\u3001\u7ba1\u7ebf\u4e0e\u6cbb\u7406\u80fd\u529b\u63a5\u5165 Codex\uff1a\u80fd\u529b\u76ee\u5f55\u3001\u53ea\u8bfb\u6570\u5b57\u4eba\u5de5\u4f5c\u53f0\u3001\u53d7\u63a7\u6267\u884c\u5165\u53e3\uff08P0 \u53ea\u8bfb\uff09\u3002",
   "author": {
-    "name": "WorkLoom Growthtest 实验",
+    "name": "WorkLoom Growthtest \u5b9e\u9a8c",
     "url": "https://cnb.cool/workloom-ai/workloom-growthtest"
   },
   "homepage": "https://cnb.cool/workloom-ai/workloom-growthtest",
   "repository": "https://cnb.cool/workloom-ai/workloom-growthtest",
   "license": "MIT",
-  "keywords": ["workloom", "digital-employees", "mcp", "growth", "agent-operations"],
+  "keywords": [
+    "workloom",
+    "digital-employees",
+    "mcp",
+    "growth",
+    "agent-operations"
+  ],
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "WorkLoom 工作台",
-    "shortDescription": "在 Codex 里发现并调用 WorkLoom 的数字员工与经营能力。",
-    "longDescription": "WorkLoom 工作台把 growthtest 实验仓的能力目录、数字员工班组、围栏与管线以 MCP 工具和资源的形式接入 Codex；同时提供一个本地数字人团队工作台页面用于观察工位、运行中的任务、待审批与实时事件。P0 为只读模式：只暴露能力查询、快照与事件订阅，不暴露任何写操作。",
-    "developerName": "WorkLoom Growthtest 实验",
+    "displayName": "WorkLoom \u5de5\u4f5c\u53f0",
+    "shortDescription": "\u5728 Codex \u91cc\u53d1\u73b0\u5e76\u8c03\u7528 WorkLoom \u7684\u6570\u5b57\u5458\u5de5\u4e0e\u7ecf\u8425\u80fd\u529b\u3002",
+    "longDescription": "WorkLoom \u5de5\u4f5c\u53f0\u628a growthtest \u5b9e\u9a8c\u4ed3\u7684\u80fd\u529b\u76ee\u5f55\u3001\u6570\u5b57\u5458\u5de5\u73ed\u7ec4\u3001\u56f4\u680f\u4e0e\u7ba1\u7ebf\u4ee5 MCP \u5de5\u5177\u548c\u8d44\u6e90\u7684\u5f62\u5f0f\u63a5\u5165 Codex\uff1b\u540c\u65f6\u63d0\u4f9b\u4e00\u4e2a\u672c\u5730\u6570\u5b57\u4eba\u56e2\u961f\u5de5\u4f5c\u53f0\u9875\u9762\u7528\u4e8e\u89c2\u5bdf\u5de5\u4f4d\u3001\u8fd0\u884c\u4e2d\u7684\u4efb\u52a1\u3001\u5f85\u5ba1\u6279\u4e0e\u5b9e\u65f6\u4e8b\u4ef6\u3002P0 \u4e3a\u53ea\u8bfb\u6a21\u5f0f\uff1a\u53ea\u66b4\u9732\u80fd\u529b\u67e5\u8be2\u3001\u5feb\u7167\u4e0e\u4e8b\u4ef6\u8ba2\u9605\uff0c\u4e0d\u66b4\u9732\u4efb\u4f55\u5199\u64cd\u4f5c\u3002",
+    "developerName": "WorkLoom Growthtest \u5b9e\u9a8c",
     "category": "Productivity",
-    "capabilities": ["Read", "Interactive"],
+    "capabilities": [
+      "Read",
+      "Interactive"
+    ],
     "defaultPrompt": [
-      "我们有哪些数字员工和能力？先列目录。",
-      "打开数字人团队工作台，让我看战况。",
-      "GEO 能见度监测怎么做？先给我方案再执行。"
+      "\u6211\u4eec\u6709\u54ea\u4e9b\u6570\u5b57\u5458\u5de5\u548c\u80fd\u529b\uff1f\u5148\u5217\u76ee\u5f55\u3002",
+      "\u6253\u5f00\u6570\u5b57\u4eba\u56e2\u961f\u5de5\u4f5c\u53f0\uff0c\u8ba9\u6211\u770b\u6218\u51b5\u3002",
+      "GEO \u80fd\u89c1\u5ea6\u76d1\u6d4b\u600e\u4e48\u505a\uff1f\u5148\u7ed9\u6211\u65b9\u6848\u518d\u6267\u884c\u3002"
     ],
     "brandColor": "#FFD98A"
   }

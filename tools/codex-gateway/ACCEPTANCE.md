@@ -125,3 +125,15 @@ codex exec -C <growthtest> -s read-only --skip-git-repo-check --json \
   - 审批写回业务库 `approvals` 表（当前人审在网关 store；DB 侧仅镜像事件）；
   - MCP 工具 allow/deny 策略、hooks 信任审查与插件 marketplace 安装的真机验收；
   - 多租户/多工作区切换、生产部署与发布门禁。
+
+## P4 插件打包与安装验收（2026-09-22）
+
+- **marketplace / 插件安装**：`codex plugin marketplace add /Users/mac/WorkLoom-fleet/workloom-growthtest` 成功；`codex plugin add workloom-workbench@workloom-growthtest` 成功，安装缓存 `~/.codex/plugins/cache/workloom-growthtest/workloom-workbench/0.1.2+codex.*`；插件列表中为 installed/enabled。
+- **真机发现的平台行为**（JSONL 警告 + 环境取证脚本）：
+  1. Codex 启动插件 stdio MCP 时 **cwd = 项目目录**（不是插件根），`PLUGIN_ROOT` / `CLAUDE_PLUGIN_ROOT` **均未设置**；
+  2. `.mcp.json` 的相对命令 `./scripts/start-mcp.sh` → `No such file or directory`；
+  3. `$PLUGIN_ROOT/scripts/start-mcp.sh` 形态 → `MCP server startup failed ... initialize response: connection closed`（脚本分支直接退出）；
+  4. 绝对命令路径可以正常握手，证明启动环境本身可用。
+- **处置**：新增 `scripts/install-launcher.sh`，把 `workloom-workbench-mcp` 启动器安装到 `~/.local/bin`（Codex 的 PATH 已包含该目录），并在插件根写入 `repo-root.txt`（已加入 `.gitignore`，不入库）；`.mcp.json` 改为 `"command": "workloom-workbench-mcp"`。官方便携格式目前只支持远程 HTTPS MCP，本地 stdio 属于兼容/本地测试用法，公开分发应改为远程 HTTPS。
+- **终验**：不加载任何临时 profile，直接 `codex exec`；真实模型自动发现插件技能与 `workloom-core` MCP 工具，调用 `workloom_health` 一次成功，返回 `ok=true`、`counts.employees=73`、`counts.pipelines=10`、`warnings=[]`。
+- **仍未覆盖**：MCP 工具 allow/deny 与 hooks 信任审查的端到端配置（hooks 已提供 `hooks/hooks.json`，首次启用需用户在 `/hooks` 或桌面端信任）；多工作区切换与生产分发。

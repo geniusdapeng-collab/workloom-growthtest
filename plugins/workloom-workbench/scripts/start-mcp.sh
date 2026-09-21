@@ -4,12 +4,18 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PLUGIN_DIR=$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)
-REPO_ROOT=$(CDPATH= cd -- "${PLUGIN_DIR}/../.." && pwd)
-
-export WORKLOOM_REPO_ROOT="${REPO_ROOT}"
 
 # shellcheck source=resolve-node.sh
 . "${SCRIPT_DIR}/resolve-node.sh"
+# shellcheck source=resolve-repo.sh
+. "${SCRIPT_DIR}/resolve-repo.sh"
+
+if ! REPO_ROOT=$(resolve_workloom_repo_root "${PLUGIN_DIR}"); then
+  echo "workloom-workbench: 未找到 WorkLoom 仓库根。请设置 WORKLOOM_REPO_ROOT=/path/to/workloom-growthtest，或在插件目录写入 repo-root.txt" >&2
+  exit 1
+fi
+
+export WORKLOOM_REPO_ROOT="${REPO_ROOT}"
 
 if ! NODE_BIN=$(resolve_workloom_node); then
   echo "workloom-workbench: 未找到 Node ≥24。请安装 Node，或设置 WORKLOOM_NODE=/path/to/node" >&2

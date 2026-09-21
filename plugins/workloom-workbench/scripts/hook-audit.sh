@@ -4,12 +4,17 @@ set -eu
 
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PLUGIN_DIR=$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)
-REPO_ROOT=$(CDPATH= cd -- "${PLUGIN_DIR}/../.." && pwd)
-
-export WORKLOOM_REPO_ROOT="${REPO_ROOT}"
 
 # shellcheck source=resolve-node.sh
 . "${SCRIPT_DIR}/resolve-node.sh"
+# shellcheck source=resolve-repo.sh
+. "${SCRIPT_DIR}/resolve-repo.sh"
+
+if ! REPO_ROOT=$(resolve_workloom_repo_root "${PLUGIN_DIR}"); then
+  exit 0
+fi
+
+export WORKLOOM_REPO_ROOT="${REPO_ROOT}"
 
 if ! NODE_BIN=$(resolve_workloom_node); then
   exit 0

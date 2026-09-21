@@ -35,6 +35,9 @@ release/
 # C 层评测运行产物（本地/评审侧生成）
 outputs/c-layer/
 
+# Codex 工作台插件的本机仓库路径（由 install-launcher.sh 生成，含绝对路径，不入库）
+plugins/workloom-workbench/repo-root.txt
+
 # 桌面自包含载荷与验收产物（本地构建/跑验收生成，不入库）
 dist-payload/
 dist-payload.tar.gz
