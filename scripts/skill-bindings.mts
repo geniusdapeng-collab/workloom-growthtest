@@ -52,6 +52,14 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<s
     "publish-ops": ["G9", "G9a"],
     "render-ops": ["G8"],
     "shot-prompt-craft": ["G6"],
+    // 后期 BGM 配乐师五件套（2026-09-22）：安装即绑定成片配乐门 G-BGM0..G-BGM5，卸载即撤销。
+    // 注：同批的调色师四件套（color-*）未登记在本表（历史遗留，见 docs/bgm-composer-role-design.md §13），
+    // 其围栏目前只经 colorist preset 的 fence_bindings 生效；补登记会把色桥技能并集一次性放宽，故留作独立任务卡。
+    "bgm-score-design": ["G-BGM0", "G-BGM1", "G-BGM3", "G-BGM5"],
+    "bgm-audio-layering": ["G-BGM0", "G-BGM2", "G-BGM3", "G-BGM4"],
+    "bgm-vocal-separation": ["G-BGM0", "G-BGM3"],
+    "bgm-library-license": ["G-BGM1", "G-BGM5"],
+    "bgm-delivery-spec": ["G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5"],
   },
   "geo-growth": {
     "ai-answer-rewrite": ["G-GEO1", "G-GEO2"],

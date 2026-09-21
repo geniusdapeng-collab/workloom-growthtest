@@ -1632,6 +1632,86 @@
       "notes": "成片调色内核：signalstats/lut3d/colorbalance/colortemperature/curves/eq/normalize/waveform/vectorscope/histogram。受控下载 + sha256 校验（kit/ffmpeg-pin.json，含 darwin-arm64 实测摘要）；ffmpeg-static 静态构建含 nonfree，仅工位本地使用、不可随产品分发，如需分发请换 LGPL 构建。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）以及 LUT 黄金文件校验。LUT 资产为自算（bundles/ai-video/library/luts/generate-luts.mjs），本仓不携带第三方 LUT。",
       "latest": "b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0）",
       "latest_checked_at": "2026-09-21T00:00:00.000Z"
+    },
+    {
+      "name": "FFmpeg（配乐工位内核）",
+      "repo": "https://github.com/FFmpeg/FFmpeg",
+      "license": "LGPL-2.1-or-later（本工位静态构建 configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不可随产品分发）",
+      "channel": "github",
+      "usage": "binary",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json",
+        "pattern": "\"releaseTag\":\\s*\"([^\"]+)\""
+      },
+      "scope": [
+        "bundles/ai-video/connectors/bgm-bridge/kit（受控下载 + sha256 pin + 必需滤镜清单）",
+        "bundles/ai-video/connectors/bgm-bridge（core/measure/synth/cli/server/executor）",
+        "Mac 配乐工位 ~/.workloom-bgm/bin（运行时二进制，不进仓库）"
+      ],
+      "cadence": "quarterly",
+      "gate": "workstation-pin",
+      "notes": "成片配乐内核：loudnorm/ebur128/volumedetect/silencedetect/aspectralstats/astats/sidechaincompress/pan/amix/adelay/afade/apad/atrim/showwavespic/showspectrumpic。受控下载 + sha256 校验（与调色工位共用 ffmpeg-static b6.1.1 构建，但安装目录、pin 与滤镜清单独立）。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）。音频素材全部自算（synth.mjs 合成 WAV），本仓不携带任何第三方音源或曲库文件。",
+      "latest": "b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0）",
+      "latest_checked_at": "2026-09-22T00:00:00.000Z"
+    },
+    {
+      "name": "python-audio-separator（人声分离·可选引擎）",
+      "repo": "https://github.com/nomadkaraoke/python-audio-separator",
+      "license": "MIT",
+      "channel": "github",
+      "usage": "external-optional",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json",
+        "pattern": "\"audio-separator\":\\s*\\{[^}]*?\"version\":\\s*\"([^\"]+)\""
+      },
+      "scope": [
+        "bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）",
+        "Mac 配乐工位（外部安装，不随仓分发；WORKLOOM_BGM_DEMUCS 指定可执行文件）"
+      ],
+      "cadence": "quarterly",
+      "gate": "optional-engine",
+      "notes": "UVR 模型族（MDX/VR/Demucs 系）的 CLI/Python 封装，是配乐工位「档位 A」深度学习分离的首选引擎（活跃维护、MIT）。未安装时工位按档位 B（ffmpeg 中心声道近似）执行并如实标注 quality=approximate；安装与否不影响作曲/混音主链路。",
+      "latest": "v0.47.0（2026-08-27，GitHub Releases）",
+      "latest_checked_at": "2026-09-22T00:00:00.000Z"
+    },
+    {
+      "name": "Demucs（人声分离·可选引擎）",
+      "repo": "https://github.com/facebookresearch/demucs",
+      "license": "MIT",
+      "channel": "github",
+      "usage": "external-optional",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json",
+        "pattern": "\"demucs\":\\s*\\{[^}]*?\"version\":\\s*\"([^\"]+)\""
+      },
+      "scope": [
+        "bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）",
+        "Mac 配乐工位（外部安装，不随仓分发）"
+      ],
+      "cadence": "quarterly",
+      "gate": "optional-engine",
+      "notes": "htdemucs 两轨分离（vocals / no_vocals），MIT；**上游仓库已归档（2026-09-22 核验，最后推送 2024-04，最新发布 v4.0.1 / 2023-09）**，故只作兼容引擎保留，推荐改用 python-audio-separator。工位不内置其模型权重，也不随产品分发。",
+      "latest": "v4.0.1（2023-09-07；仓库已归档）",
+      "latest_checked_at": "2026-09-22T00:00:00.000Z"
+    },
+    {
+      "name": "MusicGen / AudioCraft（评估后不采用）",
+      "repo": "https://github.com/facebookresearch/audiocraft",
+      "license": "代码 MIT；**模型权重 CC-BY-NC 4.0（禁止商用）**",
+      "channel": "github",
+      "usage": "evaluated-not-adopted",
+      "scope": [
+        "bundles/ai-video/skills/bgm-library-license/SKILL.md（许可陷阱条款）",
+        "bundles/ai-video/library/bgm-library/README.md（曲库对比表）"
+      ],
+      "cadence": "quarterly",
+      "gate": "license-review",
+      "notes": "文本生成音乐（MusicGen / MAGNeT / JASCO）与音频编解码（EnCodec）。**权重为 CC-BY-NC 4.0，输出不可直接用于商用交付**，因此配乐工位的默认路径是自算作曲（synth.mjs），而非该模型；仅在客户另行取得授权或纯研究场景才可评估接入。许可结论来自官方 README 的 License 段（2026-09-22 核验）。",
+      "latest": "v1.3.0（2024-05-02）",
+      "latest_checked_at": "2026-09-22T00:00:00.000Z"
     }
   ]
 }
