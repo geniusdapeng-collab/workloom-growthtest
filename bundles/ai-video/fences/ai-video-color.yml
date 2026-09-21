@@ -1,0 +1,55 @@
+# 成片调色围栏包（视频经理 · 调色工位）
+# 与 ai-video-baseline.yml 同口径：默认基线、只可加严、命中取严（block > review > auto）；
+# 求值语义：匹配命中后求值 when（沙箱，禁任意代码），写类动作无命中按 default_level。
+version: ai-video-color/v1
+default_level: review
+rules:
+  - rule_id: G-COL0
+    name: 常规调色直通（本地可逆动作）
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [final_video, color_report, video_asset]
+      actions: [colorwrite.grade, colorwrite.match]
+    when: "true"
+    note: 成片调色是工位本地、非破坏性、可回滚动作（原片只读 + 新文件 + 版本链），默认直通；品牌 look 变更（G-COL1）、覆盖原片（G-COL2）、关闭校验（G-COL3）、日配额（G-COL4）叠加升级，deny 优先并集取严。未命中写动作的保守默认是 review，故此处必须显式声明 auto，否则干净调色也被挂起。
+
+  - rule_id: G-COL1
+    name: 品牌 look / 新 LUT 首次启用必审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [color_report, final_video]
+      actions: [color.look.change, colorwrite.grade]
+    when: "params.look_change == true or params.lut_approved == false"
+    note: 调整品牌默认 look、或首次启用尚未审过的 LUT（params.lut_approved=false）属对外观感变更，须人审（审批号随调色报告归档）；复用已审 LUT 自动放行
+
+  - rule_id: G-COL2
+    name: 覆盖原片禁止
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, video_asset]
+      actions: [colorwrite.grade]
+    when: "params.overwrite_source == true or params.output_path == params.input_path"
+    note: 原片只读是硬红线：调色一律产出新文件并进版本链，任何覆盖原片的调用一票否决
+
+  - rule_id: G-COL3
+    name: 调色必须可核验（禁止关闭校验）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, color_report]
+      actions: [colorwrite.grade]
+    when: "params.skip_verify == true or params.verify == false"
+    note: 调色调用必须带指标复检与 sha256 回执；关闭校验的调用禁止执行（无回执=未核实，不得进入入库/发布队列）
+
+  - rule_id: G-COL4
+    name: 单租户日调色配额熔断
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, render_job]
+      actions: [colorwrite.grade, colorwrite.match]
+    when: "context.tenant_daily_grades >= 30"
+    note: 每租户每日 30 次调色上限（含匹配），超限熔断并告警；上调须人审（工位产能与成本保护）

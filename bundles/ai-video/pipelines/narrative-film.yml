@@ -3,7 +3,7 @@
 quest: narrative-film
 name: 叙事片管线
 version: v1
-description: 剧本→场景→片头→视听→连贯审查→提示词融合→字段质检→定妆照→预生产确认→渲染→后期→成片入库
+description: 剧本→场景→片头→视听→连贯审查→提示词融合→字段质检→定妆照→预生产确认→渲染→后期→调色→成片入库
 steps:
   - step_key: script
     name: 剧本蓝图
@@ -77,6 +77,10 @@ steps:
     name: 后期合成
     owner: post-editor
     outputs: [final_video]
+  - step_key: color
+    name: 成片调色
+    owner: colorist
+    outputs: [color_report, final_video]   # 对母版只调一次；平台变体/二剪变体从已调色母版派生，不重复调色
   - step_key: archive
     name: 成片入库
     owner: post-editor

@@ -15,6 +15,7 @@
     { "type": "render_job", "label": "渲染任务" },
     { "type": "video_asset", "label": "视频素材" },
     { "type": "final_video", "label": "成片" },
+    { "type": "color_report", "label": "色彩报告", "note": "调色师产物：前后指标、滤镜链、profile/LUT 版本、scope 与前后对比帧引用、产物 sha256；无回执不得进入入库/发布队列（G-COL3）" },
     { "type": "publish_task", "label": "发布任务" },
     { "type": "account_metric", "label": "账号指标", "note": "账号/视频时序指标（播放/完播/互动/转化）；阈值告警与战报的事实源；G16 复用其登录风控上下文" },
     { "type": "comment", "label": "评论", "note": "采集原始评论；意图分类 praise/thanks/consult/after_sale/negative/crisis/sensitive 后驱动 G10 三级分流" },

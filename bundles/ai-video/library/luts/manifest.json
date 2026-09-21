@@ -1,0 +1,138 @@
+{
+  "schemaVersion": "workloom.luts/v1",
+  "generatedBy": "bundles/ai-video/library/luts/generate-luts.mjs",
+  "license": "self-generated（本仓自有产物，无第三方 LUT 再分发）",
+  "source": {
+    "slog3": "Sony S-Log3 公开传输函数（码值→线性反射率）",
+    "rec709": "ITU-R BT.709 OETF",
+    "note": "仅做色调曲线转换，未做 S-Gamut3.Cine→BT.709 色域矩阵；极端色域素材请先确认色域或补矩阵"
+  },
+  "luts": [
+    {
+      "file": "slog3-to-rec709.cube",
+      "kind": "conversion",
+      "size": 33,
+      "use": "log 素材先转换（禁止在 log 上直接叠创意 LUT）"
+    },
+    {
+      "file": "look-clean-bright.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "科普/教学/产品说明：干净、提亮、少风格",
+      "params": {
+        "lift": 0.02,
+        "gain": 1,
+        "shadow": [
+          0.004,
+          0.002,
+          0.012
+        ],
+        "high": [
+          0.008,
+          0.004,
+          0
+        ],
+        "saturation": 1.14,
+        "contrast": 1.03,
+        "gamma": 1.05
+      },
+      "note": "满档参数（intensity=1.0 的画面语言）；低于 0.6 强度基本看不出变化，交付前必须过可见性校验"
+    },
+    {
+      "file": "look-warm-film.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "叙事片/情感向：暖调、轻提黑位、肤色友好",
+      "params": {
+        "lift": 0.032,
+        "gain": 0.99,
+        "shadow": [
+          0.02,
+          0.006,
+          -0.016
+        ],
+        "high": [
+          0.032,
+          0.008,
+          -0.024
+        ],
+        "saturation": 1.08,
+        "contrast": 1.07,
+        "gamma": 1.03
+      },
+      "note": "满档参数（intensity=1.0 的画面语言）；低于 0.6 强度基本看不出变化，交付前必须过可见性校验"
+    },
+    {
+      "file": "look-teal-orange.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "商业片/品牌统一：青影橙高光",
+      "params": {
+        "lift": 0.006,
+        "gain": 1,
+        "shadow": [
+          -0.055,
+          -0.005,
+          0.075
+        ],
+        "high": [
+          0.062,
+          0.01,
+          -0.062
+        ],
+        "saturation": 1.02,
+        "contrast": 1.15,
+        "gamma": 0.97
+      },
+      "note": "满档参数（intensity=1.0 的画面语言）；低于 0.6 强度基本看不出变化，交付前必须过可见性校验"
+    },
+    {
+      "file": "look-moody-dark.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "严肃/悬疑：压黑、去饱和（力度别满档）",
+      "params": {
+        "lift": -0.012,
+        "gain": 0.97,
+        "shadow": [
+          -0.022,
+          -0.008,
+          0.042
+        ],
+        "high": [
+          0,
+          -0.01,
+          0.022
+        ],
+        "saturation": 0.76,
+        "contrast": 1.17,
+        "gamma": 0.93
+      },
+      "note": "满档参数（intensity=1.0 的画面语言）；低于 0.6 强度基本看不出变化，交付前必须过可见性校验"
+    },
+    {
+      "file": "look-cool-technical.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "科技/SaaS/数码：冷调、精密（屏幕白必须仍读作白）",
+      "params": {
+        "lift": 0.004,
+        "gain": 0.995,
+        "shadow": [
+          -0.02,
+          -0.004,
+          0.045
+        ],
+        "high": [
+          -0.014,
+          0.004,
+          0.03
+        ],
+        "saturation": 0.93,
+        "contrast": 1.09,
+        "gamma": 0.98
+      },
+      "note": "满档参数（intensity=1.0 的画面语言）；低于 0.6 强度基本看不出变化，交付前必须过可见性校验"
+    }
+  ]
+}

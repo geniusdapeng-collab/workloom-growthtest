@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "workloom.workstation-pin/v1",
+  "component": "ffmpeg/ffprobe（调色工位内核）",
+  "source": {
+    "project": "FFmpeg",
+    "projectUrl": "https://ffmpeg.org/",
+    "distributor": "eugeneware/ffmpeg-static（GitHub Releases，静态构建）",
+    "releaseTag": "b6.1.1",
+    "publishedAt": "2025-11-14T20:35:00Z"
+  },
+  "license": {
+    "spdx": "GPL-3.0-or-later AND (build flags include --enable-nonfree)",
+    "note": "本工位使用的是静态构建，configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不得随产品分发；如需随产品分发，请改为 LGPL 构建或由发行方自行编译。仓库只保存下载脚本与摘要，不提交二进制。",
+    "licenseFile": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/darwin-arm64.LICENSE"
+  },
+  "targets": {
+    "darwin-arm64": {
+      "ffmpeg": {
+        "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-arm64.gz",
+        "sha256": "a90e3db6a3fd35f6074b013f948b1aa45b31c6375489d39e572bea3f18336584",
+        "sha256Scope": "解压后的二进制（安装脚本先解压再校验）"
+      },
+      "ffprobe": {
+        "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-arm64.gz",
+        "sha256": "bb2db6f5d8cef919da12fbf592119a987202a8c060a886f3cab091f9cab90b64",
+        "sha256Scope": "解压后的二进制（安装脚本先解压再校验）"
+      },
+      "verifiedAt": "2026-09-21",
+      "verifiedVersion": "ffmpeg version 6.0 / ffprobe version 6.0"
+    },
+    "darwin-x64": {
+      "ffmpeg": { "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffmpeg-darwin-x64.gz", "sha256": "UNVERIFIED" },
+      "ffprobe": { "url": "https://github.com/eugeneware/ffmpeg-static/releases/download/b6.1.1/ffprobe-darwin-x64.gz", "sha256": "UNVERIFIED" }
+    }
+  },
+  "requiredFilters": [
+    "signalstats", "metadata", "lut3d", "colorbalance", "colortemperature",
+    "curves", "eq", "normalize", "waveform", "vectorscope", "histogram", "blend", "split"
+  ]
+}
+

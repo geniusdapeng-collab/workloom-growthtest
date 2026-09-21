@@ -48,10 +48,12 @@
         "presets/distribution-operator.yml",
         "presets/ip-curator.yml",
         "presets/review-analyst.yml",
-        "presets/settlement-clerk.yml"
+        "presets/settlement-clerk.yml",
+        "presets/colorist.yml"
       ],
       "fences": [
-        "fences/ai-video-baseline.yml"
+        "fences/ai-video-baseline.yml",
+        "fences/ai-video-color.yml"
       ],
       "skills": [
         "skills/jenny-loom-research/SKILL.md",
@@ -61,7 +63,11 @@
         "skills/portrait-studio/SKILL.md",
         "skills/render-ops/SKILL.md",
         "skills/publish-ops/SKILL.md",
-        "skills/comment-ops/SKILL.md"
+        "skills/comment-ops/SKILL.md",
+        "skills/color-grade/SKILL.md",
+        "skills/color-look-design/SKILL.md",
+        "skills/color-shot-matching/SKILL.md",
+        "skills/color-delivery-spec/SKILL.md"
       ],
       "schemas": [
         "schemas/objects.json",
@@ -314,7 +320,16 @@
         "library/templates/project-config-template.json",
         "library/templates/prompt-v4-template.md",
         "library/templates/scene-card-template.md",
-        "library/templates/shot-card-v4-template.md"
+        "library/templates/shot-card-v4-template.md",
+        "library/color-recipes/recipes.json",
+        "library/luts/generate-luts.mjs",
+        "library/luts/slog3-to-rec709.cube",
+        "library/luts/look-clean-bright.cube",
+        "library/luts/look-warm-film.cube",
+        "library/luts/look-teal-orange.cube",
+        "library/luts/look-moody-dark.cube",
+        "library/luts/look-cool-technical.cube",
+        "library/luts/manifest.json"
       ],
       "segmentDefaults": [],
       "connectors": [],
@@ -448,9 +463,11 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "7b383b1afc32d1bcc578ff17d0a109a39fce0f3445249327ed00dce1f48eae79",
+    "digest": "cc79d9a05f063e44275027776b14770e70c693bc76c1d82b9236d2b85180dfea",
     "assets": {
       "fences/ai-video-baseline.yml": "d0c8f2f8f7bf59dd3b9b74b2d880d3e1d405ddf849b64adca703b8c071b2eed7",
+      "fences/ai-video-color.yml": "709cb9fc3cba47a4ee2b4ee233d714277223cb23f9ca210ed3712de54c597ed6",
+      "library/color-recipes/recipes.json": "796a34a124521d1bade7f1ef0ccfed7d74ed38832918f17144ea2cdd3e4d2f2d",
       "library/hollywood-factory/技能系列/镜头级专项/剧情_卡梅隆_情感手持.md": "823392d5017ce604099c67a5e18da812923d3f6e3bf8949f7ec8615e84eba7ba",
       "library/hollywood-factory/技能系列/镜头级专项/剧情_卡梅隆_紧张手持.md": "6beefc37e904e113eb127a856aab05d81e97e92ef27614fcd90387b0bb61f833",
       "library/hollywood-factory/技能系列/镜头级专项/剧情_卢卡斯_告别斯坦尼康.md": "4dbe34cb520f9b66e10cc6b615b74221722a9ac8bd1aa491efb70bd4b2a1777a",
@@ -654,6 +671,14 @@
       "library/hollywood-factory/技能系列/镜头级专项/纪录_黑泽明_温情_斯坦尼康.md": "1f86c1aa5d03a623a39c1e6c6e4df2f5d0335b7ea90a7c253fcee9fd86926b3f",
       "library/hollywood-factory/技能系列/镜头级专项/纪录_黑泽明_紧张_定场.md": "69b3043af6555d52ce52fdbf1d09b0093dfd8aa4a07e9191d879eab1b2cf9fd8",
       "library/hollywood-factory/技能系列/镜头级专项/纪录_黑泽明_诗意_定场.md": "8b87bc2a0e208b8d8821048d61629d632d0b3c6d4843cf2fa781d12b6dc06be9",
+      "library/luts/generate-luts.mjs": "081ee03925402067c5b4c015e224c0312ba97cf0189e3bb6f01cc495d2b70901",
+      "library/luts/look-clean-bright.cube": "f70305e70ca40e7d30b8bbcd6a838af844dca12fcf80a9614327cbc4d5ea8ff3",
+      "library/luts/look-cool-technical.cube": "ded4b127781253b6e5aa1fa9ea2ed622d2cc0058c63e658a98a9f18741172b45",
+      "library/luts/look-moody-dark.cube": "630976e5641fdc78606d93ca0d70da8dd45fdb49f5b84cefeddd9365d3ab10ff",
+      "library/luts/look-teal-orange.cube": "114098717dfcc57961d29ee696ae5727690a9b7b81b513bfc9b0cf3f6985b745",
+      "library/luts/look-warm-film.cube": "ae364f75a09e87d2b70d79e2804b5790d140e96605ff99d22f32413a83ecacb1",
+      "library/luts/manifest.json": "a4685c2d1f631c6d6de1dd88a84bc60117d216d8b8a5c94254900a353939ad56",
+      "library/luts/slog3-to-rec709.cube": "63ff904e3535404f23f6f23048233726b5c09839a87c0f436724ccba0e43d01e",
       "library/README.md": "82876765dfaeb39e2762ecb4398791ea015ab2a5a7e86b6ebcbd781913b74ad5",
       "library/seedance-references/audio-tags.md": "d1b4d9ba2c19b697f6671d6b1c2fa1d38ba1b00d64f3a9ecfaeea906aed63c88",
       "library/seedance-references/cinematography.md": "fbbf2f0f097680cc7101357396e0a926203fb8159fd18af627508f82da6b2991",
@@ -690,10 +715,11 @@
       "pipelines/account-ops.yml": "455383c019ac1d0523db48c6088c7bfce4aa9e8e1eef8d7d71399aa69e107264",
       "pipelines/ads-creative-factory.yml": "90e475e5482ecf15541aa2d6eca5499aa1c9bea8d9928e2122975ae77df869c5",
       "pipelines/marketing-film.yml": "4ba95c0e83538de605126072ce26a462211e4cea3a82c5fcaee8227a71b485b1",
-      "pipelines/narrative-film.yml": "fe26f73d260de9c05365d120c38c41f9a3386ed85724047deef5e84d11891913",
+      "pipelines/narrative-film.yml": "e909d2bd470a0a1da6e87705741c4e59750cb816b5db322879c7839d7e4da391",
       "pipelines/settlement-recon.yml": "c4af96be653224e31ec8882ae19da37026dbbe1f2d5fb28435deee92b37db1d0",
       "presets/ads-optimizer.yml": "4969554944f4e2586aef8ab29da819d76611a6ba537b5964db6e9e7db9cc5bf2",
       "presets/audio-designer.yml": "e0122309c8a94d7b8e73109c3b88f92b900917bdc04c5535836e7f1f3c66dc0b",
+      "presets/colorist.yml": "13a9ab516b6fa91b86c4c208afa018d461d446dd17173863656cd855cd08ab67",
       "presets/comment-operator.yml": "6b96a0ef1e62d6f98bc82872578bec3afd590e4f51f3b1076b974fa7b2fe7b93",
       "presets/compliance-officer.yml": "0fe8477702798a61fa32366318d4cdda6f0f85ceecfc50f3ef6a51a775bc8e68",
       "presets/continuity-reviewer.yml": "b4eee93a32e3cf5efdf53eacd428e3ab628798c59aa7d7abcb1bb6155458b6e3",
@@ -725,8 +751,12 @@
       "presets/settlement-clerk.yml": "6b6f1cdcc3e71d5d2a88dc9aba1e9013e250e924b4bd95eda393a710dcd99f5c",
       "presets/trend-researcher.yml": "802b157911cf35216d5122784d8ba0d89ac1da2187748413243f957c002307b3",
       "presets/visual-director.yml": "74683eed31a08c7ffce74ffeb02a4349051c4ec9164ba995470455cf35f6fa61",
-      "schemas/objects.json": "c4092fff25e72c5a55baf0fef2a2020e4f99ab20e05400c260cf0c8cdaf0d97e",
+      "schemas/objects.json": "516d63d3e0589c86a9e589185fb85634271712beba22288e968819949a6f83c0",
       "schemas/stages.json": "418332ca5a5522083592da40773265d8f09b1ab9276d566275e075ef56118831",
+      "skills/color-delivery-spec/SKILL.md": "29a3f0020747d1665f11026d444d211672063955aae2d7d41e7c85f50ccdcbc8",
+      "skills/color-grade/SKILL.md": "1223a64397b2f6a26c578ea4232bb360bca84223ae886e5f143b453afb534df0",
+      "skills/color-look-design/SKILL.md": "0f6f6d8f915d9ea4ea1099a2c71270ff66cfc3d8dbcb2fbca3f2b6c28894d913",
+      "skills/color-shot-matching/SKILL.md": "edc81124f4955a3559146d20386f7c6e622acb007ea562ac5e847a5503b19310",
       "skills/comment-ops/SKILL.md": "33e3ec30ca314e91f1113fdedb8d6c515fa181a9d4d0391db99b4f42ebd4b9ba",
       "skills/director-review/SKILL.md": "7ca415f0a42877c92f9393ceb93b4866f0b2debca5fb979fabef6033389760c1",
       "skills/jenny-loom-research/SKILL.md": "d7eab8f47705713a9127fe6c108d7eeb4f8d15ed137feee09f4172a42900c922",
