@@ -2,7 +2,7 @@
  * P5 规则与权限（F8：群权限管理 · 规则围栏；PRD P5-①②③④⑤ 逐条对账）
  *  - 左栏版本历史（P5E1：active/rolled_back/出厂基线 🔒；单调守卫只可加严 L2.1）+ 生效范围统计
  *  - 中央规则列表（P5E2：级别 pill auto/review/block/需介入 + 来源 + 30 天触发数；基线 🔒 集团强制 F2.3）
- *  - 新增群规：文本命名 + 当前行业包范围显式选择 → dry-run → 审批；未接入语义翻译时不伪装理解
+ *  - 新增群规：文本命名 + 当前行业包范围显式选择 → dry-run → 就地放行；未接入语义翻译时不伪装理解
  *  - dry-run 报告「模拟航行」（P5E4：回放最近 10 条，列出将拦截项；影响面过大标红 E2.3）
  * 状态变体：p5 默认 / p5_block 求值异常按 block 熔断横幅（E2.1）/ p5_readonly 只读权限（E2.6/L5.1）
  */
@@ -21,10 +21,18 @@ interface RuleRow {
   is_baseline: boolean; status: string; created_by: string; hits30: string;
 }
 interface VersionRow { version: string; status: string; rules: string; created_at: string }
+/** 待放行的规则变更（审批行投影；只在治理页就地放行，不再经基座审批中心） */
+interface PendingProposal {
+  approval_id: string; event_id: string; status: string;
+  snapshot: { after?: { ruleId?: string; name?: string; level?: string } };
+}
 interface DryRunReport {
   ruleId: string; ruleVersion: string; replayed: number;
   wouldBlock: string[]; wouldReview: string[]; unchanged: number; impact: string;
 }
+
+/** 规则行状态文案（基座审批环节移除后 pending_approval 在本页读作「待放行」） */
+const RULE_STATUS_TEXT: Record<string, string> = { ...COMMON_STATUS_TEXT, pending_approval: "待放行" };
 
 /** 级别映射（需介入紫=高危险动作类，首版按名称推断；保持四色语义 §2.2） */
 function levelOf(r: RuleRow): FenceLevel4 {
@@ -38,24 +46,28 @@ export default function P5() {
   const [loadMessage, setLoadMessage] = useState("");
   const [rules, setRules] = useState<RuleRow[]>([]);
   const [versions, setVersions] = useState<VersionRow[]>([]);
+  const [proposals, setProposals] = useState<PendingProposal[]>([]);
   const [banner, setBanner] = useState<{ level: "alert" | "warn" | "info"; text: string } | null>(null);
   // NL 新增群规（P5E3）
   const [nlText, setNlText] = useState("");
   const [draft, setDraft] = useState<{ ruleId: string; name: string; level: "auto" | "review" | "block"; objectTypes: string[]; actions: string[]; when: string; scopeLabel: string } | null>(null);
   const [report, setReport] = useState<{ dryRunId: string; report: DryRunReport } | null>(null);
-  const [busy, setBusy] = useState<"dry-run" | "confirm" | null>(null);
+  const [busy, setBusy] = useState<"dry-run" | "confirm" | "release" | null>(null);
   const [actionError, setActionError] = useState("");
 
   const load = useCallback(async () => {
     setLoadState("loading");
     try {
       await ensureDemoLogin();
-      const [ru, ve] = await Promise.all([
+      const [ru, ve, ap] = await Promise.all([
         trpc.fence.rules.query() as Promise<RuleRow[]>,
         trpc.fence.versions.query() as Promise<VersionRow[]>,
+        trpc.approvals.list.query({ status: "pending" }) as Promise<Array<PendingProposal & { event?: { decision?: { action?: string } } }>>,
       ]);
       setRules(ru);
       setVersions(ve);
+      // 只认围栏变更提案（fence.rule.propose）；其余审批行不属于本页职责
+      setProposals(ap.filter((row) => row.event?.decision?.action === "fence.rule.propose"));
       setHasSnapshot(true);
       setLoadMessage("");
       setLoadState("ready");
@@ -134,7 +146,7 @@ export default function P5() {
     try {
       const { scopeLabel: _scopeLabel, ...rule } = draft;
       const result = await trpc.fence.confirmDryRun.mutate({ dryRunId: report.dryRunId, rule }) as { eventId?: string; approvalId?: string };
-      setBanner({ level: "info", text: `服务端已受理规则草稿，当前为${COMMON_STATUS_TEXT.pending_approval}；${result.eventId ? `账本事件 ${shortId(result.eventId)}，` : ""}审批前不会生效。` });
+      setBanner({ level: "info", text: `服务端已受理规则草稿，当前为待放行；${result.eventId ? `账本事件 ${shortId(result.eventId)}，` : ""}请在本页「待放行的规则变更」里放行后生效。` });
       setDraft(null); setReport(null); setNlText("");
       await load();
     } catch (error) {
@@ -144,6 +156,37 @@ export default function P5() {
       setBusy(null);
     }
   }, [draft, report, busy, load]);
+
+  /**
+   * 规则变更就地放行/退回（2026-09-21 产品所有者口径，本机单人运行）。
+   *
+   * 基座通用审批环节（审批中心）已移除，但围栏变更仍是受控动作：本项目由治理页操作人
+   * 当场放行——提案、手势与激活三者都写入事件账本，链路与原来一致，只是不再跳转到别处。
+   */
+  const releaseProposal = useCallback(async (proposal: PendingProposal, gesture: "approve" | "reject") => {
+    if (busy) return;
+    setBusy("release");
+    setActionError("");
+    try {
+      await trpc.approvals.decide.mutate({
+        approvalId: proposal.approval_id,
+        gesture,
+        ...(gesture === "reject" ? { reasonEnum: "other", reasonText: "本机操作人在治理页退回本次规则变更" } : {}),
+      });
+      setBanner({
+        level: "info",
+        text: gesture === "approve"
+          ? `规则变更 ${shortId(proposal.approval_id)} 已放行并激活；版本与账本事件可在此页复核。`
+          : `规则变更 ${shortId(proposal.approval_id)} 已退回，规则未生效。`,
+      });
+      await load();
+    } catch (error) {
+      console.warn("规则变更放行失败", error);
+      setActionError(operationFailure(error, "规则变更放行"));
+    } finally {
+      setBusy(null);
+    }
+  }, [busy, load]);
 
   /* ---------- 左栏：版本历史 + 生效范围 ---------- */
   const left = (
@@ -156,7 +199,7 @@ export default function P5() {
           <div className="flex items-center justify-between">
             <span className="text-body font-bold text-ink">{versionText(v.version)}</span>
             <span className={`text-body ${v.status === "active" ? "text-go" : v.status === "rolled_back" ? "text-ink3" : "text-warn"}`}>
-              {dictText(COMMON_STATUS_TEXT, v.status)}
+              {dictText(RULE_STATUS_TEXT, v.status)}
             </span>
           </div>
           <div className="mt-0.5 text-body text-ink3">{clientValueText(v.rules)} 条规则</div>
@@ -207,7 +250,7 @@ export default function P5() {
                 当前行业包尚未提供可选规则范围，系统不会代替你猜测对象或动作。
               </div>
             )}
-            <div className="mt-2 text-body text-ink3">当前未启用语义条件翻译；草稿只使用你明确选择的范围，并默认进入人工复核。</div>
+            <div className="mt-2 text-body text-ink3">当前未启用语义条件翻译；草稿只使用你明确选择的范围，默认级别为人工复核。</div>
             <button
               type="button"
               onClick={prepareDraft}
@@ -220,10 +263,10 @@ export default function P5() {
 
           {draft && (
             <div className="rounded-lg border border-gline bg-gold/5 p-3">
-              <div className="mb-1.5 text-body font-bold text-gold">草稿预览（确认后进入变更审批）</div>
+              <div className="mb-1.5 text-body font-bold text-gold">草稿预览（确认后进入待放行）</div>
               <div className="space-y-0.5 font-mono text-body text-ink2">
                 <div>{draft.name}</div>
-                <div>级别 <span className="text-warn">{dictText(FENCE_LEVEL_TEXT, draft.level)}</span>（新规则默认必须审批，且不可放宽安全基线）</div>
+                <div>级别 <span className="text-warn">{dictText(FENCE_LEVEL_TEXT, draft.level)}</span>（新规则默认人工复核，且不可放宽安全基线）</div>
                 <div>适用范围 {draft.scopeLabel}</div>
                 <div>条件 <span className="text-holo">对所选范围内的每次动作生效</span></div>
               </div>
@@ -269,7 +312,7 @@ export default function P5() {
                 aria-busy={busy === "confirm" || undefined}
                 className="mt-2 w-full cursor-pointer rounded-lg border border-go/50 bg-go/10 px-3 py-1.5 text-body font-bold text-go disabled:cursor-wait disabled:opacity-50"
               >
-                {busy === "confirm" ? "正在提交…" : <><Icon name="check" size={14} className="inline" /> 确认并提交变更审批（审批前不生效）</>}
+                {busy === "confirm" ? "正在提交…" : <><Icon name="check" size={14} className="inline" /> 确认并提交（在本页放行后生效）</>}
               </button>
             </div>
           )}
@@ -326,6 +369,52 @@ export default function P5() {
             <div className="rounded-lg border border-line bg-bg800/40 p-3 text-body text-ink3">
               所有直接操作、子任务和自动化触发都经过同一套围栏；硬约束优先于工作区规则。
               断网时仍按最近一次有效规则拦截；行业默认值由当前行业包提供，基座不内置行业数值。
+            </div>
+          </div>
+        )}
+
+        {/* 待放行的规则变更（治理页就地放行；审批中心已随基座审批环节下线） */}
+        {hasSnapshot && proposals.length > 0 && (
+          <div className="mt-3 rounded-lg border border-gline/60 bg-gold/5 p-3">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-body font-bold text-gold">
+              <Icon name="rules" size={14} />待放行的规则变更 · {proposals.length} 件
+            </div>
+            <div className="space-y-2">
+              {proposals.map((p) => (
+                <div key={p.approval_id} className="rounded-lg border border-line bg-card p-3">
+                  <div className="mb-1 flex flex-wrap items-center gap-2 text-body text-ink3">
+                    <span className="font-mono">{shortId(p.approval_id)}</span>
+                    <span>{clientChineseText(p.snapshot.after?.name, "未命名规则")}</span>
+                    <span className="rounded border border-warn/40 px-1 text-warn">待放行</span>
+                  </div>
+                  <div className="text-body text-ink2">
+                    规则 {clientValueText(p.snapshot.after?.ruleId)} · 级别 {clientValueText(p.snapshot.after?.level)}
+                  </div>
+                  {!readonly && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => void releaseProposal(p, "approve")}
+                        className="cursor-pointer rounded border border-go/50 px-3 py-1 text-body font-bold text-go hover:bg-go/10 disabled:opacity-40"
+                      >
+                        放行并生效
+                      </button>
+                      <button
+                        type="button"
+                        disabled={Boolean(busy)}
+                        onClick={() => void releaseProposal(p, "reject")}
+                        className="cursor-pointer rounded border border-warn/50 px-3 py-1 text-body font-bold text-warn hover:bg-warn/10 disabled:opacity-40"
+                      >
+                        退回
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 text-body text-ink3">
+              为什么在本页放行：本机单人运行不需要独立的审批中心，但围栏变更仍属受控动作——提案、放行手势与激活都写入事件账本。
             </div>
           </div>
         )}

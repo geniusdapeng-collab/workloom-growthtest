@@ -1,8 +1,8 @@
 /**
- * TriGestureBar 待我审批三操纵杆（设计规范 §5.4；审批手势 F5.2）
+ * TriGestureBar 业务关卡三操纵杆（设计规范 §5.4；关卡放行手势 F5.2）
  * 结构：三杆并列 ✓推进（绿边）/ ✎校准（青边）/ ✗制动（红边）；大图标+主名+小字副标题
  *      （采纳 / 编辑后采纳 / 驳回）
- * 铁律：驳回必弹原因（枚举+≤200 字，L5.2）；无审批权角色整组隐藏（非置灰，L5.1/F5.6）；
+ * 铁律：退回必弹原因（枚举+≤200 字，L5.2）；无放行权角色整组隐藏（非置灰，L5.1/F5.6）；
  *      快照过期时三杆整体禁用并刷新（E5.3）
  */
 
@@ -25,9 +25,9 @@ export function TriGestureBar({
 }: {
   /** 快照过期（E5.3）：三杆整体禁用并提示刷新 */
   expired?: boolean;
-  /** 无审批权 → 整组隐藏（非置灰；L5.1 服务端另有强制鉴权） */
+  /** 无放行权 → 整组隐藏（非置灰；L5.1 服务端另有强制鉴权） */
   canApprove?: boolean;
-  /** 提交中锁定全部手势，防止同一审批被重复裁决。 */
+  /** 提交中锁定全部手势，防止同一关卡被重复放行。 */
   busy?: boolean;
   onGesture?: (g: Gesture) => void;
   onRefresh?: () => void;
@@ -36,7 +36,7 @@ export function TriGestureBar({
   if (expired) {
     return (
       <div className="flex items-center gap-3 rounded-lg border border-warn/40 bg-warn/5 px-4 py-2.5">
-        <span className="text-body text-warn">审批依据已更新，操作已锁定，请刷新后重新确认</span>
+        <span className="text-body text-warn">关卡依据已更新，操作已锁定，请刷新后重新确认</span>
         <button
           type="button"
           onClick={onRefresh}

@@ -4,7 +4,9 @@
  * 纪律：零素材（纯 Canvas 程序化绘制）；员工每个动作来自 theater.floor 派生态（动作即数据）。
  * 渲染模型：逻辑网格 (x,y) → 等距屏幕坐标；员工位置逐帧插值（走位动画）；
  * 五态动画：working=打字 / blocked=踱步 / asking=走到指挥台举手+聚光灯 / celebrating=跳跃+彩带 / idle=休息角待命。
- * 交互：点员工 → 回调父级（绩效卡）；点请示员工 → 弹出审批卡（原地三手势）。
+ * 交互：点员工 → 回调父级（员工档案/指挥卡）；点任务牌 → 任务详情。
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，asking 只保留「待放行」状态可视化，
+ * 点击不再弹出审批卡；业务链路自带的关卡在各自业务页面就地放行。
  */
 import { useEffect, useRef } from "react";
 import { displayNameOf, roleTitleOf } from "../../lib/naming";
@@ -46,7 +48,7 @@ const CONFETTI_COLORS = ["#ffd98a", "#8ad8ff", "#6adf8a", "#ff8a8a", "#e8a2ff"];
 /** 头顶任务牌状态词（与 3D 版同口径） */
 const FLOOR_STATE_TEXT: Record<string, string> = {
   working: "进行中",
-  asking: "待您拍板",
+  asking: "待放行",
   blocked: "有异常",
   celebrating: "已完成",
   collab: "协作中",
@@ -55,13 +57,11 @@ const FLOOR_STATE_TEXT: Record<string, string> = {
 };
 
 export function FloorView({
-  floor, ceoName, onPickAgent, onDecide, onPickApproval, onOpenProfile, onOpenTask,
+  floor, ceoName, onPickAgent, onOpenProfile, onOpenTask,
 }: {
   floor: FloorPayload;
   ceoName: string;
   onPickAgent: (a: FloorAgent) => void;
-  onDecide: (approvalId: string, gesture: "approve" | "reject") => void;
-  onPickApproval: (a: FloorAgent) => void;
   /** 员工本体点击 → 员工档案（2026-09-20 重设计：派活改由拖任务卡 / 全局对话框承担） */
   onOpenProfile?: (a: FloorAgent) => void;
   /** 头顶任务牌点击 → 任务详情 */
@@ -265,7 +265,7 @@ export function FloorView({
           hitboxes.current.push({ id: a.id, sx, sy: py + 10, r: 11, kind: "task", threadId: a.currentThread.id });
         }
         if (a.state === "asking") {
-          bubble(ctx, sx, sy - 46, a.pendingTier === "l4_chairman" ? "请您定（董事长级）" : "请您定", "#e8890c");
+          bubble(ctx, sx, sy - 46, "待放行", "#e8890c");
           // 聚光灯
           const sp = ctx.createRadialGradient(sx, sy, 2, sx, sy, 30);
           sp.addColorStop(0, "rgba(255,190,106,.28)"); sp.addColorStop(1, "rgba(255,190,106,0)");
@@ -292,12 +292,11 @@ export function FloorView({
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     for (const h of [...hitboxes.current].reverse()) {
       if ((mx - h.sx) ** 2 + (my - h.sy) ** 2 < h.r ** 2 * 2.2) {
-        // 任务牌命中 → 任务详情；员工本体命中 → asking 走审批卡，否则员工档案
+        // 任务牌命中 → 任务详情；员工本体命中 → 员工档案（审批卡入口已随基座审批环节移除）
         if (h.kind === "task" && h.threadId) { onOpenTask?.(h.threadId); return; }
         const agent = floorRef.current.agents.find((a) => a.id === h.id);
         if (!agent) return;
-        if (agent.state === "asking" && agent.approvalId) onPickApproval(agent);
-        else (onOpenProfile ?? onPickAgent)(agent);
+        (onOpenProfile ?? onPickAgent)(agent);
         return;
       }
     }

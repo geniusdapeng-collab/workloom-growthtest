@@ -1,9 +1,10 @@
 /**
- * QuestlineOverlay · 首日上岗引导壳（五关）
+ * QuestlineOverlay · 首日上岗引导壳（四关：认人 → 定目标 → 派活 → 验收）
  *
  * 设计要点：
  *  - 不新增路由：客户始终在经营主页之上走完，走完落回原处，不会"迷路"；
- *  - 派活与拍板都走**真实通道**（threads.dispatch / approvals.decide），不做假按钮；
+ *  - 派活走**真实通道**（threads.dispatch），不做假按钮；基座通用审批环节已移除
+ *    （2026-09-21 产品所有者口径），业务关卡由各自业务页面就地放行；
  *  - 事实回传（onFact）：由 P0 汇总成 QuestFacts，再交给 useQuestline 的 autoAdvance；
  *  - 随时"稍后再来"：进度在 useQuestline 里持久化，下次从同一关继续。
  */
@@ -23,14 +24,11 @@ import { useQuestlineContent } from "../../onboarding/QuestlineContent";
 import { MateGuideAvatar, type GuideMood } from "./MateGuideAvatar";
 import { MateGuideBubble } from "./MateGuideBubble";
 import {
-  ApproveStage,
   CompletionPanel,
   DispatchStage,
   GoalStage,
   ReviewStage,
   StageActions,
-  REJECT_REASONS,
-  type PendingApprovalView,
   type ThreadView,
 } from "./QuestlineStages";
 
@@ -46,8 +44,6 @@ export interface QuestlineOverlayProps {
   xp: number;
   celebration: QuestCelebrationView;
   canDispatch: boolean;
-  canApprove: boolean;
-  pendingApproval: PendingApprovalView | null;
   onClose: () => void;
   onCompleteStage: () => void;
   onSkipStage: () => void;
@@ -69,8 +65,6 @@ export function QuestlineOverlay({
   xp,
   celebration,
   canDispatch,
-  canApprove,
-  pendingApproval,
   onClose,
   onCompleteStage,
   onSkipStage,
@@ -91,11 +85,6 @@ export function QuestlineOverlay({
   const [toast, setToast] = useState("");
   const [thread, setThread] = useState<ThreadView | null>(null);
   const [dispatchedTaskId, setDispatchedTaskId] = useState<string | null>(null);
-  const rejectReasonOptions = content.rejectReasons.length > 0 ? content.rejectReasons : REJECT_REASONS;
-  const [rejectCode, setRejectCode] = useState(rejectReasonOptions[0]?.code ?? "other");
-  const [rejectNote, setRejectNote] = useState("");
-  const [editNote, setEditNote] = useState("");
-  const [mode, setMode] = useState<"normal" | "reject" | "edit">("normal");
   const [hintVisible, setHintVisible] = useState(false);
 
   /* M3：无障碍与表面管理交给基座统一实现（Esc 关闭 / 焦点圈定 / 背景 inert / 焦点恢复） */
@@ -301,53 +290,6 @@ export function QuestlineOverlay({
     }
   };
 
-  const decide = async (gesture: "approve" | "edit" | "reject") => {
-    if (!pendingApproval) {
-      setError("现在没有待您拍板的事项。");
-      return;
-    }
-    if (!canApprove) {
-      setError("当前角色没有审批权限；可以让店主账号来试这一步。");
-      return;
-    }
-    if (gesture === "edit" && !editNote.trim()) {
-      setError("修改请写一句要改什么，这句话会进入偏好记忆。");
-      return;
-    }
-    if (gesture === "reject" && rejectCode === "other" && !rejectNote.trim()) {
-      setError("选「其他」时请补一句原因。");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      await ensureDemoLogin();
-      await trpc.approvals.decide.mutate({
-        approvalId: pendingApproval.approvalId,
-        gesture,
-        ...(gesture === "reject" ? { reasonEnum: rejectCode, ...(rejectNote.trim() ? { reasonText: rejectNote.trim() } : {}) } : {}),
-        ...(gesture === "edit" ? { editedAfter: { note: editNote.trim() }, editKind: "correction" as const } : {}),
-      });
-      onFact("decided", true);
-      onXp("decided");
-      onTrack("questline.approval.decided", { gesture, reason: gesture === "reject" ? rejectCode : "" });
-      try {
-        AudioEngine.play(gesture === "approve" ? "approve" : gesture === "reject" ? "reject" : "key");
-      } catch {
-        /* 忽略 */
-      }
-      showToast(gesture === "approve" ? "已批准，全链留痕" : gesture === "edit" ? "已修改并留痕" : "已驳回并留痕");
-      onCompleteStage();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "";
-      setError(message.includes("权限") || message.includes("FORBIDDEN")
-        ? "当前角色没有审批权限；可以让店主账号来试这一步。"
-        : "这次拍板没有写进去，什么都不会改变。可以稍后再试。");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const openNextStep = (to: string, id: string) => {
     onTrack("questline.next_step.clicked", { target: id });
     onClose();
@@ -360,14 +302,12 @@ export function QuestlineOverlay({
   const completed = state.status === "completed";
   const mood: GuideMood = completed
     ? "celebrate"
-    : state.stage === "approve"
-      ? pendingApproval ? "alert" : "think"
-      : state.stage === "dispatch"
-        ? thread ? "think" : "listen"
-        : "listen";
+    : state.stage === "dispatch"
+      ? thread ? "think" : "listen"
+      : "listen";
 
   const bubbleText = completed
-    ? `${content.stages[4]?.script.success ?? ""}`
+    ? `${content.stages[3]?.script.success ?? ""}`
     : hintVisible
       ? def.script.hint
       : def.script.enter;
@@ -550,24 +490,6 @@ export function QuestlineOverlay({
                 />
               )}
 
-              {state.stage === "approve" && (
-                <ApproveStage
-                  pending={pendingApproval}
-                  canApprove={canApprove}
-                  mode={mode}
-                  onMode={setMode}
-                  rejectCode={rejectCode}
-                  onRejectCode={setRejectCode}
-                  rejectNote={rejectNote}
-                  onRejectNote={setRejectNote}
-                  editNote={editNote}
-                  onEditNote={setEditNote}
-                  busy={busy}
-                  onDecide={(gesture) => void decide(gesture)}
-                  onSkip={onSkipStage}
-                />
-              )}
-
               {state.stage === "review" && (
                 <ReviewStage
                   thread={thread}
@@ -595,14 +517,13 @@ export function QuestlineOverlay({
                 <MateGuideAvatar size={84} mood={mood} speaking />
               </span>
               <div className="min-w-0 flex-1">
-                <MateGuideBubble text={bubbleText} tone={state.stage === "approve" ? "warn" : "default"}>
+                <MateGuideBubble text={bubbleText} tone="default">
                   <StageActions
                     stage={state.stage}
                     busy={busy}
                     thread={thread}
                     litCore={litCore}
                     goalReady={Boolean(goalId) || goalFree.trim().length > 0}
-                    hasPendingApproval={pendingApproval !== null}
                     onPrimary={state.stage === "meet"
                       ? onCompleteStage
                       : state.stage === "goal"

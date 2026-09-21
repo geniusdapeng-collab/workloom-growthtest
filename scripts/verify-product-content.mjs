@@ -98,9 +98,14 @@ if (product) {
     }
   }
   const siteRoot = path.resolve(root, product.release?.website ?? "");
+  // 舰队 2026-09-17 已迁至 CNB：站点页面的仓库/下载地址现在指向 cnb.cool；
+  // 这里同时接受 CNB 事实源与旧 GitHub 域名（历史页面尚未全量改写），二者都算与产品清单一致。
+  const repositoryAddresses = [`github.com/${product.repository}`, `cnb.cool/${product.repository}`];
   for (const file of ["index.html", "en.html"]) {
     const siteFile = path.join(siteRoot, file);
-    if (fs.existsSync(siteFile) && !fs.readFileSync(siteFile, "utf8").includes(`github.com/${product.repository}`)) {
+    if (!fs.existsSync(siteFile)) continue;
+    const siteSource = fs.readFileSync(siteFile, "utf8");
+    if (!repositoryAddresses.some((address) => siteSource.includes(address))) {
       errors.push(`${path.relative(root, siteFile)} 下载/仓库地址与产品清单不一致`);
     }
   }

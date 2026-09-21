@@ -43,7 +43,7 @@ export function PlanCompareCard({
             <div className="mt-1 text-body text-ink3">
               预估 <b className="font-orb text-gold">{p.estCredits}</b> 积分 · 命中 {p.fences.length} 条围栏
             </div>
-            {p.overFence && <div className="mt-1 text-body text-warn">超出围栏 · 采用前须前往审批中心双人确认</div>}
+            {p.overFence && <div className="mt-1 text-body text-warn">超出围栏 · 采用前须由对应业务页面放行</div>}
             <div className="mt-2">
               {adoptedId === p.id ? (
                 <span className="inline-flex items-center gap-1 text-body font-bold text-go"><Icon name="check" size={14} />已采用（已写事件）</span>

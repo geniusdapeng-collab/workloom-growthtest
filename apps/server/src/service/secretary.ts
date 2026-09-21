@@ -150,25 +150,12 @@ export async function scan(workspaceId: string, memberNo: string): Promise<{ add
     }
   };
 
-  // ① 审批台高风险卡（要你判断）
-  const approvals = await svcQuery<{ approval_id: string; action: string; tier: string; title: string }>(workspaceId,
-    `SELECT approval_id, payload->'decision'->>'action' AS action,
-            payload->'decision'->'after'->>'tier' AS tier,
-            COALESCE(payload->'decision'->'after'->>'title', payload->'decision'->>'action') AS title
-     FROM biz_events WHERE payload->'decision'->>'action' LIKE 'approval.%'
-       AND payload->'decision'->'after'->>'status'='pending'
-     ORDER BY seq DESC LIMIT 20`).catch(() => [] as never[]);
-  // 审批口径兼容：approvals 表为主
-  const apprRows = await svcQuery<{ id: string; action: string; tier: string; created_at: string }>(workspaceId,
-    `SELECT id, action, tier, created_at FROM approvals WHERE status='pending' ORDER BY created_at DESC LIMIT 10`).catch(() => [] as never[]);
-  for (const a of apprRows) {
-    await push({
-      sourceKey: `appr-${a.id}`, kind: "judge", level: "high",
-      title: "有张审批卡等您拍板", body: `${a.action}（${a.tier} 级）。要点我整理好了，您看一眼就能定。`,
-      actions: [{ label: "去审批", link: "/p4" }], link: "/p4",
-    });
-  }
-  void approvals;
+  /**
+   * 基座通用审批环节已移除（2026-09-21 产品所有者口径，本机单人运行）：
+   * 织伴不再推送「审批卡待拍板」提醒，也不再指向已下线的 /p4 审批中心。
+   * 业务链路自带的关卡（如视频管线 G1–G10、定妆照确认）由各自业务页面就地放行，
+   * 需要提醒时应由对应业务页面自己发推送，而不是由基座代办。
+   */
 
   // ② 开发任务待裁决 / ③ 转人工（开发场域）
   const devPend = await svcQuery<{ id: string; title: string }>(workspaceId,

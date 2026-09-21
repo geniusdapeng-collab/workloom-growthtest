@@ -68,23 +68,19 @@ export const SOURCE_KIND_TEXT: Record<string, string> = {
   manual: "手工录入",
 };
 
-// —— 审批域 ——
-export const APPROVAL_STATUS_TEXT: Record<string, string> = {
-  pending: "待审批",
-  approved: "已批准",
-  rejected: "已驳回",
-  edited: "已改派",
-  escalated: "已升级",
-};
-
+/**
+ * —— 业务关卡放行域 ——
+ * 基座通用审批环节已移除（2026-09-21 产品所有者口径，本机单人运行）；这里保留的是
+ * 业务链路自带关卡（如视频管线 G1–G10、定妆照确认）的放行手势文案。
+ */
 export const APPROVAL_GESTURE_TEXT: Readonly<Record<string, string>> = {
-  approve: "已批准",
-  edit: "已修改后批准",
-  reject: "已驳回",
+  approve: "已放行",
+  edit: "改后放行",
+  reject: "已退回",
 };
 
 export function approvalGestureText(value: string | null | undefined): string {
-  return value ? (APPROVAL_GESTURE_TEXT[value] ?? "审批已处理") : "审批已处理";
+  return value ? (APPROVAL_GESTURE_TEXT[value] ?? "关卡已处理") : "关卡已处理";
 }
 
 // —— 对话意图 ——
@@ -122,7 +118,7 @@ export const COMMON_STATUS_TEXT: Record<string, string> = {
   blocked: "已隔离",
   pending: "待处理",
   pending_review: "待审查",
-  pending_approval: "待审批",
+  pending_approval: "待放行",
   expired: "已过期",
   rolled_back: "已回滚",
   ready: "就绪",
@@ -156,7 +152,7 @@ export const MODEL_WINDOW_TEXT: Record<string, string> = {
 export const MEMBER_ROLE_TEXT: Record<string, string> = {
   owner: "负责人",
   manager: "管理员",
-  approver: "审批人",
+  approver: "放行人",
   member: "成员",
   readonly: "只读成员",
   partner: "合作伙伴",
@@ -164,7 +160,7 @@ export const MEMBER_ROLE_TEXT: Record<string, string> = {
 
 export const OBJECT_TYPE_TEXT: Record<string, string> = {
   thread: "任务",
-  approval: "审批事项",
+  approval: "关卡事项",
   rule: "规则",
   member: "成员",
   agent: "数字员工",
@@ -283,7 +279,7 @@ const ACTION_PART_TEXT: Record<string, string> = {
   complete: "办结",
   escalate: "升级",
   submit: "提交",
-  approve: "审批",
+  approve: "放行",
   publish: "发布",
   update: "更新",
   confirm: "确认",
@@ -416,7 +412,7 @@ export function actorText(id: string): string {
 /** 夜班/运营高频动作码补录（F-CN1） */
 export const ACTION_OPS_TEXT: Record<string, string> = {
   // 基座公共动作码；行业动作从 Bundle 术语投影读取。
-  "approval.gesture": "审批手势",
+  "approval.gesture": "关卡手势",
   "ask.answer": "问询应答",
   "memory.consolidate": "记忆整理",
   "night.package.deliver": "夜班日报投递",

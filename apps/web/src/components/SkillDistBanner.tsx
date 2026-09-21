@@ -1,12 +1,14 @@
 /**
  * 技能更新通栏（技能保鲜环 · 客户侧通知）
  *
- * 数据源 = skills.skillOps.status（recentLoaded 近 24h 装载事件 / pendingCount 待审批数）：
- *  - 有待审批（L2 新工具/权限）→ 琥珀条：引导去 P4 审批中心拍板（永不静默的执行面变化）；
+ * 数据源 = skills.skillOps.status（recentLoaded 近 24h 装载事件）：
  *  - 近 24h 有静默装载 → 青条：「夜班已自动更新 N 个技能」，可跳 P6 技能中心查看，
  *    当日可关闭（localStorage 按日记忆，次日有新装载再出现）；
- *  - 两者皆无 → 不渲染（不打扰）。
+ *  - 无装载事件 → 不渲染（不打扰）。
  * 挂载点：与 SimBanner 同位（P0 经营主页 + Bridge 工作台顶栏下方）。
+ *
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，本通栏不再提示
+ * 「新工具/新权限待拍板」（原 pendingCount → 审批中心入口）；技能装载继续按事件留痕。
  */
 import { useEffect, useState } from "react";
 import { Icon } from "@workloom/ui";
@@ -16,7 +18,6 @@ import { chineseDisplayName, versionText } from "../lib/display";
 interface LoadedItem { skillId: string; name: string; version: string; tier: string; at: string; auto: boolean }
 interface DistStatus {
   recentLoaded: LoadedItem[];
-  pendingCount: number;
 }
 
 const dismissKey = (day: string) => `skill-dist-banner-dismissed:${day}`;
@@ -51,32 +52,13 @@ export function SkillDistBanner() {
 
   if (!st || dismissed) return null;
   const loaded = st.recentLoaded ?? [];
-  const pending = st.pendingCount ?? 0;
-  if (pending === 0 && loaded.length === 0) return null;
+  if (loaded.length === 0) return null;
 
   const onDismiss = () => {
     const day = new Date().toISOString().slice(0, 10);
     localStorage.setItem(dismissKey(day), "1");
     setDismissed(true);
   };
-
-  // 待审批优先（执行面变化永不静默，必须人拍板）
-  if (pending > 0) {
-    return (
-      <div className="relative z-30 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-amber-500/50 bg-amber-100/80 px-4 py-2 text-body text-amber-800 backdrop-blur">
-        <Icon name="lock" size={16} />
-        <span className="min-w-0 flex-1">
-          官方技能更新有 <b>{pending}</b> 项涉及<b>新工具或新权限</b>，按治理纪律需要你拍板后才生效。
-        </span>
-        <a
-          href="/approvals"
-          className="shrink-0 rounded border border-amber-500/60 bg-amber-200/60 px-3 py-1 font-bold text-amber-900 no-underline transition-colors hover:bg-amber-300/60"
-        >
-          去审批 →
-        </a>
-      </div>
-    );
-  }
 
   // 装载事件里的 name 可能夹带拉丁记号（如演示包的「Y 域分发技能」）——旧实现整串回落成
   // 「技能能力」，用户看到的是一排同名技能；这里剔除记号后再展示，实在无法中文化才用中性兜底。

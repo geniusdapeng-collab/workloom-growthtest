@@ -63,10 +63,11 @@ describe("弹层出口（关闭/取消/Esc/背景）全量覆盖", () => {
 
   it("扫描覆盖面不缩水（渲染点数下限）", () => {
     /**
-     * 当前三端共 21 个"开口标签"渲染点（Overlay 15 / ConfirmDialog 4 / Drawer 2 等）。
-     * 下限取 16：既是漂移探测器（路径或正则失配会骤降），又允许正常重构把两层弹层合并成一层。
+     * 当前三端共 14 个"开口标签"渲染点（Overlay / ConfirmDialog / Drawer 等）。
+     * 2026-09-21：基座通用审批环节移除后，审批中心页（P4）与两处审批弹层随之下线，
+     * 渲染点由 21 降到 14；下限同步取 14，仍作为漂移探测器（路径或正则失配会骤降）。
      * 注意：本测试统计的是 `<Overlay` 这类**开口标签**，闭合标签 `</Overlay>` 不计。
      */
-    expect(points).toBeGreaterThanOrEqual(16);
+    expect(points).toBeGreaterThanOrEqual(14);
   });
 });

@@ -5,10 +5,11 @@
  *  - PC 端：右侧固定通栏对话框——贴界面最右、从顶到底的瘦长完整对话模块，任何页面常驻；
  *    可收起为 56px 图标条（收起后随时展开，不是隐藏）
  *  - 移动端 B 端：底部 Tab 首个即对话（生产移动壳落地时按此口径；demo 已镜像）
- *  - 栏内构成：头部（AI 助手 + 待审批数量 + 收起）/ 消息流 / 情境快捷钮 / 输入栏
+ *  - 栏内构成：头部（AI 助手 + 收起）/ 消息流 / 情境快捷钮 / 输入栏
  *  - 上下文感知：useLocation 读当前路由预置情境 chips（/p22 服务前台、/p13 订单、/p15 口碑等）
  *  - 输入分流：问句走 ask（threads.dispatch 意图路由 → ask 即时应答，P2 同口径）；明确任务走 quest（立项 → P2）
- *  - 待审批数：approvals.list({status:"pending"}) 10s 轮询（D6「其余」口径）
+ *  - 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除——不再显示待审批角标、
+ *    不再提供框内一键批准；业务链路自带的关卡（如视频管线 G1–G10、定妆照确认）由各自业务页面就地放行
  *  - ⌘K / Ctrl+K 聚焦输入框；调用失败优雅降级（✗ 回执上屏，输入保留可重试 §9.3）
  *  - 布局协作：经 window 自定义事件 askrail-width 通知 Bridge 预留右侧空间（320px / 56px）
  *
@@ -45,14 +46,12 @@ import { sharedLayoutPixels } from "../../lib/useAskRail";
 const CONTEXT_CHIPS: Array<[prefix: string, chips: string[]]> = [
   ["/service", ["试试知识库检索", "今天工单有什么超时风险"]],
   ["/p22", ["试试知识库检索", "今天工单有什么超时风险"]],
-  ["/approvals", ["这批审批有高危项吗", "汇总今日待审重点"]],
-  ["/p4", ["这批审批有高危项吗", "汇总今日待审重点"]],
   ["/tasks/", ["这项任务卡在哪一步", "预估剩余积分消耗"]],
   ["/p2", ["这线程卡在哪一步", "预估剩余积分消耗"]],
   ["/tasks", ["昨夜经营有什么异常", "今天优先级最高的三件事"]],
   ["/p1", ["昨夜经营有什么异常", "今天优先级最高的三件事"]],
 ];
-const DEFAULT_CHIPS = ["汇报当前经营概况", "有哪些待我审批的事项"];
+const DEFAULT_CHIPS = ["汇报当前经营概况", "今天有哪些业务关卡需要我确认"];
 
 interface RingMsg {
   id: number;
@@ -65,8 +64,6 @@ interface RingMsg {
   linkTo?: string;
   /** 落点标签（三合一方案的「结果可见」）：问/派/留言/推进/个人 */
   intent?: RailIntent;
-  /** 待审批步骤的审批号：框内可一键「批准并继续」（不必跳审批中心） */
-  approvalId?: string;
   /** 长周期任务卡片（派活即出卡，轮询与员工头顶任务状态同源同步） */
   card?: TaskCard;
   /** ask 应答的原始提问（👎 升级重答入参，v3.0 反馈环） */
@@ -83,11 +80,10 @@ interface TaskCard {
   stepsTotal?: number;
   updatedAt?: string;
   summary?: string;
-  approvalId?: string;
 }
 
 const TASK_STATUS_TEXT: Record<string, string> = {
-  queued: "排队中", running: "进行中", pending_review: "待您拍板",
+  queued: "排队中", running: "进行中", pending_review: "等待业务关卡放行",
   completed: "已完成", failed: "失败", paused: "已暂停",
 };
 
@@ -103,7 +99,7 @@ function taskCardSummary(card: TaskCard): string {
   if (card.summary) return card.summary;
   if (card.status === "completed") return `全部 ${card.stepsTotal ?? card.stepsDone ?? 0} 步已完成`;
   if (card.status === "failed") return "执行失败，可进入任务详情查看原因";
-  if (card.status === "pending_review") return "有步骤在等您审批";
+  if (card.status === "pending_review") return "有步骤正在等待业务关卡放行（在对应业务页面处理）";
   if (typeof card.stepsTotal === "number" && card.stepsTotal > 0) return `已执行 ${card.stepsDone ?? 0}/${card.stepsTotal} 步`;
   return "已派发，等待执行";
 }
@@ -145,10 +141,9 @@ interface DispatchResult {
   answer?: string;
   threadId?: string;
   status?: string;
-  /** runImmediately 的 Quest 执行回执（步数/总数；pending_review=有步骤等审批） */
+  /** runImmediately 的 Quest 执行回执（步数/总数；pending_review=有步骤等待业务关卡放行） */
   stepsDone?: number;
   stepsTotal?: number;
-  pendingApprovalId?: string;
 }
 
 function ClapperIcon({ size = 24 }: { size?: number }) {
@@ -158,12 +153,12 @@ function ClapperIcon({ size = 24 }: { size?: number }) {
 /**
  * 长周期任务卡片（右侧窄栏专用，2026-09-20）：
  *   图标（按状态）+ 主标题（任务名，单行截断）+ 状态徽标 + 一行摘要 + 步骤/时间 + 「查看任务 →」；
- *   有挂起步骤时附「批准并继续」。整卡可点 → 任务详情（与员工头顶任务牌同一线程状态机）。
+ *   整卡可点 → 任务详情（与员工头顶任务牌同一线程状态机）。
+ *   2026-09-21 产品所有者口径（本机单人运行）：卡片不再附「批准并继续」按钮——基座通用审批环节已移除。
  */
-function TaskCardView({ card, onOpen, onApprove, highlight = false }: {
+function TaskCardView({ card, onOpen, highlight = false }: {
   card: TaskCard;
   onOpen: () => void;
-  onApprove: () => void;
   /** 任务完成播报期间（小织的魔法棒指过来）卡片发光，视线落在同一处 */
   highlight?: boolean;
 }) {
@@ -204,15 +199,6 @@ function TaskCardView({ card, onOpen, onApprove, highlight = false }: {
         </span>
         <span className="shrink-0 text-holo">查看任务 →</span>
       </div>
-      {card.approvalId && !terminal && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onApprove(); }}
-          className="mt-1.5 rounded border border-gold/50 px-2 py-0.5 text-body font-bold text-gold hover:bg-gold/15"
-        >
-          批准并继续 →
-        </button>
-      )}
     </div>
   );
 }
@@ -232,7 +218,6 @@ export function StarRing() {
   const [collapsed, setCollapsed] = useState(() => window.matchMedia("(max-width: 820px)").matches);
   const [hidden, setHidden] = useState(false);
   const [compactViewport, setCompactViewport] = useState(() => window.matchMedia("(max-width: 820px)").matches);
-  const [pendingCount, setPendingCount] = useState(0);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [msgs, setMsgs] = useState<RingMsg[]>([]);
@@ -306,21 +291,6 @@ export function StarRing() {
     ));
   }, [collapsed, compactViewport, hidden]);
   useEffect(() => () => emitRailWidth(0), []);
-
-  /* ---------- 待审批 badge（approvals 轮询，D6 口径；失败静默保留上次值） ---------- */
-  useEffect(() => {
-    let alive = true;
-    const poll = async () => {
-      try {
-        await ensureDemoLogin();
-        const rows = (await trpc.approvals.list.query({ status: "pending" })) as unknown[];
-        if (alive) setPendingCount(rows.length);
-      } catch { /* 断线保留上次计数 */ }
-    };
-    void poll();
-    const t = setInterval(() => void poll(), 10000);
-    return () => { alive = false; clearInterval(t); };
-  }, []);
 
   /* ---------- ⌘K / Ctrl+K 聚焦输入框 ---------- */
   useEffect(() => {
@@ -460,7 +430,7 @@ export function StarRing() {
        *  - 视觉类目标（海报/配图/封面/生图…）默认派给「视觉设计师」岗位——它声明了
        *    visualwrite.* 工具，才会走真实视觉工位（bridge → Ark seedream）出图；
        *  - runImmediately：本机演示没有独立调度器，只立项会永远排队；这里让派活立即执行
-       *    （围栏/审批/回执语义不变，pending_review 仍会挂起等您拍板）。
+       *    （围栏/回执语义不变；命中业务关卡时 pending_review 会在对应业务页面等待放行）。
        */
       // 覆盖口语说法："生成一张…图 / 画一张 / 做一张…图"都要能落到视觉岗位
       const visualGoal = /海报|配图|封面|生图|出图|图片|视觉|主视觉|素材图|生成.{0,12}图|画一?[张幅].{0,12}图|做一?[张幅].{0,12}图/.test(text);
@@ -498,7 +468,6 @@ export function StarRing() {
           stepsDone: r.stepsDone,
           stepsTotal: r.stepsTotal,
           updatedAt: new Date().toISOString(),
-          approvalId: r.pendingApprovalId,
         };
         setMsgs((cur) => [...cur, { id: cardMsgId!, role: "agent", intent: "task", card }]);
       }
@@ -569,7 +538,6 @@ export function StarRing() {
               stepsDone: typeof t.progress_done === "number" ? t.progress_done : x.card.stepsDone,
               stepsTotal: typeof t.progress_total === "number" ? t.progress_total : x.card.stepsTotal,
               updatedAt: t.updated_at ?? new Date().toISOString(),
-              approvalId: t.status === "pending_review" ? x.card.approvalId : undefined,
             },
           } : x)));
         }
@@ -579,44 +547,6 @@ export function StarRing() {
     const timer = window.setInterval(() => void tick(), 5000);
     return () => { alive = false; window.clearInterval(timer); };
   }, [pendingCardKey]);
-
-  /**
-   * 框内一键「批准并继续」：对需要人审的步骤直接批准——
-   * 服务端批准后会**自动续跑**该线程（scheduleQuestResumeAfterApproval），
-   * 用户不必再跳去审批中心或手动点"继续推进"。失败保留可重试提示。
-   */
-  const approveInline = useCallback(async (msg: RingMsg) => {
-    /**
-     * 审批号可能挂在两类消息上：文本卡在 `msg.approvalId`，长任务卡片在 `msg.card.approvalId`。
-     * 2026-09-20 真机修复：早期只读前者，卡片上的「批准并继续」点了没有任何反应（静默 return）。
-     */
-    const approvalId = msg.approvalId ?? msg.card?.approvalId;
-    if (!approvalId) return;
-    try {
-      await trpc.approvals.decide.mutate({ approvalId, gesture: "approve" });
-      setMsgs((cur) => cur.map((m) => (m.id === msg.id
-        ? {
-          ...m,
-          approvalId: undefined,
-          ...(m.card
-            ? { card: { ...m.card, approvalId: undefined, summary: "本步已批准，正在自动续跑…", updatedAt: new Date().toISOString() } }
-            : {}),
-          ...(m.text ? { text: `${m.text}（本步已批准，正在自动续跑…）` } : {}),
-        }
-        : m)));
-      pushMsg({
-        role: "agent", intent: "advance", action: "已批准 · 自动续跑", receipt: "unverified",
-        text: "该步骤已批准，任务正在自动续跑；完成后结果写入任务与事件账本，可在任务中心查看。",
-      });
-    } catch (error) {
-      console.warn("框内批准失败", error);
-      const message = error instanceof Error ? error.message : String(error);
-      pushMsg({
-        role: "agent", action: "批准失败", receipt: "failed",
-        text: /权限|FORBIDDEN|403/.test(message) ? "当前身份没有审批权限，请换有审批权的账号或到审批中心处理。" : "批准未生效，请稍后重试或到审批中心处理。",
-      });
-    }
-  }, [pushMsg]);
 
   const inputBar = (
     <div className="flex items-center gap-2">
@@ -672,11 +602,6 @@ export function StarRing() {
           >
             <ClapperIcon />
           </button>
-          {pendingCount > 0 && (
-            <span className="pointer-events-none absolute right-0 top-0 flex h-5 min-w-5 items-center justify-center rounded-full border border-alert/70 bg-alert px-1 font-orb text-body font-bold text-ink shadow-[0_0_10px_rgba(255,77,109,.7)]">
-              {pendingCount}
-            </span>
-          )}
         </div>
         <div className="text-body tracking-[.25em] text-gold [writing-mode:vertical-rl]">AI 助手</div>
         <div className="flex-1" />
@@ -723,11 +648,6 @@ export function StarRing() {
             {ctxThreadId ? ` · 任务 ${clientIdentifierText(ctxThreadId)}` : nightChannel ? " · 夜班频道" : ""}
           </div>
         </div>
-        {pendingCount > 0 && (
-          <span className="ml-1 flex h-5 min-w-5 items-center justify-center rounded-full border border-alert/70 bg-alert px-1 font-orb text-body font-bold text-ink">
-            {pendingCount}
-          </span>
-        )}
         <span className="flex-1" />
         <button
           type="button"
@@ -767,7 +687,6 @@ export function StarRing() {
               key={m.id}
               card={m.card}
               onOpen={() => { if (m.card?.threadId) nav(`/tasks/${encodeURIComponent(m.card.threadId)}`); }}
-              onApprove={() => void approveInline(m)}
             />
           ) : (
             <AgentActionMessage
@@ -782,15 +701,6 @@ export function StarRing() {
                 <span className="mr-1 rounded border border-holo/40 px-1 text-body text-holo">{INTENT_LABEL[m.intent]}</span>
               )}
               {m.text}
-              {m.approvalId && (
-                <button
-                  type="button"
-                  onClick={() => void approveInline(m)}
-                  className="ml-1 rounded border border-gold/50 px-2 py-0.5 text-body font-bold text-gold hover:bg-gold/15"
-                >
-                  批准并继续 →
-                </button>
-              )}
               {m.linkTo && (
                 <button type="button" onClick={() => nav(m.linkTo!)} className="ml-1 text-holo underline">→ 任务中心跟进</button>
               )}
@@ -811,7 +721,7 @@ export function StarRing() {
       {/* 情境快捷钮 */}
       <div className="flex flex-wrap gap-1.5 border-t border-line/60 px-3 pt-2">
         {domain === "mine" ? (
-          ["任务怎么样了", "明早八点提醒我过审批", "找总经理"].map((c) => (
+          ["任务怎么样了", "明早八点提醒我看交付结果", "找总经理"].map((c) => (
             <button
               key={c}
               type="button"

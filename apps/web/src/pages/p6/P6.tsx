@@ -309,7 +309,7 @@ export default function P6() {
         <>
           <div className="mb-2 px-1 text-body tracking-[.2em] text-ink3">能力沉淀闭环</div>
           <div className="rounded-lg border border-line bg-card p-3 text-body leading-relaxed text-ink2">
-            执行 → 沉淀为技能和记忆 → 数字员工复用 → 再执行；审批结果和驳回原因会回流为评估数据。
+            执行 → 沉淀为技能和记忆 → 数字员工复用 → 再执行；关卡放行结果和退回原因会回流为评估数据。
           </div>
           <div className="mt-2.5 rounded-lg border border-line bg-card p-3 text-body leading-relaxed text-ink3">
             <div className="mb-1 text-body font-bold text-ink2">安全约束</div>
@@ -639,7 +639,7 @@ function SkillWizard({
               <textarea
                 value={boundary}
                 onChange={(e) => setBoundary(e.target.value)}
-                placeholder="只读分析，不得直接写回；涉及金额或高风险动作必须审批"
+                placeholder="只读分析，不得直接写回；涉及金额或高风险动作必须由业务关卡放行"
                 rows={2}
                 className="w-full resize-none rounded-md border border-line bg-bg900 px-2.5 py-1.5 text-body text-ink outline-none focus:border-holo/50"
               />

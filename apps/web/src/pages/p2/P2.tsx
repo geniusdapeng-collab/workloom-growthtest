@@ -4,7 +4,9 @@
  *  - 失败步红框 + 转人工/降级重试/回滚三入口（E3.1）；无回执标「未核实」不宣称完成（L3.6/E3.7）
  *  - ThreadInspector 右栏：进度 x/y · 参与成员 · 计量（档/窗口/积分/降级链）· 围栏判定，≤5s 轮询（F3.4）；
  *    断线显「连接中断·重连中」不伪造进度
- *  - 审批卡内联（ApprovalCardMsg 语义：diff + 命中规则版本 + 三手势 → approvals.decide 写回）
+ *  - 业务关卡卡内联（ApprovalCardMsg 语义）：只呈现业务链路自带的关卡（如视频管线 G1–G10、
+ *    定妆照确认）——diff + 命中规则版本 + 三手势 → 服务端放行写回；基座通用审批环节已移除
+ *    （2026-09-21 产品所有者口径，本机单人运行）
  *  - 完成后态 p2_done：交付卡 + 决策链路时间轴；无对外变更明示「仅只读分析」（E3.7）
  *  - 权限态：只读成员不显示输入栏（E2.6，隐藏非置灰）
  * 状态变体：p2 执行中 / p2_review 待审查 / p2_done 已完成 / p2_error 错误（?demo= 强制走查）
@@ -225,7 +227,7 @@ export default function P2() {
       if (th) {
         const ev = (await trpc.threads.events.query({ threadId })) as Ev[];
         setEvents(ev);
-        // 本线程相关审批（event_id ∈ 线程事件链）
+        // 本线程相关的业务关卡（event_id ∈ 线程事件链）
         const ids = new Set(ev.map((e) => e.event_id));
         /**
          * 只展示「需要人审的决策门」：内部生产协作（脚本/分镜/拍摄清单/成片这些员工之间的
@@ -298,7 +300,7 @@ export default function P2() {
 
   /**
    * 关键链路进展 + 最终结果（2026-09-20 真机反馈补齐）：
-   *  派发（人下达）→ 执行（数字员工动作，含子呼叫/审批）→ 交付（线程收尾 + 可展示结果）。
+   *  派发（人下达）→ 执行（数字员工动作，含子呼叫）→ 交付（线程收尾 + 可展示结果）。
    * 全程只用事件账本里真实存在的事实，不编造进度：没有的事件就是「尚未发生」。
    */
   const chain = useMemo(() => {
@@ -328,7 +330,7 @@ export default function P2() {
       return;
     }
     await trpc.approvals.decide.mutate({ approvalId, gesture: g });
-    setBanner({ level: "info", text: "审批结果已写入事件账本，并用于校准协作偏好。" });
+    setBanner({ level: "info", text: "关卡放行结果已写入事件账本，并用于校准协作偏好。" });
     await load();
   }, [load]);
 
@@ -483,7 +485,7 @@ export default function P2() {
               <ol className="flex flex-wrap items-center gap-x-2 gap-y-1.5 text-body">
                 {[
                   { key: "派发", done: chain.dispatched, detail: chain.dispatched ? "已下达给数字员工" : "尚未下达" },
-                  { key: "执行", done: chain.agentActions > 0, detail: chain.agentActions > 0 ? `${chain.agentActions} 条动作${chain.approvalsIn ? ` · ${chain.approvalsIn} 次审批` : ""}` : "尚未执行" },
+                  { key: "执行", done: chain.agentActions > 0, detail: chain.agentActions > 0 ? `${chain.agentActions} 条动作${chain.approvalsIn ? ` · ${chain.approvalsIn} 次关卡放行` : ""}` : "尚未执行" },
                   { key: "交付", done: chain.delivered && Boolean(chain.result), detail: chain.delivered ? (chain.result ? "已产出结果" : "已收尾 · 无对外结果") : "尚未交付" },
                 ].map((stage, index) => (
                   <li key={stage.key} className="inline-flex min-w-0 items-center gap-2">
@@ -515,7 +517,7 @@ export default function P2() {
                   const text = ev.decision.action === "thread.dispatch"
                     ? (after?.title ?? thread.title)
                     : ev.decision.action === "approval.gesture"
-                      ? `待我审批：${approvalGestureText(after?.gesture)}`
+                      ? `业务关卡：${approvalGestureText(after?.gesture)}`
                       : actionText(ev.decision.action);
                   return <HumanBubble key={ev.event_id} time={new Date(ev.context.time).toTimeString().slice(0, 5)}>{text}</HumanBubble>;
                 }
@@ -567,12 +569,12 @@ export default function P2() {
                 );
               })}
 
-              {/* 内联审批卡（ApprovalCardMsg 语义：diff + 命中规则版本 + 三手势/已决态） */}
+              {/* 内联业务关卡卡（ApprovalCardMsg 语义：diff + 命中规则版本 + 三手势/已决态） */}
               {approvals.map((a) => (
                 <div key={a.approval_id} className={`rounded-msg border p-4 ${a.status === "pending" ? "border-warn/40 bg-warn/4" : "border-line bg-card"}`}>
                   <div className="mb-2 flex items-center gap-2">
                     <span className={`inline-flex items-center gap-1 text-h2 font-bold ${a.status === "pending" ? "text-warn" : "text-ink2"}`}>
-                      <Icon name="approval" size={15} />待我审批 · {a.status === "pending" ? "待审查" : a.status === "approved" ? "已采纳" : a.status === "edited" ? "编辑后采纳" : a.status === "rejected" ? "已驳回" : "已过期"}
+                      <Icon name="approval" size={15} />业务关卡 · {a.status === "pending" ? "待放行" : a.status === "approved" ? "已放行" : a.status === "edited" ? "改后放行" : a.status === "rejected" ? "已退回" : "已过期"}
                     </span>
                     <span className="font-mono text-body text-ink3">{shortId(a.approval_id)}</span>
                     {a.snapshot.rule_version && <span className="text-body text-holo">命中关联围栏</span>}
@@ -586,7 +588,7 @@ export default function P2() {
                   {a.status === "pending" ? (
                     <TriGestureBar canApprove={canApprove} onGesture={(g) => void gesture(a.approval_id, g)} />
                   ) : (
-                    <div className="text-body text-ink3">审批动作已写入事件账本，并用于校准协作偏好；重复提交不会重复生效。</div>
+                    <div className="text-body text-ink3">关卡放行动作已写入事件账本，并用于校准协作偏好；重复提交不会重复生效。</div>
                   )}
                 </div>
               ))}
@@ -617,7 +619,7 @@ export default function P2() {
                   )}
                   <div className="mt-2 border-t border-go/25 pt-2 text-body text-ink3">
                     关键链路：派发 {chain.dispatched ? "已下达" : "未下达"} · 执行 {chain.agentActions} 条动作
-                    {chain.approvalsIn ? ` · 审批 ${chain.approvalsIn} 次` : ""} · 交付 {chain.result ? "已产出结果" : "无对外结果"}
+                    {chain.approvalsIn ? ` · 关卡放行 ${chain.approvalsIn} 次` : ""} · 交付 {chain.result ? "已产出结果" : "无对外结果"}
                     （共 {events.length} 条账本事件）
                   </div>
                 </div>

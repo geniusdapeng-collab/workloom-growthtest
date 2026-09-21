@@ -126,8 +126,7 @@ export function useQuestline({ ready, facts, content = QUESTLINE }: UseQuestline
     facts.dispatched ? "d" : "-",
     facts.decided ? "a" : "-",
     facts.delivered ? "v" : "-",
-    facts.approvalsAvailable ? "p" : "-",
-  ].join(""), [facts.goalConfirmed, facts.dispatched, facts.decided, facts.delivered, facts.approvalsAvailable]);
+  ].join(""), [facts.goalConfirmed, facts.dispatched, facts.decided, facts.delivered]);
 
   const track = useCallback<QuestlineApi["track"]>((name, payload) => {
     appendEvent({ name, at: Date.now(), ...(payload ? { payload } : {}) });
@@ -170,7 +169,6 @@ export function useQuestline({ ready, facts, content = QUESTLINE }: UseQuestline
     const coreIds = coreCardIds(content);
     if (coreIds.every((id) => state.litCards.includes(id))) desired.push("three-keepers");
     if (facts.dispatched || state.stageDone.includes("dispatch")) desired.push("first-dispatch");
-    if (facts.decided || state.stageDone.includes("approve")) desired.push("first-decision");
     if (facts.delivered || state.stageDone.includes("review")) desired.push("first-close");
     setState((current) => unlockAchievements(current, desired).state);
     // eslint-disable-next-line react-hooks/exhaustive-deps

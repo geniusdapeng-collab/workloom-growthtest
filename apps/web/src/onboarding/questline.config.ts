@@ -13,7 +13,7 @@
  * 内容纪律：
  *  - 岗位、职责、航道（围栏）逐条对照行业包，不自造岗位、不编造围栏；
  *  - 文案讲的是本产品的真实闭环：获客五环（意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘）
- *    与「您只做三件事：定方向、拍板、收钱」；
+ *    与「您只做两件事：定方向、收钱」；
  *  - 任何"示例数字"必须带 `sample: true` 标注，界面按演示数据处理；
  *  - 台词每关至少 3 句（进场/等待/过关），单句控制在 42 字以内（"三句话汇报"节奏）。
  */
@@ -134,14 +134,12 @@ export const QUEST_ACHIEVEMENTS: AchievementDef[] = [
   { id: "aboard", title: "首航就绪", hint: "完成首次欢迎仪式", icon: "rocket", stage: "meet" },
   { id: "three-keepers", title: "三位当家人", hint: "认识获客班组的三位当家人", icon: "team", stage: "meet" },
   { id: "first-dispatch", title: "第一次派活", hint: "把第一件活交给数字员工", icon: "tasks", stage: "dispatch" },
-  { id: "first-decision", title: "第一次拍板", hint: "完成一次真实审批", icon: "approval", stage: "approve" },
   { id: "first-close", title: "首次闭环", hint: "首单产出被验收", icon: "celebrate", stage: "review" },
 ];
 
 /** 价值计数口径：三项都标明数据来源，界面不得出现无出处的数字 */
 export const QUEST_VALUES: ValueMetricDef[] = [
   { id: "auto-work", label: "已自主完成", unit: "项作业", source: "工作区事件账本（真实计数）" },
-  { id: "pending", label: "待您拍板", unit: "项", source: "审批队列（真实计数）" },
   { id: "on-duty", label: "团队在岗", unit: "人", source: "当前 Bundle 编制（真实计数）" },
 ];
 
@@ -153,11 +151,13 @@ export const QUEST_NEXT_STEPS: NextStepDef[] = [
 ];
 
 /**
- * 五关文案（产品级，不含行业私有词）。
+ * 四关文案（产品级，不含行业私有词）。
  *
  * 讲的是本产品的真实闭环：获客五环（意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘）
- * 与「您只做三件事：定方向、拍板、收钱」。三套行业内容包共用这段叙事，
+ * 与「您只做两件事：定方向、收钱」。三套行业内容包共用这段叙事，
  * 差异只落在员工卡 / 目标卡 / 任务卡 / 驳回枚举上。
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，原「拍板」关整关删除；
+ * 业务链路自带的关卡（如视频管线 G1–G10、定妆照确认）由各自业务页面就地放行。
  */
 export function genericStages(): QuestStageDef[] {
   return [
@@ -180,7 +180,7 @@ export function genericStages(): QuestStageDef[] {
       objective: "给团队一个方向：要更多人看见、更多询盘，还是更快成交——谁负责、几步做完、什么时候来问您，我都写清楚。",
       primaryLabel: "就按这个来",
       script: {
-        enter: "您只做三件事：定方向、拍板、收钱。先从定方向开始——选一个，或者直接跟我说一句。",
+        enter: "您只做两件事：定方向、收钱。先从定方向开始——选一个，或者直接跟我说一句。",
         hint: "三个选项都来自本行业包的真实管线，不是我编的；也可以直接说您自己的目标。",
         success: "收到。我把它拆成任务，派给该负责的岗位。",
       },
@@ -189,30 +189,18 @@ export function genericStages(): QuestStageDef[] {
       id: "dispatch",
       badge: "派活",
       title: "第 3 关 · 把第一件活交出去",
-      objective: "亲手派一单，看着它跑起来：挂起、拍板、产出都走真实业务通道。",
+      objective: "亲手派一单，看着它跑起来：拆解、执行、产出都走真实业务通道。",
       primaryLabel: "派给他",
       script: {
         enter: "光看不算数，得派一单试试。看中哪张卡，拖到人身上也行。",
-        hint: "每张卡都写清了：谁做、几步、多久、产出什么、要您拍板几次。",
+        hint: "每张卡都写清了：谁做、几步、多久、产出什么；涉钱与外发动作由对应业务页面把关。",
         success: "活已经派出去了，进度我帮您盯着。",
-      },
-    },
-    {
-      id: "approve",
-      badge: "拍板",
-      title: "第 4 关 · 第一次行使拍板权",
-      objective: "在高风险动作上做一次真实决策——加投、报价承诺、内容外发，AI 永远不替您拍板。",
-      primaryLabel: "就这样定",
-      script: {
-        enter: "这事按您定的航道必须您拍板。改前改后和依据都在这儿。",
-        hint: "批准、修改、驳回都行；驳回想写原因就写一句。",
-        success: "记下了，全链留痕。以后这种事只找您一次。",
       },
     },
     {
       id: "review",
       badge: "验收",
-      title: "第 5 关 · 看看今天赚了什么",
+      title: "第 4 关 · 看看今天赚了什么",
       objective: "验收产出、看归因结果，再决定下一步往哪走。",
       primaryLabel: "我看到了",
       script: {
