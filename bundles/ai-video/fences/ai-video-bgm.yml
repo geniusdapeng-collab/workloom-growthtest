@@ -1,0 +1,65 @@
+# 成片配乐围栏包（视频经理 · 配乐工位）
+# 与 ai-video-baseline.yml / ai-video-color.yml 同口径：默认基线、只可加严、命中取严（block > review > auto）；
+# 求值语义：匹配命中后求值 when（沙箱，禁任意代码），写类动作无命中按 default_level。
+version: ai-video-bgm/v1
+default_level: review
+rules:
+  - rule_id: G-BGM0
+    name: 常规配乐直通（本地可逆动作）
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [final_video, bgm_report, video_asset, bgm_track]
+      actions: [bgmwrite.compose, bgmwrite.mix, bgmwrite.separate, bgmwrite.best]
+    when: "true"
+    note: 成片配乐是工位本地、非破坏性、可回滚动作（原片只读 + 新文件 + 版本链），默认直通；曲库首次入片（G-BGM1）、覆盖原片（G-BGM2）、丢弃原声（G-BGM3）、日配额（G-BGM4）、版权不合规（G-BGM5）叠加升级，deny 优先并集取严。未命中写动作的保守默认是 review，故此处必须显式声明 auto，否则干净配乐也被挂起。
+
+  - rule_id: G-BGM1
+    name: 曲库首次入片 / 品牌主题曲变更必审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [bgm_report, final_video, bgm_track]
+      actions: [bgmwrite.mix, bgmwrite.best]
+    when: "params.license_reviewed == false or params.theme_change == true"
+    note: 新曲库/新平台的第一支曲目入片、或改动品牌主题曲，属对外观感与法律风险变更，须人审（审批号随配乐报告归档）；已核验许可的曲目复用自动放行。
+
+  - rule_id: G-BGM2
+    name: 覆盖原片禁止
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, video_asset]
+      actions: [bgmwrite.mix, bgmwrite.compose, bgmwrite.best]
+    when: "params.overwrite_source == true or params.output_path == params.input_path"
+    note: 原片只读是硬红线：配乐一律产出新文件并进版本链（视频轨 copy 不改画面），任何覆盖原片的调用一票否决。
+
+  - rule_id: G-BGM3
+    name: 人声保护与「禁止静音原声」
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, bgm_report]
+      actions: [bgmwrite.mix, bgmwrite.best]
+    when: "params.skip_verify == true or params.verify == false or params.mute_dialogue == true or (params.policy == \"music-only\" and params.allow_discard_original != true) or params.remove_vocals_full == true"
+    note: 两条硬线：① 配乐必须带复检（响度/人声余量/配乐可闻度），关闭校验的调用禁止执行（无回执=未核实）；② 不许把"声音全去掉再盖音乐"当默认做法——丢弃原声（含人声）必须显式声明 allow_discard_original=true，且不得声称为标准流程。
+
+  - rule_id: G-BGM4
+    name: 单租户日配乐配额熔断
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, render_job]
+      actions: [bgmwrite.mix, bgmwrite.best, bgmwrite.compose]
+    when: "context.tenant_daily_bgm >= 40"
+    note: 每租户每日 40 次配乐上限（含作曲/混音/择优），超限熔断并告警；上调须人审（工位产能与成本保护）。
+
+  - rule_id: G-BGM5
+    name: 版权不合规禁止入片
+    level: block
+    is_baseline: true
+    match:
+      object_types: [bgm_track, bgm_report]
+      actions: [bgmwrite.mix, bgmwrite.best]
+    when: "params.commercial_use == true and not contains_any(params.track_license, ['cc0-1.0', 'cc-by-4.0', 'cc-by-sa-4.0', 'royalty-free', 'workloom-self-generated'])"
+    note: "商用交付只允许 CC0 / CC BY / CC BY-SA / 明确可商用的免版税曲目；NC/ND/未标注一律一票否决（自算作曲属本仓产物，许可为 workloom-self-generated，命中白名单豁免）。DSL 语义：contains_any 的 haystack 非字符串（含字段缺失）→ false → 条件成立 → 阻断，即「没登记许可」按不合规处理（fail-closed）。"

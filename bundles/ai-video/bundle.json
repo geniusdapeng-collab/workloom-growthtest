@@ -49,11 +49,13 @@
         "presets/ip-curator.yml",
         "presets/review-analyst.yml",
         "presets/settlement-clerk.yml",
-        "presets/colorist.yml"
+        "presets/colorist.yml",
+        "presets/bgm-composer.yml"
       ],
       "fences": [
         "fences/ai-video-baseline.yml",
-        "fences/ai-video-color.yml"
+        "fences/ai-video-color.yml",
+        "fences/ai-video-bgm.yml"
       ],
       "skills": [
         "skills/jenny-loom-research/SKILL.md",
@@ -67,7 +69,12 @@
         "skills/color-grade/SKILL.md",
         "skills/color-look-design/SKILL.md",
         "skills/color-shot-matching/SKILL.md",
-        "skills/color-delivery-spec/SKILL.md"
+        "skills/color-delivery-spec/SKILL.md",
+        "skills/bgm-score-design/SKILL.md",
+        "skills/bgm-audio-layering/SKILL.md",
+        "skills/bgm-vocal-separation/SKILL.md",
+        "skills/bgm-library-license/SKILL.md",
+        "skills/bgm-delivery-spec/SKILL.md"
       ],
       "schemas": [
         "schemas/objects.json",
@@ -329,10 +336,25 @@
         "library/luts/look-teal-orange.cube",
         "library/luts/look-moody-dark.cube",
         "library/luts/look-cool-technical.cube",
-        "library/luts/manifest.json"
+        "library/luts/manifest.json",
+        "library/bgm-recipes/recipes.json",
+        "library/bgm-library/README.md",
+        "library/bgm-library/tracks.example.json"
       ],
       "segmentDefaults": [],
-      "connectors": [],
+      "connectors": [
+        "connectors/bgm-bridge/core.mjs",
+        "connectors/bgm-bridge/measure.mjs",
+        "connectors/bgm-bridge/synth.mjs",
+        "connectors/bgm-bridge/executor.ts",
+        "connectors/bgm-bridge/server.mjs",
+        "connectors/bgm-bridge/cli.mjs",
+        "connectors/bgm-bridge/server-adapter.mts",
+        "connectors/bgm-bridge/README.md",
+        "connectors/bgm-bridge/kit/ffmpeg-pin.json",
+        "connectors/bgm-bridge/kit/install.sh",
+        "connectors/bgm-bridge/kit/selftest.sh"
+      ],
       "modelPolicy": "model-policy.yml"
     },
     "ui": {
@@ -463,10 +485,25 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "bc27945e9e186638b788efa43e004ddcb1611249ffa9e4839b3012ba01300b07",
+    "digest": "db36fa32f9c11ef36f598f21d56667608f5d0fd326043c76d43c3522ba786154",
     "assets": {
+      "connectors/bgm-bridge/cli.mjs": "1997249d6cb8f6c2ec165e7b4f166d66d3c7126d3e0da4de7ecc501b8e0e18e0",
+      "connectors/bgm-bridge/core.mjs": "640addf6d00d4ceeb4275668840785e4732e4ea79210a3636962cd411ef053c2",
+      "connectors/bgm-bridge/executor.ts": "6b4e44eb80bc071eceb4327b9ea666b9a67a9dd3ee58bc88648e0b6ad8d5ac1f",
+      "connectors/bgm-bridge/kit/ffmpeg-pin.json": "0373e14b63b3ba4e883e10c3823b2658be41929cbbc541a71086162ae3fda96e",
+      "connectors/bgm-bridge/kit/install.sh": "2bb487a25c6af04297e9406826e75c1c9c50c9f02e1ead3a5edd749d664d51e5",
+      "connectors/bgm-bridge/kit/selftest.sh": "8512b55b961835a2abda341cf661067834e1cb18a17354a683b7298da323ef0f",
+      "connectors/bgm-bridge/measure.mjs": "6061cda37951a5d6e1f4bd99e60ae69bad76de8980eac7d65c2c92302c8ef0e9",
+      "connectors/bgm-bridge/README.md": "70bbd486bd8957d9d70f2e55ee4a3c304630afd71130348719f5d8efa5248e85",
+      "connectors/bgm-bridge/server-adapter.mts": "bd8790725a0662cedfd0f8d9bd4d984bff4fdaa32d02c7cb1e182835995f4c20",
+      "connectors/bgm-bridge/server.mjs": "53503ea2050936af97901d387dd39565651eba2c7272072fe3dfe266bef13837",
+      "connectors/bgm-bridge/synth.mjs": "a7f1f0ef2dcdfa9abb6236e554c8d0649697a58b6e13e519588928b3eeb31d52",
       "fences/ai-video-baseline.yml": "d0c8f2f8f7bf59dd3b9b74b2d880d3e1d405ddf849b64adca703b8c071b2eed7",
+      "fences/ai-video-bgm.yml": "ab160d340f9625b6e76bd96c536bd81a07ed49827a45fd9b051a2002ea4f4cee",
       "fences/ai-video-color.yml": "709cb9fc3cba47a4ee2b4ee233d714277223cb23f9ca210ed3712de54c597ed6",
+      "library/bgm-library/README.md": "d63373a49054372ac1607ef675f06add6822e97cbdb9b0b63b696cd76972c215",
+      "library/bgm-library/tracks.example.json": "38a110e7efef8082422cfb11cf30e5bac88657c6e23c2ebe2200ae2700446203",
+      "library/bgm-recipes/recipes.json": "47d4ee6b74cbd48d2ddf489ce7e6be49dc380b96fd07055ee3eaa1cea930a09d",
       "library/color-recipes/recipes.json": "796a34a124521d1bade7f1ef0ccfed7d74ed38832918f17144ea2cdd3e4d2f2d",
       "library/hollywood-factory/技能系列/镜头级专项/剧情_卡梅隆_情感手持.md": "823392d5017ce604099c67a5e18da812923d3f6e3bf8949f7ec8615e84eba7ba",
       "library/hollywood-factory/技能系列/镜头级专项/剧情_卡梅隆_紧张手持.md": "6beefc37e904e113eb127a856aab05d81e97e92ef27614fcd90387b0bb61f833",
@@ -715,10 +752,11 @@
       "pipelines/account-ops.yml": "455383c019ac1d0523db48c6088c7bfce4aa9e8e1eef8d7d71399aa69e107264",
       "pipelines/ads-creative-factory.yml": "90e475e5482ecf15541aa2d6eca5499aa1c9bea8d9928e2122975ae77df869c5",
       "pipelines/marketing-film.yml": "4ba95c0e83538de605126072ce26a462211e4cea3a82c5fcaee8227a71b485b1",
-      "pipelines/narrative-film.yml": "e909d2bd470a0a1da6e87705741c4e59750cb816b5db322879c7839d7e4da391",
+      "pipelines/narrative-film.yml": "e0ffee8fc2f31b3b6491acc089e187dfd36d2be97286d87cc7f81c38d0a246df",
       "pipelines/settlement-recon.yml": "c4af96be653224e31ec8882ae19da37026dbbe1f2d5fb28435deee92b37db1d0",
       "presets/ads-optimizer.yml": "4969554944f4e2586aef8ab29da819d76611a6ba537b5964db6e9e7db9cc5bf2",
       "presets/audio-designer.yml": "e0122309c8a94d7b8e73109c3b88f92b900917bdc04c5535836e7f1f3c66dc0b",
+      "presets/bgm-composer.yml": "4be097e646f26c547d7b0b47a0c160087810d259c56d61a3a39c4aa61ec0229e",
       "presets/colorist.yml": "d3b93f95a3a1d2e3cbba95f6c05129d2fa9729f54913999e0e647e8963753c51",
       "presets/comment-operator.yml": "6b96a0ef1e62d6f98bc82872578bec3afd590e4f51f3b1076b974fa7b2fe7b93",
       "presets/compliance-officer.yml": "0fe8477702798a61fa32366318d4cdda6f0f85ceecfc50f3ef6a51a775bc8e68",
@@ -751,8 +789,13 @@
       "presets/settlement-clerk.yml": "6b6f1cdcc3e71d5d2a88dc9aba1e9013e250e924b4bd95eda393a710dcd99f5c",
       "presets/trend-researcher.yml": "802b157911cf35216d5122784d8ba0d89ac1da2187748413243f957c002307b3",
       "presets/visual-director.yml": "74683eed31a08c7ffce74ffeb02a4349051c4ec9164ba995470455cf35f6fa61",
-      "schemas/objects.json": "516d63d3e0589c86a9e589185fb85634271712beba22288e968819949a6f83c0",
+      "schemas/objects.json": "23f9f34c8b96c7cb0700ba4f80f8e94f2471642cf7e12b520ab67c83dd19b9c5",
       "schemas/stages.json": "418332ca5a5522083592da40773265d8f09b1ab9276d566275e075ef56118831",
+      "skills/bgm-audio-layering/SKILL.md": "1c45ab7052f97a5b315baba84d9520c4f7253f0f56420a669f58f8126023d05f",
+      "skills/bgm-delivery-spec/SKILL.md": "86ed144da06a569113dd8fd0a68156d43d38ced7b81ab966b3b15f9857c747b9",
+      "skills/bgm-library-license/SKILL.md": "8428338566c0f9afce5bb0a2ace7f292e151986c1d4642c53c6a24ef99f0a0b1",
+      "skills/bgm-score-design/SKILL.md": "790d61bf656d1958222194eb6f1bbcf3599bafd7d7825177a6518568c1bd5175",
+      "skills/bgm-vocal-separation/SKILL.md": "f8a32d522b1d325a6770189590d8d5c25ee62b13d8100fa17cb6d4211164b667",
       "skills/color-delivery-spec/SKILL.md": "29a3f0020747d1665f11026d444d211672063955aae2d7d41e7c85f50ccdcbc8",
       "skills/color-grade/SKILL.md": "1223a64397b2f6a26c578ea4232bb360bca84223ae886e5f143b453afb534df0",
       "skills/color-look-design/SKILL.md": "0ceb6a93c21f6018af8a654bc9f673ef7d8c0cac64b82e7280f336557513fa50",

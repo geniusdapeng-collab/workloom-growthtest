@@ -4,9 +4,11 @@
  * 与 scripts/seed.ts（酒店 Bundle）同构，装载：
  *  - 演示租户/工作区（industry: ai-video）
  *  - 人类成员（主理人/运营/剪辑）
- *  - bundles/ai-video 的 33 个数码员工 preset（制作 21 + 经营 12；含 fence_bindings 原样落库）
- *  - ai-video-baseline/v2 基线围栏（G1-G10 系列 15 条 + 经营扩展 G11-G16 共 21 条）
- *  - 8 个官方技能（安装即绑定围栏）
+ *  - bundles/ai-video 的 35 个数码员工 preset（制作 21 + 经营 12 + 后期 2：调色师 / BGM 配乐师；含 fence_bindings 原样落库）
+ *  - 围栏 32 条：ai-video-baseline/v2（G1-G16 共 21 条）+ ai-video-color/v1（成片调色门 G-COL0..G-COL4 共 5 条）
+ *    + ai-video-bgm/v1（成片配乐门 G-BGM0..G-BGM5 共 6 条）
+ *  - 17 个官方技能（安装即绑定围栏；含调色师四件套与 BGM 配乐师五件套
+ *    bgm-score-design / bgm-audio-layering / bgm-vocal-separation / bgm-library-license / bgm-delivery-spec）
  *  - 一企一档（品牌档案 + forbidden 红线）
  *  - 自动化触发器（每 2h 数据采集 / 早八点战报 / 每 30min 评论采集）
  *  - 演示项目：1 个 video_project + 3 镜渲染脚本（v1）+ 2 条素材
@@ -14,6 +16,7 @@
  * 幂等可复跑（全部 ON CONFLICT DO NOTHING / DO UPDATE）。
  * 运行：pnpm db:seed:video
  */
+import { COMPOSED_SKILL_BINDINGS } from "./skill-bindings.mts";
 import pg from "pg";
 import YAML from "yaml";
 import { readFileSync, readdirSync } from "node:fs";
@@ -85,7 +88,8 @@ interface FenceRule {
 
 /**
  * 围栏装载：以 bundle.json 的 provides.fences 为唯一事实源（与 seed-geo 同构）。
- * 新增围栏包（如 fences/ai-video-color.yml 的成片调色门 G-COL0..G-COL4）无需再改本脚本。
+ * 新增围栏包（如 fences/ai-video-color.yml 的成片调色门 G-COL0..G-COL4、
+ * fences/ai-video-bgm.yml 的成片配乐门 G-BGM0..G-BGM5）无需再改本脚本。
  */
 function loadFences(): FenceRule[] {
   const manifest = JSON.parse(readFileSync(join(BUNDLE_DIR, "bundle.json"), "utf-8"));
@@ -104,6 +108,8 @@ interface SkillDoc {
   name: string;
   description: string;
   body: string;
+  /** 安装时快照到 skill_installs.fence_bindings_snapshot 的围栏绑定（#17 口径） */
+  fenceBindings?: string[];
 }
 
 /** 管线 YAML 解析校验：管线由 Quest 调度器直接消费 YAML，此处解析计数确保可解析 */
@@ -126,10 +132,14 @@ function loadSkills(): SkillDoc[] {
       const raw = readFileSync(join(dir, d, "SKILL.md"), "utf-8");
       const m = raw.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
       const fm = YAML.parse(m?.[1] ?? "{}");
+      const name = String(fm.name ?? d);
       return {
-        name: String(fm.name ?? d),
+        name,
         description: String(fm.description ?? ""),
         body: (m?.[2] ?? "").trim(),
+        // 围栏绑定以 scripts/skill-bindings.mts 为唯一事实源（与 seed.ts/seed-geo.ts 共用），
+        // 不在本脚本里另立一份绑定表——否则同一技能在不同工作区会绑到不同围栏。
+        fenceBindings: COMPOSED_SKILL_BINDINGS["ai-video"][name] ?? [],
       };
     });
 }
@@ -365,15 +375,20 @@ async function main() {
   // 官方技能 + 安装绑定（F8.1/F8.2）
   for (const s of skillsDocs) {
     const skillId = `skill-${s.name}`;
+    // 与 seed.ts 同口径（#17 安装时快照 + D15-⑤ installed_version）：
+    // 技能行按版本升级 body/绑定；安装行快照取自技能行，保证 seed 与运行时两条路径的围栏并集一致。
     await q(
       `INSERT INTO skills (id, level, bundle, name, version, description, fence_bindings, body, desensitized)
-       VALUES ($1,'official','ai-video',$2,'1.0.0',$3,'[]',$4,false)
-       ON CONFLICT (id) DO NOTHING`,
-      [skillId, s.name, s.description, s.body],
+       VALUES ($1,'official','ai-video',$2,'1.0.0',$3,$4,$5,false)
+       ON CONFLICT (id) DO UPDATE SET bundle = EXCLUDED.bundle, body = EXCLUDED.body, version = EXCLUDED.version,
+                                      fence_bindings = EXCLUDED.fence_bindings
+       WHERE skills.version IS DISTINCT FROM EXCLUDED.version`,
+      [skillId, s.name, s.description, JSON.stringify(s.fenceBindings ?? []), s.body],
     );
     await q(
-      `INSERT INTO skill_installs (skill_id, workspace_id, installed_by)
-       VALUES ($1,$2,'MEM-V01') ON CONFLICT (skill_id, workspace_id) DO NOTHING`,
+      `INSERT INTO skill_installs (skill_id, workspace_id, installed_by, fence_bindings_snapshot, installed_version)
+       SELECT s.id, $2, 'MEM-V01', s.fence_bindings, s.version FROM skills s WHERE s.id = $1
+       ON CONFLICT (skill_id, workspace_id) DO NOTHING`,
       [skillId, WS_ID],
     );
   }
@@ -410,8 +425,9 @@ async function main() {
       [skillId, s.name, s.description, s.body],
     );
     await q(
-      `INSERT INTO skill_installs (skill_id, workspace_id, installed_by)
-       VALUES ($1,$2,'MEM-V01') ON CONFLICT (skill_id, workspace_id) DO NOTHING`,
+      `INSERT INTO skill_installs (skill_id, workspace_id, installed_by, fence_bindings_snapshot, installed_version)
+       SELECT s.id, $2, 'MEM-V01', s.fence_bindings, s.version FROM skills s WHERE s.id = $1
+       ON CONFLICT (skill_id, workspace_id) DO NOTHING`,
       [skillId, WS_ID],
     );
   }
