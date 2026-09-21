@@ -83,11 +83,21 @@ interface FenceRule {
   note?: string;
 }
 
+/**
+ * 围栏装载：以 bundle.json 的 provides.fences 为唯一事实源（与 seed-geo 同构）。
+ * 新增围栏包（如 fences/ai-video-color.yml 的成片调色门 G-COL0..G-COL4）无需再改本脚本。
+ */
 function loadFences(): FenceRule[] {
-  const doc = YAML.parse(
-    readFileSync(join(BUNDLE_DIR, "fences/ai-video-baseline.yml"), "utf-8"),
-  );
-  return (doc?.rules ?? []) as FenceRule[];
+  const manifest = JSON.parse(readFileSync(join(BUNDLE_DIR, "bundle.json"), "utf-8"));
+  const declared: string[] = manifest?.workloom?.provides?.fences ?? ["fences/ai-video-baseline.yml"];
+  const out: FenceRule[] = [];
+  for (const relative of declared) {
+    const doc = YAML.parse(readFileSync(join(BUNDLE_DIR, relative), "utf-8"));
+    for (const rule of (doc?.rules ?? []) as FenceRule[]) {
+      out.push({ ...rule, packVersion: (doc?.version as string) ?? FENCE_VERSION });
+    }
+  }
+  return out;
 }
 
 interface SkillDoc {

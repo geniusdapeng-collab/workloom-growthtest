@@ -4,7 +4,7 @@
 
 > 生成器：`scripts/oss-inventory.mjs`（离线事实）＋ `scripts/oss-watch.sh`（上游最新版本）
 > 仓库：workloom-ai/workloom-growthtest ｜ 最近一次上游扫描：2026-09-19T10:10:43.000Z
-> 统计：登记组件 91 个 ｜ npm 直接依赖 163 个 ｜ Python 依赖 1 个 ｜ 容器镜像 2 个
+> 统计：登记组件 92 个 ｜ npm 直接依赖 163 个 ｜ Python 依赖 1 个 ｜ 容器镜像 2 个
 
 ## 0. 维护机制（四件事）
 
@@ -112,6 +112,7 @@
 | 89 | python-pptx | [github.com/scanny/python-pptx](https://github.com/scanny/python-pptx) · MIT | 按需安装（未锁定版本） | 1.0.2 | 开发/构建 | scripts/build-capability-pptx.py（能力清单 PPT 生成） | 本地工具链依赖，不随产品分发；版本未锁定属已知缺口（建议后续补 requirements 引脚） |
 | 90 | Playwright（Python · computer-use 工具链） | [github.com/microsoft/playwright-python](https://github.com/microsoft/playwright-python) · Apache-2.0 | >=1.40.0 | **1.46.0** ⬆ | 开发/构建 | packages/base/computer-use/toolkit（安装脚本按 requirements 拉取） | 与 Node 侧 @playwright/test 独立版本线；浏览器二进制由 playwright install 管理，升级需同步预检脚本断言 |
 | 91 | Compositor（Mac 图像编辑器 / 视觉工位渲染内核） | [github.com/robbietilton/Compositor](https://github.com/robbietilton/Compositor) · MIT | 1.0.4 | 1.0.4 | 运行时 | Mac 视觉工位 headless 引擎（复用 ProjectStore/ImageExporter/LayerRenderer 源码）、人机协作精修：Compositor.app（macOS 26.5+） | MIT；上游 2026-09-16 创建、单作者，无 CLI/API/AppleScript，故采用源码 headless 裁剪 + 工位 pin 版本；生产工位关闭 Sparkle 自动更新；升级永不自动（先 selftest + golden 对比再灰度） |
+| 92 | FFmpeg（调色工位内核） | [github.com/FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) · LGPL-2.1-or-later（本工位静态构建 configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不可随产品分发） | b6.1.1 | b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0） | 随包二进制 | bundles/ai-video/connectors/color-bridge/kit（受控下载 + sha256 pin）、bundles/ai-video/connectors/color-bridge（core/cli/server/executor）、Mac 调色工位 ~/.workloom-color/bin（运行时二进制，不进仓库） | 成片调色内核：signalstats/lut3d/colorbalance/colortemperature/curves/eq/normalize/waveform/vectorscope/histogram。受控下载 + sha256 校验（kit/ffmpeg-pin.json，含 darwin-arm64 实测摘要）；ffmpeg-static 静态构建含 nonfree，仅工位本地使用、不可随产品分发，如需分发请换 LGPL 构建。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）以及 LUT 黄金文件校验。LUT 资产为自算（bundles/ai-video/library/luts/generate-luts.mjs），本仓不携带第三方 LUT。 |
 
 ## 2. 全量直接依赖（本仓事实，含上游最新）
 

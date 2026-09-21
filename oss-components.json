@@ -1610,6 +1610,28 @@
       "currentSource": "docs/visual-workstation.md",
       "latest": "1.0.4",
       "latest_checked_at": "2026-09-19T07:30:00.000Z"
+    },
+    {
+      "name": "FFmpeg（调色工位内核）",
+      "repo": "https://github.com/FFmpeg/FFmpeg",
+      "license": "LGPL-2.1-or-later（本工位静态构建 configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不可随产品分发）",
+      "channel": "github",
+      "usage": "binary",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/color-bridge/kit/ffmpeg-pin.json",
+        "pattern": "\"releaseTag\":\\s*\"([^\"]+)\""
+      },
+      "scope": [
+        "bundles/ai-video/connectors/color-bridge/kit（受控下载 + sha256 pin）",
+        "bundles/ai-video/connectors/color-bridge（core/cli/server/executor）",
+        "Mac 调色工位 ~/.workloom-color/bin（运行时二进制，不进仓库）"
+      ],
+      "cadence": "quarterly",
+      "gate": "workstation-pin",
+      "notes": "成片调色内核：signalstats/lut3d/colorbalance/colortemperature/curves/eq/normalize/waveform/vectorscope/histogram。受控下载 + sha256 校验（kit/ffmpeg-pin.json，含 darwin-arm64 实测摘要）；ffmpeg-static 静态构建含 nonfree，仅工位本地使用、不可随产品分发，如需分发请换 LGPL 构建。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）以及 LUT 黄金文件校验。LUT 资产为自算（bundles/ai-video/library/luts/generate-luts.mjs），本仓不携带第三方 LUT。",
+      "latest": "b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0）",
+      "latest_checked_at": "2026-09-21T00:00:00.000Z"
     }
   ]
 }
