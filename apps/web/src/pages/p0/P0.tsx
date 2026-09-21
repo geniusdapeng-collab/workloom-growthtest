@@ -4,12 +4,14 @@
  * 界面三要素：形象（数字CEO全息CEO+员工员工状态）/ 实况（语音气泡+请示卡+实况字幕）/ 聊天框。
  * 设计原则：剧场负责「感觉」，工作台（/p1…）负责「操作」；全部状态来自真实事件（captain.theater 5s 心跳）。
  * 形象纯 SVG+CSS+Canvas 零素材；仪式：每日首访晨间播报（光核→光环→卫星逐亮→报到词）。
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除——本页不再展示「请您决策」
+ * 请示卡，员工状态卡不再提供批准/驳回手势；业务链路自带的关卡（如视频管线 G1–G10、定妆照确认）
+ * 由各自业务页面就地放行。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ensureDemoLogin, isLocalFull, trpc } from "../../lib/trpc";
-import { RejectDialog } from "../../components/RejectDialog";
 import { CommandCard } from "../../components/CommandCard";
-import { actionText, actorText , payloadText } from "../../lib/display";
+import { actionText, actorText } from "../../lib/display";
 import { SimBanner } from "../../components/SimBanner";
 import { SkillDistBanner } from "../../components/SkillDistBanner";
 import { FloorView, type FloorPayload, type FloorAgent } from "./Floor";
@@ -29,9 +31,9 @@ import { questlineForBundle } from "../../onboarding/questline.config";
 import { QuestlineContentProvider } from "../../onboarding/QuestlineContent";
 import { useTheaterDiff } from "../../lib/theaterDiff";
 import { displayNameOf, hydrateAliases, reportTitleOf, selectReporters } from "../../lib/naming";
-import { Link, useNavigate } from "react-router";
+import { useNavigate } from "react-router";
 import { useNavigationAccess } from "../../shell/NavigationAccess";
-import { Button, Icon, Overlay, clientChineseText } from "@workloom/ui";
+import { clientChineseText } from "@workloom/ui";
 
 /* ================= 类型 ================= */
 interface Satellite { id: string; presetKey: string; name: string; alias?: string | null; grade: string }
@@ -43,11 +45,6 @@ interface Theater {
   satellites: Satellite[];
   ticker: TickerItem[];
   floor?: FloorPayload | null;
-}
-interface ChairmanItem {
-  approval_id: string; event_id: string;
-  snapshot: { action?: string; params?: Record<string, unknown>; ceo_rationale?: string; title?: string };
-  payload: { decision: { action: string } };
 }
 interface WelcomeState {
   status: "not_started" | "in_progress" | "paused" | "completed";
@@ -186,8 +183,6 @@ export default function P0() {
   const { bundle, entries, canAction, subject } = useNavigationAccess();
   const navigate = useNavigate();
   const canDispatch = canAction("task.dispatch");
-  const canApprove = canAction("approval.decide");
-  const canReadApprovals = entries.some((entry) => entry.route === "/approvals");
   const [wsName, setWsName] = useState("WorkLoom");
   const [showWelcome, setShowWelcome] = useState(false);
   const [welcome, setWelcome] = useState<WelcomeState | null>(null);
@@ -229,14 +224,12 @@ export default function P0() {
     );
   }, [floorAgentsAll]);
   const visibleFloorAgents = sortedFloorAgents;
-  const [queue, setQueue] = useState<ChairmanItem[]>([]);
-
   /* ---- 首日上岗（织伴 · 首席增长官带玩）：进度本地持久化，关卡推进只认客户操作与真实事实 ---- */
   const [questFacts, setQuestFacts] = useState<QuestFacts>(EMPTY_FACTS);
   const [serverXp, setServerXp] = useState<number | null>(null);
   const memberNo = subject?.memberNo ?? null;
   // S3：跨页面事实由剧场 ticker（近 14 条真实事件）推导——
-  // 3D 职场拖拽派活、AskRail 派活、审批中心拍板都能被认出来，而不是只认引导层里的动作。
+  // 3D 职场拖拽派活、AskRail 派活都能被认出来，而不是只认引导层里的动作。
   const tickerFacts = useMemo(
     () => factsFromRecentActions(
       (data?.ticker ?? []).map((item) => ({ action: item.action, who: item.who })),
@@ -249,9 +242,8 @@ export default function P0() {
       ...questFacts,
       dispatched: questFacts.dispatched || tickerFacts.dispatched,
       decided: questFacts.decided || tickerFacts.decided,
-      approvalsAvailable: queue.length > 0,
     }),
-    [questFacts, tickerFacts, queue.length],
+    [questFacts, tickerFacts],
   );
   // 欢迎仪式走完才算"起跑线"；中途暂停欢迎的客户仍可从左下角手动开始
   const questlineReady = Boolean(!showWelcome && welcome && welcome.status === "completed");
@@ -289,26 +281,12 @@ export default function P0() {
   const markQuestFact = (key: keyof QuestFacts, value: boolean) => {
     setQuestFacts((current) => (current[key] === value ? current : { ...current, [key]: value }));
   };
-  const pendingApproval = useMemo(() => {
-    const first = queue[0];
-    if (!first) return null;
-    const action = first.snapshot.action ?? first.payload.decision.action;
-    return {
-      approvalId: first.approval_id,
-      title: clientChineseText(first.snapshot.title, actionText(action)),
-      actionLabel: actionText(action),
-      ...(first.snapshot.ceo_rationale
-        ? { rationale: clientChineseText(first.snapshot.ceo_rationale, "负责人意见待确认") }
-        : {}),
-    };
-  }, [queue]);
   const [pick, setPick] = useState<Satellite | null>(null);
   const [ceremony, setCeremony] = useState(0); // 0=未演 1-4=晨间播报阶段 5=完成
   const [msg, setMsg] = useState("");
   // D25 视图：floor=数字办公区（默认） / stage=剧场舞台（D23）
   const [view, setView] = useState<"floor" | "stage">(() =>
     (typeof localStorage !== "undefined" && localStorage.getItem("theater-view") === "stage") ? "stage" : "floor");
-  const [askPick, setAskPick] = useState<FloorAgent | null>(null); // 职场请示卡弹层
   // WebGL 可用性探测：不可用（远程桌面/老驱动/虚拟机）时 3D 舞台自动降级为 SVG 卫星视图
   const webglOk = useMemo(() => {
     try {
@@ -316,7 +294,6 @@ export default function P0() {
       return !!(c.getContext("webgl2") ?? c.getContext("webgl"));
     } catch { return false; }
   }, []);
-  const [rejectTarget, setRejectTarget] = useState<string | null>(null); // M1.2 驳回弹窗目标
   const switchView = (v: "floor" | "stage") => { setView(v); localStorage.setItem("theater-view", v); };
   // —— M1 视听觉醒：事件源 / 环境声 / 手势启动 ——
   const directorEvent = useTheaterDiff(data);
@@ -362,29 +339,13 @@ export default function P0() {
 
   const load = async () => {
     await ensureDemoLogin();
-    const [t, q] = await Promise.all([
-      trpc.captain.theater.query() as Promise<Theater>,
-      canReadApprovals ? trpc.captain.chairmanQueue.query() as Promise<ChairmanItem[]> : Promise.resolve([]),
-    ]);
+    const t = await trpc.captain.theater.query() as Theater;
     setData({
       ...t,
       latestBriefing: t.latestBriefing
         ? { ...t.latestBriefing, text: clientChineseText(t.latestBriefing.text, BRIEFING_FALLBACK) }
         : null,
     });
-    setQueue(q.map((item) => ({
-      ...item,
-      snapshot: {
-        ...item.snapshot,
-        title: clientChineseText(
-          item.snapshot.title,
-          actionText(item.snapshot.action ?? item.payload.decision.action),
-        ),
-        ceo_rationale: item.snapshot.ceo_rationale === undefined
-          ? undefined
-          : clientChineseText(item.snapshot.ceo_rationale, "负责人意见待确认"),
-      },
-    })));
     hydrateAliases(t.satellites.map((a) => ({ presetKey: a.presetKey, alias: a.alias })));
   };
   const saveWelcome = async (
@@ -417,46 +378,12 @@ export default function P0() {
     seq.forEach((ms, i) => setTimeout(() => setCeremony(i + 2), ms));
   }, []);
 
-  const l4 = data?.pendingByTier.l4_chairman ?? 0;
   const tone = useMemo(() => {
     if (!data) return "grey" as const;
     if (data.mode === "disabled") return "grey" as const;
-    if (l4 > 0) return "amber" as const;
     if (data.mode === "trial" || data.mode === "active") return "gold" as const;
     return "holo" as const;
-  }, [data, l4]);
-
-  const decide = async (approvalId: string, gesture: "approve" | "reject") => {
-    if (!canApprove) return;
-    AudioEngine.play(gesture === "approve" ? "approve" : "reject");
-    if (gesture === "reject") {
-      // M1.2（D24）：驳回必须选择行业受控枚举（弹窗），原「无原因驳回」已被服务端 L5.2 拒绝
-      setRejectTarget(approvalId);
-      return;
-    }
-    await trpc.approvals.decide.mutate({ approvalId, gesture });
-    setMsg(`已批准，全链留痕`);
-    setAskPick(null);
-    setTimeout(() => setMsg(""), 3000);
-    await load();
-  };
-  /** 拖拽任务卡到员工身上（派活闭环·拖拽形态：落点即下达，与指挥卡同通道） */
-
-  /** 驳回弹窗提交（M1.2 受控枚举 + L5.2 留痕） */
-  const submitReject = async (r: { reasonEnum: string; reasonLabel?: string; reasonText?: string }) => {
-    if (!rejectTarget) return;
-    await trpc.approvals.decide.mutate({
-      approvalId: rejectTarget,
-      gesture: "reject",
-      reasonEnum: r.reasonEnum,
-      reasonText: r.reasonText,
-    });
-    setRejectTarget(null);
-    setMsg(`已驳回（${clientChineseText(r.reasonLabel, "其他原因")}），全链留痕`);
-    setAskPick(null);
-    setTimeout(() => setMsg(""), 3000);
-    await load();
-  };
+  }, [data]);
 
   const showCeremony = ceremony < 5;
   return (
@@ -490,7 +417,7 @@ export default function P0() {
         )}
         {/* 本机个人使用：不展示「试用期/未授权」等开通类角标（启动器注入 VITE_WORKLOOM_LOCAL_FULL=1） */}
         {!isLocalFull() && (
-          <span className={`rounded border px-2 py-0.5 text-body ${tone === "amber" ? "border-amber-500/60 text-amber-600" : tone === "gold" ? "border-gline text-gold" : "border-line text-ink3"}`}>
+          <span className={`rounded border px-2 py-0.5 text-body ${tone === "gold" ? "border-gline text-gold" : "border-line text-ink3"}`}>
             {MODE_TEXT[data?.mode ?? ""] ?? "…"}
           </span>
         )}
@@ -515,8 +442,6 @@ export default function P0() {
                 onPickAgent={(a) => setPick({ id: a.id, presetKey: a.presetKey, name: a.name, grade: data.satellites.find((s) => s.id === a.id)?.grade ?? "正常" })}
                 onOpenProfile={(a) => navigate(`/agents/${encodeURIComponent(a.id)}`)}
                 onOpenTask={(threadId) => navigate(`/tasks/${encodeURIComponent(threadId)}`)}
-                onPickApproval={(a) => { if (canApprove) setAskPick(a); }}
-                onDecide={(id, g) => { if (canApprove) void decide(id, g); }}
               />
             ) : (
               <FloorView
@@ -525,8 +450,6 @@ export default function P0() {
                 onPickAgent={(a) => setPick({ id: a.id, presetKey: a.presetKey, name: a.name, grade: data.satellites.find((s) => s.id === a.id)?.grade ?? "正常" })}
                 onOpenProfile={(a) => navigate(`/agents/${encodeURIComponent(a.id)}`)}
                 onOpenTask={(threadId) => navigate(`/tasks/${encodeURIComponent(threadId)}`)}
-                onPickApproval={(a) => { if (canApprove) setAskPick(a); }}
-                onDecide={(id, g) => { if (canApprove) void decide(id, g); }}
               />
             )}
           </div>
@@ -548,29 +471,6 @@ export default function P0() {
           </div>
         )}
 
-      {/* 请示卡（对话与播报统一在右侧「织伴」全局框；2026-09-20 产品决定删除经营主页常驻语音条） */}
-        <div className="mt-2 w-full max-w-2xl space-y-2">
-          {/* L4 请示卡（聚光灯） */}
-          {canApprove && queue.length > 0 && (
-            <div className="space-y-2 rounded-xl border border-amber-400/40 bg-amber-400/5 p-3 shadow-[0_0_40px_rgba(255,190,106,.12)]">
-              <div className="text-body tracking-[.2em] text-amber-300">请您决策 · {queue.length} 件</div>
-              {queue.slice(0, 2).map((q) => (
-                <div key={q.approval_id} className="rounded-lg border border-amber-300/30 bg-card p-3">
-                  <div className="break-words text-body text-ink2">
-                    <b>{clientChineseText(q.snapshot.title, actionText(q.snapshot.action ?? q.payload.decision.action))}</b>
-                    <span className="ml-2 text-ink3">{payloadText(q.snapshot.params ?? {}, 80)}</span>
-                  </div>
-                  {q.snapshot.ceo_rationale && <div className="mt-1 break-words text-body text-holo">公司负责人意见：{clientChineseText(q.snapshot.ceo_rationale, "负责人意见待确认")}</div>}
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    <button onClick={() => void decide(q.approval_id, "approve")} className="inline-flex items-center gap-1 rounded border border-go/50 px-3 py-1 text-body text-go"><Icon name="check" size={14} />批准</button>
-                    <button onClick={() => void decide(q.approval_id, "reject")} className="inline-flex items-center gap-1 rounded border border-warn/50 px-3 py-1 text-body text-warn"><Icon name="error" size={14} />驳回</button>
-                  </div>
-                </div>
-              ))}
-              {queue.length > 2 && <Link to="/executive" className="break-words text-body text-amber-300">其余 {queue.length - 2} 件 → 经营驾驶舱</Link>}
-            </div>
-          )}
-        </div>
       </main>
 
       {/* 实况字幕条：2026-09-20 产品决定删除（不再展示） */}
@@ -584,28 +484,6 @@ export default function P0() {
           onDispatched={(m) => { setMsg(m); setTimeout(() => setMsg(""), 3500); void load(); }}
         />
       )}
-
-      {/* 职场请示卡：统一 Overlay 负责焦点圈定、Esc、背景关闭与焦点恢复。 */}
-      <Overlay
-        open={canApprove && askPick !== null}
-        title="请您决策"
-        description={askPick ? `${askPick.pendingTier === "l4_chairman" ? "董事长级" : askPick.pendingTier === "l3_fleet" ? "集团负责人级" : "公司负责人级"}事项` : undefined}
-        onClose={() => setAskPick(null)}
-        footer={askPick && (
-          <>
-            <Button variant="quiet" onClick={() => setAskPick(null)}>稍后处理</Button>
-            <Button variant="danger" onClick={() => void decide(askPick.approvalId!, "reject")}>驳回</Button>
-            <Button variant="primary" onClick={() => void decide(askPick.approvalId!, "approve")}>批准</Button>
-          </>
-        )}
-      >
-        {askPick && (
-          <div className="min-w-0 space-y-2">
-            <div className="break-words text-sm font-bold text-ink">{clientChineseText(askPick.name, actorText(askPick.presetKey))}</div>
-            <div className="break-words text-body leading-relaxed text-ink2">{clientChineseText(askPick.statusLine, "当前事项需要您确认")}</div>
-          </div>
-        )}
-      </Overlay>
 
       {/* 开门仪式遮罩 */}
       {showCeremony && (
@@ -660,8 +538,6 @@ export default function P0() {
             xp={questline.xp}
             celebration={questline.celebration}
             canDispatch={canDispatch}
-            canApprove={canApprove}
-            pendingApproval={pendingApproval}
             onClose={questline.closeQuestline}
             onCompleteStage={questline.completeCurrent}
             onSkipStage={questline.skipCurrent}
@@ -675,12 +551,6 @@ export default function P0() {
         </QuestlineContentProvider>
       )}
       {/* 播报台/字幕条：2026-09-20 产品决定删除（语音字幕不再常驻经营主页） */}
-      <RejectDialog
-        open={canApprove && rejectTarget !== null}
-        mode="reject"
-        onCancel={() => setRejectTarget(null)}
-        onSubmit={(r) => void submitReject(r)}
-      />
     </div>
   );
 }

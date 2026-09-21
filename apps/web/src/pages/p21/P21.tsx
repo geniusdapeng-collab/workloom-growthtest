@@ -4,7 +4,6 @@
  */
 import { useEffect, useState } from "react";
 import { ensureDemoLogin, trpc } from "../../lib/trpc";
-import { RejectDialog } from "../../components/RejectDialog";
 import { actionText, actorText, payloadText, shortId } from "../../lib/display";
 import { Icon, Input, clientChineseText, clientValueText } from "@workloom/ui";
 import { Bridge } from "../../shell/Bridge";
@@ -47,13 +46,6 @@ interface StateResp {
 
 interface BriefRow { event_id: string; created_at: string; payload: { decision: { action: string; params?: Record<string, unknown>; after?: Record<string, unknown> } } }
 
-interface ChairmanItem {
-  approval_id: string; event_id: string;
-  snapshot: { action?: string; params?: Record<string, unknown>; ceo_escalated?: boolean; ceo_rationale?: string };
-  // 事件行可能缺失（历史/测试夹具）：请示仍须出现在队列中，依据链降级显示"事件缺行"
-  payload: { decision: { action: string; basis?: string[] }; who: { id: string } } | null;
-}
-
 interface Scorecard {
   decisions: number; briefings: number; initiatives: number;
   escalatedToChairman: number; breakerTrips: number; shadowDecisions: number;
@@ -70,7 +62,7 @@ const MODE_TONE: Record<CeoMode, "ok" | "warn" | "info"> = {
   disabled: "info", shadow: "info", trial: "warn", suspended: "warn", active: "ok",
 };
 const BEATS: Array<[string, string]> = [
-  ["daily", "晨报"], ["queue", "公司级审批"], ["deviation", "偏差扫描"], ["breaker", "熔断巡检"],
+  ["daily", "晨报"], ["queue", "公司级决策"], ["deviation", "偏差扫描"], ["breaker", "熔断巡检"],
   ["outcome", "命中率回测"], ["hr", "绩效评议"], ["board", "董事会包"], ["orgscan", "扩编扫描"], ["weekly", "周经营会"],
 ];
 
@@ -78,9 +70,6 @@ export default function P21() {
   const [state, setState] = useState<StateResp | null>(null);
   const [briefs, setBriefs] = useState<BriefRow[]>([]);
   const [score, setScore] = useState<Scorecard | null>(null);
-  const [queue, setQueue] = useState<ChairmanItem[]>([]);
-  /** 与 queue 同一次快照读到的分层计数（避免"徽标 N 件 / 列表空"的撕裂） */
-  const [queueCounts, setQueueCounts] = useState<Record<string, number> | null>(null);
   const [msg, setMsg] = useState("");
   // 授权向导
   const [clauses, setClauses] = useState<Record<string, boolean>>({});
@@ -94,10 +83,6 @@ export default function P21() {
     setAutonomyDraft(structuredClone(nextState.charter.autonomy));
     setBriefs(await trpc.captain.briefings.query({ limit: 8 }) as unknown as BriefRow[]);
     setScore(await trpc.captain.scorecard.query() as unknown as Scorecard);
-    // 徽标与列表必须来自同一次快照：队列端点是单语句 CTE，计数与条目不可能互相矛盾
-    const snap = await trpc.captain.queueSnapshot.query() as unknown as { counts: Record<string, number>; items: ChairmanItem[] };
-    setQueue(snap.items);
-    setQueueCounts(snap.counts);
   };
   useEffect(() => { void load(); }, []);
 
@@ -107,7 +92,6 @@ export default function P21() {
     setMsg(`节拍「${BEATS.find(([k]) => k === b)?.[1] ?? "经营节拍"}」已完成。${payloadText(r, 120)}`);
     await load();
   };
-  const [rejectTarget, setRejectTarget] = useState<string | null>(null);
   const transit = async (kind: string) => {
     const r = await trpc.captain.transit.mutate({ kind: kind as "advance" }) as { mode: CeoMode };
     setMsg(`状态迁移 → ${MODE_LABEL[r.mode]}`);
@@ -116,30 +100,6 @@ export default function P21() {
   const feedback = async (eventId: string, signal: "up" | "down") => {
     await trpc.captain.feedback.mutate({ eventId, signal });
     setMsg(`已记录您的${signal === "up" ? "点赞" : "点踩"}（入组织记忆，影响后续决策）`);
-  };
-
-  const decide = async (approvalId: string, gesture: "approve" | "reject") => {
-    if (gesture === "reject") {
-      // M1.2（D24）：驳回必须选择行业受控枚举（弹窗），原「无原因驳回」已被服务端 L5.2 拒绝
-      setRejectTarget(approvalId);
-      return;
-    }
-    await trpc.approvals.decide.mutate({ approvalId, gesture });
-    setMsg(`请示 ${shortId(approvalId)} 已批准（三手势写回，全链留痕）`);
-    await load();
-  };
-  /** 驳回弹窗提交（M1.2 受控枚举 + L5.2 留痕） */
-  const submitReject = async (r: { reasonEnum: string; reasonText?: string }) => {
-    if (!rejectTarget) return;
-    await trpc.approvals.decide.mutate({
-      approvalId: rejectTarget,
-      gesture: "reject",
-      reasonEnum: r.reasonEnum,
-      reasonText: r.reasonText,
-    });
-    setRejectTarget(null);
-    setMsg(`请示 ${shortId(rejectTarget)} 已驳回并记录原因，全链路已留痕。`);
-    await load();
   };
 
   const grant = async () => {
@@ -177,17 +137,10 @@ export default function P21() {
               </div>
             )}
           </div>
-          <div className="rounded-lg border border-line bg-card p-3 text-body text-ink2">
-            <div className="mb-1 text-body tracking-[.2em] text-ink3">待审分层</div>
-            公司负责人审批 {state?.pendingByTier.l2_captain ?? 0} 件<br />
-            集团负责人审批 {state?.pendingByTier.l3_fleet ?? 0} 件<br />
-            {/* 董事长这行必须与下方列表同快照（queueSnapshot），否则会出现"请示 3 件 / 列表为空" */}
-            <b className="text-gold">请示董事长 {queueCounts?.l4_chairman ?? state?.pendingByTier.l4_chairman ?? 0} 件</b>
-          </div>
           {score && (
             <div className="rounded-lg border border-line bg-card p-3 text-body text-ink2">
               <div className="mb-1 text-body tracking-[.2em] text-ink3">成绩单（30 天）</div>
-              审批 {score.decisions} · 简报 {score.briefings} · 立项 {score.initiatives}<br />
+              决策 {score.decisions} · 简报 {score.briefings} · 立项 {score.initiatives}<br />
               谨慎上浮 {score.escalatedToChairman} · 熔断 {score.breakerTrips} · 影子决策 {score.shadowDecisions}<br />
               <b className="text-gold">命中率 {score.hitRate === null ? "样本积累中" : `${(score.hitRate * 100).toFixed(0)}%`}</b>
               {score.outcomeCounts.hit + score.outcomeCounts.miss + score.outcomeCounts.fail > 0 && (
@@ -288,41 +241,6 @@ export default function P21() {
         </Panel>
       )}
 
-      {queue.length > 0 && (
-        <Panel title={`请您决策（${queue.length} 件 · 董事长级）`}>
-          <div className="space-y-2">
-            {queue.map((q) => {
-              const snap = q.snapshot;
-              const basis = q.payload?.decision?.basis ?? [];
-              return (
-                <div key={q.approval_id} className="rounded-lg border border-gline bg-card p-3">
-                  <div className="mb-1 flex flex-wrap items-center gap-2 text-body text-ink3">
-                    <span className="font-mono">{shortId(q.approval_id)}</span>
-                    <span>{actionText(snap.action ?? q.payload?.decision?.action ?? "待董事长裁决")}</span>
-                    {snap.ceo_escalated && <span className="rounded border border-holo/40 px-1 text-holo">公司负责人谨慎上浮</span>}
-                    {!q.payload && <span className="rounded border border-line px-1 text-ink3">事件缺行，按审批快照展示</span>}
-                  </div>
-                  <div className="text-body text-ink2">
-                    关键参数：{payloadText(snap.params ?? {}, 180)}
-                  </div>
-                  {snap.ceo_rationale && <div className="mt-1 text-body text-holo">负责人意见：{clientValueText(snap.ceo_rationale)}</div>}
-                  {basis.length > 0 && (
-                    <details className="mt-1 text-body text-ink3">
-                      <summary className="cursor-pointer">依据链（{basis.length}）</summary>
-                      {basis.map((b, i) => <div key={i}>· {clientValueText(b)}</div>)}
-                    </details>
-                  )}
-                  <div className="wl-action-row mt-2 flex flex-wrap gap-2">
-                    <button onClick={() => void decide(q.approval_id, "approve")} className="inline-flex items-center gap-1 rounded border border-go/50 px-3 py-1 text-body text-go hover:bg-go/10"><Icon name="check" size={14} />批准</button>
-                    <button onClick={() => void decide(q.approval_id, "reject")} className="inline-flex items-center gap-1 rounded border border-warn/50 px-3 py-1 text-body text-warn hover:bg-warn/10"><Icon name="error" size={14} />驳回</button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-      )}
-
       <Panel title="简报与决策流">
         {briefs.length === 0 && <div className="text-body text-ink3">暂无简报——触发一次「晨报」节拍试试</div>}
         <div className="space-y-2">
@@ -358,12 +276,6 @@ export default function P21() {
           })}
         </div>
       </Panel>
-      <RejectDialog
-        open={rejectTarget !== null}
-        mode="reject"
-        onCancel={() => setRejectTarget(null)}
-        onSubmit={(r) => void submitReject(r)}
-      />
     </Bridge>
   );
 }

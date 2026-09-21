@@ -73,11 +73,11 @@ describe("行业术语投影", () => {
   });
 });
 
-describe("审批手势文案", () => {
+describe("业务关卡放行手势文案", () => {
   it("只展示受控字典文案，不直出手势码", () => {
-    expect(approvalGestureText("approve")).toBe("已批准");
-    expect(approvalGestureText("edit")).toBe("已修改后批准");
-    expect(approvalGestureText("reject")).toBe("已驳回");
-    expect(approvalGestureText("private_gesture")).toBe("审批已处理");
+    expect(approvalGestureText("approve")).toBe("已放行");
+    expect(approvalGestureText("edit")).toBe("改后放行");
+    expect(approvalGestureText("reject")).toBe("已退回");
+    expect(approvalGestureText("private_gesture")).toBe("关卡已处理");
   });
 });

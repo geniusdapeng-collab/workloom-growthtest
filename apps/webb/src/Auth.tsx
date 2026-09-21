@@ -59,7 +59,7 @@ export function Auth({ onReady }: { onReady: () => void }) {
       <Card className="auth-card">
         <p className="eyebrow">B 端移动工作台</p>
         <h1>登录 WorkLoom</h1>
-        <p className="muted">审批、任务、夜班交接和经营结果会使用与 PC 相同的工作区数据。</p>
+        <p className="muted">任务、夜班交接和经营结果会使用与 PC 相同的工作区数据。</p>
         <label>工作区识别码<input value={workspace} disabled={Boolean(busy)} onChange={(event) => setWorkspace(event.target.value)} autoComplete="organization" /></label>
         <label>手机号<input value={phone} disabled={Boolean(busy)} onChange={(event) => setPhone(event.target.value)} inputMode="tel" autoComplete="tel" /></label>
         <div className="inline-fields">
@@ -71,7 +71,7 @@ export function Auth({ onReady }: { onReady: () => void }) {
         {error && <AsyncState status="error" title="登录未完成" description={error} />}
         <Button variant="primary" onClick={() => void login()} busy={busy === "login"} disabled={workspace.length < 3 || code.length !== 6 || Boolean(busy)}>登录工作区</Button>
         <Button variant="quiet" onClick={() => void guest()} busy={busy === "guest"} disabled={Boolean(busy)}>体验只读示例</Button>
-        <p className="fine-print">示例不会执行审批、外发或正式经营动作；正式账号请使用受邀手机号登录。</p>
+        <p className="fine-print">示例不会执行外发或正式经营动作；正式账号请使用受邀手机号登录。</p>
       </Card>
     </main>
   );

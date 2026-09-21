@@ -241,7 +241,7 @@ export default function CustomizeWizard() {
                       {candidate.failureReasons.map((reason) => <div key={reason} className="mt-1 break-words leading-relaxed text-alert">· {clientValueText(reason)}</div>)}
                       {candidate.pendingCapabilities.length > 0 && (
                         <div className="mt-1 break-words leading-relaxed text-amber-200">
-                          待审批、未安装：{candidate.pendingCapabilities.map(capabilityText).join("、")}。相关能力保持阻断，不纳入已激活能力。
+                          未安装：{candidate.pendingCapabilities.map(capabilityText).join("、")}。相关能力保持阻断，不纳入已激活能力。
                         </div>
                       )}
                     </div>
@@ -282,7 +282,7 @@ export default function CustomizeWizard() {
               <div className="break-words font-semibold text-go">逐岗位实测通过 {examResult.candidates.filter((item) => item.passed).length}/{examResult.candidates.length}</div>
               {examResult.candidates.some((item) => item.pendingCapabilities.length > 0) && (
                 <div className="mt-1 break-words leading-relaxed text-amber-200">
-                  以下能力仍待审批、未安装，运行时保持阻断：{[...new Set(examResult.candidates.flatMap((item) => item.pendingCapabilities))].map(capabilityText).join("、")}。
+                  以下能力仍未安装，运行时保持阻断：{[...new Set(examResult.candidates.flatMap((item) => item.pendingCapabilities))].map(capabilityText).join("、")}。
                 </div>
               )}
             </div>

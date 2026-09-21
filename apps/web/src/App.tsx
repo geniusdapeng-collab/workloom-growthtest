@@ -7,7 +7,6 @@ import P9 from "./pages/p9/P9";
 import P21 from "./pages/p21/P21";
 import P0 from "./pages/p0/P0";
 import P3 from "./pages/p3/P3";
-import P4 from "./pages/p4/P4";
 import P5 from "./pages/p5/P5";
 import P6 from "./pages/p6/P6";
 import P7 from "./pages/p7/P7";
@@ -101,7 +100,6 @@ function Shell() {
       <Route path="/p9" element={<Navigate to="/night" replace />} />
       <Route path="/p21" element={<Navigate to="/executive" replace />} />
       <Route path="/p3" element={<Navigate to="/reports" replace />} />
-      <Route path="/p4" element={<Navigate to="/approvals" replace />} />
       <Route path="/p5" element={<Navigate to="/guardrails" replace />} />
       <Route path="/p6" element={<Navigate to="/skills" replace />} />
       <Route path="/p6/create" element={<Navigate to="/skills/create" replace />} />
@@ -117,7 +115,6 @@ function Shell() {
       <Route path="/inbox" element={<P28 />} />
       <Route path="/tasks" element={<P1 />} />
       <Route path="/tasks/:threadId" element={<P2 />} />
-      <Route path="/approvals" element={<P4 />} />
       <Route path="/reports" element={<P3 />} />
       <Route path="/executive" element={<P21 />} />
       <Route path="/guardrails" element={<P5 />} />

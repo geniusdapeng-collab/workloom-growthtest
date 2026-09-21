@@ -38,7 +38,7 @@ requireText(access, "NavigationAccessBoundary", "PC 深链缺少与导航同源�
 forbid(navAssembly, /route:\s*"\/p(?:0|1|3|4|5|6|7|8|9|21|22|23|24|26|27|28|29|30|31)"/, "PC 导航不得复制共享基座的旧版页面路径");
 
 for (const route of [
-  "/", "/inbox", "/tasks", "/approvals", "/reports", "/service", "/executive",
+  "/", "/inbox", "/tasks", "/reports", "/service", "/executive",
   "/guardrails", "/events", "/exams", "/memory", "/night", "/models", "/skills",
   "/workspaces", "/customize", "/configuration", "/assembly", "/agents", "/members",
   "/partners", "/account",
@@ -66,7 +66,6 @@ for (const path of [
 ]) {
   forbid(path, /JSON\.stringify\(/, `${path} 仍直接向业务界面输出 JSON`);
 }
-forbid("apps/web/src/pages/p4/P4.tsx", /\{r\.result\}/, "审批中心仍直接显示围栏判定底层值");
 forbid("apps/web/src/pages/p7/P7.tsx", /\{a\.presetKey\}/, "装配中心仍直接显示岗位内部键");
 forbid("apps/web/src/components/CommandCard.tsx", /\{target\.presetKey\}/, "指挥卡仍直接显示岗位内部键");
 forbid("apps/web/src/components/star-ring/StarRing.tsx", /ASK\s*·|Ask\s*·|\{pathname\}/, "AI 助手仍显示英文产品标签或内部路由");

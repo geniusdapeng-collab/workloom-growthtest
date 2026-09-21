@@ -1,6 +1,8 @@
 /**
  * P1 工作台·工作台（F3：真实 API 接线版；PRD P1-①②③ 逐条对账）
- *  - 左栏 ConversationList：📌 置顶（夜班中心频道/昨夜日报）+ 待办（审批请求 badge）+ 任务线程（状态点实时）+ 问答
+ *  - 左栏 ConversationList：📌 置顶（夜班中心频道/昨夜日报）+ 任务线程（状态点实时）+ 问答
+ *    2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，左栏不再汇总审批请求；
+ *    业务链路自带的关卡（如视频管线 G1–G10、定妆照确认）在各自业务页面就地放行。
  *  - 中栏 MessageFlow：系统分隔线 → 交接班卡（P1E3，三计数与 P3 强一致 F4.4）→ 基座运行指标
  *    → 巡检雷达推送（P1E4，一键派单接 inspection.dispatch；无异常显「昨夜一切正常」）
  *  - 右栏：档案 chips / 夜班班组状态卡 / 在线成员人机混编（P1E6）/ 渠道巡检状态
@@ -54,7 +56,6 @@ export default function P1() {
   const [threads, setThreads] = useState<ThreadRow[]>([]);
   const [night, setNight] = useState<{ configured: boolean; run?: { id: string; status: string; fenceSnapshot: string | null; stats: { done: number; pending: number; need_human: number; credits_used: number } | null } } | null>(null);
   const [insp, setInsp] = useState<{ lastRunAt: string | null; totalChecks: number; okCount: number; attention: Array<{ eventId: string; severity: string; summary: string; objectType: string; objectId?: string }> } | null>(null);
-  const [pendingCount, setPendingCount] = useState(0);
   const [profile, setProfile] = useState<ProfileResp | null>(null);
   const [agents, setAgents] = useState<Array<{ preset_key: string; name: string; version: string; kind: string; status: string }>>([]);
   const [members, setMembers] = useState<Array<{ memberNo: string; name: string; role: string }>>([]);
@@ -65,7 +66,6 @@ export default function P1() {
   })), [agents]);
 
   // 派遣栏状态（P1E1）
-  const canViewInbox = entries.some((entry) => entry.route === "/inbox");
   const canViewNight = entries.some((entry) => entry.route === "/night");
   const canViewMembers = entries.some((entry) => entry.route === "/members");
   const canInspect = capabilities.inspection !== false;
@@ -74,17 +74,16 @@ export default function P1() {
   const load = useCallback(async () => {
     try {
       await ensureDemoLogin();
-      const [th, ni, ins, ap, prof, ag, mb] = await Promise.all([
+      const [th, ni, ins, prof, ag, mb] = await Promise.all([
         trpc.threads.list.query() as Promise<ThreadRow[]>,
         canViewNight ? trpc.nightShift.current.query() as Promise<typeof night> : Promise.resolve(null),
         canInspect ? trpc.inspection.status.query() as Promise<typeof insp> : Promise.resolve(null),
-        canViewInbox ? trpc.approvals.list.query({ status: "pending" }) as Promise<unknown[]> : Promise.resolve([]),
         trpc.workspace.profile.query() as Promise<ProfileResp>,
         trpc.workspace.agents.query() as Promise<typeof agents>,
         canViewMembers ? trpc.members.list.query() as Promise<typeof members> : Promise.resolve([]),
       ]);
       setThreads(th); setNight(ni); setInsp(ins);
-      setPendingCount(ap.length); setProfile(prof); setAgents(ag ?? []); setMembers(mb ?? []);
+      setProfile(prof); setAgents(ag ?? []); setMembers(mb ?? []);
       setError(null);
     } catch (e) {
       console.error("工作台加载失败", e);
@@ -92,7 +91,7 @@ export default function P1() {
     } finally {
       setReady(true);
     }
-  }, [canInspect, canViewInbox, canViewMembers, canViewNight]);
+  }, [canInspect, canViewMembers, canViewNight]);
 
   useEffect(() => {
     void load();
@@ -102,10 +101,9 @@ export default function P1() {
     }, 5000);
     const t2 = setInterval(() => { // 其余 10s（D6）
       if (canInspect) trpc.inspection.status.query().then((r) => setInsp(r as typeof insp)).catch(() => undefined);
-      if (canViewInbox) trpc.approvals.list.query({ status: "pending" }).then((r) => setPendingCount((r as unknown[]).length)).catch(() => undefined);
     }, 10000);
     return () => { clearInterval(t1); clearInterval(t2); };
-  }, [canInspect, canViewInbox, canViewNight, load]);
+  }, [canInspect, canViewNight, load]);
 
   /* ---------- 派生状态 ---------- */
   const plan = demo === "p1_community" ? "community" : (accessPlan ?? "community");
@@ -120,11 +118,11 @@ export default function P1() {
   const kpis = useMemo(() => {
     return [
       { name: "进行中任务", value: `${threads.filter((thread) => thread.status === "running" || thread.status === "queued").length} 项` },
-      { name: "待人工决策", value: `${pendingCount} 项` },
+      { name: "已完成任务", value: `${threads.filter((thread) => thread.status === "completed").length} 项` },
       { name: "巡检正常项", value: insp ? `${insp.okCount}/${insp.totalChecks}` : "—" },
       { name: "可用数字员工", value: `${agents.filter((agent) => agent.status === "ready").length} 位` },
     ];
-  }, [agents, insp, pendingCount, threads]);
+  }, [agents, insp, threads]);
   const metricsAsOf = new Date().toTimeString().slice(0, 5);
 
   /**
@@ -140,7 +138,7 @@ export default function P1() {
 
   /* ---------- 状态变体 ---------- */
   const isLoading = demo === "p1_loading" || !ready;
-  const isEmpty = demo === "p1_empty" || (ready && threads.length === 0 && pendingCount === 0 && (insp?.attention.length ?? 0) === 0);
+  const isEmpty = demo === "p1_empty" || (ready && threads.length === 0 && (insp?.attention.length ?? 0) === 0);
 
   /* ---------- 左栏：会话列表（分组渲染） ---------- */
   const left = (
@@ -167,21 +165,8 @@ export default function P1() {
         >
           <div className="inline-flex items-center gap-1 text-body text-gold"><Icon name="pin" size={13} />昨夜日报</div>
           <div className="mt-0.5 text-body text-ink2">
-            完成 {night.run.stats.done} · 待审批 {night.run.stats.pending} · 求援 {night.run.stats.need_human}
+            完成 {night.run.stats.done} · 求援 {night.run.stats.need_human}
           </div>
-        </button>
-      )}
-      {canViewInbox && pendingCount > 0 && (
-        <button
-          type="button"
-          onClick={() => navigate("/approvals")}
-          className="mb-1.5 w-full cursor-pointer rounded-lg border border-warn/40 bg-warn/5 px-3 py-2.5 text-left"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-body text-warn">待办 · 审批请求</span>
-            <span className="rounded-full bg-warn/15 px-1.5 font-orb text-body font-bold text-warn">{pendingCount}</span>
-          </div>
-          <div className="mt-0.5 text-body text-ink2">请到审批中心处理</div>
         </button>
       )}
       <div className="mt-3 mb-2 px-1 text-body tracking-[.2em] text-ink3">任务线程 · 最多 10 项并行</div>
@@ -308,7 +293,7 @@ export default function P1() {
                   data={{
                     deliveredAt: "08:30",
                     fenceSnapshot: night.run.fenceSnapshot ? "配置已锁定" : "—",
-                    done: night.run.stats.done, pending: night.run.stats.pending,
+                    done: night.run.stats.done,
                     needHuman: night.run.stats.need_human, credits: night.run.stats.credits_used,
                   }}
                 />

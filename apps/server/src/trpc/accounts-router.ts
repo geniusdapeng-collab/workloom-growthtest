@@ -560,22 +560,15 @@ export const accountsRouter = router({
       const accId = await accountIdOf(ctx.identity!);
       if (!accId) return { groups: [] };
       const ships = await listMemberships(ownerQuery, accId);
-      const groups = [];
-      for (const m of ships) {
-        // 各工作区待办计数（审批卡 pending；告警/工单由行业包数据面补充，结构先行）
-        const approvals = await withWorkspace(getAppPool(), {
-          tenantId: m.tenant_id as string,
-          workspaceId: m.workspace_id as string,
-        }, async (_db, client) => client.query(
-          `SELECT count(*)::int AS c FROM approvals WHERE workspace_id=$1 AND status='pending'`,
-          [m.workspace_id])).catch(() => ({ rows: [{ c: 0 }] }));
-        groups.push({
+      // 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，
+      // 统一待办不再聚合审批数量（原 pendingApprovals 字段随审批中心一并下线）。
+      // 非审批类待办（告警 / 工单）在行业包数据面就绪后按同一结构补充。
+      return {
+        groups: ships.map((m) => ({
           workspaceId: m.workspace_id, slug: m.slug, workspaceName: m.workspace_name,
           tenantName: m.tenant_name, role: m.role, industry: m.industry,
-          pendingApprovals: (approvals.rows[0] as { c: number }).c,
-        });
-      }
-      return { groups };
+        })),
+      };
     }),
   }),
 });

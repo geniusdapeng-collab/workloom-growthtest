@@ -1,21 +1,16 @@
 /**
- * QuestlineStages · 首日上岗五关的分关视图（从引导壳中拆出，便于逐关审查）
+ * QuestlineStages · 首日上岗四关的分关视图（从引导壳中拆出，便于逐关审查）
  *
  * 约束：只负责渲染与回调，不做 tRPC 调用、不写进度、不改事实——
  * 所有副作用都留在 QuestlineOverlay 与 useQuestline 里。
+ *
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，原「拍板」关
+ * （待拍板队列 + 批准/修改/驳回卡片）整关删除；业务链路自带的关卡在各自业务页面就地放行。
  */
 import { Icon } from "@workloom/ui";
 import type { QuestLevel, QuestStageId } from "../../onboarding/questline";
 import type { TaskCardDef } from "../../onboarding/questline.config";
 import { useQuestlineContent } from "../../onboarding/QuestlineContent";
-
-/** 待拍板事项视图（来自 P0 的真实审批队列，不是编造的示例） */
-export interface PendingApprovalView {
-  approvalId: string;
-  title: string;
-  rationale?: string;
-  actionLabel?: string;
-}
 
 /** 任务线程视图（真实事实：status/progress 来自服务端） */
 export interface ThreadView {
@@ -26,20 +21,12 @@ export interface ThreadView {
   progress_total: number;
 }
 
-/** 驳回原因兜底：内容包未声明时用酒店枚举（bundles/hotel/feedback-enums.yml） */
-export const REJECT_REASONS: Array<{ code: string; label: string }> = [
-  { code: "price.too_high", label: "涨幅过大" },
-  { code: "data.stale", label: "依据不足" },
-  { code: "other", label: "其他（我补一句）" },
-];
-
 export function StageActions({
   stage,
   busy,
   thread,
   litCore,
   goalReady,
-  hasPendingApproval,
   onPrimary,
   onSkip,
   onOpenThread,
@@ -51,7 +38,6 @@ export function StageActions({
   thread: ThreadView | null;
   litCore: number;
   goalReady: boolean;
-  hasPendingApproval: boolean;
   onPrimary?: (() => void) | undefined;
   onSkip: () => void;
   onOpenThread: (id: string) => void;
@@ -64,13 +50,12 @@ export function StageActions({
       onClick={onSkip}
       className="min-h-9 rounded-lg border border-line px-3 text-body text-ink3 hover:border-gline hover:text-ink"
     >
-      {stage === "approve" && !hasPendingApproval ? "暂无可拍板，跳过" : "这关先跳过"}
+      这关先跳过
     </button>
   );
 
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-2">
-      {stage === "approve" && <span className="break-words text-body text-ink3">批准 / 修改 / 驳回请在卡片上操作</span>}
       {stage === "dispatch" && thread && (
         <>
           <span className="break-words text-body text-go">
@@ -138,7 +123,7 @@ export function GoalStage({
               <div className="break-words text-body font-bold text-ink">{goal.title}</div>
               <div className="mt-1 break-words text-body text-ink3">{goal.metric}</div>
               <div className="mt-2 break-words text-body text-ink3">
-                负责人 {goal.ownerTitle} · {goal.steps} 步 · 需要您拍板 {goal.approvals} 次
+                负责人 {goal.ownerTitle} · {goal.steps} 步 · 业务关卡确认 {goal.approvals} 次
               </div>
             </button>
           );
@@ -150,7 +135,7 @@ export function GoalStage({
           <div className="mt-1 break-words text-body text-ink2">衡量口径：{picked.metric}</div>
           <div className="mt-1 break-words text-body text-ink2">负责人：{picked.ownerTitle} · 首个产出：{picked.artifact}</div>
           <div className="mt-1 break-words text-body text-ink3">
-            预估 {picked.steps} 步，中途会找您拍板 {picked.approvals} 次；不涉及外发与资金的动作自动完成。
+            预估 {picked.steps} 步，中途有 {picked.approvals} 处业务关卡需要您确认（例如视频管线的定妆照确认）；不涉及外发与资金的动作自动完成。
           </div>
         </div>
       )}
@@ -207,7 +192,7 @@ export function DispatchStage({
                 <div>谁做：{task.ownerTitle}</div>
                 <div>几步：{task.steps} 步 · {task.eta}（预估）</div>
                 <div>产出：{task.artifact}</div>
-                <div>要您拍板：{task.approvals} 次 · 约 {task.credits} 积分（预估）</div>
+                <div>业务关卡确认：{task.approvals} 次 · 约 {task.credits} 积分（预估）</div>
               </dl>
               {/* M5：步数/时长/积分是行业包的演示预估，不是承诺；真实计量以任务线程为准 */}
               <div className="mt-1.5 break-words text-body text-ink3">
@@ -232,163 +217,9 @@ export function DispatchStage({
       {thread && (
         <div className="min-w-0 rounded-xl border border-holo/40 bg-holo/5 px-3 py-2 text-body text-ink2">
           任务线程 <span className="font-mono text-holo">{thread.id}</span> · 当前状态 {thread.status} ·
-          进度 {thread.progress_done}/{thread.progress_total}（下一步进入"拍板"关）
+          进度 {thread.progress_done}/{thread.progress_total}（下一步看交付结果）
         </div>
       )}
-    </div>
-  );
-}
-
-export function ApproveStage({
-  pending,
-  canApprove,
-  mode,
-  onMode,
-  rejectCode,
-  onRejectCode,
-  rejectNote,
-  onRejectNote,
-  editNote,
-  onEditNote,
-  busy,
-  onDecide,
-  onSkip,
-}: {
-  pending: PendingApprovalView | null;
-  canApprove: boolean;
-  mode: "normal" | "reject" | "edit";
-  onMode: (mode: "normal" | "reject" | "edit") => void;
-  rejectCode: string;
-  onRejectCode: (code: string) => void;
-  rejectNote: string;
-  onRejectNote: (note: string) => void;
-  editNote: string;
-  onEditNote: (note: string) => void;
-  busy: boolean;
-  onDecide: (gesture: "approve" | "edit" | "reject") => void;
-  onSkip: () => void;
-}) {
-  const content = useQuestlineContent();
-  if (!pending) {
-    return (
-      <div className="min-w-0 rounded-xl border border-line bg-bg900/60 px-3 py-3">
-        <div className="break-words text-body text-ink2">现在没有待您拍板的事项。</div>
-        <div className="mt-1 break-words text-body text-ink3">
-          这是真实状态：没有挂起事项时，我不会为了凑一关而编一条审批出来。
-        </div>
-        <button
-          type="button"
-          onClick={onSkip}
-          className="mt-2 rounded-lg border border-line px-3 py-1.5 text-body text-ink2 hover:border-gline"
-        >
-          跳过这一关，直接看结果
-        </button>
-      </div>
-    );
-  }
-  return (
-    <div className="min-w-0 space-y-3" data-approval-card={pending.approvalId}>
-      <div className="min-w-0 rounded-xl border border-amber-400/50 bg-amber-400/5 px-3 py-3">
-        <div className="text-body tracking-widest text-amber-300">请您决策 · 1 件</div>
-        <div className="mt-1 break-words text-body font-bold text-ink">{pending.title}</div>
-        {pending.rationale && pending.rationale !== "负责人意见待确认" && (
-          <div className="mt-1 break-words text-body text-holo">负责人意见：{pending.rationale}</div>
-        )}
-        <div className="mt-2 break-words text-body text-ink3">
-          命中航道：{pending.actionLabel ?? "高风险动作需人工拍板"}。批准后动作立即生效并写入账本；驳回必须选原因。
-        </div>
-        {!canApprove && (
-          <div className="mt-1 break-words text-body text-warn">
-            当前角色没有审批权限。
-            <a href="/login" className="ml-1 underline">切换到店主/店长身份 →</a>
-          </div>
-        )}
-      </div>
-
-      {mode === "reject" && (
-        <div className="min-w-0 rounded-xl border border-warn/50 bg-warn/5 px-3 py-3">
-          <div className="text-body text-warn">驳回原因（受控枚举，会用于校准偏好）</div>
-          <div className="mt-2 flex min-w-0 flex-wrap gap-2">
-            {(content.rejectReasons.length > 0 ? content.rejectReasons : REJECT_REASONS).map((reason) => (
-              <button
-                key={reason.code}
-                type="button"
-                onClick={() => onRejectCode(reason.code)}
-                className={`rounded-full border px-3 py-1 text-body ${
-                  rejectCode === reason.code ? "border-warn/70 bg-warn/15 text-warn" : "border-line text-ink3"
-                }`}
-              >
-                {reason.label}
-              </button>
-            ))}
-          </div>
-          <input
-            value={rejectNote}
-            onChange={(event) => onRejectNote(event.target.value)}
-            placeholder={rejectCode === "other" ? "补一句原因（必填）" : "补充说明（可选）"}
-            className="mt-2 w-full min-w-0 rounded-lg border border-line bg-bg900 px-3 py-2 text-body text-ink outline-none focus:border-gline"
-          />
-        </div>
-      )}
-
-      {mode === "edit" && (
-        <div className="min-w-0 rounded-xl border border-holo/50 bg-holo/5 px-3 py-3">
-          <div className="text-body text-holo">修改后采纳：写一句要改什么</div>
-          <input
-            value={editNote}
-            onChange={(event) => onEditNote(event.target.value)}
-            placeholder="例：涨幅压到 5% 以内，其余照办"
-            className="mt-2 w-full min-w-0 rounded-lg border border-line bg-bg900 px-3 py-2 text-body text-ink outline-none focus:border-gline"
-          />
-        </div>
-      )}
-
-      <div className="flex min-w-0 flex-wrap gap-2">
-        <button
-          type="button"
-          disabled={busy || !canApprove}
-          onClick={() => onDecide("approve")}
-          className="min-h-9 rounded-lg border border-go/60 bg-go/10 px-4 text-body font-bold text-go hover:bg-go/20 disabled:opacity-40"
-        >
-          <Icon name="check" size={13} className="inline" /> 批准
-        </button>
-        <button
-          type="button"
-          disabled={busy || !canApprove}
-          onClick={() => onMode(mode === "edit" ? "normal" : "edit")}
-          className="min-h-9 rounded-lg border border-holo/60 bg-holo/10 px-4 text-body font-bold text-holo hover:bg-holo/20 disabled:opacity-40"
-        >
-          <Icon name="edit" size={13} className="inline" /> 修改后采纳
-        </button>
-        <button
-          type="button"
-          disabled={busy || !canApprove}
-          onClick={() => onMode(mode === "reject" ? "normal" : "reject")}
-          className="min-h-9 rounded-lg border border-warn/60 bg-warn/10 px-4 text-body font-bold text-warn hover:bg-warn/20 disabled:opacity-40"
-        >
-          <Icon name="error" size={13} className="inline" /> 驳回
-        </button>
-        {mode === "reject" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onDecide("reject")}
-            className="min-h-9 rounded-lg border border-warn/70 bg-warn/20 px-4 text-body font-bold text-warn disabled:opacity-40"
-          >
-            确认驳回
-          </button>
-        )}
-        {mode === "edit" && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => onDecide("edit")}
-            className="min-h-9 rounded-lg border border-holo/70 bg-holo/20 px-4 text-body font-bold text-holo disabled:opacity-40"
-          >
-            确认修改
-          </button>
-        )}
-      </div>
     </div>
   );
 }

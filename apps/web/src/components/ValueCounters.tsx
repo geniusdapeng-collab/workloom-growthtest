@@ -1,13 +1,15 @@
 /**
  * ValueCounters · 累计价值计数器（方案 V4 §6.2「数得清的战果」）
- * 三枚呼吸计数器：已自主完成 N 项作业 / 待您拍板 N 项 / 团队成员 N 人。
- * 数据全部来自真实事件库（onboarding.status 工作区计数 + captain.theater 审批数），
+ * 两枚呼吸计数器：已自主完成 N 项作业 / 团队成员 N 人。
+ * 数据全部来自真实事件库（onboarding.status 工作区计数），
  * 首次启动即非零——"系统在替我干活"一眼可证。
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，「待您拍板」计数随之下线；
+ * 业务链路自带的关卡（如定妆照确认）在各自业务页面就地放行，不在此汇总。
  */
 import { useEffect, useState } from "react";
 import { ensureDemoLogin, trpc } from "../lib/trpc";
 
-interface Counts { events: number; agents: number; pending: number }
+interface Counts { events: number; agents: number }
 
 export function ValueCounters() {
   const [c, setC] = useState<Counts | null>(null);
@@ -16,12 +18,8 @@ export function ValueCounters() {
     const load = async () => {
       try {
         await ensureDemoLogin();
-        const [st, th] = await Promise.all([
-          trpc.onboarding.status.query() as Promise<{ workspace?: { events?: number; agents?: number } }>,
-          trpc.captain.theater.query() as Promise<{ pendingByTier?: Record<string, number> }>,
-        ]);
-        const pending = Object.values(th.pendingByTier ?? {}).reduce((s, n) => s + n, 0);
-        if (!stop) setC({ events: st.workspace?.events ?? 0, agents: st.workspace?.agents ?? 0, pending });
+        const st = await trpc.onboarding.status.query() as { workspace?: { events?: number; agents?: number } };
+        if (!stop) setC({ events: st.workspace?.events ?? 0, agents: st.workspace?.agents ?? 0 });
       } catch { /* 静默 */ }
     };
     void load();
@@ -32,7 +30,6 @@ export function ValueCounters() {
 
   const items = [
     { label: "已自主完成", value: c.events, unit: "项作业", tone: "text-holo" },
-    { label: "待您拍板", value: c.pending, unit: "项", tone: c.pending > 0 ? "text-gold" : "text-ink3" },
     { label: "团队在岗", value: c.agents, unit: "人", tone: "text-go" },
   ];
   return (

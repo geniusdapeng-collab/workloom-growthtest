@@ -58,15 +58,13 @@ describe("首日上岗状态机", () => {
     expect(startQuestline(done, 5000).status).toBe("running");
   });
 
-  it("按顺序推进五关，最后一关完成即整条主线完成", () => {
+  it("按顺序推进四关，最后一关完成即整条主线完成", () => {
     let state = startQuestline(createQuestState(0), 0);
     state = completeStage(state, "meet", 10);
     expect(state.stage).toBe("goal");
     state = completeStage(state, "goal", 20);
     expect(state.stage).toBe("dispatch");
     state = completeStage(state, "dispatch", 30);
-    expect(state.stage).toBe("approve");
-    state = completeStage(state, "approve", 40);
     expect(state.stage).toBe("review");
     state = completeStage(state, "review", 50);
     expect(state.status).toBe("completed");
@@ -106,7 +104,8 @@ describe("事实驱动推进", () => {
     // 认人需要客户自己确认（或跳过），事实不能替他完成；先手动过第一关
     const started = completeStage(startQuestline(createQuestState(0), 0), "meet", 5);
     const advanced = autoAdvance(started, facts({ goalConfirmed: true, dispatched: true }), 10);
-    expect(advanced.stage).toBe("approve");
+    // 第 3 关（派活）被事实点亮后直接进入验收关：原「拍板」关已随基座审批环节移除
+    expect(advanced.stage).toBe("review");
     expect(advanced.stageDone).toEqual(["meet", "goal", "dispatch"]);
   });
 
@@ -115,7 +114,7 @@ describe("事实驱动推进", () => {
     expect(autoAdvance(started, facts(), 10).stage).toBe("meet");
   });
 
-  it("五个事实齐了会推到验收关，但验收必须由客户亲自确认（S4b）", () => {
+  it("事实齐了会推到验收关，但验收必须由客户亲自确认（S4b）", () => {
     const started = completeStage(startQuestline(createQuestState(0), 0), "meet", 5);
     const advanced = autoAdvance(started, facts({
       goalConfirmed: true,
@@ -208,19 +207,19 @@ describe("进度摘要", () => {
   it("按已完成关卡计算剩余时间与文案", () => {
     let state = startQuestline(createQuestState(0), 0);
     expect(progressSummary(state).done).toBe(0);
-    expect(progressSummary(state).label).toContain("还差 5 关");
+    expect(progressSummary(state).label).toContain("还差 4 关");
     state = completeStage(state, "meet", 1);
     state = completeStage(state, "goal", 2);
     expect(progressSummary(state).done).toBe(2);
-    expect(progressSummary(state).label).toContain("还差 3 关");
-    const finished = completeStage(completeStage(state, "dispatch", 3), "approve", 4);
+    expect(progressSummary(state).label).toContain("还差 2 关");
+    const finished = completeStage(state, "dispatch", 3);
     expect(progressSummary(finished).label).toBe("就差最后一关");
     expect(progressSummary(completeStage(finished, "review", 5)).label).toBe("首日上岗已完成");
   });
 });
 
 describe("内容包完整性（行业可替换的硬约束）", () => {
-  it("五关齐备，每关都有三句台词与主按钮", () => {
+  it("四关齐备，每关都有三句台词与主按钮", () => {
     expect(QUESTLINE.stages).toHaveLength(QUEST_STAGE_ORDER.length);
     for (const id of QUEST_STAGE_ORDER) {
       const def = stageDef(id);
@@ -255,7 +254,7 @@ describe("内容包完整性（行业可替换的硬约束）", () => {
   });
 
   it("成就都指向已有类型且带说明", () => {
-    expect(QUESTLINE.achievements.length).toBeGreaterThanOrEqual(5);
+    expect(QUESTLINE.achievements.length).toBeGreaterThanOrEqual(4);
     for (const achievement of QUESTLINE.achievements) {
       expect(achievement.title.length).toBeGreaterThan(0);
       expect(achievement.hint.length).toBeGreaterThan(0);
@@ -333,12 +332,12 @@ describe("内容包完整性（行业可替换的硬约束）", () => {
 
   /** 逐包门禁：员工卡/目标/任务引用的岗位必须真实存在于该行业包（含其声明的依赖包），否则界面会出现点不开的幽灵岗位 */
   for (const [bundleId, content] of Object.entries(QUESTLINE_PACKS)) {
-    it(`[${bundleId}] 五关齐备且引用岗位/驳回枚举与行业包一致`, () => {
+    it(`[${bundleId}] 四关齐备且引用岗位与行业包一致`, () => {
       const bundlesRootDir = join(dirname(fileURLToPath(import.meta.url)), "../../../../bundles");
       const available = composedPresetKeys(bundlesRootDir, bundleId);
       expect(available.size).toBeGreaterThan(0);
 
-      // ① 五关与台词齐备
+      // ① 四关与台词齐备
       expect(content.stages).toHaveLength(QUEST_STAGE_ORDER.length);
       for (const id of QUEST_STAGE_ORDER) {
         const def = stageDef(id, content);

@@ -1,6 +1,5 @@
-import { AsyncState, Badge, Button, Card } from "@workloom/ui";
+import { AsyncState, Badge, Card } from "@workloom/ui";
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate } from "react-router";
 import { MEMBER_ROLE_TEXT, dictText } from "../../lib/display";
 import { ensureDemoLogin, trpc } from "../../lib/trpc";
 import { workspaceIndustryText } from "./systemText";
@@ -11,11 +10,9 @@ interface WorkspaceMembership {
   tenantName: string;
   industry: string;
   role: string;
-  pendingApprovals: number;
 }
 
 export default function Workspaces() {
-  const navigate = useNavigate();
   const [status, setStatus] = useState<"loading" | "ready" | "empty" | "error">("loading");
   const [rows, setRows] = useState<WorkspaceMembership[]>([]);
 
@@ -65,12 +62,9 @@ export default function Workspaces() {
                 </div>
                 <Badge tone="info">{dictText(MEMBER_ROLE_TEXT, row.role)}</Badge>
               </div>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1 text-body text-ink2">
-                  {row.pendingApprovals > 0 ? `${row.pendingApprovals} 项待审批` : "当前无待审批事项"}
-                </span>
-                <Button variant="secondary" onClick={() => navigate("/approvals")}>进入审批中心</Button>
-              </div>
+              <p className="mt-4 text-body text-ink3">
+                该工作区的任务、夜班交接与经营结果都使用独立的数据与权限范围。
+              </p>
             </Card>
           ))}
         </div>

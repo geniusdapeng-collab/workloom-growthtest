@@ -84,11 +84,14 @@ export interface ActiveBundleUi {
 }
 
 /**
- * growth 实验车道模块裁剪（2026-09-20 产品决定）：服务前台 / 成员管理 / 伙伴授权 / 个人与偏好
- * 四个模块的页面与路由已删除（见 App.tsx），导航同样过滤，避免出现点进去 404 的入口。
+ * growth 实验车道模块裁剪（2026-09-20 与 2026-09-21 产品决定）：
+ *  ① 服务前台 / 成员管理 / 伙伴授权 / 个人与偏好（2026-09-20）；
+ *  ② 审批中心（2026-09-21：本机单人运行不需要基座通用审批环节；业务链路自带的关卡
+ *     （如视频管线 G1–G10、定妆照确认）仍由各业务页面就地放行，不受影响）。
+ * 两个批次的页面与路由都已删除（见 App.tsx），导航同样过滤，避免出现点进去 404 的入口。
  * 只过滤导航入口，不动基座授权结果与其它页面。
  */
-const REMOVED_NAV_ROUTES = new Set(["/service", "/members", "/partners", "/account"]);
+const REMOVED_NAV_ROUTES = new Set(["/service", "/members", "/partners", "/account", "/approvals"]);
 const withoutRemovedModules = (list: readonly NavigationEntry[]): NavigationEntry[] =>
   list.filter((entry) => !REMOVED_NAV_ROUTES.has(entry.route));
 

@@ -7,7 +7,6 @@ import {
   BottomTabs,
   Button,
   Card,
-  DecisionPackage,
   Drawer,
   Icon,
   IconButton,
@@ -16,8 +15,6 @@ import {
   NAVIGATION_GROUP_LABELS,
   NAVIGATION_GROUP_ORDER,
   Overlay,
-  Select,
-  Textarea,
   NightShiftStatus,
   TopContextBar,
   clientChineseText,
@@ -43,14 +40,6 @@ interface Identity {
   workspaceId: string;
 }
 interface Me { identity: Identity; capabilities: Record<string, boolean | number> }
-interface Approval {
-  approval_id: string;
-  event_id: string;
-  status: string;
-  created_at: string;
-  snapshot: { high_risk?: boolean; before?: unknown; after?: unknown; expires_at?: string };
-  event?: { decision?: { action?: string }; who?: { id?: string }; rule_impact?: unknown[] };
-}
 interface ThreadRow { id: string; title: string; status: string; progress_done: number; progress_total: number; agent_id: string | null; created_at: string }
 interface NightState { configured: boolean; run?: { id: string; status: string; runDate: string; stats?: { done: number; pending: number; need_human: number; credits_used: number } | null } }
 interface FeedbackReason { code: string; label: string; appliesTo?: string[] }
@@ -122,35 +111,31 @@ function Resource<T>({ state, retry, empty, children }: { state: ReturnType<type
 }
 
 function TodayPage({ navigate, me, entries }: { navigate: (path: string) => void; me: Me; entries: readonly NavigationEntry[] }) {
-  const canOpenInbox = isBMobileRoutePermitted("/inbox", entries);
   const canOpenTasks = isBMobileRoutePermitted("/tasks", entries);
   const canOpenNight = isBMobileRoutePermitted("/night", entries);
   const loader = useCallback(async () => {
-    const [approvals, threads, night] = await Promise.all([
-      canOpenInbox ? trpc.approvals.list.query({ status: "pending" }) as Promise<Approval[]> : Promise.resolve([]),
+    const [threads, night] = await Promise.all([
       canOpenTasks ? trpc.threads.list.query() as Promise<ThreadRow[]> : Promise.resolve([]),
       canOpenNight ? trpc.nightShift.current.query() as Promise<NightState> : Promise.resolve({ configured: false } as NightState),
     ]);
-    return { me, approvals, threads, night };
-  }, [canOpenInbox, canOpenNight, canOpenTasks, me]);
+    return { me, threads, night };
+  }, [canOpenNight, canOpenTasks, me]);
   const resource = useResource(loader);
-  return <div className="page"><PageHeading title="今天需要关注什么" description="先看需要你决定的事，再看数字员工运行进度。" />
-    <Resource state={resource.state} retry={resource.reload}>{({ me, approvals, threads, night }) => {
+  return <div className="page"><PageHeading title="今天需要关注什么" description="先看数字员工运行进度，再看夜班是否需要你介入。" />
+    <Resource state={resource.state} retry={resource.reload}>{({ me, threads, night }) => {
       const running = threads.filter((thread) => ["running", "queued", "pending_review"].includes(thread.status));
       const needsHuman = night.run?.stats?.need_human ?? 0;
       return <>
         <div className={`status-strip ${me.identity.memberNo === "GUEST" ? "demo" : ""}`}>
-          {me.identity.memberNo === "GUEST" ? "只读示例：不会执行审批、外发或正式经营动作。" : `当前身份：${me.identity.name} · ${ROLE_LABELS[me.identity.role] ?? "成员"}`}
+          {me.identity.memberNo === "GUEST" ? "只读示例：不会执行外发或正式经营动作。" : `当前身份：${me.identity.name} · ${ROLE_LABELS[me.identity.role] ?? "成员"}`}
         </div>
         <div className="metric-grid">
-          {canOpenInbox && <MetricCard label="待我审批" value={approvals.length} period="当前待办" source="审批服务" updatedAt="接口未提供更新时间" />}
           {canOpenTasks && <MetricCard label="运行中任务" value={running.length} period="当前任务" source="任务事件" updatedAt="接口未提供更新时间" />}
           {canOpenNight && <MetricCard label="夜班需介入" value={needsHuman} period="最近班次" source="夜班交接" updatedAt="接口未提供更新时间" />}
           {canOpenTasks && <MetricCard label="已完成任务" value={threads.filter((item) => item.status === "completed").length} period="当前任务列表" source="任务事件" updatedAt="接口未提供更新时间" />}
         </div>
-        {canOpenInbox && approvals.length > 0 && <Card><div className="row"><h2>优先处理审批</h2><Badge tone="warning">{approvals.length} 项</Badge></div><p className="item-copy">最高风险事项会排在待办页前面，提交后可从事件账本核对回执。</p><div className="action-row"><Button variant="primary" onClick={() => navigate("/inbox")}>查看待办</Button></div></Card>}
         {canOpenTasks && <><div className="row"><h2>数字员工正在做</h2><Button variant="quiet" onClick={() => navigate("/tasks")}>查看全部</Button></div>
-        <div className="stack">{running.slice(0, 3).map((thread) => <AgentWorkCard key={thread.id} work={{ id: thread.id, actor: thread.agent_id ? "数字员工" : "等待分派", humanOwner: me.identity.name, goal: thread.title, stage: clientStatusLabel(thread.status), progress: { completed: thread.progress_done, total: thread.progress_total || undefined, next: thread.status === "pending_review" ? "等待人类裁决" : "继续执行当前里程碑" }, reason: "进度来自当前工作区的任务事件。", needsHuman: thread.status === "pending_review" ? { action: "查看并裁决当前结果", consequence: "任务会保持等待，不会自行越过围栏。" } : undefined, risk: thread.status === "pending_review" ? "medium" : "none", receipt: { requestId: thread.id }, recovery: "可进入任务页查看、暂停或接管" }} />)}{running.length === 0 && <AsyncState status="empty" title="目前没有运行中的任务" description="新任务创建后，会在这里展示执行者、阶段、依据和需要你的动作。" />}</div></>}
+        <div className="stack">{running.slice(0, 3).map((thread) => <AgentWorkCard key={thread.id} work={{ id: thread.id, actor: thread.agent_id ? "数字员工" : "等待分派", humanOwner: me.identity.name, goal: thread.title, stage: clientStatusLabel(thread.status), progress: { completed: thread.progress_done, total: thread.progress_total || undefined, next: thread.status === "pending_review" ? "等待业务关卡放行" : "继续执行当前里程碑" }, reason: "进度来自当前工作区的任务事件。", needsHuman: thread.status === "pending_review" ? { action: "到对应业务页面放行该关卡", consequence: "任务会保持等待，不会自行越过围栏。" } : undefined, risk: thread.status === "pending_review" ? "medium" : "none", receipt: { requestId: thread.id }, recovery: "可进入任务页查看、暂停或接管" }} />)}{running.length === 0 && <AsyncState status="empty" title="目前没有运行中的任务" description="新任务创建后，会在这里展示执行者、阶段、依据和需要你的动作。" />}</div></>}
         {canOpenNight && <><NightShiftStatus status={night.configured ? clientStatusLabel(night.run?.status ?? "pending") : "尚未配置"} nextRun={night.run?.runDate ? formatTime(night.run.runDate) : undefined} needsHuman={needsHuman} />
         <div className="action-row"><Button onClick={() => navigate("/night")}>查看夜班</Button></div></>}
       </>;
@@ -158,60 +143,19 @@ function TodayPage({ navigate, me, entries }: { navigate: (path: string) => void
   </div>;
 }
 
-function ApprovalsPage({ canDecide }: { canDecide: boolean }) {
-  const loader = useCallback(async () => Promise.all([
-    trpc.approvals.list.query() as Promise<Approval[]>,
-    trpc.memory.feedbackEnums.query() as Promise<FeedbackReason[]>,
-  ]).then(([approvals, reasons]) => ({ approvals, reasons: reasons.filter((item) => !item.appliesTo || item.appliesTo.includes("reject")) })), []);
-  const resource = useResource(loader);
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [approving, setApproving] = useState<Approval | null>(null);
-  const [rejecting, setRejecting] = useState<Approval | null>(null);
-  const [reason, setReason] = useState("");
-  const [note, setNote] = useState("");
-  const decide = async (approval: Approval, gesture: "approve" | "reject") => {
-    if (busy) return;
-    setBusy(approval.approval_id); setError(""); setNotice("");
-    try {
-      const result = await trpc.approvals.decide.mutate({ approvalId: approval.approval_id, gesture, ...(gesture === "reject" ? { reasonEnum: reason, reasonText: note || undefined } : {}) }) as { deduped?: boolean; gestureEventId?: string };
-      setApproving(null); setRejecting(null); setNote("");
-      setNotice(result.deduped ? "该审批此前已完成，本次未重复执行。" : "服务端已记录本次审批决定；外部动作仍以执行回执为准。");
-      await resource.reload();
-    } catch (cause) { setError(`审批提交未完成。${safeMessage(cause)}`); }
-    finally { setBusy(null); }
-  };
-  return <div className="page"><PageHeading title="待办与审批" description="每次决定都会写入事件账本；审批成功不等于外部执行成功。" />
-    {error && <div className="status-strip" role="alert">{error}</div>}
-    {notice && <div className="status-strip" role="status">{notice}</div>}
-    <Resource state={resource.state} retry={resource.reload} empty={({ approvals }) => approvals.length === 0}>{({ approvals, reasons }) => <div className="stack">{approvals.map((approval) => {
-      const readonly = !canDecide || approval.status !== "pending";
-      return <DecisionPackage key={approval.approval_id} decision={{ title: approval.event?.decision?.action ? "待确认的经营动作" : "待确认事项", action: "批准后由受控执行链继续处理", summary: `由${approval.event?.who?.id ? "数字员工" : "系统流程"}发起，当前状态为${clientStatusLabel(approval.status)}。`, before: clientValueText(approval.snapshot.before), after: clientValueText(approval.snapshot.after), evidence: approval.event?.rule_impact?.length ? [{ title: `命中 ${approval.event.rule_impact.length} 条规则`, source: "围栏判断" }] : [{ title: "审批事件已进入待办", source: "事件账本" }], risk: approval.snapshot.high_risk ? "high" : "medium", fence: approval.snapshot.high_risk ? "高风险动作必须由人类明确裁决" : "当前动作需要人类确认", impact: clientValueText(approval.snapshot.after), rollback: "审批前不会执行；执行后的回滚方式以对应任务回执为准。", eventId: approval.event_id }} actions={!readonly ? <><Button variant="primary" disabled={Boolean(busy)} onClick={() => setApproving(approval)}>批准</Button><Button variant="danger" disabled={Boolean(busy)} onClick={() => { setReason(reasons[0]?.code ?? "other"); setRejecting(approval); }}>驳回</Button></> : undefined} />;
-    })}</div>}</Resource>
-    <Overlay open={Boolean(approving)} title="确认批准" description="审批决定会写入事件账本；批准不等于外部动作已经生效。" onClose={() => { if (!busy) setApproving(null); }} dismissOnBackdrop={!busy} dismissOnEscape={!busy} footer={<><Button disabled={Boolean(busy)} onClick={() => setApproving(null)}>取消</Button><Button variant="primary" busy={busy === approving?.approval_id} onClick={() => approving && void decide(approving, "approve")}>确认批准</Button></>}>
-      <p>影响摘要：{clientValueText(approving?.snapshot.after)}。提交后请继续核对外部执行回执。</p>
-    </Overlay>
-    <Overlay open={Boolean(rejecting)} title="驳回审批" description="请选择结构化原因；补充说明会进入可追溯记录。" onClose={() => { if (!busy) setRejecting(null); }} dismissOnBackdrop={!busy} dismissOnEscape={!busy} footer={<><Button disabled={Boolean(busy)} onClick={() => setRejecting(null)}>取消</Button><Button variant="danger" busy={busy === rejecting?.approval_id} disabled={!reason} onClick={() => rejecting && void decide(rejecting, "reject")}>确认驳回</Button></>}>
-      <div className="stack">
-        <Select label="驳回原因" required value={reason} disabled={Boolean(busy)} onChange={(event) => setReason(event.target.value)}>
-          {(resource.state.status === "ready" ? resource.state.data.reasons : [{ code: "other", label: "其他原因" }]).map((item) => (
-            <option key={item.code} value={item.code}>{clientChineseText(item.label, "其他原因")}</option>
-          ))}
-        </Select>
-        <Textarea
-          label="补充说明"
-          description="最多 200 个字；内容会随驳回原因写入事件账本。"
-          value={note}
-          disabled={Boolean(busy)}
-          onChange={(event) => setNote(event.target.value)}
-          maxLength={200}
-          rows={4}
-        />
-      </div>
-    </Overlay>
+function InboxPage() {
+  /**
+   * 统一待办（本机单人运行）：
+   * 基座通用审批环节已移除（2026-09-21 产品所有者口径），本页不再列出审批事项、不再提供批准/驳回。
+   * 业务链路自带的关卡（如视频管线 G1–G10、定妆照确认）在各自业务页面就地放行；
+   * 非审批类待办（告警 / 工单）在行业包数据面就绪后按同一结构补充。
+   */
+  return <div className="page">
+    <PageHeading title="待办" description="跨工作区聚合你名下需要处理的事项。" />
+    <AsyncState status="empty" title="当前没有需要你处理的待办事项" description="行业包提供非审批类待办数据后，会在这里按店分组显示。" />
   </div>;
 }
+
 
 function TasksPage({ canDispatch }: { canDispatch: boolean }) {
   const loader = useCallback(async () => Promise.all([
@@ -246,7 +190,7 @@ function TasksPage({ canDispatch }: { canDispatch: boolean }) {
   return <div className="page"><PageHeading title="任务" description="查看谁在做、做到哪、为什么停住，以及下一步是否需要你。" />
     <Resource state={resource.state} retry={resource.reload}>{({ me, threads, agents }) => <>
       {canDispatch && <Card><h2>发起任务</h2><p className="item-copy">请写清目标、对象和时间；信息不足时系统会先反问，不会偷偷创建任务。</p><div className="stack"><label>任务目标<textarea rows={3} value={title} disabled={busy} onChange={(event) => setTitle(event.target.value)} placeholder="例如：复盘本周核心指标变化，并列出需要我决定的三件事" /></label>{error && <div className="status-strip" role="alert">{error}</div>}{notice && <div className="status-strip" role="status">{notice}</div>}<Button variant="primary" disabled={!title.trim() || agents.length === 0 || busy} onClick={() => setConfirmDispatch(true)}>预览并创建任务</Button></div></Card>}
-      <div className="stack">{threads.map((thread) => <AgentWorkCard key={thread.id} work={{ id: thread.id, actor: thread.agent_id ? "数字员工" : "等待分派", humanOwner: me.identity.name, goal: thread.title, stage: clientStatusLabel(thread.status), progress: { completed: thread.progress_done, total: thread.progress_total || undefined, next: thread.status === "pending_review" ? "等待人类裁决" : thread.status === "failed" ? "查看失败原因并选择重试或接管" : undefined }, reason: `状态和进度来自当前工作区的任务事件；创建于 ${formatTime(thread.created_at)}。`, needsHuman: thread.status === "pending_review" ? { action: "审核当前结果", consequence: "未裁决前任务保持等待。" } : thread.status === "failed" ? { action: "选择重试、接管或停止", consequence: "任务不会被标记为完成。" } : undefined, risk: thread.status === "failed" ? "high" : thread.status === "pending_review" ? "medium" : "none", receipt: { requestId: thread.id }, recovery: "失败可重试，关键动作可由人类接管" }} />)}{threads.length === 0 && <AsyncState status="empty" title="暂无任务" description="创建任务后，可以在这里跟踪数字员工进度和异常。" />}</div>
+      <div className="stack">{threads.map((thread) => <AgentWorkCard key={thread.id} work={{ id: thread.id, actor: thread.agent_id ? "数字员工" : "等待分派", humanOwner: me.identity.name, goal: thread.title, stage: clientStatusLabel(thread.status), progress: { completed: thread.progress_done, total: thread.progress_total || undefined, next: thread.status === "pending_review" ? "等待业务关卡放行" : thread.status === "failed" ? "查看失败原因并选择重试或接管" : undefined }, reason: `状态和进度来自当前工作区的任务事件；创建于 ${formatTime(thread.created_at)}。`, needsHuman: thread.status === "pending_review" ? { action: "到对应业务页面放行该关卡", consequence: "关卡放行前任务保持等待。" } : thread.status === "failed" ? { action: "选择重试、接管或停止", consequence: "任务不会被标记为完成。" } : undefined, risk: thread.status === "failed" ? "high" : thread.status === "pending_review" ? "medium" : "none", receipt: { requestId: thread.id }, recovery: "失败可重试，关键动作可由人类接管" }} />)}{threads.length === 0 && <AsyncState status="empty" title="暂无任务" description="创建任务后，可以在这里跟踪数字员工进度和异常。" />}</div>
       <Overlay open={confirmDispatch} title="确认创建任务" description="提交后系统会先判断信息是否充分；信息不足时只会反问，不会创建任务。" onClose={() => { if (!busy) setConfirmDispatch(false); }} dismissOnBackdrop={!busy} dismissOnEscape={!busy} footer={<><Button disabled={busy} onClick={() => setConfirmDispatch(false)}>取消</Button><Button variant="primary" busy={busy} onClick={() => void dispatch(agents)}>确认交给数字员工</Button></>}><div className="stack"><p><strong>任务目标：</strong>{title.trim()}</p><p><strong>首选执行者：</strong>{clientChineseText(agents[0]?.name, "尚无可用数字员工")}</p></div></Overlay>
     </>}</Resource>
   </div>;
@@ -429,7 +373,8 @@ function MobileApp({ onLogout }: { onLogout: () => void }) {
       return <AsyncState status="forbidden" title="当前身份不能访问此页面" description="该入口受当前工作区角色、套餐或伙伴授权限制。权限变化后可重新刷新。" action={<Button onClick={() => navigate(primaryTabs[0]?.id ?? "/")}>返回可用页面</Button>} />;
     }
     if (pathname === "/" && me) return <TodayPage navigate={navigate} me={me} entries={navEntries} />;
-    if (pathname === "/inbox" || pathname === "/approvals") return <ApprovalsPage canDecide={actionPermissions.has("approval.decide")} />;
+    // /approvals（审批中心）已随基座审批环节下线：地址不再提供服务，统一走「页面不存在」出口。
+    if (pathname === "/inbox") return <InboxPage />;
     if (pathname === "/tasks") return <TasksPage canDispatch={actionPermissions.has("task.dispatch")} />;
     if (pathname === "/operations" || pathname === "/reports" || pathname === "/executive") return <OperationsPage />;
     if (pathname === "/account" && me && shellData) return <AccountPage navigate={navigate} onLogout={onLogout} me={me} entries={navEntries} partner={shellData.access.subject.kind === "partner"} scope={shellData.access.scope} availableScopes={shellData.access.availableScopes} onSelectScope={(option) => setRequestedScope({ tenantId: option.tenantId, workspaceId: option.workspaceId })} />;

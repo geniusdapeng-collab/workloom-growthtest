@@ -80,9 +80,9 @@ interface Profile {
   }>;
 }
 
-/** 角色口径（PRD P8 正文：经营者·审批人 / 只读成员 / 集团 Teams；F5.6 三端一致） */
+/** 角色口径（PRD P8 正文：经营者 / 只读成员 / 集团 Teams；F5.6 三端一致） */
 const ROLE_LABEL: Record<string, string> = {
-  owner: "经营者 · 审批人",
+  owner: "经营者",
   manager: "工作区管理员",
   staff: "工作区成员",
   readonly: "只读成员",
@@ -91,7 +91,7 @@ const ROLE_LABEL: Record<string, string> = {
 };
 const ROLE_SCOPE: Record<string, string> = {
   owner: "紧急制动 · 规则制定 · 成员任免",
-  manager: "跨店继承与审计 · 审批",
+  manager: "跨店继承与审计",
   readonly: "只读视图 · 无写入口",
   group: "集团视角",
   channel: "渠道接入",
@@ -131,7 +131,7 @@ function HumanCard({ h }: { h: HumanRow }) {
       <div className="mt-2 border-t border-line/60 pt-2 text-body leading-relaxed text-ink3">
         {ROLE_SCOPE[h.role] ?? ""}
         <div className="mt-1 flex gap-3">
-          <span>30 天审批 <b className="font-orb text-holo">{h.stats.decided30}</b></span>
+          <span>30 天决策 <b className="font-orb text-holo">{h.stats.decided30}</b></span>
           <span>派遣 <b className="font-orb text-holo">{h.stats.dispatched30}</b></span>
           <span>沉淀 <b className="font-orb text-holo">{h.stats.settled30}</b></span>
         </div>
@@ -333,7 +333,7 @@ function RosterHome() {
         </div>
         <div className="rounded-lg border border-line bg-card p-3 text-body leading-relaxed text-ink2">
           <b className="text-holo">三端权限保持一致</b>
-          <div className="mt-1 text-ink3">权限变更必须审批并留痕；无权使用的入口不会显示。</div>
+          <div className="mt-1 text-ink3">权限变更必须留痕；无权使用的入口不会显示。</div>
         </div>
       </div>
     </>

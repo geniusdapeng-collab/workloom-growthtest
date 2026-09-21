@@ -3,7 +3,7 @@
  *  - 记忆可读可改可禁用：企业的「口味、规矩、教训」是看得见摸得着的数据资产（信任+纠偏通道）
  *  - 每条记忆可反查来源事件与被引用记录（F1.4 归因闭环）
  *  - 来源人一键清算：成员离任/换岗时作废其手势沉淀的偏好（防个人口味过拟合，D24 修订 2）
- *  - 进化积分卡：北极星=审批一次通过率，趋势看斜率；记忆引用量=偏好注入生效口径
+ *  - 进化积分卡：北极星=关卡一次放行率，趋势看斜率；记忆引用量=偏好注入生效口径
  * 权限态：readonly 隐藏编辑/禁用/清算按钮（服务端 writeProcedure 同样 403，前端隐藏非置灰）
  */
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -311,7 +311,7 @@ export default function P23() {
         {/* 进化积分卡（M5：北极星 + 趋势斜率） */}
         <div className="mb-5 grid min-w-0 grid-cols-1 gap-3 xl:grid-cols-2 2xl:grid-cols-4">
           <div className="min-w-0 break-words rounded-xl border border-gold/40 bg-panel p-4">
-            <div className="break-words text-body tracking-widest text-ink3">北极星 · 审批一次通过率</div>
+            <div className="break-words text-body tracking-widest text-ink3">北极星 · 关卡一次放行率</div>
             <div className="mt-1 text-2xl font-bold text-gold">{pct(t?.firstPassRate ?? null)}</div>
             <div className="mt-1 text-body text-ink3">已裁决 {t?.decided ?? 0} 条（批 {t?.approved ?? 0} / 改 {t?.edited ?? 0} / 驳 {t?.rejected ?? 0}）</div>
           </div>
@@ -400,7 +400,7 @@ export default function P23() {
         {/* 记忆列表 */}
         {memories.length === 0 && (
           <div className="rounded-xl border border-line bg-panel p-8 text-center text-body text-ink3">
-            {showRecalled ? "回收区暂无记忆。" : "暂无记忆。系统会在你审批、驳回、改稿的过程中持续沉淀——也可以点「立即运行记忆提炼」。"}
+            {showRecalled ? "回收区暂无记忆。" : "暂无记忆。系统会在你放行、退回、改稿的过程中持续沉淀——也可以点「立即运行记忆提炼」。"}
           </div>
         )}
         <div className="space-y-2">

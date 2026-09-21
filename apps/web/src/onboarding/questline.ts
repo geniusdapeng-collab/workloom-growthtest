@@ -14,10 +14,16 @@
 export const QUEST_JOURNEY_VERSION = 1;
 export const QUEST_STORAGE_KEY = "wl-questline-v1";
 
-export type QuestStageId = "meet" | "goal" | "dispatch" | "approve" | "review";
+export type QuestStageId = "meet" | "goal" | "dispatch" | "review";
 
-/** 关卡顺序即叙事顺序：认人 → 定目标 → 派活 → 拍板 → 验收 */
-export const QUEST_STAGE_ORDER: readonly QuestStageId[] = ["meet", "goal", "dispatch", "approve", "review"];
+/**
+ * 关卡顺序即叙事顺序：认人 → 定目标 → 派活 → 验收。
+ *
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，原第 4 关「拍板」
+ * （真实审批队列 + 批准/修改/驳回）随之删除；业务链路自带的关卡（如视频管线 G1–G10、
+ * 定妆照确认）仍由各自业务页面就地放行，不再由首日上岗引导代管。
+ */
+export const QUEST_STAGE_ORDER: readonly QuestStageId[] = ["meet", "goal", "dispatch", "review"];
 
 export type QuestStatus = "idle" | "running" | "completed";
 
@@ -27,12 +33,10 @@ export interface QuestFacts {
   goalConfirmed: boolean;
   /** L3：已通过真实通道派出第一件活 */
   dispatched: boolean;
-  /** L4：已完成第一次拍板（批准/修改/驳回均可） */
+  /** 已完成过一次关卡放行（如视频管线定妆照确认）；仅用于 XP 口径与事件识别，不再作为单独关卡 */
   decided: boolean;
   /** L5：首单已产生交付（线程完成） */
   delivered: boolean;
-  /** 当前是否存在可拍板事项；没有时允许客户"暂无可拍板"跳过该关 */
-  approvalsAvailable: boolean;
 }
 
 export const EMPTY_FACTS: QuestFacts = {
@@ -40,7 +44,6 @@ export const EMPTY_FACTS: QuestFacts = {
   dispatched: false,
   decided: false,
   delivered: false,
-  approvalsAvailable: false,
 };
 
 export interface QuestXpTally {
@@ -246,8 +249,6 @@ export function stageSatisfiedByFacts(stage: QuestStageId, facts: QuestFacts): b
       return facts.goalConfirmed;
     case "dispatch":
       return facts.dispatched;
-    case "approve":
-      return facts.decided;
     case "review":
       // 验收必须由客户自己看完（交付卡 + 成绩单）再点确认：
       // 若用事实自动关掉这一关，客户会在"秒级完成"的演示环境里直接跳到完成面板，
@@ -261,12 +262,12 @@ export function stageSatisfiedByFacts(stage: QuestStageId, facts: QuestFacts): b
 /**
  * 按真实事实自动推进：覆盖"客户在别处把活干了"的场景——P0 从剧场 ticker
  * （近 14 条真实事件）推导 `thread.dispatch` / `approval.gesture` 是否由本人发出，
- * 因此 3D 职场拖拽派活、AskRail 派活、审批中心拍板都能被认出来。
+ * 因此 3D 职场拖拽派活、AskRail 派活都能被认出来。
  * 认人（meet）与验收（review）必须由客户本人确认，事实不能代劳。
  */
 export function autoAdvance(state: QuestState, facts: QuestFacts, now: number = Date.now()): QuestState {
   let current = state.status === "idle" && hasAnyFact(facts) ? startQuestline(state, now) : state;
-  // 五关最多推进五次；每次只消化"当前关已满足"的情况，避免跳关
+  // 每关最多推进一次；每次只消化"当前关已满足"的情况，避免跳关
   for (let guard = 0; guard < QUEST_STAGE_ORDER.length; guard += 1) {
     if (current.status === "completed") break;
     if (!stageSatisfiedByFacts(current.stage, facts)) break;

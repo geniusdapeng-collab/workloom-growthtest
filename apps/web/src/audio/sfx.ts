@@ -35,7 +35,7 @@ const T = (type: ToneType, freq: number, dur: number, vol: number, extra: Partia
 
 /** 反馈层（sfx 总线） */
 export const SFX_FEEDBACK: Record<string, SfxPreset> = {
-  /** 审批盖章：低频方波短促 + 噪声冲击 */
+  /** 关卡放行盖章：低频方波短促 + 噪声冲击 */
   approve: {
     tones: [T("square", 180, 0.07, 0.5, { attack: 0.004, decay: 0.05 }), T("square", 120, 0.06, 0.3, { at: 0.05 })],
     noise: { dur: 0.035, vol: 0.35, lowpass: 2400 },

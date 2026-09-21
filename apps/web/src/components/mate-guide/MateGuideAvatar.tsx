@@ -6,7 +6,7 @@
  * Live2D 官方海报 `/live2d/mao/poster.png`——与挂件兜底同源；换形象 = 换模型 + 换 poster.png，两件同批。
  *
  * 为什么引导层不再起第二个 Live2D 实例：经营主页已挂载织伴挂件（WebGL 多 canvas 共存不稳定，
- * 首装舞台独占唯一数字人实例）。引导层用**海报 + 状态环**表达"她在听 / 在汇报 / 在跟进 / 庆祝 / 需要拍板"，
+ * 首装舞台独占唯一数字人实例）。引导层用**海报 + 状态环**表达"她在听 / 在汇报 / 在跟进 / 庆祝 / 需要放行"，
  * 既保证形象一致，又不与主实例抢资源。
  *
  * 降级：`prefers-reduced-motion` 下只保留静态形象（呼吸/脉冲动画全部关闭）；
@@ -27,14 +27,14 @@ export interface MateGuideAvatarProps {
   label?: string;
 }
 
-/** 状态 → 环色/状态词（与成长化文案一致：她在听、在汇报、在跟进、庆祝、需要您拍板） */
+/** 状态 → 环色/状态词（与成长化文案一致：她在听、在汇报、在跟进、庆祝、需要您放行） */
 const MOOD_STYLE: Record<GuideMood, { ring: string; glow: string; label: string }> = {
   idle: { ring: "#8f9aac", glow: "rgba(143,154,172,.35)", label: "待命" },
   listen: { ring: "#8ad8ff", glow: "rgba(138,216,255,.40)", label: "在听" },
   talk: { ring: "#e8c97a", glow: "rgba(232,201,122,.45)", label: "正在汇报" },
   think: { ring: "#9fd0c0", glow: "rgba(159,208,192,.40)", label: "正在跟进" },
   celebrate: { ring: "#6adf8a", glow: "rgba(106,223,138,.45)", label: "在庆祝" },
-  alert: { ring: "#ffbe6a", glow: "rgba(255,190,106,.50)", label: "需要您拍板" },
+  alert: { ring: "#ffbe6a", glow: "rgba(255,190,106,.50)", label: "需要您放行" },
 };
 
 const GUIDE_CSS = `

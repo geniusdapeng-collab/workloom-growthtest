@@ -2,7 +2,7 @@
  * theaterDiff · 轮询数据 diff → 导演事件（CineDirector 的事件源）
  *
  * 对 P0 的 theater 轮询 payload 做增量检测：
- *  - ask：新增 asking 成员（含 approvalId）→ 请示事件（运镜+风铃）
+ *  - ask：新增 asking 成员（等待业务关卡放行的员工）→ 提示事件（运镜+风铃）
  *  - fuse：ticker 新增围栏熔断类动作 → 熔断事件（警报+语音打断）
  *  - cheer：ticker 新增完成/捷报类动作 → 捷报事件（特写+琶音）
  */

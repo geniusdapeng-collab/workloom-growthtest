@@ -1,9 +1,11 @@
 /**
  * HandoffCard 昨夜日报卡（设计规范 §5.3；交接班消息卡，08:30 决策包送达 F4.4）
  * 结构：卡头（✦ 昨夜日报 · 夜班中心 + 送达时间 + 围栏快照版本）
- *      + 三栏大数字：战果绿 / 待审批琥珀 / 求援红（Orbitron 发光）
+ *      + 两栏大数字：战果绿 / 求援红（Orbitron 发光）
  *      + 卡尾（积分消耗 + 打开入口）
- * 铁律：三计数与 P3 逐条强一致（F4.4）；未启用夜班时整卡转空态，禁止显 0（§5.3）
+ * 铁律：计数与 P3 逐条强一致（F4.4）；未启用夜班时整卡转空态，禁止显 0（§5.3）
+ * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，交接班卡不再展示「待审批」计数；
+ * 业务链路自带的关卡仍按各自业务页面就地放行，不在此卡汇总。
  */
 import { versionText } from "../../lib/display";
 import { Icon } from "@workloom/ui";
@@ -12,7 +14,6 @@ export interface HandoffData {
   deliveredAt: string; // HH:MM
   fenceSnapshot: string;
   done: number;
-  pending: number;
   needHuman: number;
   credits: number;
 }
@@ -49,11 +50,10 @@ export function HandoffCard({
         <span className="hidden flex-1 sm:inline" />
         <span className="max-w-full break-words text-body text-holo">围栏快照 {versionText(data.fenceSnapshot)}</span>
       </div>
-      {/* 三栏大数字（Orbitron 发光；战果✓绿 / 待审批◆琥珀 / 求援▲红——固定语义 §6） */}
-      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+      {/* 两栏大数字（Orbitron 发光；战果✓绿 / 求援▲红——固定语义 §6） */}
+      <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         {[
           { n: data.done, label: "战果", cls: "text-go", glow: "0_0_18px_rgba(34,200,138,.45)" },
-          { n: data.pending, label: "待审批", cls: "text-warn", glow: "0_0_18px_rgba(255,170,51,.45)" },
           { n: data.needHuman, label: "求援", cls: "text-alert", glow: "0_0_18px_rgba(255,77,109,.45)" },
         ].map((c) => (
           <div key={c.label} className="rounded-lg border border-line bg-bg800/60 px-3 py-2.5 text-center">

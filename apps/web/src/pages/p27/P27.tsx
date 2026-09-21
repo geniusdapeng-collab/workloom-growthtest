@@ -227,7 +227,7 @@ export default function P27() {
               className="rounded-lg bg-go px-5 py-2 text-body font-bold text-black disabled:opacity-40">
               {busy ? "提交中…" : `确认选中的 ${checked.size} 条，生成草稿 →`}
             </button>
-            <span className="text-body text-ink3">草稿不会直接生效——生效要走定制中心的考试与审批，随时可回滚</span>
+            <span className="text-body text-ink3">草稿不会直接生效——生效要走定制中心的考试与留痕，随时可回滚</span>
           </div>
         </div>
       )}

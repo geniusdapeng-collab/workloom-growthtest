@@ -25,7 +25,7 @@ const TIER_TEXT: Record<PacketItem["tier"], string> = {
 };
 
 /**
- * 决策包条目标题：服务端在「审批快照没有人工标题」时会把内部动作码当标题回落
+ * 决策包条目标题：服务端在「决策快照没有人工标题」时会把内部动作码当标题回落
  * （如 `skill.install.conflict`），客户端必须中文化再上屏——否则董事长看到的是裸代码。
  */
 function packetTitle(item: PacketItem): string {
@@ -86,7 +86,7 @@ export default function Portfolio() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-h1 font-black text-ink">组合看板</h1>
-          <p className="mt-1 text-body text-ink3">按结果组合看整支舰队：域健康、待董事长拍板（≤{data?.packet.quota ?? 7} 件/日）、任务契约。</p>
+          <p className="mt-1 text-body text-ink3">按结果组合看整支舰队：域健康、待董事长决策（≤{data?.packet.quota ?? 7} 件/日）、任务契约。</p>
         </div>
         <div className="rounded-lg border border-line bg-card px-3 py-2 text-body text-ink2">
           在岗 <b className="font-orb text-h3 text-ink">{totals?.agents ?? 0}</b> 人 · 待批 <b className="font-orb text-h3 text-gold">{totals?.pending ?? 0}</b> 件
@@ -137,7 +137,7 @@ export default function Portfolio() {
               </li>
             ))}
           </ul>
-        ) : <div className="mt-2 text-body text-ink3">今日无需董事长拍板事项。</div>}
+        ) : <div className="mt-2 text-body text-ink3">今日无需董事长决策事项。</div>}
       </section>
 
       <section className="rounded-msg border border-line bg-card p-4">

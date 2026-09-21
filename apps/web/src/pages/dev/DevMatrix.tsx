@@ -76,7 +76,7 @@ export default function DevMatrix() {
           <QuestCard eventId="E-8842" title="周五旺季调价" action="竞对采集中" done={2} total={3} status="running" />
         </Cell>
         <Cell label="review 待审查（琥珀呼吸）">
-          <QuestCard eventId="E-8843" title="差评应急回复" action="回复草稿待审批" done={2} total={3} status="review" />
+          <QuestCard eventId="E-8843" title="差评应急回复" action="回复草稿等待业务关卡放行" done={2} total={3} status="review" />
         </Cell>
         <Cell label="done 已完成 / queued 排队">
           <div className="space-y-2">
@@ -89,18 +89,18 @@ export default function DevMatrix() {
       </Section>
 
       <Section name="HandoffCard 昨夜日报卡" spec="§5.3 · 默认/空态（禁显 0）">
-        <Cell label="默认（三栏大数字强一致 F4.4）">
-          <HandoffCard data={{ deliveredAt: "08:30", fenceSnapshot: "hotel-baseline/v1", done: 12, pending: 2, needHuman: 1, credits: 46 }} />
+        <Cell label="默认（两栏大数字与 P3 强一致 F4.4）">
+          <HandoffCard data={{ deliveredAt: "08:30", fenceSnapshot: "hotel-baseline/v1", done: 12, needHuman: 1, credits: 46 }} />
         </Cell>
         <Cell label="空态（夜班未启用 → 整卡空态）">
           <HandoffCard nightEnabled={false} />
         </Cell>
       </Section>
 
-      <Section name="TriGestureBar 审批三操纵杆" spec="§5.4 · 默认/过期禁用/权限隐藏">
+      <Section name="TriGestureBar 关卡三操纵杆" spec="§5.4 · 默认/过期禁用/权限隐藏">
         <Cell label="默认三杆"><TriGestureBar /></Cell>
         <Cell label="expired 快照过期（E5.3 整组锁定+刷新）"><TriGestureBar expired /></Cell>
-        <Cell label="无审批权（整组隐藏非置灰 L5.1）">
+        <Cell label="无放行权（整组隐藏非置灰 L5.1）">
           <div className="text-caption text-ink3">下方渲染为 null（无置灰残影）：<TriGestureBar canApprove={false} />∅</div>
         </Cell>
       </Section>

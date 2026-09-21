@@ -5,8 +5,9 @@
  *  - 数据同源：floor payload（scene/agents）原样消费；走位目标计算与 Floor.tsx 同语义
  *    （asking→指挥台前 / blocked→工位侧 / idle→休息角 / disabled→入口 / working→工位，
  *    同工位按 id hash 微偏移站位）；
- *  - 交互同义：点击员工 → asking 且有 approvalId 走 onPickApproval（审批卡），
- *    否则 onPickAgent（绩效卡）——与 Canvas 版点击分派一字不差；
+ *  - 交互同义：点击员工 → onPickAgent（绩效卡/员工档案）——与 Canvas 版点击分派一致；
+ *    2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，asking 只保留
+ *    「待放行」状态可视化，点击不再弹出审批卡（业务关卡在各自业务页面就地放行）；
  *  - 视觉（cinematic 工具包）：镜面反射地板 / 体积光柱 / 开场推轨运镜 /
  *    穹顶天幕 + 城市光带 / 游戏式角色名牌 / 辉光 + 暗角 + 胶片颗粒。
  */
@@ -33,7 +34,7 @@ function hash(s: string): number { let h = 0; for (let i = 0; i < s.length; i++)
 /** 头顶任务牌的状态词（与楼层状态机一一对应，保持短句） */
 const FLOOR_STATE_TEXT: Record<string, string> = {
   working: "进行中",
-  asking: "待您拍板",
+  asking: "待放行",
   blocked: "有异常",
   celebrating: "已完成",
   collab: "协作中",
@@ -83,7 +84,7 @@ const STATE_COLOR: Record<string, string> = {
 };
 const STATE_TEXT: Record<string, string> = {
   working: "作业中",
-  asking: "请您定",
+  asking: "待放行",
   blocked: "受阻",
   celebrating: "捷报",
   collab: "协作中",
@@ -212,8 +213,10 @@ function Worker({
       {/* 游戏式名牌：只显示岗位名；用户设置别名后只显示别名。状态仅在请示时出现。 */}
       {/*
        * 头顶常驻任务牌（2026-09-20 重设计）：
-       *  第一行 = 岗位名；第二行 = 当前任务（进行中/待您拍板/已完成…）+ 任务标题。
-       *  点任务牌 → 任务详情；点员工本体 → 员工档案；asking 另有金色徽标 → 审批卡。
+       *  第一行 = 岗位名；第二行 = 当前任务（进行中/待放行/已完成…）+ 任务标题。
+       *  点任务牌 → 任务详情；点员工本体 → 员工档案。
+       *  2026-09-21 产品所有者口径（本机单人运行）：asking 不再提供审批卡入口；
+       *  业务链路自带的关卡在各自业务页面就地放行。
        *  数据随 theater 5s 轮询自动刷新（状态机即数据）。
        *
        * 2026-09-21 密度口径（产品所有者："团队舞台没有展示全面"；门禁要求防任务牌重叠）：
@@ -248,19 +251,6 @@ function Worker({
                   : FLOOR_STATE_TEXT[agent.state] ?? "待命"}
               </span>
             </button>
-            {asking && agent.approvalId && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onPick(agent); }}
-                style={{
-                  pointerEvents: "auto", cursor: "pointer", fontSize: 10, fontWeight: 700,
-                  color: "#12151a", border: "none", borderRadius: 999, padding: "1px 8px",
-                  background: "linear-gradient(135deg, #ffe6ad, #f5c860)", boxShadow: "0 2px 10px rgba(255,201,96,.45)",
-                }}
-              >
-                待您拍板 →
-              </button>
-            )}
           </div>
         </Html>
       )}
@@ -477,7 +467,7 @@ function PanClamp({ controlsRef, bounds }: { controlsRef: React.RefObject<any>; 
 
 /* ---------------- 主组件（props 与 FloorView 全兼容） ---------------- */
 export function Floor3D({
-  floor, ceoName, onPickAgent, onPickApproval, onDropTask, directorEvent = null,
+  floor, ceoName, onPickAgent, onDropTask, directorEvent = null,
   onOpenProfile, onOpenTask,
 }: {
   floor: FloorPayload;
@@ -488,8 +478,6 @@ export function Floor3D({
   onOpenTask: (threadId: string) => void;
   /** 兼容保留：员工指挥卡入口（其他视图仍在用） */
   onPickAgent: (a: FloorAgent) => void;
-  onDecide: (approvalId: string, gesture: "approve" | "reject") => void;
-  onPickApproval: (a: FloorAgent) => void;
   onDropTask?: (a: FloorAgent, task: string) => void;
   /** 导演运镜事件（theaterDiff 输入；null=无新事件） */
   directorEvent?: DirectorEvent | null;
@@ -498,8 +486,7 @@ export function Floor3D({
   const tile = 1.02;
   const scene = floor.scene;
   const onPick = (a: FloorAgent) => {
-    if (a.state === "asking" && a.approvalId) onPickApproval(a);
-    else onOpenProfile(a);
+    onOpenProfile(a);
   };
   const night = useNightTime();
   const camY = Math.max(scene.grid.w, scene.grid.h) * tile * 0.95;
