@@ -463,7 +463,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "cc79d9a05f063e44275027776b14770e70c693bc76c1d82b9236d2b85180dfea",
+    "digest": "bc27945e9e186638b788efa43e004ddcb1611249ffa9e4839b3012ba01300b07",
     "assets": {
       "fences/ai-video-baseline.yml": "d0c8f2f8f7bf59dd3b9b74b2d880d3e1d405ddf849b64adca703b8c071b2eed7",
       "fences/ai-video-color.yml": "709cb9fc3cba47a4ee2b4ee233d714277223cb23f9ca210ed3712de54c597ed6",
@@ -719,7 +719,7 @@
       "pipelines/settlement-recon.yml": "c4af96be653224e31ec8882ae19da37026dbbe1f2d5fb28435deee92b37db1d0",
       "presets/ads-optimizer.yml": "4969554944f4e2586aef8ab29da819d76611a6ba537b5964db6e9e7db9cc5bf2",
       "presets/audio-designer.yml": "e0122309c8a94d7b8e73109c3b88f92b900917bdc04c5535836e7f1f3c66dc0b",
-      "presets/colorist.yml": "13a9ab516b6fa91b86c4c208afa018d461d446dd17173863656cd855cd08ab67",
+      "presets/colorist.yml": "d3b93f95a3a1d2e3cbba95f6c05129d2fa9729f54913999e0e647e8963753c51",
       "presets/comment-operator.yml": "6b96a0ef1e62d6f98bc82872578bec3afd590e4f51f3b1076b974fa7b2fe7b93",
       "presets/compliance-officer.yml": "0fe8477702798a61fa32366318d4cdda6f0f85ceecfc50f3ef6a51a775bc8e68",
       "presets/continuity-reviewer.yml": "b4eee93a32e3cf5efdf53eacd428e3ab628798c59aa7d7abcb1bb6155458b6e3",
@@ -755,7 +755,7 @@
       "schemas/stages.json": "418332ca5a5522083592da40773265d8f09b1ab9276d566275e075ef56118831",
       "skills/color-delivery-spec/SKILL.md": "29a3f0020747d1665f11026d444d211672063955aae2d7d41e7c85f50ccdcbc8",
       "skills/color-grade/SKILL.md": "1223a64397b2f6a26c578ea4232bb360bca84223ae886e5f143b453afb534df0",
-      "skills/color-look-design/SKILL.md": "0f6f6d8f915d9ea4ea1099a2c71270ff66cfc3d8dbcb2fbca3f2b6c28894d913",
+      "skills/color-look-design/SKILL.md": "0ceb6a93c21f6018af8a654bc9f673ef7d8c0cac64b82e7280f336557513fa50",
       "skills/color-shot-matching/SKILL.md": "edc81124f4955a3559146d20386f7c6e622acb007ea562ac5e847a5503b19310",
       "skills/comment-ops/SKILL.md": "33e3ec30ca314e91f1113fdedb8d6c515fa181a9d4d0391db99b4f42ebd4b9ba",
       "skills/director-review/SKILL.md": "7ca415f0a42877c92f9393ceb93b4866f0b2debca5fb979fabef6033389760c1",

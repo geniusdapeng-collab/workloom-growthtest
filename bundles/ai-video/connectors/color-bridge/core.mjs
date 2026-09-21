@@ -1170,6 +1170,7 @@ function averageMetrics(samples) {
 export async function best({
   input, output = null, sampleAt = null, candidates = null,
   minImprovement = 2, width = 480, bins = resolveBinaries(), maxSamples = 4,
+  recipe = null, genre = null, platform = null,
 }) {
   const probe = await probeMedia(input, { bins });
   const at = Array.isArray(sampleAt) && sampleAt.length
@@ -1192,16 +1193,48 @@ export async function best({
     for (const t of at) statsFrames.push(await frameStats({ input, at: t, bins }));
     const autoApplied = autoCorrections(summarize(statsFrames));
 
+    // 配方驱动候选：给出题材/配方时，以该配方的 look 与强度为中心生成候选（± 一档），
+    // 并额外提供「配方 LUT」候选——这就是"不同片子/场景自动出方案"的落点：
+    // 题材决定方向，择优决定力度，画质分决定动不动。
+    let recipeUsed = null;
+    const recipePool = [];
+    if (recipe || genre || platform) {
+      const found = findRecipes({ recipeId: recipe, genre, platform, list: false });
+      recipeUsed = found.recipe ?? null;
+      if (recipeUsed) {
+        const base = Number(recipeUsed.intensity) || 0.7;
+        for (const raw of [base - 0.2, base, base + 0.2]) {
+          const intensity = Math.round(Math.min(1, Math.max(0.3, raw)) * 100) / 100;
+          recipePool.push({
+            id: `recipe:${recipeUsed.id}@${intensity}`,
+            label: `${recipeUsed.genre}·${recipeUsed.id} 强度 ${intensity}`,
+            spec: { profile: recipeUsed.profile, intensity },
+          });
+        }
+        if (recipeUsed.lut && recipeUsed.lutExists) {
+          recipePool.push({
+            id: `recipe-lut:${recipeUsed.id}`,
+            label: `${recipeUsed.genre}·${recipeUsed.id}（LUT）`,
+            spec: { lutPath: recipeUsed.lut, intensity: 1 },
+          });
+        }
+      }
+    }
+
     const pool = [
       { id: "identity", label: "原片不动（不调色）", spec: null },
       ...(Object.keys(autoApplied).length
         ? [{ id: "auto-correct", label: "仅自动校正（白平衡/曝光/裁切）", spec: { corrections: autoApplied, intensity: 1 } }]
         : []),
+      ...recipePool,
       ...(Array.isArray(candidates) && candidates.length ? candidates : defaultCandidates()),
     ];
+    // 去重：同 id 只保留第一个（identity > auto-correct > 配方候选 > 通用候选）
+    const seen = new Set();
+    const deduped = pool.filter((entry) => (seen.has(entry.id) ? false : (seen.add(entry.id), true)));
 
     const evaluated = [];
-    for (const candidate of pool) {
+    for (const candidate of deduped) {
       const chain = candidate.spec ? buildChain(candidate.spec) : "null";
       // 同一候选的抽样帧并行评估（4 帧并发），候选之间串行——总耗时从分钟级降到十几秒。
       const perFrame = await Promise.all(
@@ -1228,6 +1261,8 @@ export async function best({
         minImprovement,
         reason: `最佳候选「${winner.label}」仅比原片高 ${improvement} 分（阈值 ${minImprovement}）：按「不劣化优先」纪律判定无需调色，未产出新文件`,
         source: baseline.quality,
+        recipe: recipeUsed?.id ?? null,
+        recipeContext: recipeUsed ? { genre: recipeUsed.genre, scene: recipeUsed.scene, mood: recipeUsed.mood, avoid: recipeUsed.avoid } : null,
         sampledAt: at,
         candidates: table,
         sha256: await sha256File(input),
@@ -1250,6 +1285,8 @@ export async function best({
       verdict: "graded",
       winner: winner.id,
       winnerLabel: winner.label,
+      recipe: recipeUsed?.id ?? null,
+      recipeContext: recipeUsed ? { genre: recipeUsed.genre, scene: recipeUsed.scene, mood: recipeUsed.mood, avoid: recipeUsed.avoid } : null,
       improvement,
       minImprovement,
       source: baseline.quality,
@@ -1434,6 +1471,9 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         output,
         sampleAt: Array.isArray(params.sample_at) ? params.sample_at.map(Number) : null,
         minImprovement: params.min_improvement === undefined ? 2 : Number(params.min_improvement),
+        recipe: params.recipe_id ?? null,
+        genre: params.genre ?? null,
+        platform: params.platform ?? null,
         bins,
       });
       return {
