@@ -82,10 +82,15 @@ export class ArkVideoProvider implements GenProvider {
   async submit(req: GenRequest): Promise<{ taskId: string }> {
     const p = neutral(req);
     const content: Array<Record<string, unknown>> = [{ type: "text", text: req.prompt }];
+    /**
+     * Ark 的 `content` 里**每张图都必须带 role**：真机 2026-09-22 实测，
+     * 参考图不带 role 时直接 400 `role must be specified for image contents`
+     * （渲染提交整批失败）。首帧用 first_frame，参考图用 reference_image。
+     */
     const first = p.firstFrameUrl?.trim();
-    if (first) content.push({ type: "image_url", image_url: { url: first } });
+    if (first) content.push({ type: "image_url", image_url: { url: first }, role: "first_frame" });
     for (const url of p.referenceImageUrls ?? []) {
-      if (url?.trim()) content.push({ type: "image_url", image_url: { url } });
+      if (url?.trim()) content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
     }
     const payload: Record<string, unknown> = {
       model: requireModel(req),

@@ -136,6 +136,32 @@ describe("供应商适配器", () => {
     expect(body.resolution).toBe("720p");
     expect(body.generate_audio).toBe(true);
     expect(JSON.stringify(body.content)).toContain("https://cdn.example.com/a.jpg");
+    // 首帧必须带 role：Ark 对无 role 的 image content 直接 400（真机 2026-09-22）
+    const firstFrame = (body.content as Array<Record<string, unknown>>)[1]!;
+    expect(firstFrame.role).toBe("first_frame");
+  });
+
+  it("Ark Seedance：参考图带 role=reference_image（否则 400 role must be specified）", async () => {
+    const calls: Array<{ body: Record<string, unknown> }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      calls.push({ body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> });
+      return new Response(JSON.stringify({ id: "cgt-test-ref" }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    const provider = new ArkVideoProvider({ apiKey: "k" });
+    await provider.submit({
+      prompt: "南园宾馆园林夜景",
+      estimatedUnits: 5,
+      params: {
+        providerModel: "doubao-seedance-2-5-260628",
+        durationSec: 5,
+        aspectRatio: "9:16",
+        referenceImageUrls: ["data:image/jpeg;base64,AAAA", "data:image/jpeg;base64,BBBB"],
+      },
+    });
+    const content = calls[0]!.body.content as Array<Record<string, unknown>>;
+    const images = content.filter((c) => c.type === "image_url");
+    expect(images).toHaveLength(2);
+    for (const image of images) expect(image.role).toBe("reference_image");
   });
 
   it("Ark Seedance：poll 映射 succeeded/failed/running", async () => {

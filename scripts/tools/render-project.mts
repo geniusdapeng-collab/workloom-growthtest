@@ -114,6 +114,12 @@ const VENUE_KEYWORDS: Array<{ pattern: RegExp; ref: string[] }> = [
 
 export function pickVenueRefs(shot: ShotCard, refs: string[], limit: number): string[] {
   if (refs.length === 0) return [];
+  // 镜头卡显式指定的参考图优先（人工校正脚本时最准确）
+  const hinted = Array.isArray(shot.referenceHint)
+    ? (shot.referenceHint as unknown[])
+        .map((name) => refs.find((r) => basename(r) === String(name)))
+        .filter((file): file is string => Boolean(file))
+    : [];
   const text = `${shot.scene ?? ""} ${shot.sceneDescription ?? ""} ${shot.prompt ?? ""} ${shot.subtitle ?? ""}`;
   const scored = new Map<string, number>();
   for (const { pattern, ref } of VENUE_KEYWORDS) {
@@ -123,7 +129,10 @@ export function pickVenueRefs(shot: ShotCard, refs: string[], limit: number): st
       if (file) scored.set(file, (scored.get(file) ?? 0) + (ref.length - idx));
     });
   }
-  const ranked = [...scored.entries()].sort((a, b) => b[1] - a[1]).map(([file]) => file);
+  const ranked = [
+    ...hinted,
+    ...[...scored.entries()].sort((a, b) => b[1] - a[1]).map(([file]) => file).filter((f) => !hinted.includes(f)),
+  ];
   for (const file of refs) {
     if (ranked.length >= limit) break;
     if (!ranked.includes(file)) ranked.push(file);
@@ -308,20 +317,32 @@ for (const shot of shots) {
   }
 
   try {
-    const saved = await call<{ id: string; version: number }>("video.cms.saveScriptVersion", {
-      scriptKey,
-      md,
-      fields: {
-        镜头号: shot.shotId,
-        场景: shot.scene ?? "",
-        时长秒: seconds,
-        画幅: aspect,
-        分辨率: resolution,
-        参考图: references.map((f) => basename(f)),
-        角色: shot.characters ?? [],
-      },
-      diffSummary: `项目级出片：${shot.shotId}（预生产定稿 ${promptText.length} 字）`,
-    });
+    const fields = {
+      镜头号: shot.shotId,
+      场景: shot.scene ?? "",
+      时长秒: seconds,
+      画幅: aspect,
+      分辨率: resolution,
+      参考图: references.map((f) => basename(f)),
+      角色: shot.characters ?? [],
+    };
+    const diffSummary = String(shot.diffSummary ?? `项目级出片：${shot.shotId}（预生产定稿 ${promptText.length} 字）`);
+    /**
+     * 镜头卡进管线的正门：v1 用 cms.createScript；key 已存在则走 saveScriptVersion 生成新版本
+     * （版本链 + diff 摘要留痕，v1 缺失是 2026-09-21 真机暴露的缺口）。
+     */
+    let saved: { id: string; version: number };
+    try {
+      saved = await call<{ id: string; version: number }>("video.cms.createScript", {
+        scriptKey, projectId, shotId: shot.shotId, md, fields,
+      });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/已存在/.test(message)) throw err;
+      saved = await call<{ id: string; version: number }>("video.cms.saveScriptVersion", {
+        scriptKey, md, fields, diffSummary,
+      });
+    }
     row.scriptId = saved.id;
     const submitted = await call<{
       jobId: string; taskId: string; mock: boolean; durationSec: number; clamped: boolean;
@@ -357,9 +378,10 @@ for (let round = 0; round < POLL_ROUNDS && pending.size > 0 && !dryRun; round +=
   await call("video.render.poll", { limit: 50 }).catch((err: unknown) => {
     console.warn(`轮询回填失败（下轮重试）：${err instanceof Error ? err.message : String(err)}`);
   });
+  /** 任务台账在 gen 路由下（video.gen.jobs）：render.* 只有提交与轮询回填 */
   const jobs = await call<Array<{
     id: string; status: string; asset_id: string | null; local_path: string | null; result_url: string | null;
-  }>>("video.render.jobs", { projectId, limit: 100 }, "GET");
+  }>>("video.gen.jobs", { projectId, limit: 100 }, "GET");
   for (const job of jobs) {
     const row = pending.get(job.id);
     if (!row) continue;

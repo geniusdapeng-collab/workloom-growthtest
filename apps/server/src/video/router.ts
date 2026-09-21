@@ -19,6 +19,7 @@ import { getAppPool, getGatewayPool } from "@workloom/db";
 import { gatewayAppendOnClient } from "@workloom/base/workdata";
 import {
   approve as approveRenderScript,
+  create as createRenderScript,
   listByProject as listRenderScripts,
   newVersion as newRenderScriptVersion,
   RenderScriptError,
@@ -178,6 +179,51 @@ const studioRouter = router({
 /* ================= cms：渲染脚本 CMS（§6） ================= */
 
 const cmsRouter = router({
+  /**
+   * 创建初版脚本（v1，draft）：预生产镜头卡 → 渲染脚本的第一步。
+   *
+   * 为什么必须有：`saveScriptVersion` 只做"新版本"（`新版本需已有 v1`），此前没有任何
+   * tRPC 入口能建 v1 —— 真机 2026-09-21 实测出片链路止步于
+   * `渲染脚本 <key> 不存在，须先 create`，只能直连数据库插行。此入口补上"镜头卡进管线"的正门。
+   * 已存在的 key 明确拒绝（避免覆盖他人版本链），改版本请用 video.cms.saveScriptVersion。
+   */
+  createScript: writeProcedure
+    .input(z.object({
+      scriptKey: z.string().min(1).max(120),
+      projectId: z.string().min(1).max(120),
+      shotId: z.string().min(1).max(80),
+      md: z.string().min(1),
+      fields: z.record(z.string(), z.unknown()).optional(),
+      charCheck: z.record(z.string(), z.unknown()).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      const existing = await scopedQuery<{ id: string; version: number }>(
+        getAppPool(), scope,
+        `SELECT id, version FROM render_scripts WHERE workspace_id=$1 AND script_key=$2 ORDER BY version DESC LIMIT 1`,
+        [scope.workspaceId, input.scriptKey],
+      );
+      if (existing[0]) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `渲染脚本 ${input.scriptKey} 已存在（v${existing[0].version}）：新版本请用 video.cms.saveScriptVersion`,
+        });
+      }
+      try {
+        return await createRenderScript(getAppPool(), getGatewayPool(), scope, {
+          scriptKey: input.scriptKey,
+          projectId: input.projectId,
+          shotId: input.shotId,
+          md: input.md,
+          fields: input.fields,
+          charCheck: input.charCheck,
+          by: ctx.identity.memberNo,
+        });
+      } catch (err) {
+        renderScriptRethrow(err);
+      }
+    }),
+
   /** 按项目列出全部脚本版本（片库·脚本页数据源） */
   listScripts: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))

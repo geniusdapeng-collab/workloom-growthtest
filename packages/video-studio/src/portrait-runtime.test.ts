@@ -121,6 +121,40 @@ describe("定妆照真实出图运行时", () => {
     expect(Object.keys(runtime.snapshot().characters)).toHaveLength(0);
   });
 
+  /**
+   * 真机回归（2026-09-21）：vendor 角色分支只传 `portraitId + angle + prompt`，
+   * 早先实现把非 ASCII 名压成 "-" → `住客-three_quarter` 退化成 `three_quarter`，
+   * 三个角色的定妆照互相覆盖还被归到商品桶。这里锁死"按角色归桶 + 名字回填"。
+   */
+  it("vendor 真实角色任务形状按角色归桶，不再退化成角度名", async () => {
+    const root = workDir();
+    const { fetchImpl } = fakeArk();
+    const runtime = createPortraitRuntime({
+      workDir: root, projectId: "VID-9999", apiKey: "k", model: "m", fetchImpl
+    });
+    const first = await runtime.apiRender({
+      portraitId: "char_001-front_full",
+      angle: "front_full",
+      angleName: "正面全身",
+      prompt: "【定妆照】引路学者 — 正面全身\n角色档案：深灰民国长衫，全息透明轮廓"
+    });
+    const second = await runtime.apiRender({
+      portraitId: "char_002-front_full",
+      angle: "front_full",
+      angleName: "正面全身",
+      prompt: "【定妆照】公馆记忆体 — 正面全身\n角色档案：半透明历史照片碎片"
+    });
+
+    expect(first).toContain("/char_001/portraits/char_001-front.png");
+    expect(second).toContain("/char_002/portraits/char_002-front.png");
+    expect(first).not.toBe(second);
+    const characters = runtime.snapshot().characters;
+    expect(Object.keys(characters).sort()).toEqual(["char_001", "char_002"]);
+    expect(characters["char_001"]!.name).toBe("引路学者");
+    expect(characters["char_002"]!.name).toBe("公馆记忆体");
+    expect(Object.keys(runtime.snapshot().products)).toHaveLength(0);
+  });
+
   it("参考图预填与基准图直通（服务类链路锚定真实实拍）", async () => {
     const root = workDir();
     const refsDir = join(root, "refs");

@@ -114,21 +114,35 @@ export interface PortraitRuntime {
 
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 120_000;
 
-function asciiKey(raw: string): string {
+/**
+ * 目录/文件名的安全化：**保留中文等非 ASCII 字符**。
+ *
+ * 真机教训（2026-09-21）：早先版本把所有非 ASCII 字符替换成 "-"，于是
+ * `住客-three_quarter` 被压成 `three_quarter` → 三个角色的定妆照互相覆盖、还被归到商品桶。
+ * 中文名在文件系统与绑定清单里都是合法标识，只清洗路径分隔符/保留字符即可。
+ */
+export function portraitKey(raw: string): string {
   const cleaned = raw
     .trim()
-    .replace(/[^A-Za-z0-9._-]+/g, "-")
+    .replace(/[\\/:*?"<>|\u0000-\u001f]+/g, "-")
+    .replace(/\s+/g, "-")
     .replace(/-+/g, "-")
-    .replace(/^-|-$/g, "");
-  return cleaned || `subject-${Math.abs(hash(raw)) % 100000}`;
+    .replace(/^[.\s-]+|[.\s-]+$/g, "");
+  return cleaned || "subject";
 }
 
-function hash(text: string): number {
-  let h = 0;
-  for (let i = 0; i < text.length; i += 1) {
-    h = (h * 31 + text.charCodeAt(i)) | 0;
-  }
-  return h;
+/** 从 vendor 的 portraitId（`<characterId>-<angleId>`）剥掉角度后缀，还原主体标识 */
+function stripAngleSuffix(portraitId: string, angleRaw: string): string {
+  if (!portraitId || !angleRaw) return portraitId;
+  const escaped = angleRaw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return portraitId.replace(new RegExp(`[-_/\\s]+${escaped}$`), "");
+}
+
+/** 从 vendor 的定妆照提示词模板里取角色名：`【定妆照】<name> — <angleName>` */
+function characterNameFromPrompt(prompt: unknown): string {
+  if (typeof prompt !== "string") return "";
+  const match = prompt.match(/【定妆照】\s*([^—\n]+?)\s*—/);
+  return match?.[1]?.trim() ?? "";
 }
 
 function nonEmptyFile(file: string): boolean {
@@ -309,20 +323,28 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
   }
 
   async function apiRender(task: PortraitTask, baseImage?: string | null): Promise<string> {
-    const kind: "character" | "product" =
-      task.characterId || task.characterName ? "character" : "product";
-    const id = String(
-      (kind === "character" ? task.characterId || task.characterName : task.productId || task.productName)
-        || task.portraitId
-        || "subject"
-    );
+    /**
+     * vendor 的角色分支只把 `portraitId/angle/angleName/prompt` 传进来（角色 id/name 留在外层任务上），
+     * 商品分支则带 `productId/view`。所以：
+     *   · 用 `view`（商品视角）与 `angle`（角色角度）区分两条链路；
+     *   · 角色标识从 `portraitId` 剥掉角度后缀还原（`char_001-front_full` → `char_001`），
+     *     显示名从提示词模板 `【定妆照】<name> — ...` 里取回。
+     */
+    const angleRaw = String(task.angle || task.view || "view");
+    const isProduct = Boolean(task.productId || task.productName || task.view);
+    const kind: "character" | "product" = isProduct ? "product" : "character";
+    const portraitId = String(task.portraitId ?? "");
+    const explicitId = isProduct
+      ? task.productId || task.productName
+      : task.characterId || task.characterName;
+    const id = String(explicitId || stripAngleSuffix(portraitId, angleRaw) || "subject");
     const name = String(
-      (kind === "character" ? task.characterName || task.characterId : task.productName || task.productId)
+      (isProduct ? task.productName || task.productId : task.characterName || characterNameFromPrompt(task.prompt))
+        || explicitId
         || id
     );
-    const angleRaw = String(task.angle || task.view || "view");
     const angle = ANGLE_FILE_ALIASES[angleRaw] ?? angleRaw;
-    const key = asciiKey(id);
+    const key = portraitKey(id);
     const bucket = kind === "character" ? "characters" : "products";
 
     const cached = existingPortrait(key, angle);
