@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "workloom-core": {
+      "command": "sh",
+      "args": [
+        "-lc",
+        "if [ -n \"${PLUGIN_ROOT:-}\" ] && [ -x \"$PLUGIN_ROOT/scripts/start-mcp.sh\" ]; then exec \"$PLUGIN_ROOT/scripts/start-mcp.sh\"; elif [ -x ./scripts/start-mcp.sh ]; then exec ./scripts/start-mcp.sh; else echo 'workloom-workbench: cannot locate scripts/start-mcp.sh' >&2; exit 1; fi"
+      ]
+    }
+  }
+}

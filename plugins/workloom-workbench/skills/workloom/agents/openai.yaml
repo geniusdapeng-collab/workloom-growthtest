@@ -1,0 +1,13 @@
+interface:
+  display_name: "WorkLoom 能力路由"
+  short_description: "先查能力目录，再执行；高风险动作必须人审。"
+  brand_color: "#FFD98A"
+  default_prompt: "我们有哪些能力？先列出能力目录，再等我选择。"
+policy:
+  allow_implicit_invocation: true
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "workloom-core"
+      description: "WorkLoom 能力网关（P0 只读）"
+      transport: "stdio"

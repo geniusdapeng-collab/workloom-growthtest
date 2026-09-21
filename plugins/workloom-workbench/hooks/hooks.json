@@ -1,0 +1,19 @@
+{
+  "description": "WorkLoom 工作台 hooks（P0：SessionStart 注入能力/在岗/待审批摘要；写操作审计在 P1 接入）",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$PLUGIN_ROOT/scripts/hook-session-start.sh\"",
+            "timeout": 20,
+            "statusMessage": "加载 WorkLoom 能力上下文",
+            "additionalContextLimit": 1500
+          }
+        ]
+      }
+    ]
+  }
+}
