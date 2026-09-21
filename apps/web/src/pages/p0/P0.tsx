@@ -215,13 +215,12 @@ export default function P0() {
   const [data, setData] = useState<Theater | null>(null);
 
   /**
-   * 职场视图分批（2026-09-20 密度重设计）：
-   *  - 排序：有请托/异常/汇报/协作/在跑任务的员工优先，其次待命，最后停用工位；
-   *  - 分批：每批 18 人（3×6 站位舒适密度），第 1 批天然是"活跃置顶"；
-   *  - 自动轮播：每 12 秒换一批，可暂停/手动换批（人数 ≤ 每批上限时不轮播）。
+   * 职场视图编制（2026-09-21 产品所有者真机反馈："进入到首页后，团队舞台没有展示全面"）：
+   *  - 旧实现每 18 人一批、12 秒轮播，任何时刻只看得见 1/4 的团队——72 人编制在工作区里
+   *    被静默裁成 18 人，产品所有者判定为"没展示全面"。
+   *  - 新口径：**全体在岗成员同屏**，只做排序（有请托/异常/汇报/协作/在跑任务者优先），
+   *    不再分批、不再轮播；站位由 Floor3D 按工位分组自动散开。
    */
-  const FLOOR_BATCH_SIZE = 18;
-  const [waveIndex, setWaveIndex] = useState(0);
   const floorAgentsAll = useMemo(() => data?.floor?.agents ?? [], [data]);
   const sortedFloorAgents = useMemo(() => {
     const rank: Record<string, number> = { asking: 0, blocked: 1, celebrating: 2, collab: 3, working: 4, idle: 5, disabled: 6 };
@@ -229,20 +228,7 @@ export default function P0() {
       (a, b) => (rank[a.state] ?? 9) - (rank[b.state] ?? 9) || a.id.localeCompare(b.id),
     );
   }, [floorAgentsAll]);
-  const floorWaves = useMemo(() => {
-    const waves: FloorAgent[][] = [];
-    for (let i = 0; i < sortedFloorAgents.length; i += FLOOR_BATCH_SIZE) {
-      waves.push(sortedFloorAgents.slice(i, i + FLOOR_BATCH_SIZE));
-    }
-    return waves.length ? waves : [[]];
-  }, [sortedFloorAgents]);
-  const visibleFloorAgents = floorWaves[Math.min(waveIndex, floorWaves.length - 1)] ?? [];
-  useEffect(() => { setWaveIndex((i) => (i >= floorWaves.length ? 0 : i)); }, [floorWaves.length]);
-  useEffect(() => {
-    if (floorWaves.length <= 1) return;
-    const timer = window.setInterval(() => setWaveIndex((i) => (i + 1) % floorWaves.length), 12_000);
-    return () => window.clearInterval(timer);
-  }, [floorWaves.length]);
+  const visibleFloorAgents = sortedFloorAgents;
   const [queue, setQueue] = useState<ChairmanItem[]>([]);
 
   /* ---- 首日上岗（织伴 · 首席增长官带玩）：进度本地持久化，关卡推进只认客户操作与真实事实 ---- */

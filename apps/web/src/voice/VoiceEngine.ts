@@ -177,6 +177,63 @@ export class VoiceEngineImpl {
     return chosen;
   }
 
+  /**
+   * 系统音色表冷启动等待（2026-09-21 真机修复）。
+   *
+   * 真机反馈：开场第一句"我是织伴…"是**男声**，后面才变女声。
+   * 根因：Chromium 的 `speechSynthesis.getVoices()` 首次调用常常返回空数组
+   * （列表由 `voiceschanged` 异步送达）。旧实现遇到空列表就把 `null` 缓存下来，
+   * 于是"性别硬约束"在最关键的第一句上失效——utterance 不带 voice，
+   * 直接落到操作系统默认声（macOS 中文默认常为男声）。
+   * 现在：性别有约束的角色**第一次开口前**先等音色表（有上限），
+   * 表就绪后照旧锁定同一位音色整场不换人；等不到才退回系统默认声并锁定。
+   */
+  /**
+   * 首次开口前等音色表的上限（一次性成本，每角色只等一次）。
+   * 真机实测（2026-09-21，打包客户端）：页面刚加载时 `getVoices()` 返回 0，
+   * 音色表要数秒后才由 Chromium 异步送达；等得不够久，第一句仍会落到系统默认男声。
+   * 字幕在入队时就已经发出（见 enqueue → emitCaption），等待期间用户看得到文字，不会"卡住"。
+   */
+  static readonly VOICE_READY_TIMEOUT_MS = 5000;
+
+  /** 等系统音色表就绪（事件优先 + 轮询兜底；到点即返回，不阻塞仪式）。 */
+  waitForVoices(timeoutMs = VoiceEngineImpl.VOICE_READY_TIMEOUT_MS): Promise<void> {
+    const tts = this.tts;
+    if (!tts || tts.getVoices().length > 0) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      const startedAt = Date.now();
+      let settled = false;
+      const done = () => { if (!settled) { settled = true; resolve(); } };
+      const tick = () => {
+        if (tts.getVoices().length > 0 || Date.now() - startedAt >= timeoutMs) { done(); return; }
+        setTimeout(tick, 80);
+      };
+      try {
+        const onChanged = () => { if (tts.getVoices().length > 0) done(); };
+        tts.addEventListener?.("voiceschanged", onChanged);
+        setTimeout(() => { try { tts.removeEventListener?.("voiceschanged", onChanged); } catch { /* 静默 */ } }, timeoutMs + 500);
+      } catch { /* 平台不支持事件时靠轮询 */ }
+      setTimeout(tick, 80);
+    });
+  }
+
+  /**
+   * 首次定声前的等待：只在"性别有约束 + 该角色还没定过声 + 音色表为空"时等，
+   * 保证不会出现"第一句默认男声、第二句换女声"这种同人换声。
+   */
+  private async ensureVoiceDecision(profile: VoiceProfile, role: string): Promise<void> {
+    if (profile.female === undefined) return;
+    const cacheKey = `${role}|${profile.female === true ? "f" : "m"}`;
+    if (this.voiceCache.has(cacheKey)) return;
+    if ((this.tts?.getVoices().length ?? 0) > 0) return;
+    await this.waitForVoices();
+  }
+
+  /** 应用启动即预热音色表（首装开场前把列表准备好，避免第一句抢跑）。 */
+  warmUp(): void {
+    void this.waitForVoices(3000);
+  }
+
   private settle(item: QueuedUtterance, result: VoicePlaybackResult): void {
     if (item.settled) return;
     item.settled = true;
@@ -265,12 +322,21 @@ export class VoiceEngineImpl {
     this.active = item;
     try {
       const preset = next.voiceOverride ?? voiceProfileForRole(next.role);
+      // 性别有硬约束的角色（织伴/女声岗位）：首次开口前等音色表就绪，避免第一句用系统默认男声
+      await this.ensureVoiceDecision(preset, next.role);
       const utt = new SpeechSynthesisUtterance(next.text);
       utt.lang = "zh-CN";
       utt.pitch = preset.pitch;
       utt.rate = preset.rate;
       const v = this.pickVoice(preset, next.role);
       if (v) utt.voice = v;
+      // 真机可观测：把"这一句用了谁的声音"写进 DOM，供渲染冒烟与人工排障取证
+      try {
+        if (typeof document !== "undefined") {
+          document.documentElement.dataset.wlVoice = `${next.role}:${v ? v.name : "system-default"}`;
+          document.documentElement.dataset.wlVoices = String(tts.getVoices().length);
+        }
+      } catch { /* 静默 */ }
       await new Promise<void>((resolve) => {
         let done = false;
         let timeout = 0;

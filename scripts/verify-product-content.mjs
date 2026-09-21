@@ -182,21 +182,26 @@ for (const scene of ["apps/web/src/components/Floor3D.tsx", "apps/web/src/compon
   ]);
 }
 /**
- * 2026-09-21 产品所有者口径变更：职场头顶信息由「悬停名牌」改为**常驻任务牌**
- * （第一行岗位名、第二行当前任务/状态），稀疏性不再靠悬停，而是靠 P0 的**分批展示**
- * （每批 ≤18 人 + 活跃置顶 + 12s 轮播）。旧规则"空闲态只能悬停显示名牌"因此作废，
- * 改为校验新的两条硬约束：任务牌状态词与楼层状态机同口径、任务牌可点进任务详情；
- * 同时要求 P0 保留分批上限常量，避免把 70+ 人一次铺满造成标签重叠。
+ * 2026-09-21 产品所有者口径（两轮）：
+ *  ① 职场头顶信息由「悬停名牌」改为**常驻任务牌**（第一行岗位名、第二行当前任务/状态）；
+ *  ② 当日晚间再变更：**团队必须全员同屏**（"进入到首页后，团队舞台没有展示全面"），
+ *     废止「每批 ≤18 人 + 12s 轮播」的分批展示。
+ * 稀疏性因此改由"任务牌挂载条件"承担：只有有在办任务 / 待拍板 / 异常 / 捷报 / 协作中的成员
+ * 挂常驻任务牌，待命与停用成员只显示数字人本体。本门禁校验这两条新硬约束
+ * （全员同屏 + 任务牌按状态稀疏挂载），旧的分批上限常量不再要求存在。
  */
 requireSource("apps/web/src/components/Floor3D.tsx", [
   { includes: "FLOOR_STATE_TEXT", message: "头顶任务牌必须显示与楼层状态机同口径的状态词" },
   { includes: "onOpenTask", message: "头顶任务牌必须能点进任务详情" },
+  { includes: "showTaskPlate", message: "常驻任务牌必须按状态稀疏挂载（待命/停用不挂牌），避免全员同屏时标签重叠" },
 ]);
 requireSource("apps/web/src/pages/p0/P0.tsx", [
-  { includes: "FLOOR_BATCH_SIZE", message: "职场必须分批展示（密度受控，避免人群标签重叠）" },
+  { includes: "const visibleFloorAgents = sortedFloorAgents", message: "职场必须全员同屏（废止分批轮播，产品所有者 2026-09-21 口径）" },
+  { excludes: "FLOOR_BATCH_SIZE", message: "职场不得再分批展示（旧口径已废止）" },
 ]);
 requireSource("apps/web/src/components/Stage3D.tsx", [
   { includes: "hovered || spotlight", message: "舞台只应在悬停或点名时显示成员名牌" },
+  { includes: "STAGE_MAX_HEIGHT", message: "舞台画布必须有高度上限（否则团队队列被挤出取景框，2026-09-21 真机事故）" },
 ]);
 requireSource("apps/web/src/components/CeremonyStage.tsx", [
   { includes: "data-ceremony-ready={ready ? \"true\" : \"false\"}", message: "团队舞台必须等全员首帧后才报告 ready" },

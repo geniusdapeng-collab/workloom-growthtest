@@ -31,9 +31,31 @@ const VAGUE_PATTERNS = [
   /^怎么样[了]?[？?]?$/,
 ];
 
+/**
+ * 自我介绍 / 身份 / 能力询问（2026-09-21 产品所有者真机反馈："我说介绍下你自己的时候，
+ * 这里出现了『需要我拍板』，这不对"）。
+ *
+ * 根因：这类句子既无疑问词也无动作动词，会掉进 `ruleBasedRoute` 的默认分支被当成
+ * **交付型指令（Quest）**，于是凭空建线程、跑规划器，还把内部步骤挂成人审。
+ * 口径：凡是"问它自己是谁/能干什么"的句子，一律 ask——直接回答，不建任务、不产生审批。
+ */
+const SELF_INTRO_PATTERNS = [
+  /自我(介绍|说明)/,
+  /介绍(一下|下)?(你|您|自己)/,
+  /(你|您)(自己)?(是|叫)(谁|什么|干嘛的|干什么的)/,
+  /(你|您)(究竟|到底)?(能|会|可以|都)(做|干|帮)(什么|啥|哪些|哪些事)/,
+  /(你|您)(有|会)(什么|哪些)(本事|能力|功能|招)/,
+  /(你|您)(是|是什么)(AI|ai|机器人|数字员工|助手|秘书)/,
+];
+
 /** 规则兜底直译（确定性；LLM 不可用时的安全带） */
 export function ruleBasedRoute(text: string): IntentResult {
   const t = text.trim();
+  // 自我介绍 / 身份 / 能力询问：直接回答，不立项、不产生人审（2026-09-21 真机反馈）。
+  // 必须排在"过短/含糊"判定之前——「你是谁」只有 3 个字，但语义毫无歧义。
+  if (SELF_INTRO_PATTERNS.some((p) => p.test(t))) {
+    return { kind: "routed", mode: "ask", rationale: "自我介绍/身份/能力类问句，直接回答（不立项）", via: "rule" };
+  }
   if (VAGUE_PATTERNS.some((p) => p.test(t)) || t.length < 4) {
     return {
       kind: "clarify",
@@ -81,6 +103,9 @@ export class LlmIntentClassifier implements IntentClassifier {
 - agent：逐步商量类，每步操作前挂起审查
 - quest：交付型指令，规格驱动自主执行
 - clarify：含糊无法归类
+
+特别注意（2026-09-21 真机口径）：自我介绍 / 身份 / 能力询问一律 ask，
+例如「介绍下你自己」「你是谁」「你能做什么」——都不产生执行任务，也不应触发任何人工审批。
 
 只输出 JSON {"mode":"ask|agent|quest|clarify","rationale":"一句话"}，不要输出其他内容。
 

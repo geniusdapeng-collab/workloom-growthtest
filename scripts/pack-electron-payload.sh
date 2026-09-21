@@ -52,6 +52,18 @@ copy() {
 }
 
 echo "== 装配 Electron 自包含载荷（${VERSION} · ${PLATFORM}-${ARCH}）=="
+
+# ---------- 0. 行业包完整性门禁（fail fast） ----------
+# 2026-09-21 真机实证：手改 bundle 资产（如围栏 YAML）而不刷新 bundle.json 的资产摘要，
+# 打包本身不会报错，客户端却会在首启种子阶段 INTEGRITY_FAILED 起不来（"装得上、起不来"）。
+# 装配前先跑受控治理门禁：摘要不一致直接在这里失败，而不是等到用户机器上。
+echo "→ 行业包完整性门禁（bundle 资产摘要）…"
+if ! pnpm -s bundle:governance > "$STAGE/bundle-governance.log" 2>&1; then
+  echo "❌ 行业包完整性门禁失败（下面为末尾输出；可用 pnpm bundle:release 刷新摘要后重试）："
+  tail -6 "$STAGE/bundle-governance.log"
+  exit 1
+fi
+
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
