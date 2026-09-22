@@ -309,4 +309,38 @@ console.log("RESULT " + JSON.stringify({
     expect(result.valid).toBe(true);
     expect(Number(result.reportLines)).toBeGreaterThan(0);
   }, 60_000);
+
+  /**
+   * 静态审计命中（全仓唯一 const 重赋值）：requirement-discovery `_fillDefaults` 的
+   * `const filled` + `{...result}` 会把数组展平成对象（该分支不可达但数组已损坏）。
+   * 修复桥要求：数组保持数组、对象保持对象，且不再抛 const 赋值错误。
+   */
+  it("需求洞察字段填充桥：数组保形（原实现会 {0:…} 展平且 const 重赋值）", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorDiscoveryFixBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const mod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js"))});
+const engine = new mod.RequirementDiscoveryEngine({ llmEngine: null });
+const agent = engine.agents.scene;
+const schema = { type: 'array', items: { type: 'object', properties: { title: { type: 'string' } } } };
+const input = [{ title: 'A' }, { title: 'B' }];
+const before = agent._fillDefaults(input, schema);
+const uninstall = installVendorDiscoveryFixBridge({ log: () => undefined });
+const after = agent._fillDefaults(input, schema);
+uninstall();
+console.log("RESULT " + JSON.stringify({
+  beforeIsArray: Array.isArray(before),
+  beforeKeys: Object.keys(before || {}),
+  afterIsArray: Array.isArray(after),
+  afterLength: Array.isArray(after) ? after.length : -1,
+  afterFirst: Array.isArray(after) ? after[0] : null
+}));
+`;
+    const result = runInChild(script);
+    expect(result.beforeIsArray).toBe(false);
+    expect(result.afterIsArray).toBe(true);
+    expect(Number(result.afterLength)).toBe(2);
+    expect((result.afterFirst as { title?: string } | null)?.title).toBe("A");
+  }, 60_000);
 });

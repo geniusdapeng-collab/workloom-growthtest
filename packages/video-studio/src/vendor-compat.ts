@@ -760,3 +760,154 @@ export function installVendorContractBridge(options: { log?: (line: string) => v
     return () => undefined;
   }
 }
+
+/**
+ * 需求洞察「字段默认值填充」修复桥（2026-09-22 静态审计发现）
+ *
+ * vendor `engines/requirement-discovery-engine.js` 的 `BaseDiscoveryAgent._fillDefaults(results, schema, path)`：
+ *   ① 第 340 行 `filled = filled.map(...)`（对 `const filled` 重新赋值）——AST 扫描全仓唯一命中；
+ *   ② 更隐蔽的是第 316 行 `const filled = { ...result }`：**数组会被展开成对象**（`{0:…,1:…}`），
+ *      于是 ① 的 `Array.isArray(filled)` 永远为 false（该分支不可达），而数组型 LLM 结果
+ *      （如 references/scenes 列表）在补默认值时**被静默改成对象**，下游按数组消费时会错位。
+ *
+ * 本桥用修正实现替换该方法：数组保持数组、对象保持对象，required/properties/items 三段逻辑按原意执行。
+ */
+export function installVendorDiscoveryFixBridge(options: { log?: (line: string) => void } = {}): () => void {
+  const log = options.log ?? (() => undefined);
+  try {
+    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+    const file = resolvePath(
+      repoRoot,
+      "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js"
+    );
+    if (!existsSync(file)) return () => undefined;
+    /**
+     * 该模块只导出 `RequirementDiscoveryEngine`（BaseDiscoveryAgent 不导出），
+     * 所以先构造一个引擎实例，再沿原型链找到**真正拥有** `_fillDefaults` 的那一层原型。
+     */
+    const mod = vendorRequire(file) as {
+      RequirementDiscoveryEngine?: new (options?: Record<string, unknown>) => {
+        agents?: Record<string, { _fillDefaults?: unknown }>;
+      };
+    };
+    if (!mod?.RequirementDiscoveryEngine) return () => undefined;
+    const probeEngine = new mod.RequirementDiscoveryEngine({ llmEngine: null });
+    const probeAgent = probeEngine?.agents?.scene ?? probeEngine?.agents?.audience ?? null;
+    let prototype: Record<string, unknown> | null = probeAgent ? Object.getPrototypeOf(probeAgent) as Record<string, unknown> : null;
+    while (prototype && prototype !== Object.prototype && !Object.prototype.hasOwnProperty.call(prototype, "_fillDefaults")) {
+      prototype = Object.getPrototypeOf(prototype) as Record<string, unknown> | null;
+    }
+    if (!prototype || typeof prototype._fillDefaults !== "function") return () => undefined;
+    const original = prototype._fillDefaults as (result: unknown, schema: Record<string, unknown>, path?: string) => unknown;
+
+    prototype._fillDefaults = function patchedFillDefaults(
+      this: {
+        _fallback: (seed: Record<string, unknown>, schema: unknown) => Record<string, unknown>;
+        _fillDefaults: (result: unknown, schema: Record<string, unknown>, path?: string) => unknown;
+      },
+      result: unknown,
+      schema: Record<string, unknown>,
+      path = ""
+    ) {
+      if (!result || typeof result !== "object") return this._fallback({}, schema);
+      const schemaRecord = (schema ?? {}) as Record<string, unknown>;
+      let filled: unknown = Array.isArray(result) ? [...(result as unknown[])] : { ...(result as Record<string, unknown>) };
+
+      if (!Array.isArray(filled) && Array.isArray(schemaRecord.required)) {
+        const fallback = this._fallback({}, schemaRecord) as Record<string, unknown>;
+        for (const key of schemaRecord.required as string[]) {
+          const record = filled as Record<string, unknown>;
+          if (record[key] === undefined || record[key] === null) record[key] = fallback?.[key];
+        }
+      }
+      const properties = schemaRecord.properties as Record<string, Record<string, unknown>> | undefined;
+      if (properties && !Array.isArray(filled)) {
+        const record = filled as Record<string, unknown>;
+        for (const [key, propSchema] of Object.entries(properties)) {
+          if (record[key] && propSchema?.type === "object") {
+            record[key] = this._fillDefaults(record[key], propSchema, `${path}.${key}`);
+          }
+        }
+      }
+      if (schemaRecord.items && Array.isArray(filled)) {
+        filled = (filled as unknown[]).map((item, i) =>
+          this._fillDefaults(item, schemaRecord.items as Record<string, unknown>, `${path}[${i}]`)
+        );
+      }
+      return filled;
+    };
+    log("[vendor-compat] 需求洞察 _fillDefaults 修复桥已注入（数组保持数组、消除 const 重赋值）");
+    return () => {
+      prototype._fillDefaults = original;
+    };
+  } catch (err) {
+    log(`[vendor-compat] 需求洞察修复桥注入失败（不影响其它桥）：${err instanceof Error ? err.message : String(err)}`);
+    return () => undefined;
+  }
+}
+
+/**
+ * 深栈诊断（Phase 3 变体定位用）：除阶段 execute 外，再包裹 Phase 3 的后融合链路，
+ * 让「Assignment to constant variable.」这类被 vendor catch 吞掉的异常直接打出栈帧。
+ */
+export function installVendorPhaseInternalsDiagnostics(options: { log?: (line: string) => void } = {}): () => void {
+  const log = options.log ?? ((line: string) => console.warn(line));
+  const targets: Array<{ path: string; exportName: string; methods: string[] }> = [
+    {
+      path: "engines/production-engine/agents/prompt-fusion-agent.js",
+      exportName: "PromptFusionAgent",
+      methods: ["process", "_fuseSingleShotWithDeadline", "_buildShotResult", "_finalizeShotResult"]
+    },
+    {
+      path: "engines/production-engine/production-engine.js",
+      exportName: "ProductionEngine",
+      methods: ["_mergeShotsByShotId", "_deepCloneValue", "_deepCloneShot"]
+    },
+    {
+      path: "utils/dialogue-timing-calculator.js",
+      exportName: "DialogueTimingCalculator",
+      methods: ["validateShots", "validateShot"]
+    },
+    {
+      path: "engines/production-engine/phases/phase-3-prompt-fusion.js",
+      exportName: "Phase3PromptFusion",
+      methods: ["_checkDialogueTiming"]
+    }
+  ];
+  const restores: Array<() => void> = [];
+  try {
+    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+    for (const target of targets) {
+      const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system", target.path);
+      if (!existsSync(file)) continue;
+      const mod = vendorRequire(file) as Record<string, unknown>;
+      const prototype = (mod?.[target.exportName] as { prototype?: Record<string, unknown> } | undefined)?.prototype;
+      if (!prototype) continue;
+      for (const method of target.methods) {
+        const fn = prototype[method];
+        if (typeof fn !== "function") continue;
+        const original = fn as (...args: unknown[]) => unknown;
+        prototype[method] = function patched(this: unknown, ...args: unknown[]) {
+          try {
+            const out = original.apply(this, args);
+            return out;
+          } catch (err) {
+            const error = err instanceof Error ? err : new Error(String(err));
+            log(`[vendor-compat] ${target.exportName}.${method} 抛出：${error.message}`);
+            log(`[vendor-compat]  栈：${(error.stack ?? "").split("\n").slice(0, 10).join(" ← ")}`);
+            throw err;
+          }
+        };
+        restores.push(() => {
+          prototype[method] = original;
+        });
+      }
+    }
+    return () => restores.forEach((restore) => restore());
+  } catch (err) {
+    log(`[vendor-compat] 深栈诊断注入失败：${err instanceof Error ? err.message : String(err)}`);
+    return () => restores.forEach((restore) => restore());
+  }
+}
