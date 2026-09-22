@@ -1,0 +1,511 @@
+{
+  "schemaVersion": "workloom.workstation-pin/v1",
+  "component": "字体库 font-library v1.1（字幕工位字体 · 29 款开源/免费商用）",
+  "catalog": "bundles/ai-video/library/font-catalog/font_db.json",
+  "verifiedOn": "darwin-arm64",
+  "install": {
+    "targetDir": "${WORKLOOM_SUBTITLE_FONTS_DIR:-$HOME/.workloom-subtitle/fonts}",
+    "layout": "cn/ 与 en/（与档案 file 字段逐一致）",
+    "discipline": "下载/复制到临时目录 → 逐文件校验 sha256 → 原子替换；摘要不符立即失败且不覆盖现有文件。--download 只放行 verifiedAt 非空的直链；未核验的一律拒绝并提示走 --from-dir。"
+  },
+  "licenseWhitelist": [
+    "ofl-1.1",
+    "apache-2.0",
+    "vendor-free-commercial"
+  ],
+  "fonts": [
+    {
+      "id": "noto-sans-sc-variable",
+      "name": "思源黑体CN（可变字重）",
+      "file": "cn/NotoSansSC-Variable.ttf",
+      "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
+      "bytes": 17772300,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "noto-serif-sc-variable",
+      "name": "思源宋体CN（可变字重）",
+      "file": "cn/NotoSerifSC-Variable.ttf",
+      "sha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9",
+      "bytes": 25125512,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "zcool-kuaile",
+      "name": "站酷快乐体",
+      "file": "cn/ZCOOLKuaiLe-Regular.ttf",
+      "sha256": "812a6fc1fe54b6d73a419245c32dfeba8aa33104d5be90d1cf6af082007cb71d",
+      "bytes": 1514968,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolkuaile/ZCOOLKuaiLe-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "zcool-qingke-huangyou",
+      "name": "站酷庆科黄油体",
+      "file": "cn/ZCOOLQingKeHuangYou-Regular.ttf",
+      "sha256": "54f0c0df4308cd74cd0f2fd3494ae054dbc4a1fd6fa7d71f4807eb4cdd8b4136",
+      "bytes": 8328684,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolqingkehuangyou/ZCOOLQingKeHuangYou-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "zcool-xiaowei",
+      "name": "站酷小薇",
+      "file": "cn/ZCOOLXiaoWei-Regular.ttf",
+      "sha256": "a42b620140f493db42f741351dfbf343c0936d58588ee8004b8b2a218d997ff1",
+      "bytes": 6313808,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolxiaowei/ZCOOLXiaoWei-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "ma-shan-zheng",
+      "name": "马善政毛笔楷书",
+      "file": "cn/MaShanZheng-Regular.ttf",
+      "sha256": "6d2546bb189c732a8ca29af9e22457b152387d158aa459e4ac2ce1e51788b7fb",
+      "bytes": 5857936,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/mashanzheng/MaShanZheng-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "zhi-mang-xing",
+      "name": "志莽行书",
+      "file": "cn/ZhiMangXing-Regular.ttf",
+      "sha256": "644e0cae9b40f0b10ab729a01bd32032e3973bac22be3dccae01bf6ae7fde969",
+      "bytes": 4063532,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zhimangxing/ZhiMangXing-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "liu-jian-mao-cao",
+      "name": "流建毛草",
+      "file": "cn/LiuJianMaoCao-Regular.ttf",
+      "sha256": "cab396b91a5b7c0b4005a35891180d06e6751f5ac261fe680aec65c1ae209033",
+      "bytes": 4951804,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/liujianmaocao/LiuJianMaoCao-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "long-cang",
+      "name": "龙藏体",
+      "file": "cn/LongCang-Regular.ttf",
+      "sha256": "e5bf2c3f24ef2327c6f136d8f73e2f9dfdf44896fdbeb35a9515f44777bb91bc",
+      "bytes": 5162508,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/longcang/LongCang-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "source-han-sans-cn-extralight",
+      "name": "思源黑体CN-ExtraLight",
+      "file": "cn/SourceHanSansCN-ExtraLight.otf",
+      "sha256": "cbeba9e956a628fdc6c518ad174fe6686929211477ad4b518f9be9c950227d77",
+      "bytes": 7612056,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/adobe-fonts/source-han-sans",
+      "upstream": {
+        "project": "adobe-fonts/source-han-sans",
+        "projectUrl": "https://github.com/adobe-fonts/source-han-sans",
+        "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-ExtraLight.otf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "source-han-sans-cn-heavy",
+      "name": "思源黑体CN-Heavy",
+      "file": "cn/SourceHanSansCN-Heavy.otf",
+      "sha256": "88c749b0a54a0800124ded6544e399302ed224aa49992ea364b88769f825c54c",
+      "bytes": 8808068,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/adobe-fonts/source-han-sans",
+      "upstream": {
+        "project": "adobe-fonts/source-han-sans",
+        "projectUrl": "https://github.com/adobe-fonts/source-han-sans",
+        "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-Heavy.otf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "lxgw-wen-kai",
+      "name": "霞鹜文楷",
+      "file": "cn/LXGWWenKai-Regular.ttf",
+      "sha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009",
+      "bytes": 25575676,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/lxgw/LxgwWenKai",
+      "upstream": {
+        "project": "lxgw/LxgwWenKai",
+        "projectUrl": "https://github.com/lxgw/LxgwWenKai",
+        "url": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "smiley-sans-oblique",
+      "name": "得意黑",
+      "file": "cn/SmileySans-Oblique.ttf",
+      "sha256": "b447d7e781f08bc95c4c9f23ba71ed2b8ebb639aa7184485c71c4ca5afcd25c4",
+      "bytes": 2629764,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/atelier-anchor/smiley-sans",
+      "upstream": {
+        "project": "atelier-anchor/smiley-sans",
+        "projectUrl": "https://github.com/atelier-anchor/smiley-sans",
+        "url": "https://github.com/atelier-anchor/smiley-sans/releases/download/v2.0.1/smiley-sans-v2.0.1.zip",
+        "zipMember": "SmileySans-Oblique.ttf",
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "inter",
+      "name": "Inter",
+      "file": "en/Inter-Variable.ttf",
+      "sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+      "bytes": 876576,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "montserrat",
+      "name": "Montserrat",
+      "file": "en/Montserrat-Variable.ttf",
+      "sha256": "0f7b311b2f3279e4eef9b2f968bcdbab6e28f4daeb1f049f4f278a902bcd82f7",
+      "bytes": 744936,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "playfair-display",
+      "name": "Playfair Display",
+      "file": "en/PlayfairDisplay-Variable.ttf",
+      "sha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
+      "bytes": 300724,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "oswald",
+      "name": "Oswald",
+      "file": "en/Oswald-Variable.ttf",
+      "sha256": "5b38c246e255a12f5712d640d56bcced0472466fc68983d2d0410ec0457c2817",
+      "bytes": 172088,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/Oswald%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "cinzel",
+      "name": "Cinzel",
+      "file": "en/Cinzel-Variable.ttf",
+      "sha256": "f4d83d34d1f6c741193e4acf4b3dff9531e5a67b6aa65228d00a7db72a4e0f34",
+      "bytes": 125468,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "dancing-script",
+      "name": "Dancing Script",
+      "file": "en/DancingScript-Variable.ttf",
+      "sha256": "21808625578fe8d8cd10cb684be546dca077b27cd03a53a2f1ec11dc743c924c",
+      "bytes": 133636,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "roboto",
+      "name": "Roboto",
+      "file": "en/Roboto-Variable.ttf",
+      "sha256": "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134",
+      "bytes": 488584,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth,wght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "bebas-neue",
+      "name": "Bebas Neue",
+      "file": "en/BebasNeue-Regular.ttf",
+      "sha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73",
+      "bytes": 61400,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "anton",
+      "name": "Anton",
+      "file": "en/Anton-Regular.ttf",
+      "sha256": "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab",
+      "bytes": 170812,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "archivo-black",
+      "name": "Archivo Black",
+      "file": "en/ArchivoBlack-Regular.ttf",
+      "sha256": "dd9a89a019b4849f66ab75455fe7bdf931311042cbb0f0f97acc061539703180",
+      "bytes": 90988,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivoblack/ArchivoBlack-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "lobster",
+      "name": "Lobster",
+      "file": "en/Lobster-Regular.ttf",
+      "sha256": "d6568e697fd50cedc0be04d8aae4127fe95add607e7bff954ca88604be80c205",
+      "bytes": 406076,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/lobster/Lobster-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "pacifico",
+      "name": "Pacifico",
+      "file": "en/Pacifico-Regular.ttf",
+      "sha256": "5b6c0d5334a7bf77dea52b975c5a0c408878c0f7115ed5b6fb151f634b7bf701",
+      "bytes": 329380,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/pacifico/Pacifico-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "bangers",
+      "name": "Bangers",
+      "file": "en/Bangers-Regular.ttf",
+      "sha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824",
+      "bytes": 93148,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bangers/Bangers-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "caveat",
+      "name": "Caveat",
+      "file": "en/Caveat-Variable.ttf",
+      "sha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
+      "bytes": 403648,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/Caveat%5Bwght%5D.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "poppins",
+      "name": "Poppins",
+      "file": "en/Poppins-Regular.ttf",
+      "sha256": "7e65201e9b79159e2300267cc885e16c8dcef2424cdfa09a29bfb0980a94a7ba",
+      "bytes": 160316,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    },
+    {
+      "id": "poppins-bold",
+      "name": "Poppins Bold",
+      "file": "en/Poppins-Bold.ttf",
+      "sha256": "983676516167748b74de6f4771fb384c664fd913acb8b471122ecacf5da5ea6c",
+      "bytes": 155996,
+      "license": "ofl-1.1",
+      "catalogSource": "https://github.com/google/fonts",
+      "upstream": {
+        "project": "google/fonts",
+        "projectUrl": "https://github.com/google/fonts",
+        "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf",
+        "zipMember": null,
+        "verifiedAt": null,
+        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+      }
+    }
+  ]
+}

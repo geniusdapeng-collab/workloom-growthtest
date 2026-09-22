@@ -1,0 +1,1373 @@
+{
+  "schemaVersion": "workloom.font-catalog/v1",
+  "version": "1.1",
+  "updatedAt": "2026-09-23",
+  "source": "font-library-v1.1（29 款开源/免费商用字体，来自随包 font_db.json v1.1 打标档）",
+  "principle": "场景 + 语言先硬过滤，再按 作品类型30 / BGM节奏20 / 粗细×场景20 / 艺术气息×调性15 / 气质关键词15 加权打分；账号调性的『锁定字体』是品牌视觉锤，优先于打分。字体文件不进仓库：工位按 connectors/subtitle-bridge/kit/fonts-pin.json 获取并逐文件 sha256 校验。",
+  "licensePolicy": {
+    "commercialWhitelist": [
+      "ofl-1.1",
+      "apache-2.0",
+      "vendor-free-commercial"
+    ],
+    "note": "商用交付只允许白名单许可；单售字体文件被 OFL 禁止，修改后再发布必须改名。vendor-free-commercial 指厂商免费商用授权（如阿里妈妈/普惠体），登记时必须附许可证明链接。"
+  },
+  "size_policy": {
+    "_comment": "字号策略：字号 = 短边 × base_ratio[场景] × 粗细修正(1+(2.5-粗细)*0.04)；再乘平台字号倍率(见 layout_policy)",
+    "base_ratio": {
+      "标题": 0.11,
+      "字幕": 0.048,
+      "弹幕": 0.04,
+      "贴纸": 0.07
+    },
+    "outline_ratio": 0.06,
+    "safe_margin_ratio": 0.05,
+    "弹幕规则": "从右向左滚动或顶部固定，单条不超过 20 字，透明度 85%",
+    "贴纸规则": "配合出现动画（弹入/淡入 200ms），停留 1.5~3s"
+  },
+  "layout_policy": {
+    "默认": {
+      "画幅": "16:9",
+      "基准分辨率": [
+        1920,
+        1080
+      ],
+      "标题": {
+        "alignment": 8,
+        "top_margin_ratio": 0.08,
+        "字号倍率": 1.0,
+        "位置说明": "顶部居中，距顶 8%，符合视觉动线起点"
+      },
+      "字幕": {
+        "alignment": 2,
+        "bottom_margin_ratio": 0.05,
+        "字号倍率": 1.0,
+        "位置说明": "底部居中，距底 5%（安全边距内）"
+      },
+      "封面风格": "大标题居中偏上 + 高对比描边",
+      "occlusion_zones": []
+    },
+    "抖音/快手": {
+      "画幅": "9:16",
+      "基准分辨率": [
+        1080,
+        1920
+      ],
+      "标题": {
+        "alignment": 8,
+        "top_margin_ratio": 0.1,
+        "字号倍率": 1.15,
+        "位置说明": "顶部居中加大；避开顶部关注按钮区"
+      },
+      "字幕": {
+        "alignment": 2,
+        "bottom_margin_ratio": 0.18,
+        "字号倍率": 1.05,
+        "位置说明": "底部上抬至 18%：避开右侧点赞栏与底部文案/进度条遮挡区"
+      },
+      "弹幕": {
+        "alignment": 7,
+        "位置说明": "顶部 1/4 区域滚动，避开中部人物主体"
+      },
+      "封面风格": "大字报式粗黑体标题（占屏 1/5）+ 人物/主体抠图前置 + 高饱和撞色描边",
+      "occlusion_zones": [
+        {
+          "id": "right-rail",
+          "note": "右侧点赞/评论/分享栏",
+          "x": 0.78,
+          "y": 0.42,
+          "w": 0.22,
+          "h": 0.42
+        },
+        {
+          "id": "bottom-caption",
+          "note": "底部文案与进度条",
+          "x": 0.0,
+          "y": 0.88,
+          "w": 1.0,
+          "h": 0.12
+        },
+        {
+          "id": "top-follow",
+          "note": "顶部关注/音乐信息",
+          "x": 0.58,
+          "y": 0.0,
+          "w": 0.42,
+          "h": 0.12
+        }
+      ]
+    },
+    "B站": {
+      "画幅": "16:9",
+      "基准分辨率": [
+        1920,
+        1080
+      ],
+      "标题": {
+        "alignment": 8,
+        "top_margin_ratio": 0.07,
+        "字号倍率": 1.0,
+        "位置说明": "顶部居中，兼容站内弹幕区（顶部 10% 适当留空）"
+      },
+      "字幕": {
+        "alignment": 2,
+        "bottom_margin_ratio": 0.06,
+        "字号倍率": 1.0,
+        "位置说明": "底部居中；知识区惯例配细体（文楷/细黑）"
+      },
+      "弹幕": {
+        "alignment": 7,
+        "位置说明": "顶部滚动弹幕为站内生态，自加弹幕放顶部 1/4"
+      },
+      "封面风格": "左文右图/上文下图，标题两行以内，粗体+描边，保留UP主固定视觉锤",
+      "occlusion_zones": [
+        {
+          "id": "top-danmaku",
+          "note": "顶部弹幕区",
+          "x": 0.0,
+          "y": 0.0,
+          "w": 1.0,
+          "h": 0.1
+        },
+        {
+          "id": "bottom-controls",
+          "note": "底部播放器控件",
+          "x": 0.0,
+          "y": 0.93,
+          "w": 1.0,
+          "h": 0.07
+        }
+      ]
+    },
+    "小红书": {
+      "画幅": "3:4",
+      "基准分辨率": [
+        1080,
+        1440
+      ],
+      "标题": {
+        "alignment": 8,
+        "top_margin_ratio": 0.08,
+        "字号倍率": 1.2,
+        "位置说明": "封面即标题：顶部超大字号花字，支持多色拼接"
+      },
+      "字幕": {
+        "alignment": 2,
+        "bottom_margin_ratio": 0.08,
+        "字号倍率": 0.95,
+        "位置说明": "底部居中略收，竖屏信息流不遮挡"
+      },
+      "封面风格": "花字封面：手写/可爱体 + 贴纸元素 + 奶油色系，关键词前置（如『川西｜…』）",
+      "occlusion_zones": [
+        {
+          "id": "right-rail",
+          "note": "右侧互动栏",
+          "x": 0.8,
+          "y": 0.48,
+          "w": 0.2,
+          "h": 0.38
+        },
+        {
+          "id": "bottom-caption",
+          "note": "底部文案与话题",
+          "x": 0.0,
+          "y": 0.9,
+          "w": 1.0,
+          "h": 0.1
+        }
+      ]
+    },
+    "视频号": {
+      "画幅": "9:16",
+      "基准分辨率": [
+        1080,
+        1920
+      ],
+      "标题": {
+        "alignment": 8,
+        "top_margin_ratio": 0.09,
+        "字号倍率": 1.1,
+        "位置说明": "顶部居中；中老年受众占比高，字号整体上浮"
+      },
+      "字幕": {
+        "alignment": 2,
+        "bottom_margin_ratio": 0.16,
+        "字号倍率": 1.1,
+        "位置说明": "底部上抬 16% 并放大 10%，照顾可读性"
+      },
+      "封面风格": "稳重粗黑/宋体大标题，少花哨，信息直给",
+      "occlusion_zones": [
+        {
+          "id": "right-rail",
+          "note": "右侧互动栏",
+          "x": 0.8,
+          "y": 0.52,
+          "w": 0.2,
+          "h": 0.34
+        },
+        {
+          "id": "bottom-caption",
+          "note": "底部文案区",
+          "x": 0.0,
+          "y": 0.86,
+          "w": 1.0,
+          "h": 0.14
+        }
+      ]
+    },
+    "YouTube": {
+      "画幅": "16:9",
+      "基准分辨率": [
+        1920,
+        1080
+      ],
+      "标题": {
+        "alignment": 4,
+        "top_margin_ratio": 0.0,
+        "字号倍率": 1.0,
+        "位置说明": "Lower-third 左下对齐（距左 5%、距底 20%），国际惯例"
+      },
+      "字幕": {
+        "alignment": 2,
+        "bottom_margin_ratio": 0.05,
+        "字号倍率": 0.95,
+        "位置说明": "底部居中偏小，遵守 broadcast 安全区"
+      },
+      "封面风格": "缩略图逻辑：3 词以内超大粗体 + 表情/主体特写 + 高对比，小图可读优先",
+      "occlusion_zones": [
+        {
+          "id": "bottom-controls",
+          "note": "底部进度条与控件",
+          "x": 0.0,
+          "y": 0.92,
+          "w": 1.0,
+          "h": 0.08
+        }
+      ]
+    },
+    "_comment": "版式 = 基本美学标准(黄金比例/安全边距) × 平台UI遮挡区 × 账号调性。bottom_margin_ratio 指字幕基线距画面底部的短边占比（避开平台底部UI）。",
+    "occlusion_note": "遮挡区为本仓工程取值：依据附件 layout_policy 的「位置说明」把平台 UI 遮挡来源落成可判定矩形；平台改版时按同一口径更新，字幕/标题的实测墨迹外接框与之相交即判安全区不达标（G-SUB3）。"
+  },
+  "account_persona": {
+    "_comment": "账号调性影响选型与版式：锁定字体=品牌视觉锤（每期固定，优先于打分）；艺术气息区间覆盖内容调性推断结果",
+    "示例-文艺旅行账号": {
+      "锁定字体": {
+        "字幕": "霞鹜文楷",
+        "标题": "马善政毛笔楷书"
+      },
+      "艺术气息区间": [
+        3,
+        5
+      ]
+    },
+    "示例-专业科普账号": {
+      "锁定字体": {
+        "字幕": "思源黑体CN（可变字重）"
+      },
+      "艺术气息区间": [
+        1,
+        3
+      ]
+    },
+    "示例-搞笑综艺账号": {
+      "锁定字体": {},
+      "艺术气息区间": [
+        4,
+        5
+      ]
+    }
+  },
+  "fonts": [
+    {
+      "id": "noto-sans-sc-variable",
+      "字体名称": "思源黑体CN（可变字重）",
+      "font_family": "Noto Sans SC",
+      "font_fullname": "Noto Sans SC Thin",
+      "file": "cn/NotoSansSC-Variable.ttf",
+      "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da",
+      "bytes": 17772300,
+      "语言": [
+        "zh",
+        "en"
+      ],
+      "场景": [
+        "字幕",
+        "标题",
+        "弹幕"
+      ],
+      "风格标签": "非衬线字体",
+      "气质关键词": [
+        "中性",
+        "现代",
+        "清晰",
+        "百搭"
+      ],
+      "适合作品类型": [
+        "全部类型"
+      ],
+      "艺术气息": 3,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "全部类型"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "可变字重 100~900，等价于用户原库的方正兰亭黑系列，可商用"
+    },
+    {
+      "id": "noto-serif-sc-variable",
+      "字体名称": "思源宋体CN（可变字重）",
+      "font_family": "Noto Serif SC",
+      "font_fullname": "Noto Serif SC ExtraLight",
+      "file": "cn/NotoSerifSC-Variable.ttf",
+      "sha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9",
+      "bytes": 25125512,
+      "语言": [
+        "zh",
+        "en"
+      ],
+      "场景": [
+        "字幕",
+        "标题"
+      ],
+      "风格标签": "衬线/印刷体",
+      "气质关键词": [
+        "书卷气",
+        "正式",
+        "人文",
+        "典雅"
+      ],
+      "适合作品类型": [
+        "产品介绍",
+        "宣传片",
+        "知识科普",
+        "纪录片"
+      ],
+      "艺术气息": 3,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "慢",
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "可变字重，对标老宋体"
+    },
+    {
+      "id": "zcool-kuaile",
+      "字体名称": "站酷快乐体",
+      "font_family": "ZCOOL KuaiLe",
+      "font_fullname": "ZCOOL KuaiLe Regular",
+      "file": "cn/ZCOOLKuaiLe-Regular.ttf",
+      "sha256": "812a6fc1fe54b6d73a419245c32dfeba8aa33104d5be90d1cf6af082007cb71d",
+      "bytes": 1514968,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "标题",
+        "贴纸",
+        "弹幕"
+      ],
+      "风格标签": "艺术字体",
+      "气质关键词": [
+        "活泼",
+        "可爱",
+        "综艺感",
+        "年轻"
+      ],
+      "适合作品类型": [
+        "生活vlog",
+        "美食",
+        "综艺剪辑",
+        "亲子"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "licenseNote": "站酷免费商用授权，Google Fonts 以 OFL-1.1 发布（ofl/zcoolkuaile 含 OFL.txt）",
+      "备注": "对标用户库的方正喵呜体/华康POP"
+    },
+    {
+      "id": "zcool-qingke-huangyou",
+      "字体名称": "站酷庆科黄油体",
+      "font_family": "ZCOOL QingKe HuangYou",
+      "font_fullname": "ZCOOL QingKe HuangYou Regular",
+      "file": "cn/ZCOOLQingKeHuangYou-Regular.ttf",
+      "sha256": "54f0c0df4308cd74cd0f2fd3494ae054dbc4a1fd6fa7d71f4807eb4cdd8b4136",
+      "bytes": 8328684,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "标题",
+        "贴纸"
+      ],
+      "风格标签": "艺术字体",
+      "气质关键词": [
+        "复古",
+        "潮流",
+        "力量感",
+        "海报感"
+      ],
+      "适合作品类型": [
+        "产品介绍",
+        "宣传片",
+        "游戏",
+        "运动"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 4,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "licenseNote": "站酷免费商用授权，Google Fonts 以 OFL-1.1 发布",
+      "备注": "对标迷你简汉真广标/腾祥金砖黑"
+    },
+    {
+      "id": "zcool-xiaowei",
+      "字体名称": "站酷小薇",
+      "font_family": "站酷小薇体",
+      "font_fullname": "ZCOOL XiaoWei Regular",
+      "file": "cn/ZCOOLXiaoWei-Regular.ttf",
+      "sha256": "a42b620140f493db42f741351dfbf343c0936d58588ee8004b8b2a218d997ff1",
+      "bytes": 6313808,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "标题",
+        "字幕"
+      ],
+      "风格标签": "衬线/宋体系",
+      "气质关键词": [
+        "文艺",
+        "清新",
+        "纤细",
+        "女性化"
+      ],
+      "适合作品类型": [
+        "生活vlog",
+        "文艺短片",
+        "宣传片"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "慢",
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "licenseNote": "站酷免费商用授权，Google Fonts 以 OFL-1.1 发布",
+      "备注": "对标汉仪良品线简"
+    },
+    {
+      "id": "ma-shan-zheng",
+      "字体名称": "马善政毛笔楷书",
+      "font_family": "Ma Shan Zheng",
+      "font_fullname": "Ma Shan Zheng Regular",
+      "file": "cn/MaShanZheng-Regular.ttf",
+      "sha256": "6d2546bb189c732a8ca29af9e22457b152387d158aa459e4ac2ce1e51788b7fb",
+      "bytes": 5857936,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "标题",
+        "贴纸"
+      ],
+      "风格标签": "传统书法",
+      "气质关键词": [
+        "国风",
+        "毛笔",
+        "端庄",
+        "书卷气"
+      ],
+      "适合作品类型": [
+        "生活vlog",
+        "产品介绍",
+        "宣传片",
+        "国风"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "慢",
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "对标经典行书/苏新诗柳楷"
+    },
+    {
+      "id": "zhi-mang-xing",
+      "字体名称": "志莽行书",
+      "font_family": "Zhi Mang Xing",
+      "font_fullname": "Zhi Mang Xing Regular",
+      "file": "cn/ZhiMangXing-Regular.ttf",
+      "sha256": "644e0cae9b40f0b10ab729a01bd32032e3973bac22be3dccae01bf6ae7fde969",
+      "bytes": 4063532,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "标题"
+      ],
+      "风格标签": "传统书法",
+      "气质关键词": [
+        "豪放",
+        "武侠",
+        "洒脱",
+        "大气"
+      ],
+      "适合作品类型": [
+        "宣传片",
+        "国风",
+        "武侠",
+        "游戏"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 4,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "对标沙孟海书法/汉标百侠体"
+    },
+    {
+      "id": "liu-jian-mao-cao",
+      "字体名称": "流建毛草",
+      "font_family": "Liu Jian Mao Cao",
+      "font_fullname": "Liu Jian Mao Cao Regular",
+      "file": "cn/LiuJianMaoCao-Regular.ttf",
+      "sha256": "cab396b91a5b7c0b4005a35891180d06e6751f5ac261fe680aec65c1ae209033",
+      "bytes": 4951804,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "标题",
+        "贴纸"
+      ],
+      "风格标签": "传统书法",
+      "气质关键词": [
+        "狂草",
+        "写意",
+        "艺术",
+        "张扬"
+      ],
+      "适合作品类型": [
+        "国风",
+        "文艺短片",
+        "宣传片"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "慢",
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "辨识度低，不宜字幕"
+    },
+    {
+      "id": "long-cang",
+      "字体名称": "龙藏体",
+      "font_family": "Long Cang",
+      "font_fullname": "Long Cang Regular",
+      "file": "cn/LongCang-Regular.ttf",
+      "sha256": "e5bf2c3f24ef2327c6f136d8f73e2f9dfdf44896fdbeb35a9515f44777bb91bc",
+      "bytes": 5162508,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "字幕",
+        "贴纸",
+        "弹幕"
+      ],
+      "风格标签": "手写体",
+      "气质关键词": [
+        "手写",
+        "随性",
+        "生活感",
+        "亲切"
+      ],
+      "适合作品类型": [
+        "生活vlog",
+        "美食",
+        "旅行"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "对标静蕾/罗西钢笔行楷"
+    },
+    {
+      "id": "source-han-sans-cn-extralight",
+      "字体名称": "思源黑体CN-ExtraLight",
+      "font_family": "Source Han Sans CN",
+      "font_fullname": "Source Han Sans CN ExtraLight",
+      "file": "cn/SourceHanSansCN-ExtraLight.otf",
+      "sha256": "cbeba9e956a628fdc6c518ad174fe6686929211477ad4b518f9be9c950227d77",
+      "bytes": 7612056,
+      "语言": [
+        "zh",
+        "en"
+      ],
+      "场景": [
+        "字幕"
+      ],
+      "风格标签": "非衬线字体",
+      "气质关键词": [
+        "纤细",
+        "高级",
+        "呼吸感",
+        "极简"
+      ],
+      "适合作品类型": [
+        "全部类型"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 1,
+      "适配BGM节奏": [
+        "全部类型"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/adobe-fonts/source-han-sans",
+      "备注": "用户原库同款，字幕首选"
+    },
+    {
+      "id": "source-han-sans-cn-heavy",
+      "字体名称": "思源黑体CN-Heavy",
+      "font_family": "Source Han Sans CN",
+      "font_fullname": "Source Han Sans CN Heavy",
+      "file": "cn/SourceHanSansCN-Heavy.otf",
+      "sha256": "88c749b0a54a0800124ded6544e399302ed224aa49992ea364b88769f825c54c",
+      "bytes": 8808068,
+      "语言": [
+        "zh",
+        "en"
+      ],
+      "场景": [
+        "标题"
+      ],
+      "风格标签": "非衬线字体",
+      "气质关键词": [
+        "厚重",
+        "冲击力",
+        "现代",
+        "稳定"
+      ],
+      "适合作品类型": [
+        "全部类型",
+        "产品介绍",
+        "宣传片"
+      ],
+      "艺术气息": 2,
+      "字体粗细程度": 5,
+      "适配BGM节奏": [
+        "慢",
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/adobe-fonts/source-han-sans",
+      "备注": "对标蒙纳超刚黑/尔雅新大黑"
+    },
+    {
+      "id": "lxgw-wen-kai",
+      "字体名称": "霞鹜文楷",
+      "font_family": "LXGW WenKai",
+      "font_fullname": "LXGW WenKai",
+      "file": "cn/LXGWWenKai-Regular.ttf",
+      "sha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009",
+      "bytes": 25575676,
+      "语言": [
+        "zh"
+      ],
+      "场景": [
+        "字幕",
+        "标题"
+      ],
+      "风格标签": "楷体/印刷体",
+      "气质关键词": [
+        "温润",
+        "文艺",
+        "书卷气",
+        "治愈"
+      ],
+      "适合作品类型": [
+        "生活vlog",
+        "知识科普",
+        "文艺短片",
+        "旅行"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "慢",
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/lxgw/LxgwWenKai",
+      "备注": "B站知识区字幕神体"
+    },
+    {
+      "id": "smiley-sans-oblique",
+      "字体名称": "得意黑",
+      "font_family": "Smiley Sans",
+      "font_fullname": "Smiley Sans Oblique",
+      "file": "cn/SmileySans-Oblique.ttf",
+      "sha256": "b447d7e781f08bc95c4c9f23ba71ed2b8ebb639aa7184485c71c4ca5afcd25c4",
+      "bytes": 2629764,
+      "语言": [
+        "zh",
+        "en"
+      ],
+      "场景": [
+        "标题",
+        "贴纸",
+        "弹幕"
+      ],
+      "风格标签": "艺术字体",
+      "气质关键词": [
+        "倾斜",
+        "现代",
+        "轻快",
+        "设计感"
+      ],
+      "适合作品类型": [
+        "产品介绍",
+        "生活vlog",
+        "科技",
+        "运动"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/atelier-anchor/smiley-sans",
+      "备注": "对标造字工房悦黑系列"
+    },
+    {
+      "id": "inter",
+      "字体名称": "Inter",
+      "font_family": "Inter",
+      "font_fullname": "Inter Regular",
+      "file": "en/Inter-Variable.ttf",
+      "sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031",
+      "bytes": 876576,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "字幕",
+        "标题",
+        "弹幕"
+      ],
+      "风格标签": "非衬线字体",
+      "气质关键词": [
+        "中性",
+        "现代",
+        "UI感",
+        "清晰"
+      ],
+      "适合作品类型": [
+        "全部类型"
+      ],
+      "艺术气息": 2,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "全部类型"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "可变字重，英文字幕首选"
+    },
+    {
+      "id": "montserrat",
+      "字体名称": "Montserrat",
+      "font_family": "Montserrat",
+      "font_fullname": "Montserrat Thin",
+      "file": "en/Montserrat-Variable.ttf",
+      "sha256": "0f7b311b2f3279e4eef9b2f968bcdbab6e28f4daeb1f049f4f278a902bcd82f7",
+      "bytes": 744936,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题",
+        "字幕"
+      ],
+      "风格标签": "几何无衬线",
+      "气质关键词": [
+        "都市",
+        "时尚",
+        "简洁",
+        "品牌感"
+      ],
+      "适合作品类型": [
+        "产品介绍",
+        "宣传片",
+        "科技"
+      ],
+      "艺术气息": 3,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "playfair-display",
+      "字体名称": "Playfair Display",
+      "font_family": "Playfair Display",
+      "font_fullname": "Playfair Display Regular",
+      "file": "en/PlayfairDisplay-Variable.ttf",
+      "sha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6",
+      "bytes": 300724,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题"
+      ],
+      "风格标签": "衬线字体",
+      "气质关键词": [
+        "优雅",
+        "高级感",
+        "复古",
+        "杂志感"
+      ],
+      "适合作品类型": [
+        "时尚",
+        "品牌宣传",
+        "文艺短片",
+        "婚礼"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "慢",
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "oswald",
+      "字体名称": "Oswald",
+      "font_family": "Oswald",
+      "font_fullname": "Oswald Regular",
+      "file": "en/Oswald-Variable.ttf",
+      "sha256": "5b38c246e255a12f5712d640d56bcced0472466fc68983d2d0410ec0457c2817",
+      "bytes": 172088,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题",
+        "弹幕"
+      ],
+      "风格标签": "窄体无衬线",
+      "气质关键词": [
+        "紧凑",
+        "运动",
+        "工业感"
+      ],
+      "适合作品类型": [
+        "运动",
+        "科技",
+        "汽车",
+        "宣传片"
+      ],
+      "艺术气息": 2,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "cinzel",
+      "字体名称": "Cinzel",
+      "font_family": "Cinzel",
+      "font_fullname": "Cinzel Regular",
+      "file": "en/Cinzel-Variable.ttf",
+      "sha256": "f4d83d34d1f6c741193e4acf4b3dff9531e5a67b6aa65228d00a7db72a4e0f34",
+      "bytes": 125468,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题"
+      ],
+      "风格标签": "古典衬线",
+      "气质关键词": [
+        "史诗",
+        "罗马碑刻",
+        "电影感",
+        "庄重"
+      ],
+      "适合作品类型": [
+        "影视混剪",
+        "纪录片",
+        "游戏"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "慢"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "仅大写效果最好"
+    },
+    {
+      "id": "dancing-script",
+      "字体名称": "Dancing Script",
+      "font_family": "Dancing Script",
+      "font_fullname": "Dancing Script Regular",
+      "file": "en/DancingScript-Variable.ttf",
+      "sha256": "21808625578fe8d8cd10cb684be546dca077b27cd03a53a2f1ec11dc743c924c",
+      "bytes": 133636,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "贴纸",
+        "标题"
+      ],
+      "风格标签": "手写花体",
+      "气质关键词": [
+        "浪漫",
+        "轻盈",
+        "手写",
+        "柔美"
+      ],
+      "适合作品类型": [
+        "生活vlog",
+        "婚礼",
+        "文艺短片",
+        "旅行"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 1,
+      "适配BGM节奏": [
+        "慢",
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "roboto",
+      "字体名称": "Roboto",
+      "font_family": "Roboto",
+      "font_fullname": "Roboto Regular",
+      "file": "en/Roboto-Variable.ttf",
+      "sha256": "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134",
+      "bytes": 488584,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "字幕",
+        "弹幕"
+      ],
+      "风格标签": "非衬线字体",
+      "气质关键词": [
+        "中性",
+        "工程感",
+        "百搭"
+      ],
+      "适合作品类型": [
+        "全部类型"
+      ],
+      "艺术气息": 1,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "全部类型"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "licenseNote": "Google Fonts 现以 OFL-1.1 发布（历史版本为 Apache-2.0，两者均在商用白名单）"
+    },
+    {
+      "id": "bebas-neue",
+      "字体名称": "Bebas Neue",
+      "font_family": "Bebas Neue",
+      "font_fullname": "Bebas Neue Regular",
+      "file": "en/BebasNeue-Regular.ttf",
+      "sha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73",
+      "bytes": 61400,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题",
+        "弹幕"
+      ],
+      "风格标签": "窄体无衬线",
+      "气质关键词": [
+        "潮流",
+        "海报感",
+        "力量",
+        "速度"
+      ],
+      "适合作品类型": [
+        "运动",
+        "影视混剪",
+        "潮流",
+        "宣传片"
+      ],
+      "艺术气息": 3,
+      "字体粗细程度": 4,
+      "适配BGM节奏": [
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "仅大写，YouTube 片头常客"
+    },
+    {
+      "id": "anton",
+      "字体名称": "Anton",
+      "font_family": "Anton",
+      "font_fullname": "Anton Regular",
+      "file": "en/Anton-Regular.ttf",
+      "sha256": "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab",
+      "bytes": 170812,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题"
+      ],
+      "风格标签": "超粗无衬线",
+      "气质关键词": [
+        "冲击力",
+        "海报",
+        "直白"
+      ],
+      "适合作品类型": [
+        "宣传片",
+        "运动",
+        "综艺剪辑"
+      ],
+      "艺术气息": 2,
+      "字体粗细程度": 5,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "archivo-black",
+      "字体名称": "Archivo Black",
+      "font_family": "Archivo Black",
+      "font_fullname": "Archivo Black Regular",
+      "file": "en/ArchivoBlack-Regular.ttf",
+      "sha256": "dd9a89a019b4849f66ab75455fe7bdf931311042cbb0f0f97acc061539703180",
+      "bytes": 90988,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题",
+        "贴纸"
+      ],
+      "风格标签": "超粗无衬线",
+      "气质关键词": [
+        "厚重",
+        "街头",
+        "现代"
+      ],
+      "适合作品类型": [
+        "宣传片",
+        "潮流",
+        "音乐"
+      ],
+      "艺术气息": 2,
+      "字体粗细程度": 5,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "lobster",
+      "字体名称": "Lobster",
+      "font_family": "Lobster",
+      "font_fullname": "Lobster Regular",
+      "file": "en/Lobster-Regular.ttf",
+      "sha256": "d6568e697fd50cedc0be04d8aae4127fe95add607e7bff954ca88604be80c205",
+      "bytes": 406076,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题",
+        "贴纸"
+      ],
+      "风格标签": "复古手写",
+      "气质关键词": [
+        "复古",
+        "招牌感",
+        "美式"
+      ],
+      "适合作品类型": [
+        "美食",
+        "复古",
+        "生活vlog"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 4,
+      "适配BGM节奏": [
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "pacifico",
+      "字体名称": "Pacifico",
+      "font_family": "Pacifico",
+      "font_fullname": "Pacifico Regular",
+      "file": "en/Pacifico-Regular.ttf",
+      "sha256": "5b6c0d5334a7bf77dea52b975c5a0c408878c0f7115ed5b6fb151f634b7bf701",
+      "bytes": 329380,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "贴纸",
+        "标题"
+      ],
+      "风格标签": "手写体",
+      "气质关键词": [
+        "轻松",
+        "度假",
+        "随意",
+        "阳光"
+      ],
+      "适合作品类型": [
+        "旅行",
+        "生活vlog",
+        "美食"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "慢",
+        "中"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "bangers",
+      "字体名称": "Bangers",
+      "font_family": "Bangers",
+      "font_fullname": "Bangers Regular",
+      "file": "en/Bangers-Regular.ttf",
+      "sha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824",
+      "bytes": 93148,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "弹幕",
+        "贴纸",
+        "标题"
+      ],
+      "风格标签": "漫画体",
+      "气质关键词": [
+        "漫画",
+        "爆炸贴",
+        "搞怪",
+        "二次元"
+      ],
+      "适合作品类型": [
+        "游戏",
+        "综艺剪辑",
+        "二次元"
+      ],
+      "艺术气息": 5,
+      "字体粗细程度": 4,
+      "适配BGM节奏": [
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "caveat",
+      "字体名称": "Caveat",
+      "font_family": "Caveat",
+      "font_fullname": "Caveat Regular",
+      "file": "en/Caveat-Variable.ttf",
+      "sha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988",
+      "bytes": 403648,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "贴纸",
+        "弹幕",
+        "标题"
+      ],
+      "风格标签": "马克笔手写",
+      "气质关键词": [
+        "涂鸦",
+        "手账",
+        "率真",
+        "随性"
+      ],
+      "适合作品类型": [
+        "生活vlog",
+        "旅行",
+        "综艺剪辑"
+      ],
+      "艺术气息": 4,
+      "字体粗细程度": 3,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts",
+      "备注": "可变字重，手账贴纸感"
+    },
+    {
+      "id": "poppins",
+      "字体名称": "Poppins",
+      "font_family": "Poppins",
+      "font_fullname": "Poppins Regular",
+      "file": "en/Poppins-Regular.ttf",
+      "sha256": "7e65201e9b79159e2300267cc885e16c8dcef2424cdfa09a29bfb0980a94a7ba",
+      "bytes": 160316,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "字幕",
+        "标题"
+      ],
+      "风格标签": "几何无衬线",
+      "气质关键词": [
+        "圆润",
+        "友好",
+        "年轻",
+        "现代"
+      ],
+      "适合作品类型": [
+        "产品介绍",
+        "生活vlog",
+        "科技"
+      ],
+      "艺术气息": 3,
+      "字体粗细程度": 2,
+      "适配BGM节奏": [
+        "慢",
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    },
+    {
+      "id": "poppins-bold",
+      "字体名称": "Poppins Bold",
+      "font_family": "Poppins",
+      "font_fullname": "Poppins Bold",
+      "file": "en/Poppins-Bold.ttf",
+      "sha256": "983676516167748b74de6f4771fb384c664fd913acb8b471122ecacf5da5ea6c",
+      "bytes": 155996,
+      "语言": [
+        "en"
+      ],
+      "场景": [
+        "标题"
+      ],
+      "风格标签": "几何无衬线",
+      "气质关键词": [
+        "圆润",
+        "醒目",
+        "年轻"
+      ],
+      "适合作品类型": [
+        "产品介绍",
+        "综艺剪辑",
+        "生活vlog"
+      ],
+      "艺术气息": 3,
+      "字体粗细程度": 4,
+      "适配BGM节奏": [
+        "中",
+        "快"
+      ],
+      "license": "ofl-1.1",
+      "licenseLabel": "SIL OFL 1.1",
+      "source": "https://github.com/google/fonts"
+    }
+  ]
+}

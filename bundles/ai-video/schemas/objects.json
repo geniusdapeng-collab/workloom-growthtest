@@ -18,6 +18,8 @@
     { "type": "color_report", "label": "色彩报告", "note": "调色师产物：前后指标（YMIN/YAVG/YMAX/UAVG/VAVG/SATAVG）、滤镜链、profile/LUT 版本、scope 与前后对比帧引用、产物 sha256；无回执不得进入入库/发布队列（G-COL3）" },
     { "type": "bgm_track", "label": "配乐音轨", "note": "配乐师产物：自算作曲（配方 id/调性/BPM/配器/种子）或曲库曲目（id/许可/TASL 署名）；含 sha256 与实测峰值/RMS；许可不合规不得入片（G-BGM5）" },
     { "type": "bgm_report", "label": "配乐报告", "note": "配乐师产物：分层策略、BGM 电平与让位深度、人声-音乐余量、配乐可闻度、响度（LUFS/dBTP/LRA）、卡点达标率与采用 BPM、署名文件、产物 sha256；无回执不得进入入库/发布队列（G-BGM3）" },
+    { "type": "subtitle_track", "label": "字幕轨（文字版式方案）", "note": "字幕师产物：字体 id/家族/fullname/文件 sha256/许可 + 场景字号/描边/边距/对齐 + ASS 样式与事件 + 平台版式；字体许可不合规不得入片（G-SUB5），方案可直接给剪辑软件复用" },
+    { "type": "subtitle_report", "label": "字幕报告", "note": "字幕师产物：选型理由（含被否候选）、版式体检（实测墨迹外接框/字号占短边/行宽/安全区/遮挡区/对比度）、字幕可现度增量、时间轴回读一致性、fontselect 字体解析命中、编码器、证据帧与成片 sha256；无回执不得进入入库/发布队列（G-SUB3）" },
     { "type": "publish_task", "label": "发布任务" },
     { "type": "account_metric", "label": "账号指标", "note": "账号/视频时序指标（播放/完播/互动/转化）；阈值告警与战报的事实源；G16 复用其登录风控上下文" },
     { "type": "comment", "label": "评论", "note": "采集原始评论；意图分类 praise/thanks/consult/after_sale/negative/crisis/sensitive 后驱动 G10 三级分流" },

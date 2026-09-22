@@ -2,7 +2,7 @@
   "meta": {
     "schema": "workloom.oss-components/v2",
     "name": "WorkLoom 开源组件登记表（oss-watch）",
-    "updated": "2026-09-19",
+    "updated": "2026-09-23",
     "doc": "docs/OPEN_SOURCE_COMPONENTS.md",
     "plan": "docs/oss-update-plan.md",
     "state": ".oss-watch-state.json",
@@ -1712,6 +1712,107 @@
       "notes": "文本生成音乐（MusicGen / MAGNeT / JASCO）与音频编解码（EnCodec）。**权重为 CC-BY-NC 4.0，输出不可直接用于商用交付**，因此配乐工位的默认路径是自算作曲（synth.mjs），而非该模型；仅在客户另行取得授权或纯研究场景才可评估接入。许可结论来自官方 README 的 License 段（2026-09-22 核验）。",
       "latest": "v1.3.0（2024-05-02）",
       "latest_checked_at": "2026-09-22T00:00:00.000Z"
+    },
+    {
+      "name": "font-library v1.1（字幕工位字体库：思源/Noto 系列）",
+      "repo": "https://github.com/adobe-fonts/source-han-sans",
+      "license": "SIL OFL 1.1",
+      "channel": "manual",
+      "usage": "asset",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
+        "pattern": "\"component\":\\s*\"字体库 font-library v1\\.1[^\"]*\""
+      },
+      "scope": [
+        "bundles/ai-video/library/font-catalog（打标档案 + 许可 + 逐文件 sha256）",
+        "bundles/ai-video/connectors/subtitle-bridge/kit（fonts-pin.json 引脚 + install-fonts.sh 安装）",
+        "Mac 字幕工位 ~/.workloom-subtitle/fonts（运行时字体，不进仓库）"
+      ],
+      "cadence": "quarterly",
+      "gate": "workstation-pin",
+      "notes": "字幕工位字体：思源黑体/思源宋体（Source Han Sans/Serif CN、Noto Sans/Serif SC）。仓库只保存档案（打标/许可/sha256）与引脚，不携带字体二进制；安装走 kit/install-fonts.sh（--from-dir 离线导入或 --download 已核验直链），逐文件 sha256 校验并把 LICENSES.md 一并落盘（OFL 再分发要求）。本能力不做子集化（OFL 修改后再发布需改名）。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts。",
+      "latest": "Source Han Sans 2.004（release 分支，实测直链逐字节一致）"
+    },
+    {
+      "name": "霞鹜文楷 LXGW WenKai（字幕工位字体）",
+      "repo": "https://github.com/lxgw/LxgwWenKai",
+      "license": "SIL OFL 1.1",
+      "channel": "github",
+      "usage": "asset",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
+        "pattern": "lxgw[^\\\"]*"
+      },
+      "scope": [
+        "bundles/ai-video/library/font-catalog/font_db.json#fonts（lxgw-wen-kai）",
+        "Mac 字幕工位 ~/.workloom-subtitle/fonts/cn（运行时字体，不进仓库）"
+      ],
+      "cadence": "quarterly",
+      "gate": "workstation-pin",
+      "notes": "知识区字幕首选（楷体/印刷体，艺术气息 5、粗细 2）。受控下载 release 资产 LXGWWenKai-Regular.ttf 并核验 sha256；未核验前不得用 --download。",
+      "latest": "v1.522（GitHub Releases，实测直链逐字节一致）"
+    },
+    {
+      "name": "得意黑 Smiley Sans（字幕工位字体）",
+      "repo": "https://github.com/atelier-anchor/smiley-sans",
+      "license": "SIL OFL 1.1",
+      "channel": "github",
+      "usage": "asset",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
+        "pattern": "smiley[^\\\"]*"
+      },
+      "scope": [
+        "bundles/ai-video/library/font-catalog/font_db.json#fonts（smiley-sans-oblique）",
+        "Mac 字幕工位 ~/.workloom-subtitle/fonts/cn（运行时字体，不进仓库）"
+      ],
+      "cadence": "quarterly",
+      "gate": "workstation-pin",
+      "notes": "现代倾斜标题体（对标造字工房悦黑系列）。release 资产为 zip，安装脚本按 zipMember 取 SmileySans-Oblique.ttf 后再校验 sha256。",
+      "latest": "v2.0.1（GitHub Releases，实测摘包后逐字节一致）"
+    },
+    {
+      "name": "Google Fonts 字体组（字幕工位字体：ZCOOL 系列/马善政/志莽行书/流建毛草/龙藏体 + 15 款英文字体）",
+      "repo": "https://github.com/google/fonts",
+      "license": "SIL OFL 1.1（站酷系列为站酷免费商用授权，Google Fonts 以 OFL-1.1 发布）",
+      "channel": "github",
+      "usage": "asset",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
+        "pattern": "google/fonts"
+      },
+      "scope": [
+        "bundles/ai-video/library/font-catalog/font_db.json#fonts（25 款：中文 9 + 英文 16）",
+        "Mac 字幕工位 ~/.workloom-subtitle/fonts（运行时字体，不进仓库）"
+      ],
+      "cadence": "quarterly",
+      "gate": "workstation-pin",
+      "notes": "ZCOOL 快乐体/庆科黄油体/小薇、马善政毛笔楷书、志莽行书、流建毛草、龙藏体 + Inter/Montserrat/Playfair Display/Oswald/Cinzel/Dancing Script/Roboto/Bebas Neue/Anton/Archivo Black/Lobster/Pacifico/Bangers/Caveat/Poppins（Regular/Bold）。上游为 google/fonts main 分支 raw 直链，逐文件 sha256 核验结果写进 fonts-pin.json；未核验条目不得用 --download（走 --from-dir）。",
+      "latest": "google/fonts main（滚动分支；逐文件 sha256 已核验部分见 fonts-pin.json#upstream.verifiedAt）"
+    },
+    {
+      "name": "FFmpeg + libass（字幕工位内核）",
+      "repo": "https://github.com/FFmpeg/FFmpeg",
+      "license": "LGPL-2.1-or-later（libass 为 ISC；本工位使用本机 ffmpeg 构建，不随产品分发）",
+      "channel": "github",
+      "usage": "binary",
+      "probe": {
+        "kind": "regex",
+        "file": "bundles/ai-video/connectors/subtitle-bridge/README.md",
+        "pattern": "libass"
+      },
+      "scope": [
+        "bundles/ai-video/connectors/subtitle-bridge（core/measure/cli/server/executor）",
+        "Mac 字幕工位（运行时二进制，不进仓库；WORKLOOM_SUBTITLE_FFMPEG_PATH 指定）"
+      ],
+      "cadence": "quarterly",
+      "gate": "workstation-pin",
+      "notes": "字幕烧录内核：ass/subtitles（libass）+ bbox（文字墨迹实测）+ signalstats/edgedetect（画面可读性）+ crop。工位自检（kit/selftest.sh）会校验 ass 滤镜与编码器；缺 libass 直接判工位不可用，不做降级渲染。",
+      "latest": "ffmpeg 6.0（工位实装自报）/ n8.0（上游）。仓内不 pin 版本：跟随工位安装，自检时如实上报版本号"
     }
   ]
 }
