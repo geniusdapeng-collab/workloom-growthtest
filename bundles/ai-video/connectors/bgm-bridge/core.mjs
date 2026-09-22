@@ -21,8 +21,9 @@ import os from "node:os";
 import path from "node:path";
 
 import {
-  MeasureError, binaryVersion, detectCuts, detectVoiceBandSegments, measureLoudness,
-  probeMedia, renderWaveformCompare, resolveBinaries, round, runBin, segmentMeanVolumeDb,
+  MeasureError, binaryVersion, classifySegments, decodePcm, detectCuts, detectVoiceBandSegments,
+  energyEnvelope, estimateBpmFromOnsets, measureLoudness, onsetStrength, probeMedia,
+  renderWaveformCompare, resolveBinaries, round, runBin, scoreSegments, segmentMeanVolumeDb,
   segmentSpectralStats, sha256File, tempDir,
 } from "./measure.mjs";
 import { composeToWav, planComposition } from "./synth.mjs";
@@ -37,6 +38,7 @@ export const BGM_TOOLS = [
   "bgmread.health",
   "bgmread.probe",
   "bgmread.analyze",
+  "bgmread.structure",
   "bgmread.recipes",
   "bgmread.library",
   "bgmwrite.compose",
@@ -483,6 +485,358 @@ export async function analyze({ input, noiseDb = -38, bins = resolveBinaries(), 
 
 /* ============================ 卡点对齐 ============================ */
 
+/* ============================ 音乐结构识别与选段 ============================ */
+
+/** 本仓提供的选段模式。 */
+export const SECTION_MODES = ["full", "auto", "climax", "calm"];
+
+/**
+ * 曲目结构分析：能量包络 → 分段（intro/verse/build/drop/breakdown/outro/flat）→ BPM → 段落候选。
+ *
+ * 诚实边界：这是**规则式（分位数 + 走向 + 起音密度）分段**，不是深度学习结构识别，也不是乐谱级
+ * 的"主歌/副歌"标注；它能稳定回答"哪一段最响、最密、最适合当高潮"这类选段问题。
+ */
+export async function analyzeStructure({ input, windowSec = 0.25, minSegmentSec = 3, maxSeconds = 600, bins = resolveBinaries() }) {
+  const probe = await probeMedia(input, { bins });
+  const { pcm, sampleRate } = await decodePcm({ input, maxSeconds, bins });
+  const envelope = energyEnvelope({ pcm, sampleRate, windowSec });
+  const onsets = onsetStrength(envelope.db);
+  const tempo = estimateBpmFromOnsets(onsets, { windowSec });
+  const structure = classifySegments({ envelope, onsets, minSegmentSec });
+  // 边界吸附只在拍速可信（medium/high）时启用：低置信度的 BPM 会把边界带到没有意义的位置
+  const snapBpm = tempo.confidence === "low" ? null : tempo.bpm;
+  const climax = scoreSegments({ segments: structure.segments, bpm: snapBpm, prefer: "climax", durationSec: envelope.durationSec });
+  const calm = scoreSegments({ segments: structure.segments, bpm: snapBpm, prefer: "calm", durationSec: envelope.durationSec });
+  return {
+    input,
+    durationSec: envelope.durationSec,
+    analyzedSec: envelope.durationSec,
+    truncated: probe.duration > envelope.durationSec + windowSec,
+    probeDurationSec: probe.duration,
+    sampleRate,
+    windowSec,
+    tempo,
+    envelope: {
+      windows: envelope.windows,
+      avgDb: envelope.avgDb,
+      peakDb: envelope.peakDb,
+      quantiles: envelope.quantiles,
+      db: envelope.db,
+    },
+    structure: {
+      method: structure.method,
+      dynamicsDb: structure.dynamicsDb,
+      thresholds: structure.thresholds,
+      note: structure.note,
+      segments: structure.segments,
+    },
+    climax,
+    calm,
+    method: {
+      envelope: "解码为 8kHz 单声道 PCM 后在 JS 内按窗口算 RMS（一遍 ffmpeg + 纯 JS）",
+      segmentation: "规则式：能量分位数（p25/p75）三档 + 段内走向 + 起音密度",
+      tempo: "起音包络自相关（拿不到稳定周期就如实返回 null）",
+    },
+  };
+}
+
+/**
+ * 选出要用的音乐片段。
+ *
+ * `auto` 的决策顺序：
+ * 1. 片子里有明确能量峰值区（例如结尾的情绪高点）→ 取曲子的高潮段，并把**高潮段的峰值对齐到片子的峰值时刻**；
+ * 2. 片子能量平坦（没有高点）→ 取曲子里能量最集中的一段（代表性片段），从片子开头铺；
+ * 3. 曲子本身平坦（flat）→ 从曲头取足够长的一段（等价于"没有高潮可挑"），并把理由写进回执。
+ * 4. 段落选出来"太长"（超过曲子一半或超过片长）→ 退化为**在段落内滑窗**：以能量最高窗为中心取一段，
+ *    避免"选了个 30s 的段去配 15s 的片子"这种等于没选的结论。
+ */
+export function chooseSection({ structure, filmArc = null, mode = "auto", filmDurationSec = null, minSectionSec = 6 }) {
+  if (!SECTION_MODES.includes(mode) && mode !== "full") {
+    throw new BgmError(`未知选段模式：${mode}（可用：${SECTION_MODES.join(", ")}）`, "bad_request");
+  }
+  const trackDuration = structure?.durationSec ?? 0;
+  if (!(trackDuration > 0)) throw new BgmError("结构分析结果缺少时长", "bad_request");
+
+  const pick = (candidates, typeWanted) => {
+    const target = typeWanted ? candidates.find((item) => item.type === typeWanted) : null;
+    return target ?? candidates[0] ?? null;
+  };
+
+  /** 段落内的滑窗取段：以覆盖窗口内能量均值最高的位置为中心，长度取 min(片长, 曲子 40%)。 */
+  const slideWindowWithin = (segment, reason) => {
+    const wanted = Math.max(
+      Math.min(minSectionSec, trackDuration),
+      Math.min(filmDurationSec ?? 30, trackDuration * 0.4),
+    );
+    const windows = structure.envelope.db ?? [];
+    const windowSec = structure.windowSec;
+    const fromIndex = Math.max(0, Math.round(segment.startSec / windowSec));
+    const toIndex = Math.min(windows.length, Math.round(segment.endSec / windowSec));
+    const spanWindows = Math.max(1, Math.round(wanted / windowSec));
+    let bestStart = fromIndex;
+    let bestValue = -Infinity;
+    for (let start = fromIndex; start + spanWindows <= Math.max(toIndex, fromIndex + spanWindows); start += 1) {
+      const slice = windows.slice(start, Math.min(start + spanWindows, windows.length));
+      if (slice.length < spanWindows) break;
+      const value = slice.reduce((a, b) => a + b, 0) / slice.length;
+      if (value > bestValue) { bestValue = value; bestStart = start; }
+    }
+    const startSec = round(bestStart * windowSec, 3);
+    const endSec = round(Math.min(trackDuration, startSec + wanted), 3);
+    return {
+      id: `${segment.id}-win`,
+      type: segment.type,
+      startSec,
+      endSec,
+      durationSec: round(endSec - startSec, 3),
+      avgDb: round(bestValue, 2),
+      peakDb: segment.peakDb,
+      onsetDensity: segment.onsetDensity,
+      score: segment.score,
+      windowed: true,
+      reason,
+    };
+  };
+
+  if (mode === "full") {
+    return { mode, chosen: null, reason: "整曲模式：循环铺满，不做选段", alignFilmPeak: false, source: { trackDurationSec: trackDuration } };
+  }
+  if (mode === "climax") {
+    const chosen = pick(structure.climax.candidates, "drop");
+    return {
+      mode,
+      chosen,
+      reason: `指定高潮段：选 ${chosen.type}（平均 ${chosen.avgDb}dB / 峰值 ${chosen.peakDb}dB / 起点 ${chosen.startSec}s）`,
+      alignFilmPeak: true,
+      source: { trackDurationSec: trackDuration },
+    };
+  }
+  if (mode === "calm") {
+    const chosen = pick(structure.calm.candidates, "intro") ?? pick(structure.calm.candidates, "verse");
+    return {
+      mode,
+      chosen,
+      reason: `指定铺垫段：选 ${chosen.type}（平均 ${chosen.avgDb}dB）`,
+      alignFilmPeak: false,
+      source: { trackDurationSec: trackDuration },
+    };
+  }
+
+  // auto
+  const flatTrack = structure.structure.segments.length === 1 && structure.structure.segments[0].type === "flat";
+  const filmPeakSec = Number.isFinite(filmArc?.peakTimeSec) ? filmArc.peakTimeSec : null;
+  const filmDynamics = Number.isFinite(filmArc?.dynamicsDb) ? filmArc.dynamicsDb : null;
+  const filmHasPeak = filmPeakSec !== null && filmArc?.climaxBasis && filmArc.climaxBasis !== "none";
+
+  if (flatTrack) {
+    const chosen = {
+      id: "head",
+      type: "flat",
+      startSec: 0,
+      endSec: Math.min(trackDuration, Math.max(minSectionSec, filmDurationSec ?? 30)),
+      durationSec: Math.min(trackDuration, Math.max(minSectionSec, filmDurationSec ?? 30)),
+      avgDb: structure.envelope.avgDb,
+      peakDb: structure.envelope.peakDb,
+      onsetDensity: null,
+      score: null,
+    };
+    return {
+      mode,
+      chosen,
+      reason: "曲子能量平坦（无高潮可言）：从曲头取足够长的一段，按整段铺",
+      alignFilmPeak: false,
+      source: { trackDurationSec: trackDuration, filmPeakSec, filmDynamicsDb: filmDynamics },
+    };
+  }
+
+  if (filmHasPeak) {
+    const picked = pick(structure.climax.candidates, "drop");
+    const tooLong = picked.durationSec > Math.max(trackDuration * 0.5, (filmDurationSec ?? 30) * 1.2);
+    const chosen = tooLong
+      ? slideWindowWithin(picked, `高潮段本身长 ${picked.durationSec}s，超过片子所需：在段内以能量最高处为中心取 ${Math.round(Math.min(filmDurationSec ?? 30, trackDuration * 0.4))}s`)
+      : picked;
+    return {
+      mode,
+      chosen,
+      reason: chosen.windowed
+        ? `片子有明确高点（${filmPeakSec}s）→ ${chosen.reason}，并把窗口峰值对齐到 ${filmPeakSec}s`
+        : `片子有明确高点（${filmPeakSec}s，动态 ${filmDynamics}dB）→ 取曲子高潮段（${chosen.type}，平均 ${chosen.avgDb}dB）并把峰值对齐到 ${filmPeakSec}s`,
+      alignFilmPeak: true,
+      source: { trackDurationSec: trackDuration, filmPeakSec, filmDynamicsDb: filmDynamics },
+    };
+  }
+
+  const picked = pick(structure.climax.candidates, "drop");
+  const tooLong = picked.durationSec > Math.max(trackDuration * 0.5, (filmDurationSec ?? 30) * 1.2);
+  const chosen = tooLong
+    ? slideWindowWithin(picked, `段落长 ${picked.durationSec}s，超过片子所需：在段内以能量最高处为中心取一段`)
+    : picked;
+  return {
+    mode,
+    chosen,
+    reason: `片子未识别到可用的高潮点（对白占比 ${Number.isFinite(filmArc?.climaxDetails?.audio?.speechRatio) ? Math.round(filmArc.climaxDetails.audio.speechRatio * 100) + "%" : "n/a"}／无非对白能量峰／无剪辑成簇）→ 取曲子最有代表性的一段（${chosen.type}，平均 ${chosen.avgDb}dB），从片子开头铺，不做峰值对齐`,
+    alignFilmPeak: false,
+    source: { trackDurationSec: trackDuration, filmPeakSec, filmDynamicsDb: filmDynamics },
+  };
+}
+
+/** 影片侧的能量弧线（选段对齐的依据）：与音乐同一套包络算法，口径一致。 */
+export async function filmEnergyArc({ input, windowSec = 0.25, maxSeconds = 600, bins = resolveBinaries() }) {
+  const { pcm, sampleRate } = await decodePcm({ input, maxSeconds, bins });
+  const envelope = energyEnvelope({ pcm, sampleRate, windowSec });
+  const db = envelope.db;
+  const smoothWindow = Math.max(1, Math.round(1.25 / windowSec));
+  let peakIndex = 0;
+  let peakValue = -Infinity;
+  for (let index = 0; index < db.length; index += 1) {
+    const from = Math.max(0, index - Math.floor(smoothWindow / 2));
+    const to = Math.min(db.length, from + smoothWindow);
+    const slice = db.slice(from, to);
+    if (!slice.length) continue;
+    const value = slice.reduce((a, b) => a + b, 0) / slice.length;
+    if (value > peakValue) { peakValue = value; peakIndex = index; }
+  }
+  const p95 = envelope.quantiles.p90 ?? envelope.peakDb ?? 0;
+  const p05 = envelope.quantiles.p10 ?? envelope.avgDb ?? 0;
+  return {
+    input,
+    windowSec,
+    durationSec: envelope.durationSec,
+    avgDb: envelope.avgDb,
+    peakDb: envelope.peakDb,
+    dynamicsDb: Math.round(((p95 ?? 0) - (p05 ?? 0)) * 100) / 100,
+    peakTimeSec: Math.round(peakIndex * windowSec * 1000) / 1000,
+    peakWindowDb: Math.round(peakValue * 100) / 100,
+    db,
+  };
+}
+
+/**
+ * 片子的"高潮时刻"该取哪里——口播片不能拿台词最响处当高潮（那会把音乐高潮对到人声上）。
+ *
+ * 三级依据，**每级都要"确有峰"才采用**，找不到就如实返回 `basis: "none"`（宁可不做峰值对齐，
+ * 也不把音乐高潮对到片头第一秒这种人眼一看就不对的位置）：
+ * 1. `cut-density`：±2s 窗口内剪辑点成簇（≥2 个）处——画面节奏的高点；
+ * 2. `non-dialogue-energy`：非对白窗口里的能量峰，且要比非对白窗口中位数高 ≥3dB——空镜/动作段的高点；
+ * 3. `audio-energy`：整体音频能量峰，且该片对白占比 <35%（对白稀少的片子才把它当高潮）。
+ */
+export function filmClimaxTime({ arc, cuts = [], voice = null, durationSec = null }) {
+  const windowSec = arc?.windowSec ?? 0.25;
+  const duration = durationSec ?? arc?.durationSec ?? 0;
+  const radiusWindows = Math.max(1, Math.round(2 / windowSec));
+  const details = {};
+
+  if (Array.isArray(cuts) && cuts.length >= 2) {
+    let bestTime = null;
+    let bestCount = 0;
+    for (const cut of cuts) {
+      const count = cuts.filter((other) => Math.abs(other.at - cut.at) <= 2).length;
+      if (count > bestCount || (count === bestCount && bestTime !== null && cut.at > bestTime)) {
+        bestCount = count;
+        bestTime = cut.at;
+      }
+    }
+    details.cutDensity = { timeSec: bestTime, cutsInWindow: bestCount, radiusSec: 2 };
+    if (bestTime !== null && bestCount >= 2) {
+      return { timeSec: Math.round(bestTime * 1000) / 1000, basis: "cut-density", details };
+    }
+  }
+
+  const silences = Array.isArray(voice?.silences) ? voice.silences : [];
+  // 「安静窗口」= 整窗都落在静音段内部、且离人声边界至少 0.75s（否则会把台词起音算成"安静段的能量峰"，
+  // 实测就是这个坑：0.25s 那格跨在对白起音上，被当成高潮点）。
+  const marginSec = 0.75;
+  const isQuietWindow = (time) => silences.some((segment) => (
+    time >= segment.start + marginSec && time + windowSec <= segment.end - marginSec
+  ));
+  const db = arc?.db ?? [];
+  const quietWindows = [];
+  for (let index = 0; index < db.length; index += 1) {
+    const time = index * windowSec;
+    if (time > duration - 1) break;
+    if (!isQuietWindow(time)) continue;
+    const from = Math.max(0, index - radiusWindows);
+    const to = Math.min(db.length, index + radiusWindows + 1);
+    const slice = db.slice(from, to).filter((_, offset) => isQuietWindow((from + offset) * windowSec));
+    if (!slice.length) continue;
+    const value = slice.reduce((a, b) => a + b, 0) / slice.length;
+    quietWindows.push({ time, value });
+  }
+  if (quietWindows.length) {
+    const sorted = [...quietWindows].map((entry) => entry.value).sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)] ?? -60;
+    const best = quietWindows.reduce((a, b) => (b.value > a.value ? b : a));
+    details.nonDialogue = {
+      timeSec: Math.round(best.time * 1000) / 1000,
+      avgDb: Math.round(best.value * 100) / 100,
+      medianDb: Math.round(median * 100) / 100,
+      aboveMedianDb: Math.round((best.value - median) * 100) / 100,
+      quietSeconds: Math.round(silences.reduce((sum, segment) => sum + segment.duration, 0) * 100) / 100,
+    };
+    if (best.value - median >= 3) {
+      return { timeSec: Math.round(best.time * 1000) / 1000, basis: "non-dialogue-energy", details };
+    }
+  }
+
+  const speechRatio = Number.isFinite(voice?.activeRatio) ? voice.activeRatio : null;
+  details.audio = { peakTimeSec: arc?.peakTimeSec ?? null, speechRatio, dynamicsDb: arc?.dynamicsDb ?? null };
+  if ((arc?.dynamicsDb ?? 0) >= 6 && speechRatio !== null && speechRatio < 0.35) {
+    return { timeSec: arc.peakTimeSec, basis: "audio-energy", details };
+  }
+  return {
+    timeSec: null,
+    basis: "none",
+    reason: "片子未识别到明确高潮点（无剪辑成簇、非对白段无能量峰、对白占比高）→ 不做峰值对齐",
+    details,
+  };
+}
+
+/** 把选中的片段裁成独立文件（后续按现有链路循环铺满；边界加 120ms 微淡避免爆音）。 */
+export async function renderSection({ input, output, startSec, endSec, bins = resolveBinaries(), fadeSec = 0.12 }) {
+  const length = Math.max(0.5, endSec - startSec);
+  const fade = Math.min(fadeSec, length / 4);
+  await fsp.mkdir(path.dirname(output), { recursive: true });
+  await runBin(bins.ffmpeg, [
+    "-hide_banner", "-v", "error", "-y",
+    "-ss", String(startSec), "-t", String(length), "-i", input,
+    "-af", `afade=t=in:st=0:d=${round(fade, 3)},afade=t=out:st=${round(Math.max(0, length - fade), 3)}:d=${round(fade, 3)}`,
+    "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", output,
+  ], { label: "ffmpeg(section)", timeoutMs: 600_000 });
+  return { path: output, startSec: round(startSec, 3), endSec: round(endSec, 3), durationSec: round(length, 3), sha256: await sha256File(output) };
+}
+
+/** 选段证据图：上=曲目波形（红框=选中片段），下=影片波形（红框=能量高点）。 */
+export async function renderSectionEvidence({ music, film, section, filmPeakSec = null, output, bins = resolveBinaries(), width = 1000, height = 200 }) {
+  await fsp.mkdir(path.dirname(output), { recursive: true });
+  const musicDuration = Math.max(0.001, music.durationSec);
+  const x = Math.max(0, Math.round((section.startSec / musicDuration) * width));
+  const w = Math.max(2, Math.round(((section.endSec - section.startSec) / musicDuration) * width));
+  const parts = [
+    `[0:a]showwavespic=s=${width}x${height}:colors=0x2f7d5b[top]`,
+    `[top]drawbox=x=${x}:y=0:w=${w}:h=${height}:color=red@0.85:t=6[t1]`,
+  ];
+  const map = ["[t1]"];
+  if (film) {
+    const filmDuration = Math.max(0.001, film.durationSec);
+    parts.push(`[1:a]showwavespic=s=${width}x${height}:colors=0x8899aa[bottom]`);
+    if (Number.isFinite(filmPeakSec)) {
+      const px = Math.max(0, Math.round((filmPeakSec / filmDuration) * width));
+      parts.push(`[bottom]drawbox=x=${Math.max(0, px - 8)}:y=0:w=16:h=${height}:color=red@0.85:t=fill[b1]`);
+      map.push("[b1]");
+    } else {
+      map.push("[bottom]");
+    }
+    parts.push(`${map.join("")}vstack=inputs=2[out]`);
+  } else {
+    parts.push("[t1]null[out]");
+  }
+  const args = ["-hide_banner", "-v", "error", "-y", "-i", music.input ?? music.path];
+  if (film) args.push("-i", film.input);
+  args.push("-filter_complex", parts.join(";"), "-map", "[out]", "-frames:v", "1", output);
+  await runBin(bins.ffmpeg, args, { label: "ffmpeg(section-evidence)", timeoutMs: 300_000 });
+  return { path: output, sha256: await sha256File(output) };
+}
+
 /** 到最近整拍的距离（秒）。 */
 function beatDistance(time, offset, beatSec) {
   const relative = (time - offset) % beatSec;
@@ -658,17 +1012,31 @@ async function normalizeLoudness({ input, output, targetLufs, truePeak, bins }) 
   const measuredLra = Number.isFinite(measured.lra) ? measured.lra : 11;
   const measuredThresh = Number.isFinite(measured.thresholdLufs) ? measured.thresholdLufs : targetLufs - 10;
   const offset = Number.isFinite(measured.targetOffset) ? measured.targetOffset : 0;
+  // 真峰值留 0.5dB 余量：loudnorm 的 TP 是"上限"而不是"保证值"，贴边设置实测会越界（本仓实测 -0.74dBTP > -1.0 目标）。
+  // 交付口径仍然是 ≤-1.0dBTP，由末尾的实测复检 + 闭环修正兜底。
+  const applyTruePeak = Math.round((truePeak - 0.5) * 100) / 100;
   await runBin(bins.ffmpeg, [
     "-hide_banner", "-v", "error", "-y",
     "-i", input,
     "-af",
-    `loudnorm=I=${targetLufs}:TP=${truePeak}:LRA=11:linear=true:`
+    `loudnorm=I=${targetLufs}:TP=${applyTruePeak}:LRA=11:linear=true:`
     + `measured_I=${measuredI}:measured_TP=${measuredTp}:measured_LRA=${measuredLra}:`
     + `measured_thresh=${measuredThresh}:offset=${offset}:print_format=summary`,
     "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2",
     output,
   ], { label: "ffmpeg(loudnorm-apply)", timeoutMs: 900_000 });
   return { path: output, measuredBefore: measured, sha256: await sha256File(output) };
+}
+
+/** 闭环修正：把已过真峰值红线的母版整体下压（可逆、只减不增），再复测。 */
+async function trimMaster({ input, output, gainDb, bins }) {
+  await runBin(bins.ffmpeg, [
+    "-hide_banner", "-v", "error", "-y",
+    "-i", input,
+    "-af", `volume=${round(gainDb, 2)}dB`,
+    "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", output,
+  ], { label: "ffmpeg(trim-master)", timeoutMs: 600_000 });
+  return { path: output, sha256: await sha256File(output) };
 }
 
 /**
@@ -688,6 +1056,7 @@ export async function mix({
   fadeInSec = 1.2, fadeOutSec = 1.6, align = true, allowDiscardOriginal = false,
   evidenceDir = null, bins = resolveBinaries(), workDir = null, keepWork = false,
   licenseReviewed = true, commercialUse = true,
+  section = "full", sectionStartSec = null, sectionEndSec = null,
 }) {
   if (!AUDIO_POLICIES.includes(policy)) {
     throw new BgmError(`未知分层策略：${policy}（可用：${AUDIO_POLICIES.join(", ")}）`, "bad_request");
@@ -708,7 +1077,7 @@ export async function mix({
   // music_level_db 的口径是「BGM 在成片里的实际平均电平（dBFS）」，不是 volume 滤镜的增益：
   // 所以先量 BGM 自身的平均电平，再反推需要施加的增益。这样配方里的 -22dB 就是"BGM 约 -22dBFS"。
   const bgmSelfLevel = await segmentMeanVolumeDb({ input: bgmPath, duration: Math.min(bgmProbe.duration, 10), bins });
-  const bgmMeanDb = Number.isFinite(bgmSelfLevel.meanDb) ? bgmSelfLevel.meanDb : -18;
+  let bgmMeanDb = Number.isFinite(bgmSelfLevel.meanDb) ? bgmSelfLevel.meanDb : -18;
   if (path.resolve(output) === path.resolve(input)) {
     throw new BgmError("禁止覆盖原片（原片只读）", "overwrite_source_forbidden");
   }
@@ -721,7 +1090,125 @@ export async function mix({
   const grid = align
     ? alignBeatGrid({ bpm: Number(bgmBpm ?? 100), cuts })
     : { bpm: Number(bgmBpm ?? 100), offsetSec: 0, cuts: [], meanAbsErrorMs: null, verdict: "disabled", method: "disabled" };
-  const offset = align ? grid.offsetSec : 0;
+
+  /**
+   * 选段：`section=auto|climax|calm|full` 或显式 `section_start_sec/section_end_sec`。
+   * 选段后整条链路不变——只是把"整曲无限循环"换成"选中片段无限循环"，并按片子能量高点做落点对齐。
+   */
+  let sectionPlan = null;
+  let structure = null;
+  let filmArc = null;
+  let playPath = bgmPath;
+  let sectionTrimHeadSec = 0;
+  let sectionPlaceOffsetSec = null;
+  let sectionArtifact = null;
+  const explicitSection = Number.isFinite(sectionStartSec) && Number.isFinite(sectionEndSec);
+  if (explicitSection || section !== "full") {
+    structure = await analyzeStructure({ input: bgmPath, bins });
+    filmArc = await filmEnergyArc({ input, bins });
+    // 片子的"高潮"按三级依据定：剪辑密度 → 非对白能量 → 音频能量（口播片不会被台词峰值带跑）
+    const climax = filmClimaxTime({
+      arc: filmArc,
+      cuts: align ? cuts : (await detectCuts({ input, bins })).cuts,
+      voice,
+      durationSec: duration,
+    });
+    filmArc.climaxTimeSec = climax.timeSec;
+    filmArc.climaxBasis = climax.basis;
+    filmArc.climaxDetails = climax.details;
+    filmArc.audioPeakTimeSec = filmArc.peakTimeSec;
+    filmArc.peakTimeSec = climax.timeSec;
+    if (explicitSection) {
+      if (!(sectionEndSec > sectionStartSec)) throw new BgmError("section_end_sec 必须大于 section_start_sec", "bad_request");
+      if (sectionStartSec < 0 || sectionEndSec > structure.durationSec + 0.5) {
+        throw new BgmError(`显式片段越界：${sectionStartSec}-${sectionEndSec}s，曲目时长 ${structure.durationSec}s`, "bad_request");
+      }
+      sectionPlan = {
+        mode: "explicit",
+        chosen: {
+          id: "explicit",
+          type: "explicit",
+          startSec: round(sectionStartSec, 3),
+          endSec: round(sectionEndSec, 3),
+          durationSec: round(sectionEndSec - sectionStartSec, 3),
+          avgDb: null,
+          peakDb: null,
+          onsetDensity: null,
+          score: null,
+        },
+        reason: "调用方显式指定片段",
+        alignFilmPeak: false,
+        source: { trackDurationSec: structure.durationSec },
+      };
+    } else {
+      sectionPlan = chooseSection({
+        structure,
+        filmArc,
+        mode: section,
+        filmDurationSec: duration,
+        minSectionSec: Math.min(8, Math.max(4, duration / 3)),
+      });
+    }
+    const chosen = sectionPlan.chosen;
+    if (chosen && chosen.durationSec > 0.5) {
+      // 片段内的"锚点" = 能量最高窗（对齐片子高点用）
+      const from = Math.max(0, Math.round(chosen.startSec / structure.windowSec));
+      const to = Math.min(structure.envelope.db.length, Math.round(chosen.endSec / structure.windowSec));
+      let anchorIndex = from;
+      let anchorValue = -Infinity;
+      for (let index = from; index < to; index += 1) {
+        if (structure.envelope.db[index] > anchorValue) { anchorValue = structure.envelope.db[index]; anchorIndex = index; }
+      }
+      const anchorOffsetSec = round(anchorIndex * structure.windowSec - chosen.startSec, 3);
+      if (sectionPlan.alignFilmPeak && Number.isFinite(filmArc?.peakTimeSec)) {
+        const desiredStartSec = filmArc.peakTimeSec - anchorOffsetSec;
+        if (desiredStartSec >= 0) {
+          sectionPlaceOffsetSec = round(Math.min(desiredStartSec, Math.max(0, duration - 1)), 3);
+        } else {
+          sectionTrimHeadSec = round(Math.min(-desiredStartSec, chosen.durationSec - 1), 3);
+          sectionPlaceOffsetSec = 0;
+        }
+        sectionPlan.filmPeakAlign = {
+          filmPeakSec: filmArc.peakTimeSec,
+          basis: filmArc.climaxBasis ?? null,
+          musicAnchorOffsetSec: anchorOffsetSec,
+          placedAtSec: round(sectionPlaceOffsetSec + sectionTrimHeadSec, 3),
+          note: sectionTrimHeadSec > 0
+            ? `片子高点早于片段峰值，向前裁掉 ${sectionTrimHeadSec}s 片头以对齐`
+            : `片段整体延后 ${sectionPlaceOffsetSec}s 起播，使峰值落在片子高点`,
+        };
+      }
+      if (!sectionPlan.alignFilmPeak) {
+        sectionPlan.filmPeakAlign = filmArc?.climaxBasis === "none" || !filmArc?.climaxBasis
+          ? { skipped: true, reason: filmArc?.climaxDetails?.reason ?? "片子未识别到明确高潮点，音乐不做峰值对齐" }
+          : { skipped: true, reason: "选段模式不要求峰值对齐（如整段/铺垫模式）" };
+      }
+      sectionArtifact = await renderSection({
+        input: bgmPath,
+        output: path.join(work, "section.wav"),
+        startSec: chosen.startSec + sectionTrimHeadSec,
+        endSec: chosen.endSec,
+        bins,
+      });
+      playPath = sectionArtifact.path;
+      // 片段自己的平均电平与整曲可能差很多：用它反推增益，保证"配乐电平"口径仍然成立
+      const sectionLevel = await segmentMeanVolumeDb({ input: playPath, duration: Math.min(sectionArtifact.durationSec, 10), bins });
+      if (Number.isFinite(sectionLevel.meanDb)) bgmMeanDb = sectionLevel.meanDb;
+      sectionPlan.played = {
+        startSec: round(chosen.startSec + sectionTrimHeadSec, 3),
+        endSec: chosen.endSec,
+        durationSec: sectionArtifact.durationSec,
+        loops: sectionArtifact.durationSec > 0 ? Math.ceil(duration / sectionArtifact.durationSec) : 0,
+        sha256: sectionArtifact.sha256,
+      };
+    } else {
+      sectionPlan = { ...sectionPlan, chosen: null, note: "选段结果不足 0.5s，回退整曲循环" };
+    }
+  }
+
+  const offset = sectionPlaceOffsetSec !== null
+    ? sectionPlaceOffsetSec
+    : (align ? grid.offsetSec : 0);
 
   const roomTone = await (async () => {
     const windows = voice.silences
@@ -796,7 +1283,7 @@ export async function mix({
   const musicArgs = [
     "-hide_banner", "-v", "error", "-y",
     "-i", input,
-    "-stream_loop", "-1", "-i", bgmPath,
+    "-stream_loop", "-1", "-i", playPath,
   ];
   const musicParts = [`[1:a]${musicChain},atrim=0:${round(duration, 3)},asetpts=N/SR/TB[music]`];
   if (sidechainSource) {
@@ -826,9 +1313,24 @@ export async function mix({
   ], { label: "ffmpeg(mix-down)", timeoutMs: 900_000 });
 
   // ④ 母版响度（两遍法 loudnorm：-14 LUFS / -1 dBTP）
-  const normalized = await normalizeLoudness({
+  let normalized = await normalizeLoudness({
     input: premasterPath, output: path.join(work, "master.wav"), targetLufs, truePeak, bins,
   });
+
+  // ④·b 真峰值闭环：首次应用后若仍越过 -1.0dBTP，就整体下压再复测（只减不增，可解释、可复现）
+  let masterTrimDb = 0;
+  {
+    const check = await measureLoudness(normalized.path, { bins, targetLufs, truePeak });
+    if (Number.isFinite(check.truePeakDbtp) && check.truePeakDbtp > truePeak) {
+      masterTrimDb = Math.round((truePeak - check.truePeakDbtp - 0.1) * 100) / 100;
+      normalized = await trimMaster({
+        input: normalized.path,
+        output: path.join(work, "master-trimmed.wav"),
+        gainDb: masterTrimDb,
+        bins,
+      });
+    }
+  }
 
   // ⑤ 与视频合流（画面不重编码）
   if (probe.video) {
@@ -931,6 +1433,17 @@ export async function mix({
       before: input, after: output, output: path.join(evidenceDir, "waveform-before-after.png"), bins,
     });
     evidence = { waveform };
+    if (sectionPlan?.chosen) {
+      const structureShot = await renderSectionEvidence({
+        music: { input: bgmPath, durationSec: structure?.durationSec ?? bgmProbe.duration },
+        film: { input, durationSec: duration },
+        section: { startSec: sectionPlan.played?.startSec ?? sectionPlan.chosen.startSec, endSec: sectionPlan.chosen.endSec },
+        filmPeakSec: filmArc?.peakTimeSec ?? null,
+        output: path.join(evidenceDir, "section-picked.png"),
+        bins,
+      });
+      evidence.sectionPicked = structureShot;
+    }
   }
 
   const report = {
@@ -945,7 +1458,41 @@ export async function mix({
       bpm: grid.bpm,
       selfMeanDb: bgmMeanDb,
       appliedGainDb: musicGainDb,
+      playedPath: playPath,
+      playedSha256: sectionArtifact?.sha256 ?? await sha256File(bgmPath),
     },
+    section: sectionPlan
+      ? {
+        mode: sectionPlan.mode,
+        chosen: sectionPlan.chosen,
+        played: sectionPlan.played ?? null,
+        reason: sectionPlan.reason ?? sectionPlan.note ?? null,
+        filmPeakAlign: sectionPlan.filmPeakAlign ?? null,
+        track: structure
+          ? {
+            durationSec: structure.durationSec,
+            bpm: structure.tempo.bpm,
+            bpmConfidence: structure.tempo.confidence,
+            dynamicsDb: structure.structure.dynamicsDb,
+            segments: structure.structure.segments.map((segment) => ({
+              type: segment.type, startSec: segment.startSec, endSec: segment.endSec,
+              avgDb: segment.avgDb, peakDb: segment.peakDb,
+            })),
+            method: structure.method,
+          }
+          : null,
+        filmArc: filmArc
+          ? {
+            peakTimeSec: filmArc.peakTimeSec,
+            peakBasis: filmArc.climaxBasis ?? null,
+            peakDetails: filmArc.climaxDetails ?? null,
+            audioPeakTimeSec: filmArc.audioPeakTimeSec ?? null,
+            dynamicsDb: filmArc.dynamicsDb,
+            avgDb: filmArc.avgDb,
+          }
+          : null,
+      }
+      : { mode: "full", chosen: null, reason: "整曲循环（未启用选段）" },
     separation,
     mix: {
       musicLevelDb: round(effectivePolicyLevel, 2),
@@ -969,13 +1516,14 @@ export async function mix({
       musicPresenceDb,
       programLevelDb: speechLevel,
     },
-    loudness: {
-      before: {
-        integratedLufs: round(normalized.measuredBefore?.integratedLufs, 2),
-        truePeakDbtp: round(normalized.measuredBefore?.truePeakDbtp, 2),
+      loudness: {
+        before: {
+          integratedLufs: round(normalized.measuredBefore?.integratedLufs, 2),
+          truePeakDbtp: round(normalized.measuredBefore?.truePeakDbtp, 2),
+        },
+        after: { integratedLufs: round(loudnessAfter.integratedLufs, 2), truePeakDbtp: round(loudnessAfter.truePeakDbtp, 2), lra: round(loudnessAfter.lra, 2) },
+        masterTrimDb,
       },
-      after: { integratedLufs: round(loudnessAfter.integratedLufs, 2), truePeakDbtp: round(loudnessAfter.truePeakDbtp, 2), lra: round(loudnessAfter.lra, 2) },
-    },
     output: {
       path: output,
       durationSeconds: outputProbe.duration,
@@ -1359,6 +1907,7 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
           ffprobe,
           tools: BGM_TOOLS,
           policies: AUDIO_POLICIES,
+          sectionModes: SECTION_MODES,
           synth: "builtin-wav（自算作曲，零第三方音源）",
           separationEngines: engines,
           library: { dir: library.dir, present: library.present, tracks: library.tracks.length, note: library.note },
@@ -1384,6 +1933,21 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         bins,
       });
       return { result: report, receipt: { synced: true, sha256: await sha256File(input) } };
+    }
+
+    case "bgmread.structure": {
+      const input = assertPathAllowed(text(params.input_path, "input_path"), roots, "input_path");
+      const result = await analyzeStructure({
+        input,
+        windowSec: optionalNumber(params.window_sec) ?? 0.25,
+        minSegmentSec: optionalNumber(params.min_segment_sec) ?? 3,
+        maxSeconds: optionalNumber(params.max_seconds) ?? 600,
+        bins,
+      });
+      return {
+        result,
+        receipt: { synced: true, sha256: await sha256File(input), verified_at: new Date().toISOString() },
+      };
     }
 
     case "bgmread.recipes": {
@@ -1487,6 +2051,9 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         keepWork: params.keep_work === true,
         licenseReviewed: params.license_reviewed !== false,
         commercialUse: params.commercial_use !== false,
+        section: typeof params.section === "string" ? params.section : "full",
+        sectionStartSec: optionalNumber(params.section_start_sec),
+        sectionEndSec: optionalNumber(params.section_end_sec),
       });
       let attributionFile = null;
       if (params.attribution_out) {

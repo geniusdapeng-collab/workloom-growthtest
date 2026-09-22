@@ -314,7 +314,12 @@ async function main() {
     await q(
       `INSERT INTO agents (id, workspace_id, preset_key, name, version, kind, readonly, fence_bindings, skills, status, meta)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'ready',$10)
-       ON CONFLICT (id) DO NOTHING`,
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name, version = EXCLUDED.version, kind = EXCLUDED.kind,
+         readonly = EXCLUDED.readonly, fence_bindings = EXCLUDED.fence_bindings,
+         skills = EXCLUDED.skills, status = 'ready', meta = EXCLUDED.meta
+       WHERE agents.version IS DISTINCT FROM EXCLUDED.version
+          OR agents.meta IS DISTINCT FROM EXCLUDED.meta`,
       [
         `agt-${p.preset_key}`,
         WS_ID,

@@ -9,6 +9,7 @@
  *
  * 场景：
  *   clean           —— 常规配乐：G-BGM0 auto 直通，产出成片，回执 sha256 与磁盘文件一致
+ *   structure       —— 结构识别 + 自动选段：bgmread.structure 找高潮段，mix(section=auto) 对齐出片
  *   review          —— 曲库首次入片（许可未核验）：G-BGM1 review，线程 pending_review，产生审批行
  *   blocked         —— 覆盖原片：G-BGM2 block，线程 paused，不执行工具
  *   blocked-license —— NC 曲目用于商用：G-BGM5 block，线程 paused
@@ -41,6 +42,7 @@ const PRESET_KEY = "bgm-composer";
 const SOURCE = join(WORK_DIR, "smoke-source.mp4");
 const BGM = join(WORK_DIR, "smoke-bgm.wav");
 const MIXED = join(WORK_DIR, "smoke-mixed.mp4");
+const SECTION_MIXED = join(WORK_DIR, "smoke-section-mixed.mp4");
 const REVIEW_OUT = join(WORK_DIR, "smoke-review.mp4");
 const LICENSE_OUT = join(WORK_DIR, "smoke-license.mp4");
 const OVERWRITE_OUT = join(WORK_DIR, "smoke-blocked.mp4");
@@ -131,6 +133,25 @@ const steps = {
       label: "配乐出片（G-BGM0 直通）",
     },
   ],
+  structure: () => [
+    {
+      stepId: "s0", action: "bgmread.structure", objectType: "bgm_track", tool: "bgmread.structure",
+      params: { input_path: BGM },
+      context: { tenant_daily_bgm: 0 },
+      label: "识别曲目结构（分段 + 高潮候选）",
+    },
+    {
+      stepId: "s0b", action: "bgmwrite.mix", objectType: "bgm_report", tool: "bgmwrite.mix",
+      params: {
+        input_path: SOURCE, output_path: SECTION_MIXED, bgm_path: BGM, policy: "keep-dialogue",
+        music_level_db: -24, ducking_db: 12, section: "auto",
+        track_license: "workloom-self-generated", commercial_use: true,
+        evidence_dir: join(WORK_DIR, "evidence-section"),
+      },
+      context: { tenant_daily_bgm: 0 },
+      label: "自动选段配乐（高潮段对齐片子高点）",
+    },
+  ],
   review: () => [
     {
       stepId: "s1", action: "bgmwrite.mix", objectType: "bgm_report", tool: "bgmwrite.mix",
@@ -176,6 +197,7 @@ const steps = {
 
 const goals: Record<keyof typeof steps, string> = {
   clean: "对成片做一次完整配乐并出证据",
+  structure: "按曲目结构自动选段并配乐（高潮段对齐片子高点）",
   review: "曲库首次入片时配乐（演练人审）",
   blocked: "配乐时直接覆盖原片（演练红线）",
   "blocked-license": "用 NC 许可曲目做商用配乐（演练版权红线）",
@@ -291,6 +313,7 @@ async function main(): Promise<number> {
   const receiptUri = mixEvent?.receipt?.snapshot_uri ?? null;
   const eventResultHash = mixEvent?.resultSha256 ?? null;
   const review = find("review");
+  const structure = find("structure");
   const blocked = find("blocked");
   const blockedLicense = find("blocked-license");
   const outage = find("outage");
@@ -303,6 +326,9 @@ async function main(): Promise<number> {
       && (receiptUri ?? "").includes(mixedHash),
     ),
     bgm_track_produced: Boolean(bgmHash),
+    structure_section_chosen: structure?.outcome.status === "completed"
+      && Boolean(existsSync(SECTION_MIXED))
+      && (structure?.events ?? []).some((event) => event.action === "bgmread.structure" && event.receipt?.synced === true),
     review_pending: review?.outcome.status === "pending_review" && Boolean(review?.outcome.pendingApprovalId),
     blocked_by_overwrite_rule: blocked?.outcome.status === "paused" && (blocked?.outcome.blockedBy ?? "").includes("覆盖原片"),
     blocked_by_license_rule: blockedLicense?.outcome.status === "paused" && (blockedLicense?.outcome.blockedBy ?? "").includes("版权"),
