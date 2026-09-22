@@ -3,7 +3,7 @@
 quest: narrative-film
 name: 叙事片管线
 version: v1
-description: 剧本→场景→片头→视听→连贯审查→提示词融合→字段质检→定妆照→预生产确认→渲染→后期→调色→字幕→配乐→成片入库
+description: 剧本→场景→片头→视听→连贯审查→提示词融合→字段质检→定妆照→预生产确认→渲染→后期→调色→字幕→配音→配乐→成片入库
 steps:
   - step_key: script
     name: 剧本蓝图
@@ -85,6 +85,10 @@ steps:
     name: 标题字幕制作
     owner: subtitle-stylist
     outputs: [subtitle_track, subtitle_report, final_video]   # 文字层收口：字体选型 + 平台版式 + 版式体检 + 可现度复检；调色之后烧字（LUT 不改字色），配乐之前（音轨恒 copy）
+  - step_key: voice
+    name: 成片配音
+    owner: voice-artist
+    outputs: [voice_track, voice_report, final_video]   # 克隆音色配音：时窗对齐 + 原声让位 + 视频轨 copy；授权不清不得建音色档案
   - step_key: bgm
     name: 成片配乐
     owner: bgm-composer

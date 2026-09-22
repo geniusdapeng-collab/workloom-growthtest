@@ -36,6 +36,9 @@
     { "type": "creator_collab", "label": "达人合作", "note": "达人合作单：筛选依据/建联记录/Brief/交付验收/效果回填" },
     { "type": "ip_asset", "label": "版权资产", "note": "音乐/字体/素材/肖像授权台账：授权范围（用途/平台/地域/期限）+ 来源凭证，无凭证禁止使用" },
     { "type": "review_submission", "label": "送审单", "note": "平台送审载体：三级预检全绿方可提交，未过预检受 G14 阻断；驳回案例回写规则库" },
-    { "type": "budget_ledger", "label": "预算台账", "note": "项目/账号级预算与算力台账：G11 算力超预算暂停、G12 加投必审的计量依据" }
+    { "type": "budget_ledger", "label": "预算台账", "note": "项目/账号级预算与算力台账：G11 算力超预算暂停、G12 加投必审的计量依据" },
+    { "type": "voice_profile", "label": "音色档案", "note": "配音师产物：参考音频（本机麦克风或授权素材）+ 逐字转写 + 质量指标 + 授权回执（consent.json）；无授权声明不得建档（G-VOICE1），参考音频与声纹不出本机（G-VOICE5）" },
+    { "type": "voice_track", "label": "配音音轨", "note": "配音师产物：逐段合成的配音轨（时窗对齐 + 倍速适配），含每段起点/时窗/语音时长；产物 sha256 入回执，无回执不得进入入库/发布队列（G-VOICE3）" },
+    { "type": "voice_report", "label": "配音报告", "note": "配音师产物：音色档案引用、原声保留策略与让位深度、响度（LUFS/dBTP/LRA）、音画时长漂移、逐段时窗表、引擎与模型版本、RTF 与产物 sha256；对外发布还需授权范围覆盖 external-publish（G-VOICE6）" }
   ]
 }

@@ -4,11 +4,12 @@
  * 与 scripts/seed.ts（酒店 Bundle）同构，装载：
  *  - 演示租户/工作区（industry: ai-video）
  *  - 人类成员（主理人/运营/剪辑）
- *  - bundles/ai-video 的 36 个数码员工 preset（制作 21 + 经营 12 + 后期 3：调色师 / BGM 配乐师 / 字幕师；含 fence_bindings 原样落库）
- *  - 围栏 38 条：ai-video-baseline/v2（G1-G16 共 21 条）+ ai-video-color/v1（成片调色门 G-COL0..G-COL4 共 5 条）
- *    + ai-video-bgm/v1（成片配乐门 G-BGM0..G-BGM5 共 6 条）+ ai-video-subtitle/v1（标题字幕门 G-SUB0..G-SUB5 共 6 条）
- *  - 22 个官方技能（安装即绑定围栏；含调色师四件套、BGM 配乐师五件套与字幕师五件套
- *    font-selection / subtitle-layout-design / caption-burnin-ops / font-license-compliance / subtitle-delivery-spec）
+ *  - bundles/ai-video 的 37 个数码员工 preset（制作 21 + 经营 12 + 后期 4：调色师 / BGM 配乐师 / 字幕师 / 配音师；含 fence_bindings 原样落库）
+ *  - 围栏 45 条：ai-video-baseline/v2（G1-G16 共 21 条）+ ai-video-color/v1（G-COL0..G-COL4 共 5 条）
+ *    + ai-video-bgm/v1（G-BGM0..G-BGM5 共 6 条）+ ai-video-subtitle/v1（G-SUB0..G-SUB5 共 6 条）
+ *    + ai-video-voice/v1（本地声音克隆/配音门 G-VOICE0..G-VOICE6 共 7 条）
+ *  - 27 个官方技能（安装即绑定围栏；含调色师四件套、BGM 配乐师五件套、字幕师五件套与配音师五件套
+ *    voice-clone-consent / voice-reference-craft / voice-profile-craft / voice-dubbing-sync / voice-delivery-spec）
  *  - 一企一档（品牌档案 + forbidden 红线）
  *  - 自动化触发器（每 2h 数据采集 / 早八点战报 / 每 30min 评论采集）
  *  - 演示项目：1 个 video_project + 3 镜渲染脚本（v1）+ 2 条素材

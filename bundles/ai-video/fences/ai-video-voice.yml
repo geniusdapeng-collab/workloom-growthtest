@@ -1,0 +1,84 @@
+# 本地声音克隆 / 配音围栏包（视频经理 · 配音工位）
+# 与 ai-video-baseline.yml / ai-video-color.yml / ai-video-bgm.yml 同口径：默认基线、只可加严、
+# 命中取严（block > review > auto）；求值语义：匹配命中后求值 when（沙箱，禁任意代码），
+# 写类动作无命中按 default_level。
+#
+# 本包守的是三条与"人的声音"有关的红线：
+#   ① 声音是有主权的——克隆/配音前必须有明确授权（G-VOICE1，对外发布再叠一道 G-VOICE6）；
+#   ② 声纹不出域——参考音频、音色档案与授权回执只留工位本机（G-VOICE5）；
+#   ③ 无回执不算完成——产物必须带响度/真峰值/时长复检（G-VOICE3）。
+version: ai-video-voice/v1
+default_level: review
+rules:
+  - rule_id: G-VOICE0
+    name: 常规本地配音动作直通（工位本地、可逆、原片只读）
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [voice_profile, voice_track, voice_report, final_video, audio_asset, video_asset]
+      actions:
+        [voiceread.health, voiceread.devices, voiceread.voices, voiceread.probe,
+         voicewrite.record, voicewrite.register, voicewrite.speak, voicewrite.dub, voicewrite.verify]
+    when: "true"
+    note: 录音、克隆、播报与配音都是工位本地、非破坏性、可回滚动作（原片只读 + 新文件 + sha256 回执），默认直通；授权（G-VOICE1）、对外发布（G-VOICE6）、覆盖原片（G-VOICE2）、关闭校验（G-VOICE3）、日配额（G-VOICE4）、声纹出域（G-VOICE5）叠加升级，deny 优先并集取严。未命中写动作的保守默认是 review，故此处必须显式声明 auto，否则干净配音也被挂起。
+
+  - rule_id: G-VOICE1
+    name: 声音克隆授权必审（没有授权声明不得建音色档案）
+    level: review
+    is_baseline: true
+    match:
+      object_types: [voice_profile, voice_report]
+      actions: [voicewrite.register, voicewrite.consent]
+    when: "params.consent_declared != true or (params.consent_scope == 'commercial' and params.consent_reviewed != true)"
+    note: "克隆任何人的声音都是对人声音肖像权的处分：建档案（voicewrite.register）时必须有明确授权声明（voicewrite.consent 已落盘，params.consent_declared=true）；授权范围是商用（commercial）而尚未复核（consent_reviewed!=true）时同样挂起人审，审批号随音色档案归档。本人声音的内部播报（scope=internal + declared=true）自动放行。DSL 语义：consent_declared 缺失（含字段未传）→ 条件成立 → 挂起，即「没声明授权」按需人审处理（fail-closed）。"
+
+  - rule_id: G-VOICE2
+    name: 覆盖原片 / 覆盖参考音频禁止
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, video_asset, voice_profile, audio_asset]
+      actions: [voicewrite.dub, voicewrite.speak, voicewrite.register]
+    when: "params.overwrite_source == true or params.output_path in [params.input_path] or params.out in [params.video] or params.out in [params.reference]"
+    note: "原片与参考音频一律只读：配音产出新文件并进版本链（视频轨 copy，不动画面），重建音色档案只替换档案内的 reference.wav 而不动调用方给的原始录音；任何覆盖原片/参考音频的调用一票否决。DSL 写法说明：路径相同判定用 `a in [b]` 而不是 `a == b`——求值器里缺失路径是 undefined，`undefined == undefined` 为真，会让「未传 output_path/input_path」的调用被误判成覆盖原片（本工位工具口径是 video/out 命名，必踩）；`in` 的左值缺失直接不命中，正是这里要的语义。"
+
+  - rule_id: G-VOICE3
+    name: 配音与播报必须可核验（禁止关闭校验）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [voice_track, voice_report, final_video]
+      actions: [voicewrite.speak, voicewrite.dub, voicewrite.verify]
+    when: "params.skip_verify == true or params.verify == false"
+    note: 播报与配音必须带响度/真峰值/时长复检与 sha256 回执（无回执=未核实，不得进入入库/发布队列）；关闭校验的调用禁止执行——声音交付里"听起来差不多"不是证据。
+
+  - rule_id: G-VOICE4
+    name: 单租户日配音时长配额熔断
+    level: block
+    is_baseline: true
+    match:
+      object_types: [voice_track, render_job, final_video]
+      actions: [voicewrite.speak, voicewrite.dub]
+    when: "context.tenant_daily_voice_seconds >= 3600"
+    note: 每租户每日 3600 秒（1 小时）合成上限（含播报与配音），超限熔断并告警；上调须人审。本地工位是单机推理（M 系列统一内存），配额是产能与稳定性的保护线，不是计费线。
+
+  - rule_id: G-VOICE5
+    name: 声纹与参考音频不出域
+    level: block
+    is_baseline: true
+    match:
+      object_types: [voice_profile, voice_report, audio_asset]
+      actions:
+        [voicewrite.register, voicewrite.consent, voicewrite.speak, voicewrite.dub, voiceread.voices]
+    when: "params.upload_voiceprint == true or params.export_profile == true or params.share_reference == true or params.allow_nonlocal_engine == true"
+    note: 参考音频 = 生物特征数据：只落工位本机素材区，不上传云端、不进仓库、不进蜂群。任何"上传声纹 / 导出音色档案 / 共享参考音频 / 允许非本机引擎"的调用一票否决（需要跨机推理时走内网专线与显式人审，不能用工具参数绕过）。
+
+  - rule_id: G-VOICE6
+    name: 克隆音色对外发布必审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [final_video, voice_track, voice_report]
+      actions: [voicewrite.speak, voicewrite.dub]
+    when: "params.publish_external == true and params.consent_scope != 'external-publish'"
+    note: 用克隆音色做对外发布（含平台外发、客户交付、公开投放）时，授权范围必须显式覆盖 external-publish；否则挂起人审（G9 公网发布必审在此之上继续生效）。内部播报与草稿审听不受此条影响。

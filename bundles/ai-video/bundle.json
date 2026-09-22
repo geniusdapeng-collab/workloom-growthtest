@@ -51,13 +51,15 @@
         "presets/settlement-clerk.yml",
         "presets/colorist.yml",
         "presets/bgm-composer.yml",
-        "presets/subtitle-stylist.yml"
+        "presets/subtitle-stylist.yml",
+        "presets/voice-artist.yml"
       ],
       "fences": [
         "fences/ai-video-baseline.yml",
         "fences/ai-video-color.yml",
         "fences/ai-video-bgm.yml",
-        "fences/ai-video-subtitle.yml"
+        "fences/ai-video-subtitle.yml",
+        "fences/ai-video-voice.yml"
       ],
       "skills": [
         "skills/jenny-loom-research/SKILL.md",
@@ -81,7 +83,12 @@
         "skills/subtitle-layout-design/SKILL.md",
         "skills/caption-burnin-ops/SKILL.md",
         "skills/font-license-compliance/SKILL.md",
-        "skills/subtitle-delivery-spec/SKILL.md"
+        "skills/subtitle-delivery-spec/SKILL.md",
+        "skills/voice-clone-consent/SKILL.md",
+        "skills/voice-reference-craft/SKILL.md",
+        "skills/voice-profile-craft/SKILL.md",
+        "skills/voice-dubbing-sync/SKILL.md",
+        "skills/voice-delivery-spec/SKILL.md"
       ],
       "schemas": [
         "schemas/objects.json",
@@ -506,7 +513,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "aa84427dfe13f5bdf44b381deb75d3d31b8d90a17075dea0656df10abda68215",
+    "digest": "df9da5e82a6bc461f1418e69fc18acd234d5184eb88e4724c8d14f8a709758fe",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "4a750118f5bbc7a6c6238be241ee1f3a4cbb695fd3b40066e4c71072179993ed",
       "connectors/bgm-bridge/core.mjs": "12f94fb62c0e183857d3ce2b970eaba9b29da70223a50e5d897fa8a005af9ffb",
@@ -533,6 +540,7 @@
       "fences/ai-video-bgm.yml": "ab160d340f9625b6e76bd96c536bd81a07ed49827a45fd9b051a2002ea4f4cee",
       "fences/ai-video-color.yml": "709cb9fc3cba47a4ee2b4ee233d714277223cb23f9ca210ed3712de54c597ed6",
       "fences/ai-video-subtitle.yml": "6cfba150513fd2ef2a7d468ed591f056ef5caf31e5982469241bbea71acb104a",
+      "fences/ai-video-voice.yml": "52ab044fbfa8c4b1f83c91c8e469e97ae82d1c5d31b15dc420b705858694d295",
       "library/bgm-library/README.md": "d63373a49054372ac1607ef675f06add6822e97cbdb9b0b63b696cd76972c215",
       "library/bgm-library/tracks.example.json": "38a110e7efef8082422cfb11cf30e5bac88657c6e23c2ebe2200ae2700446203",
       "library/bgm-recipes/recipes.json": "47d4ee6b74cbd48d2ddf489ce7e6be49dc380b96fd07055ee3eaa1cea930a09d",
@@ -788,7 +796,7 @@
       "pipelines/account-ops.yml": "455383c019ac1d0523db48c6088c7bfce4aa9e8e1eef8d7d71399aa69e107264",
       "pipelines/ads-creative-factory.yml": "90e475e5482ecf15541aa2d6eca5499aa1c9bea8d9928e2122975ae77df869c5",
       "pipelines/marketing-film.yml": "4ba95c0e83538de605126072ce26a462211e4cea3a82c5fcaee8227a71b485b1",
-      "pipelines/narrative-film.yml": "f53d6f0f08d6e37b2a5f34a1f791c4ea141748f0e307dc7389fff530991e64c6",
+      "pipelines/narrative-film.yml": "0c6d5c695cf6bd6f8e81752e315ad05f4cb1f7909dd5565e2f7b0b3f9a9585f1",
       "pipelines/settlement-recon.yml": "c4af96be653224e31ec8882ae19da37026dbbe1f2d5fb28435deee92b37db1d0",
       "presets/ads-optimizer.yml": "4969554944f4e2586aef8ab29da819d76611a6ba537b5964db6e9e7db9cc5bf2",
       "presets/audio-designer.yml": "e0122309c8a94d7b8e73109c3b88f92b900917bdc04c5535836e7f1f3c66dc0b",
@@ -826,7 +834,8 @@
       "presets/subtitle-stylist.yml": "034f42a0c2f9210988074b45c8a0b8cc834e2c8587f3dfb8c5f798001aced04c",
       "presets/trend-researcher.yml": "802b157911cf35216d5122784d8ba0d89ac1da2187748413243f957c002307b3",
       "presets/visual-director.yml": "74683eed31a08c7ffce74ffeb02a4349051c4ec9164ba995470455cf35f6fa61",
-      "schemas/objects.json": "06f32354dca5843a69e5132a6872a38c9ae6cade272f5c37ddbf94494a222b82",
+      "presets/voice-artist.yml": "ea8d3efaab6de0659fc39e52f37568595c2f8c0caa5c2220d7cb71203beebdb7",
+      "schemas/objects.json": "7a92af35844c698bec6877d5963f3fb2ef68bb789738aa5bd15c8a4ab92454d6",
       "schemas/stages.json": "418332ca5a5522083592da40773265d8f09b1ab9276d566275e075ef56118831",
       "skills/bgm-audio-layering/SKILL.md": "bd33df72c968541ce1a3b4ce3bf0bc6f075068a82456a528103a2fb4ef2addaf",
       "skills/bgm-delivery-spec/SKILL.md": "6d20e7b842f83c9121b401582db7249dc73407ebcc988c1b0765a6fee4da3e86",
@@ -850,6 +859,11 @@
       "skills/shot-prompt-craft/SKILL.md": "4d152daca2135f313f887c4ec4c150495d27d55dbebe312fa2e9ae810c67d3ec",
       "skills/subtitle-delivery-spec/SKILL.md": "cd9b086eae21c6eb341df5ea77b2e0f23209f505874ae8021cf1ef210a580953",
       "skills/subtitle-layout-design/SKILL.md": "f47f05cfa9f131b599aa998ebac6041d01c972cdf70c19a932789425ff952719",
+      "skills/voice-clone-consent/SKILL.md": "16faabf06b8a3cff80c32e1795cf25b9511fa637a8cf6c96cb7a06f9e4d446c4",
+      "skills/voice-delivery-spec/SKILL.md": "cd07ea2f1134d514dc88b8b0a6be74e55017e30e5e034e3f65b54177feedc177",
+      "skills/voice-dubbing-sync/SKILL.md": "649ba8ddc09347c4169f10ff6ae86930ef2df3bd46297c9e6af7dadd2542caff",
+      "skills/voice-profile-craft/SKILL.md": "992f357c393ab217dd874e8d31c9107223da418fb575a41c69238bcec4820db9",
+      "skills/voice-reference-craft/SKILL.md": "7b572de1953955f4e7b163805e6885fab23cd6d20b07058644d42850229ca3b1",
       "ui/cases.json": "2105dbbca42ca0f2f84a5b6d9af50659ec83fa9b310c509c729c0ac0c4ce569c"
     }
   }

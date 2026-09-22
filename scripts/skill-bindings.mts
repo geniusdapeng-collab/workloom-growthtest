@@ -66,6 +66,13 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<s
     "caption-burnin-ops": ["G-SUB0", "G-SUB2", "G-SUB3"],
     "font-license-compliance": ["G-SUB1", "G-SUB5"],
     "subtitle-delivery-spec": ["G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5"],
+    // 后期配音师五件套（2026-09-23）：安装即绑定本地声音克隆/配音门 G-VOICE0..G-VOICE6，卸载即撤销。
+    // 授权（G-VOICE1/G-VOICE6）与声纹不出域（G-VOICE5）是这套技能的核心纪律，故五件套全量绑定。
+    "voice-clone-consent": ["G-VOICE1", "G-VOICE5", "G-VOICE6"],
+    "voice-reference-craft": ["G-VOICE0", "G-VOICE1", "G-VOICE5"],
+    "voice-profile-craft": ["G-VOICE0", "G-VOICE1", "G-VOICE2", "G-VOICE5", "G-VOICE6"],
+    "voice-dubbing-sync": ["G-VOICE2", "G-VOICE3", "G-VOICE4"],
+    "voice-delivery-spec": ["G-VOICE0", "G-VOICE1", "G-VOICE2", "G-VOICE3", "G-VOICE4", "G-VOICE5", "G-VOICE6"],
   },
   "geo-growth": {
     "ai-answer-rewrite": ["G-GEO1", "G-GEO2"],

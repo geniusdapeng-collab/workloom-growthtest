@@ -1,0 +1,156 @@
+# 成片配音 / 本地声音克隆 bridge 连接器（ai-video）
+
+把 `voiceread.* / voicewrite.*` 工具接到**本机配音工位**（本机 TTS/ASR 引擎 + ffmpeg 内核），
+供「配音师」数字员工完成 **采参考音 → 建音色档案 → 播报/视频配音 → 复检出证** 全链路。
+
+## 部署形态
+
+```
+WorkLoom（大脑：岗位/技能/围栏/事件账本）        Mac 配音工位（手，声纹不出本机）
+  runtime ToolExecutor ──HTTP/Bearer──▶  voice-bridge (127.0.0.1:9776)
+                                            ├─ 本机引擎 sidecar（launchd 托管，127.0.0.1:8099）
+                                            │    mlx-audio（MIT）：/v1/audio/speech + /v1/audio/transcriptions
+                                            ├─ ffmpeg / ffprobe（录音 / 裁剪 / 拼接 / 混音 / 核验）
+                                            ├─ 音色档案区  profiles/<id>/{reference.wav,profile.json,consent.json}
+                                            ├─ 产物区      deliveries/（新文件 + sha256 回执）
+                                            └─ 任务台账    jobs/YYYY-MM-DD.jsonl
+```
+
+**声纹不出工位**：服务器只传路径与参数，工位本地读写素材；参考音频、音色档案与授权回执只落本机，
+只回元数据与哈希。围栏 G-VOICE5 对任何"上传声纹 / 导出档案 / 非本机引擎"的调用一票否决。
+
+## 安装与自检（工位一次性）
+
+```bash
+# 1) 安装引擎与模型（macOS Apple Silicon；建 venv + 装 mlx-audio[server] + 下模型 + 补 ASR 处理器）
+bash kit/install.sh                 # 首次约 3.3GB 下载；可用 HTTPS_PROXY 走本机代理
+
+# 2) 起常驻引擎（launchd 托管，关终端也不掉）
+bash kit/station.sh start           # stop | status | logs | fg
+
+# 3) 真机自检（健康 → 麦克风 → 录音 → 建档 → 播报 → 核验）
+bash kit/selftest.sh                # 已有参考音频可加 --ref/--ref-text 跳过录音
+```
+
+引擎口径固定在 `kit/engine-pin.json`（引擎与模型、许可、为什么选它；Fish Speech 仅登记事实、不提供安装路径）。
+切到别的后端不必改代码，只改环境变量：
+
+```bash
+# 默认：Apple 原生 MLX（MIT）
+export WORKLOOM_VOICE_ENGINE=mlx WORKLOOM_VOICE_ENGINE_URL=http://127.0.0.1:8099
+# 可选：VoiceStudio 桌面工位（AGPL-3.0，OpenAI 兼容 :3900，带 GUI/配音工作区/听写）
+export WORKLOOM_VOICE_ENGINE=openai WORKLOOM_VOICE_ENGINE_URL=http://127.0.0.1:3900
+# 可选：GPT-SoVITS api_v2（MIT，中文/粤语/日韩克隆第一梯队）
+export WORKLOOM_VOICE_ENGINE=openai WORKLOOM_VOICE_ENGINE_URL=http://127.0.0.1:9880
+```
+
+## 接线
+
+```ts
+import { createVoiceBridgeExecutor } from "./bundles/ai-video/connectors/voice-bridge/executor.ts";
+
+const toolExecutor = createVoiceBridgeExecutor({
+  baseUrl: process.env.WORKLOOM_VOICE_BRIDGE_URL!,      // 支持逗号分隔多端点
+  token: process.env.WORKLOOM_VOICE_BRIDGE_TOKEN!,
+  tenantId: "ws-video",
+  timeoutMs: 1_800_000,                                 // 克隆+配音含模型推理与多遍 ffmpeg
+});
+```
+
+与调色/配乐工位同款：基座 seam 提案仍处「暂缓」，当前生产入口是**行业侧脚本注入**，不改任何基座文件。
+
+## 工具面（10 个）
+
+| 工具 | 类型 | 用途 |
+|---|---|---|
+| `voiceread.health` | 读 | 工位与引擎健康（引擎可达性/模型、ffmpeg、麦克风、音色档案数、许可口径） |
+| `voiceread.devices` | 读 | 本机音频输入设备清单与默认麦克风（macOS AVFoundation） |
+| `voiceread.voices` | 读 | 已登记音色档案（含授权状态与到期日） |
+| `voiceread.probe` | 读 | 音/视频规格探测（时长/声道/采样率/编码/有无音轨） |
+| `voicewrite.consent` | 写 | **声音授权声明**落盘（克隆的前置条件，围栏 G-VOICE1 的判据） |
+| `voicewrite.record` | 写 | **本机麦克风录音** → 静音裁剪 + 参考电平归一 + 质量门（时长/活动占比/真峰值） |
+| `voicewrite.register` | 写 | 建/更新音色档案（参考音频入库 + 逐字转写（可自动 ASR）+ 质量与授权校验） |
+| `voicewrite.speak` | 写 | 播报：长文本分句 → 逐句合成 → 拼接（段间气口）→ 响度归一 → 复检回执 |
+| `voicewrite.dub` | 写 | 视频配音：逐段合成 → 时窗适配（atempo ≤1.25×）→ 按策略混音 → 视频轨 copy 出片 |
+| `voicewrite.verify` | 写 | 产物核验：响度/真峰值/时长/静音占比 +（可选）ASR 回读与原稿比对 |
+
+## 四种原声策略（`voicewrite.dub`）
+
+| policy | 声音床 | 适用 | 纪律 |
+|---|---|---|---|
+| `keep-dialogue`（默认） | 原声全保留，配音侧链让位 | 口播/访谈/带货加解说 | 让位 8–12dB；人声-配音余量 ≥6dB |
+| `keep-all` | 原声全保留，让位更浅 | 纪录片/现场感 | 让位 3–6dB |
+| `replace-bed` | 原声丢弃，只留配音 | 外语配音/原声脏 | 需声明；要保现场声先跑 `bgmwrite.separate` |
+| `music-only` | 原声全丢 | 纯音乐卡点片 | 必须显式 `allow_discard_original=true`，否则工具与围栏都拒绝 |
+
+## 交付口径
+
+| 项 | 播报 | 成片配音 |
+|---|---|---|
+| 响度 | -16 LUFS（±1.0，闭环校正） | -14 LUFS（±1.5，超差自动重挂音轨） |
+| 真峰值 | ≤ -1.5 dBTP | ≤ -1.0 dBTP |
+| 视频轨 | — | **copy**（不重编码画面） |
+| 回执 | sha256 + 时长 + LUFS + dBTP + RTF + 分段数 | 另附逐段时窗表、总时长漂移、让位深度 |
+
+## 真机实测（MacBook Air M3 / 8GB / macOS 15.7.3，2026-09-23）
+
+| 项 | 实测 |
+|---|---|
+| 麦克风 | 「MacBook Air麦克风」可采；12s 底噪 mean -44.9 dB（先给运行本工位的程序授权麦克风） |
+| 参考音频质量门 | 10.9s / 活动占比 0.954 / 真峰值 -8.15 dBTP → `gate.ok=true` |
+| ASR 转写 | whisper-large-v3-turbo：10.9s → 23s；中文可读，逐字稿仍建议人工确认 |
+| 中文合成 | 空载 19s 音频 23.3s 渲染（RTF 1.24，16 步）；克隆 6.4s 音频 18.6s（RTF 2.92） |
+| 播报成品 | 9.92s，LUFS -14.49 → 闭环后达标，真峰值 -2.09 dBTP，sha256 回执 |
+| 视频配音 | 12s 成片 2 段配音，时长漂移 **0.000s**，真峰值 -3.12 dBTP，视频轨 copy |
+| 8GB 注意 | ASR 用完即卸载（默认 ≤16GB 机器 `auto`）；多段合成期间别并行跑别的重负载 |
+
+## 安全
+
+- token 只从受控秘密存储或工位本机文件读取，不进仓库、不进日志；
+- bridge 默认只监听 `127.0.0.1`，跨机置于内网反代 + mTLS 之后；
+- **路径监狱**：`WORKLOOM_VOICE_ALLOWED_ROOTS`（冒号分隔）之外一律拒绝，软链逃逸同样拦；
+- **原片与参考音频只读**：输出路径等于输入路径直接拒绝（`overwrite_source_forbidden`），并由 G-VOICE2 一票否决；
+- **声纹不出域**：G-VOICE5 对上传/导出/共享/非本机引擎一票否决；
+- 无回执 = 未核实：executor 不会为缺失的 receipt 伪造 `synced`。
+
+## 环境变量
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `WORKLOOM_VOICE_STATION_DIR` | `~/.workloom/voice-station` | 工位根目录（档案/产物/台账/日志） |
+| `WORKLOOM_VOICE_ENGINE` | `mlx` | `mlx` / `openai` / `mock` |
+| `WORKLOOM_VOICE_ENGINE_URL` | `http://127.0.0.1:8099`（mlx）/ `:3900`（openai） | 引擎地址（仅本机或可信内网） |
+| `WORKLOOM_VOICE_TTS_MODEL` | `mlx-community/OmniVoice-bf16` | TTS/克隆模型 |
+| `WORKLOOM_VOICE_ASR_MODEL` | `mlx-community/whisper-large-v3-turbo` | 转写模型（参考稿 + 可懂度回读） |
+| `WORKLOOM_VOICE_UNLOAD_ASR` | `auto` | `auto`（≤16GB 卸载）/ `always` / `never` |
+| `WORKLOOM_VOICE_ALLOWED_ROOTS` | 工位目录 + Movies + Desktop | 额外素材白名单（冒号分隔） |
+| `WORKLOOM_VOICE_MIC_DEVICE` | 系统默认输入 | 指定麦克风名或索引 |
+| `WORKLOOM_VOICE_BRIDGE_TOKEN` | 无（未设则拒绝一切调用） | 工位 token |
+| `WORKLOOM_VOICE_BRIDGE_TENANT` | 无 | 绑定租户后校验 `params.tenant_id` |
+| `WORKLOOM_VOICE_IDEMPOTENCY_TTL_MS` | 600000 | 幂等缓存 TTL |
+
+## 错误码
+
+可重试：`network_error` / `timeout` / `ffmpeg_failed` / `decode_failed` / `engine_failed` / `bad_response` / `engine_busy`
+
+不可重试：`bad_request` / `bad_media` / `bad_reference` / `ref_text_required` / `mic_not_found` /
+`mic_permission_denied` / `platform_unsupported` / `consent_required` / `voiceprint_export_forbidden` /
+`overwrite_source_forbidden` / `verify_failed` / `segment_overflow` / `no_speech` / `path_not_allowed` /
+`tenant_mismatch` / `quota_exceeded` / `not_configured` / `license_blocked`
+
+## 常见问题
+
+| 现象 | 原因 | 处置 |
+|---|---|---|
+| `mic_permission_denied` | 没给麦克风权限 | 系统设置 → 隐私与安全性 → 麦克风，授权运行工位的程序（终端/Codex/宿主） |
+| `ref_text_required` | 引擎不支持 ASR 且没给逐字稿 | 显式传 `ref_text`（或用 `WORKLOOM_VOICE_ENGINE=mlx` 让工位自动转写） |
+| `bad_reference` | 参考音频太短/太长/几乎没人声/削波 | 看回执里的 `gate.reasons`，按 `voice-reference-craft` 重录 |
+| `segment_overflow` | 该段文案放不进时窗（>1.25×） | 改文案或允许溢出，别硬拉语速 |
+| 引擎可达但转写 500（`Processor not found`） | mlx-community 的 Whisper 权重仓缺 processor | 重跑 `kit/install.sh`（会自动补齐 8 个处理器文件），或手动补 `openai/whisper-large-v3-turbo` 的 tokenizer/preprocessor |
+| 多段合成第 2 段起失败（旧版报 `terminated`） | Node 全局 fetch 的 300s bodyTimeout | 已修：引擎调用走 node 内置 http（绝对超时 + 独立连接 + 连接层重试） |
+
+## 许可
+
+工位默认引擎 `mlx-audio`（MIT）与 Whisper（MIT）；
+可选后端 VoiceStudio（AGPL-3.0）、GPT-SoVITS（MIT）；
+Fish Speech 为 Fish Audio Research License，仅登记不纳入。选型依据与实测见 `docs/voice-clone-engine-decision.md`。

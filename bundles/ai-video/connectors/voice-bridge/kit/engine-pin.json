@@ -1,0 +1,54 @@
+{
+  "schema": "workloom.voice-station/v1",
+  "updatedAt": "2026-09-23",
+  "targetPlatform": "darwin-arm64",
+  "engine": {
+    "id": "mlx-audio",
+    "repo": "https://github.com/Blaizzy/mlx-audio",
+    "runtime": "Apple MLX（Apple Silicon 原生）",
+    "license": "MIT",
+    "pin": "mlx-audio>=0.5.5",
+    "python": "3.12",
+    "why": "Apple Silicon 上唯一零 CUDA 依赖的 TTS/ASR 一体引擎；MIT；一个 sidecar 覆盖克隆、播报与转写；真机实测 M3/8GB 可跑（见 docs/voice-clone-engine-decision.md）"
+  },
+  "models": {
+    "tts": {
+      "id": "mlx-community/OmniVoice-bf16",
+      "params": "≈1B（bf16）",
+      "downloadGb": 1.64,
+      "clone": true,
+      "languages": "646+",
+      "note": "零样本克隆（ref_audio + ref_text），24kHz 单声道输出；与 VoiceStudio 默认引擎同源，便于日后换 GUI 工位"
+    },
+    "asr": {
+      "id": "mlx-community/whisper-large-v3-turbo",
+      "downloadGb": 1.61,
+      "license": "MIT（OpenAI Whisper 权重派生）",
+      "usage": "参考音频自动转写（ref_text）+ 交付物可懂度回读抽检"
+    }
+  },
+  "optionalEngines": [
+    {
+      "id": "voicestudio",
+      "repo": "https://github.com/debpalash/VoiceStudio",
+      "license": "AGPL-3.0（模型各自许可）",
+      "interface": "OpenAI 兼容 POST /v1/audio/speech（默认 http://127.0.0.1:3900）+ MCP + dictation",
+      "when": "需要桌面 GUI / 配音工作区 / 词典与批量任务时；Electron 应用 + Python 后端约占 10GB，默认引擎建议 6GB 级显存，8GB 统一内存机器优先改用其 MLX / GGUF 引擎档",
+      "howToSwitch": "WORKLOOM_VOICE_ENGINE=openai WORKLOOM_VOICE_ENGINE_URL=http://127.0.0.1:3900，音色用档案里的 engine_voice_id 引用"
+    },
+    {
+      "id": "gpt-sovits",
+      "repo": "https://github.com/RVC-Boss/GPT-SoVITS",
+      "license": "MIT",
+      "interface": "api_v2 服务（默认 http://127.0.0.1:9880；VoiceStudio 亦可直连）",
+      "when": "中文/粤语/日韩克隆要求更高保真、或需要 1 分钟数据少样本微调时；官方实测环境含 Apple Silicon（MPS/CPU），M4 CPU 上 RTF ≈ 0.53",
+      "note": "本机未安装（磁盘与内存预算优先给默认引擎）；切换方式同上，engine=openai + 9880"
+    },
+    {
+      "id": "fish-speech",
+      "repo": "https://github.com/fishaudio/fish-speech",
+      "license": "Fish Audio Research License（研究用途；商用需向 Fish Audio 单独授权）",
+      "when": "不适用于本机：仅 Linux/WSL2；S2-Pro 4B 参数，建议 24GB 显存；本仓仅登记事实，不提供安装路径"
+    }
+  ]
+}
