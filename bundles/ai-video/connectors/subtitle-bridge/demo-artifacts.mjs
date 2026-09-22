@@ -217,6 +217,7 @@ async function main() {
       timeline: burned.timeline,
       presence: burned.presence,
       checks: burned.checks,
+      layoutChecks: burned.layoutChecks,   // kit/selftest.sh 的指标核验读这一段（版式体检逐项）
       evidence: burned.evidence,
     },
     best: bestOutcome.verdict === "scored"
