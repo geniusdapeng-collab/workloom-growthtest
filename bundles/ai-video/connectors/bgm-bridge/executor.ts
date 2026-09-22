@@ -60,6 +60,7 @@ export const BGM_BRIDGE_TOOLS = [
   "bgmread.health",
   "bgmread.probe",
   "bgmread.analyze",
+  "bgmread.structure",
   "bgmread.recipes",
   "bgmread.library",
   "bgmwrite.compose",

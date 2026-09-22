@@ -21,7 +21,7 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-import { analyze, compose, findRecipes, mix, separate } from "./core.mjs";
+import { analyze, analyzeStructure, compose, findRecipes, mix, separate } from "./core.mjs";
 import { binaryVersion, probeMedia, resolveBinaries } from "./measure.mjs";
 
 const FONT = "/System/Library/Fonts/Supplemental/Arial Unicode.ttf";
@@ -179,6 +179,43 @@ async function main() {
   const separated = await separate({ input: original, outDir, engine: "auto", bins });
   console.log(`  人声分离：${separated.engine}（${separated.quality}）→ vocals.wav / instrumental.wav`);
 
+  /**
+   * 选段演示：造一条 150 秒的"库曲"（主歌/副歌结构），让工位**只截最合适的高潮段**配到 26 秒的片子上。
+   * 为什么要单独演示：自算作曲是"按片长写"，而外部曲库曲目是"整首 2–3 分钟"——那才是选段要解决的问题。
+   */
+  const longTrack = path.join(outDir, "bgm-library-track-long.wav");
+  const longRaw = path.join(workDir, "library-track-raw.wav");
+  const composedLong = await compose({ durationSeconds: 150, output: longRaw, recipeId, seed: seed + 1, bins });
+  // 给这条"库曲"加上真实歌曲式的段落力度（主歌弱/副歌强/桥段弱/末段副歌强），供结构识别去发现
+  run(bins.ffmpeg, [
+    "-hide_banner", "-v", "error", "-y",
+    "-i", composedLong.output,
+    // 注意：这里**不能**用单遍 loudnorm——它会做动态归一化，把段落力度压平（实测动态从 ~20dB 掉到 9dB，
+    // 结构识别就再也分不出副歌）。改成"手动力度 + 固定增益"，保留真实歌曲的动态。
+    "-af", "volume='if(between(t\\,0\\,14),0.35,"
+      + "if(between(t\\,14\\,48),0.95,"
+      + "if(between(t\\,48\\,66),0.30,"
+      + "if(between(t\\,66\\,118),1.0,"
+      + "if(between(t\\,118\\,134),0.32,0.22))))"
+      + ")':eval=frame,volume=7dB",
+    "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", longTrack,
+  ], "造选段演示用库曲（150s，含主歌/副歌/桥段结构）");
+  const longStructure = await analyzeStructure({ input: longTrack, bins });
+  const sectionedPath = path.join(outDir, "bgm-mixed-sectioned.mp4");
+  const sectioned = await mix({
+    input: original,
+    output: sectionedPath,
+    bgmPath: longTrack,
+    policy: "keep-dialogue",
+    bgmBpm: longStructure.tempo.bpm ?? recipe.bpm,
+    musicLevelDb: recipe.musicLevelDb,
+    duckingDb: recipe.duckingDb,
+    section: "auto",
+    evidenceDir: outDir,
+    bins,
+  });
+  console.log(`  选段演示：库曲 ${longStructure.durationSec}s（分段 ${longStructure.structure.segments.map((item) => item.type).join("/")}）→ 选中 ${sectioned.section?.chosen?.type} ${sectioned.section?.played?.startSec ?? "?"}s→${sectioned.section?.chosen?.endSec}s`);
+
   const report = {
     generatedAt: new Date().toISOString(),
     generator: "bundles/ai-video/connectors/bgm-bridge/demo-artifacts.mjs",
@@ -187,11 +224,27 @@ async function main() {
     recipe: { id: recipe.id, genre: recipe.genre, scene: recipe.scene, mood: recipe.mood, avoid: recipe.avoid },
     composedBgm: bgm,
     mixReport: mixed,
+    sectionDemo: {
+      libraryTrack: { path: longTrack, durationSec: longStructure.durationSec },
+      structure: {
+        method: longStructure.structure.method,
+        dynamicsDb: longStructure.structure.dynamicsDb,
+        bpm: longStructure.tempo.bpm,
+        bpmConfidence: longStructure.tempo.confidence,
+        segments: longStructure.structure.segments,
+        climaxCandidates: longStructure.climax.candidates.slice(0, 3),
+      },
+      selection: sectioned.section,
+      mixReport: sectioned,
+    },
     separation: separated,
     deliverables: {
       original: path.basename(original),
       bgmTrack: path.basename(bgmPath),
       bgmMixed: path.basename(mixedPath),
+      libraryTrack: path.basename(longTrack),
+      bgmMixedSectioned: path.basename(sectionedPath),
+      sectionPicked: "section-picked.png",
       vocals: path.basename(separated.vocals.path),
       instrumental: path.basename(separated.instrumental.path),
       waveform: "waveform-before-after.png",
@@ -210,6 +263,9 @@ async function main() {
     "| `original.mp4` | 原始成片：4 段硬切画面 + 3 句对白 + 环境声（-18 LUFS 原始母版） |",
     "| `bgm-track.wav` | 自算作曲的 BGM（零第三方音源，无署名义务，可商用） |",
     "| `bgm-mixed.mp4` | 配乐后成片：原声保留、BGM 人声让位、母版 -14 LUFS / -1 dBTP |",
+    "| `bgm-library-track-long.wav` | 选段演示用「库曲」：150s、含主歌/副歌/桥段力度结构 |",
+    "| `bgm-mixed-sectioned.mp4` | **自动选段**版成片：工位只截库曲的高潮段，并把峰值对齐片子的高潮时刻（26s 片子 ← 150s 库曲） |",
+    "| `section-picked.png` | 选段证据：上=库曲波形（红框=选中片段），下=片子波形（红框=对齐到的高潮时刻） |",
     "| `vocals.wav` / `instrumental.wav` | 人声分离演示（中心声道近似，质量等级见报告） |",
     "| `waveform-before-after.png` | 前后波形对比（上=原片音轨，下=配乐后音轨） |",
     "| `bgm-report.json` | 诊断 / 作曲 / 混音 / 复检的完整数据 |",
@@ -221,6 +277,13 @@ async function main() {
     `- 人声-音乐余量：${mixed.levels.speechToMusicMarginDb} dB（目标 ≥ 6 dB）`,
     `- 配乐可闻度（静音段相对原片提升）：${mixed.levels.musicPresenceDb} dB（目标 ≥ 3 dB）`,
     `- 卡点对齐：${mixed.alignment.verdict}（平均误差 ${mixed.alignment.meanAbsErrorMs} ms，BPM ${mixed.alignment.bpm}）`,
+    "",
+    "## 选段（自动截取最合适的部分）",
+    "",
+    `- 库曲结构识别：${report.sectionDemo.structure.method}，动态 ${report.sectionDemo.structure.dynamicsDb}dB，分段 ${report.sectionDemo.structure.segments.map((item) => item.type).join(" / ")}`,
+    `- 选段模式：${report.sectionDemo.selection?.mode} → 片段 ${report.sectionDemo.selection?.played?.startSec}s–${report.sectionDemo.selection?.played?.endSec}s（${report.sectionDemo.selection?.played?.durationSec}s，循环 ${report.sectionDemo.selection?.played?.loops} 次铺满）`,
+    `- 决策理由：${report.sectionDemo.selection?.reason}`,
+    `- 峰值对齐：${report.sectionDemo.selection?.filmPeakAlign?.note ?? report.sectionDemo.selection?.filmPeakAlign?.reason ?? "（未启用）"}`,
     "",
     "## 复现",
     "",

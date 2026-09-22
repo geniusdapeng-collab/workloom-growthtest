@@ -31,7 +31,7 @@
 | 风险级别 | 本地非破坏动作，不烧生成额度；**曲库首次入片 / 品牌主题曲变更**属对外观感与法律风险变更，须人审 |
 | 产物 | 成片（新文件）+ `bgm_track`（配乐音轨）+ `bgm_report`（配乐报告）+ 波形/频谱证据 + 署名文件（如需） |
 
-## 3. 能力矩阵（5 技能 × 9 工具 × 6 围栏）
+## 3. 能力矩阵（5 技能 × 10 工具 × 6 围栏）
 
 ### 3.1 技能（随 Bundle 分发，安装即生效、卸载即撤销）
 
@@ -43,7 +43,7 @@
 | `bgm-library-license` | **曲库怎么接、许可怎么判**：白名单、TASL 署名、AI 生成音乐的许可陷阱、留证 |
 | `bgm-delivery-spec` | **怎么交付**：-14 LUFS / -1 dBTP 口径、平台变体派生、证据包、返工归因表、不可修复情形 |
 
-### 3.2 工具（配乐工位 bridge，9 个，全部真实 ffmpeg 内核）
+### 3.2 工具（配乐工位 bridge，10 个，全部真实 ffmpeg 内核）
 
 | 工具 | 类型 | 用途 |
 |---|---|---|
@@ -223,11 +223,11 @@ pad（情绪地基）/ bass（低频走向）/ pluck（推进感）/ kick·hat�
 
 | 项 | 状态 |
 |---|---|
-| 岗位 preset | ✅ `presets/bgm-composer.yml`（5 技能 / 9 工具 / 6 围栏 / 事件域 `bgm.`） |
+| 岗位 preset | ✅ `presets/bgm-composer.yml`（5 技能 / 10 工具 / 6 围栏 / 事件域 `bgm.`） |
 | 技能矩阵 | ✅ 5 个 SKILL.md 随 Bundle 分发并进签名索引 |
 | 配方库 | ✅ 16 条题材配方（`library/bgm-recipes/recipes.json`） |
 | 曲库契约 | ✅ `library/bgm-library/`（接入规范 + 示例 + 许可白名单实现） |
-| 工位工具 | ✅ `connectors/bgm-bridge`（9 工具，真实 ffmpeg 内核 + 自算作曲内核） |
+| 工位工具 | ✅ `connectors/bgm-bridge`（10 工具，真实 ffmpeg 内核 + 自算作曲内核 + 结构识别/自动选段） |
 | 围栏 | ✅ `fences/ai-video-bgm.yml`（G-BGM0..G-BGM5） |
 | 管线接线 | ✅ 叙事片管线 `render → post → color → bgm → archive` |
 | 对象类型 | ✅ `bgm_track` / `bgm_report`（`schemas/objects.json`） |
@@ -235,6 +235,27 @@ pad（情绪地基）/ bass（低频走向）/ pluck（推进感）/ kick·hat�
 | 连接器单测 | ✅ `connectors/bgm-bridge/executor.test.ts`（白名单/幂等/软失败/故障转移） |
 | 真机验证 | ✅ `runtime-smoke.mts`（真实 PG + 6 条围栏 + bridge + ffmpeg，5 场景全绿） |
 | 真机产物 | ✅ `demo-artifacts.mjs`（原始成片 / BGM / 配乐成片 / 人声分离 / 波形证据 / 报告） |
+
+## 12.5 选段：外部曲目"取哪一段"（2026-09-22 补强）
+
+外部曲目动辄 2–3 分钟，片子只有 15–60 秒——**"裁哪一段"和"配什么曲子"同等重要**。本版补上这条链路：
+
+| 能力 | 落点 |
+|---|---|
+| 曲目结构识别 | `bgmread.structure`：解码 8kHz 单声道 PCM → 逐窗 RMS 能量包络 → 分位数三档分段（intro/verse/build/drop/breakdown/outro/flat）+ 起音包络自相关估 BPM + 高潮/铺垫候选打分 |
+| 片子高潮判定 | `filmClimaxTime`：剪辑密度成簇 → 非对白段能量峰 → 音频总能量峰（对白占比 <35%）；**口播片不拿台词峰值当高潮** |
+| 自动选段 | `bgmwrite.mix --section auto|climax|calm|full` 或显式 `section_start_sec/section_end_sec` |
+| 落点对齐 | 取 `drop` 段并把段内能量峰值对齐到片子高潮时刻；片子高潮更早则向前裁片头（回执写明裁了多少） |
+| 滑窗兜底 | 选出的段比片子还长 → 段内以能量最高处为中心取 片长×40% 的窗口；曲子平坦则从曲头取 |
+| 边界纪律 | 边界优先吸结构边界、其次吸节拍（BPM 置信度 low 时不吸）；两端 120ms 微淡；选段后重新量片段电平再定增益 |
+| 证据 | `section-picked.png`（上=曲目波形+红框，下=片子波形+高潮红框）、`report.section`（模式/片段/理由/是否对齐） |
+
+**诚实边界**：结构识别是**规则式**（分位数 + 走向 + 起音密度），不是深度学习结构识别，也不是乐谱级主歌/副歌标注；
+它能稳定回答"哪段最响、最密、最适合当高潮"。找不到可靠高潮点时**如实返回 `basis: "none"` 并跳过峰值对齐**——
+宁可不对齐，也不把音乐高潮对到片头第一秒。
+
+真机验证（`structure.test.ts`，真实 ffmpeg）：人造"安静→高潮→安静"曲子，8–20s 高潮段被识别为 drop、拍速落在 120BPM；
+人造"三连切+更响"的片子，高潮按剪辑密度判定；自动选段出片后落点误差 ≤1.5s 且复检全绿。
 
 ## 13. 设计边界与遗留
 

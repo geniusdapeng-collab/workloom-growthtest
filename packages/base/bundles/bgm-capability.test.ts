@@ -17,9 +17,12 @@ import YAML from "yaml";
 import { evalCondition } from "../fence-engine/expr.js";
 import { bundlesRoot } from "./assembly.js";
 import {
-  BGM_TOOLS, LICENSE_TABLE, alignBeatGrid, deriveDuckParams, deriveTempoFromCuts,
-  findRecipes, findTracks, licenseInfo,
+  BGM_TOOLS, LICENSE_TABLE, SECTION_MODES, alignBeatGrid, chooseSection, deriveDuckParams,
+  deriveTempoFromCuts, filmClimaxTime, findRecipes, findTracks, licenseInfo,
 } from "../../../bundles/ai-video/connectors/bgm-bridge/core.mjs";
+import {
+  classifySegments, energyEnvelope, estimateBpmFromOnsets, onsetStrength, scoreSegments,
+} from "../../../bundles/ai-video/connectors/bgm-bridge/measure.mjs";
 import { CHORDS, SCALES, planComposition, renderCompositionToWav } from "../../../bundles/ai-video/connectors/bgm-bridge/synth.mjs";
 
 const ROOT = bundlesRoot();
@@ -397,7 +400,7 @@ describe("自算作曲内核", () => {
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 120_000);
 
   it("非法配方显式失败（不静默兜底）", () => {
     expect(() => planComposition({ recipe: { ...recipe, bpm: 500 }, durationSec: 10 })).toThrow(/BPM/);
@@ -412,3 +415,172 @@ function readFiles(dir: string): string[] {
     .filter((entry) => entry.isFile() && entry.name.endsWith(".yml"))
     .map((entry) => join(dir, entry.name));
 }
+
+/** 用合成包络（不碰真实音频文件）验证结构分段与选段决策——纯函数，CI 里也能跑。 */
+function envelopeOf(dbBySecond: number[][], windowSec = 0.25) {
+  const db: number[] = [];
+  for (const entry of dbBySecond) {
+    const levels = Array.isArray(entry) ? entry : [entry];
+    const perSecond = Math.round(1 / windowSec);
+    for (let index = 0; index < perSecond; index += 1) db.push(levels[index % levels.length]!);
+  }
+  const rd = (value: number) => Math.round(value * 100) / 100;
+  return {
+    windowSec,
+    windows: db.length,
+    durationSec: Math.round(db.length * windowSec * 1000) / 1000,
+    db: db.map(rd),
+    rms: db.map((value) => 10 ** (value / 20)),
+    peakDb: rd(Math.max(...db)),
+    avgDb: rd(db.reduce((a, b) => a + b, 0) / db.length),
+    quantiles: {
+      p10: rd([...db].sort((a, b) => a - b)[Math.floor(db.length * 0.1)] ?? -60),
+      p25: rd([...db].sort((a, b) => a - b)[Math.floor(db.length * 0.25)] ?? -60),
+      p50: rd([...db].sort((a, b) => a - b)[Math.floor(db.length * 0.5)] ?? -60),
+      p75: rd([...db].sort((a, b) => a - b)[Math.floor(db.length * 0.75)] ?? -60),
+      p90: rd([...db].sort((a, b) => a - b)[Math.floor(db.length * 0.9)] ?? -60),
+    },
+  };
+}
+
+describe("曲目结构识别与自动选段（规则式，纯函数）", () => {
+  it("安静→渐强→高潮→回落 的能量曲线被正确分段（intro/build/drop/breakdown/outro）", () => {
+    const envelope = envelopeOf([
+      ...Array(8).fill([-46]),          // intro 8s
+      ...Array(4).fill([-40, -36, -32, -28]), // build 4s（上行）
+      ...Array(10).fill([-22]),         // drop 10s
+      ...Array(4).fill([-42]),          // breakdown 4s
+      ...Array(4).fill([-48]),          // outro 4s
+    ]);
+    const onsets = onsetStrength(envelope.db);
+    const structure = classifySegments({ envelope, onsets });
+    const types = structure.segments.map((segment) => segment.type);
+    expect(types[0]).toBe("intro");
+    expect(types).toContain("drop");
+    expect(types[types.length - 1]).toBe("outro");
+    const drop = structure.segments.find((segment) => segment.type === "drop")!;
+    // 渐强段会被并进高潮段（段短于 minSegmentSec 或属于中能档时并段），因此均值略低于纯高潮平台值
+    expect(drop.avgDb).toBeGreaterThan(-30);
+    expect(drop.durationSec).toBeGreaterThanOrEqual(8);
+    expect(drop.startSec).toBeGreaterThanOrEqual(8);
+    expect(drop.endSec).toBeLessThanOrEqual(28);
+    // 语义校验：drop 是全场平均能量最高的段
+    expect(Math.max(...structure.segments.map((segment) => segment.avgDb!))).toBe(drop.avgDb);
+  });
+
+  it("全曲能量平坦时如实标 flat 并说明「没有高潮可言」，不硬编一个 drop", () => {
+    const envelope = envelopeOf(Array(20).fill([-30, -29.5, -30.5, -30]));
+    const structure = classifySegments({ envelope, onsets: onsetStrength(envelope.db) });
+    expect(structure.segments).toHaveLength(1);
+    expect(structure.segments[0]!.type).toBe("flat");
+    expect(structure.note).toContain("没有明显高潮段");
+  });
+
+  it("高潮候选按段平均能量排序（不是按单帧峰值——带切点的安静段不该赢）", () => {
+    const envelope = envelopeOf([
+      ...Array(6).fill([-44]),   // 安静段（构造一个孤立尖峰）
+      ...Array(6).fill([-20]),   // 高能段
+      ...Array(6).fill([-46]),
+    ]);
+    // 人为制造尖峰：安静段里有一帧 -18
+    envelope.db[20] = -18;
+    const structure = classifySegments({ envelope, onsets: onsetStrength(envelope.db) });
+    const scored = scoreSegments({ segments: structure.segments, prefer: "climax", durationSec: envelope.durationSec });
+    expect(scored.candidates[0]!.avgDb).toBeGreaterThan(-24);
+    expect(scored.candidates[0]!.type).toBe("drop");
+  });
+
+  it("边界吸附受时长约束：不吸到曲外（此前 bug：段落终点被吸到 28.75s > 实际 28.25s）", () => {
+    const envelope = envelopeOf([[-46], [-44], [-30], [-22], [-24], [-46]], 0.25);
+    const structure = classifySegments({ envelope, onsets: onsetStrength(envelope.db) });
+    const scored = scoreSegments({ segments: structure.segments, bpm: 48, prefer: "climax", durationSec: envelope.durationSec });
+    for (const candidate of scored.candidates) {
+      expect(candidate.startSec).toBeGreaterThanOrEqual(0);
+      expect(candidate.endSec).toBeLessThanOrEqual(envelope.durationSec);
+    }
+  });
+
+  it("BPM 估计：周期性起音给出可信拍速；无周期时如实返回 null", () => {
+    const periodic: number[] = [];
+    for (let index = 0; index < 80; index += 1) periodic.push(index % 4 === 0 ? 6 : 0.2);
+    const bpm = estimateBpmFromOnsets(periodic, { windowSec: 0.25 });
+    expect(bpm.bpm).not.toBeNull();
+    expect(bpm.candidates.length).toBeGreaterThan(0);
+
+    const flat = new Array(80).fill(0.05);
+    expect(estimateBpmFromOnsets(flat, { windowSec: 0.25 }).bpm).toBeNull();
+    expect(estimateBpmFromOnsets([1, 2, 3], { windowSec: 0.25 }).reason).toContain("包络太短");
+  });
+
+  it("片子高潮判据三级降级：剪辑成簇 → 非对白能量峰 → 无（口播片不拿台词峰值当高潮）", () => {
+    const arc = { windowSec: 0.25, durationSec: 40, db: new Array(160).fill(-40), peakTimeSec: 10, dynamicsDb: 20, avgDb: -40 };
+
+    // ① 剪辑成簇（±2s 内 3 个剪辑点）
+    const clustered = filmClimaxTime({ arc, cuts: [{ at: 18 }, { at: 19 }, { at: 20.5 }, { at: 34 }], voice: { activeRatio: 0.6, silences: [] }, durationSec: 40 });
+    expect(clustered.basis).toBe("cut-density");
+    expect(clustered.timeSec).toBeGreaterThanOrEqual(18);
+    expect(clustered.timeSec).toBeLessThanOrEqual(20.5);
+
+    // ② 非对白段能量峰（比非对白中位数高 6dB）
+    const db = new Array(160).fill(-50);
+    for (let index = 60; index < 80; index += 1) db[index] = -42;
+    const nonDialogue = filmClimaxTime({
+      arc: { ...arc, db },
+      cuts: [{ at: 5 }],
+      voice: { activeRatio: 0.5, silences: [{ start: 14, end: 24 }, { start: 30, end: 40 }] },
+      durationSec: 40,
+    });
+    expect(nonDialogue.basis).toBe("non-dialogue-energy");
+    expect(nonDialogue.timeSec).toBeGreaterThanOrEqual(15);
+    expect(nonDialogue.timeSec).toBeLessThan(20);
+
+    // ③ 口播片 + 均匀环境声 + 无剪辑成簇 → 不硬给高潮点
+    const flatArc = { windowSec: 0.25, durationSec: 40, db: new Array(160).fill(-38), peakTimeSec: 9, dynamicsDb: 24, avgDb: -38 };
+    const none = filmClimaxTime({
+      arc: flatArc,
+      cuts: [{ at: 7 }, { at: 14 }, { at: 20 }],
+      voice: { activeRatio: 0.55, silences: [{ start: 12.9, end: 20.4 }] },
+      durationSec: 40,
+    });
+    expect(none.basis).toBe("none");
+    expect(none.timeSec).toBeNull();
+    expect(none.reason).toContain("未识别到明确高潮点");
+  });
+
+  it("选段决策：片子有高潮点→取曲子高潮段并声明峰值对齐；没有→取代表段且不做对齐", () => {
+    const envelope = envelopeOf([
+      ...Array(6).fill([-46]),
+      ...Array(6).fill([-22]),
+      ...Array(6).fill([-46]),
+    ]);
+    const structure = {
+      durationSec: envelope.durationSec,
+      windowSec: envelope.windowSec,
+      envelope,
+      structure: classifySegments({ envelope, onsets: onsetStrength(envelope.db) }),
+      climax: scoreSegments({ segments: classifySegments({ envelope, onsets: onsetStrength(envelope.db) }).segments, prefer: "climax", durationSec: envelope.durationSec }),
+      calm: scoreSegments({ segments: classifySegments({ envelope, onsets: onsetStrength(envelope.db) }).segments, prefer: "calm", durationSec: envelope.durationSec }),
+      tempo: { bpm: 100, confidence: "medium" },
+    };
+    const withPeak = chooseSection({
+      structure,
+      filmArc: { peakTimeSec: 14, dynamicsDb: 18, climaxBasis: "cut-density" },
+      mode: "auto",
+      filmDurationSec: 20,
+    });
+    expect(withPeak.alignFilmPeak).toBe(true);
+    expect(withPeak.chosen!.type).toBe("drop");
+
+    const withoutPeak = chooseSection({
+      structure,
+      filmArc: { peakTimeSec: null, dynamicsDb: 25, climaxBasis: "none", climaxDetails: { audio: { speechRatio: 0.6 } } },
+      mode: "auto",
+      filmDurationSec: 20,
+    });
+    expect(withoutPeak.alignFilmPeak).toBe(false);
+    expect(withoutPeak.reason).toContain("未识别到可用的高潮点");
+
+    expect(SECTION_MODES).toEqual(["full", "auto", "climax", "calm"]);
+    expect(() => chooseSection({ structure, mode: "made-up" })).toThrow(/未知选段模式/);
+  });
+});

@@ -497,6 +497,337 @@ export async function renderSpectrumPic({ input, output, start = 0, duration = 6
 
 /* ============================ 工具 ============================ */
 
+/* ============================ 能量包络（结构识别的事实源） ============================ */
+
+/**
+ * 把音轨解码成低采样率单声道 PCM，用于在 JS 里算能量包络。
+ *
+ * 为什么不用滤镜输出：`astats` / `ebur128` 的逐帧日志语义随版本变化（实测 reset 行为不稳定），
+ * 而"解码成 PCM 自己算"是一遍 ffmpeg + 纯 JS，确定、可复现、可单测，也不依赖具体滤镜实现。
+ *
+ * @returns {Promise<{pcm:Float32Array, sampleRate:number, durationSec:number}>}
+ */
+export async function decodePcm({ input, sampleRate = 8000, maxSeconds = 600, startSec = 0, bins = resolveBinaries() }) {
+  const args = ["-hide_banner", "-v", "error"];
+  if (startSec > 0) args.push("-ss", String(startSec));
+  if (maxSeconds) args.push("-t", String(maxSeconds));
+  args.push("-i", input, "-vn", "-ac", "1", "-ar", String(sampleRate), "-f", "s16le", "-");
+  const { stdout } = await runBin(bins.ffmpeg, args, { label: "ffmpeg(decode-pcm)", timeoutMs: 600_000 });
+  const frames = Math.floor(stdout.length / 2);
+  const pcm = new Float32Array(frames);
+  for (let index = 0; index < frames; index += 1) {
+    pcm[index] = stdout.readInt16LE(index * 2) / 32768;
+  }
+  return { pcm, sampleRate, durationSec: frames / sampleRate };
+}
+
+/**
+ * 能量包络：按窗口算 RMS（dBFS），并给出峰值/均值/分位。
+ * @param {{pcm:Float32Array, sampleRate:number, windowSec?:number}} input
+ */
+export function energyEnvelope({ pcm, sampleRate, windowSec = 0.25 }) {
+  const windowSize = Math.max(1, Math.round(windowSec * sampleRate));
+  const windows = Math.max(1, Math.floor(pcm.length / windowSize));
+  const db = [];
+  const rms = [];
+  for (let index = 0; index < windows; index += 1) {
+    let sum = 0;
+    const start = index * windowSize;
+    for (let offset = 0; offset < windowSize; offset += 1) {
+      const sample = pcm[start + offset] ?? 0;
+      sum += sample * sample;
+    }
+    const value = Math.sqrt(sum / windowSize);
+    rms.push(value);
+    db.push(20 * Math.log10(Math.max(value, 1e-6)));
+  }
+  const sorted = [...db].sort((a, b) => a - b);
+  const quantile = (q) => sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * q)))] ?? null;
+  const rd = (value) => (Number.isFinite(value) ? Math.round(value * 100) / 100 : null);
+  return {
+    windowSec,
+    windows: db.length,
+    durationSec: Math.round(db.length * windowSec * 1000) / 1000,
+    db: db.map(rd),
+    rms,
+    peakDb: sorted.length ? rd(sorted[sorted.length - 1]) : null,
+    avgDb: sorted.length ? rd(sorted.reduce((a, b) => a + b, 0) / sorted.length) : null,
+    quantiles: {
+      p10: rd(quantile(0.1)), p25: rd(quantile(0.25)), p50: rd(quantile(0.5)),
+      p75: rd(quantile(0.75)), p90: rd(quantile(0.9)),
+    },
+  };
+}
+
+/** 起音强度（正向能量跃变）：结构分段与 BPM 估计共用。 */
+export function onsetStrength(db) {
+  const out = [];
+  for (let index = 0; index < db.length; index += 1) {
+    const previous = db[index - 1] ?? db[index];
+    out.push(Math.max(0, db[index] - previous));
+  }
+  return out.map((value) => Math.round(value * 100) / 100);
+}
+
+/**
+ * 由起音包络估计 BPM（自相关）：在 [60/maxBpm, 60/minBpm] 的滞后范围内找最强周期性。
+ * 拿不到稳定周期（例：持续铺底 pad）时返回 confidence=low 与 null，绝不硬编一个 BPM。
+ */
+export function estimateBpmFromOnsets(onsets, { windowSec = 0.25, minBpm = 50, maxBpm = 190 } = {}) {
+  if (!Array.isArray(onsets) || onsets.length < 8) return { bpm: null, confidence: "low", reason: "包络太短" };
+  const mean = onsets.reduce((a, b) => a + b, 0) / onsets.length;
+  const centered = onsets.map((value) => value - mean);
+  // 浮点残差防线：恒定包络（持续铺底）算出来的 centered 是 1e-17 量级的噪声，
+  // 不加这道判断会"估"出一个 240BPM 之类的假拍速（实测踩过）。
+  const maxAbsCentered = centered.reduce((max, value) => Math.max(max, Math.abs(value)), 0);
+  if (maxAbsCentered < 1e-9) {
+    return { bpm: null, confidence: "low", reason: "包络无起伏（持续铺底/无起音）" };
+  }
+  const minLag = Math.max(1, Math.round(60 / maxBpm / windowSec));
+  const maxLag = Math.min(centered.length - 2, Math.round(60 / minBpm / windowSec));
+  if (maxLag <= minLag) return { bpm: null, confidence: "low", reason: "窗口粒度不足以分辨拍速" };
+  let bestLag = null;
+  let bestScore = 0;
+  let energy = 0;
+  for (let lag = minLag; lag <= maxLag; lag += 1) {
+    let sum = 0;
+    for (let index = lag; index < centered.length; index += 1) sum += centered[index] * centered[index - lag];
+    const score = sum / (centered.length - lag);
+    energy += Math.abs(score);
+    if (score > bestScore) { bestScore = score; bestLag = lag; }
+  }
+  if (bestLag === null || energy === 0) return { bpm: null, confidence: "low", reason: "无稳定周期性" };
+  const bpmOf = (lag) => Math.round((60 / (lag * windowSec)) * 10) / 10;
+  const peakCoverage = Math.round((bestScore / (energy / (maxLag - minLag + 1))) * 100) / 100;
+  return {
+    bpm: bpmOf(bestLag),
+    confidence: peakCoverage >= 3 ? "high" : peakCoverage >= 1.6 ? "medium" : "low",
+    autocorrPeak: peakCoverage,
+    candidates: [bestLag, Math.round(bestLag / 2), bestLag * 2]
+      .filter((lag) => lag >= minLag && lag <= maxLag)
+      .map(bpmOf),
+    lagWindows: bestLag,
+  };
+}
+
+/** 分位数（结构分段的阈值来源）。 */
+function percentile(values, q) {
+  if (!values.length) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.min(sorted.length - 1, Math.max(0, Math.round((sorted.length - 1) * q)))];
+}
+
+/**
+ * 结构分段（**规则式，不是深度学习**——这一点必须如实陈述）。
+ *
+ * 做法：能量包络按分位数切 低/中/高 三档 → 合并成连续段 → 依据位置 + 能量档 + 走向 + 起音密度贴标签：
+ * - 开头低能段 = intro；结尾低能段 = outro；高能段 = drop
+ * - 高能段前面持续上行的那段 = build；高能段之后的低能段 = breakdown；其余中能段 = verse
+ * - 全曲能量平坦（动态 < 6dB）= 单段 flat（此时"高潮"不存在，选段退化为"代表性片段"）
+ */
+export function classifySegments({ envelope, onsets = null, minSegmentSec = 3 }) {
+  const db = envelope?.db ?? [];
+  const windowSec = envelope?.windowSec ?? 0.25;
+  if (!db.length) return { segments: [], method: "rule-based-percentile", note: "无包络数据" };
+  /**
+   * 先平滑再分档：真实曲子里每个小节都有强弱起伏（1–2 窗的瞬时凹点），
+   * 不平滑会把一个副歌切成几十段"高-低-高"（实测：150s 曲目出 120+ 段，段标签全乱）。
+   * 平滑窗取 2.5s（乐句级），随后再对标签做多数滤波（窗宽 = minSegmentSec）去掉残留抖动。
+   */
+  const smoothWindows = Math.max(1, Math.round(2.5 / windowSec));
+  const smoothed = db.map((_, index) => {
+    const from = Math.max(0, index - Math.floor(smoothWindows / 2));
+    const to = Math.min(db.length, from + smoothWindows);
+    const slice = db.slice(from, to);
+    return slice.reduce((a, b) => a + b, 0) / slice.length;
+  });
+  const p25 = percentile(smoothed, 0.25);
+  const p75 = percentile(smoothed, 0.75);
+  const dynamics = (percentile(smoothed, 0.95) ?? 0) - (percentile(smoothed, 0.05) ?? 0);
+  const p10 = percentile(smoothed, 0.1);
+  const p90 = percentile(smoothed, 0.9);
+  const span = Math.max(1e-6, (p90 ?? 0) - (p10 ?? 0));
+  const rd = (value) => (Number.isFinite(value) ? Math.round(value * 100) / 100 : null);
+  const densityOf = (slice) => (slice.length ? rd(slice.reduce((a, b) => a + b, 0) / slice.length) : null);
+
+  if (dynamics < 6) {
+    return {
+      segments: [{
+        id: "seg-1",
+        type: "flat",
+        level: "mid",
+        startSec: 0,
+        endSec: envelope.durationSec,
+        durationSec: envelope.durationSec,
+        avgDb: envelope.avgDb,
+        peakDb: envelope.peakDb,
+        riseDb: 0,
+        onsetDensity: onsets ? densityOf(onsets) : null,
+      }],
+      method: "rule-based-percentile",
+      dynamicsDb: rd(dynamics),
+      thresholds: {
+        p25: rd(p25),
+        p75: rd(p75),
+        levelBands: { lowBelow: rd(p10 + span * 0.35), highAbove: rd(p10 + span * 0.7) },
+      },
+      note: "全曲能量平坦（动态 <6dB）：没有明显高潮段，选段按「代表性片段」处理",
+    };
+  }
+
+  /**
+   * 分档用**相对动态范围**而不是固定分位数：真实歌曲里"副歌占一半时长"很常见，
+   * 固定 p75 会把整段副歌切成"只有最响的 25% 算高能"，导致高潮段被标成 verse（实测踩过）。
+   * 口径：(db - p10) / (p90 - p10) → <0.35 低能 / ≥0.7 高能 / 其余中能。
+   */
+  const rawLevel = smoothed.map((value) => {
+    const normalized = ((value - p10) / span);
+    if (normalized < 0.35) return "low";
+    if (normalized >= 0.7) return "high";
+    return "mid";
+  });
+  // 标签多数滤波：窗宽 = minSegmentSec，去掉"高-低-高"里的瞬时夹层
+  const filterHalf = Math.max(1, Math.round(minSegmentSec / windowSec / 2));
+  const level = rawLevel.map((_, index) => {
+    const from = Math.max(0, index - filterHalf);
+    const to = Math.min(rawLevel.length, index + filterHalf + 1);
+    const counts = { low: 0, mid: 0, high: 0 };
+    for (let cursor = from; cursor < to; cursor += 1) counts[rawLevel[cursor]] += 1;
+    return Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  });
+  const raw = [];
+  for (let index = 0; index < level.length; index += 1) {
+    const last = raw[raw.length - 1];
+    if (last && last.level === level[index]) last.endWindow = index;
+    else raw.push({ level: level[index], startWindow: index, endWindow: index });
+  }
+  const minWindows = Math.max(1, Math.round(minSegmentSec / windowSec));
+  const merged = [];
+  for (const segment of raw) {
+    const last = merged[merged.length - 1];
+    const length = segment.endWindow - segment.startWindow + 1;
+    if (last && (length < minWindows || segment.level === "mid")) {
+      last.endWindow = segment.endWindow;
+      // 并段后按"占多数的档位"重算该段档位：否则整段会继承第一段的档位（实测把副歌标成 verse）
+      const counts = { low: 0, mid: 0, high: 0 };
+      for (let cursor = last.startWindow; cursor <= last.endWindow; cursor += 1) counts[level[cursor]] += 1;
+      last.level = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+    } else {
+      merged.push({ ...segment });
+    }
+  }
+
+  const segments = merged.map((segment, index) => {
+    const slice = db.slice(segment.startWindow, segment.endWindow + 1);
+    const startSec = Math.round(segment.startWindow * windowSec * 1000) / 1000;
+    const endSec = Math.round((segment.endWindow + 1) * windowSec * 1000) / 1000;
+    const onsetSlice = onsets ? onsets.slice(segment.startWindow, segment.endWindow + 1) : [];
+    return {
+      id: `seg-${index + 1}`,
+      level: segment.level,
+      startSec,
+      endSec,
+      durationSec: Math.round((endSec - startSec) * 1000) / 1000,
+      avgDb: rd(slice.reduce((a, b) => a + b, 0) / slice.length),
+      peakDb: rd(Math.max(...slice)),
+      riseDb: slice.length > 2 ? rd(slice[slice.length - 1] - slice[0]) : 0,
+      onsetDensity: densityOf(onsetSlice),
+    };
+  });
+
+  for (let index = 0; index < segments.length; index += 1) {
+    const segment = segments[index];
+    const previous = segments[index - 1];
+    const next = segments[index + 1];
+    if (segment.level === "high") segment.type = "drop";
+    else if (segment.level === "low") {
+      if (!previous) segment.type = "intro";
+      else if (!next) segment.type = "outro";
+      else if (previous.type === "drop") segment.type = "breakdown";
+      else segment.type = "verse";
+    } else {
+      segment.type = next && next.level === "high" && segment.riseDb > 1.5 ? "build" : "verse";
+    }
+  }
+
+  // 收尾修正：末段若仍是高能段，把最后 15% 拆成 outro，保证有自然收束点
+  const last = segments[segments.length - 1];
+  if (last && last.type === "drop" && last.durationSec > minSegmentSec * 2) {
+    const outroStart = Math.round((last.endSec - Math.max(2, last.durationSec * 0.15)) * 1000) / 1000;
+    const outroSlice = db.slice(Math.max(0, Math.round(outroStart / windowSec)));
+    const outroOnsetSlice = onsets ? onsets.slice(Math.max(0, Math.round(outroStart / windowSec))) : [];
+    segments.push({
+      id: `seg-${segments.length + 1}`,
+      type: "outro",
+      level: "mid",
+      startSec: outroStart,
+      endSec: last.endSec,
+      durationSec: Math.round((last.endSec - outroStart) * 1000) / 1000,
+      avgDb: outroSlice.length ? rd(outroSlice.reduce((a, b) => a + b, 0) / outroSlice.length) : null,
+      peakDb: outroSlice.length ? rd(Math.max(...outroSlice)) : null,
+      riseDb: last.riseDb,
+      onsetDensity: outroOnsetSlice.length
+        ? rd(outroOnsetSlice.reduce((a, b) => a + b, 0) / outroOnsetSlice.length)
+        : null,
+    });
+    last.endSec = outroStart;
+    last.durationSec = Math.round((outroStart - last.startSec) * 1000) / 1000;
+  }
+  return {
+    segments,
+    method: "rule-based-percentile",
+    dynamicsDb: rd(dynamics),
+    thresholds: {
+      p25: rd(p25),
+      p75: rd(p75),
+      levelBands: { lowBelow: rd(p10 + span * 0.35), highAbove: rd(p10 + span * 0.7) },
+    },
+    note: null,
+  };
+}
+
+/**
+ * 段落打分与节拍吸附：给每段算"当高潮用 / 当铺垫用"的分，并把边界吸到节拍网格上
+ * （边界落在拍点，裁切就不会切在乐句中间）。
+ */
+export function scoreSegments({ segments, bpm = null, prefer = "climax", durationSec = null }) {
+  const beatSec = Number.isFinite(bpm) && bpm > 0 ? 60 / bpm : null;
+  const snap = (time) => {
+    const value = beatSec ? Math.round(time / beatSec) * beatSec : time;
+    const clamped = Number.isFinite(durationSec) ? Math.min(Math.max(0, value), durationSec) : Math.max(0, value);
+    return Math.round(clamped * 1000) / 1000;
+  };
+  const rd = (value) => (Number.isFinite(value) ? Math.round(value * 1000) / 1000 : null);
+  // 用**段平均能量**作主依据（峰值受单帧瞬态影响大，实测会把带切点的安静段误判成高潮），
+  // 峰值只作为小幅加成；起音密度给"有推动力"的段加分。
+  const maxAvg = Math.max(...segments.map((segment) => segment.avgDb ?? -60));
+  const candidates = segments.map((segment) => {
+    const energyScore = Math.max(0, Math.min(1, ((segment.avgDb ?? -60) - (maxAvg - 12)) / 12));
+    const peakScore = Math.max(0, Math.min(1, ((segment.peakDb ?? -60) - (maxAvg - 6)) / 6));
+    const lengthScore = Math.min(1, (segment.durationSec ?? 0) / 12);
+    const onsetScore = Math.min(1, (segment.onsetDensity ?? 0) / 3);
+    const calmScore = Math.max(0, 1 - energyScore);
+    const score = prefer === "climax"
+      ? energyScore * 0.6 + lengthScore * 0.2 + onsetScore * 0.15 + peakScore * 0.05
+      : calmScore * 0.5 + lengthScore * 0.3 + (1 - onsetScore) * 0.2;
+    const startSec = snap(segment.startSec);
+    const endSec = snap(segment.endSec);
+    return {
+      id: segment.id,
+      type: segment.type,
+      startSec,
+      endSec,
+      durationSec: Math.round((endSec - startSec) * 1000) / 1000,
+      avgDb: segment.avgDb,
+      peakDb: segment.peakDb,
+      onsetDensity: segment.onsetDensity,
+      score: rd(score),
+    };
+  });
+  candidates.sort((a, b) => b.score - a.score);
+  return { prefer, beatSec: beatSec ? Math.round(beatSec * 1000) / 1000 : null, candidates };
+}
+
 export async function sha256File(file) {
   return await new Promise((resolve, reject) => {
     const hash = createHash("sha256");

@@ -23,7 +23,7 @@
 
 import process from "node:process";
 
-import { BgmError, analyze, best, callTool, compose, findRecipes, findTracks, mix, separate } from "./core.mjs";
+import { BgmError, analyze, analyzeStructure, best, callTool, compose, findRecipes, findTracks, mix, separate } from "./core.mjs";
 
 function parseArgs(argv) {
   const positional = [];
@@ -85,6 +85,26 @@ async function main() {
         line("问题：");
         for (const issue of report.issues) line(`  [${issue.severity}] ${issue.kind} — ${issue.detail}`);
       }
+      return 0;
+    }
+    case "structure": {
+      const result = await analyzeStructure({
+        input: flags.in,
+        windowSec: number(flags.window, 0.25),
+        minSegmentSec: number(flags["min-segment"], 3),
+      });
+      line(`曲目：${result.input} · ${result.durationSec}s${result.truncated ? "（超长，已按前 10 分钟分析）" : ""}`);
+      line(`能量：均值 ${result.envelope.avgDb}dB · 峰值 ${result.envelope.peakDb}dB · 动态 ${result.structure.dynamicsDb}dB`);
+      line(`拍速：${result.tempo.bpm ?? "未能估计"}（置信度 ${result.tempo.confidence}${result.tempo.reason ? ` · ${result.tempo.reason}` : ""}）`);
+      line(`分段（${result.structure.method}）：`);
+      for (const segment of result.structure.segments) {
+        line(`  ${String(segment.type).padEnd(10)} ${String(segment.startSec).padStart(7)}s → ${String(segment.endSec).padStart(7)}s  平均 ${segment.avgDb}dB  峰值 ${segment.peakDb}dB  起音 ${segment.onsetDensity ?? "n/a"}`);
+      }
+      line("高潮候选：");
+      for (const candidate of result.climax.candidates.slice(0, 3)) {
+        line(`  ${candidate.id} ${candidate.type} ${candidate.startSec}s→${candidate.endSec}s 分 ${candidate.score}`);
+      }
+      if (result.structure.note) line(`说明：${result.structure.note}`);
       return 0;
     }
     case "recipes": {
@@ -163,11 +183,20 @@ async function main() {
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
         licenseReviewed: flags["license-unverified"] !== true,
         commercialUse: flags["non-commercial"] !== true,
+        section: typeof flags.section === "string" ? flags.section : "full",
+        sectionStartSec: number(flags["section-start"]),
+        sectionEndSec: number(flags["section-end"]),
       });
       line(`已配乐：${result.output.path}`);
       line(`  策略 ${result.policy} · BGM ${result.mix.musicLevelDb}dB · 让位 ${result.levels.duckingDepthDb}dB · 人声余量 ${result.levels.speechToMusicMarginDb}dB · 配乐可闻度 ${result.levels.musicPresenceDb}dB`);
       line(`  响度 ${result.loudness.after.integratedLufs} LUFS / 真峰值 ${result.loudness.after.truePeakDbtp} dBTP（目标 ${result.mix.targetLufs} / ${result.mix.truePeak}）`);
       line(`  卡点：${result.alignment.verdict}（${result.alignment.alignedCount}/${result.alignment.cuts.length} 落在 ±${result.alignment.toleranceMs}ms 内，平均 ${result.alignment.meanAbsErrorMs}ms，BPM ${result.alignment.bpm}）`);
+      if (result.section?.chosen) {
+        line(`  选段：${result.section.mode} → ${result.section.chosen.type} ${result.section.played?.startSec ?? result.section.chosen.startSec}s→${result.section.chosen.endSec}s`);
+        line(`        理由：${result.section.reason}`);
+        if (result.section.filmPeakAlign?.note) line(`        对齐：${result.section.filmPeakAlign.note}`);
+        else if (result.section.filmPeakAlign?.skipped) line(`        对齐：跳过（${result.section.filmPeakAlign.reason}）`);
+      }
       line(`  sha256 ${result.output.hash}`);
       for (const warning of result.warnings) line(`  ⚠ ${warning}`);
       return 0;

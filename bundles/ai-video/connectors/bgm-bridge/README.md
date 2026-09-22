@@ -36,19 +36,42 @@ const toolExecutor = createBgmBridgeExecutor({
 与调色工位同款：基座 seam 提案仍处「暂缓」（`proposals/workloom-im/0001-deployment-tool-executor-seam.md`），
 因此当前生产入口是**行业侧脚本注入**（见 `runtime-smoke.mts` 与部署层 `server-adapter.mts`），不改任何基座文件。
 
-## 工具面（9 个）
+## 工具面（10 个）
 
 | 工具 | 类型 | 用途 |
 |---|---|---|
 | `bgmread.health` | 读 | 工位与引擎健康（ffmpeg/ffprobe、作曲内核、分离引擎、曲库是否存在） |
 | `bgmread.probe` | 读 | 音轨规格：时长/声道/采样率/编码 |
 | `bgmread.analyze` | 读 | 响度（EBU R128）、人声频段活动段、静音窗口底噪、剪辑点、疑似已有配乐 |
+| `bgmread.structure` | 读 | **曲目结构识别**：能量包络→intro/verse/build/drop/breakdown/outro 分段 + BPM 估计 + 高潮/铺垫候选 |
 | `bgmread.recipes` | 读 | **题材×情绪配方检索**（调式/调性/BPM/和弦/配器/电平/让位/禁忌） |
 | `bgmread.library` | 读 | 无版权曲库检索 + 许可判定 + TASL 署名文件 |
 | `bgmwrite.compose` | 写 | **自算作曲**出 BGM（可按时长对齐片子、可按剪辑点定速） |
 | `bgmwrite.mix` | 写 | 分层混音出片：原声保留策略、侧链让位、卡点对齐、淡入淡出、-14 LUFS 母版 |
 | `bgmwrite.separate` | 写 | 人声分离（demucs/audio-separator → ffmpeg 中心声道近似，质量等级如实标注） |
 | `bgmwrite.best` | 写 | 择优配乐：候选池打分；**允许结论是"这片子不需要配乐"**（不产出文件） |
+
+## 选段（外部曲目只取"最合适的那一段"）
+
+外部曲目通常 2–3 分钟、片子只有几十秒，所以"裁哪一段"与"配什么曲子"同等重要：
+
+```bash
+bgm-cli structure --in track.wav                       # 看结构：分段 + BPM + 高潮候选
+bgm-cli mix --in clip.mp4 --out scored.mp4 --bgm track.wav --section auto
+bgm-cli mix ... --section climax                       # 强制取高潮段
+bgm-cli mix ... --section calm                         # 强制取铺垫段
+bgm-cli mix ... --section-start 62 --section-end 78    # 人工指定（秒）
+```
+
+`section=auto` 的决策链（每一步都写进回执 `report.section`）：
+
+1. 先定**片子的高潮时刻**，依据按优先级：剪辑密度成簇（±2s 内 ≥2 剪辑点）→ 非对白段能量峰（比非对白中位数高 ≥3dB）→ 音频总能量峰（且对白占比 <35%）；
+2. 找得到 → 取曲子的 `drop` 段，把它内部的能量峰值**对齐到片子高潮时刻**（片子高潮更早则向前裁片头）；
+3. 找不到（口播/访谈这类无画面高潮的片子）→ **不做峰值对齐**，取曲子最有代表性的一段从片头铺，回执写明原因；
+4. 选出的段比片子还长 → 段内**滑窗**（以能量最高处为中心取 片长×40%）；曲子平坦则从曲头取。
+
+边界纪律：片段边界优先吸结构边界、其次吸节拍（BPM 置信度 low 时不吸）；两端各 120ms 微淡防爆音；选段后**重新量片段电平**再定增益。
+证据：`section-picked.png`（上=曲目波形+选中片段红框，下=片子波形+高潮时刻红框）。
 
 ## 四种分层策略（回答"声音全去掉？直接盖？还是先分离人声？"）
 
@@ -127,6 +150,7 @@ node_modules/.bin/tsx bundles/ai-video/connectors/bgm-bridge/runtime-smoke.mts
 | 不压住人声 | 人声-音乐余量 <3dB 直接 `verify_failed`；3–6dB 记告警 |
 | 响度交付口径 | 两遍法 `loudnorm`：-14 LUFS / -1 dBTP，复检超差记 `loudness_ok=false` |
 | 卡点对齐 | 剪辑点（scene 检测）→ 节拍网格偏移搜索；平均/达标率与阈值写进回执 |
+| 选段可解释 | `bgmread.structure` 的段表 + `chooseSection` 的决策理由 + `section-picked.png` 证据；无高潮点如实写 `skipped` |
 | 原片只读 | `assertOutputWritable` 同款检查 + 围栏 G-BGM2 |
 | 无回执不算完成 | 指标复检 + sha256 回执 + 围栏 G-BGM3；outage 场景负例 |
 | 许可干净 | 曲库白名单 + G-BGM1/G-BGM5；自算作曲为默认路径 |
