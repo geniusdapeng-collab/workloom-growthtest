@@ -22,6 +22,8 @@ import {
   installVendorContractBridge,
   installVendorFieldQualityBridge,
   installVendorMicroMotionBridge,
+  installVendorDiscoveryFixBridge,
+  installVendorPhaseInternalsDiagnostics,
   installVendorPhaseDiagnosticsBridge,
   installVendorPromptRebuildBridge
 } from "./vendor-compat.js";
@@ -203,6 +205,10 @@ export class VideoStudio {
      * 并标记 promptRebuilt（非静默兜底）。
      */
     const uninstallPromptRebuild = installVendorPromptRebuildBridge({ log });
+    /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
+    const uninstallDiscoveryFix = installVendorDiscoveryFixBridge({ log });
+    /** Phase 3 后融合链路深栈诊断（vendor 内部 catch 会吞掉栈帧） */
+    const uninstallInnerDiagnostics = installVendorPhaseInternalsDiagnostics({ log });
 
     // 与 vendor CLI（app/commands/preproduction.js）保持同一装配口径
     process.env.STORMAXE_TOTAL_DEADLINE_MS =
@@ -293,6 +299,8 @@ export class VideoStudio {
       });
       throw err;
     } finally {
+      uninstallInnerDiagnostics();
+      uninstallDiscoveryFix();
       uninstallPromptRebuild();
       uninstallContract();
       uninstallMicroMotion();
