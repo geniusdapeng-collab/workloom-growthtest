@@ -18,8 +18,11 @@ import { resolveGate, type GateVerdict } from "./gates.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { createPortraitRuntime, type PortraitRuntimeOptions } from "./portrait-runtime.js";
 import {
+  applyDurationPolicyToManager,
+  installVendorAudioDisciplineBridge,
   installVendorConfigIsolatorBridge,
   installVendorContractBridge,
+  installVendorDurationPolicyBridge,
   installVendorFieldQualityBridge,
   installVendorMicroMotionBridge,
   installVendorDiscoveryFixBridge,
@@ -27,6 +30,8 @@ import {
   installVendorPhaseDiagnosticsBridge,
   installVendorPromptRebuildBridge
 } from "./vendor-compat.js";
+import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
+import { loadDurationRules } from "./duration-rules.js";
 
 /** vendor 引擎暴露的最小结构（HyperrealitySystem 实例方法） */
 interface HyperrealitySystemLike {
@@ -97,6 +102,11 @@ export interface StudioConfig {
   deferRender?: boolean;
   /** 运行期日志（默认 console.log） */
   log?: (line: string) => void;
+  /**
+   * 镜头时长策略（2026-09-23）：默认从媒体目录读取模型能力（Seedance 2.5 实测 4–30s），
+   * 并把 vendor 的三处 15s 口径统一放宽，避免"计划能拍、提交被拒"或节奏被悄悄夹紧。
+   */
+  durationPolicy?: { maxSingleShotSeconds?: number; minSingleShotSeconds?: number };
 }
 
 export interface RunInput {
@@ -209,6 +219,30 @@ export class VideoStudio {
     const uninstallDiscoveryFix = installVendorDiscoveryFixBridge({ log });
     /** Phase 3 后融合链路深栈诊断（vendor 内部 catch 会吞掉栈帧） */
     const uninstallInnerDiagnostics = installVendorPhaseInternalsDiagnostics({ log });
+    /** 镜头内音频纪律（禁止 BGM）与时长策略（模型能力 4–30s）两条产品口径 */
+    const uninstallAudioDiscipline = installVendorAudioDisciplineBridge({
+      clause: AUDIO_DISCIPLINE_CLAUSE,
+      negativeTerms: AUDIO_NEGATIVE_TERMS,
+      log
+    });
+    const durationRules = loadDurationRules();
+    const maxSingleShot = cfg.durationPolicy?.maxSingleShotSeconds ?? durationRules.modelMax;
+    const minSingleShot = cfg.durationPolicy?.minSingleShotSeconds ?? durationRules.modelMin;
+    const uninstallDurationPolicy = installVendorDurationPolicyBridge({
+      maxSingleShotSeconds: maxSingleShot,
+      minSingleShotSeconds: minSingleShot,
+      log
+    });
+    log(
+      `[studio] 时长策略：单镜 ${minSingleShot}–${maxSingleShot}s（模型目录口径，Seedance 2.5 实测上限 30s）`
+      + `；口径清单 ${durationRules.sources.length} 条（在用 ${durationRules.sources.filter((s) => s.live).length} / 未接线 ${durationRules.nonLive.length}）`
+    );
+    if (!durationRules.aligned) {
+      log(
+        `[studio] ⚠️ 仍有在用口径低于模型上限：`
+        + durationRules.blockers.map((b) => `${b.id}=${b.value}s`).join("；")
+      );
+    }
 
     // 与 vendor CLI（app/commands/preproduction.js）保持同一装配口径
     process.env.STORMAXE_TOTAL_DEADLINE_MS =
@@ -257,8 +291,15 @@ export class VideoStudio {
       },
       scriptEngine: { charactersDir },
       renderingEngine: { charactersDir, outputDir: renderOutputDir },
-      charactersDir
+      charactersDir,
+      durationConstraint: { maxSingleShot, minSingleShot }
     });
+    /** 实例级放宽 rhythmProfiles（standard 12 / slow 15 → 模型上限），否则 30s 单镜会被重新夹紧 */
+    applyDurationPolicyToManager(
+      (system as unknown as { durationConstraintManager?: unknown }).durationConstraintManager,
+      maxSingleShot,
+      minSingleShot
+    );
 
     await emit({ kind: "pipeline.started", projectId: input.projectId, runId: null });
     try {
@@ -299,6 +340,8 @@ export class VideoStudio {
       });
       throw err;
     } finally {
+      uninstallDurationPolicy();
+      uninstallAudioDiscipline();
       uninstallInnerDiagnostics();
       uninstallDiscoveryFix();
       uninstallPromptRebuild();

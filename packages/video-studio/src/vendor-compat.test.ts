@@ -344,3 +344,137 @@ console.log("RESULT " + JSON.stringify({
     expect((result.afterFirst as { title?: string } | null)?.title).toBe("A");
   }, 60_000);
 });
+
+/**
+ * T-2026-0923-0047：镜头内禁 BGM（音频纪律）+ 单镜 30s 口径统一。
+ * 两条产品口径都由**运行期桥**落实（vendor 只读），因此断言必须在真实 node 进程里跑：
+ * 桥用 createRequire 加载 vendor 原型，vitest 的 ESM 转换会误处理 CJS。
+ */
+describe("音频纪律桥与时长策略桥（真机口径 2026-09-23）", () => {
+  it("音频纪律桥：组装器出口追加【音频纪律】+ 清洗 audio 字段里的音乐指令，摘除后复原", () => {
+    const script = `
+import { createRequire } from "node:module";
+import { installVendorAudioDisciplineBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const mod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-fusion-agent.js"))});
+const CLAUSE = "【音频纪律】本镜头音频仅允许：台词人声、旁白、环境音效与动作音效；严禁出现任何背景音乐、BGM、配乐。";
+const NEGATIVE = "no background music, no bgm, no soundtrack";
+const agent = new mod.PromptFusionAgent({});
+const build = () => {
+  const fields = {
+    scene: "苏州平江路的清晨，讲述人站在石桥边",
+    baseline: "8K写实电影质感，自然光造型",
+    constraint: "9:16画幅，480x853，24fps，MP4格式",
+    audio: "背景音乐：钢琴长音铺底；环境声：水声与鸟鸣；配乐在1.5s进点"
+  };
+  const prompt = String(agent._assembleStandardPrompt(
+    { shotId: "S1", duration: 5, scene: fields.scene, fields }, fields, "9:16"));
+  return { prompt, fields };
+};
+const before = build();
+const uninstall = installVendorAudioDisciplineBridge({ clause: CLAUSE, negativeTerms: NEGATIVE, log: () => undefined });
+const after = build();
+uninstall();
+const restored = build();
+console.log("RESULT " + JSON.stringify({
+  beforeHasClause: before.prompt.includes("【音频纪律】"),
+  beforeKeepsMusic: before.prompt.includes("钢琴长音铺底"),
+  afterHasClause: after.prompt.includes("【音频纪律】"),
+  afterHasNegative: /no background music/i.test(after.prompt),
+  afterMusicRemoved: !after.prompt.includes("钢琴长音铺底") && !after.prompt.includes("配乐在1.5s进点"),
+  afterFieldCleaned: String(after.fields.audio).includes("环境声") && !String(after.fields.audio).includes("钢琴"),
+  restoredHasClause: restored.prompt.includes("【音频纪律】"),
+  restoredKeepsMusic: restored.prompt.includes("钢琴长音铺底")
+}));
+`;
+    const result = runInChild(script);
+    /** 桥之前：vendor 原样照抄音乐指令，提示词里没有纪律子句（真机把 BGM 写进镜头的根因） */
+    expect(result.beforeHasClause).toBe(false);
+    expect(result.beforeKeepsMusic).toBe(true);
+    /** 桥之后：子句 + 英文负面词齐备，音乐指令被剔除 */
+    expect(result.afterHasClause).toBe(true);
+    expect(result.afterHasNegative).toBe(true);
+    expect(result.afterMusicRemoved).toBe(true);
+    expect(result.afterFieldCleaned).toBe(true);
+    /** 摘除后精确还原（桥不残留） */
+    expect(result.restoredHasClause).toBe(false);
+    expect(result.restoredKeepsMusic).toBe(true);
+  }, 90_000);
+
+  it("时长策略桥：5 处在用口径统一放宽到模型上限 30s，摘除后精确还原", () => {
+    const script = `
+import { createRequire } from "node:module";
+import {
+  installVendorDurationPolicyBridge,
+  applyDurationPolicyToManager
+} from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const theme = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/config/theme-config.js"))});
+const profiles = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/config/platform-profiles.js"))});
+const managerMod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/duration-constraint/duration-constraint-manager.js"))});
+const allocatorMod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/systems/shot-duration-allocator.js"))});
+const builderMod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/script-engine/core/requirement-list-builder.js"))});
+const quotaOf = () => Object.values(theme.types || {}).map((t) => t.resourceQuota?.maxShotDuration).filter((v) => typeof v === "number");
+const bandOf = () => Object.values(profiles.PROFILES || {}).map((p) => p.shotDuration?.max);
+const buildRequirementList = () => new builderMod.RequirementListBuilder()
+  ._buildRequirementList({ videoType: "tourism", style: { primary: "写实" }, duration: 30 }, "平江路三十秒宣传片", { title: "平江路", currentEpisode: 1, totalEpisodes: 1 });
+const before = {
+  quotaMin: Math.min(...quotaOf()),
+  dcmDefault: new managerMod.DurationConstraintManager().maxSingleShot,
+  allocatorMax: new allocatorMod.ShotDurationAllocator().config.maxDuration,
+  builderParserRules: builderMod.ParserRules.constraints.maxShotDuration,
+  builderResult: buildRequirementList().constraints.maxShotDuration
+};
+const uninstall = installVendorDurationPolicyBridge({ maxSingleShotSeconds: 30, minSingleShotSeconds: 4, log: () => undefined });
+const manager = new managerMod.DurationConstraintManager();
+applyDurationPolicyToManager(manager, 30, 4);
+const allocator = new allocatorMod.ShotDurationAllocator();
+const after = {
+  quotaMin: Math.min(...quotaOf()),
+  bandMaxMin: Math.min(...bandOf()),
+  dcmDefault: new managerMod.DurationConstraintManager().maxSingleShot,
+  dcmExplicitWins: new managerMod.DurationConstraintManager({ maxSingleShot: 12 }).maxSingleShot,
+  dcmRhythmUpper: Math.max(...Object.values(manager.rhythmProfiles).map((p) => p.shotRange[1])),
+  allocatorMax: allocator.config.maxDuration,
+  allocatorRoleMaxMin: Math.min(...Object.values(allocator.roleConfig).map((r) => r.max)),
+  builderParserRules: builderMod.ParserRules.constraints.maxShotDuration,
+  builderResult: buildRequirementList().constraints.maxShotDuration
+};
+uninstall();
+const restored = {
+  quotaMin: Math.min(...quotaOf()),
+  dcmDefault: new managerMod.DurationConstraintManager().maxSingleShot,
+  allocatorMax: new allocatorMod.ShotDurationAllocator().config.maxDuration,
+  builderParserRules: builderMod.ParserRules.constraints.maxShotDuration,
+  builderResult: buildRequirementList().constraints.maxShotDuration
+};
+console.log("RESULT " + JSON.stringify({ before, after, restored }));
+`;
+    const result = runInChild(script);
+    const before = result.before as Record<string, number>;
+    const after = result.after as Record<string, number>;
+    const restored = result.restored as Record<string, number>;
+    /** 桥之前：各处默认仍是 15s（真实存在，不是猜的） */
+    expect(before.dcmDefault).toBe(15);
+    expect(before.allocatorMax).toBe(15);
+    expect(before.builderParserRules).toBe(15);
+    expect(before.builderResult).toBe(15);
+    expect(before.quotaMin).toBe(10); // KIDS 题材
+    /** 桥之后：全部抬到模型上限；显式传参仍然优先（不越权覆盖调用方） */
+    expect(after.quotaMin).toBe(30);
+    expect(after.bandMaxMin).toBe(30);
+    expect(after.dcmDefault).toBe(30);
+    expect(after.dcmExplicitWins).toBe(12);
+    expect(after.dcmRhythmUpper).toBe(30);
+    expect(after.allocatorMax).toBe(30);
+    expect(after.allocatorRoleMaxMin).toBe(30);
+    expect(after.builderParserRules).toBe(30);
+    expect(after.builderResult).toBe(30);
+    /** 摘除后精确还原 */
+    expect(restored.quotaMin).toBe(before.quotaMin);
+    expect(restored.dcmDefault).toBe(15);
+    expect(restored.allocatorMax).toBe(15);
+    expect(restored.builderParserRules).toBe(15);
+    expect(restored.builderResult).toBe(15);
+  }, 120_000);
+});

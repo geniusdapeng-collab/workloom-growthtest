@@ -513,7 +513,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "df9da5e82a6bc461f1418e69fc18acd234d5184eb88e4724c8d14f8a709758fe",
+    "digest": "535716e248ef885f150fe0be042006b916489124ce41bd0e00f06737fa7638fe",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "4a750118f5bbc7a6c6238be241ee1f3a4cbb695fd3b40066e4c71072179993ed",
       "connectors/bgm-bridge/core.mjs": "12f94fb62c0e183857d3ce2b970eaba9b29da70223a50e5d897fa8a005af9ffb",
@@ -823,7 +823,7 @@
       "presets/opening-designer.yml": "6a860c8dc8990514a46ca14b5cf7b57e5e1a119f224e45a16cb0d3349749f620",
       "presets/portrait-artist.yml": "7fcf4d17d6e0d4aae8a62206f68215292319694c407eeba65b51a170d799ddaf",
       "presets/post-editor.yml": "e6b1699d43dcd9d8c4bab0424bb8178ed4724c09dca5c91c186ce5291313ad9e",
-      "presets/prd-specialist.yml": "53abc6784a167063419b4a32c65d0b0ccba08739adb8d0686580ceb1532c1325",
+      "presets/prd-specialist.yml": "8b26aa5c4441d92944fc06bf720666181b579ea6c7b01a22b276d18bf8b0ba93",
       "presets/prompt-fuser.yml": "019952c79c5770875ca59e6415324194d2300368a36c3b4e28ef0c1d12ac7894",
       "presets/publish-operator.yml": "303b23a76c094f2ae3778c712edf71ec63de27d67b2ccd1bfe9f577f4b695dce",
       "presets/render-operator.yml": "b1c0632c658424ccbf65eea245897fb6317bd99b595c4cedcad031e14b0a858c",
@@ -856,7 +856,7 @@
       "skills/portrait-studio/SKILL.md": "3322a2ee7b7296aead5d2640a0e5e37f32ea0c1858caa43acdfd96149eea112c",
       "skills/publish-ops/SKILL.md": "dd929d5ea42af3672a773dda05c13a26027780f6d682e532ef8c83fe9fe2a36c",
       "skills/render-ops/SKILL.md": "069e98c12983808a88731802de29e7260721d9144606b2a97e22ad59b76a83d8",
-      "skills/shot-prompt-craft/SKILL.md": "4d152daca2135f313f887c4ec4c150495d27d55dbebe312fa2e9ae810c67d3ec",
+      "skills/shot-prompt-craft/SKILL.md": "e131c8eaefaedea499e281b641d0cd6321b792de92beaffbeebe8848affc4df0",
       "skills/subtitle-delivery-spec/SKILL.md": "cd9b086eae21c6eb341df5ea77b2e0f23209f505874ae8021cf1ef210a580953",
       "skills/subtitle-layout-design/SKILL.md": "f47f05cfa9f131b599aa998ebac6041d01c972cdf70c19a932789425ff952719",
       "skills/voice-clone-consent/SKILL.md": "16faabf06b8a3cff80c32e1795cf25b9511fa637a8cf6c96cb7a06f9e4d446c4",

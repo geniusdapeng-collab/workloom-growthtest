@@ -5,6 +5,7 @@ export * from "./gates.js";
 export * from "./llm-adapter.js";
 export * from "./portrait-runtime.js";
 export * from "./shot-spec.js";
+export * from "./duration-rules.js";
 export * from "./vendor-compat.js";
 export * from "./confirmation.js";
 export * from "./studio.js";
