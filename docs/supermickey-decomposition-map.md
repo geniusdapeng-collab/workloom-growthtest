@@ -87,7 +87,7 @@
 | 镜头字段数 | 内容 25 / 片头 30（+5 专属） | `config/audit-standards.js` + `prompt-fusion-agent.js` schema | Bundle 配置 + zod schema |
 | Prompt 长度 | 硬上限 3000；理想 2470-3000；精炼后 ≥1200 | `config/prompt-length.js` | 配置 |
 | 语速 | 3.5 字/秒（slow 2.5） | `config/speech-rate.js` | 配置 |
-| 单镜时长 | 3-15 秒 | `engines/duration-constraint/` | 配置 |
+| 单镜时长 | 4-30 秒（供应商能力真源＝媒体目录；Seedance 2.5 真机实测 2026-09-23） | `bundles/ai-video/library/media-catalog/media-catalog.json` + `packages/video-studio/src/duration-rules.ts`（全量口径清单） | 配置 |
 | 场景类型 | opening/establishing/conflict/emotional_climax/resolution | `script-engine/core/scene-type-normalizer.js` | 枚举 schema |
 | 创意主题 | 12 字段 | `skills/creative-theme-generator/SKILL.md` | 技能规范 |
 | 平台蓝图 | tiktok/抖音/小红书/视频号/快手/B站（画幅/时长带/速率/钩子/CTA/文字政策） | `config/platform-profiles.js` | Bundle 配置（P5 扩展 YouTube 等） |

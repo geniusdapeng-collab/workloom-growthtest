@@ -33,6 +33,7 @@ import { accountingRouter } from "./accounting.js";
 import { pollRenderJobs } from "./render-poller.js";
 import { defaultVideoModelId, getModel, listModels } from "./gen/catalog.js";
 import { checkCostCaps, costCaps, estimateCost, renderSpendCny, usdCnyRate } from "./gen/cost.js";
+import { serviceTierRejectionReason } from "./gen/params.js";
 import { submitGenJob } from "./gen/submit.js";
 import { createPublishTask, executePublishTask, fenceOverrideEnabled } from "./gen/publish.js";
 import { mediaUrl } from "./gen/ingest.js";
@@ -379,6 +380,14 @@ const renderRouter = router({
         throw new TRPCError({ code: "BAD_REQUEST", message: `模型目录中不存在「${modelId}」（video.gen.catalog 可查可用清单）` });
       }
       const requestedSeconds = input.durationSec ?? input.estimatedSeconds;
+      /**
+       * 真机 2026-09-23：`service_tier: flex` 不支持视频生成（400），前置拒绝。
+       * 判定收在 gen/params.ts（纯函数，带单测），避免各入口各写一遍口径。
+       */
+      const tierRejection = serviceTierRejectionReason(input.serviceTier);
+      if (tierRejection) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: tierRejection });
+      }
       const maxSeconds = chosen.limits?.durationSec?.max ?? 15;
       const minSeconds = chosen.limits?.durationSec?.min ?? 4;
       const durationSec = Math.min(maxSeconds, Math.max(minSeconds, Math.round(requestedSeconds)));

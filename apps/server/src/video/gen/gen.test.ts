@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { listModels, getModel, providerConfigured, findFallbackModels, defaultVideoModelId } from "./catalog.js";
 import { estimateCost, checkCostCaps, costCaps, usdCnyRate } from "./cost.js";
 import { ArkVideoProvider, HiggsfieldProvider, buildVideoGenPool } from "./providers.js";
+import { serviceTierRejectionReason } from "./params.js";
 import { signMediaPath, verifyMediaToken, resolveMediaPath, downloadToMediaStore } from "./ingest.js";
 import { createDryRunDriver, buildPublishAdapters, fenceOverrideEnabled } from "./publish.js";
 
@@ -192,6 +193,23 @@ describe("供应商适配器", () => {
     expect(body.service_tier).toBe("flex");
     expect(body.return_last_frame).toBe(true);
     expect(body.camera_fixed).toBe(true);
+  });
+
+  /**
+   * 真机 2026-09-23：Ark 对 `service_tier: flex` 直接 400
+   * （`the specified service_tier flex does not support content generation`）。
+   * 供应商适配器仍按中立参数透传（保持通用），由平台侧前置拒绝，避免烧一次必然失败的提交。
+   */
+  describe("生成参数闸（service_tier）", () => {
+    it("flex 被前置拒绝（大小写不敏感），default/未传放行", () => {
+      expect(serviceTierRejectionReason("flex")).toMatch(/flex 不支持视频生成/);
+      expect(serviceTierRejectionReason("FLEX")).toMatch(/flex 不支持视频生成/);
+      expect(serviceTierRejectionReason(" Flex ")).toMatch(/flex 不支持视频生成/);
+      expect(serviceTierRejectionReason("default")).toBeNull();
+      expect(serviceTierRejectionReason("")).toBeNull();
+      expect(serviceTierRejectionReason(undefined)).toBeNull();
+      expect(serviceTierRejectionReason(null)).toBeNull();
+    });
   });
 
   it("Ark Seedance：视频/音频参考以 video_url / audio_url content 提交（含 role）", async () => {

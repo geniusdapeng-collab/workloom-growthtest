@@ -17,7 +17,7 @@
       "tier": "L3",
       "supports": ["duration", "aspectRatio", "resolution", "audio", "firstFrame", "references"],
       "limits": {
-        "durationSec": { "min": 4, "max": 15, "default": 5 },
+        "durationSec": { "min": 4, "max": 30, "default": 5 },
         "resolutions": ["480p", "720p", "1080p"],
         "aspectRatios": ["16:9", "9:16", "1:1", "4:3", "3:4"],
         "maxReferenceImages": 4,

@@ -129,6 +129,39 @@ describe("字段规范真源", () => {
     expect(report.missingSpecFields).not.toContain("dialogue");
     expect(report.prompt).toContain("【台词】");
   });
+
+  /** 产品口径（2026-09-23）：镜头内只允许台词/旁白/音效，禁止 BGM；配乐统一在后期加 */
+  it("音频纪律：每镜提示词都带禁 BGM 子句与英文负面词", () => {
+    for (const card of [contentCard(), openingCard()]) {
+      const report = prepareShotPrompt(card, { ratio: "9:16", log: () => undefined });
+      expect(report.prompt).toContain("【音频纪律】");
+      expect(report.prompt).toMatch(/no background music/i);
+      expect(report.delivery.pass).toBe(true);
+    }
+  });
+
+  it("音频纪律：audio 字段里的音乐指令被剔除，不进入提示词", () => {
+    const shot = contentCard();
+    shot.audio = "背景音乐：钢琴长音铺底；环境声：水声与鸟鸣；配乐在1.5s进点";
+    const logs: string[] = [];
+    const report = prepareShotPrompt(shot, { ratio: "9:16", log: (line) => logs.push(line) });
+    expect(logs.join()).toContain("剔除");
+    // 清洗后只保留环境声描述 + 音频纪律子句；不得出现「背景音乐/配乐」的正面指令
+    const positive = report.prompt.split("【音频纪律】")[0] ?? "";
+    expect(positive).not.toContain("背景音乐：钢琴");
+    expect(positive).not.toContain("配乐在1.5s进点");
+    expect(report.prompt).toContain("环境声：水声与鸟鸣");
+  });
+
+  /** 真机 2026-09-23 平江路 dry-run：vendor 音频设计写「人声清晰，无配乐」，误删会丢合规表述 */
+  it("音频纪律：否定式表述（「无配乐」）与纪律同向，不被误删", () => {
+    const shot = contentCard();
+    shot.audio = "环境声：水声与船桨声；人声清晰，无配乐喧宾";
+    const logs: string[] = [];
+    const report = prepareShotPrompt(shot, { ratio: "9:16", log: (line) => logs.push(line) });
+    expect(report.prompt).toContain("无配乐喧宾");
+    expect(logs.join()).not.toContain("剔除");
+  });
 });
 
 describe("镜头卡交付闸（vendor PromptDeliveryGuard 为准）", () => {

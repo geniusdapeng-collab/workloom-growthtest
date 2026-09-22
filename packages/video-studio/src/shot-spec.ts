@@ -228,6 +228,64 @@ const FALLBACK_OPENING_EXCLUSIVE = [
 /** 实验车道补充红线：真机里出现过的、与行业 brief 无关的意象（vendor 禁词表之外） */
 const EXTRA_REDLINE_WORDS = ["细胞质", "核糖体", "微管", "显微镜", "量子", "黑洞", "元宇宙", "数据空间"];
 
+/**
+ * 镜头内音频纪律（产品所有者口径，2026-09-23）：
+ * 生成镜头**只允许**①台词人声 ②音效 ③旁白；**禁止 BGM/配乐/背景音乐**——配乐统一在后期环节加入。
+ * 这段文本会追加到每个镜头的提示词末尾，并作为交付闸的必备标记（缺它即判不合格）。
+ */
+export const AUDIO_DISCIPLINE_CLAUSE =
+  "【音频纪律】本镜头音频仅允许：台词人声、旁白、环境音效与动作音效；"
+  + "严禁出现任何背景音乐、BGM、配乐、音乐节拍、旋律或歌曲（配乐由后期环节统一加入）；"
+  + "台词人声清晰自然，环境音与动作音效贴合画面。";
+
+/** 追加到负面约束里的音乐禁词（与 vendor 的英文负面约束同语言） */
+export const AUDIO_NEGATIVE_TERMS =
+  "no background music, no bgm, no soundtrack, no music score, no musical bed, no melody, no song, no singing voice";
+
+/** 正向音乐词（用于清洗 audio 字段与提示词中的音乐指令） */
+const POSITIVE_MUSIC_PATTERN =
+  /(背景音乐|配乐|音乐风格|音乐节拍|旋律|歌曲|music\s*style|background\s*music|\bbgm\b|\bmusic\b|soundtrack)/gi;
+
+/**
+ * 否定式音乐表述（"无配乐/不加配乐/no bgm"）：与音频纪律**同向**，必须保留——
+ * 真机出片（2026-09-23 平江路 30s dry-run）里 vendor 音频设计会写「人声清晰，无配乐」，
+ * 若按正向词一刀切，会把这些合规表述一起删掉。
+ */
+const NEGATED_MUSIC_PATTERN =
+  /(无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要)\s*(任何)?\s*(背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|no\s+(background\s+)?music|no\s+bgm|without\s+(background\s+)?music/i;
+
+/**
+ * 清洗镜头卡的 `audio` 字段：vendor 的 `AudioDesignAgent` 会把「音乐风格/配乐」写进该字段，
+ * 与"镜头内禁止 BGM"冲突。这里把含音乐词的分句整句剔除（保留环境音/音效描述），并记录日志。
+ */
+export function sanitizeAudioField(
+  audio: unknown,
+  log: (line: string) => void = () => undefined
+): { value: unknown; stripped: string[] } {
+  if (typeof audio !== "string" || !audio.trim()) return { value: audio, stripped: [] };
+  const stripped: string[] = [];
+  const kept = audio
+    .split(/[。；;\n]/)
+    .map((seg) => seg.trim())
+    .filter(Boolean)
+    .filter((seg) => {
+      /** 否定式（"无配乐"）与纪律同向：保留，避免误删合规表述 */
+      if (NEGATED_MUSIC_PATTERN.test(seg)) return true;
+      POSITIVE_MUSIC_PATTERN.lastIndex = 0;
+      if (POSITIVE_MUSIC_PATTERN.test(seg)) {
+        stripped.push(seg.slice(0, 60));
+        return false;
+      }
+      return true;
+    });
+  if (stripped.length === 0) return { value: audio, stripped };
+  const merged = kept.length > 0
+    ? `${kept.join("；")}；${AUDIO_DISCIPLINE_CLAUSE}`
+    : AUDIO_DISCIPLINE_CLAUSE;
+  log(`[shot-spec] audio 字段剔除 ${stripped.length} 处音乐指令（镜头内禁止 BGM）：${stripped.join(" / ")}`);
+  return { value: merged, stripped };
+}
+
 let vendorCache: {
   standardizer: VendorFieldStandardizer;
   fusionCtor: new (options?: Record<string, unknown>) => VendorFusionAgent;
@@ -398,6 +456,9 @@ export function prepareShotPrompt(
   const log = options.log ?? (() => undefined);
   /** 先做结构化字段归一：避免 `[object Object]` 进入提示词（真机 6–7 处/镜） */
   const normalizedCard = normalizeStructuredFields(card as Record<string, unknown>);
+  /** 音频纪律：清洗 audio 字段里的音乐指令（vendor 音频设计会写「音乐风格/配乐」） */
+  const audioClean = sanitizeAudioField(normalizedCard.audio, log);
+  if (audioClean.value !== normalizedCard.audio) normalizedCard.audio = audioClean.value;
   const std = standardizer.standardizeShot(normalizedCard) as Record<string, unknown>;
   const isOpening = Boolean(standardizer.isOpeningShot(std)) || std.sceneType === "opening";
   const shotId = String(std.shotId ?? card.shotId ?? "");
@@ -442,6 +503,12 @@ export function prepareShotPrompt(
   if (!prompt) {
     prompt = fusion._assembleStandardPrompt(assemblyShot, fields, ratio);
   }
+  /**
+   * 音频纪律子句 + 音乐负面词：确保**每一镜**都显式声明"禁止镜头内 BGM"，
+   * 并追加英文负面约束（与 vendor 的 negative 同语言，便于模型按词面规避）。
+   */
+  if (!prompt.includes("【音频纪律】")) prompt += ` | ${AUDIO_DISCIPLINE_CLAUSE}`;
+  if (!/no background music/i.test(prompt)) prompt += ` | ${AUDIO_NEGATIVE_TERMS}`;
   const constraint = normalizeConstraintSegment(prompt, ratio, resolution);
   if (constraint.changed) {
     log(
@@ -457,6 +524,11 @@ export function prepareShotPrompt(
   if (objectLeaks > 0) {
     delivery.pass = false;
     delivery.issues = [...delivery.issues, `提示词含 ${objectLeaks} 处 [object Object]（结构化字段未归一）`];
+  }
+  /** 音频纪律自检：缺标记 = 组装链路没带上禁令 → 判不合格（禁止无声放行 BGM） */
+  if (!prompt.includes("【音频纪律】") || !/no background music/i.test(prompt)) {
+    delivery.pass = false;
+    delivery.issues = [...delivery.issues, "提示词缺少镜头内禁 BGM 的音频纪律子句"];
   }
   const missingSpecFields = [...spec.p0, ...spec.p1, ...spec.p2, ...spec.p3]
     /**
