@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   fieldSpec,
   normalizeConstraintSegment,
+  normalizeStructuredFields,
   prepareShotPrompt,
+  readableValue,
   resolutionToPixels,
   shotSpecMarkdown
 } from "./shot-spec.js";
@@ -88,6 +90,44 @@ describe("字段规范真源", () => {
     expect(resolutionToPixels("1080p", "16:9")).toBe("1920x1080");
     expect(resolutionToPixels("720p", "9:16")).toBe("720x1280");
     expect(resolutionToPixels("1080x1920", "9:16")).toBe("1080x1920");
+  });
+
+  /** 真机 2026-09-22：对象/数组字段被 String() 成 `[object Object]` 进提示词，每镜 3–7 处 */
+  it("结构化字段归一：lighting/camera_movement/timeline 不再以 [object Object] 进提示词", () => {
+    const shot = {
+      ...contentCard(),
+      lighting: { key_light: "主光自然光5600K", fill_light: "反光板补光", time_of_day: "清晨", atmosphere: "薄雾" },
+      camera_movement: { timeline: [{ timeRange: "0-2s", cameraMovement: "缓推" }], composition: "竖版居中" },
+      timeline: [
+        { object: { start: "T00:00", end: "T00:02" }, string: "T00:00-T00:02 / 建立空间" },
+        { object: { start: "T00:02", end: "T00:05" }, string: "T00:02-T00:05 / 推进到水面" }
+      ]
+    };
+    const normalized = normalizeStructuredFields(shot);
+    expect(typeof normalized.lighting).toBe("string");
+    expect(String(normalized.lighting)).toContain("主光");
+    expect(String(normalized.timeline)).toContain("建立空间");
+    expect(normalized._rawTimeline).toBeDefined();
+
+    const report = prepareShotPrompt(shot, { ratio: "9:16", log: () => undefined });
+    expect(report.prompt).not.toContain("[object Object]");
+    expect(report.prompt).toContain("主光");
+  });
+
+  it("readableValue：数组/对象/嵌套都可读，不产生对象字符串", () => {
+    expect(readableValue(["A", "B"])).toBe("A；B");
+    expect(readableValue({ string: "原样" })).toBe("原样");
+    expect(readableValue({ key_light: "主光", fill_light: "补光" })).toContain("主光");
+    expect(readableValue(null)).toBe("");
+    expect(readableValue({ deep: { deeper: { deepest: 1 } } }, 3)).toBe("");
+  });
+
+  it("dialogueBlocks 视为台词已提供（不算缺字段）", () => {
+    const shot = contentCard();
+    delete shot.dialogue;
+    const report = prepareShotPrompt(shot, { ratio: "9:16", log: () => undefined });
+    expect(report.missingSpecFields).not.toContain("dialogue");
+    expect(report.prompt).toContain("【台词】");
   });
 });
 

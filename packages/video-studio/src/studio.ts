@@ -17,7 +17,14 @@ import { installConfirmationHandler, type ConfirmationHandler } from "./confirma
 import { resolveGate, type GateVerdict } from "./gates.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { createPortraitRuntime, type PortraitRuntimeOptions } from "./portrait-runtime.js";
-import { installVendorConfigIsolatorBridge, installVendorPhaseDiagnosticsBridge } from "./vendor-compat.js";
+import {
+  installVendorConfigIsolatorBridge,
+  installVendorContractBridge,
+  installVendorFieldQualityBridge,
+  installVendorMicroMotionBridge,
+  installVendorPhaseDiagnosticsBridge,
+  installVendorPromptRebuildBridge
+} from "./vendor-compat.js";
 
 /** vendor 引擎暴露的最小结构（HyperrealitySystem 实例方法） */
 interface HyperrealitySystemLike {
@@ -175,6 +182,27 @@ export class VideoStudio {
     const uninstallIsolator = installVendorConfigIsolatorBridge();
     /** 阶段异常栈诊断：Phase 3/3.5 失败时把栈写进 run 日志（vendor 只打 message，真机无法定位行号） */
     const uninstallPhaseDiagnostics = installVendorPhaseDiagnosticsBridge({ log });
+    /**
+     * 字段质检桥：Phase 3.5 对结构化 timeline 崩 `tl.match` / `result.reports` 缺失导致整套质检失败
+     * （真机：FieldGuard 默认模板覆盖 6 镜并标记降级）。入参归一 + 结果兜底。
+     */
+    const uninstallFieldQuality = installVendorFieldQualityBridge({ log });
+    /**
+     * 微动作桥：`_extractCameraDistance` 只读 `camera`（实际字段是 camera_movement）+ 模板缺 neutral
+     * → 真机两次 run 均 0/6 增强（环节空转）。补齐字段映射与 neutral 模板。
+     */
+    const uninstallMicroMotion = installVendorMicroMotionBridge({ log });
+    /**
+     * 契约桥：Phase1→2/2→3/3→Output 的类型不匹配此前只告警（且 autoFix 对逐镜头字段不生效），
+     * 导致对象字段以 `[object Object]` 进入提示词。这里做入参归一 + 契约账本留痕。
+     */
+    const uninstallContract = installVendorContractBridge({ log });
+    /**
+     * 提示词重建桥：Phase 3 失败（真机 `Assignment to constant variable.`）时 6 镜 prompt 为空，
+     * 最终被 PipelineGuard 严格模式拦下、整条 run 无产物。用 vendor 自己的组装器按字段重建，
+     * 并标记 promptRebuilt（非静默兜底）。
+     */
+    const uninstallPromptRebuild = installVendorPromptRebuildBridge({ log });
 
     // 与 vendor CLI（app/commands/preproduction.js）保持同一装配口径
     process.env.STORMAXE_TOTAL_DEADLINE_MS =
@@ -265,6 +293,10 @@ export class VideoStudio {
       });
       throw err;
     } finally {
+      uninstallPromptRebuild();
+      uninstallContract();
+      uninstallMicroMotion();
+      uninstallFieldQuality();
       uninstallPhaseDiagnostics();
       uninstallIsolator();
       uninstall();

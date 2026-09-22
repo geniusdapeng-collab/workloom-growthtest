@@ -105,6 +105,98 @@ export function resolutionToPixels(resolution: string, ratio: string): string {
   return w >= h ? `${long}x${short}` : `${short}x${long}`;
 }
 
+/* ================= 结构化字段 → 可读文案（消除 [object Object]） ================= */
+
+/** 任意结构化值 → 可读字符串（数组 join、对象按 key 拼接、优先 `.string` 字段） */
+export function readableValue(value: unknown, depth = 0): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) {
+    return value.map((item) => readableValue(item, depth + 1)).filter(Boolean).join("；");
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (typeof record.string === "string" && record.string.trim()) return record.string.trim();
+    if (depth > 2) return "";
+    return Object.entries(record)
+      .filter(([key]) => !key.startsWith("_"))
+      .map(([key, item]) => {
+        const text = readableValue(item, depth + 1);
+        if (!text) return "";
+        const label = FIELD_LABEL_CN[key] ?? key;
+        return label === key ? text : `${label}：${text}`;
+      })
+      .filter(Boolean)
+      .join("；");
+  }
+  return "";
+}
+
+const FIELD_LABEL_CN: Record<string, string> = {
+  key_light: "主光",
+  fill_light: "补光",
+  time_of_day: "时间",
+  atmosphere: "氛围",
+  composition: "构图",
+  timeline: "时间轴",
+  camera: "运镜",
+  movement: "运动",
+  shotType: "景别",
+  purpose: "目的",
+  string: "",
+  object: ""
+};
+
+/**
+ * 把镜头卡里的结构化字段规范成**可读字符串**。
+ *
+ * 真机证据（2026-09-22 VID-1021）：管线产出的 `lighting`/`camera_movement`/`timeline`/
+ * `backgroundSound`/`dialogue` 是对象或数组，而 vendor 的字段契约（`[CONTRACT]` 校验）
+ * 与提示词组装器（`_assembleStandardPrompt`）都按字符串消费 →
+ * 组装出的提示词里出现 **6–7 处 `[object Object]`**，模型拿到的是占位垃圾；
+ * 同时 `FieldCheckAgent._checkStructure` 对数组时间轴执行 `tl.match` 直接崩溃。
+ *
+ * 这里按"业务可读"归一：数组拼接、对象取 `.string` 或按键值中文化拼接，
+ * 原始结构化值保留在 `_raw<Field>` 供需要结构化消费的环节使用。
+ */
+export function normalizeStructuredFields(
+  shot: Record<string, unknown>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...shot };
+  const targets = [
+    "lighting",
+    "camera_movement",
+    "cameraMovement",
+    "timeline",
+    "backgroundSound",
+    "background_sound",
+    "audio",
+    "dialogue"
+  ];
+  for (const key of targets) {
+    const value = out[key];
+    if (value === null || value === undefined) continue;
+    if (typeof value === "string") continue;
+    const text = readableValue(value);
+    if (!text) continue;
+    out[`_raw${key.charAt(0).toUpperCase()}${key.slice(1)}`] = value;
+    out[key] = text;
+  }
+  // dialogue 例外：vendor 交付格式是 dialogueBlocks；字符串化后的 dialogue 仅作兜底
+  if (Array.isArray(out.dialogue) && out.dialogue.length > 0) {
+    const blocks = out.dialogue
+      .map((item) => (item && typeof item === "object" ? (item as Record<string, unknown>) : null))
+      .filter(Boolean) as Array<Record<string, unknown>>;
+    if (blocks.length > 0 && blocks.every((b) => typeof b.line === "string" || typeof b.text === "string")) {
+      out.dialogue = blocks
+        .map((b) => `${String(b.speaker ?? "角色")}：${String(b.line ?? b.text ?? "").trim()}`)
+        .join("；");
+    }
+  }
+  return out;
+}
+
 interface VendorFieldStandardizer {
   CRITICAL_FIELDS: {
     p0: string[]; p1: string[]; p2: string[]; p3: string[];
@@ -304,7 +396,9 @@ export function prepareShotPrompt(
     ratio
   );
   const log = options.log ?? (() => undefined);
-  const std = standardizer.standardizeShot(card) as Record<string, unknown>;
+  /** 先做结构化字段归一：避免 `[object Object]` 进入提示词（真机 6–7 处/镜） */
+  const normalizedCard = normalizeStructuredFields(card as Record<string, unknown>);
+  const std = standardizer.standardizeShot(normalizedCard) as Record<string, unknown>;
   const isOpening = Boolean(standardizer.isOpeningShot(std)) || std.sceneType === "opening";
   const shotId = String(std.shotId ?? card.shotId ?? "");
   const durationSec = Number(std.duration ?? card.duration ?? 0) || 0;
@@ -318,7 +412,9 @@ export function prepareShotPrompt(
   const effective = (key: string): unknown => {
     const normalized = std[key];
     if (!isEmptyValue(normalized)) return normalized;
-    const raw = (card as Record<string, unknown>)[key];
+    // 回落到**归一后的**卡片（而不是原始卡片）：否则结构化字段会绕过归一，
+    // 再次以 `[object Object]` 进入提示词（真机 2026-09-22 复现）
+    const raw = normalizedCard[key];
     return isEmptyValue(raw) ? undefined : raw;
   };
   for (const key of specFieldKeys(true)) {
@@ -356,8 +452,24 @@ export function prepareShotPrompt(
   }
 
   const delivery = guard.verify(prompt, assemblyShot);
+  /** 兜底自检：提示词里出现 `[object Object]` 属组装缺陷，直接判不合格 */
+  const objectLeaks = (prompt.match(/\[object Object\]/g) ?? []).length;
+  if (objectLeaks > 0) {
+    delivery.pass = false;
+    delivery.issues = [...delivery.issues, `提示词含 ${objectLeaks} 处 [object Object]（结构化字段未归一）`];
+  }
   const missingSpecFields = [...spec.p0, ...spec.p1, ...spec.p2, ...spec.p3]
-    .filter((key) => isEmptyValue(effective(key)));
+    /**
+     * `dialogue` 的等价形态：vendor 交付格式是 `dialogueBlocks`（speaker/line/emotion/trigger），
+     * 标准镜头卡里没有 dialogue 时不算缺字段（真机口径：有 blocks 即视为台词已提供）。
+     */
+    .filter((key) => {
+      if (key === "dialogue") {
+        const blocks = (card as Record<string, unknown>).dialogueBlocks;
+        if (Array.isArray(blocks) && blocks.length > 0) return false;
+      }
+      return isEmptyValue(effective(key));
+    });
   const missingOpeningFields = isOpening
     ? spec.openingExclusive.filter((key) => isEmptyValue(effective(key)))
     : [];

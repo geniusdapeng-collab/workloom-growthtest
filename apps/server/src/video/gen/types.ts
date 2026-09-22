@@ -83,8 +83,30 @@ export interface VideoGenParams {
   generateAudio?: boolean;
   firstFrameUrl?: string;
   referenceImageUrls?: string[];
+  /** 视频参考（v2v/omni 参考任务；role 由调用方给出，默认 reference_video） */
+  referenceVideoUrls?: string[];
+  /** 音频参考（音频驱动口播；role 默认 reference_audio） */
+  referenceAudioUrls?: string[];
   seed?: number;
   negativePrompt?: string;
+  /** 平台是否加水印（默认 false：成片不应带平台水印） */
+  watermark?: boolean;
+  /** 机位是否固定（口播/棚拍镜头） */
+  cameraFixed?: boolean;
+  /** 返回尾帧（供下一镜 first_frame 接力） */
+  returnLastFrame?: boolean;
+  /** 服务档位：default | flex（flex 更低成本/更低优先级） */
+  serviceTier?: "default" | "flex" | string;
+  /** 排队优先级（数值，平台口径） */
+  priority?: number;
+  /** 任务执行过期时间（秒） */
+  executionExpiresAfter?: number;
+  /** 帧数口径（与 durationSec 二选一，平台口径） */
+  frames?: number;
+  /** 输出格式（平台口径，如 mp4） */
+  outputFormat?: string;
+  /** 完成回调（公网可达；本地开发留空走轮询） */
+  callbackUrl?: string;
   /** 供应商特有的透传参数（目录 providerExtras 声明者才允许） */
   extra?: Record<string, unknown>;
 }
