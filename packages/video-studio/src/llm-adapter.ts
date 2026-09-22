@@ -262,6 +262,104 @@ export class WorkloomLLMEngine {
   ): Promise<LLMReasonResult> {
     return this.reason(prompt, { ...options, forceJson: true });
   }
+
+  /**
+   * vendor 内部助手方法（2026-09-22 真机修复）
+   *
+   * `engines/requirement-discovery-engine.js:260` 直接调 `llmEngine._extractJsonObject(content)`；
+   * 注入的是本适配器时该方法不存在 → `SceneArchitect` 连续两次失败 →
+   * 日志出现「❌ 全部失败，使用兜底规则」→ 场景设计整段退化为规则模板（下游再补齐）。
+   * 这里补上与 vendor `systems/llm-reasoning-engine.js:106` 同语义的实现（失败返回 null，不抛）。
+   */
+  _extractJsonObject(text: unknown): string | null {
+    /**
+     * 与 vendor `systems/llm-reasoning-engine.js#_extractJsonObject` **同语义**：
+     * 返回**JSON 文本字符串**（调用方自己 `JSON.parse`），非字符串输入返回 null。
+     *
+     * 真机教训（VID-1022）：首版实现返回已解析对象，而
+     * `requirement-discovery-engine.js:262` 是 `return JSON.parse(extracted)` →
+     * `JSON.parse(对象)` 走 `String(对象)` → `"[object Object]" is not valid JSON`，
+     * SceneArchitect 仍然全失败。此实现含输入截断与扫描预算，避免大响应冻结事件循环。
+     */
+    if (!text || typeof text !== "string") return null;
+    const MAX_INPUT_LEN = 200_000;
+    const input = text.length > MAX_INPUT_LEN ? text.slice(0, MAX_INPUT_LEN) : text;
+
+    const fenced = input.match(/```json\s*([\s\S]*?)\s*```/i);
+    if (fenced?.[1]) {
+      const candidate = fenced[1].trim();
+      try {
+        JSON.parse(candidate);
+        return candidate;
+      } catch {
+        /* 继续 */
+      }
+    }
+    const whole = input.trim();
+    if (whole) {
+      try {
+        JSON.parse(whole);
+        return whole;
+      } catch {
+        /* 继续 */
+      }
+    }
+    // 单次栈扫描找"顶层完整 JSON"候选（与 vendor 同算法，带 300ms 预算、不阻塞事件循环）
+    const stack: Array<"{" | "["> = [];
+    let inString = false;
+    let escaped = false;
+    let start = -1;
+    const budgetStart = Date.now();
+    let ops = 0;
+    for (let i = 0; i < input.length; i += 1) {
+      if ((++ops & 0x3fff) === 0 && Date.now() - budgetStart > 300) break;
+      const ch = input[i]!;
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (ch === "\\") escaped = true;
+        else if (ch === '"') inString = false;
+        continue;
+      }
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+      if (ch === "{" || ch === "[") {
+        if (stack.length === 0) start = i;
+        stack.push(ch);
+        continue;
+      }
+      if (ch === "}" || ch === "]") {
+        const open = stack.pop();
+        const matches = (open === "{" && ch === "}") || (open === "[" && ch === "]");
+        if (!matches) {
+          stack.length = 0;
+          start = -1;
+          continue;
+        }
+        if (stack.length === 0 && start >= 0) {
+          const candidate = input.slice(start, i + 1);
+          try {
+            JSON.parse(candidate);
+            return candidate;
+          } catch {
+            start = -1;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  /** vendor 调用点清理钩子（无持久连接，空实现保持接口一致） */
+  async close(): Promise<void> {
+    return undefined;
+  }
+
+  /** vendor 调用点统计钩子（返回本适配器的真实统计） */
+  getStats(): { totalCalls: number; totalFailures: number; model: string } {
+    return { ...this.stats, model: this.cfg.model };
+  }
 }
 
 /**

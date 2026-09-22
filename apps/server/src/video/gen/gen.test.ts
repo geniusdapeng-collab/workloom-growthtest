@@ -164,6 +164,58 @@ describe("供应商适配器", () => {
     for (const image of images) expect(image.role).toBe("reference_image");
   });
 
+  /** 官方 SDK（5.0.50）新增/既有未用参数：watermark 默认关闭、seed/service_tier/return_last_frame 透传 */
+  it("Ark Seedance：watermark 默认 false，新参数（seed/service_tier/return_last_frame/camera_fixed）透传", async () => {
+    const calls: Array<{ body: Record<string, unknown> }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      calls.push({ body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> });
+      return new Response(JSON.stringify({ id: "cgt-params" }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    const provider = new ArkVideoProvider({ apiKey: "k" });
+    await provider.submit({
+      prompt: "南园夜景口播",
+      estimatedUnits: 10,
+      params: {
+        providerModel: "doubao-seedance-2-5-260628",
+        durationSec: 10,
+        aspectRatio: "9:16",
+        seed: 12345,
+        serviceTier: "flex",
+        returnLastFrame: true,
+        cameraFixed: true,
+        generateAudio: true
+      }
+    });
+    const body = calls[0]!.body;
+    expect(body.watermark).toBe(false);
+    expect(body.seed).toBe(12345);
+    expect(body.service_tier).toBe("flex");
+    expect(body.return_last_frame).toBe(true);
+    expect(body.camera_fixed).toBe(true);
+  });
+
+  it("Ark Seedance：视频/音频参考以 video_url / audio_url content 提交（含 role）", async () => {
+    const calls: Array<{ body: Record<string, unknown> }> = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => {
+      calls.push({ body: JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown> });
+      return new Response(JSON.stringify({ id: "cgt-ref" }), { status: 200, headers: { "content-type": "application/json" } });
+    }));
+    const provider = new ArkVideoProvider({ apiKey: "k" });
+    await provider.submit({
+      prompt: "以参考视频的运动风格生成园林镜头",
+      estimatedUnits: 5,
+      params: {
+        providerModel: "doubao-seedance-2-5-260628",
+        durationSec: 5,
+        referenceVideoUrls: ["https://cdn.example.com/ref.mp4"],
+        referenceAudioUrls: ["https://cdn.example.com/voice.mp3"]
+      }
+    });
+    const content = calls[0]!.body.content as Array<Record<string, unknown>>;
+    expect(content.some((c) => c.type === "video_url" && c.role === "reference_video")).toBe(true);
+    expect(content.some((c) => c.type === "audio_url" && c.role === "reference_audio")).toBe(true);
+  });
+
   it("Ark Seedance：poll 映射 succeeded/failed/running", async () => {
     const provider = new ArkVideoProvider({ apiKey: "k" });
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ status: "succeeded", content: { video_url: "https://cdn.example.com/v.mp4" } }), { status: 200 })));

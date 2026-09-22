@@ -23,8 +23,19 @@ interface NeutralParams {
   generateAudio?: boolean;
   firstFrameUrl?: string;
   referenceImageUrls?: string[];
+  referenceVideoUrls?: string[];
+  referenceAudioUrls?: string[];
   seed?: number;
   negativePrompt?: string;
+  watermark?: boolean;
+  cameraFixed?: boolean;
+  returnLastFrame?: boolean;
+  serviceTier?: string;
+  priority?: number;
+  executionExpiresAfter?: number;
+  frames?: number;
+  outputFormat?: string;
+  callbackUrl?: string;
   extra?: Record<string, unknown>;
 }
 
@@ -92,14 +103,36 @@ export class ArkVideoProvider implements GenProvider {
     for (const url of p.referenceImageUrls ?? []) {
       if (url?.trim()) content.push({ type: "image_url", image_url: { url }, role: "reference_image" });
     }
+    // 视频/音频参考（官方 SDK 支持 video_url / audio_url 内容类型；role 由调用方语义给出）
+    for (const url of p.referenceVideoUrls ?? []) {
+      if (url?.trim()) content.push({ type: "video_url", video_url: { url }, role: "reference_video" });
+    }
+    for (const url of p.referenceAudioUrls ?? []) {
+      if (url?.trim()) content.push({ type: "audio_url", audio_url: { url }, role: "reference_audio" });
+    }
     const payload: Record<string, unknown> = {
       model: requireModel(req),
       content,
       ...(p.durationSec ? { duration: Math.round(p.durationSec) } : {}),
+      ...(p.frames ? { frames: Math.round(p.frames) } : {}),
       ...(p.aspectRatio ? { ratio: p.aspectRatio } : {}),
       ...(p.resolution ? { resolution: p.resolution } : {}),
       ...(p.generateAudio === undefined ? {} : { generate_audio: p.generateAudio }),
       ...(p.seed === undefined ? {} : { seed: p.seed }),
+      /**
+       * 官方 SDK（volcengine-python-sdk@5.0.50，2026-09-17）确认的新参数：
+       * watermark / camera_fixed / return_last_frame / service_tier / priority /
+       * execution_expires_after / output_format / callback_url。
+       * watermark 默认 false（产品成片不应带平台水印）。
+       */
+      watermark: p.watermark ?? false,
+      ...(p.cameraFixed === undefined ? {} : { camera_fixed: p.cameraFixed }),
+      ...(p.returnLastFrame === undefined ? {} : { return_last_frame: p.returnLastFrame }),
+      ...(p.serviceTier ? { service_tier: p.serviceTier } : {}),
+      ...(p.priority === undefined ? {} : { priority: p.priority }),
+      ...(p.executionExpiresAfter === undefined ? {} : { execution_expires_after: p.executionExpiresAfter }),
+      ...(p.outputFormat ? { output_format: p.outputFormat } : {}),
+      ...(p.callbackUrl ? { callback_url: p.callbackUrl } : {}),
       ...(p.extra ?? {}),
     };
     const data = await postJson(`${this.base()}/contents/generations/tasks`, { authorization: `Bearer ${this.cfg.apiKey}` }, payload) as { id?: string };

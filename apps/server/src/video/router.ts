@@ -305,6 +305,20 @@ const renderRouter = router({
       firstFrameUrl: z.string().url().optional(),
       /** 参考图（定妆照等，最多 4 张） */
       referenceImageUrls: z.array(z.string().url()).max(4).optional(),
+      /** 视频参考（官方 SDK 的 video_url content；最多 2 条） */
+      referenceVideoUrls: z.array(z.string().url()).max(2).optional(),
+      /** 音频参考（音频驱动口播；最多 1 条） */
+      referenceAudioUrls: z.array(z.string().url()).max(1).optional(),
+      /** 复现种子（写入 render_jobs 便于对比与复盘） */
+      seed: z.number().int().optional(),
+      /** 平台水印开关（默认关闭） */
+      watermark: z.boolean().optional(),
+      /** 固定机位（口播/棚拍） */
+      cameraFixed: z.boolean().optional(),
+      /** 返回尾帧（供下一镜 first_frame 接力） */
+      returnLastFrame: z.boolean().optional(),
+      /** 服务档位：default（终稿）| flex（草稿，成本更低） */
+      serviceTier: z.enum(["default", "flex"]).optional(),
       /** 幂等键（缺省按脚本+模型+时长+模式生成，防重复点击重复扣费） */
       idempotencyKey: z.string().max(200).optional(),
       /** 预计渲染秒数（额度台账计量基准；兼容旧调用，默认 30s） */
@@ -421,6 +435,13 @@ const renderRouter = router({
           generateAudio: input.generateAudio,
           firstFrameUrl: input.firstFrameUrl,
           referenceImageUrls: input.referenceImageUrls,
+          referenceVideoUrls: input.referenceVideoUrls,
+          referenceAudioUrls: input.referenceAudioUrls,
+          seed: input.seed,
+          watermark: input.watermark,
+          cameraFixed: input.cameraFixed,
+          returnLastFrame: input.returnLastFrame,
+          serviceTier: input.serviceTier,
         },
         /** 幂等键：同脚本 + 同模型 + 同时长 + 同模式重复点击不会重复扣费 */
         idempotencyKey: input.idempotencyKey?.trim() || `render:${script.id}:${chosen.id}:${durationSec}:${input.mode}`,

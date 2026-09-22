@@ -273,6 +273,40 @@ const only = arg("--only").split(",").map((s) => s.trim()).filter(Boolean);
 const dryRun = flag("--dry-run");
 /** 交付闸未过的镜头默认拒绝提交（避免把不合规提示词烧成额度）；显式放行需带此开关 */
 const allowSpecFail = flag("--allow-spec-fail");
+/** 复现种子（同一 seed + 同 prompt 便于 A/B；写入 render_jobs 便于复盘） */
+const seedArg = arg("--seed");
+/** 服务档位：default（终稿）| flex（草稿，成本更低） */
+const serviceTier = arg("--service-tier");
+/** 固定机位（口播/棚拍镜头） */
+const cameraFixed = flag("--camera-fixed");
+/**
+ * 逐镜首尾帧接力：第 N 镜返回尾帧（return_last_frame），作为第 N+1 镜 first_frame。
+ * 官方 SDK 参数（volcengine-python-sdk@5.0.50）确认支持；能显著改善多镜空间/光线连续性。
+ * 代价：必须顺序提交（每镜等出片），总时长变长。
+ */
+const chainLastFrame = flag("--chain-last-frame");
+/**
+ * 超套餐额度时显式确认按量实扣（G8 预算闸口径：`allowOverage`）。
+ * 默认关闭（平台额度用尽即停）；产品所有者明确要求产出完整成片时才开。
+ */
+const allowOverage = flag("--allow-overage");
+const ARK_BASE = (process.env.ARK_BASE_URL ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, "");
+const ARK_KEY = process.env.VOLCENGINE_ARK_API_KEY ?? process.env.ARK_API_KEY ?? "";
+/** 查询 Ark 任务详情（取 content.last_frame_url） */
+async function fetchLastFrameUrl(taskId: string, timeoutMs = 15_000): Promise<string | null> {
+  if (!ARK_KEY) return null;
+  try {
+    const res = await fetch(`${ARK_BASE}/contents/generations/tasks/${taskId}`, {
+      headers: { authorization: `Bearer ${ARK_KEY}` },
+      signal: AbortSignal.timeout(timeoutMs)
+    });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { content?: { last_frame_url?: string } };
+    return data?.content?.last_frame_url ?? null;
+  } catch {
+    return null;
+  }
+}
 const workDir = resolve(REPO_ROOT, process.env.HR_WORK_DIR ?? ".vm-work");
 const refFiles = loadRefFiles(arg("--refs", "var/media/references/suzhou-nanyuan"));
 const portraitIndex = loadPortraitIndex(projectId, workDir);
@@ -310,6 +344,36 @@ interface ShotResult {
 const results: ShotResult[] = [];
 const specReports: ShotSpecReport[] = [];
 const pending = new Map<string, ShotResult>();
+/** 首尾帧接力用：当前镜头应带的首帧 URL（Ark 尾帧 URL 或 null） */
+let chainFirstFrame: string | null = null;
+
+/** 轮询单个渲染任务直到 done/failed；返回尾帧 URL（用于接力） */
+async function waitForShotAndLastFrame(jobId: string, taskId: string): Promise<string | null> {
+  for (let i = 0; i < 90; i += 1) {
+    await new Promise((r) => setTimeout(r, 15_000));
+    await call("video.render.poll", { limit: 20 }).catch(() => undefined);
+    const jobs = await call<Array<{ id: string; status: string; asset_id: string | null; local_path: string | null }>>(
+      "video.gen.jobs", { projectId, limit: 100 }, "GET"
+    ).catch(() => []);
+    const job = jobs.find((j) => j.id === jobId);
+    if (!job) continue;
+    if (job.status === "done") {
+      const row = pending.get(jobId) ?? results.find((r) => r.jobId === jobId);
+      if (row) { row.status = "done"; row.assetId = job.asset_id; row.localPath = job.local_path; }
+      pending.delete(jobId);
+      console.log(`   🔗 ${jobId} 已出片 asset=${job.asset_id ?? "—"}`);
+      return await fetchLastFrameUrl(taskId);
+    }
+    if (job.status === "failed") {
+      const row = pending.get(jobId) ?? results.find((r) => r.jobId === jobId);
+      if (row) row.status = "failed";
+      pending.delete(jobId);
+      console.warn(`   ⛔ ${jobId} 渲染失败，接力中断`);
+      return null;
+    }
+  }
+  return null;
+}
 
 for (const shot of shots) {
   const seconds = durations.get(shot.shotId)!;
@@ -327,13 +391,34 @@ for (const shot of shots) {
    */
   const cardWithPortraits: ShotCard = { ...shot };
   if (!Array.isArray(cardWithPortraits.portraits) || (cardWithPortraits.portraits as unknown[]).length === 0) {
+    /**
+     * 定妆照绑定优先级（2026-09-22 真人出镜场景）：
+     *   ① 角色定妆照（镜头文本命中角色 id/name）→ ② 商品/场所定妆照 → ③ 实拍参考图。
+     * 角色 4 角度齐备时按 front/threeQuarter/closeup/side 全绑（作为【定妆照】锚点）。
+     */
+    const characterEntry = portraitIndex?.characters
+      ? Object.values(portraitIndex.characters).find((entry) =>
+          [entry.id, entry.name]
+            .filter((t): t is string => Boolean(t))
+            .some((token) => `${shot.character ?? ""} ${shot.characters ?? ""} ${shot.prompt ?? ""}`.includes(token))
+        ) ?? Object.values(portraitIndex.characters)[0]
+      : undefined;
+    const characterPortraits = characterEntry?.files
+      ? ["front", "threeQuarter", "closeup", "side"]
+          .map((angle) => characterEntry.files?.[angle])
+          .filter((file): file is string => Boolean(file))
+      : [];
     const productPortraits = portraitIndex?.products
       ? Object.values(portraitIndex.products)
           .map((entry) => entry.files?.front ?? Object.values(entry.files ?? {})[0])
           .filter((file): file is string => Boolean(file))
           .slice(0, 2)
       : [];
-    const fallback = productPortraits.length > 0 ? productPortraits : venue;
+    const fallback = characterPortraits.length > 0
+      ? characterPortraits
+      : productPortraits.length > 0
+        ? productPortraits
+        : venue;
     if (fallback.length > 0) cardWithPortraits.portraits = fallback;
   }
 
@@ -421,10 +506,28 @@ for (const shot of shots) {
       mode: "auto",
       modelId,
       durationSec: seconds,
-      aspectRatio: aspect,
+      /**
+       * 首帧模式（i2v）**不能传 ratio**（真机 2026-09-22 实测 400：
+       * `For first-frame or first-last-frame generation, the output ratio follows the first-frame image`）。
+       * 接力镜沿用上一镜尾帧的画幅，因此这里只在非接力镜上传 ratio。
+       */
+      ...(chainFirstFrame ? {} : { aspectRatio: aspect }),
       resolution,
       generateAudio: true,
-      referenceImageUrls: references.map(dataUrl),
+      /**
+       * 首尾帧与参考图**互斥**（真机 2026-09-22 实测 400：
+       * `first/last frame content cannot be mixed with reference media content`）。
+       * 接力镜只用上一镜尾帧作为 first_frame（尾帧本身已携带人物与场景，天然保持一致性），
+       * 非接力镜继续用 ≤4 张定妆照/实拍参考图。
+       */
+      ...(chainFirstFrame
+        ? { firstFrameUrl: chainFirstFrame }
+        : { referenceImageUrls: references.map(dataUrl) }),
+      ...(seedArg ? { seed: Number(seedArg) } : {}),
+      ...(serviceTier ? { serviceTier } : {}),
+      ...(cameraFixed ? { cameraFixed: true } : {}),
+      ...(chainLastFrame ? { returnLastFrame: true } : {}),
+      ...(allowOverage ? { allowOverage: true } : {}),
       estimatedSeconds: seconds,
       idempotencyKey: `render-project:${projectId}:${shot.shotId}:${modelId}:${seconds}`,
     });
@@ -434,6 +537,17 @@ for (const shot of shots) {
     row.status = "submitted";
     pending.set(submitted.jobId, row);
     console.log(`✅ ${shot.shotId} 提交：job=${submitted.jobId} task=${submitted.taskId} mock=${submitted.mock} ${submitted.durationSec}s${submitted.clamped ? "（已夹紧）" : ""} refs=${references.length}`);
+    /** 首尾帧接力：顺序等本镜出片 → 取尾帧 → 作为下一镜首帧 */
+    if (chainLastFrame && !submitted.mock) {
+      const lastFrame = await waitForShotAndLastFrame(submitted.jobId, submitted.taskId);
+      if (lastFrame) {
+        chainFirstFrame = lastFrame;
+        console.log(`   🔗 ${shot.shotId} 尾帧就绪 → 作为下一镜 first_frame`);
+      } else {
+        console.warn(`   ⚠️ ${shot.shotId} 未取到尾帧（下一镜按无条件首帧提交）`);
+        chainFirstFrame = null;
+      }
+    }
   } catch (err) {
     row.error = err instanceof Error ? err.message : String(err);
     console.error(`⛔ ${shot.shotId} 提交失败：${row.error}`);
