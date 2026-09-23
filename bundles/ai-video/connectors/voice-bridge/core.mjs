@@ -599,6 +599,10 @@ export async function listInputDevices({ bins = resolveBinaries(), env = process
  * 本机麦克风录音 → 参考音频。
  * - 原始采集写 `out`；默认再做「静音裁剪 + 参考电平归一」得到 `<out 基名>.prepared.wav`；
  * - 质量门：时长 3–20s、语音活动占比 ≥0.35、信噪比 ≥8dB、无削波，不达标如实返回 gate 结果（不伪造 ok）。
+ * - 采集后端：默认 ffmpeg(avfoundation)；设 `WORKLOOM_VOICE_RECORDER` 时改用该可执行文件
+ *   （形如 `vrec --out <file> --seconds <n>`）。为什么需要：从"双击打开的应用"里调 ffmpeg 采集时，
+ *   macOS 会把请求判给 ffmpeg 这个没有用途说明的普通二进制并**静默拒绝**（不弹权限框、录到数字静音），
+ *   而应用包内的原生录音器会把权限请求归属到应用本身；因此 GUI 路径固定使用 recorder。
  */
 export async function record(params = {}, { bins = resolveBinaries(), env = process.env } = {}) {
   const out = assertPathAllowed(params.out ?? path.join(stationDir(env), "captures", `mic-${Date.now()}.wav`), allowedRoots(env), "out");
@@ -615,11 +619,17 @@ export async function record(params = {}, { bins = resolveBinaries(), env = proc
       ?? devices.devices.find((device) => String(device.index) === String(wanted));
   if (!target) throw new VoiceError(`找不到麦克风设备：${wanted}`, "mic_not_found");
 
-  const result = await captureProcess(bins.ffmpeg, [
-    "-hide_banner", "-loglevel", "error",
-    "-f", "avfoundation", "-i", `:${target.index}`,
-    "-t", String(seconds), "-ac", "1", "-ar", "24000", "-y", out,
-  ], { timeoutMs: (seconds + 20) * 1000, label: "ffmpeg(record)" });
+  const recorder = String(env.WORKLOOM_VOICE_RECORDER ?? "").trim();
+  const useRecorder = recorder && fs.existsSync(recorder);
+  const result = useRecorder
+    ? await captureProcess(recorder, ["--out", out, "--seconds", String(seconds)], {
+      timeoutMs: (seconds + 40) * 1000, label: "vrec(record)",
+    })
+    : await captureProcess(bins.ffmpeg, [
+      "-hide_banner", "-loglevel", "error",
+      "-f", "avfoundation", "-i", `:${target.index}`,
+      "-t", String(seconds), "-ac", "1", "-ar", "24000", "-y", out,
+    ], { timeoutMs: (seconds + 20) * 1000, label: "ffmpeg(record)" });
   if (result.code !== 0 || !fs.existsSync(out) || fs.statSync(out).size < 1024) {
     const denied = /Permission|not authorized|denied/i.test(result.stderr);
     throw new VoiceError(

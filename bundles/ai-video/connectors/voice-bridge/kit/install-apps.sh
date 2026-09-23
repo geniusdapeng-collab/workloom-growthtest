@@ -4,7 +4,8 @@
 #   bash kit/install-apps.sh [--dest "$HOME/Applications"] [--no-desktop]
 #
 # 做三件事：把 app.applescript 里的路径替换成真实路径 → osacompile 编译成 .app →
-# 补 Info.plist（名称 + 麦克风用途说明）→ 安装到 ~/Applications（默认再在桌面放一个快捷方式）。
+# 编译原生录音器 vrec 并放进应用包内（麦克风权限要归属应用本身）→ 补 Info.plist（名称 + 麦克风用途说明）
+# → 安装到 ~/Applications（默认再在桌面放一个快捷方式）。
 # 幂等：重复执行=覆盖安装。卸载：删掉 ~/Applications/小织声音工坊.app 即可（声音档案仍在 ~/.workloom）。
 set -eu
 
@@ -29,10 +30,30 @@ TMP_SRC="$(mktemp -t voice-workshop).applescript"
 trap 'rm -f "$TMP_SRC"' EXIT
 sed -e "s|__HELPER__|$HERE/gui-voice.sh|g" -e "s|__KIT__|$HERE|g" "$HERE/app.applescript" > "$TMP_SRC"
 
+# --- 原生录音器：为什么必须有它 ---
+# 从"双击打开的应用"里启动 ffmpeg 采集时，macOS 会把麦克风请求判给 ffmpeg 这个**没有用途说明的普通二进制**
+# 并静默拒绝（不弹权限框、录到数字静音）。把 vrec 编进应用包内，权限请求才会归属到『小织声音工坊』，
+# 首次录音时正常弹出授权框。缺 clang 时跳过（此时录音回落 ffmpeg，界面里会提示权限问题）。
+if command -v clang >/dev/null 2>&1; then
+  mkdir -p "$HERE/bin"
+  if clang -fobjc-arc -O2 -framework Foundation -framework AVFoundation -o "$HERE/bin/vrec" "$HERE/vrec.m" 2>/tmp/vrec-build.log; then
+    echo "✓ 已编译原生录音器：$HERE/bin/vrec"
+  else
+    echo "⚠️ 原生录音器编译失败（详见 /tmp/vrec-build.log），录音将回落 ffmpeg" >&2
+  fi
+else
+  echo "⚠️ 没有 clang（缺命令行工具），跳过原生录音器；录音将回落 ffmpeg（从应用里可能拿不到麦克风权限）" >&2
+fi
+
 mkdir -p "$DEST"
 APP="$DEST/$APP_NAME.app"
 rm -rf "$APP"
 osacompile -o "$APP" "$TMP_SRC"
+
+if [ -x "$HERE/bin/vrec" ]; then
+  cp "$HERE/bin/vrec" "$APP/Contents/MacOS/vrec"
+  chmod +x "$APP/Contents/MacOS/vrec"
+fi
 
 PLIST="$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleName $APP_NAME" "$PLIST" 2>/dev/null || /usr/libexec/PlistBuddy -c "Add :CFBundleName string $APP_NAME" "$PLIST"

@@ -24,6 +24,8 @@ SECONDS_TO_RECORD=12
 TEXT=""
 VIDEO=""
 SCRIPT_TEXT="大家好，我是小织。今天为你播报三条经营要点：答案可见度上升百分之十八，获客成本下降百分之十二。"
+# 采集后端：应用内会传自己的原生录音器（权限归属应用）；不传就用工位自带的 bin/vrec；都没有才回落 ffmpeg。
+RECORDER="${WORKLOOM_VOICE_RECORDER:-}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -34,6 +36,7 @@ while [ $# -gt 0 ]; do
     --seconds) SECONDS_TO_RECORD="${2:?}"; shift 2 ;;
     --text) TEXT="${2-}"; shift 2 ;;
     --script) SCRIPT_TEXT="${2-}"; shift 2 ;;
+    --recorder) RECORDER="${2-}"; shift 2 ;;
     --video) VIDEO="${2:?}"; shift 2 ;;
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "未知参数：$1" >&2; exit 2 ;;
@@ -57,6 +60,9 @@ export WORKLOOM_VOICE_STATION_DIR="$STATION"
 export WORKLOOM_VOICE_ENGINE="${WORKLOOM_VOICE_ENGINE:-mlx}"
 export WORKLOOM_VOICE_ENGINE_URL="${WORKLOOM_VOICE_ENGINE_URL:-http://127.0.0.1:8099}"
 export WORKLOOM_VOICE_ALLOWED_ROOTS="${WORKLOOM_VOICE_ALLOWED_ROOTS:-$HOME/Movies:$HOME/Desktop:$HOME/Downloads:$HOME/Documents}"
+# 录音器优先级：命令行显式指定 > 工位自带 bin/vrec
+if [ -z "$RECORDER" ] && [ -x "$HERE/bin/vrec" ]; then RECORDER="$HERE/bin/vrec"; fi
+if [ -n "$RECORDER" ] && [ -x "$RECORDER" ]; then export WORKLOOM_VOICE_RECORDER="$RECORDER"; fi
 mkdir -p "$STATION/logs"
 LOG="$STATION/logs/gui-$(date +%Y%m%d-%H%M%S).log"
 
@@ -72,8 +78,33 @@ except Exception:
     print("")
     raise SystemExit(0)
 for part in dotted.split("."):
-    node = node.get(part) if isinstance(node, dict) else None
+    if isinstance(node, dict):
+        node = node.get(part)
+    elif isinstance(node, list) and part.isdigit() and int(part) < len(node):
+        node = node[int(part)]
+    else:
+        node = None
 print("" if node is None else node)
+PY
+}
+
+# 质检不达标时，把"为什么不达标 + 实测电平"拼成一句人话（用户要能据此决定是重念还是改设置）
+gate_reason() { # gate_reason <record-json>
+  python3 - "$1" <<'PY'
+import json, sys
+try:
+    raw = json.load(open(sys.argv[1]))["result"]
+except Exception:
+    print("没有拿到质检结果")
+    raise SystemExit(0)
+gate = raw.get("gate") or {}
+reasons = gate.get("reasons") or []
+level = raw.get("raw") or {}
+bits = "；".join(str(r) for r in reasons) if reasons else "原因未知"
+extra = ""
+if level.get("seconds"):
+    extra = "（录音 %.1fs / 语音活动占比 %.2f）" % (level["seconds"], level.get("activeRatio") or 0)
+print(bits + extra)
 PY
 }
 
@@ -160,6 +191,10 @@ cli() { "$NODE" "$BRIDGE/cli.mjs" "$@"; }
 if [ "$MODE" = "doctor" ]; then
   printf 'node:   %s\n' "${NODE:-未找到}"
   printf 'ffmpeg: %s\n' "$(command -v ffmpeg || echo 未找到)"
+  printf '录音器: %s\n' "${RECORDER:-未找到（将回落 ffmpeg；从应用里录音会拿不到权限）}"
+  if [ -n "$RECORDER" ] && [ -x "$RECORDER" ]; then
+    "$RECORDER" --check >/dev/null 2>&1 && printf '麦克风: 已授权\n' || printf '麦克风: 未授权（首次录音时点『允许』）\n'
+  fi
   printf '引擎:   %s\n' "$(engine_up && echo 就绪 || echo 未就绪)"
   printf '工位:   %s\n' "$STATION"
   printf '档案:   %s\n' "$(ls "$STATION/profiles" 2>/dev/null | tr '\n' ' ')"
@@ -175,11 +210,18 @@ fi
 if [ "$MODE" = "record" ]; then
   log "mode=record profile=$PROFILE seconds=$SECONDS_TO_RECORD"
   ensure_engine || { write_result failed "语音引擎没起来（${WORKLOOM_VOICE_ENGINE_URL}）。日志：$LOG"; summary "$RESULT_FILE"; exit 1; }
+  # 录前权限自检：没授权就不让用户白念一遍（实测踩过：应用里用 ffmpeg 采集会被系统静默拒绝、录到全静音）
+  if [ -n "${WORKLOOM_VOICE_RECORDER:-}" ] && [ -x "${WORKLOOM_VOICE_RECORDER}" ]; then
+    if ! "$WORKLOOM_VOICE_RECORDER" --check >>"$LOG" 2>&1; then
+      write_result permission "麦克风权限还没打开：请到『系统设置 → 隐私与安全性 → 麦克风』把『小织声音工坊』打开（若列表里没有它，先点一次『开始录音』，系统会弹一次授权框），然后重新双击应用试一次。"
+      summary "$RESULT_FILE"; exit 1
+    fi
+  fi
   CAPTURE="$STATION/captures/gui-$(date +%s).wav"
   log "开始录音 → $CAPTURE"
   # 录音多给 5 秒富余：用户看到提词器才开始念（开头那 1–2 秒是静音），首尾静音由 record 的裁剪步骤去掉。
   RECORD_WINDOW=$((SECONDS_TO_RECORD + 5))
-  cli record --out "$CAPTURE" --seconds "$RECORD_WINDOW" > "$STATION/logs/last-record.json" 2>>"$LOG" &
+  cli record --out "$CAPTURE" --seconds "$RECORD_WINDOW" > "$STATION/logs/last-record.json" 2>"$STATION/logs/last-record.err" &
   RECORD_PID=$!
   # 先起录、再把提词器推到最前：念的第一个字不会被裁掉，且提词稿在录音全程可见（用户反馈原设计"文字消失了"）。
   teleprompter_start "$SCRIPT_TEXT" $((RECORD_WINDOW + 20))
@@ -187,14 +229,21 @@ if [ "$MODE" = "record" ]; then
   teleprompter_stop
   RECORDED="$(cat "$STATION/logs/last-record.json" 2>/dev/null || true)"
   if [ -z "$RECORDED" ]; then
-    write_result failed "录音没成功：麦克风可能被别的程序占用，或系统还没给麦克风权限（日志：${LOG}）"
+    REASON="$(tr '\n' ' ' < "$STATION/logs/last-record.err" 2>/dev/null | tail -c 300)"
+    cat "$STATION/logs/last-record.err" >>"$LOG" 2>/dev/null || true
+    case "$REASON" in
+      *mic_permission_denied*|*权限被拒*)
+        write_result permission "麦克风权限还没打开：请到『系统设置 → 隐私与安全性 → 麦克风』把『小织声音工坊』打开（若列表里没有，先点一次『开始录音』再来找），然后重新双击应用试一次。" ;;
+      *)
+        write_result failed "录音没成功：${REASON:-没有拿到音频}（日志：${LOG}）" ;;
+    esac
     summary "$RESULT_FILE"; exit 1
   fi
   REFERENCE="$(json_pick "$STATION/logs/last-record.json" result.reference)"
   GATE_OK="$(json_pick "$STATION/logs/last-record.json" result.gate.ok)"
-  GATE_WHY="$(json_pick "$STATION/logs/last-record.json" result.gate.reasons.0)"
+  GATE_WHY="$(gate_reason "$STATION/logs/last-record.json")"
   if [ "$GATE_OK" != "True" ]; then
-    write_result retry "录到的这段没通过质量检查（${GATE_WHY:-没有检测到说话声}）。请靠近麦克风，对着屏幕上弹出的提词稿再念一次；周围尽量安静。"
+    write_result retry "录到的这段没通过质量检查：${GATE_WHY}。请靠近麦克风（20 厘米内），对着屏幕上弹出的提词稿再念一次，周围尽量安静；说话声音比平时稍大一点也可以。"
     summary "$RESULT_FILE"; exit 0
   fi
   [ -n "$REFERENCE" ] || REFERENCE="$CAPTURE"

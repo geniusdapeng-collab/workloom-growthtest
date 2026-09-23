@@ -15,7 +15,14 @@ on run
 		set tip to "接下来录 12 秒左右。点『开始录音』后，下面这段文字会留在屏幕正中（会另开一个提词器窗口），照着念就行：" & return & return & practiceScript & return & return & "不用等提示音，看到文字就开始念，念完自然停下即可；多录的空白我会自动裁掉。不想念这段也可以，说一句「大家好，我是某某，很高兴认识你」就行。第一次使用 macOS 会问麦克风权限，请点『允许』。"
 		display dialog tip buttons {"取消", "开始录音"} default button "开始录音" with title "小织声音工坊" with icon note
 		-- 提词器与「正在生成音色」窗口由执行器自己弹（它知道录音何时开始/结束），这里不再叠进度框
-		my runTask("record --script " & quoted form of practiceScript, "", false)
+		-- 用应用包内的原生录音器：麦克风权限才会归属到『小织声音工坊』（用 ffmpeg 会被系统静默拒绝）
+		set recorderPath to (POSIX path of (path to me)) & "Contents/MacOS/vrec"
+		set recorderArg to ""
+		try
+			do shell script "test -x " & quoted form of recorderPath
+			set recorderArg to " --recorder " & quoted form of recorderPath
+		end try
+		my runTask("record --script " & quoted form of practiceScript & recorderArg, "", false)
 	else if choice begins with "②" then
 		set answer to display dialog "输入要播报的文字：" default answer "您好，我是小织，今天的经营日报已经准备好了。" buttons {"取消", "生成并试听"} default button "生成并试听" with title "小织声音工坊"
 		my runTask("speak --text " & quoted form of (text returned of answer), "正在合成语音…（约 1–2 分钟）", true)
@@ -41,6 +48,19 @@ on runTask(argString, progressText, showProgress)
 		-- 失败原因由 helper 写进结果文件；这里不弹系统级报错，避免吓到用户
 	end try
 	if showProgress then do shell script "kill $(cat /tmp/voice-gui-progress.pid) 2>/dev/null; rm -f /tmp/voice-gui-progress.pid; true"
+	-- 麦克风没授权时给一个直达设置的按钮，别让用户自己去翻系统设置
+	set needsPermission to false
+	try
+		set statusLine to do shell script "/usr/bin/python3 -c 'import json,sys;print(json.load(open(sys.argv[1])).get(\"status\",\"\"))' " & quoted form of resultFile
+		if statusLine is "permission" then set needsPermission to true
+	end try
 	set theSummary to do shell script "/bin/bash " & quoted form of helperPath & " --summary " & quoted form of resultFile
-	display dialog theSummary buttons {"好"} default button "好" with title "小织声音工坊" with icon note
+	if needsPermission then
+		set answer to display dialog theSummary buttons {"稍后再说", "打开麦克风设置"} default button "打开麦克风设置" with title "小织声音工坊" with icon caution
+		if button returned of answer is "打开麦克风设置" then
+			do shell script "open 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'"
+		end if
+	else
+		display dialog theSummary buttons {"好"} default button "好" with title "小织声音工坊" with icon note
+	end if
 end runTask
