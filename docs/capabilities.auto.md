@@ -1,10 +1,6 @@
 # workloom-ai-acquisition · 能力导览（人类版）
 
-<<<<<<< HEAD
 > AI超增长 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）
-=======
-> WorkLoom 获客系统 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）
->>>>>>> eeb16dd (feat(video): 字体库 29 款随仓分发 + 弹幕/贴纸/卡拉OK/双语字幕（字幕师 v1.1 二期）[T-2026-0923-0048])
 > 本文件由 `node scripts/generate-capabilities.mjs` 从代码事实**自动生成**（2026-09-23），
 > 请勿手改——能力变更后重跑生成器即可。Agent 版机器清单见 docs/capability-map.md。
 
