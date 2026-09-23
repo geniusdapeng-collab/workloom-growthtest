@@ -1737,14 +1737,14 @@ export async function renderDanmaku({
   const size = pick.size.sizePx;
   const targets = loadRecipes().targets;
   const layoutBands = textBands({ resolution, layout });
-  // 弹幕带 = 顶部 1/4 区域（滚动轨道与顶部固定行都在这里；用标题带会漏掉贴顶那一行）
-  const danmakuBandPx = {
+  // 选型/配色用「顶部 1/4 区域」整带（滚动轨道与顶部固定行都在这里）
+  const danmakuAreaPx = {
     x: 0,
     y: 0,
     w: resolution[0],
     h: Math.max(24, Math.round(resolution[1] * Number(layout.弹幕?.top_band_ratio ?? 0.25))),
   };
-  const bandStats = await regionStats({ input, bins, region: danmakuBandPx });
+  const bandStats = await regionStats({ input, bins, region: danmakuAreaPx });
   const decision = decideTextStyle({ scene: "弹幕", band: bandStats, size, targets });
   const alphaValue = Math.round((1 - Math.min(Math.max(opacity, 0.1), 1)) * 255).toString(16).padStart(2, "0").toUpperCase();
   const tracks = planDanmakuTracks(trimming.kept, { resolution, layout, size, lanes });
@@ -1795,6 +1795,18 @@ export async function renderDanmaku({
   const sampleAt = sample.mode === "scroll"
     ? round(sample.at + sample.durationSec / 2, 2)
     : round(sample.at + Math.min(1, sample.durationSec / 2), 2);
+  /**
+   * 可现度实测带 = **被抽样那条弹幕自己的轨道条带**（不是整块顶部 1/4）。
+   * 实测教训：整带面积大，墨迹占比被稀释——稀疏弹幕（1~2 条）Δ≈0.0017、7 条时 Δ≈0.0038，
+   * 都会贴着 0.004 阈值抖动，出现"明明渲染了却判失败"。收紧到该条的轨道条带后 Δ≈0.014，
+   * 判的是"这条弹幕出现没有"，与阈值口径一致。
+   */
+  const danmakuBandPx = {
+    x: 0,
+    y: Math.max(0, sample.y - Math.round(size * 0.4)),
+    w: resolution[0],
+    h: Math.round(size * 1.6),
+  };
   const presence = await measureBandPresence({
     input, output, at: sampleAt, band: danmakuBandPx, bins,
   });
