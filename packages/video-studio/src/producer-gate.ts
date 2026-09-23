@@ -1,0 +1,386 @@
+/**
+ * producer-gate —— AI 监制（制片人）门：把"人工确认"换成"机器评审 + 打回重跑"
+ *
+ * 背景（T-2026-0924-0001）：
+ *   视频链路上原有 G1–G7 七个确认门。早先实现是两道极端：要么挂人工审批卡等人点（停线），
+ *   要么用 `HR_AUTO_GATES` 一律 `approved:true`（等于没有质量门，坏产物直接往下流）。
+ *   产品口径是**全自动预生产 + 人类只在花钱/对外时介入**，所以中间门需要的是"AI 监制"：
+ *   看产物、按纪律打分、不合格就打回重跑，并把裁决写进日志与事件。
+ *
+ * 本模块提供三件事：
+ *   1. `PRODUCER_RUBRICS` —— 逐环节评审要点（与 bundles/ai-video/skills 的纪律同源）；
+ *   2. 确定性硬闸（调用方传入 ffprobe/文件校验结果）—— 硬失败直接打回，不消耗模型额度；
+ *   3. 可选的 LLM 评审（含图像）—— 打分 + 问题清单 + 修改建议；模型不可用时**如实降级**并标注。
+ *
+ * 纪律：默认 fail-closed —— 硬闸失败必打回；LLM 不可用且无硬闸结论时**不放行**（返回 rerun），
+ * 只有"硬闸全过 + 显式允许降级"才降级放行并标记 `via:"fallback"`（便于审计"哪些门是空转的"）。
+ */
+
+export type ProducerStage =
+  | "script"
+  | "prompt"
+  | "keyframe"
+  | "shot"
+  | "compose"
+  | "color"
+  | "subtitle"
+  | "danmaku"
+  | "bgm"
+  | "cover"
+  | "master";
+
+import { readFileSync } from "node:fs";
+
+export interface DeterministicCheck {
+  id: string;
+  pass: boolean;
+  detail: string;
+  /** 硬闸：失败即打回（LLM 无权推翻）。缺省 = 软信号（只进问题清单，不影响放行判定） */
+  hard?: boolean;
+}
+
+export interface ProducerArtifact {
+  path: string;
+  kind: "image" | "video" | "audio" | "text" | "json";
+  bytes?: number;
+  /** ffprobe 摘要（video/audio）：width/height/duration/loudness 等 */
+  probe?: Record<string, unknown>;
+  note?: string;
+}
+
+export interface ProducerVerdict {
+  stage: ProducerStage;
+  approved: boolean;
+  /** 0–100；硬闸失败为 0 */
+  score: number;
+  hardFailures: string[];
+  issues: string[];
+  suggestions: string[];
+  /** 建议重跑本环节（approved=false 时恒为 true） */
+  rerun: boolean;
+  via: "deterministic" | "llm" | "fallback";
+  model?: string;
+  ms: number;
+  reason: string;
+  /** 降级放行（模型不可用但硬闸全过）——审计要用 */
+  degraded: boolean;
+}
+
+/**
+ * 逐环节评审要点（与 bundles/ai-video/skills 的纪律同源；中文，便于直接落日志/审批卡）。
+ * 注意：这里是"监制看什么"，不是确定性断言——确定性断言由调用方按产物实测传入。
+ */
+export const PRODUCER_RUBRICS: Record<ProducerStage, string[]> = {
+  script: [
+    "台词速率 ≤ 3.6 字/秒（按镜头时长硬算），不出现念不完的长句",
+    "每镜有明确的动作与情绪变化，不是静态摆拍",
+    "镜头时长合计等于目标总时长，节奏有起伏（开场/推进/收尾）"
+  ],
+  prompt: [
+    "25/30 字段齐备且非模板默认值（字段是生成的，不是下游补的）",
+    "提示词长度达到交付口径（≥1200 字），含【约束】实际画幅分辨率",
+    "不含红线词（科幻/微观等与 brief 无关的意象），无 [object Object]",
+    "场景与人物解耦：定妆照只描述人，场景只由镜头提示词给"
+  ],
+  keyframe: [
+    "画面里的人物与角色档案/定妆照是同一张脸、同一发型与服装",
+    "是纯写实影像（非插画/3D/CG），皮肤有真实质感不塑料",
+    "构图符合镜头卡（景别/朝向/留白），主体完整入画无裁切事故",
+    "无文字、无水印、无多余手指/肢体，无第二张脸",
+    "场景与镜头卡一致（地点/时段/道具），且没有出现定妆照里的中性背景"
+  ],
+  shot: [
+    "肢体语言自然：重心、步态、手部动作有真实物理感，无肢体畸变",
+    "表情丰富且与台词情绪一致（眉眼/嘴角有变化，不是面无表情）",
+    "口型与台词时长匹配，动作连贯无跳帧感",
+    "与前后镜人物形象一致（同脸同服装），无跨镜漂移"
+  ],
+  compose: [
+    "拼接处无花屏/丢帧/音画不同步，转场自然",
+    "总时长与目标一致（±0.5s），分辨率/帧率/像素格式全片统一"
+  ],
+  color: [
+    "肤色不偏色（不蜡黄不发青），暗部不死黑、高光不溢出",
+    "影调统一且符合题材（江南水乡：低饱和、月白黛青、暖灯不过饱和）",
+    "调色后画质不劣于原片（择优机制：拿不到提升就不调）"
+  ],
+  subtitle: [
+    "字幕在安全区内（避开平台 UI 遮挡区与画面主体面部）",
+    "字体/字号/描边与题材匹配，可现度达标（Δ 超过阈值）",
+    "时间轴与台词逐条对齐，无错字与断句事故"
+  ],
+  danmaku: [
+    "弹幕不遮挡主体面部与字幕带，密度不过载（并发未超上限）",
+    "弹幕内容与画面语境相符，不出现与题材无关的评论",
+    "滚动/固定弹幕分层清晰，透明度不淹没画面"
+  ],
+  bgm: [
+    "整片响度达标（−14 LUFS 附近）且真峰值不超 −1 dBTP",
+    "人声/环境声时刻 BGM 让位（ducking），不盖台词",
+    "曲风与题材匹配（江南水乡：温润、中慢、器乐为主），无人声唱歌抢戏"
+  ],
+  cover: [
+    "钩子文案与成片内容一致（不标题党），主标题 ≤ 9 字/行、最多两行",
+    "主体面部不被文字压住，底部平台 UI 遮挡区不放大字",
+    "封面与视频首帧风格统一，色彩与调色后母版一致"
+  ],
+  master: [
+    "整片可播放、时长/分辨率/帧率/音轨符合交付规格",
+    "五项后期能力（调色/字幕/弹幕/配乐/封面）都在成片里可见",
+    "无黑帧、无静音段事故、无编码错误"
+  ]
+};
+
+export interface ProducerGateOptions {
+  stage: ProducerStage;
+  projectId: string;
+  artifacts: ProducerArtifact[];
+  deterministic: DeterministicCheck[];
+  /** 覆盖默认评审要点 */
+  rubric?: string[];
+  /** 画面类环节可附视觉基准（如定妆照）做一致性比对 */
+  referenceImages?: string[];
+  context?: Record<string, unknown>;
+  /** 允许在"硬闸全过 + 模型不可用"时降级放行（默认 false，fail-closed） */
+  allowFallbackApprove?: boolean;
+  env?: Record<string, string | undefined>;
+  fetchImpl?: typeof fetch;
+  log?: (line: string) => void;
+}
+
+interface LlmConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+}
+
+/** 解析评审模型（与 model-router 的 LLM_* 口径一致，兼容 DEEPSEEK_* 秘密文件） */
+export function resolveProducerLlm(env: Record<string, string | undefined> = process.env): LlmConfig | null {
+  const baseUrl = env.LLM_BASE_URL ?? env.DEEPSEEK_BASE_URL ?? "";
+  const apiKey = env.LLM_API_KEY ?? env.DEEPSEEK_API_KEY ?? "";
+  const model = env.LLM_MODEL ?? env.DEEPSEEK_MODEL ?? "";
+  if (!baseUrl || !apiKey || !model) return null;
+  return { baseUrl: baseUrl.replace(/\/$/, ""), apiKey, model };
+}
+
+function mimeOf(path: string): string {
+  const lower = path.toLowerCase();
+  if (lower.endsWith(".png")) return "image/png";
+  if (lower.endsWith(".webp")) return "image/webp";
+  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
+  return "application/octet-stream";
+}
+
+function summarizeArtifacts(artifacts: ProducerArtifact[]): string {
+  return artifacts.map((a) => {
+    const probe = a.probe ? ` ${JSON.stringify(a.probe)}` : "";
+    const bytes = typeof a.bytes === "number" ? ` ${(a.bytes / 1024).toFixed(0)}KB` : "";
+    return `- [${a.kind}] ${a.path}${bytes}${probe}${a.note ? ` — ${a.note}` : ""}`;
+  }).join("\n");
+}
+
+/**
+ * 解析评审模型输出的 JSON：
+ *   ① 直接解析（剥掉可能的 ``` 包裹）；
+ *   ② 取第一个 `{` 到最后一个 `}` 的片段再解析（裁掉解释性前后缀）；
+ *   ③ 仍失败 → 让模型"只重发合法 JSON"自修复一次；
+ *   ④ 还失败 → 抛错（调用方按"评审不可用"fail-closed 处理）。
+ */
+async function parseJudgeJson(
+  raw: string,
+  llm: LlmConfig,
+  fetchImpl: typeof fetch,
+  log: (line: string) => void,
+  stage: ProducerStage
+): Promise<Record<string, unknown>> {
+  const stripped = raw.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim();
+  const tryParse = (text: string): Record<string, unknown> | null => {
+    try {
+      return JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  };
+  const direct = tryParse(stripped);
+  if (direct) return direct;
+  const start = stripped.indexOf("{");
+  const end = stripped.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    const sliced = tryParse(stripped.slice(start, end + 1));
+    if (sliced) return sliced;
+  }
+  log(`[producer][${stage}] 评审输出不是合法 JSON，要求模型自修复一次`);
+  const repair = await fetchImpl(`${llm.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
+    body: JSON.stringify({
+      model: llm.model,
+      messages: [
+        { role: "user", content: "把下面这段内容整理成**严格合法**的 JSON（只输出 JSON，不要任何解释、不要 markdown）：\n\n" + raw.slice(0, 4000) }
+      ],
+      temperature: 0,
+      response_format: { type: "json_object" }
+    }),
+    signal: AbortSignal.timeout(120_000)
+  });
+  const repairText = await repair.text();
+  if (!repair.ok) throw new Error(`评审 JSON 修复失败：HTTP ${repair.status} ${repairText.slice(0, 160)}`);
+  const repaired = (JSON.parse(repairText) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
+  const fixed = tryParse(repaired.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim());
+  if (!fixed) throw new Error(`评审 JSON 修复后仍非法：${repaired.slice(0, 160)}`);
+  return fixed;
+}
+
+/**
+ * 评审一个环节。返回裁决；调用方按 `approved` 决定放行或重跑。
+ */
+export async function reviewStage(options: ProducerGateOptions): Promise<ProducerVerdict> {
+  const started = Date.now();
+  const log = options.log ?? (() => undefined);
+  const stage = options.stage;
+  const rubric = options.rubric ?? PRODUCER_RUBRICS[stage];
+  const hardFailures = options.deterministic.filter((c) => !c.pass && c.hard === true).map((c) => `${c.id}：${c.detail}`);
+  const softFailures = options.deterministic.filter((c) => c.pass === false).map((c) => `${c.id}：${c.detail}`);
+
+  /** ① 硬闸：任一失败直接打回 */
+  if (hardFailures.length > 0) {
+    log(`[producer][${stage}] 硬闸失败，打回重跑：${hardFailures.join("；")}`);
+    return {
+      stage,
+      approved: false,
+      score: 0,
+      hardFailures,
+      issues: softFailures,
+      suggestions: [`按硬闸失败项修复后重跑本环节：${hardFailures[0]}`],
+      rerun: true,
+      via: "deterministic",
+      ms: Date.now() - started,
+      reason: `确定性硬闸未通过（${hardFailures.length} 项）`,
+      degraded: false
+    };
+  }
+
+  const llm = resolveProducerLlm(options.env ?? process.env);
+  /** ② 无模型：显式降级（默认不放行，除非调用方允许降级） */
+  if (!llm) {
+    const approved = Boolean(options.allowFallbackApprove);
+    log(`[producer][${stage}] 无可用评审模型 → ${approved ? "降级放行（已标记 degraded）" : "拒绝放行（fail-closed）"}`);
+    return {
+      stage,
+      approved,
+      score: approved ? 60 : 0,
+      hardFailures: [],
+      issues: softFailures,
+      suggestions: approved ? ["接入 LLM_* 后重新开启实质评审"] : ["配置 LLM_BASE_URL / LLM_API_KEY / LLM_MODEL 后重跑"],
+      rerun: !approved,
+      via: "fallback",
+      ms: Date.now() - started,
+      reason: approved ? "无评审模型，按允许降级放行" : "无评审模型，且未允许降级",
+      degraded: true
+    };
+  }
+
+  /** ③ LLM 监制评审（可带图） */
+  const imageArtifacts = options.artifacts.filter((a) => a.kind === "image");
+  const content: Array<Record<string, unknown>> = [
+    {
+      type: "text",
+      text: [
+        `你是视频项目的 AI 监制（制片人），负责在【${stage}】环节放行或打回重跑。`,
+        `项目：${options.projectId}`,
+        "",
+        "评审要点（逐条判断）：",
+        ...rubric.map((r, i) => `${i + 1}. ${r}`),
+        "",
+        "本环节产物：",
+        summarizeArtifacts(options.artifacts),
+        "",
+        "确定性检查结果（已通过，作为事实依据）：",
+        options.deterministic.map((c) => `- ${c.pass ? "PASS" : "FAIL"} ${c.id}：${c.detail}`).join("\n") || "- 无",
+        options.context ? `\n补充事实：\n${JSON.stringify(options.context, null, 1).slice(0, 2000)}` : "",
+        "",
+        "只输出 JSON（不要 markdown 代码块）：",
+        '{"approved": true|false, "score": 0-100, "issues": ["..."], "suggestions": ["..."], "reason": "一句话结论"}',
+        "判定纪律（以下任一命中即必须 approved=false，并给出可执行的重跑建议）：人物不像、画质塑料、肢体畸变、遮挡主体、与上面任一条纪律冲突。"
+      ].join("\n")
+    }
+  ];
+  /**
+   * 图像配额（2026-09-24 真机修正）：**待评审产物优先**。
+   * 早先把基准图排在前面，4 张基准图吃满配额后产物只剩 2 张，评审看不到 closeup 等关键机位。
+   * 现在口径：产物最多 4 张，基准图最多 2 张（够做人脸参照即可）。
+   */
+  const imageQueue = [
+    ...imageArtifacts.slice(0, 4).map((a) => ({ path: a.path, label: "待评审产物" })),
+    ...(options.referenceImages ?? []).slice(0, 2).map((path) => ({ path, label: "基准图（角色定妆照/授权真人照片）" }))
+  ];
+  for (const image of imageQueue) {
+    try {
+      const bytes = readFileSync(image.path);
+      content.push({ type: "text", text: `以下是${image.label}：${image.path}` });
+      content.push({ type: "image_url", image_url: { url: `data:${mimeOf(image.path)};base64,${bytes.toString("base64")}` } });
+    } catch (err) {
+      log(`[producer][${stage}] 读取图像失败（跳过）：${image.path} — ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  try {
+    const res = await (options.fetchImpl ?? fetch)(`${llm.baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
+      body: JSON.stringify({
+        model: llm.model,
+        messages: [{ role: "user", content }],
+        temperature: 0.2,
+        response_format: { type: "json_object" }
+      }),
+      signal: AbortSignal.timeout(180_000)
+    });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0, 200)}`);
+    const parsed = JSON.parse(text) as { choices?: Array<{ message?: { content?: string } }> };
+    const raw = parsed.choices?.[0]?.message?.content ?? "";
+    /**
+     * 评审模型返回的 JSON 偶发畸形（真机 2026-09-24：SC-06 评审返回在第 155 字符处少了一个逗号，
+     * 直接 JSON.parse 抛错 → 整个环节被判"评审不可用"）。这里先做**括号截取修复**，
+     * 仍失败再让模型自修复一次；两次都失败才按"评审不可用"处理（仍是 fail-closed，但不再因一个逗号卡住产线）。
+     */
+    const json = await parseJudgeJson(raw, llm, options.fetchImpl ?? fetch, log, stage) as {
+      approved?: boolean; score?: number; issues?: string[]; suggestions?: string[]; reason?: string;
+    };
+    const approved = json.approved === true;
+    log(`[producer][${stage}] 评审：${approved ? "放行" : "打回"}（score=${json.score ?? "?"}）— ${json.reason ?? ""}`);
+    return {
+      stage,
+      approved,
+      score: typeof json.score === "number" ? json.score : approved ? 80 : 40,
+      hardFailures: [],
+      issues: [...softFailures, ...(json.issues ?? [])],
+      suggestions: json.suggestions ?? [],
+      rerun: !approved,
+      via: "llm",
+      model: llm.model,
+      ms: Date.now() - started,
+      reason: json.reason ?? (approved ? "评审通过" : "评审未通过"),
+      degraded: false
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const approved = Boolean(options.allowFallbackApprove);
+    log(`[producer][${stage}] 评审调用失败：${message.slice(0, 200)} → ${approved ? "降级放行" : "拒绝放行"}`);
+    return {
+      stage,
+      approved,
+      score: approved ? 55 : 0,
+      hardFailures: [],
+      issues: [...softFailures, `评审模型不可用：${message.slice(0, 160)}`],
+      suggestions: approved ? ["修复评审模型通路后重跑本环节以获得实质评审"] : ["修复评审模型通路后重跑本环节"],
+      rerun: !approved,
+      via: "fallback",
+      model: llm.model,
+      ms: Date.now() - started,
+      reason: `评审模型不可用：${message.slice(0, 120)}`,
+      degraded: true
+    };
+  }
+}

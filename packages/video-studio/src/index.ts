@@ -7,6 +7,7 @@ export * from "./portrait-runtime.js";
 export * from "./portrait-binding.js";
 export * from "./character-archive.js";
 export * from "./portrait-agent.js";
+export * from "./producer-gate.js";
 export * from "./shot-spec.js";
 export * from "./duration-rules.js";
 export * from "./vendor-compat.js";

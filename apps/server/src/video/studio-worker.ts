@@ -26,11 +26,13 @@ import {
   installVendorEngineBridge,
   installVendorPortraitBindingBridge,
   installVendorRenderCompatBridge,
+  reviewStage,
   type ApprovalCallback,
   type EventSink,
   type GateKey,
   type GateVerdict,
   type PortraitIndex,
+  type ProducerStage,
   type RunInput,
   type StudioPortraitConfig,
 } from "@hyperreality/video-studio";
@@ -58,6 +60,68 @@ const AUTO_GATES = new Set(
     ?? "G1_DOSSIER,G2_THEME,G3_INSIGHT,G4_PRD,G5_PORTRAIT,G6_PROMPT,G7_FINAL")
     .split(",").map((value) => value.trim()).filter(Boolean),
 );
+
+/**
+ * 内部门的三档处置（T-2026-0924-0001 机制改造）：
+ *
+ *   `review`（默认）—— **AI 监制**：拿门内容当产物走 `producer-gate` 评审（确定性硬闸 + LLM 打分），
+ *                       判不合格就返回 `approved:false` 打回重跑，而不是一路放行；
+ *   `auto`          —— 旧口径：内部准备门直接放行（只在应急/离线演示时用）；
+ *   `human`         —— 恢复人工：走 approvals 行 + 轮询等人点（原实现）。
+ *
+ * 为什么要改：此前实现要么"一律放行"（质量问题被静默带到下游），要么"每步等人"（停线）。
+ * 产品口径是**全自动预生产 + 人工只管花钱与对外**，所以内部准备门应当由 AI 监制来放行。
+ * 花钱/对外门（G8 渲染提交、G9 发布、G10 对外评论）不在本集合内，仍按高风险走人审。
+ */
+type ProducerMode = "review" | "auto" | "human";
+const PRODUCER_MODE: ProducerMode = (() => {
+  const raw = (process.env.HR_PRODUCER ?? "review").trim().toLowerCase();
+  return raw === "auto" || raw === "human" ? (raw as ProducerMode) : "review";
+})();
+
+/** 门 → 监制评审环节（决定默认评审要点；`producer-gate` 里定义） */
+const GATE_PRODUCER_STAGE: Partial<Record<GateKey, ProducerStage>> = {
+  G1_DOSSIER: "script",
+  G2_THEME: "script",
+  G3_INSIGHT: "script",
+  G4_PRD: "prompt",
+  G5_PORTRAIT: "keyframe",
+  G6_PROMPT: "prompt",
+  G7_FINAL: "master"
+};
+
+/** 逐门评审要点（在通用 rubric 之上叠加该门的专属口径） */
+const GATE_RUBRIC: Partial<Record<GateKey, string[]>> = {
+  G1_DOSSIER: ["情报档案有真实来源与可核验事实，不出现凭空编造的品牌/数据", "与项目主题相关，不含无关行业的商品与场景"],
+  G2_THEME: ["主题/受众/时长/画幅与需求一致", "不出现与主题无关的红线意象（科幻/微观/无关地域）"],
+  G3_INSIGHT: ["需求对齐清单覆盖角色/场景/道具/动作四类契约", "受众与风险项有具体结论，不是占位文字"],
+  G4_PRD: ["角色系统有可执行的外观锚点（定妆照前置）", "交付标准可验证（画幅/时长/音频/字幕口径）"],
+  G5_PORTRAIT: ["定妆照必须真出图（completedPortraits>0），不接受只有规格包的 pending 状态", "必需角度 front/threeQuarter/closeup/side 齐备", "人物与角色档案一致（授权真人须与本人照片同一张脸）"],
+  G6_PROMPT: ["每镜提示词达到交付口径（≥1200 字）且 25/30 字段齐备", "台词速率与占比合规，无红线词"],
+  G7_FINAL: ["预生产收口：镜头卡/定妆照/提示词三件套齐备且互相引用一致", "渲染提交前的花额度动作仍需人审（本门只放行内部准备）"]
+};
+
+/**
+ * 门内容的确定性检查（零 token 先判）：
+ * 空内容 / 占位符 / 声称完成但没有产物 —— 一律硬失败，不浪费模型额度。
+ */
+function gateDeterministicChecks(gate: GateKey, content: string): Array<{ id: string; pass: boolean; detail: string; hard?: boolean }> {
+  const text = content ?? "";
+  const trimmed = text.trim();
+  const checks = [
+    { id: "content-present", pass: trimmed.length > 0, hard: true, detail: trimmed.length > 0 ? `门内容 ${trimmed.length} 字` : "门内容为空（vendor 未产出该环节产物）" },
+    { id: "no-placeholder", pass: !/undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed), hard: true, detail: /undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed) ? "门内容含 undefined/null/NaN/[object Object] 占位" : "无占位符泄漏" },
+    { id: "min-length", pass: trimmed.length >= 120, hard: true, detail: `内容长度 ${trimmed.length}（下限 120，过短通常意味着上游字段过薄）` }
+  ];
+  if (gate === "G5_PORTRAIT") {
+    const pendingOnly = /completedPortraits["'\s:]+0/.test(trimmed) || /"pending"\s*:\s*true/.test(trimmed);
+    checks.push({ id: "portrait-produced", pass: !pendingOnly, hard: true, detail: pendingOnly ? "定妆照仍是 pending / completedPortraits=0（只有规格包，未真出图）" : "定妆照有实际出图记录" });
+    const angles = ["front", "threeQuarter", "closeup", "side"];
+    const missing = angles.filter((a) => !trimmed.includes(a) && !trimmed.includes(a.toLowerCase().replace("threequarter", "three_quarter")));
+    checks.push({ id: "required-angles", pass: missing.length === 0, hard: missing.length >= 3, detail: missing.length === 0 ? "必需角度齐备" : `门内容未提到角度：${missing.join("/")}` });
+  }
+  return checks;
+}
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）：参考图相对路径按此解析 */
@@ -377,11 +441,33 @@ export function startRun(scope: Scope, input: RunInput): string {
     const gateObj = gateObjectOf(gate, req.vendorType);
     const objectId = gate === "G7_FINAL" ? input.projectId : `${input.projectId}:${gate.toLowerCase()}`;
     /**
-     * 内部准备门：自动放行 + 留痕（不插 approvals 行）。
+     * 内部准备门：**AI 监制评审** + 留痕（不插 approvals 行）。
      * 与下面的人工门共用同一事务口径：门事件经安全网关落事件账本（过程与时间线可见），
      * 审批中心只保留真正的业务决策与花钱/对外门。
+     *
+     * 裁决三类：① 评审放行 → approved；② 评审打回 → approved:false（vendor 中止本 run，由发起方重跑）；
+     * ③ `HR_PRODUCER=auto` → 旧的无条件放行（应急口径，事件里标注 autoApproved 以便审计）。
      */
-    if (AUTO_GATES.has(gate)) {
+    if (AUTO_GATES.has(gate) && PRODUCER_MODE !== "human") {
+      const producerStage = GATE_PRODUCER_STAGE[gate] ?? "script";
+      let producerVerdict: Awaited<ReturnType<typeof reviewStage>> | null = null;
+      if (PRODUCER_MODE === "review") {
+        producerVerdict = await reviewStage({
+          stage: producerStage,
+          projectId: input.projectId,
+          artifacts: [{ path: `${gate}:${req.vendorType}`, kind: "text", note: req.title }],
+          deterministic: gateDeterministicChecks(gate, req.contentMd ?? ""),
+          rubric: [
+            ...((GATE_RUBRIC[gate] ?? []) as string[]),
+            `门内容摘录（供核对，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
+          ],
+          context: { gate, vendorType: req.vendorType, runId: entry.runId, contentChars: (req.contentMd ?? "").length },
+          // 内部准备门默认 fail-closed：评审模型不可用即打回，不静默放行
+          allowFallbackApprove: (process.env.HR_PRODUCER_FALLBACK_APPROVE ?? "0") === "1",
+          log: (line) => console.log(line)
+        });
+      }
+      const approved = PRODUCER_MODE === "auto" ? true : Boolean(producerVerdict?.approved);
       const autoClient = await getAppPool().connect();
       try {
         await autoClient.query("BEGIN");
@@ -398,9 +484,19 @@ export function startRun(scope: Scope, input: RunInput): string {
             action: gateObj.action,
             after: {
               gate: req.gate, vendorType: req.vendorType, runId: entry.runId, title: req.title,
-              autoApproved: true,
+              producerMode: PRODUCER_MODE,
+              approved,
+              ...(producerVerdict
+                ? {
+                    score: producerVerdict.score, via: producerVerdict.via, model: producerVerdict.model ?? null,
+                    degraded: producerVerdict.degraded, issues: producerVerdict.issues.slice(0, 5),
+                    suggestions: producerVerdict.suggestions.slice(0, 5), reason: producerVerdict.reason
+                  }
+                : { autoApproved: true }),
             },
-            basis: ["员工日常协作不设人审（2026-09-21 口径）：内部准备门自动放行，产出作为过程与时间线留痕"],
+            basis: PRODUCER_MODE === "auto"
+              ? ["HR_PRODUCER=auto（应急口径）：内部准备门无条件放行，产出作为过程与时间线留痕"]
+              : [`AI 监制门（${producerStage}）：确定性硬闸 + 模型评审后${approved ? "放行" : "打回重跑"}；人审只保留给花钱与对外动作`],
           },
           rule_impact: [],
         });
@@ -411,8 +507,21 @@ export function startRun(scope: Scope, input: RunInput): string {
       } finally {
         autoClient.release();
       }
-      return { approved: true, reason: `auto-approved(${req.gate})`, suggestions: [] };
+      if (PRODUCER_MODE === "auto") {
+        return { approved: true, reason: `auto-approved(${req.gate})`, suggestions: [] };
+      }
+      return producerVerdict
+        ? {
+            approved,
+            reason: producerVerdict.approved
+              ? `producer-approved(${req.gate} · score=${producerVerdict.score} · via=${producerVerdict.via})`
+              : `producer-rejected(${req.gate} · score=${producerVerdict.score})：${producerVerdict.reason}`,
+            suggestions: producerVerdict.suggestions,
+            fatal: producerVerdict.approved ? undefined : "producer_rejected"
+          }
+        : { approved: false, reason: `producer-unavailable(${req.gate})`, fatal: "producer_unavailable" };
     }
+    /* HR_PRODUCER=human 或门不在 AUTO_GATES 内 → 落到下面的人工审批分支（插 approvals 行等人点） */
     // D16（#1/A）：门动作事件与 approvals 行同一事务同一 COMMIT（模仿 fence.confirmDryRun 口径）
     const client = await getAppPool().connect();
     let approvalId: string;

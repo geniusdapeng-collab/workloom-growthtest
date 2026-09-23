@@ -1,0 +1,29 @@
+---
+name: producer-gate-review
+description: 预生产内部门（G1–G7）的 AI 监制评审纪律：确定性硬闸前置、逐环节评审要点、放行/打回裁决口径与留痕要求。绑定制片人岗位与 G1–G7；卸载即撤销（内部门回到人审）。
+---
+
+# 监制门评审（Producer Gate Review）
+
+## 适用场景
+- 预生产内部准备门（G1 情报 / G2 主题 / G3 对齐 / G4 PRD / G5 定妆照 / G6 提示词 / G7 预生产收口）
+- 全链路出片（`scripts/tools/full-chain-film.mts`）里的关键帧、镜头、调色、字幕、弹幕、配乐、封面、母版评审
+
+## 方法
+1. **先硬闸后模型**：空内容、`undefined`/`[object Object]` 占位、内容过短、定妆照 `completedPortraits=0`、
+   分辨率/时长/音轨不符 —— 命中即打回，不调用模型（省额度、结论可复算）。
+2. **再按环节要点评审**：用 `packages/video-studio/src/producer-gate.ts#PRODUCER_RUBRICS` 的标准；
+   图像类评审必须把**待评审产物**与**基准图**一起给模型看（产物优先占配额，基准图最多 2 张）。
+3. **裁决三类**：放行（approved）/ 打回重跑（rerun）/ 需介入（模型不可用或超预算）。
+4. **打回必须可执行**：写清"改什么、改成什么、为什么"——例如"用 img2img 挂 4 张授权真人照片重跑，锁面孔"。
+5. **留痕**：每次裁决写 `gate`、`score`、`via`（deterministic/llm/fallback）、`model`、`issues`、`suggestions`，
+   落五元事件账本；`degraded=true` 表示"模型不可用但硬闸全过"，必须显式可见。
+
+## 输出契约
+- 每次评审：`{approved, score, hardFailures, issues, suggestions, rerun, via, model, ms, reason}`
+- 全链路运行：`<work-dir>/logs/stages.jsonl`（逐环节）+ `stage-summary.json`（汇总，含未调用/降级/复用计数）
+
+## 边界
+- 不替代花钱门（G8 渲染提交）与对外门（G9 发布 / G10 评论回复）的人审。
+- 不静默放行：模型不可用时默认拒绝，除非显式配置 `HR_PRODUCER_FALLBACK_APPROVE=1`（会标 `degraded`）。
+- 不做"AI 自评自过"：定妆照与关键帧这类视觉产物必须带基准图比对；没有基准图时只能判画质与纪律，结论里要写明。

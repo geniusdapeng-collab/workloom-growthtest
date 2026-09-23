@@ -19,6 +19,15 @@ export interface PortraitSet {
   angles: string[];
   /** 来源：纯文生图 / 图生图 / 授权真人素材 */
   source: "pure-t2i" | "img2img" | "real-authorized";
+  /**
+   * 图生图锚点（授权真人素材）——只记录**相对角色目录**的路径，便于审计与复现；
+   * 原始照片本身不进仓库、不外发（2026-09-24 真人出镜加装）。
+   */
+  anchors?: string[];
+  /** 生成失败的角度（逐角度隔离；角度数组 angles 只含成功项） */
+  failedAngles?: Array<{ angle: string; error: string }>;
+  /** 背景干净度实测（抠像友好硬闸的留痕：阈值口径 + 逐角度实测值） */
+  backgroundChecks?: Record<string, Record<string, unknown>>;
   active?: boolean;
   model?: string;
   seed?: number;
