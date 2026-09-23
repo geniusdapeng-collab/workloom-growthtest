@@ -5,8 +5,11 @@
  *  - 优先级队列：fuse（熔断，立即打断）> ask（请示）> ceremony（仪式）> ambient；
  *  - 降级：speechSynthesis 不可用/无语音 → available=false，仅走字幕（SubBus）。
  *  - 字幕事件总线（SubBus）：所有播报（含仅字幕模式）同步发字幕，新闻台字幕条消费。
+ *
+ * [VOICE-DEFAULT] 织伴默认音色=本机克隆音色（工位不可用时回落系统女声）
  */
 import { AudioEngine } from "../audio/AudioEngine";
+import { neuralVoiceAvailable, neuralVoiceConfig, playNeuralSpeech, probeNeuralVoice, wantsNeuralVoice } from "./neuralVoice";
 import { libraryVoiceFor } from "./voiceLibrary";
 
 export type VoicePriority = "fuse" | "ask" | "ceremony" | "ambient";
@@ -27,6 +30,10 @@ export interface VoiceProfile {
   female?: boolean;
   /** 按顺序锁定系统音色；用于固定人物声线，禁止段落间换人。 */
   preferredNames?: string[];
+  /** 是否使用本机克隆音色：true=强制、false=禁用、undefined=按角色默认（织伴用） */
+  neural?: boolean;
+  /** 克隆音色档案名（配音工位 profiles/<name>）；缺省用构建期 VITE_WORKLOOM_VOICE_PROFILE */
+  neuralProfile?: string;
 }
 
 export interface Caption {
@@ -118,6 +125,11 @@ type CaptionListener = (c: Caption) => void;
 export class VoiceEngineImpl {
   private queue: QueuedUtterance[] = [];
   private speaking = false;
+
+  constructor() {
+    // 每页探测一次本机工位能力：探到了走克隆音色，探不到走系统语音（探测不阻塞播报）
+    void probeNeuralVoice();
+  }
   private active: QueuedUtterance | null = null;
   private activeFinish: (() => void) | null = null;
   private generation = 0;
@@ -322,6 +334,18 @@ export class VoiceEngineImpl {
     this.active = item;
     try {
       const preset = next.voiceOverride ?? voiceProfileForRole(next.role);
+      // 小织/织伴：优先本机克隆音色（音色档案在工位本机，声纹不出域）；
+      // 工位未配置/不可达/解码失败 → 返回 false，继续走下面的系统语音（宁可换声线，不让播报消失）。
+      if (neuralVoiceAvailable() && wantsNeuralVoice(next.role, next.persona, { neural: preset.neural })) {
+        const played = await this.speakNeural(next, preset);
+        if (played) {
+          this.settle(item, "spoken");
+          this.active = null;
+          this.speaking = false;
+          if (this.queue.length > 0) void this.pump();
+          return;
+        }
+      }
       // 性别有硬约束的角色（织伴/女声岗位）：首次开口前等音色表就绪，避免第一句用系统默认男声
       await this.ensureVoiceDecision(preset, next.role);
       const utt = new SpeechSynthesisUtterance(next.text);
@@ -367,6 +391,31 @@ export class VoiceEngineImpl {
     this.active = null;
     this.speaking = false;
     if (this.queue.length > 0) void this.pump();
+  }
+  /** 播放本机克隆音色；口型由播放进度驱动（克隆音频没有 onboundary 事件）。 */
+  private async speakNeural(u: Utterance, preset: VoiceProfile): Promise<boolean> {
+    return await playNeuralSpeech(
+      u.text,
+      {
+        onStart: () => {
+          AudioEngine.setSpeechActive(true);
+          this.emitLip({ type: "start", role: u.role, text: u.text });
+        },
+        onProgress: (ratio) => {
+          this.emitLip({
+            type: "boundary",
+            charIndex: Math.max(0, Math.min(u.text.length, Math.floor(ratio * u.text.length))),
+            role: u.role,
+            text: u.text,
+          });
+        },
+        onEnd: () => {
+          AudioEngine.setSpeechActive(false);
+          this.emitLip({ type: "end", role: u.role });
+        },
+      },
+      preset.neuralProfile ? { config: { ...neuralVoiceConfig(), profile: preset.neuralProfile } } : {},
+    );
   }
 }
 
