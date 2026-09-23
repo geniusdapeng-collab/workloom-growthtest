@@ -63,3 +63,23 @@ rules:
       actions: [bgmwrite.mix, bgmwrite.best]
     when: "params.commercial_use == true and not contains_any(params.track_license, ['cc0-1.0', 'cc-by-4.0', 'cc-by-sa-4.0', 'royalty-free', 'workloom-self-generated'])"
     note: "商用交付只允许 CC0 / CC BY / CC BY-SA / 明确可商用的免版税曲目；NC/ND/未标注一律一票否决（自算作曲属本仓产物，许可为 workloom-self-generated，命中白名单豁免）。DSL 语义：contains_any 的 haystack 非字符串（含字段缺失）→ false → 条件成立 → 阻断，即「没登记许可」按不合规处理（fail-closed）。"
+
+  - rule_id: G-BGM6
+    name: 在线取源首次启用 / 新曲源必审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [bgm_track, bgm_report]
+      actions: [bgmwrite.fetch, bgmwrite.best]
+    when: "params.new_provider == true or params.provider_reviewed == false"
+    note: 首次启用某个在线曲源（Jamendo / Freesound / Mubert / 客户自建索引）或更换 provider 时，须人审确认授权范围、商用口径与署名义务；已核验过的 provider 复用自动放行（params.provider_reviewed=true）。
+
+  - rule_id: G-BGM7
+    name: 未登记曲源 / 非 http(s) 取源禁止
+    level: block
+    is_baseline: true
+    match:
+      object_types: [bgm_track, bgm_report]
+      actions: [bgmwrite.fetch]
+    when: "params.allow_unlicensed_source == true or params.unregistered_source == true or params.url_scheme_ok == false"
+    note: 在线取源只允许已登记 provider 与客户自建索引（generic-http），且只接受 http(s)；任何"未知域/绕过鉴权/允许未授权源"的调用一票否决。连接器层同时做协议校验与体积上限（双保险）。
