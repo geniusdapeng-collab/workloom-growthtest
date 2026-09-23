@@ -28,8 +28,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
       }
     },
     {
@@ -45,8 +46,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "050080d9255a86808f2945bffac582b31ef32bc36411ce29563b4961670c66f9"
       }
     },
     {
@@ -62,8 +64,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolkuaile/ZCOOLKuaiLe-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "812a6fc1fe54b6d73a419245c32dfeba8aa33104d5be90d1cf6af082007cb71d"
       }
     },
     {
@@ -79,8 +82,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolqingkehuangyou/ZCOOLQingKeHuangYou-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "54f0c0df4308cd74cd0f2fd3494ae054dbc4a1fd6fa7d71f4807eb4cdd8b4136"
       }
     },
     {
@@ -96,8 +100,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolxiaowei/ZCOOLXiaoWei-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "a42b620140f493db42f741351dfbf343c0936d58588ee8004b8b2a218d997ff1"
       }
     },
     {
@@ -113,8 +118,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/mashanzheng/MaShanZheng-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "6d2546bb189c732a8ca29af9e22457b152387d158aa459e4ac2ce1e51788b7fb"
       }
     },
     {
@@ -130,8 +136,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zhimangxing/ZhiMangXing-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "644e0cae9b40f0b10ab729a01bd32032e3973bac22be3dccae01bf6ae7fde969"
       }
     },
     {
@@ -147,8 +154,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/liujianmaocao/LiuJianMaoCao-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "cab396b91a5b7c0b4005a35891180d06e6751f5ac261fe680aec65c1ae209033"
       }
     },
     {
@@ -164,8 +172,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/longcang/LongCang-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "e5bf2c3f24ef2327c6f136d8f73e2f9dfdf44896fdbeb35a9515f44777bb91bc"
       }
     },
     {
@@ -181,8 +190,9 @@
         "projectUrl": "https://github.com/adobe-fonts/source-han-sans",
         "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-ExtraLight.otf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "cbeba9e956a628fdc6c518ad174fe6686929211477ad4b518f9be9c950227d77"
       }
     },
     {
@@ -198,8 +208,9 @@
         "projectUrl": "https://github.com/adobe-fonts/source-han-sans",
         "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-Heavy.otf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "88c749b0a54a0800124ded6544e399302ed224aa49992ea364b88769f825c54c"
       }
     },
     {
@@ -215,8 +226,9 @@
         "projectUrl": "https://github.com/lxgw/LxgwWenKai",
         "url": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "39ad71264b588165b469e35e6afb162a378dacd1f95348160240ba9038ac3009"
       }
     },
     {
@@ -232,8 +244,9 @@
         "projectUrl": "https://github.com/atelier-anchor/smiley-sans",
         "url": "https://github.com/atelier-anchor/smiley-sans/releases/download/v2.0.1/smiley-sans-v2.0.1.zip",
         "zipMember": "SmileySans-Oblique.ttf",
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "b447d7e781f08bc95c4c9f23ba71ed2b8ebb639aa7184485c71c4ca5afcd25c4"
       }
     },
     {
@@ -249,8 +262,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
       }
     },
     {
@@ -266,8 +280,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "0f7b311b2f3279e4eef9b2f968bcdbab6e28f4daeb1f049f4f278a902bcd82f7"
       }
     },
     {
@@ -283,8 +298,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "c40f2293766a503bc70cce9e512ef844a4ccb7cbcde792fe2ea31d191917d8d6"
       }
     },
     {
@@ -300,8 +316,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/Oswald%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "5b38c246e255a12f5712d640d56bcced0472466fc68983d2d0410ec0457c2817"
       }
     },
     {
@@ -317,8 +334,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "f4d83d34d1f6c741193e4acf4b3dff9531e5a67b6aa65228d00a7db72a4e0f34"
       }
     },
     {
@@ -334,8 +352,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "21808625578fe8d8cd10cb684be546dca077b27cd03a53a2f1ec11dc743c924c"
       }
     },
     {
@@ -351,8 +370,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth,wght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "d7598e12c5dbef095ff8272cfc55da0250bd07fbdecbac8a530b9b277872a134"
       }
     },
     {
@@ -368,8 +388,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "08e4623805102d819f58601e46e345648846075e363b2ceb23313c2d1c83ec73"
       }
     },
     {
@@ -385,8 +406,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "a4ba3a92350ebb031da0cb47630ac49eb265082ca1bc0450442f4a83ab947cab"
       }
     },
     {
@@ -402,8 +424,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivoblack/ArchivoBlack-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "dd9a89a019b4849f66ab75455fe7bdf931311042cbb0f0f97acc061539703180"
       }
     },
     {
@@ -419,8 +442,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/lobster/Lobster-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "d6568e697fd50cedc0be04d8aae4127fe95add607e7bff954ca88604be80c205"
       }
     },
     {
@@ -436,8 +460,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/pacifico/Pacifico-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "5b6c0d5334a7bf77dea52b975c5a0c408878c0f7115ed5b6fb151f634b7bf701"
       }
     },
     {
@@ -453,8 +478,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bangers/Bangers-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "4160a7311de9342674cce9160cde9fcbb30f48190397d86ff1b70b455af65824"
       }
     },
     {
@@ -470,8 +496,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/Caveat%5Bwght%5D.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "0bdb6b660482d31531b3945849fba5916b3ef8695da7024a9e6b9ee3c4157988"
       }
     },
     {
@@ -487,8 +514,9 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "7e65201e9b79159e2300267cc885e16c8dcef2424cdfa09a29bfb0980a94a7ba"
       }
     },
     {
@@ -504,10 +532,18 @@
         "projectUrl": "https://github.com/google/fonts",
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf",
         "zipMember": null,
-        "verifiedAt": null,
-        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
+        "verifiedAt": "2026-09-23",
+        "note": "上游直链已于 2026-09-23 实测逐字节一致（下载 sha256 与随包字体相同）——既可作为升级比对基线，也证明随包字节与上游等价",
+        "verifiedSha256": "983676516167748b74de6f4771fb384c664fd913acb8b471122ecacf5da5ea6c"
       }
     }
   ],
-  "distribution": "随仓分发：bundles/ai-video/library/fonts/{cn,en}/（OFL-1.1 / 站酷免费商用 / 厂商免费商用）"
+  "distribution": "随仓分发：bundles/ai-video/library/fonts/{cn,en}/（OFL-1.1 / 站酷免费商用 / 厂商免费商用）",
+  "verification": {
+    "verifiedAt": "2026-09-23",
+    "verifiedCount": 29,
+    "total": 29,
+    "method": "逐文件下载上游资产（zip 资产按成员解包）→ 计算 sha256 → 与随包字体字节比对（相等才算通过）",
+    "note": "29/29 款与上游直链逐字节一致；随包字体同时受字体档案与 bundle 完整性索引约束"
+  }
 }
