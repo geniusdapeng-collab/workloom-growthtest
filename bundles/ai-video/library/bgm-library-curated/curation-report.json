@@ -1,0 +1,2833 @@
+{
+  "generatedAt": "2026-09-23T15:38:28.617Z",
+  "sourceIndex": "/Users/mac/.workloom-bgm/library/tracks.json",
+  "count": 50,
+  "maxPerStyle": 7,
+  "byStyle": {
+    "electronic-pulse": 5,
+    "lo-fi-chill": 5,
+    "cinematic-build": 5,
+    "tension-dark": 5,
+    "modern-pop": 5,
+    "festive-bright": 5,
+    "acoustic-warm": 4,
+    "ambient-calm": 4,
+    "documentary-bed": 4,
+    "corporate-clean": 4,
+    "sports-hype": 4
+  },
+  "byEnergyBucket": {
+    "low": 24,
+    "mid": 14,
+    "high": 12
+  },
+  "items": [
+    {
+      "id": "electronic-pulse-kingdom-of-lost-dreams-looping-183",
+      "file": "electronic-pulse-kingdom-of-lost-dreams-looping-183.m4a",
+      "style": "electronic-pulse",
+      "energyBucket": "low",
+      "score": 95.98,
+      "reasons": [
+        "响度 -14.63 LUFS（距 -14 目标 0.63）→ +24",
+        "真峰值 -1.2 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 17 段（含 drop） → +12",
+        "动态 6.48 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1002 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8",
+        "时长 122.31s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 62.31,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（85s→99s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 864641,
+        "sha256": "e24b1f9b760a74e4f38f0d91fe899d7b97618b278837ee11cab56c5711bd4729",
+        "loudness": {
+          "integratedLufs": -14.59,
+          "truePeakDbtp": -1.67,
+          "lra": 2,
+          "thresholdLufs": -24.59,
+          "targetOffset": -0.01,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.59",
+            "input_tp": "-1.67",
+            "input_lra": "2.00",
+            "input_thresh": "-24.59",
+            "output_i": "-13.99",
+            "output_tp": "-1.11",
+            "output_lra": "1.90",
+            "output_thresh": "-23.99",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.01"
+          }
+        },
+        "gainAppliedDb": -0.3,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.59,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/电子游戏/Kingdom-of-Lost-Dreams_Looping.mp3"
+    },
+    {
+      "id": "lo-fi-chill-sad-walk-with-sad-melodica-861",
+      "file": "lo-fi-chill-sad-walk-with-sad-melodica-861.m4a",
+      "style": "lo-fi-chill",
+      "energyBucket": "low",
+      "score": 95.57,
+      "reasons": [
+        "响度 -13.24 LUFS（距 -14 目标 0.76）→ +23.6",
+        "真峰值 -1.32 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 17 段（含 drop） → +12",
+        "动态 7.13 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1117 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8",
+        "时长 191.32s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 82.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（82.8s→100.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 857410,
+        "sha256": "88a6685645a3f592120218f922c2ccc7e780005391047b83215c4e937e1db1b5",
+        "loudness": {
+          "integratedLufs": -14.58,
+          "truePeakDbtp": -2.03,
+          "lra": 4.4,
+          "thresholdLufs": -24.59,
+          "targetOffset": -0.49,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.58",
+            "input_tp": "-2.03",
+            "input_lra": "4.40",
+            "input_thresh": "-24.59",
+            "output_i": "-13.51",
+            "output_tp": "-1.51",
+            "output_lra": "4.10",
+            "output_thresh": "-23.51",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.49"
+          }
+        },
+        "gainAppliedDb": -1.29,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.58,
+        "retried": true
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/Sad walk with sad melodica.mp3"
+    },
+    {
+      "id": "cinematic-build-chasing-daylight-672",
+      "file": "cinematic-build-chasing-daylight-672.m4a",
+      "style": "cinematic-build",
+      "energyBucket": "mid",
+      "score": 92.02,
+      "reasons": [
+        "响度 -14.62 LUFS（距 -14 目标 0.62）→ +24",
+        "真峰值 -1.06 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 10.75 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 874 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 273.89s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 128.25,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（128.3s→170.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 852731,
+        "sha256": "28267a36a001629fe6f8b4a498581bb48420c6573e651b93f9366a934c0fc975",
+        "loudness": {
+          "integratedLufs": -14.06,
+          "truePeakDbtp": -2.62,
+          "lra": 10.8,
+          "thresholdLufs": -24.53,
+          "targetOffset": 0.63,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.06",
+            "input_tp": "-2.62",
+            "input_lra": "10.80",
+            "input_thresh": "-24.53",
+            "output_i": "-14.63",
+            "output_tp": "-2.72",
+            "output_lra": "7.20",
+            "output_thresh": "-25.02",
+            "normalization_type": "dynamic",
+            "target_offset": "0.63"
+          }
+        },
+        "gainAppliedDb": -1.86,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.06,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/史诗-震撼/Chasing Daylight.mp3"
+    },
+    {
+      "id": "tension-dark-eternal-sleep-941",
+      "file": "tension-dark-eternal-sleep-941.m4a",
+      "style": "tension-dark",
+      "energyBucket": "low",
+      "score": 90.58,
+      "reasons": [
+        "响度 -15.07 LUFS（距 -14 目标 1.07）→ +22.6",
+        "真峰值 -1.64 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 7.6 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 1248 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 111.63s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 51.63,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（74.3s→104.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 851760,
+        "sha256": "c2560fd792690a8fcfd806a45460e2ec20d7744a0918fc90be8860d2eea8212f",
+        "loudness": {
+          "integratedLufs": -14.09,
+          "truePeakDbtp": -1.84,
+          "lra": 4.7,
+          "thresholdLufs": -24.4,
+          "targetOffset": -0.47,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.09",
+            "input_tp": "-1.84",
+            "input_lra": "4.70",
+            "input_thresh": "-24.40",
+            "output_i": "-13.53",
+            "output_tp": "-1.00",
+            "output_lra": "4.80",
+            "output_thresh": "-23.73",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.47"
+          }
+        },
+        "gainAppliedDb": -0.22,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.09,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/悲伤-负面/Eternal Sleep.mp3"
+    },
+    {
+      "id": "modern-pop-scott-buckley-soar-640",
+      "file": "modern-pop-scott-buckley-soar-640.m4a",
+      "style": "modern-pop",
+      "energyBucket": "low",
+      "score": 90.3,
+      "reasons": [
+        "响度 -14.53 LUFS（距 -14 目标 0.53）→ +24.3",
+        "真峰值 -1.01 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 4 段（含 drop） → +12",
+        "动态 11.69 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1442 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 192.42s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 90.38,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（76.3s→164.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853497,
+        "sha256": "a1630b3171bf5c82407e371370693c21b67b80342986f9ec339dfc78b855a61f",
+        "loudness": {
+          "integratedLufs": -14.17,
+          "truePeakDbtp": -2.76,
+          "lra": 1.7,
+          "thresholdLufs": -24.18,
+          "targetOffset": -0.15,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.17",
+            "input_tp": "-2.76",
+            "input_lra": "1.70",
+            "input_thresh": "-24.18",
+            "output_i": "-13.85",
+            "output_tp": "-2.63",
+            "output_lra": "1.40",
+            "output_thresh": "-23.86",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.15"
+          }
+        },
+        "gainAppliedDb": -2.05,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.17,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/励志-明朗/scott-buckley-soar.mp3"
+    },
+    {
+      "id": "festive-bright-track-1016",
+      "file": "festive-bright-track-1016.m4a",
+      "style": "festive-bright",
+      "energyBucket": "mid",
+      "score": 89.78,
+      "reasons": [
+        "响度 -12.37 LUFS（距 -14 目标 1.63）→ +20.8",
+        "真峰值 0.1 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 8.6 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1050 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8",
+        "时长 118.81s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 55.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（55.8s→89.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 855620,
+        "sha256": "9d703be86db8f387191d619899b725ca15f012b3d0b2a5f41e175155989acb64",
+        "loudness": {
+          "integratedLufs": -15.14,
+          "truePeakDbtp": -1.33,
+          "lra": 9.3,
+          "thresholdLufs": -25.6,
+          "targetOffset": 0.58,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.14",
+            "input_tp": "-1.33",
+            "input_lra": "9.30",
+            "input_thresh": "-25.60",
+            "output_i": "-14.58",
+            "output_tp": "-1.00",
+            "output_lra": "7.20",
+            "output_thresh": "-24.74",
+            "normalization_type": "dynamic",
+            "target_offset": "0.58"
+          }
+        },
+        "gainAppliedDb": -2.6,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -1.14,
+        "retried": true
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/欢快-轻松/我的生活（主）.mp3"
+    },
+    {
+      "id": "acoustic-warm-liqwyd-shine-552",
+      "file": "acoustic-warm-liqwyd-shine-552.m4a",
+      "style": "acoustic-warm",
+      "energyBucket": "mid",
+      "score": 88.97,
+      "reasons": [
+        "响度 -13.99 LUFS（距 -14 目标 0.01）→ +26",
+        "真峰值 -0.06 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 9 段（含 drop） → +12",
+        "动态 10.85 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 3134 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 148.4s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 88.4,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（107.5s→130.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 858827,
+        "sha256": "a45534bdd346dd25d751fa4a1ca6cac736dc817d90f62fdcab7ca1d2f0ae664e",
+        "loudness": {
+          "integratedLufs": -14.71,
+          "truePeakDbtp": -1.34,
+          "lra": 8.9,
+          "thresholdLufs": -25.14,
+          "targetOffset": -0.27,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.71",
+            "input_tp": "-1.34",
+            "input_lra": "8.90",
+            "input_thresh": "-25.14",
+            "output_i": "-13.73",
+            "output_tp": "-1.00",
+            "output_lra": "8.60",
+            "output_thresh": "-24.11",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.27"
+          }
+        },
+        "gainAppliedDb": -1.34,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.71,
+        "retried": true
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/Vlog-旅拍/liqwyd-shine.mp3"
+    },
+    {
+      "id": "ambient-calm-desert-crossing-71",
+      "file": "ambient-calm-desert-crossing-71.m4a",
+      "style": "ambient-calm",
+      "energyBucket": "low",
+      "score": 88.76,
+      "reasons": [
+        "响度 -13.3 LUFS（距 -14 目标 0.7）→ +23.8",
+        "真峰值 -0.28 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 8 段（含 drop） → +12",
+        "动态 7.58 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 1054 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 99.49s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 39.49,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（66.3s→92.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 849446,
+        "sha256": "51de135dc97951e86d7ef6a295771dea18c05efe088c83e82075ff1347816787",
+        "loudness": {
+          "integratedLufs": -14.07,
+          "truePeakDbtp": -1.59,
+          "lra": 3.2,
+          "thresholdLufs": -24.37,
+          "targetOffset": 0.1,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.07",
+            "input_tp": "-1.59",
+            "input_lra": "3.20",
+            "input_thresh": "-24.37",
+            "output_i": "-14.10",
+            "output_tp": "-1.67",
+            "output_lra": "2.90",
+            "output_thresh": "-24.37",
+            "normalization_type": "dynamic",
+            "target_offset": "0.10"
+          }
+        },
+        "gainAppliedDb": -1.22,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.07,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/安静冥想/Desert-Crossing.mp3"
+    },
+    {
+      "id": "documentary-bed-track-926",
+      "file": "documentary-bed-track-926.m4a",
+      "style": "documentary-bed",
+      "energyBucket": "high",
+      "score": 88.22,
+      "reasons": [
+        "响度 -15.18 LUFS（距 -14 目标 1.18）→ +22.2",
+        "真峰值 -0.91 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 9 段（含 drop） → +12",
+        "动态 12.36 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 803 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 108.09s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 48.09,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（60.8s→82.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853687,
+        "sha256": "94b14044d3203f1aa088b442be2be6aa9132a6058f17fe1b4c61bcce1a949d0d",
+        "loudness": {
+          "integratedLufs": -15.14,
+          "truePeakDbtp": -1.39,
+          "lra": 6,
+          "thresholdLufs": -25.67,
+          "targetOffset": 0.47,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.14",
+            "input_tp": "-1.39",
+            "input_lra": "6.00",
+            "input_thresh": "-25.67",
+            "output_i": "-14.47",
+            "output_tp": "-1.00",
+            "output_lra": "5.70",
+            "output_thresh": "-24.80",
+            "normalization_type": "dynamic",
+            "target_offset": "0.47"
+          }
+        },
+        "gainAppliedDb": -0.59,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -1.14,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/自然.mp3"
+    },
+    {
+      "id": "corporate-clean-track-577",
+      "file": "corporate-clean-track-577.m4a",
+      "style": "corporate-clean",
+      "energyBucket": "high",
+      "score": 88.2,
+      "reasons": [
+        "响度 -14.25 LUFS（距 -14 目标 0.25）→ +25.2",
+        "真峰值 -0.19 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 4 段（含 drop） → +12",
+        "动态 19.59 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1249 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 113.19s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 41.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（41.8s→81.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 854095,
+        "sha256": "7d2f6bfbe5055b7bdd5202db8c97a7066df3f31ebed474e765a3245f513d57db",
+        "loudness": {
+          "integratedLufs": -14.68,
+          "truePeakDbtp": -1.03,
+          "lra": 5,
+          "thresholdLufs": -24.74,
+          "targetOffset": -0.01,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.68",
+            "input_tp": "-1.03",
+            "input_lra": "5.00",
+            "input_thresh": "-24.74",
+            "output_i": "-13.99",
+            "output_tp": "-1.00",
+            "output_lra": "4.70",
+            "output_thresh": "-24.05",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.01"
+          }
+        },
+        "gainAppliedDb": -1.3,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.68,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/企业-宣传/超越递进.mp3"
+    },
+    {
+      "id": "sports-hype-crusaders-approaching-104",
+      "file": "sports-hype-crusaders-approaching-104.m4a",
+      "style": "sports-hype",
+      "energyBucket": "high",
+      "score": 84.69,
+      "reasons": [
+        "响度 -16.91 LUFS（距 -14 目标 2.91）→ +16.7",
+        "真峰值 -0.92 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 10.68 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1627 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8"
+      ],
+      "excerpt": {
+        "startSec": 0,
+        "durationSec": 51.1,
+        "reason": "取最长 drop 段（25.5s→31.8s）中心对齐的 51.1s 窗口"
+      },
+      "encoded": {
+        "bytes": 737018,
+        "sha256": "5a68076fa95dd9387f17c07e719661b645fb6a038ded4562cd844b51ba8c0605",
+        "loudness": {
+          "integratedLufs": -17.67,
+          "truePeakDbtp": -1.53,
+          "lra": 5.6,
+          "thresholdLufs": -27.72,
+          "targetOffset": 0.31,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-17.67",
+            "input_tp": "-1.53",
+            "input_lra": "5.60",
+            "input_thresh": "-27.72",
+            "output_i": "-14.31",
+            "output_tp": "-1.00",
+            "output_lra": "4.70",
+            "output_thresh": "-24.36",
+            "normalization_type": "dynamic",
+            "target_offset": "0.31"
+          }
+        },
+        "gainAppliedDb": -0.58,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -3.67,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/激情战斗/Crusaders-Approaching.mp3"
+    },
+    {
+      "id": "electronic-pulse-city-beneath-the-waves-v001-133",
+      "file": "electronic-pulse-city-beneath-the-waves-v001-133.m4a",
+      "style": "electronic-pulse",
+      "energyBucket": "low",
+      "score": 94.17,
+      "reasons": [
+        "响度 -14.26 LUFS（距 -14 目标 0.26）→ +25.2",
+        "真峰值 -0.75 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 3 段（含 drop） → +9",
+        "动态 9.69 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1324 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8",
+        "时长 110.63s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 23.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（9.5s→98s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853759,
+        "sha256": "db95e5a63a765840a1e916307073100454c1a3fac17adc21db7586269d3fcd13",
+        "loudness": {
+          "integratedLufs": -14.22,
+          "truePeakDbtp": -2.01,
+          "lra": 2,
+          "thresholdLufs": -24.22,
+          "targetOffset": -0.02,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.22",
+            "input_tp": "-2.01",
+            "input_lra": "2.00",
+            "input_thresh": "-24.22",
+            "output_i": "-13.98",
+            "output_tp": "-1.73",
+            "output_lra": "2.10",
+            "output_thresh": "-23.98",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.02"
+          }
+        },
+        "gainAppliedDb": -0.13,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.22,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/电子游戏/City-Beneath-the-Waves_v001.mp3"
+    },
+    {
+      "id": "lo-fi-chill-affirmations-719",
+      "file": "lo-fi-chill-affirmations-719.m4a",
+      "style": "lo-fi-chill",
+      "energyBucket": "low",
+      "score": 93.14,
+      "reasons": [
+        "响度 -14.27 LUFS（距 -14 目标 0.27）→ +25.1",
+        "真峰值 -1.07 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 12 段（含 drop） → +12",
+        "动态 10.28 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 950 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 301.77s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 129.5,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（129.5s→172.4s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 852621,
+        "sha256": "9aa4d9530e7248fd2b7057ad7f04b989b573bcc008fa4a04b133492acc98c3a5",
+        "loudness": {
+          "integratedLufs": -14.16,
+          "truePeakDbtp": -3.13,
+          "lra": 2.5,
+          "thresholdLufs": -24.16,
+          "targetOffset": -0.51,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.16",
+            "input_tp": "-3.13",
+            "input_lra": "2.50",
+            "input_thresh": "-24.16",
+            "output_i": "-13.49",
+            "output_tp": "-1.56",
+            "output_lra": "1.50",
+            "output_thresh": "-23.49",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.51"
+          }
+        },
+        "gainAppliedDb": -2.19,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.16,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/Affirmations.mp3"
+    },
+    {
+      "id": "cinematic-build-march-of-midnight-695",
+      "file": "cinematic-build-march-of-midnight-695.m4a",
+      "style": "cinematic-build",
+      "energyBucket": "mid",
+      "score": 91.39,
+      "reasons": [
+        "响度 -14.19 LUFS（距 -14 目标 0.19）→ +25.4",
+        "真峰值 -0.61 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 8 段（含 drop） → +12",
+        "动态 13.51 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1576 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 164.78s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 94.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（94.8s→150.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853757,
+        "sha256": "9b89cbe9cf39a59d2b4dab8b3db42cb05fb83d6f94d208b4da7432ee98256a0b",
+        "loudness": {
+          "integratedLufs": -14.1,
+          "truePeakDbtp": -1.73,
+          "lra": 5.6,
+          "thresholdLufs": -24.27,
+          "targetOffset": -0.7,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.10",
+            "input_tp": "-1.73",
+            "input_lra": "5.60",
+            "input_thresh": "-24.27",
+            "output_i": "-13.30",
+            "output_tp": "-1.00",
+            "output_lra": "3.30",
+            "output_thresh": "-23.37",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.70"
+          }
+        },
+        "gainAppliedDb": -1.52,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.1,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/史诗-震撼/March of Midnight.mp3"
+    },
+    {
+      "id": "tension-dark-lake-of-destiny-948",
+      "file": "tension-dark-lake-of-destiny-948.m4a",
+      "style": "tension-dark",
+      "energyBucket": "mid",
+      "score": 90.34,
+      "reasons": [
+        "响度 -14.52 LUFS（距 -14 目标 0.52）→ +24.3",
+        "真峰值 -1.49 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 10.56 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1514 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 159.53s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 46.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（36s→117.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853629,
+        "sha256": "8845f816e3f1a82ca92eb19c44facd541a5fbd2fd92ecf5f1043a17b243318fb",
+        "loudness": {
+          "integratedLufs": -14.08,
+          "truePeakDbtp": -2.39,
+          "lra": 2.1,
+          "thresholdLufs": -24.11,
+          "targetOffset": -0.18,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.08",
+            "input_tp": "-2.39",
+            "input_lra": "2.10",
+            "input_thresh": "-24.11",
+            "output_i": "-13.82",
+            "output_tp": "-2.12",
+            "output_lra": "1.30",
+            "output_thresh": "-23.84",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.18"
+          }
+        },
+        "gainAppliedDb": -1.16,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.08,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/悲伤-负面/Lake of Destiny.mp3"
+    },
+    {
+      "id": "modern-pop-salvation-inspiring-uplifting-orchestra-617",
+      "file": "modern-pop-salvation-inspiring-uplifting-orchestra-617.m4a",
+      "style": "modern-pop",
+      "energyBucket": "low",
+      "score": 89.76,
+      "reasons": [
+        "响度 -14.7 LUFS（距 -14 目标 0.7）→ +23.8",
+        "真峰值 -0.61 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 4 段（含 drop） → +12",
+        "动态 9.94 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1647 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 343.93s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 82.63,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（75s→150.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 857302,
+        "sha256": "cde046ee0cff507b14ac8d61a0e80b22f5f90918ebba0a8a84c3c9cfc4874398",
+        "loudness": {
+          "integratedLufs": -14.18,
+          "truePeakDbtp": -2.42,
+          "lra": 2.5,
+          "thresholdLufs": -24.19,
+          "targetOffset": -0.53,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.18",
+            "input_tp": "-2.42",
+            "input_lra": "2.50",
+            "input_thresh": "-24.19",
+            "output_i": "-13.47",
+            "output_tp": "-1.85",
+            "output_lra": "1.60",
+            "output_thresh": "-23.48",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.53"
+          }
+        },
+        "gainAppliedDb": -1.45,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.18,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/励志-明朗/Salvation-Inspiring-Uplifting-Orchestra.mp3"
+    },
+    {
+      "id": "festive-bright-track-579",
+      "file": "festive-bright-track-579.m4a",
+      "style": "festive-bright",
+      "energyBucket": "high",
+      "score": 88.97,
+      "reasons": [
+        "响度 -13.99 LUFS（距 -14 目标 0.01）→ +26",
+        "真峰值 0.09 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 13 段（含 drop） → +12",
+        "动态 9.62 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 2672 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 157.65s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 39.5,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（39.5s→75s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 860167,
+        "sha256": "8b10ca1cd8156774e28780b807e8076a7c3603e58f5d9546049f73b3d81381f4",
+        "loudness": {
+          "integratedLufs": -15.59,
+          "truePeakDbtp": -1.03,
+          "lra": 3.3,
+          "thresholdLufs": -25.71,
+          "targetOffset": 0.5,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.59",
+            "input_tp": "-1.03",
+            "input_lra": "3.30",
+            "input_thresh": "-25.71",
+            "output_i": "-14.50",
+            "output_tp": "-1.00",
+            "output_lra": "2.90",
+            "output_thresh": "-24.61",
+            "normalization_type": "dynamic",
+            "target_offset": "0.50"
+          }
+        },
+        "gainAppliedDb": -1.57,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -1.59,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/企业-宣传/轻松欢快(尤克里里).mp3"
+    },
+    {
+      "id": "acoustic-warm-ghostrifter-official-zeal-456",
+      "file": "acoustic-warm-ghostrifter-official-zeal-456.m4a",
+      "style": "acoustic-warm",
+      "energyBucket": "low",
+      "score": 88.9,
+      "reasons": [
+        "响度 -13.03 LUFS（距 -14 目标 0.97）→ +22.9",
+        "真峰值 -0.8 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 9 段（含 drop） → +12",
+        "动态 6.44 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 2011 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 266.11s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 73.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（73.8s→89.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 855506,
+        "sha256": "7d1f6edbc992ac9f8949aa55bad78f0aef93a2b8b94dc13373c1bce8acbcf164",
+        "loudness": {
+          "integratedLufs": -14.29,
+          "truePeakDbtp": -1.19,
+          "lra": 3.9,
+          "thresholdLufs": -24.3,
+          "targetOffset": 1,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.29",
+            "input_tp": "-1.19",
+            "input_lra": "3.90",
+            "input_thresh": "-24.30",
+            "output_i": "-15.00",
+            "output_tp": "-2.21",
+            "output_lra": "3.00",
+            "output_thresh": "-25.00",
+            "normalization_type": "dynamic",
+            "target_offset": "1.00"
+          }
+        },
+        "gainAppliedDb": -0.71,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.29,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/Vlog-旅拍/Ghostrifter-Official-Zeal.mp3"
+    },
+    {
+      "id": "ambient-calm-icicles-looping-80",
+      "file": "ambient-calm-icicles-looping-80.m4a",
+      "style": "ambient-calm",
+      "energyBucket": "mid",
+      "score": 86.78,
+      "reasons": [
+        "响度 -13.62 LUFS（距 -14 目标 0.38）→ +24.8",
+        "真峰值 -0.94 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 12.35 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1482 Hz → +8",
+        "风格置信度 high → +8"
+      ],
+      "excerpt": {
+        "startSec": 1.93,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（55.5s→60s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 859495,
+        "sha256": "78553deb604a1b3cb68dadd225690cfec4582133aa3680a0a79202a723ec5157",
+        "loudness": {
+          "integratedLufs": -14.21,
+          "truePeakDbtp": -1.55,
+          "lra": 5.5,
+          "thresholdLufs": -24.34,
+          "targetOffset": -1.64,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.21",
+            "input_tp": "-1.55",
+            "input_lra": "5.50",
+            "input_thresh": "-24.34",
+            "output_i": "-12.36",
+            "output_tp": "-1.00",
+            "output_lra": "4.00",
+            "output_thresh": "-22.38",
+            "normalization_type": "dynamic",
+            "target_offset": "-1.64"
+          }
+        },
+        "gainAppliedDb": -0.56,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.21,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/安静冥想/Icicles_Looping.mp3"
+    },
+    {
+      "id": "documentary-bed-track-921",
+      "file": "documentary-bed-track-921.m4a",
+      "style": "documentary-bed",
+      "energyBucket": "mid",
+      "score": 84.86,
+      "reasons": [
+        "响度 -14.98 LUFS（距 -14 目标 0.98）→ +22.9",
+        "真峰值 0.01 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 15 段（含 drop） → +12",
+        "动态 12.4 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 853 Hz → +8",
+        "风格置信度 medium → +5",
+        "时长 119.11s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 59.11,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（80s→90s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 855285,
+        "sha256": "7e43fa5baf729ac697cf9836d253a99b548a0d166dc8885a484a4eba62c2986d",
+        "loudness": {
+          "integratedLufs": -15.99,
+          "truePeakDbtp": -1.49,
+          "lra": 12.4,
+          "thresholdLufs": -26.5,
+          "targetOffset": 0.26,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.99",
+            "input_tp": "-1.49",
+            "input_lra": "12.40",
+            "input_thresh": "-26.50",
+            "output_i": "-14.26",
+            "output_tp": "-1.00",
+            "output_lra": "9.30",
+            "output_thresh": "-24.42",
+            "normalization_type": "dynamic",
+            "target_offset": "0.26"
+          }
+        },
+        "gainAppliedDb": -0.47,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -1.99,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/在森林里 - 用于视频的环境原声吉他器乐背景音乐.mp3"
+    },
+    {
+      "id": "sports-hype-luke-bergs-tropical-soulmp3-496",
+      "file": "sports-hype-luke-bergs-tropical-soulmp3-496.m4a",
+      "style": "sports-hype",
+      "energyBucket": "high",
+      "score": 82.91,
+      "reasons": [
+        "响度 -11.16 LUFS（距 -14 目标 2.84）→ +16.9",
+        "真峰值 0.5 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 10 段（含 drop） → +12",
+        "动态 15.19 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 2453 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 medium → +5",
+        "时长 188.69s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 63.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（63.8s→82.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 861692,
+        "sha256": "9050a47c962565b09b218efbadc3c92015ab943e83634ceb41c64afb59a876ee",
+        "loudness": {
+          "integratedLufs": -15.65,
+          "truePeakDbtp": -0.98,
+          "lra": 9.6,
+          "thresholdLufs": -25.78,
+          "targetOffset": 1.84,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.65",
+            "input_tp": "-0.98",
+            "input_lra": "9.60",
+            "input_thresh": "-25.78",
+            "output_i": "-15.84",
+            "output_tp": "-2.39",
+            "output_lra": "6.00",
+            "output_thresh": "-25.87",
+            "normalization_type": "dynamic",
+            "target_offset": "1.84"
+          }
+        },
+        "gainAppliedDb": -4.42,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0.02,
+        "loudnessDeltaDb": -1.65,
+        "retried": true
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/Vlog-旅拍/Luke-Bergs-Tropical-Soulmp3.mp3"
+    },
+    {
+      "id": "corporate-clean-track-570",
+      "file": "corporate-clean-track-570.m4a",
+      "style": "corporate-clean",
+      "energyBucket": "mid",
+      "score": 82.9,
+      "reasons": [
+        "响度 -14.97 LUFS（距 -14 目标 0.97）→ +22.9",
+        "真峰值 1.44 dBTP → +2",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 9 段（含 drop） → +12",
+        "动态 8.13 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 2200 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 162.22s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 102.22,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（130.8s→156.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 859922,
+        "sha256": "9815e429c30bdb33d2fa15cb22494c6173b93997c56b3a9dcf7b0935222e4e0b",
+        "loudness": {
+          "integratedLufs": -17.86,
+          "truePeakDbtp": -0.95,
+          "lra": 8.7,
+          "thresholdLufs": -28.26,
+          "targetOffset": 0.24,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-17.86",
+            "input_tp": "-0.95",
+            "input_lra": "8.70",
+            "input_thresh": "-28.26",
+            "output_i": "-14.24",
+            "output_tp": "-1.00",
+            "output_lra": "7.40",
+            "output_thresh": "-24.49",
+            "normalization_type": "dynamic",
+            "target_offset": "0.24"
+          }
+        },
+        "gainAppliedDb": -3.42,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0.05,
+        "loudnessDeltaDb": -3.86,
+        "retried": true
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/企业-宣传/商业快节奏.mp3"
+    },
+    {
+      "id": "electronic-pulse-rpg-battle-climax-v001-231",
+      "file": "electronic-pulse-rpg-battle-climax-v001-231.m4a",
+      "style": "electronic-pulse",
+      "energyBucket": "low",
+      "score": 92.33,
+      "reasons": [
+        "响度 -13.79 LUFS（距 -14 目标 0.21）→ +25.3",
+        "真峰值 -0.29 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 6.4 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 1738 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8"
+      ],
+      "excerpt": {
+        "startSec": 9.39,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（28s→57s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 851730,
+        "sha256": "bc225022a3908b0430baaf93b909201ee4c550d7b99b1def6a3e0484fc8da6a1",
+        "loudness": {
+          "integratedLufs": -14.9,
+          "truePeakDbtp": -1.83,
+          "lra": 3.2,
+          "thresholdLufs": -25.36,
+          "targetOffset": -0.54,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.90",
+            "input_tp": "-1.83",
+            "input_lra": "3.20",
+            "input_thresh": "-25.36",
+            "output_i": "-13.46",
+            "output_tp": "-1.00",
+            "output_lra": "2.40",
+            "output_thresh": "-23.74",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.54"
+          }
+        },
+        "gainAppliedDb": -1.21,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.9,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/电子游戏/RPG-Battle-Climax_v001.mp3"
+    },
+    {
+      "id": "lo-fi-chill-skogur-871",
+      "file": "lo-fi-chill-skogur-871.m4a",
+      "style": "lo-fi-chill",
+      "energyBucket": "low",
+      "score": 91.3,
+      "reasons": [
+        "响度 -14.22 LUFS（距 -14 目标 0.22）→ +25.3",
+        "真峰值 -0.67 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 19.44 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 901 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 167.13s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 74.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（60.3s→149.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 855226,
+        "sha256": "644fa4f81871aaba59dcda6268365f9a238b6e36b04a79eae344d6e24d18515a",
+        "loudness": {
+          "integratedLufs": -14.16,
+          "truePeakDbtp": -1.85,
+          "lra": 4.6,
+          "thresholdLufs": -24.16,
+          "targetOffset": -0.23,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.16",
+            "input_tp": "-1.85",
+            "input_lra": "4.60",
+            "input_thresh": "-24.16",
+            "output_i": "-13.77",
+            "output_tp": "-1.59",
+            "output_lra": "4.50",
+            "output_thresh": "-23.77",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.23"
+          }
+        },
+        "gainAppliedDb": -1.16,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.16,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/Skogur.mp3"
+    },
+    {
+      "id": "tension-dark-sorrow-963",
+      "file": "tension-dark-sorrow-963.m4a",
+      "style": "tension-dark",
+      "energyBucket": "low",
+      "score": 89.95,
+      "reasons": [
+        "响度 -14.64 LUFS（距 -14 目标 0.64）→ +24",
+        "真峰值 -1.98 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 9.19 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1586 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 183.9s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 53.13,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（48.8s→117.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 857244,
+        "sha256": "db85a1b0b0edc7341773c1c9ef00d76e1eaf608dbcac31c2f172d7eb54aedab3",
+        "loudness": {
+          "integratedLufs": -14.06,
+          "truePeakDbtp": -1.35,
+          "lra": 1.7,
+          "thresholdLufs": -24.09,
+          "targetOffset": -0.2,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.06",
+            "input_tp": "-1.35",
+            "input_lra": "1.70",
+            "input_thresh": "-24.09",
+            "output_i": "-13.80",
+            "output_tp": "-1.07",
+            "output_lra": "1.60",
+            "output_thresh": "-23.82",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.20"
+          }
+        },
+        "gainAppliedDb": -0.76,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.06,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/悲伤-负面/Sorrow.mp3"
+    },
+    {
+      "id": "modern-pop-keys-of-moon-the-success-633",
+      "file": "modern-pop-keys-of-moon-the-success-633.m4a",
+      "style": "modern-pop",
+      "energyBucket": "high",
+      "score": 89.25,
+      "reasons": [
+        "响度 -13.14 LUFS（距 -14 目标 0.86）→ +23.2",
+        "真峰值 -0.66 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 7.47 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1469 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 118.99s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 58.99,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（66.8s→114s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 852268,
+        "sha256": "f5b8bc3a1acf67348398b71e0b026f961859f0b591ea0f253a53b24c564c5cfd",
+        "loudness": {
+          "integratedLufs": -14.05,
+          "truePeakDbtp": -1.68,
+          "lra": 2.2,
+          "thresholdLufs": -24.38,
+          "targetOffset": -0.23,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.05",
+            "input_tp": "-1.68",
+            "input_lra": "2.20",
+            "input_thresh": "-24.38",
+            "output_i": "-13.77",
+            "output_tp": "-1.00",
+            "output_lra": "2.10",
+            "output_thresh": "-23.96",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.23"
+          }
+        },
+        "gainAppliedDb": -1.05,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.05,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/励志-明朗/keys-of-moon-the-success.mp3"
+    },
+    {
+      "id": "cinematic-build-discovery-676",
+      "file": "cinematic-build-discovery-676.m4a",
+      "style": "cinematic-build",
+      "energyBucket": "low",
+      "score": 89.1,
+      "reasons": [
+        "响度 -15.53 LUFS（距 -14 目标 1.53）→ +21.1",
+        "真峰值 -1.02 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 8.69 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 997 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 235.34s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 126.25,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（126.3s→171.9s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 852739,
+        "sha256": "70723ae5c866003951e4e96c31bd77c95747a4ef158a1745a0f0433640d39f2d",
+        "loudness": {
+          "integratedLufs": -14.19,
+          "truePeakDbtp": -1.98,
+          "lra": 3.6,
+          "thresholdLufs": -24.2,
+          "targetOffset": -0.93,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.19",
+            "input_tp": "-1.98",
+            "input_lra": "3.60",
+            "input_thresh": "-24.20",
+            "output_i": "-13.07",
+            "output_tp": "-1.00",
+            "output_lra": "2.10",
+            "output_thresh": "-23.07",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.93"
+          }
+        },
+        "gainAppliedDb": -1.31,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.19,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/史诗-震撼/Discovery.mp3"
+    },
+    {
+      "id": "festive-bright-city-sunshine-998",
+      "file": "festive-bright-city-sunshine-998.m4a",
+      "style": "festive-bright",
+      "energyBucket": "high",
+      "score": 88.77,
+      "reasons": [
+        "响度 -12.99 LUFS（距 -14 目标 1.01）→ +22.8",
+        "真峰值 1.2 dBTP → +2",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 10 段（含 drop） → +12",
+        "动态 14.24 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 3169 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8",
+        "时长 185s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 125,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（128.3s→158.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 898517,
+        "sha256": "3dd86998a7b7ef22274be1ec88ab8dce8cadfa3f847abfd79fd16e04e2b9e091",
+        "loudness": {
+          "integratedLufs": -16.04,
+          "truePeakDbtp": -0.78,
+          "lra": 1.2,
+          "thresholdLufs": -26.15,
+          "targetOffset": -0.14,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-16.04",
+            "input_tp": "-0.78",
+            "input_lra": "1.20",
+            "input_thresh": "-26.15",
+            "output_i": "-13.86",
+            "output_tp": "-1.00",
+            "output_lra": "1.20",
+            "output_thresh": "-23.97",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.14"
+          }
+        },
+        "gainAppliedDb": -3.79,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0.22,
+        "loudnessDeltaDb": -2.04,
+        "retried": true
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/欢快-轻松/City Sunshine.mp3"
+    },
+    {
+      "id": "ambient-calm-cumulonimbus-67",
+      "file": "ambient-calm-cumulonimbus-67.m4a",
+      "style": "ambient-calm",
+      "energyBucket": "low",
+      "score": 86.2,
+      "reasons": [
+        "响度 -15.5 LUFS（距 -14 目标 1.5）→ +21.2",
+        "真峰值 -1.03 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 13 段（含 drop） → +12",
+        "动态 8.63 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 922 Hz → +8",
+        "风格置信度 medium → +5",
+        "时长 138.12s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 10.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（10.8s→37.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 854614,
+        "sha256": "1dc89255da341c9e4e94b3572417d2d7cba57aba8bf037214b8d2541f317a95e",
+        "loudness": {
+          "integratedLufs": -16.23,
+          "truePeakDbtp": -1.35,
+          "lra": 6.1,
+          "thresholdLufs": -26.26,
+          "targetOffset": 0.39,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-16.23",
+            "input_tp": "-1.35",
+            "input_lra": "6.10",
+            "input_thresh": "-26.26",
+            "output_i": "-14.39",
+            "output_tp": "-1.00",
+            "output_lra": "6.10",
+            "output_thresh": "-24.41",
+            "normalization_type": "dynamic",
+            "target_offset": "0.39"
+          }
+        },
+        "gainAppliedDb": -0.47,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -2.23,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/安静冥想/Cumulonimbus.mp3"
+    },
+    {
+      "id": "acoustic-warm-john-bartmann-a-kwela-fella-461",
+      "file": "acoustic-warm-john-bartmann-a-kwela-fella-461.m4a",
+      "style": "acoustic-warm",
+      "energyBucket": "high",
+      "score": 85.8,
+      "reasons": [
+        "响度 -13 LUFS（距 -14 目标 1）→ +22.8",
+        "真峰值 -0.08 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 17 段（含 drop） → +12",
+        "动态 6.24 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1484 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 156.45s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 54.5,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（54.5s→74s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 913880,
+        "sha256": "78c7bf7cce71ebeb5ba6ee5afb0d99c6659c14ede928aa7ba2c66bf079d821c7",
+        "loudness": {
+          "integratedLufs": -14.09,
+          "truePeakDbtp": -1.18,
+          "lra": 2.1,
+          "thresholdLufs": -24.11,
+          "targetOffset": 0.04,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.09",
+            "input_tp": "-1.18",
+            "input_lra": "2.10",
+            "input_thresh": "-24.11",
+            "output_i": "-14.04",
+            "output_tp": "-1.10",
+            "output_lra": "1.90",
+            "output_thresh": "-24.05",
+            "normalization_type": "dynamic",
+            "target_offset": "0.04"
+          }
+        },
+        "gainAppliedDb": -1.45,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.09,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/Vlog-旅拍/John-Bartmann-A-Kwela-Fella.mp3"
+    },
+    {
+      "id": "corporate-clean-track-582",
+      "file": "corporate-clean-track-582.m4a",
+      "style": "corporate-clean",
+      "energyBucket": "mid",
+      "score": 82.09,
+      "reasons": [
+        "响度 -11.84 LUFS（距 -14 目标 2.16）→ +19.1",
+        "真峰值 -0.12 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 9 段（含 drop） → +12",
+        "动态 10.71 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1324 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 191.35s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 16.25,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（16.3s→59.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 865861,
+        "sha256": "32a20f4560744ba5e677e911547165f2e7bf131726076fd1fb81123ccadd7826",
+        "loudness": {
+          "integratedLufs": -14.17,
+          "truePeakDbtp": -1.54,
+          "lra": 2.8,
+          "thresholdLufs": -24.2,
+          "targetOffset": -0.21,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.17",
+            "input_tp": "-1.54",
+            "input_lra": "2.80",
+            "input_thresh": "-24.20",
+            "output_i": "-13.79",
+            "output_tp": "-1.32",
+            "output_lra": "2.50",
+            "output_thresh": "-23.80",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.21"
+          }
+        },
+        "gainAppliedDb": -2.53,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.17,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/企业-宣传/随和舒缓(适合画外音背景).mp3"
+    },
+    {
+      "id": "sports-hype-wild-west-coast-racing-7-54",
+      "file": "sports-hype-wild-west-coast-racing-7-54.m4a",
+      "style": "sports-hype",
+      "energyBucket": "mid",
+      "score": 79.7,
+      "reasons": [
+        "响度 -13.28 LUFS（距 -14 目标 0.72）→ +23.7",
+        "真峰值 -0.88 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 2 段（含 drop） → +9",
+        "动态 10.22 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 3545 Hz → +8",
+        "风格置信度 medium → +5"
+      ],
+      "excerpt": {
+        "startSec": 0,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（0s→46s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 870335,
+        "sha256": "7f18270dbfec7299938fbec0169ab0d7efe0f0e5a46b6663fbc85dac6fed9298",
+        "loudness": {
+          "integratedLufs": -14.04,
+          "truePeakDbtp": -1.28,
+          "lra": 5.4,
+          "thresholdLufs": -24.14,
+          "targetOffset": 0.92,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.04",
+            "input_tp": "-1.28",
+            "input_lra": "5.40",
+            "input_thresh": "-24.14",
+            "output_i": "-14.92",
+            "output_tp": "-2.03",
+            "output_lra": "4.30",
+            "output_thresh": "-24.97",
+            "normalization_type": "dynamic",
+            "target_offset": "0.92"
+          }
+        },
+        "gainAppliedDb": -1.07,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.04,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/动感激进/Wild-West-Coast-Racing_7.mp3"
+    },
+    {
+      "id": "documentary-bed-track-927",
+      "file": "documentary-bed-track-927.m4a",
+      "style": "documentary-bed",
+      "energyBucket": "mid",
+      "score": 78.41,
+      "reasons": [
+        "响度 -10.69 LUFS（距 -14 目标 3.31）→ +15.4",
+        "真峰值 0.03 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 20 段（含 drop） → +12",
+        "动态 8.44 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1291 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 182s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 122,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（140.3s→150.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 856095,
+        "sha256": "6362ae473272dcfe3eaed99f7f8db66d85cf3b05dedd0e7dfb4e6919225bbc52",
+        "loudness": {
+          "integratedLufs": -14.07,
+          "truePeakDbtp": -3.29,
+          "lra": 4.3,
+          "thresholdLufs": -24.73,
+          "targetOffset": -0.44,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.07",
+            "input_tp": "-3.29",
+            "input_lra": "4.30",
+            "input_thresh": "-24.73",
+            "output_i": "-13.56",
+            "output_tp": "-2.73",
+            "output_lra": "4.10",
+            "output_thresh": "-24.02",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.44"
+          }
+        },
+        "gainAppliedDb": -3.77,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.07,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/自然的旋律（主）.mp3"
+    },
+    {
+      "id": "electronic-pulse-secret-journey-looping-243",
+      "file": "electronic-pulse-secret-journey-looping-243.m4a",
+      "style": "electronic-pulse",
+      "energyBucket": "low",
+      "score": 91.78,
+      "reasons": [
+        "响度 -14.07 LUFS（距 -14 目标 0.07）→ +25.8",
+        "真峰值 -0.82 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 11 段（含 drop） → +12",
+        "动态 6.81 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1168 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 126.46s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 66.46,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（104.3s→122.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 859391,
+        "sha256": "7211247a91d21a0d17ff104ef466cf2e231649f66af0e9c82fd943c3aab23107",
+        "loudness": {
+          "integratedLufs": -14.13,
+          "truePeakDbtp": -1.57,
+          "lra": 4,
+          "thresholdLufs": -24.4,
+          "targetOffset": -0.22,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.13",
+            "input_tp": "-1.57",
+            "input_lra": "4.00",
+            "input_thresh": "-24.40",
+            "output_i": "-13.78",
+            "output_tp": "-1.53",
+            "output_lra": "3.20",
+            "output_thresh": "-23.93",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.22"
+          }
+        },
+        "gainAppliedDb": -0.68,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.13,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/电子游戏/Secret-Journey_Looping.mp3"
+    },
+    {
+      "id": "lo-fi-chill-calm-waters-744",
+      "file": "lo-fi-chill-calm-waters-744.m4a",
+      "style": "lo-fi-chill",
+      "energyBucket": "high",
+      "score": 91.26,
+      "reasons": [
+        "响度 -13.77 LUFS（距 -14 目标 0.23）→ +25.3",
+        "真峰值 -0.19 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 16 段（含 drop） → +12",
+        "动态 15.58 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1007 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 medium → +5",
+        "时长 129.39s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 69.39,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（97s→108.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 860068,
+        "sha256": "26f8ca8fcdb992127db7578b501ea5d058b4b8f2e45d36407abc24edfe2d3adc",
+        "loudness": {
+          "integratedLufs": -14.75,
+          "truePeakDbtp": -1.39,
+          "lra": 6.9,
+          "thresholdLufs": -25.6,
+          "targetOffset": 0.39,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.75",
+            "input_tp": "-1.39",
+            "input_lra": "6.90",
+            "input_thresh": "-25.60",
+            "output_i": "-14.39",
+            "output_tp": "-1.00",
+            "output_lra": "8.30",
+            "output_thresh": "-24.94",
+            "normalization_type": "dynamic",
+            "target_offset": "0.39"
+          }
+        },
+        "gainAppliedDb": -1.31,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.75,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/Calm Waters.mp3"
+    },
+    {
+      "id": "tension-dark-dusty-memories-940",
+      "file": "tension-dark-dusty-memories-940.m4a",
+      "style": "tension-dark",
+      "energyBucket": "low",
+      "score": 89.02,
+      "reasons": [
+        "响度 -14.93 LUFS（距 -14 目标 0.93）→ +23",
+        "真峰值 -1.48 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 8 段（含 drop） → +12",
+        "动态 8.74 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 956 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 190.08s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 77,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（77s→124.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853284,
+        "sha256": "9a0b5faad7ca16052fd05a380f2168745e3186406497f4f088b8e375e6df4ec1",
+        "loudness": {
+          "integratedLufs": -14.15,
+          "truePeakDbtp": -2.27,
+          "lra": 2.9,
+          "thresholdLufs": -24.15,
+          "targetOffset": 0.04,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.15",
+            "input_tp": "-2.27",
+            "input_lra": "2.90",
+            "input_thresh": "-24.15",
+            "output_i": "-14.04",
+            "output_tp": "-2.41",
+            "output_lra": "2.80",
+            "output_thresh": "-24.05",
+            "normalization_type": "dynamic",
+            "target_offset": "0.04"
+          }
+        },
+        "gainAppliedDb": -1.11,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.15,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/悲伤-负面/Dusty Memories.mp3"
+    },
+    {
+      "id": "festive-bright-the-drunk-pelican-duet-looping-388",
+      "file": "festive-bright-the-drunk-pelican-duet-looping-388.m4a",
+      "style": "festive-bright",
+      "energyBucket": "high",
+      "score": 88.62,
+      "reasons": [
+        "响度 -15.68 LUFS（距 -14 目标 1.68）→ +20.6",
+        "真峰值 -0.91 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 12.6 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1884 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8"
+      ],
+      "excerpt": {
+        "startSec": 13.53,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（35s→48.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 886601,
+        "sha256": "8f22b41fb8008595da1ec75af0a9944d77627a10f91fa95b54d0d36f6829ddda",
+        "loudness": {
+          "integratedLufs": -16.17,
+          "truePeakDbtp": -1.47,
+          "lra": 2.3,
+          "thresholdLufs": -26.23,
+          "targetOffset": -0.27,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-16.17",
+            "input_tp": "-1.47",
+            "input_lra": "2.30",
+            "input_thresh": "-26.23",
+            "output_i": "-13.73",
+            "output_tp": "-1.00",
+            "output_lra": "1.40",
+            "output_thresh": "-23.75",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.27"
+          }
+        },
+        "gainAppliedDb": -0.6,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -2.17,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/趣味古怪/The-Drunk-Pelican-Duet_Looping.mp3"
+    },
+    {
+      "id": "cinematic-build-the-summoning-705",
+      "file": "cinematic-build-the-summoning-705.m4a",
+      "style": "cinematic-build",
+      "energyBucket": "low",
+      "score": 87.36,
+      "reasons": [
+        "响度 -15.45 LUFS（距 -14 目标 1.45）→ +21.4",
+        "真峰值 -2.25 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 18 段（含 drop） → +12",
+        "动态 16.42 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1409 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 205.43s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 70,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（70s→106s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 852555,
+        "sha256": "924bb159c4aebc4dc27906be1b55b41dcb41550ecb1fd1ae7cd3067005c19a9b",
+        "loudness": {
+          "integratedLufs": -14.18,
+          "truePeakDbtp": -1.29,
+          "lra": 13.5,
+          "thresholdLufs": -24.94,
+          "targetOffset": 1.46,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.18",
+            "input_tp": "-1.29",
+            "input_lra": "13.50",
+            "input_thresh": "-24.94",
+            "output_i": "-15.46",
+            "output_tp": "-2.31",
+            "output_lra": "9.50",
+            "output_thresh": "-25.58",
+            "normalization_type": "dynamic",
+            "target_offset": "1.46"
+          }
+        },
+        "gainAppliedDb": 0.75,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.18,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/史诗-震撼/The Summoning.mp3"
+    },
+    {
+      "id": "modern-pop-in-dreams-600",
+      "file": "modern-pop-in-dreams-600.m4a",
+      "style": "modern-pop",
+      "energyBucket": "low",
+      "score": 86.76,
+      "reasons": [
+        "响度 -13.3 LUFS（距 -14 目标 0.7）→ +23.8",
+        "真峰值 0.31 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 4 段（含 drop） → +12",
+        "动态 10.37 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1819 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 248.56s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 81,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（71s→151s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853512,
+        "sha256": "df20b0ce4b58ea3a50af97258a42eecff906fad71049bc3569432d419915e191",
+        "loudness": {
+          "integratedLufs": -14.12,
+          "truePeakDbtp": -1.87,
+          "lra": 4.7,
+          "thresholdLufs": -24.15,
+          "targetOffset": 0.54,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.12",
+            "input_tp": "-1.87",
+            "input_lra": "4.70",
+            "input_thresh": "-24.15",
+            "output_i": "-14.54",
+            "output_tp": "-2.47",
+            "output_lra": "4.30",
+            "output_thresh": "-24.55",
+            "normalization_type": "dynamic",
+            "target_offset": "0.54"
+          }
+        },
+        "gainAppliedDb": -1.3,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.12,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/励志-明朗/In Dreams.mp3"
+    },
+    {
+      "id": "ambient-calm-primitive-life-emerges-looping-88",
+      "file": "ambient-calm-primitive-life-emerges-looping-88.m4a",
+      "style": "ambient-calm",
+      "energyBucket": "low",
+      "score": 85.42,
+      "reasons": [
+        "响度 -16.68 LUFS（距 -14 目标 2.68）→ +17.4",
+        "真峰值 -1.27 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 4 段（含 drop） → +12",
+        "动态 15.95 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1249 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8"
+      ],
+      "excerpt": {
+        "startSec": 0,
+        "durationSec": 52.33,
+        "reason": "取最长 drop 段（8.3s→24.5s）中心对齐的 52.3s 窗口"
+      },
+      "encoded": {
+        "bytes": 744129,
+        "sha256": "bb154ce70e3bed3d8e23c0fcb8440375fdfd4b08227b7627dcd5607a6b4f1763",
+        "loudness": {
+          "integratedLufs": -16.93,
+          "truePeakDbtp": -1.51,
+          "lra": 17.3,
+          "thresholdLufs": -27.76,
+          "targetOffset": 0.14,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-16.93",
+            "input_tp": "-1.51",
+            "input_lra": "17.30",
+            "input_thresh": "-27.76",
+            "output_i": "-14.14",
+            "output_tp": "-1.00",
+            "output_lra": "13.20",
+            "output_thresh": "-24.57",
+            "normalization_type": "dynamic",
+            "target_offset": "0.14"
+          }
+        },
+        "gainAppliedDb": -0.23,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -2.93,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/安静冥想/Primitive-Life-Emerges_Looping.mp3"
+    },
+    {
+      "id": "acoustic-warm-sillyvillain-320bit-516",
+      "file": "acoustic-warm-sillyvillain-320bit-516.m4a",
+      "style": "acoustic-warm",
+      "energyBucket": "mid",
+      "score": 85.09,
+      "reasons": [
+        "响度 -16.16 LUFS（距 -14 目标 2.16）→ +19.1",
+        "真峰值 -1.09 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 8 段（含 drop） → +12",
+        "动态 10.55 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 2263 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 95s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 35,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（58s→82.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853386,
+        "sha256": "85a1fddd03983b6f662526cb8397f1bc6281fe94910a613d4b4397b4c7ab3024",
+        "loudness": {
+          "integratedLufs": -15.97,
+          "truePeakDbtp": -1.52,
+          "lra": 2.9,
+          "thresholdLufs": -26.12,
+          "targetOffset": -0.58,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.97",
+            "input_tp": "-1.52",
+            "input_lra": "2.90",
+            "input_thresh": "-26.12",
+            "output_i": "-13.42",
+            "output_tp": "-1.00",
+            "output_lra": "2.60",
+            "output_thresh": "-23.56",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.58"
+          }
+        },
+        "gainAppliedDb": -0.41,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -1.97,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/Vlog-旅拍/SillyVillain-320bit.mp3"
+    },
+    {
+      "id": "corporate-clean-track-576",
+      "file": "corporate-clean-track-576.m4a",
+      "style": "corporate-clean",
+      "energyBucket": "mid",
+      "score": 81.61,
+      "reasons": [
+        "响度 -11.69 LUFS（距 -14 目标 2.31）→ +18.6",
+        "真峰值 0.66 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 11.72 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 2766 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 125s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 65,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（79s→117.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 788047,
+        "sha256": "6e341bed568136fff919696018f724229e7d45253fca2492d6106add95b2cf15",
+        "loudness": {
+          "integratedLufs": -14.51,
+          "truePeakDbtp": -0.99,
+          "lra": 4,
+          "thresholdLufs": -24.56,
+          "targetOffset": -0.87,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.51",
+            "input_tp": "-0.99",
+            "input_lra": "4.00",
+            "input_thresh": "-24.56",
+            "output_i": "-13.13",
+            "output_tp": "-1.00",
+            "output_lra": "2.90",
+            "output_thresh": "-23.18",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.87"
+          }
+        },
+        "gainAppliedDb": -3.61,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0.01,
+        "loudnessDeltaDb": -0.51,
+        "retried": true
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/企业-宣传/节奏卡点(摇滚感).mp3"
+    },
+    {
+      "id": "sports-hype-red-convertible-35",
+      "file": "sports-hype-red-convertible-35.m4a",
+      "style": "sports-hype",
+      "energyBucket": "low",
+      "score": 77.47,
+      "reasons": [
+        "响度 -16.04 LUFS（距 -14 目标 2.04）→ +19.5",
+        "真峰值 -1.08 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 5.7 dB → +5",
+        "拍速置信度 low → +2",
+        "频谱重心 3302 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 medium → +5",
+        "时长 100.32s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 34.75,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（34.8s→63.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 885520,
+        "sha256": "0cb8c5b0ba5b477918c30664525d0af5ef73d0333d0b25f369677ae7abcbe7f7",
+        "loudness": {
+          "integratedLufs": -16.05,
+          "truePeakDbtp": -1.73,
+          "lra": 1.5,
+          "thresholdLufs": -26.07,
+          "targetOffset": 0.11,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-16.05",
+            "input_tp": "-1.73",
+            "input_lra": "1.50",
+            "input_thresh": "-26.07",
+            "output_i": "-14.11",
+            "output_tp": "-1.00",
+            "output_lra": "1.00",
+            "output_thresh": "-24.12",
+            "normalization_type": "dynamic",
+            "target_offset": "0.11"
+          }
+        },
+        "gainAppliedDb": -0.42,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -2.05,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/动感激进/Red-Convertible.mp3"
+    },
+    {
+      "id": "documentary-bed-track-1028",
+      "file": "documentary-bed-track-1028.m4a",
+      "style": "documentary-bed",
+      "energyBucket": "low",
+      "score": 75.85,
+      "reasons": [
+        "响度 -18.11 LUFS（距 -14 目标 4.11）→ +12.8",
+        "真峰值 -0.68 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 9 段（含 drop） → +12",
+        "动态 19.76 dB → +10",
+        "拍速置信度 low → +2",
+        "频谱重心 1840 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 medium → +5",
+        "时长 240.1s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 7,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（7s→25.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 854100,
+        "sha256": "adc710e346ad2084110bac031f2d3d2cce695a1b11daa537060fca85cadfd0ed",
+        "loudness": {
+          "integratedLufs": -19.18,
+          "truePeakDbtp": -1.41,
+          "lra": 21.3,
+          "thresholdLufs": -30.95,
+          "targetOffset": 4.87,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-19.18",
+            "input_tp": "-1.41",
+            "input_lra": "21.30",
+            "input_thresh": "-30.95",
+            "output_i": "-18.87",
+            "output_tp": "-1.00",
+            "output_lra": "15.80",
+            "output_thresh": "-29.54",
+            "normalization_type": "dynamic",
+            "target_offset": "4.87"
+          }
+        },
+        "gainAppliedDb": -0.79,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -5.18,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/自然-特效/雨声和雨林.mp3"
+    },
+    {
+      "id": "lo-fi-chill-se-recourber-862",
+      "file": "lo-fi-chill-se-recourber-862.m4a",
+      "style": "lo-fi-chill",
+      "energyBucket": "high",
+      "score": 91.1,
+      "reasons": [
+        "响度 -15.22 LUFS（距 -14 目标 1.22）→ +22.1",
+        "真峰值 -0.23 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 9 段（含 drop） → +12",
+        "动态 13.2 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 730 Hz → +8",
+        "循环友好（首尾差 null dB）→ +6",
+        "风格置信度 high → +8",
+        "时长 169.04s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 34.25,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（34.3s→77.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 857931,
+        "sha256": "3ce1d5628979611c87e7f4f331a3935386cb2933f6299e67957d59031efbe088",
+        "loudness": {
+          "integratedLufs": -14.07,
+          "truePeakDbtp": -1.59,
+          "lra": 3.2,
+          "thresholdLufs": -24.22,
+          "targetOffset": -0.29,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.07",
+            "input_tp": "-1.59",
+            "input_lra": "3.20",
+            "input_thresh": "-24.22",
+            "output_i": "-13.71",
+            "output_tp": "-1.01",
+            "output_lra": "3.20",
+            "output_thresh": "-23.81",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.29"
+          }
+        },
+        "gainAppliedDb": -0.03,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.07,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/安静-舒缓/Se recourber.mp3"
+    },
+    {
+      "id": "tension-dark-sundae-sunset-966",
+      "file": "tension-dark-sundae-sunset-966.m4a",
+      "style": "tension-dark",
+      "energyBucket": "mid",
+      "score": 88.9,
+      "reasons": [
+        "响度 -14.03 LUFS（距 -14 目标 0.03）→ +25.9",
+        "真峰值 -0.13 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 6 段（含 drop） → +12",
+        "动态 19.17 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1842 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 138.77s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 48.38,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（30s→126.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 860553,
+        "sha256": "5bcc66cf2b9a4544c56f4dc99ebab01330f79e5b6070ace7eaae950b51b4941b",
+        "loudness": {
+          "integratedLufs": -14.48,
+          "truePeakDbtp": -1.54,
+          "lra": 2.2,
+          "thresholdLufs": -24.49,
+          "targetOffset": -0.41,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.48",
+            "input_tp": "-1.54",
+            "input_lra": "2.20",
+            "input_thresh": "-24.49",
+            "output_i": "-13.59",
+            "output_tp": "-1.00",
+            "output_lra": "2.00",
+            "output_thresh": "-23.60",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.41"
+          }
+        },
+        "gainAppliedDb": -1.36,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.48,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/悲伤-负面/Sundae Sunset.mp3"
+    },
+    {
+      "id": "electronic-pulse-mystical-open-211",
+      "file": "electronic-pulse-mystical-open-211.m4a",
+      "style": "electronic-pulse",
+      "energyBucket": "low",
+      "score": 88.82,
+      "reasons": [
+        "响度 -14.37 LUFS（距 -14 目标 0.37）→ +24.8",
+        "真峰值 -0.83 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 4 段（含 drop） → +12",
+        "动态 10 dB → +10",
+        "拍速置信度 high → +10",
+        "频谱重心 2365 Hz → +8",
+        "风格置信度 high → +8"
+      ],
+      "excerpt": {
+        "startSec": 0,
+        "durationSec": 57.6,
+        "reason": "取最长 drop 段（27.3s→52.8s）中心对齐的 57.6s 窗口"
+      },
+      "encoded": {
+        "bytes": 817050,
+        "sha256": "e1a5365307e71f5dde934273df79d4bf13d0e4787e57e4dede51fed941e5e704",
+        "loudness": {
+          "integratedLufs": -15.14,
+          "truePeakDbtp": -1.49,
+          "lra": 5.8,
+          "thresholdLufs": -25.55,
+          "targetOffset": -1.64,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.14",
+            "input_tp": "-1.49",
+            "input_lra": "5.80",
+            "input_thresh": "-25.55",
+            "output_i": "-12.36",
+            "output_tp": "-1.00",
+            "output_lra": "2.60",
+            "output_thresh": "-22.61",
+            "normalization_type": "dynamic",
+            "target_offset": "-1.64"
+          }
+        },
+        "gainAppliedDb": -0.67,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -1.14,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/400首商用/电子游戏/Mystical-Open.mp3"
+    },
+    {
+      "id": "festive-bright-floating-oompa-982",
+      "file": "festive-bright-floating-oompa-982.m4a",
+      "style": "festive-bright",
+      "energyBucket": "high",
+      "score": 88.58,
+      "reasons": [
+        "响度 -15.07 LUFS（距 -14 目标 1.07）→ +22.6",
+        "真峰值 -0.52 dBTP → +8",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 13.77 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 2006 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 140.44s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 80.44,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（93s→134.5s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 847629,
+        "sha256": "6f45f4871e67e35a66512bf56e31cf8b43766802872c49c94fb1c2741f9adc82",
+        "loudness": {
+          "integratedLufs": -15.39,
+          "truePeakDbtp": -1.1,
+          "lra": 1.7,
+          "thresholdLufs": -25.73,
+          "targetOffset": -0.09,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-15.39",
+            "input_tp": "-1.10",
+            "input_lra": "1.70",
+            "input_thresh": "-25.73",
+            "output_i": "-13.91",
+            "output_tp": "-1.00",
+            "output_lra": "1.60",
+            "output_thresh": "-24.19",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.09"
+          }
+        },
+        "gainAppliedDb": -0.79,
+        "gainMode": "linear-gain-peak-protected",
+        "peakProtected": true,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -1.39,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/有趣-幽默/Floating Oompa.mp3"
+    },
+    {
+      "id": "modern-pop-guardians-of-the-fallen-epic-soundtrack-598",
+      "file": "modern-pop-guardians-of-the-fallen-epic-soundtrack-598.m4a",
+      "style": "modern-pop",
+      "energyBucket": "low",
+      "score": 86.6,
+      "reasons": [
+        "响度 -14.75 LUFS（距 -14 目标 0.75）→ +23.6",
+        "真峰值 -0.11 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 12 段（含 drop） → +12",
+        "动态 15.99 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1946 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 265.93s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 73.25,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（69.3s→137.3s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 857416,
+        "sha256": "bfaf8b24239647e708c3a85a46d18a43eca21eb7bdce820ea46cece0d28d7c30",
+        "loudness": {
+          "integratedLufs": -14.05,
+          "truePeakDbtp": -1.09,
+          "lra": 2.2,
+          "thresholdLufs": -24.17,
+          "targetOffset": -0.45,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.05",
+            "input_tp": "-1.09",
+            "input_lra": "2.20",
+            "input_thresh": "-24.17",
+            "output_i": "-13.55",
+            "output_tp": "-1.00",
+            "output_lra": "1.00",
+            "output_thresh": "-23.64",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.45"
+          }
+        },
+        "gainAppliedDb": -1.91,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.05,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/励志-明朗/Guardians-Of-The-Fallen-Epic-Soundtrack.mp3"
+    },
+    {
+      "id": "cinematic-build-spirit-of-the-dream-700",
+      "file": "cinematic-build-spirit-of-the-dream-700.m4a",
+      "style": "cinematic-build",
+      "energyBucket": "low",
+      "score": 86.5,
+      "reasons": [
+        "响度 -13.22 LUFS（距 -14 目标 0.78）→ +23.5",
+        "真峰值 -0.26 dBTP → +5",
+        "平坦因子 0（削波证据）→ +8",
+        "结构 7 段（含 drop） → +12",
+        "动态 7.61 dB → +10",
+        "拍速置信度 medium → +8",
+        "频谱重心 1078 Hz → +8",
+        "风格置信度 high → +8",
+        "时长 201.48s（≥90s，选段余地大）→ +4"
+      ],
+      "excerpt": {
+        "startSec": 123.5,
+        "durationSec": 60,
+        "reason": "取最长 drop 段（123.5s→176.8s）中心对齐的 60s 窗口"
+      },
+      "encoded": {
+        "bytes": 853129,
+        "sha256": "b69f13e7231130c4283cf460762563cd75f6a7788e696ccafd72aac76c5abf96",
+        "loudness": {
+          "integratedLufs": -14.1,
+          "truePeakDbtp": -2.41,
+          "lra": 5.4,
+          "thresholdLufs": -24.15,
+          "targetOffset": -0.04,
+          "fromSec": 0,
+          "windowSec": null,
+          "windowNote": "整曲实测",
+          "raw": {
+            "input_i": "-14.10",
+            "input_tp": "-2.41",
+            "input_lra": "5.40",
+            "input_thresh": "-24.15",
+            "output_i": "-13.96",
+            "output_tp": "-1.83",
+            "output_lra": "2.80",
+            "output_thresh": "-24.01",
+            "normalization_type": "dynamic",
+            "target_offset": "-0.04"
+          }
+        },
+        "gainAppliedDb": -1.42,
+        "gainMode": "linear-gain",
+        "peakProtected": false,
+        "peakOverrunDb": 0,
+        "loudnessDeltaDb": -0.1,
+        "retried": false
+      },
+      "sourceFile": "/Users/mac/Downloads/1200可商用纯音乐/史诗-震撼/Spirit of The Dream.mp3"
+    }
+  ]
+}
