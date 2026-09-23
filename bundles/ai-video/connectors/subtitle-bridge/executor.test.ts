@@ -27,12 +27,15 @@ function errResponse(error: string, message: string, retryable = false) {
 }
 
 describe("工具白名单", () => {
-  it("只声明 9 个字幕工具，且不提供他人工具", () => {
-    expect(SUBTITLE_BRIDGE_TOOLS).toHaveLength(9);
+  it("只声明 12 个字幕工具（含弹幕/贴纸/卡拉OK），且不提供他人工具", () => {
+    expect(SUBTITLE_BRIDGE_TOOLS).toHaveLength(12);
     expect(isSubtitleBridgeTool("subtitleread.fonts")).toBe(true);
     expect(isSubtitleBridgeTool("subtitlewrite.burn")).toBe(true);
     expect(isSubtitleBridgeTool("subtitlewrite.title")).toBe(true);
     expect(isSubtitleBridgeTool("subtitlewrite.best")).toBe(true);
+    expect(isSubtitleBridgeTool("subtitlewrite.danmaku")).toBe(true);
+    expect(isSubtitleBridgeTool("subtitlewrite.sticker")).toBe(true);
+    expect(isSubtitleBridgeTool("subtitlewrite.karaoke")).toBe(true);
     expect(isSubtitleBridgeTool("bgmwrite.mix")).toBe(false);
     expect(isSubtitleBridgeTool("colorwrite.grade")).toBe(false);
     expect(isSubtitleBridgeTool("render.submit")).toBe(false);

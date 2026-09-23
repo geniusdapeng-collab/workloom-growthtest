@@ -13,6 +13,7 @@ description: 字幕交付规范官方套件（字幕师专业套件）：交付�
 | 字幕方案 | 字体与字号、描边与边距、平台版式、ASS 样式与事件、版式体检明细 | `subtitle-plan.json` + `subtitle-plan.ass` |
 | 字幕报告 | 选型理由、六项复检结果、编码器、证据帧清单、时间轴回读 | `subtitle_report`（业务事件） |
 | 证据帧 | 标题帧 + 首条字幕帧 + 末条字幕帧（PNG，带 sha256） | `evidence-<成片名>-<时间>.png` |
+| 扩展轨报告（用到时） | 弹幕密度/抽稀条数、贴纸停留与落点、卡拉OK 逐字误差与口径（显式/均分）、双语两行版式 | `subtitle_report.mode = danmaku|sticker|karaoke` |
 
 > 证据帧按**产物名**打前缀：同一批次里 burn 与 best 各自出片时证据不互相覆盖，
 > 每张证据都能对回它证明的那支成片。
@@ -28,7 +29,10 @@ description: 字幕交付规范官方套件（字幕师专业套件）：交付�
 | 文字-背景对比 | ≥ 0.32 | 抽帧实测文字带亮度 |
 | 字幕可现度 | 加字前后 Δ ≥ 0.004 | 抽帧实测（边缘能量/亮度增量） |
 | 时间轴回读 | 100% 一致（条数 + 起止） | ASS 回读 × 源 SRT |
-| 字体解析 | 100% 命中工位字体目录 | `fontselect` 日志 |
+| 字体解析 | 100% 命中随包字体目录 | `fontselect` 日志 |
+| 弹幕密度 | 1s 窗口并发 ≤8（超出抽稀并如实报告） | `subtitle_report.density` |
+| 贴纸停留 | 1.5~3s（越界拒绝） | `subtitle_report.placements[].holdSec` |
+| 卡拉OK 逐字时长 | 合计 = 字幕条时长 ±0.05s | `subtitle_report.timing[].sumErrorSec` |
 | 分辨率 / 音轨 | 与母版一致（音轨 copy） | ffprobe 前后对比 |
 
 ## 三、命名与版本链

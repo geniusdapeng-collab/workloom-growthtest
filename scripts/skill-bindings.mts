@@ -62,10 +62,10 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<s
     "bgm-delivery-spec": ["G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5"],
     // 后期字幕师五件套（2026-09-23）：安装即绑定标题字幕门 G-SUB0..G-SUB5，卸载即撤销。
     "font-selection": ["G-SUB0", "G-SUB1", "G-SUB3", "G-SUB5"],
-    "subtitle-layout-design": ["G-SUB0", "G-SUB3"],
-    "caption-burnin-ops": ["G-SUB0", "G-SUB2", "G-SUB3"],
+    "subtitle-layout-design": ["G-SUB0", "G-SUB3", "G-SUB6"],
+    "caption-burnin-ops": ["G-SUB0", "G-SUB2", "G-SUB3", "G-SUB6"],
     "font-license-compliance": ["G-SUB1", "G-SUB5"],
-    "subtitle-delivery-spec": ["G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5"],
+    "subtitle-delivery-spec": ["G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5", "G-SUB6"],
     // 后期配音师五件套（2026-09-23）：安装即绑定本地声音克隆/配音门 G-VOICE0..G-VOICE6，卸载即撤销。
     // 授权（G-VOICE1/G-VOICE6）与声纹不出域（G-VOICE5）是这套技能的核心纪律，故五件套全量绑定。
     "voice-clone-consent": ["G-VOICE1", "G-VOICE5", "G-VOICE6"],

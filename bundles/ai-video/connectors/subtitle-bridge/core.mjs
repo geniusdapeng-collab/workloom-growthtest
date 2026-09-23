@@ -42,6 +42,9 @@ export const SUBTITLE_TOOLS = [
   "subtitlewrite.plan",
   "subtitlewrite.burn",
   "subtitlewrite.title",
+  "subtitlewrite.danmaku",
+  "subtitlewrite.sticker",
+  "subtitlewrite.karaoke",
   "subtitlewrite.best",
 ];
 
@@ -137,10 +140,16 @@ export function loadRecipes(file = RECIPE_FILE) {
   return doc;
 }
 
-/** 工位字体目录：环境变量优先，缺省 ~/.workloom-subtitle/fonts。 */
+/**
+ * 字体目录：**仓库随包字体优先**（font-library v1.1 全量入库，`library/fonts/`），
+ * `WORKLOOM_SUBTITLE_FONTS_DIR` 可指向客户自备/工位外置字体目录覆盖之（同名文件按 sha256 校验）。
+ */
 export function fontsRoot(env = process.env) {
   const raw = (env.WORKLOOM_SUBTITLE_FONTS_DIR ?? "").trim();
-  return raw ? path.resolve(raw) : path.join(os.homedir(), ".workloom-subtitle", "fonts");
+  if (raw) return path.resolve(raw);
+  const bundled = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../library/fonts");
+  if (fs.existsSync(bundled)) return bundled;
+  return path.join(os.homedir(), ".workloom-subtitle", "fonts");
 }
 
 /**
@@ -898,6 +907,8 @@ export async function plan({
   titleText = "",
   titleDurationSec = 3,
   cues = [],
+  secondaryCues = [],
+  secondaryLabel = "EN",
   scenes = ["标题", "字幕"],
   catalog = loadFontCatalog(),
   fontsDir = null,
@@ -1022,6 +1033,28 @@ export async function plan({
   for (const cue of cues) {
     if (!subPick) throw new SubtitleError("提供了字幕条但没有可用的字幕字体", "font_not_found", false);
     events.push({ layer: 0, start: cue.start, end: cue.end, style: "Sub", name: subPick.id, text: cue.text });
+  }
+  // 双语：第二语言单独一条样式（字号小 12%、整体下移一行），语义上仍属同一条字幕
+  if (secondaryCues.length && subPick) {
+    const subStyleEntry = styles.find((entry) => entry.name === "Sub");
+    if (subStyleEntry) {
+      const secondarySize = Math.max(18, Math.round(subStyleEntry.style.fontSize * 0.88));
+      styles.push({
+        name: "Sub2",
+        style: {
+          ...subStyleEntry.style,
+          fontSize: secondarySize,
+          outline: Math.max(1, Math.round(secondarySize * 0.06)),
+          marginV: Math.max(0, Math.round(subStyleEntry.style.marginV - subStyleEntry.style.fontSize * 1.35)),
+        },
+      });
+      for (const cue of secondaryCues) {
+        events.push({
+          layer: 0, start: cue.start, end: cue.end, style: "Sub2",
+          name: `${subPick.id}-${secondaryLabel}`, text: cue.text,
+        });
+      }
+    }
   }
 
   const assText = buildAssDocument({ resolution: targetResolution, styles, events });
@@ -1196,6 +1229,34 @@ export const FONT_SOURCE = {
  * - 字幕可现度：字幕带在"加字前后"的边缘能量/亮度必须有可测增量（配了跟没配一样 → 拒绝交付）；
  * - 版式体检：字号 / 行宽 / 安全区 / 对比度全部通过。
  */
+/**
+ * ASS → 成片编码（新渲染器共用）：扁平字体目录 → ffmpeg libass → 回读输出规格与 fontselect。
+ * 关键纪律：字体必须命中仓内/工位字体目录，静默回落系统字体一律判失败。
+ */
+async function encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, extraFilter = ",format=yuv420p" }) {
+  const encoder = await pickVideoEncoder({ bins });
+  const probe = await probeMedia(input, { bins });
+  const renderWorkDir = await tempDir("workloom-subtitle-render-");
+  const flatFonts = prepareFlatFontsDir({ fontsDir, catalog, workDir: renderWorkDir });
+  if (flatFonts.missing.length) {
+    throw new SubtitleError(
+      `字体缺失 ${flatFonts.missing.length} 款（如 ${flatFonts.missing[0]}）：请补齐 library/fonts 或指定 WORKLOOM_SUBTITLE_FONTS_DIR`,
+      "font_not_found",
+      false,
+    );
+  }
+  const filter = `ass=${escapeFilterPath(assPath)}:fontsdir=${escapeFilterPath(flatFonts.flat)}${extraFilter}`;
+  const args = ["-hide_banner", "-v", "info", "-y", "-i", input, "-map", "0:v:0"];
+  if (probe.hasAudio) args.push("-map", "0:a:0", "-c:a", "copy");
+  args.push("-vf", filter, ...encoder.args, "-movflags", "+faststart", output);
+  const log = (await runBin(bins.ffmpeg, args, { label: "ffmpeg" })).stderr;
+  if (!fs.existsSync(output)) throw new SubtitleError(`渲染未产出文件：${output}`, "ffmpeg_failed", true);
+  const outputProbe = await probeMedia(output, { bins });
+  const hash = await sha256File(output);
+  const fontResolution = parseFontSelections(log, flatFonts.flat);
+  return { encoder, probe, outputProbe, hash, fontResolution, flatFonts };
+}
+
 export async function renderWithSubtitles({
   mode = "subtitle",
   input,
@@ -1203,6 +1264,8 @@ export async function renderWithSubtitles({
   cues = [],
   titleText = "",
   titleDurationSec = 3,
+  secondaryCues = [],
+  secondaryLabel = "EN",
   brief = {},
   platform = null,
   fontsDir = null,
@@ -1234,6 +1297,8 @@ export async function renderWithSubtitles({
     titleText: mode === "subtitle" ? "" : titleText,
     titleDurationSec,
     cues: mode === "title" ? [] : cues,
+    secondaryCues: mode === "title" ? [] : secondaryCues,
+    secondaryLabel,
     scenes,
     catalog,
     fontsDir,
@@ -1408,6 +1473,698 @@ export async function renderWithSubtitles({
 /** 标题/花字轨（title_text 必填；可选同时烧字幕）。 */
 export async function renderTitle(options) {
   return renderWithSubtitles({ ...options, mode: options.cues?.length ? "both" : "title" });
+}
+
+/* ============================ 弹幕 / 贴纸 / 卡拉OK（v1.1 二期） ============================ */
+
+export const DANMAKU_MODES = ["scroll", "top", "bottom"];
+
+export const DANMAKU_COLOURS = ["#FFFFFF", "#FFF200", "#00E5FF", "#7CFF6B", "#FF9AD5", "#FFB020"];
+
+/** ASS 文本转义：大括号必须转义，换行转硬换行（否则会被 libass 当作 override 标签吃掉）。 */
+export function escapeAssText(text) {
+  return String(text).replace(/[{}]/g, (match) => `\\${match}`).replace(/\r?\n/g, "\\N");
+}
+
+/**
+ * 弹幕输入解析：数组或 JSONL/JSON 字符串。
+ * 每条：{ at(秒) , text , mode?: scroll|top|bottom , colour? , sizeScale? }
+ */
+export function parseDanmaku(input) {
+  let list = [];
+  if (typeof input === "string" && input.trim()) {
+    const text = input.trim();
+    list = text.startsWith("[")
+      ? JSON.parse(text)
+      : text.split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+  } else if (Array.isArray(input)) {
+    list = input;
+  }
+  if (!list.length) throw new SubtitleError("弹幕列表为空", "bad_request", false);
+  return list.map((raw, index) => {
+    const at = Number(raw.at ?? raw.time ?? 0);
+    const text = String(raw.text ?? raw.content ?? "").trim();
+    if (!Number.isFinite(at) || at < 0) throw new SubtitleError(`弹幕 #${index + 1} 的 at 非法：${raw.at}`, "bad_style", false);
+    if (!text) throw new SubtitleError(`弹幕 #${index + 1} 文本为空`, "bad_style", false);
+    const mode = DANMAKU_MODES.includes(raw.mode) ? raw.mode : "scroll";
+    const colour = typeof raw.colour === "string" && /^#[0-9A-Fa-f]{6}$/.test(raw.colour) ? raw.colour : null;
+    const sizeScale = Number(raw.sizeScale ?? 1);
+    return { at, text, mode, colour, sizeScale: Number.isFinite(sizeScale) && sizeScale > 0 ? sizeScale : 1 };
+  }).sort((a, b) => a.at - b.at);
+}
+
+/** 弹幕密度体检：滑动窗口内并发条数（刷屏/霸屏的量化口径）。 */
+export function checkDanmakuDensity(items, { windowSec = 1, maxConcurrent = 8 } = {}) {
+  const sorted = [...items].sort((a, b) => a.at - b.at);
+  let peak = 0;
+  let peakAt = null;
+  for (let index = 0; index < sorted.length; index += 1) {
+    const windowStart = sorted[index].at;
+    let count = 0;
+    for (let cursor = index; cursor < sorted.length; cursor += 1) {
+      if (sorted[cursor].at - windowStart > windowSec) break;
+      count += 1;
+    }
+    if (count > peak) {
+      peak = count;
+      peakAt = windowStart;
+    }
+  }
+  return {
+    total: sorted.length,
+    windowSec,
+    maxConcurrent,
+    peakConcurrent: peak,
+    peakAt,
+    ok: peak <= maxConcurrent,
+    note: peak > maxConcurrent
+      ? `${windowSec}s 窗口内并发 ${peak} 条（上限 ${maxConcurrent}）：需抽稀或降速`
+      : "弹幕密度在口径内",
+  };
+}
+
+/** 弹幕密度裁剪：按窗口保留上限内的条目，如实报告裁掉多少（不静默丢）。 */
+export function trimDanmaku(items, { windowSec = 1, maxConcurrent = 8 } = {}) {
+  const sorted = [...items].sort((a, b) => a.at - b.at);
+  const kept = [];
+  const dropped = [];
+  for (const item of sorted) {
+    const recent = kept.filter((entry) => item.at - entry.at <= windowSec);
+    if (recent.length >= maxConcurrent) dropped.push(item);
+    else kept.push(item);
+  }
+  return { kept, dropped, trimmed: dropped.length };
+}
+
+/**
+ * 弹幕轨道分配：滚动弹幕占顶部 1/4 区域的固定轨道（round-robin），
+ * 顶部/底部固定各占自己的行位；返回每条的时间与位移参数（确定性、可复算）。
+ */
+export function planDanmakuTracks(items, {
+  resolution, layout = {}, size = 40, lanes = 8, topRows = 2, bottomRows = 2, holdSec = 4, scrollSec = 7,
+}) {
+  const [width, height] = resolution;
+  const topBandRatio = Number(layout.弹幕?.top_band_ratio ?? 0.25);
+  const marginTop = Math.round(height * 0.04);
+  const laneGap = Math.max(12, Math.round((height * topBandRatio - marginTop) / Math.max(lanes, 1)));
+  const bottomBase = Math.round(height * (1 - Number(layout.字幕?.bottom_margin_ratio ?? 0.05) - 0.08));
+  let scrollCursor = 0;
+  let topCursor = 0;
+  let bottomCursor = 0;
+  return items.map((item) => {
+    const textWidth = Math.max(size, Array.from(item.text).length * size);
+    if (item.mode === "top") {
+      const row = topCursor % topRows;
+      topCursor += 1;
+      return { ...item, y: marginTop + row * Math.round(laneGap * 1.15), durationSec: holdSec, enterX: null, exitX: null };
+    }
+    if (item.mode === "bottom") {
+      const row = bottomCursor % bottomRows;
+      bottomCursor += 1;
+      return { ...item, y: bottomBase - row * Math.round(laneGap * 1.15), durationSec: holdSec, enterX: null, exitX: null };
+    }
+    const lane = scrollCursor % lanes;
+    scrollCursor += 1;
+    return {
+      ...item,
+      y: marginTop + lane * laneGap,
+      durationSec: scrollSec + textWidth / (width * 1.4),
+      enterX: width,
+      exitX: -textWidth,
+    };
+  });
+}
+
+/** 逐字时间轴规范化：显式 [{text,start,end}] / [{text,duration}] → 均分兜底（如实标注口径）。 */
+export function parseTimedWords(payload, { text, start, end, mode = "even" }) {
+  const cueStart = assistToSeconds(start);
+  const cueEnd = assistToSeconds(end);
+  const cueDuration = cueEnd - cueStart;
+  if (Array.isArray(payload) && payload.length) {
+    let cursor = cueStart;
+    const words = payload.map((raw, index) => {
+      const word = String(raw.text ?? raw.w ?? "").trim();
+      if (!word) throw new SubtitleError(`逐字时间轴 #${index + 1} 文本为空`, "bad_style", false);
+      const wordStart = Number.isFinite(Number(raw.start)) ? Number(raw.start) : cursor;
+      const wordEnd = Number.isFinite(Number(raw.end))
+        ? Number(raw.end)
+        : wordStart + (Number.isFinite(Number(raw.duration)) ? Number(raw.duration) : 0);
+      if (!(wordEnd > wordStart)) throw new SubtitleError(`逐字时间轴 #${index + 1} 时长非法`, "bad_style", false);
+      cursor = wordEnd;
+      return { text: word, start: wordStart, end: wordEnd };
+    });
+    const sum = round(words.reduce((acc, word) => acc + (word.end - word.start), 0), 3);
+    return { words, basis: "explicit", cueDuration: round(cueDuration, 3), sum, sumErrorSec: round(sum - cueDuration, 3) };
+  }
+  if (mode !== "even") throw new SubtitleError("缺少逐字时间轴时只能用 timing_mode=even", "bad_request", false);
+  const plain = String(text ?? "").replace(/\\N/g, "");
+  const units = /\p{Script=Han}/u.test(plain)
+    ? Array.from(plain.replace(/\s+/g, ""))
+    : plain.split(/\s+/).filter(Boolean);
+  if (!units.length) throw new SubtitleError("均分逐字时间轴需要非空文本", "bad_style", false);
+  const step = cueDuration / units.length;
+  const words = units.map((unit, index) => ({
+    text: unit,
+    start: round(cueStart + index * step, 3),
+    end: round(cueStart + (index + 1) * step, 3),
+  }));
+  return { words, basis: "even-split（按字数均分，非真实发音对齐）", cueDuration: round(cueDuration, 3), sum: round(cueDuration, 3), sumErrorSec: 0 };
+}
+
+/** 卡拉OK 文本：\kf 扫过 / \k 跳变（厘秒）。 */
+export function karaokeAssText(words, { mode = "kf" } = {}) {
+  const tag = mode === "kf" ? "kf" : "k";
+  return words.map((word) => {
+    const centis = Math.max(1, Math.round((word.end - word.start) * 100));
+    return `{\\${tag}${centis}}${escapeAssText(word.text)}`;
+  }).join("");
+}
+
+/** 贴纸/花字风格预设（撞色 / 奶油 / 国风 / 科技 / 促销）。 */
+export const STICKER_PRESETS = {
+  撞色: { primaryColour: "#FFF200", outlineColour: "#FF2D55", backColour: "&H80000000", borderStyle: 1, rotation: -4 },
+  奶油: { primaryColour: "#6B4A2B", outlineColour: "#FFF3DC", backColour: "&H59FFF3DC", borderStyle: 3, rotation: 2 },
+  国风: { primaryColour: "#FFF7E6", outlineColour: "#8B1E1E", backColour: "&H808B1E1E", borderStyle: 1, rotation: 0 },
+  科技: { primaryColour: "#E8FBFF", outlineColour: "#0072FF", backColour: "&H990072FF", borderStyle: 3, rotation: 0 },
+  促销: { primaryColour: "#FFFFFF", outlineColour: "#E61E25", backColour: "&H80E61E25", borderStyle: 1, rotation: 0 },
+};
+
+export function stickerStylePreset(name) {
+  const preset = STICKER_PRESETS[name] ?? STICKER_PRESETS.撞色;
+  return { name: STICKER_PRESETS[name] ? name : "撞色", ...preset };
+}
+
+/** 贴纸事件文本：200ms 弹入（缩放 40%→100%）+ 预设旋转，符合附件「弹入/淡入 200ms」。 */
+export function stickerAssText(sticker, { preset }) {
+  const popIn = `{\\fscx40\\fscy40\\frz${preset.rotation}\\t(0,200,\\fscx100\\fscy100)}`;
+  return `${popIn}${escapeAssText(sticker.text)}`;
+}
+
+/** 可现度实测（加字前后同一文字带的边缘能量/亮度增量；不足即视为没交付）。 */
+async function measureBandPresence({ input, output, at, band, bins }) {
+  const workDir = await tempDir("workloom-subtitle-presence-");
+  const beforeFrame = path.join(workDir, "before.png");
+  const afterFrame = path.join(workDir, "after.png");
+  await extractFrame({ input, at, output: beforeFrame, bins });
+  await extractFrame({ input: output, at, output: afterFrame, bins });
+  const [before, after] = await Promise.all([
+    regionStats({ input: beforeFrame, bins, region: band }),
+    regionStats({ input: afterFrame, bins, region: band }),
+  ]);
+  const edgeDelta = round((after.edgeDensityUnit ?? 0) - (before.edgeDensityUnit ?? 0), 4);
+  const lumaDelta = round((after.lumaAvgUnit ?? 0) - (before.lumaAvgUnit ?? 0), 4);
+  return { at, edgeDelta, lumaDelta, delta: round(Math.max(edgeDelta, Math.abs(lumaDelta)), 4), before, after };
+}
+
+function assertRenderable({ input, output, skipVerify }) {
+  if (typeof input !== "string" || !input.trim()) throw new SubtitleError("input_path 缺失", "bad_request");
+  if (typeof output !== "string" || !output.trim()) throw new SubtitleError("output_path 缺失", "bad_request");
+  if (path.resolve(input) === path.resolve(output)) {
+    throw new SubtitleError("禁止覆盖原片（输出路径等于输入路径）", "overwrite_source_forbidden", false);
+  }
+  if (skipVerify) {
+    throw new SubtitleError("交付必须带复检（关闭校验的调用禁止执行，围栏 G-SUB3）", "bad_request", false);
+  }
+}
+
+async function removeOnFailure(output) {
+  if (typeof fsp.rm === "function") await fsp.rm(output, { force: true });
+  else if (fs.existsSync(output)) fs.unlinkSync(output);
+}
+
+/**
+ * 弹幕轨渲染：滚动（顶部 1/4 轨道）+ 顶部/底部固定。
+ * 口径：单条 ≤ 20 字（超出即拒绝），密度按滑动窗口裁剪到上限并如实报告裁掉条目，
+ * 透明度默认 0.85，渲染后复检（密度/条数/字体解析/可现度/分辨率/音轨/证据帧）。
+ */
+export async function renderDanmaku({
+  input,
+  output,
+  items = [],
+  platform = null,
+  brief = {},
+  fontsDir = null,
+  evidenceDir = null,
+  bins = resolveBinaries(),
+  catalog = loadFontCatalog(),
+  opacity = 0.85,
+  maxChars = 20,
+  maxConcurrent = 8,
+  windowSec = 1,
+  lanes = 8,
+  skipVerify = false,
+}) {
+  fontsDir = fontsDir ?? fontsRoot();
+  assertRenderable({ input, output, skipVerify });
+  const parsed = parseDanmaku(items);
+  const tooLong = parsed.filter((item) => Array.from(item.text).length > maxChars);
+  if (tooLong.length) {
+    throw new SubtitleError(
+      `${tooLong.length} 条弹幕超过单条 ${maxChars} 字上限（示例：${tooLong[0].text.slice(0, 12)}…）：请改写或拆条`,
+      "bad_style",
+      false,
+    );
+  }
+  const trimming = trimDanmaku(parsed, { windowSec, maxConcurrent });
+  const densityBefore = checkDanmakuDensity(parsed, { windowSec, maxConcurrent });
+  const probe = await probeMedia(input, { bins });
+  const platformKey = platform ?? brief.平台 ?? "默认";
+  const { key: layoutKey, layout } = layoutFor(platformKey, catalog);
+  const resolution = [probe.width, probe.height];
+  const selection = selectFonts({ brief, scene: "弹幕", top: 1, catalog, fontsDir, resolution });
+  const pick = selection.top.find((item) => item.installed !== false) ?? selection.top[0];
+  if (!pick) throw new SubtitleError("弹幕场景没有可用字体", "font_not_found", false);
+  const size = pick.size.sizePx;
+  const targets = loadRecipes().targets;
+  const layoutBands = textBands({ resolution, layout });
+  // 选型/配色用「顶部 1/4 区域」整带（滚动轨道与顶部固定行都在这里）
+  const danmakuAreaPx = {
+    x: 0,
+    y: 0,
+    w: resolution[0],
+    h: Math.max(24, Math.round(resolution[1] * Number(layout.弹幕?.top_band_ratio ?? 0.25))),
+  };
+  const bandStats = await regionStats({ input, bins, region: danmakuAreaPx });
+  const decision = decideTextStyle({ scene: "弹幕", band: bandStats, size, targets });
+  const alphaValue = Math.round((1 - Math.min(Math.max(opacity, 0.1), 1)) * 255).toString(16).padStart(2, "0").toUpperCase();
+  const tracks = planDanmakuTracks(trimming.kept, { resolution, layout, size, lanes });
+  const baseStyle = {
+    fontName: pick.fontFullname,
+    fontSize: size,
+    primaryColour: decision.primaryColour,
+    outlineColour: decision.outlineColour,
+    backColour: decision.backColour,
+    bold: false,
+    spacing: 0,
+    borderStyle: 1,
+    outline: Math.max(1, Math.round(size * 0.05)),
+    shadow: decision.shadow,
+    marginL: 0,
+    marginR: 0,
+    marginV: 0,
+  };
+  const styles = [
+    { name: "Danmaku", style: { ...baseStyle, alignment: 7 } },
+    { name: "DanmakuTop", style: { ...baseStyle, alignment: 8 } },
+    { name: "DanmakuBottom", style: { ...baseStyle, alignment: 2 } },
+  ];
+  const events = tracks.map((item) => {
+    const colour = item.colour ? assColour(item.colour) : baseStyle.primaryColour;
+    const fontSize = Math.max(16, Math.round(size * item.sizeScale));
+    const styleName = item.mode === "top" ? "DanmakuTop" : item.mode === "bottom" ? "DanmakuBottom" : "Danmaku";
+    const overrides = item.enterX === null
+      ? `{\\alpha&H${alphaValue}&\\c${colour}\\fs${fontSize}\\pos(${Math.round(resolution[0] / 2)},${item.y})}`
+      : `{\\alpha&H${alphaValue}&\\c${colour}\\fs${fontSize}\\move(${item.enterX},${item.y},${item.exitX},${item.y},0,${Math.round(item.durationSec * 1000)})}`;
+    return {
+      layer: 0,
+      start: srtSecondsToAss(item.at),
+      end: srtSecondsToAss(item.at + item.durationSec),
+      style: styleName,
+      name: pick.id,
+      text: `${overrides}${escapeAssText(item.text)}`,
+    };
+  });
+  const dir = evidenceDir ?? (await tempDir("workloom-subtitle-danmaku-"));
+  await fsp.mkdir(dir, { recursive: true });
+  const assPath = path.join(dir, "danmaku-plan.ass");
+  const assText = buildAssDocument({ resolution, styles, events });
+  await fsp.writeFile(assPath, assText, "utf8");
+  const encoded = await encodeWithAss({ input, output, assPath, fontsDir, catalog, bins });
+  // 抽样优先取滚动弹幕的「屏幕中段时刻」（位移中点最可靠），没有滚动条就取固定条
+  const sample = tracks.find((item) => item.mode === "scroll") ?? tracks[0];
+  const sampleAt = sample.mode === "scroll"
+    ? round(sample.at + sample.durationSec / 2, 2)
+    : round(sample.at + Math.min(1, sample.durationSec / 2), 2);
+  /**
+   * 可现度实测带 = **被抽样那条弹幕自己的轨道条带**（不是整块顶部 1/4）。
+   * 实测教训：整带面积大，墨迹占比被稀释——稀疏弹幕（1~2 条）Δ≈0.0017、7 条时 Δ≈0.0038，
+   * 都会贴着 0.004 阈值抖动，出现"明明渲染了却判失败"。收紧到该条的轨道条带后 Δ≈0.014，
+   * 判的是"这条弹幕出现没有"，与阈值口径一致。
+   */
+  const danmakuBandPx = {
+    x: 0,
+    y: Math.max(0, sample.y - Math.round(size * 0.4)),
+    w: resolution[0],
+    h: Math.round(size * 1.6),
+  };
+  const presence = await measureBandPresence({
+    input, output, at: sampleAt, band: danmakuBandPx, bins,
+  });
+  const evidence = [];
+  for (const at of [...new Set(tracks.slice(0, 3).map((item) => round(item.at + 0.6, 2)))]) {
+    const file = path.join(dir, `evidence-danmaku-${String(at).replace(".", "_")}.png`);
+    await extractFrame({ input: output, at, output: file, bins });
+    evidence.push({ at, file, sha256: await sha256File(file) });
+  }
+  const backRead = parseAssEvents(assText).filter((event) => event.style.startsWith("Danmaku"));
+  const checks = {
+    event_count_ok: backRead.length === tracks.length,
+    density_within_cap: densityBefore.ok,
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir !== false,
+    presence_ok: presence.delta >= 0.004,
+    resolution_preserved: encoded.outputProbe.width === probe.width && encoded.outputProbe.height === probe.height,
+    audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
+    evidence_frames: evidence.length > 0,
+  };
+  const report = {
+    schemaVersion: "workloom.subtitle-report/v1",
+    mode: "danmaku",
+    input,
+    output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
+    encoder: encoded.encoder.name,
+    platform: layoutKey,
+    resolution,
+    font: { id: pick.id, name: pick.字体名称 ?? pick.name, file: pick.file, license: pick.license, sha256: pick.sha256 },
+    opacity,
+    maxChars,
+    density: {
+      ...densityBefore,
+      kept: trimming.kept.length,
+      trimmed: trimming.trimmed,
+      trimmedItems: trimming.dropped.map((item) => item.text),
+    },
+    tracks: tracks.map((item) => ({ text: item.text, mode: item.mode, at: item.at, y: item.y, durationSec: round(item.durationSec, 2) })),
+    style: baseStyle,
+    textStyleDecision: decision,
+    presence,
+    evidence,
+    assPath,
+    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies },
+    checks,
+  };
+  if (!Object.values(checks).every(Boolean)) {
+    const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+    await removeOnFailure(output);
+    throw new SubtitleError(`弹幕复检未通过（${failed.join("/")}）：产物已删除`, "verify_failed", false);
+  }
+  return report;
+}
+
+/**
+ * 贴纸/花字渲染：200ms 弹入 + 停留 1.5~3s（附件口径，越界即拒绝）。
+ * 位置必须在安全区内、与平台遮挡区零相交；渲染后复检可现度/字体解析/分辨率/音轨/证据帧。
+ */
+export async function renderSticker({
+  input,
+  output,
+  stickers = [],
+  platform = null,
+  brief = {},
+  fontsDir = null,
+  evidenceDir = null,
+  bins = resolveBinaries(),
+  catalog = loadFontCatalog(),
+  skipVerify = false,
+}) {
+  fontsDir = fontsDir ?? fontsRoot();
+  assertRenderable({ input, output, skipVerify });
+  if (!Array.isArray(stickers) || !stickers.length) throw new SubtitleError("贴纸列表为空", "bad_request", false);
+  const targets = loadRecipes().targets;
+  const probe = await probeMedia(input, { bins });
+  const platformKey = platform ?? brief.平台 ?? "默认";
+  const { key: layoutKey, layout } = layoutFor(platformKey, catalog);
+  const resolution = [probe.width, probe.height];
+  const short = probe.shortSide;
+  const selection = selectFonts({ brief, scene: "贴纸", top: 1, catalog, fontsDir, resolution });
+  const pick = selection.top.find((item) => item.installed !== false) ?? selection.top[0];
+  if (!pick) throw new SubtitleError("贴纸场景没有可用字体", "font_not_found", false);
+  const zones = layout.occlusion_zones ?? [];
+  const styles = [];
+  const placements = [];
+  const events = [];
+  stickers.forEach((raw, index) => {
+    const preset = stickerStylePreset(raw.preset ?? raw.style ?? "撞色");
+    const text = String(raw.text ?? "").trim();
+    if (!text) throw new SubtitleError(`贴纸 #${index + 1} 文本为空`, "bad_style", false);
+    const start = Number(raw.start ?? 0);
+    const end = Number(raw.end ?? start + 2);
+    const hold = round(end - start, 2);
+    if (!(hold > 0)) throw new SubtitleError(`贴纸 #${index + 1} 时间轴非法`, "bad_style", false);
+    if (hold < 1.5 || hold > 3) {
+      throw new SubtitleError(
+        `贴纸 #${index + 1} 停留 ${hold}s 超出附件口径 1.5~3s：请调整时间或改用字幕轨`,
+        "bad_style",
+        false,
+      );
+    }
+    const scale = Number(raw.scale ?? 1);
+    const size = Math.max(16, Math.round(short * 0.07 * (Number.isFinite(scale) && scale > 0 ? scale : 1)));
+    const styleName = `Sticker${index + 1}`;
+    styles.push({
+      name: styleName,
+      style: {
+        fontName: pick.fontFullname,
+        fontSize: size,
+        primaryColour: assColour(preset.primaryColour),
+        outlineColour: assColour(preset.outlineColour),
+        backColour: preset.backColour,
+        bold: true,
+        spacing: 1,
+        borderStyle: preset.borderStyle,
+        outline: Math.max(2, Math.round(size * 0.08)),
+        shadow: preset.borderStyle === 3 ? 0 : 1,
+        alignment: 5,
+        marginL: 0,
+        marginR: 0,
+        marginV: 0,
+      },
+    });
+    const cx = Math.round(resolution[0] * Number(raw.x ?? 0.5));
+    const cy = Math.round(resolution[1] * Number(raw.y ?? 0.3));
+    const estWidth = Array.from(text).length * size;
+    const estHeight = Math.round(size * 1.3);
+    const rect = {
+      x: round((cx - estWidth / 2) / resolution[0], 4),
+      y: round((cy - estHeight / 2) / resolution[1], 4),
+      w: round(estWidth / resolution[0], 4),
+      h: round(estHeight / resolution[1], 4),
+    };
+    const hits = overlapsOcclusion(rect, zones);
+    if (hits.length) {
+      throw new SubtitleError(
+        `贴纸 #${index + 1} 落在平台遮挡区（${hits.map((zone) => zone.id).join("、")}）：请挪位或改用标题轨`,
+        "bad_style",
+        false,
+      );
+    }
+    const margin = targets.safeAreaMarginRatio * 0.5;
+    if (rect.x < margin || rect.y < margin || rect.x + rect.w > 1 - margin || rect.y + rect.h > 1 - margin) {
+      throw new SubtitleError(`贴纸 #${index + 1} 越出安全区：请把 x/y 收到 5% 边距内`, "bad_style", false);
+    }
+    placements.push({ text, preset: preset.name, start, end, holdSec: hold, rect, centre: { x: cx, y: cy } });
+    events.push({
+      layer: 2,
+      start: srtSecondsToAss(start),
+      end: srtSecondsToAss(end),
+      style: styleName,
+      name: `${pick.id}-sticker`,
+      text: `{\\pos(${cx},${cy})}${stickerAssText({ text }, { preset })}`,
+    });
+  });
+  const dir = evidenceDir ?? (await tempDir("workloom-subtitle-sticker-"));
+  await fsp.mkdir(dir, { recursive: true });
+  const assPath = path.join(dir, "sticker-plan.ass");
+  const assText = buildAssDocument({ resolution, styles, events });
+  await fsp.writeFile(assPath, assText, "utf8");
+  const encoded = await encodeWithAss({ input, output, assPath, fontsDir, catalog, bins });
+  const sample = placements[0];
+  const presence = await measureBandPresence({
+    input,
+    output,
+    at: round(sample.start + Math.min(0.8, sample.holdSec / 2), 2),
+    band: {
+      x: Math.max(0, Math.round(sample.rect.x * resolution[0])),
+      y: Math.max(0, Math.round(sample.rect.y * resolution[1])),
+      w: Math.max(8, Math.round(sample.rect.w * resolution[0])),
+      h: Math.max(8, Math.round(sample.rect.h * resolution[1])),
+    },
+    bins,
+  });
+  const evidence = [];
+  for (const at of [...new Set(placements.map((item) => round(item.start + Math.min(0.8, item.holdSec / 2), 2)))].slice(0, 3)) {
+    const file = path.join(dir, `evidence-sticker-${String(at).replace(".", "_")}.png`);
+    await extractFrame({ input: output, at, output: file, bins });
+    evidence.push({ at, file, sha256: await sha256File(file) });
+  }
+  const checks = {
+    per_sticker_hold_ok: placements.every((item) => item.holdSec >= 1.5 && item.holdSec <= 3),
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir !== false,
+    presence_ok: presence.delta >= 0.004,
+    resolution_preserved: encoded.outputProbe.width === probe.width && encoded.outputProbe.height === probe.height,
+    audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
+    evidence_frames: evidence.length > 0,
+  };
+  const report = {
+    schemaVersion: "workloom.subtitle-report/v1",
+    mode: "sticker",
+    input,
+    output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
+    encoder: encoded.encoder.name,
+    platform: layoutKey,
+    resolution,
+    font: { id: pick.id, name: pick.字体名称 ?? pick.name, file: pick.file, license: pick.license },
+    entranceMs: 200,
+    placements,
+    presence,
+    evidence,
+    assPath,
+    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies },
+    checks,
+  };
+  if (!Object.values(checks).every(Boolean)) {
+    const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+    await removeOnFailure(output);
+    throw new SubtitleError(`贴纸复检未通过（${failed.join("/")}）：产物已删除`, "verify_failed", false);
+  }
+  return report;
+}
+
+/**
+ * 卡拉OK 字幕：\kf 逐字扫过（可选双语第二行）。
+ * 逐字时间轴优先用显式传入；缺省按字数均分，并在报告里如实标注「非真实发音对齐」。
+ */
+export async function renderKaraoke({
+  input,
+  output,
+  cues = [],
+  timings = null,
+  timingMode = "even",
+  secondaryCues = [],
+  secondaryLabel = "EN",
+  platform = null,
+  brief = {},
+  fontsDir = null,
+  evidenceDir = null,
+  bins = resolveBinaries(),
+  catalog = loadFontCatalog(),
+  highlightColour = "#FFE066",
+  skipVerify = false,
+}) {
+  fontsDir = fontsDir ?? fontsRoot();
+  assertRenderable({ input, output, skipVerify });
+  if (!cues.length) throw new SubtitleError("卡拉OK 需要 SRT 字幕条", "bad_request", false);
+  const probe = await probeMedia(input, { bins });
+  const platformKey = platform ?? brief.平台 ?? "默认";
+  const { key: layoutKey, layout } = layoutFor(platformKey, catalog);
+  const resolution = [probe.width, probe.height];
+  const selection = selectFonts({ brief, scene: "字幕", top: 1, catalog, fontsDir, resolution });
+  const pick = selection.top.find((item) => item.installed !== false) ?? selection.top[0];
+  if (!pick) throw new SubtitleError("字幕场景没有可用字体", "font_not_found", false);
+  const size = pick.size.sizePx;
+  const subLayout = layout.字幕 ?? {};
+  const marginV = Math.round(resolution[1] * Number(subLayout.bottom_margin_ratio ?? 0.05));
+  const styles = [{
+    name: "Kara",
+    style: {
+      fontName: pick.fontFullname,
+      fontSize: size,
+      primaryColour: assColour("#FFFFFF"),
+      secondaryColour: assColour(highlightColour),
+      outlineColour: assColour("#000000"),
+      backColour: "&H64000000",
+      bold: false,
+      spacing: 0,
+      borderStyle: 1,
+      outline: Math.max(1, Math.round(size * 0.06)),
+      shadow: 1,
+      alignment: Number(subLayout.alignment ?? 2),
+      marginL: Math.round(resolution[0] * 0.05),
+      marginR: Math.round(resolution[0] * 0.05),
+      marginV,
+    },
+  }];
+  const timingRows = [];
+  const events = cues.map((cue, index) => {
+    const payload = Array.isArray(timings) ? timings[index] : (timings?.[index] ?? null);
+    const parsed = parseTimedWords(payload, { text: cue.text, start: cue.start, end: cue.end, mode: timingMode });
+    timingRows.push({
+      cue: index + 1, basis: parsed.basis, cueDuration: parsed.cueDuration, sum: parsed.sum, sumErrorSec: parsed.sumErrorSec,
+    });
+    return {
+      layer: 0,
+      start: cue.start,
+      end: cue.end,
+      style: "Kara",
+      name: pick.id,
+      text: karaokeAssText(parsed.words, { mode: "kf" }),
+    };
+  });
+  if (secondaryCues.length) {
+    const secondarySize = Math.max(16, Math.round(size * 0.85));
+    styles.push({
+      name: "Kara2",
+      style: {
+        ...styles[0].style,
+        fontSize: secondarySize,
+        outline: Math.max(1, Math.round(secondarySize * 0.06)),
+        marginV: Math.max(0, Math.round(marginV - size * 1.35)),
+      },
+    });
+    for (const cue of secondaryCues) {
+      events.push({
+        layer: 0, start: cue.start, end: cue.end, style: "Kara2",
+        name: `${pick.id}-${secondaryLabel}`, text: escapeAssText(cue.text),
+      });
+    }
+  }
+  const dir = evidenceDir ?? (await tempDir("workloom-subtitle-karaoke-"));
+  await fsp.mkdir(dir, { recursive: true });
+  const assPath = path.join(dir, "karaoke-plan.ass");
+  const assText = buildAssDocument({ resolution, styles, events });
+  await fsp.writeFile(assPath, assText, "utf8");
+  const encoded = await encodeWithAss({ input, output, assPath, fontsDir, catalog, bins });
+  const bands = textBands({ resolution, layout });
+  const firstCue = cues[0];
+  const presence = await measureBandPresence({
+    input,
+    output,
+    at: round(Math.max(0, assistToSeconds(firstCue.end) - 0.4), 2),
+    band: bands.subtitleBand.px,
+    bins,
+  });
+  const evidence = [];
+  for (const cue of cues.slice(0, 3)) {
+    const at = round((assistToSeconds(cue.start) + assistToSeconds(cue.end)) / 2, 2);
+    const file = path.join(dir, `evidence-karaoke-${String(at).replace(".", "_")}.png`);
+    await extractFrame({ input: output, at, output: file, bins });
+    evidence.push({ at, file, sha256: await sha256File(file) });
+  }
+  const checks = {
+    timing_sum_ok: timingRows.every((row) => Math.abs(row.sumErrorSec) <= 0.05),
+    karaoke_tags_present: events
+      .filter((event) => event.style === "Kara")
+      .every((event) => /\\kf?\d+/.test(event.text)),
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir !== false,
+    presence_ok: presence.delta >= 0.004,
+    resolution_preserved: encoded.outputProbe.width === probe.width && encoded.outputProbe.height === probe.height,
+    audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
+    evidence_frames: evidence.length > 0,
+  };
+  const report = {
+    schemaVersion: "workloom.subtitle-report/v1",
+    mode: "karaoke",
+    input,
+    output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
+    encoder: encoded.encoder.name,
+    platform: layoutKey,
+    resolution,
+    font: { id: pick.id, name: pick.字体名称 ?? pick.name, file: pick.file, license: pick.license },
+    highlightColour,
+    timingMode,
+    timing: timingRows,
+    bilingual: secondaryCues.length > 0,
+    presence,
+    evidence,
+    assPath,
+    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies },
+    checks,
+  };
+  if (!Object.values(checks).every((ok) => ok)) {
+    const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+    await removeOnFailure(output);
+    throw new SubtitleError(`卡拉OK复检未通过（${failed.join("/")}）：产物已删除`, "verify_failed", false);
+  }
+  return report;
 }
 
 /* ============================ 择优出片 ============================ */
@@ -1779,6 +2536,8 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         input,
         output,
         cues: resolveCues(params),
+        secondaryCues: resolveCues({ srt_path: params.srt_path_en ?? undefined, srt_text: params.srt_text_en ?? undefined }),
+        secondaryLabel: String(params.secondary_label ?? "EN"),
         titleText: params.title_text ?? "",
         titleDurationSec: optionalNumber(params.title_duration_sec) ?? 3,
         brief: resolveBrief(params),
@@ -1829,6 +2588,97 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         receipt: {
           synced: true,
           snapshot_uri: `subtitle://title/${path.basename(report.output.path)}?sha256=${report.output.hash}`,
+          sha256: report.output.hash,
+          verified_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    case "subtitlewrite.danmaku": {
+      const input = assertPathAllowed(text(params.input_path, "input_path"), roots, "input_path");
+      const output = assertPathAllowed(text(params.output_path, "output_path"), roots, "output_path");
+      const items = Array.isArray(params.items) ? params.items : params.danmaku_path
+        ? JSON.parse(fs.readFileSync(assertPathAllowed(String(params.danmaku_path), roots, "danmaku_path"), "utf8"))
+        : [];
+      const report = await renderDanmaku({
+        input,
+        output,
+        items,
+        platform: params.platform ?? null,
+        brief: resolveBrief(params),
+        fontsDir: params.fonts_dir ? assertPathAllowed(String(params.fonts_dir), roots, "fonts_dir") : fontRoot,
+        evidenceDir: optionalPath(params.evidence_dir, "evidence_dir"),
+        bins,
+        catalog,
+        opacity: optionalNumber(params.opacity) ?? 0.85,
+        maxChars: optionalNumber(params.max_chars) ?? 20,
+        maxConcurrent: optionalNumber(params.max_concurrent) ?? 8,
+        windowSec: optionalNumber(params.window_sec) ?? 1,
+        lanes: optionalNumber(params.lanes) ?? 8,
+        skipVerify: params.skip_verify === true || params.verify === false,
+      });
+      return {
+        result: { ...report, output_path: report.output.path, sha256: report.output.hash },
+        receipt: {
+          synced: true,
+          snapshot_uri: `subtitle://danmaku/${path.basename(report.output.path)}?sha256=${report.output.hash}`,
+          sha256: report.output.hash,
+          verified_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    case "subtitlewrite.sticker": {
+      const input = assertPathAllowed(text(params.input_path, "input_path"), roots, "input_path");
+      const output = assertPathAllowed(text(params.output_path, "output_path"), roots, "output_path");
+      const report = await renderSticker({
+        input,
+        output,
+        stickers: Array.isArray(params.stickers) ? params.stickers : [],
+        platform: params.platform ?? null,
+        brief: resolveBrief(params),
+        fontsDir: params.fonts_dir ? assertPathAllowed(String(params.fonts_dir), roots, "fonts_dir") : fontRoot,
+        evidenceDir: optionalPath(params.evidence_dir, "evidence_dir"),
+        bins,
+        catalog,
+        skipVerify: params.skip_verify === true || params.verify === false,
+      });
+      return {
+        result: { ...report, output_path: report.output.path, sha256: report.output.hash },
+        receipt: {
+          synced: true,
+          snapshot_uri: `subtitle://sticker/${path.basename(report.output.path)}?sha256=${report.output.hash}`,
+          sha256: report.output.hash,
+          verified_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    case "subtitlewrite.karaoke": {
+      const input = assertPathAllowed(text(params.input_path, "input_path"), roots, "input_path");
+      const output = assertPathAllowed(text(params.output_path, "output_path"), roots, "output_path");
+      const report = await renderKaraoke({
+        input,
+        output,
+        cues: resolveCues(params),
+        timings: Array.isArray(params.timings) ? params.timings : null,
+        timingMode: params.timing_mode === "explicit" ? "explicit" : "even",
+        secondaryCues: resolveCues({ srt_path: params.srt_path_en ?? undefined, srt_text: params.srt_text_en ?? undefined }),
+        secondaryLabel: String(params.secondary_label ?? "EN"),
+        platform: params.platform ?? null,
+        brief: resolveBrief(params),
+        fontsDir: params.fonts_dir ? assertPathAllowed(String(params.fonts_dir), roots, "fonts_dir") : fontRoot,
+        evidenceDir: optionalPath(params.evidence_dir, "evidence_dir"),
+        bins,
+        catalog,
+        highlightColour: typeof params.highlight_colour === "string" ? params.highlight_colour : "#FFE066",
+        skipVerify: params.skip_verify === true || params.verify === false,
+      });
+      return {
+        result: { ...report, output_path: report.output.path, sha256: report.output.hash },
+        receipt: {
+          synced: true,
+          snapshot_uri: `subtitle://karaoke/${path.basename(report.output.path)}?sha256=${report.output.hash}`,
           sha256: report.output.hash,
           verified_at: new Date().toISOString(),
         },

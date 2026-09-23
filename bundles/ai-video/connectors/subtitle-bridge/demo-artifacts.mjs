@@ -25,7 +25,10 @@ import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-import { analyzeVideo, best, findRecipes, health, plan, renderWithSubtitles, selectFonts } from "./core.mjs";
+import {
+  analyzeVideo, best, findRecipes, health, plan, renderDanmaku, renderKaraoke, renderSticker,
+  renderWithSubtitles, selectFonts,
+} from "./core.mjs";
 import { resolveBinaries } from "./measure.mjs";
 
 const SHOTS = [
@@ -57,6 +60,45 @@ const BRIEF = {
 };
 
 const TITLE_TEXT = "川西之行 · WEST SICHUAN";
+
+/** 演示弹幕（含滚动/顶部固定/底部固定与彩色条，密度在 1s 窗口上限内）。 */
+const DANMAKU = [
+  { at: 0.8, text: "这也太好看了吧" },
+  { at: 1.0, text: "川西永远的神" },
+  { at: 1.2, text: "求路线", colour: "#FFF200" },
+  { at: 2.0, text: "雪山绝了", mode: "top" },
+  { at: 6.5, text: "已收藏" },
+  { at: 9.0, text: "藏寨好美" },
+  { at: 13.5, text: "背景音乐是什么", mode: "bottom" },
+];
+
+/** 演示贴纸/花字（停留 1.5~3s，落点避开平台遮挡区）。 */
+const STICKERS = [
+  { text: "川西必去", start: 1.0, end: 3.5, x: 0.5, y: 0.24, preset: "撞色" },
+  { text: "收藏", start: 13.4, end: 15.8, x: 0.26, y: 0.62, preset: "奶油" },
+];
+
+/** 演示英文轨（双语字幕第二行；与中文 SRT 同时间轴）。 */
+const EN_SRT = `1
+00:00:00,600 --> 00:00:03,400
+Snow peaks reflected in the morning light
+
+2
+00:00:03,600 --> 00:00:06,200
+Tibetan smoke is a letter to the sky
+
+3
+00:00:06,600 --> 00:00:09,400
+Only the wind in the valley
+
+4
+00:00:09,800 --> 00:00:12,600
+Snow peaks, grasslands, and Tibetan songs
+
+5
+00:00:13,000 --> 00:00:18,000
+Keep this clarity for you
+`;
 
 function arg(name, fallback = null) {
   const index = process.argv.indexOf(name);
@@ -173,7 +215,7 @@ async function main() {
     bins,
   });
 
-  process.stderr.write("⑥ 择优出片（候选池打分）\n");
+process.stderr.write("⑥ 择优出片（候选池打分）\n");
   const bestOutcome = await best({
     input: source,
     output: path.join(outDir, "best.mp4"),
@@ -182,6 +224,47 @@ async function main() {
     brief,
     platform,
     fontsDir,
+    evidenceDir,
+    bins,
+  });
+
+  process.stderr.write("⑦ 弹幕 / 贴纸 / 卡拉OK / 双语字幕\n");
+  const cues = (await import("./core.mjs")).parseSrt(fs.readFileSync(srt, "utf8"));
+  const danmakuReport = await renderDanmaku({
+    input: source,
+    output: path.join(outDir, "danmaku.mp4"),
+    items: DANMAKU,
+    brief,
+    platform,
+    evidenceDir,
+    bins,
+  });
+  const stickerReport = await renderSticker({
+    input: source,
+    output: path.join(outDir, "sticker.mp4"),
+    stickers: STICKERS,
+    brief,
+    platform,
+    evidenceDir,
+    bins,
+  });
+  const karaokeReport = await renderKaraoke({
+    input: source,
+    output: path.join(outDir, "karaoke.mp4"),
+    cues: cues.slice(0, 3),
+    brief,
+    platform,
+    evidenceDir,
+    bins,
+  });
+  const bilingualReport = await renderWithSubtitles({
+    mode: "subtitle",
+    input: source,
+    output: path.join(outDir, "bilingual.mp4"),
+    cues,
+    secondaryCues: (await import("./core.mjs")).parseSrt(EN_SRT),
+    brief,
+    platform,
     evidenceDir,
     bins,
   });
@@ -231,6 +314,37 @@ async function main() {
         })),
       }
       : bestOutcome,
+    danmaku: {
+      path: danmakuReport.output.path,
+      sha256: danmakuReport.output.hash,
+      font: danmakuReport.font,
+      density: danmakuReport.density,
+      tracks: danmakuReport.tracks,
+      presence: danmakuReport.presence,
+      checks: danmakuReport.checks,
+    },
+    sticker: {
+      path: stickerReport.output.path,
+      sha256: stickerReport.output.hash,
+      placements: stickerReport.placements,
+      entranceMs: stickerReport.entranceMs,
+      presence: stickerReport.presence,
+      checks: stickerReport.checks,
+    },
+    karaoke: {
+      path: karaokeReport.output.path,
+      sha256: karaokeReport.output.hash,
+      timing: karaokeReport.timing,
+      highlightColour: karaokeReport.highlightColour,
+      presence: karaokeReport.presence,
+      checks: karaokeReport.checks,
+    },
+    bilingual: {
+      path: bilingualReport.output.path,
+      sha256: bilingualReport.output.hash,
+      checks: bilingualReport.checks,
+      presence: bilingualReport.presence.delta,
+    },
   };
   fs.writeFileSync(path.join(outDir, "report.json"), `${JSON.stringify(report, null, 2)}\n`, "utf8");
 
@@ -247,6 +361,10 @@ async function main() {
     "| `subtitle-plan.json` / `.ass` | 选型与版式方案：字体、字号、描边、边距、版式体检 |",
     "| `burned.mp4` | 烧录成片（字幕 + 片头标题），带复检回执 |",
     "| `best.mp4` | 择优出片（字体×描边候选池打分后的赢家） |",
+    "| `danmaku.mp4` | 弹幕轨（滚动 + 顶部/底部固定，密度熔断） |",
+    "| `sticker.mp4` | 贴纸/花字（200ms 弹入 + 安全区校验） |",
+    "| `karaoke.mp4` | 卡拉OK 逐字扫过（\\kf） |",
+    "| `bilingual.mp4` | 双语字幕（中文主行 + 英文次行） |",
     "| `evidence-*.png` | 交付证据帧（标题帧 / 首条字幕 / 末条字幕） |",
     "| `analyze-*.png` | 画面可读性诊断抽帧 |",
     "| `report.json` | 全量指标：选型理由、版式体检、字幕可现度、时间轴回读、sha256 |",

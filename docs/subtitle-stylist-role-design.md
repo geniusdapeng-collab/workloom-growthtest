@@ -37,7 +37,7 @@
 | 风险级别 | 本地非破坏动作，不烧生成额度；**品牌视觉锤（账号锁定字体）变更 / 字体库首次入片**属对外观感与法律风险变更，须人审 |
 | 产物 | 成片（新文件）+ `subtitle_track`（字幕轨/版式方案）+ `subtitle_report`（字幕报告）+ 证据帧（标题/首条字幕/末条字幕） |
 
-## 3. 能力矩阵（5 技能 × 9 工具 × 6 围栏）
+## 3. 能力矩阵（5 技能 × 12 工具 × 7 围栏）
 
 ### 3.1 技能（随 Bundle 分发，安装即生效、卸载即撤销）
 
@@ -49,7 +49,7 @@
 | `font-license-compliance` | **许可怎么判**：OFL/Apache/厂商免费商用白名单、OFL 四条义务、不做子集化的理由、客户自备字体登记口径 |
 | `subtitle-delivery-spec` | **怎么交付**：交付物四件、指标阈值表、命名与版本链、返工归因表、不可修复情形 |
 
-### 3.2 工具（字幕工位 bridge，9 个，全部真实 ffmpeg + libass 内核）
+### 3.2 工具（字幕工位 bridge，12 个，全部真实 ffmpeg + libass 内核）
 
 | 工具 | 类型 | 用途 |
 |---|---|---|
@@ -61,6 +61,9 @@
 | `subtitlewrite.plan` | 写 | 出方案包（ASS 样式与事件 + 版式体检 + 抽样墨迹实测），**不动成片** |
 | `subtitlewrite.burn` | 写 | 字幕烧录出片（SRT→ASS→libass，六项复检） |
 | `subtitlewrite.title` | 写 | 片头标题/花字渲染出片（平台版式 + 描边/底衬 + 安全区校验） |
+| `subtitlewrite.danmaku` | 写 | 弹幕轨：滚动（顶部 1/4 轨道）+ 顶部/底部固定；单条 ≤20 字、透明度 0.85、密度熔断 + 抽稀如实报告 |
+| `subtitlewrite.sticker` | 写 | 贴纸/花字：200ms 弹入 + 停留 1.5~3s；五种预设；安全区与遮挡区双校验 |
+| `subtitlewrite.karaoke` | 写 | 卡拉OK：`\kf` 逐字扫过；逐字时间轴显式或均分（如实标注）；可叠双语第二行 |
 | `subtitlewrite.best` | 写 | 择优出片：字体×描边候选池打分；**允许结论是"无需加字幕"**（不产出文件） |
 
 ### 3.3 围栏（`fences/ai-video-subtitle.yml`）
@@ -73,6 +76,7 @@
 | G-SUB3 | 交付必须带复检，且不得无视安全区 | block | 关闭校验 / 强行忽略遮挡区一票否决 |
 | G-SUB4 | 单租户日字幕渲染配额 | block | 60 次/日熔断（工位产能保护） |
 | G-SUB5 | 字体许可不合规禁止入片 | block | 非白名单许可不得进入商用交付（fail-closed） |
+| G-SUB6 | 弹幕刷屏与越界熔断 | block | `allow_flood` / `ignore_density` / `skip_safe_area` 任一即阻断 |
 
 ## 4. 核心问题的正面回答：标题字幕怎么落地到成片
 
@@ -84,6 +88,7 @@
   ↓ ② 选型：场景×语言硬过滤 → 五维加权 → 账号视觉锤优先 → Top-N + 理由 + 字号
   ↓ ③ 版式：字号=短边×基准比×粗细修正×平台倍率；描边/底衬由实测决定；标题与字幕分层
   ↓ ④ 烧录：SRT→ASS（PlayRes=实际分辨率）→ ffmpeg libass（扁平字体目录）→ 六项复检
+  ↓ ⑤ 扩展轨（按需）：弹幕（滚动/固定 + 密度熔断）· 贴纸花字（200ms 弹入）· 卡拉OK（\kf 逐字）· 双语第二行
   ↓ 交付：新成片 + subtitle_track + subtitle_report + 证据帧 + sha256
 ```
 
@@ -162,7 +167,8 @@
 4. 时间轴回读：ASS 事件与源 SRT 逐条一致（条数 + 起止）；
 5. 字体解析：`fontselect` 全部命中工位字体目录（无系统字体回落）；
 6. 分辨率与音轨保持：与母版一致（音轨 copy）；
-7. 证据帧：标题帧 + 首条字幕 + 末条字幕（PNG，带 sha256，按产物名打前缀）。
+7. 证据帧：标题帧 + 首条字幕 + 末条字幕（PNG，带 sha256，按产物名打前缀）；
+8. 扩展轨（用到时）：弹幕密度与抽稀条数、贴纸停留时长与落点、卡拉OK 逐字时长误差与口径（显式/均分）、双语两行版式体检。
 
 ## 9. 与上下游的接口
 
@@ -207,10 +213,11 @@
 | 岗位 preset | ✅ `presets/subtitle-stylist.yml`（5 技能 / 9 工具 / 6 围栏 / 事件域 `subtitle.`） |
 | 技能矩阵 | ✅ 5 个 SKILL.md 随 Bundle 分发并进签名索引 |
 | 字体档案 | ✅ `library/font-catalog/`（29 款打标 + 许可 + sha256 + 六平台版式 + 遮挡区） |
+| 字体分发 | ✅ `library/fonts/{cn,en}/` **29 款全量随仓分发**（档案 sha256 ↔ 随包文件 ↔ bundle 完整性索引 三层校验） |
 | 版式配方 | ✅ `library/typography-recipes/recipes.json`（16 条题材配方 + 交付目标值） |
-| 工位工具 | ✅ `connectors/subtitle-bridge`（9 工具，真实 ffmpeg + libass 内核） |
+| 工位工具 | ✅ `connectors/subtitle-bridge`（12 工具：字幕/标题/弹幕/贴纸/卡拉OK/双语，真实 ffmpeg + libass 内核） |
 | 字体获取 | ✅ `kit/fonts-pin.json` + `kit/install-fonts.sh`（逐文件 sha256，字体不进仓库） |
-| 围栏 | ✅ `fences/ai-video-subtitle.yml`（G-SUB0..G-SUB5） |
+| 围栏 | ✅ `fences/ai-video-subtitle.yml`（G-SUB0..G-SUB6） |
 | 管线接线 | ✅ 叙事片管线 `render → post → color → subtitle → bgm → archive` |
 | 对象类型 | ✅ `subtitle_track` / `subtitle_report`（`schemas/objects.json`） |
 | 静态验证 | ✅ `packages/base/bundles/subtitle-capability.test.ts`（围栏语义/档案/配方/纯函数/接线） |
@@ -225,7 +232,7 @@
 2. **"已带硬字幕"的检测依赖上游声明**：`subtitlewrite.best` 用 `has_burned_in_subtitles` 显式参数判定，
    没有做 OCR/版式反推（避免误判导致该加字幕时停手）。
 3. **遮挡区是本仓工程取值**：依据附件版式的「位置说明」落成矩形；平台 UI 改版时需要按同一口径更新并回归。
-4. **上游直链核验分批进行**：`fonts-pin.json` 只把**实测逐字节一致**的直链标 `verifiedAt`，
-   其余条目需走 `--from-dir` 导入（离线/客户自备通道），未核验不发下载。
+4. **字体已随仓分发，上游直链只作升级比对**：`fonts-pin.json` 把实测逐字节一致的直链标 `verifiedAt`，
+   其余条目仅用于升级比对（升级时必须先下载核验 sha256 再回填，不得直接替换随包字体）。
 5. **两隔离副本（growthtest / growthmatrix）** 的移植按产品所有者指令执行（见任务回执），
    移植后以各自仓的回归口径重新验证，不以本仓结论代表它们。
