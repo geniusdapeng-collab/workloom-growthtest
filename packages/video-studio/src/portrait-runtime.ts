@@ -45,6 +45,9 @@ export interface PortraitTask {
   angle?: string;
   view?: string;
   prompt?: string;
+  /** 角色档案描述（供应商侧叫法不一，这里显式声明便于桥接） */
+  characterDescription?: string;
+  description?: string;
   [key: string]: unknown;
 }
 
@@ -82,6 +85,14 @@ export interface PortraitRuntimeOptions {
   referenceImages?: string[];
   /** 角色锚定参考图（例如实拍人物），缺省不锚定 */
   characterAnchorImages?: string[];
+  /**
+   * 角色定妆照是否必须有可用的"角色档案"描述（默认 false，保持 vendor 既有行为；
+   * WorkLoom 生产链路在 `studio-worker` 里显式打开）。
+   * 真机事故 2026-09-23：描述为空时走兜底写法（只有"名字 + 角度 + 规范"），
+   * 生成结果与角色设定无关（要求"三十岁上下女性"却出了个男性模特），
+   * 进而污染整条真人出镜链路。打开后没有描述即拒绝出图（fail-closed）。
+   */
+  requireCharacterDescription?: boolean;
   /** 单次生成随附参考图上限（Seedance/Seedream 一致性口径 4 张） */
   maxReferenceImages?: number;
   log?: (line: string) => void;
@@ -173,6 +184,7 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
     timeoutMs = 240_000,
     referenceImages = [],
     characterAnchorImages = [],
+    requireCharacterDescription = false,
     maxReferenceImages = 4,
     retries = 2
   } = options;
@@ -257,9 +269,62 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
       const name = String(task.characterName || task.characterId || task.productName || task.productId || "主体");
       parts.push(`【定妆照】${name} — ${angleRaw}`);
     }
+    if (kind === "character") {
+      const profile = characterProfileOf(task);
+      if (profile) {
+        if (!parts.some((part) => part.includes("角色档案"))) parts.push(`角色档案：${profile}`);
+      } else if (requireCharacterDescription) {
+        const name = String(task.characterName || task.characterId || "该角色");
+        throw new Error(
+          `角色定妆照缺少「角色档案」描述（${name}）：拒绝无描述出图——历史事故里这会生成与设定无关的人物`
+          + "（如要求女性却出男性）。请在剧本/蓝图里补齐角色描述，或显式设 requireCharacterDescription=false。"
+        );
+      } else {
+        /** 不阻断，但绝不静默：无描述=人物由模型自由发挥，真机事故根因之一 */
+        log(
+          `[portrait] ⚠️ 角色「${String(task.characterName || task.characterId || "未命名")}」缺少角色档案描述：`
+          + "本次出图人物由模型自由发挥（与设定/真人可能无关）；生产链路应开启 requireCharacterDescription。"
+        );
+      }
+    }
     parts.push("规范：写实摄影质感，主体完整入画，无文字无水印无边框，无多余肢体");
     if (kind === "product") parts.push("以参考图中的真实场景/空间为准，保持建筑、家具与材质细节不漂移");
     return parts.join("\n");
+  }
+
+  /**
+   * 从任务里取"角色档案"描述：优先任务自带字段，其次 prompt 里的 `角色档案：…` 行，
+   * 最后兜底检查 prompt 本身是否已是足够具体的人物描写。
+   * 返回 null 表示"描述不可用"（调用方按 fail-closed 处理）。
+   */
+  function characterProfileOf(task: PortraitTask): string | null {
+    const explicit = [task.characterDescription, task.description]
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .find((value) => usableProfile(value) !== null);
+    if (explicit) return usableProfile(explicit);
+    const prompt = typeof task.prompt === "string" ? task.prompt : "";
+    const line = /角色档案[:：]\s*([^\n]+)/.exec(prompt)?.[1]?.trim() ?? "";
+    const fromLine = usableProfile(line, task.characterName ?? task.characterId);
+    if (fromLine) return fromLine;
+    /** 兜底只认"整段就是人物描写"的提示词：先剥掉定妆照模板行，避免把模板当成角色档案 */
+    const stripped = prompt
+      .replace(/【定妆照】[^\n]*/g, "")
+      .replace(/^\s*(构图|规范|一致性|视觉系统|角度|背景)[:：][^\n]*$/gm, "")
+      .trim();
+    return usableProfile(stripped, task.characterName ?? task.characterId);
+  }
+
+  /** 去掉角色名与"human/真人/角色"这类占位词后，仍需足够具体才算可用描述 */
+  function usableProfile(raw: string, name?: string): string | null {
+    let text = raw.trim();
+    if (!text) return null;
+    if (name) text = text.split(name).join(" ");
+    text = text.replace(/^(角色档案|角色|人物)[:：]\s*/, "")
+      .replace(/\b(human|person|character)\b/gi, " ")
+      .replace(/定妆照|全身|半身|正面|侧面|背面|近景|远景|特写/g, " ")
+      .replace(/[，。、；;：:（）()【】\s]/g, "");
+    const descriptive = /[女男]|[0-9一二三四五六七八九十]{1,2}\s*十?岁|发|裙|衣|装|妆|身高|体型|气质|脸|眼/;
+    return text.length >= 8 && descriptive.test(text) ? raw.trim() : null;
   }
 
   async function toDataUrl(file: string): Promise<string> {
@@ -360,7 +425,12 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
     const anchors = anchorsFor(kind, baseImage);
     log(
       `[portrait] 出图：${name} / ${angleRaw} → ${angle}`
-      + `${anchors.length ? `（锚定参考图 ${anchors.length} 张）` : "（无参考图）"}`
+      + `${anchors.length
+        ? `（锚定参考图 ${anchors.length} 张）`
+        : kind === "character"
+          // 角色无锚定 = 人物与真人无关（真机事故根因之一），必须显性告警
+          ? "（⚠️ 无锚定参考图：生成人物与真人无关，需配置 HR_PORTRAIT_ANCHORS）"
+          : "（无参考图）"}`
     );
     const url = await generateImage(buildPrompt(task, kind, angleRaw), anchors);
     const bytes = await download(url);
