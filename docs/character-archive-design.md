@@ -204,3 +204,47 @@ node scripts/tools/character-archive.mts impact --character pingjiang-presenter 
 
 结论：**"定妆照与场景解耦 + 出片时场景只由提示词给"** 是保证"像真人、不像 AI"的关键纪律；
 档案 `generation-recipe.json` 已新增 `sceneDecoupled` 字段，`portraitSets` 已升级到 v3（去场景版）。
+
+### 附录 A.3 · 定妆照生成 Agent（`portrait-agent`，绑定角色档案）
+
+**定位**：定妆照这件事只由一个 Agent 负责，升级也只改它——不再把提示词散落在各处。
+
+| 项 | 内容 |
+|---|---|
+| 代码 | `packages/video-studio/src/portrait-agent.ts`（`buildPortraitPlan` 纯函数 + `runPortraitAgent` 执行器） |
+| CLI | `node scripts/tools/portrait-agent.mts plan --character <id>`（dry-run 打印 4 角度提示词）<br>`node scripts/tools/portrait-agent.mts run --character <id> [--seed N] [--version N] [--angles …] [--no-activate]` |
+| 绑定 | 读 `var/media/characters/<id>/profile.json`；产出写回 `portraits/vN` + `portrait-sets/vN.json`，并更新 `profile.json#portraitSets`（新集置 active）与 `profile.json#portraitAgent`（本次模型/角度/模式留痕） |
+| 默认口径 | **纯写实 + 场景解耦**：只描述人（外貌/发型/服装）+ 中性浅灰背景 + 中性柔光 5600K + 85mm f/4 + 保留毛孔/眼神光；4 角度 `front/threeQuarter/closeup/side`；负面词含 `no scene/no location/no props/no golden hour/no warm filter/no studio glamour` + 写实负面词 |
+| 豁免 | 角色档案显式声明风格（`style: anime/cartoon/3d…`）或 `kind: animal/object…` → 走非写实模板并记录理由 |
+| 版本 | 只增不改；`--version` 可指定，缺省自动 `max+1`；失败即抛错（不写半套、不动 active） |
+
+### 附录 A.4 · 写实强约束的落点与措辞（2026-09-24）
+
+**落点（三处，缺一不可）**
+
+| 层 | 文件 | 作用 |
+|---|---|---|
+| ① 提示词组装 | `packages/video-studio/src/shot-spec.ts`（`REALISM_CLAUSE` / `SCENE_DECOUPLE_CLAUSE` / `EXTRAS_REALISM_CLAUSE` / `REALISM_NEGATIVE_TERMS`） | 每镜自动追加子句与英文负面词 |
+| ② 交付闸 | 同上 `delivery.pass` 自检 | 缺标记 → 判不合格（拒绝提交，不静默放行） |
+| ③ 定妆照生成 | `packages/video-studio/src/portrait-agent.ts` 的写实模板 + 负面词 | 从源头保证"人只在定妆照里、且是写实" |
+
+**措辞（原文）**
+- 【写实纪律】出镜人物一律为纯写实真人质感：真实皮肤纹理（可见毛孔与细颗粒）、自然肤质与面部微结构、自然光影与真实镜头语言（纪录片/电影实拍观感）；严禁卡通、动漫、插画、3D/CG 渲染感、塑料感或磨皮美颜。
+- 【场景解耦】人物形象（脸型、发型、服装）只以角色档案与定妆照为准；本镜头的场景、光源、色调与构图仅按本镜头描述生成，不得照搬定妆照/参考图的背景、布光与色调，也不得用参考图的场景特征替换本镜头场景。
+- 【路人写实】画面中的路人、群演与背景人物同样按写实真人质感呈现：有可辨识的年龄、衣着与自然动作，个体面貌有差异，不出现塑料人偶、重复脸或无面孔人影。
+- 英文负面：`no cartoon, no anime, no illustration, no cgi look, no 3d render, no plastic skin, no wax figure, no beauty filter, no airbrushed face, no mannequin crowd, no duplicated faces`
+
+**豁免（必须显式）**：卡片/档案声明 `style: cartoon|anime|illustration|3d|cg|stylized|pixar|comic`、`subjectType: animal|creature|object|product|vehicle|plant|food`，或 `realism: false`；
+豁免会在日志打印理由（`写实约束豁免：…`），便于审计"这镜为什么不是写实"。
+
+### 附录 B · 技能与知识库链路核查（2026-09-24，代码级）
+
+| 能力 | 是否存在 | 链路上是否被调用 | 证据 |
+|---|---|---|---|
+| 行业包技能（27 个：镜头提示词工艺/定妆照/渲染/发布/评论/调色 4/字体 2/字幕 2/配音 4/配乐 5/调研/营销/导演评审） | ✅ 在 `bundles/ai-video/skills/**`，且 `bundle.json#provides.skills` 27 条齐全 | 由岗位/围栏绑定装配（`scripts/skill-bindings.mts`），出片侧以"纪律子句"形式落到提示词 | `bundle.json` + `shot-spec.ts` |
+| 创意主题技能（12 字段） | ✅ `skills/creative-theme-generator` | ✅ 阶段「创意主题（12 字段）」 | `stage-registry.ts:56-58` |
+| 好莱坞导演技能库（场景/运镜，含技能质检） | ✅ `skills/hollywood-cinematography/cinematography-skill-router.js` | ✅ **phase-1 选导演**（`assignFilmDirector`）+ **phase-3 逐镜技能预匹配**（`routeAndEnhanceV3` → `_skillContext` / `_skillMatched`）与 `getSkillQCBlocks`/`checkSkillCompliance` 质检；日志前缀 `SKILL-PREMATCH` | `phase-1-scene-design.js:44`、`phase-3-prompt-fusion.js:75-98` |
+| 微动作/微表情子系统 | ✅ `vendor/supermickey/seedance-micromotion/`（`scripts/micromotion.js`、`agents/face-sculptor.js`、`merge.js`） | ✅ 阶段「微动作增强」（`engines/enhancers/micro-motion-adapter.js` 懒加载该子系统，失败降级模板库）；我方另有**微动作桥**修复字段映射（真机曾 `0/6` 空转），studio 已装配 | `stage-registry.ts:237-239`、`vendor-compat.ts#installVendorMicroMotionBridge`、`studio.ts:206` |
+| 知识库（KB / 行业 knowhow） | ✅ 存在（`kb_*` 表 + 技能侧 knowhow 门禁） | ❌ **视频链路未接**：`apps/server/src/video/**` 与 `packages/video-studio/**` 无 `kb_/knowledge` 引用 → 出片不查知识库 | 全链路 grep（0 命中） |
+
+**待补（P1）**：① 给落点 ② 补"技能命中 0 / 微动作 0 个镜头"的告警（避免静默空转）；② 若要把行业 knowhow 用于出片，需要新增"知识库检索 → 镜头提示词"的桥（目前没有）。

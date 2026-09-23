@@ -184,6 +184,30 @@ describe("字段规范真源", () => {
     expect(AUDIO_NEGATIVE_TERMS).toMatch(/no non-diegetic music/i);
     expect(AUDIO_NEGATIVE_TERMS).not.toMatch(/singing voice|no song|no melody/i);
   });
+
+  /**
+   * 写实纪律 + 场景解耦 + 路人写实（2026-09-24 产品口径，默认强制）：
+   * 人物纯写实；场景/光线/色调只按本镜头描述给，不被定妆照/参考图污染；路人同样真人质感。
+   */
+  it("写实纪律：默认每镜都带【写实纪律】【场景解耦】【路人写实】与英文写实负面词", () => {
+    for (const card of [contentCard(), openingCard()]) {
+      const report = prepareShotPrompt(card, { ratio: "9:16", log: () => undefined });
+      expect(report.prompt).toContain("【写实纪律】");
+      expect(report.prompt).toContain("【场景解耦】");
+      expect(report.prompt).toContain("【路人写实】");
+      expect(report.prompt).toMatch(/no cartoon/i);
+      expect(report.delivery.pass).toBe(true);
+    }
+  });
+
+  it("写实纪律：卡片显式声明风格（如 anime）时豁免，并记录理由", () => {
+    const shot = contentCard();
+    (shot as Record<string, unknown>).style = "anime";
+    const logs: string[] = [];
+    const report = prepareShotPrompt(shot, { ratio: "9:16", log: (line) => logs.push(line) });
+    expect(report.prompt).not.toContain("【写实纪律】");
+    expect(logs.join()).toContain("写实约束豁免");
+  });
 });
 
 describe("镜头卡交付闸（vendor PromptDeliveryGuard 为准）", () => {

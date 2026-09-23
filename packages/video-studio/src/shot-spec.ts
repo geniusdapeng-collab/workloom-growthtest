@@ -251,6 +251,70 @@ export const AUDIO_DISCIPLINE_CLAUSE =
 export const AUDIO_NEGATIVE_TERMS =
   "no non-diegetic music, no background music, no bgm, no soundtrack, no music score, no musical bed";
 
+/* ============================ 写实纪律 + 场景解耦（2026-09-24） ============================ */
+
+/**
+ * 写实纪律（默认强制）：人物必须是纯写实真人质感，越像真人越好。
+ * 例外：卡片/角色档案显式声明风格（cartoon/anime/3d/stylized/illustration）或主体非人（动物/器物）。
+ */
+export const REALISM_CLAUSE =
+  "【写实纪律】出镜人物一律为纯写实真人质感：真实皮肤纹理（可见毛孔与细颗粒）、自然肤质与面部微结构、"
+  + "自然光影与真实镜头语言（纪录片/电影实拍观感）；严禁卡通、动漫、插画、3D/CG 渲染感、塑料感或磨皮美颜。";
+
+/**
+ * 场景解耦（默认强制）：人物形象只由角色档案/定妆照决定；镜头场景、光线与色调只按本镜头描述生成，
+ * 不得把定妆照的背景/光源/色调（或参考图中的场景特征）带进画面。
+ */
+export const SCENE_DECOUPLE_CLAUSE =
+  "【场景解耦】人物形象（脸型、发型、服装）只以角色档案与定妆照为准；"
+  + "本镜头的场景、光源、色调与构图仅按本镜头描述生成，不得照搬定妆照/参考图的背景、布光与色调，"
+  + "也不得用参考图的场景特征替换本镜头场景。";
+
+/** 路人/群演写实：背景人物同样按真人质感描述，避免"塑料路人"。 */
+export const EXTRAS_REALISM_CLAUSE =
+  "【路人写实】画面中的路人、群演与背景人物同样按写实真人质感呈现："
+  + "有可辨识的年龄、衣着与自然动作，个体面貌有差异，不出现塑料人偶、重复脸或无面孔人影。";
+
+/** 写实模式下并入负面约束（与 vendor negative 同语言） */
+export const REALISM_NEGATIVE_TERMS =
+  "no cartoon, no anime, no illustration, no cgi look, no 3d render, no plastic skin, no wax figure, "
+  + "no beauty filter, no airbrushed face, no mannequin crowd, no duplicated faces";
+
+/** 允许显式声明的非写实风格（客户明确要求时才可开启） */
+export const STYLIZED_STYLES = ["cartoon", "anime", "illustration", "3d", "cg", "stylized", "pixar", "comic"] as const;
+/** 非人主体（动物/器物等）不适用"真人写实"约束 */
+export const NON_HUMAN_SUBJECTS = ["animal", "creature", "object", "product", "vehicle", "plant", "food"] as const;
+
+export interface RealismPolicy {
+  mode: "photoreal" | "stylized";
+  reason: string;
+}
+
+/**
+ * 判定本镜是否走"写实强制"：
+ * 默认 photoreal；只有**显式**声明风格或非人主体才豁免（并记录理由，便于审计）。
+ */
+export function resolveRealismPolicy(card: Record<string, unknown>): RealismPolicy {
+  const style = String(card.style ?? card.visualStyle ?? card.renderStyle ?? "").trim().toLowerCase();
+  if (!style) {
+    /* 无显式风格声明 → 默认写实 */
+  } else if ((STYLIZED_STYLES as readonly string[]).includes(style)) {
+    return { mode: "stylized", reason: `卡片显式声明风格「${style}」` };
+  } else if (style === "realistic" || style === "photoreal" || style === "live-action" || style === "写实") {
+    /* 显式写实 → 照常强制 */
+  } else if (style !== "realistic") {
+    return { mode: "stylized", reason: `卡片显式声明风格「${style}」` };
+  }
+  const subject = String(card.subjectType ?? card.subject ?? "").trim().toLowerCase();
+  if ((NON_HUMAN_SUBJECTS as readonly string[]).includes(subject)) {
+    return { mode: "stylized", reason: `主体非人（${subject}），不适用真人写实约束` };
+  }
+  if (card.realism === false || card.photoreal === false) {
+    return { mode: "stylized", reason: "卡片显式关闭写实约束（realism/photoreal=false）" };
+  }
+  return { mode: "photoreal", reason: "默认口径（未声明其它风格、主体为人）" };
+}
+
 /** 正向音乐词（用于清洗 audio 字段与提示词中的音乐指令） */
 const POSITIVE_MUSIC_PATTERN =
   /(背景音乐|配乐|音乐风格|音乐节拍|旋律|歌曲|music\s*style|background\s*music|\bbgm\b|\bmusic\b|soundtrack)/gi;
@@ -522,6 +586,20 @@ export function prepareShotPrompt(
    */
   if (!prompt.includes("【音频纪律】")) prompt += ` | ${AUDIO_DISCIPLINE_CLAUSE}`;
   if (!/no background music/i.test(prompt)) prompt += ` | ${AUDIO_NEGATIVE_TERMS}`;
+  /**
+   * 写实纪律 + 场景解耦 + 路人写实（2026-09-24 产品口径，**默认强制**）：
+   * 人物纯写实（越像真人越好）；人物形象只由角色档案/定妆照决定，场景/光线/色调只按本镜头描述生成；
+   * 路人同样按真人质感。仅当卡片显式声明风格（cartoon/anime/3d/stylized…）、主体非人，或 realism=false 时豁免。
+   */
+  const realismPolicy = resolveRealismPolicy(card as Record<string, unknown>);
+  if (realismPolicy.mode === "photoreal") {
+    if (!prompt.includes("【写实纪律】")) prompt += ` | ${REALISM_CLAUSE}`;
+    if (!prompt.includes("【场景解耦】")) prompt += ` | ${SCENE_DECOUPLE_CLAUSE}`;
+    if (!prompt.includes("【路人写实】")) prompt += ` | ${EXTRAS_REALISM_CLAUSE}`;
+    if (!/no cartoon/i.test(prompt)) prompt += ` | ${REALISM_NEGATIVE_TERMS}`;
+  } else {
+    log(`[shot-spec] ${shotId} 写实约束豁免：${realismPolicy.reason}（如属误判请在卡片显式声明 style/subjectType）`);
+  }
   const constraint = normalizeConstraintSegment(prompt, ratio, resolution);
   if (constraint.changed) {
     log(
@@ -542,6 +620,15 @@ export function prepareShotPrompt(
   if (!prompt.includes("【音频纪律】") || !/no background music/i.test(prompt)) {
     delivery.pass = false;
     delivery.issues = [...delivery.issues, "提示词缺少镜头内禁 BGM 的音频纪律子句"];
+  }
+  /**
+   * 写实纪律自检（默认强制）：缺标记 = 组装链路没带上"纯写实 + 场景解耦"约束 → 判不合格。
+   * 需要其它风格时必须显式声明（`style` / `subjectType` / `realism:false`），不允许默认静默降级。
+   */
+  if (realismPolicy.mode === "photoreal"
+    && (!prompt.includes("【写实纪律】") || !prompt.includes("【场景解耦】") || !/no cartoon/i.test(prompt))) {
+    delivery.pass = false;
+    delivery.issues = [...delivery.issues, "提示词缺少「纯写实 + 场景解耦」纪律子句（默认强制；其它风格请在卡片显式声明 style/realism）"];
   }
   const missingSpecFields = [...spec.p0, ...spec.p1, ...spec.p2, ...spec.p3]
     /**
