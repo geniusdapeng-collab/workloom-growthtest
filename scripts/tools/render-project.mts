@@ -26,14 +26,20 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "
 import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
 import {
   allocateShotDurations,
+  allocateReferenceSlots,
+  composeShotReferences,
   durationRulesMarkdown,
   durationValidationMarkdown,
   fieldSpec,
+  pickCharacterPortrait as pickCharacterPortraitFromIndex,
+  loadCharacterLibrary,
   prepareShotPrompt,
+  resolveShotCharacters,
   shotSpecMarkdown,
   validateShotDurations,
   type ShotSpecReport
 } from "../../packages/video-studio/src/index.js";
+import type { PortraitIndexLike as PackagePortraitIndexLike } from "../../packages/video-studio/src/index.js";
 
 const API = process.env.WORKLOOM_API ?? "http://127.0.0.1:8787";
 const TOKEN = process.env.WORKLOOM_TOKEN ?? "";
@@ -229,6 +235,12 @@ export function composePromptBySpec(
 }
 
 function dataUrl(file: string): string {
+  /**
+   * 已授权真人素材（方舟人像库 asset ID）与远端 URL 直接透传：
+   * 真人肖像不能直传图片（平台隐私闸 400），必须用 `asset://<asset ID>`；
+   * 透传可避免把 asset 引用误读成本地文件。
+   */
+  if (file.startsWith("asset://") || /^https?:\/\//i.test(file)) return file;
   const ext = extname(file).toLowerCase();
   const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
   return `data:${mime};base64,${readFileSync(file).toString("base64")}`;
@@ -250,17 +262,13 @@ function loadPortraitIndex(projectId: string, workDir: string): PortraitIndexLik
   }
 }
 
+/**
+ * 挑定妆照（2026-09-23 修复）：旧实现只看 `shot.prompt + shot.characters`，而我们的镜头卡用
+ * `character`（单数）→ 12/12 镜头永远命中不到 → 视频里的人只能靠文字瞎编（真机事故）。
+ * 现在委托给 `packages/video-studio/src/portrait-binding.ts`（纯函数，带单测）。
+ */
 export function pickCharacterPortrait(index: PortraitIndexLike | null, shot: ShotCard): string | null {
-  if (!index?.characters) return null;
-  const text = `${shot.prompt ?? ""} ${(shot.characters ?? []).join(" ")}`;
-  for (const entry of Object.values(index.characters)) {
-    const tokens = [entry.id, entry.name].filter((t): t is string => Boolean(t));
-    if (tokens.some((t) => t.length > 1 && text.includes(t))) {
-      const front = entry.files?.front;
-      if (front && existsSync(front)) return front;
-    }
-  }
-  return null;
+  return pickCharacterPortraitFromIndex(index as PackagePortraitIndexLike | null, shot).file;
 }
 
 /* ================= 主流程 ================= */
@@ -279,6 +287,11 @@ const dryRun = flag("--dry-run");
 const maxShotSeconds = arg("--max-shot-seconds");
 /** 交付闸未过的镜头默认拒绝提交（避免把不合规提示词烧成额度）；显式放行需带此开关 */
 const allowSpecFail = flag("--allow-spec-fail");
+/**
+ * 项目里有角色、但拿不到人物定妆照时默认**拒绝提交**（2026-09-23 真机事故：4 张场景图下发、
+ * 人物缺失，成片主角完全由文字编出来）。显式放行需带此开关 —— 只用于空镜/纯场景片。
+ */
+const allowMissingPortrait = flag("--allow-missing-portrait");
 /** 复现种子（同一 seed + 同 prompt 便于 A/B；写入 render_jobs 便于复盘） */
 const seedArg = arg("--seed");
 /** 服务档位：default（终稿）| flex（草稿，成本更低） */
@@ -316,6 +329,11 @@ async function fetchLastFrameUrl(taskId: string, timeoutMs = 15_000): Promise<st
 const workDir = resolve(REPO_ROOT, process.env.HR_WORK_DIR ?? ".vm-work");
 const refFiles = loadRefFiles(arg("--refs", "var/media/references/suzhou-nanyuan"));
 const portraitIndex = loadPortraitIndex(projectId, workDir);
+/** 人物档案库（跨项目资产；`HR_CHARACTER_LIBRARY` 可覆盖默认 var/media/characters） */
+const characterLibrary = loadCharacterLibrary(resolve(REPO_ROOT, process.env.HR_CHARACTER_LIBRARY ?? "var/media/characters"));
+if (characterLibrary.size > 0) {
+  console.log(`人物档案库：${characterLibrary.size} 个角色（${[...characterLibrary.values()].map((c) => `${c.name}@v${c.activeSet?.version ?? "-"}`).join("、")}）`);
+}
 
 const shots = loadShots(resolve(shotsFile)).filter((s) => only.length === 0 || only.includes(s.shotId));
 /**
@@ -403,11 +421,90 @@ async function waitForShotAndLastFrame(jobId: string, taskId: string): Promise<s
 for (const shot of shots) {
   const seconds = durations.get(shot.shotId)!;
   const scriptKey = `${projectId}-${shot.shotId}`.toLowerCase();
-  const portrait = pickCharacterPortrait(portraitIndex, shot);
-  const venue = pickVenueRefs(shot, refFiles, portrait ? 3 : 4);
-  const references = [...venue, ...(portrait ? [portrait] : [])].slice(0, 4);
+  /**
+   * ① 档案库选角（1–10 人，T-2026-0923-0058）：跨项目人物档案优先；
+   *    未建档的老项目回退到项目级 `portrait-index.json` 的单角色逻辑。
+   */
+  const cast = characterLibrary.size > 0
+    ? resolveShotCharacters(shot as unknown as Record<string, unknown>, characterLibrary)
+    : { characters: [], unmatched: [] as string[] };
+  const venuePool = pickVenueRefs(shot, refFiles, 4);
+  let references: string[];
+  let planNote: string;
+  let usedCharacters: Array<{ id: string; name: string; angle: string }> = [];
+  let droppedCharacters: Array<{ id: string; name: string; reason: string }> = [];
+  let portrait: string | null = null;
+  let portraitPick: { file: string | null; matchedBy: string; character?: string; note?: string } = { file: null, matchedBy: "none" };
+  let sourceLabel = "档案库";
+
+  if (cast.characters.length > 0) {
+    const dialogueLines = Array.isArray((shot as Record<string, unknown>).dialogueBlocks)
+      ? ((shot as Record<string, unknown>).dialogueBlocks as unknown[]).length
+      : 0;
+    const plan = allocateReferenceSlots({
+      characters: cast.characters.map((character, index) => ({
+        id: character.id,
+        name: character.name,
+        files: character.files,
+        dialogueLines,
+        lead: index === 0
+      })),
+      venueRefs: venuePool,
+      maxRefs: 4
+    });
+    references = plan.references;
+    planNote = plan.note;
+    usedCharacters = plan.used;
+    droppedCharacters = plan.dropped;
+    const first = plan.used[0];
+    portrait = first ? (cast.characters.find((c) => c.id === first.id)?.files[first.angle] ?? null) : null;
+    portraitPick = { file: portrait, matchedBy: "archive", character: first?.name };
+  } else {
+    sourceLabel = "项目索引";
+    const pick = pickCharacterPortraitFromIndex(portraitIndex as PackagePortraitIndexLike | null, shot);
+    portraitPick = pick;
+    portrait = pick.file;
+    const venue = pickVenueRefs(shot, refFiles, portrait ? 3 : 4);
+    const composed = composeShotReferences({ portrait, venueRefs: venue, maxRefs: 4 });
+    references = composed.references;
+    planNote = composed.note;
+    usedCharacters = portrait ? [{ id: pick.character ?? "unknown", name: pick.character ?? "未命名", angle: "front" }] : [];
+  }
+  const characterCount = Object.keys((portraitIndex as PackagePortraitIndexLike | null)?.characters ?? {}).length;
+  /** 镜头卡自己声明了出镜角色（`character`/`characters`/`character_ref` 任一非空）也算"需要人物参考" */
+  const declaresCharacter = Boolean(
+    [shot.character, shot.character_ref, shot.characterRef]
+      .map((value) => (typeof value === "string" ? value.trim() : ""))
+      .find(Boolean)
+  ) || (Array.isArray(shot.characters) && shot.characters.length > 0);
+  console.log(
+    `🎭 ${shot.shotId} 参考图：${planNote}`
+    + `（来源=${sourceLabel}｜命中方式=${portraitPick.matchedBy}`
+    + `${portrait ? `｜人物=${basename(portrait)}` : "｜人物=无"}`
+    + `${usedCharacters.length > 0
+      ? `｜角色=${usedCharacters.map((u) => {
+          const version = cast.characters.find((c) => c.id === u.id)?.activeSet?.version;
+          return `${u.name}@v${version ?? "-"}:${u.angle}`;
+        }).join("、")}`
+      : ""}）`
+    + `${portraitPick.note ? `\n   · ${portraitPick.note}` : ""}`
+    + `${droppedCharacters.length > 0 ? `\n   · 降级：${droppedCharacters.map((d) => `${d.name}（${d.reason}）`).join("、")}` : ""}`
+    + `${cast.unmatched.length > 0 ? `\n   · ⚠️ 未建档角色（当前按文字描述处理）：${cast.unmatched.join("、")}` : ""}`
+  );
   const row: ShotResult = { shotId: shot.shotId, scriptKey, scriptId: scriptKey, seconds, references: references.length };
   results.push(row);
+
+  /**
+   * fail-closed：项目登记了角色却没有可下发的人物参考图 → 拒绝提交。
+   * 历史事故：静默按"纯场景"提交，成片主角完全由文字生成，与真人和定妆照都无关。
+   */
+  if ((declaresCharacter || characterCount > 0) && !portrait && !allowMissingPortrait) {
+    row.error = `本镜需要人物出镜（${declaresCharacter ? "镜头卡声明了角色" : `项目登记了 ${characterCount} 个角色`}），`
+      + `但拿不到人物定妆照（命中方式：${portraitPick.matchedBy}`
+      + `${portraitPick.note ? `；${portraitPick.note}` : ""}）→ 默认拒绝提交，避免生成"主角不存在"的镜头`;
+    console.error(`⛔ ${shot.shotId}：${row.error}（--allow-missing-portrait 可显式放行，仅适用于空镜/纯场景片）`);
+    continue;
+  }
 
   /**
    * 定妆照字段回填（机械修复）：vendor 的 25 字段含 `portraits`，但管线里该字段常为空

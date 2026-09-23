@@ -204,3 +204,59 @@ describe("定妆照真实出图运行时", () => {
     expect(log.mock.calls.map((c) => String(c[0])).join("\n")).toMatch(/出图成功/);
   });
 });
+
+/**
+ * T-2026-0923-0050 · 真机事故回归：角色定妆照"无角色档案"时会生成与设定无关的人物
+ * （真机证据：要求"三十岁上下女性、深色缎面长裙"，产出的却是一名男性模特）。
+ * 生产链路（studio-worker）打开 `requireCharacterDescription` 后必须 fail-closed。
+ */
+describe("角色定妆照：角色档案必填（生产链路 fail-closed）", () => {
+  it("requireCharacterDescription=true 且无档案 → 拒绝出图，给出可行动提示", async () => {
+    const { fetchImpl, calls } = fakeArk();
+    const runtime = createPortraitRuntime({
+      workDir: workDir(), projectId: "VID-9999", apiKey: "k", model: "m", fetchImpl,
+      requireCharacterDescription: true
+    });
+    await expect(runtime.apiRender({
+      portraitId: "平江路讲述人-front_full",
+      characterName: "平江路讲述人",
+      angle: "front_full",
+      prompt: "【定妆照】平江路讲述人 — 全身正面"
+    })).rejects.toThrow(/角色档案/);
+    expect(calls).toHaveLength(0); // 不烧额度
+  });
+
+  it("requireCharacterDescription=true 且带 vendor 风格档案 → 出图成功，描述进入提示词", async () => {
+    const { fetchImpl, calls } = fakeArk();
+    const runtime = createPortraitRuntime({
+      workDir: workDir(), projectId: "VID-9999", apiKey: "k", model: "m", fetchImpl,
+      requireCharacterDescription: true
+    });
+    await runtime.apiRender({
+      portraitId: "平江路讲述人-front_full",
+      characterName: "平江路讲述人",
+      angle: "front_full",
+      prompt: [
+        "【定妆照】平江路讲述人 — 全身正面",
+        "角色档案：三十岁上下女性，深色缎面长裙，珍珠肩带，齐肩微卷发",
+        "构图：全身，正面"
+      ].join("\n")
+    });
+    const prompt = String(calls[0]!.body.prompt);
+    expect(prompt).toContain("三十岁上下女性");
+    expect(prompt).toContain("深色缎面长裙");
+  });
+
+  it("默认（不开启）保持 vendor 既有行为，但必须打印『无档案』告警，不静默", async () => {
+    const { fetchImpl } = fakeArk();
+    const log = vi.fn();
+    const runtime = createPortraitRuntime({
+      workDir: workDir(), projectId: "VID-9999", apiKey: "k", model: "m", fetchImpl, log
+    });
+    await runtime.apiRender({
+      portraitId: "住客-front_full", characterName: "住客", angle: "front_full",
+      prompt: "【定妆照】住客 — 正面全身"
+    });
+    expect(log.mock.calls.map((c) => String(c[0])).join("\n")).toMatch(/缺少角色档案描述/);
+  });
+});
