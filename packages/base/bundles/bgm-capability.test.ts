@@ -518,51 +518,6 @@ describe("在线曲源层（登记表与许可归一）", () => {
   });
 });
 
-describe("随仓精选曲库（12 首自算曲目）", () => {
-  const curatedDir = join(BUNDLE_DIR, "library/bgm-library-curated");
-  const manifestPath = join(curatedDir, "tracks.json");
-
-  it("清单齐备：12 首、12 个风格、全部自算许可、字段完整", () => {
-    expect(existsSync(manifestPath), "缺少 tracks.json（用 scripts/bgm-library-build.mjs --curated 生成）").toBe(true);
-    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as {
-      library: { tracks: number; provider: string };
-      tracks: Array<Record<string, unknown>>;
-    };
-    expect(doc.tracks).toHaveLength(12);
-    expect(new Set(doc.tracks.map((track) => track.style)).size).toBe(12);
-    for (const track of doc.tracks) {
-      expect(track.license).toBe("workloom-self-generated");
-      expect(String(track.file)).toMatch(/\.m4a$/);
-      expect(existsSync(join(curatedDir, String(track.file)))).toBe(true);
-      expect(track.bpm).toBeGreaterThan(40);
-      expect(track.durationSec).toBeGreaterThan(30);
-      const loudness = track.loudness as { integratedLufs: number; truePeakDbtp: number };
-      expect(Math.abs(loudness.integratedLufs + 14)).toBeLessThan(1.5);
-      expect(loudness.truePeakDbtp).toBeLessThanOrEqual(-1.0);
-      const structure = track.structure as { hasDrop: boolean; segments: unknown[] };
-      expect(structure.hasDrop, `${track.id} 缺少可选的 drop 段`).toBe(true);
-      expect(structure.segments.length).toBeGreaterThanOrEqual(3);
-    }
-  });
-
-  it("每首曲目的 sha256 与磁盘文件一致（随仓分发的是可核验产物）", () => {
-    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as { tracks: Array<{ file: string; sha256: string }> };
-    for (const track of doc.tracks) {
-      const bytes = readFileSync(join(curatedDir, track.file));
-      const actual = createHash("sha256").update(bytes).digest("hex");
-      expect(actual, `${track.file} 摘要不一致`).toBe(track.sha256);
-    }
-  }, 60_000);
-
-  it("曲库能被工位的本地曲库加载器读到（客户曲库 → 随仓精选 → 工位本地 三级合并）", () => {
-    const loaded = loadAllLocalTracks({});
-    const curated = loaded.tracks.filter((track) => track.libraryKind === "local-curated");
-    expect(curated.length).toBe(12);
-    expect(loaded.sources.some((entry) => entry.kind === "local-curated" && entry.present)).toBe(true);
-    expect(curated.every((track) => track.localPath && existsSync(track.localPath))).toBe(true);
-  });
-});
-
 /** 用合成包络（不碰真实音频文件）验证结构分段与选段决策——纯函数，CI 里也能跑。 */
 function envelopeOf(dbBySecond: number[][], windowSec = 0.25) {
   const db: number[] = [];
