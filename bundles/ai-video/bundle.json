@@ -596,7 +596,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "d240cf5dc6920eb36afedd1ec4c04b340dd4d0f7bb347f4d6b79f96ea3a9ef91",
+    "digest": "d3d526c7a3837d8a212e07df60d8eede919eebd1815b48ee80935f6faf19f214",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "4a750118f5bbc7a6c6238be241ee1f3a4cbb695fd3b40066e4c71072179993ed",
       "connectors/bgm-bridge/core.mjs": "1f1a39da1a1460c19ac6e15c7ddbc7817a84acf027dc9c400c61c7c70a9232ec",
@@ -605,7 +605,7 @@
       "connectors/bgm-bridge/kit/install.sh": "2bb487a25c6af04297e9406826e75c1c9c50c9f02e1ead3a5edd749d664d51e5",
       "connectors/bgm-bridge/kit/selftest.sh": "8512b55b961835a2abda341cf661067834e1cb18a17354a683b7298da323ef0f",
       "connectors/bgm-bridge/measure.mjs": "f54c54f1d79342a18e2277fa03593f95479d66b45ee104138a0915deaa364cae",
-      "connectors/bgm-bridge/README.md": "2ec044dc22dbf604dbc62db841dae850e8d088dc544d7f41f9bce54c2e7597c2",
+      "connectors/bgm-bridge/README.md": "d30aa996eda98a1adbceeeb7c4aee52b67574d563a697d11253477043d494790",
       "connectors/bgm-bridge/server-adapter.mts": "bd8790725a0662cedfd0f8d9bd4d984bff4fdaa32d02c7cb1e182835995f4c20",
       "connectors/bgm-bridge/server.mjs": "53503ea2050936af97901d387dd39565651eba2c7272072fe3dfe266bef13837",
       "connectors/bgm-bridge/synth.mjs": "e6ebdcb8d6a37e40786a8ae22d00417b19761965141c6e7fad20eecb971f085a",
