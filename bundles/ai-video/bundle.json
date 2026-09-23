@@ -543,7 +543,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "72907d8d58b6fe6dbc44c064447e1610d09e32d47fa1df9c41e2b0a6674d4744",
+    "digest": "65a0222df7c04847c147beee8636635600384bdfd7dd9f8cf425e70c39ca38c9",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "4a750118f5bbc7a6c6238be241ee1f3a4cbb695fd3b40066e4c71072179993ed",
       "connectors/bgm-bridge/core.mjs": "1f1a39da1a1460c19ac6e15c7ddbc7817a84acf027dc9c400c61c7c70a9232ec",
@@ -559,7 +559,7 @@
       "connectors/subtitle-bridge/cli.mjs": "d92e75331c020521b2447dd90f7f7d8b5ee62117839b80f42a748195b488ddfc",
       "connectors/subtitle-bridge/core.mjs": "5e4760ea9245ca650cfae06130af2c0249c194af7a3ef363651758e831c20d28",
       "connectors/subtitle-bridge/executor.ts": "474e7b72be3cb80645d009dc7ad338d256067764ddacddee10ea55b4a74d5ae3",
-      "connectors/subtitle-bridge/kit/fonts-pin.json": "57f3c9b06f45eb687962e5d526e67e9bc1754fb10859ab8609965ab924fc068d",
+      "connectors/subtitle-bridge/kit/fonts-pin.json": "b3b19159777af663168dee1cb94e5c607e7875b96522d4b37de3627826987ce4",
       "connectors/subtitle-bridge/kit/install-fonts.sh": "2faf221c1431b9b35311d1721606d496664af9e2f451bd35b2a3af0f63e8ddcc",
       "connectors/subtitle-bridge/kit/selftest.sh": "87a7e4e5f1be4828de2aa28d6fcbc9cb951ce22892566acfce900d0a0de059eb",
       "connectors/subtitle-bridge/measure.mjs": "ab59ecdf75fddbb0890031fdb04d1994a32e5ecd0e915c39d1e80c756a7fdb0d",
