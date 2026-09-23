@@ -51,6 +51,21 @@ const toolExecutor = createBgmBridgeExecutor({
 | `bgmwrite.separate` | 写 | 人声分离（demucs/audio-separator → ffmpeg 中心声道近似，质量等级如实标注） |
 | `bgmwrite.best` | 写 | 择优配乐：候选池打分；**允许结论是"这片子不需要配乐"**（不产出文件） |
 
+## 随仓兜底曲库（50 首可商用纯音乐选段）
+
+`bundles/ai-video/library/bgm-library-curated/` 是**兜底曲库**：客户没有自建曲库（`WORKLOOM_BGM_LIBRARY_DIR`）、
+在线曲源也不可用时，配乐链路用它不断档。
+
+- **来源与许可**：由产品所有者提供的可商用纯音乐包经**实测打标 + 精选**生成（打标/精选流水线在主仓
+  `WorkLoom-growth` 的 `bgmwrite.tag` / `scripts/bgm-curate-library.mjs`；本仓只做分发与检索）。
+  许可登记为 `royalty-free`，来源目录写在每条索引的 `licenseSource` 里——上游逐首许可未随包提供，**再分发前请复核**；
+- **形态**：每首 60s 选段（优先取能量最饱满的 drop 段中心），线性增益到 -14 LUFS；峰值贴顶的选段按**峰值保护优先**，
+  实际响度与偏差逐首登记在 `excerpt.loudnessDeltaDb` / `excerpt.peakProtected`；AAC 112kbps 44.1kHz 立体声；
+- **检索**：`tracks.json` 是运行时契约（风格族/题材/情绪/BPM 档/能量档/配器/使用场景/结构/响度/许可/置信度），
+  工位用 `bgmread.library` 检索、`bgmwrite.best` 择优；选谁/为何/取了哪一段见 `curation-report.json`；
+- **分布**：11 个风格族各 4-5 首（electronic-pulse / lo-fi-chill / cinematic-build / tension-dark / modern-pop /
+  festive-bright / acoustic-warm / ambient-calm / documentary-bed / corporate-clean / sports-hype）。
+
 ## 选段（外部曲目只取"最合适的那一段"）
 
 外部曲目通常 2–3 分钟、片子只有几十秒，所以"裁哪一段"与"配什么曲子"同等重要：

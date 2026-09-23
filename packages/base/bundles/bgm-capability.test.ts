@@ -545,6 +545,51 @@ function envelopeOf(dbBySecond: number[][], windowSec = 0.25) {
   };
 }
 
+describe("随仓兜底曲库（50 首可商用纯音乐选段）", () => {
+  const curatedDir = join(BUNDLE_DIR, "library/bgm-library-curated");
+  const manifestPath = join(curatedDir, "tracks.json");
+
+  it("客户自建曲库目录缺失时如实报告（该根 present=false），随仓兜底曲库仍可加载", () => {
+    const loaded = loadAllLocalTracks({ WORKLOOM_BGM_LIBRARY_DIR: "/tmp/definitely-missing-bgm-library" });
+    expect(loaded.sources.find((entry) => entry.kind === "local-custom")?.present).toBe(false);
+    expect(loaded.sources.find((entry) => entry.kind === "local-curated")?.present).toBe(true);
+    expect(loaded.tracks.filter((track) => track.libraryKind === "local-curated").length).toBe(50);
+  });
+
+  it("清单齐备：50 首 / 多风格族 / 可商用许可 / 字段完整 / 选段信息可追溯", () => {
+    expect(existsSync(manifestPath), "缺少 tracks.json（用 scripts/bgm-curate-library.mjs 生成）").toBe(true);
+    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      library: { tracks: number; provider: string; selection: { byStyle: Record<string, number> } };
+      tracks: Array<Record<string, unknown>>;
+    };
+    expect(doc.tracks).toHaveLength(50);
+    expect(doc.library.provider).toBe("owner-provided-pack");
+    expect(Object.keys(doc.library.selection.byStyle).length).toBeGreaterThanOrEqual(10);
+    for (const track of doc.tracks) {
+      expect(track.license).toBe("royalty-free");
+      expect(existsSync(join(curatedDir, String(track.file))), `缺文件 ${track.file}`).toBe(true);
+      const loudness = track.loudness as { integratedLufs: number; truePeakDbtp: number };
+      const deviation = Math.abs(loudness.integratedLufs + 14);
+      expect(deviation, `${track.id} 响度偏离 -14`).toBeLessThan(6);
+      if (deviation > 2) {
+        expect((track.excerpt as { peakProtected?: boolean }).peakProtected, `${track.id} 偏低必须标明是峰值保护所致`).toBe(true);
+      }
+      expect(loudness.truePeakDbtp, `${track.id} 真峰值越界`).toBeLessThanOrEqual(-0.4);
+      const excerpt = track.excerpt as { durationSec: number; reason: string };
+      expect(excerpt.durationSec).toBeGreaterThan(30);
+      expect(excerpt.reason.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("每首选段的 sha256 与磁盘文件一致（随仓分发的是可核验产物）", () => {
+    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as { tracks: Array<{ file: string; sha256: string }> };
+    for (const track of doc.tracks) {
+      const actual = createHash("sha256").update(readFileSync(join(curatedDir, track.file))).digest("hex");
+      expect(actual, `${track.file} 摘要不一致`).toBe(track.sha256);
+    }
+  }, 60_000);
+});
+
 describe("曲目结构识别与自动选段（规则式，纯函数）", () => {
   it("安静→渐强→高潮→回落 的能量曲线被正确分段（intro/build/drop/breakdown/outro）", () => {
     const envelope = envelopeOf([
