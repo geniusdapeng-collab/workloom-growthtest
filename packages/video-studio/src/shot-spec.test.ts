@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  AUDIO_DISCIPLINE_CLAUSE,
+  AUDIO_NEGATIVE_TERMS,
   fieldSpec,
   normalizeConstraintSegment,
   normalizeStructuredFields,
@@ -161,6 +163,26 @@ describe("字段规范真源", () => {
     const report = prepareShotPrompt(shot, { ratio: "9:16", log: (line) => logs.push(line) });
     expect(report.prompt).toContain("无配乐喧宾");
     expect(logs.join()).not.toContain("剔除");
+  });
+
+  /**
+   * 产品所有者 2026-09-23 听检 30s 样片后确认：**画面内实况声源（评弹/三弦等）不算 BGM**，
+   * 必须保留；禁的只是镜头外加配乐。这条口径同时约束子句文本与负面词表，避免"越收越紧"。
+   */
+  it("音频纪律：画内实况声源（评弹/三弦/琵琶）保留，子句与负面词不越界", () => {
+    const shot = contentCard();
+    shot.audio = "街巷人声；远处评弹声与三弦、琵琶声；室内混响自然，无其他配乐";
+    const logs: string[] = [];
+    const report = prepareShotPrompt(shot, { ratio: "9:16", log: (line) => logs.push(line) });
+    expect(report.prompt).toContain("评弹声");
+    expect(report.prompt).toContain("三弦");
+    expect(report.prompt).toContain("琵琶");
+    expect(logs.join()).not.toContain("剔除");
+    // 子句显式承认画内实况声；负面词不再包含会压掉实况音乐的过宽词
+    expect(AUDIO_DISCIPLINE_CLAUSE).toContain("实况声源");
+    expect(AUDIO_DISCIPLINE_CLAUSE).toContain("镜头外");
+    expect(AUDIO_NEGATIVE_TERMS).toMatch(/no non-diegetic music/i);
+    expect(AUDIO_NEGATIVE_TERMS).not.toMatch(/singing voice|no song|no melody/i);
   });
 });
 

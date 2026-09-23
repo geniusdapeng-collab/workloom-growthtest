@@ -513,7 +513,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "535716e248ef885f150fe0be042006b916489124ce41bd0e00f06737fa7638fe",
+    "digest": "f1148bac0647eb74147a35a0874e5613ac0518ceebe360ad04958eb38e23953f",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "4a750118f5bbc7a6c6238be241ee1f3a4cbb695fd3b40066e4c71072179993ed",
       "connectors/bgm-bridge/core.mjs": "12f94fb62c0e183857d3ce2b970eaba9b29da70223a50e5d897fa8a005af9ffb",
@@ -856,7 +856,7 @@
       "skills/portrait-studio/SKILL.md": "3322a2ee7b7296aead5d2640a0e5e37f32ea0c1858caa43acdfd96149eea112c",
       "skills/publish-ops/SKILL.md": "dd929d5ea42af3672a773dda05c13a26027780f6d682e532ef8c83fe9fe2a36c",
       "skills/render-ops/SKILL.md": "069e98c12983808a88731802de29e7260721d9144606b2a97e22ad59b76a83d8",
-      "skills/shot-prompt-craft/SKILL.md": "e131c8eaefaedea499e281b641d0cd6321b792de92beaffbeebe8848affc4df0",
+      "skills/shot-prompt-craft/SKILL.md": "bed3f7154a9a91e6e741b3961d6bc1172a14fbb3f45206d4e504fca3ef6d10cb",
       "skills/subtitle-delivery-spec/SKILL.md": "cd9b086eae21c6eb341df5ea77b2e0f23209f505874ae8021cf1ef210a580953",
       "skills/subtitle-layout-design/SKILL.md": "f47f05cfa9f131b599aa998ebac6041d01c972cdf70c19a932789425ff952719",
       "skills/voice-clone-consent/SKILL.md": "16faabf06b8a3cff80c32e1795cf25b9511fa637a8cf6c96cb7a06f9e4d446c4",
