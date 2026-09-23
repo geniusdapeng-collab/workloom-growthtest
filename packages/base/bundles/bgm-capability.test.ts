@@ -8,6 +8,7 @@
  *  · 曲库许可判定写松 → 商用交付踩版权红线。
  * 这些都能在磁盘上静态验出来，所以本组测试不触 DB、不依赖 ffmpeg。
  */
+import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -18,12 +19,14 @@ import { evalCondition } from "../fence-engine/expr.js";
 import { bundlesRoot } from "./assembly.js";
 import {
   BGM_TOOLS, LICENSE_TABLE, SECTION_MODES, alignBeatGrid, chooseSection, deriveDuckParams,
-  deriveTempoFromCuts, filmClimaxTime, findRecipes, findTracks, licenseInfo,
+  deriveTempoFromCuts, filmClimaxTime, findRecipes, findTracks, licenseInfo, loadAllLocalTracks,
 } from "../../../bundles/ai-video/connectors/bgm-bridge/core.mjs";
 import {
   classifySegments, energyEnvelope, estimateBpmFromOnsets, onsetStrength, scoreSegments,
 } from "../../../bundles/ai-video/connectors/bgm-bridge/measure.mjs";
 import { CHORDS, SCALES, planComposition, renderCompositionToWav } from "../../../bundles/ai-video/connectors/bgm-bridge/synth.mjs";
+import { analyzePromptBrief, energyCurveFor, scoreTrackAgainstBrief } from "../../../bundles/ai-video/connectors/bgm-bridge/brief.mjs";
+import { normalizeLicense, listSources, SOURCE_ENV } from "../../../bundles/ai-video/connectors/bgm-bridge/sources.mjs";
 
 const ROOT = bundlesRoot();
 const REPO_ROOT = dirname(ROOT);
@@ -52,13 +55,14 @@ describe("配乐围栏（G-BGM0..G-BGM5）语义", () => {
   it("六条规则齐备，级别与基线口径正确", () => {
     expect(fencePack.version).toBe("ai-video-bgm/v1");
     expect(fencePack.rules.map((rule) => rule.rule_id)).toEqual([
-      "G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5",
+      "G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5", "G-BGM6", "G-BGM7",
     ]);
     expect(fencePack.rules.every((rule) => rule.is_baseline === true)).toBe(true);
     const levels = Object.fromEntries(fencePack.rules.map((rule) => [rule.rule_id, rule.level]));
     expect(levels).toEqual({
       "G-BGM0": "auto", "G-BGM1": "review", "G-BGM2": "block",
       "G-BGM3": "block", "G-BGM4": "block", "G-BGM5": "block",
+      "G-BGM6": "review", "G-BGM7": "block",
     });
   });
 
@@ -102,6 +106,18 @@ describe("配乐围栏（G-BGM0..G-BGM5）语义", () => {
     expect(evaluate("G-BGM5", { commercial_use: true, track_license: "workloom-self-generated" })).toBe(false);
     // 非商用场景不拦（但仍受"别把 NC 当商用交付"的技能纪律约束）
     expect(evaluate("G-BGM5", { commercial_use: false, track_license: "cc-by-nc-4.0" })).toBe(false);
+
+    // G-BGM6：新曲源/未核验 provider → review；已核验复用放行
+    expect(evaluate("G-BGM6", { new_provider: true })).toBe(true);
+    expect(evaluate("G-BGM6", { provider_reviewed: false })).toBe(true);
+    expect(evaluate("G-BGM6", { provider_reviewed: true })).toBe(false);
+    expect(evaluate("G-BGM6")).toBe(false);
+
+    // G-BGM7：未登记曲源 / 允许未授权源 / 非 http(s) → block
+    expect(evaluate("G-BGM7", { unregistered_source: true })).toBe(true);
+    expect(evaluate("G-BGM7", { allow_unlicensed_source: true })).toBe(true);
+    expect(evaluate("G-BGM7", { url_scheme_ok: false })).toBe(true);
+    expect(evaluate("G-BGM7", { url_scheme_ok: true, unregistered_source: false })).toBe(false);
   });
 });
 
@@ -155,20 +171,20 @@ describe("岗位 / 技能 / 管线 / 对象四层引用", () => {
     coverage: Array<{ eventPrefix: string }>; write_back: string[];
   };
 
-  it("岗位卡：5 技能 / 9 工具 / 6 围栏 / 事件域 bgm.", () => {
+  it("岗位卡：5 技能 / 12 工具 / 8 围栏 / 事件域 bgm.", () => {
     expect(preset.preset_key).toBe("bgm-composer");
     expect(preset.name).toBe("BGM配乐师");
     expect(preset.kind).toBe("operator");
     expect(preset.readonly).toBe(false);
     expect(preset.high_risk).toBe(false);
-    expect(preset.fence_bindings).toEqual(["G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5"]);
+    expect(preset.fence_bindings).toEqual(["G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5", "G-BGM6", "G-BGM7"]);
     expect(preset.skills).toEqual([
       "bgm-score-design", "bgm-audio-layering", "bgm-vocal-separation", "bgm-library-license", "bgm-delivery-spec",
     ]);
     expect(preset.tools.map((tool) => tool.name)).toEqual([...BGM_TOOLS]);
     expect(preset.tools.some((tool) => tool.access === "write")).toBe(true);
     expect(preset.tools.filter((tool) => tool.access === "write").map((tool) => tool.name)).toEqual([
-      "bgmwrite.compose", "bgmwrite.mix", "bgmwrite.separate", "bgmwrite.best",
+      "bgmwrite.compose", "bgmwrite.fetch", "bgmwrite.mix", "bgmwrite.separate", "bgmwrite.best",
     ]);
     expect(preset.write_back).toEqual(["bgmwrite.compose", "bgmwrite.mix"]);
     expect(preset.coverage.map((coverage) => coverage.eventPrefix)).toEqual(["bgm."]);
@@ -415,6 +431,137 @@ function readFiles(dir: string): string[] {
     .filter((entry) => entry.isFile() && entry.name.endsWith(".yml"))
     .map((entry) => join(dir, entry.name));
 }
+
+describe("渲染提示词 → 配乐简报（brief）", () => {
+  const cases: Array<{ text: string; recipe: string | null; energy?: string; climax?: string; noMusic?: boolean; policy?: string; avoid?: string[] }> = [
+    { text: "夜幕下的城市霓虹，主角在雨中奔跑，结尾反转揭晓真相，快剪高能", recipe: "night-city", energy: "high", climax: "end" },
+    { text: "美食探店：热气腾腾的火锅特写，温柔治愈，保留现场声", recipe: "food", energy: "low", policy: "keep-all" },
+    { text: "口播讲解：三分钟说清 AI 芯片架构，不要鼓点", recipe: "tech", avoid: ["kick", "hat"] },
+    { text: "产品广告：旗舰新品开箱，黄金三秒钩子，卡点快节奏", recipe: "product-ad", energy: "high", climax: "start" },
+    { text: "随手拍的家庭日常，不要背景音乐", recipe: "family", noMusic: true, policy: "none" },
+    { text: "一段没有任何题材线索的空镜合集", recipe: null },
+  ];
+
+  it("六个真实提示词全部按预期解析（题材/能量/高潮/禁忌/无配乐）", () => {
+    for (const item of cases) {
+      const { brief } = analyzePromptBrief({ promptText: item.text, durationSec: 30 });
+      expect(brief.recipeId, item.text).toBe(item.recipe);
+      if (item.energy) expect(brief.energyLevel, item.text).toBe(item.energy);
+      if (item.climax) expect(brief.climax.position, item.text).toBe(item.climax);
+      if (item.noMusic) expect(brief.noMusic, item.text).toBe(true);
+      if (item.policy) expect(brief.audioPolicy, item.text).toBe(item.policy);
+      if (item.avoid) expect(brief.instrumentation.avoid, item.text).toEqual(expect.arrayContaining(item.avoid));
+    }
+  });
+
+  it("高潮落点会被换算成秒（用于选段对齐），并按提示词调整配乐电平", () => {
+    const end = analyzePromptBrief({ promptText: "结尾反转，全片紧张", durationSec: 40 }).brief;
+    expect(end.climax.atSec).toBeCloseTo(34, 1);
+    const quiet = analyzePromptBrief({ promptText: "产品广告：音乐要轻，别太满", durationSec: 20 }).brief;
+    expect(quiet.musicLevelDeltaDb).toBeLessThan(0);
+    const loud = analyzePromptBrief({ promptText: "运动燃向快剪，音乐要突出", durationSec: 20 }).brief;
+    expect(loud.musicLevelDeltaDb).toBeGreaterThan(0);
+  });
+
+  it("能量弧线形状：结尾高潮=rise-to-climax / 开场钩子=hook-first / 无配乐=none", () => {
+    const mk = (text: string) => analyzePromptBrief({ promptText: text, durationSec: 30 }).brief;
+    expect(energyCurveFor({ brief: mk("结尾反转揭晓"), durationSec: 30 }).shape).toBe("rise-to-climax");
+    expect(energyCurveFor({ brief: mk("黄金三秒钩子，开场就炸"), durationSec: 30 }).shape).toBe("hook-first");
+    expect(energyCurveFor({ brief: mk("不要背景音乐"), durationSec: 30 }).shape).toBe("none");
+    expect(energyCurveFor({ brief: mk("中段爆发"), durationSec: 30 }).shape).toBe("peak-middle");
+  });
+
+  it("曲目打分与提示词一致：题材命中得高分、违反禁忌直接否决", () => {
+    const { brief } = analyzePromptBrief({ promptText: "美食探店，温柔治愈", durationSec: 30 });
+    const good = scoreTrackAgainstBrief({
+      track: { id: "t1", genre: "美食 / 餐饮", mood: "诱人温暖", bpm: 96, durationSec: 60, energyScore: 0.3, structure: { segments: [] } },
+      brief, recipeCatalog: findRecipes({ list: true }).items,
+    });
+    const off = scoreTrackAgainstBrief({
+      track: { id: "t2", genre: "夜景 / 都市", mood: "戏剧现代", bpm: 92, durationSec: 180, energyScore: 0.9 },
+      brief, recipeCatalog: findRecipes({ list: true }).items,
+    });
+    expect(good.score).toBeGreaterThan(off.score);
+    expect(good.verdict).toBe("ok");
+
+    const drums = analyzePromptBrief({ promptText: "口播讲解，不要鼓点", durationSec: 30 }).brief;
+    const rejected = scoreTrackAgainstBrief({
+      track: { id: "t3", genre: "科技 / SaaS", mood: "冷静精密", bpm: 100, durationSec: 60, instrumentation: ["kick", "pad"] },
+      brief: drums, recipeCatalog: findRecipes({ list: true }).items,
+    });
+    expect(rejected.verdict).toBe("rejected");
+    expect(rejected.reasons.join(" ")).toContain("违反提示词禁忌");
+  });
+});
+
+describe("在线曲源层（登记表与许可归一）", () => {
+  it("四个登记源各自的必需环境变量齐备（未配置时如实报告 missingEnv）", () => {
+    expect(Object.keys(SOURCE_ENV).sort()).toEqual(["freesound", "generic-http", "jamendo", "mubert"]);
+    const configured = listSources({
+      JAMENDO_CLIENT_ID: "x", FREESOUND_API_TOKEN: "y", MUBERT_CUSTOMER_ID: "c", MUBERT_ACCESS_TOKEN: "t",
+      WORKLOOM_BGM_ONLINE_ENDPOINT: "https://music.example.com/index",
+    });
+    expect(configured.every((entry) => entry.configured)).toBe(true);
+    const none = listSources({});
+    expect(none.every((entry) => entry.configured === false)).toBe(true);
+    expect(none.find((entry) => entry.name === "mubert")!.missingEnv).toEqual(["MUBERT_CUSTOMER_ID", "MUBERT_ACCESS_TOKEN"]);
+  });
+
+  it("许可归一覆盖 CC 全家族与未知（未知按不可商用处理）", () => {
+    expect(normalizeLicense("http://creativecommons.org/licenses/by/4.0/")).toBe("cc-by-4.0");
+    expect(normalizeLicense("http://creativecommons.org/licenses/by-sa/3.0/")).toBe("cc-by-sa-4.0");
+    expect(normalizeLicense("http://creativecommons.org/licenses/by-nc-nd/4.0/")).toBe("cc-by-nc-nd-4.0");
+    expect(normalizeLicense("https://creativecommons.org/publicdomain/zero/1.0/")).toBe("cc0-1.0");
+    expect(normalizeLicense("免版税（Mubert）")).toBe("royalty-free");
+    expect(normalizeLicense("all rights reserved")).toBe("unknown");
+    expect(licenseInfo(normalizeLicense("all rights reserved")).commercial).toBeNull();
+  });
+});
+
+describe("随仓精选曲库（12 首自算曲目）", () => {
+  const curatedDir = join(BUNDLE_DIR, "library/bgm-library-curated");
+  const manifestPath = join(curatedDir, "tracks.json");
+
+  it("清单齐备：12 首、12 个风格、全部自算许可、字段完整", () => {
+    expect(existsSync(manifestPath), "缺少 tracks.json（用 scripts/bgm-library-build.mjs --curated 生成）").toBe(true);
+    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      library: { tracks: number; provider: string };
+      tracks: Array<Record<string, unknown>>;
+    };
+    expect(doc.tracks).toHaveLength(12);
+    expect(new Set(doc.tracks.map((track) => track.style)).size).toBe(12);
+    for (const track of doc.tracks) {
+      expect(track.license).toBe("workloom-self-generated");
+      expect(String(track.file)).toMatch(/\.m4a$/);
+      expect(existsSync(join(curatedDir, String(track.file)))).toBe(true);
+      expect(track.bpm).toBeGreaterThan(40);
+      expect(track.durationSec).toBeGreaterThan(30);
+      const loudness = track.loudness as { integratedLufs: number; truePeakDbtp: number };
+      expect(Math.abs(loudness.integratedLufs + 14)).toBeLessThan(1.5);
+      expect(loudness.truePeakDbtp).toBeLessThanOrEqual(-1.0);
+      const structure = track.structure as { hasDrop: boolean; segments: unknown[] };
+      expect(structure.hasDrop, `${track.id} 缺少可选的 drop 段`).toBe(true);
+      expect(structure.segments.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("每首曲目的 sha256 与磁盘文件一致（随仓分发的是可核验产物）", () => {
+    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as { tracks: Array<{ file: string; sha256: string }> };
+    for (const track of doc.tracks) {
+      const bytes = readFileSync(join(curatedDir, track.file));
+      const actual = createHash("sha256").update(bytes).digest("hex");
+      expect(actual, `${track.file} 摘要不一致`).toBe(track.sha256);
+    }
+  }, 60_000);
+
+  it("曲库能被工位的本地曲库加载器读到（客户曲库 → 随仓精选 → 工位本地 三级合并）", () => {
+    const loaded = loadAllLocalTracks({});
+    const curated = loaded.tracks.filter((track) => track.libraryKind === "local-curated");
+    expect(curated.length).toBe(12);
+    expect(loaded.sources.some((entry) => entry.kind === "local-curated" && entry.present)).toBe(true);
+    expect(curated.every((track) => track.localPath && existsSync(track.localPath))).toBe(true);
+  });
+});
 
 /** 用合成包络（不碰真实音频文件）验证结构分段与选段决策——纯函数，CI 里也能跑。 */
 function envelopeOf(dbBySecond: number[][], windowSec = 0.25) {

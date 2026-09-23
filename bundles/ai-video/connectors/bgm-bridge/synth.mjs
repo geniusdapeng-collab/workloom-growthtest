@@ -73,6 +73,79 @@ export function midiToFreq(midi) {
   return 440 * 2 ** ((midi - 69) / 12);
 }
 
+/* ============================ 风格包（2026-09-23 新增） ============================ */
+
+/**
+ * 风格包 = 「配器 + 演奏法 + 泵感/摇摆 + 明暗」的组合，用来把同一套配方渲染成不同年代/圈层的听感。
+ * 说明：这些是**本仓自有的合成参数**（不采样任何第三方音源），风格命名只描述听感取向。
+ */
+export const STYLE_PACKS = {
+  "modern-pop": {
+    label: "现代流行（鼓组+副旋律）",
+    instrumentation: ["pad", "bass", "sub", "pluck", "kick", "snare", "hat", "lead"],
+    pumping: 0.22, swing: 0, brightness: 1.05, percussion: "full",
+  },
+  "electronic-pulse": {
+    label: "电子脉冲（泵感+琶音）",
+    instrumentation: ["pad", "sub", "bass", "kick", "hat", "arp"],
+    pumping: 0.45, swing: 0, brightness: 0.98, percussion: "four-on-floor",
+  },
+  "lo-fi-chill": {
+    label: "Lo-Fi 松弛（软鼓+摇摆）",
+    instrumentation: ["pad", "bass", "pluck", "hat"],
+    pumping: 0.08, swing: 0.14, brightness: 0.82, percussion: "soft",
+  },
+  "cinematic-build": {
+    label: "电影感推进（渐强+落锤）",
+    instrumentation: ["pad", "bass", "bell", "riser", "impact"],
+    pumping: 0, swing: 0, brightness: 0.9, percussion: "cinematic",
+  },
+  "ambient-calm": {
+    label: "氛围舒缓（无鼓）",
+    instrumentation: ["pad", "bell", "bass"],
+    pumping: 0, swing: 0, brightness: 0.86, percussion: "none",
+  },
+  "corporate-clean": {
+    label: "商务干净（拨弦+轻打点）",
+    instrumentation: ["pluck", "pad", "bass", "hat"],
+    // 该风格的 hat 噪声在 AAC 下产生极端码间峰值（实测真峰值 +2.6dBTP → 为保真峰值把整首压到 -20.7 LUFS），
+    // 商务片床本来也不需要打击乐：直接撤掉打击，保留拨弦+铺底。
+    pumping: 0.06, swing: 0, brightness: 1.1, percussion: "none",
+  },
+  "acoustic-warm": {
+    label: "原声温暖（拨弦+铃）",
+    instrumentation: ["pluck", "pad", "bass", "bell"],
+    pumping: 0, swing: 0.06, brightness: 0.95, percussion: "none",
+  },
+  "tension-dark": {
+    label: "暗色张力（低频脉冲）",
+    instrumentation: ["pad", "sub", "hat", "impact"],
+    pumping: 0.18, swing: 0, brightness: 0.78, percussion: "sparse",
+  },
+  "sports-hype": {
+    label: "运动燃（重鼓+主音）",
+    instrumentation: ["kick", "snare", "bass", "lead", "pad"],
+    pumping: 0.3, swing: 0, brightness: 1.12, percussion: "full",
+  },
+  "festive-bright": {
+    label: "节日明亮（铃+拨弦）",
+    instrumentation: ["bell", "pluck", "bass", "kick", "hat"],
+    pumping: 0.12, swing: 0, brightness: 1.15, percussion: "light",
+  },
+  "documentary-bed": {
+    label: "纪录片铺底（极简）",
+    instrumentation: ["pad", "bass"],
+    pumping: 0, swing: 0, brightness: 0.88, percussion: "none",
+  },
+  "city-night": {
+    label: "都市夜行（低频+琶音）",
+    instrumentation: ["pad", "sub", "hat", "arp", "bass"],
+    pumping: 0.26, swing: 0, brightness: 0.95, percussion: "sparse",
+  },
+};
+
+export const STYLE_IDS = Object.keys(STYLE_PACKS);
+
 /* ============================ 确定性随机 ============================ */
 
 function mulberry32(seed) {
@@ -126,21 +199,38 @@ export function planComposition({ recipe, durationSec, seed = 0, bpmOverride = n
     ? recipe.instrumentation
     : DEFAULT_INSTRUMENTATION).filter((name) => typeof name === "string");
   if (!instrumentation.length) throw new MeasureError("配器为空", "bad_recipe");
+  const styleId = String(recipe.style ?? "corporate-clean");
+  const style = STYLE_PACKS[styleId] ?? null;
+  if (!style) throw new MeasureError(`未知风格包：${styleId}（可用：${STYLE_IDS.join(", ")}）`, "bad_recipe");
+  // 风格包给"基础配器"，配方里的 instrumentaton 作为额外叠加：两者并集，避免风格包覆盖题材要求
+  const finalInstrumentation = [...new Set([
+    ...style.instrumentation,
+    ...(Array.isArray(recipe.instrumentation) ? recipe.instrumentation : []),
+  ])];
 
   const mode = String(recipe.mode ?? "major");
   if (!SCALES[mode]) throw new MeasureError(`调式无法解析：${mode}（可用：${Object.keys(SCALES).join(", ")}）`, "bad_recipe");
   const rootMidi = noteToMidi(recipe.key ?? "C4");
 
   const barsPlan = [];
+  // 段落力度：真实歌曲有"主歌弱 / 副歌强 / 桥段回落"的对比；此前 intro/body 只差 ~2.5dB，
+  // 结构识别会判成"平坦、无高潮"（实测 12 首精选全部 withDrop=0）。这里把对比拉到 ~8–10dB，
+  // 并在主体中段插入一段 breakdown（撤鼓、降配器），让选段能力真的有东西可选。
+  const breakdownStart = introBars + Math.max(2, Math.round(bodyBars * 0.42));
+  const breakdownBars = bodyBars >= 8 ? Math.max(1, Math.round(bodyBars * 0.16)) : 0;
   for (let bar = 0; bar < bars; bar += 1) {
     const section = bar < introBars ? "intro" : bar >= introBars + bodyBars ? "outro" : "body";
-    const intensity = section === "intro" ? 0.55 : section === "outro" ? 0.45 : 1;
+    const isBreakdown = breakdownBars > 0 && bar >= breakdownStart && bar < breakdownStart + breakdownBars;
+    // 力度对比按"真实歌曲"标定：主歌/副歌差 ~13dB（此前 0.38 vs 1.0 只有 ~8dB，
+    // 再过母带就掉到 3–4dB，选段能力失效——实测 12 首精选全部被判 flat）
+    const intensity = isBreakdown ? 0.28 : section === "intro" ? 0.22 : section === "outro" ? 0.18 : 1;
     barsPlan.push({
       bar,
       startSec: round(bar * barSec + offset, 3),
       chord: progression[bar % progression.length],
-      section,
+      section: isBreakdown ? "breakdown" : section,
       intensity,
+      breakdown: isBreakdown,
     });
   }
 
@@ -162,7 +252,8 @@ export function planComposition({ recipe, durationSec, seed = 0, bpmOverride = n
     durationSec: round(bars * barSec, 3),
     requestedDurationSec: round(requested, 3),
     offsetSec: round(offset, 3),
-    instrumentation,
+    instrumentation: finalInstrumentation,
+    style: { id: styleId, ...style, instrumentation: undefined },
     chords: progression,
     bars_: barsPlan,
     seed,
@@ -192,6 +283,7 @@ function envelope(t, { attack = 0.01, decay = 0.2, sustain = 0.8, release = 0.3,
 function addVoice(buffer, {
   startSample, lengthSamples, freq, amplitude, harmonics = [[1, 1]], detune = 0,
   env = { attack: 0.01, decay: 0.2, sustain: 0.8, release: 0.3 }, pan = 0,
+  pump = null,
 }) {
   const start = Math.max(0, Math.floor(startSample));
   const end = Math.min(buffer.left.length, start + Math.floor(lengthSamples));
@@ -201,7 +293,7 @@ function addVoice(buffer, {
   const phases = detune > 0 ? [1 + detune, 1 - detune] : [1];
   for (let index = start; index < end; index += 1) {
     const t = (index - start) / SAMPLE_RATE;
-    const envValue = envelope(t, { ...env, length: lengthSec });
+    const envValue = envelope(t, { ...env, length: lengthSec }) * (pump ? pump(t) : 1);
     if (envValue <= 0) continue;
     let sample = 0;
     for (const factor of phases) {
@@ -254,6 +346,19 @@ export function renderPlan(plan) {
   const padVelocity = Array.from({ length: 4 }, () => 1 + (random() - 0.5) * 0.08);
   const pluckVelocity = 1 + (random() - 0.5) * 0.12;
 
+  /* ===== 风格包参数（2026-09-23）：泵感 / 摇摆 / 明暗 / 打击密度 ===== */
+  const style = plan.style ?? { id: "corporate-clean", pumping: 0, swing: 0, brightness: 1, percussion: "light" };
+  const beatSec = plan.beatSec;
+  // 泵感：每个拍点后音量指数回落再恢复（电子乐"抽气"听感）。作用在 pad/pluck/arp/bell/lead 上，不作用在鼓与低频冲击。
+  const pumpFn = style.pumping > 0
+    ? (t) => 1 - style.pumping * Math.exp(-((t % beatSec) / (beatSec * 0.35)))
+    : null;
+  // 摇摆：偶数八分音符（1、3 拍后半）向后偏移，给 lo-fi/爵士一点"人味"
+  const swingShift = style.swing > 0 ? style.swing * beatSec * 0.5 : 0;
+  const bright = Number.isFinite(style.brightness) ? style.brightness : 1;
+  const perc = style.percussion ?? "light";
+  const hasDrums = perc !== "none";
+
   for (const bar of plan.bars_) {
     const chordTones = CHORDS[bar.chord].map((offset) => plan.rootMidi + offset);
     const barStartSample = bar.startSec * SAMPLE_RATE;
@@ -266,7 +371,8 @@ export function renderPlan(plan) {
           startSample: barStartSample - 0.15 * SAMPLE_RATE,
           lengthSamples: (plan.barSec + 0.9) * SAMPLE_RATE,
           freq: midiToFreq(midi + 12),
-          amplitude: 0.075 * intensity * (1 - voiceIndex * 0.12) * (padVelocity[voiceIndex % padVelocity.length] ?? 1),
+          // pad 是能量主导声部：用 intensity^1.6 放大段落对比（否则弱风格只有 4–5dB 动态、选段判 flat）
+          amplitude: 0.075 * (intensity ** 1.6) * (1 - voiceIndex * 0.12) * (padVelocity[voiceIndex % padVelocity.length] ?? 1),
           harmonics: [[1, 1], [2, 0.3], [3, 0.11]],
           detune: 0.0012,
           env: { attack: 0.7, decay: 0.4, sustain: 0.85, release: 1.1 },
@@ -280,7 +386,9 @@ export function renderPlan(plan) {
         startSample: barStartSample,
         lengthSamples: (plan.barSec * 0.95) * SAMPLE_RATE,
         freq: midiToFreq(plan.rootMidi - 24),
-        amplitude: 0.2 * (0.7 + 0.3 * intensity),
+        // bass 也必须随段落走：此前留了 0.7 的固定底，导致 intro/outro 里低频几乎和副歌一样响，
+        // 段落动态被抹平（实测 lo-fi 风格整首只有 5dB 动态、判 flat）。
+        amplitude: 0.2 * (0.22 + 0.78 * (intensity ** 1.2)),
         harmonics: [[1, 1], [2, 0.18]],
         env: { attack: 0.02, decay: 0.35, sustain: 0.72, release: 0.25 },
         pan: 0,
@@ -298,23 +406,117 @@ export function renderPlan(plan) {
       }
     }
 
-    if (has("pluck") && bar.section === "body") {
+    if (has("pluck") && bar.section === "body" && !bar.breakdown) {
       const pattern = pluckPattern;
       for (let step = 0; step < pattern.length; step += 1) {
         const tone = chordTones[pattern[step] % chordTones.length] + 12;
         addVoice(buffer, {
-          startSample: barStartSample + step * (barSamples / pattern.length),
+          startSample: barStartSample + step * (barSamples / pattern.length) + (step % 2 === 1 ? swingShift * SAMPLE_RATE : 0),
           lengthSamples: 0.4 * SAMPLE_RATE,
           freq: midiToFreq(tone),
           amplitude: 0.058 * intensity * pluckVelocity,
-          harmonics: [[1, 1], [3, 0.22]],
+          harmonics: [[1, 1], [3, 0.22 * bright]],
           env: { attack: 0.006, decay: 0.12, sustain: 0.28, release: 0.22 },
           pan: step % 2 === 0 ? -0.22 : 0.22,
+          pump: pumpFn,
         });
       }
     }
 
-    if (bar.section === "body" && (has("kick") || has("hat"))) {
+    /* ===== 新增音色：sub（低频支撑）/ arp（十六分琶音）/ lead（super-saw 主音）/ snare / riser / impact ===== */
+    if (has("sub")) {
+      addVoice(buffer, {
+        startSample: barStartSample,
+        lengthSamples: (plan.barSec * 0.98) * SAMPLE_RATE,
+        freq: midiToFreq(plan.rootMidi - 36),
+        amplitude: 0.22 * intensity,
+        harmonics: [[1, 1], [2, 0.1]],
+        env: { attack: 0.01, decay: 0.3, sustain: 0.85, release: 0.2 },
+        pan: 0,
+      });
+    }
+
+    if (has("arp") && bar.section === "body" && !bar.breakdown) {
+      const steps = 16;
+      for (let step = 0; step < steps; step += 1) {
+        const tone = chordTones[(step * 2) % chordTones.length] + 24;
+        addVoice(buffer, {
+          startSample: barStartSample + step * (barSamples / steps) + (step % 2 === 1 ? swingShift * SAMPLE_RATE : 0),
+          lengthSamples: 0.16 * SAMPLE_RATE,
+          freq: midiToFreq(tone),
+          amplitude: 0.032 * intensity * bright,
+          harmonics: [[1, 1], [2, 0.18 * bright]],
+          env: { attack: 0.003, decay: 0.06, sustain: 0.15, release: 0.1 },
+          pan: step % 4 < 2 ? -0.3 : 0.3,
+          pump: pumpFn,
+        });
+      }
+    }
+
+    if (has("lead") && bar.section === "body" && !bar.breakdown) {
+      // 两小节一句的极简主音：和弦音 + 一次上邻音；super-saw = 三路失谐 + 谐波叠加
+      const phrase = [0, 2, 1, 3];
+      const tone = chordTones[phrase[bar.bar % phrase.length] % chordTones.length] + 12;
+      addVoice(buffer, {
+        startSample: barStartSample + plan.beatSec * 0.5 * SAMPLE_RATE,
+        lengthSamples: (plan.barSec * 0.7) * SAMPLE_RATE,
+        freq: midiToFreq(tone),
+        amplitude: 0.036 * intensity * bright,
+        harmonics: [[1, 1], [2, 0.4], [3, 0.22], [4, 0.12], [5, 0.07]],
+        detune: 0.0035,
+        env: { attack: 0.05, decay: 0.3, sustain: 0.55, release: 0.45 },
+        pan: -0.12,
+        pump: pumpFn,
+      });
+    }
+
+    if (has("snare") && bar.section === "body" && (perc === "full" || perc === "four-on-floor")) {
+      for (const beat of [1, 3]) {
+        addNoise(buffer, {
+          startSample: barStartSample + beat * plan.beatSec * SAMPLE_RATE,
+          lengthSamples: 0.12 * SAMPLE_RATE,
+          amplitude: 0.13 * intensity,
+          decay: 0.045,
+          pan: -0.05,
+          random,
+          highpass: false,
+        });
+      }
+    }
+
+    if (has("riser") && bar.section === "body" && bar.bar === plan.introBars + plan.bodyBars - 2) {
+      // 主体倒数第二小节起：2 小节上行噪声 + 上扫正弦，制造"要来了"的推进
+      const lengthSamples = Math.floor(plan.barSec * 2 * SAMPLE_RATE);
+      const start = Math.floor(barStartSample);
+      const end = Math.min(buffer.left.length, start + lengthSamples);
+      let previous = 0;
+      for (let index = start; index < end; index += 1) {
+        const ratio = (index - start) / lengthSamples;
+        const raw = random() * 2 - 1;
+        const hp = raw - previous;
+        previous = raw;
+        const sweep = 220 + ratio * 1800;
+        const sample = (hp * 0.05 + Math.sin(2 * Math.PI * sweep * (index / SAMPLE_RATE)) * 0.05) * ratio * ratio;
+        buffer.left[index] += sample * 0.7;
+        buffer.right[index] += sample * 0.7;
+      }
+    }
+
+    if (has("impact") && bar.section === "body" && (bar.bar === plan.introBars || bar.bar === plan.introBars + Math.floor(plan.bodyBars * 0.6))) {
+      const lengthSamples = Math.floor(1.2 * SAMPLE_RATE);
+      const start = Math.floor(barStartSample);
+      const end = Math.min(buffer.left.length, start + lengthSamples);
+      for (let index = start; index < end; index += 1) {
+        const t = (index - start) / SAMPLE_RATE;
+        const freq = 32 + 60 * Math.exp(-t / 0.08);
+        const envValue = Math.exp(-t / 0.35);
+        const sample = Math.sin(2 * Math.PI * freq * t) * 0.3 * envValue;
+        buffer.left[index] += sample;
+        buffer.right[index] += sample;
+      }
+    }
+
+    if (bar.section === "body" && !bar.breakdown && hasDrums && (has("kick") || has("hat"))) {
       for (let beat = 0; beat < 4; beat += 1) {
         const beatStart = barStartSample + beat * plan.beatSec * SAMPLE_RATE;
         if (has("kick") && (beat === 0 || beat === 2)) {
@@ -343,7 +545,7 @@ export function renderPlan(plan) {
       }
     }
 
-    if (has("bell") && bar.section === "body" && bar.bar % 2 === 0) {
+    if (has("bell") && (bar.section === "body" || bar.breakdown) && bar.bar % 2 === 0) {
       addVoice(buffer, {
         startSample: barStartSample + plan.beatSec * bellBeat * SAMPLE_RATE,
         lengthSamples: 1.3 * SAMPLE_RATE,

@@ -27,6 +27,8 @@ import {
   segmentSpectralStats, sha256File, tempDir,
 } from "./measure.mjs";
 import { composeToWav, planComposition } from "./synth.mjs";
+import { analyzePromptBrief, energyCurveFor, scoreTrackAgainstBrief } from "./brief.mjs";
+import { cacheDir as onlineCacheDir, fetchCandidate, listSources, searchOnline } from "./sources.mjs";
 
 /** 工位对外错误类型（与 measure 内核同源，统一 code 语义）。 */
 export const BgmError = MeasureError;
@@ -39,9 +41,11 @@ export const BGM_TOOLS = [
   "bgmread.probe",
   "bgmread.analyze",
   "bgmread.structure",
+  "bgmread.brief",
   "bgmread.recipes",
   "bgmread.library",
   "bgmwrite.compose",
+  "bgmwrite.fetch",
   "bgmwrite.mix",
   "bgmwrite.separate",
   "bgmwrite.best",
@@ -197,6 +201,31 @@ export function libraryDir(env = process.env) {
   return path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../library/bgm-library");
 }
 
+/**
+ * 本地曲库根目录（可多个，按优先级）：
+ * 1. `WORKLOOM_BGM_LIBRARY_DIR`（客户自建曲库，最高优先）
+ * 2. `bundles/ai-video/library/bgm-library-curated`（**随仓库分发的 12 首精选**，每风格 1 首）
+ * 3. `WORKLOOM_BGM_HOME/library`（默认 `~/.workloom-bgm/library`，工位本地 50–70 首全量曲库）
+ *
+ * 三个目录都用同一份 `tracks.json` 契约；同 id 时前面的优先（客户可以覆盖仓库版本）。
+ */
+export function libraryRoots(env = process.env) {
+  const here = path.dirname(new URL(import.meta.url).pathname);
+  const custom = (env.WORKLOOM_BGM_LIBRARY_DIR ?? "").trim();
+  const workbenchHome = (env.WORKLOOM_BGM_HOME ?? "").trim() || path.join(os.homedir(), ".workloom-bgm");
+  const candidates = [
+    custom ? { dir: path.resolve(custom), kind: "local-custom", label: "客户自建曲库" } : null,
+    { dir: path.resolve(here, "../../library/bgm-library-curated"), kind: "local-curated", label: "随仓精选曲库（12 首）" },
+    { dir: path.join(workbenchHome, "library"), kind: "local-workbench", label: "工位本地曲库" },
+  ].filter(Boolean);
+  const seen = new Set();
+  return candidates.filter((entry) => {
+    if (seen.has(entry.dir)) return false;
+    seen.add(entry.dir);
+    return true;
+  });
+}
+
 /** 许可白名单：只能商用 → true；非商用/禁止演绎 → false；未知 → null（未知一律按"不可商用"处理）。 */
 export const LICENSE_TABLE = {
   "cc0-1.0": { commercial: true, attributionRequired: false, label: "CC0 1.0（公有领域）" },
@@ -230,6 +259,41 @@ function loadLibraryTracks(env = process.env) {
   }
   const tracks = Array.isArray(doc?.tracks) ? doc.tracks : [];
   return { dir, file, tracks, present: true, note: null };
+}
+
+/** 合并读取全部本地曲库根（客户曲库 / 随仓精选 / 工位本地），同 id 先到先得。 */
+export function loadAllLocalTracks(env = process.env) {
+  const roots = libraryRoots(env);
+  const byId = new Map();
+  const sources = [];
+  for (const root of roots) {
+    const file = path.join(root.dir, "tracks.json");
+    if (!fs.existsSync(file)) {
+      sources.push({ ...root, present: false, tracks: 0 });
+      continue;
+    }
+    let doc;
+    try {
+      doc = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (error) {
+      throw new BgmError(`曲库索引解析失败（${file}）：${error instanceof Error ? error.message : String(error)}`, "bad_request");
+    }
+    const tracks = Array.isArray(doc?.tracks) ? doc.tracks : [];
+    let added = 0;
+    for (const track of tracks) {
+      if (!track?.id || byId.has(track.id)) continue;
+      byId.set(track.id, {
+        ...track,
+        libraryRoot: root.dir,
+        libraryKind: root.kind,
+        localPath: track.file ? path.resolve(root.dir, track.file) : null,
+        origin: root.kind === "local-curated" ? "library-curated" : "library-local",
+      });
+      added += 1;
+    }
+    sources.push({ ...root, present: true, file, tracks: added });
+  }
+  return { tracks: [...byId.values()], sources, total: byId.size };
 }
 
 /** TASL 署名（Title / Author / Source / License）——CC 系许可的合规署名格式。 */
@@ -340,6 +404,131 @@ export function findTracks(query = {}, env = process.env) {
 }
 
 /** 写署名文件（有署名义务的曲目必须随交付物留档）。 */
+/**
+ * 曲目三级解析：**在线源（优先）→ 本地曲库（兜底）→ 自算作曲（最后兜底）**。
+ *
+ * 每一级都要过"许可可商用"闸；任何一级成功都要把"用了哪一级、为什么降级、候选打分"写进回执。
+ * 这是本仓对"实时在线取曲 + 离线可用"的实现口径：在线不可用不等于失败，但**必须如实说明降级**。
+ */
+export async function resolveTrackForBrief({
+  brief = null, recipe = null, policy = "online-first", durationSec = null,
+  env = process.env, fetchImpl = fetch, destDir = null, limit = 8,
+}) {
+  const attempts = [];
+  const recipes = loadRecipes().recipes;
+  const wanted = String(policy ?? "online-first");
+
+  if (wanted === "online-first" || wanted === "online-only") {
+    try {
+      const { candidates, attempts: searchAttempts, configuredSources } = await searchOnline({
+        brief, recipe, limit, env, fetchImpl,
+      });
+      attempts.push(...searchAttempts.map((entry) => ({ ...entry, layer: "online" })));
+      if (!candidates.length) {
+        attempts.push({ layer: "online", source: "-", status: "no_candidates", message: configuredSources.length ? "已配置的在线源没有返回可下载曲目" : "没有任何在线源被配置" });
+      } else {
+        const scored = candidates
+          .map((candidate) => {
+            const info = licenseInfo(candidate.license);
+            const match = scoreTrackAgainstBrief({ track: candidate, brief: brief ?? { recipeId: recipe?.id ?? null, genreTags: [], energyLevel: "medium", bpmScale: 1, instrumentation: { avoid: [] }, durationSec }, recipeCatalog: recipes });
+            return { candidate, info, match };
+          })
+          .sort((a, b) => b.match.score - a.match.score);
+        const compliant = scored.filter((entry) => entry.info.commercial === true);
+        const rejected = scored.filter((entry) => entry.info.commercial !== true);
+        if (rejected.length) {
+          attempts.push({
+            layer: "online", source: rejected[0].candidate.source, status: "license_rejected",
+            message: `拒收 ${rejected.length} 首非可商用/许可不明曲目（如 ${rejected[0].candidate.id}：${rejected[0].info.label}）`,
+          });
+        }
+        if (compliant.length) {
+          const winner = compliant[0];
+          try {
+            const fetched = await fetchCandidate({
+              candidate: winner.candidate,
+              destDir: destDir ?? onlineCacheDir(env),
+              env, fetchImpl,
+            });
+            attempts.push({
+              layer: "online", source: winner.candidate.source, status: "used",
+              message: `命中「${winner.candidate.title ?? winner.candidate.id}」（匹配分 ${winner.match.score}，许可 ${winner.info.label}${fetched.cached ? "，命中本地缓存" : "，已下载"}）`,
+            });
+            return {
+              layer: "online",
+              track: {
+                ...fetched,
+                bpm: fetched.bpm ?? null,
+                durationSec: fetched.durationSec ?? null,
+                match: winner.match,
+                licenseLabel: winner.info.label,
+                licenseReviewed: true,
+              },
+              attempts,
+              degraded: false,
+            };
+          } catch (error) {
+            attempts.push({
+              layer: "online", source: winner.candidate.source,
+              status: error instanceof BgmError ? error.code : "download_failed",
+              message: error instanceof Error ? error.message.slice(0, 200) : String(error),
+            });
+          }
+        } else {
+          attempts.push({ layer: "online", source: "-", status: "no_compliant_match", message: "在线候选里没有许可可商用的匹配（NC/ND/未知一律拒收）" });
+        }
+      }
+    } catch (error) {
+      attempts.push({
+        layer: "online", source: "-",
+        status: error instanceof BgmError ? error.code : "error",
+        message: error instanceof Error ? error.message.slice(0, 200) : String(error),
+      });
+    }
+    if (wanted === "online-only") {
+      return { layer: null, track: null, attempts, degraded: false, failed: true, reason: "online-only 模式下在线取源失败" };
+    }
+  }
+
+  // ② 本地曲库兜底（客户曲库 → 随仓精选 12 首 → 工位本地 50–70 首）
+  const local = loadAllLocalTracks(env);
+  const scoredLocal = local.tracks
+    .map((track) => {
+      const info = licenseInfo(track.license);
+      const match = scoreTrackAgainstBrief({
+        track,
+        brief: brief ?? { recipeId: recipe?.id ?? null, genreTags: [], energyLevel: "medium", bpmScale: 1, instrumentation: { avoid: [] }, durationSec },
+        recipeCatalog: recipes,
+      });
+      return { track, info, match };
+    })
+    .filter((entry) => entry.info.commercial === true && entry.match.verdict !== "rejected")
+    .sort((a, b) => b.match.score - a.match.score);
+  if (scoredLocal.length) {
+    const winner = scoredLocal[0];
+    attempts.push({
+      layer: "local", source: winner.track.libraryKind, status: "used",
+      message: `本地兜底命中「${winner.track.title ?? winner.track.id}」（匹配分 ${winner.match.score}，来源：${winner.track.libraryKind}${winner.info.attributionRequired ? "，需署名" : ""}）`,
+    });
+    return {
+      layer: "local",
+      track: {
+        ...winner.track,
+        licenseLabel: winner.info.label,
+        match: winner.match,
+        licenseReviewed: true,
+      },
+      attempts,
+      degraded: true,
+    };
+  }
+  attempts.push({ layer: "local", source: "-", status: "no_match", message: `本地曲库无可用匹配（候选 ${local.total} 首：${local.sources.map((entry) => `${entry.label}=${entry.tracks}`).join(" / ")}）` });
+
+  // ③ 自算作曲兜底（永远可用、零权利风险）
+  attempts.push({ layer: "compose", source: "builtin-synth", status: "will_compose", message: "在线与本地曲库都不可用 → 回退自算作曲（按配方 + 片长生成）" });
+  return { layer: null, track: null, attempts, degraded: true, fallbackToCompose: true };
+}
+
 async function writeAttributionFile(track, outputPath) {
   const attribution = buildAttribution(track);
   const lines = [
@@ -1056,7 +1245,7 @@ export async function mix({
   fadeInSec = 1.2, fadeOutSec = 1.6, align = true, allowDiscardOriginal = false,
   evidenceDir = null, bins = resolveBinaries(), workDir = null, keepWork = false,
   licenseReviewed = true, commercialUse = true,
-  section = "full", sectionStartSec = null, sectionEndSec = null,
+  section = "full", sectionStartSec = null, sectionEndSec = null, filmClimaxOverrideSec = null,
 }) {
   if (!AUDIO_POLICIES.includes(policy)) {
     throw new BgmError(`未知分层策略：${policy}（可用：${AUDIO_POLICIES.join(", ")}）`, "bad_request");
@@ -1113,6 +1302,12 @@ export async function mix({
       voice,
       durationSec: duration,
     });
+    // 提示词给的高潮线索：当音频/剪辑都判不出高潮点时（basis=none）才采信，来源写进回执（basis=prompt-brief）
+    if (climax.timeSec === null && Number.isFinite(filmClimaxOverrideSec)) {
+      climax.timeSec = Math.max(0, Math.min(duration - 0.5, Number(filmClimaxOverrideSec)));
+      climax.basis = "prompt-brief";
+      climax.reason = `片子音频/剪辑未识别到高潮点，采用提示词线索：高潮约在 ${Math.round(climax.timeSec)}s`;
+    }
     filmArc.climaxTimeSec = climax.timeSec;
     filmArc.climaxBasis = climax.basis;
     filmArc.climaxDetails = climax.details;
@@ -1654,9 +1849,49 @@ export async function best({
   input, output = null, genre = null, mood = null, recipeIds = null, policy = "keep-dialogue",
   minScore = 92, evidenceDir = null, bins = resolveBinaries(), seed = 0, targetLufs = -14, truePeak = -1.0,
   bpmStrategy = "cut-driven",
+  promptText = null, sourcePolicy = "compose-only", destDir = null, env = process.env, fetchImpl = fetch,
 }) {
   const probe = await probeMedia(input, { bins });
   const duration = probe.duration;
+
+  /**
+   * 提示词驱动（2026-09-23 新增）：把"提交渲染的原始提示词"当输入源 →
+   * ① 解析成配乐简报（题材/情绪/BPM/禁忌/能量弧线/高潮落点）；
+   * ② 三级取曲：在线源优先 → 本地曲库兜底 → 自算作曲最后兜底；
+   * ③ 用简报调配方电平与分层策略，并让提示词的高潮线索参与选段对齐。
+   */
+  const briefBundle = promptText
+    ? analyzePromptBrief({ promptText, durationSec: duration })
+    : null;
+  const brief = briefBundle?.brief ?? null;
+  const energyCurve = brief ? energyCurveFor({ brief, durationSec: duration }) : null;
+  if (brief?.noMusic) {
+    return {
+      verdict: "no_bgm_needed",
+      reason: "提示词明确要求不加配乐（no music）→ 按 do-no-harm 判定，不产出文件",
+      brief,
+      energyCurve,
+      source: { speechLevelDb: null, roomToneDb: null, activeRatio: null },
+      candidates: [],
+      sha256: await sha256File(input),
+    };
+  }
+  const briefGenre = brief?.recipeId
+    ? (findRecipes({ recipeId: brief.recipeId }).recipe?.genre ?? null)
+    : null;
+  const effectiveGenre = genre ?? briefGenre;
+  const effectiveMood = mood ?? (brief?.mood?.length ? null : null);
+
+  /** 取曲：仅有提示词或显式要求时走"在线优先/本地兜底"，否则保持原有自算作曲择优路径。 */
+  let trackResolution = null;
+  const wantsLibrary = Boolean(brief) || sourcePolicy !== "compose-only";
+  if (wantsLibrary) {
+    const recipeForSearch = brief?.recipeId ? findRecipes({ recipeId: brief.recipeId }).recipe : null;
+    trackResolution = await resolveTrackForBrief({
+      brief, recipe: recipeForSearch, policy: sourcePolicy, durationSec: duration,
+      env, fetchImpl, destDir,
+    });
+  }
   const voice = await detectVoiceBandSegments({ input, duration, bins });
   const detected = probe.video ? await detectCuts({ input, bins }) : { cuts: [], strong: [], method: "no-video" };
   const roomWindows = voice.silences
@@ -1694,9 +1929,10 @@ export async function best({
   const catalog = findRecipes({ list: true }).items;
   let pool = catalog;
   if (Array.isArray(recipeIds) && recipeIds.length) pool = catalog.filter((recipe) => recipeIds.includes(recipe.id));
-  else if (genre || mood) {
+  else if (effectiveGenre || mood || (brief?.recipeId)) {
     const filtered = catalog.filter((recipe) => {
-      const genreHit = genre ? recipe.genre.includes(String(genre)) : false;
+      if (brief?.recipeId && recipe.id === brief.recipeId) return true;
+      const genreHit = effectiveGenre ? recipe.genre.includes(String(effectiveGenre)) : false;
       const moodHit = mood ? recipe.mood.includes(String(mood)) : false;
       return genreHit || moodHit;
     });
@@ -1714,7 +1950,10 @@ export async function best({
     for (const duckDepth of [recipe.duckingDb - 2, recipe.duckingDb, recipe.duckingDb + 2]) {
       const depth = Math.max(6, Math.min(18, duckDepth));
       const musicLevel = Math.max(-30, Math.min(-16, recipe.musicLevelDb));
-      const margin = Number.isFinite(speechLevel) ? round(speechLevel - (musicLevel + depth), 2) : null;
+      // 人声出现时 BGM 被压低 depth dB → 该窗口音乐电平 = musicLevel - depth，
+      // 因此余量 = 人声电平 − (音乐电平 − 让位深度)。此前写成 (musicLevel + depth)，
+      // 会把"音乐被压低"算成"音乐更响"，导致 best 误判"无需配乐"（2026-09-23 演示实测）。
+      const margin = Number.isFinite(speechLevel) ? round(speechLevel - (musicLevel - depth), 2) : null;
       const presence = Number.isFinite(roomTone) ? round(musicLevel - roomTone, 2) : null;
       let score = 100;
       const reasons = [];
@@ -1777,20 +2016,51 @@ export async function best({
 
   const recipe = loadRecipes().recipes.find((item) => item.id === winner.recipeId);
   const work = await tempDir("bgm-best-");
-  const bgmPath = path.join(work, "bgm.wav");
-  const composed = await composeToWav({ recipe, durationSec: duration, output: bgmPath, seed, bpmOverride: winner.bpm });
+  const levelWithBrief = Math.max(-30, Math.min(-16, winner.musicLevelDb + (brief?.musicLevelDeltaDb ?? 0)));
+  const climaxOverride = Number.isFinite(brief?.climax?.atSec) ? brief.climax.atSec : null;
+
+  // 取曲三级链的落地：在线/本地命中就直接用那首；否则回退自算作曲
+  let bgmPath;
+  let composed = null;
+  let trackInfo = null;
+  let sectionMode = "full";
+  if (trackResolution?.track?.localPath) {
+    bgmPath = trackResolution.track.localPath;
+    trackInfo = {
+      layer: trackResolution.layer,
+      id: trackResolution.track.id,
+      title: trackResolution.track.title ?? null,
+      artist: trackResolution.track.artist ?? null,
+      source: trackResolution.track.source ?? null,
+      pageUrl: trackResolution.track.pageUrl ?? null,
+      license: trackResolution.track.license,
+      licenseLabel: trackResolution.track.licenseLabel ?? licenseInfo(trackResolution.track.license).label,
+      sha256: trackResolution.track.sha256 ?? null,
+      cached: trackResolution.track.cached ?? false,
+      match: trackResolution.track.match ?? null,
+    };
+    sectionMode = "auto";
+  } else {
+    if (trackResolution?.failed) {
+      throw new BgmError(`在线取源失败且未允许回退：${trackResolution.reason}`, "not_found");
+    }
+    bgmPath = path.join(work, "bgm.wav");
+    composed = await composeToWav({ recipe, durationSec: duration, output: bgmPath, seed, bpmOverride: winner.bpm });
+  }
   const mixed = await mix({
     input,
     output,
     bgmPath,
     policy,
     bgmBpm: winner.bpm,
-    musicLevelDb: winner.musicLevelDb,
+    musicLevelDb: levelWithBrief,
     duckingDb: winner.duckingDb,
     targetLufs,
     truePeak,
     evidenceDir,
     bins,
+    section: sectionMode,
+    filmClimaxOverrideSec: climaxOverride,
   });
   await fsp.rm(work, { recursive: true, force: true }).catch(() => {});
   return {
@@ -1800,6 +2070,12 @@ export async function best({
     score: winner.score,
     minScore,
     recipe: { id: recipe.id, genre: recipe.genre, mood: recipe.mood, key: recipe.key, mode: recipe.mode, bpm: recipe.bpm, chords: recipe.chords },
+    brief,
+    energyCurve,
+    track: trackInfo,
+    sourceResolution: trackResolution
+      ? { requested: sourcePolicy, layer: trackResolution.layer, degraded: Boolean(trackResolution.degraded), attempts: trackResolution.attempts }
+      : { requested: "compose-only", layer: "compose", degraded: false, attempts: [] },
     tempo: winner.tempo,
     composed,
     source: { speechLevelDb: speechLevel, roomToneDb: roomTone, activeRatio: voice.activeRatio },
@@ -1947,6 +2223,68 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
       return {
         result,
         receipt: { synced: true, sha256: await sha256File(input), verified_at: new Date().toISOString() },
+      };
+    }
+
+    case "bgmread.brief": {
+      // 提示词 → 配乐简报（题材/情绪/BPM 倍率/禁忌/能量弧线/高潮落点/分层策略）
+      const promptText = text(params.prompt_text, "prompt_text");
+      const { brief, matched } = analyzePromptBrief({
+        promptText,
+        platform: params.platform ?? null,
+        durationSec: optionalNumber(params.duration_sec),
+        recipeHint: params.recipe_hint ?? null,
+      });
+      const energyCurve = energyCurveFor({ brief, durationSec: optionalNumber(params.duration_sec) });
+      const matchedRecipe = brief.recipeId ? findRecipes({ recipeId: brief.recipeId }).recipe : null;
+      return {
+        result: {
+          brief,
+          energyCurve,
+          matched,
+          suggestedRecipe: matchedRecipe
+            ? {
+              id: matchedRecipe.id, genre: matchedRecipe.genre, mood: matchedRecipe.mood,
+              bpm: matchedRecipe.bpm, key: matchedRecipe.key, mode: matchedRecipe.mode,
+              musicLevelDb: matchedRecipe.musicLevelDb,
+              recommendedLevelDb: Math.max(-30, Math.min(-16, matchedRecipe.musicLevelDb + brief.musicLevelDeltaDb)),
+              duckingDb: matchedRecipe.duckingDb,
+            }
+            : null,
+          sourcePolicyHint: "online-first（在线曲源优先，失败回退本地曲库，再兜底自算作曲）",
+        },
+        receipt: { synced: true, snapshot_uri: `bgm://brief/${brief.recipeId ?? "unknown"}`, verified_at: new Date().toISOString() },
+      };
+    }
+
+    case "bgmwrite.fetch": {
+      // 在线取源（可单独调用）：按简报或题材去已配置的在线源检索 → 许可闸 → 下载缓存
+      const promptText = params.prompt_text ? String(params.prompt_text) : null;
+      const durationSec = optionalNumber(params.duration_sec);
+      const brief = promptText
+        ? analyzePromptBrief({ promptText, durationSec }).brief
+        : null;
+      const recipe = params.recipe_id
+        ? findRecipes({ recipeId: String(params.recipe_id) }).recipe
+        : (brief?.recipeId ? findRecipes({ recipeId: brief.recipeId }).recipe : null);
+      const destDir = params.dest_dir ? assertPathAllowed(String(params.dest_dir), roots, "dest_dir") : onlineCacheDir(env);
+      const resolution = await resolveTrackForBrief({
+        brief, recipe, policy: params.source_policy ?? "online-first",
+        durationSec, env, destDir, limit: optionalNumber(params.limit) ?? 8,
+      });
+      return {
+        result: {
+          ...resolution,
+          brief,
+          sources: listSources(env),
+          cacheDir: destDir,
+        },
+        receipt: {
+          synced: Boolean(resolution.track),
+          ...(resolution.track?.sha256 ? { sha256: resolution.track.sha256 } : {}),
+          snapshot_uri: resolution.track ? `bgm://fetch/${resolution.track.id}` : undefined,
+          verified_at: new Date().toISOString(),
+        },
       };
     }
 
@@ -2114,6 +2452,9 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         bins,
         seed: optionalNumber(params.seed) ?? 0,
         bpmStrategy: params.bpm_strategy === "recipe" ? "recipe" : "cut-driven",
+        promptText: params.prompt_text ? String(params.prompt_text) : null,
+        sourcePolicy: typeof params.source_policy === "string" ? params.source_policy : "compose-only",
+        destDir: params.dest_dir ? assertPathAllowed(String(params.dest_dir), roots, "dest_dir") : null,
       });
       return {
         result: outcome,

@@ -1,0 +1,1394 @@
+{
+  "schemaVersion": "workloom.bgm-library/v1",
+  "library": {
+    "name": "WorkLoom 精选 BGM 曲库（12 首）",
+    "provider": "workloom-self-generated",
+    "licensePolicy": "本仓自算合成：无第三方样本/权重，可商用于客户交付，无署名义务",
+    "generatedAt": "2026-09-23T01:40:03.524Z",
+    "generator": "scripts/bgm-library-build.mjs",
+    "tracks": 12,
+    "totalBytes": 11958845,
+    "note": "随仓库分发的精选子集（每风格 1 首）；完整曲库用 --full 60 在工位本地生成"
+  },
+  "tracks": [
+    {
+      "id": "modern-pop-product-ad-1000",
+      "title": "产品广告 · 现代流行 01",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "产品广告",
+      "mood": "干净可信",
+      "style": "modern-pop",
+      "styleLabel": "现代流行（鼓组+副旋律）",
+      "recipeId": "product-ad",
+      "bpm": 60,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "modern-pop-product-ad-1000.m4a",
+      "sha256": "0902de3d20c871e5bbbe8d7f90860e77720ef7bfc4f49b9fb4759c4ccbf46aaa",
+      "bytes": 1011625,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -15.08,
+        "truePeakDbtp": -1.42,
+        "lra": 11.9
+      },
+      "energyScore": 0.7,
+      "dynamicsDb": 12.7,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 8.75,
+            "avgDb": -23.89,
+            "peakDb": -11.73
+          },
+          {
+            "type": "drop",
+            "startSec": 8.75,
+            "endSec": 28.25,
+            "avgDb": -13.32,
+            "peakDb": -11.37
+          },
+          {
+            "type": "breakdown",
+            "startSec": 28.25,
+            "endSec": 34.25,
+            "avgDb": -22.87,
+            "peakDb": -18.2
+          },
+          {
+            "type": "drop",
+            "startSec": 34.25,
+            "endSec": 53.75,
+            "avgDb": -13.2,
+            "peakDb": -11.35
+          },
+          {
+            "type": "outro",
+            "startSec": 53.75,
+            "endSec": 60.5,
+            "avgDb": -27.43,
+            "peakDb": -19.37
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 34.25,
+          "endSec": 53.75,
+          "durationSec": 19.5,
+          "avgDb": -13.2,
+          "peakDb": -11.35,
+          "onsetDensity": 0.8,
+          "score": 0.89
+        }
+      },
+      "generation": {
+        "recipeId": "product-ad",
+        "style": "modern-pop",
+        "seed": 1000,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 5.13,
+          "finalTrimDb": -3.45,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "9a33e303cf894470b0bafd1e244b9e3a5004b3cbf9545c2898d0f81e2ce21cee"
+      },
+      "instrumentation": [
+        "pad",
+        "bass",
+        "sub",
+        "pluck",
+        "kick",
+        "snare",
+        "hat",
+        "lead",
+        "bell"
+      ],
+      "mixHints": {
+        "musicLevelDb": -22,
+        "duckingDb": 12,
+        "avoid": [
+          "压过卖点口播",
+          "情绪过重",
+          "低频轰鸣"
+        ]
+      },
+      "tags": [
+        "产品广告",
+        "干净可信",
+        "现代流行（鼓组+副旋律）",
+        "douyin",
+        "xiaohongshu",
+        "wechat-channels",
+        "bilibili"
+      ]
+    },
+    {
+      "id": "electronic-pulse-festival-promo-1137",
+      "title": "节日促销 · 电子脉冲 02",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "节日促销",
+      "mood": "热烈紧迫",
+      "style": "electronic-pulse",
+      "styleLabel": "电子脉冲（泵感+琶音）",
+      "recipeId": "festival-promo",
+      "bpm": 60,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "electronic-pulse-festival-promo-1137.m4a",
+      "sha256": "306c7c94b2351c40306c9dad8d303e0975e1c31f714f2009cd71d7b965eb408d",
+      "bytes": 1006368,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.02,
+        "truePeakDbtp": -2.12,
+        "lra": 10.7
+      },
+      "energyScore": 0.71,
+      "dynamicsDb": 12.56,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 9.5,
+            "avgDb": -23.32,
+            "peakDb": -12.2
+          },
+          {
+            "type": "drop",
+            "startSec": 9.5,
+            "endSec": 28.5,
+            "avgDb": -12.72,
+            "peakDb": -9.57
+          },
+          {
+            "type": "breakdown",
+            "startSec": 28.5,
+            "endSec": 35.5,
+            "avgDb": -22.18,
+            "peakDb": -18.29
+          },
+          {
+            "type": "drop",
+            "startSec": 35.5,
+            "endSec": 52.25,
+            "avgDb": -12.44,
+            "peakDb": -9.62
+          },
+          {
+            "type": "outro",
+            "startSec": 52.25,
+            "endSec": 60.5,
+            "avgDb": -26.06,
+            "peakDb": -18.13
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 35.5,
+          "endSec": 52.25,
+          "durationSec": 16.75,
+          "avgDb": -12.44,
+          "peakDb": -9.62,
+          "onsetDensity": 0.99,
+          "score": 0.899
+        }
+      },
+      "generation": {
+        "recipeId": "festival-promo",
+        "style": "electronic-pulse",
+        "seed": 1137,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 4.19,
+          "finalTrimDb": -2.26,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "1da60c6959651c55281dab8e882bc413cc94ff9788d340c219249e2633747879"
+      },
+      "instrumentation": [
+        "pad",
+        "sub",
+        "bass",
+        "kick",
+        "hat",
+        "arp",
+        "pluck",
+        "bell"
+      ],
+      "mixHints": {
+        "musicLevelDb": -19,
+        "duckingDb": 10,
+        "avoid": [
+          "价格口播被鼓点压住",
+          "结尾不干净"
+        ]
+      },
+      "tags": [
+        "节日促销",
+        "热烈紧迫",
+        "电子脉冲（泵感+琶音）",
+        "douyin",
+        "xiaohongshu"
+      ]
+    },
+    {
+      "id": "lo-fi-chill-beauty-1274",
+      "title": "美妆 / 护肤 · Lo-Fi 松弛 03",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "美妆 / 护肤",
+      "mood": "通透可信",
+      "style": "lo-fi-chill",
+      "styleLabel": "Lo-Fi 松弛（软鼓+摇摆）",
+      "recipeId": "beauty",
+      "bpm": 90,
+      "durationSec": 61.85,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "lo-fi-chill-beauty-1274.m4a",
+      "sha256": "e2533d953c14a7c03da0e376e39d8a52f1b4e949c5a52912bc0cf826c90165d2",
+      "bytes": 1022630,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.02,
+        "truePeakDbtp": -4.39,
+        "lra": 12.3
+      },
+      "energyScore": 0.6,
+      "dynamicsDb": 12.16,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 8.25,
+            "avgDb": -25.16,
+            "peakDb": -13.67
+          },
+          {
+            "type": "drop",
+            "startSec": 8.25,
+            "endSec": 27,
+            "avgDb": -15.12,
+            "peakDb": -13.41
+          },
+          {
+            "type": "breakdown",
+            "startSec": 27,
+            "endSec": 34.5,
+            "avgDb": -23.7,
+            "peakDb": -17.83
+          },
+          {
+            "type": "drop",
+            "startSec": 34.5,
+            "endSec": 53.5,
+            "avgDb": -15.09,
+            "peakDb": -13.42
+          },
+          {
+            "type": "outro",
+            "startSec": 53.5,
+            "endSec": 61.75,
+            "avgDb": -27.69,
+            "peakDb": -23.29
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 34.5,
+          "endSec": 53.5,
+          "durationSec": 19,
+          "avgDb": -15.09,
+          "peakDb": -13.42,
+          "onsetDensity": 0.7,
+          "score": 0.885
+        }
+      },
+      "generation": {
+        "recipeId": "beauty",
+        "style": "lo-fi-chill",
+        "seed": 1274,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 2.74,
+          "finalTrimDb": -4.39,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "4fd04e7dd730996464cfbd17149f4b57a862f5cdf025adf581849bb30ef5514f"
+      },
+      "instrumentation": [
+        "pad",
+        "bass",
+        "pluck",
+        "hat",
+        "bell"
+      ],
+      "mixHints": {
+        "musicLevelDb": -26,
+        "duckingDb": 13,
+        "avoid": [
+          "厚重低音",
+          "密集打击"
+        ]
+      },
+      "tags": [
+        "美妆 / 护肤",
+        "通透可信",
+        "Lo-Fi 松弛（软鼓+摇摆）",
+        "xiaohongshu",
+        "douyin"
+      ]
+    },
+    {
+      "id": "cinematic-build-drama-story-1411",
+      "title": "叙事剧情片 · 电影感推进 04",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "叙事剧情片",
+      "mood": "情绪推进",
+      "style": "cinematic-build",
+      "styleLabel": "电影感推进（渐强+落锤）",
+      "recipeId": "drama-story",
+      "bpm": 68,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "cinematic-build-drama-story-1411.m4a",
+      "sha256": "5ba2bcd6bedb1736b56765c60f37141706430cc5727a14aa4d7ad201e46d3503",
+      "bytes": 981915,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.01,
+        "truePeakDbtp": -2.76,
+        "lra": 12.7
+      },
+      "energyScore": 0.59,
+      "dynamicsDb": 12.26,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 10.5,
+            "avgDb": -25.47,
+            "peakDb": -22.98
+          },
+          {
+            "type": "drop",
+            "startSec": 10.5,
+            "endSec": 28.5,
+            "avgDb": -14.86,
+            "peakDb": -11.49
+          },
+          {
+            "type": "breakdown",
+            "startSec": 28.5,
+            "endSec": 35.25,
+            "avgDb": -24.61,
+            "peakDb": -22.21
+          },
+          {
+            "type": "drop",
+            "startSec": 35.25,
+            "endSec": 53,
+            "avgDb": -14.82,
+            "peakDb": -10.56
+          },
+          {
+            "type": "outro",
+            "startSec": 53,
+            "endSec": 60.5,
+            "avgDb": -28.12,
+            "peakDb": -22.08
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 35.25,
+          "endSec": 53,
+          "durationSec": 17.75,
+          "avgDb": -14.82,
+          "peakDb": -10.56,
+          "onsetDensity": 0.73,
+          "score": 0.887
+        }
+      },
+      "generation": {
+        "recipeId": "drama-story",
+        "style": "cinematic-build",
+        "seed": 1411,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 4.15,
+          "finalTrimDb": -2.48,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "9002ffc4a4dd65d02018f51636ab8718994dc1b4c4e51da9ea98f0535fb55f62"
+      },
+      "instrumentation": [
+        "pad",
+        "bass",
+        "bell",
+        "riser",
+        "impact",
+        "pluck"
+      ],
+      "mixHints": {
+        "musicLevelDb": -25,
+        "duckingDb": 13,
+        "avoid": [
+          "情绪提前给满",
+          "与台词争夺句读"
+        ]
+      },
+      "tags": [
+        "叙事剧情片",
+        "情绪推进",
+        "电影感推进（渐强+落锤）",
+        "bilibili",
+        "youtube"
+      ]
+    },
+    {
+      "id": "ambient-calm-documentary-1548",
+      "title": "纪录片 / 科普 · 氛围舒缓 05",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "纪录片 / 科普",
+      "mood": "真实克制",
+      "style": "ambient-calm",
+      "styleLabel": "氛围舒缓（无鼓）",
+      "recipeId": "documentary",
+      "bpm": 76,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "ambient-calm-documentary-1548.m4a",
+      "sha256": "6092ca0881468c1af313094a69611d8c59a0cfa70ac0e742bbb13a86e9301b80",
+      "bytes": 982890,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.01,
+        "truePeakDbtp": -4.67,
+        "lra": 12
+      },
+      "energyScore": 0.63,
+      "dynamicsDb": 11.7,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 9.75,
+            "avgDb": -24.51,
+            "peakDb": -13
+          },
+          {
+            "type": "drop",
+            "startSec": 9.75,
+            "endSec": 28.75,
+            "avgDb": -14.79,
+            "peakDb": -12.99
+          },
+          {
+            "type": "breakdown",
+            "startSec": 28.75,
+            "endSec": 35,
+            "avgDb": -23.68,
+            "peakDb": -13.14
+          },
+          {
+            "type": "drop",
+            "startSec": 35,
+            "endSec": 53.75,
+            "avgDb": -14.71,
+            "peakDb": -12.9
+          },
+          {
+            "type": "outro",
+            "startSec": 53.75,
+            "endSec": 60.5,
+            "avgDb": -27.83,
+            "peakDb": -22.09
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 35,
+          "endSec": 53.75,
+          "durationSec": 18.75,
+          "avgDb": -14.71,
+          "peakDb": -12.9,
+          "onsetDensity": 0.47,
+          "score": 0.874
+        }
+      },
+      "generation": {
+        "recipeId": "documentary",
+        "style": "ambient-calm",
+        "seed": 1548,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 1.68,
+          "finalTrimDb": -4.39,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "d70047e419304eabea0e0718d26cf157d9904ca14506d0d82c220079e1b59ddf"
+      },
+      "instrumentation": [
+        "pad",
+        "bell",
+        "bass"
+      ],
+      "mixHints": {
+        "musicLevelDb": -27,
+        "duckingDb": 14,
+        "avoid": [
+          "情绪操纵",
+          "与事实段落情绪冲突"
+        ]
+      },
+      "tags": [
+        "纪录片 / 科普",
+        "真实克制",
+        "氛围舒缓（无鼓）",
+        "bilibili",
+        "youtube"
+      ]
+    },
+    {
+      "id": "corporate-clean-realestate-1685",
+      "title": "房产 / 空间 · 商务干净 06",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "房产 / 空间",
+      "mood": "明亮通透",
+      "style": "corporate-clean",
+      "styleLabel": "商务干净（拨弦+轻打点）",
+      "recipeId": "realestate",
+      "bpm": 48,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "corporate-clean-realestate-1685.m4a",
+      "sha256": "753ed4fbd653b803a6d75f3e379269b8e98c8806b5086e486ea7a31416fb01a3",
+      "bytes": 981789,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14,
+        "truePeakDbtp": -4.18,
+        "lra": 11.4
+      },
+      "energyScore": 0.7,
+      "dynamicsDb": 11.76,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 8.25,
+            "avgDb": -23.24,
+            "peakDb": -17.99
+          },
+          {
+            "type": "drop",
+            "startSec": 8.25,
+            "endSec": 27.5,
+            "avgDb": -13.29,
+            "peakDb": -11.79
+          },
+          {
+            "type": "breakdown",
+            "startSec": 27.5,
+            "endSec": 35.75,
+            "avgDb": -21.49,
+            "peakDb": -11.69
+          },
+          {
+            "type": "drop",
+            "startSec": 35.75,
+            "endSec": 52.25,
+            "avgDb": -13.5,
+            "peakDb": -11.85
+          },
+          {
+            "type": "outro",
+            "startSec": 52.25,
+            "endSec": 60.5,
+            "avgDb": -25.41,
+            "peakDb": -15.65
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-2",
+          "type": "drop",
+          "startSec": 8.25,
+          "endSec": 27.5,
+          "durationSec": 19.25,
+          "avgDb": -13.29,
+          "peakDb": -11.79,
+          "onsetDensity": 0.51,
+          "score": 0.876
+        }
+      },
+      "generation": {
+        "recipeId": "realestate",
+        "style": "corporate-clean",
+        "seed": 1685,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 4.17,
+          "finalTrimDb": -4.16,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "b04231cf95a6afebcd1660f46324a5cd79cc54d472a87136ac6c2b4153b82bfa"
+      },
+      "instrumentation": [
+        "pluck",
+        "pad",
+        "bass",
+        "hat"
+      ],
+      "mixHints": {
+        "musicLevelDb": -25,
+        "duckingDb": 13,
+        "avoid": [
+          "压迫感",
+          "与讲解语速抢拍"
+        ]
+      },
+      "tags": [
+        "房产 / 空间",
+        "明亮通透",
+        "商务干净（拨弦+轻打点）",
+        "xiaohongshu",
+        "wechat-channels"
+      ]
+    },
+    {
+      "id": "acoustic-warm-family-1822",
+      "title": "亲子 / 家庭 · 原声温暖 07",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "亲子 / 家庭",
+      "mood": "明亮有温度",
+      "style": "acoustic-warm",
+      "styleLabel": "原声温暖（拨弦+铃）",
+      "recipeId": "family",
+      "bpm": 48,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "acoustic-warm-family-1822.m4a",
+      "sha256": "e9edfa13c39ae6939ae84f75b2fee3212414311508ddec262d1c52a230f80d98",
+      "bytes": 981922,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.02,
+        "truePeakDbtp": -4.52,
+        "lra": 12
+      },
+      "energyScore": 0.68,
+      "dynamicsDb": 11.18,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 9.75,
+            "avgDb": -23.07,
+            "peakDb": -14.37
+          },
+          {
+            "type": "drop",
+            "startSec": 9.75,
+            "endSec": 29,
+            "avgDb": -13.79,
+            "peakDb": -12.13
+          },
+          {
+            "type": "breakdown",
+            "startSec": 29,
+            "endSec": 36.5,
+            "avgDb": -21.65,
+            "peakDb": -12.34
+          },
+          {
+            "type": "drop",
+            "startSec": 36.5,
+            "endSec": 52.75,
+            "avgDb": -13.67,
+            "peakDb": -12.06
+          },
+          {
+            "type": "outro",
+            "startSec": 52.75,
+            "endSec": 60.5,
+            "avgDb": -26.44,
+            "peakDb": -21.1
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 36.5,
+          "endSec": 52.75,
+          "durationSec": 16.25,
+          "avgDb": -13.67,
+          "peakDb": -12.06,
+          "onsetDensity": 0.59,
+          "score": 0.88
+        }
+      },
+      "generation": {
+        "recipeId": "family",
+        "style": "acoustic-warm",
+        "seed": 1822,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 2.87,
+          "finalTrimDb": -4.27,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "02b646f9892b88c1a1808e6a94bbb01a188fc67636b9cd9cd7c87b8225adfeef"
+      },
+      "instrumentation": [
+        "pluck",
+        "pad",
+        "bass",
+        "bell"
+      ],
+      "mixHints": {
+        "musicLevelDb": -23,
+        "duckingDb": 12,
+        "avoid": [
+          "过暗调式",
+          "紧张感"
+        ]
+      },
+      "tags": [
+        "亲子 / 家庭",
+        "明亮有温度",
+        "原声温暖（拨弦+铃）",
+        "xiaohongshu",
+        "wechat-channels"
+      ]
+    },
+    {
+      "id": "tension-dark-night-city-1959",
+      "title": "夜景 / 都市 · 暗色张力 08",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "夜景 / 都市",
+      "mood": "戏剧现代",
+      "style": "tension-dark",
+      "styleLabel": "暗色张力（低频脉冲）",
+      "recipeId": "night-city",
+      "bpm": 92,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "tension-dark-night-city-1959.m4a",
+      "sha256": "60ae8190bfd7829ac7bcf0d425a58c83dbe464502564fefa75d4b3888d15cc3d",
+      "bytes": 996469,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -13.99,
+        "truePeakDbtp": -1.81,
+        "lra": 12.4
+      },
+      "energyScore": 0.73,
+      "dynamicsDb": 12.81,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 7.75,
+            "avgDb": -23.57,
+            "peakDb": -21.68
+          },
+          {
+            "type": "drop",
+            "startSec": 7.75,
+            "endSec": 26.5,
+            "avgDb": -12.39,
+            "peakDb": -10.51
+          },
+          {
+            "type": "breakdown",
+            "startSec": 26.5,
+            "endSec": 33.5,
+            "avgDb": -22.02,
+            "peakDb": -20.28
+          },
+          {
+            "type": "drop",
+            "startSec": 33.5,
+            "endSec": 52.25,
+            "avgDb": -12.45,
+            "peakDb": -10.65
+          },
+          {
+            "type": "outro",
+            "startSec": 52.25,
+            "endSec": 60.5,
+            "avgDb": -26.54,
+            "peakDb": -21.85
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-2",
+          "type": "drop",
+          "startSec": 7.75,
+          "endSec": 26.5,
+          "durationSec": 18.75,
+          "avgDb": -12.39,
+          "peakDb": -10.51,
+          "onsetDensity": 0.67,
+          "score": 0.884
+        }
+      },
+      "generation": {
+        "recipeId": "night-city",
+        "style": "tension-dark",
+        "seed": 1959,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 4.55,
+          "finalTrimDb": -2.48,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "08fe29de8acba7ada859e456e5ef0417f6de6e32c202105d09066363a6854419"
+      },
+      "instrumentation": [
+        "pad",
+        "sub",
+        "hat",
+        "impact",
+        "bass",
+        "bell"
+      ],
+      "mixHints": {
+        "musicLevelDb": -24,
+        "duckingDb": 12,
+        "avoid": [
+          "甜美化",
+          "高频刺耳"
+        ]
+      },
+      "tags": [
+        "夜景 / 都市",
+        "戏剧现代",
+        "暗色张力（低频脉冲）",
+        "douyin",
+        "bilibili"
+      ]
+    },
+    {
+      "id": "sports-hype-product-ad-2096",
+      "title": "产品广告 · 运动燃 09",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "产品广告",
+      "mood": "干净可信",
+      "style": "sports-hype",
+      "styleLabel": "运动燃（重鼓+主音）",
+      "recipeId": "product-ad",
+      "bpm": 60,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "sports-hype-product-ad-2096.m4a",
+      "sha256": "aa1618bc7c103a5a0e8c79d48cb6988cc217623b7ee1a6ffd5f019e975a22be6",
+      "bytes": 1019700,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.01,
+        "truePeakDbtp": -1.96,
+        "lra": 12
+      },
+      "energyScore": 0.68,
+      "dynamicsDb": 12.02,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 8.75,
+            "avgDb": -23.86,
+            "peakDb": -11.4
+          },
+          {
+            "type": "drop",
+            "startSec": 8.75,
+            "endSec": 28.25,
+            "avgDb": -14.01,
+            "peakDb": -10.73
+          },
+          {
+            "type": "breakdown",
+            "startSec": 28.25,
+            "endSec": 34.5,
+            "avgDb": -22.81,
+            "peakDb": -10.99
+          },
+          {
+            "type": "drop",
+            "startSec": 34.5,
+            "endSec": 54.25,
+            "avgDb": -14.18,
+            "peakDb": -10.64
+          },
+          {
+            "type": "outro",
+            "startSec": 54.25,
+            "endSec": 60.5,
+            "avgDb": -27.23,
+            "peakDb": -17.64
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-2",
+          "type": "drop",
+          "startSec": 8.75,
+          "endSec": 28.25,
+          "durationSec": 19.5,
+          "avgDb": -14.01,
+          "peakDb": -10.73,
+          "onsetDensity": 0.99,
+          "score": 0.899
+        }
+      },
+      "generation": {
+        "recipeId": "product-ad",
+        "style": "sports-hype",
+        "seed": 2096,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 4.44,
+          "finalTrimDb": -2.03,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "b855aa3252e130de4cac09b7bee6580f9ec4af75a6221111074449af8e55c5d3"
+      },
+      "instrumentation": [
+        "kick",
+        "snare",
+        "bass",
+        "lead",
+        "pad",
+        "pluck",
+        "hat",
+        "bell"
+      ],
+      "mixHints": {
+        "musicLevelDb": -22,
+        "duckingDb": 12,
+        "avoid": [
+          "压过卖点口播",
+          "情绪过重",
+          "低频轰鸣"
+        ]
+      },
+      "tags": [
+        "产品广告",
+        "干净可信",
+        "运动燃（重鼓+主音）",
+        "douyin",
+        "xiaohongshu",
+        "wechat-channels",
+        "bilibili"
+      ]
+    },
+    {
+      "id": "festive-bright-festival-promo-2233",
+      "title": "节日促销 · 节日明亮 10",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "节日促销",
+      "mood": "热烈紧迫",
+      "style": "festive-bright",
+      "styleLabel": "节日明亮（铃+拨弦）",
+      "recipeId": "festival-promo",
+      "bpm": 60,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "festive-bright-festival-promo-2233.m4a",
+      "sha256": "3cfdc4e669f394bc0d036649ec684ab50bd88a63e636318fa9acd883597ef76d",
+      "bytes": 994090,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -13.98,
+        "truePeakDbtp": -1.55,
+        "lra": 8.5
+      },
+      "energyScore": 0.66,
+      "dynamicsDb": 11.23,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 9.5,
+            "avgDb": -22.66,
+            "peakDb": -11.13
+          },
+          {
+            "type": "drop",
+            "startSec": 9.5,
+            "endSec": 28.25,
+            "avgDb": -13.63,
+            "peakDb": -9.47
+          },
+          {
+            "type": "breakdown",
+            "startSec": 28.25,
+            "endSec": 35.5,
+            "avgDb": -21.96,
+            "peakDb": -16.31
+          },
+          {
+            "type": "drop",
+            "startSec": 35.5,
+            "endSec": 52.25,
+            "avgDb": -13.37,
+            "peakDb": -9.49
+          },
+          {
+            "type": "outro",
+            "startSec": 52.25,
+            "endSec": 60.5,
+            "avgDb": -29.28,
+            "peakDb": -16.69
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 35.5,
+          "endSec": 52.25,
+          "durationSec": 16.75,
+          "avgDb": -13.37,
+          "peakDb": -9.49,
+          "onsetDensity": 1.77,
+          "score": 0.938
+        }
+      },
+      "generation": {
+        "recipeId": "festival-promo",
+        "style": "festive-bright",
+        "seed": 2233,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 4.62,
+          "finalTrimDb": -1.63,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "195b7d17eb8457ee03c855d57448599381b558744c1e035e8f5b18564b53ac97"
+      },
+      "instrumentation": [
+        "bell",
+        "pluck",
+        "bass",
+        "kick",
+        "hat"
+      ],
+      "mixHints": {
+        "musicLevelDb": -19,
+        "duckingDb": 10,
+        "avoid": [
+          "价格口播被鼓点压住",
+          "结尾不干净"
+        ]
+      },
+      "tags": [
+        "节日促销",
+        "热烈紧迫",
+        "节日明亮（铃+拨弦）",
+        "douyin",
+        "xiaohongshu"
+      ]
+    },
+    {
+      "id": "documentary-bed-documentary-2370",
+      "title": "纪录片 / 科普 · 纪录片铺底 11",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "纪录片 / 科普",
+      "mood": "真实克制",
+      "style": "documentary-bed",
+      "styleLabel": "纪录片铺底（极简）",
+      "recipeId": "documentary",
+      "bpm": 76,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "documentary-bed-documentary-2370.m4a",
+      "sha256": "e9ac9ac87a41c245989e5c2651b8be7c91635f8de4e0fb675e21998bded31786",
+      "bytes": 981999,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.02,
+        "truePeakDbtp": -2.84,
+        "lra": 12.1
+      },
+      "energyScore": 0.63,
+      "dynamicsDb": 11.69,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 9.75,
+            "avgDb": -24.46,
+            "peakDb": -13.09
+          },
+          {
+            "type": "drop",
+            "startSec": 9.75,
+            "endSec": 28.75,
+            "avgDb": -14.77,
+            "peakDb": -12.96
+          },
+          {
+            "type": "breakdown",
+            "startSec": 28.75,
+            "endSec": 35,
+            "avgDb": -23.64,
+            "peakDb": -13.09
+          },
+          {
+            "type": "drop",
+            "startSec": 35,
+            "endSec": 53.75,
+            "avgDb": -14.69,
+            "peakDb": -12.89
+          },
+          {
+            "type": "outro",
+            "startSec": 53.75,
+            "endSec": 60.5,
+            "avgDb": -27.8,
+            "peakDb": -22.08
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 35,
+          "endSec": 53.75,
+          "durationSec": 18.75,
+          "avgDb": -14.69,
+          "peakDb": -12.89,
+          "onsetDensity": 0.48,
+          "score": 0.874
+        }
+      },
+      "generation": {
+        "recipeId": "documentary",
+        "style": "documentary-bed",
+        "seed": 2370,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 1.67,
+          "finalTrimDb": -4.4,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "a2c4dbff1fe060ea509b563938e237e64ab267f79ea209e7aca398c5669762c4"
+      },
+      "instrumentation": [
+        "pad",
+        "bass"
+      ],
+      "mixHints": {
+        "musicLevelDb": -27,
+        "duckingDb": 14,
+        "avoid": [
+          "情绪操纵",
+          "与事实段落情绪冲突"
+        ]
+      },
+      "tags": [
+        "纪录片 / 科普",
+        "真实克制",
+        "纪录片铺底（极简）",
+        "bilibili",
+        "youtube"
+      ]
+    },
+    {
+      "id": "city-night-suspense-2507",
+      "title": "悬疑 / 紧张 · 都市夜行 12",
+      "artist": "WorkLoom 自算曲库",
+      "genre": "悬疑 / 紧张",
+      "mood": "不安张力",
+      "style": "city-night",
+      "styleLabel": "都市夜行（低频+琶音）",
+      "recipeId": "suspense",
+      "bpm": 240,
+      "durationSec": 60.5,
+      "license": "workloom-self-generated",
+      "licenseNote": "本仓自算合成（synth.mjs），无第三方样本/权重，可商用、无署名义务",
+      "file": "city-night-suspense-2507.m4a",
+      "sha256": "9b8a1a2051771d5854953cb55e5d9a664defa86575de2ae6642e897b9b3c4218",
+      "bytes": 997448,
+      "format": "aac/m4a",
+      "loudness": {
+        "integratedLufs": -14.02,
+        "truePeakDbtp": -2.82,
+        "lra": 11.5
+      },
+      "energyScore": 0.76,
+      "dynamicsDb": 12.16,
+      "structure": {
+        "method": "rule-based-percentile",
+        "segments": [
+          {
+            "type": "intro",
+            "startSec": 0,
+            "endSec": 8.75,
+            "avgDb": -22.34,
+            "peakDb": -12.68
+          },
+          {
+            "type": "drop",
+            "startSec": 8.75,
+            "endSec": 26.25,
+            "avgDb": -12.37,
+            "peakDb": -10.99
+          },
+          {
+            "type": "breakdown",
+            "startSec": 26.25,
+            "endSec": 31.5,
+            "avgDb": -20.85,
+            "peakDb": -17.38
+          },
+          {
+            "type": "drop",
+            "startSec": 31.5,
+            "endSec": 51.5,
+            "avgDb": -12.14,
+            "peakDb": -11.12
+          },
+          {
+            "type": "outro",
+            "startSec": 51.5,
+            "endSec": 60.5,
+            "avgDb": -25.41,
+            "peakDb": -21.05
+          }
+        ],
+        "hasDrop": true,
+        "climaxCandidate": {
+          "id": "seg-4",
+          "type": "drop",
+          "startSec": 31.5,
+          "endSec": 51.5,
+          "durationSec": 20,
+          "avgDb": -12.14,
+          "peakDb": -11.12,
+          "onsetDensity": 0.46,
+          "score": 0.873
+        }
+      },
+      "generation": {
+        "recipeId": "suspense",
+        "style": "city-night",
+        "seed": 2507,
+        "durationSec": 60,
+        "masteredWith": {
+          "toneChain": "highpass=f=26,equalizer=f=180:t=q:w=1:g=-1.5,equalizer=f=3200:t=q:w=1:g=1.2",
+          "gainDb": 2.96,
+          "finalTrimDb": -3.27,
+          "targetLufs": -14,
+          "targetTruePeakDbtp": -1.5,
+          "limiterCeiling": 0.6
+        },
+        "rawSha256": "75bd467d44c0febdf0936bcef76e86deab5e4e8f9b7dd1005666c3d29e2f4032"
+      },
+      "instrumentation": [
+        "pad",
+        "sub",
+        "hat",
+        "arp",
+        "bass"
+      ],
+      "mixHints": {
+        "musicLevelDb": -24,
+        "duckingDb": 12,
+        "avoid": [
+          "旋律过甜",
+          "节奏过早开始"
+        ]
+      },
+      "tags": [
+        "悬疑 / 紧张",
+        "不安张力",
+        "都市夜行（低频+琶音）",
+        "bilibili",
+        "douyin"
+      ]
+    }
+  ]
+}
