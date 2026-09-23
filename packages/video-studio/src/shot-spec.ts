@@ -230,17 +230,26 @@ const EXTRA_REDLINE_WORDS = ["细胞质", "核糖体", "微管", "显微镜", "�
 
 /**
  * 镜头内音频纪律（产品所有者口径，2026-09-23）：
- * 生成镜头**只允许**①台词人声 ②音效 ③旁白；**禁止 BGM/配乐/背景音乐**——配乐统一在后期环节加入。
+ * 生成镜头**只允许**①台词人声 ②音效 ③旁白；**禁止镜头外加配乐/BGM**——配乐统一在后期环节加入。
+ *
+ * 边界（产品所有者 2026-09-23 听检 30s 样片后确认）：**画面内实况声源不算配乐**——
+ * 街头评弹/三弦/店内音响等「画面里真实存在的声源」可以保留；禁的是镜头外铺底的 BGM/配乐。
  * 这段文本会追加到每个镜头的提示词末尾，并作为交付闸的必备标记（缺它即判不合格）。
  */
 export const AUDIO_DISCIPLINE_CLAUSE =
   "【音频纪律】本镜头音频仅允许：台词人声、旁白、环境音效与动作音效；"
-  + "严禁出现任何背景音乐、BGM、配乐、音乐节拍、旋律或歌曲（配乐由后期环节统一加入）；"
+  + "严禁镜头外添加的背景音乐、BGM、配乐、音乐节拍（配乐由后期环节统一加入）；"
+  + "画面内实况声源（如街头评弹、店内音响等实况音乐）不属配乐，允许保留；"
   + "台词人声清晰自然，环境音与动作音效贴合画面。";
 
-/** 追加到负面约束里的音乐禁词（与 vendor 的英文负面约束同语言） */
+/**
+ * 追加到负面约束里的音乐禁词（与 vendor 的英文负面约束同语言）。
+ *
+ * 注意口径：只禁**非画内（non-diegetic）**的音乐铺底。像 `no singing voice`/`no song`/`no melody`
+ * 这类会把画内实况音乐（评弹唱腔、店内广播旋律）一并压掉的词，按 2026-09-23 产品确认去掉。
+ */
 export const AUDIO_NEGATIVE_TERMS =
-  "no background music, no bgm, no soundtrack, no music score, no musical bed, no melody, no song, no singing voice";
+  "no non-diegetic music, no background music, no bgm, no soundtrack, no music score, no musical bed";
 
 /** 正向音乐词（用于清洗 audio 字段与提示词中的音乐指令） */
 const POSITIVE_MUSIC_PATTERN =
@@ -252,11 +261,15 @@ const POSITIVE_MUSIC_PATTERN =
  * 若按正向词一刀切，会把这些合规表述一起删掉。
  */
 const NEGATED_MUSIC_PATTERN =
-  /(无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要)\s*(任何)?\s*(背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|no\s+(background\s+)?music|no\s+bgm|without\s+(background\s+)?music/i;
+  /(无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要)[^，。；;、,.]{0,6}(背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|no\s+(background\s+)?music|no\s+bgm|without\s+(background\s+)?music/i;
 
 /**
  * 清洗镜头卡的 `audio` 字段：vendor 的 `AudioDesignAgent` 会把「音乐风格/配乐」写进该字段，
  * 与"镜头内禁止 BGM"冲突。这里把含音乐词的分句整句剔除（保留环境音/音效描述），并记录日志。
+ *
+ * 口径边界（2026-09-23 产品确认）：**画内实况声源保留**——「远处评弹声」「三弦、琵琶声」
+ * 「店内音响」这类画面里真实存在的声源不属配乐，不在此清洗范围；只有「背景音乐/配乐/音乐风格」
+ * 这类后期职责的指令才剔除。
  */
 export function sanitizeAudioField(
   audio: unknown,

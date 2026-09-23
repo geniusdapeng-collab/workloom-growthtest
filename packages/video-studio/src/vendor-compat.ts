@@ -916,6 +916,8 @@ export function installVendorPhaseInternalsDiagnostics(options: { log?: (line: s
  * 镜头内音频纪律桥（2026-09-23）
  *
  * 产品口径：生成的镜头只允许台词人声/旁白/音效，**禁止 BGM**（配乐统一在后期加）。
+ * 边界（2026-09-23 产品确认）：画面内实况声源（街头评弹/三弦/店内音响等）不算配乐，不清洗、不压制；
+ * 只清洗「背景音乐/配乐/音乐风格」这类后期职责的指令。
  * vendor 的 `PromptFusionAgent._assembleStandardPrompt` 会照抄 `AudioDesignAgent` 写进 audio 的
  * 「音乐风格/配乐」描述 —— 本桥在组装器出口统一追加【音频纪律】子句 + 英文音乐负面词，
  * 并清洗音频段落里的音乐指令（与宿主 shot-spec 同一口径，vendor 直跑也生效）。
@@ -952,7 +954,7 @@ export function installVendorAudioDisciplineBridge(options: {
       const musicPattern = /(背景音乐|配乐|音乐风格|音乐节拍|旋律|歌曲|background\s*music|\bbgm\b|soundtrack)/gi;
       /** 否定式（"无配乐/不加配乐/no bgm"）与音频纪律同向，保留不删 */
       const negatedPattern =
-        /(无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要)\s*(任何)?\s*(背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|no\s+(background\s+)?music|no\s+bgm|without\s+(background\s+)?music/i;
+        /(无|没有|不含|不加|不出现|不加入|禁止|避免|无需|不要)[^，。；;、,.]{0,6}(背景音乐|配乐|音乐|BGM|旋律|歌曲|soundtrack)|no\s+(background\s+)?music|no\s+bgm|without\s+(background\s+)?music/i;
       // 1) 清洗入参里 audio / fields.audio 的音乐指令
       for (const holder of [shot, fields]) {
         const value = holder?.audio;
