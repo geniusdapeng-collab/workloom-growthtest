@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 小织声音工坊 · 图形界面背后的执行器（给不敲命令的人用）
 #
-#   bash kit/gui-voice.sh record  [--profile zh-myvoice] [--seconds 12] [--result <json>]
+#   bash kit/gui-voice.sh record  [--profile zh-myvoice] [--seconds 12] [--script "提词稿"] [--result <json>]
 #   bash kit/gui-voice.sh speak   --text "要播报的文字"                 [--result <json>]
 #   bash kit/gui-voice.sh dub     --video /path/film.mp4 --text "文案"  [--result <json>]
 #   bash kit/gui-voice.sh --summary <json>          # 把结果 JSON 变成一句人话（给对话框用）
@@ -23,6 +23,7 @@ MODE=""
 SECONDS_TO_RECORD=12
 TEXT=""
 VIDEO=""
+SCRIPT_TEXT="大家好，我是小织。今天为你播报三条经营要点：答案可见度上升百分之十八，获客成本下降百分之十二。"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -32,6 +33,7 @@ while [ $# -gt 0 ]; do
     --profile) PROFILE="${2:?}"; shift 2 ;;
     --seconds) SECONDS_TO_RECORD="${2:?}"; shift 2 ;;
     --text) TEXT="${2-}"; shift 2 ;;
+    --script) SCRIPT_TEXT="${2-}"; shift 2 ;;
     --video) VIDEO="${2:?}"; shift 2 ;;
     -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
     *) echo "未知参数：$1" >&2; exit 2 ;;
@@ -129,6 +131,30 @@ ensure_engine() {
   bash "$HERE/station.sh" start >>"$LOG" 2>&1 || true
   engine_up
 }
+
+# --- 屏幕上的两个窗口（分别为"正在干活"和"照着念"） ---
+# disown：窗口进程后面会被 kill 收尾，从作业表里摘掉才不会在日志里刷 "Terminated: 15" 这类噪音。
+progress_start() {
+  nohup osascript "$HERE/progress-dialog.applescript" "$1" >/dev/null 2>&1 &
+  echo $! > /tmp/voice-gui-progress.pid
+  disown 2>/dev/null || true
+}
+progress_stop() {
+  local pid; pid="$(cat /tmp/voice-gui-progress.pid 2>/dev/null || true)"
+  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  rm -f /tmp/voice-gui-progress.pid
+}
+# 提词器必须活得比确认框久：用户反馈"点了开始录音，要说的内容就消失了"，所以录音期间它一直在屏幕正中。
+teleprompter_start() {
+  nohup osascript "$HERE/teleprompter.applescript" "$1" "$2" >/dev/null 2>&1 &
+  echo $! > /tmp/voice-gui-teleprompter.pid
+  disown 2>/dev/null || true
+}
+teleprompter_stop() {
+  local pid; pid="$(cat /tmp/voice-gui-teleprompter.pid 2>/dev/null || true)"
+  [ -n "$pid" ] && kill "$pid" 2>/dev/null || true
+  rm -f /tmp/voice-gui-teleprompter.pid
+}
 cli() { "$NODE" "$BRIDGE/cli.mjs" "$@"; }
 
 if [ "$MODE" = "doctor" ]; then
@@ -151,20 +177,28 @@ if [ "$MODE" = "record" ]; then
   ensure_engine || { write_result failed "语音引擎没起来（${WORKLOOM_VOICE_ENGINE_URL}）。日志：$LOG"; summary "$RESULT_FILE"; exit 1; }
   CAPTURE="$STATION/captures/gui-$(date +%s).wav"
   log "开始录音 → $CAPTURE"
-  RECORDED="$(cli record --out "$CAPTURE" --seconds "$SECONDS_TO_RECORD" 2>>"$LOG")"
+  # 录音多给 5 秒富余：用户看到提词器才开始念（开头那 1–2 秒是静音），首尾静音由 record 的裁剪步骤去掉。
+  RECORD_WINDOW=$((SECONDS_TO_RECORD + 5))
+  cli record --out "$CAPTURE" --seconds "$RECORD_WINDOW" > "$STATION/logs/last-record.json" 2>>"$LOG" &
+  RECORD_PID=$!
+  # 先起录、再把提词器推到最前：念的第一个字不会被裁掉，且提词稿在录音全程可见（用户反馈原设计"文字消失了"）。
+  teleprompter_start "$SCRIPT_TEXT" $((RECORD_WINDOW + 20))
+  wait "$RECORD_PID" || true
+  teleprompter_stop
+  RECORDED="$(cat "$STATION/logs/last-record.json" 2>/dev/null || true)"
   if [ -z "$RECORDED" ]; then
     write_result failed "录音没成功：麦克风可能被别的程序占用，或系统还没给麦克风权限（日志：${LOG}）"
     summary "$RESULT_FILE"; exit 1
   fi
-  printf '%s' "$RECORDED" > "$STATION/logs/last-record.json"
   REFERENCE="$(json_pick "$STATION/logs/last-record.json" result.reference)"
   GATE_OK="$(json_pick "$STATION/logs/last-record.json" result.gate.ok)"
   GATE_WHY="$(json_pick "$STATION/logs/last-record.json" result.gate.reasons.0)"
   if [ "$GATE_OK" != "True" ]; then
-    write_result retry "录到的这段没通过质量检查（${GATE_WHY:-没有检测到说话声}）。请靠近麦克风、用正常语速再念一次，周围尽量安静。"
+    write_result retry "录到的这段没通过质量检查（${GATE_WHY:-没有检测到说话声}）。请靠近麦克风，对着屏幕上弹出的提词稿再念一次；周围尽量安静。"
     summary "$RESULT_FILE"; exit 0
   fi
   [ -n "$REFERENCE" ] || REFERENCE="$CAPTURE"
+  progress_start "正在生成音色（转写逐字稿 + 建档 + 合成试听），约 1–3 分钟，请稍等…"
   log "建档 + 转写 → profile=$PROFILE"
   if [ ! -f "$STATION/profiles/$PROFILE/consent.json" ]; then
     cli consent --profile "$PROFILE" --speaker self --scope internal \
@@ -172,6 +206,7 @@ if [ "$MODE" = "record" ]; then
   fi
   REGISTERED="$(cli register --profile "$PROFILE" --ref "$REFERENCE" --speaker-label "我的声音" 2>>"$LOG")"
   if [ -z "$REGISTERED" ]; then
+    progress_stop
     write_result failed "建档失败：参考音频或逐字稿有问题（日志：${LOG}）"
     summary "$RESULT_FILE"; exit 1
   fi
@@ -182,6 +217,7 @@ if [ "$MODE" = "record" ]; then
   SPOKEN="$(cli speak --profile "$PROFILE" \
     --text "您好，我是小织。这条声音是用您刚才的录音克隆出来的，接下来我会用它为您播报经营日报。" \
     --out "$DEMO" 2>>"$LOG")"
+  progress_stop
   if [ -z "$SPOKEN" ]; then
     write_result failed "声音档案建好了，但试听合成失败（日志：${LOG}）" profile "$PROFILE" reference "$REFERENCE"
     summary "$RESULT_FILE"; exit 1
