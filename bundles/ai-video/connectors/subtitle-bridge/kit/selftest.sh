@@ -53,10 +53,14 @@ checks = burned["checks"]
 presence = burned["presence"]
 timeline = burned["timeline"]
 layout = {item["kind"]: item["ok"] for item in burned["layoutChecks"]}
+for mode in ("danmaku", "sticker", "karaoke", "bilingual"):
+    section = report.get(mode, {})
+    layout.update({f"{mode}.{key}": value for key, value in (section.get("checks") or {}).items()})
 targets = {
     "时间轴回读一致": timeline["ok"],
     "字幕可现度": presence["delta"] >= presence["threshold"],
     "版式体检全绿": all(layout.values()),
+    "扩展轨复检全绿": all(layout.values()),
     "字体解析命中工位目录": checks["font_resolved_from_fonts_dir"],
     "分辨率保持": checks["resolution_preserved"],
     "音轨保持": checks["audio_preserved"],
@@ -68,6 +72,13 @@ fonts = report.get("plan", {}).get("fonts", {})
 sub_name = (fonts.get("字幕") or {}).get("chosen", {}).get("name", "-")
 title_name = (fonts.get("标题") or {}).get("chosen", {}).get("name", "-")
 print(f"  字幕字体 {sub_name} · 标题字体 {title_name} · 可现度 Δ{presence['delta']} · 时间轴 {timeline['cues']}/{timeline['sourceCues']} 条")
+for mode in ("danmaku", "sticker", "karaoke", "bilingual"):
+    section = report.get(mode, {})
+    checks = section.get("checks") or {}
+    ok = all(checks.values()) if checks else False
+    print(f"  {'✓' if ok else '✗'} {mode}（{section.get('path', '') .split('/')[-1] or '缺失'}）")
+    if not ok:
+        targets[f"{mode} 复检"] = False
 failed = [name for name, ok in targets.items() if not ok]
 if failed:
     print(f"✗ 自检未通过：{', '.join(failed)}")

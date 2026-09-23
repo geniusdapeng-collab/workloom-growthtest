@@ -65,6 +65,9 @@ export const SUBTITLE_BRIDGE_TOOLS = [
   "subtitlewrite.plan",
   "subtitlewrite.burn",
   "subtitlewrite.title",
+  "subtitlewrite.danmaku",
+  "subtitlewrite.sticker",
+  "subtitlewrite.karaoke",
   "subtitlewrite.best",
 ] as const;
 

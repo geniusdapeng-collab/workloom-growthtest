@@ -9,7 +9,8 @@
  *  · 岗位/技能/管线/对象四层断链 → 运行到后期时"这一步没人执行"。
  * 这些都能在磁盘上静态验出来，所以本组测试不触 DB、不依赖 ffmpeg。
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -20,8 +21,10 @@ import { bundlesRoot } from "./assembly.js";
 import {
   FONT_LICENSE_TABLE, MOOD_ART_PREF, SCENE_WEIGHT_PREF, SUBTITLE_TOOLS, WEIGHTS,
   assColour, buildAssDocument, checkFontSize, checkLineWidth, decideTextStyle, findRecipes,
-  layoutFor, licenseInfo, loadFontCatalog, loadRecipes, overlapsOcclusion, parseAssEvents,
-  parseSrt, prepareFlatFontsDir, recommendSize, scoreFont, selectFonts, styleLine, textBands,
+  checkDanmakuDensity, escapeAssText, karaokeAssText, layoutFor, licenseInfo, loadFontCatalog, loadRecipes,
+  overlapsOcclusion, parseAssEvents, parseDanmaku, parseSrt, parseTimedWords, planDanmakuTracks,
+  prepareFlatFontsDir, recommendSize, scoreFont, selectFonts, stickerAssText, stickerStylePreset,
+  styleLine, textBands, trimDanmaku, fontsRoot, scanFonts,
 } from "../../../bundles/ai-video/connectors/subtitle-bridge/core.mjs";
 
 const ROOT = bundlesRoot();
@@ -50,15 +53,15 @@ const evaluate = (ruleId: string, params: Record<string, unknown> = {}, context:
 
 describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
   it("六条规则齐备，级别与基线口径正确", () => {
-    expect(fencePack.version).toBe("ai-video-subtitle/v1");
+    expect(fencePack.version).toBe("ai-video-subtitle/v2");
     expect(fencePack.rules.map((rule) => rule.rule_id)).toEqual([
-      "G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5",
+      "G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5", "G-SUB6",
     ]);
     expect(fencePack.rules.every((rule) => rule.is_baseline === true)).toBe(true);
     const levels = Object.fromEntries(fencePack.rules.map((rule) => [rule.rule_id, rule.level]));
     expect(levels).toEqual({
       "G-SUB0": "auto", "G-SUB1": "review", "G-SUB2": "block",
-      "G-SUB3": "block", "G-SUB4": "block", "G-SUB5": "block",
+      "G-SUB3": "block", "G-SUB4": "block", "G-SUB5": "block", "G-SUB6": "block",
     });
   });
 
@@ -98,6 +101,22 @@ describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
     expect(evaluate("G-SUB5", { commercial_use: true, font_license: "apache-2.0" })).toBe(false);
     expect(evaluate("G-SUB5", { commercial_use: true, font_license: "vendor-free-commercial" })).toBe(false);
     expect(evaluate("G-SUB5", { commercial_use: false, font_license: "unknown-vendor" })).toBe(false);
+
+    // G-SUB6：弹幕/贴纸不得绕过密度与安全区（allow_flood / ignore_density / skip_safe_area）
+    expect(evaluate("G-SUB6", { allow_flood: true })).toBe(true);
+    expect(evaluate("G-SUB6", { ignore_density: true })).toBe(true);
+    expect(evaluate("G-SUB6", { skip_safe_area: true })).toBe(true);
+    expect(evaluate("G-SUB6", { max_concurrent: 8 })).toBe(false);
+  });
+
+  it("G-SUB0 覆盖全部渲染动作（含弹幕/贴纸/卡拉OK），写动作不留白", () => {
+    const auto = fencePack.rules.find((rule) => rule.rule_id === "G-SUB0")!;
+    for (const action of SUBTITLE_TOOLS.filter((tool) => tool.startsWith("subtitlewrite."))) {
+      expect(auto.match.actions, `G-SUB0 未覆盖 ${action}`).toContain(action);
+    }
+    const flood = fencePack.rules.find((rule) => rule.rule_id === "G-SUB6")!;
+    expect(flood.match.actions).toContain("subtitlewrite.danmaku");
+    expect(flood.match.actions).toContain("subtitlewrite.sticker");
   });
 });
 
@@ -417,6 +436,36 @@ describe("SRT 与 ASS（时间轴是交付契约）", () => {
 });
 
 describe("渲染字体目录准备（防 libass 静默回落）", () => {
+  it("29 款字体已随仓分发，且文件字节与档案 sha256 逐一致（A 级：真实文件哈希）", () => {
+    const catalog = loadFontCatalog();
+    const fontsDir = join(BUNDLE_DIR, "library/fonts");
+    expect(existsSync(join(fontsDir, "LICENSES.md"))).toBe(true);
+    let verified = 0;
+    for (const font of catalog.fonts) {
+      const file = join(fontsDir, font.file);
+      expect(existsSync(file), `随包字体缺失：${font.file}`).toBe(true);
+      const digest = createHash("sha256").update(readFileSync(file)).digest("hex");
+      expect(digest, `${font.file} 与档案 sha256 不一致`).toBe(font.sha256);
+      expect(statSync(file).size).toBe(font.bytes);
+      verified += 1;
+    }
+    expect(verified).toBe(29);
+  });
+
+  it("字体目录默认解析到随包目录（无需工位安装即可渲染）", () => {
+    const previous = process.env.WORKLOOM_SUBTITLE_FONTS_DIR;
+    delete process.env.WORKLOOM_SUBTITLE_FONTS_DIR;
+    try {
+      expect(fontsRoot()).toBe(join(BUNDLE_DIR, "library/fonts"));
+      const scan = scanFonts();
+      expect(scan.installed).toBe(29);
+      expect(scan.missing).toEqual([]);
+    } finally {
+      if (previous === undefined) delete process.env.WORKLOOM_SUBTITLE_FONTS_DIR;
+      else process.env.WORKLOOM_SUBTITLE_FONTS_DIR = previous;
+    }
+  });
+
   it("把 cn/ en/ 摊平成单层目录，并把缺失字体如实列出", () => {
     const fontsDir = mkdtempSync(join(tmpdir(), "subtitle-flat-"));
     const workDir = mkdtempSync(join(tmpdir(), "subtitle-flat-work-"));
@@ -436,6 +485,93 @@ describe("渲染字体目录准备（防 libass 静默回落）", () => {
       rmSync(fontsDir, { recursive: true, force: true });
       rmSync(workDir, { recursive: true, force: true });
     }
+  });
+});
+
+describe("弹幕 / 贴纸 / 卡拉OK（v1.1 二期）", () => {
+  it("弹幕解析：数组与 JSONL 两种输入都支持，非法条目显式失败", () => {
+    const fromArray = parseDanmaku([{ at: 1.2, text: "这也太好看了吧" }, { at: 2, text: "川西永远的神", mode: "top" }]);
+    expect(fromArray).toHaveLength(2);
+    expect(fromArray[0]).toMatchObject({ at: 1.2, text: "这也太好看了吧", mode: "scroll" });
+    expect(fromArray[1].mode).toBe("top");
+    const fromJsonl = parseDanmaku('{"at":3,"text":"求路线"}\n{"at":4,"text":"已收藏","mode":"bottom"}');
+    expect(fromJsonl.map((item: { mode: string }) => item.mode)).toEqual(["scroll", "bottom"]);
+    expect(() => parseDanmaku([])).toThrow(/为空/);
+    expect(() => parseDanmaku([{ at: -1, text: "负时间" }])).toThrow(/at 非法/);
+    expect(() => parseDanmaku([{ at: 1, text: "   " }])).toThrow(/文本为空/);
+  });
+
+  it("弹幕密度：1s 窗口并发超上限即判不达标，抽稀按窗口逐条裁并如实计数", () => {
+    const dense = Array.from({ length: 12 }, (_, index) => ({ at: 10 + index * 0.02, text: `弹幕${index}`, mode: "scroll" }));
+    const density = checkDanmakuDensity(dense, { windowSec: 1, maxConcurrent: 8 });
+    expect(density.ok).toBe(false);
+    expect(density.peakConcurrent).toBe(12);
+    const { kept, dropped, trimmed } = trimDanmaku(dense, { windowSec: 1, maxConcurrent: 8 });
+    expect(kept).toHaveLength(8);
+    expect(dropped).toHaveLength(4);
+    expect(trimmed).toBe(4);
+    // 稀疏时不动刀
+    expect(trimDanmaku([{ at: 0, text: "a" }, { at: 5, text: "b" }], { windowSec: 1, maxConcurrent: 8 }).trimmed).toBe(0);
+  });
+
+  it("弹幕轨道：滚动占顶部 1/4 轨道（round-robin）、顶部/底部固定各占行位，长弹幕走更久", () => {
+    const items = [
+      { at: 0.5, text: "短", mode: "scroll", colour: null, sizeScale: 1 },
+      { at: 0.7, text: "一条比较长的滚动弹幕文本", mode: "scroll", colour: null, sizeScale: 1 },
+      { at: 1, text: "顶部固定", mode: "top", colour: null, sizeScale: 1 },
+      { at: 2, text: "底部固定", mode: "bottom", colour: null, sizeScale: 1 },
+    ];
+    const tracks = planDanmakuTracks(items, {
+      resolution: [1080, 1920], layout: { 弹幕: { top_band_ratio: 0.25 }, 字幕: { bottom_margin_ratio: 0.18 } }, size: 47,
+    });
+    expect(tracks[0].y).toBeLessThan(1920 * 0.25);
+    expect(tracks[1].y).toBeGreaterThan(tracks[0].y);
+    expect(tracks[0].enterX).toBe(1080);
+    expect(tracks[0].exitX).toBeLessThan(0);
+    expect(tracks[1].durationSec).toBeGreaterThan(tracks[0].durationSec);
+    expect(tracks[2].enterX).toBeNull();
+    expect(tracks[3].y).toBeGreaterThan(1000);
+  });
+
+  it("卡拉OK 逐字时间轴：显式优先，缺失时按字数均分并如实标注；\\kf 时长与字数一致", () => {
+    const explicit = parseTimedWords(
+      [{ text: "雪", start: 1, end: 1.4 }, { text: "山", start: 1.4, end: 2.0 }],
+      { text: "雪山", start: "0:00:01.00", end: "0:00:02.00" },
+    );
+    expect(explicit.basis).toBe("explicit");
+    expect(explicit.sumErrorSec).toBeCloseTo(0, 3);
+    // 显式时间轴与字幕条时长不匹配时如实报误差（不悄悄拉伸）
+    const mismatched = parseTimedWords(
+      [{ text: "雪", start: 1, end: 1.4 }, { text: "山", start: 1.4, end: 1.8 }],
+      { text: "雪山", start: "0:00:01.00", end: "0:00:02.00" },
+    );
+    expect(mismatched.sumErrorSec).toBeCloseTo(-0.2, 3);
+    const even = parseTimedWords(null, { text: "雪山倒映", start: "0:00:01.00", end: "0:00:03.00" });
+    expect(even.basis).toContain("even-split");
+    expect(even.words).toHaveLength(4);
+    expect(even.sumErrorSec).toBe(0);
+    const tags = karaokeAssText(even.words);
+    expect(tags).toMatch(/^\{\\kf50\}雪\{\\kf50\}山\{\\kf50\}倒\{\\kf50\}映$/);
+    expect(() => parseTimedWords(null, { text: "字", start: "0:00:01.00", end: "0:00:02.00", mode: "explicit" })).toThrow(/even/);
+  });
+
+  it("贴纸：五种预设齐备，200ms 弹入 + 旋转写进 ASS 文本", () => {
+    const preset = stickerStylePreset("撞色");
+    expect(preset.name).toBe("撞色");
+    expect(Object.keys(stickerStylePreset("不存在")).length).toBeGreaterThan(0);
+    expect(stickerStylePreset("不存在").name).toBe("撞色");
+    const ass = stickerAssText({ text: "川西必去" }, { preset });
+    expect(ass).toContain("\\t(0,200,");
+    expect(ass).toContain("川西必去");
+    for (const name of ["撞色", "奶油", "国风", "科技", "促销"]) {
+      expect(stickerStylePreset(name).primaryColour).toMatch(/^#[0-9A-F]{6}$/i);
+    }
+  });
+
+  it("ASS 文本转义：大括号与换行不会破坏 override 标签", () => {
+    expect(escapeAssText("正常文本")).toBe("正常文本");
+    expect(escapeAssText("{恶意}")).toBe("\\{恶意\\}");
+    expect(escapeAssText("第一行\n第二行")).toBe("第一行\\N第二行");
   });
 });
 
@@ -459,22 +595,25 @@ describe("岗位 / 技能 / 管线 / 对象四层引用", () => {
     coverage: Array<{ eventPrefix: string }>; write_back: string[];
   };
 
-  it("岗位卡：5 技能 / 9 工具 / 6 围栏 / 事件域 subtitle.", () => {
+  it("岗位卡：5 技能 / 12 工具 / 7 围栏 / 事件域 subtitle.", () => {
     expect(preset.preset_key).toBe("subtitle-stylist");
     expect(preset.name).toBe("字幕师");
     expect(preset.kind).toBe("operator");
     expect(preset.readonly).toBe(false);
     expect(preset.night_shift).toBe(true);
     expect(preset.high_risk).toBe(false);
-    expect(preset.fence_bindings).toEqual(["G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5"]);
+    expect(preset.fence_bindings).toEqual(["G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5", "G-SUB6"]);
     expect(preset.skills).toEqual([
       "font-selection", "subtitle-layout-design", "caption-burnin-ops", "font-license-compliance", "subtitle-delivery-spec",
     ]);
     expect(preset.tools.map((tool) => tool.name)).toEqual([...SUBTITLE_TOOLS]);
     expect(preset.tools.filter((tool) => tool.access === "write").map((tool) => tool.name)).toEqual([
-      "subtitlewrite.plan", "subtitlewrite.burn", "subtitlewrite.title", "subtitlewrite.best",
+      "subtitlewrite.plan", "subtitlewrite.burn", "subtitlewrite.title",
+      "subtitlewrite.danmaku", "subtitlewrite.sticker", "subtitlewrite.karaoke", "subtitlewrite.best",
     ]);
-    expect(preset.write_back).toEqual(["subtitlewrite.burn", "subtitlewrite.title"]);
+    expect(preset.write_back).toEqual([
+      "subtitlewrite.burn", "subtitlewrite.title", "subtitlewrite.danmaku", "subtitlewrite.sticker", "subtitlewrite.karaoke",
+    ]);
     expect(preset.coverage.map((coverage) => coverage.eventPrefix)).toEqual(["subtitle."]);
   });
 
@@ -511,8 +650,8 @@ describe("岗位 / 技能 / 管线 / 对象四层引用", () => {
       expect(bound.length).toBeGreaterThan(0);
       for (const ruleId of bound) expect(ruleIds.has(ruleId), `${skill} 绑定不存在的围栏 ${ruleId}`).toBe(true);
     }
-    // 交付规范是"全量口径"，必须绑满六条
-    expect(bindings["subtitle-delivery-spec"]).toEqual(["G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5"]);
+    // 交付规范是"全量口径"，必须绑满七条
+    expect(bindings["subtitle-delivery-spec"]).toEqual(["G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5", "G-SUB6"]);
   });
 
   it("叙事片管线在调色之后、配乐之前插入字幕步，且 owner/产物齐备", () => {
@@ -584,14 +723,14 @@ describe("字体引脚（fonts-pin）与档案一致", () => {
   const pin = JSON.parse(readFileSync(join(BRIDGE_DIR, "kit/fonts-pin.json"), "utf8")) as {
     schemaVersion: string;
     licenseWhitelist: string[];
-    install: { discipline: string; targetDir: string };
+    install: { discipline: string; bundledDir: string; externalDir: string };
     fonts: Array<{
       id: string; name: string; file: string; sha256: string; bytes: number; license: string;
       upstream: { url: string | null; verifiedAt: string | null; verifiedSha256?: string; zipMember?: string | null };
     }>;
   };
 
-  it("档案与引脚逐文件一一对应，sha256 完全一致（字体不进仓库、只登记）", () => {
+  it("档案与引脚逐文件一一对应，sha256 完全一致（字体随仓分发 + 引脚可审计）", () => {
     expect(pin.schemaVersion).toBe("workloom.workstation-pin/v1");
     expect(pin.fonts).toHaveLength(catalog.fonts.length);
     const byFile = new Map(pin.fonts.map((font) => [font.file, font]));
@@ -604,8 +743,9 @@ describe("字体引脚（fonts-pin）与档案一致", () => {
       expect(entry!.id).toBe(font.id);
       expect(pin.licenseWhitelist).toContain(entry!.license);
     }
-    // 引脚只登记上游地址与核验结果，字体二进制本身不在仓库
-    expect(existsSync(join(BRIDGE_DIR, "fonts"))).toBe(false);
+    // 字体二进制随仓分发（library/fonts），引脚登记上游地址与逐文件摘要供升级比对
+    expect(existsSync(join(BUNDLE_DIR, "library/fonts/cn"))).toBe(true);
+    expect(existsSync(join(BUNDLE_DIR, "library/fonts/en"))).toBe(true);
   });
 
   it("上游直链要么核验过（sha256 对得上），要么显式标未核验并给出来源说明", () => {
@@ -614,11 +754,13 @@ describe("字体引脚（fonts-pin）与档案一致", () => {
         expect(font.upstream.url).toMatch(/^https:\/\//);
         expect(font.upstream.verifiedSha256).toBe(font.sha256);
       } else {
-        expect(font.upstream.note ?? "").toContain("--from-dir");
+        // 未核验的上游直链只用于升级比对；随包字体本身已由 sha256 三重校验
+        expect(font.upstream.note ?? "").toContain("升级");
       }
     }
     expect(pin.install.discipline).toContain("sha256");
-    expect(pin.install.targetDir).toContain("WORKLOOM_SUBTITLE_FONTS_DIR");
+    expect(pin.install.bundledDir).toContain("library/fonts");
+    expect(pin.install.externalDir).toContain("WORKLOOM_SUBTITLE_FONTS_DIR");
   });
 });
 

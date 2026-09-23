@@ -12,6 +12,8 @@
  *   review          —— 品牌视觉锤变更（许可未核验）：G-SUB1 review，线程 pending_review，产生审批行
  *   blocked         —— 覆盖原片：G-SUB2 block，线程 paused，不执行工具
  *   blocked-license —— 非白名单字体许可：G-SUB5 block，线程 paused
+ *   danmaku         —— 弹幕轨渲染：G-SUB0 直通，产出弹幕成片，复检全绿
+ *   blocked-flood   —— 关闭弹幕刷屏熔断（allow_flood）：G-SUB6 block，线程 paused
  *   outage          —— 工位不可达：软失败，步骤标未核实，线程 failed（不伪造回执）
  *
  * 运行（在 WorkLoom-growth 仓库内，需 DATABASE_URL / DATABASE_GATEWAY_URL，且工作区 ws-video 已 seed）：
@@ -43,6 +45,8 @@ const SRT = join(WORK_DIR, "smoke-source.srt");
 const BURNED = join(WORK_DIR, "smoke-burned.mp4");
 const REVIEW_OUT = join(WORK_DIR, "smoke-review.mp4");
 const LICENSE_OUT = join(WORK_DIR, "smoke-license.mp4");
+const DANMAKU_OUT = join(WORK_DIR, "smoke-danmaku.mp4");
+const FLOOD_OUT = join(WORK_DIR, "smoke-flood.mp4");
 
 const FFMPEG = process.env.WORKLOOM_SUBTITLE_FFMPEG_PATH ?? process.env.FFMPEG_PATH ?? "ffmpeg";
 const FFPROBE = process.env.WORKLOOM_SUBTITLE_FFPROBE_PATH ?? process.env.FFPROBE_PATH ?? "ffprobe";
@@ -171,6 +175,37 @@ const steps = {
       label: "非白名单字体许可用于商用（应被 G-SUB5 阻断）",
     },
   ],
+  danmaku: () => [
+    {
+      stepId: "s1", action: "subtitlewrite.danmaku", objectType: "subtitle_report", tool: "subtitlewrite.danmaku",
+      params: {
+        input_path: SOURCE, output_path: DANMAKU_OUT,
+        items: [
+          { at: 0.8, text: "这也太好看了吧" },
+          { at: 1.2, text: "川西永远的神", colour: "#FFF200" },
+          { at: 2.0, text: "雪山绝了", mode: "top" },
+          { at: 6.5, text: "已收藏" },
+        ],
+        brief: BRIEF, platform: "抖音/快手", evidence_dir: join(WORK_DIR, "danmaku-evidence"),
+        font_license: "ofl-1.1", commercial_use: true,
+      },
+      context: { tenant_daily_subtitle: 0 },
+      label: "弹幕轨渲染（密度在口径内，G-SUB0 直通）",
+    },
+  ],
+  "blocked-flood": () => [
+    {
+      stepId: "s1", action: "subtitlewrite.danmaku", objectType: "subtitle_report", tool: "subtitlewrite.danmaku",
+      params: {
+        input_path: SOURCE, output_path: FLOOD_OUT,
+        items: [{ at: 1, text: "刷屏测试" }],
+        brief: BRIEF, platform: "抖音/快手", allow_flood: true,
+        font_license: "ofl-1.1", commercial_use: true,
+      },
+      context: { tenant_daily_subtitle: 0 },
+      label: "关闭弹幕刷屏熔断（应被 G-SUB6 阻断）",
+    },
+  ],
   outage: () => [
     {
       stepId: "s1", action: "subtitleread.analyze", objectType: "final_video", tool: "subtitleread.analyze",
@@ -186,6 +221,8 @@ const goals: Record<keyof typeof steps, string> = {
   review: "品牌视觉锤变更时渲染字幕（演练人审）",
   blocked: "字幕烧录时直接覆盖原片（演练红线）",
   "blocked-license": "用非白名单许可字体做商用字幕（演练版权红线）",
+  danmaku: "给成片做一层弹幕轨并出证据",
+  "blocked-flood": "关闭弹幕密度熔断（演练刷屏红线）",
   outage: "工位不可达时做字幕（演练软失败）",
 };
 
@@ -219,7 +256,7 @@ async function main(): Promise<number> {
     if (!(await waitForHealth(BASE_URL))) throw new Error("字幕 bridge 未在 15s 内就绪");
     // 健康探针走 HTTP，确认工位（含字体与 libass）真的可用；不可用就直接失败，不进入"看起来在跑"的假象
     const health = await fetch(`${BASE_URL}/health`).then((res) => res.json() as Promise<Record<string, unknown>>);
-    if (!Array.isArray(health.tools) || (health.tools as string[]).length !== 9) {
+    if (!Array.isArray(health.tools) || (health.tools as string[]).length !== 12) {
       throw new Error(`字幕 bridge 工具面异常：${JSON.stringify(health.tools)}`);
     }
 
@@ -314,7 +351,11 @@ async function main(): Promise<number> {
   const review = find("review");
   const blocked = find("blocked");
   const blockedLicense = find("blocked-license");
+  const danmaku = find("danmaku");
+  const blockedFlood = find("blocked-flood");
   const outage = find("outage");
+  const danmakuHash = existsSync(DANMAKU_OUT) ? createHash("sha256").update(readFileSync(DANMAKU_OUT)).digest("hex") : null;
+  const danmakuEvent = danmaku?.events.find((event) => event.action === "subtitlewrite.danmaku");
 
   const checks = {
     clean_completed: clean?.outcome.status === "completed",
@@ -335,6 +376,11 @@ async function main(): Promise<number> {
     review_pending: review?.outcome.status === "pending_review" && Boolean(review?.outcome.pendingApprovalId),
     blocked_by_overwrite_rule: blocked?.outcome.status === "paused" && (blocked?.outcome.blockedBy ?? "").includes("覆盖原片"),
     blocked_by_license_rule: blockedLicense?.outcome.status === "paused" && (blockedLicense?.outcome.blockedBy ?? "").includes("字体许可"),
+    danmaku_completed: danmaku?.outcome.status === "completed" && Boolean(danmakuHash),
+    danmaku_report_all_checks_green: Boolean(
+      danmakuEvent?.checks && Object.values(danmakuEvent.checks).every((value) => value === true),
+    ),
+    blocked_by_flood_rule: blockedFlood?.outcome.status === "paused" && (blockedFlood?.outcome.blockedBy ?? "").includes("弹幕刷屏"),
     outage_unverified: outage?.outcome.status === "failed" && (outage?.outcome.unverified?.length ?? 0) >= 1,
   };
 
@@ -350,6 +396,8 @@ async function main(): Promise<number> {
       burned: BURNED,
       burnedSha256: burnedHash,
       burnedGeometry: probe,
+      danmaku: DANMAKU_OUT,
+      danmakuSha256: danmakuHash,
       receiptSha256: receiptHash,
       receiptUri,
       fonts: burnEvent?.fonts ?? null,

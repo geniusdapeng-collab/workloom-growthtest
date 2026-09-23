@@ -1,12 +1,13 @@
 {
   "schemaVersion": "workloom.workstation-pin/v1",
-  "component": "字体库 font-library v1.1（字幕工位字体 · 29 款开源/免费商用）",
+  "component": "字体库 font-library v1.1（字幕工位字体 · 29 款已随仓分发）",
   "catalog": "bundles/ai-video/library/font-catalog/font_db.json",
   "verifiedOn": "darwin-arm64",
   "install": {
-    "targetDir": "${WORKLOOM_SUBTITLE_FONTS_DIR:-$HOME/.workloom-subtitle/fonts}",
+    "bundledDir": "bundles/ai-video/library/fonts（默认取用位，随 Bundle 分发）",
+    "externalDir": "${WORKLOOM_SUBTITLE_FONTS_DIR:-$HOME/.workloom-subtitle/fonts}（可选覆盖位：客户自备/升级字体）",
     "layout": "cn/ 与 en/（与档案 file 字段逐一致）",
-    "discipline": "下载/复制到临时目录 → 逐文件校验 sha256 → 原子替换；摘要不符立即失败且不覆盖现有文件。--download 只放行 verifiedAt 非空的直链；未核验的一律拒绝并提示走 --from-dir。"
+    "discipline": "三层校验：①字体档案 sha256 ↔ 随包文件（packages/base 回归用例）；②bundle 完整性索引（bundle:governance 发布门禁）；③本引脚的 sha256。任一不符即判失败；--install/--from-dir 写入外置目录前同样逐文件校验。"
   },
   "licenseWhitelist": [
     "ofl-1.1",
@@ -28,7 +29,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -45,7 +46,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/notoserifsc/NotoSerifSC%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -62,7 +63,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolkuaile/ZCOOLKuaiLe-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -79,7 +80,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolqingkehuangyou/ZCOOLQingKeHuangYou-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -96,7 +97,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zcoolxiaowei/ZCOOLXiaoWei-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -113,7 +114,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/mashanzheng/MaShanZheng-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -130,7 +131,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/zhimangxing/ZhiMangXing-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -147,7 +148,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/liujianmaocao/LiuJianMaoCao-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -164,7 +165,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/longcang/LongCang-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -181,7 +182,7 @@
         "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-ExtraLight.otf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -198,7 +199,7 @@
         "url": "https://raw.githubusercontent.com/adobe-fonts/source-han-sans/release/SubsetOTF/CN/SourceHanSansCN-Heavy.otf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -215,7 +216,7 @@
         "url": "https://github.com/lxgw/LxgwWenKai/releases/download/v1.522/LXGWWenKai-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -232,7 +233,7 @@
         "url": "https://github.com/atelier-anchor/smiley-sans/releases/download/v2.0.1/smiley-sans-v2.0.1.zip",
         "zipMember": "SmileySans-Oblique.ttf",
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -249,7 +250,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -266,7 +267,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/Montserrat%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -283,7 +284,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/PlayfairDisplay%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -300,7 +301,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/Oswald%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -317,7 +318,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/Cinzel%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -334,7 +335,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/dancingscript/DancingScript%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -351,7 +352,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto%5Bwdth,wght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -368,7 +369,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/BebasNeue-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -385,7 +386,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/anton/Anton-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -402,7 +403,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/archivoblack/ArchivoBlack-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -419,7 +420,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/lobster/Lobster-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -436,7 +437,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/pacifico/Pacifico-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -453,7 +454,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/bangers/Bangers-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -470,7 +471,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/caveat/Caveat%5Bwght%5D.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -487,7 +488,7 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Regular.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     },
     {
@@ -504,8 +505,9 @@
         "url": "https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf",
         "zipMember": null,
         "verifiedAt": null,
-        "note": "本仓未完成上游逐字节核验（下载失败或超时）：安装请走 --from-dir 从字体包/客户字体目录导入；确需直链下载时先核验 sha256 再回填 verifiedAt"
+        "note": "字体已随仓分发并逐文件 sha256 校验；本引脚的该上游直链尚未在仓内逐一核验（verifiedAt=null），仅用于升级比对——升级时必须先下载核验 sha256 再回填 verifiedAt，不得直接替换随包字体"
       }
     }
-  ]
+  ],
+  "distribution": "随仓分发：bundles/ai-video/library/fonts/{cn,en}/（OFL-1.1 / 站酷免费商用 / 厂商免费商用）"
 }

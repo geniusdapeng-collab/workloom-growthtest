@@ -13,6 +13,9 @@
  *   subtitle-cli burn       --in clip.mp4 --out out.mp4 --srt subs.srt [--title "…"] [--platform …]
  *                           [--brief brief.json] [--evidence-dir dir]
  *   subtitle-cli title      --in clip.mp4 --out out.mp4 --title "川西之行 · WEST SICHUAN" [--srt subs.srt]
+ *   subtitle-cli danmaku    --in clip.mp4 --out out.mp4 --items danmaku.json [--opacity 0.85]
+ *   subtitle-cli sticker    --in clip.mp4 --out out.mp4 --items stickers.json
+ *   subtitle-cli karaoke    --in clip.mp4 --out out.mp4 --srt subs.srt [--srt-en subs.en.srt] [--timings words.json]
  *   subtitle-cli best       --in clip.mp4 --out out.mp4 --srt subs.srt [--title "…"] [--min-score 80]
  *
  * 退出码：0 成功；2 用法错误；3 工具错误（code 见 SubtitleError）。
@@ -23,7 +26,8 @@ import fs from "node:fs";
 import process from "node:process";
 
 import {
-  SubtitleError, best, callTool, findRecipes, health, plan, renderTitle, renderWithSubtitles, selectFonts,
+  SubtitleError, best, callTool, findRecipes, health, plan, renderDanmaku, renderKaraoke,
+  renderSticker, renderTitle, renderWithSubtitles, selectFonts,
 } from "./core.mjs";
 
 function parseArgs(argv) {
@@ -197,6 +201,66 @@ async function main() {
       line(`  sha256 ${report.output.hash}`);
       return 0;
     }
+    case "danmaku": {
+      const report = await renderDanmaku({
+        input: flags.in,
+        output: flags.out,
+        items: flags.items ? JSON.parse(fs.readFileSync(flags.items, "utf8")) : (flags["items-json"] ? JSON.parse(flags["items-json"]) : []),
+        platform: typeof flags.platform === "string" ? flags.platform : null,
+        brief: readBrief(flags),
+        evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
+        opacity: number(flags.opacity, 0.85),
+        maxChars: number(flags["max-chars"], 20),
+        maxConcurrent: number(flags["max-concurrent"], 8),
+      });
+      line(`已渲染弹幕：${report.output.path}`);
+      line(`  条数 ${report.density.kept}/${report.density.total}（窗口 ${report.density.windowSec}s 并发峰值 ${report.density.peakConcurrent}/${report.density.maxConcurrent}${report.density.trimmed ? `，抽稀 ${report.density.trimmed}` : ""}）`);
+      line(`  字体 ${report.font.name} · 字号 ${report.style.fontSize}px · 透明度 ${report.opacity}`);
+      line(`  复检：${Object.entries(report.checks).map(([k, v]) => `${k}=${v ? "ok" : "fail"}`).join(" ")}`);
+      line(`  sha256 ${report.output.hash}`);
+      return 0;
+    }
+    case "sticker": {
+      const report = await renderSticker({
+        input: flags.in,
+        output: flags.out,
+        stickers: flags.items ? JSON.parse(fs.readFileSync(flags.items, "utf8")) : (flags["items-json"] ? JSON.parse(flags["items-json"]) : []),
+        platform: typeof flags.platform === "string" ? flags.platform : null,
+        brief: readBrief(flags),
+        evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
+      });
+      line(`已渲染贴纸：${report.output.path}`);
+      for (const item of report.placements) {
+        line(`  「${item.text}」 ${item.preset} · ${item.start}s~${item.end}s（停留 ${item.holdSec}s）· 中心 ${item.centre.x},${item.centre.y}`);
+      }
+      line(`  复检：${Object.entries(report.checks).map(([k, v]) => `${k}=${v ? "ok" : "fail"}`).join(" ")}`);
+      line(`  sha256 ${report.output.hash}`);
+      return 0;
+    }
+    case "karaoke": {
+      const cues = (await import("./core.mjs")).parseSrt(fs.readFileSync(flags.srt, "utf8"));
+      const secondary = flags["srt-en"] ? (await import("./core.mjs")).parseSrt(fs.readFileSync(flags["srt-en"], "utf8")) : [];
+      const timings = flags.timings ? JSON.parse(fs.readFileSync(flags.timings, "utf8")) : null;
+      const report = await renderKaraoke({
+        input: flags.in,
+        output: flags.out,
+        cues,
+        timings,
+        timingMode: typeof flags["timing-mode"] === "string" ? flags["timing-mode"] : "even",
+        secondaryCues: secondary,
+        platform: typeof flags.platform === "string" ? flags.platform : null,
+        brief: readBrief(flags),
+        evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
+        highlightColour: typeof flags["highlight"] === "string" ? flags["highlight"] : "#FFE066",
+      });
+      line(`已渲染卡拉OK：${report.output.path}`);
+      for (const row of report.timing) {
+        line(`  cue#${row.cue} 口径 ${row.basis} · 字幕时长 ${row.cueDuration}s · 逐字合计 ${row.sum}s（误差 ${row.sumErrorSec}s）`);
+      }
+      line(`  复检：${Object.entries(report.checks).map(([k, v]) => `${k}=${v ? "ok" : "fail"}`).join(" ")}`);
+      line(`  sha256 ${report.output.hash}`);
+      return 0;
+    }
     case "best": {
       const outcome = await best({
         input: flags.in,
@@ -220,7 +284,7 @@ async function main() {
     }
     default:
       process.stderr.write(
-        "用法：subtitle-cli <health|probe|analyze|fonts|recipes|plan|burn|title|best> [--flags]\n"
+        "用法：subtitle-cli <health|probe|analyze|fonts|recipes|plan|burn|title|danmaku|sticker|karaoke|best> [--flags]\n"
         + "参见 bundles/ai-video/connectors/subtitle-bridge/README.md\n",
       );
       return 2;

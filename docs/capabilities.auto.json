@@ -1,7 +1,12 @@
 {
  "repo": "workloom-ai-acquisition",
+<<<<<<< HEAD
  "description": "AI超增长 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）",
  "generatedAt": "2026-09-23T01:20:03.481Z",
+=======
+ "description": "WorkLoom 获客系统 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）",
+ "generatedAt": "2026-09-23T01:35:13.013Z",
+>>>>>>> eeb16dd (feat(video): 字体库 29 款随仓分发 + 弹幕/贴纸/卡拉OK/双语字幕（字幕师 v1.1 二期）[T-2026-0923-0048])
  "demoPages": [
   "geo-customer-app.html",
   "geo-demo-c.html",
