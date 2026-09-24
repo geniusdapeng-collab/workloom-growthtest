@@ -108,6 +108,12 @@ export interface BackgroundCheck {
   maxRange: number;
   maxSat: number;
   notes: string[];
+  /**
+   * 允许被投影进角色档案的宽类型字段：`PortraitSet.backgroundChecks` 声明为
+   * `Record<string, Record<string, unknown>>`（档案是可演进 JSON，不锁死字段），
+   * 没有这条索引签名时 `Record<string, BackgroundCheck>` 无法赋给它（TS2322，CI typecheck 直接红）。
+   */
+  [key: string]: unknown;
 }
 
 export type BackgroundProber = (file: string) => BackgroundCheck;
@@ -365,7 +371,14 @@ export async function runPortraitAgent(options: {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const failed: BackgroundCheck = {
-        ok: false, policy: CLEAN_BACKGROUND_POLICY.id, bands: [], cornerSpread: Number.NaN, maxRange: Number.NaN, maxSat: Number.NaN,
+        ok: false,
+        policy: CLEAN_BACKGROUND_POLICY.id,
+        // 探针不可用时的占位采样模式：按默认 ring 口径登记（失败原因写在 notes，不假装测过 corners）
+        mode: "ring",
+        bands: [],
+        cornerSpread: Number.NaN,
+        maxRange: Number.NaN,
+        maxSat: Number.NaN,
         notes: [`背景探针不可用：${message.slice(0, 160)}（按不合格处理，不静默放行）`]
       };
       backgroundChecks[angle] = failed;

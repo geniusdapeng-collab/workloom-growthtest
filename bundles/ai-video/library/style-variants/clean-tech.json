@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "workloom.style-variant/v1",
+  "id": "clean-tech",
+  "name": "干净科技版",
+  "positioning": "产品/科技/知识：冷净调、硬切、信息优先文案",
+  "platforms": ["抖音/快手", "视频号", "B站", "官网"],
+  "color": {
+    "profile": "cool-technical",
+    "lut": "look-cool-technical.cube",
+    "intensity": 0.7,
+    "lookLabel": "冷净精密",
+    "note": "屏幕白必须仍读作白；去饱和不压暗"
+  },
+  "transitions": {
+    "mode": "hard",
+    "fadeSec": 0,
+    "note": "硬切不打断信息密度；卖点与数据段不加入场动画"
+  },
+  "bgm": {
+    "mood": "干净可信",
+    "style": "corporate-clean",
+    "policy": "keep-dialogue",
+    "musicLevelDb": -25,
+    "targetLufs": -14,
+    "fadeInSec": 0.8,
+    "fadeOutSec": 1.0,
+    "section": "auto",
+    "note": "极简律动；人声是主角，音乐只做底噪衔接"
+  },
+  "cover": {
+    "template": "参数卡",
+    "at": 0.6,
+    "alignment": 8,
+    "marginRatio": 0.07,
+    "note": "上方压标题 + 参数式钩子；下方留出平台 UI 安全区"
+  },
+  "copy": {
+    "tone": "简洁理性",
+    "titleTemplate": "{title}｜{hook}",
+    "opening": "三个数据先说结论。",
+    "closing": "细节写在评论区置顶，需要的自取。",
+    "cta": "还有想看的参数，评论区点名",
+    "hashtags": ["#科技数码", "#产品实测", "#硬核科普"]
+  },
+  "subtitleStyle": {
+    "scene": "字幕",
+    "note": "中性无衬线、细描边；数字与单位不拆行"
+  }
+}

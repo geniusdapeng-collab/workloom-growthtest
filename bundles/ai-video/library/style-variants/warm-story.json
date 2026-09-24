@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "workloom.style-variant/v1",
+  "id": "warm-story",
+  "name": "暖调故事版",
+  "positioning": "情感/文旅/民宿/人物：暖调胶片、慢转场、留白文案",
+  "platforms": ["抖音/快手", "视频号", "小红书", "B站"],
+  "color": {
+    "profile": "warm-film",
+    "lut": "look-warm-film.cube",
+    "intensity": 0.75,
+    "lookLabel": "暖调胶片",
+    "note": "肤色友好、轻提黑位；调色在拼接之后、配乐之前（音轨不受影响）"
+  },
+  "transitions": {
+    "mode": "fade",
+    "fadeSec": 0.6,
+    "note": "慢入慢出，情绪连贯；适合叙事线"
+  },
+  "bgm": {
+    "mood": "温暖自在",
+    "style": "acoustic-warm",
+    "policy": "keep-dialogue",
+    "musicLevelDb": -23,
+    "targetLufs": -14,
+    "fadeInSec": 1.4,
+    "fadeOutSec": 2.0,
+    "section": "auto",
+    "note": "木质原声；人声出现时让位（ducking），母版 -14 LUFS"
+  },
+  "cover": {
+    "template": "留白题签",
+    "at": 0.32,
+    "alignment": 2,
+    "marginRatio": 0.1,
+    "note": "下半留白压两行题签（主标题 + 一句话钩子），与暖调画面同色温"
+  },
+  "copy": {
+    "tone": "温暖克制",
+    "titleTemplate": "{title}",
+    "opening": "有些地方，值得慢一点看。",
+    "closing": "收藏起来，等一个合适的周末。",
+    "cta": "想去的扣个「想去」，我把路线发你",
+    "hashtags": ["#旅行推荐", "#慢生活", "#周末去哪儿"]
+  },
+  "subtitleStyle": {
+    "scene": "字幕",
+    "note": "细描边、不上重底衬，字幕位置按平台安全区（抖音上抬 18%）"
+  }
+}

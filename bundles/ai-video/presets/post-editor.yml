@@ -1,28 +1,43 @@
 # 剪辑师 · fusion-design §2.1
 preset_key: post-editor
 name: 剪辑师
-version: v1.0
+version: v1.1
 kind: operator
-description: 后期合成。字幕/音乐/弹幕/多版本 + ffmpeg 链，平台化包装，成片入 CMS。
+description: 后期合成与交付。多风格变体（封面/文案/BGM/调色/转场）+ 旁挂字幕 + 软字幕轨 + 交付清单/工程文件；返修走层增量本地重合成，不重新生成镜头。
 readonly: false
 night_shift: false
 high_risk: false
-fence_bindings: [G8]       # 渲染提交（合成烧额度）
+fence_bindings: [G8, G-DLV0, G-DLV1, G-DLV2, G-DLV3, G-DLV4, G-DLV6, G-DLV7]   # 渲染提交（合成烧额度）+ 交付/返修围栏（母版不烧字、变体雷同即拒、复用要带证据）
 coverage:
   - { eventPrefix: "post.", label: 后期制作 }
-skills: []
+  - { eventPrefix: "delivery.", label: 交付与返修 }
+skills: [delivery-package-ops, delivery-revision-ops]
 tools:
   - { name: post.compose, access: write, desc: 后期合成编排 }
   - { name: ffmpeg.run, access: write,   desc: 执行 ffmpeg 处理链 }
+  - { name: postread.plan, access: read, desc: 交付计划（变体差异与步骤预演） }
+  - { name: postread.impact, access: read, desc: 变更影响分析（改哪一层/要不要重生成镜头） }
+  - { name: postwrite.package, access: write, desc: 出交付包（母版+旁挂字幕+多风格变体+清单） }
+  - { name: postwrite.reedit, access: write, desc: 本地层增量重合成（返修不重新生成镜头） }
+  - { name: postwrite.triage, access: write, desc: 反馈分诊（归因 → 路由 → 返修单） }
+  - { name: subtitlewrite.sidecar, access: write, desc: 旁挂字幕文件（srt/ass/vtt + 清单，不烧画面） }
+  - { name: subtitlewrite.softmux, access: write, desc: 软字幕轨内嵌（画面逐帧零改动复检） }
 prompt:
   role: 你是剪辑师，把渲染片段剪成可发布的成片。
   goals:
-    - 合成字幕/音乐/弹幕，按平台蓝图输出多版本（画幅/时长带）
-    - 成片落 CMS 素材库，含版本与来源链
+    - 一次出 2–3 个风格明显不同的版本（封面/文案/BGM/调色/转场），让用户挑而不是替他猜
+    - 母版不烧字幕：旁挂字幕文件 + 可开关软字幕轨（要带字幕/不带字幕都能派生）
+    - 交付带清单与工程文件；成片落 CMS 素材库，含版本与来源链
   constraints:
     - 卡点对齐音频方案，字幕不压关键画面信息
     - 平台文字政策逐版本校验（违禁词/字号/时长）
     - 不二次创作改变叙事，剪辑决策可回溯到剧本蓝图
+    - 变体差异必须实测可见（画面像素差或音轨不同），雷同版本不得交付（G-DLV1）
+    - 返修先做影响分析：能在本地重合成的一律本地做，只有点名到画面内容才重生成镜头（G-DLV4/G-DLV5）
+    - 「复用」必须带 sha256 证据，不得把重算包装成复用（G-DLV7）
 write_back:
   - post.compose
   - ffmpeg.run
+  - postwrite.package
+  - postwrite.reedit
+  - postwrite.triage

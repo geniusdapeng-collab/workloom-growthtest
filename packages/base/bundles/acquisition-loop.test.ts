@@ -199,15 +199,15 @@ describe("多领域融合：组合岗位编制裁决", () => {
     /**
      * 先校验不变式：组合编制 = 各包编制之和 − 被遮蔽的同名定义数（每个 preset_key 只留一个权威定义）。
      * 再校验该不变式算出的数量与对外口径（README/装配测试的 76 岗）一致——口径漂移时同时暴露两侧。
-     * 数量本身随各包编制演化（曾从 61 长到 70、72、73、74、75 —— 2026-09-22 新增 ai-video「BGM 配乐师」到 75，
-     * 2026-09-23 字幕师与配音师相继落地，总数 76），
+     * 数量本身随各包编制演化（曾从 61 长到 70、72、73、74，再到 75 —— 2026-09-23 新增 ai-video「字幕师」，
+     * 同日再新增 ai-video「配音师」，总数 76；2026-09-24 新增 ai-video「制片人／监制」（77）与「摄影指导」（78）），
      * 所以断言读的是算出来的值，而不是让维护者去猜。
      */
     const declared = VIEWS.reduce((sum, bundle) => sum + bundle.presets.size, 0);
     const shadowed = composed.shadowed.length;
     expect(keys.length).toBe(declared - shadowed);
     expect(shadowed).toBe(4);
-    expect(keys.length).toBe(76);
+    expect(keys.length).toBe(78);
   });
 
   it("同名岗位按主包声明落到权威归属包", () => {

@@ -16,6 +16,10 @@
  *   subtitle-cli danmaku    --in clip.mp4 --out out.mp4 --items danmaku.json [--opacity 0.85]
  *   subtitle-cli sticker    --in clip.mp4 --out out.mp4 --items stickers.json
  *   subtitle-cli karaoke    --in clip.mp4 --out out.mp4 --srt subs.srt [--srt-en subs.en.srt] [--timings words.json]
+ *   subtitle-cli sidecar    --out-dir dir [--in master.mp4] --srt subs.srt [--srt-en subs.en.srt] [--name film]
+ *                           [--platform 抖音/快手] [--brief brief.json] [--evidence-dir dir]
+ *   subtitle-cli softmux    --in master.mp4 --out master-softsub.mp4 --srt subs.srt [--srt-en subs.en.srt]
+ *                           [--lang chi] [--lang-en eng]        # 字幕轨可开关，画面零改动
  *   subtitle-cli best       --in clip.mp4 --out out.mp4 --srt subs.srt [--title "…"] [--min-score 80]
  *
  * 退出码：0 成功；2 用法错误；3 工具错误（code 见 SubtitleError）。
@@ -26,8 +30,8 @@ import fs from "node:fs";
 import process from "node:process";
 
 import {
-  SubtitleError, best, callTool, findRecipes, health, plan, renderDanmaku, renderKaraoke,
-  renderSticker, renderTitle, renderWithSubtitles, selectFonts,
+  SubtitleError, best, callTool, exportSidecars, findRecipes, health, parseSrt, plan, renderDanmaku,
+  renderKaraoke, renderSticker, renderTitle, renderWithSubtitles, selectFonts, softMux,
 } from "./core.mjs";
 
 function parseArgs(argv) {
@@ -261,6 +265,42 @@ async function main() {
       line(`  sha256 ${report.output.hash}`);
       return 0;
     }
+    case "sidecar": {
+      // 旁挂字幕交付：只出字幕文件（srt/ass/vtt + 清单），**不烧进画面**——带字幕/不带字幕留给后期决定。
+      const cues = flags.srt ? parseSrt(fs.readFileSync(flags.srt, "utf8")) : [];
+      const cuesEn = flags["srt-en"] ? parseSrt(fs.readFileSync(flags["srt-en"], "utf8")) : [];
+      const outcome = await exportSidecars({
+        input: typeof flags.in === "string" ? flags.in : null,
+        outputDir: typeof flags["out-dir"] === "string" ? flags["out-dir"] : ".",
+        name: typeof flags.name === "string" ? flags.name : null,
+        cues,
+        cuesEn,
+        titleText: typeof flags.title === "string" ? flags.title : "",
+        platform: typeof flags.platform === "string" ? flags.platform : null,
+        brief: readBrief(flags),
+        evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
+        analyze: flags["no-analyze"] !== true,
+      });
+      line(`旁挂字幕交付：${outcome.outputDir}`);
+      for (const file of outcome.files) {
+        line(`  ${file.path.split("/").pop()} · ${file.role}/${file.lang}/${file.format} · ${file.bytes}B · sha256 ${file.sha256.slice(0, 12)}`);
+      }
+      line(`  时间轴回读 ${outcome.manifest.timeline.readback.ass ? "ok" : "fail"} · 条数 ${outcome.manifest.timeline.cues} · 母版未被改动 ${outcome.manifest.source ? (outcome.manifest.source.untouched ? "ok" : "fail") : "n/a"}`);
+      line(`  清单：${outcome.manifestPath}`);
+      line(`  结论：母版不含字幕（burnedIn=false）；要用软轨走 softmux，要硬字幕走 burn`);
+      return outcome.passed ? 0 : 3;
+    }
+    case "softmux": {
+      const tracks = [];
+      if (flags.srt) tracks.push({ path: flags.srt, lang: typeof flags.lang === "string" ? flags.lang : "chi", title: "中文", default: true });
+      if (flags["srt-en"]) tracks.push({ path: flags["srt-en"], lang: typeof flags["lang-en"] === "string" ? flags["lang-en"] : "eng", title: "English", default: tracks.length === 0 });
+      const report = await softMux({ input: flags.in, output: flags.out, subtitles: tracks });
+      line(`软字幕轨：${report.output}`);
+      line(`  字幕轨 ${report.tracks.map((track) => `${track.lang}/${track.title}${track.default ? "(默认)" : ""}`).join("、")} · 编码 ${report.subtitleCodec}`);
+      line(`  复检：${report.checks.map((check) => `${check.kind}=${check.ok ? "ok" : "fail"}`).join(" ")}`);
+      line(`  sha256 ${report.sha256}`);
+      return 0;
+    }
     case "best": {
       const outcome = await best({
         input: flags.in,
@@ -284,7 +324,7 @@ async function main() {
     }
     default:
       process.stderr.write(
-        "用法：subtitle-cli <health|probe|analyze|fonts|recipes|plan|burn|title|danmaku|sticker|karaoke|best> [--flags]\n"
+        "用法：subtitle-cli <health|probe|analyze|fonts|recipes|plan|burn|title|danmaku|sticker|karaoke|sidecar|softmux|best> [--flags]\n"
         + "参见 bundles/ai-video/connectors/subtitle-bridge/README.md\n",
       );
       return 2;

@@ -53,7 +53,7 @@ const evaluate = (ruleId: string, params: Record<string, unknown> = {}, context:
 
 describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
   it("六条规则齐备，级别与基线口径正确", () => {
-    expect(fencePack.version).toBe("ai-video-subtitle/v2");
+    expect(fencePack.version).toBe("ai-video-subtitle/v3");
     expect(fencePack.rules.map((rule) => rule.rule_id)).toEqual([
       "G-SUB0", "G-SUB1", "G-SUB2", "G-SUB3", "G-SUB4", "G-SUB5", "G-SUB6",
     ]);
@@ -609,10 +609,12 @@ describe("岗位 / 技能 / 管线 / 对象四层引用", () => {
     expect(preset.tools.map((tool) => tool.name)).toEqual([...SUBTITLE_TOOLS]);
     expect(preset.tools.filter((tool) => tool.access === "write").map((tool) => tool.name)).toEqual([
       "subtitlewrite.plan", "subtitlewrite.burn", "subtitlewrite.title",
-      "subtitlewrite.danmaku", "subtitlewrite.sticker", "subtitlewrite.karaoke", "subtitlewrite.best",
+      "subtitlewrite.danmaku", "subtitlewrite.sticker", "subtitlewrite.karaoke",
+      "subtitlewrite.sidecar", "subtitlewrite.softmux", "subtitlewrite.best",
     ]);
     expect(preset.write_back).toEqual([
       "subtitlewrite.burn", "subtitlewrite.title", "subtitlewrite.danmaku", "subtitlewrite.sticker", "subtitlewrite.karaoke",
+      "subtitlewrite.sidecar", "subtitlewrite.softmux",
     ]);
     expect(preset.coverage.map((coverage) => coverage.eventPrefix)).toEqual(["subtitle."]);
   });
