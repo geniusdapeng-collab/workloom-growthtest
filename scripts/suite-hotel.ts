@@ -12,6 +12,7 @@ import { readFileSync, readdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { judge, type RuntimeRule } from "@workloom/base/fence-engine";
+import { composeWorkforce } from "@workloom/base/bundles";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
@@ -180,11 +181,16 @@ b("基线回归：R2 保底价熔断仍生效", () => {
 
 /* ================= C · 种子与运行态 ================= */
 const c = C("C");
-c("16 个酒店岗全部在编（组合编制共 72 岗）", async () => {
-  // 组合编制口径（获客主包 27 岗含视觉栈 2 + 酒店包 + 视频包）：总数 72（hotel 16 / ai-video 30 / geo-growth 26），其中酒店来源 16。
-  // 旧断言只认 16 会把组合编制的跨域岗位误判为缺编。
+c("16 个酒店岗全部在编（组合编制全员在编）", async () => {
+  /**
+   * 组合编制口径（hotel + ai-video + geo-growth，主包 geo-growth 裁决同名遮蔽）：
+   * 期望总数**从装配器实时推导**，不再写死数字——2026-09-24 实测 78 岗
+   * （历史写死值 72 已随岗位扩充漂移，导致本用例长期误报）。
+   * 种子走的是同一个 provisionComposedWorkforce（scripts/seed.ts），所以两者必然一致。
+   */
+  const expected = composeWorkforce("geo-growth").presets.size;
   const all = await q(`SELECT count(*) n FROM agents WHERE workspace_id=$1`, [WS]);
-  assert(Number(all.rows[0].n) === 72, `组合编制 agents=${all.rows[0].n}`);
+  assert(Number(all.rows[0].n) === expected, `组合编制 agents=${all.rows[0].n}（装配器期望 ${expected}）`);
   const hotel = await q(
     `SELECT count(*) n FROM agents WHERE workspace_id=$1 AND (meta->>'sourceBundleId' = 'hotel' OR meta->>'sourceBundleId' IS NULL)`,
     [WS],

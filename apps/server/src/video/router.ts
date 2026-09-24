@@ -16,7 +16,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { getAppPool, getGatewayPool } from "@workloom/db";
-import { gatewayAppendOnClient } from "@workloom/base/workdata";
+import { gatewayAppendOnClient, MockEmbedder, upsertMemoryInTx } from "@workloom/base/workdata";
 import {
   approve as approveRenderScript,
   create as createRenderScript,
@@ -42,7 +42,8 @@ export type { PollReport } from "./render-poller.js";
 import { dealRouter } from "./deal.js";
 import { getRun, startRun, startVideoProjectRun, StudioWorkerError } from "./studio-worker.js";
 import {
-  DeliveryError, deliveryJobStatus, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
+  DeliveryError, buildVariantPreferenceContent, deliveryJobStatus, deliveryPreferenceConfidence,
+  deliveryPreferenceMemoryId, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
   readDeliveryPackage, recordRevisionRequest, selectDeliveryVariant, startDeliveryRevision, triageDeliveryFeedback,
 } from "./delivery.js";
 
@@ -144,14 +145,22 @@ function deliveryRethrow(err: unknown): never {
 async function appendDeliveryEvent(
   ctx: { identity: { memberNo: string } },
   scope: Scope,
-  event: { objectType: string; objectId: string; action: string; after: Record<string, unknown>; basis: string[] },
+  event: {
+    objectType: string; objectId: string; action: string;
+    after: Record<string, unknown>; basis: string[];
+    /**
+     * 可选：同一事务内把这次动作沉淀成组织偏好记忆（evolve M3 偏好的写入侧）。
+     * 与事件同一 COMMIT（D16）：要么"动作 + 偏好"都留下，要么都不留。
+     */
+    preference?: { memoryId: string; content: string; confidence: number } | null;
+  },
 ): Promise<void> {
   const client = await getGatewayPool().connect();
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-    await gatewayAppendOnClient(client, { ...scope, actor: { id: ctx.identity.memberNo, type: "human" } }, {
+    const appended = await gatewayAppendOnClient(client, { ...scope, actor: { id: ctx.identity.memberNo, type: "human" } }, {
       who: { type: "human", id: ctx.identity.memberNo },
       context: {
         tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
@@ -161,6 +170,37 @@ async function appendDeliveryEvent(
       decision: { action: event.action, after: event.after, basis: event.basis },
       rule_impact: [],
     });
+    if (event.preference) {
+      /**
+       * 先取旧来源（`FOR UPDATE` 锁行）再写：`upsertMemoryInTx` 的 ON CONFLICT 是**覆盖**语义，
+       * 直接写会把历史归因冲掉（真机实测：第二次选择后 source_events 只剩最新一条）。
+       * 合并去重后最多留 20 条，偏好要能回答"这条口味是从哪几次选择长出来的"。
+       */
+      const prior = await client.query<{ source_events: string[] | null }>(
+        `SELECT source_events FROM org_memory WHERE memory_id = $1 FOR UPDATE`,
+        [event.preference.memoryId],
+      );
+      const mergedEvents = [...new Set([...(prior.rows[0]?.source_events ?? []), appended.eventId])]
+        .sort()
+        .slice(-20);
+      // 偏好内容经 workdata 的 maskText 脱敏后落库（与董事长反馈同一条路径）
+      await upsertMemoryInTx(client, scope, {
+        memoryId: event.preference.memoryId,
+        scope: "workspace",
+        kind: "preference",
+        content: event.preference.content,
+        sourceEvents: mergedEvents,
+        confidence: event.preference.confidence,
+      }, new MockEmbedder());
+      /**
+       * 置信度单调上调：`upsertMemoryInTx` 的 ON CONFLICT 只更新内容/来源，不动 confidence，
+       * 这里显式按"选择次数"抬到目标值（只升不降，避免一次误点把长期口味打下去）。
+       */
+      await client.query(
+        `UPDATE org_memory SET confidence = GREATEST(confidence, $2) WHERE memory_id = $1`,
+        [event.preference.memoryId, event.preference.confidence],
+      );
+    }
     await client.query("COMMIT");
   } catch (err) {
     await client.query("ROLLBACK").catch(() => undefined);
@@ -237,8 +277,33 @@ const deliveryRouter = router({
         action: "delivery.variant.selected",
         after: { variantId: selection.variantId, note: selection.note, at: selection.at },
         basis: ["用户在交付包里选择了风格变体（一个包多版本，选择即交付结论）"],
+        /**
+         * 选择结果回流组织偏好池：同一事务写入 preference 记忆，
+         * 之后每次 ask/agent/quest 执行前都会被注入（见 packages/runtime/src/loop.ts），
+         * 于是"用户爱暖调慢剪"这类口味会自然影响下一轮出片的变体默认值。
+         */
+        preference: {
+          memoryId: deliveryPreferenceMemoryId(scope.workspaceId, selection.variantId),
+          content: buildVariantPreferenceContent({
+            projectId: selection.projectId,
+            variantId: selection.variantId,
+            variantName: selection.variant?.name ?? null,
+            positioning: selection.variant?.positioning ?? null,
+            style: selection.variant?.style ?? null,
+            note: selection.note,
+          }),
+          confidence: deliveryPreferenceConfidence(selection.selectionCount),
+        },
       });
-      return selection;
+      return {
+        ...selection,
+        preference: {
+          memoryId: deliveryPreferenceMemoryId(scope.workspaceId, selection.variantId),
+          confidence: deliveryPreferenceConfidence(selection.selectionCount),
+          scope: "workspace" as const,
+          note: "已写入组织偏好池（下一次 ask/agent/quest 执行前注入；反复选择同一风格会逐步抬高置信度）",
+        },
+      };
     }),
 
   /** 反馈分诊：规则表判归因/受影响层/是否需重生成镜头；同时落返修单（可选关闭落单） */

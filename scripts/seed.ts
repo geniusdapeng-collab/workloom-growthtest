@@ -7,7 +7,7 @@
  * 用法：pnpm db:seed（读取 .env；幂等，可重复执行）
  *
  * 内容：demo 租户 / 云栖酒店工作区 / 3 人类成员 / 16 个基础 Agent preset 实例 +
- *      组合编制 72 岗（hotel 16 + ai-video 30 + geo-growth 26，同名遮蔽 4 处按主包裁决，
+ *      组合编制全员上岗（2026-09-24 实测 78 岗：hotel 16 + ai-video 36 + geo-growth 26，同名遮蔽 4 处按主包裁决，
  *      见 provisionComposedWorkforce；口径事实源为装配器运行结果，不在此手工维护）/
  *      一店一档（含 forbidden 硬约束 + 布草/断点/FAQ 字段组）/ 基线围栏 R1–R26（hotel-baseline/v4）装载 / 53 个组合官方技能 /
  *      2 触发器 / 昨夜夜班班次 / 100 条五元事件（哈希链）/ 审批样例 / 组织记忆

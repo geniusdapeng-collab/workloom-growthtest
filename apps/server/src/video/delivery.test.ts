@@ -16,8 +16,9 @@ import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  DeliveryError, latestFilmProjectPath, listDeliveryPackages, readDeliveryPackage,
-  readDeliveryArtifact, recordRevisionRequest, resolvePackageDir, selectDeliveryVariant, startDeliveryRevision,
+  DeliveryError, buildVariantPreferenceContent, deliveryPreferenceConfidence, deliveryPreferenceMemoryId,
+  latestFilmProjectPath, listDeliveryPackages, readDeliveryPackage, readDeliveryArtifact,
+  recordRevisionRequest, resolvePackageDir, selectDeliveryVariant, startDeliveryRevision,
 } from "./delivery.js";
 
 let root: string;
@@ -191,6 +192,67 @@ describe("选择变体与返修单", () => {
     const stored = JSON.parse(readFileSync(requestPath, "utf8")) as { triage: { layers: string[] }; by: string };
     expect(stored.triage.layers).toEqual(["audio"]);
     expect(stored.by).toBe("MEM-V01");
+  });
+});
+
+describe("选择结果 → 组织偏好池（evolve 写入侧）", () => {
+  it("偏好内容带齐风格轴与来源项目，措辞可被下一轮注入直接使用", () => {
+    const content = buildVariantPreferenceContent({
+      projectId: "VID-TEST-001",
+      variantId: "warm-story",
+      variantName: "暖调故事版",
+      positioning: "情感/文旅/民宿",
+      style: {
+        color: { profile: "warm-film", lut: "look-warm-film.cube", intensity: 0.75 },
+        bgm: { mood: "温暖自在", style: "acoustic-warm", policy: "keep-dialogue" },
+        transitions: { mode: "fade", fadeSec: 0.6 },
+        copyTone: "温暖克制",
+      },
+      note: "客户说这套更高级",
+    });
+    expect(content).toContain("【交付口味】");
+    expect(content).toContain("VID-TEST-001");
+    expect(content).toContain("暖调故事版");
+    // 不能写成 profile@强度：会被 PII 脱敏当邮箱（真机实测），用「（强度 …）」
+    expect(content).toContain("温暖自在");
+    expect(content).toContain("warm-film（强度 0.75）");
+    expect(content).not.toMatch(/[\w.-]+@[\w.-]+/);
+    expect(content).toContain("fade 0.6s");
+    expect(content).toContain("温暖克制");
+    expect(content).toContain("客户说这套更高级");
+    // 缺省轴兜底不伪造数值
+    const bare = buildVariantPreferenceContent({ projectId: "P", variantId: "clean-tech" });
+    expect(bare).toContain("不调色");
+    expect(bare).toContain("原声");
+    expect(bare).toContain("默认");
+  });
+
+  it("偏好记忆 id 按（工作区 × 变体）稳定：反复选同一风格是更新同一条，不堆新行", () => {
+    const a = deliveryPreferenceMemoryId("ws-video", "warm-story");
+    const b = deliveryPreferenceMemoryId("ws-video", "warm-story");
+    const c = deliveryPreferenceMemoryId("ws-other", "warm-story");
+    expect(a).toBe(b);
+    expect(a).not.toBe(c);
+    expect(a).toMatch(/^mem-pref-delivery-ws-video-warm-story$/);
+    // 非法字符收敛，避免脏 id 落库
+    expect(deliveryPreferenceMemoryId("ws/../x", "warm story")).toBe("mem-pref-delivery-ws----x-warm-story");
+  });
+
+  it("置信度随选择次数单调上调且有上限（留出人审上调空间）", () => {
+    expect(deliveryPreferenceConfidence(1)).toBe(0.5);
+    expect(deliveryPreferenceConfidence(3)).toBe(0.6);
+    expect(deliveryPreferenceConfidence(20)).toBe(0.9);
+    expect(deliveryPreferenceConfidence(0)).toBe(0.5);
+    expect(deliveryPreferenceConfidence(Number.NaN)).toBe(0.5);
+  });
+
+  it("selectDeliveryVariant 回传风格元数据与选择次数（供偏好写入用）", () => {
+    const first = selectDeliveryVariant({ dir: "VID-TEST-001", variantId: "warm-story", env: env() });
+    expect(first.projectId).toBe("VID-TEST-001");
+    expect(first.variant?.style?.color?.profile).toBe("warm-film");
+    expect(first.selectionCount).toBe(1);
+    const second = selectDeliveryVariant({ dir: "VID-TEST-001", variantId: "warm-story", env: env() });
+    expect(second.selectionCount).toBe(2);
   });
 });
 

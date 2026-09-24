@@ -133,6 +133,30 @@ post-cli reedit  --project <交付包>/film-project.json --patch patch.json
 | `bgm-bridge.mix` 让位混音挂死 | 音乐输入 `-stream_loop -1` 永不 EOF，侧链（原片音轨）先 EOF 时 `sidechaincompress` 等一个不来的帧：实测 0% CPU 挂 14 分钟（`-t` 无效，因为滤镜图不再产帧） | 侧链加 `apad`（两端都无限）+ 输出 `-t <片长>`；修复后同一片子混音从"挂死"变为秒级完成 |
 | `bgm-capability.test.ts` / `acquisition-loop.test.ts` 既有红灯 | 随仓兜底曲库（2026-09-23）与"制片人"岗位（2026-09-24）入库后，测试里写死的"单库假设"和"76 岗"未同步 | 断言收敛为可核实事实（自定义根 present=false、兜底库在位；组合编制 77 岗） |
 
+### 5.6 选择结果回流偏好池（2026-09-24 补：闭环另一半）
+
+交付包界面上的"选这个版本"不只是记录一次点击，而是**组织口味的一次采样**：
+
+```
+用户点选 → delivery.variant.selected 事件（五元账本，同一事务）
+        → org_memory(kind='preference', scope='workspace') 写入
+           内容：【交付口味】<项目> 选择了「暖调故事版」｜定位：情感/文旅｜
+                风格：调色 warm-film@0.75 · 配乐 温暖自在 · 转场 fade 0.6s · 文案口吻 温暖克制
+                后续同类题材出片时，把该风格作为变体集合的首选与默认
+           memory_id：mem-pref-delivery-<工作区>-<变体>（反复选择是**更新同一条**，不堆新行）
+           confidence：0.5 起、每次选择 +0.05、上限 0.9（只升不降，留人审上调空间）
+        → packages/runtime/src/loop.ts / ask.ts 执行前注入（loadActivePreferences + buildPreferenceBlock）
+        → 下一轮出片的提案与变体默认值自动贴合这口味（不重训任何模型）
+```
+
+纪律：
+
+- **与事件同一 COMMIT**（D16）：动作与偏好要么都留下，要么都不留；
+- **行业措辞写在行业层**（`apps/server/src/video/delivery.ts#buildVariantPreferenceContent`），
+  基座 `evolve` 只提供通用的偏好检索/注入与 `upsertMemoryInTx` 写入原语——底座行业零残留（D18）；
+- **偏好不是围栏**：口味类信号只进偏好池（主观通道），永远不编码进围栏 DSL；
+- 内容经 workdata `maskText` 脱敏后落库（与董事长反馈同一条路径）。
+
 ## 6. 接口与数据模型
 
 ### 6.1 工具面（工位 `127.0.0.1:9777`）
@@ -244,13 +268,22 @@ tsx scripts/tools/full-chain-film.mts --shots shotlist.json --project VID-1 --ou
 围栏：`bundles/ai-video/fences/ai-video-delivery.yml`（G-DLV0…G-DLV7）；字幕侧同步扩到
 `ai-video-subtitle/v3`（旁挂与软轨纳入 G-SUB0/2/3/5，不计入 G-SUB4 渲染配额）。
 
-## 10. 下一步（P1/P2 备选，未在本轮交付）
+## 10. 已交付与下一步
+
+已交付（原 P1 清单，2026-09-24 收口）：
+
+| 事项 | 落地位置 |
+|---|---|
+| 应用内"交付包"视图：变体对照（封面/文案/BGM/调色）+ 点选 + `delivery.variant.selected` 事件 | `apps/web/src/extensions/ai-video/pages/Delivery.tsx`（`?tab=delivery`） |
+| 应用内返修入口：自然语言 → `postwrite.triage` → patch → `postwrite.reedit`，进度与回执上屏 | 同页返修区 + `video.delivery.{triage,startRevision,job}` |
+| 偏好回流：选择结果写入 `org_memory(kind='preference')`，经执行前注入影响下一轮出片 | §5.6；`buildVariantPreferenceContent` / `deliveryPreferenceMemoryId` / `deliveryPreferenceConfidence` |
+
+下一步（尚未交付）：
 
 | 优先级 | 事项 | 价值 |
 |---|---|---|
-| P1 | 应用内"交付包"视图：列出变体（封面/文案/BGM/调色对照）+ 用户点选 + 选择事件 `delivery.variant.selected` | 把"让用户选"搬到产品面；为变体默认集合提供长期数据 |
-| P1 | 应用内返修入口：自然语言反馈 → 调 `postwrite.triage` → 生成 patch → `postwrite.reedit`，进度与回执上屏 | 让非工程用户也能走返修闭环 |
-| P1 | 偏回流：把"风格偏好/返修归因"接入 `packages/base/evolve` 的偏好池与错题本 | 反馈不只改这一支片 |
+| P1 | 返修归因接入考试院错题本（目前只进偏好池与账本） | 反复被打回的层沉淀成考题与技能迭代依据 |
+| P1 | 变体默认集合按偏好自动重排（当前偏好已注入上下文，但变体顺序仍固定） | 让"选过一次"直接改变下一轮的默认顺序 |
 | P2 | 变体差异阈值按题材校准（目前统一 4/255 visible） | 美食/纪实等"本就低对比"的题材减少误判 |
 | P2 | 音频层与调色层解耦（调色时音频流 copy），省掉"改调色必重算混音" | 少一次混音（约数秒到数十秒） |
 | P2 | 清理 vendor `PostProductionEngine` 的 HTML 版本路径 | 去掉与交付包重复的旧通路 |
