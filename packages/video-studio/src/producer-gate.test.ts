@@ -52,6 +52,35 @@ describe("AI 监制门", () => {
     }
   });
 
+  /**
+   * 真机事故（2026-09-24 晚）：prompt 环节只送产物**路径清单**，监制看不到正文，
+   * 于是以"字段与红线项无正文可核验"打回（score 58）——门变成了空转。
+   * 现在 json/text 产物正文按预算送审。
+   */
+  it("文本类产物把正文片段送审（监制能真的核字段与红线）", async () => {
+    const promptPath = join(tmpdir(), `judge-prompt-${randomUUID()}.txt`);
+    writeFileSync(promptPath, `【约束】9:16画幅，1080x1920\n${"平江路石拱桥，女主正面走近。".repeat(20)}`);
+    let sentBody = "";
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      sentBody = String(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ approved: true, score: 88, issues: [], suggestions: [], reason: "ok" }) } }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as unknown as typeof fetch;
+    try {
+      await reviewStage({
+        stage: "prompt", projectId: "VID-1",
+        artifacts: [{ path: promptPath, kind: "text", bytes: 2000 }],
+        deterministic: [], env, fetchImpl
+      });
+      expect(sentBody).toContain("平江路石拱桥");
+      expect(sentBody).toContain("产物正文");
+    } finally {
+      rmSync(promptPath, { force: true });
+    }
+  });
+
   it("rubric 覆盖所有环节且都有可判定的条目", () => {
     for (const [stage, rubric] of Object.entries(PRODUCER_RUBRICS)) {
       expect(rubric.length, `${stage} 至少要有一条评审要点`).toBeGreaterThan(0);

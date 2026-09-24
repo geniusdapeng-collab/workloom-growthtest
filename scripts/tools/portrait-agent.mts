@@ -17,7 +17,7 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPortraitPlan, loadCharacterEntry, reviewStage, runPortraitAgent } from "../../packages/video-studio/src/index.js";
+import { buildPortraitPlan, findAngleFile, loadCharacterEntry, reviewStage, runPortraitAgent } from "../../packages/video-studio/src/index.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const LIBRARY_ROOT = resolve(REPO_ROOT, process.env.HR_CHARACTER_LIBRARY ?? "var/media/characters");
@@ -137,8 +137,8 @@ async function main(): Promise<void> {
     const setDir = resolve(characterDir, target.dir);
     const produced = (target.angles ?? [])
       .map((angle) => {
-        const file = readdirSync(setDir).find((f) => f.startsWith(`${entry.name}-${angle}`) && /\.(png|jpe?g)$/i.test(f));
-        return file ? join(setDir, file) : null;
+        /** 与 character-archive 同口径：规范命名优先，允许任意前缀-<角度>（真机 2026-09-24 修复） */
+        return findAngleFile(setDir, entry.name, angle);
       })
       .filter((f): f is string => Boolean(f));
     const anchors = (target.anchors ?? []).map((p) => resolve(characterDir, p)).filter(existsSync);

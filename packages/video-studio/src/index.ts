@@ -15,3 +15,6 @@ export * from "./confirmation.js";
 export * from "./studio.js";
 export * from "./render-scripts.js";
 export * from "./stage-registry.js";
+export * from "./micromotion.js";
+export * from "./continuity.js";
+export * from "./gate-ledger.js";

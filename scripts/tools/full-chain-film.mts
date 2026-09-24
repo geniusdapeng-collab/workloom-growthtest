@@ -28,7 +28,10 @@ import {
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
-import { prepareShotPrompt, reviewStage, type ProducerVerdict } from "../../packages/video-studio/src/index.js";
+import {
+  applyMicromotion, appendGateEvent, auditContinuity, buildGateEvent, findAngleFile, prepareShotPrompt, reviewStage,
+  type GateCheck, type GateEvent, type PipelineGateStepKey, type ProducerVerdict
+} from "../../packages/video-studio/src/index.js";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
 const FFMPEG = process.env.WL_FFMPEG ?? "ffmpeg";
@@ -70,8 +73,12 @@ const RESUME = !flag("--no-resume");
 const DRY_RUN = flag("--dry-run");
 const ALLOW_FALLBACK_APPROVE = flag("--allow-fallback-approve");
 const STAGES = new Set(
-  // 两处默认阶段的并集：`cine-kb`（摄影知识库，T-2026-0924-0001）与 `mux`（软字幕轨收口，T-2026-0924-0070/0071）
-  arg("--stages", "cine-kb,spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover,mux").split(",").map((s) => s.trim()).filter(Boolean)
+  /**
+   * 默认阶段的并集：
+   *   `cine-kb`（摄影知识库）/ `continuity`（连贯性导演评审）/ `micromotion`（微动作增强，T-2026-0924-0001 第二次收口）
+   *   `mux`（软字幕轨收口，T-2026-0924-0070/0071）
+   */
+  arg("--stages", "cine-kb,continuity,micromotion,spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover,mux").split(",").map((s) => s.trim()).filter(Boolean)
 );
 /**
  * 字幕落地方式（2026-09-24 产品所有者口径）：
@@ -140,6 +147,9 @@ type StageRecord = {
   evidence: Record<string, unknown>;
   verdict: ProducerVerdict | null;
   note?: string;
+  /** 门事件专用：管线 step_key 与门编号（G5/G6/G7/G8） */
+  stepKey?: PipelineGateStepKey;
+  gate?: string;
 };
 const records: StageRecord[] = [];
 function record(rec: Omit<StageRecord, "at">): void {
@@ -148,6 +158,39 @@ function record(rec: Omit<StageRecord, "at">): void {
   appendFileSync(STAGE_LOG, `${JSON.stringify(full)}\n`, "utf8");
   const tag = full.ok ? (full.degraded ? "DEGRADED" : "ok") : "FAIL";
   log(`  ⇢ [${full.stage}${full.shotId ? ` ${full.shotId}` : ""}] ${tag}${full.cached ? "（复用）" : ""} ${full.ms}ms${full.artifact ? ` → ${full.artifact}` : ""}`);
+}
+
+/**
+ * 门事件记账（2026-09-24，G5/G6/G7/G8 的 step_key 级运行时组件）。
+ *
+ * 为什么需要：管线 yml 声明了四个按 step_key 记账的确认门，但运行时不落事件——
+ * 审计只能看到"环节调没调用"，看不到"门有没有被按名调用、判据是什么、谁放行的"。
+ * 现在每次门判定都往**同一个 stages.jsonl** 追加一条 `stage: "gate"` 记录
+ * （规范形状见 `packages/video-studio/src/gate-ledger.ts`），平台执行器与审计器都能按 step_key 检索。
+ */
+function recordGate(input: {
+  stepKey: PipelineGateStepKey;
+  sourceStage: string | null;
+  checks: GateCheck[];
+  shotIds?: string[];
+  softApproved?: boolean | null;
+  via?: GateEvent["via"];
+  score?: number | null;
+  reason?: string;
+  degraded?: boolean;
+  evidence?: Record<string, unknown>;
+}): GateEvent {
+  const event = buildGateEvent({ projectId: PROJECT, ...input });
+  appendGateEvent(STAGE_LOG, event);
+  records.push({
+    at: event.at, stage: "gate", shotId: input.shotIds?.length === 1 ? input.shotIds[0]! : null,
+    invoked: true, ok: event.ok, cached: false, degraded: event.degraded, attempt: 1, ms: 0, artifact: null,
+    evidence: { stepKey: event.stepKey, gate: event.gate, via: event.via, score: event.score, sourceStage: event.sourceStage, shotIds: event.shotIds, checks: event.checks, reason: event.reason, ...(event.evidence ?? {}) },
+    verdict: null, note: `门 ${event.gate}（${event.stepKey}）`, stepKey: event.stepKey, gate: event.gate
+  });
+  const tag = event.ok ? (event.degraded ? "DEGRADED" : "ok") : "FAIL";
+  log(`  ⇢ [gate ${event.gate} ${event.stepKey}] ${tag}${event.via === "llm" ? `（llm${event.score !== null ? ` score=${event.score}` : ""}）` : "（deterministic）"} — ${event.reason.slice(0, 140)}`);
+  return event;
 }
 
 /**
@@ -454,8 +497,14 @@ function loadCharacterRoot(root: string, library: Map<string, CharacterEntryLike
       const setDir = join(dir, active.dir);
       if (existsSync(setDir)) {
         for (const angle of active.angles) {
-          const hit = readdirSync(setDir).find((f) => f.startsWith(`${profile.name}-${angle}`) && /\.(png|jpe?g)$/i.test(f));
-          if (hit) files[angle] = join(setDir, hit);
+          /**
+           * 角度文件解析统一走 `findAngleFile`（2026-09-24 修复）：
+           * 早先这里按 `${profile.name}-${angle}` 前缀硬匹配，而随仓 1 号模特的
+           * `portraits/v3/` 文件名前缀是"平江路讲述人"、档案 name 是"陈卓" →
+           * 8 张定妆照全部匹配不到（G5 门当场亮红才发现）。
+           */
+          const hit = findAngleFile(setDir, profile.name, angle);
+          if (hit) files[angle] = hit;
         }
       }
     }
@@ -502,6 +551,88 @@ const lead = (() => {
 })();
 if (lead && characterRegistry.defaultModel && lead.id === characterRegistry.defaultModel) {
   log(`未显式指定模特 → 使用系统默认模特：${lead.name}（${lead.id}，1 号）`);
+}
+
+/* ---------- ⓪-0 G5 定妆照确认（step_key: g5-portrait-confirm） ---------- */
+/**
+ * 管线 yml 的 `g5-portrait-confirm` 门：确认"这组定妆照可用于本片"。
+ *
+ * CLI 口径 = **资产硬闸 + 定妆照监制记录**：
+ *   · 硬闸：角色档案在、四个必需角度齐备、单张 >50KB（占位图/失败图直接拦）；
+ *   · 监制记录：读角色目录 `reviews/*.json` 的**最近一次**定妆照评审（`portrait-agent review` 产出），
+ *     最近一次是"打回"就不放行；没有记录则如实标 degraded（说明这个门只做了确定性校验）。
+ * 与 §⑤ 的 `keyframe`/`shot` 门不同，G5 管的是**角色资产**，不是本片画面。
+ */
+if (!DRY_RUN) {
+  const requiredAngles = ["front", "threeQuarter", "closeup", "side"];
+  const published = lead ? requiredAngles.map((angle) => ({ angle, path: lead.files[angle] ?? "" })) : [];
+  const missing = published.filter((f) => !f.path || !existsSync(f.path));
+  /** 安全取字节数：缺失/空路径返回 0（真机 2026-09-24：空路径直接 statSync 抛 ENOENT 把整个运行打断） */
+  const sizeOf = (path: string): number => (path && existsSync(path) ? statSync(path).size : 0);
+  const tiny = published.filter((f) => sizeOf(f.path) > 0 && sizeOf(f.path) < 50_000);
+  const reviewFile = (() => {
+    if (!lead) return null;
+    const dir = join(lead.dir, "reviews");
+    if (!existsSync(dir)) return null;
+    const files = readdirSync(dir).filter((f) => f.endsWith(".json")).sort();
+    return files.length > 0 ? join(dir, files[files.length - 1]!) : null;
+  })();
+  const review = (() => {
+    if (!reviewFile) return null;
+    try {
+      return JSON.parse(readFileSync(reviewFile, "utf8")) as { at?: string; verdict?: { approved?: boolean; score?: number; reason?: string } };
+    } catch { return null; }
+  })();
+  const checks: GateCheck[] = lead
+    ? [
+        { id: "character-present", pass: true, detail: `角色 ${lead.name}（${lead.id}）`, hard: true },
+        {
+          id: "required-angles", pass: missing.length === 0, hard: true,
+          detail: missing.length === 0
+            ? `必需角度齐备：${requiredAngles.join("/")}`
+            : `缺角度或文件不存在：${missing.map((m) => m.angle).join("/")}`
+        },
+        {
+          id: "file-size", pass: tiny.length === 0, hard: true,
+          detail: tiny.length === 0
+            ? `四角度均 >50KB（${published.map((f) => `${f.angle}=${(sizeOf(f.path) / 1024).toFixed(0)}KB`).join(" ")}）`
+            : `以下角度文件过小（疑似占位图）：${tiny.map((f) => f.angle).join("/")}`
+        },
+        {
+          /** 附加信息（不参与硬闸）：档案里一共有多少角度可用——只有 4 个必需角度时也能拍，但选择面更窄 */
+          id: "archive-angles", pass: Object.keys(lead.files).length >= 4, hard: false,
+          detail: `档案可用角度 ${Object.keys(lead.files).join("/") || "无"}（共 ${Object.keys(lead.files).length} 个）`
+        },
+        ...(review
+          ? [{
+              id: "portrait-review", pass: review.verdict?.approved !== false, hard: true,
+              detail: `最近一次定妆照监制：${review.verdict?.approved === false ? "打回" : "放行"}（score=${review.verdict?.score ?? "?"}，${review.at ?? "无时间"}）`
+            }]
+          : [])
+      ]
+    : [{ id: "applicable", pass: true, detail: "镜头卡未涉及人物（空镜片）→ 定妆照门不适用", hard: false }];
+  const gate = recordGate({
+    stepKey: "g5-portrait-confirm",
+    sourceStage: "portrait",
+    checks,
+    /**
+     * 没有定妆照监制记录时**不冒充实质评审**：确定性闸照跑，但 degraded 置位，
+     * 让审计一眼看到"这个门这次只做了资产校验"。
+     */
+    degraded: Boolean(lead) && !review,
+    evidence: {
+      character: lead ? { id: lead.id, name: lead.name, angles: Object.keys(lead.files) } : null,
+      reviewFile,
+      reviewApproved: review?.verdict?.approved ?? null,
+      note: review ? "含定妆照监制评审记录" : "无定妆照监制记录：本次仅做资产硬闸（角度/尺寸/字节）"
+    },
+    reason: lead
+      ? (review ? undefined : "定妆照资产齐备（无监制评审记录，已标 degraded）")
+      : "本片无人物，定妆照门不适用"
+  });
+  if (!gate.approved && !ACCEPT_REJECTED.includes("G5")) {
+    throw new Error(`G5 定妆照确认未通过：${gate.reason}（确需继续请显式传 --accept-rejected G5）`);
+  }
 }
 
 /* ================= 关键帧 / 视频 出图出片 ================= */
@@ -779,7 +910,117 @@ if (STAGES.has("cine-kb")) {
   }
 }
 
-/* ---------- ① 脚本 + 提示词交付闸（监制：prompt） ---------- */
+/* ---------- ① 连贯性导演评审（监制：continuity，step_key: continuity） ---------- */
+/**
+ * 管线 yml 的 `continuity` 环节（位置与 yml 一致：**在提示词融合之前**）。
+ *
+ * 为什么放这么前：跨镜问题（同一场戏换造型、时段倒退、方向相反、道具凭空出现）在**镜头卡**层面就能查出来，
+ * 等到出片才发现要烧一整轮渲染额度。确定性检查在 `packages/video-studio/src/continuity.ts`（6 问 + 5 维评分），
+ * LLM 只补"机检查不出的语义跳变"。硬阻断按 yml 纪律**直接打回**（不花钱）。
+ */
+if (STAGES.has("continuity")) {
+  const started = Date.now();
+  const report = auditContinuity(shots as unknown as Array<Record<string, unknown>>, {
+    targetSeconds: ONLY.length > 0 ? null : totalSeconds,
+    projectId: PROJECT
+  });
+  const checks: GateCheck[] = report.checks.map((c) => ({ id: c.id, pass: c.pass, detail: c.detail, hard: c.hard }));
+  if (!DRY_RUN) {
+    const verdict = await reviewStage({
+      stage: "continuity", projectId: PROJECT,
+      artifacts: [{ path: SHOTS_FILE, kind: "json", note: "镜头卡（跨镜一致性评审对象）" }],
+      deterministic: checks,
+      context: {
+        shotCount: report.shotCount,
+        totalSeconds: report.totalSeconds,
+        sixQuestions: report.questions.map((q) => `${q.question} → ${q.answer}（${q.note}）`),
+        fiveDimensions: report.dimensions.map((d) => `${d.name} ${d.score}/20`),
+        deterministicScore: report.score,
+        discipline: "硬阻断（打回）：造型无理由不一致、总时长不符、台词重复。其余为软信号，进问题清单但不阻断；"
+          + "跨镜判断只看镜头卡文本，不要索要额外画面证据。"
+      },
+      env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+    });
+    record({
+      stage: "continuity", shotId: null, invoked: true, ok: verdict.approved, cached: false, degraded: verdict.degraded,
+      attempt: 1, ms: Date.now() - started, artifact: SHOTS_FILE,
+      evidence: { score: verdict.score, deterministicScore: report.score, blocking: report.blocking, dimensions: report.dimensions, questions: report.questions },
+      verdict
+    });
+    if (!verdict.approved && !ACCEPT_REJECTED.includes("continuity")) {
+      log(`⛔ 连贯性导演评审未放行：${verdict.reason}（${verdict.issues.slice(0, 3).join("；")}）`);
+      log(`   纪律：本环节在**花钱之前**硬阻断。确需带瑕疵继续，请显式传 --accept-rejected continuity（会留痕）。`);
+      process.exit(4);
+    }
+    if (!verdict.approved) log(`⚠ 连贯性导演评审被打回，但已显式声明带瑕疵放行（--accept-rejected continuity）`);
+  } else {
+    record({
+      stage: "continuity", shotId: null, invoked: false, ok: report.approved, cached: false, degraded: false,
+      attempt: 0, ms: Date.now() - started, artifact: SHOTS_FILE,
+      evidence: { dryRun: true, deterministicScore: report.score, blocking: report.blocking }, verdict: null
+    });
+    log(`连贯性（dry-run）：确定性 5 维 ${report.score}/100，硬阻断 ${report.blocking.length} 条`);
+  }
+}
+
+/* ---------- ①-1 微动作增强（step_key: micromotion，5 路：面部/身体/眼神/呼吸/融合） ---------- */
+/**
+ * 管线 yml 的 `micromotion` 环节。
+ *
+ * **与 yml 的顺序差异（显式声明）**：yml 把它排在 G6 之后；这里**前移到提示词融合之前**——
+ * 增强的本质是改镜头卡（action 字段），融合之后再改就会绕开刚通过的 G6 审核
+ * （"审过的提示词 ≠ 最终提交的提示词"）。前移后 G6 审的就是含微动作的最终稿。
+ */
+if (STAGES.has("micromotion")) {
+  const started = Date.now();
+  const traces: Array<Record<string, unknown>> = [];
+  let empty = 0;
+  for (const shot of shots) {
+    const { card, trace } = applyMicromotion(shot as unknown as Record<string, unknown>);
+    traces.push(trace as unknown as Record<string, unknown>);
+    if (trace.applied.length === 0 && !trace.skipped) empty += 1;
+    if (!trace.skipped) {
+      /** 就地替换镜头卡：后续 spec 融合、关键帧 platePrompt、视频提交读到的都是增强后的 action */
+      const index = shots.findIndex((s) => s.shotId === shot.shotId);
+      if (index >= 0) shots[index] = card as unknown as ShotCard;
+    }
+  }
+  const channelsOk = traces.every((t) => (t.applied as unknown[]).length >= 4 || Boolean(t.skipped));
+  const bounded = traces.every((t) => Number(t.charDelta ?? 0) <= 200);
+  const languageOnly = !/f\/|ISO|帧率|焦段/.test(traces.map((t) => String(t.text ?? "")).join(" "));
+  const checks: GateCheck[] = [
+    { id: "five-channels", pass: channelsOk, hard: true, detail: channelsOk ? "每镜 5 路微动作齐备（面部/身体/眼神/呼吸/融合）" : "存在镜头不足 4 路微动作" },
+    { id: "bounded-delta", pass: bounded, hard: true, detail: bounded ? `增量均在界内（最大 ${Math.max(0, ...traces.map((t) => Number(t.charDelta ?? 0)))} 字）` : "微动作增量超过 200 字上限" },
+    { id: "language-only", pass: languageOnly, hard: true, detail: "微动作只写画面语言（不含 f 值/ISO/帧率等技术参数）" }
+  ];
+  const verdict = flag("--micromotion-review") && !DRY_RUN
+    ? await reviewStage({
+        stage: "micromotion", projectId: PROJECT,
+        artifacts: [{ path: SHOTS_FILE, kind: "json" }],
+        deterministic: checks,
+        context: { traces: traces.slice(0, 8).map((t) => ({ shotId: t.shotId, text: t.text })) },
+        env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+      })
+    : null;
+  const ok = checks.every((c) => !c.hard || c.pass) && (verdict ? verdict.approved : true);
+  const traceFile = join(WORK_DIR, `micromotion-${PROJECT}.json`);
+  if (!DRY_RUN) writeFileSync(traceFile, `${JSON.stringify({ at: stamp(), projectId: PROJECT, traces }, null, 2)}\n`, "utf8");
+  record({
+    stage: "micromotion", shotId: null, invoked: true, ok, cached: false, degraded: Boolean(verdict?.degraded),
+    attempt: 1, ms: Date.now() - started, artifact: DRY_RUN ? null : traceFile,
+    evidence: {
+      channels: traces.map((t) => ({ shotId: t.shotId, applied: (t.applied as unknown[]).length, skipped: t.skipped ?? null, charDelta: t.charDelta })),
+      llmReviewed: Boolean(verdict)
+    },
+    verdict
+  });
+  if (empty > 0 || !ok) {
+    throw new Error(`微动作增强未通过自检：空增强 ${empty} 镜${verdict && !verdict.approved ? `；监制：${verdict.reason}` : ""}`);
+  }
+  log(`微动作增强：${shots.length} 镜 × 5 路（面部/身体/眼神/呼吸/融合）已并入 action${verdict ? `，监制${verdict.approved ? "放行" : "打回"}` : "（未启用 LLM 复评）"}`);
+}
+
+/* ---------- ② 脚本 + 提示词交付闸（监制：prompt） ---------- */
 if (STAGES.has("spec")) {
   const started = Date.now();
   const checks: Array<{ id: string; pass: boolean; detail: string; hard?: boolean }> = [];
@@ -814,15 +1055,26 @@ if (STAGES.has("spec")) {
      * 模型每次只能满足一半，于是"这一版背身、下一版换脸"反复打回。
      * 这里在**花钱之前**拦下来：要求拆镜或改成"正面接近/正面站定"。
      */
-    const actionText = `${shot.action ?? ""} ${(shot.camera_movement ?? "")}`;
+    /**
+     * 朝向互斥闸的判据口径（2026-09-24 真机二次校准）：
+     *   · **先剥否定**：「不转身」「不指物」里的"转身"是禁止项，早先被当成要求项（假阳性）；
+     *   · **再判顺序**：带时间顺序的动作（先…再…／随后／最后／停下后）是**分步执行**，
+     *     不是同刻互斥——"走三步后停下、侧身回眸看向镜头"是正常镜头语言，
+     *     真出问题的是"全程正面行进 + 转身侧身"这种没有先后交代的写法。顺序动作降级为提示。
+     */
+    const actionRaw = `${shot.action ?? ""} ${(shot.camera_movement ?? "")}`;
+    const actionText = actionRaw.replace(/(不|没有|勿|避免|不要|禁止)[^，。；、,;]{0,12}/g, " ");
     const wantsFront = /面向镜头|正对镜头|正脸|直视镜头|眼神交流|看向镜头/.test(actionText);
     /** 注意：只把"身体转向"算作互斥；"转头/扭头看镜头"是正常小动作，不算（2026-09-24 修正） */
     const wantsTurn = /转身|回眸|侧身|侧转|背对|背身|转正脸|转回/.test(actionText);
+    const sequenced = /先[^。；]{0,24}(再|随后|然后)|随后|然后|之后|最后|再转身|再转回|停下(后|之后)?|停留一拍|走(三|两)步后/.test(actionRaw);
     checks.push({
-      id: `pose-contradiction:${shot.shotId}`, pass: !(wantsFront && wantsTurn), hard: true,
-      detail: wantsFront && wantsTurn
+      id: `pose-contradiction:${shot.shotId}`, pass: !(wantsFront && wantsTurn && !sequenced), hard: true,
+      detail: wantsFront && wantsTurn && !sequenced
         ? "同一镜同时要求「面向镜头/眼神交流」与「转身/回头/侧身」——动作互斥，模型只能满足一半（真机 SC-02 连续 4 次被打回）。请拆成两镜，或改成「正面站定/正面走近」的重述。"
-        : (wantsTurn ? "含转身/回眸（无正面要求，属可接受的动态）" : "无朝向互斥")
+        : wantsFront && wantsTurn && sequenced
+          ? "含转身/回眸与正面要求，但有明确时间顺序（先…再…）→ 属分步动作，不判互斥；建议在提示词里保留顺序词"
+          : (wantsTurn ? "含转身/回眸（无正面要求或已否定，属可接受的动态）" : "无朝向互斥")
     });
     /**
      * 场景先验风险闸（软信号，2026-09-24 SC-02 badcase 的**真正根因**）：
@@ -841,8 +1093,14 @@ if (STAGES.has("spec")) {
         : "无已知构图先验冲突"
     });
     /** 动作复杂度预算（软信号）：5 秒内节拍过多会让模型每次只满足一部分，表现为"这版动作对、下版表情对" */
-    const beats = (actionText.match(/然后|随后|接着|再|边[^，。]{0,6}边|同时|先[^，。]{0,4}再/g) ?? []).length
-      + actionText.split(/[，,；;]/).filter((s) => s.trim().length > 1).length;
+    /**
+     * 计拍只算**宏观动作节拍**（2026-09-24 真机）：微动作增强会在 action 末尾追加
+     * 5 路微动作（面部/眼神/身体/呼吸/融合，用「；」分隔），把它算进节拍会让每镜
+     * 平白多出 5–6 拍（真机 15→21），监制据此打回；微动作是质感层，不是叙事节拍。
+     */
+    const macroAction = actionRaw.split("【微动作】")[0] ?? actionRaw;
+    const beats = (macroAction.match(/然后|随后|接着|再|边[^，。]{0,6}边|同时|先[^，。]{0,4}再/g) ?? []).length
+      + macroAction.split(/[，,；;]/).filter((s) => s.trim().length > 1).length;
     /**
      * 节拍预算**只作参考信息，不进 PASS/FAIL 清单**（2026-09-24 修正）：
      * 放进确定性检查时，监制会把它当硬闸用（真机：9 个节拍直接打回，而 9 与 8 的差别并不构成缺陷）。
@@ -874,13 +1132,33 @@ if (STAGES.has("spec")) {
       title: shotlist.title, shots: shots.length, rateFail,
       /** 节拍预算：只报数不拦（监制可据情权衡，不作 PASS/FAIL） */
       motionBudget: motionBudgetNotes,
-      poseContradictionRule: "同一镜「面向镜头」与「转身/侧身/背身」互斥；「桥/栏杆/船/河 + 指物 + 正面」属高漂移先验，建议改正面走近或删指物"
+      poseContradictionRule: "同一镜「面向镜头」与「转身/侧身/背身」互斥；「桥/栏杆/船/河 + 指物 + 正面」属高漂移先验，建议改正面走近或删指物",
+      /**
+       * 监制口径说明（2026-09-24 真机修正）：把"哪些是信息、哪些是判据"写清楚——
+       * 早先监制把 advisory 的节拍数当硬闸用（21 拍直接打回），而节拍预算的产品口径是"只报数不拦"。
+       */
+      advisoryRule: "motionBudget 是**参考信息，不构成打回依据**（产品口径：节拍数只报数不拦）；"
+        + "打回只能依据：交付闸/字数/语速/朝向互斥/构图先验这些确定性结论，或你把正文逐条读出来的实质缺陷。"
+        + "微动作段（action 里【微动作】之后）是质感层，不参与节拍与动作复杂度判断。"
     }, env: ENV,
     allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
   });
   record({
     stage: "prompt-review", shotId: null, invoked: true, ok: verdict.approved, cached: false, degraded: verdict.degraded,
     attempt: 1, ms: verdict.ms, artifact: join(PROMPT_DIR, "spec-report.json"), evidence: { score: verdict.score }, verdict
+  });
+  /** G6 提示词审核（step_key: g6-prompt-confirm）——把 prompt-review 的裁决按门记账 */
+  recordGate({
+    stepKey: "g6-prompt-confirm",
+    sourceStage: "prompt-review",
+    checks,
+    shotIds: shots.map((s) => s.shotId),
+    softApproved: verdict.approved,
+    via: verdict.via,
+    score: verdict.score,
+    degraded: verdict.degraded,
+    reason: verdict.reason,
+    evidence: { issues: verdict.issues, suggestions: verdict.suggestions, artifacts: `${PROMPT_DIR}/${PROJECT}` }
   });
   if (!verdict.approved) {
     log(`⛔ 监制未放行提示词环节：${verdict.reason}（${verdict.suggestions.join("；")}）`);
@@ -973,6 +1251,44 @@ if (STAGES.has("plates")) {
 /* ---------- ③ 逐镜视频（监制：shot） ---------- */
 if (STAGES.has("videos")) {
   /**
+   * G7 预生产最终确认（step_key: g7-preproduction）。
+   *
+   * 位置：**关键帧全部放行之后、第一次提交渲染之前**。这是"花钱之前的最后一道门"：
+   * 确认提示词稿与关键帧稿都齐备且都放行过，才允许把请求发给 Seedance。
+   * 判据全部看**产物 + 历史裁决**（支持分段重跑：只跑 videos 时，plate/prompt 的放行记录在 stages.jsonl 里）。
+   */
+  const gateHistory = readStageHistory();
+  const promptReady = shots.every((s) => {
+    const file = join(PROMPT_DIR, `${s.shotId}.txt`);
+    return existsSync(file) && readFileSync(file, "utf8").trim().length >= 1200;
+  });
+  const plateReady = shots.every((s) => {
+    const plate = join(PLATE_DIR, `${s.shotId}-plate.png`);
+    return existsSync(plate) && statSync(plate).size > 50_000;
+  });
+  const promptApproved = historyApproved(gateHistory, "prompt-review") || historyApproved(records, "prompt-review");
+  const plateApproved = shots.every((s) => gateHistory.some((r) => r.stage === "keyframe" && r.shotId === s.shotId && r.ok));
+  const micromotionReady = !STAGES.has("micromotion") || shots.every((s) => String(s.action ?? "").includes("【微动作】"))
+    || gateHistory.some((r) => r.stage === "micromotion" && r.ok);
+  const g7 = recordGate({
+    stepKey: "g7-preproduction",
+    sourceStage: "keyframe",
+    shotIds: shots.map((s) => s.shotId),
+    checks: [
+      { id: "prompt-files", pass: promptReady, hard: true, detail: promptReady ? `${shots.length} 镜提示词齐备且 ≥1200 字` : "有镜头缺提示词或字数不足 1200" },
+      { id: "plate-files", pass: plateReady, hard: true, detail: plateReady ? `${shots.length} 镜关键帧文件齐备（>50KB）` : "有关键帧缺失或过小" },
+      { id: "prompt-approved", pass: promptApproved, hard: true, detail: promptApproved ? "提示词环节有放行裁决（历史/本轮）" : "提示词环节无放行裁决" },
+      { id: "plates-approved", pass: plateApproved, hard: true, detail: plateApproved ? "每镜关键帧均有放行裁决" : "有镜头关键帧未放行" },
+      { id: "micromotion-applied", pass: micromotionReady, hard: false, detail: micromotionReady ? "微动作增强已并入镜头卡（或本轮未启用）" : "镜头卡未见微动作增强标记" }
+    ],
+    evidence: { promptReady, plateReady, promptApproved, plateApproved, micromotionReady }
+  });
+  if (!g7.approved && !ACCEPT_REJECTED.includes("G7")) {
+    log(`⛔ G7 预生产最终确认未通过：${g7.reason}`);
+    process.exit(5);
+  }
+
+  /**
    * 参考图口径（`docs/character-archive-design.md` 附录 A.2）：**默认不往每镜塞定妆照**。
    * 真机复验：影棚灰底定妆照当参考图会把"美颜 + 柔光箱"的风格带进成片
    * （细节 58.6 vs 实景帧 1204.2、饱和 0.369 vs 0.205）。人物一致性改由 **首帧 = 该镜关键帧** 承担
@@ -1008,6 +1324,29 @@ if (STAGES.has("videos")) {
         attempt: 1, ms: verdict.ms, artifact: clip, evidence: info, verdict,
         note: verdict.approved ? "复用既有产物（幂等）+ 复检通过" : "复用产物复检未过 → 重新渲染"
       });
+      /**
+       * G8 的**复用复核**（step_key: g8-render-submit，mode=recheck）：
+       * 复用产物这次并没有真的"提交渲染"，但提交判据（提示词字数/无 f 值/画幅约束/时长/首帧锚点）
+       * 仍然可以按当前产物复核一遍——审计要能看到"这一单当时满足提交条件"，而不是因为走了复用分支
+       * 就完全查不到 G8。复核不通过只告警不拦截（复用是否放行由上面的 shot 复检决定）。
+       */
+      const reusePrompt = existsSync(join(PROMPT_DIR, `${shot.shotId}.txt`)) ? readFileSync(join(PROMPT_DIR, `${shot.shotId}.txt`), "utf8") : "";
+      const plate = join(PLATE_DIR, `${shot.shotId}-plate.png`);
+      const g8Recheck = recordGate({
+        stepKey: "g8-render-submit",
+        sourceStage: "shot",
+        shotIds: [shot.shotId],
+        checks: [
+          { id: "prompt-length", pass: reusePrompt.trim().length >= 1200, hard: true, detail: `提示词 ${reusePrompt.trim().length} 字（交付口径 ≥1200）` },
+          { id: "no-hard-params", pass: !/f\/\d/.test(reusePrompt), hard: true, detail: /f\/\d/.test(reusePrompt) ? "提示词正文出现 f 值（KB 纪律：正文只写画面语言）" : "正文不含 f 值等技术参数" },
+          { id: "aspect-constraint", pass: /【约束】/.test(reusePrompt) && reusePrompt.includes(ASPECT), hard: true, detail: `含【约束】与画幅 ${ASPECT}` },
+          { id: "duration-limit", pass: duration > 0 && duration <= 30, hard: true, detail: `单镜时长 ${duration}s（上限 30s）` },
+          { id: "clip-on-disk", pass: existsSync(clip) && statSync(clip).size > 100_000, hard: true, detail: `成片片段 ${(statSync(clip).size / 1024 / 1024).toFixed(1)}MB` },
+          { id: "plate-size", pass: !existsSync(plate) || statSync(plate).size > 50_000, hard: false, detail: existsSync(plate) ? `关键帧 ${(statSync(plate).size / 1024).toFixed(0)}KB` : "无关键帧文件" }
+        ],
+        evidence: { mode: "recheck", note: "复用产物复核：本次未向渲染服务提交", seconds: duration, cached: true }
+      });
+      if (!g8Recheck.approved) log(`  ⚠ ${shot.shotId} G8 复用复核存在未过项（复用放行以上方复检裁决为准）：${g8Recheck.reason.slice(0, 120)}`);
       if (verdict.approved) continue;
       log(`↻ ${shot.shotId} 既有成片复检未过（${verdict.reason}），重新渲染`);
       log(`  （复用判据：${actual.toFixed(2)}s / ${info.width}x${info.height}）`);
@@ -1041,6 +1380,41 @@ if (STAGES.has("videos")) {
         const firstFrame = hosted ?? (existsSync(plate) ? dataUrl(plate) : undefined);
         if (!hosted && existsSync(plate)) {
           log(`  ⚠ ${shot.shotId} 无有效托管 URL，退回 base64 首帧（真人题材大概率被隐私校验拒）`);
+        }
+        /**
+         * G8 渲染提交审批（step_key: g8-render-submit）——**花钱之前**的逐镜门。
+         *
+         * 与 §⑤ 的 `shot` 门（生成之后再评审）不同，G8 管的是"这一单该不该提交"：
+         * 提示词是否达到交付口径、有没有把 f 值等技术参数写进正文（KB 纪律）、画幅约束是否在场、
+         * 首帧锚点是否存在、以及本镜是否在知情放行名单里。不通过就不提交（不烧额度）。
+         */
+        const promptText = readFileSync(join(PROMPT_DIR, `${shot.shotId}.txt`), "utf8");
+        const g8 = recordGate({
+          stepKey: "g8-render-submit",
+          sourceStage: "shot",
+          shotIds: [shot.shotId],
+          checks: [
+            { id: "prompt-length", pass: promptText.trim().length >= 1200, hard: true, detail: `提示词 ${promptText.trim().length} 字（交付口径 ≥1200）` },
+            { id: "no-hard-params", pass: !/f\/\d/.test(promptText), hard: true, detail: /f\/\d/.test(promptText) ? "提示词正文出现 f 值（KB 纪律：正文只写画面语言，f 值只进 trace）" : "正文不含 f 值等技术参数" },
+            { id: "aspect-constraint", pass: /【约束】/.test(promptText) && promptText.includes(ASPECT), hard: true, detail: `含【约束】与画幅 ${ASPECT}` },
+            { id: "duration-limit", pass: duration > 0 && duration <= 30, hard: true, detail: `单镜时长 ${duration}s（上限 30s）` },
+            { id: "first-frame", pass: Boolean(hosted) || existsSync(plate), hard: true, detail: hosted ? `首帧用 Ark 托管 URL（${basename(hosted)}）` : existsSync(plate) ? "首帧退回本地关键帧 base64（隐私校验风险，已记录）" : "既无托管 URL 也无关键帧" },
+            { id: "plate-size", pass: !existsSync(plate) || statSync(plate).size > 50_000, hard: false, detail: existsSync(plate) ? `关键帧 ${(statSync(plate).size / 1024).toFixed(0)}KB` : "无关键帧文件" }
+          ],
+          evidence: {
+            model: VIDEO_MODEL, seconds: duration, attempt,
+            promptFingerprint: createHash("sha256").update(attemptPrompt).digest("hex").slice(0, 12),
+            promptChars: promptText.trim().length
+          }
+        });
+        if (!g8.approved && !ACCEPT_REJECTED.includes(shot.shotId) && !ACCEPT_REJECTED.includes("G8")) {
+          log(`  ⏭ ${shot.shotId} G8 未批准提交（${g8.reason.slice(0, 120)}）→ 不提交，避免白烧额度`);
+          record({
+            stage: "shot", shotId: shot.shotId, invoked: false, ok: false, cached: false, degraded: false, attempt,
+            ms: Date.now() - started, artifact: null, evidence: { gateBlocked: "g8-render-submit", reason: g8.reason }, verdict: null,
+            note: "G8 渲染提交审批未通过：未向渲染服务提交"
+          });
+          break;
         }
         const submitted = await arkVideo({
           prompt: attemptPrompt,

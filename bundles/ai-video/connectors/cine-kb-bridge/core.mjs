@@ -254,9 +254,26 @@ export function parseApertureRange(text) {
   return { min: Math.min(...nums), max: Math.max(...nums) };
 }
 
-/** 档位表命中：给定光圈区间，取覆盖它的那一档（用于把 f 值换成画面效果关键词） */
+/**
+ * 档位表命中：给定光圈区间，取**覆盖最多**的那一档（用于把 f 值换成画面效果关键词）。
+ *
+ * 2026-09-24 真机三轮校准：早先取"第一个有交集的档位"，于是一个跨档的区间会被最小那一档代言——
+ * 夜景收尾镜 f/1.4–f/2.8 命中了 f/1.2–f/1.4 档，画面语言变成"奶油般虚化、梦幻光斑、**主体悬浮感**"，
+ * 监制据此打回（夜景人物"漂浮"是明确的翻车信号）。改为按区间重叠长度取档：
+ * f/1.4–f/2.8 与 f/1.8–f/2.0 重叠 0.2，胜过其余候选 → 得到"柔和虚化、主体突出、电影感"。
+ * 完全无重叠（区间落在档位缝隙）时退回第一个有交集的档，保持旧行为不变。
+ */
 export function apertureStopFor(apertureKnowledge, range) {
   if (!apertureKnowledge || !range) return null;
+  let best = null;
+  let bestOverlap = 0;
+  for (const stop of apertureKnowledge.stops) {
+    const r = parseApertureRange(stop.fRange);
+    if (!r) continue;
+    const overlap = Math.min(range.max, r.max) - Math.max(range.min, r.min);
+    if (overlap > bestOverlap) { best = stop; bestOverlap = overlap; }
+  }
+  if (best) return best;
   return apertureKnowledge.stops.find((stop) => {
     const r = parseApertureRange(stop.fRange);
     return r && range.min <= r.max && range.max >= r.min;
@@ -875,6 +892,29 @@ function phraseFor(pick) {
   return pick.en ? `${zh}（${pick.en}）` : zh;
 }
 
+/**
+ * KB 行里的**占位符**必须在进提示词之前落成具体元素。
+ *
+ * 知识库里有模板行，例如 CINE-001「固定机位观察」原文是
+ * 「固定机位，镜头完全静止，画面内**［元素］**自行运动」——占位符直接下发，
+ * 模型会把它当字面文本（真机监制打回："[元素] 未实例化"）。
+ * 这里按卡片已有元素填：灯笼 / 水面与倒影 / 摇橹船 / 往来行人 / 人物与光影；
+ * 一个都推不出来时用"画面内元素"兜底（去掉方括号，避免字面占位符进入提示词）。
+ */
+function resolvePlaceholders(phrase, ctx) {
+  if (!/\[[^\]\n]{1,12}\]/.test(phrase)) return { phrase, changed: false };
+  const candidates = [];
+  if (/灯笼/.test(ctx.text)) candidates.push("灯笼");
+  if (/水面|河|湖|倒影|波纹/.test(ctx.text)) candidates.push("水面与倒影");
+  if (/船|乌篷|摇橹/.test(ctx.text)) candidates.push("摇橹船");
+  if (/行人|游客|人群/.test(ctx.text)) candidates.push("往来行人");
+  if (/花瓣|柳絮|落叶/.test(ctx.text)) candidates.push("飘落的花叶");
+  if (candidates.length === 0) candidates.push("画面内元素");
+  let index = 0;
+  const filled = phrase.replace(/\[[^\]\n]{1,12}\]/g, () => candidates[Math.min(index++, candidates.length - 1)]);
+  return { phrase: filled, changed: filled !== phrase };
+}
+
 /* ================= 意图 → 知识行（确定性注入表） ================= */
 
 /**
@@ -956,11 +996,32 @@ const INJECTION_RULES = [
   { field: "props", id: "reflection", when: (c) => c.mirrorWater && !c.rain, topic: "PHYS-001", row: "镜面倒影" },
   { field: "props", id: "water-ripple", when: (c) => c.water && c.watercraft && !c.snow, topic: "PHYS-001", row: "湖面微澜" },
   { field: "props", id: "drizzle", when: (c) => c.rain && !c.heavyRain, topic: "PHYS-001", row: "毛毛细雨" },
-  { field: "props", id: "steam-food", when: (c) => c.food && c.steam, topic: "PHYS-001", row: "咖啡热气" },
-  { field: "props", id: "silk", when: (c) => c.silk, topic: "PHYS-002", row: "丝绸光泽流动" },
-  { field: "props", id: "food-texture", when: (c) => c.food, topic: "PHYS-002", row: "油亮酱汁" },
+  /**
+   * 蒸汽行（2026-09-24 真机三轮校准）：PHYS-001 §2.8「蒸汽」的**提示词写法示例是咖啡专用**
+   * （"热气从咖啡杯口袅袅升起 … steam rising from a cup of coffee"），
+   * 早先只要有"食物+蒸汽"就注入它 → 糖粥/汤面场景的提示词里出现"咖啡杯"（真机监制据此打回）。
+   * 现在只在场景真是咖啡语境时注入；中餐/汤食的蒸汽由镜头卡自己的 props/action 描述承担
+   * （KB 缺口：缺一行中餐蒸汽，已在三轮审计文档登记）。
+   */
+  { field: "props", id: "steam-coffee", when: (c) => c.food && c.steam && /咖啡|拿铁|咖啡杯|espresso|latte/i.test(c.text), topic: "PHYS-001", row: "咖啡热气" },
+  /**
+   * 丝绸光泽归**服装材质**而不是道具（真机监制打回："丝绸表面光泽随动作流动"被当成道具串场）。
+   * 旗袍/缎面属于人物造型的一部分，写进 costume 才不会被读成画面里的独立物体。
+   */
+  { field: "costume", id: "silk", when: (c) => c.silk, topic: "PHYS-002", row: "丝绸光泽流动" },
+  /**
+   * 食物质感行只在**真的有酱/汁/炖/烤**时注入（真机 2026-09-24 三轮校准）：
+   * 早先只要命中"食物"就注入"酱汁油亮挂壁" → 桂花糖粥/海棠糕的镜头里出现"酱汁"，
+   * 监制按"字段模板串场"打回。
+   */
+  { field: "props", id: "food-texture", when: (c) => c.food && /酱|汁|炖|卤|烤|油亮|挂壁|油光/.test(c.text), topic: "PHYS-002", row: "油亮酱汁" },
   { field: "makeup", id: "skin-texture", when: (c) => c.person && (c.closeup || c.personSkin), topic: "PHYS-002", row: "真实皮肤（通用）" },
-  { field: "props", id: "lantern-glow", when: (c) => c.lantern, topic: "PHYS-001", row: "烛光特写" },
+  /**
+   * 烛火特写要求画面里**真有火焰**（烛光/蜡烛/篝火/火锅），灯笼不算（真机 2026-09-24 校准）：
+   * 白天支巷挂红灯笼的镜头被注入"烛火小而稳定…暖光晕开"，监制按道具串场打回。
+   * 灯笼场景的光效由 LIGHT-003 的电影感夜景/光斑虚化承担。
+   */
+  { field: "props", id: "candle-glow", when: (c) => c.candle, topic: "PHYS-001", row: "烛光特写" },
 
   /* ---------- 画质基线 ---------- */
   { field: "baseline", id: "clean-commercial", when: (c) => c.cleanLook && !c.filmGrain, topic: "OPTICS-004", row: "商业级干净画面" },
@@ -1032,7 +1093,12 @@ export function injectionContext(card) {
     aerial: has(/无人机|航拍|俯瞰|aerial|drone/i),
     staticCamera: has(/固定机位|静止|固定镜头/),
     eyeLevel: has(/平视|eye[- ]level/),
-    lookBack: has(/回眸|回头|回望|转头/),
+    /**
+     * 回头类动作只认**回眸/回头/回望**（2026-09-24 三轮校准）：
+     * "转头"大量出现在造型描述里（"发丝随转头轻摆"），早先据此注入"行走中回头看向镜头"，
+     * 与卡片写明的"全程正脸、不转身"直接冲突（真机监制据此打回）。
+     */
+    lookBack: has(/回眸|回头|回望/),
     framing: framingHit ?? null,
     framingKnown: Boolean(framingHit),
     jiangnan: has(/江南|水乡|月白|黛青|白墙|青石/),
@@ -1124,7 +1190,9 @@ export function enrichShotCard(kb, card, options = {}) {
     const field = rule.field;
     if (!field) continue;
     if (aperture && field === "depth_of_field") continue; // 光圈已占该字段
-    byField.set(field, [{ pick: row, phrase: phraseFor(row) }]);
+    /** 占位符实例化（[元素] → 灯笼/水面与倒影/…）：模板行必须落成具体画面元素才能进提示词 */
+    const resolved = resolvePlaceholders(phraseFor(row), ctx);
+    byField.set(field, [{ pick: row, phrase: resolved.phrase, placeholderResolved: resolved.changed }]);
   }
   for (const [field, list] of byField) {
     const addition = list.map((x) => x.phrase).join("；");
@@ -1134,7 +1202,8 @@ export function enrichShotCard(kb, card, options = {}) {
     const apertureMeta = list.find((x) => x.apertureMeta)?.apertureMeta;
     applied.push({
       field, from: original.slice(0, 80), added: addition.slice(0, 160), topics: list.map((x) => x.pick.topicId),
-      ...(apertureMeta ? { aperture: apertureMeta.range, matchedBy: apertureMeta.matchedBy, advisor: true } : {})
+      ...(apertureMeta ? { aperture: apertureMeta.range, matchedBy: apertureMeta.matchedBy, advisor: true } : {}),
+      ...(list.some((x) => x.placeholderResolved) ? { placeholderResolved: true } : {})
     });
   }
   const params = {

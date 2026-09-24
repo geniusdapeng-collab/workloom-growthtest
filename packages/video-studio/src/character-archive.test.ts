@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   allocateReferenceSlots,
+  findAngleFile,
   impactOfVersionChange,
   listPortraitVersions,
   loadCharacterLibrary,
@@ -36,6 +37,28 @@ function makeLibrary(root: string, id: string, name: string, options: { version?
 }
 
 describe("人物档案库：装载与版本", () => {
+  /**
+   * 真机 bug（2026-09-24）：随仓 1 号模特的档案 name 是"陈卓"，
+   * 但 portraits/v3 下的文件名是"平江路讲述人-front.png"（沿用上一代素材前缀）→
+   * 严格前缀匹配时 8 张定妆照全部解析不到，G5 门亮红才发现。
+   */
+  it("文件名前缀与档案名不一致时，仍能按角度后缀解析到定妆照", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wl-angle-"));
+    writeFileSync(join(dir, "平江路讲述人-front.png"), "png");
+    writeFileSync(join(dir, "平江路讲述人-threeQuarter.png"), "png");
+    expect(findAngleFile(dir, "陈卓", "front")).toBe(join(dir, "平江路讲述人-front.png"));
+    expect(findAngleFile(dir, "陈卓", "threeQuarter")).toBe(join(dir, "平江路讲述人-threeQuarter.png"));
+    // 角度不存在 → null（不许拿别的角度顶替）
+    expect(findAngleFile(dir, "陈卓", "side")).toBeNull();
+  });
+
+  it("规范命名优先于回退命名", () => {
+    const dir = mkdtempSync(join(tmpdir(), "wl-angle-prio-"));
+    writeFileSync(join(dir, "平江路讲述人-front.png"), "png");
+    writeFileSync(join(dir, "陈卓-front.png"), "png");
+    expect(findAngleFile(dir, "陈卓", "front")).toBe(join(dir, "陈卓-front.png"));
+  });
+
   it("装载档案并解析 active 定妆照集的角度文件", () => {
     const root = mkdtempSync(join(tmpdir(), "wl-archive-"));
     makeLibrary(root, "presenter", "平江路讲述人");

@@ -18,12 +18,15 @@
 
 export type ProducerStage =
   | "script"
+  | "continuity"
+  | "micromotion"
   | "prompt"
   | "keyframe"
   | "shot"
   | "compose"
   | "color"
   | "subtitle"
+  | "mux"
   | "danmaku"
   | "bgm"
   | "cover"
@@ -86,6 +89,28 @@ export const PRODUCER_RUBRICS: Record<ProducerStage, string[]> = {
     "不含红线词（科幻/微观等与 brief 无关的意象），无 [object Object]",
     "场景与人物解耦：定妆照只描述人，场景只由镜头提示词给"
   ],
+  /**
+   * 连贯性导演评审（2026-09-24 接入）：跨镜头看"还是不是同一支片子"。
+   * 6 问 + 5 维与 `packages/video-studio/src/continuity.ts` 的确定性检查同源，
+   * LLM 只负责"机检查不出来的语义跳变"（例如同一场景里空间关系讲不通）。
+   */
+  continuity: [
+    "人物同一性：六镜是同一个人、同一套造型（服装/妆造/发型无可解释变化）",
+    "空间连续性：同一场所的空间锚点（河道/桥/船/建筑/巷道）连续，转场有交代",
+    "时间与光线推进：时段单向推进或显式闪回，不出现时间错乱",
+    "动作与视线连续：相邻镜的运动方向与视线读得通，没有来回折返",
+    "道具状态连续：关键道具（碗/勺/船/灯笼/伞）的出现与消失都有动作交代",
+    "节奏与情绪：总时长对齐目标，情绪曲线有起承转收，结尾收得住"
+  ],
+  /**
+   * 微动作增强（2026-09-24 接入）：5 路（面部/身体/眼神/呼吸/融合）是否真的落到提示词里。
+   */
+  micromotion: [
+    "五路微动作齐备：面部（眉/嘴角）、眼神（注视点与眨眼）、身体（重心/肩线）、呼吸（与时长对齐）、融合（与台词节拍对齐）",
+    "微动作是**画面语言**（可被摄影机拍到），不是情绪形容词堆砌",
+    "微动作与宏观动作不冲突（不出现'站在原地走两步'这类互斥描述）",
+    "增量有界：微动作补充不把提示词撑到影响交付闸（增量 ≤200 字）"
+  ],
   keyframe: [
     "画面里的人物与角色档案/定妆照是同一张脸、同一发型与服装",
     "是纯写实影像（非插画/3D/CG），皮肤有真实质感不塑料",
@@ -121,6 +146,17 @@ export const PRODUCER_RUBRICS: Record<ProducerStage, string[]> = {
     "字幕在安全区内（避开平台 UI 遮挡区与画面主体面部）",
     "字体/字号/描边与题材匹配，可现度达标（Δ 超过阈值）",
     "时间轴与台词逐条对齐，无错字与断句事故"
+  ],
+  /**
+   * 软字幕轨收口（2026-09-24 补登记）。这个环节一直是**默认阶段**（`mux`），
+   * 但因为一直没人跑到它就没人发现 rubric 缺失——真机第一次跑到即 TypeError，
+   * 把整条交付链打断在最后一步。补上判据。
+   */
+  mux: [
+    "软字幕轨版可播放，字幕轨可开关（画面与声音轨逐帧 copy、零改动）",
+    "时长与母版一致（±0.05s），无重新编码导致的画质劣化",
+    "旁挂字幕文件（srt/ass/vtt + 清单）随交付目录齐备，语言标注正确",
+    "字幕轨内容与旁挂文件一致（不是两份各说各话）"
   ],
   danmaku: [
     "弹幕不遮挡主体面部与字幕带，密度不过载（并发未超上限）",
@@ -379,6 +415,33 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       content.push({ type: "image_url", image_url: { url: `data:${mimeOf(attachPath)};base64,${bytes.toString("base64")}` } });
     } catch (err) {
       log(`[producer][${stage}] 读取图像失败（跳过）：${image.path} — ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  /**
+   * **文本类产物正文**也要给监制（2026-09-24 真机）：
+   * 早先只送 `- [text] /path (2296KB)` 这样的清单，监制看不到正文，
+   * 于是对"字段是否模板默认值 / 有没有红线词 / 有没有 [object Object]"只能回一句
+   * "无正文可核验"——要么误放行、要么以"无法核实"打回（真机 prompt 环节 58 分打回）。
+   * 现在按预算把 json/text 产物正文片段送进去（单文件 1600 字、总量 12000 字），
+   * 图像信息优先级不变（图像在前，文本在后）。
+   */
+  const TEXT_EVIDENCE_PER_FILE = 1600;
+  const TEXT_EVIDENCE_TOTAL = 12_000;
+  const textArtifacts = [
+    ...options.artifacts.filter((a) => a.kind === "json"),
+    ...options.artifacts.filter((a) => a.kind === "text")
+  ];
+  let textBudget = TEXT_EVIDENCE_TOTAL;
+  for (const artifact of textArtifacts) {
+    if (textBudget <= 0) break;
+    try {
+      const raw = readFileSync(artifact.path, "utf8");
+      const limit = Math.min(TEXT_EVIDENCE_PER_FILE, textBudget);
+      const clipped = raw.length > limit ? `${raw.slice(0, limit)}\n…（已截断；原文 ${raw.length} 字）` : raw;
+      textBudget -= clipped.length;
+      content.push({ type: "text", text: `以下是产物正文（${artifact.kind}）：${artifact.path}\n${clipped}` });
+    } catch (err) {
+      log(`[producer][${stage}] 读取文本产物失败（跳过）：${artifact.path} — ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 

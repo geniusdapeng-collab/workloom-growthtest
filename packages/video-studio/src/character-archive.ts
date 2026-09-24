@@ -68,8 +68,19 @@ export const REQUIRED_PORTRAIT_ANGLES = ["front", "threeQuarter", "closeup", "si
 
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
 
-/** 在目录里找某角度的图：`<name>-<angle>.png` 或 `<name>-<angle>-v2.png`（含 asset:// 直写） */
-function findAngleFile(dir: string, name: string, angle: string): string | null {
+/**
+ * 在目录里找某角度的图。
+ *
+ * 首选规范命名 `<name>-<angle>.png` / `<name>-<angle>-v2.png`；
+ * **回退口径**（2026-09-24 真机发现）：按"任意前缀-<角度>"匹配。
+ * 起因：随仓分发的 1 号模特 `chen-zhuo` 档案里 `name` 是"陈卓"，
+ * 但 `portraits/v3/` 下的文件是"平江路讲述人-front.png"（沿用上一代素材的文件名前缀）——
+ * 严格按档案名匹配时 8 张定妆照**全部匹配不到**，于是"角色有定妆照"这件事对所有消费者都不存在
+ * （G5 门因此亮红、图生图锚点为空，而链路表面上一切正常）。
+ * 文件名前缀不是身份的唯一来源，档案 `name` 才是；因此这里允许前缀不同、以角度后缀为准。
+ * 导出供 CLI/工位复用（避免各处再写一套匹配规则）。
+ */
+export function findAngleFile(dir: string, name: string, angle: string): string | null {
   if (!existsSync(dir)) return null;
   let entries: string[];
   try {
@@ -78,9 +89,14 @@ function findAngleFile(dir: string, name: string, angle: string): string | null 
     return null;
   }
   const exact = `${name}-${angle}`;
+  const suffix = new RegExp(`-${angle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:[-.]|$)`, "i");
   const candidates = entries
-    .filter((f) => IMAGE_EXT.test(f) && (f.startsWith(`${exact}.`) || f.startsWith(`${exact}-`)))
-    .sort();
+    .filter((f) => IMAGE_EXT.test(f) && (f.startsWith(`${exact}.`) || f.startsWith(`${exact}-`) || suffix.test(f)))
+    .sort((a, b) => {
+      // 规范命名优先；同为回退命名时取文件名字典序最后一个（版本号更大的排后面）
+      const rank = (f: string) => (f.startsWith(`${exact}.`) || f.startsWith(`${exact}-`) ? 1 : 0);
+      return rank(a) - rank(b) || a.localeCompare(b);
+    });
   return candidates.length > 0 ? join(dir, candidates[candidates.length - 1]!) : null;
 }
 
