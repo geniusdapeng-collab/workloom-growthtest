@@ -131,6 +131,14 @@ export function auditContinuity(shots: Array<Record<string, unknown>>, options: 
   const checks: ContinuityCheck[] = [];
   const totalSeconds = shots.reduce((sum, s) => sum + (Number(s.duration ?? 0) || 0), 0);
   const targetSeconds = options.targetSeconds ?? null;
+  /**
+   * **真实素材段**（卡里有 `photo`）：画面是实拍照片，没有人物的造型/动作/视线可查。
+   * 造型一致性这类"同一个人跨镜同款"的硬闸对它们不适用——必须排除，
+   * 否则"实拍图没有 costume 字段"会被误判成"换款"（2026-09-25 新增真图题材时暴露）。
+   */
+  const isPhotoShot = (s: Record<string, unknown>): boolean => String(s.photo ?? "").trim().length > 0;
+  const photoIds = shots.filter(isPhotoShot).map((s) => String(s.shotId ?? ""));
+  const characterShots = shots.filter((s) => !isPhotoShot(s));
 
   /* ── ① 人物同一性：造型**核心签名**（主服装 + 主色）跨镜一致（显式换装除外） ──
    * 真机校准（2026-09-24）：六张卡片写的是同一件"月白色苏式改良旗袍"，
@@ -138,18 +146,20 @@ export function auditContinuity(shots: Array<Record<string, unknown>>, options: 
    * 用全文比对会把正常的分镜写法判成"换造型"，所以只比核心签名；
    * 细节差异降级为软信号列出来，交给导演/监制判断。
    */
-  const cores = shots.map((s) => costumeCore(s));
+  const cores = characterShots.map((s) => costumeCore(s));
   const coreKeys = [...new Set(cores.map((c) => `${c.garment ?? "?"}|${c.color ?? "?"}`))];
   const declaresWardrobeChange = shots.some((s) => /换装|更衣|换上|脱下|换上另一套/.test(`${text(s, "action")} ${text(s, "director_instruction")}`));
   const costumePass = coreKeys.length <= 1 || declaresWardrobeChange;
-  const detailNotes = cores.map((c, i) => `${ids[i]}:${c.garment ?? "未标注服装"}${c.color ? `·${c.color}` : ""}${c.accessories.length > 0 ? `·${c.accessories.join("/")}` : ""}`);
+  const characterIds = characterShots.map((s) => String(s.shotId ?? ""));
+  const detailNotes = cores.map((c, i) => `${characterIds[i]}:${c.garment ?? "未标注服装"}${c.color ? `·${c.color}` : ""}${c.accessories.length > 0 ? `·${c.accessories.join("/")}` : ""}`);
+  const photoNote = photoIds.length > 0 ? `；真实素材段 ${photoIds.join("/")} 不参与造型判定（实拍画面）` : "";
   checks.push({
     id: "costume-consistency",
     pass: costumePass,
     hard: true,
     detail: costumePass
       ? (coreKeys.length === 1
-          ? `${shots.length} 镜造型核心一致（${coreKeys[0]}）；细节：${detailNotes.join("，")}`
+          ? `${characterShots.length} 个人物镜造型核心一致（${coreKeys[0]}）；细节：${detailNotes.join("，")}${photoNote}`
           : "存在多套造型，但卡片显式声明了换装动作")
       : `造型核心出现 ${coreKeys.length} 组（${coreKeys.join(" / ")}），且无换装动作声明——同一个人在同一场戏里换款（真机高危项）`,
     shots: ids

@@ -36,6 +36,7 @@ import {
   type RunInput,
   type StudioPortraitConfig,
 } from "@hyperreality/video-studio";
+import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 
 /* ================= 可配项（环境变量） ================= */
 
@@ -468,6 +469,20 @@ export function startRun(scope: Scope, input: RunInput): string {
         });
       }
       const approved = PRODUCER_MODE === "auto" ? true : Boolean(producerVerdict?.approved);
+      /**
+       * 门外账本字段（2026-09-25）：把平台门按 **step_key** 记账，与 CLI 运行时同一套口径。
+       * 能一一对应的门（G5/G6/G7）在事件 payload 里带 `stepKey` 与规范化 `gateEvent`；
+       * 未知/未映射门返回 null，payload 保持原样（**不猜映射**，审计一眼能看出"这个门没有 step_key"）。
+       */
+      const gateRecord = buildServerGateRecord({
+        gate,
+        vendorType: String(req.vendorType ?? ""),
+        projectId: input.projectId,
+        runId: entry.runId,
+        approved,
+        verdict: producerVerdict,
+        producerMode: PRODUCER_MODE
+      });
       const autoClient = await getAppPool().connect();
       try {
         await autoClient.query("BEGIN");
@@ -482,7 +497,7 @@ export function startRun(scope: Scope, input: RunInput): string {
           object: { type: gateObj.type, id: objectId },
           decision: {
             action: gateObj.action,
-            after: {
+            after: withGateLedger({
               gate: req.gate, vendorType: req.vendorType, runId: entry.runId, title: req.title,
               producerMode: PRODUCER_MODE,
               approved,
@@ -493,7 +508,7 @@ export function startRun(scope: Scope, input: RunInput): string {
                     suggestions: producerVerdict.suggestions.slice(0, 5), reason: producerVerdict.reason
                   }
                 : { autoApproved: true }),
-            },
+            }, gateRecord),
             basis: PRODUCER_MODE === "auto"
               ? ["HR_PRODUCER=auto（应急口径）：内部准备门无条件放行，产出作为过程与时间线留痕"]
               : [`AI 监制门（${producerStage}）：确定性硬闸 + 模型评审后${approved ? "放行" : "打回重跑"}；人审只保留给花钱与对外动作`],

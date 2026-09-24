@@ -1301,6 +1301,8 @@ export async function mix({
   evidenceDir = null, bins = resolveBinaries(), workDir = null, keepWork = false,
   licenseReviewed = true, commercialUse = true,
   section = "full", sectionStartSec = null, sectionEndSec = null, filmClimaxOverrideSec = null,
+  /** 显式剪辑网格（秒）：由成片方给出真实剪辑点，优先于从音轨起音"猜"剪辑点（2026-09-25 真机） */
+  cutTimes = null, bpmOverride = null, bpmStrategy = "recipe",
 }) {
   if (!AUDIO_POLICIES.includes(policy)) {
     throw new BgmError(`未知分层策略：${policy}（可用：${AUDIO_POLICIES.join(", ")}）`, "bad_request");
@@ -1330,10 +1332,29 @@ export async function mix({
   const work = workDir ?? (await tempDir("bgm-mix-"));
   await fsp.mkdir(work, { recursive: true });
   const voice = await detectVoiceBandSegments({ input, duration, bins });
-  const cuts = align ? (await detectCuts({ input, bins })).cuts : [];
+  /**
+   * 剪辑点来源（2026-09-25 真机）：`cutTimes` 有值就用它（成片方最清楚自己的剪辑网格——
+   * 例如每镜 5s 硬切），否则退回 `detectCuts()` 从音轨起音反推。
+   * 起因：快剪片里"音频起音"会把台词音节当成剪辑点（36 个 0.5s 级起音），
+   * 于是 BPM 反推全部落空、退回 100BPM 默认值，卡点指标对任何片子都报同一组数字、永远判未对齐。
+   */
+  const explicitCuts = Array.isArray(cutTimes) && cutTimes.length > 0
+    ? cutTimes.map((at) => ({ at: Number(at), score: 1 })).filter((cut) => Number.isFinite(cut.at))
+    : null;
+  const cuts = explicitCuts ?? (align ? (await detectCuts({ input, bins })).cuts : []);
+  /** BPM：显式 > 剪辑驱动（按真实剪辑网格反推）> 传入值/默认 100 */
+  const baseBpm = Number(bgmBpm ?? 100);
+  const tempoChoice = (() => {
+    if (bpmOverride != null) return { bpm: Number(bpmOverride), source: "explicit" };
+    if (bpmStrategy === "cut-driven" && cuts.length > 1) {
+      const derived = deriveTempoFromCuts({ cuts, baseBpm });
+      return { bpm: derived.bpm, source: derived.source, note: derived.note ?? null };
+    }
+    return { bpm: baseBpm, source: "recipe" };
+  })();
   const grid = align
-    ? alignBeatGrid({ bpm: Number(bgmBpm ?? 100), cuts })
-    : { bpm: Number(bgmBpm ?? 100), offsetSec: 0, cuts: [], meanAbsErrorMs: null, verdict: "disabled", method: "disabled" };
+    ? alignBeatGrid({ bpm: tempoChoice.bpm, cuts })
+    : { bpm: tempoChoice.bpm, offsetSec: 0, cuts: [], meanAbsErrorMs: null, verdict: "disabled", method: "disabled" };
 
   /**
    * 选段：`section=auto|climax|calm|full` 或显式 `section_start_sec/section_end_sec`。
@@ -1641,6 +1662,24 @@ export async function mix({
     "-t", String(round(duration, 3)), duckedPath,
   ], { label: "ffmpeg(ducked-music)", timeoutMs: 900_000 });
   const duckedProbe = await probeMedia(duckedPath, { bins });
+  /**
+   * 让位深度的**正确测法**（2026-09-25 真机）：用同一条音乐链再渲一版"**不挂侧链**"的对照，
+   * 在同一组人声窗里比较 `对照 − 让位后` —— 这才是"侧链压了多少 dB"。
+   * 旧口径（让位后的人声窗 − 安静窗）测的其实是**曲子自身的能量起伏**：
+   * 实测同一段片子换曲子/改 `--ducking`（8→40dB），旧口径只在 2.3–7.8dB 之间漂移，
+   * 监制据此反复打回"让位不足"，而真实侧链深度根本没被量到。
+   */
+  let controlPath = null;
+  if (sidechainSource) {
+    controlPath = path.join(work, "control-music.wav");
+    await runBin(bins.ffmpeg, [
+      "-hide_banner", "-v", "error", "-y",
+      "-i", input, "-i", playPath,
+      "-filter_complex", `[1:a]${musicChain},atrim=0:${round(duration, 3)},asetpts=N/SR/TB[ctl]`,
+      "-map", "[ctl]", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2",
+      "-t", String(round(duration, 3)), controlPath,
+    ], { label: "ffmpeg(control-music)", timeoutMs: 600_000 });
+  }
 
   // ③ 合流（BGM + 声音床）
   const premasterPath = path.join(work, "premaster.wav");
@@ -1715,13 +1754,24 @@ export async function mix({
   };
   const duckedInVoice = await levelOf(duckedPath, windows.voice);
   const duckedInQuiet = await levelOf(duckedPath, windows.quiet);
+  const controlInVoice = controlPath ? await levelOf(controlPath, windows.voice) : null;
   const finalInQuiet = await levelOf(output, windows.quiet);
   const finalInVoiceBand = await levelOf(output, windows.voice, VOICE_BAND);
   const sourceInQuiet = await levelOf(input, windows.quiet);
 
-  const duckingDepthDb = Number.isFinite(duckedInVoice) && Number.isFinite(duckedInQuiet)
+  /** 旧口径（对照用，保留字段以免下游断链）：让位后的"人声窗 − 安静窗"，受曲子动态影响 */
+  const duckingContrastDb = Number.isFinite(duckedInVoice) && Number.isFinite(duckedInQuiet)
     ? round(duckedInVoice - duckedInQuiet, 2)
     : null;
+  /**
+   * 新口径（权威）：同窗口下"让位后 − 不挂侧链的对照"，按本模块既有约定取**负值**
+   * （`ducking_applied` 判 `<= -4`、预警判 `> -6`；负得越多＝压得越深）。
+   */
+  const duckingDepthDb = Number.isFinite(controlInVoice) && Number.isFinite(duckedInVoice)
+    ? round(duckedInVoice - controlInVoice, 2)
+    : duckingContrastDb;
+  /** 对照口径（旧指标）也一并暴露，便于回归比较"曲子动态"与"真实侧链深度"两条曲线 */
+  const levelsDebug = { controlInVoiceDb: controlInVoice, duckingContrastDb };
   const speechToMusicMarginDb = Number.isFinite(finalInVoiceBand) && Number.isFinite(duckedInVoice)
     ? round(finalInVoiceBand - duckedInVoice, 2)
     : null;
@@ -1866,6 +1916,7 @@ export async function mix({
       sourceInQuietDb: sourceInQuiet,
       finalInQuietDb: finalInQuiet,
       duckingDepthDb,
+      ...levelsDebug,
       speechToMusicMarginDb,
       musicPresenceDb,
       programLevelDb: speechLevel,
@@ -2270,7 +2321,12 @@ export async function compose({
     throw new BgmError(`没有匹配的配乐配方（genre=${genre ?? "-"} mood=${mood ?? "-"}）；先跑 bgmread.recipes 看清单`, "not_found");
   }
   let tempo = { bpm: Number(bpmOverride ?? found.recipe.bpm), source: bpmOverride ? "explicit" : "recipe", note: null };
-  if (bpmOverride === null && bpmStrategy === "cut-driven" && input) {
+  /**
+   * 注意用宽松判等（2026-09-25 真机）：CLI 未传 `--bpm` 时可能是 `undefined` 而不是 `null`，
+   * 早先严格 `=== null` 会让 `cut-driven` 分支**静默不生效**——tempo 永远取配方默认 100BPM，
+   * 于是"卡点"对任何片子/任何曲子都报同一组数字（14/36、116.2ms），快剪片永远对不齐。
+   */
+  if (bpmOverride == null && bpmStrategy === "cut-driven" && input) {
     if (!probe) probe = await probeMedia(input, { bins });
     if (probe.video) {
       const detected = await detectCuts({ input, bins });

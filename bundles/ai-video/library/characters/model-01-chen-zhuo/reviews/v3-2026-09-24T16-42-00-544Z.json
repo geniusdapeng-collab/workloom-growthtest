@@ -1,0 +1,40 @@
+{
+  "at": "2026-09-24T16:42:00.547Z",
+  "characterId": "chen-zhuo",
+  "version": 3,
+  "source": "img2img",
+  "verdict": {
+    "stage": "keyframe",
+    "approved": true,
+    "score": 84,
+    "hardFailures": [],
+    "issues": [
+      "anchor-present：无基准照片（无法判断像不像，仅能判画质与纪律）",
+      "四张可见图（front/threeQuarter/closeup/side）为同一人、同一发型与服装，脸型/眼型/鼻型/唇形一致，但珍珠耳饰在 front（小耳钉）与 threeQuarter（垂坠款）之间存在款式不统一，属妆造细节漂移",
+      "side 图中垂侧的手部手指略有并指/边缘发软，threeQuarter 底边手臂被画框切断（肖像取景可接受，但手部结构不算干净）",
+      "确定性检查 anchor-present=FAIL：本包无基准照片，无法完成「同一张脸」的硬核比对，只能确认画质与纪律达标"
+    ],
+    "suggestions": [
+      "重跑时锁定耳饰为单一款式（建议统一为珍珠耳钉），在 prompt 中显式写死配饰条目",
+      "side/actionPose 等出现手部的角度补一条「五指分离、指甲与指节清晰、无并指」的负向约束，或改用不露手姿态规避",
+      "若后续拿到授权基准照，追加一轮 img2img 相似度校验，关闭 anchor-present 的敞口"
+    ],
+    "rerun": false,
+    "via": "llm",
+    "model": "deepseek-flash",
+    "ms": 6651,
+    "reason": "四张定妆照人物一致、纯写实无塑料感、中性灰背景与场景解耦口径相符、无文字水印与肢体畸变，仅耳饰款式小幅漂移与手部细节略软，达到放行标准。",
+    "degraded": false
+  },
+  "artifacts": [
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-threeQuarter.png",
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-closeup.png",
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-side.png",
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-back.png",
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-actionPose.png",
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-emotionCloseup.png",
+    "/Users/mac/WorkLoom-fleet/.wt-pjl/bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-handDetail.png"
+  ],
+  "references": []
+}

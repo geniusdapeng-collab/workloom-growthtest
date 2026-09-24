@@ -15,9 +15,12 @@
  * 设计见 `docs/character-archive-design.md`（附录 A.1/A.2）。
  */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildPortraitPlan, findAngleFile, loadCharacterEntry, reviewStage, runPortraitAgent } from "../../packages/video-studio/src/index.js";
+import {
+  appendGateEvent, buildGateEvent, buildPortraitPlan, findAngleFile, loadCharacterEntry, reviewStage, runPortraitAgent
+} from "../../packages/video-studio/src/index.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const LIBRARY_ROOT = resolve(REPO_ROOT, process.env.HR_CHARACTER_LIBRARY ?? "var/media/characters");
@@ -28,14 +31,25 @@ function arg(name: string, fallback = ""): string {
 }
 const flag = (name: string): boolean => process.argv.includes(name);
 
-const ENV = Object.fromEntries(
-  existsSync(resolve(REPO_ROOT, ".env"))
-    ? readFileSync(resolve(REPO_ROOT, ".env"), "utf8")
-        .split("\n")
-        .filter((line) => line && !line.startsWith("#") && line.includes("="))
-        .map((line) => { const i = line.indexOf("="); return [line.slice(0, i), line.slice(i + 1)]; })
-    : []
-) as Record<string, string>;
+/**
+ * 密钥加载（2026-09-24 修复）：与 `full-chain-film.mts` 同口径——**先读仓库外密钥文件**
+ * `~/.workloom/live.env`（VOLCENGINE_ARK_API_KEY / LLM_* 的真实位置），再读仓库 `.env`，
+ * 最后让进程环境覆盖。早先这里只读仓库 `.env`，于是 `portrait-agent review` 在真机上
+ * 永远拿不到评审模型（fail-closed 打回），定妆照评审实际从未跑成过。
+ */
+const ENV: Record<string, string> = (() => {
+  const out: Record<string, string> = {};
+  const files = [resolve(homedir(), ".workloom", "live.env"), resolve(REPO_ROOT, ".env")];
+  for (const file of files) {
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split("\n")) {
+      const match = line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (match && match[2]!.trim() && !out[match[1]!]) out[match[1]!] = match[2]!.trim();
+    }
+  }
+  for (const [key, value] of Object.entries(process.env)) if (value && !out[key]) out[key] = value;
+  return out;
+})();
 
 const command = process.argv[2] ?? "";
 const characterId = arg("--character");
@@ -166,12 +180,42 @@ async function main(): Promise<void> {
         note: "评审要点：定妆照必须与基准照片是同一张脸（五官比例/眼型/鼻型/唇形/脸型），同一发型与发色；允许妆造与服装变化。不确定时以「能不能认出是同一个人」为唯一硬标准。"
       },
       allowFallbackApprove: false,
+      /**
+       * 必须显式传 env（2026-09-24 真机）：`reviewStage` 缺省只读 `process.env`，
+       * 而密钥在 `~/.workloom/live.env` 里 → 不传 env 就永远"无可用评审模型"，
+       * 定妆照评审实际从未跑成（G5 门因此长期只有 degraded 记录）。
+       */
+      env: ENV,
       log: (line) => console.log(line)
     });
     const reviewDir = join(characterDir, "reviews");
     mkdirSync(reviewDir, { recursive: true });
     const reviewFile = join(reviewDir, `v${target.version}-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
     writeFileSync(reviewFile, `${JSON.stringify({ at: new Date().toISOString(), characterId: entry.id, version: target.version, source: target.source, verdict, artifacts: produced, references: fallbackAnchors }, null, 2)}\n`);
+    /**
+     * G5 门事件落账（2026-09-24）：定妆照确认门 `g5-portrait-confirm` 以前只有 review 文件，
+     * 片场运行时（full-chain-film 的 G5）读不到"按 step_key 记账的门记录"，只能标 degraded。
+     * 这里把评审结论写进角色目录的 `gates.jsonl`（与阶段日志同一门账本格式），供片场与平台按 step_key 检索。
+     */
+    const gateEvent = buildGateEvent({
+      stepKey: "g5-portrait-confirm",
+      projectId: `portrait:${entry.id}:v${target.version}`,
+      sourceStage: "portrait-review",
+      shotIds: [],
+      checks: [
+        { id: "required-angles", pass: required.every((a) => (target.angles ?? []).includes(a)), hard: true, detail: `必需角度 ${required.join("/")}；实际 ${(target.angles ?? []).join("/")}` },
+        { id: "file-size", pass: produced.every((f) => statSync(f).size > 50_000), hard: true, detail: produced.map((f) => `${f.split("/").slice(-1)[0]}=${(statSync(f).size / 1024).toFixed(0)}KB`).join(" ") },
+        { id: "anchor-present", pass: fallbackAnchors.length > 0, detail: fallbackAnchors.length > 0 ? `基准照片 ${fallbackAnchors.length} 张` : "无基准照片（人像同一性无法与真人比对，仅判画质与跨角度一致性）" }
+      ],
+      softApproved: verdict.approved,
+      via: verdict.via,
+      score: verdict.score,
+      degraded: verdict.degraded,
+      reason: verdict.reason,
+      evidence: { reviewFile, artifacts: produced.length, references: fallbackAnchors.length, characterId: entry.id, version: target.version }
+    });
+    appendGateEvent(join(characterDir, "gates.jsonl"), gateEvent);
+    console.log(`门记录（g5-portrait-confirm）：${gateEvent.ok ? "放行" : "未过"} → ${join(characterDir, "gates.jsonl")}`);
     console.log(`监制结论：${verdict.approved ? "放行" : "打回重跑"}（score=${verdict.score} · via=${verdict.via}）`);
     console.log(`  理由：${verdict.reason}`);
     if (verdict.issues.length > 0) console.log(`  问题：${verdict.issues.join("；")}`);

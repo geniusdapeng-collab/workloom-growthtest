@@ -83,3 +83,51 @@ describe("第三轮审计回归：镜面倒影的语境闸", () => {
     expect(props({ scene: "无风的湖面倒影如镜，人物立于船头", character: "陈卓" })).toContain("镜面");
   });
 });
+
+/**
+ * 第四轮校准（2026-09-24 晚，真机交付链暴露）：
+ * ① "不横移/不环绕"里的"横移"被当成运镜要求 → 与固定机位冲突；
+ * ② 上午镜头被注入"明亮的午后阳光" → 灯光时段自相矛盾；
+ * ③ 知识行附带的英文括注与卡片【语言约束】（全中文）冲突 → 默认只下发中文。
+ */
+describe("第四轮校准：否定剥离 / 时段归属 / 语言口径", () => {
+  const KNOWN_EN = /[A-Za-z]{3,}/;
+
+  it("'不横移不环绕'不再注入摇摄（与固定机位不冲突）", () => {
+    const { trace } = enrichShotCard(kb, {
+      shotId: "SC-02",
+      scene: "石拱桥桥头，河道与白墙黛瓦",
+      lighting: "上午十点柔和散射日光，白平衡中性",
+      camera_movement: "固定机位略低角度，镜头只做轻微呼吸晃动，不横移不环绕",
+      action: "沿桥面正面走近镜头",
+      character: "陈卓"
+    });
+    const movement = trace.applied.find((a) => a.field === "camera_movement")?.added ?? "";
+    expect(movement).not.toContain("摇摄");
+    expect(movement).not.toContain("横移");
+  });
+
+  it("上午镜头不再被注入'午后阳光'（时段口径归属明确）", () => {
+    const morning = enrichShotCard(kb, {
+      shotId: "SC-01", scene: "青石板主街", lighting: "上午十点柔和散射日光，白平衡中性", action: "缓步向前", character: "陈卓"
+    });
+    expect(morning.trace.applied.find((a) => a.field === "lighting")?.added ?? "").not.toContain("午后");
+    const afternoon = enrichShotCard(kb, {
+      shotId: "SC-02", scene: "石拱桥桥头", lighting: "午后斜光，方向明确", action: "沿桥面走近", character: "陈卓"
+    });
+    expect(afternoon.trace.applied.find((a) => a.field === "lighting")?.added ?? "").toContain("午后");
+  });
+
+  it("默认注入短语为中文（英文关键词只进 trace）；显式开启才附英文", () => {
+    const card = {
+      shotId: "SC-02", scene: "石拱桥桥头，河道与白墙黛瓦", lighting: "午后斜光",
+      action: "沿桥面正面走近镜头", character: "陈卓", mood: "开阔"
+    };
+    const zhOnly = enrichShotCard(kb, card);
+    for (const item of zhOnly.trace.applied) {
+      expect(item.added, `${item.field} 不应夹带英文`).not.toMatch(KNOWN_EN);
+    }
+    const withGloss = enrichShotCard(kb, card, { englishGloss: true });
+    expect(withGloss.trace.applied.some((a) => KNOWN_EN.test(a.added))).toBe(true);
+  });
+});

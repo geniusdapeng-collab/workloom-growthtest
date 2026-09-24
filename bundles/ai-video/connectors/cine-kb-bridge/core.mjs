@@ -594,6 +594,13 @@ const norm = (v) => String(v ?? "").trim().toLowerCase();
 function stripNegatedContext(raw) {
   return String(raw ?? "")
     .replace(/(避免|不要|禁止)[^，。；、,;]{0,18}/g, " ")
+    /**
+     * 光秃秃的"不 + 动作"（2026-09-24 真机）：分镜卡写"固定机位…**不横移**不环绕"，
+     * 早先只剥"不要/禁止/避免"，于是"横移"照旧命中 → 注入"镜头缓慢从左向右摇摄"，
+     * 与"固定机位"直接冲突（监制按"运镜两套并存"打回）。
+     * 只剥与信号词表相关的动词，避免误伤"不断走近"这类正常表达。
+     */
+    .replace(/不(横移|环绕|摇镜|摇摄|平移|推近|推进|跟拍|跟踪|转身|回眸|回头|回望|侧身|侧转|指物|指船|指|挥手|摆动|走动|移动|手持|过曝|偏色|做|加)/g, " ")
     .replace(/(无|不含|非)[^，。；、,;的地]{0,12}/g, " ")
     /** "其他/其它"里的"他"会把空镜误判成人物（三轮审计：人称代词只认单独出现的"她/他"） */
     .replace(/其他|其它/g, " ");
@@ -887,9 +894,18 @@ const TOPIC_TARGET_FIELDS = {
 };
 
 /** 一条知识 → 注入句式（中文写法为主，附英文关键词给国际模型） */
-function phraseFor(pick) {
+/**
+ * 行 → 提示词短语。
+ *
+ * `englishGloss` 默认 **false**（2026-09-24 真机二次校准）：分镜卡的【语言约束】写明
+ * "全部字段必须使用中文输出，禁止出现英文单词/短语"，而知识库行的英文括注（如
+ * "（bright afternoon sunlight, directional sunlight, clean daylight）"）会被监制判为
+ * **自违约束**并打回。默认只下发中文短语；英文关键词仍完整保留在 trace（picks 的 zh/en）里，
+ * 供需要英文提示词的模型/场景显式开启（`enrichShotCard(..., { englishGloss: true })`）。
+ */
+function phraseFor(pick, englishGloss = false) {
   const zh = pick.zh.replace(/[。；;]\s*$/, "");
-  return pick.en ? `${zh}（${pick.en}）` : zh;
+  return englishGloss && pick.en ? `${zh}（${pick.en}）` : zh;
 }
 
 /**
@@ -947,7 +963,13 @@ const INJECTION_RULES = [
   { field: "lighting", id: "noon-hard", when: (c) => c.noon && !c.overcast, topic: "LIGHT-002", row: "正午硬光（纪实/压迫）" },
   { field: "lighting", id: "overcast-soft", when: (c) => c.overcast && !c.snow, topic: "LIGHT-001", row: "阴天软光" },
   /** 斜光只在明确写了上午/下午时生效（避免"正午/白天"被当成斜光） */
-  { field: "lighting", id: "day-slant", when: (c) => c.day && !c.overcast && !c.interior && !c.noon && !c.blueHour && /上午|下午|早晨|清晨|morning|afternoon/.test(c.text), topic: "LIGHT-002", row: "上午/下午日常斜光" },
+  /**
+   * 斜光行**只给下午**（2026-09-24 真机二次校准）：LIGHT-002 这一行的措辞是
+   * "明亮的**午后**阳光，方向明确的斜射光"，早先只要卡片出现"上午/清晨"也会注入，
+   * 于是"上午十点散射日光"的镜头里同时出现"午后阳光"——灯光时段自相矛盾（监制据此打回）。
+   * 上午/清晨镜头的光由卡片自身措辞承担；KB 缺一行"上午光"已登记为缺口。
+   */
+  { field: "lighting", id: "day-afternoon", when: (c) => c.day && !c.overcast && !c.interior && !c.noon && !c.blueHour && /下午|午后|afternoon/.test(c.text), topic: "LIGHT-002", row: "上午/下午日常斜光" },
   /**
    * 逆光三兄弟的优先级（2026-09-24 三轮审计）：
    * 「有意剪影 / 轮廓光」比「黄金时刻」更具体——原来是黄金时刻先命中（日落语境必然同时命中），
@@ -1054,7 +1076,7 @@ export function injectionContext(card) {
      * "服装店内景…明亮"早先因为没有"白天/日光"字面被判成"夜间室内" → 注入"暖黄钨丝灯、2800K 温馨居家"。
      * 夜景规则排在本条之前，所以"夜晚的明亮灯市"仍走夜景，不会被误判成白天。
      */
-    day: has(/上午|清晨|早上|正午|中午|下午|日光|白天|明亮|自然光|光线充足/),
+    day: has(/上午|清晨|早上|正午|中午|下午|午后|日光|白天|明亮|自然光|光线充足/),
     interior: has(/室内|铺内|店内|房间|屋内|屋里|茶馆|食肆|大堂/),
     overcast: has(/阴天|多云|散射光|漫射光|无硬阴影/),
     goldenHour: has(/黄金时刻|magic hour|落日|日落|夕阳/),
@@ -1174,7 +1196,8 @@ export function enrichShotCard(kb, card, options = {}) {
    */
   const aperture = options.aperture ? null : recommendAperture(kb, card);
   if (aperture) {
-    const depthClause = [aperture.effectZh, aperture.effectEn ? `（${aperture.effectEn}）` : ""].join("");
+    /** 与知识行同口径：默认只下发中文；英文关键词进 trace，不违卡片的"全中文"语言约束 */
+    const depthClause = [aperture.effectZh, options.englishGloss && aperture.effectEn ? `（${aperture.effectEn}）` : ""].join("");
     /** 只登记到 byField，applied 由下面的统一循环写（避免同一字段在溯源里出现两条） */
     byField.set("depth_of_field", [{
       pick: { topicId: "OPTICS-001", topicTitle: "光圈", intent: aperture.scenarioLabel ?? "按场景推荐" },
@@ -1190,8 +1213,11 @@ export function enrichShotCard(kb, card, options = {}) {
     const field = rule.field;
     if (!field) continue;
     if (aperture && field === "depth_of_field") continue; // 光圈已占该字段
-    /** 占位符实例化（[元素] → 灯笼/水面与倒影/…）：模板行必须落成具体画面元素才能进提示词 */
-    const resolved = resolvePlaceholders(phraseFor(row), ctx);
+    /**
+     * 占位符实例化（[元素] → 灯笼/水面与倒影/…）与英文括注口径：
+     * 默认中文-only（`options.englishGloss` 显式开启才附英文关键词），与卡片语言约束对齐。
+     */
+    const resolved = resolvePlaceholders(phraseFor(row, Boolean(options.englishGloss)), ctx);
     byField.set(field, [{ pick: row, phrase: resolved.phrase, placeholderResolved: resolved.changed }]);
   }
   for (const [field, list] of byField) {

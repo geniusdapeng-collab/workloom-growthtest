@@ -21,18 +21,26 @@ export const PIPELINE_GATE_STEP_KEYS = [
   "g5-portrait-confirm",
   "g6-prompt-confirm",
   "g7-preproduction",
-  "g8-render-submit"
+  "g8-render-submit",
+  /** 多风格交付包：变体雷同一票否决（narrative-film.yml `deliver` 步） */
+  "deliver",
+  /** 返修闭环：层增量重合成 + 复用 sha256 证据（narrative-film.yml `revise` 步） */
+  "revise"
 ] as const;
 
 export type PipelineGateStepKey = (typeof PIPELINE_GATE_STEP_KEYS)[number];
-export type PipelineGateId = "G5" | "G6" | "G7" | "G8";
+export type PipelineGateId = "G5" | "G6" | "G7" | "G8" | "G-DLV1" | "G-DLV4";
 
 /** step_key → 门的编号（与 narrative-film.yml 的 `gate:` 字段一致） */
 const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
   "g5-portrait-confirm": "G5",
   "g6-prompt-confirm": "G6",
   "g7-preproduction": "G7",
-  "g8-render-submit": "G8"
+  "g8-render-submit": "G8",
+  /** deliver 步的 gate 字段在 yml 里就是 `G-DLV1`（变体雷同否决） */
+  deliver: "G-DLV1",
+  /** revise 步按 G-DLV4（层增量重合成 + 复用证据）记账 */
+  revise: "G-DLV4"
 };
 
 export interface GateCheck {

@@ -1461,10 +1461,19 @@ export async function renderWithSubtitles({
 
   if (!Object.values(report.checks).every(Boolean)) {
     const failed = Object.entries(report.checks).filter(([, ok]) => !ok).map(([key]) => key);
+    /**
+     * 诊断信息要能定位到"哪一项版式检查失败、实测值多少"（2026-09-25 真机）：
+     * 早先只报 `layout_ok` 一个词，产物还当场删了——排查只能靠猜。
+     * 现在把失败项对应的 layoutChecks 明细拼进错误消息（保留 checks 前缀，不改变对外语义）。
+     */
+    const failedDetails = report.layoutChecks
+      .filter((check) => !check.ok)
+      .map((check) => `${check.kind}：${JSON.stringify(check.detail ?? check.note ?? null)}`)
+      .join("；");
     if (typeof fsp.rm === "function") await fsp.rm(output, { force: true });
     else fs.unlinkSync(output);
     throw new SubtitleError(
-      `字幕复检未通过（${failed.join("/")}）：产物已删除，不进入入库/发布队列`,
+      `字幕复检未通过（${failed.join("/")}）${failedDetails ? `：${failedDetails}` : ""}：产物已删除，不进入入库/发布队列`,
       "verify_failed",
       false,
     );

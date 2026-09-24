@@ -176,6 +176,17 @@ async function main() {
         bgmPath: flags.bgm,
         policy: typeof flags.policy === "string" ? flags.policy : "keep-dialogue",
         bgmBpm: number(flags["bgm-bpm"]),
+        /**
+         * BPM 策略必须透传（2026-09-25 真机）：CLI 声明了 `--bpm-strategy cut-driven` 与 `--bpm`，
+         * 但 mix 分支没把它们传进 core → tempo 永远取配方默认值（100BPM），
+         * 于是"卡点"对任何曲子都报同一组数字（14/36、116.2ms），快剪片永远对齐不了。
+         */
+        bpmOverride: number(flags.bpm),
+        bpmStrategy: flags["bpm-strategy"] === "cut-driven" ? "cut-driven" : "recipe",
+        /** 显式剪辑网格：`--cut-times 5,10,15,20,25`（成片方给出真实剪辑点，优先于音轨起音反推） */
+        cutTimes: typeof flags["cut-times"] === "string"
+          ? String(flags["cut-times"]).split(",").map((value) => Number(value.trim())).filter((value) => Number.isFinite(value))
+          : null,
         musicLevelDb: number(flags["music-level"]),
         duckingDb: number(flags.ducking),
         targetLufs: number(flags.lufs, -14),
