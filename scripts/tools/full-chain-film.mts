@@ -21,6 +21,7 @@
  * 阶段汇总：`<work-dir>/logs/stages.json`
  */
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync
 } from "node:fs";
@@ -253,6 +254,27 @@ function runCli(cli: string, args: string[]): { ok: boolean; out: string } {
 const SUBTITLE_CLI = join(REPO_ROOT, "bundles/ai-video/connectors/subtitle-bridge/cli.mjs");
 const COLOR_CLI = join(REPO_ROOT, "bundles/ai-video/connectors/color-bridge/cli.mjs");
 const BGM_CLI = join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/cli.mjs");
+
+/**
+ * 重试指令（2026-09-24「反复重跑烧额度」根因修复）。
+ *
+ * 事故：SC-02 连烧 5 次渲染仍不过——因为第 2 次尝试提交的是**与第 1 次一字不差的提示词**，
+ * 只换了 seed，本质是"重采样碰运气"。而监制每轮都给了具体问题与建议，这些信息**没有被用上**。
+ * 现在：把上一轮 verdict 的 issues/suggestions 显式写进重跑提示词，并按次数给出升级动作。
+ */
+function retryInstruction(verdict: ProducerVerdict | null, attempt: number, maxAttempts: number): string {
+  const issues = (verdict?.issues ?? []).filter(Boolean).slice(0, 4);
+  const suggestions = (verdict?.suggestions ?? []).filter(Boolean).slice(0, 4);
+  return [
+    `【重跑要求·第 ${attempt}/${maxAttempts} 次】上一版未过监制：${verdict?.reason ?? "未给出理由"}`,
+    ...issues.map((item) => `必须修复：${item}`),
+    ...suggestions.map((item) => `按建议修改：${item}`),
+    attempt >= maxAttempts
+      ? "本次为最后一次尝试：若仍不达标，将按「带瑕疵放行 + badcase 归档」处理，不再重复烧额度。"
+      : "注意：同一问题第二次出现说明是分镜设计问题（机位/动作/朝向），优先改设计而不是继续加形容词。",
+    "输出仍须满足：人物与定妆照同一张脸、肢体与手指结构正确、空间物理自洽（桥/台阶有落点）。"
+  ].join("\n");
+}
 
 /**
  * 黑帧 / 静音段体检（监制终审要的"事故证据"，2026-09-24 真机补）：
@@ -566,7 +588,15 @@ function platePrompt(shot: ShotCard, characterName: string, appearanceText = "")
     `色调：${pick("color_palette")}`,
     `情绪：${pick("mood")}`,
     `规格：${ASPECT} 竖幅 ${RESOLUTION}，写实电影感摄影，自然肤质（保留毛孔与细颗粒，不做美颜磨皮），浅景深，纪实风格`,
-    "禁止：文字、字幕、水印、logo、卡通、插画、3D 渲染、塑料皮肤、多余手指、第二个人物清晰入镜"
+    /**
+     * 空间物理自洽约束（2026-09-24 badcase「无头之桥」）：
+     * 人物在桥/栈道/台阶上时，模型容易生成"看不出通向哪里、悬在水上的桥面"。
+     * 人造物必须写出**落点**：桥连两岸、桥头可见、台阶连着岸。
+     */
+    ...(/(桥|栈道|廊桥|石阶|台阶|埠头)/.test(`${shot.scene ?? ""}${shot.sceneDescription ?? ""}${shot.composition ?? ""}`)
+      ? ["空间自洽约束：桥/台阶必须连到两岸（桥头、石阶或对岸可见），不得出现悬空、无桥头、看不出通往何处的桥面；水面与桥底关系清晰，栏杆与桥面透视线一致。"]
+      : []),
+    "禁止：文字、字幕、水印、logo、卡通、插画、3D 渲染、塑料皮肤、多余手指、第二个人物清晰入镜、悬空无落点的建筑结构"
   ].join("\n");
 }
 function buildSrt(): string {
@@ -824,11 +854,16 @@ if (STAGES.has("plates")) {
       continue;
     }
     let approved = false;
+    /** 关键帧阶段同样记录上一轮裁决，用于"带变更"重试 */
+    let plateVerdict: ProducerVerdict | null = null;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS && !approved; attempt += 1) {
       const started = Date.now();
       try {
         const prompt = platePrompt(shot, lead?.name ?? "主角", lead?.appearanceText ?? "")
-          + (attempt > 1 ? "\n重跑要求：构图更准，人物面部与人物描述严格一致，无多余肢体。" : "");
+          /**
+           * 关键帧重试同样"带变更"：把上一轮监制的具体问题写进去（原来只有一句泛泛的"构图更准"）。
+           */
+          + (attempt > 1 ? `\n${retryInstruction(plateVerdict, attempt, MAX_ATTEMPTS)}` : "");
         const anchors = plateAnchorMode === "real"
           ? ([portraitRefs[0], portraitRefs[1], venueRefs[0]].filter(Boolean) as string[])
           : (venueRefs.slice(0, 1) as string[]);
@@ -857,6 +892,7 @@ if (STAGES.has("plates")) {
           attempt, ms: Date.now() - started, artifact: plate, evidence: info, verdict
         });
         approved = verdict.approved;
+        if (!approved) plateVerdict = verdict;
         if (!approved) log(`↻ 关键帧 ${shot.shotId} 第 ${attempt} 次未过监制：${verdict.reason}`);
       } catch (err) {
         record({
@@ -918,8 +954,18 @@ if (STAGES.has("videos")) {
     const plate = join(PLATE_DIR, `${shot.shotId}-plate.png`);
     const prompt = readFileSync(join(PROMPT_DIR, `${shot.shotId}.txt`), "utf8");
     let approved = false;
+    /**
+     * 重试必须「带变更」（2026-09-24 烧额度根因）：
+     * 早先第 2 次尝试提交的是**与第 1 次完全相同的提示词**（只有 seed 不同），
+     * 本质是"重采样碰运气"而不是修问题——SC-02 因此连烧 5 次渲染仍不过。
+     * 现在把上一轮监制的 issues/suggestions 显式写进提示词，并记录提示词指纹，
+     * 让日志能自证"这次重试确实改了东西"。
+     */
+    let lastVerdict: ProducerVerdict | null = null;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS && !approved; attempt += 1) {
       const started = Date.now();
+      const attemptPrompt = attempt === 1 ? prompt : `${prompt}\n\n${retryInstruction(lastVerdict, attempt, MAX_ATTEMPTS)}`;
+      const promptFingerprint = createHash("sha256").update(attemptPrompt).digest("hex").slice(0, 12);
       try {
         /**
          * 首帧必须用**Ark 托管 URL**（同账号模型产物），不能是 base64：
@@ -932,7 +978,7 @@ if (STAGES.has("videos")) {
           log(`  ⚠ ${shot.shotId} 无有效托管 URL，退回 base64 首帧（真人题材大概率被隐私校验拒）`);
         }
         const submitted = await arkVideo({
-          prompt,
+          prompt: attemptPrompt,
           firstFrame,
           refs: refs.map(dataUrl),
           seconds: duration,
@@ -991,9 +1037,15 @@ if (STAGES.has("videos")) {
         });
         record({
           stage: "shot", shotId: shot.shotId, invoked: true, ok: verdict.approved, cached: false, degraded: verdict.degraded,
-          attempt, ms: Date.now() - started, artifact: clip, evidence: { ...info, taskId: submitted.taskId, frames: frameFiles }, verdict
+          attempt, ms: Date.now() - started, artifact: clip,
+          evidence: {
+            ...info, taskId: submitted.taskId, frames: frameFiles,
+            promptVariant: attempt === 1 ? "base" : "retry-with-feedback",
+            promptFingerprint
+          }, verdict
         });
         approved = verdict.approved;
+        if (!approved) lastVerdict = verdict;
         if (!approved) log(`↻ 镜头 ${shot.shotId} 第 ${attempt} 次未过监制：${verdict.reason}`);
       } catch (err) {
         record({
