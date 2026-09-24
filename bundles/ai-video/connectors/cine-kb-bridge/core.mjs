@@ -264,8 +264,10 @@ const APERTURE_INTENT_HINTS = [
   { id: "vlog", pattern: /vlog|手持|边走边拍|跟拍|走动/i, prefer: ["Vlog", "边走边拍", "手持"] },
   /** 注意：不要把"全景"当风光信号——它是景别术语（"全景转中景"的人像镜头会被误判成风光） */
   { id: "landscape", pattern: /风光|大场景|山脉|雪山|湖面|大海|山谷|草原|日出|日落|远景|天际线|戈壁|沙漠/, prefer: ["大场景风光", "风光"] },
-  { id: "architecture", pattern: /建筑|室内|空间|廊|街巷|街道|房间/, prefer: ["建筑", "城市", "街拍"] },
-  { id: "starburst", pattern: /星芒|太阳|路灯|车灯|点光源/, prefer: ["星芒", "车轨"] },
+  /** 注意：室内/房间不再算"街拍"信号——阴天室内茶室曾因此被判成 f/8 街拍档（2026-09-24 抽查）。室内有人物时走"环境人像"。 */
+  { id: "architecture", pattern: /建筑|街巷|街道|城市天际线|高楼/, prefer: ["建筑", "城市", "街拍"] },
+  /** 星芒必须是**显式意图**：只是场景里有太阳/路灯不代表要拍星芒（海边人像曾被判成 f/16 星芒档）。 */
+  { id: "starburst", pattern: /星芒|放射状光|sun star|starburst/, prefer: ["星芒", "车轨"] },
   { id: "food", pattern: /美食|食物|糖粥|点心|餐|蒸汽|菜品/, prefer: ["美食", "单品特写"] },
   { id: "product", pattern: /产品|商品|包装|摆盘|全貌/, prefer: ["产品全貌", "单品特写"] },
   { id: "macro", pattern: /微距|细节特写|纹理特写/, prefer: ["微距"] }
@@ -473,7 +475,7 @@ const CONTEXT_LEXICON = {
     { key: "rain", pattern: /雨|雨天|暴雨|细雨|雨后/ },
     { key: "snow", pattern: /雪|下雪|飘雪/ },
     { key: "fog", pattern: /雾|薄雾|晨雾|水汽/ },
-    { key: "overcast", pattern: /阴天|多云|散射光|无硬阴影|overcast/ },
+    { key: "overcast", pattern: /阴天|多云|散射|漫射|柔光|无硬阴影|overcast/ },
     { key: "clear", pattern: /晴|通透|澄澈|蓝天/ }
   ],
   subject: [

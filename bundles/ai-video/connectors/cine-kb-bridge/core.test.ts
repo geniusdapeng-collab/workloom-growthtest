@@ -51,7 +51,8 @@ describe("光圈顾问（OPTICS-001 权威口径）", () => {
     }, "f/1.4–f/1.8"],
     ["风光大场景（雪山湖泊）", { scene: "雪山脚下的湖泊倒影，前景野花，清晨低角度阳光" }, "f/8–f/11"],
     ["十人团队合影", { scene: "公司门口团队合影，背景是办公楼", character: "十人团队", action: "集体微笑看镜头" }, "f/5.6–f/8"],
-    ["太阳星芒风光", { scene: "海边日落，太阳在画面中，前景礁石" }, "f/16"],
+    /** 星芒必须显式要求（只是"场景里有太阳"不算——见下方回归用例） */
+    ["太阳星芒风光（显式要星芒）", { scene: "海边日落，太阳呈放射状星芒，前景礁石", mood: "史诗" }, "f/16"],
     ["美食特写（糖粥蒸汽）", { scene: "老字号茶食铺，桂花糖粥与海棠糕，蒸汽升起", action: "低头闻香" }, "f/2.8"]
   ];
   for (const [label, card, expected] of cases) {
@@ -63,6 +64,30 @@ describe("光圈顾问（OPTICS-001 权威口径）", () => {
       expect(pick!.source).toContain("OPTICS-001");
     });
   }
+
+  /**
+   * 深度抽查回归（2026-09-24 第二轮审计）：这三条都是"注入错了"的真实案例，
+   * 起因都是**把场景里的词当成了意图**（有太阳≠要星芒、室内≠街拍、散射≠午后硬光）。
+   */
+  it("阴天散射光不被判成「午后斜光」，而是柔光路线", () => {
+    const pick = recommendAperture(kb, { scene: "阴天的茶室内，木格窗外是青瓦白墙", character: "陈卓", action: "端起茶杯轻抿" });
+    expect(pick!.aperture).not.toBe("f/8");
+    const { trace } = enrichShotCard(kb, { scene: "阴天的茶室内，木格窗外是青瓦白墙，桌上有青瓷茶杯", character: "陈卓", action: "端起茶杯轻抿", mood: "安静" });
+    const lighting = trace.applied.find((a) => a.field === "lighting")?.added ?? "";
+    expect(lighting).not.toContain("午后阳光");
+  });
+
+  it("海边人像不因场景里有太阳而被判成星芒档（星芒必须是显式意图）", () => {
+    const pick = recommendAperture(kb, { scene: "海边日落，太阳贴着海平面，人物站在礁石上", character: "陈卓", action: "迎风站立", mood: "史诗" });
+    expect(pick!.aperture).not.toBe("f/16");
+    const explicit = recommendAperture(kb, { scene: "海边日落，太阳星芒四射，礁石前景", mood: "史诗" });
+    expect(explicit!.aperture).toBe("f/16");
+  });
+
+  it("室内人物镜头不走「街拍 f/8」档", () => {
+    const pick = recommendAperture(kb, { scene: "室内会议室，白墙前", character: "陈卓", action: "坐着说话" });
+    expect(pick!.aperture).not.toBe("f/8");
+  });
 });
 
 describe("自动注入：纪律与回归", () => {
