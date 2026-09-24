@@ -1274,6 +1274,26 @@ async function trimMaster({ input, output, gainDb, bins }) {
  *
  * @returns {Promise<object>} 产物 + 指标 + 证据（不含任何客户原始数据的上行）
  */
+/**
+ * 配乐可闻度结论文案（纯函数，便于单测；2026-09-24 真机复核后拆出）：
+ *
+ * 「测不到」与「测得偏低」是两种不同结论——
+ *   · 测得偏低：报**实测差值** vs 目标（可据此调电平）；
+ *   · 测不到：全程连续现场声/连续口播时，既无绝对静音、也找不到相对安静窗口，
+ *     `musicPresenceDb` 只能是 `null`。这时按「未核实」拒绝出片（fail-closed 不变），
+ *     但绝不能写成 `nulldB < 阈值`——那是没发生过的比较，会把人误导成电平问题反复调电平。
+ */
+export function explainMusicAudibility({
+  musicPresenceDb = null, targetDb = 3, quietWindowSource = "unknown", measured = false,
+} = {}) {
+  if (measured) return `配乐可闻度 ${musicPresenceDb}dB < ${targetDb}dB`;
+  const why = quietWindowSource === "none"
+    ? "全片既无绝对静音窗口、也找不到相对安静窗口（连续现场声/连续口播）"
+    : `安静窗口不可用（quietWindowSource=${quietWindowSource}）`;
+  return `配乐可闻度无法测量（${why}）→ 按「未核实」拒绝出片；`
+    + "可改用带人声间隙的素材、或指定 section 片段复用后在有人声间隙处复检再重试本变体";
+}
+
 export async function mix({
   input, output, bgmPath = null, policy = "keep-dialogue", bgmBpm = null,
   musicLevelDb = null, duckingDb = null, targetLufs = -14, truePeak = -1.0,
@@ -1708,6 +1728,15 @@ export async function mix({
   const musicPresenceDb = Number.isFinite(finalInQuiet) && Number.isFinite(sourceInQuiet)
     ? round(finalInQuiet - sourceInQuiet, 2)
     : Number.isFinite(duckedInQuiet) && Number.isFinite(roomTone) ? round(duckedInQuiet - roomTone, 2) : null;
+  /**
+   * 可闻度的**依据来源**写进回执：quiet-window（安静窗口实测）｜room-tone（房间底噪基准）｜none（测不到）。
+   * 下游据此区分「测得偏低」与「测不到」，不再从 null 反推（真机实测：clean-tech 硬切变体全程连续现场声 → none）。
+   */
+  const presenceMeasured = (Number.isFinite(finalInQuiet) && Number.isFinite(sourceInQuiet))
+    || (Number.isFinite(duckedInQuiet) && Number.isFinite(roomTone));
+  const presenceBasis = Number.isFinite(finalInQuiet) && Number.isFinite(sourceInQuiet)
+    ? "quiet-window"
+    : (Number.isFinite(duckedInQuiet) && Number.isFinite(roomTone) ? "room-tone" : "none");
 
   const targets = findRecipes({ list: true }).targets;
   const checks = {
@@ -1738,9 +1767,15 @@ export async function mix({
   if (!checks.music_audible || !checks.dialogue_preserved) {
     await fsp.rm(output, { force: true }).catch(() => {});
     throw new BgmError(
-      `配乐复检未通过（${!checks.music_audible ? `配乐可闻度 ${musicPresenceDb}dB < ${targets.musicPresenceDb}dB` : ""}`
+      `配乐复检未通过（${!checks.music_audible
+        ? explainMusicAudibility({
+          musicPresenceDb, targetDb: targets.musicPresenceDb, quietWindowSource, measured: presenceMeasured,
+        })
+        : ""}`
       + `${!checks.dialogue_preserved ? `人声-音乐余量 ${speechToMusicMarginDb}dB < 3dB` : ""}）：已删除产物，不得作为成片交付`,
       "verify_failed",
+      // 测不到时降 3dB 重试也照样测不到（不是电平问题）→ 明确不可重试，省掉一次白跑的混音
+      presenceMeasured,
     );
   }
 
@@ -1858,6 +1893,7 @@ export async function mix({
       method: voice.method,
       quietWindowSource,
       quietWindowsUsed: windows.quiet.length,
+      presenceBasis,
     },
     evidence,
     license: { reviewed: licenseReviewed, commercialUse },
