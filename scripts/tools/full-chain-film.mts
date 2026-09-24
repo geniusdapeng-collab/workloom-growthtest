@@ -264,6 +264,47 @@ const BGM_CLI = join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/cli.mjs"
  * 为什么要自己量：配乐工位的 `best` 在"人声太满"时会直接判 `no_bgm_needed` 而不产出，
  * 监制因此拿不到任何响度证据（真机连续两次以"无响度读数"打回）。这里用确定性测量补上。
  */
+/**
+ * 画面运动能量（2026-09-24 SC-02 badcase 修复）：
+ * 把片段按 8fps 降采样成 128×228 灰度帧序列，算**相邻帧中心区（60%）平均绝对差**。
+ * 用途：给监制一个"到底有没有动"的数字证据——之前只给 3 张静帧，
+ * 监制无法验证"走来/挥手"，只能以「动作证据不足」打回（fail-closed），
+ * 于是同一镜反复重渲。返回平均运动能量（0–255）与峰值出现时刻。
+ */
+function measureMotionEnergy(file: string, durationSec: number): { energy: number; peakAt: number; frames: number } {
+  const W = 128;
+  const H = 228;
+  const res = spawnSync(FFMPEG, [
+    "-v", "error", "-i", file,
+    "-vf", `fps=8,scale=${W}:${H},format=gray,crop=${Math.round(W * 0.6)}:${Math.round(H * 0.6)}`,
+    "-f", "rawvideo", "-"
+  ], { maxBuffer: 64 * 1024 * 1024 });
+  const buf = res.stdout ?? Buffer.alloc(0);
+  const cw = Math.round(W * 0.6);
+  const ch = Math.round(H * 0.6);
+  const frameBytes = cw * ch;
+  const count = Math.floor(buf.length / frameBytes);
+  if (count < 2) return { energy: 0, peakAt: 0, frames: count };
+  let total = 0;
+  let peak = 0;
+  let peakIndex = 0;
+  for (let i = 1; i < count; i += 1) {
+    const prev = (i - 1) * frameBytes;
+    const cur = i * frameBytes;
+    let sum = 0;
+    for (let p = 0; p < frameBytes; p += 4) sum += Math.abs(buf[cur + p]! - buf[prev + p]!);
+    const diff = sum / (frameBytes / 4);
+    total += diff;
+    if (diff > peak) { peak = diff; peakIndex = i; }
+  }
+  const fps = 8;
+  return {
+    energy: total / (count - 1),
+    peakAt: Math.min(durationSec, peakIndex / fps),
+    frames: count
+  };
+}
+
 function measureLoudness(file: string): { lufs: number | null; peakDb: number | null; detail: string } {
   /**
    * 注意：ffmpeg 把滤波器日志写在 **stderr**，且退出码通常为 0。
@@ -593,6 +634,8 @@ log(`阶段：${[...STAGES].join(" → ")}｜监制：${flag("--allow-fallback-a
 if (DRY_RUN) log("⚠ dry-run：只做脚本/提示词/计划，不出图不出片");
 
 const specReports: Array<Record<string, unknown>> = [];
+/** 动作节拍预算（advisory：只报数不拦，避免把"9 个 vs 8 个"这种量级差当成缺陷） */
+const motionBudgetNotes: Array<{ shotId: string; beats: number; advice: string }> = [];
 
 /* ---------- ⓪ 摄影知识库注入（监制：cine-kb） ---------- */
 /**
@@ -670,6 +713,47 @@ if (STAGES.has("spec")) {
       id: `speech-rate:${shot.shotId}`, pass: rate <= 3.6, hard: true,
       detail: `台词 ${chars} 字 / ${duration}s = ${rate.toFixed(2)} 字每秒（上限 3.6）`
     });
+    /**
+     * 分镜自相矛盾闸（2026-09-24 SC-02 badcase）：
+     * 同一镜里既要"面向镜头/视线交流"又要"转身/回头/背身"是**物理上互斥**的动作要求，
+     * 模型每次只能满足一半，于是"这一版背身、下一版换脸"反复打回。
+     * 这里在**花钱之前**拦下来：要求拆镜或改成"正面接近/正面站定"。
+     */
+    const actionText = `${shot.action ?? ""} ${(shot.camera_movement ?? "")}`;
+    const wantsFront = /面向镜头|正对镜头|正脸|直视镜头|眼神交流|看向镜头/.test(actionText);
+    /** 注意：只把"身体转向"算作互斥；"转头/扭头看镜头"是正常小动作，不算（2026-09-24 修正） */
+    const wantsTurn = /转身|回眸|侧身|侧转|背对|背身|转正脸|转回/.test(actionText);
+    checks.push({
+      id: `pose-contradiction:${shot.shotId}`, pass: !(wantsFront && wantsTurn), hard: true,
+      detail: wantsFront && wantsTurn
+        ? "同一镜同时要求「面向镜头/眼神交流」与「转身/回头/侧身」——动作互斥，模型只能满足一半（真机 SC-02 连续 4 次被打回）。请拆成两镜，或改成「正面站定/正面走近」的重述。"
+        : (wantsTurn ? "含转身/回眸（无正面要求，属可接受的动态）" : "无朝向互斥")
+    });
+    /**
+     * 场景先验风险闸（软信号，2026-09-24 SC-02 badcase 的**真正根因**）：
+     * 模型对「桥/栏杆 + 船/河 + 指物」这组语义有强先验——会主动把人演成侧身倚栏指船，
+     * 哪怕提示词写着"面向镜头"。文本层查不出矛盾（文字没写侧身），只能靠**场景语义组合**预警。
+     * 命中时给监制与设计者一个明确建议：改"正面走近"或去掉指物。
+     */
+    const sceneText = `${shot.scene ?? ""} ${shot.sceneDescription ?? ""}`;
+    const priorRisk = /指|挥|递|捧|端/.test(actionText)
+      && /桥|栏杆|船|河|水|岸/.test(sceneText)
+      && /面向镜头|看向镜头|正对镜头|正脸|眼神交流/.test(actionText);
+    checks.push({
+      id: `prior-risk:${shot.shotId}`, pass: !priorRisk, hard: false,
+      detail: priorRisk
+        ? "高风险构图先验：场景含「桥/栏杆/船/河」且动作含「指物/递物」又要求「正面看镜头」——模型大概率演成侧身倚栏指船（真机 SC-02 因此连续 4 次被打回）。建议：改「正面走近/正面站定」，或删掉指物动作。"
+        : "无已知构图先验冲突"
+    });
+    /** 动作复杂度预算（软信号）：5 秒内节拍过多会让模型每次只满足一部分，表现为"这版动作对、下版表情对" */
+    const beats = (actionText.match(/然后|随后|接着|再|边[^，。]{0,6}边|同时|先[^，。]{0,4}再/g) ?? []).length
+      + actionText.split(/[，,；;]/).filter((s) => s.trim().length > 1).length;
+    /**
+     * 节拍预算**只作参考信息，不进 PASS/FAIL 清单**（2026-09-24 修正）：
+     * 放进确定性检查时，监制会把它当硬闸用（真机：9 个节拍直接打回，而 9 与 8 的差别并不构成缺陷）。
+     * 现在改为 context 里的 advisory，监制可据情权衡，不再自动阻断。
+     */
+    motionBudgetNotes.push({ shotId: shot.shotId, beats, advice: beats > 8 ? "节拍偏多（建议 ≤8），可合并同拍的连续位移" : "节拍在预算内" });
     if (rate > 3.6) rateFail += 1;
     record({
       stage: "spec", shotId: shot.shotId, invoked: true, ok: report.delivery.pass && report.charCount >= 1200,
@@ -690,7 +774,13 @@ if (STAGES.has("spec")) {
   const verdict = await reviewStage({
     stage: "prompt", projectId: PROJECT,
     artifacts: [{ path: join(PROMPT_DIR, "spec-report.json"), kind: "json" }, ...shots.map((s) => ({ path: join(PROMPT_DIR, `${s.shotId}.txt`), kind: "text" as const }))],
-    deterministic: checks, context: { title: shotlist.title, shots: shots.length, rateFail }, env: ENV,
+    deterministic: checks,
+    context: {
+      title: shotlist.title, shots: shots.length, rateFail,
+      /** 节拍预算：只报数不拦（监制可据情权衡，不作 PASS/FAIL） */
+      motionBudget: motionBudgetNotes,
+      poseContradictionRule: "同一镜「面向镜头」与「转身/侧身/背身」互斥；「桥/栏杆/船/河 + 指物 + 正面」属高漂移先验，建议改正面走近或删指物"
+    }, env: ENV,
     allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
   });
   record({
@@ -854,15 +944,24 @@ if (STAGES.has("videos")) {
         const actual = Number(info.duration ?? 0);
         const height = Number(info.height ?? 0);
         const width = Number(info.width ?? 0);
-        /** 抽 3 帧做视觉评审 */
+        /**
+         * 抽帧 + 动作证据（2026-09-24 SC-02 badcase 修复）：
+         * 早先只抽 3 帧（0.6 / 中段 / 末段），监制无法判断"有没有在走动/挥手"，
+         * 只能以"手部摆动与步态证据不足"打回（fail-closed）。现在：
+         *   · 抽 4 帧给监制看（0.5 / 1.8 / 3.2 / 4.5）；
+         *   · 另抽 8 帧算**画面运动能量**（相邻帧中心区平均绝对差），把"有没有动"变成数字证据；
+         *   · 当分镜要求走/挥手/移动而运动能量过低时，判为硬失败（动作没做出来）。
+         */
         const framesDir = join(WORK_DIR, "frames", PROJECT, shot.shotId);
         mkdirSync(framesDir, { recursive: true });
         const frameFiles: string[] = [];
-        for (const [i, at] of [0.6, duration / 2, Math.max(0.6, duration - 0.8)].entries()) {
+        for (const [i, at] of [0.5, 1.8, 3.2, Math.max(0.6, duration - 0.5)].entries()) {
           const file = join(framesDir, `f${i + 1}.png`);
           run(FFMPEG, ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", file]);
           frameFiles.push(file);
         }
+        const motion = measureMotionEnergy(clip, duration);
+        const expectsMotion = /走|步行|漫步|挥|摆|蹲|起身|跑|turn|walk/i.test(String(shot.action ?? ""));
         const verdict = await reviewStage({
           stage: "shot", projectId: PROJECT,
           artifacts: [
@@ -872,7 +971,19 @@ if (STAGES.has("videos")) {
           deterministic: [
             { id: "duration", pass: Math.abs(actual - duration) <= 0.6, detail: `期望 ${duration}s 实测 ${actual.toFixed(2)}s`, hard: true },
             { id: "resolution", pass: height >= 720 && width >= 720, detail: `${width}x${height}`, hard: true },
-            { id: "audio-track", pass: Boolean(info.hasAudio), detail: info.hasAudio ? `音轨 ${info.acodec}` : "无音轨（配乐环节可兜底，但人声缺失需复核）" }
+            { id: "audio-track", pass: Boolean(info.hasAudio), detail: info.hasAudio ? `音轨 ${info.acodec}` : "无音轨（配乐环节可兜底，但人声缺失需复核）" },
+            {
+              id: "motion-evidence",
+              pass: !expectsMotion || motion.energy >= 2.5,
+              /**
+               * 只做软证据（不跨景别当硬闸）：实测同一批片子里，
+               * "走近"镜运动能量 5.79/255，而静物特写 12.48/255——近景/特写的像素级微动天然更高，
+               * 绝对值不能跨景别比较。只有低到近乎全程静止（<0.8）才升级为硬失败。
+               */
+              hard: expectsMotion && motion.energy < 0.8,
+              detail: `画面运动能量 ${motion.energy.toFixed(2)}/255（峰值帧 ${motion.peakAt.toFixed(1)}s，期望动作=${expectsMotion ? "是" : "否"}）`
+                + (expectsMotion && motion.energy < 2.5 ? "：动作幅度偏低，可能是「站着念完」而非分镜要求的走/挥手" : "")
+            }
           ],
           referenceImages: refs.slice(0, 2),
           context: { shotId: shot.shotId, dialogue: dialogueText(shot), action: shot.action, taskId: submitted.taskId },

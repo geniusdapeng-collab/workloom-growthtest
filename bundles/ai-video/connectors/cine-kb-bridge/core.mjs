@@ -352,6 +352,31 @@ export function recommendAperture(kb, card) {
   const range = parseApertureRange(picked.aperture);
   const stop = apertureStopFor(knowledge, range);
   const direction = range && range.max <= 2.8 ? "shallow" : range && range.min >= 8 ? "deep" : "moderate";
+  /**
+   * 手部/道具纠偏（2026-09-24 badcase：SC-02 连续 4 次因"手部指节粘连/手指畸变/左手消失"被打回）：
+   * 手在画面里承担动作叙事时，光圈不宜开到最大——浅景深会把手部细节交给模糊，模型更容易糊成一团。
+   * 依据 OPTICS-001 §3.1（单人特写 f/1.4–2.0 的代价是"景深极浅"）与 §3.4（产品单品 f/2.0–2.8 才保细节）。
+   */
+  const handAction = /指|挥|搭|捧|端|舀|勺|摸|握|递|摆手|手势/.test(text);
+  let finalAperture = picked.aperture;
+  let finalReason = picked.reason;
+  let handAdjust = null;
+  /**
+   * 只对**白天/室内**的手部叙事镜生效：夜景按 KB §3.5「能开多大开多大」优先保进光量，
+   * 此时收光圈会逼高 ISO；宁可让手部略软，也不要夜景噪点炸掉整镜（2026-09-24 修正）。
+   */
+  const isNightScene = detectContext(card).timeOfDay.includes("night");
+  if (handAction && !isNightScene && range && range.max <= 2.0) {
+    const corrected = knowledge.scenarios.find((s) => /环境人像/.test(s.label));
+    if (corrected) {
+      finalAperture = corrected.aperture;
+      finalReason = `${corrected.reason}（含手部动作，收小光圈保手部与道具细节）`;
+      handAdjust = { from: picked.aperture, to: corrected.aperture, why: "手部/道具在画面内承担动作，浅景深易糊手" };
+    }
+  }
+  const finalRange = parseApertureRange(finalAperture);
+  const finalStop = apertureStopFor(knowledge, finalRange);
+  const finalDirection = finalRange && finalRange.max <= 2.8 ? "shallow" : finalRange && finalRange.min >= 8 ? "deep" : "moderate";
   /** 英文关键词：取 §六 对应方向的条目（浅/深景深方向各取首条） */
   const apertureTopic = kb.topics.find((t) => t.id === "OPTICS-001");
   const entriesByDirection = {
@@ -360,15 +385,16 @@ export function recommendAperture(kb, card) {
     /** 中景深要"人景皆清"那句，不能抓"全画面清晰"（那是深景深口径）——2026-09-24 修正 */
     moderate: apertureTopic?.entries.find((e) => /人景皆清/.test(e.intent)) ?? null
   };
-  const entry = entriesByDirection[direction] ?? null;
+  const entry = entriesByDirection[finalDirection] ?? null;
   return {
-    aperture: picked.aperture,
-    direction,
-    effectZh: stop ? `${stop.effectZh}（${stop.depth}景深）` : (entry?.zh ?? ""),
+    aperture: finalAperture,
+    direction: finalDirection,
+    effectZh: finalStop ? `${finalStop.effectZh}（${finalStop.depth}景深）` : (entry?.zh ?? ""),
     effectEn: entry?.en ?? "",
-    reason: picked.reason,
+    reason: finalReason,
     scenarioLabel: picked.label,
     matchedBy: pickedBy,
+    handAdjust,
     intents: hitIntents.map((h) => h.id),
     source: `OPTICS-001 §三/§八${knowledge.version ? `（${knowledge.version}）` : ""}`
   };
