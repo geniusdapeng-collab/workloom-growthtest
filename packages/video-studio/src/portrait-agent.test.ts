@@ -82,7 +82,7 @@ describe("定妆照生成 Agent：执行", () => {
    * 否则会被硬闸按「探针不可用 = 不合格」拦下（这正是 fail-closed 的预期行为）。
    */
   const passingProber = (): BackgroundCheck => ({
-    ok: true, policy: CLEAN_BACKGROUND_POLICY.id, bands: [], cornerSpread: 6, maxRange: 10, maxSat: 2, notes: []
+    ok: true, policy: CLEAN_BACKGROUND_POLICY.id, mode: "ring", bands: [], cornerSpread: 6, maxRange: 10, maxSat: 2, notes: []
   });
 
   it("落盘 portraits/vN + portrait-sets/vN.json 并把新集置为 active", async () => {
@@ -186,7 +186,7 @@ describe("定妆照生成 Agent：执行", () => {
     const prober = (): BackgroundCheck => {
       call += 1;
       const ok = call > 1; // 第一张背景不干净，第二张干净
-      return { ok, policy: CLEAN_BACKGROUND_POLICY.id, bands: [], cornerSpread: ok ? 8 : 60, maxRange: ok ? 12 : 80, maxSat: 3, notes: ok ? [] : ["四角亮度极差 60.0 > 22（有暗角或方向性渐变）"] };
+      return { ok, policy: CLEAN_BACKGROUND_POLICY.id, mode: "ring", bands: [], cornerSpread: ok ? 8 : 60, maxRange: ok ? 12 : 80, maxSat: 3, notes: ok ? [] : ["四角亮度极差 60.0 > 22（有暗角或方向性渐变）"] };
     };
     const result = await runPortraitAgent({
       libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m",
@@ -207,7 +207,7 @@ describe("定妆照生成 Agent：执行", () => {
     const calls: Array<Record<string, unknown>> = [];
     /** 只有 closeup 的背景脏（模拟真机"某角度背景带暗角"），其余角度干净 */
     const perAngle = (file: string): BackgroundCheck => file.includes("closeup")
-      ? { ok: false, policy: CLEAN_BACKGROUND_POLICY.id, bands: [], cornerSpread: 70, maxRange: 90, maxSat: 4, notes: ["四角亮度极差 70.0 > 22（有暗角或方向性渐变）"] }
+      ? { ok: false, policy: CLEAN_BACKGROUND_POLICY.id, mode: "ring", bands: [], cornerSpread: 70, maxRange: 90, maxSat: 4, notes: ["四角亮度极差 70.0 > 22（有暗角或方向性渐变）"] }
       : passingProber();
     const result = await runPortraitAgent({
       libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m",
@@ -216,7 +216,7 @@ describe("定妆照生成 Agent：执行", () => {
     expect(result.files.closeup).toBeFalsy();
     expect(result.files.front).toBeTruthy();
     expect(result.failures[0]!.error).toContain("background_not_clean");
-    const saved = JSON.parse(readFileSync(join(charDir, "portrait-sets", "v1.json"), "utf8")) as { angles: string[]; backgroundChecks?: Record<string, { ok: boolean }> };
+    const saved = JSON.parse(readFileSync(join(charDir, "portrait-sets", "v1.json"), "utf8")) as { angles: string[]; backgroundChecks?: Record<string, { ok: boolean }>; failedAngles?: Array<{ angle: string }> };
     expect(saved.angles).toEqual(["front"]);
     expect(saved.backgroundChecks!.closeup!.ok).toBe(false);
     expect(saved.failedAngles![0]!.angle).toBe("closeup");

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "workloom.style-variants/v1",
+  "updatedAt": "2026-09-24",
+  "principle": "同一批镜头、同一份字幕文件，后期派生出风格明显不同的几个版本让用户选：镜头生成费只付一次，风格差异只吃本地算力（零 token）。每个变体必须同时给出调色 / BGM / 转场 / 封面 / 文案五个轴上的差异化参数——差异必须是实测看得出来（画面平均像素差或音轨不同），不允许给用户两个一样的片子。",
+  "axes": ["调色", "BGM 配乐", "转场节奏", "封面设计", "文案口吻"],
+  "defaults": ["warm-story", "clean-tech", "bold-promo"],
+  "variants": [
+    {
+      "id": "warm-story",
+      "file": "warm-story.json",
+      "name": "暖调故事版",
+      "positioning": "情感/文旅/民宿/人物：暖调胶片、慢转场、留白文案"
+    },
+    {
+      "id": "clean-tech",
+      "file": "clean-tech.json",
+      "name": "干净科技版",
+      "positioning": "产品/科技/知识：冷净调、硬切、信息优先文案"
+    },
+    {
+      "id": "bold-promo",
+      "file": "bold-promo.json",
+      "name": "强推促销版",
+      "positioning": "带货/本地生活/促销：高对比、快切、直给卖点文案"
+    }
+  ]
+}

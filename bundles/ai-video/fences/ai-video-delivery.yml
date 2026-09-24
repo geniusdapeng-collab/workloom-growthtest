@@ -1,0 +1,92 @@
+# 交付包 · 多风格变体 · 本地返修围栏包（视频经理 · 后期交付与返修工位）
+# 与 ai-video-subtitle.yml / ai-video-color.yml / ai-video-bgm.yml 同口径：默认基线、只可加严、
+# 命中取严（block > review > auto）；求值语义：匹配命中后求值 when（沙箱，禁任意代码），
+# 写类动作无命中按 default_level。
+#
+# 这一包拦的是"多版本交付 + 返修"里最贵、最不可逆的四件事：
+#   ① 给了用户两个看不出差别的版本（等于白做多版本）；
+#   ② 把字幕烧进母版（画面像素被改，之后"不要字幕"的诉求只能重剪）；
+#   ③ 返修时不做影响分析就整体重跑（把"后期能解决的事"变成"重新生成镜头"的账单）；
+#   ④ 交付不带清单/工程文件（用户选不了、事后对不了账，返修也没有输入）。
+version: ai-video-delivery/v1
+default_level: review
+rules:
+  - rule_id: G-DLV0
+    name: 交付包派生与旁挂字幕（本地可逆动作直通）
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [final_video, video_asset, subtitle_track, subtitle_report, delivery_package]
+      actions: [postread.health, postread.plan, postread.impact, postwrite.package, postwrite.reedit, postwrite.triage, subtitlewrite.sidecar, subtitlewrite.softmux]
+    when: "true"
+    note: 派生变体、出旁挂字幕文件、软字幕轨内嵌、按 patch 本地重合成，都是工位本地、非破坏、可回滚动作（原片只读 + 版本只增不覆盖 + 产物带 sha256），默认直通。覆盖原片（G-DLV2）、关复检（G-DLV3）、变体雷同（G-DLV1）、返修跳过影响分析（G-DLV4）、缺清单（G-DLV6）、复用无证据（G-DLV7）叠加升级，deny 优先并集取严。未命中写动作的保守默认是 review，故此处必须显式声明 auto。
+
+  - rule_id: G-DLV1
+    name: 多版本必须真的"看得出差别"（雷同即拒）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [delivery_package, final_video]
+      actions: [postwrite.package, postwrite.reedit]
+    when: "params.variants_distinct == false or params.identical_variants == true or params.variant_count == 0 or params.variant_count == 1"
+    note: 多风格交付的**唯一理由**是"用户能选"。因此：变体少于 2 个视为没得选；两个变体在调色（画面像素差）与音轨（曲目/分层）上同时测不出差别视为雷同。两者一律一票否决——省下的是本地算力，亏掉的是"用户挑不出自己喜欢的"。
+
+  - rule_id: G-DLV2
+    name: 母版不得烧字幕（字幕一律旁挂/软轨交付）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, video_asset, delivery_package]
+      actions: [postwrite.package, postwrite.reedit, subtitlewrite.softmux]
+    when: "params.master_burned_in == true or params.burn_into_master == true or params.overwrite_source == true or params.output_path == params.input_path"
+    note: 硬线：**母版永远是"无字画面"**。有些片子要带字幕、有些不要，而"要不要"是发布时的选择；烧一次就回不去了（像素被改，想拿掉只能重剪）。要硬字幕必须另存副本（`*.burned.mp4`），母版保持干净；软字幕轨走 softmux（视频/音频轨 copy，逐帧零改动复检）。
+
+  - rule_id: G-DLV3
+    name: 软字幕轨必须带"画面零改动"复检
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, subtitle_track, delivery_package]
+      actions: [subtitlewrite.softmux, postwrite.package, postwrite.reedit]
+    when: "params.skip_verify == true or params.verify == false or params.reencode_video == true or params.allow_video_reencode == true"
+    note: 软字幕的意义是"字幕可开关、画面像素不变"。因此内嵌必须 `-c:v copy` 并做四项复检（视频轨逐帧哈希一致 / 音轨一致 / 时长保持 / 字幕轨数量与语言齐备）；关复检或要求重编码视频一律拒绝——那就不是软字幕，是二次压缩。
+
+  - rule_id: G-DLV4
+    name: 返修必须先做影响分析；能在本地重合成的不得走镜头重生成
+    level: block
+    is_baseline: true
+    match:
+      object_types: [delivery_package, final_video, render_job]
+      actions: [postwrite.reedit, postwrite.package]
+    when: "params.skip_impact_analysis == true or params.impact_analyzed == false or (params.requires_shot_regeneration == true and params.shot_ids_missing == true)"
+    note: 镜头生成是贵的、后期是便宜的，所以返修必须走"先分析后动手"：字幕/文案/封面/配乐/调色/转场这些能在本地重合成的一律本地做；只有点名到**画面内容**才允许重生成镜头，而且必须逐镜点名（说不出是第几个镜头就不许重跑整片）。
+
+  - rule_id: G-DLV5
+    name: 镜头重生成（花钱）人审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [render_job, video_asset, delivery_package]
+      actions: [postwrite.reedit, postwrite.package, render.submit]
+    when: "params.requires_shot_regeneration == true or params.regenerate_shots == true"
+    note: 重生成镜头会烧渲染额度（与 G8 同源风险）。因此：只出计划、不自动执行；人审放行后只重跑被点名的镜头，其余镜头与全部后期层复用（复用必须带哈希证据，见 G-DLV7）。
+
+  - rule_id: G-DLV6
+    name: 交付必须带清单与工程文件
+    level: block
+    is_baseline: true
+    match:
+      object_types: [delivery_package, final_video]
+      actions: [postwrite.package, postwrite.reedit]
+    when: "params.delivery_manifest == false or params.engineering_file == false or params.skip_manifest == true"
+    note: 「没有清单就不是交付」：`delivery-manifest.json`（每个产物的 sha256/规格/变体差异实测值/成本口径）与 `film-project.json`（层结构 + 产物血缘，返修的输入）缺一不可。缺了它们，用户选不了版本、事后对不了账、下一轮返修也没有可复用的层描述。
+
+  - rule_id: G-DLV7
+    name: 「复用」必须带证据（不得声称复用却重算）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [delivery_package, final_video]
+      actions: [postwrite.reedit, postwrite.package]
+    when: "params.reuse_without_evidence == true or params.claim_reuse_without_hash == true"
+    note: 返修回执里"复用了哪些层"必须能对账：复用产物给出 sha256 与 mtime 未变的证据，重算产物给出新 sha256；镜头层还要与工程文件里记录的哈希逐镜比对，不一致就如实标注"被外部改动过"。禁止把"重算了但没写清楚"包装成"复用"。

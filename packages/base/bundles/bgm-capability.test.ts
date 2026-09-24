@@ -341,39 +341,49 @@ describe("配乐内核纯函数（对齐 / 定速 / 让位换算 / 许可）", (
         ],
       }, null, 2));
       const commercial = findTracks({ commercialUse: true }, { WORKLOOM_BGM_LIBRARY_DIR: dir });
-      expect(commercial.total).toBe(2);
-      expect(commercial.matched).toBe(1);
-      expect(commercial.items[0]!.id).toBe("ok-by");
-      expect(commercial.items[0]!.licenseLabel).toContain("CC BY 4.0");
+      /**
+       * 2026-09-24 修正：`libraryRoots` 现在**总会**带上随仓兜底曲库（`library/bgm-library-curated`，50 首）
+       * 与工位/自动发现的曲库根，因此 `total/matched` 不再等于"本次自建库的条数"。
+       * 这里把断言收敛到**本次夹具曲目**上：既保留"NC 被过滤"的语义，又不会因为随仓曲库增删而假红。
+       */
+      const customIds = new Set(["ok-by", "blocked-nc"]);
+      const customCommercial = commercial.items.filter((item) => customIds.has(item.id));
+      expect(commercial.sources.some((source) => source.dir === dir && source.present === true)).toBe(true);
+      expect(customCommercial.map((item) => item.id)).toEqual(["ok-by"]);
+      expect(customCommercial[0]!.licenseLabel).toContain("CC BY 4.0");
 
       // 缺省即商用口径（fail-safe）：不显式声明 commercial_use=false 时，NC 曲目不进候选
       const defaultQuery = findTracks({}, { WORKLOOM_BGM_LIBRARY_DIR: dir });
-      expect(defaultQuery.matched).toBe(1);
-      expect(defaultQuery.items.map((item) => item.id)).toEqual(["ok-by"]);
+      expect(defaultQuery.items.filter((item) => customIds.has(item.id)).map((item) => item.id)).toEqual(["ok-by"]);
 
       const all = findTracks({ commercialUse: false }, { WORKLOOM_BGM_LIBRARY_DIR: dir });
-      expect(all.matched).toBe(2);
       const nc = all.items.find((item) => item.id === "blocked-nc")!;
       expect(nc.commercialOk).toBe(false);
       expect(nc.attribution.required).toBe(true);
       expect(nc.attribution.text).toContain("Night");
 
       const byMood = findTracks({ mood: "诱人温暖", genre: "美食", commercialUse: true }, { WORKLOOM_BGM_LIBRARY_DIR: dir });
-      expect(byMood.matched).toBe(1);
+      expect(byMood.items.filter((item) => customIds.has(item.id)).map((item) => item.id)).toEqual(["ok-by"]);
       const noHit = findTracks({ genre: "科技 / SaaS" }, { WORKLOOM_BGM_LIBRARY_DIR: dir });
-      expect(noHit.matched).toBe(0);
+      expect(noHit.items.filter((item) => customIds.has(item.id))).toEqual([]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it("未接入曲库时如实返回 libraryPresent=false，不伪造可交付", () => {
+  it("自建曲库目录为空时如实登记（随仓兜底曲库仍在，不谎称「未接入」）", () => {
     const dir = mkdtempSync(join(tmpdir(), "bgm-lib-empty-"));
     try {
       const result = findTracks({}, { WORKLOOM_BGM_LIBRARY_DIR: dir });
-      expect(result.libraryPresent).toBe(false);
-      expect(result.total).toBe(0);
-      expect(result.note).toContain("未接入");
+      /**
+       * 产品口径已变（2026-09-23 起）：随仓自带 50 首兜底曲库，因此"客户目录为空"不等于"没有曲库可用"。
+       * 断言随之收敛为事实：① 该自定义根被登记为 present=false；② 兜底曲库真实在位；
+       * ③ 不再向用户谎称"曲库未接入"。
+       */
+      expect(result.sources.some((source) => source.dir === dir && source.present === false)).toBe(true);
+      expect(result.libraryPresent).toBe(true);
+      expect(result.total).toBeGreaterThan(0);
+      expect(result.note).toBeNull();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

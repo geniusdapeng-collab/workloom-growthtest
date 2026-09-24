@@ -28,6 +28,8 @@ tools:
   - { name: subtitlewrite.danmaku, access: write, desc: 弹幕轨渲染（滚动/顶部/底部固定，密度熔断 + 抽稀如实报告） }
   - { name: subtitlewrite.sticker, access: write, desc: 贴纸/花字渲染（200ms 弹入 + 安全区/遮挡区校验） }
   - { name: subtitlewrite.karaoke, access: write, desc: 卡拉OK 逐字扫过（\kf）+ 双语第二行；逐字时间轴可显式或均分（如实标注） }
+  - { name: subtitlewrite.sidecar, access: write, desc: 旁挂字幕交付：出 srt/ass/vtt + 清单（**不烧进画面**，带字幕/不带字幕留给后期决定） }
+  - { name: subtitlewrite.softmux, access: write, desc: 软字幕轨内嵌（可开关字幕轨；视频/音频轨 copy，逐帧零改动复检） }
   - { name: subtitlewrite.best,   access: write, desc: 择优出片：字体×描边候选池打分；判「无需加字幕」时不产出文件（do no harm） }
 prompt:
   role: 你是字幕师。先问"给谁看、在哪看、看多久"，再动手排字；一次只改一个变量，改完必须复检实测。
@@ -36,6 +38,9 @@ prompt:
     - 版式：按平台取版式（画幅/边距比/字号倍率/对齐），竖屏字幕必须避开点赞栏与底部文案区；字号与服务从"短边×基准比×粗细修正×平台倍率"推导
     - 可读性：先量画面（文字带亮度与细节密度），再决定字色/描边/底衬；看不清就不交付
     - 制作：SRT→ASS→libass 烧录，母版只烧一次，平台变体从母版派生；标题与字幕分层，不抢同一区域
+    - 旁挂优先：成片母版**默认不烧字**——先出旁挂字幕文件（srt/ass/vtt + 清单），
+      需要"带字幕的片子"时走软字幕轨（画面逐帧零改动）或明确要求后另存烧字副本；
+      这样同一支母版既能交带字幕版、也能交不带字幕版（发布时才决定，不必各自重剪）
     - 扩展轨：弹幕走顶部 1/4 轨道（滚动）与顶部/底部固定行，单条 ≤20 字、透明度 0.85、1s 窗口并发 ≤8；
       贴纸/花字走 200ms 弹入 + 停留 1.5~3s；卡拉OK 用 \kf 逐字扫过，双语时第二语言小一号叠在同侧
     - 交付：附方案（字体/字号/描边/边距）、版式体检、字幕可现度、时间轴回读、证据帧与 sha256
@@ -58,3 +63,5 @@ write_back:
   - subtitlewrite.danmaku
   - subtitlewrite.sticker
   - subtitlewrite.karaoke
+  - subtitlewrite.sidecar
+  - subtitlewrite.softmux

@@ -37,3 +37,26 @@ enums:
   - code: other
     label: 其他（须附自由文本说明）
     appliesTo: [reject, edit]
+  # ---- 返修归因（后期交付与返修工位；triage 的确定性规则表产出这些码，历史事件按 code 归因）----
+  # 用途：把"用户说了什么"映射成"改哪一层"，并沉淀成考试院错题与岗位绩效口径。
+  - code: rev.text.track
+    label: 文字层返修（字幕文案/时间轴/双语/字号描边）
+    appliesTo: [revise]
+  - code: rev.audio.mix
+    label: 音频层返修（换曲/音量/分层策略）
+    appliesTo: [revise]
+  - code: rev.color.look
+    label: 调色层返修（冷暖/浓淡/曝光观感）
+    appliesTo: [revise]
+  - code: rev.edit.pacing
+    label: 剪辑层返修（转场/节奏/顺序/时长）
+    appliesTo: [revise]
+  - code: rev.cover.layout
+    label: 封面层返修（版式/标题/首图）
+    appliesTo: [revise]
+  - code: rev.copy.tone
+    label: 文案层返修（标题/话题/口吻/CTA）
+    appliesTo: [revise]
+  - code: rev.shot.content
+    label: 画面内容返修（人物/穿帮/镜头质量，需重生成点名镜头）
+    appliesTo: [revise]

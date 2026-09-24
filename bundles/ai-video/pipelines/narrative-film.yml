@@ -3,7 +3,7 @@
 quest: narrative-film
 name: 叙事片管线
 version: v1
-description: 剧本→场景→片头→视听→连贯审查→提示词融合→字段质检→定妆照→预生产确认→渲染→后期→调色→字幕→配音→配乐→成片入库
+description: 剧本→场景→片头→视听→连贯审查→提示词融合→字段质检→定妆照→预生产确认→渲染→后期→调色→字幕→配音→配乐→多风格交付→成片入库→返修闭环
 steps:
   - step_key: script
     name: 剧本蓝图
@@ -84,7 +84,7 @@ steps:
   - step_key: subtitle
     name: 标题字幕制作
     owner: subtitle-stylist
-    outputs: [subtitle_track, subtitle_report, final_video]   # 文字层收口：字体选型 + 平台版式 + 版式体检 + 可现度复检；调色之后烧字（LUT 不改字色），配乐之前（音轨恒 copy）
+    outputs: [subtitle_track, subtitle_report, final_video]   # 文字层收口：字体选型 + 平台版式 + 版式体检 + 可现度复检。**字幕以旁挂文件交付（srt/ass/vtt + 清单），母版不烧字**（G-DLV2）；要带字幕的片子由软字幕轨（softmux，画面逐帧零改动）或另存烧字副本派生
   - step_key: voice
     name: 成片配音
     owner: voice-artist
@@ -93,7 +93,16 @@ steps:
     name: 成片配乐
     owner: bgm-composer
     outputs: [bgm_track, bgm_report, final_video]   # 后期音频链路收口：原声保留策略 + BGM 让位 + -14 LUFS 母版
+  - step_key: deliver
+    name: 多风格交付包
+    owner: post-editor
+    gate: G-DLV1                  # 变体雷同（画面与音轨都测不出差别）一票否决
+    outputs: [delivery_package, final_video, subtitle_track]   # 干净母版 + 旁挂字幕 + 2–3 个风格变体（封面/文案/BGM/调色/转场）+ 软字幕轨版 + 交付清单 + 工程文件；镜头只生成一次，变体零 token
   - step_key: archive
     name: 成片入库
     owner: post-editor
     outputs: [final_video, video_asset]
+  - step_key: revise
+    name: 返修闭环（反馈 → 分诊 → 本地重合成）
+    owner: post-editor
+    outputs: [revision_report, delivery_package]   # 变更影响分析 → 层增量重合成（不重新生成镜头）；点名到画面内容才走 G8 人审 + 只重跑点名镜头；复用带 sha256 证据（G-DLV4/G-DLV5/G-DLV7）

@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "workloom.style-variant/v1",
+  "id": "bold-promo",
+  "name": "强推促销版",
+  "positioning": "带货/本地生活/促销：高对比、快切、直给卖点文案",
+  "platforms": ["抖音/快手", "小红书", "美团", "大众点评"],
+  "color": {
+    "profile": "high-contrast-social",
+    "intensity": 0.9,
+    "lookLabel": "高对比社媒",
+    "note": "压黑提对比 + 提饱和，信息流里更抓眼；不改商品本色到失真"
+  },
+  "transitions": {
+    "mode": "xfade",
+    "fadeSec": 0.35,
+    "note": "交叉溶解快切，制造节奏推进感；适合卡点卖点"
+  },
+  "bgm": {
+    "mood": "激昂有力",
+    "style": "sports-hype",
+    "policy": "keep-dialogue",
+    "musicLevelDb": -21,
+    "targetLufs": -14,
+    "fadeInSec": 0.4,
+    "fadeOutSec": 0.8,
+    "section": "auto",
+    "note": "能量更足、电平更靠前（-21dB，三个变体里最响）；仍然人声让位（ducking 12dB）。人声余量红线（≥3dB）由配乐工位复检把关：越线会自动降 3dB 重试一次并如实记账，仍不过则本变体按原声降级交付"
+  },
+  "cover": {
+    "template": "促销横幅",
+    "at": 0.45,
+    "alignment": 2,
+    "marginRatio": 0.06,
+    "note": "底部压大字 + 价格/利益点；避免遮挡平台底部文案区"
+  },
+  "copy": {
+    "tone": "直接叫卖",
+    "titleTemplate": "{hook}｜{title}",
+    "opening": "先说价格，再讲值不值。",
+    "closing": "到店说「看视频来的」有额外福利。",
+    "cta": "点下方链接领券，今天下单再减",
+    "hashtags": ["#限时优惠", "#本地生活", "#到店必点"]
+  },
+  "subtitleStyle": {
+    "scene": "字幕",
+    "note": "字重更粗、描边更明显；价格数字单独成行不大段堆叠"
+  }
+}

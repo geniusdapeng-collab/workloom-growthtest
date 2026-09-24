@@ -45,6 +45,8 @@ export const SUBTITLE_TOOLS = [
   "subtitlewrite.danmaku",
   "subtitlewrite.sticker",
   "subtitlewrite.karaoke",
+  "subtitlewrite.sidecar",
+  "subtitlewrite.softmux",
   "subtitlewrite.best",
 ];
 
@@ -2322,6 +2324,379 @@ function loadCatalog() {
   return loadFontCatalog();
 }
 
+/* ============== 旁挂字幕交付（只出文件，不动画面）与软字幕轨 ============== */
+
+/**
+ * 为什么单独有这一段（2026-09-24 产品所有者口径）：
+ * 成片交付有两种用法——**有些片子要带字幕、有些不要**，而"要不要"是后期/发布时的选择，不是生产时的死决定。
+ * 因此母版一律**不烧字**：先出旁挂字幕文件（srt/ass/vtt + 清单），后期想用再选：
+ *   ① 直接用旁挂文件（交给剪辑软件/平台上传口）；
+ *   ② `softmux` 把字幕作为**可开关的字幕轨**嵌进容器（视频/音频轨逐帧 copy，画面零改动）；
+ *   ③ 明确要硬字幕时才走 `burn`（另存名字，母版不动）。
+ * 三条路的文字层同源（同一份 ASS 生成器），所以"软/硬/旁挂"三种形态的字幕版式一致，不会各说各话。
+ */
+
+const SRT_TIME_RE = /^(\d{1,2}):(\d{2}):(\d{2})[,.](\d{1,3})$/;
+
+/** 秒 → SRT 时间戳（HH:MM:SS,mmm）。 */
+export function srtTimestamp(seconds) {
+  const total = Math.max(0, Number(seconds) || 0);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = Math.floor(total % 60);
+  const millis = Math.round((total - Math.floor(total)) * 1000);
+  const pad = (value, size = 2) => String(value).padStart(size, "0");
+  // 毫秒四舍五入到 1000 时要进位，否则会出现 00:00:05,1000 这种非法时间戳
+  const carry = millis >= 1000 ? 1 : 0;
+  const normalised = carry
+    ? { hours: hours + (secs + 1 >= 60 && minutes + 1 >= 60 ? 1 : 0), minutes: (minutes + (secs + 1 >= 60 ? 1 : 0)) % 60, secs: (secs + 1) % 60, millis: 0 }
+    : { hours, minutes, secs, millis };
+  return `${pad(normalised.hours)}:${pad(normalised.minutes)}:${pad(normalised.secs)},${pad(normalised.millis, 3)}`;
+}
+
+/** 旁挂 SRT 文本（保留 cue 顺序，一条不留、一条不多）。 */
+export function cuesToSrt(cues = []) {
+  const blocks = cues.map((cue, index) => {
+    const start = assistToSeconds(cue.start);
+    const end = assistToSeconds(cue.end);
+    const text = String(cue.text ?? "").trim();
+    if (!text) throw new SubtitleError(`第 ${index + 1} 条字幕为空文本`, "bad_srt", false);
+    if (!(end > start)) throw new SubtitleError(`第 ${index + 1} 条字幕时间轴非法（${cue.start} → ${cue.end}）`, "bad_srt", false);
+    return `${index + 1}\n${srtTimestamp(start)} --> ${srtTimestamp(end)}\n${text}`;
+  });
+  return `${blocks.join("\n\n")}\n`;
+}
+
+function vttTimestamp(seconds) {
+  return srtTimestamp(seconds).replace(",", ".");
+}
+
+/** WebVTT（平台后台上传口/网页播放器用；双语时同一条内先主后备，与烧录叠放顺序一致）。 */
+export function cuesToVtt(cues = [], { secondaryCues = [], label = "" } = {}) {
+  const head = ["WEBVTT", ...(label ? [`NOTE ${label}`] : [])].join("\n");
+  const blocks = cues.map((cue, index) => {
+    const start = assistToSeconds(cue.start);
+    const end = assistToSeconds(cue.end);
+    const secondary = secondaryCues[index] ? String(secondaryCues[index].text ?? "").trim() : "";
+    const lines = [String(cue.text ?? "").trim(), ...(secondary ? [secondary] : [])].filter(Boolean);
+    return `${index + 1}\n${vttTimestamp(start)} --> ${vttTimestamp(end)}\n${lines.join("\n")}`;
+  });
+  return `${head}\n\n${blocks.join("\n\n")}\n`;
+}
+
+/** 轨道签名（视频/音频轨"有没有被改"的判据）：流参数 + 采样帧哈希。 */
+export async function streamSignature(input, { bins = resolveBinaries(), kind = "video", at = [0.1, null, 0.9] } = {}) {
+  const { stdout } = await runBin(bins.ffprobe, [
+    "-v", "error", "-print_format", "json", "-show_streams", "-show_format", input,
+  ], { label: "ffprobe" });
+  const doc = JSON.parse(stdout);
+  const stream = (doc.streams ?? []).find((item) => item.codec_type === kind) ?? null;
+  if (!stream) return { present: false, signature: null, frames: [] };
+  const duration = Number(doc.format?.duration ?? stream.duration);
+  const signature = [
+    kind, stream.codec_name, stream.profile ?? "-", stream.width ?? "-", stream.height ?? "-",
+    stream.pix_fmt ?? "-", stream.avg_frame_rate ?? "-", stream.sample_rate ?? "-",
+    stream.channels ?? "-", stream.nb_frames ?? "-",
+  ].join("|");
+  const frames = [];
+  if (kind === "video") {
+    const times = at.map((value) => (value === null ? Math.max(0, (Number.isFinite(duration) ? duration : 1) / 2) : value));
+    for (const time of times) {
+      const { stdout: hashOut } = await runBin(bins.ffmpeg, [
+        "-v", "error", "-ss", String(round(time, 3)), "-i", input,
+        "-frames:v", "1", "-f", "hash", "-hash", "md5", "-",
+      ], { label: "ffmpeg" });
+      frames.push({ at: round(time, 3), hash: hashOut.trim().replace(/^MD5=/, "") });
+    }
+  }
+  return {
+    present: true,
+    signature,
+    duration: Number.isFinite(duration) ? round(duration, 3) : null,
+    frames,
+  };
+}
+
+function signaturesEqual(a, b) {
+  if (a?.present !== b?.present) return false;
+  if (!a?.present) return true;
+  if (a.signature !== b.signature) return false;
+  if (a.frames.length !== b.frames.length) return false;
+  return a.frames.every((frame, index) => frame.hash === b.frames[index]?.hash);
+}
+
+/** 源母版指纹（大小 + mtime）：证明"出字幕文件这一步没有动过母版"。 */
+async function fileStatFingerprint(file) {
+  const stat = await fsp.stat(file);
+  return { sizeBytes: stat.size, mtimeMs: Math.round(stat.mtimeMs), sha256: await sha256File(file) };
+}
+
+/**
+ * 旁挂字幕交付：出 SRT / ASS / VTT / 双语 + `subtitle-manifest.json`，**不产出视频**。
+ * 版式沿用与烧录同源的 plan（同一 ASS 生成器 + 同一字体选型 + 同一版式体检），因此
+ * "先旁挂、后想烧"或"先旁挂、后走软轨"三种形态的字幕观感一致。
+ */
+export async function exportSidecars({
+  input = null,
+  outputDir,
+  name = null,
+  cues = [],
+  cuesEn = [],
+  platform = null,
+  brief = {},
+  titleText = "",
+  fontsDir = null,
+  catalog = loadFontCatalog(),
+  bins = resolveBinaries(),
+  evidenceDir = null,
+  analyze = true,
+}) {
+  if (!Array.isArray(cues) || cues.length === 0) {
+    throw new SubtitleError("旁挂字幕交付需要至少一条字幕（SRT/VTT 都不为空）", "bad_srt", false);
+  }
+  if (typeof outputDir !== "string" || !outputDir.trim()) {
+    throw new SubtitleError("output_dir 缺失（旁挂字幕要落到交付目录）", "bad_request", false);
+  }
+  const outDir = path.resolve(outputDir);
+  await fsp.mkdir(outDir, { recursive: true });
+  const baseName = (name && String(name).trim()) || "film";
+
+  const beforeFingerprint = input ? await fileStatFingerprint(input) : null;
+  const outcome = await plan({
+    input,
+    brief,
+    platform,
+    titleText,
+    cues,
+    scenes: ["标题", "字幕"],
+    catalog,
+    fontsDir: fontsDir ?? fontsRoot(),
+    bins,
+    outputDir: outDir,
+    evidenceDir,
+    analyze,
+  });
+
+  const resolvedPlatform = platform ?? brief.平台 ?? "默认";
+  const { layout } = layoutFor(resolvedPlatform, catalog);
+  const files = [];
+  const writeFile = async (suffix, content, meta) => {
+    const target = path.join(outDir, `${baseName}${suffix}`);
+    await fsp.writeFile(target, content, "utf8");
+    const sha256 = await sha256File(target);
+    const record = {
+      path: target,
+      sha256,
+      bytes: Buffer.byteLength(content, "utf8"),
+      ...meta,
+    };
+    files.push(record);
+    return record;
+  };
+
+  const zhSrt = await writeFile(".zh.srt", cuesToSrt(cues), { role: "subtitle", lang: "chi", format: "srt", primary: true });
+  const assText = await fsp.readFile(outcome.assPath, "utf8");
+  const zhAss = await writeFile(".zh.ass", assText, {
+    role: "subtitle", lang: "chi", format: "ass", primary: true,
+    styled: true, note: "与烧录/软轨同源（同一 ASS 生成器 + 同一字体选型）",
+  });
+  let enSrt = null;
+  if (Array.isArray(cuesEn) && cuesEn.length) {
+    enSrt = await writeFile(".en.srt", cuesToSrt(cuesEn), { role: "subtitle", lang: "eng", format: "srt", secondary: true });
+  }
+  const vtt = await writeFile(".vtt", cuesToVtt(cues, {
+    secondaryCues: Array.isArray(cuesEn) ? cuesEn : [],
+    label: `WorkLoom ${baseName} · ${resolvedPlatform}${outcome.plan.resolution ? ` · ${outcome.plan.resolution.join("x")}` : ""}`,
+  }), {
+    role: "subtitle", lang: Array.isArray(cuesEn) && cuesEn.length ? "chi+eng" : "chi", format: "vtt",
+    note: "平台后台上传口/网页播放器；双语时同条先主后备",
+  });
+
+  // 时间轴回读：写出的 ASS 事件必须与源字幕逐条一致（旁挂也一样要能对回时间轴）
+  const assEvents = parseAssEvents(assText).filter((event) => event.style === "Sub");
+  const timelineOk = assEvents.length === cues.length
+    && assEvents.every((event, index) => event.start === cues[index].start && event.end === cues[index].end);
+  const srtRoundTrip = parseSrt(await fsp.readFile(zhSrt.path, "utf8"));
+  const srtOk = srtRoundTrip.length === cues.length
+    && srtRoundTrip.every((cue, index) => cue.text === String(cues[index].text).trim());
+  const secondaryOk = !enSrt || parseSrt(await fsp.readFile(enSrt.path, "utf8")).length === cuesEn.length;
+  const afterFingerprint = input ? await fileStatFingerprint(input) : null;
+  const sourceUntouched = !input
+    ? null
+    : beforeFingerprint.sha256 === afterFingerprint.sha256
+      && beforeFingerprint.sizeBytes === afterFingerprint.sizeBytes
+      && beforeFingerprint.mtimeMs === afterFingerprint.mtimeMs;
+  if (sourceUntouched === false) {
+    throw new SubtitleError("旁挂字幕交付过程改动了母版（母版必须只读）", "overwrite_source_forbidden", false);
+  }
+
+  const checks = [
+    ...outcome.checks,
+    { kind: "timeline_readback", ok: timelineOk, detail: { cues: cues.length, events: assEvents.length } },
+    { kind: "srt_round_trip", ok: srtOk, detail: { cues: cues.length, parsed: srtRoundTrip.length } },
+    { kind: "secondary_language", ok: secondaryOk, detail: { cuesEn: cuesEn.length } },
+    { kind: "source_untouched", ok: sourceUntouched !== false, detail: { hashed: Boolean(input) } },
+  ];
+
+  const manifest = {
+    schemaVersion: "workloom.subtitle-sidecar/v1",
+    generatedAt: new Date().toISOString(),
+    name: baseName,
+    platform: outcome.plan.platform,
+    resolution: outcome.plan.resolution,
+    burnedIn: false,
+    note: "母版不含字幕；字幕以旁挂文件交付，可后置决定『不用 / 软轨内嵌 / 硬烧』",
+    source: input
+      ? { path: input, sha256: beforeFingerprint.sha256, sizeBytes: beforeFingerprint.sizeBytes, untouched: sourceUntouched }
+      : null,
+    layout: {
+      subtitleBand: textBands({ resolution: outcome.plan.resolution, layout }).subtitleBand.px,
+      occlusionZones: layout.occlusion_zones ?? [],
+    },
+    styles: outcome.styles.map((entry) => ({ name: entry.name, ...entry.style })),
+    timeline: {
+      cues: cues.length,
+      secondaryCues: Array.isArray(cuesEn) ? cuesEn.length : 0,
+      first: cues[0] ? { start: cues[0].start, end: cues[0].end } : null,
+      last: cues.at(-1) ? { start: cues.at(-1).start, end: cues.at(-1).end } : null,
+      readback: { ass: timelineOk, srt: srtOk, secondary: secondaryOk },
+    },
+    files: files.map((file) => ({ ...file, path: path.basename(file.path) })),
+    checks: checkSummary(checks),
+  };
+  const manifestPath = path.join(outDir, `${baseName}.subtitle-manifest.json`);
+  await fsp.writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+
+  return {
+    name: baseName,
+    outputDir: outDir,
+    files,
+    manifest,
+    manifestPath,
+    planPath: outcome.planPath,
+    assText,
+    cues,
+    cuesEn,
+    checks,
+    passed: checkSummary(checks).every((check) => check.ok !== false),
+  };
+}
+
+/**
+ * 软字幕轨内嵌：把旁挂字幕嵌成容器里的**可开关字幕轨**（默认轨/语言标签齐备）。
+ * 纪律：视频轨与音频轨一律 `-c copy`，字幕是"加一条轨"，不是"改画面"——
+ * 交付前逐帧哈希比对（0.1s / 中间 / 0.9 处）证明母版画面零改动；对不上即失败并删除产物。
+ */
+export async function softMux({
+  input,
+  output,
+  subtitles = [],
+  bins = resolveBinaries(),
+  verify = true,
+}) {
+  if (typeof input !== "string" || !input.trim()) throw new SubtitleError("input_path 缺失", "bad_request", false);
+  if (typeof output !== "string" || !output.trim()) throw new SubtitleError("output_path 缺失", "bad_request", false);
+  if (path.resolve(input) === path.resolve(output)) {
+    throw new SubtitleError("禁止覆盖原片（输出路径等于输入路径）", "overwrite_source_forbidden", false);
+  }
+  const tracks = (Array.isArray(subtitles) ? subtitles : []).map((entry, index) => {
+    const file = typeof entry === "string" ? entry : entry?.path;
+    if (typeof file !== "string" || !file.trim()) throw new SubtitleError(`第 ${index + 1} 条软字幕轨缺少 path`, "bad_request", false);
+    if (!fs.existsSync(file)) throw new SubtitleError(`软字幕文件不存在：${file}`, "not_found", false);
+    const ext = path.extname(file).toLowerCase();
+    if (![".srt", ".ass", ".ssa", ".vtt"].includes(ext)) {
+      throw new SubtitleError(`软字幕文件格式不支持：${ext || "(无扩展名)"}（支持 .srt/.ass/.ssa/.vtt）`, "bad_srt", false);
+    }
+    const lang = String(entry?.lang ?? (index === 0 ? "chi" : "eng"));
+    return {
+      path: file,
+      ext,
+      lang,
+      title: String(entry?.title ?? (lang === "chi" ? "中文" : "English")),
+      default: entry?.default ?? index === 0,
+    };
+  });
+  if (tracks.length === 0) throw new SubtitleError("软字幕轨至少需要一条字幕文件", "bad_request", false);
+  if (verify === false) {
+    throw new SubtitleError("软字幕交付必须带画面零改动复检（关闭校验的调用禁止执行，围栏 G-SUB3）", "bad_request", false);
+  }
+
+  const container = path.extname(output).toLowerCase();
+  if (![".mp4", ".mkv", ".mov"].includes(container)) {
+    throw new SubtitleError(`软字幕输出容器不支持：${container || "(无扩展名)"}（支持 .mp4/.mkv/.mov）`, "bad_request", false);
+  }
+  const subtitleCodec = container === ".mov" ? "mov_text" : container === ".mp4" ? "mov_text" : null;
+  const probe = await probeMedia(input, { bins });
+  await fsp.mkdir(path.dirname(path.resolve(output)), { recursive: true });
+
+  const beforeVideo = await streamSignature(input, { bins, kind: "video" });
+  const beforeAudio = await streamSignature(input, { bins, kind: "audio" });
+
+  const args = ["-hide_banner", "-v", "error", "-y", "-i", input];
+  for (const track of tracks) args.push("-i", track.path);
+  args.push("-map", "0");
+  tracks.forEach((_, index) => args.push("-map", `${index + 1}:0`));
+  args.push("-c:v", "copy");
+  if (probe.hasAudio) args.push("-c:a", "copy");
+  if (subtitleCodec) args.push("-c:s", subtitleCodec);
+  else args.push("-c:s", "copy");
+  tracks.forEach((track, index) => {
+    args.push(`-metadata:s:s:${index}`, `language=${track.lang}`);
+    args.push(`-metadata:s:s:${index}`, `title=${track.title}`);
+  });
+  if (container === ".mp4") args.push("-movflags", "+faststart");
+  args.push(output);
+  await runBin(bins.ffmpeg, args, { label: "ffmpeg(softmux)", timeoutMs: 600_000 });
+  if (!fs.existsSync(output)) throw new SubtitleError(`软字幕内嵌未产出文件：${output}`, "ffmpeg_failed", true);
+
+  const afterVideo = await streamSignature(output, { bins, kind: "video", at: beforeVideo.frames.map((frame) => frame.at) });
+  const afterAudio = await streamSignature(output, { bins, kind: "audio" });
+  const outputProbe = await probeMedia(output, { bins });
+  const outputStreams = JSON.parse((await runBin(bins.ffprobe, [
+    "-v", "error", "-print_format", "json", "-show_streams", output,
+  ], { label: "ffprobe" })).stdout);
+  const outputSubtitleStreams = (outputStreams.streams ?? [])
+    .filter((stream) => stream.codec_type === "subtitle")
+    .map((stream) => ({
+      codec: stream.codec_name ?? null,
+      lang: stream.tags?.language ?? null,
+      title: stream.tags?.title ?? null,
+      index: stream.index,
+    }));
+
+  const videoUnchanged = signaturesEqual(beforeVideo, afterVideo);
+  const audioUnchanged = signaturesEqual(beforeAudio, afterAudio);
+  const durationOk = Math.abs((outputProbe.duration ?? 0) - (probe.duration ?? 0)) <= 0.15;
+  const tracksOk = outputSubtitleStreams.length === tracks.length;
+  const checks = [
+    { kind: "video_unchanged", ok: videoUnchanged, detail: { before: beforeVideo, after: afterVideo } },
+    { kind: "audio_unchanged", ok: audioUnchanged, detail: { before: beforeAudio, after: afterAudio } },
+    { kind: "duration_kept", ok: durationOk, detail: { source: probe.duration, output: outputProbe.duration } },
+    { kind: "subtitle_tracks", ok: tracksOk, detail: { expected: tracks.length, actual: outputSubtitleStreams.length, streams: outputSubtitleStreams } },
+  ];
+  const failed = checks.filter((check) => check.ok !== true);
+  if (failed.length) {
+    await fsp.rm(output, { force: true });
+    throw new SubtitleError(
+      `软字幕内嵌复检失败（${failed.map((check) => check.kind).join("、")}）：已删除产物，母版未受影响`,
+      "verify_failed",
+      false,
+    );
+  }
+
+  return {
+    input,
+    output,
+    container,
+    subtitleCodec: subtitleCodec ?? "copy",
+    tracks: tracks.map((track, index) => ({ ...track, index: outputSubtitleStreams[index]?.index ?? null, lang: outputSubtitleStreams[index]?.lang ?? track.lang })),
+    probe: outputProbe,
+    sha256: await sha256File(output),
+    defaultTrack: tracks.findIndex((track) => track.default) ?? 0,
+    checks,
+  };
+}
+
 /* ============================ 健康探针 ============================ */
 
 export async function health({ catalog = loadFontCatalog(), bins = resolveBinaries(), env = process.env } = {}) {
@@ -2680,6 +3055,80 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
           synced: true,
           snapshot_uri: `subtitle://karaoke/${path.basename(report.output.path)}?sha256=${report.output.hash}`,
           sha256: report.output.hash,
+          verified_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    case "subtitlewrite.sidecar": {
+      const input = params.input_path ? assertPathAllowed(String(params.input_path), roots, "input_path") : null;
+      const outputDir = assertPathAllowed(text(params.output_dir, "output_dir"), roots, "output_dir");
+      const cues = resolveCues(params);
+      const cuesEn = resolveCues({ srt_path: params.srt_path_en ?? undefined, srt_text: params.srt_text_en ?? undefined });
+      const outcome = await exportSidecars({
+        input,
+        outputDir,
+        name: typeof params.name === "string" ? params.name : null,
+        cues,
+        cuesEn,
+        platform: params.platform ?? null,
+        brief: resolveBrief(params),
+        titleText: params.title_text ?? "",
+        fontsDir: params.fonts_dir ? assertPathAllowed(String(params.fonts_dir), roots, "fonts_dir") : fontRoot,
+        evidenceDir: optionalPath(params.evidence_dir, "evidence_dir"),
+        bins,
+        catalog,
+        analyze: params.analyze !== false,
+      });
+      const primary = outcome.files.find((file) => file.format === "ass") ?? outcome.files[0];
+      return {
+        result: {
+          name: outcome.name,
+          output_dir: outcome.outputDir,
+          files: outcome.files,
+          manifest: outcome.manifest,
+          manifest_path: outcome.manifestPath,
+          plan_path: outcome.planPath,
+          cues: outcome.cues.length,
+          cues_secondary: outcome.cuesEn.length,
+          checks: checkSummary(outcome.checks),
+          passed: outcome.passed,
+          burned_in: false,
+        },
+        receipt: {
+          synced: true,
+          snapshot_uri: `subtitle://sidecar/${path.basename(primary.path)}?sha256=${primary.sha256}`,
+          sha256: primary.sha256,
+          verified_at: new Date().toISOString(),
+        },
+      };
+    }
+
+    case "subtitlewrite.softmux": {
+      const input = assertPathAllowed(text(params.input_path, "input_path"), roots, "input_path");
+      const output = assertPathAllowed(text(params.output_path, "output_path"), roots, "output_path");
+      if (params.verify === false || params.skip_verify === true) {
+        throw new SubtitleError("软字幕交付必须带画面零改动复检（G-SUB3）", "bad_request", false);
+      }
+      const tracks = Array.isArray(params.subtitles)
+        ? params.subtitles.map((entry) => {
+          if (typeof entry === "string") return { path: assertPathAllowed(entry, roots, "subtitles[]") };
+          const file = assertPathAllowed(text(entry?.path, "subtitles[].path"), roots, "subtitles[].path");
+          return { ...entry, path: file };
+        })
+        : [];
+      const report = await softMux({ input, output, subtitles: tracks, bins });
+      return {
+        result: {
+          ...report,
+          output_path: report.output,
+          video_unchanged: true,
+          note: "字幕是可开关的字幕轨；画面与声音轨逐帧 copy，母版零改动",
+        },
+        receipt: {
+          synced: true,
+          snapshot_uri: `subtitle://softmux/${path.basename(report.output)}?sha256=${report.sha256}`,
+          sha256: report.sha256,
           verified_at: new Date().toISOString(),
         },
       };

@@ -12,7 +12,8 @@
  *   tsx scripts/tools/full-chain-film.mts \
  *     --shots <shotlist.json> --project VID-PJL01 \
  *     --library <角色档案库根> --work-dir <.vm-work 根> --out <交付目录> \
- *     [--stages spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover] \
+ *     [--stages spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover,mux] \
+ *     [--subtitle-mode sidecar|burn|both]   # 缺省 sidecar：字幕只做旁挂文件 + 软字幕轨，母版不烧字 \
  *     [--aspect 9:16] [--resolution 1080p] [--fps 30] [--max-attempts 2] \
  *     [--keys-file ~/.workloom/live.env] [--brief <brief.json>] [--no-resume] [--dry-run]
  *
@@ -68,8 +69,24 @@ const RESUME = !flag("--no-resume");
 const DRY_RUN = flag("--dry-run");
 const ALLOW_FALLBACK_APPROVE = flag("--allow-fallback-approve");
 const STAGES = new Set(
-  arg("--stages", "cine-kb,spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover").split(",").map((s) => s.trim()).filter(Boolean)
+  // 两处默认阶段的并集：`cine-kb`（摄影知识库，T-2026-0924-0001）与 `mux`（软字幕轨收口，T-2026-0924-0070/0071）
+  arg("--stages", "cine-kb,spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover,mux").split(",").map((s) => s.trim()).filter(Boolean)
 );
+/**
+ * 字幕落地方式（2026-09-24 产品所有者口径）：
+ *   sidecar（缺省）= 母版**不烧字**，出旁挂字幕文件（srt/ass/vtt + 清单）并另出一支软字幕轨版；
+ *   burn           = 旧行为：把字幕烧进画面（母版变成带字版）；
+ *   both           = 旁挂 + 烧字副本都出（发布方想两条路都留）。
+ * 为什么默认改成 sidecar：**有些片子要带字幕、有些不要**，而"要不要"是后期/发布时的选择；
+ * 烧一次就回不去了（画面像素被改），旁挂文件则可以随时软轨内嵌或再烧。
+ */
+const SUBTITLE_MODE = (() => {
+  const value = arg("--subtitle-mode", "sidecar");
+  if (!["sidecar", "burn", "both"].includes(value)) {
+    throw new Error(`--subtitle-mode 只支持 sidecar | burn | both，收到：${value}`);
+  }
+  return value as "sidecar" | "burn" | "both";
+})();
 
 const LOG_DIR = join(WORK_DIR, "logs");
 const STAGE_LOG = join(LOG_DIR, "stages.jsonl");
@@ -993,39 +1010,95 @@ if (STAGES.has("color") && existsSync(master)) {
   });
 }
 
-/* ---------- ⑥ 字幕（subtitle-bridge：选型 + 版式 + 烧录） ---------- */
+/* ---------- ⑥ 字幕（subtitle-bridge：选型 + 版式 + 旁挂文件；烧录按需） ---------- */
+/**
+ * 两种落地方式（`--subtitle-mode`）：
+ *   · sidecar（缺省）：**母版不烧字**——出 `subtitles/<项目>.zh.srt|.zh.ass|.vtt` + 清单，
+ *     后期想用就软轨内嵌（`mux` 阶段）或交给剪辑软件，不想用就当没这回事（画面像素从未被改）；
+ *   · burn：仍把字烧进画面（另存 `master-subtitled.mp4`），母版变成带字版（发出去就回不来）。
+ * 旁挂文件与烧录共用同一套字体选型 / 版式 / ASS 生成器（subtitle-bridge plan），所以两种形态观感一致。
+ */
 /** 未重跑字幕时，若磁盘上有"不早于当前上游"的字幕版就沿用它（只重跑后段的场景） */
 let subtitled = STAGES.has("subtitle") ? colored : preferDownstream(join(POST_DIR, "master-subtitled.mp4"), colored);
+/** 旁挂字幕文件（sidecar 模式的产物；burn 模式下为 null，下游仍走烧字版） */
+let subtitleSidecar: { dir: string; srt: string; ass: string; manifest: string | null; timelineOk: boolean } | null = null;
 if (STAGES.has("subtitle") && existsSync(colored)) {
   const started = Date.now();
   const srtFile = join(POST_DIR, "subtitle.srt");
   writeFileSync(srtFile, buildSrt(), "utf8");
   const briefFile = BRIEF_FILE ? abs(BRIEF_FILE) : null;
-  const out = join(POST_DIR, "master-subtitled.mp4");
-  const result = runCli(SUBTITLE_CLI, [
-    "burn", "--in", colored, "--out", out, "--srt", srtFile,
-    "--title", arg("--title", shotlist.title ?? ""),
-    "--platform", arg("--platform", "抖音/快手"),
-    ...(briefFile ? ["--brief", briefFile] : []),
-    "--evidence-dir", join(POST_DIR, "subtitle-evidence")
-  ]);
-  const info = existsSync(out) ? probe(out) : {};
-  const verdict = await reviewStage({
-    stage: "subtitle", projectId: PROJECT,
-    artifacts: [{ path: existsSync(out) ? out : colored, kind: "video", probe: info }, { path: srtFile, kind: "text" }],
-    deterministic: [
-      { id: "burned", pass: existsSync(out), detail: existsSync(out) ? "字幕版已产出" : "字幕版未产出", hard: true },
-      { id: "tool-exit", pass: result.ok, detail: result.ok ? "字幕工位退出码 0" : `字幕工位失败：${result.out.slice(-300)}`, hard: true },
-      { id: "timeline", pass: /时间轴回读 (\d+)\/(\d+) 条（一致）/.test(result.out) || result.out.includes("一致"), detail: (result.out.match(/时间轴回读[^\n]*/) ?? ["无回读信息"])[0] ?? "" }
-    ],
-    context: { srt: readFileSync(srtFile, "utf8").slice(0, 1200), platform: arg("--platform", "抖音/快手"), toolOutput: result.out.slice(-900) },
-    env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
-  });
-  if (existsSync(out)) subtitled = out;
-  record({
-    stage: "subtitle", shotId: null, invoked: true, ok: result.ok && existsSync(out), cached: false, degraded: false,
-    attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : null, evidence: { srt: srtFile, tool: "subtitle-bridge burn" }, verdict
-  });
+  const platform = arg("--platform", "抖音/快手");
+
+  if (SUBTITLE_MODE !== "burn") {
+    const sidecarDir = join(POST_DIR, "subtitles");
+    const sidecarResult = runCli(SUBTITLE_CLI, [
+      "sidecar", "--in", colored, "--out-dir", sidecarDir, "--srt", srtFile, "--name", PROJECT,
+      "--platform", platform,
+      ...(briefFile ? ["--brief", briefFile] : [])
+    ]);
+    const zhSrt = join(sidecarDir, `${PROJECT}.zh.srt`);
+    const zhAss = join(sidecarDir, `${PROJECT}.zh.ass`);
+    const manifest = join(sidecarDir, `${PROJECT}.subtitle-manifest.json`);
+    const timelineOk = sidecarResult.ok && /时间轴回读 ok/.test(sidecarResult.out);
+    const verdict = await reviewStage({
+      stage: "subtitle", projectId: PROJECT,
+      artifacts: [
+        { path: existsSync(zhSrt) ? zhSrt : srtFile, kind: "text", note: "旁挂字幕（母版未烧字）" },
+        ...(existsSync(zhAss) ? [{ path: zhAss, kind: "text" as const, note: "带版式的 ASS（软轨/再烧同源）" }] : [])
+      ],
+      deterministic: [
+        { id: "sidecar-produced", pass: existsSync(zhSrt) && existsSync(zhAss), detail: existsSync(zhSrt) ? "旁挂字幕文件已产出（srt + ass）" : "旁挂字幕文件未产出", hard: true },
+        { id: "tool-exit", pass: sidecarResult.ok, detail: sidecarResult.ok ? "字幕工位退出码 0" : `字幕工位失败：${sidecarResult.out.slice(-300)}`, hard: true },
+        { id: "timeline", pass: timelineOk, detail: (sidecarResult.out.match(/时间轴回读[^\n]*/) ?? ["无回读信息"])[0] ?? "" },
+        { id: "master-untouched", pass: sidecarResult.out.includes("母版未被改动 ok"), detail: "母版只读：出字幕文件的过程不改动画面（哈希与 mtime 双验）", hard: true }
+      ],
+      context: { mode: SUBTITLE_MODE, srt: readFileSync(srtFile, "utf8").slice(0, 1200), platform, toolOutput: sidecarResult.out.slice(-900) },
+      env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+    });
+    if (existsSync(zhSrt)) {
+      subtitleSidecar = { dir: sidecarDir, srt: zhSrt, ass: existsSync(zhAss) ? zhAss : zhSrt, manifest: existsSync(manifest) ? manifest : null, timelineOk };
+    }
+    record({
+      stage: "subtitle", shotId: null, invoked: true, ok: sidecarResult.ok && Boolean(subtitleSidecar), cached: false, degraded: false,
+      attempt: 1, ms: Date.now() - started, artifact: existsSync(zhSrt) ? zhSrt : null,
+      evidence: { mode: "sidecar", srt: zhSrt, ass: zhAss, manifest, tool: "subtitle-bridge sidecar", masterBurnedIn: false }, verdict
+    });
+    if (sidecarResult.ok) log(`字幕以旁挂文件产出（母版不烧字）：${zhSrt}`);
+  }
+
+  if (SUBTITLE_MODE !== "sidecar") {
+    const out = join(POST_DIR, "master-subtitled.mp4");
+    const result = runCli(SUBTITLE_CLI, [
+      "burn", "--in", colored, "--out", out, "--srt", srtFile,
+      "--title", arg("--title", shotlist.title ?? ""),
+      "--platform", platform,
+      ...(briefFile ? ["--brief", briefFile] : []),
+      "--evidence-dir", join(POST_DIR, "subtitle-evidence")
+    ]);
+    const info = existsSync(out) ? probe(out) : {};
+    const verdict = await reviewStage({
+      // 阶段名统一为 `subtitle`（历史裁决按阶段名检索：burn/sidecar 只是同一步的两种落地方式，
+      // 命名分开会让"历史日志里有 subtitle 的放行裁决"这条链路完整性检查在本模式下误判缺失）
+      stage: "subtitle", projectId: PROJECT,
+      artifacts: [{ path: existsSync(out) ? out : colored, kind: "video", probe: info }, { path: srtFile, kind: "text" }],
+      deterministic: [
+        { id: "burned", pass: existsSync(out), detail: existsSync(out) ? "字幕版已产出" : "字幕版未产出", hard: true },
+        { id: "tool-exit", pass: result.ok, detail: result.ok ? "字幕工位退出码 0" : `字幕工位失败：${result.out.slice(-300)}`, hard: true },
+        { id: "timeline", pass: /时间轴回读 (\d+)\/(\d+) 条（一致）/.test(result.out) || result.out.includes("一致"), detail: (result.out.match(/时间轴回读[^\n]*/) ?? ["无回读信息"])[0] ?? "" }
+      ],
+      context: { mode: SUBTITLE_MODE, srt: readFileSync(srtFile, "utf8").slice(0, 1200), platform, toolOutput: result.out.slice(-900) },
+      env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+    });
+    if (existsSync(out)) subtitled = out;
+    record({
+      stage: "subtitle", shotId: null, invoked: true, ok: result.ok && existsSync(out), cached: false, degraded: false,
+      attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : null,
+      evidence: { mode: "burn", srt: srtFile, tool: "subtitle-bridge burn", masterBurnedIn: true }, verdict
+    });
+  } else {
+    // sidecar 模式：画面这一路保持"未烧字"，下游（弹幕/配乐/封面）都从干净版派生
+    subtitled = colored;
+  }
 }
 
 /* ---------- ⑦ 弹幕（subtitle-bridge danmaku） ---------- */
@@ -1228,7 +1301,62 @@ if (STAGES.has("cover") && existsSync(scored)) {
   });
 }
 
-/* ---------- ⑩ 母版交付 + 终审 ---------- */
+/* ---------- ⑩ 软字幕轨收口（母版不烧字 + 字幕可开关） ---------- */
+/**
+ * 旁挂字幕的两种用法在这里分叉：
+ *   · 交付目录里保留 `.srt/.ass/.vtt` 文件（平台后台上传口 / 剪辑软件用）；
+ *   · 另出一支 `-softsub.mp4`：字幕作为**可开关的字幕轨**内嵌，画面与声音轨逐帧 copy
+ *     （工位复检四件：video_unchanged / audio_unchanged / duration_kept / subtitle_tracks）。
+ * 这样"要带字幕的片子"和"不要字幕的片子"是同一个画面母版派生的两个文件，不会各烧一遍。
+ */
+let softsubFile: string | null = null;
+if (STAGES.has("mux") && subtitleSidecar && existsSync(scored) && !DRY_RUN) {
+  const started = Date.now();
+  const deliverSubtitleDir = join(OUT_DIR, "subtitles");
+  mkdirSync(deliverSubtitleDir, { recursive: true });
+  for (const name of readdirSync(subtitleSidecar.dir)) {
+    if (!/\.(srt|ass|vtt|json)$/i.test(name)) continue;
+    execFileSync("cp", [join(subtitleSidecar.dir, name), join(deliverSubtitleDir, name)]);
+  }
+  const out = join(OUT_DIR, `${PROJECT}-softsub.mp4`);
+  const result = runCli(SUBTITLE_CLI, [
+    "softmux", "--in", scored, "--out", out,
+    "--srt", join(deliverSubtitleDir, `${PROJECT}.zh.srt`),
+    "--lang", arg("--subtitle-lang", "chi"),
+    ...(existsSync(join(deliverSubtitleDir, `${PROJECT}.en.srt`))
+      ? ["--srt-en", join(deliverSubtitleDir, `${PROJECT}.en.srt`), "--lang-en", "eng"]
+      : [])
+  ]);
+  const info = existsSync(out) ? probe(out) : {};
+  const verdict = await reviewStage({
+    stage: "mux", projectId: PROJECT,
+    artifacts: [
+      ...(existsSync(out) ? [{ path: out, kind: "video" as const, probe: info, note: "软字幕轨版（字幕可开关，画面零改动）" }] : []),
+      ...(existsSync(join(deliverSubtitleDir, `${PROJECT}.zh.srt`))
+        ? [{ path: join(deliverSubtitleDir, `${PROJECT}.zh.srt`), kind: "text" as const, note: "交付目录里的旁挂字幕" }]
+        : [])
+    ],
+    deterministic: [
+      { id: "softsub-produced", pass: existsSync(out), detail: existsSync(out) ? "软字幕轨版已产出" : "软字幕轨版未产出", hard: true },
+      { id: "tool-exit", pass: result.ok, detail: result.ok ? "字幕工位退出码 0" : `软轨内嵌失败：${result.out.slice(-300)}`, hard: true },
+      { id: "video-unchanged", pass: result.out.includes("video_unchanged=ok"), detail: (result.out.match(/复检：[^\n]*/) ?? ["无复检信息"])[0] ?? "", hard: true },
+      { id: "subtitle-files", pass: existsSync(join(deliverSubtitleDir, `${PROJECT}.zh.srt`)), detail: "交付目录含旁挂字幕文件（平台上传口/剪辑软件可直接用）", hard: true }
+    ],
+    context: { mode: SUBTITLE_MODE, toolOutput: result.out.slice(-900), softsub: out },
+    env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+  });
+  if (existsSync(out)) softsubFile = out;
+  record({
+    stage: "mux", shotId: null, invoked: true, ok: result.ok && existsSync(out), cached: false, degraded: false,
+    attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : null,
+    evidence: { tool: "subtitle-bridge softmux", subtitlesDir: deliverSubtitleDir, videoUnchanged: result.out.includes("video_unchanged=ok") }, verdict
+  });
+  if (existsSync(out)) {
+    log(`软字幕轨版：${out}（画面与 ${basename(scored)} 逐帧一致；旁挂字幕在 ${deliverSubtitleDir}）`);
+  }
+}
+
+/* ---------- ⑪ 母版交付 + 终审 ---------- */
 if (existsSync(scored) && !DRY_RUN) {
   const deliverable = join(OUT_DIR, `${PROJECT}-30s-final.mp4`);
   execFileSync("cp", [scored, deliverable]);
@@ -1239,12 +1367,19 @@ if (existsSync(scored) && !DRY_RUN) {
    * 历史裁决来自 stages.jsonl；血缘来自文件与 mtime 递进——两者都过才算五项后期都落地。
    */
   const history = readStageHistory();
+  /**
+   * 血缘链按**实际落地方式**拼：sidecar 模式下母版不烧字，`master-subtitled.mp4` 本来就不该存在，
+   * 若把它写死进链，血缘检查会因"缺产物"永久红灯（真机回归会踩）。
+   */
   const chain = [
     { label: "raw", path: join(POST_DIR, "master-raw.mp4") },
     { label: "graded", path: join(POST_DIR, "master-graded.mp4") },
-    { label: "subtitled", path: join(POST_DIR, "master-subtitled.mp4") },
+    ...(existsSync(join(POST_DIR, "master-subtitled.mp4"))
+      ? [{ label: "subtitled", path: join(POST_DIR, "master-subtitled.mp4") }]
+      : []),
     { label: "danmaku", path: join(POST_DIR, "master-danmaku.mp4") },
-    { label: "scored", path: scored }
+    { label: "scored", path: scored },
+    ...(softsubFile ? [{ label: "softsub", path: softsubFile }] : [])
   ];
   const lineage = lineageCheck(chain);
   const capabilityChecks = (["color", "subtitle", "danmaku", "bgm"] as const).map((stage) => ({
@@ -1272,6 +1407,8 @@ if (existsSync(scored) && !DRY_RUN) {
     artifacts: [
       { path: deliverable, kind: "video", bytes: Number(info.bytes ?? 0), probe: info },
       ...(existsSync(join(OUT_DIR, `${PROJECT}-cover.png`)) ? [{ path: join(OUT_DIR, `${PROJECT}-cover.png`), kind: "image" as const, note: "封面产物" }] : []),
+      ...(softsubFile ? [{ path: softsubFile, kind: "video" as const, note: "软字幕轨版（字幕可开关、画面零改动）" }] : []),
+      ...(subtitleSidecar ? [{ path: subtitleSidecar.srt, kind: "text" as const, note: "旁挂字幕文件（母版未烧字）" }] : []),
       { path: STAGE_LOG, kind: "json", note: "逐环节阶段日志（invoked/ok/degraded/cached/verdict）" }
     ],
     deterministic: [
@@ -1282,6 +1419,20 @@ if (existsSync(scored) && !DRY_RUN) {
       { id: "no-black-frame", pass: accidents.blackSeconds <= 0.2, detail: `最长黑帧 ${accidents.blackSeconds.toFixed(2)}s（阈值 ≤0.2s）· ${accidents.detail}`, hard: true },
       { id: "silence-window", pass: accidents.silenceSeconds <= 2.0, detail: `最长静音段 ${accidents.silenceSeconds.toFixed(2)}s（阈值 ≤2.0s；配乐铺底后不应出现长静音）` },
       { id: "post-chain-lineage", pass: lineage.ok, detail: lineage.detail },
+      /**
+       * 字幕交付口径（2026-09-24）：sidecar 模式必须真的留下旁挂文件；
+       * burn 模式必须真的有带字成片。两种都不能"说交付了但盘上什么都没有"。
+       */
+      {
+        id: "subtitle-delivery",
+        pass: SUBTITLE_MODE === "burn"
+          ? existsSync(join(POST_DIR, "master-subtitled.mp4"))
+          : Boolean(subtitleSidecar && existsSync(subtitleSidecar.srt)),
+        detail: SUBTITLE_MODE === "burn"
+          ? "字幕模式 burn：成片含烧录字幕"
+          : `字幕模式 sidecar：母版不烧字，旁挂文件 ${subtitleSidecar ? basename(subtitleSidecar.srt) : "(缺失)"}${softsubFile ? " + 软字幕轨版" : ""}`,
+        hard: true
+      },
       ...capabilityChecks
     ],
     context: { stageSummary, stages: [...STAGES] },
