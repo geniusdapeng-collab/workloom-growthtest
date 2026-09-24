@@ -1158,6 +1158,27 @@ export function alignBeatGrid({ bpm, cuts = [], stepMs = 5, maxCuts = 60, weight
  * 侧链压缩参数：把"目标让位深度(dB)"换算成 sidechaincompress 的阈值。
  * 压缩衰减 ≈ (侧链电平 - 阈值) × (1 - 1/ratio)，因此阈值 = 人声电平 - 深度 / (1 - 1/ratio)。
  */
+/**
+ * 峰值对齐的**预卷相位**（2026-09-24 真机修复）。
+ *
+ * 缺陷背景：`--section auto` 的"高潮对齐"早先是把**整条音乐床延后** `desiredStartSec` 秒
+ * （`adelay=25.733s`），于是 30s 片子里前 25.7s 完全没有音乐——真机产品所有者反馈
+ * "我听不到你新合成的 BGM"，实测 `ducked-music.wav` 前 25s 为数字静音（-120dBFS）。
+ *
+ * 正确做法是**相位预卷**：把选段按相位旋转后再循环铺满，
+ * 使段内峰值仍落在片子高点，同时从 0s 起就有音乐。
+ *
+ * @param {{sectionDurationSec:number, anchorOffsetSec:number, filmPeakSec:number}} p
+ * @returns {number} 旋转相位（秒，0 ≤ phase < sectionDurationSec）
+ */
+export function prerollPhaseSec({ sectionDurationSec, anchorOffsetSec, filmPeakSec }) {
+  const L = Number(sectionDurationSec);
+  const anchor = Number(anchorOffsetSec) || 0;
+  const peak = Number(filmPeakSec) || 0;
+  if (!Number.isFinite(L) || L <= 0) return 0;
+  return round((((anchor - peak) % L) + L) % L, 4);
+}
+
 export function deriveDuckParams({ speechLevelDb, duckingDb, ratio = 8 }) {
   const depth = Math.max(0, Number(duckingDb) || 0);
   const ratioSafe = Math.max(2, Number(ratio) || 8);
@@ -1410,6 +1431,45 @@ export async function mix({
         loops: sectionArtifact.durationSec > 0 ? Math.ceil(duration / sectionArtifact.durationSec) : 0,
         sha256: sectionArtifact.sha256,
       };
+      /**
+       * 预卷（2026-09-24 真机修复）：需要"整段延后"才能对齐峰值时，改为**旋转选段 + 从 0s 铺满**。
+       * 否则前 `sectionPlaceOffsetSec` 秒是静音（真机 25.7s / 30s 无音乐）。
+       */
+      if (sectionPlaceOffsetSec !== null && sectionPlaceOffsetSec > 0.05 && Number.isFinite(filmArc?.peakTimeSec)) {
+        const L = sectionArtifact.durationSec;
+        const phase = prerollPhaseSec({ sectionDurationSec: L, anchorOffsetSec, filmPeakSec: filmArc.peakTimeSec });
+        const rotatedPath = path.join(work, "section-prerolled.wav");
+        await runBin(bins.ffmpeg, [
+          "-hide_banner", "-v", "error", "-y",
+          "-i", sectionArtifact.path,
+          "-filter_complex",
+          `[0:a]atrim=start=${phase},asetpts=N/SR/TB[head];[0:a]atrim=end=${phase},asetpts=N/SR/TB[tail];`
+          + "[head][tail]concat=n=2:v=0:a=1[out]",
+          "-map", "[out]", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", rotatedPath,
+        ], { label: "ffmpeg(section-preroll)", timeoutMs: 300_000 });
+        playPath = rotatedPath;
+        sectionPlaceOffsetSec = 0;
+        sectionPlan.preroll = {
+          applied: true,
+          phaseSec: phase,
+          sectionDurationSec: L,
+          reason: `选段按相位旋转 ${phase}s 后再循环铺满：峰值仍落在片子高点 ${round(filmArc.peakTimeSec, 3)}s，且从 0s 起全程有音乐`,
+          previousBug: "早先把整条音乐床延后，导致前段静音（2026-09-24 真机：30s 片子里 25.7s 无音乐）",
+        };
+        if (sectionPlan.filmPeakAlign) {
+          /**
+           * 落点（新语义）：旋转后峰值首次出现在 `(anchor − phase) mod L`，之后每 L 秒重现一次；
+           * 取能覆盖到片子高点的那个整圈，得到**实际落点**，供复检与测试断言。
+           */
+          const firstPeak = ((anchorOffsetSec - phase) % L + L) % L;
+          const loopsToPeak = Math.floor((filmArc.peakTimeSec - firstPeak) / L);
+          const landed = round(firstPeak + loopsToPeak * L, 3);
+          sectionPlan.filmPeakAlign.note = `选段相位预卷 ${phase}s 后循环铺底：峰值对齐到片子高点 ${round(filmArc.peakTimeSec, 3)}s（全程有音乐）`;
+          sectionPlan.filmPeakAlign.placedAtSec = round(phase, 3);
+          sectionPlan.filmPeakAlign.peakLandedAtSec = landed;
+          sectionPlan.filmPeakAlign.mode = "preroll-loop";
+        }
+      }
     } else {
       sectionPlan = { ...sectionPlan, chosen: null, note: "选段结果不足 0.5s，回退整曲循环" };
     }

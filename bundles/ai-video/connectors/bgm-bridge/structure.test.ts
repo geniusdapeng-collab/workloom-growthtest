@@ -28,6 +28,30 @@ const hasFfmpeg = (() => {
 
 const workDir = join(tmpdir(), `bgm-structure-${Date.now().toString(36)}`);
 const musicPath = join(workDir, "music.wav");
+
+/**
+ * 「混音 − 原片」在指定窗口的残差 RMS（dBFS）——用来量"配乐到底有没有进画面"。
+ * 这是 2026-09-24 真机事故（配乐被整条延后、前 25.7s 静音）的**结果级判据**。
+ */
+function measureResidualRmsDb(reference: string, mixed: string, startSec: number, durationSec: number): number {
+  const decode = (file: string): Float32Array => {
+    const buf = execFileSync(bins.ffmpeg, [
+      "-v", "error", "-ss", String(startSec), "-t", String(durationSec), "-i", file,
+      "-f", "f32le", "-ac", "1", "-ar", "48000", "-",
+    ], { maxBuffer: 1 << 30 });
+    const n = Math.floor(buf.length / 4);
+    const out = new Float32Array(n);
+    for (let i = 0; i < n; i += 1) out[i] = buf.readFloatLE(i * 4);
+    return out;
+  };
+  const a = decode(reference);
+  const b = decode(mixed);
+  const n = Math.min(a.length, b.length);
+  let sum = 0;
+  for (let i = 0; i < n; i += 1) { const d = b[i]! - a[i]!; sum += d * d; }
+  const rms = Math.sqrt(sum / Math.max(1, n));
+  return rms > 0 ? 20 * Math.log10(rms) : -120;
+}
 const filmPath = join(workDir, "film.mp4");
 const mixedPath = join(workDir, "film-scored.mp4");
 
@@ -130,10 +154,32 @@ describe.skipIf(!hasFfmpeg)("配乐结构识别与选段（真实 ffmpeg）", ()
     expect(report.section.filmPeakAlign).toBeTruthy();
     expect(report.section.played).toBeTruthy();
 
-    // 落点校验：曲子高潮峰值 + 起播偏移 ≈ 片子高潮时刻
-    const align = report.section.filmPeakAlign as { filmPeakSec: number; musicAnchorOffsetSec: number; placedAtSec: number };
-    const landed = align.placedAtSec + align.musicAnchorOffsetSec;
-    expect(Math.abs(landed - align.filmPeakSec)).toBeLessThanOrEqual(1.5);
+    /**
+     * 落点校验（2026-09-24 语义更新）：
+     * 旧实现是"整条音乐床延后"（placedAtSec + anchor ≈ 片子高点），代价是**前段完全静音**
+     * （真机事故：30s 成片里 25.7s 无音乐）。
+     * 新实现是**相位预卷**：`mode=preroll-loop`，峰值的**实际落点**（含整圈循环）对齐片子高点，
+     * 且从 0s 起全程有音乐。断言改用 `peakLandedAtSec`。
+     */
+    const align = report.section.filmPeakAlign as {
+      filmPeakSec: number; musicAnchorOffsetSec: number; placedAtSec: number;
+      peakLandedAtSec?: number; mode?: string;
+    };
+    expect(align.mode).toBe("preroll-loop");
+    expect(typeof align.peakLandedAtSec).toBe("number");
+    expect(Math.abs((align.peakLandedAtSec ?? 0) - align.filmPeakSec)).toBeLessThanOrEqual(1.5);
+    /**
+     * 回归（结果级，最关键）：**开头不许静音**。
+     * 旧实现把整条床延后 25.7s，前段残差 ≈ 0；新实现从 0s 起有音乐，
+     * 因此用"混音 − 原片"的前 3s 残差 RMS 作为判据（> -40dBFS 即证明开头有配乐）。
+     */
+    const earlyMusic = measureResidualRmsDb(filmPath, mixedPath, 0, 3);
+    expect(earlyMusic).toBeGreaterThan(-40);
+    const preroll = report.section.preroll as { applied?: boolean; phaseSec?: number } | undefined;
+    if (preroll?.applied) {
+      expect(preroll.phaseSec!).toBeGreaterThanOrEqual(0);
+      expect(preroll.phaseSec!).toBeLessThan(align.filmPeakSec);
+    }
     expect(Object.values(report.checks).every(Boolean)).toBe(true);
     expect(report.evidence.sectionPicked).toBeTruthy();
   }, 180_000);
