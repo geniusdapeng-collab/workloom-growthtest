@@ -335,7 +335,20 @@ function assertLicenseUsable(track, { commercialUse = true, licenseReviewed = tr
  * 只做检索与合规判定，不下载、不搬运（音源由客户/工位本地提供）。
  */
 export function findTracks(query = {}, env = process.env) {
-  const library = loadLibraryTracks(env);
+  /**
+   * 多曲库根合并（2026-09-24 修复）：
+   * 早先这里用 `loadLibraryTracks()`——**只读** `library/bgm-library` 单目录；
+   * 而随仓兜底曲库在 `library/bgm-library-curated`、工位曲库在 `~/.workloom-bgm/library`，
+   * 于是 `bgm-cli library` 恒报「曲库未接入（缺 tracks.json）」：库里 1000+ 首曲子，
+   * 选曲入口却看不见，只能退回自算作曲（真机 VID-PJL01 配乐被迫走旧通路）。
+   * 与 `resolveTrackForBrief` 对齐，改用 `loadAllLocalTracks()`（客户库 → 随仓 → 工位）。
+   */
+  const library = loadAllLocalTracks(env);
+  const presentSources = library.sources.filter((source) => source.present);
+  const libraryPresent = presentSources.length > 0;
+  const libraryNote = libraryPresent ? null : "曲库未接入（缺 tracks.json）；可用 bgmwrite.compose 走自算作曲";
+  /** 曲目所在根目录（用于把 tracks.json 里的相对 path 还原成绝对路径） */
+  const rootOf = (kind) => library.sources.find((source) => source.kind === kind)?.dir ?? library.dir;
   const norm = (value) => String(value ?? "").trim().toLowerCase();
   const mood = norm(query.mood);
   const genre = norm(query.genre);
@@ -358,7 +371,7 @@ export function findTracks(query = {}, env = process.env) {
     })
     .map((track) => {
       const info = licenseInfo(track.license);
-      const absolute = track.path ? path.resolve(library.dir, track.path) : null;
+      const absolute = track.localPath ?? (track.path ? path.resolve(rootOf(track.libraryKind), track.path) : null);
       return {
         id: track.id,
         title: track.title ?? null,
@@ -391,15 +404,16 @@ export function findTracks(query = {}, env = process.env) {
   }
 
   return {
-    libraryDir: library.dir,
-    libraryPresent: library.present,
-    note: library.note,
+    libraryDir: presentSources.map((source) => source.dir).join(" + "),
+    libraryPresent,
+    note: libraryNote,
     total: library.tracks.length,
     matched: items.length,
     commercialUse,
     track: selected,
     items: items.slice(0, 20),
     licenseTable: LICENSE_TABLE,
+    sources: library.sources,
   };
 }
 

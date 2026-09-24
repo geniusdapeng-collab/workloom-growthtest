@@ -132,6 +132,54 @@ function record(rec: Omit<StageRecord, "at">): void {
   log(`  ⇢ [${full.stage}${full.shotId ? ` ${full.shotId}` : ""}] ${tag}${full.cached ? "（复用）" : ""} ${full.ms}ms${full.artifact ? ` → ${full.artifact}` : ""}`);
 }
 
+/**
+ * 读取**历史**阶段日志（同一 work-dir 的 `stages.jsonl`）。
+ *
+ * 为什么需要（2026-09-24 真机）：`--stages bgm,master` 这类"只重跑一段"的用法里，
+ * 进程内 `records` 只有本次的两个环节，终审门因此误判"调色/字幕/弹幕没执行"。
+ * 正确口径是看**产物血缘 + 历史裁决**：文件在、顺序对、历史里有放行记录，就算链路完整。
+ */
+function readStageHistory(): StageRecord[] {
+  if (!existsSync(STAGE_LOG)) return [];
+  try {
+    return readFileSync(STAGE_LOG, "utf8").split("\n").filter(Boolean).map((line) => JSON.parse(line) as StageRecord);
+  } catch {
+    return [];
+  }
+}
+
+/** 历史里某个环节是否有"放行"裁决（没有裁决记录的跳过环节按未知处理，不冒充已通过） */
+function historyApproved(history: StageRecord[], stage: string): boolean {
+  return history.some((r) => r.stage === stage && r.ok && (r.verdict ? r.verdict.approved : true));
+}
+
+/** 产物血缘：文件存在 + mtime 递进（raw → graded → subtitled → danmaku → scored） */
+function lineageCheck(files: Array<{ label: string; path: string }>): { ok: boolean; detail: string } {
+  const missing = files.filter((f) => !existsSync(f.path));
+  if (missing.length > 0) return { ok: false, detail: `缺产物：${missing.map((f) => f.label).join("、")}` };
+  const times = files.map((f) => ({ ...f, mtime: statSync(f.path).mtimeMs }));
+  const outOfOrder = times.some((entry, index) => index > 0 && entry.mtime < times[index - 1]!.mtime);
+  return {
+    ok: !outOfOrder,
+    detail: outOfOrder
+      ? `产物时间顺序异常：${times.map((t) => `${t.label}=${new Date(t.mtime).toISOString().slice(11, 19)}`).join(" → ")}`
+      : `产物血缘完整：${times.map((t) => `${t.label}(${(statSync(t.path).size / 1048576).toFixed(1)}MB)`).join(" → ")}`
+  };
+}
+
+/**
+ * 下游产物选择（2026-09-24 真机修复）：
+ * 只重跑某一段时（例如 `--stages bgm,master`），未被重跑的环节应**沿用磁盘上更下游的既有产物**，
+ * 而不是退回上游原片——早先 `let colored = master` 这类默认值会把"只跑 master"变成"交付未调色未烧字的原片"，
+ * 同时让血缘检查（scored 的 mtime 早于 danmaku）永久失败。
+ * 判据：候选文件存在且 **mtime 不早于**上游产物（晚于等于即视为由它或更晚的链路产出）。
+ */
+function preferDownstream(candidate: string, upstream: string): string {
+  if (!existsSync(candidate)) return upstream;
+  if (!existsSync(upstream)) return candidate;
+  return statSync(candidate).mtimeMs >= statSync(upstream).mtimeMs ? candidate : upstream;
+}
+
 /* ================= 媒体工具 ================= */
 
 function run(bin: string, args: string[]): string {
@@ -846,7 +894,8 @@ if (STAGES.has("compose")) {
 }
 
 /* ---------- ⑤ 调色（color-bridge 择优） ---------- */
-let colored = master;
+/** 未重跑调色时：磁盘上若已有"不早于 raw"的调色版就沿用它（只重跑后段的场景） */
+let colored = STAGES.has("color") ? master : preferDownstream(join(POST_DIR, "master-graded.mp4"), master);
 if (STAGES.has("color") && existsSync(master)) {
   const started = Date.now();
   const graded = join(POST_DIR, "master-graded.mp4");
@@ -898,7 +947,8 @@ if (STAGES.has("color") && existsSync(master)) {
 }
 
 /* ---------- ⑥ 字幕（subtitle-bridge：选型 + 版式 + 烧录） ---------- */
-let subtitled = colored;
+/** 未重跑字幕时，若磁盘上有"不早于当前上游"的字幕版就沿用它（只重跑后段的场景） */
+let subtitled = STAGES.has("subtitle") ? colored : preferDownstream(join(POST_DIR, "master-subtitled.mp4"), colored);
 if (STAGES.has("subtitle") && existsSync(colored)) {
   const started = Date.now();
   const srtFile = join(POST_DIR, "subtitle.srt");
@@ -932,7 +982,7 @@ if (STAGES.has("subtitle") && existsSync(colored)) {
 }
 
 /* ---------- ⑦ 弹幕（subtitle-bridge danmaku） ---------- */
-let danmakuOut = subtitled;
+let danmakuOut = STAGES.has("danmaku") ? subtitled : preferDownstream(join(POST_DIR, "master-danmaku.mp4"), subtitled);
 if (STAGES.has("danmaku") && existsSync(subtitled)) {
   const started = Date.now();
   const itemsFile = DANMAKU_FILE ? abs(DANMAKU_FILE) : join(POST_DIR, "danmaku.json");
@@ -987,7 +1037,8 @@ if (STAGES.has("danmaku") && existsSync(subtitled)) {
 }
 
 /* ---------- ⑧ 配乐（bgm-bridge） ---------- */
-let scored = danmakuOut;
+/** 未重跑配乐时沿用磁盘上不早于上游的配乐版；重跑则由下面的 bgm 环节覆盖 */
+let scored = STAGES.has("bgm") ? danmakuOut : preferDownstream(join(POST_DIR, "master-scored.mp4"), danmakuOut);
 if (STAGES.has("bgm") && existsSync(danmakuOut)) {
   const started = Date.now();
   const out = join(POST_DIR, "master-scored.mp4");
@@ -995,6 +1046,15 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
   const mood = arg("--bgm-mood", "温润治愈");
   const policy = arg("--bgm-policy", "keep-dialogue");
   const sourcePolicy = arg("--bgm-source-policy", "online-first");
+  /**
+   * 指定曲目（2026-09-24 真机补）：`--bgm-track <曲库 id | 绝对路径>`。
+   *
+   * 背景：`best` 的自动选曲在"题材"维度上不够硬——真机把「运动/高燃」的曲目选给了江南水乡口播片
+   * （match.reasons 明确写着"题材未命中"，但因为能量/BPM 命中仍被采信）。
+   * 产品所有者本地曲库（`~/.workloom-bgm/library`，1034 首，已打标）里本就有题材贴合的曲子，
+   * 因此监制可以直接点名曲目：这条路径**跳过自动择优**，但仍走工位的混音/让位/响度/选段全套复检。
+   */
+  const chosenTrack = arg("--bgm-track", "");
   const result = runCli(BGM_CLI, [
     "best", "--in", danmakuOut, "--out", out, "--genre", genre, "--mood", mood, "--policy", policy,
     "--source-policy", sourcePolicy,
@@ -1009,7 +1069,30 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
    */
   let bgmVia = "best";
   let bgmDetail = result.out.slice(-800);
-  if (!existsSync(out)) {
+  if (chosenTrack) {
+    /** 监制点名曲目：id → 走曲库索引解析出绝对路径；已是绝对路径则直用 */
+    let trackPath = chosenTrack;
+    if (!existsSync(trackPath)) {
+      try {
+        const core = await import(join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/core.mjs"));
+        const found = (core as { findTracks: (q: Record<string, unknown>) => { track?: { path?: string } } })
+          .findTracks({ trackId: chosenTrack, commercialUse: true });
+        if (found.track?.path && existsSync(found.track.path)) trackPath = found.track.path;
+        else throw new Error(`曲库中未找到可用曲目：${chosenTrack}`);
+      } catch (err) {
+        throw new Error(`--bgm-track 解析失败（${chosenTrack}）：${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    const mix = runCli(BGM_CLI, [
+      "mix", "--in", danmakuOut, "--out", out, "--bgm", trackPath, "--policy", policy,
+      "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
+      "--section", arg("--bgm-section", "auto"),
+      "--evidence-dir", join(POST_DIR, "bgm-evidence")
+    ]);
+    bgmVia = "library-track";
+    bgmDetail = `监制点名曲目（跳过自动择优）：${trackPath}\n--- mix ---\n${mix.out.slice(-900)}`;
+    log(`↻ 配乐：监制点名曲库曲目 → ${trackPath.split("/").slice(-1)[0]}（走混音/让位/响度/选段复检）`);
+  } else if (!existsSync(out)) {
     const recipe = arg("--bgm-recipe", "interview");
     const bgmFile = join(POST_DIR, "bgm-composed.wav");
     const compose = runCli(BGM_CLI, ["compose", "--out", bgmFile, "--in", danmakuOut, "--id", recipe, "--seed", "20260924"]);
@@ -1104,6 +1187,26 @@ if (existsSync(scored) && !DRY_RUN) {
   execFileSync("cp", [scored, deliverable]);
   const info = probe(deliverable);
   const accidents = detectQualityAccidents(deliverable);
+  /**
+   * 链路完整性：**产物血缘 + 历史裁决**（支持"只重跑一段"）。
+   * 历史裁决来自 stages.jsonl；血缘来自文件与 mtime 递进——两者都过才算五项后期都落地。
+   */
+  const history = readStageHistory();
+  const chain = [
+    { label: "raw", path: join(POST_DIR, "master-raw.mp4") },
+    { label: "graded", path: join(POST_DIR, "master-graded.mp4") },
+    { label: "subtitled", path: join(POST_DIR, "master-subtitled.mp4") },
+    { label: "danmaku", path: join(POST_DIR, "master-danmaku.mp4") },
+    { label: "scored", path: scored }
+  ];
+  const lineage = lineageCheck(chain);
+  const capabilityChecks = (["color", "subtitle", "danmaku", "bgm"] as const).map((stage) => ({
+    id: `history-${stage}`,
+    pass: historyApproved(history, stage),
+    detail: historyApproved(history, stage)
+      ? `历史日志里有 ${stage} 的放行裁决`
+      : `历史日志里没有 ${stage} 的放行裁决（若本次只重跑部分环节，请确认该环节此前确实执行过）`
+  }));
   const stageSummary = {
     total: records.length,
     invoked: records.filter((r) => r.invoked).length,
@@ -1131,7 +1234,8 @@ if (existsSync(scored) && !DRY_RUN) {
       { id: "audio", pass: Boolean(info.hasAudio), detail: info.hasAudio ? `音轨 ${info.acodec}` : "无音轨", hard: true },
       { id: "no-black-frame", pass: accidents.blackSeconds <= 0.2, detail: `最长黑帧 ${accidents.blackSeconds.toFixed(2)}s（阈值 ≤0.2s）· ${accidents.detail}`, hard: true },
       { id: "silence-window", pass: accidents.silenceSeconds <= 2.0, detail: `最长静音段 ${accidents.silenceSeconds.toFixed(2)}s（阈值 ≤2.0s；配乐铺底后不应出现长静音）` },
-      { id: "post-chain", pass: records.some((r) => r.stage === "color") && records.some((r) => r.stage === "subtitle") && records.some((r) => r.stage === "danmaku") && records.some((r) => r.stage === "bgm"), detail: "调色/字幕/弹幕/配乐四段都在链路上被执行" }
+      { id: "post-chain-lineage", pass: lineage.ok, detail: lineage.detail },
+      ...capabilityChecks
     ],
     context: { stageSummary, stages: [...STAGES] },
     env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
