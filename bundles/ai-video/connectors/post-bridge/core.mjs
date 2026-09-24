@@ -747,7 +747,12 @@ async function mixVariantAudio({
         break;
       } catch (error) {
         lastError = error;
-        const retryableVerify = (error?.code ?? "") === "verify_failed";
+        /**
+         * 只有「测得偏低」值得退一档重试（可能是电平偏高）。
+         * bgm-bridge 对「测不到可闻度」（无安静窗口）显式标 `retryable:false`——
+         * 那种情况降 3dB 也测不到，重试纯属白跑（2026-09-24 真机复核后加）。
+         */
+        const retryableVerify = (error?.code ?? "") === "verify_failed" && error?.retryable !== false;
         if (!retryableVerify || attempt.autoTrimDb !== 0) throw error;
       }
     }
