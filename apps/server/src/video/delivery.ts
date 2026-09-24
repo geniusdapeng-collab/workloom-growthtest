@@ -561,11 +561,15 @@ export function selectDeliveryVariant({
   dir, variantId, note = null, by = null, env = process.env,
 }: {
   dir: string; variantId: string; note?: string | null; by?: string | null; env?: NodeJS.ProcessEnv;
-}): DeliverySelection {
+}): DeliverySelection & {
+  selectionCount: number;
+  projectId: string;
+  variant: { id: string; name: string; positioning: string | null; style: ManifestVariant["style"] | null } | null;
+} {
   const packageDir = resolvePackageDir(dir, env);
   const manifest = readJson<DeliveryManifest>(join(packageDir, "delivery-manifest.json"));
-  const exists = (manifest?.variants ?? []).some((variant) => variant.id === variantId);
-  if (!exists) {
+  const matched = (manifest?.variants ?? []).find((variant) => variant.id === variantId);
+  if (!matched) {
     throw new DeliveryError(
       `交付包里没有变体「${variantId}」`
       + `（可用：${(manifest?.variants ?? []).map((variant) => variant.id).join("、") || "无"}）`,
@@ -580,7 +584,85 @@ export function selectDeliveryVariant({
   };
   writeFileSync(join(packageDir, "selection.json"), `${JSON.stringify(selection, null, 2)}\n`, "utf8");
   appendFileSync(join(packageDir, "selections.jsonl"), `${JSON.stringify(selection)}\n`, "utf8");
-  return selection;
+  /**
+   * 一并返回"这一版被选过几次"：选择结果回流组织偏好池时用它推导 confidence，
+   * 让"同一风格被反复选中"表现为置信度单调上调，而不是每次都写同一个 0.5。
+   */
+  const selectionCount = readSelections(packageDir).filter((row) => row.variantId === variantId).length;
+  return {
+    ...selection,
+    selectionCount,
+    projectId: String(manifest?.projectId ?? ""),
+    variant: {
+      id: matched.id,
+      name: String(matched.name ?? matched.id),
+      positioning: matched.positioning ?? null,
+      style: matched.style ?? null,
+    },
+  };
+}
+
+/* ============== 选择结果 → 组织偏好池（evolve 偏好写入侧） ============== */
+
+/**
+ * 把"用户在交付包里选了哪个风格版本"翻译成**组织偏好记忆**。
+ *
+ * 为什么写在行业层：偏好措辞是视频语义（调色 / 配乐 / 转场 / 文案口吻），基座 `evolve`
+ * 只提供通用的偏好检索与注入；行业措辞留在行业包，避免底座行业零残留（不变量 D18）。
+ *
+ * 闭环（不需要重训任何模型）：
+ *   选择 → 本函数产出偏好内容 → `upsertMemoryInTx` 落 `org_memory(kind='preference', scope='workspace')`
+ *   → `packages/runtime/src/loop.ts` / `ask.ts` 执行前注入（`loadActivePreferences` +
+ *   `buildPreferenceBlock`）→ 下一轮出片的提案与变体默认值自动贴合这口味。
+ */
+export function buildVariantPreferenceContent(input: {
+  projectId: string;
+  variantId: string;
+  variantName?: string | null;
+  positioning?: string | null;
+  style?: {
+    color?: { profile?: string | null; lut?: string | null; intensity?: number | null } | null;
+    bgm?: { mood?: string | null; style?: string | null; policy?: string | null } | null;
+    transitions?: { mode?: string; fadeSec?: number } | null;
+    copyTone?: string | null;
+  } | null;
+  note?: string | null;
+}): string {
+  const style = input.style ?? {};
+  /**
+   * 注意：**不要用 `profile@强度` 这种写法**——workdata 的 PII 脱敏会把 `warm-film@0.75`
+   * 误判成邮箱并替换为 `[PII:EMAIL:…]`（真机实测：偏好内容里的调色信息整段丢失）。
+   * 改用「（强度 0.75）」，既避开邮箱形态，也保持可读。
+   */
+  const color = style.color
+    ? `${style.color.profile ?? style.color.lut ?? "有色"}`
+      + `${style.color.intensity === null || style.color.intensity === undefined ? "" : `（强度 ${style.color.intensity}）`}`
+    : "不调色";
+  const bgm = style.bgm
+    ? `${style.bgm.mood ?? style.bgm.style ?? "已配乐"}${style.bgm.policy ? `（${style.bgm.policy}）` : ""}`
+    : "原声";
+  const transitions = style.transitions?.mode
+    ? `${style.transitions.mode}${style.transitions.fadeSec ? ` ${style.transitions.fadeSec}s` : ""}`
+    : "默认";
+  return [
+    `【交付口味】${input.projectId} 的交付包中，用户选择了「${input.variantName ?? input.variantId}」（${input.variantId}）`,
+    input.positioning ? `定位：${input.positioning}` : null,
+    `风格：调色 ${color} · 配乐 ${bgm} · 转场 ${transitions} · 文案口吻 ${style.copyTone ?? "默认"}`,
+    input.note ? `用户补充：${String(input.note).slice(0, 200)}` : null,
+    "后续同类题材出片时，把该风格作为变体集合的首选与默认（除非用户明确要求换风格）。",
+  ].filter(Boolean).join("｜");
+}
+
+/** 偏好记忆 id：按（工作区 × 变体）稳定——反复选同一风格是**更新同一条记忆**，不堆新行。 */
+export function deliveryPreferenceMemoryId(workspaceId: string, variantId: string): string {
+  const safe = (value: string) => value.replace(/[^A-Za-z0-9_-]/g, "-").slice(0, 60);
+  return `mem-pref-delivery-${safe(workspaceId)}-${safe(variantId)}`;
+}
+
+/** 选择次数 → 偏好置信度（0.5 起、每次 +0.05、上限 0.9：留出人审上调空间，不自动封顶）。 */
+export function deliveryPreferenceConfidence(selectionCount: number): number {
+  const count = Number.isFinite(selectionCount) ? Math.max(1, Math.floor(selectionCount)) : 1;
+  return Math.min(0.9, Math.round((0.5 + 0.05 * (count - 1)) * 100) / 100);
 }
 
 /** 落返修单（用户意见 + 分诊 + patch 提示）：工位/CLI 与人审都从这份单据接手。 */

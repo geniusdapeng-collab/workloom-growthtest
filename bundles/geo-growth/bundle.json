@@ -224,10 +224,10 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "e235051c49e3bacab5031f382013ed049659234e7d1029b200d550f6cf61f5ed",
+    "digest": "65b49ac1d8020dda25df61f21860a33137b0a6f629385344dbe32fc445c097c2",
     "assets": {
       "eval/questions.json": "49e7b69803ac4c398b812e93758d136332c9312041d894ca7b74a8a1623e7993",
-      "fences/geo-growth-baseline.yml": "97e4eee3807ef53af465277b7973527e38247b0d5f3e2f182a24fc79bee4cf2f",
+      "fences/geo-growth-baseline.yml": "f11a2d04045409168fa20f665a3852646555e99a0ece0f36afa70d7d2160eaf3",
       "fences/geo-growth-visual.yml": "a892215c17dc0406d0328ab401d97ae7fce2ee1289c260304dc4c8fa77dd7cfd",
       "model-policy.yml": "c2350007cf1a112c9de24231b6270e39d69344e2a9a3c05b8f17d246e571b84e",
       "pipelines/dual-content-factory.yml": "0650692f2c48ea051b2a334c92b5880f762632d4091b5fb2a48e58a227a756b6",
