@@ -19,6 +19,7 @@
         "presets/ads-optimizer.yml",
         "presets/audio-designer.yml",
         "presets/bgm-composer.yml",
+        "presets/cinematographer.yml",
         "presets/colorist.yml",
         "presets/comment-operator.yml",
         "presets/compliance-officer.yml",
@@ -57,8 +58,9 @@
       ],
       "fences": [
         "fences/ai-video-baseline.yml",
-        "fences/ai-video-color.yml",
         "fences/ai-video-bgm.yml",
+        "fences/ai-video-cine-kb.yml",
+        "fences/ai-video-color.yml",
         "fences/ai-video-subtitle.yml",
         "fences/ai-video-voice.yml"
       ],
@@ -69,6 +71,7 @@
         "skills/bgm-score-design/SKILL.md",
         "skills/bgm-vocal-separation/SKILL.md",
         "skills/caption-burnin-ops/SKILL.md",
+        "skills/cinematography-kb/SKILL.md",
         "skills/color-delivery-spec/SKILL.md",
         "skills/color-grade/SKILL.md",
         "skills/color-look-design/SKILL.md",

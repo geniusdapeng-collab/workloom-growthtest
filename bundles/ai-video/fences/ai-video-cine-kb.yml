@@ -1,0 +1,55 @@
+# 摄影知识库围栏包（视频经理 · 摄影指导 / 提示词环节）
+# 与 ai-video-baseline.yml 同口径：默认基线、只可加严、命中取严（block > review > auto）。
+# 知识库是只读资产：读取与检索一律直通；只有"改写知识库本身"才需要人审。
+version: ai-video-cine-kb/v1
+default_level: review
+rules:
+  - rule_id: G-KB0
+    name: 知识库检索直通（只读、零成本）
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [shot_card, prompt_package, video_project]
+      actions: [cineread.index, cineread.search, cineread.aperture, cineread.recipe]
+    when: "true"
+    note: 检索摄影知识库（光圈/焦距/光线/影调/景别/运镜/材质/情绪配方）是只读、零额度、可复算动作，默认直通；写类动作未命中时保守默认 review，故此处显式声明 auto。
+
+  - rule_id: G-KB1
+    name: 知识条目注入提示词必须留痕（可回滚）
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [shot_card, prompt_package]
+      actions: [cinewrite.enrich]
+    when: "params.trace_required == true"
+    note: 把知识条目写进镜头卡字段属可逆改写，但必须留溯源（命中的主题行 / 注入文本 / 建议参数），否则无法复核"这条画面语言是哪来的"。未带 trace 的调用不匹配本规则，落回 review。
+
+  - rule_id: G-KB2
+    name: 提示词正文写 f 值等硬参数必须人审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [prompt_package]
+      actions: [cinewrite.enrich, prompt.finalize]
+    when: "params.contains_technical_params == true"
+    note: 知识库总则：视频生成模型不认 F 值/ISO/快门数值，只认视觉效果描述。技术参数只允许留在 trace 供监制复核；提示词正文出现硬参数须人审（多为误用）。
+
+  - rule_id: G-KB3
+    name: 覆盖或删除知识库条目禁止（资产只增不改）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [knowledge_asset]
+      actions: [cinewrite.overwrite, cinewrite.delete]
+    when: "true"
+    note: 摄影知识库是产品资产，按只增不改纪律：升级请新增版本或新增条目，禁止就地覆盖或删除（与围栏单调守卫同源）。
+
+  - rule_id: G-KB4
+    name: 缺篇或解析异常不得静默
+    level: review
+    is_baseline: true
+    match:
+      object_types: [knowledge_asset]
+      actions: [cineread.index]
+    when: "params.missing_topics != null and params.missing_topics != ''"
+    note: 索引引用了但目录里没有的篇目（真机案例：OPTICS-001 光圈篇未随库分发）必须显式报缺并留痕，禁止静默降级成"少几条知识"。

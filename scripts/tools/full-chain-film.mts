@@ -68,7 +68,7 @@ const RESUME = !flag("--no-resume");
 const DRY_RUN = flag("--dry-run");
 const ALLOW_FALLBACK_APPROVE = flag("--allow-fallback-approve");
 const STAGES = new Set(
-  arg("--stages", "spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover").split(",").map((s) => s.trim()).filter(Boolean)
+  arg("--stages", "cine-kb,spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover").split(",").map((s) => s.trim()).filter(Boolean)
 );
 
 const LOG_DIR = join(WORK_DIR, "logs");
@@ -576,6 +576,53 @@ log(`阶段：${[...STAGES].join(" → ")}｜监制：${flag("--allow-fallback-a
 if (DRY_RUN) log("⚠ dry-run：只做脚本/提示词/计划，不出图不出片");
 
 const specReports: Array<Record<string, unknown>> = [];
+
+/* ---------- ⓪ 摄影知识库注入（监制：cine-kb） ---------- */
+/**
+ * 为什么放在提示词之前：知识库的价值就在"写提示词前先定关键细节"——
+ * 光圈档位、景别、光位、色调、材质先在库里选好，再交给交付闸与提示词融合。
+ * 纪律：提示词字段只写**画面语言**；f 值等硬参数只进 trace（KB 检索总则）。
+ */
+if (STAGES.has("cine-kb")) {
+  const started = Date.now();
+  const kbDir = resolve(arg("--kb-dir", join(REPO_ROOT, "bundles/ai-video/library/cinematography-kb")));
+  const bridgePath = join(REPO_ROOT, "bundles/ai-video/connectors/cine-kb-bridge/core.mjs");
+  if (!existsSync(bridgePath) || !existsSync(kbDir)) {
+    record({
+      stage: "cine-kb", shotId: null, invoked: false, ok: false, cached: false, degraded: false, attempt: 1, ms: 0,
+      artifact: null, evidence: { kbDir, bridgePath, exists: { bridge: existsSync(bridgePath), kb: existsSync(kbDir) } },
+      verdict: null, note: "摄影知识库或连接器缺失，跳过注入（不静默：此处显式记录）"
+    });
+  } else {
+    const core = await import(bridgePath) as {
+      loadKb: (dir: string) => Record<string, unknown>;
+      kbStatus: (kb: unknown) => Record<string, unknown>;
+      enrichShotCard: (kb: unknown, card: unknown) => { card: Record<string, unknown>; trace: Record<string, unknown> };
+    };
+    const kb = core.loadKb(kbDir);
+    const status = core.kbStatus(kb) as { topics: number; entries: number; missingTopics: Array<{ id: string; title: string }> };
+    log(`摄影知识库：${status.topics} 篇 / ${status.entries} 条映射${status.missingTopics.length > 0 ? `｜⚠ 缺篇 ${status.missingTopics.map((t) => `${t.id} ${t.title}`).join("、")}` : ""}`);
+    const traceDir = join(WORK_DIR, "cine-kb");
+    mkdirSync(traceDir, { recursive: true });
+    for (const [index, shot] of shots.entries()) {
+      const { card, trace } = core.enrichShotCard(kb, shot);
+      shots[index] = card as ShotCard;
+      const traceFile = join(traceDir, `${shot.shotId}.json`);
+      writeFileSync(traceFile, `${JSON.stringify({ ...trace, kbDir, kbStatus: status }, null, 2)}\n`, "utf8");
+      const advisor = (trace as { apertureAdvisor?: { aperture: string; scenarioLabel: string | null; matchedBy: string } }).apertureAdvisor;
+      const fields = ((trace as { applied?: Array<{ field: string; added: string }> }).applied ?? []);
+      log(`  ${shot.shotId}: 光圈 ${advisor?.aperture ?? "-"}（${advisor?.scenarioLabel ?? "-"}）· 注入 ${fields.filter((f) => f.field !== "depth_of_field").length} 条知识 → ${fields.map((f) => f.field).join("/")}`);
+      record({
+        stage: "cine-kb", shotId: shot.shotId, invoked: true, ok: true, cached: false, degraded: false, attempt: 1,
+        ms: Date.now() - started, artifact: traceFile,
+        evidence: { aperture: advisor?.aperture ?? null, scenario: advisor?.scenarioLabel ?? null, matchedBy: advisor?.matchedBy ?? null, injectedFields: fields.map((f) => f.field), missingTopics: status.missingTopics.map((t) => t.id) },
+        verdict: null, note: "知识库按场景注入（参数只进 trace，提示词只写画面语言）"
+      });
+    }
+    /** 提示词交付闸前把增强后的镜头卡落盘留档 */
+    writeFileSync(join(WORK_DIR, `shotlist-enriched-${PROJECT}.json`), `${JSON.stringify({ projectId: PROJECT, shots, cineKbApplied: true }, null, 2)}\n`, "utf8");
+  }
+}
 
 /* ---------- ① 脚本 + 提示词交付闸（监制：prompt） ---------- */
 if (STAGES.has("spec")) {

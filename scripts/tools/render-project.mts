@@ -234,6 +234,44 @@ export function composePromptBySpec(
   });
 }
 
+/**
+ * 摄影知识库注入（2026-09-24）：生产出片路径与 `full-chain-film.mts` 同口径——
+ * 提交渲染前先按场景定光圈档/景别/光位/色调/材质，把知识库的画面语言补进字段。
+ * 失败不阻断（但**不静默**：把原因写进日志），因为知识库是增强项、不是渲染前置依赖。
+ */
+export async function enrichShotWithCinematographyKb(
+  shot: ShotCard,
+  options: { kbDir?: string; log?: (line: string) => void } = {}
+): Promise<{ shot: ShotCard; aperture: string | null; fields: string[]; error: string | null }> {
+  const log = options.log ?? (() => undefined);
+  const kbDir = resolve(options.kbDir ?? process.env.WORKLOOM_CINE_KB_DIR ?? resolve(REPO_ROOT, "bundles/ai-video/library/cinematography-kb"));
+  const bridge = resolve(REPO_ROOT, "bundles/ai-video/connectors/cine-kb-bridge/core.mjs");
+  if (!existsSync(bridge) || !existsSync(kbDir)) {
+    return { shot, aperture: null, fields: [], error: `摄影知识库不可用（bridge=${existsSync(bridge)}, kb=${existsSync(kbDir)}）` };
+  }
+  try {
+    const core = (await import(bridge)) as {
+      loadKb: (dir: string) => unknown;
+      enrichShotCard: (kb: unknown, card: unknown) => { card: ShotCard; trace: Record<string, unknown> };
+    };
+    /** 知识库整库解析有成本，进程内缓存一次（同一批镜头复用） */
+    const cacheKey = kbDir;
+    if (!cinematographyKbCache.has(cacheKey)) cinematographyKbCache.set(cacheKey, core.loadKb(kbDir));
+    const { card, trace } = core.enrichShotCard(cinematographyKbCache.get(cacheKey), shot);
+    const advisor = (trace as { apertureAdvisor?: { aperture?: string } }).apertureAdvisor;
+    const fields = ((trace as { applied?: Array<{ field: string }> }).applied ?? []).map((a) => a.field);
+    log(`[cine-kb] ${shot.shotId}：光圈 ${advisor?.aperture ?? "-"} · 注入 ${fields.length} 处（${fields.join("/")}）`);
+    return { shot: card, aperture: advisor?.aperture ?? null, fields, error: null };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    log(`[cine-kb] ${shot.shotId} 注入失败（不阻断，但记录）：${message.slice(0, 200)}`);
+    return { shot, aperture: null, fields: [], error: message.slice(0, 300) };
+  }
+}
+
+/** 知识库进程内缓存（key=目录） */
+const cinematographyKbCache = new Map<string, unknown>();
+
 function dataUrl(file: string): string {
   /**
    * 已授权真人素材（方舟人像库 asset ID）与远端 URL 直接透传：
@@ -544,7 +582,13 @@ for (const shot of shots) {
     if (fallback.length > 0) cardWithPortraits.portraits = fallback;
   }
 
-  const specReport = composePromptBySpec(cardWithPortraits, { aspect, resolution, log: (line) => console.log(line) });
+  /**
+   * 摄影知识库注入（先定关键细节，再组装提示词）：光圈/景别/光位/色调/材质按场景从库里选，
+   * 让"质感参数"有依据；注入失败只记录不阻断（渲染链路不因知识库不可用而停）。
+   */
+  const kbEnriched = await enrichShotWithCinematographyKb(cardWithPortraits, { log: (line) => console.log(line) });
+  const cardForPrompt: ShotCard = kbEnriched.shot;
+  const specReport = composePromptBySpec(cardForPrompt, { aspect, resolution, log: (line) => console.log(line) });
   specReports.push(specReport);
   row.spec = {
     isOpening: specReport.isOpening,
