@@ -263,10 +263,17 @@ const BGM_CLI = join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/cli.mjs"
  * 现在：把上一轮 verdict 的 issues/suggestions 显式写进重跑提示词，并按次数给出升级动作。
  */
 function retryInstruction(verdict: ProducerVerdict | null, attempt: number, maxAttempts: number): string {
-  const issues = (verdict?.issues ?? []).filter(Boolean).slice(0, 4);
-  const suggestions = (verdict?.suggestions ?? []).filter(Boolean).slice(0, 4);
+  /**
+   * 长度上限（2026-09-24 真机）：监制的 issues/suggestions 可能很长（一次给了 9 条、每条上百字），
+   * 直接拼进重跑提示词会把多模态评审请求撑到 **HTTP 413（payload too large）**，
+   * 于是监制不可用 → 又触发一次重渲（白烧额度）。这里按条裁断 + 总量封顶。
+   */
+  const clip = (text: string, max = 110) => (text.length > max ? `${text.slice(0, max)}…` : text);
+  const issues = (verdict?.issues ?? []).filter(Boolean).slice(0, 3).map((item) => clip(item));
+  const suggestions = (verdict?.suggestions ?? []).filter(Boolean).slice(0, 3).map((item) => clip(item));
+  const reason = clip(String(verdict?.reason ?? "未给出理由"), 90);
   return [
-    `【重跑要求·第 ${attempt}/${maxAttempts} 次】上一版未过监制：${verdict?.reason ?? "未给出理由"}`,
+    `【重跑要求·第 ${attempt}/${maxAttempts} 次】上一版未过监制：${reason}`,
     ...issues.map((item) => `必须修复：${item}`),
     ...suggestions.map((item) => `按建议修改：${item}`),
     attempt >= maxAttempts
@@ -1047,6 +1054,21 @@ if (STAGES.has("videos")) {
         approved = verdict.approved;
         if (!approved) lastVerdict = verdict;
         if (!approved) log(`↻ 镜头 ${shot.shotId} 第 ${attempt} 次未过监制：${verdict.reason}`);
+        /**
+         * 监制不可用 ≠ 产物不合格（2026-09-24 真机：评审请求 413 → 系统连渲两次）：
+         * 评审侧故障（fallback 且无硬失败）时**不应重渲**——重渲既修不了故障、又白烧额度。
+         * 此时保留本次产物、标注 degraded，交给下一次复检或人工裁决。
+         */
+        const judgeUnavailable = !approved && verdict.via === "fallback" && (verdict.hardFailures ?? []).length === 0;
+        if (judgeUnavailable) {
+          log(`⏸ ${shot.shotId} 监制不可用（${verdict.reason.slice(0, 80)}）→ 不再重渲，保留本次产物待复检`);
+          record({
+            stage: "shot", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: true, attempt,
+            ms: Date.now() - started, artifact: clip, evidence: { ...info, taskId: submitted.taskId, frames: frameFiles, judgeUnavailable: true }, verdict,
+            note: "监制不可用：不重渲（避免为评审故障付费），产物保留待复检"
+          });
+          break;
+        }
       } catch (err) {
         record({
           stage: "shot", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt,
@@ -1220,6 +1242,19 @@ if (STAGES.has("subtitle") && existsSync(colored)) {
     });
     if (existsSync(zhSrt)) {
       subtitleSidecar = { dir: sidecarDir, srt: zhSrt, ass: existsSync(zhAss) ? zhAss : zhSrt, manifest: existsSync(manifest) ? manifest : null, timelineOk };
+      /**
+       * 血缘刷新（2026-09-24 真机）：旁挂字幕的内容通常与本轮一致，工位按幂等不重写文件，
+       * 于是 mtime 停留在上一轮 → 终审的血缘检查判"字幕来自旧产物、与母版断链"。
+       * 这一轮既然重新产出了字幕决策，就把文件时间戳刷新到本轮（内容不变、血缘归位）。
+       */
+      try {
+        const now = new Date();
+        for (const file of [zhSrt, zhAss, manifest]) {
+          if (file && existsSync(file)) utimesSync(file, now, now);
+        }
+      } catch {
+        /* 时间戳刷新失败不影响交付，血缘检查会如实报出 */
+      }
     }
     record({
       stage: "subtitle", shotId: null, invoked: true, ok: sidecarResult.ok && Boolean(subtitleSidecar), cached: false, degraded: false,
@@ -1521,7 +1556,25 @@ if (STAGES.has("mux") && subtitleSidecar && existsSync(scored) && !DRY_RUN) {
 
 /* ---------- ⑪ 母版交付 + 终审 ---------- */
 if (existsSync(scored) && !DRY_RUN) {
-  const deliverable = join(OUT_DIR, `${PROJECT}-30s-final.mp4`);
+  /**
+ * 旁挂字幕的**磁盘回填**（2026-09-24 真机）：只跑 `--stages master` 时，进程内 `subtitleSidecar` 为 null，
+ * 但文件其实在盘上（上一环节已产出）。门应该看**产物**而不是进程状态——否则"分段重跑"会被误判缺件。
+ */
+if (!subtitleSidecar && SUBTITLE_MODE !== "burn") {
+  const sidecarDir = join(POST_DIR, "subtitles");
+  const zhSrt = join(sidecarDir, `${PROJECT}.zh.srt`);
+  const zhAss = join(sidecarDir, `${PROJECT}.zh.ass`);
+  if (existsSync(zhSrt)) {
+    subtitleSidecar = {
+      dir: sidecarDir, srt: zhSrt, ass: existsSync(zhAss) ? zhAss : zhSrt,
+      manifest: existsSync(join(sidecarDir, `${PROJECT}.subtitle-manifest.json`)) ? join(sidecarDir, `${PROJECT}.subtitle-manifest.json`) : null,
+      timelineOk: true
+    };
+    log(`旁挂字幕从磁盘回填（分段重跑）：${zhSrt}`);
+  }
+}
+
+const deliverable = join(OUT_DIR, `${PROJECT}-30s-final.mp4`);
   execFileSync("cp", [scored, deliverable]);
   const info = probe(deliverable);
   const accidents = detectQualityAccidents(deliverable);
@@ -1537,7 +1590,11 @@ if (existsSync(scored) && !DRY_RUN) {
   const chain = [
     { label: "raw", path: join(POST_DIR, "master-raw.mp4") },
     { label: "graded", path: join(POST_DIR, "master-graded.mp4") },
-    ...(existsSync(join(POST_DIR, "master-subtitled.mp4"))
+    /**
+     * burn 模式才把带字幕成片计入血缘；sidecar 模式下母版不烧字，
+     * 盘上遗留的旧 master-subtitled.mp4 属于历史产物，计入会造成"时间戳倒序"的假告警（2026-09-24 真机）。
+     */
+    ...(SUBTITLE_MODE === "burn" && existsSync(join(POST_DIR, "master-subtitled.mp4"))
       ? [{ label: "subtitled", path: join(POST_DIR, "master-subtitled.mp4") }]
       : []),
     { label: "danmaku", path: join(POST_DIR, "master-danmaku.mp4") },
