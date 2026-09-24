@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "workloom.character-registry/v1",
+  "defaultModel": "chen-zhuo",
+  "rules": [
+    "未指定模特时，自动使用 defaultModel（当前为 陈卓）",
+    "镜头卡里出现模特姓名或其别名（如“陈卓”）时，解析到对应档案",
+    "多角色项目里，指定姓名的角色按姓名解析，其余未指定角色才回落到默认模特"
+  ],
+  "models": [
+    {
+      "ordinal": 1,
+      "id": "chen-zhuo",
+      "name": "陈卓",
+      "aliases": [
+        "陈卓",
+        "卓卓"
+      ],
+      "archive": "bundles/ai-video/library/characters/model-01-chen-zhuo",
+      "authorization": "real-authorized",
+      "note": "系统默认 1 号模特"
+    }
+  ]
+}

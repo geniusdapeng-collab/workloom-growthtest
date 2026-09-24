@@ -1,0 +1,92 @@
+{
+  "schemaVersion": "workloom.character-profile/v1",
+  "id": "chen-zhuo",
+  "name": "陈卓",
+  "ordinal": 1,
+  "kind": "authorized-real",
+  "modelRole": "系统的默认 1 号模特（未指定模特时自动启用）",
+  "identity": {
+    "gender": "female",
+    "age": "三十岁上下",
+    "height": "166cm",
+    "occupation": "文化讲述人",
+    "origin": "苏州"
+  },
+  "appearance": {
+    "gender": "female",
+    "face": "东亚女性面孔，鹅蛋脸偏小圆，下颌线柔和，颧骨不突出，下巴圆润微尖，三庭均衡而中庭略长，自然平眉微挑且毛流感细，鼻梁直而窄、鼻头圆润小巧、鼻翼窄，唇形饱满、唇峰清晰、自然玫瑰豆沙唇色",
+    "skin": "白皙偏冷调带自然血色，肤质细腻、裸妆状态下可见真实毛孔与细小绒毛，脸颊有淡淡自然红晕",
+    "eyes": "杏眼，窄开扇双眼皮，眼裂中等偏长、眼尾微上扬，深棕近黑瞳色，睫毛自然纤长，眼神温和有交流感，笑时眯成弯月且卧蚕明显",
+    "hair": "深栗棕色及肩锁骨发（室内接近黑、日光下见棕调），中分偏左，顺直带自然微卷、发尾自然内扣，发量中等偏多、发丝有真实碎发",
+    "features": [
+      "笑时嘴角上扬幅度小、露齿少",
+      "颈线修长、锁骨明显",
+      "手指修长白皙、指甲短圆无美甲"
+    ],
+    "bodyType": "纤细挺拔，肩窄腰细，比例自然偏修长，站姿肩背打开、放松"
+  },
+  "wardrobe": [
+    {
+      "id": "w1",
+      "name": "月白色苏式改良旗袍",
+      "detail": "立领盘扣、七分袖、及踝开衩，面料为有垂坠感的哑光缎面，配素色中跟绣花鞋与一粒珍珠耳饰",
+      "scene": "日景/夜景通用（本片主造型）"
+    },
+    {
+      "id": "w2",
+      "name": "米白针织开衫配深色直筒长裤",
+      "detail": "日常通勤造型，配小白鞋",
+      "scene": "日常/幕后"
+    }
+  ],
+  "persona": {
+    "tone": "温润知性、松弛亲切，像带朋友逛街而不是念稿",
+    "speechRate": "3.5 字/秒",
+    "accent": "普通话（可夹轻微吴语软糯腔）",
+    "gesture": "手势小而准，靠眼神与嘴角传递情绪，不做夸张肢体"
+  },
+  "biography": [
+    "本档案来自产品所有者提供的本人照片（授权使用），仅用于其自有项目的形象生成。"
+  ],
+  "generation": {
+    "stylePrompt": "专业人像摄影，纯写实，中性浅灰无缝背景，中性柔光 5600K，85mm 定焦 f/4，低饱和，皮肤保留真实毛孔与细颗粒",
+    "negativePrompt": "CG、3D 渲染、卡通、插画、过度磨皮、塑料皮肤、浓妆、金色暖调滤镜、影棚 glamour 光、场景与道具",
+    "model": "doubao-seedream-5-0-pro-260628",
+    "seed": 20260924
+  },
+  "authorization": {
+    "status": "real-authorized",
+    "evidence": "产品所有者于会话内提供本人配偶照片并明确指示用于本次定妆照与测试片生成（2026-09-24）",
+    "expiresAt": "2027-09-24",
+    "note": "原始照片不进仓库（仅本地 sources/ 保留）；仓库内只保存 AI 生成的定妆照与档案正文"
+  },
+  "portraitSets": [
+    {
+      "version": 3,
+      "dir": "portraits/v3",
+      "angles": [
+        "front",
+        "threeQuarter",
+        "closeup",
+        "side",
+        "back",
+        "actionPose",
+        "emotionCloseup",
+        "handDetail"
+      ],
+      "source": "img2img",
+      "active": true,
+      "model": "doubao-seedream-5-0-pro-260628",
+      "note": "v3 = 图生图（锚定本人照片）+ 抠像友好背景硬闸 clean-background/v2 全 8 角度合格"
+    }
+  ],
+  "tags": [
+    "苏州",
+    "平江路",
+    "口播",
+    "写实真人",
+    "默认模特"
+  ],
+  "createdAt": "2026-09-24",
+  "updatedAt": "2026-09-24T14:15:24.223026Z"
+}

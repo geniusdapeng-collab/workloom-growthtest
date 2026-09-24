@@ -403,11 +403,41 @@ interface CharacterEntryLike {
   /** 档案正文里的外貌描述（纯文生图时的唯一人物变量；真人图不可作为视频首帧时靠它保人） */
   appearanceText: string;
 }
+/**
+ * 角色库装载（2026-09-24 扩展）：除 `HR_CHARACTER_LIBRARY` 外，**同时**装载随仓分发的默认模特库
+ * `bundles/ai-video/library/characters/*`（系统默认 1 号模特 = 陈卓），并读取 registry.json 的别名表——
+ * 这样"未指定模特时自动用陈卓""镜头卡写'陈卓'时解析到该档案"两条规则才能在管线里生效。
+ */
 function loadCharacters(): Map<string, CharacterEntryLike> {
   const library = new Map<string, CharacterEntryLike>();
-  if (!existsSync(LIBRARY)) return library;
-  for (const name of readdirSync(LIBRARY)) {
-    const dir = join(LIBRARY, name);
+  const repoCharacters = join(REPO_ROOT, "bundles/ai-video/library/characters");
+  for (const root of [LIBRARY, repoCharacters]) {
+    if (existsSync(root)) loadCharacterRoot(root, library);
+  }
+  return library;
+}
+
+/** registry.json：默认模特 + 姓名别名（别名解析在选角时用） */
+function loadCharacterRegistry(): { defaultModel: string | null; aliases: Array<{ id: string; names: string[] }> } {
+  const file = join(REPO_ROOT, "bundles/ai-video/library/characters/registry.json");
+  if (!existsSync(file)) return { defaultModel: null, aliases: [] };
+  try {
+    const doc = JSON.parse(readFileSync(file, "utf8")) as {
+      defaultModel?: string;
+      models?: Array<{ id: string; name?: string; aliases?: string[] }>;
+    };
+    return {
+      defaultModel: doc.defaultModel ?? null,
+      aliases: (doc.models ?? []).map((m) => ({ id: m.id, names: [m.id, m.name ?? "", ...(m.aliases ?? [])].filter(Boolean) }))
+    };
+  } catch {
+    return { defaultModel: null, aliases: [] };
+  }
+}
+
+function loadCharacterRoot(root: string, library: Map<string, CharacterEntryLike>): void {
+  for (const name of readdirSync(root)) {
+    const dir = join(root, name);
     const profileFile = join(dir, "profile.json");
     if (!existsSync(profileFile) || !statSync(dir).isDirectory()) continue;
     const profile = JSON.parse(readFileSync(profileFile, "utf8")) as {
@@ -448,7 +478,31 @@ function loadCharacters(): Map<string, CharacterEntryLike> {
   return library;
 }
 const characters = loadCharacters();
-const lead = [...characters.values()].find((c) => c.id === shotlist.character?.id) ?? [...characters.values()][0];
+/**
+ * 选角（2026-09-24 规则）：
+ *   ① 镜头卡/项目显式指定 → 用指定的；
+ *   ② 文本里出现模特姓名或别名（如"陈卓"）→ 解析到该档案；
+ *   ③ 都没指定 → 回落到 registry.json 的 **defaultModel（系统默认 1 号模特 = 陈卓）**；
+ *   ④ 仍然没有 → 用库里第一个（并如实记录，不静默）。
+ */
+const characterRegistry = loadCharacterRegistry();
+const lead = (() => {
+  const list = [...characters.values()];
+  const explicitId = shotlist.character?.id ?? "";
+  const explicitName = shotlist.character?.name ?? "";
+  const byExplicit = list.find((c) => c.id === explicitId || c.name === explicitName);
+  if (byExplicit) return byExplicit;
+  const aliasHit = characterRegistry.aliases.find((a) => a.names.some((n) => n && n.length > 1 && explicitName.includes(n)));
+  if (aliasHit) return list.find((c) => c.id === aliasHit.id) ?? undefined;
+  if (characterRegistry.defaultModel) {
+    const preferred = list.find((c) => c.id === characterRegistry.defaultModel);
+    if (preferred) return preferred;
+  }
+  return list[0];
+})();
+if (lead && characterRegistry.defaultModel && lead.id === characterRegistry.defaultModel) {
+  log(`未显式指定模特 → 使用系统默认模特：${lead.name}（${lead.id}，1 号）`);
+}
 
 /* ================= 关键帧 / 视频 出图出片 ================= */
 
