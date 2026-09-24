@@ -1,6 +1,6 @@
 <div align="center">
 
-# WorkLoom 获客用增系统（实验室版）
+# AI超增长（实验版）
 
 **短视频社媒营销 × GEO × 获客五环——把获客从玄学，变成一门可测量、可追溯、可归因的生意。**
 
@@ -8,11 +8,13 @@
 你只做三件事：**定方向、拍板、收钱。**
 
 [![License](https://img.shields.io/badge/license-Apache--2.0-9A7B2D)](LICENSE)
-[![GitHub](https://img.shields.io/badge/repo-workloom-1B2A4E)](https://github.com/workloom-ai/workloom)
+[![CNB](https://img.shields.io/badge/repo-workloom--growthtest-1B2A4E)](https://cnb.cool/workloom-ai/workloom-growthtest)
 
 </div>
 
 ---
+
+> 🧪 **实验副本说明（growth-test）**：本仓 `workloom-ai/workloom-growthtest` 是 [`workloom-ai/WorkLoom-growth`](https://cnb.cool/workloom-ai/workloom-growth) 的完整复制（复制基线 `a6dc89a`，2026-09-21），产品名定为 **AI超增长**，用于在稳定版之外做**激进改造实验**。实验语义只在本仓存在：**不下发、不覆盖、不回流**主仓；验证成功的通用能力必须先走提案任务卡（L2→L1→L0）才能进入基座。
 
 <!-- WORKLOOM-AUTONOMOUS-OPERATIONS:BEGIN -->
 ## 🧭 理论纲领 · AI 自主经营模式
@@ -30,7 +32,7 @@
 
 ## 产品定位
 
-WorkLoom 获客用增系统是一套**面向 B 端商家的 AI 获客经营系统**：以「短视频社媒营销 + GEO（生成式引擎优化）」双引擎触达客户，以「获客五环」（意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘）闭环经营，每一环都可度量到钱。首个深度垂直行业是**酒店**（社媒营销 × GEO × 获客 × 酒店运营一体），底座支持向各行业复制 Bundle。
+AI超增长是一套**面向 B 端商家的 AI 获客经营系统**：以「短视频社媒营销 + GEO（生成式引擎优化）」双引擎触达客户，以「获客五环」（意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘）闭环经营，每一环都可度量到钱。首个深度垂直行业是**酒店**（社媒营销 × GEO × 获客 × 酒店运营一体），底座支持向各行业复制 Bundle。
 
 > **主题边界（全仓口径）**：本仓产品主题只有一个——**获客用增**（意图洞察 → 双域触达 → 承接转化 → 归因复盘 → 增长实验）。酒店是**首个深度垂直行业试点**：仓内的酒店业务对象（客房/住客/房态/送物/报修等）只作为试点行业的经营底座与 C 端契约夹具保留，**不属于产品主题，也不得进入获客用增的对外叙事**。获客用增的产品演示工作区是 `geo-growth`（`ws-geo`）；酒店工作区（`yunqi-hotel`）是试点业务前台夹具。
 
@@ -42,7 +44,7 @@ WorkLoom 获客用增系统是一套**面向 B 端商家的 AI 获客经营系�
 
 还有一个正在发生、但大多数人没看见的变化：**42% 的消费者已经开始用生成式 AI 查消费信息**——「杭州亲子酒店哪家好」「xx 牌子的激光切割机靠谱吗」。AI 搜索里没有你，你就失去了一个爆发中的新入口。
 
-| 传统获客的死法 | WorkLoom 获客系统的活法 |
+| 传统获客的死法 | AI超增长的活法 |
 |---|---|
 | 广撒网做内容，不知道给谁看 | **意图雷达**：竞对评论区 / 搜索 query / 差评里萃取「谁在为这个问题找答案」，先有人群再有内容 |
 | 内容发完就完，转化靠缘分 | **双域触达**：短视频社媒种草 + GEO 六段式占领 AI 搜索答案，一次生产两处变现 |
@@ -139,16 +141,16 @@ AI 搜索月活破 8.2 亿、AI 问答流量占比首超传统搜索——客户
 
 ### 数字员工名册与数字人：获客班组的在岗证明
 
-- **编制可查（`/agents`）**：获客用增主包 27 个岗位（与 hotel + ai-video 组合后编制 **78 岗**：各包声明 hotel 16 + ai-video 39 + geo-growth 27，其中 4 个同名岗位按主包权威归属遮蔽；口径由装配器与各包 `bundle.json` 计算，事实源 `packages/base/bundles/assembly.ts`）与人类员工同一本通讯录——每个岗位都有平台档案：来源 Bundle、**围栏授权逐条对账**（悬空标红）、绑定技能包、运行约束、**30 天战绩**（动作数 / 采纳率 / 被驳回 / 积分与谷时占比）与等级段位；点「派遣」当场建任务线程；夜班岗位 22:00–08:00 自动上线，只读岗位标绿（无写工具）。
+- **编制可查（`/agents`）**：获客用增主包 27 个岗位（组合编制 **78 岗**：各包声明 hotel 16 + ai-video 36 + geo-growth 26（同名遮蔽 4 处按主包裁决））与人类员工同一本通讯录——每个岗位都有平台档案：来源 Bundle、**围栏授权逐条对账**（悬空标红）、绑定技能包、运行约束、**30 天战绩**（动作数 / 采纳率 / 被驳回 / 积分与谷时占比）与等级段位；点「派遣」当场建任务线程；夜班岗位 22:00–08:00 自动上线，只读岗位标绿（无写工具）。
 - **数字人织伴（LoomMate）**：PC 端全页面常驻的 Live2D 秘书——语音 + 口型播报「昨夜内容发布 / 询盘承接 / 今日待拍板」，三态（小角落 / 大形象 / 屏保）可切；你不在电脑前时她聚合非 P0 事项、屏保守着全场，点她就能问数据、派活、看记忆。
 
 ---
 
 ## 系统架构与业务闭环
 
-<p align="center"><img src="docs/images/architecture.png" alt="WorkLoom 获客用增系统架构（体验层 / 服务层 / geo-growth Bundle + 基座十域 / 运行时地基 / 数据层）" width="92%"/></p>
+<p align="center"><img src="docs/images/architecture.png" alt="AI超增长架构（体验层 / 服务层 / geo-growth Bundle + 基座十域 / 运行时地基 / 数据层）" width="92%"/></p>
 
-五层结构自上而下：**体验层**（B 端工作台 / 移动端 / C 端 AI 服务前台 / 织伴数字人 + IM 通道）→ **服务层**（Hono + tRPC v11，工作区上下文 + RLS）→ **能力层**（geo-growth Bundle：27 个岗位 / 29 个技能 / 4 条管线，与 hotel + ai-video 组合后 **78 岗 / 90 技能 / 10 管线**〔组合口径 = 三包声明并集 − 同名遮蔽，技能按目录并集〕+ 获客五环与双域触达 ＋ 基座十域零改动继承）→ **运行时地基**（DeepSeek Harness seam 适配）→ **数据层**（PostgreSQL 17 + pgvector：素材与线索全留痕、组织记忆、五元事件哈希链）。
+五层结构自上而下：**体验层**（B 端工作台 / 移动端 / C 端 AI 服务前台 / 织伴数字人 + IM 通道）→ **服务层**（Hono + tRPC v11，工作区上下文 + RLS）→ **能力层**（geo-growth Bundle：27 个岗位 / 29 个技能 / 4 条管线，与 hotel + ai-video 组合后 **78 岗 / 10 管线** + 获客五环与双域触达 ＋ 基座十域零改动继承）→ **运行时地基**（DeepSeek Harness seam 适配）→ **数据层**（PostgreSQL 17 + pgvector：素材与线索全留痕、组织记忆、五元事件哈希链）。
 
 <p align="center"><img src="docs/images/business-loop.png" alt="获客一天的业务闭环：意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘 → 老板拍板" width="92%"/></p>
 
@@ -162,7 +164,7 @@ AI 搜索月活破 8.2 亿、AI 问答流量占比首超传统搜索——客户
 
 ### PC 端 · B 端工作台
 
-| 经营剧场（默认首页 `/`） | 数字员工 · 人机混编通讯录（`/agents`，组合 78 岗） |
+| 经营剧场（默认首页 `/`） | 数字员工 · 人机混编通讯录（`/agents`，组合 75 岗） |
 |---|---|
 | ![经营剧场](docs/images/shots/pc-home.png) | ![数字员工](docs/images/shots/pc-agents.png) |
 
@@ -237,8 +239,8 @@ AI 搜索月活破 8.2 亿、AI 问答流量占比首超传统搜索——客户
 ### 一键跑起来（推荐）
 
 ```bash
-git clone https://github.com/workloom-ai/workloom.git
-cd workloom
+git clone https://cnb.cool/workloom-ai/workloom-growthtest.git
+cd workloom-growthtest
 pnpm setup && pnpm preview:all
 ```
 
