@@ -41,6 +41,10 @@ import { mediaUrl } from "./gen/ingest.js";
 export type { PollReport } from "./render-poller.js";
 import { dealRouter } from "./deal.js";
 import { getRun, startRun, startVideoProjectRun, StudioWorkerError } from "./studio-worker.js";
+import {
+  DeliveryError, deliveryJobStatus, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
+  readDeliveryPackage, recordRevisionRequest, selectDeliveryVariant, startDeliveryRevision, triageDeliveryFeedback,
+} from "./delivery.js";
 
 interface Scope { tenantId: string; workspaceId: string }
 
@@ -117,6 +121,206 @@ function renderScriptRethrow(err: unknown): never {
   }
   throw err;
 }
+
+/* ================= delivery：交付包 / 选变体 / 提返修（T-2026-0924-0071） ================= */
+
+/** 交付域错误 → tRPC 错误码（路径越界按 FORBIDDEN，缺件按 NOT_FOUND，其余按业务拒绝） */
+function deliveryRethrow(err: unknown): never {
+  if (err instanceof DeliveryError) {
+    const code = err.code === "not_found" ? "NOT_FOUND"
+      : err.code === "path_not_allowed" ? "FORBIDDEN"
+        : err.code === "idempotency_conflict" || err.code === "shot_regeneration_required" || err.code === "artifact_too_large"
+          ? "PRECONDITION_FAILED"
+          : "BAD_REQUEST";
+    throw new TRPCError({ code, message: err.message });
+  }
+  throw err;
+}
+
+/**
+ * 交付域事件留痕（D16：与文件写入同一工作区作用域，事件进五元账本）。
+ * 文件（selection.json / revision 单 / 作业日志）在工位侧落盘，事件在服务端补——两者都留痕才算完成。
+ */
+async function appendDeliveryEvent(
+  ctx: { identity: { memberNo: string } },
+  scope: Scope,
+  event: { objectType: string; objectId: string; action: string; after: Record<string, unknown>; basis: string[] },
+): Promise<void> {
+  const client = await getGatewayPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+    await gatewayAppendOnClient(client, { ...scope, actor: { id: ctx.identity.memberNo, type: "human" } }, {
+      who: { type: "human", id: ctx.identity.memberNo },
+      context: {
+        tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
+        time: new Date().toISOString(), channel: "inapp",
+      },
+      object: { type: event.objectType, id: event.objectId },
+      decision: { action: event.action, after: event.after, basis: event.basis },
+      rule_impact: [],
+    });
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * 交付包与返修：读（列表/详情/作业）+ 写（选变体/分诊落单/启动本地重合成）。
+ *
+ * 纪律：交付根由 `WORKLOOM_DELIVERY_DIR` 指定（默认 `<repo>/var/delivery`），只读交付根内的包；
+ * 重合成不在请求内执行（spawn 作业 + 轮询）；命中画面内容的返修一律拒绝并指向 G8 人审。
+ */
+const deliveryRouter = router({
+  /** 交付包列表（按创建时间倒序；无交付根时返回空列表） */
+  list: protectedProcedure
+    .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
+    .query(({ input }) => listDeliveryPackages({ limit: input.limit })),
+
+  /** 单个交付包详情（母版/旁挂字幕/变体/差异实测/检查/返修历史/选择记录；媒体给签名 URL） */
+  get: protectedProcedure
+    .input(z.object({ dir: z.string().min(1).max(200) }))
+    .query(({ input }) => {
+      try {
+        return readDeliveryPackage(input.dir);
+      } catch (err) {
+        deliveryRethrow(err);
+      }
+    }),
+
+  /**
+   * 交付物取件（封面 / 成片 / 旁挂字幕文件）。
+   *
+   * 为什么不走独立 HTTP 路由：`apps/server/src/index.ts` 是舰队同步 PR 的常改文件（协议 §4 同文件后到者拒），
+   * 交付界面不该为此常年排队；走行业域 tRPC 同时天然拿到 workspace 作用域与统一错误规约。
+   * 体积上限内联返回 base64（默认 8MB），超出则报错并提示用本地播放器打开。
+   */
+  artifact: protectedProcedure
+    .input(z.object({
+      dir: z.string().min(1).max(200),
+      ref: z.string().min(1).max(400),
+      maxBytes: z.number().int().min(1024).max(64 * 1024 * 1024).optional(),
+    }))
+    .query(({ input }) => {
+      try {
+        return readDeliveryArtifact({ dir: input.dir, ref: input.ref, maxBytes: input.maxBytes });
+      } catch (err) {
+        deliveryRethrow(err);
+      }
+    }),
+
+  /** 选变体：落选择记录 + 五元事件（用户最终选了哪个，这是变体默认集合的长期依据） */
+  selectVariant: writeProcedure
+    .input(z.object({
+      dir: z.string().min(1).max(200),
+      variantId: z.string().min(1).max(80),
+      note: z.string().max(500).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      let selection;
+      try {
+        selection = selectDeliveryVariant({
+          dir: input.dir, variantId: input.variantId,
+          note: input.note ?? null, by: ctx.identity.memberNo,
+        });
+      } catch (err) {
+        deliveryRethrow(err);
+      }
+      await appendDeliveryEvent(ctx, scope, {
+        objectType: "delivery_package", objectId: input.dir,
+        action: "delivery.variant.selected",
+        after: { variantId: selection.variantId, note: selection.note, at: selection.at },
+        basis: ["用户在交付包里选择了风格变体（一个包多版本，选择即交付结论）"],
+      });
+      return selection;
+    }),
+
+  /** 反馈分诊：规则表判归因/受影响层/是否需重生成镜头；同时落返修单（可选关闭落单） */
+  triage: writeProcedure
+    .input(z.object({
+      dir: z.string().min(1).max(200),
+      feedback: z.string().min(1).max(4000),
+      record: z.boolean().default(true),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      let outcome;
+      try {
+        outcome = await triageDeliveryFeedback(input.dir, input.feedback);
+      } catch (err) {
+        deliveryRethrow(err);
+      }
+      let requestPath: string | null = null;
+      if (input.record) {
+        try {
+          const recorded = recordRevisionRequest({
+            dir: input.dir, feedback: input.feedback,
+            triage: outcome.triage, patchHint: outcome.patchHint, by: ctx.identity.memberNo,
+          });
+          requestPath = recorded.requestPath;
+        } catch (err) {
+          deliveryRethrow(err);
+        }
+        await appendDeliveryEvent(ctx, scope, {
+          objectType: "delivery_package", objectId: input.dir,
+          action: "delivery.revision.triaged",
+          after: {
+            feedback: input.feedback.slice(0, 500),
+            kinds: outcome.triage.kinds ?? null,
+            attributions: outcome.triage.attributions ?? null,
+            layers: outcome.triage.layers ?? null,
+            requiresShotRegeneration: outcome.triage.requiresShotRegeneration ?? null,
+            requestPath: requestPath ? requestPath.split("/").slice(-3).join("/") : null,
+          },
+          basis: ["用户反馈经确定性规则表分诊：先判『后期能解决』还是『必须重生成画面』，再决定走本地重合成还是人审"],
+        });
+      }
+      return { ...outcome, requestPath };
+    }),
+
+  /** 启动本地层增量重合成（spawn 工位 CLI；立刻返回 jobId，前端轮询 video.delivery.job） */
+  startRevision: writeProcedure
+    .input(z.object({
+      dir: z.string().min(1).max(200),
+      patch: z.record(z.string(), z.unknown()),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      let job;
+      try {
+        job = await startDeliveryRevision({ dir: input.dir, patch: input.patch, by: ctx.identity.memberNo });
+      } catch (err) {
+        deliveryRethrow(err);
+      }
+      await appendDeliveryEvent(ctx, scope, {
+        objectType: "delivery_package", objectId: input.dir,
+        action: "delivery.revision.started",
+        after: {
+          jobId: job.jobId, patch: input.patch,
+          layers: (job.impact?.layers as unknown) ?? null,
+          localOnly: (job.impact?.localOnly as unknown) ?? null,
+        },
+        basis: ["返修走本地层增量重合成：镜头不重新生成，复用层带哈希证据（G-DLV4/G-DLV7）"],
+      });
+      return job;
+    }),
+
+  /** 重合成作业状态（内存注册表；日志同时落盘 `<包>/revision-jobs/<jobId>.log`） */
+  job: protectedProcedure
+    .input(z.object({ jobId: z.string().min(1).max(120) }))
+    .query(({ input }) => deliveryJobStatus(input.jobId)),
+
+  /** 某交付包（或缺省全部）的作业列表 */
+  jobs: protectedProcedure
+    .input(z.object({ dir: z.string().min(1).max(200).optional() }))
+    .query(({ input }) => listDeliveryJobs(input.dir)),
+});
 
 /* ================= studio：预生产流水线 ================= */
 
@@ -799,4 +1003,5 @@ export const videoRouter = router({
   comments: commentsRouter,
   deal: dealRouter,
   accounting: accountingRouter,
+  delivery: deliveryRouter,
 });
