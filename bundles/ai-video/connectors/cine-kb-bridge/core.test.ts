@@ -104,10 +104,11 @@ describe("自动注入：纪律与回归", () => {
     depth_of_field: "焦点：人物面部；景深：浅"
   };
 
-  it("每镜最多注入 3 条知识、每字段一条，且提示词字段里不出现 f 值", () => {
+  it("每镜注入有条数上限、每字段一条，且提示词字段里不出现 f 值", () => {
     const { card, trace } = enrichShotCard(kb, daytimePortrait);
+    /** 政策更新（三轮审计）：字段级仍"一字段一条"，但总量上限放宽到 5（灯光/构图/运镜/色调/材质各一） */
     const injected = trace.applied.filter((a) => a.field !== "depth_of_field");
-    expect(injected.length).toBeLessThanOrEqual(3);
+    expect(injected.length).toBeLessThanOrEqual(5);
     expect(new Set(injected.map((a) => a.field)).size).toBe(injected.length);
     for (const field of ["lighting", "composition", "camera_movement", "color_palette", "props", "baseline"]) {
       const value = String((card as Record<string, unknown>)[field] ?? "");

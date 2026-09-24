@@ -1,4 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
 import { PRODUCER_RUBRICS, resolveProducerLlm, reviewStage } from "./producer-gate.js";
 
 function fakeLlm(answer: Record<string, unknown>): typeof fetch {
@@ -12,6 +16,42 @@ function fakeLlm(answer: Record<string, unknown>): typeof fetch {
 const env = { LLM_BASE_URL: "https://api.example.com", LLM_API_KEY: "k", LLM_MODEL: "judge-1" };
 
 describe("AI 监制门", () => {
+  /**
+   * 真机事故（2026-09-24 三轮审计）：4 张 1080×1920 PNG 抽帧 + 2 张定妆照 base64 后 ≈53MB，
+   * 评审网关直接 HTTP 413 → 监制"不可用"、镜头既没通过也没被打回（悬空待复检）。
+   */
+  it("送审图超预算时自动压缩后再送审（防 413 让监制悬空）", async () => {
+    const bigPath = join(tmpdir(), `judge-big-${randomUUID()}.png`);
+    const smallPath = join(tmpdir(), `judge-small-${randomUUID()}.jpg`);
+    writeFileSync(bigPath, Buffer.alloc(2_400_000, 0x41)); // 'A' × 2.4MB（模拟 10MB PNG 的量级）
+    writeFileSync(smallPath, Buffer.alloc(64_000, 0x42)); // 'B' × 64KB（模拟 720 宽 JPEG）
+    const bigB64 = Buffer.alloc(2_400_000, 0x41).toString("base64").slice(0, 48);
+    const smallB64 = Buffer.alloc(64_000, 0x42).toString("base64").slice(0, 48);
+    let sentBody = "";
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      sentBody = String(init.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ approved: true, score: 80, issues: [], suggestions: [], reason: "ok" }) } }] }), {
+        status: 200,
+        headers: { "content-type": "application/json" }
+      });
+    }) as unknown as typeof fetch;
+    try {
+      const verdict = await reviewStage({
+        stage: "shot", projectId: "VID-1",
+        artifacts: [{ path: bigPath, kind: "image" }],
+        deterministic: [], env, fetchImpl,
+        shrinkImage: () => smallPath
+      });
+      expect(verdict.approved).toBe(true);
+      expect(sentBody).toContain(smallB64);
+      expect(sentBody).not.toContain(bigB64);
+      expect(sentBody.length).toBeLessThan(400_000);
+    } finally {
+      rmSync(bigPath, { force: true });
+      rmSync(smallPath, { force: true });
+    }
+  });
+
   it("rubric 覆盖所有环节且都有可判定的条目", () => {
     for (const [stage, rubric] of Object.entries(PRODUCER_RUBRICS)) {
       expect(rubric.length, `${stage} 至少要有一条评审要点`).toBeGreaterThan(0);

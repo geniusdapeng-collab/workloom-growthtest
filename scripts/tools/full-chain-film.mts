@@ -702,8 +702,13 @@ function cachedShotSettings(shot: ShotCard): { frames: string[]; checks: Array<{
   mkdirSync(framesDir, { recursive: true });
   const frames: string[] = [];
   for (const [i, at] of [0.6, duration / 2, Math.max(0.6, duration - 0.8)].entries()) {
-    const file = join(framesDir, `cached-f${i + 1}.png`);
-    run(FFMPEG, ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", file]);
+    /**
+     * 评审帧压缩（2026-09-24 三轮审计）：**复用分支同样要压缩**。
+     * 真机事故：1080×1920 的 PNG 抽帧单张 ≈10MB，base64 后 4 张 ≈53MB → 评审模型 HTTP 413，
+     * 监制被判"不可用"、镜头悬在"未复核"状态。渲染分支已改 720 宽 JPEG，复用分支漏改过一版。
+     */
+    const file = join(framesDir, `cached-f${i + 1}.jpg`);
+    run(FFMPEG, ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", file]);
     frames.push(file);
   }
   return {
@@ -1062,8 +1067,13 @@ if (STAGES.has("videos")) {
         mkdirSync(framesDir, { recursive: true });
         const frameFiles: string[] = [];
         for (const [i, at] of [0.5, 1.8, 3.2, Math.max(0.6, duration - 0.5)].entries()) {
-          const file = join(framesDir, `f${i + 1}.png`);
-          run(FFMPEG, ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", file]);
+          /**
+           * 评审帧压缩（2026-09-24 三轮审计）：全分辨率 PNG（1080×1920，单张 1–2MB）四张一起送审，
+           * base64 后 ≈11MB → 评审模型直接 **HTTP 413**（payload too large）→ 监制不可用。
+           * 改成 720 宽 JPEG（质量 82，单张 ≈100KB），肉眼足够判断动作/表情/一致性。
+           */
+          const file = join(framesDir, `f${i + 1}.jpg`);
+          run(FFMPEG, ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", file]);
           frameFiles.push(file);
         }
         const motion = measureMotionEnergy(clip, duration);

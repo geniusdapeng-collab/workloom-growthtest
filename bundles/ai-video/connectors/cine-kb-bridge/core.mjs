@@ -219,8 +219,23 @@ export function parseApertureKnowledge(kb) {
       scenarios.push({ label: clean(table[1]), aperture: clean(table[2]), reason: clean(table[3]) });
       continue;
     }
-    const bullet = line.match(/^-\s*([^：:]+)[：:]\s*\*{0,2}(f\/[^，,*]+(?:\s*[–-]\s*f\/[\d.]+)?)\*{0,2}[，,]?\s*(.*)$/);
-    if (bullet) scenarios.push({ label: clean(bullet[1]), aperture: clean(bullet[2]), reason: clean(bullet[3]).replace(/。$/, "") });
+    /**
+     * 要点行解析（三轮审计放宽）：形如
+     *   `- 打卡照：**f/5.6**，原因…`
+     *   `- 星空银河：**用镜头最大光圈**（f/1.4–f/2.8），原因…`
+     *   `- 微距景深天然极浅，**f/8–f/16** 起步才能…`
+     * 早先要求 f 值紧跟标签，导致"星空""微距"两行没进场景表 → 兜底成 f/5.6 打卡档。
+     */
+    const bulletLine = line.match(/^-\s*(.+)$/);
+    if (bulletLine) {
+      const raw = clean(bulletLine[1]);
+      const fMatch = raw.match(/f\/\s*\d+(?:\.\d+)?(?:\s*[–\-~]\s*f\/\s*\d+(?:\.\d+)?)?/);
+      if (fMatch) {
+        const label = clean(raw.split(/[：:（(]/)[0]).replace(/\*\*/g, "");
+        const reason = clean(raw.slice(raw.indexOf(fMatch[0]) + fMatch[0].length)).replace(/^[，,、）)]+/, "").replace(/。$/, "");
+        scenarios.push({ label, aperture: clean(fMatch[0]), reason });
+      }
+    }
   }
 
   /** §八 决策树：`├─ "…" → 浅景深（f/1.4–f/2.8 效果）` */
@@ -280,11 +295,21 @@ const APERTURE_INTENT_HINTS = [
 export function recommendAperture(kb, card) {
   const knowledge = kb.aperture ?? parseApertureKnowledge(kb);
   if (!knowledge) return null;
-  const text = norm(shotSignals(card).text);
+  /**
+   * 与 detectContext / injectionContext 同口径：先剥否定语境（三轮审计）。
+   * 旧的 shotSignals 原始文本里带着"避免…""其他…"，"其他"里的"他"直接把空镜判成有人物。
+   */
+  const text = stripNegatedContext(norm(shotSignals(card).text));
   const context = detectContext(card);
   /** 命中的人像/人群意图（用于"有没有明确主体"的判断，以及多人口径） */
   const hitIntents = APERTURE_INTENT_HINTS.filter((hint) => hint.pattern.test(text));
-  const hasPerson = context.subject.includes("person") || hitIntents.some((h) => ["single-portrait", "pair", "group", "night-portrait"].includes(h.id));
+  /**
+   * 主体判定（三轮审计修正）：老代码写的是 `single-portrait`——**这个 id 在 HINTS 里根本不存在**，
+   * 真正表示人物的 `person` / `closeup-portrait` / `scene-portrait` 反而没算进去，
+   * 于是"只有角色名、没有'人物/她/他'字面"的卡片全被判成空镜。
+   */
+  const hasPerson = context.subject.includes("person")
+    || hitIntents.some((h) => ["person", "closeup-portrait", "scene-portrait", "pair", "group", "night-portrait"].includes(h.id));
   const isGroup = hitIntents.some((h) => h.id === "group");
 
   /** ① 场景表打分：意图加词命中 → 对应场景行加分；再用 2-gram 重合度补分 */
@@ -305,6 +330,13 @@ export function recommendAperture(kb, card) {
     const isNight = context.timeOfDay.includes("night");
     /** 夜景 + 有人物时，KB §3.5 明确"能开多大开多大"——人像档要压过环境/风光档 */
     if (isNight && hasPerson && /夜景人像|手持夜景/.test(row.label)) score += 8;
+    /** 无人物夜景不给人像档（三轮审计：夜晚车轨被塞"夜景人像 + 奶油虚化"） */
+    if (isNight && !hasPerson && /夜景人像|手持夜景/.test(row.label)) score -= 6;
+    /**
+     * 无主体时不该选"人像类"档（三轮审计：空镜夜景巷子靠 2-gram 噪声被选成「环境人像 f/2.8–f/4」，
+     * 画面里根本没有人物，档位的语义就对不上）。人像行留给真的有人物的镜头。
+     */
+    if (!hasPerson && /人像|单人特写|双人|多人合影|合影/.test(row.label)) score -= 4;
     if (isNight && hasPerson && /大场景风光|风光/.test(row.label)) score -= 3;
     /**
      * 景别消歧（KB §3.1）：中景/中近景的人像镜头要"人清楚、场景可辨"，
@@ -344,11 +376,52 @@ export function recommendAperture(kb, card) {
 
   /** ③ 兜底：有明确人物主体 → "环境人像"（人清楚、场景可辨）；否则给"打卡"安全档 */
   if (!picked) {
-    picked = (hasPerson ? knowledge.scenarios.find((s) => /环境人像/.test(s.label)) : null)
+    /**
+     * 兜底不再一律"打卡 f/5.6"（三轮审计：产品/婚礼/儿童/体育/航拍/棚拍全被塞成打卡档）。
+     * 先按主体类型在 KB §三 里挑对应行，再退回打卡。
+     */
+    const subjectPreference = [
+      /**
+       * 产品（三轮审计）：单品（香水、瓶身、杯）走 §3.4「单品特写 f/2.0–2.8，聚光灯式聚焦」——
+       * 该行原文点名"香水、咖啡杯"；只有明确要"全貌/包装/摆盘"时才用「产品全貌 f/8–f/11」。
+       */
+      {
+        test: /产品|商品|包装|摆盘|静物|香水|瓶身/,
+        prefer: /全貌|整箱|整套|包装盒|陈列|摆盘全景/.test(text) ? ["产品全貌", "单品特写"] : ["单品特写", "产品全貌"]
+      },
+      { test: /婚礼|新人|婚宴|情侣|双人|两人/, prefer: ["双人", "小合影"] },
+      { test: /儿童|孩子|亲子|生日会|家庭/, prefer: ["多人合影", "团体"] },
+      /**
+       * 体育（三轮审计）：KB 无体育专档，取 §3.3「边走边拍的 Vlog f/4–f/5.6」——
+       * 该行的理由是"给对焦系统留容错，防止人物出景深"，正是快速移动主体的同一诉求；
+       * 原先映射到「车轨/大场景风光 f/8–f/11」会把运动主体写成全程清晰的全景打卡。
+       */
+      { test: /体育|运动|竞技|跑道|球场|赛道/, prefer: ["边走边拍", "环境人像"] },
+      { test: /航拍|俯瞰|梯田|云海|山川|草原/, prefer: ["大场景风光", "风光"] },
+      { test: /棚拍|影棚|纯色背景|灰背景|白背景/, prefer: hasPerson ? ["单人特写", "环境人像"] : ["产品全貌", "单品特写"] },
+      /** 场所类主体：有人在 → 环境人像（人清楚、场景可辨）；纯空间 → 街拍叙事（超焦距、整条走廊清晰） */
+      { test: /门店|店内|商场|展厅|铺面/, prefer: hasPerson ? ["环境人像", "打卡"] : ["街拍", "打卡"] },
+      { test: /办公室|工位|会议室/, prefer: hasPerson ? ["环境人像", "打卡"] : ["街拍", "打卡"] },
+      { test: /医院|走廊|大堂|候车厅|长廊/, prefer: hasPerson ? ["环境人像", "打卡"] : ["街拍", "大场景风光"] },
+      { test: /美食|食物|菜|汤|点心|餐/, prefer: ["美食蒸汽", "单品特写"] },
+      { test: /微距|昆虫|露珠/, prefer: ["微距"] },
+      { test: /星空|银河|星轨/, prefer: ["星空", "手持夜景"] }
+    ].find((rule) => rule.test.test(text));
+    /**
+     * 偏好表按**书写优先级**取行（不是 KB 文件顺序）：
+     * 例如「棚拍」偏好 `单人特写 > 环境人像`，KB 里两行都在，必须取前者。
+     */
+    const preferred = subjectPreference
+      ? subjectPreference.prefer
+          .map((p) => knowledge.scenarios.find((s) => s.label.includes(p)))
+          .find(Boolean) ?? null
+      : null;
+    picked = preferred
+      ?? (hasPerson ? knowledge.scenarios.find((s) => /环境人像/.test(s.label)) : null)
       ?? knowledge.scenarios.find((s) => /打卡/.test(s.label))
       ?? knowledge.scenarios[0]
       ?? { label: null, aperture: "f/5.6", reason: "通用安全档" };
-    pickedBy = "fallback-default";
+    pickedBy = preferred ? "subject-fallback" : "fallback-default";
   }
 
   const range = parseApertureRange(picked.aperture);
@@ -368,6 +441,36 @@ export function recommendAperture(kb, card) {
    * 此时收光圈会逼高 ISO；宁可让手部略软，也不要夜景噪点炸掉整镜（2026-09-24 修正）。
    */
   const isNightScene = detectContext(card).timeOfDay.includes("night");
+  /** 专项意图需要一个"注入决策上下文"（含 星空/车轨/微距 等信号） */
+  const ctx = injectionContext(card);
+  /** 专项意图优先（三轮审计）：星空=最大光圈求进光；车轨/长曝=小光圈；微距=小光圈保景深 */
+  const special = ctx?.starfield ? knowledge.scenarios.find((s) => /星空|银河/.test(s.label))
+    : ctx?.lightTrail ? knowledge.scenarios.find((s) => /车轨|长曝/.test(s.label))
+    : ctx?.macro ? knowledge.scenarios.find((s) => /微距/.test(s.label)) : null;
+  if (special) {
+    const specRange = parseApertureRange(special.aperture);
+    const specStop = apertureStopFor(knowledge, specRange);
+    /**
+     * 画面语言口径（三轮审计）：§二 档位表把 f/1.4–f/2.8 的效果词写成"奶油般虚化、梦幻光斑、主体悬浮感"，
+     * 那是**人像浅景深**的语言；而 §3.5 对星空银河的原话是"此时求的是进光量而非景深"。
+     * 照抄档位表会让模型去画一片背景光斑而不是星点，所以"进光量优先"的行一律用行内理由当画面语言。
+     */
+    const lightPriority = /星空|银河/.test(special.label);
+    return {
+      aperture: special.aperture,
+      direction: specRange && specRange.max <= 2.8 ? "shallow" : specRange && specRange.min >= 8 ? "deep" : "moderate",
+      effectZh: lightPriority
+        ? `${special.reason || "以进光量为先"}（${special.label}）`
+        : specStop ? `${specStop.effectZh}（${specStop.depth}景深）` : special.reason,
+      effectEn: "",
+      reason: `${special.reason}（专项意图：${ctx?.starfield ? "星空" : ctx?.lightTrail ? "车轨/长曝" : "微距"}）`,
+      scenarioLabel: special.label,
+      matchedBy: "special-intent",
+      handAdjust: null,
+      intents: hitIntents.map((h) => h.id),
+      source: `OPTICS-001 §三/§八${knowledge.version ? `（${knowledge.version}）` : ""}`
+    };
+  }
   if (handAction && !isNightScene && range && range.max <= 2.0) {
     const corrected = knowledge.scenarios.find((s) => /环境人像/.test(s.label));
     if (corrected) {
@@ -461,6 +564,24 @@ export function isoToEffect(iso) {
 
 const norm = (v) => String(v ?? "").trim().toLowerCase();
 
+/**
+ * 否定语境剥离（判断"这个镜头要不要 X"之前先做）。
+ *
+ * 两类否定在中文里结构不同，早先共用一条"剥 18 个字"的规则：
+ *   · 谓词否定（避免/不要/禁止 + 从句）——剥掉整个从句，如"避免日落时段的金色调"；
+ *   · 限定词否定（无/不含/非 + **定语** + 的 + 中心词）——只该剥掉定语，
+ *     如"**无光污染**的星空银河"里，"星空银河"是要拍的主体。
+ * 三轮审计真机：旧规则把"无光污染的星空银河"整段吃掉 → 星空专项光圈规则根本没触发。
+ * 因此限定词否定改为"遇到'的/地'即停"，谓词否定维持 18 字。
+ */
+function stripNegatedContext(raw) {
+  return String(raw ?? "")
+    .replace(/(避免|不要|禁止)[^，。；、,;]{0,18}/g, " ")
+    .replace(/(无|不含|非)[^，。；、,;的地]{0,12}/g, " ")
+    /** "其他/其它"里的"他"会把空镜误判成人物（三轮审计：人称代词只认单独出现的"她/他"） */
+    .replace(/其他|其它/g, " ");
+}
+
 /** 时段/天气/主体识别（用于"矛盾闸"：日景镜头不能被塞夜景配方） */
 const CONTEXT_LEXICON = {
   timeOfDay: [
@@ -486,6 +607,22 @@ const CONTEXT_LEXICON = {
   ]
 };
 
+/**
+ * 命名主体信号（2026-09-24 三轮审计）：
+ * 镜头卡写 `character: "陈卓"` 时画面里**确实有人**，但词面上下文只认"人/人物/她/他/人像"这些词，
+ * 于是这类镜头被判成"空镜"——光圈兜底因此掉进 f/5.6「打卡照」（正午人像/蓝调人像/雪天人像全中）。
+ * 这里把**角色字段非空且未被否定**本身当作主体信号；`无 / 空镜 / 不需要 / 不出镜` 仍判空镜。
+ */
+function hasNamedSubject(card) {
+  const raw = [card?.character, card?.characters, card?.cast, card?.presenter]
+    .filter(Boolean)
+    .map((v) => (typeof v === "string" ? v : JSON.stringify(v)))
+    .join(" ");
+  const text = norm(raw);
+  if (!text) return false;
+  return !/无人物|空镜|不需要|不出镜|^(无|没有|none|null)/i.test(text);
+}
+
 export function detectContext(card) {
   /**
    * 先剥离**否定语境**：我们的镜头卡里写着"避免日落时段的金色调、避免暖黄滤镜"这类白平衡锚点，
@@ -497,9 +634,11 @@ export function detectContext(card) {
     /** 人物/服装/道具也要进上下文：否则"有人物的镜头"会被判成无主体（2026-09-24 修正） */
     card?.character, card?.character_constraint, card?.characters, card?.costume, card?.props
   ].filter(Boolean).map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(" "));
-  const text = raw.replace(/(避免|不要|禁止|无|不含|非)[^，。；、,;]{0,18}/g, " ");
+  const text = stripNegatedContext(raw);
   const pick = (list) => list.filter((x) => x.pattern.test(text)).map((x) => x.key);
-  return { timeOfDay: pick(CONTEXT_LEXICON.timeOfDay), weather: pick(CONTEXT_LEXICON.weather), subject: pick(CONTEXT_LEXICON.subject) };
+  const subject = pick(CONTEXT_LEXICON.subject);
+  if (hasNamedSubject(card) && !subject.includes("person")) subject.push("person");
+  return { timeOfDay: pick(CONTEXT_LEXICON.timeOfDay), weather: pick(CONTEXT_LEXICON.weather), subject };
 }
 
 /**
@@ -750,6 +889,10 @@ function phraseFor(pick) {
  */
 const INJECTION_RULES = [
   /* ---------- 光线 ---------- */
+  /** 蓝调时刻必须最先判（2026-09-24 三轮审计：放在夜景规则后面会被"电影感夜景"抢位） */
+  /** 蓝调时刻：日落后天光偏蓝，与"夜晚霓虹/灯笼"是两种光（原来会掉到 night-film 或干脆不注入） */
+  { field: "lighting", id: "blue-hour", when: (c) => c.blueHour, topic: "LIGHT-002", row: "蓝调时刻" },
+
   /** 灯笼夜景优先用"电影感夜景"，只有画面强调光斑时才用"城市光斑虚化"（避免给收尾镜注入"孤独空旷街角"的调性） */
   { field: "lighting", id: "night-bokeh-first", when: (c) => c.night && c.lantern && c.bokeh && !c.neon, topic: "LIGHT-003", row: "城市光斑虚化" },
   { field: "lighting", id: "night-lantern", when: (c) => c.night && c.lantern && !c.neon, topic: "LIGHT-003", row: "电影感夜景" },
@@ -758,11 +901,22 @@ const INJECTION_RULES = [
   { field: "lighting", id: "night-film", when: (c) => c.night && !c.neon && !c.lantern, topic: "LIGHT-003", row: "电影感夜景" },
   { field: "lighting", id: "indoor-warm-mix", when: (c) => c.interior && c.day, topic: "LIGHT-002", row: "混合色温（室内暖+窗外冷）" },
   { field: "lighting", id: "indoor-tungsten", when: (c) => c.interior && !c.day, topic: "LIGHT-003", row: "钨丝灯室内" },
-  { field: "lighting", id: "overcast-soft", when: (c) => c.overcast, topic: "LIGHT-001", row: "阴天软光" },
-  { field: "lighting", id: "day-slant", when: (c) => c.day && !c.overcast && !c.interior, topic: "LIGHT-002", row: "上午/下午日常斜光" },
-  { field: "lighting", id: "golden-hour", when: (c) => c.goldenHour, topic: "LIGHT-002", row: "黄金时刻通用" },
-  { field: "lighting", id: "rim-light", when: (c) => c.rimLight, topic: "LIGHT-001", row: "金色轮廓光" },
+  /** 雪景光：阴天散射 + 雪面反光（先于阴天软光判定，避免雪天被当成普通阴天） */
+  { field: "lighting", id: "snow-light", when: (c) => c.snow, topic: "SCENE-001", row: "落雪安静" },
+  /** 正午硬光：烈日顶光，与"上午/下午斜光"不同（三轮审计：正午被误判成午后） */
+  { field: "lighting", id: "noon-hard", when: (c) => c.noon && !c.overcast, topic: "LIGHT-002", row: "正午硬光（纪实/压迫）" },
+  { field: "lighting", id: "overcast-soft", when: (c) => c.overcast && !c.snow, topic: "LIGHT-001", row: "阴天软光" },
+  /** 斜光只在明确写了上午/下午时生效（避免"正午/白天"被当成斜光） */
+  { field: "lighting", id: "day-slant", when: (c) => c.day && !c.overcast && !c.interior && !c.noon && !c.blueHour && /上午|下午|早晨|清晨|morning|afternoon/.test(c.text), topic: "LIGHT-002", row: "上午/下午日常斜光" },
+  /**
+   * 逆光三兄弟的优先级（2026-09-24 三轮审计）：
+   * 「有意剪影 / 轮廓光」比「黄金时刻」更具体——原来是黄金时刻先命中（日落语境必然同时命中），
+   * 于是明确写着"人物呈剪影"的镜头被注入"低角度暖金色阳光、长影子"，剪影诉求被吃掉。
+   * 顺序：剪影 > 轮廓光 > 黄金时刻；黄金时刻再补一条 `!silhouette` 兜底。
+   */
   { field: "lighting", id: "silhouette", when: (c) => c.silhouette, topic: "LIGHT-001", row: "逆光剪影" },
+  { field: "lighting", id: "rim-light", when: (c) => c.rimLight && !c.silhouette, topic: "LIGHT-001", row: "金色轮廓光" },
+  { field: "lighting", id: "golden-hour", when: (c) => c.goldenHour && !c.silhouette && !c.rimLight, topic: "LIGHT-002", row: "黄金时刻通用" },
   { field: "lighting", id: "window-light", when: (c) => c.windowLight, topic: "LIGHT-001", row: "柔美窗光" },
   { field: "lighting", id: "fog-light", when: (c) => c.fog, topic: "LIGHT-001", row: "朦胧逆光雾感" },
   { field: "lighting", id: "candle", when: (c) => c.candle, topic: "LIGHT-001", row: "烛光 / 火光" },
@@ -797,8 +951,10 @@ const INJECTION_RULES = [
   { field: "color_palette", id: "low-key", when: (c) => c.moody, topic: "COLOR-002", row: "低调、深沉" },
 
   /* ---------- 材质 / 道具（真实感的最后 10%） ---------- */
-  { field: "props", id: "reflection", when: (c) => c.water && !c.rain, topic: "PHYS-001", row: "镜面倒影" },
-  { field: "props", id: "water-ripple", when: (c) => c.water && c.watercraft, topic: "PHYS-001", row: "湖面微澜" },
+  { field: "props", id: "snow-fall", when: (c) => c.snow, topic: "SCENE-001", row: "落雪安静" },
+  /** 倒影只在"平静水面"语境命中（三轮审计：水下镜头/冰面/产品白背景曾被误注入镜面倒影） */
+  { field: "props", id: "reflection", when: (c) => c.mirrorWater && !c.rain, topic: "PHYS-001", row: "镜面倒影" },
+  { field: "props", id: "water-ripple", when: (c) => c.water && c.watercraft && !c.snow, topic: "PHYS-001", row: "湖面微澜" },
   { field: "props", id: "drizzle", when: (c) => c.rain && !c.heavyRain, topic: "PHYS-001", row: "毛毛细雨" },
   { field: "props", id: "steam-food", when: (c) => c.food && c.steam, topic: "PHYS-001", row: "咖啡热气" },
   { field: "props", id: "silk", when: (c) => c.silk, topic: "PHYS-002", row: "丝绸光泽流动" },
@@ -815,12 +971,12 @@ const INJECTION_RULES = [
 /** 从镜头卡抽取"注入决策上下文"（纯词面判断，可解释、可测试） */
 export function injectionContext(card) {
   /** 与 detectContext 同口径：**先剥否定语境**——"避免日落时段的金色调"不能被读成"要日落"（2026-09-24 真机） */
-  const text = norm([
+  const rawText = norm([
     card?.scene, card?.sceneDescription, card?.lighting, card?.mood, card?.action, card?.composition,
     card?.camera_movement, card?.color_palette, card?.character, card?.costume, card?.props,
     card?.makeup, card?.baseline, card?.director_instruction, card?.pacing
-  ].filter(Boolean).map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(" "))
-    .replace(/(避免|不要|禁止|无|不含|非)[^，。；、,;]{0,18}/g, " ");
+  ].filter(Boolean).map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(" "));
+  const text = stripNegatedContext(norm(rawText));
   const has = (re) => re.test(text);
   const framingHit = ["大远景", "远景", "全景", "中近景", "中景", "近景", "特写"].find((f) => text.includes(f));
   return {
@@ -829,11 +985,20 @@ export function injectionContext(card) {
      * 夜间信号只认"真的在夜里"：灯笼/烛光是**点光源**，白天巷口挂灯笼不等于夜景
      * （2026-09-24 真机：白天巷子被注入"暖橙钠灯光池"）。
      */
-    night: has(/夜景|夜晚|入夜|晚上|夜色|深夜|霓虹|月夜/),
-    day: has(/上午|清晨|早上|正午|中午|下午|日光|白天/),
+    night: has(/夜景|夜晚|入夜|晚上|夜色|深夜|霓虹|月夜|暮色|蓝调/),
+    /** 蓝调时刻是"暮色"而非深夜：单独识别，灯光规则要按蓝调走（2026-09-24 三轮审计） */
+    blueHour: has(/蓝调|blue hour|暮色|日落后/),
+    /**
+     * 白天信号（三轮审计补 "明亮/自然光/光线充足"）：
+     * "服装店内景…明亮"早先因为没有"白天/日光"字面被判成"夜间室内" → 注入"暖黄钨丝灯、2800K 温馨居家"。
+     * 夜景规则排在本条之前，所以"夜晚的明亮灯市"仍走夜景，不会被误判成白天。
+     */
+    day: has(/上午|清晨|早上|正午|中午|下午|日光|白天|明亮|自然光|光线充足/),
     interior: has(/室内|铺内|店内|房间|屋内|屋里|茶馆|食肆|大堂/),
     overcast: has(/阴天|多云|散射光|漫射光|无硬阴影/),
-    goldenHour: has(/黄金时刻|magic hour|落日|日落/),
+    goldenHour: has(/黄金时刻|magic hour|落日|日落|夕阳/),
+    /** 正午硬光：需要与"午后斜光"区分（前者硬、后者斜） */
+    noon: has(/正午|中午|晌午|烈日|顶光/),
     neon: has(/霓虹|neon/),
     lantern: has(/灯笼|烛光|暖灯|吊灯|串灯/),
     candle: has(/烛光|蜡烛|火锅|篝火/),
@@ -844,11 +1009,18 @@ export function injectionContext(card) {
     rain: has(/雨/),
     heavyRain: has(/暴雨|大雨|倾盆/),
     water: has(/水|河|湖|江|倒影/),
+    /** 镜面倒影必须是"平静水面"语境；水下/冰面/雪地不算（三轮审计：水下镜头被注入镜面倒影） */
+    mirrorWater: has(/倒影|镜面|如镜|平静水面|无风水面|静水/) && !has(/水下|海底|冰|雪/),
     watercraft: has(/船|摇橹|乌篷|橹/),
     steam: has(/蒸汽|热气|雾气升腾|冒烟|热气腾/),
     food: has(/糖粥|海棠糕|点心|茶食|美食|食物|餐|糕点|小吃/),
+    /** 专项意图（三轮审计新增）：星空/车轨/微距/雪景——这些场景的档位与常规人像/打卡完全不同 */
+    starfield: has(/星空|银河|星河|星轨/),
+    lightTrail: has(/车轨|车流|光轨|拖影长曝/),
+    macro: has(/微距|超近距|昆虫特写|露珠特写/),
+    snow: has(/雪/),
     silk: has(/旗袍|缎面|丝绸|绸/),
-    person: has(/女主|男主角|人物|她|他|角色|面部|人像/),
+    person: has(/女主|男主角|人物|她|他|角色|面部|人像/) || hasNamedSubject(card),
     closeup: has(/特写|close-?up|面部|脸/i),
     personSkin: has(/皮肤|肤质|毛孔|裸妆/),
     walking: has(/行走|走动|步行|向前走|走过|漫步|缓步|walk/i),
@@ -908,7 +1080,12 @@ export function enrichShotCard(kb, card, options = {}) {
    */
   const pickedRows = [];
   const usedFields = new Set();
-  const maxInjections = options.maxInjections ?? 3;
+  /**
+   * 注入上限（2026-09-24 三轮审计修正）：原先全局上限 3 会让"靠后的领域"（材质/道具）被前面
+   * （灯光/构图/运镜）挤掉——实测"湖面倒影"因此没有被注入。改为 **5**：
+   * 字段级仍严格"一字段一条"，所以最多就是 灯光/构图/运镜/色调/材质 各一条，不会堆提示词。
+   */
+  const maxInjections = options.maxInjections ?? 5;
   for (const rule of INJECTION_RULES) {
     if (pickedRows.length >= maxInjections) break;
     if (usedFields.has(rule.field)) continue;
@@ -919,6 +1096,8 @@ export function enrichShotCard(kb, card, options = {}) {
     if (rule.id === "framing" && ctx.framingKnown) continue;
     const row = pickRow(kb, rule.topic, rule.row);
     if (!row) continue;
+    /** 同一知识行不重复落到多个字段（三轮审计：雪景"落雪安静"同时进了 lighting 与 props） */
+    if (pickedRows.some((p) => p.row.topicId === row.topicId && p.row.intent === row.intent)) continue;
     pickedRows.push({ rule, row });
     usedFields.add(rule.field);
   }

@@ -29,7 +29,11 @@ export type ProducerStage =
   | "cover"
   | "master";
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 export interface DeterministicCheck {
   id: string;
@@ -156,6 +160,11 @@ export interface ProducerGateOptions {
   env?: Record<string, string | undefined>;
   fetchImpl?: typeof fetch;
   log?: (line: string) => void;
+  /**
+   * 评审图压缩器（2026-09-24 三轮审计）：送审图大于预算时调用，返回压缩后的图片路径（失败返回 null）。
+   * 默认实现用 ffmpeg 缩到 720 宽 JPEG；测试注入替身，避免单测依赖 ffmpeg。
+   */
+  shrinkImage?: (path: string) => string | null;
 }
 
 interface LlmConfig {
@@ -187,6 +196,30 @@ function summarizeArtifacts(artifacts: ProducerArtifact[]): string {
     const bytes = typeof a.bytes === "number" ? ` ${(a.bytes / 1024).toFixed(0)}KB` : "";
     return `- [${a.kind}] ${a.path}${bytes}${probe}${a.note ? ` — ${a.note}` : ""}`;
   }).join("\n");
+}
+
+/**
+ * 单张送审图预算（2026-09-24 三轮审计，真机事故复现）：
+ * 视频抽帧是 1080×1920 的 PNG，单张 ≈10MB；4 张产物帧 + 2 张基准图一起 base64 后 **≈53MB**，
+ * 评审模型的网关直接返回 `HTTP 413 Request Entity Too Large` → 监制判为"不可用"、镜头悬空（既没通过也没真打回）。
+ * 这里加一道**按需压缩**：超过预算的图先缩到 720 宽 JPEG 再送审；压缩器不可用时保持原图并如实记日志
+ * （宁可送大图赌一次，也不能悄悄丢掉评审证据）。
+ */
+const JUDGE_IMAGE_BUDGET_BYTES = 900_000;
+
+/** 默认压缩器：ffmpeg 缩到 720 宽 JPEG（失败返回 null，由调用方如实降级） */
+function shrinkImageWithFfmpeg(path: string): string | null {
+  const bin = process.env.WL_FFMPEG ?? "ffmpeg";
+  const out = join(tmpdir(), `producer-judge-${randomUUID()}.jpg`);
+  const res = spawnSync(bin, [
+    "-hide_banner", "-v", "error", "-y", "-i", path,
+    "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", out
+  ]);
+  if (res.status !== 0 || !existsSync(out)) {
+    try { rmSync(out, { force: true }); } catch { /* 压缩失败产物不存在也无所谓 */ }
+    return null;
+  }
+  return statSync(out).size < statSync(path).size ? out : null;
 }
 
 /**
@@ -324,11 +357,26 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
     ...imageArtifacts.slice(0, 4).map((a) => ({ path: a.path, label: "待评审产物" })),
     ...(options.referenceImages ?? []).slice(0, 2).map((path) => ({ path, label: "基准图（角色定妆照/授权真人照片）" }))
   ];
+  /** 压缩产物是临时文件，请求结束后回收（评审重试/修复调用共用同一批已编码内容） */
+  const tempImages: string[] = [];
   for (const image of imageQueue) {
     try {
-      const bytes = readFileSync(image.path);
-      content.push({ type: "text", text: `以下是${image.label}：${image.path}` });
-      content.push({ type: "image_url", image_url: { url: `data:${mimeOf(image.path)};base64,${bytes.toString("base64")}` } });
+      let attachPath = image.path;
+      let bytes = readFileSync(attachPath);
+      if (bytes.byteLength > JUDGE_IMAGE_BUDGET_BYTES) {
+        const shrink = options.shrinkImage ?? shrinkImageWithFfmpeg;
+        const shrunk = shrink(image.path);
+        if (shrunk) {
+          attachPath = shrunk;
+          tempImages.push(shrunk);
+          bytes = readFileSync(shrunk);
+          log(`[producer][${stage}] 送审图超预算（${(readFileSync(image.path).byteLength / 1024 / 1024).toFixed(1)}MB）→ 压缩到 ${(bytes.byteLength / 1024).toFixed(0)}KB：${image.path}`);
+        } else {
+          log(`[producer][${stage}] 送审图超预算且压缩不可用（按原图送审，可能触发 413）：${image.path}`);
+        }
+      }
+      content.push({ type: "text", text: `以下是${image.label}：${attachPath}` });
+      content.push({ type: "image_url", image_url: { url: `data:${mimeOf(attachPath)};base64,${bytes.toString("base64")}` } });
     } catch (err) {
       log(`[producer][${stage}] 读取图像失败（跳过）：${image.path} — ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -392,5 +440,10 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       reason: `评审模型不可用：${message.slice(0, 120)}`,
       degraded: true
     };
+  } finally {
+    /** 回收送审用的临时压缩图（评审失败路径也要回收，避免 /tmp 里越攒越多） */
+    for (const temp of tempImages) {
+      try { rmSync(temp, { force: true }); } catch { /* 临时文件删不掉不该影响评审结论 */ }
+    }
   }
 }
