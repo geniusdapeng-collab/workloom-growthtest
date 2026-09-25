@@ -5,7 +5,14 @@
   "durationSeconds": 48,
   "aspect": "9:16",
   "resolution": "1080p",
-  "character": { "id": "chen-zhuo", "name": "陈卓", "appearanceInShots": ["NC-01", "NC-16"] },
+  "character": {
+    "id": "chen-zhuo",
+    "name": "陈卓",
+    "appearanceInShots": [
+      "NC-01",
+      "NC-16"
+    ]
+  },
   "visualSystem": {
     "renderStyle": "写实电影感摄影，自然皮肤质感，非插画非卡通非3D渲染；参考素材只作实景依据，不做风格化重绘",
     "whiteBalanceAnchor": "白平衡中性（日景 5600K / 夜景 3800–4200K），肤色自然；夜景允许冷暖对比，避免整幅橙调",
@@ -19,14 +26,100 @@
   "shotPlan": {
     "template": "city-watchtower",
     "segments": [
-      { "segment": "build", "shots": ["NC-01", "NC-02", "NC-03"], "shotSeconds": [3.5, 4.5], "intent": "建立城市与主地标" },
-      { "segment": "accelerate", "shots": ["NC-04", "NC-05", "NC-06", "NC-07", "NC-08", "NC-09", "NC-10"], "shotSeconds": [2.5, 3.5], "intent": "市井与肌理，卡点开始" },
-      { "segment": "climax", "shots": ["NC-11", "NC-12", "NC-13", "NC-14", "NC-15"], "shotSeconds": [1.5, 2.5], "intent": "最短镜 + 夜景与灯光连击" },
-      { "segment": "resolve", "shots": ["NC-16"], "shotSeconds": [3.5, 4.5], "intent": "收尾邀请" }
+      {
+        "segment": "build",
+        "shots": [
+          "NC-01",
+          "NC-02",
+          "NC-03"
+        ],
+        "shotSeconds": [
+          3.5,
+          4.5
+        ],
+        "intent": "建立城市与主地标"
+      },
+      {
+        "segment": "accelerate",
+        "shots": [
+          "NC-04",
+          "NC-05",
+          "NC-06",
+          "NC-07",
+          "NC-08",
+          "NC-09",
+          "NC-10"
+        ],
+        "shotSeconds": [
+          2.5,
+          3.5
+        ],
+        "intent": "市井与肌理，卡点开始"
+      },
+      {
+        "segment": "climax",
+        "shots": [
+          "NC-11",
+          "NC-12",
+          "NC-13",
+          "NC-14",
+          "NC-15"
+        ],
+        "shotSeconds": [
+          1.5,
+          2.5
+        ],
+        "intent": "最短镜 + 夜景与灯光连击"
+      },
+      {
+        "segment": "resolve",
+        "shots": [
+          "NC-16"
+        ],
+        "shotSeconds": [
+          3.5,
+          4.5
+        ],
+        "intent": "收尾邀请"
+      }
     ],
-    "cutTransition": { "name": "hblur", "durationSec": 0.18, "at": [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16] },
-    "voice": { "profile": "chen-zhuo-film", "linesMax": 3 },
-    "sfx": { "kinds": ["whoosh", "impact", "riser"], "climaxShotId": "NC-15" }
+    "cutTransition": {
+      "name": "hblur",
+      "durationSec": 0.18,
+      "at": [
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16
+      ]
+    },
+    "voice": {
+      "profile": "chen-zhuo-film",
+      "linesMax": 3
+    },
+    "sfx": {
+      "kinds": [
+        "whoosh",
+        "impact",
+        "riser"
+      ],
+      "climaxShotId": "NC-15"
+    },
+    "referenceManifest": "<WS>/work/nanchang/selected/sources.json（ready 5 / weak 5 / pending 4）",
+    "notes": [
+      "参考素材状态：ready=可直接跑；weak=可用但建议换更好的；pending=缺（暂走文生视频或补授权素材）"
+    ]
   },
   "shots": [
     {
@@ -42,10 +135,19 @@
       "makeup": "通透裸妆：自然眉形、淡棕眼影、纤长睫毛、豆沙唇",
       "action": "她正对镜头轻快抬手打招呼，随即开口说出开场句，说完眼神保持镜头交流",
       "dialogue": [
-        { "speaker": "陈卓", "text": "南昌，48 秒，我带你看一遍", "emotion": "亲切自信", "trigger": "抬手招呼后开口" }
+        {
+          "speaker": "陈卓",
+          "text": "南昌，48 秒，我带你看一遍",
+          "emotion": "亲切自信",
+          "trigger": "抬手招呼后开口"
+        }
       ],
-      "portraits": ["image://characters/chen-zhuo/portrait.png"],
-      "consistency": ["NC-16"],
+      "portraits": [
+        "image://characters/chen-zhuo/portrait.png"
+      ],
+      "consistency": [
+        "NC-16"
+      ],
       "mood": "亲切明亮带期待，视线始终落在镜头",
       "color_palette": "蓝调天空 + 米白衣着 + 城市暖灯点，中低饱和",
       "audio": "无配乐（配乐统一处理）；保留很轻的环境声",
@@ -59,12 +161,17 @@
       "materialUsage": "generation-reference",
       "materialDescription": "滕王阁白天全景实拍：红柱绿瓦主楼与赣江、城市天际线同框",
       "motion": "低空俯冲推近：从江面高度快速扑向楼体正面（起手极快 → 中段稳行 → 收尾缓停），前景赣江水纹与远景天际线产生强烈视差",
-      "focus": { "x": 0.45, "y": 0.5 },
+      "focus": {
+        "x": 0.45,
+        "y": 0.5
+      },
       "scene": "真实实拍参考：南昌滕王阁白天全景，楼阁临江，江对岸是城市天际线",
       "dialogue": [],
       "color_palette": "青蓝天光 + 红柱绿瓦 + 江水青灰",
       "props": "赣江、城市天际线、滕王阁主楼",
-      "transition": "硬切（进入匾额细节）"
+      "transition": "硬切（进入匾额细节）",
+      "referenceStatus": "ready",
+      "referenceNote": "File:Pavilion of Prince Teng 2023021301.jpg · CC BY 4.0"
     },
     {
       "shotId": "NC-03",
@@ -73,180 +180,240 @@
       "materialUsage": "generation-reference",
       "materialDescription": "滕王阁匾额与飞檐细节实拍：蓝底金字匾额与层叠斗拱",
       "motion": "贴檐高速横摇甩入：从左向右高速横扫（带运动模糊），匾额文字快速进入画面后急停定住，斗拱与瓦当层次产生视差",
-      "focus": { "x": 0.9, "y": 0.45 },
+      "focus": {
+        "x": 0.9,
+        "y": 0.45
+      },
       "scene": "真实实拍参考：滕王阁匾额与飞檐细节",
       "dialogue": [],
       "color_palette": "朱红梁柱 + 蓝底金字 + 青绿瓦当",
       "props": "匾额、斗拱、飞檐、脊兽",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "ready",
+      "referenceNote": "File:Pavilion of Prince Teng, Nanchang, China3.jpg · CC BY 2.5"
     },
     {
       "shotId": "NC-04",
       "duration": 3.5,
-      "photo": "<WS>/work/nanchang/selected/nc-wanshougong-alley.jpg",
+      "photo": "<WS>/work/nanchang/selected/nc-wanshougong-street.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "万寿宫历史文化街区街巷实拍：青砖马头墙、门洞、石板路",
       "motion": "穿框推进：镜头从街口门洞穿过推进到巷内，门框从画面前景掠过形成遮挡与视差",
-      "focus": { "x": 0.5, "y": 0.55 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.55
+      },
       "scene": "真实实拍参考：万寿宫街区门洞与石板巷；本镜含临时角色（写生学生）",
       "character": "临时角色：写生学生（女，20 岁上下，马尾、浅灰卫衣，膝上速写本）——类型化生成人物，非真实个人",
       "action": "她抬头看飞檐又低头落笔，笔尖快速排线",
       "dialogue": [],
       "color_palette": "青砖灰 + 灯笼暖点",
       "props": "门洞、马头墙、石板路、速写本",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "ready",
+      "referenceNote": "File:Wanshou Palace Histroric Street.jpg · CC BY-SA 4.0"
     },
     {
       "shotId": "NC-05",
       "duration": 3.5,
-      "photo": "<WS>/work/nanchang/selected/nc-ganjiang-sunset.jpg",
+      "photo": "<WS>/work/nanchang/selected/nc-ganjiang-dusk.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "赣江黄昏实拍：江面开阔，天光转金，对岸城市轮廓层叠",
       "motion": "贴水面横移 + 抬升：镜头贴着江面右移后拉起，前景水纹与远景城市天际线视差明显，云层加速流动",
-      "focus": { "x": 0.5, "y": 0.6 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.6
+      },
       "scene": "真实实拍参考：赣江黄昏江面与对岸城市",
       "dialogue": [],
       "color_palette": "暖金天光 + 冷青江水",
       "props": "江水、晚霞、城市轮廓",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "ready",
+      "referenceNote": "File:Chaoyang Bridge 20160907 132553.jpg · CC BY-SA 4.0"
     },
     {
       "shotId": "NC-06",
       "duration": 3.0,
-      "photo": "<WS>/work/nanchang/selected/nc-qiushui-park.jpg",
+      "photo": "<WS>/work/nanchang/selected/nc-city-aerial.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "秋水广场清晨实拍：江岸步道、晨雾、对岸楼群剪影",
       "motion": "低角度缓推进：镜头从地面高度推进，前景石板与栏杆掠过，晨练人物在中景划弧转身形成遮挡层次",
-      "focus": { "x": 0.45, "y": 0.55 },
+      "focus": {
+        "x": 0.45,
+        "y": 0.55
+      },
       "scene": "真实实拍参考：秋水广场江岸清晨；本镜含临时角色（晨练老人）",
       "character": "临时角色：晨练老人（男，70 岁上下，银白短发、浅灰太极服、布鞋）——类型化生成人物",
       "action": "双手缓慢划弧转身，背景是江面晨雾",
       "dialogue": [],
       "color_palette": "晨雾灰蓝 + 暖色晨光",
       "props": "江岸步道、栏杆、晨雾",
-      "transition": "硬切"
+      "transition": "硬切",
+      "referenceStatus": "weak",
+      "referenceNote": "File:DJI 0865-HDR-Pano - 缩小.jpg · CC BY-SA 4.0"
     },
     {
       "shotId": "NC-07",
       "duration": 3.0,
-      "photo": "<WS>/work/nanchang/selected/nc-bridge-traffic.jpg",
+      "photo": "<WS>/work/nanchang/selected/nc-ganjiang-bridge.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "跨江大桥与滨江大道实拍：桥体结构、车流、江面",
       "motion": "横向甩镜追随：镜头随车流高速右甩，桥索与护栏在前景快速掠过（带运动模糊），收尾定住露出江面",
-      "focus": { "x": 0.5, "y": 0.5 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.5
+      },
       "scene": "真实实拍参考：南昌跨江大桥与滨江大道；本镜含临时角色（外卖骑手）",
       "character": "临时角色：外卖骑手（男，25 岁上下，黄色冲锋衣与头盔）——类型化生成人物",
       "action": "在滨江大道上减速拐弯出画，尾灯拖出光带",
       "dialogue": [],
       "color_palette": "桥体冷灰 + 车灯暖点",
       "props": "大桥、护栏、电动车流",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "ready",
+      "referenceNote": "File:Ganjiang Bridge 20141121 110905.jpg · CC BY-SA 4.0"
     },
     {
       "shotId": "NC-08",
       "duration": 3.0,
-      "photo": "<WS>/work/nanchang/selected/nc-metro-hall.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "地铁站厅与扶梯实拍：灯箱、扶梯、人流",
       "motion": "上升推镜：镜头跟着扶梯上行推进，扶手与灯箱在前景掠过形成规律遮挡与视差",
-      "focus": { "x": 0.5, "y": 0.45 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.45
+      },
       "scene": "真实实拍参考：南昌地铁站厅灯箱与扶梯；本镜含临时角色（通勤青年）",
       "character": "临时角色：地铁通勤青年（男，28 岁上下，黑框眼镜、深灰风衣、双肩包）——类型化生成人物",
       "action": "扶梯上行时抬眼看向灯箱，随后出画",
       "dialogue": [],
       "color_palette": "站厅冷白 + 灯箱暖白",
       "props": "扶梯、灯箱、双肩包",
-      "transition": "硬切"
+      "transition": "硬切",
+      "referenceStatus": "pending",
+      "referenceNote": "地铁站厅参考缺（检索到的 Metro Central 实为街景）",
+      "fallback": "无实景参考时走文生视频（videos 阶段）；补齐授权素材后改回 material-gen"
     },
     {
       "shotId": "NC-09",
       "duration": 3.0,
-      "photo": "<WS>/work/nanchang/selected/nc-noodle-stand.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "南昌拌粉摊实拍：大锅、米粉、调料碗、蒸汽与摊位灯",
       "motion": "俯拍推近：镜头从摊位上方向下推近到锅口，蒸汽从画面下方升腾遮住半幅，前景蒸汽与后景摊主形成视差",
-      "focus": { "x": 0.5, "y": 0.6 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.6
+      },
       "scene": "真实实拍参考：南昌早点摊拌粉；本镜含临时角色（拌粉摊主）",
       "character": "临时角色：拌粉摊主（女，50 岁上下，深蓝围裙与袖套）——类型化生成人物",
       "action": "双手抓起一把米粉抖散下锅，蒸汽腾起，头略低不看镜头",
       "dialogue": [],
       "color_palette": "摊位暖灯 + 米粉米白 + 辣椒红",
       "props": "大锅、米粉、调料碗、蒸汽",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "pending",
+      "referenceNote": "拌粉摊参考缺（需自制/授权，或改走文生视频）",
+      "fallback": "无实景参考时走文生视频（videos 阶段）；补齐授权素材后改回 material-gen"
     },
     {
       "shotId": "NC-10",
       "duration": 3.0,
-      "photo": "<WS>/work/nanchang/selected/nc-soup-jar.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "瓦罐汤实拍：大瓦缸、小瓦罐、托盘与热气",
       "motion": "侧向缓移：镜头贴着瓦缸沿横向缓移，前景瓦罐接缝与后景师傅手臂交替掠过，热气持续上升",
-      "focus": { "x": 0.5, "y": 0.55 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.55
+      },
       "scene": "真实实拍参考：南昌瓦罐汤与瓦缸；本镜含临时角色（瓦罐汤师傅）",
       "character": "临时角色：瓦罐汤师傅（男，60 岁上下，花白短寸、深色对襟短褂、棉布手套）——类型化生成人物",
       "action": "从大瓦缸里夹出一只小瓦罐放到托盘上，动作稳",
       "dialogue": [],
       "color_palette": "陶土棕 + 热气白 + 灯光暖",
       "props": "瓦缸、小瓦罐、托盘、热气",
-      "transition": "硬切"
+      "transition": "硬切",
+      "referenceStatus": "pending",
+      "referenceNote": "瓦罐汤参考缺（同上）",
+      "fallback": "无实景参考时走文生视频（videos 阶段）；补齐授权素材后改回 material-gen"
     },
     {
       "shotId": "NC-11",
       "duration": 2.5,
-      "photo": "<WS>/work/nanchang/selected/nc-shengjinta.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "绳金塔塔身与塔院实拍：七层塔檐、砖雕、塔院古树",
       "motion": "绕塔半圈 + 拉升：镜头贴塔基环绕半圈同时抬升，塔檐层次与院中行人产生强烈视差",
-      "focus": { "x": 0.5, "y": 0.4 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.4
+      },
       "scene": "真实实拍参考：绳金塔塔身与塔院",
       "dialogue": [],
       "color_palette": "青灰砖 + 檐下暗红 + 院中绿",
       "props": "塔檐、砖雕、古树、塔院",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "pending",
+      "referenceNote": "绳金塔主体参考缺（Commons 只有雕像/石雕特写）",
+      "fallback": "无实景参考时走文生视频（videos 阶段）；补齐授权素材后改回 material-gen"
     },
     {
       "shotId": "NC-12",
       "duration": 2.5,
-      "photo": "<WS>/work/nanchang/selected/nc-wanshougong-night.jpg",
+      "photo": "<WS>/work/nanchang/selected/nc-wanshougong-hall.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "万寿宫历史文化街区夜景实拍：灯笼长街、青砖马头墙、游人",
       "motion": "穿街推镜：镜头沿灯笼长街快速推进，灯笼在前景连续掠过（带运动模糊），收尾定住露出街巷纵深",
-      "focus": { "x": 0.5, "y": 0.5 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.5
+      },
       "scene": "真实实拍参考：万寿宫街区夜景灯笼长街",
       "dialogue": [],
       "color_palette": "灯笼红暖 + 青砖冷底",
       "props": "灯笼、马头墙、石板街、游人",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "weak",
+      "referenceNote": "File:Wanshou Palace, Nanchang.jpg · CC BY-SA 4.0"
     },
     {
       "shotId": "NC-13",
       "duration": 2.2,
-      "photo": "<WS>/work/nanchang/selected/nc-star-wheel-dusk.jpg",
+      "photo": "<WS>/work/nanchang/selected/nc-star-wheel2.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "南昌之星摩天轮黄昏实拍：摩天轮轮廓、江边湿地、天光转金",
       "motion": "拉升 + 环绕：从摩天轮座舱高度快速拉升并轻微环绕，轮辐在前景掠过，云层同步流动",
-      "focus": { "x": 0.5, "y": 0.45 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.45
+      },
       "scene": "真实实拍参考：南昌之星摩天轮与江边湿地黄昏",
       "dialogue": [],
       "color_palette": "暖金天光 + 轮体冷白",
       "props": "摩天轮、湿地、云层",
-      "transition": "硬切"
+      "transition": "硬切",
+      "referenceStatus": "weak",
+      "referenceNote": "File:Star of Nanchang 20170413 123532.jpg · CC BY-SA 4.0"
     },
     {
       "shotId": "NC-14",
       "duration": 1.8,
-      "photo": "<WS>/work/nanchang/selected/nc-ganjiang-night.jpg",
       "materialUsage": "generation-reference",
       "materialDescription": "赣江夜景实拍：两岸灯光带、江面倒影、桥体灯带",
       "motion": "贴江面高速横移：镜头贴着水面高速向左横移，灯带与倒影被拉成连续光带，收尾定住露出对岸楼群",
-      "focus": { "x": 0.5, "y": 0.6 },
+      "focus": {
+        "x": 0.5,
+        "y": 0.6
+      },
       "scene": "真实实拍参考：赣江夜景与两岸灯光；本镜含临时角色（夜跑者）",
       "character": "临时角色：夜跑者（女，30 岁上下，深色运动背心、反光臂环）——类型化生成人物",
       "action": "沿江岸夜跑经过，速度感靠前后景视差体现",
       "dialogue": [],
       "color_palette": "冷蓝夜空 + 暖金灯带",
       "props": "江面、灯带、倒影、桥",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "weak",
+      "referenceNote": "File:Night City Nanchang Pavilionofprinceteng (244242429).jpeg · CC BY 3.0",
+      "photo": "<WS>/work/nanchang/selected/nc-wanshougong-night.jpg"
     },
     {
       "shotId": "NC-15",
@@ -255,14 +422,24 @@
       "materialUsage": "generation-reference",
       "materialDescription": "滕王阁夜景灯光实拍：楼体暖金灯带、赣江两岸灯火与水面倒影",
       "motion": "甩镜冲入 + 半圈环绕：高速甩镜冲进夜景后贴江面环绕楼体半圈，灯带、飞檐与水面倒影随环绕产生强烈视差，收尾定住",
-      "focus": { "x": 0.55, "y": 0.5 },
+      "focus": {
+        "x": 0.55,
+        "y": 0.5
+      },
       "scene": "真实实拍参考：滕王阁夜景灯光与江面倒影",
       "dialogue": [
-        { "speaker": "旁白", "text": "今晚的滕王阁，赣江边最亮的楼", "emotion": "赞叹", "trigger": "环绕定住时" }
+        {
+          "speaker": "旁白",
+          "text": "今晚的滕王阁，赣江边最亮的楼",
+          "emotion": "赞叹",
+          "trigger": "环绕定住时"
+        }
       ],
       "color_palette": "冷蓝夜空 + 楼体暖金，高对比",
       "props": "灯笼、灯带、江面倒影、城市灯光",
-      "transition": "甩镜转场（hblur）"
+      "transition": "甩镜转场（hblur）",
+      "referenceStatus": "weak",
+      "referenceNote": "File:Nanchang Skyline.jpg · CC BY-SA 4.0"
     },
     {
       "shotId": "NC-16",
@@ -277,10 +454,19 @@
       "makeup": "通透裸妆：自然眉形、淡棕眼影、纤长睫毛、豆沙唇",
       "action": "她先轻微点头作收束，随即微笑说出邀请句，说完抬手做个轻快邀请手势",
       "dialogue": [
-        { "speaker": "陈卓", "text": "来南昌，登一次滕王阁", "emotion": "温和坚定，带邀请感", "trigger": "轻微点头后开口" }
+        {
+          "speaker": "陈卓",
+          "text": "来南昌，登一次滕王阁",
+          "emotion": "温和坚定，带邀请感",
+          "trigger": "轻微点头后开口"
+        }
       ],
-      "portraits": ["image://characters/chen-zhuo/portrait.png"],
-      "consistency": ["NC-01"],
+      "portraits": [
+        "image://characters/chen-zhuo/portrait.png"
+      ],
+      "consistency": [
+        "NC-01"
+      ],
       "mood": "温柔收束留余韵，说完收住表情留半拍",
       "color_palette": "冷蓝夜色 + 米白衣着 + 城市暖灯",
       "audio": "无配乐（统一处理）；保留极轻环境夜声",
