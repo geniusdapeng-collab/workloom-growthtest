@@ -59,3 +59,37 @@ describe("关键帧提示词组装（从脚本搬进公开模块 + 回归保护�
     expect(prompt).toContain("陈卓");
   });
 });
+
+/**
+ * 2026-09-25 第四轮知识注入审计（落地层）：
+ * 知识注入把"该浅还是该深""画面里有什么材质/粒子"写进 depth_of_field 与 props，
+ * 但关键帧提示词此前根本没有这两行；而「规格」行无条件写着"浅景深"——
+ * 于是风光/建筑/合影/车轨/微距的深景深档在关键帧阶段被覆盖（航拍梯田也按浅景深出图）。
+ * 关键帧是图生视频的首帧：首帧没有的东西，后面不会长出来。
+ */
+describe("知识注入落地层：景深与道具必须进关键帧提示词", () => {
+  it("注入的 depth_of_field 出现在提示词，且【规格】行不再硬编码浅景深", () => {
+    const withDepth = { ...shot, depth_of_field: "全画面锐利、细节丰富（较深景深）" };
+    const prompt = buildPlatePrompt(withDepth, options);
+    expect(prompt).toContain("景深：全画面锐利、细节丰富（较深景深）");
+    expect(prompt.split("\n").find((l) => l.startsWith("规格："))).not.toContain("浅景深");
+  });
+
+  it("卡片没有声明景深时，规格行仍给通用安全值浅景深（不劣化）", () => {
+    const prompt = buildPlatePrompt(shot, options);
+    expect(prompt).not.toContain("景深：");
+    expect(prompt.split("\n").find((l) => l.startsWith("规格："))).toContain("浅景深");
+  });
+
+  it("注入的 props 出现在提示词；无 props 时不产生空的占位行", () => {
+    const withProps = { ...shot, props: "无风水面如镜面，倒影清晰稳定" };
+    expect(buildPlatePrompt(withProps, options)).toContain("道具与质感：无风水面如镜面，倒影清晰稳定");
+    expect(buildPlatePrompt(shot, options)).not.toContain("道具与质感：");
+  });
+
+  it("空字符串字段不得变成空行（避免占位噪音进提示词）", () => {
+    const prompt = buildPlatePrompt({ ...shot, depth_of_field: "   ", props: "" }, options);
+    expect(prompt).not.toMatch(/^景深：\s*$/m);
+    expect(prompt).not.toMatch(/^道具与质感：\s*$/m);
+  });
+});

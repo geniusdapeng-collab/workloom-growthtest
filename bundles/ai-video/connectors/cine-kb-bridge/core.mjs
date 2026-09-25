@@ -102,28 +102,48 @@ export function parseTopic(markdown, file) {
     chapters.push({ numeral: mark.numeral, title: mark.title, body: markdown.slice(mark.index, end) });
   });
 
-  /** 第六章（映射表）= 核心调用区；NARR-001 的列头是"中文意图/标准英文情绪词/配方缩写"，需兼容 */
+  /**
+   * 第六章（映射表）= 核心调用区；NARR-001 的列头是"中文意图/标准英文情绪词/配方缩写"，需兼容。
+   *
+   * 表头判定（2026-09-25 四轮审计修正）：改为**按 markdown 结构判定**——
+   *   `| 表头 | … |` 的下一行一定是分隔线 `|---|---|`，这才是表头；而不是"第一个单元格恰好叫创作意图"。
+   * 早先按单元格文本判表头，有两个后果：
+   *   ① 表头不认识时 `tableKind` 保持 null，但末尾的 `entries.push(kind:"prompt")` 照样吸收 →
+   *      CINE-002 §6.3「组合公式」表（单元格是 `ECU + 85mm + f/1.4 效果` 这类**参数配方**）
+   *      整表进了条目池，连表头行本身都成了一条 intent="想要的效果" 的假条目；
+   *      条目池会进 `trace.explored` 与 `cine-kb-cli search`，与"提示词不写 f 值"的总则直接冲突。
+   *   ② 同一小节里第二张表若表头不规范，会**继承上一张表的 tableKind**（串表）。
+   * 现在：结构识别表头 → 识别不了的表整表跳过（登记 unknownTables 留痕）；识别得了的按类型入库。
+   */
   const mappingChapter = chapters.find((c) => c.numeral === "六") ?? chapters.find((c) => /映射表|调用区/.test(c.title));
   const entries = [];
   const reverseEntries = [];
+  const unknownTables = [];
   if (mappingChapter) {
+    const lines = mappingChapter.body.split("\n");
+    const cellsOf = (line) => {
+      const row = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$/);
+      return row ? [row[1], row[2], row[3]].map((c) => c.trim().replace(/\*\*/g, "")) : null;
+    };
     let section = "";
     let tableKind = null;
-    for (const line of mappingChapter.body.split("\n")) {
+    for (let i = 0; i < lines.length; i += 1) {
+      const line = lines[i];
       const sec = line.match(/^###\s+(.+)$/);
       if (sec) { section = sec[1].trim(); tableKind = null; continue; }
-      const row = line.match(/^\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*([^|]+?)\s*\|\s*$/);
-      if (!row) continue;
-      const [c1, c2, c3] = [row[1].trim(), row[2].trim(), row[3].trim()];
-      /** 表头行：据此判定这张表能不能直接当提示词用（2026-09-24 真机修正：NARR §6.2 是"参数→情绪反查"，不能注入） */
-      if (/^-+$/.test(c1)) continue;
-      if (/^(创作意图|中文意图|参数组合特征|技术参数|参考特征)$/.test(c1)) {
+      const cells = cellsOf(line);
+      if (!cells) continue;
+      const [c1, c2, c3] = cells;
+      /** 表头 = 下一行是 markdown 分隔线的那一行 */
+      if (/^\|\s*[-: ]+\|/.test(lines[i + 1] ?? "")) {
         if (/反推情绪/.test(c2)) tableKind = "reverse";
         else if (/配方缩写/.test(c3) || /配方/.test(c3)) tableKind = "recipe";
         else if (/中文提示词写法|提示词写法/.test(c2)) tableKind = "prompt";
         else tableKind = "other";
         continue;
       }
+      if (/^-+$/.test(c1)) continue;
+      if (tableKind === null) { unknownTables.push({ section, header: null, row: [c1, c2, c3] }); continue; }
       if (tableKind === "other") continue;
       if (tableKind === "reverse") { reverseEntries.push({ section, feature: c1, emotion: c2, confidence: c3 }); continue; }
       if (tableKind === "recipe") { entries.push({ section, kind: "recipe", intent: c1, zh: c2, en: c3 }); continue; }
@@ -152,6 +172,7 @@ export function parseTopic(markdown, file) {
     })),
     entries,
     reverseEntries,
+    unknownTables,
     quickRefRows,
     bytes: Buffer.byteLength(markdown, "utf8")
   };
@@ -238,13 +259,59 @@ export function parseApertureKnowledge(kb) {
     }
   }
 
-  /** §八 决策树：`├─ "…" → 浅景深（f/1.4–f/2.8 效果）` */
+  /**
+   * §八 决策树：`├─ "…" → 浅景深（f/1.4–f/2.8 效果）`
+   *
+   * 2026-09-25 四轮审计：原文里 6 个意图叶子只有 4 个能被旧正则捞出来——
+   *   · `"夜晚/暗光手持" → 最大光圈效果（f/1.4–f/2.8）`：**"效果"在括号外**，旧式 `（f/… 效果）` 匹配不到；
+   *   · `"运镜叙事/焦点转移" → 浅景深 + rack focus`：整个叶子没有 f 值（是方向型规则，不是档位型规则）。
+   * 现在两种写法都认；方向型叶子（无 f 值）单独登记进 directionRules，不参与档位选择
+   * （否则它会以 `aperture=null` 进候选，被选中后落回"人景皆清"这类不相关档位）。
+   */
   const rules = [];
+  const directionRules = [];
   for (const line of chapter("八").split("\n")) {
-    const m = line.match(/["“](.+?)["”]\s*→\s*([^（(]+)[（(](f\/[^）)]+?)\s*效果[）)]/);
-    if (m) rules.push({ intent: clean(m[1]), direction: clean(m[2]), aperture: clean(m[3]) });
+    const arrow = line.match(/["“](.+?)["”]\s*→\s*(.+)$/);
+    if (!arrow) continue;
+    const intent = clean(arrow[1]);
+    const tail = arrow[2];
+    const fMatch = tail.match(/[（(]\s*(f\/[^）)]+?)(?:\s*效果)?\s*[）)]/) ?? tail.match(/效果\s*[（(]\s*(f\/[^）)]+?)\s*[）)]/);
+    if (fMatch) {
+      const direction = clean(tail.split(/[（(]/)[0]).replace(/效果$/, "").trim();
+      rules.push({ intent, direction: direction || clean(tail), aperture: clean(fMatch[1]) });
+      continue;
+    }
+    directionRules.push({ intent, direction: clean(tail) });
   }
-  return { topicId: topic.id, title: topic.title, version: topic.version, stops, scenarios, rules };
+  return { topicId: topic.id, title: topic.title, version: topic.version, stops, scenarios, rules, directionRules };
+}
+
+/**
+ * 档位效果词里的**禁用短句**（2026-09-25 四轮审计）。
+ *
+ * OPTICS-001 §二 把 f/1.2–f/1.4 档的效果词写成"奶油般虚化、梦幻光斑、**主体悬浮感**"；
+ * 而 §三 的「夜景人像 f/1.4–f/1.8」与 §二 每一档都**零重叠**（只在下界擦边），
+ * `apertureStopFor` 于是落回"第一个有交集的档位" = f/1.2–f/1.4 ——
+ * 夜景人像镜头又一次拿到"主体悬浮感"。这正是 2026-09-24 真机监制打回过的翻车信号
+ * （"夜景人物漂浮"，三轮审计的校准注释里写着"主体悬浮感是明确的翻车信号"，
+ * 但当时的修法只覆盖了 f/1.4–f/2.8 那一个区间，夜景人像档漏在网外）。
+ * 处置：该短句不得进入提示词正文；同句其余措辞仍取 KB 原文（不另写文案）。
+ */
+const APERTURE_EFFECT_BLOCKLIST = ["主体悬浮感", "主体漂浮感", "漂浮感"];
+
+/** 剔除效果词里的禁用短句；未命中时原样返回 */
+export function sanitizeApertureEffect(text) {
+  const s = String(text ?? "");
+  if (!APERTURE_EFFECT_BLOCKLIST.some((b) => s.includes(b))) return s;
+  const cut = s.search(/[（(]/);
+  const head = cut >= 0 ? s.slice(0, cut) : s;
+  const tail = cut >= 0 ? s.slice(cut) : "";
+  const clauses = head.split(/[、,，]/).map((c) => c.trim()).filter(Boolean);
+  const kept = clauses.filter((c) => !APERTURE_EFFECT_BLOCKLIST.some((b) => c.includes(b)));
+  if (kept.length === clauses.length) return s;
+  const headOut = kept.join("、");
+  if (headOut) return `${headOut}${tail}`;
+  return tail.replace(/^[（(]\s*/, "").replace(/\s*[）)]$/, "");
 }
 
 /** f 区间解析：`f/1.4–f/2.0` / `f/16` → {min,max} */
@@ -297,7 +364,8 @@ const APERTURE_INTENT_HINTS = [
   /** 注意：不要把"全景"当风光信号——它是景别术语（"全景转中景"的人像镜头会被误判成风光） */
   { id: "landscape", pattern: /风光|大场景|山脉|雪山|湖面|大海|山谷|草原|日出|日落|远景|天际线|戈壁|沙漠/, prefer: ["大场景风光", "风光"] },
   /** 注意：室内/房间不再算"街拍"信号——阴天室内茶室曾因此被判成 f/8 街拍档（2026-09-24 抽查）。室内有人物时走"环境人像"。 */
-  { id: "architecture", pattern: /建筑|街巷|街道|城市天际线|高楼/, prefer: ["建筑", "城市", "街拍"] },
+  /** 建筑类信号补「幕墙/楼宇」（四轮审计：写字楼玻璃幕墙镜头此前落 f/5.6 打卡档 —— 它既没有人物也没有"建筑/高楼"字面） */
+  { id: "architecture", pattern: /建筑|街巷|街道|城市天际线|高楼|幕墙|楼宇/, prefer: ["建筑", "城市", "街拍"] },
   /** 星芒必须是**显式意图**：只是场景里有太阳/路灯不代表要拍星芒（海边人像曾被判成 f/16 星芒档）。 */
   { id: "starburst", pattern: /星芒|放射状光|sun star|starburst/, prefer: ["星芒", "车轨"] },
   { id: "food", pattern: /美食|食物|糖粥|点心|餐|蒸汽|菜品/, prefer: ["美食", "单品特写"] },
@@ -422,8 +490,17 @@ export function recommendAperture(kb, card) {
       { test: /医院|走廊|大堂|候车厅|长廊/, prefer: hasPerson ? ["环境人像", "打卡"] : ["街拍", "大场景风光"] },
       { test: /美食|食物|菜|汤|点心|餐/, prefer: ["美食蒸汽", "单品特写"] },
       { test: /微距|昆虫|露珠/, prefer: ["微距"] },
-      { test: /星空|银河|星轨/, prefer: ["星空", "手持夜景"] }
-    ].find((rule) => rule.test.test(text));
+      { test: /星空|银河|星轨/, prefer: ["星空", "手持夜景"] },
+      /**
+       * 纯风光兜底（四轮审计）：海雾/海岸/山脊这类"没有 '风光/大场景' 字面"的自然大景此前落 f/5.6「打卡照」，
+       * 而打卡行的语义是"人景皆清"——画面里根本没有"人"。只在**确认无人物**时启用，避免"湖边人像"被推去风光档。
+       */
+      {
+        test: /海面|海岸|海边|湖面|湖泊|山脊|山谷|山顶|云海|梯田|溪流|瀑布|草原|沙丘|荒原/,
+        when: (_text, hasPerson) => !hasPerson,
+        prefer: ["大场景风光", "风光"]
+      }
+    ].find((rule) => rule.test.test(text) && (!rule.when || rule.when(text, hasPerson)));
     /**
      * 偏好表按**书写优先级**取行（不是 KB 文件顺序）：
      * 例如「棚拍」偏好 `单人特写 > 环境人像`，KB 里两行都在，必须取前者。
@@ -438,7 +515,12 @@ export function recommendAperture(kb, card) {
       ?? knowledge.scenarios.find((s) => /打卡/.test(s.label))
       ?? knowledge.scenarios[0]
       ?? { label: null, aperture: "f/5.6", reason: "通用安全档" };
-    pickedBy = preferred ? "subject-fallback" : "fallback-default";
+    /**
+     * 溯源标签细化（四轮审计）：早先"有人物→环境人像"与"无主体→打卡"都记成 `fallback-default`，
+     * 审计时无法从 trace 区分"走了哪条兜底"。现在三分：subject-fallback（主体偏好表）/ person-fallback
+     * （有人物但偏好表未覆盖）/ fallback-default（无主体安全档）。
+     */
+    pickedBy = preferred ? "subject-fallback" : hasPerson ? "person-fallback" : "fallback-default";
   }
 
   const range = parseApertureRange(picked.aperture);
@@ -476,9 +558,9 @@ export function recommendAperture(kb, card) {
     return {
       aperture: special.aperture,
       direction: specRange && specRange.max <= 2.8 ? "shallow" : specRange && specRange.min >= 8 ? "deep" : "moderate",
-      effectZh: lightPriority
+    effectZh: sanitizeApertureEffect(lightPriority
         ? `${special.reason || "以进光量为先"}（${special.label}）`
-        : specStop ? `${specStop.effectZh}（${specStop.depth}景深）` : special.reason,
+        : specStop ? `${specStop.effectZh}（${specStop.depth}景深）` : special.reason),
       effectEn: "",
       reason: `${special.reason}（专项意图：${ctx?.starfield ? "星空" : ctx?.lightTrail ? "车轨/长曝" : "微距"}）`,
       scenarioLabel: special.label,
@@ -511,7 +593,7 @@ export function recommendAperture(kb, card) {
   return {
     aperture: finalAperture,
     direction: finalDirection,
-    effectZh: finalStop ? `${finalStop.effectZh}（${finalStop.depth}景深）` : (entry?.zh ?? ""),
+    effectZh: sanitizeApertureEffect(finalStop ? `${finalStop.effectZh}（${finalStop.depth}景深）` : (entry?.zh ?? "")),
     effectEn: entry?.en ?? "",
     reason: finalReason,
     scenarioLabel: picked.label,
@@ -943,11 +1025,29 @@ function resolvePlaceholders(phrase, ctx) {
  * 有才去知识库里取**指定那一行**（措辞仍取 KB 原文，不另写文案），没有就不加。
  * 自由检索能力保留在 `selectEntries()` / `cine-kb-cli search`，供 Agent 主动提问用。
  */
+/**
+ * 卡片是否**明写了日光来源**（窗光/正午/阴天散射/黄金时刻/雪地反光）。
+ * 用于让"室内"兜底规则给显式光源让路（四轮审计，见 indoor-warm-mix 注释）。
+ */
+function hasExplicitDaylight(c) {
+  return Boolean(c.windowLight || c.noon || c.overcast || c.goldenHour || c.snow || c.blueHour);
+}
+
 const INJECTION_RULES = [
   /* ---------- 光线 ---------- */
   /** 蓝调时刻必须最先判（2026-09-24 三轮审计：放在夜景规则后面会被"电影感夜景"抢位） */
   /** 蓝调时刻：日落后天光偏蓝，与"夜晚霓虹/灯笼"是两种光（原来会掉到 night-film 或干脆不注入） */
   { field: "lighting", id: "blue-hour", when: (c) => c.blueHour, topic: "LIGHT-002", row: "蓝调时刻" },
+
+  /**
+   * 显式人工光意图优先于通用夜景（四轮审计）：
+   * 「舞台追光 / 烟花夜空 / 车轨长曝」在 LIGHT-003 §六 都有**点名的行**，
+   * 但早先没有任何规则引用它们——舞台镜头零注入、烟花镜头只在光圈侧兜底、
+   * 车轨镜头拿到泛化的「电影感夜景」，最贴切的那条知识反而没进提示词。
+   */
+  { field: "lighting", id: "stage-light", when: (c) => c.stageLight, topic: "LIGHT-003", row: "舞台追光" },
+  { field: "lighting", id: "fireworks", when: (c) => c.fireworks && c.night, topic: "LIGHT-003", row: "烟花夜空" },
+  { field: "lighting", id: "car-trails", when: (c) => c.lightTrail, topic: "LIGHT-003", row: "车轨长曝" },
 
   /** 灯笼夜景优先用"电影感夜景"，只有画面强调光斑时才用"城市光斑虚化"（避免给收尾镜注入"孤独空旷街角"的调性） */
   { field: "lighting", id: "night-bokeh-first", when: (c) => c.night && c.lantern && c.bokeh && !c.neon, topic: "LIGHT-003", row: "城市光斑虚化" },
@@ -955,8 +1055,17 @@ const INJECTION_RULES = [
   { field: "lighting", id: "night-neon", when: (c) => c.night && c.neon, topic: "LIGHT-003", row: "霓虹街头" },
   { field: "lighting", id: "night-bokeh", when: (c) => c.night && (c.bokeh || c.person), topic: "LIGHT-003", row: "城市光斑虚化" },
   { field: "lighting", id: "night-film", when: (c) => c.night && !c.neon && !c.lantern, topic: "LIGHT-003", row: "电影感夜景" },
-  { field: "lighting", id: "indoor-warm-mix", when: (c) => c.interior && c.day, topic: "LIGHT-002", row: "混合色温（室内暖+窗外冷）" },
-  { field: "lighting", id: "indoor-tungsten", when: (c) => c.interior && !c.day, topic: "LIGHT-003", row: "钨丝灯室内" },
+  /**
+   * 室内兜底**必须给卡片已明写的光源让路**（2026-09-25 四轮审计）：
+   * 早先只要命中"室内/店内"就注入「钨丝灯室内」或「混合色温（室内暖+窗外冷）」，
+   * 于是三条真机口径全部走样：
+   *   · 「室内，窗边柔光」的老年肖像 → 被写成"暖黄钨丝灯下的温馨室内"（卡片明写窗光）；
+   *   · 「阴天的茶室，木格窗外是青瓦白墙」→ 被写成钨丝灯，阴天散射光反而没进去；
+   *   · 「正午的室内，强光从窗户斜射」→ 被写成"窗外蓝调天光"（正午不可能是蓝调）。
+   * 因此室内兜底加排除条件：窗光 / 正午 / 阴天散射 / 黄金时刻 / 雪景 任一显式成立时，让位给后面的专用规则。
+   */
+  { field: "lighting", id: "indoor-warm-mix", when: (c) => c.interior && c.day && !hasExplicitDaylight(c), topic: "LIGHT-002", row: "混合色温（室内暖+窗外冷）" },
+  { field: "lighting", id: "indoor-tungsten", when: (c) => c.interior && !c.day && !hasExplicitDaylight(c), topic: "LIGHT-003", row: "钨丝灯室内" },
   /** 雪景光：阴天散射 + 雪面反光（先于阴天软光判定，避免雪天被当成普通阴天） */
   { field: "lighting", id: "snow-light", when: (c) => c.snow, topic: "SCENE-001", row: "落雪安静" },
   /** 正午硬光：烈日顶光，与"上午/下午斜光"不同（三轮审计：正午被误判成午后） */
@@ -1016,6 +1125,11 @@ const INJECTION_RULES = [
   { field: "props", id: "snow-fall", when: (c) => c.snow, topic: "SCENE-001", row: "落雪安静" },
   /** 倒影只在"平静水面"语境命中（三轮审计：水下镜头/冰面/产品白背景曾被误注入镜面倒影） */
   { field: "props", id: "reflection", when: (c) => c.mirrorWater && !c.rain, topic: "PHYS-001", row: "镜面倒影" },
+  /**
+   * 玻璃幕墙/玻璃面反射（四轮审计）：PHYS-002 §六 有「玻璃反射」行，但没有任何规则引用它，
+   * 于是"玻璃幕墙映出街景与云层"这类镜头零知识注入（指标池里也没有对应信号词）。
+   */
+  { field: "props", id: "glass-reflection", when: (c) => c.glassWall, topic: "PHYS-002", row: "玻璃反射" },
   { field: "props", id: "water-ripple", when: (c) => c.water && c.watercraft && !c.snow, topic: "PHYS-001", row: "湖面微澜" },
   { field: "props", id: "drizzle", when: (c) => c.rain && !c.heavyRain, topic: "PHYS-001", row: "毛毛细雨" },
   /**
@@ -1068,7 +1182,12 @@ export function injectionContext(card) {
      * 夜间信号只认"真的在夜里"：灯笼/烛光是**点光源**，白天巷口挂灯笼不等于夜景
      * （2026-09-24 真机：白天巷子被注入"暖橙钠灯光池"）。
      */
-    night: has(/夜景|夜晚|入夜|晚上|夜色|深夜|霓虹|月夜|暮色|蓝调/),
+    /**
+     * 夜间信号（四轮审计补 `夜空|跨年夜|午夜|凌晨`）：
+     * "跨年夜的城市上空，烟花绽放"早先因为只写"跨年"没有"夜晚/夜色"字面 → 判成日景，
+     * 既没进夜景规则也没进烟花规则（零知识注入 + 落 f/5.6 打卡档）。
+     */
+    night: has(/夜景|夜晚|入夜|晚上|夜色|深夜|霓虹|月夜|暮色|蓝调|夜空|跨年|午夜|凌晨/),
     /** 蓝调时刻是"暮色"而非深夜：单独识别，灯光规则要按蓝调走（2026-09-24 三轮审计） */
     blueHour: has(/蓝调|blue hour|暮色|日落后/),
     /**
@@ -1095,8 +1214,15 @@ export function injectionContext(card) {
     /** 镜面倒影必须是"平静水面"语境；水下/冰面/雪地不算（三轮审计：水下镜头被注入镜面倒影） */
     mirrorWater: has(/倒影|镜面|如镜|平静水面|无风水面|静水/) && !has(/水下|海底|冰|雪/),
     watercraft: has(/船|摇橹|乌篷|橹/),
+    /** 舞台/演出语境（四轮审计）：LIGHT-003 §六 有点名的「舞台追光」行 */
+    stageLight: has(/舞台|追光|剧场|livehouse|演唱会|舞台光/),
+    /** 烟花（四轮审计）：LIGHT-003 §六 有点名的「烟花夜空」行 */
+    fireworks: has(/烟花|焰火/),
+    /** 玻璃幕墙/玻璃面（四轮审计）：PHYS-002 §六 有点名的「玻璃反射」行 */
+    glassWall: has(/幕墙|玻璃墙|玻璃幕墙|玻璃面|玻璃反射/),
     steam: has(/蒸汽|热气|雾气升腾|冒烟|热气腾/),
-    food: has(/糖粥|海棠糕|点心|茶食|美食|食物|餐|糕点|小吃/),
+    /** 食物信号补「汤/砂锅/菜」等（四轮审计：砂锅汤镜头此前连 food 都不成立，food 相关规则整条不评估） */
+    food: has(/糖粥|海棠糕|点心|茶食|美食|食物|餐|糕点|小吃|汤|砂锅|菜|饭|面|羹/),
     /** 专项意图（三轮审计新增）：星空/车轨/微距/雪景——这些场景的档位与常规人像/打卡完全不同 */
     starfield: has(/星空|银河|星河|星轨/),
     lightTrail: has(/车轨|车流|光轨|拖影长曝/),

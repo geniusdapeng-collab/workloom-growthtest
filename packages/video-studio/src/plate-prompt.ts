@@ -18,12 +18,16 @@ export interface PlatePromptShot {
   shotId?: string;
   costume?: string;
   makeup?: string;
+  /** 知识库注入的道具/材质画面语言（如"镜面倒影""烛火小而稳定""细密雨丝"） */
+  props?: unknown;
   scene?: string;
   sceneDescription?: string;
   action?: string;
   composition?: string;
   lighting?: string;
   color_palette?: string;
+  /** 知识库（OPTICS-001 光圈顾问）注入的景深画面语言；**不含 f 值** */
+  depth_of_field?: string;
   mood?: string;
   [key: string]: unknown;
 }
@@ -77,6 +81,20 @@ export function buildPlatePrompt(shot: PlatePromptShot, options: PlatePromptOpti
   };
   const aspect = options.aspect ?? "9:16";
   const resolution = options.resolution ?? "1080p";
+  /**
+   * 只在有值时才出一行：`景深：` 这种空字段行会变成占位噪音进提示词。
+   */
+  const onlyWhenFilled = (label: string, value: string): string[] => (value.trim() ? [`${label}${value}`] : []);
+  /**
+   * 景深与道具必须进关键帧提示词（2026-09-25 四轮审计 · 注入落地层）：
+   * 知识注入把"该浅还是该深、画面里有什么材质/粒子"写进 `depth_of_field` 与 `props`，
+   * 但关键帧提示词此前**根本没有这两行**——结果：
+   *   ① 注入给风光的"全画面锐利、细节丰富（较深景深）"从没进过关键帧，
+   *      而「规格」行硬编码的"浅景深"把每一镜都按浅景深出图（航拍梯田/雾中湖面/车轨全中）；
+   *   ② 镜面倒影、湖面微澜、烛火、雨丝这些 props 注入同样只到视频提示词，关键帧里没有。
+   * 关键帧是图生视频的首帧，首帧没有的东西后面也不会长出来 —— 所以这里是"注入是否真的生效"的关键一环。
+   */
+  const depthOfField = pick("depth_of_field");
   const lines = [
     /**
      * 白平衡锚点**前置**（`docs/character-archive-design.md` 附录 A.1 复验：写在中后段压不住前置的光照描述，
@@ -87,14 +105,20 @@ export function buildPlatePrompt(shot: PlatePromptShot, options: PlatePromptOpti
     `角色：${options.characterName}${options.appearanceText ? `。人物外貌（必须严格按此描述，跨镜一致）：${options.appearanceText}` : ""}`,
     `服装：${pick("costume")}`,
     `妆造：${pick("makeup")}`,
+    ...onlyWhenFilled("道具与质感：", pick("props")),
     `场景：${pick("scene")}`,
     `环境细节：${pick("sceneDescription")}`,
     `人物动作与表情（这一帧的瞬间）：${pick("action")}`,
     `构图：${pick("composition")}`,
+    ...onlyWhenFilled("景深：", depthOfField),
     `光线：${pick("lighting")}`,
     `色调：${pick("color_palette")}`,
     `情绪：${pick("mood")}`,
-    `规格：${aspect} 竖幅 ${resolution}，写实电影感摄影，自然肤质（保留毛孔与细颗粒，不做美颜磨皮），浅景深，纪实风格`,
+    /**
+     * "浅景深"不再无条件硬编码：卡片/知识注入没有声明景深时才给这个通用安全值；
+     * 已声明时以 `景深：` 行为准（两处互相打架会把 KB 的档位裁决冲掉）。
+     */
+    `规格：${aspect} 竖幅 ${resolution}，写实电影感摄影，自然肤质（保留毛孔与细颗粒，不做美颜磨皮）${depthOfField.trim() ? "" : "，浅景深"}，纪实风格`,
     UNIVERSAL_SPATIAL_INVARIANT,
     ...(isBridgeScene(shot) ? [BRIDGE_STRUCTURE_CONSTRAINT] : []),
     "禁止：文字、字幕、水印、logo、卡通、插画、3D 渲染、塑料皮肤、多余手指、第二个人物清晰入镜、悬空无落点的建筑结构"
