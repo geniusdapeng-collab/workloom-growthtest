@@ -8,9 +8,11 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  MATERIAL_MOTION_POLICY,
   MATERIAL_POLICY_STATEMENT,
   MATERIAL_REUSE_POLICY,
   MaterialPolicyError,
+  assessMotionRichness,
   assessMaterialReuse,
   assertMaterialGenerationProvenance,
   buildMaterialMotionPrompt,
@@ -102,6 +104,41 @@ describe("素材镜生成提示词", () => {
     expect(injected).toContain("光圈只进 trace");
     const noMotion = buildMaterialMotionPrompt({ ...baseShot, motion: undefined, camera_movement: undefined });
     expect(noMotion).toContain("缓速推进后稳住");
+  });
+
+  it("运动强度要求写清楚：要真实三维运镜与速度坡道，只禁「贴图式运动」", () => {
+    expect(prompt).toContain("运动强度要求");
+    expect(prompt).toContain("明显的位移与速度变化");
+    expect(prompt).toContain("速度坡道");
+    expect(prompt).toContain("视差");
+    expect(prompt).toContain("贴图式运动");
+  });
+
+  it("重跑升级档把「上一版运动不足」写进提示词", () => {
+    const escalated = buildMaterialMotionPrompt(baseShot, { motionStrength: "assertive" });
+    expect(escalated).toContain("上一版镜头运动幅度不足");
+    expect(escalated).toContain("显著加大");
+  });
+});
+
+describe("运动强度判定（产品所有者第二轮反馈）", () => {
+  it("真机达标的甩镜通过（9.2 / 5.6）", () => {
+    const verdict = assessMotionRichness({ meanEnergy: 9.2, maxEnergy: 51.76, rampRatio: 5.63 });
+    expect(verdict.rich).toBe(true);
+  });
+
+  it("「会呼吸的照片」被拦下（真机 7.4 / 1.2、2.7 / 1.1、4.1 / 1.5）", () => {
+    for (const sample of [
+      { meanEnergy: 7.43, maxEnergy: 9.03, rampRatio: 1.22 },
+      { meanEnergy: 2.69, maxEnergy: 3.02, rampRatio: 1.12 },
+      { meanEnergy: 4.05, maxEnergy: 5.91, rampRatio: 1.46 }
+    ]) {
+      const verdict = assessMotionRichness(sample);
+      expect(verdict.rich).toBe(false);
+      expect(verdict.detail).toMatch(/运动幅度不足|缺少速度坡道/);
+    }
+    expect(MATERIAL_MOTION_POLICY.minMeanEnergy).toBe(8);
+    expect(MATERIAL_MOTION_POLICY.minRampRatio).toBe(1.8);
   });
 });
 

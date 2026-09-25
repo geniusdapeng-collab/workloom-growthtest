@@ -68,6 +68,32 @@ const width = Number(arg("--width", "1080"));
 const height = Number(arg("--height", "1920"));
 const fps = Number(arg("--fps", "30"));
 const fade = Number(arg("--fade", "0.5"));
+/**
+ * 逐刀转场（2026-09-25 新增）：
+ * 早先本工具只做 `concat`（纯硬切）+ 首尾淡入淡出，`--fade` 并不作用在刀口上——
+ * 于是"硬切 0.12s + 甩镜"这类口径在成片里根本没发生（真机复核实锤）。
+ * 现在：`--transition <xfade 名>` + `--transition-duration <秒>` 时，用 xfade/acrossfade
+ * **在每一刀**做转场（`hblur` ≈ 甩镜拖影、`smoothleft` ≈ 横向擦除，按片子的剪辑风格选）；
+ * 不传则维持纯硬切（默认行为不变）。
+ */
+const transition = arg("--transition");
+const transitionDuration = Number(arg("--transition-duration", "0"));
+/**
+ * 只在指定刀口做转场（`--transition-at 2,3,4,5` = 第 2/3/4/5 个入点做转场，其余硬切）。
+ * 为什么要能挑刀口：xfade 每做一刀就吃掉 transitionDuration 的总时长。
+ * 六镜各 5s 的片子若满刀做 0.18s 转场，总长会从 30.1s 掉到 29.2s（真机实测打回），
+ * 而"人物口播 → 地标"这类刀口本来就该硬切——只在快剪段做甩镜转场，时长与节奏都更稳。
+ */
+const transitionAt = arg("--transition-at")
+  .split(",")
+  .map((value) => Number(value.trim()))
+  .filter((value) => Number.isFinite(value) && value > 0);
+/**
+ * 时长补偿（2026-09-25）：逐刀转场会按刀数吃掉总时长（6 镜 @0.18s × 4 刀 = 0.72s）。
+ * 传 `--retime-to <秒>` 时，整片按 `目标/实际` 做一次**统一微调**（视频 setpts + 音频同倍率 atempo），
+ * 把总长对齐到目标（2% 量级的微调肉眼不可辨），而不是靠截断/冻结帧——后者会在片尾留静帧。
+ */
+const retimeTo = Number(arg("--retime-to", "0"));
 const title = arg("--title");
 const subtitle = arg("--subtitle");
 /**
@@ -109,7 +135,42 @@ clips.forEach((clip, index) => {
 const listFile = join(temp, "concat.txt");
 writeFileSync(listFile, normalized.map((file) => `file '${file}'`).join("\n"), "utf8");
 const raw = join(temp, "raw.mp4");
-run(FFMPEG, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", "-movflags", "+faststart", raw]);
+if (transition && transitionDuration > 0) {
+  /**
+   * xfade 链：每刀的 offset = 到该刀为止的累计时长 − 已消耗的转场重叠。
+   * 视频用 xfade（`transition` 指定名），音频用 acrossfade 同步收口；
+   * 归一化阶段已统一分辨率/帧率/采样率，因此这里不会出现参数不匹配。
+   */
+  const durations = normalized.map((file) => probeDuration(file));
+  const inputs: string[] = [];
+  normalized.forEach((file) => inputs.push("-i", file));
+  let videoLabel = "[0:v]";
+  let audioLabel = "[0:a]";
+  let offset = 0;
+  const steps: string[] = [];
+  for (let index = 1; index < normalized.length; index += 1) {
+    const useTransition = transitionAt.length === 0 || transitionAt.includes(index);
+    /** 不做转场的刀口用 0 秒 xfade 等价于硬切，但仍走同一条 filter 链（参数一致、便于复算） */
+    const overlap = useTransition ? transitionDuration : 0;
+    offset += durations[index - 1]! - overlap;
+    const vOut = `[v${index}]`;
+    const aOut = `[a${index}]`;
+    steps.push(`${videoLabel}[${index}:v]xfade=transition=${useTransition ? transition : "fade"}:duration=${overlap}:offset=${Math.max(0, offset).toFixed(3)}${vOut}`);
+    steps.push(`${audioLabel}[${index}:a]acrossfade=d=${Math.max(0.01, overlap)}:c1=tri:c2=tri${aOut}`);
+    videoLabel = vOut;
+    audioLabel = aOut;
+  }
+  run(FFMPEG, ["-y", ...inputs,
+    "-filter_complex", steps.join(";"),
+    "-map", videoLabel, "-map", audioLabel,
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+    "-movflags", "+faststart", raw]);
+  const usedCuts = transitionAt.length === 0 ? normalized.length - 1 : transitionAt.filter((i) => i < normalized.length).length;
+  console.log(`  ② 逐刀转场：${transition} @${transitionDuration}s × ${usedCuts} 刀（其余硬切）`);
+} else {
+  run(FFMPEG, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", "-movflags", "+faststart", raw]);
+}
 const rawDuration = probeDuration(raw);
 console.log(`  ② 拼接完成 → ${rawDuration.toFixed(2)}s`);
 
@@ -137,12 +198,32 @@ if (subtitle) {
     + `enable='between(t,${fade},${Math.min(rawDuration, fade + 4).toFixed(2)})'`
   );
 }
-run(FFMPEG, [
-  "-y", "-i", raw,
-  ...(filters.length > 0 ? ["-vf", filters.join(",")] : []),
-  "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-  "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out,
-]);
+const retimeFactor = retimeTo > 0 && rawDuration > 0 ? Number((retimeTo / rawDuration).toFixed(6)) : 1;
+if (Math.abs(retimeFactor - 1) > 0.0005) {
+  /** atempo 单实例限制 0.5–2.0：把倍率拆成链（微调场景通常只有一段） */
+  const tempo = 1 / retimeFactor;
+  const chain: string[] = [];
+  let remaining = tempo;
+  while (remaining > 2) { chain.push("atempo=2"); remaining /= 2; }
+  while (remaining < 0.5) { chain.push("atempo=0.5"); remaining /= 0.5; }
+  chain.push(`atempo=${remaining.toFixed(6)}`);
+  const videoFilters = [...filters, `setpts=PTS*${retimeFactor.toFixed(6)}`];
+  run(FFMPEG, [
+    "-y", "-i", raw,
+    "-vf", videoFilters.join(","),
+    "-af", chain.join(","),
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out,
+  ]);
+  console.log(`  ③ 时长补偿：${rawDuration.toFixed(2)}s → 目标 ${retimeTo}s（整片 ×${retimeFactor.toFixed(4)}）`);
+} else {
+  run(FFMPEG, [
+    "-y", "-i", raw,
+    ...(filters.length > 0 ? ["-vf", filters.join(",")] : []),
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out,
+  ]);
+}
 const outDuration = probeDuration(out);
 console.log(`  ③ 母版 → ${out}（${outDuration.toFixed(2)}s）`);
 

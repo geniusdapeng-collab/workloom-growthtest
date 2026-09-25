@@ -450,7 +450,7 @@ export async function synthesize(config, {
 }
 
 /** 参考音频转写（克隆需要的 ref_text）；引擎不支持转写时如实返回 supported=false。 */
-export async function transcribe(config, { input, language = null, fetchImpl = fetch, bins = resolveBinaries() } = {}) {
+export async function transcribe(config, { input, language = null, context = null, fetchImpl = fetch, bins = resolveBinaries() } = {}) {
   if (!input) throw new VoiceError("缺少待转写音频", "bad_request");
   if (!config.asr) {
     return { supported: false, text: null, note: "当前引擎未声明 ASR 能力（WORKLOOM_VOICE_ENGINE=mock）" };
@@ -482,7 +482,18 @@ export async function transcribe(config, { input, language = null, fetchImpl = f
   }
   const effectiveLanguage = language ?? config.asrLanguage ?? null;
   const multipart = buildMultipart(
-    { model: config.asrModel, response_format: "json", ...(effectiveLanguage ? { language: effectiveLanguage } : {}) },
+    {
+      model: config.asrModel,
+      response_format: "json",
+      ...(effectiveLanguage ? { language: effectiveLanguage } : {}),
+      /**
+       * 热词偏置（2026-09-25）：把"预期台词"作为 Whisper 的 context 传入，
+       * 专有名词（滕王阁、滕王阁序、赣江…）不再被听成"童王阁/藤王格旭"。
+       * 这直接决定人声门能不能判对：真机 SC-03 未加 context 时 match 0.462（误判"没说话"），
+       * 加 context 后专有名词可被正确解码。
+       */
+      ...(context ? { context: String(context).slice(0, 400) } : {}),
+    },
     { name: "file", filename: audio.name, contentType: "audio/wav", data: audio.bytes },
   );
   const response = await engineHttp(config, "/v1/audio/transcriptions", {
@@ -1422,7 +1433,16 @@ export async function verify(params = {}, { bins = resolveBinaries(), env = proc
   let asr = null;
   let matchRatio = null;
   if (params.expect_text && config.asr && params.round_trip !== false) {
-    const result = await transcribe(config, { input, language: params.language ?? null, fetchImpl });
+    /**
+     * 核查预期台词时默认把 expect_text 作为**热词上下文**交给 ASR（可用 `context` 显式覆盖）：
+     * 人声门要判的是"这句台词有没有被人听见"，专有名词听错会把通过判成不通过（真机 SC-03）。
+     */
+    const result = await transcribe(config, {
+      input,
+      language: params.language ?? null,
+      context: params.context ?? params.expect_text ?? null,
+      fetchImpl,
+    });
     asr = result.text;
     if (result.text) matchRatio = textMatchRatio(String(params.expect_text), result.text);
   }

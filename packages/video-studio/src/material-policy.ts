@@ -116,6 +116,12 @@ export interface MaterialMotionPromptOptions {
   title?: string;
   /** 摄影知识库/连贯性环节注入的画面语言（原样并入，不改写） */
   injection?: string;
+  /**
+   * 运动强度档位（2026-09-25 产品所有者第二轮反馈后新增）：
+   * 上一版提示词只写"运动幅度以明显可辨为准"，模型选了最保守的微动 → 成片"看着像图片"。
+   * 现在按 `motionStrength` 追加**量化运动要求**（`assertive` 用于重跑升级）。
+   */
+  motionStrength?: "standard" | "assertive";
 }
 
 /**
@@ -146,8 +152,24 @@ export function buildMaterialMotionPrompt(shot: Record<string, unknown>, options
       + "不得把实拍建筑改成幻想建筑或添加原本不存在的构件。",
     "【必须生成真实运动】画面要有物理自洽的真实运动：云层与天空缓慢流动、水面波纹与倒影轻晃、"
       + "树叶与灯笼随风轻摆、光线随时间轻微变化、远处人群与车流自然移动；"
-       + "运动幅度以「明显可辨但不变形」为准，禁止用整幅画面平移、缩放、旋转等方式伪造运动。",
+      + "运动幅度以「明显可辨但不变形」为准，禁止用整幅画面平移、缩放、旋转等方式伪造运动。",
     motionIntent ? `【镜头运动】${motionIntent}` : "【镜头运动】缓速推进后稳住，保持主体构图稳定。",
+    /**
+     * 运动强度（2026-09-25 新增）：把"要明显的镜头运动"写成可执行要求——
+     * 允许并鼓励**真实的三维镜头位移**（推/拉/横摇/俯仰/升降/环绕 + 速度坡道），
+     * 仍然禁止"整幅画面平移缩放的贴图式运动"（那是把静态图当镜头，属产品口径的红线）。
+     */
+    "【运动强度要求】镜头必须有**明显的位移与速度变化**：画面要在 5 秒内完成一次完整的运镜"
+      + "（例如高速推进后急停稳住、低空俯冲后拉升、快速横摇后定住、环绕半圈、升降穿越前景），"
+      + "并带**速度坡道**（起手快→收尾稳，或起手慢→中段加速→收尾快）、至少两段不同速度；"
+      + "前景/中景/背景要因为镜头位移产生**明显视差**（近处元素移动幅度显著大于远处，证明是三维空间里的真实运镜）。"
+      + "允许并鼓励镜头运动幅度大、速度快；**禁止的只是「整幅画面平移/缩放的贴图式运动」**"
+      + "（那是把静态照片当镜头用，与真实运镜的区别在于：真实运镜有视差、有透视变化、有前后景相对位移）。",
+    options.motionStrength === "assertive"
+      ? "【上一版问题·必须加大】上一版镜头运动幅度不足（实测运动能量偏低）：这次把镜头位移距离与速度变化**显著加大**"
+        + "（推近/拉开的行程更大、横摇更快、俯仰更明显、速度坡道的快慢对比更极端），"
+        + "运动要从画面第一帧就开始、到最后一帧都保持可辨；宁可运镜更「猛」，也不要「像一张会呼吸的照片」。"
+      : "",
     `【禁止静态直出】画面不得全程静止、不得整幅不变、不得出现"照片被平移/放大"的贴图感；`
       + `若模型无法生成运动，宁可输出极缓的自然运动（云、水、光的变化）也不得复刻首帧静止画面。`,
     "【画面质感】写实电影摄影质感，自然光与真实材质，噪点与颗粒自然；无 AI 绘画感、无塑料感、无油画笔触。",
@@ -251,4 +273,52 @@ export function assertMaterialGenerationProvenance(evidence: {
     return { ok: false, detail: "产物指纹与素材指纹相同：这就是素材本身（静态直出）" };
   }
   return { ok: true, detail: `生成溯源齐备：任务 ${evidence.renderTaskId}（${evidence.model}）` };
+}
+
+/**
+ * 镜头运动强度（2026-09-25 产品所有者第二轮反馈后新增）。
+ *
+ * 事故：素材镜虽然**确实是生成画面**（溯源与复用度都过），但运镜保守——实测运动能量
+ * SC-02 7.4 / SC-03 2.7 / SC-04 4.1、速度坡道比（峰值帧差 ÷ 平均帧差）1.1–1.5，
+ * 观感仍是"会呼吸的照片"，被产品所有者判为"运镜拉跨、不高极、不像《土耳其瞭望塔》"。
+ *
+ * 判据两条（都在成片片段上实测，口径与 `scripts/tools/full-chain-film.mts#measureMotionRichness` 一致）：
+ *   · `meanEnergy`：全片平均帧间差（160×284 灰度、4 像素步长）——衡量"有没有一直在动"；
+ *   · `rampRatio`：峰值帧间差 ÷ 平均——衡量"有没有速度坡道"（匀速运动比值接近 1）。
+ * 阈值按真机标定（2026-09-25）：达标样片 SC-05 甩镜 9.2 / 5.6；待改进的 SC-02/03/04 分别 7.4/1.2、2.7/1.1、4.1/1.5。
+ */
+export interface MotionRichness {
+  /** 平均帧间差（0–255 灰度量级） */
+  meanEnergy: number;
+  /** 峰值帧间差 */
+  maxEnergy: number;
+  /** 速度坡道比 = maxEnergy / meanEnergy */
+  rampRatio: number;
+  frames?: number;
+}
+
+export interface MotionPolicy {
+  minMeanEnergy: number;
+  minRampRatio: number;
+}
+
+export const MATERIAL_MOTION_POLICY: MotionPolicy = {
+  minMeanEnergy: 8,
+  minRampRatio: 1.8
+};
+
+export function assessMotionRichness(
+  motion: MotionRichness,
+  policy: MotionPolicy = MATERIAL_MOTION_POLICY
+): { rich: boolean; detail: string } {
+  const meanOk = motion.meanEnergy >= policy.minMeanEnergy;
+  const rampOk = motion.rampRatio >= policy.minRampRatio;
+  const detail = `运动能量 平均 ${motion.meanEnergy.toFixed(2)}／峰值 ${motion.maxEnergy.toFixed(2)}（下限 ${policy.minMeanEnergy}）`
+    + ` · 速度坡道比 ${motion.rampRatio.toFixed(2)}（下限 ${policy.minRampRatio}，匀速约为 1）`;
+  return {
+    rich: meanOk && rampOk,
+    detail: meanOk && rampOk
+      ? detail
+      : `${detail}——${meanOk ? "" : "运动幅度不足；"}${rampOk ? "" : "缺少速度坡道；"}需重渲（加大镜头位移与速度变化）`
+  };
 }

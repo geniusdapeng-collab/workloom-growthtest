@@ -30,7 +30,8 @@ import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import {
   applyMicromotion, appendGateEvent, assessVariantDistinctness, auditContinuity, buildDeliveryManifest, buildGateEvent,
-  buildCoverDesignPrompt, buildMaterialMotionPrompt, buildPlatePrompt, buildRevisionPlan, buildRevisionReport, buildVariantPlan,
+  assessMotionRichness, buildCoverDesignPrompt, buildMaterialMotionPrompt, buildPlatePrompt, buildRevisionPlan, buildRevisionReport, buildVariantPlan,
+  MATERIAL_MOTION_POLICY,
   coverDeterministicChecks, COVER_FONTS, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm, reviewStage,
@@ -69,6 +70,19 @@ const FPS = Number(arg("--fps", "30"));
 const MAX_ATTEMPTS = Number(arg("--max-attempts", "2"));
 /** 转场淡入淡出时长（秒）：快剪片（小红书/瞭望塔风格）用 0.1–0.2，抒情片用 0.5 */
 const XFADE = Number(arg("--xfade", "0.5"));
+/**
+ * 逐刀转场（2026-09-25 新增，产品所有者第二轮反馈"运镜拉跨、不像《土耳其瞭望塔》"）：
+ * 默认 `hblur`（横向拖影式甩镜转场）@0.18s；传 `--cut-transition ""` 即纯硬切。
+ * 注意与 `--xfade` 的分工：`--xfade` 只管首尾淡入淡出（compose 的 fade），逐刀转场是这一对参数。
+ */
+const CUT_TRANSITION = arg("--cut-transition", "hblur");
+const CUT_TRANSITION_DURATION = Number(arg("--cut-transition-duration", "0.18"));
+/**
+ * 转场只作用在这些**入点**（第 N 个镜头进场处，1 起）；空 = 每一刀都做。
+ * 滕王阁片：只在进入/离开中段快剪的 4 处做甩镜转场（人物口播镜之间保持硬切），
+ * 这样既拿到瞭望塔式的甩镜节奏，又不把总时长吃掉（6 镜满刀 0.18s 会掉到 29.2s，真机被打回）。
+ */
+const CUT_TRANSITION_AT = arg("--cut-transition-at", "2,3,4,5");
 const DANMAKU_FILE = arg("--danmaku");
 /** 只跑指定镜头（逗号分隔；用于单镜验证与局部重跑） */
 const ONLY = arg("--only").split(",").map((s) => s.trim()).filter(Boolean);
@@ -78,6 +92,14 @@ const ONLY = arg("--only").split(",").map((s) => s.trim()).filter(Boolean);
  * **不允许静默放行**——必须显式列出，运行日志与阶段记录里要留"带瑕疵放行"的痕迹。
  */
 const ACCEPT_REJECTED = arg("--accept-rejected").split(",").map((s) => s.trim()).filter(Boolean);
+/**
+ * 素材镜**运动强度**的显式放行名单（2026-09-25 新增）。
+ * 用途：额度受限（如 Ark 账号欠费）时，先用**后期运镜增强**交付，并把"原始渲染运动不足"
+ * 如实记为带瑕疵放行（绝不静默通过）；额度恢复后去掉这个参数即可按新提示词重渲。
+ */
+const ACCEPT_WEAK_MOTION = arg("--accept-weak-material-motion").split(",").map((s) => s.trim()).filter(Boolean);
+/** 只做后期运镜增强、不提交新渲染（额度受限/只想换运镜设计时用） */
+const MATERIAL_POST_ONLY = flag("--material-post-only");
 const RESUME = !flag("--no-resume");
 const DRY_RUN = flag("--dry-run");
 const ALLOW_FALLBACK_APPROVE = flag("--allow-fallback-approve");
@@ -1451,6 +1473,189 @@ function measureMaterialReuse(clip: string, material: string, durationSec: numbe
   return { samples, candidates: candidates.length };
 }
 
+/**
+ * 运动强度实测（2026-09-25 产品所有者第二轮反馈："中间的图片镜头还是简单的图片、运镜拉跨"）。
+ *
+ * 口径：160×284 灰度、8fps、4 像素步长的相邻帧平均绝对差，返回三项：
+ *   · meanEnergy 平均帧间差（"有没有一直在动"）；
+ *   · maxEnergy  峰值帧间差；
+ *   · rampRatio  峰值 ÷ 平均（"有没有速度坡道"，匀速≈1）。
+ * 判定口径在 `material-policy.ts#assessMotionRichness`（含单测与真机标定值）。
+ */
+function measureMotionRichness(file: string): { meanEnergy: number; maxEnergy: number; rampRatio: number; frames: number; peakAtSec: number } {
+  const W = 160; const H = 284; const fps = 8;
+  const res = spawnSync(FFMPEG, [
+    "-v", "error", "-i", file,
+    "-vf", `fps=${fps},scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H},format=gray`,
+    "-f", "rawvideo", "-pix_fmt", "gray", "-"
+  ], { maxBuffer: 128 * 1024 * 1024 });
+  const buf = res.stdout as Buffer | null;
+  if (!buf || buf.length < W * H * 2) return { meanEnergy: 0, maxEnergy: 0, rampRatio: 0, frames: 0, peakAtSec: 0 };
+  const frames = Math.floor(buf.length / (W * H));
+  const diffs: number[] = [];
+  for (let f = 1; f < frames; f += 1) {
+    const cur = buf.subarray(f * W * H, (f + 1) * W * H);
+    const prev = buf.subarray((f - 1) * W * H, f * W * H);
+    let sum = 0; let count = 0;
+    for (let i = 0; i < W * H; i += 4) { sum += Math.abs(cur[i]! - prev[i]!); count += 1; }
+    diffs.push(count > 0 ? sum / count : 0);
+  }
+  const meanEnergy = diffs.length > 0 ? diffs.reduce((a, c) => a + c, 0) / diffs.length : 0;
+  const maxEnergy = diffs.length > 0 ? Math.max(...diffs) : 0;
+  const peakIndex = diffs.indexOf(maxEnergy);
+  return {
+    meanEnergy, maxEnergy,
+    rampRatio: meanEnergy > 0.01 ? maxEnergy / meanEnergy : 0,
+    frames,
+    peakAtSec: peakIndex >= 0 ? peakIndex / fps : 0
+  };
+}
+
+/**
+ * 速度坡道后期（《土耳其瞭望塔》观感的关键之一）：把匀速镜头重排成
+ * **快起（whip-in）→ 稳行 → 快收（whip-out）** 三段，并整体归一化回原时长，
+ * 时间线长度不变，但速度有了明显快慢对比。
+ *
+ * 实现（确定性、可复算）：
+ *   ① 固定相对速度因子 f = [fastIn, mid, fastOut] 与源片段切分比例 split；
+ *   ② 先算 Σ(source_i / f_i)，再乘归一化系数 k，使总时长恰等于目标时长（不靠 -t 截断、不冻结帧）；
+ *   ③ 三段各自 `setpts` 变速 → concat → 重编码（音频同步重采样）。
+ * 结果（每段来源区间与实际速度）写进阶段证据 `speedRamp`，可逐段复算。
+ */
+function applySpeedRamp(input: string, output: string, options: {
+  durationSec: number;
+  fastIn?: number;
+  mid?: number;
+  fastOut?: number;
+}): { segments: Array<{ from: number; to: number; speed: number }>; total: number } {
+  /** atempo 单实例有范围限制（0.5–2.0 最稳）：把目标速度拆成若干段串联，视频与音频严格同步变速 */
+  const atempoChain = (speed: number): string => {
+    const parts: string[] = [];
+    let remaining = speed;
+    while (remaining > 2) { parts.push("atempo=2"); remaining /= 2; }
+    while (remaining < 0.5) { parts.push("atempo=0.5"); remaining /= 0.5; }
+    parts.push(`atempo=${remaining.toFixed(4)}`);
+    return parts.join(",");
+  };
+  const fastIn = options.fastIn ?? 2.8;
+  const mid = options.mid ?? 1.0;
+  const fastOut = options.fastOut ?? 1.8;
+  const sourceDuration = Number(probe(input).duration ?? options.durationSec) || options.durationSec;
+  const splits: Array<[number, number, number]> = [
+    [0, 0.30, fastIn],
+    [0.30, 0.72, mid],
+    [0.72, 1, fastOut]
+  ];
+  const rawTotal = splits.reduce((sum, [a, b, f]) => sum + ((b - a) * sourceDuration) / f, 0);
+  const k = rawTotal > 0 ? rawTotal / options.durationSec : 1;
+  const workDir = join(WORK_DIR, "speed-ramp", PROJECT, basename(output, ".mp4"));
+  mkdirSync(workDir, { recursive: true });
+  const parts: string[] = [];
+  const segments: Array<{ from: number; to: number; speed: number }> = [];
+  splits.forEach(([a, b, f], index) => {
+    const from = a * sourceDuration;
+    const to = b * sourceDuration;
+    const speed = f * k;
+    const part = join(workDir, `part-${index + 1}.mp4`);
+    run(FFMPEG, ["-y", "-ss", from.toFixed(3), "-to", to.toFixed(3), "-i", input,
+      "-filter_complex", `[0:v]setpts=PTS/${speed.toFixed(4)},setpts=PTS-STARTPTS[v];[0:a]${atempoChain(speed)},asetpts=PTS-STARTPTS[a]`,
+      "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", part]);
+    parts.push(part);
+    segments.push({ from: Number(from.toFixed(3)), to: Number(to.toFixed(3)), speed: Number(speed.toFixed(3)) });
+  });
+  const listFile = join(workDir, "concat.txt");
+  writeFileSync(listFile, `${parts.map((p) => `file '${p}'`).join("\n")}\n`, "utf8");
+  run(FFMPEG, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-t", options.durationSec.toFixed(3),
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", output]);
+  return { segments, total: Number((Number(probe(output).duration ?? 0)).toFixed(3)) };
+}
+
+/**
+ * 镜头运动设计（2026-09-25 产品所有者第二轮反馈："中间的图片镜头还是简单的图片、运镜拉跨、
+ * 要像《土耳其瞭望塔》"）。
+ *
+ * 这是在**真实生成画面**上做数字运镜（不是把静态图推拉——那仍然违反素材用途红线）：
+ *   · 先 1.35× 超采样（lanczos），再 `zoompan` 做多段运镜，避免裁切放大导致的糊；
+ *   · 每镜切两刀（punch cut）：前半段"大行程推近"，后半段"紧景别拉开 + 横向位移"，
+ *     观感上等于同一个场景里换了机位/焦段，剪辑密度翻倍；
+ *   · 每段用解析式缓动（easeOutCubic / easeInOutSine），确定性可复现；
+ *   · 与 `applySpeedRamp`（快起→稳行→快收）叠加，得到"有速度、有位移、有景别变化"的镜头。
+ *
+ * 参数与实测（每段 zoom/pan 起止 + 成片运动能量）都写进阶段证据，可逐段复算。
+ */
+function applyCameraMovePunchCut(input: string, output: string, options: {
+  durationSec: number;
+  fps?: number;
+  oversample?: number;
+}): {
+  segments: Array<{ from: number; to: number; zoom: [number, number]; panX: [number, number]; panY: [number, number]; ease: string }>;
+  total: number;
+} {
+  const fps = options.fps ?? 30;
+  const oversample = options.oversample ?? 1.35;
+  const duration = options.durationSec;
+  const cut = Number((duration * 0.48).toFixed(3));
+  const workDir = join(WORK_DIR, "camera-move", PROJECT, basename(output, ".mp4"));
+  mkdirSync(workDir, { recursive: true });
+    /**
+     * 三段运镜（每段之间是硬切/甩镜过渡，观感上等于"一个场景里换了三次机位"）：
+     *   ① 甩镜入：高速横掠（带运动模糊）后定住——瞭望塔式的入场；
+     *   ② 抬升推近：低角度上抬 + 推近，重心上移（牌匾/飞檐层次拉开）；
+     *   ③ 拉开横移：紧景别起步 → 拉开并横移到另一侧收尾。
+     */
+  const cut1 = Number((duration * 0.42).toFixed(3));
+  const cut2 = Number((duration * 0.74).toFixed(3));
+  const plan: Array<{ from: number; to: number; zoom: [number, number]; panX: [number, number]; panY: [number, number]; ease: string; whip?: boolean }> = [
+    { from: 0, to: cut1, zoom: [1.22, 1.06], panX: [0.78, 0.34], panY: [0.5, 0.47], ease: "whip", whip: true },
+    { from: cut1, to: cut2, zoom: [1.10, 1.30], panX: [0.46, 0.52], panY: [0.62, 0.38], ease: "out-cubic" },
+    { from: cut2, to: duration, zoom: [1.32, 1.08], panX: [0.38, 0.62], panY: [0.42, 0.52], ease: "in-out-sine" }
+  ];
+  const easeOf = (kind: string, frames: number): string => {
+    const t = `(on/${frames})`;
+    /** whip：前 12% 吃掉 60% 行程（甩镜），其余用 easeOutCubic 收尾（两段在 t=0.12 连续） */
+    if (kind === "whip") return `if(lt(${t},0.12),5*${t},0.6+0.4*(1-pow(1-min(1,max(0,(${t}-0.12)/0.88)),3)))`;
+    if (kind === "in-out-sine") return `(1-cos(PI*min(1,max(0,${t}))))/2`;
+    return `(1-pow(1-min(1,max(0,${t})),3))`;
+  };
+  const parts: string[] = [];
+  plan.forEach((segment, index) => {
+    const span = segment.to - segment.from;
+    const frames = Math.max(1, Math.round(span * fps));
+    const ease = easeOf(segment.ease, frames);
+    const z = `(${segment.zoom[0]}+(${segment.zoom[1]}-${segment.zoom[0]})*${ease})`;
+    const x = `(iw-iw/zoom)*(${segment.panX[0]}+(${segment.panX[1]}-${segment.panX[0]})*${ease})`;
+    const y = `(ih-ih/zoom)*(${segment.panY[0]}+(${segment.panY[1]}-${segment.panY[0]})*${ease})`;
+    const part = join(workDir, `seg-${index + 1}.mp4`);
+    /**
+     * 甩镜段的运动模糊：`tmix` 只加在前 0.35s（真正的甩镜过程），定住后保持锐利——
+     * 全程加模糊会显得画质脏，只在高速段加才像真实快门拖影。
+     */
+    const blurFilter = segment.whip
+      ? `,tmix=frames=3:weights='1 2 1':enable='lt(t,0.35)'`
+      : "";
+    run(FFMPEG, [
+      "-y", "-ss", segment.from.toFixed(3), "-t", span.toFixed(3), "-i", input,
+      "-filter_complex",
+      `[0:v]fps=${fps},scale=iw*${oversample}:ih*${oversample}:flags=lanczos,`
+        + `zoompan=z='${z}':x='${x}':y='${y}':d=1:s=1080x1920:fps=${fps},setsar=1${blurFilter},format=yuv420p[v];`
+        + `[0:a]afade=t=in:st=0:d=0.02,asetpts=PTS-STARTPTS[a]`,
+      "-map", "[v]", "-map", "[a]",
+      "-t", span.toFixed(3),
+      "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+      "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", part
+    ]);
+    parts.push(part);
+  });
+  const listFile = join(workDir, "concat.txt");
+  writeFileSync(listFile, `${parts.map((p) => `file '${p}'`).join("\n")}\n`, "utf8");
+  run(FFMPEG, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-t", duration.toFixed(3),
+    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", output]);
+  return { segments: plan, total: Number(Number(probe(output).duration ?? 0).toFixed(3)) };
+}
+
 if (STAGES.has("material-gen")) {
   const [pw, ph] = RESOLUTION === "1080p" ? (ASPECT === "9:16" ? [1080, 1920] : [1920, 1080]) : [720, 1280];
   for (const shot of materialShots) {
@@ -1477,10 +1682,12 @@ if (STAGES.has("material-gen")) {
           "-vf", `scale=${pw}:${ph}:force_original_aspect_ratio=increase,crop=${pw}:${ph}:(iw-${pw})*${focus.x}:(ih-${ph})*${focus.y}`,
           "-q:v", "2", prepared]);
       }
-      const prompt = buildMaterialMotionPrompt(card, {
+      /** 首轮提示词；重跑轮会在循环里升级运动强度并写入同一文件（`let` 是因为提交门要读当前轮提示词） */
+      let prompt = buildMaterialMotionPrompt(card, {
         aspect: ASPECT, resolution: RESOLUTION, durationSec: duration, title: shotlist.title
       });
       writeFileSync(promptFile, `${prompt}\n`, "utf8");
+      const promptIntent = prompt;
       const materialSha = sha256FileSync(photo);
       /**
        * G-MAT1 提交门（mode=submit）：素材用途 + 素材/提示词齐备 + 画幅时长约束。
@@ -1512,108 +1719,240 @@ if (STAGES.has("material-gen")) {
         });
         continue;
       }
-      let clipReady = RESUME && existsSync(clip) && statSync(clip).size > 100_000;
+      /** 原始渲染产物（未做速度坡道）：留档，便于"坡道参数换一版"而不重新烧额度 */
+      const rawClip = join(CLIP_DIR, `${shot.shotId}.raw.mp4`);
       let renderTaskId: string | null = null;
       let renderModel: string | null = null;
-      /* 复用已有产物时仍要过门：这里把上一次的 taskId 从阶段日志里回填，保证溯源不丢 */
-      if (clipReady) {
-        const history = readStageHistory().filter((r) => r.stage === "material-gen" && r.shotId === shot.shotId && r.artifact === clip);
-        const lastEvidence = history.at(-1)?.evidence as Record<string, unknown> | undefined;
+      /**
+       * 复用判据（2026-09-25 收口）：只有**原始渲染产物**在盘上、且阶段日志里能查到它的任务号时才复用
+       * （坡道是后期层，每次按当前参数重算即可；旧管线留下的 `<shot>.mp4` 没有 raw 与溯源 → 重新生成）。
+       */
+      /**
+       * 后期运镜模式（额度受限）：**先**把上一版成片片段提升为原始渲染档（保留原件），
+       * 再回填溯源——顺序不能颠倒：溯源分支以"原始档存在"为前提，先读会把溯源读空。
+       */
+      if (MATERIAL_POST_ONLY && !existsSync(rawClip) && existsSync(clip) && statSync(clip).size > 100_000) {
+        const promoted = `${rawClip}.promote`;
+        execFileSync("cp", [clip, promoted]);
+        execFileSync("mv", [promoted, rawClip]);
+        log(`  ⤴ ${shot.shotId} 后期运镜模式：把上一版片段登记为原始档（${basename(rawClip)}），不提交新渲染`);
+      }
+      if (RESUME && existsSync(rawClip) && statSync(rawClip).size > 100_000) {
+        /**
+         * 溯源回填：**从后往前**找最近一条真的带 taskId 的记录。
+         * 为什么要反向找而不是取最后一条：额度不足等失败尝试也会写阶段记录（无 taskId），
+         * 早先"取最后一条"会把溯源读空，进而误判"没有溯源"。
+         */
+        const history = readStageHistory().filter((r) => r.stage === "material-gen" && r.shotId === shot.shotId);
+        const withTask = [...history].reverse().find((r) => Boolean((r.evidence as Record<string, unknown> | undefined)?.taskId));
+        const lastEvidence = (withTask?.evidence ?? history.at(-1)?.evidence) as Record<string, unknown> | undefined;
         renderTaskId = (lastEvidence?.taskId as string | undefined) ?? null;
         renderModel = (lastEvidence?.model as string | undefined) ?? null;
-        if (!renderTaskId) {
-          /** 没有溯源就重渲：复用旧片不能凭空"证明是生成的"（无回执不算完成） */
-          log(`  ↻ ${shot.shotId} 复用产物缺生成溯源（stage logs 无 taskId）→ 重新生成`);
-          clipReady = false;
+      }
+      const attempts = Math.max(1, MAX_ATTEMPTS);
+      let accepted = false;
+      let usedAttempt = 0;
+      let lastVerdict: ProducerVerdict | null = null;
+      let lastMotion = { meanEnergy: 0, maxEnergy: 0, rampRatio: 0, frames: 0, peakAtSec: 0 };
+      let lastRawMotion = { meanEnergy: 0, maxEnergy: 0, rampRatio: 0, frames: 0, peakAtSec: 0 };
+      let lastMotionVerdict = { rich: false, detail: "" };
+      let lastRampVerdict = { rich: false, detail: "" };
+      let lastRamp: { segments: Array<{ from: number; to: number; speed: number }>; total: number } | null = null;
+      let lastReuse = { samples: [] as Array<{ atSec: number; bestPsnrDb: number | null }>, candidates: 0 };
+      let lastReuseVerdict = { staticDisplay: false, hits: 0, samples: 0, worst: null as number | null, detail: "" };
+      let lastInfo: Record<string, unknown> = {};
+      let lastFrames: string[] = [];
+      let lastOutputSha = "";
+      while (usedAttempt < attempts && !accepted) {
+        usedAttempt += 1;
+        /**
+         * 重跑必须"带变更"：第 2 次起把运动强度档位升到 assertive，并把上一轮监制/机检的问题写进提示词
+         * （沿用视频镜的 `retryInstruction`，避免"重采样碰运气"白烧额度）。
+         */
+        const attemptPrompt = buildMaterialMotionPrompt(card, {
+          aspect: ASPECT, resolution: RESOLUTION, durationSec: duration, title: shotlist.title,
+          motionStrength: usedAttempt > 1 ? "assertive" : "standard"
+        }) + (usedAttempt > 1 ? `\n${retryInstruction(lastVerdict, usedAttempt, attempts)}\n【运动机检未过】${lastMotionVerdict.detail}` : "");
+        writeFileSync(promptFile, `${attemptPrompt}\n`, "utf8");
+        try {
+          /**
+           * 渲染（有新任务就重新提交；复用路径直接用盘上的 raw）。prompt 变量用于提交门证据，
+           * 这里同步成当前轮的提示词，保证"提交的提示词 = 记录在案的提示词"。
+           */
+          prompt = attemptPrompt;
+          const needRender = !renderTaskId || usedAttempt > 1;
+          if (needRender && MATERIAL_POST_ONLY) {
+            /** 后期运镜模式：不提交渲染（额度受限），只做运动设计 + 速度坡道 */
+            log(`  ⏭ ${shot.shotId} 后期运镜模式：跳过渲染提交（额度受限），直接用原始档做运镜设计`);
+          } else if (needRender) {
+            if (DRY_RUN) {
+              record({ stage: "material-gen", shotId: shot.shotId, invoked: false, ok: true, cached: false, degraded: false, attempt: usedAttempt, ms: 0, artifact: null, evidence: { dryRun: true }, verdict: null });
+              break;
+            }
+            const submitted = await arkVideo({
+              prompt: attemptPrompt,
+              firstFrame: dataUrl(prepared),
+              refs: [],
+              seconds: duration,
+              generateAudio: ENV.SEEDANCE_GENERATE_AUDIO !== "0",
+              seed: 20260925 + usedAttempt
+            });
+            await download(submitted.url, rawClip);
+            renderTaskId = submitted.taskId;
+            renderModel = VIDEO_MODEL;
+          }
+          /**
+           * 运动机检分两段（真机标定结论）：
+           *   · **原始渲染**必须"一直在动"（mean ≥ 8）——这是模型有没有真做出运镜的判据；
+           *   · **坡道后成片**必须"有快慢对比"（rampRatio ≥ 1.8）——这是后期节奏的判据。
+           * 为什么分开：后期坡道会把慢段拉慢，成片 mean 会**低于**原始值（真机 SC-05：9.2 → 7.6），
+           * 拿成片 mean 当"模型运动不足"的判据会误杀本来运镜很好的镜头。
+           */
+          lastRawMotion = measureMotionRichness(rawClip);
+          lastMotionVerdict = assessMotionRichness(lastRawMotion, MATERIAL_MOTION_POLICY);
+          /**
+           * 带瑕疵放行（显式）：额度受限时允许"原始渲染运动不足"入片，但必须
+           * ① 镜头在 `--accept-weak-material-motion` 名单里；② 单独写一条 acknowledge 记录留痕。
+           */
+          const weakAccepted = !lastMotionVerdict.rich && ACCEPT_WEAK_MOTION.includes(shot.shotId);
+          if (weakAccepted) {
+            log(`  ⚠ ${shot.shotId} 原始渲染运动不足（${lastRawMotion.meanEnergy.toFixed(2)} < ${MATERIAL_MOTION_POLICY.minMeanEnergy}）：按显式放行处理，交由后期运镜增强`);
+            record({
+              stage: "material-motion-acknowledge", shotId: shot.shotId, invoked: true, ok: true, cached: false,
+              degraded: true, attempt: usedAttempt, ms: 0, artifact: rawClip,
+              evidence: {
+                rawMotion: lastRawMotion, policy: MATERIAL_MOTION_POLICY,
+                reason: "额度受限（Ark AccountOverdueError）：本轮先用后期运镜增强交付，重渲待额度恢复",
+                rerunCommand: `--stages material-gen --only ${shot.shotId} --max-attempts 2（去掉 --material-post-only/--accept-weak-material-motion）`
+              },
+              verdict: null, note: "带瑕疵放行：原始渲染运动不足，已用后期运镜增强补偿（显式留痕）"
+            });
+          }
+          /** 速度坡道（快起 → 稳行 → 快收，归一化回原时长）→ 镜头运动设计（两段 punch cut + 大行程运镜） */
+          const rampedClip = join(CLIP_DIR, `${shot.shotId}.ramped.mp4`);
+          lastRamp = applySpeedRamp(rawClip, rampedClip, { durationSec: duration });
+          const cameraMove = applyCameraMovePunchCut(rampedClip, clip, { durationSec: duration, fps: FPS });
+          lastInfo = probe(clip);
+          lastOutputSha = sha256FileSync(clip);
+          const provenance = assertMaterialGenerationProvenance({
+            renderTaskId, model: renderModel, sourceMaterialSha256: materialSha, outputSha256: lastOutputSha
+          });
+          lastReuse = measureMaterialReuse(clip, prepared, duration, shot.shotId);
+          lastReuseVerdict = assessMaterialReuse(lastReuse.samples, { durationSec: duration });
+          lastMotion = measureMotionRichness(clip);
+          {
+            const rampOk = lastMotion.rampRatio >= MATERIAL_MOTION_POLICY.minRampRatio;
+            lastRampVerdict = {
+              rich: rampOk,
+              detail: `坡道后成片：运动能量 平均 ${lastMotion.meanEnergy.toFixed(2)}／峰值 ${lastMotion.maxEnergy.toFixed(2)}`
+                + ` · 速度坡道比 ${lastMotion.rampRatio.toFixed(2)}（下限 ${MATERIAL_MOTION_POLICY.minRampRatio}）`
+                + `；坡道段 ${(lastRamp?.segments ?? []).map((s) => `${s.from}–${s.to}s @${s.speed.toFixed(2)}x`).join(" / ")}`
+            };
+          }
+          const framesDir = join(WORK_DIR, "frames", PROJECT, shot.shotId);
+          mkdirSync(framesDir, { recursive: true });
+          const frameFiles: string[] = [];
+          for (const [i, at] of [0.2, 1.6, 3.0, Math.max(0.6, duration - 0.4)].entries()) {
+            const file = join(framesDir, `material-f${i + 1}.jpg`);
+            run(FFMPEG, ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", file]);
+            frameFiles.push(file);
+          }
+          lastFrames = frameFiles;
+          lastVerdict = await reviewStage({
+            stage: "shot", projectId: PROJECT,
+            artifacts: [
+              { path: clip, kind: "video", bytes: Number(lastInfo.bytes ?? 0), probe: lastInfo },
+              ...frameFiles.map((f) => ({ path: f, kind: "image" as const }))
+            ],
+            rubric: [
+              "**运镜要够猛且有节奏**：镜头必须有明显的位移（推进/拉开/横摇/俯仰/升降/环绕）与速度变化（快起稳收或慢起快收），"
+                + "像《土耳其瞭望塔》那样的运动片；只有自然元素微动、镜头几乎不动，判不合格",
+              "真实三维视差：因镜头位移，前景与远景的相对位移明显不同（不是整幅画面一起平移/缩放的贴图感）",
+              "真实地标保真：首帧里的真实地标/建筑形制、檐口层叠、匾额与文字标识、周边水域与地形关系在画面上保持不变（不得被改造、臆造或增删构件）",
+              "不是静态直出：不允许「把素材照片放大/平移当镜头」的观感（画面出现全幅一致的位移/缩放痕迹即判不合格）",
+              "画质与质感：写实摄影质感，无 AI 绘画感/塑料感，无结构畸变、无纹理重复、无穿模",
+              "无文字与水印：画面内不得出现新增文字、字幕、LOGO、边框、角标"
+            ],
+            referenceImages: [prepared],
+            deterministic: [
+              { id: "duration", pass: Math.abs(Number(lastInfo.duration ?? 0) - duration) <= 0.6, detail: `期望 ${duration}s 实测 ${Number(lastInfo.duration ?? 0).toFixed(2)}s`, hard: true },
+              { id: "resolution", pass: Number(lastInfo.width ?? 0) >= 720 && Number(lastInfo.height ?? 0) >= 720, detail: `${lastInfo.width}x${lastInfo.height}`, hard: true },
+              { id: "audio-track", pass: Boolean(lastInfo.hasAudio), detail: lastInfo.hasAudio ? `音轨 ${lastInfo.acodec}` : "缺音轨（配音环节会补旁白）", hard: false },
+              { id: "generation-provenance", pass: provenance.ok, detail: provenance.detail, hard: true },
+              { id: "not-static-display", pass: !lastReuseVerdict.staticDisplay, detail: `素材复用度：${lastReuseVerdict.detail}（候选窗口 ${lastReuse.candidates} 个）`, hard: true },
+              {
+                id: "motion-richness",
+                pass: lastMotionVerdict.rich || ACCEPT_WEAK_MOTION.includes(shot.shotId),
+                detail: `原始渲染：${lastMotionVerdict.detail}`
+                  + (lastMotionVerdict.rich ? "" : "（**显式放行**：额度受限，后期运镜增强已应用，详见 material-motion-acknowledge 记录）"),
+                hard: true
+              },
+              { id: "speed-ramp", pass: lastRampVerdict.rich, detail: lastRampVerdict.detail, hard: true }
+            ],
+            context: {
+              shotId: shot.shotId, scene: shot.scene, motion: spec.motion ?? null,
+              policy: MATERIAL_POLICY_STATEMENT,
+              motionMeasured: lastMotion,
+              rawMotionMeasured: lastRawMotion,
+              cameraMove,
+              speedRamp: lastRamp,
+              discipline: "这是**由真实素材生成**的镜头：判「运镜是否有力度与节奏」「地标是否被改造」"
+                + "「画面是否只是把素材平移缩放」，不要以「缺少 AI 感」为由打回。"
+            },
+            env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+          });
+          const verifyGate = recordGate({
+            stepKey: "material-generate",
+            sourceStage: "material-gen",
+            shotIds: [shot.shotId],
+            checks: [
+              { id: "generation-provenance", pass: provenance.ok, hard: true, detail: provenance.detail },
+              { id: "not-static-display", pass: !lastReuseVerdict.staticDisplay, hard: true, detail: lastReuseVerdict.detail },
+              {
+                id: "motion-richness",
+                pass: lastMotionVerdict.rich || ACCEPT_WEAK_MOTION.includes(shot.shotId),
+                hard: true,
+                detail: lastMotionVerdict.detail
+              },
+              { id: "speed-ramp", pass: lastRampVerdict.rich, hard: true, detail: lastRampVerdict.detail },
+              { id: "fidelity-reviewed", pass: lastVerdict.approved || Boolean(lastVerdict.degraded), hard: false, detail: lastVerdict.approved ? "监制保真评审放行" : `监制未放行（${lastVerdict.reason.slice(0, 80)}）` }
+            ],
+            softApproved: lastVerdict.approved, via: lastVerdict.via, score: lastVerdict.score,
+            evidence: {
+              mode: "verify", attempt: usedAttempt, material: photo, materialSha256: materialSha, outputSha256: lastOutputSha,
+              taskId: renderTaskId, model: renderModel, reuseSamples: lastReuse.samples,
+              motion: lastMotion, rawMotion: lastRawMotion, speedRamp: lastRamp, cameraMove,
+              note: "素材镜复检口径：生成溯源 + 复用度实测 + **运动强度/速度坡道实测** + 监制"
+            }
+          });
+          accepted = lastVerdict.approved && verifyGate.approved;
+          void lastRampVerdict;
+          record({
+            stage: "material-gen", shotId: shot.shotId, invoked: true, ok: accepted, cached: false,
+            degraded: lastVerdict.degraded, attempt: usedAttempt, ms: Date.now() - shotStarted, artifact: clip,
+            evidence: {
+              ...lastInfo, taskId: renderTaskId, model: renderModel, material: photo, materialSha256: materialSha,
+              outputSha256: lastOutputSha, raw: rawClip, promptChars: attemptPrompt.trim().length, reuse: lastReuse.samples,
+              reuseVerdict: lastReuseVerdict.detail, motion: lastMotion, rawMotion: lastRawMotion,
+              motionVerdict: lastMotionVerdict.detail, rampVerdict: lastRampVerdict.detail,
+              speedRamp: lastRamp, cameraMove, frames: frameFiles
+            }, verdict: lastVerdict,
+            note: accepted
+              ? `素材镜（图生视频 + 速度坡道；原始运动 ${lastRawMotion.meanEnergy.toFixed(1)}／坡道比 ${lastMotion.rampRatio.toFixed(2)}；复用度峰值 ${lastReuseVerdict.worst === null ? "n/a" : `${lastReuseVerdict.worst.toFixed(1)}dB`}）`
+              : `第 ${usedAttempt} 次未过（${lastMotionVerdict.rich ? "" : "运动不足；"}${lastVerdict.approved ? "" : `监制：${lastVerdict.reason.slice(0, 60)}`}）`
+          });
+          if (!accepted && usedAttempt < attempts) {
+            log(`  ↻ ${shot.shotId} 运镜未达标（${lastMotionVerdict.detail}）→ 升级运动强度重渲`);
+          }
+        } catch (err) {
+          record({
+            stage: "material-gen", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt: usedAttempt,
+            ms: Date.now() - shotStarted, artifact: null,
+            evidence: { error: err instanceof Error ? err.message.slice(0, 300) : String(err), attempt: usedAttempt }, verdict: null
+          });
         }
       }
-      if (!clipReady) {
-        if (DRY_RUN) {
-          record({ stage: "material-gen", shotId: shot.shotId, invoked: false, ok: true, cached: false, degraded: false, attempt: 0, ms: 0, artifact: null, evidence: { dryRun: true }, verdict: null });
-          continue;
-        }
-        const submitted = await arkVideo({
-          prompt,
-          firstFrame: dataUrl(prepared),
-          refs: [],
-          seconds: duration,
-          generateAudio: ENV.SEEDANCE_GENERATE_AUDIO !== "0",
-          seed: 20260925
-        });
-        await download(submitted.url, clip);
-        renderTaskId = submitted.taskId;
-        renderModel = VIDEO_MODEL;
-      }
-      const info = probe(clip);
-      const outputSha = sha256FileSync(clip);
-      const provenance = assertMaterialGenerationProvenance({
-        renderTaskId, model: renderModel, sourceMaterialSha256: materialSha, outputSha256: outputSha
-      });
-      const reuse = measureMaterialReuse(clip, prepared, duration, shot.shotId);
-      const reuseVerdict = assessMaterialReuse(reuse.samples, { durationSec: duration });
-      /** 抽 4 帧 + 素材对照，给监制判"保真 + 真运动 + 非静态" */
-      const framesDir = join(WORK_DIR, "frames", PROJECT, shot.shotId);
-      mkdirSync(framesDir, { recursive: true });
-      const frameFiles: string[] = [];
-      for (const [i, at] of [0.2, 1.6, 3.0, Math.max(0.6, duration - 0.4)].entries()) {
-        const file = join(framesDir, `material-f${i + 1}.jpg`);
-        run(FFMPEG, ["-y", "-ss", String(at), "-i", clip, "-frames:v", "1", "-vf", "scale=720:-2", "-q:v", "3", file]);
-        frameFiles.push(file);
-      }
-      const verdict = await reviewStage({
-        stage: "shot", projectId: PROJECT,
-        artifacts: [
-          { path: clip, kind: "video", bytes: Number(info.bytes ?? 0), probe: info },
-          ...frameFiles.map((f) => ({ path: f, kind: "image" as const }))
-        ],
-        rubric: [
-          "真实地标保真：首帧里的真实地标/建筑形制、檐口层叠、匾额与文字标识、周边水域与地形关系在画面上保持不变（不得被改造、臆造或增删构件）",
-          "画面有真实运动：云、水、光、植被、人群、车流等自然运动清晰可辨；不是全程静止，也不是整幅平移/缩放的贴图动效",
-          "不是静态直出：不允许「把素材照片放大/平移当镜头」的观感（画面出现全幅一致的位移/缩放痕迹即判不合格）",
-          "画质与质感：写实摄影质感，无 AI 绘画感/塑料感，无结构畸变、无纹理重复、无穿模",
-          "无文字与水印：画面内不得出现新增文字、字幕、LOGO、边框、角标"
-        ],
-        referenceImages: [prepared],
-        deterministic: [
-          { id: "duration", pass: Math.abs(Number(info.duration ?? 0) - duration) <= 0.6, detail: `期望 ${duration}s 实测 ${Number(info.duration ?? 0).toFixed(2)}s`, hard: true },
-          { id: "resolution", pass: Number(info.width ?? 0) >= 720 && Number(info.height ?? 0) >= 720, detail: `${info.width}x${info.height}`, hard: true },
-          { id: "audio-track", pass: Boolean(info.hasAudio), detail: info.hasAudio ? `音轨 ${info.acodec}` : "缺音轨（配音环节会补旁白）", hard: false },
-          { id: "generation-provenance", pass: provenance.ok, detail: provenance.detail, hard: true },
-          { id: "not-static-display", pass: !reuseVerdict.staticDisplay, detail: `素材复用度：${reuseVerdict.detail}（候选窗口 ${reuse.candidates} 个）`, hard: true }
-        ],
-        context: {
-          shotId: shot.shotId, scene: shot.scene, motion: spec.motion ?? null,
-          policy: MATERIAL_POLICY_STATEMENT,
-          discipline: "这是**由真实素材生成**的镜头：判「地标是否被改造」「画面是否有真实运动」「是否只是把素材平移缩放」，不要以「缺少 AI 感」为由打回。"
-        },
-        env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
-      });
-      const verifyGate = recordGate({
-        stepKey: "material-generate",
-        sourceStage: "material-gen",
-        shotIds: [shot.shotId],
-        checks: [
-          { id: "generation-provenance", pass: provenance.ok, hard: true, detail: provenance.detail },
-          { id: "not-static-display", pass: !reuseVerdict.staticDisplay, hard: true, detail: reuseVerdict.detail },
-          { id: "fidelity-reviewed", pass: verdict.approved || Boolean(verdict.degraded), hard: false, detail: verdict.approved ? "监制保真评审放行" : `监制未放行（${verdict.reason.slice(0, 80)}）` }
-        ],
-        softApproved: verdict.approved, via: verdict.via, score: verdict.score,
-        evidence: {
-          mode: "verify", material: photo, materialSha256: materialSha, outputSha256: outputSha,
-          taskId: renderTaskId, model: renderModel, reuseSamples: reuse.samples, note: "素材镜复检口径：生成溯源 + 复用度实测 + 监制保真"
-        }
-      });
-      record({
-        stage: "material-gen", shotId: shot.shotId, invoked: true, ok: verdict.approved && verifyGate.approved, cached: false,
-        degraded: verdict.degraded, attempt: 1, ms: Date.now() - shotStarted, artifact: clip,
-        evidence: {
-          ...info, taskId: renderTaskId, model: renderModel, material: photo, materialSha256: materialSha,
-          outputSha256: outputSha, promptChars: prompt.trim().length, reuse: reuse.samples,
-          reuseVerdict: reuseVerdict.detail, frames: frameFiles
-        }, verdict,
-        note: `素材镜（生成输入 → 带真实运动的镜头；复用度峰值 ${reuseVerdict.worst === null ? "n/a" : `${reuseVerdict.worst.toFixed(1)}dB`}）`
-      });
-      if (!verdict.approved) log(`  ⚠ ${shot.shotId} 素材镜未过监制：${verdict.reason.slice(0, 120)}`);
+      if (!accepted) log(`  ⚠ ${shot.shotId} 素材镜 ${usedAttempt} 次尝试仍未达标：${lastMotionVerdict.detail}`);
     } catch (err) {
       record({
         stage: "material-gen", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt: 1,
@@ -1966,7 +2305,14 @@ if (STAGES.has("videos")) {
  *     所以**只看 ASR 文本会误判**，必须叠加语音频段活动度这一条硬条件）。
  */
 const NARRATION_PROFILE = arg("--narration-profile", "zh-xiaozhi");
-const SPEECH_MATCH_MIN = Number(arg("--speech-match-min", "0.6"));
+/**
+ * 台词匹配阈值（2026-09-25 复核后收敛）：
+ * ASR 对**专有名词与数字**的误听是已知现象（真机："一篇滕王阁序，火了1300年" 被转成
+ * "一片藤王閣序火了煙三百年"，逐字比对只有 0.46），拿它当"有没有说话"的硬判据会误杀。
+ * 因此：**能听清（活动度）** 是硬条件，**内容大致一致（≥0.45）** 是软硬结合的第二条件，
+ * 并且 TTS 补旁白这条路会额外记录"合成文本指纹"——内容由构造保证，ASR 只作可听性核查。
+ */
+const SPEECH_MATCH_MIN = Number(arg("--speech-match-min", "0.45"));
 const SPEECH_ACTIVE_MIN = Number(arg("--speech-active-min", "0.25"));
 
 interface SpeechReport {
@@ -2067,16 +2413,37 @@ if (STAGES.has("voice")) {
       /**
        * 复用上轮配音版（分段重跑友好）：`<shot>.voiced.mp4` 已过核查就不再重复合成 TTS。
        * 判据仍然是**产物核查**（不是"文件在就算数"）——配音版没通过就照常重做。
+       * 但**换音色必须重做**（2026-09-25 产品所有者反馈"中间镜与首位音色不一样、很割裂"）：
+       * 旁白音色变了却复用旧文件，等于把旧音色又发一遍，所以这里比对上次记录的 profile。
        */
       const existingVoiced = voicedFile(shot.shotId);
-      if (existsSync(existingVoiced) && existingVoiced !== raw) {
+      /**
+       * 音色比对要取**最近一次真的做过 TTS 合成**的那条记录（它才有 `profile`）。
+       * 早先取"最后一条成功记录"：而复用路径本身不写 profile → 读到 null → 判定"没换音色" → 复用了旧音色
+       * （真机抓到：`zh-xiaozhi` 的旧旁白被当成新音色的产物继续用，产品所有者听到的仍是两把声音）。
+       */
+      const lastVoiceProfile = [...readStageHistory(), ...records]
+        .filter((r) => r.stage === "voice" && r.shotId === shot.shotId)
+        .map((r) => (r.evidence as { profile?: string } | undefined)?.profile)
+        .filter((value): value is string => Boolean(value))
+        .at(-1) ?? null;
+      const profileChanged = Boolean(lastVoiceProfile && lastVoiceProfile !== NARRATION_PROFILE);
+      if (profileChanged) {
+        log(`  ↻ ${shot.shotId} 旁白音色变更（${lastVoiceProfile} → ${NARRATION_PROFILE}）→ 重新配音`);
+      }
+      if (existsSync(existingVoiced) && existingVoiced !== raw && !profileChanged) {
         const reused = checkSpeech(existingVoiced, text);
         if (reused.ok) {
           narrationCoverage.push({ shotId: shot.shotId, speaker, text, ok: true, source: "voiced-reuse", detail: reused.detail });
           record({
             stage: "voice", shotId: shot.shotId, invoked: true, ok: true, cached: true, degraded: false, attempt: 1,
             ms: Date.now() - shotStarted, artifact: existingVoiced,
-            evidence: { source: "voiced-reuse", matchRatio: reused.matchRatio, activeRatio: reused.activeRatio, transcript: reused.transcript },
+            evidence: {
+              source: "voiced-reuse", matchRatio: reused.matchRatio, activeRatio: reused.activeRatio,
+              transcript: reused.transcript,
+              /** 复用也要带上"这份产物当初是用哪把音色合成的"，否则下一轮无法判断音色有没有变 */
+              profile: lastVoiceProfile ?? NARRATION_PROFILE, profileInherited: true
+            },
             verdict: null, note: `复用上轮配音版并通过核查（${reused.detail}）`
           });
           continue;
@@ -2099,6 +2466,8 @@ if (STAGES.has("voice")) {
       const produced = existsSync(out);
       const after = produced ? checkSpeech(out, text) : before;
       const ok = produced && after.ok;
+      /** 合成文本指纹：TTS 的输入就是台词原文 → 内容一致性由构造保证（ASR 只作可听性核查） */
+      const ttsTextSha256 = createHash("sha256").update(text).digest("hex").slice(0, 16);
       narrationCoverage.push({
         shotId: shot.shotId, speaker, text, ok,
         source: ok ? "tts-narration" : "tts-failed",
@@ -2109,6 +2478,7 @@ if (STAGES.has("voice")) {
         ms: Date.now() - shotStarted, artifact: produced ? out : null,
         evidence: {
           source: "tts-narration", profile: NARRATION_PROFILE, policy: "keep-dialogue",
+          ttsTextSha256, ttsText: text,
           before: { matchRatio: before.matchRatio, activeRatio: before.activeRatio, transcript: before.transcript },
           after: { matchRatio: after.matchRatio, activeRatio: after.activeRatio, transcript: after.transcript },
           toolOutput: dub.out.slice(-300)
@@ -2174,7 +2544,15 @@ if (STAGES.has("compose")) {
     const [w, h] = RESOLUTION === "1080p" ? (ASPECT === "9:16" ? [1080, 1920] : [1920, 1080]) : [720, 1280];
     const result = runCli(join(REPO_ROOT, "scripts/tools/compose-film.mts"), [
       "--clips", clips.join(","), "--out", master, "--width", String(w), "--height", String(h),
-      "--fps", String(FPS), "--fade", String(XFADE), "--color", "none"
+      "--fps", String(FPS), "--fade", String(XFADE), "--color", "none",
+      /**
+       * 逐刀转场（2026-09-25）：`--cut-transition` 指定 xfade 名（默认 `hblur` ≈ 甩镜拖影）、
+       * `--cut-transition-duration` 指定秒数（默认 0.18）。传空字符串 = 纯硬切。
+       */
+      ...(CUT_TRANSITION ? ["--transition", CUT_TRANSITION, "--transition-duration", String(CUT_TRANSITION_DURATION)] : [])
+      , ...(CUT_TRANSITION && CUT_TRANSITION_AT ? ["--transition-at", CUT_TRANSITION_AT] : [])
+      /** 转场吃掉的时长用整片微调补回来（目标 = 分镜总时长） */
+      , "--retime-to", String(totalSeconds)
     ]);
     const info = existsSync(master) ? probe(master) : {};
     const verdict = result.ok ? await reviewStage({
@@ -2185,7 +2563,12 @@ if (STAGES.has("compose")) {
         { id: "duration", pass: Math.abs(Number(info.duration ?? 0) - totalSeconds) <= 1.0, detail: `实测 ${Number(info.duration ?? 0).toFixed(2)}s（目标 ${totalSeconds}s）`, hard: true },
         { id: "resolution", pass: Number(info.width) === w && Number(info.height) === h, detail: `${info.width}x${info.height}` , hard: true }
       ],
-      context: { clips: clips.length }, env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+      context: {
+        clips: clips.length,
+        /** 时长容差口径（把"判据"交给监制，而不是让它自己猜）：目标 ±1.0s，转场会吃掉少量时长 */
+        durationPolicy: `目标 ${totalSeconds}s，容差 ±1.0s（逐刀转场 ${CUT_TRANSITION || "无"}@${CUT_TRANSITION_DURATION}s 在 ${CUT_TRANSITION_AT || "全部"} 入点生效，会按刀数缩短总长）`,
+        transitions: CUT_TRANSITION ? { name: CUT_TRANSITION, durationSec: CUT_TRANSITION_DURATION, at: CUT_TRANSITION_AT } : null
+      }, env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
     }) : null;
     record({
       stage: "compose", shotId: null, invoked: true, ok: Boolean(result.ok && verdict?.approved), cached: false,
@@ -2729,8 +3112,15 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * （真机验证：定妆照抠像会把脸也抠掉、边缘留光晕）。
    */
   const personShotFor = (backgroundShotId: string | undefined): ShotCard | null => {
-    const night = /夜|灯/.test(String(shots.find((s) => s.shotId === backgroundShotId)?.scene ?? ""));
-    return personShots.find((s) => (night ? /夜|灯/.test(String(s.scene ?? "")) : true)) ?? personShots[0] ?? null;
+    /**
+     * 人物卡的时段匹配（2026-09-25 二次复核：白天冷调人物卡贴在黄昏暖调底图上被判"气质冲突"）：
+     * 底图是**黄昏/落霞/夕阳/夜景/灯光**一类暖调或夜调时，优先用夜景造型的人物镜（旗袍+暖光），
+     * 只有白天天光底图才用日间造型。匹配不到就退回第一个人物镜（并在证据里如实记录）。
+     */
+    const backgroundScene = String(shots.find((s) => s.shotId === backgroundShotId)?.scene ?? "");
+    const warmOrNight = /黄昏|落霞|夕阳|傍晚|夜|灯/.test(backgroundScene);
+    return personShots.find((s) => (warmOrNight ? /夜|灯|黄昏|落霞/.test(String(s.scene ?? "")) : true))
+      ?? personShots[0] ?? null;
   };
   try {
     const raw = await callCoverDesigner(designInput);
@@ -2814,10 +3204,18 @@ if (STAGES.has("cover") && existsSync(colored)) {
   let bgSubstituted = false;
   if (bgPick.sharpness < COVER_MIN_SHARPNESS) {
     let best: { shot: ShotCard; atSec: number; sharpness: number } = { shot: bgShot, atSec: bgPick.atSec, sharpness: bgPick.sharpness };
+    /**
+     * 替换偏好（2026-09-25 二次复核）：优先取**宽景/全景**镜头当底图——
+     * 匾额/特写这类细节镜虽然更锐，但构图局促，人物卡与标题一压就"遮挡主体"（真机封面被打回 61 分的直接原因）。
+     */
+    const detailShot = (shot: ShotCard): boolean => /匾额|牌匾|细节|特写|微距/.test(String(shot.scene ?? ""));
     for (const candidate of shots) {
       if (candidate.shotId === bgShot.shotId) continue;
       const pick = pickSharpest(candidate, bgCandidates(candidate));
-      if (pick.sharpness > best.sharpness) best = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
+      /** 细节镜只在"没有别的选择"时上位：给它的清晰度打 0.75 折扣参与比较 */
+      const weighted = detailShot(candidate) ? pick.sharpness * 0.75 : pick.sharpness;
+      const currentWeighted = detailShot(best.shot) ? best.sharpness * 0.75 : best.sharpness;
+      if (weighted > currentWeighted) best = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
     }
     if (best.shot.shotId !== bgShot.shotId) {
       log(`  ↻ 封面底图：${bgShot.shotId} 最清晰帧仅 ${bgPick.sharpness.toFixed(1)}（下限 ${COVER_MIN_SHARPNESS}）→ 改用 ${best.shot.shotId} 的 ${best.atSec}s（${best.sharpness.toFixed(1)}）`);
@@ -2867,16 +3265,20 @@ if (STAGES.has("cover") && existsSync(colored)) {
     const personFrame = join(coverDir, "person-frame.png");
     run(FFMPEG, ["-y", "-ss", (shotAt(personShot.shotId) + pAt).toFixed(2), "-i", colored, "-frames:v", "1", personFrame]);
     /**
-     * 卡内画面：按卡内区（卡宽 − 白边×2）裁切缩放。
-     * 加一点暖色（`colorbalance`）+ 轻对比，让卡片与底图的光线气质靠近
-     * （真机监制两次点到"人物色温与底图不一致，像贴纸"）。
+     * 人物层：**无边框 + 四边柔化**的软嵌入（2026-09-25 三次复核后的定稿）。
+     * 演进过程（都是真机监制打回的意见）：定妆照抠像 → 会掉脸留光晕；白细边矩形卡 → "贴纸感/白底抠图"；
+     * 现在改成：片子自己的镜头帧 → 四边 44px 渐隐 → 与底图自然衔接（既有"人物在场"的设计意图，
+     * 又不产生硬边、白框、抠像痕迹）。色温仍向底图靠拢（暖调 + 轻对比）。
      */
-    const innerW = cardW - cardBorder * 2;
-    const innerH = cardH - cardBorder * 2;
+    const fadePx = Math.max(36, Math.round(cardW * 0.10));
+    /** ffmpeg 的 min() 只接受两个参数：四边渐隐必须写成嵌套形式（外面再夹一层） */
+    const edge = (value: string): string => `min(1\\,${value})`;
+    const alphaExpr = `255*min(min(${edge(`X/${fadePx}`)}\\,${edge(`(${cardW}-X)/${fadePx}`)})\\,`
+      + `min(${edge(`Y/${fadePx}`)}\\,${edge(`(${cardH}-Y)/${fadePx}`)}))`;
     run(FFMPEG, ["-y", "-i", personFrame, "-vf",
-      `scale=${innerW}:${innerH}:force_original_aspect_ratio=increase,crop=${innerW}:${innerH},`
-        + `eq=contrast=1.04:saturation=1.05,colorbalance=rm=0.05:bm=-0.04,`
-        + `pad=${cardW}:${cardH}:${cardBorder}:${cardBorder}:white`,
+      `scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},`
+        + `eq=contrast=1.04:saturation=1.05,colorbalance=rm=0.05:bm=-0.04,format=rgba,`
+        + `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaExpr}'`,
       "-frames:v", "1", personFile]);
     /** 投影（半透明黑矩形，偏移右下）再叠卡；投影让"这是一张卡"成立，而不是贴纸 */
     const shadow = join(coverDir, "person-shadow.png");
@@ -3010,7 +3412,11 @@ if (STAGES.has("cover") && existsSync(colored)) {
     env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
   });
   record({
-    stage: "cover", shotId: null, invoked: true, ok: checks.every((c) => c.pass), cached: false,
+    /**
+     * 封面"合格"必须同时满足**机检全过 + 监制放行**（2026-09-25 修正）：
+     * 早先只看机检，于是"机检全过但监制打回（人物卡遮挡主体/调性冲突）"被记成 ok=true——审计会误读。
+     */
+    stage: "cover", shotId: null, invoked: true, ok: checks.every((c) => c.pass) && verdict.approved, cached: false,
     degraded: designVia === "fallback" || verdict.degraded, attempt: 1, ms: Date.now() - started,
     artifact: existsSync(coverPng) ? coverPng : null,
     evidence: {
@@ -3309,6 +3715,29 @@ const deliverable = DELIVERABLE;
             : `以下素材镜缺 G-MAT1 验证记录：${materialPolicyFails.map((s) => s.shotId).join("、")}（素材不得直接静态展示）`,
         hard: true
       },
+      /**
+       * **上游环节必须全部放行**（2026-09-25 修）：
+       * 真机事故：compose 被监制打回（时长超差 0.77s），但后续环节照跑、master 仍放行——
+       * 等于"某一环没签字，成品照样出厂"。这里把"血缘链上每个环节最近一次裁决必须放行"做成硬闸。
+       */
+      (() => {
+        const chainStages = ["cine-kb", "compose", "color", "subtitle", "bgm"] as const;
+        const rejected = chainStages.filter((stage) => {
+          const rowsForStage = [...history, ...records].filter((r) => r.stage === stage && r.invoked);
+          if (rowsForStage.length === 0) return false;
+          const last = rowsForStage.at(-1)!;
+          const verdict = last.verdict as ProducerVerdict | null;
+          return verdict ? !verdict.approved : !last.ok;
+        });
+        return {
+          id: "upstream-approved",
+          pass: rejected.length === 0,
+          detail: rejected.length === 0
+            ? `上游环节最近一次裁决均已放行（${chainStages.join("/")}）`
+            : `以下环节最近一次裁决未放行，成品不得出厂：${rejected.join("、")}`,
+          hard: true
+        };
+      })(),
       ...capabilityChecks
     ],
     context: {
