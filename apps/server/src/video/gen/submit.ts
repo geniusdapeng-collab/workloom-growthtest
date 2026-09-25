@@ -37,6 +37,14 @@ export interface SubmitGenJobInput {
   script: RenderScriptLike;
   modelId: string;
   params: VideoGenParams;
+  /** 时长来源（T-2026-0925-0001）：用于留痕"计划=执行"的派生链 */
+  durationProvenance?: {
+    source: "request" | "script-fields" | "script-md" | "estimate-fallback";
+    planSeconds: number | null;
+    requestedSeconds: number | null;
+    mismatchSeconds: number | null;
+    strict: boolean;
+  };
   mode: "manual" | "batch" | "auto";
   idempotencyKey?: string | null;
   fenceLevel: string;
@@ -217,7 +225,8 @@ export async function submitGenJob(input: SubmitGenJobInput): Promise<SubmitGenJ
         after: {
           jobId, taskId, mock, mode: input.mode,
           scriptKey: script.script_key, version: script.version, projectId: script.project_id,
-          estimated_seconds: input.params.durationSec ?? null,
+	estimated_seconds: input.params.durationSec ?? null,
+	duration_provenance: input.durationProvenance ?? null,
           est_usd: est.usd, est_cny: est.cny,
           provider: usedProvider, provider_model: usedProviderModel,
           idempotency_key: input.idempotencyKey ?? null,

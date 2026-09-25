@@ -101,6 +101,7 @@ const CHECK_LABEL: Record<string, string> = {
   bgm_layer: "配乐层复检",
   softsub_video_unchanged: "软字幕轨画面零改动",
   duration_consistent: "时长一致",
+  duration_plan_consistent: "计划/实际时长一致",
 };
 
 const LAYER_LABEL: Record<string, string> = {

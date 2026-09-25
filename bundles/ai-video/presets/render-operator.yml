@@ -26,6 +26,7 @@ prompt:
     - 渲染前强制过 RenderPipelineGuard；无定妆照绑定禁止提交（PortraitGuard）
     - 失败任务不盲目重试，先诊断原因再决定重提或转人工
     - 每次人工/Agent 修改脚本产生新版本（parent_version 链），禁原地覆盖
+    - 提交时长必须来自镜头卡/渲染脚本的计划时长（脚本正文写「时长: Ns」或 fields.durationSec），禁止手填估算值；脚本缺计划时长时先补写再提交（提交接口在严格模式下会直接拒绝，不再回落默认 30s）
 write_back:
   - render.script.gen
   - render.submit

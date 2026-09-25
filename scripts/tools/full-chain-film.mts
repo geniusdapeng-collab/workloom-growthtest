@@ -1269,6 +1269,34 @@ if (STAGES.has("spec")) {
     id: "duration-total", pass: Math.abs(selectedSeconds - expectedSeconds) < 0.001, hard: true,
     detail: `镜头时长合计 ${selectedSeconds}s（目标 ${expectedSeconds}s${ONLY.length > 0 ? `，局部重跑 ${ONLY.join(",")}` : ""}）`
   });
+  /**
+   * 全素材项目守卫（T-2026-0925-0001 真机发现，同"全真图"缺口在新版重现）：
+   * 当 7 镜全部是**素材镜**（真实照片只作生成输入）时，文生提示词产物是空数组
+   * （素材镜的提示词由 material-gen 阶段按"图生视频动效提示词"生成，G6 时还不存在），
+   * 把空载体送给监制必然判"无正文"打回；而素材镜的把关门是 **G-MAT1**。
+   * 因此这里显式跳过 G6 并留痕（via=skip），既不静默放行，也不让监制去判不适用的载体。
+   */
+  if (materialShots.length === shots.length) {
+    log(`ℹ️ 全片 ${shots.length} 镜均为素材镜：文生提示词门（G6）不适用，按 skip 留痕（素材镜由 G-MAT1 把关）`);
+    record({
+      stage: "prompt-package", shotId: null, invoked: false, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
+      artifact: join(PROMPT_DIR, "spec-report.json"),
+      evidence: { materialShots: shots.map((s) => s.shotId), skipReason: "全片素材镜（真实素材只作生成输入）" },
+      verdict: null, note: "全素材项目：无文生镜 → G6 不适用（素材镜提示词由 material-gen 生成并由 G-MAT1 把关）"
+    });
+    recordGate({
+      stepKey: "g6-prompt-confirm",
+      sourceStage: "prompt-package",
+      checks: [{ id: "no-generated-shots", pass: true, hard: true, detail: `${shots.length} 镜全部为素材镜（usage=generation-reference）` }],
+      shotIds: shots.map((s) => s.shotId),
+      softApproved: true,
+      via: "skip",
+      score: null,
+      degraded: false,
+      reason: "全素材项目：无文生镜，提示词门不适用",
+      evidence: { materialShots: shots.length }
+    });
+  } else {
   const verdict = await reviewStage({
     stage: "prompt", projectId: PROJECT,
     artifacts: [
@@ -1312,6 +1340,7 @@ if (STAGES.has("spec")) {
   if (!verdict.approved) {
     log(`⛔ 监制未放行提示词环节：${verdict.reason}（${verdict.suggestions.join("；")}）`);
     if (!DRY_RUN) process.exit(3);
+  }
   }
 }
 

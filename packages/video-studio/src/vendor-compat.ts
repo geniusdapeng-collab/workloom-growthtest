@@ -18,6 +18,15 @@ import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  applyProjectedDurations,
+  computeVoiceFloor,
+  countVisibleUnits,
+  extractDialogueLines,
+  loadSpeechRate,
+  projectShotDurations,
+  resolveRateKey,
+} from "./duration-projection.js";
 import type { PortraitIndex } from "./portrait-runtime.js";
 
 /**
@@ -1205,4 +1214,419 @@ export function applyDurationPolicyToManager(
     const upper = Number(profile.shotRange[1] ?? maxSingleShotSeconds);
     profile.shotRange = [Math.max(minSingleShotSeconds, lower), Math.max(upper, maxSingleShotSeconds)];
   }
+}
+
+/* ============================================================================================
+ * 镜头时长单点守恒投影桥（T-2026-0925-0001）
+ *
+ * 解决的问题（均有本仓实测证据）：
+ *   ① 生成端无规则 → 单镜可产出 3s / 54s，越出模型 4–30s（script-generator.js:1314-1315）；
+ *   ② 台词修复被运行期权重表重分配整体抹平（duration-constraint-manager.js:112-143，实测 critical 0→2）；
+ *   ③ 残差兜底把差额塞给最后一镜且无上限（production-engine.js:1288-1295，fuzz 585/2000 越界）；
+ *   ④ "情绪语速"恒回落 3.5 字/s（dialogue-timing-calculator.js:309-326 只认整词）；
+ *   ⑤ 缩短台词的目标字数与可行性公式不自洽 → 修完仍 critical 且产生残句（:207 vs :46-65）。
+ *
+ * 做法：把 vendor 的**所有时长决策点**收敛到宿主投影器（duration-projection.ts）：
+ *   · _enforceTargetDuration / _normalizeDurations / DCM.constrain → 改为调用投影器；
+ *   · DCM._redistributeDurations → 停用（权重表不再参与）；
+ *   · phase-3._checkDialogueTiming → 保留检测与文案修复，但时长一律重投影；
+ *   · DialogueTimingCalculator._getSpeechRate/_shortenText/_generateFix → 修复输入契约与目标字数。
+ * vendor 目录只读，全部为运行期原型补丁；桥可摘除、幂等、带引用计数（并发 run 不会互相拆桥）。
+ * ========================================================================================== */
+
+export interface DurationProjectionShotReport {
+  shotId: string;
+  planSeconds: number;
+  seconds: number;
+  voiceFloorSeconds: number;
+  raised: boolean;
+  lowered: boolean;
+}
+
+export interface DurationProjectionEvent {
+  kind: "projected" | "infeasible" | "skipped";
+  source: "script-generator" | "production-engine.normalize" | "dcm.constrain" | "phase-3";
+  targetSeconds: number | null;
+  totalSeconds: number;
+  shots: DurationProjectionShotReport[];
+  message?: string;
+}
+
+export interface DurationProjectionBridgeOptions {
+  log?: (line: string) => void;
+  onEvent?: (event: DurationProjectionEvent) => void;
+  minShotSeconds?: number;
+  maxShotSeconds?: number;
+}
+
+/** 进程级共享桥注册表：第一个安装、最后一个卸载（并发 run 安全） */
+const sharedBridges = new Map<string, { restore: () => void; refs: number }>();
+
+/**
+ * 包装任意"安装 → 返回摘除函数"的桥为**引用计数共享桥**。
+ * 并发 run 场景下，后完成的 run 不会把仍在使用的桥提前摘掉。
+ */
+export function installSharedBridge(key: string, install: () => () => void): () => void {
+  const existing = sharedBridges.get(key);
+  if (existing) {
+    existing.refs += 1;
+  } else {
+    const restore = install();
+    sharedBridges.set(key, { restore, refs: 1 });
+  }
+  let released = false;
+  return () => {
+    if (released) return;
+    released = true;
+    const entry = sharedBridges.get(key);
+    if (!entry) return;
+    entry.refs -= 1;
+    if (entry.refs <= 0) {
+      try {
+        entry.restore();
+      } finally {
+        sharedBridges.delete(key);
+      }
+    }
+  };
+}
+
+/** 供测试/诊断读取当前存活的共享桥 */
+export function listSharedBridges(): Array<{ key: string; refs: number }> {
+  return [...sharedBridges.entries()].map(([key, value]) => ({ key, refs: value.refs }));
+}
+
+export function installVendorDurationProjectionBridge(options: DurationProjectionBridgeOptions = {}): () => void {
+  const log = options.log ?? (() => undefined);
+  const emit = options.onEvent ?? (() => undefined);
+  const minShot = options.minShotSeconds ?? 4;
+  const maxShot = options.maxShotSeconds ?? 30;
+  const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+  let vendorRequire: NodeJS.Require;
+  try {
+    vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+  } catch (err) {
+    log(`[vendor-compat] 时长投影桥无法建立 vendor require：${err instanceof Error ? err.message : String(err)}`);
+    return () => undefined;
+  }
+
+  const restores: Array<() => void> = [];
+  const step = (label: string, run: () => void): void => {
+    try {
+      run();
+    } catch (err) {
+      log(`[vendor-compat] 时长投影桥·${label} 注入失败（其余目标继续）：${err instanceof Error ? err.message : String(err)}`);
+    }
+  };
+
+  type Recordish = Record<string, unknown>;
+  const idOf = (record: Recordish, fallback: string): string =>
+    String(record.shotId ?? record.shot_id ?? record.scene_id ?? record.sceneId ?? fallback);
+  const durationOf = (record: Recordish): number => {
+    const timing = record.timing as { duration?: unknown } | undefined;
+    return Number(record.duration ?? timing?.duration ?? 0) || 0;
+  };
+
+  /** 通用：把一组镜头/场景投影到 target，并**原地**写回 duration + timing（保持对象引用不变） */
+  const projectRecords = (
+    records: Recordish[],
+    targetSeconds: number | null,
+    source: DurationProjectionEvent["source"],
+    kindLabel: string,
+    planningMode = false
+  ): boolean => {
+    if (!Number.isFinite(Number(targetSeconds)) || Number(targetSeconds) <= 0) {
+      emit({
+        kind: "skipped",
+        source,
+        targetSeconds: null,
+        totalSeconds: records.reduce((sum, record) => sum + durationOf(record), 0),
+        shots: [],
+        message: "缺少目标总时长，投影器跳过（不改时长）",
+      });
+      return false;
+    }
+    const inputs = records.map((record, index) => ({
+      shotId: idOf(record, `${kindLabel}-${index + 1}`),
+      duration: durationOf(record),
+      timing: record.timing as { start?: number; duration?: number; end?: number } | undefined,
+      dialogue: record.dialogue,
+      emotion: (record.emotion as string | undefined) ?? (record.mood as string | undefined),
+      mood: record.mood as string | undefined,
+      sceneType: (record.sceneType ?? record.scene_type) as string | undefined,
+    }));
+    const projectOnce = (enforceVoiceFloor: boolean) =>
+      projectShotDurations(inputs, {
+        targetSeconds: Number(targetSeconds),
+        minSeconds: minShot,
+        maxSeconds: maxShot,
+        enforceVoiceFloor,
+      });
+    let result = projectOnce(true);
+    if (!result.ok && planningMode) {
+      // 规划阶段：台词尚未精简，硬下限常不可满足——先保守恒与能力区间，交由执行阶段强制下限
+      emit({
+        kind: "infeasible",
+        source,
+        targetSeconds: Number(targetSeconds),
+        totalSeconds: records.reduce((sum, record) => sum + durationOf(record), 0),
+        shots: result.entries.map((entry) => ({ ...entry })),
+        message: `规划阶段台词硬下限暂不可满足（${result.reason}）：${result.suggestions.join("；")}；已按能力区间投影，交由台词修复阶段强制`,
+      });
+      result = projectOnce(false);
+    }
+    if (!result.ok) {
+      emit({
+        kind: "infeasible",
+        source,
+        targetSeconds: Number(targetSeconds),
+        totalSeconds: records.reduce((sum, record) => sum + durationOf(record), 0),
+        shots: result.entries.map((entry) => ({ ...entry, planSeconds: entry.planSeconds })),
+        message: `${result.reason}：${result.suggestions.join("；")}`,
+      });
+      log(`[vendor-compat] 时长投影 INFEASIBLE（${source}）：${result.suggestions.join("；")}`);
+      return false;
+    }
+    const applied = applyProjectedDurations(
+      records.map((record, index) => ({ ...record, shotId: idOf(record, `${kindLabel}-${index + 1}`) })),
+      result.entries
+    );
+    // 原地写回（保持数组元素引用，避免调用方持有旧对象）
+    records.forEach((record, index) => {
+      const next = applied[index] as Recordish;
+      record.duration = next.duration;
+      record.timing = next.timing;
+    });
+    emit({
+      kind: "projected",
+      source,
+      targetSeconds: Number(targetSeconds),
+      totalSeconds: result.totalSeconds,
+      shots: result.entries.map((entry) => ({
+        shotId: entry.shotId,
+        planSeconds: entry.planSeconds,
+        seconds: entry.seconds,
+        voiceFloorSeconds: entry.voiceFloorSeconds,
+        raised: entry.raised,
+        lowered: entry.lowered,
+      })),
+    });
+    return true;
+  };
+
+  /* ---------- ① 剧本引擎：总量对齐改为投影 ---------- */
+  step("ScriptGenerator._enforceTargetDuration", () => {
+    const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/engines/script-engine/core/script-generator.js");
+    if (!existsSync(file)) return;
+    const mod = vendorRequire(file) as { ScriptGenerator?: { prototype?: Recordish } };
+    const prototype = mod?.ScriptGenerator?.prototype;
+    const original = prototype?._enforceTargetDuration as ((this: unknown, parsed: unknown, target: unknown) => void) | undefined;
+    if (!prototype || typeof original !== "function") return;
+    const patched = function patchedEnforceTargetDuration(this: unknown, parsed: Recordish, target: unknown): void {
+      const structure = parsed?.structure as { scenes?: Recordish[] } | undefined;
+      const scenes = structure?.scenes ?? [];
+      const applied = projectRecords(scenes, Number(target), "script-generator", "SC", true);
+      if (!applied) {
+        // INFEASIBLE / 无目标：保留原实现的兜底格式化行为（时间轴重建），但不越界
+        original.call(this, parsed, target);
+        return;
+      }
+      const meta = (parsed.meta ?? {}) as Recordish;
+      meta.total_duration = scenes.reduce((sum, scene) => sum + durationOf(scene), 0);
+      parsed.meta = meta;
+      log(`[vendor-compat] 剧本时长投影完成：${scenes.length} 场景 / 合计 ${meta.total_duration}s`);
+    };
+    prototype._enforceTargetDuration = patched;
+    restores.push(() => {
+      prototype._enforceTargetDuration = original;
+    });
+    log("[vendor-compat] 时长投影桥：ScriptGenerator._enforceTargetDuration → 宿主投影器");
+  });
+
+  /* ---------- ② 制作引擎：总量归一改为投影（去掉"最后一镜兜底"） ---------- */
+  step("ProductionEngine._normalizeDurations", () => {
+    const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js");
+    if (!existsSync(file)) return;
+    const mod = vendorRequire(file) as { ProductionEngine?: { prototype?: Recordish } };
+    const prototype = mod?.ProductionEngine?.prototype;
+    const original = prototype?._normalizeDurations as ((this: unknown, shots: Recordish[], target: unknown) => Recordish[]) | undefined;
+    if (!prototype || typeof original !== "function") return;
+    const patched = function patchedNormalizeDurations(this: unknown, shots: Recordish[], target: unknown): Recordish[] {
+      if (!Array.isArray(shots) || shots.length === 0) return shots;
+      const applied = projectRecords(shots, Number(target), "production-engine.normalize", "S", true);
+      if (!applied) return original.call(this, shots, target);
+      return shots;
+    };
+    prototype._normalizeDurations = patched;
+    restores.push(() => {
+      prototype._normalizeDurations = original;
+    });
+    log("[vendor-compat] 时长投影桥：ProductionEngine._normalizeDurations → 宿主投影器（无最后一镜兜底）");
+  });
+
+  /* ---------- ③ 运行期约束：constrain 改投影；权重表重分配停用 ---------- */
+  step("DurationConstraintManager", () => {
+    const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/engines/duration-constraint/duration-constraint-manager.js");
+    if (!existsSync(file)) return;
+    const mod = vendorRequire(file) as { DurationConstraintManager?: { prototype?: Recordish } };
+    const prototype = mod?.DurationConstraintManager?.prototype;
+    if (!prototype) return;
+    const originalConstrain = prototype.constrain as ((this: unknown, scenes: Recordish[], options?: Recordish) => unknown) | undefined;
+    const originalRedistribute = prototype._redistributeDurations as ((...args: unknown[]) => unknown) | undefined;
+    if (typeof originalConstrain === "function") {
+      const patched = function patchedConstrain(this: Recordish, scenes: Recordish[], opts: Recordish = {}): Recordish {
+        if (!Array.isArray(scenes) || scenes.length === 0) {
+          return originalConstrain.call(this, scenes ?? [], opts) as Recordish;
+        }
+        const explicitTarget = Number(opts.targetDuration);
+        const sum = scenes.reduce((total, scene) => total + durationOf(scene), 0);
+        const target = Number.isFinite(explicitTarget) && explicitTarget > 0 ? explicitTarget : sum;
+        projectRecords(scenes, target, "dcm.constrain", "SC");
+        const ensure = prototype._ensureSequentialTiming as ((this: unknown, list: Recordish[]) => void) | undefined;
+        if (typeof ensure === "function") ensure.call(this, scenes);
+        return { scenes, adjustments: [], valid: true };
+      };
+      prototype.constrain = patched;
+      restores.push(() => {
+        prototype.constrain = originalConstrain;
+      });
+    }
+    if (typeof originalRedistribute === "function") {
+      const disabled = function disabledRedistribute(this: Recordish, scenes: Recordish[]): void {
+        log("[vendor-compat] DCM 权重表重分配已停用（时长决策统一由宿主投影器负责）");
+        const ensure = prototype._ensureSequentialTiming as ((this: unknown, list: Recordish[]) => void) | undefined;
+        if (typeof ensure === "function" && Array.isArray(scenes)) ensure.call(this, scenes);
+      };
+      prototype._redistributeDurations = disabled;
+      restores.push(() => {
+        prototype._redistributeDurations = originalRedistribute;
+      });
+    }
+    log("[vendor-compat] 时长投影桥：DCM.constrain → 投影器；_redistributeDurations 停用");
+  });
+
+  /* ---------- ④ 台词检测：保留检测与文案修复，时长一律重投影 ---------- */
+  step("Phase3PromptFusion._checkDialogueTiming", () => {
+    const file = resolvePath(
+      repoRoot,
+      "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-prompt-fusion.js"
+    );
+    if (!existsSync(file)) return;
+    const mod = vendorRequire(file) as { Phase3PromptFusion?: { prototype?: Recordish } };
+    const prototype = mod?.Phase3PromptFusion?.prototype;
+    const original = prototype?._checkDialogueTiming as
+      | ((this: unknown, shots: Recordish[], blueprint: Recordish) => Promise<Recordish[]>)
+      | undefined;
+    if (!prototype || typeof original !== "function") return;
+    const patched = async function patchedCheckDialogueTiming(
+      this: unknown,
+      shots: Recordish[],
+      blueprint: Recordish
+    ): Promise<Recordish[]> {
+      const after = await original.call(this, shots, blueprint);
+      const config = (blueprint?.config ?? {}) as Recordish;
+      const meta = (blueprint?.meta ?? {}) as Recordish;
+      const target = Number(config.target_duration ?? meta.target_duration ?? blueprint?.targetDuration);
+      projectRecords(after, Number.isFinite(target) && target > 0 ? target : null, "phase-3", "S");
+      return after;
+    };
+    prototype._checkDialogueTiming = patched;
+    restores.push(() => {
+      prototype._checkDialogueTiming = original;
+    });
+    log("[vendor-compat] 时长投影桥：phase-3 台词检测后统一重投影");
+  });
+
+  /* ---------- ⑤ 台词引擎输入契约：情绪归一 + 缩短目标自洽 ---------- */
+  step("DialogueTimingCalculator", () => {
+    const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/utils/dialogue-timing-calculator.js");
+    if (!existsSync(file)) return;
+    const mod = vendorRequire(file) as { DialogueTimingCalculator?: { prototype?: Recordish } };
+    const prototype = mod?.DialogueTimingCalculator?.prototype;
+    if (!prototype) return;
+
+    const originalGetRate = prototype._getSpeechRate as ((this: Recordish, emotion?: string) => number) | undefined;
+    if (typeof originalGetRate === "function") {
+      const speech = loadSpeechRate();
+      const patched = function patchedGetSpeechRate(this: Recordish, emotion?: string): number {
+        const self = this as Recordish | undefined;
+        const rates = ((self?.speechRates as Record<string, number> | undefined) ?? speech.RATES) as Record<string, number>;
+        const key = resolveRateKey(emotion);
+        return Number(rates[key] ?? rates.normal ?? speech.NORMAL);
+      };
+      prototype._getSpeechRate = patched;
+      restores.push(() => {
+        prototype._getSpeechRate = originalGetRate;
+      });
+    }
+
+    const originalShorten = prototype._shortenText as ((this: unknown, text: string, targetChars: number) => string) | undefined;
+    if (typeof originalShorten === "function") {
+      const patched = function patchedShortenText(this: unknown, text: string, targetChars: number): string {
+        const source = String(text ?? "");
+        const budget = Math.max(1, Math.floor(Number(targetChars) || 0));
+        if (source.length <= budget) return source;
+        const head = source.slice(0, budget);
+        // 优先在整句处收尾；其次在分句处收尾；都找不到才硬截断（不再补标点，避免制造语义错误）
+        const sentenceBreak = Math.max(head.lastIndexOf("。"), head.lastIndexOf("！"), head.lastIndexOf("？"), head.lastIndexOf("."));
+        if (sentenceBreak >= Math.floor(budget * 0.6)) return head.slice(0, sentenceBreak + 1);
+        const clauseBreak = Math.max(
+          head.lastIndexOf("，"),
+          head.lastIndexOf("、"),
+          head.lastIndexOf("；"),
+          head.lastIndexOf("：")
+        );
+        if (clauseBreak >= Math.floor(budget * 0.6)) return head.slice(0, clauseBreak);
+        return head.replace(/[，、；：,;:\s]+$/, "");
+      };
+      prototype._shortenText = patched;
+      restores.push(() => {
+        prototype._shortenText = originalShorten;
+      });
+    }
+
+    const originalGenerateFix = prototype._generateFix as
+      | ((this: Recordish, shot: Recordish, issueType: string) => Recordish | null)
+      | undefined;
+    if (typeof originalGenerateFix === "function") {
+      const patched = function patchedGenerateFix(this: Recordish, shot: Recordish, issueType: string): Recordish | null {
+        if (issueType !== "overflow") return originalGenerateFix.call(this, shot, issueType);
+        const duration = Number(shot.duration ?? (shot.timing as Recordish | undefined)?.duration ?? 0) || 0;
+        const dialogue = shot.dialogue;
+        const lines = extractDialogueLines(dialogue);
+        const text = lines.join("");
+        if (!duration || !text) return originalGenerateFix.call(this, shot, issueType);
+        const speech = loadSpeechRate();
+        /** 与投影器同口径：可见字数 ÷ 基准语速 ≤ 镜头时长 × 0.8 */
+        const limit = duration * speech.MAX_DIALOGUE_RATIO * speech.NORMAL;
+        let low = 1;
+        let high = text.length;
+        while (low < high) {
+          const mid = Math.ceil((low + high) / 2);
+          if (countVisibleUnits(text.slice(0, mid)) <= limit) low = mid;
+          else high = mid - 1;
+        }
+        const targetChars = Math.max(1, low);
+        const shortened = (this._shortenText as (t: string, c: number) => string).call(this, text, targetChars);
+        const floorAfter = computeVoiceFloor({ ...shot, dialogue: { text: shortened } } as never);
+        return {
+          type: "shorten_dialogue",
+          description: `缩短台词至适合镜头时长（目标可见字数 ≤ ${Math.floor(limit)}，下限 ${floorAfter.seconds}s）`,
+          originalText: text,
+          suggestedText: shortened,
+          originalChars: countVisibleUnits(text),
+          targetChars: countVisibleUnits(shortened),
+        };
+      };
+      prototype._generateFix = patched;
+      restores.push(() => {
+        prototype._generateFix = originalGenerateFix;
+      });
+    }
+    log("[vendor-compat] 时长投影桥：台词引擎情绪归一 + 缩短目标自洽");
+  });
+
+  return () => {
+    restores.reverse().forEach((restore) => restore());
+  };
 }

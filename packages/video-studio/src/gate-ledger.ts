@@ -67,7 +67,8 @@ export interface GateEvent {
   /** 放行判定（= 硬闸全过 且 软裁决通过/无软裁决） */
   ok: boolean;
   approved: boolean;
-  via: "deterministic" | "llm" | "fallback";
+  /** skip：该门对本片不适用（例：全素材项目没有文生镜 → 提示词门不适用），留痕而非静默通过 */
+  via: "deterministic" | "llm" | "fallback" | "skip";
   score: number | null;
   /** 触发该门的环节（portrait / prompt-review / keyframe / shot） */
   sourceStage: string | null;

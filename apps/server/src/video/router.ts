@@ -630,6 +630,30 @@ const cmsRouter = router({
 
 /* ================= render：Seedance 提交（G8 围栏） ================= */
 
+/**
+ * 从渲染脚本解出**计划时长**（T-2026-0925-0001）。
+ *
+ * 背景：`render_scripts.fields` 此前恒为 `{}`，时长只写在人读的 md 行（`render-scripts.ts:63-68`），
+ * 提交侧因此只能拿到调用方手填值，缺省时回落 `estimatedSeconds=30` —— 于是"计划 8–12s 的镜头
+ * 按 30s 烧额度"（2.5–3.75×）且与镜头卡完全脱钩。
+ * 取值优先级：`fields.durationSec` → md 的「时长: Ns」→ null（由调用方决定是否拒绝）。
+ */
+export function plannedDurationOf(script: { fields?: unknown; md?: string }): {
+  seconds: number | null;
+  source: "script-fields" | "script-md" | null;
+} {
+  const fields = (script.fields ?? {}) as Record<string, unknown>;
+  const direct = Number(fields.durationSec ?? fields.duration_sec ?? fields["时长"]);
+  if (Number.isFinite(direct) && direct > 0) return { seconds: Math.round(direct), source: "script-fields" };
+  const md = String(script.md ?? "");
+  const matched = /(?:时长|duration)\s*[:：]\s*([0-9]+(?:\.[0-9]+)?)\s*s?/i.exec(md);
+  if (matched) {
+    const value = Number(matched[1]);
+    if (Number.isFinite(value) && value > 0) return { seconds: Math.round(value), source: "script-md" };
+  }
+  return { seconds: null, source: null };
+}
+
 const renderRouter = router({
   /**
    * 渲染提交（§6 三档模式 manual/batch/auto；G8 烧额度门）：
@@ -730,7 +754,31 @@ const renderRouter = router({
       if (!chosen) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `模型目录中不存在「${modelId}」（video.gen.catalog 可查可用清单）` });
       }
-      const requestedSeconds = input.durationSec ?? input.estimatedSeconds;
+    /**
+     * 计划 = 执行（T-2026-0925-0001）：
+     * 优先用调用方显式值；否则用**镜头卡/渲染脚本的计划时长**；最后才回落 estimatedSeconds。
+     * `WORKLOOM_DURATION_SUBMIT_STRICT=1` 时：缺计划时长或与计划偏差 >1s 一律拒绝（先告警灰度后可切）。
+     */
+    /** 回滚开关：WORKLOOM_DURATION_SUBMIT_DERIVE=off 时退回"调用方给值 / estimatedSeconds"的旧行为 */
+    const deriveFromScript = (process.env.WORKLOOM_DURATION_SUBMIT_DERIVE ?? "on") !== "off";
+    const planned = deriveFromScript ? plannedDurationOf(script) : { seconds: null, source: null };
+    const strictDuration = (process.env.WORKLOOM_DURATION_SUBMIT_STRICT ?? "0") === "1";
+    if (strictDuration && planned.seconds === null) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message: "渲染脚本缺少计划时长：请在 fields.durationSec 或正文写上「时长: Ns」后再提交（不允许回落默认 30s）"
+      });
+    }
+    const requestedSeconds = input.durationSec ?? planned.seconds ?? input.estimatedSeconds;
+    if (strictDuration && planned.seconds !== null && input.durationSec !== undefined) {
+      const mismatch = Math.round(input.durationSec) - planned.seconds;
+      if (Math.abs(mismatch) > 1) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `提交时长 ${input.durationSec}s 与镜头卡计划 ${planned.seconds}s 偏差 ${mismatch}s（>1s）：请改用计划时长或先改脚本`
+        });
+      }
+    }
       /**
        * 真机 2026-09-23：`service_tier: flex` 不支持视频生成（400），前置拒绝。
        * 判定收在 gen/params.ts（纯函数，带单测），避免各入口各写一遍口径。
@@ -741,8 +789,20 @@ const renderRouter = router({
       }
       const maxSeconds = chosen.limits?.durationSec?.max ?? 15;
       const minSeconds = chosen.limits?.durationSec?.min ?? 4;
-      const durationSec = Math.min(maxSeconds, Math.max(minSeconds, Math.round(requestedSeconds)));
-      const clamped = durationSec !== Math.round(requestedSeconds);
+    const durationSec = Math.min(maxSeconds, Math.max(minSeconds, Math.round(requestedSeconds)));
+    const clamped = durationSec !== Math.round(requestedSeconds);
+    const durationProvenance = {
+      source:
+        input.durationSec !== undefined
+          ? ("request" as const)
+          : planned.seconds === null
+            ? ("estimate-fallback" as const)
+            : planned.source!,
+      planSeconds: planned.seconds,
+      requestedSeconds: Number.isFinite(requestedSeconds) ? Math.round(requestedSeconds) : null,
+      mismatchSeconds: planned.seconds === null ? null : Math.round(requestedSeconds) - planned.seconds,
+      strict: strictDuration
+    };
 
       const monthStart = new Date();
       monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
@@ -805,10 +865,11 @@ const renderRouter = router({
         },
         /** 幂等键：同脚本 + 同模型 + 同时长 + 同模式重复点击不会重复扣费 */
         idempotencyKey: input.idempotencyKey?.trim() || `render:${script.id}:${chosen.id}:${durationSec}:${input.mode}`,
-        fenceLevel: verdict.level,
-        fenceImpacts: verdict.impacts,
-        budgetOverageSeconds: budget.overageSeconds,
-      });
+      fenceLevel: verdict.level,
+      fenceImpacts: verdict.impacts,
+      budgetOverageSeconds: budget.overageSeconds,
+      durationProvenance
+    });
 
       return {
         jobId: submitted.jobId,
@@ -819,8 +880,9 @@ const renderRouter = router({
         estUsd: submitted.estUsd,
         estCny: submitted.estCny,
         deduped: submitted.deduped,
-        durationSec,
-        clamped,
+      durationSec,
+      clamped,
+      durationProvenance,
         level: verdict.level,
         budget: { usedSeconds, overageSeconds: budget.overageSeconds },
       };

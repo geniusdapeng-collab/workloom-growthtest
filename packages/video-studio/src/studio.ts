@@ -23,12 +23,14 @@ import {
   installVendorConfigIsolatorBridge,
   installVendorContractBridge,
   installVendorDurationPolicyBridge,
+  installVendorDurationProjectionBridge,
   installVendorFieldQualityBridge,
   installVendorMicroMotionBridge,
   installVendorDiscoveryFixBridge,
   installVendorPhaseInternalsDiagnostics,
   installVendorPhaseDiagnosticsBridge,
-  installVendorPromptRebuildBridge
+  installVendorPromptRebuildBridge,
+  installSharedBridge
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
@@ -67,6 +69,10 @@ export type EventSink = (event: {
     | "pipeline.started"
     | "pipeline.gate.requested"
     | "pipeline.gate.resolved"
+    | "pipeline.duration.projected"
+    | "pipeline.duration.infeasible"
+    | "pipeline.duration.skipped"
+    | "pipeline.duration.package_check"
     | "pipeline.finished"
     | "pipeline.failed";
   projectId: string;
@@ -246,14 +252,59 @@ export class VideoStudio {
       negativeTerms: AUDIO_NEGATIVE_TERMS,
       log
     });
-    const durationRules = loadDurationRules();
-    const maxSingleShot = cfg.durationPolicy?.maxSingleShotSeconds ?? durationRules.modelMax;
-    const minSingleShot = cfg.durationPolicy?.minSingleShotSeconds ?? durationRules.modelMin;
-    const uninstallDurationPolicy = installVendorDurationPolicyBridge({
+  const durationRules = loadDurationRules();
+  const maxSingleShot = cfg.durationPolicy?.maxSingleShotSeconds ?? durationRules.modelMax;
+  const minSingleShot = cfg.durationPolicy?.minSingleShotSeconds ?? durationRules.modelMin;
+  /**
+   * 桥按"进程级共享 + 引用计数"安装（T-2026-0925-0001）：
+   * 预生产 run 允许并发，而桥是进程全局的；若每个 run 各自装卸，
+   * 先结束的 run 会把仍在运行的 run 的补丁一起还原（时长口径中途分裂）。
+   */
+  const uninstallDurationPolicy = installSharedBridge("vendor-duration-policy", () =>
+    installVendorDurationPolicyBridge({
       maxSingleShotSeconds: maxSingleShot,
       minSingleShotSeconds: minSingleShot,
       log
-    });
+    })
+  );
+  /**
+   * 镜头时长单点守恒投影桥（T-2026-0925-0001）：
+   * 把 vendor 的四处时长决策（剧本总量对齐 / 制作归一 / 运行期约束 / 台词修复后的重排）
+   * 全部收敛到宿主投影器；`WORKLOOM_DURATION_PROJECTION=off` 可一键回到原行为（回滚开关）。
+   */
+  const projectionEnabled = (process.env.WORKLOOM_DURATION_PROJECTION ?? "on") !== "off";
+  let lastProjectedTarget: number | null = null;
+  const uninstallDurationProjection = projectionEnabled
+    ? installSharedBridge("vendor-duration-projection", () =>
+        installVendorDurationProjectionBridge({
+          minShotSeconds: minSingleShot,
+          maxShotSeconds: maxSingleShot,
+          log,
+          onEvent: (event) => {
+            if (typeof event.targetSeconds === "number" && event.targetSeconds > 0) {
+              lastProjectedTarget = event.targetSeconds;
+            }
+            void emit({
+              kind: `pipeline.duration.${event.kind}`,
+              projectId: input.projectId,
+              runId,
+              payload: {
+                source: event.source,
+                targetSeconds: event.targetSeconds,
+                totalSeconds: event.totalSeconds,
+                raised: event.shots.filter((shot) => shot.raised).map((shot) => shot.shotId),
+                lowered: event.shots.filter((shot) => shot.lowered).map((shot) => shot.shotId),
+                message: event.message ?? null
+              }
+            });
+            if (event.kind !== "projected") {
+              log(`[studio] 时长投影 ${event.kind}（${event.source}）：${event.message ?? ""}`);
+            }
+          }
+        })
+      )
+    : () => undefined;
+  if (!projectionEnabled) log("[studio] 时长投影桥已按 WORKLOOM_DURATION_PROJECTION=off 关闭（回滚态）");
     log(
       `[studio] 时长策略：单镜 ${minSingleShot}–${maxSingleShot}s（模型目录口径，Seedance 2.5 实测上限 30s）`
       + `；口径清单 ${durationRules.sources.length} 条（在用 ${durationRules.sources.filter((s) => s.live).length} / 未接线 ${durationRules.nonLive.length}）`
@@ -363,6 +414,46 @@ export class VideoStudio {
         const products = Object.keys(index.products).length;
         log(`[studio] 定妆照索引落盘：${portraitRuntime.indexPath()}（角色 ${characters} / 商品 ${products}）`);
       }
+      /**
+       * 作品级校验（T-2026-0925-0001，问题 P10）：
+       * vendor 的 `PromptDeliveryGuard.verifyPackage`（片头在场 / 平台时长带 / 禁全部同长 / 总时长 ±15%）
+       * 此前**全仓 0 处调用**，等于不存在；这里在预生产产物返回后、宣告 finished 之前补上，
+       * 结果落 `pipeline.duration.package_check` 事件（只报告不阻断；阻断由渲染提交侧负责）。
+       */
+      try {
+        const shots = (
+          (result?.stages?.productionEngine as { shots?: Array<Record<string, unknown>> } | undefined)?.shots ?? []
+        ).filter((shot) => Number(shot.duration ?? 0) > 0);
+        if (shots.length > 0) {
+          const guardMod = createRequire(import.meta.url)(
+            path.resolve(
+              fileURLToPath(new URL(".", import.meta.url)),
+              "../../../vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-delivery-guard.js"
+            )
+          ) as { PromptDeliveryGuard: new () => { verifyPackage: (list: unknown[], options?: Record<string, unknown>) => { pass: boolean; issues: string[] } } };
+          const check = new guardMod.PromptDeliveryGuard().verifyPackage(shots, {
+            targetDuration: lastProjectedTarget ?? undefined
+          });
+          await emit({
+            kind: "pipeline.duration.package_check",
+            projectId: input.projectId,
+            runId,
+            payload: {
+              pass: check.pass,
+              issueCount: check.issues.length,
+              issues: check.issues.slice(0, 20),
+              targetSeconds: lastProjectedTarget,
+              shots: shots.length,
+              totalSeconds: shots.reduce((sum, shot) => sum + Number(shot.duration ?? 0), 0)
+            }
+          });
+          if (!check.pass) {
+            log(`[studio] ⚠️ 作品级时长校验未通过（${check.issues.length} 项）：${check.issues.slice(0, 5).join("；")}`);
+          }
+        }
+      } catch (err) {
+        log(`[studio] 作品级校验跳过：${err instanceof Error ? err.message : String(err)}`);
+      }
       await emit({
         kind: result.success ? "pipeline.finished" : "pipeline.failed",
         projectId: input.projectId,
@@ -379,6 +470,7 @@ export class VideoStudio {
       });
       throw err;
     } finally {
+      uninstallDurationProjection();
       uninstallDurationPolicy();
       uninstallAudioDiscipline();
       uninstallInnerDiagnostics();

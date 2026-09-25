@@ -1091,8 +1091,8 @@ export async function buildDeliveryPackage({
     { kind: "covers_distinct", ok: coverDivergence.every((row) => row.distinct), detail: coverDivergence },
     { kind: "bgm_layer", ok: audioFailures.length === 0, detail: { failed: audioFailures, note: "失败的变体已按原声降级交付，不冒充带配乐成片" } },
     { kind: "softsub_video_unchanged", ok: variantsOut.every((variant) => !variant.artifacts.softsub || variant.artifacts.softsub.checks.every((check) => check.ok === true)), detail: variantsOut.filter((variant) => variant.artifacts.softsub).map((variant) => ({ id: variant.id, checks: variant.artifacts.softsub.checks.map((check) => check.kind) })) },
-    {
-      kind: "duration_consistent",
+{
+kind: "duration_consistent",
       // xfade 会在镜头之间做重叠过渡，成片比"母版"短 (镜数-1)×转场时长——这是设计使然，不是误差。
       // 因此基准按每个变体自己的转场口径算期望时长，再比对实测（±0.4s 容差）。
       ok: variantsOut.every((variant) => {
@@ -1117,9 +1117,40 @@ export async function buildDeliveryPackage({
             transitions: `${transitions.mode}${transitions.fadeSec ? ` ${transitions.fadeSec}s` : ""}`,
           };
         }),
-      },
-    },
-  ];
+},
+},
+{
+/**
+ * 计划 vs 实际（T-2026-0925-0001）：
+ * 镜头卡/PRD 给出的计划总时长（`project.targetDurationSec` / `target_duration_sec` / `briefDurationSec`）
+ * 与本次实际素材总时长比对（±1s/镜，至少 ±2s）。
+ * 计划缺失时**不静默通过**：ok=true 但 detail.note 明确写"计划时长未提供（未校验）"，
+ * 报告与前端据此可区分"校验通过"与"未校验"。
+ */
+kind: "duration_plan_consistent",
+ok: (() => {
+const planned = Number(project.targetDurationSec ?? project.target_duration_sec ?? project.briefDurationSec);
+if (!Number.isFinite(planned) || planned <= 0) return true;
+const tolerance = Math.max(2, normalised.length * 1);
+return Math.abs(totalSeconds - planned) <= tolerance;
+})(),
+detail: (() => {
+const plannedRaw = project.targetDurationSec ?? project.target_duration_sec ?? project.briefDurationSec;
+const planned = Number(plannedRaw);
+if (!Number.isFinite(planned) || planned <= 0) {
+return { plannedSeconds: null, actualSeconds: totalSeconds, note: "计划时长未提供（未校验）" };
+}
+const tolerance = Math.max(2, normalised.length * 1);
+return {
+plannedSeconds: planned,
+actualSeconds: totalSeconds,
+deltaSeconds: round(totalSeconds - planned, 2),
+toleranceSeconds: tolerance,
+note: "计划口径 = 镜头卡/PRD 的目标总时长；实际口径 = 逐镜素材净时长合计",
+};
+})(),
+},
+];
   if (indistinct.length) {
     throw new PostError(
       `变体之间测不出差异（${indistinct.map((row) => `${row.a}~${row.b}`).join("、")}）：多风格交付必须是"能看出差别"的版本，拒绝交付雷同版本`,
