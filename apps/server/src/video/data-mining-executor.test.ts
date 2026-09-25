@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  createApiSearchRunner,
   createDataMiningExecutor,
   filterUnknownUrls,
   normalizeUrl,
+  resolveApiSearchConfig,
   validateStagePayload,
   type SearchHit,
 } from "./data-mining-executor.js";
@@ -124,5 +126,71 @@ describe("商品情报执行器", () => {
     });
     expect(await executor("A1", {})).toBeNull();
     expect(called).toBe(false);
+  });
+
+  /* ---------- API 检索源（生产首选通道，T-2026-0925-0003） ---------- */
+
+  it("Tavily 协议：POST body 带 api_key，results[].content 作摘要", async () => {
+    let capturedBody = "";
+    const runner = createApiSearchRunner({
+      provider: "tavily",
+      apiKey: "tvly-test",
+      apiUrl: "https://api.tavily.com/search",
+      fetchImpl: (async (_url: string, init: RequestInit) => {
+        capturedBody = String(init.body ?? "");
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ results: [
+            { title: "米家空气净化器4 Lite 参数 - ZOL", url: "https://detail.zol.com.cn/air_purifier/1.shtml", content: "适用面积 26-45㎡，噪音≤60分贝" },
+            { title: "开箱实测", url: "https://www.bilibili.com/video/BV1xx", content: "睡眠档 33dB" },
+          ] }),
+        } as unknown as Response;
+      }) as unknown as typeof fetch,
+    });
+    expect(runner.enabled).toBe(true);
+    const { hits, blocked } = await runner.search("米家空气净化器 4 Lite 参数", 5);
+    expect(blocked).toBe(false);
+    expect(hits).toHaveLength(2);
+    expect(hits[0]!.snippet).toContain("26-45㎡");
+    const body = JSON.parse(capturedBody) as Record<string, unknown>;
+    expect(body.api_key).toBe("tvly-test");
+    expect(body.search_depth).toBe("basic");
+  });
+
+  it("通用 JSON 网关：Bearer 鉴权 + data.items 兼容解析", async () => {
+    let authHeader = "";
+    const runner = createApiSearchRunner({
+      provider: "generic",
+      apiKey: "gw-key",
+      apiUrl: "https://search.internal/api",
+      fetchImpl: (async (_url: string, init: RequestInit) => {
+        const headers = (init.headers ?? {}) as Record<string, string>;
+        authHeader = headers.authorization ?? "";
+        return {
+          ok: true, status: 200,
+          json: async () => ({ data: { items: [{ name: "测评", link: "https://x.test/a", description: "真实体验" }] } }),
+        } as unknown as Response;
+      }) as unknown as typeof fetch,
+    });
+    const { hits } = await runner.search("任何查询", 3);
+    expect(authHeader).toBe("Bearer gw-key");
+    expect(hits[0]).toMatchObject({ title: "测评", url: "https://x.test/a", snippet: "真实体验" });
+  });
+
+  it("API 限流（429/403）→ blocked=true 交给上层熔断，不当作零结果", async () => {
+    const runner = createApiSearchRunner({
+      provider: "tavily", apiKey: "k", apiUrl: "https://api.tavily.com/search",
+      fetchImpl: (async () => ({ ok: false, status: 429, json: async () => ({}) }) as unknown as Response) as unknown as typeof fetch,
+    });
+    const r = await runner.search("q", 3);
+    expect(r.blocked).toBe(true);
+    expect(r.hits).toHaveLength(0);
+  });
+
+  it("未配置 key → 通道关闭（静默跳过，不影响其它引擎）", () => {
+    const cfg = resolveApiSearchConfig({}, {} as NodeJS.ProcessEnv);
+    expect(cfg).toBeNull();
+    expect(createApiSearchRunner({ provider: "tavily", apiKey: "", apiUrl: "" }).enabled).toBe(false);
   });
 });
