@@ -34,9 +34,21 @@ import {
   type PortraitIndex,
   type ProducerStage,
   type RunInput,
+  type StudioConfig,
   type StudioPortraitConfig,
 } from "@hyperreality/video-studio";
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
+import { createDataMiningExecutor } from "./data-mining-executor.js";
+import {
+  AUTO_GATES,
+  GATE_PRODUCER_STAGE,
+  GATE_RUBRIC,
+  gateDeterministicChecks,
+  isProducerRejection,
+  producerModeFromEnv,
+  writeGateArtifact,
+  type ProducerMode,
+} from "./gate-policy.js";
 
 /* ================= 可配项（环境变量） ================= */
 
@@ -48,87 +60,62 @@ const APPROVAL_POLL_MS = Number(process.env.HR_APPROVAL_POLL_MS ?? 2_000);
 const TOTAL_DEADLINE_MS = Number(process.env.VM_TOTAL_DEADLINE_MS ?? 3_600_000);
 
 /**
- * 自动放行的「内部准备门」（2026-09-21 产品所有者口径：数字员工之间的日常协作不设人审）。
- *
- * 人审只留给两类事：① **业务决策**（主题 G2 / 需求对齐清单 G4 / 镜头提示词 G6 —— 决定"对外说什么、
- * 长什么样"）；② **花钱或对外**（G8 渲染提交烧额度、G9 公网发布、G10 对外评论回复）。
- * 情报档案 G1 / 需求整理 G3 / 定妆照 G5 / 预生产收口 G7 属内部准备：直接放行，但**照样写事件**，
- * 作为过程与时间线留痕（不插 approvals 行，审批中心不再出现内部协作项）。
- * 可用 HR_AUTO_GATES 覆盖（逗号分隔；设为空字符串即恢复全部人审）。
+ * 内部门三档处置与逐门口径见 `./gate-policy.js`（服务端与本地审计跑批共用同一份定义，
+ * 避免"审计过的门 ≠ 生产的门"漂移）。花钱/对外门（G8 渲染提交、G9 发布、G10 对外评论）
+ * 不在 AUTO_GATES 内，仍按高风险走人审。
  */
-const AUTO_GATES = new Set(
-  (process.env.HR_AUTO_GATES
-    ?? "G1_DOSSIER,G2_THEME,G3_INSIGHT,G4_PRD,G5_PORTRAIT,G6_PROMPT,G7_FINAL")
-    .split(",").map((value) => value.trim()).filter(Boolean),
-);
-
-/**
- * 内部门的三档处置（T-2026-0924-0001 机制改造）：
- *
- *   `review`（默认）—— **AI 监制**：拿门内容当产物走 `producer-gate` 评审（确定性硬闸 + LLM 打分），
- *                       判不合格就返回 `approved:false` 打回重跑，而不是一路放行；
- *   `auto`          —— 旧口径：内部准备门直接放行（只在应急/离线演示时用）；
- *   `human`         —— 恢复人工：走 approvals 行 + 轮询等人点（原实现）。
- *
- * 为什么要改：此前实现要么"一律放行"（质量问题被静默带到下游），要么"每步等人"（停线）。
- * 产品口径是**全自动预生产 + 人工只管花钱与对外**，所以内部准备门应当由 AI 监制来放行。
- * 花钱/对外门（G8 渲染提交、G9 发布、G10 对外评论）不在本集合内，仍按高风险走人审。
- */
-type ProducerMode = "review" | "auto" | "human";
-const PRODUCER_MODE: ProducerMode = (() => {
-  const raw = (process.env.HR_PRODUCER ?? "review").trim().toLowerCase();
-  return raw === "auto" || raw === "human" ? (raw as ProducerMode) : "review";
-})();
-
-/** 门 → 监制评审环节（决定默认评审要点；`producer-gate` 里定义） */
-const GATE_PRODUCER_STAGE: Partial<Record<GateKey, ProducerStage>> = {
-  G1_DOSSIER: "script",
-  G2_THEME: "script",
-  G3_INSIGHT: "script",
-  G4_PRD: "prompt",
-  G5_PORTRAIT: "keyframe",
-  G6_PROMPT: "prompt",
-  G7_FINAL: "master"
-};
-
-/** 逐门评审要点（在通用 rubric 之上叠加该门的专属口径） */
-const GATE_RUBRIC: Partial<Record<GateKey, string[]>> = {
-  G1_DOSSIER: ["情报档案有真实来源与可核验事实，不出现凭空编造的品牌/数据", "与项目主题相关，不含无关行业的商品与场景"],
-  G2_THEME: ["主题/受众/时长/画幅与需求一致", "不出现与主题无关的红线意象（科幻/微观/无关地域）"],
-  G3_INSIGHT: ["需求对齐清单覆盖角色/场景/道具/动作四类契约", "受众与风险项有具体结论，不是占位文字"],
-  G4_PRD: ["角色系统有可执行的外观锚点（定妆照前置）", "交付标准可验证（画幅/时长/音频/字幕口径）"],
-  G5_PORTRAIT: ["定妆照必须真出图（completedPortraits>0），不接受只有规格包的 pending 状态", "必需角度 front/threeQuarter/closeup/side 齐备", "人物与角色档案一致（授权真人须与本人照片同一张脸）"],
-  G6_PROMPT: ["每镜提示词达到交付口径（≥1200 字）且 25/30 字段齐备", "台词速率与占比合规，无红线词"],
-  G7_FINAL: ["预生产收口：镜头卡/定妆照/提示词三件套齐备且互相引用一致", "渲染提交前的花额度动作仍需人审（本门只放行内部准备）"]
-};
-
-/**
- * 门内容的确定性检查（零 token 先判）：
- * 空内容 / 占位符 / 声称完成但没有产物 —— 一律硬失败，不浪费模型额度。
- */
-function gateDeterministicChecks(gate: GateKey, content: string): Array<{ id: string; pass: boolean; detail: string; hard?: boolean }> {
-  const text = content ?? "";
-  const trimmed = text.trim();
-  const checks = [
-    { id: "content-present", pass: trimmed.length > 0, hard: true, detail: trimmed.length > 0 ? `门内容 ${trimmed.length} 字` : "门内容为空（vendor 未产出该环节产物）" },
-    { id: "no-placeholder", pass: !/undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed), hard: true, detail: /undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed) ? "门内容含 undefined/null/NaN/[object Object] 占位" : "无占位符泄漏" },
-    { id: "min-length", pass: trimmed.length >= 120, hard: true, detail: `内容长度 ${trimmed.length}（下限 120，过短通常意味着上游字段过薄）` }
-  ];
-  if (gate === "G5_PORTRAIT") {
-    const pendingOnly = /completedPortraits["'\s:]+0/.test(trimmed) || /"pending"\s*:\s*true/.test(trimmed);
-    checks.push({ id: "portrait-produced", pass: !pendingOnly, hard: true, detail: pendingOnly ? "定妆照仍是 pending / completedPortraits=0（只有规格包，未真出图）" : "定妆照有实际出图记录" });
-    const angles = ["front", "threeQuarter", "closeup", "side"];
-    const missing = angles.filter((a) => !trimmed.includes(a) && !trimmed.includes(a.toLowerCase().replace("threequarter", "three_quarter")));
-    checks.push({ id: "required-angles", pass: missing.length === 0, hard: missing.length >= 3, detail: missing.length === 0 ? "必需角度齐备" : `门内容未提到角度：${missing.join("/")}` });
-  }
-  return checks;
-}
+const PRODUCER_MODE: ProducerMode = producerModeFromEnv();
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）：参考图相对路径按此解析 */
 const REPO_ROOT = path.resolve(here, "../../../..");
 /** 运行产物根（checkpoints/characters/confirmations）：默认仓库根 .vm-work/ */
 const WORK_DIR = process.env.HR_WORK_DIR ?? path.resolve(here, "../../../..", ".vm-work");
+
+/**
+ * 营销路由判定 → 情报层装配开关（2026-09-25 激活）。
+ *
+ * 判定与 vendor 的激活条件同源（`metadata.dataMining` / `metadata.brief.product`），
+ * 另接受 `metadata.pipelineRoute.kind === 'marketing'`（分流器的落库口径）与 `products[]`
+ * （产品所有者给的实拍图登记）。命中即为本次 run 装配**真实检索执行器**：
+ *   - 情报五站由 api 模式的 executor 真跑（Bing 公开 RSS + 模型结构化回填）；
+ *   - 档案落盘按工作区隔离：`<WORK_DIR>/dossiers/<workspaceId>`；
+ *   - 未命中（叙事片）保持原行为，vendor 不会进情报层。
+ */
+function dataMiningConfigFor(
+  metadata: Record<string, unknown> | undefined,
+  llm: WorkloomLLMEngine,
+  workspaceId: string,
+): StudioConfig["dataMining"] | undefined {
+  if ((process.env.VM_DATA_MINING ?? "1") === "0") return undefined;
+  const dm = metadata?.dataMining as { name?: unknown } | undefined;
+  const brief = metadata?.brief as { product?: unknown } | undefined;
+  const route = metadata?.pipelineRoute as { kind?: unknown } | undefined;
+  const products = metadata?.products;
+  const marketing = Boolean(
+    (dm && typeof dm.name === "string" && dm.name.trim())
+    || (brief && typeof brief.product === "string" && brief.product.trim())
+    || route?.kind === "marketing"
+    || (Array.isArray(products) && products.length > 0),
+  );
+  if (!marketing) return undefined;
+  const mode = (process.env.VM_DATA_MINING_MODE ?? "api").trim() === "spec" ? "spec" : "api";
+  return {
+    mode,
+    ...(mode === "api"
+      ? {
+          // vendor 侧按 `executor(stage, plan)` 调用（stage 为 A1/A2/A3），此处收敛为宿主类型
+          executor: createDataMiningExecutor({ llm, log: (line) => console.log(line) }) as unknown as (
+            stage: string,
+            plan: Record<string, unknown>,
+          ) => Promise<Record<string, unknown> | null>,
+        }
+      : {}),
+    refresh: (process.env.VM_DATA_MINING_REFRESH ?? "") === "1",
+    storeRoot: path.join(WORK_DIR, "dossiers", workspaceId),
+    staleAfterDays: Number(process.env.VM_DATA_MINING_STALE_DAYS ?? 30) || 30,
+  };
+}
 
 /**
  * 运行日志 tee（2026-09-22 真机审计需求）：
@@ -351,6 +338,12 @@ function portraitConfig(metadata?: Record<string, unknown>): StudioPortraitConfi
     referenceImages: collectReferenceImages(metadata).map((image) =>
       path.isAbsolute(image) ? image : path.join(REPO_ROOT, image)),
     characterAnchorImages: anchors.map((image) => (path.isAbsolute(image) ? image : path.join(REPO_ROOT, image))),
+    /**
+     * 生产链路 fail-closed：角色定妆照必须带"角色档案"描述。
+     * 真机事故 2026-09-23：描述为空时模型自由发挥，要求"三十岁上下女性"却出了男性模特，
+     * 直接污染真人出镜链路。（vendor 直跑保持默认 false，不影响其它产品。）
+     */
+    requireCharacterDescription: true,
   };
 }
 
@@ -453,14 +446,20 @@ export function startRun(scope: Scope, input: RunInput): string {
       const producerStage = GATE_PRODUCER_STAGE[gate] ?? "script";
       let producerVerdict: Awaited<ReturnType<typeof reviewStage>> | null = null;
       if (PRODUCER_MODE === "review") {
+        /**
+         * 门内容落盘后送审（真机根因修复）：此前传的是 `${gate}:${vendorType}` 标签路径，
+         * `reviewStage` 读不到文件 → 监制只看到 rubric 里的 600 字摘录 → 文档后半段
+         * （需求契约/结论摘要等）等于不存在，连续三轮把 G3 判成"契约缺失"。
+         */
+        const artifact = writeGateArtifact(WORK_DIR, input.projectId, gate, req.contentMd ?? "");
         producerVerdict = await reviewStage({
           stage: producerStage,
           projectId: input.projectId,
-          artifacts: [{ path: `${gate}:${req.vendorType}`, kind: "text", note: req.title }],
+          artifacts: [{ path: artifact.path, kind: "text", note: req.title }],
           deterministic: gateDeterministicChecks(gate, req.contentMd ?? ""),
           rubric: [
             ...((GATE_RUBRIC[gate] ?? []) as string[]),
-            `门内容摘录（供核对，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
+            `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
           ],
           context: { gate, vendorType: req.vendorType, runId: entry.runId, contentChars: (req.contentMd ?? "").length },
           // 内部准备门默认 fail-closed：评审模型不可用即打回，不静默放行
@@ -594,17 +593,54 @@ export function startRun(scope: Scope, input: RunInput): string {
     totalDeadlineMs: TOTAL_DEADLINE_MS,
     deferRender: (process.env.HR_DEFER_RENDER ?? "1") !== "0",
     portraits: portraitConfig(input.metadata),
+    /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
+    dataMining: dataMiningConfigFor(input.metadata, llm, scope.workspaceId),
     log: (line) => console.log(line),
   });
 
   // 异步执行：不阻塞 tRPC 响应；终态只写注册表投影（生命周期事件由 onEvent 落库）
   void (async () => {
     try {
-      const result = await studio.runPreproduction(input);
+      /**
+       * AI 监制打回 → **有上限的自动重跑**（T-2026-0925-0002）。
+       *
+       * 门语义是"打回重跑"：此前一次被打回就整条停线，等于把返工成本丢给用户
+       * （真机 VID-AUDIT-M2/M3/M5 均因单次打回停线）。默认重跑 1 次，
+       * `VM_PRODUCER_RETRY` 可调（0 = 打回即停，与旧行为一致）。
+       */
+      const maxAttempts = Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 1) + 1);
+      let result = await studio.runPreproduction(input);
+      let attempts = 1;
+      while (attempts < maxAttempts && isProducerRejection(result)) {
+        attempts += 1;
+        console.log(`[studio-worker] AI 监制打回 → 自动重跑第 ${attempts}/${maxAttempts} 次（同一项目、同一门口径）`);
+        result = await studio.runPreproduction(input);
+      }
       entry.status = "finished";
+      /** 情报层产出摘要（逐环节审计要看得见"档案到底有没有装订出来"） */
+      const dataMiningStage = (result.stages?.dataMining ?? null) as
+        | { status?: string; product_id?: string; data?: { ok?: boolean; reused?: boolean; dossier?: { gaps?: unknown[]; provenance?: unknown[] } } }
+        | null;
       entry.resultSummary = {
         success: result.success,
         stages: Object.keys(result.stages ?? {}),
+        producerAttempts: attempts,
+        ...(dataMiningStage
+          ? {
+              dataMining: {
+                status: dataMiningStage.status ?? null,
+                productId: dataMiningStage.product_id ?? null,
+                ok: dataMiningStage.data?.ok ?? null,
+                reused: dataMiningStage.data?.reused ?? null,
+                evidenceCount: Array.isArray(dataMiningStage.data?.dossier?.provenance)
+                  ? dataMiningStage.data!.dossier!.provenance!.length
+                  : null,
+                gaps: Array.isArray(dataMiningStage.data?.dossier?.gaps)
+                  ? dataMiningStage.data!.dossier!.gaps!.length
+                  : null,
+              },
+            }
+          : {}),
       };
     } catch (err) {
       entry.status = "failed";

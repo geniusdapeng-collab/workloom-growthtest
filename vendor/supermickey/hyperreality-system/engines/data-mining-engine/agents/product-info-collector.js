@@ -60,7 +60,11 @@ class ProductInfoCollector {
   plan(input = {}) {
     if (!input.name) throw new Error('[A1] 缺商品名 name，无法构建采集任务书');
     const kind = this._productKind(input);
-    const base = [input.brand, input.name, input.model].filter(Boolean).join(' ');
+    /**
+     * 【2026-09-25 修复】品名里已经含品牌时不再重复拼品牌（"米家 米家空气净化器 4 Lite"），
+     * 重复词会拉低检索召回（实测检索端点会把重复词当噪声）。
+     */
+    const base = ProductInfoCollector.queryBase(input);
     const cat = input.category || '';
 
     // 查询矩阵：每个查询带意图与目标渠道，执行方按此检索并回填
@@ -124,6 +128,15 @@ class ProductInfoCollector {
         '看到的和推断的严格分开，推断写进 inferred_notes 不得混入 facts'
       ]
     };
+  }
+
+  /** 检索词基底：品牌 + 品名 + 型号，且不重复品牌（品牌已在品名里时只用品名） */
+  static queryBase(input = {}) {
+    const brand = String(input.brand || '').trim();
+    const name = String(input.name || '').trim();
+    const model = String(input.model || '').trim();
+    const nameHasBrand = Boolean(brand) && name.toLowerCase().includes(brand.toLowerCase());
+    return [nameHasBrand ? '' : brand, name, model].filter(Boolean).join(' ');
   }
 
   /**

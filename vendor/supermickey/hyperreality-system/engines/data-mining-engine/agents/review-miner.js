@@ -93,7 +93,10 @@ class ReviewMiner {
    */
   plan(input = {}) {
     if (!input.name) throw new Error('[A2] 缺商品名 name');
-    const base = [input.brand, input.name].filter(Boolean).join(' ');
+    // 【2026-09-25 修复】与 A1 同口径：品名已含品牌时不重复拼品牌
+    const brand = String(input.brand || '').trim();
+    const name = String(input.name || '').trim();
+    const base = (brand && name.toLowerCase().includes(brand.toLowerCase()) ? name : [brand, name].filter(Boolean).join(' '));
     const points = Array.isArray(input.sellingPointCandidates) ? input.sellingPointCandidates : [];
 
     const queries = [

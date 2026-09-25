@@ -19,7 +19,13 @@ const TYPE_LIBRARY = {
   '恐怖悬疑': ['恐怖', '惊悚', '悬疑', '鬼', '灵异', '密室', '推理', '凶手', '杀人', '侦探'],
   '自然纪录片': ['自然', '动物', '森林', '海洋', '纪录片', '生态', '雨林', '极地', '深海'],
   '美食文化': ['美食', '餐厅', '料理', '烹饪', '厨师', '食材', '深夜食堂', '舌尖上的'],
-  '商业广告': ['商业', '广告', '产品', '品牌', '宣传', '营销', 'TVC', '宣传片', 'slogan', 'logo', '品牌故事'],
+  /**
+   * 【2026-09-25-fix】补社媒营销语汇：真机 VID-AUDIT-M2 里「抖音种草视频」只命中了
+   * 旅游推广（抖音/推广），商业广告一个词都没命中 → 类型判成「旅游推广」，
+   * G2 监制以「类型与家电种草主题直接冲突」打回。本仓 ai-video 的主业就是营销片，
+   * 词库必须覆盖 种草/带货/开箱/测评/商品/电商/投放 等基本盘。
+   */
+  '商业广告': ['商业', '广告', '产品', '品牌', '宣传', '营销', 'TVC', '宣传片', 'slogan', 'logo', '品牌故事', '种草', '带货', '开箱', '测评', '评测', '商品', '电商', '上新', '投放', '投流', '直播', 'SKU', 'sku', '详情页'],
   '科普教育': ['科普', '教育', '知识', '科学', '教学', '讲解', '小学生', '数据可视化', '动画版'],
   '音乐MV': ['音乐', '舞蹈', 'MV', '节奏', '歌曲', '演唱会', '编舞', '歌舞'],
   '家庭温情': ['家庭', '亲情', '温情', '父母', '孩子', '团圆', '成长', '纪念', '宝宝', '女儿', '儿子'],
@@ -1519,18 +1525,36 @@ class CreativeThemeGenerator {
 字段 schema 与规则（duration/creative_style 取值等）维持原要求不变。
 用户输入：
 ${text}`;
-    let content = '';
-    if (typeof this.llmEngine.generate === 'function') {
-      const r = await this.llmEngine.generate(prompt, { maxTokens: 2000, temperature: 1 });
-      content = r.content || '';
-    } else if (typeof this.llmEngine.reason === 'function') {
-      const r = await this.llmEngine.reason(prompt, { maxTokens: 2000, temperature: 1 });
-      content = r.content || '';
-    } else if (typeof this.llmEngine.chat === 'function') {
-      const r = await this.llmEngine.chat('你是严格输出 JSON 的结构化提取器。', prompt, 1);
-      content = r.content || r.data || '';
-    } else {
+    /**
+     * 【2026-09-25-fix】JSON 强制 + 低温度 + 一次重试。
+     * 真机连续两轮出现「LLM 输出中未找到 JSON」：temperature=1 且未开 response_format 时，
+     * 模型（deepseek-flash）会输出讲解文字而不是 JSON → 只能落到规则兜底推断类型
+     * （正是 VID-AUDIT-M2 类型判成「旅游推广」、G2 打回的直接原因）。
+     */
+    const callOnce = async (opts) => {
+      if (typeof this.llmEngine.generate === 'function') {
+        const r = await this.llmEngine.generate(prompt, opts);
+        return r.content || '';
+      }
+      if (typeof this.llmEngine.reason === 'function') {
+        const r = await this.llmEngine.reason(prompt, opts);
+        return r.content || '';
+      }
+      if (typeof this.llmEngine.chat === 'function') {
+        const r = await this.llmEngine.chat('你是严格输出 JSON 的结构化提取器，只输出 JSON。', prompt, 0.3);
+        return (typeof r === 'string' ? r : (r && (r.content || r.data)) || '');
+      }
       throw new Error('LLM 引擎无可用调用方法');
+    };
+    let content = await callOnce({ maxTokens: 2000, temperature: 0.3, forceJson: true });
+    if (!/\{[\s\S]*\}/.test(content)) {
+      console.warn('[CreativeThemeGenerator] ⚠️ 首次提取未返回 JSON，按「只输出 JSON」重试一次');
+      content = await callOnce({
+        maxTokens: 2000,
+        temperature: 0.2,
+        forceJson: true,
+        systemPrompt: '你是严格输出 JSON 的结构化提取器。只输出一个合法 JSON 对象，不要 markdown、不要解释。'
+      });
     }
     const m = content.match(/\{[\s\S]*\}/);
     if (!m) throw new Error('LLM 输出中未找到 JSON');
@@ -1612,9 +1636,10 @@ ${box('📖', originalStory)}
 ║ 类型: ${String(task.type).padEnd(30)}║
 ║ 主题: ${String(task.theme).padEnd(30)}║
 ║ 时长: ${String(task.duration_sec + '秒').padEnd(30)}║
-║ 难度: ${String(task.difficulty).padEnd(30)}║
+${task.aspect_ratio ? `║ 画幅: ${String(task.aspect_ratio).padEnd(30)}║\n` : ''}${task.platform ? `║ 平台: ${String(task.platform).padEnd(30)}║\n` : ''}${task.brief_duration_source ? `║ 时长口径: ${String(task.brief_duration_source).padEnd(26)}║\n` : ''}║ 难度: ${String(task.difficulty).padEnd(30)}║
 ║ 创意系数: ${String(task.creative_style).padEnd(26)}║
 ║ 情绪基调: ${String(task.tone).padEnd(28)}║
+${task.tone_override_reason ? `║ 基调口径: ${String(task.tone_override_reason).slice(0, 60).padEnd(28)}║\n` : ''}${task.product_anchor ? `║ 商品锚点: ${String(task.product_anchor).slice(0, 60).padEnd(28)}║\n` : ''}
 ╠══════════════════════════════════════════╣
 ║ 📋 核心描述:                             ║
 ${box('📋', task.description)}

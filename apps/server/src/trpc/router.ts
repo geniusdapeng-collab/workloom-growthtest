@@ -37,6 +37,7 @@ import { providerFromEnv, OpenAiCompatibleProvider } from "@workloom/base/model-
 import { routedLlmCall, resetLlmAssembly } from "../service/llm.js";
 import { loadDeploymentToolExecutor } from "../runtime/tool-executor.js";
 import { startVideoProjectRun, StudioWorkerError } from "../video/studio-worker.js";
+import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
 import { creditsRouter, modelFeedbackRouter } from "./credits-router.js";
 import { runRouterReviewBeat } from "@workloom/base/model-router";
 import {
@@ -1187,6 +1188,58 @@ const threadsRouter = router({
         // 含糊指令：反问澄清，不盲目建任务
         return { kind: "clarify" as const, question: intent.clarifyQuestion, via: intent.via };
       }
+      /**
+       * 视频目标「管线分流」（T-2026-0925-0002）。
+       *
+       * 此前这里对所有视频目标硬编码 `isMarketing: true` 且不传 metadata：
+       *   ① 叙事片/知识片也被当成营销片立项，而营销片要多跑情报五站 + G1 门，成本更高；
+       *   ② 营销片其实**没有真的跑情报**——vendor 靠 `metadata.dataMining / brief.product`
+       *      数据驱动，两个条件都不成立就整层跳过，等于「营销片 = 叙事片 + 一个营销标签」。
+       *
+       * 现在改成：先分流（规则优先，摇摆时才走模型仲裁），拿不准就把选择交回用户
+       * （`clarify`，不建线程、不建项目、不花渲染/情报成本）；营销片必须带商品锚点，
+       * 缺商品名同样先问清楚。
+       */
+      const videoGoal = /视频|短片|影片|成片|镜头卡|分镜|宣传片|TVC|纪录片|口播|种草片|混剪/.test(input.title);
+      const isVideoQuest = input.runImmediately && intent.mode === "quest" && videoGoal;
+      const videoRoute = isVideoQuest
+        ? await routeVideoPipeline({ text: input.title }, { llmCall: llmCall("pipeline-route", scope) })
+        : null;
+      if (videoRoute && videoRoute.route === "clarify") {
+        // 澄清留痕（无线程可挂，用视频路由对象作载体；依据与信号一并落账，便于复盘"为什么没开工"）
+        await gatewayAppend(getGatewayPool(), {
+          tenantId: scope.tenantId, workspaceId: scope.workspaceId,
+          actor: { id: ctx.identity.memberNo, type: "human" },
+        }, {
+          who: { type: "human", id: ctx.identity.memberNo },
+          context: {
+            tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
+            time: new Date().toISOString(), channel: "inapp",
+          },
+          object: { type: "video_pipeline_route", id: `route-${Date.now().toString(36)}` },
+          decision: {
+            action: "video.route.clarify",
+            after: {
+              intent: input.title.slice(0, 500),
+              missing: videoRoute.clarify?.missing ?? ["route"],
+              signals: videoRoute.signals,
+              rationale: videoRoute.rationale,
+            },
+            basis: ["分流不确定 → 先问用户，避免按错误管线花情报/渲染成本（宁可多问一句，不做错一条片）"],
+          },
+          rule_impact: [],
+        });
+        return {
+          kind: "clarify" as const,
+          question: videoRoute.clarify?.question ?? "这条片子走营销片还是叙事片？",
+          via: videoRoute.via,
+          videoRoute: {
+            route: "clarify" as const,
+            missing: videoRoute.clarify?.missing ?? ["route"],
+            signals: videoRoute.signals,
+          },
+        };
+      }
       const presetKey = input.presetKey ?? (await resolveDispatchPresetKey(scope));
       const app = getAppPool();
       const client = await app.connect();
@@ -1253,12 +1306,28 @@ const threadsRouter = router({
        * 照单执行并留下「未提供工具」的空跑记录（真机实测：T-175 视频任务）。
        * 线程照常建档（任务中心可见），并落一条关联事件把线程与视频项目串起来。
        */
-      const videoGoal = /视频|短片|影片|成片|镜头卡|分镜|宣传片|TVC|纪录片|口播|种草片|混剪/.test(input.title);
-      if (input.runImmediately && intent.mode === "quest" && videoGoal) {
+      if (isVideoQuest) {
+        const decision = videoRoute!;
         try {
+          /**
+           * 分流结论落到 metadata（营销片写 dataMining/brief，叙事片显式清空），
+           * 这样 vendor 的情报层才会按"数据驱动"的口径被真正激活或跳过。
+           */
+          const seededMetadata = applyRouteToMetadata(undefined, decision);
+          /**
+           * 创作意图清理 + 需求口径（真机 VID-AUDIT-M1）：
+           * ① 「走营销片」这类分流行指令不能进创意解析（否则主题被解析成「走营销片」，质量 0/5）；
+           * ② 营销片默认竖屏 30s（与本仓 brief 默认一致），显式写进口径块，
+           *    否则生成器按类型推导出 45s，G2 监制以「时长自相矛盾 + 缺画幅」打回。
+           */
+          const pipelineIntent = buildPipelineIntent(input.title, {
+            durationSec: 30,
+            aspectRatio: decision.route === "marketing" ? "9:16" : undefined,
+          });
           const started = await startVideoProjectRun(scope, {
-            intent: input.title,
-            isMarketing: true, // 本仓目标语料以营销/获客素材为主，走营销片管线（含情报前置层）
+            intent: pipelineIntent,
+            metadata: seededMetadata,
+            isMarketing: decision.route === "marketing",
             by: { id: ctx.identity.memberNo, type: "human" },
             threadId,
           });
@@ -1275,15 +1344,33 @@ const threadsRouter = router({
             object: { type: "video_project", id: started.projectId },
             decision: {
               action: "video.route.standard",
-              after: { threadId, projectId: started.projectId, runId: started.runId },
-              basis: ["视频目标路由到标准视频管线（25/30 字段镜头卡 + 导演前置评审 + 定妆锚定）"],
+              after: {
+                threadId, projectId: started.projectId, runId: started.runId,
+                pipeline: decision.route,
+                via: decision.via,
+                confidence: decision.confidence,
+                product: decision.product?.name ?? null,
+                productSource: decision.product?.source ?? null,
+                signals: decision.signals,
+              },
+              basis: [
+                decision.route === "marketing"
+                  ? "分流判定：营销片（含商品情报档案 Stage -2：情报五站 + G1 确认门）"
+                  : "分流判定：叙事片（通用管线，不跑情报层）",
+                `分流依据：${decision.rationale}`,
+              ],
             },
             rule_impact: [],
           });
           return {
             kind: "routed" as const, mode: "quest" as const, via: intent.via, threadId,
             status: "running" as const,
-            video: { projectId: started.projectId, runId: started.runId },
+            video: {
+              projectId: started.projectId,
+              runId: started.runId,
+              pipeline: decision.route,
+              product: decision.product?.name ?? null,
+            },
           };
         } catch (error) {
           if (error instanceof StudioWorkerError && error.code === "LLM_MISSING") {

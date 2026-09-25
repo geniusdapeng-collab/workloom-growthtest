@@ -19,6 +19,22 @@ const path = require('path');
 
 const DEFAULT_STALE_DAYS = 30;
 
+/**
+ * 默认档案根：`<repo>/data/dossiers`。
+ *
+ * 【2026-09-25 修复】原默认值少写一层 `..`，解析成 `<repo>/vendor/data/dossiers`——
+ * 运行期数据落进 vendor（受管第三方树）目录，vendor 升级/清理即丢档。
+ * 宿主若需要（如按工作区隔离），应显式传 `storeRoot`；本默认值只作为单机兜底。
+ */
+const DEFAULT_ROOT = path.resolve(__dirname, '..', '..', '..', '..', '..', 'data', 'dossiers');
+
+/** 原子写：先写临时文件再 rename，避免进程中断留下半截 JSON */
+function writeJsonAtomic(filePath, value) {
+  const tmp = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tmp, JSON.stringify(value, null, 2), 'utf8');
+  fs.renameSync(tmp, filePath);
+}
+
 class DossierStore {
   /**
    * @param {object} [opts]
@@ -26,7 +42,7 @@ class DossierStore {
    * @param {number} [opts.staleAfterDays] 过期天数（默认 30）
    */
   constructor(opts = {}) {
-    this.root = opts.root || path.resolve(__dirname, '..', '..', '..', '..', 'data', 'dossiers');
+    this.root = opts.root || DEFAULT_ROOT;
     this.staleAfterDays = Number(opts.staleAfterDays) > 0 ? Number(opts.staleAfterDays) : DEFAULT_STALE_DAYS;
   }
 
@@ -39,15 +55,19 @@ class DossierStore {
     const fp = path.join(this.root, 'index.json');
     if (!fs.existsSync(fp)) return { entries: [] };
     try {
-      return JSON.parse(fs.readFileSync(fp, 'utf8'));
+      const parsed = JSON.parse(fs.readFileSync(fp, 'utf8'));
+      return { ...parsed, entries: Array.isArray(parsed && parsed.entries) ? parsed.entries : [] };
     } catch (e) {
-      return { entries: [] };
+      // 索引损坏不应静默当成空索引（否则下一次 save 会抹掉既有登记）——改名留证后重建
+      const corrupt = `${fp}.corrupt-${Date.now()}`;
+      try { fs.renameSync(fp, corrupt); } catch { /* 留证失败不阻断重建 */ }
+      return { entries: [], recovered_from: corrupt };
     }
   }
 
   _writeIndex(index) {
     fs.mkdirSync(this.root, { recursive: true });
-    fs.writeFileSync(path.join(this.root, 'index.json'), JSON.stringify(index, null, 2), 'utf8');
+    writeJsonAtomic(path.join(this.root, 'index.json'), index);
   }
 
   /** 保存档案（覆盖式，index 同步更新） */
@@ -55,7 +75,7 @@ class DossierStore {
     if (!dossier || !dossier.product_id) throw new Error('[DossierStore] 档案缺 product_id，拒绝落盘');
     const dir = this._dir(dossier.product_id);
     fs.mkdirSync(path.join(dir, 'images'), { recursive: true });
-    fs.writeFileSync(path.join(dir, 'dossier.json'), JSON.stringify(dossier, null, 2), 'utf8');
+    writeJsonAtomic(path.join(dir, 'dossier.json'), dossier);
 
     // 商品图 manifest 单独成文：定妆照分支的交接物
     const manifest = {
@@ -68,7 +88,7 @@ class DossierStore {
       })),
       exported_at: new Date().toISOString()
     };
-    fs.writeFileSync(path.join(dir, 'images', 'manifest.json'), JSON.stringify(manifest, null, 2), 'utf8');
+    writeJsonAtomic(path.join(dir, 'images', 'manifest.json'), manifest);
 
     const index = this._readIndex();
     index.entries = index.entries.filter(e => e.product_id !== dossier.product_id);
@@ -80,6 +100,7 @@ class DossierStore {
       image_count: dossier.visual_assets.images.length,
       stale: false
     });
+    index.updated_at = new Date().toISOString();
     this._writeIndex(index);
     return { dir, dossierPath: path.join(dir, 'dossier.json'), manifestPath: path.join(dir, 'images', 'manifest.json') };
   }

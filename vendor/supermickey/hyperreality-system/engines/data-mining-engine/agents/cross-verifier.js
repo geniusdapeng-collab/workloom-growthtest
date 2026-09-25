@@ -47,14 +47,27 @@ class CrossVerifier {
         report.graded.inferred += 1;
         return null;
       }
-      // 官方来源或 >=2 独立来源 → confirmed
+      /**
+       * 官方来源或 >=2 独立来源 → confirmed。
+       *
+       * 【2026-09-25 修复】原实现两处失真：
+       *   ① `const official = refs.some(() => false)` 是恒 false 的桩——评价类永远拿不到官方级；
+       *   ② `Math.max(refs.length, item.mentions || 1)` 把**提及次数**当独立来源数，
+       *      一条评价被复读十次即升 confirmed，直接违背铁律二（≥2 个**独立**来源）。
+       * 现改为向证据账本查渠道级别与 host 去重后的独立来源数；账本查不到编号时按 reported 保守处理。
+       */
       const claimKey = `${claimPrefix}:${item.aspect || item.point}`;
-      const official = refs.some(() => false); // 评价类无官方级，独立来源数定级
-      const independent = Math.max(refs.length, item.mentions || 1);
+      const official = ledger.hasOfficialAmong(refs);
+      const independent = ledger.independentSourceCountForRefs(refs);
+      const channels = ledger.classCountsAmong(refs);
       const confidence = (official || independent >= 2) ? 'confirmed' : 'reported';
       report.graded[confidence] += 1;
-      report.checks_run.push(`${claimKey} -> ${confidence}（来源 ${refs.length}，提及 ${item.mentions || 1}）`);
-      return { ...item, confidence, evidence_strength: refs.length >= 2 ? 'strong' : 'single' };
+      report.checks_run.push(
+        `${claimKey} -> ${confidence}（证据 ${refs.length} 条 / 独立来源 ${independent}`
+        + `（官方 ${channels.official} · 电商 ${channels.ecommerce} · 社区 ${channels.community} · 未知 ${channels.unknown}）`
+        + ` / 提及 ${item.mentions || 1} 次；提及次数不参与定级）`
+      );
+      return { ...item, confidence, evidence_strength: official || independent >= 2 ? 'strong' : 'single' };
     };
 
     const verifiedPraise = (packs.a2?.praise_points || []).map(p => gradePoint(p, 'voc.praise')).filter(Boolean);
@@ -64,7 +77,8 @@ class CrossVerifier {
     const identity = { ...(packs.a1?.identity || {}) };
     const priceRefs = ledger.forClaim('identity.price_band');
     if (priceRefs.length >= 2) {
-      const nums = String(identity.price_band || '').match(/\d+(\.\d+)?/g).map(Number);
+      // 价格带无数字时的防御（原实现 match() 返回 null 后直接 .map 会抛 TypeError）
+      const nums = (String(identity.price_band || '').match(/\d+(\.\d+)?/g) || []).map(Number);
       if (nums.length >= 2) {
         const spread = (Math.max(...nums) - Math.min(...nums)) / Math.min(...nums);
         if (spread > this.conflictPriceRatio) {
@@ -96,10 +110,11 @@ class CrossVerifier {
     // ===== 3. 竞品数据定级（A3 产出）=====
     const competitors = (packs.a3?.competitors || []).map(c => {
       const refs = Array.isArray(c.source_refs) ? c.source_refs : [];
+      const independent = ledger.independentSourceCountForRefs(refs);
       return {
         ...c,
-        confidence: refs.length >= 2 ? 'confirmed' : 'reported',
-        evidence_strength: refs.length >= 2 ? 'strong' : 'single'
+        confidence: independent >= 2 ? 'confirmed' : 'reported',
+        evidence_strength: independent >= 2 ? 'strong' : 'single'
       };
     });
 

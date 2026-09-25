@@ -77,4 +77,46 @@ function newTraceId(productId = '') {
   return `LOOM-${head}-${stamp}-${rand}`;
 }
 
-module.exports = { create, verify, newTraceId };
+/**
+ * 校验信封链的**连续性**（防跳站 / 防串包）。
+ *
+ * 【2026-09-25 修复】此前只校验单个信封的 payload 摘要，`prev_checksum` 写了却没人读——
+ * 「链式锁定」只停留在文档里。现在按流水线顺序逐环核对：
+ *   ① 每个信封自身通过 verify()；
+ *   ② 后一封的 prev_checksum 必须等于前一封的 checksum（首封必须为 null）；
+ *   ③ 阶段序列不得跳站（只允许约定的 A1→A2→A3→A4→A5 顺序，缺站由缺站纪律处理，
+ *      但**乱序**一律判为被篡改/串包）。
+ * @param {Array<object>} envelopes assemble 过程中产出的信封序列
+ * @returns {{ok: boolean, issues: string[]}}
+ */
+const STAGE_ORDER = ['A1_COLLECT', 'A2_MINE', 'A3_SCOUT', 'A4_VERIFY', 'A5_BIND'];
+
+function verifyChain(envelopes = []) {
+  const issues = [];
+  if (!Array.isArray(envelopes) || envelopes.length === 0) {
+    return { ok: false, issues: ['信封链为空：流水线未产出任何站'] };
+  }
+  let lastIndex = -1;
+  envelopes.forEach((env, i) => {
+    const self = verify(env);
+    if (!self.ok) issues.push(`第 ${i + 1} 封（${env.stage}）自身校验失败：${self.issues.join('；')}`);
+    if (i === 0) {
+      if (env.prev_checksum) issues.push(`首封 ${env.stage} 不应带 prev_checksum（链起点）`);
+    } else {
+      const prev = envelopes[i - 1];
+      if (env.prev_checksum !== prev.checksum) {
+        issues.push(`链断裂：${env.stage} 的 prev_checksum 与上一封 ${prev.stage} 的 checksum 不一致（可能被篡改或串包）`);
+      }
+    }
+    const stageIndex = STAGE_ORDER.indexOf(env.stage);
+    if (stageIndex < 0) {
+      issues.push(`未知阶段 ${env.stage}：不在契约阶段序列内`);
+    } else {
+      if (stageIndex <= lastIndex) issues.push(`阶段乱序/重复：${env.stage} 出现在 ${envelopes[i - 1]?.stage} 之后`);
+      lastIndex = Math.max(lastIndex, stageIndex);
+    }
+  });
+  return { ok: issues.length === 0, issues };
+}
+
+module.exports = { create, verify, verifyChain, newTraceId, STAGE_ORDER };

@@ -107,6 +107,27 @@ export interface StudioConfig {
    * 并把 vendor 的三处 15s 口径统一放宽，避免"计划能拍、提交被拒"或节奏被悄悄夹紧。
    */
   durationPolicy?: { maxSingleShotSeconds?: number; minSingleShotSeconds?: number };
+  /**
+   * 商品情报档案（Stage -2 · 珍妮纺织机）运行参数（2026-09-25 激活）。
+   *
+   * 为什么要有：vendor 的情报层是**数据驱动**的（`metadata.dataMining` / `metadata.brief.product`
+   * 存在才跑），而 `spec` 模式且无 executor 时只产出《采集任务书》、不产档案——宿主此前
+   * 两样都没接，于是营销片实际等于叙事片跑法。这里把四个运行开关显式透传给 vendor：
+   *
+   *  - `mode`：`spec`（出任务书，等执行方回填）| `api`（注入 executor 全自动五站）；
+   *  - `executor`：api 模式的检索执行器（宿主实现，见 apps/server/src/video/data-mining-executor.ts）；
+   *  - `refresh`：命中旧档案也强制重跑（默认复用未过期档案，30 天 stale）；
+   *  - `raw`：执行方已完成回填时直接装订（免重复检索）；
+   *  - `storeRoot`：档案落盘根（缺省 `<workDir>/dossiers`，按工作区隔离）。
+   */
+  dataMining?: {
+    mode?: "spec" | "api";
+    executor?: (stage: string, plan: Record<string, unknown>) => Promise<Record<string, unknown> | null>;
+    refresh?: boolean;
+    raw?: Record<string, unknown>;
+    storeRoot?: string;
+    staleAfterDays?: number;
+  };
 }
 
 export interface RunInput {
@@ -310,6 +331,24 @@ export class VideoStudio {
        */
       const createOptions: Record<string, unknown> = {};
       if (cfg.deferRender === true) createOptions.skipRender = true;
+      /**
+       * 商品情报档案（Stage -2）开关透传：只有宿主显式装配才生效，
+       * 未装配时 vendor 保持原有行为（spec 模式出任务书、不落档案）。
+       */
+      if (cfg.dataMining) {
+        createOptions.dataMiningMode = cfg.dataMining.mode ?? "api";
+        createOptions.dataMiningStoreRoot = cfg.dataMining.storeRoot
+          ?? path.join(cfg.workDir, "dossiers");
+        if (cfg.dataMining.executor) createOptions.dataMiningExecutor = cfg.dataMining.executor;
+        if (cfg.dataMining.refresh) createOptions.dataMiningRefresh = true;
+        if (cfg.dataMining.raw) createOptions.dataMiningRaw = cfg.dataMining.raw;
+        if (cfg.dataMining.staleAfterDays) createOptions.dataMiningStaleDays = cfg.dataMining.staleAfterDays;
+        log(
+          `[studio] 商品情报档案已装配：mode=${String(createOptions.dataMiningMode)}`
+          + `${cfg.dataMining.executor ? " + 真实检索执行器" : "（无执行器：只出采集任务书）"}`
+          + `；档案根 ${String(createOptions.dataMiningStoreRoot)}`
+        );
+      }
       if (portraitRuntime) {
         createOptions.batchMode = true;
         createOptions.portraitExecutor = "api";
