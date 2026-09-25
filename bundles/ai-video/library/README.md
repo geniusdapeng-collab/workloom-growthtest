@@ -11,7 +11,7 @@
 
 | 目录 | 来源 | 文件数 | 说明 |
 |---|---|---|---|
-| `characters/` | 本仓自研（T-2026-0924-0001 角色库落地） | **15** | **内置角色档案库**：1 号模特「陈卓」+ 8 角度定妆照 + 默认选角规则（`registry.json`）——**出片开箱即用**，详见 [characters/README.md](characters/README.md) |
+| `characters/` | 本仓自研（T-2026-0924-0001 角色库落地） | **15** | **内置角色档案库**：1 号模特「陈卓」+ 8 角度定妆照 + 默认选角规则（`registry.json`）——**出片开箱即用**，详见 [characters/README.md](characters/README.md)；其中 10 件（`registry.json` + `profile.json` + v3 定妆照）已入册 `bundle.json#provides.library` 完整性索引 |
 | `hollywood-factory/` | `hyperreality-system/skills/好莱坞工业电影技能工厂` | **203** 个 .md | 好莱坞工业电影技能工厂：10 题材 × 9 导演 + 微表情系列 ~30 + 孤独系列等镜头级专项技能 |
 | `social-marketing/` | `hyperreality-system/skills/social-marketing/skills` | **20** 个 .md | 营销技能：钩子 4 式 / 种草 3 / 演示 3 / 剪辑 3 / UGC 3 / 收尾 4 |
 | `templates/` | `templates` | **5** 个模板 | scene-card / shot-card-v4 / prompt-v4 / director-review-form / project-config |

@@ -34,10 +34,14 @@
         node --test scripts/oss-inventory.test.mjs
         pnpm oss:check
 
-    - name: 产品身份与行业包治理
+    - name: 产品身份与行业包治理（含内置角色资产与声明一致性）
       script: |
         set -eu
         pnpm product:verify
+        # 内置默认模特「陈卓」随仓分发（bundles/ai-video/library/characters/**）：守住「资产在 + 声明在」——
+        # 默认模特可解析、四角度定妆照齐备、声明在首页/文档/能力清单/目录说明同步存在。
+        # 背景：新下载项目的开发者与 AI Agent 常以为"仓库里没有人物资产"而重复建档（T-2026-0925-0004/0006）。
+        node scripts/verify-builtin-character-assets.mjs
 
     - name: 三端生产构建
       script: |

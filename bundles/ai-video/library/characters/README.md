@@ -14,6 +14,12 @@
 | `model-01-chen-zhuo/portraits/v3/*.png` | 定妆照集 **8 个角度**：front / threeQuarter / closeup / side / back / actionPose / emotionCloseup / handDetail |
 | `model-01-chen-zhuo/gates.jsonl`、`reviews/*.json` | 定妆照门与监制评审留痕（**只增不改**，纠正用新记录） |
 
+> **在册资产（完整性索引）**：`registry.json` + `profile.json` + `portraits/v3/` 的 8 张定妆照（共 10 件）
+> 已登记在 `bundles/ai-video/bundle.json#provides.library`，装载时校验 sha256（稳定包另验 Ed25519 签名）。
+> **改动这 10 件必须在同一提交重算摘要**：`tsx scripts/bundle-governance.mts --refresh-digests`
+> （稳定包另需 `BUNDLE_SIGNING_PRIVATE_KEY` / `BUNDLE_SIGNING_KEY_ID` 重签），否则行业包会装载失败。
+> `gates.jsonl` / `reviews/*.json` / 本 README 刻意不入册（运行期账本与文档）。
+
 ## 二、选角规则（管线自动执行，无需配置）
 
 1. 镜头卡/项目**显式指定**（`character` / `characters` / `portraits`）→ 用指定的；
