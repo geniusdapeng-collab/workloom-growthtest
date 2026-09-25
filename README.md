@@ -55,7 +55,7 @@ AI超增长是一套**面向 B 端商家的 AI 获客经营系统**：以「短�
 **获客的精髓就一句话：在对的地方，用对的内容，接住有意图的人，并且每一环都能度量到钱。**
 
 <!-- CAPABILITIES:BEGIN -->
-<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-09-24），请勿手改；重跑 pnpm capabilities 更新 -->
+<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-09-25），请勿手改；重跑 pnpm capabilities 更新 -->
 
 ## 🧩 系统能力速览（自动生成 · 与代码同步）
 
@@ -131,6 +131,20 @@ AI 搜索月活破 8.2 亿、AI 问答流量占比首超传统搜索——客户
 - **👍/👎 反馈环**：Ask 应答卡一键升级重答（点踩换更强大脑，首次免费），反馈数据回流驱动路由调表
 
 **商业化锚点**：智享 499 / 标准 1,299 / 智能 2,999 元每店每月——用不到一个获客专员的月薪，买下「流量 → 询盘 → 成交」全链路的 AI 获客团队。
+
+### 内置人物资产：视频出片**开箱即用**（别重复造角色）
+
+本仓**自带 1 号模特「陈卓」（`chen-zhuo`）**——角色档案（外貌 / 服装 / 气质 / 授权信息）+ **8 角度定妆照** +
+默认选角规则随仓分发，克隆下来就能出片：**镜头卡里不写 `character` 时，出片链路自动采用默认模特**
+（运行日志会打印 `未显式指定模特 → 使用系统默认模特：陈卓（chen-zhuo，1 号）`），不需要先建角色、也不需要准备照片。
+
+- **在哪**：`bundles/ai-video/library/characters/`（事实源 `registry.json`，目录说明见该目录的 README）
+- **怎么用**：镜头卡写 `"character": "陈卓"`（别名「卓卓」同样解析）即点名；**什么都不写就是默认**；
+  多人项目里写了名字的按名字解析，其余未指定角色才回落到默认模特
+- **真人边界**：真人肖像只走平台授权通道（火山方舟「私域真人人像库」→ `asset://<asset ID>`），
+  直传真人照片会被平台隐私闸拦（`InputImageSensitiveContentDetected.PrivacyInformation`）——本仓不提供绕过手段
+- **加新 / 换默认**：新建 `model-02-<拼音>/` + 在 `registry.json#models` 追加一条；改默认就改 `defaultModel`
+- **规则与 FAQ**：[内置角色库与默认模特](docs/character-registry.md) ｜ **自检**：`node scripts/verify-builtin-character-assets.mjs`（资产齐备 + 声明四处同步）
 
 ### WorkData 数据底座：素材、线索与过程全留痕
 
@@ -340,6 +354,7 @@ Ask 问询另支持联网实时检索事实面（`ASK_WEB_SEARCH=1`，Bing RSS�
 ## 文档索引
 
 - [完整能力导览（自动生成）](docs/capabilities.auto.md) ｜ [全量能力清单](docs/capability-map.md)
+- [内置角色库与默认模特（视频出片开箱即用）](docs/character-registry.md) ｜ [角色档案设计与授权边界](docs/character-archive-design.md)
 - [获客系统升级方案（获客五环 / 酒店垂直 / 分期落地）](docs/plan-acquisition.md)
 - [社媒短视频营销 × GEO 融合经营系统落地执行方案](docs/geo-fusion-plan.md)
 - [酒店资产迁移判断与架构方案](docs/plan-hotel-migration.md)

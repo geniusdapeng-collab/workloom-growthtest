@@ -107,6 +107,25 @@
 | `geo-growth/` | GEO 双域包 + 获客用增班组：25 preset（双域 16 + 增长 9，含 2 个 P2 条件岗）、25 围栏（双域 17 + 增长 8）、41 对象类、4 管线、15 技能（双域 6 + 增长 9） | `bundles/geo-growth/` |
 | `ai-video/` | 短视频创作域 | `bundles/ai-video/` |
 
+### L4.1 内置人物资产 · 开箱即用的默认模特（**别重复造角色**）
+
+本仓自带 1 号模特「陈卓」（`chen-zhuo`）：档案正文 + 8 角度定妆照 + 默认选角规则随仓分发，克隆即可出片。
+**镜头卡不写 `character` 时，出片链路自动使用 `registry.json#defaultModel`**（日志：
+`未显式指定模特 → 使用系统默认模特：陈卓（chen-zhuo，1 号）`）；`full-chain-film.mts` 固定装载
+`bundles/ai-video/library/characters/**`，无需额外参数。
+
+| 能力 | 调用 | 验证 |
+|---|---|---|
+| 角色档案库（事实源） | `bundles/ai-video/library/characters/registry.json`（`defaultModel` + `models[].aliases/archive`） | `node scripts/verify-builtin-character-assets.mjs` 校验默认模特可解析、四角度定妆照齐备（>50KB） |
+| 内置默认模特「陈卓」（8 角度定妆照） | `bundles/ai-video/library/characters/model-01-chen-zhuo/` | 目录内 `gates.jsonl`（定妆照门）+ `reviews/*.json`（监制评审，只增不改） |
+| 选角解析（显式 / 姓名别名 / 默认回落 / 兜底） | `scripts/tools/full-chain-film.mts#loadCharacters`、`packages/video-studio/src/character-archive.ts` | `pnpm vitest run packages/video-studio`；跑一镜出片看默认模特日志 |
+| 真人肖像授权通道（`asset://`） | 方舟「私域真人人像库」授权素材；参考图绑定见 `packages/video-studio/src/portrait-binding.ts` | 直传真人图必被平台拦（`InputImageSensitiveContentDetected.PrivacyInformation`）——不得绕过 |
+| 加新模特 / 换默认 | 新建 `model-02-<拼音>/` + `registry.json#models` 追加 + `defaultModel` 改指向 | `node scripts/verify-builtin-character-assets.mjs` + `pnpm capabilities`（能力速览自动同步） |
+
+> 声明点（任一入口都能找到这件事）：`docs/character-registry.md`（权威）· `bundles/ai-video/library/README.md` ·
+> `bundles/ai-video/library/characters/README.md` · `README.md`（能力速览自动生成块）· `docs/SYSTEM-OVERVIEW.md` ·
+> `.ai-prompt` · `AGENTS.repo.md`。
+
 ## L5 技能资产层 · skills/official/
 
 系统自带的可复用技能（Agent 可按各 SKILL.md 加载执行）：

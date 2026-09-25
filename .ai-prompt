@@ -10,3 +10,8 @@
    之后可用 browser_* 动作自动打开上述三端验证页面——**UI 改动必须实际截图核对**。
    生产部署（install.sh 一键装齐 + HTTP/MCP 远程驱动）见 `docs/computer-use-production.md`。
 4. 发布前必须 `pnpm release:gate` 全过（硬性门禁）。
+5. **视频出片自带默认模特，别重复造角色**：本仓内置 1 号模特「陈卓」（`chen-zhuo`）——角色档案 +
+   8 角度定妆照随仓分发在 `bundles/ai-video/library/characters/`，**镜头卡不写 `character` 时出片链路自动用它**
+   （日志：`未显式指定模特 → 使用系统默认模特：陈卓（chen-zhuo，1 号）`）。
+   规则与常见问题见 `docs/character-registry.md`，目录内说明见 `bundles/ai-video/library/characters/README.md`；
+   真人肖像只走平台授权通道（方舟 `asset://`），不要直传真人照片。
