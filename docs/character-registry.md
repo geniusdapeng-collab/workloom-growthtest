@@ -12,6 +12,11 @@
 - **1 号模特：陈卓（`chen-zhuo`）** — 系统默认模特。档案：`bundles/ai-video/library/characters/model-01-chen-zhuo/`
 - 档案正文含：外貌特征（照片提取）、服装基线、气质、授权信息、定妆照集（v3，8 角度，图生图 + 抠像友好背景硬闸）。
 - **原始照片不进仓库**（仅本地保留）；仓库内只放 AI 生成的定妆照与档案正文。
+- **在册资产（完整性索引）**：`registry.json`、`model-01-chen-zhuo/profile.json`、`model-01-chen-zhuo/portraits/v3/*.png`（8 张，
+  合计 10 件）已登记在 `bundles/ai-video/bundle.json#provides.library`——装载时会校验 sha256，稳定包还会验 Ed25519 签名。
+  因此**改动这些文件必须在同一提交里重算摘要**（`pnpm bundle:release` 或在仓内跑
+  `tsx scripts/bundle-governance.mts --refresh-digests`，稳定包另需 `BUNDLE_SIGNING_PRIVATE_KEY` / `BUNDLE_SIGNING_KEY_ID`）。
+  运行期账本（`gates.jsonl`、`reviews/*.json`）与目录说明 README **刻意不入册**——它们是追加写/文档，不入完整性索引。
 
 ## 二、选角规则（管线自动执行）
 
@@ -68,4 +73,4 @@
 | 定妆照绑定与 `asset://` 授权素材透传 | `packages/video-studio/src/portrait-binding.ts` |
 | 出片链路装载与默认模特日志 | `scripts/tools/full-chain-film.mts`（`loadCharacters` / `loadCharacterRegistry`） |
 | 设计与数据模型 | `docs/character-archive-design.md` |
-| 自检 | `node scripts/verify-builtin-character-assets.mjs`（资产 + 声明一致性） · `pnpm vitest run packages/video-studio` |
+| 自检 | `node scripts/verify-builtin-character-assets.mjs`（资产 + 声明一致性，已接入 `.cnb.yml` static-gate） · `pnpm vitest run packages/video-studio` |
