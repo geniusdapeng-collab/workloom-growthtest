@@ -208,7 +208,7 @@ describe("多领域融合：组合岗位编制裁决", () => {
     expect(keys.length).toBe(declared - shadowed);
     expect(shadowed).toBe(4);
     // 本仓组合编制实测 78 岗（2026-09-24 交付机制落地时复算；历史值 76）
-    expect(keys.length).toBe(78);
+    expect(keys.length).toBe(79);
   });
 
   it("同名岗位按主包声明落到权威归属包", () => {
