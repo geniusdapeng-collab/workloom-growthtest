@@ -75,11 +75,29 @@ class EvidenceLedger {
     return this._entries.filter(x => x.claim_ref === claimRef);
   }
 
+  /** 按证据编号取条目（A4 定级要用渠道级别，不能只看编号个数） */
+  byIds(ids = []) {
+    const wanted = new Set(Array.isArray(ids) ? ids : []);
+    if (wanted.size === 0) return [];
+    return this._entries.filter(e => wanted.has(e.id));
+  }
+
   /**
    * 独立来源计数（按 host 去重；无 URL 的 origin 每个算独立）
    */
   independentSourceCount(claimRef) {
-    const entries = this.forClaim(claimRef);
+    return this.independentSourceCountForRefs(this.forClaim(claimRef).map(e => e.id));
+  }
+
+  /**
+   * 独立来源计数（按证据编号）。
+   * 【2026-09-25 修复】A4 此前用 `refs.length` / `mentions` 充当独立来源数，
+   * 把"一个帖子被转十次""一句话被十个人复读"算成十个来源。此处按 host 去重，
+   * 无 URL 的 origin 每个算一条独立来源（口径与 A4 文档一致）。
+   * @param {string[]} ids 证据编号数组
+   */
+  independentSourceCountForRefs(ids = []) {
+    const entries = this.byIds(ids);
     const hosts = new Set();
     let originCount = 0;
     for (const e of entries) {
@@ -88,9 +106,26 @@ class EvidenceLedger {
     return hosts.size + originCount;
   }
 
+  /** 这批证据里是否有官方级来源（按渠道分级，不是按字符串包含） */
+  hasOfficialAmong(ids = []) {
+    return this.byIds(ids).some(e => e.channel_class === 'official');
+  }
+
+  /** 渠道级别分布（审计/报告用） */
+  classCountsAmong(ids = []) {
+    const counts = { official: 0, ecommerce: 0, community: 0, unknown: 0 };
+    for (const e of this.byIds(ids)) counts[e.channel_class] = (counts[e.channel_class] || 0) + 1;
+    return counts;
+  }
+
   /** 是否含官方级来源 */
   hasOfficialSource(claimRef) {
     return this.forClaim(claimRef).some(e => e.channel_class === 'official');
+  }
+
+  /** 全部证据编号（信封 evidence_refs 用；此前调用方直接读内部 `_entries`） */
+  ids() {
+    return this._entries.map(e => e.id);
   }
 
   /** 导出为档案 provenance 数组 */

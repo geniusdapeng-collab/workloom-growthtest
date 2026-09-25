@@ -42,16 +42,24 @@ class CompetitorScout {
     const cat = input.category;
     const priceHint = input.price_band ? ` ${input.price_band}价位` : '';
 
+    /**
+     * 【2026-09-25 修复】此前只暴露 `discovery_queries`，而 api 模式的执行器统一读
+     * `plan.queries`（A1/A2 都是这个键）→ A3 会被判「缺查询矩阵」→ **竞品站永远缺站**。
+     * 现在两个键都给：`queries` 供执行器统一消费，`discovery_queries` 保持旧口径兼容。
+     */
+    const discoveryQueries = [
+      { q: `${cat} 排行榜 热销 ${priceHint}`.trim(), intent: 'ranking', channel: '电商榜单' },
+      { q: `${cat} 哪个牌子好 知乎`, intent: 'brand_compare', channel: '知乎' },
+      { q: `${cat} 测评 对比 ${input.name}`, intent: 'head_to_head', channel: '评测媒体/社媒' },
+      { q: `${cat} 推荐 小红书 ${priceHint}`.trim(), intent: 'ugc_recommend', channel: '小红书' }
+    ];
+
     return {
       stage: 'A3_SCOUT',
       agent: this.agentName,
       competitor_cap: this.cap,
-      discovery_queries: [
-        { q: `${cat} 排行榜 热销 ${priceHint}`.trim(), intent: 'ranking', channel: '电商榜单' },
-        { q: `${cat} 哪个牌子好 知乎`, intent: 'brand_compare', channel: '知乎' },
-        { q: `${cat} 测评 对比 ${input.name}`, intent: 'head_to_head', channel: '评测媒体/社媒' },
-        { q: `${cat} 推荐 小红书 ${priceHint}`.trim(), intent: 'ugc_recommend', channel: '小红书' }
-      ],
+      queries: discoveryQueries,
+      discovery_queries: discoveryQueries,
       profile_template: {
         per_competitor_queries: [
           { q: '{竞品名} 价格 旗舰店', intent: 'comp_price' },

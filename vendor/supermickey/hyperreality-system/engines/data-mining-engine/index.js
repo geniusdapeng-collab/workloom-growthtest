@@ -106,7 +106,7 @@ class JennyLoomEngine {
     const pass = (stage, agent, payload) => {
       const env = Envelope.create({
         traceId, stage, agent, mode: this.mode, payload,
-        evidenceRefs: ledger._entries.map(e => e.id),
+        evidenceRefs: ledger.ids(),
         prevChecksum
       });
       const check = Envelope.verify(env);
@@ -115,7 +115,10 @@ class JennyLoomEngine {
       if (!gate.ok) throw new Error(`[JennyLoom] 出站闸机拦截 @${stage}: ${gate.hardFailures.join('；')}`);
       stageGaps.push(...gate.gaps);
       prevChecksum = env.checksum;
-      envelopes.push({ stage, envelope_id: env.envelope_id, checksum: env.checksum, gaps: gate.gaps.length });
+      // 保留完整信封（含 payload 与 prev_checksum）——链校验必须能读到上一封的 checksum；
+      // 对外返回时再剥掉 payload（见 assemble 的 envelopes 投影）。
+      env.gaps = gate.gaps.length;
+      envelopes.push(env);
       return env;
     };
 
@@ -181,6 +184,18 @@ class JennyLoomEngine {
 
     // ===== A5 装订（必经站）=====
     const productId = JennyLoomEngine.deriveProductId(input);
+    /**
+     * 装订前先核链：链断即拒收，**且不落盘**（A5.bind 会写档案目录，
+     * 不能等到写完才发现链被篡改）。装订后再核一次全长链作为终检。
+     */
+    const preChain = Envelope.verifyChain(envelopes);
+    if (!preChain.ok) {
+      errors.push({ stage: 'CHAIN_VERIFY', message: preChain.issues.join('；'), fatal: true });
+      return {
+        ok: false, trace_id: traceId, product_id: productId, errors, chain: preChain,
+        envelopes: envelopes.map(({ payload, ...rest }) => rest)
+      };
+    }
     const a5Out = this.a5.bind({
       productId,
       verified: a4Out.verified,
@@ -193,6 +208,20 @@ class JennyLoomEngine {
     });
     pass('A5_BIND', 'DossierBinder', { dossier: a5Out.dossier, cards: a5Out.cards });
 
+    /**
+     * 【2026-09-25 修复】信封链连续性校验（防跳站/防串包）。
+     * 此前 `prev_checksum` 只写不验，「链式锁定」是文档里的话；现在装订完成后强制核链，
+     * 链断即整档拒收（fail-closed），并把结论写进返回值供审计取用。
+     */
+    const chain = Envelope.verifyChain(envelopes);
+    if (!chain.ok) {
+      errors.push({ stage: 'CHAIN_VERIFY', message: chain.issues.join('；'), fatal: true });
+      return {
+        ok: false, trace_id: traceId, product_id: productId, errors, chain,
+        envelopes: envelopes.map(({ payload, ...rest }) => rest)
+      };
+    }
+
     return {
       ok: true,
       trace_id: traceId,
@@ -202,7 +231,9 @@ class JennyLoomEngine {
       saved: a5Out.saved,
       validation: a5Out.validation,
       verification_report: a4Out.verification_report,
-      envelopes,
+      // 对外只回链上元数据（id/checksum/prev_checksum/gaps），完整 payload 已在各站被消费
+      envelopes: envelopes.map(({ payload, ...rest }) => rest),
+      chain,
       errors
     };
   }

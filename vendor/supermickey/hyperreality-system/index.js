@@ -510,7 +510,11 @@ class HyperrealitySystem {
           const { JennyLoomEngine } = require('./engines/data-mining-engine');
           const dmEngine = new JennyLoomEngine({
             mode: options.dataMiningMode || process.env.SUPERMICKEY_DATA_MINING_MODE || 'spec',
-            executor: options.dataMiningExecutor
+            executor: options.dataMiningExecutor,
+            // 【2026-09-25】档案落盘根可注入：缺省仍走引擎自带兜底（<repo>/data/dossiers），
+            // 宿主应传工作区独立目录（如 <workDir>/dossiers），否则多工作区会共用同一份档案。
+            storeRoot: options.dataMiningStoreRoot,
+            staleAfterDays: options.dataMiningStaleDays
           });
           const dmProductId = JennyLoomEngine.deriveProductId(dmInput);
 
@@ -594,8 +598,24 @@ class HyperrealitySystem {
       const stageNeg1Start = Date.now();
 
       try {
-        const themeResult = await this.creativeThemeGenerator.generate(intent);
-        
+        /**
+         * 【2026-09-25-fix 情报/ Brief 进创意】创意主题生成此前只拿意图原文，
+         * 情报摘要卡（theme_card）与营销 Brief（卖点/人群/平台）根本没有进生成器——
+         * 真机表现：营销片被推成「旅游推广/神秘敬畏」，G2 监制连打两轮。
+         * 这里把 Brief + 情报摘要拼成结构化上下文再生成（有情报才注入，故事片不受影响）。
+         */
+        const themeInput = this._buildThemeInput(intent, metadata);
+        const themeResult = await this.creativeThemeGenerator.generate(themeInput);
+
+        /**
+         * 【2026-09-25-fix 口径统一】Brief 是时长/画幅/平台的权威源。
+         *
+         * 真机事故（VID-AUDIT-M1）：意图里写明「30 秒」，主题生成器按类型/难度自行推导成 45 秒，
+         * 确认单也没有画幅字段 → G2 监制以「时长自相矛盾 + 缺画幅」打回，整条数据管线停摆。
+         * 这里在确认门之前用 Brief 口径覆盖，并标注口径来源，让人/监制看到的是同一套数字。
+         */
+        this._applyBriefProfile(themeResult, metadata);
+
         result.stages.creativeTheme = {
           data: themeResult,
           timing: Date.now() - stageNeg1Start
@@ -701,7 +721,14 @@ class HyperrealitySystem {
       // 生成 Markdown 供人工确认 - 需求清单确认不可跳过!
       console.log('\n📋 [业务需求对齐清单] 等待人工确认...');
 
-      const markdown = this.requirementDiscoveryEngine.generateMarkdown(discoveryResult);
+      /**
+       * 【2026-09-25-fix 契约进确认单】G3 的评审要点要求「覆盖角色/场景/道具/动作四类契约」，
+       * 但 `generateMarkdown` 出的确认单只有受众/场景结构/风险/参考，**没有契约表**——
+       * 真机 VID-AUDIT-M3 因此被判「四类契约缺失」打回（内容其实很完整，是确认单缺字段）。
+       * 这里把对齐闸机提取的四类契约附在确认单末尾：判据看得见，才不会误杀。
+       */
+      const markdown = this.requirementDiscoveryEngine.generateMarkdown(discoveryResult)
+        + this._renderRequirementContract(intent, metadata, requirementList, discoveryResult);
       const requirementConfirmation = await this._confirmRequirementList(markdown, requirementList);
       result.confirmations.requirementList = requirementConfirmation;
       
@@ -882,6 +909,29 @@ class HyperrealitySystem {
 
         // 生成 PRD
         prdResult = await this.prdGenerator.generate(discoveryResult);
+        /**
+         * 【2026-09-25-fix 画幅口径】PRD 的画幅由「平台名」推断（`agent-1` 只认中文
+         * '抖音'/'小红书'），Brief 传的是 `douyin` → 判成 16:9，与需求 9:16 自相矛盾
+         * （真机 VID-AUDIT-M10 G4 打回原话：「门内自相矛盾（9:16 需求 vs 16:9 交付）」）。
+         * Brief 是权威源：显式回写画幅与时长，并标注来源。
+         */
+        const briefAspect = metadata?.brief?.aspectRatio || metadata?.brief?.aspect_ratio;
+        const briefDuration = Number(metadata?.brief?.duration) > 0 ? Number(metadata.brief.duration) : null;
+        if (prdResult && (briefAspect || briefDuration)) {
+          prdResult.productPositioning = prdResult.productPositioning || {};
+          if (briefAspect && prdResult.productPositioning.aspectRatio !== briefAspect) {
+            console.log(`   📐 PRD 画幅口径统一：${prdResult.productPositioning.aspectRatio || '默认'} → ${briefAspect}（Brief 为权威源）`);
+            prdResult.productPositioning.aspectRatio = briefAspect;
+            prdResult._briefAspectOverride = `Brief 画幅 ${briefAspect}`;
+          }
+          if (briefDuration) {
+            const delivery = prdResult.deliveryStandards = prdResult.deliveryStandards || {};
+            if (Number(delivery.durationSeconds ?? delivery.duration_sec ?? delivery.totalDuration) !== briefDuration) {
+              delivery.durationSeconds = briefDuration;
+              prdResult._briefDurationOverride = `Brief 时长 ${briefDuration}s`;
+            }
+          }
+        }
         result.stages.prdGeneration = {
           data: prdResult,
           timing: Date.now() - prdStart,
@@ -2823,6 +2873,272 @@ class HyperrealitySystem {
    * ⭐ v2.2.1-fix: 审核前片头专属5字段优化（此前仅调用未定义，导致标题动画字段停留占位符）
    * 幂等：5 字段齐全且非占位符则跳过
    */
+  /**
+   * 拼装创意主题生成输入：意图原文 + 营销 Brief + 情报摘要卡（theme_card）。
+   *
+   * 只在确有 Brief / 情报时注入，避免污染纯故事片的创作（叙事路由不带这两样）。
+   * 注入内容全部来自真实登记（Brief 字段与档案摘要卡），不新增任何未经验证的事实。
+   */
+  _buildThemeInput(intent, metadata = {}) {
+    const brief = (metadata && typeof metadata.brief === 'object') ? metadata.brief : null;
+    const cards = metadata?._dataDossier?.cards || null;
+    const themeCard = cards?.theme_card || null;
+    const briefCard = cards?.brief_card || null;
+    const lines = [];
+
+    const product = brief?.product || briefCard?.product;
+    if (product) lines.push(`商品：${product}`);
+    if (brief?.category || briefCard?.category) lines.push(`品类：${brief?.category || briefCard?.category}`);
+    const sellingPoints = Array.isArray(brief?.sellingPoints) && brief.sellingPoints.length > 0
+      ? brief.sellingPoints
+      : (Array.isArray(briefCard?.sellingPoints) ? briefCard.sellingPoints : []);
+    if (sellingPoints.length > 0) lines.push(`核心卖点：${sellingPoints.slice(0, 3).join('、')}`);
+    const audience = brief?.audience || briefCard?.audience;
+    if (audience) lines.push(`目标人群：${audience}`);
+    if (brief?.platform) lines.push(`投放平台：${brief.platform}`);
+    if (brief?.goal) {
+      const goalText = { seeding: '种草', traffic: '引流', conversion: '转化' }[brief.goal] || brief.goal;
+      lines.push(`转化目标：${goalText}`);
+    }
+    if (Array.isArray(themeCard?.differentiation_space) && themeCard.differentiation_space.length > 0) {
+      lines.push(`差异化空位（竞品没讲的）：${themeCard.differentiation_space.slice(0, 3).join('、')}`);
+    }
+    if (Array.isArray(themeCard?.avoid_pits) && themeCard.avoid_pits.length > 0) {
+      const pits = themeCard.avoid_pits
+        .map((p) => (typeof p === 'string' ? p : (p && p.aspect) || ''))
+        .filter(Boolean);
+      if (pits.length > 0) lines.push(`用户真实吐槽（创意必须回避或正面回应）：${pits.slice(0, 3).join('、')}`);
+    }
+    if (Array.isArray(themeCard?.verbatim_spark) && themeCard.verbatim_spark.length > 0) {
+      lines.push(`用户原话灵感：${themeCard.verbatim_spark.slice(0, 2).join(' / ')}`);
+    }
+    if (Array.isArray(themeCard?.top_scenarios) && themeCard.top_scenarios.length > 0) {
+      const scenes = themeCard.top_scenarios
+        .map((s) => [s.persona, s.scene, s.moment].filter(Boolean).join('·'))
+        .filter(Boolean);
+      if (scenes.length > 0) lines.push(`高频使用场景：${scenes.slice(0, 3).join('、')}`);
+    }
+    if (lines.length === 0) return intent;
+    lines.push('类型要求：这是商品/品牌推广类社媒短片（电商种草），不是旅游/纪录片/剧情片；请按「商业广告」类型组织创意。');
+    lines.push('情绪基调要求：从【温暖治愈 / 轻快明朗 / 冷酷精密 / 诗意哀伤】中选择与品类相符的一项；'
+      + '禁止使用 史诗悲壮 / 神秘敬畏 / 心理恐惧 / 肃杀诗意 等与消费决策语境冲突的宏大或惊悚基调。');
+    return `${intent}\n[营销 Brief 与商品情报]\n${lines.join('\n')}`;
+  }
+
+  /**
+   * 渲染「需求契约（四类）」确认区：角色 / 场景 / 道具 / 动作。
+   *
+   * 数据来源两路互补：
+   *   ① `RequirementAlignmentGate._extractContract`（渲染前对齐闸机的同一套提取口径）；
+   *   ② `requirementList`（角色表 + 场景结构），保证契约与下游剧本/镜头参数同源。
+   * 提取不到时显式写「未提取到」——让门看到真实缺口，而不是让字段悄悄消失。
+   */
+  _renderRequirementContract(intent, metadata = {}, requirementList = {}, discoveryResult = {}) {
+    /**
+     * 契约来源优先级（真机 VID-AUDIT-M4 教训）：
+     * 对齐闸机的 `_extractContract` 是**故事片口径**的意图关键词启发式，喂营销 Brief 会抽出
+     * 「场景：给米家 / 道具：给米家空气」这类噪声；直接展示反而被判「契约缺失」。
+     * 因此改为：结构化资料（角色表/场景结构/商品）优先，闸机结果只作补充，且过滤明显噪声。
+     */
+    const rawIntent = String(intent || '');
+    // 注意：sceneStructure 必须在下面所有使用点之前初始化（真机 VID-AUDIT-M9 曾因 TDZ 崩在 G3 门前）
+    const sceneStructure = discoveryResult?.sceneStructure || {};
+    const noisy = (item) => {
+      const text = String(item || '').trim();
+      if (text.length <= 1) return true;
+      // 「给米家」「给米家空气」这类只是原文前缀的碎片，不是契约元素
+      if (rawIntent.startsWith(text) && text.length <= 8) return true;
+      return /^(给|把|做|拍|来|要|的|和|与)/.test(text) && text.length <= 8;
+    };
+    let heuristic = { characters: [], scenes: [], actions: [], props: [] };
+    try {
+      if (this.requirementAlignmentGate && typeof this.requirementAlignmentGate._extractContract === 'function') {
+        heuristic = this.requirementAlignmentGate._extractContract(intent, metadata) || heuristic;
+      }
+    } catch (e) {
+      console.warn(`   ⚠️ 契约提取异常（按结构化资料渲染）: ${e.message}`);
+    }
+
+    // ① 角色：结构化角色表优先（真机 M6/M8：角色表为空但场景里明确有"妈妈/宝宝"，
+    //    `_convertDiscoveryToRequirementList` 没搬角色 → 契约区写成"无真人角色"，
+    //    与场景自相矛盾、被监制判"未显式对齐"。这里补一层从场景文本抽角色的兜底。）
+    const characters = (requirementList.characters || []).map(c => {
+      const name = typeof c === 'string' ? c : (c.name || '');
+      const role = c && c.role ? `（${c.role === 'protagonist' ? '主角' : c.role === 'supporting' ? '配角' : c.role}）` : '';
+      const desc = c && c.description ? `：${c.description}` : '';
+      return `${name}${role}${desc}`;
+    }).filter(Boolean);
+    if (characters.length === 0) {
+      const sceneText = [
+        sceneStructure.opening?.purpose,
+        ...(sceneStructure.scenes || []).map(s => s.purpose),
+        sceneStructure.ending?.purpose,
+        JSON.stringify(sceneStructure.opening?.keyElements || []),
+        JSON.stringify((sceneStructure.scenes || []).flatMap(s => s.keyElements || [])),
+        JSON.stringify(sceneStructure.ending?.keyElements || []),
+      ].filter(Boolean).join(' ');
+      const roleLexicon = ['妈妈', '爸爸', '宝宝', '婴儿', '孩子', '女儿', '儿子', '老人', '爷爷', '奶奶', '外婆', '男主', '女主', '妻子', '丈夫', '店员', '顾客', '学生', '白领', '女生', '男生', '快递员', '维修师傅', '宠物', '猫', '狗'];
+      for (const role of roleLexicon) {
+        if (sceneText.includes(role)) characters.push(`${role}（出镜角色，须登记肖像授权或使用授权模特）`);
+      }
+    }
+    const characterLine = characters.length > 0
+      ? characters
+      : ['无真人角色（商品/场景为主体；如需真人出镜须使用授权模特并登记肖像授权）'];
+
+    // ② 场景：场景结构（开场/主体/结尾）为权威口径
+    const scenes = [];
+    const pushScene = (label, node) => {
+      if (!node) return;
+      const purpose = String(node.purpose || node.description || '').replace(/\s+/g, ' ').slice(0, 60);
+      scenes.push(`${label}（${node.duration || 0}s）${purpose ? `：${purpose}` : ''}`);
+    };
+    pushScene('开场', sceneStructure.opening);
+    for (const [i, scene] of (sceneStructure.scenes || []).entries()) {
+      pushScene(scene.name || `场景${i + 1}`, scene);
+    }
+    pushScene('结尾', sceneStructure.ending);
+    const sceneLine = scenes.length > 0
+      ? scenes
+      : (requirementList.structure?.scenes || []).map(s => `${s.name || s.id || '场景'}（${s.duration || 0}s）`);
+
+    // ③ 道具：商品本体（Brief/情报）+ 场景关键元素里的实物名词
+    const keyElements = [];
+    const collectElements = (node) => {
+      if (!node) return;
+      const elements = node.keyElements || node.key_elements || [];
+      for (const el of elements) keyElements.push(String(el));
+    };
+    collectElements(sceneStructure.opening);
+    for (const scene of sceneStructure.scenes || []) collectElements(scene);
+    collectElements(sceneStructure.ending);
+    const propPattern = /(净化器|空气净化|检测仪|分贝仪|滤网|柜|纸箱|床|枕头|被|夜灯|台灯|地板|窗|书|水杯|A4纸|logo|指示灯|屏幕|遥控器|插座|充电线)/;
+    const propsRaw = [
+      ...(metadata?.brief?.product ? [String(metadata.brief.product)] : []),
+      ...keyElements.map(el => (el.match(propPattern) || [null])[0]).filter(Boolean),
+    ];
+    const props = [...new Set(propsRaw)];
+
+    // ④ 动作：场景目的里的可拍行为（叙事主语的行为动词）
+    const actionPattern = /(按下|按动|推开|打开|关闭|走到|躺回|躺下|蹲下|贴近|平贴|深吸|深呼吸|咳嗽|咳醒|举起|拿起|看向|抚摸|擦拭|调低|调高|贴上|撕开|对比|翻书|关灯|入睡|翻身|起身|停顿|注视|贴在)/g;
+    const actions = [];
+    for (const text of [sceneStructure.opening?.purpose, ...(sceneStructure.scenes || []).map(s => s.purpose), sceneStructure.ending?.purpose]
+      .filter(Boolean)) {
+      for (const match of String(text).matchAll(actionPattern)) {
+        if (!actions.includes(match[1])) actions.push(match[1]);
+      }
+    }
+    // 闸机结果只作补充，且先过滤噪声
+    for (const item of (heuristic.actions || [])) {
+      if (!noisy(item) && !actions.includes(item)) actions.push(item);
+    }
+    for (const item of (heuristic.props || [])) {
+      if (!noisy(item) && !props.includes(item) && item.length >= 2) props.push(item);
+    }
+
+    const line = (label, items, note = '') => `- **${label}**（${items.length}）：${items.length > 0 ? items.join('、') : '无'}${note}`;
+
+    // 确认门要核对的"受众结论/风险结论"（此前只散落在第二节正文里，门容易判"缺失"）
+    const profile = discoveryResult?.audienceProfile || {};
+    const primary = profile.primaryAudience || {};
+    const audienceText = [
+      primary.ageRange, primary.gender === 'female' ? '女性为主' : primary.gender === 'male' ? '男性为主' : '不限性别',
+      ...(primary.interestTags || []).slice(0, 4),
+    ].filter(Boolean).join(' · ');
+    const risk = discoveryResult?.riskAssessment || {};
+    const risks = Array.isArray(risk.technicalRisks) ? risk.technicalRisks : [];
+    const riskText = risks.length > 0
+      ? `${risks.length} 项技术风险（${risks.slice(0, 2).map(r => `${r.level === 'high' ? '高' : r.level === 'medium' ? '中' : '低'}：${String(r.risk || '').slice(0, 40)}`).join('；')}）；缓解：${(risk.mitigationSuggestions || [])[0]?.slice(0, 60) || '见 2.3'}`
+      : '';
+
+    return `
+
+---
+
+## 四、需求契约（不可协商元素 · 剧本/镜头卡/提示词三阶段都要逐项保留）
+
+${line('角色', characterLine)}
+${line('场景', sceneLine)}
+${line('道具', props, '（道具外观一律以实拍/官方素材为准，禁止生成虚构外观）')}
+${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
+
+## 五、结论摘要（供确认门核对）
+
+- **受众结论**：${audienceText || '见 2.1'}
+- **风险结论**：${riskText || '见 2.3'}
+- **口径**：时长 ${metadata?.brief?.duration || '未指定'}s / 画幅 ${metadata?.brief?.aspectRatio || metadata?.brief?.aspect_ratio || '未指定'} / 平台 ${metadata?.brief?.platform || '未指定'}
+
+> 契约纪律：以上四类元素在剧本、镜头卡、提示词三个阶段都必须逐项保留；缺失即由对齐闸机在下游拦截。
+`;
+  }
+
+  /**
+   * 把 Brief 的时长/画幅/平台口径注入创意主题结果（Brief 为权威源）。
+   *
+   * 纪律：Brief 是时长/画幅/平台的**权威源**（与「PRD 是时长唯一权威源」同口径），
+   * 与生成器推导值不一致时以 Brief 为准，并在结果上标注口径来源，供 G2 门核对。
+   */
+  _applyBriefProfile(themeResult, metadata = {}) {
+    const brief = (metadata && typeof metadata.brief === 'object') ? metadata.brief : null;
+    const tasks = Array.isArray(themeResult?.tasks) ? themeResult.tasks : [];
+    if (tasks.length === 0) return;
+    const duration = Number(brief?.duration) > 0 ? Number(brief.duration) : null;
+    const aspect = typeof brief?.aspectRatio === 'string' && brief.aspectRatio.trim()
+      ? brief.aspectRatio.trim()
+      : (typeof brief?.aspect_ratio === 'string' && brief.aspect_ratio.trim() ? brief.aspect_ratio.trim() : null);
+    const platform = typeof brief?.platform === 'string' && brief.platform.trim() ? brief.platform.trim() : null;
+    for (const task of tasks) {
+      if (duration) {
+        const before = Number(task.duration_sec) || null;
+        if (before !== duration) {
+          task.duration_sec = duration;
+          task.brief_duration_source = `Brief 覆盖（生成器推导 ${before ?? '无'}s → ${duration}s）`;
+          console.log(`   📐 时长口径统一：${before ?? '无'}s → ${duration}s（Brief 为权威源）`);
+        }
+      }
+      if (aspect) task.aspect_ratio = aspect;
+      /**
+       * 平台口径中英统一（真机 VID-AUDIT-M10）：
+       * 下游（PRD 画幅推断、发布蓝图）按中文平台名匹配（'抖音'/'小红书'），
+       * Brief 里给的是 `douyin` → 匹配不上 → 画幅退回 16:9。这里归一为中文标签，
+       * 同时保留原始值在 `platform_id` 里，避免丢信息。
+       */
+      const PLATFORM_LABEL = {
+        douyin: '抖音', tiktok: 'TikTok', xiaohongshu: '小红书', bilibili: '哔哩哔哩',
+        shipinhao: '视频号', wechat_channels: '视频号', youtube: 'YouTube', instagram: 'Instagram',
+      };
+      if (platform) {
+        task.platform = PLATFORM_LABEL[String(platform).toLowerCase()] || platform;
+        task.platform_id = platform;
+      }
+
+      /**
+       * 【2026-09-25-fix 基调护栏】营销片禁用"宏大/惊悚"基调。
+       *
+       * 真机 VID-AUDIT-M3/M5 连续两轮把「静音除醛种草片」的基调判成「史诗悲壮」，
+       * G2 监制两轮都以"基调与内容严重冲突"打回（内容本身没问题）。
+       * 这里按品类落一个可用基调（只替换冲突值，并在结果上标注覆盖原因，可审计）。
+       */
+      if (brief?.product) {
+        const CONFLICT_TONES = ['史诗悲壮', '神秘敬畏', '心理恐惧', '肃杀诗意', '恐怖悬疑'];
+        if (CONFLICT_TONES.includes(String(task.tone || ''))) {
+          const category = String(brief?.category || '');
+          const before = task.tone;
+          task.tone = /3C|数码|电子|电脑|手机|耳机|相机|路由器|硬件/.test(category)
+            ? '冷酷精密'
+            : /家居|家电|空气净化|厨|清洁|床|寝|香|母婴|宠物/.test(category)
+              ? '温暖治愈'
+              : '轻快明朗';
+          task.tone_override_reason = `营销片基调护栏：${before} → ${task.tone}（品类「${category || '未标注'}」与消费决策语境要求）`;
+          console.log(`   🎚️ 基调口径护栏：${before} → ${task.tone}`);
+        }
+      }
+    }
+    if (duration || aspect || platform) {
+      themeResult._briefProfile = { duration, aspectRatio: aspect, platform };
+    }
+  }
+
   async _optimizeOpeningTitle(productionResult, result, metadata) {
     const shots = productionResult?.shots || [];
     const isOpening = (s) => s && (s.sceneType === 'opening' || /^(S?C?00($|-|_)|OP|opening|intro)/i.test(String(s.shotId || s.shot_id || '')));

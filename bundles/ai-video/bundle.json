@@ -617,7 +617,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "35855b7ef985ef7b0e087a4df146eb20e8702f005d2b08bf35b82f186d2bc07f",
+    "digest": "aba1b8bedb41a11af167f33131c19e6c90eccce6b2f4bb22a223d1a2420b5d48",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
       "connectors/bgm-bridge/core.mjs": "44c8b8b615fcbb39e4ac0be710c1c211b01f64a008c009cd7f11f146ff03518d",
@@ -992,7 +992,7 @@
       "library/templates/scene-card-template.md": "1db045140ae41be4b3f32e1c08967b74d0fb2a7101a567e0c8054b2bd47ac8b1",
       "library/templates/shot-card-v4-template.md": "46cd261292b95725f59576069131b9a772ef8b5c7a2cdf55bbbaf2117b0bad87",
       "library/typography-recipes/recipes.json": "08009f8e2b1884c2d7c04b65e724c08ab45cbdd9c2576a135966065690953601",
-      "model-policy.yml": "15e2069bf71388b0c23f910fd2f1b16d37dd44a8e47b9a1a5709b6e2056325e8",
+      "model-policy.yml": "280be41a77f9a67e548aed1a3f1f4b358815ddb712707e61898188ddaeb9d40c",
       "pipelines/account-ops.yml": "455383c019ac1d0523db48c6088c7bfce4aa9e8e1eef8d7d71399aa69e107264",
       "pipelines/ads-creative-factory.yml": "90e475e5482ecf15541aa2d6eca5499aa1c9bea8d9928e2122975ae77df869c5",
       "pipelines/marketing-film.yml": "4ba95c0e83538de605126072ce26a462211e4cea3a82c5fcaee8227a71b485b1",

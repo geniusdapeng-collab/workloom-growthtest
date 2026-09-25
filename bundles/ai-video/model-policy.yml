@@ -5,6 +5,9 @@ version: "v3.0"
 scenes:
   # —— 高频轻量 ——
   intent-classify:   { tier: L1, fallback: rule-template }
+  # 视频管线分流（T-2026-0925-0002）：只在规则判不准时调用；必须能降级到规则+澄清，
+  # 不允许因为模型不可用就把需求默默按某条管线立项（错管线 = 情报/渲染成本白花）。
+  pipeline-route:    { tier: L1, fallback: rule-template }
   cs-answer:         { tier: L1, escalateOn: [low-confidence, thumbs-down] }
   comment-classify:  { tier: L1, window: off-peak-only }                # 评论五分类（30min 批量巡检）
   nl-translate:      { tier: L1, fallback: rule-template }

@@ -41,6 +41,8 @@ import { mediaUrl } from "./gen/ingest.js";
 export type { PollReport } from "./render-poller.js";
 import { dealRouter } from "./deal.js";
 import { getRun, startRun, startVideoProjectRun, StudioWorkerError } from "./studio-worker.js";
+import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
+import { routedLlmCall } from "../service/llm.js";
 import {
   DeliveryError, buildVariantPreferenceContent, deliveryJobStatus, deliveryPreferenceConfidence,
   deliveryPreferenceMemoryId, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
@@ -48,6 +50,14 @@ import {
 } from "./delivery.js";
 
 interface Scope { tenantId: string; workspaceId: string }
+
+/**
+ * 分流用 LLM 调用面（T-2026-0925-0002）：只在规则判不准时被调用，
+ * 场景走 `pipeline-route`（L1 轻量档 + 规则兜底；模型不可用即纯规则 → 不确定则澄清）。
+ */
+function routeLlmCall(scope: Scope): ((prompt: string) => Promise<string>) | undefined {
+  return routedLlmCall({ gateway: getGatewayPool(), scope, scene: "pipeline-route" });
+}
 
 /** pg.Pool 结构类型（server 不直接依赖 @types/pg，从 db 包入口推导） */
 export type AppPool = ReturnType<typeof getAppPool>;
@@ -390,34 +400,100 @@ const deliveryRouter = router({
 /* ================= studio：预生产流水线 ================= */
 
 const studioRouter = router({
-  /** 启动预生产（异步；projectId 缺省按 VID-nnn 口径生成；LLM 未配置明确拒绝） */
+  /**
+   * 启动预生产（异步；projectId 缺省按 VID-nnn 口径生成；LLM 未配置明确拒绝）。
+   *
+   * T-2026-0925-0002：新增**自动化分流**。`route="auto"`（默认）时按意图判定走营销片
+   * 还是叙事片；判不准返回 `{ kind: "clarify" }`（把选择交回用户，不立项、不花钱）。
+   * `route="marketing"|"narrative"` 表示调用方已确认（例如用户在澄清后重提）。
+   */
   start: writeProcedure
     .input(z.object({
       projectId: z.string().min(1).optional(),
       intent: z.string().min(1).max(2000),
       metadata: z.record(z.string(), z.unknown()).optional(),
-      isMarketing: z.boolean().default(false),
+      /** 兼容旧字段：显式指定营销/叙事；与 route 同时给出时以 route 为准 */
+      isMarketing: z.boolean().optional(),
+      /** 管线选择：auto=按意图自动分流（默认） */
+      route: z.enum(["auto", "marketing", "narrative"]).default("auto"),
     }))
     .mutation(async ({ ctx, input }) => {
       const scope = scopeOf(ctx.identity);
+      const explicitRoute = input.route !== "auto"
+        ? input.route
+        : input.isMarketing === undefined
+          ? undefined
+          : input.isMarketing
+            ? "marketing"
+            : "narrative";
+
       if (input.projectId) {
-        // 指定 projectId 的补跑：项目行已存在，仅重启管线
+        // 指定 projectId 的补跑：项目行已存在，仅重启管线（kind 以项目行为准，避免改写立项语义）
+        const rows = await scopedQuery<{ kind: string | null }>(
+          getAppPool(), scope,
+          `SELECT kind FROM video_projects WHERE id=$1 AND workspace_id=$2`,
+          [input.projectId, scope.workspaceId],
+        );
+        const projectKind = rows[0]?.kind === "marketing" ? "marketing" : "narrative";
+        const decision = await routeVideoPipeline({
+          text: input.intent,
+          metadata: input.metadata,
+          explicit: explicitRoute ?? projectKind,
+        }, { llmCall: routeLlmCall(scope) });
+        if (decision.route === "clarify") {
+          return {
+            kind: "clarify" as const,
+            question: decision.clarify?.question ?? "补跑前请确认商品信息：商品名（必填）/品牌/品类。",
+            missing: decision.clarify?.missing ?? ["product"],
+            signals: decision.signals,
+            via: decision.via,
+          };
+        }
         const runId = startRun(scope, {
           projectId: input.projectId,
-          intent: input.intent,
-          metadata: input.metadata,
-          isMarketing: input.isMarketing,
+          intent: buildPipelineIntent(input.intent, {
+            durationSec: 30,
+            aspectRatio: decision.route === "marketing" ? "9:16" : undefined,
+          }),
+          metadata: applyRouteToMetadata(input.metadata, decision),
+          isMarketing: decision.route === "marketing",
         });
-        return { runId, projectId: input.projectId };
+        return { kind: "routed" as const, runId, projectId: input.projectId, pipeline: decision.route };
+      }
+
+      const decision = await routeVideoPipeline({
+        text: input.intent,
+        metadata: input.metadata,
+        explicit: explicitRoute,
+      }, { llmCall: routeLlmCall(scope) });
+      if (decision.route === "clarify") {
+        return {
+          kind: "clarify" as const,
+          question: decision.clarify?.question ?? "这条片子走营销片还是叙事片？",
+          missing: decision.clarify?.missing ?? ["route"],
+          signals: decision.signals,
+          via: decision.via,
+        };
       }
       try {
         // 与「右栏派活识别出视频目标」共用同一条标准管线入口（studio-worker#startVideoProjectRun）
-        return await startVideoProjectRun(scope, {
-          intent: input.intent,
-          metadata: input.metadata,
-          isMarketing: input.isMarketing,
+        const started = await startVideoProjectRun(scope, {
+          intent: buildPipelineIntent(input.intent, {
+            durationSec: 30,
+            aspectRatio: decision.route === "marketing" ? "9:16" : undefined,
+          }),
+          metadata: applyRouteToMetadata(input.metadata, decision),
+          isMarketing: decision.route === "marketing",
           by: { id: ctx.identity.memberNo, type: "human" },
         });
+        return {
+          kind: "routed" as const,
+          runId: started.runId,
+          projectId: started.projectId,
+          pipeline: decision.route,
+          product: decision.product?.name ?? null,
+          via: decision.via,
+        };
       } catch (err) {
         if (err instanceof StudioWorkerError && err.code === "LLM_MISSING") {
           throw new TRPCError({ code: "PRECONDITION_FAILED", message: err.message });
@@ -571,10 +647,16 @@ const renderRouter = router({
       aspectRatio: z.string().max(16).optional(),
       resolution: z.string().max(16).optional(),
       generateAudio: z.boolean().optional(),
-      /** 图生视频首帧（URL；后续接资产库时由 assetId 解析） */
-      firstFrameUrl: z.string().url().optional(),
-      /** 参考图（定妆照等，最多 4 张） */
-      referenceImageUrls: z.array(z.string().url()).max(4).optional(),
+      /**
+       * 图生视频首帧（URL）。
+       * 真人肖像不接受直传图片（平台审核拦截 `InputImageSensitiveContentDetected.PrivacyInformation`），
+       * 必须走方舟「已授权真人素材」：`asset://asset-2026...`（见《录入真人形象素材》）。
+       */
+      firstFrameUrl: z.union([z.string().url(), z.string().regex(/^asset:\/\/[A-Za-z0-9._-]{6,}$/, "asset://<asset ID>")]).optional(),
+      /** 参考图（定妆照等，最多 4 张；支持 https URL 或方舟 asset:// 授权素材） */
+      referenceImageUrls: z.array(
+        z.union([z.string().url(), z.string().regex(/^asset:\/\/[A-Za-z0-9._-]{6,}$/, "asset://<asset ID>")])
+      ).max(4).optional(),
       /** 视频参考（官方 SDK 的 video_url content；最多 2 条） */
       referenceVideoUrls: z.array(z.string().url()).max(2).optional(),
       /** 音频参考（音频驱动口播；最多 1 条） */
