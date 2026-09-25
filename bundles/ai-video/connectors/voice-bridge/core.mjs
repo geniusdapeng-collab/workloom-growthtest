@@ -450,16 +450,40 @@ export async function synthesize(config, {
 }
 
 /** 参考音频转写（克隆需要的 ref_text）；引擎不支持转写时如实返回 supported=false。 */
-export async function transcribe(config, { input, language = null, fetchImpl = fetch } = {}) {
+export async function transcribe(config, { input, language = null, fetchImpl = fetch, bins = resolveBinaries() } = {}) {
   if (!input) throw new VoiceError("缺少待转写音频", "bad_request");
   if (!config.asr) {
     return { supported: false, text: null, note: "当前引擎未声明 ASR 能力（WORKLOOM_VOICE_ENGINE=mock）" };
   }
-  const bytes = await fsp.readFile(input);
+  /**
+   * 转写前统一转成 **16kHz 单声道 WAV**（2026-09-25 真机修复）：
+   * 事故现象——对 mp4/m4a 直接调 /v1/audio/transcriptions 会 **HTTP 500**，
+   * 因为引擎（mlx-audio server，launchd 托管）在解码 AAC/M4A 时要依赖**它自己 PATH 里的 ffmpeg**，
+   * 而 launchd 进程没有登录 shell 的 PATH → 引擎报 `ffmpeg not found!`。
+   * 早先的实现还把 mp4 的字节按 `contentType: audio/wav` 硬标成 wav（字段与实际不符）。
+   * 现在由桥在本地用**工位自己的 ffmpeg** 转好 WAV 再上传：既不依赖引擎的 PATH，也不再谎报类型。
+   */
+  const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "workloom-asr-"));
+  let audio = null;
+  try {
+    const wav = path.join(workDir, "asr-input.wav");
+    await runBin(bins.ffmpeg, [
+      "-hide_banner", "-loglevel", "error", "-y", "-i", input,
+      "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav,
+    ], { label: "ffmpeg(asr)" });
+    audio = { bytes: await fsp.readFile(wav), name: "asr-input.wav" };
+  } catch (error) {
+    await fsp.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
+    throw new VoiceError(
+      `转写预处理失败（转 16kHz 单声道 WAV）：${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
+      "engine_failed",
+      true,
+    );
+  }
   const effectiveLanguage = language ?? config.asrLanguage ?? null;
   const multipart = buildMultipart(
     { model: config.asrModel, response_format: "json", ...(effectiveLanguage ? { language: effectiveLanguage } : {}) },
-    { name: "file", filename: path.basename(input), contentType: "audio/wav", data: bytes },
+    { name: "file", filename: audio.name, contentType: "audio/wav", data: audio.bytes },
   );
   const response = await engineHttp(config, "/v1/audio/transcriptions", {
     method: "POST",
@@ -469,6 +493,7 @@ export async function transcribe(config, { input, language = null, fetchImpl = f
     timeoutMs: Math.min(config.timeoutMs, 600_000),
     label: "转写引擎",
   });
+  await fsp.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
   const text = response.body.toString("utf8");
   if (response.status < 200 || response.status >= 300) {
     throw new VoiceError(`转写失败（HTTP ${response.status}）：${text.slice(0, 200)}`, "engine_failed", response.status >= 500);
@@ -1236,6 +1261,25 @@ export async function dub(params = {}, { bins = resolveBinaries(), env = process
     await fsp.rename(fixedVideo, out);
     loudness = await measureLoudness(out, { bins, targetLufs, truePeak });
   }
+  /**
+   * 真峰值闭环（2026-09-25 真机）：单遍 loudnorm 只保证响度目标，**不管真峰值**。
+   * 事故：SC-04 补旁白后 `verify` 直接判 `clipping（-0.69 dBTP）`——旁白与配乐 / 原声叠加时
+   * 峰值可以比目标高 1dB 以上。音频超峰是交付硬伤（平台会削波），所以这里按实测差值再压一次：
+   * 视频轨仍 copy，只重编一次音频；留 0.2dB 余量，避免 AAC 编码后再次越线。
+   */
+  let peakFixDb = 0;
+  if (loudness.truePeakDbtp !== null && loudness.truePeakDbtp > truePeak) {
+    peakFixDb = round(truePeak - 0.2 - loudness.truePeakDbtp, 2);
+    const fixedPeakVideo = `${out}.peak.mp4`;
+    await runBin(bins.ffmpeg, [
+      "-hide_banner", "-loglevel", "error", "-i", out,
+      "-map", "0:v:0", "-map", "0:a:0",
+      "-c:v", "copy", "-af", `volume=${peakFixDb}dB`, "-c:a", "aac", "-b:a", "192k",
+      "-movflags", "+faststart", "-y", fixedPeakVideo,
+    ], { label: "ffmpeg(dub-peak-fix)", timeoutMs: 900_000 });
+    await fsp.rename(fixedPeakVideo, out);
+    loudness = await measureLoudness(out, { bins, targetLufs, truePeak });
+  }
   const driftSec = round(outMedia.duration - media.duration, 3);
   const syncOk = Math.abs(driftSec) <= Number(params.max_drift_sec ?? 0.25);
   if (params.verify !== false && !syncOk) {
@@ -1257,6 +1301,7 @@ export async function dub(params = {}, { bins = resolveBinaries(), env = process
       lufs: loudness.integratedLufs,
       true_peak_dbtp: loudness.truePeakDbtp,
       loudness_fix_db: loudnessFixDb,
+      peak_fix_db: peakFixDb,
       elapsed_ms: elapsedMs,
       rtf: round(elapsedMs / 1000 / Math.max(outMedia.duration, 0.001), 3),
       discarded_original: policy === "music-only" || policy === "replace-bed",

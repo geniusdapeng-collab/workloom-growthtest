@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildServerGateRecord, SERVER_GATE_STEP_KEY, withGateLedger } from "./gate-ledger-bridge.js";
+import { buildServerGateRecord, SERVER_GATE_STEP_KEY, UNMAPPED_PIPELINE_GATES, withGateLedger } from "./gate-ledger-bridge.js";
 
 describe("平台侧门账本桥（apps/server → step_key 记账）", () => {
   it("G5/G6/G7 映射到管线 step_key；未映射的门返回 null（不猜）", () => {
@@ -7,6 +7,8 @@ describe("平台侧门账本桥（apps/server → step_key 记账）", () => {
     expect(SERVER_GATE_STEP_KEY.G6_PROMPT).toBe("g6-prompt-confirm");
     expect(SERVER_GATE_STEP_KEY.G7_FINAL).toBe("g7-preproduction");
     expect(buildServerGateRecord({ gate: "G2_THEME", vendorType: "theme", projectId: "VID-1", runId: "run-1", approved: true })).toBeNull();
+    /** 素材门（G-MAT1）平台侧没有对应 vendor 门：如实登记为未映射，不猜映射 */
+    expect(UNMAPPED_PIPELINE_GATES).toContain("material-generate");
   });
 
   it("监制打回 → 门事件未通过，理由与分数随裁决落账", () => {

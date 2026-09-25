@@ -10,6 +10,7 @@ describe("门账本（G5/G6/G7/G8 的 step_key 运行时记账）", () => {
     expect(gateForStepKey("g6-prompt-confirm")).toBe("G6");
     expect(gateForStepKey("g7-preproduction")).toBe("G7");
     expect(gateForStepKey("g8-render-submit")).toBe("G8");
+    expect(gateForStepKey("material-generate")).toBe("G-MAT1");
     expect(() => gateForStepKey("g9-whatever")).toThrow(/未知的门 step_key/);
   });
 

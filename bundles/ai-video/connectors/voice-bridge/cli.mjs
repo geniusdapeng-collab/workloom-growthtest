@@ -145,6 +145,13 @@ async function main() {
         min_match_ratio: number(flags["min-match"]),
         lufs: number(flags.lufs),
         true_peak: number(flags["true-peak"]),
+        /**
+         * `--no-strict`（2026-09-25）：只做**人声核查**的调用方（如"每句台词都要有人声"的逐镜探测）
+         * 要的是 ASR 与活动度**读数**，不应该因为真峰值/响度这类交付项不达标就整条命令失败——
+         * 那会让"到底有没有人声"这件事变成不可读（真机：SC-04 因 -0.69dBTP 让核查返回空值）。
+         * 交付项本身由配音/配乐/母版环节的复核与门禁把关，不在这里混判。
+         */
+        ...(flags["no-strict"] === true ? { strict: false } : {}),
       }));
       return 0;
     case "tools":

@@ -186,6 +186,7 @@ async function main() {
       line(`  字幕字体 ${report.fonts.字幕?.name ?? "-"} · 标题字体 ${report.fonts.标题?.name ?? "-"}`);
       line(`  时间轴回读 ${report.timeline.cues}/${report.timeline.sourceCues} 条（${report.timeline.ok ? "一致" : "不一致"}）`);
       line(`  字幕可现度 Δ${report.presence.delta}（阈值 ${report.presence.threshold}，t=${report.presence.at}s）`);
+      line(`  标点体检 ${report.checks.punctuation_ok ? "ok" : "fail"}（口径：字幕不带标点；数字内的 . : - / 保留）`);
       line(`  版式体检：${report.layoutChecks.map((check) => `${check.kind}=${check.ok ? "ok" : "fail"}`).join(" ")}`);
       line(`  sha256 ${report.output.hash}`);
       return 0;
@@ -286,6 +287,12 @@ async function main() {
         line(`  ${file.path.split("/").pop()} · ${file.role}/${file.lang}/${file.format} · ${file.bytes}B · sha256 ${file.sha256.slice(0, 12)}`);
       }
       line(`  时间轴回读 ${outcome.manifest.timeline.readback.ass ? "ok" : "fail"} · 条数 ${outcome.manifest.timeline.cues} · 母版未被改动 ${outcome.manifest.source ? (outcome.manifest.source.untouched ? "ok" : "fail") : "n/a"}`);
+      /**
+       * 标点体检必须打在**串口输出**里：管线（full-chain-film.mts）按 stdout 判读交付口径，
+       * 只写进 manifest 会让"字幕带标点"这类返工项在日志里看不见。
+       */
+      const punctuationCheck = outcome.checks.find((check) => check.kind === "no_punctuation");
+      line(`  标点体检 ${punctuationCheck?.ok === false ? "fail" : "ok"}（残留 ${punctuationCheck?.detail?.hits ?? 0} 处；口径：字幕不带标点，数字内的 . : - / 保留）`);
       line(`  清单：${outcome.manifestPath}`);
       line(`  结论：母版不含字幕（burnedIn=false）；要用软轨走 softmux，要硬字幕走 burn`);
       return outcome.passed ? 0 : 3;

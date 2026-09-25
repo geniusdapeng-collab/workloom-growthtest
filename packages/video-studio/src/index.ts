@@ -3,6 +3,8 @@
  */
 export * from "./gates.js";
 export * from "./llm-adapter.js";
+export * from "./material-policy.js";
+export * from "./cover-design.js";
 export * from "./portrait-runtime.js";
 export * from "./portrait-binding.js";
 export * from "./character-archive.js";
@@ -20,6 +22,5 @@ export * from "./continuity.js";
 export * from "./gate-ledger.js";
 export * from "./plate-prompt.js";
 export * from "./prompt-language.js";
-export * from "./photo-motion.js";
 export * from "./deliver.js";
 export * from "./revise.js";

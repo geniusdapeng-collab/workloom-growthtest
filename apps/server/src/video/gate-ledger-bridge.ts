@@ -19,6 +19,15 @@ export const SERVER_GATE_STEP_KEY: Partial<Record<GateKey, PipelineGateStepKey>>
   G7_FINAL: "g7-preproduction"
 };
 
+/**
+ * 不映射的门（如实登记，避免"看起来都对齐了"的错觉）：
+ *   · `g8-render-submit`：平台侧属高风险人审，平台只报门处置结果，与 CLI 的分项提交判据不同构；
+ *   · `material-generate`（G-MAT1，2026-09-25 素材用途门）：**平台侧暂无对应 vendor 门**——
+ *     素材镜的"用途声明 + 生成溯源 + 非静态直出"三条判据只在 CLI 管线（`full-chain-film.mts`）里可执行，
+ *     平台管线要走这条路必须先补 vendor 门类型；在那之前**不猜映射**（宁可缺，不要假对齐）。
+ */
+export const UNMAPPED_PIPELINE_GATES: PipelineGateStepKey[] = ["g8-render-submit", "material-generate"];
+
 export interface ServerGateVerdictLike {
   approved?: boolean;
   score?: number | null;

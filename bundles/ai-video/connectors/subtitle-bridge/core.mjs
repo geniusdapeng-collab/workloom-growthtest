@@ -524,6 +524,86 @@ export function findRecipes(query = {}, doc = loadRecipes()) {
 
 /* ============================ SRT / ASS ============================ */
 
+/**
+ * 字幕标点政策（2026-09-25 产品所有者口径）：
+ * **正规字幕不带标点符号**——标点是给朗读用的语音停顿记号，落在屏上是阅读噪声
+ * （小红书/抖音的头部账号基本都不打标点）。这里把"去标点"做成**入站口的一次性规范化**：
+ * 任何形态（sidecar 旁挂 / burn 烧录 / softmux 软轨 / karaoke）都从 `parseSrt` 拿 cues，
+ * 因此在这一处去掉，全链路（含导出 srt/vtt/ass）自动一致，不会出现"画面干净、文件带标点"。
+ *
+ * 三条细则（避免"一刀切"造成新事故）：
+ *   ① 数字里的分隔符不动：`3.5 字/秒`、`9:16`、`2026-09-25`、`1300年` 都保持原样（两侧是数字时跳过）；
+ *   ② 纯西文字幕不强制去标点（英文句子的句读是阅读标准），只有含中日韩文字的字幕才走"全去"口径；
+ *   ③ 去标点后为空的行（例如整行只有"……"）退回原文本——宁可留一个标点，也不许出现空字幕条。
+ */
+export const SUBTITLE_CJK_PUNCTUATION = "，。、；：！？…—～·「」『』《》〈〉【】〔〕（）［］｛｝“”‘’";
+export const SUBTITLE_LATIN_PUNCTUATION = ".,!?;:\"'()[]{}<>~";
+/** 数字之间出现时**不视为标点**的字符（小数、时间、日期、比例、区间） */
+const NUMERIC_INFIX = new Set([".", ":", "-", "/", "、", "，"]);
+const cjkCharRe = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/;
+
+/** 判断文本是否以中日韩文字为主（决定要不要走"全去标点"口径） */
+export function isCjkText(text) {
+  return cjkCharRe.test(String(text ?? ""));
+}
+
+/**
+ * 去标点。`mode`：auto（默认，含中日韩文字才去）/ strip（强制去）/ keep（原样保留）。
+ * 逐字符处理而不是一次性 replace：只有这样才能保住数字内的分隔符（细则①）。
+ */
+export function stripSubtitlePunctuation(text, { mode = "auto" } = {}) {
+  const raw = String(text ?? "");
+  if (!raw.trim() || mode === "keep") return raw;
+  if (mode === "auto" && !isCjkText(raw)) return raw;
+  const drop = new Set([...SUBTITLE_CJK_PUNCTUATION, ...SUBTITLE_LATIN_PUNCTUATION]);
+  const lines = raw.split("\\N").map((line) => {
+    const chars = [...line];
+    const kept = [];
+    for (let index = 0; index < chars.length; index += 1) {
+      const char = chars[index];
+      if (!drop.has(char)) {
+        kept.push(char);
+        continue;
+      }
+      const prev = chars[index - 1] ?? "";
+      const next = chars[index + 1] ?? "";
+      if (NUMERIC_INFIX.has(char) && /\d/.test(prev) && /\d/.test(next)) {
+        kept.push(char);
+        continue;
+      }
+      /** 省略号/破折号这类连续标点一并吃掉，避免留半个「…」或「—」 */
+      while (index + 1 < chars.length && chars[index + 1] === char) index += 1;
+    }
+    return kept.join("").replace(/[ \t]{2,}/g, " ").trim();
+  });
+  const stripped = lines.join("\\N").trim();
+  /** 细则③：整行只剩标点时不许产出空字幕 */
+  return stripped.replace(/\\N/g, "").length > 0 ? stripped : raw;
+}
+
+/**
+ * 找出文本里仍然残留的字幕标点（体检/门禁用：返回命中的字符列表，空数组=干净）。
+ * 与 `stripSubtitlePunctuation` 同一套字符表与数字豁免，避免"清的规则"和"查的规则"两套。
+ */
+export function findSubtitlePunctuation(text) {
+  const raw = String(text ?? "");
+  if (!isCjkText(raw)) return [];
+  const drop = new Set([...SUBTITLE_CJK_PUNCTUATION, ...SUBTITLE_LATIN_PUNCTUATION]);
+  const hits = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const chars = [...line];
+    for (let index = 0; index < chars.length; index += 1) {
+      const char = chars[index];
+      if (!drop.has(char)) continue;
+      const prev = chars[index - 1] ?? "";
+      const next = chars[index + 1] ?? "";
+      if (NUMERIC_INFIX.has(char) && /\d/.test(prev) && /\d/.test(next)) continue;
+      hits.push(char);
+    }
+  }
+  return hits;
+}
+
 const SRT_TIME = /(\d+):(\d+):(\d+)[,.](\d+)/;
 
 export function srtToAssTime(value) {
@@ -555,6 +635,12 @@ export function srtSecondsToAss(seconds) {
  */
 export function parseSrt(text) {
   const content = String(text).replace(/^\uFEFF/, "");
+  /**
+   * 标点规范化（2026-09-25 产品所有者口径）：字幕不带标点。
+   * 放在**解析入口**而不是各出口，保证旁挂 srt/vtt/ass、烧录、软字幕轨四条路完全一致。
+   * 折行已在写入 SRT 前按标点做过（`buildSrt` 的 wrapCue），所以这里去掉标点不会破坏断行。
+   */
+  const punctuationMode = process.env.WORKLOOM_SUBTITLE_PUNCTUATION ?? "auto";
   const blocks = content.split(/\r?\n\s*\r?\n/).map((block) => block.trim()).filter(Boolean);
   const cues = [];
   for (const block of blocks) {
@@ -568,7 +654,7 @@ export function parseSrt(text) {
     const [startRaw, endRaw] = timeLine.split("-->").map((item) => item.trim());
     const start = srtToAssTime(startRaw);
     const end = srtToAssTime(endRaw);
-    const body = lines.slice(timeIndex + 1).join("\\N");
+    const body = stripSubtitlePunctuation(lines.slice(timeIndex + 1).join("\\N"), { mode: punctuationMode });
     if (!body.trim()) throw new SubtitleError(`SRT 块缺少文本：${block.slice(0, 60)}`, "bad_srt", false);
     if (assistToSeconds(end) <= assistToSeconds(start)) {
       throw new SubtitleError(`SRT 时间轴非法（结束不晚于开始）：${timeLine}`, "bad_srt", false);
@@ -1034,7 +1120,11 @@ export async function plan({
   }
   for (const cue of cues) {
     if (!subPick) throw new SubtitleError("提供了字幕条但没有可用的字幕字体", "font_not_found", false);
-    events.push({ layer: 0, start: cue.start, end: cue.end, style: "Sub", name: subPick.id, text: cue.text });
+    events.push({
+      layer: 0, start: cue.start, end: cue.end, style: "Sub", name: subPick.id,
+      /** 出口兜底（2026-09-25）：程序化直接传 cues 的调用（不经 SRT）同样按"字幕不带标点"交付 */
+      text: stripSubtitlePunctuation(cue.text),
+    });
   }
   // 双语：第二语言单独一条样式（字号小 12%、整体下移一行），语义上仍属同一条字幕
   if (secondaryCues.length && subPick) {
@@ -1053,7 +1143,7 @@ export async function plan({
       for (const cue of secondaryCues) {
         events.push({
           layer: 0, start: cue.start, end: cue.end, style: "Sub2",
-          name: `${subPick.id}-${secondaryLabel}`, text: cue.text,
+          name: `${subPick.id}-${secondaryLabel}`, text: stripSubtitlePunctuation(cue.text),
         });
       }
     }
@@ -1453,6 +1543,12 @@ export async function renderWithSubtitles({
     timeline_ok: timelineOk,
     presence_ok: presenceOk,
     layout_ok: layoutOk,
+    /**
+     * 标点口径（2026-09-25）：烧录/软轨用的 cues 必须已经去过标点。
+     * 这里对**写进画面的 ASS 事件文本**再查一遍（而不是只查入参），
+     * 因为"入参干净、事件脏"只有在这一层能看到。
+     */
+    punctuation_ok: subEvents.every((event) => findSubtitlePunctuation(String(event.text ?? "")).length === 0),
     font_resolved_from_fonts_dir: fontResolution.allFromFontsDir !== false,
     resolution_preserved: outputProbe.width === probe.width && outputProbe.height === probe.height,
     audio_preserved: outputProbe.hasAudio === probe.hasAudio,
@@ -2368,7 +2464,8 @@ export function cuesToSrt(cues = []) {
   const blocks = cues.map((cue, index) => {
     const start = assistToSeconds(cue.start);
     const end = assistToSeconds(cue.end);
-    const text = String(cue.text ?? "").trim();
+    /** 出口兜底（2026-09-25 标点口径）：写文件前再去一次标点，避免"内存干净、文件带标点" */
+    const text = stripSubtitlePunctuation(String(cue.text ?? "").trim());
     if (!text) throw new SubtitleError(`第 ${index + 1} 条字幕为空文本`, "bad_srt", false);
     if (!(end > start)) throw new SubtitleError(`第 ${index + 1} 条字幕时间轴非法（${cue.start} → ${cue.end}）`, "bad_srt", false);
     return `${index + 1}\n${srtTimestamp(start)} --> ${srtTimestamp(end)}\n${text}`;
@@ -2386,8 +2483,8 @@ export function cuesToVtt(cues = [], { secondaryCues = [], label = "" } = {}) {
   const blocks = cues.map((cue, index) => {
     const start = assistToSeconds(cue.start);
     const end = assistToSeconds(cue.end);
-    const secondary = secondaryCues[index] ? String(secondaryCues[index].text ?? "").trim() : "";
-    const lines = [String(cue.text ?? "").trim(), ...(secondary ? [secondary] : [])].filter(Boolean);
+    const secondary = secondaryCues[index] ? stripSubtitlePunctuation(String(secondaryCues[index].text ?? "").trim()) : "";
+    const lines = [stripSubtitlePunctuation(String(cue.text ?? "").trim()), ...(secondary ? [secondary] : [])].filter(Boolean);
     return `${index + 1}\n${vttTimestamp(start)} --> ${vttTimestamp(end)}\n${lines.join("\n")}`;
   });
   return `${head}\n\n${blocks.join("\n\n")}\n`;
@@ -2529,6 +2626,15 @@ export async function exportSidecars({
   const srtOk = srtRoundTrip.length === cues.length
     && srtRoundTrip.every((cue, index) => cue.text === String(cues[index].text).trim());
   const secondaryOk = !enSrt || parseSrt(await fsp.readFile(enSrt.path, "utf8")).length === cuesEn.length;
+  /**
+   * 标点体检（2026-09-25 口径）：交付的字幕文件里不得残留标点。
+   * 判定看**落盘文件**而不是内存里的 cues——"清的是内存、发的是脏文件"正是这类事故的典型形态。
+   */
+  const zhSrtText = await fsp.readFile(zhSrt.path, "utf8");
+  const punctuationHits = zhSrtText.split(/\r?\n/)
+    .filter((line) => line.includes("-->") === false && !/^\d+$/.test(line.trim()) && line.trim() !== "")
+    .flatMap((line) => findSubtitlePunctuation(line));
+  const punctuationOk = punctuationHits.length === 0;
   const afterFingerprint = input ? await fileStatFingerprint(input) : null;
   const sourceUntouched = !input
     ? null
@@ -2544,6 +2650,15 @@ export async function exportSidecars({
     { kind: "timeline_readback", ok: timelineOk, detail: { cues: cues.length, events: assEvents.length } },
     { kind: "srt_round_trip", ok: srtOk, detail: { cues: cues.length, parsed: srtRoundTrip.length } },
     { kind: "secondary_language", ok: secondaryOk, detail: { cuesEn: cuesEn.length } },
+    {
+      kind: "no_punctuation",
+      ok: punctuationOk,
+      detail: {
+        hits: punctuationHits.length,
+        sample: punctuationHits.slice(0, 8),
+        policy: "字幕不带标点（数字内的 . : - / 保留；纯西文字幕不强制）",
+      },
+    },
     { kind: "source_untouched", ok: sourceUntouched !== false, detail: { hashed: Boolean(input) } },
   ];
 

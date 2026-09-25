@@ -64,6 +64,12 @@ steps:
     name: 渲染脚本生成入 CMS
     owner: render-operator
     outputs: [render_script]        # MD 正文 + 25/30 字段 JSON + 字符数校验快照，v1 起版本链
+  - step_key: material-generate
+    name: 真实素材生成（素材只作生成输入）
+    owner: render-operator
+    gate: G-MAT1                    # 素材用途门：用途声明 + 生成溯源 + 非静态直出一票否决
+    outputs: [render_job, video_asset]   # 真实实拍素材必须当**首帧/参考输入**交给生成模型出带真实运动的镜头；
+                                         # **严禁把素材（含裁切/推拉/滤镜包装）当镜头直接入时间线**（产品所有者 2026-09-25 硬规定）
   - step_key: g8-render-submit
     name: 渲染提交审批
     owner: director

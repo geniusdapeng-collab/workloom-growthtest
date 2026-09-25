@@ -24,6 +24,7 @@
         "presets/comment-operator.yml",
         "presets/compliance-officer.yml",
         "presets/continuity-reviewer.yml",
+        "presets/cover-designer.yml",
         "presets/creative-planner.yml",
         "presets/creator-partner.yml",
         "presets/deal-manager.yml",
@@ -61,9 +62,10 @@
         "fences/ai-video-bgm.yml",
         "fences/ai-video-cine-kb.yml",
         "fences/ai-video-color.yml",
+        "fences/ai-video-delivery.yml",
+        "fences/ai-video-material.yml",
         "fences/ai-video-subtitle.yml",
-        "fences/ai-video-voice.yml",
-        "fences/ai-video-delivery.yml"
+        "fences/ai-video-voice.yml"
       ],
       "skills": [
         "skills/bgm-audio-layering/SKILL.md",
@@ -78,6 +80,7 @@
         "skills/color-look-design/SKILL.md",
         "skills/color-shot-matching/SKILL.md",
         "skills/comment-ops/SKILL.md",
+        "skills/cover-design/SKILL.md",
         "skills/delivery-package-ops/SKILL.md",
         "skills/delivery-revision-ops/SKILL.md",
         "skills/director-review/SKILL.md",

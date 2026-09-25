@@ -22,6 +22,8 @@ export const PIPELINE_GATE_STEP_KEYS = [
   "g6-prompt-confirm",
   "g7-preproduction",
   "g8-render-submit",
+  /** 素材镜生成门（G-MAT1，2026-09-25）：素材只作生成输入、禁止静态直出 */
+  "material-generate",
   /** 多风格交付包：变体雷同一票否决（narrative-film.yml `deliver` 步） */
   "deliver",
   /** 返修闭环：层增量重合成 + 复用 sha256 证据（narrative-film.yml `revise` 步） */
@@ -29,7 +31,7 @@ export const PIPELINE_GATE_STEP_KEYS = [
 ] as const;
 
 export type PipelineGateStepKey = (typeof PIPELINE_GATE_STEP_KEYS)[number];
-export type PipelineGateId = "G5" | "G6" | "G7" | "G8" | "G-DLV1" | "G-DLV4";
+export type PipelineGateId = "G5" | "G6" | "G7" | "G8" | "G-MAT1" | "G-DLV1" | "G-DLV4";
 
 /** step_key → 门的编号（与 narrative-film.yml 的 `gate:` 字段一致） */
 const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
@@ -37,6 +39,11 @@ const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
   "g6-prompt-confirm": "G6",
   "g7-preproduction": "G7",
   "g8-render-submit": "G8",
+  /**
+   * 素材生成门（2026-09-25 产品所有者口径）：真实素材只作生成输入、禁止静态直出。
+   * step_key 在 narrative-film.yml 里紧随 render-script（素材镜的"提交生成"与 G8 同层，但判据不同）。
+   */
+  "material-generate": "G-MAT1",
   /** deliver 步的 gate 字段在 yml 里就是 `G-DLV1`（变体雷同否决） */
   deliver: "G-DLV1",
   /** revise 步按 G-DLV4（层增量重合成 + 复用证据）记账 */

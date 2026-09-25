@@ -1,0 +1,51 @@
+# 真实素材用途围栏包（视频经理 · 素材镜）
+# 与 ai-video-baseline.yml / ai-video-color.yml / ai-video-bgm.yml 同口径：默认基线、只可加严、
+# 命中取严（block > review > auto）；求值语义：匹配命中后求值 when（沙箱，禁任意代码），
+# 写类动作无命中按 default_level。
+#
+# 本包守的是产品所有者 2026-09-25 定的**一条硬规定**：
+#   真实图片/视频素材**只作生成输入**（渲染素材），严禁在视频里直接静态展示素材本身；
+#   素材镜必须能证明"画面由生成模型产出"（渲染任务号 + 素材/产物指纹），
+#   且生成结果必须保持真实地标与文字标识不被改造。
+version: ai-video-material/v1
+default_level: review
+rules:
+  - rule_id: G-MAT0
+    name: 素材镜走生成（工位本地、非破坏、可回滚）直通
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [material_asset, render_job, video_asset, final_video]
+      actions: [material.write, material.prepare, material.generate, render.write]
+    when: "true"
+    note: 素材的登记、画幅准备与"交给生成模型出片"都是工位本地、非破坏、可回滚动作（素材只读 + 新文件 + sha256 回执），默认直通；静态直出（G-MAT1）、缺生成溯源（G-MAT2）、改造地标（G-MAT3）叠加升级，deny 优先并集取严。未命中写动作的保守默认是 review，故此处必须显式声明 auto。
+
+  - rule_id: G-MAT1
+    name: 素材静态直出一票否决（素材只能当生成输入）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [final_video, video_asset, material_asset, render_job]
+      actions: [material.write, material.prepare, material.display, render.write]
+    when: "params.material_usage != 'generation-reference' or params.static_display == true or params.reuse_material_frame == true or params.photo_as_shot == true"
+    note: "产品所有者 2026-09-25 硬规定：素材是**渲染素材**，不是成片内容。缺用途声明（material_usage 缺失或写 direct-display/static-display/slideshow）、把素材原样或经裁切/缩放/推拉/滤镜包装后当镜头入时间线（static_display/reuse_material_frame/photo_as_shot 任一为 true）一律阻断，审批也不能放行（人无权绕过产品口径）。DSL 语义：material_usage 缺失 → 左值 undefined != 'generation-reference' 为真 → 阻断（fail-closed，缺声明按违规处理）。"
+
+  - rule_id: G-MAT2
+    name: 素材镜必须带生成溯源（无回执不算完成）
+    level: review
+    is_baseline: true
+    match:
+      object_types: [material_asset, render_job, video_asset]
+      actions: [material.write, material.generate, render.write]
+    when: "params.material_usage == 'generation-reference' and (params.render_task_id == null or params.model == null or params.source_material_sha256 == null or params.output_sha256 == null)"
+    note: 素材镜提交/回填必须能证明"这一镜真的由生成模型产出"：渲染任务号、模型名、素材指纹、产物指纹四件齐备。缺任一件挂人审（不允许用"我看过了"替代回执）；四件齐备且非静态直出时由 G-MAT0 直通。
+
+  - rule_id: G-MAT3
+    name: 素材镜保真复核（地标与文字标识不得被改造）
+    level: review
+    is_baseline: true
+    match:
+      object_types: [material_asset, video_asset, final_video]
+      actions: [material.generate, render.write]
+    when: "params.fidelity_reviewed != true or params.landmark_altered == true or params.text_identifier_changed == true"
+    note: 图生视频会把"真实地标"交给模型自由演绎，存在"顺手美化建筑/改匾额文字"的风险：素材镜的生成产物必须过保真复核（主楼形制、檐口层叠、匾额与脊饰、水域关系、文字标识），未复核或确认被改造即挂起；确认保真的结果由 G-MAT0 直通。
