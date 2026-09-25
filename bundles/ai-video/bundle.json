@@ -617,7 +617,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "89b5eea31dce187207e8a83402d11956c96989761fbe341026ce8f1248424690",
+    "digest": "c3efe460cb73602485553e8d3ca3119bb0c04df59789b2f528426a1f63e76361",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
       "connectors/bgm-bridge/core.mjs": "44c8b8b615fcbb39e4ac0be710c1c211b01f64a008c009cd7f11f146ff03518d",
@@ -955,7 +955,7 @@
       "library/luts/look-warm-film.cube": "ae364f75a09e87d2b70d79e2804b5790d140e96605ff99d22f32413a83ecacb1",
       "library/luts/manifest.json": "a4685c2d1f631c6d6de1dd88a84bc60117d216d8b8a5c94254900a353939ad56",
       "library/luts/slog3-to-rec709.cube": "63ff904e3535404f23f6f23048233726b5c09839a87c0f436724ccba0e43d01e",
-      "library/README.md": "82876765dfaeb39e2762ecb4398791ea015ab2a5a7e86b6ebcbd781913b74ad5",
+      "library/README.md": "2d130a42626f1d2c511b0ce86019c55cc875363cf29c72e50d02e1e0a3fd18b0",
       "library/seedance-references/audio-tags.md": "d1b4d9ba2c19b697f6671d6b1c2fa1d38ba1b00d64f3a9ecfaeea906aed63c88",
       "library/seedance-references/cinematography.md": "fbbf2f0f097680cc7101357396e0a926203fb8159fd18af627508f82da6b2991",
       "library/seedance-references/director-styles.md": "7b93e8ce74943f3b7db7b6b1d4149cf6d68477be739f31eb90c28cdef8eb6947",

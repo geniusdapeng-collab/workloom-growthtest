@@ -3,6 +3,11 @@
 > 状态：设计稿（2026-09-23）· 适用范围：AI 视频/漫剧出镜人物（1–10 人/项目）
 > 定位：**人物档案是客户的核心资产**——一次建档、跨项目复用；生成链路自动解析、自动调用、可版本化、可审计。
 
+> **开箱即用提示**：本仓**已经内置** 1 号模特「陈卓」（`chen-zhuo`）——档案 + 8 角度定妆照随仓分发在
+> `bundles/ai-video/library/characters/`，镜头卡不写 `character` 时出片链路自动使用她。
+> 规则、用法与常见问题见 [`character-registry.md`](character-registry.md)；目录内说明见
+> [`../bundles/ai-video/library/characters/README.md`](../bundles/ai-video/library/characters/README.md)。
+
 ## 〇、为什么需要它（现状问题）
 
 - 现状只有"项目级定妆照索引"（`.vm-work/characters/<projectId>/portrait-index.json`），字段仅 `kind/id/name/dir/files`：

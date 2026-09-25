@@ -75,6 +75,11 @@ docs/          设计规范、方案、能力地图、本文
 4. **Bundle 装配**：preset（员工）/围栏/技能/触发器/对象以 Bundle 为单位装载；装配器保证幂等与属地隔离。
 5. **Mock 运行态**：种子数据 + 内置确定性模型 + `SERVICE_C_DEMO_AUTH` 演示直登。界面常驻"全模拟运行态"横幅是**刻意设计**。
 6. **号源纪律**：T-###/VID-### 等主键全库唯一但按本区分配，用 `threads_max_t_no()`/`video_projects_max_vid_no()` 函数分配；bigint 返回 string，必须 `Number()` 后再 +1。
+7. **内置人物资产（开箱即用的默认模特）**：本仓自带 1 号模特「陈卓」（`chen-zhuo`）——
+   `bundles/ai-video/library/characters/` 里有档案正文（`profile.json`）+ 8 角度定妆照（`portraits/v3/`）+ 选角规则（`registry.json`）。
+   **镜头卡不写 `character` 时，出片链路自动使用 `defaultModel`**（日志：`未显式指定模特 → 使用系统默认模特：陈卓（chen-zhuo，1 号）`）；
+   不要以为"仓库里没有人物资产"而重复建档。真人肖像只能走方舟 `asset://` 授权素材，直传真人照片会被平台隐私闸拦。
+   详见 `docs/character-registry.md` 与 `bundles/ai-video/library/characters/README.md`。
 
 ## 6. 你的工作流（照此执行，不会踩坑）
 
@@ -127,3 +132,4 @@ pnpm capabilities:check                    # 能力产物与代码同步校验
 - 发布清单：`docs/release-checklist.md`
 - 业务方案：`docs/plan-acquisition.md`（获客五环）、`docs/geo-fusion-plan.md`（GEO 融合）、`docs/fusion-design.md`（架构）
 - Mock 数据口径：`mock/README.md`
+- 视频人物资产：`docs/character-registry.md`（内置默认模特「陈卓」规则 + 常见问题）｜ `bundles/ai-video/library/characters/README.md`（目录内说明）
