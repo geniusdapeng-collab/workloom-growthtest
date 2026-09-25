@@ -617,7 +617,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "aba1b8bedb41a11af167f33131c19e6c90eccce6b2f4bb22a223d1a2420b5d48",
+    "digest": "f72c3f4673924060944134b201ecfca62675a62f80168382075e3e05168efd51",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
       "connectors/bgm-bridge/core.mjs": "44c8b8b615fcbb39e4ac0be710c1c211b01f64a008c009cd7f11f146ff03518d",
@@ -651,7 +651,7 @@
       "fences/ai-video-cine-kb.yml": "a0cbe87e4b9c663c9a5aec32c4a51f9d331c9e1d77111df72ad2d3c24e45c2e8",
       "fences/ai-video-color.yml": "709cb9fc3cba47a4ee2b4ee233d714277223cb23f9ca210ed3712de54c597ed6",
       "fences/ai-video-delivery.yml": "e849d8c1d323597b1d943f346a0b5f6ebd6e45fd91dfaf890cfa279207b322d6",
-      "fences/ai-video-material.yml": "73eec2abfc450948e73359e44cdd13dc731f411b4c280057645fcfa2d1426c56",
+      "fences/ai-video-material.yml": "95343733c4021c0c7993d0f72e5b3c123d1525ea0a2cb1f576745acf8b42137d",
       "fences/ai-video-subtitle.yml": "da04abf084a0ecbf87bd22a183ab10195ad13df5ee463229bb0e34324e47e7bf",
       "fences/ai-video-voice.yml": "52ab044fbfa8c4b1f83c91c8e469e97ae82d1c5d31b15dc420b705858694d295",
       "library/bgm-library-curated/acoustic-warm-ghostrifter-official-zeal-456.m4a": "7d1f6edbc992ac9f8949aa55bad78f0aef93a2b8b94dc13373c1bce8acbcf164",
@@ -996,7 +996,7 @@
       "pipelines/account-ops.yml": "455383c019ac1d0523db48c6088c7bfce4aa9e8e1eef8d7d71399aa69e107264",
       "pipelines/ads-creative-factory.yml": "90e475e5482ecf15541aa2d6eca5499aa1c9bea8d9928e2122975ae77df869c5",
       "pipelines/marketing-film.yml": "4ba95c0e83538de605126072ce26a462211e4cea3a82c5fcaee8227a71b485b1",
-      "pipelines/narrative-film.yml": "03004c1c2dce9dd0abe1ac13ce4c0ec32caa022febe8d02c6439b3fde61d1a45",
+      "pipelines/narrative-film.yml": "363c73ae1ac1e2deae13b20054a46d6f6fcc4f2dc20e46f97e721a474557c087",
       "pipelines/settlement-recon.yml": "c4af96be653224e31ec8882ae19da37026dbbe1f2d5fb28435deee92b37db1d0",
       "presets/ads-optimizer.yml": "4969554944f4e2586aef8ab29da819d76611a6ba537b5964db6e9e7db9cc5bf2",
       "presets/audio-designer.yml": "e0122309c8a94d7b8e73109c3b88f92b900917bdc04c5535836e7f1f3c66dc0b",

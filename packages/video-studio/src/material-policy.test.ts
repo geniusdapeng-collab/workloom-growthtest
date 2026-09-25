@@ -11,10 +11,14 @@ import {
   MATERIAL_MOTION_POLICY,
   MATERIAL_POLICY_STATEMENT,
   MATERIAL_REUSE_POLICY,
+  MATERIAL_SCENE_POLICY_STATEMENT,
+  REFERENCE_INDEPENDENCE_POLICY,
   MaterialPolicyError,
   assessMotionRichness,
+  assessReferenceIndependence,
   assessMaterialReuse,
   assertMaterialGenerationProvenance,
+  buildMaterialScenePrompt,
   buildMaterialMotionPrompt,
   isMaterialShot,
   readMaterialSpec
@@ -139,6 +143,66 @@ describe("运动强度判定（产品所有者第二轮反馈）", () => {
     }
     expect(MATERIAL_MOTION_POLICY.minMeanEnergy).toBe(8);
     expect(MATERIAL_MOTION_POLICY.minRampRatio).toBe(1.8);
+  });
+});
+
+/**
+ * 场景构建口径（material-scene/v1，产品所有者第三轮纠偏）：
+ * "图片只是实景素材参考，是用来构建真实视频场景的，不是简单做个运镜了事，我们做的是视频。"
+ */
+describe("场景构建口径", () => {
+  const prompt = buildMaterialScenePrompt(baseShot, { aspect: "9:16", resolution: "1080p", title: "南昌 · 滕王阁" });
+
+  it("提示词要求「构建视频场景」而不是「把参考图动起来」", () => {
+    expect(prompt).toContain("构建一段");
+    expect(prompt).toContain("实景依据");
+    expect(prompt).toContain("不是首帧");
+    expect(prompt).toContain("机位与取景自己定");
+    expect(prompt).toContain("不得复刻参考图的构图");
+    expect(prompt).toContain("真实三维视差");
+    expect(prompt).toContain("补全画面");
+    expect(prompt).toContain("参考图的边界");
+    expect(prompt).toContain("禁止");
+    expect(prompt).not.toMatch(/NaN|undefined|\[object Object\]/);
+  });
+
+  it("策略原文把五条红线说全（实景依据/构建场景/视差与环境运动/不复刻构图/运镜不是遮羞布）", () => {
+    expect(MATERIAL_SCENE_POLICY_STATEMENT).toContain("只作实景依据");
+    expect(MATERIAL_SCENE_POLICY_STATEMENT).toContain("构建出来的视频场景");
+    expect(MATERIAL_SCENE_POLICY_STATEMENT).toContain("真实三维视差");
+    expect(MATERIAL_SCENE_POLICY_STATEMENT).toContain("不得复刻参考图构图");
+    expect(MATERIAL_SCENE_POLICY_STATEMENT).toContain("不是遮羞布");
+  });
+
+  it("重跑升级档要求「换机位重新构建」，而不是「加大数字运镜」", () => {
+    const escalated = buildMaterialScenePrompt(baseShot, { motionStrength: "assertive" });
+    expect(escalated).toContain("换一个机位");
+    expect(escalated).toContain("云/水/人群至少两处在动");
+  });
+});
+
+describe("参考独立性判定（是构建场景，还是参考图被推动）", () => {
+  it("首帧就是参考图（最佳匹配 ≥32dB）判复刻", () => {
+    const verdict = assessReferenceIndependence({ firstFrameBestPsnrDb: 41.2, midFrameBestPsnrDb: 18.4, directPsnrDb: 36.0 });
+    expect(verdict.independent).toBe(false);
+    expect(verdict.detail).toContain("参考图被推动");
+  });
+
+  it("直比同图（≥40dB）也判复刻", () => {
+    const verdict = assessReferenceIndependence({ firstFrameBestPsnrDb: 30.1, midFrameBestPsnrDb: 22.0, directPsnrDb: 44.8 });
+    expect(verdict.independent).toBe(false);
+    expect(verdict.detail).toContain("同图");
+  });
+
+  it("中段还能高精度对回参考图（≥34dB）判复刻", () => {
+    const verdict = assessReferenceIndependence({ firstFrameBestPsnrDb: 24.0, midFrameBestPsnrDb: 37.5, directPsnrDb: 27.0 });
+    expect(verdict.independent).toBe(false);
+  });
+
+  it("换机位构建出来的场景（首帧/中段都对不回参考图）判通过", () => {
+    const verdict = assessReferenceIndependence({ firstFrameBestPsnrDb: 22.4, midFrameBestPsnrDb: 19.8, directPsnrDb: 18.2 });
+    expect(verdict.independent).toBe(true);
+    expect(verdict.detail).toContain(`≥${REFERENCE_INDEPENDENCE_POLICY.reproducedPsnrDb} 判复刻`);
   });
 });
 

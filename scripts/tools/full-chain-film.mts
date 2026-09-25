@@ -31,7 +31,8 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import {
   applyMicromotion, appendGateEvent, assessVariantDistinctness, auditContinuity, buildDeliveryManifest, buildGateEvent,
   assessMotionRichness, buildCoverDesignPrompt, buildMaterialMotionPrompt, buildPlatePrompt, buildRevisionPlan, buildRevisionReport, buildVariantPlan,
-  MATERIAL_MOTION_POLICY,
+  buildMaterialScenePrompt, assessReferenceIndependence, MATERIAL_MOTION_POLICY, MATERIAL_SCENE_POLICY_VERSION,
+  REFERENCE_INDEPENDENCE_POLICY,
   coverDeterministicChecks, COVER_FONTS, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm, reviewStage,
@@ -100,6 +101,13 @@ const ACCEPT_REJECTED = arg("--accept-rejected").split(",").map((s) => s.trim())
 const ACCEPT_WEAK_MOTION = arg("--accept-weak-material-motion").split(",").map((s) => s.trim()).filter(Boolean);
 /** 只做后期运镜增强、不提交新渲染（额度受限/只想换运镜设计时用） */
 const MATERIAL_POST_ONLY = flag("--material-post-only");
+/** 后期速度坡道（剪辑手法，默认开；关掉则完全保留模型给的时间节奏） */
+const MATERIAL_SPEED_RAMP = !flag("--no-material-speed-ramp");
+/**
+ * 后期数字运镜（变焦 + 换景别切，默认**关**）。
+ * 产品所有者口径：画面里的运镜必须由模型构建（参考图只作实景依据），数字变焦只作应急手段。
+ */
+const MATERIAL_POST_CAMERA_MOVE = flag("--material-post-camera-move");
 const RESUME = !flag("--no-resume");
 const DRY_RUN = flag("--dry-run");
 const ALLOW_FALLBACK_APPROVE = flag("--allow-fallback-approve");
@@ -1474,6 +1482,74 @@ function measureMaterialReuse(clip: string, material: string, durationSec: numbe
 }
 
 /**
+ * 参考独立性实测（material-scene/v1，2026-09-25 产品所有者口径纠偏）：
+ * "图片只是实景素材参考，是用来构建真实视频场景的，不是简单做个运镜了事"。
+ *
+ * 判据（数值阈值与决策在 `material-policy.ts#assessReferenceIndependence`）：
+ *   · 首帧最佳匹配 PSNR：把成片首帧与参考素材的全部候选窗口对齐后取最佳——高 = 首帧就是那张图；
+ *   · 首帧直比 PSNR：不缩放不对齐直接比——很高 = 同一个取景、同一张图；
+ *   · 中段最佳匹配 PSNR：整段仍能高精度对回参考图 = 参考图被变换，而不是重建场景。
+ */
+function measureReferenceIndependence(clip: string, material: string, durationSec: number, shotId: string): {
+  firstFrameBestPsnrDb: number | null;
+  midFrameBestPsnrDb: number | null;
+  directPsnrDb: number | null;
+  candidates: number;
+} {
+  const dir = join(WORK_DIR, "reference-independence", PROJECT, shotId);
+  mkdirSync(dir, { recursive: true });
+  const W = 360; const H = 640;
+  const scales = [1, 1.15, 1.3, 1.45];
+  const positions: Array<[string, number, number]> = [
+    ["center", 0.5, 0.5], ["left", 0, 0.5], ["right", 1, 0.5], ["top", 0.5, 0], ["bottom", 0.5, 1],
+    ["topleft", 0, 0], ["topright", 1, 0], ["bottomleft", 0, 1], ["bottomright", 1, 1]
+  ];
+  const candidates: string[] = [];
+  for (const scale of scales) {
+    const cropW = Math.round((W / scale) / 2) * 2;
+    const cropH = Math.round((H / scale) / 2) * 2;
+    for (const [name, fx, fy] of positions) {
+      const out = join(dir, `cand-s${scale}-${name}.png`);
+      try {
+        run(FFMPEG, ["-y", "-i", material,
+          "-vf", `scale=${W * 2}:${H * 2}:force_original_aspect_ratio=increase,`
+            + `crop=${cropW * 2}:${cropH * 2}:(iw-${cropW * 2})*${fx}:(ih-${cropH * 2})*${fy},scale=${W}:${H}`,
+          "-frames:v", "1", out]);
+        if (existsSync(out)) candidates.push(out);
+      } catch {
+        /* 候选窗口越界：跳过 */
+      }
+    }
+  }
+  const frameAt = (at: number, name: string): string => {
+    const file = join(dir, name);
+    run(FFMPEG, ["-y", "-ss", at.toFixed(2), "-i", clip, "-frames:v", "1",
+      "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, file]);
+    return file;
+  };
+  const bestFor = (frame: string): number | null => {
+    let best: number | null = null;
+    for (const candidate of candidates) {
+      const value = psnrBetween(frame, candidate);
+      if (value === null) continue;
+      if (best === null || value > best) best = value;
+    }
+    return best;
+  };
+  const first = frameAt(0.05, "first-frame.png");
+  const mid = frameAt(Math.max(0.2, durationSec / 2), "mid-frame.png");
+  /** 直比：参考素材整体缩到同尺寸，不裁切不对齐 */
+  const referenceDirect = join(dir, "reference-direct.png");
+  run(FFMPEG, ["-y", "-i", material, "-vf", `scale=${W}:${H}:force_original_aspect_ratio=increase,crop=${W}:${H}`, "-frames:v", "1", referenceDirect]);
+  return {
+    firstFrameBestPsnrDb: bestFor(first),
+    midFrameBestPsnrDb: bestFor(mid),
+    directPsnrDb: psnrBetween(first, referenceDirect),
+    candidates: candidates.length
+  };
+}
+
+/**
  * 运动强度实测（2026-09-25 产品所有者第二轮反馈："中间的图片镜头还是简单的图片、运镜拉跨"）。
  *
  * 口径：160×284 灰度、8fps、4 像素步长的相邻帧平均绝对差，返回三项：
@@ -1682,8 +1758,12 @@ if (STAGES.has("material-gen")) {
           "-vf", `scale=${pw}:${ph}:force_original_aspect_ratio=increase,crop=${pw}:${ph}:(iw-${pw})*${focus.x}:(ih-${ph})*${focus.y}`,
           "-q:v", "2", prepared]);
       }
-      /** 首轮提示词；重跑轮会在循环里升级运动强度并写入同一文件（`let` 是因为提交门要读当前轮提示词） */
-      let prompt = buildMaterialMotionPrompt(card, {
+      /**
+       * 首轮提示词：**场景构建**口径（material-scene/v1）——参考图只作实景依据，
+       * 机位/视差/环境运动由模型构建（不再走"把参考图当首帧做动效"的老路）。
+       * 重跑轮会在循环里升级强度并写入同一文件（`let` 是因为提交门要读当前轮提示词）。
+       */
+      let prompt = buildMaterialScenePrompt(card, {
         aspect: ASPECT, resolution: RESOLUTION, durationSec: duration, title: shotlist.title
       });
       writeFileSync(promptFile, `${prompt}\n`, "utf8");
@@ -1701,8 +1781,21 @@ if (STAGES.has("material-gen")) {
           { id: "material-usage-declared", pass: spec.usage === "generation-reference", hard: true, detail: `用途声明 ${spec.usage}（只允许 generation-reference；禁止静态直出）` },
           { id: "material-file", pass: existsSync(photo) && statSync(photo).size > 20_000, hard: true, detail: `真实素材 ${basename(photo)}（${(statSync(photo).size / 1024).toFixed(0)}KB，sha256 ${materialSha.slice(0, 12)}）` },
           { id: "material-prepared", pass: existsSync(prepared) && statSync(prepared).size > 50_000, hard: true, detail: `生成首帧已按 ${ASPECT} 准备（${pw}x${ph}，仅作生成输入）` },
-          { id: "prompt-ready", pass: prompt.trim().length >= 400, hard: true, detail: `素材镜提示词 ${prompt.trim().length} 字（含保真/真运动/禁止静态直出）` },
-          { id: "no-static-policy", pass: prompt.includes("禁止静态直出") && prompt.includes("不得整幅不变"), hard: true, detail: "提示词含「禁止静态直出/不得整幅不变」硬约束" },
+          {
+            id: "prompt-ready", pass: prompt.trim().length >= 400, hard: true,
+            detail: `素材镜提示词 ${prompt.trim().length} 字（场景构建口径：实景依据 + 自选机位 + 视差 + 环境运动）`
+          },
+          {
+            /**
+             * 口径升级（material-scene/v1）：判据从"禁止静态直出"改为"必须以实景依据构建视频场景"——
+             * 提示词里必须出现 ① 实景依据 ② 构建视频场景 ③ 不得复刻参考图构图 ④ 禁止贴图式运动/静止画面。
+             */
+            id: "scene-construction-policy",
+            pass: prompt.includes("实景依据") && prompt.includes("构建一段")
+              && prompt.includes("不得复刻参考图的构图") && prompt.includes("贴图式运动") && prompt.includes("画面全程静止"),
+            hard: true,
+            detail: "提示词含「实景依据 / 构建视频场景 / 不得复刻参考图构图 / 禁止贴图式运动与静止画面」四条硬约束"
+          },
           { id: "aspect-constraint", pass: prompt.includes(ASPECT), hard: true, detail: `含画幅约束 ${ASPECT}` },
           { id: "duration-limit", pass: duration > 0 && duration <= 30, hard: true, detail: `单镜时长 ${duration}s（上限 30s）` }
         ],
@@ -1769,7 +1862,7 @@ if (STAGES.has("material-gen")) {
          * 重跑必须"带变更"：第 2 次起把运动强度档位升到 assertive，并把上一轮监制/机检的问题写进提示词
          * （沿用视频镜的 `retryInstruction`，避免"重采样碰运气"白烧额度）。
          */
-        const attemptPrompt = buildMaterialMotionPrompt(card, {
+        const attemptPrompt = buildMaterialScenePrompt(card, {
           aspect: ASPECT, resolution: RESOLUTION, durationSec: duration, title: shotlist.title,
           motionStrength: usedAttempt > 1 ? "assertive" : "standard"
         }) + (usedAttempt > 1 ? `\n${retryInstruction(lastVerdict, usedAttempt, attempts)}\n【运动机检未过】${lastMotionVerdict.detail}` : "");
@@ -1791,8 +1884,13 @@ if (STAGES.has("material-gen")) {
             }
             const submitted = await arkVideo({
               prompt: attemptPrompt,
-              firstFrame: dataUrl(prepared),
-              refs: [],
+              /**
+               * **不再用 first_frame**（2026-09-25 产品所有者口径）：参考图只作实景依据，
+               * 以 `reference_image` 角色提交，让模型自己构建机位与取景——
+               * first_frame 会把"这张照片"钉成首帧，正是"把图片动起来"的根源。
+               */
+              firstFrame: undefined,
+              refs: [dataUrl(prepared)],
               seconds: duration,
               generateAudio: ENV.SEEDANCE_GENERATE_AUDIO !== "0",
               seed: 20260925 + usedAttempt
@@ -1828,10 +1926,29 @@ if (STAGES.has("material-gen")) {
               verdict: null, note: "带瑕疵放行：原始渲染运动不足，已用后期运镜增强补偿（显式留痕）"
             });
           }
-          /** 速度坡道（快起 → 稳行 → 快收，归一化回原时长）→ 镜头运动设计（两段 punch cut + 大行程运镜） */
+          /**
+           * 后期层（默认只保留**速度坡道**这一项剪辑手法；画面里的运镜必须由模型构建）：
+           *   · `--material-speed-ramp`（默认开）：快起→稳行→快收，归一化回原时长——这是剪辑节奏，不是"把图动起来"；
+           *   · `--material-post-camera-move`（默认**关**）：数字变焦 + 换景别切（应急手段）。
+           * 产品所有者口径（2026-09-25）："图片只是实景素材参考，是用来构建真实视频场景的，不是简单做个运镜了事"——
+           * 所以画面运动一律由模型构建（reference 模式 + 场景构建提示词），数字运镜不再默认参与出片。
+           */
           const rampedClip = join(CLIP_DIR, `${shot.shotId}.ramped.mp4`);
-          lastRamp = applySpeedRamp(rawClip, rampedClip, { durationSec: duration });
-          const cameraMove = applyCameraMovePunchCut(rampedClip, clip, { durationSec: duration, fps: FPS });
+          lastRamp = MATERIAL_SPEED_RAMP
+            ? applySpeedRamp(rawClip, rampedClip, { durationSec: duration })
+            : (() => {
+              execFileSync("cp", [rawClip, rampedClip]);
+              return { segments: [] as Array<{ from: number; to: number; speed: number }>, total: Number(Number(probe(rampedClip).duration ?? 0).toFixed(3)) };
+            })();
+          const cameraMove = MATERIAL_POST_CAMERA_MOVE
+            ? applyCameraMovePunchCut(rampedClip, clip, { durationSec: duration, fps: FPS })
+            : (() => {
+              execFileSync("cp", [rampedClip, clip]);
+              return {
+                segments: [] as Array<{ from: number; to: number; zoom: [number, number]; panX: [number, number]; panY: [number, number]; ease: string }>,
+                total: Number(Number(probe(clip).duration ?? 0).toFixed(3))
+              };
+            })();
           lastInfo = probe(clip);
           lastOutputSha = sha256FileSync(clip);
           const provenance = assertMaterialGenerationProvenance({
@@ -1839,6 +1956,9 @@ if (STAGES.has("material-gen")) {
           });
           lastReuse = measureMaterialReuse(clip, prepared, duration, shot.shotId);
           lastReuseVerdict = assessMaterialReuse(lastReuse.samples, { durationSec: duration });
+          /** 场景构建判据：这一镜是"构建出来的视频场景"还是"参考图被推动"（material-scene/v1） */
+          const independence = measureReferenceIndependence(clip, prepared, duration, shot.shotId);
+          const independenceVerdict = assessReferenceIndependence(independence, REFERENCE_INDEPENDENCE_POLICY);
           lastMotion = measureMotionRichness(clip);
           {
             const rampOk = lastMotion.rampRatio >= MATERIAL_MOTION_POLICY.minRampRatio;
@@ -1881,6 +2001,12 @@ if (STAGES.has("material-gen")) {
               { id: "generation-provenance", pass: provenance.ok, detail: provenance.detail, hard: true },
               { id: "not-static-display", pass: !lastReuseVerdict.staticDisplay, detail: `素材复用度：${lastReuseVerdict.detail}（候选窗口 ${lastReuse.candidates} 个）`, hard: true },
               {
+                id: "scene-constructed",
+                pass: independenceVerdict.independent,
+                detail: `${independenceVerdict.detail}（候选窗口 ${independence.candidates} 个；口径 ${MATERIAL_SCENE_POLICY_VERSION}）`,
+                hard: true
+              },
+              {
                 id: "motion-richness",
                 pass: lastMotionVerdict.rich || ACCEPT_WEAK_MOTION.includes(shot.shotId),
                 detail: `原始渲染：${lastMotionVerdict.detail}`
@@ -1908,6 +2034,10 @@ if (STAGES.has("material-gen")) {
             checks: [
               { id: "generation-provenance", pass: provenance.ok, hard: true, detail: provenance.detail },
               { id: "not-static-display", pass: !lastReuseVerdict.staticDisplay, hard: true, detail: lastReuseVerdict.detail },
+              {
+                id: "scene-constructed", pass: independenceVerdict.independent, hard: true,
+                detail: independenceVerdict.detail
+              },
               {
                 id: "motion-richness",
                 pass: lastMotionVerdict.rich || ACCEPT_WEAK_MOTION.includes(shot.shotId),

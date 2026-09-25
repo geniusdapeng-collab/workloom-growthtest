@@ -17,6 +17,28 @@
 /** 素材用途策略版本（写进阶段日志与提示词，便于审计回溯口径） */
 export const MATERIAL_POLICY_VERSION = "material-usage/v1";
 
+/**
+ * 场景构建策略版本（2026-09-25 产品所有者第三次口径纠偏）：
+ * "你不是把图片简单变成动图增加一点变化，你是要从一开始就做的是视频，图片只是实景素材参考，
+ *  是用来构建真实视频场景的，不是简单做个运镜了事，我们做的是视频。"
+ *
+ * 因此素材镜的**唯一合法产物形态**是"以参考素材为依据构建出来的真实视频场景"：
+ *   · 参考图作 `reference_image`（**不再作 first_frame**）——首帧就不该是那张照片；
+ *   · 机位/焦段/取景由模型自行构建（可换机位、可换高度角度），至少完成一次真实镜头位移；
+ *   · 画面必须有真实三维视差与环境运动（云/水/光/人群/车流/植被）；
+ *   · 参考图没拍到的画面边缘要合理补全，不得出现参考图边界/黑边/复刻构图。
+ */
+export const MATERIAL_SCENE_POLICY_VERSION = "material-scene/v1";
+
+/** 场景构建策略原文（提示词、错误信息、文档共用） */
+export const MATERIAL_SCENE_POLICY_STATEMENT = [
+  "参考素材只作实景依据：用它确认地标形制、结构层次、文字标识、环境关系、材质与天色；",
+  "成片必须是**构建出来的视频场景**：机位、焦段、取景、镜头运动由模型自行构建，至少完成一次真实镜头位移；",
+  "必须有真实三维视差与环境运动（前景/中景/远景相对位移；云、水、光、人群、车流、植被随时间变化）；",
+  "不得复刻参考图构图：首帧不是参考图（不出现参考图边界、黑边或「同一张图」的取景）；",
+  "镜头运动不是遮羞布：没有镜头位移、只有环境微动的画面不算视频场景（会被机检打回）。"
+].join("");
+
 /** 给人与给模型看的政策原文（提示词、文档、错误信息共用一处，避免口径漂移） */
 export const MATERIAL_POLICY_STATEMENT = [
   "真实素材只作生成输入：实拍照片/视频必须作为生成模型的首帧或参考输入（渲染素材），由模型产出带真实运动的镜头；",
@@ -273,6 +295,115 @@ export function assertMaterialGenerationProvenance(evidence: {
     return { ok: false, detail: "产物指纹与素材指纹相同：这就是素材本身（静态直出）" };
   }
   return { ok: true, detail: `生成溯源齐备：任务 ${evidence.renderTaskId}（${evidence.model}）` };
+}
+
+export interface MaterialScenePromptOptions extends MaterialMotionPromptOptions {
+  /** 参考素材里"必须保持一致"的实景要素（地标形制/文字标识等），由镜头卡给出 */
+  mustKeep?: string[];
+}
+
+/**
+ * **场景构建提示词**（material-scene/v1，当前素材镜的唯一合法出片路径）。
+ *
+ * 与 `buildMaterialMotionPrompt`（旧：把参考图当首帧做动效）的区别就在第一句：
+ * 这里要求模型"以参考为依据**构建**一段真实拍摄的视频场景"，并明确"禁止复刻参考图构图"。
+ */
+export function buildMaterialScenePrompt(shot: Record<string, unknown>, options: MaterialScenePromptOptions = {}): string {
+  const spec = readMaterialSpec(shot);
+  const aspect = options.aspect ?? "9:16";
+  const resolution = options.resolution ?? "1080p";
+  const duration = Number(options.durationSec ?? shot.duration ?? 5);
+  const scene = String(shot.scene ?? spec.description ?? "").trim();
+  const sceneDescription = String(shot.sceneDescription ?? "").trim();
+  const lighting = String(shot.lighting ?? "").trim();
+  const colorPalette = String(shot.color_palette ?? "").trim();
+  const propsLine = String(shot.props ?? "").trim();
+  const negative = String(shot.negative ?? "").trim();
+  const motionIntent = spec.motion ?? String(shot.camera_movement ?? "").trim();
+  const mustKeep = (options.mustKeep ?? [
+    "地标/建筑的形制与层叠关系", "匾额与牌匾文字标识", "水域、地形与城市天际线的相对关系", "材质与天色的真实感"
+  ]).join("、");
+  const lines = [
+    `【任务】以提供的实拍参考素材为**实景依据**，构建一段 ${duration} 秒的真实拍摄感视频场景。`
+      + `注意：参考图只用于确认实景要素，**不是首帧、不是要你把它动起来**——你要拍的是这个真实场景里的一段视频。`,
+    `【实景依据·保持一致】${mustKeep}。参考素材说明：${scene || "实拍地标"}${sceneDescription ? `；${sceneDescription}` : ""}`,
+    "【必须由你构建的部分】① **机位与取景自己定**：不得复刻参考图的构图；可以从更高/更低、更近/更远、"
+      + "偏左/偏右的位置拍，可以换焦段（广角全景 → 长焦细节）；② **至少完成一次真实镜头位移**"
+      + "（推近/拉开/横摇/俯仰/升降/环绕/甩镜，允许速度坡道：快起稳收或慢起快收）；"
+      + "③ **真实三维视差**：前景、中景、远景的相对位移必须不同（这是「真实场景」与「照片被推动」的分水岭）；"
+      + "④ **环境运动**：云层流动、水面波纹与倒影、光线变化、树叶/灯笼/旗帜摆动、人群与车流自然移动；"
+      + "⑤ **补全画面**：参考图没拍到的边缘（天空、地面、侧向空间）要按真实场景合理延伸，"
+      + "不得出现参考图的边界、黑边、贴图边缘或「原图被放大」的观感。",
+    motionIntent ? `【镜头运动（本镜意图）】${motionIntent}` : "【镜头运动（本镜意图）】低空推进后抬升，让地标从画面下缘进入并稳住。",
+    options.motionStrength === "assertive"
+      ? "【上一版问题·必须加大】上一版被判定为「像参考图被推动」：这一版**换一个机位**重新构建场景，"
+        + "镜头位移更大、视差更明确、环境运动更容易看出来（云/水/人群至少两处在动）。"
+      : "",
+    "【禁止】把参考照片整幅平移/缩放/旋转（贴图式运动）；复刻参考图构图；出现参考图边界或黑边；"
+      + "画面全程静止；只有环境微动而镜头不动；把静态照片直接当镜头。",
+    "【画面质感】写实电影摄影：真实镜头语言、自然景深与运动模糊、真实材质与光比；无 AI 绘画感、无塑料感、无穿模。",
+    lighting ? `【光线】${lighting}` : "",
+    colorPalette ? `【色调】${colorPalette}` : "",
+    propsLine ? `【画面元素】${propsLine}` : "",
+    `【约束】${aspect} 画幅 ${resolution}；无水印、无字幕、无标题字、无 LOGO、无边框；画面内不出现任何新增文字。`,
+    negative ? `【负面】${negative}；照片复刻、贴图平移、参考图边界、静止画面、建筑臆造、文字变化、水印字幕。`
+      : "【负面】照片复刻、贴图平移、参考图边界、静止画面、建筑臆造、文字变化、水印字幕。",
+    options.injection ? String(options.injection).trim() : "",
+    options.title ? `【作品】${options.title}` : ""
+  ].filter((line) => line.length > 0);
+  const prompt = lines.join("\n");
+  assertNoDegenerateTokens(prompt);
+  return prompt;
+}
+
+export interface ReferenceIndependenceSample {
+  /** 成片首帧与参考素材（含候选裁切/缩放窗口）的**最佳匹配 PSNR**（dB） */
+  firstFrameBestPsnrDb: number | null;
+  /** 成片中段帧与参考素材的最佳匹配 PSNR（dB） */
+  midFrameBestPsnrDb: number | null;
+  /** 首帧与参考素材在"不缩放、不位移"下的直接 PSNR（越低越说明取景不同） */
+  directPsnrDb: number | null;
+}
+
+export interface ReferenceIndependencePolicy {
+  /** 首帧"就是参考图"的判据：最佳匹配 PSNR ≥ 该值即判复刻 */
+  reproducedPsnrDb: number;
+  /** 直接比对（不对齐）到该值以上也判复刻（同一张图、同一次取景） */
+  directReproducedPsnrDb: number;
+  /** 中段仍能高精度匹配到参考图 → 整段是参考图的变换而非重建场景 */
+  midFrameReproducedPsnrDb: number;
+}
+
+export const REFERENCE_INDEPENDENCE_POLICY: ReferenceIndependencePolicy = {
+  reproducedPsnrDb: 32,
+  directReproducedPsnrDb: 40,
+  midFrameReproducedPsnrDb: 34
+};
+
+/**
+ * "这是构建出来的视频场景，还是把参考图动起来"的量化判据（material-scene/v1）。
+ * 与"静态直出"（material-usage）判据的区别：直出管的是"画面有没有动"，
+ * 这里管的是"画面是不是从参考图长出来的"——首帧/中段只要还能高精度对回参考图，就判复刻。
+ */
+export function assessReferenceIndependence(
+  sample: ReferenceIndependenceSample,
+  policy: ReferenceIndependencePolicy = REFERENCE_INDEPENDENCE_POLICY
+): { independent: boolean; detail: string } {
+  const best = sample.firstFrameBestPsnrDb;
+  const mid = sample.midFrameBestPsnrDb;
+  const direct = sample.directPsnrDb;
+  const reproducedByBest = best !== null && best >= policy.reproducedPsnrDb;
+  const reproducedByDirect = direct !== null && direct >= policy.directReproducedPsnrDb;
+  const reproducedMid = mid !== null && mid >= policy.midFrameReproducedPsnrDb;
+  const detail = `首帧最佳匹配 ${best === null ? "未测到" : `${best.toFixed(1)}dB`}（≥${policy.reproducedPsnrDb} 判复刻）`
+    + ` · 首帧直比 ${direct === null ? "未测到" : `${direct.toFixed(1)}dB`}（≥${policy.directReproducedPsnrDb} 判同图）`
+    + ` · 中段最佳匹配 ${mid === null ? "未测到" : `${mid.toFixed(1)}dB`}（≥${policy.midFrameReproducedPsnrDb} 判复刻）`;
+  return {
+    independent: !reproducedByBest && !reproducedByDirect && !reproducedMid,
+    detail: reproducedByBest || reproducedByDirect || reproducedMid
+      ? `${detail}——判定为"参考图被推动/复刻"，不是构建出来的视频场景（需换机位重做）`
+      : detail
+  };
 }
 
 /**

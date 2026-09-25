@@ -49,3 +49,13 @@ rules:
       actions: [material.generate, render.write]
     when: "params.fidelity_reviewed != true or params.landmark_altered == true or params.text_identifier_changed == true"
     note: 图生视频会把"真实地标"交给模型自由演绎，存在"顺手美化建筑/改匾额文字"的风险：素材镜的生成产物必须过保真复核（主楼形制、檐口层叠、匾额与脊饰、水域关系、文字标识），未复核或确认被改造即挂起；确认保真的结果由 G-MAT0 直通。
+
+  - rule_id: G-MAT4
+    name: 素材只作场景依据（禁止把参考图当首帧做动效）
+    level: block
+    is_baseline: true
+    match:
+      object_types: [material_asset, render_job, video_asset, final_video]
+      actions: [material.generate, render.write]
+    when: "params.reference_only != true or params.first_frame_from_reference == true or params.photo_as_first_frame == true"
+    note: "产品所有者 2026-09-25 口径：**图片只是实景素材参考，是用来构建真实视频场景的**——素材必须以 reference_image（reference_only=true）提交，禁止当 first_frame；成片必须是模型构建出来的视频场景（自有 机位/视差/环境运动），不是「参考图被推动」。机检口径 material-scene/v1：首帧最佳匹配 PSNR ≥32dB、首帧直比 ≥40dB、或中段最佳匹配 ≥34dB，任一命中即判「参考图被推动」，一票否决。DSL 语义：reference_only 缺失 → 左值 != true 成立 → 阻断（fail-closed）。"
