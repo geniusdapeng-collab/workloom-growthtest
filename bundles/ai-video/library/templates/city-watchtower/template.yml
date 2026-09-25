@@ -1,0 +1,170 @@
+# 《瞭望塔》式城市片制作模式（city-watchtower）· v1.0 · 2026-09-25
+#
+# 来源：对《Watchtower of Turkey》的深度拉片（docs/watchtower-deconstruction.md）。
+# 一句话口径：**参考素材只作实景依据**；画面里的机位/视差/环境运动由模型构建（material-scene/v1）；
+# 节奏靠"镜长曲线 + 卡点 + 运动掩体转场 + 三层声音"。
+template_key: city-watchtower
+name: 瞭望塔式城市片
+version: v1.0
+owner: director
+description: 一座城市的 45–60 秒快剪片：建立 → 加速 → 高潮 → 收束，镜长曲线化、剪辑点卡在 BPM、
+  转场只用运动掩体（甩镜拖影/擦除/match cut）、声音三层（音乐床 + 人声层 + 转场音效）、人物以临时角色作"人味标点"。
+platforms: [小红书, 抖音, 视频号, YouTube]
+aspect_presets: ["9:16", "16:9"]
+
+# ── 一、结构（时间轴百分比 → 段落） ─────────────────────────────────────────
+structure:
+  - { segment: build, ratio: [0.00, 0.18], shot_seconds: [3.2, 4.5], intent: 建立城市与色调（大景、留白、慢起） }
+  - { segment: accelerate, ratio: [0.18, 0.55], shot_seconds: [2.2, 3.2], intent: 城市肌理与市井（景别跳变、卡点开始） }
+  - { segment: climax, ratio: [0.55, 0.82], shot_seconds: [1.2, 2.2], intent: 最短镜 + match cut 连击（夜、灯、水、人） }
+  - { segment: resolve, ratio: [0.82, 1.00], shot_seconds: [3.0, 4.5], intent: 收束留白（人 + 地标同框或空镜余韵） }
+
+# ── 二、镜头类型库（每类给：画面任务 / 运镜 / 声音 / 机检要点） ───────────────
+shot_types:
+  - id: establishing-descend
+    name: 低空俯冲建立
+    task: 交代城市与地标的关系（江/山/天际线 + 主地标）
+    camera: 低空俯冲推近 → 抬升稳住（速度坡道：快起稳收）
+    sound: whoosh（入场）+ 音乐主题起
+    gate: 运动能量 ≥8；地标形制保真；不得复刻参考图构图
+  - id: detail-macro
+    name: 长焦细节
+    task: 用材质/文字/纹样讲"真"（匾额、砖雕、匾额金粉、汤面蒸汽）
+    camera: 长焦贴身微推 + 轻横移（视差来自前后景层次）
+    sound: 环境声浮出
+    gate: 文字标识不得改动；不得糊；不出现参考图边界
+  - id: people-moment
+    name: 人物节点
+    task: 0.6–1.5 秒的"人味标点"（不做角色塑造）
+    camera: 手持呼吸感 / 跟随一步 / 入画出画
+    sound: 环境声 + 音乐继续
+    gate: 人脸自然无畸变；不与镜头说话；单镜停留 ≤2s
+  - id: transit-motion
+    name: 交通动势
+    task: 城市速度（地铁、车流、电动车、渡轮）
+    camera: 横向甩镜 / 同向追随 / 出画入画
+    sound: whoosh 对齐出画帧
+    gate: 运动模糊自然；不出现乱码文字
+  - id: texture-close
+    name: 材质特写
+    task: 质感层（瓦当、木纹、雨滴、蒸汽、辣椒、米粉）
+    camera: 微距推近 + 极浅景深
+    sound: 轻 impact 或静音留白
+    gate: 无 AI 塑料感；纹理不重复
+  - id: water-reflect
+    name: 水面/反射
+    task: 把城市复制成上下两份（赣江/湿地/雨后石路）
+    camera: 贴水面横移 + 抬升
+    sound: 音乐段落转换点
+    gate: 倒影与实体逻辑一致（不得镜像穿模）
+  - id: night-light
+    name: 夜景灯光
+    task: 高潮段主料（灯光秀、摩天轮、桥、江面）
+    camera: 环绕半圈 / 拉升 / 甩镜
+    sound: impact + 音乐爆发
+    gate: 高光不过曝；暗部有层次
+  - id: food-steam
+    name: 食物蒸汽
+    task: 生活气味（拌粉、瓦罐汤、白糖糕、藜蒿炒腊肉）
+    camera: 俯拍推近 + 蒸汽升腾（顺带"前景遮挡"）
+    sound: 环境声 + 轻 whoosh 出画
+    gate: 蒸汽形态自然；不出现第二份餐盘复制
+  - id: corridor-frame
+    name: 框景/门洞
+    task: 视觉母题（古街门洞、地铁口、桥洞、窗棂）
+    camera: 穿框推进 / 出框拉开
+    sound: whoosh
+    gate: 框结构不畸变
+  - id: resolve-portrait
+    name: 收束人物
+    task: 收尾把"人"放回城市（主讲人或临时角色 + 地标同框）
+    camera: 缓拉远 + 轻微上抬
+    sound: 音乐回落，人声短句（可选）
+    gate: 人物与片中造型一致（主讲人）；临时角色不重复出现
+
+# ── 三、节奏与卡点 ───────────────────────────────────────────────────────
+pacing:
+  cut_transition: hblur        # 甩镜拖影；擦除可用 smoothleft
+  cut_transition_seconds: 0.18
+  transition_at: [2, 3, 4, 5]  # 只在进入/离开快剪段的入点做转场（避免吃掉过多总时长）
+  beat_lock:
+    method: bgm-bridge --bgm-section auto + --cut-times（真实剪辑网格）
+    tolerance_ms: 80
+    target_hit_rate: "5/5"
+  speed_ramp:
+    enabled: true
+    shape: "快起(0–30% 源) → 稳行(30–72%) → 快收(72–100%)"
+    normalize: true            # 归一化回原镜时长
+
+# ── 四、声音三层 ─────────────────────────────────────────────────────────
+audio:
+  music_bed:
+    source: bgm-bridge（曲库/受控曲目）
+    loudness_lufs: -14
+    true_peak_dbtp: -1
+    ducking_db: 12
+  voice_layer:
+    optional: true
+    style: "短句/气息式（不承担解说）"
+    profile: "同片统一音色（人物口播与旁白必须同一音色档案）"
+    lines_max: 3
+  sfx_layer:
+    stage: sfx                 # 管线 ⑧-2 阶段
+    kinds: [whoosh, impact, riser]
+    policy:
+      whoosh_gain_db: -13
+      impact_gain_db: -9
+      riser_gain_db: -16
+      whoosh_lead_seconds: 0.06
+      min_gap_seconds: 0.45
+    rule: "riser 必须**结束在高潮那一刻**（前置抬升）；间隔不足按 impact > riser > whoosh 取舍并留痕"
+  verify: [响度漂移 ≤1.5 LUFS, 人声可辨（不让位不足）, 音效条数与间隔合规]
+
+# ── 五、素材策略（产品口径） ─────────────────────────────────────────────
+materials:
+  policy: material-scene/v1
+  usage: generation-reference       # 素材只作实景依据，**不作 first_frame**
+  submit_as: reference_image
+  gates:
+    - G-MAT1 用途声明 + 生成溯源 + 非静态直出
+    - G-MAT4 素材只作场景依据（参考图当首帧 → 阻断）
+    - scene-constructed 机检（首帧 ≥32dB / 直比 ≥40dB / 中段 ≥34dB 判"参考图被推动"）
+  sourcing:
+    - 地标/场所：官方授权素材或自制拍摄优先；公开网络图仅限内部样片并标注来源
+    - 人物：主讲人用角色档案；**临时角色用生成式类型化人物**（不克隆真实个人面孔/声音）
+
+# ── 六、人物策略 ────────────────────────────────────────────────────────
+cast:
+  lead:
+    role: 主讲人/命题人
+    screen_time_ratio: "≤15%"
+    appearances: [开场 1 镜, 收尾 1 镜]     # 中间不再出现整段口播
+    voice: 与旁白同一音色档案
+  temporary_roles:
+    count: [5, 8]
+    screen_time_seconds: [0.6, 1.5]
+    rule:
+      - 每个临时角色全片只出现一次，不重复
+      - 一律无台词、只做动作（干活/走动/看/笑/招手）
+      - 类型化描述（职业+年龄+衣着+动作），不使用真实个人肖像
+      - 不与镜头说话，不做"对镜叙述"
+    examples: [早点摊主, 瓦罐汤师傅, 外卖骑手, 写生学生, 晨练老人, 地铁通勤者, 夜跑者, 灯光秀讲解员]
+
+# ── 七、门禁清单（跑片前逐条勾） ─────────────────────────────────────────
+gates_checklist:
+  - G5 定妆照确认（有主讲人时）
+  - G6 提示词审核（镜长曲线/运镜/声音三层写进镜头卡）
+  - G7 预生产确认（素材镜按 material-scene/v1 备好参考与提示词）
+  - G8 渲染提交（逐镜；素材镜走 G-MAT1/G-MAT4）
+  - G-MAT1/G-MAT4 + scene-constructed（素材镜）
+  - 卡点实测（≥目标命中率，容差 ≤80ms）
+  - SFX 层复核（条数/间隔/响度漂移/人声可辨）
+  - 封面（三件套 + 六项机检 + 监制）
+  - 终审（upstream-approved：任一上游环节被打回不得出厂）
+
+# ── 八、交付物 ─────────────────────────────────────────────────────────
+deliverables:
+  - 成片（主版本 + 2–3 个风格变体；G-DLV1 变体雷同否决）
+  - 封面（1080×1920 / 平台适配）
+  - 字幕（旁挂 srt/ass/vtt；不带标点）
+  - 交付清单 + 阶段日志（含音效摆放与卡点实测）

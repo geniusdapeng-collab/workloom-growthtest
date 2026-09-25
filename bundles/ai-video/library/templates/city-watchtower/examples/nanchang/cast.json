@@ -1,0 +1,83 @@
+{
+  "schema": "workloom.cast/v1",
+  "note": "临时角色一律**类型化生成**（不克隆真实个人面孔/声音），全片每人只出现一次、无台词、0.6–1.5 秒；主讲人用角色档案并贯穿音色。",
+  "lead": {
+    "id": "chen-zhuo",
+    "name": "陈卓",
+    "role": "主讲人（命题人）",
+    "screenTimeRatio": "≤15%",
+    "appearances": ["NC-01", "NC-16"],
+    "voiceProfile": "chen-zhuo-film",
+    "wardrobe": "月白色苏式改良旗袍（收尾）/ 米白针织上衣（开场，日景）"
+  },
+  "temporaryRoles": [
+    {
+      "id": "nc-vendor-noodle",
+      "name": "拌粉摊主（女，50 岁上下）",
+      "shotId": "NC-09",
+      "appearance": "东亚面孔，圆脸、短发别在耳后，穿深蓝工作围裙与袖套，手指有力、指甲短",
+      "action": "双手抓起一把米粉抖散下锅，蒸汽腾起，头略低不看镜头",
+      "durationSec": 1.2,
+      "voice": "无"
+    },
+    {
+      "id": "nc-vendor-soup",
+      "name": "瓦罐汤师傅（男，60 岁上下）",
+      "shotId": "NC-10",
+      "appearance": "东亚面孔，清瘦、花白短寸、深色对襟短褂，前臂有烫痕，戴棉布手套",
+      "action": "从大瓦缸里夹出一只小瓦罐，放到托盘上，动作稳",
+      "durationSec": 1.0,
+      "voice": "无"
+    },
+    {
+      "id": "nc-rider-delivery",
+      "name": "外卖骑手（男，25 岁上下）",
+      "shotId": "NC-07",
+      "appearance": "东亚面孔，黄色冲锋衣与头盔，袖口卷起，电动车后箱有磨损",
+      "action": "在江边大道上减速拐弯出画，尾灯拖出光带",
+      "durationSec": 1.2,
+      "voice": "无"
+    },
+    {
+      "id": "nc-student-sketch",
+      "name": "写生学生（女，20 岁上下）",
+      "shotId": "NC-04",
+      "appearance": "东亚面孔，马尾、浅灰卫衣，膝上摊着速写本，铅笔握在指节处",
+      "action": "抬头看飞檐又低头落笔，笔尖快速排线",
+      "durationSec": 1.0,
+      "voice": "无"
+    },
+    {
+      "id": "nc-elder-morning",
+      "name": "晨练老人（男，70 岁上下）",
+      "shotId": "NC-06",
+      "appearance": "东亚面孔，银白短发、浅灰太极服、布鞋，动作缓慢有力",
+      "action": "双手缓慢划弧转身，背景是江面晨雾",
+      "durationSec": 1.5,
+      "voice": "无"
+    },
+    {
+      "id": "nc-commuter-metro",
+      "name": "地铁通勤青年（男，28 岁上下）",
+      "shotId": "NC-08",
+      "appearance": "东亚面孔，黑框眼镜、深灰风衣、双肩包，耳机挂着",
+      "action": "扶梯上行时抬眼看向站厅灯箱，随后出画",
+      "durationSec": 1.0,
+      "voice": "无"
+    },
+    {
+      "id": "nc-runner-night",
+      "name": "夜跑者（女，30 岁上下）",
+      "shotId": "NC-14",
+      "appearance": "东亚面孔，深色运动背心与短裤、反光臂环，头发扎起",
+      "action": "沿江岸夜跑经过，速度感靠前后景视差体现",
+      "durationSec": 0.8,
+      "voice": "无"
+    }
+  ],
+  "compliance": {
+    "portrait": "临时角色为生成式类型化人物，不对应任何真实个人；如需真人出镜，素材与肖像授权由产品所有者提供",
+    "voice": "临时角色无台词；人声只用于主讲人短句与旁白（同一音色档案 chen-zhuo-film）",
+    "location": "地标与街区的参考素材需官方授权或自制；公开网络图仅限内部样片并标注来源"
+  }
+}

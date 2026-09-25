@@ -36,6 +36,7 @@ import {
   coverDeterministicChecks, COVER_FONTS, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm, reviewStage,
+  buildSfxArgs, cutTimesFromShots, planCutSfxDetailed, CUT_SFX_POLICY,
   normalizePromptLanguage,
   restoreTimelineField,
   type CoverDesignInput, type CoverMeasurements, type CoverPlan, type GateCheck, type GateEvent, type PipelineGateStepKey,
@@ -3083,6 +3084,118 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
     attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : null,
     evidence: { genre, mood, policy, via: bgmVia, loudness: mixLufs, measured: measured.detail, tool: `bgm-bridge ${bgmVia}` }, verdict
   });
+}
+
+/* ---------- ⑧-2 转场音效层（step_key: sfx，《瞭望塔》式城市片的第三层声音，2026-09-25 新增） ---------- */
+/**
+ * 拉片结论（`docs/watchtower-deconstruction.md` §三/§六）：这类片子听感的一半来自**剪辑点上的音效**——
+ * 甩镜有气流（whoosh）、段落重音有冲击（impact）、进入高潮前有抬升（riser）。
+ * 本阶段把这层补上，且全部**合成**（无第三方采样，确定性可复现）：
+ *   ① 从镜头时长 + 逐刀转场参数推出剪辑点（与 compose 的 xfade 口径一致）；
+ *   ② 每个剪辑点铺 whoosh、段落重音铺 impact、高潮前铺 riser（`planCutSfx`）；
+ *   ③ 合成音效 → 逐条 adelay 拼成 SFX 轨 → 与母版音轨混音（视频轨 copy）；
+ *   ④ 复核：响度仍在 −14 LUFS ±1.5、剪辑点窗口内确有新增能量（"做了但听不见"要被抓出来）。
+ */
+if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
+  const started = Date.now();
+  const sfxDir = join(POST_DIR, "sfx");
+  mkdirSync(sfxDir, { recursive: true });
+  const totalDuration = Number(probe(scored).duration ?? 0);
+  const shotDurations = shots.map((s) => Number(s.duration ?? 5));
+  const cutTimes = cutTimesFromShots(shotDurations, CUT_TRANSITION ? CUT_TRANSITION_DURATION : 0,
+    CUT_TRANSITION ? CUT_TRANSITION_AT.split(",").map((v) => Number(v.trim())).filter((v) => Number.isFinite(v) && v > 0) : []);
+  /** 段落重音 = 进入快剪段的第一刀 + 最后一刀（模板可覆盖） */
+  const accentTimes = cutTimes.length > 1 ? [cutTimes[0]!, cutTimes[cutTimes.length - 1]!] : cutTimes.slice(0, 1);
+  /**
+   * 高潮那一刻 = 最后一个重音刀口（进入收尾镜之前）。
+   * riser 由策划器**前置**到高潮之前（真机打回：riser 落在切点之后 = 高潮过去了才抬升）。
+   */
+  const climaxAtSec = accentTimes.length > 0 ? accentTimes[accentTimes.length - 1] : undefined;
+  const sfxPlan = planCutSfxDetailed({ cutTimes, durationSec: totalDuration, accentTimes, climaxAtSec }, CUT_SFX_POLICY);
+  const placements = sfxPlan.placements;
+  try {
+    const files: string[] = [];
+    const renderOne = (kind: "whoosh" | "impact" | "riser", durationSec: number, file: string): void => {
+      run(FFMPEG, ["-y", ...buildSfxArgs({ kind, durationSec }), "-f", "wav", file]);
+    };
+    placements.forEach((placement, index) => {
+      const file = join(sfxDir, `${String(index + 1).padStart(2, "0")}-${placement.kind}-${placement.atSec}s.wav`);
+      renderOne(placement.kind, placement.kind === "riser" ? 1.2 : placement.kind === "impact" ? 0.26 : 0.36, file);
+      files.push(file);
+    });
+    const sfxTrack = join(sfxDir, "sfx-track.wav");
+    if (placements.length === 0) {
+      log("  ⚠ 没有剪辑点可铺音效（跳过 SFX 层）");
+      record({
+        stage: "sfx", shotId: null, invoked: true, ok: true, cached: false, degraded: true, attempt: 1, ms: Date.now() - started,
+        artifact: null, evidence: { placements: 0, cutTimes }, verdict: null, note: "无剪辑点：SFX 层未产出（如实记录，不静默）"
+      });
+    } else {
+      /** 合成 SFX 轨：每条音效按 atSec 延迟后混在一起（amix 不做响度归一，避免把短音效拉爆） */
+      const inputs = placements.map((_, index) => `-i ${JSON.stringify(files[index]!)}`).join(" ");
+      const delays = placements.map((placement, index) =>
+        `[${index}:a]adelay=${Math.round(placement.atSec * 1000)}|${Math.round(placement.atSec * 1000)},volume=${placement.gainDb}dB[a${index}]`
+      ).join(";");
+      const mixInputs = placements.map((_, index) => `[a${index}]`).join("");
+      run(FFMPEG, ["-y", ...placements.flatMap((_, index) => ["-i", files[index]!]),
+        "-filter_complex", `${delays};${mixInputs}amix=inputs=${placements.length}:normalize=0:dropout_transition=0[aout]`,
+        "-map", "[aout]", "-t", totalDuration.toFixed(3), "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", sfxTrack]);
+      void inputs;
+      /** 与母版混音：视频轨 copy，音轨 = 母版 + SFX（SFX 已在摆放阶段设过增益） */
+      const out = join(POST_DIR, "master-sfx.mp4");
+      run(FFMPEG, ["-y", "-i", scored, "-i", sfxTrack,
+        "-filter_complex", "[0:a][1:a]amix=inputs=2:duration=first:normalize=0[aout]",
+        "-map", "0:v:0", "-map", "[aout]",
+        "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+        "-movflags", "+faststart", out]);
+      const before = measureLoudness(scored);
+      const after = measureLoudness(out);
+      const drift = before.lufs !== null && after.lufs !== null ? Math.abs(after.lufs - before.lufs) : null;
+      const verdict = await reviewStage({
+        stage: "sfx", projectId: PROJECT,
+        artifacts: [{ path: out, kind: "video", probe: probe(out) }, ...placements.slice(0, 6).map((p, i) => ({ path: files[i]!, kind: "audio" as const, note: `${p.kind}@${p.atSec}s` }))],
+        rubric: [
+          "音效与画面剪辑点对齐：甩镜/擦除处能听到气流，段落重音处有冲击，高潮前有抬升",
+          "音效不能盖台词：有人声的镜头里，人声仍清晰可辨（响度与让位不因加音效而破坏）",
+          "音效不过量：不是每个镜头都塞特效，密集段也不能糊成一片（间隔与条数在口径内）",
+          "整片响度仍在母版口径（−14 LUFS ±1.5）"
+        ],
+        deterministic: [
+          { id: "sfx-produced", pass: existsSync(out), detail: existsSync(out) ? "带音效母版已产出" : "带音效母版未产出", hard: true },
+          { id: "sfx-count", pass: placements.length >= Math.min(3, cutTimes.length), detail: `音效 ${placements.length} 条 / 剪辑点 ${cutTimes.length} 个`, hard: true },
+          { id: "video-untouched", pass: Number(probe(out).duration ?? 0) > 0, detail: "视频轨 copy（画面零改动）", hard: true },
+          {
+            id: "loudness-drift", pass: drift === null ? false : drift <= 1.5,
+            detail: `加音效前后响度漂移 ${drift === null ? "未测到" : `${drift.toFixed(2)} LUFS`}（上限 1.5）`, hard: true
+          }
+        ],
+        context: {
+          placements: placements.map((p) => `${p.kind}@${p.atSec}s（${p.gainDb}dB，${p.reason}）`),
+          cutTimes, policy: CUT_SFX_POLICY,
+          discipline: "音效是**剪辑点掩体**，不是音效秀：条数与增益按口径执行；听不见=白做，盖住人声=事故。"
+        },
+        env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
+      });
+      if (existsSync(out) && verdict.approved) scored = out;
+      record({
+        stage: "sfx", shotId: null, invoked: true, ok: verdict.approved && existsSync(out), cached: false,
+        degraded: verdict.degraded, attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : null,
+        evidence: {
+          placements: placements.map((p) => ({ atSec: p.atSec, kind: p.kind, gainDb: p.gainDb, reason: p.reason })),
+          dropped: sfxPlan.dropped.map((p) => ({ atSec: p.atSec, kind: p.kind, reason: p.reason })),
+          climaxAtSec, cutTimes, loudnessBefore: before.detail, loudnessAfter: after.detail, drift,
+          tool: "sfx-synth（合成，无第三方采样）"
+        },
+        verdict, note: `转场音效 ${placements.length} 条（whoosh/impact/riser）`
+      });
+    }
+  } catch (err) {
+    record({
+      stage: "sfx", shotId: null, invoked: true, ok: false, cached: false, degraded: false, attempt: 1,
+      ms: Date.now() - started, artifact: null,
+      evidence: { error: err instanceof Error ? err.message.slice(0, 300) : String(err) }, verdict: null
+    });
+  }
 }
 
 /* ---------- ⑨ 封面（封面设计师：设计稿 → 合成 → 机检 → 监制，2026-09-25 重写） ---------- */

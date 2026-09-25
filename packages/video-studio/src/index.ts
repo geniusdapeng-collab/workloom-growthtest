@@ -5,6 +5,7 @@ export * from "./gates.js";
 export * from "./llm-adapter.js";
 export * from "./material-policy.js";
 export * from "./cover-design.js";
+export * from "./sfx-synth.js";
 export * from "./portrait-runtime.js";
 export * from "./portrait-binding.js";
 export * from "./character-archive.js";
