@@ -99,18 +99,19 @@ const DEFAULT_QUERY_CAP: Record<IntelStage, number> = { A1: 8, A2: 8, A3: 5 };
  * 无关结果——档案会因此"有来源但没情报"。实测搜狗 / 360 / 百度 对同一查询能返回
  * 参数站、测评、开箱、知乎讨论等真实结果，故按引擎链并行取结果再合并去重。
  */
-export type SearchProvider = "baidu-m" | "so360" | "bing" | "sogou" | "baidu";
+export type SearchProvider = "api" | "baidu-m" | "so360" | "bing" | "sogou" | "baidu";
 /** 预置结果通道（平台检索/人工回填写进缓存时的来源名） */
 export const FIXTURE_PROVIDER = "fixture";
 
 /**
  * 默认引擎链（2026-09-25 实测口径）：
+ *   · api（可选，**配 key 即置顶**）：Tavily 或通用 JSON 检索服务——生产首选（见 §检索通道配置）；
  *   · baidu-m（移动百度）：中文长尾词命中最好，且桌面版会弹「百度安全验证」而移动端不弹；
  *   · so360（360 搜索）：参数站/测评/开箱覆盖好，稳定返回服务端渲染结果；
  *   · bing（RSS）：结果 URL 是真实目标域名（另外两家是跳转链接），作为补充通道。
  * 搜狗已改为前端渲染（服务端 HTML 无 h3 结果块），仅在显式配置时尝试。
  */
-export const DEFAULT_SEARCH_PROVIDERS: SearchProvider[] = ["baidu-m", "so360", "bing"];
+export const DEFAULT_SEARCH_PROVIDERS: SearchProvider[] = ["api", "baidu-m", "so360", "bing"];
 
 function decodeEntities(text: string): string {
   return text
@@ -174,7 +175,105 @@ async function searchBingRss(query: string, limit: number, timeoutMs: number): P
 
 const MOBILE_UA = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1";
 
-const PROVIDER_CONFIG: Record<Exclude<SearchProvider, "bing">, { base: string; ua: string }> = {
+/* ================= API 检索源（生产首选；公开 HTML 检索随时可能被反爬掐掉） ================= */
+
+export interface ApiSearchConfig {
+  /** `tavily`（默认，协议固定）或 `generic`（自定义 OpenAI 风格 JSON 网关） */
+  provider?: "tavily" | "generic";
+  /** 覆盖默认端点（tavily 默认 https://api.tavily.com/search） */
+  apiUrl?: string;
+  apiKey?: string;
+  timeoutMs?: number;
+  /** 测试注入；默认全局 fetch */
+  fetchImpl?: typeof fetch;
+  log?: (line: string) => void;
+}
+
+export interface ApiSearchRunner {
+  enabled: boolean;
+  label: string | null;
+  search: (query: string, limit: number) => Promise<{ hits: SearchHit[]; blocked: boolean }>;
+}
+
+/** 从环境解析 API 检索配置：`TAVILY_API_KEY` 或 `WL_SEARCH_API_URL`+`WL_SEARCH_API_KEY` */
+export function resolveApiSearchConfig(
+  explicit: ApiSearchConfig = {},
+  env: NodeJS.ProcessEnv = process.env,
+): (ApiSearchConfig & { provider: "tavily" | "generic"; apiUrl: string; apiKey: string }) | null {
+  const provider = explicit.provider
+    ?? (env.WL_SEARCH_API_PROVIDER === "generic" ? "generic" : env.TAVILY_API_KEY ? "tavily" : env.WL_SEARCH_API_URL ? "generic" : undefined);
+  const apiKey = explicit.apiKey ?? (provider === "tavily" ? env.TAVILY_API_KEY : env.WL_SEARCH_API_KEY) ?? "";
+  const apiUrl = explicit.apiUrl ?? (provider === "tavily"
+    ? "https://api.tavily.com/search"
+    : env.WL_SEARCH_API_URL ?? "");
+  if (!provider || !apiKey || !apiUrl) return null;
+  return { ...explicit, provider, apiUrl, apiKey };
+}
+
+/**
+ * 构造 API 检索执行器（未配置返回 `enabled:false`，调用方直接跳过）。
+ *
+ * 两种协议：
+ *   · tavily：POST 端点，body `{ api_key, query, max_results, search_depth:'basic' }`，
+ *     结果在 `results[{ title, url, content }]`；
+ *   · generic：POST 端点（Bearer 鉴权），body `{ query, count }`，
+ *     结果在 `results | data | items`，字段兼容 `snippet|content|description|summary`。
+ * 失败/限流（403/429）返回 `blocked:true` 交给上层熔断冷却——与 HTML 通道同口径。
+ */
+export function createApiSearchRunner(config: ApiSearchConfig = {}): ApiSearchRunner {
+  const resolved = resolveApiSearchConfig(config);
+  if (!resolved) return { enabled: false, label: null, search: async () => ({ hits: [], blocked: false }) };
+  const fetchImpl = resolved.fetchImpl ?? fetch;
+  const timeoutMs = resolved.timeoutMs ?? 12_000;
+  const log = resolved.log ?? (() => undefined);
+  return {
+    enabled: true,
+    label: resolved.provider,
+    search: async (query, limit) => {
+      try {
+        const isTavily = resolved.provider === "tavily";
+        const res = await fetchImpl(resolved.apiUrl, {
+          method: "POST",
+          signal: AbortSignal.timeout(timeoutMs),
+          headers: {
+            "content-type": "application/json",
+            ...(isTavily ? {} : { authorization: `Bearer ${resolved.apiKey}` }),
+          },
+          body: JSON.stringify(isTavily
+            ? { api_key: resolved.apiKey, query, max_results: Math.max(1, Math.min(limit, 20)), search_depth: "basic" }
+            : { query, count: Math.max(1, Math.min(limit, 20)) }),
+        });
+        if (!res.ok) {
+          log(`[intel] API 检索非 200（${res.status}，provider=${resolved.provider}）`);
+          return { hits: [], blocked: res.status === 403 || res.status === 429 };
+        }
+        const json = await res.json() as Record<string, unknown>;
+        /** 结果数组位置兼容：`results` / `items` / `data[]` / `data.items[]`（网关风格不统一） */
+        const candidates: unknown[] = [json.results, json.items, json.data];
+        const dataObj = (json.data && typeof json.data === "object") ? json.data as Record<string, unknown> : null;
+        if (dataObj) candidates.push(dataObj.results, dataObj.items, dataObj.list);
+        const rows = candidates.find((candidate) => Array.isArray(candidate)) as unknown[] | undefined;
+        const list = rows ?? [];
+        const hits: SearchHit[] = [];
+        for (const row of list) {
+          const record = (row && typeof row === "object") ? row as Record<string, unknown> : {};
+          const title = String(record.title ?? record.name ?? "").trim();
+          const url = String(record.url ?? record.link ?? "").trim();
+          const snippet = String(record.content ?? record.snippet ?? record.description ?? record.summary ?? "").trim();
+          if (!title || !url) continue;
+          hits.push({ title, url, snippet: snippet.slice(0, 400) });
+          if (hits.length >= limit) break;
+        }
+        return { hits, blocked: false };
+      } catch (err) {
+        log(`[intel] API 检索异常（provider=${resolved.provider}）：${err instanceof Error ? err.message : String(err)}`);
+        return { hits: [], blocked: false };
+      }
+    },
+  };
+}
+
+const PROVIDER_CONFIG: Record<Exclude<SearchProvider, "bing" | "api">, { base: string; ua: string }> = {
   "baidu-m": { base: "https://m.baidu.com/s?word=", ua: MOBILE_UA },
   so360: { base: "https://www.so.com/s?q=", ua: SEARCH_UA },
   sogou: { base: "https://www.sogou.com/web?query=", ua: SEARCH_UA },
@@ -188,6 +287,7 @@ async function searchOneProvider(
   timeoutMs: number,
 ): Promise<{ hits: SearchHit[]; blocked: boolean }> {
   if (provider === "bing") return searchBingRss(query, limit, timeoutMs);
+  if (provider === "api") return { hits: [], blocked: false }; // API 通道由 createApiSearchRunner 独立处理
   const { base, ua } = PROVIDER_CONFIG[provider];
   const res = await fetch(`${base}${encodeURIComponent(query.slice(0, 80))}`, {
     signal: AbortSignal.timeout(timeoutMs),
@@ -251,12 +351,15 @@ export function createWebSearch(options: {
   cacheTtlMs?: number;
   /** 同一引擎两次请求的最小间隔（默认 1200ms） */
   paceMs?: number;
+  /** API 检索源配置（缺省从 env 解析：TAVILY_API_KEY / WL_SEARCH_API_URL） */
+  api?: ApiSearchConfig;
 } = {}): SearchFn {
   const timeoutMs = options.timeoutMs ?? 10_000;
+  const apiRunner = createApiSearchRunner({ ...options.api, log: options.api?.log ?? options.log });
   const providers = options.providers
     ?? (process.env.WL_SEARCH_PROVIDERS
       ? process.env.WL_SEARCH_PROVIDERS.split(",").map((s) => s.trim()).filter((s): s is SearchProvider =>
-          ["baidu-m", "so360", "bing", "sogou", "baidu"].includes(s))
+          ["api", "baidu-m", "so360", "bing", "sogou", "baidu"].includes(s))
       : DEFAULT_SEARCH_PROVIDERS);
   const cacheTtlMs = options.cacheTtlMs ?? 12 * 3600 * 1000;
   const paceMs = options.paceMs ?? 1_200;
@@ -306,6 +409,24 @@ export function createWebSearch(options: {
     // ② 线上引擎（逐引擎降级；命中足够即停）
     for (const provider of providers) {
       if (merged.length >= limit) break;
+      if (provider === "api") {
+        if (!apiRunner.enabled) continue; // 未配 key → 静默跳过（不占冷却、不报错）
+        const cached = readCachedHits(cache, "api", query, cacheTtlMs);
+        if (cached) { take("api", cached); continue; }
+        const until = cooldownUntil.get("api") ?? 0;
+        if (Date.now() < until) { perProvider.push("api=cooldown"); continue; }
+        const { hits, blocked } = await apiRunner.search(query, limit);
+        if (blocked) {
+          const minutes = 15;
+          cooldownUntil.set("api", Date.now() + minutes * 60_000);
+          options.log?.(`[intel] API 检索命中限流（provider=${apiRunner.label}）→ 冷却 ${minutes} 分钟`);
+          perProvider.push("api=blocked");
+          continue;
+        }
+        writeCachedHits(cache, "api", query, hits);
+        take("api", hits);
+        continue;
+      }
       const cached = readCachedHits(cache, provider, query, cacheTtlMs);
       if (cached) {
         take(provider, cached);

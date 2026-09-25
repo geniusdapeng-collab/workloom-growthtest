@@ -1,5 +1,11 @@
 # Changelog
 
+## [intel-search-api] - 2026-09-25 · 情报检索通道加固：API 检索源（T-2026-0925-0003）
+
+- 引擎链新增 `api` 通道并置顶：`TAVILY_API_KEY` 或 `WL_SEARCH_API_URL`+`WL_SEARCH_API_KEY` 配好即启用；
+  未配置静默跳过，保留 HTML 三引擎链；限流 403/429 进 15 分钟熔断冷却；失败按缺站（不编造）。
+- 单测 +4（Tavily 解析 / 通用网关鉴权 / 限流熔断 / 未配置静默）。
+
 ## [experiment-0.1.0] - 2026-09-21 · 分叉为 growth-test 实验仓并更名「AI超增长」
 
 > 本仓 `workloom-ai/workloom-growthtest` 由 `workloom-ai/WorkLoom-growth@a6dc89a` 完整复制而来，作为**激进改造实验车道**独立演进。

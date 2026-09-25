@@ -147,8 +147,13 @@
 
 ## 6. 未修复 / 遗留（明确列出）
 
-1. **公开检索通道不稳定**（生产风险）：HTML 检索端点会限流/改版。建议生产配置 API 检索源
-   （如 `TAVILY_API_KEY` 等）并置于引擎链首位；当前已具备缓存/冷却/预置三件套，被限流时**缺站**而非编造。
+1. ~~**公开检索通道不稳定**（生产风险）~~ → **已补 API 通道（T-2026-0925-0003）**：
+   引擎链新增 `api` 通道并置于首位，配置 `TAVILY_API_KEY`（Tavily 协议）或
+   `WL_SEARCH_API_URL` + `WL_SEARCH_API_KEY`（通用 JSON 网关，Bearer 鉴权；
+   结果数组兼容 `results / items / data[] / data.items[]`，字段兼容 `snippet|content|description|summary`）
+   即自动启用；未配置时静默跳过，仍走 HTML 三引擎链。
+   限流（403/429）同样进入 15 分钟熔断冷却；失败仍按**缺站**处理（不编造）。
+   生产建议：`TAVILY_API_KEY` 或自建网关 + `WL_SEARCH_PROVIDERS=api,so360,baidu-m,bing`。
 2. **G3 受众画像泛化**：`AudienceProfiler` 在情报薄（无评价样本/无场景）时输出"通用/情感共鸣"套话，
    监制持续打回。建议：把情报 `insight_card.audience_profile` 作为该 Agent 的强上下文；情报薄时先补采再进 G3。
 3. **AI 监制返工预算**：已实现"打回→自动重跑（默认 1 次）"，但重跑不携带监制意见（每次都是新生成）。
