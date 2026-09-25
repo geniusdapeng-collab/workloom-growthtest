@@ -64,6 +64,12 @@ function main() {
       line(`知识库：${status.dir}`);
       line(`主题 ${status.topics} 篇 · 映射条目 ${status.entries} 条 · ${(status.bytes / 1024).toFixed(0)}KB`);
       for (const topic of kb.topics) line(`  ${topic.id}  ${topic.title}  [${topic.domain}]  映射 ${topic.entries.length} 条`);
+      /**
+       * 索引页自带的"联合检索高频组合"（五轮审计）：KB 检索总则要求"完整创作先取 NARR-001 配方，
+       * 再按配方回查各篇"，而索引里那三条组合建议（虚化/电影感/人像）此前**解析了却没人输出**——
+       * Agent 只能自己猜该联合哪几篇。现在原样打出来。
+       */
+      for (const tip of kb.index.jointSuggestions ?? []) line(`  ↳ 联合检索建议：${tip}`);
       if (status.missingTopics.length > 0) {
         line(`⚠ 索引引用了但目录里没有：${status.missingTopics.map((t) => `${t.id} ${t.title}`).join("、")}`);
       }
@@ -136,13 +142,15 @@ function main() {
         shotId: enrichedShots[index].shotId ?? index + 1,
         aperture: trace.apertureAdvisor?.aperture ?? null,
         scenario: trace.apertureAdvisor?.scenarioLabel ?? null,
+        /** 情绪配方派发线索（只派发不直注）：五轮审计前该线索在 trace 里被丢弃，这里一并给出 */
+        recipe: trace.recipeDispatch?.intent ?? null,
         topics: trace.picks.map((p) => p.topicId),
         fields: trace.applied.map((a) => a.field)
       }));
       if (json) line(JSON.stringify({ summary, traces }, null, 2));
       else {
         for (const item of summary) {
-          line(`${item.shotId}：光圈 ${item.aperture ?? "-"}（${item.scenario ?? "-"}）· 注入字段 ${item.fields.join("/")} · 命中主题 ${item.topics.join("/")}`);
+          line(`${item.shotId}：光圈 ${item.aperture ?? "-"}（${item.scenario ?? "-"}）· 注入字段 ${item.fields.join("/")} · 命中主题 ${item.topics.join("/")}${item.recipe ? ` · 情绪配方派发 ${item.recipe}` : ""}`);
         }
       }
       return 0;

@@ -35,10 +35,18 @@ describe("第三轮审计回归：光照规则互不抢位", () => {
   it("蓝调=蓝调时刻、正午=硬光、雪天=落雪（雪只注入一次）", () => {
     expect(light({ scene: "蓝调时刻的江边，城市灯光刚亮", character: "陈卓", action: "凭栏远眺" })).toContain("蓝调时刻");
     expect(light({ scene: "正午烈日下的广场，白墙反光强烈", character: "陈卓" })).toContain("正午顶光");
-    expect(light({ scene: "雪后的古镇清晨，屋顶积雪，河面薄冰", character: "陈卓" })).toContain("雪花");
-    const snowEntries = enrichShotCard(kb, { scene: "雪后的古镇清晨，屋顶积雪，河面薄冰", character: "陈卓", action: "踩雪缓行" })
+    /**
+     * 期望值修正（2026-09-25 五轮审计）：
+     * 本条原本断言「**雪后**的古镇清晨」也注入"雪花缓缓飘落"——那正是本轮判定为缺陷的行为
+     * （该行原文写的是"雪花缓缓飘落"，用在雪已停的镜头上自相矛盾）。
+     * 现在改为：**正在下雪**才注入「落雪安静」；雪后静景不注入（KB 无对应行，登记缺口 G18）。
+     */
+    expect(light({ scene: "大雪纷飞的古镇清晨，屋顶积雪", character: "陈卓" })).toContain("雪花");
+    const snowEntries = enrichShotCard(kb, { scene: "大雪纷飞的古镇清晨，屋顶积雪", character: "陈卓", action: "踩雪缓行" })
       .trace.applied.filter((a) => a.added.includes("雪花"));
     expect(snowEntries.length).toBe(1);
+    const afterSnow = enrichShotCard(kb, { scene: "雪后的古镇清晨，屋顶积雪，河面薄冰", character: "陈卓", action: "踩雪缓行" }).trace;
+    expect(afterSnow.applied.some((a) => a.added.includes("雪花缓缓飘落")), "雪已停的镜头不得注入正在飘雪").toBe(false);
   });
 });
 

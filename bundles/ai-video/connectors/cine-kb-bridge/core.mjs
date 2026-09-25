@@ -364,8 +364,12 @@ const APERTURE_INTENT_HINTS = [
   /** 注意：不要把"全景"当风光信号——它是景别术语（"全景转中景"的人像镜头会被误判成风光） */
   { id: "landscape", pattern: /风光|大场景|山脉|雪山|湖面|大海|山谷|草原|日出|日落|远景|天际线|戈壁|沙漠/, prefer: ["大场景风光", "风光"] },
   /** 注意：室内/房间不再算"街拍"信号——阴天室内茶室曾因此被判成 f/8 街拍档（2026-09-24 抽查）。室内有人物时走"环境人像"。 */
-  /** 建筑类信号补「幕墙/楼宇」（四轮审计：写字楼玻璃幕墙镜头此前落 f/5.6 打卡档 —— 它既没有人物也没有"建筑/高楼"字面） */
-  { id: "architecture", pattern: /建筑|街巷|街道|城市天际线|高楼|幕墙|楼宇/, prefer: ["建筑", "城市", "街拍"] },
+  /**
+   * 建筑类信号补「幕墙/楼宇」（四轮审计：写字楼玻璃幕墙镜头此前落 f/5.6 打卡档）。
+   * 五轮审计修偏好标签：§三 场景表里**没有"建筑""城市"这两行**（原 prefer 里两个标签永远匹配不到任何行，
+   * 只有"街拍"有效）→ 改为实际存在的行标签。
+   */
+  { id: "architecture", pattern: /建筑|街巷|街道|城市天际线|高楼|幕墙|楼宇/, prefer: ["街拍"] },
   /** 星芒必须是**显式意图**：只是场景里有太阳/路灯不代表要拍星芒（海边人像曾被判成 f/16 星芒档）。 */
   { id: "starburst", pattern: /星芒|放射状光|sun star|starburst/, prefer: ["星芒", "车轨"] },
   { id: "food", pattern: /美食|食物|糖粥|点心|餐|蒸汽|菜品/, prefer: ["美食", "单品特写"] },
@@ -729,18 +733,35 @@ function hasNamedSubject(card) {
   return !/无人物|空镜|不需要|不出镜|^(无|没有|none|null)/i.test(text);
 }
 
+/**
+ * 两套上下文共用的取词字段表（2026-09-25 五轮审计）。
+ *
+ * 早先 `detectContext()` 与 `injectionContext()` 各写一份字段清单：detectContext 看得到 `timeline`，
+ * injectionContext 看得到 `makeup / baseline / pacing`，于是**同一张卡在"光圈决策"与"注入决策"里看到的世界不同**——
+ * 只把时段写进 `timeline` 的卡片，光圈侧判夜间、注入侧判日景（运行时复现）。
+ * 现在共用一张表：先取词 → 剥否定 → 两边各自解读，口径不会再漂移。
+ */
+const CONTEXT_FIELDS = [
+  "scene", "sceneDescription", "lighting", "mood", "timeline", "director_instruction", "color_palette",
+  "action", "composition", "camera_movement", "character", "character_constraint", "characters",
+  "costume", "props", "makeup", "baseline", "pacing"
+];
+
+function contextText(card) {
+  return norm(CONTEXT_FIELDS
+    .map((field) => card?.[field])
+    .filter(Boolean)
+    .map((v) => (typeof v === "string" ? v : JSON.stringify(v)))
+    .join(" "));
+}
+
 export function detectContext(card) {
   /**
    * 先剥离**否定语境**：我们的镜头卡里写着"避免日落时段的金色调、避免暖黄滤镜"这类白平衡锚点，
    * 早先直接做关键词匹配，把"避免日落"读成了"要日落"，于是日景镜头被注入逆光日落配方（2026-09-24 真机）。
+   * 取词走 `contextText()`：与 injectionContext 同一张字段表（人物/服装/道具也在内，否则有人物的镜头会被判成无主体）。
    */
-  const raw = norm([
-    card?.scene, card?.sceneDescription, card?.lighting, card?.mood, card?.timeline,
-    card?.director_instruction, card?.color_palette, card?.action,
-    /** 人物/服装/道具也要进上下文：否则"有人物的镜头"会被判成无主体（2026-09-24 修正） */
-    card?.character, card?.character_constraint, card?.characters, card?.costume, card?.props
-  ].filter(Boolean).map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(" "));
-  const text = stripNegatedContext(raw);
+  const text = stripNegatedContext(contextText(card));
   const pick = (list) => list.filter((x) => x.pattern.test(text)).map((x) => x.key);
   const subject = pick(CONTEXT_LEXICON.subject);
   if (hasNamedSubject(card) && !subject.includes("person")) subject.push("person");
@@ -790,7 +811,11 @@ function contradictionPenalty(entry, context) {
   const reasons = [];
   for (const marker of ENTRY_TIME_MARKERS) {
     if (!marker.pattern.test(text)) continue;
-    const daytimeOnly = context.timeOfDay.length > 0 && context.timeOfDay.every((t) => ["morning", "noon", "afternoon", "overcast"].includes(t));
+    /**
+     * 五轮审计：原列表里混进了 `"overcast"`——它是 **weather** 的键，永远不可能出现在 `timeOfDay` 里，
+     * 属死条件（`every()` 只会因此更宽松而永远不成立）。移除后语义不变、可读性恢复。
+     */
+    const daytimeOnly = context.timeOfDay.length > 0 && context.timeOfDay.every((t) => ["morning", "noon", "afternoon"].includes(t));
     if ((marker.key === "dusk" || marker.key === "night" || marker.key === "blueHour") && daytimeOnly && !context.timeOfDay.includes(marker.key)) {
       penalty += 12;
       reasons.push(`${marker.key}≠日景`);
@@ -890,6 +915,11 @@ export function selectEntries(kb, card, options = {}) {
   const minScore = options.minScore ?? 4;
   const explicit = options.topics ?? null; // 允许监制指定主题（如 ["NARR-001","LIGHT-003"]）
   const signals = shotSignals(card);
+  /**
+   * 条目打分必须用**剥离否定语境后**的文本（2026-09-25 五轮审计）：
+   * 见下方 scoreEntry 调用处的说明。
+   */
+  const scoredText = stripNegatedContext(signals.text);
   const context = detectContext(card);
   const indexById = new Map(kb.index.topics.map((t) => [t.id, t]));
 
@@ -906,7 +936,13 @@ export function selectEntries(kb, card, options = {}) {
   for (const { topic, score } of topicScores) {
     const indexKeywords = indexById.get(topic.id)?.keywords ?? [];
     for (const entry of topic.entries) {
-      const { score: entryScore, reasons, hardConflict } = scoreEntry(entry, topic, signals.text, context, indexKeywords);
+      /**
+       * 早先把**原始文本**（含"避免…""不要…"）交给 scoreEntry，于是否定指令反而满足了
+       * `styleConflict()` 的白名单条件——卡里写"避免赛博朋克全息广告"，条目池照样把
+       * STYLE-001#赛博朋克 以 10.8 分送进候选（运行时复现）。改用 scoredText 后，
+       * 意图命中、2-gram 重合、风格冲突三项判定都只看**未被否定**的内容。
+       */
+      const { score: entryScore, reasons, hardConflict } = scoreEntry(entry, topic, scoredText, context, indexKeywords);
       if (hardConflict) continue; // 时段/光照矛盾的知识一律不许进提示词
       if (entryScore <= 0) continue;
       /**
@@ -914,7 +950,8 @@ export function selectEntries(kb, card, options = {}) {
        * 只有**情绪被镜头卡明确写到**时才登记为派发线索，用于指导其它主题检索。
        */
       if (topic.id === "NARR-001") {
-        const moodText = norm(`${card?.mood ?? ""} ${card?.director_instruction ?? ""} ${card?.genre ?? ""}`);
+        /** 情绪派发同样只看未被否定的表述（"不要孤独感"不该派发孤独配方） */
+        const moodText = stripNegatedContext(norm(`${card?.mood ?? ""} ${card?.director_instruction ?? ""} ${card?.genre ?? ""}`));
         if (!recipeDispatch && moodText.includes(norm(entry.intent))) {
           recipeDispatch = { intent: entry.intent, emotion: entry.zh, recipe: entry.en, score: entryScore, basis: "mood-explicit-match" };
         }
@@ -952,29 +989,11 @@ export function selectEntries(kb, card, options = {}) {
 
 /* ================= 字段注入 ================= */
 
-/** 主题 → 目标字段（KB 条目落到 25 字段卡的哪个位置） */
-const TOPIC_TARGET_FIELDS = {
-  "OPTICS-001": ["depth_of_field"],
-  "OPTICS-002": ["depth_of_field", "composition"],
-  "OPTICS-003": ["action"],
-  "OPTICS-004": ["baseline"],
-  "CINE-001": ["camera_movement"],
-  "CINE-002": ["composition"],
-  "LIGHT-001": ["lighting"],
-  "LIGHT-002": ["lighting"],
-  "LIGHT-003": ["lighting"],
-  "COLOR-001": ["color_palette"],
-  "COLOR-002": ["color_palette"],
-  "PHYS-001": ["props"],
-  "PHYS-002": ["props", "makeup"],
-  "SCENE-001": ["sceneDescription"],
-  "SCENE-002": ["sceneDescription"],
-  "STYLE-001": ["director_instruction"],
-  "STYLE-002": ["pacing"],
-  "HUMAN-001": ["composition", "action"],
-  "NARR-001": ["mood"]
-};
-
+/**
+ * （已删除）`TOPIC_TARGET_FIELDS` 主题→字段映射表。
+ * 2026-09-25 五轮审计确认：该表**除定义外没有任何引用**（字段落点早已由 `INJECTION_RULES[].field` 决定），
+ * 留着只会让人以为"字段映射在另一处维护"。落点口径以 `INJECTION_RULES` 为唯一事实源。
+ */
 /** 一条知识 → 注入句式（中文写法为主，附英文关键词给国际模型） */
 /**
  * 行 → 提示词短语。
@@ -1066,8 +1085,18 @@ const INJECTION_RULES = [
    */
   { field: "lighting", id: "indoor-warm-mix", when: (c) => c.interior && c.day && !hasExplicitDaylight(c), topic: "LIGHT-002", row: "混合色温（室内暖+窗外冷）" },
   { field: "lighting", id: "indoor-tungsten", when: (c) => c.interior && !c.day && !hasExplicitDaylight(c), topic: "LIGHT-003", row: "钨丝灯室内" },
-  /** 雪景光：阴天散射 + 雪面反光（先于阴天软光判定，避免雪天被当成普通阴天） */
-  { field: "lighting", id: "snow-light", when: (c) => c.snow, topic: "SCENE-001", row: "落雪安静" },
+  /**
+   * 雪景光：阴天散射 + 雪面反光（先于阴天软光判定，避免雪天被当成普通阴天）。
+   * 五轮审计收口：只在**正在下雪**时用「落雪安静」——该行原文写的是"雪花缓缓飘落"，
+   * 用在"雪后 / 屋顶积雪"的镜头上自相矛盾。雪后静景目前 KB 无对应行（已登记缺口 G18），
+   * 由卡片自述承担（与"上午光"同一处置口径）。
+   */
+  { field: "lighting", id: "snow-light", when: (c) => c.snowNow, topic: "SCENE-001", row: "落雪安静" },
+  /**
+   * 雨天时序（五轮审计）：雨后走 SCENE-001 §6.2「雨后初晴」（"雨停后阳光刺破云层，湿街反射金色天光"）——
+   * 这是 KB 里唯一正对"雨停之后"的行；夜景雨后不适用（该行描述的是阳光），阴天雨后也排除（否则与阴天冲突）。
+   */
+  { field: "lighting", id: "after-rain", when: (c) => c.rain && !c.rainNow && !c.night && !c.overcast, topic: "SCENE-001", row: "雨后初晴" },
   /** 正午硬光：烈日顶光，与"上午/下午斜光"不同（三轮审计：正午被误判成午后） */
   { field: "lighting", id: "noon-hard", when: (c) => c.noon && !c.overcast, topic: "LIGHT-002", row: "正午硬光（纪实/压迫）" },
   { field: "lighting", id: "overcast-soft", when: (c) => c.overcast && !c.snow, topic: "LIGHT-001", row: "阴天软光" },
@@ -1093,14 +1122,23 @@ const INJECTION_RULES = [
   { field: "lighting", id: "candle", when: (c) => c.candle, topic: "LIGHT-001", row: "烛光 / 火光" },
 
   /* ---------- 构图 / 机位 ---------- */
-  { field: "composition", id: "framing", when: (c) => c.framing === "大远景", topic: "CINE-002", row: "大远景 / 史诗开场" },
-  { field: "composition", id: "framing", when: (c) => c.framing === "远景", topic: "CINE-002", row: "远景 / 人在环境中" },
-  { field: "composition", id: "framing", when: (c) => c.framing === "全景", topic: "CINE-002", row: "全景 / 动作完整" },
-  { field: "composition", id: "framing", when: (c) => c.framing === "中景", topic: "CINE-002", row: "中景 / 对话标配" },
-  { field: "composition", id: "framing", when: (c) => c.framing === "中近景", topic: "CINE-002", row: "中近景 / 访谈感" },
-  { field: "composition", id: "framing", when: (c) => c.framing === "近景", topic: "CINE-002", row: "近景 / 面部表情" },
-  { field: "composition", id: "framing", when: (c) => c.framing === "特写", topic: "CINE-002", row: "大特写 / 情绪放大" },
-  { field: "composition", id: "look-back", when: (c) => c.lookBack, topic: "HUMAN-001", row: "故事感回头" },
+  /**
+   * 七条 `id:"framing"` 规则已删除（2026-09-25 五轮审计 · 死规则清理）。
+   *
+   * 它们写的是 `when: (c) => c.framing === "中景"` 这类条件，而循环里又有一条
+   * `if (rule.id === "framing" && ctx.framingKnown) continue;`——`c.framing` 非空蕴含 `framingKnown`，
+   * 于是**这七条永远不可能命中**（运行时复现：`景别：中景 / 近景 / 特写 / 大特写` 四种卡片，composition 注入均为"无"）。
+   * 即便去掉守卫也不会更有价值：卡片自己已经写了景别，再注入一行"中景，腰部以上"只是重复；
+   * CINE-002 的景别行改为**只经自由检索**可达（`cine-kb-cli search`），已在 round5 报告登记。
+   */
+  /**
+   * 回头类动作**必须真在走动**才用「故事感回头」（五轮审计）：
+   * 该行中文写法是"行走中回头看向镜头"，断言了"行走"这个动作。
+   * 复现：`{action:"回眸一笑，身体不动", camera_movement:"固定机位"}` 被注入"行走中回头看向镜头"——
+   * 与卡片的"静止"直接冲突（与 playbook §一 事故 5 同源，只是触发词不同）。
+   * 静止回眸目前 KB 无对应行（已登记缺口 G19），由卡片自述承担。
+   */
+  { field: "composition", id: "look-back", when: (c) => c.lookBack && c.walking, topic: "HUMAN-001", row: "故事感回头" },
   { field: "composition", id: "eyelevel", when: (c) => c.eyeLevel && !c.framingKnown, topic: "HUMAN-001", row: "平等真实" },
 
   /* ---------- 运镜 ---------- */
@@ -1122,7 +1160,8 @@ const INJECTION_RULES = [
   { field: "color_palette", id: "low-key", when: (c) => c.moody, topic: "COLOR-002", row: "低调、深沉" },
 
   /* ---------- 材质 / 道具（真实感的最后 10%） ---------- */
-  { field: "props", id: "snow-fall", when: (c) => c.snow, topic: "SCENE-001", row: "落雪安静" },
+  /** 落雪（props）：同样只在**正在下雪**时注入（五轮审计，与 lighting 同口径） */
+  { field: "props", id: "snow-fall", when: (c) => c.snowNow, topic: "SCENE-001", row: "落雪安静" },
   /** 倒影只在"平静水面"语境命中（三轮审计：水下镜头/冰面/产品白背景曾被误注入镜面倒影） */
   { field: "props", id: "reflection", when: (c) => c.mirrorWater && !c.rain, topic: "PHYS-001", row: "镜面倒影" },
   /**
@@ -1131,7 +1170,10 @@ const INJECTION_RULES = [
    */
   { field: "props", id: "glass-reflection", when: (c) => c.glassWall, topic: "PHYS-002", row: "玻璃反射" },
   { field: "props", id: "water-ripple", when: (c) => c.water && c.watercraft && !c.snow, topic: "PHYS-001", row: "湖面微澜" },
-  { field: "props", id: "drizzle", when: (c) => c.rain && !c.heavyRain, topic: "PHYS-001", row: "毛毛细雨" },
+  /** 细雨只在**正在下**时注入（五轮审计：雨后不再注入"雨丝如雾"） */
+  { field: "props", id: "drizzle", when: (c) => c.rainNow && !c.heavyRain, topic: "PHYS-001", row: "毛毛细雨" },
+  /** 暴雨：此前没有任何规则引用「暴雨倾盆」行（五轮审计补上） */
+  { field: "props", id: "downpour", when: (c) => c.rainNow && c.heavyRain, topic: "PHYS-001", row: "暴雨倾盆" },
   /**
    * 蒸汽行（2026-09-24 真机三轮校准）：PHYS-001 §2.8「蒸汽」的**提示词写法示例是咖啡专用**
    * （"热气从咖啡杯口袅袅升起 … steam rising from a cup of coffee"），
@@ -1167,13 +1209,8 @@ const INJECTION_RULES = [
 
 /** 从镜头卡抽取"注入决策上下文"（纯词面判断，可解释、可测试） */
 export function injectionContext(card) {
-  /** 与 detectContext 同口径：**先剥否定语境**——"避免日落时段的金色调"不能被读成"要日落"（2026-09-24 真机） */
-  const rawText = norm([
-    card?.scene, card?.sceneDescription, card?.lighting, card?.mood, card?.action, card?.composition,
-    card?.camera_movement, card?.color_palette, card?.character, card?.costume, card?.props,
-    card?.makeup, card?.baseline, card?.director_instruction, card?.pacing
-  ].filter(Boolean).map((v) => (typeof v === "string" ? v : JSON.stringify(v))).join(" "));
-  const text = stripNegatedContext(norm(rawText));
+  /** 与 detectContext 同口径：同一张字段表 + **先剥否定语境**（"避免日落时段的金色调"不能被读成"要日落"） */
+  const text = stripNegatedContext(contextText(card));
   const has = (re) => re.test(text);
   const framingHit = ["大远景", "远景", "全景", "中近景", "中景", "近景", "特写"].find((f) => text.includes(f));
   return {
@@ -1210,6 +1247,18 @@ export function injectionContext(card) {
     fog: has(/雾|水汽|薄雾/),
     rain: has(/雨/),
     heavyRain: has(/暴雨|大雨|倾盆/),
+    /**
+     * 天气时序（2026-09-25 五轮审计）：早先 `rain` 把"雨后"与"正在下雨"当同一件事，
+     * 于是"**雨后**的古镇石板路，积水倒映着白墙黛瓦"被注入"细密雨丝如雾般飘落"（雨已经停了，画面不成立）；
+     * 雪后同理被注入"雪花缓缓飘落"。现在拆出"是否正在下"：
+     *   · rainNow —— 提到雨且未落到"雨后 / 雨停 / 雨过 / 初晴 / 已停"；
+     *   · snowNow —— 必须有"正在下"的字面（下雪 / 雪中 / 飘雪 / 雪花 / 飞雪 / 大雪 / 暴雪 / 雪夜 / 雪粒），
+     *     且不能是"雪后 / 雪停 / 残雪 / 融雪"这类已停的表述。
+     *     注意：**"积雪"不算停雪证据**——"大雪纷飞…屋顶积雪"是同时成立的（下着雪且已积起来），
+     *     所以只把"雪后/雪停/残雪/融雪"作为排除项。
+     */
+    rainNow: has(/雨/) && !has(/雨后|雨停|雨过|初晴|已停|停了/),
+    snowNow: has(/下雪|雪中|飘雪|雪花|飞雪|大雪|暴雪|雪夜|雪粒/) && !has(/雪后|雪停|残雪|融雪/),
     water: has(/水|河|湖|江|倒影/),
     /** 镜面倒影必须是"平静水面"语境；水下/冰面/雪地不算（三轮审计：水下镜头被注入镜面倒影） */
     mirrorWater: has(/倒影|镜面|如镜|平静水面|无风水面|静水/) && !has(/水下|海底|冰|雪/),
@@ -1306,8 +1355,6 @@ export function enrichShotCard(kb, card, options = {}) {
     let ok = false;
     try { ok = Boolean(rule.when(ctx)); } catch { ok = false; }
     if (!ok) continue;
-    /** 景别类的行只在卡片没写景别时补（避免"中景"卡被叠加"大远景"） */
-    if (rule.id === "framing" && ctx.framingKnown) continue;
     const row = pickRow(kb, rule.topic, rule.row);
     if (!row) continue;
     /** 同一知识行不重复落到多个字段（三轮审计：雪景"落雪安静"同时进了 lighting 与 props） */
@@ -1349,11 +1396,37 @@ export function enrichShotCard(kb, card, options = {}) {
   for (const [field, list] of byField) {
     const addition = list.map((x) => x.phrase).join("；");
     const original = typeof enriched[field] === "string" && enriched[field].trim() ? String(enriched[field]).trim().replace(/[；;]\s*$/, "") : "";
-    const merged = original ? `${original}；${addition}` : addition;
-    enriched[field] = merged.length > MAX_FIELD_CHARS ? `${merged.slice(0, MAX_FIELD_CHARS - 1)}…` : merged;
+    /**
+     * 字段预算语义（2026-09-25 五轮审计修正）。
+     *
+     * 旧行为：对**合并后的整串**做 `slice(0, 319) + "…"`。两个后果都是真机可复现的：
+     *   ① 注入短语永远拼在末尾 → 字段原文一长，**注入被整段吃掉却仍记在 applied 里**（假回执）；
+     *      复现：camera_movement 原文 342 字 → 结果 320 字，注入"手持镜头，轻微自然晃动"完全没进去；
+     *   ② 卡片作者写的原文尾部被截掉（数据损坏）。
+     * 新行为：**原文一字不动**。放得下才追加；放不下就整条丢弃并在 trace 里如实记 `dropped`，
+     * 让"注入了几条"与"实际写进几条"永远可对账（无回执不算完成）。
+     */
+    const budget = MAX_FIELD_CHARS - (original ? original.length + 1 : 0);
+    const fits = addition.length <= budget;
+    let written = "";
+    let dropped = null;
+    if (fits) {
+      written = addition;
+      enriched[field] = original ? `${original}；${addition}` : addition;
+    } else if (!original) {
+      /** 字段本来是空的：注入自己超预算（只可能出现在 englishGloss 等长短语），截自己、不动别人的内容 */
+      written = `${addition.slice(0, MAX_FIELD_CHARS - 1)}…`;
+      enriched[field] = written;
+    } else {
+      dropped = "field-over-budget";
+      enriched[field] = original;
+    }
     const apertureMeta = list.find((x) => x.apertureMeta)?.apertureMeta;
     applied.push({
-      field, from: original.slice(0, 80), added: addition.slice(0, 160), topics: list.map((x) => x.pick.topicId),
+      field, from: original.slice(0, 80), added: addition.slice(0, 160),
+      writtenChars: written.length,
+      ...(dropped ? { dropped, fieldBudget: MAX_FIELD_CHARS, originalChars: original.length } : {}),
+      topics: list.map((x) => x.pick.topicId),
       ...(apertureMeta ? { aperture: apertureMeta.range, matchedBy: apertureMeta.matchedBy, advisor: true } : {}),
       ...(list.some((x) => x.placeholderResolved) ? { placeholderResolved: true } : {})
     });
@@ -1378,6 +1451,14 @@ export function enrichShotCard(kb, card, options = {}) {
     ...(options.fps ? { shutter: shutterToEffect(options.fps, options.shutterStyle) } : {}),
     ...(options.iso ? { iso: isoToEffect(options.iso) } : {})
   };
+  /**
+   * 自由检索（供监制 / Agent 复核"当时还有哪些候选"，不影响已注入字段）。
+   *
+   * 五轮审计：这里同时取回 NARR-001 的**情绪配方派发线索**。早先调用后只保留 picks，
+   * `recipeDispatch` 被直接丢掉 —— 而 KB 检索总则要求"先取情绪配方，再按配方回查细节"，
+   * 派发线索本来是这条链路的凭据，丢掉之后 trace 里既看不到派发了什么，也无法复核。
+   */
+  const freeSearch = selectEntries(kb, card, { maxEntries: 5 });
   return {
     card: enriched,
     trace: {
@@ -1388,7 +1469,12 @@ export function enrichShotCard(kb, card, options = {}) {
       ranked: pickedRows.map(({ rule, row }) => ({ topicId: row.topicId, title: row.topicTitle, ruleId: rule.id, field: rule.field })),
       picks: pickedRows.map(({ rule, row }) => ({ ...row, ruleId: rule.id, field: rule.field })),
       /** 自由检索结果（供监制/Agent 复核"当时还有哪些候选"，不影响已注入字段） */
-      explored: selectEntries(kb, card, { maxEntries: 5 }).picks.map((p) => ({ topicId: p.topicId, intent: p.intent, zh: p.zh })),
+      explored: freeSearch.picks.map((p) => ({ topicId: p.topicId, intent: p.intent, zh: p.zh })),
+      /**
+       * NARR-001 情绪配方派发线索（只派发不直注）：卡片情绪命中配方时给出 intent/emotion/recipe，
+       * 供上游按配方回查各篇细节；未命中为 null。
+       */
+      recipeDispatch: freeSearch.recipeDispatch ?? null,
       applied,
       suggestedParams: params,
       apertureAdvisor: aperture ?? null,
