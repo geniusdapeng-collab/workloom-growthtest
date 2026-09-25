@@ -48,4 +48,20 @@ describe("三端访问权威路由面", () => {
       accessAuthorityDeps.loadMemberFacts = originalLoadMemberFacts;
     }
   });
+
+  /**
+   * 回归守卫（T-2026-0925-0007）：`fence.activeRules` 是 dsh 围栏插件的数据源
+   * （`packages/runtime/plugins/workloom-fence.plugin.js` 直接 fetch 该路径）。
+   * 端点缺失时 tRPC 返回 404，插件把错误体当数组遍历 → 工具执行流水线整体不可用
+   * （本仓 2026-09-24 P 域实测过该故障，随后被一次移植覆盖再次丢失）。此处只守"端点必须挂载"。
+   */
+  it("挂载围栏数据源端点 fence.activeRules（dsh 围栏插件依赖）", () => {
+    const caller = appRouter.createCaller({
+      session: null,
+      identity: null,
+      partnerIdentity: null,
+      headers: new Headers(),
+    });
+    expect(typeof caller.fence.activeRules).toBe("function");
+  });
 });
