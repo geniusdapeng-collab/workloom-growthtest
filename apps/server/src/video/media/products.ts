@@ -21,6 +21,8 @@ import { assertInside, safeSegment } from "./paths.js";
 export type ProductProfileRow = {
   id: string;
   product_name: string;
+  /** dossier 目录名（稳定身份；商品改名不再新建行） */
+  dossier_product_id: string | null;
   dossier_path: string;
   dossier_sha256: string;
   summary: Record<string, unknown>;
@@ -33,6 +35,8 @@ export type ProductProfileRow = {
 export interface ProductProfileView {
   id: string;
   productName: string;
+  /** 供 UI「重新扫描」用的稳定标识（目录名），不再用商品名冒充 */
+  dossierProductId: string | null;
   dossierPath: string;
   dossierSha256: string;
   summary: Record<string, unknown>;
@@ -50,6 +54,7 @@ function toView(row: ProductProfileRow, heroUrlByAsset: Map<string, string> = ne
   return {
     id: row.id,
     productName: row.product_name,
+    dossierProductId: row.dossier_product_id,
     dossierPath: row.dossier_path,
     dossierSha256: row.dossier_sha256,
     summary: row.summary ?? {},
@@ -195,7 +200,8 @@ export async function upsertProductProfileFromDossier(
 ): Promise<UpsertProductProfileResult> {
   const errors: string[] = [];
   // productId 只接受单段目录名（深审实测："../../../etc" 曾把 dossier 探测到根外）
-  const dir = join(input.dossierRoot, safeSegment(input.productId, "productId"));
+  const dossierProductId = safeSegment(input.productId, "productId");
+  const dir = join(input.dossierRoot, dossierProductId);
   const dossierPath = join(dir, "dossier.json");
   if (!existsSync(dossierPath)) {
     throw new Error(`商品档案不存在：${dossierPath}（情报环节未产出该 product_id）`);
@@ -215,9 +221,13 @@ export async function upsertProductProfileFromDossier(
     ?? input.productId,
   );
 
+  // 稳定身份优先：同一 dossier 目录名 → 同一行（改名只改 product_name，不新建行）
   const existing = await scopedQuery<ProductProfileRow>(app, scope,
-    `SELECT * FROM media_product_profiles WHERE workspace_id = $1 AND product_name = $2`,
-    [scope.workspaceId, productName]);
+    `SELECT * FROM media_product_profiles
+      WHERE workspace_id = $1 AND (dossier_product_id = $2 OR dossier_product_id IS NULL AND product_name = $3)
+      ORDER BY (dossier_product_id = $2) DESC NULLS LAST
+      LIMIT 1`,
+    [scope.workspaceId, dossierProductId, productName]);
   const prev = existing[0] ?? null;
   const changed = !prev || prev.dossier_sha256 !== dossierSha;
   const id = prev?.id ?? newId("MP");
@@ -293,16 +303,17 @@ export async function upsertProductProfileFromDossier(
 
   await scopedQuery<ProductProfileRow>(app, scope,
     `INSERT INTO media_product_profiles
-       (id, workspace_id, product_name, dossier_path, dossier_sha256, summary, hero_asset_id, status, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,'active', now())
-     ON CONFLICT (workspace_id, product_name) DO UPDATE
-       SET dossier_path = EXCLUDED.dossier_path,
+       (id, workspace_id, product_name, dossier_product_id, dossier_path, dossier_sha256, summary, hero_asset_id, status, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'active', now())
+     ON CONFLICT (workspace_id, dossier_product_id) WHERE dossier_product_id IS NOT NULL DO UPDATE
+       SET product_name = EXCLUDED.product_name,
+           dossier_path = EXCLUDED.dossier_path,
            dossier_sha256 = EXCLUDED.dossier_sha256,
            summary = EXCLUDED.summary,
            hero_asset_id = COALESCE(EXCLUDED.hero_asset_id, media_product_profiles.hero_asset_id),
            status = 'active',
            updated_at = now()`,
-    [id, scope.workspaceId, productName, dossierPath, dossierSha, JSON.stringify(summary), heroAssetId]);
+    [id, scope.workspaceId, productName, dossierProductId, dossierPath, dossierSha, JSON.stringify(summary), heroAssetId]);
 
   const saved = await getProductProfile(app, scope, id);
   return {

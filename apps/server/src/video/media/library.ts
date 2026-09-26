@@ -130,16 +130,22 @@ export type SearchLayer = "semantic" | "tsv" | "trgm" | "none";
  * 第 1 页命中 tsv、第 2 页 tsv 零命中就会掉进 trgm 兜底，排序口径从 created_at 变成
  * similarity → 翻页结果错乱/漏项。游标把"这一搜用的是哪一层"钉死，翻页路径稳定。
  */
-export function parseCursor(cursor?: string | null): { layer: SearchLayer | null; at: string | null; id: string | null } {
-  if (!cursor) return { layer: null, at: null, id: null };
+export function parseCursor(cursor?: string | null): { layer: SearchLayer | null; sim: number | null; at: string | null; id: string | null } {
+  if (!cursor) return { layer: null, sim: null, at: null, id: null };
   const parts = cursor.split("|");
-  if (parts.length >= 3) return { layer: parts[0] as SearchLayer, at: parts[1] ?? null, id: parts.slice(2).join("|") || null };
-  if (parts.length === 2) return { layer: null, at: parts[0] ?? null, id: parts[1] ?? null }; // 兼容旧游标
-  return { layer: null, at: null, id: null };
+  // trgm 层：`trgm|<similarity>|<ISO>|<id>`（相似度参与排序，游标必须带上它）
+  if (parts.length >= 4) {
+    const sim = Number(parts[1]);
+    return { layer: parts[0] as SearchLayer, sim: Number.isFinite(sim) ? sim : null, at: parts[2] ?? null, id: parts.slice(3).join("|") || null };
+  }
+  if (parts.length === 3) return { layer: parts[0] as SearchLayer, sim: null, at: parts[1] ?? null, id: parts.slice(2).join("|") || null };
+  if (parts.length === 2) return { layer: null, sim: null, at: parts[0] ?? null, id: parts[1] ?? null }; // 兼容旧游标
+  return { layer: null, sim: null, at: null, id: null };
 }
 
 function cursorClause(builder: WhereBuilder, cursor?: string | null): void {
-  const { at, id } = parseCursor(cursor);
+  const { layer, at, id } = parseCursor(cursor);
+  if (layer === "trgm") return; // 相似度元组在 trgm 查询里单独拼（ORDER BY similarity DESC, created_at DESC, id DESC）
   if (!at || !id) return;
   const p1 = builder.add(at);
   const p2 = builder.add(id);
@@ -213,6 +219,41 @@ function whereBuilder(scope: Scope, input: ListAssetsInput): WhereBuilder {
   return builder;
 }
 
+/**
+ * trgm / 子串兜底层：排序是 `similarity DESC, created_at DESC, id DESC`，
+ * 游标必须是**同一个三元组**，否则翻页会漏项（T-2026-0926-0015 深审实证：
+ * 旧实现用 created_at 单键游标 → 相似度最高但创建较早的行之后的命中项被跳过）。
+ */
+async function searchTrgm(
+  app: AppPool, scope: Scope, input: ListAssetsInput, query: string, limit: number,
+  trace: NonNullable<ListAssetsResult["searchTrace"]>,
+): Promise<ListAssetsResult> {
+  const w = whereBuilder(scope, { ...input, cursor: undefined });
+  const q = w.add(query);
+  const pattern = w.add(likePattern(query));
+  const threshold = w.add(0.2);
+  const simExpr = `GREATEST(similarity(COALESCE(a.title, ''), ${q}), similarity(COALESCE(a.prompt, ''), ${q}))`;
+  w.clauses.push(`(
+      a.title ILIKE ${pattern} ESCAPE '\\'
+      OR a.prompt ILIKE ${pattern} ESCAPE '\\'
+      OR a.tags::text ILIKE ${pattern} ESCAPE '\\'
+      OR ${simExpr} > ${threshold}
+    )`);
+  const cur = parseCursor(input.cursor);
+  if (cur.layer === "trgm" && cur.sim !== null && cur.at && cur.id) {
+    const pSim = w.add(cur.sim);
+    const pAt = w.add(cur.at);
+    const pId = w.add(cur.id);
+    w.clauses.push(`(${simExpr}, a.created_at, a.id) < (${pSim}::real, ${pAt}::timestamptz, ${pId}::text)`);
+  }
+  const pLimit = w.add(limit);
+  const rows = await scopedQuery<MediaAssetRow>(app, scope,
+    `SELECT ${ASSET_COLUMNS}, ${simExpr} AS similarity
+       FROM video_assets a WHERE ${w.clauses.join(" AND ")}
+      ORDER BY similarity DESC, a.created_at DESC, a.id DESC LIMIT ${pLimit}`, w.params);
+  return finishList(rows, limit, { ...trace, layer: "trgm" });
+}
+
 export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsInput): Promise<ListAssetsResult> {
   const limit = Math.min(Math.max(input.limit ?? 60, 1), 200);
   const query = input.query?.trim();
@@ -253,45 +294,11 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
     if (pinned === "tsv") return finishList([], limit, { ...trace, layer: "tsv" });
 
     // ③ trgm / 子串兜底：中文的实际主路（tsv 零命中才走到这里）
-    const wt = whereBuilder(scope, input);
-    const qt = wt.add(query);
-    const pattern = wt.add(likePattern(query));
-    const threshold = wt.add(0.2);
-    wt.clauses.push(`(
-        a.title ILIKE ${pattern} ESCAPE '\\'
-        OR a.prompt ILIKE ${pattern} ESCAPE '\\'
-        OR a.tags::text ILIKE ${pattern} ESCAPE '\\'
-        OR similarity(COALESCE(a.title, ''), ${qt}) > ${threshold}
-        OR similarity(COALESCE(a.prompt, ''), ${qt}) > ${threshold}
-      )`);
-    const pt = wt.add(limit);
-    const trgmRows = await scopedQuery<MediaAssetRow>(app, scope,
-      `SELECT ${ASSET_COLUMNS},
-              GREATEST(similarity(COALESCE(a.title, ''), ${qt}), similarity(COALESCE(a.prompt, ''), ${qt})) AS similarity
-         FROM video_assets a WHERE ${wt.clauses.join(" AND ")}
-        ORDER BY similarity DESC, a.created_at DESC, a.id DESC LIMIT ${pt}`, wt.params);
-    return finishList(trgmRows, limit, { ...trace, layer: "trgm" });
+    return searchTrgm(app, scope, input, query, limit, trace);
   }
 
-  if (query && pinned && pinned !== "tsv") {
-    const wt = whereBuilder(scope, input);
-    const qt = wt.add(query);
-    const pattern = wt.add(likePattern(query));
-    const threshold = wt.add(0.2);
-    wt.clauses.push(`(
-        a.title ILIKE ${pattern} ESCAPE '\\'
-        OR a.prompt ILIKE ${pattern} ESCAPE '\\'
-        OR a.tags::text ILIKE ${pattern} ESCAPE '\\'
-        OR similarity(COALESCE(a.title, ''), ${qt}) > ${threshold}
-        OR similarity(COALESCE(a.prompt, ''), ${qt}) > ${threshold}
-      )`);
-    const pt = wt.add(limit);
-    const trgmRows = await scopedQuery<MediaAssetRow>(app, scope,
-      `SELECT ${ASSET_COLUMNS},
-              GREATEST(similarity(COALESCE(a.title, ''), ${qt}), similarity(COALESCE(a.prompt, ''), ${qt})) AS similarity
-         FROM video_assets a WHERE ${wt.clauses.join(" AND ")}
-        ORDER BY similarity DESC, a.created_at DESC, a.id DESC LIMIT ${pt}`, wt.params);
-    return finishList(trgmRows, limit, { ...trace, layer: "trgm" });
+  if (query && pinned === "trgm") {
+    return searchTrgm(app, scope, input, query, limit, trace);
   }
 
   const w = whereBuilder(scope, input);
@@ -302,12 +309,16 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
   return finishList(plainRows, limit, trace);
 }
 
-function finishList(rows: MediaAssetRow[], limit: number, trace: ListAssetsResult["searchTrace"]): ListAssetsResult {
+function finishList(rows: MediaAssetRow[], limit: number, trace: NonNullable<ListAssetsResult["searchTrace"]>): ListAssetsResult {
   const items = rows.map((row) => toAssetView(row));
   const last = rows.at(-1);
   return {
     items,
-    nextCursor: rows.length === limit && last ? `${trace?.layer ?? "none"}|${toIso(last.created_at)}|${last.id}` : null,
+    nextCursor: rows.length === limit && last
+      ? (trace?.layer === "trgm" && last.similarity !== undefined && last.similarity !== null
+        ? `trgm|${toNumber(last.similarity) ?? 0}|${toIso(last.created_at)}|${last.id}`
+        : `${trace?.layer ?? "none"}|${toIso(last.created_at)}|${last.id}`)
+      : null,
     searchTrace: trace,
   };
 }

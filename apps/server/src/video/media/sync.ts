@@ -264,8 +264,8 @@ export async function changesSince(
       ORDER BY updated_at ASC, collection_id ASC, asset_id ASC LIMIT $5`,
     [scope.workspaceId, start.i[0], start.i[1], start.i[2], limit]);
   const products = await scopedQuery<Record<string, unknown>>(app, scope,
-    `SELECT id, product_name, dossier_path, dossier_sha256, summary, hero_asset_id, status, created_at, updated_at,
-            updated_at::text AS cursor_at
+    `SELECT id, product_name, dossier_product_id, dossier_path, dossier_sha256, summary, hero_asset_id, status,
+            created_at, updated_at, updated_at::text AS cursor_at
        FROM media_product_profiles
       WHERE workspace_id = $1 AND (updated_at, id) > ($2::timestamptz, $3::text)
       ORDER BY updated_at ASC, id ASC LIMIT $4`,
@@ -586,14 +586,17 @@ export async function applyPush(
       }
       const written = await rowTx(app, scope, async (client) => (await client.query(
         `INSERT INTO media_product_profiles
-           (id, workspace_id, product_name, dossier_path, dossier_sha256, summary, hero_asset_id, status, created_at, updated_at)
-         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9::timestamptz,$10::timestamptz)
-         ON CONFLICT (id) DO UPDATE SET dossier_path = EXCLUDED.dossier_path,
+           (id, workspace_id, product_name, dossier_product_id, dossier_path, dossier_sha256, summary, hero_asset_id, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::timestamptz,$11::timestamptz)
+         ON CONFLICT (id) DO UPDATE SET product_name = EXCLUDED.product_name,
+           dossier_product_id = COALESCE(EXCLUDED.dossier_product_id, media_product_profiles.dossier_product_id),
+           dossier_path = EXCLUDED.dossier_path,
            dossier_sha256 = EXCLUDED.dossier_sha256, summary = EXCLUDED.summary,
            hero_asset_id = EXCLUDED.hero_asset_id, status = EXCLUDED.status
          WHERE media_product_profiles.updated_at < EXCLUDED.updated_at`,
-        [id, scope.workspaceId, String(product.product_name ?? "未命名商品"), String(product.dossier_path ?? ""),
-         String(product.dossier_sha256 ?? ""), JSON.stringify(product.summary ?? {}),
+        [id, scope.workspaceId, String(product.product_name ?? "未命名商品"),
+         product.dossier_product_id ? String(product.dossier_product_id) : null,
+         String(product.dossier_path ?? ""), String(product.dossier_sha256 ?? ""), JSON.stringify(product.summary ?? {}),
          product.hero_asset_id ?? null, String(product.status ?? "active"),
          isoOf(product.created_at) || new Date().toISOString(),
          isoOf(product.updated_at) || new Date().toISOString()])).rowCount ?? 0);
