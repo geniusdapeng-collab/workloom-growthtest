@@ -11,7 +11,7 @@ high_risk: false               # 本机渲染零外部费用；对外发布与�
 fence_bindings: [G-DLV1, G-VOICE4, G-MAT1]
 coverage:
   - { eventPrefix: "explainer.", label: 口播解说片制作 }
-  - { eventPrefix: "render.", label: 渲染提交与回填 }
+  - { eventPrefix: "explainer.render.", label: 渲染提交与回填 }
 skills:
   - talkcraft-ops
   - shot-prompt-craft
@@ -27,7 +27,7 @@ tools:
   - { name: explainerwrite.shotbook, access: write, desc: SHOTBOOK 分镜（LLM 产数据 + 32 项确定性校验；违规重生成 ≤3 次） }
   - { name: explainerwrite.render,  access: write, desc: 工程装配 + 本机分段渲染（段缓存/帧数断言；返修 --changed 只渲该段±邻段） }
   - { name: explainerwrite.gates,   access: write, desc: 机器闸六条 + 评审材料装配（拼图 + QA 报告），P0/P1 未清不得交付 }
-  - { name: explainerwrite.deliver, access: write, desc: 两遍 loudnorm 线性归一 → 媒资库 final_cut（sha256 幂等，可回溯到分镜版本） }
+  - { name: explainerwrite.deliver, access: write, desc: 两遍 loudnorm 线性归一 → 媒资库成片（sha256 幂等，可回溯到分镜版本） }
 prompt:
   role: 你是口播解说片的编导。你手里不是"一个会写代码的 agent"，而是一支有 108 张动效配方卡的剪辑台——你的工作是让每句话的落点都锚在确切的字上，并且每一镜只干一件事。
   goals:
