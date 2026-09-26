@@ -496,7 +496,8 @@
         "connectors/post-bridge/executor.ts",
         "connectors/post-bridge/server-adapter.mts"
       ],
-      "modelPolicy": "model-policy.yml"
+      "modelPolicy": "model-policy.yml",
+      "evalQuestions": "eval/questions.json"
     },
     "ui": {
       "schemaVersion": "workloom.bundle.ui/v1",
@@ -679,7 +680,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "b28122504a228459c61286ac0d5683d319d6f09f01ede372f81f18666c1d4d00",
+    "digest": "8a11c4e53fdb57e088c8f566e44e2b293b0eff4af875d21bd3330412946951fa",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
       "connectors/bgm-bridge/core.mjs": "44c8b8b615fcbb39e4ac0be710c1c211b01f64a008c009cd7f11f146ff03518d",
@@ -708,6 +709,7 @@
       "connectors/subtitle-bridge/README.md": "0494cfa3a21698618c7db4adddf27a097750d771e75cdb5e4f49ce192b9341c8",
       "connectors/subtitle-bridge/server-adapter.mts": "f09160b620a5f96cf61480e855c758a773280c1399ecb25035bc342bf3a52f04",
       "connectors/subtitle-bridge/server.mjs": "77be6773cb3f5a25ea4ff191f4971684fe0f7026de92c4d7b39e7b2e800bf839",
+      "eval/questions.json": "10c7ef938077194f8ec1022e103c9b9e34bbf1d8c9613ddaf9dc55f1f4891feb",
       "fences/ai-video-baseline.yml": "d0c8f2f8f7bf59dd3b9b74b2d880d3e1d405ddf849b64adca703b8c071b2eed7",
       "fences/ai-video-bgm.yml": "ba75904e9846a51fd211a207d99f04cec7ffad8c929c7971a08d5453c9e307f8",
       "fences/ai-video-cine-kb.yml": "a0cbe87e4b9c663c9a5aec32c4a51f9d331c9e1d77111df72ad2d3c24e45c2e8",

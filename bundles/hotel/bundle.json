@@ -92,7 +92,8 @@
       "connectors": [
         "connectors/connectors.json"
       ],
-      "modelPolicy": "model-policy.yml"
+      "modelPolicy": "model-policy.yml",
+      "evalQuestions": "eval/questions.json"
     },
     "ui": {
       "schemaVersion": "workloom.bundle.ui/v1",
@@ -156,9 +157,10 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "191f1c27cd522b561f5e5532fed85efd98f7363cd240caa48fc3d7d20654af0e",
+    "digest": "51a9effebd7d047ff921f2c0e65c290b1b6639a15d0c0638112344abde4b0f45",
     "assets": {
       "connectors/connectors.json": "da242e8b9584c76bd95a5de798983fd6d8a401590f34944c64c5dd0eae86b863",
+      "eval/questions.json": "072a979d79275ca4c57e84e59f9c802d802c9386fabc54fbc3af823e4589ce13",
       "fences/hotel-baseline.yml": "3086f0e78f567997b6cf67cd4aea9ab5201bd36b3e39d8c9c8eb20d5ba043334",
       "fences/patches/audit-only-patch.yml": "8c6f1874bf895ba0e2ceea7b5b801195e590d35650ed12a7d7b7b8290393abba",
       "fences/patches/homestay-patch.yml": "64b1b4cdca3f3a962237c9e64d791527eae86a3b39e5dae5d68a653b7d44eeb9",
