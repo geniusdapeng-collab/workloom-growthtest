@@ -142,6 +142,21 @@ describe("向量文本与开关", () => {
 });
 
 describe("媒体仓路径与交付包目录安全", () => {
+  it("路径围栏：resolveInside/assertInside 拒绝 `..` 与仓外绝对路径，safeSegment 只收单段", async () => {
+    const { assertInside, resolveInside, safeSegment } = await import("./paths.js");
+    const root = join(TMP, "confine");
+    mkdirSync(join(root, "ws-a"), { recursive: true });
+    expect(resolveInside(root, "ws-a/clip.mp4")).toBe(join(root, "ws-a/clip.mp4"));
+    for (const bad of ["../../etc/passwd", "ws-a/../../../etc/passwd", "/etc/passwd"]) {
+      expect(() => resolveInside(root, bad), `越界输入必须被拒：${bad}`).toThrow(/越界|非法/);
+    }
+    expect(assertInside(root, join(root, "ws-a"))).toBe(join(root, "ws-a"));
+    expect(safeSegment("PRD-1")).toBe("PRD-1");
+    for (const bad of ["../../etc", "a/b", ".hidden", ""]) {
+      expect(() => safeSegment(bad), `非法标识必须被拒：${bad}`).toThrow(/非法/);
+    }
+  });
+
   it("上传件进 upload/、生成件进 video|image（扩展名兜底）", () => {
     expect(mediaRelPathFor("upload_video", "ws-a", "a".repeat(64), "/tmp/x")).toBe(`upload/ws-a/${"a".repeat(64)}.mp4`);
     expect(mediaRelPathFor("clip", "ws-a", "b".repeat(64), "/tmp/x.mov")).toBe(`video/ws-a/${"b".repeat(64)}.mov`);

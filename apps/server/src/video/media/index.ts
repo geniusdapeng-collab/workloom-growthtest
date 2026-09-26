@@ -373,7 +373,8 @@ export const mediaRouter = router({
       const { scope, by } = collectBy(ctx);
       const name = input.dir ?? input.packageName;
       if (!name) throw new TRPCError({ code: "BAD_REQUEST", message: "需要 dir（交付包目录名或相对路径）" });
-      const abs = name.includes("/") ? name : assertSafePackageName(name, deliveryRoot());
+      // 深审修正：原实现"含 / 就整体放行"，等于把 dir 变成任意路径读取入口（assertSafePackageName 被短路）
+      const abs = assertSafePackageName(name, deliveryRoot());
       try {
         return await ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: abs, by });
       } catch (err) {

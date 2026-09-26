@@ -23,6 +23,7 @@ import { newId } from "@workloom/shared";
 import { mediaRoot, mediaUrl } from "../gen/ingest.js";
 import { scopedQuery, type AppPool, type Scope } from "../gen/db.js";
 import { sha256File } from "./register-local.js";
+import { resolveInside } from "./paths.js";
 
 export const SYNC_TABLES = ["assets", "collections", "items", "products"] as const;
 export type SyncTable = (typeof SYNC_TABLES)[number];
@@ -644,7 +645,7 @@ export async function ensureAssetFile(
   if (!asset) return { ok: false, error: `素材 ${input.assetId} 不在本工作区` };
   if (!asset.local_path) return { ok: false, error: "该素材没有 localPath（不是本地媒体仓产物）" };
 
-  const abs = join(mediaRoot(input.env), asset.local_path);
+  const abs = resolveInside(mediaRoot(input.env), asset.local_path, "拉取路径");
   if (existsSync(abs) && (await sha256File(abs)) === asset.sha256) {
     await scopedQuery(app, scope,
       `UPDATE video_assets SET sync_state = 'synced' WHERE workspace_id = $1 AND id = $2`,

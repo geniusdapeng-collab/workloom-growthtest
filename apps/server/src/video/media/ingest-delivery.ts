@@ -14,6 +14,7 @@ import { isAbsolute, join } from "node:path";
 import type pg from "pg";
 import type { AppPool, Scope } from "../gen/db.js";
 import { registerLocalAsset, type RegisterLocalAssetResult } from "./register-local.js";
+import { assertInside } from "./paths.js";
 
 export interface DeliveryManifestLike {
   projectId?: string;
@@ -40,11 +41,16 @@ export interface IngestDeliveryResult {
 /** 交付包内相对路径解析：先按包根，再退到 versions/<最新>（返修产物的历史口径） */
 function resolveArtifact(packageDir: string, path: string | undefined): string | null {
   if (!path) return null;
-  const candidates = isAbsolute(path)
-    ? [path]
-    : [join(packageDir, path), join(packageDir, "versions", path)];
+  // 交付清单是**数据**不是指令：绝对路径/`..` 一律按越界拒收（深审实测：绝对路径曾被原样登记进媒体仓）
+  const relative = String(path).replace(/^[/\\]+/, "");
+  const candidates = [join(packageDir, relative), join(packageDir, "versions", relative)];
   for (const candidate of candidates) {
-    if (existsSync(candidate)) return candidate;
+    try {
+      const abs = assertInside(packageDir, candidate, "交付产物路径");
+      if (existsSync(abs)) return abs;
+    } catch {
+      return null;
+    }
   }
   return null;
 }
