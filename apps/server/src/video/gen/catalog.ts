@@ -9,6 +9,7 @@ import { readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import type { MediaCatalog, MediaKind, MediaModel, MediaMode } from "./types.js";
+import { whiteboardEngineReady } from "../whiteboard/engine.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 /** apps/server/src/video/gen → 仓库根（gen→video→src→server→apps→root） */
@@ -27,9 +28,19 @@ export const PROVIDER_ENV: Record<string, readonly string[]> = {
   kling: ["KLING_API_KEY"],
   jimeng: ["JIMENG_API_KEY"],
   muapi: ["MUAPI_API_KEY"],
+  /**
+   * 本地白板渲染器（T-2026-0926-0020）没有密钥：可用性 = `WHITEBOARD_ENABLED=1`
+   * **且** venv 解释器存在。这里登记环境变量名只是为了让 `validate()` 认可该供应商
+   * （`availability=wired` 必须有登记）；真正的判定在 `providerConfigured` 的特判分支。
+   */
+  "whiteboard-local": ["WHITEBOARD_ENABLED"],
 };
 
 export function providerConfigured(provider: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (provider === "whiteboard-local") {
+    // 开关型配置："非空即配置"不成立——必须显式置 1 且引擎（venv）真的在
+    return (env.WHITEBOARD_ENABLED ?? "0") === "1" && whiteboardEngineReady(env);
+  }
   const keys = PROVIDER_ENV[provider];
   if (!keys) return false;
   return keys.every((k) => Boolean(env[k]?.trim()));
@@ -127,7 +138,14 @@ export function listModels(filter: ListFilter = {}, path?: string): ListedModel[
       const reason = m.availability !== "wired"
         ? "目录登记模型（未接入适配器）"
         : available ? undefined
-          : `供应商 ${m.provider} 未配置密钥（${(PROVIDER_ENV[m.provider] ?? []).join("+")}）`;
+          /**
+           * 不可用原因要**说人话**：白板引擎不是"缺密钥"，而是"开关没开"或"venv 没装"。
+           * 真机踩过：错误提示写"未配置密钥 WHITEBOARD_ENABLED"会把人带去配密钥，
+           * 而实际要做的是跑安装器 + 置 1。
+           */
+          : m.provider === "whiteboard-local"
+            ? `本地白板引擎未就绪：需 WHITEBOARD_ENABLED=1 且 venv 已安装（pnpm exec tsx scripts/tools/whiteboard-env-install.mts）`
+            : `供应商 ${m.provider} 未配置密钥（${(PROVIDER_ENV[m.provider] ?? []).join("+")}）`;
       return { ...m, effectiveProviderModel: resolveProviderModel(m, env), available, unavailableReason: reason };
     })
     .filter((m) => (onlyAvailable ? m.available : true));

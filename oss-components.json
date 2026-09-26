@@ -2,7 +2,7 @@
   "meta": {
     "schema": "workloom.oss-components/v2",
     "name": "WorkLoom 开源组件登记表（oss-watch）",
-    "updated": "2026-09-23",
+    "updated": "2026-09-27",
     "doc": "docs/OPEN_SOURCE_COMPONENTS.md",
     "plan": "docs/oss-update-plan.md",
     "state": ".oss-watch-state.json",
@@ -1124,6 +1124,23 @@
       "cadence": "monthly",
       "gate": "full",
       "notes": "vendored 进仓并本地加固；上游为参考实现（无版本号），升级=人工比对；生产部署纪律见 docs/computer-use-production.md；publish-rpa 的 BrowserDriver 上游"
+    },
+    {
+      "name": "SRT Whiteboard Animation（手绘白板渲染器，vendored）",
+      "repo": "https://github.com/geeklee/srt-whiteboard-animation",
+      "license": "MIT",
+      "channel": "vendor",
+      "usage": "runtime",
+      "current": "vendor-696a724",
+      "currentSource": "vendor/srt-whiteboard（PINNED.md：上游 commit 696a7243c0e6ffb6827676e539c2ca5ebae2bf6b + 3 处本地补丁）",
+      "scope": [
+        "vendor/srt-whiteboard（scripts/：parse_srt / render_stream_whiteboard / stream_render / merge_scenes / render_annotation_preview / prepare_env）",
+        "apps/server/src/video/whiteboard（引擎桥 + 编排：provider/router/srt/narration/lineart/annotate/mux）",
+        "scripts/whiteboard/lineart_tools.py（本仓扩展：sketch / analyze / check / hand）"
+      ],
+      "cadence": "monthly",
+      "gate": "runtime-gate",
+      "notes": "字幕驱动的手绘白板渲染器：本地确定性 CPU 渲染、零 API 依赖、MIT 可商用。随仓携带上游源码 + 自有中性执笔手素材（assets/whiteboard/drawing-hand-workloom.png）。Python 依赖闭包见 vendor/srt-whiteboard/requirements.txt，venv 由 scripts/tools/whiteboard-env-install.mts 幂等安装、不入库。升级=人工比对上游 + 重跑官方样例与全链路出片"
     },
     {
       "name": "BrowserAct 技能包",

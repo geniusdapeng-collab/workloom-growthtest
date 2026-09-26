@@ -23,7 +23,7 @@ const KIND_LABEL: Record<string, string> = {
   upload_audio: "上传音频", product_image: "商品图", reference_image: "参考图",
 };
 const KIND_ORDER = Object.keys(KIND_LABEL);
-const PIPELINE_LABEL: Record<string, string> = { narrative: "叙事片", marketing: "营销片" };
+const PIPELINE_LABEL: Record<string, string> = { narrative: "叙事片", marketing: "营销片", explainer: "口播解说片" };
 const SOURCE_LABEL: Record<string, string> = {
   generated: "生产生成", uploaded: "用户上传", imported: "外部导入", recut: "重剪产出",
 };

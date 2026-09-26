@@ -61,6 +61,19 @@ function resolveProvider(
   return pool.get(provider ?? "seedance") ?? null;
 }
 
+/**
+ * 项目 kind → 媒资库片型（narrative / marketing / explainer）。
+ *
+ * T-2026-0926-0020：0042 起 `explainer`（口播解说片）是合法项目类型，
+ * 白板片的产物不该被登记成 narrative——媒资库的片型筛选就是靠这一列。
+ * 未知值按叙事片兜底（与既有行为一致，不因新增枚举引入空值）。
+ */
+export function pipelineKindOf(projectKind: string | null | undefined): "narrative" | "marketing" | "explainer" {
+  if (projectKind === "marketing") return "marketing";
+  if (projectKind === "explainer") return "explainer";
+  return "narrative";
+}
+
 export async function pollRenderJobs(
   app: pg.Pool,
   gateway: pg.Pool,
@@ -186,7 +199,8 @@ export async function pollRenderJobs(
             seconds: result.actualUnits ?? null,
             title: `${job.project_id} · ${job.script_id}`,
             prompt: (scriptRow[0]?.md ?? "").slice(0, 4000) || null,
-            pipelineKind: projectRow[0]?.kind === "marketing" ? "marketing" : "narrative",
+            /** 片型如实回填（T-2026-0926-0020；口径收在 pipelineKindOf，带单测） */
+            pipelineKind: pipelineKindOf(projectRow[0]?.kind),
             aspectRatio: job.submit_payload?.decision?.after?.request?.aspectRatio ?? null,
             by: "render-poller",
           });

@@ -47,6 +47,7 @@ import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./arc
 import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
 import { deliveryIngestHook, mediaRouter } from "./media/index.js";
+import { whiteboardRouter } from "./whiteboard/router.js";
 import {
   DeliveryError, buildVariantPreferenceContent, deliveryJobStatus, deliveryPreferenceConfidence,
   deliveryPreferenceMemoryId, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
@@ -1304,6 +1305,8 @@ export const videoRouter = router({
   cms: cmsRouter,
   render: renderRouter,
   gen: genRouter,
+  /** 手绘白板解说引擎（T-2026-0926-0020）：口播稿 → 配音 → SRT → 分幕 → 线稿 → 标注 → 成片 */
+  whiteboard: whiteboardRouter,
   publish: publishRouter,
   metrics: metricsRouter,
   comments: commentsRouter,

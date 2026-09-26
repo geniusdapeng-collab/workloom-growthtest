@@ -20,7 +20,8 @@ export interface MediaColumnPatch {
   title?: string | null;
   tags?: string[];
   prompt?: string | null;
-  pipelineKind?: "narrative" | "marketing" | null;
+  /** 片型（0042 扩展 explainer：口播解说片，白板/动效引擎共用同一片型） */
+  pipelineKind?: "narrative" | "marketing" | "explainer" | null;
   durationSeconds?: number | null;
   width?: number | null;
   height?: number | null;
