@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { promptFieldText, rebuildPromptsFromFields } from "./vendor-compat.js";
+import { healPromptContract, promptFieldText, rebuildPromptsFromFields } from "./vendor-compat.js";
 
 /**
  * 定妆照绑定桥的端到端断言必须在**真实 node 进程**里跑：
@@ -272,6 +272,76 @@ console.log("RESULT " + JSON.stringify({
     expect(promptFieldText({ key_light: "主光", fill_light: "补光" })).toContain("主光");
     expect(promptFieldText({ string: "原样" })).toBe("原样");
     expect(promptFieldText(null)).toBe("");
+  });
+
+  /**
+   * 契约自愈（T-2026-0926-0007 / #165）：重建产物缺【服装】字段 + 台词竖杠，
+   * 会被 vendor `render-pipeline-guard` 的 COSTUME_LOCK / DIALOGUE_FORMAT 稳定拦下。
+   */
+  describe("healPromptContract（重建产物契约自愈）", () => {
+    const basePrompt = [
+      "01.【场景】明亮工作室，工作台与显示器。",
+      "02.【角色】陈卓，与定妆照同一人，深栗棕及肩锁骨发。",
+      "03.【台词】[00s-05s] 陈卓 抬手后开口, 笃定地 说:\"别再买工具 | 你缺的是一支班组。\"",
+      "04.【动作】她走到中景停住。",
+      "05.【负面约束】无文字、无水印。"
+    ].join("\n");
+
+    it("台词竖杠归一：只改【台词】字段，其它字段不动", () => {
+      const result = healPromptContract(basePrompt);
+      const dialogueLine = result.prompt.split("\n").find((line) => line.includes("【台词】"))!;
+      expect(dialogueLine).not.toContain("|");
+      expect(dialogueLine).toContain("别再买工具，你缺的是一支班组。");
+      expect(result.fixes.some((fix) => fix.includes("台词竖杠归一"))).toBe(true);
+    });
+
+    it("缺【服装】字段：有卡片服装短语 → 补字段并重排编号，判为已锁定", () => {
+      const result = healPromptContract(basePrompt, { costumeHint: "月白色苏式改良旗袍，配珍珠耳饰" });
+      expect(result.costumeLocked).toBe(true);
+      expect(result.prompt).toMatch(/【服装】月白色苏式改良旗袍/);
+      const numbers = result.prompt.split("\n").map((line) => Number(/^(\d{2})\./.exec(line)?.[1] ?? 0));
+      expect(numbers).toEqual([1, 2, 3, 4, 5, 6]);
+    });
+
+    it("缺【服装】字段且无提示：补「未锁定」声明并判 costumeLocked=false（不得静默放行）", () => {
+      const result = healPromptContract(basePrompt);
+      expect(result.costumeLocked).toBe(false);
+      expect(result.prompt).toContain("【服装】未锁定");
+      expect(result.fixes.some((fix) => fix.includes("未锁定"))).toBe(true);
+    });
+
+    it("已有【服装】字段：不重复补字段", () => {
+      const withCostume = basePrompt.replace(
+        "02.【角色】陈卓，与定妆照同一人，深栗棕及肩锁骨发。",
+        "02.【角色】陈卓，与定妆照同一人，深栗棕及肩锁骨发。\n02b.【服装】月白色苏式改良旗袍，配素色绣花鞋"
+      );
+      const result = healPromptContract(withCostume);
+      expect(result.prompt.match(/【服装】/g)?.length).toBe(1);
+      expect(result.fixes.some((fix) => fix.includes("补【服装】"))).toBe(false);
+    });
+
+    it("重建链路：空 prompt 镜头重建后自带【服装】补全与台词归一留痕", () => {
+      const shots: Array<Record<string, unknown>> = [
+        {
+          shotId: "SC-09",
+          duration: 5,
+          prompt: "",
+          scene: "明亮工作室",
+          character: "陈卓，与定妆照同一人",
+          costume: "月白色苏式改良旗袍，配珍珠耳饰",
+          action: "她抬手示意"
+        }
+      ];
+      const rebuilt = rebuildPromptsFromFields(shots, "9:16", () =>
+        "01.【场景】明亮工作室。\n02.【角色】陈卓。\n03.【台词】[00s-05s] 陈卓 抬手, 笃定地 说:\"A | B。\""
+      );
+      expect(rebuilt).toEqual(["SC-09"]);
+      const prompt = String(shots[0]!.prompt);
+      expect(prompt).toContain("【服装】月白色苏式改良旗袍");
+      expect(prompt).not.toContain("A | B");
+      expect(Array.isArray(shots[0]!.promptContractHealed)).toBe(true);
+      expect(shots[0]!.costumeLock).toBeUndefined();
+    });
   });
 
   /** 契约桥：autoFix 的 `String(value)` 会把对象变成 [object Object]；validate 前先用可读文本归一 */

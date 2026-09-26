@@ -1071,8 +1071,35 @@ export function deriveTempoFromCuts({ cuts = [], baseBpm, toleranceRatio = 0.25 
   if (!candidates.length) {
     return { bpm: base, source: "recipe", note: "无剪辑点或间距无法反推 BPM，沿用配方 BPM" };
   }
-  candidates.sort((a, b) => Math.abs(a.bpm - base) - Math.abs(b.bpm - base));
-  const best = candidates[0];
+  /**
+   * 【2026-09-26 真机修复】候选**按票数聚类**，不再只挑"离基准最近的一个"。
+   *
+   * 事故（VID-GR01）：基准 BPM 取到默认 100（调用方没传 `--bgm-bpm`），
+   * 相邻剪辑点间距被逐个取整到整拍 → 5.00s 反推 96、4.82s 反推 99.6、4.50s 反推 106.7，
+   * "离 100 最近"的 99.6 被选中；可 99.6BPM 的网格（0.6024s/拍）**根本对不上自己的剪辑点**，
+   * 于是工位自判 `unaligned`（7/17 命中、平均 122ms），监制据此连续打回配乐环节。
+   *
+   * 现在改为：把 ±2BPM 内的候选并成一个簇，**取支持剪辑点最多的簇**（票数相同再比离基准的距离）。
+   * 这样个别被转场/抖动偏移的间隔不会再把整体 BPM 带偏；基准 BPM 只作平票裁决与容差门槛。
+   */
+  const clusters = [];
+  for (const candidate of candidates) {
+    const cluster = clusters.find((entry) => Math.abs(entry.bpm - candidate.bpm) <= 2);
+    if (cluster) {
+      cluster.votes += 1;
+      cluster.bpm = (cluster.bpm * (cluster.votes - 1) + candidate.bpm) / cluster.votes;
+      if (Math.abs(candidate.bpm - base) < Math.abs(cluster.representative - base)) {
+        cluster.representative = candidate.bpm;
+        cluster.interval = candidate.interval;
+        cluster.beats = candidate.beats;
+      }
+    } else {
+      clusters.push({ bpm: candidate.bpm, representative: candidate.bpm, votes: 1, interval: candidate.interval, beats: candidate.beats });
+    }
+  }
+  clusters.sort((a, b) => (b.votes - a.votes) || (Math.abs(a.representative - base) - Math.abs(b.representative - base)));
+  const winner = clusters[0];
+  const best = { bpm: winner.bpm, interval: winner.interval, beats: winner.beats, votes: winner.votes, total: candidates.length };
   const adopted = Math.abs(best.bpm - base) / base <= toleranceRatio;
   const derived = Math.round(best.bpm * 10) / 10;
   return {
@@ -1081,8 +1108,11 @@ export function deriveTempoFromCuts({ cuts = [], baseBpm, toleranceRatio = 0.25 
     candidateBpm: derived,
     intervalSec: round(best.interval, 3),
     beats: best.beats,
+    votes: best.votes,
+    voteTotal: best.total,
     note: adopted
-      ? `按剪辑点间距 ${round(best.interval, 2)}s ≈ ${best.beats} 拍反推 BPM ${derived}（配方基准 ${base}）`
+      ? `按剪辑点间距 ${round(best.interval, 2)}s ≈ ${best.beats} 拍反推 BPM ${derived}`
+        + `（${best.votes}/${best.total} 个间隔同簇，配方基准 ${base}）`
       : `剪辑点间距反推 BPM ${derived} 与配方 ${base} 差异 >${Math.round(toleranceRatio * 100)}%，沿用配方 BPM`,
   };
 }

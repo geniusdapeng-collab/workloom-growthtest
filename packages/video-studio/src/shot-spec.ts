@@ -51,6 +51,96 @@ export interface ShotSpecReport {
   degradeReason: string;
   /** 内容红线命中（实验车道：科幻/微观等与 brief 无关的意象） */
   redlines: string[];
+  /**
+   * 【场景】是否被 vendor 写实校验替换/漂移（2026-09-26 真机 T-2026-0926-0007）。
+   * 被替换时提示词里的【场景】已经不是卡片写的那一段——必须显式暴露，不能等监制看画面才发现。
+   */
+  sceneSubstituted: boolean;
+  /** 场景替换/漂移的细节（未替换时为 null） */
+  sceneSubstitution: SceneSubstitutionReport | null;
+}
+
+/**
+ * vendor 写实校验（`config/production-profile.js#REALISM_FORBIDDEN.full.scene`）使用的场景禁用词。
+ * 命中后 vendor 的 `rule-fallback` 会把整段【场景】**静默替换**成 `config/neutral-fallbacks.js`
+ * 里的中立模板；真机证据：卡片写"打烊店铺前厅 + 门外霓虹"，成图却是"简约室内房间 + 白墙窗帘"。
+ */
+export const REALISM_FORBIDDEN_SCENE_WORDS = [
+  "全息", "虚拟", "投影", "抽象", "光影场域", "数据空间", "元宇宙", "时间操控",
+  "霓虹", "微观世界", "宏观", "抽象几何", "流动光影", "交织光影", "色彩对冲"
+];
+
+/** vendor 的中立兜底场景模板（`config/neutral-fallbacks.js#FALLBACK_SCENES` 原样） */
+export const NEUTRAL_FALLBACK_SCENES = [
+  "室内明亮空间,白色顶灯均匀照明,浅色墙面挂有无文字图形装饰画,木质桌面带有细微使用痕迹,地面浅灰色地板",
+  "现代开放式走廊,冷白色LED光源从顶部连续排列向下照射,无文字指示标识,地面浅色抛光瓷砖,墙面纯白涂层",
+  "简约室内房间,白色墙面悬挂无文字示意图,桌面摆放日常器物,窗户透入自然光,浅色窗帘半掩",
+  "开放式公共大厅,嵌入式灯带洒下柔和暖白光,接待台后方排列无文字图形展板,前方沙发与茶几,地面灰色哑光瓷砖"
+];
+
+export interface SceneSubstitutionReport {
+  substituted: boolean;
+  reason: string;
+  /** 镜头卡里写的【场景】 */
+  from: string;
+  /** 组装后提示词里的【场景】 */
+  to: string;
+  /** 卡片场景命中的写实禁用词 */
+  hits: string[];
+  /** 两段场景文本的字符二元组重合度（0–1） */
+  overlap: number;
+}
+
+/** 场景文本归一（去标点与空白），用于机械比对 */
+function normalizeSceneForCompare(text: string): string {
+  return String(text ?? "").replace(/[\s，。、；：,.;:"'“”「」（）()\-—…]/g, "");
+}
+
+function sceneBigrams(text: string): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i + 1 < text.length; i += 1) out.add(text.slice(i, i + 2));
+  return out;
+}
+
+/**
+ * 【场景】替换/漂移检测（零 token 确定性判据）。
+ *
+ * 判定顺序：
+ *   1. 组装后的场景**就是** vendor 的中立兜底模板 → 判替换（写实校验触发）；
+ *   2. 组装后的场景与卡片场景的字符二元组重合度 < 0.35 → 判漂移（提示词里的场景已经不是卡片写的）；
+ *   3. 其余判一致。
+ */
+export function detectSceneSubstitution(cardScene: string, assembledScene: string): SceneSubstitutionReport {
+  const from = String(cardScene ?? "").trim();
+  const to = String(assembledScene ?? "").trim();
+  const hits = REALISM_FORBIDDEN_SCENE_WORDS.filter((word) => from.includes(word));
+  const normFrom = normalizeSceneForCompare(from);
+  const normTo = normalizeSceneForCompare(to);
+  if (!normFrom || !normTo) {
+    return { substituted: false, reason: "场景文本缺失，无法比对", from, to, hits, overlap: 0 };
+  }
+  const fallbackHit = NEUTRAL_FALLBACK_SCENES.some((template) => normalizeSceneForCompare(template) === normTo);
+  const a = sceneBigrams(normFrom);
+  const b = sceneBigrams(normTo);
+  let inter = 0;
+  for (const gram of a) if (b.has(gram)) inter += 1;
+  const union = a.size + b.size - inter;
+  const overlap = union > 0 ? inter / union : 0;
+  if (fallbackHit) {
+    return {
+      substituted: true,
+      reason: `【场景】被替换为 vendor 中立兜底模板（写实校验命中：${hits.join("、") || "未知词"}）`,
+      from, to, hits, overlap: Number(overlap.toFixed(3))
+    };
+  }
+  if (overlap < 0.35) {
+    return {
+      substituted: true,
+      reason: `【场景】与镜头卡不一致（重合度 ${(overlap * 100).toFixed(0)}%）`,
+      from, to, hits, overlap: Number(overlap.toFixed(3))
+    };
+  }
+  return { substituted: false, reason: "场景与镜头卡一致", from, to, hits, overlap: Number(overlap.toFixed(3)) };
 }
 
 export interface PrepareOptions {
@@ -738,6 +828,20 @@ export function prepareShotPrompt(
     log(`[shot-spec] ${shotId} 命中内容红线：${redlines.join("、")}（提交前必须处理或显式放行）`);
   }
 
+  /**
+   * 【场景】替换/漂移检测（2026-09-26 真机 T-2026-0926-0007）：
+   * vendor 的写实校验命中禁用词（如"霓虹"）时会把整段【场景】换成中立兜底模板，且**不写日志**。
+   * 早先只能靠监制看画面与卡片不符打回（真机白烧一轮出图 + 一次评审），现在零 token 暴露。
+   */
+  const sceneSegment = prompt.match(/【场景】([^\n|]*)/);
+  const sceneSubstitution = detectSceneSubstitution(String(card.scene ?? ""), sceneSegment?.[1]?.trim() ?? "");
+  if (sceneSubstitution.substituted) {
+    log(
+      `[shot-spec] ${shotId} ⚠ ${sceneSubstitution.reason}｜卡片："${sceneSubstitution.from.slice(0, 40)}"`
+      + ` → 提示词："${sceneSubstitution.to.slice(0, 40)}"（重合度 ${(sceneSubstitution.overlap * 100).toFixed(0)}%）`
+    );
+  }
+
   return {
     shotId,
     isOpening,
@@ -750,7 +854,9 @@ export function prepareShotPrompt(
     delivery: { pass: delivery.pass, issues: delivery.issues },
     degraded: Boolean(std.degraded),
     degradeReason: String(std.degradeReason ?? ""),
-    redlines
+    redlines,
+    sceneSubstituted: sceneSubstitution.substituted,
+    sceneSubstitution
   };
 }
 

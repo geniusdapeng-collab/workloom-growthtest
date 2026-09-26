@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   AUDIO_DISCIPLINE_CLAUSE,
   AUDIO_NEGATIVE_TERMS,
+  detectSceneSubstitution,
   fieldSpec,
+  NEUTRAL_FALLBACK_SCENES,
   normalizeConstraintSegment,
   normalizeStructuredFields,
   prepareShotPrompt,
   readableValue,
+  REALISM_FORBIDDEN_SCENE_WORDS,
   resolutionToPixels,
   shotSpecMarkdown
 } from "./shot-spec.js";
@@ -296,5 +299,66 @@ describe("镜头卡交付闸（vendor PromptDeliveryGuard 为准）", () => {
     expect(md).toContain("片头(30)");
     expect(md).toContain("内容(25)");
     expect(md).toContain("字段规范来源");
+  });
+});
+
+/**
+ * 【场景】替换/漂移检测（T-2026-0926-0007 真机缺口）。
+ *
+ * 背景：真机 VID-GR01 的 GR-03 卡片写的是「打烊后的店铺前厅 + 门外虚化的街道霓虹」，
+ * vendor 写实校验命中禁用词「霓虹」后把整段【场景】替换成中立模板「简约室内房间…」，
+ * 且不写任何日志——只能靠监制看画面与卡片不符打回，白烧一轮出图。
+ */
+describe("【场景】写实校验替换检测", () => {
+  it("纯函数：组装后就是 vendor 中立兜底模板 → 判替换，并给出命中的禁用词", () => {
+    const result = detectSceneSubstitution(
+      "打烊后的店铺前厅，柜台、玻璃门与门外虚化的街道霓虹",
+      NEUTRAL_FALLBACK_SCENES[2]!
+    );
+    expect(result.substituted).toBe(true);
+    expect(result.reason).toContain("中立兜底模板");
+    expect(result.hits).toContain("霓虹");
+  });
+
+  it("纯函数：文本完全一致 → 判一致", () => {
+    const scene = "现代写字楼高层的办公室，落地窗外是黄昏转入夜色的城市天际线";
+    const result = detectSceneSubstitution(scene, scene);
+    expect(result.substituted).toBe(false);
+    expect(result.overlap).toBeCloseTo(1, 5);
+  });
+
+  it("纯函数：重合度过低（明显被换掉）→ 判漂移", () => {
+    const result = detectSceneSubstitution(
+      "深夜客服工位，三块屏幕与耳机",
+      "白墙木地板客厅，沙发与茶几"
+    );
+    expect(result.substituted).toBe(true);
+    expect(result.reason).toContain("不一致");
+  });
+
+  it("纯函数：场景缺失 → 不误报（无法比对时不得凭空判替换）", () => {
+    expect(detectSceneSubstitution("", "任意场景").substituted).toBe(false);
+    expect(detectSceneSubstitution("任意场景", "").substituted).toBe(false);
+  });
+
+  it("禁用词表与 vendor 写实校验口径一致（含霓虹/投影等关键条目）", () => {
+    expect(REALISM_FORBIDDEN_SCENE_WORDS).toContain("霓虹");
+    expect(REALISM_FORBIDDEN_SCENE_WORDS).toContain("投影");
+    expect(REALISM_FORBIDDEN_SCENE_WORDS).toContain("元宇宙");
+  });
+
+  it("真机链路：卡片场景含「霓虹」→ 报告显式标记 sceneSubstituted，并保留前后文本", () => {
+    const card = contentCard("S9");
+    card.scene = "打烊后的店铺前厅，柜台、玻璃门与门外虚化的街道霓虹";
+    const report = prepareShotPrompt(card);
+    expect(report.sceneSubstituted).toBe(true);
+    expect(report.sceneSubstitution?.from).toContain("霓虹");
+    expect(report.sceneSubstitution?.to).not.toContain("霓虹");
+  });
+
+  it("真机链路：正常场景卡片 → 不标记替换", () => {
+    const report = prepareShotPrompt(contentCard("S10"));
+    expect(report.sceneSubstituted).toBe(false);
+    expect(report.sceneSubstitution?.reason).toContain("一致");
   });
 });
