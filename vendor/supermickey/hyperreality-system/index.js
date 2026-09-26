@@ -675,6 +675,27 @@ class HyperrealitySystem {
         result.errors.push({ stage: 'CreativeThemeGenerator', message: err.message });
       }
 
+      /**
+       * ========== 🆕 Layer -0.5: 产品事实红线闸（营销片 truth-check） ==========
+       * 【T-2026-0926-0103】此前 `product-truth-checker.js`（ProductTruthChecker）在全仓
+       * 没有任何调用点：管线 YAML 声明了 `truth-check` 环节与"一票否决"，运行时却是纸门。
+       * 这里把闭环接上（位置严格按 yml：创意主题之后、业务需求洞察之前）：
+       *   情报档案（dossier）→ truth-check-bridge 映射 researchNotes（带信源）
+       *   → ProductTruthChecker.verify({brief, researchNotes, creative})
+       *   → 命中"创意前提与事实矛盾"即打回创意（不进洞察与 PRD）
+       *   → factRedLines 注入 PRD「制作约束」，供镜头层不得突破。
+       * 口径：
+       *   · 只对营销片运行（dataMining / pipelineRoute.kind=marketing / brief.product）；
+       *   · 只有 conflicts（真矛盾）阻断；调研缺口（issues）作为 degraded 信号落账不阻断
+       *     ——与情报层"档案可缺站、缺口必须显式"的既有口径一致；
+       *   · 桥异常 → 记 degraded 后继续（不静默：阶段与错误都落 result）。
+       */
+      const truthGate = this._runProductTruthCheckGate(metadata, result);
+      if (truthGate && truthGate.blocking) {
+        result.success = false;
+        return result;
+      }
+
       // ========== 🆕 Layer 0: 需求洞察 + 业务需求对齐清单 ==========
       // 【v2.1.8-强制流程】Step 3: 需求洞察 + 人工确认（不可跳过）
       console.log('📋 [Layer 0] 需求洞察 - 基于创意主题进行深度业务分析...');
@@ -930,6 +951,27 @@ class HyperrealitySystem {
               delivery.durationSeconds = briefDuration;
               prdResult._briefDurationOverride = `Brief 时长 ${briefDuration}s`;
             }
+          }
+        }
+        /**
+         * 【T-2026-0926-0103】事实红线 → PRD「制作约束」原样继承（checker 的契约：
+         * "PRD 生成器必须原样继承进制作约束章节，镜头设计层不得突破"）。
+         * 只追加内容、不改结构：`productionConstraints.businessConstraints` 属既有数组字段。
+         */
+        const inheritedFactRedLines = Array.isArray(metadata && metadata._factRedLines) ? metadata._factRedLines : [];
+        if (prdResult && inheritedFactRedLines.length > 0) {
+          prdResult.productionConstraints = prdResult.productionConstraints || {};
+          const constraints = prdResult.productionConstraints;
+          if (!Array.isArray(constraints.businessConstraints)) constraints.businessConstraints = [];
+          let appended = 0;
+          for (const line of inheritedFactRedLines) {
+            const text = String(line || '').trim();
+            if (!text || constraints.businessConstraints.includes(text)) continue;
+            constraints.businessConstraints.push(text);
+            appended += 1;
+          }
+          if (appended > 0) {
+            console.log(`   🧷 事实红线已注入 PRD 制作约束：${appended} 条`);
           }
         }
         result.stages.prdGeneration = {
@@ -2879,6 +2921,92 @@ class HyperrealitySystem {
    * 只在确有 Brief / 情报时注入，避免污染纯故事片的创作（叙事路由不带这两样）。
    * 注入内容全部来自真实登记（Brief 字段与档案摘要卡），不新增任何未经验证的事实。
    */
+  /**
+   * 产品事实红线闸（营销片 truth-check · Layer -0.5）
+   * ------------------------------------------------------------------
+   * 【T-2026-0926-0103】`product-truth-checker.js`（ProductTruthChecker）此前在全仓
+   * 没有任何调用点：管线 YAML 声明了 `truth-check` 与"一票否决"，运行时却是纸门。
+   * 本方法把闭环接上（位置严格按 yml：创意主题之后、业务需求洞察之前）：
+   *   情报档案（dossier）→ truth-check-bridge 映射 researchNotes（带信源）
+   *   → ProductTruthChecker.verify({brief, researchNotes, creative})
+   *   → 命中"创意前提与事实矛盾"即判 blocking（调用方中止并打回创意）
+   *   → factRedLines 写 metadata._factRedLines，供 PRD「制作约束」原样继承。
+   *
+   * 口径：
+   *   · 只对营销片运行（dataMining / pipelineRoute.kind=marketing / brief.product）；
+   *   · 只有 conflicts（真矛盾）阻断；调研缺口（issues）作为 degraded 落账不阻断
+   *     ——与情报层"档案可缺站、缺口必须显式"的既有产品口径一致；
+   *   · 桥异常 → 记 degraded 后继续（不静默：阶段与错误都落 result）。
+   * @param {object} metadata 运行 metadata（含 brief / _dataDossier / _creativeTheme）
+   * @param {object} result   运行结果容器（写入 result.stages.truthCheck）
+   * @returns {{blocking:boolean, degraded:boolean}}
+   */
+  _runProductTruthCheckGate(metadata = {}, result = {}) {
+    result.stages = result.stages || {};
+    const stageTruthStart = Date.now();
+    try {
+      const { isMarketingRun, buildCreativeInput, runTruthCheck } = require('./engines/truth-check-bridge');
+      if (!isMarketingRun(metadata)) {
+        return { blocking: false, degraded: false };
+      }
+      const { ProductTruthChecker } = require('./engines/production-engine/agents/product-truth-checker');
+      if (!this._productTruthChecker) this._productTruthChecker = new ProductTruthChecker();
+      const truthBrief = (metadata && typeof metadata.brief === 'object' && metadata.brief) ? metadata.brief : {};
+      const dmData = result.stages && result.stages.dataMining ? result.stages.dataMining.data : null;
+      const verdict = runTruthCheck({
+        checker: this._productTruthChecker,
+        brief: truthBrief,
+        dossier: dmData && dmData.dossier ? dmData.dossier : null,
+        cards: (metadata && metadata._dataDossier && metadata._dataDossier.cards) || (dmData && dmData.cards) || null,
+        creative: buildCreativeInput(metadata && metadata._creativeTheme)
+      });
+      result.stages.truthCheck = {
+        pass: verdict.pass,
+        blocking: verdict.blocking,
+        notes: verdict.notes,
+        degraded: verdict.degraded,
+        degradedReason: verdict.degradedReason,
+        issues: verdict.issues,
+        conflicts: verdict.conflicts,
+        factRedLines: verdict.factRedLines,
+        timing: Date.now() - stageTruthStart
+      };
+      if (Array.isArray(verdict.factRedLines) && verdict.factRedLines.length > 0) {
+        metadata._factRedLines = verdict.factRedLines;
+      }
+      if (verdict.blocking) {
+        console.log(`   ⛔ 事实红线命中 ${verdict.conflicts.length} 条 → 打回创意主题`);
+        result.stages.truthCheck.status = 'rejected';
+        result.errors = result.errors || [];
+        result.errors.push({
+          stage: 'ProductTruthChecker',
+          message: `创意前提与产品事实矛盾：${verdict.conflicts.map((c) => c.banned || c.type).join('、')}`,
+          fatal: true
+        });
+        return { blocking: true, degraded: false };
+      }
+      if (verdict.degraded) {
+        console.log(`   ⚠️ 事实红线闸降级通过（${verdict.degradedReason}）：无情报证据，未执行事实校验`);
+      } else {
+        console.log(`   ✅ 事实红线闸通过（档案事实 ${verdict.notes} 条，红线 ${verdict.factRedLines.length} 条）`);
+      }
+      return { blocking: false, degraded: verdict.degraded };
+    } catch (truthErr) {
+      result.stages.truthCheck = {
+        pass: null,
+        blocking: false,
+        degraded: true,
+        degradedReason: 'bridge-error',
+        error: truthErr.message,
+        timing: Date.now() - stageTruthStart
+      };
+      console.warn(`   ⚠️ 事实红线闸异常（不阻断，已记 degraded）: ${truthErr.message}`);
+      result.errors = result.errors || [];
+      result.errors.push({ stage: 'ProductTruthChecker', message: truthErr.message });
+      return { blocking: false, degraded: true };
+    }
+  }
+
   _buildThemeInput(intent, metadata = {}) {
     const brief = (metadata && typeof metadata.brief === 'object') ? metadata.brief : null;
     const cards = metadata?._dataDossier?.cards || null;
