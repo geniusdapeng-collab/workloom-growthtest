@@ -438,6 +438,19 @@ export const MATERIAL_MOTION_POLICY: MotionPolicy = {
   minRampRatio: 1.8
 };
 
+/**
+ * **原始渲染**的运动口径（2026-09-25 南昌片真机校准）：
+ * 模型端只要"一直在动、有真实镜头位移"即可（mean ≥ 8），**速度坡道是后期的事**——
+ * 早先拿成片口径（ramp ≥ 1.8）去卡原始渲染，会把"匀速但运动充分"的真实运镜误判为不合格
+ * （真机：NC-05 平均 9.35／坡道比 1.45、NC-12 8.68／1.65 被判"缺少速度坡道"重渲，白烧两次额度）。
+ * 这里只保留一个**很软**的坡道下限（≥1.25）：用来拦住"完全匀速的无人机式平移"，
+ * 真正的节奏由 `applySpeedRamp` 在成片上保证。
+ */
+export const MATERIAL_RAW_MOTION_POLICY: MotionPolicy = {
+  minMeanEnergy: 8,
+  minRampRatio: 1.25
+};
+
 export function assessMotionRichness(
   motion: MotionRichness,
   policy: MotionPolicy = MATERIAL_MOTION_POLICY

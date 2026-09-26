@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "workloom.character-profile/v1",
+  "id": "nc-vendor-noodle",
+  "name": "拌粉摊主",
+  "kind": "generated-temporary",
+  "modelRole": "本片临时角色（一次性出镜，类型化生成人物，不对应任何真实个人）",
+  "appearance": {
+    "summary": "拌粉摊主"
+  },
+  "authorization": {
+    "status": "generated",
+    "evidence": "Seedream 生成的类型化人物，用于本片一次性出镜（2026-09-25）"
+  },
+  "portraitSets": [
+    {
+      "dir": "portraits",
+      "angles": [
+        "portrait"
+      ],
+      "active": true,
+      "version": 1
+    }
+  ]
+}
