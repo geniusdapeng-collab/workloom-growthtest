@@ -224,11 +224,28 @@ export interface MaterialReuseSample {
    * 越高越像"素材本身被平移/放大"；真实生成的画面会因为云/水/光/人群的变化而明显下降。
    */
   bestPsnrDb: number | null;
+  /**
+   * 同一候选窗口的**最佳结构相似度（0–1）**。
+   *
+   * 为什么要第二个指标（2026-09-26 真机）：模型"从远景推近到参考照片"时，后段画面是参考图的
+   * **深度变焦**——它既不是像素级拷贝（PSNR 只有 20–35dB，到不了同一张图的 45dB），
+   * 也不是真实重建场景（结构、构图、细节与参考图高度一致，SSIM ≥ 0.8）。
+   * 只看 PSNR 会把这类"看起来就是那张照片"的镜头放行（真机 NC-02：复用度峰值 13.2dB 被判通过，
+   * 但成片 5.5–9.5s 观众看到的就是照片特写）。
+   */
+  bestSsim?: number | null;
 }
 
 export interface MaterialReusePolicy {
-  /** 判定"几乎就是同一张图"的 PSNR 阈值（dB）：JPEG 重编码级别 ≈40，因此取 45 留出余量 */
+  /** 判定"像素级几乎就是同一张图"的 PSNR 阈值（dB）：JPEG 重编码级别 ≈40，因此取 45 留出余量 */
   identicalPsnrDb: number;
+  /**
+   * 判定"视觉上就是那张照片"的 PSNR 下限（dB）：低于它时连结构都不像参考图，不参与照片判定。
+   * 与 `photoLikeSsim` **同时满足**才计一次命中（两个指标互证，避免单一指标误杀）。
+   */
+  photoLikePsnrDb: number;
+  /** 判定"视觉上就是那张照片"的结构相似度下限（0–1） */
+  photoLikeSsim: number;
   /** 判定静态直出所需的最少命中采样数（单帧可能是巧合，中后段连续命中才是直出） */
   minHits: number;
   /** 采样点覆盖比例下限：低于该时刻的样本不参与"后段复用"判定 */
@@ -237,15 +254,30 @@ export interface MaterialReusePolicy {
 
 export const MATERIAL_REUSE_POLICY: MaterialReusePolicy = {
   identicalPsnrDb: 45,
+  /**
+   * 26dB + SSIM 0.80：真机标定——NC-02 的照片变焦后段与"素材按 2–4× 变焦窗口"对齐后
+   * 落在 26–34dB / SSIM 0.82–0.93；而正常重建场景（河岸远景、街景、夜市）在同样候选集下
+   * 峰值 PSNR ≤ 20dB、SSIM ≤ 0.62。阈值取在两簇之间，既不误杀真实场景，也不放行照片变焦。
+   */
+  photoLikePsnrDb: 26,
+  photoLikeSsim: 0.8,
   minHits: 2,
   lateSampleRatio: 0.4
 };
 
 export interface MaterialReuseAssessment {
+  /** 硬判据：中后段连续命中 → 就是素材本身（像素级或视觉级） */
   staticDisplay: boolean;
   hits: number;
   samples: number;
+  /** 全部采样帧里的最高 PSNR（dB），用于报告"最像素材的一帧有多像" */
   worst: number | null;
+  /** 全部采样帧里的最高 SSIM（0–1） */
+  maxSsim: number | null;
+  /** 首次命中（`staticDisplay` 判据）的时刻（秒）；无命中为 null。用于**尾部裁剪**定位 */
+  firstHitSec: number | null;
+  /** 命中的判定依据：pixel（PSNR≥identicalPsnrDb）/ visual（PSNR+SSIM 双证据）/ null */
+  hitKind: "pixel" | "visual" | null;
   detail: string;
 }
 
@@ -261,16 +293,34 @@ export function assessMaterialReuse(
   options: { durationSec: number; policy?: MaterialReusePolicy }
 ): MaterialReuseAssessment {
   const policy = options.policy ?? MATERIAL_REUSE_POLICY;
-  const late = samples.filter((s) => s.atSec >= options.durationSec * policy.lateSampleRatio && s.bestPsnrDb !== null);
-  const hits = late.filter((s) => (s.bestPsnrDb as number) >= policy.identicalPsnrDb);
+  const isPixelHit = (s: MaterialReuseSample): boolean => (s.bestPsnrDb ?? -1) >= policy.identicalPsnrDb;
+  /**
+   * 视觉命中：PSNR 与 SSIM **同时**达标。
+   * 单独用 SSIM 会把"构图相似但确是重建"的镜头误杀（真实场景重建也会保构图），
+   * 单独用 PSNR 又会漏掉深度变焦（见 `bestSsim` 注释），两指标互证才稳。
+   */
+  const isVisualHit = (s: MaterialReuseSample): boolean => (
+    (s.bestPsnrDb ?? -1) >= policy.photoLikePsnrDb
+    && (s.bestSsim ?? -1) >= policy.photoLikeSsim
+  );
+  const late = samples.filter((s) => s.atSec >= options.durationSec * policy.lateSampleRatio);
+  const lateHits = late.filter((s) => isPixelHit(s) || isVisualHit(s));
   const measured = samples.map((s) => s.bestPsnrDb).filter((v): v is number => v !== null);
+  const ssims = samples.map((s) => s.bestSsim).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const worstAll = measured.length > 0 ? Math.max(...measured) : null;
-  const staticDisplay = hits.length >= policy.minHits;
+  const maxSsim = ssims.length > 0 ? Math.max(...ssims) : null;
+  const staticDisplay = lateHits.length >= policy.minHits;
+  const firstHitSec = lateHits.length > 0 ? Math.min(...lateHits.map((s) => s.atSec)) : null;
+  const hitKind: MaterialReuseAssessment["hitKind"] = lateHits.length === 0
+    ? null
+    : (lateHits.some(isPixelHit) ? "pixel" : "visual");
   const detail = measured.length === 0
     ? "复用度未测到（无有效采样）"
-    : `后段采样 ${late.length} 帧，最佳匹配 PSNR ${hits.length} 帧 ≥ ${policy.identicalPsnrDb}dB`
-      + `（峰值 ${worstAll === null ? "n/a" : `${worstAll.toFixed(1)}dB`}；越低越说明画面是生成出来的）`;
-  return { staticDisplay, hits: hits.length, samples: late.length, worst: worstAll, detail };
+    : `后段采样 ${late.length} 帧，命中 ${lateHits.length} 帧`
+      + `（像素级 ≥${policy.identicalPsnrDb}dB 或 视觉级 ≥${policy.photoLikePsnrDb}dB 且 SSIM ≥${policy.photoLikeSsim}）`
+      + `；峰值 PSNR ${worstAll === null ? "n/a" : `${worstAll.toFixed(1)}dB`} / 峰值 SSIM ${maxSsim === null ? "n/a" : maxSsim.toFixed(3)}`
+      + (firstHitSec === null ? "" : `；首次命中 ${firstHitSec.toFixed(2)}s（可用于尾部裁剪）`);
+  return { staticDisplay, hits: lateHits.length, samples: late.length, worst: worstAll, maxSsim, firstHitSec, hitKind, detail };
 }
 
 /**

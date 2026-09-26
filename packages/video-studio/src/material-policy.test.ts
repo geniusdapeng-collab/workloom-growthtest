@@ -231,6 +231,52 @@ describe("静态直出判定", () => {
     expect(verdict.staticDisplay).toBe(false);
     expect(verdict.detail).toContain("未测到");
   });
+
+  /**
+   * 真机回归（2026-09-26 · 南昌片 NC-02）：模型"从远景推近到参考照片"的后段是**深度变焦**——
+   * PSNR 到不了 45dB（像素级拷贝），但结构与参考图几乎一致。只看 PSNR 会漏掉"画面就是那张照片"。
+   */
+  it("深度变焦后段：PSNR 未到像素级但 SSIM 高 → 仍判静态直出（视觉级命中）", () => {
+    const verdict = assessMaterialReuse(
+      [
+        { atSec: 0.5, bestPsnrDb: 12.8, bestSsim: 0.41 },
+        { atSec: 2.5, bestPsnrDb: 28.4, bestSsim: 0.86 },
+        { atSec: 4.0, bestPsnrDb: 31.2, bestSsim: 0.91 }
+      ],
+      { durationSec: 4.9 }
+    );
+    expect(verdict.staticDisplay).toBe(true);
+    expect(verdict.hitKind).toBe("visual");
+    expect(verdict.hits).toBe(2);
+    /** 首次命中要能定位到尾部起点，供自动裁剪使用 */
+    expect(verdict.firstHitSec).toBe(2.5);
+    expect(verdict.maxSsim).toBeCloseTo(0.91, 2);
+  });
+
+  it("真实重建场景（构图相似但两张图）不误杀：PSNR/SSIM 双低", () => {
+    const verdict = assessMaterialReuse(
+      [
+        { atSec: 1.0, bestPsnrDb: 18.2, bestSsim: 0.58 },
+        { atSec: 3.0, bestPsnrDb: 19.6, bestSsim: 0.62 },
+        { atSec: 4.5, bestPsnrDb: 17.4, bestSsim: 0.55 }
+      ],
+      { durationSec: 5 }
+    );
+    expect(verdict.staticDisplay).toBe(false);
+    expect(verdict.hitKind).toBeNull();
+    expect(verdict.firstHitSec).toBeNull();
+  });
+
+  it("结构像但 PSNR 太低（只是构图雷同）不算命中——两指标必须互证", () => {
+    const verdict = assessMaterialReuse(
+      [
+        { atSec: 2.0, bestPsnrDb: 21.5, bestSsim: 0.88 },
+        { atSec: 4.0, bestPsnrDb: 20.1, bestSsim: 0.9 }
+      ],
+      { durationSec: 4.5 }
+    );
+    expect(verdict.staticDisplay).toBe(false);
+  });
 });
 
 describe("生成溯源判据", () => {

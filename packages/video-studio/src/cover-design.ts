@@ -102,6 +102,13 @@ export interface CoverDesignInput {
   title?: string;
   /** 成片真实时长（秒）：标题里写"XX 秒"时必须与它一致（容差 ±2s，真机 2026-09-25） */
   durationSeconds?: number;
+  /**
+   * 封面版式（2026-09-26 产品所有者口径：**只有两种主视觉**）：
+   *   · `person-led` 人物为主：人物占画面主体，背景（景物/商品）只作环境点缀；
+   *   · `subject-led` 物体为主：景物/商品/动物等**非人主体**满幅为主视觉，画面里不再放人物小卡。
+   * 禁止第三种"人物小图贴在地标/商品上"——两种主视觉打架，真机被打回三次。
+   */
+  archetype?: "person-led" | "subject-led";
   brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string } | null;
   platform?: string;
   character?: { id?: string; name?: string } | null;
@@ -132,11 +139,22 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
     ...shotLines,
     "",
     "设计要求（硬性）：",
-    "1. 封面必须同时有【主视觉画面 + 人物（若片中有主角）+ 主标题（+ 可选副标题/角标）】，禁止只有一行标题；",
-    "1.1 **底图必须是单张连续画面**（地标主体清晰可辨、占画面高度 ≥30%）：禁止把两个镜头横向拼接——"
+    /**
+     * 版式先于一切（2026-09-26 产品所有者口径）：
+     * 早先的提示词写死"必须有人物肖像卡"，于是所有封面都变成"人物小图贴在地标上"——
+     * 两种主视觉互相打架，既不像人物封面也不像景物封面。现在只有两种合法版式。
+     */
+    `0. **版式（archetype）二选一，必须与本片指定一致**：本片指定 \`${input.archetype ?? "subject-led"}\`。`,
+    "   0.1 `person-led`（人物为主）：人物是唯一主视觉，占画面高 ≥55%，背景只作环境点缀（可虚化、可只留地标轮廓）；标题压在留白处；画面里**不得**再放第二个人物小图。",
+    "   0.2 `subject-led`（物体为主）：景物/商品/动物等非人主体满幅为主视觉（占画面高 ≥35%），"
+      + "画面里**不得**出现人物小卡、人物竖带或任何人物拼贴；标题压在留白处；"
+      + "**人物在成图中缺席不是缺陷，是本版式的设计选择**。",
+    "   0.3 禁止第三种版式：把人物小图/竖带贴到景物或商品上（两种主视觉打架）。真机口径：这种封面被打回三次。",
+    "1. 封面必须同时有【主视觉画面 + 主标题（+ 可选副标题/角标）】，禁止只有一行标题；人物只在 `person-led` 版式里出现；",
+    "1.1 **底图必须是单张连续画面**（主体清晰可辨、占画面高度 ≥30%）：禁止把两个镜头横向拼接——"
       + "拼接会留下贯穿全宽的硬接缝，一眼能看出是合成残次品；",
-    "1.2 人物用**肖像卡**（右下角、白细边、带投影，宽度占画幅 28%–50%）：人物来自片子自己的镜头帧，"
-      + "不要试图把人抠出来贴在画面里（会掉脸、留光晕）；",
+    "1.2 `person-led` 版式的人物取自**片子自己的镜头帧**（不做抠像贴图，会掉脸留光晕）；"
+      + "`subject-led` 版式的主体取自片子里的地标/商品/动物镜头帧；",
     "2. 主标题 ≤12 个字，说人话、有钩子，可以是地点+意象或一句邀请；必要时用 \\n 断成两行；"
       + `**若标题里要点出时长，必须写成"${Number.isFinite(input.durationSeconds) ? Math.round(Number(input.durationSeconds)) : "成片"} 秒"，不得用别的数字**；`,
     "3. 人物卡与主标题不得重叠；人物卡不要压住地标主体（塔身/飞檐/牌匾）；",
@@ -166,6 +184,19 @@ const visualLength = (text: string): number => [...text.replace(/\n/g, "")].leng
  */
 export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { shots: [] }): CoverPlan {
   const issues: string[] = [];
+  /**
+   * 版式一致性（2026-09-26 产品所有者口径）：
+   *   `subject-led`（物体为主）不允许再挂人物层——人物小卡/竖带会与主视觉打架；
+   *   `person-led`（人物为主）必须开启人物层并给出人物来源镜头。
+   * 这条同时约束渲染侧与监制侧：监制按 archetype 判，不再对物体版式要求"主角必须在场"。
+   */
+  const archetype = input.archetype ?? "subject-led";
+  if (archetype === "subject-led" && plan.person?.enabled) {
+    issues.push("物体为主版式（subject-led）里不允许开启人物层（人物小卡/竖带会与主视觉打架）");
+  }
+  if (archetype === "person-led" && plan.person && plan.person.enabled === false) {
+    issues.push("人物为主版式（person-led）必须开启人物层并提供人物来源镜头");
+  }
   if (!plan.headline?.trim()) issues.push("缺主标题");
   else if (visualLength(plan.headline) > 12) issues.push(`主标题 ${visualLength(plan.headline)} 字（上限 12）`);
   if (plan.headline.includes("\n") && plan.headline.split("\n").length > 2) issues.push("主标题超过两行");
