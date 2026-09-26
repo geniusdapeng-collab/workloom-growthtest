@@ -14,6 +14,8 @@ import { PageExitLink } from "../../../shell/PageExitLink";
 interface ProductProfile {
   id: string;
   productName: string;
+  /** dossier 目录名（稳定身份；重扫用它，不能用商品名） */
+  dossierProductId: string | null;
   dossierPath: string;
   dossierSha256: string;
   summary: {
@@ -156,10 +158,10 @@ export default function MediaProducts() {
                 <button
                   type="button"
                   className="cursor-pointer rounded border border-line px-2 py-1 text-caption text-ink2"
-                  onClick={() => void refresh(profile.productName)}
+                  onClick={() => void refresh(profile.dossierProductId ?? undefined)}
                   disabled={busy !== null}
                 >
-                  {busy === profile.productName ? "重扫中…" : "重新扫描"}
+                  {busy === (profile.dossierProductId ?? "all") ? "重扫中…" : "重新扫描"}
                 </button>
                 <button
                   type="button"

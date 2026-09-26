@@ -635,6 +635,74 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     expect(leaked.rowCount).toBe(0);
   }, 90_000);
 
+  /**
+   * 商品档案稳定身份（T-2026-0926-0015）：改名不再新建行；UI 的"单卡重扫"改用目录名。
+   */
+  it("⑯ 商品档案：改名只更新同一行，且可用 dossier 目录名重扫", async () => {
+    const root = join(TMP, "dossiers-16", workspaceId);
+    const productId = "PRD-RENAME-1";
+    mkdirSync(join(root, productId), { recursive: true });
+    const write = (name: string) => writeFileSync(join(root, productId, "dossier.json"), JSON.stringify({
+      product_id: productId, identity: { name, brand: "品牌" }, selling_points: ["卖点"],
+    }), "utf8");
+
+    write("改名前的商品");
+    const first = await mods.upsertProductProfileFromDossier(getAppPool(), getGatewayPool(), scope, {
+      dossierRoot: root, productId, by: "vitest", fetchHero: false,
+    });
+    expect(first.profile.dossierProductId).toBe(productId);
+
+    write("改名后的商品");
+    const second = await mods.upsertProductProfileFromDossier(getAppPool(), getGatewayPool(), scope, {
+      dossierRoot: root, productId, by: "vitest", fetchHero: false,
+    });
+    expect(second.profile.id, "改名必须复用同一行").toBe(first.profile.id);
+    expect(second.profile.productName).toBe("改名后的商品");
+    const rows = await owner.query(`SELECT id, product_name FROM media_product_profiles WHERE workspace_id=$1 AND dossier_product_id=$2`, [workspaceId, productId]);
+    expect(rows.rowCount).toBe(1);
+
+    // UI 同款调用：用 dossierProductId（目录名）重扫必须成功
+    const third = await mods.upsertProductProfileFromDossier(getAppPool(), getGatewayPool(), scope, {
+      dossierRoot: root, productId: second.profile.dossierProductId!, by: "vitest", fetchHero: false,
+    });
+    expect(third.profile.id).toBe(first.profile.id);
+  }, 90_000);
+
+  /**
+   * trgm 翻页回归（T-2026-0926-0015）：相似度排序必须配相似度游标。
+   * 夹具让"相似度并列最高"的两条分别最旧/最新、低相似度那条在中间 —— 旧实现（created_at 单键游标）
+   * 会把中间那条永久跳过。
+   */
+  it("⑰ trgm 兜底层翻页：相似度游标必须覆盖全部命中（不漏项）", async () => {
+    const mkClip = async (name: string, prompt: string) => {
+      const file = await writeFixtureFile(`${name}.mp4`, `bytes-${name}`);
+      return mods.registerLocalAsset(getAppPool(), getGatewayPool(), scope, {
+        absPath: file, kind: "clip", title: name, prompt, by: "vitest", probe: false, thumbnail: false,
+      });
+    };
+    await mkClip("trgm-oldest", "实验室");
+    await new Promise((r) => setTimeout(r, 30));
+    await mkClip("trgm-middle", "实验室 讲解 结构 产品 演示 现场");
+    await new Promise((r) => setTimeout(r, 30));
+    await mkClip("trgm-newest", "实验室");
+
+    const full = (await mods.listAssets(getAppPool(), scope, { query: "实验", limit: 200 })).items.map((i) => i.id).sort();
+    expect(full.length).toBeGreaterThanOrEqual(3);
+    const seen: string[] = [];
+    const layers = new Set<string>();
+    let cursor: string | null = null;
+    for (let guard = 0; guard < 30; guard += 1) {
+      const page = await mods.listAssets(getAppPool(), scope, { query: "实验", limit: 2, cursor: cursor ?? undefined });
+      if (page.searchTrace?.layer) layers.add(page.searchTrace.layer);
+      seen.push(...page.items.map((i) => i.id));
+      cursor = page.nextCursor;
+      if (!cursor) break;
+    }
+    expect(layers.has("trgm"), `夹具必须落在 trgm 兜底层（实际 ${[...layers].join(",")}）`).toBe(true);
+    expect(new Set(seen).size).toBe(seen.length);
+    expect([...seen].sort(), "trgm 翻页并集必须等于检索全量").toEqual(full);
+  }, 120_000);
+
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {
     const a = await makeTinyClip("recut-a.mp4", "red");
     const b = await makeTinyClip("recut-b.mp4", "blue");
