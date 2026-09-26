@@ -64,7 +64,7 @@ interface MediaDetail extends MediaItem {
   licenseRisk: string;
   versions: Array<{ id: string; version: number; status: string; createdAt: string; sha256: string }>;
   project: { id: string; title: string; kind: string; status: string } | null;
-  archive: { dir: string; exists: boolean } | null;
+  archive: { relative: string; exists: boolean } | null;
 }
 
 const fmtBytes = (n: number | null) => {
@@ -518,7 +518,7 @@ export default function MediaLibrary() {
                   ) : null}
                   {selected.archive ? (
                     <div className="mt-1 break-all">
-                      制片档案：{selected.archive.dir}{selected.archive.exists ? "" : "（目录不存在）"}
+                      制片档案：{selected.archive.relative}{selected.archive.exists ? "" : "（目录不存在）"}
                     </div>
                   ) : null}
                 </div>

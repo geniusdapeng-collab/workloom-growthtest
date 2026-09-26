@@ -29,7 +29,9 @@ export function semanticEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
 export function embedderFromEnv(env: NodeJS.ProcessEnv = process.env): EmbedderChoice {
   const baseUrl = (env.MEDIA_EMBEDDING_BASE_URL ?? env.LLM_BASE_URL ?? "").trim().replace(/\/$/, "");
   const apiKey = (env.MEDIA_EMBEDDING_API_KEY ?? env.LLM_API_KEY ?? "").trim();
-  const model = (env.MEDIA_EMBEDDING_MODEL ?? env.LLM_MODEL ?? "text-embedding-3-small").trim();
+  // 深审：原来把 LLM_MODEL（通常是 chat 模型）当 embedding 模型用 → /embeddings 必 400；
+  // embedding 必须独立配置，缺省用业界通用的小模型名。
+  const model = (env.MEDIA_EMBEDDING_MODEL ?? "text-embedding-3-small").trim();
   if (baseUrl && apiKey && !baseUrl.includes("mock")) {
     return { embedder: new OpenAiEmbedder({ baseUrl, apiKey, model }), mock: false, model, reason: "OpenAI 兼容 embeddings 通道" };
   }
@@ -105,9 +107,22 @@ export async function backfillEmbeddings(
       if (!text.trim()) { result.skipped += 1; continue; }
       try {
         const vec = await choice.embedder.embed(text);
-        await scopedQuery(app, scope,
-          `UPDATE video_assets SET embedding = $3::vector WHERE workspace_id = $1 AND id = $2`,
-          [scope.workspaceId, row.id, vectorLiteral(vec)]);
+        // 回填不推进 updated_at（`app.skip_media_touch` 事务级豁免），否则每次回填都会制造"全库变更"
+        const client = await app.connect();
+        try {
+          await client.query("BEGIN");
+          await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+          await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+          await client.query("SELECT set_config('app.skip_media_touch', '1', true)");
+          await client.query(`UPDATE video_assets SET embedding = $3::vector WHERE workspace_id = $1 AND id = $2`,
+            [scope.workspaceId, row.id, vectorLiteral(vec)]);
+          await client.query("COMMIT");
+        } catch (innerErr) {
+          await client.query("ROLLBACK").catch(() => undefined);
+          throw innerErr;
+        } finally {
+          client.release();
+        }
         result.embedded += 1;
       } catch (err) {
         result.failed += 1;

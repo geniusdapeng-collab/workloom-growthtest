@@ -4,8 +4,9 @@
  * 三层检索一体（规格书 §4，实现期按中文语料校准）：
  *   ① 语义（MEDIA_SEMANTIC_ENABLED=1 且 embedding 已回填）→ 向量近邻 id 集回表；
  *   ② 全文（search_tsv @@ plainto_tsquery('simple', q)）→ 拉丁文/分词命中主路；
- *   ③ trgm/子串兜底（title/prompt/tags ILIKE 子串 + similarity 阈值）→ **中文实际主路**
- *      （`simple` 分词对中文整句几乎零命中，实测只有子串/trigram 靠得住）。
+ *   ③ trgm/子串兜底（title/prompt/tags ILIKE 子串 + similarity 阈值）→ **中文主要靠它**
+ *      （口径更正 T-2026-0926-0017：`simple` 分词把整句中文当一个 token，
+ *        单 token 查询如"实验室"tsv 能命中；只有**子串/多词**查询才会掉到这一层）。
  *
  * 纪律：全部查询事务内 set_config（编码铁律）；越权返回空（L7.1）；
  *      写操作（改名/打标/归档）与五元事件同一事务同一 COMMIT（D16）。
@@ -183,6 +184,12 @@ export function toAssetView(row: MediaAssetRow, opts: { thumbExists?: (rel: stri
 }
 
 /** 列表列投影（list / 语义回表 / trgm 兜底三处共用，避免"三套 SELECT 三个口径"） */
+/** RETURNING 用的列投影（UPDATE ... RETURNING 不能带 `a.` 前缀，独立常量避免字符串替换） */
+const ASSET_COLUMNS_RETURNING = `id, kind, title, tags, prompt, pipeline_kind, source_type,
+        duration_seconds, width, height, thumb_path, status, sync_state,
+        project_id, version, chain_id, created_at, updated_at,
+        meta->>'localPath' AS local_path, meta->>'bytes' AS bytes`;
+
 const ASSET_COLUMNS = `a.id, a.kind, a.title, a.tags, a.prompt, a.pipeline_kind, a.source_type,
         a.duration_seconds, a.width, a.height, a.thumb_path, a.status, a.sync_state,
         a.project_id, a.version, a.chain_id, a.created_at, a.updated_at,
@@ -274,7 +281,8 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
       const p = w.add(limit);
       const rows = await scopedQuery<MediaAssetRow>(app, scope,
         `SELECT ${ASSET_COLUMNS} FROM video_assets a WHERE ${w.clauses.join(" AND ")}
-          ORDER BY a.created_at DESC, a.id DESC LIMIT ${p}`, w.params);
+          ORDER BY array_position($${w.params.length}::text[], a.id), a.created_at DESC, a.id DESC LIMIT ${p}`,
+        [...w.params, ids]);
       if (rows.length > 0) return finishList(rows, limit, { ...trace, layer: "semantic" });
       if (pinned === "semantic") return finishList([], limit, { ...trace, layer: "semantic" });
       trace.layer = "tsv";
@@ -332,7 +340,7 @@ export interface MediaAssetDetail extends MediaAssetView {
   heroImageId: string | null;
   versions: Array<{ id: string; version: number; status: string; createdAt: string; sha256: string }>;
   project: { id: string; title: string; kind: string; status: string } | null;
-  archive: { dir: string; exists: boolean } | null;
+  archive: { relative: string; exists: boolean } | null;
 }
 
 export async function getAsset(app: AppPool, scope: Scope, assetId: string): Promise<MediaAssetDetail | null> {
@@ -373,7 +381,10 @@ export async function getAsset(app: AppPool, scope: Scope, assetId: string): Pro
       id: v.id, version: v.version, status: v.status, createdAt: toIso(v.created_at), sha256: v.sha256,
     })),
     project,
-    archive: archiveDir ? { dir: archiveDir, exists: existsSync(archiveDir) } : null,
+    // 不回显服务端绝对路径（深审：信息泄露面）；给相对标识 + 是否存在
+    archive: archiveDir
+      ? { relative: `archive/${scope.workspaceId}/${row.project_id}`, exists: existsSync(archiveDir) }
+      : null,
   };
 }
 
@@ -421,7 +432,7 @@ export async function updateAssetMeta(app: AppPool, scope: Scope, input: UpdateA
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
     const res = await client.query<MediaAssetRow>(
       `UPDATE video_assets SET ${sets.join(", ")} WHERE workspace_id = $1 AND id = $2
-        RETURNING ${ASSET_COLUMNS.replace(/a\./g, "")}`,
+        RETURNING ${ASSET_COLUMNS_RETURNING}`,
       params,
     );
     const row = res.rows[0];

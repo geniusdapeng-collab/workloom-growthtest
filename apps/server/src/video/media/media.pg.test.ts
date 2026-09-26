@@ -58,6 +58,8 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     registerUploadedAsset: typeof import("./upload.js").registerUploadedAsset;
     checkUploadQuota: typeof import("./upload.js").checkUploadQuota;
     uploadRelPath: typeof import("./upload.js").uploadRelPath;
+    cleanupStaleUploads: typeof import("./upload.js").cleanupStaleUploads;
+    backfillEmbeddings: typeof import("./embed.js").backfillEmbeddings;
     listAssets: typeof import("./library.js").listAssets;
     listFilms: typeof import("./library.js").listFilms;
     getAsset: typeof import("./library.js").getAsset;
@@ -78,7 +80,6 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     ensureAssetFile: typeof import("./sync.js").ensureAssetFile;
     reconcile: typeof import("./sync.js").reconcile;
     enrollDevice: typeof import("./sync.js").enrollDevice;
-    cleanupStaleUploads: typeof import("./upload.js").cleanupStaleUploads;
     verifyDeviceRequest: typeof import("./sync.js").verifyDeviceRequest;
     deviceKeyFor: typeof import("./sync.js").deviceKeyFor;
     deviceSignature: typeof import("./sync.js").deviceSignature;
@@ -112,6 +113,8 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
       registerUploadedAsset: (await import("./upload.js")).registerUploadedAsset,
       checkUploadQuota: (await import("./upload.js")).checkUploadQuota,
       uploadRelPath: (await import("./upload.js")).uploadRelPath,
+      cleanupStaleUploads: (await import("./upload.js")).cleanupStaleUploads,
+      backfillEmbeddings: (await import("./embed.js")).backfillEmbeddings,
       listAssets: (await import("./library.js")).listAssets,
       listFilms: (await import("./library.js")).listFilms,
       getAsset: (await import("./library.js")).getAsset,
@@ -132,7 +135,6 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
       ensureAssetFile: (await import("./sync.js")).ensureAssetFile,
       reconcile: (await import("./sync.js")).reconcile,
       enrollDevice: (await import("./sync.js")).enrollDevice,
-      cleanupStaleUploads: (await import("./upload.js")).cleanupStaleUploads,
       verifyDeviceRequest: (await import("./sync.js")).verifyDeviceRequest,
       deviceKeyFor: (await import("./sync.js")).deviceKeyFor,
       deviceSignature: (await import("./sync.js")).deviceSignature,
@@ -158,15 +160,24 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
   }, 60_000);
 
   afterAll(async () => {
-    await owner.query(`DELETE FROM media_collection_items WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM media_collections WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM media_product_profiles WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM media_tags WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM media_sync_devices WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM video_assets WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM video_projects WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM workspaces WHERE id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]).catch(() => undefined);
-    await owner.query(`DELETE FROM tenants WHERE id = ANY($1::text[])`, [[tenantId, otherTenantId]]).catch(() => undefined);
+    // 具名清理：失败即抛（旧实现 9 处 .catch(() => undefined) 静默吞错 → 实测留下残留 workspace）
+    const cleanup: Array<[string, string, unknown[]]> = [
+      ["collection_items", `DELETE FROM media_collection_items WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["collections", `DELETE FROM media_collections WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["product_profiles", `DELETE FROM media_product_profiles WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["tags", `DELETE FROM media_tags WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["sync_devices", `DELETE FROM media_sync_devices WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["sync_log", `DELETE FROM media_sync_log WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["assets", `DELETE FROM video_assets WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["projects", `DELETE FROM video_projects WHERE workspace_id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["workspaces", `DELETE FROM workspaces WHERE id = ANY($1::text[])`, [[workspaceId, otherWorkspaceId]]],
+      ["tenants", `DELETE FROM tenants WHERE id = ANY($1::text[])`, [[tenantId, otherTenantId]]],
+    ];
+    const cleanupErrors: string[] = [];
+    for (const [label, sql, params] of cleanup) {
+      try { await owner.query(sql, params); } catch (err) { cleanupErrors.push(`${label}: ${err instanceof Error ? err.message : String(err)}`); }
+    }
+    expect(cleanupErrors, `夹具清理必须干净（残留会污染后续用例）：${cleanupErrors.join("；")}`).toEqual([]);
     await owner.end();
     rmSync(MEDIA_DIR, { recursive: true, force: true });
     rmSync(TMP, { recursive: true, force: true });
@@ -736,6 +747,24 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     });
     expect(verdict.ok).toBe(false);
     expect(verdict.code).toBe("DEVICE_EXPIRED");
+  }, 90_000);
+
+  /**
+   * 质量跟进回归（T-2026-0926-0017）：向量回填不得推进 updated_at（否则每轮回填制造"全库变更"）。
+   */
+  it("⑲ 向量回填不推进 updated_at（skip_media_touch 豁免生效）", async () => {
+    const file = await writeFixtureFile("embed-probe.mp4", "embed-bytes");
+    const clip = await mods.registerLocalAsset(getAppPool(), getGatewayPool(), scope, {
+      absPath: file, kind: "clip", title: "回填素材", prompt: "回填实验室探针", by: "vitest", probe: false, thumbnail: false,
+    });
+    const before = (await owner.query<{ updated_at: string }>(`SELECT updated_at::text AS updated_at FROM video_assets WHERE id=$1`, [clip.assetId])).rows[0]!.updated_at;
+    // batch/max 必须覆盖整个工作区（回填按 created_at ASC 取批，只跑 5 条时新素材排不进批）
+    const result = await mods.backfillEmbeddings(getAppPool(), scope, { batch: 200, max: 1000, env: {} });
+    expect(result.embedded + result.skipped).toBeGreaterThan(0);
+    const after = (await owner.query<{ updated_at: string; has_embedding: boolean }>(
+      `SELECT updated_at::text AS updated_at, (embedding IS NOT NULL) AS has_embedding FROM video_assets WHERE id=$1`, [clip.assetId])).rows[0]!;
+    expect(after.has_embedding, "回填必须真的写入向量").toBe(true);
+    expect(after.updated_at, "回填不得推进 updated_at").toBe(before);
   }, 90_000);
 
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {

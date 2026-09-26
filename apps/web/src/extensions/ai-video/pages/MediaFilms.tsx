@@ -35,7 +35,7 @@ export default function MediaFilms() {
   const [error, setError] = useState<string | null>(null);
   const [projectFilter, setProjectFilter] = useState("");
   const [selected, setSelected] = useState<FilmRow | null>(null);
-  const [detail, setDetail] = useState<{ prompt: string | null; provenance: Record<string, unknown>; archive: { dir: string; exists: boolean } | null } | null>(null);
+  const [detail, setDetail] = useState<{ prompt: string | null; provenance: Record<string, unknown>; archive: { relative: string; exists: boolean } | null } | null>(null);
 
   const load = useCallback(async (mode: "reset" | "more") => {
     if (mode === "reset") setLoading(true);
@@ -73,7 +73,7 @@ export default function MediaFilms() {
       setDetail({
         prompt: (d as { prompt: string | null }).prompt,
         provenance: (d as { provenance: Record<string, unknown> }).provenance,
-        archive: (d as { archive: { dir: string; exists: boolean } | null }).archive,
+        archive: (d as { archive: { relative: string; exists: boolean } | null }).archive,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
@@ -196,7 +196,7 @@ export default function MediaFilms() {
                   </button>
                 </div>
               ) : null}
-              {detail?.archive ? <div className="break-all">制片档案：{detail.archive.dir}{detail.archive.exists ? "" : "（目录不存在）"}</div> : null}
+              {detail?.archive ? <div className="break-all">制片档案：{detail.archive.relative}{detail.archive.exists ? "" : "（目录不存在）"}</div> : null}
               <div className="rounded border border-line p-2">
                 <div className="text-[11px]">来源证据（provenance）</div>
                 <pre className="mt-1 max-h-40 overflow-auto whitespace-pre-wrap text-[11px]">{JSON.stringify(detail?.provenance ?? {}, null, 2)}</pre>
