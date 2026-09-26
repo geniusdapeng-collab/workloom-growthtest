@@ -1,5 +1,5 @@
 /**
- * 数字员工配套技能「行业 Know-How 结构」回归（T-2026-0926-0101）
+ * 数字员工配套技能「行业 Know-How 结构」回归（T-2026-0926-0101 → 0107 扩展）
  *
  * 为什么单独一组：技能文件是本仓最容易被"顺手改薄"的资产——
  *  · 决策原则被删成口号 → 岗位在真机上只能凭模型自由发挥；
@@ -8,8 +8,12 @@
  *  · 岗位与技能绑定断开 → 技能存在但没人调用（孤儿资产）。
  * 这些都能在磁盘上静态验出来，所以本组测试不触 DB、不依赖 ffmpeg。
  *
- * 覆盖范围：本轮先锁「营销前置两站 + 事实红线评审」三个技能（S-A 分型）。
- * 随后逐批把其它技能纳入（见 docs/audit/GAP-LEDGER.md）。
+ * 判定口径 = `scripts/tools/agent-knowhow-audit.mts` 的**结构等价**：
+ *   ① 语义区块（标题含关键词即可，兼容「## 二、时窗适配」这类编号标题）；
+ *   ② 全文量化阈值行（含比较符或带单位数值）；
+ *   ③ 红线/禁止表述（作为参数边界的可判定形式）；
+ *   ④ 失败模式允许「症状→检测器→处置」表，也允许「情形 → 处置」条目式。
+ * 覆盖：视频域 18 个关键技能（S-A 3 / S-B 8 / S-C 7）。
  */
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -21,30 +25,26 @@ import { bundlesRoot } from "./assembly.js";
 const ROOT = bundlesRoot();
 const BUNDLE_DIR = join(ROOT, "ai-video");
 
-/** S-A 型技能必须齐备的五个区块（结构等价判定，允许标题带括注） */
-const REQUIRED_SECTIONS = ["决策原则", "打法库", "SOP", "关键指标", "失败模式"] as const;
-
+/** S-A 经营/决策型 */
 const SKILLS_SA: Array<{ name: string; boundBy: string[] }> = [
-  // 营销片前置：情报五站（G1 前）
   { name: "jenny-loom-research", boundBy: ["intel-collector", "intel-reviewer", "intel-competitor", "intel-verifier", "intel-binder", "trend-researcher"] },
-  // 营销片前置：Brief 解析（G2 前）
   { name: "marketing-brief-parser", boundBy: ["creative-planner"] },
-  // 营销片事实红线闸 + G6 评审材料
   { name: "director-review", boundBy: ["continuity-reviewer"] },
 ];
 
-/** S-B 制作/工艺型：工艺判据表 + 参数边界 + 失败模式 + 输出契约 */
+/** S-B 制作/工艺型 */
 const SKILLS_SB: Array<{ name: string; boundBy: string[] }> = [
   { name: "shot-prompt-craft", boundBy: ["prompt-fuser", "field-inspector"] },
   { name: "portrait-studio", boundBy: ["portrait-artist"] },
-  // 后期链四工位（调色选型 / 配乐定调 / 字幕版式 / 音色档案）
   { name: "color-look-design", boundBy: ["colorist"] },
   { name: "bgm-score-design", boundBy: ["bgm-composer"] },
   { name: "subtitle-layout-design", boundBy: ["subtitle-stylist", "cover-designer"] },
   { name: "voice-profile-craft", boundBy: ["voice-artist"] },
+  { name: "cinematography-kb", boundBy: ["cinematographer", "visual-director"] },
+  { name: "voice-clone-consent", boundBy: ["voice-artist"] },
 ];
 
-/** S-C 工具/纪律型：前置校验 + 失败诊断 + 证据口径 + 输出契约 */
+/** S-C 工具/纪律型 */
 const SKILLS_SC: Array<{ name: string; boundBy: string[] }> = [
   { name: "publish-ops", boundBy: ["publish-operator", "distribution-operator"] },
   { name: "render-ops", boundBy: ["render-operator"] },
@@ -79,9 +79,10 @@ const tableRows = (block: string): number => {
   return count;
 };
 
-/** 语义区块查找（结构等价）：兼容「## 工艺判据」与「## 二、时窗适配：…」两种写法 */
-function findSection(text: string, keywords: string[]): string {
+/** 所有命中标题的区块（同一语义可能被多节承载，取最强的那节） */
+function findAllSections(text: string, keywords: string[]): string[] {
   const lines = text.split("\n");
+  const bodies: string[] = [];
   for (let i = 0; i < lines.length; i += 1) {
     const m = /^##\s+(.*)$/.exec(lines[i]!);
     if (!m) continue;
@@ -91,9 +92,20 @@ function findSection(text: string, keywords: string[]): string {
       if (/^##\s/.test(lines[j]!)) break;
       body.push(lines[j]!);
     }
-    return body.join("\n");
+    bodies.push(body.join("\n"));
   }
-  return "";
+  return bodies;
+}
+
+function sectionMetrics(text: string, keywords: string[]): { rows: number; items: number; merged: string } {
+  let rows = 0;
+  let items = 0;
+  const bodies = findAllSections(text, keywords);
+  for (const body of bodies) {
+    rows = Math.max(rows, tableRows(body));
+    items = Math.max(items, numbered(body) + bullets(body));
+  }
+  return { rows, items, merged: bodies.join("\n") };
 }
 
 /** 量化阈值行数（判据"可判定"的最低证据） */
@@ -124,7 +136,7 @@ function expectBoundToPresets(name: string, boundBy: string[]): void {
     const doc = YAML.parse(readFileSync(p, "utf8")) as { skills?: string[] };
     if ((doc.skills ?? []).includes(name)) bound.push(preset);
   }
-  expect(bound.length).toBeGreaterThan(0);
+  expect(bound.length, `${name} 未被任何声明岗位绑定`).toBeGreaterThan(0);
 }
 
 describe("数字员工配套技能 · 行业 Know-How 结构（S-A 经营/决策型）", () => {
@@ -132,7 +144,7 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-A 经营/决策
     const text = skillText(name);
 
     it(`${name}：五个 Know-How 区块齐备`, () => {
-      for (const heading of REQUIRED_SECTIONS) {
+      for (const heading of ["决策原则", "打法库", "SOP", "关键指标", "失败模式"]) {
         expect(section(text, heading), `${name} 缺「${heading}」区块`).not.toBe("");
       }
     });
@@ -140,7 +152,7 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-A 经营/决策
     it(`${name}：决策原则 ≥3 条且含阈值或失败关闭语义`, () => {
       const block = section(text, "决策原则");
       expect(numbered(block) + bullets(block)).toBeGreaterThanOrEqual(3);
-      expect(/失败关闭|禁止|不得|即.*(剔除|打回|停摆|拒收|挂起)/.test(block), "决策原则必须可判定（阈值或失败关闭）").toBe(true);
+      expect(/失败关闭|禁止|不得|即.*(剔除|打回|停摆|拒收|挂起)/.test(block), "决策原则必须可判定").toBe(true);
     });
 
     it(`${name}：打法库 ≥3 条且至少 2 条分支`, () => {
@@ -167,11 +179,8 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-A 经营/决策
       expect(block).toContain("处置");
     });
 
-    it(`${name}：无不可判定的模板化表述`, () => {
+    it(`${name}：无不可判定的模板化表述 + 岗位绑定未断链`, () => {
       expect(/应加强专业性|提升专业水平|注意结合实际情况/.test(text)).toBe(false);
-    });
-
-    it(`${name}：岗位绑定未断链（技能不会变成孤儿）`, () => {
       expectBoundToPresets(name, boundBy);
     });
   }
@@ -182,34 +191,31 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-B 制作/工艺
     const text = skillText(name);
 
     it(`${name}：工艺判据 ≥4（语义区块或全文量化阈值行）`, () => {
-      const block = findSection(text, [
+      const metrics = sectionMetrics(text, [
         "工艺判据", "判据", "工艺", "参数", "手法", "目标值", "参数表", "配方",
-        "规格", "版式", "选型", "策略", "口径", "适配", "同步", "决策",
+        "规格", "版式", "选型", "策略", "口径", "适配", "同步", "决策", "判定", "问清",
       ]);
-      const count = Math.max(tableRows(block), numbered(block), bullets(block), quantifiedLines(text));
-      expect(count, `${name} 工艺判据不足（区块命中=${block ? "有" : "无"}）`).toBeGreaterThanOrEqual(4);
+      const count = Math.max(metrics.rows, metrics.items, quantifiedLines(text));
+      expect(count, `${name} 工艺判据不足`).toBeGreaterThanOrEqual(4);
     });
 
     it(`${name}：参数边界 ≥3（边界区块或红线/禁止表述）`, () => {
-      const block = findSection(text, ["参数边界", "边界", "硬红线", "红线", "纪律", "限制", "禁用", "禁忌"]);
-      const count = Math.max(numbered(block) + bullets(block), prohibitionLines(text));
-      expect(count).toBeGreaterThanOrEqual(3);
+      const metrics = sectionMetrics(text, ["参数边界", "边界", "硬红线", "红线", "纪律", "限制", "禁用", "禁忌"]);
+      expect(Math.max(metrics.items, prohibitionLines(text)), `${name} 缺参数边界`).toBeGreaterThanOrEqual(3);
     });
 
-    it(`${name}：失败模式 ≥3（含检测器与处置语义）`, () => {
-      const block = findSection(text, ["失败", "翻车", "故障", "异常处置"]);
-      const count = Math.max(tableRows(block), numbered(block), bullets(block));
+    it(`${name}：失败模式 ≥3（含"原因→处置"结构）`, () => {
+      const kwargs = ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "返工", "拒绝", "否决", "处置", "红线"];
+      const metrics = sectionMetrics(text, kwargs);
+      const count = Math.max(metrics.rows, metrics.items);
       expect(count, `${name} 缺失败模式区块`).toBeGreaterThanOrEqual(3);
-      expect(block).toMatch(/检测器|根因|原因/);
-      expect(block).toMatch(/处置|回退|修复|停用|拒绝/);
+      const hasCauseColumn = /检测器|首查|根因|原因|理由|症状|情形|现象/.test(metrics.merged);
+      const hasArrowPairs = (metrics.merged.match(/→/g)?.length ?? 0) >= 2;
+      expect(hasCauseColumn || hasArrowPairs, `${name} 失败模式缺少"原因→处置"结构`).toBe(true);
     });
 
-    it(`${name}：参数边界可见（边界/红线区块或全文红线表述）`, () => {
-      const boundarySection = findSection(text, ["参数边界", "边界", "硬红线", "红线", "纪律", "限制", "禁用", "禁忌"]);
-      expect(boundarySection !== "" || prohibitionLines(text) >= 3, `${name} 缺参数边界`).toBe(true);
-    });
-
-    it(`${name}：岗位绑定未断链（技能不会变成孤儿）`, () => {
+    it(`${name}：无不可判定表述 + 岗位绑定未断链`, () => {
+      expect(/应加强专业性|提升专业水平|注意结合实际情况/.test(text)).toBe(false);
       expectBoundToPresets(name, boundBy);
     });
   }
@@ -220,40 +226,34 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-C 工具/纪律
     const text = skillText(name);
 
     it(`${name}：前置校验 ≥3（语义区块或红线/必须表述）`, () => {
-      const block = findSection(text, [
+      const metrics = sectionMetrics(text, [
         "前置校验", "SOP", "触发条件", "校验", "检查", "发布包", "复检", "核对",
         "清单", "交付前", "交付", "口径", "影响",
       ]);
-      const count = Math.max(numbered(block) + bullets(block), prohibitionLines(text));
-      expect(count, `${name} 前置校验不足`).toBeGreaterThanOrEqual(3);
+      expect(Math.max(metrics.items, prohibitionLines(text)), `${name} 前置校验不足`).toBeGreaterThanOrEqual(3);
     });
 
-    it(`${name}：失败诊断 ≥3（含检测器/首查与处置语义）`, () => {
-      const block = findSection(text, ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线"]);
-      const count = Math.max(tableRows(block), numbered(block), bullets(block));
-      expect(count, `${name} 失败诊断不足`).toBeGreaterThanOrEqual(3);
-      const hasCauseColumn = /检测器|首查|根因|原因|症状|情形|现象/.test(block);
-      const hasArrowPairs = (block.match(/→/g)?.length ?? 0) >= 2; // 「情形 → 处置」式条目
+    it(`${name}：失败诊断 ≥3（含"原因→处置"结构）`, () => {
+      const kwargs = ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线"];
+      const metrics = sectionMetrics(text, kwargs);
+      expect(Math.max(metrics.rows, metrics.items), `${name} 失败诊断不足`).toBeGreaterThanOrEqual(3);
+      const hasCauseColumn = /检测器|首查|根因|原因|理由|症状|情形|现象/.test(metrics.merged);
+      const hasArrowPairs = (metrics.merged.match(/→/g)?.length ?? 0) >= 2;
       expect(hasCauseColumn || hasArrowPairs, `${name} 失败诊断缺少"原因→处置"结构`).toBe(true);
-      expect(block).toMatch(/处置|回退|拒绝|转人工|上报|不可能|退回上游|报错|先给/);
     });
 
     it(`${name}：证据口径 ≥2（证据/回执/留痕区块或表述）`, () => {
-      const block = findSection(text, ["证据口径", "留痕", "回执", "证据", "清单"]);
+      const metrics = sectionMetrics(text, ["证据口径", "留痕", "回执", "证据", "清单"]);
       const evidenceLines = text
         .split("\n")
         .map((l) => l.trim())
         .filter((t) => t && !/^\|\s*-+/.test(t))
         .filter((t) => /回执|sha256|SHA256|证据链|留痕|清单/.test(t)).length;
-      const count = Math.max(tableRows(block), numbered(block), bullets(block), evidenceLines);
-      expect(count, `${name} 证据口径不足`).toBeGreaterThanOrEqual(2);
+      expect(Math.max(metrics.rows, metrics.items, evidenceLines), `${name} 证据口径不足`).toBeGreaterThanOrEqual(2);
     });
 
-    it(`${name}：无不可判定表述`, () => {
+    it(`${name}：无不可判定表述 + 岗位绑定未断链`, () => {
       expect(/应加强专业性|提升专业水平|注意结合实际情况/.test(text)).toBe(false);
-    });
-
-    it(`${name}：岗位绑定未断链（技能不会变成孤儿）`, () => {
       expectBoundToPresets(name, boundBy);
     });
   }

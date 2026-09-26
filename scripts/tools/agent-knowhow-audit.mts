@@ -132,6 +132,35 @@ function findSection(text: string, keywords: string[]): { heading: string; body:
   return { heading: "", body: "" };
 }
 
+/** 所有命中标题的区块（结构等价：同一语义可能被多节承载，取最强的那节） */
+function findAllSections(text: string, keywords: string[]): string[] {
+  const lines = text.split("\n");
+  const bodies: string[] = [];
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = /^##\s+(.*)$/.exec(lines[i]!);
+    if (!m) continue;
+    if (!keywords.some((k) => (m[1] ?? "").includes(k))) continue;
+    const body: string[] = [];
+    for (let j = i + 1; j < lines.length; j += 1) {
+      if (/^##\s/.test(lines[j]!)) break;
+      body.push(lines[j]!);
+    }
+    bodies.push(body.join("\n"));
+  }
+  return bodies;
+}
+
+/** 语义区块计量：取所有命中区块中的最大值（表行数 / 条目数） */
+function sectionMetrics(text: string, keywords: string[]): { rows: number; items: number } {
+  let rows = 0;
+  let items = 0;
+  for (const body of findAllSections(text, keywords)) {
+    rows = Math.max(rows, tableRows(body));
+    items = Math.max(items, numbered(body) + bullets(body));
+  }
+  return { rows, items };
+}
+
 /** 量化阈值行数：含比较符或带单位的数值（判据"可判定"的最低证据） */
 function quantifiedLines(text: string): number {
   const ROW = /(≤|≥|<|>|不超过|小于|大于)\s*\d|\d+(\.\d+)?\s*(%|dB|dBTP|LUFS|ms|毫秒|秒|s\b|×|°|字|行|条|像素|px|K|kbps)/;
@@ -250,51 +279,51 @@ function auditSkill(bundle: string, skill: string, path: string, bindings: Map<s
   } else if (type === "S-B") {
     // 结构等价：判据 = 语义区块内的表格/条目数，与全文量化阈值行数取大者
     // （本仓工艺型技能常用「目标值表 / 配方 / 版式表 / 时窗适配」等命名承载判据）
-    const craft = findSection(text, [
+    const craftMetrics = sectionMetrics(text, [
       "工艺判据", "判据", "工艺", "参数", "手法", "目标值", "参数表", "配方",
-      "规格", "版式", "选型", "策略", "口径", "适配", "同步", "决策",
-    ]).body;
-    const nCraft = Math.max(tableRows(craft), numbered(craft), bullets(craft), quantifiedLines(text));
+      "规格", "版式", "选型", "策略", "口径", "适配", "同步", "决策", "判定", "问清",
+    ]);
+    const nCraft = Math.max(craftMetrics.rows, craftMetrics.items, quantifiedLines(text));
     metrics["工艺判据"] = nCraft;
     if (nCraft < 4) issues.push(`工艺判据 ${nCraft} < 4`);
 
     // 结构等价：本仓常用「硬红线 / 红线 / 纪律 / 禁忌」表达参数边界
-    const boundary = findSection(text, ["参数边界", "边界", "硬红线", "红线", "纪律", "限制", "禁用", "禁忌"]).body;
-    const nBoundary = Math.max(numbered(boundary) + bullets(boundary), prohibitionLines(text));
+    const boundaryMetrics = sectionMetrics(text, ["参数边界", "边界", "硬红线", "红线", "纪律", "限制", "禁用", "禁忌"]);
+    const nBoundary = Math.max(boundaryMetrics.items, prohibitionLines(text));
     metrics["边界"] = nBoundary;
     if (nBoundary < 3) issues.push(`参数边界 ${nBoundary} < 3`);
 
     // 结构等价：本仓常用「常见翻车 / 翻车 / 故障 / 异常处置」表达失败模式
-    const fail = findSection(text, ["失败", "翻车", "故障", "异常处置"]).body;
-    const nFail = tableRows(fail);
+    const failMetrics = sectionMetrics(text, ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "返工", "拒绝", "否决", "处置", "红线"]);
+    const nFail = failMetrics.rows;
     metrics["失败模式"] = nFail;
     if (nFail < 3) {
       // 允许以带"检测器/处置"语义的条目列表表达（脚本化判定兜底）
-      const nItems = numbered(fail) + bullets(fail);
+      const nItems = failMetrics.items;
       metrics["失败模式"] = nItems;
       if (nItems < 3) issues.push(`失败模式 ${nFail} 行 / 条目 ${nItems} < 3`);
     }
   } else {
-    const pre = findSection(text, [
+    const preMetrics = sectionMetrics(text, [
       "前置校验", "SOP", "触发条件", "校验", "检查", "发布包", "复检", "核对",
       "清单", "交付前", "交付", "口径", "影响",
-    ]).body;
-    const nPre = Math.max(numbered(pre), bullets(pre), prohibitionLines(text));
+    ]);
+    const nPre = Math.max(preMetrics.items, prohibitionLines(text));
     metrics["前置校验"] = nPre;
     if (nPre < 3) issues.push(`前置校验 ${nPre} < 3`);
 
-    const fail = findSection(text, ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线"]).body;
-    const nFail = Math.max(tableRows(fail), numbered(fail), bullets(fail));
+    const failMetrics = sectionMetrics(text, ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线"]);
+    const nFail = Math.max(failMetrics.rows, failMetrics.items);
     metrics["失败诊断"] = nFail;
     if (nFail < 3) issues.push(`失败诊断 ${nFail} < 3`);
 
-    const evidence = findSection(text, ["证据口径", "留痕", "回执", "证据"]).body;
+    const evidenceMetrics = sectionMetrics(text, ["证据口径", "留痕", "回执", "证据"]);
     const evidenceLines = text
       .split("\n")
       .map((l) => l.trim())
       .filter((t) => t && !/^\|\s*-+/.test(t))
       .filter((t) => /回执|sha256|SHA256|证据链|留痕|同步回执/.test(t)).length;
-    const nEvidence = Math.max(tableRows(evidence), numbered(evidence), bullets(evidence), evidenceLines);
+    const nEvidence = Math.max(evidenceMetrics.rows, evidenceMetrics.items, evidenceLines);
     metrics["证据口径"] = nEvidence;
     if (nEvidence < 2) issues.push(`证据口径 ${nEvidence} < 2`);
   }

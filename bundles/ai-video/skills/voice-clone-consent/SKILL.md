@@ -81,3 +81,14 @@ description: 声音授权与克隆合规官方套件（随 bundles/ai-video 分�
 
 克隆前置说明必须能回答：**谁的声音、什么授权、什么范围、谁声明的、证据在哪、到什么时候**，
 并给出这次使用的授权判定结论（放行 / 挂人审 / 拒绝）与依据条款。
+
+## 六、工艺判据（声源类型 × 用途 → 判定）
+
+| 声源类型 | 用途范围 | 判定 | 依据 | 来源 |
+|---|---|---|---|---|
+| 本人声线（self） | 内部播报（internal） | 放行（自动） | 自采自用 | KB:围栏 G-VOICE1 |
+| 本人声线（self） | 对外发布（external-publish） | 挂人审 | 需把 `scope` 提到 external-publish | KB:围栏 G-VOICE6 |
+| 已授权第三方（authorized-third-party） | 商用（commercial） | 挂人审 + 书面授权 | 审批号写入音色档案；**不得转授权**给其他客户 | KB:围栏 G-VOICE1 |
+| 合成声线（synthetic） | 任意商用 | 放行但须登记来源与许可 | 记录引擎与许可（如 MIT/AGPL/研究许可）；冒充真人仍禁止 | KB:本套件 §二·合成声线 |
+| 任一类型 | 声纹/参考音频出域 | **一票否决** | `upload_voiceprint` / `allow_nonlocal_engine` 等参数被拒 | KB:围栏 G-VOICE5（block） |
+| 任一类型 | 授权缺失/过期/超范围 | 拒绝（fail-closed） | 停用档案并留痕；补授权前不得出新片 | KB:本套件 §一/§四 |
