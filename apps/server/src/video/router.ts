@@ -48,6 +48,9 @@ import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@
 import { routedLlmCall } from "../service/llm.js";
 import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import { whiteboardRouter } from "./whiteboard/router.js";
+import { explainerRouter } from "./explainer/router.js";
+import { getExplainerRun } from "./explainer/runs.js";
+import { createExplainerDraft } from "./explainer/db.js";
 import {
   DeliveryError, buildVariantPreferenceContent, deliveryJobStatus, deliveryPreferenceConfidence,
   deliveryPreferenceMemoryId, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
@@ -486,6 +489,33 @@ const studioRouter = router({
           via: decision.via,
         };
       }
+      /**
+       * 口播解说片分流（T-2026-0926-0008）：
+       * 这条线不跑 vendor 预生产（情报/剧本/定妆/逐镜生成），而是"口播稿 + 配音 → 字级同步图文成片"，
+       * 因此不在这里 async 起 run，而是建 kind='explainer' 项目 + v1 草稿分镜，
+       * 把控制权交回调用方（后续走 video.explainer.shotbook → submit → finalize，每步都有门）。
+       */
+      if (decision.route === "explainer") {
+        const draft = await createExplainerDraft(scope, {
+          intent: input.intent,
+          by: ctx.identity.memberNo,
+        });
+        return {
+          kind: "routed" as const,
+          runId: null,
+          projectId: draft.projectId,
+          shotbookId: draft.shotbookId,
+          pipeline: "explainer" as const,
+          next: [
+            "video.explainer.saveScript（放正式口播稿；数字必须写汉字）",
+            "video.explainer.shotbook（生成分镜）",
+            "video.explainer.submit（准备段 + G8 渲染提交）",
+            "video.explainer.finalize（机器闸 + 两遍 loudnorm + 入媒资库）",
+          ],
+          via: decision.via,
+          signals: decision.signals,
+        };
+      }
       try {
         // 与「右栏派活识别出视频目标」共用同一条标准管线入口（studio-worker#startVideoProjectRun）
         const started = await startVideoProjectRun(scope, {
@@ -518,7 +548,25 @@ const studioRouter = router({
     .input(z.object({ runId: z.string().min(1) }))
     .query(({ ctx, input }) => {
       const entry = getRun(input.runId, scopeOf(ctx.identity).workspaceId);
-      if (!entry) return null;
+      if (!entry) {
+        /**
+         * 口播解说片的运行投影在 explainer 自己的注册表里（T-2026-0926-0008）：
+         * 前端只认 runId，不需要知道背后是哪条管线，所以这里统一兜底一层。
+         */
+        const explainer = getExplainerRun(input.runId, scopeOf(ctx.identity).workspaceId);
+        if (!explainer) return null;
+        return {
+          runId: explainer.runId,
+          projectId: explainer.projectId,
+          status: explainer.status,
+          currentGate: explainer.stage,
+          pendingApprovalId: null,
+          startedAt: explainer.startedAt,
+          finishedAt: explainer.finishedAt,
+          error: explainer.error,
+          resultSummary: explainer.resultSummary,
+        };
+      }
       return {
         runId: entry.runId,
         projectId: entry.projectId,
@@ -1315,6 +1363,8 @@ export const videoRouter = router({
   delivery: deliveryRouter,
   /** 媒资库（T-2026-0926-0007…0010）：列表/详情/上传/合集/商品档案/复用/重剪/同步 */
   media: mediaRouter,
+  /** 口播解说片（T-2026-0926-0008）：立项/分镜/提交/收尾/版本链/引擎体检 */
+  explainer: explainerRouter,
 });
 
 /**

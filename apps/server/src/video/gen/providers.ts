@@ -16,6 +16,7 @@ import {
 import { ProviderError, type ProviderErrorKind } from "./types.js";
 import { WhiteboardProvider } from "../whiteboard/provider.js";
 import { whiteboardEngineReady } from "../whiteboard/engine.js";
+import { RemotionProvider } from "../explainer/remotion-provider.js";
 
 interface NeutralParams {
   providerModel?: string;
@@ -344,6 +345,14 @@ export function buildVideoGenPool(opts: GenPoolOptions = {}): Map<string, GenPro
    * "环境变量非空"被通用口径误判为已配置。
    */
   if (whiteboardEngineReady(env)) pool.set("whiteboard-local", new WhiteboardProvider(env));
+  /**
+   * 本机口播解说渲染（talkcraft 引擎，T-2026-0926-0008）：**只认开关**，不认密钥。
+   * 真实就绪度由 provider.healthy() 复检（引擎安装完整 + 运行时冒烟 + 许可闸），
+   * 因此"目录 wired 但引擎没装"会以 unhealthy 明确拒绝，不会静默 mock。
+   */
+  if ((env.TALKCRAFT_ENABLED ?? "0").trim() === "1") {
+    pool.set("remotion-local", new RemotionProvider({ env }));
+  }
   return pool;
 }
 
@@ -354,11 +363,13 @@ export function videoGenPool(): Map<string, GenProvider> {
   /**
    * 单例缓存键必须包含**所有影响装配的输入**：白板引擎由"开关 + venv 是否存在"驱动，
    * 只按密钥拼键会出现"装了 venv，但池子仍是旧的（没有 whiteboard-local）"的假不可用。
+   * 同理，talkcraft 引擎由 `TALKCRAFT_ENABLED` 驱动（运行中开闸必须立即生效，不等进程重启）。
    */
   const key = [
     env.VOLCENGINE_ARK_API_KEY, env.HF_API_KEY_ID, env.HF_API_KEY_SECRET, env.MUAPI_API_KEY,
     env.KLING_API_KEY, env.JIMENG_API_KEY,
     env.WHITEBOARD_ENABLED, env.WHITEBOARD_ENGINE_DIR, env.WHITEBOARD_PYTHON,
+    env.TALKCRAFT_ENABLED, env.TALKCRAFT_ENGINE_DIR,
   ].join("|");
   if (!singletonPool || singletonPool.key !== key) singletonPool = { key, pool: buildVideoGenPool() };
   return singletonPool.pool;

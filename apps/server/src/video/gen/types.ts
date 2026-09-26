@@ -14,8 +14,13 @@
 /** 生成模态（本仓当前真实接入 video；image/audio 目录登记、按 availability 标注） */
 export type MediaKind = "video" | "image" | "audio";
 
-/** 生成模式：文生/图生/参考图/视频生视频/唇形 */
-export type MediaMode = "t2v" | "i2v" | "r2v" | "v2v" | "t2i" | "i2i" | "lipsync" | "audio";
+/**
+ * 生成模式：文生/图生/参考图/视频生视频/唇形 + **本机合成渲染**（render）。
+ * `render` 是本仓新增的档位：它不吃"文生视频"语义（提示词不是画面内容，而是数据层的口播稿摘要），
+ * 由本地 Remotion provider（talkcraft 引擎）按分镜数据装配渲染——因此**不参与默认模型选择**，
+ * 也不作为其他模型的降级备援（模式交集为空，天然隔离）。
+ */
+export type MediaMode = "t2v" | "i2v" | "r2v" | "v2v" | "t2i" | "i2i" | "lipsync" | "audio" | "render";
 
 /** 档位（与 model-policy.yml 的 L1/L2/L3 同口径） */
 export type MediaTier = "L1" | "L2" | "L3";

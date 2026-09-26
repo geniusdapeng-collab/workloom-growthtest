@@ -34,6 +34,11 @@ export const PROVIDER_ENV: Record<string, readonly string[]> = {
    * （`availability=wired` 必须有登记）；真正的判定在 `providerConfigured` 的特判分支。
    */
   "whiteboard-local": ["WHITEBOARD_ENABLED"],
+  /**
+   * 本机 Remotion 渲染（talkcraft 引擎，T-2026-0926-0008）：同样是"开关型"供应商
+   * （无密钥），就绪度由 provider.healthy() 复检（引擎安装完整 + 运行时冒烟 + 许可闸）。
+   */
+  "remotion-local": ["TALKCRAFT_ENABLED"],
 };
 
 export function providerConfigured(provider: string, env: NodeJS.ProcessEnv = process.env): boolean {
@@ -176,7 +181,9 @@ export function defaultVideoModelId(env: NodeJS.ProcessEnv = process.env, path?:
   const preferred = env.WORKLOOM_VIDEO_DEFAULT_MODEL?.trim();
   if (preferred) return preferred;
   const tierOrder: Record<string, number> = { L1: 1, L2: 2, L3: 3 };
+  // 排除本机合成渲染档（render）：它没有"一句话生成"语义，不能被当成默认文生视频模型
   const list = listModels({ kind: "video", onlyAvailable: true, env }, path)
+    .filter((m) => m.modes.some((mode) => mode !== "render"))
     .sort((a, b) => (tierOrder[a.tier] ?? 2) - (tierOrder[b.tier] ?? 2));
   const chosen = list[0];
   if (!chosen) {

@@ -76,7 +76,11 @@
     "desktop:release:contract": "node --test scripts/unsigned-desktop-release.test.mjs scripts/desktop-release-finalizer.test.mjs",
     "oss:inventory": "bash scripts/oss-watch.sh --inventory",
     "oss:check": "bash scripts/oss-watch.sh --check",
-    "test:oss": "node --test scripts/oss-inventory.test.mjs"
+    "test:oss": "node --test scripts/oss-inventory.test.mjs",
+    "talkcraft:install": "tsx scripts/tools/talkcraft-engine-install.mts",
+    "talkcraft:check": "tsx scripts/tools/talkcraft-engine-install.mts --check",
+    "explainer:run": "tsx scripts/tools/explainer-run.mts",
+    "test:talkcraft": "vitest run apps/server/src/video/explainer/explainer.test.ts"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
