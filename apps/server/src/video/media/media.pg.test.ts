@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
+import { isoOf } from "./sync.js";
 
 process.env.DATABASE_URL ??= "postgres://postgres:workloom@localhost:5432/workloom";
 process.env.DATABASE_APP_URL ??= "postgres://workloom_app:workloom_dev_app@localhost:5432/workloom";
@@ -559,6 +560,44 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     // 必须能收敛（旧实现 hasMore 恒 true → 这里会跑满 guard）
     expect(cursor).toBeNull();
     expect(guard).toBeLessThan(40);
+  }, 90_000);
+
+  /**
+   * 推送隔离回归（T-2026-0926-0013 深审实证）：同批出现重复 sha256 会让整个 push 500，
+   * 且已写入的行不回滚；`applied` 也曾与实际写入不符。现在要求：坏行只影响自己。
+   */
+  it("⑭ 推送逐行隔离：重复 sha256 降级为冲突，坏行进 failed[]，好行照常落库", async () => {
+    const base = (await owner.query<{ id: string; sha256: string }>(
+      `SELECT id, sha256 FROM video_assets WHERE workspace_id=$1 AND status <> 'archived' LIMIT 1`,
+      [workspaceId])).rows[0]!;
+    const stamp = () => isoOf(new Date(Date.now() + 3_600_000));
+    const row = (id: string, sha256: string, extra: Record<string, unknown> = {}) => ({
+      id, project_id: null, chain_id: id, kind: "clip", version: 1, parent_id: null,
+      source_url: "local://push", provenance: {}, license_risk: "none", hero_image_id: null,
+      sha256, meta: {}, status: "registered", created_by: "device", created_at: stamp(), updated_at: stamp(),
+      title: `推送行 ${id}`, tags: [], prompt: null, pipeline_kind: null, duration_seconds: null,
+      width: null, height: null, thumb_path: null, source_type: "generated", sync_state: "cloud_only",
+      ...extra,
+    });
+
+    const goodId = `VA-push-ok-${suffix}`;
+    const result = await mods.applyPush(getAppPool(), scope, {
+      assets: [
+        row(goodId, `sha-push-ok-${suffix}`),
+        // 与既有素材同内容不同 id → 必须降级为冲突（旧实现：唯一索引炸整个请求）
+        row(`VA-push-dup-${suffix}`, base.sha256),
+        // 违反 CHECK 约束（kind 非法）→ 必须进 failed[] 且不影响其它行
+        row(`VA-push-bad-${suffix}`, `sha-push-bad-${suffix}`, { kind: "not_a_kind" }),
+      ] as never,
+    }, "device-isolation");
+
+    expect(result.applied.assets, "好行必须落库").toBe(1);
+    expect(result.conflicts.some((c) => c.table === "assets" && c.reason.includes("sha256"))).toBe(true);
+    expect(result.failed.some((f) => f.id === `VA-push-bad-${suffix}`)).toBe(true);
+    const stored = await owner.query(`SELECT id FROM video_assets WHERE workspace_id=$1 AND id=$2`, [workspaceId, goodId]);
+    expect(stored.rowCount).toBe(1);
+    const bad = await owner.query(`SELECT id FROM video_assets WHERE workspace_id=$1 AND id=$2`, [workspaceId, `VA-push-bad-${suffix}`]);
+    expect(bad.rowCount, "坏行不得落库").toBe(0);
   }, 90_000);
 
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {

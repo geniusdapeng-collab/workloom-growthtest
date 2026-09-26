@@ -377,6 +377,8 @@ export interface SyncConflict {
 export interface SyncPushResult {
   applied: Record<SyncTable, number>;
   conflicts: SyncConflict[];
+  /** 逐行隔离后的失败行（错误原文，便于对账与重试） */
+  failed: Array<{ table: SyncTable; id: string; error: string }>;
 }
 
 /** TIMESTAMPTZ → ISO（Date/字符串都能吃；不可解析时原样返回，交给上层报错） */
@@ -400,127 +402,209 @@ function newerThan(a: unknown, b: unknown): boolean {
  * LWW 合并：逐行比较 updated_at，服务端更新则拒绝并回报冲突（不静默覆盖）。
  * 每次真实写入都记 media_sync_log（payload_kind='metadata'），台账可审计。
  */
+/**
+ * 逐行独立事务：任一行失败只回滚该行（T-2026-0926-0013 深审修正——原实现每行各自
+ * scopedQuery 但没有错误隔离，同批出现重复 sha256 会让整个 push 500，且已写入的行留在库里）。
+ */
+async function rowTx<T>(app: AppPool, scope: Scope, fn: (client: pg.PoolClient) => Promise<T>): Promise<T> {
+  const client = await app.connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+    const out = await fn(client);
+    await client.query("COMMIT");
+    return out;
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
+ * 推送合并（云端侧）：LWW + **逐行隔离** + **真实回执**。
+ *
+ * 深审实证（T-2026-0926-0013）：
+ *  - 同批出现同 sha256 不同 id 的行 → 唯一索引 `video_assets_workspace_id_sha256_key` 抛出，
+ *    整个 push 500，且失败前已提交的行不回滚（无逐行隔离/无整体事务）；
+ *  - `applied` 原先无条件 +1：`ON CONFLICT … WHERE updated_at < EXCLUDED.updated_at` 被抑制时
+ *    其实一行没写，回执却报"已应用"。
+ * 现在：每行一个事务 + rowCount 回执；sha256 撞既有素材降级为冲突清单（不静默合并、不炸批）；
+ * 失败行进 `failed[]` 并写 failed 台账，成功的行进 `applied` 并写 done 台账。
+ */
 export async function applyPush(
   app: AppPool, scope: Scope, payload: SyncPushPayload, peer: string,
 ): Promise<SyncPushResult> {
-  const result: SyncPushResult = { applied: { assets: 0, collections: 0, items: 0, products: 0 }, conflicts: [] };
+  const result: SyncPushResult = { applied: { assets: 0, collections: 0, items: 0, products: 0 }, conflicts: [], failed: [] };
+
+  const recordFailure = async (table: SyncTable, id: string, error: string) => {
+    result.failed.push({ table, id, error });
+    await logSync(app, scope, { assetId: id, direction: "pull", payloadKind: "metadata", peer, status: "failed", error });
+  };
 
   for (const asset of payload.assets ?? []) {
-    const existing = await scopedQuery<{ updated_at: string }>(app, scope,
-      `SELECT updated_at FROM video_assets WHERE workspace_id = $1 AND id = $2`,
-      [scope.workspaceId, asset.id]);
-    const serverUpdatedAt = existing[0]?.updated_at ?? null;
-    if (serverUpdatedAt && !newerThan(asset.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "assets", id: asset.id, localUpdatedAt: isoOf(asset.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
-      continue;
+    try {
+      const nearby = await scopedQuery<{ id: string; updated_at: string }>(app, scope,
+        `SELECT id, updated_at FROM video_assets WHERE workspace_id = $1 AND (id = $2 OR sha256 = $3)`,
+        [scope.workspaceId, asset.id, asset.sha256]);
+      const byId = nearby.find((row) => row.id === asset.id) ?? null;
+      const bySha = nearby.find((row) => row.id !== asset.id) ?? null;
+      if (bySha) {
+        result.conflicts.push({
+          table: "assets", id: asset.id, localUpdatedAt: isoOf(asset.updated_at), serverUpdatedAt: isoOf(bySha.updated_at),
+          reason: `同内容已存在于素材 ${bySha.id}（sha256 幂等键命中）：不静默合并，请人工确认后再推`,
+        });
+        continue;
+      }
+      if (byId && !newerThan(asset.updated_at, byId.updated_at)) {
+        result.conflicts.push({ table: "assets", id: asset.id, localUpdatedAt: isoOf(asset.updated_at), serverUpdatedAt: isoOf(byId.updated_at), reason: "服务端更新更晚" });
+        continue;
+      }
+      const written = await rowTx(app, scope, async (client) => {
+        const res = await client.query(
+          `INSERT INTO video_assets
+             (id, workspace_id, project_id, chain_id, kind, version, parent_id, source_url, provenance,
+              license_risk, hero_image_id, sha256, meta, status, created_by, created_at, updated_at,
+              title, tags, prompt, pipeline_kind, duration_seconds, width, height, thumb_path, source_type, sync_state)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb,$14,$15,$16::timestamptz,$17::timestamptz,
+                   $18,$19::jsonb,$20,$21,$22,$23,$24,$25,$26,$27)
+           ON CONFLICT (id) DO UPDATE SET
+             project_id = EXCLUDED.project_id, version = EXCLUDED.version, source_url = EXCLUDED.source_url,
+             provenance = EXCLUDED.provenance, license_risk = EXCLUDED.license_risk,
+             hero_image_id = EXCLUDED.hero_image_id, meta = EXCLUDED.meta, status = EXCLUDED.status,
+             title = EXCLUDED.title, tags = EXCLUDED.tags, prompt = EXCLUDED.prompt,
+             pipeline_kind = EXCLUDED.pipeline_kind, duration_seconds = EXCLUDED.duration_seconds,
+             width = EXCLUDED.width, height = EXCLUDED.height, thumb_path = EXCLUDED.thumb_path,
+             source_type = EXCLUDED.source_type, sync_state = EXCLUDED.sync_state
+           WHERE video_assets.updated_at < EXCLUDED.updated_at`,
+          [asset.id, scope.workspaceId, asset.project_id, asset.chain_id, asset.kind, asset.version, asset.parent_id,
+           asset.source_url, JSON.stringify(asset.provenance ?? {}), asset.license_risk, asset.hero_image_id, asset.sha256,
+           JSON.stringify(asset.meta ?? {}), asset.status, asset.created_by,
+           isoOf(asset.created_at) || new Date().toISOString(),
+           isoOf(asset.updated_at) || new Date().toISOString(), asset.title ?? null, JSON.stringify(asset.tags ?? []),
+           asset.prompt ?? null, asset.pipeline_kind ?? null, asset.duration_seconds ?? null, asset.width ?? null,
+           asset.height ?? null, asset.thumb_path ?? null, asset.source_type ?? "generated",
+           asset.sync_state ?? "cloud_only"]);
+        return res.rowCount ?? 0;
+      });
+      if (written === 0) {
+        result.conflicts.push({ table: "assets", id: asset.id, localUpdatedAt: isoOf(asset.updated_at), serverUpdatedAt: "", reason: "并发写入：比对后服务端又被更新，本次未落库" });
+        continue;
+      }
+      result.applied.assets += written;
+      await logSync(app, scope, { assetId: asset.id, direction: "pull", payloadKind: "metadata", bytes: JSON.stringify(asset).length, peer, status: "done" });
+    } catch (err) {
+      await recordFailure("assets", asset.id, err instanceof Error ? err.message : String(err));
     }
-    await scopedQuery(app, scope,
-      `INSERT INTO video_assets
-         (id, workspace_id, project_id, chain_id, kind, version, parent_id, source_url, provenance,
-          license_risk, hero_image_id, sha256, meta, status, created_by, created_at, updated_at,
-          title, tags, prompt, pipeline_kind, duration_seconds, width, height, thumb_path, source_type, sync_state)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13::jsonb,$14,$15,$16::timestamptz,$17::timestamptz,
-               $18,$19::jsonb,$20,$21,$22,$23,$24,$25,$26,$27)
-       ON CONFLICT (id) DO UPDATE SET
-         project_id = EXCLUDED.project_id, version = EXCLUDED.version, source_url = EXCLUDED.source_url,
-         provenance = EXCLUDED.provenance, license_risk = EXCLUDED.license_risk,
-         hero_image_id = EXCLUDED.hero_image_id, meta = EXCLUDED.meta, status = EXCLUDED.status,
-         title = EXCLUDED.title, tags = EXCLUDED.tags, prompt = EXCLUDED.prompt,
-         pipeline_kind = EXCLUDED.pipeline_kind, duration_seconds = EXCLUDED.duration_seconds,
-         width = EXCLUDED.width, height = EXCLUDED.height, thumb_path = EXCLUDED.thumb_path,
-         source_type = EXCLUDED.source_type, sync_state = EXCLUDED.sync_state
-       WHERE video_assets.updated_at < EXCLUDED.updated_at`,
-      [asset.id, scope.workspaceId, asset.project_id, asset.chain_id, asset.kind, asset.version, asset.parent_id,
-       asset.source_url, JSON.stringify(asset.provenance ?? {}), asset.license_risk, asset.hero_image_id, asset.sha256,
-       JSON.stringify(asset.meta ?? {}), asset.status, asset.created_by,
-       isoOf(asset.created_at) || new Date().toISOString(),
-       isoOf(asset.updated_at) || new Date().toISOString(), asset.title ?? null, JSON.stringify(asset.tags ?? []),
-       asset.prompt ?? null, asset.pipeline_kind ?? null, asset.duration_seconds ?? null, asset.width ?? null,
-       asset.height ?? null, asset.thumb_path ?? null, asset.source_type ?? "generated",
-       asset.sync_state ?? "cloud_only"]);
-    result.applied.assets += 1;
-    await logSync(app, scope, {
-      assetId: asset.id, direction: "pull", payloadKind: "metadata",
-      bytes: JSON.stringify(asset).length, peer, status: "done",
-    });
   }
 
   for (const collection of payload.collections ?? []) {
     const id = String(collection.id ?? "");
     if (!id) continue;
-    const existing = await scopedQuery<{ updated_at: string }>(app, scope,
-      `SELECT updated_at FROM media_collections WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, id]);
-    const serverUpdatedAt = existing[0]?.updated_at ?? null;
-    if (serverUpdatedAt && !newerThan(collection.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "collections", id, localUpdatedAt: isoOf(collection.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
-      continue;
+    try {
+      const existing = await scopedQuery<{ updated_at: string }>(app, scope,
+        `SELECT updated_at FROM media_collections WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, id]);
+      const serverUpdatedAt = existing[0]?.updated_at ?? null;
+      if (serverUpdatedAt && !newerThan(collection.updated_at, serverUpdatedAt)) {
+        result.conflicts.push({ table: "collections", id, localUpdatedAt: isoOf(collection.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
+        continue;
+      }
+      const written = await rowTx(app, scope, async (client) => (await client.query(
+        `INSERT INTO media_collections (id, workspace_id, title, purpose, meta, status, created_by, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8::timestamptz,$9::timestamptz)
+         ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, purpose = EXCLUDED.purpose,
+           meta = EXCLUDED.meta, status = EXCLUDED.status
+         WHERE media_collections.updated_at < EXCLUDED.updated_at`,
+        [id, scope.workspaceId, String(collection.title ?? "未命名合集"), String(collection.purpose ?? "recut"),
+         JSON.stringify(collection.meta ?? {}), String(collection.status ?? "open"),
+         String(collection.created_by ?? peer), isoOf(collection.created_at) || new Date().toISOString(),
+         isoOf(collection.updated_at) || new Date().toISOString()])).rowCount ?? 0);
+      if (written === 0) {
+        result.conflicts.push({ table: "collections", id, localUpdatedAt: isoOf(collection.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "并发写入：比对后服务端又被更新" });
+        continue;
+      }
+      result.applied.collections += written;
+      await logSync(app, scope, { assetId: id, direction: "pull", payloadKind: "metadata", bytes: JSON.stringify(collection).length, peer, status: "done" });
+    } catch (err) {
+      await recordFailure("collections", id, err instanceof Error ? err.message : String(err));
     }
-    await scopedQuery(app, scope,
-      `INSERT INTO media_collections (id, workspace_id, title, purpose, meta, status, created_by, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5::jsonb,$6,$7,$8::timestamptz,$9::timestamptz)
-       ON CONFLICT (id) DO UPDATE SET title = EXCLUDED.title, purpose = EXCLUDED.purpose,
-         meta = EXCLUDED.meta, status = EXCLUDED.status
-       WHERE media_collections.updated_at < EXCLUDED.updated_at`,
-      [id, scope.workspaceId, String(collection.title ?? "未命名合集"), String(collection.purpose ?? "recut"),
-       JSON.stringify(collection.meta ?? {}), String(collection.status ?? "open"),
-       String(collection.created_by ?? peer), collection.created_at ?? new Date().toISOString(),
-       collection.updated_at ?? new Date().toISOString()]);
-    result.applied.collections += 1;
   }
 
   for (const item of payload.items ?? []) {
     const collectionId = String(item.collection_id ?? "");
     const assetId = String(item.asset_id ?? "");
+    const itemKey = `${collectionId}/${assetId}`;
     if (!collectionId || !assetId) continue;
-    const existing = await scopedQuery<{ updated_at: string }>(app, scope,
-      `SELECT updated_at FROM media_collection_items
-        WHERE workspace_id = $1 AND collection_id = $2 AND asset_id = $3`,
-      [scope.workspaceId, collectionId, assetId]);
-    const serverUpdatedAt = existing[0]?.updated_at ?? null;
-    if (serverUpdatedAt && !newerThan(item.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "items", id: `${collectionId}/${assetId}`, localUpdatedAt: isoOf(item.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "合集条目顺序冲突（seq 以服务端为准，人工确认）" });
-      continue;
+    try {
+      const existing = await scopedQuery<{ updated_at: string }>(app, scope,
+        `SELECT updated_at FROM media_collection_items
+          WHERE workspace_id = $1 AND collection_id = $2 AND asset_id = $3`,
+        [scope.workspaceId, collectionId, assetId]);
+      const serverUpdatedAt = existing[0]?.updated_at ?? null;
+      if (serverUpdatedAt && !newerThan(item.updated_at, serverUpdatedAt)) {
+        result.conflicts.push({ table: "items", id: itemKey, localUpdatedAt: isoOf(item.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "合集条目顺序冲突（seq 以服务端为准，人工确认）" });
+        continue;
+      }
+      const assetExists = await scopedQuery<{ id: string }>(app, scope,
+        `SELECT id FROM video_assets WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, assetId]);
+      if (assetExists.length === 0) {
+        result.conflicts.push({ table: "items", id: itemKey, localUpdatedAt: isoOf(item.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "素材行未同步到位（先推 assets 再推 items）" });
+        continue;
+      }
+      const written = await rowTx(app, scope, async (client) => (await client.query(
+        `INSERT INTO media_collection_items (collection_id, workspace_id, asset_id, seq, note, added_by, added_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$7::timestamptz,$8::timestamptz)
+         ON CONFLICT (collection_id, asset_id) DO UPDATE SET seq = EXCLUDED.seq, note = EXCLUDED.note
+         WHERE media_collection_items.updated_at < EXCLUDED.updated_at`,
+        [collectionId, scope.workspaceId, assetId, Number(item.seq ?? 0), item.note ?? null,
+         String(item.added_by ?? peer), isoOf(item.added_at) || new Date().toISOString(),
+         isoOf(item.updated_at) || new Date().toISOString()])).rowCount ?? 0);
+      if (written === 0) {
+        result.conflicts.push({ table: "items", id: itemKey, localUpdatedAt: isoOf(item.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "并发写入：比对后服务端又被更新" });
+        continue;
+      }
+      result.applied.items += written;
+      await logSync(app, scope, { assetId, direction: "pull", payloadKind: "metadata", bytes: JSON.stringify(item).length, peer, status: "done" });
+    } catch (err) {
+      await recordFailure("items", itemKey, err instanceof Error ? err.message : String(err));
     }
-    const assetExists = await scopedQuery<{ id: string }>(app, scope,
-      `SELECT id FROM video_assets WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, assetId]);
-    if (assetExists.length === 0) {
-      result.conflicts.push({ table: "items", id: `${collectionId}/${assetId}`, localUpdatedAt: isoOf(item.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "素材行未同步到位（先推 assets 再推 items）" });
-      continue;
-    }
-    await scopedQuery(app, scope,
-      `INSERT INTO media_collection_items (collection_id, workspace_id, asset_id, seq, note, added_by, added_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7::timestamptz,$8::timestamptz)
-       ON CONFLICT (collection_id, asset_id) DO UPDATE SET seq = EXCLUDED.seq, note = EXCLUDED.note
-       WHERE media_collection_items.updated_at < EXCLUDED.updated_at`,
-      [collectionId, scope.workspaceId, assetId, Number(item.seq ?? 0), item.note ?? null,
-       String(item.added_by ?? peer), item.added_at ?? new Date().toISOString(),
-       item.updated_at ?? new Date().toISOString()]);
-    result.applied.items += 1;
   }
 
   for (const product of payload.products ?? []) {
     const id = String(product.id ?? "");
     if (!id) continue;
-    const existing = await scopedQuery<{ updated_at: string }>(app, scope,
-      `SELECT updated_at FROM media_product_profiles WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, id]);
-    const serverUpdatedAt = existing[0]?.updated_at ?? null;
-    if (serverUpdatedAt && !newerThan(product.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "products", id, localUpdatedAt: isoOf(product.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
-      continue;
+    try {
+      const existing = await scopedQuery<{ updated_at: string }>(app, scope,
+        `SELECT updated_at FROM media_product_profiles WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, id]);
+      const serverUpdatedAt = existing[0]?.updated_at ?? null;
+      if (serverUpdatedAt && !newerThan(product.updated_at, serverUpdatedAt)) {
+        result.conflicts.push({ table: "products", id, localUpdatedAt: isoOf(product.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
+        continue;
+      }
+      const written = await rowTx(app, scope, async (client) => (await client.query(
+        `INSERT INTO media_product_profiles
+           (id, workspace_id, product_name, dossier_path, dossier_sha256, summary, hero_asset_id, status, created_at, updated_at)
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9::timestamptz,$10::timestamptz)
+         ON CONFLICT (id) DO UPDATE SET dossier_path = EXCLUDED.dossier_path,
+           dossier_sha256 = EXCLUDED.dossier_sha256, summary = EXCLUDED.summary,
+           hero_asset_id = EXCLUDED.hero_asset_id, status = EXCLUDED.status
+         WHERE media_product_profiles.updated_at < EXCLUDED.updated_at`,
+        [id, scope.workspaceId, String(product.product_name ?? "未命名商品"), String(product.dossier_path ?? ""),
+         String(product.dossier_sha256 ?? ""), JSON.stringify(product.summary ?? {}),
+         product.hero_asset_id ?? null, String(product.status ?? "active"),
+         isoOf(product.created_at) || new Date().toISOString(),
+         isoOf(product.updated_at) || new Date().toISOString()])).rowCount ?? 0);
+      if (written === 0) {
+        result.conflicts.push({ table: "products", id, localUpdatedAt: isoOf(product.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "并发写入：比对后服务端又被更新" });
+        continue;
+      }
+      result.applied.products += written;
+      await logSync(app, scope, { assetId: id, direction: "pull", payloadKind: "metadata", bytes: JSON.stringify(product).length, peer, status: "done" });
+    } catch (err) {
+      await recordFailure("products", id, err instanceof Error ? err.message : String(err));
     }
-    await scopedQuery(app, scope,
-      `INSERT INTO media_product_profiles
-         (id, workspace_id, product_name, dossier_path, dossier_sha256, summary, hero_asset_id, status, created_at, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9::timestamptz,$10::timestamptz)
-       ON CONFLICT (id) DO UPDATE SET dossier_path = EXCLUDED.dossier_path,
-         dossier_sha256 = EXCLUDED.dossier_sha256, summary = EXCLUDED.summary,
-         hero_asset_id = EXCLUDED.hero_asset_id, status = EXCLUDED.status
-       WHERE media_product_profiles.updated_at < EXCLUDED.updated_at`,
-      [id, scope.workspaceId, String(product.product_name ?? "未命名商品"), String(product.dossier_path ?? ""),
-       String(product.dossier_sha256 ?? ""), JSON.stringify(product.summary ?? {}),
-       product.hero_asset_id ?? null, String(product.status ?? "active"),
-       product.created_at ?? new Date().toISOString(), product.updated_at ?? new Date().toISOString()]);
-    result.applied.products += 1;
   }
 
   return result;
