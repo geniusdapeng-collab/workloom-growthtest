@@ -12,7 +12,8 @@
  *    补写与 register 不同事务，故失败重试一次再报错，并留下可巡检特征（title 空而 meta.title 在场）。
  */
 import { createHash } from "node:crypto";
-import { createReadStream, copyFileSync, existsSync, mkdirSync, statSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
+import { copyFile } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import type pg from "pg";
@@ -102,7 +103,8 @@ export async function registerLocalAsset(
   const absTarget = join(mediaRoot(), relPath);
   if (!existsSync(absTarget) || statSync(absTarget).size !== bytes) {
     mkdirSync(dirname(absTarget), { recursive: true });
-    copyFileSync(input.absPath, absTarget); // 同名同内容覆盖：sha256 幂等，无害
+    // 异步拷贝：300MB 级文件用 copyFileSync 会把事件循环按住数秒（深审 T-2026-0926-0016）
+    await copyFile(input.absPath, absTarget); // 同名同内容覆盖：sha256 幂等，无害
   }
   return registerStoredMedia(app, gateway, scope, {
     ...input,

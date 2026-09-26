@@ -13,7 +13,7 @@
  *
  * 说明：本文件用 RUN_DB_TESTS=1 打开（与仓内既有 *.pg.test.ts 同口径）。
  */
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -78,6 +78,7 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     ensureAssetFile: typeof import("./sync.js").ensureAssetFile;
     reconcile: typeof import("./sync.js").reconcile;
     enrollDevice: typeof import("./sync.js").enrollDevice;
+    cleanupStaleUploads: typeof import("./upload.js").cleanupStaleUploads;
     verifyDeviceRequest: typeof import("./sync.js").verifyDeviceRequest;
     deviceKeyFor: typeof import("./sync.js").deviceKeyFor;
     deviceSignature: typeof import("./sync.js").deviceSignature;
@@ -131,6 +132,7 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
       ensureAssetFile: (await import("./sync.js")).ensureAssetFile,
       reconcile: (await import("./sync.js")).reconcile,
       enrollDevice: (await import("./sync.js")).enrollDevice,
+      cleanupStaleUploads: (await import("./upload.js")).cleanupStaleUploads,
       verifyDeviceRequest: (await import("./sync.js")).verifyDeviceRequest,
       deviceKeyFor: (await import("./sync.js")).deviceKeyFor,
       deviceSignature: (await import("./sync.js")).deviceSignature,
@@ -702,6 +704,39 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     expect(new Set(seen).size).toBe(seen.length);
     expect([...seen].sort(), "trgm 翻页并集必须等于检索全量").toEqual(full);
   }, 120_000);
+
+  /**
+   * 运维/安全批回归（T-2026-0926-0016）：重剪并发闸 + 临时目录清理 + 配额含孤儿 + 设备过期。
+   */
+  it("⑱ 重剪并发闸 + 临时目录清理；配额计入未登记上传；设备凭证过期即拒", async () => {
+    // 1) 配额：未登记的上传落盘必须计入（旧实现只看已登记 meta.bytes）
+    const orphanDir = join(process.env.WORKLOOM_MEDIA_DIR!, "upload", workspaceId);
+    mkdirSync(orphanDir, { recursive: true });
+    const orphan = join(orphanDir, "orphan-⑱.mp4");
+    writeFileSync(orphan, Buffer.alloc(2 * 1024 * 1024, 3));
+    const tight = await mods.checkUploadQuota(getAppPool(), scope, 1024, { WORKLOOM_MEDIA_QUOTA_GB: "0.001" });
+    expect(tight.ok, "孤儿占盘必须参与配额判定").toBe(false);
+    // TTL 按 mtime 判定：把孤儿"变旧"再清理（新文件不该被误删）
+    const past = new Date(Date.now() - 7_200_000);
+    utimesSync(orphan, past, past);
+    const cleanup = mods.cleanupStaleUploads(workspaceId, { MEDIA_ORPHAN_TTL_HOURS: "1" });
+    expect(cleanup.removed).toBeGreaterThan(0);
+    expect(existsSync(orphan)).toBe(false);
+
+    // 2) 设备凭证过期即拒
+    const device = await mods.enrollDevice(getAppPool(), scope, { label: "过期设备", by: "MEM-T" });
+    await owner.query(`UPDATE media_sync_devices SET expires_at = now() - interval '1 day' WHERE id = $1`, [device.deviceId]);
+    const key = mods.deviceKeyFor(device.deviceId);
+    const timestamp = String(Date.now());
+    const bodyText = "";
+    const verdict = await mods.verifyDeviceRequest(owner, {
+      deviceId: device.deviceId, timestamp,
+      signature: mods.deviceSignature({ method: "GET", path: "/sync/media/pull", timestamp, bodySha256: mods.bodyHash(bodyText) }, key),
+      method: "GET", path: "/sync/media/pull", body: bodyText,
+    });
+    expect(verdict.ok).toBe(false);
+    expect(verdict.code).toBe("DEVICE_EXPIRED");
+  }, 90_000);
 
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {
     const a = await makeTinyClip("recut-a.mp4", "red");

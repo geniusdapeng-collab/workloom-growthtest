@@ -420,6 +420,10 @@ export const mediaRouter = router({
     enroll: writeProcedure
       .input(z.object({ label: z.string().min(1).max(80) }))
       .mutation(async ({ ctx, input }) => {
+        // 设备凭证是长期凭证（默认 90 天）：只允许 owner/manager 签发（深审：staff 也有 workspace.write）
+        if (ctx.identity.role !== "owner" && ctx.identity.role !== "manager") {
+          throw new TRPCError({ code: "FORBIDDEN", message: "只有工作区所有者/管理员可以签发设备凭证" });
+        }
         const { scope, by } = collectBy(ctx);
         try {
           return await enrollDevice(getAppPool(), scope, { label: input.label, by });
