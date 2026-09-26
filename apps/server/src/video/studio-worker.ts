@@ -225,6 +225,47 @@ export function getRun(runId: string, workspaceId: string): RunEntry | null {
   return entry;
 }
 
+/** 工作区 run 聚合（studio.active 数据源：只读内存投影，不改变任何运行语义） */
+export interface WorkspaceRunSummary {
+  /** 正在执行的 run 数 */
+  running: number;
+  /** 停在人审门上的 run 数 */
+  awaitingApproval: number;
+  /** 最近失败（窗口内）的 run 数 */
+  failedRecent: number;
+  /** 活跃 run 的编号（running + awaitingApproval，供 UI 深链） */
+  activeRunIds: string[];
+}
+
+/**
+ * 汇总本工作区 run 状态（供「织伴」全局状态球与运维面板使用）。
+ * 语义边界：run 注册表是**进程内**投影（服务重启即清空），这里只做只读汇总，
+ * 不写库、不改变 run 生命周期；失败窗口默认 15 分钟（够一次 10s/20s 轮询看见）。
+ */
+export function summarizeWorkspaceRuns(
+  workspaceId: string,
+  options: { now?: number; failedWindowMs?: number } = {},
+): WorkspaceRunSummary {
+  const now = options.now ?? Date.now();
+  const failedWindowMs = options.failedWindowMs ?? 15 * 60_000;
+  const summary: WorkspaceRunSummary = { running: 0, awaitingApproval: 0, failedRecent: 0, activeRunIds: [] };
+  for (const entry of runs.values()) {
+    if (entry.workspaceId !== workspaceId) continue;
+    if (entry.status === "running") {
+      summary.running += 1;
+      summary.activeRunIds.push(entry.runId);
+    } else if (entry.status === "awaiting_approval") {
+      summary.awaitingApproval += 1;
+      summary.activeRunIds.push(entry.runId);
+    } else if (entry.status === "failed" && entry.finishedAt) {
+      const finishedAt = Date.parse(entry.finishedAt);
+      if (!Number.isNaN(finishedAt) && now - finishedAt <= failedWindowMs) summary.failedRecent += 1;
+    }
+  }
+  summary.activeRunIds.sort();
+  return summary;
+}
+
 export class StudioWorkerError extends Error {
   constructor(
     public readonly code: "LLM_MISSING",

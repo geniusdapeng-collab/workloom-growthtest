@@ -41,7 +41,7 @@ import { mediaUrl } from "./gen/ingest.js";
 /** PollReport 类型再导出（web 端 AppRouter 类型可移植性，TS2883） */
 export type { PollReport } from "./render-poller.js";
 import { dealRouter } from "./deal.js";
-import { getRun, startRun, startVideoProjectRun, StudioWorkerError } from "./studio-worker.js";
+import { getRun, startRun, startVideoProjectRun, summarizeWorkspaceRuns, StudioWorkerError } from "./studio-worker.js";
 import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
 import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
@@ -530,6 +530,33 @@ const studioRouter = router({
         resultSummary: entry.resultSummary,
       };
     }),
+
+  /**
+   * 工作区活跃度聚合（织伴「班组状态眼」的唯一服务端事实源）。
+   *
+   * 只读投影，两条真实信号：
+   *  - run 注册表（进程内）：running / awaiting_approval / 近 15 分钟失败；
+   *  - approvals 表：本工作区 pending 审批数（高风险门：花钱、对外发布）。
+   * 不写库、不产生事件；轮询由客户端负责（织伴 20s 一拍）。
+   */
+  active: protectedProcedure.query(async ({ ctx }) => {
+    const scope = scopeOf(ctx.identity);
+    const summary = summarizeWorkspaceRuns(scope.workspaceId);
+    const rows = await scopedQuery<{ n: string }>(
+      getAppPool(),
+      scope,
+      `SELECT count(*)::text AS n FROM approvals WHERE workspace_id=$1 AND status='pending'`,
+      [scope.workspaceId],
+    );
+    return {
+      activeRuns: summary.running + summary.awaitingApproval,
+      running: summary.running,
+      awaitingApproval: summary.awaitingApproval,
+      pendingApprovals: Number(rows[0]?.n ?? 0),
+      failedRecent: summary.failedRecent,
+      activeRunIds: summary.activeRunIds,
+    };
+  }),
 
   /**
    * 制片档案恢复（T-2026-0926-0002）：

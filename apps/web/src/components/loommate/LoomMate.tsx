@@ -11,6 +11,7 @@ import { VoiceEngine } from "../../voice/VoiceEngine";
 import { mateVoiceProfileOf } from "../../voice/mateVoice";
 import { AudioEngine } from "../../audio/AudioEngine";
 import { MateLive2D, type MateMood, type MateGesture } from "./MateLive2D";
+import { LoomBall, emotionLabelOf, emotionOfSystem, loomBallEnabled, useStableEmotion, type SystemStatusSignal } from "../loomball";
 import { useAskRailPadding, useSideNavWidth } from "../../lib/useAskRail";
 import { canonicalNavigationPath } from "../../shell/NavMenu";
 import { Icon, clientChineseText, clientValueText, useManagedSurface } from "@workloom/ui";
@@ -30,6 +31,28 @@ interface InboxItem {
 }
 interface MemRow { id: string; layer: string; mkey: string; content: string; source: string; confidence: string; created_at: string }
 interface ChatMsg { from: "me" | "mate"; text: string }
+/** 班组活跃度（video.studio.active 只读投影：run 注册表 + approvals 表两路真实信号） */
+interface StudioActive {
+  activeRuns: number; running: number; awaitingApproval: number;
+  pendingApprovals: number; failedRecent: number; activeRunIds: string[];
+}
+
+/** 勿扰时段判定（"HH:MM"~"HH:MM"，支持跨零点；格式非法时按不在时段处理，不猜） */
+function inQuietHours(start: string | undefined, end: string | undefined, now: Date): boolean {
+  const parse = (value: string | undefined): number | null => {
+    const match = /^(\d{1,2}):(\d{2})$/.exec((value ?? "").trim());
+    if (!match) return null;
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (hours > 23 || minutes > 59) return null;
+    return hours * 60 + minutes;
+  };
+  const from = parse(start);
+  const to = parse(end);
+  if (from === null || to === null) return false;
+  const at = now.getHours() * 60 + now.getMinutes();
+  return from <= to ? at >= from && at <= to : at >= from || at <= to;
+}
 
 /**
  * 任务完成播报（2026-09-20 产品所有者设计）：
@@ -116,6 +139,7 @@ export function LoomMate() {
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const [settings, setSettings] = useState<Settings | null>(null);
   const [items, setItems] = useState<InboxItem[]>([]);
+  const [studioActive, setStudioActive] = useState<StudioActive | null>(null);
   const [open, setOpen] = useState<"none" | "settings" | "memory">("none");
   const [busy, setBusy] = useState(false);
   const [memory, setMemory] = useState<Record<string, MemRow[]> | null>(null);
@@ -287,6 +311,20 @@ export function LoomMate() {
     ? (wandPhase === "rise" ? "handup" : "wandpoint")
     : items.length > 0 ? "handup" : null;
 
+  /**
+   * 织球「班组状态眼」（接入面 B）：全局系统状态 → 表情。
+   * 三条真实信号：run 注册表活跃数、approvals 待办数、近 15 分钟失败数；
+   * 叠加用户自己的勿扰时段（夜班值守）。没有信号就是待机——不装在线、不演忙碌。
+   */
+  const systemSignal: SystemStatusSignal = {
+    activeRuns: studioActive?.activeRuns ?? 0,
+    awaitingApprovals: studioActive?.pendingApprovals ?? 0,
+    recentFailure: (studioActive?.failedRecent ?? 0) > 0,
+    quietHours: inQuietHours(settings?.quiet_start, settings?.quiet_end, new Date()),
+  };
+  const systemEmotion = useStableEmotion(emotionOfSystem(systemSignal));
+  const systemEmotionText = emotionLabelOf(systemEmotion);
+
   const load = useCallback(async () => {
     await ensureDemoLogin();
     const [s, box] = await Promise.all([
@@ -312,6 +350,30 @@ export function LoomMate() {
   }, [personaName]);
 
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * 班组活跃度信号（织球「班组状态眼」的另一半输入）：
+   * 独立轮询，**不并入上面的 load()**——批量请求里任何一路失败都会让整批 reject，
+   * 那样会让状态球永远停在「待机」。失败时保留上一次读数（不猜、不清零成"一切正常"）。
+   */
+  useEffect(() => {
+    let alive = true;
+    const pull = async () => {
+      try {
+        await ensureDemoLogin();
+        const active = await trpc.video.studio.active.query() as StudioActive;
+        if (alive) setStudioActive(active);
+      } catch {
+        /* 保留上一次读数：宁可显示旧状态，也不假装一切正常 */
+      }
+    };
+    void pull();
+    const timer = window.setInterval(() => void pull(), 20_000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, []);
 
   /** 视口跨入窄屏断点时自动收起为小球（跨出时不自动展开，尊重用户当前选择） */
   useEffect(() => {
@@ -571,10 +633,20 @@ export function LoomMate() {
         <div className="relative">
           <button
             onClick={() => { setMini(false); persistLocal("loommate.mini", "0"); }}
-            title="展开小织"
+            title={loomBallEnabled ? `展开${personaName}（班组${systemEmotionText}）` : `展开${personaName}`}
+            data-loommate-emotion={loomBallEnabled ? String(systemEmotion) : undefined}
+            data-loommate-signal={loomBallEnabled ? JSON.stringify(systemSignal) : undefined}
             className="pointer-events-auto relative block h-16 w-16 overflow-hidden rounded-full border-2 border-gold/60 bg-bg900 shadow-xl transition-transform hover:scale-110"
           >
-            <img src="/live2d/mao/poster.png" alt={personaName} draggable={false} className="h-full w-full object-cover" />
+            {loomBallEnabled ? (
+              /* 小角落态：静态小头像 → 织球（班组此刻在干什么，一眼看得见；
+                 形象本体与人格不进这颗球——那是大形象的职责） */
+              <span className="flex h-full w-full items-center justify-center bg-bg900">
+                <LoomBall emotion={systemEmotion} size={56} live followGaze={false} title={`班组${systemEmotionText}`} />
+              </span>
+            ) : (
+              <img src="/live2d/mao/poster.png" alt={personaName} draggable={false} className="h-full w-full object-cover" />
+            )}
             {unread > 0 && (
               <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-alert px-1 text-body font-bold text-white shadow-lg">
                 {unread}
@@ -634,6 +706,13 @@ export function LoomMate() {
             {webglOk
               ? <MateLive2D size={dim} mood={mood} gesture={mateGesture} />
               : <MateAvatar size={dim} excited={unread > 0 || Boolean(celebrate)} />}
+            {/* 紧凑态（widget_size='small'）：形象保留，右上角挂一枚班组状态眼；
+                大形象与全屏屏保不加球（人格外壳零改动） */}
+            {loomBallEnabled && size === "small" && (
+              <span className="absolute -left-3 -top-1" title={`班组${systemEmotionText}`}>
+                <LoomBall emotion={systemEmotion} size={40} live followGaze={false} />
+              </span>
+            )}
             {/* 任务完成：星尘沿魔法棒洒出并飞向右栏，配一条指向对话框的光轨 */}
             {celebrate && (
               <div className="wl-wand-cast" aria-hidden="true">
