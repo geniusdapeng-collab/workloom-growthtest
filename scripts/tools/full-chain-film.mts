@@ -23,7 +23,7 @@
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
-  appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync
+  appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, utimesSync, writeFileSync
 } from "node:fs";
 import { homedir } from "node:os";
 import { tmpdir } from "node:os";
@@ -37,6 +37,7 @@ import {
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm, reviewStage,
   buildSfxArgs, cutTimesFromShots, planCutSfxDetailed, CUT_SFX_POLICY,
+  measureBpm, beatGridReport, checkShotOrder, assessVariantAxes, VARIANT_MIN_COUNT,
   normalizePromptLanguage,
   restoreTimelineField,
   type CoverDesignInput, type CoverMeasurements, type CoverPlan, type GateCheck, type GateEvent, type PipelineGateStepKey,
@@ -85,6 +86,15 @@ const CUT_TRANSITION_DURATION = Number(arg("--cut-transition-duration", "0.18"))
  * 这样既拿到瞭望塔式的甩镜节奏，又不把总时长吃掉（6 镜满刀 0.18s 会掉到 29.2s，真机被打回）。
  */
 const CUT_TRANSITION_AT = arg("--cut-transition-at", "2,3,4,5");
+/**
+ * 镜头顺序口径（2026-09-26 产品所有者点名）：
+ *   `storyboard`（默认）= 成片顺序必须等于分镜顺序，后期不得为卡点/情绪重排；
+ *   `reuse-assembly`    = 媒资库历史镜头复用路径，允许重组，但必须给 `--reuse-plan` 重组依据。
+ * 重排入口用 `--compose-order NC-04,NC-01,...` 显式声明；不声明就按分镜顺序。
+ */
+const ORDER_POLICY = arg("--order-policy", "storyboard") as "storyboard" | "reuse-assembly";
+const COMPOSE_ORDER = arg("--compose-order", "");
+const REUSE_PLAN = arg("--reuse-plan", "");
 /**
  * 封面主版式（2026-09-25 南昌片收口）：
  *   `landmark`（默认）= 地标满幅 + 人物卡（适合"人物镜头质量一般"的片子）；
@@ -154,21 +164,61 @@ const MATERIAL_PHOTO_TAIL_TRIM = !flag("--no-material-photo-tail-trim");
  *   ③ 打分：本地曲库优先（产品所有者自己的库）> 随仓兜底；题材/用例贴合（旅行/城市/Vlog/卡点）加分；
  *   ④ 只选**纯器乐**音乐床：混音时用更低电平（-28dB）与更深让位（16dB），保证不抢人声。
  */
-async function pickGridCompatibleBed(masterSeconds: number): Promise<{
-  id: string; title: string; path: string; bpm: number; score: number; reasons: string[];
+/**
+ * 曲库音乐床选曲（**按实测 BPM**，2026-09-26 产品所有者口径）：
+ * 早先按曲库标签 BPM 挑"落在 60/120/240 网格族"的曲子，真机实测卡点平均误差 123ms——
+ * 标签 BPM 是人工/批量打标，与音频真实节拍经常差一截（半速错标、变速混音）。
+ * 现在：标签只做粗筛，**入选必须实测 BPM 与剪辑网格的卡点误差达标**（见 beat-verify.ts）。
+ */
+/** 解码前 N 秒为 f32 单声道——实测 BPM 用（ffmpeg 抽 PCM，避免依赖外部库）。 */
+function readPcmSamples(file: string, sampleRate: number, seconds: number): Float32Array {
+  const buf = execFileSync(FFMPEG, [
+    "-v", "error", "-t", String(seconds), "-i", file,
+    "-vn", "-ac", "1", "-ar", String(sampleRate), "-f", "f32le", "-",
+  ], { maxBuffer: 256 * 1024 * 1024 });
+  const view = new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 4));
+  return view.slice();
+}
+
+async function pickGridCompatibleBed(
+  masterSeconds: number,
+  cutTimes: readonly number[],
+  hints: { genre?: string; mood?: string } = {},
+): Promise<{
+  id: string; title: string; path: string; bpm: number; measuredBpm: number; gridErrorMs: number;
+  score: number; reasons: string[];
 } | null> {
+  /**
+   * 直接读**全库**再排序（2026-09-26 真机发现）：
+   * `findTracks` 的返回是 `items.slice(0, 20)`——切片发生在排序**之前**，
+   * 于是"1034 首的曲库"在选曲侧只能看到库里前 20 首（真机现状），再好的曲子也进不了候选池。
+   * 这里改用 `loadAllLocalTracks(ENV)` 拿全量，按"标签粗筛 + 曲风线索 + 本地库优先 + 时长富余"排序后再实测。
+   */
   const core = (await import(join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/core.mjs"))) as {
-    findTracks: (query: Record<string, unknown>) => { items?: Array<Record<string, unknown>> };
+    loadAllLocalTracks: (env?: NodeJS.ProcessEnv) => {
+      tracks?: Array<{
+        id?: string; title?: string; genre?: string; mood?: string; bpm?: number;
+        durationSec?: number; localPath?: string | null; file?: string;
+      }>;
+    };
   };
-  const found = core.findTracks({ commercialUse: true, minDurationSec: Math.max(30, masterSeconds + 8) });
+  const library = core.loadAllLocalTracks(ENV);
+  const minSeconds = Math.max(30, masterSeconds + 8);
+  const allTracks = (library.tracks ?? [])
+    .filter((track) => {
+      const path = String(track.localPath ?? "");
+      if (!path || !existsSync(path)) return false;
+      const duration = Number(track.durationSec ?? 0);
+      /** 时长口径：≥ 片子长度 + 8s 余量；元数据缺失时长时放行（交给实测判断） */
+      return !(duration > 0) || duration >= minSeconds;
+    });
   const grid = [60, 120, 240];
-  const scored = (found.items ?? []).map((item) => {
+  const coarse = allTracks.map((item) => {
     const bpm = Number(item.bpm ?? 0);
-    const path = String(item.path ?? "");
+    const path = String(item.localPath ?? "");
     const delta = Math.min(...grid.map((value) => Math.abs(bpm - value)));
     const reasons: string[] = [];
     let score = 0;
-    if (!path || item.fileExists === false) return null;
     if (delta <= 2) {
       /**
        * 网格族内部再排序：本片剪辑网格就是 120BPM（0.5s/拍），60BPM 的曲子虽然"同族"，
@@ -180,10 +230,18 @@ async function pickGridCompatibleBed(masterSeconds: number): Promise<{
     } else if (delta <= 5) {
       score += 25;
       reasons.push(`BPM ${bpm} 贴近剪辑网格（Δ${delta}，混音可 ±2% 微调）`);
-    } else {
-      return null;
     }
-    if (/\.workloom-bgm\/library\//.test(path)) {
+    /**
+     * 标签只是**粗筛**：不达标的不再直接丢（真机教训是标签本身会错），
+     * 只把分数压低，让它排到后面——真正的判据是下面逐首实测的卡点误差。
+     * 变体选曲（hints）时优先匹配该变体的曲风线索。
+     */
+    const label = [item.genre, item.mood, item.title].join(" ");
+    const genreHit = (hints.genre ?? "").split("|").map((v) => v.trim()).filter(Boolean).filter((value) => label.includes(value));
+    const moodHit = (hints.mood ?? "").split("|").map((v) => v.trim()).filter(Boolean).filter((value) => label.includes(value));
+    if (genreHit.length > 0) { score += 24; reasons.push(`曲风线索命中「${genreHit.join("/")}」`); }
+    if (moodHit.length > 0) { score += 18; reasons.push(`情绪线索命中「${moodHit.join("/")}」`); }
+    if (/\.workloom-bgm\/library\//.test(path) || String(item.localPath ?? "").includes("/.workloom-bgm/")) {
       score += 20;
       reasons.push("来自产品所有者本地曲库");
     }
@@ -191,14 +249,47 @@ async function pickGridCompatibleBed(masterSeconds: number): Promise<{
       score += 6;
       reasons.push(`时长 ${Math.round(Number(item.durationSec ?? 0))}s 富余`);
     }
-    if (/旅行|城市|Vlog|旅拍|卡点|游记/.test([item.genre, item.mood, item.title].join(" "))) {
+    if (!hints.genre && !hints.mood && /旅行|城市|Vlog|旅拍|卡点|游记/.test(label)) {
       score += 8;
       reasons.push("题材贴合城市漫游");
     }
     return { id: String(item.id), title: String(item.title ?? ""), path, bpm, score, reasons };
   }).filter((value): value is { id: string; title: string; path: string; bpm: number; score: number; reasons: string[] } => value !== null);
-  scored.sort((a, b) => b.score - a.score);
-  return scored[0] ?? null;
+  coarse.sort((a, b) => b.score - a.score);
+  /**
+   * 逐首实测（最多 8 首，避免选曲阶段扫全库）：
+   * 用曲子前 45s 的波形测 BPM，再把**真实剪辑点**投到节拍上算误差。
+   */
+  const measured = coarse.slice(0, 16).map((candidate) => {
+    try {
+      const samples = readPcmSamples(candidate.path, 16000, 45);
+      const bpm = measureBpm(samples, 16000);
+      if (!(bpm.bpm > 0)) return null;
+      const report = beatGridReport(bpm.bpm, cutTimes);
+      return { ...candidate, measuredBpm: bpm.bpm, strength: bpm.strength, grid: report };
+    } catch {
+      return null;
+    }
+  }).filter((value): value is NonNullable<typeof value> => value !== null && value.grid.ok);
+  const ranked = measured.map((candidate) => {
+    const reasons = [...candidate.reasons];
+    const gridDistance = candidate.grid.meanErrorMs;
+    let score = candidate.score + Math.max(0, 60 - gridDistance) * 1.5;
+    reasons.push(`实测 ${candidate.measuredBpm}BPM（标签 ${candidate.bpm}BPM，节拍强度 ${candidate.strength}）`);
+    reasons.push(`卡点实测：${candidate.grid.detail}`);
+    /** 同族里优先"一拍 = 剪辑点间隔"的那档（120 族最贴城市快剪），其次 240、60 */
+    if (candidate.measuredBpm >= 117 && candidate.measuredBpm <= 123) { score += 40; reasons.push("实测落在 120 族（一拍 0.5s，最贴本片剪辑网格）"); }
+    else if (candidate.measuredBpm >= 235) { score += 24; reasons.push("实测落在 240 族"); }
+    else { score += 10; reasons.push("实测落在 60 族（同族但拍点较疏）"); }
+    return { ...candidate, score, reasons };
+  }).sort((a, b) => b.score - a.score);
+  const best = ranked[0];
+  if (!best) return null;
+  return {
+    id: best.id, title: best.title, path: best.path, bpm: best.bpm,
+    measuredBpm: best.measuredBpm, gridErrorMs: best.grid.meanErrorMs,
+    score: Math.round(best.score), reasons: best.reasons,
+  };
 }
 const RESUME = !flag("--no-resume");
 const DRY_RUN = flag("--dry-run");
@@ -214,7 +305,12 @@ const STAGES = new Set(
    *   · `photo-motion` 已**移除**——真实素材不再有"静态直出"路径，改为 `material-gen`（素材当生成输入）；
    *   · 新增 `voice`：逐镜人声核查 + 缺播报的镜头补 TTS 旁白（"中间只有字幕没台词播报"的修复）。
    */
-  arg("--stages", "cine-kb,continuity,micromotion,spec,plates,material-gen,videos,voice,compose,color,subtitle,danmaku,bgm,cover,mux").split(",").map((s) => s.trim()).filter(Boolean)
+  /**
+   * 2026-09-26 产品口径补充：`deliver`（多风格交付包）**默认开启**——
+   * 真机复盘发现"一次产出几个版本"的约束一直没执行，根因就是它不在默认阶段表里，
+   * 只有显式 `--stages ...,deliver` 才会跑，于是日常跑全链根本不产变体。
+   */
+  arg("--stages", "cine-kb,continuity,micromotion,spec,plates,material-gen,videos,voice,compose,color,subtitle,danmaku,bgm,cover,mux,deliver").split(",").map((s) => s.trim()).filter(Boolean)
 );
 /**
  * 字幕落地方式（2026-09-24 产品所有者口径）：
@@ -3092,8 +3188,32 @@ if (STAGES.has("voice")) {
 let master = join(POST_DIR, "master-raw.mp4");
 if (STAGES.has("compose")) {
   const started = Date.now();
+  /**
+   * 镜头顺序不变量（2026-09-26）：成片顺序默认必须**等于分镜顺序**——
+   * 镜头之间有内容逻辑顺序，后期不许为卡点/情绪重排；素材来自媒资库时走 reuse-assembly 并给依据。
+   * 这里把"顺序"做成显式判据 + 阶段证据，未来任何"排在前面/后面"的改动都会被这一关拦下。
+   */
+  const storyboardOrder = shots.map((s) => s.shotId);
+  const requestedOrder = COMPOSE_ORDER
+    ? COMPOSE_ORDER.split(",").map((value) => value.trim()).filter(Boolean)
+    : storyboardOrder;
+  const clipById = new Map(shots.map((s) => [s.shotId, clipFor(s)]));
+  const orderCheck = checkShotOrder(storyboardOrder, requestedOrder, ORDER_POLICY, { reusePlan: REUSE_PLAN });
+  if (!orderCheck.ok) {
+    log(`⛔ 镜头顺序判据不通过：${orderCheck.detail}`);
+    record({
+      stage: "compose-order", shotId: null, invoked: true, ok: false, cached: false, degraded: false, attempt: 1, ms: 0,
+      artifact: null,
+      evidence: { policy: ORDER_POLICY, expected: orderCheck.expected, actual: orderCheck.actual, firstDivergence: orderCheck.firstDivergence },
+      verdict: null, note: "后期不得重排镜头（内容逻辑顺序）；确需重排请走 --order-policy reuse-assembly + --reuse-plan"
+    });
+  } else if (ORDER_POLICY === "reuse-assembly") {
+    log(`↻ 镜头顺序：媒资库复用路径（reuse-assembly）—— ${orderCheck.detail}`);
+  }
   /** 合成用片段：优先取配音版（旁白已混入），原始片段保持只读 */
-  const clips = shots.map((s) => clipFor(s));
+  const clips = orderCheck.ok
+    ? requestedOrder.map((shotId) => clipById.get(shotId)!).filter(Boolean)
+    : [];
   const missing = clips.filter((c) => !existsSync(c));
   /**
    * 带瑕疵放行审计：被监制打回、又出现在 `--accept-rejected` 里的镜头，
@@ -3172,7 +3292,11 @@ if (STAGES.has("compose")) {
     record({
       stage: "compose", shotId: null, invoked: true, ok: Boolean(result.ok && verdict?.approved), cached: false,
       degraded: Boolean(verdict?.degraded), attempt: 1, ms: Date.now() - started, artifact: master,
-      evidence: { ...info, tool: "scripts/tools/compose-film.mts" }, verdict
+      evidence: {
+        ...info, tool: "scripts/tools/compose-film.mts",
+        /** 顺序判据证据（policy/期望顺序/实际顺序），终审与审计都能按它复核"有没有打乱镜头" */
+        order: { policy: ORDER_POLICY, expected: orderCheck.expected, actual: orderCheck.actual, ok: orderCheck.ok },
+      }, verdict
     });
     if (!result.ok) log(`⛔ 合成失败：${result.out.slice(-400)}`);
   }
@@ -3500,7 +3624,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
      * 而是**降低择优门槛、仍然只从曲库里选**：优先低密度、纯器乐、BPM 与剪辑网格相容的曲子当"音乐床"，
      * 用更低的音乐电平（-28dB）与更深的让位（16dB）保证不抢人声。
      */
-    const bed = await pickGridCompatibleBed(Number(probe(danmakuOut).duration ?? 0));
+    const bed = await pickGridCompatibleBed(Number(probe(danmakuOut).duration ?? 0), CUT_GRID);
     if (bed) {
       const mix = runCli(BGM_CLI, [
         "mix", "--in", danmakuOut, "--out", out, "--bgm", bed.path, "--policy", policy,
@@ -3519,9 +3643,11 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
       if (mix.ok && existsSync(out)) {
         bgmVia = "library-bed";
         bgmDetail = `best 严格阈值未过（人声太满）→ **曲库音乐床**（不自算作曲）\n`
-          + `曲目 ${bed.id} · ${bed.title} · ${bed.bpm}BPM · 评分 ${bed.score}\n`
+          + `曲目 ${bed.id} · ${bed.title} · 标签 ${bed.bpm}BPM / **实测 ${bed.measuredBpm}BPM** · `
+          + `卡点实测平均误差 ${bed.gridErrorMs}ms · 评分 ${bed.score}\n`
           + `评分依据：${bed.reasons.join("；")}\n--- mix ---\n${mix.out.slice(-700)}`;
-        log(`↻ 配乐：严格选曲未过阈值 → 曲库音乐床 ${bed.id}（${bed.bpm}BPM，评分 ${bed.score}；不再自算作曲）`);
+        log(`↻ 配乐：严格选曲未过阈值 → 曲库音乐床 ${bed.id}（标签 ${bed.bpm}BPM / 实测 ${bed.measuredBpm}BPM，`
+          + `卡点平均误差 ${bed.gridErrorMs}ms，评分 ${bed.score}；不再自算作曲）`);
       } else {
         bgmDetail = `曲库音乐床混音失败：${mix.out.slice(-500)}`;
       }
@@ -4798,7 +4924,42 @@ if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
   const started = Date.now();
   const variantPlans = buildVariantPlan({ master: DELIVERABLE, outDir: OUT_DIR, projectId: PROJECT, coverHook: arg("--cover-hook", shotlist.title ?? "") });
   const samples: Array<{ variantId: string; frames: Array<{ r: number; g: number; b: number }>; loudness: { lufs: number; peakDb: number } | null }> = [];
-  const variantManifest: Array<{ id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null }> = [];
+  const variantManifest: Array<{
+    id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
+    cover?: { path: string; sha256: string } | null;
+    bgm?: { track: string; sha256: string; measuredBpm?: number; gridErrorMs?: number } | null;
+  }> = [];
+  /**
+   * 变体封面（三轴之一，2026-09-26 产品口径）：主封面 + 该变体的强调色条与风格角标。
+   * 为什么不是每支重跑封面设计师：变体是**零 token 的后期层派生**，重跑设计稿会破坏这条纪律；
+   * 三支封面的差异用"强调色 + 风格角标"保证**可区分且可核对**（sha256 进清单）。
+   */
+  const renderVariantCover = (variantId: string, accent: string, label: string): { path: string; sha256: string } | null => {
+    const source = join(OUT_DIR, `${PROJECT}-cover.png`);
+    if (!existsSync(source)) return null;
+    const target = join(OUT_DIR, `${PROJECT}-cover-${variantId}.png`);
+    const fontFile = join(REPO_ROOT, "bundles/ai-video/library/fonts", COVER_FONTS["smiley-sans"].file);
+    const hex = accent.replace("#", "0x");
+    try {
+      execFileSync(FFMPEG, [
+        "-v", "error", "-y", "-i", source,
+        "-vf", [
+          `drawbox=x=0:y=ih-14:w=iw:h=14:color=${hex}@0.95:t=fill`,
+          `drawbox=x=64:y=ih-124:w=iw-128:h=76:color=black@0.45:t=fill`,
+          /** 注意：drawtext 表达式里高度变量是 `h`（不是 drawbox 的 `ih`）——写错整条滤镜配置会失败 */
+          `drawtext=${existsSync(fontFile) ? `fontfile='${fontFile}':` : ""}text='${label}':`
+            + `fontcolor=white:fontsize=44:x=84:y=h-112`,
+        ].join(","),
+        "-frames:v", "1", target,
+      ]);
+    } catch (err) {
+      log(`  ⚠ 变体封面合成失败（${variantId}）：${err instanceof Error ? err.message.slice(0, 160) : String(err)}`);
+      return null;
+    }
+    return existsSync(target)
+      ? { path: target, sha256: createHash("sha256").update(readFileSync(target)).digest("hex") }
+      : null;
+  };
   /** 取几个时间点的 1×1 平均色：稳定的"画面指纹"（不做逐像素对比，只判风格差异是否可测） */
   const meanColorsAt = (file: string, times: number[]): Array<{ r: number; g: number; b: number }> => times.map((at) => {
     const out = spawnSync(FFMPEG, ["-v", "error", "-ss", String(at), "-i", file, "-frames:v", "1", "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 1024 });
@@ -4814,6 +4975,44 @@ if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
         runCli(COLOR_CLI, [...plan.gradeArgs, "--out", plan.output]);
       }
       if (!existsSync(plan.output)) { log(`  ⚠ 变体 ${plan.variant.id} 未产出（跳过）`); continue; }
+      /**
+       * 变体配乐（三轴之一）：按该变体的曲风线索从**曲库**里选，且必须**实测 BPM 命中剪辑网格**；
+       * 选不到就留空（三轴判据随后会拦下，而不是静默用同一条曲子糊过去）。
+       */
+      let variantBgm: { track: string; sha256: string; measuredBpm?: number; gridErrorMs?: number } | null = null;
+      try {
+        const variantDuration = Number(probe(plan.output).duration ?? 0);
+        const bed = await pickGridCompatibleBed(variantDuration, CUT_GRID, {
+          genre: plan.variant.bgmGenre, mood: plan.variant.bgmMood,
+        });
+        if (bed) {
+          const mixed = plan.output.replace(/\.mp4$/i, "-bgm.mp4");
+          const mix = runCli(BGM_CLI, [
+            "mix", "--in", plan.output, "--out", mixed, "--bgm", bed.path, "--policy", "keep-dialogue",
+            "--music-level", String(-26 + plan.variant.musicLevelDeltaDb),
+            "--ducking", "14", "--lufs", "-14", "--section", "auto",
+            "--bpm-strategy", "cut-driven", "--cut-times", CUT_GRID.join(","),
+            "--evidence-dir", join(POST_DIR, "bgm-evidence"),
+          ]);
+          if (mix.ok && existsSync(mixed)) {
+            execFileSync("mv", [mixed, plan.output]);
+            variantBgm = {
+              track: bed.id,
+              sha256: createHash("sha256").update(readFileSync(bed.path)).digest("hex"),
+              measuredBpm: bed.measuredBpm,
+              gridErrorMs: bed.gridErrorMs,
+            };
+            log(`  变体 ${plan.variant.id} 配乐：${bed.id}（实测 ${bed.measuredBpm}BPM，卡点平均 ${bed.gridErrorMs}ms）`);
+          } else {
+            log(`  ⚠ 变体 ${plan.variant.id} 配乐混音失败：${mix.out.slice(-200)}`);
+          }
+        } else {
+          log(`  ⚠ 变体 ${plan.variant.id} 未找到"实测 BPM 命中剪辑网格"的曲库曲目（三轴判据会拦下）`);
+        }
+      } catch (err) {
+        log(`  ⚠ 变体 ${plan.variant.id} 配乐环节异常：${err instanceof Error ? err.message.slice(0, 160) : String(err)}`);
+      }
+      const variantCover = renderVariantCover(plan.variant.id, plan.variant.coverAccent, `${plan.variant.label}${plan.variant.copySuffix}`);
       const info = probe(plan.output);
       const duration = Number(info.duration ?? 0);
       const times = [duration * 0.2, duration * 0.5, duration * 0.8].map((t) => Math.max(0.2, Math.round(t * 10) / 10));
@@ -4826,7 +5025,8 @@ if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
       variantManifest.push({
         id: plan.variant.id, label: plan.variant.label, path: plan.output,
         sha256: createHash("sha256").update(readFileSync(plan.output)).digest("hex"),
-        note: plan.variant.note, gradeProfile: plan.variant.gradeProfile
+        note: plan.variant.note, gradeProfile: plan.variant.gradeProfile,
+        cover: variantCover, bgm: variantBgm,
       });
       log(`  变体 ${plan.variant.id}（${plan.variant.label}）→ ${basename(plan.output)}`);
     } catch (err) {
@@ -4838,14 +5038,34 @@ if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
     }
   }
   const distinctness = assessVariantDistinctness(samples);
+  /**
+   * 三轴判据（2026-09-26 产品所有者："一次必须产出 3 个不同风格的后期版本"）：
+   * 数量 ≥3，且 **调色 / 封面 / 配乐** 三轴上两两不同——只换滤镜名不算风格。
+   */
+  const variantAxes = assessVariantAxes(variantManifest.map((variant) => ({
+    id: variant.id,
+    gradeProfile: variant.gradeProfile,
+    coverSha: variant.cover?.sha256 ?? null,
+    bgmSha: variant.bgm?.sha256 ?? null,
+  })));
   const gate = recordGate({
     stepKey: "deliver",
     sourceStage: "deliver",
     checks: [
-      { id: "variants-produced", pass: variantManifest.length >= 2, hard: true, detail: `产出变体 ${variantManifest.length} 个（至少 2 个才算交付包）：${variantManifest.map((v) => v.id).join("/")}` },
-      { id: "variants-distinct", pass: distinctness.approved, hard: true, detail: distinctness.detail }
+      { id: "variants-produced", pass: variantManifest.length >= VARIANT_MIN_COUNT, hard: true, detail: `产出变体 ${variantManifest.length} 个（产品口径：至少 ${VARIANT_MIN_COUNT} 个不同风格的后期版本）：${variantManifest.map((v) => v.id).join("/")}` },
+      { id: "variants-distinct", pass: distinctness.approved, hard: true, detail: distinctness.detail },
+      { id: "variant-axes", pass: variantAxes.ok, hard: true, detail: variantAxes.detail },
     ],
-    evidence: { samples, variants: variantManifest.map((v) => ({ id: v.id, sha256: v.sha256.slice(0, 16) })) }
+    evidence: {
+      samples,
+      variants: variantManifest.map((v) => ({
+        id: v.id, sha256: v.sha256.slice(0, 16),
+        gradeProfile: v.gradeProfile,
+        cover: v.cover ? { path: v.cover.path, sha256: v.cover.sha256.slice(0, 16) } : null,
+        bgm: v.bgm ? { track: v.bgm.track, sha256: v.bgm.sha256.slice(0, 16), measuredBpm: v.bgm.measuredBpm, gridErrorMs: v.bgm.gridErrorMs } : null,
+      })),
+      axes: variantAxes,
+    }
   });
   const manifestFile = join(OUT_DIR, `${PROJECT}-delivery-manifest.json`);
   writeFileSync(manifestFile, `${JSON.stringify(buildDeliveryManifest({
@@ -4860,6 +5080,7 @@ if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
     cover: { path: existsSync(join(OUT_DIR, `${PROJECT}-cover.png`)) ? join(OUT_DIR, `${PROJECT}-cover.png`) : null, hook: arg("--cover-hook", shotlist.title ?? "") },
     variants: variantManifest,
     distinctness,
+    variantAxes,
     samples,
     at: stamp()
   }), null, 2)}\n`, "utf8");
