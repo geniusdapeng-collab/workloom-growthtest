@@ -115,4 +115,41 @@ describe("ArchiveStore", () => {
       files: 0, bytes: 0, skipped: [],
     });
   });
+
+  it("ensure(identity)：档案夹被另一代 DB 的同名 projectId 复用时留痕并校正 kind（D1 修复）", async () => {
+    // 第一代：叙事片建档案
+    const narrativeStore = new ArchiveStore(workDir, "ws-test", "VID-001", "narrative");
+    await narrativeStore.ensure({ kind: "narrative", title: "第一代片子", createdAt: "2026-09-26T10:00:00.000Z" });
+    const first = await narrativeStore.readManifest();
+    expect(first?.pipelineKind).toBe("narrative");
+    expect(first?.projectIdentity).toEqual({ kind: "narrative", title: "第一代片子", createdAt: "2026-09-26T10:00:00.000Z" });
+
+    // 第二代：同一 (ws, projectId) 被营销片复用（换库/重置种子的真实场景）
+    const marketingStore = new ArchiveStore(workDir, "ws-test", "VID-001", "marketing", { aspectRatio: "9:16" });
+    await marketingStore.ensure({ kind: "marketing", title: "第二代片子", createdAt: "2026-09-26T13:00:00.000Z" });
+
+    const after = await marketingStore.readManifest();
+    expect(after?.pipelineKind).toBe("marketing"); // 校正为本次 run 的真实值
+    expect(after?.pipelineKindHistory?.map((h) => h.kind)).toEqual(["narrative", "marketing"]);
+    expect(after?.identityDrifts).toHaveLength(1);
+    expect(after?.identityDrifts?.[0]).toMatchObject({
+      previousKind: "narrative",
+      currentKind: "marketing",
+      previousIdentity: { createdAt: "2026-09-26T10:00:00.000Z" },
+      currentIdentity: { createdAt: "2026-09-26T13:00:00.000Z" },
+    });
+    const events = await marketingStore.readEvents();
+    expect(events.map((e) => e.kind)).toContain("manifest.identity_drift");
+    // 历史产物不被抹掉
+    expect(await marketingStore.readManifest()).toBeTruthy();
+  });
+
+  it("ensure(identity)：身份一致时不产生漂移记录（不误报）", async () => {
+    const identity = { kind: "marketing" as const, title: "同一部片子", createdAt: "2026-09-26T10:00:00.000Z" };
+    await store.ensure(identity);
+    await store.ensure(identity);
+    const manifest = await store.readManifest();
+    expect(manifest?.identityDrifts ?? []).toHaveLength(0);
+    expect(manifest?.pipelineKindHistory).toHaveLength(1);
+  });
 });

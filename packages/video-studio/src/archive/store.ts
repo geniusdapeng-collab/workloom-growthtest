@@ -31,12 +31,25 @@ export interface ArchiveManifest {
   workspaceId: string;
   /** 管线类型（两条制片管线：marketing 含前置情报层 / narrative 通用；见规格书 §5.4） */
   pipelineKind: PipelineKind;
+  /** 管线类型历史（同一档案夹被不同 kind 的 run 复用时留痕，不静默改写） */
+  pipelineKindHistory?: Array<{ kind: PipelineKind; at: string }>;
+  /** 项目身份指纹（来自 PG 的 video_projects：kind/title/created_at），用于识别"档案夹被另一代 DB 的同名 ID 复用" */
+  projectIdentity?: ArchiveProjectIdentity | null;
+  /** 身份漂移记录（只增不减，供监控器开工程发现） */
+  identityDrifts?: Array<Record<string, unknown>>;
   /** 路由决策元数据（aspectRatio 9:16 等，供跨会话承接重建上下文） */
   routeMeta?: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
   /** 环节账本：stageId → 最新一次 attempt 摘要 */
   ledger: Record<string, ArchiveLedgerEntry>;
+}
+
+/** 项目身份（PG 事实源快照；compareOn 用于跨代检测） */
+export interface ArchiveProjectIdentity {
+  kind: string;
+  title: string | null;
+  createdAt: string | null;
 }
 
 /** 档案相对路径监狱：拒绝绝对路径与越出档案根的 `..`（回归：`../../etc/passwd`） */
@@ -66,25 +79,85 @@ export class ArchiveStore {
     this.root = path.join(workDir, "archive", workspaceId, projectId);
   }
 
-  /** 建档案夹 + 写 manifest（已存在则原样保留，不覆盖历史） */
-  async ensure(): Promise<void> {
+  /**
+   * 建档案夹 + 写 manifest。
+   *
+   * 已存在时不覆盖历史账本，但**必须做身份一致性校验**（真机审计发现）：
+   * 档案夹以 `workspaceId/projectId` 为单位，而 projectId 只在一代数据库内唯一——
+   * 换库/重置种子后同一个 `VID-nnn` 会指向另一个片子，旧档案会被静默继承
+   * （实测：营销片的 manifest 写着 narrative）。这里把差异写成事件与漂移记录，
+   * 并把 `pipelineKind` 校正为**本次 run 的真实值**（历史值进 pipelineKindHistory）。
+   */
+  async ensure(identity?: ArchiveProjectIdentity | null): Promise<void> {
     await fs.mkdir(this.root, { recursive: true });
     const manifestPath = path.join(this.root, "manifest.json");
+    let existing: ArchiveManifest | null = null;
     try {
       await fs.access(manifestPath);
+      existing = await this.readManifest();
     } catch {
+      existing = null;
+    }
+    if (!existing) {
       const now = new Date().toISOString();
       const manifest: ArchiveManifest = {
         schemaVersion: ARCHIVE_SCHEMA_VERSION,
         projectId: this.projectId,
         workspaceId: this.workspaceId,
         pipelineKind: this.pipelineKind,
+        pipelineKindHistory: [{ kind: this.pipelineKind, at: now }],
+        ...(identity ? { projectIdentity: identity } : {}),
         ...(this.routeMeta ? { routeMeta: this.routeMeta } : {}),
         createdAt: now,
         updatedAt: now,
         ledger: {},
       };
       await this.writeJsonAtomic("manifest.json", manifest);
+      return;
+    }
+
+    const kindChanged = existing.pipelineKind !== this.pipelineKind;
+    const identityChanged = Boolean(
+      identity
+      && existing.projectIdentity
+      && (existing.projectIdentity.createdAt !== identity.createdAt || existing.projectIdentity.kind !== identity.kind),
+    );
+    if (kindChanged || identityChanged) {
+      const drift = {
+        at: new Date().toISOString(),
+        previousKind: existing.pipelineKind,
+        currentKind: this.pipelineKind,
+        previousIdentity: existing.projectIdentity ?? null,
+        currentIdentity: identity ?? null,
+      };
+      console.error(
+        `[archive] 档案身份漂移 ${this.workspaceId}/${this.projectId}：`
+        + `pipelineKind ${existing.pipelineKind}→${this.pipelineKind}`
+        + `${identityChanged ? "（项目身份指纹不一致：档案夹可能被另一代数据库的同名 ID 复用）" : ""}`,
+      );
+      try {
+        await this.appendJsonl("events.jsonl", { kind: "manifest.identity_drift", ...drift });
+      } catch (err) {
+        console.error(`[archive] 漂移事件写入失败: ${(err as Error).message}`);
+      }
+      const nextHistory = [...(existing.pipelineKindHistory ?? [])];
+      if (kindChanged) nextHistory.push({ kind: this.pipelineKind, at: drift.at });
+      await this.writeJsonAtomic("manifest.json", {
+        ...existing,
+        pipelineKind: this.pipelineKind,
+        pipelineKindHistory: nextHistory,
+        projectIdentity: identity ?? existing.projectIdentity ?? null,
+        identityDrifts: [...(existing.identityDrifts ?? []), drift].slice(-20),
+        updatedAt: drift.at,
+      });
+      return;
+    }
+    if (identity && !existing.projectIdentity) {
+      await this.writeJsonAtomic("manifest.json", {
+        ...existing,
+        projectIdentity: identity,
+        updatedAt: new Date().toISOString(),
+      });
     }
   }
 

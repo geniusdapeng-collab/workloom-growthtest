@@ -176,6 +176,23 @@ function teeRunLogs(projectId: string): () => void {
 /** 工作器系统身份（事件归因；网关段① human/system 无额外校验） */
 const WORKER_ACTOR = { id: "video-studio", type: "system" } as const;
 
+/**
+ * 软失败原因提取（T-2026-0926-0005）：vendor 返回 `success:false` 但不抛异常时，
+ * 注册表 `entry.error` 往往是空串——`?? 兜底` 会落成空消息并被分类成 BUG。
+ * 取因顺序：运行器异常 → result.error → vendor `failures[].message` → 通用兜底。
+ */
+export function terminalFailureMessageOf(result: unknown, entryError?: string | null): string {
+  const r = (result ?? {}) as { error?: unknown; failures?: Array<{ message?: unknown }> };
+  const candidates: string[] = [];
+  const push = (value: unknown): void => {
+    if (typeof value === "string" && value.trim()) candidates.push(value.trim());
+  };
+  push(entryError);
+  push(r.error);
+  if (Array.isArray(r.failures)) for (const failure of r.failures) push(failure?.message);
+  return (candidates[0] ?? "vendor 返回 success:false").slice(0, 500);
+}
+
 /* ================= run 注册表 ================= */
 
 export type RunStatus = "running" | "awaiting_approval" | "finished" | "failed";
@@ -697,8 +714,13 @@ export function startRun(scope: Scope, input: RunInput): string {
     try {
       if (archive) {
         try {
-          await archive.ensure();
+          /** 先读项目身份再 ensure：manifest 要拿它做跨代一致性校验（真机审计发现 D1） */
           projectMeta = await readProjectMeta(scope, input.projectId).catch(() => null);
+          await archive.ensure(
+            projectMeta
+              ? { kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt }
+              : { kind: pipelineKind, title: null, createdAt: null },
+          );
           await archive.appendJsonl("events.jsonl", {
             kind: "run.started",
             runId: entry.runId,
@@ -794,11 +816,71 @@ export function startRun(scope: Scope, input: RunInput): string {
             const dm = (r.stages?.dataMining ?? null) as
               | { status?: string; product_id?: string; data?: { dossier?: { provenance?: unknown[] } } }
               | null;
+            /**
+             * 提示词包落档案（真机审计发现 D3）：预生产最有价值的产物是 6 镜 × 25/30 字段的完整提示词，
+             * 但 vendor 只把它们留在内存与 console（`checkpointDir` 指向的 Phase checkpoint 在成功后
+             * 会被 vendor 主动清理）。档案号称"自包含、可跨会话承接"，就必须把提示词本体落盘，
+             * 否则新会话拿到档案也接不上下一步（提交渲染/交付）。
+             */
+            const shots = (
+              (r.stages?.productionEngine as { shots?: Array<Record<string, unknown>> } | undefined)?.shots ?? []
+            );
+            const promptPack = shots.length
+              ? {
+                  stageId: "preproduction",
+                  attempt: ctx.attempt,
+                  pipelineKind,
+                  generatedAt: new Date().toISOString(),
+                  shotCount: shots.length,
+                  totalPromptChars: shots.reduce((sum, shot) => sum + String(shot.prompt ?? "").length, 0),
+                  dossier: dm
+                    ? { root: `dossiers/${scope.workspaceId}`, productId: dm.product_id ?? null }
+                    : null,
+                  shots: shots.map((shot) => ({
+                    shotId: shot.shot_id ?? shot.shotId ?? null,
+                    sceneId: shot.scene_id ?? shot.sceneId ?? null,
+                    sceneType: shot.scene_type ?? shot.sceneType ?? null,
+                    durationSec: shot.duration ?? null,
+                    degraded: shot.degraded === true,
+                    promptCharCount: String(shot.prompt ?? "").length,
+                    /** 提示词包内的字段序号与名称（`01.【语言约束】…` 口径），供审计核对"25/30 字段是否齐" */
+                    promptFieldNames: Array.from(
+                      String(shot.prompt ?? "").matchAll(/\d{1,2}\.【([^】]{1,10})】/g),
+                    ).map((m) => m[1]),
+                    fieldKeys: shot.fields && typeof shot.fields === "object" ? Object.keys(shot.fields as object) : [],
+                    prompt: String(shot.prompt ?? ""),
+                    fields: shot.fields ?? null,
+                  })),
+                }
+              : null;
+            const promptsArtifact = promptPack
+              ? await ctx.writeArtifact(`stages/preproduction/attempt-${ctx.attempt}.prompts.json`, promptPack, {
+                  // 超 4MB 时先丢 fields 明细（保留 prompt 全文与字段名），绝不丢整包
+                  shrink: (data) => ({
+                    ...(data as Record<string, unknown>),
+                    fieldsTrimmed: true,
+                    shots: (data as { shots: Array<Record<string, unknown>> }).shots.map((shot) => ({ ...shot, fields: null })),
+                  }),
+                })
+              : null;
+            if (promptsArtifact) {
+              decisionLog.push(
+                `提示词包已归档：${promptPack!.shotCount} 镜 / ${promptPack!.totalPromptChars} 字符`
+                + `（stages/preproduction/attempt-${ctx.attempt}.prompts.json，sha256=${promptsArtifact.sha256.slice(0, 12)}）`,
+              );
+            }
             return {
               output: {
                 success: r.success,
                 stages: Object.keys(r.stages ?? {}),
                 checkpointDir: `checkpoints/${input.projectId}`,
+                ...(promptsArtifact
+                  ? {
+                      promptsRef: `stages/preproduction/attempt-${ctx.attempt}.prompts.json`,
+                      promptsSha256: promptsArtifact.sha256,
+                      promptShotCount: promptPack!.shotCount,
+                    }
+                  : {}),
                 ...(preCheckpoints.files > 0
                   ? {
                       preCheckpointSnapshot: {
@@ -867,6 +949,7 @@ export function startRun(scope: Scope, input: RunInput): string {
       if (archive) {
         try {
           const producerRejected = isProducerRejection(result);
+          const terminalFailureMessage = terminalFailureMessageOf(result, entry.error);
           await updateContextBundle(archive, {
             pipelineKind,
             threadId: projectMeta?.threadId ?? null,
@@ -875,8 +958,15 @@ export function startRun(scope: Scope, input: RunInput): string {
               ? {}
               : {
                   failedStage: "preproduction",
-                  errorClass: producerRejected ? "GATE_REJECTED" : classifyError(new Error(entry.error ?? "预生产未成功")),
-                  errorMsg: String((result as { error?: unknown }).error ?? "vendor 返回 success:false").slice(0, 500),
+                  /**
+                   * 软失败口径（真机审计发现 D2）：vendor 返回 `success:false` 时不一定抛异常，
+                   * `entry.error` 常为空字符串——用 `??` 会落进 `new Error("")` 被判成 BUG（误升级 P0）。
+                   * 这里按"异常 → result.error → vendor failures[] → 通用兜底"顺序取真实原因。
+                   */
+                  errorClass: producerRejected
+                    ? "GATE_REJECTED"
+                    : classifyError(new Error(terminalFailureMessage)),
+                  errorMsg: terminalFailureMessage.slice(0, 500),
                 }),
             decisions: [
               `预生产${result.success ? "完成" : "**未成功**"}（归档 attempt=${stageRef.attempt || "-"}；本次运行内重试 ${attempts} 次；内部环节 ${Object.keys(result.stages ?? {}).length} 个）`,
@@ -891,7 +981,9 @@ export function startRun(scope: Scope, input: RunInput): string {
                   ]
                 : []),
             ],
-            nextSteps: ["预生产完成 → 渲染提交（video.render.submit）或按交付包进入后期/交付段"],
+            ...(result.success
+              ? { nextSteps: ["预生产完成 → 渲染提交（video.render.submit）或按交付包进入后期/交付段"] }
+              : {}),
           });
         } catch (err) {
           console.error(`[archive] 交接包写入失败（不影响运行）: ${(err as Error).message}`);
