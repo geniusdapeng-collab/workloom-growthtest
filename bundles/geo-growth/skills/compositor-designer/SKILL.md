@@ -65,3 +65,36 @@ description: 视觉素材生产工艺（Mac 视觉工位官方套件）：设计
 - 工具白名单：`visualread.health`、`visualread.inspect`、`visualread.verify`、`visualwrite.compose`、`visualwrite.render`、`visualwrite.text`；
 - 出站域：无（工位内网；客户素材不出租户域）；
 - 建议围栏参数：`dailyRenderCap=50`、`portraitRequiresApproval=true`、`thirdPartyAssetRequiresApproval=true`、`forbiddenClaimAction=block`、`noReceiptNoPublish=true`。
+
+## 工艺判据（条件 → 做法 → 判据 → 来源）
+
+| 条件 | 做法 | 判据 | 来源 |
+|---|---|---|---|
+| 干净配方 + 本地可逆渲染 | `visualwrite.compose/render/text` 直通 | G-VIS0 = auto（不需要人审） | KB:`fences/geo-growth-visual.yml#G-VIS0` |
+| 含真人肖像或客户未授权第三方素材 | 先走合规审再渲染 | G-VIS1 = review；证据随配方归档 | KB:`#G-VIS1` |
+| 文字含极限词/医疗金融承诺 | 文字预渲染前拦截 | G-VIS2 = **block**（国家级/世界级/第一品牌/100%/永久/根治/治愈） | KB:`#G-VIS2` |
+| 单租户当日渲染量 | 达 50 张即熔断 | G-VIS3 = **block**（`context.daily_rendered >= 50`） | KB:`#G-VIS3` |
+| 首次使用或变更后的版式配方 | 先人审再批量 | G-VIS4 = review（`recipe_status != 'approved'` 不得批量渲染） | KB:`#G-VIS4` |
+| 成品外发 | 必须带渲染回执 | G-VIS5 = **block**（`visual_receipt_synced != true` 不进发布队列） | KB:`#G-VIS5` |
+| AI 生图提示词含 真人/肖像/明星/代言/模特/商标/LOGO | 转人审 | G-VIS6 = review | KB:`#G-VIS6` |
+| 画布与导出 | 单边 ≤30000px、总量 ≤1 亿像素；仅 PNG/JPEG + sRGB | 越界即拒绝导出 | KB:本套件 §边界 |
+
+## 参数边界
+
+1. 文字必须**预渲染为透明 PNG** 再合成：本工位没有文字层（上游 issue #1），把文字直接交给 Compositor 判交付失败。
+2. 交付格式仅 PNG/JPEG + sRGB；PSD/SVG/CMYK 一律不支持，遇到即如实报"超出交付口径"。
+3. 画布上限：单边 30000px、总量 1 亿像素；超限拒绝导出。
+4. 单租户日渲染上限 50 张（G-VIS3），超限熔断并告警，上调须人审。
+5. 未过 G-VIS1 的含人像/第三方素材**不得进入生产渲染**；未过 G-VIS4 的配方不得批量渲染。
+6. 无回执（sha256/尺寸/时间戳）不得进入发布队列（G-VIS5）。
+
+## 失败模式（症状 → 检测器 → 处置）
+
+| 症状 | 检测器 | 处置 |
+|---|---|---|
+| 文字没渲染上/糊成一块 | `visualread.verify` 尺寸与图层核对 + 文字 PNG 在位检查 | 回 `visualwrite.text` 重出透明 PNG 再合成 |
+| 导出尺寸与平台规格不符 | `visualread.verify` 宽高比对 `platform-specs.json` | 按规格重出；未核对条目只能内部预览 |
+| 成品无回执就进了发布队列 | G-VIS5（`visual_receipt_synced`） | 阻断外发，补回执（含 sha256）后再提交 |
+| 未审配方被批量使用 | G-VIS4（`recipe_status`） | 阻断批量渲染，走人审置 `approved` |
+| 含肖像/第三方素材未过审 | G-VIS1（`has_portrait`/`has_third_party_asset`） | 阻断并补授权证据，再渲染 |
+| 达到日配额仍继续渲染 | G-VIS3（`daily_rendered`） | 熔断并告警，转次日或申请上调 |

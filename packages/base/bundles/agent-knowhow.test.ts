@@ -258,3 +258,67 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-C 工具/纪律
     });
   }
 });
+
+/** geo-growth 视觉栈（S-B 制作/工艺型）：获客系统的成套视觉生产能力 */
+const GEO_VISUAL_SKILLS: Array<{ name: string; boundBy: string[] }> = [
+  { name: "compositor-designer", boundBy: ["visual-designer"] },
+  { name: "art-direction", boundBy: ["material-scout", "visual-designer"] },
+  { name: "design-brief", boundBy: ["visual-designer"] },
+  { name: "design-critique", boundBy: ["visual-designer"] },
+  { name: "material-scout", boundBy: ["material-scout", "visual-designer"] },
+  { name: "image-retouch", boundBy: ["visual-designer"] },
+  { name: "brand-guard", boundBy: ["visual-designer"] },
+  { name: "product-poster", boundBy: ["visual-designer"] },
+  { name: "video-cover", boundBy: ["visual-designer"] },
+  { name: "asset-variant-forge", boundBy: ["visual-designer"] },
+  { name: "geo-answer-card", boundBy: ["visual-designer"] },
+  { name: "moments-post", boundBy: ["visual-designer"] },
+  { name: "poster-series", boundBy: ["visual-designer"] },
+  { name: "promo-banner", boundBy: ["visual-designer"] },
+];
+
+describe("geo-growth 视觉栈 · 行业 Know-How 结构（S-B 制作/工艺型）", () => {
+  const GEO_DIR = join(ROOT, "geo-growth");
+  const geoSkillText = (name: string): string => readFileSync(join(GEO_DIR, "skills", name, "SKILL.md"), "utf8");
+  const expectGeoBound = (name: string, boundBy: string[]): void => {
+    const bound: string[] = [];
+    for (const preset of boundBy) {
+      const p = join(GEO_DIR, "presets", `${preset}.yml`);
+      expect(existsSync(p), `geo preset 缺失：${preset}`).toBe(true);
+      const doc = YAML.parse(readFileSync(p, "utf8")) as { skills?: string[] };
+      if ((doc.skills ?? []).includes(name)) bound.push(preset);
+    }
+    expect(bound.length, `${name} 未被任何声明岗位绑定`).toBeGreaterThan(0);
+  };
+
+  for (const { name, boundBy } of GEO_VISUAL_SKILLS) {
+    const text = geoSkillText(name);
+
+    it(`${name}：工艺判据 ≥4（语义区块或全文量化阈值行）`, () => {
+      const metrics = sectionMetrics(text, [
+        "工艺判据", "判据", "工艺", "参数", "手法", "目标值", "参数表", "配方",
+        "规格", "版式", "选型", "策略", "口径", "适配", "同步", "决策", "判定", "问清", "方法", "清单",
+      ]);
+      expect(Math.max(metrics.rows, metrics.items, quantifiedLines(text)), `${name} 工艺判据不足`).toBeGreaterThanOrEqual(4);
+    });
+
+    it(`${name}：参数边界 ≥3（边界区块或红线/禁止表述）`, () => {
+      const metrics = sectionMetrics(text, ["参数边界", "边界", "硬红线", "红线", "纪律", "限制", "禁用", "禁忌"]);
+      expect(Math.max(metrics.items, prohibitionLines(text)), `${name} 缺参数边界`).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`${name}：失败模式 ≥3（含"原因→处置"结构）`, () => {
+      const kwargs = ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "返工", "拒绝", "否决", "处置", "红线"];
+      const metrics = sectionMetrics(text, kwargs);
+      expect(Math.max(metrics.rows, metrics.items), `${name} 缺失败模式区块`).toBeGreaterThanOrEqual(3);
+      const hasCauseColumn = /检测器|首查|根因|原因|理由|症状|情形|现象/.test(metrics.merged);
+      const hasArrowPairs = (metrics.merged.match(/→/g)?.length ?? 0) >= 2;
+      expect(hasCauseColumn || hasArrowPairs, `${name} 失败模式缺少"原因→处置"结构`).toBe(true);
+    });
+
+    it(`${name}：无不可判定表述 + 岗位绑定未断链`, () => {
+      expect(/应加强专业性|提升专业水平|注意结合实际情况/.test(text)).toBe(false);
+      expectGeoBound(name, boundBy);
+    });
+  }
+});

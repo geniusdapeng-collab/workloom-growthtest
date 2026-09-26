@@ -28,6 +28,7 @@
 | GAP-0019 | B1 | 交付/返修技能口径 | T2 工具口径 | P2 | `delivery-package-ops` / `delivery-revision-ops` 内容完整（不达标处置、不可修复情形、返修回执俱全），但章节名为「不达标怎么办 / 不可修复情形 / 返修回执」，被首版审计器误判为缺失 | `scripts/tools/agent-knowhow-audit.mts` | **FIXED（T-2026-0926-0107）**：S-C 判定加入「不达标/回退/不可修复/处置」等价域与「红线/必须」前置校验口径；两技能判定为达标（未改内容） | 同 GAP-0018 | FIXED | A/B |
 | GAP-0020 | B1 | 视频域剩余 S-B 技能 | T9 资产深度 | P1 | 8 个视频技能缺「工艺判据 / 参数边界 / 失败模式」之一：人声分离档位判据、音色授权判定、曲库许可失败、摄影库注入失败、封面三件套机检失败、字体许可失败、字体选型否决、配音参数边界 | `bundles/ai-video/skills/{bgm-vocal-separation,voice-clone-consent,bgm-library-license,cinematography-kb,cover-design,font-license-compliance,font-selection,voice-delivery-spec}/SKILL.md` | **FIXED（T-2026-0926-0108）**：补工艺判据表（含来源）、参数边界与失败模式表；判据取自各技能既有阈值与围栏（G-BGM/G-VOICE/G-SUB/G-KB/G-COL） | `agent-knowhow.test.ts`（S-B 8/8、S-C 7/7、S-A 3/3） | FIXED | A |
 | GAP-0021 | B1 | 审计器区块判定 | T2 工具口径 | P2 | 审计器只取**首个**命中标题的区块，导致同一语义被多节承载（如「四、落盘口径」在「六、工艺判据」之前）时低估指标 | `scripts/tools/agent-knowhow-audit.mts` | **FIXED（T-2026-0926-0108）**：改为「所有命中区块取最大值」+ 量化阈值行/红线表述兜底；视频域达标率随之校正为 **32/32** | 同 GAP-0020 | FIXED | A/B |
+| GAP-0022 | B4 | geo-growth 视觉栈 14 技能 | T9 资产深度 | P1 | 获客系统的成套视觉生产（设计配方/艺术指导/需求分析/评审/寻源/精修/品牌质检/商品海报/短视频封面/变体矩阵/GEO 配图/朋友圈/系列海报/促销横幅）只有"方法 + 边界"，缺可执行判据（G-VIS0–G-VIS6 未落成技能内判据表）、参数边界与失败模式 | `bundles/geo-growth/skills/{compositor-designer,art-direction,design-brief,design-critique,material-scout,image-retouch,brand-guard,product-poster,video-cover,asset-variant-forge,geo-answer-card,moments-post,poster-series,promo-banner}/SKILL.md` | **FIXED（T-2026-0926-0109）**：每个技能补「工艺判据（条件→做法→判据→来源）」「参数边界」「失败模式（症状→检测器→处置）」；判据全部锚定 `fences/geo-growth-visual.yml` 的 G-VIS0–G-VIS6、平台规格表与技能自身既有阈值 | `agent-knowhow.test.ts`（geo 视觉栈 14/14、共 137 项） | FIXED | A |
 
 ## 变更记录
 
@@ -39,3 +40,4 @@
 | 2026-09-26 | T-2026-0926-0104 | 完成 GAP-0016（后期链四工位失败模式）与 GAP-0017（审计器结构等价口径）；视频域 Know-How 达标 15/32，回归 214 项全绿 |
 | 2026-09-27 | T-2026-0926-0107 | 完成 GAP-0018/0019：S-C 纪律型四技能强化 + 审计器等价域补全；视频域 Know-How 达标 **21/32**（S-A 3/3、S-B 11/22、S-C 7/7），回归 504 项全绿 |
 | 2026-09-27 | T-2026-0926-0108 | 完成 GAP-0020/0021：视频域剩余 8 个 S-B 技能补强 + 审计器多区块口径；**视频域 Know-How 达标 32/32（100%）**，全仓 48/103；回归 496 项全绿 |
+| 2026-09-27 | T-2026-0926-0109 | 完成 GAP-0022：geo-growth 视觉栈 14 技能补强；**geo-growth Know-How 达标 29/29（100%）**；回归扩到 32 个技能（137 项断言），全套 196 项相关测试全绿 |
