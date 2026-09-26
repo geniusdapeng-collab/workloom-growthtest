@@ -15,7 +15,8 @@ import {
 } from "@workloom/base/model-router";
 import { newId } from "@workloom/shared";
 import { videoGenPool } from "./gen/providers.js";
-import { downloadToMediaStore, registerFinalCut } from "./gen/ingest.js";
+import { downloadToMediaStore, registerRenderedClip } from "./gen/ingest.js";
+import { scopedQuery } from "./gen/db.js";
 import { findModelByProviderModel } from "./gen/catalog.js";
 import { recordRenderCost, usdCnyRate } from "./gen/cost.js";
 import { classifyProviderError, logStageOutcome, type ArchiveStore, type StageLedgerWriter } from "@hyperreality/video-studio";
@@ -28,10 +29,11 @@ interface OpenJob {
   task_id: string;
   script_id: string;
   project_id: string;
-  provider: string | null;
   provider_model: string | null;
   est_cny: string | null;
   est_usd: string | null;
+  /** 提交事件原文（provider / request.aspectRatio 等留痕字段一次取回，避免重复扫事件表） */
+  submit_payload: { decision?: { after?: { provider?: string; request?: { aspectRatio?: string } } } } | null;
 }
 
 export interface PollReport {
@@ -52,10 +54,11 @@ function resolveProvider(
   job: OpenJob,
   mockPool: Map<string, GenProvider>,
 ): GenProvider | null {
+  const provider = job.submit_payload?.decision?.after?.provider ?? null;
   if (job.task_id.startsWith("mock-")) {
-    return mockPool.get(job.provider ?? "seedance") ?? mockPool.get("seedance") ?? null;
+    return mockPool.get(provider ?? "seedance") ?? mockPool.get("seedance") ?? null;
   }
-  return pool.get(job.provider ?? "seedance") ?? null;
+  return pool.get(provider ?? "seedance") ?? null;
 }
 
 export async function pollRenderJobs(
@@ -105,12 +108,12 @@ export async function pollRenderJobs(
     // 开放任务 + 提交事件留痕的供应商（event 回放取 provider，无留痕回退推断）
     const rows = await client.query<OpenJob>(
       `SELECT j.id, j.task_id, j.script_id, j.project_id, j.provider_model, j.est_cny, j.est_usd,
-              (SELECT e.payload->'decision'->'after'->>'provider'
+              (SELECT e.payload
                  FROM biz_events e
                 WHERE e.workspace_id=j.workspace_id
                   AND e.payload->'decision'->>'action'='render.submit'
                   AND e.payload->'decision'->'after'->>'jobId'=j.id
-                ORDER BY e.seq DESC LIMIT 1) AS provider
+                ORDER BY e.seq DESC LIMIT 1) AS submit_payload
          FROM render_jobs j
         WHERE j.workspace_id=$1 AND j.status IN ('submitted','rendering') AND j.task_id IS NOT NULL
         ORDER BY j.created_at ASC
@@ -131,7 +134,11 @@ export async function pollRenderJobs(
     report.checked += 1;
     const provider = resolveProvider(realPool, job, mockPool);
     if (!provider) {
-      report.details.push({ jobId: job.id, status: "skip", error: `供应商 ${job.provider ?? "seedance"} 未配置` });
+      report.details.push({
+        jobId: job.id,
+        status: "skip",
+        error: `供应商 ${job.submit_payload?.decision?.after?.provider ?? "seedance"} 未配置`,
+      });
       continue;
     }
     let result: { status: string; uri?: string; actualUnits?: number; error?: string };
@@ -144,7 +151,8 @@ export async function pollRenderJobs(
     if (result.status === "succeeded" || result.status === "failed") {
       const done = result.status === "succeeded";
 
-      /* ---- ① 成片入库（T-2026-0921-0002）：下载 → sha256 → video_assets（sha256 幂等去重） ---- */
+      /* ---- ① 素材入库（T-2026-0921-0002 → T-2026-0926-0007 粒度修正）：
+                下载 → sha256 → video_assets(kind=clip)（sha256 幂等去重）+ prompt/pipeline/时长/画幅 ---- */
       let ingested: { assetId: string; localPath: string; sha256: string; bytes: number } | null = null;
       let ingestError: string | null = null;
       if (done && result.uri && opts.ingest !== false) {
@@ -153,8 +161,20 @@ export async function pollRenderJobs(
             workspaceId: scope.workspaceId,
             fetchImpl: opts.fetchImpl,
           });
-          const reg = await registerFinalCut(app, gateway, scope, {
+          /**
+           * 单镜 job 的产物是**镜头片段**（clip），不是成片（final_cut）。
+           * 提示词从 render_scripts.md 冗余进素材（检索与复用匹配的唯一可用语料），
+           * 管线类型取 video_projects.kind（双管线过滤口径）。
+           */
+          const scriptRow = await scopedQuery<{ md: string | null }>(app, scope,
+            `SELECT md FROM render_scripts WHERE workspace_id=$1 AND id=$2`,
+            [scope.workspaceId, job.script_id]);
+          const projectRow = await scopedQuery<{ kind: string | null }>(app, scope,
+            `SELECT kind FROM video_projects WHERE workspace_id=$1 AND id=$2`,
+            [scope.workspaceId, job.project_id]);
+          const reg = await registerRenderedClip(app, gateway, scope, {
             assetId: newId("VA"),
+            kind: "clip",
             projectId: job.project_id,
             sha256: media.sha256,
             sourceUrl: result.uri,
@@ -164,6 +184,10 @@ export async function pollRenderJobs(
             jobId: job.id,
             scriptId: job.script_id,
             seconds: result.actualUnits ?? null,
+            title: `${job.project_id} · ${job.script_id}`,
+            prompt: (scriptRow[0]?.md ?? "").slice(0, 4000) || null,
+            pipelineKind: projectRow[0]?.kind === "marketing" ? "marketing" : "narrative",
+            aspectRatio: job.submit_payload?.decision?.after?.request?.aspectRatio ?? null,
             by: "render-poller",
           });
           ingested = { assetId: reg.assetId, localPath: media.relPath, sha256: media.sha256, bytes: media.bytes };
@@ -174,7 +198,7 @@ export async function pollRenderJobs(
       }
 
       /* ---- ② 实际成本（目录价 × 实际秒数；未核价 → 0 元入账并标 pricing=unknown） ---- */
-      const catalogModel = job.provider
+      const catalogModel = job.submit_payload?.decision?.after?.provider
         ? findModelByProviderModel(provider.providerId, job.provider_model ?? "")
         : null;
       const actualUnits = result.actualUnits ?? null;

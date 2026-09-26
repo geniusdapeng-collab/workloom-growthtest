@@ -750,9 +750,15 @@ export function listDeliveryJobs(dir?: string): RevisionJob[] {
  * **不在本接口里重生成镜头**：patch 命中画面内容时直接拒绝（先去过 G8 人审 + 只重跑点名镜头）。
  */
 export async function startDeliveryRevision({
-  dir, patch, by = null, env = process.env,
+  dir, patch, by = null, env = process.env, onCompleted,
 }: {
   dir: string; patch: Record<string, unknown>; by?: string | null; env?: NodeJS.ProcessEnv;
+  /**
+   * 作业完成回调（T-2026-0926-0007 接线点）：交付包里的母版/变体/封面要进媒资库。
+   * 用回调而不是在 delivery 里直接依赖 media 模块，避免"交付层 ↔ 媒资层"互相 import 成环；
+   * 回调抛错只写作业日志，不影响作业终态（媒资入库是旁路）。
+   */
+  onCompleted?: (info: { dir: string; outDir: string | null; version: number | null }) => void;
 }): Promise<RevisionJob> {
   const packageDir = resolvePackageDir(dir, env);
   const projectPath = latestFilmProjectPath(packageDir);
@@ -822,6 +828,17 @@ export async function startDeliveryRevision({
     outDir: null,
   };
   jobs.set(jobId, job);
+  /** 完成回调只触发一次（打印标记与进程退出是两条信号，先到者生效） */
+  let completedNotified = false;
+  const notifyCompleted = () => {
+    if (completedNotified) return;
+    completedNotified = true;
+    try {
+      onCompleted?.({ dir, outDir: job.outDir, version: job.version });
+    } catch (err) {
+      appendFileSync(logPath, `[media-hook] 完成回调异常（不影响作业终态）：${err instanceof Error ? err.message : String(err)}\n`, "utf8");
+    }
+  };
 
   /**
    * `--delivery-dir` 必须显式传交付包根：连续返修的基线是 `versions/vN/film-project.json`，
@@ -856,6 +873,7 @@ export async function startDeliveryRevision({
         if (job.status === "running") {
           job.status = "done";
           job.finishedAt = new Date().toISOString();
+          notifyCompleted();
           /**
            * 完成标记到了但进程还没退（Node 关停阶段的 join 卡顿）：给 15 秒宽限，
            * 仍不退就 Kill——产物已经齐了，不能让一个僵尸进程占住"同包只能一个作业"的闸。
@@ -886,6 +904,7 @@ export async function startDeliveryRevision({
     job.finishedAt = job.finishedAt ?? new Date().toISOString();
     job.exitCode = code ?? -1;
     appendFileSync(logPath, `\n[${job.finishedAt}] 退出码 ${code}\n`, "utf8");
+    if (code === 0) notifyCompleted();
   });
   return job;
 }
