@@ -6,6 +6,7 @@ import {
   fieldSpec,
   NEUTRAL_FALLBACK_SCENES,
   normalizeConstraintSegment,
+  OPENING_EXCLUSIVE_FIELDS_LEGACY,
   normalizeStructuredFields,
   prepareShotPrompt,
   readableValue,
@@ -54,28 +55,30 @@ function contentCard(shotId = "S2"): Record<string, unknown> {
 }
 
 /** 片头卡片：25 字段 + 主/副标题 + 5 专属字段（= 30 字段体系） */
+/**
+ * 片头卡片（2026-09-26 口径）：**不再要求**主标题等 5 个片头专属字段——
+ * 标题与主视觉由后期封面工位产出（`cover` 阶段），生成侧只出 25 个标准字段。
+ * 这里保留 `title/subtitle` 两个内容字段（文案仍可用于封面策划），但不再有 title_* 系列。
+ */
 function openingCard(): Record<string, unknown> {
   return {
     ...contentCard("S1"),
     sceneType: "opening",
     title: "苏州南园宾馆",
     subtitle: "唯一可以入住的苏州园林",
-    title_content: "苏州南园宾馆：唯一可以入住的苏州园林",
-    subtitle_content: "十全街 · 明轩 · 丽夕阁 · 237 间客房",
-    title_animation: "0-1.5s 光点自门楣汇聚成形，1.5-4s 标题定住，4-5s 与晨雾一同淡出",
-    title_font_design: "宋体骨架的现代衬线体，冷白字身，边缘极淡暖金光晕，字距舒展",
-    opening_audio_design: "0-1s 环境先入（鸟鸣与水声），1s 一记木质钟声，随后低声弦乐铺底"
   };
 }
 
 describe("字段规范真源", () => {
-  it("从 vendor 读取 25/30 字段与长度口径（不在 TS 层复制字面值）", () => {
+  it("从 vendor 读取 25 字段与长度口径（片头专属 5 字段已下线，不在 TS 层复制字面值）", () => {
     const spec = fieldSpec();
     expect(spec.p0).toHaveLength(12);
     expect(spec.p1).toHaveLength(7);
     expect(spec.p2).toHaveLength(4);
     expect(spec.p3).toHaveLength(2);
-    expect(spec.openingExclusive).toHaveLength(5);
+    /** 片头不再是 30 字段：主标题/副标题/标题动画/标题字体/开场音频设计 由后期封面承担 */
+    expect(spec.openingExclusive).toHaveLength(0);
+    expect(OPENING_EXCLUSIVE_FIELDS_LEGACY).toHaveLength(5);
     expect(spec.lengths.refinedMin).toBeGreaterThan(0);
     expect(spec.lengths.hardMax).toBeGreaterThanOrEqual(3000);
   });
@@ -224,24 +227,19 @@ describe("镜头卡交付闸（vendor PromptDeliveryGuard 为准）", () => {
     expect(report.delivery.pass).toBe(true);
   });
 
-  it("片头镜头缺 5 个专属字段 → 交付闸判 fail（片头 30 字段规则可执行）", () => {
-    const bare = contentCard("S1");
-    bare.sceneType = "opening";
-    const report = prepareShotPrompt(bare);
-    expect(report.isOpening).toBe(true);
-    expect(report.missingOpeningFields.sort()).toEqual(fieldSpec().openingExclusive.slice().sort());
-    expect(report.delivery.pass).toBe(false);
-    expect(report.delivery.issues.join("；")).toContain("片头专属字段");
-  });
-
-  it("片头镜头 30 字段齐备 → 提示词含 5 个片头段落且过闸", () => {
+  it("片头镜头不再要求 5 个专属字段：25 字段齐备即过闸（标题由后期封面产出）", () => {
     const report = prepareShotPrompt(openingCard());
     expect(report.isOpening).toBe(true);
     expect(report.missingOpeningFields).toEqual([]);
-    for (const label of ["【主标题内容】", "【副标题内容】", "【标题动画设计】", "【标题字体设计】", "【开场音频设计】"]) {
-      expect(report.prompt).toContain(label);
-    }
+    expect(report.missingSpecFields).toEqual([]);
     expect(report.delivery.pass).toBe(true);
+  });
+
+  it("片头提示词**不含**标题段落（生成侧不产标题，避免中文字形不可控 + 后期换标题要重渲）", () => {
+    const report = prepareShotPrompt(openingCard());
+    for (const label of ["【主标题内容】", "【副标题内容】", "【标题动画设计】", "【标题字体设计】", "【开场音频设计】"]) {
+      expect(report.prompt).not.toContain(label);
+    }
   });
 
   it("缺 P0 字段（如 scene）→ 交付闸 fail 并列出缺字段", () => {
@@ -293,12 +291,14 @@ describe("镜头卡交付闸（vendor PromptDeliveryGuard 为准）", () => {
     expect(allowed.redlines).toEqual([]);
   });
 
-  it("规范报告渲染成 Markdown（含片头/内容类型与未通过明细）", () => {
+  it("规范报告渲染成 Markdown（片头与内容同为 25 字段口径）", () => {
     const reports = [prepareShotPrompt(contentCard("S2")), prepareShotPrompt(openingCard())];
     const md = shotSpecMarkdown(reports);
-    expect(md).toContain("片头(30)");
+    /** 片头不再有 5 个专属字段：报告里片头也是 25 字段口径，并在表头写明口径变更 */
+    expect(md).toContain("片头(25)");
     expect(md).toContain("内容(25)");
     expect(md).toContain("字段规范来源");
+    expect(md).toContain("片头不再有 5 个专属字段");
   });
 });
 

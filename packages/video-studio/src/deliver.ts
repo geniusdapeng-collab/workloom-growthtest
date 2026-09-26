@@ -22,6 +22,11 @@ export interface DeliveryVariant {
   musicLevelDeltaDb: number;
   /** 封面/文案后缀（标题党护栏：只做风格前缀，不改钩子语义） */
   copySuffix: string;
+  /** 该变体封面的强调色（#RRGGBB）——三支变体的封面必须互相可区分 */
+  coverAccent: string;
+  /** 该变体配乐的曲库检索线索（实测 BPM 命中剪辑网格后才允许入选） */
+  bgmGenre: string;
+  bgmMood: string;
   note: string;
 }
 
@@ -31,12 +36,78 @@ export interface DeliveryVariant {
  *   · warm-film 暖调胶片：暖色胶片颗粒（人文/旅行/情绪题材）
  *   · punchy-social 社交高对比：对比与饱和提起来（信息流里"跳出来"，小红书/抖音）
  * 干净母版本身是交付物的主件（不烧字/不调色的那支），不占变体名额。
+ *
+ * 2026-09-26 产品所有者口径：**一次必须产出 3 个不同风格的后期版本**，
+ * 且三支要在**封面 / 配乐 / 调色**三个维度上都不同（只换滤镜名不算）。
  */
 export const DELIVERY_VARIANTS: DeliveryVariant[] = [
-  { id: "cool-tech", label: "冷调技术感", gradeProfile: "cool-technical", gradeIntensity: 0.55, musicLevelDeltaDb: 0, copySuffix: "｜冷调", note: "低饱和冷调，适合城市/地标" },
-  { id: "warm-film", label: "暖调胶片", gradeProfile: "warm-film", gradeIntensity: 0.5, musicLevelDeltaDb: 1.5, copySuffix: "｜暖调", note: "暖色胶片，适合人文/旅行" },
-  { id: "punchy-social", label: "社交高对比", gradeProfile: "high-contrast-social", gradeIntensity: 0.45, musicLevelDeltaDb: 0.5, copySuffix: "｜高对比", note: "信息流跳脱，适合小红书/抖音封面流" }
+  /** 曲风线索用 `|` 分隔多个候选词，与曲库标签（如「游戏 / 电子」「旅拍 / 生活」「卡点 / 律动」）对齐 */
+  { id: "cool-tech", label: "冷调技术感", gradeProfile: "cool-technical", gradeIntensity: 0.55, musicLevelDeltaDb: 0, copySuffix: "｜冷调", coverAccent: "#6FD3E8", bgmGenre: "游戏|电子|史诗", bgmMood: "律动兴奋|宏大推进|安静舒缓", note: "低饱和冷调，适合城市/地标" },
+  { id: "warm-film", label: "暖调胶片", gradeProfile: "warm-film", gradeIntensity: 0.5, musicLevelDeltaDb: 1.5, copySuffix: "｜暖调", coverAccent: "#E8B44A", bgmGenre: "旅拍|生活", bgmMood: "温暖自在|松弛平和", note: "暖色胶片，适合人文/旅行" },
+  { id: "punchy-social", label: "社交高对比", gradeProfile: "high-contrast-social", gradeIntensity: 0.45, musicLevelDeltaDb: 0.5, copySuffix: "｜高对比", coverAccent: "#FF6A5A", bgmGenre: "轻快|卡点", bgmMood: "律动兴奋|明快愉悦", note: "信息流跳脱，适合小红书/抖音封面流" }
 ];
+
+/** 交付包最少变体数（产品口径：一次产出 3 个不同风格的后期版本让用户选） */
+export const VARIANT_MIN_COUNT = 3;
+
+export interface VariantAxesEntry {
+  id: string;
+  gradeProfile: string | null;
+  /** 变体封面指纹（缺 = 该变体没出封面） */
+  coverSha?: string | null;
+  /** 变体配乐指纹（缺 = 该变体没换曲） */
+  bgmSha?: string | null;
+}
+
+export interface VariantAxesReport {
+  ok: boolean;
+  count: number;
+  missing: string[];
+  detail: string;
+}
+
+/**
+ * 三轴判据：数量 ≥3，且 **调色 / 封面 / 配乐** 三个维度上都不能出现"两支一样"。
+ * 为什么是硬判据：2026-09-26 产品所有者点名"我看系统里有一次产出几个版本的约束，为什么没执行"——
+ * 除了"阶段没被调用"这个执行问题，约束本身也只有"≥2 且画面/音轨可测差异"，
+ * 允许"三支只有滤镜不同、封面与配乐完全一样"混过去。这里把口径收紧到产品意图。
+ */
+export function assessVariantAxes(variants: VariantAxesEntry[]): VariantAxesReport {
+  const count = variants.length;
+  const missing: string[] = [];
+  const duplicate = (key: "gradeProfile" | "coverSha" | "bgmSha", label: string): string | null => {
+    const seen = new Map<string, string>();
+    for (const variant of variants) {
+      const value = variant[key];
+      if (value === null || value === undefined || value === "") {
+        missing.push(`${variant.id} 缺${label}`);
+        continue;
+      }
+      const previous = seen.get(String(value));
+      if (previous) return `${previous} 与 ${variant.id} 的${label}相同（${String(value).slice(0, 12)}）`;
+      seen.set(String(value), variant.id);
+    }
+    return null;
+  };
+  const problems: string[] = [];
+  if (count < VARIANT_MIN_COUNT) {
+    problems.push(`变体数 ${count} < ${VARIANT_MIN_COUNT}（产品口径：一次产出 3 个不同风格的后期版本让用户选）`);
+  }
+  const dupGrade = duplicate("gradeProfile", "调色档");
+  const dupCover = duplicate("coverSha", "封面");
+  const dupBgm = duplicate("bgmSha", "配乐");
+  for (const item of [dupGrade, dupCover, dupBgm]) if (item) problems.push(item);
+  if (problems.length === 0 && missing.length === 0) {
+    return {
+      ok: true, count, missing,
+      detail: `${count} 支变体在 调色/封面/配乐 三轴上两两不同（${variants.map((v) => v.id).join("、")}）`,
+    };
+  }
+  return {
+    ok: false, count, missing,
+    detail: [...problems, ...(missing.length > 0 ? [`缺项：${missing.join("；")}`] : [])].join("；"),
+  };
+}
 
 export interface VariantPlan {
   variant: DeliveryVariant;
@@ -142,9 +213,17 @@ export interface DeliveryManifest {
   deliverable: { path: string; sha256: string; bytes: number };
   subtitles: { sidecarDir: string | null; softsub: string | null; burned: boolean };
   cover: { path: string | null; hook: string };
-  variants: Array<{ id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null }>;
+  variants: Array<{
+    id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
+    /** 该变体自己的封面（三轴口径：封面必须互相可区分） */
+    cover?: { path: string; sha256: string } | null;
+    /** 该变体自己的配乐（曲库曲目 + 实测 BPM/卡点偏差） */
+    bgm?: { track: string; sha256: string; measuredBpm?: number; gridErrorMs?: number } | null;
+  }>;
   /** G-DLV1 判定结果（雷同一票否决） */
   distinctness: DistinctnessReport;
+  /** 三轴判据（数量 ≥3 且 调色/封面/配乐 两两不同） */
+  variantAxes?: VariantAxesReport;
   /** 证据：变体测量原始值（审计可复核） */
   samples: VariantSample[];
   reuseDiscipline: string;
@@ -158,6 +237,7 @@ export function buildDeliveryManifest(input: {
   cover: { path: string | null; hook: string };
   variants: DeliveryManifest["variants"];
   distinctness: DistinctnessReport;
+  variantAxes?: VariantAxesReport;
   samples: VariantSample[];
   at?: string;
 }): DeliveryManifest {
@@ -170,6 +250,7 @@ export function buildDeliveryManifest(input: {
     cover: input.cover,
     variants: input.variants,
     distinctness: input.distinctness,
+    ...(input.variantAxes ? { variantAxes: input.variantAxes } : {}),
     samples: input.samples,
     reuseDiscipline: "变体只做后期层派生（调色/混音/文案），镜头不重新生成（零 token）；每支变体带 sha256 便于发布方核对"
   };

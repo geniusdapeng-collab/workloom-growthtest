@@ -364,5 +364,10 @@ export const FIELD_BUSINESS_GROUPS: Array<{ group: string; fields: string[]; not
   { group: "道具与一致性", fields: ["props", "consistency", "portraits"], note: "道具、跨镜一致性、定妆照锚点" },
   { group: "叙事与节奏", fields: ["dialogue", "timeline", "mood", "pacing", "transition"], note: "台词/时间轴/情绪/节奏/转场" },
   { group: "音频", fields: ["audio"], note: "环境声与音乐（营销场景另有 bgm）" },
-  { group: "片头专属（+5）", fields: ["title", "subtitle", "title_content", "subtitle_content", "title_animation", "title_font_design", "opening_audio_design"], note: "片头 30 字段体系" }
+  /**
+   * 片头标题字段**已下线**（2026-09-26 产品所有者口径）：
+   * 主标题/副标题/标题动画/标题字体/开场音频设计 由**后期封面工位**（cover 阶段）产出，
+   * 生成侧片头与内容镜同为 25 字段口径；这里只保留 `title/subtitle` 两个**文案**字段供封面策划复用。
+   */
+  { group: "片头文案（无标题渲染字段）", fields: ["title", "subtitle"], note: "片头与内容同为 25 字段；标题由后期封面产出（title_content 等 5 字段已下线）" }
 ];
