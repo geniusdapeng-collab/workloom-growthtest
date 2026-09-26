@@ -21,6 +21,7 @@
 import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import {
+  OPENING_EXCLUSIVE_FIELDS_LEGACY,
   prepareShotPrompt,
   shotSpecMarkdown,
   fieldSpec,
@@ -168,11 +169,16 @@ const steps: StepCheck[] = [
     ok: shots.length > 0
   },
   {
-    step: "opening", name: "片头设计（30 字段）",
+    /**
+     * 片头口径（2026-09-26 变更）：不再要求 5 个标题渲染字段（标题由后期封面产出），
+     * 与内容镜同为 25 字段；这里查的是"片头镜的 25 字段齐备 + 交付闸放行"。
+     */
+    step: "opening", name: "片头设计（25 字段 · 标题交后期封面）",
     evidence: openingShot
-      ? `${String(openingShot.shotId)} sceneType=opening；片头专属字段 ${spec.openingExclusive.length - (openingReport?.missingOpeningFields.length ?? 0)}/${spec.openingExclusive.length}`
+      ? `${String(openingShot.shotId)} sceneType=opening；25 字段缺 ${openingReport?.missingSpecFields.length ?? "?"} 项；`
+        + `标题渲染字段已下线（历史 5 字段：${OPENING_EXCLUSIVE_FIELDS_LEGACY.length} 个）`
       : "未识别到片头镜头",
-    ok: Boolean(openingShot) && (openingReport?.missingOpeningFields.length ?? 1) === 0
+    ok: Boolean(openingShot) && (openingReport?.missingSpecFields.length ?? 1) === 0
   },
   {
     step: "visual", name: "视觉语言设计",
@@ -304,7 +310,9 @@ verdicts.push(
   + (specFailures.length ? `；未过：${specFailures.map((r) => r.shotId).join("、")}` : "")
 );
 verdicts.push(
-  `片头 30 字段：${openingShot ? `${String(openingShot.shotId)} 专属字段缺 ${openingReport?.missingOpeningFields.length ?? "?"}/5` : "未识别片头镜头"}`
+  `片头口径：${openingShot
+    ? `${String(openingShot.shotId)} 走 25 字段（标题由后期封面产出，5 个标题渲染字段已下线）；25 字段缺 ${openingReport?.missingSpecFields.length ?? "?"} 项`
+    : "未识别片头镜头"}`
 );
 verdicts.push(
   `内容红线：${redlineHits.length ? `${redlineHits.map((r) => `${r.shotId}(${r.redlines.join("/")})`).join("、")}` : "无命中"}`

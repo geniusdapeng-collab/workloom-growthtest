@@ -13,7 +13,7 @@
 | 规范项 | 权威文件 | 说明 |
 |--------|----------|------|
 | 内容镜头 25 字段组装 | `hyperreality-system/engines/production-engine/agents/prompt-fusion-agent.js` | `_assembleStandardPrompt`：01.【语言约束】→ 25.【角色一致性】 |
-| 片头镜头 30 字段 | 同上（`isOpening` 分支） | 25 标准字段 + 5 个片头专属字段：【主标题内容】【副标题内容】【标题动画设计】【标题字体设计】【开场音频设计】 |
+| 片头镜头（**同为 25 字段**） | 同上（`isOpening` 分支） | **2026-09-26 口径变更**：主标题/副标题/标题动画/标题字体/开场音频设计 5 个字段**已下线**——标题与主视觉由后期 `cover` 阶段产出（封面设计师设计稿 + 确定性合成 + 机检 + 监制），生成侧不再要求渲染标题（避免中文字形不可控、以及后期换标题必须重渲）；`title`/`subtitle` 两个**文案**字段保留，供封面策划复用。vendor 基线里 `openingExclusiveFields` 保持只读不动，差异在 `packages/video-studio/src/shot-spec.ts` 显式表达 |
 | 字段别名与分级校验 | `hyperreality-system/engines/field-standardizer.js` | P0 致命级 12 字段 / P1 核心级 7 字段，导出前 25 字段非空硬检查 |
 | 长度标准 | `hyperreality-system/config/prompt-length.js` | TARGET 2470-3000，HARD_MAX 3000，唯一权威入口 |
 | 审核报告格式 | `hyperreality-system/index.js`（提示词审核报告生成器） | 镜头总览五列核验 + 序号化完整提示词 + 7 条审核须知 |

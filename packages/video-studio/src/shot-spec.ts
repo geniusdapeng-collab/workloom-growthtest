@@ -311,8 +311,32 @@ interface VendorDeliveryGuard {
   };
 }
 
-const FALLBACK_OPENING_EXCLUSIVE = [
+/**
+ * **片头 5 个专属字段已下线**（产品所有者口径，2026-09-26）。
+ *
+ * 原口径（vendor field-standardizer）：片头镜除 25 个标准字段外，还要 5 个专属字段——
+ * `title_content` / `subtitle_content` / `title_animation` / `title_font_design` / `opening_audio_design`，
+ * 让**生成模型直接把主标题烧进画面**。
+ *
+ * 为什么下线：标题与主视觉现在由**后期封面工位**产出（`cover` 阶段：封面设计师设计稿 + 确定性合成 +
+ * 机检 + 监制），封面卡会作为片头合成进成片。生成阶段再让模型画一遍标题，只会带来两个问题：
+ *   ① 生成模型的中文字形不可控（写成错字/糊字，只能整条重渲）；
+ *   ② 后期换标题/改口径（如"南昌 46 秒"→"南昌 48 秒"）必须重渲，违背"镜头只生成一次、后续零 token"。
+ *
+ * 因此本层**不再向生成侧要求这 5 个字段**：片头镜与内容镜同为 25 字段口径，
+ * 提示词里也不再注入【主标题内容】【副标题内容】【标题动画设计】【标题字体设计】【开场音频设计】。
+ * vendor 真源里的字段定义保持只读不动（那是上游基线），差异在本层显式表达。
+ */
+export const OPENING_EXCLUSIVE_FIELDS_RETIRED: string[] = [];
+
+/** 兼容出口：历史上片头专属字段的键名（仅用于审计回溯，不再参与校验与提示词注入） */
+export const OPENING_EXCLUSIVE_FIELDS_LEGACY = [
   "title_content", "subtitle_content", "title_animation", "title_font_design", "opening_audio_design"
+];
+
+/** 已下线的 5 个片头标题段落在提示词里的字面标签（反向自检用） */
+export const RETIRED_OPENING_LABELS = [
+  "【主标题内容】", "【副标题内容】", "【标题动画设计】", "【标题字体设计】", "【开场音频设计】"
 ];
 
 /** 实验车道补充红线：真机里出现过的、与行业 brief 无关的意象（vendor 禁词表之外） */
@@ -473,22 +497,6 @@ function vendorPath(relative: string): string {
   return resolvePath(repoRoot(), "vendor/supermickey/hyperreality-system", relative);
 }
 
-/** 从 vendor 源码里解析片头专属 5 字段（避免在 TS 层复制规范字面值） */
-function readOpeningExclusive(standardizerPath: string): string[] {
-  try {
-    const source = readFileSync(standardizerPath, "utf8");
-    const match = source.match(/const openingExclusiveFields = \[([^\]]+)\]/);
-    if (!match) return FALLBACK_OPENING_EXCLUSIVE;
-    const body = match[1] ?? "";
-    const keys = [...body.matchAll(/'([^']+)'|"([^"]+)"/g)]
-      .map((m) => m[1] ?? m[2])
-      .filter((key): key is string => Boolean(key));
-    return keys.length > 0 ? keys : FALLBACK_OPENING_EXCLUSIVE;
-  } catch {
-    return FALLBACK_OPENING_EXCLUSIVE;
-  }
-}
-
 function loadVendor() {
   if (vendorCache) return vendorCache;
   const req = vendorRequire();
@@ -514,7 +522,8 @@ function loadVendor() {
     p3: [...standardizer.CRITICAL_FIELDS.p3],
     common: [...standardizer.CRITICAL_FIELDS.common],
     opening: [...standardizer.CRITICAL_FIELDS.opening],
-    openingExclusive: readOpeningExclusive(standardizerPath),
+    /** 片头专属字段已下线（见 OPENING_EXCLUSIVE_FIELDS_RETIRED 注释）——本层固定为空 */
+    openingExclusive: [...OPENING_EXCLUSIVE_FIELDS_RETIRED],
     lengths: {
       targetMin: lengthCfg.TARGET_MIN,
       targetMax: lengthCfg.TARGET_MAX,
@@ -773,6 +782,28 @@ export function prepareShotPrompt(
   });
 
   const delivery = guard.verify(prompt, assemblyShot);
+  /**
+   * 片头标题字段下线的**落地处理**（2026-09-26）：
+   * vendor 交付闸（只读基线）仍按"片头 30 字段"口径报 `缺片头专属字段:…`，
+   * 本层已不再向生成侧要求这 5 个字段（标题由后期封面产出），因此：
+   *   ① 过滤掉这批告警（它们不再是缺陷）；
+   *   ② 若过滤后没有其它问题 → 判放行（否则片头镜会永远卡在"缺标题字段"上，真机就是这么卡住的）；
+   *   ③ 反向自检：提示词里**不该**再出现这 5 个段落（出现即说明有人把标题塞回生成侧）。
+   */
+  if (isOpening) {
+    const retiredPattern = /^缺片头专属字段:/;
+    const retired = delivery.issues.filter((issue) => retiredPattern.test(issue));
+    if (retired.length > 0) {
+      delivery.issues = delivery.issues.filter((issue) => !retiredPattern.test(issue));
+      if (delivery.issues.length === 0) delivery.pass = true;
+      log(`[shot-spec] ${shotId} 片头标题字段已下线：忽略 vendor 交付闸的 ${retired.length} 条"缺片头专属字段"（标题由后期封面产出）`);
+    }
+    const leaked = RETIRED_OPENING_LABELS.some((label) => prompt.includes(label));
+    if (leaked) {
+      delivery.pass = false;
+      delivery.issues = [...delivery.issues, "提示词出现片头标题段落（主标题/副标题/标题动画/标题字体/开场音频设计）：该口径已下线，标题由后期封面产出"];
+    }
+  }
   /** 兜底自检：提示词里出现 `[object Object]` 属组装缺陷，直接判不合格 */
   const objectLeaks = (prompt.match(/\[object Object\]/g) ?? []).length;
   if (objectLeaks > 0) {
@@ -864,15 +895,16 @@ export function prepareShotPrompt(
 export function shotSpecMarkdown(reports: ShotSpecReport[]): string {
   const spec = fieldSpec();
   const lines = [
-    `> 字段规范来源：vendor field-standardizer（25 字段 = P0 ${spec.p0.length} + P1 ${spec.p1.length} + P2 ${spec.p2.length} + P3 ${spec.p3.length}；片头 +${spec.openingExclusive.length} 专属 = 30）；`
+    `> 字段规范来源：vendor field-standardizer（25 字段 = P0 ${spec.p0.length} + P1 ${spec.p1.length} + P2 ${spec.p2.length} + P3 ${spec.p3.length}）；`
+    + "**片头不再有 5 个专属字段**（主标题/副标题/标题动画/标题字体/开场音频设计）："
+    + "标题与主视觉由后期封面工位产出（cover 阶段），生成侧只出 25 字段；"
     + `长度口径 ${spec.lengths.refinedMin}–${spec.lengths.hardMax} 字（目标 ${spec.lengths.targetMin}–${spec.lengths.targetMax}）`,
     "",
-    "| 镜头 | 类型 | 字数 | 来源 | 25字段缺 | 片头5字段缺 | 交付闸 | 红线 |",
-    "|---|---|---:|---|---:|---:|---|---|",
+    "| 镜头 | 类型 | 字数 | 来源 | 25字段缺 | 交付闸 | 红线 |",
+    "|---|---|---:|---|---:|---|---|",
     ...reports.map((r) =>
-      `| ${r.shotId} | ${r.isOpening ? "片头(30)" : "内容(25)"} | ${r.charCount} | ${r.promptSource} | `
+      `| ${r.shotId} | ${r.isOpening ? "片头(25)" : "内容(25)"} | ${r.charCount} | ${r.promptSource} | `
       + `${r.missingSpecFields.length}${r.missingSpecFields.length ? `（${r.missingSpecFields.slice(0, 3).join("、")}${r.missingSpecFields.length > 3 ? "…" : ""}）` : ""} | `
-      + `${r.isOpening ? r.missingOpeningFields.length : "—"} | `
       + `${r.delivery.pass ? "pass" : `fail(${r.delivery.issues.length})`} | ${r.redlines.length ? r.redlines.join("、") : "—"} |`
     ),
     ""
