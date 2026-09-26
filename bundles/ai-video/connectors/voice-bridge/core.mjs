@@ -796,11 +796,17 @@ export function profileDir(profileId, env = process.env) {
   return path.join(profilesDir(env), safe);
 }
 
-export async function listProfiles(env = process.env) {
+/**
+ * 档案清单（带降级明细）：损坏档案不再"静默少一条"。
+ * 返回 `{ profiles, skipped:[{profile_id, reason}] }`——调用方（health / voices）必须把 skipped 显示出来，
+ * 否则"少了几个档案"在界面上看不出来（GAP-0011 静默降级）。
+ */
+export async function listProfilesDetailed(env = process.env) {
   const dir = profilesDir(env);
-  if (!fs.existsSync(dir)) return [];
+  if (!fs.existsSync(dir)) return { profiles: [], skipped: [] };
   const entries = await fsp.readdir(dir, { withFileTypes: true });
   const profiles = [];
+  const skipped = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) continue;
     const manifest = path.join(dir, entry.name, "profile.json");
@@ -821,11 +827,17 @@ export async function listProfiles(env = process.env) {
           ? { declared: consent.declared === true, scope: consent.scope ?? null, expires_at: consent.expires_at ?? null }
           : { declared: false, scope: null, expires_at: null },
       });
-    } catch {
-      // 档案损坏跳过（不掩盖：health/voices 会显示 count 差异）
+    } catch (error) {
+      // 档案损坏跳过，但**不静默**：把 id 与原因记进 skipped，由 health/voices 显式展示
+      skipped.push({ profile_id: entry.name, reason: error instanceof Error ? error.message : String(error) });
     }
   }
-  return profiles.sort((a, b) => String(a.profile_id).localeCompare(String(b.profile_id)));
+  profiles.sort((a, b) => String(a.profile_id).localeCompare(String(b.profile_id)));
+  return { profiles, skipped };
+}
+
+export async function listProfiles(env = process.env) {
+  return (await listProfilesDetailed(env)).profiles;
 }
 
 /** 授权声明（声音肖像权）：这是克隆的前置条件，写进档案目录并作为围栏 G-VOICE1 的判据。 */
@@ -1499,12 +1511,16 @@ export function textMatchRatio(expected, actual) {
 /* ============================ 健康检查 ============================ */
 
 export async function health({ bins = resolveBinaries(), env = process.env, config = engineConfig(env), fetchImpl = fetch } = {}) {
+  const profilesSettled = await listProfilesDetailed(env)
+    .then((result) => ({ ...result, error: null }))
+    .catch((error) => ({ profiles: [], skipped: [], error: error instanceof Error ? error.message : String(error) }));
   const [ffmpeg, engine, devices, profiles] = await Promise.all([
     binaryVersion(bins.ffmpeg),
     probeEngine(config, { fetchImpl }),
     listInputDevices({ bins, env }).catch(() => ({ supported: false, devices: [], error: "network_error" })),
-    listProfiles(env).catch(() => []),
+    Promise.resolve(profilesSettled.profiles),
   ]);
+  const skipped = profilesSettled.skipped ?? [];
   const station = stationDir(env);
   return {
     service: "workloom-voice-bridge",
@@ -1514,7 +1530,12 @@ export async function health({ bins = resolveBinaries(), env = process.env, conf
     ffprobe: await binaryVersion(bins.ffprobe),
     engine,
     mic: { supported: devices.supported, default: devices.default ?? null, device_count: devices.devices?.length ?? 0 },
-    profiles: { count: profiles.length, ids: profiles.map((profile) => profile.profile_id) },
+    profiles: {
+      count: profiles.length,
+      ids: profiles.map((profile) => profile.profile_id),
+      ...(skipped.length > 0 ? { skipped } : {}),
+      ...(profilesSettled.error ? { error: profilesSettled.error } : {}),
+    },
     licenses: {
       "mlx-audio": "MIT（Apple Silicon 本机引擎）",
       "mlx-community/OmniVoice-bf16": "见模型卡上游许可",
