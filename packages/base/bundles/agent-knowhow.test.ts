@@ -322,3 +322,55 @@ describe("geo-growth 视觉栈 · 行业 Know-How 结构（S-B 制作/工艺型�
     });
   }
 });
+
+/**
+ * hotel 技能采用本仓另一种生产模板（触发条件/输入数据/方法/输出动作/围栏绑定/验收用例），
+ * 因此这里只锁三条硬要求：前置校验 ≥3、失败诊断 ≥3（含可判定语义）、证据口径 ≥2。
+ * 其中 10 个技能无岗位绑定（登记为可装配能力），故不做绑定断言。
+ */
+const HOTEL_SKILLS: string[] = [
+  "ai-live-assistant", "channel-reconciler", "checkin-checkout", "content-marketing", "coupon-ops",
+  "customer-service", "fast-scan", "finance-reporting", "guest-profile-crm", "handover-manager",
+  "hotel-geo-content", "incident-postmortem", "inspection-suite", "intent-radar", "inventory-procurement",
+  "lead-concierge", "maintenance-dispatch", "morning-briefing", "night-audit-suite", "ota-operations",
+  "overbooking-parity-guard", "phone-concierge", "pricing-matrix", "retention-manager", "revenue-manager",
+  "review-asset-mining", "review-crisis", "room-service-dispatch", "safety-compliance", "staff-scheduler",
+];
+
+describe("hotel 值守技能 · 行业 Know-How 结构（S-C 工具/纪律型）", () => {
+  const HOTEL_DIR = join(ROOT, "hotel");
+
+  for (const name of HOTEL_SKILLS) {
+    const path = join(HOTEL_DIR, "skills", name, "SKILL.md");
+    if (!existsSync(path)) continue; // 名称表兜底：不存在的条目跳过（由机检器负责报缺）
+    const text = readFileSync(path, "utf8");
+
+    it(`${name}：前置校验 ≥3`, () => {
+      const metrics = sectionMetrics(text, [
+        "前置校验", "SOP", "触发条件", "校验", "检查", "清单", "交付前", "交付", "口径", "输入数据", "方法", "输入",
+      ]);
+      expect(Math.max(metrics.items, prohibitionLines(text)), `${name} 前置校验不足`).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`${name}：失败诊断 ≥3 且含可判定语义`, () => {
+      const metrics = sectionMetrics(text, [
+        "失败", "异常", "不达标", "回退", "不可修复", "处置", "红线", "验收用例", "异常路径", "边界", "围栏绑定", "不做什么",
+      ]);
+      expect(Math.max(metrics.rows, metrics.items), `${name} 失败诊断不足`).toBeGreaterThanOrEqual(3);
+      expect(
+        /异常路径|失败|block|review|不执行|不编造|未核实|回滚|挂起|熔断|打回|剔除|停止|冻结|撤回|告警|转人工|退回|报错|不可能/.test(metrics.merged),
+        `${name} 失败诊断缺少可判定语义`,
+      ).toBe(true);
+    });
+
+    it(`${name}：证据口径 ≥2`, () => {
+      const metrics = sectionMetrics(text, ["证据口径", "留痕", "回执", "证据", "输出动作", "输出契约", "事件"]);
+      const evidenceLines = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((t) => t && !/^\|\s*-+/.test(t))
+        .filter((t) => /回执|sha256|SHA256|证据链|留痕|事件 ID/.test(t)).length;
+      expect(Math.max(metrics.rows, metrics.items, evidenceLines), `${name} 证据口径不足`).toBeGreaterThanOrEqual(2);
+    });
+  }
+});

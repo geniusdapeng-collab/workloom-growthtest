@@ -150,15 +150,16 @@ function findAllSections(text: string, keywords: string[]): string[] {
   return bodies;
 }
 
-/** 语义区块计量：取所有命中区块中的最大值（表行数 / 条目数） */
-function sectionMetrics(text: string, keywords: string[]): { rows: number; items: number } {
+/** 语义区块计量：取所有命中区块中的最大值（表行数 / 条目数），并返回合并正文供语义判定 */
+function sectionMetrics(text: string, keywords: string[]): { rows: number; items: number; merged: string } {
   let rows = 0;
   let items = 0;
-  for (const body of findAllSections(text, keywords)) {
+  const bodies = findAllSections(text, keywords);
+  for (const body of bodies) {
     rows = Math.max(rows, tableRows(body));
     items = Math.max(items, numbered(body) + bullets(body));
   }
-  return { rows, items };
+  return { rows, items, merged: bodies.join("\n") };
 }
 
 /** 量化阈值行数：含比较符或带单位的数值（判据"可判定"的最低证据） */
@@ -304,20 +305,32 @@ function auditSkill(bundle: string, skill: string, path: string, bindings: Map<s
       if (nItems < 3) issues.push(`失败模式 ${nFail} 行 / 条目 ${nItems} < 3`);
     }
   } else {
+    /**
+     * S-C 工具/纪律型（含酒店值守模板的结构等价）：
+     *   前置校验 ← 前置校验/SOP/触发条件/输入数据/方法/校验/检查/清单/口径
+     *   失败诊断 ← 失败/异常/处置/红线/验收用例/边界/围栏绑定（需含"异常路径/block/未核实"语义）
+     *   证据口径 ← 证据/留痕/回执/输出动作/输出契约/事件
+     */
     const preMetrics = sectionMetrics(text, [
       "前置校验", "SOP", "触发条件", "校验", "检查", "发布包", "复检", "核对",
-      "清单", "交付前", "交付", "口径", "影响",
+      "清单", "交付前", "交付", "口径", "影响", "输入数据", "方法", "输入",
     ]);
     const nPre = Math.max(preMetrics.items, prohibitionLines(text));
     metrics["前置校验"] = nPre;
     if (nPre < 3) issues.push(`前置校验 ${nPre} < 3`);
 
-    const failMetrics = sectionMetrics(text, ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线"]);
+    const failMetrics = sectionMetrics(text, [
+      "失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线",
+      "验收用例", "异常路径", "边界", "围栏绑定", "不做什么",
+    ]);
     const nFail = Math.max(failMetrics.rows, failMetrics.items);
     metrics["失败诊断"] = nFail;
     if (nFail < 3) issues.push(`失败诊断 ${nFail} < 3`);
+    else if (!/异常路径|失败|block|review|不执行|不编造|未核实|回滚|挂起|熔断|打回|剔除|停止|冻结|撤回|告警|转人工|退回|报错|不可能/.test(failMetrics.merged)) {
+      issues.push("失败诊断缺少可判定语义（异常路径/Fail-closed/挂起）");
+    }
 
-    const evidenceMetrics = sectionMetrics(text, ["证据口径", "留痕", "回执", "证据"]);
+    const evidenceMetrics = sectionMetrics(text, ["证据口径", "留痕", "回执", "证据", "输出动作", "输出契约", "事件"]);
     const evidenceLines = text
       .split("\n")
       .map((l) => l.trim())
