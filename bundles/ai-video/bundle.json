@@ -626,7 +626,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "15f698ddb8cebd1a94a1a73f87c3d148faf3ff1e57b3d50aff09088fec0376b3",
+    "digest": "9015ad61c72f09a5c048283f9ab1893d97a7f013a6382667ee8453e19a36d4a4",
     "assets": {
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
       "connectors/bgm-bridge/core.mjs": "44c8b8b615fcbb39e4ac0be710c1c211b01f64a008c009cd7f11f146ff03518d",
@@ -646,7 +646,7 @@
       "connectors/post-bridge/server-adapter.mts": "80780fbfef049f3690bdd14b591d59cd4e8ddfba6e9854344601a4ffb5073d48",
       "connectors/post-bridge/server.mjs": "5cf52a2b58fe4ad20118f1c02fe44ded25649d6c5d4a6911c4f9f1f36a2fcb1f",
       "connectors/subtitle-bridge/cli.mjs": "461e17a7de4458a5cef1198c22ec5fdcc720924adb433152a171139dfbd3e178",
-      "connectors/subtitle-bridge/core.mjs": "b499ef6f00d7c8d5db98212b56a4225bb8cdfda72d9f5fbe5064453bf65077ee",
+      "connectors/subtitle-bridge/core.mjs": "41e3c7ba36a3ea5657ac40fdecb0e8b12a4d4533e71af6d7276ebb436efb35fd",
       "connectors/subtitle-bridge/executor.ts": "ae5ad37e44a4407a2f6bc53499ac9adc7d4caeeed38d4b20ad2a358296c1deb1",
       "connectors/subtitle-bridge/kit/fonts-pin.json": "b3b19159777af663168dee1cb94e5c607e7875b96522d4b37de3627826987ce4",
       "connectors/subtitle-bridge/kit/install-fonts.sh": "2faf221c1431b9b35311d1721606d496664af9e2f451bd35b2a3af0f63e8ddcc",
