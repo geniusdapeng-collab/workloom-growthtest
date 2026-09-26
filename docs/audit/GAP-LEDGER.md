@@ -24,6 +24,8 @@
 | GAP-0015 | B2 | 营销片真机全链 | T2 无证据 | P1 | 事实红线闸的接线已在类级与单测级验证，但**尚未**在真实检索通道 + 真实模型下跑完整营销片链路（需要 `TAVILY_API_KEY`/`WL_SEARCH_API_URL` 或 HTML 检索通道可用 + LLM key），因此"真实档案 → 真实冲突命中"尚无真机证据 | `apps/server/src/video/data-mining-executor.ts`（需真实检索）；本机无 key | 待真机轮：用真实商品跑一次营销片（情报五站 → truth-check → PRD），核验 `stages.truthCheck` 与 PRD 制作约束 | — | OPEN | D（未验证，已声明） |
 | GAP-0016 | B1/B2 | 后期链四工位 | T9 资产深度 | P1 | 调色选型/配乐定调/字幕版式/音色档案四个技能「判据齐、失败模式缺」：真机翻车（风格跳变、配乐盖人声、字幕压 UI、换引擎变声）没有可判定的检测器与处置 | `bundles/ai-video/skills/{color-look-design,bgm-score-design,subtitle-layout-design,voice-profile-craft}/SKILL.md` | **FIXED（T-2026-0926-0104）**：各补 6–8 行失败模式表（症状 → 检测器 → 处置），判据全部取自该技能既有阈值与围栏（G-COL/G-BGM/G-SUB/G-VOICE） | `agent-knowhow.test.ts`（59 项，覆盖 12 个技能） | FIXED | A |
 | GAP-0017 | B1 | 审计器口径 | T2 工具口径 | P2 | 首版 `agent-knowhow-audit.mts` 只认固定章节名，把本仓「一、二、三」编号标题与「目标值表/禁忌/常见翻车」等写法误判为缺失 | `scripts/tools/agent-knowhow-audit.mts` | **FIXED（T-2026-0926-0104）**：改为语义区块 + 全文量化阈值行 + 红线表述的混合口径（结构等价判定），并同步回归测试；视频域达标率由 7/32 修正为 15/32（真实值） | 同 GAP-0016 | FIXED | A/B |
+| GAP-0018 | B1/B2 | S-C 工具/纪律型四技能 | T9 资产深度 | P1 | 渲染提交（G8）、评论外发（G10）、监制门（G1–G7）、字幕烧录四个纪律型技能缺「前置校验 / 失败诊断 / 证据口径」：提交被拒、误分流、无正文可核验、字体回落系统字体这些真机翻车没有判定与处置 | `bundles/ai-video/skills/{render-ops,comment-ops,producer-gate-review,caption-burnin-ops}/SKILL.md` | **FIXED（T-2026-0926-0107）**：前置校验 3–5 条、失败诊断表 6–7 行（含检测器与处置）、证据口径 3–4 条；判据取自 G8 严格模式/`duration_provenance`、G10 分流与关键词必审、监制门正文预算与 fail-closed、libass fontselect 回落判失败 | `agent-knowhow.test.ts`（S-C 7/7）、504 项回归 | FIXED | A |
+| GAP-0019 | B1 | 交付/返修技能口径 | T2 工具口径 | P2 | `delivery-package-ops` / `delivery-revision-ops` 内容完整（不达标处置、不可修复情形、返修回执俱全），但章节名为「不达标怎么办 / 不可修复情形 / 返修回执」，被首版审计器误判为缺失 | `scripts/tools/agent-knowhow-audit.mts` | **FIXED（T-2026-0926-0107）**：S-C 判定加入「不达标/回退/不可修复/处置」等价域与「红线/必须」前置校验口径；两技能判定为达标（未改内容） | 同 GAP-0018 | FIXED | A/B |
 
 ## 变更记录
 
@@ -33,3 +35,4 @@
 | 2026-09-26 | T-2026-0926-0102 | 完成 GAP-0012/0013/0014（提示词工艺 / 定妆照纪律 / 发布纪律）Know-How 强化；回归扩到 S-A/S-B/S-C 三型（39 项） |
 | 2026-09-26 | T-2026-0926-0103 | 完成 GAP-0001：营销片事实红线闸接线（桥 + 引擎方法 + PRD 红线继承 + 类级验证 3/3）；新登记 GAP-0015（真机全链待验） |
 | 2026-09-26 | T-2026-0926-0104 | 完成 GAP-0016（后期链四工位失败模式）与 GAP-0017（审计器结构等价口径）；视频域 Know-How 达标 15/32，回归 214 项全绿 |
+| 2026-09-27 | T-2026-0926-0107 | 完成 GAP-0018/0019：S-C 纪律型四技能强化 + 审计器等价域补全；视频域 Know-How 达标 **21/32**（S-A 3/3、S-B 11/22、S-C 7/7），回归 504 项全绿 |

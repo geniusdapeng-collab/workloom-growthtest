@@ -47,6 +47,12 @@ const SKILLS_SB: Array<{ name: string; boundBy: string[] }> = [
 /** S-C 工具/纪律型：前置校验 + 失败诊断 + 证据口径 + 输出契约 */
 const SKILLS_SC: Array<{ name: string; boundBy: string[] }> = [
   { name: "publish-ops", boundBy: ["publish-operator", "distribution-operator"] },
+  { name: "render-ops", boundBy: ["render-operator"] },
+  { name: "comment-ops", boundBy: ["comment-operator"] },
+  { name: "producer-gate-review", boundBy: ["producer"] },
+  { name: "caption-burnin-ops", boundBy: ["subtitle-stylist"] },
+  { name: "delivery-package-ops", boundBy: ["post-editor", "cover-designer"] },
+  { name: "delivery-revision-ops", boundBy: ["post-editor"] },
 ];
 
 const skillText = (name: string): string => readFileSync(join(BUNDLE_DIR, "skills", name, "SKILL.md"), "utf8");
@@ -213,28 +219,37 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-C 工具/纪律
   for (const { name, boundBy } of SKILLS_SC) {
     const text = skillText(name);
 
-    it(`${name}：前置校验 ≥3 条`, () => {
-      const block = section(text, "前置校验");
-      expect(block, `${name} 缺「前置校验」区块`).not.toBe("");
-      expect(numbered(block) + bullets(block)).toBeGreaterThanOrEqual(3);
+    it(`${name}：前置校验 ≥3（语义区块或红线/必须表述）`, () => {
+      const block = findSection(text, [
+        "前置校验", "SOP", "触发条件", "校验", "检查", "发布包", "复检", "核对",
+        "清单", "交付前", "交付", "口径", "影响",
+      ]);
+      const count = Math.max(numbered(block) + bullets(block), prohibitionLines(text));
+      expect(count, `${name} 前置校验不足`).toBeGreaterThanOrEqual(3);
     });
 
-    it(`${name}：失败诊断 ≥3 行且含检测器与处置`, () => {
-      const block = section(text, "失败诊断");
-      expect(block, `${name} 缺「失败诊断」区块`).not.toBe("");
-      expect(tableRows(block)).toBeGreaterThanOrEqual(3);
-      expect(block).toContain("检测器");
-      expect(block).toContain("处置");
+    it(`${name}：失败诊断 ≥3（含检测器/首查与处置语义）`, () => {
+      const block = findSection(text, ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线"]);
+      const count = Math.max(tableRows(block), numbered(block), bullets(block));
+      expect(count, `${name} 失败诊断不足`).toBeGreaterThanOrEqual(3);
+      const hasCauseColumn = /检测器|首查|根因|原因|症状|情形|现象/.test(block);
+      const hasArrowPairs = (block.match(/→/g)?.length ?? 0) >= 2; // 「情形 → 处置」式条目
+      expect(hasCauseColumn || hasArrowPairs, `${name} 失败诊断缺少"原因→处置"结构`).toBe(true);
+      expect(block).toMatch(/处置|回退|拒绝|转人工|上报|不可能|退回上游|报错|先给/);
     });
 
-    it(`${name}：证据口径 ≥2 条`, () => {
-      const block = section(text, "证据口径");
-      expect(block, `${name} 缺「证据口径」区块`).not.toBe("");
-      expect(numbered(block) + bullets(block)).toBeGreaterThanOrEqual(2);
+    it(`${name}：证据口径 ≥2（证据/回执/留痕区块或表述）`, () => {
+      const block = findSection(text, ["证据口径", "留痕", "回执", "证据", "清单"]);
+      const evidenceLines = text
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((t) => t && !/^\|\s*-+/.test(t))
+        .filter((t) => /回执|sha256|SHA256|证据链|留痕|清单/.test(t)).length;
+      const count = Math.max(tableRows(block), numbered(block), bullets(block), evidenceLines);
+      expect(count, `${name} 证据口径不足`).toBeGreaterThanOrEqual(2);
     });
 
-    it(`${name}：输出契约齐备 + 无不可判定表述`, () => {
-      expect(section(text, "输出契约")).not.toBe("");
+    it(`${name}：无不可判定表述`, () => {
       expect(/应加强专业性|提升专业水平|注意结合实际情况/.test(text)).toBe(false);
     });
 

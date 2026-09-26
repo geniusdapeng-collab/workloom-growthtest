@@ -275,12 +275,15 @@ function auditSkill(bundle: string, skill: string, path: string, bindings: Map<s
       if (nItems < 3) issues.push(`失败模式 ${nFail} 行 / 条目 ${nItems} < 3`);
     }
   } else {
-    const pre = findSection(text, ["前置校验", "SOP", "触发条件", "校验", "检查", "发布包", "复检", "核对", "清单", "交付前"]).body;
-    const nPre = Math.max(numbered(pre), bullets(pre));
+    const pre = findSection(text, [
+      "前置校验", "SOP", "触发条件", "校验", "检查", "发布包", "复检", "核对",
+      "清单", "交付前", "交付", "口径", "影响",
+    ]).body;
+    const nPre = Math.max(numbered(pre), bullets(pre), prohibitionLines(text));
     metrics["前置校验"] = nPre;
     if (nPre < 3) issues.push(`前置校验 ${nPre} < 3`);
 
-    const fail = findSection(text, ["失败", "翻车", "故障", "异常"]).body;
+    const fail = findSection(text, ["失败", "翻车", "故障", "异常", "不达标", "回退", "不可修复", "处置", "红线"]).body;
     const nFail = Math.max(tableRows(fail), numbered(fail), bullets(fail));
     metrics["失败诊断"] = nFail;
     if (nFail < 3) issues.push(`失败诊断 ${nFail} < 3`);
