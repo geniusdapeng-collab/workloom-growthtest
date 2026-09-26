@@ -23,14 +23,20 @@ import { makeReadableId, newId } from "@workloom/shared";
 import {
   VideoStudio,
   WorkloomLLMEngine,
+  ArchiveStore,
+  StageRunner,
+  attachStructuredLog,
+  classifyError,
   installVendorEngineBridge,
   installVendorPortraitBindingBridge,
   installVendorRenderCompatBridge,
   reviewStage,
+  updateContextBundle,
   type ApprovalCallback,
   type EventSink,
   type GateKey,
   type GateVerdict,
+  type PipelineKind,
   type PortraitIndex,
   type ProducerStage,
   type RunInput,
@@ -39,6 +45,7 @@ import {
 } from "@hyperreality/video-studio";
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
+import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
 import {
   AUTO_GATES,
   GATE_PRODUCER_STAGE,
@@ -69,8 +76,12 @@ const PRODUCER_MODE: ProducerMode = producerModeFromEnv();
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）：参考图相对路径按此解析 */
 const REPO_ROOT = path.resolve(here, "../../../..");
-/** 运行产物根（checkpoints/characters/confirmations）：默认仓库根 .vm-work/ */
-const WORK_DIR = process.env.HR_WORK_DIR ?? path.resolve(here, "../../../..", ".vm-work");
+/**
+ * 运行产物根（checkpoints/characters/confirmations/archive）：默认仓库根 `.vm-work/`。
+ * 与 archive-watch / archive-resume CLI 共用 `archiveWorkDir()` 解析（相对路径按仓库根，
+ * 历史 cwd 相对路径自动兼容），避免"服务器写一处、巡检读另一处"的路径漂移。
+ */
+const WORK_DIR = archiveWorkDir();
 
 /**
  * 营销路由判定 → 情报层装配开关（2026-09-25 激活）。
@@ -413,7 +424,64 @@ export function startRun(scope: Scope, input: RunInput): string {
   };
   runs.set(entry.runId, entry);
 
+  /**
+   * ================= 制片档案（T-2026-0926-0001） =================
+   *
+   * 旁路不阻断：档案写盘失败只 console.error，主流程语义零变化。
+   * `ARCHIVE_ENABLED=0` → 完全回到现状路径（回滚开关，与本次改动前逐字一致）。
+   * 管线类型：营销片（含情报层）/ 叙事片，落进 manifest.pipelineKind 供跨会话承接。
+   */
+  const archiveEnabled = (process.env.ARCHIVE_ENABLED ?? "1") !== "0";
+  const pipelineKind: PipelineKind = input.isMarketing ? "marketing" : "narrative";
+  const archive = archiveEnabled
+    ? new ArchiveStore(path.resolve(WORK_DIR), scope.workspaceId, input.projectId, pipelineKind, {
+        aspectRatio: (input.metadata as Record<string, unknown> | undefined)?.aspectRatio ?? null,
+      })
+    : null;
+  /** 结构化日志镜像的"当前环节"（StageRunner 在环节边界更新；与文本 tee 并行） */
+  const stageRef: { name: string | null; attempt: number } = { name: null, attempt: 0 };
+  const runner = archive
+    ? new StageRunner(archive, makeLedgerWriter(scope), entry.runId, {
+        onStart: (stageId, attempt) => {
+          stageRef.name = stageId;
+          stageRef.attempt = attempt;
+        },
+      })
+    : null;
+  /** 交接包线索（来自真实事件，不猜）：门裁决 + 时长投影 */
+  const decisionLog: string[] = [];
+
   const onEvent: EventSink = async (e) => {
+    try {
+      if (e.kind === "pipeline.duration.projected") {
+        const target = (e.payload as { targetSeconds?: unknown } | undefined)?.targetSeconds;
+        const source = (e.payload as { source?: unknown } | undefined)?.source;
+        if (typeof target === "number" && target > 0) {
+          decisionLog.push(`时长：投影目标 ${target}s${typeof source === "string" ? `（source=${source}）` : ""}`);
+        }
+      } else if (e.kind === "pipeline.gate.resolved") {
+        const payload = (e.payload ?? {}) as { approved?: unknown; reason?: unknown };
+        decisionLog.push(
+          `门 ${e.gate ?? "-"}：${payload.approved ? "放行" : "打回"}${payload.reason ? `（${String(payload.reason).slice(0, 120)}）` : ""}`,
+        );
+      }
+      if (decisionLog.length > 20) decisionLog.splice(0, decisionLog.length - 20);
+    } catch (err) {
+      console.error(`[archive] 交接线索采集失败（不影响运行）: ${(err as Error).message}`);
+    }
+    /**
+     * 进度心跳（规格书 §5.2 写盘点②）：预生产单环节跑几十分钟，没有心跳就无法区分
+     * 「慢」与「死」。vendor 的门请求/放行、时长投影就是真实进度信号，直接转成档案心跳
+     * （文件 events.jsonl + PG last_heartbeat_at，PG 侧 5s 节流）。
+     */
+    if (runner && (e.kind === "pipeline.gate.requested" || e.kind === "pipeline.gate.resolved" || e.kind === "pipeline.duration.projected")) {
+      const ctx = runner.currentContext();
+      if (ctx) {
+        void ctx.heartbeat({ event: e.kind, ...(e.gate ? { gate: e.gate } : {}) }).catch((err) => {
+          console.error(`[archive] heartbeat 写入失败: ${(err as Error).message}`);
+        });
+      }
+    }
     await gatewayAppend(getGatewayPool(), { ...scope, actor: { ...WORKER_ACTOR } }, {
       who: { ...WORKER_ACTOR },
       context: {
@@ -600,21 +668,174 @@ export function startRun(scope: Scope, input: RunInput): string {
 
   // 异步执行：不阻塞 tRPC 响应；终态只写注册表投影（生命周期事件由 onEvent 落库）
   void (async () => {
+    /**
+     * 项目级执行者租约（规格书 §11：同一项目同一时刻只允许一个执行者，杜绝双写与重复烧额度）。
+     * 会话级 advisory lock 持有到 run 结束；进程被 kill -9 → 连接断开 → 锁自动释放。
+     */
+    const lease = runner
+      ? await acquireProjectLease(input.projectId).catch((err) => {
+          console.error(`[archive] 项目租约获取异常（按无锁继续，档案仍落文件）: ${(err as Error).message}`);
+          return "error" as const;
+        })
+      : null;
+    if (lease === null && runner) {
+      entry.status = "failed";
+      entry.error = `项目 ${input.projectId} 已有执行者持有档案租约（不重复启动，避免双份烧额度）`;
+      console.error(`[studio-worker] ${entry.error}`);
+      restoreRunLogs();
+      uninstallPortraitBinding();
+      entry.finishedAt = new Date().toISOString();
+      return;
+    }
+    const activeLease = lease && lease !== "error" ? lease : null;
+    const detachStructuredLog = archive ? attachStructuredLog(archive, {
+      currentStage: () => stageRef.name,
+      currentAttempt: () => stageRef.attempt,
+    }) : null;
+    /** 项目元数据（thread_id 进交接包，跨会话承接对得上任务线程）；读失败不阻断 */
+    let projectMeta: Awaited<ReturnType<typeof readProjectMeta>> = null;
     try {
+      if (archive) {
+        try {
+          await archive.ensure();
+          projectMeta = await readProjectMeta(scope, input.projectId).catch(() => null);
+          await archive.appendJsonl("events.jsonl", {
+            kind: "run.started",
+            runId: entry.runId,
+            pipelineKind,
+            threadId: projectMeta?.threadId ?? null,
+            intent: input.intent.slice(0, 200),
+          });
+        } catch (err) {
+          console.error(`[archive] 档案初始化失败（继续执行）: ${(err as Error).message}`);
+        }
+      }
       /**
        * AI 监制打回 → **有上限的自动重跑**（T-2026-0925-0002）。
        *
        * 门语义是"打回重跑"：此前一次被打回就整条停线，等于把返工成本丢给用户
        * （真机 VID-AUDIT-M2/M3/M5 均因单次打回停线）。默认重跑 1 次，
        * `VM_PRODUCER_RETRY` 可调（0 = 打回即停，与旧行为一致）。
+       *
+       * 制片档案口径（T-2026-0926-0001）：每次重跑 = 新 attempt（`claimRun` 原子递增），
+       * 「第几次尝试、耗时、错误分类」全部落盘，历史不丢。
        */
       const maxAttempts = Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 1) + 1);
-      let result = await studio.runPreproduction(input);
+      const runOnce = async (): Promise<Awaited<ReturnType<typeof studio.runPreproduction>>> => {
+        const runnerStore = archive;
+        if (!runner || !runnerStore) return studio.runPreproduction(input);
+        return (await runner.run(
+          "preproduction",
+          { intent: input.intent, isMarketing: input.isMarketing ?? false, pipelineKind },
+          async (ctx) => {
+            /**
+             * 断点快照（真机发现的方案缺陷修复，T-2026-0926-0001 留痕）：
+             * vendor 在 Phase checkpoint 指纹不匹配时会**删除**自己的 checkpoint
+             * （production-engine.js#_loadLatestCheckpoint），"曾经有断点但恢复没命中"这段证据
+             * 会被重跑就地销毁。开跑前先只读快照进档案，供恢复对账与工程发现。
+             */
+            const preCheckpoints = await runnerStore
+              .snapshotExternalDir(
+                path.resolve(WORK_DIR, "checkpoints", input.projectId),
+                `checkpoints/attempt-${ctx.attempt}-before`,
+                { filter: (name) => name.endsWith(".json") },
+              )
+              .catch((err) => {
+                console.error(`[archive] 断点快照失败（继续执行）: ${(err as Error).message}`);
+                return { files: 0, bytes: 0, skipped: [] as string[] };
+              });
+            const r = await studio.runPreproduction(input);
+            await ctx.heartbeat({ stages: Object.keys(r.stages ?? {}) });
+            const vendorResumed = (r as unknown as { resumed?: unknown }).resumed === true;
+            const vendorDegraded = (r as unknown as { degraded?: unknown }).degraded === true;
+            if (preCheckpoints.files > 0) {
+              await ctx.log(
+                "info",
+                `断点快照 ${preCheckpoints.files} 个文件 / ${preCheckpoints.bytes}B；本轮 vendor resumed=${vendorResumed}`,
+                { files: preCheckpoints.files, resumed: vendorResumed, attempt: ctx.attempt },
+              );
+              decisionLog.push(
+                `第 ${ctx.attempt} 次尝试：开跑前存在 ${preCheckpoints.files} 个 Phase checkpoint，本轮 resumed=${vendorResumed}`,
+              );
+            }
+            /**
+             * 环节自评（诚实台账）：vendor 跑完但 `success:false`（含 AI 监制打回）时，
+             * 台账必须记 failed + 错误分类，否则监控器把真实失败聚类成 BUG 或完全看不见。
+             */
+            const rejected = isProducerRejection(r);
+            /**
+             * 失败原因取 vendor 的 `result.errors[]`（真实证据：哪个环节、什么错）。
+             * 只写 `success:false` 会让监控把所有业务失败都聚类成 BUG（P0 误升级）。
+             */
+            const rawErrors = (r as unknown as { errors?: unknown }).errors;
+            const vendorErrors = Array.isArray(rawErrors)
+              ? (rawErrors as Array<Record<string, unknown>>).slice(0, 10)
+              : [];
+            const vendorFailure = vendorErrors
+              .map((entry) => `${String(entry.stage ?? entry.layer ?? "unknown")}: ${String(entry.message ?? entry.error ?? "")}`.trim())
+              .filter(Boolean)
+              .join("；");
+            const failureMessage = String(
+              (r as { error?: unknown }).error
+                ?? (r as { errorMessage?: unknown }).errorMessage
+                ?? (vendorFailure || "预生产未成功（vendor 返回 success:false）"),
+            ).slice(0, 500);
+            const outcome = r.success
+              ? undefined
+              : {
+                  status: "failed" as const,
+                  errorClass: rejected ? "GATE_REJECTED" : classifyError(new Error(failureMessage)),
+                  errorMsg: failureMessage,
+                };
+            /**
+             * 营销片：收编情报档案指针（dossier 在档案夹之外，跨会话承接不断链）；
+             * 字段口径对齐既有 resultSummary 摘要（studio-worker.ts resultSummary）。
+             */
+            const dm = (r.stages?.dataMining ?? null) as
+              | { status?: string; product_id?: string; data?: { dossier?: { provenance?: unknown[] } } }
+              | null;
+            return {
+              output: {
+                success: r.success,
+                stages: Object.keys(r.stages ?? {}),
+                checkpointDir: `checkpoints/${input.projectId}`,
+                ...(preCheckpoints.files > 0
+                  ? {
+                      preCheckpointSnapshot: {
+                        dir: `checkpoints/attempt-${ctx.attempt}-before`,
+                        files: preCheckpoints.files,
+                        bytes: preCheckpoints.bytes,
+                        resumed: vendorResumed,
+                      },
+                    }
+                  : {}),
+                resumed: vendorResumed,
+                degraded: vendorDegraded,
+                ...(failureMessage && !r.success ? { failureMessage } : {}),
+                ...(vendorErrors.length ? { failures: vendorErrors } : {}),
+                ...(dm
+                  ? {
+                      dossier: {
+                        root: `dossiers/${scope.workspaceId}`,
+                        productId: dm.product_id ?? null,
+                        evidenceCount: Array.isArray(dm.data?.dossier?.provenance)
+                          ? dm.data!.dossier!.provenance!.length
+                          : 0,
+                      },
+                    }
+                  : {}),
+              },
+              ...(outcome ? { outcome } : {}),
+            };
+          },
+        )) as Awaited<ReturnType<typeof studio.runPreproduction>>;
+      };
+      let result = await runOnce();
       let attempts = 1;
       while (attempts < maxAttempts && isProducerRejection(result)) {
         attempts += 1;
         console.log(`[studio-worker] AI 监制打回 → 自动重跑第 ${attempts}/${maxAttempts} 次（同一项目、同一门口径）`);
-        result = await studio.runPreproduction(input);
+        result = await runOnce();
       }
       entry.status = "finished";
       /** 情报层产出摘要（逐环节审计要看得见"档案到底有没有装订出来"） */
@@ -642,10 +863,60 @@ export function startRun(scope: Scope, input: RunInput): string {
             }
           : {}),
       };
+      /** 终态交接包（改动 D）：跨会话承接只凭 projectId + 档案夹即可续跑，不依赖原始上下文 */
+      if (archive) {
+        try {
+          const producerRejected = isProducerRejection(result);
+          await updateContextBundle(archive, {
+            pipelineKind,
+            threadId: projectMeta?.threadId ?? null,
+            lastStage: "preproduction",
+            ...(result.success
+              ? {}
+              : {
+                  failedStage: "preproduction",
+                  errorClass: producerRejected ? "GATE_REJECTED" : classifyError(new Error(entry.error ?? "预生产未成功")),
+                  errorMsg: String((result as { error?: unknown }).error ?? "vendor 返回 success:false").slice(0, 500),
+                }),
+            decisions: [
+              `预生产${result.success ? "完成" : "**未成功**"}（归档 attempt=${stageRef.attempt || "-"}；本次运行内重试 ${attempts} 次；内部环节 ${Object.keys(result.stages ?? {}).length} 个）`,
+              ...decisionLog,
+              ...(dataMiningStage
+                ? [
+                    `情报档案：dossiers/${scope.workspaceId}（商品 ${dataMiningStage.product_id ?? "未标注"}，证据 ${
+                      Array.isArray(dataMiningStage.data?.dossier?.provenance)
+                        ? dataMiningStage.data!.dossier!.provenance!.length
+                        : 0
+                    } 条）`,
+                  ]
+                : []),
+            ],
+            nextSteps: ["预生产完成 → 渲染提交（video.render.submit）或按交付包进入后期/交付段"],
+          });
+        } catch (err) {
+          console.error(`[archive] 交接包写入失败（不影响运行）: ${(err as Error).message}`);
+        }
+      }
     } catch (err) {
       entry.status = "failed";
       entry.error = err instanceof Error ? err.message : String(err);
+      if (archive) {
+        try {
+          await updateContextBundle(archive, {
+            pipelineKind,
+            threadId: projectMeta?.threadId ?? null,
+            failedStage: "preproduction",
+            errorClass: classifyError(err),
+            errorMsg: entry.error,
+            decisions: decisionLog,
+          });
+        } catch (bundleErr) {
+          console.error(`[archive] 失败交接包写入失败: ${(bundleErr as Error).message}`);
+        }
+      }
     } finally {
+      detachStructuredLog?.();
+      if (activeLease) await activeLease.release();
       restoreRunLogs();
       uninstallPortraitBinding();
       entry.finishedAt = new Date().toISOString();

@@ -18,6 +18,8 @@ import { videoGenPool } from "./gen/providers.js";
 import { downloadToMediaStore, registerFinalCut } from "./gen/ingest.js";
 import { findModelByProviderModel } from "./gen/catalog.js";
 import { recordRenderCost, usdCnyRate } from "./gen/cost.js";
+import { classifyProviderError, logStageOutcome, type ArchiveStore, type StageLedgerWriter } from "@hyperreality/video-studio";
+import { makeStageArchive } from "./archive-host.js";
 
 interface Scope { tenantId: string; workspaceId: string }
 
@@ -66,6 +68,13 @@ export async function pollRenderJobs(
     /** 成片入库开关（默认 true；测试可关） */
     ingest?: boolean;
     fetchImpl?: typeof fetch;
+    /**
+     * 制片档案句柄（T-2026-0926-0002）：
+     *   - 缺省（undefined）= 按 HR_WORK_DIR/ARCHIVE_ENABLED 自建；
+     *   - `null` = 显式关闭（测试用）；
+     *   - 显式传入 = 复用调用方句柄（同一项目多次轮询共用一个 store）。
+     */
+    archive?: { store: ArchiveStore; ledger: StageLedgerWriter } | null;
   } = {},
 ): Promise<PollReport> {
   // 生成池：基座 provider（Kling/即梦等）与视频接缝 provider（Ark 带参数 / Higgsfield / MuAPI）合并，
@@ -77,6 +86,14 @@ export async function pollRenderJobs(
     ["jimeng", new MockGenProvider("jimeng")],
   ]);
   const report: PollReport = { checked: 0, done: 0, failed: 0, running: 0, ingested: 0, details: [] };
+  /** 档案句柄（每个项目一个：同一 job 的多次轮询不会重复开 attempt，只有终态才记账） */
+  const archiveCache = new Map<string, { store: ArchiveStore; ledger: StageLedgerWriter } | null>();
+  const archiveFor = (projectId: string) => {
+    if (opts.archive === null) return null;
+    if (opts.archive) return opts.archive;
+    if (!archiveCache.has(projectId)) archiveCache.set(projectId, makeStageArchive(scope, projectId));
+    return archiveCache.get(projectId) ?? null;
+  };
 
   const client = await app.connect();
   let jobs: OpenJob[];
@@ -243,6 +260,37 @@ export async function pollRenderJobs(
 
       if (done) report.done += 1; else report.failed += 1;
       if (ingested) report.ingested += 1;
+
+      /* ---- ④ 环节台账（T-2026-0926-0002）：每个 job 的终态迁移记一次 attempt（append-only） ---- */
+      const archiveWriter = archiveFor(job.project_id);
+      if (archiveWriter) {
+        try {
+          await logStageOutcome(archiveWriter.store, archiveWriter.ledger, {
+            stageId: "renderPoll",
+            status: done ? "done" : "failed",
+            input: { jobId: job.id, taskId: job.task_id, provider: provider.providerId, scriptId: job.script_id },
+            output: {
+              jobId: job.id,
+              taskId: job.task_id,
+              assetId: ingested?.assetId ?? null,
+              provider: provider.providerId,
+              providerModel: job.provider_model ?? null,
+              actualSeconds: actualUnits,
+              actualCny: actualCny,
+              pricing: pricingMode,
+              resultUrl: result.uri ?? null,
+              ingest: done ? (ingestError ? { ok: false, error: ingestError } : { ok: Boolean(ingested) }) : null,
+            },
+            errorClass: done ? null : classifyProviderError(result.error ?? "provider failed"),
+            errorMsg: done ? null : (result.error ?? "供应商返回 failed（无原因文本）"),
+            cost: { cashCny: actualCny },
+            runId: null,
+          });
+        } catch (err) {
+          console.error(`[render-poller] 档案记账失败（不影响回填）job=${job.id}：${(err as Error).message}`);
+        }
+      }
+
       report.details.push({
         jobId: job.id, status: done ? "done" : "failed", uri: result.uri,
         error: result.error, assetId: ingested?.assetId,
@@ -254,6 +302,26 @@ export async function pollRenderJobs(
         `UPDATE render_jobs SET status='rendering' WHERE id=$1 AND workspace_id=$2 AND status='submitted'`,
         [job.id, scope.workspaceId],
       );
+      /**
+       * 进度心跳（T-2026-0926-0002，规格书 §6.2 改动 B）：
+       * "慢" 与 "死" 必须可区分——in-flight 只写档案事件（带 jobId/taskId），不开新 attempt，
+       * 避免每拍轮询都污染台账（台账只记终态迁移）。
+       */
+      const heartbeatArchive = archiveFor(job.project_id);
+      if (heartbeatArchive) {
+        try {
+          await heartbeatArchive.store.appendJsonl("events.jsonl", {
+            kind: "stage.heartbeat",
+            stageId: "renderPoll",
+            jobId: job.id,
+            taskId: job.task_id,
+            provider: provider.providerId,
+            status: "rendering",
+          });
+        } catch (err) {
+          console.error(`[render-poller] 档案心跳写入失败（不影响回填）job=${job.id}：${(err as Error).message}`);
+        }
+      }
       report.running += 1;
       report.details.push({ jobId: job.id, status: "running" });
     }
