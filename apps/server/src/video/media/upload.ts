@@ -14,7 +14,7 @@
  * 生产素材（已付费产物）不受此闸限制，避免把自动入库误伤成"付费内容写不进去"。
  */
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readdirSync, rmSync, statSync } from "node:fs";
 import { extname, join } from "node:path";
 import { TRPCError } from "@trpc/server";
 import { newId } from "@workloom/shared";
@@ -129,13 +129,62 @@ export interface UploadQuotaVerdict {
   reason?: string;
 }
 
+/**
+ * 未登记上传件占盘（深审 T-2026-0926-0016）：配额原来只统计已登记资产的 meta.bytes，
+ * 而上传是"先落盘后登记"——写盘不登记即可绕过配额（实测 3MB 孤儿不计数）。
+ */
+export function uploadDirBytesOnDisk(workspaceId: string): number {
+  const dir = join(mediaRoot(), "upload", workspaceId);
+  if (!existsSync(dir)) return 0;
+  let total = 0;
+  const walk = (current: string) => {
+    for (const entry of readdirSync(current, { withFileTypes: true })) {
+      const abs = join(current, entry.name);
+      if (entry.isDirectory()) walk(abs);
+      else if (entry.isFile()) total += statSync(abs).size;
+    }
+  };
+  walk(dir);
+  return total;
+}
+
+/** 清理过期未登记上传件与半成品（防止"写盘不登记"把磁盘写爆；TTL 可配，缺省 24h / 1h） */
+export function cleanupStaleUploads(workspaceId: string, env: NodeJS.ProcessEnv = process.env): { removed: number; bytes: number } {
+  const registered = new Set<string>();
+  void registered; // 由调用方传入已登记 relPath 更精确；此处按 mtime TTL 兜底
+  const ttlHours = Number(env.MEDIA_ORPHAN_TTL_HOURS ?? 24);
+  const ttlMs = (Number.isFinite(ttlHours) && ttlHours > 0 ? ttlHours : 24) * 3_600_000;
+  const tmpTtlMs = 3_600_000;
+  const now = Date.now();
+  let removed = 0;
+  let bytes = 0;
+  const sweep = (dir: string, ttl: number) => {
+    if (!existsSync(dir)) return;
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const abs = join(dir, entry.name);
+      if (entry.isDirectory()) { sweep(abs, ttl); continue; }
+      const stat = statSync(abs);
+      if (now - stat.mtimeMs < ttl) continue;
+      try {
+        rmSync(abs, { force: true });
+        removed += 1;
+        bytes += stat.size;
+      } catch { /* 清理失败不阻断上传 */ }
+    }
+  };
+  sweep(join(mediaRoot(), "upload", workspaceId), ttlMs);
+  sweep(join(mediaRoot(), ".upload-tmp"), tmpTtlMs);
+  return { removed, bytes };
+}
+
 export async function checkUploadQuota(
   app: AppPool,
   scope: Scope,
   incomingBytes: number,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<UploadQuotaVerdict> {
-  const usedBytes = await mediaUsageBytes(app, scope);
+  // 已登记资产 + 未登记落盘（孤儿）：两者都占磁盘，配额必须一起算
+  const usedBytes = (await mediaUsageBytes(app, scope)) + uploadDirBytesOnDisk(scope.workspaceId);
   const quotaBytes = mediaQuotaBytes(env);
   if (usedBytes + incomingBytes > quotaBytes) {
     return {

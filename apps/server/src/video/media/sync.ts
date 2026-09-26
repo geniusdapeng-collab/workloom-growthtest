@@ -70,15 +70,17 @@ export interface EnrollResult {
 /** 云端控制台签发设备（一次性展示 deviceKey；库内只存身份与状态） */
 export async function enrollDevice(
   app: AppPool, scope: Scope,
-  input: { label: string; by: string; env?: NodeJS.ProcessEnv },
+  input: { label: string; by: string; env?: NodeJS.ProcessEnv; ttlDays?: number },
 ): Promise<EnrollResult> {
   const label = input.label.trim();
   if (!label) throw new Error("设备名不能为空");
   const id = newId("SD");
+  const ttlDays = Number(input.env?.MEDIA_SYNC_DEVICE_TTL_DAYS ?? input.ttlDays ?? 90);
+  const days = Number.isFinite(ttlDays) && ttlDays > 0 ? Math.floor(ttlDays) : 90;
   await scopedQuery(app, scope,
-    `INSERT INTO media_sync_devices (id, workspace_id, label, created_by)
-     VALUES ($1,$2,$3,$4)`,
-    [id, scope.workspaceId, label, input.by]);
+    `INSERT INTO media_sync_devices (id, workspace_id, label, created_by, expires_at)
+     VALUES ($1,$2,$3,$4, now() + ($5 || ' days')::interval)`,
+    [id, scope.workspaceId, label, input.by, String(days)]);
   return {
     deviceId: id,
     deviceKey: deviceKeyFor(id, input.env ?? process.env),
@@ -88,13 +90,16 @@ export async function enrollDevice(
 }
 
 export async function listDevices(app: AppPool, scope: Scope): Promise<Array<{
-  id: string; label: string; status: string; lastSeenAt: string | null; createdAt: string;
+  id: string; label: string; status: string; lastSeenAt: string | null; createdAt: string; expiresAt: string; expired: boolean;
 }>> {
-  const rows = await scopedQuery<{ id: string; label: string; status: string; last_seen_at: string | null; created_at: string }>(
+  const rows = await scopedQuery<{ id: string; label: string; status: string; last_seen_at: string | null; created_at: string; expires_at: string; expired: boolean }>(
     app, scope,
-    `SELECT id, label, status, last_seen_at, created_at FROM media_sync_devices
-      WHERE workspace_id = $1 ORDER BY created_at DESC`, [scope.workspaceId]);
-  return rows.map((r) => ({ id: r.id, label: r.label, status: r.status, lastSeenAt: r.last_seen_at, createdAt: r.created_at }));
+    `SELECT id, label, status, last_seen_at, created_at, expires_at, (expires_at <= now()) AS expired
+       FROM media_sync_devices WHERE workspace_id = $1 ORDER BY created_at DESC`, [scope.workspaceId]);
+  return rows.map((r) => ({
+    id: r.id, label: r.label, status: r.status, lastSeenAt: r.last_seen_at,
+    createdAt: isoOf(r.created_at), expiresAt: isoOf(r.expires_at), expired: r.expired === true,
+  }));
 }
 
 export async function revokeDevice(app: AppPool, scope: Scope, deviceId: string): Promise<{ revoked: boolean }> {
@@ -133,8 +138,8 @@ export async function verifyDeviceRequest(owner: AppPool, input: DeviceAuthInput
    * 校验发生在"还不知道是哪个 workspace"的时刻，因此这里用 owner 连接直查（表 owner 天然绕过 RLS），
    * 且只按设备主键命中一行、只取校验所需字段——不把设备表暴露成跨租户列表。
    */
-  const ownerRows = await owner.query<{ id: string; workspace_id: string; tenant_id: string; label: string; status: string }>(
-    `SELECT d.id, d.workspace_id, w.tenant_id, d.label, d.status
+  const ownerRows = await owner.query<{ id: string; workspace_id: string; tenant_id: string; label: string; status: string; expired: boolean }>(
+    `SELECT d.id, d.workspace_id, w.tenant_id, d.label, d.status, (d.expires_at <= now()) AS expired
        FROM media_sync_devices d JOIN workspaces w ON w.id = d.workspace_id
       WHERE d.id = $1`,
     [input.deviceId]);
@@ -142,6 +147,7 @@ export async function verifyDeviceRequest(owner: AppPool, input: DeviceAuthInput
   const device = rows[0];
   if (!device) return { ok: false, code: "DEVICE_UNKNOWN" };
   if (device.status !== "active") return { ok: false, code: "DEVICE_REVOKED" };
+  if ((device as { expired?: boolean }).expired) return { ok: false, code: "DEVICE_EXPIRED" };
   const expect = Buffer.from(deviceSignature({
     method: input.method, path: input.path, timestamp: input.timestamp, bodySha256: bodyHash(input.body),
   }, deviceKeyFor(device.id, input.env)));
