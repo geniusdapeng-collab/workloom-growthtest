@@ -12,7 +12,7 @@
  * 纪律：任一 FAIL 即整体 FAIL；**SKIP 必须带理由**（如"本片未用音效"），不允许静默跳过。
  */
 import { spawn } from "node:child_process";
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { resolvePython } from "./asr-aligner.js";
 import { engineDirOf } from "./engine.js";
@@ -28,6 +28,10 @@ export interface GateInput {
   baseline?: string | null;
   /** 抽帧宽度（竖屏 540） */
   qaScale?: number;
+  /** 画幅（决定抖动采样窗的裁剪带：竖屏 1080 宽，横屏 1920 宽） */
+  aspect?: "9:16" | "16:9";
+  /** 分镜起止（每镜取一个采样窗，替代 motion_check 的 18s 自动采样） */
+  shots?: Array<{ id: string; start: number; end: number }>;
   engineDir?: string;
   env?: NodeJS.ProcessEnv;
   onLog?: (line: string) => void;
@@ -91,6 +95,19 @@ export async function runMachineGates(input: GateInput): Promise<GateRunResult> 
   {
     const args = [join(engineDir, "scripts/motion_check.py"), video];
     if (input.baseline && existsSync(input.baseline)) args.push("--baseline", input.baseline);
+    /**
+     * 显式采样窗（而不是让脚本每 18s 自动采）：脚本的 DEFAULT_CROP 是横屏版面口径
+     * （1200×120@(150,150)），竖屏 1080 宽会让 ffmpeg crop 直接报错——抖动闸等于没跑。
+     * 这里按画幅给出合法裁剪带，并按**每镜取一点**（首镜动作落点 + 镜中段）覆盖全片。
+     */
+    const band = (input.aspect ?? "9:16") === "9:16" ? "1080:140:0:1500" : "1200:120:150:150";
+    const windows = new Set<string>();
+    for (const shot of input.shots ?? []) {
+      windows.add(`${Math.max(1, Math.round((shot.start + 1.2) * 100) / 100)},${band}`);
+      const mid = (shot.start + shot.end) / 2;
+      windows.add(`${Math.round(mid * 100) / 100},${band}`);
+    }
+    for (const window of windows) args.push("--window", window);
     args.push("--anchors", anchors);
     const r = await run(python, args, { cwd: input.jobDir, env, timeoutMs, onLog: input.onLog });
     const info = summarize(r.stdout, r.stderr);
@@ -121,9 +138,18 @@ export async function runMachineGates(input: GateInput): Promise<GateRunResult> 
     });
   } else {
     const solo = join(input.jobDir, "out", "sfx-solo.wav");
-    let soloOk = existsSync(solo);
+    /**
+     * solo 轨与 props 同源：props（cue 位置/音量）比 solo 新时必须重渲——
+     * 复用旧 solo 会让"音效在场"闸对着**上一版的 cue 表**检查（真机踩过：
+     * cue 挪进气口后闸仍读 02:39 的旧轨，报"中位峰值 -140dBFS"，其实新轨没渲）。
+     */
+    const propsFile = join(input.jobDir, "remotion", "props.json");
+    const soloFresh = existsSync(solo) && existsSync(propsFile)
+      && statSync(solo).mtimeMs >= statSync(propsFile).mtimeMs;
+    let soloOk = soloFresh;
     let soloErr = "";
     if (!soloOk) {
+      if (existsSync(solo)) input.onLog?.("[sfx_check] props 比 solo 轨新 → 重渲 solo 轨（不复用旧口径）");
       const args = [
         join(engineDir, "scripts/render_shots.mjs"),
         "--shots", "shots.json", "--audio", "../out/sfx-solo.wav",

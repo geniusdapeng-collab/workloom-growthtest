@@ -355,6 +355,8 @@ export const explainerRouter = router({
       const cueCount = existsSync(cuesPath) ? (JSON.parse(readFileSync(cuesPath, "utf8")) as unknown[]).length : 0;
       const { report } = await runMachineGates({
         jobDir: row.job_dir, cards, cueCount, engineDir,
+        aspect: "9:16",
+        shots: JSON.parse(readFileSync(join(row.job_dir, "remotion", "shots.json"), "utf8")) as Array<{ id: string; start: number; end: number }>,
         onLog: (line) => console.log(`[explainer:finalize] ${line}`),
       });
       await updateShotbook(scope, row.id, { qaReport: report });

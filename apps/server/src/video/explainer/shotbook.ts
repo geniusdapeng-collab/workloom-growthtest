@@ -359,30 +359,6 @@ export function shotbookFromPlan(
     const text = indexes.map((i) => textOf.get(i) ?? "").join("");
     const start = spans[0]!.start;
     const end = spans[spans.length - 1]!.end;
-    const sfx = (entry.sfx ?? []).map((cue) => {
-      let t = cue.t ?? null;
-      if (t === null && cue.at) {
-        /**
-         * 两种锚法：
-         *   `"3@0.2"`     —— 第 3 句起点 + 0.2s（画面动作落点）；
-         *   `"end-0.35"`  —— 本镜镜尾前 0.35s（**句间气口**；引擎纪律：转场/边界 cue 要落在气口里，
-         *                    埋在语音里等于没放——sfx_check --mix 会以 MASKED 比例判 FAIL）。
-         */
-        const tail = /^end\s*-\s*([\d.]+)$/i.exec(cue.at.trim());
-        if (tail) {
-          t = end - Number(tail[1]);
-        } else {
-          const [anchor, offsetRaw] = cue.at.split("@");
-          const sentenceIndex = Number(anchor?.replace(/^s/i, ""));
-          const offset = Number(offsetRaw ?? 0);
-          const sentence = byIndex.get(sentenceIndex);
-          if (!sentence) throw new Error(`分镜计划 ${entry.id} 的 sfx 锚点句号不存在：${cue.at}`);
-          t = sentence.start + (Number.isFinite(offset) ? offset : 0);
-        }
-      }
-      if (t === null) throw new Error(`分镜计划 ${entry.id} 的 sfx 缺 t 或 at（at 形如 "3@0.2"）`);
-      return { t: Math.round(t * 1000) / 1000, name: cue.name, vol: cue.vol ?? 0.3 };
-    });
     return {
       id: entry.id,
       start: Math.round(start * 1000) / 1000,
@@ -393,11 +369,40 @@ export function shotbookFromPlan(
       replace: entry.replace ?? [],
       skin: entry.skin ?? {},
       material: entry.material ?? { kind: "文" as const },
-      sfx,
+      // 音效落点在第一遍先保留锚点表达式（`end-0.35` 依赖**首尾相接后**的镜尾，见下面的第二遍）
+      sfx: [] as Array<{ t: number; name: string; vol: number }>,
+      _sfxPlan: entry.sfx ?? [],
       notes: entry.notes ?? "",
     };
   });
   const chained = chainShotTimes(shots, timestamps.total);
+  /**
+   * 音效落点第二遍（真机修正）：`end-0.35` 必须用**首尾相接后的镜尾**——
+   * 首遍用的是"末句结束"，接缝之前落在语音里，sfx_check --mix 会判 MASKED
+   * （实测 14 记 cue 全部不在气口：识别的 14 处 ≥0.5s 气口里 cue 命中 0 处）。
+   */
+  for (const shot of chained) {
+    const plan = (shot as unknown as { _sfxPlan?: ShotPlan["shots"][number]["sfx"] })._sfxPlan ?? [];
+    shot.sfx = plan.map((cue) => {
+      let t = cue.t ?? null;
+      if (t === null && cue.at) {
+        const tail = /^end\s*-\s*([\d.]+)$/i.exec(cue.at.trim());
+        if (tail) {
+          t = shot.end - Number(tail[1]);
+        } else {
+          const [anchor, offsetRaw] = cue.at.split("@");
+          const sentenceIndex = Number(anchor?.replace(/^s/i, ""));
+          const offset = Number(offsetRaw ?? 0);
+          const sentence = byIndex.get(sentenceIndex);
+          if (!sentence) throw new Error(`分镜计划 ${shot.id} 的 sfx 锚点句号不存在：${cue.at}`);
+          t = sentence.start + (Number.isFinite(offset) ? offset : 0);
+        }
+      }
+      if (t === null) throw new Error(`分镜计划 ${shot.id} 的 sfx 缺 t 或 at（at 形如 "3@0.2" 或 "end-0.35"）`);
+      return { t: Math.round(t * 1000) / 1000, name: cue.name, vol: cue.vol ?? 0.3 };
+    });
+    delete (shot as unknown as Record<string, unknown>)._sfxPlan;
+  }
   const rhythm = plan.rhythm ?? shots.map((shot, index) => ({
     shotId: shot.id,
     hostForm: RULE_HOST_FORMS[index % RULE_HOST_FORMS.length]!,

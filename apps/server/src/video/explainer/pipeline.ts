@@ -317,6 +317,8 @@ export async function runExplainerPipeline(input: ExplainerRunInput): Promise<Ex
   const { report } = await runMachineGates({
     jobDir, cards: build.cards, cueCount: build.sfxFiles.length > 0 ? countCues(build) : 0,
     baseline: input.baselineHost ?? null, engineDir, env, onLog: log,
+    aspect: input.aspect ?? "9:16",
+    shots: JSON.parse(readFileSync(build.shotsPath, "utf8")) as Array<{ id: string; start: number; end: number }>,
   });
   await stage({
     stageId: "machineGates", status: report.pass ? "done" : "failed",

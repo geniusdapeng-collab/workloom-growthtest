@@ -205,13 +205,20 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
   const endById = new Map(shots.map((s) => [s.id, s.end]));
   const beats = deriveBeats(input.shotbook, input.timestamps, input.semantics);
   const anchors = deriveAnchors(beats, input.shotbook);
+  /**
+   * 锚点窗裁剪：竖屏/横屏各自给一条合法裁剪带（motion_check 的 DEFAULT_CROP 是 1200×120@(150,150)，
+   * 按横屏宽幅版面写的——直接用在 1080 宽的竖屏上会以 "Invalid too big ... width 1200" 崩掉抖动闸）。
+   * 这里给**画面下部信息带**（字幕之上、卡片之下），是静态文字最容易露抖动的位置。
+   */
+  const cropBand = aspect === "9:16" ? "1080:140:0:1500" : "1200:120:150:150";
+  const anchorsWithCrop = anchors.map((a) => ({ ...a, crop: cropBand }));
   const shotsPath = join(remotionDir, "shots.json");
   const beatsPath = join(remotionDir, "beats.json");
   const anchorsPath = join(remotionDir, "anchors.json");
   const cuesPath = join(remotionDir, "cues.json");
   writeFileSync(shotsPath, JSON.stringify(shots, null, 1));
   writeFileSync(beatsPath, JSON.stringify(beats, null, 1));
-  writeFileSync(anchorsPath, JSON.stringify(anchors, null, 1));
+  writeFileSync(anchorsPath, JSON.stringify(anchorsWithCrop, null, 1));
   writeFileSync(cuesPath, JSON.stringify(cues, null, 1));
 
   const props = {
