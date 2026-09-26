@@ -1,0 +1,75 @@
+# 口播解说片管线 · talkcraft-explainer（T-2026-0926-0008）
+# 形态：一份口播稿 + 一条配音 → 字级对齐的图文动效解说片；不跑 vendor 情报/剧本/定妆/逐镜生成链。
+quest: explainer-film
+name: 口播解说片管线
+version: v1
+description: 口播稿→配音(TTS/录音预剪)→字级时间戳→语义标注→SHOTBOOK 分镜→工程装配→素材体检→本机渲染→机器闸六条→独立审片→两遍 loudnorm→媒资库入库→(可选)发布
+steps:
+  - step_key: script-intake
+    name: 口播稿入档
+    owner: explainer-director
+    outputs: [explainer_script]     # 句子数组（数字必须汉字化：逐字锚定按文本对位）
+  - step_key: voice-produce
+    name: 配音制作
+    owner: voice-artist
+    outputs: [voice_track]          # TTS（本机克隆音色）或真人录音；声纹不出本机工位
+  - step_key: voice-trim
+    name: 配音预剪（真人录音必经）
+    owner: voice-artist
+    outputs: [voice_track, cut_report]   # 先 --dry-run 出报告 → 人过目确认 → 才落盘；TTS 产物跳过
+  - step_key: align
+    name: 字级时间戳对齐
+    owner: explainer-director
+    outputs: [timestamps, timing]   # 每个动效节拍都锚在确切的字上；match<0.90 的句进人工听核清单
+  - step_key: semantics
+    name: 语义标注（②-1）
+    owner: explainer-director
+    outputs: [semantics]            # 26 词封闭词表：选卡的需求侧过滤（没有它选卡只剩输入类型一道）
+  - step_key: shotbook
+    name: SHOTBOOK 分镜
+    owner: explainer-director
+    outputs: [shotbook]             # 层矩阵结构化分镜：G0 风格档 + 版式节奏表 + 逐镜层矩阵（机器可验）
+  - step_key: assemble
+    name: 工程装配
+    owner: explainer-director
+    outputs: [explainer_job]        # 模板 + 引擎卡 + 逐镜派生场景 + props/beats/anchors/cues
+  - step_key: preflight
+    name: 素材体检（进渲染前的闸）
+    owner: director
+    outputs: [preflight_report]     # 人物素材/素材盘点；任一 FAIL 不进渲染
+  - step_key: g8-render-submit
+    name: 渲染提交审批（花钱/烧算力门）
+    owner: director
+    gate: G8
+    outputs: [render_job]           # 本机渲染 est=0：额度台账按音频秒数计量（actual_units=秒数）
+  - step_key: render
+    name: 本机分段渲染与回填
+    owner: render-operator
+    outputs: [render_job, video_asset]   # 段缓存 + 帧数断言；成片经 render-poller 回填入库（clip）
+  - step_key: machine-gates
+    name: 机器闸六条（第一重验收）
+    owner: review-analyst
+    outputs: [qa_report]
+    note: 静止/抖动 · 音效在场 · 音效可听 · 卡保真 · 词落点 · 评审材料抽帧拼图；任一 FAIL 不交付
+  - step_key: producer-review
+    name: 制片评审（第二重验收 · 全新上下文）
+    owner: review-analyst
+    outputs: [review_report]
+    note: 材料 = contact_sheet 拼图 + qa_report + SHOTBOOK 可读版；rubric = 摄影八条 + 字幕安全区 + 真图硬规；P0/P1 修完才放行（≤3 轮）
+  - step_key: deliver
+    name: 交付（两遍 loudnorm → 媒资库）
+    owner: post-editor
+    outputs: [final_video, video_asset]   # 第一遍量测、第二遍 linear=true 线性归一；成片入媒资库 kind=final_cut/pipeline_kind=explainer
+  - step_key: revise
+    name: 单镜返修（--changed）
+    owner: explainer-director
+    outputs: [explainer_job, final_video]   # 只重渲该段±邻段；同分镜新版本 + 幂等键 explainer:<shotbookId>:v<n>
+  - step_key: publish-plan
+    name: 发布计划编排（可选）
+    owner: publish-operator
+    outputs: [publish_task]
+  - step_key: g9-publish-confirm
+    name: 公网发布审批（可选）
+    owner: director
+    gate: G9
+    outputs: [publish_task]

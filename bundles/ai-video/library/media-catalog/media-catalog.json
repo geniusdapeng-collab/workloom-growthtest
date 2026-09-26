@@ -691,6 +691,48 @@
       "availability": "wired",
       "docs": "https://github.com/geeklee/srt-whiteboard-animation",
       "notes": "口播解说片（kind=explainer）的第二视觉引擎：SRT 驱动、逐元素手绘揭示。开关 WHITEBOARD_ENABLED=1 + venv 就绪才可用；渲染耗时随幕数与总时长线性增长（真机实测 ~0.4× 实时 @1280/30fps）"
+    },
+    {
+      "id": "remotion-talkcraft",
+      "name": "本机口播解说渲染 · talkcraft 引擎",
+      "provider": "remotion-local",
+      "providerModel": "remotion-4.0.519",
+      "kind": "video",
+      "modes": [
+        "render"
+      ],
+      "tier": "L1",
+      "supports": [
+        "duration",
+        "aspectRatio",
+        "resolution"
+      ],
+      "limits": {
+        "durationSec": {
+          "min": 4,
+          "max": 600,
+          "default": 60
+        },
+        "aspectRatios": [
+          "9:16",
+          "16:9"
+        ],
+        "resolutions": [
+          "1080x1920",
+          "1920x1080"
+        ],
+        "maxPromptChars": 8000
+      },
+      "pricing": {
+        "unit": "second",
+        "usd": 0,
+        "asOf": "2026-09-26",
+        "note": "本机渲染零供应商费用：只花本机算力；额度台账按音频秒数计量（actualUnits=秒数）"
+      },
+      "retentionDays": null,
+      "availability": "wired",
+      "docs": "docs/talkcraft-explainer.md",
+      "notes": "口播解说片专用（T-2026-0926-0008）：提示词不是画面内容，而是数据层（shotbook/口播稿）摘要；要求 TALKCRAFT_ENABLED=1 且引擎安装完整+运行时冒烟通过（video.explainer.engine 可查）。商用时须先取得上游作者书面商业授权。"
     }
   ]
 }

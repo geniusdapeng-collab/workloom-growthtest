@@ -55,7 +55,8 @@
         "presets/subtitle-stylist.yml",
         "presets/trend-researcher.yml",
         "presets/visual-director.yml",
-        "presets/voice-artist.yml"
+        "presets/voice-artist.yml",
+        "presets/explainer-director.yml"
       ],
       "fences": [
         "fences/ai-video-baseline.yml",
@@ -99,7 +100,8 @@
         "skills/voice-delivery-spec/SKILL.md",
         "skills/voice-dubbing-sync/SKILL.md",
         "skills/voice-profile-craft/SKILL.md",
-        "skills/voice-reference-craft/SKILL.md"
+        "skills/voice-reference-craft/SKILL.md",
+        "skills/talkcraft-ops/SKILL.md"
       ],
       "schemas": [
         "schemas/objects.json",
@@ -115,7 +117,8 @@
         "pipelines/ads-creative-factory.yml",
         "pipelines/marketing-film.yml",
         "pipelines/narrative-film.yml",
-        "pipelines/settlement-recon.yml"
+        "pipelines/settlement-recon.yml",
+        "pipelines/explainer-film.yml"
       ],
       "library": [
         "library/bgm-library-curated/acoustic-warm-ghostrifter-official-zeal-456.m4a",
@@ -464,7 +467,8 @@
         "library/templates/prompt-v4-template.md",
         "library/templates/scene-card-template.md",
         "library/templates/shot-card-v4-template.md",
-        "library/typography-recipes/recipes.json"
+        "library/typography-recipes/recipes.json",
+        "library/media-catalog/media-catalog.json"
       ],
       "segmentDefaults": [],
       "connectors": [
