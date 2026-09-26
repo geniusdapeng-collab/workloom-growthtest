@@ -32,6 +32,10 @@ __pycache__/
 *.pyc
 release/
 
+# 手绘白板引擎（vendor/srt-whiteboard）：venv 随机器重建；渲染任务产物不入库
+vendor/srt-whiteboard/.venv/
+var/whiteboard-jobs/
+
 # C 层评测运行产物（本地/评审侧生成）
 outputs/c-layer/
 

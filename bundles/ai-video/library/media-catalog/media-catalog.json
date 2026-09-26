@@ -13,17 +13,47 @@
       "provider": "seedance",
       "providerModel": "doubao-seedance-2-5-260628",
       "kind": "video",
-      "modes": ["t2v", "i2v", "r2v"],
+      "modes": [
+        "t2v",
+        "i2v",
+        "r2v"
+      ],
       "tier": "L3",
-      "supports": ["duration", "aspectRatio", "resolution", "audio", "firstFrame", "references"],
+      "supports": [
+        "duration",
+        "aspectRatio",
+        "resolution",
+        "audio",
+        "firstFrame",
+        "references"
+      ],
       "limits": {
-        "durationSec": { "min": 4, "max": 30, "default": 5 },
-        "resolutions": ["480p", "720p", "1080p"],
-        "aspectRatios": ["16:9", "9:16", "1:1", "4:3", "3:4"],
+        "durationSec": {
+          "min": 4,
+          "max": 30,
+          "default": 5
+        },
+        "resolutions": [
+          "480p",
+          "720p",
+          "1080p"
+        ],
+        "aspectRatios": [
+          "16:9",
+          "9:16",
+          "1:1",
+          "4:3",
+          "3:4"
+        ],
         "maxReferenceImages": 4,
         "maxPromptChars": 4000
       },
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21", "note": "火山方舟按量计费；单价以方舟控制台账单为准（本机未接入账单 API）" },
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "火山方舟按量计费；单价以方舟控制台账单为准（本机未接入账单 API）"
+      },
       "retentionDays": 7,
       "availability": "wired",
       "docs": "https://www.volcengine.com/docs/82379",
@@ -35,16 +65,44 @@
       "provider": "seedance",
       "providerModel": "doubao-seedance-2-0",
       "kind": "video",
-      "modes": ["t2v", "i2v", "r2v"],
+      "modes": [
+        "t2v",
+        "i2v",
+        "r2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "aspectRatio", "resolution", "audio", "firstFrame", "references"],
+      "supports": [
+        "duration",
+        "aspectRatio",
+        "resolution",
+        "audio",
+        "firstFrame",
+        "references"
+      ],
       "limits": {
-        "durationSec": { "min": 4, "max": 12, "default": 5 },
-        "resolutions": ["480p", "720p", "1080p"],
-        "aspectRatios": ["16:9", "9:16", "1:1"],
+        "durationSec": {
+          "min": 4,
+          "max": 12,
+          "default": 5
+        },
+        "resolutions": [
+          "480p",
+          "720p",
+          "1080p"
+        ],
+        "aspectRatios": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
         "maxReferenceImages": 4
       },
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21", "note": "按方舟控制台账单为准" },
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "按方舟控制台账单为准"
+      },
       "retentionDays": 7,
       "availability": "wired",
       "docs": "https://www.volcengine.com/docs/82379",
@@ -56,11 +114,26 @@
       "provider": "seedream",
       "providerModel": "doubao-seedream-5-0-pro-260628",
       "kind": "image",
-      "modes": ["t2i"],
+      "modes": [
+        "t2i"
+      ],
       "tier": "L2",
-      "supports": ["resolution", "seed"],
-      "limits": { "resolutions": ["2K", "4K"] },
-      "pricing": { "unit": "image", "usd": null, "asOf": "2026-09-21", "note": "按方舟控制台账单为准" },
+      "supports": [
+        "resolution",
+        "seed"
+      ],
+      "limits": {
+        "resolutions": [
+          "2K",
+          "4K"
+        ]
+      },
+      "pricing": {
+        "unit": "image",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "按方舟控制台账单为准"
+      },
       "retentionDays": 7,
       "availability": "wired",
       "docs": "https://www.volcengine.com/docs/82379",
@@ -72,11 +145,35 @@
       "provider": "kling",
       "providerModel": "kling-v3.0-std",
       "kind": "video",
-      "modes": ["t2v", "i2v"],
+      "modes": [
+        "t2v",
+        "i2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "aspectRatio", "references"],
-      "limits": { "durationSec": { "min": 5, "max": 10, "default": 5 }, "aspectRatios": ["16:9", "9:16", "1:1"], "maxReferenceImages": 1 },
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21", "note": "以可灵开放平台账单为准" },
+      "supports": [
+        "duration",
+        "aspectRatio",
+        "references"
+      ],
+      "limits": {
+        "durationSec": {
+          "min": 5,
+          "max": 10,
+          "default": 5
+        },
+        "aspectRatios": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ],
+        "maxReferenceImages": 1
+      },
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "以可灵开放平台账单为准"
+      },
       "retentionDays": null,
       "availability": "wired",
       "docs": "https://www.klingai.com/dev",
@@ -88,11 +185,27 @@
       "provider": "kling",
       "providerModel": "kling-v2.6",
       "kind": "video",
-      "modes": ["t2v", "i2v"],
+      "modes": [
+        "t2v",
+        "i2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "aspectRatio"],
-      "limits": { "durationSec": { "min": 5, "max": 10, "default": 5 } },
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21" },
+      "supports": [
+        "duration",
+        "aspectRatio"
+      ],
+      "limits": {
+        "durationSec": {
+          "min": 5,
+          "max": 10,
+          "default": 5
+        }
+      },
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21"
+      },
       "retentionDays": null,
       "availability": "wired",
       "docs": "https://www.klingai.com/dev"
@@ -103,11 +216,29 @@
       "provider": "jimeng",
       "providerModel": "jimeng-video-3.0",
       "kind": "video",
-      "modes": ["t2v", "i2v"],
+      "modes": [
+        "t2v",
+        "i2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "aspectRatio", "firstFrame"],
-      "limits": { "durationSec": { "min": 3, "max": 12, "default": 5 } },
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21", "note": "以火山视觉账单为准" },
+      "supports": [
+        "duration",
+        "aspectRatio",
+        "firstFrame"
+      ],
+      "limits": {
+        "durationSec": {
+          "min": 3,
+          "max": 12,
+          "default": 5
+        }
+      },
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "以火山视觉账单为准"
+      },
       "retentionDays": null,
       "availability": "wired",
       "docs": "https://www.volcengine.com/docs/82379",
@@ -119,15 +250,43 @@
       "provider": "higgsfield",
       "providerModel": "bytedance/seedance-2.0/text-to-video",
       "kind": "video",
-      "modes": ["t2v"],
+      "modes": [
+        "t2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "resolution", "aspectRatio", "audio"],
+      "supports": [
+        "duration",
+        "resolution",
+        "aspectRatio",
+        "audio"
+      ],
       "limits": {
-        "durationSec": { "min": 4, "max": 15, "default": 5 },
-        "resolutions": ["480p", "720p", "1080p", "4k"],
-        "aspectRatios": ["16:9", "9:16", "1:1", "4:3", "3:4"]
+        "durationSec": {
+          "min": 4,
+          "max": 15,
+          "default": 5
+        },
+        "resolutions": [
+          "480p",
+          "720p",
+          "1080p",
+          "4k"
+        ],
+        "aspectRatios": [
+          "16:9",
+          "9:16",
+          "1:1",
+          "4:3",
+          "3:4"
+        ]
       },
-      "pricing": { "unit": "second", "usd": 0.0985, "promo": true, "asOf": "2026-09-20", "note": "官方促销价（原价 0.1407/s）；促销结束按官方价" },
+      "pricing": {
+        "unit": "second",
+        "usd": 0.0985,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销价（原价 0.1407/s）；促销结束按官方价"
+      },
       "retentionDays": 7,
       "availability": "wired",
       "docs": "https://docs.higgsfield.ai/docs/models/seedance-2/text-to-video.md"
@@ -138,15 +297,42 @@
       "provider": "higgsfield",
       "providerModel": "bytedance/seedance-2.0/image-to-video",
       "kind": "video",
-      "modes": ["i2v"],
+      "modes": [
+        "i2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "resolution", "aspectRatio", "audio", "firstFrame"],
+      "supports": [
+        "duration",
+        "resolution",
+        "aspectRatio",
+        "audio",
+        "firstFrame"
+      ],
       "limits": {
-        "durationSec": { "min": 4, "max": 15, "default": 5 },
-        "resolutions": ["480p", "720p", "1080p", "4k"],
-        "aspectRatios": ["16:9", "9:16", "1:1"]
+        "durationSec": {
+          "min": 4,
+          "max": 15,
+          "default": 5
+        },
+        "resolutions": [
+          "480p",
+          "720p",
+          "1080p",
+          "4k"
+        ],
+        "aspectRatios": [
+          "16:9",
+          "9:16",
+          "1:1"
+        ]
       },
-      "pricing": { "unit": "second", "usd": 0.0985, "promo": true, "asOf": "2026-09-20", "note": "官方促销价（原价 0.1407/s）" },
+      "pricing": {
+        "unit": "second",
+        "usd": 0.0985,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销价（原价 0.1407/s）"
+      },
       "retentionDays": 7,
       "availability": "wired",
       "docs": "https://docs.higgsfield.ai/docs/models/seedance-2/image-to-video.md"
@@ -157,11 +343,36 @@
       "provider": "higgsfield",
       "providerModel": "bytedance/seedance-2.5/text-to-video",
       "kind": "video",
-      "modes": ["t2v"],
+      "modes": [
+        "t2v"
+      ],
       "tier": "L3",
-      "supports": ["duration", "resolution", "aspectRatio", "audio"],
-      "limits": { "durationSec": { "min": 4, "max": 30, "default": 5 }, "resolutions": ["480p", "720p", "1080p", "4k"] },
-      "pricing": { "unit": "second", "usd": 0.144, "promo": true, "asOf": "2026-09-20", "note": "官方促销价（原价 0.2057/s）" },
+      "supports": [
+        "duration",
+        "resolution",
+        "aspectRatio",
+        "audio"
+      ],
+      "limits": {
+        "durationSec": {
+          "min": 4,
+          "max": 30,
+          "default": 5
+        },
+        "resolutions": [
+          "480p",
+          "720p",
+          "1080p",
+          "4k"
+        ]
+      },
+      "pricing": {
+        "unit": "second",
+        "usd": 0.144,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销价（原价 0.2057/s）"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
@@ -173,11 +384,29 @@
       "provider": "higgsfield",
       "providerModel": "kling/kling-3.0/text-to-video",
       "kind": "video",
-      "modes": ["t2v"],
+      "modes": [
+        "t2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "aspectRatio", "audio"],
-      "limits": { "durationSec": { "min": 5, "max": 10, "default": 5 } },
-      "pricing": { "unit": "second", "usd": 0.042, "promo": true, "asOf": "2026-09-20", "note": "官方促销价（原价 0.084/s）——走量主力档" },
+      "supports": [
+        "duration",
+        "aspectRatio",
+        "audio"
+      ],
+      "limits": {
+        "durationSec": {
+          "min": 5,
+          "max": 10,
+          "default": 5
+        }
+      },
+      "pricing": {
+        "unit": "second",
+        "usd": 0.042,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销价（原价 0.084/s）——走量主力档"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
@@ -189,10 +418,22 @@
       "provider": "higgsfield",
       "providerModel": "minimax/minimax-h3/text-to-video",
       "kind": "video",
-      "modes": ["t2v"],
+      "modes": [
+        "t2v"
+      ],
       "tier": "L3",
-      "supports": ["duration", "resolution", "audio"],
-      "pricing": { "unit": "second", "usd": 0.0715, "promo": true, "asOf": "2026-09-20", "note": "官方促销价（原价 0.13/s）" },
+      "supports": [
+        "duration",
+        "resolution",
+        "audio"
+      ],
+      "pricing": {
+        "unit": "second",
+        "usd": 0.0715,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销价（原价 0.13/s）"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
@@ -204,10 +445,22 @@
       "provider": "higgsfield",
       "providerModel": "alibaba/wan-3.0-prime/text-to-video",
       "kind": "video",
-      "modes": ["t2v"],
+      "modes": [
+        "t2v"
+      ],
       "tier": "L3",
-      "supports": ["duration", "resolution", "audio"],
-      "pricing": { "unit": "second", "usd": 0.0476, "promo": true, "asOf": "2026-09-20", "note": "官方促销起价（原价 0.068/s）" },
+      "supports": [
+        "duration",
+        "resolution",
+        "audio"
+      ],
+      "pricing": {
+        "unit": "second",
+        "usd": 0.0476,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销起价（原价 0.068/s）"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
@@ -219,10 +472,20 @@
       "provider": "higgsfield",
       "providerModel": "higgsfield/genjutsu",
       "kind": "video",
-      "modes": ["v2v"],
+      "modes": [
+        "v2v"
+      ],
       "tier": "L3",
-      "supports": ["duration"],
-      "pricing": { "unit": "second", "usd": 0.159, "promo": true, "asOf": "2026-09-20", "note": "官方促销价（原价 0.318/s）" },
+      "supports": [
+        "duration"
+      ],
+      "pricing": {
+        "unit": "second",
+        "usd": 0.159,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销价（原价 0.318/s）"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
@@ -234,10 +497,19 @@
       "provider": "higgsfield",
       "providerModel": "higgsfield/marketing-studio/image",
       "kind": "image",
-      "modes": ["t2i", "i2i"],
+      "modes": [
+        "t2i",
+        "i2i"
+      ],
       "tier": "L2",
       "supports": [],
-      "pricing": { "unit": "image", "usd": 0.0121, "promo": true, "asOf": "2026-09-20", "note": "官方促销价（原价 0.0162/张）" },
+      "pricing": {
+        "unit": "image",
+        "usd": 0.0121,
+        "promo": true,
+        "asOf": "2026-09-20",
+        "note": "官方促销价（原价 0.0162/张）"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
@@ -249,10 +521,19 @@
       "provider": "higgsfield",
       "providerModel": "higgsfield-ai/soul/v2/standard",
       "kind": "image",
-      "modes": ["t2i"],
+      "modes": [
+        "t2i"
+      ],
       "tier": "L2",
-      "supports": ["seed"],
-      "pricing": { "unit": "image", "usd": 0.0032, "asOf": "2026-09-20", "note": "官方起价 0.0032/张" },
+      "supports": [
+        "seed"
+      ],
+      "pricing": {
+        "unit": "image",
+        "usd": 0.0032,
+        "asOf": "2026-09-20",
+        "note": "官方起价 0.0032/张"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://docs.higgsfield.ai/docs/concepts/billing-and-retention.md",
@@ -264,10 +545,23 @@
       "provider": "muapi",
       "providerModel": "seedance-2.5-text-to-video",
       "kind": "video",
-      "modes": ["t2v", "i2v"],
+      "modes": [
+        "t2v",
+        "i2v"
+      ],
       "tier": "L3",
-      "supports": ["duration", "resolution", "aspectRatio", "firstFrame"],
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21", "note": "MuAPI 按次计价；以官方定价页为准" },
+      "supports": [
+        "duration",
+        "resolution",
+        "aspectRatio",
+        "firstFrame"
+      ],
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "MuAPI 按次计价；以官方定价页为准"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://muapi.ai/pricing",
@@ -279,10 +573,20 @@
       "provider": "muapi",
       "providerModel": "kling-v3.0-standard-text-to-video",
       "kind": "video",
-      "modes": ["t2v", "i2v"],
+      "modes": [
+        "t2v",
+        "i2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "aspectRatio"],
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21" },
+      "supports": [
+        "duration",
+        "aspectRatio"
+      ],
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://muapi.ai/pricing"
@@ -293,10 +597,21 @@
       "provider": "muapi",
       "providerModel": "grok-imagine-text-to-video",
       "kind": "video",
-      "modes": ["t2v", "i2v"],
+      "modes": [
+        "t2v",
+        "i2v"
+      ],
       "tier": "L2",
-      "supports": ["duration", "aspectRatio"],
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21", "note": "xAI 官方直连可用性未核实；此条为聚合器通道" },
+      "supports": [
+        "duration",
+        "aspectRatio"
+      ],
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "xAI 官方直连可用性未核实；此条为聚合器通道"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://muapi.ai/pricing",
@@ -308,10 +623,19 @@
       "provider": "higgsfield",
       "providerModel": "infinitetalk-image-to-video",
       "kind": "video",
-      "modes": ["lipsync"],
+      "modes": [
+        "lipsync"
+      ],
       "tier": "L2",
-      "supports": ["resolution"],
-      "pricing": { "unit": "second", "usd": null, "asOf": "2026-09-21", "note": "以官方定价页为准" },
+      "supports": [
+        "resolution"
+      ],
+      "pricing": {
+        "unit": "second",
+        "usd": null,
+        "asOf": "2026-09-21",
+        "note": "以官方定价页为准"
+      },
       "retentionDays": 7,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
@@ -323,14 +647,50 @@
       "provider": "higgsfield",
       "providerModel": "suno/create-music",
       "kind": "audio",
-      "modes": ["audio"],
+      "modes": [
+        "audio"
+      ],
       "tier": "L2",
       "supports": [],
-      "pricing": { "unit": "request", "usd": null, "asOf": "2026-09-21" },
+      "pricing": {
+        "unit": "request",
+        "usd": null,
+        "asOf": "2026-09-21"
+      },
       "retentionDays": null,
       "availability": "catalog-only",
       "docs": "https://open.higgsfield.ai/explore",
       "notes": "配乐/音效；本轮未接适配器"
+    },
+    {
+      "id": "whiteboard-stream",
+      "name": "手绘白板流式笔迹 · 本地确定性渲染（vendor/srt-whiteboard）",
+      "provider": "whiteboard-local",
+      "providerModel": "srt-whiteboard-stream",
+      "kind": "video",
+      "modes": [
+        "t2v"
+      ],
+      "tier": "L1",
+      "supports": [
+        "aspectRatio"
+      ],
+      "limits": {
+        "aspectRatios": [
+          "16:9"
+        ],
+        "maxPromptChars": 20000
+      },
+      "pricing": {
+        "unit": "second",
+        "usd": 0,
+        "asOf": "2026-09-27",
+        "note": "本地 CPU 渲染，零模型成本（只消耗本机算力）"
+      },
+      "retentionDays": null,
+      "availability": "wired",
+      "docs": "https://github.com/geeklee/srt-whiteboard-animation",
+      "notes": "口播解说片（kind=explainer）的第二视觉引擎：SRT 驱动、逐元素手绘揭示。开关 WHITEBOARD_ENABLED=1 + venv 就绪才可用；渲染耗时随幕数与总时长线性增长（真机实测 ~0.4× 实时 @1280/30fps）"
     }
   ]
 }

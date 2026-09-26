@@ -7,7 +7,7 @@
  * 播放：签名 URL（HMAC + 过期时间），`/media/*` 路由校验后才吐文件——不做无鉴权裸目录。
  */
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import type { getAppPool, getGatewayPool } from "@workloom/db";
@@ -33,11 +33,22 @@ export interface DownloadedMedia {
 
 const DEFAULT_MAX_BYTES = 300 * 1024 * 1024; // 300MB：短视频上限；超限拒收，避免磁盘被写爆
 
-/** 下载供应商产物到媒体库（流式落盘 + 边写边算 sha256；超限中止并删除半成品） */
+/**
+ * 取供应商/本地产物到媒体库（sha256 幂等；超限拒收）。
+ *
+ * 支持两种来源：
+ *   · `http(s)://` —— 远端供应商产物（原行为：整段取回后落盘并算 sha256）；
+ *   · `file://`    —— **本地渲染产物**（T-2026-0926-0020 新增）。
+ *     为什么必须支持：手绘白板引擎是本地确定性渲染器，产物天然在磁盘上，
+ *     没有远端 URL。若这里只认 http(s)，白板片就永远进不了媒资库，
+ *     只能被迫写一条平行入库路径——违反"零平行实现"的口径。
+ */
 export async function downloadToMediaStore(
   uri: string,
   opts: { workspaceId: string; maxBytes?: number; fetchImpl?: typeof fetch } = { workspaceId: "unknown" },
 ): Promise<DownloadedMedia> {
+  if (/^file:\/\//i.test(uri)) return storeLocalFile(uri, opts);
+  if (uri.startsWith("/")) return storeLocalFile(uri, opts);   // 本仓产物的裸绝对路径写法
   if (!/^https?:\/\//i.test(uri)) throw new Error(`只支持 http(s) 产物地址：${uri.slice(0, 80)}`);
   const fetchImpl = opts.fetchImpl ?? fetch;
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
@@ -54,6 +65,34 @@ export async function downloadToMediaStore(
   mkdirSync(dirname(absPath), { recursive: true });
   writeFileSync(absPath, buf);
   return { relPath: relPath.split(sep).join("/"), absPath, sha256, bytes: buf.byteLength, contentType };
+}
+
+/** 本地文件 → 媒体仓（拷贝 + sha256 + 同名幂等；超限拒收，不落半成品） */
+export function storeLocalFile(
+  uri: string,
+  opts: { workspaceId: string; maxBytes?: number },
+): DownloadedMedia {
+  // 兼容三种写法：file:///abs/path、file://localhost/abs/path、裸绝对路径。
+  // 裸路径支持是刻意的：调用方（白板 provider / 渲染器产物）拿到的是文件系统路径，
+  // 强制先拼 file:// 反而容易拼错（相对路径会变成 URL 的 host，见 ERR_INVALID_FILE_URL_HOST）。
+  const srcPath = uri.startsWith("file://") ? fileURLToPath(uri) : uri;
+  const st = statSync(srcPath); // 不存在 → 抛错（调用方按入库失败处理，不静默）
+  if (!st.isFile()) throw new Error(`本地产物不是文件：${srcPath}`);
+  const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
+  if (st.size > maxBytes) throw new Error(`成片超过大小上限（${st.size} > ${maxBytes} 字节），已拒收`);
+  const ext = srcPath.toLowerCase().endsWith(".webm") ? "webm"
+    : srcPath.toLowerCase().endsWith(".png") ? "png"
+      : /\.jpe?g$/i.test(srcPath) ? "jpg" : "mp4";
+  // 先算 sha256 再落盘：与远端分支同一口径（内容寻址 + 同内容幂等）
+  const bytes = readFileSync(srcPath);
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  const relPath = join("video", opts.workspaceId, `${sha256}.${ext}`);
+  const absPath = join(mediaRoot(), relPath);
+  if (!existsSync(absPath)) {
+    mkdirSync(dirname(absPath), { recursive: true });
+    copyFileSync(srcPath, absPath);
+  }
+  return { relPath: relPath.split(sep).join("/"), absPath, sha256, bytes: bytes.byteLength, contentType: null };
 }
 
 /* ================= 成片注册（asset-cms） ================= */
@@ -96,7 +135,8 @@ export interface RegisterRenderedClipInput {
   title?: string | null;
   /** 提示词冗余（检索依赖；来自 render_scripts.md） */
   prompt?: string | null;
-  pipelineKind?: "narrative" | "marketing" | null;
+  /** 片型（0042 扩展 explainer：口播解说片） */
+  pipelineKind?: "narrative" | "marketing" | "explainer" | null;
   aspectRatio?: string | null;
   by: string;
 }

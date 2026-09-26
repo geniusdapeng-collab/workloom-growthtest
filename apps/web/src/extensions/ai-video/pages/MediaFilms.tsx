@@ -25,7 +25,7 @@ interface FilmRow {
   publishTasks: { total: number; published: number; failed: number };
 }
 
-const PIPELINE_LABEL: Record<string, string> = { narrative: "叙事片", marketing: "营销片" };
+const PIPELINE_LABEL: Record<string, string> = { narrative: "叙事片", marketing: "营销片", explainer: "口播解说片" };
 
 export default function MediaFilms() {
   const navigate = useNavigate();

@@ -14,6 +14,8 @@ import {
   type GenKind, type GenProvider, type GenRequest, type GenTaskStatus,
 } from "@workloom/base/model-router";
 import { ProviderError, type ProviderErrorKind } from "./types.js";
+import { WhiteboardProvider } from "../whiteboard/provider.js";
+import { whiteboardEngineReady } from "../whiteboard/engine.js";
 
 interface NeutralParams {
   providerModel?: string;
@@ -335,6 +337,13 @@ export function buildVideoGenPool(opts: GenPoolOptions = {}): Map<string, GenPro
       model: env.JIMENG_MODEL?.trim() || undefined,
     }));
   }
+  /**
+   * 本地白板渲染器（T-2026-0926-0020）：**零 API 依赖**，开关 + venv 就绪即可用。
+   * 与上面几家不同，它的"配置"不是密钥而是 `WHITEBOARD_ENABLED=1` + venv 解释器存在，
+   * 因此单独判定（`whiteboardEngineReady`）；否则 `WHITEBOARD_ENABLED=0` 会因为
+   * "环境变量非空"被通用口径误判为已配置。
+   */
+  if (whiteboardEngineReady(env)) pool.set("whiteboard-local", new WhiteboardProvider(env));
   return pool;
 }
 
@@ -342,7 +351,15 @@ export function buildVideoGenPool(opts: GenPoolOptions = {}): Map<string, GenPro
 let singletonPool: { key: string; pool: Map<string, GenProvider> } | null = null;
 export function videoGenPool(): Map<string, GenProvider> {
   const env = process.env;
-  const key = [env.VOLCENGINE_ARK_API_KEY, env.HF_API_KEY_ID, env.HF_API_KEY_SECRET, env.MUAPI_API_KEY].join("|");
+  /**
+   * 单例缓存键必须包含**所有影响装配的输入**：白板引擎由"开关 + venv 是否存在"驱动，
+   * 只按密钥拼键会出现"装了 venv，但池子仍是旧的（没有 whiteboard-local）"的假不可用。
+   */
+  const key = [
+    env.VOLCENGINE_ARK_API_KEY, env.HF_API_KEY_ID, env.HF_API_KEY_SECRET, env.MUAPI_API_KEY,
+    env.KLING_API_KEY, env.JIMENG_API_KEY,
+    env.WHITEBOARD_ENABLED, env.WHITEBOARD_ENGINE_DIR, env.WHITEBOARD_PYTHON,
+  ].join("|");
   if (!singletonPool || singletonPool.key !== key) singletonPool = { key, pool: buildVideoGenPool() };
   return singletonPool.pool;
 }
