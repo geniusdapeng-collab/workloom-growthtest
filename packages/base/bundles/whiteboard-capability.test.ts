@@ -151,8 +151,14 @@ describe("接线面：目录 / 开关 / 迁移 / 编排", () => {
     expect(sql).toContain("CREATE TABLE IF NOT EXISTS whiteboard_scenes");
     expect(sql).toContain("DROP POLICY IF EXISTS");
     expect(sql).toContain("GRANT SELECT, INSERT, UPDATE, DELETE ON whiteboard_films, whiteboard_scenes TO workloom_app");
-    // 迁移号不得与既有文件撞车
-    expect(existsSync(join(REPO_ROOT, "packages/db/migrations/0041_media_sync_device_expiry.sql"))).toBe(true);
+    /**
+     * 迁移号不得与既有文件撞车（这是接入时的真实事故：规格书写 0041，而 0041 已被占用）。
+     * 断言「编号唯一」而不是「某个具体文件存在」——各仓迁移序列不同步
+     * （本仓 0042 / growthtest 0043 / growthmatrix 0053），写死文件名会让能力测试在移植仓误红。
+     */
+    const prefix = file!.match(/^(\d{4})_/)![1];
+    const sameNumber = readdirSync(migrationsDir).filter((name) => name.startsWith(`${prefix}_`));
+    expect(sameNumber, `迁移号 ${prefix} 撞车：${sameNumber.join("、")}`).toEqual([file]);
   });
 
   it("编排面齐备：七个环节 + 两个长任务观察面 + 单幕返修", () => {
