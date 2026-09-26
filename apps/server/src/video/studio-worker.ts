@@ -45,7 +45,7 @@ import {
 } from "@hyperreality/video-studio";
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
-import { acquireProjectLease, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
+import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
 import {
   AUTO_GATES,
   GATE_PRODUCER_STAGE,
@@ -76,8 +76,12 @@ const PRODUCER_MODE: ProducerMode = producerModeFromEnv();
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）：参考图相对路径按此解析 */
 const REPO_ROOT = path.resolve(here, "../../../..");
-/** 运行产物根（checkpoints/characters/confirmations）：默认仓库根 .vm-work/ */
-const WORK_DIR = process.env.HR_WORK_DIR ?? path.resolve(here, "../../../..", ".vm-work");
+/**
+ * 运行产物根（checkpoints/characters/confirmations/archive）：默认仓库根 `.vm-work/`。
+ * 与 archive-watch / archive-resume CLI 共用 `archiveWorkDir()` 解析（相对路径按仓库根，
+ * 历史 cwd 相对路径自动兼容），避免"服务器写一处、巡检读另一处"的路径漂移。
+ */
+const WORK_DIR = archiveWorkDir();
 
 /**
  * 营销路由判定 → 情报层装配开关（2026-09-25 激活）。

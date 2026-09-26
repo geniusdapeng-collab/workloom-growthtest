@@ -11,12 +11,47 @@
  *   ③ readProjectMeta(scope, id) —— 交接包需要的项目元数据（thread_id / kind / title）
  */
 import type pg from "pg";
+import path from "node:path";
+import { existsSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { getAppPool } from "@workloom/db";
-import type { StageLedgerWriter, StageStatus } from "@hyperreality/video-studio";
+import {
+  ArchiveStore,
+  type StageLedgerWriter,
+  type StageStatus,
+} from "@hyperreality/video-studio";
 
 interface Scope {
   tenantId: string;
   workspaceId: string;
+}
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(here, "../../../..");
+
+/**
+ * 工作目录（服务器 / 巡检工具 / 恢复 CLI **必须同一口径**，否则档案与台账指向两个地方）。
+ *
+ * 口径：`HR_WORK_DIR` 绝对路径直接用；相对路径按**仓库根**解析（`.env.example` 写 `.vm-work`
+ * 即 `<repo>/.vm-work`）。历史版本按进程 cwd（`pnpm -C apps/server start` → `<repo>/apps/server/`）
+ * 解析相对路径，因此保留一条兼容回落：仓库根下没有、而 `<repo>/apps/server/` 下有同名字录时用旧的，
+ * 避免升级后既有项目档案/checkpoint 变孤儿（真机巡检时踩到过：工具算出的路径与服务器写入的不是同一个）。
+ */
+export function archiveWorkDir(env: NodeJS.ProcessEnv = process.env): string {
+  const raw = env.HR_WORK_DIR?.trim() || ".vm-work";
+  if (path.isAbsolute(raw)) return raw;
+  const fromRepoRoot = path.resolve(REPO_ROOT, raw);
+  const fromServerCwd = path.resolve(REPO_ROOT, "apps/server", raw);
+  /** "看得出是工作目录"的判据：有 archive/ 或 checkpoints/ 子目录（只看目录存在会被 findings/ 之类的旁产误判） */
+  const looksLikeWorkDir = (dir: string): boolean =>
+    existsSync(path.join(dir, "archive")) || existsSync(path.join(dir, "checkpoints"));
+  if (!looksLikeWorkDir(fromRepoRoot) && looksLikeWorkDir(fromServerCwd)) return fromServerCwd;
+  return fromRepoRoot;
+}
+
+/** 档案开关（`ARCHIVE_ENABLED=0` 时全旁路；测试可直接传 null） */
+export function archiveEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
+  return (env.ARCHIVE_ENABLED ?? "1") !== "0";
 }
 
 /**
@@ -203,3 +238,22 @@ export async function markProjectInterrupted(scope: Scope, projectId: string): P
 }
 
 export type { StageStatus };
+
+/**
+ * 轮询/提交这类"一次性环节"用的档案句柄（旁路；`null` = 关闭或初始化失败）。
+ * 只做构造，不做 IO——调用方在写盘点里自己 try/catch（写盘失败不得阻断主流程）。
+ */
+export function makeStageArchive(
+  scope: Scope,
+  projectId: string,
+  pipelineKind: "marketing" | "narrative" = "narrative",
+): { store: ArchiveStore; ledger: StageLedgerWriter } | null {
+  if (!archiveEnabled()) return null;
+  try {
+    const store = new ArchiveStore(archiveWorkDir(), scope.workspaceId, projectId, pipelineKind);
+    return { store, ledger: makeLedgerWriter(scope) };
+  } catch (err) {
+    console.error(`[archive] 环节档案句柄构造失败（旁路关闭）: ${(err as Error).message}`);
+    return null;
+  }
+}
