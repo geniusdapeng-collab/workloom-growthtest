@@ -664,6 +664,16 @@ class HyperrealitySystem {
           console.log('   🔄 已应用用户调整');
         }
 
+        /**
+         * 【T-2026-0926-0115】情报证据注入：insight_card / prd_card → 创意描述
+         * 读码事实：六张摘要卡里只有 brief_card / theme_card 有消费者，
+         * insight_card（受众/共识/差评）与 prd_card（演示场景/卖点证据/合规红线/钩子候选）
+         * 从未进入下游提示词。这里把两张卡压成**有界证据块**追加进 `_creativeTheme.description`
+         * ——需求洞察与 PRD 生成器的提示词都读该字段，于是证据真正到达决策现场。
+         * 纪律：只搬运卡片字段、不新增事实；幂等（已含标记则不重复）；失败只记 degraded 不阻断。
+         */
+        this._injectDossierEvidence(metadata, result);
+
       } catch (err) {
         // 【DXB-fix】确认门崩溃属于流程性故障，继续跑只会产出全模板垃圾，必须中止
         if (/onPoll|confirmation|确认/.test(err.message)) {
@@ -2921,6 +2931,53 @@ class HyperrealitySystem {
    * 只在确有 Brief / 情报时注入，避免污染纯故事片的创作（叙事路由不带这两样）。
    * 注入内容全部来自真实登记（Brief 字段与档案摘要卡），不新增任何未经验证的事实。
    */
+  /**
+   * 情报证据注入（T-2026-0926-0115）
+   * ------------------------------------------------------------------
+   * 读码事实：六张情报摘要卡里只有 brief_card / theme_card 有消费者；
+   * insight_card（受众/共识/差评地图/市场位势）与 prd_card（演示场景/卖点证据/
+   * 合规红线/钩子候选）从未进入下游提示词。本方法把两张卡压成**有界证据块**
+   * 追加进 `metadata._creativeTheme.description`——需求洞察与 PRD 生成器都读该字段，
+   * 于是证据真正到达决策现场。
+   *
+   * 纪律：只搬运卡片字段（不新增事实）；幂等（已含标记不重复注入）；
+   *      失败只记 degraded 不阻断主链；无卡时如实写 `no-dossier`。
+   * @param {object} metadata 运行 metadata（含 `_dataDossier.cards` 与 `_creativeTheme`）
+   * @param {object} result   运行结果容器（写入 `result.stages.dossierEvidence`）
+   * @returns {{injected:boolean, reason?:string, cards?:string[], chars?:number}}
+   */
+  _injectDossierEvidence(metadata = {}, result = {}) {
+    result.stages = result.stages || {};
+    try {
+      const cards = (metadata && metadata._dataDossier && metadata._dataDossier.cards) || null;
+      const { buildDossierEvidence } = require('./engines/data-mining-engine/card-consumers');
+      const blocks = buildDossierEvidence(cards);
+      const task = metadata && metadata._creativeTheme;
+      if (blocks.length === 0 || !task || typeof task !== 'object') {
+        result.stages.dossierEvidence = { injected: false, reason: cards ? 'no-consumable-cards' : 'no-dossier' };
+        return result.stages.dossierEvidence;
+      }
+      const existing = String(task.description || '');
+      const additions = blocks.filter((b) => !existing.includes(b.marker)).map((b) => b.text);
+      if (additions.length === 0) {
+        result.stages.dossierEvidence = { injected: false, reason: 'already-present' };
+        return result.stages.dossierEvidence;
+      }
+      task.description = `${existing}${existing ? '\n' : ''}${additions.join('\n')}`;
+      result.stages.dossierEvidence = {
+        injected: true,
+        cards: blocks.map((b) => b.card),
+        chars: additions.join('\n').length
+      };
+      console.log(`   📎 情报证据已注入创意描述：${blocks.map((b) => b.card).join('、')}（${additions.join('\n').length} 字）`);
+      return result.stages.dossierEvidence;
+    } catch (evidenceErr) {
+      result.stages.dossierEvidence = { injected: false, degraded: true, error: evidenceErr.message };
+      console.warn(`   ⚠️ 情报证据注入失败（不阻断，已记 degraded）: ${evidenceErr.message}`);
+      return result.stages.dossierEvidence;
+    }
+  }
+
   /**
    * 产品事实红线闸（营销片 truth-check · Layer -0.5）
    * ------------------------------------------------------------------

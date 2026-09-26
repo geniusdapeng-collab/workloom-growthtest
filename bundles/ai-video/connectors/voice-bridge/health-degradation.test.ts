@@ -51,13 +51,20 @@ describe("音色档案 · 降级可见性", () => {
     expect(result.skipped[0]!.reason.length).toBeGreaterThan(0);
   });
 
-  it("health() 透出 skipped（不把降级伪装成 0 个档案）", async () => {
+  it("health() 透出 skipped（不把降级伪装成 0 个档案）", { timeout: 20_000 }, async () => {
     const station = makeStation();
     const broken = join(station, "profiles", "zh-broken-v1");
     mkdirSync(broken, { recursive: true });
     writeFileSync(join(broken, "profile.json"), "not-json", "utf8");
 
-    const report = await core.health({ env: { WORKLOOM_VOICE_STATION_DIR: station } });
+    // 让健康检查保持**离线且快速**：二进制路径指向不存在的位置，引擎探测用必然失败的 fetch。
+    const report = await core.health({
+      env: { WORKLOOM_VOICE_STATION_DIR: station },
+      bins: { ffmpeg: "/nonexistent/ffmpeg", ffprobe: "/nonexistent/ffprobe" },
+      fetchImpl: async () => {
+        throw new Error("offline");
+      },
+    });
     expect(report.profiles.count).toBe(0);
     expect(report.profiles.skipped?.map((s) => s.profile_id)).toEqual(["zh-broken-v1"]);
   });
