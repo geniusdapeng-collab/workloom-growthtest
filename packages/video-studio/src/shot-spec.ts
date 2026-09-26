@@ -609,6 +609,79 @@ export function prepareShotPrompt(
     prompt = constraint.prompt;
   }
 
+  /**
+   * 无台词镜：**摘掉空的【台词】段**（2026-09-25 南昌片真机）。
+   * 组装器会无条件输出一行 `NN.【台词】`；对显式声明 `dialogueFree: true` 的镜头（快剪城市片里
+   * 只做动作不说话的临时角色/空镜），交付守卫会判「数据层无台词但出现【台词】字段（疑似虚构）」。
+   * 这里在**交付前**把这一空段删掉（只删空段：有台词内容的镜头不动），既符合"空镜禁虚构"的纪律，
+   * 也避免卡片被逼着写假台词。
+   */
+  if (card.dialogueFree === true) {
+    const stripped = prompt
+      .split("\n")
+      .filter((line) => !/^\s*\d{1,2}\.\s*【台词】\s*$/.test(line))
+      .join("\n");
+    if (stripped !== prompt) {
+      /**
+       * 移除空【台词】段后**重排字段编号**：否则会出现 01…17、19…（缺 18）的断号，
+       * 监制会把"字段缺号"当成结构性缺陷打回（真机 2026-09-25 NC-08）。
+       */
+      prompt = stripped
+        .split("\n")
+        .map((line, index) => (/^\s*\d{1,2}\.\s*【/.test(line) ? line.replace(/^\s*\d{1,2}\.\s*(?=【)/, `${String(index + 1).padStart(2, "0")}.`) : line))
+        .join("\n");
+      log(`[shot-spec] ${shotId} 无台词镜：已移除空【台词】段并重排字段编号（dialogueFree=true）`);
+    }
+  }
+
+  /**
+   * 语言约束的**显式豁免**（2026-09-25 南昌片真机）：
+   * 管线自检要求提示词里保留少量英文禁词标记（`no background music` / `no cartoon` 等，见下方音频与写实纪律自检），
+   * 而 vendor 的【语言约束】写的是"全部中文、禁止英文单词"——两者并存会被监制判"自相矛盾"。
+   * 这里在【语言约束】后**显式写明豁免范围与用途**：既不偷偷违规，也不让机器标记被当成文案缺陷。
+   */
+  if (/【语言约束】/.test(prompt) && /(no background music|no non-diegetic music|no cartoon)/i.test(prompt)) {
+    /** 幂等标记：复用已定稿 prompt 时不得重复追加豁免说明（真机单测：追加两次 = 文案噪声） */
+    const exemptionMark = "（豁免：管线自检要求的英文禁词标记";
+    prompt = prompt.replace(/^(\s*\d{1,2}\.\s*【语言约束】[^\n]*)$/m, (line) => {
+      if (line.includes(exemptionMark)) return line;
+      return `${line.replace(/[。\s]+$/, "")}（豁免：管线自检要求的英文禁词标记 no background music / no cartoon 等仅作机器校验，不作为画面语言。）`;
+    });
+  }
+
+  /**
+   * 【负面约束】**双重否定反转**归一（2026-09-25 南昌片真机）：
+   * 组装器会把"no"前缀与中文否定词拼在一起，产生 `no 无扭曲` / `no malformed fingers` 这类半英半中、
+   * 语义反转的条目（"不要无扭曲" = 要扭曲）。这里只对【负面约束】那一行做归一：英文 `no XXX` 逐条换成中文否定，
+   * 中文里已有的 `无…` 保持；不触碰写实纪律/音频纪律自检所需的英文标记。
+   */
+  const negativeFixes: Array<[RegExp, string]> = [
+    [/\bno\s+无/g, "无"],
+    [/\bno\s+low resolution\b/gi, "无低分辨率"],
+    [/\bno\s+pixelated\b/gi, "无像素化"],
+    [/\bno\s+compression noise\b/gi, "无压缩噪点"],
+    [/\bno\s+malformed fingers\b/gi, "无畸形手指"],
+    [/\bno\s+fused fingers\b/gi, "无粘连手指"],
+    [/\bno\s+artifacts?\b/gi, "无伪影"],
+    [/\bno\s+distortion\b/gi, "无变形"],
+    [/\bno\s+blur\b/gi, "无模糊"],
+    [/\bno\s+extra limbs?\b/gi, "无多余肢体"]
+  ];
+  prompt = prompt.replace(/^(\s*\d{1,2}\.\s*【负面约束】)([^\n]*)$/m, (_line, head: string, body: string) => {
+    let fixedBody = body;
+    for (const [pattern, replacement] of negativeFixes) fixedBody = fixedBody.replace(pattern, replacement);
+    fixedBody = fixedBody.replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ");
+    /** 去重：组装会把"无文字/无水印/无标牌"这类条目重复拼接（真机监制：负面约束重复即不合格） */
+    const items = fixedBody.split(/[,，、；;]/).map((item) => item.trim()).filter(Boolean);
+    const seen = new Set<string>();
+    const unique = items.filter((item) => {
+      if (seen.has(item)) return false;
+      seen.add(item);
+      return true;
+    });
+    return `${head}${unique.join("、")}`;
+  });
+
   const delivery = guard.verify(prompt, assemblyShot);
   /** 兜底自检：提示词里出现 `[object Object]` 属组装缺陷，直接判不合格 */
   const objectLeaks = (prompt.match(/\[object Object\]/g) ?? []).length;
@@ -634,11 +707,16 @@ export function prepareShotPrompt(
     /**
      * `dialogue` 的等价形态：vendor 交付格式是 `dialogueBlocks`（speaker/line/emotion/trigger），
      * 标准镜头卡里没有 dialogue 时不算缺字段（真机口径：有 blocks 即视为台词已提供）。
+     *
+     * 2026-09-25 补：**无台词镜**（快剪城市片/空镜/人物只做动作）在卡片里显式声明 `dialogueFree: true`
+     * 即视为满足该字段——否则这类镜头会被逼着写一句假台词（真机：南昌片 4 个临时角色镜被"缺必备字段:台词"拦下，
+     * 而按产品口径它们是**只做动作、不说话**的镜头）。声明是显式的：没写 dialogueFree 又没台词，仍然判缺字段。
      */
     .filter((key) => {
       if (key === "dialogue") {
         const blocks = (card as Record<string, unknown>).dialogueBlocks;
         if (Array.isArray(blocks) && blocks.length > 0) return false;
+        if (card.dialogueFree === true) return false;
       }
       return isEmptyValue(effective(key));
     });

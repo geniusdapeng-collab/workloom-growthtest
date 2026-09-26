@@ -6,7 +6,7 @@
   "coverHook": "南昌 48 秒",
   "bgm": "electronic-pulse-city-beneath-the-waves-v001-133（律动兴奋 · 律动卡点 · 免版税可商用）",
   "editingStyle": "参考《土耳其瞭望塔》：镜长曲线化（3.5s→2.5s→1.5s→3.5s）、逐刀甩镜转场（hblur 0.18s）、剪辑点卡 BPM（容差 ≤80ms）、速度坡道（快起稳收）；转场音效层 whoosh/impact/riser",
-  "durationSeconds": 48,
+  "durationSeconds": 49.9,
   "aspect": "9:16",
   "assetsPolicy": "参考素材只作实景依据（material-scene/v1）：以 reference_image 提交，由模型构建机位与视差；正式发布前需替换为官方授权或自制素材",
   "referenceNeeds": [

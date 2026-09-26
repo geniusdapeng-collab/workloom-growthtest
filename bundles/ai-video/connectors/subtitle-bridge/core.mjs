@@ -1473,7 +1473,15 @@ export async function renderWithSubtitles({
     : [...new Set([cues[0], cues[Math.floor(cues.length / 2)], cues[cues.length - 1]].filter(Boolean).map((cue) => (
       round((assistToSeconds(cue.start) + assistToSeconds(cue.end)) / 2, 2)
     )))];
-  for (const at of stamps) {
+  /**
+   * 抽帧时刻**必须夹在成片时长内**（2026-09-25 南昌片真机）：
+   * 字幕时间轴来自分镜时长，可能比成片（扣掉逐刀转场后）长一点点，
+   * 末条字幕的中点就会落到片尾之后 → `extractFrame` 失败 → 整条烧录被判失败（其实画面完全正常）。
+   * 这里按输出时长做防御性夹取（并留 0.1s 余量），不让"证据帧采样越界"毁掉一次成功的烧录。
+   */
+  const safeDuration = Number(outputProbe.duration ?? 0);
+  for (const rawAt of stamps) {
+    const at = safeDuration > 0.3 ? round(Math.min(Number(rawAt), safeDuration - 0.1), 2) : Number(rawAt);
     // 证据帧按「产物名」打前缀：同一批次里 burn 与 best 各自出片时证据不互相覆盖，
     // 每张证据都能对回它证明的那支成片（traceability 不能靠文件名撞运气）。
     const label = path.basename(output, path.extname(output)).replace(/[^\w.-]/g, "_");

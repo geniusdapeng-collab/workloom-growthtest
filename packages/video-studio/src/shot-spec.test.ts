@@ -249,6 +249,28 @@ describe("镜头卡交付闸（vendor PromptDeliveryGuard 为准）", () => {
     expect(report.delivery.pass).toBe(false);
   });
 
+  /**
+   * 无台词镜（2026-09-25 南昌片真机）：快剪城市片里的人只做动作、不说话，
+   * 卡片显式声明 `dialogueFree: true` 即视为满足台词字段；不声明又没台词仍然判缺。
+   */
+  it("显式声明无台词（dialogueFree:true）→ 不再被判缺台词字段", () => {
+    const silent = contentCard("S9");
+    delete (silent as Record<string, unknown>).dialogue;
+    delete (silent as Record<string, unknown>).dialogueBlocks;
+    (silent as Record<string, unknown>).dialogueFree = true;
+    const report = prepareShotPrompt(silent);
+    expect(report.missingSpecFields).not.toContain("dialogue");
+    /** 且提示词里不得残留空【台词】段（交付守卫会判"疑似虚构台词"） */
+    expect(report.prompt).not.toMatch(/【台词】\s*$/m);
+    expect(report.delivery.issues.join("；")).not.toContain("疑似虚构");
+
+    const undeclared = contentCard("S10");
+    delete (undeclared as Record<string, unknown>).dialogue;
+    delete (undeclared as Record<string, unknown>).dialogueBlocks;
+    const undeclaredReport = prepareShotPrompt(undeclared);
+    expect(undeclaredReport.missingSpecFields).toContain("dialogue");
+  });
+
   it("已达标的管线定稿 prompt 直接复用（不重复组装）", () => {
     const assembled = prepareShotPrompt(contentCard());
     const withPrompt = { ...contentCard(), prompt: assembled.prompt };

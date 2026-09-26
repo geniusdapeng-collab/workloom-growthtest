@@ -100,6 +100,8 @@ export const COVER_SAFE_AREA = {
 
 export interface CoverDesignInput {
   title?: string;
+  /** 成片真实时长（秒）：标题里写"XX 秒"时必须与它一致（容差 ±2s，真机 2026-09-25） */
+  durationSeconds?: number;
   brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string } | null;
   platform?: string;
   character?: { id?: string; name?: string } | null;
@@ -118,7 +120,7 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
   return [
     "你是短视频封面设计师。请为下面这支片子出一份**可执行的封面设计稿**（只输出 JSON，不要解释、不要 markdown）。",
     "",
-    `作品：${input.title ?? "未命名"}`,
+    `作品：${input.title ?? "未命名"}${Number.isFinite(input.durationSeconds) ? `（成片 ${Math.round(Number(input.durationSeconds))} 秒）` : ""}`,
     `平台：${input.platform ?? input.brief?.platform ?? "小红书"}（竖屏 9:16，平台 UI 会遮住画面底部约 12%，顶部约 6% 也不宜放字）`,
     input.character?.name ? `主角：${input.character.name}（有定妆照可做抠像人物层）` : "无人物",
     input.brief?.coverHook ? `封面钩子（brief 给的）：${input.brief.coverHook}` : "",
@@ -135,7 +137,8 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
       + "拼接会留下贯穿全宽的硬接缝，一眼能看出是合成残次品；",
     "1.2 人物用**肖像卡**（右下角、白细边、带投影，宽度占画幅 28%–50%）：人物来自片子自己的镜头帧，"
       + "不要试图把人抠出来贴在画面里（会掉脸、留光晕）；",
-    "2. 主标题 ≤12 个字，说人话、有钩子，可以是地点+意象或一句邀请；必要时用 \\n 断成两行；",
+    "2. 主标题 ≤12 个字，说人话、有钩子，可以是地点+意象或一句邀请；必要时用 \\n 断成两行；"
+      + `**若标题里要点出时长，必须写成"${Number.isFinite(input.durationSeconds) ? Math.round(Number(input.durationSeconds)) : "成片"} 秒"，不得用别的数字**；`,
     "3. 人物卡与主标题不得重叠；人物卡不要压住地标主体（塔身/飞檐/牌匾）；",
     "4. 文字全部落在上部 6%–42% 的标题带内，底部 12% 不放任何文字；",
     "5. 配色与片子的调性一致（说明主标题色与强调色，用 #RRGGBB）；底图保持片子原有的光线气质，不要加冷雾或滤镜把暖调画面改成另一种天气；",
@@ -188,6 +191,17 @@ export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { s
   if (!HEX.test(String(plan.typography?.color ?? ""))) issues.push(`主标题颜色 ${plan.typography?.color} 不是 #RRGGBB`);
   if (!HEX.test(String(plan.typography?.accentColor ?? ""))) issues.push(`强调色 ${plan.typography?.accentColor} 不是 #RRGGBB`);
   if (!plan.rationale?.trim()) issues.push("缺设计理由（rationale）");
+  /**
+   * 片长一致性（2026-09-25 真机）：标题/副标题里写了"48 秒"而成片其实是 51s，监制会判"与成片口径不符"。
+   * `input.durationSeconds` 由管线给出真实片长；出现 秒 级数字时按 ±2s 容差校验。
+   */
+  const stated = `${plan.headline ?? ""} ${plan.subline ?? ""}`.match(/(\d{1,3})\s*秒/);
+  if (stated && Number.isFinite(input.durationSeconds)) {
+    const claimed = Number(stated[1]);
+    if (Math.abs(claimed - Number(input.durationSeconds)) > 2) {
+      issues.push(`标题里的时长 ${claimed} 秒与成片 ${Number(input.durationSeconds).toFixed(0)} 秒不符（容差 ±2s）`);
+    }
+  }
   if (issues.length > 0) {
     throw new CoverDesignError(`封面设计稿不合法：${issues.join("；")}`, "cover_design_invalid");
   }
