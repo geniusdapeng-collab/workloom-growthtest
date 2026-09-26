@@ -46,10 +46,16 @@ const validPlan: CoverPlan = {
 };
 
 describe("封面设计稿", () => {
-  it("提示词把三件套与安全区写清楚（设计师不能只交标题）", () => {
+  it("提示词把版式（两种主视觉）与安全区写清楚（设计师不能只交标题）", () => {
     const prompt = buildCoverDesignPrompt(input);
     expect(prompt).toContain("禁止只有一行标题");
-    expect(prompt).toContain("主视觉画面 + 人物");
+    /**
+     * 2026-09-26 产品口径：封面只有两种主视觉——人物为主 / 物体为主（景物·商品·动物等非人主体）。
+     * 旧提示词写死"必须有人物肖像卡"，导致人物小图贴地标（两种主视觉打架）——这条断言随口径一起改。
+     */
+    expect(prompt).toContain("版式（archetype）二选一");
+    expect(prompt).toContain("subject-led");
+    expect(prompt).toContain("person-led");
     expect(prompt).toContain("底部 12% 不放任何文字");
     expect(prompt).toContain("rationale");
     expect(prompt).toContain("SC-05");
