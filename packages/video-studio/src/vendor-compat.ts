@@ -559,6 +559,94 @@ export function promptFieldText(value: unknown): string {
   return "";
 }
 
+/** 服装锁定关键词（与 vendor `render-pipeline-guard.js#COSTUME_LOCK` 同一口径，只读不复制语义） */
+const COSTUME_LOCK_PATTERN = /身穿|wearing|dressed in|in a|职业装|正装|西装|中山装|制服|工装|旗袍|礼裙|戏服|古装|战甲|铠甲|armor|袍|褂|裙|衫|服/;
+
+export interface PromptContractHealResult {
+  prompt: string;
+  /** 本次自愈做了哪些事（逐条留痕，不允许静默修改） */
+  fixes: string[];
+  /** 服装是否已锁定（false = 只能写"未锁定"声明，调用方必须显式记账） */
+  costumeLocked: boolean;
+}
+
+/**
+ * 提示词契约自愈（T-2026-0926-0007 真机缺陷修复，对应 #165）。
+ *
+ * 背景（连续 4 轮营销片真实模型复现）：vendor Phase 3 抛 `Assignment to constant variable.` 后，
+ * 宿主侧用 `rebuildPromptsFromFields` 重建 prompt；重建产物**没有再过一遍 PipelineGuard 字段契约**，
+ * 于是被 `render-pipeline-guard` 稳定拦下：
+ *   ① `COSTUME_LOCK`：prompt 里没有【服装】字段，角色描述也不含"身穿/旗袍/西装"等词
+ *      → 每轮 5–6 镜判"未锁定服装"；
+ *   ② `DIALOGUE_FORMAT`：字段层的台词把情绪/语气标记用 `|` 写进 prompt，格式校验必挂。
+ *
+ * 自愈只做两件**可审计**的事，不做静默放行：
+ *   · 台词 `|` → `，`（保持原文信息，只是换成合法分隔符）；
+ *   · 缺【服装】字段时补一条：优先取卡片 `costume` / 角色描述里的服装短语；确实没有则写
+ *     **显式「未锁定」声明**并让调用方记 `costumeLock=false`（由人裁决是否允许渲染）。
+ * 补字段后**重排字段编号**，避免出现断号（监制会把断号当结构缺陷打回）。
+ */
+export function healPromptContract(prompt: string, options: { costumeHint?: string } = {}): PromptContractHealResult {
+  const fixes: string[] = [];
+  let text = String(prompt ?? "");
+
+  /** ① 台词竖杠归一：按字段块切分，只改【台词】块里的 `|` */
+  if (text.includes("|")) {
+    const blocks = text.split(/(?=^\s*\d{1,2}\.\s*【)/m);
+    let touched = 0;
+    text = blocks
+      .map((block) => {
+        if (!/^\s*\d{1,2}\.\s*【台词】/.test(block)) return block;
+        /** 竖杠两侧的空白一并收掉，避免留下"工具 ， 你缺"这种带空格的分隔（单测口径） */
+        const replaced = block.replace(/\s*\|\s*/g, "，");
+        if (replaced !== block) touched += 1;
+        return replaced;
+      })
+      .join("");
+    if (touched > 0) fixes.push(`台词竖杠归一（${touched} 处 | → ，）`);
+  }
+
+  /** ② 服装锁定：有独立【服装】字段或关键词即视为已锁定 */
+  const hasCostumeField = /【服装】[^【】]{10,}/.test(text);
+  const hasCostumeKeyword = COSTUME_LOCK_PATTERN.test(text);
+  let costumeLocked = hasCostumeField || hasCostumeKeyword;
+  if (!hasCostumeField) {
+    const hint = String(options.costumeHint ?? "").trim();
+    const usable = hint.length >= 10 ? hint : "";
+    const costumeLine = usable
+      ? `【服装】${usable}`
+      : "【服装】未锁定：镜头卡与角色档案均未提供服装字段，出片前须补齐（见 docs/character-registry.md）";
+    const lines = text.split("\n");
+    const characterIndex = lines.findIndex((line) => /^\s*\d{1,2}\.\s*【角色】/.test(line));
+    const insertAt = characterIndex >= 0 ? characterIndex + 1 : lines.length;
+    lines.splice(insertAt, 0, costumeLine);
+    /**
+     * 重排字段编号（补字段后不留断号）：按**字段行**计数，不用行号——
+     * 新插入的【服装】行还没有编号，用行号会把后续字段整体错位（单测抓到）。
+     */
+    let fieldCounter = 0;
+    text = lines
+      .map((line) => {
+        if (/^\s*\d{1,2}\.\s*【/.test(line)) {
+          fieldCounter += 1;
+          return line.replace(/^\s*\d{1,2}\.\s*(?=【)/, `${String(fieldCounter).padStart(2, "0")}.`);
+        }
+        if (/^\s*【/.test(line)) {
+          fieldCounter += 1;
+          return `${String(fieldCounter).padStart(2, "0")}.${line.trim()}`;
+        }
+        return line;
+      })
+      .join("\n");
+    fixes.push(usable
+      ? "补【服装】字段（来源：镜头卡 costume 字段）"
+      : "补【服装】未锁定声明（显式留痕，costumeLock=false）");
+    costumeLocked = Boolean(usable) || hasCostumeKeyword;
+  }
+
+  return { prompt: text, fixes, costumeLocked };
+}
+
 /**
  * 从镜头字段重建 prompt（Phase 3 失败止血的核心逻辑，独立导出便于单测）。
  * @returns 被重建的 shotId 列表（空数组表示无需重建）
@@ -584,9 +672,23 @@ export function rebuildPromptsFromFields(
     }
     const prompt = assemble(shot, fields, ratio);
     if (!prompt || typeof prompt !== "string") continue;
-    shot.prompt = prompt;
-    shot.promptCharCount = prompt.length;
+    /**
+     * 重建后必须**再过一遍字段契约**（T-2026-0926-0007 / #165 真机）：
+     * 早先重建产物直接进 PipelineGuard，被 `COSTUME_LOCK`（缺【服装】字段）与
+     * `DIALOGUE_FORMAT`（台词竖杠）稳定拦下——营销片连续 4 轮零渲染提交。
+     */
+    const costumeHint = promptFieldText(fields.costume) || promptFieldText(shot.costume) || promptFieldText(shot.character);
+    const healed = healPromptContract(prompt, { costumeHint });
+    shot.prompt = healed.prompt;
+    shot.promptCharCount = healed.prompt.length;
     shot.promptRebuilt = true;
+    if (healed.fixes.length > 0) {
+      shot.promptContractHealed = healed.fixes;
+    }
+    if (!healed.costumeLocked) {
+      /** 显式记账：不允许"未锁定也当锁定"地静默放行（由档案与事件面裁决是否继续渲染） */
+      shot.costumeLock = false;
+    }
     rebuilt.push(String(shot.shotId ?? "?"));
   }
   return rebuilt;
@@ -648,6 +750,21 @@ export function installVendorPromptRebuildBridge(options: { log?: (line: string)
             `[vendor-compat] Phase 3 未产出 prompt，已按 25/30 字段重建 ${rebuilt.length} 镜`
             + `（${rebuilt.join("、")}）；标记 promptRebuilt=true`
           );
+          const healedRows = shots
+            .filter((shot) => shot.promptRebuilt === true && Array.isArray(shot.promptContractHealed) && (shot.promptContractHealed as string[]).length > 0)
+            .map((shot) => `${String(shot.shotId ?? "?")}：${(shot.promptContractHealed as string[]).join("；")}`);
+          if (healedRows.length > 0) {
+            log(`[vendor-compat] 重建产物契约自愈 ${healedRows.length} 镜 → ${healedRows.join(" ｜ ")}`);
+          }
+          const unlocked = shots
+            .filter((shot) => shot.promptRebuilt === true && shot.costumeLock === false)
+            .map((shot) => String(shot.shotId ?? "?"));
+          if (unlocked.length > 0) {
+            log(
+              `[vendor-compat] ⚠ 服装未锁定 ${unlocked.length} 镜（${unlocked.join("、")}）：已记 costumeLock=false，`
+              + "按提示词契约须先补齐角色服装字段再渲染（不得静默放行）"
+            );
+          }
         }
       } catch (err) {
         log(`[vendor-compat] prompt 重建失败（保持原样）：${err instanceof Error ? err.message : String(err)}`);

@@ -31,7 +31,7 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import {
   applyMicromotion, appendGateEvent, assessVariantDistinctness, auditContinuity, buildDeliveryManifest, buildGateEvent,
   assessMotionRichness, buildCoverDesignPrompt, buildMaterialMotionPrompt, buildPlatePrompt, buildRevisionPlan, buildRevisionReport, buildVariantPlan,
-  buildMaterialScenePrompt, assessReferenceIndependence, MATERIAL_MOTION_POLICY, MATERIAL_RAW_MOTION_POLICY, MATERIAL_SCENE_POLICY_VERSION,
+  buildMaterialScenePrompt, assessReferenceIndependence, decidePlateCache, MATERIAL_MOTION_POLICY, MATERIAL_RAW_MOTION_POLICY, MATERIAL_SCENE_POLICY_VERSION,
   REFERENCE_INDEPENDENCE_POLICY,
   coverDeterministicChecks, COVER_FONTS, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
@@ -901,6 +901,53 @@ function loadHostedUrl(shotId: string, maxAgeHours = 20): string | null {
   }
 }
 
+/**
+ * 关键帧指纹元文件（2026-09-26 新增，T-2026-0926-0007）。
+ *
+ * 为什么必须落盘：关键帧的缓存命中判据原来是"文件在盘 + >50KB"，改过镜头卡之后旧图会被
+ * 当成有效产物复用（真机：把出镜服装从西装改回档案 w1 旗袍后，四镜旧图仍被记 ok）。
+ * 现在出图时写一份指纹（出图用的提示词 sha256 + 锚点模式 + 模型），复用前逐条比对。
+ */
+function plateMetaFile(shotId: string): string {
+  return join(PLATE_DIR, `${shotId}.plate-meta.json`);
+}
+
+function readPlateMeta(shotId: string): { promptSha256?: string; anchorMode?: string; model?: string; at?: string } | null {
+  const file = plateMetaFile(shotId);
+  if (!existsSync(file)) return null;
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as { promptSha256?: string; anchorMode?: string; model?: string; at?: string };
+  } catch {
+    return null;
+  }
+}
+
+function writePlateMeta(shotId: string, promptText: string, anchorMode: string): void {
+  const payload = {
+    promptSha256: createHash("sha256").update(promptText).digest("hex"),
+    anchorMode,
+    model: IMAGE_MODEL,
+    at: stamp()
+  };
+  writeFileSync(plateMetaFile(shotId), `${JSON.stringify(payload, null, 2)}\n`, "utf8");
+}
+
+/** 当前提示词文件的 sha256（提示词还没产出时返回 null，视为缓存不可用） */
+function promptSha256(shotId: string): string | null {
+  const file = join(PROMPT_DIR, `${shotId}.txt`);
+  if (!existsSync(file)) return null;
+  const text = readFileSync(file, "utf8").trim();
+  if (!text) return null;
+  return createHash("sha256").update(text).digest("hex");
+}
+
+/** 本镜最近一次关键帧裁决是否为放行（被驳回过的产物不得被缓存复用洗白） */
+function lastKeyframeApproved(history: StageRecord[], shotId: string): boolean {
+  const rows = [...history].reverse().filter((r) => r.stage === "keyframe" && r.shotId === shotId);
+  if (rows.length === 0) return false;
+  return Boolean(rows[0]!.ok);
+}
+
 async function download(url: string, file: string): Promise<string> {
   const res = await fetch(url, { signal: AbortSignal.timeout(300_000) });
   if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}`);
@@ -1288,11 +1335,16 @@ if (STAGES.has("spec")) {
       shotId: shot.shotId, charCount: finalPrompt.length, promptSource: report.promptSource,
       deliveryPass: report.delivery.pass, issues: report.delivery.issues,
       missingSpecFields: report.missingSpecFields, redlines: report.redlines, degraded: report.degraded,
+      sceneSubstituted: report.sceneSubstituted, sceneSubstitution: report.sceneSubstitution,
       languageNormalized: {
         replacements: normalized.replacements, dedupedRefs: normalized.dedupedRefs,
         remainingLatin: normalized.remainingLatin, timelineRestored: timelineFixed.restored
       }
     });
+    /** 【场景】被 vendor 写实校验替换/漂移：必须在运行日志里显性出现（不得静默换掉卡片场景） */
+    if (report.sceneSubstituted) {
+      log(`  ⚠ ${shot.shotId} ${report.sceneSubstitution?.reason ?? "【场景】与镜头卡不一致"}`);
+    }
     if (normalized.replacements > 0 || normalized.dedupedRefs > 0) {
       log(`  ${shot.shotId}: 提示词归一（英文负面词→中文 ${normalized.replacements} 处 · 角色图去重 ${normalized.dedupedRefs} 处）`);
     }
@@ -1373,7 +1425,12 @@ if (STAGES.has("spec")) {
     record({
       stage: "spec", shotId: shot.shotId, invoked: true, ok: report.delivery.pass && report.charCount >= 1200,
       cached: false, degraded: report.degraded, attempt: 1, ms: Date.now() - started,
-      artifact: promptFile, evidence: { charCount: report.charCount, promptSource: report.promptSource, missing: report.missingSpecFields }, verdict: null
+      artifact: promptFile,
+      evidence: {
+        charCount: report.charCount, promptSource: report.promptSource, missing: report.missingSpecFields,
+        sceneSubstituted: report.sceneSubstituted, sceneSubstitution: report.sceneSubstitution
+      },
+      verdict: null
     });
   }
   writeFileSync(join(PROMPT_DIR, "spec-report.json"), `${JSON.stringify(specReports, null, 2)}\n`, "utf8");
@@ -1505,11 +1562,46 @@ if (STAGES.has("plates")) {
       });
       continue;
     }
-    const cached = RESUME && existsSync(plate) && statSync(plate).size > 50_000;
-    if (cached) {
+    /**
+     * 关键帧缓存必须过**两道失效判据**（2026-09-26 真机 T-2026-0926-0007）：
+     *
+     *  1. **提示词指纹**：出图时写 `GR-xx.plate-meta.json`（prompt sha256 + 锚点模式 + 模型）。
+     *     镜头卡改过（例如把西装改成档案 w1 旗袍）后，旧图必须重出——早先只看"文件在 + >50KB"
+     *     就复用，真机表现为"改了卡片，产物还是旧图，却被记成 ok"。
+     *  2. **历史裁决**：本镜最近一次 keyframe 记录必须是 ok。被监制打回过的图不得因为
+     *     重跑一次就被"缓存复用"洗白（与 shot 阶段"复用也要复检"同一纪律）。
+     *
+     * 两条任一不满足 → 判缓存失效，照常重新出图并重新过监制。
+     */
+    const cachedPlateExists = existsSync(plate);
+    const cachedMeta = readPlateMeta(shot.shotId);
+    const currentPromptSha = promptSha256(shot.shotId);
+    const cacheDecision = decidePlateCache({
+      exists: cachedPlateExists,
+      sizeBytes: cachedPlateExists ? statSync(plate).size : 0,
+      meta: cachedMeta,
+      currentPromptSha256: currentPromptSha,
+      anchorMode: plateAnchorMode,
+      lastApproved: lastKeyframeApproved(readStageHistory(), shot.shotId)
+    });
+    const plateCacheValid = RESUME && cacheDecision.valid;
+    if (plateCacheValid) {
       const probeInfo = probe(plate);
-      record({ stage: "keyframe", shotId: shot.shotId, invoked: true, ok: true, cached: true, degraded: false, attempt: 1, ms: 0, artifact: plate, evidence: probeInfo, verdict: null, note: "复用已有产物（幂等）" });
+      record({
+        stage: "keyframe", shotId: shot.shotId, invoked: true, ok: true, cached: true, degraded: false, attempt: 1, ms: 0,
+        artifact: plate, evidence: { ...probeInfo, promptSha256: currentPromptSha, anchorMode: plateAnchorMode }, verdict: null,
+        note: `复用已有产物（${cacheDecision.reason}）`
+      });
       continue;
+    }
+    if (cachedPlateExists && !plateCacheValid) {
+      const reason = RESUME ? cacheDecision.reason : "本次禁用复用（--no-resume）";
+      log(`  ↻ ${shot.shotId} 关键帧缓存失效（${reason}）→ 重新生成并复检`);
+      record({
+        stage: "keyframe-cache-invalid", shotId: shot.shotId, invoked: false, ok: false, cached: true, degraded: false, attempt: 0, ms: 0,
+        artifact: plate, evidence: { reason, cachedPromptSha256: cachedMeta?.promptSha256 ?? null, currentPromptSha256: currentPromptSha }, verdict: null,
+        note: `缓存失效（${reason}）：旧图不得直接复用`
+      });
     }
     if (DRY_RUN) {
       record({ stage: "keyframe", shotId: shot.shotId, invoked: false, ok: true, cached: false, degraded: false, attempt: 0, ms: 0, artifact: null, evidence: { dryRun: true }, verdict: null });
@@ -1553,6 +1645,8 @@ if (STAGES.has("plates")) {
           stage: "keyframe", shotId: shot.shotId, invoked: true, ok: verdict.approved, cached: false, degraded: verdict.degraded,
           attempt, ms: Date.now() - started, artifact: plate, evidence: info, verdict
         });
+        /** 放行才写指纹：被驳回的图不写元文件，下一轮必然重出（缓存失效判据 ② 的物证） */
+        if (verdict.approved) writePlateMeta(shot.shotId, prompt, plateAnchorMode);
         approved = verdict.approved;
         if (!approved) plateVerdict = verdict;
         if (!approved) log(`↻ 关键帧 ${shot.shotId} 第 ${attempt} 次未过监制：${verdict.reason}`);
@@ -3363,12 +3457,17 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
   if (chosenTrack) {
     /** 监制点名曲目：id → 走曲库索引解析出绝对路径；已是绝对路径则直用 */
     let trackPath = chosenTrack;
+    /** 点名曲目的真实 BPM（交混音器当基准；解析不到时留空，不硬编造） */
+    let trackBpm: number | null = null;
     if (!existsSync(trackPath)) {
       try {
         const core = await import(join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/core.mjs"));
-        const found = (core as { findTracks: (q: Record<string, unknown>) => { track?: { path?: string } } })
+        const found = (core as { findTracks: (q: Record<string, unknown>) => { track?: { path?: string; bpm?: number } } })
           .findTracks({ trackId: chosenTrack, commercialUse: true });
-        if (found.track?.path && existsSync(found.track.path)) trackPath = found.track.path;
+        if (found.track?.path && existsSync(found.track.path)) {
+          trackPath = found.track.path;
+          trackBpm = Number.isFinite(Number(found.track.bpm)) ? Number(found.track.bpm) : null;
+        }
         else throw new Error(`曲库中未找到可用曲目：${chosenTrack}`);
       } catch (err) {
         throw new Error(`--bgm-track 解析失败（${chosenTrack}）：${err instanceof Error ? err.message : String(err)}`);
@@ -3378,6 +3477,8 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
         "mix", "--in", danmakuOut, "--out", out, "--bgm", trackPath, "--policy", policy,
         "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
         "--section", arg("--bgm-section", "auto"),
+        /** 同理：点名曲目也要把真实 BPM 交给混音器（否则基准落到默认 100，卡点判定失真） */
+        ...(trackBpm ? ["--bgm-bpm", String(trackBpm)] : []),
         /**
          * 剪辑网格 + 剪辑驱动 BPM（2026-09-25 真机）：成片方最清楚自己的剪辑点（每镜固定时长、硬切），
          * 把网格直接交给混音器反推 BPM（5s 切点 → 96BPM = 8 拍/镜）——卡点平均误差从 116ms 降到 0ms。
@@ -3405,6 +3506,12 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
         "mix", "--in", danmakuOut, "--out", out, "--bgm", bed.path, "--policy", policy,
         "--music-level", arg("--bgm-bed-level", "-28"), "--ducking", arg("--bgm-bed-ducking", "16"), "--lufs", "-14",
         "--section", arg("--bgm-section", "auto"),
+        /**
+         * **把曲目真实 BPM 交给混音器**（2026-09-26 真机修复）：
+         * 不传时 `deriveTempoFromCuts` 的基准会落到默认 100，反推出的 BPM 与剪辑网格自相矛盾
+         * （VID-GR01：标称 120BPM 的曲子被判 99.6BPM、卡点 7/17、平均 122ms → 监制连续打回配乐）。
+         */
+        "--bgm-bpm", String(bed.bpm),
         "--bpm-strategy", "cut-driven",
         "--cut-times", CUT_GRID.join(","),
         "--evidence-dir", join(POST_DIR, "bgm-evidence")

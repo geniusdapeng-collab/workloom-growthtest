@@ -22,6 +22,7 @@ export * from "./micromotion.js";
 export * from "./continuity.js";
 export * from "./gate-ledger.js";
 export * from "./plate-prompt.js";
+export * from "./plate-cache.js";
 export * from "./prompt-language.js";
 export * from "./deliver.js";
 export * from "./revise.js";
