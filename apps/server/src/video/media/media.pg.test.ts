@@ -522,6 +522,45 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     }
   }, 120_000);
 
+  /**
+   * 同步增量游标回归（T-2026-0926-0012 深审实证）：触发器把 updated_at 写成事务时间，
+   * 同一事务写入的多行时间戳**完全相同**；旧实现用"全局 max(updated_at) + 严格大于"做游标，
+   * 同刻行数 > limit 时页与页原地打转（hasMore 恒 true），这些行永远同步不过去。
+   */
+  it("⑬ 同步增量游标：同刻批量写入也必须能推进（不丢行/不死循环）", async () => {
+    const tx = await owner.connect();
+    const ids = [`VA-tx-a-${suffix}`, `VA-tx-b-${suffix}`, `VA-tx-c-${suffix}`];
+    try {
+      await tx.query("BEGIN");
+      for (const [index, id] of ids.entries()) {
+        await tx.query(
+          `INSERT INTO video_assets (id, workspace_id, chain_id, kind, version, source_url, sha256, meta, status, created_by, title)
+           VALUES ($1,$2,$1,'clip',1,'local://tx',$3,'{"localPath":"video/x/tx.mp4"}','registered','vitest',$4)`,
+          [id, workspaceId, `sha-tx-${index}-${suffix}`, `同刻素材 ${index}`]);
+      }
+      await tx.query("COMMIT");
+    } finally {
+      tx.release();
+    }
+
+    const seen = new Set<string>();
+    const pages: number[] = [];
+    let cursor: string | null = new Date(Date.now() - 60_000).toISOString();
+    let guard = 0;
+    while (cursor && guard < 40) {
+      guard += 1;
+      const page = await mods.changesSince(getAppPool(), scope, { since: cursor, limit: 2 });
+      pages.push(page.assets.length);
+      for (const asset of page.assets) seen.add(asset.id);
+      cursor = page.hasMore ? page.cursor : null;
+    }
+    // 三条同刻行都必须被拉到（旧实现会卡在同一页）
+    for (const id of ids) expect(seen.has(id), `同刻批量行 ${id} 必须被增量游标拉到`).toBe(true);
+    // 必须能收敛（旧实现 hasMore 恒 true → 这里会跑满 guard）
+    expect(cursor).toBeNull();
+    expect(guard).toBeLessThan(40);
+  }, 90_000);
+
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {
     const a = await makeTinyClip("recut-a.mp4", "red");
     const b = await makeTinyClip("recut-b.mp4", "blue");

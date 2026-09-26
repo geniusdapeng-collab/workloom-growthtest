@@ -240,30 +240,35 @@ export async function changesSince(
   input: { since?: string | Date | null; limit?: number } = {},
 ): Promise<SyncPullPayload> {
   const limit = Math.min(Math.max(input.limit ?? 500, 1), 1000);
-  /** since 可能是 Date（进程内调用）或 ISO 字符串（HTTP/设备文件）；统一 ISO 后再进 SQL */
-  const since = input.since ? isoOf(input.since) : "1970-01-01T00:00:00.000Z";
+  const start = decodeCursor(input.since);
   const assets = await scopedQuery<SyncAssetRow>(app, scope,
     `SELECT id, project_id, chain_id, kind, version, parent_id, source_url, provenance, license_risk,
             hero_image_id, sha256, meta, status, created_by, created_at, updated_at, title, tags, prompt,
-            pipeline_kind, duration_seconds, width, height, thumb_path, source_type, sync_state
-       FROM video_assets WHERE workspace_id = $1 AND updated_at > $2::timestamptz
-      ORDER BY updated_at ASC LIMIT $3`,
-    [scope.workspaceId, since, limit]);
+            pipeline_kind, duration_seconds, width, height, thumb_path, source_type, sync_state,
+            updated_at::text AS cursor_at
+       FROM video_assets
+      WHERE workspace_id = $1 AND (updated_at, id) > ($2::timestamptz, $3::text)
+      ORDER BY updated_at ASC, id ASC LIMIT $4`,
+    [scope.workspaceId, start.a[0], start.a[1], limit]);
   const collections = await scopedQuery<Record<string, unknown>>(app, scope,
-    `SELECT id, title, purpose, meta, status, created_by, created_at, updated_at
-       FROM media_collections WHERE workspace_id = $1 AND updated_at > $2::timestamptz
-      ORDER BY updated_at ASC LIMIT $3`,
-    [scope.workspaceId, since, limit]);
+    `SELECT id, title, purpose, meta, status, created_by, created_at, updated_at, updated_at::text AS cursor_at
+       FROM media_collections
+      WHERE workspace_id = $1 AND (updated_at, id) > ($2::timestamptz, $3::text)
+      ORDER BY updated_at ASC, id ASC LIMIT $4`,
+    [scope.workspaceId, start.c[0], start.c[1], limit]);
   const items = await scopedQuery<Record<string, unknown>>(app, scope,
-    `SELECT collection_id, asset_id, seq, note, added_by, added_at, updated_at
-       FROM media_collection_items WHERE workspace_id = $1 AND updated_at > $2::timestamptz
-      ORDER BY updated_at ASC LIMIT $3`,
-    [scope.workspaceId, since, limit]);
+    `SELECT collection_id, asset_id, seq, note, added_by, added_at, updated_at, updated_at::text AS cursor_at
+       FROM media_collection_items
+      WHERE workspace_id = $1 AND (updated_at, collection_id, asset_id) > ($2::timestamptz, $3::text, $4::text)
+      ORDER BY updated_at ASC, collection_id ASC, asset_id ASC LIMIT $5`,
+    [scope.workspaceId, start.i[0], start.i[1], start.i[2], limit]);
   const products = await scopedQuery<Record<string, unknown>>(app, scope,
-    `SELECT id, product_name, dossier_path, dossier_sha256, summary, hero_asset_id, status, created_at, updated_at
-       FROM media_product_profiles WHERE workspace_id = $1 AND updated_at > $2::timestamptz
-      ORDER BY updated_at ASC LIMIT $3`,
-    [scope.workspaceId, since, limit]);
+    `SELECT id, product_name, dossier_path, dossier_sha256, summary, hero_asset_id, status, created_at, updated_at,
+            updated_at::text AS cursor_at
+       FROM media_product_profiles
+      WHERE workspace_id = $1 AND (updated_at, id) > ($2::timestamptz, $3::text)
+      ORDER BY updated_at ASC, id ASC LIMIT $4`,
+    [scope.workspaceId, start.p[0], start.p[1], limit]);
   const urls: SyncPullPayload["urls"] = {};
   for (const asset of assets) {
     const localPath = (asset.meta as { localPath?: string } | null)?.localPath;
@@ -271,15 +276,85 @@ export async function changesSince(
       urls[asset.id] = { url: mediaUrl(localPath, 3600), expiresInSec: 3600 };
     }
   }
-  const stamps: string[] = [
-    ...assets.map((a) => isoOf(a.updated_at)),
-    ...collections.map((c) => isoOf(c.updated_at)),
-    ...items.map((i) => isoOf(i.updated_at)),
-    ...products.map((p) => isoOf(p.updated_at)),
-  ].filter(Boolean);
-  const cursor = stamps.length > 0 ? stamps.sort().at(-1)! : since;
+  /**
+   * 游标推进 = 每表各自的 (updated_at, id) 末条；本表本页无行则保留原元组。
+   * 为什么不用"全局 max(updated_at)"（T-2026-0926-0012 深审实证）：触发器把 updated_at
+   * 写成**事务时间**，同一事务写入的多行时间戳完全相同；当同刻行数 > limit 时，
+   * 全局游标 + 严格大于会让拉取原地打转（page2 == page1、hasMore 恒 true、行永远同步不过去）。
+   */
+  const next = {
+    v: 2 as const,
+    a: advance(start.a, assets.at(-1), (row) => [cursorStamp(row), String(row.id)]),
+    c: advance(start.c, collections.at(-1), (row) => [cursorStamp(row), String(row.id)]),
+    i: advance(start.i, items.at(-1), (row) => [cursorStamp(row), String(row.collection_id), String(row.asset_id)]),
+    p: advance(start.p, products.at(-1), (row) => [cursorStamp(row), String(row.id)]),
+  };
   const hasMore = [assets, collections, items, products].some((rows) => rows.length === limit);
-  return { since: input.since ? since : null, cursor, hasMore, assets, collections, items, products, urls };
+  return {
+    since: input.since ? (typeof input.since === "string" ? input.since : isoOf(input.since)) : null,
+    cursor: encodeCursor(next), hasMore, assets, collections, items, products, urls,
+  };
+}
+
+/* ================= 同步游标（opaque v2） ================= */
+
+type Tuple = [string, ...string[]];
+export interface SyncCursor {
+  v: 2;
+  a: Tuple;
+  c: Tuple;
+  i: Tuple;
+  p: Tuple;
+}
+
+/** 起点元组固定 3 段：2 段比较（assets/collections/products）与 3 段比较（items）都能直接用 */
+const EPOCH: Tuple = ["1970-01-01T00:00:00.000Z", "", ""];
+
+function advance<T>(prev: Tuple, row: T | undefined, pick: (row: T) => Tuple): Tuple {
+  return row ? pick(row) : prev;
+}
+
+/**
+ * 游标里的时间戳必须用 **SQL 原文**（`updated_at::text`，微秒精度 + 带时区偏移），
+ * 不能走 JS Date：pg 解析 timestamptz 只到毫秒，回写成 ISO 会截断微秒，
+ * 于是 `(updated_at, id) > (被截断的 ts, id)` 永远包含同秒的行 → 分页原地打转
+ * （T-2026-0926-0012 实测：`…935123` 被截成 `…935Z`）。
+ */
+function cursorStamp(row: unknown): string {
+  const value = (row as { cursor_at?: unknown } | null)?.cursor_at;
+  if (typeof value === "string" && value) return value;
+  return isoOf((row as { updated_at?: unknown } | null)?.updated_at);
+}
+
+export function encodeCursor(cursor: SyncCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+/**
+ * 解析游标：既接受 v2 opaque 游标，也接受**上一版的全局 ISO 字符串**（设备文件里存的旧值），
+ * 后者退化为"四表都用该时间戳 + 空 id"——语义等价于旧行为，不会把自己锁死。
+ */
+export function decodeCursor(value?: string | Date | null): SyncCursor {
+  if (!value) return { v: 2, a: EPOCH, c: EPOCH, i: EPOCH, p: EPOCH };
+  if (value instanceof Date) {
+    const iso = value.toISOString();
+    return { v: 2, a: [iso, ""], c: [iso, ""], i: [iso, "", ""], p: [iso, ""] };
+  }
+  const text = String(value);
+  try {
+    const parsed = JSON.parse(Buffer.from(text, "base64url").toString("utf8")) as Partial<SyncCursor>;
+    if (parsed && parsed.v === 2) {
+      return {
+        v: 2,
+        a: Array.isArray(parsed.a) && parsed.a.length > 0 ? (parsed.a as Tuple) : EPOCH,
+        c: Array.isArray(parsed.c) && parsed.c.length > 0 ? (parsed.c as Tuple) : EPOCH,
+        i: Array.isArray(parsed.i) && parsed.i.length > 0 ? (parsed.i as Tuple) : EPOCH,
+        p: Array.isArray(parsed.p) && parsed.p.length > 0 ? (parsed.p as Tuple) : EPOCH,
+      };
+    }
+  } catch { /* 非 v2：按旧 ISO 游标处理 */ }
+  const iso = isoOf(text);
+  return { v: 2, a: [iso, ""], c: [iso, ""], i: [iso, "", ""], p: [iso, ""] };
 }
 
 /* ================= 元数据：推送（云端侧 LWW 合并） ================= */
