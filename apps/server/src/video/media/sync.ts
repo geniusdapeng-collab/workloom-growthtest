@@ -204,8 +204,9 @@ export type SyncAssetRow = {
   meta: Record<string, unknown>;
   status: string;
   created_by: string;
-  created_at: string;
-  updated_at: string;
+  /** 运行时是 JS Date（pg 解析 TIMESTAMPTZ）；进出统一经 isoOf() 归一 */
+  created_at: string | Date;
+  updated_at: string | Date;
   title: string | null;
   tags: unknown;
   prompt: string | null;
@@ -236,10 +237,11 @@ export interface SyncPullPayload {
  */
 export async function changesSince(
   app: AppPool, scope: Scope,
-  input: { since?: string | null; limit?: number } = {},
+  input: { since?: string | Date | null; limit?: number } = {},
 ): Promise<SyncPullPayload> {
   const limit = Math.min(Math.max(input.limit ?? 500, 1), 1000);
-  const since = input.since ?? "1970-01-01T00:00:00.000Z";
+  /** since 可能是 Date（进程内调用）或 ISO 字符串（HTTP/设备文件）；统一 ISO 后再进 SQL */
+  const since = input.since ? isoOf(input.since) : "1970-01-01T00:00:00.000Z";
   const assets = await scopedQuery<SyncAssetRow>(app, scope,
     `SELECT id, project_id, chain_id, kind, version, parent_id, source_url, provenance, license_risk,
             hero_image_id, sha256, meta, status, created_by, created_at, updated_at, title, tags, prompt,
@@ -269,15 +271,15 @@ export async function changesSince(
       urls[asset.id] = { url: mediaUrl(localPath, 3600), expiresInSec: 3600 };
     }
   }
-  const stamps = [
-    ...assets.map((a) => a.updated_at),
-    ...collections.map((c) => String(c.updated_at ?? "")),
-    ...items.map((i) => String(i.updated_at ?? "")),
-    ...products.map((p) => String(p.updated_at ?? "")),
+  const stamps: string[] = [
+    ...assets.map((a) => isoOf(a.updated_at)),
+    ...collections.map((c) => isoOf(c.updated_at)),
+    ...items.map((i) => isoOf(i.updated_at)),
+    ...products.map((p) => isoOf(p.updated_at)),
   ].filter(Boolean);
   const cursor = stamps.length > 0 ? stamps.sort().at(-1)! : since;
   const hasMore = [assets, collections, items, products].some((rows) => rows.length === limit);
-  return { since: input.since ?? null, cursor, hasMore, assets, collections, items, products, urls };
+  return { since: input.since ? since : null, cursor, hasMore, assets, collections, items, products, urls };
 }
 
 /* ================= 元数据：推送（云端侧 LWW 合并） ================= */
@@ -302,9 +304,19 @@ export interface SyncPushResult {
   conflicts: SyncConflict[];
 }
 
+/** TIMESTAMPTZ → ISO（Date/字符串都能吃；不可解析时原样返回，交给上层报错） */
+export function isoOf(value: unknown): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+  }
+  return "";
+}
+
 function newerThan(a: unknown, b: unknown): boolean {
-  const ta = Date.parse(String(a ?? ""));
-  const tb = Date.parse(String(b ?? ""));
+  const ta = Date.parse(isoOf(a));
+  const tb = Date.parse(isoOf(b));
   if (!Number.isFinite(ta) || !Number.isFinite(tb)) return true;
   return ta > tb;
 }
@@ -324,7 +336,7 @@ export async function applyPush(
       [scope.workspaceId, asset.id]);
     const serverUpdatedAt = existing[0]?.updated_at ?? null;
     if (serverUpdatedAt && !newerThan(asset.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "assets", id: asset.id, localUpdatedAt: asset.updated_at, serverUpdatedAt, reason: "服务端更新更晚" });
+      result.conflicts.push({ table: "assets", id: asset.id, localUpdatedAt: isoOf(asset.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
       continue;
     }
     await scopedQuery(app, scope,
@@ -345,8 +357,9 @@ export async function applyPush(
        WHERE video_assets.updated_at < EXCLUDED.updated_at`,
       [asset.id, scope.workspaceId, asset.project_id, asset.chain_id, asset.kind, asset.version, asset.parent_id,
        asset.source_url, JSON.stringify(asset.provenance ?? {}), asset.license_risk, asset.hero_image_id, asset.sha256,
-       JSON.stringify(asset.meta ?? {}), asset.status, asset.created_by, asset.created_at,
-       asset.updated_at ?? new Date().toISOString(), asset.title ?? null, JSON.stringify(asset.tags ?? []),
+       JSON.stringify(asset.meta ?? {}), asset.status, asset.created_by,
+       isoOf(asset.created_at) || new Date().toISOString(),
+       isoOf(asset.updated_at) || new Date().toISOString(), asset.title ?? null, JSON.stringify(asset.tags ?? []),
        asset.prompt ?? null, asset.pipeline_kind ?? null, asset.duration_seconds ?? null, asset.width ?? null,
        asset.height ?? null, asset.thumb_path ?? null, asset.source_type ?? "generated",
        asset.sync_state ?? "cloud_only"]);
@@ -364,7 +377,7 @@ export async function applyPush(
       `SELECT updated_at FROM media_collections WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, id]);
     const serverUpdatedAt = existing[0]?.updated_at ?? null;
     if (serverUpdatedAt && !newerThan(collection.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "collections", id, localUpdatedAt: String(collection.updated_at ?? ""), serverUpdatedAt, reason: "服务端更新更晚" });
+      result.conflicts.push({ table: "collections", id, localUpdatedAt: isoOf(collection.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
       continue;
     }
     await scopedQuery(app, scope,
@@ -390,13 +403,13 @@ export async function applyPush(
       [scope.workspaceId, collectionId, assetId]);
     const serverUpdatedAt = existing[0]?.updated_at ?? null;
     if (serverUpdatedAt && !newerThan(item.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "items", id: `${collectionId}/${assetId}`, localUpdatedAt: String(item.updated_at ?? ""), serverUpdatedAt, reason: "合集条目顺序冲突（seq 以服务端为准，人工确认）" });
+      result.conflicts.push({ table: "items", id: `${collectionId}/${assetId}`, localUpdatedAt: isoOf(item.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "合集条目顺序冲突（seq 以服务端为准，人工确认）" });
       continue;
     }
     const assetExists = await scopedQuery<{ id: string }>(app, scope,
       `SELECT id FROM video_assets WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, assetId]);
     if (assetExists.length === 0) {
-      result.conflicts.push({ table: "items", id: `${collectionId}/${assetId}`, localUpdatedAt: String(item.updated_at ?? ""), serverUpdatedAt: serverUpdatedAt ?? "", reason: "素材行未同步到位（先推 assets 再推 items）" });
+      result.conflicts.push({ table: "items", id: `${collectionId}/${assetId}`, localUpdatedAt: isoOf(item.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "素材行未同步到位（先推 assets 再推 items）" });
       continue;
     }
     await scopedQuery(app, scope,
@@ -417,7 +430,7 @@ export async function applyPush(
       `SELECT updated_at FROM media_product_profiles WHERE workspace_id = $1 AND id = $2`, [scope.workspaceId, id]);
     const serverUpdatedAt = existing[0]?.updated_at ?? null;
     if (serverUpdatedAt && !newerThan(product.updated_at, serverUpdatedAt)) {
-      result.conflicts.push({ table: "products", id, localUpdatedAt: String(product.updated_at ?? ""), serverUpdatedAt, reason: "服务端更新更晚" });
+      result.conflicts.push({ table: "products", id, localUpdatedAt: isoOf(product.updated_at), serverUpdatedAt: isoOf(serverUpdatedAt), reason: "服务端更新更晚" });
       continue;
     }
     await scopedQuery(app, scope,

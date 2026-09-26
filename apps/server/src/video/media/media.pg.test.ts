@@ -58,6 +58,7 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     checkUploadQuota: typeof import("./upload.js").checkUploadQuota;
     uploadRelPath: typeof import("./upload.js").uploadRelPath;
     listAssets: typeof import("./library.js").listAssets;
+    listFilms: typeof import("./library.js").listFilms;
     getAsset: typeof import("./library.js").getAsset;
     updateAssetMeta: typeof import("./library.js").updateAssetMeta;
     archiveAsset: typeof import("./library.js").archiveAsset;
@@ -110,6 +111,7 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
       checkUploadQuota: (await import("./upload.js")).checkUploadQuota,
       uploadRelPath: (await import("./upload.js")).uploadRelPath,
       listAssets: (await import("./library.js")).listAssets,
+      listFilms: (await import("./library.js")).listFilms,
       getAsset: (await import("./library.js")).getAsset,
       updateAssetMeta: (await import("./library.js")).updateAssetMeta,
       archiveAsset: (await import("./library.js")).archiveAsset,
@@ -462,6 +464,63 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     const detail = await mods.getAsset(getAppPool(), otherScope, clipIds[0]!);
     expect(detail).toBeNull();
   }, 60_000);
+
+  /**
+   * 分页回归（T-2026-0926-0011 深审发现）：`nextCursor` 曾把 JS Date 的 toString()
+   * 拼进去（"Sat Sep … GMT+0800 (China Standard Time)|VA-…"），第二页 `::timestamptz`
+   * 直接 22023 → 媒资库/成片历史「加载更多」必崩。这里锁死：游标必须是 ISO，
+   * 且两页并集 == 全量、无重复。
+   */
+  it("⑫ 分页游标必须是 ISO 且翻页并集等于全量（列表/检索/成片）", async () => {
+    // 造 5 条 clip（其中 3 条命中中文检索），保证必然分页
+    for (const index of [0, 1, 2]) {
+      const file = await writeFixtureFile(`page-${index}.mp4`, `page-bytes-${index}`);
+      await mods.registerLocalAsset(getAppPool(), getGatewayPool(), scope, {
+        absPath: file, kind: "clip", title: `分页素材 ${index}`, prompt: "分页实验室素材", by: "vitest",
+        probe: false, thumbnail: false,
+      });
+    }
+    const pageProbe = await mods.listAssets(getAppPool(), scope, { limit: 2 });
+    expect(pageProbe.nextCursor, "limit 命中时必须给出游标").toBeTruthy();
+    expect(pageProbe.nextCursor!).toMatch(/^(semantic|tsv|trgm|none)\|\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\|/);
+
+    const walk = async (input: { limit: number; query?: string; status?: "active" | "archived" | "all" }) => {
+      const seen: string[] = [];
+      const layers: string[] = [];
+      let cursor: string | null = null;
+      for (let guard = 0; guard < 20; guard += 1) {
+        const result = await mods.listAssets(getAppPool(), scope, { ...input, cursor: cursor ?? undefined });
+        seen.push(...result.items.map((item) => item.id));
+        if (result.searchTrace?.layer) layers.push(result.searchTrace.layer);
+        cursor = result.nextCursor;
+        if (!cursor) break;
+      }
+      return { seen, layers };
+    };
+    for (const input of [{ limit: 2 }, { limit: 3 }]) {
+      const { seen, layers } = await walk(input);
+      const full = (await mods.listAssets(getAppPool(), scope, { limit: 200 })).items.map((item) => item.id).sort();
+      expect(new Set(seen).size, `分页不应重复 id（input=${JSON.stringify(input)}）`).toBe(seen.length);
+      expect([...seen].sort(), `分页并集必须等于全量（input=${JSON.stringify(input)}）`).toEqual(full);
+      expect(new Set(layers).size, "同一轮翻页不得跨检索层").toBeLessThanOrEqual(1);
+    }
+    // 带检索的翻页：并集必须等于**该检索**的全量，且层必须稳定（不得 tsv→trgm 漂移）
+    for (const query of ["实验室", "实验"]) {
+      const { seen, layers } = await walk({ limit: 2, query });
+      const full = (await mods.listAssets(getAppPool(), scope, { limit: 200, query })).items.map((item) => item.id).sort();
+      expect(new Set(seen).size, `检索分页不应重复（query=${query}）`).toBe(seen.length);
+      expect([...seen].sort(), `检索分页并集必须等于该检索全量（query=${query}）`).toEqual(full);
+      expect(new Set(layers).size, `检索翻页不得跨层（query=${query}，实际 ${layers.join("→")}）`).toBeLessThanOrEqual(1);
+    }
+
+    // 成片历史同款游标
+    const films = await mods.listFilms(getAppPool(), scope, { limit: 1 });
+    if (films.nextCursor) {
+      expect(films.nextCursor).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z\|/);
+      const second = await mods.listFilms(getAppPool(), scope, { limit: 1, cursor: films.nextCursor });
+      expect(second.items.every((item) => item.id !== films.items[0]?.id)).toBe(true);
+    }
+  }, 120_000);
 
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {
     const a = await makeTinyClip("recut-a.mp4", "red");

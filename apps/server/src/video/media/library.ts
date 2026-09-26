@@ -38,8 +38,9 @@ export type MediaAssetRow = {
   project_id: string | null;
   version: number;
   chain_id: string;
-  created_at: string;
-  updated_at: string;
+  /** 运行时是 JS Date（pg 解析 TIMESTAMPTZ），出参/游标一律经 toIso() 归一 */
+  created_at: string | Date;
+  updated_at: string | Date;
   local_path: string | null;
   bytes: string | null;
   similarity?: number | null;
@@ -104,6 +105,46 @@ function toNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * node-postgres 把 TIMESTAMPTZ 解析成 **JS Date**（不是字符串）：直接拼进游标会得到
+ * `Sat Sep 26 2026 23:35:47 GMT+0800 (China Standard Time)|VA-…`，下一轮请求把它
+ * `::timestamptz` 强转即 22023（T-2026-0926-0011 深审实证：列表翻页必 500）。
+ * 出参时间与游标统一 ISO 化，让类型合同（string）与运行时行为一致。
+ */
+function toIso(value: string | Date | null | undefined): string {
+  if (value instanceof Date) return value.toISOString();
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString();
+  }
+  return "";
+}
+
+export type SearchLayer = "semantic" | "tsv" | "trgm" | "none";
+
+/**
+ * 游标格式 `<layer>|<ISO created_at>|<id>`。
+ *
+ * 为什么要带 layer（T-2026-0926-0011 深审实证）：三层检索是"逐页现算"的，
+ * 第 1 页命中 tsv、第 2 页 tsv 零命中就会掉进 trgm 兜底，排序口径从 created_at 变成
+ * similarity → 翻页结果错乱/漏项。游标把"这一搜用的是哪一层"钉死，翻页路径稳定。
+ */
+export function parseCursor(cursor?: string | null): { layer: SearchLayer | null; at: string | null; id: string | null } {
+  if (!cursor) return { layer: null, at: null, id: null };
+  const parts = cursor.split("|");
+  if (parts.length >= 3) return { layer: parts[0] as SearchLayer, at: parts[1] ?? null, id: parts.slice(2).join("|") || null };
+  if (parts.length === 2) return { layer: null, at: parts[0] ?? null, id: parts[1] ?? null }; // 兼容旧游标
+  return { layer: null, at: null, id: null };
+}
+
+function cursorClause(builder: WhereBuilder, cursor?: string | null): void {
+  const { at, id } = parseCursor(cursor);
+  if (!at || !id) return;
+  const p1 = builder.add(at);
+  const p2 = builder.add(id);
+  builder.clauses.push(`(a.created_at, a.id) < (${p1}::timestamptz, ${p2}::text)`);
+}
+
 export function toAssetView(row: MediaAssetRow, opts: { thumbExists?: (rel: string) => boolean } = {}): MediaAssetView {
   const tags = Array.isArray(row.tags) ? row.tags.map((t) => String(t)) : [];
   const exists = opts.thumbExists ?? ((rel: string) => existsSync(join(mediaRoot(), rel)));
@@ -123,8 +164,8 @@ export function toAssetView(row: MediaAssetRow, opts: { thumbExists?: (rel: stri
     projectId: row.project_id,
     version: row.version,
     chainId: row.chain_id,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
+    createdAt: toIso(row.created_at),
+    updatedAt: toIso(row.updated_at),
     bytes: toNumber(row.bytes),
     localPath: row.local_path,
     hasLocalFile: Boolean(row.local_path) && exists(row.local_path!),
@@ -166,28 +207,24 @@ function whereBuilder(scope: Scope, input: ListAssetsInput): WhereBuilder {
     clauses.push(`a.id IN (SELECT asset_id FROM media_collection_items
                             WHERE workspace_id = $1 AND collection_id = ${p})`);
   }
-  if (input.cursor) {
-    const [createdAt, id] = input.cursor.split("|");
-    if (createdAt && id) {
-      const p1 = add(createdAt);
-      const p2 = add(id);
-      clauses.push(`(a.created_at, a.id) < (${p1}::timestamptz, ${p2}::text)`);
-    }
-  }
-  return { clauses, params, add };
+  const builder: WhereBuilder = { clauses, params, add };
+  cursorClause(builder, input.cursor);
+  return builder;
 }
 
 export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsInput): Promise<ListAssetsResult> {
   const limit = Math.min(Math.max(input.limit ?? 60, 1), 200);
   const query = input.query?.trim();
   const semanticOn = Boolean(query) && semanticEnabled();
+  /** 游标里钉住的检索层：有游标就只走那一层，避免翻页时层间漂移（排序口径变化） */
+  const pinned = parseCursor(input.cursor).layer;
   const trace: ListAssetsResult["searchTrace"] = {
     layer: query ? (semanticOn ? "semantic" : "tsv") : "none",
     semanticEnabled: semanticOn,
     mock: embedderFromEnv().mock,
   };
 
-  if (query && semanticOn) {
+  if (query && semanticOn && (!pinned || pinned === "semantic")) {
     const ids = await semanticSearchIds(app, scope, query, { limit: 30 });
     if (ids.length > 0) {
       const w = whereBuilder(scope, input);
@@ -197,11 +234,12 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
         `SELECT ${ASSET_COLUMNS} FROM video_assets a WHERE ${w.clauses.join(" AND ")}
           ORDER BY a.created_at DESC, a.id DESC LIMIT ${p}`, w.params);
       if (rows.length > 0) return finishList(rows, limit, { ...trace, layer: "semantic" });
+      if (pinned === "semantic") return finishList([], limit, { ...trace, layer: "semantic" });
       trace.layer = "tsv";
     }
   }
 
-  if (query) {
+  if (query && (!pinned || pinned === "tsv")) {
     const w = whereBuilder(scope, input);
     const q = w.add(query);
     w.clauses.push(`a.search_tsv @@ plainto_tsquery('simple', ${q})`);
@@ -210,8 +248,31 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
       `SELECT ${ASSET_COLUMNS} FROM video_assets a WHERE ${w.clauses.join(" AND ")}
         ORDER BY a.created_at DESC, a.id DESC LIMIT ${p}`, w.params);
     if (tsvRows.length > 0) return finishList(tsvRows, limit, { ...trace, layer: "tsv" });
+    // 已钉在 tsv 层（翻页中）：不能掉进 trgm，否则排序口径突变 → 返回空由上层结束翻页
+    if (pinned === "tsv") return finishList([], limit, { ...trace, layer: "tsv" });
 
     // ③ trgm / 子串兜底：中文的实际主路（tsv 零命中才走到这里）
+    const wt = whereBuilder(scope, input);
+    const qt = wt.add(query);
+    const pattern = wt.add(likePattern(query));
+    const threshold = wt.add(0.2);
+    wt.clauses.push(`(
+        a.title ILIKE ${pattern} ESCAPE '\\'
+        OR a.prompt ILIKE ${pattern} ESCAPE '\\'
+        OR a.tags::text ILIKE ${pattern} ESCAPE '\\'
+        OR similarity(COALESCE(a.title, ''), ${qt}) > ${threshold}
+        OR similarity(COALESCE(a.prompt, ''), ${qt}) > ${threshold}
+      )`);
+    const pt = wt.add(limit);
+    const trgmRows = await scopedQuery<MediaAssetRow>(app, scope,
+      `SELECT ${ASSET_COLUMNS},
+              GREATEST(similarity(COALESCE(a.title, ''), ${qt}), similarity(COALESCE(a.prompt, ''), ${qt})) AS similarity
+         FROM video_assets a WHERE ${wt.clauses.join(" AND ")}
+        ORDER BY similarity DESC, a.created_at DESC, a.id DESC LIMIT ${pt}`, wt.params);
+    return finishList(trgmRows, limit, { ...trace, layer: "trgm" });
+  }
+
+  if (query && pinned && pinned !== "tsv") {
     const wt = whereBuilder(scope, input);
     const qt = wt.add(query);
     const pattern = wt.add(likePattern(query));
@@ -245,7 +306,7 @@ function finishList(rows: MediaAssetRow[], limit: number, trace: ListAssetsResul
   const last = rows.at(-1);
   return {
     items,
-    nextCursor: rows.length === limit && last ? `${last.created_at}|${last.id}` : null,
+    nextCursor: rows.length === limit && last ? `${trace?.layer ?? "none"}|${toIso(last.created_at)}|${last.id}` : null,
     searchTrace: trace,
   };
 }
@@ -297,7 +358,7 @@ export async function getAsset(app: AppPool, scope: Scope, assetId: string): Pro
     licenseRisk: row.license_risk,
     heroImageId: row.hero_image_id,
     versions: versions.map((v) => ({
-      id: v.id, version: v.version, status: v.status, createdAt: v.created_at, sha256: v.sha256,
+      id: v.id, version: v.version, status: v.status, createdAt: toIso(v.created_at), sha256: v.sha256,
     })),
     project,
     archive: archiveDir ? { dir: archiveDir, exists: existsSync(archiveDir) } : null,
@@ -520,7 +581,7 @@ export async function listFilms(
     };
   });
   const last = rows.at(-1);
-  return { items, nextCursor: rows.length === limit && last ? `${last.created_at}|${last.id}` : null };
+  return { items, nextCursor: rows.length === limit && last ? `${toIso(last.created_at)}|${last.id}` : null };
 }
 
 /** workspace 媒体仓占用（配额闸数据源）：Σ meta.bytes（未登记字节的存量行按 0 计，另行磁盘巡检） */
