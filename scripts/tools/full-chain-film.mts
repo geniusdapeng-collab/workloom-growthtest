@@ -4472,10 +4472,23 @@ if (!subtitleSidecar && SUBTITLE_MODE !== "burn") {
   }
 }
 
-const deliverable = DELIVERABLE;
+  const deliverable = DELIVERABLE;
   execFileSync("cp", [scored, deliverable]);
   const info = probe(deliverable);
   const accidents = detectQualityAccidents(deliverable);
+  /**
+   * 音画对齐实测报告（2026-09-26 真机事故沉淀 · 机制）：
+   * 合成阶段（compose-film）必须留下 `<master>.av-sync.json`——逐镜实测声音相对画面的偏移与全片累计漂移。
+   * 为什么按硬闸处理：这类漂移**肉眼很难在剪辑台上发现**，但用户一听就是"上一镜的音效串到下一镜"，
+   * 真机上已经出过一次（15 镜尾镜 +125ms）。机制口径：没测 = 不过，不允许"没测就当过"。
+   */
+  const avSyncReportPath = join(POST_DIR, "master-raw.av-sync.json");
+  const avSyncReport = existsSync(avSyncReportPath)
+    ? JSON.parse(readFileSync(avSyncReportPath, "utf8")) as {
+      ok?: boolean; maxAbsLagMs?: number; driftMs?: number | null; measured?: number;
+      violations?: string[]; generatedAt?: string;
+    }
+    : null;
   /**
    * 链路完整性：**产物血缘 + 历史裁决**（支持"只重跑一段"）。
    * 历史裁决来自 stages.jsonl；血缘来自文件与 mtime 递进——两者都过才算五项后期都落地。
@@ -4619,6 +4632,20 @@ const deliverable = DELIVERABLE;
           ? "字幕模式 burn：成片含烧录字幕"
           : `字幕模式 sidecar：母版不烧字，旁挂文件 ${subtitleSidecar ? basename(subtitleSidecar.srt) : "(缺失)"}${softsubFile ? " + 软字幕轨版" : ""}`,
         hard: true
+      },
+      /**
+       * 音画对齐硬闸（2026-09-26 机制）：报告来自合成阶段的逐镜实测。
+       * 硬闸口径：本次跑了 compose 还没报告 = 直接红；只跑 master（分段重跑）时缺报告 → 非硬告警并留痕。
+       */
+      {
+        id: "av-sync",
+        pass: avSyncReport?.ok === true,
+        detail: avSyncReport
+          ? `音画对齐实测：可测 ${avSyncReport.measured ?? 0} 镜，最大偏移 ${avSyncReport.maxAbsLagMs ?? "?"}ms，`
+            + `累计漂移 ${avSyncReport.driftMs ?? "?"}ms（报告 ${basename(avSyncReportPath)}，生成于 ${avSyncReport.generatedAt ?? "?"}）`
+          : `缺音画对齐实测报告（${basename(avSyncReportPath)}）——机制不允许「没测就当过」；`
+            + "跑一次 compose 阶段即可生成（分段重跑 master 时该报告应已存在）",
+        hard: STAGES.has("compose"),
       },
       /**
        * 字幕**标点口径**（2026-09-25）：正规字幕不带标点。
