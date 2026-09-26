@@ -8,10 +8,14 @@ import { serve } from "@hono/node-server";
 import { serveStatic } from "@hono/node-server/serve-static";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
+import type { Context } from "hono";
 import { cors } from "hono/cors";
-import { existsSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { once } from "node:events";
+import { createWriteStream, existsSync, mkdirSync, renameSync, rmSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, extname, join } from "node:path";
 import { appRouter } from "./trpc/router.js";
 import { createContext } from "./trpc/context.js";
 import { serviceGateway } from "./service/gateway.js";
@@ -19,6 +23,12 @@ import { getOwnerPool, getAppPool, getGatewayPool } from "@workloom/db";
 import { bundlesRoot } from "@workloom/base/bundles";
 import { registerFeedbackEnumsFromDisk } from "@workloom/base/evolve";
 import { startSkillDistAutoSync, buildManifest, receiveReflux, type RefluxPayload } from "@workloom/base/skill-ops";
+import { resolveMediaPath, verifyMediaToken } from "./video/gen/ingest.js";
+import { mediaRoot } from "./video/gen/ingest.js";
+import { safeExtOf, uploadMaxBytes, uploadRelPath, verifyUploadTicket } from "./video/media/upload.js";
+import { changesSince, applyPush, syncEnabled, verifyDeviceRequest } from "./video/media/sync.js";
+import { scopedQuery } from "./video/gen/db.js";
+import { mediaUrl } from "./video/gen/ingest.js";
 
 import { readVoiceFile, synthesizeVoice, voiceStationConfig } from "./voice/station.js";
 const app = new Hono();
@@ -78,29 +88,11 @@ app.get("/api/voice/speech", async (c) => {
 
 /** tRPC v11 over HTTP（fetch adapter；httpBatchLink 由客户端侧决定） */
 app.all("/trpc/*", async (c) => {
-  const startedAt = Date.now();
   const res = await fetchRequestHandler({
     endpoint: "/trpc",
     req: c.req.raw,
     router: appRouter,
     createContext: () => createContext(c.req.raw),
-    /**
-     * 2026-09-21 真机修复（可观测性）：此前未注册 onError，tRPC 内部异常只回给客户端，
-     * 服务端日志里什么都没有——真机上「require is not defined」这类 500 只能靠客户端提示反推。
-     * 统一落一条结构化错误日志（含过程名/耗时/错误码），让 bootstrap 捕获的 server.log 能自证故障。
-     */
-    onError({ error, path, type, input }) {
-      const code = (error as { code?: string }).code ?? "INTERNAL_SERVER_ERROR";
-      const elapsed = Date.now() - startedAt;
-      const inputSummary = (() => {
-        try {
-          const text = JSON.stringify(input ?? null);
-          return text && text.length > 200 ? `${text.slice(0, 200)}…` : text;
-        } catch { return "<unserializable>"; }
-      })();
-      console.error(`[trpc-error] ${type} ${path ?? "<unknown>"} code=${code} ${elapsed}ms message=${error.message} input=${inputSummary}`);
-      if (code === "INTERNAL_SERVER_ERROR" && error.stack) console.error(error.stack);
-    },
   });
   return res;
 });
@@ -109,6 +101,155 @@ const port = Number(process.env.SERVER_PORT ?? 8787);
 
 /** C 端公开网关（AI 服务前台；独立于员工 tRPC，c-token 鉴权 + 限流） */
 app.route("/c", serviceGateway);
+
+/**
+ * 成片媒体库通道（T-2026-0921-0002）：HMAC 签名 + 过期时间，防目录穿越。
+ * 为什么不做裸静态目录：成片是客户资产，必须带鉴权（签名即鉴权，短 TTL，不落 cookie）。
+ */
+const MEDIA_MIME: Record<string, string> = {
+  ".mp4": "video/mp4", ".webm": "video/webm", ".mov": "video/quicktime",
+  ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp",
+};
+app.get("/media/*", async (c) => {
+  const raw = c.req.path.replace(/^\/media\//, "");
+  let relPath: string;
+  try {
+    relPath = decodeURIComponent(raw);
+  } catch {
+    return c.json({ error: "MEDIA_PATH_INVALID" }, 400);
+  }
+  const verdict = verifyMediaToken(relPath, c.req.query("token") ?? "");
+  if (!verdict.ok) return c.json({ error: "MEDIA_TOKEN_INVALID", reason: verdict.reason }, 403);
+  let abs: string;
+  try {
+    abs = resolveMediaPath(relPath);
+  } catch {
+    return c.json({ error: "MEDIA_PATH_INVALID" }, 400);
+  }
+  if (!existsSync(abs)) return c.json({ error: "MEDIA_NOT_FOUND" }, 404);
+  const buf = await readFile(abs);
+  return new Response(buf, {
+    headers: {
+      "content-type": MEDIA_MIME[extname(abs).toLowerCase()] ?? "application/octet-stream",
+      "cache-control": "private, max-age=300",
+    },
+  });
+});
+
+/**
+ * 上传流水（T-2026-0926-0007 规格书 §3.5 第②步）：Hono 原生流式，不经 tRPC。
+ * 鉴权靠 `uploadTicket` 签发的 10 分钟 HMAC 凭证（载荷含 workspaceId/filename/maxBytes 且全字段进签名）；
+ * 边写边算 sha256，超限即中止并删半成品。落盘位置 `upload/<ws>/<sha256><ext>`，与入库口径一致。
+ */
+app.post("/media/upload", async (c) => {
+  const verdict = verifyUploadTicket(c.req.query("token") ?? "");
+  if (!verdict.ok) return c.json({ error: verdict.reason }, 403);
+  const maxBytes = Math.min(verdict.maxBytes, uploadMaxBytes());
+  const tmpDir = join(mediaRoot(), ".upload-tmp");
+  mkdirSync(tmpDir, { recursive: true });
+  const tmp = join(tmpDir, `${verdict.nonce}.part`);
+  const hash = createHash("sha256");
+  const stream = createWriteStream(tmp);
+  let bytes = 0;
+  try {
+    for await (const chunk of c.req.raw.body as unknown as AsyncIterable<Uint8Array>) {
+      bytes += chunk.byteLength;
+      if (bytes > maxBytes) {
+        stream.destroy();
+        rmSync(tmp, { force: true });
+        return c.json({ error: "UPLOAD_TOO_LARGE", maxBytes }, 413);
+      }
+      hash.update(chunk);
+      if (!stream.write(Buffer.from(chunk))) await once(stream, "drain");
+    }
+    await new Promise<void>((resolve) => stream.end(() => resolve()));
+  } catch (err) {
+    stream.destroy();
+    rmSync(tmp, { force: true });
+    return c.json({ error: "UPLOAD_FAILED", message: err instanceof Error ? err.message : String(err) }, 500);
+  }
+  if (bytes === 0) {
+    rmSync(tmp, { force: true });
+    return c.json({ error: "UPLOAD_EMPTY" }, 400);
+  }
+  const sha256 = hash.digest("hex");
+  const relPath = uploadRelPath(verdict.workspaceId, sha256, `${verdict.nonce}${safeExtOf(verdict.filename)}`);
+  const abs = join(mediaRoot(), relPath);
+  mkdirSync(dirname(abs), { recursive: true });
+  renameSync(tmp, abs);
+  return c.json({ sha256, relPath, bytes, filename: verdict.filename, expiresAt: new Date(verdict.exp * 1000).toISOString() });
+});
+
+/**
+ * 云端同步通道（T-2026-0926-0009）：设备级 HMAC 鉴权（`x-workloom-device/timestamp/signature`）。
+ * 只在 `WORKLOOM_CLOUD_SYNC=1` 时挂载——未开启部署形态下这些路径根本不存在（不暴露半开的同步面）。
+ */
+if (syncEnabled()) {
+  const bodyOf = async (c: Context): Promise<string> => {
+    try {
+      return await c.req.text();
+    } catch {
+      return "";
+    }
+  };
+  const auth = async (c: Context, body: string, method: string, path: string) => {
+    return verifyDeviceRequest(getOwnerPool(), {
+      deviceId: c.req.header("x-workloom-device") ?? "",
+      timestamp: c.req.header("x-workloom-timestamp") ?? "",
+      signature: c.req.header("x-workloom-signature") ?? "",
+      method,
+      path,
+      body,
+    });
+  };
+  /**
+   * 签名覆盖 **路径 + 查询串**（`c.req.path` 不含 query）：否则同一路径的签名
+   * 可被换成 `since=`/`limit=` 复用，等于把"这一请求"降级成"这一端点"。
+   */
+  const signedPathOf = (c: Context): string => {
+    const url = new URL(c.req.url);
+    return `${url.pathname}${url.search}`;
+  };
+
+  app.get("/sync/media/pull", async (c) => {
+    const verdict = await auth(c, "", "GET", signedPathOf(c));
+    if (!verdict.ok || !verdict.scope) return c.json({ error: verdict.code ?? "DEVICE_UNAUTHORIZED" }, 403);
+    const since = c.req.query("since") ?? null;
+    const limit = Number(c.req.query("limit") ?? 500);
+    const payload = await changesSince(getAppPool(), verdict.scope, {
+      since, limit: Number.isFinite(limit) ? limit : 500,
+    });
+    return c.json({ ...payload, device: verdict.deviceLabel ?? null });
+  });
+
+  app.post("/sync/media/push", async (c) => {
+    const body = await bodyOf(c);
+    const verdict = await auth(c, body, "POST", signedPathOf(c));
+    if (!verdict.ok || !verdict.scope) return c.json({ error: verdict.code ?? "DEVICE_UNAUTHORIZED" }, 403);
+    let payload: unknown;
+    try {
+      payload = JSON.parse(body || "{}");
+    } catch {
+      return c.json({ error: "SYNC_BODY_INVALID_JSON" }, 400);
+    }
+    const result = await applyPush(getAppPool(), verdict.scope, payload as never, verdict.deviceLabel ?? "device");
+    return c.json(result);
+  });
+
+  app.get("/sync/media/url", async (c) => {
+    const verdict = await auth(c, "", "GET", signedPathOf(c));
+    if (!verdict.ok || !verdict.scope) return c.json({ error: verdict.code ?? "DEVICE_UNAUTHORIZED" }, 403);
+    const assetId = c.req.query("assetId") ?? "";
+    if (!assetId) return c.json({ error: "ASSET_ID_REQUIRED" }, 400);
+    const rows = await scopedQuery<{ local_path: string | null }>(getAppPool(), verdict.scope,
+      `SELECT meta->>'localPath' AS local_path FROM video_assets WHERE workspace_id = $1 AND id = $2`,
+      [verdict.scope.workspaceId, assetId]);
+    const localPath = rows[0]?.local_path ?? null;
+    if (!localPath) return c.json({ error: "ASSET_FILE_NOT_ON_CLOUD" }, 404);
+    return c.json({ url: mediaUrl(localPath, 3600), expiresInSec: 3600 });
+  });
+  console.log("云端媒资同步通道已挂载：GET /sync/media/pull · POST /sync/media/push · GET /sync/media/url");
+}
 
 /** 官方运营台 HTTP 端点（仅 SKILL_OPS_MODE=official 部署挂载）：
  *  GET  /skill-dist/manifest.json —— 客户端拉取通道（分发包逐一官方签名，客户端 staging① 验签）

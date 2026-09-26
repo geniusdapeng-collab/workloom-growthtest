@@ -1,7 +1,10 @@
 /**
  * asset-cms · 素材服务（fusion-design §5 video_assets）
  *
- * 素材五类：商品图 product_image / 参考图 reference_image / 定妆照 portrait / 片段 clip / 成片 final_cut
+ * 素材十类（T-2026-0926-0007 媒资库扩展；与 0039 迁移的 video_assets_kind_check 同源）：
+ *   生产类：商品图 product_image / 参考图 reference_image / 定妆照 portrait / 片段 clip /
+ *          成片 final_cut / 底板 shot_plate / 封面 cover
+ *   用户上传类：upload_video / upload_image / upload_audio
  * 纪律：
  *  - 一切写入经 workdata 安全网关落五元事件（D16：业务行与事件同一 COMMIT）
  *  - sha256 幂等去重（L1.4 同源：重复注册返回已有行，不重复写事件）
@@ -13,8 +16,18 @@ import { gatewayAppendOnClient } from "../workdata/gateway.js";
 
 interface Scope { tenantId: string; workspaceId: string }
 
-export const ASSET_KINDS = ["product_image", "reference_image", "portrait", "clip", "final_cut"] as const;
+export const ASSET_KINDS = [
+  "product_image", "reference_image", "portrait", "clip", "final_cut",
+  "shot_plate", "cover", "upload_video", "upload_image", "upload_audio",
+] as const;
 export type AssetKind = (typeof ASSET_KINDS)[number];
+
+/** 媒资库类型分组（UI 筛选与抽取缩略图的判据共用同一份定义） */
+export const ASSET_KIND_GROUPS = {
+  video: ["clip", "final_cut", "shot_plate", "upload_video"],
+  image: ["product_image", "reference_image", "portrait", "cover", "upload_image"],
+  audio: ["upload_audio"],
+} as const satisfies Record<string, readonly AssetKind[]>;
 
 export const LICENSE_RISKS = ["none", "low", "high", "unknown"] as const;
 export type LicenseRisk = (typeof LICENSE_RISKS)[number];
@@ -37,6 +50,18 @@ export interface AssetRow {
   status: string;
   created_by: string;
   created_at: string;
+  /** 0039 媒资列（register() 不写这些列，由应用层 applyMediaColumns 补写） */
+  title: string | null;
+  tags: string[];
+  prompt: string | null;
+  pipeline_kind: "narrative" | "marketing" | null;
+  duration_seconds: string | null;
+  width: number | null;
+  height: number | null;
+  thumb_path: string | null;
+  source_type: "generated" | "uploaded" | "imported" | "recut";
+  sync_state: "local_only" | "syncing" | "synced" | "cloud_only" | "conflict";
+  updated_at: string;
 }
 
 export class AssetError extends Error {

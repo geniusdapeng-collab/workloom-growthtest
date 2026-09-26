@@ -46,6 +46,8 @@ import {
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
+import { ingestPortraitsFromIndex } from "./media/library.js";
+import { upsertProductProfileFromDossier } from "./media/products.js";
 import {
   AUTO_GATES,
   GATE_PRODUCER_STAGE,
@@ -945,6 +947,47 @@ export function startRun(scope: Scope, input: RunInput): string {
             }
           : {}),
       };
+
+      /**
+       * 媒资库自动入库（T-2026-0926-0007 规格书 §3.4）：
+       * 定妆照/商品图批量入库（kind=portrait / product_image）+ 营销管线商品档案投影。
+       * 旁路写：整体 try/catch，任何失败只记日志，**不改 run 终态**（素材入库不该推翻"片子跑完了"）。
+       */
+      if ((process.env.MEDIA_INGEST_ENABLED ?? "1") !== "0") {
+        try {
+          const portraits = await ingestPortraitsFromIndex(getAppPool(), getGatewayPool(), scope, {
+            projectId: input.projectId,
+            pipelineKind: input.isMarketing ? "marketing" : "narrative",
+            indexPath: portraitIndexPath,
+            by: "video-studio",
+          });
+          if (portraits.scanned > 0) {
+            console.log(
+              `[media-ingest] 定妆照/商品图入库：扫描 ${portraits.scanned}，新增 ${portraits.ingested}，`
+              + `去重 ${portraits.deduped}，跳过 ${portraits.skipped}，失败 ${portraits.errors.length}`,
+            );
+          }
+          for (const error of portraits.errors.slice(0, 5)) console.warn(`[media-ingest] 单张入库失败：${error}`);
+        } catch (err) {
+          console.error(`[media-ingest] 定妆照入库失败（不影响 run 终态）：${(err as Error).message}`);
+        }
+        const minedProductId = dataMiningStage?.product_id ?? null;
+        if (input.isMarketing && minedProductId) {
+          try {
+            const profile = await upsertProductProfileFromDossier(getAppPool(), getGatewayPool(), scope, {
+              dossierRoot: path.join(WORK_DIR, "dossiers", scope.workspaceId),
+              productId: minedProductId,
+              by: "video-studio",
+            });
+            console.log(
+              `[media-ingest] 商品档案投影：${profile.profile.productName}`
+              + `（sha256 ${profile.profile.dossierSha256.slice(0, 12)}…，内容变化=${profile.changed}，主图新入库=${profile.heroIngested}）`,
+            );
+          } catch (err) {
+            console.error(`[media-ingest] 商品档案投影失败（不影响 run 终态）：${(err as Error).message}`);
+          }
+        }
+      }
       /** 终态交接包（改动 D）：跨会话承接只凭 projectId + 档案夹即可续跑，不依赖原始上下文 */
       if (archive) {
         try {

@@ -46,6 +46,7 @@ import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
 import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
+import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import {
   DeliveryError, buildVariantPreferenceContent, deliveryJobStatus, deliveryPreferenceConfidence,
   deliveryPreferenceMemoryId, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
@@ -372,7 +373,13 @@ const deliveryRouter = router({
       const scope = scopeOf(ctx.identity);
       let job;
       try {
-        job = await startDeliveryRevision({ dir: input.dir, patch: input.patch, by: ctx.identity.memberNo });
+        job = await startDeliveryRevision({
+          dir: input.dir,
+          patch: input.patch,
+          by: ctx.identity.memberNo,
+          /** 返修完成 → 新版本成片/封面自动进媒资库（T-2026-0926-0007；失败只记日志） */
+          onCompleted: deliveryIngestHook(scope),
+        });
       } catch (err) {
         deliveryRethrow(err);
       }
@@ -1276,6 +1283,8 @@ export const videoRouter = router({
   deal: dealRouter,
   accounting: accountingRouter,
   delivery: deliveryRouter,
+  /** 媒资库（T-2026-0926-0007…0010）：列表/详情/上传/合集/商品档案/复用/重剪/同步 */
+  media: mediaRouter,
 });
 
 /**

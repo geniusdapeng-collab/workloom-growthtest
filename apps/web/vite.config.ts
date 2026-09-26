@@ -11,6 +11,9 @@ const trpcProxy = {
   target: `http://localhost:${Number(process.env.SERVER_PORT ?? 8787)}`,
   changeOrigin: true,
 };
+// 媒资库的播放/缩略图/上传走 `/media/*`（服务端签名鉴权），设备同步走 `/sync/media/*`。
+// 不代理时请求会打回 Vite 自身，SPA 回退把 404 伪装成 200 的 index.html，播放器静默失败。
+const mediaProxy = { ...trpcProxy };
 export default defineConfig({
   define: product.define,
   plugins: [product.plugin, react(), tailwindcss()],
@@ -18,10 +21,10 @@ export default defineConfig({
     port: Number(process.env.WEB_PORT ?? 5173),
     // /health 同代理：前端「环境守门员」（BackendGate）经此探测后端就绪态，
     // 覆盖第三方工具只起 web 不起 server 的首启场景
-    proxy: { "/trpc": trpcProxy, "/health": trpcProxy, "/api": trpcProxy },
+    proxy: { "/trpc": trpcProxy, "/health": trpcProxy, "/api": trpcProxy, "/media": mediaProxy, "/sync": mediaProxy },
   },
   preview: {
     port: Number(process.env.WEB_PORT ?? 5173),
-    proxy: { "/trpc": trpcProxy, "/health": trpcProxy, "/api": trpcProxy },
+    proxy: { "/trpc": trpcProxy, "/health": trpcProxy, "/api": trpcProxy, "/media": mediaProxy, "/sync": mediaProxy },
   },
 });
