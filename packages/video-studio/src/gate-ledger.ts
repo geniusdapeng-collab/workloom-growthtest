@@ -162,3 +162,49 @@ export function summarizeGates(events: GateEvent[]): Array<{
       return { stepKey: key, gate: e.gate, approved: e.approved, at: e.at, via: e.via, reason: e.reason, shotIds: e.shotIds };
     });
 }
+
+/**
+ * 门账本**只读审计**（T-2026-0926-0112）——把"只写不读"补上消费侧。
+ *
+ * 背景：平台侧与 CLI 侧都已按 step_key 落门账本（`stage: "gate"`），但没有任何
+ * 读取方做判定，账本等于只写不读。本函数给审计/验收一个确定性消费者：
+ *   ① 摘要：每个 step_key 的最后裁决；
+ *   ② 计数：调用次数；
+ *   ③ 缺门：期望出现却没有事件的门（没被调用 / 被绕过）；
+ *   ④ 打回未复核：最后一次裁决 approved=false（打回后必须有一次复核）；
+ *   ⑤ 门号错配：事件的 gate 与 step_key 的规范门号不一致（脏账本）。
+ */
+export interface GateLedgerAudit {
+  counts: Array<{ stepKey: PipelineGateStepKey; count: number }>;
+  summary: ReturnType<typeof summarizeGates>;
+  missing: PipelineGateStepKey[];
+  rejectedWithoutRecheck: PipelineGateStepKey[];
+  mismatched: Array<{ stepKey: PipelineGateStepKey; gate: string; expected: PipelineGateId }>;
+  total: number;
+}
+
+export function auditGateLedger(
+  events: GateEvent[],
+  expected: readonly PipelineGateStepKey[] = PIPELINE_GATE_STEP_KEYS,
+): GateLedgerAudit {
+  const counts = new Map<PipelineGateStepKey, number>();
+  const mismatched: Array<{ stepKey: PipelineGateStepKey; gate: string; expected: PipelineGateId }> = [];
+  for (const event of events) {
+    counts.set(event.stepKey, (counts.get(event.stepKey) ?? 0) + 1);
+    const expectedGate = GATE_BY_STEP_KEY[event.stepKey];
+    if (expectedGate && event.gate !== expectedGate) {
+      mismatched.push({ stepKey: event.stepKey, gate: String(event.gate), expected: expectedGate });
+    }
+  }
+  const summary = summarizeGates(events);
+  const missing = expected.filter((key) => !counts.has(key));
+  const rejectedWithoutRecheck = summary.filter((row) => !row.approved).map((row) => row.stepKey);
+  return {
+    counts: expected.filter((key) => counts.has(key)).map((key) => ({ stepKey: key, count: counts.get(key) ?? 0 })),
+    summary,
+    missing,
+    rejectedWithoutRecheck,
+    mismatched,
+    total: events.length,
+  };
+}
