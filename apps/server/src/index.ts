@@ -223,7 +223,13 @@ if (syncEnabled()) {
   });
 
   app.post("/sync/media/push", async (c) => {
+    const declared = Number(c.req.header("content-length") ?? 0);
+    const maxBytes = Number(process.env.MEDIA_SYNC_PUSH_MAX_MB ?? 8) * 1024 * 1024;
+    if (Number.isFinite(declared) && declared > maxBytes) {
+      return c.json({ error: "SYNC_PUSH_TOO_LARGE", maxBytes }, 413);
+    }
     const body = await bodyOf(c);
+    if (body.length > maxBytes) return c.json({ error: "SYNC_PUSH_TOO_LARGE", maxBytes }, 413);
     const verdict = await auth(c, body, "POST", signedPathOf(c));
     if (!verdict.ok || !verdict.scope) return c.json({ error: verdict.code ?? "DEVICE_UNAUTHORIZED" }, 403);
     let payload: unknown;

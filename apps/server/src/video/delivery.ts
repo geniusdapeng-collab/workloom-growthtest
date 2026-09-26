@@ -828,8 +828,9 @@ export async function startDeliveryRevision({
     outDir: null,
   };
   jobs.set(jobId, job);
-  /** 完成回调只触发一次（打印标记与进程退出是两条信号，先到者生效） */
+  /** 完成回调只触发一次；但"打印了完成标记"不等于作业成功（深审：标记后仍可能非 0 退出） */
   let completedNotified = false;
+  let markerSeen = false;
   const notifyCompleted = () => {
     if (completedNotified) return;
     completedNotified = true;
@@ -864,6 +865,7 @@ export async function startDeliveryRevision({
       if (versionMatch) {
         job.version = Number(versionMatch[1]);
         job.outDir = versionMatch[2]?.trim() ?? null;
+        markerSeen = true;
         /**
          * 以**工位打印的完成标记**为权威完成信号，不等进程退出事件。
          * 原因（2026-09-24 真机）：Node 24 在"跑完立刻退出"时可能卡在 V8 worker 线程 join，
@@ -873,7 +875,6 @@ export async function startDeliveryRevision({
         if (job.status === "running") {
           job.status = "done";
           job.finishedAt = new Date().toISOString();
-          notifyCompleted();
           /**
            * 完成标记到了但进程还没退（Node 关停阶段的 join 卡顿）：给 15 秒宽限，
            * 仍不退就 Kill——产物已经齐了，不能让一个僵尸进程占住"同包只能一个作业"的闸。
@@ -904,7 +905,13 @@ export async function startDeliveryRevision({
     job.finishedAt = job.finishedAt ?? new Date().toISOString();
     job.exitCode = code ?? -1;
     appendFileSync(logPath, `\n[${job.finishedAt}] 退出码 ${code}\n`, "utf8");
-    if (code === 0) notifyCompleted();
+    if (code === 0) {
+      notifyCompleted();
+    } else if (markerSeen) {
+      // 已知真机现象：产物已齐但 Node 卡在 worker join，宽限后被 SIGTERM —— 仍应入库
+      appendFileSync(logPath, `[media-hook] 完成标记已见但退出码 ${code}：按"产物已落盘"处理（作业终态仍为失败）\n`, "utf8");
+      notifyCompleted();
+    }
   });
   return job;
 }
