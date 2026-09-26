@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import { buildServerGateRecord, SERVER_GATE_STEP_KEY, UNMAPPED_PIPELINE_GATES, withGateLedger } from "./gate-ledger-bridge.js";
 
 describe("平台侧门账本桥（apps/server → step_key 记账）", () => {
-  it("G5/G6/G7 映射到管线 step_key；未映射的门返回 null（不猜）", () => {
+  it("G1–G7 映射到管线 step_key（营销片前置门已补齐）；未知门返回 null（不猜）", () => {
+    // 【T-2026-0926-0117】营销片前置门：vendor 的 dossier/theme/requirement/prd 确认单 = G1–G4
+    expect(SERVER_GATE_STEP_KEY.G1_DOSSIER).toBe("g1-dossier-confirm");
+    expect(SERVER_GATE_STEP_KEY.G2_THEME).toBe("g2-theme-confirm");
+    expect(SERVER_GATE_STEP_KEY.G3_INSIGHT).toBe("g3-insight-confirm");
+    expect(SERVER_GATE_STEP_KEY.G4_PRD).toBe("g4-prd-confirm");
     expect(SERVER_GATE_STEP_KEY.G5_PORTRAIT).toBe("g5-portrait-confirm");
     expect(SERVER_GATE_STEP_KEY.G6_PROMPT).toBe("g6-prompt-confirm");
     expect(SERVER_GATE_STEP_KEY.G7_FINAL).toBe("g7-preproduction");
-    expect(buildServerGateRecord({ gate: "G2_THEME", vendorType: "theme", projectId: "VID-1", runId: "run-1", approved: true })).toBeNull();
+    // 真未知门仍然不猜（返回 null）
+    expect(buildServerGateRecord({ gate: "UNKNOWN", vendorType: "mystery", projectId: "VID-1", runId: "run-1", approved: true })).toBeNull();
     /** 素材门（G-MAT1）平台侧没有对应 vendor 门：如实登记为未映射，不猜映射 */
     expect(UNMAPPED_PIPELINE_GATES).toContain("material-generate");
   });

@@ -14,6 +14,15 @@ import type { GateKey } from "@hyperreality/video-studio";
 
 /** 平台门 → 管线 step_key（只有能一一对应的才映射；G8 渲染提交在平台属高风险人审，暂不映射） */
 export const SERVER_GATE_STEP_KEY: Partial<Record<GateKey, PipelineGateStepKey>> = {
+  /**
+   * 【T-2026-0926-0117】营销片前置门补齐：vendor 的 dossier/theme/requirement/prd 确认单
+   * 在营销片链路里就是 G1–G4，此前只映射了 G5/G6/G7 → 营销片这四个门在门账本里没有记录。
+   * 现在按 marketing-film.yml 的 step_key 原样对齐（不改管线拓扑、不改门级别）。
+   */
+  G1_DOSSIER: "g1-dossier-confirm",
+  G2_THEME: "g2-theme-confirm",
+  G3_INSIGHT: "g3-insight-confirm",
+  G4_PRD: "g4-prd-confirm",
   G5_PORTRAIT: "g5-portrait-confirm",
   G6_PROMPT: "g6-prompt-confirm",
   G7_FINAL: "g7-preproduction"

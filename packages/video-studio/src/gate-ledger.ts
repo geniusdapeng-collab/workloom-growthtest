@@ -27,11 +27,29 @@ export const PIPELINE_GATE_STEP_KEYS = [
   /** 多风格交付包：变体雷同一票否决（narrative-film.yml `deliver` 步） */
   "deliver",
   /** 返修闭环：层增量重合成 + 复用 sha256 证据（narrative-film.yml `revise` 步） */
-  "revise"
+  "revise",
+  /**
+   * 【T-2026-0926-0117】营销片前/后置门补齐（读码事实：`marketing-film.yml` 声明了
+   * g1-dossier-confirm / g2-theme-confirm / g3-insight-confirm / g4-prd-confirm / g9-publish-confirm，
+   * 但白名单只有叙事片 7 个 key → 平台与 CLI 都不会按 step_key 记账，营销片的关键门在账本里查不到。
+   * 本次按 yml 原样登记，不改任何管线拓扑。
+   */
+  "g1-dossier-confirm",
+  "g2-theme-confirm",
+  "g3-insight-confirm",
+  "g4-prd-confirm",
+  "g9-publish-confirm",
+  /** 经营线门（account-ops / ads-creative-factory / settlement-recon 声明） */
+  "g10-dispatch",
+  "g12-boost-confirm",
+  "g13-diff-alert"
 ] as const;
 
 export type PipelineGateStepKey = (typeof PIPELINE_GATE_STEP_KEYS)[number];
-export type PipelineGateId = "G5" | "G6" | "G7" | "G8" | "G-MAT1" | "G-DLV1" | "G-DLV4";
+export type PipelineGateId =
+  | "G1" | "G2" | "G3" | "G4" | "G5" | "G6" | "G7" | "G8"
+  | "G9" | "G10" | "G12" | "G13"
+  | "G-MAT1" | "G-DLV1" | "G-DLV4";
 
 /** step_key → 门的编号（与 narrative-film.yml 的 `gate:` 字段一致） */
 const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
@@ -47,7 +65,17 @@ const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
   /** deliver 步的 gate 字段在 yml 里就是 `G-DLV1`（变体雷同否决） */
   deliver: "G-DLV1",
   /** revise 步按 G-DLV4（层增量重合成 + 复用证据）记账 */
-  revise: "G-DLV4"
+  revise: "G-DLV4",
+  // 营销片前置/后置门（与 marketing-film.yml 的 step_key/gate 一一对应）
+  "g1-dossier-confirm": "G1",
+  "g2-theme-confirm": "G2",
+  "g3-insight-confirm": "G3",
+  "g4-prd-confirm": "G4",
+  "g9-publish-confirm": "G9",
+  // 经营线门（与 account-ops / ads-creative-factory / settlement-recon 对应）
+  "g10-dispatch": "G10",
+  "g12-boost-confirm": "G12",
+  "g13-diff-alert": "G13"
 };
 
 export interface GateCheck {
