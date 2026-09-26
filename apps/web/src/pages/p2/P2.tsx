@@ -16,6 +16,7 @@ import { useParams, useSearchParams } from "react-router";
 import { ensureDemoLogin, trpc } from "../../lib/trpc";
 import { COMMON_STATUS_TEXT, MODEL_TIER_TEXT, MODEL_WINDOW_TEXT, RULE_RESULT_TEXT, THREAD_MODE_TEXT, actionText, actorText, approvalGestureText, dictText, payloadText, shortId } from "../../lib/display";
 import { Bridge } from "../../shell/Bridge";
+import { LoomBall, TONE_CLASS, emotionLabelOf, emotionOfThread, emotionToneOf, loomBallEnabled, useStableEmotion } from "../../components/loomball";
 import { useNavigationAccess } from "../../shell/NavigationAccess";
 import { RejectDialog } from "../../components/RejectDialog";
 import { PageExitLink } from "../../shell/PageExitLink";
@@ -295,6 +296,11 @@ export default function P2() {
   const hasWrite = events.some((e) => e.decision.effect === "write" && e.receipt?.synced === true);
   const isDone = thread?.status === "completed";
   const isFailed = demo === "p2_error" || thread?.status === "failed";
+  /* 织球线程状态眼（接入面 C）：thread.status 是线程投影的真实状态，pending_review=等人审 */
+  const rawThreadEmotion = emotionOfThread({ status: isFailed ? "failed" : (thread?.status ?? "draft"), awaitingApproval: false });
+  const threadEmotion = useStableEmotion(rawThreadEmotion);
+  const threadTone = emotionToneOf(threadEmotion);
+  const threadEmotionText = emotionLabelOf(threadEmotion);
   const canApprove = canAction("approval.decide");
   const canDispatch = canAction("task.dispatch");
 
@@ -432,6 +438,15 @@ export default function P2() {
               </span>
               <span className="font-mono text-body text-ink3">{shortId(thread.id)}</span>
               <span className="text-body text-ink2">{thread.title}</span>
+              {loomBallEnabled && (
+                <span className="inline-flex items-center gap-1.5" title={`任务${threadEmotionText}`}>
+                  <LoomBall emotion={threadEmotion} size={40} live={threadTone === "busy" || threadTone === "wait"}
+                    hoverActivate={!(threadTone === "busy" || threadTone === "wait")} followGaze={false} />
+                  <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-body ${TONE_CLASS[threadTone]}`}>
+                    {threadEmotionText}
+                  </span>
+                </span>
+              )}
               <span className="flex-1" />
               {canDispatch && thread.status !== "completed" && thread.status !== "failed" && (
                 <button

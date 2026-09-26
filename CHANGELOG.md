@@ -1,5 +1,22 @@
 # Changelog
 
+## [loomball] - 2026-09-27 · 织球 LoomBall：AI 班组状态可视化（T-2026-0926-0002）
+
+> 点名单向移植自 `workloom-ai/workloom-growth` 的 T-2026-0926-0019（隔离副本车道：基座/上游改动都不双向同步）。
+> 一只球把「班组此刻在干什么」变得看得见：名册 / 织伴 / 任务页三处接入，全部由**真实信号**驱动
+> （事件账本最近动作、待审批单、围栏阻断、夜班窗口、run 注册表）；开关一关全体回退。
+
+- `apps/web/src/vendor/loomball/**`：上游 grok-ball（MIT）原样入库（`PINNED` 锁 commit + `LICENSE` + `NOTICE.md`），
+  适配层捕获后删除上游兼容门面 `window.GrokBall`，业务代码零上游商标字样（`provenance.test.ts` 闸门）；
+- `apps/web/src/components/loomball/**`：`LoomBall.tsx` / `agent-emotion.ts`（状态→表情唯一事实源，与文字 chip 同源）/
+  `useStableEmotion.ts`（1.5s 驻留 + 出错立即报丧并驻留 6s）/ 自定义工作状态 `50 渲染中 / 51 待审批 / 52 夜班值守`；
+- 三处接入：名册员工卡 44px 织球（忙碌/待审批常驻动画，其余静态 + hover 激活）、织伴小角落态（mini 圆球 = 班组状态眼，
+  紧凑态旁挂 40px）、任务页标题行线程状态球（`pending_review` = 待人审）；
+- 服务端真实信号：`roster.list` 增 LATERAL 只读投影（最近动作+时间 / 待审批数 / 近 1h 围栏阻断数）、
+  新增只读聚合 `video.studio.active`（run 注册表 + approvals）——不新增表、不改任何写路径；
+- 回退开关：`VITE_LOOMBALL=0` 全部回退（不创建实例、不注册表情、不挂监听、不启动 rAF）；
+- 登记与文档：`oss-components.json` + `docs/OPEN_SOURCE_COMPONENTS.md`（102 组件）、`docs/loomball.md`、`.env.example`。
+
 ## [intel-search-api] - 2026-09-25 · 情报检索通道加固：API 检索源（T-2026-0925-0003）
 
 - 引擎链新增 `api` 通道并置顶：`TAVILY_API_KEY` 或 `WL_SEARCH_API_URL`+`WL_SEARCH_API_KEY` 配好即启用；
