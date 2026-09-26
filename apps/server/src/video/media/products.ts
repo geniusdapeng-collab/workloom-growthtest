@@ -16,6 +16,7 @@ import { newId } from "@workloom/shared";
 import { scopedQuery, type AppPool, type Scope } from "../gen/db.js";
 import { mediaRelPathFor, registerLocalAsset, registerStoredMedia, sha256File } from "./register-local.js";
 import { mediaRoot } from "../gen/ingest.js";
+import { assertInside, safeSegment } from "./paths.js";
 
 export type ProductProfileRow = {
   id: string;
@@ -193,7 +194,8 @@ export async function upsertProductProfileFromDossier(
   input: { dossierRoot: string; productId: string; by: string; fetchHero?: boolean; heroMaxBytes?: number },
 ): Promise<UpsertProductProfileResult> {
   const errors: string[] = [];
-  const dir = join(input.dossierRoot, input.productId);
+  // productId 只接受单段目录名（深审实测："../../../etc" 曾把 dossier 探测到根外）
+  const dir = join(input.dossierRoot, safeSegment(input.productId, "productId"));
   const dossierPath = join(dir, "dossier.json");
   if (!existsSync(dossierPath)) {
     throw new Error(`商品档案不存在：${dossierPath}（情报环节未产出该 product_id）`);
@@ -242,6 +244,7 @@ export async function upsertProductProfileFromDossier(
           : undefined;
         const localFile = localMatch ?? localCandidates[0] ?? null;
         if (localFile && existsSync(localFile)) {
+          assertInside(localDir, localFile, "dossier 主图");
           const reg = await registerLocalAsset(app, gateway, scope, {
             absPath: localFile,
             kind: "product_image",

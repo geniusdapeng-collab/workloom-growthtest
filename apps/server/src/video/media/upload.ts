@@ -19,6 +19,7 @@ import { extname, join } from "node:path";
 import { TRPCError } from "@trpc/server";
 import { newId } from "@workloom/shared";
 import { mediaRoot, mediaSigningSecret } from "../gen/ingest.js";
+import { resolveInside } from "./paths.js";
 import type { AppPool, Scope } from "../gen/db.js";
 import { mediaUsageBytes } from "./library.js";
 import { registerStoredMedia, sha256File, type RegisterLocalAssetResult } from "./register-local.js";
@@ -171,7 +172,8 @@ export async function registerUploadedAsset(
   if (!input.relPath.startsWith(prefix)) {
     throw new TRPCError({ code: "FORBIDDEN", message: "上传路径不属于当前工作区（拒绝登记）" });
   }
-  const abs = join(mediaRoot(), input.relPath);
+  // 前缀只证明"属于本工作区"；真正 confinement 由 resolveInside 保证（`upload/ws/../../…` 会被拒）
+  const abs = resolveInside(mediaRoot(), input.relPath, "上传路径");
   if (!existsSync(abs)) {
     throw new TRPCError({ code: "NOT_FOUND", message: `上传文件不在媒体仓：${input.relPath}（先完成 POST /media/upload）` });
   }

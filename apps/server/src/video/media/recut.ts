@@ -15,6 +15,7 @@ import { newId } from "@workloom/shared";
 import { scopedQuery, type AppPool, type Scope } from "../gen/db.js";
 import { deliveryRoot } from "../delivery.js";
 import { mediaRoot } from "../gen/ingest.js";
+import { resolveInside } from "./paths.js";
 import { concatNormalize, ffmpegAvailable } from "./ffmpeg.js";
 import { registerLocalAsset } from "./register-local.js";
 import { markCollectionUsed } from "./collections.js";
@@ -86,7 +87,14 @@ export async function startRecut(
       ORDER BY i.seq ASC`,
     [scope.workspaceId, input.collectionId]);
   if (items.length < 2) throw new Error("合集至少 2 段素材才能重剪");
-  const missing = items.filter((item) => !item.local_path || !existsSync(join(mediaRoot(), item.local_path)));
+  const missing = items.filter((item) => {
+    if (!item.local_path) return true;
+    try {
+      return !existsSync(resolveInside(mediaRoot(), item.local_path, "片段路径"));
+    } catch {
+      return true;   // 越界路径一律视为"不在本机媒体仓"
+    }
+  });
   if (missing.length > 0) {
     throw new Error(`有 ${missing.length} 段素材不在本机媒体仓（先点播触发文件拉取再重剪）：${missing.slice(0, 3).map((m) => m.asset_id).join("、")}`);
   }
@@ -116,7 +124,7 @@ export async function startRecut(
     try {
       const outputPath = join(outDir, "master.mp4");
       const summary = await concatNormalize(
-        items.map((item) => join(mediaRoot(), item.local_path!)),
+        items.map((item) => resolveInside(mediaRoot(), item.local_path!, "片段路径")),
         outputPath,
         { env, onProgress: (line) => { job.log.push(`[${new Date().toISOString()}] ${line}`); } },
       );

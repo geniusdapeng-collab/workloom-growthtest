@@ -19,6 +19,7 @@ import { mediaRoot, mediaUrl } from "../gen/ingest.js";
 import { scopedQuery, type AppPool, type Scope } from "../gen/db.js";
 import { archiveWorkDir } from "../archive-host.js";
 import { registerLocalAsset } from "./register-local.js";
+import { assertInside } from "./paths.js";
 import { embedderFromEnv, semanticSearchIds, semanticEnabled } from "./embed.js";
 
 export type MediaAssetRow = {
@@ -634,7 +635,8 @@ export async function ingestPortraitsFromIndex(
   for (const bucket of buckets) {
     for (const [key, entry] of Object.entries(bucket.entries)) {
       for (const [angle, file] of Object.entries(entry.files ?? {})) {
-        const abs = isAbsolute(file) ? file : resolve(archiveWorkDir(), file);
+        // 索引里的路径允许绝对（portrait runtime 就写绝对路径），但必须落在 WORK_DIR 内
+        const abs = assertInside(resolve(archiveWorkDir()), file, "定妆照路径");
         result.scanned += 1;
         if (!existsSync(abs)) { result.skipped += 1; continue; }
         try {

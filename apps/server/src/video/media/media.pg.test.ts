@@ -600,6 +600,41 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     expect(bad.rowCount, "坏行不得落库").toBe(0);
   }, 90_000);
 
+  /**
+   * 路径围栏回归（T-2026-0926-0014 深审实证）：四处入口曾只做字符串拼接/前缀判断，
+   * 可把媒体仓外的路径带进业务（甚至把仓外文件复制进媒体仓并可签名下载）。
+   */
+  it("⑮ 路径围栏：上传 relPath / dossier productId / 交付清单绝对路径 全部拒收", async () => {
+    // 1) 上传登记：前缀对但发生路径穿越 → 必须拒
+    await expect(mods.registerUploadedAsset(getAppPool(), getGatewayPool(), scope, {
+      sha256: "a".repeat(64),
+      relPath: `upload/${workspaceId}/../../../etc/passwd`,
+      kind: "upload_video",
+    }, "vitest")).rejects.toThrow(/越界/);
+
+    // 2) 商品档案：productId 只收单段目录名
+    await expect(mods.upsertProductProfileFromDossier(getAppPool(), getGatewayPool(), scope, {
+      dossierRoot: join(TMP, "dossiers", workspaceId), productId: "../../../etc", by: "vitest", fetchHero: false,
+    })).rejects.toThrow(/productId非法/);
+
+    // 3) 交付清单：manifest 里的绝对路径必须被拒（原实现会把它复制进媒体仓）
+    const outside = join(TMP, "outside-⑮");
+    mkdirSync(outside, { recursive: true });
+    writeFileSync(join(outside, "secret.txt"), "SECRET", "utf8");
+    const pkg = join(TMP, "delivery-⑮");
+    mkdirSync(pkg, { recursive: true });
+    writeFileSync(join(pkg, "delivery-manifest.json"), JSON.stringify({
+      projectId, master: { path: join(outside, "secret.txt"), sha256: "x" }, variants: [],
+    }), "utf8");
+    const ingested = await mods.ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: pkg, by: "vitest" });
+    expect(ingested.registered.length, "越界产物不得入库").toBe(0);
+    expect(ingested.skipped).toBeGreaterThan(0);
+    const leaked = await owner.query(
+      `SELECT id FROM video_assets WHERE workspace_id=$1 AND meta->>'deliveryRole'='master' AND meta->>'deliveryPackage'=$2`,
+      [workspaceId, pkg]);
+    expect(leaked.rowCount).toBe(0);
+  }, 90_000);
+
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {
     const a = await makeTinyClip("recut-a.mp4", "red");
     const b = await makeTinyClip("recut-b.mp4", "blue");
