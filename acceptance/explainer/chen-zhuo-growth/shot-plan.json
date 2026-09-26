@@ -1,0 +1,586 @@
+{
+  "$comment": "验收片《陈卓 · 获客增长系统销售讲解》的导演分镜计划。时间不手敲：sentences 给句号，start/end 由字级时间戳换算（engine §shotbookFromPlan）。卡片内容补丁只走两条数据通道：consts（对象槽浅合并）与 replace（原文必须唯一出现）。",
+  "style": {
+    "domain": "WorkLoom 获客增长系统",
+    "tone": "销售讲解 · 专业、克制、有结论",
+    "palette": {
+      "base": "#0B1020",
+      "accent": "#7A5AF8",
+      "ink": "#F5F7FF"
+    },
+    "font": "PingFang SC / Noto Sans SC",
+    "energy": "中"
+  },
+  "rhythm": [
+    {
+      "shotId": "s01",
+      "hostForm": "半身",
+      "container": "装框",
+      "card": "split-text-stagger"
+    },
+    {
+      "shotId": "s02",
+      "hostForm": "角标左下",
+      "container": "底床",
+      "card": "lead-word-zoom-assemble"
+    },
+    {
+      "shotId": "s03",
+      "hostForm": "角标右下",
+      "container": "装框",
+      "card": "info-card-assemble"
+    },
+    {
+      "shotId": "s04",
+      "hostForm": "分屏格",
+      "container": "分屏格",
+      "card": "unit-grid-proportion"
+    },
+    {
+      "shotId": "s05",
+      "hostForm": "角标左下",
+      "container": "装框",
+      "card": "chart-grow"
+    },
+    {
+      "shotId": "s06",
+      "hostForm": "半身",
+      "container": "出血全屏",
+      "card": "flying-words"
+    },
+    {
+      "shotId": "s07",
+      "hostForm": "角标右下",
+      "container": "装框",
+      "card": "alt-block-lines"
+    },
+    {
+      "shotId": "s08",
+      "hostForm": "半身",
+      "container": "装框",
+      "card": "source-converge"
+    },
+    {
+      "shotId": "s09",
+      "hostForm": "角标左下",
+      "container": "底床",
+      "card": "grid-to-hero"
+    },
+    {
+      "shotId": "s10",
+      "hostForm": "短离场",
+      "container": "出血全屏",
+      "card": "tracking-in"
+    },
+    {
+      "shotId": "s11",
+      "hostForm": "角标右下",
+      "container": "装框",
+      "card": "line-by-line-slide"
+    },
+    {
+      "shotId": "s12",
+      "hostForm": "半身",
+      "container": "出血全屏",
+      "card": "per-character-rise"
+    },
+    {
+      "shotId": "s13",
+      "hostForm": "角标左下",
+      "container": "装框",
+      "card": "chip-grid-single-select"
+    },
+    {
+      "shotId": "s14",
+      "hostForm": "半身",
+      "container": "装框",
+      "card": "word-relay-filmstrip"
+    }
+  ],
+  "shots": [
+    {
+      "id": "s01",
+      "sentences": "1",
+      "card": "split-text-stagger",
+      "replace": [
+        {
+          "from": "把复杂的事，讲简单",
+          "to": "大家好，我是陈卓"
+        },
+        {
+          "from": "——口播脚本的第一原则",
+          "to": "获客增长系统 · 销售讲解"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-front.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pk-impact-impact-deep-whoosh",
+          "vol": 0.32
+        }
+      ],
+      "notes": "开场：本人出镜 + 字级上字；第一镜必须让人知道'谁在讲'"
+    },
+    {
+      "id": "s02",
+      "sentences": "2",
+      "card": "lead-word-zoom-assemble",
+      "replace": [
+        {
+          "from": "效率",
+          "to": "获客"
+        },
+        {
+          "from": "护城河",
+          "to": "增长引擎"
+        },
+        {
+          "from": "不是参数，也不是模型大小",
+          "to": "不是概念，是每天在漏的钱"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-three-quarter.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "whoosh",
+          "vol": 0.32
+        }
+      ],
+      "notes": "定调：把'算账'变成视觉锤"
+    },
+    {
+      "id": "s03",
+      "sentences": "3",
+      "card": "info-card-assemble",
+      "replace": [
+        {
+          "from": "这期推荐的一本书",
+          "to": "第一笔账 · 流量越来越贵"
+        },
+        {
+          "from": "《讲故事的科学》",
+          "to": "投流成本年年上涨"
+        },
+        {
+          "from": "叙事",
+          "to": "投流"
+        },
+        {
+          "from": "心理学",
+          "to": "转化"
+        },
+        {
+          "from": "三幕结构的现代版：钩子、转折、回收",
+          "to": "内容不发没有声量"
+        },
+        {
+          "from": "为什么开头 3 秒必须有冲突",
+          "to": "发了没有转化"
+        },
+        {
+          "from": "怎么让数据有画面感",
+          "to": "等于给平台打工"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-closeup.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pop",
+          "vol": 0.32
+        }
+      ],
+      "notes": "第一笔账：账单式信息卡"
+    },
+    {
+      "id": "s04",
+      "sentences": "4",
+      "card": "unit-grid-proportion",
+      "content": {
+        "CONFIG": {
+          "cols": 10,
+          "total": 100,
+          "target": 70
+        }
+      },
+      "replace": [
+        {
+          "from": "的观众",
+          "to": "的询盘"
+        },
+        {
+          "from": "在前 3 秒划走",
+          "to": "在夜间和高峰流失"
+        },
+        {
+          "from": "每格 = 1 人（示意数据）",
+          "to": "每格 = 1 个询盘（示例口径）"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-front.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "tick",
+          "vol": 0.32
+        }
+      ],
+      "notes": "第二笔账：70/100 格直接读成'七成流失'"
+    },
+    {
+      "id": "s05",
+      "sentences": "5",
+      "card": "chart-grow",
+      "content": {
+        "COLS": [
+          {
+            "v": 15,
+            "year": "低线",
+            "hot": false
+          },
+          {
+            "v": 20,
+            "year": "常见",
+            "hot": false
+          },
+          {
+            "v": 25,
+            "year": "高线",
+            "hot": true
+          }
+        ]
+      },
+      "replace": [
+        {
+          "from": "年营收（亿元）",
+          "to": "平台佣金（%）"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-three-quarter.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "click",
+          "vol": 0.32
+        }
+      ],
+      "notes": "第三笔账：用最小必要图表说清 15%–25%"
+    },
+    {
+      "id": "s06",
+      "sentences": "6",
+      "card": "flying-words",
+      "content": {
+        "DEFAULT_WORDS": [
+          "生成式 AI",
+          "查消费信息",
+          "答案位",
+          "新入口",
+          "百分之四十二",
+          "AI 搜索",
+          "消费决策",
+          "问答流量"
+        ]
+      },
+      "material": {
+        "kind": "V",
+        "ref": "host/host-closeup.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "whoosh",
+          "vol": 0.32
+        }
+      ],
+      "notes": "第四笔账：新入口的'词流'——最隐蔽的一笔"
+    },
+    {
+      "id": "s07",
+      "sentences": "7",
+      "card": "alt-block-lines",
+      "content": {
+        "ROWS": [
+          {
+            "cls": "a",
+            "text": "不是又一个工具"
+          },
+          {
+            "cls": "b",
+            "text": "是一支 AI 获客班组"
+          }
+        ]
+      },
+      "material": {
+        "kind": "V",
+        "ref": "host/host-front.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "slam",
+          "vol": 0.32
+        }
+      ],
+      "notes": "转折句：块状对比，后块反色压住"
+    },
+    {
+      "id": "s08",
+      "sentences": "8",
+      "card": "source-converge",
+      "replace": [
+        {
+          "from": "四个平台的数据，怎么汇成一张表",
+          "to": "五个环节，汇成一条获客链"
+        },
+        {
+          "from": "抖音",
+          "to": "找人群"
+        },
+        {
+          "from": "小红书",
+          "to": "做内容"
+        },
+        {
+          "from": "B 站",
+          "to": "接询盘"
+        },
+        {
+          "from": "公众号",
+          "to": "跟线索"
+        },
+        {
+          "from": "一张表",
+          "to": "归因成交"
+        },
+        {
+          "from": "每天 8 点自动更新",
+          "to": "每一环都度量到钱"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-three-quarter.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pk-transition-transition-soft",
+          "vol": 0.32
+        }
+      ],
+      "notes": "闭环：四路来源汇聚成一个结果（口播第五环'算成交'由汇聚点承载）"
+    },
+    {
+      "id": "s09",
+      "sentences": "9",
+      "card": "grid-to-hero",
+      "content": {
+        "DEFAULT_LABELS": [
+          "情报策略团",
+          "影视制作团",
+          "社媒运营团",
+          "经营转化团"
+        ]
+      },
+      "material": {
+        "kind": "V",
+        "ref": "host/host-closeup.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pop",
+          "vol": 0.32
+        }
+      ],
+      "notes": "四支团队：九宫格候选里定出一支做主角（两条产线由字幕承载）"
+    },
+    {
+      "id": "s10",
+      "sentences": "10",
+      "card": "tracking-in",
+      "replace": [
+        {
+          "from": "认知决定上限",
+          "to": "你睡了，生意还在跑"
+        }
+      ],
+      "material": {
+        "kind": "文"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pk-scifi-hitech-bleep",
+          "vol": 0.32
+        }
+      ],
+      "notes": "夜班：人物短离场，纯字镜（字距收拢 = 安静下来）"
+    },
+    {
+      "id": "s11",
+      "sentences": "11",
+      "card": "line-by-line-slide",
+      "replace": [
+        {
+          "from": "第一，把问题写下来",
+          "to": "月内容产能：十二条 → 二百六十条"
+        },
+        {
+          "from": "第二，只留一个变量",
+          "to": "询盘首响：三十秒（含夜间）"
+        },
+        {
+          "from": "第三，跑最小实验",
+          "to": "直连预订 +九点二个百分点 · 年省四十一万"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-three-quarter.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pk-text-keyboard",
+          "vol": 0.32
+        }
+      ],
+      "notes": "战报：三行数据逐行滑入（不做柱状图，避免与 s05 的图表卡重复版式）"
+    },
+    {
+      "id": "s12",
+      "sentences": "12",
+      "card": "per-character-rise",
+      "replace": [
+        {
+          "from": "先想清楚，再动手",
+          "to": "定方向，拍板，收钱"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-front.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "ding",
+          "vol": 0.32
+        }
+      ],
+      "notes": "金句：逐字升起，全片唯一'慢下来'的金句镜"
+    },
+    {
+      "id": "s13",
+      "sentences": "13",
+      "card": "chip-grid-single-select",
+      "content": {
+        "DEMO_OPTIONS": [
+          "免费体检 · 只读扫描",
+          "影子试用 · 三天",
+          "正式托管 · 按战绩放权",
+          "按档位开通班组",
+          "先不做"
+        ],
+        "DEMO_EQ": [
+          {
+            "text": "十五到三十分钟"
+          },
+          {
+            "text": "出报告",
+            "accent": true
+          },
+          {
+            "text": "×"
+          },
+          {
+            "text": "零写入"
+          },
+          {
+            "text": "="
+          },
+          {
+            "text": "一个字都不写回",
+            "accent": true
+          }
+        ]
+      },
+      "replace": [
+        {
+          "from": "五个方案，我选哪个？",
+          "to": "怎么开始？先看体检报告"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-closeup.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pop",
+          "vol": 0.32
+        }
+      ],
+      "notes": "行动号召：把'免费体检'做成被选中的那个选项"
+    },
+    {
+      "id": "s14",
+      "sentences": "14",
+      "card": "word-relay-filmstrip",
+      "replace": [
+        {
+          "from": "一个 AI，能",
+          "to": "获客增长系统，"
+        },
+        {
+          "from": "写文案",
+          "to": "找人群"
+        },
+        {
+          "from": "做配图",
+          "to": "做内容"
+        },
+        {
+          "from": "剪视频",
+          "to": "接询盘"
+        },
+        {
+          "from": "配旁白",
+          "to": "归因成交"
+        }
+      ],
+      "material": {
+        "kind": "V",
+        "ref": "host/host-front.mp4"
+      },
+      "sfx": [
+        {
+          "at": "end-0.35",
+          "name": "pk-data-data-load-os",
+          "vol": 0.32
+        }
+      ],
+      "notes": "收尾：四段胶片接力 = 四件事自己跑起来"
+    }
+  ]
+}

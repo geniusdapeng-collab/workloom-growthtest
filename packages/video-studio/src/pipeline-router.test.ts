@@ -188,4 +188,35 @@ describe("视频管线自动化分流", () => {
     expect(intent).toContain("画幅：9:16");
     expect(intent).not.toContain("走营销片");
   });
+
+  /* ================= T-2026-0926-0008：第三条线（口播解说片） ================= */
+
+  it("显式声明「走口播片」→ explainer（不跑情报、不问商品）", async () => {
+    const decision = await routeVideoPipeline({ text: "走口播片：给我们的获客系统做一条讲解视频" });
+    expect(decision.route).toBe("explainer");
+    expect(decision.via).toBe("rule");
+    expect(decision.clarify).toBeUndefined();
+  });
+
+  it("口播/讲解线索严格领先 → explainer；卖货线索仍走 marketing", async () => {
+    const explainer = await routeVideoPipeline({ text: "做一条口播解说，讲清我们这套获客系统怎么跑闭环" });
+    expect(explainer.route).toBe("explainer");
+    expect(explainer.signals.explainer.length).toBeGreaterThan(0);
+
+    const marketing = await routeVideoPipeline({ text: "给米家空气净化器做一条抖音种草带货视频，突出卖点" });
+    expect(marketing.route).toBe("marketing");
+  });
+
+  it("口播线索与商品线索并存且不领先 → 不擅自换线（回到既有判定/澄清）", async () => {
+    // "讲解 + 商品" 双信号：口播分不严格领先 → 不应被判成 explainer
+    const decision = await routeVideoPipeline({ text: "给这款筋膜枪做一条讲解视频，突出静音和便携" });
+    expect(decision.route).not.toBe("explainer");
+  });
+
+  it("澄清话术含第三条线的选项（用户能自己说「走口播片」）", async () => {
+    const decision = await routeVideoPipeline({ text: "帮我做个视频" });
+    expect(decision.route).toBe("clarify");
+    expect(decision.clarify?.question).toContain("口播解说片");
+    expect(decision.clarify?.question).toContain("走口播片");
+  });
 });

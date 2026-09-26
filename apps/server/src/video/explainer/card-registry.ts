@@ -106,8 +106,8 @@ function tryParseLiteral(literal: string): unknown {
   if (literal === "false") return false;
   if (literal === "null") return null;
   try {
-    // JS 字面量（单引号 / 尾逗号 / undefined）→ JSON 的保守归一后再解析
-    const jsonish = literal
+    // JS 字面量（注释 / 单引号 / 未加引号的键 / 尾逗号）→ 保守归一后再解析
+    const jsonish = stripComments(literal)
       .replace(/([{,[]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2":')
       .replace(/'/g, '"')
       .replace(/,(\s*[}\]])/g, "$1");
@@ -137,7 +137,20 @@ export function patchCardSource(
      * 整体替换会把其余键连同注释一起丢掉 → 卡的时间轴直接塌掉。
      * 因此：槽原值是对象且补丁值也是对象 → 合并后序列化；其余情况整体替换。
      */
-    const current = tryParseLiteral(out.slice(start, end).trim());
+    const existing = out.slice(start, end).trim();
+    const current = tryParseLiteral(existing);
+    /**
+     * 对象槽不能"整体覆盖"（真机事故，T-2026-0926-0008）：
+     * `unit-grid-proportion` 的 CONFIG 含时序/几何十余键，补丁只改 `target` 时整体覆盖会丢键，
+     * 卡在 render 期以 `mixHex(undefined)` 崩掉（帧 410 才炸，静帧 QA 看不出来）。
+     * 因此：补丁值是对象但原值**解析不成对象**（含函数/表达式）→ 直接拒绝，让人改用 replace 通道。
+     */
+    if (isPlainObject(value) && current === null && existing.startsWith("{")) {
+      throw new Error(
+        `内容槽 ${name} 是对象字面量但无法安全解析合并（可能含函数/表达式）——`
+        + `请改用 replaces 通道精确改文案，或把该槽的完整对象值给全（当前不支持部分合并）。`,
+      );
+    }
     const merged = isPlainObject(current) && isPlainObject(value) ? { ...current, ...value } : value;
     out = `${out.slice(0, start)}${JSON.stringify(merged)}${out.slice(end)}`;
     applied.push(`const:${name}`);

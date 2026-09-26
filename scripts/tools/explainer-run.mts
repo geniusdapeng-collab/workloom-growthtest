@@ -207,6 +207,7 @@ async function main(): Promise<void> {
     templateDir: templateDirOf(),
     renderScope: opt("render-scope", "full"),
     stopAfterRender: has("stop-after-render"),
+    resumeFrom: has("resume") ? "render" : undefined,
     onLog: log,
   });
 

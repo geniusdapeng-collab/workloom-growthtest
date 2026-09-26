@@ -166,6 +166,33 @@ function firstDifference(a: string, b: string): number {
   return n;
 }
 
+/**
+ * 分镜时间**首尾相接**（T-2026-0926-0008 实现期修正）。
+ *
+ * 为什么必须做：口播稿的句间气口（TTS 气口 180ms + 自然停顿，实测 0.26–0.76s）不是"空白"——
+ * talkcraft 的分镜纪律是**镜与镜首尾相接**（转场靠 12 帧交叠，不靠留白），留白会让画面断档，
+ * 也会让 render_shots 的"末镜 end == composition 时长"断言失败。
+ * 处置：把空档并入**前一镜的镜尾**（新元素仍在词锚处进场，不提前），末镜补到配音总长。
+ */
+export function chainShotTimes<T extends { id: string; start: number; end: number }>(shots: T[], total: number): T[] {
+  const ordered = [...shots].sort((a, b) => a.start - b.start);
+  const out: T[] = ordered.map((shot) => ({ ...shot }));
+  /**
+   * 片头留白并入首镜（真机补）：配音首字前通常有 0.3–0.8s 静默，若首镜从首字开始，
+   * 时间线 0..start 这一段**没有任何段覆盖**——render_shots 拼装出的总帧数会比 composition
+   * 少这一段（实测 2783→2763，差 20 帧），直接以"拼装总帧数不一致"FAIL。
+   * 首镜从 0 起还能满足引擎"开镜不空台"的纪律：画面先到，第一句话再落。
+   */
+  if (out[0]) out[0].start = 0;
+  for (let i = 0; i < out.length - 1; i += 1) {
+    const next = out[i + 1]!;
+    if (out[i]!.end < next.start) out[i]!.end = next.start;
+  }
+  const last = out[out.length - 1];
+  if (last && last.end < total) last.end = total;
+  return out;
+}
+
 /* ================= 生成 ================= */
 
 export interface GenerateInput {
@@ -200,7 +227,12 @@ export async function generateShotbook(input: GenerateInput): Promise<GenerateRe
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
         const text = await input.llm(attempt === 1 ? prompt : `${prompt}\n\n上一次输出被校验拒绝，原因如下，请逐条修正后重新输出完整 JSON：\n${failures[failures.length - 1]}`);
-        const shotbook = ExplainerShotbookSchema.parse(extractJson(text));
+        const parsed = ExplainerShotbookSchema.parse(extractJson(text));
+        // LLM 的时间来自时间戳，但句间气口会留空档 → 统一做"首尾相接"再校验（确定性、可复现）
+        const shotbook: ExplainerShotbook = {
+          ...parsed,
+          shots: chainShotTimes(parsed.shots, input.timestamps.total),
+        };
         const check = validateShotbook({
           shotbook, script: input.script, timestamps: input.timestamps,
           registry: input.registry, engineDir: input.engineDir,
@@ -330,12 +362,23 @@ export function shotbookFromPlan(
     const sfx = (entry.sfx ?? []).map((cue) => {
       let t = cue.t ?? null;
       if (t === null && cue.at) {
-        const [anchor, offsetRaw] = cue.at.split("@");
-        const sentenceIndex = Number(anchor?.replace(/^s/i, ""));
-        const offset = Number(offsetRaw ?? 0);
-        const sentence = byIndex.get(sentenceIndex);
-        if (!sentence) throw new Error(`分镜计划 ${entry.id} 的 sfx 锚点句号不存在：${cue.at}`);
-        t = sentence.start + (Number.isFinite(offset) ? offset : 0);
+        /**
+         * 两种锚法：
+         *   `"3@0.2"`     —— 第 3 句起点 + 0.2s（画面动作落点）；
+         *   `"end-0.35"`  —— 本镜镜尾前 0.35s（**句间气口**；引擎纪律：转场/边界 cue 要落在气口里，
+         *                    埋在语音里等于没放——sfx_check --mix 会以 MASKED 比例判 FAIL）。
+         */
+        const tail = /^end\s*-\s*([\d.]+)$/i.exec(cue.at.trim());
+        if (tail) {
+          t = end - Number(tail[1]);
+        } else {
+          const [anchor, offsetRaw] = cue.at.split("@");
+          const sentenceIndex = Number(anchor?.replace(/^s/i, ""));
+          const offset = Number(offsetRaw ?? 0);
+          const sentence = byIndex.get(sentenceIndex);
+          if (!sentence) throw new Error(`分镜计划 ${entry.id} 的 sfx 锚点句号不存在：${cue.at}`);
+          t = sentence.start + (Number.isFinite(offset) ? offset : 0);
+        }
       }
       if (t === null) throw new Error(`分镜计划 ${entry.id} 的 sfx 缺 t 或 at（at 形如 "3@0.2"）`);
       return { t: Math.round(t * 1000) / 1000, name: cue.name, vol: cue.vol ?? 0.3 };
@@ -354,6 +397,7 @@ export function shotbookFromPlan(
       notes: entry.notes ?? "",
     };
   });
+  const chained = chainShotTimes(shots, timestamps.total);
   const rhythm = plan.rhythm ?? shots.map((shot, index) => ({
     shotId: shot.id,
     hostForm: RULE_HOST_FORMS[index % RULE_HOST_FORMS.length]!,
@@ -369,7 +413,7 @@ export function shotbookFromPlan(
       energy: plan.style?.energy ?? "中",
     },
     rhythmTable: rhythm,
-    shots,
+    shots: chained,
   });
 }
 
@@ -470,6 +514,7 @@ export function ruleShotbook(input: GenerateInput): ExplainerShotbook {
       notes: "规则兜底分镜（未经 LLM 精修）",
     };
   });
+  const chained = chainShotTimes(shots, timestamps.total);
 
   return ExplainerShotbookSchema.parse({
     style: {
@@ -479,13 +524,13 @@ export function ruleShotbook(input: GenerateInput): ExplainerShotbook {
       font: "PingFang SC / Noto Sans SC",
       energy: "中",
     },
-    rhythmTable: shots.map((shot, index) => ({
+    rhythmTable: chained.map((shot, index) => ({
       shotId: shot.id,
       hostForm: RULE_HOST_FORMS[index % RULE_HOST_FORMS.length]!,
       container: RULE_CONTAINERS[index % RULE_CONTAINERS.length]!,
       card: shot.card,
     })),
-    shots,
+    shots: chained,
   });
 }
 
@@ -513,7 +558,11 @@ export function deriveBeats(shotbook: ExplainerShotbook, timestamps: TimestampsF
     beats.push({
       t: Math.round(t * 1000) / 1000,
       anchor,
-      sentence: sentence.i,
+      /**
+       * `sentence` 用 **0 基下标**：`beat_lint.py` 的实现是 `sentences[b["sentence"]]`（列表下标），
+       * 写 1 基句号时最后一句会越界（`IndexError: list index out of range`，真机踩过）。
+       */
+      sentence: sentence.i - 1,
       what: `镜头 ${shot.id} 入场（卡 ${shot.card}）`,
       label: `${shot.id}-in`,
       shot: shot.id,

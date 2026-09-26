@@ -121,8 +121,10 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
     const canonical = join(cardsDir, `${shot.card}.tsx`);
     if (!existsSync(canonical)) {
       copyFileSync(cardPath, canonical);
-      cards.push(shot.card);
     }
+    // 用卡清单必须**无条件**登记（不是"本次新复制的"）：card_lint 要拿它做逐卡保真核验，
+    // 复跑时若只登记新卡，闸会收到空清单并判"工程里没有 src/cards/*.tsx"（真机踩过）。
+    cards.push(shot.card);
     const patched = patchCardSource(readFileSync(cardPath, "utf8"), { consts: shot.content, replaces: shot.replace });
     const sceneFile = join(scenesDir, `${shot.id}.tsx`);
     writeFileSync(sceneFile, sceneHeader(shot.id, shot.card, patched.applied) + patched.source);
@@ -170,12 +172,37 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
     }
   }
 
+  /**
+   * sources.md（素材来源台账）：引擎 preflight 对"每条素材都要登记来源/授权"的硬规，
+   * 本机人物底板与音效库都是**随仓资产**，这里如实登记它们的来源与授权口径
+   * （写不出来源的素材不允许进片——这条不是形式主义，是 preflight 判 FAIL 的依据）。
+   */
+  writeFileSync(join(input.jobDir, "sources.md"), [
+    "# 素材来源台账（project-builder 生成）",
+    "",
+    "| 素材 | 类型 | 来源 | 授权口径 |",
+    "|---|---|---|---|",
+    ...Object.entries(input.hostAssets ?? {}).map(([form, absPath]) =>
+      `| host/${basename(absPath)}（${form}） | 人物底板（定妆照驱动） | 本仓角色档案 model-01-chen-zhuo（bundles/ai-video/library/characters） | 产品所有者授权角色档案；合成人脸，非真人素材 |`),
+    cues.length > 0
+      ? "| public/sfx/*.mp3 | 音效采样 | video-talkcraft 内嵌采样（demos/_lib/sfx-samples.js） | Mixkit Sound Effects Free License（免署名可商用，见 demos/_lib/sfx/ATTRIBUTION.md） |"
+      : "",
+  ].filter(Boolean).join("\n") + "\n");
+
   /* ---------- ⑤ 分镜表 / 节拍 / 锚点 / props ---------- */
+  /**
+   * 末镜对齐配音总长（T-2026-0926-0008 实现期修正）：
+   * render_shots.mjs 会断言「shots.json 末镜 end 帧数 == composition.durationInFrames（差 ≤1 帧）」，
+   * 而配音尾部通常有 0.1–0.5s 留白（TTS 尾音/气口），末句 end 往往略早于音频总长 ——
+   * 不补齐就会以"分镜表与合成不同源"直接 FAIL。补齐后末镜多出的部分是收尾定格（内容不动，相机继续推）。
+   */
+  const lastId = input.shotbook.shots[input.shotbook.shots.length - 1]?.id;
   const shots = input.shotbook.shots.map((shot) => ({
     id: shot.id,
     start: shot.start,
-    end: shot.end,
+    end: shot.id === lastId ? Math.max(shot.end, input.timestamps.total) : shot.end,
   }));
+  const endById = new Map(shots.map((s) => [s.id, s.end]));
   const beats = deriveBeats(input.shotbook, input.timestamps, input.semantics);
   const anchors = deriveAnchors(beats, input.shotbook);
   const shotsPath = join(remotionDir, "shots.json");
@@ -204,7 +231,7 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
     shots: input.shotbook.shots.map((shot) => ({
       id: shot.id,
       start: shot.start,
-      end: shot.end,
+      end: endById.get(shot.id) ?? shot.end,
       card: shot.card,
       hostForm: rhythmHostForm(input.shotbook, shot.id) ?? "无人物",
       container: rhythmContainer(input.shotbook, shot.id) ?? "装框",
@@ -217,6 +244,12 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
   };
   const propsPath = join(remotionDir, "props.json");
   writeFileSync(propsPath, JSON.stringify(props, null, 1));
+  /**
+   * 纯音效轨 props（`sfxSolo`）：sfx_check 的"在场性"检查要一条只有音效、没有人声的 wav，
+   * 由 `render_shots.mjs --audio out/sfx-solo.wav --props @props-sfx.json` 渲出（合成里 `sfxSolo` 会静默人声）。
+   * 装配期就把它写好——QA 阶段再补文件会让"闸"依赖一个不存在的输入（真机踩过）。
+   */
+  writeFileSync(join(remotionDir, "props-sfx.json"), JSON.stringify({ ...props, voice: null, sfxSolo: true }, null, 1));
   writeFileSync(join(remotionDir, "overrides.json"), "{}\n");
 
   /* ---------- ⑥ 依赖软链 + 工程清单 ---------- */

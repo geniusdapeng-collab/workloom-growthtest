@@ -162,8 +162,15 @@ function main(): void {
       sh(python, ["-m", "venv", venv]);
     }
     sh(join(venv, "bin/pip"), ["install", "-q", "--disable-pip-version-check", "--upgrade", "pip"], { allowFail: true });
-    sh(join(venv, "bin/pip"), ["install", "-q", "--disable-pip-version-check", "mlx-whisper"]);
-    log("[engine] mlx-whisper 就绪（词级时间戳后端；模型走 HF_HOME 缓存，缺则首跑下载 ~1.6GB）");
+    /**
+     * 依赖口径（真机补）：引擎的脚本依赖分开装——
+     *   mlx-whisper   —— 词级时间戳后端（ASR）；
+     *   numpy/imageio —— motion_check 的抖动判定（缺了只退化成静止检查，抖动闸等于没跑）；
+     *   pillow        —— contact_sheet 拼图（缺了评审材料出不来）。
+     * 三者都是"闸/材料"的硬依赖，装不全就会出现"闸静默降级"，所以一起装。
+     */
+    sh(join(venv, "bin/pip"), ["install", "-q", "--disable-pip-version-check", "mlx-whisper", "numpy", "imageio", "pillow"]);
+    log("[engine] Python 依赖就绪：mlx-whisper（ASR）+ numpy/imageio（抖动闸）+ pillow（评审拼图）");
   }
 
   const status = checkEngine();

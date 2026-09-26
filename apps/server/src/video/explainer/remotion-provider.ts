@@ -114,6 +114,13 @@ export class RemotionProvider implements GenProvider {
     if (!license.okToRender) throw new Error(`RemotionProvider：许可闸拒绝渲染——${license.reason}`);
 
     const scope = params.scope ?? "full";
+    /**
+     * taskId → jobDir 指针（真机事故，T-2026-0926-0008）：
+     * 编排方给的工程目录不一定叫 taskId（服务端是 `<shotbookId>-v<n>/`），而 poll(taskId) 只能拿到 taskId。
+     * 上一版让 poll 直接按 `jobsDir/<taskId>` 找 status.json → 永远读不到（渲染早就完成，CLI 却干等到超时）。
+     * 指针文件就是这条映射的唯一事实源，崩溃重启后依然有效。
+     */
+    writeFileSync(join(jobsDirOf(env), `${taskId}.jobdir`), jobDir);
     writeJobState(jobDir, { status: "running", taskId, jobDir, scope, startedAt: new Date().toISOString() });
     const args = renderShotsArgs({
       scope,
@@ -158,7 +165,9 @@ export class RemotionProvider implements GenProvider {
 
   async poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; actualUnits?: number; error?: string }> {
     const env = this.opts.env ?? process.env;
-    const jobDir = join(jobsDirOf(env), taskId);
+    const jobsDir = jobsDirOf(env);
+    const pointer = join(jobsDir, `${taskId}.jobdir`);
+    const jobDir = existsSync(pointer) ? readFileSync(pointer, "utf8").trim() : join(jobsDir, taskId);
     const state = readJobState(jobDir);
     if (!state) {
       return { status: "running", error: `任务 ${taskId} 状态文件尚未落盘（渲染刚启动）` };

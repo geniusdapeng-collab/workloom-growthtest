@@ -127,7 +127,8 @@ export async function runMachineGates(input: GateInput): Promise<GateRunResult> 
       const args = [
         join(engineDir, "scripts/render_shots.mjs"),
         "--shots", "shots.json", "--audio", "../out/sfx-solo.wav",
-        "--props", `@${join(input.jobDir, "remotion", "props-sfx.json")}`,
+        // 相对路径：cwd 是工程 remotion/ 目录（与 render_shots 的默认解析一致）
+        "--props", "@props-sfx.json",
       ];
       const r = await run("node", args, { cwd: join(input.jobDir, "remotion"), env, timeoutMs, onLog: input.onLog });
       soloOk = r.code === 0 && existsSync(solo);

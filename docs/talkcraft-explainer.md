@@ -97,6 +97,18 @@ pnpm explainer:run -- \
 | `TALKCRAFT_ENABLED` | 总开关；`0` 时 provider 缺位、路由退化成"无可用模型"（不静默 mock） |
 | `TALKCRAFT_LICENSE_SCOPE` | `noncommercial`（评估）/ `authorized`（需 `LICENSE-GRANT.md`） |
 | `TALKCRAFT_ASR_BACKEND` | `voice-station`（本机 mlx-whisper 词级）/ `vendor-whisper` / `vendor-sherpa` / `precomputed` |
+| `TALKCRAFT_VOICE_MAX_CHUNK_CHARS` | TTS 分块上限（缺省 60 = 按句合成；逐句合成才能断点续跑） |
+| `TALKCRAFT_VOICE_GAP_MS` | 句间气口（缺省 520ms；也是音效能被听出来的物理前提） |
+| `TALKCRAFT_RENDER_WORKERS` | 渲染并行段数（低配设 1） |
+
+### 5.1 段缓存与断点
+
+- **段缓存**在 `<jobDir>/remotion/out/segments/<shotId>.mp4`（render_shots 的 cwd 是工程 `remotion/`，
+  所以 `out/segments` 相对工程而不是任务根目录）；段指纹含素材/时序/props，改一镜只重渲该段±邻段。
+- **成片**在 `<jobDir>/out/{assembled.mp4, full-mix.wav, v1.mp4, delivery.mp4}`；
+  `qa-frames/`、`qa-sheets/`、`qa-report.json` 是机器闸与评审材料。
+- **断点续跑**：`pnpm explainer:run -- ... --resume` 在 `out/v1.mp4` 已在盘时跳过渲染直接跑闸与交付；
+  TTS 逐句缓存（工位 `deliveries/talkcraft-sNN-*.wav`），中断后重跑只补缺的句子。
 
 ## 6. 验收口径
 

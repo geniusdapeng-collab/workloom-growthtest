@@ -77,6 +77,12 @@ export interface ExplainerRunInput {
   onStage?: StageHook;
   /** 渲染范围（返修：changed:<shotId>）；首渲 full */
   renderScope?: string;
+  /**
+   * 断点续跑：`"render"` = 已有 `out/v1.mp4` 时跳过渲染，直接跑机器闸与交付。
+   * 场景：渲染已完成但后续步骤（闸/交付）中断，或渲染进程被外部杀掉——
+   * 段缓存与成片都在盘上，重渲一次要十几分钟，没必要（talkcraft 断点纪律的同构落地）。
+   */
+  resumeFrom?: "render";
   /** 只渲染不交付（首镜先做先确认 / 单镜返修预览） */
   stopAfterRender?: boolean;
   /** 只做到装配段（服务端 submit 用：渲染由 submitGenJob + render-poller 接管） */
@@ -241,7 +247,19 @@ export async function runExplainerPipeline(input: ExplainerRunInput): Promise<Ex
 
   /* ---------- ⑦ 素材体检（preflight --media-only） ---------- */
   await stage({ stageId: "preflight", status: "running" });
-  const preflight = await runPreflight({ jobDir, engineDir, env, baselineHost: input.baselineHost ?? null, onLog: log });
+  /**
+   * preflight 的 `--host` 只给**唇形同步级人物素材**（真实拍摄/生成的说话人视频）：
+   * 引擎会断言"人物素材时长 == 配音时长（±1 帧）"——本引擎的人物窗用的是**定妆照驱动的循环底板**
+   * （12s 极缓推近，模板里 `<Loop>` 复用），时长天然不匹配，套用该断言等于把"底板"误判成"说话人"。
+   * 因此：只有调用方显式给了 baselineHost（真人物素材）才传 `--host`；底板的存在与来源由
+   * `sources.md` 素材台账 + 机器闸 `motion_check --anchors` 承担。
+   */
+  const hostFromProject = Object.values(build.hostSrcByShot).find((rel): rel is string => Boolean(rel));
+  if (hostFromProject && !input.baselineHost) {
+    log(`[preflight] 人物为底板（${hostFromProject}，非唇形同步素材）→ 不传 --host（引擎该断言仅适用说话人素材）`);
+  }
+  const baselineHost = input.baselineHost ?? null;
+  const preflight = await runPreflight({ jobDir, engineDir, env, baselineHost, onLog: log });
   await stage({
     stageId: "preflight", status: preflight.ok ? "done" : "failed",
     output: { summary: preflight.summary },
@@ -271,18 +289,28 @@ export async function runExplainerPipeline(input: ExplainerRunInput): Promise<Ex
   await stage({ stageId: "render", status: "running", output: { scope: input.renderScope ?? "full" } });
   const provider = new RemotionProvider({ env });
   const audioSeconds = align.total;
-  const submitted = await provider.submit({
-    prompt: script.sentences.map((s) => s.text).join(""),
-    estimatedUnits: Math.round(audioSeconds),
-    refId: input.taskId,
-    params: { jobDir, audioSeconds, scope: input.renderScope ?? "full", providerModel: "remotion-4.0.519" },
-  });
-  const polled = await pollUntilDone(provider, submitted.taskId, jobDir, { log, timeoutMs: Number(env.TALKCRAFT_RENDER_TIMEOUT_MS ?? 3_600_000) });
+  const renderedPath = join(jobDir, "out", "v1.mp4");
+  const canResume = (input.resumeFrom === "render") && existsSync(renderedPath);
+  const polled = canResume
+    ? { status: "succeeded" as const, uri: renderedPath, error: undefined as string | undefined }
+    : await (async () => {
+        const submitted = await provider.submit({
+          prompt: script.sentences.map((s) => s.text).join(""),
+          estimatedUnits: Math.round(audioSeconds),
+          refId: input.taskId,
+          params: { jobDir, audioSeconds, scope: input.renderScope ?? "full", providerModel: "remotion-4.0.519" },
+        });
+        return await pollUntilDone(provider, submitted.taskId, jobDir, {
+          log,
+          timeoutMs: Number(env.TALKCRAFT_RENDER_TIMEOUT_MS ?? 3_600_000),
+        });
+      })();
+  if (canResume) log(`[render] 断点续跑：复用已在盘的成片 ${renderedPath}（跳过渲染）`);
   if (polled.status !== "succeeded" || !polled.uri) {
     await stage({ stageId: "render", status: "failed", errorClass: "RENDER_FAILED", errorMsg: polled.error ?? "渲染失败" });
     throw new Error(`渲染失败：${polled.error ?? "未知原因"}`);
   }
-  await stage({ stageId: "render", status: "done", output: { video: polled.uri, frames: null } });
+  await stage({ stageId: "render", status: "done", output: { video: polled.uri, frames: null, resumed: canResume } });
 
   /* ---------- ⑨ 机器闸六条 ---------- */
   await stage({ stageId: "machineGates", status: "running" });
@@ -336,6 +364,7 @@ async function pollUntilDone(
 ): Promise<{ status: string; uri?: string; error?: string }> {
   const started = Date.now();
   let lastLog = "";
+  let missingStatePolls = 0;
   for (;;) {
     const state = readJobState(jobDir);
     if (state?.logTail && state.logTail !== lastLog) {
@@ -345,6 +374,18 @@ async function pollUntilDone(
     }
     const result = await provider.poll(taskId);
     if (result.status === "succeeded" || result.status === "failed") return result;
+    /**
+     * 快速失败：状态文件一直找不到 = taskId 与任务目录不匹配（装配错误），
+     * 不能让它伪装成"仍在渲染"干等到 60 分钟超时（真机事故：渲染 10 分钟就完了，CLI 等了 1 小时）。
+     */
+    if (result.error?.includes("状态文件尚未落盘")) {
+      missingStatePolls += 1;
+      if (missingStatePolls > 15) {
+        return { status: "failed", error: `${result.error}（连续 ${missingStatePolls} 次）——taskId 与任务目录不匹配，检查 provider 的 jobDir 指针` };
+      }
+    } else {
+      missingStatePolls = 0;
+    }
     if (Date.now() - started > opts.timeoutMs) return { status: "failed", error: `渲染超时（${Math.round(opts.timeoutMs / 60000)}min）` };
     await new Promise((r) => setTimeout(r, 2000));
   }
