@@ -190,7 +190,8 @@ export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { s
    *   `person-led`（人物为主）必须开启人物层并给出人物来源镜头。
    * 这条同时约束渲染侧与监制侧：监制按 archetype 判，不再对物体版式要求"主角必须在场"。
    */
-  const archetype = input.archetype ?? "subject-led";
+  /** 只有**显式指定**版式时才做一致性校验：旧调用/旧用例没传 archetype，保持既有行为（人物卡照旧可选） */
+  const archetype = input.archetype;
   if (archetype === "subject-led" && plan.person?.enabled) {
     issues.push("物体为主版式（subject-led）里不允许开启人物层（人物小卡/竖带会与主视觉打架）");
   }
