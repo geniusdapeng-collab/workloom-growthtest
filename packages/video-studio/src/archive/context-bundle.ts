@@ -110,16 +110,26 @@ export async function updateContextBundle(
   const previous = await store.readJson<ContextBundle>("context-bundle.json");
   const progress = await summarizeArchiveProgress(store, manifest, input.lastStage);
 
-  const openQuestions = mergeList(previous?.openQuestions, [
+  /**
+   * 交接包是**面向下一棒的行动指南**，不是过程博物馆：
+   *   - `decisions`（历史裁决）继续累加，跨会话承接要看得见走过的路；
+   *   - `openQuestions` 在同一环节失败时**替换旧条目**（否则每轮重跑都追加一条同义句）；
+   *   - `nextSteps` 有新值即**整体替换**（旧建议会误导恢复动作）。
+   * 真机审计：营销片三连跑后 openQuestions/nextSteps 出现同义重复（"失败（BUG）…"）
+   * 与过期建议并存，故在此收紧。
+   */
+  const stalePrefix = input.failedStage ? `${input.failedStage} 失败` : null;
+  const priorQuestions = (previous?.openQuestions ?? []).filter(
+    (item) => !stalePrefix || !String(item).startsWith(stalePrefix),
+  );
+  const openQuestions = mergeList(priorQuestions, [
     ...(input.openQuestions ?? []),
     ...(input.failedStage
       ? [`${input.failedStage} 失败（${input.errorClass ?? "未分类"}）：${(input.errorMsg ?? "").slice(0, 200)}`]
       : []),
   ]);
-  const nextSteps = mergeList(previous?.nextSteps, [
-    ...(input.nextSteps ?? []),
-    ...deriveNextSteps(input, progress),
-  ]);
+  /** nextSteps 是行动指南：每次重建都以当轮结论为准（有值时整体替换，不与旧建议并存） */
+  const nextSteps = mergeList(undefined, [...(input.nextSteps ?? []), ...deriveNextSteps(input, progress)]);
 
   const bundle: ContextBundle = {
     projectId: store.projectId,

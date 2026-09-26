@@ -64,6 +64,16 @@ export interface StageContext {
   attempt: number;
   log(level: "info" | "warn" | "error", msg: string, data?: Record<string, unknown>): Promise<void>;
   heartbeat(data?: Record<string, unknown>): Promise<void>;
+  /**
+   * 落一份**附属产物**到档案（例如预生产结束后的 25/30 字段提示词包）。
+   * 返回 `{ sha256, bytes, truncated }`；`truncated=true` 表示超出体积预算、已按策略裁剪
+   * （默认丢弃 `fields` 明细只留 prompt 与字段名，绝不静默丢整包）。
+   */
+  writeArtifact(
+    relPath: string,
+    data: unknown,
+    opts?: { maxBytes?: number; shrink?: (data: unknown) => unknown },
+  ): Promise<{ sha256: string; bytes: number; truncated: boolean } | null>;
 }
 
 /**
@@ -197,6 +207,43 @@ export class StageRunner {
           lastHeartbeatAt = now;
           await safe(() => this.ledger.heartbeatRun!({ projectId: this.store.projectId, stageId, attempt }));
         }
+      },
+      /* 附属产物：默认 4MB 预算；超限先按调用方给的 shrink() 裁剪一次，仍超则只留指针与摘要 */
+      writeArtifact: async (relPath, data, opts) => {
+        const maxBytes = opts?.maxBytes ?? 4 * 1024 * 1024;
+        const sizeOf = (value: unknown): number => {
+          try {
+            return Buffer.byteLength(JSON.stringify(value), "utf8");
+          } catch {
+            return Number.POSITIVE_INFINITY;
+          }
+        };
+        let payload = data;
+        let truncated = false;
+        if (sizeOf(payload) > maxBytes && opts?.shrink) {
+          payload = opts.shrink(payload);
+          truncated = true;
+        }
+        if (sizeOf(payload) > maxBytes) {
+          payload = {
+            truncated: true,
+            note: `附属产物超过 ${Math.round(maxBytes / 1024)}KB 预算，已只留摘要（原大小 ${sizeOf(data)} 字节）`,
+            summary: (() => {
+              try {
+                return JSON.parse(JSON.stringify(data).slice(0, 4_000)) as unknown;
+              } catch {
+                return null;
+              }
+            })(),
+          };
+          truncated = true;
+        }
+        let result: { sha256: string; bytes: number; truncated: boolean } | null = null;
+        await safe(async () => {
+          const written = await this.store.writeJsonAtomic(relPath, payload);
+          result = { sha256: written.sha256, bytes: sizeOf(payload), truncated };
+        });
+        return result;
       },
     };
     this.activeCtx = ctx;

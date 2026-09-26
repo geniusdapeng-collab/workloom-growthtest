@@ -205,13 +205,17 @@ export interface ProjectMeta {
   title: string | null;
   kind: "marketing" | "narrative";
   threadId: string | null;
+  /** 项目建档时间（身份指纹：换库/重置种子后同名 VID 会拿到不同的 createdAt） */
+  createdAt: string | null;
 }
 
 /** 读项目元数据（交接包/恢复编排共用；越权返回 null） */
 export async function readProjectMeta(scope: Scope, projectId: string): Promise<ProjectMeta | null> {
-  const rows = await scopedRows<{ title: string | null; kind: string | null; thread_id: string | null }>(
+  const rows = await scopedRows<{
+    title: string | null; kind: string | null; thread_id: string | null; created_at: string | null;
+  }>(
     scope,
-    `SELECT title, kind, thread_id FROM video_projects WHERE id=$1 AND workspace_id=$2`,
+    `SELECT title, kind, thread_id, created_at FROM video_projects WHERE id=$1 AND workspace_id=$2`,
     [projectId, scope.workspaceId],
   );
   const row = rows[0];
@@ -221,6 +225,13 @@ export async function readProjectMeta(scope: Scope, projectId: string): Promise<
     title: row.title,
     kind: row.kind === "marketing" ? "marketing" : "narrative",
     threadId: row.thread_id,
+    /** 归一成 ISO（pg 返回的是 Date.toString() 口径；身份指纹要可比较） */
+    createdAt: row.created_at
+      ? (() => {
+          const parsed = new Date(row.created_at);
+          return Number.isNaN(parsed.getTime()) ? String(row.created_at) : parsed.toISOString();
+        })()
+      : null,
   };
 }
 

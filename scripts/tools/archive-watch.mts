@@ -119,6 +119,14 @@ function archiveFileExists(workspaceId: string, projectId: string, relPath: stri
   return existsSync(abs);
 }
 
+function readJsonSafe<T>(file: string): T | null {
+  try {
+    return JSON.parse(readFileSync(file, "utf8")) as T;
+  } catch {
+    return null;
+  }
+}
+
 /** ⑥ 恢复未生效：读 attempt 产物里的 preCheckpointSnapshot + resumed */
 function resumeEvidence(workspaceId: string, projectId: string, outputRef: string | null): { snapshots: number; resumed: boolean } | null {
   if (!outputRef) return null;
@@ -348,6 +356,57 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
           occurrences: 1,
           rule: "resume_ineffective",
           note: "vendor 以 blueprint 指纹校验 Phase checkpoint，不一致即丢弃并删除；根因修复需 blueprint 复用（另立任务卡）",
+        },
+      });
+    }
+
+    /**
+     * ⑦ 档案身份漂移（真机审计发现）
+     *
+     * 档案夹以 `workspaceId/projectId` 为单位，而 projectId 只在一代数据库内唯一：
+     * 换库/重置种子后同名 `VID-nnn` 会指向另一部片子，旧档案被静默继承
+     * （实测：营销片的 manifest 写着 narrative）。这里把「manifest 管线类型 vs PG 项目类型」
+     * 与「manifest 里记录过的历史漂移」都作为工程发现上报。
+     */
+    const projectRows = await stageRows<{ project_id: string }>(
+      `SELECT DISTINCT project_id FROM production_stage_runs WHERE workspace_id=$1`,
+      [workspaceId],
+    );
+    const kindRows = await stageRows<{ project_id: string; kind: string }>(
+      `SELECT id AS project_id, kind FROM video_projects WHERE workspace_id=$1`,
+      [workspaceId],
+    );
+    const dbKindByProject = new Map(kindRows.map((row) => [row.project_id, row.kind]));
+    for (const row of projectRows) {
+      const projectId = row.project_id;
+      const manifest = readJsonSafe<{
+        pipelineKind?: string;
+        identityDrifts?: unknown[];
+        projectIdentity?: { kind?: string | null } | null;
+      }>(join(WORK_DIR, "archive", workspaceId, projectId, "manifest.json"));
+      if (!manifest) continue;
+      const dbKind = dbKindByProject.get(projectId) ?? null;
+      const driftCount = Array.isArray(manifest.identityDrifts) ? manifest.identityDrifts.length : 0;
+      const kindMismatch = Boolean(dbKind && manifest.pipelineKind && manifest.pipelineKind !== dbKind);
+      if (!kindMismatch && driftCount === 0) continue;
+      findings.push({
+        dedupeKey: `watch:identity:${projectId}`,
+        workspaceId,
+        category: "bug",
+        severity: "P2",
+        projectId,
+        stageId: null,
+        title:
+          `档案身份漂移：${projectId} manifest.pipelineKind=${manifest.pipelineKind ?? "-"}`
+          + ` / PG kind=${dbKind ?? "-"}（历史漂移 ${driftCount} 次）`,
+        evidence: {
+          archiveRoot: join(WORK_DIR, "archive", workspaceId, projectId),
+          manifestKind: manifest.pipelineKind ?? null,
+          dbKind,
+          identityDrifts: driftCount,
+          occurrences: 1,
+          rule: "archive_identity_drift",
+          note: "档案夹按 (workspaceId, projectId) 复用；projectId 只在一代 DB 内唯一，换库后同名 ID 会撞档案",
         },
       });
     }

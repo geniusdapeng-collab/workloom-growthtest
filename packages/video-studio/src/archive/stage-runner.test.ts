@@ -173,6 +173,77 @@ describe("StageRunner", () => {
     const bundle = await store.readJson<{ openQuestions: string[] }>("context-bundle.json");
     expect(bundle?.openQuestions.join(" ")).toContain("GATE_REJECTED");
   });
+
+  it("ctx.writeArtifact：提示词包等附属产物落档案并返回摘要（D3 修复）", async () => {
+    const ledger = new FakeLedger();
+    const runner = new StageRunner(store, ledger, "RUN-6");
+    const pack = {
+      stageId: "preproduction",
+      attempt: 1,
+      shotCount: 2,
+      shots: [
+        { shotId: "SC-1", prompt: "【导演指令】…", promptCharCount: 1200, fields: { scene: "办公室" } },
+        { shotId: "SC-2", prompt: "【导演指令】…", promptCharCount: 1100, fields: { scene: "地铁" } },
+      ],
+    };
+
+    const output = await runner.run("preproduction", { intent: "x" }, async (ctx) => {
+      const written = await ctx.writeArtifact(`stages/preproduction/attempt-${ctx.attempt}.prompts.json`, pack);
+      return { output: { success: true, promptsSha256: written?.sha256 ?? null } };
+    });
+
+    expect(String(output.promptsSha256)).toMatch(/^[0-9a-f]{64}$/);
+    const saved = await store.readJson<{ shotCount: number; shots: Array<{ shotId: string }> }>(
+      "stages/preproduction/attempt-1.prompts.json",
+    );
+    expect(saved?.shotCount).toBe(2);
+    expect(saved?.shots.map((s) => s.shotId)).toEqual(["SC-1", "SC-2"]);
+  });
+
+  it("ctx.writeArtifact：超预算时按 shrink 裁剪并标记 truncated，不丢整包", async () => {
+    const ledger = new FakeLedger();
+    const runner = new StageRunner(store, ledger, "RUN-7");
+    // fields 明细是体积主因（真实提示词包里 fields 远大于 prompt 之外的结构体）
+    const big = { shots: [{ shotId: "SC-1", prompt: "x".repeat(100), fields: { blob: "y".repeat(2_000) } }] };
+
+    await runner.run("preproduction", { intent: "x" }, async (ctx) => {
+      const written = await ctx.writeArtifact("stages/preproduction/attempt-1.prompts.json", big, {
+        maxBytes: 800,
+        shrink: (data) => ({
+          ...(data as Record<string, unknown>),
+          fieldsTrimmed: true,
+          shots: (data as { shots: Array<Record<string, unknown>> }).shots.map((s) => ({ ...s, fields: null })),
+        }),
+      });
+      expect(written?.truncated).toBe(true);
+      return { output: { ok: true } };
+    });
+
+    const saved = await store.readJson<{ fieldsTrimmed?: boolean; shots: Array<{ fields: unknown; prompt: string }> }>(
+      "stages/preproduction/attempt-1.prompts.json",
+    );
+    expect(saved?.fieldsTrimmed).toBe(true);
+    expect(saved?.shots[0]?.fields).toBeNull();
+    expect(saved?.shots[0]?.prompt).toHaveLength(100); // 提示词全文保留，只裁明细
+  });
+
+  it("ctx.writeArtifact：shrink 后仍超预算 → 只留摘要（truncated 标记明确）", async () => {
+    const ledger = new FakeLedger();
+    const runner = new StageRunner(store, ledger, "RUN-8");
+    await runner.run("preproduction", { intent: "x" }, async (ctx) => {
+      const written = await ctx.writeArtifact("stages/preproduction/attempt-1.prompts.json", { shots: [{ prompt: "z".repeat(2_000) }] }, {
+        maxBytes: 300,
+        shrink: (data) => data, // 没有可用裁剪手段
+      });
+      expect(written?.truncated).toBe(true);
+      return { output: { ok: true } };
+    });
+    const saved = await store.readJson<{ truncated?: boolean; note?: string }>(
+      "stages/preproduction/attempt-1.prompts.json",
+    );
+    expect(saved?.truncated).toBe(true);
+    expect(saved?.note ?? "").toContain("预算");
+  });
 });
 
 describe("错误分类（监控聚类与 findings 归因共用口径）", () => {
