@@ -128,6 +128,17 @@ export function validateAnnotation(ann: unknown, imageSize: { width: number; hei
       }
     }
   }
+  /**
+   * 每个元素的**可见面积**必须为正：上游渲染器的允许掩码为空时画不出任何线
+   * （打补丁前还会整幕崩，见 vendor PINNED.md 补丁④）。这里把它变成一条可机检的契约。
+   */
+  for (let i = 0; i < value.elements.length; i += 1) {
+    const el = value.elements[i]!;
+    const later = value.elements.slice(i + 1).map((e) => e.region);
+    if (visibleArea(el.region, later) <= 0) {
+      problems.push(`元素 ${el.id} 被后续区域完全覆盖（允许掩码为空，画不出任何内容）`);
+    }
+  }
   return problems;
 }
 
@@ -135,6 +146,43 @@ function overlapArea(a: AnnotationRegion, b: AnnotationRegion): number {
   const x = Math.max(0, Math.min(a.x + a.width, b.x + b.width) - Math.max(a.x, b.x));
   const y = Math.max(0, Math.min(a.y + a.height, b.y + b.height) - Math.max(a.y, b.y));
   return x * y;
+}
+
+/**
+ * 区域的"可见面积"：region 扣掉全部后续 region 之后还剩多少面积。
+ *
+ * 为什么需要：上游渲染器给每个元素算的允许掩码就是 `region − 后续区域 − protectedRegions`，
+ * 掩码为空时既画不出东西、又（在打补丁前）会直接崩。这里用容斥原理精确算剩余面积
+ * （后续区域最多 8 个 → 2^8 = 256 个子集，代价可忽略），把"空掩码"从源头拦掉。
+ */
+export function visibleArea(region: AnnotationRegion, laterRegions: AnnotationRegion[]): number {
+  const rects = laterRegions.filter((r) => overlapArea(region, r) > 0);
+  if (rects.length === 0) return region.width * region.height;
+  let area = region.width * region.height;
+  const n = rects.length;
+  for (let mask = 1; mask < (1 << n); mask += 1) {
+    let inter: AnnotationRegion | null = null;
+    let bits = 0;
+    for (let i = 0; i < n; i += 1) {
+      if ((mask & (1 << i)) === 0) continue;
+      bits += 1;
+      inter = inter ? intersectRect(inter, rects[i]!) : rects[i]!;
+      if (!inter) break;
+    }
+    if (!inter) continue;
+    const sub = inter.width * inter.height;
+    area += (bits % 2 === 1 ? -sub : sub);
+  }
+  return Math.max(0, area);
+}
+
+function intersectRect(a: AnnotationRegion, b: AnnotationRegion): AnnotationRegion | null {
+  const x0 = Math.max(a.x, b.x);
+  const y0 = Math.max(a.y, b.y);
+  const x1 = Math.min(a.x + a.width, b.x + b.width);
+  const y1 = Math.min(a.y + a.height, b.y + b.height);
+  if (x1 <= x0 || y1 <= y0) return null;
+  return { x: x0, y: y0, width: x1 - x0, height: y1 - y0 };
 }
 
 /* ================= 区域 ground truth ================= */
@@ -296,7 +344,20 @@ function composeAnnotation(args: {
   canvas: { width: number; height: number };
   sceneDurationMs: number;
 }): WhiteboardAnnotation {
-  const { cues, plan, regions, canvas, sceneDurationMs } = args;
+  const { cues, plan, canvas, sceneDurationMs } = args;
+  /**
+   * 去重叠预处理：丢掉"被后续区域完全盖住"的区域。
+   *
+   * 这类区域在上游渲染器里的允许掩码为空——画不出任何线，且（打补丁前）会让整幕崩。
+   * 直接丢弃是**诚实**的处理：那一句口播仍然会播（字幕与配音都在），
+   * 只是不给它单独起一笔，而不是硬塞一个永远画不出东西的区域。
+   */
+  const keptRegions: AnnotationRegion[] = [];
+  args.regions.forEach((region, i) => {
+    const later = args.regions.slice(i + 1);
+    if (visibleArea(region, later) >= 16) keptRegions.push(region);
+  });
+  const regions = keptRegions.length > 0 ? keptRegions : [args.regions[0]!];
   const n = Math.min(plan.length, regions.length);
   const budgetMs = Math.max(1000, sceneDurationMs - 500);           // 结尾至少 0.5s 完整画面
   const breathMs = 120;                                              // 元素之间的"换笔呼吸"

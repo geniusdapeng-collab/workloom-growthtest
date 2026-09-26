@@ -197,23 +197,46 @@ async function main(): Promise<void> {
   }
 
   if (wants("lineart")) {
+    /**
+     * **逐幕调用**，不是一次 onSubmit 全部。
+     *
+     * 为什么：方舟出图每张几十秒，11 幕串在一次请求里必然超过 HTTP 的头超时（真机实测 300s 上限，
+     * 客户端拿到 `fetch failed`，而服务端其实还在出图）。逐幕调用把每次请求压到几十秒内，
+     * 且天然可续跑（已出好的幕会被服务端跳过，不重烧出图费用）。
+     */
     const sceneNo = arg("--scene");
-    const lineart = await step("lineart", () => call<Record<string, unknown>>("video.whiteboard.lineart", {
-      filmId,
-      ...(sceneNo ? { sceneNo: Number(sceneNo) } : {}),
-      ...(arg("--source") ? { sourcePath: arg("--source") } : {}),
-    }));
-    evidence.artifacts = { ...(evidence.artifacts ?? {}), lineart };
+    const targets = sceneNo
+      ? [{ scene_no: Number(sceneNo) }]
+      : (await call<{ scenes: Array<{ scene_no: number; lineart_path: string | null }> }>(
+        "video.whiteboard.status", { filmId }, "GET",
+      )).scenes;
+    const linearts: unknown[] = [];
+    for (const scene of targets) {
+      linearts.push(await step(`lineart:${scene.scene_no}`, () => call<Record<string, unknown>>(
+        "video.whiteboard.lineart",
+        {
+          filmId,
+          sceneNo: scene.scene_no,
+          ...(arg("--source") ? { sourcePath: arg("--source") } : {}),
+          ...(flag("--force-lineart") ? { force: true } : {}),
+        },
+      )));
+    }
+    evidence.artifacts = { ...(evidence.artifacts ?? {}), lineart: linearts };
   }
 
   if (wants("annotate")) {
     const sceneNo = arg("--scene");
-    const annotate = await step("annotate", () => call<Record<string, unknown>>("video.whiteboard.annotate", {
-      filmId,
-      ...(sceneNo ? { sceneNo: Number(sceneNo) } : {}),
-      strict: flag("--strict"),
-    }));
-    evidence.artifacts = { ...(evidence.artifacts ?? {}), annotate };
+    const targets = sceneNo
+      ? [{ scene_no: Number(sceneNo) }]
+      : (await call<{ scenes: Array<{ scene_no: number }> }>("video.whiteboard.status", { filmId }, "GET")).scenes;
+    const annotations: unknown[] = [];
+    for (const scene of targets) {
+      annotations.push(await step(`annotate:${scene.scene_no}`, () => call<Record<string, unknown>>(
+        "video.whiteboard.annotate", { filmId, sceneNo: scene.scene_no, strict: flag("--strict") },
+      )));
+    }
+    evidence.artifacts = { ...(evidence.artifacts ?? {}), annotate: annotations };
   }
 
   if (wants("preview")) {
@@ -238,6 +261,7 @@ async function main(): Promise<void> {
   if (wants("poll")) {
     const deadline = Date.now() + num("--poll-timeout-ms", 60 * 60_000);
     let done = false;
+    let idleRounds = 0;
     while (Date.now() < deadline) {
       const report = await call<{ checked: number; done: number; failed: number; running: number }>(
         "video.whiteboard.poll", { filmId, limit: 5 },
@@ -248,6 +272,26 @@ async function main(): Promise<void> {
         done = true;
         if (report.failed > 0) throw new Error(`渲染失败（failed=${report.failed}）—— 看 video.whiteboard.status 的 error 字段`);
         break;
+      }
+      /**
+       * 没有开放任务时不要空转：`checked=0` 连续两轮说明这一轮**根本没有在跑的任务**
+       * （最常见的原因是幂等键命中了上一次失败的任务）。真机踩到：这里会静默轮询一小时。
+       */
+      if (report.checked === 0) {
+        idleRounds += 1;
+        if (idleRounds >= 2) {
+          const st = await call<{ jobs: Array<{ id: string; status: string; task_id: string | null }> }>(
+            "video.whiteboard.status", { filmId }, "GET",
+          );
+          const last = st.jobs[0];
+          throw new Error(
+            `没有在跑的渲染任务（poll 连续 2 轮 checked=0）。最近一条任务：`
+            + `job=${last?.id ?? "无"} status=${last?.status ?? "无"} task=${last?.task_id ?? "无"}`
+            + "——若状态是 failed，说明提交被幂等命中或渲染失败；改过标注后重跑会生成新的内容指纹",
+          );
+        }
+      } else {
+        idleRounds = 0;
       }
       await new Promise((r) => setTimeout(r, num("--poll-interval-ms", 5000)));
     }

@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { buildSrt, groupScenes, parseSrt, srtTime, tileScenes } from "./srt.js";
-import { validateAnnotation } from "./annotate.js";
+import { validateAnnotation, visibleArea } from "./annotate.js";
 import { pipelineKindOf } from "../render-poller.js";
 import { reusableSegment, splitSentences, type SegmentManifest } from "./narration.js";
 import { resumableScene } from "./store.js";
@@ -177,6 +177,48 @@ describe("annotation 契约校验（上游遮罩不变量）", () => {
     const ann = base();
     ann.sceneDurationMs = 5000; // 元素画完于 4920ms
     expect(validateAnnotation(ann, size).join("；")).toContain("0.5s");
+  });
+
+  it("区域被后续区域完全覆盖 → 拦下（空掩码：上游渲染器画不出线，打补丁前还会整幕崩）", () => {
+    const ann = base();
+    // e2 的区域把 e1 完全盖住 → e1 的允许掩码为空
+    ann.elements[1]!.region = { x: 0, y: 0, width: 1672, height: 941 };
+    expect(validateAnnotation(ann, size).join("；")).toContain("完全覆盖");
+  });
+});
+
+describe("可见面积（容斥）——空掩码的机检依据", () => {
+  it("无重叠 → 等于自身面积", () => {
+    const r = { x: 0, y: 0, width: 100, height: 50 };
+    expect(visibleArea(r, [{ x: 200, y: 200, width: 10, height: 10 }])).toBe(5000);
+  });
+
+  it("被完全覆盖 → 0", () => {
+    const r = { x: 10, y: 10, width: 50, height: 50 };
+    expect(visibleArea(r, [{ x: 0, y: 0, width: 100, height: 100 }])).toBe(0);
+  });
+
+  it("两个后续区域分别盖住一半 → 剩余 0（并且不会因重复扣减变成负数）", () => {
+    const r = { x: 0, y: 0, width: 100, height: 100 };
+    expect(visibleArea(r, [
+      { x: 0, y: 0, width: 100, height: 50 },
+      { x: 0, y: 50, width: 100, height: 50 },
+    ])).toBe(0);
+  });
+
+  it("部分重叠 → 精确扣减（含交集加回）", () => {
+    const r = { x: 0, y: 0, width: 100, height: 100 };
+    // 两块各盖 30×100，彼此不重叠 → 剩 40×100
+    expect(visibleArea(r, [
+      { x: 0, y: 0, width: 30, height: 100 },
+      { x: 70, y: 0, width: 30, height: 100 },
+    ])).toBe(4000);
+    // 第二块完全落在第一块内（各 30×100 与 30×50，并集仍是 30×100）
+    // → 容斥必须把重复扣减加回来：10000 − 3000 − 1500 + 1500 = 7000
+    expect(visibleArea(r, [
+      { x: 0, y: 0, width: 30, height: 100 },
+      { x: 0, y: 50, width: 30, height: 50 },
+    ])).toBe(7000);
   });
 });
 

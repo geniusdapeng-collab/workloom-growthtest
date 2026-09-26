@@ -21,6 +21,7 @@
  * （`render_auto` 默认放行；判定为 review 且脚本未 approved 时拒绝）。
  */
 import { z } from "zod";
+import { createHash } from "node:crypto";
 import { TRPCError } from "@trpc/server";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { gatewayAppendOnClient } from "@workloom/base/workdata";
@@ -322,6 +323,13 @@ export const whiteboardRouter = router({
       sceneNo: z.number().int().min(1).optional(),
       /** sketch / upload 路径的输入图（媒体仓相对路径，或仓库内绝对路径） */
       sourcePath: z.string().min(1).optional(),
+      /**
+       * 重出已有线稿。
+       *
+       * 默认 false = **跳过已经有线稿的幕**：线稿走方舟出图，是要花钱的；
+       * 一轮里有一幕失败、重跑时不该把前面已出好的幕再出一次（真机踩到过 Seedream 白烧）。
+       */
+      force: z.boolean().default(false),
     }))
     .mutation(async ({ ctx, input }) => {
       const scope = scopeOf(ctx.identity);
@@ -337,6 +345,10 @@ export const whiteboardRouter = router({
         : undefined;
       const results: Array<Record<string, unknown>> = [];
       for (const scene of targets) {
+        if (scene.lineart_path && !input.force) {
+          results.push({ sceneNo: scene.scene_no, ok: true, skipped: true, path: scene.lineart_path });
+          continue;
+        }
         try {
           const lineart = await buildSceneLineart({
             mode: film.lineart_mode,
@@ -648,6 +660,20 @@ export const whiteboardRouter = router({
       }
 
       const totalDurationMs = scenes.reduce((sum, s) => sum + (s.duration_ms ?? 0), 0);
+      /**
+       * 幂等键必须**含渲染输入的内容指纹**，不能只用"幕数 + 总时长"。
+       *
+       * 真机踩到：改完标注重渲时，幕数与总时长都没变 → 幂等键命中上一次那条
+       * **失败**的任务，`submitGenJob` 直接把旧 taskId 返回来，新标注根本没渲。
+       * 这里把"每幕线稿路径 + 标注全文 + 时长"一起哈希，内容一变就是新任务；
+       * 内容没变时才是真正的重复提交（幂等保护仍然有效）。
+       */
+      const fingerprint = createHash("sha256")
+        .update(scenes.map((s) => JSON.stringify({
+          no: s.scene_no, lineart: s.lineart_path, ms: s.duration_ms, annotation: s.annotation,
+        })).join("\n"))
+        .digest("hex")
+        .slice(0, 16);
       const submit = await submitGenJob({
         app, gateway, scope, actor,
         script: {
@@ -679,7 +705,7 @@ export const whiteboardRouter = router({
           },
         },
         mode: "manual",
-        idempotencyKey: input.idempotencyKey ?? `whiteboard:${film.id}:${scenes.length}:${totalDurationMs}`,
+        idempotencyKey: input.idempotencyKey ?? `whiteboard:${film.id}:${fingerprint}`,
         fenceLevel: verdict.level,
         fenceImpacts: verdict.impacts as never,
         budgetOverageSeconds: input.allowOverage ? Math.max(0, Math.round(totalDurationMs / 1000)) : 0,

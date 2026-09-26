@@ -191,9 +191,14 @@ export class WhiteboardProvider implements GenProvider {
         durationMs,
       }, this.env);
     } catch (err) {
-      const message = err instanceof WhiteboardEngineError || err instanceof Error
-        ? err.message.slice(0, 500)
-        : String(err);
+      /**
+       * 错误必须**带细节**：白板渲染的失败原因全在子进程 stdout/stderr 尾部
+       * （真机踩到：状态文件只留一句"白板脚本执行失败"，实际是上游 `_lay_ink` 参数不匹配的
+       * TypeError，只能靠手工复现才能定位）。这里把 detail 一并落进任务目录。
+       */
+      const message = err instanceof WhiteboardEngineError
+        ? `${err.message}${err.detail ? `｜${err.detail}` : ""}`.slice(0, 1500)
+        : err instanceof Error ? err.message.slice(0, 500) : String(err);
       const failed = scenes.find((s) => s.status === "rendering");
       if (failed) { failed.status = "failed"; failed.error = message; }
       writeJobState({ ...state(), status: "failed", error: message }, this.env);

@@ -424,7 +424,16 @@ class RegionStreamRenderer:
                         self._lay_ink_grid(writer, ink_frames, samples, pen_lifts, sample_cell, path, allowed)
                         centers = [self._cell_center(c) for c in path]
                     else:
-                        self._lay_ink(writer, ink_frames, [], set(), None, allowed)
+                        """
+                        本地补丁（2026-09-27，T-2026-0926-0020，见 vendor/srt-whiteboard/PINNED.md 补丁④）：
+                        区域被后续区域**完全盖住**时（allowed 掩码为空 → 网格路径为空），
+                        上游这里多传了一个 `None`（旧签名 `_lay_ink(..., sample_cell, allowed)` 的残留），
+                        直接 TypeError 崩掉整幕渲染。真机表现：前 7 幕正常、第 8 幕突然
+                        `_lay_ink() takes 6 positional arguments but 7 were given`。
+                        这里按当前签名（writer, frames, samples, pen_lifts, allowed）调用；
+                        语义与"区域无墨"一致：该段只推进笔尖、不落墨。
+                        """
+                        self._lay_ink(writer, ink_frames, [], set(), allowed)
                         centers = []
 
                 cur_ms += ink_frames * ms_per_frame
