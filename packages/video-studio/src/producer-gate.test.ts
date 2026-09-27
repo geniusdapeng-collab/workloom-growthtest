@@ -96,7 +96,29 @@ describe("AI producer evidence gate", () => {
   it.each([{ ...good, score: 1 }, { ...good, approved: false }])("low score or reject cannot pass %j", async (answer) => {
     const v = await reviewStage(textOptions({ fetchImpl: judge(answer) })); expect(v.status).toBe("failed"); expect(v.approved).toBe(false);
   });
-  it.each([{ ...good, approved: "true" }, { ...good, score: 101 }, { ...good, score: null }, { ...good, issues: "bad" }, { ...good, suggestions: [false] }, [], null])("invalid response is unverified %j", async (answer) => {
+  /**
+   * 2026-09-28 T1 真机：模型返回合法 JSON 但形状有偏差（score 字符串、issues 单条字符串、
+   * 用 summary 代 reason、approved 写成 "true"）时，旧实现直接判"结构非法"要求整环节重跑——
+   * 10 镜里 2 镜因此失败。无歧义偏差按语义归一，不改事实。
+   */
+  it.each([{ ...good, approved: "true" }, { ...good, issues: "bad" }, { ...good, score: "88" }, { approved: true, score: 85, summary: "ok" }])(
+    "unambiguous shape deviations are normalized %j", async (answer) => {
+      const v = await reviewStage(textOptions({ fetchImpl: judge(answer) }));
+      expect(v.approved).toBe(true); expect(v.status).toBe("passed");
+    }
+  );
+  it("wrong-shaped review is repaired into the schema instead of failing the stage", async () => {
+    let calls = 0;
+    const fetchImpl = (async () => {
+      calls += 1;
+      const content = calls === 1 ? JSON.stringify({ ...good, suggestions: [false] }) : JSON.stringify(good);
+      return new Response(JSON.stringify({ choices: [{ message: { content } }] }));
+    }) as typeof fetch;
+    const v = await reviewStage(textOptions({ fetchImpl }));
+    expect(calls).toBe(2);
+    expect(v.approved).toBe(true);
+  });
+  it.each([{ ...good, score: 101 }, { ...good, score: null }, { ...good, suggestions: [false] }, [], null])("invalid response is unverified %j", async (answer) => {
     const v = await reviewStage(textOptions({ fetchImpl: judge(answer) })); expect(v.status).toBe("unverified"); expect(v.approved).toBe(false);
   });
   it("unsupported audio and missing acoustic review cannot be called passed", async () => {

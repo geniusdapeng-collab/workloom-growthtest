@@ -304,6 +304,79 @@ async function parseJudgeJson(
   return fixed;
 }
 
+type JudgeResult = { approved: boolean; score: number; issues: string[]; suggestions: string[]; reason: string };
+
+/**
+ * 评审结果结构归一（2026-09-28 T1 真机：10 镜逐镜监制有 2 镜返回"结构非法"）。
+ *
+ * 真机现象：模型返回的是**合法 JSON**，只是形状有偏差（score 写成字符串、issues 写成一条字符串、
+ * 用 summary/conclusion 代替 reason、approved 写成 "true"）——旧实现直接判"结构非法"并要求重跑，
+ * 一镜重跑 12–24 秒且随时可能再次失败。这里只做**无歧义**的归一（不新增事实、不改语义），
+ * 归一不了的仍然走 schema 自修复、再不行 fail-closed 判 unverified。
+ */
+export function coerceJudgeResult(json: unknown): JudgeResult | null {
+  if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+  const record = json as Record<string, unknown>;
+  const list = (value: unknown): string[] | null => {
+    if (value === undefined || value === null) return [];
+    if (typeof value === "string") return value.trim() ? [value.trim()] : [];
+    if (Array.isArray(value) && value.every((item) => typeof item === "string")) return value as string[];
+    return null;
+  };
+  const approved = typeof record.approved === "boolean"
+    ? record.approved
+    : typeof record.approved === "string" && /^(?:true|false)$/i.test(record.approved.trim())
+      ? record.approved.trim().toLowerCase() === "true"
+      : null;
+  const score = typeof record.score === "number" && Number.isFinite(record.score)
+    ? record.score
+    : typeof record.score === "string" && record.score.trim() !== "" && Number.isFinite(Number(record.score))
+      ? Number(record.score)
+      : null;
+  const issues = list(record.issues);
+  const suggestions = list(record.suggestions);
+  const reasonRaw = record.reason ?? record.summary ?? record.conclusion;
+  const reason = typeof reasonRaw === "string" ? reasonRaw : "";
+  if (approved === null || score === null || score < 0 || score > 100 || !issues || !suggestions) return null;
+  return { approved, score, issues, suggestions, reason };
+}
+
+/** 结构自修复：把形状不对的 JSON 交给模型按 schema 重排（只整理结构，不得新增事实）。 */
+async function repairJudgeShape(
+  parsed: Record<string, unknown>,
+  llm: LlmConfig,
+  fetchImpl: typeof fetch,
+  log: (line: string) => void,
+  stage: ProducerStage
+): Promise<JudgeResult | null> {
+  log(`[producer][${stage}] 评审结果结构不合规，要求模型按 schema 自修复一次`);
+  const res = await fetchImpl(`${llm.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
+    body: JSON.stringify({
+      model: llm.model,
+      messages: [{
+        role: "user",
+        content: "把下面这份评审结论**只整理成结构**，不得新增或改变任何事实、分数与结论：\n"
+          + '只输出 JSON：{"approved":true|false,"score":0-100,"issues":["..."],"suggestions":["..."],"reason":"结论"}\n\n'
+          + JSON.stringify(parsed)
+      }],
+      temperature: 0,
+      response_format: { type: "json_object" }
+    }),
+    signal: AbortSignal.timeout(120_000)
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`评审结构修复失败：HTTP ${res.status} ${text.slice(0, 160)}`);
+  const content = (JSON.parse(text) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
+  const stripped = content.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim();
+  try {
+    return coerceJudgeResult(JSON.parse(stripped));
+  } catch {
+    return null;
+  }
+}
+
 /**
  * 评审一个环节。返回裁决；调用方按 `approved` 决定放行或重跑。
  */
@@ -450,10 +523,14 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       const raw = JSON.parse(rawBody).choices?.[0]?.message?.content;
       if (typeof raw !== "string") throw new Error("评审模型缺少文本结果");
       const json = await parseJudgeJson(raw, llm, options.fetchImpl ?? fetch, log, stage);
-      if (typeof json.approved !== "boolean" || typeof json.score !== "number" || !Number.isFinite(json.score) || json.score < 0 || json.score > 100
-        || !Array.isArray(json.issues) || !json.issues.every((x) => typeof x === "string")
-        || !Array.isArray(json.suggestions) || !json.suggestions.every((x) => typeof x === "string") || typeof json.reason !== "string") throw new Error("评审结果结构非法");
-      answers.push(json as typeof answers[number]);
+      /**
+       * 结构归一 → 仍不合规则按 schema 自修复一次 → 还不行才判"结构非法"。
+       * 2026-09-28 T1 真机：旧实现在这一步直接判死，10 镜里有 2 镜因形状偏差被要求整环节重跑。
+       */
+      const normalizedResult = coerceJudgeResult(json)
+        ?? await repairJudgeShape(json, llm, options.fetchImpl ?? fetch, log, stage);
+      if (!normalizedResult) throw new Error("评审结果结构非法");
+      answers.push(normalizedResult);
     }
     for (const item of evidence) {
       const currentHash = createHash("sha256").update(readFileSync(item.path)).digest("hex");

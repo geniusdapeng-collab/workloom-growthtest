@@ -19,6 +19,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeNegativeConstraintItems } from "./prompt-language.js";
 
 export interface FieldSpec {
   p0: string[];
@@ -148,6 +149,8 @@ export interface PrepareOptions {
   ratio?: string;
   /** 分辨率（写入【约束】段），默认 1080x1920（竖版） */
   resolution?: string;
+  /** 实际提交帧率；不指定时保留历史 24fps 口径。 */
+  fps?: number;
   /**
    * 内容红线词表（默认取自 vendor `field-standardizer` 的 scene 禁词 + 本车道补充观察到的漂移词）。
    * 命中即判不合格，除非在 `allowRedlines` 中显式放行。
@@ -158,7 +161,7 @@ export interface PrepareOptions {
 }
 
 /**
- * 【约束】段画幅归一。
+ * 【约束】段画幅、像素与帧率归一。
  *
  * 真机发现（2026-09-22）：`PromptFusionAgent` 构造 `FieldContentRefiner` 时**硬编码**
  * `constraintTemplate: '16:9画幅，8K分辨率，24fps，MP4格式'`；只有当平台蓝图被判为
@@ -169,15 +172,20 @@ export interface PrepareOptions {
 export function normalizeConstraintSegment(
   prompt: string,
   ratio: string,
-  resolution: string
+  resolution: string,
+  fps = 24
 ): { prompt: string; changed: boolean; from: string | null } {
+  if (!Number.isInteger(fps) || fps < 1 || fps > 120) throw new Error("镜头约束帧率必须是 1–120 的整数");
   const match = prompt.match(/【约束】([^\n|]*)/);
   if (!match) return { prompt, changed: false, from: null };
   const current = match[1]?.trim() ?? "";
-  const target = `${ratio}画幅，${resolution}，24fps，MP4格式`;
-  if (current.includes(`${ratio}画幅`)) return { prompt, changed: false, from: current };
+  const target = `${ratio}画幅，${resolution}，${fps}fps，MP4格式`;
+  if (current.includes(`${ratio}画幅`) && current.includes(resolution)
+    && current.includes(`${fps}fps`) && /MP4/i.test(current)) return { prompt, changed: false, from: current };
+  const format = /MP4(?:格式)?/i.exec(current);
+  const suffix = format ? current.slice(format.index + format[0].length) : "";
   return {
-    prompt: prompt.replace(match[0], `【约束】${target}`),
+    prompt: prompt.replace(match[0], `【约束】${target}${suffix}`),
     changed: true,
     from: current
   };
@@ -384,10 +392,15 @@ export const SCENE_DECOUPLE_CLAUSE =
   + "本镜头的场景、光源、色调与构图仅按本镜头描述生成，不得照搬定妆照/参考图的背景、布光与色调，"
   + "也不得用参考图的场景特征替换本镜头场景。";
 
-/** 路人/群演写实：背景人物同样按真人质感描述，避免"塑料路人"。 */
+/**
+ * 路人/群演写实：背景人物同样按真人质感描述，避免"塑料路人"。
+ * 2026-09-28 T1 真机监制打回：原措辞在**单人镜**里被读成"要求出现群演/可能引入额外出镜主体"，
+ * 因此改为条件句——只在画面出现群演时生效，并显式禁止无描述时添加人物。
+ */
 export const EXTRAS_REALISM_CLAUSE =
-  "【路人写实】画面中的路人、群演与背景人物同样按写实真人质感呈现："
-  + "有可辨识的年龄、衣着与自然动作，个体面貌有差异，不出现塑料人偶、重复脸或无面孔人影。";
+  "【路人写实】若本镜画面出现路人、群演或背景人物，同样按写实真人质感呈现："
+  + "有可辨识的年龄、衣着与自然动作，个体面貌有差异，不出现塑料人偶、重复脸或无面孔人影；"
+  + "本镜描述中未出现的群演不得额外添加。";
 
 /** 写实模式下并入负面约束（与 vendor negative 同语言） */
 export const REALISM_NEGATIVE_TERMS =
@@ -699,11 +712,11 @@ export function prepareShotPrompt(
   } else {
     log(`[shot-spec] ${shotId} 写实约束豁免：${realismPolicy.reason}（如属误判请在卡片显式声明 style/subjectType）`);
   }
-  const constraint = normalizeConstraintSegment(prompt, ratio, resolution);
+  const constraint = normalizeConstraintSegment(prompt, ratio, resolution, options.fps ?? 24);
   if (constraint.changed) {
     log(
-      `[shot-spec] ${shotId} 【约束】画幅归一：${constraint.from || "（空）"} → ${ratio}画幅，${resolution}`
-      + "（vendor 在电影叙事画像下硬编码 16:9，按实际提交参数纠正）"
+      `[shot-spec] ${shotId} 【约束】画幅/分辨率/帧率归一：${constraint.from || "（空）"} → ${ratio}画幅，${resolution}，${options.fps ?? 24}fps`
+      + "（按实际提交参数纠正 vendor 的固定模板）"
     );
     prompt = constraint.prompt;
   }
@@ -770,15 +783,11 @@ export function prepareShotPrompt(
     let fixedBody = body;
     for (const [pattern, replacement] of negativeFixes) fixedBody = fixedBody.replace(pattern, replacement);
     fixedBody = fixedBody.replace(/,\s*,+/g, ", ").replace(/\s{2,}/g, " ");
-    /** 去重：组装会把"无文字/无水印/无标牌"这类条目重复拼接（真机监制：负面约束重复即不合格） */
-    const items = fixedBody.split(/[,，、；;]/).map((item) => item.trim()).filter(Boolean);
-    const seen = new Set<string>();
-    const unique = items.filter((item) => {
-      if (seen.has(item)) return false;
-      seen.add(item);
-      return true;
-    });
-    return `${head}${unique.join("、")}`;
+    /**
+     * 去重 + 补否定前缀：组装会把"无文字/无水印/无标牌"这类条目重复拼接，卡片里也可能把禁用项
+     * 写成裸词（`水印`、`脸漂`）——两条都属于真机监制打回项，见 normalizeNegativeConstraintItems。
+     */
+    return `${head}${normalizeNegativeConstraintItems(fixedBody).body}`;
   });
 
   const delivery = guard.verify(prompt, assemblyShot);

@@ -439,6 +439,9 @@
         "library/luts/sgamut3cine-to-rec709.cube",
         "library/luts/slog3-to-rec709.cube",
         "library/README.md",
+        "library/scene-policies/README.md",
+        "library/scene-policies/commercial-person.json",
+        "library/scene-policies/commercial-person.source.md",
         "library/seedance-references/audio-tags.md",
         "library/seedance-references/cinematography.md",
         "library/seedance-references/director-styles.md",
@@ -731,7 +734,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "8d8b371d88b006ea616e5e8455d0c05e84507621f8a5c2808cb42160b28b67cf",
+    "digest": "f33fd44b1b716c87e575d4b2ba5d6eb9b9b96d106045ee566c470e4bde607ea8",
     "assets": {
       "connectors/bgm-bridge/brief.mjs": "bb858adae23728deffa1668d9f9db15085f9c94ed73d2c01b5505d82e78e2407",
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
@@ -1125,6 +1128,9 @@
       "library/luts/slog3-to-rec709.cube": "63ff904e3535404f23f6f23048233726b5c09839a87c0f436724ccba0e43d01e",
       "library/media-catalog/media-catalog.json": "569f9a0f05a8bb66eb48d67b742bd53a3bd64ea213a79cb0f4925c7ecf627d27",
       "library/README.md": "791f05f2cd3f60d1ac343ce09c5bab841cb7157847f87bc0bc9eaa735f6b7730",
+      "library/scene-policies/commercial-person.json": "92e5d5ac79eac0b64e75cc3cb740fe65319d493689eead54833ea4f611de73d1",
+      "library/scene-policies/commercial-person.source.md": "445541407ea1e568301214e2dfdc6b07cfe9ad6b0e05355ec5e5ad3052fa96c6",
+      "library/scene-policies/README.md": "154957d73032ea3d86e69bd73d68850d98698524cbe047c3d8f7a298a249b660",
       "library/seedance-references/audio-tags.md": "d1b4d9ba2c19b697f6671d6b1c2fa1d38ba1b00d64f3a9ecfaeea906aed63c88",
       "library/seedance-references/cinematography.md": "fbbf2f0f097680cc7101357396e0a926203fb8159fd18af627508f82da6b2991",
       "library/seedance-references/director-styles.md": "7b93e8ce74943f3b7db7b6b1d4149cf6d68477be739f31eb90c28cdef8eb6947",

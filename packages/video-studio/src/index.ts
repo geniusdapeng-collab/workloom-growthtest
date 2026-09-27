@@ -38,6 +38,7 @@ export * from "./revise.js";
 export * from "./pipeline-router.js";
 export * from "./archive/index.js";
 export * from "./scene-bible.js";
+export * from "./scene-policy.js";
 export * from "./opening-hook.js";
 export * from "./device-policy.js";
 export * from "./quality-evidence.js";
