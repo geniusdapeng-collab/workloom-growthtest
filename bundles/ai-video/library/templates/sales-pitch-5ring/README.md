@@ -51,6 +51,31 @@ node_modules/.bin/tsx scripts/tools/full-chain-film.mts \
 | 字幕 | 母版不烧字；旁挂 srt/ass/vtt + 软字幕轨副本 | `docs/video-delivery-and-revision.md` |
 | 变体差异 | 3 个变体必须实测可辨（画面平均像素差 / 音轨差异），雷同一票否决 | G-DLV1 |
 
+## 场景圣经与开场钩子（2026-09-27 新增，示例已按新口径升级）
+
+示例镜头卡里现在带三样新东西，直接复跑就会被用到：
+
+| 字段 | 在哪 | 作用 |
+|---|---|---|
+| `sceneBible` | shotlist 顶层 | 片级真实空间事实源（上海静安 1936 年纺织厂改建办公楼 + 1.2 公里外门店）：空间实指 / 材质带工艺与使用痕迹 / 场景内实用光源 / 色彩纪律。管线在装载期把它**展开进每镜的既有字段** |
+| `hook` | shotlist 顶层 | 开场钩子卡（`question` 型，承诺「还在给平台打工吗」由 GR-06 用台词回应）；钩子音 `impact@0.08s` 落在 0–0.6s 窗口 |
+| `propInteraction` | 7 个含可交互道具的镜头 | 道具-人体物理关系（朝向/操作者/承重/遮挡）：手机与平板**屏幕朝向使用者本人**，观众只见机身背面或侧缘 |
+
+渲染前自检（零 token，硬缺陷会阻断渲染）：
+
+```bash
+# 改造前口径（看镜头卡原文；本模板改造前的实测：硬缺陷 12 · 软提示 18）
+node_modules/.bin/tsx scripts/tools/environment-realism-audit.mts \
+  --shots bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growth/shotlist.json
+
+# 管线真实口径（先把圣经展开进每镜；本模板现在应为 0 硬缺陷 / 0 软提示）
+node_modules/.bin/tsx scripts/tools/environment-realism-audit.mts \
+  --shots bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growth/shotlist.json --expand
+```
+
+口径细节见 `docs/environment-realism.md` 与 `docs/opening-hook.md`；两类真机 badcase 见
+`docs/badcases/BADCASE-2026-0927-env-average-room.md`、`docs/badcases/BADCASE-2026-0927-phone-screen-toward-audience.md`。
+
 ## 真机打回清单
 
 见 `template.yml#anti_patterns`（人脸漂移 / 服装冲突 / 手部畸变 / 屏幕文字 / 玻璃镜像第二张脸 /

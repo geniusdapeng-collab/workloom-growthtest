@@ -32,6 +32,21 @@
 - **色温设定**: {color_temperature}
 - **参考场次**: {light_reference}
 
+## 环境真实性（2026-09-27 起为硬口径，渲染前机检）
+
+> 真机事故：8 镜全部通过监制，产品所有者一眼判"空间布景不像实拍"——根因是**场次卡里没有一个字描述真实空间**，
+> 各镜自己写空词（"现代简约商务空间"），模型只能落回平均样板间。本节填完即成为片级 `sceneBible`。
+
+- **空间实指**（城市/建筑/年代/面积/层高/朝向/时段，≥3 项）: {space_specifics}
+- **材质与工艺**（物件 + 材质 + 工艺/表面处理 + 使用状态，≥3 项）: {materials_with_finish}
+- **场景内实用光源**（窗光/筒灯/台灯/屏幕光…带方向与色温，≥1 项）: {practical_lights}
+- **使用痕迹**（指纹/水渍/卷边/划痕/薄灰/杯痕/旧钉眼，≥1 项）: {usage_traces}
+- **第二空间**（门店/客户现场/街景等；须登记进 otherSpaces 并由镜头卡指认）: {other_spaces}
+- **色彩纪律**（低饱和/肤色中性/暗部保留纹理…）: {color_discipline}
+
+机检：`tsx scripts/tools/environment-realism-audit.mts --shots <shotlist> --expand`（硬缺陷即阻断渲染）；
+字段规格与规则表见 `docs/environment-realism.md`。
+
 ## 色彩策略
 
 - **主色调**: {primary_palette}

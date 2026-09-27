@@ -203,6 +203,55 @@ export function planCutSfx(input: CutSfxPlanInput, policy: CutSfxPolicy = CUT_SF
 }
 
 /**
+ * 开场钩子音效（2026-09-27 新增：前 3 秒机制的"声音那一半"）。
+ *
+ * 背景：转场音效只铺在**剪辑点**上——0–0.6s 一直是空白。但短平台的"钉住观众"发生在第 1 秒：
+ * 画面钩子（首镜模板）与**钩子音**必须同帧起，否则钩子只是文案。本函数把这条补上，
+ * 判据与 `opening-hook.ts#HOOK_SFX_WINDOW_SEC` 同源（配音/画面/音效三者的窗口口径一致）。
+ *
+ * 纪律：
+ *   · 只在 0–0.6s 窗口内摆放（越窗即抛错——宁可不出声，也不在 2s 处放一个"开场音"）；
+ *   · 钩子音是**一记**，不是一串：本函数只回一条摆放（由调用方与转场音效一起去冲突）；
+ *   · 增益默认低于 impact（-11dB）：开场音要"抬一下"，不能盖住首句台词。
+ */
+export const HOOK_SFX_POLICY = {
+  /** 允许摆放的窗口（秒）：与 opening-hook.ts#HOOK_SFX_WINDOW_SEC 同源 */
+  windowSec: 0.6,
+  /** 默认起点：略晚于 0（ffmpeg 第 0 帧起音会与波形起点对齐，听感上"抢半拍"） */
+  atSec: 0.08,
+  kind: "impact" as SfxKind,
+  gainDb: -11,
+  /** 钩子音时长（不越过窗口结束太多：0.26s 的冲击落在 0.34s 内收完） */
+  durationSec: 0.26
+};
+
+export interface HookSfxInput {
+  enabled: boolean;
+  /** 覆盖默认起点（秒） */
+  atSec?: number;
+  kind?: SfxKind;
+  gainDb?: number;
+  durationSec?: number;
+}
+
+export function planHookSfx(
+  input: HookSfxInput,
+  policy: typeof HOOK_SFX_POLICY = HOOK_SFX_POLICY
+): SfxPlacement | null {
+  if (!input.enabled) return null;
+  const atSec = Number((input.atSec ?? policy.atSec).toFixed(3));
+  if (!Number.isFinite(atSec) || atSec < 0 || atSec > policy.windowSec) {
+    throw new Error(`钩子音效起点 ${input.atSec}s 不在 0–${policy.windowSec}s 窗口内（开场音必须在开头，不允许"迟到"）`);
+  }
+  return {
+    atSec,
+    kind: input.kind ?? policy.kind,
+    gainDb: input.gainDb ?? policy.gainDb,
+    reason: `开场钩子音：前 ${policy.windowSec}s 窗口内与钩子画面同帧（${input.kind ?? policy.kind}）`
+  };
+}
+
+/**
  * 从镜头时长 + 逐刀转场参数推出剪辑点（与 compose 的 xfade 口径一致）。
  * `transitionAt` 用**入点序号**（1 起，与 CLI `--transition-at` 同义）：第 N 个镜头进场处是否有转场。
  */

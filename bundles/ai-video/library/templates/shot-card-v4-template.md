@@ -41,8 +41,13 @@
 ## 空间环境
 
 - **场景地点**: {location}
+- **场景圣经**: {scene_bible_id}（片级真实空间事实源；门店/客户现场等第二空间写进 shotlist 的 otherSpaces，并在本卡用 scene_id 指认）
 - **空间关系**: {spatial_relation}
 - **环境特征**: {environment_traits}
+- **环境实指**: {environment_specifics}（空间类型/年代/地段/尺度/朝向/时段 ≥3 项；禁止"简约/现代/通透/商务空间"这类空词）
+- **使用痕迹**: {usage_traces}（指纹/水渍/卷边/划痕/薄灰/杯痕/旧钉眼——"无痕"= 假）
+- **可交互道具物理关系**: {prop_interaction}（prop/orientation/operatedBy/contact/occlusion；
+  屏幕类必须写"屏幕朝向使用者本人，观众只见机身背面或侧缘"）
 - **连续性模式**: {continuity_mode} (strict/soft/none)
 - **与前一镜关系**: {prev_shot_relation}
 - **与后一镜关系**: {next_shot_relation}
