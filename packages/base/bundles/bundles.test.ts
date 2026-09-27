@@ -168,26 +168,26 @@ describe.runIf(RUN_DB)("行业装配 PG 集成（F2.10 铁律）", async () => {
       const provision = await provisionComposedWorkforce(app, scope2, "geo-growth", "MEM-FUSION");
       expect(provision.bundleIds).toEqual(["hotel", "ai-video", "geo-growth"]);
       // 本仓组合编制实测 78 岗（与 acquisition-loop 同口径）
-      expect(provision.rosterSize).toBe(79);
+      expect(provision.rosterSize).toBe(80);
       // 每个 preset_key 只由一个包提供（同名按主包裁决）：hotel 16 / ai-video 34 / geo-growth 26
-      expect(provision.perBundle).toEqual({ hotel: 16, "ai-video": 37, "geo-growth": 26 });
+      expect(provision.perBundle).toEqual({ hotel: 16, "ai-video": 38, "geo-growth": 26 });
       expect(provision.shadowed.length).toBe(4);
       expect(provision.fenceRules).toBeGreaterThanOrEqual(68);
 
       const profile = await computeAssembly(app, scope2, "geo-growth");
       expect(profile.checks.map((c) => c.ok)).toEqual([true, true, true, true, true, true]);
       expect(profile.canActivate).toBe(true);
-      expect(profile.agents.length).toBe(79);
+      expect(profile.agents.length).toBe(80);
 
       const activated = await activateBundle(app, gw, scope2, "geo-growth", "MEM-FUSION");
-      expect(activated.composition.rosterSize).toBe(79);
+      expect(activated.composition.rosterSize).toBe(80);
       const ev = await qScope<{ payload: { decision: { after: { composition?: { bundles?: string[]; rosterSize?: number } } } } }>(
         `SELECT payload FROM biz_events WHERE workspace_id=$1 AND payload->'decision'->>'action'='bundle.activate'
           ORDER BY seq DESC LIMIT 1`,
         [wsId],
       );
       expect(ev.rows[0]!.payload.decision.after.composition?.bundles).toEqual(["hotel", "ai-video", "geo-growth"]);
-      expect(ev.rows[0]!.payload.decision.after.composition?.rosterSize).toBe(79);
+      expect(ev.rows[0]!.payload.decision.after.composition?.rosterSize).toBe(80);
     } finally {
       await qScope(`DELETE FROM agents WHERE workspace_id=$1`, [wsId]).catch(() => undefined);
       await qScope(`DELETE FROM fence_rules WHERE workspace_id=$1`, [wsId]).catch(() => undefined);
