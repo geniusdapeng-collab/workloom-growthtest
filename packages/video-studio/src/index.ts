@@ -35,3 +35,5 @@ export * from "./deliver.js";
 export * from "./revise.js";
 export * from "./pipeline-router.js";
 export * from "./archive/index.js";
+export * from "./scene-bible.js";
+export * from "./opening-hook.js";

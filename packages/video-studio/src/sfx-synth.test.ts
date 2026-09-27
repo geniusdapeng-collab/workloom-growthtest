@@ -9,10 +9,12 @@
 import { describe, expect, it } from "vitest";
 import {
   CUT_SFX_POLICY,
+  HOOK_SFX_POLICY,
   buildSfxArgs,
   cutTimesFromShots,
   planCutSfx,
   planCutSfxDetailed,
+  planHookSfx,
   resolveSfxDuration
 } from "./sfx-synth.js";
 
@@ -109,5 +111,39 @@ describe("剪辑点推算（与 compose 逐刀转场一致）", () => {
   it("只在指定入点做转场时，其余刀口按硬切累计", () => {
     const cuts = cutTimesFromShots([5, 5, 5, 5], 0.18, [2]);
     expect(cuts.map((c) => Number(c.toFixed(2)))).toEqual([4.82, 9.82, 14.82]);
+  });
+});
+
+/**
+ * 开场钩子音（2026-09-27 前 3 秒机制）：转场音效只铺剪辑点，0–0.6s 一直是空白，
+ * 而短平台"钉住观众"恰恰发生在第 1 秒。这一组守住窗口边界（越窗必须抛错，不静默摆放）。
+ */
+describe("开场钩子音（0–0.6s 窗口）", () => {
+  it("未启用时返回 null（不凭空造音效）", () => {
+    expect(planHookSfx({ enabled: false })).toBeNull();
+  });
+
+  it("默认落在窗口内，且增益低于段落重音（不盖首句台词）", () => {
+    const placement = planHookSfx({ enabled: true });
+    expect(placement).not.toBeNull();
+    expect(placement!.atSec).toBeCloseTo(HOOK_SFX_POLICY.atSec, 3);
+    expect(placement!.kind).toBe("impact");
+    /** 增益是负 dB：数值更小 = 更轻。钩子音要比段落重音更克制，避免盖住首句台词 */
+    expect(placement!.gainDb).toBeLessThan(CUT_SFX_POLICY.impactGainDb);
+    expect(placement!.atSec).toBeLessThanOrEqual(HOOK_SFX_POLICY.windowSec);
+    expect(placement!.reason).toContain("开场钩子音");
+  });
+
+  it("越过 0–0.6s 窗口直接抛错（宁可不出声，也不在 2s 处放一个「开场音」）", () => {
+    expect(() => planHookSfx({ enabled: true, atSec: 2 })).toThrow(/窗口/);
+    expect(() => planHookSfx({ enabled: true, atSec: -0.1 })).toThrow(/窗口/);
+    expect(planHookSfx({ enabled: true, atSec: HOOK_SFX_POLICY.windowSec })).not.toBeNull();
+  });
+
+  it("音色与增益可覆盖（长视频平台可用 whoosh）", () => {
+    const placement = planHookSfx({ enabled: true, kind: "whoosh", atSec: 0.12, gainDb: -13 });
+    expect(placement!.kind).toBe("whoosh");
+    expect(placement!.atSec).toBeCloseTo(0.12, 3);
+    expect(placement!.gainDb).toBe(-13);
   });
 });

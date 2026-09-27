@@ -14,6 +14,14 @@ description: 预生产内部门（G1–G7）的 AI 监制评审纪律：确定�
    分辨率/时长/音轨不符 —— 命中即打回，不调用模型（省额度、结论可复算）。
 2. **再按环节要点评审**：用 `packages/video-studio/src/producer-gate.ts#PRODUCER_RUBRICS` 的标准；
    图像类评审必须把**待评审产物**与**基准图**一起给模型看（产物优先占配额，基准图最多 2 张）。
+   2026-09-27 起 `keyframe`/`shot`/`master` 三个环节各多两条**必判**类目：
+   - **环境真实性**：空间是可指认的真实场所（不是平均样板间）——材质带工艺与使用状态、灯光含场景内实用光源、
+     画面留有使用痕迹；判红"无痕样板间 / 一眼影棚 / 材质只写一级名词 / 空间空旷到与人物活动不符"（与
+     `scene-bible.ts#environmentDefects` 同源，见 `docs/environment-realism.md`）；
+   - **道具-人体交互逻辑**：被手持/被操作的器物必须有成立的物理关系——**屏幕朝向它的使用者**
+     （观众只见机身背面或侧缘，不出现屏幕内容正对镜头）、有承重接触、手指正常；
+     `shot` 环节额外判"这一关系在整镜时间轴上保持不变"（关键帧对、镜内翻转同样要打回）。
+     出处：真机 badcase「手机屏幕朝观众」（`docs/badcases/BADCASE-2026-0927-phone-screen-toward-audience.md`）。
 3. **裁决三类**：放行（approved）/ 打回重跑（rerun）/ 需介入（模型不可用或超预算）。
 4. **打回必须可执行**：写清"改什么、改成什么、为什么"——例如"用 img2img 挂 4 张授权真人照片重跑，锁面孔"。
 5. **留痕**：每次裁决写 `gate`、`score`、`via`（deterministic/llm/fallback）、`model`、`issues`、`suggestions`，
@@ -39,3 +47,5 @@ description: 预生产内部门（G1–G7）的 AI 监制评审纪律：确定�
 | 打回无定位，创作者反复试错 | 打回可执行性检查 | 退回评审，补齐"改什么 / 改成什么 / 为什么" |
 | 裁决没有落账 | `stages.jsonl` 门事件（gate/score/via/model/issues/suggestions） | 视为未评审：重跑该门并补落账 |
 | 超预算仍在评审 | 预算检查 | 转"需介入"，不烧额度继续评审 |
+| 画面"符合镜头卡"但一眼不像实拍 | `env-realism` 机检（渲染前）+ 环境真实性 rubric | 判**卡片空词**（不是模型问题）：补 `sceneBible` 后重渲，并登记环境 badcase |
+| 屏幕内容正对镜头 / 道具漂浮穿模 | 道具-人体交互 rubric（keyframe/shot） | 打回并要求补 `propInteraction`（朝向/操作者/承重/遮挡） |

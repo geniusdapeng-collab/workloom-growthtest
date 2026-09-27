@@ -105,6 +105,33 @@ describe("封面设计稿", () => {
     expect(plan.background.shotId).toBe("SC-05");
     expect(plan.headline.length).toBeLessThanOrEqual(12);
   });
+
+  /**
+   * 2026-09-27 真机两条：
+   *   · 副标题里的「30 秒首响」是产品指标，不是片长声明——不得被判"时长与成片不符"；
+   *   · 兜底标题来自片名（常带"· 副标题"），硬截 12 字会留尾随「·」，要先取主标题再截。
+   */
+  it("片长口径只认指向片子本身的表述（产品指标里的 30 秒不算片长）", () => {
+    const metricPlan: CoverPlan = {
+      ...validPlan,
+      headline: "三笔账\n你都懂",
+      subline: "四支团队 · 78 个岗位 · 30 秒首响",
+      badge: "获客增长"
+    };
+    expect(() => validateCoverPlan(metricPlan, { ...input, durationSeconds: 89 })).not.toThrow();
+    const lengthPlan: CoverPlan = { ...validPlan, headline: "89 秒看懂全片", subline: undefined };
+    expect(() => validateCoverPlan(lengthPlan, { ...input, durationSeconds: 30 })).toThrow(/与成片/);
+  });
+
+  it("兜底标题取主标题并去尾标点，副标题用成片真实时长", () => {
+    const plan = fallbackCoverPlan(
+      { ...input, durationSeconds: 89 },
+      { headline: "AI 班组住进你公司 · 获客增长系统 89 秒销售口播", heroShotId: "SC-05", personShotId: "SC-01" }
+    );
+    expect(plan.headline.endsWith("·")).toBe(false);
+    expect(plan.headline.length).toBeLessThanOrEqual(12);
+    expect(plan.subline).toContain("89 秒");
+  });
 });
 
 describe("封面机检", () => {

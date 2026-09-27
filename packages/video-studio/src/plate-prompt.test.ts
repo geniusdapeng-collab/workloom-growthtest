@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { BRIDGE_STRUCTURE_CONSTRAINT, buildPlatePrompt, isBridgeScene, UNIVERSAL_SPATIAL_INVARIANT } from "./plate-prompt.js";
+import {
+  BRIDGE_STRUCTURE_CONSTRAINT,
+  ENVIRONMENT_REALISM_CONSTRAINT,
+  PROP_INTERACTION_CONSTRAINT,
+  buildPlatePrompt,
+  hasInteractiveProp,
+  isBridgeScene,
+  UNIVERSAL_SPATIAL_INVARIANT
+} from "./plate-prompt.js";
 
 const shot = {
   shotId: "SC-02",
@@ -91,5 +99,51 @@ describe("知识注入落地层：景深与道具必须进关键帧提示词", (
     const prompt = buildPlatePrompt({ ...shot, depth_of_field: "   ", props: "" }, options);
     expect(prompt).not.toMatch(/^景深：\s*$/m);
     expect(prompt).not.toMatch(/^道具与质感：\s*$/m);
+  });
+});
+
+/**
+ * 2026-09-27 真机事故（产品所有者一眼判"不像实拍"）：
+ * 旧提示词侧**没有任何"环境真实性"约束**——模型收到"现代简约商务空间"这类空词，
+ * 只能落回训练分布里的**平均办公室**。这一组断言守住"约束真的在提示词里"（提示词侧兜一层）。
+ */
+describe("环境真实性与道具交互（2026-09-27 事故机制化）", () => {
+  it("环境真实性约束对**每一镜**生效（不挑场景类型）", () => {
+    expect(buildPlatePrompt(shot, options)).toContain(ENVIRONMENT_REALISM_CONSTRAINT);
+    const office = {
+      ...shot,
+      scene: "1930 年代外滩银行改建办公楼 18 层会议室，胡桃木饰面墙与混凝土梁",
+      sceneDescription: "浅橡木地板有细划痕与旧钉眼，桌面有咖啡杯痕",
+      composition: "人物坐姿半身，面部正对镜头",
+      action: "右手按住桌上的档案夹，抬眼看镜头"
+    };
+    expect(buildPlatePrompt(office, options)).toContain(ENVIRONMENT_REALISM_CONSTRAINT);
+  });
+
+  it("出现可交互器物时追加道具-人体交互硬约束；没有器物时不加（避免噪音）", () => {
+    expect(hasInteractiveProp(shot)).toBe(false);
+    expect(buildPlatePrompt(shot, options)).not.toContain(PROP_INTERACTION_CONSTRAINT);
+
+    const phoneShot = {
+      ...shot,
+      scene: "1930 年代银行改建会议室",
+      sceneDescription: "桌上立着手机支架与笔记本",
+      action: "低头看手机屏幕，随后抬眼看镜头"
+    };
+    expect(hasInteractiveProp(phoneShot)).toBe(true);
+    const prompt = buildPlatePrompt(phoneShot, options);
+    expect(prompt).toContain(PROP_INTERACTION_CONSTRAINT);
+    /** 手机屏幕朝观众这个 badcase 的判据必须写死：观众只见机身背面或侧缘 */
+    expect(prompt).toContain("屏幕朝向它的使用者");
+  });
+
+  it("约束顺序稳定：通用物理不变量 → 环境真实性 → 场景条件约束 → 禁止项（禁止项仍在最后一行）", () => {
+    const prompt = buildPlatePrompt(shot, options);
+    const lines = prompt.split("\n");
+    const indexOf = (needle: string): number => lines.findIndex((line) => line.includes(needle));
+    expect(indexOf("场景结构与物理自洽（通用）")).toBeGreaterThan(-1);
+    expect(indexOf("环境真实性（通用）")).toBeGreaterThan(indexOf("场景结构与物理自洽（通用）"));
+    expect(indexOf("桥类结构（本镜硬约束）")).toBeGreaterThan(indexOf("环境真实性（通用）"));
+    expect(lines.at(-1)).toContain("禁止：文字、字幕、水印");
   });
 });

@@ -68,6 +68,47 @@ export function isBridgeScene(shot: PlatePromptShot): boolean {
 }
 
 /**
+ * 环境真实性**通用约束**（2026-09-27 真机事故 → 提示词侧）：
+ * 事故现场：8 镜监制全放行，但成片被一眼判"不像实拍"。根因之一是提示词侧从来没有这条约束——
+ * 模型收到的场景是"现代简约商务空间"这类空词，只能生成训练分布里的**平均房间**。
+ *
+ * 与 `scene-bible.ts#environmentDefects`（确定性审计）和 `producer-gate.ts#PRODUCER_RUBRICS`
+ * （视觉复核）**三处同源**：提示词侧让模型有约束可用，审计侧在渲染前判红，评审侧兜住漏网。
+ * 纪律：这条对所有镜头生效，不针对具体空间类型（不枚举办公室/厨房/工地）。
+ */
+export const ENVIRONMENT_REALISM_CONSTRAINT =
+  "环境真实性（通用）：空间必须是一个**具体、可指认的真实场所**，不是「平均样板间」——"
+  + "材质要带**工艺与使用状态**（如「胡桃木哑光打蜡、边缘 2cm 磕痕」「微水泥批刀痕、两处细裂纹」），"
+  + "灯光必须包含**场景内真实存在的实用光源**（窗光／筒灯／台灯／屏幕光／壁灯，方向与色温明确），"
+  + "画面要留有**使用痕迹**（指纹、水渍、卷边、划痕、薄灰、杯痕、旧钉眼），"
+  + "并带可读的空间实指（空间类型、尺度、朝向、时段）。"
+  + "禁止：无任何使用痕迹的样板间、影棚柔光箱式打光、材质只写一级名词（「原木」「浅色墙面」）、"
+  + "空旷到与人物活动不符、每镜一换装修风格。";
+
+/** 可交互器物（有朝向语义的一类）：命中即追加条件硬约束 */
+const INTERACTIVE_PROP_WORDS = /(手机|平板|遥控器|键盘|鼠标|相机|麦克风|耳机|笔记本|电脑|显示器|屏幕)/;
+
+/** 场景是否含可交互器物 */
+export function hasInteractiveProp(shot: PlatePromptShot): boolean {
+  const blob = [shot.scene, shot.sceneDescription, shot.props, shot.composition, shot.action]
+    .map((v) => String(v ?? ""))
+    .join(" ");
+  return INTERACTIVE_PROP_WORDS.test(blob);
+}
+
+/**
+ * 道具-人体交互**条件硬约束**（真机 badcase：手机屏幕朝观众）。
+ * 剧本里明明是"主播自己在看手机"，成片却是"把手机举给观众看"——道具与人的物理关系
+ * 既没被声明、也没被复核。这里把关系讲死；可见性/承重/遮挡由镜头卡的 `propInteraction` 提供细节。
+ */
+export const PROP_INTERACTION_CONSTRAINT =
+  "道具与人体交互（本镜硬约束）：被手持或被操作的器物必须有成立的物理关系——"
+  + "**屏幕朝向它的使用者**（观众只见机身背面或侧缘，不出现屏幕内容／界面正对镜头），"
+  + "有真实承重与接触（立于支架、置于桌面、被手指真实包裹），手指数量与关节正常、遮挡范围合理，"
+  + "操作者的视线与手部落点指向他正在操作的界面。"
+  + "禁止：手机／平板／笔记本屏幕内容朝观众、道具漂浮或穿模、手指畸变、道具凭空出现或消失。";
+
+/**
  * 组装关键帧提示词。
  * 返回值保证：不含 `NaN` / `undefined` / `[object Object]` 这三种退化哨兵（单测强制）。
  */
@@ -120,7 +161,9 @@ export function buildPlatePrompt(shot: PlatePromptShot, options: PlatePromptOpti
      */
     `规格：${aspect} 竖幅 ${resolution}，写实电影感摄影，自然肤质（保留毛孔与细颗粒，不做美颜磨皮）${depthOfField.trim() ? "" : "，浅景深"}，纪实风格`,
     UNIVERSAL_SPATIAL_INVARIANT,
+    ENVIRONMENT_REALISM_CONSTRAINT,
     ...(isBridgeScene(shot) ? [BRIDGE_STRUCTURE_CONSTRAINT] : []),
+    ...(hasInteractiveProp(shot) ? [PROP_INTERACTION_CONSTRAINT] : []),
     "禁止：文字、字幕、水印、logo、卡通、插画、3D 渲染、塑料皮肤、多余手指、第二个人物清晰入镜、悬空无落点的建筑结构"
   ];
   return lines.filter((line) => line.trim().length > 0).join("\n");
