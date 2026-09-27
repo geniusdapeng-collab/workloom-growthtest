@@ -356,6 +356,15 @@ export function findTracks(query = {}, env = process.env) {
   const commercialUse = query.commercialUse !== false;
   const bpmMin = Number(query.bpmMin ?? 0);
   const bpmMax = Number(query.bpmMax ?? 400);
+  /**
+   * 返回条数上限（2026-09-26 真机修复）：
+   * 早先**硬编码** `items.slice(0, 20)`，而切片发生在任何排序**之前**——
+   * 于是"1034 首的曲库"在选曲侧只能看到库里前 20 首（真机：选曲永远只在 20 首里挑，
+   * 好曲子进不了候选池）。现在上限可配：`query.limit`（默认 20，保持既有调用行为），
+   * 调用方要全量候选池时传 `limit: 2000`（选曲/回填/审计用）。
+   */
+  const limitRaw = Number(query.limit ?? 20);
+  const limit = Number.isFinite(limitRaw) && limitRaw > 0 ? Math.min(5000, Math.floor(limitRaw)) : 20;
 
   const items = library.tracks
     .filter((track) => {
@@ -411,7 +420,8 @@ export function findTracks(query = {}, env = process.env) {
     matched: items.length,
     commercialUse,
     track: selected,
-    items: items.slice(0, 20),
+    limit,
+    items: items.slice(0, limit),
     licenseTable: LICENSE_TABLE,
     sources: library.sources,
   };

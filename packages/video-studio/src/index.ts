@@ -6,6 +6,8 @@ export * from "./llm-adapter.js";
 export * from "./material-policy.js";
 export * from "./av-sync.js";
 export * from "./beat-verify.js";
+export * from "./library-bpm.js";
+export * from "./character-consistency.js";
 export * from "./shot-order.js";
 export * from "./av-sync.js";
 export * from "./cover-design.js";

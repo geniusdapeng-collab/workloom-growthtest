@@ -22,6 +22,11 @@
  */
 
 import { createHash } from "node:crypto";
+import {
+  AV_SYNC_POLICY,
+  buildSampleAccurateConcatPlan,
+  verifyAssembledAvSync,
+} from "./av-sync.mjs";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -352,6 +357,38 @@ export async function normaliseShots({
  * - fade：逐镜淡入淡出后直拼（情绪连贯，适合叙事/文旅）；
  * - xfade：真交叉溶解（镜头之间重叠过渡，最"精致"但需重编码）。
  */
+/**
+ * 样点级拼接 + 拼完**实测**（音画对齐机制的平台侧落点）。
+ * ① 画面 `-c:v copy`（帧级无损）；② 声音按每段画面时长 atrim+apad 到精确长度后走 concat 滤镜；
+ * ③ 合流后逐镜实测偏移与累计漂移，超阈值直接抛 `av_sync_failed`（不静默出厂）。
+ * 关闭自检：`transitions.verifyAvSync === false`（留痕口径：调用方必须自己说明为什么跳过）。
+ */
+async function assembleSampleAccurate({ bins, list, clips, output, workDir, fps = 30, verify = true }) {
+  const plan = buildSampleAccurateConcatPlan({ listFile: list, clips, output, workDir, fps });
+  await runBin(bins.ffmpeg, plan.videoArgs, { label: "ffmpeg(concat-video)", timeoutMs: 900_000 });
+  await runBin(bins.ffmpeg, plan.audioArgs, { label: "ffmpeg(concat-audio)", timeoutMs: 900_000 });
+  await runBin(bins.ffmpeg, plan.muxArgs, { label: "ffmpeg(concat-mux)", timeoutMs: 900_000 });
+  if (!verify) return null;
+  const durations = clips.map((clip) => Number(clip.durationSec ?? 0));
+  const starts = [];
+  let cursor = 0;
+  for (let index = 0; index < clips.length; index += 1) {
+    starts.push(cursor);
+    cursor += durations[index] > 0 ? durations[index] : 0;
+  }
+  const report = await verifyAssembledAvSync({
+    ffmpeg: bins.ffmpeg, output,
+    clips: clips.map((clip, index) => ({
+      shotId: clip.shotId ?? `#${index + 1}`,
+      path: clip.path,
+      durationSec: durations[index],
+    })),
+    starts,
+    policy: AV_SYNC_POLICY,
+  });
+  return report;
+}
+
 export async function assembleTimeline({
   clips = [], transitions = {}, output, resolution, fps = 30, bins = resolveBinaries(),
 }) {
@@ -369,10 +406,16 @@ export async function assembleTimeline({
   if (mode === "hard" || clips.length === 1) {
     const list = path.join(dir, "concat.txt");
     await fsp.writeFile(list, clips.map((clip) => `file '${clip.path.replaceAll("'", "'\\''")}'`).join("\n"), "utf8");
-    await runBin(bins.ffmpeg, [
-      "-hide_banner", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", list,
-      "-c", "copy", "-movflags", "+faststart", output,
-    ], { label: "ffmpeg(concat)", timeoutMs: 900_000 });
+    /**
+     * 硬切拼接的**音画对齐纪律**（2026-09-26 真机事故修复，与基座 compose-film 同口径）：
+     * 逐段 aac 音轨按 1024 样点成帧、末帧向上取整 → 每段音轨比画面长 0–21ms；
+     * `-f concat -c copy` 让 demuxer 按各自流的时长累计偏移 → 声音逐镜漂移（真机尾镜 +125ms）。
+     * 现在：画面仍 `-c:v copy`（帧级无损），声音改走 **concat 滤镜**并按画面时长 atrim+apad 到精确长度，再合流。
+     */
+    await assembleSampleAccurate({
+      bins, list, clips, output, workDir: dir, fps,
+      verify: transitions.verifyAvSync !== false,
+    });
     return { output, mode, fadeSec: 0, shots: clips.length };
   }
 
@@ -394,10 +437,13 @@ export async function assembleTimeline({
     }
     const list = path.join(dir, "fade-concat.txt");
     await fsp.writeFile(list, parts.map((file) => `file '${file.replaceAll("'", "'\\''")}'`).join("\n"), "utf8");
-    await runBin(bins.ffmpeg, [
-      "-hide_banner", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", list,
-      "-c", "copy", "-movflags", "+faststart", output,
-    ], { label: "ffmpeg(concat)", timeoutMs: 900_000 });
+    /** 淡入淡出路径同样按样点级对齐拼接（各段已重编码，长度口径以各自的 durationSec 为准） */
+    await assembleSampleAccurate({
+      bins, list,
+      clips: clips.map((clip, index) => ({ ...clip, path: parts[index] ?? clip.path })),
+      output, workDir: dir, fps,
+      verify: transitions.verifyAvSync !== false,
+    });
     return { output, mode, fadeSec: round(fadeSec, 3), shots: clips.length };
   }
 
@@ -434,6 +480,27 @@ export async function assembleTimeline({
     "-s", `${width}x${height}`, "-r", String(fps), "-movflags", "+faststart", output,
   );
   await runBin(bins.ffmpeg, args, { label: "ffmpeg(xfade)", timeoutMs: 1_800_000 });
+  /**
+   * 交叉溶解路径同样要**实测**音画对齐（转场吃掉的重叠量与视频 xfade 的 offset 必须一致；
+   * 真机里"转场 + 时长补偿"叠加时最容易出偏差）。
+   */
+  if (transitions.verifyAvSync !== false) {
+    const starts = [];
+    let cursor = 0;
+    for (let index = 0; index < clips.length; index += 1) {
+      starts.push(cursor);
+      if (index < clips.length - 1) {
+        const fade = Math.min(fadeSec, Math.max(0.05, Math.min(durations[index], durations[index + 1]) / 2));
+        cursor += durations[index] - fade;
+      }
+    }
+    await verifyAssembledAvSync({
+      ffmpeg: bins.ffmpeg, output,
+      clips: clips.map((clip, index) => ({ shotId: clip.shotId ?? `#${index + 1}`, path: clip.path, durationSec: durations[index] })),
+      starts,
+      policy: AV_SYNC_POLICY,
+    });
+  }
   return { output, mode, fadeSec: round(fadeSec, 3), shots: clips.length };
 }
 

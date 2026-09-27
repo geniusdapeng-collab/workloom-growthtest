@@ -206,11 +206,75 @@ export function assessVariantDistinctness(
   };
 }
 
+export interface DeliverableNamingAudit {
+  ok: boolean;
+  /** 文件名里写明的时长（秒；识别不到为 null） */
+  claimedDurationSec: number | null;
+  /** 成片实际时长（秒） */
+  actualDurationSec: number;
+  detail: string;
+  /** 与成片口径一致的改名建议（名字里没写时长时为 null） */
+  suggestedName: string | null;
+}
+
+/**
+ * 文件名 / 成片时长口径审计（2026-09-26 真机事故）：
+ * 交付清单 `deliverable.path` 指到 `…-30s-final.mp4`，而实际成片是 51.07s——
+ * 发布方按路径/文件名核对就踩空（"这到底是不是那支片？"）。
+ * 纪律：**文件名里写明的时长必须与成片实际时长一致（±1s）**；不一致就给改名建议并判不合格。
+ */
+export function auditDeliverableNaming(input: {
+  path: string;
+  durationSec: number;
+  toleranceSec?: number;
+}): DeliverableNamingAudit {
+  const tolerance = input.toleranceSec ?? 1;
+  const actual = Number(input.durationSec ?? 0);
+  const file = input.path.split("/").pop() ?? input.path;
+  /** 支持 `-30s-`、`_48s.`、`-48秒-`、`-51sec-` 等写法 */
+  const match = file.match(/(\d{1,3})\s*(?:s(?:ec)?|秒)(?![a-z])/i);
+  if (!(actual > 0)) {
+    return {
+      ok: false, claimedDurationSec: match ? Number(match[1]) : null, actualDurationSec: actual,
+      detail: `成片时长未知（${input.durationSec}），无法核对文件名口径`, suggestedName: null,
+    };
+  }
+  if (!match) {
+    return {
+      ok: true, claimedDurationSec: null, actualDurationSec: Number(actual.toFixed(2)),
+      detail: `文件名未写时长（${file}）；成片实际 ${actual.toFixed(2)}s——建议文件名带时长便于发布方核对`,
+      suggestedName: null,
+    };
+  }
+  const claimed = Number(match[1]);
+  const delta = Math.abs(claimed - actual);
+  const suggested = file.replace(match[0], `${Math.round(actual)}s`);
+  if (delta <= tolerance) {
+    return {
+      ok: true, claimedDurationSec: claimed, actualDurationSec: Number(actual.toFixed(2)),
+      detail: `文件名时长 ${claimed}s 与成片 ${actual.toFixed(2)}s 一致（容差 ±${tolerance}s）`,
+      suggestedName: null,
+    };
+  }
+  return {
+    ok: false, claimedDurationSec: claimed, actualDurationSec: Number(actual.toFixed(2)),
+    detail: `文件名时长 ${claimed}s 与成片实际 ${actual.toFixed(2)}s 不符（差 ${delta.toFixed(2)}s > 容差 ±${tolerance}s）：`
+      + `发布方按名字核对会踩空，建议改名为 ${suggested}`,
+    suggestedName: suggested,
+  };
+}
+
 export interface DeliveryManifest {
   projectId: string;
   generatedAt: string;
   platform: string;
-  deliverable: { path: string; sha256: string; bytes: number };
+  deliverable: {
+    path: string; sha256: string; bytes: number;
+    /** 成片实际时长（秒）——与文件名里的时长口径同源，发布方核对时不再踩空 */
+    durationSec?: number;
+    /** 文件名签发时长审计（见 auditDeliverableNaming） */
+    namingAudit?: DeliverableNamingAudit;
+  };
   subtitles: { sidecarDir: string | null; softsub: string | null; burned: boolean };
   cover: { path: string | null; hook: string };
   variants: Array<{
@@ -232,7 +296,7 @@ export interface DeliveryManifest {
 export function buildDeliveryManifest(input: {
   projectId: string;
   platform: string;
-  deliverable: { path: string; sha256: string; bytes: number };
+  deliverable: DeliveryManifest["deliverable"];
   subtitles: { sidecarDir: string | null; softsub: string | null; burned: boolean };
   cover: { path: string | null; hook: string };
   variants: DeliveryManifest["variants"];

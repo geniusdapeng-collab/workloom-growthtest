@@ -371,6 +371,26 @@ describe("配乐内核纯函数（对齐 / 定速 / 让位换算 / 许可）", (
     }
   });
 
+  it("findTracks 返回条数上限可配（默认 20；显式 limit 可拿全量候选池）", () => {
+    /**
+     * 返回条数上限（2026-09-26 真机修复）：
+     * 早先硬编码 `items.slice(0, 20)` 且**切片发生在排序之前**——1034 首的曲库在选曲侧只能看到前 20 首。
+     * 现在上限可配：默认 20（保持既有调用行为），`limit` 放大即可拿到全量候选池（选曲/回填/审计用）。
+     */
+    const withDefaultLimit = findTracks({ commercialUse: true });
+    expect(withDefaultLimit.limit).toBe(20);
+    expect(withDefaultLimit.items.length).toBeLessThanOrEqual(20);
+    expect(withDefaultLimit.matched).toBeGreaterThanOrEqual(withDefaultLimit.items.length);
+
+    const full = findTracks({ commercialUse: true, limit: 2000 });
+    expect(full.limit).toBe(2000);
+    expect(full.items.length).toBe(full.matched);
+
+    /** 非法上限回落到默认值（不抛错、不静默返回全库） */
+    expect(findTracks({ limit: -5 }).limit).toBe(20);
+    expect(findTracks({ limit: 0 }).limit).toBe(20);
+  });
+
   it("自建曲库目录为空时如实登记（随仓兜底曲库仍在，不谎称「未接入」）", () => {
     const dir = mkdtempSync(join(tmpdir(), "bgm-lib-empty-"));
     try {

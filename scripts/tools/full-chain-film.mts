@@ -38,7 +38,8 @@ import {
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm, reviewStage,
   buildSfxArgs, cutTimesFromShots, planCutSfxDetailed, CUT_SFX_POLICY,
-  measureBpm, beatGridReport, checkShotOrder, assessVariantAxes, VARIANT_MIN_COUNT,
+  measureBpm, beatGridReport, checkShotOrder, assessVariantAxes, VARIANT_MIN_COUNT, auditDeliverableNaming,
+  assessCharacterConsistency, medianColor, type CharacterConsistencyReport, type RgbColor,
   normalizePromptLanguage,
   restoreTimelineField,
   type CoverDesignInput, type CoverMeasurements, type CoverPlan, type GateCheck, type GateEvent, type PipelineGateStepKey,
@@ -179,6 +180,20 @@ function readPcmSamples(file: string, sampleRate: number, seconds: number): Floa
   ], { maxBuffer: 256 * 1024 * 1024 });
   const view = new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 4));
   return view.slice();
+}
+
+/**
+ * 从镜头卡解析**角色 id**（角色一致性判据用）：
+ * 优先显式 `characterId`；否则用 `character` 字段的名字（主角按 cast.lead 归并，临时角色按名字）。
+ * 为什么不猜：名字不同但其实是同一人的情况由上游 `characterId` 显式声明解决，
+ * 本函数只在缺声明时给出**稳定且可追溯**的 id（写进证据，便于人工复核）。
+ */
+function characterIdOf(shot: Record<string, unknown>): string | null {
+  const explicit = String((shot as { characterId?: unknown }).characterId ?? "").trim();
+  if (explicit) return explicit;
+  const name = String((shot as { character?: unknown }).character ?? "").trim();
+  if (!name) return null;
+  return name.slice(0, 32);
 }
 
 async function pickGridCompatibleBed(
@@ -337,6 +352,12 @@ const POST_DIR = join(WORK_DIR, "post", PROJECT);
 const PROMPT_DIR = join(WORK_DIR, "prompts", PROJECT);
 /** 成片交付路径（模板块与交付包/返修块共用；模板块内部变量名保持 `deliverable` 不变） */
 const DELIVERABLE = join(OUT_DIR, `${PROJECT}-30s-final.mp4`);
+/**
+ * 成片的**实际交付路径**（2026-09-26 口径统一）：
+ * 旧名写死 `-30s-final.mp4`，但片子可能是 48s/51s——发布方按文件名核对会踩空（真机事故）。
+ * 下面在落盘时按**实测时长**重命名（如 `-48s-final.mp4`），并把这个路径用于交付清单与变体派生。
+ */
+let deliverablePath = DELIVERABLE;
 /** 工位路径白名单（冒号分隔）：仓库根 + 运行产物根 + 交付目录 + 系统临时目录 */
 const CLI_ALLOWED_ROOTS = [REPO_ROOT, WORK_DIR, OUT_DIR, tmpdir()].join(":");
 for (const dir of [LOG_DIR, PLATE_DIR, CLIP_DIR, POST_DIR, PROMPT_DIR, OUT_DIR]) mkdirSync(dir, { recursive: true });
@@ -3325,6 +3346,76 @@ if (STAGES.has("compose")) {
 }
 
 /* ---------- ⑤ 调色（color-bridge 择优） ---------- */
+/* ---------- ④-1 角色一致性实测（**跨镜造型主色**，2026-09-26 真机事故沉淀） ---------- */
+/**
+ * 事故形态：NC-10（夜市瓦罐汤）开头 7 帧里出现"白衣女主"，与前一镜（深蓝工装）判若两人——
+ * 生成模型在不相关镜头里插入了主角形象，人眼一看就是**串戏**，但事后只能靠人工发现。
+ * 判据（如实说明能力边界，**不做人脸识别**）：统一取样口径下比"同一角色在不同镜头的造型主色"。
+ *   取样：镜头中段帧 → 缩到 64×114 → 取中心区（行 25–90%、列 20–80%）的**中位色**；
+ *   锚色：该角色**首个声明出镜镜头**的取样色；差 ≥90 判失败、≥45 告警（阈值在模块里显式可审计）。
+ */
+let characterConsistency: CharacterConsistencyReport | null = null;
+if (STAGES.has("compose") && existsSync(master)) {
+  const sampleStart = Date.now();
+  const characterShots = shots.filter((shot) => {
+    const character = String((shot as { character?: unknown }).character ?? "").trim();
+    return character.length > 0;
+  });
+  const anchors: Array<{ characterId: string; sampleColor: RgbColor; fromShotId?: string }> = [];
+  const samples = characterShots.map((shot) => {
+    const clipPath = clipFor(shot);
+    const characterId = characterIdOf(shot);
+    let sampleColor: RgbColor | null = null;
+    try {
+      if (existsSync(clipPath)) {
+        const duration = Number(probe(clipPath).duration ?? 0) || 2;
+        const at = Math.max(0.2, duration * 0.5);
+        const raw = execFileSync(FFMPEG, [
+          "-v", "error", "-ss", at.toFixed(3), "-i", clipPath, "-frames:v", "1",
+          "-vf", "scale=64:114", "-pix_fmt", "rgb24", "-f", "rawvideo", "-",
+        ], { maxBuffer: 4 * 1024 * 1024 });
+        const colors: RgbColor[] = [];
+        for (let row = Math.round(114 * 0.25); row < Math.round(114 * 0.9); row += 1) {
+          for (let col = Math.round(64 * 0.2); col < Math.round(64 * 0.8); col += 1) {
+            const offset = (row * 64 + col) * 3;
+            if (offset + 2 < raw.length) colors.push({ r: raw[offset]!, g: raw[offset + 1]!, b: raw[offset + 2]! });
+          }
+        }
+        sampleColor = medianColor(colors);
+      }
+    } catch (error) {
+      log(`  ⚠ 角色取样失败（${shot.shotId}）：${error instanceof Error ? error.message.slice(0, 120) : String(error)}`);
+    }
+    if (characterId && sampleColor && !anchors.some((anchor) => anchor.characterId === characterId)) {
+      anchors.push({ characterId, sampleColor, fromShotId: shot.shotId });
+    }
+    return {
+      shotId: shot.shotId,
+      characterId,
+      declaredWardrobe: String((shot as { costume?: unknown }).costume ?? "") || null,
+      sampleColor,
+      presenceRatio: null,
+    };
+  });
+  characterConsistency = assessCharacterConsistency({ shots: samples, anchors });
+  log(`  ⓘ ${characterConsistency.detail}`);
+  for (const warning of characterConsistency.warnings.slice(0, 5)) log(`  ⚠ ${warning.detail}`);
+  for (const issue of characterConsistency.issues.slice(0, 5)) log(`  ⛔ ${issue.detail}`);
+  record({
+    stage: "character-consistency", shotId: null, invoked: true, ok: characterConsistency.ok,
+    cached: false, degraded: false, attempt: 1, ms: Date.now() - sampleStart, artifact: null,
+    evidence: {
+      checked: characterConsistency.checked,
+      skipped: characterConsistency.skipped,
+      anchors: characterConsistency.anchors,
+      issues: characterConsistency.issues,
+      warnings: characterConsistency.warnings,
+    },
+    verdict: null,
+    note: "跨镜造型主色一致性（非人脸识别；命中需人工确认或显式放行）",
+  });
+}
+
 /** 未重跑调色时：磁盘上若已有"不早于 raw"的调色版就沿用它（只重跑后段的场景） */
 let colored = STAGES.has("color") ? master : preferDownstream(join(POST_DIR, "master-graded.mp4"), master);
 if (STAGES.has("color") && existsSync(master)) {
@@ -4629,10 +4720,21 @@ if (!subtitleSidecar && SUBTITLE_MODE !== "burn") {
   }
 }
 
-  const deliverable = DELIVERABLE;
+  const scoredInfo = probe(scored);
+  /**
+   * 文件名与成片时长**同源**：先量实际时长，再决定交付文件名（不再写死 30s）。
+   * 审计口径见 `auditDeliverableNaming`：文件名里写明的时长与成片差 >1s 即判不合格。
+   */
+  const namingAudit = auditDeliverableNaming({ path: DELIVERABLE, durationSec: Number(scoredInfo.duration ?? 0) });
+  const deliverable = namingAudit.suggestedName ? join(OUT_DIR, namingAudit.suggestedName) : DELIVERABLE;
+  if (deliverable !== DELIVERABLE) {
+    log(`ℹ 成片 ${Number(scoredInfo.duration ?? 0).toFixed(2)}s：交付文件名按实测时长改写为 ${basename(deliverable)}（旧名 ${basename(DELIVERABLE)}）`);
+  }
+  deliverablePath = deliverable;
   execFileSync("cp", [scored, deliverable]);
   const info = probe(deliverable);
   const accidents = detectQualityAccidents(deliverable);
+  const finalNamingAudit = auditDeliverableNaming({ path: deliverable, durationSec: Number(info.duration ?? 0) });
   /**
    * 音画对齐实测报告（2026-09-26 真机事故沉淀 · 机制）：
    * 合成阶段（compose-film）必须留下 `<master>.av-sync.json`——逐镜实测声音相对画面的偏移与全片累计漂移。
@@ -4805,6 +4907,32 @@ if (!subtitleSidecar && SUBTITLE_MODE !== "burn") {
         hard: STAGES.has("compose"),
       },
       /**
+       * 交付文件名口径（2026-09-26 事故）：文件名写明的时长必须与成片实际时长一致。
+       * 落盘时已按实测时长改名，这一条是**兜底校验**（改名逻辑被绕过时它必须红）。
+       */
+      {
+        id: "deliverable-naming",
+        pass: finalNamingAudit.ok,
+        detail: finalNamingAudit.detail,
+        hard: true,
+      },
+      /**
+       * 角色一致性（2026-09-26 机制）：跨镜造型主色漂移 = 串戏嫌疑。
+       * 能力边界如实：**不做人脸识别**，只比"统一取样口径下的造型主色"；命中需人工确认或显式放行。
+       */
+      {
+        id: "character-consistency",
+        pass: (characterConsistency?.ok ?? true) || ACCEPT_REJECTED.includes("character-consistency"),
+        detail: characterConsistency
+          ? characterConsistency.detail
+            + (characterConsistency.warnings.length > 0
+              ? `；告警：${characterConsistency.warnings.slice(0, 2).map((w) => `${w.shotId} ${w.detail}`).join("｜")}`
+              : "")
+            + (ACCEPT_REJECTED.includes("character-consistency") ? "（已显式放行，留痕在阶段记录）" : "")
+          : "未跑合成阶段，角色一致性未实测（跨镜造型主色判据不适用）",
+        hard: Boolean(characterConsistency) && !ACCEPT_REJECTED.includes("character-consistency"),
+      },
+      /**
        * 字幕**标点口径**（2026-09-25）：正规字幕不带标点。
        * 判据看旁挂清单里的机检结果（`no_punctuation`），而不是看内存里的字幕文本——
        * 交付的是文件，门就该验文件。
@@ -4951,9 +5079,9 @@ if (!subtitleSidecar && SUBTITLE_MODE !== "burn") {
  * 纪律是"镜头只生成一次，变体零 token"——变体只做**后期层派生**（调色/混音/文案），绝不重跑渲染。
  * gate `G-DLV1`：任一对变体"画面与音轨都测不出差别"即一票否决（那不算两个变体，是把同一支片子发两遍）。
  */
-if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
+if (STAGES.has("deliver") && existsSync(deliverablePath) && !DRY_RUN) {
   const started = Date.now();
-  const variantPlans = buildVariantPlan({ master: DELIVERABLE, outDir: OUT_DIR, projectId: PROJECT, coverHook: arg("--cover-hook", shotlist.title ?? "") });
+  const variantPlans = buildVariantPlan({ master: deliverablePath, outDir: OUT_DIR, projectId: PROJECT, coverHook: arg("--cover-hook", shotlist.title ?? "") });
   const samples: Array<{ variantId: string; frames: Array<{ r: number; g: number; b: number }>; loudness: { lufs: number; peakDb: number } | null }> = [];
   const variantManifest: Array<{
     id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
@@ -5000,7 +5128,7 @@ if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
   for (const plan of variantPlans) {
     try {
       if (plan.passthrough) {
-        execFileSync("cp", [DELIVERABLE, plan.output]);
+        execFileSync("cp", [deliverablePath, plan.output]);
       } else {
         /** 调色变体走同一个调色工位（与母版一致的口径，避免"变体用了另一套引擎"） */
         runCli(COLOR_CLI, [...plan.gradeArgs, "--out", plan.output]);
@@ -5106,7 +5234,13 @@ if (STAGES.has("deliver") && existsSync(DELIVERABLE) && !DRY_RUN) {
      * 键名必须是模块入参的小写 `deliverable`：批量改名（deliverable→DELIVERABLE）时别把**键**也改掉，
      * 否则这支主件会被 JSON.stringify 静默丢掉（真机 2026-09-25 踩过：清单里没有母版指纹）。
      */
-    deliverable: { path: DELIVERABLE, sha256: createHash("sha256").update(readFileSync(DELIVERABLE)).digest("hex"), bytes: statSync(DELIVERABLE).size },
+    deliverable: {
+      path: deliverablePath,
+      sha256: createHash("sha256").update(readFileSync(deliverablePath)).digest("hex"),
+      bytes: statSync(deliverablePath).size,
+      durationSec: Number(probe(deliverablePath).duration ?? 0),
+      namingAudit: auditDeliverableNaming({ path: deliverablePath, durationSec: Number(probe(deliverablePath).duration ?? 0) }),
+    },
     subtitles: { sidecarDir: subtitleSidecar?.dir ?? null, softsub: softsubFile, burned: SUBTITLE_MODE !== "sidecar" },
     cover: { path: existsSync(join(OUT_DIR, `${PROJECT}-cover.png`)) ? join(OUT_DIR, `${PROJECT}-cover.png`) : null, hook: arg("--cover-hook", shotlist.title ?? "") },
     variants: variantManifest,
