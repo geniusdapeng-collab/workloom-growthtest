@@ -458,6 +458,8 @@
         "library/scene-policies/professional-service.source.md",
         "library/scene-policies/tech-review.json",
         "library/scene-policies/tech-review.source.md",
+        "library/scene-policies/commerce-seeding.json",
+        "library/scene-policies/commerce-seeding.source.md",
         "library/seedance-references/audio-tags.md",
         "library/seedance-references/cinematography.md",
         "library/seedance-references/director-styles.md",
@@ -750,7 +752,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "3cc444cef9e241fd54ea87931c2c8c753997ccaa8e114fe4248789a5fe90c8bd",
+    "digest": "891ba10a91e88ec0c3390ec3b234430b1574efad96fca6b6788866c0a2135b38",
     "assets": {
       "connectors/bgm-bridge/brief.mjs": "bb858adae23728deffa1668d9f9db15085f9c94ed73d2c01b5505d82e78e2407",
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
@@ -1154,6 +1156,8 @@
       "library/luts/slog3-to-rec709.cube": "63ff904e3535404f23f6f23048233726b5c09839a87c0f436724ccba0e43d01e",
       "library/media-catalog/media-catalog.json": "569f9a0f05a8bb66eb48d67b742bd53a3bd64ea213a79cb0f4925c7ecf627d27",
       "library/README.md": "791f05f2cd3f60d1ac343ce09c5bab841cb7157847f87bc0bc9eaa735f6b7730",
+      "library/scene-policies/commerce-seeding.json": "3ef8c65dbfb0072634d125195c3181522637652dc386a22d32793931caebef3b",
+      "library/scene-policies/commerce-seeding.source.md": "363e2bab86f4cdaa39c08ab1bfa3a067a0597165a91185c5734b37d5bc3557b2",
       "library/scene-policies/commercial-person.json": "92e5d5ac79eac0b64e75cc3cb740fe65319d493689eead54833ea4f611de73d1",
       "library/scene-policies/commercial-person.source.md": "445541407ea1e568301214e2dfdc6b07cfe9ad6b0e05355ec5e5ad3052fa96c6",
       "library/scene-policies/enterprise-brand.json": "e85d4a6d1a90bea639c76fd16744827b1c28a356c21191cb4c8292f4d8416357",
