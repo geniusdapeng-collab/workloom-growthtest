@@ -145,6 +145,15 @@ function validatePolicy(raw: unknown, file: string): ScenePolicy {
     if (bound.max !== undefined && (!Number.isFinite(bound.max) || bound.max < 0 || bound.max > 1)) throw new Error(`${file}: ${tag}.max 无效`);
     if (bound.min !== undefined && bound.max !== undefined && bound.min > bound.max) throw new Error(`${file}: ${tag} 上下界倒置`);
   }
+  /**
+   * 品质底线词必须能被**肯定描述**命中（2026-09-28，T2 入库时发现的机制陷阱）：
+   * 审计跑在 `affirmativeSkillText` 抽出的肯定文本上，"无…/没有…/不…" 开头的词会在归一里被截掉，
+   * 写进 qualityFloorTerms 永远不会命中——必须在加载期就拦住，而不是留一个"看起来在管、其实永不触发"的条目。
+   */
+  const ineffective = policy.qualityFloorTerms.filter((term) => /^(?:无|没有|不|避免|禁止)/.test(term));
+  if (ineffective.length > 0) {
+    throw new Error(`${file}: qualityFloorTerms 不能以"无/没有/不/避免/禁止"开头（肯定文本归一后会失效）：${ineffective.join("、")}；请改写成可被正向描述命中的缺陷名词`);
+  }
   for (const tag of policy.primaryTags) if (!policy.ratios[tag] || !policy.prompt.byTag[tag]) throw new Error(`${file}: 主景别 ${tag} 缺配比或提示`);
   return policy;
 }
@@ -200,10 +209,31 @@ export function selectScenePolicy(input: ScenePolicyInput, brief: Record<string,
     if (categoryCue) throw new Error(`客户需求含「${categoryCue}」，但没有可核实的已安装片型知识条目；请提供 scenePolicy.id 或安装对应条目`);
     return { policy: null, reason: "需求未命中已安装的片型知识条目", evidence: [] };
   }
-  if (matched.length > 1) throw new Error(`片型自动选择冲突：${matched.map((item) => item.id).join("、")}；请明确 scenePolicy.id`);
-  const policy = matched[0]!;
+  /**
+   * 多条目命中时的判优（2026-09-28，T2 起需要）：
+   *   · 人物主线优先：`requiresPerson` 为真、且客户需求里确实点了人/出镜的条目优先（T2 规范自己也写"人物部分套用 T1"）；
+   *   · 再按 `priority` 取最高（同优先级仍冲突 → fail-closed 要求显式 scenePolicy.id）。
+   * 判优结论写进 reason，便于审计看到"为什么选它而不是另一个"。
+   */
+  let candidates = matched;
+  let precedence = "";
+  const personLed = candidates.filter((policy) => policy.requiresPerson);
+  if (personLed.length > 0 && personLed.length < candidates.length) {
+    candidates = personLed;
+    precedence = "人物主线优先";
+  }
+  const top = Math.max(...candidates.map((policy) => policy.priority));
+  const highest = candidates.filter((policy) => policy.priority === top);
+  if (highest.length > 1) throw new Error(`片型自动选择冲突：${highest.map((item) => item.id).join("、")}（priority=${top}）；请明确 scenePolicy.id`);
+  const policy = highest[0]!;
   const evidence = fields.flatMap((field) => policy.autoSignals.filter((term) => field.value.includes(term)).map((term) => `${field.source}: ${term}`));
-  return { policy, reason: `需求自动命中：${[...new Set(evidence.map((item) => item.split(": ").slice(1).join(": ")))].join("、")}`, evidence };
+  const skipped = matched.filter((item) => item.id !== policy.id).map((item) => `${item.id}(priority=${item.priority}${item.requiresPerson ? "·需出镜" : ""})`);
+  return {
+    policy,
+    reason: `需求自动命中：${[...new Set(evidence.map((item) => item.split(": ").slice(1).join(": ")))].join("、")}`
+      + (skipped.length ? `；判优胜出（${precedence || `priority=${top}`}；未选 ${skipped.join("、")}）` : ""),
+    evidence
+  };
 }
 
 /** 注入关键帧和视频各自消费的字段；原台词、景别、机位、时长与角色绑定保持原样。 */
