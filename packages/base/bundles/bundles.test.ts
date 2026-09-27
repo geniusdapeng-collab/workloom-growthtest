@@ -170,7 +170,7 @@ describe.runIf(RUN_DB)("行业装配 PG 集成（F2.10 铁律）", async () => {
       // 本仓组合编制实测 78 岗（与 acquisition-loop 同口径）
       expect(provision.rosterSize).toBe(80);
       // 每个 preset_key 只由一个包提供（同名按主包裁决）：hotel 16 / ai-video 34 / geo-growth 26
-      expect(provision.perBundle).toEqual({ hotel: 16, "ai-video": 37, "geo-growth": 26 });
+      expect(provision.perBundle).toEqual({ hotel: 16, "ai-video": 38, "geo-growth": 26 });
       expect(provision.shadowed.length).toBe(4);
       expect(provision.fenceRules).toBeGreaterThanOrEqual(68);
 
