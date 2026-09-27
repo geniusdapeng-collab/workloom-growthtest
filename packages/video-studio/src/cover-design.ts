@@ -98,6 +98,22 @@ export const COVER_SAFE_AREA = {
   bottomReservedRatio: 0.12
 };
 
+/**
+ * 口播/讲解类片子的**下带文字**安全区（`--cover-hero person-solo`，2026-09-27 真机新增）。
+ *
+ * 为什么需要第二套：口播封面的人物是**居中的大头**，任何"上带标题"都会压在脸上
+ * （真机一次投产后被产品所有者直接指出"标题压脸、排版乱"）。把整块文字下移到面部下方的
+ * 安全带（58%–88%）即可从版式上消除这类重叠；下边 12% 仍留给平台 UI。
+ */
+export const COVER_LOWER_BAND_SAFE_AREA = {
+  /** 下带文字上限（比例）：文字不得越过这条线（上方是面部区） */
+  topMinRatio: 0.52,
+  /** 下带文字下限（比例）：为平台 UI 保留 12% */
+  titleBottomMaxRatio: 0.88,
+  /** 底部平台 UI 遮挡区（比例）：不放任何文字 */
+  bottomReservedRatio: 0.12
+};
+
 export interface CoverDesignInput {
   title?: string;
   /** 成片真实时长（秒）：标题里写"XX 秒"时必须与它一致（容差 ±2s，真机 2026-09-25） */
@@ -226,8 +242,16 @@ export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { s
   /**
    * 片长一致性（2026-09-25 真机）：标题/副标题里写了"48 秒"而成片其实是 51s，监制会判"与成片口径不符"。
    * `input.durationSeconds` 由管线给出真实片长；出现 秒 级数字时按 ±2s 容差校验。
+   *
+   * 2026-09-27 真机修正：原实现把**任何**「X 秒」都当片长声明，于是设计师写的
+   * `四支团队 · 78 个岗位 · 30 秒首响`（"30 秒首响"是产品指标，不是片子长度）被判
+   * 「标题里的时长 30 秒与成片 89 秒不符」→ 设计稿连打两次回、退兜底稿、封面被拒、
+   * 片头无封面。现在只认**指向片子本身的表述**：
+   *   · `N 秒 + 看懂/看完/了解/速览/讲清/说清/读懂/带你/全片/内讲完`；
+   *   · 或 `全片/本片/本视频 … N 秒`。
    */
-  const stated = `${plan.headline ?? ""} ${plan.subline ?? ""}`.match(/(\d{1,3})\s*秒/);
+  const stated = `${plan.headline ?? ""} ${plan.subline ?? ""}`.match(/(\d{1,3})\s*秒\s*(?:看懂|看完|了解|速览|讲清|说清|读懂|带你|全片|内讲完)/)
+    ?? `${plan.headline ?? ""} ${plan.subline ?? ""}`.match(/(?:全片|本片|本视频)[^0-9]{0,6}(\d{1,3})\s*秒/);
   if (stated && Number.isFinite(input.durationSeconds)) {
     const claimed = Number(stated[1]);
     if (Math.abs(claimed - Number(input.durationSeconds)) > 2) {
@@ -284,9 +308,25 @@ export function fallbackCoverPlan(
   input: CoverDesignInput,
   options: { headline: string; heroShotId: string; personShotId?: string; accentColor?: string }
 ): CoverPlan {
+  /**
+   * 兜底稿的副标题**必须使用成片真实时长**（2026-09-27 真机）：
+   * 早先这里写死 "30 秒"，而 `validateCoverPlan` 会核对"标题里的时长 vs 成片时长（±2s）"——
+   * 一条 89 秒的片子走到兜底路径时直接抛 `封面设计稿不合法：标题里的时长 30 秒与成片 89 秒不符`，
+   * 整个封面环节崩掉。现在按 durationSeconds 生成；时长未知时不提秒数。
+   */
+  const seconds = Number(input.durationSeconds ?? 0);
+  const durationText = Number.isFinite(seconds) && seconds >= 1 ? `${Math.round(seconds)} 秒` : "";
+  /**
+   * 兜底标题清洗（2026-09-27 真机）：标题来自 `--cover-hook`（默认取片名），
+   * 片名常带"· 副标题"结构，按 12 字硬截会留下尾随的「·」。这里先取 `·` 前的主标题再去尾标点。
+   */
+  const rawHeadline = String(options.headline ?? "").split(/[·|｜]/)[0] ?? "";
+  const headline = rawHeadline.replace(/[\s·・,，。.、;；:：]+$/u, "").slice(0, 12) || "封面";
   const plan: CoverPlan = {
-    headline: options.headline.slice(0, 12),
-    subline: input.character?.name ? `${input.character.name}带你 30 秒看懂` : undefined,
+    headline,
+    subline: input.character?.name
+      ? (durationText ? `${input.character.name}带你 ${durationText}看懂` : `${input.character.name}带你一次看懂`)
+      : undefined,
     badge: undefined,
     layout: "person-right",
     background: { shotId: options.heroShotId, atSec: 1.2, treatment: "grade" },
@@ -340,7 +380,10 @@ export interface CoverCheck {
 /** 画面差异阈值：PSNR 低于该值说明两个版本"肉眼可见地不同" */
 export const COVER_DIFF_PSNR_DB = 45;
 
-export function coverDeterministicChecks(measure: CoverMeasurements): CoverCheck[] {
+export function coverDeterministicChecks(
+  measure: CoverMeasurements,
+  safeArea: typeof COVER_SAFE_AREA = COVER_SAFE_AREA
+): CoverCheck[] {
   const titleDrawn = measure.titleBandPsnrDb !== null && measure.titleBandPsnrDb < COVER_DIFF_PSNR_DB;
   const personDrawn = measure.personBoxPsnrDb !== null && measure.personBoxPsnrDb < COVER_DIFF_PSNR_DB;
   return [
@@ -375,13 +418,15 @@ export function coverDeterministicChecks(measure: CoverMeasurements): CoverCheck
       /**
        * 容差 0.5%：标题带的实测值来自"墨迹包围盒 ÷ 画幅高"，而排版坐标是整数像素取整，
        * 6% 的边界很容易落成 0.0599（真机：115/1920）。用容差避免把"取整误差"判成"越界"。
+       *
+       * `safeArea` 允许调用方按版式传入（口播下带文字用 COVER_LOWER_BAND_SAFE_AREA）。
        */
-      pass: measure.titleTopRatio >= COVER_SAFE_AREA.topMinRatio - 0.005
-        && measure.titleBottomRatio <= COVER_SAFE_AREA.titleBottomMaxRatio
+      pass: measure.titleTopRatio >= safeArea.topMinRatio - 0.005
+        && measure.titleBottomRatio <= safeArea.titleBottomMaxRatio
         && measure.bottomBandInkRatio <= 0.02,
       detail: `标题带 ${(measure.titleTopRatio * 100).toFixed(1)}%–${(measure.titleBottomRatio * 100).toFixed(1)}%`
-        + `（口径 ${(COVER_SAFE_AREA.topMinRatio * 100).toFixed(0)}%–${(COVER_SAFE_AREA.titleBottomMaxRatio * 100).toFixed(0)}%），`
-        + `底部 ${(COVER_SAFE_AREA.bottomReservedRatio * 100).toFixed(0)}% 遮挡区墨迹 ${(measure.bottomBandInkRatio * 100).toFixed(2)}%（上限 2%）`,
+        + `（口径 ${(safeArea.topMinRatio * 100).toFixed(0)}%–${(safeArea.titleBottomMaxRatio * 100).toFixed(0)}%），`
+        + `底部 ${(safeArea.bottomReservedRatio * 100).toFixed(0)}% 遮挡区墨迹 ${(measure.bottomBandInkRatio * 100).toFixed(2)}%（上限 2%）`,
       hard: true
     }
   ];

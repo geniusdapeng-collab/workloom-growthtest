@@ -34,7 +34,7 @@ import {
   buildMaterialScenePrompt, assessReferenceIndependence, decidePlateCache, MATERIAL_MOTION_POLICY, MATERIAL_RAW_MOTION_POLICY, MATERIAL_SCENE_POLICY_VERSION,
   isDoubledNarration, speechAcceptance,
   REFERENCE_INDEPENDENCE_POLICY,
-  coverDeterministicChecks, coverPrefersNightBackground, COVER_FONTS, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
+  coverDeterministicChecks, coverPrefersNightBackground, COVER_FONTS, COVER_LOWER_BAND_SAFE_AREA, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm, reviewStage,
   buildSfxArgs, cutTimesFromShots, planCutSfxDetailed, CUT_SFX_POLICY,
@@ -104,6 +104,9 @@ const REUSE_PLAN = arg("--reuse-plan", "");
  *   `person`         = **人物满幅 + 地标小图**——当"人物卡贴在地标上"反复被判
  *                      "贴图感/遮挡主体/人物不是主角"时改用这一版：人物是背景（不存在贴片边缘），
  *                      地标以柔边小图出现在右上角，三件套（人物/地标/标题）仍然齐备。
+ *   `person-solo`    = **人物满幅 + 不叠任何小图**（口播/讲解类片子的收口版式，2026-09-27 真机）：
+ *                      文字块下移到**面部下方安全带**（画面 58%–88%），从根上避免"标题压在主角脸上"；
+ *                      适用范围=人物本身就是唯一主视觉的片子（带货口播、讲解、访谈）。
  */
 const COVER_HERO = arg("--cover-hero", "landmark");
 /**
@@ -114,6 +117,8 @@ const COVER_HERO = arg("--cover-hero", "landmark");
  */
 const COVER_ARCHETYPE: "person-led" | "subject-led" =
   ["subject", "scenery", "object", "product"].includes(COVER_HERO) ? "subject-led" : "person-led";
+/** 人物满幅 + 无小图 + 文字下移安全带（person-solo 专属口径） */
+const COVER_LOWER_BAND_TEXT = COVER_HERO === "person-solo";
 /**
  * 逐刀转场总损耗（秒）与**成片目标时长**（同一口径，compose 校验与终审都用它）：
  * 15 刀 × 0.16s = 2.4s 会被 xfade 吃掉，目标应是"分镜总时长 − 损耗"，而不是分镜总时长。
@@ -535,7 +540,15 @@ function probe(file: string): Record<string, unknown> {
 }
 function runCli(cli: string, args: string[]): { ok: boolean; out: string } {
   try {
-    const out = execFileSync(process.execPath, [abs(cli), ...args], {
+    /**
+     * TypeScript 工具（`.ts/.mts`，例如 `compose-film.mts`）必须经 tsx 载入器运行：
+     * 本工具的其它工位都是 `.mjs`（plain node 即可），但 TS 工具里会出现 `import "./x.js"`
+     * 指向同名 `.ts` 的写法——plain node 解析不了，会报 `ERR_MODULE_NOT_FOUND`。
+     * 2026-09-27 真机：`compose` 阶段（唯一走 .mts 的工位）因 #191 新增 `av-sync.js` 导入而整段失败，
+     * 却因为磁盘上还留着上一版母版而"看起来跑过了"（旧声轨被继续使用——双声事故能存活到交付的第二个原因）。
+     */
+    const isTypeScriptCli = /\.m?ts$/i.test(cli);
+    const out = execFileSync(process.execPath, isTypeScriptCli ? ["--import", "tsx", abs(cli), ...args] : [abs(cli), ...args], {
       encoding: "utf8", maxBuffer: 32 * 1024 * 1024, stdio: ["ignore", "pipe", "pipe"],
       /**
        * 工位路径监狱（2026-09-24 真机修复）：调色/配乐工位默认只允许访问 `process.cwd()` 与 tmpdir。
@@ -3009,6 +3022,18 @@ if (STAGES.has("videos")) {
  */
 const NARRATION_PROFILE = arg("--narration-profile", "zh-xiaozhi");
 /**
+ * 核查**工具故障**时是否仍补旁白（默认否；2026-09-27 真机事故的开关）。
+ *
+ * 事故：配音工位 ASR 首次调用超时（引擎请求超时 600s）→ 人声核查被判"未过" →
+ * 管线对**本来就有台词人声**的镜头又叠了一层 TTS 旁白；而 `dub --policy keep-dialogue`
+ * 只把原声压低、并不会消除原声 → 开头两把声音同时播（产品所有者当场听出）。
+ * 纪律：只有"核查**成功**且确认无人声"才允许补旁白；工具故障一律保留原声并标 unverified。
+ */
+const DUB_ON_VERIFY_FAILURE = flag("--dub-on-verify-failure");
+/** 配音工位不可用（超时/调用失败）的判定：只看错误前缀，不把"听不清"当成"没人声" */
+const isVoiceToolFailure = (detail: string): boolean =>
+  /配音工位调用失败|引擎请求超时|timeout|ECONNREFUSED|fetch failed/i.test(String(detail ?? ""));
+/**
  * 台词匹配阈值（2026-09-25 复核后收敛）：
  * ASR 对**专有名词与数字**的误听是已知现象（真机："一篇滕王阁序，火了1300年" 被转成
  * "一片藤王閣序火了煙三百年"，逐字比对只有 0.46），拿它当"有没有说话"的硬判据会误杀。
@@ -3108,7 +3133,34 @@ if (STAGES.has("voice")) {
         continue;
       }
       const shotStarted = Date.now();
-      const before = checkSpeech(raw, text);
+      let before = checkSpeech(raw, text);
+      /**
+       * 工具故障 → 先重试一次；仍不可用则**保留原声、不补旁白**（避免双声叠播）。
+       * 真机：首镜 ASR 冷启动超时（600s）被当成"没人声"，补进去的 TTS 与模型自己的台词人声同时播。
+       */
+      if (!before.ok && isVoiceToolFailure(before.detail) && !DUB_ON_VERIFY_FAILURE) {
+        log(`  ↻ ${shot.shotId} 人声核查工具不可用（${before.detail.slice(0, 80)}）→ 重试一次`);
+        await new Promise((resolve) => setTimeout(resolve, 2_000));
+        before = checkSpeech(raw, text);
+        if (!before.ok && isVoiceToolFailure(before.detail)) {
+          narrationCoverage.push({
+            shotId: shot.shotId, speaker, text, ok: true, source: "clip-audio-unverified",
+            detail: `人声核查工具不可用（${before.detail.slice(0, 80)}）：保留原声、不补旁白（避免双声叠播）`
+          });
+          record({
+            stage: "voice", shotId: shot.shotId, invoked: true, ok: true, cached: false, degraded: true, attempt: 1,
+            ms: Date.now() - shotStarted, artifact: raw,
+            evidence: {
+              source: "clip-audio-unverified",
+              toolFailure: true,
+              before: { matchRatio: before.matchRatio, activeRatio: before.activeRatio, transcript: before.transcript, detail: before.detail }
+            },
+            verdict: null,
+            note: "配音工位不可用：保留原声、未叠加旁白（工具恢复后可复检；`--dub-on-verify-failure` 可恢复旧行为）"
+          });
+          continue;
+        }
+      }
       if (before.ok) {
         narrationCoverage.push({ shotId: shot.shotId, speaker, text, ok: true, source: "clip-audio", detail: before.detail });
         record({
@@ -3306,6 +3358,12 @@ if (STAGES.has("compose")) {
        * 现在只在**有缺口时**按真实目标补足，节拍网格保持不动。
        */
       , "--retime-to", String(Number((totalSeconds - (CUT_TRANSITION ? CUT_TRANSITION_AT.split(",").filter(Boolean).length * CUT_TRANSITION_DURATION : 0)).toFixed(3)))
+      /**
+       * 音画对齐放行开关（2026-09-27 真机）：原始镜头的 AAC 逐段比画面短几毫秒，
+       * 8 段累计 −29.3ms（≈ 0.9 帧 @30fps）会被 compose 的单调漂移判据拦下。
+       * 客观可放行时由调用方显式声明，并在证据里记下实测值（不静默放行）。
+       */
+      , ...(flag("--accept-av-sync-drift") ? ["--accept-av-sync-drift"] : [])
     ]);
     const info = existsSync(master) ? probe(master) : {};
     const verdict = result.ok ? await reviewStage({
@@ -3549,9 +3607,26 @@ if (STAGES.has("subtitle") && existsSync(colored)) {
 
   if (SUBTITLE_MODE !== "sidecar") {
     const out = join(POST_DIR, "master-subtitled.mp4");
+    /**
+     * 片头标题卡（2026-09-27 真机事故）：字幕工位的 `burn --title` 会在**正片开头烧一张 3 秒标题卡**。
+     * 上一版把片名原样（`AI 班组住进你公司 · 获客增长系统 89 秒销售口播`）传进去，
+     * 大号标题横穿人物面部、两行还各自超宽——产品所有者看到的第一眼就是"排版乱"。
+     * 纪律：
+     *   · 封面卡已经承担片头标题时（本管线默认会产出并前置封面卡）**不再重复烧标题卡**；
+     *   · 确需标题卡（`--no-open-with-cover` 或只跑字幕段）时，用**短标题**（取 `·` 前主标题、≤12 字），
+     *     不再把整条片名塞进画面。
+     */
+    const coverWillOpenTheFilm = (STAGES.has("cover") || existsSync(join(OUT_DIR, `${PROJECT}-cover.png`)))
+      && !flag("--no-open-with-cover");
+    const burnOpeningTitle = !coverWillOpenTheFilm && !flag("--no-title-card");
+    const openingTitle = arg("--opening-title", arg("--cover-hook", shotlist.title ?? ""))
+      .split(/[·|｜]/)[0]!.trim().slice(0, 12);
+    if (!burnOpeningTitle) {
+      log(`  · 片头标题卡：跳过（封面卡承担片头标题${coverWillOpenTheFilm ? "" : "；--no-title-card 显式关闭"}）`);
+    }
     const result = runCli(SUBTITLE_CLI, [
       "burn", "--in", colored, "--out", out, "--srt", srtFile,
-      "--title", arg("--title", shotlist.title ?? ""),
+      ...(burnOpeningTitle ? ["--title", openingTitle] : []),
       "--platform", platform,
       ...(briefFile ? ["--brief", briefFile] : []),
       "--evidence-dir", join(POST_DIR, "subtitle-evidence")
@@ -4083,6 +4158,12 @@ async function callCoverDesigner(designInput: CoverDesignInput): Promise<string>
         { role: "user", content: buildCoverDesignPrompt(designInput) }
       ],
       temperature: 0.4,
+      /**
+       * 显式 max_tokens（2026-09-27 真机）：默认上限偏小/不确定时，设计稿会在
+       * `"background":{"` 处被截断 → `不是合法 JSON` → 连走两次自修复都失败 → 退兜底稿。
+       * 设计稿本来只有几百 token，给 2000 足够且不会改变风格。
+       */
+      max_tokens: 2000,
       response_format: { type: "json_object" }
     }),
     signal: AbortSignal.timeout(180_000)
@@ -4185,12 +4266,39 @@ if (STAGES.has("cover") && existsSync(colored)) {
   } catch (err) {
     designVia = "fallback";
     designNote = `设计师不可用 → 兜底稿：${err instanceof Error ? err.message.slice(0, 200) : String(err)}`;
-    plan = fallbackCoverPlan(designInput, {
-      headline: arg("--cover-hook", shotlist.title ?? "封面"),
-      heroShotId: fallbackBackground.shotId,
-      personShotId: personShotFor(fallbackBackground.shotId)?.shotId
-    });
-    log(`  ⚠ 封面设计师不可用 → 使用兜底稿：${designNote}`);
+    try {
+      plan = fallbackCoverPlan(designInput, {
+        headline: arg("--cover-hook", shotlist.title ?? "封面"),
+        heroShotId: fallbackBackground.shotId,
+        personShotId: personShotFor(fallbackBackground.shotId)?.shotId
+      });
+      log(`  ⚠ 封面设计师不可用 → 使用兜底稿：${designNote}`);
+    } catch (fallbackErr) {
+      /**
+       * 兜底稿也非法时**不许把封面环节整个崩掉**（2026-09-27 真机：兜底稿写死"30 秒"→ 校验抛错 →
+       * 整条片子的封面/片头合成全部中断）。这里退到**最小合法稿**：只保留主标题，
+       * 不提秒数、不带副标题/角标（时长口径校验因此不可能触发），交给机检+监制把关；
+       * 若监制不放行，新规则会阻止它进入成片（宁可不叠封面）。
+       */
+      designNote = `兜底稿亦不合法（${fallbackErr instanceof Error ? fallbackErr.message.slice(0, 160) : String(fallbackErr)}）→ 退最小合法稿`;
+      log(`  ⚠ ${designNote}`);
+      plan = {
+        headline: arg("--cover-hook", shotlist.title ?? "封面").slice(0, 12),
+        layout: "person-right",
+        background: { shotId: fallbackBackground.shotId, atSec: 1.2, treatment: "grade" },
+        person: { enabled: false, widthRatio: 0.42 },
+        typography: {
+          fontId: "source-han-heavy",
+          headlineSizeRatio: 0.075,
+          sublineSizeRatio: 0.034,
+          color: "#FFFFFF",
+          accentColor: "#FFD166",
+          align: "left"
+        },
+        rationale: "最小合法稿：仅主标题（不提秒数/不带副标题），避免时长口径校验与文案溢出",
+        source: "fallback"
+      };
+    }
   }
   /** 人物卡来源：与主视觉时段一致的人物镜（管线按最终设计稿再校正一次） */
   const personShot = personShotFor(plan.background.shotId);
@@ -4235,11 +4343,21 @@ if (STAGES.has("cover") && existsSync(colored)) {
   };
   const COVER_MIN_SHARPNESS = 5.5;
   /**
+   * 人物镜专用下限（2026-09-27 真机标定）：5.5 是从**景物/地标**素材标出来的
+   * （城市实拍 8.3–8.7、夜景甩镜 2.4–6.1）；而人物口播镜是浅景深+柔光，全画幅边缘能量天然只有
+   * 3.2–4.0（本片 8 镜实测），拿 5.5 去卡会把**每一条口播片**的封面都判死。
+   * 人物版式（person / person-solo）因此用 2.6：仍能拦住真正失焦/运动模糊的帧，但不误杀浅景深人物。
+   */
+  const COVER_MIN_SHARPNESS_PERSON = 2.6;
+  /**
    * 夜景底图的清晰度下限（2026-09-25 真机标定）：夜色画面天然边缘能量低
    * （实测 滕王阁夜景生成镜最清晰帧 3.0，而白天镜 8–12）。沿用 5.5 会把"唯一符合文案的夜景镜"否掉，
    * 逼着替换成白天景 → 图文不符（真机打回两次）。夜景单独用 2.8。
    */
-  const sharpnessFloorFor = (shot: ShotCard): number => (isNightShot(shot) ? 2.8 : COVER_MIN_SHARPNESS);
+  const sharpnessFloorFor = (shot: ShotCard): number =>
+    (COVER_HERO === "person" || COVER_HERO === "person-solo")
+      ? COVER_MIN_SHARPNESS_PERSON
+      : (isNightShot(shot) ? 2.8 : COVER_MIN_SHARPNESS);
   const pickSharpest = (shot: ShotCard, times: number[]): { atSec: number; sharpness: number } => {
     let best = { atSec: times[0]!, sharpness: -1 };
     for (const t of times) {
@@ -4330,7 +4448,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 要么直接以景物为主"；把人物硬贴在地标上属于两种主视觉打架，正是被打回的那版。
    */
   const insetShot = COVER_HERO === "landmark" ? personShot : COVER_HERO === "person" ? bgShot : personShot;
-  const insetEnabled = ["scenery", "subject", "object", "product"].includes(COVER_HERO)
+  const insetEnabled = ["scenery", "subject", "object", "product", "person-solo"].includes(COVER_HERO)
     ? false
     : COVER_HERO === "landmark"
       ? Boolean(plan.person.enabled && personShot)
@@ -4354,8 +4472,48 @@ if (STAGES.has("cover") && existsSync(colored)) {
    *   `person` 版：**人物镜取满幅做底**（人物是背景，不存在"贴片边缘"），地标帧留给右上角小图；
    *   `landmark` 版（默认）：地标取满幅做底，人物走右下卡片。
    */
-  const heroShot = COVER_HERO === "person" ? (personShotFor(bgShot.shotId) ?? bgShot) : bgShot;
-  const heroAt = COVER_HERO === "person" ? 1.0 : bgAt;
+  let heroShot = COVER_HERO === "person" || COVER_HERO === "person-solo"
+    ? (personShotFor(bgShot.shotId) ?? bgShot)
+    : bgShot;
+  let heroAt = COVER_HERO === "person" || COVER_HERO === "person-solo" ? 1.0 : bgAt;
+  /**
+   * 人物满幅版式的**底图取帧清晰度**修复（2026-09-27 真机：`person-solo` 固定取 1.0s 那一帧
+   * 边缘能量只有 3.60，低于 5.5 下限 → 机检 `background-sharpness` 打回、封面被拒）。
+   * 口径同"地标底图"：在人物镜内挑最清晰一帧；仍不达标就换别的**含主角**的镜头帧。
+   */
+  let heroSharpness = bgPick.sharpness;
+  if (COVER_HERO === "person" || COVER_HERO === "person-solo") {
+    const withCharacter = (shot: ShotCard): boolean => /陈卓|character|主角/i.test(String(shot.character ?? ""));
+    const candidates = [heroShot, ...shots.filter((s) => withCharacter(s) && s.shotId !== heroShot.shotId)];
+    let bestHero: { shot: ShotCard; atSec: number; sharpness: number } = { shot: heroShot, atSec: heroAt, sharpness: -1 };
+    for (const candidate of candidates) {
+      const duration = Number(candidate.duration ?? 5);
+      /**
+       * 取帧候选**避开开场/收尾半秒**（2026-09-27 真机：0.3s 那一帧"最清晰"但人物眼睛是低垂/闭着的——
+       * 静态帧边缘能量天然更高，纯按清晰度选会稳定选中"没在说话"的瞬间）。
+       * 现在只在 0.8s 之后、结束前 0.8s 之前取样：口播镜头在这些时刻通常正对镜头说话。
+       */
+      /**
+       * 两轮取样（2026-09-27 真机二次修正）：
+       *   ① 先取"避开开场/收尾半秒"的样本（这些时刻通常在说话、眼神对镜头）；
+       *   ② 若①仍低于清晰度下限，再回退到含开场/收尾的**全样本**，取绝对最清晰的那帧——
+       *      宁可牺牲"眼神"，也不能让封面因底图偏软被机检打回（上一版正是因为只顾眼神，
+       *      把 CF-01 的 0.8s 软帧选成底图，sharpness 3.56 < 5.5 → 整张封面被拒）。
+       */
+      const laterPick = pickSharpest(candidate, [0.8, duration * 0.25, duration * 0.45, duration * 0.65, Math.max(0.8, duration - 0.8)]);
+      const pick = laterPick.sharpness >= sharpnessFloorFor(candidate)
+        ? laterPick
+        : pickSharpest(candidate, [1.0, 0.5, duration * 0.5, duration * 0.75, Math.max(0.6, duration - 0.5)]);
+      if (pick.sharpness > bestHero.sharpness) bestHero = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
+      if (bestHero.sharpness >= sharpnessFloorFor(bestHero.shot)) break;
+    }
+    if (bestHero.shot.shotId !== heroShot.shotId) {
+      log(`  ↻ 封面人物底图：${heroShot.shotId} 最清晰帧仅 ${bestHero.sharpness.toFixed(1)}（下限 ${sharpnessFloorFor(bestHero.shot)}）→ 改用 ${bestHero.shot.shotId} 的 ${bestHero.atSec}s`);
+    }
+    heroShot = bestHero.shot;
+    heroAt = bestHero.atSec;
+    heroSharpness = bestHero.sharpness;
+  }
   const bgFrameA = join(coverDir, "bg-frame-a.png");
   const bgFrameB = join(coverDir, "bg-frame-b.png");
   run(FFMPEG, ["-y", "-ss", (shotAt(heroShot.shotId) + heroAt).toFixed(2), "-i", colored, "-frames:v", "1", bgFrameA]);
@@ -4365,12 +4523,16 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 上一版用两层厚带（0.32 + 0.16）→ 监制一眼看出"两条贯穿全宽的硬接缝"，判为合成残留。
    * 现在 14 层薄带、透明度从 0.40 线性衰减到 0，边缘不可辨。
    */
-  const scrimTop = 0;
-  const scrimHeight = Math.round(CH * 0.46);
+  /**
+   * 压暗带随文字带移动（person-solo：文字在下方安全带 → 压暗带也落到下半幅）。
+   * 方向也随之翻转：上方文字带是"上深下浅"，下方文字带是"上浅下深"。
+   */
+  const scrimTop = COVER_LOWER_BAND_TEXT ? Math.round(CH * 0.50) : 0;
+  const scrimHeight = Math.round(CH * (COVER_LOWER_BAND_TEXT ? 0.40 : 0.46));
   const scrimBands = 14;
   const bandHeight = Math.max(2, Math.round(scrimHeight / scrimBands));
   const scrimFilters = Array.from({ length: scrimBands }, (_, index) => {
-    const alpha = 0.40 * (1 - index / (scrimBands - 1));
+    const alpha = 0.40 * (COVER_LOWER_BAND_TEXT ? index / (scrimBands - 1) : 1 - index / (scrimBands - 1));
     const y = scrimTop + index * bandHeight;
     return `drawbox=x=0:y=${y}:w=${CW}:h=${bandHeight}:color=black@${alpha.toFixed(3)}:t=fill`;
   });
@@ -4473,7 +4635,10 @@ if (STAGES.has("cover") && existsSync(colored)) {
     Math.round(headSizeDesired * 0.6),
     Math.min(headSizeDesired, Math.floor(availableWidth / longestLineEm))
   );
-  const accentY = Math.round(CH * COVER_SAFE_AREA.topMinRatio);
+  /** 文字带起点：person-solo 下移到面部下方安全带（58%），其余版式保持顶部安全区 */
+  const accentY = COVER_LOWER_BAND_TEXT
+    ? Math.round(CH * COVER_LOWER_BAND_SAFE_AREA.topMinRatio)
+    : Math.round(CH * COVER_SAFE_AREA.topMinRatio);
   const accentH = Math.max(8, Math.round(CH * 0.006));
   const titleY = accentY + Math.round(headSize * 0.42);
   const lineGap = Math.round(headSize * 0.12);
@@ -4491,17 +4656,33 @@ if (STAGES.has("cover") && existsSync(colored)) {
   });
   const subY = titleY + titleLines.length * (headSize + lineGap) + Math.round(headSize * 0.12);
   let cursorY = subY;
+  /**
+   * 副标题/角标**同样自适应字级**（2026-09-27 真机：`四支团队 78 个岗位，你只管拍板`
+   * 在 0.03 字级下宽约 1.8 倍画幅 → 直接被右缘裁切，产品所有者当场判"排版太乱"）。
+   * 口径同主标题：汉字 1em、非汉字 0.55em 估宽，压到一行放得下为止（下限 55% 设计字级）。
+   * 注意必须在 `emWidth/availableWidth` 定义之后计算（上一版放在前面触发 TDZ 报错）。
+   */
+  const sublineText = plan.subline ? escapeDrawtextText(plan.subline) : "";
+  const subSizeDraw = sublineText
+    ? Math.max(Math.round(subSize * 0.55), Math.min(subSize, Math.floor(availableWidth / Math.max(1, emWidth(sublineText)))))
+    : subSize;
   if (plan.subline) {
     textFilters.push(
-      `drawtext=fontfile='${FONT_FILE}':text=${escapeDrawtextText(plan.subline)}:expansion=none:fontsize=${subSize}`
-        + `:fontcolor=${plan.typography.accentColor}:borderw=${Math.max(2, Math.round(subSize * 0.06))}:bordercolor=black@0.5`
+      `drawtext=fontfile='${FONT_FILE}':text=${sublineText}:expansion=none:fontsize=${subSizeDraw}`
+        + `:fontcolor=${plan.typography.accentColor}:borderw=${Math.max(2, Math.round(subSizeDraw * 0.06))}:bordercolor=black@0.5`
         + `:x=${plan.typography.align === "center" ? "(w-text_w)/2" : String(left + 4)}:y=${cursorY}`
     );
-    cursorY += subSize + Math.round(subSize * 0.45);
+    cursorY += subSizeDraw + Math.round(subSizeDraw * 0.45);
   }
-  if (plan.badge) {
+  /**
+   * 角标去重（2026-09-27 真机）：设计师会同时把时长写进副标题与角标
+   * （封面出现「89 秒看懂获客增长系统」+「89秒 · 获客增长」两行同义信息）。
+   * 判据：角标与副标题都含"秒"时判定重复，保留信息量更大的副标题。
+   */
+  const badgeText = plan.badge && plan.subline && /秒/.test(plan.badge) && /秒/.test(plan.subline) ? undefined : plan.badge;
+  if (badgeText) {
     textFilters.push(
-      `drawtext=fontfile='${FONT_FILE}':text=${escapeDrawtextText(plan.badge)}:expansion=none:fontsize=${badgeSize}`
+      `drawtext=fontfile='${FONT_FILE}':text=${escapeDrawtextText(badgeText)}:expansion=none:fontsize=${badgeSize}`
         + `:fontcolor=white@0.92:borderw=${Math.max(2, Math.round(badgeSize * 0.06))}:bordercolor=black@0.5`
         + `:x=${plan.typography.align === "center" ? "(w-text_w)/2" : String(left + 4)}:y=${cursorY}`
     );
@@ -4514,7 +4695,14 @@ if (STAGES.has("cover") && existsSync(colored)) {
   const diffFile = join(coverDir, "text-diff.png");
   imageDiff(coverPng, bgPerson, diffFile);
   const ink = inkMetrics(diffFile, CW, CH);
-  const titleBand = { x: 0, y: Math.round(CH * COVER_SAFE_AREA.topMinRatio), w: CW, h: Math.round(CH * (COVER_SAFE_AREA.titleBottomMaxRatio - COVER_SAFE_AREA.topMinRatio)) };
+  /** 标题带测量区随版式移动（person-solo 量下带，其余量上带） */
+  const coverSafeAreaForCheck = COVER_LOWER_BAND_TEXT ? COVER_LOWER_BAND_SAFE_AREA : COVER_SAFE_AREA;
+  const titleBand = {
+    x: 0,
+    y: Math.round(CH * coverSafeAreaForCheck.topMinRatio),
+    w: CW,
+    h: Math.round(CH * (coverSafeAreaForCheck.titleBottomMaxRatio - coverSafeAreaForCheck.topMinRatio))
+  };
   /** 人物卡区域（机检的人工地物）：卡内 30%–75% 高度、中央 70% 宽度——避开白边与投影的干扰 */
   const personBox = {
     x: cardX + Math.round(cardW * 0.15), y: cardY + Math.round(cardH * 0.30),
@@ -4548,16 +4736,26 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 2026-09-26 产品所有者口径：封面只有两种主视觉，要么人物为主、要么物体（景物/商品/动物）为主；
    * 没有人物层不是缺陷，而是版式选择。
    */
-  const checks = coverDeterministicChecks(measurements).filter((check) => insetEnabled || check.id !== "person-layer");
+  const checks = coverDeterministicChecks(measurements, coverSafeAreaForCheck)
+    .filter((check) => insetEnabled || check.id !== "person-layer");
   /**
    * 底图清晰度（硬闸，2026-09-25 二次复核新增）：监制抓到的"地标糊到不可辨识"应当由机检拦住，
    * 而不是等 LLM 打回。口径见上面的标定（同一抽帧标准下白天 8.3–8.7 / 黄昏 3.2–4.9 / 夜景甩镜 2.4–6.1）。
    */
   checks.push({
     id: "background-sharpness",
-    pass: bgPick.sharpness >= sharpnessFloorFor(bgShot),
-    detail: `底图边缘能量 ${bgPick.sharpness.toFixed(2)}（下限 ${sharpnessFloorFor(bgShot)}${isNightShot(bgShot) ? "，夜景口径" : ""}；低于它基本是运动模糊/失焦）`
-      + `${bgSubstituted ? "（已自动改取全片最清晰帧）" : ""}`,
+    /**
+     * 人物满幅版式（person / person-solo）的底图就是**人物镜那一帧**，
+     * 因此清晰度口径必须量这帧（`heroSharpness`），而不是地标帧（`bgPick`）——
+     * 2026-09-27 真机就是量错了对象：人物帧 3.60 被判"地标糊"，实际两者无关。
+     */
+    pass: (COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroSharpness : bgPick.sharpness)
+      >= sharpnessFloorFor(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot),
+    detail: `底图边缘能量 ${(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroSharpness : bgPick.sharpness).toFixed(2)}`
+      + `（下限 ${sharpnessFloorFor(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot)}`
+      + `${isNightShot(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot) ? "，夜景口径" : ""}；低于它基本是运动模糊/失焦）`
+      + `${bgSubstituted && !(COVER_HERO === "person" || COVER_HERO === "person-solo") ? "（已自动改取全片最清晰帧）" : ""}`
+      + `${COVER_HERO === "person" || COVER_HERO === "person-solo" ? `（人物底图：${heroShot.shotId} @ ${heroAt}s）` : ""}`,
     hard: true
   });
   /** ④ 监制：看整图（rubric 只问可验证的事） */
@@ -4596,7 +4794,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
       designVia, plan, hook: plan.headline.replace(/\n/g, " "), font: plan.typography.fontId,
       background: { shotId: bgShot.shotId, atSec: bgAt, source: "colored（未烧字幕母版）" },
       backgroundPick: { sharpness: bgPick.sharpness, floor: COVER_MIN_SHARPNESS, substituted: bgSubstituted, plannedShotId: plan.background.shotId },
-      headline: { text: plan.headline, fontId: plan.typography.fontId, sizePx: headSize, subSizePx: subSize },
+      headline: { text: plan.headline, fontId: plan.typography.fontId, sizePx: headSize, subSizePx: subSizeDraw },
       person: {
         shotId: personShot?.shotId ?? null, atSec: plan.person.atSec ?? null,
         card: { x: cardX, y: cardY, w: cardW, h: cardH, border: cardBorder },
@@ -4611,12 +4809,22 @@ if (STAGES.has("cover") && existsSync(colored)) {
     log(`⛔ 封面机检未通过：${checks.filter((c) => !c.pass).map((c) => c.id).join("、")}`);
   }
   /**
+   * 封面是否**真的合格**（机检全过 + 监制放行）。
+   * 2026-09-27 真机事故：封面两轮被判"标题压脸、副标题被裁、出现第二个人像"（28/38 分），
+   * 但片头仍把这张被打回的图合成进了成片 → 用户第一眼看到的就是那张乱版封面。
+   * 纪律：**未放行的封面不进成片**（宁可没有封面卡），并如实留痕。
+   */
+  const coverApproved = checks.every((c) => c.pass) && verdict.approved;
+  if (!coverApproved && existsSync(coverPng)) {
+    log(`⛔ 封面未放行（机检 ${checks.filter((c) => c.pass).length}/${checks.length} · 监制 ${verdict.approved ? "放行" : "打回"}）→ 不合成进片头`);
+  }
+  /**
    * **封面合成进成片**（2026-09-26 产品所有者点名："封面也没合成进去，还是黑色的"）：
    * 早先封面只是旁边一个 PNG，成片片头是一张黑底标题卡——现在把封面做成 1.2s 开场卡
    * （轻微推近，避免"完全静止"）再接正片，输出 `<项目>-with-cover.mp4`。
    * 用 `--no-open-with-cover` 可关掉（平台若要求纯正片版本）。
    */
-  if (!flag("--no-open-with-cover") && existsSync(coverPng) && existsSync(scored)) {
+  if (coverApproved && !flag("--no-open-with-cover") && existsSync(coverPng) && existsSync(scored)) {
     try {
       const card = join(coverDir, "cover-card.mp4");
       run(FFMPEG, ["-y", "-loop", "1", "-t", "1.2", "-i", coverPng,
@@ -4898,10 +5106,17 @@ if (!subtitleSidecar && SUBTITLE_MODE !== "burn") {
        */
       {
         id: "av-sync",
-        pass: avSyncReport?.ok === true,
+        /**
+         * 显式放行（`--accept-av-sync-drift`）必须**贯穿到母版终审**（2026-09-27 真机）：
+         * 该开关已让 compose CLI 放行（并把实测值写进 av-sync 报告），但终审这里只认 `ok===true`，
+         * 于是同一条片子在 compose 放行、在 master 又被同一项判红——两处口径必须一致。
+         * 放行仍留痕：detail 里如实打印实测偏移/漂移，不静默通过。
+         */
+        pass: avSyncReport?.ok === true || (Boolean(avSyncReport) && flag("--accept-av-sync-drift")),
         detail: avSyncReport
           ? `音画对齐实测：可测 ${avSyncReport.measured ?? 0} 镜，最大偏移 ${avSyncReport.maxAbsLagMs ?? "?"}ms，`
             + `累计漂移 ${avSyncReport.driftMs ?? "?"}ms（报告 ${basename(avSyncReportPath)}，生成于 ${avSyncReport.generatedAt ?? "?"}）`
+            + (avSyncReport.ok === true ? "" : (flag("--accept-av-sync-drift") ? "；已按 --accept-av-sync-drift 显式放行（带瑕疵放行，留痕）" : ""))
           : `缺音画对齐实测报告（${basename(avSyncReportPath)}）——机制不允许「没测就当过」；`
             + "跑一次 compose 阶段即可生成（分段重跑 master 时该报告应已存在）",
         hard: STAGES.has("compose"),

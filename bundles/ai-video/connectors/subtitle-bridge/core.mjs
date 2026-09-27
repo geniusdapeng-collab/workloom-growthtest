@@ -767,12 +767,26 @@ export function overlapsOcclusion(rect, zones) {
 
 /** 行宽校验：中文按字数、英文按字符数上限（超出即需要拆行或缩字号）。 */
 export function checkLineWidth(text, targets) {
-  const plain = String(text).replace(/\\N/g, "");
-  const han = (plain.match(/\p{Script=Han}/gu) ?? []).length;
-  const latin = plain.replace(/\p{Script=Han}/gu, "").replace(/\s/g, "").length;
+  /**
+   * 多行 cue 必须**逐行**体检（2026-09-27 真机修复）：
+   * 管线按标点把长句折成两行（full-chain-film#buildSrt），这里原来把整条 cue
+   * （含换行）当一行量，24 字的两行字幕被判「中文 24 字超出单行上限 18 字」，
+   * 烧录产物被删、母版终审 score=0。口径本就写的是"单行上限"，因此取最长行判定。
+   */
+  const lines = String(text).split(/\r?\n|\\N/).filter((line) => line.trim() !== "");
+  const metrics = lines.map((line) => {
+    const plain = line.replace(/\\N/g, "");
+    return {
+      han: (plain.match(/\p{Script=Han}/gu) ?? []).length,
+      latin: plain.replace(/\p{Script=Han}/gu, "").replace(/\s/g, "").length,
+    };
+  });
+  const han = Math.max(0, ...metrics.map((item) => item.han));
+  const latin = Math.max(0, ...metrics.map((item) => item.latin));
   return {
     charsHan: han,
     charsLatin: latin,
+    lines: lines.length,
     maxLineCharsZh: targets.maxLineCharsZh,
     maxLineCharsEn: targets.maxLineCharsEn,
     ok: han <= targets.maxLineCharsZh && latin <= targets.maxLineCharsEn,
