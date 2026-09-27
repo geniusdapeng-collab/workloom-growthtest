@@ -21,6 +21,7 @@
  *     [--keep-temp] [--json]
  */
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
@@ -210,18 +211,23 @@ if (transition && transitionDuration > 0) {
   const durations = shotSeconds;
   const inputs: string[] = [];
   normalized.forEach((file) => inputs.push("-i", file));
-  let videoLabel = "[0:v]";
+  /** concat 的输出 timebase 与裸 MP4 输入不同；统一到 AVTB 后可继续接 xfade。 */
+  const videoExact = normalized.map((_, index) => `[${index}:v]settb=AVTB,setpts=PTS-STARTPTS[vex${index}]`);
+  let videoLabel = "[vex0]";
   let audioLabel = "[aex0]";
   let offset = 0;
   const steps: string[] = [];
   for (let index = 1; index < normalized.length; index += 1) {
-    const useTransition = transitionAt.length === 0 || transitionAt.includes(index);
-    /** 不做转场的刀口用 0 秒 xfade 等价于硬切，但仍走同一条 filter 链（参数一致、便于复算） */
+    // 刀口编号是「进入第 N 镜」的 1 起序号；index 是 0 起数组下标。
+    const useTransition = transitionAt.length === 0 || transitionAt.includes(index + 1);
+    /** 硬切走 concat；0 秒 xfade 会在混合刀口上提前切走上一镜。 */
     const overlap = useTransition ? transitionDuration : 0;
     offset += durations[index - 1]! - overlap;
     const vOut = `[v${index}]`;
     const aOut = `[a${index}]`;
-    steps.push(`${videoLabel}[${index}:v]xfade=transition=${useTransition ? transition : "fade"}:duration=${overlap}:offset=${Math.max(0, offset).toFixed(3)}${vOut}`);
+    steps.push(useTransition
+      ? `${videoLabel}[vex${index}]xfade=transition=${transition}:duration=${overlap}:offset=${Math.max(0, offset).toFixed(3)}${vOut}`
+      : `${videoLabel}[vex${index}]concat=n=2:v=1:a=0${vOut}`);
     /**
      * 硬切口**不能**用 `acrossfade=d=0.01` 凑数（2026-09-27 真机事故）：
      * acrossfade 每做一刀就吃掉 10ms 音频，而视频侧 `xfade duration=0` 一点不损，
@@ -239,12 +245,13 @@ if (transition && transitionDuration > 0) {
     audioLabel = aOut;
   }
   run(FFMPEG, ["-y", ...inputs,
-    "-filter_complex", [...audioExact, ...steps].join(";"),
+    "-filter_complex", [...audioExact, ...videoExact, ...steps].join(";"),
     "-map", videoLabel, "-map", audioLabel,
     "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
     "-movflags", "+faststart", raw]);
-  const usedCuts = transitionAt.length === 0 ? normalized.length - 1 : transitionAt.filter((i) => i < normalized.length).length;
+  const usedCuts = transitionAt.length === 0 ? normalized.length - 1
+    : Array.from(new Set(transitionAt)).filter((i) => Number.isInteger(i) && i >= 2 && i <= normalized.length).length;
   console.log(`  ② 逐刀转场：${transition} @${transitionDuration}s × ${usedCuts} 刀（其余硬切）`);
 } else {
   /**
@@ -343,7 +350,7 @@ const shotStarts: number[] = [];
   for (let index = 0; index < normalized.length; index += 1) {
     shotStarts.push(cursor);
     if (index < normalized.length - 1) {
-      const nextCut = index + 1;
+      const nextCut = index + 2;
       const useTransition = Boolean(transition && transitionDuration > 0)
         && (transitionAt.length === 0 || transitionAt.includes(nextCut));
       cursor += shotDurations[index]! - (useTransition ? transitionDuration : 0);
@@ -408,16 +415,19 @@ for (let index = 0; index < normalized.length; index += 1) {
     correlation: Number(best.correlation.toFixed(3)),
   });
 }
-const avReport = evaluateAvSync(avSamples, AV_SYNC_POLICY);
+/** 短片只有 1–2 镜时，要求的可测窗口数不能超过真实镜头数。 */
+const avPolicy = { ...AV_SYNC_POLICY, minMeasurable: Math.min(AV_SYNC_POLICY.minMeasurable, normalized.length) };
+const avReport = evaluateAvSync(avSamples, avPolicy);
 const avReportPath = join(dirname(out), `${basename(out).replace(/\.mp4$/i, "")}.av-sync.json`);
 writeFileSync(avReportPath, `${JSON.stringify({
   ...avReport,
   generatedAt: new Date().toISOString(),
-  policy: AV_SYNC_POLICY,
+  policy: avPolicy,
   sampleRate: avSyncSampleRate,
   clipCount: normalized.length,
   retimeFactor,
   output: out,
+  outputSha256: createHash("sha256").update(readFileSync(out)).digest("hex"),
 }, null, 2)}\n`, "utf8");
 console.log(`  ③-1 ${describeAvSync(avReport)}`);
 console.log(`       报告：${avReportPath}`);

@@ -78,6 +78,25 @@ for d in "${RUNTIME_SOURCE_DIRS[@]}"; do
 done
 mkdir -p "$R/scripts"
 cp scripts/migrate.ts scripts/desktop-bootstrap-db.mjs scripts/product-runtime.mjs scripts/vite-product.mjs "$R/scripts/"
+mkdir -p "$R/scripts/tools"
+cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
+   scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
+   scripts/tools/enhance-engine-install.mjs scripts/tools/uhd-lineage.mts \
+   scripts/tools/uhd-publication.mts "$R/scripts/tools/"
+# Whiteboard source and example inputs are portable; the machine-specific Python
+# venv and FFmpeg binaries are installed separately and never copied into this payload.
+mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
+  "$R/vendor/srt-whiteboard/scripts" "$R/vendor/srt-whiteboard/assets" "$R/vendor/srt-whiteboard/examples"
+cp scripts/whiteboard/lineart_tools.py "$R/scripts/whiteboard/"
+cp assets/whiteboard/drawing-hand-workloom.png "$R/assets/whiteboard/"
+cp vendor/srt-whiteboard/LICENSE vendor/srt-whiteboard/PINNED.md vendor/srt-whiteboard/VENDOR.md \
+   vendor/srt-whiteboard/README.md vendor/srt-whiteboard/SKILL.md \
+   vendor/srt-whiteboard/requirements.txt "$R/vendor/srt-whiteboard/"
+cp vendor/srt-whiteboard/scripts/*.py "$R/vendor/srt-whiteboard/scripts/"
+cp vendor/srt-whiteboard/assets/drawing-hand.png "$R/vendor/srt-whiteboard/assets/"
+cp vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
+   vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
+   "$R/vendor/srt-whiteboard/examples/"
 cp scripts/seed*.ts "$R/scripts/"  # 全部行业种子随包（按 .env.defaults DESKTOP_SEED_SCRIPT 选用）
 printf '%s\n' "$VERSION" > "$R/VERSION"
 
@@ -106,7 +125,18 @@ for pkgjson in "${INTERNAL_PACKAGE_MANIFESTS[@]}"; do
 done
 find "$R/node_modules" -mindepth 2 -maxdepth 4 -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
 for f in node_modules/tsx/package.json node_modules/hono/package.json scripts/migrate.ts \
-         scripts/product-runtime.mjs scripts/vite-product.mjs product.manifest.json apps/web/vite.config.ts; do
+         scripts/product-runtime.mjs scripts/vite-product.mjs product.manifest.json apps/web/vite.config.ts \
+         scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
+         scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
+         scripts/tools/enhance-engine-install.mjs scripts/tools/uhd-lineage.mts \
+         scripts/tools/uhd-publication.mts scripts/whiteboard/lineart_tools.py \
+         assets/whiteboard/drawing-hand-workloom.png vendor/srt-whiteboard/LICENSE \
+         vendor/srt-whiteboard/requirements.txt vendor/srt-whiteboard/scripts/prepare_env.py \
+         vendor/srt-whiteboard/scripts/render_stream_whiteboard.py \
+         vendor/srt-whiteboard/scripts/stream_render.py vendor/srt-whiteboard/scripts/merge_scenes.py \
+         vendor/srt-whiteboard/scripts/render_annotation_preview.py \
+         vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
+         vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json; do
   [ -f "$R/$f" ] || { echo "❌ 应急载荷自检失败：runtime/$f 缺失"; exit 1; }
 done
 node scripts/payload-policy.mjs assert-runtime "$R"

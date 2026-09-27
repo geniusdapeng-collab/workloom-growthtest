@@ -118,6 +118,33 @@ test("every packaging download is wired through the verified fetch boundary", as
   assert.match(files.pgvectorWin, /\$ActualPgvectorCommit -ne \$PgvectorCommit/);
   assert.doesNotMatch(files.pgvectorWin, /foreach \(\$pkg|git clone --depth 1 --branch/);
   assert.match(files.electron, /verify-windows-pg-provenance vendor\/pg-win\/WORKLOOM-PROVENANCE\.txt/);
+  for (const tool of [
+    "full-chain-film.mts", "compose-film.mts", "explainer-run.mts", "whiteboard-film.mts",
+    "whiteboard-env-install.mts", "enhance-engine-install.mjs", "uhd-lineage.mts", "uhd-publication.mts",
+  ]) {
+    assert.match(files.electron, new RegExp(`scripts/tools/${tool.replaceAll(".", "\\.")}`));
+    assert.match(files.mac, new RegExp(`scripts/tools/${tool.replaceAll(".", "\\.")}`));
+  }
+  for (const relativePath of [
+    "scripts/whiteboard/lineart_tools.py",
+    "assets/whiteboard/drawing-hand-workloom.png",
+    "vendor/srt-whiteboard/LICENSE",
+    "vendor/srt-whiteboard/requirements.txt",
+    "vendor/srt-whiteboard/scripts/prepare_env.py",
+    "vendor/srt-whiteboard/scripts/render_stream_whiteboard.py",
+    "vendor/srt-whiteboard/scripts/stream_render.py",
+    "vendor/srt-whiteboard/scripts/merge_scenes.py",
+    "vendor/srt-whiteboard/scripts/render_annotation_preview.py",
+    "vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png",
+    "vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json",
+  ]) {
+    assert.ok(files.electron.includes(relativePath), `Electron 载荷遗漏 ${relativePath}`);
+    assert.ok(files.mac.includes(relativePath), `macOS 载荷遗漏 ${relativePath}`);
+  }
+  assert.doesNotMatch(files.electron, /cp\s+(?:-\S+\s+)*vendor\/srt-whiteboard\s/u,
+    "Electron 载荷不得把机器本地 .venv 随 vendor 根目录复制");
+  assert.doesNotMatch(files.mac, /cp\s+(?:-\S+\s+)*vendor\/srt-whiteboard\s/u,
+    "macOS 载荷不得把机器本地 .venv 随 vendor 根目录复制");
   assert.match(files.win, /verify-windows-pg-provenance vendor\/pg-win\/WORKLOOM-PROVENANCE\.txt/);
   for (const name of ["desktopWorkflow", "legacyWorkflow"]) {
     assert.match(files[name], /runs-on: windows-2022/);

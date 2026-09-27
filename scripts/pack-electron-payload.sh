@@ -97,6 +97,25 @@ for d in "${RUNTIME_SOURCE_DIRS[@]}"; do
   copy "$d" "$R/$(dirname "$d")/"
 done
 cp scripts/migrate.ts scripts/desktop-bootstrap-db.mjs scripts/product-runtime.mjs scripts/vite-product.mjs "$R/scripts/"
+mkdir -p "$R/scripts/tools"
+# Film CLIs keep their repo-relative paths in the installed runtime. Native
+# enhancer, Python venv, and FFmpeg binaries remain workstation prerequisites.
+cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
+   scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
+   scripts/tools/enhance-engine-install.mjs scripts/tools/uhd-lineage.mts \
+   scripts/tools/uhd-publication.mts "$R/scripts/tools/"
+mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
+  "$R/vendor/srt-whiteboard/scripts" "$R/vendor/srt-whiteboard/assets" "$R/vendor/srt-whiteboard/examples"
+cp scripts/whiteboard/lineart_tools.py "$R/scripts/whiteboard/"
+cp assets/whiteboard/drawing-hand-workloom.png "$R/assets/whiteboard/"
+cp vendor/srt-whiteboard/LICENSE vendor/srt-whiteboard/PINNED.md vendor/srt-whiteboard/VENDOR.md \
+   vendor/srt-whiteboard/README.md vendor/srt-whiteboard/SKILL.md \
+   vendor/srt-whiteboard/requirements.txt "$R/vendor/srt-whiteboard/"
+cp vendor/srt-whiteboard/scripts/*.py "$R/vendor/srt-whiteboard/scripts/"
+cp vendor/srt-whiteboard/assets/drawing-hand.png "$R/vendor/srt-whiteboard/assets/"
+cp vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
+   vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
+   "$R/vendor/srt-whiteboard/examples/"
 cp scripts/seed*.ts "$R/scripts/"  # 全部行业种子随包（seed/seed-aipm/seed-geo/seed-video/seed-consulting/seed-boost/seed-platform…按仓配置选用）
 # 种子共享模块：seed-*.ts 会 import 这些 .mts（不只是 seed* 前缀的文件）。
 # 2026-09-20 客户端首启实证：漏拷 skill-bindings.mts → 种子 ERR_MODULE_NOT_FOUND，客户端起不来。
@@ -228,6 +247,19 @@ if [ ! -s build/bundle-trust.json ]; then
 fi
 for f in runtime/node_modules/tsx/package.json runtime/node_modules/hono/package.json \
          runtime/scripts/migrate.ts runtime/scripts/product-runtime.mjs runtime/scripts/vite-product.mjs \
+         runtime/scripts/tools/full-chain-film.mts runtime/scripts/tools/compose-film.mts \
+         runtime/scripts/tools/explainer-run.mts runtime/scripts/tools/whiteboard-film.mts \
+         runtime/scripts/tools/whiteboard-env-install.mts runtime/scripts/tools/enhance-engine-install.mjs \
+         runtime/scripts/tools/uhd-lineage.mts runtime/scripts/tools/uhd-publication.mts \
+         runtime/scripts/whiteboard/lineart_tools.py runtime/assets/whiteboard/drawing-hand-workloom.png \
+         runtime/vendor/srt-whiteboard/LICENSE runtime/vendor/srt-whiteboard/requirements.txt \
+         runtime/vendor/srt-whiteboard/scripts/prepare_env.py \
+         runtime/vendor/srt-whiteboard/scripts/render_stream_whiteboard.py \
+         runtime/vendor/srt-whiteboard/scripts/stream_render.py \
+         runtime/vendor/srt-whiteboard/scripts/merge_scenes.py \
+         runtime/vendor/srt-whiteboard/scripts/render_annotation_preview.py \
+         runtime/vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
+         runtime/vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
          runtime/product.manifest.json runtime/apps/web/vite.config.ts; do
   [ -f "$OUT/$f" ] || { echo "❌ 载荷自检失败：$f 缺失"; exit 1; }
 done
