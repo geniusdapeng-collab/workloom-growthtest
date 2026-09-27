@@ -13,13 +13,21 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildCardRegistry, extractConstSlots, extractDisplayStrings, parseFrontmatter, patchCardSource } from "./card-registry.js";
 import { alignScriptToTimestamps, expandToTiming, intToChinese, normalizeSpoken } from "./aligner.js";
 import { licenseStateOf, engineStatus, REQUIRED_ENGINE_FILES } from "./engine.js";
 import { deriveAnchors, deriveBeats, validateShotbook } from "./shotbook.js";
-import { renderShotsArgs } from "./remotion-provider.js";
-import type { ExplainerShotbook, ExplainerScript, SemanticsFile, TimestampsFile } from "./types.js";
+import { renderShotsArgs, renderWorkerCount, remotionSubmitParams, RemotionProvider } from "./remotion-provider.js";
+import { explainerOutputSize, type ExplainerShotbook, type ExplainerScript, type SemanticsFile, type TimestampsFile } from "./types.js";
+
+describe("输出画布契约", () => {
+  it("默认 HD，UHD 竖屏与横屏均为原生尺寸", () => {
+    expect(explainerOutputSize("9:16")).toEqual({ width: 1080, height: 1920 });
+    expect(explainerOutputSize("9:16", "uhd")).toEqual({ width: 2160, height: 3840 });
+    expect(explainerOutputSize("16:9", "uhd")).toEqual({ width: 3840, height: 2160 });
+  });
+});
 
 const CARD_SRC = `import React from "react";
 // 这是注释里的中文，不该进展示文案
@@ -327,6 +335,13 @@ describe("engine 许可闸与就绪度", () => {
 });
 
 describe("渲染 CLI 组装", () => {
+  it("UHD 强制单段单帧，HD 维持可配置并行度", () => {
+    expect(renderWorkerCount(2160, 3840, 8)).toBe(1);
+    expect(renderWorkerCount(3840, 2160, 2)).toBe(1);
+    expect(renderWorkerCount(1080, 1920, 2)).toBe(2);
+    expect(() => renderWorkerCount(1080, 1920, 0)).toThrow(/正整数/);
+  });
+
   it("三态范围与参数顺序（render_shots.mjs 真实契约）", () => {
     expect(renderShotsArgs({ scope: "full", parallel: 2, muxOut: "../out/v1.mp4", propsFile: "props.json" }))
       .toEqual(["--shots", "shots.json", "--all", "--parallel", "2", "--mux", "../out/v1.mp4", "--props", "@props.json"]);
@@ -347,5 +362,117 @@ describe("真实引擎契约（vendor/talkcraft 在场时才跑）", () => {
       expect(entry.codePath).toMatch(/template\/cards\//);
       expect(readFileSync(join(engineDir, entry.codePath), "utf8").length).toBeGreaterThan(200);
     }
+  });
+});
+
+
+describe("Remotion provider 参数合同", () => {
+  it("唯一提交入口的 extra 参数与 CLI 顶层参数得到相同执行参数", () => {
+    const params = { jobDir: "/tmp/prepared", audioSeconds: 6.25, scope: "only:s01,s02", parallel: 3 };
+    const nested = remotionSubmitParams({ prompt: "script", estimatedUnits: 6, params: { durationSec: 6, extra: params } });
+    expect(nested).toEqual(remotionSubmitParams({ prompt: "script", estimatedUnits: 6, params }));
+    expect(renderShotsArgs(nested)).toContain("s01,s02");
+    expect(nested.jobDir).toBe("/tmp/prepared");
+  });
+  it("冲突参数与空范围在任何文件写入/进程启动前拒绝", async () => {
+    const provider = new RemotionProvider({ env: {} });
+    await expect(provider.submit({ prompt: "script", estimatedUnits: 6, params: { jobDir: "/a", extra: { jobDir: "/b" } } })).rejects.toThrow("冲突");
+    await expect(provider.submit({ prompt: "script", estimatedUnits: 6, params: { extra: { scope: "only:", audioSeconds: 5 } } })).rejects.toThrow();
+    await expect(provider.submit({ prompt: "script", estimatedUnits: 6, params: { extra: { parallel: 0 } } })).rejects.toThrow();
+  });
+});
+
+describe("解说片 submit 路由不可变请求复放", () => {
+  let caller: any;
+  const scope = { tenantId: "tenant-ex", workspaceId: "workspace-ex" };
+  let saved: any;
+  let row: any;
+  const prepare = vi.fn(), submit = vi.fn(), create = vi.fn(), approve = vi.fn(), update = vi.fn(), renderJob = vi.fn();
+  const query = vi.fn();
+  beforeAll(async () => {
+    const { initTRPC } = await import("@trpc/server");
+    const t = initTRPC.context<any>().create();
+    vi.doMock("../../trpc/context.js", () => ({ router: t.router, protectedProcedure: t.procedure,
+      writeProcedure: t.procedure, scopeOf: (identity: any) => ({ tenantId: identity.tenantId, workspaceId: identity.workspaceId }) }));
+    vi.doMock("@workloom/db", () => ({ getAppPool: () => ({}), getGatewayPool: () => ({}) }));
+    vi.doMock("../gen/submit.js", () => ({ submitGenJob: submit }));
+    vi.doMock("@workloom/base/asset-cms", () => ({ create, approve }));
+    vi.doMock("@workloom/base/fence-engine", () => ({ judge: () => ({ level: "auto", impacts: [], triggeredBy: [] }) }));
+    vi.doMock("@workloom/base/model-router", () => ({ checkRenderBudget: () => ({ allowed: true }), planTierToPlanId: () => "pro" }));
+    vi.doMock("../router.js", () => ({ loadActiveRules: async () => ({ rules: [], defaultLevel: "auto" }) }));
+    vi.doMock("./pipeline.js", () => ({ runExplainerPipeline: prepare }));
+    vi.doMock("./db.js", () => ({ scopedQuery: query, projectOf: async () => ({ id: "project-ex", kind: "explainer" }),
+      latestShotbook: async () => row, updateShotbook: update, renderJobOf: renderJob }));
+    caller = (await import("./router.js")).explainerRouter.createCaller({ identity: { ...scope, memberNo: "MEM-EX", plan: "pro" } } as any);
+  });
+  beforeEach(() => {
+    saved = null;
+    row = { id: "shotbook", project_id: "project-ex", version: 3, script_text: "正文句子。", shotbook: { shots: [{ id: "s1", card: "verified-card" }] } };
+    prepare.mockReset().mockResolvedValue({ jobDir: "/tmp/prepared-project", voice: { sha256: "voice" }, timestamps: { total: 5.4, sentences: [{ i: 1, ok: true }] } });
+    submit.mockReset().mockResolvedValue({ taskId: "accepted-task" }); update.mockReset();
+    renderJob.mockReset().mockResolvedValue(null);
+    create.mockReset().mockImplementation(async (_a, _g, _s, input) => {
+      saved = { id: `${input.scriptKey}-v1`, project_id: input.projectId, shot_id: input.shotId, script_key: input.scriptKey,
+        version: 1, md: input.md, fields: input.fields, status: "draft" };
+      return saved;
+    });
+    approve.mockReset().mockImplementation(async () => { saved = { ...saved, status: "approved" }; return { script: saved }; });
+    query.mockReset().mockImplementation(async (sql, params, actualScope) => {
+      expect(actualScope).toEqual(scope);
+      if (sql.includes("SELECT s.* FROM render_scripts")) {
+        expect(params).toEqual([scope.workspaceId, expect.stringMatching(/^explainer-shotbook(?:-uhd)?$/), scope.tenantId, "project-ex"]);
+        return saved && (!saved.script_key || saved.script_key === params[1]) ? [saved] : [];
+      }
+      if (sql.includes("SUM(")) return [{ total: "0" }];
+      if (sql.includes("FROM explainer_shotbooks")) return [row];
+      throw new Error(`unexpected query ${sql}`);
+    });
+  });
+  it("接受后记账失败重试复用相同 script/version/params，不重做配音工程，不重复审批", async () => {
+    submit.mockRejectedValueOnce(new Error("SUBMISSION_FINALIZATION_PENDING"));
+    await expect(caller.submit({ projectId: "project-ex" })).rejects.toThrow("SUBMISSION_FINALIZATION_PENDING");
+    const first = submit.mock.calls[0]?.[0];
+    await caller.submit({ projectId: "project-ex" });
+    const repeated = submit.mock.calls[1]?.[0];
+    expect(repeated.script).toEqual(first.script); expect(repeated.params).toEqual(first.params);
+    expect(prepare).toHaveBeenCalledTimes(1); expect(create).toHaveBeenCalledTimes(1); expect(approve).toHaveBeenCalledTimes(1);
+    expect(repeated.idempotencyKey).toBe("explainer:shotbook:v3");
+  });
+  it("UHD 采用独立脚本与幂等键，重试沿用已装配的原生 4K 画布", async () => {
+    await caller.submit({ projectId: "project-ex", quality: "uhd" });
+    const first = submit.mock.calls[0]?.[0];
+    expect(first.script.script_key).toBe("explainer-shotbook-uhd");
+    expect(first.idempotencyKey).toBe("explainer:shotbook:v3:uhd");
+    expect(first.params.resolution).toBe("2160x3840");
+    expect(prepare.mock.calls[0]?.[0].quality).toBe("uhd");
+    await caller.submit({ projectId: "project-ex", quality: "uhd" });
+    const repeated = submit.mock.calls[1]?.[0];
+    expect(repeated.script).toEqual(first.script);
+    expect(repeated.params).toEqual(first.params);
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(approve).toHaveBeenCalledTimes(1);
+  });
+  it("另一清晰度仍在渲染时拒绝覆盖分镜的工程目录", async () => {
+    renderJob.mockImplementation(async (_scope, key) => key === "explainer:shotbook:v3:uhd" ? { status: "running" } : null);
+    await expect(caller.submit({ projectId: "project-ex" })).rejects.toThrow("仍在运行");
+    expect(prepare).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+  it.each([{ voiceProfile: "changed" }, { renderScope: "only:s1" }, { assets: [{ from: "/a", to: "b" }] }])("相同分镜改变输入 %j，在重做准备/调用供应商前拒绝", async (patch) => {
+    await caller.submit({ projectId: "project-ex" });
+    await expect(caller.submit({ projectId: "project-ex", ...patch })).rejects.toThrow("绑定其他");
+    expect(prepare).toHaveBeenCalledTimes(1); expect(submit).toHaveBeenCalledTimes(1);
+  });
+  it("同工作区其他项目分镜不能套用当前项目提交或交付", async () => {
+    row.project_id = "project-other";
+    await expect(caller.submit({ projectId: "project-ex", shotbookId: "shotbook" })).rejects.toThrow("不属于");
+    await expect(caller.finalize({ projectId: "project-ex", shotbookId: "shotbook" })).rejects.toThrow("当前项目");
+    expect(prepare).not.toHaveBeenCalled(); expect(submit).not.toHaveBeenCalled();
+  });
+  it("旧脚本缺少不可变请求凭据时拒绝重建和重发", async () => {
+    saved = { id: "legacy", version: 6, md: "old", fields: {} };
+    await expect(caller.submit({ projectId: "project-ex" })).rejects.toThrow("未核实");
+    expect(prepare).not.toHaveBeenCalled(); expect(submit).not.toHaveBeenCalled(); expect(create).not.toHaveBeenCalled();
   });
 });

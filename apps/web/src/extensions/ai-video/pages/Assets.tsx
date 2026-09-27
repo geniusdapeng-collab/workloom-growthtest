@@ -5,7 +5,7 @@
  *  - 保存为新版本（cms.saveScriptVersion：parent_version 链 + diff 摘要 + 字数校验快照 2470-3000 口径）
  *  - G8 审批（cms.approveScript：仅 draft 可审；版本即审批对象，approved 不继承）
  *  - 三档提交（render.submit mode=manual/batch/auto）：G8 烧额度门——review 级须先 approved，block 级 403
- *  - 无 VOLCENGINE_ARK_API_KEY 时服务端 mock 提交（task_id 前缀 mock-，返回 mock:true 明确标注上屏）
+ *  - 服务预生产档案 → 完整请求审核 → 正式渲染；无模型配置或资格时明确拒绝
  * 状态变体：加载骨架 G10 / 空态（无脚本引导）/ 错误横幅（围栏拒绝原因展示）
  * 轮询口径（D6）：脚本列表 15s 静默刷新
  */
@@ -17,7 +17,7 @@ import { BannerAlert, EmptyState, Skeleton } from "../../../components/hud";
 
 interface ScriptRow {
   id: string; project_id: string; shot_id: string; script_key: string; version: number;
-  parent_version: number | null; status: string; md: string;
+  parent_version: number | null; status: string; md: string; fields?: Record<string, unknown>;
   char_check: Record<string, unknown>; diff_summary: string | null;
   created_by: string; created_at: string;
 }
@@ -34,9 +34,9 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 
 /** 三档提交模式（§6：manual 手动单镜 / batch 整片批量 / auto 全自动连锁） */
 const SUBMIT_MODES = [
-  { key: "manual", label: "🖱 手动单镜", hint: "点「提交渲染」单镜即提交 Seedance（G8 烧额度门）" },
-  { key: "batch", label: "📦 整片批量", hint: "整片各镜一次提交，渲染师轮询回填渲染任务" },
-  { key: "auto", label: "⚡ 自动连锁", hint: "渲染完成 → 后期 → G9 发布 → 监控，全链路自动推进" },
+  { key: "manual", label: "🖱 手动单镜", hint: "当前镜头通过完整请求审核后提交生成" },
+  { key: "batch", label: "📦 批量任务", hint: "为当前镜头记录批量任务模式；其余镜头分别审核提交" },
+  { key: "auto", label: "⚡ 自动模式", hint: "为当前镜头记录自动模式；成本上限和审批规则仍然生效" },
 ] as const;
 type SubmitMode = (typeof SUBMIT_MODES)[number]["key"];
 
@@ -154,14 +154,22 @@ export default function P10() {
     }
   }, [detail, load, selectChain]);
 
-  /** 三档渲染提交（render.submit；review 级须 approved，block 级 403；无 ARK Key 走 mock 明确标注） */
+  /** 当前工作稿必须与服务镜头一致；正式输入由服务档案编译，浏览器不上传正文。 */
   const submit = useCallback(async () => {
-    if (!detail) return;
-    setBusy("submit");
+    if (!detail || busy) return;
+    if (dirty) { setBanner({ level: "warn", text: "请先保存工作稿；正式生成使用当前服务预生产镜头，编辑内容需重新预生产后才能生效。" }); return; }
+    setBusy("qualify");
     try {
-      const r = await trpc.video.render.submit.mutate({ scriptId: detail.id, mode }) as unknown as {
-        jobId: string; taskId: string | null; mock: boolean; level: string;
-      };
+      const current = await trpc.video.production.shots.query({ projectId: detail.project_id });
+      const source = current.shots.find(shot => shot.shotId === detail.shot_id);
+      if (!source || source.prompt !== detail.md) throw new Error("当前工作稿与服务预生产镜头不一致，请重新预生产，或在生成工作室选择当前服务镜头。");
+      const catalog = await trpc.video.gen.catalog.query({ kind: "video" });
+      const model = catalog.models.find(item => ["seedance", "higgsfield", "muapi"].includes(item.provider));
+      if (!model) throw new Error("没有已配置的正式视频模型，请先在模型设置中完成配置。");
+      const qualification = await trpc.video.production.qualifyShot.mutate({ projectId: detail.project_id,
+        shotId: detail.shot_id, modelId: model.id, params: {}, mode });
+      setBusy("submit");
+      const r = await trpc.video.render.submit.mutate({ qualificationToken: qualification.qualificationToken });
       setBanner({
         level: "info",
         text: `渲染已提交：${r.mock ? "当前为演示回执，不触发真实渲染，也不消耗额度。" : "真实渲染任务已受理。"}`,
@@ -173,7 +181,7 @@ export default function P10() {
     } finally {
       setBusy(null);
     }
-  }, [detail, mode, load, selectChain]);
+  }, [detail, dirty, busy, mode, load, selectChain]);
 
   /* ---------- 左栏：项目分组脚本列表（状态 chip + 版本链） ---------- */
   const left = (
@@ -235,10 +243,11 @@ export default function P10() {
       </div>
       <div className="mt-2.5 rounded-lg border border-line bg-card p-3 text-caption leading-relaxed text-ink3">
         <div className="mb-1 text-micro font-bold text-ink2">G8 烧额度门</div>
+        先核对当前预生产镜头，再审核完整生成请求<br />
         禁止 → 直接熔断<br />
         人工复核 → 须先完成脚本审批<br />
         自动放行 → 达到信任条件后执行<br />
-        未配置真实渲染服务 → 仅生成演示回执，不消耗额度
+        预生产镜头与最终请求审核通过后才提交；未配置生成服务会明确提示
       </div>
       <div className="mt-2.5 rounded-lg border border-line bg-card p-3 text-caption text-ink3">
         <div className="mb-1 text-micro font-bold text-ink2">字数校验</div>
@@ -271,7 +280,7 @@ export default function P10() {
         {!ready ? (
           <Skeleton count={5} height={72} /> /* 加载态 G10 */
         ) : chains.length === 0 ? (
-          <EmptyState icon="🎬" title="片库空空如也" hint="营销片管线走到预生产后，提示词工程师会逐镜交付渲染脚本、结构化镜头信息和字数快照。" />
+          <div><EmptyState icon="🎬" title="还没有工作稿" hint="预生产完成后，可直接在生成工作室选择服务镜头并审核生成，无需手工建立脚本。" /><button type="button" onClick={() => nav("/ai-video/assets?tab=studio&project=" + encodeURIComponent(projectId))} className="mt-3 rounded-md gold-grad px-4 py-2 text-caption font-bold text-ongold">打开生成工作室</button></div>
         ) : (
           <>
             {/* 三档提交切换（render.submit mode 参数） */}
@@ -280,6 +289,7 @@ export default function P10() {
                 <button
                   key={m.key}
                   type="button"
+                  disabled={busy !== null}
                   onClick={() => { setMode(m.key); setBanner({ level: "info", text: `当前档位：${m.hint}` }); }}
                   className={`cursor-pointer rounded-md border px-3 py-1.5 text-caption font-bold ${
                     mode === m.key
@@ -314,7 +324,7 @@ export default function P10() {
                   <span className="flex-1" />
                   <button
                     type="button"
-                    disabled={busy === "save" || !dirty}
+                    disabled={busy !== null || !dirty}
                     onClick={() => void saveVersion()}
                     className="cursor-pointer rounded-md border border-gline bg-bg800/60 px-3 py-1.5 text-caption font-bold text-goldhi hover:border-gold/60 disabled:opacity-40"
                   >
@@ -323,7 +333,7 @@ export default function P10() {
                   {detail.status === "draft" && (
                     <button
                       type="button"
-                      disabled={busy === "approve"}
+                      disabled={busy !== null}
                       onClick={() => void approve()}
                       className="cursor-pointer rounded-md border border-go/50 px-3 py-1.5 text-caption font-bold text-go hover:bg-go/10 disabled:opacity-40"
                     >
@@ -332,29 +342,28 @@ export default function P10() {
                   )}
                   <button
                     type="button"
-                    disabled={busy === "submit"}
+                    disabled={busy !== null || dirty}
                     onClick={() => void submit()}
                     className="cursor-pointer rounded-md gold-grad px-3.5 py-1.5 text-caption font-bold text-ongold disabled:opacity-40"
                   >
-                    ▶ 提交渲染（{SUBMIT_MODES.find((m) => m.key === mode)?.label.replace(/^[^ ]+ /, "")}）
+                    {busy === "qualify" ? "正在审核完整生成请求…" : busy === "submit" ? "正在提交生成…" : "▶ 审核并生成当前镜头"}
                   </button>
                 </div>
 
                 {/* MD 工作台（contentEditable 本地编辑；保存即新版本，不原地改） */}
                 <pre
                   ref={mdRef}
-                  contentEditable
+                  contentEditable={busy === null}
                   suppressContentEditableWarning
                   spellCheck={false}
                   onInput={() => setDirty(true)}
-                  className="max-h-[460px] overflow-y-auto whitespace-pre-wrap rounded-lg border border-line bg-bg900 p-3.5 font-mono text-caption leading-relaxed text-ink2 outline-none focus:border-holo/50"
+                  className="max-h-[460px] overflow-y-auto whitespace-pre-wrap break-words rounded-lg border border-line bg-bg900 p-3.5 font-mono text-caption leading-relaxed text-ink2 outline-none focus:border-holo/50"
                   style={{ whiteSpace: "pre-wrap" }}
                 >{detail.md}</pre>
 
                 <div className="mt-2 text-micro leading-relaxed text-ink3">
                   {dirty ? "已本地修改（未保存）——保存即生成新版本并回到草稿状态" : "工作台可直接编辑；保存即生成新版本"} ·
-                  提交渲染须通过 G8 审批（烧额度）；回执会自动写入渲染任务记录
-                  {detail.status === "approved" && " · 当前版本已过 G8，可提交"}
+                  正式生成使用已完成预生产的服务镜头；工作稿审批不能代替内容审核，提交后保留任务回执
                 </div>
               </div>
             )}

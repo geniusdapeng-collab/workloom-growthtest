@@ -176,9 +176,15 @@ export async function probeMedia(input, { bins = resolveBinaries() } = {}) {
   }
   const durationRaw = Number(doc.format?.duration ?? video.duration);
   const fps = parseFps(video.avg_frame_rate) ?? parseFps(video.r_frame_rate);
+  const framesRaw = Number(video.nb_frames);
+  const videoDurationRaw = Number(video.duration);
+  const videoDuration = Number.isFinite(videoDurationRaw) && videoDurationRaw > 0
+    ? videoDurationRaw
+    : (Number.isInteger(framesRaw) && framesRaw > 0 && fps > 0 ? framesRaw / fps : null);
   return {
     path: input,
     duration: Number.isFinite(durationRaw) ? round(durationRaw, 3) : null,
+    videoDuration: videoDuration === null ? null : round(videoDuration, 6),
     width,
     height,
     shortSide: Math.min(width, height),

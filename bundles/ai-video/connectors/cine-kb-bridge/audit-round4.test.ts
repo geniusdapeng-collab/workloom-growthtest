@@ -58,7 +58,7 @@ const MATRIX: Array<[string, Card, string, string?]> = [
   ["㉗ 正午室内窗光", { scene: "正午的室内，强光从窗户斜射进来照在桌面", character: "陈卓", action: "伏案写字", mood: "日常" }, "f/2.8–f/4"],
   ["㉘ 秋日落叶人像", { scene: "秋日银杏大道，满地落叶，逆光下叶片透光", character: "陈卓", action: "抬手接住飘落的叶子", mood: "治愈" }, "f/2.8–f/4"],
   ["㉙ 雨后石板路反光", { scene: "雨后的古镇石板路，积水倒映着白墙黛瓦", mood: "清新" }, "f/5.6", "无主体街道，KB 无专档"],
-  ["㉚ 舞台追光", { scene: "剧场舞台，追光打在演唱者身上，四周漆黑", mood: "史诗" }, "f/5.6", "KB 缺舞台专档（G11）"],
+  ["㉚ 舞台追光", { scene: "剧场舞台，追光打在演唱者身上，四周漆黑", mood: "史诗" }, "f/2.8–f/4", "演唱者是明确人物主体，使用人像兜底"],
   ["㉛ 节日烟花", { scene: "跨年夜的城市上空，烟花绽放", mood: "庆典" }, "f/5.6", "KB 缺烟花专档（G12）"],
   ["㉜ 玻璃幕墙反光", { scene: "写字楼玻璃幕墙映出街景与云层", mood: "都市" }, "f/8"],
   ["㉝ 大面积水面日落", { scene: "日落时分的大面积湖面，天光云影倒映水中", mood: "壮阔" }, "f/8–f/11"],
@@ -84,7 +84,7 @@ describe("第四轮审计 · 36 场景标答矩阵", () => {
 
   it("落「打卡 f/5.6」的场景不超过 4 个（修复前是 6 个，且都是已登记 KB 缺口）", () => {
     const stuck = MATRIX.filter(([, card]) => apertureOf(card) === "f/5.6").map(([label]) => label);
-    expect(stuck).toEqual(["⑫ 水下镜头", "㉙ 雨后石板路反光", "㉚ 舞台追光", "㉛ 节日烟花"]);
+    expect(stuck).toEqual(["⑫ 水下镜头", "㉙ 雨后石板路反光", "㉛ 节日烟花"]);
   });
 
   it("matchedBy 溯源标签能区分三种兜底（A10 可溯源）", () => {
@@ -134,14 +134,18 @@ describe("第四轮修复 · 显式光源优先于室内兜底（A3/A6）", () =
     expect(text).not.toContain("午后阳光");
   });
 
-  it("正午室内窗光 → 正午硬光，不得写窗外蓝调天光（正午与蓝调自相矛盾）", () => {
+  it("正午侧窗的强光保持窗光来源，不改为顶光或窗外蓝调天光", () => {
     const text = light({ scene: "正午的室内，强光从窗户斜射进来照在桌面", character: "陈卓", action: "伏案写字" });
-    expect(text).toContain("正午");
+    expect(text).toContain("窗户");
+    expect(text).not.toMatch(/顶光|柔和|面部/);
     expect(text).not.toContain("蓝调");
   });
 
-  it("真·室内夜景仍走钨丝灯（不被本次修正误伤）", () => {
-    expect(light({ scene: "室内烛光晚餐，桌面有烛台与餐具", character: "陈卓", action: "举杯" })).toContain("钨丝灯");
+  it("烛光保持烛光；钨丝灯必须源卡明确存在", () => {
+    const candle = light({ scene: "室内烛光晚餐，桌面有烛台与餐具", character: "陈卓", action: "举杯" });
+    expect(candle).toContain("烛光");
+    expect(candle).not.toContain("钨丝灯");
+    expect(light({ scene: "室内，钨丝灯照亮房间" })).toContain("钨丝灯");
   });
 });
 

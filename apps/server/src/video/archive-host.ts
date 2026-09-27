@@ -7,7 +7,7 @@
  *
  * 三件事：
  *   ① makeLedgerWriter(scope)    —— production_stage_runs 的原子认领 / 终结写 / 心跳（事务内 set_config RLS 口径）
- *   ② acquireProjectLease(id)    —— 项目级 advisory **会话**锁（持有到 run 结束；进程被 kill 由连接断开自动释放）
+ *   ② acquireProjectLease(scope, id)    —— 项目级 advisory **会话**锁（持有到 run 结束；进程被 kill 由连接断开自动释放）
  *   ③ readProjectMeta(scope, id) —— 交接包需要的项目元数据（thread_id / kind / title）
  */
 import type pg from "pg";
@@ -63,6 +63,7 @@ async function withScopedTx<T>(
   fn: (client: pg.PoolClient) => Promise<T>,
 ): Promise<T> {
   const client = await getAppPool().connect();
+  let discard = false;
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
@@ -71,10 +72,15 @@ async function withScopedTx<T>(
     await client.query("COMMIT");
     return result;
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => undefined);
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      discard = true;
+      throw new AggregateError([err, rollbackError], "archive-transaction-rollback-failed");
+    }
     throw err;
   } finally {
-    client.release();
+    client.release(discard);
   }
 }
 
@@ -105,14 +111,19 @@ export function makeLedgerWriter(scope: Scope): StageLedgerWriter {
     claimRun: (row) =>
       withScopedTx(scope, async (client) => {
         // 每 (project, stage) 串行化：同 stage 的 attempt 递增不会互相踩
-        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`archive-stage:${row.projectId}:${row.stageId}`]);
+        await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
+          JSON.stringify(["archive-stage", scope.tenantId, scope.workspaceId, row.projectId, row.stageId]),
+        ]);
         const r = await client.query<{ attempt: number; input_ref: string }>(
           `INSERT INTO production_stage_runs
              (id, workspace_id, project_id, stage_id, attempt, input_ref, run_id, last_heartbeat_at)
-           SELECT $1, $2, $3, $4, COALESCE(MAX(attempt),0)+1,
-                  replace($5, '{attempt}', (COALESCE(MAX(attempt),0)+1)::text), $6, now()
-             FROM production_stage_runs
-            WHERE workspace_id=$2 AND project_id=$3 AND stage_id=$4
+           SELECT $1, $2, $3, $4, COALESCE(MAX(r.attempt),0)+1,
+                  replace($5, '{attempt}', (COALESCE(MAX(r.attempt),0)+1)::text), $6, now()
+             FROM video_projects p
+             LEFT JOIN production_stage_runs r
+               ON r.workspace_id=p.workspace_id AND r.project_id=p.id AND r.stage_id=$4
+            WHERE p.workspace_id=$2 AND p.id=$3
+            GROUP BY p.id
            RETURNING attempt, input_ref`,
           [row.id, scope.workspaceId, row.projectId, row.stageId, row.inputRefTemplate, row.runId],
         );
@@ -123,17 +134,34 @@ export function makeLedgerWriter(scope: Scope): StageLedgerWriter {
 
     finishRun: (row) =>
       withScopedTx(scope, async (client) => {
-        await client.query(
+        if (row.status === "running") throw new Error("STAGE_FINISH_INVALID: 终结回执不得为 running");
+        const params = [
+          scope.workspaceId, row.projectId, row.stageId, row.status,
+          row.outputRef, row.outputSha256, row.errorClass, row.errorMsg,
+          row.durationMs, JSON.stringify(row.cost ?? {}), row.attempt,
+        ];
+        const updated = await client.query(
           `UPDATE production_stage_runs
               SET status=$4, output_ref=$5, output_sha256=$6, error_class=$7, error_msg=$8,
                   duration_ms=$9, cost=$10::jsonb, finished_at=now()
-            WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$11 AND status='running'`,
-          [
-            scope.workspaceId, row.projectId, row.stageId, row.status,
-            row.outputRef, row.outputSha256, row.errorClass, row.errorMsg,
-            row.durationMs, JSON.stringify(row.cost ?? {}), row.attempt,
-          ],
+            WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$11 AND status='running'
+            RETURNING id`,
+          params,
         );
+        if (updated.rowCount === 1) return;
+        // 完成写的确认丢失后可重送同一回执；不同终态/摘要或不存在的 attempt 不能假装成功。
+        const existing = await client.query(
+          `SELECT id FROM production_stage_runs
+            WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$11
+              AND status=$4 AND output_ref IS NOT DISTINCT FROM $5
+              AND output_sha256 IS NOT DISTINCT FROM $6 AND error_class IS NOT DISTINCT FROM $7
+              AND error_msg IS NOT DISTINCT FROM $8 AND duration_ms IS NOT DISTINCT FROM $9
+              AND cost=$10::jsonb`,
+          params,
+        );
+        if (existing.rowCount !== 1) {
+          throw new Error(`STAGE_RECEIPT_CONFLICT: ${row.projectId}/${row.stageId}/${row.attempt} 未找到匹配的终结回执`);
+        }
       }),
 
     heartbeatRun: (row) =>
@@ -163,24 +191,35 @@ export interface ProjectLease {
   release(): Promise<void>;
 }
 
+/** 同一编码供执行者、恢复与启动扫描使用，字段分隔无歧义并包含租户/工作区。 */
+export function projectRunLockKey(scope: Scope, projectId: string): string {
+  if (![scope.tenantId, scope.workspaceId, projectId].every((value) => typeof value === "string" && value.trim())) {
+    throw new Error("PROJECT_LEASE_SCOPE_INVALID");
+  }
+  return JSON.stringify(["archive-run", scope.tenantId, scope.workspaceId, projectId]);
+}
+
 /**
  * 抢项目租约：`pg_try_advisory_lock`（会话级，必须持有独立连接）。
  * 返回 null = 已有执行者持有（调用方按"不重复烧额度"处理，不抛错）。
  * 进程被 kill -9 时连接断开，锁由 PG 自动释放——这正是重启后能续跑的原因。
  */
-export async function acquireProjectLease(projectId: string): Promise<ProjectLease | null> {
+export async function acquireProjectLease(scope: Scope, projectId: string): Promise<ProjectLease | null> {
+  const key = projectRunLockKey(scope, projectId);
   const client = await getAppPool().connect();
   try {
     const r = await client.query<{ ok: boolean }>(
       "SELECT pg_try_advisory_lock(hashtext($1)) AS ok",
-      [`archive-run:${projectId}`],
+      [key],
     );
-    if (!r.rows[0]?.ok) {
+    if (r.rows[0]?.ok === false) {
       client.release();
       return null;
     }
+    if (r.rows[0]?.ok !== true) throw new Error("PROJECT_LEASE_RECEIPT_INVALID");
   } catch (err) {
-    client.release();
+    // 查询可能已经取得锁、但客户端未收到确认；关闭连接才保证未知锁不会回到池里。
+    client.release(true);
     throw err;
   }
   let released = false;
@@ -189,12 +228,15 @@ export async function acquireProjectLease(projectId: string): Promise<ProjectLea
     async release(): Promise<void> {
       if (released) return;
       released = true;
+      let discard = false;
       try {
-        await client.query("SELECT pg_advisory_unlock(hashtext($1))", [`archive-run:${projectId}`]);
+        const result = await client.query<{ ok: boolean }>("SELECT pg_advisory_unlock(hashtext($1)) AS ok", [key]);
+        if (result.rows[0]?.ok !== true) throw new Error("PROJECT_LEASE_UNLOCK_UNVERIFIED");
       } catch (err) {
-        console.error(`[archive] 释放项目租约失败（连接归还后由 PG 自动释放）: ${(err as Error).message}`);
+        discard = true;
+        throw err;
       } finally {
-        client.release();
+        client.release(discard);
       }
     },
   };

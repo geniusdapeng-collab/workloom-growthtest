@@ -12,7 +12,7 @@
  * 纪律：
  *   · step_key 只认白名单里的四个（拼错即抛错，避免"看起来记了门、其实 key 是野的"）；
  *   · 门事件必须带 `sourceStage`（这个门由哪个环节的产物触发）与 `checks`（判据），不允许只写一句结论；
- *   · 硬闸失败即不通过——门不通过时调用方必须停止或显式记录"带瑕疵放行"。
+ *   · 硬闸失败、无证据或降级均不通过，调用方必须停止并修复。
  */
 import { appendFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
@@ -137,11 +137,22 @@ export function buildGateEvent(input: {
   evidence?: Record<string, unknown>;
   at?: string;
 }): GateEvent {
+  if (!Array.isArray(input.checks)) throw new Error("GATE_CHECKS_INVALID: checks 必须为数组");
+  const invalid = input.checks.length === 0 || !input.projectId.trim()
+    || input.checks.some((c) => !c || typeof c.id !== "string" || !c.id.trim() || typeof c.pass !== "boolean"
+      || typeof c.detail !== "string" || (c.hard !== undefined && typeof c.hard !== "boolean"))
+    || new Set(input.checks.map((c) => c?.id)).size !== input.checks.length
+    || (input.score != null && (!Number.isFinite(input.score) || input.score < 0 || input.score > 100))
+    || (input.softApproved != null && typeof input.softApproved !== "boolean");
+  if (input.checks.some((c) => !c)) throw new Error("GATE_CHECKS_INVALID: 判据必须为对象");
   const hardFailures = input.checks.filter((c) => c.hard && !c.pass);
   const softFailures = input.checks.filter((c) => !c.hard && !c.pass);
   const softApproved = input.softApproved ?? null;
-  const approved = hardFailures.length === 0 && softApproved !== false;
-  const reason = input.reason
+  const degraded = Boolean(input.degraded) || input.via === "fallback";
+  const approved = !invalid && !degraded && hardFailures.length === 0 && softApproved !== false;
+  const reason = invalid ? "门证据无效：须有非空、唯一且类型正确的判据，评分须为 0–100 的有限数值"
+    : degraded ? "门证据未核实：降级或 fallback 不能授予生产通过"
+    : input.reason
     ?? (hardFailures.length > 0
       ? `硬闸未通过（${hardFailures.map((c) => c.id).join("、")}）：${hardFailures.map((c) => c.detail).join("；")}`
       : softApproved === false
@@ -156,12 +167,12 @@ export function buildGateEvent(input: {
     ok: approved,
     approved,
     via: input.via ?? (softApproved === null ? "deterministic" : "llm"),
-    score: typeof input.score === "number" ? input.score : null,
+    score: typeof input.score === "number" && Number.isFinite(input.score) ? input.score : null,
     sourceStage: input.sourceStage ?? null,
     shotIds: input.shotIds ?? [],
     checks: input.checks,
     reason,
-    degraded: Boolean(input.degraded),
+    degraded,
     ...(input.evidence ? { evidence: input.evidence } : {})
   };
 }

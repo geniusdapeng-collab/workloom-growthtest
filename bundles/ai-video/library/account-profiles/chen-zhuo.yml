@@ -1,0 +1,27 @@
+# 账号定位档案样例 —— 落仓路径：bundles/ai-video/library/account-profiles/chen-zhuo.yml
+# 用法：full-chain-film.mts --account chen-zhuo（缺省无档案 = 行为与接入前完全一致）
+# 无档案时链路行为与现状完全一致（向后兼容）。
+
+account_id: chen-zhuo
+display_name: 陈卓
+positioning: 城市人文旅行人设号      # 账号定位一句话（进 prompt）
+                                     # 账号类型谱（锚 ACCT-001）：ip=人设IP号 / brand=品牌官号 / seeding=种草号 / knowledge=知识号 / local=本地生活号
+account_type: ip                     # 也接受中文标签「人设IP号」（cover-kb-bridge 会归一）
+platforms: [douyin, xiaohongshu]    # 主发平台（enrich 时按平台取规格）
+
+visual_hammer:                       # 视觉锤：封面一致性四件套（锚 ACCT-001）
+  fontId: smiley-sans                # 锁定字体（必须在 cover-design.ts COVER_FONTS 白名单内）
+  palette: ["#FFFFFF", "#FFD166"]    # 锁定色板：主标题色 + 强调色
+  archetype_bias: person-led         # 版式偏好：person-led / subject-led / null
+  badge_series: "跟着陈卓走"          # 系列角标文案（≤10 字，可空）
+
+# 钩子偏好：HOOK-001 公式 ID（question / conflict / data-shock / contrast /
+# value-preview / curiosity-gap / pattern-interrupt），enrich 时按此过滤钩子篇目
+hook_bias: [question, contrast]
+
+taboo:                               # 禁区（进 prompt 负面约束 + 校验 warn）
+  - 硬广话术
+  - 标题党夸大（"震惊""不看后悔"）
+  - 封面标题与正片首句完全重复
+
+strict: false                        # true = 偏离视觉锤判非法打回；false = warn 记 stages.jsonl

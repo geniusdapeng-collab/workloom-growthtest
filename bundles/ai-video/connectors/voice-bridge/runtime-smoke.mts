@@ -145,10 +145,24 @@ async function main() {
     const verify = await executor("voicewrite.verify", {
       input: String(speak.result.out),
       expect_text: "您好，我是小织，这是配音工位的自检播报。",
-      round_trip: false,
+      strict: false,
       lufs: Number(speak.result.lufs ?? -16),
     });
-    record("verify", verify.receipt.synced === true, `failures=${JSON.stringify(verify.result.failures ?? [])}`);
+    const verifiedText = verify.result.checked as { text_match_status?: string } | undefined;
+    record("verify", REAL
+      ? verify.receipt.synced === true && verify.result.status === "passed" && verifiedText?.text_match_status === "passed"
+      : verify.receipt.synced === false && verify.result.status === "unverified" && verifiedText?.text_match_status === "unverified",
+    `status=${verify.result.status} text_match=${verifiedText?.text_match_status}（${REAL ? "真实 ASR" : "mock 无 ASR，预期未核实"}）`);
+
+    const disabled = await executor("voicewrite.verify", {
+      input: String(speak.result.out), expect_text: "您好，我是小织，这是配音工位的自检播报。", round_trip: false, strict: false,
+    });
+    record("verify-disabled", disabled.receipt.synced === false && disabled.result.status === "unverified",
+      `status=${disabled.result.status} reason=${JSON.stringify(disabled.result.unverified ?? [])}`);
+    const declared = await executor("voicewrite.verify", { input: refPath, speech_expected: false });
+    record("verify-no-speech", declared.receipt.synced === true
+      && (declared.result.checked as { text_match_status?: string })?.text_match_status === "not_applicable",
+    "显式合成测试音无台词，物理测量有效才放行");
 
     const video = path.join(mediaDir, "smoke-film.mp4");
     await ffmpeg([
@@ -185,7 +199,7 @@ async function main() {
     );
 
     /* ---------- 场景 3：缺逐字稿且引擎无 ASR → 明确拒绝（不猜） ---------- */
-    const noTranscript = await executor("voicewrite.register", { profile: "zh-smoke-2", reference: refPath, allow_low_quality: true });
+    const noTranscript = await executor("voicewrite.register", { profile: "zh-smoke-2", reference: refPath, auto_transcribe: false, allow_low_quality: true });
     record(
       "missing-text",
       noTranscript.receipt.synced === false && String(noTranscript.result.error) === "ref_text_required",

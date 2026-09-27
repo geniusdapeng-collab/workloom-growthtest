@@ -43,10 +43,15 @@ post-cli impact --project <交付包>/film-project.json --patch patch.json
 post-cli reedit --project <交付包>/film-project.json --patch patch.json
 ```
 
+- 执行前绑定实际读取的工程版本和 SHA256：工具先用 `dry_run: true` 取得 `expectedVersion` / `expectedProjectSha256`，写请求传 `expected_version` / `expected_project_sha256`；页面按当前详情快照提交，不能默默刷新前置条件。
+- CLI `--dry-run` 只读返回前置条件；执行可显式带 `--expected-version N --expected-project-sha256 <sha256>`，省略时仅快照 `--project` 指定文件，过期仍拒绝。
+- 并发冲突 `revision_conflict`、占用 `revision_busy`、存储失败 `revision_io_failed` 不自动重试或切换端点；核对现状再提交。
 - 输出落**新版本目录**（`versions/v2/`、`v3/`…），旧版本一个字节都不动；
 - 只重算受影响层，其余层**按内容哈希复用**（归一化镜头、拼接、调色、混音都有缓存）；
 - 回执里逐层写清"重算 / 复用"，复用带 sha256 证据，可与上一版逐项对账（G-DLV7）；
+- 包级独占锁 + 新版本目录独占认领；最后发布 `film-project.json` 才算提交。失败目录保留回执、不复用版本号；残留锁由运维核对，不凭 PID 自动抢占。
 - 连续返修（v2 → v3）不受影响：每轮工程文件里的路径都按自己的目录重写。
+- UHD 工程返修沿用原 `quality` 与逐镜增强来源：未换的镜头复用已归一化产物；换镜头时在本机重新增强并回读目标画布，不把 HD 预览冒充 UHD。
 
 实测口径（真机数据，2026-09-24）：只改字幕的返修**2.4 秒**完成，三个变体的成片文件与上一版**逐字节一致**
 （画面根本没被重编码），只有字幕文件与软字幕轨发生变化；全套首次交付（3 镜头 / 27s / 3 变体）约 68 秒。
@@ -65,6 +70,7 @@ post-cli reedit --project <交付包>/film-project.json --patch patch.json
 {
   "schemaVersion": "workloom.delivery-revision/v1",
   "version": 2,
+  "commit": { "runId": "本次认领ID", "baseVersion": 1, "baseProjectSha256": "基础工程SHA256", "version": 2, "projectSha256": "新工程SHA256" },
   "patch": { "subtitles": { "zhText": "…" } },
   "impact": { "layers": ["text"], "localOnly": true, "costHint": { "tokenCostDelta": 0 } },
   "rebuilt": [{ "layer": "text", "variant": "warm-story" }],

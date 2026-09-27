@@ -80,7 +80,8 @@ export const NEVER_RETRY_CODES = new Set([
   "idempotency_conflict", "bad_request", "not_found", "not_provided",
   "ffmpeg_not_installed", "bad_media", "bad_font", "font_not_found", "bad_style", "bad_srt",
   "bad_recipe", "bad_lut", "license_blocked", "overwrite_source_forbidden", "not_configured",
-  "verify_failed",
+  "verify_failed", "version_exists",
+  "revision_conflict", "revision_busy", "revision_io_failed",
 ]);
 
 export function isPostBridgeTool(name: string): boolean {
@@ -178,9 +179,12 @@ export function createPostBridgeExecutor(options: PostBridgeOptions): ToolExecut
         throw new PostBridgeError(message, code, retryable);
       }
       const receipt = body.receipt ?? {};
+      if (!body.result || typeof body.result !== "object" || Array.isArray(body.result)) {
+        throw new PostBridgeError("后期工位成功响应缺少有效 result 对象", "bad_response", true);
+      }
       return {
         result: {
-          ...(body.result ?? {}),
+          ...body.result,
           ...(typeof body.job_id === "string" ? { job_id: body.job_id } : {}),
         } as Record<string, unknown>,
         receipt: {
@@ -216,7 +220,7 @@ export function createPostBridgeExecutor(options: PostBridgeOptions): ToolExecut
       ? `${idempotencyPrefix}-${hashKey(`${name}|${stableKey(params)}`)}`
       : undefined;
 
-    const attempts: Array<{ endpoint: string; code: string; message: string }> = [];
+    const attempts: Array<{ endpoint: string; code: string; message: string; retryable: boolean }> = [];
     for (let index = 0; index < endpoints.length; index += 1) {
       const endpoint = endpoints[(cursor + index) % endpoints.length]!;
       try {
@@ -227,14 +231,14 @@ export function createPostBridgeExecutor(options: PostBridgeOptions): ToolExecut
         const bridgeError = error instanceof PostBridgeError
           ? error
           : new PostBridgeError(String(error), "network_error", true);
-        attempts.push({ endpoint, code: bridgeError.code, message: bridgeError.message });
+        attempts.push({ endpoint, code: bridgeError.code, message: bridgeError.message, retryable: bridgeError.retryable });
         options.onRetry?.(endpoint, bridgeError);
         if (!bridgeError.retryable) break;
       }
     }
     const last = attempts[attempts.length - 1];
     if (!softFailures) {
-      throw new PostBridgeError(last?.message ?? "后期工位不可用", last?.code ?? "bridge_error", true);
+      throw new PostBridgeError(last?.message ?? "后期工位不可用", last?.code ?? "bridge_error", last?.retryable ?? true);
     }
     return {
       result: {

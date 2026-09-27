@@ -90,3 +90,23 @@ rules:
       actions: [postwrite.reedit, postwrite.package]
     when: "params.reuse_without_evidence == true or params.claim_reuse_without_hash == true"
     note: 返修回执里"复用了哪些层"必须能对账：复用产物给出 sha256 与 mtime 未变的证据，重算产物给出新 sha256；镜头层还要与工程文件里记录的哈希逐镜比对，不一致就如实标注"被外部改动过"。禁止把"重算了但没写清楚"包装成"复用"。
+
+  - rule_id: G-DLV8
+    name: UHD 母版与变体必须回读到目标画布
+    level: block
+    is_baseline: true
+    match:
+      object_types: [delivery_package, final_video]
+      actions: [postwrite.package, postwrite.reedit]
+    when: "params.uhd_requested == true and params.resolution_exact == false"
+    note: 申请 UHD 时必须以 ffprobe 回读母版和每个变体的实际宽高；只把清单写成 4K 或仅把低分辨率预览放大不算交付。
+
+  - rule_id: G-DLV9
+    name: 低分辨率来源必须有本机增强回执
+    level: block
+    is_baseline: true
+    match:
+      object_types: [delivery_package, final_video]
+      actions: [postwrite.package, postwrite.reedit]
+    when: "params.uhd_requested == true and params.enhancement_verified == false"
+    note: 申请 UHD 时逐镜记录原始规格、源哈希、增强模型、产物哈希和本地核验回执；原片已足够大时明确标 source-sufficient。边缘强度单一指标不能证明画质提升，不以拉普拉斯阈值代替模型执行来源。

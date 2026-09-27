@@ -24,7 +24,6 @@ import { getAppPool, getGatewayPool } from "@workloom/db";
 import type { Identity } from "@workloom/base/tenancy";
 import { navigationPermissionProcedure, navigationPermissionWriteProcedure, scopeOf, router } from "../../trpc/context.js";
 import { archiveWorkDir } from "../archive-host.js";
-import { deliveryRoot } from "../delivery.js";
 import type { Scope } from "../gen/db.js";
 import {
   archiveAsset, createTag, getAsset, ingestPortraitsFromIndex, listAssets, listFilms,
@@ -38,6 +37,7 @@ import { getProductProfile, listDossierProductIds, listProductProfiles, upsertPr
 import { findReusable } from "./reuse.js";
 import { listRecutJobs, recutJob, startRecut } from "./recut.js";
 import { ingestDeliveryPackage, assertSafePackageName } from "./ingest-delivery.js";
+import { DeliveryError } from "../delivery-trust.js";
 import {
   changesSince, enrollDevice, listDevices, listSyncLog, revokeDevice, syncEnabled,
 } from "./sync.js";
@@ -50,6 +50,13 @@ const writeProcedure = navigationPermissionWriteProcedure(MEDIA_READ);
 /** 领域错误 → tRPC 错误码（缺参/非法状态 400，找不到 404，其余 500） */
 function mapError(err: unknown): never {
   if (err instanceof TRPCError) throw err;
+  if (err instanceof DeliveryError) {
+    const code = err.code === "not_found" ? "NOT_FOUND"
+      : err.code === "scope_mismatch" || err.code === "path_not_allowed" ? "FORBIDDEN"
+        : err.code === "delivery_unverified" || err.code === "artifact_changed" ? "PRECONDITION_FAILED"
+          : "BAD_REQUEST";
+    throw new TRPCError({ code, message: err.message });
+  }
   const message = err instanceof Error ? err.message : String(err);
   if (/不在当前工作区|非法|至少|不一致|必须/.test(message)) {
     throw new TRPCError({ code: "BAD_REQUEST", message });
@@ -374,8 +381,8 @@ export const mediaRouter = router({
       const name = input.dir ?? input.packageName;
       if (!name) throw new TRPCError({ code: "BAD_REQUEST", message: "需要 dir（交付包目录名或相对路径）" });
       // 深审修正：原实现"含 / 就整体放行"，等于把 dir 变成任意路径读取入口（assertSafePackageName 被短路）
-      const abs = assertSafePackageName(name, deliveryRoot());
       try {
+        const abs = assertSafePackageName(name, scope);
         return await ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: abs, by });
       } catch (err) {
         mapError(err);
@@ -458,10 +465,10 @@ export function joinDossierRoot(scope: Scope): string {
  * 交付层返修作业完成 → 媒资库补录新成片（`delivery.ts` 的完成回调注入点）。
  * 失败只记日志：媒资入库是旁路，不能让交付作业被判失败。
  */
-export function deliveryIngestHook(scope: Scope): (info: { dir: string; version: number | null }) => void {
+export function deliveryIngestHook(scope: Scope): (info: { dir: string; outDir: string | null; version: number | null }) => void {
   return (info) => {
     if ((process.env.MEDIA_INGEST_ENABLED ?? "1") === "0") return;
-    void ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: info.dir, by: "delivery" })
+    void ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: info.outDir ?? info.dir, by: "delivery" })
       .then((r) => {
         console.log(`[media] 交付包入库完成：${r.registered.length} 个产物（跳过 ${r.skipped}；错误 ${r.errors.length}）`);
         for (const err of r.errors) console.warn(`[media] 交付包入库告警：${err}`);

@@ -17,6 +17,7 @@ import { join } from "node:path";
 import { resolvePython } from "./asr-aligner.js";
 import { engineDirOf } from "./engine.js";
 import type { GateResult, QaReport } from "./types.js";
+import type { ExplainerQuality } from "./types.js";
 
 export interface GateInput {
   jobDir: string;
@@ -30,6 +31,7 @@ export interface GateInput {
   qaScale?: number;
   /** 画幅（决定抖动采样窗的裁剪带：竖屏 1080 宽，横屏 1920 宽） */
   aspect?: "9:16" | "16:9";
+  quality?: ExplainerQuality;
   /** 分镜起止（每镜取一个采样窗，替代 motion_check 的 18s 自动采样） */
   shots?: Array<{ id: string; start: number; end: number }>;
   engineDir?: string;
@@ -100,7 +102,10 @@ export async function runMachineGates(input: GateInput): Promise<GateRunResult> 
      * （1200×120@(150,150)），竖屏 1080 宽会让 ffmpeg crop 直接报错——抖动闸等于没跑。
      * 这里按画幅给出合法裁剪带，并按**每镜取一点**（首镜动作落点 + 镜中段）覆盖全片。
      */
-    const band = (input.aspect ?? "9:16") === "9:16" ? "1080:140:0:1500" : "1200:120:150:150";
+    const cropScale = input.quality === "uhd" ? 2 : 1;
+    const band = (input.aspect ?? "9:16") === "9:16"
+      ? `${1080 * cropScale}:${140 * cropScale}:0:${1500 * cropScale}`
+      : `${1200 * cropScale}:${120 * cropScale}:${150 * cropScale}:${150 * cropScale}`;
     const windows = new Set<string>();
     for (const shot of input.shots ?? []) {
       windows.add(`${Math.max(1, Math.round((shot.start + 1.2) * 100) / 100)},${band}`);

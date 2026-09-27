@@ -1,174 +1,165 @@
-import { describe, expect, it } from "vitest";
-import { writeFileSync, rmSync } from "node:fs";
+import { afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
-import { PRODUCER_RUBRICS, resolveProducerLlm, reviewStage } from "./producer-gate.js";
-
-function fakeLlm(answer: Record<string, unknown>): typeof fetch {
-  return (async () =>
-    new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answer) } }] }), {
-      status: 200,
-      headers: { "content-type": "application/json" }
-    })) as unknown as typeof fetch;
-}
-
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { PRODUCER_RUBRICS, buildProducerReviewContract, resolveProducerLlm, reviewStage, type ProducerGateOptions } from "./producer-gate.js";
 const env = { LLM_BASE_URL: "https://api.example.com", LLM_API_KEY: "k", LLM_MODEL: "judge-1" };
-
-describe("AI 监制门", () => {
-  /**
-   * 真机事故（2026-09-24 三轮审计）：4 张 1080×1920 PNG 抽帧 + 2 张定妆照 base64 后 ≈53MB，
-   * 评审网关直接 HTTP 413 → 监制"不可用"、镜头既没通过也没被打回（悬空待复检）。
-   */
-  it("送审图超预算时自动压缩后再送审（防 413 让监制悬空）", async () => {
-    const bigPath = join(tmpdir(), `judge-big-${randomUUID()}.png`);
-    const smallPath = join(tmpdir(), `judge-small-${randomUUID()}.jpg`);
-    writeFileSync(bigPath, Buffer.alloc(2_400_000, 0x41)); // 'A' × 2.4MB（模拟 10MB PNG 的量级）
-    writeFileSync(smallPath, Buffer.alloc(64_000, 0x42)); // 'B' × 64KB（模拟 720 宽 JPEG）
-    const bigB64 = Buffer.alloc(2_400_000, 0x41).toString("base64").slice(0, 48);
-    const smallB64 = Buffer.alloc(64_000, 0x42).toString("base64").slice(0, 48);
-    let sentBody = "";
-    const fetchImpl = (async (_url: string, init: RequestInit) => {
-      sentBody = String(init.body);
-      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ approved: true, score: 80, issues: [], suggestions: [], reason: "ok" }) } }] }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
-    }) as unknown as typeof fetch;
-    try {
-      const verdict = await reviewStage({
-        stage: "shot", projectId: "VID-1",
-        artifacts: [{ path: bigPath, kind: "image" }],
-        deterministic: [], env, fetchImpl,
-        shrinkImage: () => smallPath
-      });
-      expect(verdict.approved).toBe(true);
-      expect(sentBody).toContain(smallB64);
-      expect(sentBody).not.toContain(bigB64);
-      expect(sentBody.length).toBeLessThan(400_000);
-    } finally {
-      rmSync(bigPath, { force: true });
-      rmSync(smallPath, { force: true });
+const dirs: string[] = [];
+const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aD1sAAAAASUVORK5CYII=", "base64");
+function file(name: string, bytes: string | Buffer): string {
+  const dir = mkdtempSync(join(tmpdir(), "quality-test-")); dirs.push(dir);
+  const path = join(dir, name); writeFileSync(path, bytes); return path;
+}
+afterEach(() => { for (const path of dirs.splice(0)) rmSync(path, { recursive: true, force: true }); });
+const good = { approved: true, score: 85, issues: [], suggestions: [], reason: "ok" };
+function judge(answer: unknown = good, bodies: string[] = []): typeof fetch {
+  return (async (_url, init) => {
+    bodies.push(String(init?.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(answer) } }] }));
+  }) as typeof fetch;
+}
+function textOptions(extra: Partial<ProducerGateOptions> = {}): ProducerGateOptions {
+  return { stage: "prompt", projectId: "VID-中文", artifacts: [{ path: file("prompt.txt", "剧本与镜头约束"), kind: "text" }], deterministic: [], env, fetchImpl: judge(), ...extra };
+}
+describe("AI producer evidence gate", () => {
+  it("every supported stage has review criteria", () => {
+    for (const rubric of Object.values(PRODUCER_RUBRICS)) expect(rubric.every((x) => x.length > 4)).toBe(true);
+  });
+  it("hard failures cannot be overturned by model", async () => {
+    const bodies: string[] = [];
+    const verdict = await reviewStage(textOptions({ deterministic: [{ id: "duration", pass: false, hard: true, detail: "bad" }], fetchImpl: judge(good, bodies) }));
+    expect(verdict.status).toBe("failed"); expect(verdict.approved).toBe(false); expect(bodies).toHaveLength(0);
+  });
+  it("required unknown and missing checks cannot pass", async () => {
+    expect((await reviewStage(textOptions({ requiredCheckIds: ["source"] }))).status).toBe("unverified");
+    expect((await reviewStage(textOptions({ deterministic: [{ id: "source", pass: true, hard: true, status: "unverified", detail: "no receipt" }] }))).approved).toBe(false);
+  });
+  it("soft failure is reported alongside actual model review", async () => {
+    const verdict = await reviewStage(textOptions({ deterministic: [{ id: "style", pass: false, detail: "different" }] }));
+    expect(verdict.status).toBe("passed"); expect(verdict.issues[0]).toContain("style");
+  });
+  it("missing model stays unverified even if fallback flag is true", async () => {
+    for (const allowFallbackApprove of [false, true]) {
+      const v = await reviewStage(textOptions({ env: {}, allowFallbackApprove }));
+      expect(v.approved).toBe(false); expect(v.status).toBe("unverified"); expect(v.degraded).toBe(true);
     }
   });
-
-  /**
-   * 真机事故（2026-09-24 晚）：prompt 环节只送产物**路径清单**，监制看不到正文，
-   * 于是以"字段与红线项无正文可核验"打回（score 58）——门变成了空转。
-   * 现在 json/text 产物正文按预算送审。
-   */
-  it("文本类产物把正文片段送审（监制能真的核字段与红线）", async () => {
-    const promptPath = join(tmpdir(), `judge-prompt-${randomUUID()}.txt`);
-    writeFileSync(promptPath, `【约束】9:16画幅，1080x1920\n${"平江路石拱桥，女主正面走近。".repeat(20)}`);
-    let sentBody = "";
-    const fetchImpl = (async (_url: string, init: RequestInit) => {
-      sentBody = String(init.body);
-      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ approved: true, score: 88, issues: [], suggestions: [], reason: "ok" }) } }] }), {
-        status: 200,
-        headers: { "content-type": "application/json" }
-      });
-    }) as unknown as typeof fetch;
-    try {
-      await reviewStage({
-        stage: "prompt", projectId: "VID-1",
-        artifacts: [{ path: promptPath, kind: "text", bytes: 2000 }],
-        deterministic: [], env, fetchImpl
-      });
-      expect(sentBody).toContain("平江路石拱桥");
-      expect(sentBody).toContain("产物正文");
-    } finally {
-      rmSync(promptPath, { force: true });
+  it("HTTP failure stays unverified", async () => {
+    const v = await reviewStage(textOptions({ fetchImpl: (async () => new Response("failure", { status: 500 })) as typeof fetch }));
+    expect(v.approved).toBe(false); expect(v.reason).toContain("HTTP 500");
+  });
+  it("empty, missing and corrupt evidence blocks before calling model", async () => {
+    const paths = ["/does-not-exist/quality.png", file("empty.png", ""), file("fake.png", "this is text")];
+    for (const path of paths) {
+      const bodies: string[] = [];
+      const v = await reviewStage(textOptions({ stage: "keyframe", artifacts: [{ path, kind: "image" }], fetchImpl: judge(good, bodies) }));
+      expect(v.status).toBe("unverified"); expect(bodies).toHaveLength(0);
     }
+    expect((await reviewStage(textOptions({ artifacts: [] }))).approved).toBe(false);
   });
-
-  it("rubric 覆盖所有环节且都有可判定的条目", () => {
-    for (const [stage, rubric] of Object.entries(PRODUCER_RUBRICS)) {
-      expect(rubric.length, `${stage} 至少要有一条评审要点`).toBeGreaterThan(0);
-      for (const line of rubric) expect(line.trim().length).toBeGreaterThan(4);
-    }
+  it("missing reference cannot be silently skipped", async () => {
+    const v = await reviewStage(textOptions({ referenceImages: ["/missing-reference.png"] }));
+    expect(v.status).toBe("unverified");
   });
-
-  it("硬闸失败直接打回：不调用模型、分数为 0", async () => {
-    let called = 0;
-    const fetchImpl = (async () => {
-      called += 1;
-      return new Response("{}", { status: 200 });
-    }) as unknown as typeof fetch;
-    const verdict = await reviewStage({
-      stage: "shot",
-      projectId: "VID-1",
-      artifacts: [],
-      deterministic: [{ id: "duration", pass: false, detail: "期望 5s 实测 3.2s", hard: true }],
-      env,
-      fetchImpl
-    });
-    expect(verdict.approved).toBe(false);
-    expect(verdict.rerun).toBe(true);
-    expect(verdict.score).toBe(0);
-    expect(verdict.via).toBe("deterministic");
-    expect(verdict.hardFailures[0]).toContain("duration");
-    expect(called).toBe(0);
+  it("image-only stages cannot approve on text evidence", async () => {
+    expect((await reviewStage(textOptions({ stage: "shot" }))).approved).toBe(false);
   });
-
-  it("软信号失败不影响放行，但进问题清单", async () => {
-    const verdict = await reviewStage({
-      stage: "color",
-      projectId: "VID-1",
-      artifacts: [],
-      deterministic: [{ id: "improvement", pass: false, detail: "调色提升 1.2 分（阈值 2）" }],
-      env,
-      fetchImpl: fakeLlm({ approved: true, score: 82, issues: [], suggestions: [], reason: "择优判定无需调色" })
-    });
-    expect(verdict.approved).toBe(true);
-    expect(verdict.issues.some((i) => i.includes("improvement"))).toBe(true);
-    expect(verdict.via).toBe("llm");
+  it("full text including violations after the old prefix limit reaches judge", async () => {
+    const path = file("long.txt", "正常描述".repeat(4000) + "末尾约束冲突");
+    const bodies: string[] = [];
+    const v = await reviewStage(textOptions({ artifacts: [{ path, kind: "text" }], fetchImpl: judge(good, bodies) }));
+    expect(v.approved).toBe(true); expect(bodies[0]).toContain("末尾约束冲突");
+    expect(v.evidence?.[0]?.sha256).toBe(createHash("sha256").update(readFileSync(path)).digest("hex"));
+    expect(v.evidence?.[0]?.scope).toBe("complete-text");
   });
-
-  it("模型判不合格 → rerun=true 且带建议", async () => {
-    const verdict = await reviewStage({
-      stage: "keyframe",
-      projectId: "VID-1",
-      artifacts: [{ path: "/tmp/x.png", kind: "image" }],
-      deterministic: [{ id: "res", pass: true, detail: "1080x1920", hard: true }],
-      env,
-      fetchImpl: fakeLlm({ approved: false, score: 35, issues: ["人物与定妆照不是同一张脸"], suggestions: ["用 img2img 挂定妆照锚点重跑"], reason: "人物不像" })
-    });
-    expect(verdict.approved).toBe(false);
-    expect(verdict.rerun).toBe(true);
-    expect(verdict.suggestions[0]).toContain("重跑");
-    expect(verdict.model).toBe("judge-1");
+  it("oversize full text or context cannot be truncated into a pass", async () => {
+    expect((await reviewStage(textOptions({ artifacts: [{ path: file("large.txt", "a".repeat(100001)), kind: "text" }] }))).status).toBe("unverified");
+    expect((await reviewStage(textOptions({ context: { large: "a".repeat(30001) } }))).status).toBe("unverified");
   });
-
-  it("无模型时 fail-closed；显式允许降级才放行并标 degraded", async () => {
-    const closed = await reviewStage({
-      stage: "prompt", projectId: "VID-1", artifacts: [], deterministic: [], env: {}, fetchImpl: fakeLlm({})
-    });
-    expect(closed.approved).toBe(false);
-    expect(closed.degraded).toBe(true);
-    expect(closed.via).toBe("fallback");
-
-    const open = await reviewStage({
-      stage: "prompt", projectId: "VID-1", artifacts: [], deterministic: [], env: {}, allowFallbackApprove: true, fetchImpl: fakeLlm({})
-    });
-    expect(open.approved).toBe(true);
-    expect(open.degraded).toBe(true);
-    expect(open.suggestions[0]).toContain("LLM_");
+  it("all seven images are reviewed in batches and a later reject wins", async () => {
+    const images = Array.from({ length: 7 }, (_, i) => ({ path: file(`image-${i}.png`, png), kind: "image" as const }));
+    const bodies: string[] = [];
+    const fetchImpl = (async (_url, init) => { bodies.push(String(init?.body)); return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(bodies.length === 1 ? good : { ...good, approved: false, reason: "last image bad" }) } }] })); }) as typeof fetch;
+    const v = await reviewStage(textOptions({ stage: "keyframe", artifacts: images, fetchImpl }));
+    expect(bodies).toHaveLength(2); expect(bodies.reduce((n, b) => n + (b.match(/image_url/g)?.length ?? 0), 0)).toBe(14);
+    expect(v.approved).toBe(false); expect(v.reason).toContain("last image bad"); expect(v.evidence).toHaveLength(7);
   });
-
-  it("模型报错同样按 fail-closed 处理（不打回静默）", async () => {
-    const verdict = await reviewStage({
-      stage: "bgm", projectId: "VID-1", artifacts: [], deterministic: [], env,
-      fetchImpl: (async () => new Response("boom", { status: 500 })) as unknown as typeof fetch
-    });
-    expect(verdict.approved).toBe(false);
-    expect(verdict.degraded).toBe(true);
-    expect(verdict.issues.some((i) => i.includes("HTTP 500"))).toBe(true);
+  it("oversize images must compress successfully without losing evidence", async () => {
+    const big = file("big.png", Buffer.concat([png, Buffer.alloc(1_000_000)]));
+    const small = file("small.png", png); const bodies: string[] = [];
+    const v = await reviewStage(textOptions({ stage: "keyframe", artifacts: [{ path: big, kind: "image" }], shrinkImage: () => small, fetchImpl: judge(good, bodies) }));
+    expect(v.approved).toBe(true); expect(bodies[0]!.length).toBeLessThan(50_000);
+    expect((await reviewStage(textOptions({ artifacts: [{ path: big, kind: "image" }], shrinkImage: () => null }))).status).toBe("unverified");
   });
+  it.each([{ ...good, score: 1 }, { ...good, approved: false }])("low score or reject cannot pass %j", async (answer) => {
+    const v = await reviewStage(textOptions({ fetchImpl: judge(answer) })); expect(v.status).toBe("failed"); expect(v.approved).toBe(false);
+  });
+  it.each([{ ...good, approved: "true" }, { ...good, score: 101 }, { ...good, score: null }, { ...good, issues: "bad" }, { ...good, suggestions: [false] }, [], null])("invalid response is unverified %j", async (answer) => {
+    const v = await reviewStage(textOptions({ fetchImpl: judge(answer) })); expect(v.status).toBe("unverified"); expect(v.approved).toBe(false);
+  });
+  it("unsupported audio and missing acoustic review cannot be called passed", async () => {
+    expect((await reviewStage(textOptions({ artifacts: [{ path: file("audio.wav", "data"), kind: "audio" }] }))).status).toBe("unverified");
+    expect((await reviewStage(textOptions({ stage: "bgm" }))).reason).toContain("audio-review");
+  });
+  const hasFfmpeg = spawnSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-version"]).status === 0;
+  it.skipIf(!hasFfmpeg)("actual video is probed and sampled at five timestamps", async () => {
+    const path = file("video.mp4", "");
+    const build = spawnSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=10", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", path]);
+    expect(build.status).toBe(0);
+    const bodies: string[] = [];
+    const v = await reviewStage(textOptions({ stage: "shot", artifacts: [{ path, kind: "video" }], fetchImpl: judge(good, bodies) }));
+    expect(v.approved, v.reason).toBe(true); expect(v.evidence?.[0]?.scope).toContain("temporal-sample");
+    expect(bodies[0]).toContain("0.800s"); expect(bodies[0]?.match(/image_url/g)).toHaveLength(10);
+  });
+  it("credentials need all three fields", () => {
+    expect(resolveProducerLlm({})).toBeNull(); expect(resolveProducerLlm({ LLM_BASE_URL: "x", LLM_API_KEY: "y" })).toBeNull();
+    expect(resolveProducerLlm({ DEEPSEEK_BASE_URL: "https://api.example.com", DEEPSEEK_API_KEY: "k", DEEPSEEK_MODEL: "test" })?.model).toBe("test");
+  });
+});
 
-  it("凭据解析：缺任一即视为不可用（不拿半套配置去调）", () => {
-    expect(resolveProducerLlm({} as NodeJS.ProcessEnv)).toBeNull();
-    expect(resolveProducerLlm({ LLM_BASE_URL: "x", LLM_API_KEY: "y" } as unknown as NodeJS.ProcessEnv)).toBeNull();
-    expect(resolveProducerLlm({ DEEPSEEK_BASE_URL: "https://api.deepseek.com", DEEPSEEK_API_KEY: "k", DEEPSEEK_MODEL: "deepseek-flash" } as unknown as NodeJS.ProcessEnv))
-      .toEqual({ baseUrl: "https://api.deepseek.com", apiKey: "k", model: "deepseek-flash" });
+
+describe("producer uses explicit source contracts", () => {
+  const shots = [{ shotId: "PAIR", scene: "两人坐在窗边", characters: ["甲", "乙"], composition: "双人近景", lighting: "右侧烛光2200K", action: "保持坐姿，不笑", depth_of_field: "深景深" }];
+  it("exact contract hash and complete facts enter judge, without old universal templates", async () => {
+    const bodies: string[] = []; const contracts = { shots };
+    const expected = buildProducerReviewContract(contracts);
+    const result = await reviewStage(textOptions({ contracts, fetchImpl: judge(good, bodies) }));
+    expect(result.approved).toBe(true); expect(result.contractHash).toBe(expected.contractHash);
+    expect(bodies[0]).toContain("右侧烛光2200K"); expect(bodies[0]).toContain("深景深"); expect(bodies[0]).toContain(expected.contractHash);
+    expect(expected.shots[0]?.intent.subject.count).toBe(2);
+    expect(Object.values(PRODUCER_RUBRICS).flat().join("；")).not.toMatch(/五路微动作齐备|无第二张脸|屏幕始终朝向|全部是 2024|六镜是同一个人|都在成片里可见/);
+  });
+  it("structured device date and purpose are checked before calling a model", async () => {
+    const bodies: string[] = [];
+    const phone = { shotId: "PHONE", scene: "手机产品特写", devices: [{ category: "phone", model: "iPhone 16" }] };
+    const missing = await reviewStage(textOptions({ contracts: { shots: [phone] }, fetchImpl: judge(good, bodies) }));
+    expect(missing.status).toBe("unverified"); expect(bodies).toHaveLength(0);
+    const future = await reviewStage(textOptions({ contracts: { shots: [phone], eraProfile: { storyDate: "2012-01-01" } }, fetchImpl: judge(good, bodies) }));
+    expect(future.status).toBe("failed"); expect(bodies).toHaveLength(0);
+    const valid = await reviewStage(textOptions({ contracts: { shots: [phone], eraProfile: { storyDate: "2024-09-20" } }, fetchImpl: judge(good, bodies) }));
+    expect(valid.approved).toBe(true); expect(bodies[0]).toContain("设备声明：iPhone 16");
+  });
+  it.each([null, { shots: [] }, { shots: [null] }, { shots: [{ scene: "空镜" }] }, { shots: [shots[0], shots[0]] }, { shots: [{ shotId: "UNKNOWN" }] }, { shots, sceneBible: null }])("invalid structured contracts are unverified before external calls %j", async (contracts) => {
+    const bodies: string[] = [];
+    const result = await reviewStage(textOptions({ contracts: contracts as never, fetchImpl: judge(good, bodies) }));
+    expect(result.status).toBe("unverified"); expect(bodies).toHaveLength(0);
+  });
+  it("mutating the source while reviewing cannot retain a passed verdict", async () => {
+    const contracts = { shots: structuredClone(shots) };
+    const fetchImpl = (async () => { contracts.shots[0]!.lighting = "左侧冷光"; return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(good) } }] })); }) as typeof fetch;
+    const result = await reviewStage(textOptions({ contracts, fetchImpl }));
+    expect(result.approved).toBe(false); expect(result.reason).toContain("合同发生变化");
+  });
+  it("oversize contract stays unverified without truncating its final facts", async () => {
+    const bodies: string[] = [];
+    const result = await reviewStage(textOptions({ contracts: { shots: [{ ...shots[0], description: "a".repeat(30001) }] }, fetchImpl: judge(good, bodies) }));
+    expect(result.status).toBe("unverified"); expect(result.reason).toContain("超预算"); expect(bodies).toHaveLength(0);
+  });
+  it("legacy no-contract caller explicitly declares the unverified fact boundary", async () => {
+    const bodies: string[] = [];
+    const result = await reviewStage(textOptions({ fetchImpl: judge(good, bodies) }));
+    expect(result.contractHash).toBeUndefined(); expect(bodies[0]).toContain("未提供结构化镜头合同");
   });
 });

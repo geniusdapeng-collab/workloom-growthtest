@@ -1,95 +1,66 @@
-# 镜头内电子设备标准：全部使用 2024 年之后的 Apple 设备（2026-09-27）
+# 镜头设备：冻结故事日期、具体型号与显式品牌档案
 
-> 产品所有者口径（原话）：**"凡是场景中出现的电子设备，例如笔记本电脑、台式机、手机、平板、显示器等，
-> 全部使用 2024 年之后的苹果设备。这一条作为硬约束，写进系统底层。"**
->
-> 本文是这条硬约束的**系统实现说明**：判据在哪、清单怎么维护、三层机制怎么兜、边界是什么。
+本页对应 `device-policy.ts` 的 `workloom.device-era/v2`。目录记录已核实的**历史上市日期**，不声称某型号现在仍在售。文字合同通过也不代表生成画面的品牌或年代已经通过视觉检查。
 
-## 一、为什么是"清单 + 声明 + 三处同源"，不是一句提示词
+原销售片的 Apple 要求保留为显式 `apple-2024plus` 档案。历史题材、产品片和其他品牌任务使用 `story-compatible`。调用方必须带入项目批准的档案；不得以系统今天的日期补齐缺失的故事日期。
 
-| 只写提示词 | 本方案（三层） |
-|---|---|
-| 降低发生率，但拦不住"模型顺手补一台杂牌笔记本/旧机型" | ① 镜头卡 `devices[]` 显式声明机型；② 渲染前确定性审计 fail-closed；③ 提示词侧约束 + 监制 rubric 同源 |
-| 机型世代会变，提示词会过期 | 清单集中在 `device-policy.ts#DEVICE_ALLOWLIST`（带 `generation` 与 `source`），改一处即全链路生效 |
-| 判不出来，只能靠人眼 | `deviceDefects()` 逐镜判红，报告落盘（可复核、可进 CI） |
+## 合同与优先级
 
-## 二、允许清单（唯一事实源）
-
-位置：`packages/video-studio/src/device-policy.ts`（`DEVICE_POLICY_VERSION = apple-2024plus/v1`）。
-核对口径：**Apple 官网在售机型**，`DEVICE_POLICY_VERIFIED_AT` 记录核对日期；在售机型均晚于 2024 年世代。
-
-| 类别 | 允许机型（示例） | 世代口径 |
-|---|---|---|
-| 笔记本 | MacBook Neo / MacBook Air / MacBook Pro | Mac 新笔电线 / M4 起 |
-| 台式机 | Mac mini / Mac Studio | M4 起 / 2025 起在售世代 |
-| 一体机 | iMac | M4 起 |
-| 显示器 | Studio Display XDR | XDR 世代（在售新机型） |
-| 手机 | iPhone 16 / 17 / 17e / Air / 18 Pro / Duo | A18 起（iPhone 16 为 2024 年世代） |
-| 平板 | iPad Pro / iPad Air / iPad / iPad mini | M4 起 / 在售世代 |
-| 配件 | Apple Watch / AirPods（含 Pro、Max）/ Magic Keyboard / Magic Mouse / Magic Trackpad / Apple Pencil | 在售世代 |
-
-**在售但世代偏早**（软清单，不判红但给建议）：`Studio Display`（2022 世代）——
-严格 2024+ 口径请用 `Studio Display XDR`。
-
-扩展方式：在 `DEVICE_ALLOWLIST` 加一条（含 `generation` 与 `source`）即可，审计/提示词/监制自动跟随。
-清单变更属于**产品口径变更**，应在任务卡里留痕。
-
-## 三、判据（`deviceDefects`，确定性、零 token）
-
-| 规则 | 级别 | 判据 |
-|---|---|---|
-| `device-declaration` | 硬 | 镜头文本里出现电子设备（笔记本/台式机/一体机/手机/平板/显示器/耳机/键鼠/手表/相机麦克风）但没有 `devices[]` 声明 |
-| `device-model` | 硬 | 声明的机型不在允许清单（含只写裸词"笔记本电脑""平板"的情况） |
-| `device-brand` | 硬 | 镜头文本里出现非 Apple 品牌（联想/戴尔/惠普/华为/小米/三星/索尼/LG/微软 Surface/罗技…） |
-| `device-generation` | 软 | 命中"在售但世代偏早"清单（如 Studio Display 2022） |
-
-> 判定纪律：**裸词不算机型**。"笔记本电脑/平板/显示器"这类词只用于**发现**设备，不能用于**声明**设备；
-> 声明必须落到具体机型。纸本与设备的分辨：`笔记本` 只有在"电脑/屏幕/键盘/金属外壳/机身/盒盖"等设备语境下才算设备
-> （真机实测：商务场景里"笔记本"有一半指纸质本）。
-
-## 四、镜头卡写法
-
-```jsonc
+```json
 {
-  "shotId": "GR-02",
-  "sceneDescription": "桌上平放一台 iPad Pro（M4 世代），屏幕朝向主播本人",
-  "props": "iPad Pro（M4 世代）、打印报表、咖啡杯",
-  "devices": [
-    { "category": "tablet", "model": "iPad Pro",
-      "role": "展示报表（界面虚化不可辨）",
-      "placement": "平放桌面、屏幕朝向主播本人，观众只见机身边缘与冷光反射" }
-  ]
+  "eraProfile": { "storyDate": "2025-03-12", "devicePolicy": "apple-2024plus" },
+  "shots": [{
+    "shotId": "PHONE-01",
+    "scene": "女人向观众演示手机报表",
+    "action": "右手握持手机，向观众展示屏幕",
+    "devices": [{ "category": "phone", "model": "iPhone 16", "placement": "右手握持", "role": "向观众展示报表" }],
+    "propInteraction": {
+      "prop": "手机", "purpose": "present", "orientation": "屏幕朝向观众",
+      "screenFacing": "audience", "operatedBy": "女人", "contact": "右手包裹机身两侧"
+    }
+  }]
 }
 ```
 
-屏幕类设备仍需同时满足**道具-人体交互**口径（`propInteraction`：屏幕朝向使用者本人，观众只见机身背面或侧缘）。
+`EraProfile.storyDate` 必须是实际日历日期 `YYYY-MM-DD`，范围 1000–9999 年。`today`、无效闰日、缺日期、未知字段和未知策略均为 `unverified`。镜头的完整 `eraProfile` 优先于继承值，允许明确闪回；不同档案不按字段拼接。`devicePolicy` 缺省为 `story-compatible`。
 
-## 五、三层机制与接线
-
-| 层 | 落点 | 行为 |
+| 策略 | 可核条件 | 不满足时 |
 |---|---|---|
-| 声明 | 镜头卡 `devices[]` | 机型是唯一可声明项；裸词不通过 |
-| 审计 | `deviceDefects()` → `full-chain-film` 装载期 / `environment-realism-audit.mts` | 生成类阶段硬缺陷 **fail-closed**（与环境审计合并为同一道闸、同一份报告） |
-| 提示词 | `plate-prompt.ts#DEVICE_STANDARD_CONSTRAINT`（含设备的镜头追加） | 画面语言：机型按卡片呈现、无其他品牌标识、旧世代外观禁止；**不重复机型清单**（避免第二事实源） |
-| 监制 | `producer-gate.ts#PRODUCER_RUBRICS` | `keyframe`/`shot`/`master` 增"设备口径"必判类目（含跨帧/跨镜一致性） |
+| `story-compatible` | 具体型号在冻结目录，类别正确，上市日期不晚于故事日期 | 未知型号/缺日期为 `unverified`；年代或类别矛盾为 `failed` |
+| `apple-2024plus` | 上述条件，加 Apple 品牌、目录上市日期不早于 2024-01-01 | 品牌或世代冲突为 `failed`；2022 显示器无软清单豁免 |
 
-## 六、验收口径
+`devices` 接受一个声明或声明数组，每项含 `category`、`model`，可选 `placement`、`role`。可选字段提供时须为非空文字。型号只接受完整规范名或已登记别名；`MacBook Pro`、`MacBook Pro 2012`、`iPhone 160` 不会因包含子串而通过。
 
-1. 单测：`pnpm -C packages/video-studio test`（`device-policy.test.ts` 8 例 + `plate-prompt.test.ts` 设备约束 1 例）；
-2. CLI：`tsx scripts/tools/environment-realism-audit.mts --shots <卡> [--expand]`
-   —— 改造前应报 `device-declaration` 硬红（模板 18 镜实测 8 镜命中），补齐 `devices[]` 后应为 0；
-3. 端到端：模板示例（销售讲解型 18 镜）在 `--expand` 下环境 + 设备**双零**；
-4. 真机：`keyframe`/`shot` 监制按"设备口径"类目给出可读结论（机型与卡片一致、无其他品牌标识）。
+发现的每个设备类别都必须有自己的有效声明；手机声明不能覆盖笔记本和显示器。无设备为 `not_applicable`。`无手机` 等已覆盖的否定不产生设备；纸质笔记本、品牌地名不自动产生设备。有限词法规则不是通用语言理解。
 
-## 七、边界（本方案不解决什么）
+## 当前目录及官方证据
 
-- **不做像素级品牌识别**：判据是"写没写、写得对不对"（声明 + 文本），"生成出来像不像该机型"由监制视觉评审兜；
-- **不做设备世代的时间校验**：清单按"Apple 官网在售"维护，`verifiedAt` 记录核对日期；清单过期需人工更新（属产品口径变更）；
-- **非列举类设备**（硬盘盒、读卡器、线材、电子时钟，以及**Apple 没有对应品类的相机/云台**）：不进声明与品牌判据
-  （否则规则不可满足），但适用提示词侧的"无其他品牌标识"约束与监制视觉复核；
-- **已交付成片不追溯**：本约束对**新提交渲染**生效；已在库的成片（如 VID-GROWTH-SALES01 的 CF-02/CF-06 含泛指手机）如需合规，需重渲——费用与排期由产品所有者决定。
+完整型号、别名、类别和来源在 `DEVICE_ALLOWLIST`，每条和别名数组均冻结。以下为本批使用的官方历史资料；首次可购买/交付日期与发布公告日期分别处理。
 
----
+| 目录组 | 上市日期 | 官方来源 |
+|---|---|---|
+| MacBook Pro M4 / M4 Pro / M4 Max | 2024-11-08 | [Apple MacBook Pro 公告](https://www.apple.com/uk/newsroom/2024/10/new-macbook-pro-features-m4-family-of-chips-and-apple-intelligence/) |
+| MacBook Air M4 | 2025-03-12 | [Apple MacBook Air 公告](https://www.apple.com/ca/newsroom/2025/03/apple-introduces-the-new-macbook-air-with-the-m4-chip-and-a-sky-blue-color/) |
+| iMac M4、USB-C Magic Keyboard / Mouse / Trackpad | 2024-11-08 | [Apple iMac 公告](https://www.apple.com/newsroom/2024/10/apple-introduces-new-imac-supercharged-by-m4-and-apple-intelligence/) |
+| Mac mini M4 / M4 Pro | 2024-11-08 | [Apple Mac mini 公告](https://www.apple.com/uk/newsroom/2024/10/apples-new-mac-mini-is-more-mighty-more-mini-and-built-for-apple-intelligence/) |
+| Mac Studio M4 Max / M3 Ultra | 2025-03-12 | [Apple Mac Studio 公告](https://www.apple.com/uk/newsroom/2025/03/apple-unveils-new-mac-studio-the-most-powerful-mac-ever/) |
+| Studio Display 2022 | 2022-03-18 | [Apple Studio Display 公告](https://www.apple.com/au/newsroom/2022/03/apple-unveils-all-new-mac-studio-and-studio-display/) |
+| iPhone 16 系列、Watch Series 10、AirPods 4 | 2024-09-20 | [Apple 首发记录](https://www.apple.com/newsroom/2024/09/the-iphone-16-lineup-airpods-4-apple-watch-series-10-arrive-around-the-world/) |
+| iPad Pro M4、iPad Air M2、Apple Pencil Pro | 2024-05-15 | [Apple iPad 上市记录](https://www.apple.com/newsroom/2024/05/the-redesigned-ipad-air-and-new-ipad-pro-are-available-today/) |
+| Samsung Galaxy S24 / S24+ / S24 Ultra | 2024-01-31 | [Samsung 上市记录](https://news.samsung.com/us/samsung-galaxy-s24-series-now-available-in-us/) |
 
-**关联**：`docs/environment-realism.md`（环境真实性机制，与本标准的闸门合并为同一道）、
-`BADCASE-2026-0927-phone-screen-toward-audience.md`（道具朝向 badcase）。
+扩展目录必须附官方历史证据、确切上市日期、型号及类别，并增加边界测试。未核实的新型号保持未验证，不用泛品牌或“在售”推断世代。不是目录成员不等于现实不存在，只表示当前版本没有证据。
+
+## 实际消费与失败边界
+
+- `deviceDefects(shots, { eraProfile })` 返回带 `rule`、`shotId`、`status`、`hard` 的缺陷；`devicePolicyStatus` 汇总四态。
+- `devicePolicyPromptLines` 先核验，再把实际型号、摆放、用途和冻结日期写入提示词；有缺陷直接抛错。
+- `buildPlatePrompt` 接受 `options.eraProfile` / `options.sceneBible`，不再强加 5600K、竖幅、浅景深、默认人物或禁第二人。
+- `reviewStage({ contracts: { shots, eraProfile, sceneBible } })` 在外部调用前编译合同，实际请求含完整事实和 `contractHash`。评审期间源合同变化则未验证。
+- `environment-realism-audit.mts` 接受 shotlist 顶层档案并生成逐镜报告。旧 full-chain 调用方的项目档案/监制合同接线由独立集成批完成；本批不声称所有旧入口已传入新字段。
+
+现有销售模板迁移时应明确冻结批准的故事日期并写 `apple-2024plus`；裸型号换成带世代的规范名，展示屏幕增加 `purpose: present`。未迁移设备卡保持未验证，不能静默补“当前 Apple”。本模块不增加外部服务或数据库表，也不签发生产交付资格。
+
+## 边界
+
+相机、云台、线材等当前九类之外的器材不冒充已经过本目录核验，仍需其自身时代资料和视觉审查。旧输入/旧媒体不会自动被改写。真实机型外观、物理交互和跨帧连续性必须由实际媒体评审验证；本批测试使用真实本地函数和 CLI，外部模型为替身。

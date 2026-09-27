@@ -179,6 +179,24 @@ export function assessVariantDistinctness(
   thresholds: { videoDelta: number; audioDelta: number } = { videoDelta: 6, audioDelta: 1.0 }
 ): DistinctnessReport {
   const pairs: DistinctnessPair[] = [];
+  const invalid = (detail: string): DistinctnessReport => ({
+    pairs: [], worstPair: null, approved: false, detail: `变体差异未核实：${detail}`,
+  });
+  if (!Array.isArray(samples) || samples.length < 2) return invalid("至少需要两支变体的实际测量，空集或单样本不能证明差异");
+  if (![thresholds.videoDelta, thresholds.audioDelta].every((value) => Number.isFinite(value) && value > 0)) {
+    return invalid("差异阈值必须为正有限数");
+  }
+  const ids = new Set<string>();
+  for (const sample of samples) {
+    if (!sample || typeof sample.variantId !== "string" || !sample.variantId.trim() || ids.has(sample.variantId)) return invalid("变体标识缺失或重复");
+    ids.add(sample.variantId);
+    if (!Array.isArray(sample.frames) || sample.frames.length === 0 || sample.frames.some((frame) =>
+      !frame || ![frame.r, frame.g, frame.b].every((value) => Number.isFinite(value) && value >= 0 && value <= 255))) {
+      return invalid(`${sample.variantId} 缺有效抽帧测量`);
+    }
+    if (sample.loudness !== null && (!sample.loudness
+      || ![sample.loudness.lufs, sample.loudness.peakDb].every(Number.isFinite))) return invalid(`${sample.variantId} 响度测量非法`);
+  }
   for (let i = 0; i < samples.length; i += 1) {
     for (let j = i + 1; j < samples.length; j += 1) {
       const a = samples[i]!;

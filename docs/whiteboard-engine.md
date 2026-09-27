@@ -38,6 +38,14 @@
 
 **默认档位**：`WHITEBOARD_FPS=30`、`WHITEBOARD_CAP_LONG_EDGE=1280`（约 0.4× 实时）。
 
+### UHD 输出档位（T-2026-0927-0010）
+
+`whiteboard.create` 和 `whiteboard.verifyExample` 接受 `quality:"hd"|"uhd"`（默认 `hd`）；`whiteboard.render` 可显式给 `quality:"uhd"`，省略时沿用片子保存的档位。UHD 固定输出 **3840×2160**，不接受自定义 `capLongEdge`。提交前会读取每幕线稿的 PNG/JPEG 尺寸，按上游 10 像素网格对齐算法预估输出；不能恰好得到 3840×2160 的线稿会被明确拒绝，避免渲到末尾才发现比例不符。
+
+UHD 的 `render_stream_whiteboard.py` 仍逐帧构建完整 4K 画布。只有当输入线稿需要放大到 4K 时，图像插值从上游 `INTER_AREA` 改为 `INTER_CUBIC`；HD 与缩小路径保持原样。这符合 [OpenCV 官方 `resize` 文档](https://docs.opencv.org/5.0/main_modules/imgproc_transform.html)对缩小/放大插值的建议，只改变已有像素之间的过渡，**不增加源线稿的细节**。每幕 H.264 产物与合并产物都经 `ffprobe` 核对尺寸；单幕还保存同名 `.render-receipt.json`（尺寸、字节数、SHA-256），供复核和故障定位。上游成功转码后自行删除临时 `*_raw.mp4`；转码失败时保留 raw 供排障。
+
+本轮静态契约测试与 TypeScript 检查已通过；4K 实帧、同素材两种插值的画面对比尚未完成，不能据此声称 UHD 的视觉质量和 M3 耗时已经验收。
+
 ## 二、本仓的接入形态（八环节）
 
 ```

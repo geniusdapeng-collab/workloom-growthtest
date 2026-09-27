@@ -4,7 +4,7 @@
  * 六组过程：
  *  - studio：预生产流水线启动/状态（异步工作器，G1–G7 门走 approvals 原生消息）
  *  - cms：渲染脚本 CMS（asset-cms render-scripts 服务：版本链 + G8 审批联动）
- *  - render：Seedance 提交（G8 围栏预检；无 VOLCENGINE_ARK_API_KEY 走 mock 并标注 mock:true）
+ *  - render：正式资格绑定的供应商请求提交（G8 围栏、预算、幂等回执）
  *  - publish：全平台 RPA 发布任务入队（G9 围栏预检，publish-rpa runner 执行时复核）
  *  - metrics：近 7 天 account_metrics 聚合投影
  *  - comments：待处理评论队列（G10 分流级别随行返回）
@@ -32,10 +32,14 @@ import { PlatformSchema } from "@workloom/base/publish-rpa";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../trpc/context.js";
 import { accountingRouter } from "./accounting.js";
 import { pollRenderJobs } from "./render-poller.js";
-import { defaultVideoModelId, getModel, listModels } from "./gen/catalog.js";
+import { getModel, listModels } from "./gen/catalog.js";
 import { checkCostCaps, costCaps, estimateCost, renderSpendCny, usdCnyRate } from "./gen/cost.js";
 import { serviceTierRejectionReason } from "./gen/params.js";
 import { submitGenJob } from "./gen/submit.js";
+import { SubmissionError } from "./gen/submission-ledger.js";
+import { canonicalRenderJson } from "./gen/compiled-request.js";
+import { loadQualifiedRenderInput } from "./production-authority.js";
+import { productionRouter } from "./production-router.js";
 import { createPublishTask, executePublishTask, fenceOverrideEnabled } from "./gen/publish.js";
 import { mediaUrl } from "./gen/ingest.js";
 /** PollReport 类型再导出（web 端 AppRouter 类型可移植性，TS2883） */
@@ -147,8 +151,10 @@ function renderScriptRethrow(err: unknown): never {
 function deliveryRethrow(err: unknown): never {
   if (err instanceof DeliveryError) {
     const code = err.code === "not_found" ? "NOT_FOUND"
-      : err.code === "path_not_allowed" ? "FORBIDDEN"
-        : err.code === "idempotency_conflict" || err.code === "shot_regeneration_required" || err.code === "artifact_too_large"
+      : ["path_not_allowed", "scope_mismatch", "scope_required"].includes(err.code) ? "FORBIDDEN"
+        : ["revision_conflict", "revision_busy"].includes(err.code) ? "CONFLICT"
+          : err.code === "revision_io_failed" ? "INTERNAL_SERVER_ERROR"
+        : err.code === "idempotency_conflict" || err.code === "shot_regeneration_required" || err.code === "artifact_too_large" || err.code === "delivery_unverified"
           ? "PRECONDITION_FAILED"
           : "BAD_REQUEST";
     throw new TRPCError({ code, message: err.message });
@@ -238,14 +244,14 @@ const deliveryRouter = router({
   /** 交付包列表（按创建时间倒序；无交付根时返回空列表） */
   list: protectedProcedure
     .input(z.object({ limit: z.number().int().min(1).max(100).default(20) }))
-    .query(({ input }) => listDeliveryPackages({ limit: input.limit })),
+    .query(({ ctx, input }) => listDeliveryPackages({ scope: scopeOf(ctx.identity), limit: input.limit })),
 
   /** 单个交付包详情（母版/旁挂字幕/变体/差异实测/检查/返修历史/选择记录；媒体给签名 URL） */
   get: protectedProcedure
     .input(z.object({ dir: z.string().min(1).max(200) }))
-    .query(({ input }) => {
+    .query(({ ctx, input }) => {
       try {
-        return readDeliveryPackage(input.dir);
+        return readDeliveryPackage(input.dir, scopeOf(ctx.identity));
       } catch (err) {
         deliveryRethrow(err);
       }
@@ -264,9 +270,9 @@ const deliveryRouter = router({
       ref: z.string().min(1).max(400),
       maxBytes: z.number().int().min(1024).max(64 * 1024 * 1024).optional(),
     }))
-    .query(({ input }) => {
+    .query(({ ctx, input }) => {
       try {
-        return readDeliveryArtifact({ dir: input.dir, ref: input.ref, maxBytes: input.maxBytes });
+        return readDeliveryArtifact({ scope: scopeOf(ctx.identity), dir: input.dir, ref: input.ref, maxBytes: input.maxBytes });
       } catch (err) {
         deliveryRethrow(err);
       }
@@ -284,6 +290,7 @@ const deliveryRouter = router({
       let selection;
       try {
         selection = selectDeliveryVariant({
+          scope,
           dir: input.dir, variantId: input.variantId,
           note: input.note ?? null, by: ctx.identity.memberNo,
         });
@@ -293,7 +300,9 @@ const deliveryRouter = router({
       await appendDeliveryEvent(ctx, scope, {
         objectType: "delivery_package", objectId: input.dir,
         action: "delivery.variant.selected",
-        after: { variantId: selection.variantId, note: selection.note, at: selection.at },
+        after: { variantId: selection.variantId, note: selection.note, at: selection.at,
+          projectId: selection.projectId, revision: selection.revision, manifestSha256: selection.manifestSha256,
+          sealSha256: selection.sealSha256, variantSha256: selection.variantSha256 },
         basis: ["用户在交付包里选择了风格变体（一个包多版本，选择即交付结论）"],
         /**
          * 选择结果回流组织偏好池：同一事务写入 preference 记忆，
@@ -335,7 +344,7 @@ const deliveryRouter = router({
       const scope = scopeOf(ctx.identity);
       let outcome;
       try {
-        outcome = await triageDeliveryFeedback(input.dir, input.feedback);
+        outcome = await triageDeliveryFeedback(input.dir, input.feedback, scope);
       } catch (err) {
         deliveryRethrow(err);
       }
@@ -343,6 +352,7 @@ const deliveryRouter = router({
       if (input.record) {
         try {
           const recorded = recordRevisionRequest({
+            scope,
             dir: input.dir, feedback: input.feedback,
             triage: outcome.triage, patchHint: outcome.patchHint, by: ctx.identity.memberNo,
           });
@@ -372,14 +382,19 @@ const deliveryRouter = router({
     .input(z.object({
       dir: z.string().min(1).max(200),
       patch: z.record(z.string(), z.unknown()),
+      expectedVersion: z.number().int().positive(),
+      expectedProjectSha256: z.string().regex(/^[a-f0-9]{64}$/),
     }))
     .mutation(async ({ ctx, input }) => {
       const scope = scopeOf(ctx.identity);
       let job;
       try {
         job = await startDeliveryRevision({
+          scope,
           dir: input.dir,
           patch: input.patch,
+          expectedVersion: input.expectedVersion,
+          expectedProjectSha256: input.expectedProjectSha256,
           by: ctx.identity.memberNo,
           /** 返修完成 → 新版本成片/封面自动进媒资库（T-2026-0926-0007；失败只记日志） */
           onCompleted: deliveryIngestHook(scope),
@@ -392,6 +407,7 @@ const deliveryRouter = router({
         action: "delivery.revision.started",
         after: {
           jobId: job.jobId, patch: input.patch,
+          expectedVersion: job.expectedVersion, expectedProjectSha256: job.expectedProjectSha256,
           layers: (job.impact?.layers as unknown) ?? null,
           localOnly: (job.impact?.localOnly as unknown) ?? null,
         },
@@ -403,12 +419,12 @@ const deliveryRouter = router({
   /** 重合成作业状态（内存注册表；日志同时落盘 `<包>/revision-jobs/<jobId>.log`） */
   job: protectedProcedure
     .input(z.object({ jobId: z.string().min(1).max(120) }))
-    .query(({ input }) => deliveryJobStatus(input.jobId)),
+    .query(({ ctx, input }) => deliveryJobStatus(input.jobId, scopeOf(ctx.identity))),
 
   /** 某交付包（或缺省全部）的作业列表 */
   jobs: protectedProcedure
     .input(z.object({ dir: z.string().min(1).max(200).optional() }))
-    .query(({ input }) => listDeliveryJobs(input.dir)),
+    .query(({ ctx, input }) => listDeliveryJobs(scopeOf(ctx.identity), input.dir)),
 });
 
 /* ================= studio：预生产流水线 ================= */
@@ -774,12 +790,13 @@ const renderRouter = router({
   /**
    * 渲染提交（§6 三档模式 manual/batch/auto；G8 烧额度门）：
    * 围栏 block → 403；review → 须脚本已过 cms.approveScript（approved）；auto → 放行
-   * 无 VOLCENGINE_ARK_API_KEY → mock 提交（task_id 前缀 mock-，返回 mock:true 明确标注）
+   * 正式资格提供完整 canonical 输入；旧字段只允许与已审值一致，不能后置覆盖或夹紧。
    */
   submit: writeProcedure
     .input(z.object({
-      scriptId: z.string().min(1),
-      mode: z.enum(["manual", "batch", "auto"]),
+      qualificationToken: z.string().min(1).max(24000).optional(),
+      scriptId: z.string().min(1).optional(),
+      mode: z.enum(["manual", "batch", "auto"]).optional(),
       /** 模型目录 id（缺省取 WORKLOOM_VIDEO_DEFAULT_MODEL 或目录首个可用视频模型） */
       modelId: z.string().min(1).optional(),
       /** 成片时长（秒）；缺省回退 estimatedSeconds，并夹紧到模型 limits（回报 clamped） */
@@ -811,23 +828,41 @@ const renderRouter = router({
       returnLastFrame: z.boolean().optional(),
       /** 服务档位：default（终稿）| flex（草稿，成本更低） */
       serviceTier: z.enum(["default", "flex"]).optional(),
-      /** 幂等键（缺省按脚本+模型+时长+模式生成，防重复点击重复扣费） */
+      /** 幂等键（缺省由提交服务按完整请求指纹生成） */
       idempotencyKey: z.string().max(200).optional(),
       /** 预计渲染秒数（额度台账计量基准；兼容旧调用，默认 30s） */
-      estimatedSeconds: z.number().int().min(1).max(600).default(30),
+      estimatedSeconds: z.number().int().min(1).max(600).optional(),
       /** 超套餐额度时显式确认按量实扣（v3.0 渲染台账 G8 前置预算闸） */
       allowOverage: z.boolean().default(false),
-    }))
+    }).strict())
     .mutation(async ({ ctx, input }) => {
       const scope = scopeOf(ctx.identity);
       const app = getAppPool();
-      const scripts = await scopedQuery<RenderScriptRow>(
-        app, scope,
-        `SELECT * FROM render_scripts WHERE workspace_id=$1 AND id=$2`,
-        [scope.workspaceId, input.scriptId],
-      );
-      const script = scripts[0];
-      if (!script) throw new TRPCError({ code: "NOT_FOUND", message: `渲染脚本 ${input.scriptId} 不存在` });
+      if (!input.qualificationToken) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "QUALIFICATION_REQUIRED：请先通过 video.production.qualifyShot 审核当前服务预生产镜头" });
+      let qualified: Awaited<ReturnType<typeof loadQualifiedRenderInput>>;
+      try { qualified = await loadQualifiedRenderInput(app, scope, input.qualificationToken); }
+      catch (error) {
+        if (error instanceof SubmissionError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
+        throw error;
+      }
+      const { script, modelId, mode, params: canonicalParams } = qualified;
+      if ((input.scriptId !== undefined && input.scriptId !== script.id)
+        || (input.modelId !== undefined && input.modelId !== modelId) || (input.mode !== undefined && input.mode !== mode)) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "QUALIFICATION_REQUEST_MISMATCH：脚本、模型或模式与已审请求不一致" });
+      }
+      for (const key of ["durationSec", "aspectRatio", "resolution", "generateAudio", "firstFrameUrl", "referenceImageUrls", "referenceVideoUrls", "referenceAudioUrls", "seed", "watermark", "cameraFixed", "returnLastFrame", "serviceTier"] as const) {
+        if (input[key] !== undefined && canonicalRenderJson(input[key]) !== canonicalRenderJson(canonicalParams[key] ?? null)) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: `QUALIFICATION_REQUEST_MISMATCH：${key} 与已审请求不一致，请按新参数重新审核` });
+        }
+      }
+      const durationSec = canonicalParams.durationSec!;
+      if (input.estimatedSeconds !== undefined && input.estimatedSeconds !== durationSec) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "QUALIFICATION_REQUEST_MISMATCH：预计时长必须与已审计划一致" });
+      const chosen = getModel(modelId);
+      if (!chosen) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "正式资格使用的模型已不可用" });
+      const modeParams = { mode, scriptKey: script.script_key, version: script.version };
+      const clamped = false;
+      const durationProvenance = { source: "script-fields" as const, planSeconds: durationSec,
+        requestedSeconds: durationSec, mismatchSeconds: 0, strict: true };
 
       // G8 围栏预检（纯函数判定；impacts 随事件落库）
       const { rules, defaultLevel } = await loadActiveRules(app, scope);
@@ -843,82 +878,28 @@ const renderRouter = router({
       const verdict = judge({
         object: { type: "render_script", id: script.id },
         action: "render.submit",
-        params: { mode: input.mode, scriptKey: script.script_key, version: script.version },
+        params: modeParams,
         context: {
-          render_auto: (process.env.WORKLOOM_RENDER_AUTO ?? "1") !== "0" || input.mode === "auto",
+          render_auto: (process.env.WORKLOOM_RENDER_AUTO ?? "1") !== "0",
           project_compute_used: 0,
           project_compute_cap: Number.isFinite(computeCap) && computeCap > 0 ? computeCap : Number.MAX_SAFE_INTEGER,
         },
       }, rules, defaultLevel);
-      if (verdict.level === "block") {
+      if (!qualified.reconciliationOnly && verdict.level === "block") {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: `G8 围栏熔断：${verdict.triggeredBy.join("；") || "render.submit 命中 block 规则"}`,
         });
       }
-      if (verdict.level === "review" && script.status !== "approved") {
+      if (!qualified.reconciliationOnly && verdict.level === "review" && script.status !== "approved") {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
           message: `G8：渲染提交烧额度前置门——脚本 ${script.script_key} v${script.version} 须先经 video.cms.approveScript 审批（当前 ${script.status}；版本即审批对象）`,
         });
       }
 
-      // v3.0 渲染额度台账：套餐秒数配额 G8 前置预算闸（用量=render.submit 事件投影，不重算）
-      // ── 模型与时长解析（T-2026-0921-0002）：目录取模 + 时长夹紧到模型上限（回报 clamped，不静默） ──
-      const modelId = input.modelId?.trim() || process.env.WORKLOOM_VIDEO_DEFAULT_MODEL?.trim() || defaultVideoModelId();
-      const chosen = getModel(modelId);
-      if (!chosen) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: `模型目录中不存在「${modelId}」（video.gen.catalog 可查可用清单）` });
-      }
-    /**
-     * 计划 = 执行（T-2026-0925-0001）：
-     * 优先用调用方显式值；否则用**镜头卡/渲染脚本的计划时长**；最后才回落 estimatedSeconds。
-     * `WORKLOOM_DURATION_SUBMIT_STRICT=1` 时：缺计划时长或与计划偏差 >1s 一律拒绝（先告警灰度后可切）。
-     */
-    /** 回滚开关：WORKLOOM_DURATION_SUBMIT_DERIVE=off 时退回"调用方给值 / estimatedSeconds"的旧行为 */
-    const deriveFromScript = (process.env.WORKLOOM_DURATION_SUBMIT_DERIVE ?? "on") !== "off";
-    const planned = deriveFromScript ? plannedDurationOf(script) : { seconds: null, source: null };
-    const strictDuration = (process.env.WORKLOOM_DURATION_SUBMIT_STRICT ?? "0") === "1";
-    if (strictDuration && planned.seconds === null) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: "渲染脚本缺少计划时长：请在 fields.durationSec 或正文写上「时长: Ns」后再提交（不允许回落默认 30s）"
-      });
-    }
-    const requestedSeconds = input.durationSec ?? planned.seconds ?? input.estimatedSeconds;
-    if (strictDuration && planned.seconds !== null && input.durationSec !== undefined) {
-      const mismatch = Math.round(input.durationSec) - planned.seconds;
-      if (Math.abs(mismatch) > 1) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `提交时长 ${input.durationSec}s 与镜头卡计划 ${planned.seconds}s 偏差 ${mismatch}s（>1s）：请改用计划时长或先改脚本`
-        });
-      }
-    }
-      /**
-       * 真机 2026-09-23：`service_tier: flex` 不支持视频生成（400），前置拒绝。
-       * 判定收在 gen/params.ts（纯函数，带单测），避免各入口各写一遍口径。
-       */
-      const tierRejection = serviceTierRejectionReason(input.serviceTier);
-      if (tierRejection) {
-        throw new TRPCError({ code: "BAD_REQUEST", message: tierRejection });
-      }
-      const maxSeconds = chosen.limits?.durationSec?.max ?? 15;
-      const minSeconds = chosen.limits?.durationSec?.min ?? 4;
-    const durationSec = Math.min(maxSeconds, Math.max(minSeconds, Math.round(requestedSeconds)));
-    const clamped = durationSec !== Math.round(requestedSeconds);
-    const durationProvenance = {
-      source:
-        input.durationSec !== undefined
-          ? ("request" as const)
-          : planned.seconds === null
-            ? ("estimate-fallback" as const)
-            : planned.source!,
-      planSeconds: planned.seconds,
-      requestedSeconds: Number.isFinite(requestedSeconds) ? Math.round(requestedSeconds) : null,
-      mismatchSeconds: planned.seconds === null ? null : Math.round(requestedSeconds) - planned.seconds,
-      strict: strictDuration
-    };
+      const tierRejection = serviceTierRejectionReason(canonicalParams.serviceTier);
+      if (tierRejection && !qualified.reconciliationOnly) throw new TRPCError({ code: "BAD_REQUEST", message: tierRejection });
 
       const monthStart = new Date();
       monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
@@ -937,7 +918,7 @@ const renderRouter = router({
         requestSeconds: durationSec,
         allowOverage: input.allowOverage,
       });
-      if (!budget.allowed) {
+      if (!qualified.reconciliationOnly && !budget.allowed) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: budget.reason ?? "渲染额度不足" });
       }
 
@@ -947,12 +928,13 @@ const renderRouter = router({
       const capCheck = checkCostCaps({
         spentDayCny: spend.day, spentMonthCny: spend.month, estCny: est.cny, caps: costCaps(),
       });
-      if (!capCheck.allowed) {
+      if (!qualified.reconciliationOnly && !capCheck.allowed) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: capCheck.reason ?? "渲染成本超出上限" });
       }
 
       // ── 提交（唯一写入口 submitGenJob）：幂等键去重 + 供应商降级链 + 参数 + 报价 + D16 同事务 ──
-      const submitted = await submitGenJob({
+      let submitted: Awaited<ReturnType<typeof submitGenJob>>;
+      try { submitted = await submitGenJob({
         app,
         gateway: getGatewayPool(),
         scope,
@@ -963,29 +945,19 @@ const renderRouter = router({
           md: script.md, fields: script.fields as Record<string, unknown> | null,
         },
         modelId,
-        mode: input.mode,
-        params: {
-          durationSec,
-          aspectRatio: input.aspectRatio,
-          resolution: input.resolution,
-          generateAudio: input.generateAudio,
-          firstFrameUrl: input.firstFrameUrl,
-          referenceImageUrls: input.referenceImageUrls,
-          referenceVideoUrls: input.referenceVideoUrls,
-          referenceAudioUrls: input.referenceAudioUrls,
-          seed: input.seed,
-          watermark: input.watermark,
-          cameraFixed: input.cameraFixed,
-          returnLastFrame: input.returnLastFrame,
-          serviceTier: input.serviceTier,
-        },
-        /** 幂等键：同脚本 + 同模型 + 同时长 + 同模式重复点击不会重复扣费 */
-        idempotencyKey: input.idempotencyKey?.trim() || `render:${script.id}:${chosen.id}:${durationSec}:${input.mode}`,
+        mode,
+        params: canonicalParams,
+        qualificationToken: input.qualificationToken,
+        /** 默认键由提交服务基于完整请求派生；显式键须与已绑定内容一致。 */
+        idempotencyKey: input.idempotencyKey?.trim() || undefined,
       fenceLevel: verdict.level,
       fenceImpacts: verdict.impacts,
       budgetOverageSeconds: budget.overageSeconds,
       durationProvenance
-    });
+    }); } catch (error) {
+      if (error instanceof SubmissionError) throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message, cause: error });
+      throw error;
+    }
 
       /**
        * 环节台账（T-2026-0926-0002，规格书 §6.3 改动 A）：
@@ -1001,8 +973,9 @@ const renderRouter = router({
             skipReason: submitted.deduped ? "idempotency-key 命中既有 job（不重复烧额度）" : null,
             input: {
               scriptId: script.id, scriptKey: script.script_key, scriptVersion: script.version,
-              mode: input.mode, modelId, durationSec, fenceLevel: verdict.level,
-              idempotencyKey: input.idempotencyKey?.trim() || `render:${script.id}:${chosen.id}:${durationSec}:${input.mode}`,
+              mode, modelId, durationSec, fenceLevel: verdict.level,
+              idempotencyKey: submitted.idempotencyKey,
+              requestHash: submitted.requestHash,
             },
             output: {
               jobId: submitted.jobId, taskId: submitted.taskId, provider: submitted.provider,
@@ -1350,6 +1323,7 @@ const genRouter = router({
 
 export const videoRouter = router({
   studio: studioRouter,
+  production: productionRouter,
   cms: cmsRouter,
   render: renderRouter,
   gen: genRouter,

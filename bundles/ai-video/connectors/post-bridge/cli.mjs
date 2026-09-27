@@ -5,13 +5,14 @@
  * 用法：
  *   post-cli health
  *   post-cli variants
- *   post-cli plan     --project project.json --shots a.mp4,b.mp4 [--variants warm-story,clean-tech]
- *   post-cli deliver  --project project.json --shots a.mp4,b.mp4 --out-dir out/
+ *   post-cli plan     --project project.json --shots a.mp4,b.mp4 [--quality hd|uhd] [--variants warm-story,clean-tech]
+ *   post-cli deliver  --project project.json --shots a.mp4,b.mp4 --out-dir out/ [--quality hd|uhd]
  *                     [--srt subs.srt] [--srt-en subs.en.srt] [--variants …]
  *                     [--burn-subtitles] [--no-soft-subtitles]
  *   post-cli impact   --project film-project.json --patch patch.json
  *   post-cli reedit   --project film-project.json --patch patch.json [--out-dir versions/v2]
- *                     [--delivery-dir <交付包根>]   # 连续返修时指定产物根（缺省=工程文件所在目录）
+ *                     [--delivery-dir <交付包根>] [--dry-run]
+ *                     [--expected-version N --expected-project-sha256 <sha256>]
  *                     [--shot SC-03=/path/new.mp4]…        # 只在已重生成镜头后使用
  *   post-cli triage   --feedback "配乐太吵了，另外第 3 个镜头人物走形"
  *
@@ -24,7 +25,7 @@ import process from "node:process";
 
 import {
   PostError, analyzeImpact, buildDeliveryPackage, callTool, findVariantPack, listVariantPacks,
-  planDelivery, reedit, triageFeedback,
+  planDelivery, readRevisionBase, reedit, triageFeedback,
 } from "./core.mjs";
 
 function parseArgs(argv) {
@@ -66,6 +67,7 @@ function readShots(value) {
     return list.map((shot, index) => ({
       shotId: String(shot.shotId ?? shot.shot_id ?? `SC-${String(index + 1).padStart(2, "0")}`),
       path: String(shot.path ?? shot.localPath ?? ""),
+      ...(shot.kind ? { kind: String(shot.kind) } : {}),
     }));
   }
   return value.split(",").map((file, index) => ({
@@ -91,7 +93,7 @@ async function main() {
       return 0;
     }
     case "plan": {
-      const project = readJson(flags.project, "--project");
+      const project = { ...readJson(flags.project, "--project"), ...(flags.quality ? { quality: flags.quality } : {}) };
       const shots = readShots(flags.shots);
       if (shots.length === 0) throw new PostError("--shots 缺失（a.mp4,b.mp4 或 shots.json）", "bad_request");
       const variants = typeof flags.variants === "string" ? flags.variants.split(",").map((id) => id.trim()).filter(Boolean) : null;
@@ -105,7 +107,7 @@ async function main() {
       return 0;
     }
     case "deliver": {
-      const project = readJson(flags.project, "--project");
+      const project = { ...readJson(flags.project, "--project"), ...(flags.quality ? { quality: flags.quality } : {}) };
       const shots = readShots(flags.shots);
       if (shots.length === 0) throw new PostError("--shots 缺失（a.mp4,b.mp4 或 shots.json）", "bad_request");
       if (typeof flags["out-dir"] !== "string") throw new PostError("--out-dir 缺失", "bad_request");
@@ -150,6 +152,16 @@ async function main() {
     }
     case "reedit": {
       const patch = readJson(flags.patch, "--patch");
+      const explicitVersion = flags["expected-version"];
+      const explicitHash = flags["expected-project-sha256"];
+      if ((explicitVersion !== undefined) !== (explicitHash !== undefined)
+        || (explicitVersion !== undefined && (typeof explicitVersion !== "string" || !/^[1-9]\d*$/.test(explicitVersion)
+          || typeof explicitHash !== "string" || !/^[a-f0-9]{64}$/.test(explicitHash)))) {
+        throw new PostError("--expected-version 和 --expected-project-sha256 必须同时提供有效版本和完整 SHA256", "bad_request");
+      }
+      // --project is the user's chosen base. Capture its exact bytes once;
+      // the core still rejects it if a different request has already advanced.
+      const base = readRevisionBase(flags.project);
       const shotPaths = Object.fromEntries((repeated["shot"] ?? []).map((entry) => {
         const index = entry.indexOf("=");
         if (index < 0) throw new PostError(`--shot 需要形如 SC-03=/path/new.mp4，收到：${entry}`, "bad_request");
@@ -158,11 +170,15 @@ async function main() {
       const outcome = await reedit({
         projectPath: flags.project,
         deliveryDir: typeof flags["delivery-dir"] === "string" ? flags["delivery-dir"] : null,
+        expectedVersion: explicitVersion === undefined ? base.version : Number(explicitVersion),
+        expectedProjectSha256: explicitHash === undefined ? base.sha256 : explicitHash,
         patch,
         outDir: typeof flags["out-dir"] === "string" ? flags["out-dir"] : null,
         shotPaths: Object.keys(shotPaths).length ? shotPaths : null,
+        dryRun: flags["dry-run"] === true,
       });
       if (!outcome.executed) {
+        if (outcome.dryRun) line(JSON.stringify({ expectedVersion: outcome.expectedVersion, expectedProjectSha256: outcome.expectedProjectSha256 }));
         line(`未执行（${outcome.blocked?.code ?? outcome.impact?.layers.join("/") ?? "planned"}）：${outcome.blocked?.message ?? "dry-run"}`);
         for (const action of outcome.blocked?.nextActions ?? []) line(`  ${action}`);
         return outcome.blocked?.code === "shot_regeneration_required" ? 4 : 0;

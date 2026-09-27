@@ -50,15 +50,16 @@ describe("vendored 引擎：引脚、补丁与许可", () => {
     expect(license).toContain("江哥是老登啊");
   });
 
-  it("PINNED 记录上游 commit 与三处本地补丁（升级时按此重放）", () => {
+  it("PINNED 记录上游 commit 与五处本地补丁（升级时按此重放）", () => {
     const pinned = readFileSync(join(ENGINE, "PINNED.md"), "utf8");
     expect(pinned).toContain("696a7243c0e6ffb6827676e539c2ca5ebae2bf6b");
     expect(pinned).toContain("render_annotation_preview.py");
     expect(pinned).toContain("prepare_env.py");
     expect(pinned).toContain("_reveal_ink_segment");
+    expect(pinned).toContain("INTER_CUBIC");
   });
 
-  it("本地补丁在位：跨平台字体 + 落墨包围盒 + 解释器版本闸", () => {
+  it("本地补丁在位：跨平台字体 + 落墨包围盒 + UHD 放大插值 + 解释器版本闸", () => {
     const preview = readFileSync(join(ENGINE, "scripts/render_annotation_preview.py"), "utf8");
     // 字体必须走"候选表 + 逐平台探测"，而不是单一硬编码路径（上游只在 Windows 可用）
     expect(preview).toContain("FONT_CANDIDATES");
@@ -70,6 +71,7 @@ describe("vendored 引擎：引脚、补丁与许可", () => {
     // 包围盒落墨：不得再出现"每次调用新建整幅掩码"
     expect(renderer).not.toContain("seg = np.zeros((self.out_h, self.out_w), dtype=np.uint8)");
     expect(renderer).toContain("pad = thick + 1");
+    expect(renderer).toContain("cfg.cap_long_edge == 3840 and scale > 1 else cv2.INTER_AREA");
 
     const prepare = readFileSync(join(ENGINE, "scripts/prepare_env.py"), "utf8");
     expect(prepare).toContain("MIN_PYTHON");

@@ -32,6 +32,7 @@ describe.runIf(RUN_DB)("制片档案活库契约", () => {
   let acquireProjectLease: typeof import("./archive-host.js").acquireProjectLease;
   let readStageBreakpoints: typeof import("./archive-resume.js").readStageBreakpoints;
   let resumeProject: typeof import("./archive-resume.js").resumeProject;
+  let scanStaleRunsOnStartup: typeof import("./archive-resume.js").scanStaleRunsOnStartup;
   let readArchiveSummary: typeof import("./archive-resume.js").readArchiveSummary;
   let gatewayAppendOnClient: typeof import("@workloom/base/workdata").gatewayAppendOnClient;
   let getGatewayPool: typeof import("@workloom/db").getGatewayPool;
@@ -39,7 +40,7 @@ describe.runIf(RUN_DB)("制片档案活库契约", () => {
 
   beforeAll(async () => {
     ({ makeLedgerWriter, acquireProjectLease } = await import("./archive-host.js"));
-    ({ readStageBreakpoints, resumeProject, readArchiveSummary } = await import("./archive-resume.js"));
+    ({ readStageBreakpoints, resumeProject, readArchiveSummary, scanStaleRunsOnStartup } = await import("./archive-resume.js"));
     ({ gatewayAppendOnClient } = await import("@workloom/base/workdata"));
     ({ getGatewayPool, getAppPool } = await import("@workloom/db"));
     await owner.query(`INSERT INTO tenants (id, name, plan) VALUES ($1,$2,'community')`, [tenantId, "制片档案契约租户"]);
@@ -150,7 +151,7 @@ describe.runIf(RUN_DB)("制片档案活库契约", () => {
   });
 
   it("resume：已有执行者持有运行租约 → busy（不重复烧额度）", async () => {
-    const lease = await acquireProjectLease(projectId);
+    const lease = await acquireProjectLease(scope, projectId);
     expect(lease).not.toBeNull();
     try {
       const result = await resumeProject(scope, {
@@ -247,4 +248,87 @@ describe.runIf(RUN_DB)("制片档案活库契约", () => {
     expect(summary.breakpoints.map((b) => b.stageId)).toContain("preproduction");
     expect(Array.isArray(summary.findings)).toBe(true);
   });
+
+  it("并发认领得到唯一 attempt，外工作区项目不能建立交叉台账", async () => {
+    const ledger = makeLedgerWriter(scope);
+    const claims = await Promise.all([1, 2, 3].map((n) => ledger.claimRun({
+      id: `SR-concurrent-${suffix}-${n}`, projectId, stageId: "concurrent-contract",
+      inputRefTemplate: "stages/concurrent/attempt-{attempt}.input.json", runId: null,
+    })));
+    expect(claims.map((claim) => claim.attempt).sort()).toEqual([1, 2, 3]);
+    await expect(makeLedgerWriter({ ...scope, workspaceId: "other-workspace" }).claimRun({
+      id: `SR-foreign-${suffix}`, projectId, stageId: "foreign-contract",
+      inputRefTemplate: "stages/foreign-{attempt}.json", runId: null,
+    })).rejects.toThrow("未返回行");
+  });
+
+  it("相同终态回执可重送，冲突或不存在的回执不能虚报成功", async () => {
+    const ledger = makeLedgerWriter(scope);
+    await ledger.claimRun({
+      id: `SR-receipt-${suffix}`, projectId, stageId: "receipt-contract",
+      inputRefTemplate: "stages/receipt-{attempt}.json", runId: null,
+    });
+    const receipt = {
+      projectId, stageId: "receipt-contract", attempt: 1, status: "done" as const,
+      outputRef: "stages/receipt.output.json", outputSha256: "verified-sha", errorClass: null, errorMsg: null, durationMs: 5,
+    };
+    await ledger.finishRun(receipt);
+    await ledger.finishRun(receipt);
+    await expect(ledger.finishRun({ ...receipt, status: "interrupted", errorClass: "RECEIPT_UNVERIFIED" })).rejects.toThrow("STAGE_RECEIPT_CONFLICT");
+    await expect(ledger.finishRun({ ...receipt, attempt: 99 })).rejects.toThrow("STAGE_RECEIPT_CONFLICT");
+    const saved = await owner.query("SELECT status, output_sha256 FROM production_stage_runs WHERE id=$1", [`SR-receipt-${suffix}`]);
+    expect(saved.rows).toEqual([{ status: "done", output_sha256: "verified-sha" }]);
+  });
+
+  it("租约同 scope 互斥，跨工作区同项目 ID 不串锁，释放后可再取得", async () => {
+    const first = await acquireProjectLease(scope, projectId);
+    expect(first).not.toBeNull();
+    let other: Awaited<ReturnType<typeof acquireProjectLease>> = null;
+    try {
+      expect(await acquireProjectLease(scope, projectId)).toBeNull();
+      other = await acquireProjectLease({ ...scope, workspaceId: `${workspaceId}-other` }, projectId);
+      expect(other).not.toBeNull();
+    } finally {
+      await first?.release();
+      await other?.release();
+    }
+    const next = await acquireProjectLease(scope, projectId);
+    expect(next).not.toBeNull();
+    await next?.release();
+  });
+
+  it("启动扫描保留新鲜心跳和活跃租约，只归位无锁且过期的行；finding 按项目分离", async () => {
+    const secondProject = `${projectId}-scan`;
+    await owner.query(`INSERT INTO video_projects (id, workspace_id, title, kind, created_by) VALUES ($1,$2,'扫描契约','narrative','MEM-T')`, [secondProject, workspaceId]);
+    for (const [id, project, heartbeat] of [
+      [`SR-fresh-${suffix}`, projectId, true],
+      [`SR-stale-${suffix}`, projectId, false],
+      [`SR-other-${suffix}`, secondProject, false],
+    ] as const) {
+      await owner.query(
+        `INSERT INTO production_stage_runs (id, workspace_id, project_id, stage_id, attempt, status, started_at, last_heartbeat_at)
+         VALUES ($1,$2,$3,$4,1,'running',now()-interval '1 hour',CASE WHEN $5 THEN now() ELSE now()-interval '1 hour' END)`,
+        [id, workspaceId, project, heartbeat ? "fresh-scan" : "stale-scan", heartbeat],
+      );
+    }
+    const env = { ARCHIVE_AUTO_RESUME: "1", ARCHIVE_STALE_RUNNING_MIN: "10" };
+    const lease = await acquireProjectLease(scope, projectId);
+    try {
+      const firstScan = await scanStaleRunsOnStartup(env);
+      expect(firstScan.interrupted.filter((row) => row.workspaceId === workspaceId).map((row) => row.projectId)).toEqual([secondProject]);
+      const held = await owner.query("SELECT status FROM production_stage_runs WHERE id=$1", [`SR-stale-${suffix}`]);
+      expect(held.rows[0]?.status).toBe("running");
+    } finally {
+      await lease?.release();
+    }
+    const secondScan = await scanStaleRunsOnStartup(env);
+    expect(secondScan.interrupted.filter((row) => row.workspaceId === workspaceId).map((row) => row.projectId)).toEqual([projectId]);
+    const fresh = await owner.query("SELECT status FROM production_stage_runs WHERE id=$1", [`SR-fresh-${suffix}`]);
+    expect(fresh.rows[0]?.status).toBe("running");
+    const findings = await owner.query("SELECT project_id, dedupe_key FROM engineering_findings WHERE workspace_id=$1 AND stage_id='stale-scan'", [workspaceId]);
+    expect(findings.rows).toHaveLength(2);
+    expect(new Set(findings.rows.map((row) => row.dedupe_key)).size).toBe(2);
+    expect(new Set(findings.rows.map((row) => row.project_id))).toEqual(new Set([projectId, secondProject]));
+  });
+
 });

@@ -1,3 +1,5 @@
+import type { QualityStatus } from "./quality-evidence.js";
+
 /**
  * material-policy —— 真实素材（实拍照片/视频）的**用途硬约束**（2026-09-25 产品所有者规定）。
  *
@@ -24,8 +26,8 @@ export const MATERIAL_POLICY_VERSION = "material-usage/v1";
  *
  * 因此素材镜的**唯一合法产物形态**是"以参考素材为依据构建出来的真实视频场景"：
  *   · 参考图作 `reference_image`（**不再作 first_frame**）——首帧就不该是那张照片；
- *   · 机位/焦段/取景由模型自行构建（可换机位、可换高度角度），至少完成一次真实镜头位移；
- *   · 画面必须有真实三维视差与环境运动（云/水/光/人群/车流/植被）；
+ *   · 机位/焦段/取景由模型自行构建（可换机位、可换高度角度），根据镜头意图选择固定机位或真实位移；
+ *   · 画面位移镜头必须有真实三维视差；主体与环境变化遵循场景（云/水/光/人群/车流/植被）；
  *   · 参考图没拍到的画面边缘要合理补全，不得出现参考图边界/黑边/复刻构图。
  */
 export const MATERIAL_SCENE_POLICY_VERSION = "material-scene/v1";
@@ -33,10 +35,10 @@ export const MATERIAL_SCENE_POLICY_VERSION = "material-scene/v1";
 /** 场景构建策略原文（提示词、错误信息、文档共用） */
 export const MATERIAL_SCENE_POLICY_STATEMENT = [
   "参考素材只作实景依据：用它确认地标形制、结构层次、文字标识、环境关系、材质与天色；",
-  "成片必须是**构建出来的视频场景**：机位、焦段、取景、镜头运动由模型自行构建，至少完成一次真实镜头位移；",
-  "必须有真实三维视差与环境运动（前景/中景/远景相对位移；云、水、光、人群、车流、植被随时间变化）；",
+  "成片必须是**构建出来的视频场景**：机位、焦段、取景、镜头运动由模型自行构建，根据镜头意图选择固定机位或真实位移；",
+  "位移镜头必须有真实三维视差；主体与环境变化遵循场景（前景/中景/远景相对位移；云、水、光、人群、车流、植被随时间变化）；",
   "不得复刻参考图构图：首帧不是参考图（不出现参考图边界、黑边或「同一张图」的取景）；",
-  "镜头运动不是遮羞布：没有镜头位移、只有环境微动的画面不算视频场景（会被机检打回）。"
+  "镜头运动不是遮羞布：固定机位本身不是错误，帧差只用于筛查，真实感须结合时序画面评审。"
 ].join("");
 
 /** 给人与给模型看的政策原文（提示词、文档、错误信息共用一处，避免口径漂移） */
@@ -172,26 +174,10 @@ export function buildMaterialMotionPrompt(shot: Record<string, unknown>, options
     "【保真硬约束】严格保持首帧中的真实地标/建筑结构与外观：楼的层数、檐口层叠关系、匾额与牌匾文字、"
       + "屋脊与脊兽、周边地形与水域关系都不得改造、增减或臆造；文字标识必须保持原有字形与内容；"
       + "不得把实拍建筑改成幻想建筑或添加原本不存在的构件。",
-    "【必须生成真实运动】画面要有物理自洽的真实运动：云层与天空缓慢流动、水面波纹与倒影轻晃、"
-      + "树叶与灯笼随风轻摆、光线随时间轻微变化、远处人群与车流自然移动；"
-      + "运动幅度以「明显可辨但不变形」为准，禁止用整幅画面平移、缩放、旋转等方式伪造运动。",
+    "【必须生成真实运动】画面要有符合原场景的物理变化；仅对场景内存在的元素，例如云层与天空缓慢流动、水面波纹、树叶随风轻摆，按原意自然表现；不得凭空增加水域、人群、车流、灯笼或光源；"
+      + "运动幅度以「明显可辨但不变形」为准，禁止用整幅画面平移、缩放、旋转等贴图式运动伪造真实运镜。",
     motionIntent ? `【镜头运动】${motionIntent}` : "【镜头运动】缓速推进后稳住，保持主体构图稳定。",
-    /**
-     * 运动强度（2026-09-25 新增）：把"要明显的镜头运动"写成可执行要求——
-     * 允许并鼓励**真实的三维镜头位移**（推/拉/横摇/俯仰/升降/环绕 + 速度坡道），
-     * 仍然禁止"整幅画面平移缩放的贴图式运动"（那是把静态图当镜头，属产品口径的红线）。
-     */
-    "【运动强度要求】镜头必须有**明显的位移与速度变化**：画面要在 5 秒内完成一次完整的运镜"
-      + "（例如高速推进后急停稳住、低空俯冲后拉升、快速横摇后定住、环绕半圈、升降穿越前景），"
-      + "并带**速度坡道**（起手快→收尾稳，或起手慢→中段加速→收尾快）、至少两段不同速度；"
-      + "前景/中景/背景要因为镜头位移产生**明显视差**（近处元素移动幅度显著大于远处，证明是三维空间里的真实运镜）。"
-      + "允许并鼓励镜头运动幅度大、速度快；**禁止的只是「整幅画面平移/缩放的贴图式运动」**"
-      + "（那是把静态照片当镜头用，与真实运镜的区别在于：真实运镜有视差、有透视变化、有前后景相对位移）。",
-    options.motionStrength === "assertive"
-      ? "【上一版问题·必须加大】上一版镜头运动幅度不足（实测运动能量偏低）：这次把镜头位移距离与速度变化**显著加大**"
-        + "（推近/拉开的行程更大、横摇更快、俯仰更明显、速度坡道的快慢对比更极端），"
-        + "运动要从画面第一帧就开始、到最后一帧都保持可辨；宁可运镜更「猛」，也不要「像一张会呼吸的照片」。"
-      : "",
+    motionDirection(shot, options.motionStrength === "assertive"),
     `【禁止静态直出】画面不得全程静止、不得整幅不变、不得出现"照片被平移/放大"的贴图感；`
       + `若模型无法生成运动，宁可输出极缓的自然运动（云、水、光的变化）也不得复刻首帧静止画面。`,
     "【画面质感】写实电影摄影质感，自然光与真实材质，噪点与颗粒自然；无 AI 绘画感、无塑料感、无油画笔触。",
@@ -266,6 +252,8 @@ export const MATERIAL_REUSE_POLICY: MaterialReusePolicy = {
 };
 
 export interface MaterialReuseAssessment {
+  status: QualityStatus;
+  passed: boolean;
   /** 硬判据：中后段连续命中 → 就是素材本身（像素级或视觉级） */
   staticDisplay: boolean;
   hits: number;
@@ -303,9 +291,19 @@ export function assessMaterialReuse(
     (s.bestPsnrDb ?? -1) >= policy.photoLikePsnrDb
     && (s.bestSsim ?? -1) >= policy.photoLikeSsim
   );
-  const late = samples.filter((s) => s.atSec >= options.durationSec * policy.lateSampleRatio);
-  const lateHits = late.filter((s) => isPixelHit(s) || isVisualHit(s));
-  const measured = samples.map((s) => s.bestPsnrDb).filter((v): v is number => v !== null);
+  const validPsnr = (value: unknown): value is number => typeof value === "number" && (Number.isFinite(value) || value === Infinity);
+  const validDuration = Number.isFinite(options.durationSec) && options.durationSec > 0;
+  const validPolicy = Number.isFinite(policy.minHits) && policy.minHits >= 2 && Number.isInteger(policy.minHits)
+    && [policy.identicalPsnrDb, policy.photoLikePsnrDb, policy.photoLikeSsim].every(Number.isFinite)
+    && policy.identicalPsnrDb >= policy.photoLikePsnrDb && policy.photoLikeSsim >= -1 && policy.photoLikeSsim <= 1
+    && Number.isFinite(policy.lateSampleRatio) && policy.lateSampleRatio > 0 && policy.lateSampleRatio < 1;
+  const late = samples.filter((s) => validDuration && Number.isFinite(s.atSec) && s.atSec >= options.durationSec * policy.lateSampleRatio && s.atSec <= options.durationSec);
+  const uniqueLate = new Map(late.map((s) => [s.atSec, s]));
+  const validLate = [...uniqueLate.values()].filter((s) => validPsnr(s.bestPsnrDb)
+    && (isPixelHit(s) || (typeof s.bestSsim === "number" && Number.isFinite(s.bestSsim) && s.bestSsim >= -1 && s.bestSsim <= 1)));
+  const complete = validDuration && validPolicy && validLate.length >= policy.minHits && validLate.length === uniqueLate.size;
+  const lateHits = validLate.filter((s) => isPixelHit(s) || isVisualHit(s));
+  const measured = samples.map((s) => s.bestPsnrDb).filter(validPsnr);
   const ssims = samples.map((s) => s.bestSsim).filter((v): v is number => typeof v === "number" && Number.isFinite(v));
   const worstAll = measured.length > 0 ? Math.max(...measured) : null;
   const maxSsim = ssims.length > 0 ? Math.max(...ssims) : null;
@@ -320,7 +318,8 @@ export function assessMaterialReuse(
       + `（像素级 ≥${policy.identicalPsnrDb}dB 或 视觉级 ≥${policy.photoLikePsnrDb}dB 且 SSIM ≥${policy.photoLikeSsim}）`
       + `；峰值 PSNR ${worstAll === null ? "n/a" : `${worstAll.toFixed(1)}dB`} / 峰值 SSIM ${maxSsim === null ? "n/a" : maxSsim.toFixed(3)}`
       + (firstHitSec === null ? "" : `；首次命中 ${firstHitSec.toFixed(2)}s（可用于尾部裁剪）`);
-  return { staticDisplay, hits: lateHits.length, samples: late.length, worst: worstAll, maxSsim, firstHitSec, hitKind, detail };
+  const status: QualityStatus = staticDisplay ? "failed" : complete ? "passed" : "unverified";
+  return { status, passed: status === "passed", staticDisplay, hits: lateHits.length, samples: late.length, worst: worstAll, maxSsim, firstHitSec, hitKind, detail: status === "unverified" ? `复用度未测到完整有效证据（需至少 ${policy.minHits} 个不同后段时间点、PSNR及SSIM）：${detail}` : detail };
 }
 
 /**
@@ -377,20 +376,10 @@ export function buildMaterialScenePrompt(shot: Record<string, unknown>, options:
     `【任务】以提供的实拍参考素材为**实景依据**，构建一段 ${duration} 秒的真实拍摄感视频场景。`
       + `注意：参考图只用于确认实景要素，**不是首帧、不是要你把它动起来**——你要拍的是这个真实场景里的一段视频。`,
     `【实景依据·保持一致】${mustKeep}。参考素材说明：${scene || "实拍地标"}${sceneDescription ? `；${sceneDescription}` : ""}`,
-    "【必须由你构建的部分】① **机位与取景自己定**：不得复刻参考图的构图；可以从更高/更低、更近/更远、"
-      + "偏左/偏右的位置拍，可以换焦段（广角全景 → 长焦细节）；② **至少完成一次真实镜头位移**"
-      + "（推近/拉开/横摇/俯仰/升降/环绕/甩镜，允许速度坡道：快起稳收或慢起快收）；"
-      + "③ **真实三维视差**：前景、中景、远景的相对位移必须不同（这是「真实场景」与「照片被推动」的分水岭）；"
-      + "④ **环境运动**：云层流动、水面波纹与倒影、光线变化、树叶/灯笼/旗帜摆动、人群与车流自然移动；"
-      + "⑤ **补全画面**：参考图没拍到的边缘（天空、地面、侧向空间）要按真实场景合理延伸，"
-      + "不得出现参考图的边界、黑边、贴图边缘或「原图被放大」的观感。",
-    motionIntent ? `【镜头运动（本镜意图）】${motionIntent}` : "【镜头运动（本镜意图）】低空推进后抬升，让地标从画面下缘进入并稳住。",
-    options.motionStrength === "assertive"
-      ? "【上一版问题·必须加大】上一版被判定为「像参考图被推动」：这一版**换一个机位**重新构建场景，"
-        + "镜头位移更大、视差更明确、环境运动更容易看出来（云/水/人群至少两处在动）。"
-      : "",
-    "【禁止】把参考照片整幅平移/缩放/旋转（贴图式运动）；复刻参考图构图；出现参考图边界或黑边；"
-      + "画面全程静止；只有环境微动而镜头不动；把静态照片直接当镜头。",
+    "【必须由你构建的部分】机位与取景遵循镜头卡，不得用参考照片平移缩放冒充视频；有镜头位移时应有真实三维视差，固定机位则保持取景稳定。环境与主体仅按场景中实际存在的元素自然变化，不新增云、水、人群或道具。补全画面应遵守真实空间，不能出现参考图的边界或黑边。",
+    motionIntent ? `【镜头运动（本镜意图）】${motionIntent}` : "【镜头运动（本镜意图）】缓速推进后稳住。",
+    motionDirection(shot, options.motionStrength === "assertive"),
+    "【禁止】把参考照片整幅平移/缩放/旋转作为成片；画面冻结；凭空增添元素；物理不成立的视差。",
     "【画面质感】写实电影摄影：真实镜头语言、自然景深与运动模糊、真实材质与光比；无 AI 绘画感、无塑料感、无穿模。",
     lighting ? `【光线】${lighting}` : "",
     colorPalette ? `【色调】${colorPalette}` : "",
@@ -438,7 +427,7 @@ export const REFERENCE_INDEPENDENCE_POLICY: ReferenceIndependencePolicy = {
 export function assessReferenceIndependence(
   sample: ReferenceIndependenceSample,
   policy: ReferenceIndependencePolicy = REFERENCE_INDEPENDENCE_POLICY
-): { independent: boolean; detail: string } {
+): { status: QualityStatus; independent: boolean; detail: string } {
   const best = sample.firstFrameBestPsnrDb;
   const mid = sample.midFrameBestPsnrDb;
   const direct = sample.directPsnrDb;
@@ -448,11 +437,14 @@ export function assessReferenceIndependence(
   const detail = `首帧最佳匹配 ${best === null ? "未测到" : `${best.toFixed(1)}dB`}（≥${policy.reproducedPsnrDb} 判复刻）`
     + ` · 首帧直比 ${direct === null ? "未测到" : `${direct.toFixed(1)}dB`}（≥${policy.directReproducedPsnrDb} 判同图）`
     + ` · 中段最佳匹配 ${mid === null ? "未测到" : `${mid.toFixed(1)}dB`}（≥${policy.midFrameReproducedPsnrDb} 判复刻）`;
+  const complete = [best, mid, direct].every((v) => typeof v === "number" && (Number.isFinite(v) || v === Infinity));
+  const failed = reproducedByBest || reproducedByDirect || reproducedMid;
   return {
-    independent: !reproducedByBest && !reproducedByDirect && !reproducedMid,
+    status: failed ? "failed" : complete ? "passed" : "unverified",
+    independent: complete && !failed,
     detail: reproducedByBest || reproducedByDirect || reproducedMid
       ? `${detail}——判定为"参考图被推动/复刻"，不是构建出来的视频场景（需换机位重做）`
-      : detail
+      : complete ? detail : `${detail}——缺少有效测量，未验证`
   };
 }
 
@@ -481,6 +473,7 @@ export interface MotionRichness {
 export interface MotionPolicy {
   minMeanEnergy: number;
   minRampRatio: number;
+  intent?: "locked" | "steady" | "dynamic" | "speed-ramp";
 }
 
 export const MATERIAL_MOTION_POLICY: MotionPolicy = {
@@ -503,16 +496,38 @@ export const MATERIAL_RAW_MOTION_POLICY: MotionPolicy = {
 
 export function assessMotionRichness(
   motion: MotionRichness,
-  policy: MotionPolicy = MATERIAL_MOTION_POLICY
-): { rich: boolean; detail: string } {
+  policy: MotionPolicy = motionPolicyForShot({})
+): { status: QualityStatus; rich: boolean; detail: string } {
+  const valid = [motion.meanEnergy, motion.maxEnergy, motion.rampRatio].every((v) => Number.isFinite(v) && v >= 0)
+    && motion.maxEnergy >= motion.meanEnergy && (motion.frames === undefined || Number.isInteger(motion.frames) && motion.frames >= 2);
+  if (!valid) return { status: "unverified", rich: false, detail: "运动测量缺失或非法，未验证；帧差不能代替物理真实性评审" };
   const meanOk = motion.meanEnergy >= policy.minMeanEnergy;
   const rampOk = motion.rampRatio >= policy.minRampRatio;
   const detail = `运动能量 平均 ${motion.meanEnergy.toFixed(2)}／峰值 ${motion.maxEnergy.toFixed(2)}（下限 ${policy.minMeanEnergy}）`
     + ` · 速度坡道比 ${motion.rampRatio.toFixed(2)}（下限 ${policy.minRampRatio}，匀速约为 1）`;
   return {
+    status: meanOk && rampOk ? "passed" : "failed",
     rich: meanOk && rampOk,
     detail: meanOk && rampOk
       ? detail
-      : `${detail}——${meanOk ? "" : "运动幅度不足；"}${rampOk ? "" : "缺少速度坡道；"}需重渲（加大镜头位移与速度变化）`
+      : `${detail}——${meanOk ? "" : "运动幅度不足；"}${rampOk ? "" : "缺少速度坡道；"}需按原镜头意图复核；帧差不能证明物理真实性`
   };
+}
+
+/** Numeric profiles are screening thresholds, not proof of camera motion or physical realism. */
+export function motionPolicyForShot(shot: Record<string, unknown>): MotionPolicy {
+  const text = String(shot.motion ?? shot.camera_movement ?? "").toLowerCase();
+  const explicit = shot.motionProfile;
+  if (explicit === "locked" || /固定|锁定|静态机位|locked|static|tripod/.test(text)) return { intent: "locked", minMeanEnergy: 0.01, minRampRatio: 0 };
+  if (explicit === "speed-ramp" || /(?<!不)(?<!无)速度坡道|speed[ -]?ramp/.test(text) && !/不要.*速度坡道|无速度坡道|no speed[ -]?ramp/.test(text)) return { intent: "speed-ramp", ...MATERIAL_MOTION_POLICY };
+  if (explicit === "dynamic" || /高速|快速|甩镜|whip|fast|rapid/.test(text)) return { intent: "dynamic", minMeanEnergy: 4, minRampRatio: 0 };
+  return { intent: "steady", minMeanEnergy: 0.2, minRampRatio: 0 };
+}
+function motionDirection(shot: Record<string, unknown>, retry: boolean): string {
+  const policy = motionPolicyForShot(shot);
+  return "【运动强度要求】保持本镜意图；" + (policy.intent === "locked"
+    ? "固定机位允许成立，主体与环境按剧本自然变化，不额外加入推拉或速度坡道。"
+    : policy.intent === "speed-ramp" ? "按已声明的速度坡道组织节奏，空间视差与加减速必须物理自洽。"
+    : "按已声明的速度与方向完成真实三维运镜，有视差，不强加速度坡道或甩镜。")
+    + (retry ? "【上一版复核】修正已发现的问题，保留原动作、运镜和节奏，不因重试擅自加大运动。" : "");
 }

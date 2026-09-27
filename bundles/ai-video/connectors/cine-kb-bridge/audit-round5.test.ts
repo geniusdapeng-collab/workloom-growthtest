@@ -24,8 +24,8 @@ const allApplied = (card: Card): string =>
   enrichShotCard(kb, card).trace.applied.map((a: { added: string }) => a.added).join(" | ");
 
 describe("第五轮修复 · 字段预算（不许静默吃注入，也不许改作者原文）", () => {
-  const LONG = "固定机位略低角度，镜头只做轻微呼吸晃动".repeat(18); // 342 字，含"晃动"→命中 handheld 规则
-  const SHORT = "固定机位，镜头轻微晃动";
+  const LONG = "手持机位略低角度，镜头保持轻微自然晃动".repeat(20); // 超过 320 字，显式手持才适用 handheld
+  const SHORT = "手持镜头，轻微自然晃动";
 
   it("原文超预算：原文逐字保留，注入整条丢弃并在 trace 里如实记账", () => {
     const card = { shotId: "R5-1", scene: "江南水乡石拱桥", character: "陈卓", action: "沿桥面走近镜头", camera_movement: LONG };
@@ -79,9 +79,10 @@ describe("第五轮修复 · NARR-001 情绪配方派发线索必须落 trace", 
 });
 
 describe("第五轮修复 · 天气时序（正在下 vs 已经停）", () => {
-  it("雨后走「雨后初晴」，不得注入正在下的雨丝", () => {
+  it("雨后不等于初晴；只有明确初晴才注入阳光，且不注入正在下的雨丝", () => {
     const card = { shotId: "R5-6", scene: "雨后的古镇石板路，积水倒映着白墙黛瓦", mood: "清新" };
-    expect(picked(card, "lighting")).toContain("雨停后");
+    expect(picked(card, "lighting")).not.toContain("阳光");
+    expect(picked({ ...card, scene: "雨后初晴，阳光刺破云层" }, "lighting")).toContain("雨停后");
     expect(allApplied(card)).not.toContain("雨丝如雾");
   });
 

@@ -1,10 +1,11 @@
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { buildPortraitPlan, runPortraitAgent } from "./portrait-agent.js";
 import { CLEAN_BACKGROUND_POLICY, type BackgroundCheck } from "./portrait-agent.js";
 import type { CharacterProfile } from "./character-archive.js";
+import { activatePortraitVersion, loadCharacterEntry, resolveShotCharacters, loadCharacterLibrary } from "./character-archive.js";
 
 function profile(overrides: Partial<CharacterProfile> = {}): CharacterProfile {
   return {
@@ -43,24 +44,23 @@ describe("定妆照生成 Agent：规划", () => {
     expect(plan.negativeTerms).toContain("no plastic skin");
   });
 
-  it("显式声明非写实风格 / 非人主体时豁免（并记录理由）", () => {
+  it("显式非写实风格记录理由，非人主体拒绝套用人物Agent", () => {
     const cartoon = buildPortraitPlan(profile({ style: "anime" } as Partial<CharacterProfile>));
     expect(cartoon.mode).toBe("stylized");
     expect(cartoon.reason).toContain("anime");
     const animal = buildPortraitPlan(profile({ kind: "virtual-preset", name: "橘猫" }));
     expect(animal.mode).toBe("photoreal"); // virtual-preset 仍是"人"，只有 animal/object 类 kind 才豁免
+    expect(() => buildPortraitPlan(profile({ subjectType: "animal" }))).toThrow("PORTRAIT_SUBJECT_NOT_APPLICABLE");
   });
 
-  it("授权真人锚点：存在的照片进入 plan.anchors，缺失的被剔除且不阻断", () => {
+  it("显式授权锚点缺失时拒绝静默退回纯文生图", () => {
     const root = mkdtempSync(join(tmpdir(), "wl-pagent-anchor-"));
     const real = join(root, "real-front.jpg");
     writeFileSync(real, Buffer.alloc(4096, 7));
-    const plan = buildPortraitPlan(profile(), { anchorImages: [real, join(root, "missing.jpg")] });
+    const plan = buildPortraitPlan(profile(), { anchorImages: [real] });
     expect(plan.anchors).toEqual([real]);
     expect(plan.reason).toContain("图生图锚定 1 张");
-    const none = buildPortraitPlan(profile(), { anchorImages: [join(root, "missing.jpg")] });
-    expect(none.anchors).toEqual([]);
-    expect(none.reason).toContain("默认口径");
+    expect(() => buildPortraitPlan(profile(), { anchorImages: [real, join(root, "missing.jpg")] })).toThrow();
   });
 });
 
@@ -106,7 +106,7 @@ describe("定妆照生成 Agent：执行", () => {
     expect(String(calls[0]!.prompt)).toContain("与任何场景无关");
   });
 
-  it("出图失败即抛错（不写半套、不改 active）", async () => {
+  it("全部角度出图失败抛错并保留失败候选，不改active", async () => {
     const root = mkdtempSync(join(tmpdir(), "wl-pagent-fail-"));
     mkdirSync(join(root, "presenter"), { recursive: true });
     writeFileSync(join(root, "presenter", "profile.json"), JSON.stringify(profile(), null, 2));
@@ -148,11 +148,12 @@ describe("定妆照生成 Agent：执行", () => {
     expect(saved.angles).toEqual(["front"]);
     expect(saved.failedAngles).toHaveLength(3);
     const updated = JSON.parse(readFileSync(join(charDir, "profile.json"), "utf8")) as CharacterProfile & { portraitAgent?: { failures?: unknown[] } };
-    expect(updated.portraitSets![0]!.active).toBe(true);
+    expect(updated.portraitSets![0]!.active).toBe(false);
+    expect(updated.portraitSets![0]!.status).toBe("candidate");
     expect(updated.portraitAgent?.failures).toHaveLength(3);
   });
 
-  it("幂等：同角度文件已存在即复用，不重复请求出图", async () => {
+  it("孤立旧文件不冒充当前请求产物；生成收据相同的候选才可幂等复用", async () => {
     const root = mkdtempSync(join(tmpdir(), "wl-pagent-idem-"));
     const charDir = join(root, "presenter");
     mkdirSync(join(charDir, "portraits", "v1"), { recursive: true });
@@ -163,9 +164,12 @@ describe("定妆照生成 Agent：执行", () => {
       libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m",
       fetchImpl: fakeArk(calls), config: { angles: ["front"], backgroundProber: passingProber }
     });
-    expect(result.reused).toEqual(["front"]);
-    expect(calls).toHaveLength(0);
+    expect(result.version).toBe(2);
+    expect(result.reused).toEqual([]);
+    expect(calls).toHaveLength(1);
     expect(result.portraitSet.angles).toEqual(["front"]);
+    const repeated = await runPortraitAgent({ libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m", fetchImpl: fakeArk(calls), config: { angles: ["front"], backgroundProber: passingProber } });
+    expect(repeated.version).toBe(2); expect(repeated.reused).toEqual(["front"]); expect(calls).toHaveLength(1);
   });
 
   it("背景硬闸：不干净就用加固措辞重跑，重跑干净才登记", async () => {
@@ -246,5 +250,108 @@ describe("定妆照生成 Agent：执行", () => {
     const saved = JSON.parse(readFileSync(join(charDir, "portrait-sets", "v3.json"), "utf8")) as { source: string; anchors?: string[] };
     expect(saved.source).toBe("img2img");
     expect(saved.anchors).toEqual(["sources/real-front.jpg", "sources/real-side.jpg"]);
+  });
+
+  function archive(overrides: Partial<CharacterProfile> = {}) {
+    const root = mkdtempSync(join(tmpdir(), "wl-candidate-")); const dir = join(root, "presenter"); mkdirSync(dir);
+    writeFileSync(join(dir, "profile.json"), JSON.stringify(profile({ portraitSets: [], ...overrides })));
+    const calls: Array<Record<string, unknown>> = [];
+    return { root, dir, calls, options: { libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m", fetchImpl: fakeArk(calls), config: { backgroundProber: passingProber } } };
+  }
+  it("同完整请求复用当前4角度；换服装产生独立候选，只有显式激活后默认绑定才切换", async () => {
+    const fixture = archive(); const first = await runPortraitAgent(fixture.options);
+    const repeat = await runPortraitAgent(fixture.options); expect(repeat.version).toBe(1); expect(repeat.reused).toHaveLength(4); expect(fixture.calls).toHaveLength(4);
+    const cacheRead = await runPortraitAgent({ ...fixture.options, config: { activate: false, backgroundProber: () => { throw new Error("不得对已绑定请求的有效背景收据重复探测"); } } });
+    expect(cacheRead.reused).toHaveLength(4); expect(cacheRead.portraitSet.active).toBe(true); expect(fixture.calls).toHaveLength(4);
+    const second = await runPortraitAgent({ ...fixture.options, config: { ...fixture.options.config, wardrobe: { id: "red", name: "红色外套" }, activate: false } });
+    expect(second.version).toBe(2); expect(second.portraitSet.status).toBe("ready"); expect(second.portraitSet.active).toBe(false);
+    expect(second.portraitSet.wardrobe).toEqual({ id: "red", name: "红色外套" }); expect(String(fixture.calls[4]!.prompt)).toContain("红色外套"); expect(String(fixture.calls[4]!.prompt)).not.toContain("黑色缎面吊带长裙");
+    expect(loadCharacterEntry(fixture.dir)!.activeSet?.version).toBe(1); expect(first.files.front).not.toBe(second.files.front);
+    expect(loadCharacterEntry(fixture.dir, { pinnedVersion: 2 })!.verification.status).toBe("passed");
+    await activatePortraitVersion(fixture.root, "presenter", 2); expect(loadCharacterEntry(fixture.dir)!.activeSet?.version).toBe(2);
+    const library = loadCharacterLibrary(fixture.root);
+    const red = resolveShotCharacters({ character: "presenter", costume: "红色外套" }, library); expect(red.status).toBe("passed"); expect(red.characters[0]!.activeSet?.version).toBe(2);
+    expect(resolveShotCharacters({ character: "presenter", costume: "黑色缎面吊带长裙" }, library).status).toBe("unverified");
+    expect(resolveShotCharacters({ cast: [{ id: "presenter", pinnedVersion: 1, costume: "黑色缎面吊带长裙" }] }, library).characters[0]!.activeSet?.version).toBe(1);
+  });
+  it("多套服装必须指定；显式原版本不允许被不同服装请求覆盖", async () => {
+    const fixture = archive({ wardrobe: [{ id: "blue", name: "蓝色衬衫" }, { id: "red", name: "红色外套" }] });
+    await expect(runPortraitAgent(fixture.options)).rejects.toThrow("PORTRAIT_WARDROBE_AMBIGUOUS"); expect(fixture.calls).toHaveLength(0);
+    const first = await runPortraitAgent({ ...fixture.options, config: { ...fixture.options.config, wardrobeId: "blue" } });
+    expect(first.portraitSet.wardrobe?.id).toBe("blue");
+    await expect(runPortraitAgent({ ...fixture.options, config: { ...fixture.options.config, wardrobeId: "red", version: 1 } })).rejects.toThrow("PORTRAIT_VERSION_CONFLICT"); expect(fixture.calls).toHaveLength(4);
+    const second = await runPortraitAgent({ ...fixture.options, config: { ...fixture.options.config, wardrobeId: "red" } }); expect(second.version).toBe(2);
+  });
+  it("模型、size、endpoint、seed零值、锚点字节均是版本请求的一部分", async () => {
+    const fixture = archive(); await runPortraitAgent(fixture.options);
+    const requests = [
+      { ...fixture.options, model: "m2" },
+      { ...fixture.options, config: { ...fixture.options.config, size: "4K" } },
+      { ...fixture.options, baseUrl: "https://example.invalid/other" },
+      { ...fixture.options, config: { ...fixture.options.config, seed: 0 } }
+    ];
+    const versions: number[] = [];
+    for (const options of requests) versions.push((await runPortraitAgent(options)).version);
+    expect(versions).toEqual([2, 3, 4, 5]); expect(fixture.calls.some(call => call.seed === 0)).toBe(true);
+    const anchor = join(fixture.dir, "anchor.png"); writeFileSync(anchor, Buffer.alloc(2048, 5));
+    const anchored = { ...fixture.options, config: { ...fixture.options.config, anchorImages: [anchor] } };
+    const before = await runPortraitAgent(anchored); writeFileSync(anchor, Buffer.alloc(2048, 6)); const after = await runPortraitAgent(anchored);
+    expect(after.version).toBe(before.version + 1); expect(after.portraitSet.requestHash).not.toBe(before.portraitSet.requestHash);
+  });
+  it("半套新服装保持旧active，后续补齐同一候选才激活", async () => {
+    const fixture = archive(); await runPortraitAgent(fixture.options);
+    const failedSide = (async (url, init) => String(url).includes("/images/generations") && String(init?.body).includes("90 度正侧面") ? new Response("参数被拒", { status: 400 }) : fixture.options.fetchImpl(url, init)) as typeof fetch;
+    const config = { ...fixture.options.config, wardrobe: { name: "红色外套" } };
+    const partial = await runPortraitAgent({ ...fixture.options, fetchImpl: failedSide, config });
+    expect(partial.version).toBe(2); expect(partial.portraitSet.status).toBe("candidate"); expect(partial.portraitSet.active).toBe(false); expect(loadCharacterEntry(fixture.dir)!.activeSet?.version).toBe(1);
+    await expect(activatePortraitVersion(fixture.root, "presenter", 2)).rejects.toThrow("PORTRAIT_ACTIVATION_UNVERIFIED");
+    const complete = await runPortraitAgent({ ...fixture.options, config }); expect(complete.version).toBe(2); expect(complete.reused).toHaveLength(3); expect(complete.portraitSet.active).toBe(true);
+  });
+  it("就绪版本文件被改不能覆盖旧版本，默认新候选且显式pin失败", async () => {
+    const fixture = archive(); const first = await runPortraitAgent(fixture.options);
+    writeFileSync(first.files.front!, Buffer.alloc(4096, 77));
+    expect(loadCharacterEntry(fixture.dir)!.verification.status).toBe("unverified");
+    await expect(runPortraitAgent({ ...fixture.options, config: { ...fixture.options.config, version: 1 } })).rejects.toThrow("PORTRAIT_VERSION_OCCUPIED");
+    const repaired = await runPortraitAgent(fixture.options); expect(repaired.version).toBe(2); expect(readFileSync(first.files.front!)[0]).toBe(77); expect(repaired.files.front).not.toBe(first.files.front);
+  });
+  it("可选第五角度属于同一不可变版本，改字节后必须新建候选而不能覆盖旧active", async () => {
+    const fixture = archive();
+    const options = { ...fixture.options, config: { ...fixture.options.config, angles: ["front", "threeQuarter", "closeup", "side", "back"] } };
+    const first = await runPortraitAgent(options);
+    expect(Object.keys(loadCharacterEntry(fixture.dir)!.files)).toHaveLength(5);
+    writeFileSync(first.files.back!, Buffer.alloc(4096, 66));
+    expect(loadCharacterEntry(fixture.dir)!.verification.status).toBe("unverified");
+    await expect(runPortraitAgent({ ...options, config: { ...options.config, version: 1 } })).rejects.toThrow("PORTRAIT_VERSION_OCCUPIED");
+    const repaired = await runPortraitAgent(options);
+    expect(repaired.version).toBe(2); expect(repaired.reused).toEqual([]); expect(readFileSync(first.files.back!)[0]).toBe(66);
+    expect(loadCharacterEntry(fixture.dir)!.activeSet?.version).toBe(2);
+  });
+  it("同角色并行请求在外调前阻断第二个，不丢候选和激活指针", async () => {
+    const fixture = archive(); let release!: () => void; let entered!: () => void;
+    const enteredPromise = new Promise<void>(resolve => { entered = resolve; }); const wait = new Promise<void>(resolve => { release = resolve; });
+    let calls = 0; const delayed = (async (url, init) => { if (String(url).includes("/images/generations") && calls++ === 0) { entered(); await wait; } return fixture.options.fetchImpl(url, init); }) as typeof fetch;
+    const first = runPortraitAgent({ ...fixture.options, fetchImpl: delayed }); await enteredPromise;
+    await expect(runPortraitAgent(fixture.options)).rejects.toThrow("PORTRAIT_ARCHIVE_BUSY"); release(); await first;
+    expect(fixture.calls).toHaveLength(4); expect(loadCharacterEntry(fixture.dir)!.activeSet?.version).toBe(1);
+  });
+  it("中途外部改档案不覆盖更新、不登记当前请求成功", async () => {
+    const fixture = archive(); const file = join(fixture.dir, "profile.json");
+    const changing = (async (url, init) => { const response = await fixture.options.fetchImpl(url, init); if (String(url).includes("/images/generations")) { const current = JSON.parse(readFileSync(file, "utf8")); current.appearance.hair = "外部改为短发"; writeFileSync(file, JSON.stringify(current)); } return response; }) as typeof fetch;
+    await expect(runPortraitAgent({ ...fixture.options, fetchImpl: changing })).rejects.toThrow("PORTRAIT_INPUT_CHANGED");
+    const saved = JSON.parse(readFileSync(file, "utf8")); expect(saved.appearance.hair).toBe("外部改为短发"); expect(saved.portraitSets.some((set: { active?: boolean }) => set.active)).toBe(false);
+  });
+  it("生成期间锚点字节改变会阻断登记且不激活候选", async () => {
+    const fixture = archive(); const anchor = join(fixture.dir, "anchor.png"); writeFileSync(anchor, Buffer.alloc(2048, 1));
+    const changing = (async (url, init) => { const response = await fixture.options.fetchImpl(url, init); if (String(url).includes("/images/generations")) writeFileSync(anchor, Buffer.alloc(2048, 2)); return response; }) as typeof fetch;
+    await expect(runPortraitAgent({ ...fixture.options, fetchImpl: changing, config: { ...fixture.options.config, anchorImages: [anchor] } })).rejects.toThrow("PORTRAIT_INPUT_CHANGED");
+    expect(loadCharacterEntry(fixture.dir)!.activeSet).toBeNull(); expect(fixture.calls).toHaveLength(1);
+  });
+  it("下载HTTP错误、NaN背景、路径逃逸和symlink输出均不产生就绪集", async () => {
+    const download = archive(); const invalidDownload = (async (url, init) => String(url).includes("/images/generations") ? download.options.fetchImpl(url, init) : new Response("failed", { status: 403 })) as typeof fetch;
+    await expect(runPortraitAgent({ ...download.options, fetchImpl: invalidDownload })).rejects.toThrow("下载 HTTP 403"); expect(loadCharacterEntry(download.dir)!.activeSet).toBeNull();
+    const nan = archive(); await expect(runPortraitAgent({ ...nan.options, config: { backgroundProber: () => ({ ...passingProber(), maxRange: Number.NaN }) } })).rejects.toThrow("background_not_clean"); expect(loadCharacterEntry(nan.dir)!.activeSet).toBeNull();
+    const unsafe = archive(); await expect(runPortraitAgent({ ...unsafe.options, characterId: "../escape" })).rejects.toThrow("CHARACTER_PATH_INVALID");
+    const outside = mkdtempSync(join(tmpdir(), "wl-outside-")); symlinkSync(outside, join(unsafe.dir, "portraits"));
+    await expect(runPortraitAgent(unsafe.options)).rejects.toThrow("PORTRAIT_PATH_INVALID"); expect(unsafe.calls).toHaveLength(0);
   });
 });

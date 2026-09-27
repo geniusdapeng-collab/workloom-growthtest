@@ -16,12 +16,18 @@
  * 任一不满足 → 判缓存失效，调用方必须重新出图并重新过监制。
  */
 
+import { createHash } from "node:crypto";
+
 export interface PlateCacheMeta {
-  /** 出图时使用的提示词 sha256（十六进制全量） */
+  /** 源生图提示词 sha256（十六进制全量；实际重试提示词另记） */
   promptSha256?: string;
+  /** 实际提交的提示词（可含监制返修要求），与未返修的源提示词分别留痕。 */
+  submittedPromptSha256?: string;
+  requestSha256?: string;
+  artifactSha256?: string;
   /** 出图时的锚点模式：none = 纯文生图（可进 Seedance）；real = 挂真人锚点（仅档案资产） */
   anchorMode?: string;
-  /** 出图模型 id（留痕用，不参与判定） */
+  /** 出图模型 id（留痕；完整请求指纹包含模型） */
   model?: string;
   /** 出图时间（ISO） */
   at?: string;
@@ -38,6 +44,10 @@ export interface PlateCacheInput {
   meta: PlateCacheMeta | null;
   /** 当前提示词 sha256（提示词不存在传 null） */
   currentPromptSha256: string | null;
+  /** 完整生图请求指纹；传入时旧元数据必须失效。 */
+  currentRequestSha256?: string;
+  /** 重新读取的关键帧字节指纹，防止已批准文件被替换。 */
+  currentArtifactSha256?: string | null;
   /** 本次运行的锚点模式 */
   anchorMode: string;
   /** 本镜最近一次关键帧裁决是否放行 */
@@ -52,6 +62,20 @@ export interface PlateCacheDecision {
 
 export const PLATE_CACHE_MIN_BYTES = 50_000;
 
+export function plateRequestSha256(input: {
+  prompt: string;
+  model: string;
+  anchorMode: string;
+  size: string;
+  referenceSha256: string[];
+}): string {
+  return createHash("sha256").update(JSON.stringify({
+    schema: "workloom.plate-request/v1",
+    prompt: input.prompt, model: input.model, anchorMode: input.anchorMode,
+    size: input.size, references: input.referenceSha256
+  })).digest("hex");
+}
+
 export function decidePlateCache(input: PlateCacheInput): PlateCacheDecision {
   const minBytes = input.minBytes ?? PLATE_CACHE_MIN_BYTES;
   if (!input.exists) return { valid: false, reason: "产物不存在" };
@@ -62,6 +86,12 @@ export function decidePlateCache(input: PlateCacheInput): PlateCacheDecision {
   if (input.meta.promptSha256 !== input.currentPromptSha256) return { valid: false, reason: "提示词已变更" };
   if (input.meta.anchorMode !== input.anchorMode) {
     return { valid: false, reason: `锚点模式已变更（${input.meta.anchorMode ?? "缺"} → ${input.anchorMode}）` };
+  }
+  if (input.currentRequestSha256 !== undefined && input.meta.requestSha256 !== input.currentRequestSha256) {
+    return { valid: false, reason: "生图请求已变更或缺少请求指纹" };
+  }
+  if (input.currentArtifactSha256 !== undefined && (!input.currentArtifactSha256 || input.meta.artifactSha256 !== input.currentArtifactSha256)) {
+    return { valid: false, reason: "关键帧字节已变更或缺少产物指纹" };
   }
   if (!input.lastApproved) return { valid: false, reason: "上次裁决未放行" };
   return { valid: true, reason: "命中（指纹一致 + 历史放行）" };

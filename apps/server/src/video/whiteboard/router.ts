@@ -31,12 +31,13 @@ import { newId } from "@workloom/shared";
 import { writeFileSync } from "node:fs";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../../trpc/context.js";
 import { scopedQuery, type Scope } from "../gen/db.js";
-import { submitGenJob } from "../gen/submit.js";
+import { submitGenJob, type RenderScriptLike } from "../gen/submit.js";
 import { pollRenderJobs } from "../render-poller.js";
 import { downloadToMediaStore, mediaUrl, registerRenderedClip, resolveMediaPath } from "../gen/ingest.js";
 import {
-  WhiteboardEngineError, readImageSize, renderAnnotationPreview, renderWhiteboardScene,
-  runLineartTool, whiteboardEngineHint, whiteboardEngineReady, whiteboardEnv,
+  WHITEBOARD_UHD_SIZE, WhiteboardEngineError, projectedWhiteboardSize, readImageSize,
+  probeWhiteboardVideoSize, renderAnnotationPreview, renderWhiteboardScene, runLineartTool, whiteboardEngineHint,
+  whiteboardEngineReady, whiteboardEnv, whiteboardQualityOf,
 } from "./engine.js";
 import { buildSrt, groupScenes, parseSrt, tileScenes } from "./srt.js";
 import { narrationConfig, splitSentences, synthesizeNarration, verifyNarration } from "./narration.js";
@@ -146,7 +147,7 @@ export const whiteboardRouter = router({
         [scope.workspaceId, film.project_id],
       );
       return {
-        film: { ...film, playUrl: film.final_path ? mediaUrl(film.final_path) : null },
+        film: { ...film, quality: whiteboardQualityOf(film.cap_long_edge), playUrl: film.final_path ? mediaUrl(film.final_path) : null },
         scenes: scenes.map((s) => ({
           ...s,
           previewUrl: s.lineart_path ? mediaUrl(s.lineart_path) : null,
@@ -164,10 +165,15 @@ export const whiteboardRouter = router({
       lineartMode: z.enum(["seedream", "sketch", "upload"]).default("seedream"),
       narrationProfile: z.string().max(64).optional(),
       fps: z.number().int().min(12).max(60).default(30),
-      capLongEdge: z.number().int().min(640).max(1920).default(1280),
+      quality: z.enum(["hd", "uhd"]).default("hd"),
+      /** HD 自定义长边；UHD 固定为原生 3840×2160。 */
+      capLongEdge: z.number().int().min(640).max(1920).optional(),
       voiceLufs: z.number().min(-30).max(-6).default(-16),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.quality === "uhd" && input.capLongEdge !== undefined) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "UHD 画质固定为 3840×2160，不接受自定义 capLongEdge" });
+      }
       const scope = scopeOf(ctx.identity);
       const projectId = newId("VP");
       const filmId = newId("WF");
@@ -187,7 +193,8 @@ export const whiteboardRouter = router({
               voice_lufs, narration_profile, status, created_by)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'draft',$10)`,
           [filmId, scope.workspaceId, projectId, input.script, input.lineartMode, input.fps,
-            input.capLongEdge, input.voiceLufs, input.narrationProfile ?? narrationConfig().profile, actor],
+            input.quality === "uhd" ? WHITEBOARD_UHD_SIZE.width : (input.capLongEdge ?? 1280),
+            input.voiceLufs, input.narrationProfile ?? narrationConfig().profile, actor],
         );
         await client.query("COMMIT");
       } catch (err) {
@@ -196,7 +203,7 @@ export const whiteboardRouter = router({
       } finally {
         client.release();
       }
-      return { filmId, projectId, modelId: WHITEBOARD_MODEL_ID };
+      return { filmId, projectId, modelId: WHITEBOARD_MODEL_ID, quality: input.quality };
     }),
 
   /**
@@ -574,6 +581,8 @@ export const whiteboardRouter = router({
   render: writeProcedure
     .input(z.object({
       filmId: z.string().min(1),
+      /** 省略时沿用 create 时存下的档位；旧片默认 HD。 */
+      quality: z.enum(["hd", "uhd"]).optional(),
       allowOverage: z.boolean().default(true),
       idempotencyKey: z.string().max(200).optional(),
     }))
@@ -582,6 +591,9 @@ export const whiteboardRouter = router({
       const app = getAppPool();
       const gateway = getGatewayPool();
       const film = await loadFilm(app, scope, input.filmId);
+      const quality = input.quality ?? whiteboardQualityOf(film.cap_long_edge);
+      const capLongEdge = quality === "uhd" ? WHITEBOARD_UHD_SIZE.width
+        : film.cap_long_edge <= 1920 ? film.cap_long_edge : 1280;
       const scenes = await loadScenes(app, scope, film);
       const ready = scenes.filter((s) => s.lineart_path && (s.annotation as WhiteboardAnnotation)?.elements?.length > 0);
       if (scenes.length === 0 || ready.length !== scenes.length) {
@@ -592,6 +604,19 @@ export const whiteboardRouter = router({
       }
       if (!whiteboardEngineReady()) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: `白板引擎不可用：${whiteboardEngineHint()}` });
+      }
+      if (quality === "uhd") {
+        for (const scene of scenes) {
+          const image = readImageSize(resolveMediaPath(scene.lineart_path!));
+          if (!image) throw new TRPCError({ code: "PRECONDITION_FAILED", message: `第 ${scene.scene_no} 幕线稿尺寸无法解析` });
+          const projected = projectedWhiteboardSize(image, capLongEdge);
+          if (projected.width !== WHITEBOARD_UHD_SIZE.width || projected.height !== WHITEBOARD_UHD_SIZE.height) {
+            throw new TRPCError({
+              code: "PRECONDITION_FAILED",
+              message: `第 ${scene.scene_no} 幕线稿 ${image.width}×${image.height} 将渲为 ${projected.width}×${projected.height}；UHD 要求 16:9，输出 3840×2160`,
+            });
+          }
+        }
       }
       const actor = ctx.identity?.memberId ?? "whiteboard-operator";
 
@@ -612,7 +637,8 @@ export const whiteboardRouter = router({
       const verdict = judge({
         object: { type: "render_script", id: `whiteboard:${film.project_id}` },
         action: "render.submit",
-        params: { engine: "whiteboard-local", scenes: scenes.length },
+        params: { engine: "whiteboard-local", scenes: scenes.length, quality,
+          capLongEdge, resolution: quality === "uhd" ? "3840x2160" : null },
         context: { render_auto: (process.env.WORKLOOM_RENDER_AUTO ?? "1") !== "0" },
       }, rules, "review");
       if (verdict.level === "block") {
@@ -624,15 +650,16 @@ export const whiteboardRouter = router({
 
       /* ---- 渲染脚本行（白板片同样走"版本即审批对象"口径） ---- */
       const scriptKey = `whiteboard-${film.project_id}`;
-      const existing = await scopedQuery<{ id: string; version: number; status: string }>(
+      const existing = await scopedQuery<RenderScriptLike & Record<string, unknown>>(
         app, scope,
-        `SELECT id, version, status FROM render_scripts
-          WHERE workspace_id=$1 AND script_key=$2 ORDER BY version DESC LIMIT 1`,
-        [scope.workspaceId, scriptKey],
+        `SELECT s.* FROM render_scripts s JOIN workspaces w ON w.id=s.workspace_id
+          WHERE s.workspace_id=$1 AND s.script_key=$2 AND w.tenant_id=$3 AND s.project_id=$4
+          ORDER BY s.version DESC LIMIT 1`,
+        [scope.workspaceId, scriptKey, scope.tenantId, film.project_id],
       );
-      let scriptId = existing[0]?.id;
-      if (!scriptId) {
-        const created = await createRenderScript(app, gateway, scope, {
+      let scriptRow: RenderScriptLike | undefined = existing[0];
+      if (!scriptRow) {
+        scriptRow = await createRenderScript(app, gateway, scope, {
           scriptKey,
           projectId: film.project_id,
           shotId: "WHITEBOARD",
@@ -641,15 +668,15 @@ export const whiteboardRouter = router({
             engine: "whiteboard-local",
             scenes: scenes.length,
             durationMs: scenes.reduce((s, x) => s + (x.duration_ms ?? 0), 0),
+            ...(quality === "uhd" ? { quality, resolution: "3840x2160" } : {}),
           },
           by: actor,
         });
-        scriptId = created.id;
       }
       if (verdict.level === "review") {
         const cur = await scopedQuery<{ status: string }>(
           app, scope, `SELECT status FROM render_scripts WHERE workspace_id=$1 AND id=$2`,
-          [scope.workspaceId, scriptId],
+          [scope.workspaceId, scriptRow.id],
         );
         if (cur[0]?.status !== "approved") {
           throw new TRPCError({
@@ -671,29 +698,26 @@ export const whiteboardRouter = router({
       const fingerprint = createHash("sha256")
         .update(scenes.map((s) => JSON.stringify({
           no: s.scene_no, lineart: s.lineart_path, ms: s.duration_ms, annotation: s.annotation,
-        })).join("\n"))
+        })).join("\n") + `\nquality=${quality};cap=${capLongEdge}`)
         .digest("hex")
         .slice(0, 16);
+      const customKey = input.idempotencyKey
+        ? `${createHash("sha256").update(input.idempotencyKey).digest("hex").slice(0, 16)}:`
+        : "";
       const submit = await submitGenJob({
         app, gateway, scope, actor,
-        script: {
-          id: scriptId,
-          project_id: film.project_id,
-          shot_id: "WHITEBOARD",
-          script_key: scriptKey,
-          version: 1,
-          status: verdict.level === "review" ? "approved" : "draft",
-          md: film.script_md,
-        },
+        script: scriptRow,
         modelId: WHITEBOARD_MODEL_ID,
         params: {
           durationSec: Math.max(1, Math.round(totalDurationMs / 1000)),
           aspectRatio: "16:9",
+          resolution: quality === "uhd" ? "3840x2160" : undefined,
           extra: {
             whiteboard: {
               projectId: film.project_id,
               fps: film.render_fps,
-              capLongEdge: film.cap_long_edge,
+              capLongEdge,
+              quality,
               scenes: scenes.map((s) => ({
                 sceneNo: s.scene_no,
                 title: s.title,
@@ -705,12 +729,18 @@ export const whiteboardRouter = router({
           },
         },
         mode: "manual",
-        idempotencyKey: input.idempotencyKey ?? `whiteboard:${film.id}:${fingerprint}`,
+        idempotencyKey: `whiteboard:${film.id}:${customKey}${fingerprint}`,
         fenceLevel: verdict.level,
         fenceImpacts: verdict.impacts as never,
         budgetOverageSeconds: input.allowOverage ? Math.max(0, Math.round(totalDurationMs / 1000)) : 0,
       });
-      return { ...submit, modelId: WHITEBOARD_MODEL_ID, totalDurationMs, scenes: scenes.length };
+      if (input.quality && film.cap_long_edge !== capLongEdge) {
+        await scopedQuery(app, scope,
+          `UPDATE whiteboard_films SET cap_long_edge=$3 WHERE workspace_id=$1 AND id=$2`,
+          [scope.workspaceId, film.id, capLongEdge]);
+      }
+      return { ...submit, modelId: WHITEBOARD_MODEL_ID, totalDurationMs, scenes: scenes.length, quality,
+        resolution: quality === "uhd" ? "3840x2160" : null };
     }),
 
   /** 渲染轮询（复用 render-poller：回填 + 入库 + 成本 + 档案；白板产物经 file:// 本地入库） */
@@ -777,6 +807,13 @@ export const whiteboardRouter = router({
         targetLufs: Number(film.voice_lufs),
         env: process.env,
       });
+      if (whiteboardQualityOf(film.cap_long_edge) === "uhd") {
+        const actual = await probeWhiteboardVideoSize(output);
+        if (actual.width !== WHITEBOARD_UHD_SIZE.width || actual.height !== WHITEBOARD_UHD_SIZE.height) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED",
+            message: `UHD 白板交付尺寸错误：实际 ${actual.width}×${actual.height}，要求 3840×2160` });
+        }
+      }
       const stored = await downloadToMediaStore(`file://${output}`, { workspaceId: scope.workspaceId });
 
       /* ---- 登记 final_cut：片型如实为 explainer；prompt 存口播稿摘要（可检索） ---- */
@@ -833,19 +870,24 @@ export const whiteboardRouter = router({
    */
   verifyExample: writeProcedure
     .input(z.object({
-      capLongEdge: z.number().int().min(640).max(1920).default(1280),
+      quality: z.enum(["hd", "uhd"]).default("hd"),
+      capLongEdge: z.number().int().min(640).max(1920).optional(),
       fps: z.number().int().min(12).max(60).default(30),
     }))
     .mutation(async ({ ctx, input }) => {
+      if (input.quality === "uhd" && input.capLongEdge !== undefined) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "UHD 样例固定为 3840×2160，不接受自定义 capLongEdge" });
+      }
       const scope = scopeOf(ctx.identity);
       const cfg = whiteboardEnv();
       try {
         const rendered = await renderWhiteboardScene({
           imagePath: cfg.exampleImage,
           annotationPath: cfg.exampleAnnotation,
-          outputPath: `${filmDir("engine-example")}/monkey-banana.mp4`,
+          outputPath: `${filmDir("engine-example")}/monkey-banana-${input.quality}.mp4`,
           fps: input.fps,
-          capLongEdge: input.capLongEdge,
+          capLongEdge: input.quality === "uhd" ? WHITEBOARD_UHD_SIZE.width : (input.capLongEdge ?? 1280),
+          quality: input.quality,
           env: process.env,
         });
         const styleCheck = await runLineartTool<{ checks: unknown[]; metrics: unknown }>(
@@ -858,6 +900,8 @@ export const whiteboardRouter = router({
           output: stored.relPath,
           url: mediaUrl(stored.relPath),
           renderMs: rendered.durationMs,
+          quality: input.quality,
+          resolution: input.quality === "uhd" ? "3840x2160" : null,
           styleCheck,
         };
       } catch (err) {

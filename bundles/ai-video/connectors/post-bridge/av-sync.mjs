@@ -152,6 +152,19 @@ export function evaluateAvSync(samples, policy = AV_SYNC_POLICY) {
 export function buildSampleAccurateConcatPlan({ listFile, clips, output, workDir, fps = 30, sampleRate = 48000 }) {
   const videoOnly = `${workDir}/video-only.mp4`;
   const voiceWav = `${workDir}/voice.wav`;
+  const concatList = [
+    "ffconcat version 1.0",
+    ...clips.flatMap((clip) => {
+      const seconds = Number(clip.durationSec);
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        throw new Error("每个拼接片段需要实测视频轨时长");
+      }
+      return [
+        `file '${clip.path.replaceAll("'", "'\\''")}'`,
+        `duration ${seconds.toFixed(6)}`,
+      ];
+    }),
+  ].join("\n") + "\n";
   const filters = [];
   const labels = [];
   clips.forEach((clip, index) => {
@@ -171,6 +184,7 @@ export function buildSampleAccurateConcatPlan({ listFile, clips, output, workDir
   return {
     videoOnly,
     voiceWav,
+    concatList,
     videoArgs: ["-hide_banner", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c:v", "copy", "-an", videoOnly],
     audioArgs: [
       "-hide_banner", "-v", "error", "-y",

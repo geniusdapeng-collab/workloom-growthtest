@@ -83,6 +83,8 @@ export interface DataMiningExecutorOptions {
   searchPaceMs?: number;
   /** 单站模型回填超时（默认 120s） */
   llmTimeoutMs?: number;
+  /** 正式营销宿主必须提供：搜索结果仅作候选，collector读取正文并返回逐主张核实的回填。 */
+  evidenceCollector?: (stage: IntelStage, plan: DataMiningStagePlan, hits: SearchHit[]) => Promise<Record<string, unknown> | null>;
 }
 
 export type DataMiningExecutor = (stage: IntelStage, plan: DataMiningStagePlan) => Promise<Record<string, unknown> | null>;
@@ -552,7 +554,7 @@ export function normalizeUrl(raw: string): string {
     const parsed = new URL(text);
     parsed.hash = "";
     const path = parsed.pathname.replace(/\/+$/, "");
-    return `${parsed.protocol}//${parsed.hostname.toLowerCase()}${path}${parsed.search}`;
+    return `${parsed.protocol}//${parsed.host.toLowerCase()}${path}${parsed.search}`;
   } catch {
     return text.replace(/#.*$/, "").replace(/\/+$/, "").toLowerCase();
   }
@@ -588,15 +590,15 @@ export function filterUnknownUrls(
   const record = asRecord(value);
   if (!record) return { value, report };
 
-  const urlFields = ["url", "source_url", "page_url"] as const;
+  const urlFields = Object.keys(record).filter(key => key === "url" || key.endsWith("_url"));
   const presentUrls = urlFields
     .map((field) => ({ field, raw: asString(record[field]) }))
     .filter((entry) => entry.raw.length > 0);
 
   if (presentUrls.length > 0) {
     const unknown = presentUrls.filter((entry) => !allowed.has(normalizeUrl(entry.raw)));
-    if (unknown.length === presentUrls.length) {
-      // 全部 URL 都是幻觉：整条剔除
+    if (unknown.length > 0) {
+      // 任一 URL 未核实即整条剔除；一个真链接不能掩护另一个假链接
       report.dropped += 1;
       report.droppedUrls.push(...presentUrls.map((entry) => entry.raw));
       return { value: undefined, report };
@@ -715,8 +717,9 @@ async function mapLimit<T, R>(items: T[], limit: number, worker: (item: T) => Pr
 /**
  * 构造 data-mining executor（注入 `VideoStudio` 的 `dataMining.executor`）。
  *
- * 永不抛错：任何一站失败返回 null，引擎据此记 gap 继续（缺站纪律），
- * 保证"情报层故障不阻塞主流程"。
+ * 旧的摘要回填模式在失败时返回 null，由引擎记 gap。
+ * 正式营销使用 evidenceCollector；其完整正文、主张与持久化校验异常直接向上传播，
+ * 不把失败的事实证据降格成一个可继续生产的空站。
  */
 export function createDataMiningExecutor(options: DataMiningExecutorOptions): DataMiningExecutor {
   const log = options.log ?? (() => undefined);
@@ -738,14 +741,15 @@ export function createDataMiningExecutor(options: DataMiningExecutorOptions): Da
      */
     const queries = (plan.queries ?? plan.discovery_queries ?? []).slice(0, cap);
     if (queries.length === 0) {
+      if (options.evidenceCollector) return options.evidenceCollector(stage, plan, []);
       log(`[intel] ${stage} 任务书缺查询矩阵，按缺站处理`);
       return null;
     }
 
     // ① 真检索（逐查询并发受限）
     const resultSets = await mapLimit(queries, 4, async (query) => {
-      const hits = await search(query.q, hitsPerQuery);
-      return hits;
+      try { return await search(query.q, hitsPerQuery); }
+      catch (error) { log(`[intel] ${stage} 查询失败：${error instanceof Error ? error.message : String(error)}`); return []; }
     });
     const hitMap = new Map<string, SearchHit>();
     for (const hits of resultSets) {
@@ -756,6 +760,7 @@ export function createDataMiningExecutor(options: DataMiningExecutorOptions): Da
     }
     const hits = [...hitMap.values()];
     log(`[intel] ${stage} 检索完成：${queries.length} 条查询 / ${hits.length} 条去重结果（${Date.now() - started}ms）`);
+    if (options.evidenceCollector) return options.evidenceCollector(stage, plan, hits);
     if (hits.length === 0) {
       log(`[intel] ${stage} 检索零结果 → 缺站（不编造）`);
       return null;

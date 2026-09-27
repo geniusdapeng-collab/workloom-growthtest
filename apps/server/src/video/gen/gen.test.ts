@@ -10,7 +10,7 @@ import { join } from "node:path";
 
 import { listModels, getModel, providerConfigured, findFallbackModels, defaultVideoModelId } from "./catalog.js";
 import { estimateCost, checkCostCaps, costCaps, usdCnyRate } from "./cost.js";
-import { ArkVideoProvider, HiggsfieldProvider, buildVideoGenPool } from "./providers.js";
+import { ArkImageProvider, ArkVideoProvider, HiggsfieldProvider, MuapiProvider, buildVideoGenPool, videoGenPool } from "./providers.js";
 import { serviceTierRejectionReason } from "./params.js";
 import { signMediaPath, verifyMediaToken, resolveMediaPath, downloadToMediaStore } from "./ingest.js";
 import { createDryRunDriver, buildPublishAdapters, fenceOverrideEnabled } from "./publish.js";
@@ -333,5 +333,42 @@ describe("发布链", () => {
     expect(fenceOverrideEnabled({ PUBLISH_TEST_FENCE_OVERRIDE: "1" } as NodeJS.ProcessEnv)).toBe(true);
     expect(fenceOverrideEnabled({ PUBLISH_TEST_FENCE_OVERRIDE: "1", NODE_ENV: "production" } as NodeJS.ProcessEnv)).toBe(false);
     expect(fenceOverrideEnabled({} as NodeJS.ProcessEnv)).toBe(false);
+  });
+});
+
+
+describe("供应商拒绝与未知接受结果", () => {
+  it.each([
+    [401, "AUTH", "not-accepted", true], [400, "BAD_REQUEST", "not-accepted", false],
+    [404, "MODEL_UNAVAILABLE", "not-accepted", true], [429, "RETRYABLE", "not-accepted", true],
+    [500, "RETRYABLE", "unknown", false], [503, "RETRYABLE", "unknown", false],
+    [408, "PROVIDER_FAILED", "unknown", false],
+  ])("HTTP %s 分类不将未知提交当成可安全重发", async (status, kind, acceptance, fallbackAllowed) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("rejected", { status: Number(status) })));
+    await expect(new ArkVideoProvider({ apiKey: "test-only" }).submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } }))
+      .rejects.toMatchObject({ kind, acceptance, fallbackAllowed });
+  });
+  it.each([
+    new ArkVideoProvider({ apiKey: "test-only" }), new ArkImageProvider({ apiKey: "test-only" }),
+    new HiggsfieldProvider({ keyId: "test-only", keySecret: "test-only" }), new MuapiProvider({ apiKey: "test-only" }),
+  ])("成功 HTTP 无 taskId/URL 仍需对账：%s", async (provider) => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
+    await expect(provider.submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } }))
+      .rejects.toMatchObject({ acceptance: "unknown", fallbackAllowed: false });
+  });
+  it("成功 HTTP 非 JSON 的响应同样不允许 fallback", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("gateway response lost", { status: 200 })));
+    await expect(new ArkVideoProvider({ apiKey: "test-only" }).submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } }))
+      .rejects.toMatchObject({ acceptance: "unknown", fallbackAllowed: false });
+  });
+  it("连接池缓存覆盖 endpoint/供应商模型配置，并接受调用者指定 env", async () => {
+    const seen: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => { seen.push(String(url)); return new Response('{"id":"test-task"}', { status: 200 }); }));
+    const first = videoGenPool({ VOLCENGINE_ARK_API_KEY: "test-only", SEEDANCE_ENDPOINT: "https://first.example.test" });
+    await first.get("seedance")!.submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } });
+    const second = videoGenPool({ VOLCENGINE_ARK_API_KEY: "test-only", SEEDANCE_ENDPOINT: "https://second.example.test" });
+    await second.get("seedance")!.submit({ prompt: "glass", estimatedUnits: 5, params: { providerModel: "test-model" } });
+    expect(seen).toEqual(["https://first.example.test/contents/generations/tasks", "https://second.example.test/contents/generations/tasks"]);
+    expect(first).not.toBe(second);
   });
 });

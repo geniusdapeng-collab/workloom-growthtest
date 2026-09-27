@@ -449,7 +449,11 @@ export async function synthesize(config, {
   };
 }
 
-/** 参考音频转写（克隆需要的 ref_text）；引擎不支持转写时如实返回 supported=false。 */
+/**
+ * 参考音频转写（克隆需要的 ref_text）；引擎不支持转写时如实返回 supported=false。
+ * @param {ReturnType<typeof engineConfig>} config
+ * @param {{input?:string, language?:string|null, context?:string|null, fetchImpl?:typeof fetch, bins?:ReturnType<typeof resolveBinaries>}} options
+ */
 export async function transcribe(config, { input, language = null, context = null, fetchImpl = fetch, bins = resolveBinaries() } = {}) {
   if (!input) throw new VoiceError("缺少待转写音频", "bad_request");
   if (!config.asr) {
@@ -464,64 +468,66 @@ export async function transcribe(config, { input, language = null, context = nul
    * 现在由桥在本地用**工位自己的 ffmpeg** 转好 WAV 再上传：既不依赖引擎的 PATH，也不再谎报类型。
    */
   const workDir = await fsp.mkdtemp(path.join(os.tmpdir(), "workloom-asr-"));
-  let audio = null;
   try {
+    let audio;
     const wav = path.join(workDir, "asr-input.wav");
-    await runBin(bins.ffmpeg, [
-      "-hide_banner", "-loglevel", "error", "-y", "-i", input,
-      "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav,
-    ], { label: "ffmpeg(asr)" });
-    audio = { bytes: await fsp.readFile(wav), name: "asr-input.wav" };
-  } catch (error) {
-    await fsp.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
-    throw new VoiceError(
-      `转写预处理失败（转 16kHz 单声道 WAV）：${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
-      "engine_failed",
-      true,
+    try {
+      await runBin(bins.ffmpeg, [
+        "-hide_banner", "-loglevel", "error", "-y", "-i", input,
+        "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", wav,
+      ], { label: "ffmpeg(asr)" });
+      audio = { bytes: await fsp.readFile(wav), name: "asr-input.wav" };
+    } catch (error) {
+      throw new VoiceError(
+        `转写预处理失败（转 16kHz 单声道 WAV）：${error instanceof Error ? error.message.split("\n")[0] : String(error)}`,
+        "engine_failed",
+        true,
+      );
+    }
+    const effectiveLanguage = language ?? config.asrLanguage ?? null;
+    const multipart = buildMultipart(
+      {
+        model: config.asrModel,
+        response_format: "json",
+        ...(effectiveLanguage ? { language: effectiveLanguage } : {}),
+        /** 预期台词仅作为热词上下文，实际匹配基于引擎返回的转写，不用原稿填补空转写。 */
+        ...(context ? { context: String(context).slice(0, 400) } : {}),
+      },
+      { name: "file", filename: audio.name, contentType: "audio/wav", data: audio.bytes },
     );
-  }
-  const effectiveLanguage = language ?? config.asrLanguage ?? null;
-  const multipart = buildMultipart(
-    {
+    const response = await engineHttp(config, "/v1/audio/transcriptions", {
+      method: "POST",
+      headers: { "content-type": multipart.contentType },
+      body: multipart.body,
+      fetchImpl,
+      timeoutMs: Math.min(config.timeoutMs, 600_000),
+      label: "转写引擎",
+    });
+    const text = response.body.toString("utf8");
+    if (response.status < 200 || response.status >= 300) {
+      throw new VoiceError(`转写失败（HTTP ${response.status}）：${text.slice(0, 200)}`, "engine_failed", response.status >= 500);
+    }
+    let payload = null;
+    try {
+      payload = JSON.parse(text);
+    } catch {
+      throw new VoiceError("转写引擎返回非 JSON 响应，无法核实台词", "bad_response", true);
+    }
+    if (!payload || typeof payload !== "object" || Array.isArray(payload)
+      || (payload.text !== null && typeof payload.text !== "string")) {
+      throw new VoiceError("转写引擎缺少有效的 text 字段，无法核实台词", "bad_response", true);
+    }
+    return {
+      supported: true,
+      text: typeof payload?.text === "string" ? payload.text.trim() : null,
       model: config.asrModel,
-      response_format: "json",
-      ...(effectiveLanguage ? { language: effectiveLanguage } : {}),
-      /**
-       * 热词偏置（2026-09-25）：把"预期台词"作为 Whisper 的 context 传入，
-       * 专有名词（滕王阁、滕王阁序、赣江…）不再被听成"童王阁/藤王格旭"。
-       * 这直接决定人声门能不能判对：真机 SC-03 未加 context 时 match 0.462（误判"没说话"），
-       * 加 context 后专有名词可被正确解码。
-       */
-      ...(context ? { context: String(context).slice(0, 400) } : {}),
-    },
-    { name: "file", filename: audio.name, contentType: "audio/wav", data: audio.bytes },
-  );
-  const response = await engineHttp(config, "/v1/audio/transcriptions", {
-    method: "POST",
-    headers: { "content-type": multipart.contentType },
-    body: multipart.body,
-    fetchImpl,
-    timeoutMs: Math.min(config.timeoutMs, 600_000),
-    label: "转写引擎",
-  });
-  await fsp.rm(workDir, { recursive: true, force: true }).catch(() => undefined);
-  const text = response.body.toString("utf8");
-  if (response.status < 200 || response.status >= 300) {
-    throw new VoiceError(`转写失败（HTTP ${response.status}）：${text.slice(0, 200)}`, "engine_failed", response.status >= 500);
+      language: effectiveLanguage,
+      unloaded: await unloadModel(config, config.asrModel, { fetchImpl }),
+    };
+  } finally {
+    // 网络异常、超时、非成功 HTTP 和正常返回都必须清理带用户声音的临时 WAV。
+    await fsp.rm(workDir, { recursive: true, force: true });
   }
-  let payload = null;
-  try {
-    payload = JSON.parse(text);
-  } catch {
-    payload = { text };
-  }
-  return {
-    supported: true,
-    text: typeof payload?.text === "string" ? payload.text.trim() : null,
-    model: config.asrModel,
-    language: effectiveLanguage,
-    unloaded: await unloadModel(config, config.asrModel, { fetchImpl }),
-  };
 }
 
 /**
@@ -534,6 +540,7 @@ export async function unloadModel(config, modelName, { fetchImpl = fetch } = {})
   try {
     const response = await engineHttp(config, `/v1/models?model_name=${encodeURIComponent(modelName)}`, {
       method: "DELETE",
+      fetchImpl,
       timeoutMs: 30_000,
       retries: 0,
       label: "卸载引擎",
@@ -1431,32 +1438,82 @@ export async function probeAnyMedia(input, { bins = resolveBinaries() } = {}) {
 
 /* ============================ 核验（verify） ============================ */
 
-/** 产物核验：响度/真峰值/时长/削波/静音占比 +（可选）转写回读与预期文本比对。 */
+/** 产物核验：物理测量 + 顺序敏感的台词回读；缺测不能通过，明确无台词才不适用。 */
 export async function verify(params = {}, { bins = resolveBinaries(), env = process.env, config = engineConfig(env), fetchImpl = fetch } = {}) {
+  if (typeof (params.input ?? params.path) !== "string" || !(params.input ?? params.path).trim()) {
+    throw new VoiceError("缺少待核验产物 input", "bad_request");
+  }
+  if (params.expect_text !== undefined && typeof params.expect_text !== "string") {
+    throw new VoiceError("expect_text 必须是字符串", "bad_request");
+  }
+  for (const key of ["speech_expected", "round_trip", "strict"]) {
+    if (params[key] !== undefined && typeof params[key] !== "boolean") {
+      throw new VoiceError(`${key} 必须是布尔值`, "bad_request");
+    }
+  }
+  const expectedText = normalizedMatchText(params.expect_text);
+  if (params.speech_expected === false && expectedText) {
+    throw new VoiceError("speech_expected=false 与非空 expect_text 冲突", "bad_request");
+  }
+  for (const key of ["min_match_ratio", "min_active_ratio", "lufs", "true_peak"]) {
+    const value = params[key];
+    if (value !== undefined && (typeof value !== "number" && (typeof value !== "string" || !value.trim()))) {
+      throw new VoiceError(`${key} 必须是数值`, "bad_request");
+    }
+  }
+  const minMatchRatio = Number(params.min_match_ratio ?? 0.6);
+  const minActiveRatio = params.min_active_ratio === undefined ? null : Number(params.min_active_ratio);
+  const targetLufs = Number(params.lufs ?? -16);
+  const truePeak = Number(params.true_peak ?? -1.0);
+  if (!Number.isFinite(minMatchRatio) || minMatchRatio < 0 || minMatchRatio > 1
+    || (minActiveRatio !== null && (!Number.isFinite(minActiveRatio) || minActiveRatio < 0 || minActiveRatio > 1))
+    || !Number.isFinite(targetLufs) || !Number.isFinite(truePeak)) {
+    throw new VoiceError("核验阈值必须为有限数值；文本匹配和活动占比须在 0–1 范围内", "bad_request");
+  }
   const input = assertPathAllowed(params.input ?? params.path ?? "", allowedRoots(env), "input");
   if (!fs.existsSync(input)) throw new VoiceError(`产物不存在：${input}`, "not_found");
   const media = await probeAnyMedia(input, { bins });
-  const targetLufs = Number(params.lufs ?? -16);
-  const truePeak = Number(params.true_peak ?? -1.0);
   const loudness = await measureLoudness(input, { bins, targetLufs, truePeak });
   const activity = await detectVoiceBandSegments({ input, duration: media.duration, bins });
   const clipping = loudness.truePeakDbtp !== null && loudness.truePeakDbtp > truePeak + 0.2;
 
   let asr = null;
   let matchRatio = null;
-  if (params.expect_text && config.asr && params.round_trip !== false) {
-    /**
-     * 核查预期台词时默认把 expect_text 作为**热词上下文**交给 ASR（可用 `context` 显式覆盖）：
-     * 人声门要判的是"这句台词有没有被人听见"，专有名词听错会把通过判成不通过（真机 SC-03）。
-     */
-    const result = await transcribe(config, {
-      input,
-      language: params.language ?? null,
-      context: params.context ?? params.expect_text ?? null,
-      fetchImpl,
-    });
-    asr = result.text;
-    if (result.text) matchRatio = textMatchRatio(String(params.expect_text), result.text);
+  let asrError = null;
+  let textMatchStatus = "unverified";
+  const unverified = [];
+  const failures = [];
+  if (params.speech_expected === false) {
+    textMatchStatus = "not_applicable";
+  } else if (!expectedText) {
+    unverified.push("expected_text_missing");
+  } else if (params.round_trip === false) {
+    unverified.push("asr_round_trip_disabled");
+  } else if (!config.asr) {
+    unverified.push("asr_not_supported");
+  } else {
+    try {
+      const result = await transcribe(config, {
+        input,
+        language: params.language ?? null,
+        context: params.context ?? params.expect_text ?? null,
+        fetchImpl,
+        bins,
+      });
+      asr = result.text;
+      if (!result.supported || !normalizedMatchText(asr)) {
+        unverified.push(result.supported ? "asr_empty_transcript" : "asr_not_supported");
+      } else {
+        matchRatio = textMatchRatio(params.expect_text, asr);
+        textMatchStatus = matchRatio >= minMatchRatio ? "passed" : "failed";
+        if (textMatchStatus === "failed") failures.push(`match_ratio ${matchRatio} < ${minMatchRatio}`);
+      }
+    } catch (error) {
+      asrError = error instanceof VoiceError
+        ? error
+        : new VoiceError(`转写无法核实：${error instanceof Error ? error.message : String(error)}`, "engine_failed", true);
+      unverified.push(`asr_error:${asrError.code}`);
+    }
   }
 
   const checked = {
@@ -1469,43 +1526,60 @@ export async function verify(params = {}, { bins = resolveBinaries(), env = proc
     clipping,
     asr_text: asr,
     match_ratio: matchRatio,
+    text_match_status: textMatchStatus,
+    text_match_method: "normalized-codepoint-lcs/max-length",
+    text_match_threshold: minMatchRatio,
+    speech_expected: params.speech_expected ?? (expectedText ? true : null),
+    asr_error: asrError ? { code: asrError.code, message: asrError.message, retryable: asrError.retryable } : null,
   };
-  const failures = [];
   if (clipping) failures.push(`clipping（${loudness.truePeakDbtp} dBTP）`);
   if (!(media.duration > 0)) failures.push("zero_duration");
-  if (params.min_active_ratio && activity.activeRatio < Number(params.min_active_ratio)) {
-    failures.push(`active_ratio ${activity.activeRatio} < ${params.min_active_ratio}`);
+  for (const [name, value] of Object.entries({ duration_sec: media.duration, lufs: loudness.integratedLufs, true_peak_dbtp: loudness.truePeakDbtp, active_ratio: activity.activeRatio })) {
+    if (!Number.isFinite(value)) unverified.push(`measurement_unavailable:${name}`);
   }
-  if (matchRatio !== null && matchRatio < Number(params.min_match_ratio ?? 0.6)) {
-    failures.push(`match_ratio ${matchRatio} < 阈值`);
+  if (minActiveRatio !== null && activity.activeRatio < minActiveRatio) {
+    failures.push(`active_ratio ${activity.activeRatio} < ${minActiveRatio}`);
   }
-  if (failures.length > 0 && params.strict !== false) {
-    throw new VoiceError(`核验未通过：${failures.join("；")}`, "verify_failed");
+  const status = failures.length ? "failed" : unverified.length ? "unverified" : "passed";
+  if (status !== "passed" && params.strict !== false) {
+    if (asrError) throw asrError;
+    throw new VoiceError(`核验${status === "unverified" ? "未核实" : "未通过"}：${[...failures, ...unverified].join("；")}`, "verify_failed");
   }
   return {
-    result: { input, ok: failures.length === 0, failures, checked, method: "ffmpeg-loudnorm+band-activity+asr" },
-    receipt: { synced: true, verified_at: new Date().toISOString(), sha256: await sha256File(input) },
+    result: { input, ok: status === "passed", status, failures, unverified, checked, method: "ffmpeg-loudnorm+band-activity+asr" },
+    receipt: { synced: status === "passed", verified_at: new Date().toISOString(), sha256: await sha256File(input) },
   };
 }
 
-/** 汉字/字母级相似度（去掉标点与空白后按字符 LCS 近似），用于转写回读比对。 */
+function normalizedMatchText(value) {
+  return String(value ?? "").normalize("NFKC").toLowerCase().replace(/[\s\p{P}\p{S}\p{Cf}]/gu, "");
+}
+
+/** 最多计算 1600 万个 DP 单元；超出边界必须显式处理，不能退回忽略词序的字符袋。 */
+export const TEXT_MATCH_MAX_CELLS = 16_000_000;
+
+/** 顺序敏感字符 LCS / 较长文本长度；NFKC、忽略大小写/标点/空白，按 Unicode 码点计数。 */
 export function textMatchRatio(expected, actual) {
-  const clean = (value) => String(value ?? "").replace(/[\s\p{P}\p{S}]/gu, "");
-  const a = clean(expected);
-  const b = clean(actual);
-  if (!a && !b) return 1;
-  if (!a || !b) return 0;
-  const counts = new Map();
-  for (const char of a) counts.set(char, (counts.get(char) ?? 0) + 1);
-  let hit = 0;
-  for (const char of b) {
-    const left = counts.get(char) ?? 0;
-    if (left > 0) {
-      hit += 1;
-      counts.set(char, left - 1);
+  const expectedClean = normalizedMatchText(expected);
+  const actualClean = normalizedMatchText(actual);
+  if (expectedClean === actualClean) return 1;
+  if (!expectedClean || !actualClean) return 0;
+  let a = Array.from(expectedClean);
+  let b = Array.from(actualClean);
+  if (a.length * b.length > TEXT_MATCH_MAX_CELLS) {
+    throw new VoiceError(`文本顺序核验超出计算上限（${a.length}×${b.length} > ${TEXT_MATCH_MAX_CELLS}），请按台词段核验`, "bad_request");
+  }
+  if (a.length < b.length) [a, b] = [b, a];
+  const row = new Uint32Array(b.length + 1);
+  for (const expectedChar of a) {
+    let diagonal = 0;
+    for (let index = 1; index <= b.length; index += 1) {
+      const previous = row[index];
+      row[index] = expectedChar === b[index - 1] ? diagonal + 1 : Math.max(row[index], row[index - 1]);
+      diagonal = previous;
     }
   }
-  return round(hit / Math.max(a.length, b.length), 3);
+  return round(row[b.length] / a.length, 3);
 }
 
 /* ============================ 健康检查 ============================ */

@@ -105,7 +105,7 @@ steps:
     name: 多风格交付包
     owner: post-editor
     gate: G-DLV1                  # 变体雷同（画面与音轨都测不出差别）一票否决
-    outputs: [delivery_package, final_video, subtitle_track]   # 干净母版 + 旁挂字幕 + 2–3 个风格变体（封面/文案/BGM/调色/转场）+ 软字幕轨版 + 交付清单 + 工程文件；镜头只生成一次，变体零 token
+    outputs: [delivery_package, final_video, subtitle_track]   # 干净母版 + 旁挂字幕 + 2–3 个风格变体（封面/文案/BGM/调色/转场）+ 软字幕轨版 + 交付清单 + 工程文件；quality=uhd 时先在本机增强低分辨率镜头，再实测目标画布与来源（G-DLV8/9）；镜头只生成一次，变体零 token
   - step_key: archive
     name: 成片入库
     owner: post-editor

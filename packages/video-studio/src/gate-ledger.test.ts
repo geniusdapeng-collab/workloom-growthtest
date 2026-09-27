@@ -5,6 +5,22 @@ import { join } from "node:path";
 import { appendGateEvent, buildGateEvent, gateForStepKey, readGateEvents, summarizeGates } from "./gate-ledger.js";
 
 describe("门账本（G5/G6/G7/G8 的 step_key 运行时记账）", () => {
+  it("空判据、重复标识、无效类型或评分均不授予通过", () => {
+    const check = { id: "exists", pass: true, hard: true, detail: "实测" };
+    const base = { stepKey: "g8-render-submit" as const, projectId: "VID-1", checks: [check] };
+    for (const patch of [{ checks: [] }, { checks: [check, check] }, { projectId: " " },
+      { checks: [{ ...check, pass: "true" }] }, { checks: [{ ...check, hard: "true" }] },
+      { score: NaN }, { score: Infinity }, { score: -1 }, { score: 101 }, { softApproved: "yes" }]) {
+      const event = buildGateEvent({ ...base, ...patch } as Parameters<typeof buildGateEvent>[0]);
+      expect(event.ok).toBe(false); expect(event.approved).toBe(false); expect(event.reason).toContain("证据无效");
+    }
+  });
+  it("降级与 fallback 即使上游同意也不能当作合格门", () => {
+    const base = { stepKey: "g8-render-submit" as const, projectId: "VID-1", checks: [{ id: "exists", pass: true, detail: "实测", hard: true }], softApproved: true };
+    expect(buildGateEvent({ ...base, degraded: true }).approved).toBe(false);
+    expect(buildGateEvent({ ...base, via: "fallback" }).approved).toBe(false);
+    expect(buildGateEvent(base).approved).toBe(true);
+  });
   it("step_key ↔ 门编号映射固定，未知 key 直接抛错（不许写野 key）", () => {
     expect(gateForStepKey("g5-portrait-confirm")).toBe("G5");
     expect(gateForStepKey("g6-prompt-confirm")).toBe("G6");

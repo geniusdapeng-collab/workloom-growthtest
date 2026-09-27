@@ -1,12 +1,14 @@
 # 人物档案（角色资产）设计与调用链路 v1
 
-> 状态：设计稿（2026-09-23）· 适用范围：AI 视频/漫剧出镜人物（1–10 人/项目）
+> 状态：设计与实现说明（2026-09-28，T-2026-0927-0036 更新）· 适用范围：AI 视频/漫剧出镜人物（1–10 人/项目）
 > 定位：**人物档案是客户的核心资产**——一次建档、跨项目复用；生成链路自动解析、自动调用、可版本化、可审计。
 
 > **开箱即用提示**：本仓**已经内置** 1 号模特「陈卓」（`chen-zhuo`）——档案 + 8 角度定妆照随仓分发在
-> `bundles/ai-video/library/characters/`，镜头卡不写 `character` 时出片链路自动使用她。
+> `bundles/ai-video/library/characters/`。当前档案模块要求原镜头明确角色身份；不写人物、仅有旁白或库中仅一人均不会自动选她。
 > 规则、用法与常见问题见 [`character-registry.md`](character-registry.md)；目录内说明见
 > [`../bundles/ai-video/library/characters/README.md`](../bundles/ai-video/library/characters/README.md)。
+
+> 调用边界：旧 `full-chain-film.mts` 还有独立的默认选角/无版本读取逻辑，其生产入口收口由后续任务处理。本次改变的是档案、绑定、生成 Agent 及其两个 CLI，不能据此宣称全部出片入口已消费同一版本。以下附录中的旧实测是历史记录，不是本次真实模型验证结果。
 
 ## 〇、为什么需要它（现状问题）
 
@@ -56,16 +58,21 @@
 
 ### 2.2 定妆照集 `portrait-sets/<version>.json`
 
-一个角色可有多个定妆照集（v1 无角色档案的旧图 / v2 写实版 / 授权真人版…），字段：`version / angles / source / model / seed / prompt / assetsSha256 / createdAt / active`。
-**只增不改**：换造型 = 新增 version；`portraitSets[].active` 决定默认调用哪一版。
+一个角色可有多个定妆照集。新生成集使用 `workloom.portrait-set/v2`，在版本、角度、来源、模型和提示词之外记录 `sourceHash / requestHash / wardrobe / wardrobeHash / files / artifacts / angleRequests / backgroundChecks / status`。`artifacts` 含每张图的精确路径、规范路径、实际字节数与 SHA-256；`angleRequests` 绑定该角度真正提交的请求（包括加固重试）。
 
-### 2.3 项目绑定（复用而非拷贝）
+换服装、外貌、模型、端点、尺寸、seed 或锚点字节会形成不同请求，生成独立候选。相同请求只在收据及当前文件一致时复用；就绪版本任一已声明角度被改动，重新生成必须使用新版本。`candidate / failed` 不替换旧 active；所有必需角度及已声明角度验证完整后才可成为 `ready` 并激活。多个 active、重复版本、路径逃逸或文件歧义均拒绝；不回退到“最后一版”。
 
-项目侧只保存**引用**：`.vm-work/characters/<projectId>/portrait-index.json`
+旧档案可按唯一文件路径验证当前字节，明确标记 `legacy-current-bytes-only`，不虚构旧生成收据，也不代表人脸同一性或平台授权已经验证。
+
+### 2.3 项目绑定（精确版本快照）
+
+`character-archive bind` 将已验证版本复制到项目目录，并保存来源引用与复制后字节证据：`.vm-work/characters/<projectId>/portrait-index.json`。复制不覆盖历史同版本文件；字节不一致会报错。`--pin 2` 真正读取 v2；不指定 pin 时解析绑定当时的 active，随后保持快照，不会在别的角色生成操作后悄悄换脸。
 ```jsonc
 { "characters": { "pingjiang-presenter": { "id": "pingjiang-presenter", "name": "平江路讲述人",
-    "libraryRef": "var/media/characters/pingjiang-presenter", "pinnedVersion": 2,   // 缺省=跟随 active
-    "files": { "front": "…/portraits/v2/pingjiang-presenter-front.png", "…": "…" } } } }
+    "libraryRef": "var/media/characters/pingjiang-presenter", "pinnedVersion": 2,
+    "portraitVersion": 2, "bindingMode": "pinned", // 无pin时为active-at-bind
+    "files": { "front": "…/portraits/v2/pingjiang-presenter-front.png", "…": "…" },
+    "artifacts": { "front": { "path": "…", "realPath": "…", "sha256": "实际文件摘要", "bytes": 123456 } } } } }
 ```
 
 ## 三、目录布局（P0：文件系统即库）
@@ -88,8 +95,8 @@ var/media/characters/<characterId>/           # 档案库（跨项目、长期�
 
 | 段 | 触发 | 动作 | 产物/留痕 |
 |---|---|---|---|
-| ① 建档 | 运营/客户录入或"建档任务" | 写 `stylePrompt`（写实口径）→ Seedream **文生图**逐角度出图（同 seed 保脸）→ 一致性复核 → 落 `portraits/v1` + `portrait-sets/v1.json` | 档案 + 定妆照集 + 生成参数 |
-| ② 选角 | 剧本/镜头卡生成时 | 解析出场角色（`character` / `characters` / 台词 speaker）→ 映射 `characterId` → 绑定 `pinnedVersion`（默认 active） | 项目绑定 + 选角清单 |
+| ① 建档 | 运营/客户录入或建档任务 | 由明确档案和服装规划逐角度请求；落不可混用的版本与字节收据；相同 seed 本身不构成人脸一致性证明 | 档案 + 候选 + 请求/产物收据 |
+| ② 选角 | 剧本/镜头卡生成时 | 原镜头 `cast / character / characters` 或肯定出镜文本映射身份与人数；只说话不代表出镜；选择精确 `pinnedVersion` 或 active | 四态选角结果 + sourceHash + 逐角色选择 |
 | ③ 出镜 | 逐镜渲染前 | 按配额挑参考图（见 §5）→ 组装 content（人物 + 场景）→ 提交 → 记录"角色×版本×图 sha256" | `render_jobs.reference_images` 留痕 |
 | ④ 更新 | 改档案/换造型/换授权 | 新增 `version+1`（旧版保留）→ **影响面分析**（哪些项目 pin 了旧版）→ 选择性重渲（`--only S1,S4`） | 版本 diff + 重渲清单 |
 | ⑤ 治理 | 出片前/审计时 | 校验：授权有效期、来源（合成/真人）、`asset://` 是否有效；导出"人物使用清单" | 审计导出（谁、哪版、用在哪几支片） |
@@ -100,20 +107,24 @@ var/media/characters/<characterId>/           # 档案库（跨项目、长期�
 |---|---|
 | 单人出镜（对白/口播） | 主角 1 + 场景 3 |
 | 双人对话 | 2 人各 1 + 场景 2 |
-| 3 人及以上 | 出场顺序 × 台词权重取前 3 人各 1 + 场景 0–1 |
-| 群像/远景 | 主角 1 + 场景 3（其余人物走文字描述） |
-| 超过 3 人且需同框清晰 | 降级方案：Seedream 合成"同框定妆照"1 张占 1 个名额 |
+| 3–4 人 | 每人各 1 张，场景只使用剩余名额；4 人时无场景名额 |
+| 群像/远景 | 明确人数与身份后逐人占位；未明确人数返回 `unverified` |
+| 超过 4 人或有人缺照 | 返回 `unverified` 与空参考数组；需要另行明确拆镜或同框候选方案，不静默把额外人物降级成文字 |
 
-优先级 = 主角 > 有台词 > 出场时长 > 是否近景。所有取舍**必须打印**（`🎭 S2 参考图：人物 2（张三/李四）+ 场景 2`），不静默。
+排序 = 主角 > 台词条数 > 原出场顺序；排序只决定参考图顺序，不能删除已确定的出镜身份。调用方必须消费 `status`，`unverified / failed` 不得继续按无人物生成。
 
 ## 六、工具面（P0 CLI / P1 tRPC）
 
 ```bash
 # P0（本仓脚本）
-node scripts/tools/character-archive.mts list
-node scripts/tools/character-archive.mts show <characterId>
-node scripts/tools/character-archive.mts bind --project VID-1023 --character pingjiang-presenter --pin 2
-node scripts/tools/character-archive.mts impact --character pingjiang-presenter --from 1
+node --import tsx scripts/tools/character-archive.mts list
+node --import tsx scripts/tools/character-archive.mts show <characterId>
+node --import tsx scripts/tools/character-archive.mts bind --project VID-1023 --character pingjiang-presenter --pin 2
+node --import tsx scripts/tools/character-archive.mts activate --character pingjiang-presenter --version 2
+node --import tsx scripts/tools/character-archive.mts impact --character pingjiang-presenter --from 1
+node --import tsx scripts/tools/portrait-agent.mts plan --character pingjiang-presenter --wardrobe-id w1
+# 新服装候选：显式--no-activate，完整检查后再使用activate
+node --import tsx scripts/tools/portrait-agent.mts run --character pingjiang-presenter --wardrobe "红色外套" --no-activate
 # P1（服务端）：video.characters.list / .show / .create / .addPortraits / .update / .bind / .impact
 ```
 
@@ -121,12 +132,12 @@ node scripts/tools/character-archive.mts impact --character pingjiang-presenter 
 
 | 现有件 | 改动 |
 |---|---|
-| `packages/video-studio/src/portrait-binding.ts` | 单角色 → **多角色**解析 + 配额分配（本 PR 已加 `allocateReferenceSlots`） |
+| `packages/video-studio/src/portrait-binding.ts` | `pickCharacterPortraits` 对项目索引逐人匹配；单角色旧接口在多人镜头返回未验证；路径不能替代身份 |
 | `packages/video-studio/src/portrait-runtime.ts` | 建档出图的执行器（要求角色档案；锚定可选） |
 | `packages/video-studio/src/character-archive.ts`（新） | 档案库读写、版本管理、选角解析、影响面分析 |
-| `scripts/tools/render-project.mts` | 调 `character-archive` 解析角色 → 逐镜打印实际下发的人物与版本 |
-| `apps/server/src/video/studio-worker.ts` | 项目绑定的默认来源（库优先，`.vm-work` 兜底） |
-| CMS 镜头卡 | `character`（单人）/`characters[]`（多人）都可；`presenterScript` 的 speaker 参与选角 |
+| `scripts/tools/render-project.mts` / `full-chain-film.mts` | 具体生产调用与服务端资格绑定由独立任务收口；不得仅凭本模块通过宣称入口已统一 |
+| `apps/server/src/video/studio-worker.ts` | 服务端权威档案、身份/授权和生产资格属于服务端任务范围，本批不新增信任捷径 |
+| CMS 镜头卡 | `cast` 对象支持 `id / pinnedVersion / wardrobeId / wardrobe / costume`；`character`（单人）和 `characters[]`（多人）仍可用；speaker 不单独参与选角 |
 
 ## 八、分阶段落地
 
@@ -220,8 +231,8 @@ node scripts/tools/character-archive.mts impact --character pingjiang-presenter 
 | CLI | `node scripts/tools/portrait-agent.mts plan --character <id>`（dry-run 打印 4 角度提示词）<br>`node scripts/tools/portrait-agent.mts run --character <id> [--seed N] [--version N] [--angles …] [--no-activate]` |
 | 绑定 | 读 `var/media/characters/<id>/profile.json`；产出写回 `portraits/vN` + `portrait-sets/vN.json`，并更新 `profile.json#portraitSets`（新集置 active）与 `profile.json#portraitAgent`（本次模型/角度/模式留痕） |
 | 默认口径 | **纯写实 + 场景解耦**：只描述人（外貌/发型/服装）+ 中性浅灰背景 + 中性柔光 5600K + 85mm f/4 + 保留毛孔/眼神光；4 角度 `front/threeQuarter/closeup/side`；负面词含 `no scene/no location/no props/no golden hour/no warm filter/no studio glamour` + 写实负面词 |
-| 豁免 | 角色档案显式声明风格（`style: anime/cartoon/3d…`）或 `kind: animal/object…` → 走非写实模板并记录理由 |
-| 版本 | 只增不改；`--version` 可指定，缺省自动 `max+1`；失败即抛错（不写半套、不动 active） |
+| 豁免 | 角色档案显式声明风格（`style: anime/cartoon/3d…`）可走对应模板；`subjectType: animal/object/product/creature` 拒绝套用人物 Agent |
+| 版本 | 相同完整请求+当前字节可复用；不同来源新建版本；`--version` 不允许覆盖不同来源。部分成功保存未激活候选，后续同请求只补失败角度；全失败抛错但保留失败记录。四个必需角度及全部声明角度验证完整才可激活；`--no-activate` 保留候选 |
 
 ### 附录 A.4 · 写实强约束的落点与措辞（2026-09-24）
 

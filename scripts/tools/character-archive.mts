@@ -11,7 +11,7 @@
  *
  * 设计见 `docs/character-archive-design.md`（档案是跨项目资产；项目只做引用 + 可 pin 版本）。
  */
-import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, writeFileSync, mkdirSync, realpathSync, lstatSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -19,6 +19,7 @@ import {
   listPortraitVersions,
   loadCharacterEntry,
   loadCharacterLibrary,
+  activatePortraitVersion, assertCharacterComponent, readPortraitArtifact, withCharacterArchiveLock, writePortraitJson,
   type ProjectBinding
 } from "../../packages/video-studio/src/index.js";
 
@@ -28,7 +29,10 @@ const WORK_DIR = resolve(REPO_ROOT, process.env.HR_WORK_DIR ?? ".vm-work");
 
 function arg(name: string, fallback = ""): string {
   const index = process.argv.indexOf(name);
-  return index >= 0 ? String(process.argv[index + 1] ?? "") : fallback;
+  if (index < 0) return fallback;
+  const value = process.argv[index + 1];
+  if (!value || value.startsWith("--")) throw new Error(`参数缺少值：${name}`);
+  return value;
 }
 
 const command = process.argv[2] ?? "";
@@ -48,6 +52,7 @@ function listCommand(): void {
 }
 
 function showCommand(id: string): void {
+  assertCharacterComponent(id);
   const entry = loadCharacterEntry(join(LIBRARY_ROOT, id));
   if (!entry) {
     console.error(`未找到角色：${id}（在 ${LIBRARY_ROOT}）`);
@@ -59,6 +64,7 @@ function showCommand(id: string): void {
 }
 
 function versionsCommand(id: string): void {
+  assertCharacterComponent(id);
   const entry = loadCharacterEntry(join(LIBRARY_ROOT, id));
   if (!entry) {
     console.error(`未找到角色：${id}`);
@@ -88,14 +94,14 @@ function loadBindings(): ProjectBinding[] {
       for (const [key, value] of Object.entries(index.characters ?? {})) {
         bindings.push({ projectId, characterId: value.id ?? key, pinnedVersion: value.pinnedVersion });
       }
-    } catch {
-      /* 跳过损坏索引（由 render-project 报错更合适） */
+    } catch (error) {
+      throw new Error(`项目绑定索引无法读取：${file}；${error instanceof Error ? error.message : String(error)}`);
     }
   }
   return bindings;
 }
 
-function bindCommand(): void {
+async function bindCommand(): Promise<void> {
   const projectId = arg("--project");
   const characterId = arg("--character");
   const pinned = arg("--pin");
@@ -104,41 +110,73 @@ function bindCommand(): void {
     process.exitCode = 2;
     return;
   }
-  const entry = loadCharacterEntry(join(LIBRARY_ROOT, characterId));
+  assertCharacterComponent(projectId); assertCharacterComponent(characterId);
+  const characterDir = join(LIBRARY_ROOT, characterId);
+  if (!existsSync(characterDir)) throw new Error(`未找到角色：${characterId}`);
+  if (lstatSync(characterDir).isSymbolicLink() || realpathSync(characterDir) !== join(realpathSync(LIBRARY_ROOT), characterId)) throw new Error("CHARACTER_PATH_INVALID: 绑定来源目录越界或为symlink");
+  const entry = loadCharacterEntry(characterDir, pinned ? { pinnedVersion: Number(pinned) } : {});
   if (!entry) {
     console.error(`未找到角色：${characterId}`);
     process.exitCode = 1;
     return;
   }
-  const projectCharacterDir = join(WORK_DIR, "characters", projectId, entry.name);
-  const portraitDir = join(projectCharacterDir, "portraits");
-  const files: Record<string, string> = {};
-  for (const [angle, source] of Object.entries(entry.files)) {
-    const target = join(portraitDir, `${entry.name}-${angle}.png`);
-    writeFileSync(target, readFileSync(source));
-    files[angle] = target;
+  if (entry.id !== characterId) throw new Error("CHARACTER_ARCHIVE_INVALID: 绑定来源路径与档案ID不一致");
+  if (entry.verification.status !== "passed" || !entry.activeSet) throw new Error(`绑定未通过：${entry.verification.issues.join("；")}`);
+  const projectRoot = join(WORK_DIR, "characters", projectId);
+  mkdirSync(WORK_DIR, { recursive: true });
+  let current = WORK_DIR;
+  for (const part of ["characters", projectId]) {
+    current = join(current, part); if (!existsSync(current)) mkdirSync(current);
+    if (lstatSync(current).isSymbolicLink()) throw new Error("CHARACTER_PATH_INVALID: 项目目录不能是symlink");
   }
-  const indexFile = join(WORK_DIR, "characters", projectId, "portrait-index.json");
+  await withCharacterArchiveLock(projectRoot, async () => {
+  const projectCharacterDir = join(projectRoot, entry.id);
+  const portraitDir = join(projectCharacterDir, "portraits", `v${entry.activeSet!.version}`);
+  current = projectRoot;
+  for (const part of [entry.id, "portraits", `v${entry.activeSet!.version}`]) { current = join(current, part); if (!existsSync(current)) mkdirSync(current); if (lstatSync(current).isSymbolicLink()) throw new Error("CHARACTER_PATH_INVALID: 绑定目录不能是symlink"); }
+  const files: Record<string, string> = {};
+  const artifacts: Record<string, unknown> = {};
+  for (const [angle, source] of Object.entries(entry.files)) {
+    const target = join(portraitDir, `${entry.id}-${angle}.png`);
+    const original = readPortraitArtifact(source, entry.dir);
+    if (original.sha256 !== entry.verification.assets[angle]?.sha256) throw new Error("PORTRAIT_BINDING_CHANGED: 拷贝前来源发生变化");
+    if (!existsSync(target)) writeFileSync(target, readFileSync(source), { flag: "wx", mode: 0o600 });
+    const copied = readPortraitArtifact(target, projectRoot);
+    if (copied.sha256 !== original.sha256) throw new Error("PORTRAIT_BINDING_CHANGED: 已有版本副本字节不符，不覆盖历史绑定");
+    files[angle] = target;
+    artifacts[angle] = copied;
+  }
+  const indexFile = join(projectRoot, "portrait-index.json");
+  if (existsSync(indexFile) && lstatSync(indexFile).isSymbolicLink()) throw new Error("CHARACTER_PATH_INVALID: 索引不能是symlink");
   const index = existsSync(indexFile)
-    ? (JSON.parse(readFileSync(indexFile, "utf8")) as { characters?: Record<string, unknown>; products?: Record<string, unknown> })
+    ? (JSON.parse(readFileSync(indexFile, "utf8")) as { schemaVersion: string; projectId: string; characters?: Record<string, unknown>; products?: Record<string, unknown> })
     : { schemaVersion: "workloom.portrait-index/v1", projectId, characters: {}, products: {} };
+  if (index.schemaVersion !== "workloom.portrait-index/v1" || index.projectId !== projectId || !index.characters || typeof index.characters !== "object") throw new Error("CHARACTER_ARCHIVE_INVALID: 项目索引不匹配");
   index.characters = index.characters ?? {};
-  index.characters[entry.name] = {
+  for (const [key, value] of Object.entries(index.characters)) if (value && typeof value === "object" && (value as { id?: string }).id === entry.id) delete index.characters[key];
+  index.characters[entry.id] = {
     kind: "character",
     id: entry.id,
     name: entry.name,
     dir: projectCharacterDir,
-    libraryRef: `var/media/characters/${entry.id}`,
+    libraryRef: realpathSync(entry.dir),
     ...(pinned ? { pinnedVersion: Number(pinned) } : {}),
-    files
+    portraitVersion: entry.activeSet!.version,
+    wardrobe: entry.activeSet!.wardrobe,
+    wardrobeHash: entry.activeSet!.wardrobeHash,
+    sourceHash: entry.activeSet!.sourceHash,
+    bindingMode: pinned ? "pinned" : "active-at-bind",
+    files, artifacts
   };
-  writeFileSync(indexFile, `${JSON.stringify(index, null, 2)}\n`);
+  writePortraitJson(indexFile, index);
   console.log(`✅ 已绑定：${projectId} ← ${entry.name}（v${entry.activeSet?.version ?? "-"}${pinned ? `，pin v${pinned}` : ""}）`);
   console.log(`   绑定文件：${indexFile}`);
+  });
 }
 
 function impactCommand(): void {
   const characterId = arg("--character");
+  assertCharacterComponent(characterId);
   const from = Number(arg("--from", "1"));
   const to = Number(arg("--to", "0")) || ((loadCharacterEntry(join(LIBRARY_ROOT, characterId))?.activeSet?.version) ?? from + 1);
   if (!characterId) {
@@ -148,16 +186,20 @@ function impactCommand(): void {
   }
   const impact = impactOfVersionChange(loadBindings(), { characterId, fromVersion: from, toVersion: to });
   console.log(`版本影响面：${characterId} v${from} → v${to}`);
-  console.log(`  跟随 active（自动跟随新版本）：${impact.followActive.map((b) => b.projectId).join("、") || "无"}`);
+  console.log(`  使用 active 的项目（下次绑定解析当前版本）：${impact.followActive.map((b) => b.projectId).join("、") || "无"}`);
   console.log(`  钉在旧版 v${from}（需评估重渲）：${impact.pinnedOld.map((b) => b.projectId).join("、") || "无"}`);
   console.log(`  已钉新版 v${to}：${impact.pinnedNew.map((b) => b.projectId).join("、") || "无"}`);
 }
 
-switch (command) {
+try { switch (command) {
   case "list": listCommand(); break;
   case "show": showCommand(process.argv[3] ?? ""); break;
   case "versions": versionsCommand(process.argv[3] ?? ""); break;
-  case "bind": bindCommand(); break;
+  case "bind": await bindCommand(); break;
+  case "activate": {
+    const entry = await activatePortraitVersion(LIBRARY_ROOT, arg("--character"), Number(arg("--version")));
+    console.log(`已激活 ${entry.id} v${entry.activeSet?.version}；四角度与当前文件收据已核验`); break;
+  }
   case "impact": impactCommand(); break;
   default:
     console.log([
@@ -166,7 +208,8 @@ switch (command) {
       "  character-archive.mts show <characterId>",
       "  character-archive.mts versions <characterId>",
       "  character-archive.mts bind --project <projectId> --character <characterId> [--pin <version>]",
+      "  character-archive.mts activate --character <characterId> --version <version>",
       "  character-archive.mts impact --character <characterId> [--from <v>] [--to <v>]"
     ].join("\n"));
     process.exitCode = command ? 2 : 0;
-}
+} } catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }

@@ -1,6 +1,6 @@
 /**
  * archive/stage-runner.test.ts —— 环节执行器单元测试（T-2026-0926-0001）
- * 覆盖：5 写盘点 / attempt 原子认领口径 / 失败现场固化 / 原样上抛 / 错误分类 / 台账不可用时的旁路降级。
+ * 覆盖：5 写盘点 / attempt 原子认领口径 / 失败现场固化 / 原样上抛 / 错误分类 / 关键回执失败关闭。
  */
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -133,25 +133,73 @@ describe("StageRunner", () => {
     expect((await store.listAttempts("preproduction")).map((row) => row.attempt)).toEqual([1, 2]);
   });
 
-  it("台账不可用：档案仍落文件、主流程照常返回（旁路不阻断）", async () => {
-    const broken: StageLedgerWriter = {
-      claimRun: async () => {
-        throw new Error("connect ECONNREFUSED 127.0.0.1:5432");
-      },
-      finishRun: async () => {
-        throw new Error("still down");
-      },
-      nextAttempt: async () => 1,
-    };
-    const errors = vi.spyOn(console, "error").mockImplementation(() => undefined);
+  it("认领失败不执行，也不回退 attempt=1 覆盖历史档案", async () => {
+    const ledger = new FakeLedger();
+    const boom = new Error("connect ECONNREFUSED 127.0.0.1:5432");
+    vi.spyOn(ledger, "claimRun").mockRejectedValue(boom);
+    const fn = vi.fn(async () => ({ output: { ok: true } }));
+    const runner = new StageRunner(store, ledger, "RUN-4");
+    await expect(runner.run("preproduction", {}, fn)).rejects.toBe(boom);
+    expect(fn).not.toHaveBeenCalled();
+    expect(ledger.finished).toHaveLength(0);
+    expect(await store.readJson("stages/preproduction/attempt-1.input.json")).toBeNull();
+    expect(runner.currentContext()).toBeNull();
+  });
 
-    const runner = new StageRunner(store, broken, "RUN-4");
-    await expect(runner.run("preproduction", { intent: "x" }, async () => ({ output: { ok: true } }))).resolves.toEqual({
-      ok: true,
+  it.each([
+    { attempt: 0, inputRef: "stages/preproduction/attempt-0.input.json" },
+    { attempt: 1.5, inputRef: "stages/preproduction/attempt-1.5.input.json" },
+    { attempt: 1, inputRef: "stages/preproduction/attempt-2.input.json" },
+  ])("非法认领回执拒绝执行：%j", async (claim) => {
+    const ledger = new FakeLedger();
+    vi.spyOn(ledger, "claimRun").mockResolvedValue(claim);
+    const fn = vi.fn(async () => ({ output: {} }));
+    await expect(new StageRunner(store, ledger, null).run("preproduction", {}, fn)).rejects.toThrow("STAGE_CLAIM_INVALID");
+    expect(fn).not.toHaveBeenCalled();
+  });
+
+  it.each(["input", "output"])("%s 写盘失败不会产生成功回执", async (point) => {
+    const ledger = new FakeLedger();
+    const write = store.writeJsonAtomic.bind(store);
+    vi.spyOn(store, "writeJsonAtomic").mockImplementation((rel, value) => {
+      if (rel.endsWith(`.${point}.json`)) throw new Error(`${point}-disk-full`);
+      return write(rel, value);
     });
-    expect(errors.mock.calls.some((call) => String(call[0]).includes("台账认领失败"))).toBe(true);
-    const input = await store.readJson<{ attempt: number }>("stages/preproduction/attempt-1.input.json");
-    expect(input?.attempt).toBe(1);
+    const fn = vi.fn(async () => ({ output: { ok: true } }));
+    const runner = new StageRunner(store, ledger, null);
+    await expect(runner.run("preproduction", {}, fn)).rejects.toThrow(`${point}-disk-full`);
+    expect(fn).toHaveBeenCalledTimes(point === "input" ? 0 : 1);
+    expect(ledger.finished).toEqual([expect.objectContaining({ status: point === "input" ? "failed" : "interrupted", outputRef: null, errorClass: point === "input" ? "BUG" : "RECEIPT_UNVERIFIED" })]);
+    expect(runner.currentContext()).toBeNull();
+  });
+
+  it("完成回执确认失败保留产物并报告待核实，不能返回成功或再次执行", async () => {
+    const ledger = new FakeLedger();
+    const boom = new Error("commit acknowledgement lost");
+    const finish = vi.spyOn(ledger, "finishRun").mockRejectedValueOnce(boom);
+    const fn = vi.fn(async () => ({ output: { ok: true } }));
+    const runner = new StageRunner(store, ledger, null);
+    await expect(runner.run("preproduction", {}, fn)).rejects.toBe(boom);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(finish.mock.calls[1]?.[0]).toMatchObject({
+      status: "interrupted", errorClass: "RECEIPT_UNVERIFIED",
+      outputRef: "stages/preproduction/attempt-1.output.json", outputSha256: expect.stringMatching(/^[0-9a-f]{64}$/),
+    });
+    expect((await store.readManifest())?.ledger.preproduction?.status).toBe("interrupted");
+    expect(runner.currentContext()).toBeNull();
+  });
+
+  it("日志与观察钩子报错不伪造业务失败，也不阻止关键回执", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.spyOn(store, "appendJsonl").mockRejectedValue(new Error("log unavailable"));
+    const ledger = new FakeLedger();
+    const runner = new StageRunner(store, ledger, null, {
+      onStart: () => { throw new Error("observer-start"); },
+      onFinish: () => { throw new Error("observer-finish"); },
+    });
+    await expect(runner.run("preproduction", {}, async () => ({ output: { ok: true } }))).resolves.toEqual({ ok: true });
+    expect(ledger.finished[0]?.status).toBe("done");
+    expect(runner.currentContext()).toBeNull();
   });
 
   it("环节自评 failed（跑完但业务未成功）：产物照落、台账记 failed + 分类", async () => {

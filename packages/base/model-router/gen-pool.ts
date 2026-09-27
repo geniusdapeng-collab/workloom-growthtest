@@ -40,6 +40,27 @@ export interface GenProvider {
   poll(taskId: string): Promise<{ status: GenTaskStatus; uri?: string; actualUnits?: number; error?: string }>;
 }
 
+/**
+ * 外部提交失败不能仅按“可重试”判断：超时/断连/5xx 可能已产生任务。
+ * 只有适配器明确证明未接受且允许换链时，路由器才可以提交下一家。
+ */
+export class GenSubmissionError extends Error {
+  constructor(
+    message: string,
+    public readonly acceptance: "not-accepted" | "unknown",
+    public readonly fallbackAllowed = false,
+  ) {
+    super(message);
+    this.name = "GenSubmissionError";
+  }
+}
+
+function httpSubmissionError(provider: string, status: number): GenSubmissionError {
+  const rejected = [400, 401, 403, 404, 422, 423, 429].includes(status);
+  const canFallback = [401, 403, 404, 423, 429].includes(status);
+  return new GenSubmissionError(`${provider} 提交失败：HTTP ${status}`, rejected ? "not-accepted" : "unknown", canFallback);
+}
+
 /* ================= Mock 生成 Provider（D4 离线可跑 + 故障注入） ================= */
 
 export class MockGenProvider implements GenProvider {
@@ -53,7 +74,7 @@ export class MockGenProvider implements GenProvider {
   async submit(req: GenRequest): Promise<{ taskId: string }> {
     this.seq += 1;
     if (this.opts.failFirst && this.seq <= this.opts.failFirst) {
-      throw new Error(`mock 生成故障注入（第 ${this.seq} 次）`);
+      throw new GenSubmissionError(`mock 生成故障注入（第 ${this.seq} 次）`, "not-accepted", true);
     }
     return { taskId: `mock-${this.providerId}-${this.seq}` };
   }
@@ -89,7 +110,7 @@ export class SeedanceProvider implements GenProvider {
         ...(req.params ?? {}),
       }),
     });
-    if (!res.ok) throw new Error(`Seedance 提交失败：HTTP ${res.status}`);
+    if (!res.ok) throw httpSubmissionError("Seedance", res.status);
     const data = (await res.json()) as { id?: string };
     if (!data.id) throw new Error("Seedance 未返回 task_id");
     return { taskId: data.id };
@@ -142,7 +163,7 @@ export class KlingProvider implements GenProvider {
         ...(req.params ?? {}),
       }),
     });
-    if (!res.ok) throw new Error(`Kling 提交失败：HTTP ${res.status}`);
+    if (!res.ok) throw httpSubmissionError("Kling", res.status);
     const data = (await res.json()) as { data?: { task_id?: string } };
     const taskId = data.data?.task_id;
     if (!taskId) throw new Error("Kling 未返回 task_id");
@@ -194,7 +215,7 @@ export class JimengProvider implements GenProvider {
         ...(req.params ?? {}),
       }),
     });
-    if (!res.ok) throw new Error(`Jimeng 提交失败：HTTP ${res.status}`);
+    if (!res.ok) throw httpSubmissionError("Jimeng", res.status);
     const data = (await res.json()) as { data?: { task_id?: string }; task_id?: string };
     const taskId = data.data?.task_id ?? data.task_id;
     if (!taskId) throw new Error("Jimeng 未返回 task_id");
@@ -314,7 +335,10 @@ export function checkRenderBudget(args: {
 /* ================= 生成任务提交（降级链 + 计量留痕） ================= */
 
 export interface GenSubmitResult {
-  kind: "submitted" | "unavailable";
+  kind: "submitted" | "unavailable" | "unverified";
+  /** unverified 只允许对账；accepted=true 时 taskId 已知，不能再次提交。 */
+  accepted?: boolean;
+  error?: string;
   providerId?: string;
   taskId?: string;
   window: Window;
@@ -343,20 +367,37 @@ export async function routeGenSubmit(
       await sink.recordDegradation({ from: pid, to, reason: "unhealthy", action: "gen.submit" });
       continue;
     }
+    let taskId: string;
     try {
-      const { taskId } = await provider.submit(req);
+      ({ taskId } = await provider.submit(req));
+      if (typeof taskId !== "string" || !taskId.trim()) {
+        throw new GenSubmissionError("供应商未返回有效任务号", "unknown");
+      }
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : String(err);
+      if (!(err instanceof GenSubmissionError) || err.acceptance !== "not-accepted") {
+        return { kind: "unverified", accepted: false, providerId: pid, window, degraded, error: reason };
+      }
+      if (!err.fallbackAllowed) throw err;
+      const to = chain[i + 1] ?? null;
+      degraded.push({ from: pid, to, reason });
+      await sink.recordDegradation({ from: pid, to, reason, action: "gen.submit" });
+      continue;
+    }
+    // 接受后的计量失败属于对账，绝不能重新进入供应商降级链。
+    try {
       await sink.recordModelTrace({
         model_id: `gen:${pid}`, tier: "gen", window,
         credits: Math.max(0.01, req.estimatedUnits * (window === "off-peak" ? OFF_PEAK_RATE_RATIO : 1) * 0.1),
         action: "gen.submit",
       });
-      return { kind: "submitted", providerId: pid, taskId, window, degraded };
     } catch (err) {
-      const to = chain[i + 1] ?? null;
-      const reason = err instanceof Error ? err.message : String(err);
-      degraded.push({ from: pid, to, reason });
-      await sink.recordDegradation({ from: pid, to, reason, action: "gen.submit" });
+      return {
+        kind: "unverified", accepted: true, providerId: pid, taskId, window, degraded,
+        error: err instanceof Error ? err.message : String(err),
+      };
     }
+    return { kind: "submitted", providerId: pid, taskId, window, degraded };
   }
   return { kind: "unavailable", window, degraded };
 }

@@ -7,7 +7,7 @@ description: 后期合成与交付。多风格变体（封面/文案/BGM/调色/
 readonly: false
 night_shift: false
 high_risk: false
-fence_bindings: [G8, G-DLV0, G-DLV1, G-DLV2, G-DLV3, G-DLV4, G-DLV6, G-DLV7]   # 渲染提交（合成烧额度）+ 交付/返修围栏（母版不烧字、变体雷同即拒、复用要带证据）
+fence_bindings: [G8, G-DLV0, G-DLV1, G-DLV2, G-DLV3, G-DLV4, G-DLV6, G-DLV7, G-DLV8, G-DLV9]   # 渲染提交（合成烧额度）+ 交付/返修围栏（母版不烧字、变体雷同即拒、复用要带证据、UHD 规格与来源必验）
 coverage:
   - { eventPrefix: "post.", label: 后期制作 }
   - { eventPrefix: "delivery.", label: 交付与返修 }
@@ -35,6 +35,7 @@ prompt:
     - 变体差异必须实测可见（画面像素差或音轨不同），雷同版本不得交付（G-DLV1）
     - 返修先做影响分析：能在本地重合成的一律本地做，只有点名到画面内容才重生成镜头（G-DLV4/G-DLV5）
     - 「复用」必须带 sha256 证据，不得把重算包装成复用（G-DLV7）
+    - UHD 交付先回读真实画布与逐镜本地增强来源；缺件即阻断（G-DLV8/G-DLV9）
 write_back:
   - post.compose
   - ffmpeg.run

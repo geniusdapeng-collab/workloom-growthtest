@@ -32,7 +32,7 @@ import { fileURLToPath } from "node:url";
 import { patchCardSource } from "./card-registry.js";
 import { engineDirOf, assertEngineReady } from "./engine.js";
 import { deriveAnchors, deriveBeats } from "./shotbook.js";
-import type { ExplainerScript, ExplainerShotbook, SemanticsFile, TimestampsFile } from "./types.js";
+import { explainerOutputSize, type ExplainerQuality, type ExplainerScript, type ExplainerShotbook, type SemanticsFile, type TimestampsFile } from "./types.js";
 
 /** 模板目录（本仓 packages/video-studio/explainer-template） */
 export function templateDirOf(): string {
@@ -52,6 +52,7 @@ export interface BuildProjectInput {
   /** 配音绝对路径（会被复制成 audio/full.wav） */
   audioPath: string;
   aspect?: "9:16" | "16:9";
+  quality?: ExplainerQuality;
   fps?: number;
   /** 人物素材：hostForm → 绝对路径（视频或静帧） */
   hostAssets?: Record<string, string>;
@@ -85,7 +86,8 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
   if (!existsSync(templateDir)) throw new Error(`模板目录不存在：${templateDir}`);
   const fps = input.fps ?? 30;
   const aspect = input.aspect ?? "9:16";
-  const [width, height] = aspect === "9:16" ? [1080, 1920] : [1920, 1080];
+  const quality = input.quality ?? "hd";
+  const { width, height } = explainerOutputSize(aspect, quality);
 
   const remotionDir = join(input.jobDir, "remotion");
   mkdirSync(join(input.jobDir, "audio"), { recursive: true });
@@ -210,7 +212,10 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
    * 按横屏宽幅版面写的——直接用在 1080 宽的竖屏上会以 "Invalid too big ... width 1200" 崩掉抖动闸）。
    * 这里给**画面下部信息带**（字幕之上、卡片之下），是静态文字最容易露抖动的位置。
    */
-  const cropBand = aspect === "9:16" ? "1080:140:0:1500" : "1200:120:150:150";
+  const cropScale = quality === "uhd" ? 2 : 1;
+  const cropBand = aspect === "9:16"
+    ? `${1080 * cropScale}:${140 * cropScale}:0:${1500 * cropScale}`
+    : `${1200 * cropScale}:${120 * cropScale}:${150 * cropScale}:${150 * cropScale}`;
   const anchorsWithCrop = anchors.map((a) => ({ ...a, crop: cropBand }));
   const shotsPath = join(remotionDir, "shots.json");
   const beatsPath = join(remotionDir, "beats.json");
@@ -225,6 +230,7 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
     fps,
     width,
     height,
+    quality,
     total: input.timestamps.total,
     theme: {
       base: input.shotbook.style.palette.base,
@@ -268,6 +274,9 @@ export function buildProject(input: BuildProjectInput): BuildProjectResult {
     schema: "workloom.explainer-job/v1",
     jobDir: input.jobDir,
     aspect,
+    quality,
+    width,
+    height,
     fps,
     total: input.timestamps.total,
     shots: shots.length,

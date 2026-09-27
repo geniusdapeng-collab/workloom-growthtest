@@ -46,6 +46,7 @@ export interface ExplainerProps {
   fps: number;
   width: number;
   height: number;
+  quality: "hd" | "uhd";
   /** 配音总长（秒）——composition 时长按它算，与 shots.json 末镜对齐 */
   total: number;
   theme: ExplainerTheme;
@@ -78,6 +79,7 @@ export function withDefaults(input: Partial<ExplainerProps>): ExplainerProps {
     fps: input.fps ?? 30,
     width: input.width ?? 1080,
     height: input.height ?? 1920,
+    quality: input.quality ?? "hd",
     total: input.total ?? 60,
     theme: { ...DEFAULT_THEME, ...(input.theme ?? {}) },
     sentences: input.sentences ?? [],

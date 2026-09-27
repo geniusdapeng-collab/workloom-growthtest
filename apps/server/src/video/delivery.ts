@@ -16,10 +16,17 @@
  */
 import { spawn } from "node:child_process";
 import {
-  appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync,
+  appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync,
 } from "node:fs";
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import {
+  DeliveryError, assertDeliveryScope, assertManifestScope, assertScopedPackagePath,
+  cleanDeliveryRef, inspectDeliveryFile, inspectDeliveryTrust, inspectRegisteredDeliveryArtifact,
+  readDeliveryManifestFile, requireDeliveryTrust, safeDeliveryPath, scopedDeliveryRoot,
+  type DeliveryScope, type DeliveryTrust,
+} from "./delivery-trust.js";
+export { DeliveryError, type DeliveryScope } from "./delivery-trust.js";
 
 /**
  * 交付物取件走 **tRPC 单一入口**（`video.delivery.artifact`），不再新开 Hono 路由：
@@ -46,15 +53,6 @@ export const ARTIFACT_INLINE_MAX_BYTES = 8 * 1024 * 1024;
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 
-export class DeliveryError extends Error {
-  readonly code: string;
-  constructor(message: string, code = "bad_request") {
-    super(message);
-    this.name = "DeliveryError";
-    this.code = code;
-  }
-}
-
 /* ============================ 路径监狱 ============================ */
 
 export function deliveryRoot(env: NodeJS.ProcessEnv = process.env): string {
@@ -62,32 +60,22 @@ export function deliveryRoot(env: NodeJS.ProcessEnv = process.env): string {
   return raw ? resolve(raw) : join(REPO_ROOT, "var/delivery");
 }
 
-function assertInside(target: string, root: string): string {
-  const abs = resolve(target);
-  if (abs !== root && !abs.startsWith(root + sep)) {
-    throw new DeliveryError(`路径越界：${abs}（交付根 ${root}）`, "path_not_allowed");
-  }
-  return abs;
-}
-
-/**
- * 交付包目录名解析：只接受**单个目录名**（不含分隔符与 `..`），再拼到交付根下做二次校验。
- * 这样"包"这个用户可见标识永远是根下的直接子目录，杜绝 `../` 之类的路径穿越。
- */
-export function resolvePackageDir(dir: string, env: NodeJS.ProcessEnv = process.env): string {
-  const root = deliveryRoot(env);
+/** Packages live in a tenant/workspace namespace; owner fields are also checked. */
+export function resolvePackageDir(dir: string, scope: DeliveryScope, env: NodeJS.ProcessEnv = process.env): string {
+  assertDeliveryScope(scope);
   const name = String(dir ?? "").trim();
   if (!name) throw new DeliveryError("缺少交付包目录名", "bad_request");
   if (name.includes("/") || name.includes("\\") || name.includes("..") || name.startsWith(".")) {
     throw new DeliveryError(`交付包目录名非法：${name}`, "path_not_allowed");
   }
-  const abs = assertInside(join(root, name), root);
-  if (!existsSync(abs) || !statSync(abs).isDirectory()) {
-    throw new DeliveryError(`交付包不存在：${name}`, "not_found");
-  }
+  const root = deliveryRoot(env);
+  const scoped = scopedDeliveryRoot(root, scope);
+  if (!existsSync(join(scoped, name))) throw new DeliveryError(`交付包不存在：${name}`, "not_found");
+  const abs = assertScopedPackagePath(root, join(scoped, name), scope);
   if (!existsSync(join(abs, "delivery-manifest.json"))) {
     throw new DeliveryError(`该目录不是交付包（缺 delivery-manifest.json）：${name}`, "not_found");
   }
+  assertManifestScope(readDeliveryManifestFile(abs).manifest, scope);
   return abs;
 }
 
@@ -102,53 +90,42 @@ export function resolvePackageDir(dir: string, env: NodeJS.ProcessEnv = process.
  */
 function artifactRefFor(
   packageDir: string,
-  relOrAbs: string | null | undefined,
-  env: NodeJS.ProcessEnv = process.env,
+  ref: string | null | undefined,
+  _env: NodeJS.ProcessEnv = process.env,
 ): string | null {
-  if (!relOrAbs) return null;
-  void env;
-  const abs = isAbsolute(relOrAbs) ? relOrAbs : resolve(packageDir, relOrAbs);
-  if (!existsSync(abs)) return null;
-  const rel = relative(packageDir, abs);
-  if (!rel || rel.startsWith("..")) return null;
-  return rel.split(sep).join("/");
+  if (!ref) return null;
+  try {
+    const { manifest } = readDeliveryManifestFile(packageDir);
+    inspectRegisteredDeliveryArtifact(packageDir, manifest, ref);
+    return ref;
+  } catch (error) {
+    // The detail view still exposes a draft with missing/corrupt artifacts, but
+    // never presents an unchecked path as a downloadable asset.
+    if (error instanceof Error) return null;
+    throw error;
+  }
 }
 
-/**
- * 读交付物（页内取件）：路径监狱 + 体积上限 + 内容类型推断。
- * 超出上限时抛 `artifact_too_large`（界面据此提示"用本地播放器打开 <路径>"），不硬搬大文件。
- */
+/** Registered reference + real file bytes + scope, including draft previews. */
 export function readDeliveryArtifact({
-  dir, ref, maxBytes = ARTIFACT_INLINE_MAX_BYTES, env = process.env,
+  dir, ref, scope, maxBytes = ARTIFACT_INLINE_MAX_BYTES, env = process.env,
 }: {
-  dir: string; ref: string; maxBytes?: number; env?: NodeJS.ProcessEnv;
+  dir: string; ref: string; scope: DeliveryScope; maxBytes?: number; env?: NodeJS.ProcessEnv;
 }): { ref: string; bytes: number; contentType: string; base64: string } {
-  const packageDir = resolvePackageDir(dir, env);
-  const cleanRef = String(ref ?? "").trim();
-  if (!cleanRef || isAbsolute(cleanRef) || cleanRef.includes("..")) {
-    throw new DeliveryError(`交付物引用非法：${cleanRef}`, "path_not_allowed");
+  const packageDir = resolvePackageDir(dir, scope, env);
+  const cleanRef = cleanDeliveryRef(ref);
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1024 || maxBytes > 64 * 1024 * 1024) {
+    throw new DeliveryError("交付物取件上限非法", "bad_request");
   }
-  const abs = resolve(packageDir, cleanRef);
-  if (!abs.startsWith(packageDir + sep)) {
-    throw new DeliveryError(`交付物越界：${cleanRef}`, "path_not_allowed");
-  }
-  if (!existsSync(abs) || !statSync(abs).isFile()) {
-    throw new DeliveryError(`交付物不存在：${cleanRef}`, "not_found");
-  }
-  const bytes = statSync(abs).size;
-  const limit = Math.max(1024, Math.min(maxBytes, 64 * 1024 * 1024));
-  if (bytes > limit) {
-    throw new DeliveryError(
-      `交付物 ${cleanRef} 共 ${(bytes / 1048576).toFixed(1)}MB，超过页内取件上限 ${(limit / 1048576).toFixed(0)}MB：`
-      + `请用本地播放器打开交付物（路径 ${abs}）`,
-      "artifact_too_large",
-    );
-  }
+  const { manifest, sha256 } = readDeliveryManifestFile(packageDir);
+  assertManifestScope(manifest, scope);
+  const file = inspectRegisteredDeliveryArtifact(packageDir, manifest, cleanRef, { read: true, maxBytes });
+  if (readDeliveryManifestFile(packageDir).sha256 !== sha256) throw new DeliveryError("交付清单在取件期间变化", "artifact_changed");
   return {
     ref: cleanRef,
-    bytes,
-    contentType: ARTIFACT_MIME[extnameOf(abs)] ?? "application/octet-stream",
-    base64: readFileSync(abs).toString("base64"),
+    bytes: file.bytes,
+    contentType: ARTIFACT_MIME[extnameOf(cleanRef)] ?? "application/octet-stream",
+    base64: file.content!.toString("base64"),
   };
 }
 
@@ -185,10 +162,13 @@ export interface ManifestVariant {
 
 export interface DeliveryManifest {
   schemaVersion?: string;
+  scope?: { tenantId: string; workspaceId: string };
+  revision?: number;
   projectId?: string;
   title?: string;
   createdAt?: string;
   platform?: string | null;
+  quality?: "hd" | "uhd";
   resolution?: number[];
   fps?: number;
   master?: { path?: string; sha256?: string; duration?: number | null; subtitles?: string };
@@ -205,11 +185,21 @@ export interface DeliveryManifest {
   }>;
   coverDivergence?: Array<{ a?: string; b?: string; meanAbsDiff?: number; verdict?: string }>;
   checks?: Array<{ kind?: string; ok?: boolean; detail?: unknown }>;
+  enhancements?: Array<{
+    shotId?: string; kind?: string; status?: string; model?: string | null;
+    sourceResolution?: number[] | null; outputResolution?: number[] | null;
+    sourceSha256?: string | null; outputSha256?: string | null; provenancePath?: string | null;
+  }>;
   filmProject?: string;
   cost?: { shotGeneration?: string; tokenCostDelta?: number | string; note?: string };
 }
 
 export interface DeliverySelection {
+  projectId: string;
+  revision: number;
+  manifestSha256: string;
+  sealSha256: string;
+  variantSha256: string;
   variantId: string;
   note: string | null;
   by: string | null;
@@ -222,9 +212,13 @@ export interface DeliveryPackageSummary {
   title: string;
   createdAt: string | null;
   platform: string | null;
+  quality: "hd" | "uhd";
   variantCount: number;
   variantIds: string[];
   passed: boolean;
+  trustStatus: DeliveryTrust["status"];
+  trustReason: string;
+  revision: number | null;
   failedChecks: string[];
   selectedVariantId: string | null;
   revisionCount: number;
@@ -240,6 +234,11 @@ export interface DeliveryPackageDetail extends DeliveryPackageSummary {
   divergence: Array<{ a: string; b: string; meanAbsDiff: number | null; verdict: string | null; audioDiffers: boolean }>;
   coverDivergence: Array<{ a: string; b: string; meanAbsDiff: number | null; verdict: string | null }>;
   checks: Array<{ kind: string; ok: boolean; detail: unknown }>;
+  enhancements: Array<{
+    shotId: string; kind: string; status: string; model: string | null;
+    sourceResolution: number[] | null; outputResolution: number[] | null;
+    sourceSha256: string | null; outputSha256: string | null; provenanceRef: string | null;
+  }>;
   cost: DeliveryManifest["cost"] | null;
     selection: DeliverySelection | null;
     selections: DeliverySelection[];
@@ -247,6 +246,8 @@ export interface DeliveryPackageDetail extends DeliveryPackageSummary {
   /** 最新一轮返修里"如实记账但用户必须知道"的瑕疵（例如某变体配乐没过检、已按原声降级） */
   latestRevisionWarnings: string[];
   projectPath: string | null;
+  revisionBase: { version: number; projectSha256: string } | null;
+  revisionBaseReason: string | null;
 }
 
 /** 交付包里一个风格变体在界面上的读模型（含签名媒体 URL 与"是否被选中"）。 */
@@ -278,6 +279,7 @@ export interface DeliveryVariantView {
 function readJson<T>(file: string): T | null {
   if (!existsSync(file)) return null;
   try {
+    safeDeliveryPath(dirname(file), basename(file));
     return JSON.parse(readFileSync(file, "utf8")) as T;
   } catch {
     throw new DeliveryError(`JSON 解析失败：${file}`, "bad_media");
@@ -289,6 +291,7 @@ function readSelections(packageDir: string): DeliverySelection[] {
   const rows: DeliverySelection[] = [];
   const jsonl = join(packageDir, "selections.jsonl");
   if (existsSync(jsonl)) {
+    safeDeliveryPath(packageDir, "selections.jsonl");
     for (const line of readFileSync(jsonl, "utf8").split("\n")) {
       if (!line.trim()) continue;
       try {
@@ -305,8 +308,15 @@ function readSelections(packageDir: string): DeliverySelection[] {
 function readRevisions(packageDir: string): DeliveryPackageDetail["revisions"] {
   const versionsDir = join(packageDir, "versions");
   if (!existsSync(versionsDir)) return [];
+  safeDeliveryPath(packageDir, "versions");
   const rows: DeliveryPackageDetail["revisions"] = [];
   for (const entry of readdirSync(versionsDir)) {
+    if (!/^v\d+$/.test(entry)) continue;
+    safeDeliveryPath(packageDir, `versions/${entry}`);
+    // revision.json is written before the atomic commit point. Failed or
+    // interrupted reservations must not appear as completed revision history.
+    const committedProject = safeDeliveryPath(packageDir, `versions/${entry}/film-project.json`, true);
+    if (!existsSync(committedProject)) continue;
     const rev = readJson<{ version?: number; at?: string; impact?: { localOnly?: boolean }; patch?: unknown; outDir?: string }>(
       join(versionsDir, entry, "revision.json"),
     );
@@ -332,11 +342,13 @@ function readRevisions(packageDir: string): DeliveryPackageDetail["revisions"] {
 function readLatestRevisionWarnings(packageDir: string, revisions: DeliveryPackageDetail["revisions"]): string[] {
   const latest = revisions.find((rev) => rev.outDir);
   if (!latest?.outDir) return [];
-  const root = resolve(packageDir, latest.outDir);
+  const root = safeDeliveryPath(packageDir, latest.outDir);
   const warnings: string[] = [];
   const variantsDir = join(root, "variants");
   if (existsSync(variantsDir)) {
+    safeDeliveryPath(root, "variants");
     for (const variantId of readdirSync(variantsDir)) {
+      safeDeliveryPath(root, `variants/${variantId}`);
       const audio = readJson<{ failed?: boolean; code?: string; message?: string }>(
         join(variantsDir, variantId, "audio.json"),
       );
@@ -356,7 +368,8 @@ function readLatestRevisionWarnings(packageDir: string, revisions: DeliveryPacka
   return warnings;
 }
 
-function summarize(packageDir: string, manifest: DeliveryManifest, env: NodeJS.ProcessEnv = process.env): DeliveryPackageSummary {
+function summarize(packageDir: string, manifest: DeliveryManifest, scope: DeliveryScope, env: NodeJS.ProcessEnv = process.env): DeliveryPackageSummary {
+  const trust = inspectDeliveryTrust(packageDir, scope, env);
   const variants = Array.isArray(manifest.variants) ? manifest.variants : [];
   const checks = Array.isArray(manifest.checks) ? manifest.checks : [];
   const selections = readSelections(packageDir);
@@ -368,11 +381,18 @@ function summarize(packageDir: string, manifest: DeliveryManifest, env: NodeJS.P
     title: String(manifest.title ?? manifest.projectId ?? basename(packageDir)),
     createdAt: manifest.createdAt ?? null,
     platform: manifest.platform ?? null,
+    quality: manifest.quality === "uhd" ? "uhd" : "hd",
     variantCount: variants.length,
     variantIds: variants.map((variant) => String(variant.id)),
-    passed: checks.length > 0 && checks.every((check) => check.ok !== false),
-    failedChecks: checks.filter((check) => check.ok === false).map((check) => String(check.kind ?? "unknown")),
-    selectedVariantId: selections.at(-1)?.variantId ?? null,
+    passed: trust.status === "verified",
+    trustStatus: trust.status,
+    trustReason: trust.reason,
+    revision: trust.revision,
+    failedChecks: [...checks.filter((check) => check.ok !== true).map((check) => String(check.kind ?? "unknown")),
+      ...(trust.status !== "verified" ? ["delivery_trust"] : [])],
+    selectedVariantId: trust.status === "verified"
+      ? selections.filter((selection) => selection.manifestSha256 === trust.manifestSha256 && selection.revision === trust.revision
+        && selection.sealSha256 === trust.sealSha256).at(-1)?.variantId ?? null : null,
     revisionCount: revisions.length,
     coverRef: firstCover ? artifactRefFor(packageDir, firstCover, env) : null,
   };
@@ -380,17 +400,21 @@ function summarize(packageDir: string, manifest: DeliveryManifest, env: NodeJS.P
 
 /** 列出交付根下的全部交付包（按创建时间倒序；根不存在时返回空列表而不是报错）。 */
 export function listDeliveryPackages({
-  limit = 20, env = process.env,
-}: { limit?: number; env?: NodeJS.ProcessEnv } = {}): DeliveryPackageSummary[] {
-  const root = deliveryRoot(env);
+  scope, limit = 20, env = process.env,
+}: { scope: DeliveryScope; limit?: number; env?: NodeJS.ProcessEnv }): DeliveryPackageSummary[] {
+  const root = scopedDeliveryRoot(deliveryRoot(env), scope);
   if (!existsSync(root)) return [];
   const rows: DeliveryPackageSummary[] = [];
   for (const entry of readdirSync(root)) {
-    const packageDir = join(root, entry);
-    if (!statSync(packageDir).isDirectory()) continue;
-    const manifest = readJson<DeliveryManifest>(join(packageDir, "delivery-manifest.json"));
-    if (!manifest) continue;
-    rows.push(summarize(packageDir, manifest, env));
+    try {
+      const packageDir = resolvePackageDir(entry, scope, env);
+      const manifest = readDeliveryManifestFile(packageDir).manifest as DeliveryManifest;
+      rows.push(summarize(packageDir, manifest, scope, env));
+    } catch (error) {
+      if (!(error instanceof DeliveryError)) throw error;
+      // Non-packages and mismatched scopes are not part of this user's listing.
+      if (!["not_found", "path_not_allowed", "scope_mismatch"].includes(error.code)) throw error;
+    }
   }
   return rows
     .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")))
@@ -398,13 +422,13 @@ export function listDeliveryPackages({
 }
 
 /** 读单个交付包（清单 + 变体 + 差异实测 + 检查 + 返修历史 + 选择记录；媒体给出签名 URL）。 */
-export function readDeliveryPackage(dir: string, env: NodeJS.ProcessEnv = process.env): DeliveryPackageDetail {
-  const packageDir = resolvePackageDir(dir, env);
+export function readDeliveryPackage(dir: string, scope: DeliveryScope, env: NodeJS.ProcessEnv = process.env): DeliveryPackageDetail {
+  const packageDir = resolvePackageDir(dir, scope, env);
   const manifest = readJson<DeliveryManifest>(join(packageDir, "delivery-manifest.json"));
   if (!manifest) throw new DeliveryError(`交付清单缺失：${dir}`, "not_found");
-  const base = summarize(packageDir, manifest, env);
+  const base = summarize(packageDir, manifest, scope, env);
   const selections = readSelections(packageDir);
-  const selectedId = selections.at(-1)?.variantId ?? null;
+  const selectedId = base.selectedVariantId;
   const variants: DeliveryVariantView[] = (manifest.variants ?? []).map((variant) => ({
     id: String(variant.id),
     name: String(variant.name ?? variant.id),
@@ -420,7 +444,7 @@ export function readDeliveryPackage(dir: string, env: NodeJS.ProcessEnv = proces
     copy: {
       title: variant.copy?.title ?? null,
       hashtags: Array.isArray(variant.copy?.hashtags) ? variant.copy.hashtags : [],
-      checks: (variant.copy?.checks ?? []).map((check: { kind?: string; ok?: boolean }) => ({ kind: String(check.kind ?? ""), ok: check.ok !== false })),
+      checks: (variant.copy?.checks ?? []).map((check: { kind?: string; ok?: boolean }) => ({ kind: String(check.kind ?? ""), ok: check.ok === true })),
     },
     audio: variant.audio
       ? {
@@ -442,6 +466,15 @@ export function readDeliveryPackage(dir: string, env: NodeJS.ProcessEnv = proces
     ref: artifactRefFor(packageDir, file.path, env),
   }));
   const revisions = readRevisions(packageDir);
+  let revisionBase: DeliveryPackageDetail["revisionBase"] = null;
+  let revisionBaseReason: string | null = null;
+  try {
+    const snapshot = readDeliveryRevisionBase(packageDir, String(manifest.projectId ?? ""));
+    revisionBase = { version: snapshot.version, projectSha256: snapshot.projectSha256 };
+  } catch (error) {
+    if (!(error instanceof DeliveryError)) throw error;
+    revisionBaseReason = error.message;
+  }
   return {
     ...base,
     resolution: Array.isArray(manifest.resolution) ? manifest.resolution : null,
@@ -470,15 +503,28 @@ export function readDeliveryPackage(dir: string, env: NodeJS.ProcessEnv = proces
     })),
     checks: (manifest.checks ?? []).map((check) => ({
       kind: String(check.kind ?? ""),
-      ok: check.ok !== false,
+      ok: check.ok === true,
       detail: check.detail ?? null,
     })),
+    enhancements: (manifest.enhancements ?? []).map((item) => ({
+      shotId: String(item.shotId ?? ""),
+      kind: String(item.kind ?? ""),
+      status: String(item.status ?? "not-requested"),
+      model: item.model ?? null,
+      sourceResolution: Array.isArray(item.sourceResolution) ? item.sourceResolution : null,
+      outputResolution: Array.isArray(item.outputResolution) ? item.outputResolution : null,
+      sourceSha256: item.sourceSha256 ?? null,
+      outputSha256: item.outputSha256 ?? null,
+      provenanceRef: artifactRefFor(packageDir, item.provenancePath, env),
+    })),
     cost: manifest.cost ?? null,
-    selection: selections.at(-1) ?? null,
+    selection: selectedId ? selections.filter((selection) => selection.variantId === selectedId).at(-1) ?? null : null,
     selections,
     revisions,
     latestRevisionWarnings: readLatestRevisionWarnings(packageDir, revisions),
-    projectPath: manifest.filmProject ? join(packageDir, manifest.filmProject) : null,
+    projectPath: manifest.filmProject ? safeDeliveryPath(packageDir, manifest.filmProject) : null,
+    revisionBase,
+    revisionBaseReason,
   };
 }
 
@@ -528,24 +574,67 @@ export function latestFilmProjectPath(packageDir: string): string {
   const rootProject = join(packageDir, "film-project.json");
   const versionsDir = join(packageDir, "versions");
   if (!existsSync(versionsDir)) return rootProject;
+  safeDeliveryPath(packageDir, "versions");
   const candidates = readdirSync(versionsDir)
     .filter((name) => /^v\d+$/.test(name))
     .map((name) => ({
       version: Number(name.slice(1)),
-      path: join(versionsDir, name, "film-project.json"),
+      path: safeDeliveryPath(packageDir, `versions/${name}/film-project.json`, true),
     }))
     .filter((entry) => existsSync(entry.path))
     .sort((a, b) => b.version - a.version);
   return candidates[0]?.path ?? rootProject;
 }
 
+/** The detail response and write endpoint compare the exact same guarded bytes. */
+function readDeliveryRevisionBase(packageDir: string, projectId: string): {
+  projectPath: string; project: Record<string, unknown>; version: number; projectSha256: string;
+} {
+  const projectPath = latestFilmProjectPath(packageDir);
+  const file = inspectDeliveryFile(packageDir, relative(packageDir, projectPath), { read: true, maxBytes: 4 * 1024 * 1024 });
+  let project: Record<string, unknown>;
+  try { project = JSON.parse(file.content!.toString("utf8")) as Record<string, unknown>; }
+  catch { throw new DeliveryError("返修工程 JSON 无法读取", "bad_media"); }
+  const version = project?.version;
+  if (project?.schemaVersion !== "workloom.film-project/v1" || project.projectId !== projectId
+    || typeof version !== "number" || !Number.isSafeInteger(version) || version < 1
+    || (dirname(projectPath) !== packageDir && basename(dirname(projectPath)) !== `v${version}`)) {
+    throw new DeliveryError("返修工程的项目归属或版本无效", "revision_conflict");
+  }
+  if (dirname(projectPath) !== packageDir) {
+    const versionRef = relative(packageDir, dirname(projectPath));
+    const readRecord = (name: string): Record<string, unknown> | null => {
+      const ref = `${versionRef}/${name}`;
+      if (!existsSync(safeDeliveryPath(packageDir, ref, true))) return null;
+      try {
+        const value = JSON.parse(inspectDeliveryFile(packageDir, ref, { read: true, maxBytes: 4 * 1024 * 1024 }).content!.toString("utf8")) as unknown;
+        if (!value || typeof value !== "object" || Array.isArray(value)) throw new DeliveryError("返修提交记录格式无效", "revision_conflict");
+        return value as Record<string, unknown>;
+      } catch (error) {
+        if (error instanceof DeliveryError) throw error;
+        throw new DeliveryError("返修提交记录无法读取", "revision_conflict");
+      }
+    };
+    const receipt = readRecord("revision.json");
+    const claim = readRecord("revision-claim.json");
+    const commit = receipt?.commit as Record<string, unknown> | undefined;
+    if ((commit && (commit.version !== version || commit.projectSha256 !== file.sha256))
+      || (claim && (!commit || commit.runId !== claim.runId || claim.version !== version
+        || commit.baseVersion !== claim.baseVersion || commit.baseProjectSha256 !== claim.baseProjectSha256))) {
+      throw new DeliveryError("返修工程与提交回执不一致，暂不能作为新返修基础", "revision_conflict");
+    }
+  }
+  return { projectPath, project, version, projectSha256: file.sha256 };
+}
+
 /** 反馈分诊（确定性规则表）：只读，不改任何文件；返回归因/受影响层/是否需重生成镜头/成本口径。 */
 export async function triageDeliveryFeedback(
   dir: string,
   feedback: string,
+  scope: DeliveryScope,
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<{ triage: Record<string, unknown>; patchHint: Record<string, unknown>; packageDir: string }> {
-  const packageDir = resolvePackageDir(dir, env);
+  const packageDir = resolvePackageDir(dir, scope, env);
   const core = await loadBridgeCore();
   const project = readFilmProject(packageDir);
   const triage = core.triageFeedback({ feedback: String(feedback ?? "").trim(), project });
@@ -558,16 +647,17 @@ export async function triageDeliveryFeedback(
 
 /** 选择变体：落 `selection.json`（最新）+ 追加 `selections.jsonl`（历史），返回选择记录。 */
 export function selectDeliveryVariant({
-  dir, variantId, note = null, by = null, env = process.env,
+  dir, variantId, scope, note = null, by = null, env = process.env,
 }: {
-  dir: string; variantId: string; note?: string | null; by?: string | null; env?: NodeJS.ProcessEnv;
+  dir: string; variantId: string; scope: DeliveryScope; note?: string | null; by?: string | null; env?: NodeJS.ProcessEnv;
 }): DeliverySelection & {
   selectionCount: number;
   projectId: string;
   variant: { id: string; name: string; positioning: string | null; style: ManifestVariant["style"] | null } | null;
 } {
-  const packageDir = resolvePackageDir(dir, env);
-  const manifest = readJson<DeliveryManifest>(join(packageDir, "delivery-manifest.json"));
+  const packageDir = resolvePackageDir(dir, scope, env);
+  const loaded = readDeliveryManifestFile(packageDir);
+  const manifest = loaded.manifest as DeliveryManifest;
   const matched = (manifest?.variants ?? []).find((variant) => variant.id === variantId);
   if (!matched) {
     throw new DeliveryError(
@@ -576,12 +666,22 @@ export function selectDeliveryVariant({
       "not_found",
     );
   }
+  const trust = requireDeliveryTrust(packageDir, scope, env);
+  if (trust.manifestSha256 !== loaded.sha256) throw new DeliveryError("交付清单在选择期间变化", "artifact_changed");
+  const variantFile = inspectRegisteredDeliveryArtifact(packageDir, manifest!, matched.video!.path!);
   const selection: DeliverySelection = {
+    projectId: manifest!.projectId!,
+    revision: trust.revision!,
+    manifestSha256: trust.manifestSha256!,
+    sealSha256: trust.sealSha256!,
+    variantSha256: variantFile.sha256,
     variantId,
     note: note ? String(note).slice(0, 500) : null,
     by: by ? String(by) : null,
     at: new Date().toISOString(),
   };
+  safeDeliveryPath(packageDir, "selection.json", true);
+  safeDeliveryPath(packageDir, "selections.jsonl", true);
   writeFileSync(join(packageDir, "selection.json"), `${JSON.stringify(selection, null, 2)}\n`, "utf8");
   appendFileSync(join(packageDir, "selections.jsonl"), `${JSON.stringify(selection)}\n`, "utf8");
   /**
@@ -667,13 +767,13 @@ export function deliveryPreferenceConfidence(selectionCount: number): number {
 
 /** 落返修单（用户意见 + 分诊 + patch 提示）：工位/CLI 与人审都从这份单据接手。 */
 export function recordRevisionRequest({
-  dir, feedback, triage, patchHint = null, by = null, env = process.env,
+  dir, feedback, triage, scope, patchHint = null, by = null, env = process.env,
 }: {
-  dir: string; feedback: string; triage: Record<string, unknown>;
+  dir: string; feedback: string; triage: Record<string, unknown>; scope: DeliveryScope;
   patchHint?: Record<string, unknown> | null; by?: string | null; env?: NodeJS.ProcessEnv;
 }): { requestPath: string; request: Record<string, unknown> } {
-  const packageDir = resolvePackageDir(dir, env);
-  const requestDir = join(packageDir, "revision-requests");
+  const packageDir = resolvePackageDir(dir, scope, env);
+  const requestDir = safeDeliveryPath(packageDir, "revision-requests", true);
   mkdirSync(requestDir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const request = {
@@ -692,6 +792,7 @@ export function recordRevisionRequest({
 /* ============================ 本地重合成作业 ============================ */
 
 export interface RevisionJob {
+  scope: DeliveryScope;
   jobId: string;
   dir: string;
   status: "running" | "done" | "failed";
@@ -700,6 +801,8 @@ export interface RevisionJob {
   exitCode: number | null;
   impact: Record<string, unknown> | null;
   patch: Record<string, unknown>;
+  expectedVersion: number;
+  expectedProjectSha256: string;
   logPath: string;
   logTail: string[];
   version: number | null;
@@ -732,12 +835,18 @@ function findPlaceholder(value: unknown, path = "patch"): string | null {
   return null;
 }
 
-export function deliveryJobStatus(jobId: string): RevisionJob | null {
-  return jobs.get(jobId) ?? null;
+const sameDeliveryScope = (a: DeliveryScope, b: DeliveryScope): boolean =>
+  a.tenantId === b.tenantId && a.workspaceId === b.workspaceId && (!b.projectId || a.projectId === b.projectId);
+
+export function deliveryJobStatus(jobId: string, scope: DeliveryScope): RevisionJob | null {
+  assertDeliveryScope(scope);
+  const job = jobs.get(jobId);
+  return job && sameDeliveryScope(job.scope, scope) ? job : null;
 }
 
-export function listDeliveryJobs(dir?: string): RevisionJob[] {
-  const rows = [...jobs.values()];
+export function listDeliveryJobs(scope: DeliveryScope, dir?: string): RevisionJob[] {
+  assertDeliveryScope(scope);
+  const rows = [...jobs.values()].filter((job) => sameDeliveryScope(job.scope, scope));
   return (dir ? rows.filter((job) => job.dir === dir) : rows)
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
@@ -750,9 +859,10 @@ export function listDeliveryJobs(dir?: string): RevisionJob[] {
  * **不在本接口里重生成镜头**：patch 命中画面内容时直接拒绝（先去过 G8 人审 + 只重跑点名镜头）。
  */
 export async function startDeliveryRevision({
-  dir, patch, by = null, env = process.env, onCompleted,
+  dir, patch, scope, expectedVersion, expectedProjectSha256, by = null, env = process.env, onCompleted,
 }: {
-  dir: string; patch: Record<string, unknown>; by?: string | null; env?: NodeJS.ProcessEnv;
+  dir: string; patch: Record<string, unknown>; scope: DeliveryScope; by?: string | null; env?: NodeJS.ProcessEnv;
+  expectedVersion: number; expectedProjectSha256: string;
   /**
    * 作业完成回调（T-2026-0926-0007 接线点）：交付包里的母版/变体/封面要进媒资库。
    * 用回调而不是在 delivery 里直接依赖 media 模块，避免"交付层 ↔ 媒资层"互相 import 成环；
@@ -760,10 +870,20 @@ export async function startDeliveryRevision({
    */
   onCompleted?: (info: { dir: string; outDir: string | null; version: number | null }) => void;
 }): Promise<RevisionJob> {
-  const packageDir = resolvePackageDir(dir, env);
-  const projectPath = latestFilmProjectPath(packageDir);
-  if (!existsSync(projectPath)) throw new DeliveryError("交付包缺 film-project.json（返修入口）", "not_found");
-  const running = [...jobs.values()].find((job) => job.dir === dir && job.status === "running");
+  const packageDir = resolvePackageDir(dir, scope, env);
+  if (!Number.isSafeInteger(expectedVersion) || expectedVersion < 1 || !/^[a-f0-9]{64}$/.test(expectedProjectSha256 ?? "")) {
+    throw new DeliveryError("返修需要页面读取时的版本和工程指纹，请刷新交付包后重新核对修改", "bad_request");
+  }
+  const projectId = String(readDeliveryManifestFile(packageDir).manifest.projectId ?? "");
+  const compareBase = () => {
+    const snapshot = readDeliveryRevisionBase(packageDir, projectId);
+    if (snapshot.version !== expectedVersion || snapshot.projectSha256 !== expectedProjectSha256) {
+      throw new DeliveryError("返修基础已变化，本次修改尚未执行；请刷新交付包并核对新版本后再提交", "revision_conflict");
+    }
+    return snapshot;
+  };
+  compareBase();
+  const running = [...jobs.values()].find((job) => sameDeliveryScope(job.scope, scope) && job.dir === dir && job.status === "running");
   if (running) {
     throw new DeliveryError(`该交付包已有重合成作业在执行中（${running.jobId}）：等它结束再提交`, "idempotency_conflict");
   }
@@ -781,7 +901,7 @@ export async function startDeliveryRevision({
     );
   }
   const core = await loadBridgeCore();
-  const project = readFilmProject(packageDir);
+  const { projectPath, project } = compareBase();
   // 先做影响分析：未知键 / 不存在的镜头在这里就被拒（不静默忽略用户指令）
   const impact = core.analyzeImpact({ project, patch: patch ?? {} });
   const regeneration = (impact.shotRegeneration ?? {}) as { required?: boolean; shotIds?: string[] };
@@ -797,7 +917,7 @@ export async function startDeliveryRevision({
   const cli = postBridgeCliPath();
   if (!existsSync(cli)) throw new DeliveryError(`后期工位 CLI 不存在：${cli}`, "not_configured");
   const jobId = `rev-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const jobsDir = join(packageDir, "revision-jobs");
+  const jobsDir = safeDeliveryPath(packageDir, "revision-jobs", true);
   mkdirSync(jobsDir, { recursive: true });
   const patchPath = join(jobsDir, `${jobId}.patch.json`);
   const logPath = join(jobsDir, `${jobId}.log`);
@@ -814,6 +934,7 @@ export async function startDeliveryRevision({
   );
 
   const job: RevisionJob = {
+    scope: { ...scope, projectId: readDeliveryManifestFile(packageDir).manifest.projectId },
     jobId,
     dir,
     status: "running",
@@ -822,6 +943,8 @@ export async function startDeliveryRevision({
     exitCode: null,
     impact,
     patch,
+    expectedVersion,
+    expectedProjectSha256,
     logPath,
     logTail: [],
     version: null,
@@ -831,11 +954,12 @@ export async function startDeliveryRevision({
   /** 完成回调只触发一次；但"打印了完成标记"不等于作业成功（深审：标记后仍可能非 0 退出） */
   let completedNotified = false;
   let markerSeen = false;
+  let completionGuard: ReturnType<typeof setTimeout> | null = null;
   const notifyCompleted = () => {
     if (completedNotified) return;
     completedNotified = true;
     try {
-      onCompleted?.({ dir, outDir: job.outDir, version: job.version });
+      onCompleted?.({ dir: packageDir, outDir: job.outDir, version: job.version });
     } catch (err) {
       appendFileSync(logPath, `[media-hook] 完成回调异常（不影响作业终态）：${err instanceof Error ? err.message : String(err)}\n`, "utf8");
     }
@@ -847,7 +971,8 @@ export async function startDeliveryRevision({
    */
   const child = spawn(
     process.execPath,
-    [cli, "reedit", "--project", projectPath, "--patch", patchPath, "--delivery-dir", packageDir],
+    [cli, "reedit", "--project", projectPath, "--patch", patchPath, "--delivery-dir", packageDir,
+      "--expected-version", String(expectedVersion), "--expected-project-sha256", expectedProjectSha256],
     {
     cwd: REPO_ROOT,
     env: { ...process.env, ...env },
@@ -866,26 +991,17 @@ export async function startDeliveryRevision({
         job.version = Number(versionMatch[1]);
         job.outDir = versionMatch[2]?.trim() ?? null;
         markerSeen = true;
-        /**
-         * 以**工位打印的完成标记**为权威完成信号，不等进程退出事件。
-         * 原因（2026-09-24 真机）：Node 24 在"跑完立刻退出"时可能卡在 V8 worker 线程 join，
-         * 进程不退出但产物已经全部写好——若只认 `close` 事件，界面会永远停在"执行中"。
-         * 标记 + 退出事件双通道：先到者生效（退出事件仍会把非 0 退出码判为失败）。
-         */
-        if (job.status === "running") {
-          job.status = "done";
-          job.finishedAt = new Date().toISOString();
-          /**
-           * 完成标记到了但进程还没退（Node 关停阶段的 join 卡顿）：给 15 秒宽限，
-           * 仍不退就 Kill——产物已经齐了，不能让一个僵尸进程占住"同包只能一个作业"的闸。
-           */
-          const guard = setTimeout(() => {
+        // A progress marker cannot finish the job: otherwise the UI stops
+        // polling and never observes a later nonzero exit. Keep the guard, but
+        // only close(0) may publish the done state and trigger ingestion.
+        if (job.status === "running" && completionGuard === null) {
+          completionGuard = setTimeout(() => {
             if (child.exitCode === null && !child.killed) {
-              appendFileSync(logPath, `[${new Date().toISOString()}] 完成标记已到但进程未退出 → 结束进程（产物已落盘）\n`, "utf8");
+              appendFileSync(logPath, `[${new Date().toISOString()}] 完成标记后进程未退出，已停止并保留未核实产物\n`, "utf8");
               child.kill("SIGTERM");
             }
           }, 15_000);
-          guard.unref();
+          completionGuard.unref();
         }
       }
     }
@@ -893,6 +1009,7 @@ export async function startDeliveryRevision({
   child.stdout?.on("data", onChunk);
   child.stderr?.on("data", onChunk);
   child.on("error", (error) => {
+    if (completionGuard) clearTimeout(completionGuard);
     job.status = "failed";
     job.finishedAt = new Date().toISOString();
     job.exitCode = -1;
@@ -900,6 +1017,7 @@ export async function startDeliveryRevision({
     job.logTail.push(`启动失败：${error.message}`);
   });
   child.on("close", (code) => {
+    if (completionGuard) clearTimeout(completionGuard);
     // 退出码为准：非 0 即使中途打印过完成标记也要如实报失败
     job.status = code === 0 ? "done" : "failed";
     job.finishedAt = job.finishedAt ?? new Date().toISOString();
@@ -908,9 +1026,7 @@ export async function startDeliveryRevision({
     if (code === 0) {
       notifyCompleted();
     } else if (markerSeen) {
-      // 已知真机现象：产物已齐但 Node 卡在 worker join，宽限后被 SIGTERM —— 仍应入库
-      appendFileSync(logPath, `[media-hook] 完成标记已见但退出码 ${code}：按"产物已落盘"处理（作业终态仍为失败）\n`, "utf8");
-      notifyCompleted();
+      appendFileSync(logPath, `[media-hook] 完成标记已见但退出码 ${code}：不触发生成件入库\n`, "utf8");
     }
   });
   return job;

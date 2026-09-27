@@ -1,28 +1,12 @@
 #!/usr/bin/env tsx
 /**
- * 项目级出片工具（2026-09-21）——把一条预生产项目的镜头卡逐镜推到 Seedance 并轮询入库。
- *
- * 与 `render-shot.mts`（单镜）的关系：这是"一部片子"的操作口径（融合设计 §6 render-operator）：
- *   镜头卡（预生产产物 shots.json）
- *     → video.cms.saveScriptVersion（版本即审批对象，G8 前置）
- *     → video.render.submit（唯一写入口：幂等键/降级链/报价/预算闸/事件留痕）
- *     → video.render.poll（回填 + 成片入库 video_assets，local_path 落 var/media）
- *
- * 参考图（≤4 张，媒体目录 maxReferenceImages 口径）：
- *   - 实拍场地图按镜头内容关键词匹配（夜景/客房/院落/亭榭…）；
- *   - 定妆照索引（`.vm-work/characters/<project>/portrait-index.json`）里角色四角度齐备时，
- *     额外挂 1 张角色正面定妆照（角色一致性锚定）。
- *   本地无公网素材站，参考图以 base64 data URL 下发（Ark 接受，已实测）。
- *
- * 用法：
- *   pnpm exec tsx --env-file=.env scripts/tools/render-project.mts \
- *     --shots apps/server/output/<ts>_untitled/shots.json \
- *     --project VID-1019 --total-seconds 30 --aspect 9:16 --resolution 1080p \
- *     [--only SC-03,SC-04] [--dry-run] [--refs <目录或逗号分隔路径>]
- *
- * 输出：每镜的 job/task/asset/localPath 汇总 JSON（stdout 的 SUMMARY 行），供拼接/调色环节消费。
+ * 服务项目出片：当前预生产档案 → 最终请求资格 → canonical提交 → 轮询入库。
+ * 正式生产：--project <id> --model <目录id> [--only S1,S2] [--max-estimated-cny N]
+ * 先用 --list-models 查询当前服务目录。WORKLOOM_API/WORKLOOM_TOKEN 提供服务地址与作用域凭据。
+ * 本地预览：--dry-run --shots <shots.json> --project <preview-id>；只做文本诊断，不授予生产资格。
+ * 真实提交不再把本地文件写入CMS或夹紧服务计划；未知回执不会自动再次提交。
  */
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, extname, isAbsolute, resolve } from "node:path";
 import {
   allocateShotDurations,
@@ -41,6 +25,9 @@ import {
 } from "../../packages/video-studio/src/index.js";
 import type { PortraitIndexLike as PackagePortraitIndexLike } from "../../packages/video-studio/src/index.js";
 
+import { ProductionClient, renderServiceProject } from "../../packages/video-studio/src/production-client.js";
+import { randomUUID } from "node:crypto";
+
 const API = process.env.WORKLOOM_API ?? "http://127.0.0.1:8787";
 const TOKEN = process.env.WORKLOOM_TOKEN ?? "";
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
@@ -50,21 +37,6 @@ function arg(name: string, fallback = ""): string {
   return i >= 0 ? (process.argv[i + 1] ?? fallback) : fallback;
 }
 const flag = (name: string) => process.argv.includes(name);
-
-async function call<T>(path: string, body: unknown, method: "POST" | "GET" = "POST"): Promise<T> {
-  const url = method === "GET"
-    ? `${API}/trpc/${path}?input=${encodeURIComponent(JSON.stringify(body))}`
-    : `${API}/trpc/${path}`;
-  const res = await fetch(url, {
-    method,
-    headers: { "content-type": "application/json", authorization: `Bearer ${TOKEN}` },
-    ...(method === "POST" ? { body: JSON.stringify(body) } : {}),
-  });
-  const text = await res.text();
-  const json = text ? (JSON.parse(text) as { error?: { message?: string }; result?: { data?: T } }) : {};
-  if (json.error) throw new Error(`${path}: ${json.error.message}`);
-  return json.result?.data as T;
-}
 
 /* ================= 镜头卡 ================= */
 
@@ -272,18 +244,6 @@ export async function enrichShotWithCinematographyKb(
 /** 知识库进程内缓存（key=目录） */
 const cinematographyKbCache = new Map<string, unknown>();
 
-function dataUrl(file: string): string {
-  /**
-   * 已授权真人素材（方舟人像库 asset ID）与远端 URL 直接透传：
-   * 真人肖像不能直传图片（平台隐私闸 400），必须用 `asset://<asset ID>`；
-   * 透传可避免把 asset 引用误读成本地文件。
-   */
-  if (file.startsWith("asset://") || /^https?:\/\//i.test(file)) return file;
-  const ext = extname(file).toLowerCase();
-  const mime = ext === ".png" ? "image/png" : ext === ".webp" ? "image/webp" : "image/jpeg";
-  return `data:${mime};base64,${readFileSync(file).toString("base64")}`;
-}
-
 /* ================= 定妆照索引 ================= */
 
 interface PortraitIndexLike {
@@ -311,16 +271,50 @@ export function pickCharacterPortrait(index: PortraitIndexLike | null, shot: Sho
 
 /* ================= 主流程 ================= */
 
-const shotsFile = arg("--shots");
-if (!shotsFile) throw new Error("需要 --shots <shots.json>");
+const dryRun = flag("--dry-run");
 const projectId = arg("--project");
+const shotsFile = arg("--shots");
+const modelId = arg("--model", dryRun ? "doubao-seedance-2-5" : "");
+const only = arg("--only").split(",").map((value) => value.trim()).filter(Boolean);
+if (!dryRun) {
+  const client = new ProductionClient({ api: API, token: TOKEN });
+  if (flag("--list-models")) {
+    console.log(JSON.stringify(await client.request("video.gen.catalog", { kind: "video", includeUnavailable: false }, "GET"), null, 2));
+    process.exit(0);
+  }
+  if (!projectId || !modelId) throw new Error("服务生产需要 --project <id> --model <服务模型目录id>；--list-models 可查询当前可用目录");
+  const forbidden = ["--shots", "--refs", "--total-seconds", "--max-shot-seconds", "--allow-spec-fail", "--allow-missing-portrait", "--allow-overage", "--chain-last-frame"];
+  const supplied = forbidden.filter(flag);
+  if (supplied.length) throw new Error(`LOCAL_PRODUCTION_OVERRIDE_REJECTED: ${supplied.join(", ")} 只适用于本地诊断或旧接口；正式生成只消费服务当前原稿与计划时长。本地镜头文件用 --dry-run 预览。`);
+  const summaryPath = resolve(REPO_ROOT, arg("--summary-out", `outputs/${projectId}/render-summary.json`));
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,199}$/.test(projectId) || projectId.includes("..")) throw new Error("PROJECT_ID_INVALID");
+  const save = (value: unknown): void => {
+    mkdirSync(dirname(summaryPath), { recursive: true });
+    const temp = `${summaryPath}.${randomUUID()}.tmp`;
+    try { writeFileSync(temp, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 }); renameSync(temp, summaryPath); }
+    finally { rmSync(temp, { force: true }); }
+  };
+  try {
+    const result = await renderServiceProject({ client, projectId, modelId, only,
+      params: { ...(flag("--aspect") ? { aspectRatio: arg("--aspect") } : {}), ...(flag("--resolution") ? { resolution: arg("--resolution") } : {}),
+        ...(flag("--seed") ? { seed: Number(arg("--seed")) } : {}), ...(flag("--service-tier") ? { serviceTier: arg("--service-tier") } : {}),
+        ...(flag("--camera-fixed") ? { cameraFixed: true } : {}), ...(flag("--no-audio") ? { generateAudio: false } : {}) },
+      ...(flag("--max-estimated-cny") ? { maxEstimatedCny: Number(arg("--max-estimated-cny")) } : {}),
+      pollRounds: Number(arg("--poll-rounds", "80")), pollIntervalMs: Number(arg("--poll-interval-ms", "15000")),
+      onProgress: save });
+    console.log(`出片汇总：${summaryPath}`);
+    console.log(`SUMMARY ${JSON.stringify(result)}`);
+    process.exit(result.status === "done" ? 0 : 6);
+  } catch (error) {
+    console.error(client.safeError(error));
+    process.exit(6);
+  }
+}
+if (!shotsFile) throw new Error("本地预览需要 --dry-run --shots <shots.json>");
 if (!projectId) throw new Error("需要 --project <VideoProjectId>");
 const totalSeconds = Number(arg("--total-seconds", "30"));
 const aspect = arg("--aspect", "9:16");
 const resolution = arg("--resolution", "1080p");
-const modelId = arg("--model", "doubao-seedance-2-5");
-const only = arg("--only").split(",").map((s) => s.trim()).filter(Boolean);
-const dryRun = flag("--dry-run");
 /** 单镜时长上限覆盖（缺省=媒体目录里该模型的能力上限，Seedance 2.5 实测 4–30s） */
 const maxShotSeconds = arg("--max-shot-seconds");
 /** 交付闸未过的镜头默认拒绝提交（避免把不合规提示词烧成额度）；显式放行需带此开关 */
@@ -330,40 +324,6 @@ const allowSpecFail = flag("--allow-spec-fail");
  * 人物缺失，成片主角完全由文字编出来）。显式放行需带此开关 —— 只用于空镜/纯场景片。
  */
 const allowMissingPortrait = flag("--allow-missing-portrait");
-/** 复现种子（同一 seed + 同 prompt 便于 A/B；写入 render_jobs 便于复盘） */
-const seedArg = arg("--seed");
-/** 服务档位：default（终稿）| flex（草稿，成本更低） */
-const serviceTier = arg("--service-tier");
-/** 固定机位（口播/棚拍镜头） */
-const cameraFixed = flag("--camera-fixed");
-/**
- * 逐镜首尾帧接力：第 N 镜返回尾帧（return_last_frame），作为第 N+1 镜 first_frame。
- * 官方 SDK 参数（volcengine-python-sdk@5.0.50）确认支持；能显著改善多镜空间/光线连续性。
- * 代价：必须顺序提交（每镜等出片），总时长变长。
- */
-const chainLastFrame = flag("--chain-last-frame");
-/**
- * 超套餐额度时显式确认按量实扣（G8 预算闸口径：`allowOverage`）。
- * 默认关闭（平台额度用尽即停）；产品所有者明确要求产出完整成片时才开。
- */
-const allowOverage = flag("--allow-overage");
-const ARK_BASE = (process.env.ARK_BASE_URL ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, "");
-const ARK_KEY = process.env.VOLCENGINE_ARK_API_KEY ?? process.env.ARK_API_KEY ?? "";
-/** 查询 Ark 任务详情（取 content.last_frame_url） */
-async function fetchLastFrameUrl(taskId: string, timeoutMs = 15_000): Promise<string | null> {
-  if (!ARK_KEY) return null;
-  try {
-    const res = await fetch(`${ARK_BASE}/contents/generations/tasks/${taskId}`, {
-      headers: { authorization: `Bearer ${ARK_KEY}` },
-      signal: AbortSignal.timeout(timeoutMs)
-    });
-    if (!res.ok) return null;
-    const data = (await res.json()) as { content?: { last_frame_url?: string } };
-    return data?.content?.last_frame_url ?? null;
-  } catch {
-    return null;
-  }
-}
 const workDir = resolve(REPO_ROOT, process.env.HR_WORK_DIR ?? ".vm-work");
 const refFiles = loadRefFiles(arg("--refs", "var/media/references/suzhou-nanyuan"));
 const portraitIndex = loadPortraitIndex(projectId, workDir);
@@ -424,38 +384,6 @@ interface ShotResult {
 
 const results: ShotResult[] = [];
 const specReports: ShotSpecReport[] = [];
-const pending = new Map<string, ShotResult>();
-/** 首尾帧接力用：当前镜头应带的首帧 URL（Ark 尾帧 URL 或 null） */
-let chainFirstFrame: string | null = null;
-
-/** 轮询单个渲染任务直到 done/failed；返回尾帧 URL（用于接力） */
-async function waitForShotAndLastFrame(jobId: string, taskId: string): Promise<string | null> {
-  for (let i = 0; i < 90; i += 1) {
-    await new Promise((r) => setTimeout(r, 15_000));
-    await call("video.render.poll", { limit: 20 }).catch(() => undefined);
-    const jobs = await call<Array<{ id: string; status: string; asset_id: string | null; local_path: string | null }>>(
-      "video.gen.jobs", { projectId, limit: 100 }, "GET"
-    ).catch(() => []);
-    const job = jobs.find((j) => j.id === jobId);
-    if (!job) continue;
-    if (job.status === "done") {
-      const row = pending.get(jobId) ?? results.find((r) => r.jobId === jobId);
-      if (row) { row.status = "done"; row.assetId = job.asset_id; row.localPath = job.local_path; }
-      pending.delete(jobId);
-      console.log(`   🔗 ${jobId} 已出片 asset=${job.asset_id ?? "—"}`);
-      return await fetchLastFrameUrl(taskId);
-    }
-    if (job.status === "failed") {
-      const row = pending.get(jobId) ?? results.find((r) => r.jobId === jobId);
-      if (row) row.status = "failed";
-      pending.delete(jobId);
-      console.warn(`   ⛔ ${jobId} 渲染失败，接力中断`);
-      return null;
-    }
-  }
-  return null;
-}
-
 for (const shot of shots) {
   const seconds = durations.get(shot.shotId)!;
   const scriptKey = `${projectId}-${shot.shotId}`.toLowerCase();
@@ -578,7 +506,7 @@ for (const shot of shots) {
       ? characterPortraits
       : productPortraits.length > 0
         ? productPortraits
-        : venue;
+        : venuePool;
     if (fallback.length > 0) cardWithPortraits.portraits = fallback;
   }
 
@@ -612,140 +540,11 @@ for (const shot of shots) {
     }
     console.warn(`⚠️ ${shot.shotId}：${row.error}（--allow-spec-fail 已显式放行）`);
   }
-  const md = [
-    `# ${projectId} · ${shot.shotId}`,
-    "",
-    "## 镜头描述（预生产定稿，25/30 字段全文）",
-    "",
-    promptText,
-    "",
-    "## 参数",
-    "",
-    `- 画幅：${aspect}`,
-    `- 分辨率：${resolution}`,
-    `- 时长：${seconds}s`,
-    `- 模型：${modelId}`,
-    `- 参考图：${references.length} 张（${references.map((f) => basename(f)).join("、") || "无"}）`,
-  ].join("\n");
-
-  if (dryRun) {
-    console.log(
-      `[dry-run] ${shot.shotId} ${seconds}s refs=${references.map((f) => basename(f)).join("+") || "无"}`
-      + ` prompt=${promptText.length}字 source=${specReport.promptSource}`
-      + ` 交付闸=${specReport.delivery.pass ? "pass" : "fail"} 字段体系=${specReport.isOpening ? "片头30" : "内容25"}`
-    );
-    continue;
-  }
-
-  try {
-    const fields = {
-      镜头号: shot.shotId,
-      场景: shot.scene ?? "",
-      时长秒: seconds,
-      画幅: aspect,
-      分辨率: resolution,
-      参考图: references.map((f) => basename(f)),
-      角色: shot.characters ?? [],
-    };
-    const diffSummary = String(shot.diffSummary ?? `项目级出片：${shot.shotId}（预生产定稿 ${promptText.length} 字）`);
-    /**
-     * 镜头卡进管线的正门：v1 用 cms.createScript；key 已存在则走 saveScriptVersion 生成新版本
-     * （版本链 + diff 摘要留痕，v1 缺失是 2026-09-21 真机暴露的缺口）。
-     */
-    let saved: { id: string; version: number };
-    try {
-      saved = await call<{ id: string; version: number }>("video.cms.createScript", {
-        scriptKey, projectId, shotId: shot.shotId, md, fields,
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (!/已存在/.test(message)) throw err;
-      saved = await call<{ id: string; version: number }>("video.cms.saveScriptVersion", {
-        scriptKey, md, fields, diffSummary,
-      });
-    }
-    row.scriptId = saved.id;
-    const submitted = await call<{
-      jobId: string; taskId: string; mock: boolean; durationSec: number; clamped: boolean;
-    }>("video.render.submit", {
-      scriptId: saved.id,
-      mode: "auto",
-      modelId,
-      durationSec: seconds,
-      /**
-       * 首帧模式（i2v）**不能传 ratio**（真机 2026-09-22 实测 400：
-       * `For first-frame or first-last-frame generation, the output ratio follows the first-frame image`）。
-       * 接力镜沿用上一镜尾帧的画幅，因此这里只在非接力镜上传 ratio。
-       */
-      ...(chainFirstFrame ? {} : { aspectRatio: aspect }),
-      resolution,
-      generateAudio: true,
-      /**
-       * 首尾帧与参考图**互斥**（真机 2026-09-22 实测 400：
-       * `first/last frame content cannot be mixed with reference media content`）。
-       * 接力镜只用上一镜尾帧作为 first_frame（尾帧本身已携带人物与场景，天然保持一致性），
-       * 非接力镜继续用 ≤4 张定妆照/实拍参考图。
-       */
-      ...(chainFirstFrame
-        ? { firstFrameUrl: chainFirstFrame }
-        : { referenceImageUrls: references.map(dataUrl) }),
-      ...(seedArg ? { seed: Number(seedArg) } : {}),
-      ...(serviceTier ? { serviceTier } : {}),
-      ...(cameraFixed ? { cameraFixed: true } : {}),
-      ...(chainLastFrame ? { returnLastFrame: true } : {}),
-      ...(allowOverage ? { allowOverage: true } : {}),
-      estimatedSeconds: seconds,
-      idempotencyKey: `render-project:${projectId}:${shot.shotId}:${modelId}:${seconds}`,
-    });
-    row.jobId = submitted.jobId;
-    row.taskId = submitted.taskId;
-    row.mock = submitted.mock;
-    row.status = "submitted";
-    pending.set(submitted.jobId, row);
-    console.log(`✅ ${shot.shotId} 提交：job=${submitted.jobId} task=${submitted.taskId} mock=${submitted.mock} ${submitted.durationSec}s${submitted.clamped ? "（已夹紧）" : ""} refs=${references.length}`);
-    /** 首尾帧接力：顺序等本镜出片 → 取尾帧 → 作为下一镜首帧 */
-    if (chainLastFrame && !submitted.mock) {
-      const lastFrame = await waitForShotAndLastFrame(submitted.jobId, submitted.taskId);
-      if (lastFrame) {
-        chainFirstFrame = lastFrame;
-        console.log(`   🔗 ${shot.shotId} 尾帧就绪 → 作为下一镜 first_frame`);
-      } else {
-        console.warn(`   ⚠️ ${shot.shotId} 未取到尾帧（下一镜按无条件首帧提交）`);
-        chainFirstFrame = null;
-      }
-    }
-  } catch (err) {
-    row.error = err instanceof Error ? err.message : String(err);
-    console.error(`⛔ ${shot.shotId} 提交失败：${row.error}`);
-  }
-}
-
-/* ---------- 轮询到成片入库 ---------- */
-const POLL_ROUNDS = Number(arg("--poll-rounds", "80"));
-const POLL_INTERVAL_MS = Number(arg("--poll-interval-ms", "15000"));
-for (let round = 0; round < POLL_ROUNDS && pending.size > 0 && !dryRun; round += 1) {
-  await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-  await call("video.render.poll", { limit: 50 }).catch((err: unknown) => {
-    console.warn(`轮询回填失败（下轮重试）：${err instanceof Error ? err.message : String(err)}`);
-  });
-  /** 任务台账在 gen 路由下（video.gen.jobs）：render.* 只有提交与轮询回填 */
-  const jobs = await call<Array<{
-    id: string; status: string; asset_id: string | null; local_path: string | null; result_url: string | null;
-  }>>("video.gen.jobs", { projectId, limit: 100 }, "GET");
-  for (const job of jobs) {
-    const row = pending.get(job.id);
-    if (!row) continue;
-    row.status = job.status;
-    row.assetId = job.asset_id;
-    row.localPath = job.local_path;
-    if (job.status === "done" || job.status === "failed") {
-      pending.delete(job.id);
-      console.log(`${job.status === "done" ? "🎬" : "⛔"} ${row.shotId} ${job.status} asset=${job.asset_id ?? "—"} local=${job.local_path ?? "—"}`);
-    }
-  }
-  if (round % 4 === 0) {
-    console.log(`轮询 ${round + 1}：待完成 ${pending.size}（${[...pending.values()].map((r) => `${r.shotId}:${r.status}`).join(" ")}）`);
-  }
+  console.log(
+    `[dry-run] ${shot.shotId} ${seconds}s refs=${references.map((file) => basename(file)).join("+") || "无"}`
+    + ` prompt=${promptText.length}字 source=${specReport.promptSource}`
+    + ` 交付闸=${specReport.delivery.pass ? "pass" : "fail"} 字段体系=${specReport.isOpening ? "片头30" : "内容25"}`
+  );
 }
 
 /* ---------- 报告落盘：镜头卡规范表 + 出片汇总（供 pipeline-audit 消费） ---------- */
@@ -773,6 +572,8 @@ if (specReports.length > 0) {
 }
 
 const summary = {
+  mode: "local-preview",
+  productionQualified: false,
   projectId,
   totalSeconds,
   aspect,

@@ -13,7 +13,8 @@
  *   voice-cli speak     --text "..." --profile zh-xiaozhi --out out.wav [--lufs -16]
  *   voice-cli dub       --in film.mp4 --out dubbed.mp4 --profile zh-xiaozhi --text "..."
  *                       [--policy keep-dialogue] [--segments segs.json] [--lufs -14]
- *   voice-cli verify    --in out.wav [--expect-text "..."] [--min-match 0.6]
+ *   voice-cli verify    --in out.wav --expect-text "..." [--min-match 0.6] [--no-strict]
+ *   voice-cli verify    --in music.wav --no-speech-expected
  *
  * 退出码：0 成功；2 用法错误；3 工具错误（code 见 VoiceError）。
  * 任何写入都落到新文件；覆盖原片/参考音频一律拒绝。
@@ -50,6 +51,14 @@ function number(value, fallback = undefined) {
   if (value === undefined || value === true) return fallback;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function verifyNumber(flags, key) {
+  if (flags[key] === undefined) return undefined;
+  if (typeof flags[key] !== "string" || !flags[key].trim() || !Number.isFinite(Number(flags[key]))) {
+    throw new VoiceError(`--${key} 必须是有限数值`, "bad_request");
+  }
+  return Number(flags[key]);
 }
 
 function print(payload) {
@@ -142,9 +151,10 @@ async function main() {
       print(await callTool("voicewrite.verify", {
         input: flags.in,
         expect_text: typeof flags["expect-text"] === "string" ? flags["expect-text"] : undefined,
-        min_match_ratio: number(flags["min-match"]),
-        lufs: number(flags.lufs),
-        true_peak: number(flags["true-peak"]),
+        ...(flags["no-speech-expected"] === true ? { speech_expected: false } : {}),
+        min_match_ratio: verifyNumber(flags, "min-match"),
+        lufs: verifyNumber(flags, "lufs"),
+        true_peak: verifyNumber(flags, "true-peak"),
         /**
          * `--no-strict`（2026-09-25）：只做**人声核查**的调用方（如"每句台词都要有人声"的逐镜探测）
          * 要的是 ASR 与活动度**读数**，不应该因为真峰值/响度这类交付项不达标就整条命令失败——

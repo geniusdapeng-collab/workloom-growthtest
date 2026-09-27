@@ -11,6 +11,8 @@
  * 纪律：供应商密钥只从环境变量读取（秘密不进文件/日志）；mock 与真实在数据与界面均明确区分。
  */
 
+import { GenSubmissionError } from "@workloom/base/model-router";
+
 /** 生成模态（本仓当前真实接入 video；image/audio 目录登记、按 availability 标注） */
 export type MediaKind = "video" | "image" | "audio";
 
@@ -133,13 +135,15 @@ export interface GenEstimate {
 export type ProviderErrorKind =
   | "AUTH" | "CONCURRENCY" | "MODEL_UNAVAILABLE" | "RETRYABLE" | "MODERATION" | "PROVIDER_FAILED" | "BAD_REQUEST";
 
-export class ProviderError extends Error {
+export class ProviderError extends GenSubmissionError {
   constructor(
     public readonly kind: ProviderErrorKind,
     message: string,
     public readonly status?: number,
+    acceptance: "not-accepted" | "unknown" = ["AUTH", "CONCURRENCY", "MODERATION", "BAD_REQUEST"].includes(kind)
+      ? "not-accepted" : "unknown",
   ) {
-    super(message);
+    super(message, acceptance, acceptance === "not-accepted" && ["AUTH", "MODEL_UNAVAILABLE", "RETRYABLE"].includes(kind));
     this.name = "ProviderError";
   }
 }

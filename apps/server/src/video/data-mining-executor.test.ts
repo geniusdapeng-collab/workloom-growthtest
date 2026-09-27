@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   createApiSearchRunner,
   createDataMiningExecutor,
@@ -192,5 +192,26 @@ describe("商品情报执行器", () => {
     const cfg = resolveApiSearchConfig({}, {} as NodeJS.ProcessEnv);
     expect(cfg).toBeNull();
     expect(createApiSearchRunner({ provider: "tavily", apiKey: "", apiUrl: "" }).enabled).toBe(false);
+  });
+});
+
+ describe("正式来源collector接缝", () => {
+  it("真实候选完整交给collector，不把snippet交给旧模型回填", async () => {
+    const reason = vi.fn(), evidenceCollector = vi.fn(async () => ({ identity: { name: "已核实" } }));
+    const executor = createDataMiningExecutor({ search: async () => [{ title: "x", url: "https://source.example.com/", snippet: "待核实" }], llm: { reason }, evidenceCollector });
+    expect(await executor("A1", { queries: [{ q: "商品" }] })).toEqual({ identity: { name: "已核实" } });
+    expect(evidenceCollector).toHaveBeenCalledWith("A1", expect.anything(), [expect.objectContaining({ snippet: "待核实" })]); expect(reason).not.toHaveBeenCalled();
+  });
+  it("缺查询/检索抛错仍交collector明确缺站；collector核验失败原样抛出", async () => {
+    const evidenceCollector = vi.fn(async (_stage: unknown, _plan: unknown, _hits: unknown[]) => { throw new Error("MARKETING_A1_UNVERIFIED"); });
+    const executor = createDataMiningExecutor({ search: async () => { throw new Error("search unavailable"); }, llm: { reason: vi.fn() }, evidenceCollector });
+    await expect(executor("A1", {})).rejects.toThrow("MARKETING_A1_UNVERIFIED");
+    await expect(executor("A1", { queries: [{ q: "商品" }] })).rejects.toThrow("MARKETING_A1_UNVERIFIED");
+    expect(evidenceCollector.mock.calls.every(call => call[2]?.length === 0)).toBe(true);
+  });
+  it("一个真URL不掩护其他假URL，端口保留参与白名单", () => {
+    const good = "https://source.example.com/item", allowed = new Set([normalizeUrl(good)]);
+    expect(filterUnknownUrls({ name: "x", source_url: good, price_source_url: "https://fake.example.com/" }, allowed).value).toBeUndefined();
+    expect(normalizeUrl("https://source.example.com:8443/item")).not.toBe(normalizeUrl(good));
   });
 });

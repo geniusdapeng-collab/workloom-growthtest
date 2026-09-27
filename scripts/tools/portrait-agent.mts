@@ -19,7 +19,7 @@ import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  appendGateEvent, buildGateEvent, buildPortraitPlan, findAngleFile, loadCharacterEntry, reviewStage, runPortraitAgent
+  appendGateEvent, assertCharacterComponent, buildGateEvent, buildPortraitPlan, loadCharacterEntry, reviewStage, runPortraitAgent
 } from "../../packages/video-studio/src/index.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -47,7 +47,7 @@ const ENV: Record<string, string> = (() => {
       if (match && match[2]!.trim() && !out[match[1]!]) out[match[1]!] = match[2]!.trim();
     }
   }
-  for (const [key, value] of Object.entries(process.env)) if (value && !out[key]) out[key] = value;
+  for (const [key, value] of Object.entries(process.env)) if (value) out[key] = value;
   return out;
 })();
 
@@ -70,7 +70,7 @@ function resolveAnchors(spec: string, characterDir: string): string[] {
       resolve(raw)
     ];
     const hit = candidates.find((p) => existsSync(p));
-    if (!hit) continue;
+    if (!hit) throw new Error(`显式锚点不存在：${raw}，不能静默改成纯文生图`);
     const stat = statSync(hit);
     if (stat.isDirectory()) {
       for (const name of readdirSync(hit).sort()) {
@@ -80,6 +80,7 @@ function resolveAnchors(spec: string, characterDir: string): string[] {
     }
     out.push(hit);
   }
+  if (out.length === 0) throw new Error("显式锚点目录没有图片，不能静默改成纯文生图");
   return out;
 }
 
@@ -89,19 +90,28 @@ async function main(): Promise<void> {
     process.exitCode = 2;
     return;
   }
+  assertCharacterComponent(characterId);
+  for (const name of ["--character", "--seed", "--version", "--angles", "--anchor", "--size", "--wardrobe-id", "--wardrobe"]) {
+    const value = arg(name);
+    if (flag(name) && (!value || value.startsWith("--"))) throw new Error(`参数缺少值：${name}`);
+  }
   const entry = loadCharacterEntry(join(LIBRARY_ROOT, characterId));
   if (!entry) {
     console.error(`未找到角色档案：${join(LIBRARY_ROOT, characterId, "profile.json")}`);
     process.exitCode = 1;
     return;
   }
+  const model = ENV.ARK_IMAGE_MODEL || ENV.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628";
   const config = {
+    model, baseUrl: ENV.ARK_BASE_URL,
     ...(arg("--seed") ? { seed: Number(arg("--seed")) } : {}),
     ...(arg("--version") ? { version: Number(arg("--version")) } : {}),
     ...(arg("--angles") ? { angles: arg("--angles").split(",").map((s) => s.trim()).filter(Boolean) } : {}),
     ...(arg("--anchor") ? { anchorImages: resolveAnchors(arg("--anchor"), join(LIBRARY_ROOT, characterId)) } : {}),
     ...(arg("--size") ? { size: arg("--size") } : {}),
-    ...(flag("--no-activate") ? { activate: false } : {})
+    ...(flag("--no-activate") ? { activate: false } : {}),
+    ...(arg("--wardrobe-id") ? { wardrobeId: arg("--wardrobe-id") } : {}),
+    ...(arg("--wardrobe") ? { wardrobe: { name: arg("--wardrobe") } } : {})
   };
 
   if (command === "plan") {
@@ -109,6 +119,7 @@ async function main(): Promise<void> {
     console.log(`角色：${plan.name}（${plan.characterId}）｜版本 v${plan.version}｜模式 ${plan.mode}（${plan.reason}）`);
     console.log(`锚点：${plan.anchors.length > 0 ? plan.anchors.map((f) => f.split("/").slice(-1)[0]).join(" / ") : "无（纯文生图）"}`);
     console.log(`角度：${plan.angles.join(" / ")}`);
+    console.log(`服装：${String(plan.wardrobe.name ?? "未指定")}｜服装hash=${plan.wardrobeHash}｜请求hash=${plan.requestHash}`);
     if (plan.negativeTerms) console.log(`负面词：${plan.negativeTerms}`);
     for (const [angle, prompt] of Object.entries(plan.prompts)) console.log(`\n[${angle}]\n${prompt}`);
     return;
@@ -121,7 +132,6 @@ async function main(): Promise<void> {
       process.exitCode = 1;
       return;
     }
-    const model = ENV.ARK_IMAGE_MODEL || ENV.SEEDREAM_MODEL || "doubao-seedream-5-0-pro-260628";
     const result = await runPortraitAgent({
       libraryRoot: LIBRARY_ROOT,
       characterId,
@@ -131,30 +141,25 @@ async function main(): Promise<void> {
       config,
       log: (line) => console.log(line)
     });
-    console.log(`\n✅ ${result.characterId} v${result.version} 完成：${Object.keys(result.files).join("/")}`);
+    console.log(`\n${result.portraitSet.status === "ready" ? "已完成" : "候选未完整"}：${result.characterId} v${result.version} ${Object.keys(result.files).join("/")}`);
     console.log(`   档案：${result.profileFile}`);
     console.log(`   定妆照集：portrait-sets/v${result.version}.json（active=${result.portraitSet.active}）`);
+    if (result.portraitSet.status !== "ready") process.exitCode = 4;
     return;
   }
 
   if (command === "review") {
     const characterDir = join(LIBRARY_ROOT, characterId);
     const versionArg = arg("--version") ? Number(arg("--version")) : null;
-    const target = versionArg
-      ? (entry.portraitSets ?? []).find((s) => s.version === versionArg) ?? null
-      : entry.activeSet;
+    const selected = loadCharacterEntry(characterDir, versionArg === null ? {} : { pinnedVersion: versionArg });
+    const target = selected?.activeSet;
     if (!target) {
       console.error(`未找到定妆照集（version=${versionArg ?? "active"}）`);
       process.exitCode = 1;
       return;
     }
-    const setDir = resolve(characterDir, target.dir);
-    const produced = (target.angles ?? [])
-      .map((angle) => {
-        /** 与 character-archive 同口径：规范命名优先，允许任意前缀-<角度>（真机 2026-09-24 修复） */
-        return findAngleFile(setDir, entry.name, angle);
-      })
-      .filter((f): f is string => Boolean(f));
+    if (selected!.verification.status !== "passed") throw new Error(`候选尚不可评审：${selected!.verification.issues.join("；")}`);
+    const produced = Object.values(selected!.files);
     const anchors = (target.anchors ?? []).map((p) => resolve(characterDir, p)).filter(existsSync);
     const fallbackAnchors = anchors.length > 0
       ? anchors
@@ -229,4 +234,4 @@ async function main(): Promise<void> {
   process.exitCode = 2;
 }
 
-await main();
+try { await main(); } catch (error) { console.error(error instanceof Error ? error.message : String(error)); process.exitCode = 1; }
