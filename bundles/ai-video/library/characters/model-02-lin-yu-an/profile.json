@@ -1,0 +1,377 @@
+{
+  "schemaVersion": "workloom.character-profile/v1",
+  "id": "lin-yu-an",
+  "name": "林予安",
+  "aliases": [
+    "林予安"
+  ],
+  "ordinal": 2,
+  "kind": "generated",
+  "modelRole": "系统内置 2 号原创虚构 AI 模特；需显式点名，不替代默认 1 号",
+  "identity": {
+    "gender": "female",
+    "age": "约三十岁",
+    "occupation": "品牌讲述人（虚构）"
+  },
+  "appearance": {
+    "gender": "female",
+    "face": "东亚女性面孔，柔和鹅蛋脸、自然下颌线、细直微弧眉、纤直鼻梁与小圆鼻头、自然豆沙唇",
+    "skin": "自然白皙肤色，保留真实皮肤纹理",
+    "eyes": "深棕杏眼，温和直视",
+    "hair": "深栗棕及锁骨微卷发，偏中分",
+    "features": [
+      "轻微闭唇笑",
+      "小珍珠耳钉与细银链单吊坠",
+      "手指自然、短圆无色指甲"
+    ],
+    "bodyType": "修长自然，站姿从容"
+  },
+  "wardrobe": [
+    {
+      "id": "w1",
+      "name": "哑光黑色及膝连身裙",
+      "detail": "圆领收腰；部分角度搭配可穿脱短款黑色粗花呢外套；黑色低跟鞋、小珍珠耳钉、极细银色单吊坠链",
+      "scene": "角色档案基线造型"
+    }
+  ],
+  "activeWardrobeId": "w1",
+  "persona": {
+    "tone": "温和自信、清楚克制",
+    "gesture": "动作小而自然，重视眼神与微表情"
+  },
+  "biography": [
+    "林予安是本仓原创虚构 AI 角色，与陈卓及任何真人为不同身份。",
+    "生成时仅人工参考旧素材中可概括的一般五官词；8 张定妆照均由官方 Seedream 5.0 pro 纯文字独立生成，未上传旧图作为图片锚点。"
+  ],
+  "generation": {
+    "stylePrompt": "真实人像摄影、均一中性浅灰背景、5600K 中性柔光、自然肤质；具体逐角度提示词与 HTTP 回执见 provenance.json",
+    "negativePrompt": "无实景、道具、文字、商标、磨皮、渐变背景、暗角和投影",
+    "model": "doubao-seedream-5-0-pro-260628"
+  },
+  "portraitSets": [
+    {
+      "version": 1,
+      "dir": "portraits/v1",
+      "angles": [
+        "front",
+        "threeQuarter",
+        "closeup",
+        "side",
+        "back",
+        "actionPose",
+        "emotionCloseup",
+        "handDetail"
+      ],
+      "source": "pure-t2i",
+      "active": true,
+      "model": "doubao-seedream-5-0-pro-260628",
+      "wardrobe": {
+        "id": "w1",
+        "name": "哑光黑色及膝连身裙",
+        "detail": "圆领收腰；部分角度搭配可穿脱短款黑色粗花呢外套；黑色低跟鞋、小珍珠耳钉、极细银色单吊坠链",
+        "scene": "角色档案基线造型"
+      },
+      "backgroundRequired": true,
+      "backgroundChecks": {
+        "front": {
+          "ok": true,
+          "policy": "clean-background/v2",
+          "mode": "ring",
+          "bands": [
+            {
+              "name": "top",
+              "ylow": 209,
+              "yhigh": 212,
+              "yavg": 210.139,
+              "satavg": 0.997949
+            },
+            {
+              "name": "bottom",
+              "ylow": 205,
+              "yhigh": 218,
+              "yavg": 204.066,
+              "satavg": 0.994888
+            },
+            {
+              "name": "left",
+              "ylow": 212,
+              "yhigh": 216,
+              "yavg": 213.85,
+              "satavg": 1.00513
+            },
+            {
+              "name": "right",
+              "ylow": 210,
+              "yhigh": 215,
+              "yavg": 212.481,
+              "satavg": 1.01239
+            }
+          ],
+          "cornerSpread": 8.818999999999988,
+          "maxRange": 13,
+          "maxSat": 1.01239,
+          "notes": []
+        },
+        "threeQuarter": {
+          "ok": true,
+          "policy": "clean-background/v2",
+          "mode": "corners",
+          "bands": [],
+          "cornerSpread": 13.314999999999998,
+          "maxRange": 0,
+          "maxSat": 3,
+          "notes": []
+        },
+        "closeup": {
+          "ok": true,
+          "policy": "clean-background/v2",
+          "mode": "corners",
+          "bands": [],
+          "cornerSpread": 17.254999999999995,
+          "maxRange": 0,
+          "maxSat": 5.73547,
+          "notes": []
+        },
+        "side": {
+          "ok": true,
+          "policy": "clean-background/v2",
+          "mode": "ring",
+          "bands": [
+            {
+              "name": "top",
+              "ylow": 212,
+              "yhigh": 219,
+              "yavg": 214.963,
+              "satavg": 1
+            },
+            {
+              "name": "bottom",
+              "ylow": 204,
+              "yhigh": 228,
+              "yavg": 209.091,
+              "satavg": 0.950849
+            },
+            {
+              "name": "left",
+              "ylow": 215,
+              "yhigh": 220,
+              "yavg": 217.72,
+              "satavg": 1
+            },
+            {
+              "name": "right",
+              "ylow": 215,
+              "yhigh": 220,
+              "yavg": 217.474,
+              "satavg": 1
+            }
+          ],
+          "cornerSpread": 15.494,
+          "maxRange": 24,
+          "maxSat": 1,
+          "notes": []
+        },
+        "back": {
+          "policy": "clean-background/v2",
+          "mode": "ring",
+          "cornerSpread": 19.548000000000002,
+          "maxRange": 15.0,
+          "maxSat": 0.946382,
+          "ok": true,
+          "bands": [
+            {
+              "name": "top",
+              "YLOW": 204.0,
+              "YHIGH": 211.0,
+              "YAVG": 207.61,
+              "SATAVG": 0.0844231
+            },
+            {
+              "name": "bottom",
+              "YLOW": 209.0,
+              "YHIGH": 224.0,
+              "YAVG": 211.35,
+              "SATAVG": 0.155545
+            },
+            {
+              "name": "left",
+              "YLOW": 208.0,
+              "YHIGH": 211.0,
+              "YAVG": 209.579,
+              "SATAVG": 0.875567
+            },
+            {
+              "name": "right",
+              "YLOW": 210.0,
+              "YHIGH": 214.0,
+              "YAVG": 212.109,
+              "SATAVG": 0.946382
+            },
+            {
+              "name": "corner-tl",
+              "YLOW": 203.0,
+              "YHIGH": 205.0,
+              "YAVG": 203.827,
+              "SATAVG": 0.2
+            },
+            {
+              "name": "corner-tr",
+              "YLOW": 203.0,
+              "YHIGH": 206.0,
+              "YAVG": 204.109,
+              "SATAVG": 0.1408
+            },
+            {
+              "name": "corner-bl",
+              "YLOW": 217.0,
+              "YHIGH": 219.0,
+              "YAVG": 218.142,
+              "SATAVG": 0.332267
+            },
+            {
+              "name": "corner-br",
+              "YLOW": 221.0,
+              "YHIGH": 225.0,
+              "YAVG": 223.375,
+              "SATAVG": 0.4816
+            }
+          ],
+          "notes": [
+            "定向返修候选：back-v3.jpg"
+          ]
+        },
+        "actionPose": {
+          "policy": "clean-background/v2",
+          "mode": "ring",
+          "cornerSpread": 16.96199999999999,
+          "maxRange": 13.0,
+          "maxSat": 2.99957,
+          "ok": true,
+          "bands": [
+            {
+              "name": "top",
+              "YLOW": 174.0,
+              "YHIGH": 181.0,
+              "YAVG": 177.821,
+              "SATAVG": 2.99115
+            },
+            {
+              "name": "bottom",
+              "YLOW": 178.0,
+              "YHIGH": 191.0,
+              "YAVG": 178.024,
+              "SATAVG": 2.72127
+            },
+            {
+              "name": "left",
+              "YLOW": 180.0,
+              "YHIGH": 184.0,
+              "YAVG": 182.068,
+              "SATAVG": 2.99957
+            },
+            {
+              "name": "right",
+              "YLOW": 165.0,
+              "YHIGH": 177.0,
+              "YAVG": 171.432,
+              "SATAVG": 2.9624
+            },
+            {
+              "name": "corner-tl",
+              "YLOW": 172.0,
+              "YHIGH": 175.0,
+              "YAVG": 174.015,
+              "SATAVG": 3.0
+            },
+            {
+              "name": "corner-tr",
+              "YLOW": 170.0,
+              "YHIGH": 173.0,
+              "YAVG": 171.638,
+              "SATAVG": 2.98293
+            },
+            {
+              "name": "corner-bl",
+              "YLOW": 187.0,
+              "YHIGH": 190.0,
+              "YAVG": 188.6,
+              "SATAVG": 3.0
+            },
+            {
+              "name": "corner-br",
+              "YLOW": 183.0,
+              "YHIGH": 186.0,
+              "YAVG": 184.212,
+              "SATAVG": 3.0
+            }
+          ],
+          "notes": [
+            "定向返修候选：actionPose-v7.jpg"
+          ]
+        },
+        "emotionCloseup": {
+          "ok": true,
+          "policy": "clean-background/v2",
+          "mode": "corners",
+          "bands": [],
+          "cornerSpread": 16.363,
+          "maxRange": 0,
+          "maxSat": 5.54987,
+          "notes": []
+        },
+        "handDetail": {
+          "policy": "clean-background/v2",
+          "mode": "corners",
+          "cornerSpread": 11.049999999999983,
+          "maxRange": 0,
+          "maxSat": 4.12587,
+          "ok": true,
+          "bands": [
+            {
+              "name": "corner-tl",
+              "YLOW": 199.0,
+              "YHIGH": 200.0,
+              "YAVG": 199.613,
+              "SATAVG": 4.12587
+            },
+            {
+              "name": "corner-tr",
+              "YLOW": 199.0,
+              "YHIGH": 201.0,
+              "YAVG": 200.272,
+              "SATAVG": 4.0
+            },
+            {
+              "name": "corner-bl",
+              "YLOW": 199.0,
+              "YHIGH": 201.0,
+              "YAVG": 199.737,
+              "SATAVG": 4.0
+            },
+            {
+              "name": "corner-br",
+              "YLOW": 187.0,
+              "YHIGH": 192.0,
+              "YAVG": 189.222,
+              "SATAVG": 3.704
+            }
+          ],
+          "notes": [
+            "定向返修候选：handDetail-v4.jpg"
+          ]
+        }
+      },
+      "createdAt": "2026-09-27T20:39:56.641964+00:00",
+      "note": "独立纯文字生成；原始 JPEG 未做像素级后期改写；仅生产通过背景探针与目视检查的候选"
+    }
+  ],
+  "provenanceFile": "provenance.json",
+  "tags": [
+    "原创AI",
+    "2号模特",
+    "黑色连身裙",
+    "非默认"
+  ],
+  "createdAt": "2026-09-27T20:39:56.641964+00:00",
+  "updatedAt": "2026-09-27T20:39:56.641964+00:00"
+}

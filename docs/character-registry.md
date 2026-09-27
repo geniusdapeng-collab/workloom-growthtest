@@ -10,8 +10,17 @@
 ## 一、命名
 
 - **1 号模特：陈卓（`chen-zhuo`）** — 系统默认模特。档案：`bundles/ai-video/library/characters/model-01-chen-zhuo/`
+- **2 号模特：林予安（`lin-yu-an`）** — 内置**原创虚构纯 AI 角色**（`kind: generated`，非真人、非 1 号替身）。
+  档案：`bundles/ai-video/library/characters/model-02-lin-yu-an/`；**只在镜头卡点名时使用**（`"character": "林予安"`），
+  `defaultModel` 仍指向 1 号陈卓。8 张定妆照全部由官方 Seedream 5.0 pro **纯文本生成**（请求不含任何图片输入），
+  逐角度证据见同目录 `provenance.json`：实际 `response.model`/`created`/HTTP `x-request-id`、提示词摘要与 SHA-256、
+  产物 SHA-256、客户自定义 ProduceID。**该 ProduceID 是我们自定义的资源映射，不是平台 task_id；平台隐式水印未验证。**
+  该套为**无 v2 收据链的历史口径**（同 1 号 v3 定妆照）：`portraitSets[0]` 不含逐角度 artifacts/angleRequests，
+  因此 `loadCharacterEntry` 的核验 scope 是 `legacy-current-bytes-only`（按角度文件名 + 当前字节核验）。
 - 档案正文含：外貌特征（照片提取）、服装基线、气质、授权信息、定妆照集（v3，8 角度，图生图 + 抠像友好背景硬闸）。
 - **原始照片不进仓库**（仅本地保留）；仓库内只放 AI 生成的定妆照与档案正文。
+- **2 号模特不是任何真人的数字化身**：生成时仅人工参考旧素材里可概括的一般五官词，未把旧图或真人原图作为图片输入；
+  档案里不主张与任何真人身份等同。
 - **在册资产（完整性索引）**：`registry.json`、`model-01-chen-zhuo/profile.json`、`model-01-chen-zhuo/portraits/v3/*.png`（8 张，
   合计 10 件）已登记在 `bundles/ai-video/bundle.json#provides.library`——装载时会校验 sha256，稳定包还会验 Ed25519 签名。
   因此**改动这些文件必须在同一提交里重算摘要**（`pnpm bundle:release` 或在仓内跑
