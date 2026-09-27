@@ -118,10 +118,14 @@
 
 | 位置 | 行为 |
 |---|---|
-| 装载期（读 shotlist 之后、任何阶段之前） | 读 `sceneBible`（或 `--scene-bible`）→ `expandShotWithBible` 展开进每镜字段 → `environmentDefects` 审计 → 报告写 `<work-dir>/env-realism-report-<project>.json` → 落 `env-audit` 阶段记录 |
-| 闸门 | 本轮要做 **spec / plates / material-gen / videos** 任一阶段时，硬缺陷 **fail-closed**（`exit 7`）；纯后期复跑（compose/subtitle/mux…）不拦。带瑕疵放行：`--accept-rejected env` 或 `--accept-env-defects`（记为 `degraded` 留痕） |
-| G7（花钱前最后一道门） | 判据清单增加 `env-realism` 检查（硬），证据带硬/软缺陷数、圣经 id 与报告路径 |
+| 装载期（读 shotlist 之后、任何阶段之前） | 读 `sceneBible`（或 `--scene-bible`）→ `expandShotWithBible` 展开进每镜字段 → `environmentDefects` **与 `deviceDefects`（设备口径，见 `docs/device-standard.md`）合并审计** → 报告写 `<work-dir>/env-realism-report-<project>.json` → 落 `env-audit` 阶段记录 |
+| 闸门 | 本轮要做 **spec / plates / material-gen / videos** 任一阶段时，环境 + 设备硬缺陷 **fail-closed**（`exit 7`）；纯后期复跑（compose/subtitle/mux…）不拦。带瑕疵放行：`--accept-rejected env` 或 `--accept-env-defects`（记为 `degraded` 留痕） |
+| G7（花钱前最后一道门） | 判据清单增加 `env-realism` 检查（硬，含设备口径），证据带硬/软缺陷数、圣经 id、设备清单版本与报告路径 |
 | 关键帧 / 视频提示词 | 展开后的字段 + `plate-prompt` 的通用约束一起进提示词（`ENVIRONMENT_REALISM_CONSTRAINT`，含道具时再加 `PROP_INTERACTION_CONSTRAINT`） |
+
+> **设备口径（2026-09-27 产品所有者硬约束）**：场景里的电子设备**全部使用 2024 年之后的 Apple 设备**，
+> 逐镜在 `devices[]` 声明机型（裸词不算），与本机制共用同一道渲染前闸门与同一份报告。
+> 清单、判据、写法见 `docs/device-standard.md`。
 
 ## 六、与既有能力的关系
 

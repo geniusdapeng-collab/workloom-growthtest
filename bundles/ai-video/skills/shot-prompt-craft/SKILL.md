@@ -32,6 +32,10 @@ description: 镜头提示词 25/30 字段工艺官方套件（随 bundles/ai-vid
    其中**屏幕类必须写"屏幕朝向使用者本人，观众只见机身背面或侧缘"**；静置道具不强制，但写了就要写全。
 8. **首镜即是钩子**：0–3 秒的画面与台词由钩子卡决定（`shotlist.hook`，见 `docs/opening-hook.md`），
    首句 ≤18 字、与首镜画面同拍，钩子音落在 0–0.6s；首镜提示词不得把钩子写成"环境交待 + 人物入场"的慢热结构。
+9. **设备口径硬约束**（产品所有者 2026-09-27）：场景里出现的电子设备（笔记本电脑、台式机、手机、平板、显示器、耳机、键鼠…）
+   **全部使用 2024 年之后的 Apple 设备**，且**机型必须写进镜头卡** `devices[]`（`category` + `model`；裸词"笔记本电脑/平板"不算机型，
+   纸本不算设备）。机型只能取自允许清单（`device-policy.ts#DEVICE_ALLOWLIST`，按 Apple 官网在售维护）；画面里不得出现其他品牌标识。
+   完整口径、判据与写法见 `docs/device-standard.md`。
 
 ## 工艺判据（条件 → 参数/做法 → 判据）
 | 条件 | 参数/做法 | 判据 | 来源 |
@@ -51,6 +55,7 @@ description: 镜头提示词 25/30 字段工艺官方套件（随 bundles/ai-vid
 | 灯光字段 | 含场景内实用光源（窗光/筒灯/台灯/屏幕光 + 方向与色温） | 只有柔光箱/反光板 → `practical-light` 硬缺陷 | KB:同上 |
 | 可交互道具 | 声明 `propInteraction`，屏幕类写"朝向使用者本人" | 缺声明或写成"屏幕朝观众" → 硬缺陷 | KB:`scene-bible.ts#propInteraction`、`BADCASE-2026-0927-phone-screen-toward-audience.md` |
 | 首镜（0–3s） | 按钩子卡给画面/首句/钩子音（首句 ≤18 字） | 首镜慢热或承诺无兑现镜 → `hook-*` 硬失败（短平台） | KB:`opening-hook.ts`、`docs/opening-hook.md` |
+| 电子设备 | 机型写进 `devices[]`（`category` + `model`），机型取自允许清单（2024 后 Apple 在售） | 裸词/非清单机型/其他品牌 → `device-*` 硬缺陷 | KB:`device-policy.ts`、`docs/device-standard.md` |
 
 ## 参数边界
 1. 字符硬上限 3000：超限不得提交 G6，也不得靠截断正文过关（截断会丢字段信息）。
@@ -73,6 +78,7 @@ description: 镜头提示词 25/30 字段工艺官方套件（随 bundles/ai-vid
 | 场景像"平均样板间"（无痕迹/匀光/一级名词材质） | `environment-realism-audit.mts`（渲染前，硬缺陷 fail-closed） | 补 `sceneBible`（空间实指/材质工艺/实用光源/使用痕迹）后重跑，硬缺陷清零再渲 |
 | 道具与人的关系没声明（手机屏朝谁？） | `prop-interaction` / `prop-screen-orientation` 规则 | 补 `propInteraction`（朝向/操作者/承重/遮挡），屏幕类写"朝向使用者本人" |
 | 开头三秒平平/钩子无兑现 | `openingHookChecks`（短平台缺钩子卡即硬失败） | 补钩子卡（类型/承诺/兑现镜/首镜模板/钩子音）后重跑 |
+| 画面出现杂牌/旧世代电子设备 | `device-declaration` / `device-model` / `device-brand` 规则（渲染前，硬缺陷 fail-closed） | 按 `docs/device-standard.md` 补 `devices[]`（机型取自允许清单），文本里的其他品牌一律替换 |
 
 ## 输出契约
 - 每镜输出：25/30 字段 JSON + 字符数校验快照 + 引用来源（场景卡/剧本/定妆照条目）。

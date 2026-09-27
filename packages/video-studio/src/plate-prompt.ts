@@ -109,6 +109,30 @@ export const PROP_INTERACTION_CONSTRAINT =
   + "禁止：手机／平板／笔记本屏幕内容朝观众、道具漂浮或穿模、手指畸变、道具凭空出现或消失。";
 
 /**
+ * 设备口径**条件硬约束**（2026-09-27 产品所有者：场景里的电子设备全部使用 2024 年之后的 Apple 设备）。
+ * 与 `device-policy.ts` 的允许清单同源：清单扩展后这条约束自动跟随（不在这里重复机型列表）。
+ * 纪律：机型必须在镜头卡里**写死**（裸词"笔记本电脑/平板/显示器"不算），避免模型自己补一台杂牌或旧机型。
+ */
+export const DEVICE_STANDARD_CONSTRAINT =
+  "设备口径（本镜硬约束）：画面里的电子设备（笔记本电脑、台式机、手机、平板、显示器、耳机、键鼠等）"
+  + "**全部为 2024 年之后世代的 Apple 在售机型**，机型按镜头卡给定的型号呈现（机身比例、材质、颜色与接口符合该机型），"
+  + "机身与屏幕上不出现任何其他品牌标识、贴纸或旧世代外观特征。"
+  + "禁止：非 Apple 品牌的笔记本／显示器／手机，旧世代或已停产机型外观，无品牌的通用设备，"
+  + "同一画面出现两台外观不一致的「同型号」设备。";
+
+/** 电子设备出现判据：命中即追加设备口径约束 */
+/** 与 `device-policy.ts#DEVICE_PRESENCE_PATTERNS` 同步：只收"Apple 有对应品类"的设备（相机/云台/读卡器不入内） */
+const DEVICE_PRESENCE_HINT = /(笔记本电脑|手提电脑|MacBook|台式机|台式电脑|一体机|主机箱|手机|iPhone|平板电脑|平板|iPad|显示器|显示屏|大屏|耳机|AirPods|键盘|鼠标|触控板|数位板|智能手表|Apple\s?Watch)/i;
+
+/** 本镜是否出现电子设备（命中即需要设备口径约束） */
+export function hasElectronicDevice(shot: PlatePromptShot): boolean {
+  const blob = [shot.scene, shot.sceneDescription, shot.props, shot.composition, shot.action]
+    .map((v) => String(v ?? ""))
+    .join(" ");
+  return DEVICE_PRESENCE_HINT.test(blob);
+}
+
+/**
  * 组装关键帧提示词。
  * 返回值保证：不含 `NaN` / `undefined` / `[object Object]` 这三种退化哨兵（单测强制）。
  */
@@ -164,6 +188,7 @@ export function buildPlatePrompt(shot: PlatePromptShot, options: PlatePromptOpti
     ENVIRONMENT_REALISM_CONSTRAINT,
     ...(isBridgeScene(shot) ? [BRIDGE_STRUCTURE_CONSTRAINT] : []),
     ...(hasInteractiveProp(shot) ? [PROP_INTERACTION_CONSTRAINT] : []),
+    ...(hasElectronicDevice(shot) ? [DEVICE_STANDARD_CONSTRAINT] : []),
     "禁止：文字、字幕、水印、logo、卡通、插画、3D 渲染、塑料皮肤、多余手指、第二个人物清晰入镜、悬空无落点的建筑结构"
   ];
   return lines.filter((line) => line.trim().length > 0).join("\n");
