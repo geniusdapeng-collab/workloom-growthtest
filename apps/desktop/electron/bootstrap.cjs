@@ -83,6 +83,23 @@ function spawnLogged(cmd, args, opts, logFile) {
   return child;
 }
 
+// The server starts from our bundled Node by absolute path, but some local renderers
+// start their own `node` child. A GUI launch may inherit no system Node in PATH.
+function withBundledNodePath(env, nodeBin, platform = process.platform) {
+  const pathApi = platform === "win32" ? path.win32 : path.posix;
+  if (!pathApi.isAbsolute(nodeBin)) throw new Error(`内置 Node 路径必须为绝对路径：${nodeBin}`);
+  const next = { ...env };
+  const pathKeys = Object.keys(next).filter((key) => platform === "win32" ? key.toLowerCase() === "path" : key === "PATH");
+  const pathKey = pathKeys[0] ?? (platform === "win32" ? "Path" : "PATH");
+  const inheritedPath = next[pathKey] || "";
+  // Windows environment keys are case insensitive; keep one PATH spelling so a
+  // duplicate key cannot hide the bundled runtime when child_process spawns.
+  for (const key of pathKeys) delete next[key];
+  const delimiter = platform === "win32" ? ";" : ":";
+  next[pathKey] = [pathApi.dirname(nodeBin), inheritedPath].filter(Boolean).join(delimiter);
+  return next;
+}
+
 function killTree(child) {
   if (!child || child.killed) return;
   try {
@@ -930,7 +947,7 @@ async function bootstrap(opts) {
     WORKLOOM_WEB_PORT: String(WEB_PORT),
     WORKLOOM_NATS_PORT: String(NATS_PORT),
   };
-  const serverEnv = { ...desktopEnv, NODE_ENV: "production" };
+  const serverEnv = withBundledNodePath({ ...desktopEnv, NODE_ENV: "production" }, NODE_BIN);
   const runDatabaseHelper = (mode, legacyPasswords = []) => run(NODE_BIN, [DB_HELPER], {
     env: {
       ...desktopEnv,
@@ -1235,4 +1252,5 @@ module.exports = {
   openExternalUrl,
   acquireBootstrapLock,
   tarExtractionPlan,
+  withBundledNodePath,
 };

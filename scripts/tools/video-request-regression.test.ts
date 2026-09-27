@@ -334,3 +334,65 @@ describe("全链路冻结年代与原合同接线", () => {
     expect(second.read("logs/regression/project-context.json").eraProfile.storyDate).toBe("2024-01-01");
   }, 40_000);
 });
+
+describe("逐刀转场入点（1 起序号）", () => {
+  const available = [ffmpeg, ffprobe].every((bin) => spawnSync(bin, ["-version"], { stdio: "ignore" }).status === 0);
+  it.skipIf(!available)("--transition-at 只对列出的入点生效，硬切与转场混用仍保持整帧对齐", () => {
+    const dir = mkdtempSync(join(tmpdir(), "compose-entry-")); temporary.push(dir);
+    const colors = ["red", "green", "blue", "yellow", "magenta", "cyan"];
+    const clips = colors.map((color, index) => {
+      const file = join(dir, `clip-${index + 1}.mp4`);
+      const made = spawnSync(ffmpeg, ["-hide_banner", "-v", "error", "-y",
+        "-f", "lavfi", "-i", `color=c=${color}:s=64x96:r=8:d=1`,
+        "-f", "lavfi", "-i", `anoisesrc=color=white:seed=${index + 20}:r=48000:d=1`,
+        "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "ultrafast",
+        "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", file,
+      ], { encoding: "utf8", timeout: 15_000 });
+      expect(made.status, `${made.error ?? ""}\n${made.stderr}`).toBe(0);
+      return file;
+    });
+    const makeMaster = (count: number, cuts: string) => {
+      const master = join(dir, `master-${count}-${cuts.replace(/,/g, "_")}.mp4`);
+      const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/tools/compose-film.mts",
+        "--clips", clips.slice(0, count).join(","), "--out", master,
+        "--width", "64", "--height", "96", "--fps", "8", "--fade", "0", "--color", "none",
+        "--transition", "fade", "--transition-duration", "0.25", "--transition-at", cuts,
+      ], { cwd: root, encoding: "utf8", timeout: 90_000,
+        env: { ...process.env, TMPDIR: dir, WL_FFMPEG: ffmpeg, WL_FFPROBE: ffprobe } });
+      expect(result.status, `${result.error ?? ""}\n${result.stdout}\n${result.stderr}`).toBe(0);
+      const duration = spawnSync(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", master], { encoding: "utf8" });
+      expect(duration.status).toBe(0);
+      return { master, seconds: Number(duration.stdout.trim()) };
+    };
+    // 三镜只在第 3 镜入点转场：总长约 3 - 0.25 = 2.75s（硬切不吃重叠）。
+    const three = makeMaster(3, "3");
+    expect(three.seconds).toBeGreaterThan(2.6);
+    expect(three.seconds).toBeLessThan(2.9);
+    const six = makeMaster(6, "2,3,4,5");
+    expect(six.seconds).toBeGreaterThan(5);
+    expect(six.seconds).toBeLessThan(6);
+    const pixel = (at: number) => {
+      const frame = spawnSync(ffmpeg, ["-v", "error", "-ss", String(at), "-i", six.master,
+        "-frames:v", "1", "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { encoding: null });
+      expect(frame.status).toBe(0);
+      return [...(frame.stdout ?? Buffer.alloc(0))];
+    };
+    const [red, green, blue] = pixel(3.75);
+    // 进入第 6 镜的刀口未列出：切换前一帧仍应是第 5 镜的紫色画面。
+    expect(red, `rgb=${red},${green},${blue}`).toBeGreaterThan(200);
+    expect(blue).toBeGreaterThan(200);
+    expect(green).toBeLessThan(50);
+    // 采样点避开帧边界（4.0s 整帧边界可能取到上一帧），取第 6 镜内的 4.25s。
+    const [nextRed, nextGreen, nextBlue] = pixel(4.25);
+    expect(nextRed).toBeLessThan(50);
+    expect(nextGreen).toBeGreaterThan(200);
+    expect(nextBlue).toBeGreaterThan(200);
+    const report = JSON.parse(readFileSync(join(dir, "master-6-2_3_4_5.av-sync.json"), "utf8")) as {
+      outputSha256?: string; clipCount?: number; samples?: Array<{ index: number }>; ok?: boolean;
+    };
+    expect(report.outputSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(report.clipCount).toBe(6);
+    expect(report.samples?.map((sample) => sample.index)).toEqual([0, 1, 2, 3, 4, 5]);
+    expect(report.ok).toBe(true);
+  }, 120_000);
+});

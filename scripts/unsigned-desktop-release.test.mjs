@@ -121,7 +121,10 @@ test("唯一 publisher 与基座 canonical 模板逐字节同源并展平候选�
 });
 
 test("桌面产品身份、端口和签名配置与产品清单一致", () => {
-  assert.equal(product.release.artifactPrefix, product.displayName);
+  // 实验车道在应用名上明示车道身份；短品牌前缀由受保护清单单独维护。
+  assert.equal(typeof product.release.artifactPrefix, "string");
+  assert.ok(product.release.artifactPrefix.trim().length > 0);
+  assert.ok(product.displayName.startsWith(product.release.artifactPrefix));
   assert.ok(builder.includes(`appId: ${product.release.appId}`));
   assert.ok(builder.includes(`productName: ${product.displayName}`));
   assert.ok(builder.includes(`workloomPortOffset: ${product.desktop.portOffset}`));
