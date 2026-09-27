@@ -4165,7 +4165,11 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
     };
     placements.forEach((placement, index) => {
       const file = join(sfxDir, `${String(index + 1).padStart(2, "0")}-${placement.kind}-${placement.atSec}s.wav`);
-      renderOne(placement.kind, placement.kind === "riser" ? 1.2 : placement.kind === "impact" ? 0.26 : 0.36, file);
+      /** 钩子音按 `HOOK_SFX_POLICY.durationSec`（0.26s 收在 0–0.6s 窗口内），剪辑点音效按各音色默认时长 */
+      const durationSec = hookPlacement && placement === hookPlacement
+        ? HOOK_SFX_POLICY.durationSec
+        : (placement.kind === "riser" ? 1.2 : placement.kind === "impact" ? 0.26 : 0.36);
+      renderOne(placement.kind, durationSec, file);
       files.push(file);
     });
     const sfxTrack = join(sfxDir, "sfx-track.wav");
