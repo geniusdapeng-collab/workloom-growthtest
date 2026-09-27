@@ -27,6 +27,8 @@ import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
   AV_SYNC_POLICY,
+  buildCutAudioStep,
+  candidateSyncWindows,
   crossCorrelationLag,
   describeAvSync,
   evaluateAvSync,
@@ -214,7 +216,19 @@ if (transition && transitionDuration > 0) {
     const vOut = `[v${index}]`;
     const aOut = `[a${index}]`;
     steps.push(`${videoLabel}[${index}:v]xfade=transition=${useTransition ? transition : "fade"}:duration=${overlap}:offset=${Math.max(0, offset).toFixed(3)}${vOut}`);
-    steps.push(`${audioLabel}[aex${index}]acrossfade=d=${Math.max(0.01, overlap)}:c1=tri:c2=tri${aOut}`);
+    /**
+     * 硬切口**不能**用 `acrossfade=d=0.01` 凑数（2026-09-27 真机事故）：
+     * acrossfade 每做一刀就吃掉 10ms 音频，而视频侧 `xfade duration=0` 一点不损，
+     * 于是声音相对画面**逐刀提前**（本片 18 镜 14 刀硬切 → 尾镜实测 -132.9ms、
+     * 整条音轨比画面短 294ms），被 compose 的音画对齐硬闸判红。
+     * 现在：硬切口走 `concat`（样点级顺序拼接、长度守恒），只有真转场才 acrossfade。
+     */
+    steps.push(buildCutAudioStep({
+      prevLabel: audioLabel,
+      nextLabel: `[aex${index}]`,
+      outLabel: aOut,
+      overlapSec: overlap,
+    }));
     videoLabel = vOut;
     audioLabel = aOut;
   }
@@ -349,30 +363,43 @@ const searchSamples = Math.round((searchMs / 1000) * avSyncSampleRate);
 const avSamples: AvSyncSample[] = [];
 for (let index = 0; index < normalized.length; index += 1) {
   const duration = shotDurations[index]!;
-  const winStart = Math.min(0.35, Math.max(0.05, duration * 0.12));
-  const winLen = Math.min(1.5, Math.max(0.5, duration - winStart - 0.25));
-  if (winLen < 0.4) continue;
+  /**
+   * **窗口择优**（2026-09-27 真机）：单一固定窗口落在停顿/环境声上时，互相关会锁到邻近镜的
+   * 相似内容（真机：GR-06 固定窗口相关性 0.439、报出 -573.6ms 假偏移，硬闸误判；同一素材
+   * 整段包络互相关 0.995、位置正好等于期望值）。同一镜试多个候选窗口，取相关性最高者——
+   * 相关性仍低于阈值就按"不可测"处理，判据不放宽，只是不再拿一个坏窗口给整镜定罪。
+   */
+  const windows = candidateSyncWindows({ durationSec: duration });
+  if (windows.length === 0) continue;
+  const winLen = windows[0]!.lengthSec;
   const segmentPcm = readAllPcm(normalized[index]!, avSyncSampleRate);
   const refFull = resample(segmentPcm, retimeFactor);
-  const refStart = Math.round(winStart * retimeFactor * avSyncSampleRate);
   const refLen = Math.round(winLen * retimeFactor * avSyncSampleRate);
-  if (refStart + refLen > refFull.length) continue;
-  const ref = refFull.subarray(refStart, refStart + refLen);
-  const expected = Math.round((shotStarts[index]! + winStart) * retimeFactor * avSyncSampleRate);
-  const targetStart = Math.max(0, expected - searchSamples);
-  const targetEnd = Math.min(masterPcm.length, expected + refLen + searchSamples);
-  const target = masterPcm.subarray(targetStart, targetEnd);
-  if (target.length < refLen + 32) continue;
-  const measured = crossCorrelationLag(ref, target, {
-    sampleRate: avSyncSampleRate,
-    maxLagMs: searchMs,
-  });
-  const trueLagMs = measured.lagMs - (expected - targetStart) / avSyncSampleRate * 1000;
+  let best: { lagMs: number; correlation: number } | null = null;
+  for (const { startSec: winStart } of windows) {
+    const refStart = Math.round(winStart * retimeFactor * avSyncSampleRate);
+    if (refStart + refLen > refFull.length) continue;
+    const ref = refFull.subarray(refStart, refStart + refLen);
+    const expected = Math.round((shotStarts[index]! + winStart) * retimeFactor * avSyncSampleRate);
+    const targetStart = Math.max(0, expected - searchSamples);
+    const targetEnd = Math.min(masterPcm.length, expected + refLen + searchSamples);
+    const target = masterPcm.subarray(targetStart, targetEnd);
+    if (target.length < refLen + 32) continue;
+    const measured = crossCorrelationLag(ref, target, {
+      sampleRate: avSyncSampleRate,
+      maxLagMs: searchMs,
+    });
+    const trueLagMs = measured.lagMs - (expected - targetStart) / avSyncSampleRate * 1000;
+    if (!best || measured.correlation > best.correlation) {
+      best = { lagMs: trueLagMs, correlation: measured.correlation };
+    }
+  }
+  if (!best) continue;
   avSamples.push({
     shotId: `#${index + 1}`,
     index,
-    lagMs: Number(trueLagMs.toFixed(2)),
-    correlation: Number(measured.correlation.toFixed(3)),
+    lagMs: Number(best.lagMs.toFixed(2)),
+    correlation: Number(best.correlation.toFixed(3)),
   });
 }
 const avReport = evaluateAvSync(avSamples, AV_SYNC_POLICY);
