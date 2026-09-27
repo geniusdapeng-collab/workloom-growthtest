@@ -30,6 +30,20 @@ export const AV_SYNC_POLICY = {
 export const AV_SYNC_SAMPLE_RATE = 16000;
 
 /**
+ * 实测不可执行（**不是**"没偏移"，是"测不了"）的显式口径。
+ *
+ * 为什么要单列这一类：真机上出现过"环境缺能力 → 检查静默跳过 → 当成通过"的事故族。
+ * 因此这里把结果分成三种，任何一种都不会被当成"通过"：
+ *   · `ok: true`             —— 真测过且达标；
+ *   · `ok: false, kind: "drift"`        —— 测到了偏移（真实缺陷，**永不降级**）；
+ *   · `ok: false, kind: "unverifiable"` —— 测不了（缺 ffmpeg/解码失败/窗口不足）。
+ * 后者的处置交给调用方显式选择：默认**阻断**（抛 `av_sync_unverifiable`）；
+ * 只有在 `allowUnverified: true`（调用方显式声明"这一环境确实无法实测"）时才降级放行，
+ * 且必须写报告文件 + 在返回值里带 `degraded: true`，让下游/审计看得见。
+ */
+export const AV_SYNC_FAILURE_KINDS = Object.freeze({ drift: "drift", unverifiable: "unverifiable" });
+
+/**
  * 归一化互相关求时延（正数 = target 落后于 ref）。
  * 与基座 TS 版逐行同口径：同一滞后范围、同一重叠窗口能量归一。
  */
@@ -188,7 +202,22 @@ export async function decodePcm16k(ffmpeg, file) {
  * 窗口取 `0.12×时长` 起、最长 1.5s；搜索范围 ±300ms。
  */
 export async function measureAssembledAvSync({ ffmpeg, output, clips, starts, policy = AV_SYNC_POLICY }) {
-  const master = await decodePcm16k(ffmpeg, output);
+  /**
+   * 实测不可执行时**不抛错**，而是返回 `unverifiable` 报告（交由调用方决定阻断还是显式降级）：
+   * 缺 ffmpeg、产物不可解码、可测窗口不足都属于这一类；真实测到偏移则仍是 `drift`。
+   */
+  let master;
+  try {
+    master = await decodePcm16k(ffmpeg, output);
+  } catch (error) {
+    return {
+      ok: false,
+      kind: AV_SYNC_FAILURE_KINDS.unverifiable,
+      reason: `解码母版失败：${error instanceof Error ? error.message.slice(0, 200) : String(error)}`,
+      violations: [], warnings: [], measured: 0, skipped: [], maxAbsLagMs: 0, driftMs: null,
+      monotonic: false, samples: [],
+    };
+  }
   const searchSamples = Math.round((300 / 1000) * AV_SYNC_SAMPLE_RATE);
   const samples = [];
   for (let index = 0; index < clips.length; index += 1) {
@@ -198,7 +227,13 @@ export async function measureAssembledAvSync({ ffmpeg, output, clips, starts, po
     const winStart = Math.min(0.35, Math.max(0.05, duration * 0.12));
     const winLen = Math.min(1.5, Math.max(0.5, duration - winStart - 0.25));
     if (winLen < 0.4) continue;
-    const segment = await decodePcm16k(ffmpeg, clip.path);
+    let segment;
+    try {
+      segment = await decodePcm16k(ffmpeg, clip.path);
+    } catch {
+      /** 单镜片段不可解码 = 该窗口不可测（计入 skipped），不影响其它窗口 */
+      continue;
+    }
     const refStart = Math.round(winStart * AV_SYNC_SAMPLE_RATE);
     const refLen = Math.round(winLen * AV_SYNC_SAMPLE_RATE);
     if (refStart + refLen > segment.length) continue;
@@ -217,17 +252,50 @@ export async function measureAssembledAvSync({ ffmpeg, output, clips, starts, po
       correlation: Number(measured.correlation.toFixed(3)),
     });
   }
-  return evaluateAvSync(samples, policy);
+  const report = evaluateAvSync(samples, policy);
+  const kind = classifyAvSyncFailure(report);
+  return kind ? { ...report, kind } : report;
 }
 
-/** 实测 + 断言：不通过即抛错（调用方决定错误类型）。 */
+/**
+ * 判定归因（纯函数，可单测）：只有"真实测到偏移"才算 `drift`；
+ * "没有可测窗口/测不够"归为 `unverifiable`。两者的处置不同——**drift 永不降级**，
+ * unverifiable 才允许在调用方显式声明后降级（并留报告）。
+ */
+export function classifyAvSyncFailure(report) {
+  if (!report || report.ok) return null;
+  if (!Array.isArray(report.samples) || report.samples.length === 0) return AV_SYNC_FAILURE_KINDS.unverifiable;
+  return report.violations?.some((line) => /单镜偏移|累计漂移|单调漂移/.test(String(line)))
+    ? AV_SYNC_FAILURE_KINDS.drift
+    : AV_SYNC_FAILURE_KINDS.unverifiable;
+}
+
+/**
+ * 实测 + 断言。
+ * 默认（`allowUnverified: false`）：偏移与"测不了"都抛错，但错误码区分
+ *   `av_sync_failed`（测到偏移）/ `av_sync_unverifiable`（测不了）。
+ * `allowUnverified: true`：仅对"测不了"降级——返回 `{ ok: null, degraded: true, reason }`，
+ * 调用方必须把 `degraded` 写进产物回执（**不静默**）；测到偏移仍然抛错。
+ */
 export async function verifyAssembledAvSync(options) {
+  const { allowUnverified = false, ...measureOptions } = options;
   const report = await measureAssembledAvSync(options);
-  if (!report.ok) {
-    const error = new Error(`音画对齐实测不通过：${report.violations.join("；")}`);
-    error.code = "av_sync_failed";
-    error.report = report;
-    throw error;
+  if (report.ok) return report;
+  if (report.kind === AV_SYNC_FAILURE_KINDS.unverifiable && allowUnverified) {
+    return {
+      ok: null,
+      degraded: true,
+      kind: AV_SYNC_FAILURE_KINDS.unverifiable,
+      reason: report.reason ?? report.violations.join("；") ?? "实测不可执行",
+      report,
+    };
   }
-  return report;
+  const error = new Error(
+    report.kind === AV_SYNC_FAILURE_KINDS.unverifiable
+      ? `音画对齐无法实测：${report.reason ?? report.violations.join("；")}`
+      : `音画对齐实测不通过：${report.violations.join("；")}`,
+  );
+  error.code = report.kind === AV_SYNC_FAILURE_KINDS.unverifiable ? "av_sync_unverifiable" : "av_sync_failed";
+  error.report = report;
+  throw error;
 }

@@ -361,9 +361,18 @@ export async function normaliseShots({
  * 样点级拼接 + 拼完**实测**（音画对齐机制的平台侧落点）。
  * ① 画面 `-c:v copy`（帧级无损）；② 声音按每段画面时长 atrim+apad 到精确长度后走 concat 滤镜；
  * ③ 合流后逐镜实测偏移与累计漂移，超阈值直接抛 `av_sync_failed`（不静默出厂）。
+ *
+ * 实测的三态口径（**没有"静默通过"这一态**）：
+ *   · 达标 → 返回报告；
+ *   · 测到偏移（`kind: "drift"`）→ 抛 `av_sync_failed`，**永不降级**；
+ *   · 测不了（`kind: "unverifiable"`，如环境缺 ffmpeg）→ 默认抛 `av_sync_unverifiable`；
+ *     只有在 `transitions.allowUnverifiedAvSync === true`（调用方显式声明"本环境确实无法实测"）时，
+ *     才返回 `{ degraded: true, reason }` 并在 `<output>.av-sync.json` 留下"未验证"报告。
  * 关闭自检：`transitions.verifyAvSync === false`（留痕口径：调用方必须自己说明为什么跳过）。
  */
-async function assembleSampleAccurate({ bins, list, clips, output, workDir, fps = 30, verify = true }) {
+async function assembleSampleAccurate({
+  bins, list, clips, output, workDir, fps = 30, verify = true, allowUnverified = false,
+}) {
   const plan = buildSampleAccurateConcatPlan({ listFile: list, clips, output, workDir, fps });
   await runBin(bins.ffmpeg, plan.videoArgs, { label: "ffmpeg(concat-video)", timeoutMs: 900_000 });
   await runBin(bins.ffmpeg, plan.audioArgs, { label: "ffmpeg(concat-audio)", timeoutMs: 900_000 });
@@ -376,17 +385,44 @@ async function assembleSampleAccurate({ bins, list, clips, output, workDir, fps 
     starts.push(cursor);
     cursor += durations[index] > 0 ? durations[index] : 0;
   }
-  const report = await verifyAssembledAvSync({
-    ffmpeg: bins.ffmpeg, output,
-    clips: clips.map((clip, index) => ({
-      shotId: clip.shotId ?? `#${index + 1}`,
-      path: clip.path,
-      durationSec: durations[index],
-    })),
-    starts,
-    policy: AV_SYNC_POLICY,
+  let report;
+  try {
+    report = await verifyAssembledAvSync({
+      ffmpeg: bins.ffmpeg, output,
+      clips: clips.map((clip, index) => ({
+        shotId: clip.shotId ?? `#${index + 1}`,
+        path: clip.path,
+        durationSec: durations[index],
+      })),
+      starts,
+      policy: AV_SYNC_POLICY,
+      allowUnverified,
+    });
+  } catch (error) {
+    /** 失败也要留报告（审计要能看到"哪一镜偏了多少/为什么测不了"），再原样抛出 */
+    await writeAvSyncReport(output, {
+      ok: false, degraded: false, error: error?.code ?? "av_sync_error",
+      detail: error?.message ?? String(error), report: error?.report ?? null,
+    });
+    throw error;
+  }
+  await writeAvSyncReport(output, {
+    ok: report?.ok === true,
+    degraded: Boolean(report?.degraded),
+    detail: report?.degraded ? `未验证：${report.reason}` : "实测完成",
+    report,
   });
   return report;
+}
+
+/** 音画对齐报告落地（与基座 CLI 同口径：`<输出>.av-sync.json`，便于发布方/审计复核）。 */
+async function writeAvSyncReport(output, payload) {
+  try {
+    const target = `${output.replace(/\.mp4$/i, "")}.av-sync.json`;
+    await fsp.writeFile(target, `${JSON.stringify({ generatedAt: new Date().toISOString(), output, ...payload }, null, 2)}\n`, "utf8");
+  } catch {
+    /* 报告写不进去不改变判定，但要显式吞掉并留在上层日志里（不静默改判） */
+  }
 }
 
 export async function assembleTimeline({
@@ -412,11 +448,12 @@ export async function assembleTimeline({
      * `-f concat -c copy` 让 demuxer 按各自流的时长累计偏移 → 声音逐镜漂移（真机尾镜 +125ms）。
      * 现在：画面仍 `-c:v copy`（帧级无损），声音改走 **concat 滤镜**并按画面时长 atrim+apad 到精确长度，再合流。
      */
-    await assembleSampleAccurate({
+    const avSync = await assembleSampleAccurate({
       bins, list, clips, output, workDir: dir, fps,
       verify: transitions.verifyAvSync !== false,
+      allowUnverified: transitions.allowUnverifiedAvSync === true,
     });
-    return { output, mode, fadeSec: 0, shots: clips.length };
+    return { output, mode, fadeSec: 0, shots: clips.length, avSync };
   }
 
   if (mode === "fade") {
@@ -438,13 +475,14 @@ export async function assembleTimeline({
     const list = path.join(dir, "fade-concat.txt");
     await fsp.writeFile(list, parts.map((file) => `file '${file.replaceAll("'", "'\\''")}'`).join("\n"), "utf8");
     /** 淡入淡出路径同样按样点级对齐拼接（各段已重编码，长度口径以各自的 durationSec 为准） */
-    await assembleSampleAccurate({
+    const avSync = await assembleSampleAccurate({
       bins, list,
       clips: clips.map((clip, index) => ({ ...clip, path: parts[index] ?? clip.path })),
       output, workDir: dir, fps,
       verify: transitions.verifyAvSync !== false,
+      allowUnverified: transitions.allowUnverifiedAvSync === true,
     });
-    return { output, mode, fadeSec: round(fadeSec, 3), shots: clips.length };
+    return { output, mode, fadeSec: round(fadeSec, 3), shots: clips.length, avSync };
   }
 
   if (mode !== "xfade") throw new PostError(`未知转场模式：${mode}（可用：hard / fade / xfade）`, "bad_request");
@@ -484,6 +522,7 @@ export async function assembleTimeline({
    * 交叉溶解路径同样要**实测**音画对齐（转场吃掉的重叠量与视频 xfade 的 offset 必须一致；
    * 真机里"转场 + 时长补偿"叠加时最容易出偏差）。
    */
+  let avSync = null;
   if (transitions.verifyAvSync !== false) {
     const starts = [];
     let cursor = 0;
@@ -494,14 +533,27 @@ export async function assembleTimeline({
         cursor += durations[index] - fade;
       }
     }
-    await verifyAssembledAvSync({
-      ffmpeg: bins.ffmpeg, output,
-      clips: clips.map((clip, index) => ({ shotId: clip.shotId ?? `#${index + 1}`, path: clip.path, durationSec: durations[index] })),
-      starts,
-      policy: AV_SYNC_POLICY,
-    });
+    try {
+      avSync = await verifyAssembledAvSync({
+        ffmpeg: bins.ffmpeg, output,
+        clips: clips.map((clip, index) => ({ shotId: clip.shotId ?? `#${index + 1}`, path: clip.path, durationSec: durations[index] })),
+        starts,
+        policy: AV_SYNC_POLICY,
+        allowUnverified: transitions.allowUnverifiedAvSync === true,
+      });
+      await writeAvSyncReport(output, {
+        ok: avSync?.ok === true, degraded: Boolean(avSync?.degraded),
+        detail: avSync?.degraded ? `未验证：${avSync.reason}` : "实测完成", report: avSync,
+      });
+    } catch (error) {
+      await writeAvSyncReport(output, {
+        ok: false, degraded: false, error: error?.code ?? "av_sync_error",
+        detail: error?.message ?? String(error), report: error?.report ?? null,
+      });
+      throw error;
+    }
   }
-  return { output, mode, fadeSec: round(fadeSec, 3), shots: clips.length };
+  return { output, mode, fadeSec: round(fadeSec, 3), shots: clips.length, avSync };
 }
 
 /* ============================ 音频层（选曲 + 混音） ============================ */
