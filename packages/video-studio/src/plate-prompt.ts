@@ -121,7 +121,8 @@ export const DEVICE_STANDARD_CONSTRAINT =
   + "同一画面出现两台外观不一致的「同型号」设备。";
 
 /** 电子设备出现判据：命中即追加设备口径约束 */
-const DEVICE_PRESENCE_HINT = /(笔记本电脑|手提电脑|MacBook|台式机|台式电脑|一体机|主机箱|手机|iPhone|平板电脑|平板|iPad|显示器|显示屏|大屏|耳机|AirPods|键盘|鼠标|触控板|数位板|智能手表|Apple\s?Watch|相机|摄像头|麦克风)/i;
+/** 与 `device-policy.ts#DEVICE_PRESENCE_PATTERNS` 同步：只收"Apple 有对应品类"的设备（相机/云台/读卡器不入内） */
+const DEVICE_PRESENCE_HINT = /(笔记本电脑|手提电脑|MacBook|台式机|台式电脑|一体机|主机箱|手机|iPhone|平板电脑|平板|iPad|显示器|显示屏|大屏|耳机|AirPods|键盘|鼠标|触控板|数位板|智能手表|Apple\s?Watch)/i;
 
 /** 本镜是否出现电子设备（命中即需要设备口径约束） */
 export function hasElectronicDevice(shot: PlatePromptShot): boolean {

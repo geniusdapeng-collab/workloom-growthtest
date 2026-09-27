@@ -19,6 +19,9 @@
  * 在售机型均晚于 2024 年世代（iPhone 16 / M 系列 M4 起）。仍在售但**世代偏早**的机型
  * （如 2022 年的 Studio Display）列入 `DEVICE_SOFT_ALLOWLIST`：不判红，但给软提示建议换新世代，
  * 避免"因为一条软约束把正常镜头全判死"。
+ *
+ * 边界（2026-09-27 实测后收窄）：**相机/云台/读卡器/硬盘盒**这类"Apple 没有对应品类"的设备
+ * **不进声明判据**（否则规则不可满足）；它们只受提示词侧"无其他品牌标识"约束 + 监制视觉复核。
  */
 
 export const DEVICE_POLICY_VERSION = "apple-2024plus/v1";
@@ -26,7 +29,7 @@ export const DEVICE_POLICY_VERSION = "apple-2024plus/v1";
 /** 清单核对日期（Apple 官网在售机型口径） */
 export const DEVICE_POLICY_VERIFIED_AT = "2026-09-27";
 
-export type DeviceCategory = "laptop" | "desktop" | "all-in-one" | "phone" | "tablet" | "display" | "wearable" | "audio" | "input" | "camera";
+export type DeviceCategory = "laptop" | "desktop" | "all-in-one" | "phone" | "tablet" | "display" | "wearable" | "audio" | "input";
 
 export interface DeviceModelEntry {
   /** 机型名（写进镜头卡的就是它） */
@@ -107,7 +110,6 @@ export const DEVICE_PRESENCE_PATTERNS: Array<{ category: DeviceCategory; pattern
   { category: "audio", label: "耳机/音频", pattern: /(耳机|耳麦|AirPods)/i },
   { category: "input", label: "键鼠/触控", pattern: /(键盘|鼠标|触控板|数位板|Magic\s?(?:Keyboard|Mouse|Trackpad))/i },
   { category: "wearable", label: "手表", pattern: /(智能手表|Apple\s?Watch)/i },
-  { category: "camera", label: "相机/麦克风", pattern: /(相机|摄像头|麦克风|云台)/ },
 ];
 
 /** 逐镜设备声明（镜头卡 `devices[]`） */
