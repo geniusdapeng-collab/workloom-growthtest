@@ -44,8 +44,9 @@ import {
   restoreTimelineField,
   environmentDefects, expandShotWithBible, summarizeDefects, validateSceneBible, spaceSummary,
   openingHookChecks, summarizeHookChecks, validateHookCard, defaultHookSfx, hookWindowFor, HOOK_TYPE_LABELS, HOOK_WINDOW_SEC,
+  deviceDefects, summarizeDeviceDefects, DEVICE_POLICY_VERSION, DEVICE_POLICY_VERIFIED_AT, allowedModelSummary,
   type CoverDesignInput, type CoverMeasurements, type CoverPlan, type GateCheck, type GateEvent, type PipelineGateStepKey,
-  type EnvDefect, type HookCard, type PlatePromptShot, type ProducerVerdict, type SceneBible
+  type DeviceCategory, type DeviceDefect, type EnvDefect, type HookCard, type PlatePromptShot, type ProducerVerdict, type SceneBible
 } from "../../packages/video-studio/src/index.js";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
@@ -760,6 +761,14 @@ const envAuditInScope = ENV_AUDIT_STAGES.some((stage) => STAGES.has(stage));
 const envBibleIssues = sceneBible ? validateSceneBible(sceneBible) : [];
 const envDefects: EnvDefect[] = environmentDefects(shots, sceneBible);
 const envSummary = summarizeDefects(envDefects);
+/**
+ * 设备口径（2026-09-27 产品所有者硬约束）：场景里的电子设备**全部使用 2024 年之后的 Apple 设备**。
+ * 与环境审计同一处 fail-closed——都是"渲染前必须清零"的资产级约束，报告合并在一份文件里（便于一条命令复核）。
+ */
+const devDefects: DeviceDefect[] = deviceDefects(shots);
+const devSummary = summarizeDeviceDefects(devDefects);
+const envHardTotal = envSummary.hard + devSummary.hard;
+const envSoftTotal = envSummary.soft + devSummary.soft;
 const ENV_REPORT_FILE = join(WORK_DIR, `env-realism-report-${PROJECT}.json`);
 mkdirSync(WORK_DIR, { recursive: true });
 writeFileSync(ENV_REPORT_FILE, `${JSON.stringify({
@@ -770,9 +779,10 @@ writeFileSync(ENV_REPORT_FILE, `${JSON.stringify({
   sceneBible: sceneBible
     ? { spaceId: sceneBible.spaceId, summary: spaceSummary(sceneBible), materials: sceneBible.materials?.length ?? 0, practicalLights: sceneBible.practicalLights?.length ?? 0, traces: sceneBible.traces?.length ?? 0, issues: envBibleIssues }
     : null,
-  summary: envSummary,
+  summary: { hard: envHardTotal, soft: envSoftTotal, byRule: { ...envSummary.byRule, ...devSummary.byRule }, environment: envSummary, device: devSummary },
+  devicePolicy: { version: DEVICE_POLICY_VERSION, verifiedAt: DEVICE_POLICY_VERIFIED_AT, brief: "场景里的电子设备全部为 2024 年后世代的 Apple 在售机型（以镜头卡 devices[] 声明）" },
   perShot: shots.map((shot) => {
-    const own = envDefects.filter((defect) => defect.shotId === shot.shotId);
+    const own = [...envDefects, ...devDefects].filter((defect) => defect.shotId === shot.shotId);
     return {
       shotId: shot.shotId,
       hard: own.filter((defect) => defect.hard).length,
@@ -781,37 +791,42 @@ writeFileSync(ENV_REPORT_FILE, `${JSON.stringify({
       detail: own.map((defect) => defect.detail)
     };
   }),
-  defects: envDefects
+  defects: [...envDefects, ...devDefects]
 }, null, 2)}\n`, "utf8");
 
 log(`环境真实性审计：${sceneBible ? `场景圣经 ${sceneBible.spaceId}（${spaceSummary(sceneBible)}）` : "未提供场景圣经（片级 sceneBible / --scene-bible）"}`);
 if (envBibleIssues.length > 0) log(`  ⚠ 圣经自身待完善（软）：${envBibleIssues.join("；")}`);
-log(`  硬缺陷 ${envSummary.hard} · 软提示 ${envSummary.soft}｜规则：${Object.entries(envSummary.byRule).map(([rule, count]) => `${rule}×${count}`).join(" · ") || "无"}`);
+log(`  环境：硬缺陷 ${envSummary.hard} · 软提示 ${envSummary.soft}｜设备口径（${DEVICE_POLICY_VERSION}）：硬缺陷 ${devSummary.hard} · 软提示 ${devSummary.soft}`);
+log(`  合计：硬缺陷 ${envHardTotal} · 软提示 ${envSoftTotal}｜规则：${Object.entries({ ...envSummary.byRule, ...devSummary.byRule }).map(([rule, count]) => `${rule}×${count}`).join(" · ") || "无"}`);
 for (const defect of envDefects.filter((item) => item.hard)) log(`  ✗ ${defect.shotId} [${defect.rule}] ${defect.detail}`);
+for (const defect of devDefects) log(`  ${defect.hard ? "✗" : "△"} ${defect.shotId} [${defect.rule}] ${defect.detail}`);
 log(`  报告：${ENV_REPORT_FILE}`);
 
 const envAccepted = ACCEPT_REJECTED.includes("env") || ACCEPT_REJECTED.includes("env-realism") || flag("--accept-env-defects");
 record({
   stage: "env-audit", shotId: null, invoked: true,
-  ok: envSummary.hard === 0 || envAccepted || !envAuditInScope,
+  ok: envHardTotal === 0 || envAccepted || !envAuditInScope,
   cached: false,
-  degraded: envSummary.hard > 0 && envAccepted,
+  degraded: envHardTotal > 0 && envAccepted,
   attempt: 1, ms: 0, artifact: ENV_REPORT_FILE,
   evidence: {
     sceneBible: sceneBible ? sceneBible.spaceId : null,
     space: sceneBible ? spaceSummary(sceneBible) : null,
     bibleIssues: envBibleIssues,
-    hard: envSummary.hard, soft: envSummary.soft, byRule: envSummary.byRule,
+    hard: envHardTotal, soft: envSoftTotal, byRule: { ...envSummary.byRule, ...devSummary.byRule },
+    environment: { hard: envSummary.hard, soft: envSummary.soft },
+    devicePolicy: { version: DEVICE_POLICY_VERSION, verifiedAt: DEVICE_POLICY_VERIFIED_AT, hard: devSummary.hard, soft: devSummary.soft },
     inScope: envAuditInScope, acceptedBy: envAccepted ? "ACCEPT_REJECTED(env)" : null,
-    hardDefects: envDefects.filter((item) => item.hard).map((item) => ({ shotId: item.shotId, rule: item.rule, detail: item.detail }))
+    hardDefects: [...envDefects, ...devDefects].filter((item) => item.hard).map((item) => ({ shotId: item.shotId, rule: item.rule, detail: item.detail }))
   },
   verdict: null,
-  note: "环境真实性审计（场景圣经展开 + 确定性规则）"
+  note: "环境真实性 + 设备口径审计（场景圣经展开 + 确定性规则）"
 });
-if (envAuditInScope && envSummary.hard > 0 && !envAccepted) {
-  log("⛔ 环境真实性硬缺陷未清零：本环节要在**花钱之前**拦住「平均样板间」。");
+if (envAuditInScope && envHardTotal > 0 && !envAccepted) {
+  log("⛔ 环境真实性 / 设备口径硬缺陷未清零：本环节要在**花钱之前**拦住「平均样板间」与非 2024 后 Apple 设备。");
   log("   修法：在 shotlist 顶层写 sceneBible（或 --scene-bible <file>），让每镜带上空间实指 / 材质工艺 / 实用光源 / 使用痕迹；");
   log("   可交互道具（手机/平板/笔记本）补 propInteraction（prop / orientation / operatedBy）。");
+  log(`   设备口径：每镜补 devices[]（category + model，机型见允许清单：${allowedModelSummary()}…）——裸词不算机型。`);
   log("   确需带瑕疵继续：--accept-rejected env（会记为 degraded 留痕）。");
   process.exit(7);
 }
@@ -2890,10 +2905,10 @@ if (STAGES.has("videos")) {
        * 平台执行器与审计器按 step_key 读的是 checks[]，环境真实性缺了这一条就又会变成"只有人眼能发现"。
        */
       {
-        id: "env-realism", pass: envSummary.hard === 0 || envAccepted, hard: true,
-        detail: envSummary.hard === 0
-          ? `环境真实性硬缺陷 0（场景圣经 ${sceneBible ? sceneBible.spaceId : "未提供"}；软提示 ${envSummary.soft} 项，报告 ${basename(ENV_REPORT_FILE)}）`
-          : `环境真实性硬缺陷 ${envSummary.hard} 项（${Object.entries(envSummary.byRule).map(([rule, count]) => `${rule}×${count}`).join(" · ")}）${envAccepted ? "——已显式声明带瑕疵放行" : "——渲染前必须清零"}`
+        id: "env-realism", pass: envHardTotal === 0 || envAccepted, hard: true,
+        detail: envHardTotal === 0
+          ? `环境真实性 + 设备口径硬缺陷 0（场景圣经 ${sceneBible ? sceneBible.spaceId : "未提供"}；设备清单 ${DEVICE_POLICY_VERSION}；软提示 ${envSoftTotal} 项，报告 ${basename(ENV_REPORT_FILE)}）`
+          : `环境真实性硬缺陷 ${envSummary.hard} 项 + 设备口径硬缺陷 ${devSummary.hard} 项（${Object.entries({ ...envSummary.byRule, ...devSummary.byRule }).map(([rule, count]) => `${rule}×${count}`).join(" · ")}）${envAccepted ? "——已显式声明带瑕疵放行" : "——渲染前必须清零"}`
       },
       /** 开场钩子（2026-09-27 新增岗位/机制）：同 env-realism，结论必须在这道花钱前的门里可见 */
       {
@@ -2907,6 +2922,7 @@ if (STAGES.has("videos")) {
     evidence: {
       promptReady, plateReady, promptApproved, plateApproved, materialReady, micromotionReady,
       envRealism: { hard: envSummary.hard, soft: envSummary.soft, byRule: envSummary.byRule, bible: sceneBible?.spaceId ?? null, report: ENV_REPORT_FILE },
+      devicePolicy: { version: DEVICE_POLICY_VERSION, hard: devSummary.hard, soft: devSummary.soft, byRule: devSummary.byRule },
       openingHook: {
         platform: PLATFORM, windowSec: hookWindowFor(PLATFORM), hard: hookSummary.hard, soft: hookSummary.soft,
         hook: hookCard ? { type: hookCard.type, promise: hookCard.promise, payoffShotId: hookCard.payoffShotId } : null,

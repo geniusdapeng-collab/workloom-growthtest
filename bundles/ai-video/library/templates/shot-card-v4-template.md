@@ -48,6 +48,8 @@
 - **使用痕迹**: {usage_traces}（指纹/水渍/卷边/划痕/薄灰/杯痕/旧钉眼——"无痕"= 假）
 - **可交互道具物理关系**: {prop_interaction}（prop/orientation/operatedBy/contact/occlusion；
   屏幕类必须写"屏幕朝向使用者本人，观众只见机身背面或侧缘"）
+- **电子设备（devices）**: {devices}（category + model；**机型必须取自允许清单**——
+  场景里的电子设备一律为 2024 年后世代的 Apple 在售机型，裸词不算机型；见 `docs/device-standard.md`）
 - **连续性模式**: {continuity_mode} (strict/soft/none)
 - **与前一镜关系**: {prev_shot_relation}
 - **与后一镜关系**: {next_shot_relation}

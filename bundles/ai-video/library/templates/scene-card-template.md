@@ -44,6 +44,14 @@
 - **第二空间**（门店/客户现场/街景等；须登记进 otherSpaces 并由镜头卡指认）: {other_spaces}
 - **色彩纪律**（低饱和/肤色中性/暗部保留纹理…）: {color_discipline}
 
+### 设备口径（产品所有者硬约束 2026-09-27）
+
+- **电子设备机型**（笔记本/台式机/手机/平板/显示器/耳机/键鼠；**全部为 2024 年后世代的 Apple 在售机型**）: {devices}
+- **其他品牌**：场景内**不允许**出现（联想/戴尔/惠普/华为/小米/三星/索尼/LG/微软 Surface/罗技…）——文本与画面都不得出现
+- **世代纪律**：不使用已停产或 2024 前世代外观；独立显示器优先 Studio Display XDR（Studio Display 属"在售但世代偏早"，会记软提示）
+
+口径与允许清单见 `docs/device-standard.md`；每镜在镜头卡 `devices[]` 声明机型（裸词不算机型）。
+
 机检：`tsx scripts/tools/environment-realism-audit.mts --shots <shotlist> --expand`（硬缺陷即阻断渲染）；
 字段规格与规则表见 `docs/environment-realism.md`。
 

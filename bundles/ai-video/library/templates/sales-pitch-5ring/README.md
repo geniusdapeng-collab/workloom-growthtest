@@ -60,6 +60,7 @@ node_modules/.bin/tsx scripts/tools/full-chain-film.mts \
 | `sceneBible` | shotlist 顶层 | 片级真实空间事实源（上海静安 1936 年纺织厂改建办公楼 + 1.2 公里外门店）：空间实指 / 材质带工艺与使用痕迹 / 场景内实用光源 / 色彩纪律。管线在装载期把它**展开进每镜的既有字段** |
 | `hook` | shotlist 顶层 | 开场钩子卡（`question` 型，承诺「还在给平台打工吗」由 GR-06 用台词回应）；钩子音 `impact@0.08s` 落在 0–0.6s 窗口 |
 | `propInteraction` | 7 个含可交互道具的镜头 | 道具-人体物理关系（朝向/操作者/承重/遮挡）：手机与平板**屏幕朝向使用者本人**，观众只见机身背面或侧缘 |
+| `devicePolicy` + `devices[]` | 顶层标记 + 11 个含电子设备的镜头 | **场景里的电子设备全部为 2024 年后世代的 Apple 在售机型**（MacBook Pro / iPad Pro / iPhone 16·17 / Studio Display XDR / Magic Keyboard / Magic Mouse / AirPods），机型逐镜声明（裸词不算） |
 
 渲染前自检（零 token，硬缺陷会阻断渲染）：
 
