@@ -11,9 +11,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   AV_SYNC_POLICY,
+  AV_SYNC_FAILURE_KINDS,
   buildSampleAccurateConcatPlan,
+  classifyAvSyncFailure,
   crossCorrelationLag as bundleLag,
   evaluateAvSync as bundleEvaluate,
+  measureAssembledAvSync,
+  verifyAssembledAvSync,
 } from "../../../bundles/ai-video/connectors/post-bridge/av-sync.mjs";
 import {
   crossCorrelationLag as baseLag,
@@ -126,5 +130,55 @@ describe("源码守卫：拼接分支不许再整条 demuxer copy", () => {
   it("不再出现「concat demuxer + 双流 -c copy」的历史写法", () => {
     /** 历史写法：`-f concat ... -c copy -movflags +faststart`（画面与声音一起直拷 → 逐镜漂移） */
     expect(source).not.toMatch(/"-f",\s*"concat",[\s\S]{0,200}?"-c",\s*"copy",\s*"-movflags"/);
+  });
+});
+
+describe("实测不可执行的降级路径（三态口径：达标 / 偏移 / 测不了）", () => {
+  it("classifyAvSyncFailure：只有真实偏移才算 drift，其余归 unverifiable", () => {
+    expect(classifyAvSyncFailure({ ok: true, samples: [{ shotId: "A" }], violations: [] })).toBeNull();
+    expect(classifyAvSyncFailure({
+      ok: false, samples: [{ shotId: "A" }], violations: ["单镜偏移超阈值：A 120.0ms（上限 40ms）"],
+    })).toBe(AV_SYNC_FAILURE_KINDS.drift);
+    expect(classifyAvSyncFailure({
+      ok: false, samples: [{ shotId: "A" }], violations: ["单调漂移：5/5 段偏移同向且累计 33.0ms"],
+    })).toBe(AV_SYNC_FAILURE_KINDS.drift);
+    expect(classifyAvSyncFailure({ ok: false, samples: [], violations: ["没有任何可测窗口（未提供取样）"] }))
+      .toBe(AV_SYNC_FAILURE_KINDS.unverifiable);
+  });
+
+  it("环境缺 ffmpeg → 归 unverifiable（而不是误报成偏移）", async () => {
+    const report = await measureAssembledAvSync({
+      ffmpeg: "/nonexistent/ffmpeg-binary",
+      output: "/tmp/does-not-exist.mp4",
+      clips: [{ shotId: "A", path: "/tmp/a.mp4", durationSec: 3 }],
+      starts: [0],
+    });
+    expect(report.ok).toBe(false);
+    expect(report.kind).toBe(AV_SYNC_FAILURE_KINDS.unverifiable);
+    expect(String(report.reason)).toMatch(/解码母版失败/);
+  });
+
+  it("默认（严格）抛 av_sync_unverifiable；只有显式 allowUnverified 才降级且带 degraded 标记", async () => {
+    const base = {
+      ffmpeg: "/nonexistent/ffmpeg-binary",
+      output: "/tmp/does-not-exist.mp4",
+      clips: [{ shotId: "A", path: "/tmp/a.mp4", durationSec: 3 }],
+      starts: [0],
+    };
+    await expect(verifyAssembledAvSync(base)).rejects.toMatchObject({ code: "av_sync_unverifiable" });
+    const degraded = await verifyAssembledAvSync({ ...base, allowUnverified: true });
+    /** 降级返回值**绝不能**长成"通过"（ok 必须是 null，不是 true） */
+    expect(degraded.ok).toBeNull();
+    expect(degraded.degraded).toBe(true);
+    expect(degraded.kind).toBe(AV_SYNC_FAILURE_KINDS.unverifiable);
+    expect(String(degraded.reason)).toMatch(/解码母版失败/);
+  });
+
+  it("源码守卫：平台侧拼接会写 <output>.av-sync.json 并显式区分降级开关", () => {
+    const core = readFileSync(join(BRIDGE_DIR, "core.mjs"), "utf8");
+    expect(core).toContain("writeAvSyncReport");
+    expect(core).toContain(".av-sync.json");
+    expect(core).toContain("allowUnverifiedAvSync");
+    expect(core).toContain("av_sync_unverifiable");
   });
 });
