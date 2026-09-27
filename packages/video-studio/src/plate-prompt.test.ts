@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   BRIDGE_STRUCTURE_CONSTRAINT,
+  DEVICE_STANDARD_CONSTRAINT,
   ENVIRONMENT_REALISM_CONSTRAINT,
   PROP_INTERACTION_CONSTRAINT,
   buildPlatePrompt,
+  hasElectronicDevice,
   hasInteractiveProp,
   isBridgeScene,
   UNIVERSAL_SPATIAL_INVARIANT
@@ -147,3 +149,29 @@ describe("环境真实性与道具交互（2026-09-27 事故机制化）", () =>
     expect(lines.at(-1)).toContain("禁止：文字、字幕、水印");
   });
 });
+
+/**
+ * 设备口径（2026-09-27 产品所有者硬约束）：场景里的电子设备**全部使用 2024 年之后的 Apple 设备**。
+ * 提示词侧只给"机型按卡片声明的型号呈现 + 无非 Apple 标识"这类**画面语言**，
+ * 具体机型清单由 `device-policy.ts#DEVICE_ALLOWLIST` 单一事实源给出（避免两处维护）。
+ */
+describe("设备口径（2024 年后 Apple 设备）", () => {
+  it("含电子设备的镜头追加设备硬约束；不含设备的不加", () => {
+    expect(hasElectronicDevice(shot)).toBe(false);
+    expect(buildPlatePrompt(shot, options)).not.toContain(DEVICE_STANDARD_CONSTRAINT);
+
+    const laptopShot = {
+      ...shot,
+      scene: "1936 年纺织厂改建办公楼 4 层会议室",
+      sceneDescription: "长桌上放着一台 MacBook Pro（M4 世代）与一杯咖啡",
+      action: "她合上 MacBook Pro 屏幕后抬眼看向镜头"
+    };
+    expect(hasElectronicDevice(laptopShot)).toBe(true);
+    const prompt = buildPlatePrompt(laptopShot, options);
+    expect(prompt).toContain(DEVICE_STANDARD_CONSTRAINT);
+    expect(prompt).toContain("Apple 在售机型");
+    expect(linesOf(prompt).at(-1)).toContain("禁止：文字、字幕、水印");
+  });
+});
+
+const linesOf = (prompt: string): string[] => prompt.split("\n");

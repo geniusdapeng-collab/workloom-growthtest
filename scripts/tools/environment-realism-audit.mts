@@ -23,10 +23,16 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import {
+  DEVICE_POLICY_VERIFIED_AT,
+  DEVICE_POLICY_VERSION,
+  allowedModelSummary,
+  deviceDefects,
   environmentDefects,
   expandShotWithBible,
+  summarizeDeviceDefects,
   summarizeDefects,
   validateSceneBible,
+  type DeviceShotFields,
   type EnvShotFields,
   type SceneBible,
 } from "../../packages/video-studio/src/index.js";
@@ -79,9 +85,17 @@ const auditedShots: EnvShotFields[] = flag("--expand") && bible
   : shots;
 const defects = environmentDefects(auditedShots, bible);
 const summary = summarizeDefects(defects);
+/** 设备口径（2026-09-27 产品所有者硬约束）：与环境审计合并——都是资产级硬约束，一份报告即可复核 */
+const devDefectsList = deviceDefects(auditedShots as DeviceShotFields[]);
+const devSummary = summarizeDeviceDefects(devDefectsList);
+const combinedSummary = {
+  hard: summary.hard + devSummary.hard,
+  soft: summary.soft + devSummary.soft,
+  byRule: { ...summary.byRule, ...devSummary.byRule },
+};
 const bibleIssues = bible ? validateSceneBible(bible) : [];
 const perShot = auditedShots.map((shot) => {
-  const own = defects.filter((defect) => defect.shotId === shot.shotId);
+  const own = [...defects, ...devDefectsList].filter((defect) => defect.shotId === shot.shotId);
   return {
     shotId: String(shot.shotId ?? "?"),
     hard: own.filter((defect) => defect.hard).length,
@@ -98,9 +112,11 @@ const report = {
   mode: flag("--expand") ? "expanded" : "raw",
   projectId: shotlist.projectId ?? null,
   sceneBible: bible ? { spaceId: bible.spaceId, issues: bibleIssues } : null,
-  summary,
+  summary: combinedSummary,
+  environment: summary,
+  devicePolicy: { version: DEVICE_POLICY_VERSION, verifiedAt: DEVICE_POLICY_VERIFIED_AT, ...devSummary },
   perShot,
-  defects,
+  defects: [...defects, ...devDefectsList],
 };
 
 const reportPath = value("--report") || join(dirname(shotsPath), "env-realism-report.json");
@@ -120,14 +136,17 @@ if (flag("--json")) {
     for (const detail of row.detail) console.log(`    · ${detail}`);
   }
   console.log(`\n规则统计：${Object.entries(summary.byRule).map(([rule, count]) => `${rule}×${count}`).join(" · ") || "无"}`);
-  console.log(`合计：硬缺陷 ${summary.hard} · 软提示 ${summary.soft} ｜ 报告：${reportPath}`);
+  console.log(`环境规则：${Object.entries(summary.byRule).map(([rule, count]) => `${rule}×${count}`).join(" · ") || "无"}`);
+  console.log(`设备口径（${DEVICE_POLICY_VERSION}，核对 ${DEVICE_POLICY_VERIFIED_AT}）：${Object.entries(devSummary.byRule).map(([rule, count]) => `${rule}×${count}`).join(" · ") || "无"}`);
+  console.log(`合计：硬缺陷 ${combinedSummary.hard}（环境 ${summary.hard} + 设备 ${devSummary.hard}）· 软提示 ${combinedSummary.soft} ｜ 报告：${reportPath}`);
 }
 
 const softAccepted = flag("--accept-soft");
-if (summary.hard > 0) {
-  console.error(`⛔ 环境真实性硬缺陷 ${summary.hard} 项：渲染前必须修复（或显式声明风险后人工放行）`);
+if (combinedSummary.hard > 0) {
+  console.error(`⛔ 硬缺陷 ${combinedSummary.hard} 项（环境 ${summary.hard} + 设备口径 ${devSummary.hard}）：渲染前必须修复（或显式声明风险后人工放行）`);
+  if (devSummary.hard > 0) console.error(`   设备口径修法：每镜补 devices[]（category + model）——裸词不算机型，可用机型见 ${allowedModelSummary()}`);
   process.exit(1);
 }
-if (summary.soft > 0 && !softAccepted) {
-  console.log(`ℹ 软提示 ${summary.soft} 项：建议修（不阻断渲染；--accept-soft 可静默）`);
+if (combinedSummary.soft > 0 && !softAccepted) {
+  console.log(`ℹ 软提示 ${combinedSummary.soft} 项：建议修（不阻断渲染；--accept-soft 可静默）`);
 }

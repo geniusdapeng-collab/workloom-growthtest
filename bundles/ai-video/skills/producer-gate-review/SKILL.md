@@ -22,6 +22,9 @@ description: 预生产内部门（G1–G7）的 AI 监制评审纪律：确定�
      （观众只见机身背面或侧缘，不出现屏幕内容正对镜头）、有承重接触、手指正常；
      `shot` 环节额外判"这一关系在整镜时间轴上保持不变"（关键帧对、镜内翻转同样要打回）。
      出处：真机 badcase「手机屏幕朝观众」（`docs/badcases/BADCASE-2026-0927-phone-screen-toward-audience.md`）。
+   - **设备口径**：画面里的电子设备（笔记本/台式机/手机/平板/显示器/耳机/键鼠）全部是 **2024 年后世代的 Apple 在售机型**，
+     且与镜头卡 `devices[]` 声明的机型一致（机身比例/材质/颜色/接口可辨）；`shot`/`master` 额外判"跨帧跨镜同一台设备外观一致"。
+     允许清单见 `device-policy.ts#DEVICE_ALLOWLIST`、口径见 `docs/device-standard.md`。
 3. **裁决三类**：放行（approved）/ 打回重跑（rerun）/ 需介入（模型不可用或超预算）。
 4. **打回必须可执行**：写清"改什么、改成什么、为什么"——例如"用 img2img 挂 4 张授权真人照片重跑，锁面孔"。
 5. **留痕**：每次裁决写 `gate`、`score`、`via`（deterministic/llm/fallback）、`model`、`issues`、`suggestions`，
@@ -49,3 +52,4 @@ description: 预生产内部门（G1–G7）的 AI 监制评审纪律：确定�
 | 超预算仍在评审 | 预算检查 | 转"需介入"，不烧额度继续评审 |
 | 画面"符合镜头卡"但一眼不像实拍 | `env-realism` 机检（渲染前）+ 环境真实性 rubric | 判**卡片空词**（不是模型问题）：补 `sceneBible` 后重渲，并登记环境 badcase |
 | 屏幕内容正对镜头 / 道具漂浮穿模 | 道具-人体交互 rubric（keyframe/shot） | 打回并要求补 `propInteraction`（朝向/操作者/承重/遮挡） |
+| 出现杂牌设备 / 旧世代机型 / 非 Apple 标识 | 设备口径 rubric（keyframe/shot/master）+ `device-*` 机检 | 打回并要求按 `docs/device-standard.md` 补/改 `devices[]` 与场景描述 |
