@@ -1,0 +1,481 @@
+{
+  "schemaVersion": "workloom.model-02-provenance/v1",
+  "characterId": "lin-yu-an",
+  "characterName": "林予安",
+  "origin": "fictional-original-AI-character",
+  "generationMode": "pure-text-to-image",
+  "inputImageCount": 0,
+  "sourceMaterialNote": "旧陈卓 v6 仅供人工概括一般五官词；未把旧图、真人原图或其字节作为生成请求图片输入；本档案不主张真人身份等同。",
+  "model": "doubao-seedream-5-0-pro-260628",
+  "apiDocument": "https://docs.volcengine.com/docs/ark/image-generation-api?lang=en",
+  "invisibleWatermarkDocument": "https://docs.volcengine.com/docs/ark/add-invisible-watermark-to-ai-generated-content?lang=zh",
+  "invisibleWatermarkStatus": "unverified",
+  "invisibleWatermarkNote": "没有验证端点是否植入隐式水印或这些 JPEG 的水印检测结果；客户 ProduceID 仅是自定义资源映射，不是方舟 task_id。",
+  "assembledAtUtc": "2026-09-27T20:39:56.641964+00:00",
+  "angles": [
+    {
+      "angle": "front",
+      "file": "portraits/v1/林予安-front.jpg",
+      "output": {
+        "sha256": "77b62333578757088263a8184934a952194c75df61a6b5b4ffcf7aa9750a0a4a",
+        "bytes": 172400
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "021790537193677f0b662e0a22462bcc30964e8c71cc76660aec0"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790537230,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T19:27:10+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "29b811c7d5f0ef09bbabee7c8c5f88fd5ecb72f0e080936a8e3c1b58ba9b148d"
+      },
+      "promptSummary": "前视背景返修，纯文本。",
+      "prompt": "原创纯AI女性「林予安」，约30岁，东亚面貌：柔和鹅蛋脸、细直微弧眉、深棕杏眼、纤直鼻梁与小圆鼻头、自然豆沙唇、轻微闭唇笑。自然白皙肌肤保留真实纹理，深栗棕及锁骨微卷发偏中分。她身形修长，穿哑光黑色圆领收腰及膝高定连身裙、短款黑色粗花呢无标识外套和黑色低跟鞋，戴小珍珠耳钉、极细银色单吊坠链。正面全身平视直立，双手放松垂在两侧，领口小吊坠清楚，头顶和鞋底完整，人物居中，竖幅2:3。人物像贴在一张没有地面概念的浅灰纯色平面上，脚下绝无接触阴影。纯均一浅灰RGB236抠像背景，四角同色无渐变、暗角、地面线和投影。中性5600K柔光，真实摄影，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "ecf23d1687a93dbe0d9ecf4ac2ef283affa33abd81bf911f5405bf7426d859d3",
+      "produceId": "WL-GROWTH-M02-FRONT-1790537230-77B623335787",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "1fa3fba141221338e1b60fc95f564196871dab6ad7e85134f0052b2289036073"
+    },
+    {
+      "angle": "threeQuarter",
+      "file": "portraits/v1/林予安-threeQuarter.jpg",
+      "output": {
+        "sha256": "0356b37f88643b59aa49fd4dd1b4e0d27afb3448ccd878f69dd5275e3d0d2af4",
+        "bytes": 179529
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "021790537969930add9fca5277b8939d33af9a0f1789d6cb7a563"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790538015,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T19:40:15+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "9af56d3dced2a7298d98613ab8a80dea6013ae68a6532f18203cdbd0a73892ef"
+      },
+      "promptSummary": "纯文字生成：45度半侧身黑裙，无外套，均匀灰底",
+      "prompt": "原创纯AI虚构女性「林予安」，约30岁，东亚面貌：柔和鹅蛋脸、细直微弧眉、深棕杏眼、纤直鼻梁与小圆鼻头、自然豆沙唇、轻微闭唇笑。真实自然肤质，深栗棕及锁骨微卷发偏中分。她身形修长，穿简洁哑光黑色圆领收腰及膝连身裙，不穿外套或披肩。戴小珍珠耳钉、极细银色单吊坠链。人物身体和脸部均向画面右方旋转45度，明确显示半侧脸与鼻梁侧面线条，眼睛回看镜头；从头顶拍到腰线下方，人物居中，双肩双臂自然、双手轻放身体两侧。人物四周保留灰色空白，四角均无遮挡。竖幅2:3。绝对均一浅灰RGB236平面背景，四角同色无渐变、暗角、地面线和投影。中性5600K柔光，真实摄影，天然皮肤纹理，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "33b4494a99025416f1e5d9c2a19215965904bef641e24f93183ba7df28c77705",
+      "produceId": "WL-GROWTH-M02-THREEQUARTER-1790538015-0356B37F8864",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "d54b829563143951ab6ff15f4f51eacacc8e8a4c4480e1c0d93b610e1c969ce6"
+    },
+    {
+      "angle": "closeup",
+      "file": "portraits/v1/林予安-closeup.jpg",
+      "output": {
+        "sha256": "b1fbd3cbd6f4ec4ca490da4d11d54ee69f1c878abb15f3d1d765455ae9c51bdc",
+        "bytes": 254037
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "02179053777212389d0c17fc196b3c940c12dd7ad5b500bf63e61"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790537814,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T19:36:54+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "0730e4c131b9c0c351b457c8d8f54db26beeec087b07103258abb402ae949f7a"
+      },
+      "promptSummary": "纯文字生成：正面胸像，双肩与四角留灰边",
+      "prompt": "原创纯AI虚构女性「林予安」，约30岁，东亚面貌：柔和鹅蛋脸、细直微弧眉、深棕杏眼、纤直鼻梁与小圆鼻头、自然豆沙唇、轻微闭唇笑。真实自然肌肤，深栗棕及锁骨微卷发偏中分。她穿哑光黑色圆领连身裙、正常穿着的短款黑色粗花呢外套，戴小珍珠耳钉、极细银色单吊坠链。正面头像档案摄影，胸部以上肖像，眼睛直视镜头，面容清晰、耳钉与小吊坠可见，画面到胸部中间截止。人物身体居中且只占画面宽度55%，双肩、发丝距离左右边缘各至少20%画面宽度；头顶离上边缘至少12%；人体不触及四角，四角与边界有大面积无遮挡浅灰留白。竖幅2:3。背景绝对均一浅灰RGB236平面，四角同色、无渐变、暗角、地面线和投影。中性5600K柔光，写实摄影，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "4e83d6a94d64492e7056e356fe5da96b7408aaa88e38b462a963f22b9953cfa7",
+      "produceId": "WL-GROWTH-M02-CLOSEUP-1790537814-B1FBD3CBD6F4",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "2ecf8a71c3a1a68b0021ef287c9a0db4ce1f105054a0bdaec230d655ed318d52"
+    },
+    {
+      "angle": "side",
+      "file": "portraits/v1/林予安-side.jpg",
+      "output": {
+        "sha256": "dd49eb6b858747b93b2757883614450198935442107183d034ab8b4f4f2f9bd0",
+        "bytes": 156587
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "021790537292037795aa3a4ba36fe885727fc31a219ca25c3f963"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790537331,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T19:28:51+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "d08e573ffe2a65d133e9bdcf963055c4cd881dd0f6f2269c5b5aa9558ca1b65c"
+      },
+      "promptSummary": "严格90度左侧全身构图，纯文本。",
+      "prompt": "原创纯AI女性「林予安」，约30岁，东亚面貌：柔和鹅蛋脸、细直微弧眉、深棕杏眼、纤直鼻梁与小圆鼻头、自然豆沙唇、轻微闭唇笑。自然白皙肌肤保留真实纹理，深栗棕及锁骨微卷发偏中分。她身形修长，穿哑光黑色圆领收腰及膝高定连身裙、短款黑色粗花呢无标识外套和黑色低跟鞋，戴小珍珠耳钉、极细银色单吊坠链。严格90度左侧正侧面全身像：身体与头部同时完全朝画面左侧，只看见一只眼和鼻子嘴巴的侧轮廓，不见正脸或第二只眼。双肩重叠，双手自然垂下，头顶至鞋底完整，竖幅2:3。纯均一浅灰RGB236抠像背景，四角同色无渐变、暗角、地面线和投影。中性5600K柔光，真实摄影，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "e053595db9147c54325c179b3e604542cdeaf9564a1e948fb9c95e00ea9c2eaf",
+      "produceId": "WL-GROWTH-M02-SIDE-1790537331-DD49EB6B8587",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "22baf5b9ccb1d2b61bcb1978fc264bc4218fb6b2502f7ed67295c6c3ea21fe58"
+    },
+    {
+      "angle": "back",
+      "file": "portraits/v1/林予安-back.jpg",
+      "output": {
+        "sha256": "9d25a38e3fa31cd6ecf9782aebe5c22a10f177ebc8bb6e1d9a720ccc70f40bf8",
+        "bytes": 178408
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "021790540727455137f500080bf18603e76d17d12e7c43e3f8a3f"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790540766,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T20:26:06+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "e9e82766dbce2d2c1372694a6f94f6ede58e477ef51c78763255334fdad80b48"
+      },
+      "promptSummary": "back-v3: 定向返修（裙长/珠宝/动作）",
+      "prompt": "原创纯AI虚构女性「林予安」，约30岁，东亚面貌：柔和鹅蛋脸、细直微弧眉、深棕杏眼、纤直鼻梁与小圆鼻头、自然豆沙唇、轻微闭唇笑。真实自然肤质，深栗棕及锁骨微卷发偏中分。身形修长。\n服装必须与正面定妆照完全同一套：哑光黑色圆领收腰连身裙，裙长严格到膝盖中部（及膝，裙摆刚好盖住膝盖上缘，露出完整小腿与膝盖以下的小腿线条，绝不长到小腿中段或脚踝），外搭短款黑色粗花呢无标识外套，外套下摆只到自然腰线（腰线以上，绝不盖住臀部），黑色低跟鞋，小珍珠耳钉与极细银色单吊坠链。\n严格180度正背面全身像：身体与头部完全背对镜头，只看见后脑勺、外套后背、臀部与及膝裙摆、鞋后跟，绝不出现眼睛、鼻子、嘴或侧脸轮廓。双手自然垂在身体两侧。头顶到鞋底完整入画，人物居中，竖幅2:3。\n人物仿佛贴在一张没有地面概念的浅灰纯色平面上，脚下绝无接触阴影。背景是四角完全同色的纯均一浅灰RGB236抠像底，绝无亮度梯度、暗角、地面线、阴影或投影。\n中性5600K柔光，真实摄影，天然皮肤纹理，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "c6c6f7bf2e5fd5fd5b5d00d3bcc88cf0890ce1d3185895b7fc9e753194013dd0",
+      "produceId": "WL-GROWTH-M02-BACK-1790540766-9D25A38E3FA3",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "a24c10498244e9e13b0ec433007fec4328d512a335018ddef7d691a54f8fdda9"
+    },
+    {
+      "angle": "actionPose",
+      "file": "portraits/v1/林予安-actionPose.jpg",
+      "output": {
+        "sha256": "aa1cfc19fbe49ee39d9ca8196709072d8deae97a3e6815cf047e6978e7d41291",
+        "bytes": 164348
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "021790540858770efca7158d8a072a352f4e6ec3154e35a5f35b6"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790540888,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T20:28:08+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "8928efdb2f85e85c5615f2cb3f49e428e804895f9a7387d396e48d226c140f44"
+      },
+      "promptSummary": "actionPose v7: 更自然的手势",
+      "prompt": "原创纯AI虚构女性「林予安」，约30岁，东亚面貌：柔和鹅蛋脸、细直微弧眉、深棕杏眼、纤直鼻梁与小圆鼻头、自然豆沙唇、轻微闭唇笑。真实自然肤质，深栗棕及肩微卷发偏中分。身形修长。\n服装与正装档案一致：哑光黑色圆领收腰及膝连身裙（裙摆到膝盖中部）、黑色低跟鞋、小珍珠耳钉与极细银色单吊坠链，不穿外套或披肩。\n动作是自然的小幅商务说明手势：身体正对镜头站定，右臂抬起、肘部弯曲约90度，右手停在胸前偏外侧，掌心侧向镜头、五指自然放松并拢（一只手做说明，左手轻搭在身前腰际），重心略偏左腿，表情从容自信，看向镜头。手势放松自然、不贴胸，五指解剖正确、不遮挡面部。\n全身像，头顶与双脚完整入画，人物居中，竖幅2:3。\n人物仿佛贴在一张没有地面概念的浅灰纯色平面上，脚下绝无接触阴影。背景是四角完全同色的纯均一浅灰RGB236抠像底，绝无亮度梯度、暗角、地面线、阴影或投影。\n中性5600K柔光，真实摄影，天然皮肤纹理，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "31197e7ae00fdc0a3e23e03c1423a075cf404491cbdd3aaaafc7499abf43c154",
+      "produceId": "WL-GROWTH-M02-ACTIONPOSE-1790540888-AA1CFC19FBE4",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "4346e218f330ff55902464c2588b916c398f0768d2a28125617fab279867f31e"
+    },
+    {
+      "angle": "emotionCloseup",
+      "file": "portraits/v1/林予安-emotionCloseup.jpg",
+      "output": {
+        "sha256": "b979cdd1adcf390441f09457bd4dc72523253bd1c5e957ca673fd5c128fb1fe2",
+        "bytes": 271998
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "021790537816048fa871229fec4115dc08043e38393b8b5b36bb3"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790537852,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T19:37:32+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "c63d8d04703e1330a5ff20580c2d62813d44d60744bece5e7c1afb4bdf7e6995"
+      },
+      "promptSummary": "纯文字生成：微笑胸像，四周留灰边",
+      "prompt": "原创纯AI虚构女性「林予安」，约30岁，东亚面貌：柔和鹅蛋脸、细直微弧眉、深棕杏眼、纤直鼻梁与小圆鼻头、自然豆沙唇。真实自然肌肤，深栗棕及锁骨微卷发偏中分。她穿哑光黑色圆领连身裙、正常穿着的短款黑色粗花呢外套，戴小珍珠耳钉、极细银色单吊坠链。正面胸像摄影，温和自信地闭唇微笑，眼角有自然的细微表情，眼睛看镜头，脸部五官清晰。镜头略后退：头顶到胸部中间，人物居中且占画面宽度约50%，头顶离上边缘12%，双肩离左右边缘各20%，四角和边界大面积浅灰留白。竖幅2:3。背景绝对均一浅灰RGB236平面，四角同色、无渐变、暗角、地面线和投影。中性5600K柔光，写实摄影，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "5563d3dbf55b886d354893ee10d5120b3a7c23a24944ba55469c0cd1395d0863",
+      "produceId": "WL-GROWTH-M02-EMOTIONCLOSEUP-1790537852-B979CDD1ADCF",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "71f66086cb49f9e721672ee74932d03a5d5edb4c0a86585a407b39e15dd82bf9"
+    },
+    {
+      "angle": "handDetail",
+      "file": "portraits/v1/林予安-handDetail.jpg",
+      "output": {
+        "sha256": "6fdd63321a6278b5998f784efc16c791e1635d641486c64190936921d73d4779",
+        "bytes": 253501
+      },
+      "request": {
+        "url": "https://ark.cn-beijing.volces.com/api/v3/images/generations",
+        "bodyWithoutPrompt": {
+          "model": "doubao-seedream-5-0-pro-260628",
+          "size": "2K",
+          "output_format": "jpeg",
+          "response_format": "url",
+          "watermark": false
+        },
+        "imageFieldPresent": false
+      },
+      "response": {
+        "httpStatus": 200,
+        "traceHeaders": {
+          "x-request-id": "0217905407677833f04613060c95c0e1cb70b4f628471a95af734"
+        },
+        "model": "doubao-seedream-5-0-pro-260628",
+        "created": 1790540802,
+        "fields": [
+          "created",
+          "data",
+          "model",
+          "usage"
+        ],
+        "imageSize": "1664x2496",
+        "imageFormat": "jpeg",
+        "usage": {
+          "input_images": 0,
+          "generated_images": 1,
+          "output_tokens": 16224,
+          "total_tokens": 16224
+        }
+      },
+      "createdAtUtc": "2026-09-27T20:26:42+00:00",
+      "download": {
+        "httpStatus": 200,
+        "traceHeaders": {},
+        "urlSha256": "38614e8b5dfdd954a84f4b55ed5746cf1a4070ba56ab0253dcaae725c12ee169"
+      },
+      "promptSummary": "handDetail-v4: 定向返修（裙长/珠宝/动作）",
+      "prompt": "原创纯AI虚构女性「林予安」的半身以下服装与双手细节摄影。\n构图：镜头从膝盖上方到锁骨下方取景，人物居中，双手在画面中央自然轻搭、十指完整且解剖正确、短圆无色指甲。人物身体与外套只占画面中央区域，四周留出干净背景，四个角落必须是纯背景、绝不被人或衣物遮挡。\n她穿哑光黑色圆领收腰及膝连身裙（裙摆在小腿上部可见），外搭黑色粗花呢短外套，袖口在手腕处；颈间可见极细银色单吊坠链，吊坠极小（直径约3毫米的小圆坠），绝不出现长链或大珍珠吊坠。脸部与腿绝不入画。\n竖幅2:3，纯均一浅灰RGB236抠像背景，四角同色无渐变、暗角、地面线和投影。\n中性5600K柔光，真实摄影，天然皮肤纹理，无磨皮、文字、标志、道具或其他人。",
+      "promptSha256": "433dcfca1dfa5c92e98867b8ed0ec82fdd822a5ebb415f212f08b654264f8552",
+      "produceId": "WL-GROWTH-M02-HANDDETAIL-1790540802-6FDD63321A62",
+      "produceIdNote": "Client-defined resource mapping. This is not an Ark or Seedream task_id.",
+      "visibleWatermarkRequested": false,
+      "invisibleWatermark": {
+        "status": "unverified",
+        "reason": "Endpoint-level feature and JPEG metadata require separate verification"
+      },
+      "sourceEvidenceSha256": "90c4e18dcf10d287b7a8eecb35f2ebcba5e555aa64182ae865ed9bdc4b899bc7"
+    }
+  ]
+}

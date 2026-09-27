@@ -18,6 +18,18 @@
       "archive": "bundles/ai-video/library/characters/model-01-chen-zhuo",
       "authorization": "real-authorized",
       "note": "系统默认 1 号模特"
+    },
+    {
+      "ordinal": 2,
+      "id": "lin-yu-an",
+      "name": "林予安",
+      "aliases": [
+        "林予安",
+        "予安"
+      ],
+      "archive": "bundles/ai-video/library/characters/model-02-lin-yu-an",
+      "authorization": "generated-original",
+      "note": "系统内置 2 号原创虚构 AI 模特（纯文生图，非真人）；仅在点名时使用，不替换默认 1 号"
     }
   ]
 }

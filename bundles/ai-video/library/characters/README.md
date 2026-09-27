@@ -2,6 +2,7 @@
 
 > 位置：`bundles/ai-video/library/characters/` ｜ 事实源：同目录 [`registry.json`](registry.json)
 > **一句话：本仓自带 1 号模特「陈卓」，镜头卡里什么都不写时，视频管线会自动用它——你不需要先建角色、也不需要准备照片。**
+> 另内置 **2 号模特「林予安」（`lin-yu-an`）**：原创虚构纯 AI 角色（纯文生图，非真人），**只在镜头卡点名时使用**，不改变 1 号默认绑定。
 
 这套档案是**随仓分发**的（不是运行时才生成），克隆下来就在，`pnpm setup` 之后即可直接出片。
 
@@ -13,8 +14,12 @@
 | [`model-01-chen-zhuo/profile.json`](model-01-chen-zhuo/profile.json) | 档案正文：外貌/肤质/发型/服装基线/气质/口音/授权信息（`kind: authorized-real`） |
 | `model-01-chen-zhuo/portraits/v3/*.png` | 定妆照集 **8 个角度**：front / threeQuarter / closeup / side / back / actionPose / emotionCloseup / handDetail |
 | `model-01-chen-zhuo/gates.jsonl`、`reviews/*.json` | 定妆照门与监制评审留痕（**只增不改**，纠正用新记录） |
+| [`model-02-lin-yu-an/profile.json`](model-02-lin-yu-an/profile.json) | **2 号模特林予安**档案正文（`kind: generated`，原创虚构 AI 角色，非真人、非 1 号替身） |
+| `model-02-lin-yu-an/portraits/v1/*.jpg` | 林予安定妆照集 **8 个角度**（同上角度表，纯文生图，逐张过 `clean-background/v2` 背景闸） |
+| `model-02-lin-yu-an/provenance.json` | 逐角度生成溯源：实际模型/创建时间/HTTP 请求 id、提示词摘要与 SHA-256、产物 SHA-256、自定义 ProduceID（**不是**平台 task_id；隐式水印未验证） |
 
-> **在册资产（完整性索引）**：`registry.json` + `profile.json` + `portraits/v3/` 的 8 张定妆照（共 10 件）
+> **在册资产（完整性索引）**：`registry.json` + 1 号 `profile.json` + `portraits/v3/` 的 8 张定妆照、
+> 2 号 `profile.json` + `provenance.json` + `portraits/v1/` 的 8 张定妆照
 > 已登记在 `bundles/ai-video/bundle.json#provides.library`，装载时校验 sha256（稳定包另验 Ed25519 签名）。
 > **改动这 10 件必须在同一提交重算摘要**：`tsx scripts/bundle-governance.mts --refresh-digests`
 > （稳定包另需 `BUNDLE_SIGNING_PRIVATE_KEY` / `BUNDLE_SIGNING_KEY_ID` 重签），否则行业包会装载失败。

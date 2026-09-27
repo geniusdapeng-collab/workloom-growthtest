@@ -96,6 +96,58 @@ if (!fs.existsSync(registryFile)) {
         errors.push(`内置默认模特「${defaultModelId}」未在${label}声明：${rel}（新下载项目与 AI Agent 靠它发现内置角色资产）`);
       }
     }
+
+    /**
+     * 2 号及以后的内置模特（2026-09-28 T-2026-0928-0002）：
+     * 每个登记条目都必须"资产在 + 声明在"——档案可解析、四角度齐备且非占位图，
+     * 并在角色库权威文档与目录说明里能被找到；默认绑定仍由 defaultModel 单独守住。
+     */
+    for (const model of models) {
+      const id = String(model?.id ?? "");
+      if (!id) {
+        errors.push("内置角色库清单存在缺少 id 的模特条目");
+        continue;
+      }
+      const archiveDir = path.resolve(root, String(model.archive ?? ""));
+      const profileFile = path.join(archiveDir, "profile.json");
+      if (!model.archive || !archiveDir.startsWith(`${root}${path.sep}`) || !fs.existsSync(profileFile)) {
+        errors.push(`内置模特「${id}」档案缺失或越出仓库：${String(model.archive ?? "未声明 archive")}`);
+        continue;
+      }
+      let profile = null;
+      try {
+        profile = JSON.parse(fs.readFileSync(profileFile, "utf8"));
+      } catch {
+        errors.push(`内置模特「${id}」档案不是合法 JSON：${path.relative(root, profileFile)}`);
+        continue;
+      }
+      if (profile?.id !== id) errors.push(`内置模特「${id}」档案 id 与清单不一致：${String(profile?.id ?? "未声明")}`);
+      const sets = Array.isArray(profile?.portraitSets) ? profile.portraitSets : [];
+      const activeSet = sets.find((set) => set?.active) ?? sets.at(-1) ?? null;
+      const setDir = activeSet ? path.join(archiveDir, String(activeSet.dir ?? "")) : "";
+      const angleFile = (angle) => {
+        if (!setDir || !fs.existsSync(setDir)) return null;
+        return fs.readdirSync(setDir).find((name) => /\.(png|jpe?g|webp)$/i.test(name)
+          && (() => {
+            const stem = name.replace(/\.[^.]+$/, "");
+            return stem === angle || stem.endsWith(`-${angle}`) || stem.endsWith(`_${angle}`);
+          })()) ?? null;
+      };
+      for (const angle of ["front", "threeQuarter", "closeup", "side"]) {
+        const hit = angleFile(angle);
+        if (!hit) errors.push(`内置模特「${id}」缺少必需角度定妆照：${angle}（${path.relative(root, setDir || archiveDir)}）`);
+        else if (fs.statSync(path.join(setDir, hit)).size < 50_000) errors.push(`内置模特「${id}」定妆照过小（疑似占位图）：${path.relative(root, path.join(setDir, hit))}`);
+      }
+      if (id !== defaultModelId) {
+        for (const [rel, label] of [
+          ["docs/character-registry.md", "角色库权威文档"],
+          ["bundles/ai-video/library/characters/README.md", "角色库目录内说明"],
+        ]) {
+          const content = fs.existsSync(path.join(root, rel)) ? fs.readFileSync(path.join(root, rel), "utf8") : "";
+          if (!content.includes(id)) errors.push(`内置模特「${id}」未在${label}声明：${rel}（非默认模特也必须可被找到，且不得改写默认绑定）`);
+        }
+      }
+    }
   }
 }
 
@@ -104,4 +156,4 @@ if (errors.length) {
   process.exit(1);
 }
 
-console.log("内置角色资产与声明一致性检查通过：默认模特可解析、四角度定妆照齐备、声明在首页/文档/能力清单/目录说明四处同步。");
+console.log("内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。");
