@@ -98,7 +98,31 @@ const toolExecutor = createVoiceBridgeExecutor({
 | `voicewrite.register` | 写 | 建/更新音色档案（参考音频入库 + 逐字转写（可自动 ASR）+ 质量与授权校验） |
 | `voicewrite.speak` | 写 | 播报：长文本分句 → 逐句合成 → 拼接（段间气口）→ 响度归一 → 复检回执 |
 | `voicewrite.dub` | 写 | 视频配音：逐段合成 → 时窗适配（atempo ≤1.25×）→ 按策略混音 → 视频轨 copy 出片 |
-| `voicewrite.verify` | 写 | 产物核验：响度/真峰值/时长/静音占比 +（可选）ASR 回读与原稿比对 |
+| `voicewrite.verify` | 写 | 产物核验：响度/真峰值/时长/活动占比 + 台词顺序回读；缺测为未核实，明确无台词才不适用 |
+
+### 台词核验合同
+
+有台词时传 `expect_text`，工具必须取得有效 ASR 转写才判定文本是否匹配。匹配值为标准化 Unicode 码点序列的
+最长公共子序列长度除以较长文本长度（NFKC、忽略大小写、空白、标点与格式控制符），保留词序与重复次数；
+默认门槛 `min_match_ratio=0.6`。错序、漏句或多念均会降低匹配值。非相同长文本最多计算 1600 万个 DP 单元，
+越界显式拒绝并要求按段核验，不退回忽略词序的算法。
+
+- `result.status` 为 `passed` / `failed` / `unverified`；只有 `passed` 才有 `result.ok=true`、`receipt.synced=true`。
+- `checked.text_match_status` 独立记录 `passed` / `failed` / `unverified` / `not_applicable`。声音削波可能使总状态
+  `failed`，同时文本仍为 `passed`；调用方不得把整体失败一律解释成“没有人声”并追加配音。
+- 缺少有效原稿、ASR 未启用、`round_trip=false`、空转写、超时、断网或非有效 JSON 响应均不能通过；
+  引擎异常在 `checked.asr_error={code,message,retryable}` 中保留，正常时该字段为 `null`。
+- 只有明确传 `speech_expected=false`（CLI：`--no-speech-expected`）才把台词项记为 `not_applicable`。
+  此声明与非空原稿冲突时拒绝；物理测量仍需有效且通过。
+- 默认严格模式未通过就抛稳定错误。`strict=false`（CLI：`--no-strict`）只使测量报告可读取，
+  不会把失败或缺测变成通过。CLI 的退出码 0 仅表示报告成功输出，放行须检查报告与回执。
+
+ASR 临时 WAV 在成功、HTTP 错误、网络异常和超时路径均清理。仓内 `verify.test.ts` 使用真实 FFmpeg/FFprobe
+测量与明确标识的替身 ASR；默认 `runtime-smoke.mts` 的 mock 引擎不具备 ASR，核验应为未核实。
+这些测试不代表真实模型可懂度或声音质量验收。
+
+`voicewrite.verify` 每次重新测量，不读写桥的幂等结果缓存，确保 ASR 恢复或同路径媒体返修后能得到当前证据。
+合成、配音等产物动作继续使用原有幂等缓存。
 
 ## 四种原声策略（`voicewrite.dub`）
 

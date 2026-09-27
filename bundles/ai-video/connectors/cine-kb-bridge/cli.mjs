@@ -114,7 +114,8 @@ function main() {
       const shotsFile = String(flags.shots ?? "");
       if (!shotsFile) { process.stderr.write("需要 --shots <shotlist.json>\n"); return 2; }
       const doc = JSON.parse(fs.readFileSync(path.resolve(shotsFile), "utf8"));
-      const shots = Array.isArray(doc) ? doc : (doc.shots ?? []);
+      const shots = Array.isArray(doc) ? doc : doc?.shots;
+      if (!Array.isArray(shots) || !shots.length) throw new Error("镜头文件必须包含非空 shots 数组");
       const enrichedShots = [];
       const traces = [];
       for (const shot of shots) {
@@ -122,7 +123,7 @@ function main() {
         enrichedShots.push(card);
         traces.push(trace);
       }
-      const out = { ...(Array.isArray(doc) ? {} : doc), shots: enrichedShots, cineKbApplied: true };
+      const out = { ...(Array.isArray(doc) ? {} : doc), shots: enrichedShots, cineKbApplied: traces.some((trace) => trace.applied.some((entry) => entry.writtenChars > 0)), cineKbStatuses: traces.map((trace) => trace.status) };
       if (typeof flags.out === "string") {
         const target = path.resolve(flags.out);
         fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -133,7 +134,7 @@ function main() {
         const dir = path.resolve(flags["trace-dir"]);
         fs.mkdirSync(dir, { recursive: true });
         traces.forEach((trace, index) => {
-          const id = enrichedShots[index].shotId ?? `shot-${index + 1}`;
+          const id = `${index + 1}-${String(enrichedShots[index]?.shotId ?? "shot").replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 80)}`;
           fs.writeFileSync(path.join(dir, `${id}.cine-kb.json`), `${JSON.stringify(trace, null, 2)}\n`, "utf8");
         });
         line(`已写出 ${traces.length} 份知识库溯源：${dir}`);
@@ -145,15 +146,17 @@ function main() {
         /** 情绪配方派发线索（只派发不直注）：五轮审计前该线索在 trace 里被丢弃，这里一并给出 */
         recipe: trace.recipeDispatch?.intent ?? null,
         topics: trace.picks.map((p) => p.topicId),
-        fields: trace.applied.map((a) => a.field)
+        status: trace.status,
+        fields: trace.applied.filter((a) => a.writtenChars > 0).map((a) => a.field),
+        droppedFields: trace.applied.filter((a) => a.dropped).map((a) => a.field)
       }));
       if (json) line(JSON.stringify({ summary, traces }, null, 2));
       else {
         for (const item of summary) {
-          line(`${item.shotId}：光圈 ${item.aperture ?? "-"}（${item.scenario ?? "-"}）· 注入字段 ${item.fields.join("/")} · 命中主题 ${item.topics.join("/")}${item.recipe ? ` · 情绪配方派发 ${item.recipe}` : ""}`);
+          line(`${item.shotId}：状态 ${item.status} · 光圈 ${item.aperture ?? "-"}（${item.scenario ?? "-"}）· 注入字段 ${item.fields.join("/")} · 命中主题 ${item.topics.join("/")}${item.recipe ? ` · 情绪配方派发 ${item.recipe}` : ""}`);
         }
       }
-      return 0;
+      return traces.some((trace) => ["failed", "unverified"].includes(trace.status)) ? 3 : 0;
     }
     default:
       process.stderr.write("用法：cine-kb-cli <health|index|search|aperture|recipe|enrich> [--flags]\n");
@@ -161,4 +164,7 @@ function main() {
   }
 }
 
-process.exit(main());
+try { process.exitCode = main(); } catch (error) {
+  process.stderr.write(`摄影知识处理失败：${error instanceof Error ? error.message : String(error)}\n`);
+  process.exitCode = 2;
+}

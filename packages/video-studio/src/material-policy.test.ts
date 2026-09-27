@@ -15,6 +15,7 @@ import {
   REFERENCE_INDEPENDENCE_POLICY,
   MaterialPolicyError,
   assessMotionRichness,
+  motionPolicyForShot,
   assessReferenceIndependence,
   assessMaterialReuse,
   assertMaterialGenerationProvenance,
@@ -110,18 +111,18 @@ describe("素材镜生成提示词", () => {
     expect(noMotion).toContain("缓速推进后稳住");
   });
 
-  it("运动强度要求写清楚：要真实三维运镜与速度坡道，只禁「贴图式运动」", () => {
+  it("平稳运镜保持意图，不被升级成速度坡道", () => {
     expect(prompt).toContain("运动强度要求");
-    expect(prompt).toContain("明显的位移与速度变化");
+    expect(prompt).toContain("不强加速度坡道或甩镜");
     expect(prompt).toContain("速度坡道");
     expect(prompt).toContain("视差");
     expect(prompt).toContain("贴图式运动");
   });
 
-  it("重跑升级档把「上一版运动不足」写进提示词", () => {
+  it("重试保留原节奏，只针对失败项返修", () => {
     const escalated = buildMaterialMotionPrompt(baseShot, { motionStrength: "assertive" });
-    expect(escalated).toContain("上一版镜头运动幅度不足");
-    expect(escalated).toContain("显著加大");
+    expect(escalated).toContain("保留原动作、运镜和节奏");
+    expect(escalated).not.toContain("显著加大");
   });
 });
 
@@ -137,7 +138,7 @@ describe("运动强度判定（产品所有者第二轮反馈）", () => {
       { meanEnergy: 2.69, maxEnergy: 3.02, rampRatio: 1.12 },
       { meanEnergy: 4.05, maxEnergy: 5.91, rampRatio: 1.46 }
     ]) {
-      const verdict = assessMotionRichness(sample);
+      const verdict = assessMotionRichness(sample, MATERIAL_MOTION_POLICY);
       expect(verdict.rich).toBe(false);
       expect(verdict.detail).toMatch(/运动幅度不足|缺少速度坡道/);
     }
@@ -157,8 +158,8 @@ describe("场景构建口径", () => {
     expect(prompt).toContain("构建一段");
     expect(prompt).toContain("实景依据");
     expect(prompt).toContain("不是首帧");
-    expect(prompt).toContain("机位与取景自己定");
-    expect(prompt).toContain("不得复刻参考图的构图");
+    expect(prompt).toContain("机位与取景遵循镜头卡");
+    expect(prompt).toContain("不得用参考照片平移缩放冒充视频");
     expect(prompt).toContain("真实三维视差");
     expect(prompt).toContain("补全画面");
     expect(prompt).toContain("参考图的边界");
@@ -174,10 +175,10 @@ describe("场景构建口径", () => {
     expect(MATERIAL_SCENE_POLICY_STATEMENT).toContain("不是遮羞布");
   });
 
-  it("重跑升级档要求「换机位重新构建」，而不是「加大数字运镜」", () => {
+  it("重试不得擅自改变机位或新增场景元素", () => {
     const escalated = buildMaterialScenePrompt(baseShot, { motionStrength: "assertive" });
-    expect(escalated).toContain("换一个机位");
-    expect(escalated).toContain("云/水/人群至少两处在动");
+    expect(escalated).toContain("不因重试擅自加大运动");
+    expect(escalated).not.toContain("云/水/人群至少两处在动");
   });
 });
 
@@ -230,6 +231,8 @@ describe("静态直出判定", () => {
     const verdict = assessMaterialReuse([{ atSec: 4, bestPsnrDb: null }], { durationSec: 5 });
     expect(verdict.staticDisplay).toBe(false);
     expect(verdict.detail).toContain("未测到");
+    expect(verdict.status).toBe("unverified");
+    expect(verdict.passed).toBe(false);
   });
 
   /**
@@ -296,5 +299,38 @@ describe("生成溯源判据", () => {
     });
     expect(same.ok).toBe(false);
     expect(same.detail).toContain("静态直出");
+  });
+});
+
+
+describe("证据完整性与镜头意图", () => {
+  it("缺失、NaN、越界和重复时间采样不能通过", () => {
+    for (const samples of [[], [{ atSec: 4, bestPsnrDb: NaN }], [{ atSec: 4, bestPsnrDb: 20, bestSsim: 0.5 }, { atSec: 4, bestPsnrDb: 20, bestSsim: 0.5 }], [{ atSec: 8, bestPsnrDb: 20, bestSsim: 0.5 }, { atSec: 9, bestPsnrDb: 20, bestSsim: 0.5 }]]) {
+      expect(assessMaterialReuse(samples, { durationSec: 5 }).status).toBe("unverified");
+    }
+    expect(assessReferenceIndependence({ firstFrameBestPsnrDb: null, midFrameBestPsnrDb: null, directPsnrDb: null })).toMatchObject({ status: "unverified", independent: false });
+    expect(assessReferenceIndependence({ firstFrameBestPsnrDb: NaN, midFrameBestPsnrDb: 20, directPsnrDb: 20 }).independent).toBe(false);
+  });
+  it("PSNR 正无穷是像素相同，不是缺失测量", () => {
+    expect(assessMaterialReuse([{ atSec: 2, bestPsnrDb: Infinity }, { atSec: 4, bestPsnrDb: Infinity }], { durationSec: 5 }).status).toBe("failed");
+    expect(assessReferenceIndependence({ firstFrameBestPsnrDb: Infinity, midFrameBestPsnrDb: 20, directPsnrDb: 20 }).status).toBe("failed");
+  });
+  it("完整低相似采样可以通过，但缺SSIM不能证明视觉级未复用", () => {
+    const samples = [{ atSec: 2.5, bestPsnrDb: 20, bestSsim: 0.4 }, { atSec: 4.5, bestPsnrDb: 21, bestSsim: 0.5 }];
+    expect(assessMaterialReuse(samples, { durationSec: 5 }).status).toBe("passed");
+    expect(assessMaterialReuse(samples.map(({ bestSsim, ...s }) => s), { durationSec: 5 }).status).toBe("unverified");
+  });
+  it("固定机位、平稳推镜、快速镜与速度坡道分别评估", () => {
+    const quiet = { meanEnergy: 0.1, maxEnergy: 0.15, rampRatio: 1.5, frames: 12 };
+    expect(assessMotionRichness(quiet, motionPolicyForShot({ motion: "固定机位" })).rich).toBe(true);
+    expect(assessMotionRichness({ meanEnergy: 2, maxEnergy: 2, rampRatio: 1 }, motionPolicyForShot({ motion: "缓慢匀速推近" })).rich).toBe(true);
+    expect(assessMotionRichness(quiet, motionPolicyForShot({ motion: "高速甩镜" })).rich).toBe(false);
+    expect(motionPolicyForShot({ motion: "匀速推进，不要速度坡道" }).intent).toBe("steady");
+    expect(motionPolicyForShot({ motion: "速度坡道快起稳收" }).intent).toBe("speed-ramp");
+    expect(buildMaterialScenePrompt({ ...baseShot, motion: "固定机位" }, { motionStrength: "assertive" })).toContain("不额外加入推拉或速度坡道");
+  });
+  it("坏运动读数不能用高分掩盖", () => {
+    for (const v of [NaN, Infinity, -1]) expect(assessMotionRichness({ meanEnergy: v, maxEnergy: 20, rampRatio: 2 }).status).toBe("unverified");
+    expect(assessMotionRichness({ meanEnergy: 20, maxEnergy: 10, rampRatio: 2 }).status).toBe("unverified");
   });
 });

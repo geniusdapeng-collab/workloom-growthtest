@@ -8,9 +8,12 @@
  * 本例把两种结论钉住：测得偏低 → 报实测差值与目标；测不到 → 报原因与可执行下一步，
  * 并显式标 `retryable=false`（post-bridge 据此跳过一次注定白跑的 -3dB 混音）。
  */
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { BgmError, explainMusicAudibility } from "./core.mjs";
+import { BgmError, enforceMixChecks, evaluateMixChecks, explainMusicAudibility, measuredDuckingDepthDb } from "./core.mjs";
 
 describe("配乐可闻度结论文案", () => {
   it("测得偏低：报实测差值 vs 目标", () => {
@@ -41,5 +44,84 @@ describe("配乐复检错误的重试语义", () => {
   it("retryable 随构造参数如实传递（false = 不许降档重试）", () => {
     expect(new BgmError("配乐复检未通过", "verify_failed", false).retryable).toBe(false);
     expect(new BgmError("配乐复检未通过", "verify_failed", true).retryable).toBe(true);
+  });
+});
+
+describe("配乐复检失败关闭", () => {
+  const measured = {
+    loudnessAfter: { integratedLufs: -14, truePeakDbtp: -1.2 },
+    targetLufs: -14,
+    truePeak: -1,
+    musicPresenceDb: 4,
+    musicPresenceTargetDb: 3,
+    speechToMusicMarginDb: 6,
+    duckingDepthDb: -8,
+    policy: "keep-dialogue",
+  };
+
+  it("真峰值测不到不得判通过；非 music-only 的让位测不到也不得判通过", () => {
+    expect(evaluateMixChecks(measured)).toEqual({
+      loudness_ok: true,
+      true_peak_ok: true,
+      music_audible: true,
+      dialogue_preserved: true,
+      ducking_applied: true,
+    });
+    expect(evaluateMixChecks({ ...measured, loudnessAfter: { integratedLufs: -14, truePeakDbtp: null } }).true_peak_ok).toBe(false);
+    expect(evaluateMixChecks({ ...measured, duckingDepthDb: null }).ducking_applied).toBe(false);
+    expect(evaluateMixChecks({ ...measured, policy: "music-only", duckingDepthDb: null }).ducking_applied).toBe(true);
+    expect(measuredDuckingDepthDb(-20, -28)).toBe(-8);
+    expect(measuredDuckingDepthDb(null, -28)).toBeNull();
+  });
+
+  it.each([
+    ["loudness_ok", { loudnessAfter: { integratedLufs: -10, truePeakDbtp: -1.2 } }],
+    ["true_peak_ok", { loudnessAfter: { integratedLufs: -14, truePeakDbtp: -0.5 } }],
+    ["ducking_applied", { duckingDepthDb: -2 }],
+  ] as const)("%s 失败时删除产物并抛 verify_failed，不能返回成功回执", async (failedName, override) => {
+    const dir = mkdtempSync(join(tmpdir(), "bgm-verify-"));
+    const output = join(dir, "mix.wav");
+    writeFileSync(output, "unverified mix");
+    try {
+      const checks = evaluateMixChecks({ ...measured, ...override });
+      expect(checks[failedName as keyof typeof checks]).toBe(false);
+      await expect(enforceMixChecks({ checks, output, retryable: true })).rejects.toMatchObject({
+        code: "verify_failed",
+        retryable: true,
+        failedChecks: [failedName],
+        message: expect.stringContaining(failedName),
+      });
+      expect(existsSync(output)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("缺少检查键也不能被空对象伪装成全通过", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "bgm-verify-"));
+    const output = join(dir, "mix.wav");
+    writeFileSync(output, "unverified mix");
+    try {
+      await expect(enforceMixChecks({ checks: {}, output })).rejects.toMatchObject({ code: "verify_failed" });
+      expect(existsSync(output)).toBe(false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("删除产物失败时仍报告失败检查键且不可重试", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "bgm-verify-"));
+    writeFileSync(join(dir, "keep.txt"), "nonempty directory");
+    try {
+      const checks = { ...evaluateMixChecks(measured), true_peak_ok: false };
+      await expect(enforceMixChecks({ checks, output: dir, retryable: true })).rejects.toMatchObject({
+        code: "verify_failed",
+        retryable: false,
+        failedChecks: ["true_peak_ok"],
+        message: expect.stringContaining("删除产物失败"),
+      });
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

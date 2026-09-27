@@ -17,8 +17,8 @@ import YAML from "yaml";
 import { evalCondition } from "../fence-engine/expr.js";
 import { bundlesRoot } from "./assembly.js";
 import {
-  ASPECT_PRESETS, POST_TOOLS, REVISION_RULES, analyzeImpact, buildCopyPack, extractShotIds,
-  findVariantPack, listVariantPacks, pickTrackForVariant, resolveLut, resolveResolution, triageFeedback,
+  ASPECT_PRESETS, UHD_ASPECT_PRESETS, POST_TOOLS, REVISION_RULES, analyzeImpact, buildCopyPack, extractShotIds,
+  findVariantPack, listVariantPacks, pickTrackForVariant, resolveLut, resolveQuality, resolveResolution, triageFeedback,
 } from "../../../bundles/ai-video/connectors/post-bridge/core.mjs";
 import {
   NEVER_RETRY_CODES, POST_BRIDGE_TOOLS, createPostBridgeExecutor, isPostBridgeTool, stableKey,
@@ -59,16 +59,16 @@ const preset = YAML.parse(readFileSync(join(BUNDLE_DIR, "presets/post-editor.yml
   coverage: Array<{ eventPrefix: string }>;
 };
 
-describe("交付与返修围栏（G-DLV0..G-DLV7）语义", () => {
-  it("八条规则齐备、级别与基线口径正确", () => {
+describe("交付与返修围栏（G-DLV0..G-DLV9）语义", () => {
+  it("十条规则齐备、级别与基线口径正确", () => {
     expect(fencePack.version).toBe("ai-video-delivery/v1");
     expect(fencePack.rules.map((rule) => rule.rule_id)).toEqual([
-      "G-DLV0", "G-DLV1", "G-DLV2", "G-DLV3", "G-DLV4", "G-DLV5", "G-DLV6", "G-DLV7",
+      "G-DLV0", "G-DLV1", "G-DLV2", "G-DLV3", "G-DLV4", "G-DLV5", "G-DLV6", "G-DLV7", "G-DLV8", "G-DLV9",
     ]);
     expect(fencePack.rules.every((rule) => rule.is_baseline === true)).toBe(true);
     expect(fencePack.rules.find((rule) => rule.rule_id === "G-DLV0")!.level).toBe("auto");
     expect(fencePack.rules.find((rule) => rule.rule_id === "G-DLV5")!.level).toBe("review");
-    for (const id of ["G-DLV1", "G-DLV2", "G-DLV3", "G-DLV4", "G-DLV6", "G-DLV7"]) {
+    for (const id of ["G-DLV1", "G-DLV2", "G-DLV3", "G-DLV4", "G-DLV6", "G-DLV7", "G-DLV8", "G-DLV9"]) {
       expect(fencePack.rules.find((rule) => rule.rule_id === id)!.level, `${id} 应为 block`).toBe("block");
     }
   });
@@ -128,6 +128,15 @@ describe("交付与返修围栏（G-DLV0..G-DLV7）语义", () => {
     expect(evaluate("G-DLV7", { claim_reuse_without_hash: true })).toBe(true);
     expect(evaluate("G-DLV7", {})).toBe(false);
   });
+
+  it("G-DLV8/G-DLV9：UHD 实测画布与本地增强来源缺一即阻断", () => {
+    expect(evaluate("G-DLV8", { uhd_requested: true, resolution_exact: false })).toBe(true);
+    expect(evaluate("G-DLV8", { uhd_requested: true, resolution_exact: true })).toBe(false);
+    expect(evaluate("G-DLV8", { uhd_requested: false, resolution_exact: false })).toBe(false);
+    expect(evaluate("G-DLV9", { uhd_requested: true, enhancement_verified: false })).toBe(true);
+    expect(evaluate("G-DLV9", { uhd_requested: true, enhancement_verified: true })).toBe(false);
+    expect(evaluate("G-DLV9", { uhd_requested: false, enhancement_verified: false })).toBe(false);
+  });
 });
 
 describe("后期工位桥（工具面与连接器纪律）", () => {
@@ -155,7 +164,7 @@ describe("后期工位桥（工具面与连接器纪律）", () => {
 
   it("幂等键稳定（同参数同键），且不可重试码覆盖交付类硬错误", () => {
     expect(stableKey({ b: 1, a: [{ d: 2, c: 3 }] })).toBe(stableKey({ a: [{ c: 3, d: 2 }], b: 1 }));
-    for (const code of ["verify_failed", "bad_recipe", "not_configured", "overwrite_source_forbidden", "bad_lut"]) {
+    for (const code of ["verify_failed", "version_exists", "bad_recipe", "not_configured", "overwrite_source_forbidden", "bad_lut"]) {
       expect(NEVER_RETRY_CODES.has(code), `${code} 应为不可重试`).toBe(true);
     }
     expect(NEVER_RETRY_CODES.has("timeout")).toBe(false);
@@ -250,18 +259,19 @@ describe("变更影响分析（返修的分水岭）", () => {
     expect(impact.shotRegeneration.required).toBe(false);
   });
 
-  it("音频/调色/封面/文案：各自只重算自己那一层", () => {
+  it("音频/调色/封面/文案：按素材依赖重算对应层", () => {
     expect(analyzeImpact({ project, patch: { bgm: { trackId: "x" } } }).layers).toEqual(["audio"]);
     // 调色会重编码音频轨（color-bridge 输出 -c:a aac），所以音频层随之重算：
     // 母版必须由同一支已调色母版派生，避免"画面 v2 / 声音 v1"的隐性错配
-    expect(analyzeImpact({ project, patch: { color: { profile: "warm-film" } } }).layers).toEqual(["color", "audio"]);
+    // 封面从调色画面抽帧；调色变化也必须刷新封面。
+    expect(analyzeImpact({ project, patch: { color: { profile: "warm-film" } } }).layers).toEqual(["color", "audio", "cover"]);
     expect(analyzeImpact({ project, patch: { cover: { at: 0.5 } } }).layers).toEqual(["cover"]);
     expect(analyzeImpact({ project, patch: { copy: { cta: "点这里" } } }).layers).toEqual(["copy"]);
   });
 
-  it("转场变化：重拼接并顺带重算下游（调色/音频/文字），但镜头不动", () => {
+  it("转场变化：重拼接并顺带重算调色/音频/文字/封面，但镜头不动", () => {
     const impact = analyzeImpact({ project, patch: { transitions: { mode: "xfade", fadeSec: 0.4 } } });
-    expect(impact.layers).toEqual(["assemble", "color", "audio", "text"]);
+    expect(impact.layers).toEqual(["assemble", "color", "audio", "text", "cover"]);
     expect(impact.localOnly).toBe(true);
     expect(impact.shotRegeneration.required).toBe(false);
   });
@@ -348,6 +358,13 @@ describe("文案包与画幅口径", () => {
   it("画幅预设可用，未知画幅报错（不猜一个默认画幅）", () => {
     expect(resolveResolution({ aspect: "9:16" })).toEqual(ASPECT_PRESETS["9:16"]);
     expect(resolveResolution({ resolution: [720, 1280] })).toEqual([720, 1280]);
+    for (const [aspect, size] of Object.entries(UHD_ASPECT_PRESETS)) {
+      expect(resolveResolution({ aspect, quality: "uhd" })).toEqual(size);
+    }
+    expect(resolveQuality({})).toBe("hd");
+    expect(resolveQuality({ quality: "uhd" })).toBe("uhd");
+    expect(() => resolveQuality({ quality: "4k" })).toThrow(/未知清晰度/);
+    expect(() => resolveResolution({ quality: "uhd", resolution: [1920, 1080] })).toThrow(/uhd 仅支持/);
     expect(() => resolveResolution({ aspect: "21:9" })).toThrow(/未知画幅/);
   });
 });
@@ -356,7 +373,7 @@ describe("岗位 / 技能 / 管线 / 反馈枚举四层接线", () => {
   it("剪辑师岗位绑定交付围栏、装上两个交付技能，并声明写工具与回写", () => {
     expect(preset.preset_key).toBe("post-editor");
     expect(preset.readonly).toBe(false);
-    for (const fence of ["G-DLV0", "G-DLV1", "G-DLV2", "G-DLV3", "G-DLV4", "G-DLV6", "G-DLV7"]) {
+    for (const fence of ["G-DLV0", "G-DLV1", "G-DLV2", "G-DLV3", "G-DLV4", "G-DLV6", "G-DLV7", "G-DLV8", "G-DLV9"]) {
       expect(preset.fence_bindings, `岗位未绑定 ${fence}`).toContain(fence);
     }
     expect(preset.skills).toEqual(["delivery-package-ops", "delivery-revision-ops"]);

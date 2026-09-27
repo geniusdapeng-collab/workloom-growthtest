@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decidePlateCache, PLATE_CACHE_MIN_BYTES, type PlateCacheInput } from "./plate-cache.js";
+import { decidePlateCache, plateRequestSha256, PLATE_CACHE_MIN_BYTES, type PlateCacheInput } from "./plate-cache.js";
 
 const SHA = "a".repeat(64);
 
@@ -60,5 +60,31 @@ describe("decidePlateCache（关键帧缓存失效判据）", () => {
     const decision = decidePlateCache(input({ currentPromptSha256: null }));
     expect(decision.valid).toBe(false);
     expect(decision.reason).toContain("提示词缺失");
+  });
+});
+
+describe("完整生图请求与产物指纹", () => {
+  const request = { prompt: "右窗自然光的关键帧", model: "image-model", anchorMode: "none", size: "2K", referenceSha256: [SHA] };
+
+  it("源生图请求一致可复用，监制重试实际提示词单独留痕", () => {
+    const hash = plateRequestSha256(request);
+    const meta = { ...input().meta!, requestSha256: hash, artifactSha256: SHA, submittedPromptSha256: "b".repeat(64) };
+    expect(decidePlateCache(input({ meta, currentRequestSha256: hash, currentArtifactSha256: SHA })).valid).toBe(true);
+  });
+
+  it.each([
+    { prompt: "左窗自然光的关键帧" }, { model: "other-model" }, { size: "4K" },
+    { anchorMode: "real" }, { referenceSha256: ["b".repeat(64)] },
+    { referenceSha256: [SHA, "b".repeat(64)] }
+  ])("请求变化必须失效：%j", (change) => {
+    const meta = { ...input().meta!, requestSha256: plateRequestSha256(request), artifactSha256: SHA };
+    expect(decidePlateCache(input({ meta, currentRequestSha256: plateRequestSha256({ ...request, ...change }), currentArtifactSha256: SHA })).valid).toBe(false);
+  });
+
+  it("拒绝缺少完整指纹的历史产物及字节被替换的产物", () => {
+    expect(decidePlateCache(input({ currentRequestSha256: plateRequestSha256(request) })).valid).toBe(false);
+    const meta = { ...input().meta!, requestSha256: plateRequestSha256(request), artifactSha256: SHA };
+    expect(decidePlateCache(input({ meta, currentArtifactSha256: "b".repeat(64) })).valid).toBe(false);
+    expect(decidePlateCache(input({ meta, currentArtifactSha256: null })).valid).toBe(false);
   });
 });

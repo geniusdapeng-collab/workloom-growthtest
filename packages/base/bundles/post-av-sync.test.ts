@@ -100,6 +100,8 @@ describe("平台侧拼接方案（样点级对齐）", () => {
     expect(args).toContain("-c:v copy");
     expect(args).toContain("-an");
     expect(args).not.toContain("libx264");
+    expect(plan.concatList).toContain("file '/tmp/a.mp4'\nduration 3.750000");
+    expect(plan.concatList).toContain("file '/tmp/b.mp4'\nduration 2.500000");
   });
 
   it("声音：每段按画面时长 atrim+apad，再走 concat 滤镜（样点级）", () => {

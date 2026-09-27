@@ -17,7 +17,7 @@ import path from "node:path";
 import { newId } from "@workloom/shared";
 import { getAppPool, getOwnerPool } from "@workloom/db";
 import { ArchiveStore, readContextBundle, type ContextBundle } from "@hyperreality/video-studio";
-import { scopedRows, archiveWorkDir } from "./archive-host.js";
+import { scopedRows, archiveWorkDir, projectRunLockKey } from "./archive-host.js";
 
 interface Scope {
   tenantId: string;
@@ -108,6 +108,7 @@ export async function resumeProject(
   let interruptedRows = 0;
   let breakpoints: StageBreakpoint[] = [];
   let pendingApprovalId: string | null = null;
+  let discard = false;
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
@@ -115,17 +116,19 @@ export async function resumeProject(
 
     const resumeLock = await client.query<{ ok: boolean }>(
       "SELECT pg_try_advisory_xact_lock(hashtext($1)) AS ok",
-      [`archive-resume:${opts.projectId}`],
+      [JSON.stringify(["archive-resume", scope.tenantId, scope.workspaceId, opts.projectId])],
     );
-    if (!resumeLock.rows[0]?.ok) {
+    if (resumeLock.rows[0]?.ok !== true && resumeLock.rows[0]?.ok !== false) throw new Error("RESUME_LOCK_RECEIPT_INVALID");
+    if (resumeLock.rows[0].ok === false) {
       await client.query("ROLLBACK");
       return { kind: "busy", stage: null, message: `项目 ${opts.projectId} 已有恢复动作在执行（resume 锁未抢到）` };
     }
     const runLock = await client.query<{ ok: boolean }>(
       "SELECT pg_try_advisory_xact_lock(hashtext($1)) AS ok",
-      [`archive-run:${opts.projectId}`],
+      [projectRunLockKey(scope, opts.projectId)],
     );
-    if (!runLock.rows[0]?.ok) {
+    if (runLock.rows[0]?.ok !== true && runLock.rows[0]?.ok !== false) throw new Error("PROJECT_LEASE_RECEIPT_INVALID");
+    if (runLock.rows[0].ok === false) {
       await client.query("ROLLBACK");
       return {
         kind: "busy",
@@ -157,15 +160,34 @@ export async function resumeProject(
 
     await client.query("COMMIT");
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => undefined);
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      discard = true;
+      throw new AggregateError([err, rollbackError], "archive-resume-rollback-failed");
+    }
     throw err;
   } finally {
-    client.release();
+    client.release(discard);
   }
 
   // 断点在事务提交后按同一口径重读（列别名与 readStageBreakpoints 保持一致，避免驼峰/蛇形漂移）
   breakpoints = await readStageBreakpoints(scope, opts.projectId);
   const stuckStage = opts.fromStage ?? breakpoints[0]?.stageId ?? "preproduction";
+  const archive = new ArchiveStore(archiveWorkDir(), scope.workspaceId, opts.projectId);
+  for (const stage of breakpoints) {
+    // PG 完成写与失败补写可能同时不可用；本地 meta/output 仍是待对账证据。
+    const meta = await archive.readJson<{ errorClass?: string }>(`stages/${stage.stageId}/attempt-${stage.attempt}.meta.json`);
+    const pendingOutput = stage.status === "interrupted"
+      ? await archive.readJson<unknown>(`stages/${stage.stageId}/attempt-${stage.attempt}.output.json`)
+      : null;
+    if (stage.errorClass === "RECEIPT_UNVERIFIED" || meta?.errorClass === "RECEIPT_UNVERIFIED" || pendingOutput !== null) {
+      return {
+        kind: "noaction", stage: stage.stageId,
+        message: `阶段 ${stage.stageId} attempt=${stage.attempt} 的完成回执待核实；先对账已有产物与台账，禁止在未知外部结果下重跑。`,
+      };
+    }
+  }
 
   /**
    * 审批等待中断保护分支：有 pending approval 就接续审批轮询，不重跑。
@@ -179,6 +201,10 @@ export async function resumeProject(
       stage: stuckStage,
       message: "存在本项目待审批门：走审批中心接续（批准/修改/驳回），不需要重跑管线",
     };
+  }
+
+  if (breakpoints.length === 0 && !opts.fromStage) {
+    return { kind: "noaction", stage: stuckStage, message: "没有待恢复的阶段；已有完成回执的项目不会通过恢复入口重新执行。" };
   }
 
   if (stuckStage === "preproduction") {
@@ -331,7 +357,7 @@ export async function scanStaleRunsOnStartup(env: NodeJS.ProcessEnv = process.en
     `SELECT r.workspace_id, w.tenant_id, r.project_id, r.stage_id, r.attempt, r.started_at
        FROM production_stage_runs r
        JOIN workspaces w ON w.id = r.workspace_id
-      WHERE r.status='running' AND r.started_at < now() - ($1 || ' minutes')::interval
+      WHERE r.status='running' AND COALESCE(r.last_heartbeat_at, r.started_at) < now() - ($1 || ' minutes')::interval
       ORDER BY r.started_at ASC
       LIMIT 100`,
     [String(staleAfterMinutes)],
@@ -349,18 +375,29 @@ export async function scanStaleRunsOnStartup(env: NodeJS.ProcessEnv = process.en
     for (const row of entry.rows) {
       try {
         const client = await getAppPool().connect();
+        let discard = false;
         try {
           await client.query("BEGIN");
           await client.query("SELECT set_config('app.workspace_id', $1, true)", [workspaceId]);
           await client.query("SELECT set_config('app.tenant_id', $1, true)", [entry.tenantId]);
+          const runLock = await client.query<{ ok: boolean }>(
+            "SELECT pg_try_advisory_xact_lock(hashtext($1)) AS ok",
+            [projectRunLockKey({ tenantId: entry.tenantId, workspaceId }, row.project_id)],
+          );
+          if (runLock.rows[0]?.ok === false) {
+            await client.query("ROLLBACK");
+            continue;
+          }
+          if (runLock.rows[0]?.ok !== true) throw new Error("PROJECT_LEASE_RECEIPT_INVALID");
           const updated = await client.query(
             `UPDATE production_stage_runs SET status='interrupted', finished_at=now()
               WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$4 AND status='running'
+                AND COALESCE(last_heartbeat_at, started_at) < now() - ($5 || ' minutes')::interval
               RETURNING id`,
-            [workspaceId, row.project_id, row.stage_id, row.attempt],
+            [workspaceId, row.project_id, row.stage_id, row.attempt, String(staleAfterMinutes)],
           );
           if ((updated.rowCount ?? 0) > 0) {
-            const dedupeKey = `restart_leftover:${row.stage_id}`;
+            const dedupeKey = JSON.stringify(["restart_leftover", row.project_id, row.stage_id, Number(row.attempt)]);
             await client.query(
               `INSERT INTO engineering_findings
                  (id, workspace_id, category, severity, source, project_id, stage_id, title, evidence, dedupe_key)
@@ -385,18 +422,25 @@ export async function scanStaleRunsOnStartup(env: NodeJS.ProcessEnv = process.en
                 dedupeKey,
               ],
             );
+          }
+          await client.query("COMMIT");
+          if ((updated.rowCount ?? 0) > 0) {
             report.findingsWritten += 1;
             report.interrupted.push({
               workspaceId, projectId: row.project_id, stageId: row.stage_id,
               attempt: Number(row.attempt), startedAt: String(row.started_at),
             });
           }
-          await client.query("COMMIT");
         } catch (err) {
-          await client.query("ROLLBACK").catch(() => undefined);
+          try {
+            await client.query("ROLLBACK");
+          } catch (rollbackError) {
+            discard = true;
+            throw new AggregateError([err, rollbackError], "archive-scan-rollback-failed");
+          }
           throw err;
         } finally {
-          client.release();
+          client.release(discard);
         }
       } catch (err) {
         console.error(

@@ -7,18 +7,20 @@
  *
  * 本模块把 PortraitStudio 的 `runtime` 三件事补齐（vendor 只读，运行期注入）：
  *   - apiRender(task, baseImage?)  逐张真实出图（火山方舟 Seedream，同步返回 URL），
- *                                  落盘到 `<workDir>/characters/<projectId>/<key>/portraits/<key>-<angle>.png`
+ *                                  落盘到 `<workDir>/characters/<projectId>/<key>/portraits/<key>-<requestHash>-<angle>.png`
  *   - searchReferences(stage)      情报档案预填参考图（prefilled：免外部检索）
  *   - processImage(stage, images)  参考图标准化（本机为直通锚点：复制真实参考图作基准图，不做抠图）
  *
  * 命名口径与 vendor 渲染核心对齐（scripts/render-submitter-core.js 的 REQUIRED_ANGLES
  * `front / threeQuarter / closeup / side`）：角度 id 走 ANGLE_FILE_ALIASES 归一，
- * 使绑定清单能直接扫到 `<key>-front.png` 这类文件。
+ * 绑定清单按索引中的精确路径消费当前版本，不通过扫描目录猜测版本。
  *
- * 幂等：同一 (角色, 角度) 文件已存在且非空即复用，不重复烧额度（重跑安全）。
+ * 幂等：完整请求与参考图字节相同、输出收据仍可核验才复用；不同请求写独立文件。
  */
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, statSync, lstatSync, realpathSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { shotIntentHash } from "./shot-intent.js";
+import { isAbsolute, join, resolve, relative, dirname, sep } from "node:path";
 
 /** vendor → 渲染核心要求的四个角度文件名（REQUIRED_ANGLES 口径） */
 const ANGLE_FILE_ALIASES: Record<string, string> = {
@@ -51,6 +53,17 @@ export interface PortraitTask {
   [key: string]: unknown;
 }
 
+export interface PortraitInputReceipt { path: string; realPath: string; sha256: string; bytes: number }
+export interface PortraitCacheReceipt {
+  schemaVersion: "workloom.portrait-cache/v2";
+  requestHash: string; sourceHash: string; kind: "character" | "product"; id: string; angle: string;
+  model: string; size: string | null; endpoint: string; promptHash: string;
+  references: PortraitInputReceipt[];
+  output: PortraitInputReceipt;
+}
+export interface PortraitBaseReceipt {
+  schemaVersion: "workloom.portrait-base/v1"; source: PortraitInputReceipt; output: PortraitInputReceipt;
+}
 export interface PortraitIndexEntry {
   kind: "character" | "product";
   id: string;
@@ -58,6 +71,7 @@ export interface PortraitIndexEntry {
   dir: string;
   /** 角度/视角 → 落盘绝对路径 */
   files: Record<string, string>;
+  receipts?: Record<string, PortraitCacheReceipt>;
 }
 
 export interface PortraitIndex {
@@ -66,6 +80,7 @@ export interface PortraitIndex {
   generatedAt: string;
   characters: Record<string, PortraitIndexEntry>;
   products: Record<string, PortraitIndexEntry>;
+  baseImages?: Record<string, PortraitBaseReceipt>;
 }
 
 export interface PortraitRuntimeOptions {
@@ -124,6 +139,30 @@ export interface PortraitRuntime {
 }
 
 const IMAGE_DOWNLOAD_TIMEOUT_MS = 120_000;
+const CACHE_VERSION = "workloom.portrait-cache/v2" as const;
+const inFlight = new Map<string, Promise<string>>();
+const hashBytes = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
+const record = (value: unknown): value is Record<string, unknown> => Boolean(value && typeof value === "object" && !Array.isArray(value));
+function snapshotFile(path: string): { receipt: PortraitInputReceipt; bytes: Buffer } {
+  const realPath = realpathSync(path);
+  const stat = statSync(realPath);
+  if (!stat.isFile() || stat.size < 1024 || stat.size > 100_000_000) throw new Error(`PORTRAIT_INPUT_INVALID: 参考图不是有效大小的普通文件：${path}`);
+  const bytes = readFileSync(realPath);
+  if (bytes.length !== stat.size || realpathSync(path) !== realPath) throw new Error(`PORTRAIT_INPUT_CHANGED: 读取期间来源变化：${path}`);
+  return { receipt: { path: resolve(path), realPath, sha256: hashBytes(bytes), bytes: bytes.length }, bytes };
+}
+function verifySource(source: PortraitInputReceipt): void {
+  const current = snapshotFile(source.path).receipt;
+  if (shotIntentHash(current) !== shotIntentHash(source)) throw new Error(`PORTRAIT_INPUT_CHANGED: 请求期间参考图发生变化：${source.path}`);
+}
+function safeComponent(value: string, label: string): string {
+  if (!value || value === "." || value === ".." || /[\\/\u0000-\u001f]/.test(value)) throw new Error(`PORTRAIT_PATH_INVALID: ${label}`);
+  return value;
+}
+function identityKey(id: string): string {
+  const key = portraitKey(id);
+  return key === id && !["_products", "__proto__"].includes(key) && [...key].length <= 24 ? key : `${[...key].slice(0, 24).join("")}-${shotIntentHash(id).slice(0, 16)}`;
+}
 
 /**
  * 目录/文件名的安全化：**保留中文等非 ASCII 字符**。
@@ -188,10 +227,26 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
     maxReferenceImages = 4,
     retries = 2
   } = options;
+  safeComponent(projectId, "projectId");
+  if (!model?.trim() || !apiKey?.trim()) throw new Error("PORTRAIT_CONFIG_INVALID: 缺model/apiKey");
+  if (!Number.isInteger(maxReferenceImages) || maxReferenceImages < 1 || maxReferenceImages > 4) throw new Error("PORTRAIT_CONFIG_INVALID: maxReferenceImages必须为1..4");
+  if (!Number.isInteger(retries) || retries < 0 || retries > 5 || !Number.isFinite(timeoutMs) || timeoutMs <= 0 || timeoutMs > 900_000) throw new Error("PORTRAIT_CONFIG_INVALID: 重试次数或超时非法");
   const fetchImpl = options.fetchImpl ?? fetch;
   const log = options.log ?? (() => undefined);
   const base = baseUrl.replace(/\/$/, "");
-  const charactersRoot = join(workDir, "characters", projectId);
+  const workRoot = resolve(workDir);
+  mkdirSync(workRoot, { recursive: true });
+  const workRealPath = realpathSync(workRoot);
+  const inside = (basePath: string, candidate: string): boolean => { const rel = relative(basePath, candidate); return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel); };
+  let scopePath = workRoot;
+  for (const component of ["characters", projectId]) {
+    if (!inside(workRealPath, realpathSync(scopePath))) throw new Error("PORTRAIT_PATH_INVALID: 项目目录逃离workDir");
+    scopePath = join(scopePath, component);
+    if (!existsSync(scopePath)) { try { mkdirSync(scopePath); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; } }
+    if (!inside(workRealPath, realpathSync(scopePath))) throw new Error("PORTRAIT_PATH_INVALID: 项目目录逃离workDir");
+  }
+  const charactersRoot = scopePath;
+  const rootRealPath = realpathSync(charactersRoot);
   const indexFile = join(charactersRoot, "portrait-index.json");
 
   const index: PortraitIndex = {
@@ -202,64 +257,120 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
     products: {}
   };
 
-  /** 进程内外的索引都以磁盘为准（服务端重启后仍能复用已出图的幂等结果） */
-  try {
-    if (existsSync(indexFile)) {
-      const loaded = JSON.parse(readFileSync(indexFile, "utf8")) as PortraitIndex;
-      if (loaded?.schemaVersion === "workloom.portrait-index/v1") {
-        index.characters = loaded.characters ?? {};
-        index.products = loaded.products ?? {};
-      }
+  function refreshIndex(): void {
+    if (!existsSync(indexFile)) return;
+    if (lstatSync(indexFile).isSymbolicLink() || realpathSync(indexFile) !== join(rootRealPath, "portrait-index.json")) throw new Error("PORTRAIT_INDEX_INVALID: 索引不能是符号链接或逃离项目");
+    const loaded: unknown = JSON.parse(readFileSync(indexFile, "utf8"));
+    if (!record(loaded) || loaded.schemaVersion !== "workloom.portrait-index/v1" || loaded.projectId !== projectId
+      || !record(loaded.characters) || !record(loaded.products) || (loaded.baseImages !== undefined && !record(loaded.baseImages))) {
+      throw new Error("PORTRAIT_INDEX_INVALID: 索引结构或项目不匹配，不能以空索引覆盖");
     }
-  } catch (err) {
-    log(`[portrait] 索引读取失败（按空索引继续）：${err instanceof Error ? err.message : String(err)}`);
+    index.characters = loaded.characters as Record<string, PortraitIndexEntry>;
+    index.products = loaded.products as Record<string, PortraitIndexEntry>;
+    index.baseImages = (loaded.baseImages ?? {}) as Record<string, PortraitBaseReceipt>;
   }
+  refreshIndex();
 
+  function assertOutputDirectory(dir: string): void {
+    const rel = relative(rootRealPath, realpathSync(dir));
+    if (rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) throw new Error(`PORTRAIT_PATH_INVALID: 输出目录逃离项目：${dir}`);
+    if (realpathSync(charactersRoot) !== rootRealPath) throw new Error("PORTRAIT_PATH_CHANGED: 项目根目录发生变化");
+  }
+  function ensureOutputDirectory(dir: string): void {
+    let current = charactersRoot;
+    const rel = relative(charactersRoot, dir);
+    if (!inside(charactersRoot, dir)) throw new Error("PORTRAIT_PATH_INVALID: 输出目录越界");
+    for (const part of rel.split(sep).filter(Boolean)) {
+      assertOutputDirectory(current);
+      current = join(current, part);
+      if (!existsSync(current)) { try { mkdirSync(current); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error; } }
+      assertOutputDirectory(current);
+    }
+    assertOutputDirectory(dir);
+  }
+  function atomicWrite(path: string, bytes: string | Buffer): void {
+    ensureOutputDirectory(dirname(path));
+    const temp = join(dirname(path), `.portrait-${randomUUID()}.tmp`);
+    try {
+      writeFileSync(temp, bytes, { flag: "wx", mode: 0o600 });
+      assertOutputDirectory(dirname(path));
+      renameSync(temp, path);
+    } finally {
+      if (existsSync(temp)) unlinkSync(temp);
+    }
+  }
   function persistIndex(): void {
     index.generatedAt = new Date().toISOString();
-    mkdirSync(charactersRoot, { recursive: true });
-    writeFileSync(indexFile, `${JSON.stringify(index, null, 2)}\n`, "utf8");
+    atomicWrite(indexFile, `${JSON.stringify(index, null, 2)}\n`);
   }
-
-  function upsert(
-    bucket: "characters" | "products",
-    kind: "character" | "product",
-    key: string,
-    id: string,
-    name: string,
-    dir: string,
-    angle: string,
-    file: string
-  ): void {
-    const existing = index[bucket][key];
-    if (existing) {
-      existing.files[angle] = file;
-      index[bucket][key] = existing;
-      persistIndex();
-      return;
+  /** Serialize filesystem publication across runtime instances and processes. Never steal an unknown paid request's lock. */
+  async function locked<T>(fn: () => Promise<T>): Promise<T> {
+    const path = join(charactersRoot, ".portrait-cache.lock");
+    const owner = JSON.stringify({ pid: process.pid, token: randomUUID() });
+    const started = Date.now();
+    for (;;) {
+      assertOutputDirectory(charactersRoot);
+      try {
+        const fd = openSync(path, "wx", 0o600);
+        try { writeFileSync(fd, owner); } finally { closeSync(fd); }
+        break;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+        let existing: string;
+        try {
+          if (lstatSync(path).isSymbolicLink()) throw new Error("PORTRAIT_CACHE_LOCK_INVALID: 锁不能是符号链接");
+          existing = readFileSync(path, "utf8");
+        } catch (error) { if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; throw error; }
+        if (existing) {
+          let holder: unknown;
+          try { holder = JSON.parse(existing); } catch { throw new Error("PORTRAIT_CACHE_LOCK_INVALID: 锁内容不可核实"); }
+          if (!record(holder) || !Number.isInteger(holder.pid) || Number(holder.pid) <= 0 || typeof holder.token !== "string") throw new Error("PORTRAIT_CACHE_LOCK_INVALID: 锁所有者不可核实");
+          try { process.kill(Number(holder.pid), 0); }
+          catch (error) {
+            if ((error as NodeJS.ErrnoException).code === "ESRCH") throw new Error("PORTRAIT_CACHE_LOCK_STALE: 上次进程已结束，需核对是否已收费/有产物后恢复，禁止盲目重发");
+            if ((error as NodeJS.ErrnoException).code !== "EPERM") throw error;
+          }
+        }
+        if (Date.now() - started > timeoutMs) throw new Error("PORTRAIT_CACHE_BUSY: 等待项目缓存锁超时，未发出重复请求");
+        await new Promise((resolveWait) => setTimeout(resolveWait, 20));
+      }
     }
-    index[bucket][key] = { kind, id, name, dir, files: { [angle]: file } };
+    try { refreshIndex(); return await fn(); }
+    finally {
+      if (readFileSync(path, "utf8") !== owner) throw new Error("PORTRAIT_CACHE_LOCK_CHANGED: 不删除其他请求的锁");
+      unlinkSync(path);
+    }
+  }
+  function upsert(bucket: "characters" | "products", key: string, name: string, dir: string, receipt: PortraitCacheReceipt): void {
+    const existing = index[bucket][key];
+    index[bucket][key] = {
+      kind: receipt.kind, id: receipt.id, name, dir,
+      files: { ...(existing?.id === receipt.id && existing.kind === receipt.kind ? existing.files : {}), [receipt.angle]: receipt.output.path },
+      receipts: { ...(existing?.id === receipt.id && existing.kind === receipt.kind ? existing.receipts : {}), [receipt.angle]: receipt },
+    };
     persistIndex();
   }
-
-  function existingPortrait(key: string, angle: string): string | null {
-    for (const bucket of ["characters", "products"] as const) {
-      const hit = index[bucket][key]?.files?.[angle];
-      if (hit && nonEmptyFile(hit)) return hit;
+  function validOutput(output: PortraitInputReceipt, expected: string): boolean {
+    try {
+      if (!record(output) || output.path !== expected || lstatSync(expected).isSymbolicLink()) return false;
+      assertOutputDirectory(dirname(expected));
+      return shotIntentHash(snapshotFile(expected).receipt) === shotIntentHash(output);
+    } catch (error) {
+      log(`[portrait] 缓存输出不可核验：${error instanceof Error ? error.message : String(error)}`);
+      return false;
     }
-    return null;
   }
-
-  function anchorsFor(kind: "character" | "product", baseImage?: string | null): string[] {
+  function existingPortrait(bucket: "characters" | "products", key: string, receipt: Omit<PortraitCacheReceipt, "output">, expected: string): string | null {
+    const entry = index[bucket][key];
+    const stored = entry?.receipts?.[receipt.angle];
+    if (!stored || entry.kind !== receipt.kind || entry.id !== receipt.id || entry.files?.[receipt.angle] !== expected) return null;
+    const { output, ...storedRequest } = stored;
+    return shotIntentHash(storedRequest) === shotIntentHash(receipt) && validOutput(output, expected) ? expected : null;
+  }
+  function anchorsFor(kind: "character" | "product", baseImage?: string | null): Array<ReturnType<typeof snapshotFile>> {
     const configured = kind === "character" ? characterAnchorImages : referenceImages;
-    const locals = configured
-      .map((image) => resolveLocal(image, workDir))
-      .filter((file) => nonEmptyFile(file));
-    if (baseImage) {
-      const base = resolveLocal(baseImage, workDir);
-      if (nonEmptyFile(base) && !locals.includes(base)) locals.unshift(base);
-    }
-    return locals.slice(0, maxReferenceImages);
+    const paths = [...(baseImage ? [resolveLocal(baseImage, workDir)] : []), ...configured.map((file) => resolveLocal(file, workDir))];
+    return [...new Set(paths)].slice(0, maxReferenceImages).map(snapshotFile);
   }
 
   function buildPrompt(task: PortraitTask, kind: "character" | "product", angleRaw: string): string {
@@ -327,25 +438,7 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
     return text.length >= 8 && descriptive.test(text) ? raw.trim() : null;
   }
 
-  async function toDataUrl(file: string): Promise<string> {
-    const bytes = readFileSync(file);
-    const ext = file.toLowerCase().endsWith(".png") ? "png" : "jpeg";
-    return `data:image/${ext};base64,${bytes.toString("base64")}`;
-  }
-
-  async function generateImage(prompt: string, anchors: string[]): Promise<string> {
-    const payload: Record<string, unknown> = {
-      model,
-      prompt,
-      response_format: "url",
-      watermark: false,
-      ...(size ? { size } : {})
-    };
-    if (anchors.length > 0) {
-      const dataUrls = await Promise.all(anchors.map((file) => toDataUrl(file)));
-      payload.image = dataUrls.length === 1 ? dataUrls[0] : dataUrls;
-    }
-
+  async function generateImage(payload: Record<string, unknown>): Promise<string> {
     let lastError: Error | null = null;
     for (let attempt = 0; attempt <= retries; attempt += 1) {
       try {
@@ -363,16 +456,19 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
             await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
             continue;
           }
+          Object.assign(err, { noRetry: true });
           throw err;
         }
-        const data = JSON.parse(text) as { data?: Array<{ url?: string; size?: string }> };
+        let data: { data?: Array<{ url?: string; size?: string }> };
+        try { data = JSON.parse(text) as typeof data; }
+        catch { throw Object.assign(new Error("定妆照出图成功响应不是有效JSON，禁止自动重复收费"), { noRetry: true }); }
         const url = data?.data?.[0]?.url;
-        if (!url) throw new Error(`定妆照出图响应缺少 url：${text.slice(0, 200)}`);
+        if (!url) throw Object.assign(new Error(`定妆照出图响应缺少 url：${text.slice(0, 200)}`), { noRetry: true });
         log(`[portrait] 出图成功（${data.data?.[0]?.size ?? "?"}）`);
         return url;
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        if (attempt >= retries) break;
+        if ((err as { noRetry?: boolean })?.noRetry || attempt >= retries) break;
         await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
       }
     }
@@ -388,55 +484,55 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
   }
 
   async function apiRender(task: PortraitTask, baseImage?: string | null): Promise<string> {
-    /**
-     * vendor 的角色分支只把 `portraitId/angle/angleName/prompt` 传进来（角色 id/name 留在外层任务上），
-     * 商品分支则带 `productId/view`。所以：
-     *   · 用 `view`（商品视角）与 `angle`（角色角度）区分两条链路；
-     *   · 角色标识从 `portraitId` 剥掉角度后缀还原（`char_001-front_full` → `char_001`），
-     *     显示名从提示词模板 `【定妆照】<name> — ...` 里取回。
-     */
+    if (!record(task)) throw new Error("PORTRAIT_TASK_INVALID: 任务必须为对象");
+    const sourceHash = shotIntentHash(task);
     const angleRaw = String(task.angle || task.view || "view");
-    const isProduct = Boolean(task.productId || task.productName || task.view);
-    const kind: "character" | "product" = isProduct ? "product" : "character";
-    const portraitId = String(task.portraitId ?? "");
-    const explicitId = isProduct
-      ? task.productId || task.productName
-      : task.characterId || task.characterName;
-    const id = String(explicitId || stripAngleSuffix(portraitId, angleRaw) || "subject");
-    const name = String(
-      (isProduct ? task.productName || task.productId : task.characterName || characterNameFromPrompt(task.prompt))
-        || explicitId
-        || id
-    );
+    const kind = task.productId || task.productName || task.view ? "product" : "character";
+    const explicitId = kind === "product" ? task.productId || task.productName : task.characterId || task.characterName;
+    const id = String(explicitId || stripAngleSuffix(String(task.portraitId ?? ""), angleRaw) || "subject");
+    const name = String((kind === "product" ? task.productName || task.productId : task.characterName || characterNameFromPrompt(task.prompt)) || explicitId || id);
     const angle = ANGLE_FILE_ALIASES[angleRaw] ?? angleRaw;
-    const key = portraitKey(id);
+    if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,63}$/.test(angle)) throw new Error("PORTRAIT_ANGLE_INVALID: 角度不能用作路径或无效标识");
+    const key = identityKey(id);
     const bucket = kind === "character" ? "characters" : "products";
-
-    const cached = existingPortrait(key, angle);
-    if (cached) {
-      log(`[portrait] 复用已出图：${key}-${angle}（幂等，不重复烧额度）`);
-      upsert(bucket, kind, key, id, name, join(charactersRoot, key), angle, cached);
-      return cached;
-    }
-
-    const dir = join(charactersRoot, key, "portraits");
-    mkdirSync(dir, { recursive: true });
-    const file = join(dir, `${key}-${angle}.png`);
+    // Build and validate all actual request inputs before considering the cache.
+    const prompt = buildPrompt(task, kind, angleRaw);
     const anchors = anchorsFor(kind, baseImage);
-    log(
-      `[portrait] 出图：${name} / ${angleRaw} → ${angle}`
-      + `${anchors.length
-        ? `（锚定参考图 ${anchors.length} 张）`
-        : kind === "character"
-          // 角色无锚定 = 人物与真人无关（真机事故根因之一），必须显性告警
-          ? "（⚠️ 无锚定参考图：生成人物与真人无关，需配置 HR_PORTRAIT_ANCHORS）"
-          : "（无参考图）"}`
-    );
-    const url = await generateImage(buildPrompt(task, kind, angleRaw), anchors);
-    const bytes = await download(url);
-    writeFileSync(file, bytes);
-    upsert(bucket, kind, key, id, name, join(charactersRoot, key), angle, file);
-    return file;
+    const images = anchors.map(({ receipt, bytes }) => `data:image/${receipt.path.toLowerCase().endsWith(".png") ? "png" : "jpeg"};base64,${bytes.toString("base64")}`);
+    const payload: Record<string, unknown> = { model, prompt, response_format: "url", watermark: false, ...(size ? { size } : {}), ...(images.length ? { image: images.length === 1 ? images[0] : images } : {}) };
+    const endpoint = `${base}/images/generations`;
+    const requestHash = shotIntentHash({ schemaVersion: CACHE_VERSION, projectId, kind, id, angle, sourceHash, endpoint, payload, references: anchors.map((anchor) => anchor.receipt) });
+    const planned: Omit<PortraitCacheReceipt, "output"> = { schemaVersion: CACHE_VERSION, requestHash, sourceHash, kind, id, angle, model, size: size ?? null, endpoint, promptHash: shotIntentHash(prompt), references: anchors.map((anchor) => anchor.receipt) };
+    const dir = kind === "character" ? join(charactersRoot, key) : join(charactersRoot, "_products", key);
+    const file = join(dir, "portraits", `${key}-${requestHash}-${angle}.png`);
+    const flightKey = `${indexFile}:${requestHash}`;
+    const pending = inFlight.get(flightKey);
+    if (pending) {
+      const output = await pending;
+      if (shotIntentHash(task) !== sourceHash) throw new Error("PORTRAIT_INPUT_CHANGED: 并发等待期间角色任务变化");
+      for (const anchor of anchors) verifySource(anchor.receipt);
+      refreshIndex(); return output;
+    }
+    const operation = locked(async () => {
+      if (shotIntentHash(task) !== sourceHash) throw new Error("PORTRAIT_INPUT_CHANGED: 等待期间角色任务变化");
+      for (const anchor of anchors) verifySource(anchor.receipt);
+      const cached = existingPortrait(bucket, key, planned, file);
+      if (cached) { log(`[portrait] 完整请求及产物哈希一致，复用：${kind}/${key}/${angle}`); return cached; }
+      ensureOutputDirectory(dirname(file));
+      log(`[portrait] 出图：${name} / ${angle}，来源 ${requestHash.slice(0, 12)}，锚点 ${anchors.length}`);
+      const url = await generateImage(payload);
+      const bytes = await download(url);
+      if (shotIntentHash(task) !== sourceHash) throw new Error("PORTRAIT_INPUT_CHANGED: 出图期间角色任务变化，产物未纳入索引");
+      for (const anchor of anchors) verifySource(anchor.receipt);
+      atomicWrite(file, bytes);
+      const output = snapshotFile(file).receipt;
+      if (output.sha256 !== hashBytes(bytes)) throw new Error("PORTRAIT_OUTPUT_CHANGED: 落盘期间产物变化");
+      upsert(bucket, key, name, dir, { ...planned, output });
+      return file;
+    });
+    inFlight.set(flightKey, operation);
+    try { return await operation; }
+    finally { if (inFlight.get(flightKey) === operation) inFlight.delete(flightKey); }
   }
 
   /** 情报档案预填：直接返回真实实拍参考图（prefilled 分支，免外部检索） */
@@ -458,27 +554,29 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
    * 作为后续 5 视角风格化的唯一真实锚点。
    */
   async function processImage(stage: ProcessingStageLike, images?: string[]): Promise<string> {
-    const candidates = [...(images ?? []), ...referenceImages.map((image) => resolveLocal(image, workDir))]
-      .map((image) => resolveLocal(String(image), workDir))
-      .filter((file) => nonEmptyFile(file));
-    const source = stage.outputBaseImage && nonEmptyFile(resolveLocal(stage.outputBaseImage, workDir))
-      ? resolveLocal(stage.outputBaseImage, workDir)
-      : candidates[0];
-    if (!source) throw new Error("参考图标准化失败：没有可用的真实参考图（禁止无参考生成）");
-    const dir = join(charactersRoot, "_product-base");
-    mkdirSync(dir, { recursive: true });
-    const ext = source.toLowerCase().endsWith(".png") ? "png" : "jpg";
-    const out = join(dir, `base.${ext}`);
-    if (!nonEmptyFile(out)) writeFileSync(out, readFileSync(source));
-    log(`[portrait] 基准图就位（直通锚点）：${out}`);
-    return out;
+    const candidates = [...(images ?? []), ...referenceImages].map((image) => resolveLocal(String(image), workDir));
+    const sourcePath = candidates[0] ?? (stage.outputBaseImage ? resolveLocal(stage.outputBaseImage, workDir) : undefined);
+    if (!sourcePath) throw new Error("参考图标准化失败：没有可用的真实参考图（禁止无参考生成）");
+    const source = snapshotFile(sourcePath);
+    const sourceHash = shotIntentHash(source.receipt);
+    const ext = sourcePath.toLowerCase().endsWith(".png") ? "png" : "jpg";
+    const out = join(charactersRoot, "_product-base", `base-${sourceHash}.${ext}`);
+    return locked(async () => {
+      verifySource(source.receipt);
+      const prior = index.baseImages?.[sourceHash];
+      if (prior?.schemaVersion === "workloom.portrait-base/v1" && shotIntentHash(prior.source) === sourceHash && validOutput(prior.output, out)) return out;
+      atomicWrite(out, source.bytes);
+      verifySource(source.receipt);
+      index.baseImages = { ...index.baseImages, [sourceHash]: { schemaVersion: "workloom.portrait-base/v1", source: source.receipt, output: snapshotFile(out).receipt } };
+      persistIndex(); log(`[portrait] 基准图按当前来源字节就位：${out}`); return out;
+    });
   }
 
   return {
     apiRender,
     searchReferences,
     processImage,
-    snapshot: () => index,
+    snapshot: () => structuredClone(index),
     indexPath: () => indexFile
   };
 }

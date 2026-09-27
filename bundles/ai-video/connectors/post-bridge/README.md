@@ -17,11 +17,12 @@
 WorkLoom（大脑：岗位/技能/围栏/事件账本）         Mac 后期工位（手，独立内网）
   runtime ToolExecutor ──HTTP/Bearer──▶  post-bridge (127.0.0.1:9777)
                                             ├─ ffmpeg / ffprobe（归一化/拼接/封面/软轨）
+                                            ├─ enhance-bridge（UHD 档：M3 本机逐帧增强低分辨率镜头）
                                             ├─ subtitle-bridge 内核（旁挂字幕 + 软字幕轨 + 标题版式）
                                             ├─ color-bridge 内核（调色，自带可见性校验）
                                             ├─ bgm-bridge 内核（选曲 + 让位混音，自带 LUFS 复检）
                                             ├─ library/style-variants（风格配方：调色/BGM/转场/封面/文案）
-                                            ├─ 产物区（新文件 + 版本链 + 缓存：norm/assemble/graded/audio）
+                                            ├─ 产物区（新文件 + 版本链 + 缓存：enhanced/norm/assemble/graded/audio）
                                             └─ 回执：sha256 / 变体差异实测 / 复用证据 / 成本口径
 ```
 
@@ -61,15 +62,49 @@ WorkLoom（大脑：岗位/技能/围栏/事件账本）         Mac 后期工�
 ```bash
 post-cli health
 post-cli variants
-post-cli plan     --project project.json --shots a.mp4,b.mp4 [--variants warm-story,clean-tech]
+post-cli plan     --project project.json --shots a.mp4,b.mp4 [--quality hd|uhd] [--variants warm-story,clean-tech]
 post-cli deliver  --project project.json --shots a.mp4,b.mp4 --out-dir out/ \
-                  [--srt subs.srt] [--srt-en subs.en.srt] [--burn-subtitles] [--no-soft-subtitles]
+                  [--quality hd|uhd] [--srt subs.srt] [--srt-en subs.en.srt] [--burn-subtitles] [--no-soft-subtitles]
 post-cli impact   --project out/film-project.json --patch patch.json
 post-cli reedit   --project out/film-project.json --patch patch.json [--shot SC-03=/path/new.mp4]
 post-cli triage   --feedback "配乐太吵，另外第 3 个镜头人物走形"
 ```
 
 退出码：`0` 成功；`2` 用法错误；`3` 工具错误（code 见 `PostError`）；`4` 需要人审（镜头重生成走 G8）。
+
+`quality` 缺省为 `hd`。`uhd` 对应竖屏 2160×3840、横屏 3840×2160、方屏 2160×2160、4:5 2160×2700。
+请求 UHD 时，低于目标画布的实拍/动画镜头先在本机增强，再进入共用后期层；增强引擎不可用、原片为可排版的文字位图、或增强回读规格不符，交付会报错。
+已达目标的原片直接使用并在清单标 `source-sufficient`。`delivery-manifest.json#enhancements` 与 `film-project.json#layers.shots[].enhancement` 留逐镜源哈希、模型、增强哈希和来源文件；`resolution_exact` 与 `enhancement_provenance` 检查不通过时不判交付完成。
+
+在 Apple Silicon macOS 工位上先安装本机工具（安装脚本校验固定版本与哈希）：
+
+```bash
+bash bundles/ai-video/connectors/color-bridge/kit/install.sh
+node scripts/tools/enhance-engine-install.mjs
+node bundles/ai-video/connectors/post-bridge/cli.mjs health
+```
+
+桌面安装包包含上述脚本与后期代码，不内置模型和 FFmpeg 二进制。现有 FFmpeg kit 的构建含 `--enable-nonfree`，不可随产品再分发；安装器把它下载到当前 Mac 的 `~/.workloom-color/bin`。后期工位优先使用显式 `WORKLOOM_POST_FFMPEG_PATH` / `WORKLOOM_POST_FFPROBE_PATH`，否则寻找该 kit，最后才查系统 `PATH`。无本机引擎或 ffmpeg 时 UHD 请求失败并给出健康探针结果；Windows 与 Intel Mac 的 UHD 增强尚未经过本机验收。
+
+## 返修并发与版本前置条件
+
+页面 `video.delivery.get` 返回当前 `revisionBase: { version, projectSha256 }`；提交 `startRevision` 必须带
+`expectedVersion` 与 `expectedProjectSha256`。服务先比较快照，原样传给 CLI，工位拿到包级排他锁后再次比较。
+页面加载后若已有新版本，或同版本工程字节改变，本次请求返回 `CONFLICT`，用户刷新并核对后才能再次提交。
+
+工具 `postwrite.reedit` 对应参数是 `expected_version` / `expected_project_sha256`；可先以 `dry_run: true`
+取得只读计划及前置条件。CLI 可用 `--dry-run`，或显式传
+`--expected-version N --expected-project-sha256 <64位小写SHA256>`。两个参数必须成对；均省略时只读取用户
+`--project` 指定文件的快照，仍会拒绝过期文件，绝不自动跟随新版本。
+
+工位用 `.revision.lock` 的独占创建认领包，同锁内独占创建 `versions/vN`；每个认领有 runId、基础版本与哈希。
+先写产物与 `revision.json#commit`，最后以不可覆盖的原子硬链接发布 `film-project.json`，发布成功才算该版本提交。
+失败目录保留 `revision-failed.json`，版本号不复用；下一次成功可能从 v1 跳到 v3。退出只清理本进程仍持有的锁。
+异常退出留下的锁不会凭 PID 自动抢占，需运维核对对应进程、runId、认领和失败回执后恢复。
+
+`revision_conflict`（快照/锁归属变化）、`revision_busy`（已有持有者）、`revision_io_failed`（认领存储失败）
+均不可自动切换端点重试。此协议面向同一台工位的本地文件系统；不宣称网络文件系统上的分布式锁保证。
+独占创建与网络文件系统限制依据 [Node.js 文件系统标志文档](https://nodejs.org/docs/latest-v24.x/api/fs.html#file-system-flags)。
 
 ## 风格变体（`library/style-variants/`）
 

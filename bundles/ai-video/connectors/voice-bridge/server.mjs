@@ -127,7 +127,10 @@ const server = http.createServer(async (req, res) => {
 
   const now = Date.now();
   gcCache(now);
-  const hit = cache.get(idempotencyKey);
+  // 核验必须读取当前文件与当前 ASR 状态：同路径可能已返修，引擎也可能从缺测恢复。
+  // 合成/配音等产物动作仍保留原有幂等语义，只有只测量的 verify 不复用结果。
+  const cacheable = tool !== "voicewrite.verify";
+  const hit = cacheable ? cache.get(idempotencyKey) : undefined;
   if (hit) {
     json(res, 200, { ...hit.payload, idempotent_replay: true });
     return;
@@ -145,7 +148,7 @@ const server = http.createServer(async (req, res) => {
       receipt: { ...outcome.receipt, verified_at: outcome.receipt?.verified_at ?? new Date().toISOString() },
       elapsed_ms: Date.now() - started,
     };
-    cache.set(idempotencyKey, { at: now, payload });
+    if (cacheable) cache.set(idempotencyKey, { at: now, payload });
     await jobAppend(jobsDir(), {
       jobId, tool, ok: true, elapsedMs: payload.elapsed_ms,
       sha256: payload.receipt.sha256 ?? null, tenant: params.tenant_id ?? null,

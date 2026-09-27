@@ -10,6 +10,21 @@
  */
 import { z } from "zod";
 
+/** 输出档位只改变合成画布尺寸；素材是否具备同等细节需由素材来源单独保证。 */
+export const ExplainerQualitySchema = z.enum(["hd", "uhd"]);
+export type ExplainerQuality = z.infer<typeof ExplainerQualitySchema>;
+
+export function explainerOutputSize(
+  aspect: "9:16" | "16:9",
+  quality: ExplainerQuality = "hd",
+): { width: number; height: number } {
+  const shortEdge = quality === "uhd" ? 2160 : 1080;
+  const longEdge = quality === "uhd" ? 3840 : 1920;
+  return aspect === "9:16"
+    ? { width: shortEdge, height: longEdge }
+    : { width: longEdge, height: shortEdge };
+}
+
 /* ================= 口播稿 ================= */
 
 export const ScriptSentenceSchema = z.object({

@@ -39,12 +39,15 @@ import {
   type PipelineKind,
   type PortraitIndex,
   type ProducerStage,
+  type ProducerVerdict,
   type RunInput,
   type StudioConfig,
   type StudioPortraitConfig,
 } from "@hyperreality/video-studio";
 import { buildServerGateRecord, withGateLedger } from "./gate-ledger-bridge.js";
 import { createDataMiningExecutor } from "./data-mining-executor.js";
+import { prepareMarketingFacts, finalizeMarketingFacts, type PreparedMarketingFacts } from "./marketing-authority.js";
+import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
 import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
@@ -55,6 +58,7 @@ import {
   gateDeterministicChecks,
   isProducerRejection,
   producerModeFromEnv,
+  portraitGateEvidence,
   writeGateArtifact,
   type ProducerMode,
 } from "./gate-policy.js";
@@ -181,17 +185,31 @@ const WORKER_ACTOR = { id: "video-studio", type: "system" } as const;
 /**
  * 软失败原因提取（T-2026-0926-0005）：vendor 返回 `success:false` 但不抛异常时，
  * 注册表 `entry.error` 往往是空串——`?? 兜底` 会落成空消息并被分类成 BUG。
- * 取因顺序：运行器异常 → result.error → vendor `failures[].message` → 通用兜底。
+ * 取因顺序：运行器异常 → result.error/errorMessage → vendor failures/errors → 被拒确认门 → 通用兜底。
  */
 export function terminalFailureMessageOf(result: unknown, entryError?: string | null): string {
-  const r = (result ?? {}) as { error?: unknown; failures?: Array<{ message?: unknown }> };
+  const r = (result ?? {}) as {
+    error?: unknown;
+    errorMessage?: unknown;
+    failures?: Array<{ message?: unknown }>;
+    errors?: Array<{ message?: unknown; error?: unknown }>;
+    confirmations?: Record<string, unknown>;
+  };
   const candidates: string[] = [];
   const push = (value: unknown): void => {
     if (typeof value === "string" && value.trim()) candidates.push(value.trim());
   };
   push(entryError);
   push(r.error);
+  push(r.errorMessage);
   if (Array.isArray(r.failures)) for (const failure of r.failures) push(failure?.message);
+  if (Array.isArray(r.errors)) for (const failure of r.errors) push(failure?.message ?? failure?.error);
+  for (const confirmation of Object.values(r.confirmations ?? {})) {
+    if (confirmation && typeof confirmation === "object") {
+      const verdict = confirmation as { approved?: unknown; reason?: unknown };
+      if (verdict.approved === false) push(verdict.reason);
+    }
+  }
   return (candidates[0] ?? "vendor 返回 success:false").slice(0, 500);
 }
 
@@ -268,7 +286,7 @@ export function summarizeWorkspaceRuns(
 
 export class StudioWorkerError extends Error {
   constructor(
-    public readonly code: "LLM_MISSING",
+    public readonly code: "LLM_MISSING" | "ARCHIVE_REQUIRED",
     message: string,
   ) {
     super(message);
@@ -423,6 +441,9 @@ function portraitConfig(metadata?: Record<string, unknown>): StudioPortraitConfi
  * @throws StudioWorkerError LLM_MISSING —— LLM_* 四环境变量未配齐（禁止静默降级）
  */
 export function startRun(scope: Scope, input: RunInput): string {
+  if ((process.env.ARCHIVE_ENABLED ?? "1") === "0") {
+    throw new StudioWorkerError("ARCHIVE_REQUIRED", "生产预生产必须启用档案与运行租约，拒绝 ARCHIVE_ENABLED=0");
+  }
   const llm = WorkloomLLMEngine.fromEnv();
   if (!llm) {
     throw new StudioWorkerError(
@@ -452,7 +473,8 @@ export function startRun(scope: Scope, input: RunInput): string {
    * vendor 只写 portraitBindings，渲染侧读 characterRef，中间断线 → 出了图也报
    * BINDING_MANIFEST_INVALID）。索引跑完预生产才落盘，故用惰性读取。
    */
-  const portraitIndexPath = path.join(WORK_DIR, "characters", input.projectId, "portrait-index.json");
+  const runWorkDir = path.join(WORK_DIR, "workspaces", scope.workspaceId);
+  const portraitIndexPath = path.join(runWorkDir, "characters", input.projectId, "portrait-index.json");
   const uninstallPortraitBinding = installVendorPortraitBindingBridge({
     resolveIndex: () => {
       try {
@@ -487,29 +509,26 @@ export function startRun(scope: Scope, input: RunInput): string {
   /**
    * ================= 制片档案（T-2026-0926-0001） =================
    *
-   * 旁路不阻断：档案写盘失败只 console.error，主流程语义零变化。
-   * `ARCHIVE_ENABLED=0` → 完全回到现状路径（回滚开关，与本次改动前逐字一致）。
+   * 认领、输入、输出及终结回执是执行前置证据；初始化失败即停止。
+   * 生产入口禁止通过 ARCHIVE_ENABLED=0 关闭档案与运行租约。
    * 管线类型：营销片（含情报层）/ 叙事片，落进 manifest.pipelineKind 供跨会话承接。
    */
-  const archiveEnabled = (process.env.ARCHIVE_ENABLED ?? "1") !== "0";
   const pipelineKind: PipelineKind = input.isMarketing ? "marketing" : "narrative";
-  const archive = archiveEnabled
-    ? new ArchiveStore(path.resolve(WORK_DIR), scope.workspaceId, input.projectId, pipelineKind, {
-        aspectRatio: (input.metadata as Record<string, unknown> | undefined)?.aspectRatio ?? null,
-      })
-    : null;
+  const archive = new ArchiveStore(path.resolve(WORK_DIR), scope.workspaceId, input.projectId, pipelineKind, {
+    aspectRatio: (input.metadata as Record<string, unknown> | undefined)?.aspectRatio ?? null,
+  });
   /** 结构化日志镜像的"当前环节"（StageRunner 在环节边界更新；与文本 tee 并行） */
   const stageRef: { name: string | null; attempt: number } = { name: null, attempt: 0 };
-  const runner = archive
-    ? new StageRunner(archive, makeLedgerWriter(scope), entry.runId, {
-        onStart: (stageId, attempt) => {
-          stageRef.name = stageId;
-          stageRef.attempt = attempt;
-        },
-      })
-    : null;
+  const runner = new StageRunner(archive, makeLedgerWriter(scope), entry.runId, {
+    onStart: (stageId, attempt) => {
+      stageRef.name = stageId;
+      stageRef.attempt = attempt;
+    },
+  });
   /** 交接包线索（来自真实事件，不猜）：门裁决 + 时长投影 */
   const decisionLog: string[] = [];
+  const gateProofs = new Map<string, Record<string, unknown>>();
+  let completedVendorResult: Awaited<ReturnType<VideoStudio["runPreproduction"]>> | null = null;
 
   const onEvent: EventSink = async (e) => {
     try {
@@ -579,12 +598,18 @@ export function startRun(scope: Scope, input: RunInput): string {
          * `reviewStage` 读不到文件 → 监制只看到 rubric 里的 600 字摘录 → 文档后半段
          * （需求契约/结论摘要等）等于不存在，连续三轮把 G3 判成"契约缺失"。
          */
-        const artifact = writeGateArtifact(WORK_DIR, input.projectId, gate, req.contentMd ?? "");
-        producerVerdict = await reviewStage({
+        const artifact = writeGateArtifact(runWorkDir, path.join(input.projectId, `attempt-${stageRef.attempt}`), gate, req.contentMd ?? "");
+        const portrait = gate === "G5_PORTRAIT" ? portraitGateEvidence({ workDir: runWorkDir, projectId: input.projectId,
+          stage: completedVendorResult?.stages?.portraitStudio,
+          scriptReport: (completedVendorResult?.stages?.scriptEngine as { report?: unknown } | undefined)?.report }) : null;
+        producerVerdict = portrait?.notApplicable ? {
+          stage: "keyframe", status: "not_applicable", approved: true, score: 100, hardFailures: [], issues: [], suggestions: [],
+          rerun: false, via: "deterministic", ms: 0, reason: "no-characters-or-products", degraded: false, evidence: [],
+        } : await reviewStage({
           stage: producerStage,
           projectId: input.projectId,
-          artifacts: [{ path: artifact.path, kind: "text", note: req.title }],
-          deterministic: gateDeterministicChecks(gate, req.contentMd ?? ""),
+          artifacts: [{ path: artifact.path, kind: "text", note: req.title }, ...(portrait?.artifacts ?? [])],
+          deterministic: portrait?.deterministic ?? gateDeterministicChecks(gate, req.contentMd ?? ""),
           rubric: [
             ...((GATE_RUBRIC[gate] ?? []) as string[]),
             `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
@@ -649,6 +674,10 @@ export function startRun(scope: Scope, input: RunInput): string {
       } finally {
         autoClient.release();
       }
+      gateProofs.set(gate, { gate, approved, status: producerVerdict?.status ?? "unverified",
+        via: producerVerdict?.via ?? "auto", degraded: producerVerdict?.degraded ?? true,
+        model: producerVerdict?.model ?? null, evidence: producerVerdict?.evidence ?? [],
+        ...(producerVerdict?.status === "not_applicable" ? { basis: producerVerdict.reason } : {}) });
       if (PRODUCER_MODE === "auto") {
         return { approved: true, reason: `auto-approved(${req.gate})`, suggestions: [] };
       }
@@ -713,18 +742,20 @@ export function startRun(scope: Scope, input: RunInput): string {
     return verdict;
   };
 
-  const studio = new VideoStudio({
+  let marketingDossierRoot: string | undefined;
+  let marketingDossierRef: string | undefined;
+  const studioConfig: StudioConfig = {
     llm,
-    workDir: WORK_DIR,
+    workDir: runWorkDir,
     onApproval,
     onEvent,
     totalDeadlineMs: TOTAL_DEADLINE_MS,
     deferRender: (process.env.HR_DEFER_RENDER ?? "1") !== "0",
     portraits: portraitConfig(input.metadata),
     /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
-    dataMining: dataMiningConfigFor(input.metadata, llm, scope.workspaceId),
+    dataMining: input.isMarketing ? undefined : dataMiningConfigFor(input.metadata, llm, scope.workspaceId),
     log: (line) => console.log(line),
-  });
+  };
 
   // 异步执行：不阻塞 tRPC 响应；终态只写注册表投影（生命周期事件由 onEvent 落库）
   void (async () => {
@@ -732,49 +763,26 @@ export function startRun(scope: Scope, input: RunInput): string {
      * 项目级执行者租约（规格书 §11：同一项目同一时刻只允许一个执行者，杜绝双写与重复烧额度）。
      * 会话级 advisory lock 持有到 run 结束；进程被 kill -9 → 连接断开 → 锁自动释放。
      */
-    const lease = runner
-      ? await acquireProjectLease(input.projectId).catch((err) => {
-          console.error(`[archive] 项目租约获取异常（按无锁继续，档案仍落文件）: ${(err as Error).message}`);
-          return "error" as const;
-        })
-      : null;
-    if (lease === null && runner) {
-      entry.status = "failed";
-      entry.error = `项目 ${input.projectId} 已有执行者持有档案租约（不重复启动，避免双份烧额度）`;
-      console.error(`[studio-worker] ${entry.error}`);
-      restoreRunLogs();
-      uninstallPortraitBinding();
-      entry.finishedAt = new Date().toISOString();
-      return;
-    }
-    const activeLease = lease && lease !== "error" ? lease : null;
-    const detachStructuredLog = archive ? attachStructuredLog(archive, {
-      currentStage: () => stageRef.name,
-      currentAttempt: () => stageRef.attempt,
-    }) : null;
-    /** 项目元数据（thread_id 进交接包，跨会话承接对得上任务线程）；读失败不阻断 */
+    let activeLease: Awaited<ReturnType<typeof acquireProjectLease>> = null;
+    let detachStructuredLog: (() => void) | null = null;
     let projectMeta: Awaited<ReturnType<typeof readProjectMeta>> = null;
     try {
-      if (archive) {
-        try {
-          /** 先读项目身份再 ensure：manifest 要拿它做跨代一致性校验（真机审计发现 D1） */
-          projectMeta = await readProjectMeta(scope, input.projectId).catch(() => null);
-          await archive.ensure(
-            projectMeta
-              ? { kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt }
-              : { kind: pipelineKind, title: null, createdAt: null },
-          );
-          await archive.appendJsonl("events.jsonl", {
-            kind: "run.started",
-            runId: entry.runId,
-            pipelineKind,
-            threadId: projectMeta?.threadId ?? null,
-            intent: input.intent.slice(0, 200),
-          });
-        } catch (err) {
-          console.error(`[archive] 档案初始化失败（继续执行）: ${(err as Error).message}`);
-        }
+      activeLease = await acquireProjectLease(scope, input.projectId);
+      if (!activeLease) {
+        throw new Error(`项目 ${input.projectId} 已有执行者持有档案租约（不重复启动，避免双份烧额度）`);
       }
+      projectMeta = await readProjectMeta(scope, input.projectId);
+      if (!projectMeta) throw new Error(`PROJECT_NOT_FOUND: 项目 ${input.projectId} 不存在或不属于当前工作区`);
+      if (projectMeta.kind !== pipelineKind) throw new Error("PIPELINE_KIND_MISMATCH：预生产管线与服务项目类型不一致");
+      await archive.ensure({ kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt });
+      detachStructuredLog = attachStructuredLog(archive, {
+        currentStage: () => stageRef.name,
+        currentAttempt: () => stageRef.attempt,
+      });
+      await archive.appendJsonl("events.jsonl", {
+        kind: "run.started", runId: entry.runId, pipelineKind,
+        threadId: projectMeta.threadId, intent: input.intent.slice(0, 200),
+      });
       /**
        * AI 监制打回 → **有上限的自动重跑**（T-2026-0925-0002）。
        *
@@ -786,13 +794,17 @@ export function startRun(scope: Scope, input: RunInput): string {
        * 「第几次尝试、耗时、错误分类」全部落盘，历史不丢。
        */
       const maxAttempts = Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 1) + 1);
-      const runOnce = async (): Promise<Awaited<ReturnType<typeof studio.runPreproduction>>> => {
+      const runOnce = async (): Promise<Awaited<ReturnType<VideoStudio["runPreproduction"]>>> => {
         const runnerStore = archive;
-        if (!runner || !runnerStore) return studio.runPreproduction(input);
-        return (await runner.run(
+        // 档案 output 是给索引/交接包使用的摘要，不能取代 vendor 业务结果。
+        // confirmations 决定打回重试，stages.dataMining 决定商品档案投影；两者必须完整保留。
+        let rawResult: Awaited<ReturnType<VideoStudio["runPreproduction"]>> | undefined;
+        await runner.run(
           "preproduction",
           { intent: input.intent, isMarketing: input.isMarketing ?? false, pipelineKind },
           async (ctx) => {
+            gateProofs.clear();
+            completedVendorResult = null;
             /**
              * 断点快照（真机发现的方案缺陷修复，T-2026-0926-0001 留痕）：
              * vendor 在 Phase checkpoint 指纹不匹配时会**删除**自己的 checkpoint
@@ -801,7 +813,7 @@ export function startRun(scope: Scope, input: RunInput): string {
              */
             const preCheckpoints = await runnerStore
               .snapshotExternalDir(
-                path.resolve(WORK_DIR, "checkpoints", input.projectId),
+                path.resolve(runWorkDir, "checkpoints", input.projectId),
                 `checkpoints/attempt-${ctx.attempt}-before`,
                 { filter: (name) => name.endsWith(".json") },
               )
@@ -809,7 +821,49 @@ export function startRun(scope: Scope, input: RunInput): string {
                 console.error(`[archive] 断点快照失败（继续执行）: ${(err as Error).message}`);
                 return { files: 0, bytes: 0, skipped: [] as string[] };
               });
-            const r = await studio.runPreproduction(input);
+            let marketing: PreparedMarketingFacts | undefined;
+            let g1Approved = true;
+            if (input.isMarketing) {
+              marketing = await prepareMarketingFacts({ scope: { ...scope, projectId: input.projectId, runId: entry.runId, attempt: ctx.attempt },
+                root: archive.root, metadata: input.metadata ?? {}, intent: input.intent, llm });
+              const verdict = await onApproval({ runId: entry.runId, gate: "G1_DOSSIER", vendorType: "host-source-dossier",
+                title: "本次营销来源正文与逐主张事实审核", contentMd: marketing.g1Content });
+              const proof = gateProofs.get("G1_DOSSIER");
+              g1Approved = verdict.approved === true && proof?.status === "passed" && proof?.via === "llm" && proof?.degraded === false
+                && typeof proof.model === "string" && proof.model.length > 0
+                && Array.isArray(proof.evidence) && proof.evidence.some(item => item?.scope === "complete-text" && item?.sha256 === renderSha256(marketing!.g1Content));
+              marketingDossierRoot = marketing.storeRoot;
+              marketingDossierRef = path.posix.join("archive", scope.workspaceId, input.projectId, `${marketing.prefix}-dossier`);
+            }
+            const studio = new VideoStudio({ ...studioConfig, ...(marketing ? { dataMining: {
+              mode: "api", storeRoot: marketing.storeRoot, refresh: true,
+              verifiedRaw: { projectId: input.projectId, rawJson: canonicalRenderJson(marketing.raw), sha256: marketing.bundle.rawSha256, productQuery: marketing.bundle.productQuery },
+            } } : {}) });
+            const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Approved ? await studio.runPreproduction(input) : {
+              success: false, stages: {}, confirmations: { hostG1: { approved: false, reason: "producer-rejected(G1_DOSSIER)：本次来源与事实未通过真实监制" } },
+            };
+            completedVendorResult = r;
+            if (r.success) {
+              // vendor 真出图批量模式跳过的是生成前询问；服务必须在实际图片存在后完成 G5。
+              const portraitVerdict = await onApproval({ runId: entry.runId, gate: "G5_PORTRAIT", vendorType: "portrait-generation",
+                title: "实际定妆照完整性与视觉审核", contentMd: JSON.stringify({ portraitStudio: r.stages?.portraitStudio,
+                  scriptReport: (r.stages?.scriptEngine as { report?: unknown } | undefined)?.report }) });
+              r.confirmations = { ...((r.confirmations ?? {}) as Record<string, unknown>), hostPortraits: portraitVerdict };
+              if (!portraitVerdict.approved) r.success = false;
+            }
+            if (r.success) {
+              const missing = [...(input.isMarketing ? ["G1_DOSSIER"] : []), "G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"].filter(gate => {
+                const proof = gateProofs.get(gate);
+                return !(proof?.approved === true && (proof.status === "passed" && proof.via === "llm" && proof.degraded === false
+                  || gate === "G5_PORTRAIT" && proof.status === "not_applicable" && proof.basis === "no-characters-or-products"));
+              });
+              if (missing.length) {
+                r.success = false;
+                r.confirmations = { ...((r.confirmations ?? {}) as Record<string, unknown>), hostQualification: { approved: false,
+                  reason: `producer-rejected：缺少服务监制裁决 ${missing.join(",")}`, fatal: "producer_rejected" } };
+              }
+            }
+            rawResult = r;
             await ctx.heartbeat({ stages: Object.keys(r.stages ?? {}) });
             const vendorResumed = (r as unknown as { resumed?: unknown }).resumed === true;
             const vendorDegraded = (r as unknown as { degraded?: unknown }).degraded === true;
@@ -877,7 +931,7 @@ export function startRun(scope: Scope, input: RunInput): string {
                   shotCount: shots.length,
                   totalPromptChars: shots.reduce((sum, shot) => sum + String(shot.prompt ?? "").length, 0),
                   dossier: dm
-                    ? { root: `dossiers/${scope.workspaceId}`, productId: dm.product_id ?? null }
+                    ? { root: marketingDossierRef ?? `dossiers/${scope.workspaceId}`, productId: dm.product_id ?? null }
                     : null,
                   shots: shots.map((shot) => ({
                     shotId: shot.shot_id ?? shot.shotId ?? null,
@@ -912,9 +966,16 @@ export function startRun(scope: Scope, input: RunInput): string {
                 + `（stages/preproduction/attempt-${ctx.attempt}.prompts.json，sha256=${promptsArtifact.sha256.slice(0, 12)}）`,
               );
             }
+            const marketingFacts = marketing && r.success && promptPack ? await finalizeMarketingFacts(marketing,
+              promptPack.shots.map(shot => ({ shotId: String(shot.shotId ?? ""), prompt: shot.prompt, fields: shot.fields }))) : undefined;
+            if (marketing && r.success && !marketingFacts) throw new Error("MARKETING_PROMPTS_UNVERIFIED：营销预生产没有完整最终镜头事实审核");
             return {
               output: {
                 success: r.success,
+                ...(marketingFacts ? { marketingFactsRef: marketingFacts.ref, marketingFactsSha256: marketingFacts.sha256 } : {}),
+                productionEvidence: { schemaVersion: "workloom.preproduction-authority/v1", issuer: "workloom.studio-worker",
+                  tenantId: scope.tenantId, workspaceId: scope.workspaceId, projectId: input.projectId,
+                  runId: entry.runId, attempt: ctx.attempt, pipelineKind, gates: [...gateProofs.values()] },
                 stages: Object.keys(r.stages ?? {}),
                 checkpointDir: `checkpoints/${input.projectId}`,
                 ...(promptsArtifact
@@ -941,7 +1002,7 @@ export function startRun(scope: Scope, input: RunInput): string {
                 ...(dm
                   ? {
                       dossier: {
-                        root: `dossiers/${scope.workspaceId}`,
+                        root: marketingDossierRef ?? `dossiers/${scope.workspaceId}`,
                         productId: dm.product_id ?? null,
                         evidenceCount: Array.isArray(dm.data?.dossier?.provenance)
                           ? dm.data!.dossier!.provenance!.length
@@ -953,7 +1014,9 @@ export function startRun(scope: Scope, input: RunInput): string {
               ...(outcome ? { outcome } : {}),
             };
           },
-        )) as Awaited<ReturnType<typeof studio.runPreproduction>>;
+        );
+        if (!rawResult) throw new Error("预生产档案执行器未返回业务结果");
+        return rawResult;
       };
       let result = await runOnce();
       let attempts = 1;
@@ -962,7 +1025,8 @@ export function startRun(scope: Scope, input: RunInput): string {
         console.log(`[studio-worker] AI 监制打回 → 自动重跑第 ${attempts}/${maxAttempts} 次（同一项目、同一门口径）`);
         result = await runOnce();
       }
-      entry.status = "finished";
+      entry.status = result.success ? "finished" : "failed";
+      entry.error = result.success ? null : terminalFailureMessageOf(result, entry.error);
       /** 情报层产出摘要（逐环节审计要看得见"档案到底有没有装订出来"） */
       const dataMiningStage = (result.stages?.dataMining ?? null) as
         | { status?: string; product_id?: string; data?: { ok?: boolean; reused?: boolean; dossier?: { gaps?: unknown[]; provenance?: unknown[] } } }
@@ -1016,7 +1080,7 @@ export function startRun(scope: Scope, input: RunInput): string {
         if (input.isMarketing && minedProductId) {
           try {
             const profile = await upsertProductProfileFromDossier(getAppPool(), getGatewayPool(), scope, {
-              dossierRoot: path.join(WORK_DIR, "dossiers", scope.workspaceId),
+              dossierRoot: marketingDossierRoot ?? path.join(WORK_DIR, "dossiers", scope.workspaceId),
               productId: minedProductId,
               by: "video-studio",
             });
@@ -1057,7 +1121,7 @@ export function startRun(scope: Scope, input: RunInput): string {
               ...decisionLog,
               ...(dataMiningStage
                 ? [
-                    `情报档案：dossiers/${scope.workspaceId}（商品 ${dataMiningStage.product_id ?? "未标注"}，证据 ${
+                    `情报档案：${marketingDossierRef ?? `dossiers/${scope.workspaceId}`}（商品 ${dataMiningStage.product_id ?? "未标注"}，证据 ${
                       Array.isArray(dataMiningStage.data?.dossier?.provenance)
                         ? dataMiningStage.data!.dossier!.provenance!.length
                         : 0
@@ -1076,7 +1140,8 @@ export function startRun(scope: Scope, input: RunInput): string {
     } catch (err) {
       entry.status = "failed";
       entry.error = err instanceof Error ? err.message : String(err);
-      if (archive) {
+      // 元数据尚未验证时，不为不存在/越权的项目创建失败档案。
+      if (projectMeta) {
         try {
           await updateContextBundle(archive, {
             pipelineKind,
@@ -1091,10 +1156,22 @@ export function startRun(scope: Scope, input: RunInput): string {
         }
       }
     } finally {
-      detachStructuredLog?.();
-      if (activeLease) await activeLease.release();
-      restoreRunLogs();
-      uninstallPortraitBinding();
+      // 一个清理失败不能跳过其余清理；租约解锁异常由宿主销毁连接，终态仍诚实报告失败。
+      for (const cleanup of [
+        () => detachStructuredLog?.(),
+        () => activeLease?.release(),
+        restoreRunLogs,
+        uninstallPortraitBinding,
+      ]) {
+        try {
+          await cleanup();
+        } catch (cleanupError) {
+          const message = cleanupError instanceof Error ? cleanupError.message : String(cleanupError);
+          entry.status = "failed";
+          entry.error = [entry.error, `运行清理失败：${message}`].filter(Boolean).join("；");
+          console.error(`[studio-worker] ${entry.error}`);
+        }
+      }
       entry.finishedAt = new Date().toISOString();
     }
   })();

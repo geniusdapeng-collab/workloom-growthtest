@@ -11,9 +11,57 @@
  *   ③ `coverDeterministicChecks` —— 渲染后的**机检**：标题真的画上去了、人物层真的合成进去了、
  *      底图来自未烧字的干净母版、文字没有落进平台 UI 遮挡区。
  * 只有 ②③ 都过、再经监制（LLM）看整图，封面才算合格——"只有标题"的封面会在第 ③ 步被拦下。
+ *
+ * 2026-09-27 平台化 + 知识库注入（方案：视频封面链路强化）：
+ *   · 平台规格（画幅/安全区/标题带/文案政策）改由 `cover-platforms.ts` 的 `getCoverSpec()` 驱动，
+ *     **douyin 默认口径与历史行为逐字/逐像素不变**（`COVER_SAFE_AREA` 仍是抖音基线值）；
+ *   · 新增 `kbHints`（封面知识库 cover-kb 的注入载荷，≤3 条，带篇目 trace）与
+ *     `accountProfile`（账号视觉锤：字体/色板/版式/角标）两个**可选**输入，
+ *     不传时提示词与校验行为与历史完全一致。
  */
 
+import {
+  getCoverSpec,
+  headlineUnits,
+  headlineLimitLabel,
+  isEnglishCoverPlatform,
+  ratioPercent,
+  type CoverPlatformSpec
+} from "./cover-platforms.js";
+
 export type CoverLayout = "person-left" | "person-right";
+
+/**
+ * 账号定位档案（视觉锤）——`bundles/ai-video/library/account-profiles/<账号>.yml` 的落库形状。
+ * 由管线读档后传入；**不传=账号无档案，行为与历史一致**（向后兼容）。
+ * 字段口径锚 KB `ACCT-001`：字体/色板/版式/角标四件套 + 钩子偏好 + 禁区。
+ */
+export interface CoverAccountProfile {
+  account_id: string;
+  display_name?: string;
+  /** 一句话定位（进 prompt，仅作设计参考） */
+  positioning?: string;
+  /** 账号类型：人设IP号 / 品牌官号 / 种草号 / 知识号 / 本地生活号（也接受 ip / brand / seeding / knowledge / local） */
+  account_type?: string;
+  /** 主发平台（封面按 `--cover-platform` 取规格，这里仅作注入上下文） */
+  platforms?: string[];
+  visual_hammer?: {
+    /** 必须是 COVER_FONTS 白名单之一，否则忽略并在 warnings 里记明 */
+    fontId?: string;
+    /** [主标题色, 强调色]，#RRGGBB */
+    palette?: string[];
+    /** 版式偏好：person-led / subject-led */
+    archetype_bias?: string | null;
+    /** 系列角标（≤10 字） */
+    badge_series?: string;
+  } | null;
+  /** 钩子偏好（HOOK-001 公式 ID：question/conflict/data-shock/contrast/value-preview/curiosity-gap/pattern-interrupt） */
+  hook_bias?: string[];
+  /** 账号级禁区（进 prompt 负面约束；命中即记 warning，strict=true 判非法） */
+  taboo?: string[];
+  /** true = 偏离视觉锤判非法打回；false/缺省 = warn 并记入设计稿 warnings */
+  strict?: boolean;
+}
 
 /**
  * 封面可用字库（全部 OFL-1.1 / 免费商用，随仓分发在 `bundles/ai-video/library/fonts/`）。
@@ -77,6 +125,11 @@ export interface CoverPlan {
   rationale: string;
   /** 设计稿来源：llm=封面设计师出的稿；fallback=设计师不可用时的确定性兜底稿 */
   source: "llm" | "fallback";
+  /**
+   * 校验期的**非致命**告警（如偏离账号视觉锤但未开 strict）。
+   * 落盘进设计稿与 stages.jsonl：告警必须留痕，不允许静默丢弃（"无回执不算完成"）。
+   */
+  warnings?: string[];
 }
 
 export class CoverDesignError extends Error {
@@ -126,17 +179,76 @@ export interface CoverDesignInput {
    */
   archetype?: "person-led" | "subject-led";
   brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string } | null;
+  /**
+   * 平台（ID 或中文别名，如 `douyin` / `抖音` / `抖音/快手`）。
+   * 语义已升格为一等参数：驱动的画幅、安全区、标题带、标题字数上限与文案政策；
+   * 缺省/未知值落 douyin（回归基线），因此旧调用行为不变。
+   */
   platform?: string;
   character?: { id?: string; name?: string } | null;
   shots: Array<{ shotId: string; scene?: string; dialogueText?: string; hasCharacter?: boolean; duration?: number }>;
+  /**
+   * 封面知识库（cover-kb）注入载荷：**≤3 条**，每条自带篇目 trace（由 cover-kb-bridge enrich 产出）。
+   * 不传 = 不注入知识（提示词与历史逐字一致）。
+   */
+  kbHints?: string[];
+  /** 账号定位档案（视觉锤）；不传 = 账号无档案，行为与历史一致 */
+  accountProfile?: CoverAccountProfile | null;
   /** 自修复轮：上一版设计稿（原样回给设计师，让它针对错误改） */
   repairFrom?: string;
   /** 自修复轮：上一版被校验拦下的原因（逐条列出） */
   repairReason?: string;
 }
 
-/** 封面设计师的提示词（LLM 只出设计稿，不画图；渲染由管线按稿执行） */
+/**
+ * 账号视觉锤/账号禁区的提示词行（只有传了档案才出现——不传时提示词与历史逐字一致）。
+ * KB ACCT-001 口径：字体/色板/版式/角标四件套锁定，偏离 warn；strict=true 判非法。
+ */
+export function accountProfilePromptLines(profile: CoverAccountProfile | null | undefined): string[] {
+  if (!profile) return [];
+  const lines: string[] = [];
+  const hammer = profile.visual_hammer ?? null;
+  const bits: string[] = [];
+  const fontId = hammer?.fontId && Object.prototype.hasOwnProperty.call(COVER_FONTS, hammer.fontId)
+    ? hammer.fontId as CoverFontId
+    : null;
+  if (fontId) bits.push(`字体必须用 ${fontId}=${COVER_FONTS[fontId].label}`);
+  const palette = Array.isArray(hammer?.palette) ? hammer!.palette.filter((c) => HEX.test(String(c))) : [];
+  if (palette.length >= 1) bits.push(`主标题色 ${palette[0]}`);
+  if (palette.length >= 2) bits.push(`强调色 ${palette[1]}`);
+  if (hammer?.archetype_bias) bits.push(`版式偏好 ${hammer.archetype_bias}`);
+  if (hammer?.badge_series) bits.push(`系列角标「${String(hammer.badge_series).slice(0, 10)}」`);
+  const who = profile.display_name ? `${profile.display_name}（${profile.account_id}）` : profile.account_id;
+  if (bits.length > 0) lines.push(`【账号视觉锤】${who}：${bits.join("；")}。同一账号的封面必须"长一个样"，不得偏离。`);
+  /**
+   * 优先级（2026-09-27 真机发现）：KB 注入里同时有"题材建议配色"与"账号视觉锤"时，
+   * 监制会判"两套配色/字体互相冲突"。这里把优先级写进提示词：账号视觉锤 > 题材建议 > 平台通用建议，
+   * 只有**平台规格**（画幅/安全区/标题上限）不可违背。
+   */
+  if (bits.length > 0) lines.push("【优先级】账号视觉锤 > 题材建议 > 平台通用建议；只有平台规格（画幅/安全区/标题上限）不可违背。");
+  if (profile.positioning) lines.push(`【账号定位】${profile.positioning}`);
+  if (Array.isArray(profile.taboo) && profile.taboo.length > 0) {
+    lines.push(`【账号禁区】${profile.taboo.join("、")}——出现即视为不合格。`);
+  }
+  return lines;
+}
+
+/**
+ * 封面设计师的提示词（LLM 只出设计稿，不画图；渲染由管线按稿执行）。
+ *
+ * 平台化口径（2026-09-27）：画幅/安全区/标题带/标题字数上限全部来自 `getCoverSpec(platform)`；
+ * **douyin + 无 KB + 无账号档案时，本函数输出与平台化之前逐字一致**（有快照测试锁死）。
+ */
 export function buildCoverDesignPrompt(input: CoverDesignInput): string {
+  /** 平台标签用**调用方原文**（保留"抖音/快手"这类历史写法），规格按 ID 解析 */
+  const platformLabel = input.platform ?? input.brief?.platform ?? "小红书";
+  const spec = getCoverSpec(platformLabel);
+  const kbHints = (input.kbHints ?? [])
+    .map((hint) => String(hint ?? "").trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .map((hint) => (hint.startsWith("【") ? hint : `【封面知识库】${hint}`));
+  const accountLines = accountProfilePromptLines(input.accountProfile);
   const shotLines = input.shots.map((s) => `- ${s.shotId}：${String(s.scene ?? "").slice(0, 80)}`
     + `${s.hasCharacter ? "（人物镜，适合当人物封面底图）" : "（地标/空镜，适合当主视觉底图）"}`
     + `${s.dialogueText ? `｜台词：${s.dialogueText.slice(0, 40)}` : ""}`);
@@ -144,7 +256,11 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
     "你是短视频封面设计师。请为下面这支片子出一份**可执行的封面设计稿**（只输出 JSON，不要解释、不要 markdown）。",
     "",
     `作品：${input.title ?? "未命名"}${Number.isFinite(input.durationSeconds) ? `（成片 ${Math.round(Number(input.durationSeconds))} 秒）` : ""}`,
-    `平台：${input.platform ?? input.brief?.platform ?? "小红书"}（竖屏 9:16，平台 UI 会遮住画面底部约 12%，顶部约 6% 也不宜放字）`,
+    `平台：${platformLabel}（${spec.orientation === "horizontal" ? "横版" : "竖屏"} ${spec.ratio}，`
+      + `平台 UI 会遮住画面底部约 ${ratioPercent(spec.safeArea.bottomReservedRatio)}，`
+      + `顶部约 ${ratioPercent(spec.safeArea.topMinRatio)} 也不宜放字）`,
+    ...accountLines,
+    ...kbHints,
     input.character?.name ? `主角：${input.character.name}（有定妆照可做抠像人物层）` : "无人物",
     input.brief?.coverHook ? `封面钩子（brief 给的）：${input.brief.coverHook}` : "",
     input.brief?.goal ? `片子目标：${input.brief.goal}` : "",
@@ -171,12 +287,22 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
       + "拼接会留下贯穿全宽的硬接缝，一眼能看出是合成残次品；",
     "1.2 `person-led` 版式的人物取自**片子自己的镜头帧**（不做抠像贴图，会掉脸留光晕）；"
       + "`subject-led` 版式的主体取自片子里的地标/商品/动物镜头帧；",
-    "2. 主标题 ≤12 个字，说人话、有钩子，可以是地点+意象或一句邀请；必要时用 \\n 断成两行；"
+    `2. 主标题 ${headlineLimitLabel(spec)}，说人话、有钩子，可以是地点+意象或一句邀请；必要时用 \\n 断成两行；`
       + `**若标题里要点出时长，必须写成"${Number.isFinite(input.durationSeconds) ? Math.round(Number(input.durationSeconds)) : "成片"} 秒"，不得用别的数字**；`,
     "3. 人物卡与主标题不得重叠；人物卡不要压住地标主体（塔身/飞檐/牌匾）；",
-    "4. 文字全部落在上部 6%–42% 的标题带内，底部 12% 不放任何文字；",
+    `4. 文字全部落在上部 ${ratioPercent(spec.titleBand.topRatio)}–${ratioPercent(spec.titleBand.bottomMaxRatio)} 的标题带内，`
+      + `底部 ${ratioPercent(spec.safeArea.bottomReservedRatio)} 不放任何文字；`,
     "5. 配色与片子的调性一致（说明主标题色与强调色，用 #RRGGBB）；底图保持片子原有的光线气质，不要加冷雾或滤镜把暖调画面改成另一种天气；",
     "6. rationale 用一句话说明这个封面为什么能让人点进来（≤60 字）。",
+    /**
+     * 数值边界（2026-09-27 真机发现）：这些区间由 `validateCoverPlan` 硬校验，
+     * 但早先提示词里没写——真实模型因此把 `person.widthRatio` 猜成 0.55，设计稿连打两次回、退兜底稿
+     * （真机证据：DeepSeek 出稿 person.widthRatio=0.55 → `人物卡宽度比例 0.55 越界（0.28–0.50）`）。
+     * 把边界写给设计师，是"降低无效往返"的确定性改进，不改变任何既有判据。
+     */
+    "7. 数值边界（越界即判非法、直接打回重出）：`person.widthRatio` 0.28–0.50；"
+      + "`typography.headlineSizeRatio` 0.045–0.12；`typography.sublineSizeRatio` 0.022–0.06；"
+      + "副标题 ≤24 字、角标 ≤10 字。",
     `字库白名单（fontId 四选一，全部免费商用）：${Object.entries(COVER_FONTS).map(([id, f]) => `${id}=${f.label}（${f.note}）`).join("；")}`,
     "",
     "输出 JSON 结构：",
@@ -201,6 +327,12 @@ const visualLength = (text: string): number => [...text.replace(/\n/g, "")].leng
 export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { shots: [] }): CoverPlan {
   const issues: string[] = [];
   /**
+   * 平台口径（2026-09-27）：标题长度上限随平台（抖音 12 / 小红书 14 / B站 16 / 英文平台按词 ≤5）。
+   * `domain="cover_design_invalid"` 的既有错误语义不变；缺省平台落 douyin，旧调用行为不变。
+   */
+  const spec = getCoverSpec(input.platform);
+  const warnings: string[] = [];
+  /**
    * 版式一致性（2026-09-26 产品所有者口径）：
    *   `subject-led`（物体为主）不允许再挂人物层——人物小卡/竖带会与主视觉打架；
    *   `person-led`（人物为主）必须开启人物层并给出人物来源镜头。
@@ -215,7 +347,14 @@ export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { s
     issues.push("人物为主版式（person-led）必须开启人物层并提供人物来源镜头");
   }
   if (!plan.headline?.trim()) issues.push("缺主标题");
-  else if (visualLength(plan.headline) > 12) issues.push(`主标题 ${visualLength(plan.headline)} 字（上限 12）`);
+  else if (isEnglishCoverPlatform(spec)) {
+    const words = headlineUnits(plan.headline, spec);
+    if (words > spec.headlineMaxChars) {
+      issues.push(`主标题 ${words} 个英文单词（${spec.id} 上限 ${spec.headlineMaxChars} 词）`);
+    }
+  } else if (visualLength(plan.headline) > spec.headlineMaxChars) {
+    issues.push(`主标题 ${visualLength(plan.headline)} 字（${spec.id} 上限 ${spec.headlineMaxChars}）`);
+  }
   if (plan.headline.includes("\n") && plan.headline.split("\n").length > 2) issues.push("主标题超过两行");
   if (plan.subline && visualLength(plan.subline) > 24) issues.push(`副标题 ${visualLength(plan.subline)} 字（上限 24）`);
   if (plan.badge && visualLength(plan.badge) > 10) issues.push(`角标 ${visualLength(plan.badge)} 字（上限 10）`);
@@ -258,10 +397,44 @@ export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { s
       issues.push(`标题里的时长 ${claimed} 秒与成片 ${Number(input.durationSeconds).toFixed(0)} 秒不符（容差 ±2s）`);
     }
   }
+  /**
+   * 账号视觉锤一致性（KB ACCT-001 四件套）：
+   * 默认只 warn（记进设计稿 warnings 与 stages.jsonl）；`accountProfile.strict=true` 判非法打回。
+   * 无档案 = 不校验（向后兼容）。
+   */
+  const hammer = input.accountProfile?.visual_hammer ?? null;
+  if (input.accountProfile) {
+    const strict = input.accountProfile.strict === true;
+    const push = (message: string): void => { if (strict) issues.push(message); else warnings.push(message); };
+    if (hammer?.fontId) {
+      if (!Object.prototype.hasOwnProperty.call(COVER_FONTS, hammer.fontId)) {
+        warnings.push(`账号档案字体 ${hammer.fontId} 不在字库白名单（已忽略该约束）`);
+      } else if (plan.typography?.fontId !== hammer.fontId) {
+        push(`字体 ${plan.typography?.fontId} 偏离账号视觉锤（${hammer.fontId}）`);
+      }
+    }
+    const palette = Array.isArray(hammer?.palette) ? hammer!.palette.filter((c) => HEX.test(String(c))) : [];
+    if (palette.length > 0) {
+      const used = [String(plan.typography?.color ?? "").toUpperCase(), String(plan.typography?.accentColor ?? "").toUpperCase()];
+      const allowed = palette.map((c) => c.toUpperCase());
+      if (!used.some((color) => allowed.includes(color))) {
+        push(`主标题色/强调色 ${used.join(" / ")} 均不在账号色板（${allowed.join(" / ")}）内`);
+      }
+    }
+    if (hammer?.archetype_bias && input.archetype && hammer.archetype_bias !== input.archetype) {
+      /** 版式由片子的主视觉决定（`--cover-hero`），账号偏好只提示不拦截——避免把"这条片子是风景"硬掰成人设 */
+      warnings.push(`版式 ${input.archetype} 与账号档案偏好 ${hammer.archetype_bias} 不同（版式以片子主视觉为准）`);
+    }
+    if (Array.isArray(input.accountProfile.taboo) && input.accountProfile.taboo.length > 0) {
+      const text = [plan.headline, plan.subline, plan.badge].filter(Boolean).join(" ");
+      const hits = input.accountProfile.taboo.filter((word) => word && text.includes(String(word)));
+      if (hits.length > 0) push(`文案命中账号禁区：${hits.join("、")}`);
+    }
+  }
   if (issues.length > 0) {
     throw new CoverDesignError(`封面设计稿不合法：${issues.join("；")}`, "cover_design_invalid");
   }
-  return plan;
+  return warnings.length > 0 ? { ...plan, warnings: [...(plan.warnings ?? []), ...warnings] } : plan;
 }
 
 /**
@@ -308,6 +481,7 @@ export function fallbackCoverPlan(
   input: CoverDesignInput,
   options: { headline: string; heroShotId: string; personShotId?: string; accentColor?: string }
 ): CoverPlan {
+  const spec = getCoverSpec(input.platform);
   /**
    * 兜底稿的副标题**必须使用成片真实时长**（2026-09-27 真机）：
    * 早先这里写死 "30 秒"，而 `validateCoverPlan` 会核对"标题里的时长 vs 成片时长（±2s）"——
@@ -321,25 +495,42 @@ export function fallbackCoverPlan(
    * 片名常带"· 副标题"结构，按 12 字硬截会留下尾随的「·」。这里先取 `·` 前的主标题再去尾标点。
    */
   const rawHeadline = String(options.headline ?? "").split(/[·|｜]/)[0] ?? "";
-  const headline = rawHeadline.replace(/[\s·・,，。.、;；:：]+$/u, "").slice(0, 12) || "封面";
+  /**
+   * 平台化（2026-09-27）：中文平台按平台字数上限截断（抖音 12 / 小红书 14 / B站 16）；
+   * 英文平台按**词数**截断并全大写（KB PLAT-006：英文封面全大写 + ≤5 词）。
+   */
+  const headline = isEnglishCoverPlatform(spec)
+    ? (rawHeadline.trim().split(/\s+/).filter(Boolean).slice(0, spec.headlineMaxChars).join(" ").toUpperCase() || "COVER")
+    : (rawHeadline.replace(/[\s·・,，。.、;；:：]+$/u, "").slice(0, spec.headlineMaxChars) || "封面");
+  /** 账号档案（若有）锁定字体与色板：兜底稿也必须与账号视觉锤一致 */
+  const hammer = input.accountProfile?.visual_hammer ?? null;
+  const hammerFont = hammer?.fontId && Object.prototype.hasOwnProperty.call(COVER_FONTS, hammer.fontId)
+    ? hammer.fontId as CoverFontId
+    : null;
+  const hammerPalette = Array.isArray(hammer?.palette) ? hammer!.palette.filter((c) => HEX.test(String(c))) : [];
+  const sublineFallback = input.character?.name
+    ? (isEnglishCoverPlatform(spec)
+      ? (durationText ? `${input.character.name} · ${Math.round(seconds)}s` : input.character.name)
+      : (durationText ? `${input.character.name}带你 ${durationText}看懂` : `${input.character.name}带你一次看懂`))
+    : undefined;
   const plan: CoverPlan = {
     headline,
-    subline: input.character?.name
-      ? (durationText ? `${input.character.name}带你 ${durationText}看懂` : `${input.character.name}带你一次看懂`)
-      : undefined,
+    subline: sublineFallback,
     badge: undefined,
     layout: "person-right",
     background: { shotId: options.heroShotId, atSec: 1.2, treatment: "grade" },
     person: { enabled: Boolean(options.personShotId), shotId: options.personShotId, atSec: 1.0, widthRatio: 0.42 },
     typography: {
-      fontId: "source-han-heavy",
+      fontId: hammerFont ?? "source-han-heavy",
       headlineSizeRatio: 0.075,
       sublineSizeRatio: 0.034,
-      color: "#FFFFFF",
-      accentColor: options.accentColor ?? "#FFD166",
+      color: hammerPalette[0] ?? "#FFFFFF",
+      accentColor: hammerPalette[1] ?? options.accentColor ?? "#FFD166",
       align: "left"
     },
-    rationale: "兜底稿：主视觉地标 + 主角人物卡 + 大字标题，保证封面三件套齐全",
+    rationale: isEnglishCoverPlatform(spec)
+      ? `Fallback plan (${spec.id}): single continuous hero frame + headline, three-piece cover kept complete`
+      : "兜底稿：主视觉地标 + 主角人物卡 + 大字标题，保证封面三件套齐全",
     source: "fallback"
   };
   return validateCoverPlan(plan, input);
@@ -380,17 +571,67 @@ export interface CoverCheck {
 /** 画面差异阈值：PSNR 低于该值说明两个版本"肉眼可见地不同" */
 export const COVER_DIFF_PSNR_DB = 45;
 
+/**
+ * 机检口径来源（三选一，向后兼容）：
+ *   · 平台 ID / 规格对象 → 画幅与安全区都按平台（平台化路径）；
+ *   · 安全区对象（旧签名）→ 画幅仍取抖音基线（旧调用零改动）；
+ *   · 缺省 → 抖音基线。
+ */
+export type CoverCheckSafeArea = { topMinRatio: number; titleBottomMaxRatio: number; bottomReservedRatio: number };
+
+export function resolveCoverCheckTarget(
+  target?: string | CoverPlatformSpec | CoverCheckSafeArea | null
+): { canvas: { width: number; height: number }; safeArea: CoverCheckSafeArea; platformId: string } {
+  if (typeof target === "string") {
+    const spec = getCoverSpec(target);
+    return {
+      canvas: spec.canvas,
+      platformId: spec.id,
+      safeArea: {
+        topMinRatio: spec.safeArea.topMinRatio,
+        titleBottomMaxRatio: spec.titleBand.bottomMaxRatio,
+        bottomReservedRatio: spec.safeArea.bottomReservedRatio
+      }
+    };
+  }
+  if (target && typeof target === "object" && "safeArea" in target && "canvas" in target) {
+    const spec = target as CoverPlatformSpec;
+    return {
+      canvas: spec.canvas,
+      platformId: spec.id,
+      safeArea: {
+        topMinRatio: spec.safeArea.topMinRatio,
+        titleBottomMaxRatio: spec.titleBand.bottomMaxRatio,
+        bottomReservedRatio: spec.safeArea.bottomReservedRatio
+      }
+    };
+  }
+  const douyin = getCoverSpec("douyin");
+  const legacy = (target as CoverCheckSafeArea | null | undefined) ?? null;
+  return {
+    canvas: douyin.canvas,
+    platformId: douyin.id,
+    safeArea: legacy ?? {
+      topMinRatio: douyin.safeArea.topMinRatio,
+      titleBottomMaxRatio: douyin.titleBand.bottomMaxRatio,
+      bottomReservedRatio: douyin.safeArea.bottomReservedRatio
+    }
+  };
+}
+
 export function coverDeterministicChecks(
   measure: CoverMeasurements,
-  safeArea: typeof COVER_SAFE_AREA = COVER_SAFE_AREA
+  target?: string | CoverPlatformSpec | CoverCheckSafeArea | null
 ): CoverCheck[] {
+  const { canvas, safeArea, platformId } = resolveCoverCheckTarget(target);
   const titleDrawn = measure.titleBandPsnrDb !== null && measure.titleBandPsnrDb < COVER_DIFF_PSNR_DB;
   const personDrawn = measure.personBoxPsnrDb !== null && measure.personBoxPsnrDb < COVER_DIFF_PSNR_DB;
   return [
     {
       id: "cover-produced",
-      pass: measure.width === 1080 && measure.height === 1920 && measure.bytes > 120_000,
-      detail: `${measure.width}x${measure.height} · ${(measure.bytes / 1024).toFixed(0)}KB（期望 1080x1920 且 >120KB）`,
+      pass: measure.width === canvas.width && measure.height === canvas.height && measure.bytes > 120_000,
+      detail: `${measure.width}x${measure.height} · ${(measure.bytes / 1024).toFixed(0)}KB`
+        + `（期望 ${canvas.width}x${canvas.height} 且 >120KB｜平台 ${platformId}）`,
       hard: true
     },
     {

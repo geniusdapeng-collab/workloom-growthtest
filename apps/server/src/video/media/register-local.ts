@@ -11,9 +11,9 @@
  *    `register()` 属基座包（改动要走 L2→L1→L0 提案），本模块走"基座不动、产品层扩展"的最小侵入路径；
  *    补写与 register 不同事务，故失败重试一次再报错，并留下可巡检特征（title 空而 meta.title 在场）。
  */
-import { createHash } from "node:crypto";
-import { createReadStream, existsSync, mkdirSync, statSync } from "node:fs";
-import { copyFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { constants, createReadStream, existsSync, lstatSync, mkdirSync, realpathSync, statSync } from "node:fs";
+import { copyFile, rename, rm } from "node:fs/promises";
 import { dirname, extname, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import type pg from "pg";
@@ -23,6 +23,8 @@ import { mediaRoot } from "../gen/ingest.js";
 import type { AppPool, Scope } from "../gen/db.js";
 import { extractThumbnail, probeMedia } from "./ffmpeg.js";
 import { applyMediaColumns, type MediaColumnPatch } from "./columns.js";
+import { safeDeliveryPath } from "../delivery-trust.js";
+import { safeSegment } from "./paths.js";
 
 export { applyMediaColumns };
 export type { MediaColumnPatch };
@@ -30,6 +32,9 @@ export type { MediaColumnPatch };
 export interface RegisterLocalAssetInput extends MediaColumnPatch {
   /** 源文件绝对路径（定妆照/封面/上传暂存件/重剪产物） */
   absPath: string;
+  /** Expected identity from a verified producer receipt; compared before and after copying. */
+  expectedSha256?: string;
+  expectedRealPath?: string;
   kind: AssetKind;
   projectId?: string | null;
   provenance?: Record<string, unknown>;
@@ -86,6 +91,7 @@ export function mediaSubdirOf(kind: AssetKind): string {
 
 /** 媒体仓相对路径口径：<大类>/<workspaceId>/<sha256><ext>（签名校验按第二段取 workspaceId） */
 export function mediaRelPathFor(kind: AssetKind, workspaceId: string, sha256: string, sourcePath: string): string {
+  safeSegment(workspaceId, "workspaceId");
   const ext = extname(sourcePath).toLowerCase() || fallbackExt(kind);
   return join(mediaSubdirOf(kind), workspaceId, `${sha256}${ext}`).split("\\").join("/");
 }
@@ -97,15 +103,46 @@ export async function registerLocalAsset(
   input: RegisterLocalAssetInput,
 ): Promise<RegisterLocalAssetResult> {
   if (!existsSync(input.absPath)) throw new Error(`入库源文件不存在：${input.absPath}`);
-  const bytes = statSync(input.absPath).size;
+  const before = statSync(input.absPath);
+  if (!before.isFile() || before.size <= 0) throw new Error("入库源文件必须为非空文件");
+  const assertSourceIdentity = () => {
+    if (input.expectedRealPath && (lstatSync(input.absPath).isSymbolicLink() || realpathSync(input.absPath) !== input.expectedRealPath)) {
+      throw new Error("入库源文件 realpath 与封签不一致");
+    }
+    const after = statSync(input.absPath);
+    if (after.dev !== before.dev || after.ino !== before.ino || after.size !== before.size
+      || after.mtimeMs !== before.mtimeMs || after.ctimeMs !== before.ctimeMs) throw new Error("入库源文件在拷贝期间变化");
+  };
+  assertSourceIdentity();
+  const bytes = before.size;
   const sha256 = await sha256File(input.absPath);
-  const relPath = mediaRelPathFor(input.kind, scope.workspaceId, sha256, input.absPath);
-  const absTarget = join(mediaRoot(), relPath);
-  if (!existsSync(absTarget) || statSync(absTarget).size !== bytes) {
-    mkdirSync(dirname(absTarget), { recursive: true });
-    // 异步拷贝：300MB 级文件用 copyFileSync 会把事件循环按住数秒（深审 T-2026-0926-0016）
-    await copyFile(input.absPath, absTarget); // 同名同内容覆盖：sha256 幂等，无害
+  if (input.expectedSha256 !== undefined && (!/^[a-f0-9]{64}$/.test(input.expectedSha256) || sha256 !== input.expectedSha256)) {
+    throw new Error("入库源文件指纹与封签不一致");
   }
+  assertSourceIdentity();
+  const relPath = mediaRelPathFor(input.kind, scope.workspaceId, sha256, input.absPath);
+  const root = mediaRoot();
+  mkdirSync(root, { recursive: true });
+  const absTarget = safeDeliveryPath(root, relPath, true);
+  mkdirSync(dirname(absTarget), { recursive: true });
+  // Existing content-addressed files are verified by bytes, never by size alone.
+  const alreadyValid = existsSync(absTarget) && statSync(absTarget).isFile()
+    && statSync(absTarget).size === bytes && await sha256File(absTarget) === sha256;
+  if (!alreadyValid) {
+    const temp = `${absTarget}.copy-${randomUUID()}`;
+    try {
+      await copyFile(input.absPath, temp, constants.COPYFILE_EXCL);
+      if (statSync(temp).size !== bytes || await sha256File(temp) !== sha256) throw new Error("媒体拷贝后指纹不一致，拒绝登记");
+      assertSourceIdentity();
+      safeDeliveryPath(root, relPath, true);
+      await rename(temp, absTarget);
+    } finally {
+      await rm(temp, { force: true });
+    }
+  }
+  assertSourceIdentity();
+  safeDeliveryPath(root, relPath);
+  if (await sha256File(absTarget) !== sha256) throw new Error("媒体仓文件指纹不一致，拒绝登记");
   return registerStoredMedia(app, gateway, scope, {
     ...input,
     relPath,
@@ -116,6 +153,8 @@ export async function registerLocalAsset(
 }
 
 export interface RegisterStoredMediaInput extends MediaColumnPatch {
+  /** Present for a receipt-bound local copy. */
+  expectedSha256?: string;
   /** 已在媒体仓内的相对路径（上传路由落盘后 / 本地拷贝完成后） */
   relPath: string;
   sha256: string;
@@ -195,6 +234,11 @@ export async function registerStoredMedia(
     status: input.status ?? "registered",
     by: input.by,
   });
+
+  if (r.deduped && input.expectedSha256 !== undefined
+    && (r.asset.project_id !== (input.projectId ?? null) || r.asset.source_type !== "generated")) {
+    throw new Error("同内容媒资已属于其他项目或来源，不允许通过交付补录改写归属");
+  }
 
   await applyMediaColumns(app, scope, r.asset.id, {
     title: input.title ?? undefined,

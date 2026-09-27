@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { assessVariantDistinctness, buildDeliveryManifest, buildVariantPlan, DELIVERY_VARIANTS } from "./deliver.js";
 import { buildRevisionPlan, buildRevisionReport, classifyRevision } from "./revise.js";
@@ -65,7 +66,7 @@ describe("返修闭环（revise · 影响分析 + 复用证据）", () => {
     { shotId: "SC-02", clipPath: "/clips/SC-02.mp4" },
     { shotId: "SC-03", clipPath: "/clips/SC-03.mp4" }
   ];
-  const hasher = (path: string) => `sha-${path.split("/").pop()}`;
+  const hasher = (path: string) => createHash("sha256").update(path).digest("hex");
 
   it("分诊：只提字幕 → 层增量；点名画面 → 要重跑镜头", () => {
     expect(classifyRevision("第 3 条字幕有错字，改一下")).toBe("layer-level");
@@ -77,8 +78,10 @@ describe("返修闭环（revise · 影响分析 + 复用证据）", () => {
     const plan = buildRevisionPlan({ note: "字幕有错字，配乐再轻一点", shots, hasher });
     expect(plan.kind).toBe("layer-level");
     expect(plan.rerunShots).toEqual([]);
-    expect(plan.layers).toEqual(["subtitle", "bgm"]);
-    expect(plan.stages).toEqual(["subtitle", "bgm"]);
+    expect(plan.requestedLayers).toEqual(["subtitle", "bgm"]);
+    expect(plan.layers).toEqual(["subtitle", "danmaku", "bgm", "mux", "master", "deliver"]);
+    expect(plan.stages).toEqual(plan.layers);
+    expect(plan.executable).toBe(true);
     expect(plan.reuseEvidence.map((e) => e.shotId)).toEqual(["SC-01", "SC-02", "SC-03"]);
     expect(plan.requiresRenderSubmitGate).toBe(false);
   });
@@ -87,18 +90,25 @@ describe("返修闭环（revise · 影响分析 + 复用证据）", () => {
     const plan = buildRevisionPlan({ note: "SC-02 手部畸变，重拍", shots, hasher });
     expect(plan.kind).toBe("shot-level");
     expect(plan.rerunShots).toEqual(["SC-02"]);
-    expect(plan.stages.slice(0, 5)).toEqual(["cine-kb", "micromotion", "spec", "plates", "videos"]);
+    expect(plan.executionSteps[0]).toEqual({ scope: "selected-shots", shotIds: ["SC-02"], stages: ["cine-kb", "continuity", "micromotion", "spec", "plates", "material-gen", "videos", "voice"] });
+    expect(plan.executionSteps[1]?.scope).toBe("project");
+    expect(plan.executionSteps[1]?.shotIds).toEqual(shots.map((shot) => shot.shotId));
     expect(plan.reuseEvidence.map((e) => e.shotId)).toEqual(["SC-01", "SC-03"]);
-    expect(plan.reuseEvidence[0]!.sha256).toBe("sha-SC-01.mp4");
+    expect(plan.reuseEvidence[0]!.sha256).toBe(hasher("/clips/SC-01.mp4"));
     expect(plan.requiresRenderSubmitGate).toBe(true);
-    expect(buildRevisionReport(plan, "SC-02 手部畸变，重拍", "2026-09-25T00:00:00Z").gate.approved).toBe(true);
+    const report = buildRevisionReport(plan, "SC-02 手部畸变，重拍", "2026-09-25T00:00:00Z");
+    expect(report.executable).toBe(true);
+    expect(report.gate.approved).toBe(false);
+    expect(report.renderSubmitApproval.status).toBe("unverified");
   });
 
   it("无法归类的意见：报告标不放行（要求人工确认，不静默跳过）", () => {
     const plan = buildRevisionPlan({ note: "整体再高级一点", shots, hasher });
-    expect(plan.kind).toBe("layer-level");
+    expect(plan.kind).toBe("unclassified");
     expect(plan.layers).toEqual([]);
+    expect(plan.executable).toBe(false);
     const report = buildRevisionReport(plan, "整体再高级一点");
-    expect(report.gate.detail).toContain("无后期层命中");
+    expect(report.gate.approved).toBe(false);
+    expect(report.gate.detail).toContain("不可执行");
   });
 });

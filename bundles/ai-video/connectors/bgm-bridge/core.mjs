@@ -1370,6 +1370,53 @@ export function explainMusicAudibility({
     + "可改用带人声间隙的素材、或指定 section 片段复用后在有人声间隙处复检再重试本变体";
 }
 
+const MIX_CHECK_NAMES = ["loudness_ok", "true_peak_ok", "music_audible", "dialogue_preserved", "ducking_applied"];
+
+/** 真正的让位深度只能由同一人声窗口内的无侧链对照与有侧链结果求得。 */
+export function measuredDuckingDepthDb(controlInVoice, duckedInVoice) {
+  return Number.isFinite(controlInVoice) && Number.isFinite(duckedInVoice)
+    ? round(duckedInVoice - controlInVoice, 2)
+    : null;
+}
+
+/** 交付复检：需要实测的值缺失时按未核实处理，不把 null 当作达标。 */
+export function evaluateMixChecks({
+  loudnessAfter, targetLufs, truePeak, musicPresenceDb, musicPresenceTargetDb,
+  speechToMusicMarginDb, duckingDepthDb, policy,
+}) {
+  return {
+    loudness_ok: Number.isFinite(loudnessAfter.integratedLufs)
+      && Math.abs(loudnessAfter.integratedLufs - targetLufs) <= 1.5,
+    true_peak_ok: Number.isFinite(loudnessAfter.truePeakDbtp)
+      && loudnessAfter.truePeakDbtp <= truePeak + 0.2,
+    music_audible: Number.isFinite(musicPresenceDb) && musicPresenceDb >= musicPresenceTargetDb,
+    dialogue_preserved: Number.isFinite(speechToMusicMarginDb) ? speechToMusicMarginDb >= 3 : true,
+    ducking_applied: policy === "music-only"
+      ? true
+      : Number.isFinite(duckingDepthDb) && duckingDepthDb <= -4,
+  };
+}
+
+/** 任一复检失败都不得返回成功回执；删除产物后由调用方重混或转人工。 */
+export async function enforceMixChecks({ checks, output, details = [], retryable = false }) {
+  const failed = MIX_CHECK_NAMES.filter((name) => checks?.[name] !== true);
+  if (failed.length === 0) return;
+  const detail = details.length ? `；${details.join("；")}` : "";
+  try {
+    await fsp.rm(output, { force: true });
+  } catch (error) {
+    const failure = new BgmError(
+      `配乐复检未通过（${failed.join("、")}${detail}）：删除产物失败：${error instanceof Error ? error.message : String(error)}；不得作为成片交付`,
+      "verify_failed", false,
+    );
+    failure.failedChecks = failed;
+    throw failure;
+  }
+  const failure = new BgmError(`配乐复检未通过（${failed.join("、")}${detail}）：已删除产物，不得作为成片交付`, "verify_failed", retryable);
+  failure.failedChecks = failed;
+  throw failure;
+}
+
 export async function mix({
   input, output, bgmPath = null, policy = "keep-dialogue", bgmBpm = null,
   musicLevelDb = null, duckingDb = null, targetLufs = -14, truePeak = -1.0,
@@ -1843,9 +1890,8 @@ export async function mix({
    * 新口径（权威）：同窗口下"让位后 − 不挂侧链的对照"，按本模块既有约定取**负值**
    * （`ducking_applied` 判 `<= -4`、预警判 `> -6`；负得越多＝压得越深）。
    */
-  const duckingDepthDb = Number.isFinite(controlInVoice) && Number.isFinite(duckedInVoice)
-    ? round(duckedInVoice - controlInVoice, 2)
-    : duckingContrastDb;
+  // 无侧链对照测不到时，旧对比值仍留作调试，不能代替权威让位深度参与交付判定。
+  const duckingDepthDb = measuredDuckingDepthDb(controlInVoice, duckedInVoice);
   /** 对照口径（旧指标）也一并暴露，便于回归比较"曲子动态"与"真实侧链深度"两条曲线 */
   const levelsDebug = { controlInVoiceDb: controlInVoice, duckingContrastDb };
   const speechToMusicMarginDb = Number.isFinite(finalInVoiceBand) && Number.isFinite(duckedInVoice)
@@ -1865,13 +1911,11 @@ export async function mix({
     : (Number.isFinite(duckedInQuiet) && Number.isFinite(roomTone) ? "room-tone" : "none");
 
   const targets = findRecipes({ list: true }).targets;
-  const checks = {
-    loudness_ok: Number.isFinite(loudnessAfter.integratedLufs) && Math.abs(loudnessAfter.integratedLufs - targetLufs) <= 1.5,
-    true_peak_ok: !Number.isFinite(loudnessAfter.truePeakDbtp) || loudnessAfter.truePeakDbtp <= truePeak + 0.2,
-    music_audible: Number.isFinite(musicPresenceDb) ? musicPresenceDb >= targets.musicPresenceDb : false,
-    dialogue_preserved: Number.isFinite(speechToMusicMarginDb) ? speechToMusicMarginDb >= 3 : true,
-    ducking_applied: policy === "music-only" ? true : (Number.isFinite(duckingDepthDb) ? duckingDepthDb <= -4 : true),
-  };
+  const checks = evaluateMixChecks({
+    loudnessAfter, targetLufs, truePeak, musicPresenceDb,
+    musicPresenceTargetDb: targets.musicPresenceDb,
+    speechToMusicMarginDb, duckingDepthDb, policy,
+  });
   const warnings = [];
   if (Number.isFinite(speechToMusicMarginDb) && speechToMusicMarginDb < targets.dialogueToMusicMarginDb) {
     warnings.push(`人声-音乐余量 ${speechToMusicMarginDb}dB 低于目标 ${targets.dialogueToMusicMarginDb}dB：建议下调 music_level_db 或加深 ducking`);
@@ -1889,21 +1933,26 @@ export async function mix({
     warnings.push(`卡点平均误差 ${grid.meanAbsErrorMs}ms（>120ms）：BPM 与剪辑节奏不匹配，建议换配方或改 BPM`);
   }
 
-  // 失败关闭：配了像没配（不可闻）或人声被压住（<3dB 余量）→ 删除产物、如实报失败
-  if (!checks.music_audible || !checks.dialogue_preserved) {
-    await fsp.rm(output, { force: true }).catch(() => {});
-    throw new BgmError(
-      `配乐复检未通过（${!checks.music_audible
-        ? explainMusicAudibility({
-          musicPresenceDb, targetDb: targets.musicPresenceDb, quietWindowSource, measured: presenceMeasured,
-        })
-        : ""}`
-      + `${!checks.dialogue_preserved ? `人声-音乐余量 ${speechToMusicMarginDb}dB < 3dB` : ""}）：已删除产物，不得作为成片交付`,
-      "verify_failed",
-      // 测不到时降 3dB 重试也照样测不到（不是电平问题）→ 明确不可重试，省掉一次白跑的混音
-      presenceMeasured,
-    );
-  }
+  // 失败关闭：响度、真峰值、可闻度、人声余量、让位任一未核实或未达标，都不能生成成功回执。
+  const failedDetails = [];
+  if (!checks.loudness_ok) failedDetails.push(Number.isFinite(loudnessAfter.integratedLufs)
+    ? `成片响度 ${loudnessAfter.integratedLufs} LUFS，目标 ${targetLufs}±1.5 LUFS`
+    : "成片响度无法测量");
+  if (!checks.true_peak_ok) failedDetails.push(Number.isFinite(loudnessAfter.truePeakDbtp)
+    ? `成片真峰值 ${loudnessAfter.truePeakDbtp} dBTP，须 ≤${truePeak + 0.2} dBTP`
+    : "成片真峰值无法测量");
+  if (!checks.music_audible) failedDetails.push(explainMusicAudibility({
+    musicPresenceDb, targetDb: targets.musicPresenceDb, quietWindowSource, measured: presenceMeasured,
+  }));
+  if (!checks.dialogue_preserved) failedDetails.push(`人声-音乐余量 ${speechToMusicMarginDb}dB < 3dB`);
+  if (!checks.ducking_applied) failedDetails.push(Number.isFinite(duckingDepthDb)
+    ? `让位深度仅 ${duckingDepthDb}dB，须 ≤-4dB`
+    : "让位深度无法测量");
+  await enforceMixChecks({
+    checks, output, details: failedDetails,
+    // 可闻度测不到时调电平重试仍测不到，保留既有不可重试语义。
+    retryable: presenceMeasured,
+  });
 
   // ⑥ 证据：前后波形对比（可选再加频谱图）
   let evidence = null;

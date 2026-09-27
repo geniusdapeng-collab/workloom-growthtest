@@ -12,13 +12,15 @@
  *   pnpm exec tsx --env-file=.env scripts/tools/whiteboard-film.mts \
  *     --script docs/examples/whiteboard-growth-sales-script.md \
  *     --title "WorkLoom 获客增长系统 · 销售解说" \
- *     --profile chen-zhuo-film --lineart seedream \
+ *     --profile chen-zhuo-film --lineart seedream --quality uhd \
  *     --workspace-slug geo-growth --member-no MEM-G01 \
  *     --evidence var/whiteboard-jobs/evidence-sales.json
  *
  * 分步重跑（会话断了接着做，不重烧算力）：
  *   --only narrate,plan / --only lineart --scene 3 / --only annotate,preview / --only render,poll,deliver
  *   --film WF-xxx           # 复用既有片子（跳过 create）
+ *   --quality hd|uhd        # 不传时新片默认 HD；复用既有片子时沿用其存档画质
+ *   --cap-long-edge 1280    # 仅 HD 可自定义；UHD 固定为 3840×2160
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -36,6 +38,20 @@ const num = (name: string, fallback: number) => {
   const v = arg(name);
   return v ? Number(v) : fallback;
 };
+
+type WhiteboardQuality = "hd" | "uhd";
+
+function requestedQuality(): WhiteboardQuality | undefined {
+  const index = process.argv.indexOf("--quality");
+  const raw = index >= 0 ? process.argv[index + 1] : process.env.WHITEBOARD_QUALITY;
+  if (raw === undefined || !raw.trim()) {
+    if (index >= 0) throw new Error("--quality 需要 hd 或 uhd");
+    return undefined;
+  }
+  const value = raw.trim().toLowerCase();
+  if (value !== "hd" && value !== "uhd") throw new Error(`--quality 仅支持 hd|uhd，实际为 ${raw}`);
+  return value;
+}
 
 interface Evidence {
   task: string;
@@ -114,6 +130,10 @@ function summarize(value: unknown): unknown {
 }
 
 async function main(): Promise<void> {
+  const quality = requestedQuality();
+  if (quality === "uhd" && flag("--cap-long-edge")) {
+    throw new Error("UHD 固定为 3840×2160，请移除 --cap-long-edge");
+  }
   await login();
 
   const only = arg("--only").split(",").map((s) => s.trim()).filter(Boolean);
@@ -139,7 +159,10 @@ async function main(): Promise<void> {
         lineartMode: (arg("--lineart", process.env.WHITEBOARD_LINEART ?? "seedream") as "seedream" | "sketch" | "upload"),
         narrationProfile: arg("--profile", process.env.WHITEBOARD_NARRATION_PROFILE ?? undefined) || undefined,
         fps: num("--fps", Number(process.env.WHITEBOARD_FPS ?? 30)),
-        capLongEdge: num("--cap-long-edge", Number(process.env.WHITEBOARD_CAP_LONG_EDGE ?? 1280)),
+        quality: quality ?? "hd",
+        ...(quality === "uhd" ? {} : {
+          capLongEdge: num("--cap-long-edge", Number(process.env.WHITEBOARD_CAP_LONG_EDGE ?? 1280)),
+        }),
         voiceLufs: num("--lufs", Number(process.env.WHITEBOARD_VOICE_LUFS ?? -16)),
       },
     ));
@@ -253,6 +276,7 @@ async function main(): Promise<void> {
   if (wants("render")) {
     const submit = await step("render", () => call<Record<string, unknown>>("video.whiteboard.render", {
       filmId, allowOverage: true,
+      ...(quality ? { quality } : {}),
     }));
     evidence.artifacts = { ...(evidence.artifacts ?? {}), submit };
     console.log(`  job ${(submit as { jobId?: string }).jobId} / task ${(submit as { taskId?: string }).taskId}`);

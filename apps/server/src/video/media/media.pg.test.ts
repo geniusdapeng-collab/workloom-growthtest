@@ -20,11 +20,14 @@ import { execFileSync } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { isoOf } from "./sync.js";
+import { scopedDeliveryRoot } from "../delivery-trust.js";
+import { seedTestPackage, TEST_DELIVERY_SECRET } from "../delivery-fixture.test-support.js";
 
 process.env.DATABASE_URL ??= "postgres://postgres:workloom@localhost:5432/workloom";
 process.env.DATABASE_APP_URL ??= "postgres://workloom_app:workloom_dev_app@localhost:5432/workloom";
 process.env.DATABASE_GATEWAY_URL ??= "postgres://workloom_gateway:workloom_dev_gateway@localhost:5432/workloom";
 process.env.MEDIA_SIGNING_SECRET ??= "test-media-signing-secret";
+process.env.WORKLOOM_DELIVERY_SIGNING_SECRET = TEST_DELIVERY_SECRET;
 
 const RUN_DB = process.env.RUN_DB_TESTS === "1" && Boolean(process.env.DATABASE_APP_URL);
 const MEDIA_DIR = mkdtempSync(join(tmpdir(), "media-pg-"));
@@ -368,22 +371,12 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
   }, 60_000);
 
   it("⑧ 交付包：母版/变体/封面登记为 final_cut/cover，重复登记幂等", async () => {
-    const pkg = join(TMP, "delivery", `pkg-${suffix}`);
-    mkdirSync(join(pkg, "variants", "cool-tech"), { recursive: true });
-    const master = join(pkg, "master.mp4");
-    const variant = join(pkg, "variants", "cool-tech", "video.mp4");
-    const cover = join(pkg, "variants", "cool-tech", "cover.png");
-    writeFileSync(master, "master-bytes", "utf8");
-    writeFileSync(variant, "variant-bytes", "utf8");
-    writeFileSync(cover, "cover-bytes", "utf8");
-    writeFileSync(join(pkg, "delivery-manifest.json"), JSON.stringify({
-      projectId,
-      master: { path: "master.mp4", sha256: "x" },
-      variants: [{ id: "cool-tech", name: "冷调", video: { path: "variants/cool-tech/video.mp4" }, cover: { path: "variants/cool-tech/cover.png" } }],
-    }), "utf8");
-
+    const pkg = join(scopedDeliveryRoot(join(TMP, "delivery"), scope), `pkg-${suffix}`);
+    seedTestPackage(pkg, scope, projectId);
+    await expect(mods.ingestDeliveryPackage(getAppPool(), getGatewayPool(), otherScope, { dir: pkg, by: "delivery" })).rejects.toThrow(/工作区/);
     const first = await mods.ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: pkg, by: "delivery" });
-    expect(first.registered.map((r) => r.role).sort()).toEqual(["cover", "master", "variant"]);
+    expect(first.registered.map((r) => r.role).sort()).toEqual(["cover", "cover", "cover", "master", "variant", "variant", "variant"]);
+    expect(first.errors).toEqual([]);
     const films = await mods.listAssets(getAppPool(), scope, { kind: ["final_cut"] });
     expect(films.items.length).toBeGreaterThanOrEqual(2);
     expect(films.items.some((item) => item.sourceType === "generated")).toBe(true);
@@ -639,9 +632,8 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     writeFileSync(join(pkg, "delivery-manifest.json"), JSON.stringify({
       projectId, master: { path: join(outside, "secret.txt"), sha256: "x" }, variants: [],
     }), "utf8");
-    const ingested = await mods.ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: pkg, by: "vitest" });
-    expect(ingested.registered.length, "越界产物不得入库").toBe(0);
-    expect(ingested.skipped).toBeGreaterThan(0);
+    await expect(mods.ingestDeliveryPackage(getAppPool(), getGatewayPool(), scope, { dir: pkg, by: "vitest" }))
+      .rejects.toThrow(/工作区/);
     const leaked = await owner.query(
       `SELECT id FROM video_assets WHERE workspace_id=$1 AND meta->>'deliveryRole'='master' AND meta->>'deliveryPackage'=$2`,
       [workspaceId, pkg]);

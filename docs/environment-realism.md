@@ -1,172 +1,98 @@
-# 环境真实性：从"相机拍得到"到"道具站得住"（2026-09-27）
+# 环境、主体与道具：按本镜事实生成与审查
 
-> 起因：销售口播片 8 镜**全部通过监制**，产品所有者复检第一句话是"空间布景不像实拍、像随意口播"。
-> 另一条同批反馈："手机屏幕朝观众"这类物理逻辑错误也要**机制化提前发现**。
-> 本文回答：环境真实感到底由什么构成、管线里怎么判、字段怎么写、以及这两类问题如何做到"渲染前就拦得住"。
+环境真实性不是“每镜都要旧办公室”。本版把空间、可见对象、使用状态和道具用途变成明确合同；同一合同用于展开、关键帧提示词和可选的结构化监制输入。确定性文本审计只证明声明自洽，不能证明生成影像已经真实。
 
-## 一、现状（改造前的事实）
+## 三个使用场景
 
-| 判据体系 | 关注点 | 对"不像实拍"的结论 |
-|---|---|---|
-| `PRODUCER_RUBRICS.keyframe`（旧） | 人物一致性 / 写实度 / 构图 / 无文字 / **场景与镜头卡一致** | 全部放行（8/8） |
-| `PRODUCER_RUBRICS.shot`（旧） | 肢体 / 表情 / 口型 / 跨镜一致 / 空间物理自洽 | 全部放行 |
-| 管线确定性检查（旧） | 字段齐备、长度、台词速率、朝向互斥… | 全部通过 |
-| **环境真实性（当时不存在）** | 空词 / 材质工艺 / 实用光源 / 使用痕迹 / 空间实指 | —— |
+1. 会议室切到街道：街道只读取自己的石板、天光和自然状态，不继承会议桌、台灯或咖啡杯痕；否则外景会被室内清单污染。
+2. 全新产品或洁净室：按真实工艺、照明与洁净状态呈现，不为满足“痕迹”指标添加划痕；产品棚可以使用明确柔光箱。
+3. 双人展示手机：两人留在构图内，屏幕向观众是明确展示用途；自己读取时则检查操作者能看清。固定“第二人禁止/屏幕朝内”会破坏这两个合法场景。
 
-**关键缺口**：旧评审只问"画面跟镜头卡对不对得上"，而**镜头卡本身写的就是空词**——
-「现代明亮的商务空间」+「柔光箱主光 + 白板补光」+「原木长桌」。
-于是"符合镜头卡"与"像实拍"之间没有任何判据，平均样板间可以连过所有门。
+## 每个空间独立存储事实
 
-实测（`environment-realism-audit.mts` 跑原卡）：**8/8 镜判红，硬缺陷 37 项**。
-
-## 二、机制（三层，缺一不可）
-
-```
-        ┌─────────────────────────────────────────────────────────┐
-        │ ① 提示词侧：让模型有约束可用（plate-prompt 通用约束）      │
-        │    ENVIRONMENT_REALISM_CONSTRAINT / PROP_INTERACTION_…    │
-        └─────────────────────────────────────────────────────────┘
-                              ▲ 同源判据
-   sceneBible ──展开──▶ 镜头卡字段（scene/sceneDescription/lighting/props）
-                              │
-        ┌─────────────────────┴───────────────────────────────────┐
-        │ ② 渲染前：确定性审计（零 token，fail-closed）             │
-        │    environmentDefects() → 硬缺陷即停，报告落盘            │
-        └─────────────────────────────────────────────────────────┘
-                              │
-        ┌─────────────────────┴───────────────────────────────────┐
-        │ ③ 评审侧：监制 rubric 两个类目（视觉复核，兜漏网）        │
-        │    keyframe/shot/master：环境真实性 + 道具-人体交互逻辑   │
-        └─────────────────────────────────────────────────────────┘
-```
-
-**为什么必须三层**：提示词减少发生率、确定性审计在**花钱之前**拦住（单镜关键帧 ~85s、视频 ~160s，还要重后期）、
-评审兜住"写对了但生成得不对"。三层判据同源，避免"提示词里写了、评审侧没有对应类目"的老问题。
-
-## 三、字段规格（片级 `sceneBible`）
-
-写在 `shotlist.json` 顶层（或用 `--scene-bible <file>` 单独维护）：
-
-```jsonc
+```json
 {
-  "spaceId": "shanghai-jingan-1936-mill-hq",     // 片级空间标识
-  "space": {
-    "city": "上海", "district": "静安",
-    "building": "1936 年日商纺织厂改建的 6 层办公楼（挑空中庭+开放工位+会议室+剪辑间+露台）",
-    "areaM2": 1800, "ceilingM": 4.2,
-    "orientation": "南向整面钢框水泥窗（原厂房窗框保留），西侧中庭挑空",
-    "timeOfDay": "同一营业日 09:40 → 23:40（时段只许推进，不许回跳）"
-  },
-  "otherSpaces": [                               // 可选：门店/客户现场/街景等第二空间
-    { "spaceId": "store-xuhui-front", "city": "上海", "district": "徐汇",
-      "building": "距总部 1.2 公里的沿街品牌门店（打烊后前厅）",
-      "orientation": "临街玻璃门内", "timeOfDay": "当日 23:10" }
-  ],
-  "materials": [                                 // ≥3 项；每项要 material + (finish 或 wear)
-    { "item": "会议桌", "material": "胡桃木饰面长桌", "finish": "哑光打蜡", "wear": "中央咖啡杯痕、边缘 2cm 磕痕" }
-  ],
-  "practicalLights": [                           // ≥1 项带色温或方向；棚具语言不算
-    { "type": "窗光", "kelvin": 5600, "direction": "南向钢框窗，午后斜射" },
-    { "type": "天花筒灯", "count": 12, "lit": 6, "kelvin": 3000 }
-  ],
-  "traces": ["桌面咖啡杯痕", "档案夹卷边", "扶手指纹与细微氧化"],   // ≥1 项
-  "colorDiscipline": "低饱和写实；肤色中性不偏黄；暗部保留材质纹理"
+  "spaceId": "office",
+  "space": { "city": "上海", "building": "旧银行改建会议室", "orientation": "东向窗", "timeOfDay": "上午" },
+  "environmentProfile": { "setting": "interior", "condition": "used" },
+  "eraProfile": { "storyDate": "2025-03-12", "devicePolicy": "apple-2024plus" },
+  "materials": [{ "item": "会议桌", "material": "胡桃木", "finish": "哑光", "wear": "桌角杯痕" }],
+  "practicalLights": [{ "type": "窗光", "direction": "东侧照入", "kelvin": 5600 }],
+  "traces": ["桌角杯痕"],
+  "otherSpaces": [{
+    "spaceId": "street", "city": "苏州", "building": "平江路街道", "timeOfDay": "傍晚",
+    "environmentProfile": { "setting": "exterior", "condition": "natural" },
+    "materials": [{ "item": "路面", "material": "砂石", "finish": "接缝可见" }],
+    "practicalLights": [{ "type": "阴天天光" }], "traces": [], "colorDiscipline": "保留天光原色"
+  }]
 }
 ```
 
-逐镜字段（可选，按镜覆盖）：
+镜头 `sceneId` 选择空间；未登记的 ID 报硬失败，不回落主空间。第二空间的材质、灯光、痕迹、颜色和环境档案**不继承**主空间。只有项目故事年代可继承，空间或镜头可用完整档案明确闪回。
 
-| 字段 | 作用 |
-|---|---|
-| `sceneId` | 指认本镜属于哪个空间；出现在 `otherSpaces` 之外的空间 → `space-continuity` 硬失败 |
-| `envNarrative` | 本镜的环境叙事任务（"桌面档案与杯痕让人读出这里刚开完一场会"） |
-| `propInteraction` | 可交互道具的物理关系（见下） |
+`environmentProfile.setting` 为 `interior / exterior / studio / product`，`condition` 为 `used / new / maintained / sterile / natural`。模型不会把档案当“已通过”的证据。
 
-```jsonc
-"propInteraction": {
-  "prop": "手机",
-  "orientation": "手机斜立于桌面支架、屏幕朝向主播本人；观众只见机身背面与侧缘的冷光",
-  "operatedBy": "左手（指尖伸向手机又停住）",
-  "contact": "手机立在简易支架里，与台面夹角约 65°",
-  "occlusion": "指尖停在屏幕上方未遮挡；屏幕内容不可辨"
+`expandShotWithBible` 只在当前卡片追加可追溯贡献，不改动作、台词、时长或构图。空间描述写 `scene`，材质写 `props`，已声明的镜头光线与色调优先。`visibleMaterials` 可限制本镜可见物件；空数组表示不补材质。JSON 往返和重复展开幂等；更换空间或圣经时只去掉已证明的旧后缀。来源被篡改则 `unverified`，不会猜测删除作者内容。
+
+输入圣经、面积、灯具数量/点亮数量、可见材料列表和重复空间均有形状校验。结构化原 `props` 不会被替换成拼接字符串；调用方须先明确字段合同。
+
+## 道具用途合同
+
+```json
+{
+  "propInteraction": {
+    "prop": "手机", "purpose": "present", "orientation": "屏幕朝向观众",
+    "screenFacing": "audience", "operatedBy": "女人右手", "contact": "右手握住机身两侧"
+  }
 }
 ```
 
-## 四、审计规则表（`environmentDefects`）
-
-| 规则 | 级别 | 判据 |
+| purpose | 可核朝向 | 使用要求 |
 |---|---|---|
-| `generic-wording` | 硬 | 出现空词（简约/现代/高级/大气/通透/温馨/氛围感/干净留白/宽敞明亮/商务空间/样板间…） |
-| `material-depth` | 硬 | 材质与工艺项 <3（材质词表 + 工艺/状态词表） |
-| `practical-light` | 硬 | `lighting` 无场景内实用光源（窗光/日光/筒灯/台灯/屏幕光/烛光…） |
-| `practical-light`（色温） | 软 | 有实用光源但未标 K 值或"色温" |
-| `usage-traces` | 硬 | 全文无使用痕迹词（指纹/水渍/卷边/划痕/薄灰/杯痕/旧钉眼…） |
-| `space-specificity` | 硬 | 本镜 `scene`+`sceneDescription` 的实指 <3 项（年代/地段/尺度/朝向/时段/空间类型） |
-| `space-continuity` | 硬 | `shot.sceneId` 不在圣经登记的空间里 |
-| `prop-interaction` | 硬 | 含被手持/被操作器物却未声明物理关系；或声明的条目缺 `orientation`/`operatedBy` |
-| `prop-screen-orientation` | 硬 | 屏幕类道具的 `orientation` 未声明"朝向使用者"（写"朝观众/正对镜头"即判红） |
-| `optic-signature` | 软 | 缺等效焦段/光圈口径 |
-| `scene-bible` | 软 | 圣经自身不完备（实指不足 / 材质缺工艺 / 无实用光源 / 痕迹为空） |
+| `operate` | `operator` 或 `shared` | 读取/点击者可见屏幕，并有操作人和接触 |
+| `present` | `audience` 或 `shared` | 观众可见展示面，不因朝镜头而判错 |
+| `shared-view` | `shared` | 参与者共同可读 |
+| `rest` | 按静置合同 | 不加操作人，仍需承重/接触关系 |
 
-规则细节（避免误伤）：
+`orientation` 与 `screenFacing` 相互矛盾为 `failed`；用途、操作者或必要接触缺失为 `unverified`。可以给数组，实际操作的不同道具各自需要对应声明。明确的旧动作动词可推导用途，但不明确时不会假定朝内。静置器物不强制添加人。有限否定规则保留“无划痕的木桌”的木桌，不把“无磨损”当痕迹证据。
 
-- **桌面设备只在"在用"时要求声明**：合盖静置的笔记本不要求（"在用"只认设备语境词，见 BADCASE-2026-0927 的规则收紧记录）；
-- **静置道具不强制**：杯子/笔/书/椅/门不要求声明物理关系（否则每镜判红、规则失去信号）；
-- **屏幕朝向与"界面不可辨"是同一件事的两面**：写清朝向，界面不可辨才成立。
+## 审计行为
 
-## 五、管线接线（`full-chain-film.mts`）
-
-| 位置 | 行为 |
+| 范围 | 行为及失败状态 |
 |---|---|
-| 装载期（读 shotlist 之后、任何阶段之前） | 读 `sceneBible`（或 `--scene-bible`）→ `expandShotWithBible` 展开进每镜字段 → `environmentDefects` **与 `deviceDefects`（设备口径，见 `docs/device-standard.md`）合并审计** → 报告写 `<work-dir>/env-realism-report-<project>.json` → 落 `env-audit` 阶段记录 |
-| 闸门 | 本轮要做 **spec / plates / material-gen / videos** 任一阶段时，环境 + 设备硬缺陷 **fail-closed**（`exit 7`）；纯后期复跑（compose/subtitle/mux…）不拦。带瑕疵放行：`--accept-rejected env` 或 `--accept-env-defects`（记为 `degraded` 留痕） |
-| G7（花钱前最后一道门） | 判据清单增加 `env-realism` 检查（硬，含设备口径），证据带硬/软缺陷数、圣经 id、设备清单版本与报告路径 |
-| 关键帧 / 视频提示词 | 展开后的字段 + `plate-prompt` 的通用约束一起进提示词（`ENVIRONMENT_REALISM_CONSTRAINT`，含道具时再加 `PROP_INTERACTION_CONSTRAINT`） |
+| 明确 `interior` | 当前文字需至少两个可见材质/工艺线索，缺失为硬 `unverified` |
+| 明确 `product` | 至少一个材质/工艺线索，支持声明棚灯 |
+| `exterior` / `studio` | 不要求凑室内家具数量；仍核对适用光源 |
+| `used` | 缺明确可见使用状态为硬 `unverified`；其他 condition 不强制磨损 |
+| 缺清晰范围或仅抽象风格 | 软 `unverified`，不替作者选择浅景深 |
+| 缺场景、未知空间、交互冲突 | 硬缺陷；明确矛盾 `failed`，缺事实 `unverified` |
+| 设备 | 按独立年代目录和明确 profile 判定，详见 device-standard.md |
 
-> **设备口径（2026-09-27 产品所有者硬约束）**：场景里的电子设备**全部使用 2024 年之后的 Apple 设备**，
-> 逐镜在 `devices[]` 声明机型（裸词不算），与本机制共用同一道渲染前闸门与同一份报告。
-> 清单、判据、写法见 `docs/device-standard.md`。
+环境档案未提供时保持兼容的有限审查，不宣称档案要求已被完整证明。规则并非完备自然语言解析；像素真实性和长时连续性仍需媒体证据。
 
-## 六、与既有能力的关系
+关键帧实际输出横/竖/方画幅，不强制默认人物、肤质、第二人禁令、5600K 或浅景深。桥梁按本镜可见结构核对承重与连接，特写不强迫两个桥头入画。未知主体、非法画幅、时代/道具合同缺陷在生成前报错。
 
-| 能力 | 关系 |
-|---|---|
-| `material-scene`（素材场景策略） | 圣经里的**真实参考图只作实景依据、不得复刻构图**（沿用 `material-scene/v1` 口径）；两者不冲突 |
-| `cine-kb-bridge`（摄影知识库） | 知识库注入光学/光线/材质语言（`depth_of_field`/`props`）；环境审计校验**这些语言是否落到卡上**（如光学签名） |
-| `continuity`（连贯性导演） | 审计管"空间事实是否声明且自洽"；连贯性导演管"跨镜读起来是不是同一支片子"，两者互补 |
-| `producer-gate`（监制） | 审计是确定性前置，监制是视觉复核；`PRODUCER_RUBRICS` 已同步加"环境真实性"与"道具-人体交互逻辑" |
+## CLI 与监制接口
 
-## 七、验收口径
+仓内脚本调用方式：
 
-1. **单测**：`pnpm -C packages/video-studio test`（`scene-bible.test.ts`：空词/材质/光源/痕迹/实指/道具朝向/空间连续性/多空间/展开；`plate-prompt.test.ts`：约束真的进提示词；`opening-hook.test.ts` 覆盖钩子侧）；
-2. **CLI 取证**：`tsx scripts/tools/environment-realism-audit.mts --shots <卡>`（原始卡 = 改造前口径）
-   与 `--expand`（管线真实口径）应给出**不同结论**——差别就是"圣经写了但卡里没带"；
-3. **真机**：单镜 A/B —— 原版 vs 实指化重渲，关键帧与视频都过监制（证据见 BADCASE 文档）；
-4. **端到端**：模板示例（18 镜销售讲解型）在 `--expand` 下硬缺陷与软提示均为 0。
+```sh
+pnpm exec tsx scripts/tools/environment-realism-audit.mts --shots ./shotlist.json --expand --json --report ./report.json
+```
 
-实测数据（改造前后）：
+可用参数只有 `--shots`、`--scene-bible`、`--report`、`--expand`、`--json`、`--accept-soft`。外部圣经优先于嵌入值；顶层 `eraProfile` 继承到未覆盖的镜头。每镜含原卡/展开卡 hash、状态和缺陷，报告含 `evidence: deterministic-text-only`。
 
-| 对象 | 硬缺陷 | 软提示 |
-|---|---|---|
-| 原卡（8 镜，未展开） | 37 | 8 |
-| 模板示例（18 镜，展开后） | 0 | 0 |
+- 退出 0 表示没有硬缺陷；有软缺证时 `status: unverified`、`qualified: false`，不等于交付资格。
+- 退出 1 表示硬缺陷阻断。`failed` 是明确冲突，`unverified` 是缺事实或来源不可核。
+- 退出 2 表示参数、JSON、形状或文件错误；报告不可覆盖输入或指向输入的符号链接。
+- `--accept-soft` 只减少文字提示，不修改证据状态或授予正式通过。
 
-## 八、怎么继续扩展（不用改代码）
+`reviewStage` 可传 `contracts: { shots, eraProfile?, sceneBible? }`。`buildProducerReviewContract` 先按共享规则编译事实，将完整合同与 hash 送审；超预算拒绝而不截断，审中源数据改变则不能通过。旧无合同调用方明确缺少结构化事实，不凭默认 rubric 宣称年代或人数已经核实。监制仍执行现有文件 hash、实际图像/时序抽帧、分批全部通过、必要音频证据等边界。
 
-1. **加空词**：`GENERIC_SCENE_WORDS` 追加词条（评审与提示词侧自动生效）；
-2. **加材质/痕迹词表**：`MATERIAL_WORDS` / `TRACE_WORDS` 追加；
-3. **加可交互器物**：`HANDHELD_PROP_WORDS` 追加（同时补单测）；
-4. **加空间**：`sceneBible.otherSpaces` 登记 + 镜头 `sceneId` 指认；
-5. **加评审类目**：直接往 `PRODUCER_RUBRICS` 对应环节追加一条（评审层自动对所有镜头生效）。
+本批新增接口已在真实函数和实际 CLI 回归验证；项目 full-chain 的完整合同传参与新生产证据资格由后续独立集成批接入，不在本文提前声明已部署或已实片通过。
 
-## 九、边界（本方案不解决什么）
+## 方案选择与边界
 
-- 不解决"材质写对了但生成得不对"（那是重渲与视觉评审的事）；
-- 不做姿态估计/像素级真实感评分（"手机屏幕朝观众"目前靠声明 + 视觉复核，不是自动检测）；
-- 不做**跨镜光照方向一致性**的像素级校验（当前只校验声明与文本）；
-- `otherSpaces` 只覆盖**空间实指**；材质/光源清单仍为片级共用，第二空间的差异材质写在那一镜的 `scene`/`props` 里。
+候选一是继续增加全局例外词，成本低但三处规则会漂移，而且镜头无法解释为什么例外。候选二是复用单一 ShotIntent，加显式空间/年代/交互合同；迁移旧卡成本较高，但提示词、文本检查和监制能核对同一事实。本版采用第二种，不新增依赖、数据库或外部 API。
 
----
-
-**关联**：`BADCASE-2026-0927-env-average-room.md`、`BADCASE-2026-0927-phone-screen-toward-audience.md`、
-`docs/scene-physics-review.md`（空间与物理自洽的上一轮机制化）、`docs/opening-hook.md`（前 3 秒钩子）。
+P0 是空间隔离、原始主体与画幅保真、时代型号、道具用途和失败关闭；不用会持续生成矛盾画面。P1 是逐镜可追溯展开与监制 hash，避免旧增强或变化合同被当新证据。P2 的更多历史设备和材料语言须带官方来源或样例再扩展，当前未知项保持未验证。人物资产缓存、知识正文升级、真实视觉盲评和完整服务交付资格不由本模块冒充完成。

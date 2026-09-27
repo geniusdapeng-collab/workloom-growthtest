@@ -18,13 +18,13 @@ import { buildCardRegistry, type CardRegistry } from "./card-registry.js";
 import { engineDirOf, jobsDirOf } from "./engine.js";
 import { buildProject, templateDirOf, type BuildProjectResult } from "./project-builder.js";
 import { runMachineGates } from "./qa-gates.js";
-import { RemotionProvider, readJobState } from "./remotion-provider.js";
+import { RemotionProvider, probeRenderedSize, readJobState } from "./remotion-provider.js";
 import { annotateSemantics } from "./semantics.js";
 import { generateShotbook, validateShotbook } from "./shotbook.js";
 import { shotbookFromPlan, type ShotPlan } from "./shotbook.js";
 import { prepareVoice, probeDurationSec, textFingerprint } from "./voice-prep.js";
 import {
-  assertSpokenNumbers, ExplainerScriptSchema, SemanticsFileSchema, type ExplainerScript,
+  assertSpokenNumbers, explainerOutputSize, ExplainerScriptSchema, SemanticsFileSchema, type ExplainerQuality, type ExplainerScript,
   type ExplainerShotbook, type QaReport, type SemanticsFile, type TimestampsFile,
 } from "./types.js";
 
@@ -63,6 +63,7 @@ export interface ExplainerRunInput {
   };
   /* ---------- 装配面 ---------- */
   aspect?: "9:16" | "16:9";
+  quality?: ExplainerQuality;
   brand?: { product: string; tone: string; accent?: string; base?: string; ink?: string };
   hostAssets?: Record<string, string>;
   assets?: Array<{ from: string; to: string }>;
@@ -108,6 +109,8 @@ export async function runExplainerPipeline(input: ExplainerRunInput): Promise<Ex
   const log = input.onLog ?? (() => undefined);
   const engineDir = input.engineDir ?? engineDirOf(env);
   const templateDir = input.templateDir ?? templateDirOf();
+  const quality = input.quality ?? "hd";
+  const aspect = input.aspect ?? "9:16";
   const script = ExplainerScriptSchema.parse(input.script);
   for (const sentence of script.sentences) assertSpokenNumbers(sentence.text);
   const jobDir = input.jobDir ?? join(jobsDirOf(env), input.taskId);
@@ -237,12 +240,12 @@ export async function runExplainerPipeline(input: ExplainerRunInput): Promise<Ex
   await stage({ stageId: "assemble", status: "running" });
   const build = buildProject({
     jobDir, engineDir, templateDir, script, timestamps: align.timestamps, semantics: semanticsResult.semantics,
-    shotbook, audioPath, aspect: input.aspect ?? "9:16", hostAssets: input.hostAssets,
+    shotbook, audioPath, aspect, quality, hostAssets: input.hostAssets,
     assets: input.assets, onLog: log,
   });
   await stage({
     stageId: "assemble", status: "done",
-    output: { scenes: build.scenes, cards: build.cards, hostSrc: Object.values(build.hostSrcByShot).filter(Boolean).length, sfx: build.sfxFiles.length },
+    output: { scenes: build.scenes, cards: build.cards, hostSrc: Object.values(build.hostSrcByShot).filter(Boolean).length, sfx: build.sfxFiles.length, quality, ...explainerOutputSize(aspect, quality) },
   });
 
   /* ---------- ⑦ 素材体检（preflight --media-only） ---------- */
@@ -290,7 +293,17 @@ export async function runExplainerPipeline(input: ExplainerRunInput): Promise<Ex
   const provider = new RemotionProvider({ env });
   const audioSeconds = align.total;
   const renderedPath = join(jobDir, "out", "v1.mp4");
-  const canResume = (input.resumeFrom === "render") && existsSync(renderedPath);
+  let canResume = false;
+  if (input.resumeFrom === "render" && existsSync(renderedPath)) {
+    const expected = explainerOutputSize(aspect, quality);
+    try {
+      const actual = await probeRenderedSize(renderedPath, env);
+      canResume = actual.width === expected.width && actual.height === expected.height;
+      if (!canResume) log(`[render] 已有成片尺寸 ${actual.width}×${actual.height} 与 ${expected.width}×${expected.height} 不符 → 重新渲染`);
+    } catch (err) {
+      log(`[render] 已有成片尺寸无法核验（${err instanceof Error ? err.message : String(err)}）→ 重新渲染`);
+    }
+  }
   const polled = canResume
     ? { status: "succeeded" as const, uri: renderedPath, error: undefined as string | undefined }
     : await (async () => {
@@ -317,7 +330,8 @@ export async function runExplainerPipeline(input: ExplainerRunInput): Promise<Ex
   const { report } = await runMachineGates({
     jobDir, cards: build.cards, cueCount: build.sfxFiles.length > 0 ? countCues(build) : 0,
     baseline: input.baselineHost ?? null, engineDir, env, onLog: log,
-    aspect: input.aspect ?? "9:16",
+    aspect,
+    quality,
     shots: JSON.parse(readFileSync(build.shotsPath, "utf8")) as Array<{ id: string; start: number; end: number }>,
   });
   await stage({

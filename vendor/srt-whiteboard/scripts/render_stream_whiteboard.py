@@ -88,7 +88,10 @@ class RegionStreamRenderer:
         self.sx = self.out_w / cw
         self.sy = self.out_h / ch
 
-        self.color_img = cv2.resize(image_bgr, (self.out_w, self.out_h), interpolation=cv2.INTER_AREA)
+        # HD 路径沿用上游 INTER_AREA；UHD 从 2K 线稿放大时改用三次插值，
+        # 避免面积插值放大带来的方块边缘。插值只平滑已有像素，不产生新细节。
+        interpolation = cv2.INTER_CUBIC if cfg.cap_long_edge == 3840 and scale > 1 else cv2.INTER_AREA
+        self.color_img = cv2.resize(image_bgr, (self.out_w, self.out_h), interpolation=interpolation)
         gray = cv2.cvtColor(self.color_img, cv2.COLOR_BGR2GRAY)
         self.thresh_map = cv2.adaptiveThreshold(
             gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 10

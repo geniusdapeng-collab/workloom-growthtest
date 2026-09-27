@@ -25,8 +25,9 @@ import type { GenKind, GenProvider, GenRequest } from "@workloom/base/model-rout
 import { newId } from "@workloom/shared";
 import { ProviderError } from "../gen/types.js";
 import {
-  WhiteboardEngineError, mergeWhiteboardScenes, renderWhiteboardScene, whiteboardEngineHint,
-  whiteboardEngineReady, whiteboardEnv,
+  WHITEBOARD_UHD_SIZE, WhiteboardEngineError, mergeWhiteboardScenes, probeWhiteboardVideoSize,
+  renderWhiteboardScene, whiteboardEngineHint, whiteboardEngineReady, whiteboardEnv,
+  type WhiteboardQuality,
 } from "./engine.js";
 import {
   readJobState, resumableScene, writeJobState,
@@ -49,6 +50,7 @@ export interface WhiteboardParams {
   scenes: WhiteboardSceneParam[];
   fps?: number;
   capLongEdge?: number;
+  quality?: WhiteboardQuality;
   handPath?: string;
   inkPath?: "grid" | "skeleton";
   colorFill?: "contour-wipe" | "brush";
@@ -63,7 +65,15 @@ export function readWhiteboardParams(req: GenRequest): WhiteboardParams {
       "whiteboard-local 缺少任务参数：params.extra.whiteboard.scenes 不能为空（调用方应经 video.whiteboard.render 下发）",
     );
   }
-  return params;
+  const quality = params.quality ?? "hd";
+  if (quality !== "hd" && quality !== "uhd") {
+    throw new ProviderError("BAD_REQUEST", `whiteboard-local quality 非法：${String(quality)}`);
+  }
+  const cap = params.capLongEdge ?? 1280;
+  if (quality === "uhd" ? cap !== WHITEBOARD_UHD_SIZE.width : !Number.isInteger(cap) || cap < 640 || cap > 1920) {
+    throw new ProviderError("BAD_REQUEST", `whiteboard-local ${quality} 长边参数非法：${cap}`);
+  }
+  return { ...params, quality, capLongEdge: cap };
 }
 
 /**
@@ -156,7 +166,12 @@ export class WhiteboardProvider implements GenProvider {
     try {
       for (const [i, scene] of params.scenes.entries()) {
         const runState = scenes[i]!;
-        if (resumableScene(runState)) continue;
+        if (resumableScene(runState)) {
+          if (params.quality !== "uhd") continue;
+          const size = await probeWhiteboardVideoSize(runState.outputPath, this.env).catch(() => null);
+          if (size?.width === WHITEBOARD_UHD_SIZE.width && size.height === WHITEBOARD_UHD_SIZE.height) continue;
+          runState.status = "pending";
+        }
         runState.status = "rendering";
         writeJobState(state(), this.env);
         const result = await renderWhiteboardScene({
@@ -166,6 +181,7 @@ export class WhiteboardProvider implements GenProvider {
           handPath: params.handPath,
           fps: params.fps,
           capLongEdge: params.capLongEdge,
+          quality: params.quality,
           inkPath: params.inkPath,
           colorFill: params.colorFill,
           totalMs: scene.durationMs,
@@ -181,6 +197,12 @@ export class WhiteboardProvider implements GenProvider {
       const mergedPath = clips.length > 1
         ? await mergeWhiteboardScenes(clips, merged, { env: this.env })
         : clips[0]!;
+      if (params.quality === "uhd") {
+        const actual = await probeWhiteboardVideoSize(mergedPath, this.env);
+        if (actual.width !== WHITEBOARD_UHD_SIZE.width || actual.height !== WHITEBOARD_UHD_SIZE.height) {
+          throw new WhiteboardEngineError(`UHD 白板合并尺寸错误：实际 ${actual.width}×${actual.height}，要求 3840×2160`);
+        }
+      }
       const durationMs = params.scenes.reduce((sum, s) => sum + s.durationMs, 0);
       writeJobState({
         ...state(),

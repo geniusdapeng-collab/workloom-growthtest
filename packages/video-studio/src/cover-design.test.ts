@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 import { coverPrefersNightBackground } from "./cover-design.js";
 import {
   COVER_DIFF_PSNR_DB,
+  COVER_LOWER_BAND_SAFE_AREA,
   COVER_SAFE_AREA,
   CoverDesignError,
   buildCoverDesignPrompt,
@@ -17,10 +18,12 @@ import {
   fallbackCoverPlan,
   parseCoverPlan,
   validateCoverPlan,
+  type CoverAccountProfile,
   type CoverDesignInput,
   type CoverMeasurements,
   type CoverPlan
 } from "./cover-design.js";
+import { getCoverSpec } from "./cover-platforms.js";
 
 const input: CoverDesignInput = {
   title: "滕王阁 · 落霞秋水",
@@ -57,9 +60,102 @@ describe("封面设计稿", () => {
     expect(prompt).toContain("版式（archetype）二选一");
     expect(prompt).toContain("subject-led");
     expect(prompt).toContain("person-led");
-    expect(prompt).toContain("底部 12% 不放任何文字");
+    /** 平台化（2026-09-27）：小红书封面是 3:4、底部遮挡 17%、标题带 7%–45% */
+    expect(prompt).toContain("竖屏 3:4");
+    expect(prompt).toContain("底部 17% 不放任何文字");
+    expect(prompt).toContain("上部 7%–45% 的标题带内");
+    expect(prompt).toContain("主标题 ≤14 个字");
     expect(prompt).toContain("rationale");
     expect(prompt).toContain("SC-05");
+  });
+
+  /**
+   * 回归基线（硬约束）：默认平台（抖音，历史默认值就是"抖音/快手"）且不注入 KB/账号档案时，
+   * **平台参数相关的提示词行**必须与平台化之前逐字一致——抖音封面行为不得因平台化改变。
+   *
+   * 唯一有意新增的行是第 7 条"数值边界"：真机（DeepSeek）出稿把 `person.widthRatio` 猜成 0.55
+   * （校验区间 0.28–0.50）导致设计稿连打两次回、退兜底稿。把校验区间写进提示词属于
+   * "减少无效往返"的确定性改进，不改变任何既有判据本身（见 docs/cover-platformization.md）。
+   */
+  it("抖音默认路径的提示词：平台参数行与历史逐字一致，且不比历史少任何硬约束", () => {
+    const douyinInput: CoverDesignInput = { ...input, platform: "抖音/快手" };
+    const prompt = buildCoverDesignPrompt(douyinInput);
+    expect(prompt).toContain("平台：抖音/快手（竖屏 9:16，平台 UI 会遮住画面底部约 12%，顶部约 6% 也不宜放字）");
+    expect(prompt).toContain("4. 文字全部落在上部 6%–42% 的标题带内，底部 12% 不放任何文字；");
+    expect(prompt).toContain("2. 主标题 ≤12 个字，说人话、有钩子");
+    /** 新增的数值边界行（真机修复：模型不再自己猜区间） */
+    expect(prompt).toContain("7. 数值边界（越界即判非法、直接打回重出）");
+    expect(prompt).toContain("`person.widthRatio` 0.28–0.50");
+    expect(prompt).not.toContain("【封面知识库】");
+    expect(prompt).not.toContain("【账号视觉锤】");
+    /** 缺省平台 = 抖音 */
+    expect(buildCoverDesignPrompt({ ...input, platform: undefined }))
+      .toContain("平台：小红书（竖屏 3:4"); // 标签沿用调用方原文，规格按平台解析
+    expect(getCoverSpec(undefined).id).toBe("douyin");
+  });
+
+  it("知识库注入：≤3 条、自带篇目前缀、不改变其他行", () => {
+    const prompt = buildCoverDesignPrompt({
+      ...input,
+      kbHints: [
+        "【封面知识库·PLAT-003§4】小红书 3:4 画幅，底部 17% 遮挡区不放文字",
+        "题材：探店 → 拼图 + 数字清单版式",
+        "钩子：价值预览式优先",
+        "第四条应被截断"
+      ]
+    });
+    expect(prompt).toContain("【封面知识库·PLAT-003§4】");
+    expect(prompt).toContain("【封面知识库】题材：探店");
+    expect(prompt).toContain("钩子：价值预览式优先");
+    expect(prompt).not.toContain("第四条应被截断");
+  });
+
+  it("账号档案注入：视觉锤四件套与禁区进 prompt；偏离视觉锤 warn（strict 才判非法）", () => {
+    const profile: CoverAccountProfile = {
+      account_id: "chen-zhuo",
+      display_name: "陈卓",
+      positioning: "城市人文旅行人设号",
+      account_type: "人设IP号",
+      platforms: ["douyin"],
+      visual_hammer: { fontId: "smiley-sans", palette: ["#FFFFFF", "#FFD166"], archetype_bias: "person-led", badge_series: "跟着陈卓走" },
+      hook_bias: ["question", "contrast"],
+      taboo: ["硬广话术"],
+      strict: false
+    };
+    const prompt = buildCoverDesignPrompt({ ...input, platform: "抖音", accountProfile: profile });
+    expect(prompt).toContain("【账号视觉锤】陈卓（chen-zhuo）");
+    expect(prompt).toContain("smiley-sans");
+    expect(prompt).toContain("系列角标「跟着陈卓走」");
+    expect(prompt).toContain("【账号定位】城市人文旅行人设号");
+    expect(prompt).toContain("【账号禁区】硬广话术");
+    /** 优先级必须写明（真机：监制把"题材配色 vs 账号视觉锤"判成互相冲突而打回） */
+    expect(prompt).toContain("【优先级】账号视觉锤 > 题材建议 > 平台通用建议");
+
+    /** 字体偏离：默认只 warn（记进设计稿 warnings），strict=true 判非法 */
+    const drifted = { ...validPlan, typography: { ...validPlan.typography, fontId: "source-han-heavy" as const } };
+    const warned = validateCoverPlan(drifted, { ...input, platform: "抖音", accountProfile: profile });
+    expect(warned.warnings?.join(" ")).toContain("偏离账号视觉锤");
+    expect(() => validateCoverPlan(drifted, {
+      ...input, platform: "抖音", accountProfile: { ...profile, strict: true }
+    })).toThrow(/偏离账号视觉锤/);
+    /** 命中禁区：strict 语义同上 */
+    const tabooPlan = { ...validPlan, headline: "硬广话术", typography: { ...validPlan.typography, fontId: "smiley-sans" as const } };
+    expect(validateCoverPlan(tabooPlan, { ...input, platform: "抖音", accountProfile: profile }).warnings?.join(" "))
+      .toContain("账号禁区");
+  });
+
+  it("平台标题口径：小红书 14 字、B站 16 字、英文平台按词计数", () => {
+    const base = { ...validPlan, typography: { ...validPlan.typography } };
+    const xhs14: CoverPlan = { ...base, headline: "落霞秋水共长天一色的滕王阁夜" }; // 14 字
+    expect(() => validateCoverPlan(xhs14, { ...input, platform: "小红书" })).not.toThrow();
+    expect(() => validateCoverPlan({ ...base, headline: "落霞秋水共长天一色的滕王阁夜景" }, { ...input, platform: "小红书" }))
+      .toThrow(/上限 14/);
+    const bili16: CoverPlan = { ...base, headline: "落霞秋水共长天一色的滕王阁夜景里" }; // 16 字
+    expect(() => validateCoverPlan(bili16, { ...input, platform: "bilibili" })).not.toThrow();
+    const tiktokEn: CoverPlan = { ...base, headline: "THIS $10 FIND BLEW UP", typography: { ...base.typography, color: "#FFFFFF", accentColor: "#FFD166" } };
+    expect(() => validateCoverPlan(tiktokEn, { ...input, platform: "tiktok" })).not.toThrow();
+    expect(() => validateCoverPlan({ ...tiktokEn, headline: "THIS $10 FIND BLEW UP RIGHT NOW" }, { ...input, platform: "tiktok" }))
+      .toThrow(/英文单词/);
   });
 
   it("合法设计稿通过校验；缺人物位/超长标题/越界字级被拒", () => {
@@ -165,6 +261,68 @@ describe("封面机检", () => {
     expect(byId(checks, "clean-source").pass).toBe(false);
     expect(byId(checks, "safe-area").pass).toBe(false);
     expect(byId(checks, "safe-area").detail).toContain(`${(COVER_SAFE_AREA.bottomReservedRatio * 100).toFixed(0)}%`);
+  });
+
+  /**
+   * 平台化机检（2026-09-27）：画幅与安全区随平台——小红书 1080×1440、B站 1920×1080；
+   * 旧签名（传安全区对象）保持抖音画幅，旧用例零改动。
+   */
+  it("平台机检：小红书 3:4 / B站 16:9 按各自画幅与安全区判定", () => {
+    const xhs = coverDeterministicChecks(measure({ width: 1080, height: 1440 }), "xiaohongshu");
+    expect(xhs.every((c) => c.pass)).toBe(true);
+    expect(xhs.find((c) => c.id === "cover-produced")!.detail).toContain("1080x1440");
+
+    const bili = coverDeterministicChecks(measure({ width: 1920, height: 1080 }), "bilibili");
+    expect(bili.every((c) => c.pass)).toBe(true);
+    expect(bili.find((c) => c.id === "cover-produced")!.detail).toContain("1920x1080");
+    expect(bili.find((c) => c.id === "cover-produced")!.detail).toContain("bilibili");
+
+    /** 画幅不符仍然拦下（小红书封面出来是 9:16 → 判失败） */
+    expect(coverDeterministicChecks(measure({ width: 1080, height: 1920 }), "xiaohongshu")
+      .find((c) => c.id === "cover-produced")!.pass).toBe(false);
+  });
+
+  it("旧签名（安全区对象）保持抖音画幅口径，机检行为不变", () => {
+    const checks = coverDeterministicChecks(measure({ titleTopRatio: 0.55, titleBottomRatio: 0.80 }), COVER_LOWER_BAND_SAFE_AREA);
+    expect(checks.find((c) => c.id === "cover-produced")!.pass).toBe(true);
+    expect(checks.find((c) => c.id === "safe-area")!.pass).toBe(true);
+    expect(checks.find((c) => c.id === "safe-area")!.detail).toContain("52%");
+  });
+});
+
+describe("封面兜底稿的平台化", () => {
+  it("B站兜底稿按 16:9 平台校验通过，标题取平台上限内的主标题", () => {
+    const plan = fallbackCoverPlan(
+      { ...input, platform: "bilibili", durationSeconds: 30 },
+      { headline: "落霞秋水共长天一色的滕王阁夜景里", heroShotId: "SC-05", personShotId: "SC-01" }
+    );
+    expect(plan.headline.length).toBeLessThanOrEqual(16);
+    expect(plan.source).toBe("fallback");
+  });
+
+  it("英文平台兜底稿按词截断并全大写，副标题不出现中文时长口径", () => {
+    const plan = fallbackCoverPlan(
+      { ...input, platform: "tiktok", durationSeconds: 30 },
+      { headline: "this ten dollar find blew up right now", heroShotId: "SC-05", personShotId: "SC-01" }
+    );
+    expect(plan.headline).toBe("THIS TEN DOLLAR FIND BLEW");
+    expect(plan.subline).toContain("30s");
+  });
+
+  it("账号档案锁定字体与色板时，兜底稿也遵守（视觉锤不因降级而漂移）", () => {
+    const plan = fallbackCoverPlan(
+      {
+        ...input, platform: "douyin",
+        accountProfile: {
+          account_id: "chen-zhuo",
+          visual_hammer: { fontId: "smiley-sans", palette: ["#FFFFFF", "#FFD166"] },
+          strict: true
+        }
+      },
+      { headline: "滕王阁 落霞秋水", heroShotId: "SC-05", personShotId: "SC-01" }
+    );
+    expect(plan.typography.fontId).toBe("smiley-sans");
+    expect(plan.typography.accentColor).toBe("#FFD166");
   });
 });
 

@@ -165,33 +165,16 @@ export class StageRunner {
     };
 
     /* 写盘点 ① start：原子认领 attempt → 输入快照 → 事件 → manifest 账本 */
-    let attempt = 1;
-    let inputRef = `${dir}/attempt-1.input.json`;
-    try {
-      const claimed = await this.ledger.claimRun({
-        id: newStageRunId(),
-        projectId: this.store.projectId,
-        stageId,
-        inputRefTemplate: `${dir}/attempt-{attempt}.input.json`,
-        runId: this.runId,
-      });
-      attempt = claimed.attempt;
-      inputRef = claimed.inputRef;
-    } catch (err) {
-      // 台账不可用 → 档案仍落文件（attempt=1），主流程照常执行（旁路不阻断）
-      console.error(`[archive] 台账认领失败（继续执行，档案仅落文件）: ${(err as Error).message}`);
+    const { attempt, inputRef } = await this.ledger.claimRun({
+      id: newStageRunId(),
+      projectId: this.store.projectId,
+      stageId,
+      inputRefTemplate: `${dir}/attempt-{attempt}.input.json`,
+      runId: this.runId,
+    });
+    if (!Number.isSafeInteger(attempt) || attempt < 1 || inputRef !== `${dir}/attempt-${attempt}.input.json`) {
+      throw new Error(`STAGE_CLAIM_INVALID: ${stageId} 未返回有效认领回执，拒绝执行`);
     }
-    await safe(() =>
-      this.store.writeJsonAtomic(inputRef, {
-        stageId,
-        attempt,
-        input,
-        startedAt: new Date().toISOString(),
-      }),
-    );
-    await safe(() => this.store.appendJsonl("events.jsonl", { kind: "stage.start", stageId, attempt, runId: this.runId }));
-    await safe(() => this.store.updateLedger(stageId, { attempt, status: "running", finishedAt: null }));
-    this.hooks.onStart?.(stageId, attempt, new Date().toISOString());
 
     let lastHeartbeatAt = 0;
     const ctx: StageContext = {
@@ -246,29 +229,37 @@ export class StageRunner {
         return result;
       },
     };
-    this.activeCtx = ctx;
-
+    let outputReceipt: { outputRef: string; sha256: string } | null = null;
+    let executionCompleted = false;
     try {
+      // 输入是执行前置证据：写失败不得开始模型/外部动作，更不能退回 attempt=1 覆盖历史。
+      await this.store.writeJsonAtomic(inputRef, {
+        stageId, attempt, input, startedAt: new Date().toISOString(),
+      });
+      await safe(() => this.store.appendJsonl("events.jsonl", { kind: "stage.start", stageId, attempt, runId: this.runId }));
+      await safe(() => this.store.updateLedger(stageId, { attempt, status: "running", finishedAt: null }));
+      await safe(async () => this.hooks.onStart?.(stageId, attempt, new Date().toISOString()));
+      this.activeCtx = ctx;
       const { output, cost, outcome } = await fn(ctx);
+      executionCompleted = true;
       /* 写盘点 ③ output-ready：产物先落盘 */
       const outputRef = `${dir}/attempt-${attempt}.output.json`;
       const { sha256 } = await this.store.writeJsonAtomic(outputRef, output);
+      outputReceipt = { outputRef, sha256 };
       const finalStatus: StageStatus = outcome?.status ?? "done";
       /* 写盘点 ④ done/failed-outcome：状态后翻转（产物已在盘上，状态永远不撒谎） */
-      await safe(() =>
-        this.ledger.finishRun({
-          projectId: this.store.projectId,
-          stageId,
-          attempt,
-          status: finalStatus,
-          outputRef,
-          outputSha256: sha256,
-          errorClass: outcome?.errorClass ?? null,
-          errorMsg: outcome?.errorMsg ?? null,
-          durationMs: Date.now() - startedAt,
-          cost,
-        }),
-      );
+      await this.ledger.finishRun({
+        projectId: this.store.projectId,
+        stageId,
+        attempt,
+        status: finalStatus,
+        outputRef,
+        outputSha256: sha256,
+        errorClass: outcome?.errorClass ?? null,
+        errorMsg: outcome?.errorMsg ?? null,
+        durationMs: Date.now() - startedAt,
+        cost,
+      });
       await safe(() =>
         this.store.appendJsonl("events.jsonl", {
           kind: finalStatus === "done" ? "stage.done" : `stage.${finalStatus}`,
@@ -287,12 +278,13 @@ export class StageRunner {
             : { failedStage: stageId, errorClass: outcome?.errorClass ?? "BUG", errorMsg: outcome?.errorMsg ?? null }),
         }),
       );
-      this.hooks.onFinish?.(stageId, attempt, finalStatus === "done" ? "done" : "failed");
-      this.activeCtx = null;
+      await safe(async () => this.hooks.onFinish?.(stageId, attempt, finalStatus === "done" ? "done" : "failed"));
       return output;
     } catch (err) {
       /* 写盘点 ⑤ failed：失败现场固化（分类 + 摘要进台账；堆栈只进 meta 文件） */
-      const errorClass = classifyError(err);
+      // 执行已返回后，输出或完成回执写失败都可能伴随已发生的外部动作；必须先对账。
+      const status: StageStatus = executionCompleted ? "interrupted" : "failed";
+      const errorClass = executionCompleted ? "RECEIPT_UNVERIFIED" : classifyError(err);
       const errorMsg = err instanceof Error ? err.message.slice(0, 500) : String(err).slice(0, 500);
       await safe(() =>
         this.store.writeJsonAtomic(`${dir}/attempt-${attempt}.meta.json`, {
@@ -306,20 +298,21 @@ export class StageRunner {
           projectId: this.store.projectId,
           stageId,
           attempt,
-          status: "failed",
-          outputRef: null,
-          outputSha256: null,
+          status,
+          outputRef: outputReceipt?.outputRef ?? null,
+          outputSha256: outputReceipt?.sha256 ?? null,
           errorClass,
           errorMsg,
           durationMs: Date.now() - startedAt,
         }),
       );
-      await safe(() => this.store.appendJsonl("events.jsonl", { kind: "stage.failed", stageId, attempt, errorClass, errorMsg }));
-      await safe(() => this.store.updateLedger(stageId, { attempt, status: "failed", finishedAt: new Date().toISOString() }));
+      await safe(() => this.store.appendJsonl("events.jsonl", { kind: `stage.${status}`, stageId, attempt, errorClass, errorMsg }));
+      await safe(() => this.store.updateLedger(stageId, { attempt, status, finishedAt: new Date().toISOString() }));
       await safe(() => updateContextBundle(this.store, { lastStage: stageId, failedStage: stageId, errorClass, errorMsg }));
-      this.hooks.onFinish?.(stageId, attempt, "failed");
-      this.activeCtx = null;
+      await safe(async () => this.hooks.onFinish?.(stageId, attempt, "failed"));
       throw err; // 原样上抛：不改变 vendor/宿主既有错误语义
+    } finally {
+      this.activeCtx = null;
     }
   }
 }

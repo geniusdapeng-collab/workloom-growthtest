@@ -268,11 +268,14 @@ describe("工位内核纯函数（不依赖引擎与 ffmpeg）", () => {
     expect(over.overflowSec).toBeGreaterThan(0);
   });
 
-  it("textMatchRatio：去标点后按字符计相似度，用于 ASR 回读抽检", () => {
+  it("textMatchRatio：保留词序与重复次数并标准化 Unicode，用于 ASR 回读核验", () => {
     expect(textMatchRatio("你好，世界。", "你好世界")).toBe(1);
     expect(textMatchRatio("一二三四", "一二四五")).toBeCloseTo(0.75, 3);
     expect(textMatchRatio("", "")).toBe(1);
     expect(textMatchRatio("有内容", "")).toBe(0);
+    expect(textMatchRatio("甲乙丙丁戊己", "己戊丁丙乙甲")).toBeCloseTo(0.167, 3);
+    expect(textMatchRatio("你好", "你好你好")).toBe(0.5);
+    expect(textMatchRatio("ＣＡＦÉ", "cafe\u0301")).toBe(1);
   });
 
   it("engineConfig：默认为本机 MLX 引擎（支持参考音频直传），非法 kind 直接拒绝", () => {

@@ -176,8 +176,6 @@ clips.forEach((clip, index) => {
 });
 
 /* ---------- ② 拼接 ---------- */
-const listFile = join(temp, "concat.txt");
-writeFileSync(listFile, normalized.map((file) => `file '${file}'`).join("\n"), "utf8");
 const raw = join(temp, "raw.mp4");
 /**
  * 每段**按画面时长**把音轨切/补到精确长度（2026-09-26 真机事故修复的关键一步）：
@@ -192,6 +190,14 @@ const shotFrames = normalized.map((file) => {
   return Number.isFinite(frames) && frames > 0 ? frames : Math.round(probeDuration(file) * fps);
 });
 const shotSeconds = shotFrames.map((frames) => frames / fps);
+/**
+ * concat demuxer 缺省用 MP4 容器时长移动下一镜的 PTS。AAC 帧尾可能令容器比
+ * 视频轨多出数毫秒，即使只拷视频也会在镜头接缝留下非整帧间隔。每镜用同一份
+ * 帧数/fps 时长覆盖容器时长；下方音轨切补和音画实测也必须共用 shotSeconds。
+ */
+const listFile = join(temp, "concat.txt");
+writeFileSync(listFile, normalized.map((file, index) =>
+  `file '${file}'\nduration ${shotSeconds[index]!.toFixed(6)}`).join("\n"), "utf8");
 const audioExact = normalized.map((_, index) =>
   `[${index}:a]atrim=end=${shotSeconds[index]!.toFixed(6)},asetpts=N/SR/TB,`
   + `apad=whole_dur=${shotSeconds[index]!.toFixed(6)}[aex${index}]`);
@@ -330,7 +336,7 @@ console.log(`  ③ 母版 → ${out}（${outDuration.toFixed(2)}s）`);
  * 所以**拼完必须实测**，并按门禁口径判能不能出厂。
  */
 const avSyncSampleRate = 16000;
-const shotDurations = normalized.map((file) => probeDuration(file));
+const shotDurations = shotSeconds;
 const shotStarts: number[] = [];
 {
   let cursor = 0;

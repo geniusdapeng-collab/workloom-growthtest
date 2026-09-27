@@ -14,12 +14,22 @@ import { withDefaults, type ExplainerProps } from "./props";
  */
 export const Main: React.FC<Partial<ExplainerProps>> = (input) => {
   const props = withDefaults(input);
+  // 卡、人物窗与字幕的排版坐标以 HD 画布为基准；UHD 在原生 4K
+  // composition 内将矢量 DOM 舞台按 2 倍布局，音轨仍保持原时间轴。
+  const designWidth = props.width > props.height ? 1920 : 1080;
+  const designHeight = props.width > props.height ? 1080 : 1920;
+  const stageScale = props.width / designWidth;
   return (
     <AbsoluteFill style={{ backgroundColor: props.theme.base, fontFamily: props.theme.font }}>
-      {props.shots.map((shot, index) => (
-        <ShotStage key={shot.id} shot={shot} props={props} index={index} />
-      ))}
-      <Subtitles sentences={props.sentences} theme={props.theme} />
+      <div style={{
+        position: "absolute", left: 0, top: 0, width: designWidth, height: designHeight,
+        transform: `scale(${stageScale})`, transformOrigin: "top left", overflow: "hidden",
+      }}>
+        {props.shots.map((shot, index) => (
+          <ShotStage key={shot.id} shot={shot} props={props} index={index} />
+        ))}
+        <Subtitles sentences={props.sentences} theme={props.theme} />
+      </div>
       <VoiceTrack props={props} />
       <SfxTrack cues={props.cues} />
       <DebugOverlay enabled={Boolean(props.debug)} />

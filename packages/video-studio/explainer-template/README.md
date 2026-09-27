@@ -21,7 +21,18 @@ shotbook.json（分镜数据） + timing.json（字级时间戳） + public/（�
   out/v1.mp4 → 机器闸六条 → loudnorm → delivery.mp4
 ```
 
-## 竖屏合成口径（模板内建，不需要每片重写）
+## 输出档位与合成口径
+
+`quality` 省略时为 `hd`。`project-builder.ts` 将档位写入 `props.json` 与 `job.json`：
+
+| 画幅 | HD | UHD |
+|---|---:|---:|
+| 竖屏 9:16 | 1080×1920 | 2160×3840 |
+| 横屏 16:9 | 1920×1080 | 3840×2160 |
+
+卡、人物窗与字幕仍用 HD 设计坐标排版；`Main.tsx` 在原生 UHD Composition 内把舞台整体放大 2 倍，音轨维持同一时间轴。UHD 的段渲染 worker 和 Remotion 帧并发都限制为 1，避免 8 GiB 工位同时持有多张 4K 帧。渲染完成后 provider 用 `ffprobe` 核对实际视频流尺寸；尺寸不符不会报成功。
+
+## 画面层（模板内建，不需要每片重写）
 
 | 层 | 文件 | 纪律 |
 |---|---|---|

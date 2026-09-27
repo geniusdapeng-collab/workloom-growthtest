@@ -12,6 +12,7 @@
  *     --profile chen-zhuo-film \
  *     --host-portraits bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3 \
  *     --brand-product 获客增长系统 \
+ *     [--quality hd|uhd] \
  *     [--shotbook var/shotbook.json] [--llm none|deepseek] [--assets assets.json]
  *     [--render-scope full|changed:s07] [--stop-after-render] [--dry-run]
  *
@@ -23,7 +24,7 @@ import { mkdirSync, existsSync, readFileSync, writeFileSync, readdirSync, statSy
 import { spawnSync } from "node:child_process";
 import { join, resolve } from "node:path";
 import { runExplainerPipeline } from "../../apps/server/src/video/explainer/pipeline.js";
-import { ExplainerScriptSchema } from "../../apps/server/src/video/explainer/types.js";
+import { ExplainerQualitySchema, explainerOutputSize, ExplainerScriptSchema } from "../../apps/server/src/video/explainer/types.js";
 import { templateDirOf } from "../../apps/server/src/video/explainer/project-builder.js";
 import { engineStatus } from "../../apps/server/src/video/explainer/engine.js";
 import type { LlmCall } from "../../apps/server/src/video/explainer/semantics.js";
@@ -164,6 +165,7 @@ async function main(): Promise<void> {
   const taskId = opt("task-id", `run-${Date.now().toString(36)}`)!;
   const profile = opt("profile", process.env.WORKLOOM_VOICE_PROFILE ?? "zh-myvoice")!;
   const aspect = (opt("aspect", "9:16") as "9:16" | "16:9");
+  const quality = ExplainerQualitySchema.parse(opt("quality", "hd"));
   const brandProduct = opt("brand-product", "WorkLoom 获客增长系统")!;
   const script = ExplainerScriptSchema.parse({ sentences: readScript(resolve(scriptPath)) });
   log(`[cli] 口播稿 ${script.sentences.length} 句 / ${script.sentences.map((s) => s.text.replace(/\s/g, "").length).reduce((a, b) => a + b, 0)} 字`);
@@ -193,6 +195,7 @@ async function main(): Promise<void> {
     shotbookPlan,
     voice: { source: "tts", profile },
     aspect,
+    quality,
     brand: {
       product: brandProduct,
       tone: "专业、克制、有结论（销售向口播）",
@@ -217,6 +220,8 @@ async function main(): Promise<void> {
     shots: output.shotbook.shots.length,
     cards: output.build.cards,
     seconds: output.timestamps.total,
+    quality,
+    resolution: explainerOutputSize(aspect, quality),
     sentences: output.timestamps.sentences.length,
     lowMatch: output.timestamps.sentences.filter((s) => !s.ok).map((s) => s.i),
     render: output.renderVideoPath,

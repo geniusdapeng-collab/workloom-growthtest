@@ -21,6 +21,9 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { appendShotContributions, normalizeShotIntent, resolveShotIntent, restoreShotContributions, shotIntentHash, shotText, splitShotAssertions } from "./shot-intent.mjs";
+
+export const CINE_KB_POLICY_VERSION = "workloom.cine-kb-policy/v2";
 
 /* ================= 解析 ================= */
 
@@ -382,6 +385,8 @@ const APERTURE_INTENT_HINTS = [
  * @returns {{aperture:string, direction:"shallow"|"deep"|"moderate", effectZh:string, effectEn:string, reason:string, scenarioLabel:string|null, source:string}}
  */
 export function recommendAperture(kb, card) {
+  const intent = normalizeShotIntent(card);
+  card = { ...(intent.source.fields ?? {}), ...intent.source };
   const knowledge = kb.aperture ?? parseApertureKnowledge(kb);
   if (!knowledge) return null;
   /**
@@ -390,6 +395,16 @@ export function recommendAperture(kb, card) {
    */
   const text = stripNegatedContext(norm(shotSignals(card).text));
   const context = detectContext(card);
+  // An explicit depth instruction outranks all inferred scenario recommendations.
+  if (intent.scene.depthMode !== "unknown") {
+    const direction = intent.scene.depthMode;
+    const row = knowledge.scenarios.find((item) => {
+      const range = parseApertureRange(item.aperture);
+      return range && (direction === "deep" ? range.min >= 8 : direction === "shallow" ? range.max <= 2.8 : range.min >= 2.8 && range.max <= 5.6);
+    });
+    if (!row) return null;
+    return { aperture: row.aperture, direction, effectZh: shotText(card.depth_of_field), effectEn: "", reason: "保留源卡显式景深", scenarioLabel: row.label, matchedBy: "explicit-depth", handAdjust: null, intents: [], source: "源镜头 depth_of_field；OPTICS-001 场景表" };
+  }
   /** 命中的人像/人群意图（用于"有没有明确主体"的判断，以及多人口径） */
   const hitIntents = APERTURE_INTENT_HINTS.filter((hint) => hint.pattern.test(text));
   /**
@@ -397,8 +412,7 @@ export function recommendAperture(kb, card) {
    * 真正表示人物的 `person` / `closeup-portrait` / `scene-portrait` 反而没算进去，
    * 于是"只有角色名、没有'人物/她/他'字面"的卡片全被判成空镜。
    */
-  const hasPerson = context.subject.includes("person")
-    || hitIntents.some((h) => ["person", "closeup-portrait", "scene-portrait", "pair", "group", "night-portrait"].includes(h.id));
+  const hasPerson = intent.subject.hasPerson;
   const isGroup = hitIntents.some((h) => h.id === "group");
 
   /** ① 场景表打分：意图加词命中 → 对应场景行加分；再用 2-gram 重合度补分 */
@@ -416,7 +430,7 @@ export function recommendAperture(kb, card) {
      * 夜景人像优先（KB §3.5：手持夜景"能开多大开多大"）：
      * 夜间 + 有人物时，人像档应压过风光档——否则"灯笼下走两步"会被判成风光 f/8。
      */
-    const isNight = context.timeOfDay.includes("night");
+    const isNight = context.timeOfDay.includes("night") || intent.scene.lightSources.includes("candle");
     /** 夜景 + 有人物时，KB §3.5 明确"能开多大开多大"——人像档要压过环境/风光档 */
     if (isNight && hasPerson && /夜景人像|手持夜景/.test(row.label)) score += 8;
     /** 无人物夜景不给人像档（三轮审计：夜晚车轨被塞"夜景人像 + 奶油虚化"） */
@@ -425,7 +439,7 @@ export function recommendAperture(kb, card) {
      * 无主体时不该选"人像类"档（三轮审计：空镜夜景巷子靠 2-gram 噪声被选成「环境人像 f/2.8–f/4」，
      * 画面里根本没有人物，档位的语义就对不上）。人像行留给真的有人物的镜头。
      */
-    if (!hasPerson && /人像|单人特写|双人|多人合影|合影/.test(row.label)) score -= 4;
+    if (!hasPerson && /人像|单人特写|双人|多人合影|合影/.test(row.label)) score -= 100;
     if (isNight && hasPerson && /大场景风光|风光/.test(row.label)) score -= 3;
     /**
      * 景别消歧（KB §3.1）：中景/中近景的人像镜头要"人清楚、场景可辨"，
@@ -543,7 +557,7 @@ export function recommendAperture(kb, card) {
    * 只对**白天/室内**的手部叙事镜生效：夜景按 KB §3.5「能开多大开多大」优先保进光量，
    * 此时收光圈会逼高 ISO；宁可让手部略软，也不要夜景噪点炸掉整镜（2026-09-24 修正）。
    */
-  const isNightScene = detectContext(card).timeOfDay.includes("night");
+  const isNightScene = context.timeOfDay.includes("night") || intent.scene.lightSources.includes("candle");
   /** 专项意图需要一个"注入决策上下文"（含 星空/车轨/微距 等信号） */
   const ctx = injectionContext(card);
   /** 专项意图优先（三轮审计）：星空=最大光圈求进光；车轨/长曝=小光圈；微距=小光圈保景深 */
@@ -597,7 +611,7 @@ export function recommendAperture(kb, card) {
   return {
     aperture: finalAperture,
     direction: finalDirection,
-    effectZh: sanitizeApertureEffect(finalStop ? `${finalStop.effectZh}（${finalStop.depth}景深）` : (entry?.zh ?? "")),
+    effectZh: sanitizeApertureEffect(finalStop ? `${finalStop.effectZh}（${finalStop.depth}景深）` : (entry?.zh ?? "")).replace(!hasPerson ? /人景皆清|人物与环境|人物/g : /$^/, (text) => text === "人景皆清" ? "主体与环境清晰" : text.replace("人物", "主体")),
     effectEn: entry?.en ?? "",
     reason: finalReason,
     scenarioLabel: picked.label,
@@ -677,20 +691,7 @@ const norm = (v) => String(v ?? "").trim().toLowerCase();
  * 三轮审计真机：旧规则把"无光污染的星空银河"整段吃掉 → 星空专项光圈规则根本没触发。
  * 因此限定词否定改为"遇到'的/地'即停"，谓词否定维持 18 字。
  */
-function stripNegatedContext(raw) {
-  return String(raw ?? "")
-    .replace(/(避免|不要|禁止)[^，。；、,;]{0,18}/g, " ")
-    /**
-     * 光秃秃的"不 + 动作"（2026-09-24 真机）：分镜卡写"固定机位…**不横移**不环绕"，
-     * 早先只剥"不要/禁止/避免"，于是"横移"照旧命中 → 注入"镜头缓慢从左向右摇摄"，
-     * 与"固定机位"直接冲突（监制按"运镜两套并存"打回）。
-     * 只剥与信号词表相关的动词，避免误伤"不断走近"这类正常表达。
-     */
-    .replace(/不(横移|环绕|摇镜|摇摄|平移|推近|推进|跟拍|跟踪|转身|回眸|回头|回望|侧身|侧转|指物|指船|指|挥手|摆动|走动|移动|手持|过曝|偏色|做|加)/g, " ")
-    .replace(/(无|不含|非)[^，。；、,;的地]{0,12}/g, " ")
-    /** "其他/其它"里的"他"会把空镜误判成人物（三轮审计：人称代词只认单独出现的"她/他"） */
-    .replace(/其他|其它/g, " ");
-}
+function stripNegatedContext(raw) { return splitShotAssertions(raw).positive; }
 
 /** 时段/天气/主体识别（用于"矛盾闸"：日景镜头不能被塞夜景配方） */
 const CONTEXT_LEXICON = {
@@ -723,15 +724,6 @@ const CONTEXT_LEXICON = {
  * 于是这类镜头被判成"空镜"——光圈兜底因此掉进 f/5.6「打卡照」（正午人像/蓝调人像/雪天人像全中）。
  * 这里把**角色字段非空且未被否定**本身当作主体信号；`无 / 空镜 / 不需要 / 不出镜` 仍判空镜。
  */
-function hasNamedSubject(card) {
-  const raw = [card?.character, card?.characters, card?.cast, card?.presenter]
-    .filter(Boolean)
-    .map((v) => (typeof v === "string" ? v : JSON.stringify(v)))
-    .join(" ");
-  const text = norm(raw);
-  if (!text) return false;
-  return !/无人物|空镜|不需要|不出镜|^(无|没有|none|null)/i.test(text);
-}
 
 /**
  * 两套上下文共用的取词字段表（2026-09-25 五轮审计）。
@@ -747,25 +739,15 @@ const CONTEXT_FIELDS = [
   "costume", "props", "makeup", "baseline", "pacing"
 ];
 
-function contextText(card) {
-  return norm(CONTEXT_FIELDS
-    .map((field) => card?.[field])
-    .filter(Boolean)
-    .map((v) => (typeof v === "string" ? v : JSON.stringify(v)))
-    .join(" "));
-}
+function contextText(card) { return normalizeShotIntent(card).scene.positiveText; }
 
 export function detectContext(card) {
-  /**
-   * 先剥离**否定语境**：我们的镜头卡里写着"避免日落时段的金色调、避免暖黄滤镜"这类白平衡锚点，
-   * 早先直接做关键词匹配，把"避免日落"读成了"要日落"，于是日景镜头被注入逆光日落配方（2026-09-24 真机）。
-   * 取词走 `contextText()`：与 injectionContext 同一张字段表（人物/服装/道具也在内，否则有人物的镜头会被判成无主体）。
-   */
-  const text = stripNegatedContext(contextText(card));
+  const intent = normalizeShotIntent(card);
+  const text = intent.scene.positiveText;
   const pick = (list) => list.filter((x) => x.pattern.test(text)).map((x) => x.key);
-  const subject = pick(CONTEXT_LEXICON.subject);
-  if (hasNamedSubject(card) && !subject.includes("person")) subject.push("person");
-  return { timeOfDay: pick(CONTEXT_LEXICON.timeOfDay), weather: pick(CONTEXT_LEXICON.weather), subject };
+  const subject = pick(CONTEXT_LEXICON.subject).filter((name) => name !== "person");
+  if (intent.subject.hasPerson) subject.push("person");
+  return { timeOfDay: intent.scene.timeOfDay, weather: pick(CONTEXT_LEXICON.weather), subject };
 }
 
 /**
@@ -833,6 +815,8 @@ function contradictionPenalty(entry, context) {
 
 /** 从 25 字段卡里抽取检索信号（带权重），并保留原文用于打分 */
 export function shotSignals(card) {
+  const source = normalizeShotIntent(card).source;
+  card = { ...(source.fields ?? {}), ...source };
   const parts = [];
   for (const [field, weight] of SIGNAL_FIELDS) {
     const raw = card?.[field];
@@ -910,6 +894,8 @@ export function scoreEntry(entry, topic, cardText, context, indexKeywords = []) 
  * @returns {{ ranked: Array, picks: Array<{topicId,intent,zh,en,section}>, missingTopics: Array }}
  */
 export function selectEntries(kb, card, options = {}) {
+  const intent = resolveShotIntent(card, options.intent);
+  card = { ...(intent.source.fields ?? {}), ...intent.source };
   const maxEntries = options.maxEntries ?? 6;
   /** 注入阈值提到 4：2-gram 偶然重合（1–2 分）不足以证明"这条知识适用于这个镜头" */
   const minScore = options.minScore ?? 4;
@@ -1083,8 +1069,8 @@ const INJECTION_RULES = [
    *   · 「正午的室内，强光从窗户斜射」→ 被写成"窗外蓝调天光"（正午不可能是蓝调）。
    * 因此室内兜底加排除条件：窗光 / 正午 / 阴天散射 / 黄金时刻 / 雪景 任一显式成立时，让位给后面的专用规则。
    */
-  { field: "lighting", id: "indoor-warm-mix", when: (c) => c.interior && c.day && !hasExplicitDaylight(c), topic: "LIGHT-002", row: "混合色温（室内暖+窗外冷）" },
-  { field: "lighting", id: "indoor-tungsten", when: (c) => c.interior && !c.day && !hasExplicitDaylight(c), topic: "LIGHT-003", row: "钨丝灯室内" },
+  { field: "lighting", id: "indoor-warm-mix", when: (c) => c.interior && c.mixedLight, topic: "LIGHT-002", row: "混合色温（室内暖+窗外冷）" },
+  { field: "lighting", id: "indoor-tungsten", when: (c) => c.interior && c.tungsten, topic: "LIGHT-003", row: "钨丝灯室内" },
   /**
    * 雪景光：阴天散射 + 雪面反光（先于阴天软光判定，避免雪天被当成普通阴天）。
    * 五轮审计收口：只在**正在下雪**时用「落雪安静」——该行原文写的是"雪花缓缓飘落"，
@@ -1096,7 +1082,7 @@ const INJECTION_RULES = [
    * 雨天时序（五轮审计）：雨后走 SCENE-001 §6.2「雨后初晴」（"雨停后阳光刺破云层，湿街反射金色天光"）——
    * 这是 KB 里唯一正对"雨停之后"的行；夜景雨后不适用（该行描述的是阳光），阴天雨后也排除（否则与阴天冲突）。
    */
-  { field: "lighting", id: "after-rain", when: (c) => c.rain && !c.rainNow && !c.night && !c.overcast, topic: "SCENE-001", row: "雨后初晴" },
+  { field: "lighting", id: "after-rain", when: (c) => c.rain && !c.rainNow && c.rainCleared && !c.night && !c.overcast, topic: "SCENE-001", row: "雨后初晴" },
   /** 正午硬光：烈日顶光，与"上午/下午斜光"不同（三轮审计：正午被误判成午后） */
   { field: "lighting", id: "noon-hard", when: (c) => c.noon && !c.overcast, topic: "LIGHT-002", row: "正午硬光（纪实/压迫）" },
   { field: "lighting", id: "overcast-soft", when: (c) => c.overcast && !c.snow, topic: "LIGHT-001", row: "阴天软光" },
@@ -1107,7 +1093,7 @@ const INJECTION_RULES = [
    * 于是"上午十点散射日光"的镜头里同时出现"午后阳光"——灯光时段自相矛盾（监制据此打回）。
    * 上午/清晨镜头的光由卡片自身措辞承担；KB 缺一行"上午光"已登记为缺口。
    */
-  { field: "lighting", id: "day-afternoon", when: (c) => c.day && !c.overcast && !c.interior && !c.noon && !c.blueHour && /下午|午后|afternoon/.test(c.text), topic: "LIGHT-002", row: "上午/下午日常斜光" },
+  { field: "lighting", id: "day-afternoon", when: (c) => c.day && !c.overcast && !c.interior && !c.windowLight && !c.noon && !c.blueHour && /下午|午后|afternoon/.test(c.text), topic: "LIGHT-002", row: "上午/下午日常斜光" },
   /**
    * 逆光三兄弟的优先级（2026-09-24 三轮审计）：
    * 「有意剪影 / 轮廓光」比「黄金时刻」更具体——原来是黄金时刻先命中（日落语境必然同时命中），
@@ -1138,11 +1124,11 @@ const INJECTION_RULES = [
    * 与卡片的"静止"直接冲突（与 playbook §一 事故 5 同源，只是触发词不同）。
    * 静止回眸目前 KB 无对应行（已登记缺口 G19），由卡片自述承担。
    */
-  { field: "composition", id: "look-back", when: (c) => c.lookBack && c.walking, topic: "HUMAN-001", row: "故事感回头" },
-  { field: "composition", id: "eyelevel", when: (c) => c.eyeLevel && !c.framingKnown, topic: "HUMAN-001", row: "平等真实" },
+  { field: "composition", id: "look-back", when: (c) => c.person && c.lookBack && c.walking && c.lookAtCamera, topic: "HUMAN-001", row: "故事感回头" },
+  { field: "composition", id: "eyelevel", when: (c) => c.person && c.eyeLevel && !c.framingKnown, topic: "HUMAN-001", row: "平等真实" },
 
   /* ---------- 运镜 ---------- */
-  { field: "camera_movement", id: "follow-side", when: (c) => c.walking && c.follow, topic: "CINE-001", row: "侧面平行跟拍" },
+  { field: "camera_movement", id: "follow-side", when: (c) => c.person && c.walking && c.follow, topic: "CINE-001", row: "侧面平行跟拍" },
   /** 人物站着讲话、镜头横移跟随手势 → "水平摇镜环顾"，而不是"跟随行走"（2026-09-24 真机） */
   { field: "camera_movement", id: "pan-with", when: (c) => !c.walking && c.panWith, topic: "CINE-001", row: "水平摇镜环顾" },
   { field: "camera_movement", id: "dolly-in", when: (c) => c.pushIn && !c.walking, topic: "CINE-001", row: "缓慢推近人物特写" },
@@ -1193,7 +1179,7 @@ const INJECTION_RULES = [
    * 监制按"字段模板串场"打回。
    */
   { field: "props", id: "food-texture", when: (c) => c.food && /酱|汁|炖|卤|烤|油亮|挂壁|油光/.test(c.text), topic: "PHYS-002", row: "油亮酱汁" },
-  { field: "makeup", id: "skin-texture", when: (c) => c.person && (c.closeup || c.personSkin), topic: "PHYS-002", row: "真实皮肤（通用）" },
+  { field: "makeup", id: "skin-texture", when: (c) => c.person && c.faceVisible && (c.closeup || c.personSkin), topic: "PHYS-002", row: "真实皮肤（通用）" },
   /**
    * 烛火特写要求画面里**真有火焰**（烛光/蜡烛/篝火/火锅），灯笼不算（真机 2026-09-24 校准）：
    * 白天支巷挂红灯笼的镜头被注入"烛火小而稳定…暖光晕开"，监制按道具串场打回。
@@ -1210,11 +1196,12 @@ const INJECTION_RULES = [
 /** 从镜头卡抽取"注入决策上下文"（纯词面判断，可解释、可测试） */
 export function injectionContext(card) {
   /** 与 detectContext 同口径：同一张字段表 + **先剥否定语境**（"避免日落时段的金色调"不能被读成"要日落"） */
-  const text = stripNegatedContext(contextText(card));
+  const intent = normalizeShotIntent(card);
+  const text = intent.scene.positiveText;
   const has = (re) => re.test(text);
   const framingHit = ["大远景", "远景", "全景", "中近景", "中景", "近景", "特写"].find((f) => text.includes(f));
   return {
-    text,
+    text, intent,
     /**
      * 夜间信号只认"真的在夜里"：灯笼/烛光是**点光源**，白天巷口挂灯笼不等于夜景
      * （2026-09-24 真机：白天巷子被注入"暖橙钠灯光池"）。
@@ -1224,28 +1211,31 @@ export function injectionContext(card) {
      * "跨年夜的城市上空，烟花绽放"早先因为只写"跨年"没有"夜晚/夜色"字面 → 判成日景，
      * 既没进夜景规则也没进烟花规则（零知识注入 + 落 f/5.6 打卡档）。
      */
-    night: has(/夜景|夜晚|入夜|晚上|夜色|深夜|霓虹|月夜|暮色|蓝调|夜空|跨年|午夜|凌晨/),
+    night: intent.scene.timeOfDay.includes("night"),
     /** 蓝调时刻是"暮色"而非深夜：单独识别，灯光规则要按蓝调走（2026-09-24 三轮审计） */
-    blueHour: has(/蓝调|blue hour|暮色|日落后/),
+    blueHour: intent.scene.timeOfDay.includes("blueHour"),
     /**
      * 白天信号（三轮审计补 "明亮/自然光/光线充足"）：
      * "服装店内景…明亮"早先因为没有"白天/日光"字面被判成"夜间室内" → 注入"暖黄钨丝灯、2800K 温馨居家"。
      * 夜景规则排在本条之前，所以"夜晚的明亮灯市"仍走夜景，不会被误判成白天。
      */
-    day: has(/上午|清晨|早上|正午|中午|下午|午后|日光|白天|明亮|自然光|光线充足/),
+    day: intent.scene.timeOfDay.some((time) => ["morning", "noon", "afternoon", "day"].includes(time)),
     interior: has(/室内|铺内|店内|房间|屋内|屋里|茶馆|食肆|大堂/),
     overcast: has(/阴天|多云|散射光|漫射光|无硬阴影/),
-    goldenHour: has(/黄金时刻|magic hour|落日|日落|夕阳/),
+    goldenHour: intent.scene.timeOfDay.includes("dusk") && has(/黄金时刻|magic hour|落日|日落|夕阳/),
     /** 正午硬光：需要与"午后斜光"区分（前者硬、后者斜） */
     noon: has(/正午|中午|晌午|烈日|顶光/),
     neon: has(/霓虹|neon/),
     lantern: has(/灯笼|烛光|暖灯|吊灯|串灯/),
-    candle: has(/烛光|蜡烛|火锅|篝火/),
+    candle: intent.scene.lightSources.includes("candle"),
+    tungsten: intent.scene.lightSources.includes("tungsten"),
+    mixedLight: intent.scene.timeOfDay.includes("blueHour") && intent.scene.temperatures.includes("warm") && /室内|屋内/.test(text),
     rimLight: has(/轮廓光|rim light|发丝光/),
     silhouette: has(/剪影|silhouette/),
-    windowLight: has(/窗光|窗边|窗外|窗棂/),
+    windowLight: intent.scene.lightSources.includes("window"),
     fog: has(/雾|水汽|薄雾/),
     rain: has(/雨/),
+    rainCleared: has(/初晴|阳光刺破|雨过天晴|雨后.*阳光/),
     heavyRain: has(/暴雨|大雨|倾盆/),
     /**
      * 天气时序（2026-09-25 五轮审计）：早先 `rain` 把"雨后"与"正在下雨"当同一件事，
@@ -1264,7 +1254,7 @@ export function injectionContext(card) {
     mirrorWater: has(/倒影|镜面|如镜|平静水面|无风水面|静水/) && !has(/水下|海底|冰|雪/),
     watercraft: has(/船|摇橹|乌篷|橹/),
     /** 舞台/演出语境（四轮审计）：LIGHT-003 §六 有点名的「舞台追光」行 */
-    stageLight: has(/舞台|追光|剧场|livehouse|演唱会|舞台光/),
+    stageLight: intent.scene.lightSources.includes("stage"),
     /** 烟花（四轮审计）：LIGHT-003 §六 有点名的「烟花夜空」行 */
     fireworks: has(/烟花|焰火/),
     /** 玻璃幕墙/玻璃面（四轮审计）：PHYS-002 §六 有点名的「玻璃反射」行 */
@@ -1278,24 +1268,26 @@ export function injectionContext(card) {
     macro: has(/微距|超近距|昆虫特写|露珠特写/),
     snow: has(/雪/),
     silk: has(/旗袍|缎面|丝绸|绸/),
-    person: has(/女主|男主角|人物|她|他|角色|面部|人像/) || hasNamedSubject(card),
+    person: intent.subject.hasPerson,
+    faceVisible: intent.subject.faceVisible,
     closeup: has(/特写|close-?up|面部|脸/i),
     personSkin: has(/皮肤|肤质|毛孔|裸妆/),
-    walking: has(/行走|走动|步行|向前走|走过|漫步|缓步|walk/i),
-    follow: has(/跟拍|跟随|跟镜|tracking|follow/i),
-    panWith: has(/横移|摇镜|平移|pan/i),
-    pushIn: has(/推近|推进|push in|dolly in/i),
-    handheld: has(/手持|晃动|handheld/i),
-    orbit: has(/环绕|绕|orbit/i),
-    aerial: has(/无人机|航拍|俯瞰|aerial|drone/i),
-    staticCamera: has(/固定机位|静止|固定镜头/),
+    walking: intent.performance.walking,
+    follow: intent.camera.modes.includes("tracking"),
+    panWith: intent.camera.modes.includes("pan"),
+    pushIn: intent.camera.modes.includes("push"),
+    handheld: intent.camera.modes.includes("handheld"),
+    orbit: intent.camera.modes.includes("orbit"),
+    aerial: intent.camera.modes.includes("aerial"),
+    staticCamera: intent.camera.modes.includes("static"),
     eyeLevel: has(/平视|eye[- ]level/),
     /**
      * 回头类动作只认**回眸/回头/回望**（2026-09-24 三轮校准）：
      * "转头"大量出现在造型描述里（"发丝随转头轻摆"），早先据此注入"行走中回头看向镜头"，
      * 与卡片写明的"全程正脸、不转身"直接冲突（真机监制据此打回）。
      */
-    lookBack: has(/回眸|回头|回望/),
+    lookBack: /回眸|回头|回望/.test(intent.performance.action),
+    lookAtCamera: /看向镜头|看镜头|望向镜头/.test(intent.performance.action),
     framing: framingHit ?? null,
     framingKnown: Boolean(framingHit),
     jiangnan: has(/江南|水乡|月白|黛青|白墙|青石/),
@@ -1332,156 +1324,133 @@ const MAX_FIELD_CHARS = 320;
  *   card  —— 注入后的卡片（字段值为**画面语言**；原值保留在后面，用"；"拼接）
  *   trace —— 审计留痕：命中的主题/条目、技术参数建议（**不进提示词**）、缺篇清单
  */
+/** Project a KB example onto explicit source constraints, recording every adaptation. */
+function compatibleRow(row, rule, ctx) {
+  const intent = ctx.intent;
+  let zh = row.zh;
+  if (rule.field === "lighting") {
+    // A named source outranks broad time/weather examples. In particular, night does not
+    // authorize adding city lamps to a candlelit room, nor does noon replace a side window.
+    const specific = ctx.candle ? "candle" : ctx.tungsten ? "indoor-tungsten" : ctx.windowLight ? "window-light" : null;
+    if (specific && ![specific, "indoor-warm-mix"].includes(rule.id)) return null;
+    if (rule.id === "fog-light" && !intent.scene.lightDirections.includes("back")) return null;
+    if (["night-bokeh-first", "night-bokeh"].includes(rule.id) && (!ctx.bokeh || intent.scene.depthMode === "deep")) return null;
+    if (["night-film", "night-lantern"].includes(rule.id) && !/青橙/.test(intent.scene.positiveText)) zh = zh.replace("，青橙色调", "");
+    if (rule.id === "blue-hour" && !/城市|街道|市区|楼宇/.test(intent.scene.positiveText)) zh = "蓝调时刻，环境天光偏蓝";
+  }
+  if (rule.field === "camera_movement") {
+    if (intent.camera.hardStatic && rule.id !== "static") return null;
+    if (intent.camera.modes.includes("static") && rule.id !== "static") return null;
+    if (rule.id === "static" && /晃动|微动|呼吸/.test(intent.camera.positiveText)) return null;
+    if (rule.id === "dolly-in" && (!intent.subject.faceVisible || intent.subject.shotScale !== "close")) zh = zh.replace("至人物面部", "");
+    if (rule.id === "pan-with") {
+      const camera = intent.camera.positiveText;
+      if (/右.*左/.test(camera)) zh = zh.replace("从左向右", "从右向左");
+      else if (!/左.*右/.test(camera)) zh = zh.replace("从左向右", "");
+      if (!/全景/.test(shotText(intent.source.composition))) zh = zh.replace(/，扫过全景/, "");
+    }
+    if (rule.id === "follow-side" && !/侧面|横移|平行/.test(intent.camera.positiveText)) zh = zh.replace("横移", "");
+    if (rule.id === "aerial" && !/向前|前飞|前进/.test(intent.camera.positiveText)) zh = zh.replace(/，缓缓向前飞行/, "");
+    // Static describes the camera, not a permission to make all scene elements move.
+    if (rule.id === "static") zh = zh.replace(/，画面内.*$/, "");
+    if (intent.camera.pace === "fast") zh = zh.replace(/缓慢|缓缓/g, "快速");
+    else if (intent.camera.pace === "unspecified") zh = zh.replace(/缓慢|缓缓/g, "");
+  }
+  if (rule.id === "window-light") {
+    const direction = intent.scene.lightDirections.includes("right") ? "右侧" : intent.scene.lightDirections.includes("left") ? "左侧" : "";
+    zh = zh.replace("左侧大窗", `${direction}窗户`);
+    if (!intent.scene.lightSources.includes("daylight")) zh = zh.replace("自然光", "光线");
+    const sourceLighting = shotText(intent.source.lighting ?? intent.source.fields?.lighting);
+    if (/硬光|直射|强光|锐利阴影/.test(splitShotAssertions(sourceLighting + "；" + intent.scene.text).positive)) {
+      zh = zh.replace("柔和的", "").replace(/，面部.*$/, "");
+    }
+    if (!intent.subject.faceVisible || /照在桌面|照亮桌面|只照物体/.test(sourceLighting + intent.scene.text)) zh = zh.replace(/，面部.*$/, "");
+  }
+  if (rule.id === "rim-light") {
+    if (!ctx.goldenHour) zh = "主体边缘呈现轮廓光";
+    else if (!intent.subject.faceVisible) zh = "夕阳从主体身后照来，主体边缘被轮廓光勾勒";
+  }
+  if (rule.id === "silhouette") {
+    if (!ctx.goldenHour || !intent.subject.hasPerson) zh = "主体呈深色剪影，轮廓分明";
+    else if (!/背对/.test(intent.scene.positiveText)) zh = zh.replace("人物背对落日", "人物在落日逆光中");
+  }
+  if (rule.id === "overcast-soft") zh = "阴天柔和漫射光，无硬阴影";
+  if (rule.id === "candle" && !intent.subject.faceVisible) zh = zh.split("，")[0];
+  if (!intent.subject.hasPerson && /人物|人像|面部|皮肤|肤感|发丝|全身/.test(zh)) return null;
+  if (!intent.subject.faceVisible && /面部|皮肤|肤感|发丝/.test(zh)) return null;
+  const temp = intent.scene.temperatures;
+  if (temp.includes("neutral") && /青橙|青绿|暖黄|冷蓝|冷白|金色|橙色/.test(zh)) return null;
+  if (temp.includes("warm") && !temp.includes("cool") && /青橙|青绿|冷白|冷蓝|蓝调/.test(zh)) return null;
+  if (temp.includes("cool") && !temp.includes("warm") && /暖色|暖黄|金色|橙色/.test(zh)) return null;
+  const negative = intent.scene.negativeConstraints.join("；");
+  if (/蓝调|冷白|冷色/.test(negative) && /蓝调|冷白|冷色/.test(zh)) return null;
+  if (/暖黄|暖色|金色/.test(negative) && /暖黄|暖色|金色/.test(zh)) return null;
+  return { ...row, zh, en: zh === row.zh ? row.en : "", ...(zh !== row.zh ? { adaptation: { originalZh: row.zh, adaptedZh: zh, basis: "source-subject-camera-light-constraints" } } : {}) };
+}
+
 export function enrichShotCard(kb, card, options = {}) {
-  const enriched = { ...card };
-  const applied = [];
-  const byField = new Map();
-  const ctx = injectionContext(card);
-  /**
-   * 自动注入 = **确定性意图映射**（≤3 条）：每条都问"这个镜头有没有这个意图"，
-   * 有才取 KB 对应行的原文措辞；没有就不加。自由检索交给 `selectEntries()`（Agent 主动提问用）。
-   */
-  const pickedRows = [];
-  const usedFields = new Set();
-  /**
-   * 注入上限（2026-09-24 三轮审计修正）：原先全局上限 3 会让"靠后的领域"（材质/道具）被前面
-   * （灯光/构图/运镜）挤掉——实测"湖面倒影"因此没有被注入。改为 **5**：
-   * 字段级仍严格"一字段一条"，所以最多就是 灯光/构图/运镜/色调/材质 各一条，不会堆提示词。
-   */
-  const maxInjections = options.maxInjections ?? 5;
-  for (const rule of INJECTION_RULES) {
-    if (pickedRows.length >= maxInjections) break;
-    if (usedFields.has(rule.field)) continue;
-    let ok = false;
-    try { ok = Boolean(rule.when(ctx)); } catch { ok = false; }
-    if (!ok) continue;
-    const row = pickRow(kb, rule.topic, rule.row);
-    if (!row) continue;
-    /** 同一知识行不重复落到多个字段（三轮审计：雪景"落雪安静"同时进了 lighting 与 props） */
-    if (pickedRows.some((p) => p.row.topicId === row.topicId && p.row.intent === row.intent)) continue;
-    pickedRows.push({ rule, row });
-    usedFields.add(rule.field);
+  let intent;
+  try { intent = resolveShotIntent(card, options.intent); } catch (error) {
+    return { card: card && typeof card === "object" && !Array.isArray(card) ? { ...card } : card,
+      trace: { schemaVersion: "workloom.cine-kb-trace/v1", policyVersion: CINE_KB_POLICY_VERSION, status: "unverified", errorCode: error.code ?? "SHOT_INTENT_INVALID", error: error.message, sourceHash: null, intentHash: null, applied: [], picks: [], ranked: [], explored: [], apertureAdvisor: null, suggestedParams: {}, recipeDispatch: null, missingTopics: kb?.missingTopics ?? [] } };
   }
-  /**
-   * 光圈顾问优先入列（产品所有者的核心诉求：光圈决定质感）：
-   * 先把"按场景选出的光圈档"翻成画面语言塞进 depth_of_field 的**开头**，
-   * 后面的知识条目再作为补充。f 值本身只进 trace，不进提示词正文（KB 纪律）。
-   */
-  const aperture = options.aperture ? null : recommendAperture(kb, card);
-  if (aperture) {
-    /** 与知识行同口径：默认只下发中文；英文关键词进 trace，不违卡片的"全中文"语言约束 */
-    const depthClause = [aperture.effectZh, options.englishGloss && aperture.effectEn ? `（${aperture.effectEn}）` : ""].join("");
-    /** 只登记到 byField，applied 由下面的统一循环写（避免同一字段在溯源里出现两条） */
-    byField.set("depth_of_field", [{
-      pick: { topicId: "OPTICS-001", topicTitle: "光圈", intent: aperture.scenarioLabel ?? "按场景推荐" },
-      phrase: depthClause,
-      apertureMeta: { range: aperture.aperture, matchedBy: aperture.matchedBy, direction: aperture.direction }
-    }]);
-  }
-  for (const { rule, row } of pickedRows) {
-    /**
-     * 一条知识只落到**一个**目标字段（主题映射里的第一个）——
-     * 早先会同时写进 composition 与 action，同一句话重复出现，提示词变啰嗦且语义错位。
-     */
-    const field = rule.field;
-    if (!field) continue;
-    if (aperture && field === "depth_of_field") continue; // 光圈已占该字段
-    /**
-     * 占位符实例化（[元素] → 灯笼/水面与倒影/…）与英文括注口径：
-     * 默认中文-only（`options.englishGloss` 显式开启才附英文关键词），与卡片语言约束对齐。
-     */
-    const resolved = resolvePlaceholders(phraseFor(row, Boolean(options.englishGloss)), ctx);
-    byField.set(field, [{ pick: row, phrase: resolved.phrase, placeholderResolved: resolved.changed }]);
-  }
-  for (const [field, list] of byField) {
-    const addition = list.map((x) => x.phrase).join("；");
-    const original = typeof enriched[field] === "string" && enriched[field].trim() ? String(enriched[field]).trim().replace(/[；;]\s*$/, "") : "";
-    /**
-     * 字段预算语义（2026-09-25 五轮审计修正）。
-     *
-     * 旧行为：对**合并后的整串**做 `slice(0, 319) + "…"`。两个后果都是真机可复现的：
-     *   ① 注入短语永远拼在末尾 → 字段原文一长，**注入被整段吃掉却仍记在 applied 里**（假回执）；
-     *      复现：camera_movement 原文 342 字 → 结果 320 字，注入"手持镜头，轻微自然晃动"完全没进去；
-     *   ② 卡片作者写的原文尾部被截掉（数据损坏）。
-     * 新行为：**原文一字不动**。放得下才追加；放不下就整条丢弃并在 trace 里如实记 `dropped`，
-     * 让"注入了几条"与"实际写进几条"永远可对账（无回执不算完成）。
-     */
-    const budget = MAX_FIELD_CHARS - (original ? original.length + 1 : 0);
-    const fits = addition.length <= budget;
-    let written = "";
-    let dropped = null;
-    if (fits) {
-      written = addition;
-      enriched[field] = original ? `${original}；${addition}` : addition;
-    } else if (!original) {
-      /** 字段本来是空的：注入自己超预算（只可能出现在 englishGloss 等长短语），截自己、不动别人的内容 */
-      written = `${addition.slice(0, MAX_FIELD_CHARS - 1)}…`;
-      enriched[field] = written;
-    } else {
-      dropped = "field-over-budget";
-      enriched[field] = original;
+  try {
+    if (!Array.isArray(kb?.topics) || !kb.topics.length) throw new Error("CINE_KB_EMPTY: 知识库没有可用主题");
+    const source = { ...(intent.source.fields ?? {}), ...intent.source };
+    const ctx = injectionContext(source);
+    const maxInjections = options.maxInjections ?? 5;
+    if (!Number.isInteger(maxInjections) || maxInjections < 0 || maxInjections > 50) throw new Error("CINE_KB_OPTIONS_INVALID: 注入上限必须为 0–50 的整数");
+    const kbHash = shotIntentHash({ topics: kb.topics.map((topic) => ({ id: topic.id, version: topic.version ?? null, entries: topic.entries, chapters: topic.chapters })), aperture: kb.aperture ?? null });
+    const pickedRows = [];
+    const rejected = [];
+    const usedFields = new Set();
+    for (const rule of INJECTION_RULES) {
+      if (pickedRows.length >= maxInjections) break;
+      if (usedFields.has(rule.field) || !rule.when(ctx)) continue;
+      const original = pickRow(kb, rule.topic, rule.row);
+      if (!original) { rejected.push({ ruleId: rule.id, reason: "knowledge-row-missing" }); continue; }
+      const row = compatibleRow(original, rule, ctx);
+      if (!row) { rejected.push({ ruleId: rule.id, reason: "source-intent-incompatible" }); continue; }
+      if (pickedRows.some((item) => item.row.topicId === row.topicId && item.row.intent === row.intent)) continue;
+      pickedRows.push({ rule, row }); usedFields.add(rule.field);
     }
-    const apertureMeta = list.find((x) => x.apertureMeta)?.apertureMeta;
-    applied.push({
-      field, from: original.slice(0, 80), added: addition.slice(0, 160),
-      writtenChars: written.length,
-      ...(dropped ? { dropped, fieldBudget: MAX_FIELD_CHARS, originalChars: original.length } : {}),
-      topics: list.map((x) => x.pick.topicId),
-      ...(apertureMeta ? { aperture: apertureMeta.range, matchedBy: apertureMeta.matchedBy, advisor: true } : {}),
-      ...(list.some((x) => x.placeholderResolved) ? { placeholderResolved: true } : {})
-    });
-  }
-  const params = {
-    ...(aperture
-      ? {
-          aperture: {
-            recommendedRange: aperture.aperture,
-            direction: aperture.direction,
-            scenario: aperture.scenarioLabel,
-            reason: aperture.reason,
-            matchedBy: aperture.matchedBy,
-            source: aperture.source,
-            /** 翻译后的画面语言（= 已写入提示词正文的那句） */
-            promptPhrase: aperture.effectZh,
-            discipline: "提示词正文不写 f 值（KB 检索总则：模型不认技术参数，只认视觉效果描述）"
-          }
-        }
-      : {}),
-    ...(options.aperture ? { aperture: apertureToEffect(options.aperture) } : {}),
-    ...(options.fps ? { shutter: shutterToEffect(options.fps, options.shutterStyle) } : {}),
-    ...(options.iso ? { iso: isoToEffect(options.iso) } : {})
-  };
-  /**
-   * 自由检索（供监制 / Agent 复核"当时还有哪些候选"，不影响已注入字段）。
-   *
-   * 五轮审计：这里同时取回 NARR-001 的**情绪配方派发线索**。早先调用后只保留 picks，
-   * `recipeDispatch` 被直接丢掉 —— 而 KB 检索总则要求"先取情绪配方，再按配方回查细节"，
-   * 派发线索本来是这条链路的凭据，丢掉之后 trace 里既看不到派发了什么，也无法复核。
-   */
-  const freeSearch = selectEntries(kb, card, { maxEntries: 5 });
-  return {
-    card: enriched,
-    trace: {
-      schemaVersion: "workloom.cine-kb-trace/v1",
-      at: new Date().toISOString(),
-      kbDir: kb.dir,
-      signals: ctx.text.slice(0, 400),
+    const byField = new Map();
+    const aperture = options.aperture ? null : recommendAperture(kb, source);
+    // Existing depth is authoritative; the advisor still records its compatible recommendation.
+    if (aperture && !shotText(source.depth_of_field).trim() && ctx.text.trim() && intent.subject.kind !== "unknown") {
+      const phrase = aperture.effectZh + (options.englishGloss && aperture.effectEn ? `（${aperture.effectEn}）` : "");
+      if (phrase.trim()) byField.set("depth_of_field", { phrase, topics: ["OPTICS-001"], aperture: aperture.aperture, matchedBy: aperture.matchedBy, advisor: true });
+    }
+    for (const { rule, row } of pickedRows) {
+      const resolved = resolvePlaceholders(phraseFor(row, Boolean(options.englishGloss)), ctx);
+      byField.set(rule.field, { phrase: resolved.phrase, topics: [row.topicId], ...(row.adaptation ? { adaptation: row.adaptation } : {}), ...(resolved.changed ? { placeholderResolved: true } : {}) });
+    }
+    const result = appendShotContributions(card, { owner: "cine-kb", policyVersion: `${CINE_KB_POLICY_VERSION}:${kbHash}`, sourceHash: intent.sourceHash },
+      [...byField].map(([field, entry]) => ({ field, text: entry.phrase, maxFieldChars: MAX_FIELD_CHARS })));
+    const applied = result.applied.map((entry) => { const { phrase, ...meta } = byField.get(entry.field); return { ...entry, ...meta }; });
+    const freeSearch = selectEntries(kb, source, { maxEntries: 5 });
+    const status = applied.some((entry) => entry.dropped) || rejected.some((entry) => entry.reason === "knowledge-row-missing") ? "unverified"
+      : applied.some((entry) => entry.writtenChars > 0) ? "passed" : intent.subject.kind === "unknown" ? "unverified" : "not_applicable";
+    const reused = shotIntentHash(result.card) === shotIntentHash(card) && applied.some((entry) => entry.writtenChars > 0);
+    return { card: result.card, trace: {
+      schemaVersion: "workloom.cine-kb-trace/v1", policyVersion: CINE_KB_POLICY_VERSION, status,
+      sourceHash: intent.sourceHash, intentHash: shotIntentHash(intent), outputHash: shotIntentHash(result.card), kbHash,
+      at: new Date().toISOString(), kbDir: kb.dir, reused, signals: ctx.text.slice(0, 400),
       ranked: pickedRows.map(({ rule, row }) => ({ topicId: row.topicId, title: row.topicTitle, ruleId: rule.id, field: rule.field })),
-      picks: pickedRows.map(({ rule, row }) => ({ ...row, ruleId: rule.id, field: rule.field })),
-      /** 自由检索结果（供监制/Agent 复核"当时还有哪些候选"，不影响已注入字段） */
-      explored: freeSearch.picks.map((p) => ({ topicId: p.topicId, intent: p.intent, zh: p.zh })),
-      /**
-       * NARR-001 情绪配方派发线索（只派发不直注）：卡片情绪命中配方时给出 intent/emotion/recipe，
-       * 供上游按配方回查各篇细节；未命中为 null。
-       */
-      recipeDispatch: freeSearch.recipeDispatch ?? null,
-      applied,
-      suggestedParams: params,
-      apertureAdvisor: aperture ?? null,
-      missingTopics: kb.missingTopics,
-      note: "suggestedParams 仅作监制/人工复核留痕；提示词正文只写画面语言（KB 检索总则：模型不认 F 值/ISO/快门数值）"
-    }
-  };
+      picks: pickedRows.map(({ rule, row }) => ({ ...row, ruleId: rule.id, field: rule.field })), rejected,
+      explored: freeSearch.picks.map((entry) => ({ topicId: entry.topicId, intent: entry.intent, zh: entry.zh })), recipeDispatch: freeSearch.recipeDispatch ?? null,
+      applied, actualWrittenFields: applied.filter((entry) => entry.writtenChars > 0).map((entry) => entry.field),
+      suggestedParams: {
+        ...(aperture ? { aperture: { recommendedRange: aperture.aperture, direction: aperture.direction, scenario: aperture.scenarioLabel, reason: aperture.reason, matchedBy: aperture.matchedBy, source: aperture.source, promptPhrase: applied.find((entry) => entry.field === "depth_of_field")?.written ?? "" } } : {}),
+        ...(options.aperture ? { aperture: apertureToEffect(options.aperture) } : {}),
+        ...(options.fps ? { shutter: shutterToEffect(options.fps, options.shutterStyle) } : {}),
+        ...(options.iso ? { iso: isoToEffect(options.iso) } : {}),
+      }, apertureAdvisor: aperture, missingTopics: kb.missingTopics,
+      note: "文本规则与写入凭据，不代表视频视觉效果通过；参数建议仅供复核，正文只写画面语言。",
+    } };
+  } catch (error) {
+    return { card: { ...card }, trace: { schemaVersion: "workloom.cine-kb-trace/v1", policyVersion: CINE_KB_POLICY_VERSION, status: "unverified", errorCode: error.code ?? "CINE_KB_ENRICHMENT_FAILED", error: error.message, sourceHash: intent.sourceHash, intentHash: shotIntentHash(intent), applied: [], picks: [], ranked: [], explored: [], apertureAdvisor: null, suggestedParams: {}, recipeDispatch: null, missingTopics: kb?.missingTopics ?? [] } };
+  }
 }
 
 /** 健康度：给 Agent / 监制看的"库是否可用、缺什么" */

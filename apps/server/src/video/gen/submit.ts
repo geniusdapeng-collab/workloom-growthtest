@@ -1,22 +1,20 @@
 /**
- * video/gen/submit.ts —— 生成任务提交（唯一写入口：render.submit 与 gen.submit 共用）
- *
- * 步骤：幂等键去重 → 目录取模（wired 校验）→ 报价预估 → 供应商提交（降级链留痕）
- *      → render_jobs 行 + 脚本状态推进 + render.submit 事件（D16：同一事务同一 COMMIT）。
- * 与旧实现的差异：携带脚本正文（而非占位编号）、携带模型与参数、记录预估成本与幂等键、
- * 失败按类分类（AUTH/并发/模型不可用/可重试），不静默换档。
+ * 生成唯一写入口：完整请求指纹 → 持久预占/CAS → 外部提交 → 接受回执 → 原子记账。
+ * 网络不在 PG 事务中；unknown/submitting 不按超时重发；accepted 只补记账。
  */
 import type { getAppPool, getGatewayPool } from "@workloom/db";
-import { gatewayAppendOnClient } from "@workloom/base/workdata";
-import { GatewayEventSink, currentWindow, type GenProvider } from "@workloom/base/model-router";
+import { gatewayAppendOnClient, type EventDraft } from "@workloom/base/workdata";
+import { GenSubmissionError, GatewayEventSink, currentWindow } from "@workloom/base/model-router";
 import type { RuleImpact } from "@workloom/base/fence-engine";
 import { newId } from "@workloom/shared";
 import { getModel, findFallbackModels, resolveProviderModel } from "./catalog.js";
 import { estimateCost } from "./cost.js";
 import { videoGenPool } from "./providers.js";
-import type { MediaModel, VideoGenParams } from "./types.js";
-import { ProviderError } from "./types.js";
+import type { VideoGenParams } from "./types.js";
 import type { Scope } from "./db.js";
+import { SubmissionError, SubmissionLedger, submissionRequestHash, type SubmissionReceipt, type SubmissionRow } from "./submission-ledger.js";
+import { buildRenderPrompt } from "./compiled-request.js";
+import { authorizeRenderSubmission } from "../production-authority.js";
 
 export interface RenderScriptLike {
   id: string;
@@ -51,6 +49,8 @@ export interface SubmitGenJobInput {
   fenceImpacts: RuleImpact[];
   budgetOverageSeconds?: number;
   env?: NodeJS.ProcessEnv;
+  /** 正式远端生成必须来自服务当前预生产的不可变资格。 */
+  qualificationToken?: string;
 }
 
 export interface SubmitGenJobResult {
@@ -63,205 +63,221 @@ export interface SubmitGenJobResult {
   estCny: number | null;
   deduped: boolean;
   degraded: Array<{ from: string; to: string | null; reason: string }>;
+  idempotencyKey: string;
+  requestHash: string;
 }
 
-function buildPrompt(script: RenderScriptLike, model: MediaModel): string {
-  const maxChars = model.limits?.maxPromptChars ?? 4000;
-  const body = String(script.md ?? "").trim();
-  const trimmed = body.length > maxChars ? body.slice(0, maxChars) : body;
-  return `${trimmed}\n\n（脚本 ${script.script_key} v${script.version}）`;
+function publicResult(receipt: SubmissionReceipt, row: SubmissionRow, deduped: boolean): SubmitGenJobResult {
+  const { events: _events, ...result } = receipt;
+  return { ...result, deduped, idempotencyKey: row.idempotency_key, requestHash: row.request_hash };
 }
 
-/** 可切换供应商的失败类别（换链）；并发/参数/合规类不换（换档必须留痕并重新算钱） */
-function switchable(err: unknown): boolean {
-  if (!(err instanceof ProviderError)) return true;
-  return err.kind === "AUTH" || err.kind === "MODEL_UNAVAILABLE" || err.kind === "RETRYABLE" || err.kind === "PROVIDER_FAILED";
+function pending(row: SubmissionRow, code = "SUBMISSION_UNVERIFIED", taskId?: string, provider?: string): SubmissionError {
+  return new SubmissionError(code,
+    `生成提交 ${row.id} 处于 ${row.state}：须核对已有任务，不能换幂等键盲目重发`,
+    { submissionId: row.id, key: row.idempotency_key, requestHash: row.request_hash,
+      taskId: taskId ?? row.task_id ?? undefined, provider: provider ?? row.provider ?? undefined });
+}
+
+/** 只记录分类，避免供应商报错回显提示词、鉴权或引用素材 URL。 */
+function failureReason(err: unknown): string {
+  if (err instanceof GenSubmissionError) return `${err.name}:${err.acceptance}`;
+  return "provider-receipt-unknown";
 }
 
 export async function submitGenJob(input: SubmitGenJobInput): Promise<SubmitGenJobResult> {
-  const { app, gateway, scope, script } = input;
-  const env = input.env ?? process.env;
-
-  /* ---------- ① 幂等：同键重复提交直接返回既有任务（不重复扣费） ---------- */
-  if (input.idempotencyKey) {
-    const rows = await (async () => {
-      const client = await app.connect();
-      try {
-        await client.query("BEGIN");
-        await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-        const r = await client.query<{
-          id: string; task_id: string | null; provider: string | null; provider_model: string | null;
-          est_usd: string | null; est_cny: string | null; mock: boolean;
-        }>(
-          `SELECT id, task_id, provider, provider_model, est_usd, est_cny, mock
-             FROM render_jobs WHERE workspace_id=$1 AND idempotency_key=$2`,
-          [scope.workspaceId, input.idempotencyKey],
-        );
-        await client.query("COMMIT");
-        return r.rows;
-      } catch (err) {
-        await client.query("ROLLBACK").catch(() => undefined);
-        throw err;
-      } finally {
-        client.release();
-      }
-    })();
-    const hit = rows[0];
-    if (hit) {
-      return {
-        jobId: hit.id, taskId: hit.task_id ?? "", provider: hit.provider ?? "seedance",
-        providerModel: hit.provider_model ?? "", mock: Boolean(hit.mock),
-        estUsd: hit.est_usd === null ? null : Number(hit.est_usd),
-        estCny: hit.est_cny === null ? null : Number(hit.est_cny),
-        deduped: true, degraded: [],
-      };
-    }
+  submissionRequestHash({ script: input.script, params: input.params });
+  const snapshot = { ...input, script: structuredClone(input.script), params: structuredClone(input.params),
+    scope: { ...input.scope }, env: { ...(input.env ?? process.env) } };
+  const model = getModel(snapshot.modelId);
+  // 本地白板/解说有独立的结构化制作链，资格由对应管线后续接入，不能套用远端提示词证明。
+  if (model && !["whiteboard-local", "remotion-local"].includes(model.provider)) {
+    const authorization = await authorizeRenderSubmission(snapshot);
+    try { return await submitWithLedger({ ...snapshot, app: authorization.leasedApp ?? snapshot.app }, authorization); }
+    finally { await authorization.release(); }
   }
+  return submitWithLedger(snapshot, null);
+}
 
-  /* ---------- ② 目录取模：必须 wired 且供应商已配置（否则明确拒绝，不 mock 冒充） ---------- */
+async function submitWithLedger(input: SubmitGenJobInput, authorization: Awaited<ReturnType<typeof authorizeRenderSubmission>> | null): Promise<SubmitGenJobResult> {
+  // 快照与指纹来自同一份 JSON 数据，等待 DB/健康探针期间调用方修改对象不能改变实际请求。
+  submissionRequestHash({ script: input.script, params: input.params });
+  const script = structuredClone(input.script);
+  const params = structuredClone(input.params);
+  const scope = { ...input.scope };
+  const env = { ...(input.env ?? process.env) };
   const model = getModel(input.modelId);
-  if (!model) throw new Error(`模型目录中不存在：${input.modelId}`);
-  if (model.availability !== "wired") {
-    throw new Error(`模型 ${model.id} 为目录登记（未接入适配器）：${model.notes ?? "请换已接入模型"}`);
+  if (!model || model.availability !== "wired") {
+    throw new SubmissionError("MODEL_UNAVAILABLE", `模型 ${input.modelId} 不存在或未接入适配器`);
   }
-  const pool = videoGenPool();
-  const providerModel = resolveProviderModel(model, env);
-  const primary = pool.get(model.provider);
-  const mock = pool.size === 0; // 全无密钥 → mock（数据与界面明确标注，不烧额度）
+  const primaryModel = authorization?.compiled.providerModel ?? resolveProviderModel(model, env);
+  const chain = [{ model, provider: model.provider, providerModel: primaryModel },
+    ...(authorization ? [] : findFallbackModels(model, 2, env)).map((fallback) => ({
+      model: fallback, provider: fallback.provider, providerModel: fallback.effectiveProviderModel,
+    }))];
+  const pool = videoGenPool(env);
+  const mock = authorization ? false : pool.size === 0;
+  const prompt = authorization?.reconciliationOnly ? script.md : buildRenderPrompt(script, model);
+  const requestHash = authorization?.requestHash ?? submissionRequestHash({
+    version: 1, scope,
+    script: { id: script.id, projectId: script.project_id, shotId: script.shot_id,
+      key: script.script_key, version: script.version, md: script.md, fields: script.fields ?? {} },
+    modelId: model.id, provider: model.provider, providerModel: primaryModel, prompt, params, mode: input.mode, mock,
+  });
+  const key = input.idempotencyKey?.trim() || `render:${requestHash}`;
+  const ledger = new SubmissionLedger(input.app, scope);
+  let row = await ledger.reserve({ projectId: script.project_id, scriptId: script.id,
+    scriptVersion: script.version, key, requestHash,
+    script: { shot_id: script.shot_id, script_key: script.script_key, md: script.md, fields: script.fields } });
 
-  /* ---------- ③ 报价预估（目录价；USD→CNY 折算） ---------- */
-  const est = estimateCost(model, { seconds: input.params.durationSec ?? model.limits?.durationSec?.default ?? 5 });
-
-  /* ---------- ④ 供应商提交（降级链 = 显式选中的模型 → 同档备援；失败分类留痕） ---------- */
-  let taskId: string;
-  let usedProvider = model.provider;
-  let usedProviderModel = providerModel;
-  const degraded: Array<{ from: string; to: string | null; reason: string }> = [];
-  const sink = new GatewayEventSink(gateway, scope, { id: "render-operator" });
-  const prompt = buildPrompt(script, model);
-  const neutralParams = {
-    providerModel,
-    ...input.params,
-  } as Record<string, unknown>;
-
-  if (mock) {
-    taskId = `mock-${newId("seedance")}`;
-  } else {
-    const chain: Array<{ provider: string; providerModel: string }> = [{ provider: model.provider, providerModel }];
-    for (const fb of findFallbackModels(model, 2, env)) {
-      chain.push({ provider: fb.provider, providerModel: fb.effectiveProviderModel });
+  const finalize = async (existing: SubmissionRow, replay: boolean): Promise<SubmitGenJobResult> => {
+    try {
+      const result = await ledger.finalize(existing.id, async (client, locked, receipt) => {
+        await client.query(
+          `INSERT INTO render_jobs
+             (id, workspace_id, project_id, script_id, script_version, task_id, status,
+              provider, provider_model, est_usd, est_cny, est_seconds, idempotency_key, mock, attempt)
+           VALUES ($1,$2,$3,$4,$5,$6,'submitted',$7,$8,$9,$10,$11,$12,$13,1)`,
+          [receipt.jobId, scope.workspaceId, locked.project_id, locked.script_id, locked.script_version,
+            receipt.taskId, receipt.provider, receipt.providerModel, receipt.estUsd, receipt.estCny,
+            params.durationSec ?? null, locked.idempotency_key, receipt.mock],
+        );
+        const updated = await client.query(
+          `UPDATE render_scripts SET status='submitted'
+            WHERE workspace_id=$1 AND id=$2 AND project_id=$3 AND version=$4 RETURNING id`,
+          [scope.workspaceId, locked.script_id, locked.project_id, locked.script_version],
+        );
+        if (updated.rowCount !== 1) throw new SubmissionError("SCRIPT_SCOPE_MISMATCH", "接受后脚本版本不可见，记账中止并保留回执");
+        for (const event of receipt.events) {
+          await gatewayAppendOnClient(client, { ...scope, actor: { id: event.who.id, type: event.who.type } }, event);
+        }
+      });
+      return publicResult(result.receipt, existing, replay || result.deduped);
+    } catch (err) {
+      const reconciliation = new SubmissionError("SUBMISSION_FINALIZATION_PENDING",
+        `供应商任务 ${existing.task_id ?? "已接受"} 已留回执，记账未核实；以原幂等键重试仅补记账`,
+        { submissionId: existing.id, key, requestHash, taskId: existing.task_id ?? undefined, provider: existing.provider ?? undefined },
+      );
+      reconciliation.cause = err;
+      throw reconciliation;
     }
-    let submitted: { taskId: string } | null = null;
-    for (let i = 0; i < chain.length; i++) {
-      const step = chain[i]!;
-      const provider: GenProvider | undefined = pool.get(step.provider);
-      const to = chain[i + 1]?.provider ?? null;
-      if (!provider || !(await provider.healthy())) {
-        degraded.push({ from: step.provider, to, reason: "unhealthy" });
-        await sink.recordDegradation({ from: step.provider, to, reason: "unhealthy", action: "gen.submit" });
-        continue;
-      }
-      try {
-        submitted = await provider.submit({
-          prompt,
-          estimatedUnits: input.params.durationSec ?? 5,
-          refId: script.id,
-          params: { ...neutralParams, providerModel: step.providerModel },
-        });
-        usedProvider = step.provider;
-        usedProviderModel = step.providerModel;
-        await sink.recordModelTrace({
-          model_id: `gen:${step.provider}:${step.providerModel}`,
-          tier: `gen-${model.tier}`,
-          window: currentWindow(new Date()),
-          credits: Math.max(0.01, (input.params.durationSec ?? 5) * 0.1),
-          action: "gen.submit",
-          scene: "video-gen",
-          bill_to: "tenant",
-        });
-        break;
-      } catch (err) {
-        const reason = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-        degraded.push({ from: step.provider, to, reason });
-        await sink.recordDegradation({ from: step.provider, to, reason, action: "gen.submit" });
-        if (!switchable(err)) throw err; // 并发满/参数错/合规：不换链，交调用方处理
-      }
-    }
-    if (!submitted) throw new Error("生成供应商全链不可用（gen.degraded 已留痕），请稍后重试");
-    taskId = submitted.taskId;
-  }
-
-  /* ---------- ⑤ 落库：行 + 脚本状态 + 事件（同一事务同一 COMMIT） ---------- */
-  const jobId = newId("RJ");
-  const client = await app.connect();
-  try {
-    await client.query("BEGIN");
-    await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-    await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-    await client.query(
-      `INSERT INTO render_jobs
-         (id, workspace_id, project_id, script_id, script_version, task_id, status,
-          provider, provider_model, est_usd, est_cny, est_seconds, idempotency_key, mock, attempt)
-       VALUES ($1,$2,$3,$4,$5,$6,'submitted',$7,$8,$9,$10,$11,$12,$13,1)`,
-      [
-        jobId, scope.workspaceId, script.project_id, script.id, script.version, taskId,
-        usedProvider, usedProviderModel, est.usd, est.cny,
-        input.params.durationSec ?? null, input.idempotencyKey ?? null, mock,
-      ],
-    );
-    await client.query(
-      `UPDATE render_scripts SET status='submitted' WHERE workspace_id=$1 AND id=$2`,
-      [scope.workspaceId, script.id],
-    );
-    await gatewayAppendOnClient(client, { ...scope, actor: { id: input.actor, type: "human" } }, {
-      who: { type: "human", id: input.actor },
-      context: {
-        tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
-        time: new Date().toISOString(), channel: "inapp",
-      },
-      object: { type: "render_script", id: script.id },
-      decision: {
-        action: "render.submit",
-        after: {
-          jobId, taskId, mock, mode: input.mode,
-          scriptKey: script.script_key, version: script.version, projectId: script.project_id,
-	estimated_seconds: input.params.durationSec ?? null,
-	duration_provenance: input.durationProvenance ?? null,
-          est_usd: est.usd, est_cny: est.cny,
-          provider: usedProvider, provider_model: usedProviderModel,
-          idempotency_key: input.idempotencyKey ?? null,
-          budget_overage_seconds: input.budgetOverageSeconds ?? 0,
-          fence_level: input.fenceLevel,
-          request: {
-            durationSec: input.params.durationSec ?? null,
-            aspectRatio: input.params.aspectRatio ?? null,
-            resolution: input.params.resolution ?? null,
-            generateAudio: input.params.generateAudio ?? null,
-            firstFrame: Boolean(input.params.firstFrameUrl),
-            referenceCount: input.params.referenceImageUrls?.length ?? 0,
-          },
-          degraded: degraded.length > 0 ? degraded : undefined,
-        },
-        basis: [
-          mock
-            ? "G8 已过，生成提交（mock：无供应商密钥，不触真实渲染不烧额度）"
-            : `G8 已过，生成提交：模型 ${model.id} → 供应商 ${usedProvider}`,
-          `报价口径：${est.usd === null ? "未核价（以供应商账单为准）" : `$${est.usd} ≈ ¥${est.cny}`}`,
-        ],
-      },
-      rule_impact: input.fenceImpacts as never,
-      receipt: { synced: false }, // 提交成功≠成片；真实回执由 poller 写
-    });
-    await client.query("COMMIT");
-  } catch (err) {
-    await client.query("ROLLBACK").catch(() => undefined);
-    throw err;
-  } finally {
-    client.release();
-  }
-
-  return {
-    jobId, taskId, provider: usedProvider, providerModel: usedProviderModel, mock,
-    estUsd: est.usd, estCny: est.cny, deduped: false, degraded,
   };
+  if (row.state === "accepted" || row.state === "finalized") return finalize(row, true);
+  if (row.state !== "reserved") throw pending(row);
+  if (authorization?.reconciliationOnly) throw pending(row, "SUBMISSION_UNVERIFIED");
+
+  const owner = newId("GSO");
+  const claimed = await ledger.claim(row, owner);
+  if (!claimed) {
+    const raced = await ledger.read(row.id);
+    if (raced?.state === "accepted" || raced?.state === "finalized") return finalize(raced, true);
+    throw pending(raced ?? row, "SUBMISSION_IN_PROGRESS");
+  }
+  row = claimed;
+  const degraded: SubmissionReceipt["degraded"] = [];
+  const sink = new GatewayEventSink(input.gateway, scope, { id: "render-operator" });
+  let selected = chain[0]!;
+  let taskId: string | undefined;
+  let dispatchUnresolved = false;
+  try {
+    if (mock) {
+      await ledger.recordDispatch(row.id, owner, selected.provider, selected.providerModel);
+      taskId = `mock-${newId("gen")}`;
+    } else {
+      for (let i = 0; i < chain.length; i++) {
+        const step = chain[i]!;
+        const provider = pool.get(step.provider);
+        const to = chain[i + 1]?.provider ?? null;
+        if (!provider || !(await provider.healthy())) {
+          const degradation = { from: step.provider, to, reason: "unhealthy" };
+          degraded.push(degradation);
+          await sink.recordDegradation({ ...degradation, action: "gen.submit" });
+          continue;
+        }
+        await ledger.recordDispatch(row.id, owner, step.provider, step.providerModel);
+        dispatchUnresolved = true;
+        try {
+          const submitted = await provider.submit({ prompt,
+            estimatedUnits: params.durationSec ?? 5, refId: script.id,
+            params: { ...params, providerModel: step.providerModel },
+          });
+          if (typeof submitted?.taskId !== "string" || !submitted.taskId.trim()) {
+            throw new GenSubmissionError("供应商未返回有效任务号", "unknown");
+          }
+          taskId = submitted.taskId;
+          selected = step;
+          break;
+        } catch (err) {
+          if (!(err instanceof GenSubmissionError) || err.acceptance !== "not-accepted") throw err;
+          dispatchUnresolved = false;
+          if (!err.fallbackAllowed) throw err;
+          const degradation = { from: step.provider, to, reason: failureReason(err) };
+          degraded.push(degradation);
+          await sink.recordDegradation({ ...degradation, action: "gen.submit" });
+        }
+      }
+    }
+    if (!taskId) throw new SubmissionError("PROVIDERS_UNAVAILABLE", "生成供应商全链不可用；没有已接受任务");
+  } catch (error) {
+    try {
+      await ledger.recordFailure(row.id, owner, dispatchUnresolved ? "unknown" : "rejected", failureReason(error));
+    } catch (ledgerError) {
+      throw new AggregateError([error, ledgerError], `生成提交 ${row.id} 状态未核实，禁止重新提交`);
+    }
+    if (dispatchUnresolved) throw pending({ ...row, state: "unknown" }, "SUBMISSION_UNKNOWN");
+    throw error;
+  }
+
+  // 接受回执先持久化。即使此时进程崩溃/DB ack 丢失，预占行仍阻止后续 submit。
+  const est = estimateCost(selected.model, { seconds: params.durationSec ?? selected.model.limits?.durationSec?.default ?? 5 });
+  const time = new Date().toISOString();
+  const context = { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time, channel: "inapp" };
+  const events: EventDraft[] = [];
+  if (!mock) {
+    events.push({
+      who: { type: "system", id: "model-router" }, context,
+      object: { type: "store", id: scope.workspaceId },
+      decision: { action: "model.call", after: { action: "gen.submit", model: `gen:${selected.provider}:${selected.providerModel}`,
+        model_tier: selected.model.tier, jobId: row.job_id, submissionId: row.id, reused: false, scene: "video-gen", bill_to: "tenant" } },
+      model_trace: { model_id: `gen:${selected.provider}:${selected.providerModel}`, tier: "gen",
+        window: currentWindow(new Date(time)), credits: Math.max(0.01, (params.durationSec ?? 5) * 0.1) },
+      rule_impact: [],
+    });
+  }
+  events.push({
+    who: { type: "human", id: input.actor }, context,
+    object: { type: "render_script", id: script.id },
+    decision: {
+      action: "render.submit",
+      after: {
+        jobId: row.job_id, taskId, mock, mode: input.mode, submissionId: row.id,
+        scriptKey: script.script_key, version: script.version, projectId: script.project_id,
+        estimated_seconds: params.durationSec ?? null, duration_provenance: input.durationProvenance ?? null,
+        est_usd: est.usd, est_cny: est.cny, provider: selected.provider, provider_model: selected.providerModel,
+        idempotency_key: key, request_hash: requestHash,
+        budget_overage_seconds: input.budgetOverageSeconds ?? 0, fence_level: input.fenceLevel,
+        request: { durationSec: params.durationSec ?? null, aspectRatio: params.aspectRatio ?? null,
+          resolution: params.resolution ?? null, generateAudio: params.generateAudio ?? null,
+          firstFrame: Boolean(params.firstFrameUrl), referenceCount: params.referenceImageUrls?.length ?? 0 },
+        degraded,
+      },
+      basis: [mock ? "G8 已过，mock 提交（无供应商密钥，不触真实生成）" : `G8 已过，供应商已接受：${selected.provider}`,
+        `报价口径：${est.usd === null ? "未核价（以供应商账单为准）" : `$${est.usd} ≈ ¥${est.cny}`}`],
+    },
+    rule_impact: input.fenceImpacts as EventDraft["rule_impact"],
+    receipt: { synced: false },
+  });
+  const receipt: SubmissionReceipt = {
+    jobId: row.job_id, taskId, provider: selected.provider, providerModel: selected.providerModel,
+    mock, estUsd: est.usd, estCny: est.cny, degraded, events,
+  };
+  try {
+    await ledger.recordAccepted(row.id, owner, receipt);
+  } catch (error) {
+    // 保留已知任务号供对账；不把落账故障当成供应商拒绝，更不进入 fallback。
+    const reconciliation = pending(row, "SUBMISSION_ACCEPTANCE_UNVERIFIED", taskId, selected.provider);
+    reconciliation.cause = error;
+    throw reconciliation;
+  }
+  return finalize({ ...row, state: "accepted", task_id: taskId, provider: selected.provider, receipt }, false);
 }

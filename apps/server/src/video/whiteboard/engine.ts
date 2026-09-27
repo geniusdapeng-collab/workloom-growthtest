@@ -12,7 +12,8 @@
  *   · 子进程输出的 stderr 只保留尾部若干行进错误信息（真机排障够用，且不污染日志）。
  */
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { createReadStream, existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -27,6 +28,50 @@ export class WhiteboardEngineError extends Error {
     super(message);
     this.name = "WhiteboardEngineError";
   }
+}
+
+export type WhiteboardQuality = "hd" | "uhd";
+export const WHITEBOARD_UHD_SIZE = { width: 3840, height: 2160 } as const;
+
+/** 与受控上游 render_stream_whiteboard.py 的默认 grid_edge=10 / 偶数对齐一致。 */
+export function projectedWhiteboardSize(
+  source: ImageSize,
+  capLongEdge: number,
+): ImageSize {
+  const align = 10;
+  const scale = capLongEdge / Math.max(source.width, source.height);
+  return {
+    width: Math.max(align, Math.floor(Math.round(source.width * scale) / align) * align),
+    height: Math.max(align, Math.floor(Math.round(source.height * scale) / align) * align),
+  };
+}
+
+export function whiteboardQualityOf(capLongEdge: number): WhiteboardQuality {
+  return capLongEdge === WHITEBOARD_UHD_SIZE.width ? "uhd" : "hd";
+}
+
+/** 输出文件的实际视频流尺寸，探测失败即抛错。 */
+export async function probeWhiteboardVideoSize(
+  file: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<ImageSize> {
+  const cfg = whiteboardEnv(env);
+  try {
+    const { stdout } = await execFileAsync(cfg.ffprobe, [
+      "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x", file,
+    ], { timeout: 60_000, env });
+    const match = /^(\d+)x(\d+)$/.exec(stdout.trim());
+    if (!match) throw new Error(`ffprobe 未返回尺寸：${stdout.trim().slice(0, 100)}`);
+    return { width: Number(match[1]), height: Number(match[2]) };
+  } catch (err) {
+    throw new WhiteboardEngineError(`白板视频尺寸无法核验：${file}`, err instanceof Error ? err.message : String(err));
+  }
+}
+
+async function sha256File(file: string): Promise<string> {
+  const hash = createHash("sha256");
+  for await (const chunk of createReadStream(file)) hash.update(chunk);
+  return hash.digest("hex");
 }
 
 /* ================= 环境与路径 ================= */
@@ -186,6 +231,7 @@ export interface RenderSceneInput {
   handPath?: string;
   fps?: number;
   capLongEdge?: number;
+  quality?: WhiteboardQuality;
   inkPath?: "grid" | "skeleton";
   colorFill?: "contour-wipe" | "brush";
   bareTip?: boolean;
@@ -197,6 +243,21 @@ export interface RenderSceneInput {
 /** 单幕渲染：`render_stream_whiteboard.py`（上游 CLI，末行 OUTPUT= 校验） */
 export async function renderWhiteboardScene(input: RenderSceneInput): Promise<{ outputPath: string; durationMs: number }> {
   const cfg = whiteboardEnv(input.env);
+  const quality = input.quality ?? "hd";
+  const capLongEdge = input.capLongEdge ?? 1280;
+  if (quality === "uhd") {
+    if (capLongEdge !== WHITEBOARD_UHD_SIZE.width) {
+      throw new WhiteboardEngineError(`UHD 白板长边必须为 ${WHITEBOARD_UHD_SIZE.width}，实际 ${capLongEdge}`);
+    }
+    const source = readImageSize(input.imagePath);
+    if (!source) throw new WhiteboardEngineError(`UHD 白板线稿尺寸不可解析：${input.imagePath}`);
+    const projected = projectedWhiteboardSize(source, capLongEdge);
+    if (projected.width !== WHITEBOARD_UHD_SIZE.width || projected.height !== WHITEBOARD_UHD_SIZE.height) {
+      throw new WhiteboardEngineError(
+        `UHD 白板线稿比例不符合 16:9：${source.width}×${source.height} 将渲为 ${projected.width}×${projected.height}，要求 3840×2160`,
+      );
+    }
+  }
   const args = [
     input.imagePath,
     input.annotationPath,
@@ -205,7 +266,7 @@ export async function renderWhiteboardScene(input: RenderSceneInput): Promise<{ 
     "--ink-path", input.inkPath ?? "grid",
     "--color-fill", input.colorFill ?? "contour-wipe",
     "--fps", String(input.fps ?? 30),
-    "--cap-long-edge", String(input.capLongEdge ?? 1280),
+    "--cap-long-edge", String(capLongEdge),
     ...(input.totalMs ? ["--total-ms", String(input.totalMs)] : []),
     ...(input.bareTip ? ["--bare-tip"] : []),
   ];
@@ -221,6 +282,24 @@ export async function renderWhiteboardScene(input: RenderSceneInput): Promise<{ 
     );
   }
   if (!existsSync(out)) throw new WhiteboardEngineError(`白板渲染声称产出但文件不存在：${out}`);
+  if (quality === "uhd") {
+    if (resolve(out) !== resolve(input.outputPath)) {
+      throw new WhiteboardEngineError(`UHD 白板渲染未得到目标 H.264 产物：${out} ≠ ${input.outputPath}`);
+    }
+    const actual = await probeWhiteboardVideoSize(out, input.env);
+    if (actual.width !== WHITEBOARD_UHD_SIZE.width || actual.height !== WHITEBOARD_UHD_SIZE.height) {
+      throw new WhiteboardEngineError(`UHD 白板渲染尺寸错误：实际 ${actual.width}×${actual.height}，要求 3840×2160`);
+    }
+    // 上游成功转码后自行删除 *_raw.mp4；这里只验证最终 mp4 并留存哈希回执。
+    // 失败时上游可能保留 raw 排障，不能在桥接层擅自清理。
+    const bytes = statSync(out).size;
+    if (bytes <= 0) throw new WhiteboardEngineError(`UHD 白板产物为空：${out}`);
+    const sha256 = await sha256File(out);
+    writeFileSync(`${out}.render-receipt.json`, `${JSON.stringify({
+      schema: "workloom.whiteboard-render-receipt/v1",
+      outputPath: out, width: actual.width, height: actual.height, bytes, sha256,
+    }, null, 2)}\n`, "utf8");
+  }
   return { outputPath: out, durationMs: run.durationMs };
 }
 

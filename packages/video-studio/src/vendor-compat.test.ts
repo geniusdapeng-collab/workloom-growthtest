@@ -42,6 +42,108 @@ function runInChild(script: string): Record<string, unknown> {
   return JSON.parse(line.slice("RESULT ".length)) as Record<string, unknown>;
 }
 
+const exactPortraitFixture = `
+import { createRequire } from "node:module";
+import { mkdtempSync, writeFileSync, readFileSync, symlinkSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, relative } from "node:path";
+import { createHash } from "node:crypto";
+import { createPortraitRuntime, REQUIRED_ANGLES } from ${JSON.stringify(resolve(here, "portrait-runtime.ts"))};
+import { installVendorPortraitBindingBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const { RenderingEngine } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/rendering-engine/rendering-engine.js"))});
+const { RenderSubmitterCore } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/scripts/render-submitter-core.js"))});
+const root = mkdtempSync(join(tmpdir(), "wl-exact-portrait-"));
+// Keep the real guardian and its persistence logic; relocate only its fixed vendor output path.
+const { PromptGuardian } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/scripts/prompt-guardian.js"))});
+const guardianSave = PromptGuardian.prototype._saveLog;
+PromptGuardian.prototype._saveLog = function(...args) { this.logPath = join(root, "guardian-log.json"); return guardianSave.apply(this, args); };
+const charactersDir = join(root, "characters", "PROJECT");
+let calls = 0;
+const runtime = createPortraitRuntime({ workDir: root, projectId: "PROJECT", apiKey: "test-only-key", model: "test-model", retries: 0, fetchImpl: async (url) => {
+  if (String(url).includes("/images/generations")) { calls++; return new Response(JSON.stringify({ data: [{ url: "https://cdn.example.invalid/out" }] })); }
+  return new Response(new Uint8Array(4096).fill(calls));
+} });
+for (const version of ["旧蓝色长裙", "新红色外套"]) for (const angle of ["front_full", "three_quarter", "face_closeup", "side_full"]) {
+  await runtime.apiRender({ characterId: "guest", characterName: "住客", characterDescription: "三十岁女性，齐肩黑发，" + version, angle, prompt: version });
+}
+let index = runtime.snapshot();
+const baseline = structuredClone(index);
+const originalManifest = RenderingEngine.prototype._generateBindingManifest;
+const originalPayload = RenderSubmitterCore.prototype.buildPayload;
+const uninstall = installVendorPortraitBindingBridge({ resolveIndex: () => index, log: () => undefined });
+const engine = new RenderingEngine({ charactersDir, outputDir: root, apiKey: "test-only-key", endpoint: "test-model" });
+const core = new RenderSubmitterCore({ charactersDir, endpoint: "test-model" });
+const prompt = () => ({ shotId: "SC-01", prompt: "guest 住客穿红色外套，站在有光照的房间中央，保持自然站姿，镜头平稳拍摄人物正面，背景清晰，没有额外角色，台词：今天我们来到这里。", duration: 6, portraits: [], characterRef: "" });
+const errorOf = async (fn) => { try { await fn(); return "MISSED"; } catch (error) { return String(error.message); } };
+`;
+
+describe("当前定妆照版本的真实消费链", () => {
+  it("真实runtime两版四角度→manifest→provider payload只消费索引最新字节，历史目录顺序无效", () => {
+    const result = runInChild(exactPortraitFixture + `
+for (const angle of REQUIRED_ANGLES) writeFileSync(join(index.characters.guest.dir, "portraits", "000-old-" + angle + ".png"), Buffer.alloc(4096, 99));
+const card = prompt();
+await engine.render([card], { dryRun: true });
+const shot = engine._convertToShotFormat(card);
+const manifest = await engine._generateBindingManifest([card]);
+const check = core.validateManifest(manifest);
+const payload = core.buildPayload(shot, manifest);
+const actual = payload.content.filter(item => item.type === "image_url").map(item => createHash("sha256").update(Buffer.from(item.image_url.url.split(",")[1], "base64")).digest("hex"));
+const expected = REQUIRED_ANGLES.map(angle => index.characters.guest.receipts[angle].output.sha256);
+const paths = REQUIRED_ANGLES.map(angle => manifest.characters.guest.portraits[angle]);
+const expectedPaths = REQUIRED_ANGLES.map(angle => relative(charactersDir, index.characters.guest.files[angle]));
+uninstall();
+console.log("RESULT " + JSON.stringify({ calls, valid: check.valid, actual, expected, paths, expectedPaths, selection: manifest.selection, restored: RenderingEngine.prototype._generateBindingManifest === originalManifest && RenderSubmitterCore.prototype.buildPayload === originalPayload }));
+`);
+    expect(result.calls).toBe(8); expect(result.valid).toBe(true);
+    expect(result.actual).toEqual(result.expected); expect(result.paths).toEqual(result.expectedPaths);
+    expect(result.selection).toBe("exact-current-index-files"); expect(result.restored).toBe(true);
+  }, 90_000);
+
+  it("篡改、缺收据、symlink、越界和重复角度均不能进入vendor提交", () => {
+    const result = runInChild(exactPortraitFixture + `
+const rejected = [];
+const front = index.characters.guest.files.front; const originalBytes = readFileSync(front);
+writeFileSync(front, Buffer.alloc(originalBytes.length, 99)); rejected.push(await errorOf(() => engine.render([prompt()], { dryRun: true }))); writeFileSync(front, originalBytes);
+delete index.characters.guest.receipts.front; rejected.push(await errorOf(() => engine._generateBindingManifest([prompt()]))); index = structuredClone(baseline);
+const external = join(root, "external.png"); writeFileSync(external, originalBytes); unlinkSync(front); symlinkSync(external, front); rejected.push(await errorOf(() => engine._generateBindingManifest([prompt()]))); unlinkSync(front); writeFileSync(front, originalBytes);
+index.characters.guest.files.front = external; rejected.push(await errorOf(() => engine._generateBindingManifest([prompt()]))); index = structuredClone(baseline);
+index.characters.guest.files.side = front; index.characters.guest.receipts.side = { ...index.characters.guest.receipts.front, angle: "side" }; rejected.push(await errorOf(() => engine._generateBindingManifest([prompt()]))); index = structuredClone(baseline);
+index.characters.guest.receipts.front.kind = "product"; rejected.push(await errorOf(() => engine._generateBindingManifest([prompt()]))); index = structuredClone(baseline);
+rejected.push(await errorOf(() => engine._generateBindingManifest([prompt(), prompt()])));
+uninstall(); console.log("RESULT " + JSON.stringify({ rejected }));
+`);
+    expect(result.rejected).toHaveLength(7);
+    for (const error of result.rejected as string[]) expect(error).toMatch(/PORTRAIT_BINDING_(INVALID|RECEIPT_INVALID)/);
+  }, 90_000);
+
+  it("清单生成后改索引/产物/清单均阻断，最终payload字节也再次核对", () => {
+    const result = runInChild(exactPortraitFixture + `
+const card = prompt(); const manifest = await engine._generateBindingManifest([card]); const shot = engine._convertToShotFormat(card);
+const front = index.characters.guest.files.front; const bytes = readFileSync(front);
+writeFileSync(front, Buffer.alloc(bytes.length, 99));
+const tampered = await errorOf(() => core.buildPayload(shot, manifest)); writeFileSync(front, bytes);
+index.characters.guest.name = "新角色版本";
+const changedIndex = await errorOf(() => engine._generateBindingManifest([card]));
+const stalePayload = await errorOf(() => core.buildPayload(shot, manifest)); index = structuredClone(baseline);
+const forged = structuredClone(manifest); forged.characters.guest.portraits.front = "changed.png";
+const changedManifest = await errorOf(() => core.buildPayload(shot, forged));
+// Inject a downstream body mutation after the real vendor builder's reads; the bridge must catch actual data bytes.
+const originalRead = require("fs").readFileSync; let changedRead = false;
+require("fs").readFileSync = function(file, ...args) {
+  const value = originalRead.call(this, file, ...args);
+  if (file === front && new Error().stack.includes("render-submitter-core.js")) { changedRead = true; return Buffer.alloc(bytes.length, 99); }
+  return value;
+};
+const changedBody = await errorOf(() => core.buildPayload(shot, manifest)); require("fs").readFileSync = originalRead;
+uninstall(); console.log("RESULT " + JSON.stringify({ tampered, changedIndex, stalePayload, changedManifest, changedBody, changedRead }));
+`);
+    expect(result.tampered).toMatch(/PORTRAIT_BINDING_RECEIPT_INVALID/);
+    for (const key of ["changedIndex", "stalePayload", "changedManifest", "changedBody"]) expect(result[key]).toMatch(/PORTRAIT_BINDING_CHANGED/);
+    expect(result.changedRead).toBe(true);
+  }, 90_000);
+});
+
 describe("定妆照绑定桥（真机故障复现 → 修复）", () => {
   it("角色四角度齐备后，vendor 绑定清单校验通过（不再 BINDING_MANIFEST_INVALID）", () => {
     const workDir = mkdtempSync(join(tmpdir(), "wl-chars-"));
@@ -546,5 +648,341 @@ console.log("RESULT " + JSON.stringify({ before, after, restored }));
     expect(restored.allocatorMax).toBe(15);
     expect(restored.builderParserRules).toBe(15);
     expect(restored.builderResult).toBe(15);
+  }, 120_000);
+});
+
+/** 运行真实 vendor CJS 类；外部模型由可观察替身提供，绝不发网络请求。 */
+function phase3Fixture(body: string): string {
+  return `
+import { createRequire } from "node:module";
+import { installVendorPhase3FusionBridge, listSharedBridges } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
+const require = createRequire(${JSON.stringify(join(repoRoot, "package.json"))});
+const { Phase3PromptFusion } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/phases/phase-3-prompt-fusion.js"))});
+const { ProductionEngine } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js"))});
+const { PromptFusionAgent } = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-fusion-agent.js"))});
+const counters = { fusion: 0, checkpoints: 0, llm: 0, timing: 0 };
+const makeState = (changes = {}) => ({
+  shots: [{ shotId: "SC-01", scene: "手表商品微距", composition: "表盘特写", camera_movement: "固定机位", duration: 5, portraits: [], ...changes }],
+  adaptedBlueprint: { title: "产品观察", config: { aspectRatio: "16:9" }, character_system: { characters: [] } },
+  result: { stages: {}, llmStats: {} }
+});
+const merger = {
+  log: () => {},
+  _deepCloneShot: ProductionEngine.prototype._deepCloneShot,
+  _deepCloneValue: ProductionEngine.prototype._deepCloneValue
+};
+const makePhase = (agentChanges = {}, phaseChanges = {}) => {
+  const agent = {
+    llmTimeout: 300000, llmMaxRetries: 5,
+    _callLLM: async () => { counters.llm++; return { result: { picks: [] }, degraded: false }; },
+    process: async (shots) => {
+      counters.fusion++;
+      return { shots: shots.map(s => ({ ...s, prompt: "【场景】手表商品表盘微距，固定机位观察材质。" })), degraded: false, stats: { failed: 0, total: shots.length } };
+    },
+    ...agentChanges
+  };
+  const phase = new Phase3PromptFusion({
+    agents: { promptFusion: agent }, logFn: () => {},
+    budgetRemaining: () => 120000, canAfford: () => true,
+    cloneShots: structuredClone,
+    mergeShots: (a, b, fields) => ProductionEngine.prototype._mergeShotsByShotId.call(merger, a, b, fields),
+    saveCheckpoint: async () => { counters.checkpoints++; },
+    ...phaseChanges
+  });
+  const timing = phase._checkDialogueTiming;
+  phase._checkDialogueTiming = async function (...args) { counters.timing++; return timing.apply(this, args); };
+  return phase;
+};
+${body}
+`;
+}
+
+describe("Phase3 宿主融合桥（C1）", () => {
+  it("原 const 重赋坏例被修复：真实 Phase3 完成融合、字段合并、台词检查与 checkpoint", () => {
+    const result = runInChild(phase3Fixture(`
+const before = await makePhase().execute(makeState());
+const beforeCalls = counters.fusion;
+const uninstall = installVendorPhase3FusionBridge();
+const state = makeState();
+const after = await makePhase().execute(state);
+uninstall();
+console.log("RESULT " + JSON.stringify({ beforeSuccess: before.success, beforeError: before.error, beforeCalls,
+ afterSuccess: after.success, counters, status: after.result.stages.phase3Fusion.status,
+ prompt: after.shots[0].prompt, stamp: after.shots[0]._workloomFusion,
+ originalHasPrompt: Boolean(state.shots[0].prompt) }));
+`));
+    expect(result.beforeSuccess).toBe(false);
+    expect(result.beforeError).toContain("Assignment to constant variable");
+    expect(result.beforeCalls).toBe(0);
+    expect(result.afterSuccess).toBe(true);
+    expect(result.status).toBe("passed");
+    expect(result.counters).toEqual(expect.objectContaining({ fusion: 1, checkpoints: 1, timing: 1 }));
+    expect(result.originalHasPrompt).toBe(false);
+    expect((result.stamp as Record<string, unknown>).promptHash).toMatch(/^[a-f\d]{64}$/);
+    expect((result.stamp as Record<string, unknown>).semanticSkillExecution).toBe("unverified");
+  }, 90_000);
+
+  it("模型 picks=[] 真正不匹配，清除旧 _skillContext 后仍按原镜头融合", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+let received = null;
+const phase = makePhase({ process: async shots => {
+ received = shots[0]; counters.fusion++;
+ return { shots: shots.map(s => ({ ...s, prompt: "【场景】女人坐在窗边。" })), stats: { failed: 0 } };
+} });
+const output = await phase.execute(makeState({ scene: "女人坐在窗边", composition: "面部近景", mood: "温情", camera_movement: "斯坦尼康慢移", _skillContext: "过期战场技能" }));
+uninstall();
+console.log("RESULT " + JSON.stringify({ counters, receivedContext: received._skillContext, matched: received._skillMatched,
+ status: output.result.stages.skillPrematch[0].status, qc: output.shots[0]._skillQC.status }));
+`));
+    expect((result.counters as Record<string, unknown>).llm).toBe(1);
+    expect(result.receivedContext).toBe("");
+    expect(result.matched).toEqual([]);
+    expect(result.status).toBe("not_applicable");
+    expect(result.qc).toBe("not_applicable");
+  }, 90_000);
+
+  it("真实 vendor 的融合请求生成器收到实际技能正文，负面禁词不被误判", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+const realAgent = new PromptFusionAgent({ semanticRefinement: false });
+let fusionRequest = "";
+let received = null;
+const phase = makePhase({
+ _callLLM: async prompt => {
+  counters.llm++;
+  const roster = JSON.parse(prompt.split("\\n").find(line => line.startsWith("候选：")).slice(3));
+  return { result: { picks: [{ file: roster[0].file, reason: "原镜头是人物温情与缓慢稳定器运镜" }] }, degraded: false };
+ },
+ process: async (shots, blueprint) => {
+  counters.fusion++; received = shots[0];
+  fusionRequest = realAgent._buildBatchPrompt(shots, "16:9", [], blueprint);
+  return { shots: shots.map(s => ({ ...s, prompt: "【场景】女人坐在窗边。\\n【运镜】斯坦尼康缓慢移动。\\n【负面约束】快速运镜、手持抖动" })), stats: { failed: 0 } };
+ }
+});
+const output = await phase.execute(makeState({ scene: "女人坐在窗边", composition: "面部近景", mood: "温情", camera_movement: "斯坦尼康慢移" }));
+uninstall();
+console.log("RESULT " + JSON.stringify({ success: output.success, containsActualContext: fusionRequest.includes(received._skillContext),
+ contextLength: received._skillContext.length, matched: received._skillMatched.length,
+ qc: output.shots[0]._skillQC.status, promptHash: output.shots[0]._workloomFusion.promptHash, counters }));
+`));
+    expect(result.success).toBe(true);
+    expect(result.containsActualContext).toBe(true);
+    expect(Number(result.contextLength)).toBeGreaterThan(100);
+    expect(Number(result.contextLength)).toBeLessThanOrEqual(1800);
+    expect(Number(result.matched)).toBe(1);
+    expect(result.qc).toBe("passed");
+    expect(result.promptHash).toMatch(/^[a-f\d]{64}$/);
+  }, 90_000);
+
+  it("预算拒绝或未知预算在任何路由模型/融合调用之前停止", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+const errors = [];
+for (const opts of [{ canAfford: () => false }, { budgetRemaining: () => Infinity }, { budgetRemaining: () => 0 }]) {
+ const state = makeState();
+ try { await makePhase({}, opts).execute(state); } catch (e) { errors.push({ code: e.code, status: state.result.stages.phase3Fusion.status }); }
+}
+uninstall();
+console.log("RESULT " + JSON.stringify({ errors, counters }));
+`));
+    expect(result.errors).toEqual([
+      { code: "PHASE3_BUDGET_EXHAUSTED", status: "failed" },
+      { code: "PHASE3_BUDGET_UNVERIFIED", status: "unverified" },
+      { code: "PHASE3_BUDGET_UNVERIFIED", status: "unverified" },
+    ]);
+    expect(result.counters).toEqual({ fusion: 0, checkpoints: 0, llm: 0, timing: 0 });
+  }, 90_000);
+
+  it("提供商边界再次核预算：第一次返回后耗尽，第二次绝不发出；原 agent 未被改写", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+let left = 120000, providerCalls = 0, providerOptions = null;
+const rawEngine = { reasonStructured: async (_prompt, _schema, opts) => { providerCalls++; providerOptions = opts; left = 100; return {}; } };
+const phase = makePhase({
+ _getLLMEngine: () => rawEngine,
+ process: async function () {
+  await this._getLLMEngine().reasonStructured("first", {}, { timeoutMs: 300000 });
+  await this._getLLMEngine().reasonStructured("second", {}, { timeoutMs: 300000 });
+  throw new Error("不应到达");
+ }
+}, { budgetRemaining: () => left });
+const originalEngine = phase.agents.promptFusion._getLLMEngine;
+const state = makeState();
+let code = null;
+try { await phase.execute(state); } catch (e) { code = e.code; }
+uninstall();
+console.log("RESULT " + JSON.stringify({ providerCalls, providerOptions, code, counters,
+ unchanged: phase.agents.promptFusion._getLLMEngine === originalEngine,
+ status: state.result.stages.phase3Fusion.status }));
+`));
+    expect(result.providerCalls).toBe(1);
+    expect(result.code).toBe("PHASE3_BUDGET_EXHAUSTED");
+    expect(result.status).toBe("failed");
+    expect(Number((result.providerOptions as Record<string, unknown>).timeoutMs)).toBeLessThanOrEqual(120000);
+    expect(result.unchanged).toBe(true);
+    expect((result.counters as Record<string, unknown>).checkpoints).toBe(0);
+  }, 90_000);
+
+  it("运行中预算变未知与 health 清理失败不会落通过 checkpoint", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+const errors = [];
+let left = 120000;
+const state = makeState();
+try { await makePhase({ process: async shots => {
+ left = NaN; return { shots: shots.map(s => ({ ...s, prompt: "表盘特写" })) };
+} }, { budgetRemaining: () => left }).execute(state); }
+catch (e) { errors.push({ code: e.code, status: state.result.stages.phase3Fusion.status }); }
+const healthState = makeState();
+try { await makePhase({}, { healthMonitor: { setLongTaskMode: (_name, active) => { if (!active) throw new Error("cleanup unavailable"); } } }).execute(healthState); }
+catch (e) { errors.push({ code: e.code, status: healthState.result.stages.phase3Fusion.status }); }
+uninstall();
+console.log("RESULT " + JSON.stringify({ errors, counters }));
+`));
+    expect(result.errors).toEqual([
+      { code: "PHASE3_BUDGET_UNVERIFIED", status: "unverified" },
+      { code: "PHASE3_HEALTH_CLEANUP_FAILED", status: "unverified" },
+    ]);
+    expect((result.counters as Record<string, unknown>).checkpoints).toBe(0);
+  }, 90_000);
+
+  it("真实 BaseAgent 的 critical 备用模型与最终缩短重试也遵守外调预算", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+let mainCalls = 0, altCalls = 0;
+const errors = [];
+for (const source of ["getter", "option"]) {
+ let left = 120000;
+ const real = new PromptFusionAgent({ semanticRefinement: false, llmMaxRetries: 1 });
+ const alt = { reasonStructured: async () => { altCalls++; return { success: true, data: { picks: [] } }; } };
+ real._getLLMEngine = () => ({ reasonStructured: async () => {
+  mainCalls++; left = 0; return { success: false, error: "offline-budget-fixture", type: "NETWORK", retryable: false };
+ } });
+ if (source === "getter") real._getAltLLMEngine = () => alt;
+ real.process = async function () {
+  await this._callLLM("摄影技能的原始场景。".repeat(200), { required: ["picks"] }, () => null,
+   { critical: true, ...(source === "option" ? { altModel: alt } : {}) });
+  throw new Error("不能到达预算耗尽后的成功分支");
+ };
+ const phase = makePhase({}, { budgetRemaining: () => left });
+ phase.agents.promptFusion = real;
+ try { await phase.execute(makeState()); } catch (e) { errors.push(e.code); }
+}
+uninstall();
+console.log("RESULT " + JSON.stringify({ mainCalls, altCalls, errors, checkpoints: counters.checkpoints }));
+`));
+    expect(result).toEqual({ mainCalls: 2, altCalls: 0, errors: ["PHASE3_BUDGET_EXHAUSTED", "PHASE3_BUDGET_EXHAUSTED"], checkpoints: 0 });
+  }, 90_000);
+
+  it("融合异常/降级/空 prompt/错 id/checkpoint 失败都不能成功返回", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+const failures = [];
+const cases = [
+ { process: async () => { throw new Error("provider unavailable"); } },
+ { process: async shots => ({ shots: shots.map(s => ({ ...s, prompt: "规则兜底" })), degraded: true }) },
+ { process: async shots => ({ shots: shots.map(s => ({ ...s, prompt: "" })) }) },
+ { process: async shots => ({ shots: shots.map(s => ({ ...s, shotId: "other", prompt: "内容" })) }) },
+];
+for (const candidate of cases) {
+ const state = makeState();
+ try { await makePhase(candidate).execute(state); } catch (e) { failures.push({ code: e.code, status: state.result.stages.phase3Fusion.status }); }
+}
+const state = makeState();
+try { await makePhase({}, { saveCheckpoint: async () => { throw new Error("disk unavailable"); } }).execute(state); }
+catch (e) { failures.push({ code: e.code, status: state.result.stages.phase3Fusion.status }); }
+uninstall();
+console.log("RESULT " + JSON.stringify({ failures, counters }));
+`));
+    expect(result.failures).toHaveLength(5);
+    for (const failure of result.failures as Array<{ status: string }>) expect(failure.status).toBe("unverified");
+    expect((result.counters as Record<string, unknown>).checkpoints).toBe(0);
+  }, 90_000);
+
+  it("同一进程重复安装采用引用计数，最后卸载精确复原", () => {
+    const result = runInChild(phase3Fixture(`
+const original = Phase3PromptFusion.prototype.execute;
+const produce = ProductionEngine.prototype.produce;
+const releaseA = installVendorPhase3FusionBridge();
+const installed = Phase3PromptFusion.prototype.execute;
+const releaseB = installVendorPhase3FusionBridge();
+const singlePatch = installed === Phase3PromptFusion.prototype.execute;
+const refs = listSharedBridges().find(x => x.key === "phase3-fusion-policy-v1").refs;
+releaseA(); releaseA();
+const stillInstalled = installed === Phase3PromptFusion.prototype.execute;
+releaseB();
+console.log("RESULT " + JSON.stringify({ singlePatch, refs, stillInstalled,
+ restored: original === Phase3PromptFusion.prototype.execute && produce === ProductionEngine.prototype.produce,
+ absent: !listSharedBridges().some(x => x.key === "phase3-fusion-policy-v1") }));
+`));
+    expect(result).toEqual({ singlePatch: true, refs: 2, stillInstalled: true, restored: true, absent: true });
+  }, 90_000);
+
+  it("安装日志抛错也还原原型且不遗留共享引用", () => {
+    const result = runInChild(phase3Fixture(`
+const original = Phase3PromptFusion.prototype.execute, produce = ProductionEngine.prototype.produce;
+let error = null;
+try { installVendorPhase3FusionBridge({ log: () => { throw new Error("logger failed"); } }); } catch (e) { error = e.message; }
+console.log("RESULT " + JSON.stringify({ error, restored: original === Phase3PromptFusion.prototype.execute && produce === ProductionEngine.prototype.produce,
+ absent: !listSharedBridges().some(x => x.key === "phase3-fusion-policy-v1") }));
+`));
+    expect(result).toEqual({ error: "logger failed", restored: true, absent: true });
+  }, 90_000);
+
+  it("vendor RECOVERY 宣称成功也被外层拦下；未知旧断点不能伪过", () => {
+    const result = runInChild(phase3Fixture(`
+const original = ProductionEngine.prototype.produce;
+let payload = { success: true, degraded: true, shots: [{ prompt: "兜底" }], stages: { phase3Fusion: { status: "failed", code: "PHASE3_BUDGET_EXHAUSTED" } } };
+ProductionEngine.prototype.produce = async () => payload;
+const uninstall = installVendorPhase3FusionBridge();
+const errors = [];
+try { await ProductionEngine.prototype.produce.call({}, makeState().adaptedBlueprint); } catch (e) { errors.push(e.code); }
+payload = { success: true, resumed: true, shots: [{ prompt: "旧断点" }], stages: {} };
+try { await ProductionEngine.prototype.produce.call({}, makeState().adaptedBlueprint); } catch (e) { errors.push(e.code); }
+uninstall(); ProductionEngine.prototype.produce = original;
+console.log("RESULT " + JSON.stringify({ errors }));
+`));
+    expect(result.errors).toEqual(["PHASE3_BUDGET_EXHAUSTED", "PHASE3_FUSION_UNVERIFIED"]);
+  }, 90_000);
+});
+
+describe("VideoStudio 的 C1 实际安装入口", () => {
+  it("runPreproduction 经现有兼容入口安装并消费 Phase3，失败与成功均卸载还原", () => {
+    const workDir = mkdtempSync(join(tmpdir(), "wl-phase3-entry-"));
+    const result = runInChild(phase3Fixture(`
+const { VideoStudio } = await import(${JSON.stringify(resolve(here, "studio.ts"))});
+const entry = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/index.js"))});
+const OriginalSystem = entry.HyperrealitySystem;
+const originalExecute = Phase3PromptFusion.prototype.execute;
+const events = [];
+let installedAtCreate = false;
+let fail = false;
+entry.HyperrealitySystem = class OfflineSystem {
+ async create() {
+  installedAtCreate = installedAtCreate || listSharedBridges().some(x => x.key === "phase3-fusion-policy-v1");
+  const output = await makePhase({}, fail ? { canAfford: () => false } : {}).execute(makeState());
+  return { success: output.success, stages: { productionEngine: { ...output.result, shots: output.shots } } };
+ }
+};
+let success = false, status = null, failure = null, restored = false;
+try {
+ const studio = new VideoStudio({ llm: { model: "offline", fastModel: "offline" }, workDir: ${JSON.stringify(workDir)},
+  onApproval: async () => ({ approved: true }), onEvent: e => events.push(e.kind), log: () => {}, portraits: { enabled: false } });
+ const output = await studio.runPreproduction({ projectId: "C1-offline-entry", intent: "观察表盘" });
+ success = output.success;
+ status = output.stages.productionEngine.stages.phase3Fusion.status;
+ fail = true;
+ try { await studio.runPreproduction({ projectId: "C1-offline-failure", intent: "观察表盘" }); } catch (e) { failure = e.code; }
+ restored = originalExecute === Phase3PromptFusion.prototype.execute && !listSharedBridges().some(x => x.key === "phase3-fusion-policy-v1");
+} finally { entry.HyperrealitySystem = OriginalSystem; }
+console.log("RESULT " + JSON.stringify({ success, status, failure, installedAtCreate, restored, events }));
+`));
+    expect(result.success).toBe(true);
+    expect(result.status).toBe("passed");
+    expect(result.failure).toBe("PHASE3_BUDGET_EXHAUSTED");
+    expect(result.installedAtCreate).toBe(true);
+    expect(result.restored).toBe(true);
+    expect(result.events).toEqual(expect.arrayContaining(["pipeline.started", "pipeline.finished", "pipeline.failed"]));
   }, 120_000);
 });

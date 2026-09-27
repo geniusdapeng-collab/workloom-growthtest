@@ -9,10 +9,11 @@
  *  ⑤ 交付包目录名的路径安全判据；
  *  ⑥ 重剪与抽帧的显式失败（缺输入即报错，不静默成功）。
  */
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { scopedDeliveryRoot } from "../delivery-trust.js";
 
 process.env.MEDIA_SIGNING_SECRET ??= "test-media-signing-secret";
 
@@ -165,10 +166,13 @@ describe("媒体仓路径与交付包目录安全", () => {
 
   it("交付包目录名只接受目录名（拒绝穿越与绝对路径）", () => {
     const root = join(TMP, "delivery");
-    mkdirSync(join(root, "pkg-1"), { recursive: true });
-    expect(assertSafePackageName("pkg-1", root)).toBe(join(root, "pkg-1"));
+    const scope = { tenantId: "tenant-media", workspaceId: "ws-a" };
+    const pkg = join(scopedDeliveryRoot(root, scope), "pkg-1");
+    mkdirSync(pkg, { recursive: true });
+    writeFileSync(join(pkg, "delivery-manifest.json"), JSON.stringify({ scope, projectId: "P1" }));
+    expect(assertSafePackageName("pkg-1", scope, { WORKLOOM_DELIVERY_DIR: root })).toBe(pkg);
     for (const bad of ["../etc", "/etc/passwd", ".hidden", "a/b", ""]) {
-      expect(() => assertSafePackageName(bad, root)).toThrow();
+      expect(() => assertSafePackageName(bad, scope, { WORKLOOM_DELIVERY_DIR: root })).toThrow();
     }
   });
 });

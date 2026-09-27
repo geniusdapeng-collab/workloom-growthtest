@@ -11,11 +11,13 @@
  *   ③ 白平衡锚点前置，显式排除 golden hour / 暖黄滤镜；
  *   ④ 出片侧的对应纪律见 `shot-spec.ts#SCENE_DECOUPLE_CLAUSE`（场景只由镜头提示词给）。
  */
-import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
-import { join, relative, resolve as resolvePath } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync, realpathSync, renameSync, unlinkSync, readdirSync } from "node:fs";
+import { join, relative, resolve as resolvePath, isAbsolute, sep } from "node:path";
+import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { REQUIRED_PORTRAIT_ANGLES, type CharacterProfile, type PortraitSet } from "./character-archive.js";
+import { REQUIRED_PORTRAIT_ANGLES, assertCharacterComponent, loadCharacterEntry, readPortraitArtifact, selectPortraitWardrobe, verifyPortraitSet, withCharacterArchiveLock, writePortraitJson, type CharacterProfile, type PortraitSet, type PortraitArtifactReceipt } from "./character-archive.js";
 import { REALISM_NEGATIVE_TERMS, STYLIZED_STYLES } from "./shot-spec.js";
+import { shotIntentHash } from "./shot-intent.js";
 
 export interface PortraitAgentConfig {
   /** 目标角度（默认渲染核心必需 4 角度） */
@@ -45,6 +47,9 @@ export interface PortraitAgentConfig {
   anchorImages?: string[];
   /** 单次随附锚点上限（Seedream 一致性口径 4 张，默认 4） */
   maxAnchors?: number;
+  wardrobeId?: string;
+  /** A changed outfit is its own candidate, never a mutation of an existing version. */
+  wardrobe?: Record<string, unknown>;
 }
 
 /** 角度 → 构图指令（与 vendor angle-catalog 语义一致） */
@@ -194,6 +199,7 @@ export function probeCleanBackground(file: string, angle = "front"): BackgroundC
   const maxRange = ranges.length > 0 ? Math.max(...ranges) : 0;
   const maxSat = Math.max(...(bands.length > 0 ? bands : corners).map((b) => b.satavg));
   const notes: string[] = [];
+  if ([...bands, ...corners].some((band) => ![band.ylow, band.yhigh, band.yavg, band.satavg].every(Number.isFinite))) notes.push("背景探针没有返回完整有限测量值");
   if (mode === "ring" && maxRange > CLEAN_BACKGROUND_POLICY.bandRangeMax) notes.push(`外圈亮度跨度 ${maxRange.toFixed(1)} > ${CLEAN_BACKGROUND_POLICY.bandRangeMax}（背景不均/有渐变或投影）`);
   if (cornerSpread > CLEAN_BACKGROUND_POLICY.cornerSpreadMax) notes.push(`四角亮度极差 ${cornerSpread.toFixed(1)} > ${CLEAN_BACKGROUND_POLICY.cornerSpreadMax}（有暗角或方向性渐变）`);
   if (maxSat > CLEAN_BACKGROUND_POLICY.bandSatMax) notes.push(`外圈饱和度 ${maxSat.toFixed(1)} > ${CLEAN_BACKGROUND_POLICY.bandSatMax}（背景偏色，抠像会带色边）`);
@@ -212,15 +218,17 @@ export interface PortraitPlan {
   reason: string;
   /** 解析后实际可用的锚点照片（绝对路径）；空数组 = 纯文生图 */
   anchors: string[];
+  anchorReceipts: PortraitArtifactReceipt[];
+  wardrobe: Record<string, unknown>;
+  wardrobeHash: string;
+  sourceHash: string;
+  requestHash: string;
 }
 
 /** 角色档案 → 外观描述（写实模板的唯一角色变量） */
-function appearanceOf(profile: CharacterProfile): string {
+function appearanceOf(profile: CharacterProfile, wardrobe: Record<string, unknown>): string {
   const a = (profile.appearance ?? {}) as Record<string, unknown>;
   const i = (profile.identity ?? {}) as Record<string, unknown>;
-  const wardrobe = Array.isArray(profile.wardrobe) && profile.wardrobe.length > 0
-    ? (profile.wardrobe[0] as Record<string, unknown>)
-    : {};
   /** 性别用中文（档案里可能是 female/male） */
   const genderMap: Record<string, string> = { female: "女性", male: "男性", woman: "女性", man: "男性" };
   const rawGender = String(a.gender ?? i.gender ?? "").trim().toLowerCase();
@@ -244,30 +252,29 @@ export function buildPortraitPlan(
   profile: CharacterProfile,
   config: PortraitAgentConfig = {}
 ): PortraitPlan {
-  const angles = config.angles ?? [...REQUIRED_PORTRAIT_ANGLES];
-  const existing = (profile.portraitSets ?? []).map((s) => s.version);
-  const version = config.version ?? (existing.length > 0 ? Math.max(...existing) + 1 : 1);
+  assertCharacterComponent(profile.id);
+  if (profile.schemaVersion !== "workloom.character-profile/v1" || !profile.name) throw new Error("PORTRAIT_PROFILE_INVALID: 角色档案无效");
+  const angles = [...(config.angles ?? REQUIRED_PORTRAIT_ANGLES)];
+  if (!angles.length || angles.some((angle) => !Object.hasOwn(ANGLE_FRAMING, angle)) || new Set(angles).size !== angles.length) throw new Error("PORTRAIT_ANGLES_INVALID: 角度为空、未知或重复");
+  if (config.version !== undefined && (!Number.isInteger(config.version) || config.version < 1)) throw new Error("PORTRAIT_VERSION_INVALID: 版本必须为正整数");
+  if (config.seed !== undefined && (!Number.isSafeInteger(config.seed) || config.seed < 0)) throw new Error("PORTRAIT_SEED_INVALID: seed必须是非负安全整数");
+  if (config.maxAnchors !== undefined && (!Number.isInteger(config.maxAnchors) || config.maxAnchors < 1 || config.maxAnchors > 4)) throw new Error("PORTRAIT_ANCHOR_INVALID: 锚点上限必须为1..4");
+  const wardrobe = selectPortraitWardrobe(profile, config);
   const declaredStyle = String((profile as unknown as Record<string, unknown>).style ?? "").trim().toLowerCase();
-  const nonHuman = ["animal", "creature", "object", "product"].includes(String(profile.kind));
-  const stylized = (STYLIZED_STYLES as readonly string[]).includes(declaredStyle) || nonHuman;
+  const nonHuman = ["animal", "creature", "object", "product"].includes(String(profile.subjectType ?? profile.kind));
+  if (nonHuman) throw new Error("PORTRAIT_SUBJECT_NOT_APPLICABLE: 非人主体不能套用人物定妆照模板");
+  const stylized = (STYLIZED_STYLES as readonly string[]).includes(declaredStyle);
   const mode: PortraitPlan["mode"] = stylized ? "stylized" : "photoreal";
   const reason = nonHuman
     ? `角色类型为 ${profile.kind}（非人），不适用真人写实模板`
     : stylized
       ? `角色档案显式声明风格「${declaredStyle}」`
       : "默认口径（纯写实 + 场景解耦）";
-  const appearance = appearanceOf(profile);
-  /**
-   * 锚点解析（2026-09-24）：不存在的文件静默剔除（不阻断），但**一个都不剩**时要如实降级为纯文生图，
-   * 由调用方（CLI/监制）在日志里看到 `source=pure-t2i`，而不是以为挂上了真人锚点。
-   */
-  const anchors = (config.anchorImages ?? []).filter((file) => {
-    try {
-      return existsSync(file) && statSync(file).size > 1024;
-    } catch {
-      return false;
-    }
-  }).slice(0, Math.max(1, config.maxAnchors ?? 4));
+  const appearance = appearanceOf(profile, wardrobe);
+  /** Every declared anchor must exist and have current byte evidence; none may disappear silently. */
+  const anchors = [...new Set(config.anchorImages ?? [])];
+  if (anchors.length > (config.maxAnchors ?? 4)) throw new Error("PORTRAIT_ANCHOR_INVALID: 显式锚点超出上限，不能静默丢弃");
+  const anchorReceipts = anchors.map((file) => readPortraitArtifact(file));
   const prompts: Record<string, string> = {};
   for (const angle of angles) {
     const framing = ANGLE_FRAMING[angle] ?? `${angle} 视角`;
@@ -275,6 +282,14 @@ export function buildPortraitPlan(
       ? `${PHOTOREAL_TEMPLATE.replace("{appearance}", appearance)}。${framing}。`
       : `${appearance}。${framing}。${declaredStyle ? `风格：${declaredStyle}。` : ""}`;
   }
+  const sourceHash = shotIntentHash({ characterId: profile.id, name: profile.name, kind: profile.kind, identity: profile.identity ?? {}, appearance: profile.appearance ?? {}, wardrobe, style: declaredStyle, subjectType: profile.subjectType ?? "person" });
+  const wardrobeHash = shotIntentHash(wardrobe);
+  const requestHash = shotIntentHash({ schemaVersion: "workloom.portrait-plan/v2", sourceHash, model: config.model ?? null, endpoint: (config.baseUrl ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, ""), size: config.size ?? null, seed: config.seed ?? null, angles, prompts, anchors: anchorReceipts, backgroundPolicy: config.requireCleanBackground === false ? "disabled" : CLEAN_BACKGROUND_POLICY, hardenedTemplate: PHOTOREAL_TEMPLATE_HARDENED });
+  const existing = (profile.portraitSets ?? []).map((set) => set.version);
+  const reusable = [...(profile.portraitSets ?? [])].reverse().find((set) => set.schemaVersion === "workloom.portrait-set/v2" && set.requestHash === requestHash);
+  const version = config.version ?? reusable?.version ?? (existing.length > 0 ? Math.max(...existing) + 1 : 1);
+  const specified = profile.portraitSets?.find((set) => set.version === version);
+  if (specified && specified.requestHash !== requestHash) throw new Error("PORTRAIT_VERSION_CONFLICT: 指定版本属于不同生成来源或旧无收据版本；需新版本候选");
   return {
     characterId: profile.id,
     name: profile.name,
@@ -286,7 +301,7 @@ export function buildPortraitPlan(
     reason: anchors.length > 0
       ? `${reason}；图生图锚定 ${anchors.length} 张授权真人照片`
       : reason,
-    anchors
+    anchors, anchorReceipts, wardrobe, wardrobeHash, sourceHash, requestHash
   };
 }
 
@@ -323,8 +338,8 @@ const SAFETY_SOFTENED_FRAMING: Record<string, string> = {
  *
  * 失败策略（2026-09-24 修订）：
  *   · **逐角度隔离**：单个角度失败不再作废整批（已出图保留并登记）；
- *   · **幂等**：目标文件已存在且非空即复用，不重复烧额度；
- *   · 只有**一个角度都没成功**时才抛错（不写半套档案）。
+ *   · **幂等**：完整请求、背景检查和当前字节收据一致才复用；
+ *   · 半套作为未激活候选保存，四个必需角度完整才允许激活。
  */
 export async function runPortraitAgent(options: {
   libraryRoot: string;
@@ -336,197 +351,154 @@ export async function runPortraitAgent(options: {
   config?: PortraitAgentConfig;
   log?: (line: string) => void;
 }): Promise<PortraitAgentResult> {
-  const log = options.log ?? (() => undefined);
-  const logs: string[] = [];
-  const say = (line: string): void => { logs.push(line); log(line); };
-  const fetchImpl = options.fetchImpl ?? fetch;
-  const base = (options.baseUrl ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, "");
-  const dir = join(options.libraryRoot, options.characterId);
+  assertCharacterComponent(options.characterId);
+  if (!options.apiKey?.trim() || !options.model?.trim()) throw new Error("PORTRAIT_CONFIG_INVALID: 缺模型或接口凭据");
+  const dir = resolvePath(options.libraryRoot, options.characterId);
+  if (lstatSync(dir).isSymbolicLink()) throw new Error("CHARACTER_PATH_INVALID: 角色目录不能是symlink");
+  const root = realpathSync(options.libraryRoot);
+  const relativeDir = relative(root, realpathSync(dir));
+  if (relativeDir === ".." || relativeDir.startsWith(`..${sep}`) || isAbsolute(relativeDir)) throw new Error("CHARACTER_PATH_INVALID: 角色目录越界");
   const profileFile = join(dir, "profile.json");
-  if (!existsSync(profileFile)) throw new Error(`角色档案不存在：${profileFile}`);
-  const profile = JSON.parse(readFileSync(profileFile, "utf8")) as CharacterProfile;
-  const plan = buildPortraitPlan(profile, { ...options.config, model: options.model });
-  say(`[portrait-agent] ${profile.name} v${plan.version}：${plan.mode}（${plan.reason}），角度 ${plan.angles.join("/")}`);
-
-  const setDir = join(dir, "portraits", `v${plan.version}`);
-  mkdirSync(setDir, { recursive: true });
-  const files: Record<string, string> = {};
-  const failures: Array<{ angle: string; error: string }> = [];
-  const reused: string[] = [];
-  const backgroundChecks: Record<string, BackgroundCheck> = {};
-  /**
-   * 背景干净度硬闸：默认开启（产品所有者 2026-09-24 口径）。
-   * 探针不可用（例如没装 ffmpeg）时**不静默放行**：记为失败并说明，避免"看着像过了"。
-   */
-  const requireCleanBackground = options.config?.requireCleanBackground !== false;
-  /** 注入的替身探针（单测用）优先；生产走自带实现，并按角度选择 ring / corners 采样 */
-  const injectedProber = options.config?.backgroundProber;
-  const checkBackground = (file: string, angle: string): BackgroundCheck => {
-    try {
-      const check = injectedProber ? injectedProber(file) : probeCleanBackground(file, angle);
-      backgroundChecks[angle] = check;
-      if (!check.ok) say(`  · ${angle} 背景干净度不合格：${check.notes.join("；")}`);
-      else say(`  · ${angle} 背景干净度合格（外圈跨度 ${check.maxRange.toFixed(1)} · 四角极差 ${check.cornerSpread.toFixed(1)} · 饱和 ${check.maxSat.toFixed(1)}）`);
-      return check;
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      const failed: BackgroundCheck = {
-        ok: false,
-        policy: CLEAN_BACKGROUND_POLICY.id,
-        // 探针不可用时的占位采样模式：按默认 ring 口径登记（失败原因写在 notes，不假装测过 corners）
-        mode: "ring",
-        bands: [],
-        cornerSpread: Number.NaN,
-        maxRange: Number.NaN,
-        maxSat: Number.NaN,
-        notes: [`背景探针不可用：${message.slice(0, 160)}（按不合格处理，不静默放行）`]
-      };
-      backgroundChecks[angle] = failed;
-      say(`  · ${angle} ${failed.notes[0]}`);
-      return failed;
+  return withCharacterArchiveLock(dir, async () => {
+    if (!loadCharacterEntry(dir)) throw new Error(`角色档案不存在：${profileFile}`);
+    const profile = JSON.parse(readFileSync(profileFile, "utf8")) as CharacterProfile;
+    if (profile.id !== options.characterId) throw new Error("PORTRAIT_PROFILE_INVALID: 路径角色与档案ID不一致");
+    const logs: string[] = [];
+    const say = (line: string): void => { logs.push(line); options.log?.(line); };
+    const fetchImpl = options.fetchImpl ?? fetch;
+    const base = (options.baseUrl ?? options.config?.baseUrl ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, "");
+    const config: PortraitAgentConfig = {
+      ...options.config, model: options.model, baseUrl: base,
+      anchorImages: (options.config?.anchorImages ?? []).map((file) => isAbsolute(file) ? file : resolvePath(dir, file))
+    };
+    let plan = buildPortraitPlan(profile, config);
+    let prior = profile.portraitSets.find((set) => set.version === plan.version);
+    const occupied = () => existsSync(join(dir, "portraits", `v${plan.version}`)) && !prior;
+    const changedReady = prior?.status === "ready" && verifyPortraitSet(dir, profile, prior).verification.status !== "passed";
+    if (occupied() || changedReady) {
+      if (config.version !== undefined) throw new Error("PORTRAIT_VERSION_OCCUPIED: 指定版本已有未知或改写的文件；需新候选版本");
+      const dirs = existsSync(join(dir, "portraits")) ? readdirSync(join(dir, "portraits")).map((name) => /^v(\d+)$/.exec(name)?.[1]).filter(Boolean).map(Number) : [];
+      plan = buildPortraitPlan(profile, { ...config, version: Math.max(plan.version, ...dirs, ...profile.portraitSets.map((set) => set.version)) + 1 });
+      prior = undefined;
     }
-  };
-  /** 锚点 → base64 data URL（Ark 接受；本地文件不出网，只有 base64 进请求体） */
-  const anchorPayloads = plan.anchors.map((file) => {
-    const ext = file.toLowerCase().endsWith(".png") ? "png" : file.toLowerCase().endsWith(".webp") ? "webp" : "jpeg";
-    return `data:image/${ext};base64,${readFileSync(file).toString("base64")}`;
-  });
-  const anchorRel = plan.anchors.map((file) => relative(dir, file));
-  for (const angle of plan.angles) {
-    const file = join(setDir, `${profile.name}-${angle}.png`);
-    /**
-     * ① 幂等复用：同角度文件已存在且非空 → 复用（不重复烧额度）。
-     * **但复用也要过硬闸**：历史图可能是老模板产出的脏背景图，直接复用等于把不合格资产放进档案。
-     */
-    if (existsSync(file) && statSync(file).size > 1024) {
-      const reusable = requireCleanBackground ? checkBackground(file, angle).ok : true;
-      if (reusable) {
-        files[angle] = file;
-        reused.push(angle);
-        say(`  · ${angle} → 复用既有产物（${statSync(file).size} B）`);
-        continue;
+    const ensure = (relativePath: string): string => {
+      let current = dir;
+      for (const part of relativePath.split("/")) {
+        current = join(current, part);
+        if (!existsSync(current)) mkdirSync(current);
+        if (lstatSync(current).isSymbolicLink() || realpathSync(current) !== join(realpathSync(dir), relative(dir, current))) throw new Error("PORTRAIT_PATH_INVALID: 输出目录不能是symlink");
       }
-      say(`  · ${angle} 既有产物背景不合格，改为重新生成（不复用脏背景图）`);
-    }
-    const buildBody = (prompt: string): Record<string, unknown> => ({
-      model: options.model,
-      prompt,
-      response_format: "url",
-      watermark: false,
-      ...(anchorPayloads.length > 0
-        ? { image: anchorPayloads.length === 1 ? anchorPayloads[0] : anchorPayloads }
-        : {}),
-      ...(options.config?.size ? { size: options.config.size } : {}),
-      ...(options.config?.seed ? { seed: options.config.seed } : {})
+      return current;
+    };
+    const setDir = ensure(`portraits/v${plan.version}`); const metadataDir = ensure("portrait-sets");
+    const files: Record<string, string> = {}; const artifacts: Record<string, PortraitArtifactReceipt> = {};
+    const angleRequests: Record<string, string> = {};
+    const failures: Array<{ angle: string; error: string }> = []; const reused: string[] = [];
+    const backgroundChecks: Record<string, BackgroundCheck> = {};
+    const requireCleanBackground = config.requireCleanBackground !== false;
+    const anchors = plan.anchors.map((file, index) => {
+      const receipt = readPortraitArtifact(file);
+      if (shotIntentHash(receipt) !== shotIntentHash(plan.anchorReceipts[index])) throw new Error("PORTRAIT_INPUT_CHANGED: 锚点已变化");
+      const ext = file.toLowerCase().endsWith(".png") ? "png" : file.toLowerCase().endsWith(".webp") ? "webp" : "jpeg";
+      const bytes = readFileSync(file);
+      if (createHash("sha256").update(bytes).digest("hex") !== receipt.sha256) throw new Error("PORTRAIT_INPUT_CHANGED: 锚点发送字节与规划收据不一致");
+      return `data:image/${ext};base64,${bytes.toString("base64")}`;
     });
-    /** ② 逐角度出图（安全拦截 → 去动作化重试一次；仍失败只记该角度） */
-    const softened = SAFETY_SOFTENED_FRAMING[angle];
-    /**
-     * 尝试序列（按需组合，最多 4 次）：
-     *   ① 常规提示词（已含背景硬约束）
-     *   ② 动作类角度命中内容安全 → 追加去动作化措辞
-     *   ③ 背景干净度不合格 → 追加加固措辞
-     *   ④ 两者叠加
-     */
-    const basePrompt = plan.prompts[angle]!;
-    const bgHardened = `${basePrompt}。${PHOTOREAL_TEMPLATE_HARDENED}`;
-    const softenedPrompt = softened ? `${basePrompt}。${softened}` : null;
-    const attempts: string[] = [basePrompt];
-    if (softenedPrompt) attempts.push(softenedPrompt);
-    if (requireCleanBackground) attempts.push(bgHardened);
-    if (softenedPrompt) attempts.push(`${bgHardened}。${softened}`);
-    let ok = false;
-    let lastError = "";
-    for (const [index, prompt] of attempts.entries()) {
+    let expectedProfileHash = shotIntentHash(profile);
+    let portraitSet: PortraitSet;
+    const assertInputs = (): void => {
+      if (lstatSync(profileFile).isSymbolicLink() || shotIntentHash(JSON.parse(readFileSync(profileFile, "utf8"))) !== expectedProfileHash) throw new Error("PORTRAIT_INPUT_CHANGED: 生成期间角色档案变化，不能覆盖外部更新");
+      for (const receipt of plan.anchorReceipts) if (shotIntentHash(readPortraitArtifact(receipt.path)) !== shotIntentHash(receipt)) throw new Error("PORTRAIT_INPUT_CHANGED: 生成期间锚点变化");
+    };
+    const persist = (complete: boolean): void => {
+      assertInputs();
+      portraitSet = {
+        schemaVersion: "workloom.portrait-set/v2", version: plan.version, dir: `portraits/v${plan.version}`,
+        angles: Object.keys(files), files: Object.fromEntries(Object.entries(files).map(([angle, file]) => [angle, relative(dir, file)])), artifacts: { ...artifacts }, angleRequests: { ...angleRequests },
+        source: anchors.length ? "img2img" : "pure-t2i", anchors: plan.anchors.map((file) => relative(dir, file)),
+        sourceHash: plan.sourceHash, requestHash: plan.requestHash, wardrobe: plan.wardrobe, wardrobeHash: plan.wardrobeHash,
+        status: complete ? "ready" : failures.length && !Object.keys(files).length ? "failed" : "candidate",
+        active: complete && config.activate !== false, model: options.model, ...(config.seed !== undefined ? { seed: config.seed } : {}),
+        // JSON null denotes a missing measurement; retaining NaN in the in-memory hash would
+        // differ from the exact persisted JSON bytes and hide the original probe failure.
+        prompt: plan.prompts.front ?? plan.prompts[plan.angles[0]!], failedAngles: [...failures], backgroundChecks: JSON.parse(JSON.stringify(backgroundChecks)) as PortraitSet["backgroundChecks"], backgroundRequired: requireCleanBackground,
+        createdAt: prior?.createdAt ?? new Date().toISOString()
+      };
+      if (complete && verifyPortraitSet(dir, profile, portraitSet).verification.status !== "passed") throw new Error("PORTRAIT_ACTIVATION_UNVERIFIED: 当前候选产物未通过完整核验");
+      const current = JSON.parse(readFileSync(profileFile, "utf8")) as CharacterProfile;
+      const sets = current.portraitSets.filter((set) => set.version !== plan.version).map((set) => portraitSet.active ? { ...set, active: false } : set);
+      // A ready version already active remains active on an identical no-activate cache read.
+      if (complete && prior?.active && config.activate === false) portraitSet.active = true;
+      sets.push(portraitSet);
+      const updated = { ...current, portraitSets: sets, portraitAgent: { model: options.model, sourceHash: plan.sourceHash, requestHash: plan.requestHash, status: portraitSet.status, version: plan.version, failures: [...failures], reused: [...reused], backgroundPolicy: requireCleanBackground ? CLEAN_BACKGROUND_POLICY.id : "disabled", updatedAt: new Date().toISOString() }, updatedAt: new Date().toISOString() };
+      writePortraitJson(join(metadataDir, `v${plan.version}.json`), portraitSet);
+      writePortraitJson(profileFile, updated); expectedProfileHash = shotIntentHash(updated);
+    };
+    const checkBackground = (file: string, angle: string): BackgroundCheck => {
+      let check: BackgroundCheck;
       try {
-        const res = await fetchImpl(`${base}/images/generations`, {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${options.apiKey}` },
-          body: JSON.stringify(buildBody(prompt))
-        });
-        const text = await res.text();
-        if (!res.ok) throw new Error(`HTTP ${res.status} ${text.slice(0, 200)}`);
-        const parsed = JSON.parse(text) as { data?: Array<{ url?: string }> };
-        const url = parsed.data?.[0]?.url;
-        if (!url) throw new Error("响应缺少 url");
-        const bytes = Buffer.from(await (await fetchImpl(url)).arrayBuffer());
-        writeFileSync(file, bytes);
-        say(`  · ${angle} → ${file}（${bytes.byteLength} B${index > 0 ? ` · 第 ${index + 1} 次尝试` : ""}）`);
-        /**
-         * 背景干净度硬闸（产品所有者口径）：不合格**不算产出**，用加固措辞重跑；
-         * 最后一次仍不合格 → 该角度判失败并把原因写进档案（下游据此知道"这张不能拿来抠像"）。
-         */
-        if (requireCleanBackground) {
-          const check = checkBackground(file, angle);
-          if (!check.ok) {
-            lastError = `background_not_clean：${check.notes.join("；")}`;
-            if (index < attempts.length - 1) {
-              say(`  · ${angle} 背景不合格 → 用加固措辞重跑（还剩 ${attempts.length - index - 1} 次机会）`);
-              continue;
-            }
-            failures.push({ angle, error: lastError });
-            break;
-          }
-        }
-        files[angle] = file;
-        ok = true;
-        break;
-      } catch (err) {
-        lastError = err instanceof Error ? err.message : String(err);
-        const isSafety = /SensitiveContent|Sensitive/i.test(lastError);
-        say(`  · ${angle} 第 ${index + 1} 次失败：${lastError.slice(0, 160)}${isSafety && index + 1 < attempts.length ? "（命中内容安全，改用语软化措辞重试）" : ""}`);
+        check = config.backgroundProber ? config.backgroundProber(file) : probeCleanBackground(file, angle);
+        if (![check.cornerSpread, check.maxRange, check.maxSat].every(Number.isFinite)) check = { ...check, ok: false, notes: [...(check.notes ?? []), "背景探针缺少有限数值"] };
+      } catch (error) {
+        check = { ok: false, policy: CLEAN_BACKGROUND_POLICY.id, mode: CLEAN_BACKGROUND_POLICY.angleMode[angle] ?? "ring", bands: [], cornerSpread: Number.NaN, maxRange: Number.NaN, maxSat: Number.NaN, notes: [`背景探针不可用：${error instanceof Error ? error.message : String(error)}`] };
       }
+      backgroundChecks[angle] = check; return check;
+    };
+    const bodyOf = (prompt: string): Record<string, unknown> => ({ model: options.model, prompt, response_format: "url", watermark: false,
+      ...(anchors.length ? { image: anchors.length === 1 ? anchors[0] : anchors } : {}), ...(config.size ? { size: config.size } : {}), ...(config.seed !== undefined ? { seed: config.seed } : {}) });
+    say(`[portrait-agent] ${profile.name} v${plan.version}：${plan.mode}，服装来源 ${plan.wardrobeHash.slice(0, 12)}，角度 ${plan.angles.join("/")}`);
+    // Reserve a candidate before external calls. Failed or partial sets never replace the active version.
+    if (!prior) persist(false);
+    for (const angle of plan.angles) {
+      const file = join(setDir, `${profile.id}-${angle}.png`);
+      const basePrompt = plan.prompts[angle]!; const softened = SAFETY_SOFTENED_FRAMING[angle];
+      const hardened = `${basePrompt}。${PHOTOREAL_TEMPLATE_HARDENED}`;
+      const attempts = [basePrompt, ...(softened ? [`${basePrompt}。${softened}`] : []), ...(requireCleanBackground ? [hardened, ...(softened ? [`${hardened}。${softened}`] : [])] : [])];
+      const allowedRequests = attempts.map((prompt) => shotIntentHash({ endpoint: `${base}/images/generations`, payload: bodyOf(prompt) }));
+      if (prior?.requestHash === plan.requestHash && prior.files?.[angle]) {
+        try {
+          const priorFile = resolvePath(dir, prior.files[angle]!); const actual = readPortraitArtifact(priorFile, dir);
+          const priorBackground = prior.backgroundChecks?.[angle] as BackgroundCheck | undefined;
+          const validBackground = !requireCleanBackground || Boolean(priorBackground?.ok && [priorBackground.cornerSpread, priorBackground.maxRange, priorBackground.maxSat].every(Number.isFinite));
+          if (shotIntentHash(actual) === shotIntentHash(prior.artifacts?.[angle] ?? null) && allowedRequests.includes(prior.angleRequests?.[angle] ?? "") && validBackground) {
+            if (priorBackground) backgroundChecks[angle] = structuredClone(priorBackground);
+            files[angle] = priorFile; artifacts[angle] = actual; angleRequests[angle] = prior.angleRequests![angle]!; reused.push(angle); continue;
+          }
+        } catch (error) { say(`  · ${angle} 旧候选不可复用：${error instanceof Error ? error.message : String(error)}`); }
+      }
+      let lastError = "";
+      for (const [attempt, prompt] of attempts.entries()) {
+        try {
+          assertInputs();
+          const response = await fetchImpl(`${base}/images/generations`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${options.apiKey}` }, body: JSON.stringify(bodyOf(prompt)), signal: AbortSignal.timeout(240_000) });
+          const text = await response.text();
+          if (!response.ok) throw new Error(`HTTP ${response.status} ${text.slice(0, 200)}`);
+          const url = (JSON.parse(text) as { data?: Array<{ url?: string }> }).data?.[0]?.url;
+          if (!url) throw new Error("响应缺少url，不能自动重复已成功的生成请求");
+          const download = await fetchImpl(url, { signal: AbortSignal.timeout(120_000) });
+          if (!download.ok) throw new Error(`定妆照下载 HTTP ${download.status}`);
+          const bytes = Buffer.from(await download.arrayBuffer());
+          if (bytes.length < 1024 || bytes.length > 100_000_000) throw new Error("PORTRAIT_DOWNLOAD_INVALID: 图片大小无效");
+          assertInputs();
+          const temporary = join(setDir, `.portrait-${randomUUID()}.tmp`);
+          try { writeFileSync(temporary, bytes, { flag: "wx", mode: 0o600 }); if (lstatSync(setDir).isSymbolicLink()) throw new Error("PORTRAIT_PATH_INVALID: 输出目录发生变化"); renameSync(temporary, file); }
+          finally { if (existsSync(temporary)) unlinkSync(temporary); }
+          if (requireCleanBackground && !checkBackground(file, angle).ok) { lastError = `background_not_clean：${backgroundChecks[angle]!.notes.join("；")}`; continue; }
+          files[angle] = file; artifacts[angle] = readPortraitArtifact(file, dir); angleRequests[angle] = allowedRequests[attempt]!;
+          say(`  · ${angle} 当前请求与产物收据已绑定`); break;
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : String(error);
+          say(`  · ${angle} 失败：${lastError.slice(0, 160)}`);
+          if (!/SensitiveContent|Sensitive/i.test(lastError)) break;
+        }
+      }
+      if (!files[angle]) failures.push({ angle, error: lastError || "未得到可核验产物" });
+      persist(false);
     }
-    if (!ok && !failures.some((f) => f.angle === angle)) failures.push({ angle, error: lastError });
-  }
-  if (Object.keys(files).length === 0) {
-    throw new Error(`定妆照全军覆没（${failures.map((f) => `${f.angle}:${f.error.slice(0, 80)}`).join("；")}）`);
-  }
-
-  const portraitSet: PortraitSet = {
-    version: plan.version,
-    dir: `portraits/v${plan.version}`,
-    angles: Object.keys(files),
-    source: anchorPayloads.length > 0 ? "img2img" : "pure-t2i",
-    ...(anchorRel.length > 0 ? { anchors: anchorRel } : {}),
-    active: options.config?.activate !== false,
-    model: options.model,
-    ...(options.config?.seed ? { seed: options.config.seed } : {}),
-    prompt: plan.prompts[Object.keys(files)[0] ?? "front"],
-    ...(failures.length > 0 ? { failedAngles: failures } : {}),
-    /** 逐角度背景测量留痕（阈值口径 + 实测值），供下游判断"这张能不能直接抠像" */
-    ...(Object.keys(backgroundChecks).length > 0 ? { backgroundChecks } : {}),
-    createdAt: new Date().toISOString()
-  };
-  mkdirSync(join(dir, "portrait-sets"), { recursive: true });
-  writeFileSync(join(dir, "portrait-sets", `v${plan.version}.json`), `${JSON.stringify(portraitSet, null, 2)}\n`);
-
-  /**
-   * 版本台账按 version **upsert**（2026-09-24 真机修复）：
-   * 同版本重跑（补角度/修背景）此前会再 push 一条同 version 的记录，
-   * 于是 `portraitSets` 里出现两条 v3，`find(version===3)` 取到的是**旧那条**——
-   * 评审与下游就会看到"实际只有 side/actionPose"的过期结论。
-   */
-  const sets = [...(profile.portraitSets ?? [])].filter((set) => set.version !== portraitSet.version);
-  if (portraitSet.active) for (const set of sets) set.active = false;
-  sets.push(portraitSet);
-  const updated: CharacterProfile = {
-    ...profile,
-    portraitSets: sets,
-    portraitAgent: {
-      model: options.model,
-      angles: Object.keys(files),
-      ...(failures.length > 0 ? { failures } : {}),
-      ...(reused.length > 0 ? { reused } : {}),
-      backgroundPolicy: requireCleanBackground ? CLEAN_BACKGROUND_POLICY.id : "disabled",
-      mode: plan.mode,
-      negativeTerms: plan.negativeTerms,
-      updatedAt: new Date().toISOString()
-    },
-    updatedAt: new Date().toISOString()
-  } as CharacterProfile;
-  writeFileSync(profileFile, `${JSON.stringify(updated, null, 2)}\n`);
-  say(`[portrait-agent] 完成：v${plan.version}${portraitSet.active ? "（已置为 active）" : ""}；档案已更新`);
-  if (failures.length > 0) say(`[portrait-agent] 失败角度（已登记，不阻断交付）：${failures.map((f) => f.angle).join("、")}`);
-  return { characterId: profile.id, version: plan.version, files, failures, reused, backgroundChecks, portraitSet, profileFile, log: logs };
+    const complete = failures.length === 0 && REQUIRED_PORTRAIT_ANGLES.every((angle) => Boolean(files[angle]));
+    persist(complete);
+    if (!Object.keys(files).length) throw new Error(`定妆照全部失败（${failures.map((item) => `${item.angle}:${item.error}`).join("；")}）`);
+    say(`[portrait-agent] 完成：v${plan.version} ${portraitSet!.status}${portraitSet!.active ? "（已激活）" : "（未激活，原active保留）"}`);
+    return { characterId: profile.id, version: plan.version, files, failures, reused, backgroundChecks, portraitSet: portraitSet!, profileFile, log: logs };
+  });
 }

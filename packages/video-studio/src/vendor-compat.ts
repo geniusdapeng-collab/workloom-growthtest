@@ -14,9 +14,10 @@
  *   - 其余类型原样传给原实现
  * 幂等；返回摘除函数。
  */
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, lstatSync, realpathSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { dirname, resolve as resolvePath } from "node:path";
+import { dirname, isAbsolute, join, relative, sep, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   applyProjectedDurations,
@@ -27,7 +28,11 @@ import {
   projectShotDurations,
   resolveRateKey,
 } from "./duration-projection.js";
-import type { PortraitIndex } from "./portrait-runtime.js";
+import { REQUIRED_ANGLES, type PortraitIndex, type PortraitIndexEntry } from "./portrait-runtime.js";
+import {
+  CinematicSkillError, cinematicSkillHash, checkCinematicSkillCompliance, planCinematicSkills,
+  type CinematicSkillRouter, type CinematicSkillStatus,
+} from "./cinematic-skill-policy.js";
 
 /**
  * 注入依赖保活桥（2026-09-22 真机根因）
@@ -173,10 +178,46 @@ interface RenderPromptLike {
 export function installVendorPortraitBindingBridge(options: PortraitBindingBridgeOptions): () => void {
   const log = options.log ?? (() => undefined);
   const maxPerShot = options.maxCharactersPerShot ?? 1;
+  if (!Number.isInteger(maxPerShot) || maxPerShot < 1) throw new Error("PORTRAIT_BINDING_INVALID: 每镜角色上限无效");
+  type Engine = { config?: { charactersDir?: string } };
+  type BoundEntry = { id: string; name: string; requiredAngles: readonly string[]; portraits: Record<string, string>; evidence: Record<string, unknown> };
+  const boundSnapshots = new WeakMap<RenderPromptLike, string>();
+  const inside = (root: string, file: string): boolean => { const rel = relative(root, file); return rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel); };
+  function currentIndex(): PortraitIndex | null {
+    const value = options.resolveIndex ? options.resolveIndex() : options.index ?? null;
+    if (value && (value.schemaVersion !== "workloom.portrait-index/v1" || !isPlainObject(value.characters))) throw new Error("PORTRAIT_BINDING_INVALID: 角色索引无效");
+    return value ? structuredClone(value) : null;
+  }
+  /** Read only the indexed files; directory order and historical filenames cannot select a version. */
+  function exactEntry(engine: Engine, key: string, entry: PortraitIndexEntry): BoundEntry {
+    const root = engine.config?.charactersDir;
+    if (!root || entry.kind !== "character" || typeof entry.id !== "string") throw new Error("PORTRAIT_BINDING_INVALID: 角色类型或根目录无效");
+    const lexicalRoot = resolvePath(root); const canonicalRoot = realpathSync(root);
+    const portraits: Record<string, string> = {}; const evidence: Record<string, unknown> = {};
+    const seen = new Set<string>();
+    for (const angle of REQUIRED_ANGLES) {
+      const file = entry.files?.[angle];
+      if (typeof file !== "string" || !isAbsolute(file) || !inside(lexicalRoot, resolvePath(file))) throw new Error(`PORTRAIT_BINDING_INVALID: ${key}/${angle} 路径越界或缺失`);
+      const rel = relative(lexicalRoot, resolvePath(file));
+      const realPath = realpathSync(file); const stat = lstatSync(file);
+      if (stat.isSymbolicLink() || !stat.isFile() || stat.size < 1024 || stat.size > 100_000_000 || realPath !== join(canonicalRoot, rel) || !inside(canonicalRoot, realPath)) throw new Error(`PORTRAIT_BINDING_INVALID: ${key}/${angle} 文件或符号链接不可用`);
+      if (seen.has(realPath)) throw new Error(`PORTRAIT_BINDING_INVALID: ${key} 多个角度指向同一文件`);
+      seen.add(realPath);
+      const bytes = readFileSync(realPath); const sha256 = createHash("sha256").update(bytes).digest("hex");
+      if (bytes.length !== stat.size || realpathSync(file) !== realPath) throw new Error(`PORTRAIT_BINDING_CHANGED: ${key}/${angle} 读取期间变化`);
+      const receipt = entry.receipts?.[angle];
+      if (receipt) {
+        if (receipt.schemaVersion !== "workloom.portrait-cache/v2" || receipt.kind !== "character" || receipt.id !== entry.id || receipt.angle !== angle || !/^[a-f0-9]{64}$/.test(receipt.requestHash)
+          || receipt.output?.path !== file || receipt.output.realPath !== realPath || receipt.output.sha256 !== sha256 || receipt.output.bytes !== bytes.length) throw new Error(`PORTRAIT_BINDING_RECEIPT_INVALID: ${key}/${angle} 当前产物与收据不一致`);
+      } else if (entry.receipts || /-[a-f0-9]{64}-[a-zA-Z]+\.png$/.test(file)) throw new Error(`PORTRAIT_BINDING_RECEIPT_INVALID: ${key}/${angle} 新缓存缺少收据`);
+      portraits[angle] = rel.split(sep).join("/");
+      evidence[angle] = { path: file, realPath, sha256, bytes: bytes.length, requestHash: receipt?.requestHash ?? null, scope: receipt ? "generation-receipt-and-current-bytes" : "legacy-index-current-bytes-only" };
+    }
+    return { id: key, name: entry.name || key, requiredAngles: REQUIRED_ANGLES, portraits, evidence };
+  }
 
   /** 四角度齐备的角色（缺一即不作为绑定对象：渲染核心会整单拒绝） */
-  function eligibleCharacters(): Array<{ key: string; files: Record<string, string> }> {
-    const index = options.resolveIndex ? options.resolveIndex() : options.index ?? null;
+  function eligibleCharacters(index: PortraitIndex | null): Array<{ key: string; files: Record<string, string> }> {
     if (!index) return [];
     return Object.entries(index.characters ?? {})
       .map(([key, entry]) => ({ key, files: (entry.files ?? {}) as Record<string, string> }))
@@ -185,8 +226,8 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
       );
   }
 
-  function pickFor(prompt: RenderPromptLike): string[] {
-    const eligible = eligibleCharacters();
+  function pickFor(prompt: RenderPromptLike, index: PortraitIndex | null): string[] {
+    const eligible = eligibleCharacters(index);
     if (eligible.length === 0) return [];
     const haystack = [
       typeof prompt.prompt === "string" ? prompt.prompt : "",
@@ -200,28 +241,20 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
     return chosen.map((item) => item.key);
   }
 
-  function bindPrompt(prompt: RenderPromptLike): void {
-    const keys = pickFor(prompt);
-    if (keys.length === 0) return;
-    const index = (options.resolveIndex ? options.resolveIndex() : options.index) as PortraitIndex | null;
-    if (!index) return;
+  function bindPrompt(engine: Engine, prompt: RenderPromptLike): BoundEntry[] {
+    const index = currentIndex(); const keys = pickFor(prompt, index);
+    if (keys.length === 0 || !index) return [];
+    const entries = keys.map((key) => exactEntry(engine, key, index.characters[key]!));
+    const snapshot = cinematicSkillHash(entries);
+    const prior = boundSnapshots.get(prompt);
+    if (prior && prior !== snapshot) throw new Error("PORTRAIT_BINDING_CHANGED: 镜头绑定后当前版本或字节发生变化");
+    boundSnapshots.set(prompt, snapshot);
     prompt._workloomBoundCharacters = keys;
-    const refs = keys
-      .map((key) => {
-        const entry = index.characters[key];
-        const front = entry?.files?.front;
-        if (!front) return null;
-        const fileName = front.split("/").pop() || `${key}-front.png`;
-        return `${key}: image://characters/${key}/portraits/${fileName}`;
-      })
-      .filter((ref): ref is string => Boolean(ref))
-      .join("; ");
-    if (!refs) return;
-    const existing = typeof prompt.characterRef === "string" ? prompt.characterRef.trim() : "";
-    if (!existing || existing === "NONE") prompt.characterRef = refs;
+    prompt.characterRef = entries.map((entry) => `${entry.id}: image://characters/${entry.portraits.front}`).join("; ");
     // 空数组在 JS 里是真值：vendor 的 `prompt.portraits || prompt.characterRef` 会优先取空数组，
     // 于是 refs 永远读不到（真机 2026-09-21 实测）。这里把空数组摘掉，让 characterRef 生效。
     if (Array.isArray(prompt.portraits) && prompt.portraits.length === 0) delete prompt.portraits;
+    return entries;
   }
 
   try {
@@ -237,27 +270,70 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
     };
     const prototype = mod?.RenderingEngine?.prototype;
     if (!prototype || typeof prototype.render !== "function") return () => undefined;
+    const coreMod = vendorRequire(resolvePath(repoRoot, "vendor/supermickey/scripts/render-submitter-core.js")) as { RenderSubmitterCore?: { prototype: Record<string, unknown> } };
+    const corePrototype = coreMod.RenderSubmitterCore?.prototype;
+    if (!corePrototype || typeof corePrototype.buildPayload !== "function") throw new Error("PORTRAIT_BINDING_INVALID: vendor缺少提交体构造入口");
+    const originalPayload = corePrototype.buildPayload as (shot: Record<string, unknown>, manifest: Record<string, unknown>) => Record<string, unknown>;
 
     const originalRender = prototype.render as (prompts: unknown, opts?: unknown) => Promise<unknown>;
+    const originalManifest = prototype._generateBindingManifest;
+    if (typeof originalManifest !== "function") throw new Error("PORTRAIT_BINDING_INVALID: vendor缺少绑定清单入口");
     const originalConvert = typeof prototype._convertToShotFormat === "function"
       ? (prototype._convertToShotFormat as (prompt: RenderPromptLike) => Record<string, unknown>)
       : null;
 
-    prototype.render = function patchedRender(this: unknown, prompts: unknown, opts?: unknown) {
+    prototype.render = function patchedRender(this: Engine, prompts: unknown, opts?: unknown) {
       const list = Array.isArray(prompts) ? (prompts as RenderPromptLike[]) : [];
       let bound = 0;
       for (const prompt of list) {
-        try {
-          bindPrompt(prompt);
-          if (prompt._workloomBoundCharacters?.length) bound += 1;
-        } catch (err) {
-          log(`[vendor-compat] 定妆照绑定失败（${String(prompt?.shotId ?? "?")}）：${err instanceof Error ? err.message : String(err)}`);
-        }
+        bindPrompt(this, prompt);
+        if (prompt._workloomBoundCharacters?.length) bound += 1;
       }
       if (bound > 0) {
         log(`[vendor-compat] 定妆照绑定桥：${bound}/${list.length} 个镜头已绑定角色定妆照（每镜 ≤${maxPerShot} 角色）`);
       }
       return originalRender.call(this, prompts, opts);
+    };
+
+    prototype._generateBindingManifest = async function patchedManifest(this: Engine, prompts: RenderPromptLike[]) {
+      const characters: Record<string, BoundEntry> = {}; const shots: Record<string, unknown>[] = [];
+      const shotIds = new Set<string>();
+      for (const prompt of prompts) {
+        if (!prompt.shotId || shotIds.has(prompt.shotId)) throw new Error("PORTRAIT_BINDING_INVALID: 镜头ID缺失或重复");
+        shotIds.add(prompt.shotId);
+        const entries = bindPrompt(this, prompt);
+        for (const entry of entries) {
+          const prior = characters[entry.id];
+          if (prior && cinematicSkillHash(prior) !== cinematicSkillHash(entry)) throw new Error("PORTRAIT_BINDING_CHANGED: 同一清单混入多个角色版本");
+          characters[entry.id] = entry;
+        }
+        shots.push({ shotId: prompt.shotId, requiredCharacters: entries.map((entry) => entry.id), duration: prompt.duration ?? 15, promptLength: prompt.promptCharCount || (typeof prompt.prompt === "string" ? prompt.prompt.length : 0) });
+      }
+      return { generatedAt: new Date().toISOString(), characters, shots, schemaVersion: "workloom.portrait-binding/v2", selection: "exact-current-index-files", bindingHash: cinematicSkillHash({ characters, shots }) };
+    };
+
+    corePrototype.buildPayload = function patchedPayload(this: { charactersDir: string; extractCharactersFromShot: (shot: Record<string, unknown>) => string[] }, shot: Record<string, unknown>, manifest: Record<string, unknown>) {
+      if (manifest.schemaVersion !== "workloom.portrait-binding/v2") throw new Error("PORTRAIT_BINDING_INVALID: 提交体必须使用本次精确文件清单");
+      if (manifest.bindingHash !== cinematicSkillHash({ characters: manifest.characters, shots: manifest.shots })) throw new Error("PORTRAIT_BINDING_CHANGED: 清单内容被改写");
+      const characters = manifest.characters as Record<string, BoundEntry>;
+      const index = currentIndex(); const expected: Array<{ sha256: string; bytes: number }> = [];
+      for (const key of this.extractCharactersFromShot(shot)) {
+        const entry = index?.characters[key];
+        if (!entry || !characters[key]) throw new Error("PORTRAIT_BINDING_INVALID: 提交角色缺少当前索引或清单");
+        const current = exactEntry({ config: { charactersDir: this.charactersDir } }, key, entry);
+        if (cinematicSkillHash(current) !== cinematicSkillHash(characters[key])) throw new Error("PORTRAIT_BINDING_CHANGED: 提交前角色版本发生变化");
+        for (const angle of REQUIRED_ANGLES) expected.push(current.evidence[angle] as { sha256: string; bytes: number });
+      }
+      const payload = originalPayload.call(this, shot, manifest);
+      const images = (Array.isArray(payload.content) ? payload.content : []).filter((item: Record<string, unknown>) => item.type === "image_url") as Array<{ image_url?: { url?: string } }>;
+      if (images.length !== expected.length) throw new Error("PORTRAIT_BINDING_CHANGED: 实际提交参考图数量不符");
+      for (let i = 0; i < images.length; i += 1) {
+        const encoded = /^data:image\/[a-zA-Z0-9.+-]+;base64,([A-Za-z0-9+/=]+)$/.exec(images[i]!.image_url?.url ?? "");
+        if (!encoded) throw new Error("PORTRAIT_BINDING_INVALID: 参考图不是实际内联字节");
+        const bytes = Buffer.from(encoded[1]!, "base64");
+        if (bytes.length !== expected[i]!.bytes || createHash("sha256").update(bytes).digest("hex") !== expected[i]!.sha256) throw new Error("PORTRAIT_BINDING_CHANGED: 实际提交参考图字节与收据不一致");
+      }
+      return payload;
     };
 
     if (originalConvert) {
@@ -271,11 +347,13 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
 
     return () => {
       prototype.render = originalRender;
+      prototype._generateBindingManifest = originalManifest;
+      corePrototype.buildPayload = originalPayload;
       if (originalConvert) prototype._convertToShotFormat = originalConvert;
     };
   } catch (err) {
-    log(`[vendor-compat] 定妆照绑定桥注入失败（不影响其它桥）：${err instanceof Error ? err.message : String(err)}`);
-    return () => undefined;
+    log(`[vendor-compat] 定妆照绑定桥注入失败：${err instanceof Error ? err.message : String(err)}`);
+    throw err;
   }
 }
 
@@ -695,89 +773,13 @@ export function rebuildPromptsFromFields(
 }
 
 /**
- * 提示词重建桥（2026-09-22 真机修复，Phase 3 失败的止血方案）
- *
- * 现象链（VID-1021/1022）：
- *   `PROMPT-FUSION-FAIL: Assignment to constant variable.` → 6 镜退回**未融合镜头**（`prompt` 为空，
- *   且 `lighting/timeline/camera_movement` 仍是对象）→ 后续 `[INTEGRITY] prompt 缺失` 仅告警 →
- *   PipelineGuard `严格模式已启用,渲染被阻止`（run 直接失败，连产物目录都没写出）。
- *
- * 处理：在 `ProductionEngine.produce` 返回后，对**每个 prompt 为空的镜头**用 vendor 自己的组装器
- * （`PromptFusionAgent._assembleStandardPrompt`）+ 镜头字段重建提示词，并保留结构化原值。
- * 这不是静默兜底：会写 `promptRebuilt` 标记与日志（`[vendor-compat] 重建 N 镜 prompt`），
- * 上游一旦真修好，重建自然不再触发。
+ * 历史安装入口保留给 VideoStudio；现在安装真正的 Phase3 融合与准入桥。
+ * 不再在融合失败后自动用字段重建 prompt：那会把预算/模型失败包装成可出片结果。
+ * rebuildPromptsFromFields 仍是显式修复工具，不参与生产失败兜底。
+ * Phase3 桥自身引用计数共享，最后一个 run 释放时才还原全部原型。
  */
 export function installVendorPromptRebuildBridge(options: { log?: (line: string) => void; ratio?: string } = {}): () => void {
-  const log = options.log ?? (() => undefined);
-  try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
-    const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
-    const enginePath = resolvePath(
-      repoRoot,
-      "vendor/supermickey/hyperreality-system/engines/production-engine/production-engine.js"
-    );
-    const fusionPath = resolvePath(
-      repoRoot,
-      "vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-fusion-agent.js"
-    );
-    if (!existsSync(enginePath) || !existsSync(fusionPath)) return () => undefined;
-    const engineMod = vendorRequire(enginePath) as { ProductionEngine?: { prototype?: Record<string, unknown> } };
-    const prototype = engineMod?.ProductionEngine?.prototype;
-    if (!prototype || typeof prototype.produce !== "function") return () => undefined;
-    const fusionMod = vendorRequire(fusionPath) as {
-      PromptFusionAgent: new (options?: Record<string, unknown>) => {
-        _assembleStandardPrompt(shot: Record<string, unknown>, fields: Record<string, unknown>, ratio: string): string;
-      };
-    };
-
-    const original = prototype.produce as (blueprint?: unknown, options?: unknown) => Promise<Record<string, unknown>>;
-    prototype.produce = async function patchedProduce(this: unknown, blueprint?: unknown, options?: unknown) {
-      const result = await original.call(this, blueprint, options);
-      try {
-        const shots = (result?.shots as Array<Record<string, unknown>> | undefined) ?? [];
-        const optionsRecord = (options ?? {}) as Record<string, unknown>;
-        const blueprintRecord = (blueprint ?? {}) as Record<string, unknown>;
-        const blueprintConfig = (blueprintRecord.config ?? {}) as Record<string, unknown>;
-        const ratio = optionsRecord.ratio ?? blueprintConfig.aspectRatio ?? optionsRecord.aspectRatio ?? "9:16";
-        const fusion = new fusionMod.PromptFusionAgent({ semanticRefinement: false });
-        const rebuilt = rebuildPromptsFromFields(
-          shots,
-          String(ratio),
-          (shot, fields, r) => fusion._assembleStandardPrompt(shot, fields, r)
-        );
-        if (rebuilt.length > 0) {
-          log(
-            `[vendor-compat] Phase 3 未产出 prompt，已按 25/30 字段重建 ${rebuilt.length} 镜`
-            + `（${rebuilt.join("、")}）；标记 promptRebuilt=true`
-          );
-          const healedRows = shots
-            .filter((shot) => shot.promptRebuilt === true && Array.isArray(shot.promptContractHealed) && (shot.promptContractHealed as string[]).length > 0)
-            .map((shot) => `${String(shot.shotId ?? "?")}：${(shot.promptContractHealed as string[]).join("；")}`);
-          if (healedRows.length > 0) {
-            log(`[vendor-compat] 重建产物契约自愈 ${healedRows.length} 镜 → ${healedRows.join(" ｜ ")}`);
-          }
-          const unlocked = shots
-            .filter((shot) => shot.promptRebuilt === true && shot.costumeLock === false)
-            .map((shot) => String(shot.shotId ?? "?"));
-          if (unlocked.length > 0) {
-            log(
-              `[vendor-compat] ⚠ 服装未锁定 ${unlocked.length} 镜（${unlocked.join("、")}）：已记 costumeLock=false，`
-              + "按提示词契约须先补齐角色服装字段再渲染（不得静默放行）"
-            );
-          }
-        }
-      } catch (err) {
-        log(`[vendor-compat] prompt 重建失败（保持原样）：${err instanceof Error ? err.message : String(err)}`);
-      }
-      return result;
-    };
-    return () => {
-      prototype.produce = original;
-    };
-  } catch (err) {
-    log(`[vendor-compat] prompt 重建桥注入失败（不影响其它桥）：${err instanceof Error ? err.message : String(err)}`);
-    return () => undefined;
-  }
+  return installVendorPhase3FusionBridge({ log: options.log });
 }
 
 /**
@@ -1746,4 +1748,306 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
   return () => {
     restores.reverse().forEach((restore) => restore());
   };
+}
+
+/** Phase3 宿主执行契约。vendor 源保持只读，失败不得退成成功的规则 prompt。 */
+export const PHASE3_FUSION_POLICY_VERSION = "workloom.phase3-fusion/v1";
+type FusionRecord = Record<string, unknown>;
+interface FusionAgent extends FusionRecord {
+  process(shots: FusionRecord[], blueprint: FusionRecord, options: FusionRecord): Promise<FusionRecord>;
+  _callLLM?: (...args: unknown[]) => Promise<unknown>;
+  _getLLMEngine?: () => FusionRecord | null;
+  _getAltLLMEngine?: () => FusionRecord | null;
+}
+interface FusionPhase extends FusionRecord {
+  agents: { promptFusion?: FusionAgent };
+  budgetRemaining(): number;
+  checkBudget(needMs: number, label: string): boolean;
+  cloneShots(shots: FusionRecord[]): FusionRecord[];
+  mergeShots(base: FusionRecord[], updated: FusionRecord[], fields: string[]): FusionRecord[];
+  _checkDialogueTiming(shots: FusionRecord[], blueprint: FusionRecord): Promise<FusionRecord[]>;
+  saveCheckpoint(phase: string, shots: FusionRecord[], data: FusionRecord): Promise<unknown>;
+  log(stage: string, message: string): void;
+  healthMonitor?: { setLongTaskMode(name: string, active: boolean, timeout?: number): void };
+}
+
+const FUSION_MERGE_FIELDS = [
+  "prompt", "enhanced_prompt", "negative_prompt", "fields", "fusionText", "promptCharCount",
+  "director_instruction", "constraint", "baseline", "scene", "lighting", "composition",
+  "color_palette", "depth_of_field", "camera_movement", "character", "costume", "makeup",
+  "action", "props", "portraits", "dialogue", "timeline", "mood", "pacing", "transition",
+  "audio", "negative", "bright_constraint", "character_constraint", "consistency", "semanticRefinement",
+];
+
+function fusionRecord(value: unknown, label: string): FusionRecord {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CinematicSkillError("PHASE3_CONTRACT_INVALID", `${label} 必须为对象`, "unverified");
+  }
+  return value as FusionRecord;
+}
+
+/**
+ * 每次执行独立的 agent 视图，避免并发 run 互改 deadline/retries/子服务回调。
+ * 在真正 reasonStructured 调用前再检查预算，封住 BaseAgent 剩余时间保底 10s 的漏洞。
+ */
+function scopedFusionAgent(agent: FusionAgent, remaining: () => number, deadline: number): FusionAgent {
+  const scoped = Object.create(agent) as FusionAgent;
+  scoped._globalDeadline = deadline;
+  scoped._remainingMs = remaining;
+  scoped._callBudget = new Map(agent._callBudget instanceof Map ? agent._callBudget : []);
+  const guardEngine = (engine: FusionRecord | null): FusionRecord | null => {
+    if (!engine || typeof engine.reasonStructured !== "function") return engine;
+    const guarded = Object.create(engine) as FusionRecord;
+    guarded.reasonStructured = async (prompt: unknown, schema: unknown, options: FusionRecord = {}) => {
+      const budget = remaining();
+      if (budget < 5000) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "提供商调用前剩余预算不足 5 秒");
+      const timeout = Number(options.timeoutMs ?? budget);
+      return (engine.reasonStructured as (...args: unknown[]) => Promise<unknown>).call(engine, prompt, schema, {
+        ...options, timeoutMs: Math.min(Number.isFinite(timeout) && timeout > 0 ? timeout : budget, budget),
+        deadlineMs: deadline,
+      });
+    };
+    return guarded;
+  };
+  const originalCall = agent._callLLM;
+  if (typeof originalCall === "function") {
+    scoped._callLLM = async (...args: unknown[]) => {
+      const budget = remaining();
+      if (budget < 5000) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "LLM 调用前剩余预算不足 5 秒");
+      const opts = args[3] && typeof args[3] === "object" ? args[3] as FusionRecord : {};
+      const requested = Number(opts.timeoutMs ?? scoped.llmTimeout ?? budget);
+      args[3] = {
+        ...opts, timeoutMs: Math.min(Number.isFinite(requested) && requested > 0 ? requested : budget, budget), shotBudget: budget,
+        ...(opts.altModel && typeof opts.altModel === "object" ? { altModel: guardEngine(opts.altModel as FusionRecord) } : {}),
+      };
+      const response = await originalCall.apply(scoped, args);
+      if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "LLM 返回时阶段预算已耗尽");
+      return response;
+    };
+  }
+  for (const getter of ["_getLLMEngine", "_getAltLLMEngine"] as const) {
+    const originalEngine = agent[getter];
+    if (typeof originalEngine === "function") scoped[getter] = () => guardEngine(originalEngine.call(scoped));
+  }
+  if (agent._semanticPass && typeof agent._semanticPass === "object" && scoped._callLLM) {
+    const semantic = Object.create(agent._semanticPass) as FusionRecord;
+    semantic.callLLM = (...args: unknown[]) => scoped._callLLM!(...args);
+    scoped._semanticPass = semantic;
+  }
+  return scoped;
+}
+
+export function installVendorPhase3FusionBridge(options: { log?: (line: string) => void } = {}): () => void {
+  return installSharedBridge("phase3-fusion-policy-v1", () => {
+    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const vendorRoot = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system");
+    const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
+    const phaseModule = vendorRequire(resolvePath(vendorRoot, "engines/production-engine/phases/phase-3-prompt-fusion.js")) as {
+      Phase3PromptFusion: { prototype: FusionRecord };
+    };
+    const engineModule = vendorRequire(resolvePath(vendorRoot, "engines/production-engine/production-engine.js")) as {
+      ProductionEngine: { prototype: FusionRecord };
+    };
+    const router = vendorRequire(resolvePath(vendorRoot, "skills/hollywood-cinematography/cinematography-skill-router.js")) as CinematicSkillRouter;
+    const indexPath = resolvePath(vendorRoot, "skills/hollywood-cinematography/skills-compiled.json");
+    const registryText = readFileSync(indexPath, "utf8");
+    const registry = JSON.parse(registryText) as { skills?: Array<{ file?: string }> };
+    if (!Array.isArray(registry.skills) || !registry.skills.length) {
+      throw new CinematicSkillError("SKILL_INDEX_INVALID", "宿主技能桥要求非空的编译技能索引", "unverified");
+    }
+    const names = new Set<string>();
+    const skillSources: Array<{ file: string; hash: string }> = [];
+    for (const row of registry.skills) {
+      if (typeof row.file !== "string" || !row.file.endsWith(".md") || /[\\/]/.test(row.file) || names.has(row.file)
+        || !existsSync(resolvePath(vendorRoot, "skills/好莱坞工业电影技能工厂/技能系列/镜头级专项", row.file))) {
+        throw new CinematicSkillError("SKILL_INDEX_INVALID", "技能索引存在重复、非法路径或缺失正文", "unverified");
+      }
+      names.add(row.file);
+      skillSources.push({ file: row.file, hash: cinematicSkillHash(readFileSync(
+        resolvePath(vendorRoot, "skills/好莱坞工业电影技能工厂/技能系列/镜头级专项", row.file), "utf8"
+      )) });
+    }
+    const registryHash = cinematicSkillHash({ compiled: registryText, sources: skillSources });
+    const prototype = phaseModule.Phase3PromptFusion?.prototype;
+    const enginePrototype = engineModule.ProductionEngine?.prototype;
+    if (!prototype || typeof prototype.execute !== "function" || !enginePrototype || typeof enginePrototype.produce !== "function") {
+      throw new CinematicSkillError("PHASE3_BRIDGE_UNAVAILABLE", "vendor Phase3/ProductionEngine 接口不可用", "unverified");
+    }
+    const originalExecute = prototype.execute;
+    const originalProduce = enginePrototype.produce as (blueprint: FusionRecord, ...args: unknown[]) => Promise<FusionRecord>;
+
+    prototype.execute = async function executeHostPhase3(this: FusionPhase, state: FusionRecord): Promise<FusionRecord> {
+      const start = Date.now();
+      const result = fusionRecord(state.result, "result");
+      const stages = result.stages && typeof result.stages === "object" ? result.stages as FusionRecord : {};
+      result.stages = stages;
+      let shots: FusionRecord[] = [];
+      let healthEnabled = false;
+      const evidence: FusionRecord = { schemaVersion: PHASE3_FUSION_POLICY_VERSION, status: "unverified", registryHash };
+      stages.phase3Fusion = evidence;
+      try {
+        if (!Array.isArray(state.shots) || !state.shots.length) throw new CinematicSkillError("PHASE3_SHOTS_MISSING", "没有待融合镜头");
+        shots = this.cloneShots(state.shots.map((shot) => fusionRecord(shot, "shot")));
+        const blueprint = fusionRecord(state.adaptedBlueprint, "adaptedBlueprint");
+        const agent = this.agents.promptFusion;
+        if (!agent || typeof agent.process !== "function") throw new CinematicSkillError("PHASE3_AGENT_MISSING", "PromptFusion Agent 不可用", "unverified");
+        const initialBudget = this.budgetRemaining();
+        if (!Number.isFinite(initialBudget) || initialBudget <= 0) throw new CinematicSkillError("PHASE3_BUDGET_UNVERIFIED", "缺少有限且有效的阶段剩余预算", "unverified");
+        // 入场保留每镜一次最小可用 LLM 时间；实际每次外调再按剩余额度硬裁剪，不虚构重试预算。
+        const minimumNeedMs = shots.length * 5000 + 1000;
+        if (initialBudget < minimumNeedMs || !this.checkBudget(minimumNeedMs, "Phase 3")) {
+          throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", `剩余 ${initialBudget}ms 不能承担最低 ${minimumNeedMs}ms`);
+        }
+        const agentDeadline = Number(agent._globalDeadline);
+        const deadline = Math.min(start + initialBudget, Number.isFinite(agentDeadline) && agentDeadline > 0 ? agentDeadline : Infinity);
+        const remaining = (): number => {
+          const currentBudget = this.budgetRemaining();
+          if (!Number.isFinite(currentBudget)) {
+            throw new CinematicSkillError("PHASE3_BUDGET_UNVERIFIED", "阶段剩余预算在运行中变为未知，停止外部调用", "unverified");
+          }
+          return Math.max(0, Math.min(deadline - Date.now(), currentBudget));
+        };
+        const requireBudget = () => {
+          if (remaining() < 5000) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "阶段剩余预算不足，停止新外部调用");
+        };
+        requireBudget();
+        evidence.budget = { initialMs: initialBudget, minimumNeedMs, deadline };
+        evidence.blueprintHash = cinematicSkillHash(blueprint);
+        const scoped = scopedFusionAgent(agent, remaining, deadline);
+        if (this.healthMonitor) {
+          this.healthMonitor.setLongTaskMode("ProductionEngine", true, remaining());
+          healthEnabled = true;
+        }
+        const plan = await planCinematicSkills(shots, blueprint, router, {
+          registryHash, beforeExternalCall: requireBudget,
+          ...(scoped._callLLM ? { llmCaller: async (prompt: string) => {
+            const raw = await scoped._callLLM!(prompt, { required: ["picks"] }, () => null, { critical: true });
+            const response = fusionRecord(raw, "技能精选响应");
+            if (response.degraded === true) throw new CinematicSkillError("SKILL_SELECTION_UNVERIFIED", "技能精选调用降级", "unverified");
+            return response.result;
+          } } : {}),
+        });
+        shots = shots.map((shot) => {
+          const p = plan.get(String(shot.shotId ?? shot.shot_id))!;
+          const next = { ...shot, _skillMatched: p.matched, _workloomSkillPlan: { ...p, qcEntries: undefined } };
+          // 抹掉旧路由残留，空匹配不得保留上次的技能正文。
+          return { ...next, _skillContext: p.contextText };
+        });
+        stages.skillPrematch = [...plan.values()].map(({ contextText: _context, qcEntries: _qc, ...entry }) => ({
+          ...entry, injection: entry.matched.length ? "pre" : "none",
+        }));
+        requireBudget();
+        const blueprintHash = cinematicSkillHash({ policy: PHASE3_FUSION_POLICY_VERSION, blueprint, registryHash, shots });
+        const pfResult = await scoped.process(this.cloneShots(shots), blueprint, { checkpointManager: this.checkpointManager, blueprintHash });
+        if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "融合返回时阶段预算已耗尽");
+        const updated = pfResult.shots;
+        if (!Array.isArray(updated) || updated.length !== shots.length || pfResult.degraded === true || Number((pfResult.stats as FusionRecord | undefined)?.failed ?? 0) > 0) {
+          throw new CinematicSkillError("PHASE3_FUSION_UNVERIFIED", "融合返回缺镜头或包含降级/失败，不接受规则兜底", "unverified");
+        }
+        const expectedIds = new Set(shots.map((shot) => String(shot.shotId ?? shot.shot_id)));
+        const outputIds = new Set<string>();
+        for (const row of updated) {
+          const shot = fusionRecord(row, "融合镜头");
+          const id = String(shot.shotId ?? shot.shot_id ?? "");
+          if (!expectedIds.has(id) || outputIds.has(id) || shot.degraded === true || typeof shot.prompt !== "string" || !shot.prompt.trim()) {
+            throw new CinematicSkillError("PHASE3_FUSION_UNVERIFIED", "融合镜头 id、提示词或降级状态无效", "unverified");
+          }
+          outputIds.add(id);
+        }
+        const merged = this.mergeShots(shots, updated as FusionRecord[], FUSION_MERGE_FIELDS);
+        const timed = await this._checkDialogueTiming(merged, blueprint);
+        if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "台词检查后阶段预算已耗尽");
+        if (!Array.isArray(timed) || timed.length !== shots.length
+          || new Set(timed.map((shot) => String(shot.shotId ?? shot.shot_id))).size !== shots.length) {
+          throw new CinematicSkillError("PHASE3_CONTRACT_INVALID", "台词检查后镜头数量或 id 不一致", "unverified");
+        }
+        const qcRows: FusionRecord[] = [];
+        const finalShots: FusionRecord[] = timed.map((shot) => {
+          const id = String(shot.shotId ?? shot.shot_id);
+          const p = plan.get(id);
+          if (!p || typeof shot.prompt !== "string" || !shot.prompt.trim()) throw new CinematicSkillError("PHASE3_CONTRACT_INVALID", "合并后丢失镜头或 prompt", "unverified");
+          const violations = checkCinematicSkillCompliance(shot.prompt, p.qcEntries);
+          const status: CinematicSkillStatus = violations.length ? "failed" : p.matched.length ? "passed" : "not_applicable";
+          const qc = { status, scope: "prompt-text-only", skills: p.matched.map(({ file }) => file), violations };
+          qcRows.push({ shotId: id, ...qc });
+          return { ...shot, _skillQC: qc, _workloomFusion: {
+            schemaVersion: PHASE3_FUSION_POLICY_VERSION, status: "passed", sourceHash: p.sourceHash,
+            contextHash: p.contextHash, promptHash: cinematicSkillHash(shot.prompt), blueprintHash: evidence.blueprintHash,
+            registryHash, semanticSkillExecution: "unverified",
+          } };
+        });
+        stages.skillQC = { status: qcRows.some((row) => row.status === "failed") ? "failed" : "passed", scope: "prompt-text-only", details: qcRows };
+        if (qcRows.some((row) => row.status === "failed")) throw new CinematicSkillError("PHASE3_SKILL_QC_FAILED", "融合提示词包含所选技能的肯定式禁止内容");
+        const llmStats = result.llmStats && typeof result.llmStats === "object" ? result.llmStats as FusionRecord : {};
+        llmStats.promptFusion = { stats: pfResult.stats ?? null, elapsedMs: Date.now() - start };
+        result.llmStats = llmStats;
+        // 清理或日志失败也不能留下可复用的通过断点；提交 checkpoint 是最后一个可能失败的步骤。
+        if (healthEnabled && this.healthMonitor) {
+          healthEnabled = false;
+          try { this.healthMonitor.setLongTaskMode("ProductionEngine", false); }
+          catch (error) {
+            throw new CinematicSkillError("PHASE3_HEALTH_CLEANUP_FAILED", error instanceof Error ? error.message : String(error), "unverified");
+          }
+        }
+        this.log("PROMPT-FUSION-AGENT", `宿主融合完成：${finalShots.length} 镜；文本检查与画面质量状态分开记录`);
+        await this.saveCheckpoint("phase3", finalShots, { opening: result.opening, llmStats, phase3Fusion: { ...evidence, status: "passed" } });
+        evidence.status = "passed";
+        evidence.shots = finalShots.map((shot) => ({ shotId: shot.shotId ?? shot.shot_id, ...(shot._workloomFusion as FusionRecord) }));
+        return { success: true, shots: finalShots, result, timing: Date.now() - start };
+      } catch (error) {
+        const failure = error instanceof CinematicSkillError ? error : new CinematicSkillError("PHASE3_EXECUTION_FAILED", error instanceof Error ? error.message : String(error), "unverified");
+        evidence.status = failure.status;
+        evidence.code = failure.code;
+        evidence.error = failure.message;
+        result.degraded = true;
+        this.log("PROMPT-FUSION-FAIL", failure.message);
+        // 抛错让 vendor 离开后续阶段；外层 produce 桥会再次拒绝其 RECOVERY 规则回退。
+        throw failure;
+      } finally {
+        if (healthEnabled && this.healthMonitor) {
+          try { this.healthMonitor.setLongTaskMode("ProductionEngine", false); }
+          catch (error) {
+            evidence.status = "unverified";
+            evidence.code = "PHASE3_HEALTH_CLEANUP_FAILED";
+            throw new CinematicSkillError("PHASE3_HEALTH_CLEANUP_FAILED", error instanceof Error ? error.message : String(error), "unverified");
+          }
+        }
+      }
+    };
+
+    enginePrototype.produce = async function guardedProduce(this: unknown, blueprint: FusionRecord, ...args: unknown[]) {
+      const result = await originalProduce.call(this, blueprint, ...args);
+      const stages = result.stages && typeof result.stages === "object" ? result.stages as FusionRecord : {};
+      const phase = stages.phase3Fusion as FusionRecord | undefined;
+      if (phase && phase.status !== "passed") {
+        result.success = false;
+        throw new CinematicSkillError(String(phase.code ?? "PHASE3_FUSION_UNVERIFIED"), "Phase3 未通过，拒绝规则恢复/提示词重建后的出片", phase.status as CinematicSkillStatus);
+      }
+      if (!phase) {
+        const shots = Array.isArray(result.shots) ? result.shots as FusionRecord[] : [];
+        const blueprintHash = cinematicSkillHash(blueprint);
+        const verifiedResume = result.resumed === true && shots.length > 0 && shots.every((shot) => {
+          const stamp = shot._workloomFusion as FusionRecord | undefined;
+          return stamp?.schemaVersion === PHASE3_FUSION_POLICY_VERSION && stamp.status === "passed"
+            && stamp.blueprintHash === blueprintHash && stamp.registryHash === registryHash;
+        });
+        if (!verifiedResume) {
+          throw new CinematicSkillError("PHASE3_FUSION_UNVERIFIED", "生产结果缺本版本融合凭据；旧断点或规则模式需重新融合", "unverified");
+        }
+        stages.phase3Fusion = { schemaVersion: PHASE3_FUSION_POLICY_VERSION, status: "passed", resumed: true, blueprintHash, registryHash };
+        result.stages = stages;
+      }
+      return result;
+    };
+    try { options.log?.("[vendor-compat] Phase3 宿主融合桥已安装（预算、路由、融合与文本 QC 不通过即停止）"); }
+    catch (error) {
+      prototype.execute = originalExecute;
+      enginePrototype.produce = originalProduce;
+      throw error;
+    }
+    return () => {
+      prototype.execute = originalExecute;
+      enginePrototype.produce = originalProduce;
+    };
+  });
 }

@@ -1592,8 +1592,9 @@ export async function grade({
   verifyAt = null, bins = resolveBinaries(), auto = false,
   sourceTransfer = null, sourceGamut = null, denoise = false,
   sampling = "scene", sceneThreshold = SCENE_CUT_THRESHOLD, maxSamples = SCENE_MAX_SAMPLES,
-  defects = true, onUnfixable = "report",
+  defects = true, onUnfixable = "report", quality = "hd",
 }) {
+  if (!["hd", "uhd"].includes(quality)) throw new ColorError(`未知清晰度档位：${quality}`, "bad_request");
   const probe = await probeMedia(input, { bins });
   await assertOutputWritable(output, input, probe.sizeBytes);
   if (lutPath && !fs.existsSync(lutPath)) throw new ColorError(`LUT 不存在：${lutPath}`, "bad_lut");
@@ -1659,7 +1660,8 @@ export async function grade({
     "-hide_banner", "-v", "error", "-y",
     "-i", input,
     "-vf", chain,
-    "-c:v", "libx264", "-preset", "medium", "-crf", "20", "-pix_fmt", "yuv420p",
+    "-c:v", "libx264", "-preset", "medium", "-crf", quality === "uhd" ? "16" : "20",
+    ...(quality === "uhd" ? ["-threads", "2", "-filter_threads", "1"] : []), "-pix_fmt", "yuv420p",
     // 交付元数据（T-04）：显式打 Rec.709 三标签，避免下游平台按容器默认值误判色域。
     "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
   ];
@@ -1743,6 +1745,7 @@ export async function grade({
     profile,
     lut: lutPath,
     intensity,
+    quality,
     auto: autoUsed,
     conversion: {
       transfer: sourceColor.transfer,

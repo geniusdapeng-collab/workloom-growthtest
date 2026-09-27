@@ -2,9 +2,9 @@
  * 多模态生成池测试（v3.0 下一迭代）：
  * 异步任务制 / 降级链留痕 / 渲染额度台账（套餐配额 × 事件投影）/ 谷时计量
  */
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
-  GEN_CHAIN, JimengProvider, KlingProvider, MockGenProvider, RENDER_QUOTA_SECONDS,
+  GEN_CHAIN, GenSubmissionError, JimengProvider, KlingProvider, MockGenProvider, RENDER_QUOTA_SECONDS, SeedanceProvider,
   checkRenderBudget, projectRenderUsage, routeGenSubmit,
 } from "./gen-pool.js";
 import type { EventSink } from "./router.js";
@@ -117,7 +117,7 @@ describe("Kling/即梦 Provider（真实备援接入）", () => {
     expect(await noKey.healthy()).toBe(false);
     const k = new KlingProvider({ apiKey: "sk-test", baseUrl: "http://127.0.0.1:1" });
     expect(await k.healthy()).toBe(true);
-    // 端点不可达 → 抛错（降级链记录并切下一家，语义与 Seedance 一致）
+    // 端点不可达 → 抛错（没有接受证据，调用方只能对账，不可盲目换下一家）
     await expect(k.submit({ prompt: "x", estimatedUnits: 5 })).rejects.toThrow();
   });
 
@@ -150,5 +150,52 @@ describe("Kling/即梦 Provider（真实备援接入）", () => {
     const r = await routeGenSubmit({ prompt: "x", estimatedUnits: 10 }, [...GEN_CHAIN], pool, sink);
     expect(r.kind).toBe("submitted");
     expect(r.providerId).toBe("jimeng");
+  });
+});
+
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("生成提交的未知回执边界", () => {
+  it("供应商已接受而计量写失败：保留 taskId 并返回 unverified，不触发备援", async () => {
+    const { sink } = memSink();
+    sink.recordModelTrace = async () => { throw new Error("trace write failed"); };
+    const primary = new MockGenProvider("seedance");
+    const backup = new MockGenProvider("kling");
+    const primarySpy = vi.spyOn(primary, "submit"), backupSpy = vi.spyOn(backup, "submit");
+    const result = await routeGenSubmit({ prompt: "glass", estimatedUnits: 5 }, ["seedance", "kling"],
+      new Map([["seedance", primary], ["kling", backup]]), sink);
+    expect(result).toMatchObject({ kind: "unverified", accepted: true, providerId: "seedance", taskId: "mock-seedance-1" });
+    expect(primarySpy).toHaveBeenCalledTimes(1); expect(backupSpy).not.toHaveBeenCalled();
+  });
+  it("超时/断连无法证明未接受：不触发备援", async () => {
+    const primary = new MockGenProvider("seedance"), backup = new MockGenProvider("kling");
+    vi.spyOn(primary, "submit").mockRejectedValue(new Error("socket closed"));
+    const backupSpy = vi.spyOn(backup, "submit");
+    const result = await routeGenSubmit({ prompt: "glass", estimatedUnits: 5 }, ["seedance", "kling"],
+      new Map([["seedance", primary], ["kling", backup]]), memSink().sink);
+    expect(result).toMatchObject({ kind: "unverified", accepted: false, providerId: "seedance" });
+    expect(backupSpy).not.toHaveBeenCalled();
+  });
+  it("明确未接受且允许备援的故障才切换", async () => {
+    const primary = new MockGenProvider("seedance", "video", { failFirst: 1 }), backup = new MockGenProvider("kling");
+    const result = await routeGenSubmit({ prompt: "glass", estimatedUnits: 5 }, ["seedance", "kling"],
+      new Map([["seedance", primary], ["kling", backup]]), memSink().sink);
+    expect(result).toMatchObject({ kind: "submitted", providerId: "kling" });
+  });
+  it("政策/参数拒绝不允许换供应商规避", async () => {
+    const primary = new MockGenProvider("seedance"), backup = new MockGenProvider("kling");
+    vi.spyOn(primary, "submit").mockRejectedValue(new GenSubmissionError("moderation rejected", "not-accepted", false));
+    const backupSpy = vi.spyOn(backup, "submit");
+    await expect(routeGenSubmit({ prompt: "glass", estimatedUnits: 5 }, ["seedance", "kling"],
+      new Map([["seedance", primary], ["kling", backup]]), memSink().sink)).rejects.toThrow("moderation rejected");
+    expect(backupSpy).not.toHaveBeenCalled();
+  });
+  it.each([SeedanceProvider, KlingProvider, JimengProvider])("基座 adapter HTTP 503 为 unknown，401 为明确拒绝：%s", async (Adapter) => {
+    const provider = new Adapter({ apiKey: "test-only" });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("service unavailable", { status: 503 })));
+    await expect(provider.submit({ prompt: "glass", estimatedUnits: 5 })).rejects.toMatchObject({ acceptance: "unknown", fallbackAllowed: false });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("unauthorized", { status: 401 })));
+    await expect(provider.submit({ prompt: "glass", estimatedUnits: 5 })).rejects.toMatchObject({ acceptance: "not-accepted", fallbackAllowed: true });
   });
 });
