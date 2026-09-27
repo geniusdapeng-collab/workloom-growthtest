@@ -702,7 +702,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "5347ca8f33dcd6c0c478a4ddd516585132e4002ddfc5a7a0a414cbb5069cc008",
+    "digest": "2737c3c7cf627a5cc147c38bf1dfdc995edbe6368d861c33a67a5942b2c26e0a",
     "assets": {
       "connectors/bgm-bridge/brief.mjs": "bb858adae23728deffa1668d9f9db15085f9c94ed73d2c01b5505d82e78e2407",
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
@@ -1175,7 +1175,7 @@
       "skills/font-selection/SKILL.md": "786265f4f87cccf78052c8c536abf5a28684cab49052a543bbf0cf8e629ad93b",
       "skills/jenny-loom-research/SKILL.md": "e284bf762dc495855f72cc8b516c925cea515a9e33d5c858689d3d1a39f20e80",
       "skills/marketing-brief-parser/SKILL.md": "ea2d799a5e052eb1cf543e9ca93015cb87fdfdd5f9d6d0c65b159c7c144cc44c",
-      "skills/opening-hook-craft/SKILL.md": "467251cfa16ab5be4078d0367c5b5d0d257d9ac8ba9d0eb2d1c161848a44fc21",
+      "skills/opening-hook-craft/SKILL.md": "755d7d985d4e2ad6740b47307ea951cb5578af1cbdec4da0c487a2adb6a6b604",
       "skills/portrait-studio/SKILL.md": "9d05fb3083ec4561997efc45d1dcdd74b6ef76fde4448aaea2d09cbaed32e860",
       "skills/producer-gate-review/SKILL.md": "6240cc94d64b74af97341a7208f738fb4bda1a6724112474455d27fdd295a5c4",
       "skills/publish-ops/SKILL.md": "c6386d9b270d3a690fdfcb7de9f4507c4024574f82bb48df667607283d7d02a4",
