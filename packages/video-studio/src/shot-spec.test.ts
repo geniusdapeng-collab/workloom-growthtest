@@ -93,6 +93,23 @@ describe("字段规范真源", () => {
     expect(again.changed).toBe(false);
   });
 
+  it("【约束】画幅已对也要纠正帧率与像素，保留 MP4 后附加约束", () => {
+    const prompt = "01.【约束】9:16画幅，720x1280，24fps，MP4格式，无文字无水印\n02.【场景】会客厅";
+    const fixed = normalizeConstraintSegment(prompt, "9:16", "1080x1920", 30);
+    expect(fixed.changed).toBe(true);
+    expect(fixed.prompt).toContain("【约束】9:16画幅，1080x1920，30fps，MP4格式，无文字无水印");
+    expect(fixed.prompt).not.toContain("24fps");
+    expect(normalizeConstraintSegment(fixed.prompt, "9:16", "1080x1920", 30).changed).toBe(false);
+    expect(() => normalizeConstraintSegment(prompt, "9:16", "1080x1920", 0)).toThrow(/帧率/);
+  });
+
+  it("逐镜提示词使用实际提交的 30fps，而非 vendor 固定的 24fps", () => {
+    const report = prepareShotPrompt(contentCard(), { ratio: "9:16", resolution: "1080p", fps: 30 });
+    expect(report.prompt).toMatch(/【约束】[^\n]*30fps/);
+    expect(report.prompt).not.toMatch(/【约束】[^\n]*24fps/);
+    expect(report.delivery.pass).toBe(true);
+  });
+
   it("分辨率口径：1080p + 画幅 → 具体像素", () => {
     expect(resolutionToPixels("1080p", "9:16")).toBe("1080x1920");
     expect(resolutionToPixels("1080p", "16:9")).toBe("1920x1080");
