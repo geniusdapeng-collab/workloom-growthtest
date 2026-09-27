@@ -14,7 +14,8 @@ description: 调色执行纪律官方套件（随 bundles/ai-video 分发）：�
 
 1. **probe**：先读规格。确认分辨率/帧率/时长/色彩空间与是否 log（`color_transfer=arib-std-b67` 或动态范围明显偏平 = 疑似 log/HLG/PQ）。
    - log 素材**必须先做转换**（本仓自算 `slog3-to-rec709` LUT 或等效曲线），**禁止**在 log 上直接叠加创意 LUT。
-2. **analyze**：抽 4 帧（首段/前中/后中/尾段）量化诊断；有人物时补一帧人脸；有灰卡/白墙时用 `neutral_patch` 精确取白平衡。
+2. **analyze**：量化诊断。抽样默认**按场景切分**（T-02：切点检测 → 每场取中段代表帧，场景 ≤4 时退回首段/前中/后中/尾段均匀四帧；多切点素材不再被 4 帧平均抹平）；有人物时补一帧人脸；有灰卡/白墙时用 `neutral_patch` 精确取白平衡。
+   - **肤色取证（T-01）**：调用方显式传 `skin_patch` > 工具自动检测（分区肤色带 → 最大连通区）> 未命中。自动命中的区域坐标/面积占比/置信度写进 `skinDetection` 证据；未命中时报告 `skin_check_skipped`（不静默跳过）。肤色判据用**标准 HSV 色相**（由 U/V 按 BT.601 推算），**不是** signalstats 的 `HUEAVG`（那是复合色度相位角）——混用会把绿/青判成肤色（FC-COL-007）。
 3. **correct**：先做校正（白平衡 → 曝光 → 裁切 → 饱和），**一次只改一个变量**，改完复检；工具的 `auto` 只给保守校正量，人/岗位永远可以压在自动之上。
    - **校正恒为 100% 生效**，不受 `intensity` 稀释（否则"欠曝修一半"，画面看不出变化）。
 4. **look**：按内容类型选 profile（见下表），强度从 0.6–0.8 起；一个项目**只用一套 look**。
@@ -53,7 +54,12 @@ description: 调色执行纪律官方套件（随 bundles/ai-video 分发）：�
 | YMAX | 235–255 | 峰值白 |
 | UAVG / VAVG | ≈128（±6） | 中性色度（蓝-黄 / 红-绿轴） |
 | SATAVG | 40–80 | 适度饱和 |
-| 肤色 | hue 20–40°、sat ≤60 | 有人脸必须复检 |
+| 肤色 | **标准 HSV 色相** 20–40°、sat ≤60 | 有人脸必须复检；色相由 U/V 按 BT.601 推算（`standardHueFromUv`），与 signalstats `HUEAVG` 不是同一口径（FC-COL-007） |
+
+## 抽样与缺陷检测（T-02/T-03，工具已内置）
+
+- **抽样**：`sampling=scene`（默认）按场景切分取每场中段代表帧，指标按时长加权聚合；`sampling=uniform` 为历史四帧口径（对照/回滚用）；显式 `at` 永远优先。
+- **缺陷检测**（`defects`，默认开）：模糊 `blurdetect`（≥8 告警 / ≥15 不可修复档）、噪点差分（≥5 可降噪 / ≥9 不可修复档）、色带直方图空洞+平台结构、裁切占比 ≥5%。命中"不可修复"必须如实上报；交付线要硬闸时传 `on_unfixable=block`（删产物 + `verify_failed`）。
 
 ## profile 选型（内容类型 → look → 建议强度）
 
@@ -84,6 +90,9 @@ description: 调色执行纪律官方套件（随 bundles/ai-video 分发）：�
 - 成片路径 + 实际滤镜链 + 强度 + profile/LUT 标识；
 - 前后指标（YMIN/YAVG/YMAX/UAVG/VAVG/SATAVG）与差值；
 - scope 图（波形/矢量/直方图）与前后对比帧；
+- **色彩元数据**（T-04）：输出必须显式打 `color_primaries/color_trc/colorspace = bt709` 三标签，并由 ffprobe 回读校验（读不到按"未核实"上报，读到不符直接 `verify_failed` 删产物）；
+- **缺陷检测结论**（T-03）：模糊/噪点/色带/裁切的实测值、阈值与"可修复/不可修复"判定（不可修复 → 退回上游）；
+- 抽样元信息（T-02）：`sampling.mode`（scene/uniform/explicit）、切点数、各场代表帧时间戳与权重；
 - 产物 sha256。
 
 无回执=未核实：缺少上述任一项时**不得宣称完成**（L3.6/E3.7），失败必须留痕不静默。
@@ -93,3 +102,9 @@ description: 调色执行纪律官方套件（随 bundles/ai-video 分发）：�
 - 桥不可达/超时 → 软失败（`receipt.synced=false`），挂起转人工，不伪造成功回执；
 - ffmpeg 缺失 / LUT 非法 / 路径越界 / 磁盘不足 → 直接拒绝（见连接器错误码表），不得用近似方案顶替；
 - 执行失败重试 ≤3 次，仍失败转人工。
+
+历史事故案例：FC-COL-001（blend 权重方向错误致强度失效）、FC-COL-003（抽样帧代表性不足，T-02 已修复）、FC-COL-005（look 参数过弱，可见性红线由来）、FC-COL-006（只有统计目标没有画质目标，画质分由来）、FC-COL-007（肤色判据混用 HUEAVG 与 HSV 色相，T-01 已修复）——见 `library/color-kb/failure-cases/`。
+
+## 知识库引用
+
+> 知识库：library/color-kb/ — CGRADE-001 肤色科学（肤色取证判据依据）、CGRADE-005 示波器与数值判读（目标值表与 scope 判据依据）、CGRADE-006 白平衡与灰世界边界（neutral_patch 与白平衡置信度判据依据）、CGRADE-008 常见事故案例库（失败纪律的复盘入口）。检索入口：library/color-kb/_INDEX.md

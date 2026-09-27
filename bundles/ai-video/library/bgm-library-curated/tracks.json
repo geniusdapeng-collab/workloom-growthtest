@@ -33,7 +33,21 @@
       "note": "打分只用实测证据；选段用结构/包络证据——没有任何'听了觉得好听'式的主观声明"
     },
     "excerptPolicy": "每首取 60s 最合适选段（优先 drop 中心，其次能量最高滑窗），线性增益到 -14 LUFS（峰值贴顶的选段按峰值保护优先、结果低于 -14，逐首实测值见 excerpt.loudnessDeltaDb），AAC 112k 44.1kHz 立体声",
-    "note": "随仓兜底曲库：客户/工位没有自建曲库、在线曲源又不可用时，用这批曲目保证配乐链路不断档"
+    "note": "随仓兜底曲库：客户/工位没有自建曲库、在线曲源又不可用时，用这批曲目保证配乐链路不断档",
+    "keyArcTaggedAt": "2026-09-27T02:21:06.651Z",
+    "keyArc": {
+      "keyTagged": 37,
+      "keyLowConfidence": 13,
+      "keyFailed": 0,
+      "priorConflicts": 0,
+      "byArc": {
+        "flat-ambient": 21,
+        "outro-resolve": 2,
+        "build-drop": 7,
+        "wave-narrative": 20
+      },
+      "note": "调性为 chromagram + Krumhansl-Schmuckler 模板相关实测（中部代表段）；弧线由 structure 段落证据归纳；低置信调性不落 key: 标签，候选见 tag-evidence.json"
+    }
   },
   "tracks": [
     {
@@ -55,7 +69,10 @@
         "游戏集锦",
         "中频暖（warm-mid）",
         "循环友好",
-        "能量-low"
+        "能量-low",
+        "key:D4",
+        "mode:minor",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "卡点剪辑",
@@ -337,7 +354,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/电子游戏/Kingdom-of-Lost-Dreams_Looping.mp3",
       "titleSource": "embedded-tag",
@@ -379,7 +397,8 @@
         "中频暖（warm-mid）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-low"
+        "能量-low",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "生活方式",
@@ -662,7 +681,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "安静-舒缓/Sad walk with sad melodica.mp3",
       "album": "It's time for adventure ! vol 2",
@@ -704,7 +724,8 @@
         "品牌史诗",
         "低频厚（bass-heavy）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "arc:outro-resolve"
       ],
       "useCases": [
         "预告片",
@@ -867,7 +888,8 @@
       "confidence": {
         "style": "high",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "史诗-震撼/Chasing Daylight.mp3",
       "album": "www.scottbuckley.com.au/library",
@@ -909,7 +931,8 @@
         "安全警示",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-low"
+        "能量-low",
+        "arc:build-drop"
       ],
       "useCases": [
         "悬疑剧情",
@@ -1060,7 +1083,8 @@
       "confidence": {
         "style": "high",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "悲伤-负面/Eternal Sleep.mp3",
       "album": "Darren's Commercially Free Music",
@@ -1101,7 +1125,8 @@
         "品牌短片",
         "口播垫底",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "产品广告",
@@ -1227,7 +1252,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "励志-明朗/scott-buckley-soar.mp3",
       "album": "www.scottbuckley.com.au/library",
@@ -1269,7 +1295,10 @@
         "欢乐合集",
         "中频暖（warm-mid）",
         "循环友好",
-        "能量-mid"
+        "能量-mid",
+        "key:B4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "节日祝福",
@@ -1433,7 +1462,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "欢快-轻松/我的生活（主）.mp3",
       "titleSource": "file-name",
@@ -1473,7 +1503,10 @@
         "手作过程",
         "高频亮（bright）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:A4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "旅拍",
@@ -1662,7 +1695,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "Vlog-旅拍/liqwyd-shine.mp3",
       "titleSource": "embedded-tag",
@@ -1701,7 +1735,8 @@
         "空镜",
         "睡眠白噪音",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "冥想疗愈",
@@ -1877,7 +1912,8 @@
       "confidence": {
         "style": "high",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "400首商用/安静冥想/Desert-Crossing.mp3",
       "titleSource": "embedded-tag",
@@ -1918,7 +1954,10 @@
         "访谈垫底",
         "低频厚（bass-heavy）",
         "打击感强（percussive）",
-        "能量-high"
+        "能量-high",
+        "key:G4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "纪录片",
@@ -2105,7 +2144,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "安静-舒缓/自然.mp3",
       "titleSource": "file-name",
@@ -2145,7 +2185,10 @@
         "年会开场",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-high"
+        "能量-high",
+        "key:D4",
+        "mode:minor",
+        "arc:build-drop"
       ],
       "useCases": [
         "企业宣传",
@@ -2274,7 +2317,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "企业-宣传/超越递进.mp3",
       "album": "FesliyanStudios ASCAP IPI 792929876, 792929974",
@@ -2316,7 +2360,10 @@
         "中频暖（warm-mid）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-high"
+        "能量-high",
+        "key:G4",
+        "mode:minor",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "运动集锦",
@@ -2467,7 +2514,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/激情战斗/Crusaders-Approaching.mp3",
       "titleSource": "embedded-tag",
@@ -2508,7 +2556,10 @@
         "游戏集锦",
         "中频暖（warm-mid）",
         "循环友好",
-        "能量-low"
+        "能量-low",
+        "key:G4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "卡点剪辑",
@@ -2622,7 +2673,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/电子游戏/City-Beneath-the-Waves_v001.mp3",
       "titleSource": "embedded-tag",
@@ -2663,7 +2715,10 @@
         "学习陪伴",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-low"
+        "能量-low",
+        "key:F4",
+        "mode:minor",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "生活方式",
@@ -2886,7 +2941,8 @@
       "confidence": {
         "style": "high",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "安静-舒缓/Affirmations.mp3",
       "album": "www.scottbuckley.com.au/library",
@@ -2928,7 +2984,8 @@
         "品牌史诗",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "arc:build-drop"
       ],
       "useCases": [
         "预告片",
@@ -3103,7 +3160,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "史诗-震撼/March of Midnight.mp3",
       "album": "www.scottbuckley.com.au/library",
@@ -3145,7 +3203,10 @@
         "安全警示",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:C#4",
+        "mode:minor",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "悬疑剧情",
@@ -3308,7 +3369,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "悲伤-负面/Lake of Destiny.mp3",
       "album": "Darren's Commercially Free Music",
@@ -3349,7 +3411,10 @@
         "品牌短片",
         "口播垫底",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "key:G#4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "产品广告",
@@ -3475,7 +3540,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "励志-明朗/Salvation-Inspiring-Uplifting-Orchestra.mp3",
       "titleSource": "embedded-tag",
@@ -3515,7 +3581,10 @@
         "欢乐合集",
         "高频亮（bright）",
         "打击感强（percussive）",
-        "能量-high"
+        "能量-high",
+        "key:G4",
+        "mode:major",
+        "arc:build-drop"
       ],
       "useCases": [
         "节日祝福",
@@ -3752,7 +3821,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "企业-宣传/轻松欢快(尤克里里).mp3",
       "album": "FesliyanStudios.com ASCAP IPI 792929876, 792929974",
@@ -3792,7 +3862,10 @@
         "家庭记录",
         "手作过程",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "key:G#4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "旅拍",
@@ -3978,7 +4051,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "Vlog-旅拍/Ghostrifter-Official-Zeal.mp3",
       "titleSource": "embedded-tag",
@@ -4019,7 +4093,10 @@
         "睡眠白噪音",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:D4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "冥想疗愈",
@@ -4170,7 +4247,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/安静冥想/Icicles_Looping.mp3",
       "titleSource": "embedded-tag",
@@ -4211,7 +4289,10 @@
         "访谈垫底",
         "低频厚（bass-heavy）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:E4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "纪录片",
@@ -4472,7 +4553,8 @@
       "confidence": {
         "style": "medium",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "安静-舒缓/在森林里 - 用于视频的环境原声吉他器乐背景音乐.mp3",
       "titleSource": "file-name",
@@ -4513,7 +4595,8 @@
         "高频亮（bright）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-high"
+        "能量-high",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "运动集锦",
@@ -4714,7 +4797,8 @@
       "confidence": {
         "style": "medium",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "Vlog-旅拍/Luke-Bergs-Tropical-Soulmp3.mp3",
       "titleSource": "embedded-tag",
@@ -4755,7 +4839,10 @@
         "年会开场",
         "高频亮（bright）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:F#4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "企业宣传",
@@ -4944,7 +5031,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "企业-宣传/商业快节奏.mp3",
       "album": "FesliyanStudios.com ASCAP IPI 792929876, 792929974",
@@ -4986,7 +5074,8 @@
         "中频暖（warm-mid）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-low"
+        "能量-low",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "卡点剪辑",
@@ -5151,7 +5240,8 @@
       "confidence": {
         "style": "high",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "400首商用/电子游戏/RPG-Battle-Climax_v001.mp3",
       "titleSource": "embedded-tag",
@@ -5191,7 +5281,10 @@
         "咖啡馆",
         "学习陪伴",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "key:F#4",
+        "mode:minor",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "生活方式",
@@ -5353,7 +5446,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "安静-舒缓/Skogur.mp3",
       "titleSource": "embedded-tag",
@@ -5394,7 +5488,10 @@
         "安全警示",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-low"
+        "能量-low",
+        "key:A4",
+        "mode:minor",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "悬疑剧情",
@@ -5557,7 +5654,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "悲伤-负面/Sorrow.mp3",
       "titleSource": "embedded-tag",
@@ -5597,7 +5695,10 @@
         "口播垫底",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-high"
+        "能量-high",
+        "key:F4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "产品广告",
@@ -5748,7 +5849,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "励志-明朗/keys-of-moon-the-success.mp3",
       "titleSource": "file-name",
@@ -5788,7 +5890,10 @@
         "纪录片高潮",
         "品牌史诗",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "key:G4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "预告片",
@@ -5938,7 +6043,8 @@
       "confidence": {
         "style": "high",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "史诗-震撼/Discovery.mp3",
       "album": "www.scottbuckley.com.au/library",
@@ -5981,7 +6087,10 @@
         "高频亮（bright）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-high"
+        "能量-high",
+        "key:C4",
+        "mode:major",
+        "arc:build-drop"
       ],
       "useCases": [
         "节日祝福",
@@ -6182,7 +6291,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "欢快-轻松/City Sunshine.mp3",
       "album": "FreePD Music",
@@ -6224,7 +6334,10 @@
         "睡眠白噪音",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-low"
+        "能量-low",
+        "key:A4",
+        "mode:minor",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "冥想疗愈",
@@ -6459,7 +6572,8 @@
       "confidence": {
         "style": "medium",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "400首商用/安静冥想/Cumulonimbus.mp3",
       "titleSource": "embedded-tag",
@@ -6500,7 +6614,10 @@
         "手作过程",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-high"
+        "能量-high",
+        "key:E4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "旅拍",
@@ -6785,7 +6902,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "Vlog-旅拍/John-Bartmann-A-Kwela-Fella.mp3",
       "album": "Soundtrack Music",
@@ -6826,7 +6944,10 @@
         "年会开场",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:C4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "企业宣传",
@@ -7015,7 +7136,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "企业-宣传/随和舒缓(适合画外音背景).mp3",
       "album": "FesliyanStudios.com ASCAP IPI 792929876, 792929974",
@@ -7056,7 +7178,10 @@
         "开业热场",
         "高频亮（bright）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:A4",
+        "mode:minor",
+        "arc:outro-resolve"
       ],
       "useCases": [
         "运动集锦",
@@ -7159,7 +7284,8 @@
       "confidence": {
         "style": "medium",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/动感激进/Wild-West-Coast-Racing_7.mp3",
       "titleSource": "embedded-tag",
@@ -7200,7 +7326,8 @@
         "访谈垫底",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "纪录片",
@@ -7521,7 +7648,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "安静-舒缓/自然的旋律（主）.mp3",
       "titleSource": "file-name",
@@ -7560,7 +7688,10 @@
         "科技产品",
         "游戏集锦",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "key:C4",
+        "mode:minor",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "卡点剪辑",
@@ -7770,7 +7901,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "400首商用/电子游戏/Secret-Journey_Looping.mp3",
       "titleSource": "embedded-tag",
@@ -7812,7 +7944,10 @@
         "中频暖（warm-mid）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-high"
+        "能量-high",
+        "key:D4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "生活方式",
@@ -8085,7 +8220,8 @@
       "confidence": {
         "style": "medium",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "安静-舒缓/Calm Waters.mp3",
       "titleSource": "embedded-tag",
@@ -8125,7 +8261,10 @@
         "安全警示",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-low"
+        "能量-low",
+        "key:G#4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "悬疑剧情",
@@ -8300,7 +8439,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "悲伤-负面/Dusty Memories.mp3",
       "album": "Darren's Commercially Free Music",
@@ -8343,7 +8483,10 @@
         "中频暖（warm-mid）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-high"
+        "能量-high",
+        "key:G4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "节日祝福",
@@ -8494,7 +8637,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/趣味古怪/The-Drunk-Pelican-Duet_Looping.mp3",
       "titleSource": "embedded-tag",
@@ -8534,7 +8678,10 @@
         "纪录片高潮",
         "品牌史诗",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "key:F#4",
+        "mode:minor",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "预告片",
@@ -8828,7 +8975,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "史诗-震撼/The Summoning.mp3",
       "album": "www.scottbuckley.com.au/library",
@@ -8869,7 +9017,8 @@
         "品牌短片",
         "口播垫底",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "产品广告",
@@ -8997,7 +9146,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "励志-明朗/In Dreams.mp3",
       "album": "www.scottbuckley.com.au/library",
@@ -9039,7 +9189,10 @@
         "睡眠白噪音",
         "中频暖（warm-mid）",
         "循环友好",
-        "能量-low"
+        "能量-low",
+        "key:G4",
+        "mode:minor",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "冥想疗愈",
@@ -9165,7 +9318,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/安静冥想/Primitive-Life-Emerges_Looping.mp3",
       "titleSource": "embedded-tag",
@@ -9206,7 +9360,10 @@
         "手作过程",
         "高频亮（bright）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "key:B4",
+        "mode:minor",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "旅拍",
@@ -9381,7 +9538,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "Vlog-旅拍/SillyVillain-320bit.mp3",
       "titleSource": "embedded-tag",
@@ -9421,7 +9579,8 @@
         "年会开场",
         "高频亮（bright）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "arc:build-drop"
       ],
       "useCases": [
         "企业宣传",
@@ -9574,7 +9733,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "企业-宣传/节奏卡点(摇滚感).mp3",
       "album": "FesliyanStudios.com ASCAP IPI 792929876, 792929974",
@@ -9615,7 +9775,10 @@
         "高频亮（bright）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-low"
+        "能量-low",
+        "key:A#4",
+        "mode:major",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "运动集锦",
@@ -9778,7 +9941,8 @@
       "confidence": {
         "style": "medium",
         "bpm": "low",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "medium"
       },
       "curatedFrom": "400首商用/动感激进/Red-Convertible.mp3",
       "titleSource": "embedded-tag",
@@ -9819,7 +9983,10 @@
         "中频暖（warm-mid）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-low"
+        "能量-low",
+        "key:A4",
+        "mode:minor",
+        "arc:build-drop"
       ],
       "useCases": [
         "纪录片",
@@ -10006,7 +10173,8 @@
       "confidence": {
         "style": "medium",
         "bpm": "low",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "自然-特效/雨声和雨林.mp3",
       "titleSource": "embedded-tag",
@@ -10047,7 +10215,10 @@
         "低频厚（bass-heavy）",
         "打击感强（percussive）",
         "循环友好",
-        "能量-high"
+        "能量-high",
+        "key:C#4",
+        "mode:minor",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "生活方式",
@@ -10236,7 +10407,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "安静-舒缓/Se recourber.mp3",
       "album": "Bonjour from Paris, Nantes and Montreal",
@@ -10279,7 +10451,8 @@
         "安全警示",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-mid"
+        "能量-mid",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "悬疑剧情",
@@ -10432,7 +10605,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "悲伤-负面/Sundae Sunset.mp3",
       "titleSource": "embedded-tag",
@@ -10472,7 +10646,10 @@
         "游戏集锦",
         "高频亮（bright）",
         "打击感强（percussive）",
-        "能量-low"
+        "能量-low",
+        "key:D4",
+        "mode:major",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "卡点剪辑",
@@ -10599,7 +10776,8 @@
       "confidence": {
         "style": "high",
         "bpm": "high",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "400首商用/电子游戏/Mystical-Open.mp3",
       "titleSource": "embedded-tag",
@@ -10640,7 +10818,8 @@
         "欢乐合集",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-high"
+        "能量-high",
+        "arc:wave-narrative"
       ],
       "useCases": [
         "节日祝福",
@@ -10803,7 +10982,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "low"
       },
       "curatedFrom": "有趣-幽默/Floating Oompa.mp3",
       "titleSource": "embedded-tag",
@@ -10843,7 +11023,10 @@
         "口播垫底",
         "中频暖（warm-mid）",
         "打击感强（percussive）",
-        "能量-low"
+        "能量-low",
+        "key:A4",
+        "mode:minor",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "产品广告",
@@ -11068,7 +11251,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "励志-明朗/Guardians-Of-The-Fallen-Epic-Soundtrack.mp3",
       "titleSource": "embedded-tag",
@@ -11107,7 +11291,10 @@
         "纪录片高潮",
         "品牌史诗",
         "中频暖（warm-mid）",
-        "能量-low"
+        "能量-low",
+        "key:A4",
+        "mode:minor",
+        "arc:flat-ambient"
       ],
       "useCases": [
         "预告片",
@@ -11271,7 +11458,8 @@
       "confidence": {
         "style": "high",
         "bpm": "medium",
-        "note": "风格判定 ≥ medium"
+        "note": "风格判定 ≥ medium",
+        "key": "high"
       },
       "curatedFrom": "史诗-震撼/Spirit of The Dream.mp3",
       "titleSource": "embedded-tag",

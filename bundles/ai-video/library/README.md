@@ -22,6 +22,17 @@
 > 说明：`characters/` 与上述"资料库"不同——它是**运行资产**（出片链路直接装载 `bundles/ai-video/library/characters/**`），
 > 因此改动它等于改动出片结果：档案与定妆照只增不改，纠正走新版本 `portraits/vN/`。
 
+## 工位 know-how 知识库（运行资产）
+
+- `color-kb/`：**调色工位 know-how**（v1.0，8 主题 CGRADE-001~008 + `failure-cases/` 失败案例 6 个 FC-COL-001~006），
+  供 `skills/color-grade` / `color-look-design` / `color-shot-matching` / `color-delivery-spec` 与 `connectors/color-bridge` 检索调用；
+  判据与阈值以 `color-recipes/recipes.json` 为准，知识库只解释"为什么"和"怎么判"，检索入口 `color-kb/_INDEX.md`。
+- `bgm-kb/`：**配乐工位 know-how**（v1.0，8 主题 SCORE-001~008 + `failure-cases/` 失败案例 6 个 FC-BGM-001~006），
+  供 `skills/bgm-score-design` / `bgm-audio-layering` / `bgm-vocal-separation` / `bgm-library-license` / `bgm-delivery-spec` 与 `connectors/bgm-bridge` 检索调用；
+  判据与阈值以 `bgm-recipes/recipes.json` 为准，检索入口 `bgm-kb/_INDEX.md`。
+
+两个知识库与 `characters/` 同属运行资产：内容更新随版本整目录替换，不做目录内局部手改；判据改动必须与对应 recipes/连接器实现同步。
+
 ## 使用约束
 - 资料为只读参考，规范字面值（字段数/字数/语速等）仍以 vendor 真源为准（设计红线 2）。
 - 内容更新随 SuperMickey 版本升级整目录替换，不做目录内局部手改。

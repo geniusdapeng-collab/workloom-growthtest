@@ -120,3 +120,9 @@ description: 配乐分层与混音纪律官方套件（随 bundles/ai-video 分�
 - ffmpeg 缺失 / 路径越界 / 磁盘不足 → 直接拒绝（见连接器错误码表）；
 - 素材问题（对白削波、底噪过大、单声道不适用于近似分离）→ 如实标注，不用配乐掩盖；
 - 重试 ≤3 次，仍失败转人工。
+
+历史事故案例：FC-BGM-002（峰值对齐致前段 25.7s 静音，preroll 旋转修复）、FC-BGM-006（可闻度测不到写成 null dB 假比较）——见 `library/bgm-kb/failure-cases/`。
+
+## 知识库引用
+
+> 知识库：library/bgm-kb/ — SCORE-001 人声与音乐协同电平口径（让位深度与 BGM 电平判据依据）、SCORE-007 混音复检六线（复检线判读与超标处置依据）。检索入口：library/bgm-kb/_INDEX.md

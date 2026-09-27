@@ -24,7 +24,7 @@ import {
 import {
   classifySegments, energyEnvelope, estimateBpmFromOnsets, onsetStrength, scoreSegments,
 } from "../../../bundles/ai-video/connectors/bgm-bridge/measure.mjs";
-import { CHORDS, SCALES, planComposition, renderCompositionToWav } from "../../../bundles/ai-video/connectors/bgm-bridge/synth.mjs";
+import { CHORDS, SCALES, STYLE_PACKS, planComposition, renderCompositionToWav } from "../../../bundles/ai-video/connectors/bgm-bridge/synth.mjs";
 import { analyzePromptBrief, energyCurveFor, scoreTrackAgainstBrief } from "../../../bundles/ai-video/connectors/bgm-bridge/brief.mjs";
 import { normalizeLicense, listSources, SOURCE_ENV } from "../../../bundles/ai-video/connectors/bgm-bridge/sources.mjs";
 
@@ -124,16 +124,26 @@ describe("配乐围栏（G-BGM0..G-BGM5）语义", () => {
 describe("配乐配方库", () => {
   const doc = findRecipes({ list: true });
 
-  it("16 条题材配方，字段取值全部落在作曲内核可执行的集合内", () => {
-    expect(doc.items).toHaveLength(16);
+  // T-15 扩库（2026-09-27）：16 既有 + 16 新增 = 32；本口径与 bundles/ai-video/library/bgm-recipes 同步。
+  it("32 条题材配方（16 既有 + T-15 新增 16），字段取值全部落在作曲内核可执行的集合内", () => {
+    expect(doc.items).toHaveLength(32);
     const ids = doc.items.map((item) => item.id);
     expect(new Set(ids).size).toBe(ids.length);
     for (const item of doc.items) {
       expect(SCALES[item.mode], `${item.id} 调式 ${item.mode}`).toBeDefined();
       for (const chord of item.chords) expect(CHORDS[chord], `${item.id} 和弦 ${chord}`).toBeDefined();
       expect(item.instrumentation.length).toBeGreaterThan(0);
+      // 声部白名单以 synth.mjs 的真实音色为准（renderPlan 实现 sub/arp/lead/snare/riser/impact 六个扩展声部；
+      // T-15 新配方按风格包使用它们——旧白名单只有六个基础声部，属过期口径）。
+      const allowedInstruments = new Set([
+        "pad", "bass", "pluck", "kick", "hat", "bell",
+        "sub", "arp", "lead", "snare", "riser", "impact",
+      ]);
+      for (const pack of Object.values(STYLE_PACKS)) {
+        for (const name of (pack as { instrumentation: string[] }).instrumentation) allowedInstruments.add(name);
+      }
       for (const name of item.instrumentation) {
-        expect(["pad", "bass", "pluck", "kick", "hat", "bell"], `${item.id} 配器 ${name}`).toContain(name);
+        expect(allowedInstruments.has(name), `${item.id} 配器 ${name} 不在 synth.mjs 声部表内`).toBe(true);
       }
       expect(item.bpm).toBeGreaterThanOrEqual(40);
       expect(item.bpm).toBeLessThanOrEqual(200);

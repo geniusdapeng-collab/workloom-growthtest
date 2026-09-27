@@ -1,0 +1,1823 @@
+{
+  "schemaVersion": "workloom.bgm-tag/v1",
+  "generatedAt": "2026-09-27T02:12:04.104Z",
+  "root": "bundles/ai-video/library/bgm-library-curated",
+  "evidence": [],
+  "keyArcEvidence": {
+    "generatedAt": "2026-09-27T02:21:06.658Z",
+    "counts": {
+      "keyTagged": 37,
+      "keyLowConfidence": 13,
+      "keyFailed": 0,
+      "priorConflicts": 0,
+      "byArc": {
+        "flat-ambient": 21,
+        "outro-resolve": 2,
+        "build-drop": 7,
+        "wave-narrative": 20
+      }
+    },
+    "tracks": [
+      {
+        "id": "electronic-pulse-kingdom-of-lost-dreams-looping-183",
+        "file": "electronic-pulse-kingdom-of-lost-dreams-looping-183.m4a",
+        "key": {
+          "key": "D4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D4",
+              "mode": "minor",
+              "corr": 0.837
+            },
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.7514
+            }
+          ],
+          "margin": 0.0856,
+          "bestCorr": 0.837,
+          "secondCorr": 0.7514,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.837/0.7514（领先 0.0856）→ D4/minor（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "lo-fi-chill-sad-walk-with-sad-melodica-861",
+        "file": "lo-fi-chill-sad-walk-with-sad-melodica-861.m4a",
+        "key": {
+          "key": "D4",
+          "mode": "minor",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D4",
+              "mode": "minor",
+              "corr": 0.5594
+            },
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.5533
+            }
+          ],
+          "margin": 0.0062,
+          "bestCorr": 0.5594,
+          "secondCorr": 0.5533,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.5594/0.5533（领先 0.0062）→ D4/minor（low）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "cinematic-build-chasing-daylight-672",
+        "file": "cinematic-build-chasing-daylight-672.m4a",
+        "key": {
+          "key": "D#4",
+          "mode": "minor",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D#4",
+              "mode": "minor",
+              "corr": 0.7159
+            },
+            {
+              "key": "D#4",
+              "mode": "major",
+              "corr": 0.7155
+            }
+          ],
+          "margin": 0.0004,
+          "bestCorr": 0.7159,
+          "secondCorr": 0.7155,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7159/0.7155（领先 0.0004）→ D#4/minor（low）"
+        },
+        "arc": {
+          "arc": "outro-resolve",
+          "reason": "drop 峰值 -17.37 dB 后尾段回落到 -26.86 dB（占全曲 28%）",
+          "source": "excerpt-structure",
+          "segments": 2
+        }
+      },
+      {
+        "id": "tension-dark-eternal-sleep-941",
+        "file": "tension-dark-eternal-sleep-941.m4a",
+        "key": {
+          "key": "E4",
+          "mode": "major",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "E4",
+              "mode": "major",
+              "corr": 0.6154
+            },
+            {
+              "key": "C#4",
+              "mode": "minor",
+              "corr": 0.5978
+            }
+          ],
+          "margin": 0.0176,
+          "bestCorr": 0.6154,
+          "secondCorr": 0.5978,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.6154/0.5978（领先 0.0176）→ E4/major（low）"
+        },
+        "arc": {
+          "arc": "build-drop",
+          "reason": "存在高能 drop 段（铺垫→爆发）",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "modern-pop-scott-buckley-soar-640",
+        "file": "modern-pop-scott-buckley-soar-640.m4a",
+        "key": {
+          "key": "E4",
+          "mode": "major",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "E4",
+              "mode": "major",
+              "corr": 0.8864
+            },
+            {
+              "key": "B4",
+              "mode": "major",
+              "corr": 0.8537
+            }
+          ],
+          "margin": 0.0327,
+          "bestCorr": 0.8864,
+          "secondCorr": 0.8537,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8864/0.8537（领先 0.0327）→ E4/major（low）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "festive-bright-track-1016",
+        "file": "festive-bright-track-1016.m4a",
+        "key": {
+          "key": "B4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "B4",
+              "mode": "major",
+              "corr": 0.8969
+            },
+            {
+              "key": "E4",
+              "mode": "major",
+              "corr": 0.7675
+            }
+          ],
+          "margin": 0.1294,
+          "bestCorr": 0.8969,
+          "secondCorr": 0.7675,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8969/0.7675（领先 0.1294）→ B4/major（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "acoustic-warm-liqwyd-shine-552",
+        "file": "acoustic-warm-liqwyd-shine-552.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "major",
+              "corr": 0.8563
+            },
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.6572
+            }
+          ],
+          "margin": 0.199,
+          "bestCorr": 0.8563,
+          "secondCorr": 0.6572,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8563/0.6572（领先 0.199）→ A4/major（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 5
+        }
+      },
+      {
+        "id": "ambient-calm-desert-crossing-71",
+        "file": "ambient-calm-desert-crossing-71.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.791
+            },
+            {
+              "key": "A4",
+              "mode": "major",
+              "corr": 0.7814
+            }
+          ],
+          "margin": 0.0096,
+          "bestCorr": 0.791,
+          "secondCorr": 0.7814,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.791/0.7814（领先 0.0096）→ A4/minor（low）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 6
+        }
+      },
+      {
+        "id": "documentary-bed-track-926",
+        "file": "documentary-bed-track-926.m4a",
+        "key": {
+          "key": "G4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G4",
+              "mode": "major",
+              "corr": 0.8531
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.7961
+            }
+          ],
+          "margin": 0.057,
+          "bestCorr": 0.8531,
+          "secondCorr": 0.7961,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8531/0.7961（领先 0.057）→ G4/major（medium）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 6
+        }
+      },
+      {
+        "id": "corporate-clean-track-577",
+        "file": "corporate-clean-track-577.m4a",
+        "key": {
+          "key": "D4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D4",
+              "mode": "minor",
+              "corr": 0.8588
+            },
+            {
+              "key": "F4",
+              "mode": "major",
+              "corr": 0.765
+            }
+          ],
+          "margin": 0.0938,
+          "bestCorr": 0.8588,
+          "secondCorr": 0.765,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8588/0.765（领先 0.0938）→ D4/minor（medium）"
+        },
+        "arc": {
+          "arc": "build-drop",
+          "reason": "存在高能 drop 段（铺垫→爆发）",
+          "source": "excerpt-structure",
+          "segments": 7
+        }
+      },
+      {
+        "id": "sports-hype-crusaders-approaching-104",
+        "file": "sports-hype-crusaders-approaching-104.m4a",
+        "key": {
+          "key": "G4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G4",
+              "mode": "minor",
+              "corr": 0.6572
+            },
+            {
+              "key": "A#4",
+              "mode": "major",
+              "corr": 0.5598
+            }
+          ],
+          "margin": 0.0974,
+          "bestCorr": 0.6572,
+          "secondCorr": 0.5598,
+          "fromSec": 3.05,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.6572/0.5598（领先 0.0974）→ G4/minor（medium）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 6
+        }
+      },
+      {
+        "id": "electronic-pulse-city-beneath-the-waves-v001-133",
+        "file": "electronic-pulse-city-beneath-the-waves-v001-133.m4a",
+        "key": {
+          "key": "G4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G4",
+              "mode": "major",
+              "corr": 0.8594
+            },
+            {
+              "key": "D4",
+              "mode": "major",
+              "corr": 0.7437
+            }
+          ],
+          "margin": 0.1157,
+          "bestCorr": 0.8594,
+          "secondCorr": 0.7437,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8594/0.7437（领先 0.1157）→ G4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "lo-fi-chill-affirmations-719",
+        "file": "lo-fi-chill-affirmations-719.m4a",
+        "key": {
+          "key": "F4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "F4",
+              "mode": "minor",
+              "corr": 0.7757
+            },
+            {
+              "key": "A#4",
+              "mode": "minor",
+              "corr": 0.7058
+            }
+          ],
+          "margin": 0.07,
+          "bestCorr": 0.7757,
+          "secondCorr": 0.7058,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7757/0.7058（领先 0.07）→ F4/minor（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "cinematic-build-march-of-midnight-695",
+        "file": "cinematic-build-march-of-midnight-695.m4a",
+        "key": {
+          "key": "C4",
+          "mode": "major",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.7163
+            },
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.6815
+            }
+          ],
+          "margin": 0.0348,
+          "bestCorr": 0.7163,
+          "secondCorr": 0.6815,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7163/0.6815（领先 0.0348）→ C4/major（low）"
+        },
+        "arc": {
+          "arc": "build-drop",
+          "reason": "存在高能 drop 段（铺垫→爆发）",
+          "source": "excerpt-structure",
+          "segments": 5
+        }
+      },
+      {
+        "id": "tension-dark-lake-of-destiny-948",
+        "file": "tension-dark-lake-of-destiny-948.m4a",
+        "key": {
+          "key": "C#4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "C#4",
+              "mode": "minor",
+              "corr": 0.8045
+            },
+            {
+              "key": "E4",
+              "mode": "major",
+              "corr": 0.6344
+            }
+          ],
+          "margin": 0.17,
+          "bestCorr": 0.8045,
+          "secondCorr": 0.6344,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8045/0.6344（领先 0.17）→ C#4/minor（high）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "modern-pop-salvation-inspiring-uplifting-orchestra-617",
+        "file": "modern-pop-salvation-inspiring-uplifting-orchestra-617.m4a",
+        "key": {
+          "key": "G#4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G#4",
+              "mode": "major",
+              "corr": 0.8411
+            },
+            {
+              "key": "F4",
+              "mode": "minor",
+              "corr": 0.7229
+            }
+          ],
+          "margin": 0.1182,
+          "bestCorr": 0.8411,
+          "secondCorr": 0.7229,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8411/0.7229（领先 0.1182）→ G#4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "festive-bright-track-579",
+        "file": "festive-bright-track-579.m4a",
+        "key": {
+          "key": "G4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G4",
+              "mode": "major",
+              "corr": 0.8147
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.759
+            }
+          ],
+          "margin": 0.0557,
+          "bestCorr": 0.8147,
+          "secondCorr": 0.759,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8147/0.759（领先 0.0557）→ G4/major（medium）"
+        },
+        "arc": {
+          "arc": "build-drop",
+          "reason": "build→drop 蓄积爆发结构",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "acoustic-warm-ghostrifter-official-zeal-456",
+        "file": "acoustic-warm-ghostrifter-official-zeal-456.m4a",
+        "key": {
+          "key": "G#4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G#4",
+              "mode": "major",
+              "corr": 0.8354
+            },
+            {
+              "key": "F4",
+              "mode": "minor",
+              "corr": 0.7443
+            }
+          ],
+          "margin": 0.0911,
+          "bestCorr": 0.8354,
+          "secondCorr": 0.7443,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8354/0.7443（领先 0.0911）→ G#4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "ambient-calm-icicles-looping-80",
+        "file": "ambient-calm-icicles-looping-80.m4a",
+        "key": {
+          "key": "D4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D4",
+              "mode": "major",
+              "corr": 0.7331
+            },
+            {
+              "key": "D4",
+              "mode": "minor",
+              "corr": 0.6424
+            }
+          ],
+          "margin": 0.0907,
+          "bestCorr": 0.7331,
+          "secondCorr": 0.6424,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7331/0.6424（领先 0.0907）→ D4/major（medium）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 5
+        }
+      },
+      {
+        "id": "documentary-bed-track-921",
+        "file": "documentary-bed-track-921.m4a",
+        "key": {
+          "key": "E4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "E4",
+              "mode": "major",
+              "corr": 0.947
+            },
+            {
+              "key": "E4",
+              "mode": "minor",
+              "corr": 0.6593
+            }
+          ],
+          "margin": 0.2876,
+          "bestCorr": 0.947,
+          "secondCorr": 0.6593,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.947/0.6593（领先 0.2876）→ E4/major（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 7
+        }
+      },
+      {
+        "id": "sports-hype-luke-bergs-tropical-soulmp3-496",
+        "file": "sports-hype-luke-bergs-tropical-soulmp3-496.m4a",
+        "key": {
+          "key": "C4",
+          "mode": "major",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.7918
+            },
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.7446
+            }
+          ],
+          "margin": 0.0472,
+          "bestCorr": 0.7918,
+          "secondCorr": 0.7446,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7918/0.7446（领先 0.0472）→ C4/major（low）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "corporate-clean-track-570",
+        "file": "corporate-clean-track-570.m4a",
+        "key": {
+          "key": "F#4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "F#4",
+              "mode": "major",
+              "corr": 0.8528
+            },
+            {
+              "key": "A#4",
+              "mode": "minor",
+              "corr": 0.5709
+            }
+          ],
+          "margin": 0.2819,
+          "bestCorr": 0.8528,
+          "secondCorr": 0.5709,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8528/0.5709（领先 0.2819）→ F#4/major（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "electronic-pulse-rpg-battle-climax-v001-231",
+        "file": "electronic-pulse-rpg-battle-climax-v001-231.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.8217
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.7869
+            }
+          ],
+          "margin": 0.0348,
+          "bestCorr": 0.8217,
+          "secondCorr": 0.7869,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8217/0.7869（领先 0.0348）→ A4/minor（low）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 6
+        }
+      },
+      {
+        "id": "lo-fi-chill-skogur-871",
+        "file": "lo-fi-chill-skogur-871.m4a",
+        "key": {
+          "key": "F#4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "F#4",
+              "mode": "minor",
+              "corr": 0.8991
+            },
+            {
+              "key": "A4",
+              "mode": "major",
+              "corr": 0.7275
+            }
+          ],
+          "margin": 0.1716,
+          "bestCorr": 0.8991,
+          "secondCorr": 0.7275,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8991/0.7275（领先 0.1716）→ F#4/minor（high）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "tension-dark-sorrow-963",
+        "file": "tension-dark-sorrow-963.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.8713
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.747
+            }
+          ],
+          "margin": 0.1243,
+          "bestCorr": 0.8713,
+          "secondCorr": 0.747,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8713/0.747（领先 0.1243）→ A4/minor（high）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "modern-pop-keys-of-moon-the-success-633",
+        "file": "modern-pop-keys-of-moon-the-success-633.m4a",
+        "key": {
+          "key": "F4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "F4",
+              "mode": "major",
+              "corr": 0.9402
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.706
+            }
+          ],
+          "margin": 0.2342,
+          "bestCorr": 0.9402,
+          "secondCorr": 0.706,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.9402/0.706（领先 0.2342）→ F4/major（high）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "动态 5.29 dB <6dB：无明确高潮",
+          "source": "excerpt-structure",
+          "segments": 3
+        }
+      },
+      {
+        "id": "cinematic-build-discovery-676",
+        "file": "cinematic-build-discovery-676.m4a",
+        "key": {
+          "key": "G4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G4",
+              "mode": "major",
+              "corr": 0.8008
+            },
+            {
+              "key": "G4",
+              "mode": "minor",
+              "corr": 0.7357
+            }
+          ],
+          "margin": 0.0652,
+          "bestCorr": 0.8008,
+          "secondCorr": 0.7357,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8008/0.7357（领先 0.0652）→ G4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "festive-bright-city-sunshine-998",
+        "file": "festive-bright-city-sunshine-998.m4a",
+        "key": {
+          "key": "C4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.714
+            },
+            {
+              "key": "C4",
+              "mode": "minor",
+              "corr": 0.5282
+            }
+          ],
+          "margin": 0.1857,
+          "bestCorr": 0.714,
+          "secondCorr": 0.5282,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.714/0.5282（领先 0.1857）→ C4/major（high）"
+        },
+        "arc": {
+          "arc": "build-drop",
+          "reason": "存在高能 drop 段（铺垫→爆发）",
+          "source": "excerpt-structure",
+          "segments": 6
+        }
+      },
+      {
+        "id": "ambient-calm-cumulonimbus-67",
+        "file": "ambient-calm-cumulonimbus-67.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.7226
+            },
+            {
+              "key": "A4",
+              "mode": "major",
+              "corr": 0.5951
+            }
+          ],
+          "margin": 0.1275,
+          "bestCorr": 0.7226,
+          "secondCorr": 0.5951,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7226/0.5951（领先 0.1275）→ A4/minor（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 7
+        }
+      },
+      {
+        "id": "acoustic-warm-john-bartmann-a-kwela-fella-461",
+        "file": "acoustic-warm-john-bartmann-a-kwela-fella-461.m4a",
+        "key": {
+          "key": "E4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "E4",
+              "mode": "major",
+              "corr": 0.7476
+            },
+            {
+              "key": "A4",
+              "mode": "major",
+              "corr": 0.4576
+            }
+          ],
+          "margin": 0.29,
+          "bestCorr": 0.7476,
+          "secondCorr": 0.4576,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7476/0.4576（领先 0.29）→ E4/major（high）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "corporate-clean-track-582",
+        "file": "corporate-clean-track-582.m4a",
+        "key": {
+          "key": "C4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.9089
+            },
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.7932
+            }
+          ],
+          "margin": 0.1157,
+          "bestCorr": 0.9089,
+          "secondCorr": 0.7932,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.9089/0.7932（领先 0.1157）→ C4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "动态 4.84 dB <6dB：无明确高潮",
+          "source": "excerpt-structure",
+          "segments": 9
+        }
+      },
+      {
+        "id": "sports-hype-wild-west-coast-racing-7-54",
+        "file": "sports-hype-wild-west-coast-racing-7-54.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.7985
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.6877
+            }
+          ],
+          "margin": 0.1108,
+          "bestCorr": 0.7985,
+          "secondCorr": 0.6877,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7985/0.6877（领先 0.1108）→ A4/minor（medium）"
+        },
+        "arc": {
+          "arc": "outro-resolve",
+          "reason": "drop 峰值 -15.14 dB 后尾段回落到 -22.85 dB（占全曲 23%）",
+          "source": "excerpt-structure",
+          "segments": 3
+        }
+      },
+      {
+        "id": "documentary-bed-track-927",
+        "file": "documentary-bed-track-927.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.8266
+            },
+            {
+              "key": "F4",
+              "mode": "major",
+              "corr": 0.8004
+            }
+          ],
+          "margin": 0.0262,
+          "bestCorr": 0.8266,
+          "secondCorr": 0.8004,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8266/0.8004（领先 0.0262）→ A4/minor（low）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 3
+        }
+      },
+      {
+        "id": "electronic-pulse-secret-journey-looping-243",
+        "file": "electronic-pulse-secret-journey-looping-243.m4a",
+        "key": {
+          "key": "C4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "C4",
+              "mode": "minor",
+              "corr": 0.8156
+            },
+            {
+              "key": "A#4",
+              "mode": "major",
+              "corr": 0.65
+            }
+          ],
+          "margin": 0.1656,
+          "bestCorr": 0.8156,
+          "secondCorr": 0.65,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8156/0.65（领先 0.1656）→ C4/minor（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 8
+        }
+      },
+      {
+        "id": "lo-fi-chill-calm-waters-744",
+        "file": "lo-fi-chill-calm-waters-744.m4a",
+        "key": {
+          "key": "D4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D4",
+              "mode": "major",
+              "corr": 0.8645
+            },
+            {
+              "key": "G4",
+              "mode": "major",
+              "corr": 0.8142
+            }
+          ],
+          "margin": 0.0503,
+          "bestCorr": 0.8645,
+          "secondCorr": 0.8142,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8645/0.8142（领先 0.0503）→ D4/major（medium）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "3 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "tension-dark-dusty-memories-940",
+        "file": "tension-dark-dusty-memories-940.m4a",
+        "key": {
+          "key": "G#4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G#4",
+              "mode": "major",
+              "corr": 0.5306
+            },
+            {
+              "key": "G#4",
+              "mode": "minor",
+              "corr": 0.4703
+            }
+          ],
+          "margin": 0.0602,
+          "bestCorr": 0.5306,
+          "secondCorr": 0.4703,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.5306/0.4703（领先 0.0602）→ G#4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "festive-bright-the-drunk-pelican-duet-looping-388",
+        "file": "festive-bright-the-drunk-pelican-duet-looping-388.m4a",
+        "key": {
+          "key": "G4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G4",
+              "mode": "major",
+              "corr": 0.8115
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.7003
+            }
+          ],
+          "margin": 0.1112,
+          "bestCorr": 0.8115,
+          "secondCorr": 0.7003,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8115/0.7003（领先 0.1112）→ G4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "cinematic-build-the-summoning-705",
+        "file": "cinematic-build-the-summoning-705.m4a",
+        "key": {
+          "key": "F#4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "F#4",
+              "mode": "minor",
+              "corr": 0.5729
+            },
+            {
+              "key": "D4",
+              "mode": "major",
+              "corr": 0.367
+            }
+          ],
+          "margin": 0.2059,
+          "bestCorr": 0.5729,
+          "secondCorr": 0.367,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.5729/0.367（领先 0.2059）→ F#4/minor（medium）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "1 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "modern-pop-in-dreams-600",
+        "file": "modern-pop-in-dreams-600.m4a",
+        "key": {
+          "key": "D#4",
+          "mode": "major",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D#4",
+              "mode": "major",
+              "corr": 0.7109
+            },
+            {
+              "key": "C4",
+              "mode": "minor",
+              "corr": 0.7019
+            }
+          ],
+          "margin": 0.009,
+          "bestCorr": 0.7109,
+          "secondCorr": 0.7019,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7109/0.7019（领先 0.009）→ D#4/major（low）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "ambient-calm-primitive-life-emerges-looping-88",
+        "file": "ambient-calm-primitive-life-emerges-looping-88.m4a",
+        "key": {
+          "key": "G4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "G4",
+              "mode": "minor",
+              "corr": 0.4254
+            },
+            {
+              "key": "D#4",
+              "mode": "major",
+              "corr": 0.2957
+            }
+          ],
+          "margin": 0.1297,
+          "bestCorr": 0.4254,
+          "secondCorr": 0.2957,
+          "fromSec": 3.66,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.4254/0.2957（领先 0.1297）→ G4/minor（medium）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "acoustic-warm-sillyvillain-320bit-516",
+        "file": "acoustic-warm-sillyvillain-320bit-516.m4a",
+        "key": {
+          "key": "B4",
+          "mode": "minor",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "B4",
+              "mode": "minor",
+              "corr": 0.6412
+            },
+            {
+              "key": "F#4",
+              "mode": "major",
+              "corr": 0.5743
+            }
+          ],
+          "margin": 0.0669,
+          "bestCorr": 0.6412,
+          "secondCorr": 0.5743,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.6412/0.5743（领先 0.0669）→ B4/minor（medium）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "4 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 6
+        }
+      },
+      {
+        "id": "corporate-clean-track-576",
+        "file": "corporate-clean-track-576.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.6858
+            },
+            {
+              "key": "D4",
+              "mode": "minor",
+              "corr": 0.6558
+            }
+          ],
+          "margin": 0.03,
+          "bestCorr": 0.6858,
+          "secondCorr": 0.6558,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.6858/0.6558（领先 0.03）→ A4/minor（low）"
+        },
+        "arc": {
+          "arc": "build-drop",
+          "reason": "存在高能 drop 段（铺垫→爆发）",
+          "source": "excerpt-structure",
+          "segments": 2
+        }
+      },
+      {
+        "id": "sports-hype-red-convertible-35",
+        "file": "sports-hype-red-convertible-35.m4a",
+        "key": {
+          "key": "A#4",
+          "mode": "major",
+          "confidence": "medium",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A#4",
+              "mode": "major",
+              "corr": 0.6359
+            },
+            {
+              "key": "D4",
+              "mode": "minor",
+              "corr": 0.576
+            }
+          ],
+          "margin": 0.0599,
+          "bestCorr": 0.6359,
+          "secondCorr": 0.576,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.6359/0.576（领先 0.0599）→ A#4/major（medium）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "documentary-bed-track-1028",
+        "file": "documentary-bed-track-1028.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.6671
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.5064
+            }
+          ],
+          "margin": 0.1608,
+          "bestCorr": 0.6671,
+          "secondCorr": 0.5064,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.6671/0.5064（领先 0.1608）→ A4/minor（high）"
+        },
+        "arc": {
+          "arc": "build-drop",
+          "reason": "存在高能 drop 段（铺垫→爆发）",
+          "source": "excerpt-structure",
+          "segments": 3
+        }
+      },
+      {
+        "id": "lo-fi-chill-se-recourber-862",
+        "file": "lo-fi-chill-se-recourber-862.m4a",
+        "key": {
+          "key": "C#4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "C#4",
+              "mode": "minor",
+              "corr": 0.7594
+            },
+            {
+              "key": "C#4",
+              "mode": "major",
+              "corr": 0.3653
+            }
+          ],
+          "margin": 0.3941,
+          "bestCorr": 0.7594,
+          "secondCorr": 0.3653,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7594/0.3653（领先 0.3941）→ C#4/minor（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段 + breakdown 交替：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 6
+        }
+      },
+      {
+        "id": "tension-dark-sundae-sunset-966",
+        "file": "tension-dark-sundae-sunset-966.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "major",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "major",
+              "corr": 0.8429
+            },
+            {
+              "key": "D4",
+              "mode": "major",
+              "corr": 0.8324
+            }
+          ],
+          "margin": 0.0105,
+          "bestCorr": 0.8429,
+          "secondCorr": 0.8324,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8429/0.8324（领先 0.0105）→ A4/major（low）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "electronic-pulse-mystical-open-211",
+        "file": "electronic-pulse-mystical-open-211.m4a",
+        "key": {
+          "key": "D4",
+          "mode": "major",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D4",
+              "mode": "major",
+              "corr": 0.8685
+            },
+            {
+              "key": "A4",
+              "mode": "major",
+              "corr": 0.5601
+            }
+          ],
+          "margin": 0.3084,
+          "bestCorr": 0.8685,
+          "secondCorr": 0.5601,
+          "fromSec": 6.3,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.8685/0.5601（领先 0.3084）→ D4/major（high）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "festive-bright-floating-oompa-982",
+        "file": "festive-bright-floating-oompa-982.m4a",
+        "key": {
+          "key": "D4",
+          "mode": "minor",
+          "confidence": "low",
+          "source": "measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "D4",
+              "mode": "minor",
+              "corr": 0.7864
+            },
+            {
+              "key": "F4",
+              "mode": "major",
+              "corr": 0.7394
+            }
+          ],
+          "margin": 0.047,
+          "bestCorr": 0.7864,
+          "secondCorr": 0.7394,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.7864/0.7394（领先 0.047）→ D4/minor（low）"
+        },
+        "arc": {
+          "arc": "wave-narrative",
+          "reason": "2 个高能段：多轮起落",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      },
+      {
+        "id": "modern-pop-guardians-of-the-fallen-epic-soundtrack-598",
+        "file": "modern-pop-guardians-of-the-fallen-epic-soundtrack-598.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.9233
+            },
+            {
+              "key": "C4",
+              "mode": "major",
+              "corr": 0.614
+            }
+          ],
+          "margin": 0.3092,
+          "bestCorr": 0.9233,
+          "secondCorr": 0.614,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.9233/0.614（领先 0.3092）→ A4/minor（high）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "单段 flat（全曲能量平坦）",
+          "source": "excerpt-structure",
+          "segments": 1
+        }
+      },
+      {
+        "id": "cinematic-build-spirit-of-the-dream-700",
+        "file": "cinematic-build-spirit-of-the-dream-700.m4a",
+        "key": {
+          "key": "A4",
+          "mode": "minor",
+          "confidence": "high",
+          "source": "prior+measured",
+          "conflict": null,
+          "top2": [
+            {
+              "key": "A4",
+              "mode": "minor",
+              "corr": 0.758
+            },
+            {
+              "key": "E4",
+              "mode": "minor",
+              "corr": 0.6232
+            }
+          ],
+          "margin": 0.1349,
+          "bestCorr": 0.758,
+          "secondCorr": 0.6232,
+          "fromSec": 7.5,
+          "windowSec": 45,
+          "method": "chromagram(4096/2048 Hann) + Krumhansl-Schmuckler 模板相关（中部代表段）",
+          "basis": "top2 模板相关度 0.758/0.6232（领先 0.1349）→ A4/minor（high）"
+        },
+        "arc": {
+          "arc": "flat-ambient",
+          "reason": "动态 4.75 dB <6dB：无明确高潮",
+          "source": "excerpt-structure",
+          "segments": 4
+        }
+      }
+    ]
+  }
+}
