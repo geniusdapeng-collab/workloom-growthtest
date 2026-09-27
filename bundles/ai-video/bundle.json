@@ -456,6 +456,8 @@
         "library/scene-policies/enterprise-brand.source.md",
         "library/scene-policies/professional-service.json",
         "library/scene-policies/professional-service.source.md",
+        "library/scene-policies/tech-review.json",
+        "library/scene-policies/tech-review.source.md",
         "library/seedance-references/audio-tags.md",
         "library/seedance-references/cinematography.md",
         "library/seedance-references/director-styles.md",
@@ -748,7 +750,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "26df2c53ed2ca902a942c47acffda1f8c9d776884dcdd7e1576a27ed6913a447",
+    "digest": "3cc444cef9e241fd54ea87931c2c8c753997ccaa8e114fe4248789a5fe90c8bd",
     "assets": {
       "connectors/bgm-bridge/brief.mjs": "bb858adae23728deffa1668d9f9db15085f9c94ed73d2c01b5505d82e78e2407",
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
@@ -1159,6 +1161,8 @@
       "library/scene-policies/professional-service.json": "ae081df3c6702b42f24d08db17e6ef9ff890bad194cc93fd065f5160d19fd7c7",
       "library/scene-policies/professional-service.source.md": "cb1644114700a8375732e239f6bb525ee96dd87ae4cff774219cb276217525e4",
       "library/scene-policies/README.md": "279999549ea11d42c74e081692b4eae5396e7f491bf81e16cac7d727b7e4ca6c",
+      "library/scene-policies/tech-review.json": "6b564c7e48aa3af844ffe0abbc93dd3b0aca916c24af736f8390287031d631fd",
+      "library/scene-policies/tech-review.source.md": "cd322a47eb583493fd8996846c101d662f613e74307709cf16dbf65911863152",
       "library/seedance-references/audio-tags.md": "d1b4d9ba2c19b697f6671d6b1c2fa1d38ba1b00d64f3a9ecfaeea906aed63c88",
       "library/seedance-references/cinematography.md": "fbbf2f0f097680cc7101357396e0a926203fb8159fd18af627508f82da6b2991",
       "library/seedance-references/director-styles.md": "7b93e8ce74943f3b7db7b6b1d4149cf6d68477be739f31eb90c28cdef8eb6947",

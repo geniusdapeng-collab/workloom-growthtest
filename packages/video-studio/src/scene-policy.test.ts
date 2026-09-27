@@ -369,3 +369,101 @@ describe("T3 专业服务出镜知识条目", () => {
     expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "PS-04").length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * T4 科技数码测评（2026-09-28）：产品特写≥40% / 功能演示≥25% / 人物 20–30% / 氛围≤10% / 运动≥30%，
+ * 必备 360° 环绕、微距工艺与"眼见为实"的功能演示；产品打亮打透与屏摄无事故是不可突破底线。
+ */
+const t4 = policies.find((item) => item.id === "tech-review")!;
+
+function techShot(index: number, tags: string[], fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `TR-${String(index).padStart(2, "0")}`, duration: 4.5, policyTags: tags,
+    scene: "极简科技工作台，桌面干净整洁、有线管理",
+    composition: "产品打亮打透、色彩真实，主体明确",
+    camera_movement: "固定机位",
+    costume: "纯色简约T恤，手部干净",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function techCompliant(): ScenePolicyInput {
+  return {
+    title: "新款手机深度测评：外观、屏幕与充电实测",
+    shots: [
+      techShot(1, ["product-close", "moving"], { composition: "环绕镜头 360° 缓慢旋转展示整机材质工艺，产品打亮打透、色彩真实", camera_movement: "环绕" }),
+      techShot(2, ["product-close", "moving"], { composition: "微距推进拍 CNC 切边与镜头模组工艺，产品打亮打透、色彩真实", camera_movement: "微距推进" }),
+      techShot(3, ["product-close"], { composition: "材质纹理特写，产品打亮打透、色彩真实" }),
+      techShot(4, ["product-close", "moving"], { composition: "滑轨平移拍中框与接口特写，主体明确", camera_movement: "滑轨平移" }),
+      techShot(5, ["demo", "moving"], { composition: "屏幕界面实测演示，画面清晰、演示与结论对应，产品打亮打透、色彩真实", camera_movement: "平移" }),
+      techShot(6, ["demo"], { composition: "跑分实测画面，屏幕参数与口播一致、屏摄干净，产品打亮打透、色彩真实" }),
+      techShot(7, ["demo"], { composition: "充电计时实测演示，界面读数清晰，产品打亮打透、色彩真实" }),
+      techShot(8, ["host"], { composition: "上半身人物讲解，工作面干净整齐、面部主光充足，产品打亮打透、色彩真实" }),
+      techShot(9, ["host"], { composition: "半身人物手持产品讲解，桌面整洁有序，产品打亮打透、色彩真实" }),
+      techShot(10, ["ambience"], { scene: "极简科技工作台，桌面全景定调，设备质感统一、干净留白", composition: "环境氛围全景，画面极简留白、产品打亮打透、色彩真实" }),
+    ],
+  };
+}
+
+describe("T4 科技数码测评知识条目", () => {
+  it("按测评信号选中，合规十镜满足配比与三项必备画面", () => {
+    expect(t4.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "新款手机深度测评与开箱", shots: [] }, null, policies).policy?.id).toBe("tech-review");
+    expect(selectScenePolicy({ title: "智能硬件新品开箱", shots: [] }, null, policies).policy?.id).toBe("tech-review");
+    const report = auditScenePolicy(techCompliant(), t4);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios["product-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.4);
+    expect(report.ratios.demo?.share ?? 0).toBeGreaterThanOrEqual(0.25);
+    expect(report.ratios.host?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.host?.share ?? 1).toBeLessThanOrEqual(0.3);
+    expect(report.ratios.ambience?.share ?? 1).toBeLessThanOrEqual(0.1);
+    expect(report.ratios.moving?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.planCues["360°环绕镜头"]?.found).toBe(true);
+    expect(report.planCues["微距工艺特写"]?.found).toBe(true);
+    expect(report.planCues["功能演示画面"]?.found).toBe(true);
+  });
+
+  it("缺环绕/缺演示/人物与氛围超配/杂乱桌面/屏摄事故/手持晃动都判硬失败", () => {
+    const broken = techCompliant();
+    /** ① 去掉环绕与微距镜 → 必备画面缺失且产品特写跌到 40% 以下 */
+    broken.shots = broken.shots.filter((item) => !["TR-01", "TR-02"].includes(item.shotId));
+    /** ② 演示镜全去掉 → 功能演示为 0，人物与氛围占比被动上升 */
+    broken.shots = broken.shots.filter((item) => !["TR-05", "TR-06", "TR-07"].includes(item.shotId));
+    /** ③ 画面出现杂乱桌面、线缆缠绕、摩尔纹与手持晃动 */
+    broken.shots = broken.shots.map((item) => item.shotId === "TR-03"
+      ? { ...item, scene: "杂乱桌面，线缆缠绕，桌面有零食饮料", composition: "产品打亮打透，但屏摄有摩尔纹与屏幕反光，手持晃动随手拍" } : item);
+    const report = auditScenePolicy(broken, t4);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("quality-floor");
+  });
+
+  it("生活化背景可凭客户原话例外（生活方式科技品类），但屏摄与产品质感底线不豁免", () => {
+    const input = techCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "TR-08"
+      ? { ...item, scene: "居家客厅的极简测评位，桌面干净整洁、有线管理，明亮" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "TR-08", term: "居家客厅",
+      customerRequest: "这是生活方式科技品类，客户要求在家里的居家客厅拍体验段落", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t4);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "TR-08", term: "居家客厅" }));
+
+    const broken = techCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "TR-09"
+      ? { ...item, composition: "产品死黑、彩色灯光污染，屏摄有频闪条纹" } : item);
+    const report = auditScenePolicy(broken, t4);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "TR-09").length).toBeGreaterThan(0);
+  });
+
+  it("夸张震惊体与拉踩话术从实际台词取证", () => {
+    const fluent = techCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "TR-08"
+      ? { ...item, dialogue: [{ speaker: "编辑", text: "这代直接颠覆行业，吊打友商。" }], speechMode: "on-camera", speechScene: "desk-review" } : item);
+    const report = auditScenePolicy(fluent, t4);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "TR-08" }));
+  });
+});
