@@ -7,6 +7,7 @@
  *   ③ 渲染后的机检必须能识别"字没画上/人物层没合成/底图带字幕/文字压进遮挡区"四类事故。
  */
 import { describe, expect, it } from "vitest";
+import { coverPrefersNightBackground } from "./cover-design.js";
 import {
   COVER_DIFF_PSNR_DB,
   COVER_SAFE_AREA,
@@ -137,5 +138,30 @@ describe("封面机检", () => {
     expect(byId(checks, "clean-source").pass).toBe(false);
     expect(byId(checks, "safe-area").pass).toBe(false);
     expect(byId(checks, "safe-area").detail).toContain(`${(COVER_SAFE_AREA.bottomReservedRatio * 100).toFixed(0)}%`);
+  });
+});
+
+/**
+ * 夜景意图判定（T-2026-0926-0121 真机修复）：过宽字表会把"五环**点亮**"误判成夜景意图，
+ * 把设计稿选好的灯环底图换成人物近景（双手交叠）→ 封面被监制判"肢体畸变"打回。
+ */
+describe("coverPrefersNightBackground（封面夜景意图）", () => {
+  it("无歧义夜色词 → 判夜景意图", () => {
+    expect(coverPrefersNightBackground("赣江夜色，落在灯影里")).toBe(true);
+    expect(coverPrefersNightBackground("深夜的城市与车流")).toBe(true);
+    expect(coverPrefersNightBackground("灯火与霓虹之间")).toBe(true);
+  });
+
+  it("真机复现：设计理由写「五环点亮」→ 不再误判夜景", () => {
+    expect(coverPrefersNightBackground("获客，算得清 · 五环闭环，90 秒讲透；理由：五环依次点亮，环环算得清")).toBe(false);
+  });
+
+  it("「亮起/亮点/灯环」这类词单独出现 → 不触发", () => {
+    expect(coverPrefersNightBackground("灯环亮起，环环相扣")).toBe(false);
+    expect(coverPrefersNightBackground("这是全片的亮点")).toBe(false);
+  });
+
+  it("空文本 → 不触发（不凭空假设夜景）", () => {
+    expect(coverPrefersNightBackground("")).toBe(false);
   });
 });

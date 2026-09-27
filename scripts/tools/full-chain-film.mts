@@ -32,8 +32,9 @@ import {
   applyMicromotion, appendGateEvent, assessVariantDistinctness, auditContinuity, buildDeliveryManifest, buildGateEvent,
   assessMotionRichness, buildCoverDesignPrompt, buildMaterialMotionPrompt, buildPlatePrompt, buildRevisionPlan, buildRevisionReport, buildVariantPlan,
   buildMaterialScenePrompt, assessReferenceIndependence, decidePlateCache, MATERIAL_MOTION_POLICY, MATERIAL_RAW_MOTION_POLICY, MATERIAL_SCENE_POLICY_VERSION,
+  isDoubledNarration, speechAcceptance,
   REFERENCE_INDEPENDENCE_POLICY,
-  coverDeterministicChecks, COVER_FONTS, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
+  coverDeterministicChecks, coverPrefersNightBackground, COVER_FONTS, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm, reviewStage,
   buildSfxArgs, cutTimesFromShots, planCutSfxDetailed, CUT_SFX_POLICY,
@@ -3026,11 +3027,17 @@ function checkSpeech(file: string, expectText: string): SpeechReport {
   const activeRatio = num(checked.active_ratio);
   const segments = num(checked.speech_segments);
   const transcript = typeof checked.asr_text === "string" ? checked.asr_text : null;
-  const ok = activeRatio !== null && activeRatio >= SPEECH_ACTIVE_MIN
-    && matchRatio !== null && matchRatio >= SPEECH_MATCH_MIN;
+  /**
+   * 判据交给 `speechAcceptance`（T-2026-0926-0121 真机修复）：
+   * **强匹配（转写与台词对得上）时不得因活动度偏低而补旁白**——否则 TTS 会叠在原声上，
+   * 同一句被说两遍（真机 VID-GR01 第 1 镜：匹配 1.000 / 活动度 0.228 → 转写变成两句重复）。
+   */
+  const verdict = speechAcceptance({ matchRatio, activeRatio, matchMin: SPEECH_MATCH_MIN, activeMin: SPEECH_ACTIVE_MIN });
+  const ok = verdict.ok;
   const detail = `人声活动度 ${activeRatio === null ? "未测到" : activeRatio.toFixed(3)}（下限 ${SPEECH_ACTIVE_MIN}）`
     + ` · 台词匹配 ${matchRatio === null ? "未测到" : matchRatio.toFixed(3)}（下限 ${SPEECH_MATCH_MIN}）`
-    + ` · 语音段 ${segments ?? "?"} · 转写 ${transcript === null ? "无" : `「${transcript.slice(0, 40)}」`}`;
+    + ` · 语音段 ${segments ?? "?"} · 转写 ${transcript === null ? "无" : `「${transcript.slice(0, 40)}」`}`
+    + `｜判据：${verdict.reason}`;
   return { ok, matchRatio, activeRatio, segments, transcript, detail };
 }
 
@@ -3146,19 +3153,32 @@ if (STAGES.has("voice")) {
       ]);
       const produced = existsSync(out);
       const after = produced ? checkSpeech(out, text) : before;
-      const ok = produced && after.ok;
+      /**
+       * 重复播报防线（真机同因）：补旁白是"叠"在原声之上，若原声本已说对，
+       * 复核转写就会出现两遍 → 判本次补旁白失败并**放弃配音产物**（回退原片，绝不交付"说了两遍"的音频）。
+       */
+      const doubled = produced && isDoubledNarration(after.transcript, text);
+      const ok = produced && after.ok && !doubled;
+      if (doubled && existsSync(out)) {
+        rmSync(out, { force: true });
+        log(`  ⚠ ${shot.shotId} 补旁白后出现重复播报（同一句两次）→ 放弃配音产物，回退原片`);
+      }
       /** 合成文本指纹：TTS 的输入就是台词原文 → 内容一致性由构造保证（ASR 只作可听性核查） */
       const ttsTextSha256 = createHash("sha256").update(text).digest("hex").slice(0, 16);
       narrationCoverage.push({
         shotId: shot.shotId, speaker, text, ok,
-        source: ok ? "tts-narration" : "tts-failed",
-        detail: ok ? after.detail : `补旁白${produced ? "后仍未通过" : "未产出"}：${after.detail}`
+        source: ok ? "tts-narration" : (doubled ? "tts-doubled-fallback" : "tts-failed"),
+        detail: ok
+          ? after.detail
+          : (doubled
+            ? `补旁白出现重复播报（同一句两次）→ 已放弃配音产物并回退原片：${after.detail}`
+            : `补旁白${produced ? "后仍未通过" : "未产出"}：${after.detail}`)
       });
       record({
         stage: "voice", shotId: shot.shotId, invoked: true, ok, cached: false, degraded: !ok, attempt: 1,
-        ms: Date.now() - shotStarted, artifact: produced ? out : null,
+        ms: Date.now() - shotStarted, artifact: produced && !doubled ? out : null,
         evidence: {
-          source: "tts-narration", profile: NARRATION_PROFILE, policy: "keep-dialogue",
+          source: "tts-narration", profile: NARRATION_PROFILE, policy: "keep-dialogue", doubled,
           ttsTextSha256, ttsText: text,
           before: { matchRatio: before.matchRatio, activeRatio: before.activeRatio, transcript: before.transcript },
           after: { matchRatio: after.matchRatio, activeRatio: after.activeRatio, transcript: after.transcript },
@@ -3167,7 +3187,9 @@ if (STAGES.has("voice")) {
         verdict: null,
         note: ok
           ? `已补旁白并通过复核（${after.detail}）`
-          : `补旁白未通过复核：${after.detail}`
+          : (doubled
+            ? "重复播报防线命中：同一句被补旁白叠成两遍，已删除配音产物并回退原片（不交付重复音频）"
+            : `补旁白未通过复核：${after.detail}`)
       });
       if (!ok) log(`  ⛔ ${shot.shotId} 补旁白后仍未通过人声核查：${after.detail}`);
     }
@@ -3563,6 +3585,11 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
    * 产品所有者本地曲库（`~/.workloom-bgm/library`，1034 首，已打标）里本就有题材贴合的曲子，
    * 因此监制可以直接点名曲目：这条路径**跳过自动择优**，但仍走工位的混音/让位/响度/选段全套复检。
    */
+  /**
+   * 真峰值目标（2026-09-27 真机）：默认 -1.5 dBTP 而不是混音器默认的 -1.0——
+   * AAC 编码后会有 ~0.1dB 过冲，直接按 -1.0 出片会变成 -0.9，越过终审的"真峰值 ≤ -1.0 dBTP"硬上限。
+   */
+  const BGM_TRUE_PEAK = arg("--bgm-true-peak", "-1.5");
   const chosenTrack = arg("--bgm-track", "");
   const result = runCli(BGM_CLI, [
     "best", "--in", danmakuOut, "--out", out, "--genre", genre, "--mood", mood, "--policy", policy,
@@ -3600,6 +3627,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
       const mix = runCli(BGM_CLI, [
         "mix", "--in", danmakuOut, "--out", out, "--bgm", trackPath, "--policy", policy,
         "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
+        "--true-peak", BGM_TRUE_PEAK,
         "--section", arg("--bgm-section", "auto"),
         /** 同理：点名曲目也要把真实 BPM 交给混音器（否则基准落到默认 100，卡点判定失真） */
         ...(trackBpm ? ["--bgm-bpm", String(trackBpm)] : []),
@@ -3629,6 +3657,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
       const mix = runCli(BGM_CLI, [
         "mix", "--in", danmakuOut, "--out", out, "--bgm", bed.path, "--policy", policy,
         "--music-level", arg("--bgm-bed-level", "-28"), "--ducking", arg("--bgm-bed-ducking", "16"), "--lufs", "-14",
+        "--true-peak", BGM_TRUE_PEAK,
         "--section", arg("--bgm-section", "auto"),
         /**
          * **把曲目真实 BPM 交给混音器**（2026-09-26 真机修复）：
@@ -3659,6 +3688,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
         const mix = runCli(BGM_CLI, [
           "mix", "--in", danmakuOut, "--out", out, "--bgm", bgmFile, "--policy", policy,
           "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
+        "--true-peak", BGM_TRUE_PEAK,
           "--bpm-strategy", "cut-driven",
           "--cut-times", CUT_GRID.join(","),
           "--evidence-dir", join(POST_DIR, "bgm-evidence")
@@ -4141,7 +4171,8 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 副标题写"江与夜"而底图是阴天日景 → 监制判"文案与画面矛盾"打回）。
    */
   const planText = [plan.headline, plan.subline ?? "", plan.badge ?? "", plan.rationale].join(" ");
-  const wantsNight = /夜|灯|亮/.test(planText);
+  /** 夜景意图判定交给 cover-design 的窄口径函数（"点亮/亮起"不再误触发，见该函数注释） */
+  const wantsNight = coverPrefersNightBackground(planText);
   /**
    * "夜景镜"判定要**排除白天灯箱**（2026-09-25 真机）：早先用 /灯/ 匹配，把"地铁站厅灯箱"也算成夜景，
    * 封面底图因此换成地铁扶梯 → 监制判"与『滕王阁的夜』文案矛盾、未见地标"。
