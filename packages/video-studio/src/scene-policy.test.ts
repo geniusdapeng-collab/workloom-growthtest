@@ -265,3 +265,107 @@ describe("T2 企业品牌宣传知识条目", () => {
     }
   });
 });
+
+/**
+ * T3 专业服务等身出镜（2026-09-28）：中景≥35% / 人近特≥30% / 信任状细节≥15% / 工作状态≥15% / 运动 20–30%，
+ * 并守住"庄重可信底线"（生活化场景、娱乐化包装、职业禁忌画面）与合规承诺（稳赚/包赢/保证治好…）。
+ */
+const t3 = policies.find((item) => item.id === "professional-service")!;
+
+function serviceShot(index: number, tags: string[], duration: number, fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `PS-${String(index).padStart(2, "0")}`, duration, policyTags: tags,
+    scene: "明亮的律所独立办公室，整洁有序，书架与卷宗整齐排列",
+    composition: "坐姿中景，人物在办公桌后居于画面中心",
+    camera_movement: "固定机位",
+    costume: "深色正装西装与衬衫领带，整洁挺括",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function serviceCompliant(): ScenePolicyInput {
+  return {
+    title: "主任律师出镜解读合同风险",
+    shots: [
+      serviceShot(1, ["medium"], 4.5, { composition: "坐姿中景，人物在办公桌后居于画面中心，书架前，画面干净明亮" }),
+      serviceShot(2, ["medium"], 4.5, { composition: "腰部以上中景，会客室沙发对谈，环境明亮整洁" }),
+      serviceShot(3, ["medium", "moving"], 4.5, { composition: "半身中景，独立办公室内讲解，背景干净有序", camera_movement: "平稳横移" }),
+      serviceShot(4, ["medium"], 4.5, { composition: "中景，会议室白板前讲解，画面明亮通透" }),
+      serviceShot(5, ["medium"], 4.5, { composition: "坐姿中景，办公桌后直视镜头，构图端正对称" }),
+      serviceShot(6, ["person-close"], 4.5, { composition: "胸部以上近景，眼神坚定诚恳，面部光均匀无硬阴影" }),
+      serviceShot(7, ["person-close"], 4.5, { composition: "面部近景特写，微笑适度，背景干净明亮" }),
+      serviceShot(8, ["person-close"], 4.5, { composition: "近景呈现讲述微表情，光线柔和" }),
+      serviceShot(9, ["person-close"], 4.5, { composition: "胸部以上特写，讲到结论时直视镜头" }),
+      serviceShot(10, ["trust-detail"], 4.5, { composition: "信任状细节特写：证书与执业资格文件，画面干净", scene: "律师事务所办公室荣誉墙，明亮整洁" }),
+      serviceShot(11, ["trust-detail"], 4.5, { composition: "专业工具与案卷卷宗的细节特写，光线干净", scene: "独立办公室桌面，卷宗整齐" }),
+      serviceShot(12, ["working", "moving"], 9, { composition: "工作场景中景：翻阅卷宗并书写批注，专业状态自然", scene: "明亮的律所办公室，桌面整洁", camera_movement: "缓推" }),
+    ],
+  };
+}
+
+describe("T3 专业服务出镜知识条目", () => {
+  it("按职业信号自动选中，合规片单满足配比与必备证据", () => {
+    expect(t3.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "主任律师出镜解读合同风险", shots: [] }, null, policies).policy?.id).toBe("professional-service");
+    expect(selectScenePolicy({ title: "医生出镜讲解体检指标", shots: [] }, null, policies).policy?.id).toBe("professional-service");
+    const report = auditScenePolicy(serviceCompliant(), t3);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios.medium?.share ?? 0).toBeGreaterThanOrEqual(0.35);
+    expect(report.ratios["person-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.ratios["trust-detail"]?.share ?? 0).toBeGreaterThanOrEqual(0.15);
+    expect(report.ratios.working?.share ?? 0).toBeGreaterThanOrEqual(0.15);
+    expect(report.ratios.moving?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.moving?.share ?? 1).toBeLessThanOrEqual(0.3);
+  });
+
+  it("缺信任状/缺工作状态/运动超标/生活化场景/娱乐包装/职业禁忌都判硬失败", () => {
+    const broken = serviceCompliant();
+    /** ① 去掉信任状与工作状态镜头 → 两支 required-plan-cue 与两项 ratio-min 同时失败 */
+    broken.shots = broken.shots.filter((item) => item.shotId !== "PS-10" && item.shotId !== "PS-11" && item.shotId !== "PS-12");
+    /** ② 运动镜头占比过高（超过 30% 上限）：给 4/9 镜打上 moving 标签 */
+    broken.shots = broken.shots.map((item, index) => index < 4
+      ? { ...item, policyTags: [...(item.policyTags ?? []), "moving"].filter((tag, i, list) => list.indexOf(tag) === i), camera_movement: "平稳横移" }
+      : { ...item, camera_movement: "固定机位" });
+    /** ③ 生活化场景 + 娱乐化包装 + 医疗禁忌 */
+    broken.shots = broken.shots.map((item) => item.shotId === "PS-02"
+      ? { ...item, scene: "居家客厅沙发，综艺花字包装，背景有病房" } : item);
+    const report = auditScenePolicy(broken, t3);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("restricted-location");
+    expect(rules).toContain("quality-floor");
+  });
+
+  it("口播含合规风险承诺（稳赚/包赢/保证治好）直接拦下，且与 T1 不冲突", () => {
+    const fluent = serviceCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "PS-06"
+      ? { ...item, dialogue: [{ speaker: "律师", text: "委托我们包赢。" }], speechMode: "on-camera", speechScene: "executive-office" } : item);
+    const report = auditScenePolicy(fluent, t3);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "PS-06" }));
+    /** 与 T1 的判优：企业负责人 + 律师出镜 → T1（人物主线且 priority 更高） */
+    const both = selectScenePolicy({ title: "企业负责人专访，同时请律师出镜解读合规", shots: [] }, null, policies);
+    expect(both.policy?.id).toBe("commercial-person");
+    expect(both.reason).toContain("判优胜出");
+  });
+
+  it("生活化场景可按客户逐镜原话例外，但职业禁忌与庄重底线不豁免", () => {
+    const input = serviceCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "PS-03"
+      ? { ...item, scene: "居家客厅改造的书房，明亮整洁、正装出镜" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "PS-03", term: "居家客厅",
+      customerRequest: "客户要求在家里的居家客厅拍摄书房段落", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t3);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "PS-03", term: "居家客厅" }));
+
+    const forbidden = serviceCompliant();
+    forbidden.shots = forbidden.shots.map((item) => item.shotId === "PS-04"
+      ? { ...item, scene: "诊断室外的病房走廊，画面出现血腥" } : item);
+    const report = auditScenePolicy(forbidden, t3);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "PS-04").length).toBeGreaterThan(0);
+  });
+});
