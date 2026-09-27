@@ -664,3 +664,104 @@ describe("T6 知识口播知识条目", () => {
     expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "KT-06" }));
   });
 });
+
+/**
+ * T7 美妆时尚/穿搭（2026-09-28）：妆容特写≥30% / 全身造型≥25% / 细节特写≥20% / 中景≥20% / 运动 20–35%，
+ * 必备 妆容或全身主镜头 + 细节特写 + 动态镜头；皮肤与色彩真实、无廉价元素不可突破。
+ */
+const t7 = policies.find((item) => item.id === "beauty-fashion")!;
+
+function fashionShot(index: number, tags: string[], duration: number, fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `BF-${String(index).padStart(2, "0")}`, duration, policyTags: tags,
+    scene: "杂志感米色纯色空间，一盏设计感灯，画面干净有呼吸感",
+    composition: "柔光通透、皮肤纹理真实，画面精致克制",
+    camera_movement: "固定机位",
+    costume: "设计感简约造型，熨烫平整",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function fashionCompliant(): ScenePolicyInput {
+  return {
+    title: "秋冬妆容教程与穿搭分享",
+    shots: [
+      fashionShot(1, ["makeup-close"], 6, { composition: "眼妆妆容特写，柔光通透、皮肤纹理真实、有眼神光", scene: "整洁梳妆区，带灯化妆镜，化妆品有序陈列" }),
+      fashionShot(2, ["makeup-close"], 6, { composition: "唇妆妆效特写，色号还原准确、柔光通透、画面精致" }),
+      fashionShot(3, ["makeup-close"], 6, { composition: "底妆质感特写，皮肤纹理真实，柔光均匀、干净有呼吸感" }),
+      fashionShot(4, ["full-look"], 7.5, { composition: "全身整体造型镜头，比例与搭配逻辑清楚，柔光通透、画面干净精致" }),
+      fashionShot(5, ["full-look", "moving"], 7.5, { composition: "穿搭全身造型，服装平整、柔光通透", camera_movement: "跟随行走" }),
+      fashionShot(6, ["detail"], 6, { composition: "面料细节特写，缝线与质感清晰，柔光通透、画面精致" }),
+      fashionShot(7, ["detail"], 6, { composition: "配饰与美甲细节特写，干净克制、光泽真实" }),
+      fashionShot(8, ["medium"], 5, { composition: "中景人物气质镜头，背景克制精致、柔光通透" }),
+      fashionShot(9, ["medium", "moving"], 5, { composition: "镜前中景，人物松弛自信，柔光通透、画面干净有呼吸感", camera_movement: "缓慢推进" }),
+      fashionShot(10, ["medium", "moving"], 5, { composition: "中景气质镜头，转身回眸，柔光通透、服装动态美清楚", camera_movement: "跟随转身" }),
+    ],
+  };
+}
+
+describe("T7 美妆时尚知识条目", () => {
+  it("按美妆/穿搭信号选中，合规十镜满足配比与三项必备画面", () => {
+    expect(t7.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "秋冬妆容教程：三分钟通勤妆", shots: [] }, null, policies).policy?.id).toBe("beauty-fashion");
+    expect(selectScenePolicy({ title: "通勤穿搭分享", shots: [] }, null, policies).policy?.id).toBe("beauty-fashion");
+    const report = auditScenePolicy(fashionCompliant(), t7);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios["makeup-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.ratios["full-look"]?.share ?? 0).toBeGreaterThanOrEqual(0.25);
+    expect(report.ratios.detail?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.medium?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.moving?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.moving?.share ?? 1).toBeLessThanOrEqual(0.35);
+    expect(report.planCues["妆容特写或全身造型"]?.found).toBe(true);
+    expect(report.planCues["细节特写"]?.found).toBe(true);
+    expect(report.planCues["动态镜头"]?.found).toBe(true);
+  });
+
+  it("缺细节/缺动态/妆容不足/快切晃镜超上限/廉价堆砌与滤镜事故都判硬失败", () => {
+    const broken = fashionCompliant();
+    /** ① 去掉细节与动态镜 → 必备画面缺失、细节与运动均不足 */
+    broken.shots = broken.shots.filter((item) => !["BF-06", "BF-07", "BF-05", "BF-10"].includes(item.shotId));
+    /** ② 剩余镜头全打 moving 标签 → 运动超 35% 上限（同时妆容不足） */
+    broken.shots = broken.shots.map((item, index) => index < 3
+      ? { ...item, policyTags: [...(item.policyTags ?? []), "moving"], camera_movement: "快切晃镜" }
+      : item);
+    /** ③ 廉价网红风堆砌 + 滤镜事故 */
+    broken.shots = broken.shots.map((item) => item.shotId === "BF-02"
+      ? { ...item, scene: "杂乱化妆台，艳俗假花与掉漆字母灯，起球地毯", composition: "磨皮成硅胶脸、假白脸，口红变色" } : item);
+    const report = auditScenePolicy(broken, t7);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("quality-floor");
+    expect(rules).toContain("motion-consistency");
+  });
+
+  it("平价生活化场景可凭客户原话例外，但皮肤质感与色彩真实底线不豁免", () => {
+    const input = fashionCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "BF-08"
+      ? { ...item, scene: "出租屋改造后的整洁梳妆角，画面干净精致有呼吸感" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "BF-08", term: "出租屋",
+      customerRequest: "这是平价改造内容，客户要求在出租屋拍整洁版梳妆角", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t7);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "BF-08", term: "出租屋" }));
+
+    const broken = fashionCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "BF-09"
+      ? { ...item, composition: "强黄光顶光，肤色蜡黄，镜面指纹与水渍" } : item);
+    const report = auditScenePolicy(broken, t7);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "BF-09").length).toBeGreaterThan(0);
+  });
+
+  it("夸大妆效与拉踩话术从实际台词取证", () => {
+    const fluent = fashionCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "BF-01"
+      ? { ...item, dialogue: [{ speaker: "博主", text: "一抹换头，直接吊打大牌。" }], speechMode: "on-camera", speechScene: "tutorial" } : item);
+    const report = auditScenePolicy(fluent, t7);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "BF-01" }));
+  });
+});
