@@ -156,7 +156,7 @@ function printHuman(command, result) {
     line(`配方：${r.id} · ${r.genre} · ${r.scene}`);
     line(`情绪：${r.mood}`);
     line(`执行：profile=${r.profile} · lut=${r.lut ?? "(无)"}${r.lutExists ? "" : " ⚠ LUT 缺失"} · 强度=${r.intensity}`);
-    line(`目标：${JSON.stringify(r.targets)}`);
+    line(`目标：${JSON.stringify(r.targets)}${r.platformOverrideApplied ? `（已叠加平台微调：${r.platformOverrideApplied}）` : ""}`);
     line(`避免：${r.avoid.join("；")}`);
     if (r.notes) line(`备注：${r.notes}`);
     return;
@@ -189,6 +189,9 @@ async function main() {
         at_seconds: flags.at ? String(flags.at).split(",").map(Number) : undefined,
         neutral_patch: parsePatch(flags.neutral, "--neutral"),
         skin_patch: parsePatch(flags.skin, "--skin"),
+        sampling: flags.sampling ? String(flags.sampling) : undefined,
+        scene_threshold: flags["scene-threshold"] === undefined ? undefined : Number(flags["scene-threshold"]),
+        defects: flags["no-defects"] === true ? false : undefined,
       }, { bins })).result;
       break;
 
@@ -204,7 +207,7 @@ async function main() {
     case "recipes":
       result = flags.list === true || !flags.id
         ? findRecipes({ list: true, genre: flags.genre ?? null, platform: flags.platform ?? null, keyword: flags.keyword ?? null })
-        : findRecipes({ recipeId: String(flags.id) });
+        : findRecipes({ recipeId: String(flags.id), platform: flags.platform ?? null });
       break;
 
     case "grade": {
@@ -218,6 +221,11 @@ async function main() {
         intensity: flags.intensity === undefined ? 0.8 : Number(flags.intensity),
         verifyAt: flags.at ? String(flags.at).split(",").map(Number) : null,
         auto: flags.auto === true,
+        denoise: flags.denoise === true,
+        sampling: flags.sampling ? String(flags.sampling) : undefined,
+        sceneThreshold: flags["scene-threshold"] === undefined ? undefined : Number(flags["scene-threshold"]),
+        defects: flags["no-defects"] === true ? false : undefined,
+        onUnfixable: flags["on-unfixable"] ? String(flags["on-unfixable"]) : undefined,
         bins,
       });
       result = graded;
@@ -233,6 +241,10 @@ async function main() {
         recipe: flags.recipe ? String(flags.recipe) : null,
         genre: flags.genre ? String(flags.genre) : null,
         platform: flags.platform ? String(flags.platform) : null,
+        sampling: flags.sampling ? String(flags.sampling) : undefined,
+        sceneThreshold: flags["scene-threshold"] === undefined ? undefined : Number(flags["scene-threshold"]),
+        defects: flags["no-defects"] === true ? false : undefined,
+        onUnfixable: flags["on-unfixable"] ? String(flags["on-unfixable"]) : undefined,
         bins,
       });
       break;
@@ -248,6 +260,8 @@ async function main() {
         outDir: needPath(flags["out-dir"], "--out-dir"),
         profile: flags.profile ? String(flags.profile) : null,
         intensity: flags.intensity === undefined ? 1 : Number(flags.intensity),
+        histogramCheck: flags["histogram-check"] ? String(flags["histogram-check"]) : "warn",
+        denoise: flags.denoise === true,
         bins,
       });
       result = matched;
@@ -276,11 +290,12 @@ async function main() {
         "  recipes [--list] [--genre <题材>] [--platform <平台>] [--keyword <词>] [--id <配方 id>]",
         "                                  题材×场景调色配方（含 profile/LUT/强度/目标区间/避免事项）",
         "  grade   --in <file> --out <file> [--profile <p>] [--lut <cube>] [--intensity 0..1] [--corrections-json <json>]",
-        "                                        [--auto]  自动校正（曝光/饱和/偏色，先校正后创作）",
+        "                                        [--auto] [--denoise]  自动校正（曝光/饱和/偏色，先校正后创作）；降噪仅在噪点命中时插入",
         "  best    --in <file> [--out <file>] [--at a,b] [--min-improvement 2]",
         "                                  可加 [--recipe <id>] / [--genre <题材>] / [--platform <平台>] 走配方驱动",
         "                                  候选择优+画质打分；判「无需调色」时不产出文件（do no harm）",
         "  match   --ref <file> --in <file> [--in <file>...] --out-dir <dir> [--profile <p>]",
+        "                                  [--histogram-check warn|fail|off] [--denoise]",
         "  compare --before <file> --after <file> [--at s] --out <png>",
         "",
         `可用 profile：${Object.keys(PROFILES).join(", ")}`,

@@ -5,7 +5,8 @@
   "source": {
     "slog3": "Sony S-Log3 公开传输函数（码值→线性反射率）",
     "rec709": "ITU-R BT.709 OETF",
-    "note": "仅做色调曲线转换，未做 S-Gamut3.Cine→BT.709 色域矩阵；极端色域素材请先确认色域或补矩阵"
+    "sgamut3cine": "S-Gamut3.Cine→XYZ 矩阵：Sony《Technical Summary for S-Gamut3.Cine/S-Log3 and S-Gamut3/S-Log3》及 S-Gamut3_S-Gamut3Cine_Matrix.xlsx 公布值；XYZ→BT.709 由 ITU-R BT.709 原色构建",
+    "note": "S-Log3 曲线转换与 S-Gamut3.Cine→BT.709 色域矩阵均已落地（T-21）；其他厂商 log（C-Log/V-Log/HLG/PQ）未登记转换路径，按超出口径上报"
   },
   "luts": [
     {
@@ -13,6 +14,13 @@
       "kind": "conversion",
       "size": 33,
       "use": "log 素材先转换（禁止在 log 上直接叠创意 LUT）"
+    },
+    {
+      "file": "sgamut3cine-to-rec709.cube",
+      "kind": "conversion",
+      "size": 33,
+      "use": "S-Gamut3.Cine 色域→BT.709 色域矩阵；串接在 slog3-to-rec709.cube 之后（S-Log3 且色域确认为 S-Gamut3.Cine 时启用，恒 100%）",
+      "note": "3×3 矩阵在线性光域作用；LUT 输入/输出为 BT.709 码值域（OETF 包裹），与 slog3-to-rec709.cube 链式复合后等效于 S-Log3 解码→线性→色域矩阵→BT.709 编码"
     },
     {
       "file": "look-clean-bright.cube",
@@ -133,6 +141,39 @@
         "gamma": 0.98
       },
       "note": "满档参数（intensity=1.0 的画面语言）；低于 0.6 强度基本看不出变化，交付前必须过可见性校验"
+    },
+    {
+      "file": "look-natural.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "等价 core.mjs PROFILES[\"natural\"] 内置滤镜串的 LUT 形态（供 recipes/外部链路按 .cube 引用）",
+      "params": {
+        "profile": "natural",
+        "filter": "eq=contrast=1.03:saturation=1.04"
+      },
+      "note": "由 FFmpeg curves/colorbalance/eq 源码语义移植的数学模型在 17³ 格子上求值生成；profile 滤镜串改动后重跑 generate-luts.mjs 同步"
+    },
+    {
+      "file": "look-high-contrast-social.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "等价 core.mjs PROFILES[\"high-contrast-social\"] 内置滤镜串的 LUT 形态（供 recipes/外部链路按 .cube 引用）",
+      "params": {
+        "profile": "high-contrast-social",
+        "filter": "curves=all='0/0 0.18/0.10 0.5/0.51 0.82/0.89 1/1',eq=contrast=1.22:saturation=1.18:gamma=0.96"
+      },
+      "note": "由 FFmpeg curves/colorbalance/eq 源码语义移植的数学模型在 17³ 格子上求值生成；profile 滤镜串改动后重跑 generate-luts.mjs 同步"
+    },
+    {
+      "file": "look-vintage-fade.cube",
+      "kind": "creative",
+      "size": 17,
+      "use": "等价 core.mjs PROFILES[\"vintage-fade\"] 内置滤镜串的 LUT 形态（供 recipes/外部链路按 .cube 引用）",
+      "params": {
+        "profile": "vintage-fade",
+        "filter": "curves=all='0/0.075 0.25/0.25 0.75/0.76 1/0.92':r='0/0.06 0.5/0.52 1/0.96':b='0/0.09 0.5/0.44 1/0.87',colorbalance=rs=0.05:gs=0.02:bs=-0.04:rh=0.05:gh=0.03:bh=-0.03,eq=contrast=0.97:saturation=0.84:gamma=1.04"
+      },
+      "note": "由 FFmpeg curves/colorbalance/eq 源码语义移植的数学模型在 17³ 格子上求值生成；profile 滤镜串改动后重跑 generate-luts.mjs 同步"
     }
   ]
 }

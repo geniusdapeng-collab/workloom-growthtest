@@ -1,6 +1,6 @@
 {
   "schemaVersion": "workloom.color-recipes/v1",
-  "updatedAt": "2026-09-21",
+  "updatedAt": "2026-09-27",
   "principle": "先校正后创作：白平衡/曝光/裁切先修到位（100% 生效），再按 intensity 叠加题材色调。肤色优先于风格；一个项目只用一套 look。",
   "levels": {
     "conversion": "log/HLG 素材先套 slog3-to-rec709.cube",
@@ -184,6 +184,176 @@
       "platforms": ["官网", "视频号", "B站"],
       "avoid": ["高饱和（显廉价）", "压黑过头（材质死黑）"],
       "notes": "高端感来自\"少\"：去饱和 + 保留高光层次；黑位要\"深而不死\"（暗部裁切 <1%）。"
+    },
+    {
+      "id": "wedding-day",
+      "genre": "婚礼 / 婚庆",
+      "scene": "仪式现场、外景婚纱、接亲纪实",
+      "mood": "高调、轻盈、有幸福感",
+      "profile": "warm-film",
+      "lut": "look-warm-film.cube",
+      "intensity": 0.55,
+      "overrides": {
+        "SATAVG": [40, 62],
+        "YAVG": [100, 145],
+        "skinGuard": true,
+        "platformOverrides": { "抖音": { "SATAVG": [45, 68] } }
+      },
+      "platforms": ["小红书", "视频号", "抖音"],
+      "avoid": ["冷调（婚礼氛围变丧）", "压黑（高调题材禁低调处理）", "肤色推向橙红（新娘妆面失真）"],
+      "notes": "白纱必须读作中性白（YMAX≥240 且不偏蓝）；新人肤色 hue 20–40° 从严复检，暖调只加氛围不染皮肤。"
+    },
+    {
+      "id": "sports-event",
+      "genre": "体育 / 赛事",
+      "scene": "比赛现场、训练集锦、运动品牌广告",
+      "mood": "力量、速度、有冲击力",
+      "profile": "high-contrast-social",
+      "lut": null,
+      "intensity": 0.7,
+      "overrides": {
+        "SATAVG": [50, 85],
+        "platformOverrides": { "抖音": { "SATAVG": [55, 88], "YAVG": [90, 140] } }
+      },
+      "platforms": ["抖音", "B站", "视频号"],
+      "avoid": ["队服/品牌色过饱和溢出（色彩断层）", "柔调慢感（消解速度感）"],
+      "notes": "对比度是速度的语法：rmsContrast 不得低于原片；队服固有色逐镜头复检，饱和上限以不溢出为界。"
+    },
+    {
+      "id": "gaming-esports",
+      "genre": "游戏 / 电竞",
+      "scene": "游戏录屏、赛事集锦、电竞外设广告",
+      "mood": "冷调霓虹、沉浸、对抗感",
+      "profile": "teal-orange",
+      "lut": "look-teal-orange.cube",
+      "intensity": 0.7,
+      "overrides": {
+        "SATAVG": [45, 80],
+        "platformOverrides": { "B站": { "SATAVG": [45, 75] } }
+      },
+      "platforms": ["B站", "抖音", "视频号"],
+      "avoid": ["游戏画面色相偏移（玩家对原画极其敏感）", "洗白暗场（霓虹氛围被毁）"],
+      "notes": "游戏内画面是\"内容本体\"：调色只作用于实拍层/包装层，录屏区域 U/V 偏移不得超过 ±6。"
+    },
+    {
+      "id": "fashion-editorial",
+      "genre": "时尚 / 大片",
+      "scene": "服装大片、走秀、品牌 lookbook",
+      "mood": "克制、先锋、有态度",
+      "profile": "moody-dark",
+      "lut": "look-moody-dark.cube",
+      "intensity": 0.6,
+      "overrides": { "SATAVG": [28, 55], "YAVG": [85, 135] },
+      "platforms": ["小红书", "官网", "B站"],
+      "avoid": ["高饱和艳俗（时尚变促销）", "服装面料本色偏移（品牌事故）"],
+      "notes": "风格交给廓形，颜色负责克制：暗部裁切 <1%（面料纹理是资产）；服装固有色以吊牌/实物为准复检。"
+    },
+    {
+      "id": "baby-family",
+      "genre": "母婴 / 亲子",
+      "scene": "婴幼儿特写、家庭日常、母婴产品",
+      "mood": "柔软、明亮、有安全感",
+      "profile": "clean-bright",
+      "lut": "look-clean-bright.cube",
+      "intensity": 0.55,
+      "overrides": { "SATAVG": [40, 60], "YAVG": [105, 145], "skinGuard": true },
+      "platforms": ["小红书", "视频号", "抖音"],
+      "avoid": ["任何压黑手法（母婴题材要\"轻\"）", "冷调（安全感崩塌）", "婴儿肤色偏红偏橘（显病态）"],
+      "notes": "比 kids-family 更软：对比度不得超过原片 1.05 倍；婴儿肤色 hue 22–38°、sat≤55 从严复检。"
+    },
+    {
+      "id": "real-estate-showroom",
+      "genre": "房产 / 家居",
+      "scene": "样板间软装、家居好物、灯光氛围展示",
+      "mood": "温暖、通透、有生活感",
+      "profile": "clean-bright",
+      "lut": "look-clean-bright.cube",
+      "intensity": 0.55,
+      "overrides": { "YAVG": [100, 145], "SATAVG": [32, 58] },
+      "platforms": ["抖音", "贝壳", "视频号", "小红书"],
+      "avoid": ["窗景过曝（采光说服力归零）", "饱和超 58（软装显假像效果图）"],
+      "notes": "real-estate 的家居子场景：窗外高光保留层次（高光裁切 <1%）；暖色灯光区允许偏暖，但白墙必须读作白。"
+    },
+    {
+      "id": "automotive-night",
+      "genre": "汽车 / 夜间行驶",
+      "scene": "夜间路跑、城市车流中的车、车灯特写",
+      "mood": "暗夜锋芒、速度、高级感",
+      "profile": "cool-technical",
+      "lut": "look-moody-dark.cube",
+      "intensity": 0.7,
+      "overrides": { "SATAVG": [30, 58], "YAVG": [70, 125], "YAVG_note": "夜车允许低于 80，必须留痕" },
+      "platforms": ["B站", "抖音", "懂车帝"],
+      "avoid": ["车漆色相偏移（品牌色失真）", "车灯高光糊成一片（失去光源形状）"],
+      "notes": "automotive 的夜间子场景：暗部裁切 <2% 且先降噪再提饱和；车漆本色以白天实车为准复检，冷调不得染车漆。"
+    },
+    {
+      "id": "finance-corporate",
+      "genre": "金融 / 财经",
+      "scene": "财报解读、理财口播、企业宣传片",
+      "mood": "冷静、稳健、值得托付",
+      "profile": "cool-technical",
+      "lut": "look-cool-technical.cube",
+      "intensity": 0.55,
+      "overrides": { "SATAVG": [28, 50], "skinGuard": true },
+      "platforms": ["视频号", "官网", "B站"],
+      "avoid": ["暖黄调（\"传销感\"，信任度归零）", "高饱和（显得不稳健）"],
+      "notes": "冷、稳、克制是金融的语法：SATAVG 上限 50；有人脸时肤色仍须 hue 20–40°——冷调给环境，不给人脸。"
+    },
+    {
+      "id": "city-night-neon",
+      "genre": "夜景 / 城市霓虹",
+      "scene": "霓虹街区、夜市、招牌林立的街道",
+      "mood": "赛博、潮湿、有故事感",
+      "profile": "teal-orange",
+      "lut": "look-teal-orange.cube",
+      "intensity": 0.75,
+      "overrides": { "SATAVG": [48, 85], "YAVG": [70, 120], "YAVG_note": "夜景允许低于 80，必须留痕" },
+      "platforms": ["抖音", "B站", "小红书"],
+      "avoid": ["灯牌高光溢出（招牌文字糊掉）", "暗部压死（噪点显影）"],
+      "notes": "night-city 的霓虹子场景：招牌高光必须保留形状（高光裁切 <2%）；霓虹固有色不许被青橙整体染掉。"
+    },
+    {
+      "id": "rain-mood",
+      "genre": "阴雨 / 情绪片",
+      "scene": "雨天街景、窗边人像、情绪短片",
+      "mood": "灰调、安静、有疏离感",
+      "profile": "vintage-fade",
+      "lut": null,
+      "intensity": 0.5,
+      "overrides": { "SATAVG": [30, 55], "YAVG": [75, 120] },
+      "platforms": ["小红书", "B站", "视频号"],
+      "avoid": ["强行提亮造假天晴（情绪被毁）", "暖调（与阴雨语义冲突）"],
+      "notes": "阴雨的灰本身就是情绪：YAVG 允许 75–120 并留痕；只修白平衡与曝光裁切，禁止把灰天拉成蓝天。"
+    },
+    {
+      "id": "retro-film",
+      "genre": "复古 / 胶片感",
+      "scene": "怀旧短片、老照片动效、回忆杀混剪",
+      "mood": "褪色、温暖、有记忆感",
+      "profile": "vintage-fade",
+      "lut": null,
+      "intensity": 0.7,
+      "overrides": { "SATAVG": [30, 55] },
+      "platforms": ["小红书", "B站", "抖音"],
+      "avoid": ["黑白死灰（复古≠去色，肤色仍要有血色）", "锐化感（数码锐利破坏胶片柔）"],
+      "notes": "褪色三件套：抬黑位+压顶部+降对比；复检标准——黑位不得真黑（YMIN≥8），肤色 hue 20–40° 依然成立。"
+    },
+    {
+      "id": "festival-sale",
+      "genre": "节庆促销 / 大促",
+      "scene": "春节红金、圣诞冷绿等节庆大促物料",
+      "mood": "热烈、喜庆、有购买冲动",
+      "profile": "high-contrast-social",
+      "lut": null,
+      "intensity": 0.8,
+      "overrides": {
+        "SATAVG": [60, 90],
+        "platformOverrides": { "抖音": { "SATAVG": [62, 92] }, "朋友圈": { "SATAVG": [55, 82] } }
+      },
+      "platforms": ["抖音", "视频号", "朋友圈"],
+      "avoid": ["节庆色淹没价格文字（转化信息丢失）", "商品本色被节庆色染偏"],
+      "notes": "festival-promo 的节庆子场景：主题色（红金/冷绿）只给氛围层；价格/折扣文字区域对比度复检必须可读。"
     }
   ]
 }
