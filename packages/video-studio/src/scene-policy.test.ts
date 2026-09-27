@@ -369,3 +369,399 @@ describe("T3 专业服务出镜知识条目", () => {
     expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "PS-04").length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * T4 科技数码测评（2026-09-28）：产品特写≥40% / 功能演示≥25% / 人物 20–30% / 氛围≤10% / 运动≥30%，
+ * 必备 360° 环绕、微距工艺与"眼见为实"的功能演示；产品打亮打透与屏摄无事故是不可突破底线。
+ */
+const t4 = policies.find((item) => item.id === "tech-review")!;
+
+function techShot(index: number, tags: string[], fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `TR-${String(index).padStart(2, "0")}`, duration: 4.5, policyTags: tags,
+    scene: "极简科技工作台，桌面干净整洁、有线管理",
+    composition: "产品打亮打透、色彩真实，主体明确",
+    camera_movement: "固定机位",
+    costume: "纯色简约T恤，手部干净",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function techCompliant(): ScenePolicyInput {
+  return {
+    title: "新款手机深度测评：外观、屏幕与充电实测",
+    shots: [
+      techShot(1, ["product-close", "moving"], { composition: "环绕镜头 360° 缓慢旋转展示整机材质工艺，产品打亮打透、色彩真实", camera_movement: "环绕" }),
+      techShot(2, ["product-close", "moving"], { composition: "微距推进拍 CNC 切边与镜头模组工艺，产品打亮打透、色彩真实", camera_movement: "微距推进" }),
+      techShot(3, ["product-close"], { composition: "材质纹理特写，产品打亮打透、色彩真实" }),
+      techShot(4, ["product-close", "moving"], { composition: "滑轨平移拍中框与接口特写，主体明确", camera_movement: "滑轨平移" }),
+      techShot(5, ["demo", "moving"], { composition: "屏幕界面实测演示，画面清晰、演示与结论对应，产品打亮打透、色彩真实", camera_movement: "平移" }),
+      techShot(6, ["demo"], { composition: "跑分实测画面，屏幕参数与口播一致、屏摄干净，产品打亮打透、色彩真实" }),
+      techShot(7, ["demo"], { composition: "充电计时实测演示，界面读数清晰，产品打亮打透、色彩真实" }),
+      techShot(8, ["host"], { composition: "上半身人物讲解，工作面干净整齐、面部主光充足，产品打亮打透、色彩真实" }),
+      techShot(9, ["host"], { composition: "半身人物手持产品讲解，桌面整洁有序，产品打亮打透、色彩真实" }),
+      techShot(10, ["ambience"], { scene: "极简科技工作台，桌面全景定调，设备质感统一、干净留白", composition: "环境氛围全景，画面极简留白、产品打亮打透、色彩真实" }),
+    ],
+  };
+}
+
+describe("T4 科技数码测评知识条目", () => {
+  it("按测评信号选中，合规十镜满足配比与三项必备画面", () => {
+    expect(t4.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "新款手机深度测评与开箱", shots: [] }, null, policies).policy?.id).toBe("tech-review");
+    expect(selectScenePolicy({ title: "智能硬件新品开箱", shots: [] }, null, policies).policy?.id).toBe("tech-review");
+    const report = auditScenePolicy(techCompliant(), t4);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios["product-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.4);
+    expect(report.ratios.demo?.share ?? 0).toBeGreaterThanOrEqual(0.25);
+    expect(report.ratios.host?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.host?.share ?? 1).toBeLessThanOrEqual(0.3);
+    expect(report.ratios.ambience?.share ?? 1).toBeLessThanOrEqual(0.1);
+    expect(report.ratios.moving?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.planCues["360°环绕镜头"]?.found).toBe(true);
+    expect(report.planCues["微距工艺特写"]?.found).toBe(true);
+    expect(report.planCues["功能演示画面"]?.found).toBe(true);
+  });
+
+  it("缺环绕/缺演示/人物与氛围超配/杂乱桌面/屏摄事故/手持晃动都判硬失败", () => {
+    const broken = techCompliant();
+    /** ① 去掉环绕与微距镜 → 必备画面缺失且产品特写跌到 40% 以下 */
+    broken.shots = broken.shots.filter((item) => !["TR-01", "TR-02"].includes(item.shotId));
+    /** ② 演示镜全去掉 → 功能演示为 0，人物与氛围占比被动上升 */
+    broken.shots = broken.shots.filter((item) => !["TR-05", "TR-06", "TR-07"].includes(item.shotId));
+    /** ③ 画面出现杂乱桌面、线缆缠绕、摩尔纹与手持晃动 */
+    broken.shots = broken.shots.map((item) => item.shotId === "TR-03"
+      ? { ...item, scene: "杂乱桌面，线缆缠绕，桌面有零食饮料", composition: "产品打亮打透，但屏摄有摩尔纹与屏幕反光，手持晃动随手拍" } : item);
+    const report = auditScenePolicy(broken, t4);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("quality-floor");
+  });
+
+  it("生活化背景可凭客户原话例外（生活方式科技品类），但屏摄与产品质感底线不豁免", () => {
+    const input = techCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "TR-08"
+      ? { ...item, scene: "居家客厅的极简测评位，桌面干净整洁、有线管理，明亮" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "TR-08", term: "居家客厅",
+      customerRequest: "这是生活方式科技品类，客户要求在家里的居家客厅拍体验段落", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t4);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "TR-08", term: "居家客厅" }));
+
+    const broken = techCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "TR-09"
+      ? { ...item, composition: "产品死黑、彩色灯光污染，屏摄有频闪条纹" } : item);
+    const report = auditScenePolicy(broken, t4);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "TR-09").length).toBeGreaterThan(0);
+  });
+
+  it("夸张震惊体与拉踩话术从实际台词取证", () => {
+    const fluent = techCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "TR-08"
+      ? { ...item, dialogue: [{ speaker: "编辑", text: "这代直接颠覆行业，吊打友商。" }], speechMode: "on-camera", speechScene: "desk-review" } : item);
+    const report = auditScenePolicy(fluent, t4);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "TR-08" }));
+  });
+});
+
+/**
+ * T5 电商带货/产品种草（2026-09-28）：产品特写≥35% / 使用场景≥30% / 人物 20–30% / 氛围≥10% / 运动≥30%，
+ * 必备「融入场景」「特写抽出」与向往证据；场景档次=感知价格，产品事故与廉价元素不可豁免。
+ */
+const t5 = policies.find((item) => item.id === "commerce-seeding")!;
+
+function shopShot(index: number, tags: string[], fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `CS-${String(index).padStart(2, "0")}`, duration: 4.5, policyTags: tags,
+    scene: "明亮精致的现代厨房，台面干净整洁",
+    composition: "产品打亮打透、色彩真实，主体明确",
+    camera_movement: "固定机位",
+    costume: "简约质感家居服，手部干净、指甲整洁",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function shopCompliant(): ScenePolicyInput {
+  return {
+    title: "厨房好物种草：一锅到底的珐琅锅",
+    shots: [
+      shopShot(1, ["product-close", "moving"], { composition: "产品特写：珐琅质感与边缘光泽，打亮打透、色彩真实", camera_movement: "环绕产品" }),
+      shopShot(2, ["product-close", "moving"], { composition: "微距特写手柄纹理与釉面细节，打亮打透", camera_movement: "推进" }),
+      shopShot(3, ["product-close"], { composition: "特写抽出：产品孤立于干净背景，材质光泽清晰" }),
+      shopShot(4, ["product-close"], { composition: "俯拍细节特写，产品色彩真实、光泽诱人" }),
+      shopShot(5, ["usage", "moving"], { scene: "明亮的现代厨房使用场景中，台面干净精致", composition: "使用演示：倒出汤汁，动作自然，产品打亮打透、色彩真实", camera_movement: "跟随" }),
+      shopShot(6, ["usage"], { scene: "明亮整洁的厨房台面，场景精致有序", composition: "使用中：小火慢炖演示，产品打亮打透、光泽可辨" }),
+      shopShot(7, ["usage"], { scene: "干净精致的餐桌场景，摆盘有序", composition: "试用：盛出装盘演示，色彩真实诱人" }),
+      shopShot(8, ["host"], { scene: "明亮精致的开放式厨房，场景高一档", composition: "人物手持产品讲解，产品打亮打透、色彩真实，画面整洁精致" }),
+      shopShot(9, ["host"], { scene: "明亮客厅使用场景中", composition: "人物半身出镜分享使用后的满足感，产品光泽真实，画面明亮精致" }),
+      shopShot(10, ["ambience"], { scene: "设计感厨房的氛围镜头，晨光通透，场景空镜定调生活美学", composition: "环境氛围：把产品摆在场景中，营造高一档的使用向往" }),
+    ],
+  };
+}
+
+describe("T5 电商带货知识条目", () => {
+  it("按带货/种草信号选中，合规十镜满足配比与三项必备画面", () => {
+    expect(t5.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "厨房好物种草：一锅到底的珐琅锅", shots: [] }, null, policies).policy?.id).toBe("commerce-seeding");
+    expect(selectScenePolicy({ title: "直播切片精剪带货片", shots: [] }, null, policies).policy?.id).toBe("commerce-seeding");
+    const report = auditScenePolicy(shopCompliant(), t5);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios["product-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.35);
+    expect(report.ratios.usage?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.ratios.host?.share ?? 1).toBeLessThanOrEqual(0.3);
+    expect(report.ratios.ambience?.share ?? 0).toBeGreaterThanOrEqual(0.1);
+    expect(report.ratios.moving?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.planCues["融入场景镜头"]?.found).toBe(true);
+    expect(report.planCues["特写抽出镜头"]?.found).toBe(true);
+    expect(report.planCues["使用向往证据"]?.found).toBe(true);
+  });
+
+  it("缺抽出/缺使用演示/人物超配/出租屋感与产品事故都判硬失败", () => {
+    const broken = shopCompliant();
+    /** ① 去掉「特写抽出」与使用演示镜 → 必备画面缺失、使用镜头跌到 30% 以下 */
+    broken.shots = broken.shots.filter((item) => !["CS-03", "CS-05", "CS-06", "CS-07"].includes(item.shotId));
+    /** ② 剩下镜头全改成人物出镜 → 人物占比超上限 */
+    broken.shots = broken.shots.map((item) => ({ ...item, policyTags: ["host"] }));
+    /** ③ 出租屋感 + 产品事故 */
+    broken.shots = broken.shots.map((item) => item.shotId === "CS-01"
+      ? { ...item, scene: "出租屋昏暗日光灯，廉价家具与杂乱电线", composition: "产品变形、有污渍、塑料感高光" } : item);
+    const report = auditScenePolicy(broken, t5);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("restricted-location");
+    expect(rules).toContain("quality-floor");
+  });
+
+  it("工厂/仓库场景可凭客户原话例外（源头好货定位），但产品质感底线不豁免", () => {
+    const input = shopCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "CS-10"
+      ? { ...item, scene: "工厂车间内的展示位，画面整洁有序、明亮通透", composition: "环境氛围：把产品摆在场景中，明亮整洁" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "CS-10", term: "工厂车间",
+      customerRequest: "我们品牌定位是工厂直销源头好货，客户要求到工厂车间实拍", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t5);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "CS-10", term: "工厂车间" }));
+
+    const broken = shopCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "CS-02"
+      ? { ...item, composition: "色差失真、塑料感高光，产品变形" } : item);
+    const report = auditScenePolicy(broken, t5);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "CS-02").length).toBeGreaterThan(0);
+  });
+
+  it("极限承诺话术从实际台词取证", () => {
+    const fluent = shopCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "CS-08"
+      ? { ...item, dialogue: [{ speaker: "主播", text: "全网最低，最后三天！" }], speechMode: "on-camera", speechScene: "scene-seeding" } : item);
+    const report = auditScenePolicy(fluent, t5);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "CS-08" }));
+  });
+});
+
+/**
+ * T6 知识口播（2026-09-28）：主口播中近景 50–60%、近景 ≥15%、B-roll ≥20%、信任状 ≥5%；
+ * 机位 ≥2、直视交流感、B-roll 与信任状为必备画面；背景不抢戏与面部光线是不可突破底线。
+ */
+const t6 = policies.find((item) => item.id === "knowledge-talking-head")!;
+
+function talkShot(index: number, tags: string[], fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `KT-${String(index).padStart(2, "0")}`, duration: 4.5, policyTags: tags,
+    scene: "明亮的书房主讲位，书架整齐、背景干净简洁",
+    composition: "胸部以上中近景，正对镜头，画面明亮清爽、人物最亮",
+    camera_movement: "固定机位",
+    costume: "纯色质感衬衫，与背景明度对比清楚",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function talkCompliant(): ScenePolicyInput {
+  return {
+    title: "金融知识口播：三分钟读懂资产配置",
+    shots: [
+      talkShot(1, ["talking"], { scene: "明亮的书房主讲位，书架与数据屏整齐、背景干净简洁", composition: "胸部以上中近景，直视镜头，画面明亮清爽、人物最亮" }),
+      talkShot(2, ["talking"], { composition: "胸部以上中近景，正对镜头讲述，背景简洁统一" }),
+      talkShot(3, ["talking"], { composition: "坐姿口播中近景，正对镜头，画面明亮干净" }),
+      talkShot(4, ["talking"], { composition: "站姿口播中近景，直视镜头，背景干净清爽" }),
+      talkShot(5, ["talking"], { camera_movement: "45°侧机位", composition: "胸部以上中近景，45°侧机位正反打，画面明亮清爽" }),
+      talkShot(6, ["person-close"], { composition: "面部近景，眼神交流清楚，情绪强调，画面明亮" }),
+      talkShot(7, ["person-close"], { composition: "近景特写，直视镜头讲结论，背景干净" }),
+      talkShot(8, ["b-roll"], { scene: "明亮的工作室，屏幕演示位", composition: "B-roll 示意图与案例画面，字幕卡干净统一" }),
+      talkShot(9, ["b-roll"], { scene: "明亮的工作室桌面演示位", composition: "B-roll 屏幕演示与数据界面，画面清爽" }),
+      talkShot(10, ["trust-detail"], { scene: "书房数据屏与证书陈列，环境干净明亮", composition: "信任状细节特写：证书与数据屏，画面干净统一" }),
+    ],
+  };
+}
+
+describe("T6 知识口播知识条目", () => {
+  it("按知识口播信号选中，合规十镜满足配比与四项必备画面", () => {
+    expect(t6.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "金融知识口播：三分钟读懂资产配置", shots: [] }, null, policies).policy?.id).toBe("knowledge-talking-head");
+    expect(selectScenePolicy({ title: "行业科普口播：干货分享", shots: [] }, null, policies).policy?.id).toBe("knowledge-talking-head");
+    /** 没点人/口播的纯「科普干货」不再自动套用讲师口播知识条目（避免误配）。 */
+    expect(selectScenePolicy({ title: "行业科普干货分享", shots: [] }, null, policies).policy).toBeNull();
+    const report = auditScenePolicy(talkCompliant(), t6);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios.talking?.share ?? 0).toBeGreaterThanOrEqual(0.5);
+    expect(report.ratios.talking?.share ?? 1).toBeLessThanOrEqual(0.6);
+    expect(report.ratios["person-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.15);
+    expect(report.ratios["b-roll"]?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios["trust-detail"]?.share ?? 0).toBeGreaterThanOrEqual(0.05);
+    expect(report.planCues["B-roll 辅助画面"]?.found).toBe(true);
+    expect(report.planCues["第二机位"]?.found).toBe(true);
+    expect(report.planCues["直视交流感"]?.found).toBe(true);
+  });
+
+  it("缺 B-roll/缺机位变化/口播超时长/空书壳与眼镜反光都判硬失败", () => {
+    const broken = talkCompliant();
+    /** ① 去掉 B-roll 与信任状镜 → 必备画面缺失、B-roll 掉到 20% 以下 */
+    broken.shots = broken.shots.filter((item) => !["KT-08", "KT-09", "KT-10"].includes(item.shotId));
+    /** ② 把近景全部改成主口播 → talking 超过 60% 上限、近景不足 */
+    broken.shots = broken.shots.map((item) => ({ ...item, policyTags: ["talking"] }));
+    /** ③ 书架空书壳 + 眼镜反光 + 阴阳脸 */
+    broken.shots = broken.shots.map((item) => item.shotId === "KT-02"
+      ? { ...item, scene: "书房书架有空书壳，背景起皱背景布", composition: "面部眼镜反光、阴阳脸，画面仍明亮" } : item);
+    const report = auditScenePolicy(broken, t6);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("quality-floor");
+  });
+
+  it("陪伴型人设的居家场景可凭客户原话例外，但面部光线与不抢戏底线不豁免", () => {
+    const input = talkCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "KT-03"
+      ? { ...item, scene: "卧室书桌前的整洁版居家场景，画面明亮干净统一" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "KT-03", term: "卧室",
+      customerRequest: "这是晚间电台式心理陪伴内容，客户要求在卧室拍整洁版居家场景", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t6);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "KT-03", term: "卧室" }));
+
+    const broken = talkCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "KT-04"
+      ? { ...item, composition: "背后窗户过曝成白板，顶光眼袋阴影" } : item);
+    const report = auditScenePolicy(broken, t6);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "KT-04").length).toBeGreaterThan(0);
+  });
+
+  it("夸张震惊体话术从实际台词取证", () => {
+    const fluent = talkCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "KT-06"
+      ? { ...item, dialogue: [{ speaker: "讲师", text: "震惊！不看后悔的配置方法。" }], speechMode: "on-camera", speechScene: "desk-talk" } : item);
+    const report = auditScenePolicy(fluent, t6);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "KT-06" }));
+  });
+});
+
+/**
+ * T7 美妆时尚/穿搭（2026-09-28）：妆容特写≥30% / 全身造型≥25% / 细节特写≥20% / 中景≥20% / 运动 20–35%，
+ * 必备 妆容或全身主镜头 + 细节特写 + 动态镜头；皮肤与色彩真实、无廉价元素不可突破。
+ */
+const t7 = policies.find((item) => item.id === "beauty-fashion")!;
+
+function fashionShot(index: number, tags: string[], duration: number, fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `BF-${String(index).padStart(2, "0")}`, duration, policyTags: tags,
+    scene: "杂志感米色纯色空间，一盏设计感灯，画面干净有呼吸感",
+    composition: "柔光通透、皮肤纹理真实，画面精致克制",
+    camera_movement: "固定机位",
+    costume: "设计感简约造型，熨烫平整",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function fashionCompliant(): ScenePolicyInput {
+  return {
+    title: "秋冬妆容教程与穿搭分享",
+    shots: [
+      fashionShot(1, ["makeup-close"], 6, { composition: "眼妆妆容特写，柔光通透、皮肤纹理真实、有眼神光", scene: "整洁梳妆区，带灯化妆镜，化妆品有序陈列" }),
+      fashionShot(2, ["makeup-close"], 6, { composition: "唇妆妆效特写，色号还原准确、柔光通透、画面精致" }),
+      fashionShot(3, ["makeup-close"], 6, { composition: "底妆质感特写，皮肤纹理真实，柔光均匀、干净有呼吸感" }),
+      fashionShot(4, ["full-look"], 7.5, { composition: "全身整体造型镜头，比例与搭配逻辑清楚，柔光通透、画面干净精致" }),
+      fashionShot(5, ["full-look", "moving"], 7.5, { composition: "穿搭全身造型，服装平整、柔光通透", camera_movement: "跟随行走" }),
+      fashionShot(6, ["detail"], 6, { composition: "面料细节特写，缝线与质感清晰，柔光通透、画面精致" }),
+      fashionShot(7, ["detail"], 6, { composition: "配饰与美甲细节特写，干净克制、光泽真实" }),
+      fashionShot(8, ["medium"], 5, { composition: "中景人物气质镜头，背景克制精致、柔光通透" }),
+      fashionShot(9, ["medium", "moving"], 5, { composition: "镜前中景，人物松弛自信，柔光通透、画面干净有呼吸感", camera_movement: "缓慢推进" }),
+      fashionShot(10, ["medium", "moving"], 5, { composition: "中景气质镜头，转身回眸，柔光通透、服装动态美清楚", camera_movement: "跟随转身" }),
+    ],
+  };
+}
+
+describe("T7 美妆时尚知识条目", () => {
+  it("按美妆/穿搭信号选中，合规十镜满足配比与三项必备画面", () => {
+    expect(t7.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "秋冬妆容教程：三分钟通勤妆", shots: [] }, null, policies).policy?.id).toBe("beauty-fashion");
+    expect(selectScenePolicy({ title: "通勤穿搭分享", shots: [] }, null, policies).policy?.id).toBe("beauty-fashion");
+    const report = auditScenePolicy(fashionCompliant(), t7);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios["makeup-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.ratios["full-look"]?.share ?? 0).toBeGreaterThanOrEqual(0.25);
+    expect(report.ratios.detail?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.medium?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.moving?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.moving?.share ?? 1).toBeLessThanOrEqual(0.35);
+    expect(report.planCues["妆容特写或全身造型"]?.found).toBe(true);
+    expect(report.planCues["细节特写"]?.found).toBe(true);
+    expect(report.planCues["动态镜头"]?.found).toBe(true);
+  });
+
+  it("缺细节/缺动态/妆容不足/快切晃镜超上限/廉价堆砌与滤镜事故都判硬失败", () => {
+    const broken = fashionCompliant();
+    /** ① 去掉细节与动态镜 → 必备画面缺失、细节与运动均不足 */
+    broken.shots = broken.shots.filter((item) => !["BF-06", "BF-07", "BF-05", "BF-10"].includes(item.shotId));
+    /** ② 剩余镜头全打 moving 标签 → 运动超 35% 上限（同时妆容不足） */
+    broken.shots = broken.shots.map((item, index) => index < 3
+      ? { ...item, policyTags: [...(item.policyTags ?? []), "moving"], camera_movement: "快切晃镜" }
+      : item);
+    /** ③ 廉价网红风堆砌 + 滤镜事故 */
+    broken.shots = broken.shots.map((item) => item.shotId === "BF-02"
+      ? { ...item, scene: "杂乱化妆台，艳俗假花与掉漆字母灯，起球地毯", composition: "磨皮成硅胶脸、假白脸，口红变色" } : item);
+    const report = auditScenePolicy(broken, t7);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("quality-floor");
+    expect(rules).toContain("motion-consistency");
+  });
+
+  it("平价生活化场景可凭客户原话例外，但皮肤质感与色彩真实底线不豁免", () => {
+    const input = fashionCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "BF-08"
+      ? { ...item, scene: "出租屋改造后的整洁梳妆角，画面干净精致有呼吸感" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "BF-08", term: "出租屋",
+      customerRequest: "这是平价改造内容，客户要求在出租屋拍整洁版梳妆角", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t7);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "BF-08", term: "出租屋" }));
+
+    const broken = fashionCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "BF-09"
+      ? { ...item, composition: "强黄光顶光，肤色蜡黄，镜面指纹与水渍" } : item);
+    const report = auditScenePolicy(broken, t7);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "BF-09").length).toBeGreaterThan(0);
+  });
+
+  it("夸大妆效与拉踩话术从实际台词取证", () => {
+    const fluent = fashionCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "BF-01"
+      ? { ...item, dialogue: [{ speaker: "博主", text: "一抹换头，直接吊打大牌。" }], speechMode: "on-camera", speechScene: "tutorial" } : item);
+    const report = auditScenePolicy(fluent, t7);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "BF-01" }));
+  });
+});
