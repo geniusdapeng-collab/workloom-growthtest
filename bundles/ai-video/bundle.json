@@ -460,6 +460,8 @@
         "library/scene-policies/tech-review.source.md",
         "library/scene-policies/commerce-seeding.json",
         "library/scene-policies/commerce-seeding.source.md",
+        "library/scene-policies/knowledge-talking-head.json",
+        "library/scene-policies/knowledge-talking-head.source.md",
         "library/seedance-references/audio-tags.md",
         "library/seedance-references/cinematography.md",
         "library/seedance-references/director-styles.md",
@@ -752,7 +754,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "891ba10a91e88ec0c3390ec3b234430b1574efad96fca6b6788866c0a2135b38",
+    "digest": "74e2f8971619a132a91e651fec58dfd563bd51cf8ec56553d26fbcc9a16b79c3",
     "assets": {
       "connectors/bgm-bridge/brief.mjs": "bb858adae23728deffa1668d9f9db15085f9c94ed73d2c01b5505d82e78e2407",
       "connectors/bgm-bridge/cli.mjs": "d9f8b241c96dda5bce8a801ae0a6f0c29602d61d28497c74b0c91f62f0c94e21",
@@ -1162,6 +1164,8 @@
       "library/scene-policies/commercial-person.source.md": "445541407ea1e568301214e2dfdc6b07cfe9ad6b0e05355ec5e5ad3052fa96c6",
       "library/scene-policies/enterprise-brand.json": "e85d4a6d1a90bea639c76fd16744827b1c28a356c21191cb4c8292f4d8416357",
       "library/scene-policies/enterprise-brand.source.md": "be6e8a05242a91fb6ac73d44fa4170156553fe74a757f60dcde15f802a599461",
+      "library/scene-policies/knowledge-talking-head.json": "bcbf9c3e446c3d87e1513aa367563146b2b1329b2a10a6e8d2a5110176a5cdfc",
+      "library/scene-policies/knowledge-talking-head.source.md": "1ede5357bf8f6201a2e73673d48b40de6ea925df5e594d7c6e8baf961a09e47e",
       "library/scene-policies/professional-service.json": "ae081df3c6702b42f24d08db17e6ef9ff890bad194cc93fd065f5160d19fd7c7",
       "library/scene-policies/professional-service.source.md": "cb1644114700a8375732e239f6bb525ee96dd87ae4cff774219cb276217525e4",
       "library/scene-policies/README.md": "279999549ea11d42c74e081692b4eae5396e7f491bf81e16cac7d727b7e4ca6c",

@@ -565,3 +565,102 @@ describe("T5 电商带货知识条目", () => {
     expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "CS-08" }));
   });
 });
+
+/**
+ * T6 知识口播（2026-09-28）：主口播中近景 50–60%、近景 ≥15%、B-roll ≥20%、信任状 ≥5%；
+ * 机位 ≥2、直视交流感、B-roll 与信任状为必备画面；背景不抢戏与面部光线是不可突破底线。
+ */
+const t6 = policies.find((item) => item.id === "knowledge-talking-head")!;
+
+function talkShot(index: number, tags: string[], fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `KT-${String(index).padStart(2, "0")}`, duration: 4.5, policyTags: tags,
+    scene: "明亮的书房主讲位，书架整齐、背景干净简洁",
+    composition: "胸部以上中近景，正对镜头，画面明亮清爽、人物最亮",
+    camera_movement: "固定机位",
+    costume: "纯色质感衬衫，与背景明度对比清楚",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function talkCompliant(): ScenePolicyInput {
+  return {
+    title: "金融知识口播：三分钟读懂资产配置",
+    shots: [
+      talkShot(1, ["talking"], { scene: "明亮的书房主讲位，书架与数据屏整齐、背景干净简洁", composition: "胸部以上中近景，直视镜头，画面明亮清爽、人物最亮" }),
+      talkShot(2, ["talking"], { composition: "胸部以上中近景，正对镜头讲述，背景简洁统一" }),
+      talkShot(3, ["talking"], { composition: "坐姿口播中近景，正对镜头，画面明亮干净" }),
+      talkShot(4, ["talking"], { composition: "站姿口播中近景，直视镜头，背景干净清爽" }),
+      talkShot(5, ["talking"], { camera_movement: "45°侧机位", composition: "胸部以上中近景，45°侧机位正反打，画面明亮清爽" }),
+      talkShot(6, ["person-close"], { composition: "面部近景，眼神交流清楚，情绪强调，画面明亮" }),
+      talkShot(7, ["person-close"], { composition: "近景特写，直视镜头讲结论，背景干净" }),
+      talkShot(8, ["b-roll"], { scene: "明亮的工作室，屏幕演示位", composition: "B-roll 示意图与案例画面，字幕卡干净统一" }),
+      talkShot(9, ["b-roll"], { scene: "明亮的工作室桌面演示位", composition: "B-roll 屏幕演示与数据界面，画面清爽" }),
+      talkShot(10, ["trust-detail"], { scene: "书房数据屏与证书陈列，环境干净明亮", composition: "信任状细节特写：证书与数据屏，画面干净统一" }),
+    ],
+  };
+}
+
+describe("T6 知识口播知识条目", () => {
+  it("按知识口播信号选中，合规十镜满足配比与四项必备画面", () => {
+    expect(t6.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "金融知识口播：三分钟读懂资产配置", shots: [] }, null, policies).policy?.id).toBe("knowledge-talking-head");
+    expect(selectScenePolicy({ title: "行业科普口播：干货分享", shots: [] }, null, policies).policy?.id).toBe("knowledge-talking-head");
+    /** 没点人/口播的纯「科普干货」不再自动套用讲师口播知识条目（避免误配）。 */
+    expect(selectScenePolicy({ title: "行业科普干货分享", shots: [] }, null, policies).policy).toBeNull();
+    const report = auditScenePolicy(talkCompliant(), t6);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios.talking?.share ?? 0).toBeGreaterThanOrEqual(0.5);
+    expect(report.ratios.talking?.share ?? 1).toBeLessThanOrEqual(0.6);
+    expect(report.ratios["person-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.15);
+    expect(report.ratios["b-roll"]?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios["trust-detail"]?.share ?? 0).toBeGreaterThanOrEqual(0.05);
+    expect(report.planCues["B-roll 辅助画面"]?.found).toBe(true);
+    expect(report.planCues["第二机位"]?.found).toBe(true);
+    expect(report.planCues["直视交流感"]?.found).toBe(true);
+  });
+
+  it("缺 B-roll/缺机位变化/口播超时长/空书壳与眼镜反光都判硬失败", () => {
+    const broken = talkCompliant();
+    /** ① 去掉 B-roll 与信任状镜 → 必备画面缺失、B-roll 掉到 20% 以下 */
+    broken.shots = broken.shots.filter((item) => !["KT-08", "KT-09", "KT-10"].includes(item.shotId));
+    /** ② 把近景全部改成主口播 → talking 超过 60% 上限、近景不足 */
+    broken.shots = broken.shots.map((item) => ({ ...item, policyTags: ["talking"] }));
+    /** ③ 书架空书壳 + 眼镜反光 + 阴阳脸 */
+    broken.shots = broken.shots.map((item) => item.shotId === "KT-02"
+      ? { ...item, scene: "书房书架有空书壳，背景起皱背景布", composition: "面部眼镜反光、阴阳脸，画面仍明亮" } : item);
+    const report = auditScenePolicy(broken, t6);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("quality-floor");
+  });
+
+  it("陪伴型人设的居家场景可凭客户原话例外，但面部光线与不抢戏底线不豁免", () => {
+    const input = talkCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "KT-03"
+      ? { ...item, scene: "卧室书桌前的整洁版居家场景，画面明亮干净统一" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "KT-03", term: "卧室",
+      customerRequest: "这是晚间电台式心理陪伴内容，客户要求在卧室拍整洁版居家场景", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t6);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "KT-03", term: "卧室" }));
+
+    const broken = talkCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "KT-04"
+      ? { ...item, composition: "背后窗户过曝成白板，顶光眼袋阴影" } : item);
+    const report = auditScenePolicy(broken, t6);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "KT-04").length).toBeGreaterThan(0);
+  });
+
+  it("夸张震惊体话术从实际台词取证", () => {
+    const fluent = talkCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "KT-06"
+      ? { ...item, dialogue: [{ speaker: "讲师", text: "震惊！不看后悔的配置方法。" }], speechMode: "on-camera", speechScene: "desk-talk" } : item);
+    const report = auditScenePolicy(fluent, t6);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "KT-06" }));
+  });
+});
