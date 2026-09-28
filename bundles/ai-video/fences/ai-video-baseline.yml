@@ -6,6 +6,12 @@
 # 审批点矩阵 G1-G16（fusion-design §3 / 拆解台账 §2；G11-G16 为经营扩展 v2）
 version: ai-video-baseline/v2
 default_level: review
+
+# GR-03（2026-09-28）：无任何岗位工具会产生下列红线动作 → 显式声明未接线（装配检查单留痕）
+unwired_blocks:
+  - rule_id: G16
+    reason: 账号登录/会话绑定类动作无对应工具（矩阵账号自动化尚未落地）
+    owner: 平台工程
 rules:
   - rule_id: G1
     name: 商品情报档案确认必审
@@ -112,8 +118,12 @@ rules:
     level: block
     is_baseline: true
     match:
-      object_types: [publish_task]
-      actions: [publish.execute]
+      # GR-03（2026-09-28 装配检查单⑥ 实测）：本包 `publish-operator` 在融合体（hotel+geo-growth）
+      # 里被 geo-growth 的同名岗位遮蔽，其工具 `publish.execute` 不在组合工具面上——
+      # 只声明它会让这条红线在融合体里**空膛**（永远不会触发）。补上组合面上真实存在的发布类工具名，
+      # 语义词保留不删（只收紧不放宽）。
+      object_types: [publish_task, publish_job, source_task]
+      actions: [publish.execute, publish.dispatch, rpa.publish, rpa.source_publish]
     when: "context.account_daily_published >= 5"
     note: 基线：单账号日发布上限 5 条，超限熔断+告警（RPA 风控纪律）
 

@@ -26,7 +26,7 @@ rules:
     is_baseline: true
     match:
       object_types: [final_video, video_asset, material_asset, render_job]
-      actions: [material.write, material.prepare, material.display, render.write]
+      actions: [material.write, material.prepare, material.display, render.write, render.submit, render.script.gen, portrait.render, coverwrite.render, explainerwrite.render, publish.execute]
     when: "params.material_usage != 'generation-reference' or params.static_display == true or params.reuse_material_frame == true or params.photo_as_shot == true"
     note: "产品所有者 2026-09-25 硬规定：素材是**渲染素材**，不是成片内容。缺用途声明（material_usage 缺失或写 direct-display/static-display/slideshow）、把素材原样或经裁切/缩放/推拉/滤镜包装后当镜头入时间线（static_display/reuse_material_frame/photo_as_shot 任一为 true）一律阻断，审批也不能放行（人无权绕过产品口径）。DSL 语义：material_usage 缺失 → 左值 undefined != 'generation-reference' 为真 → 阻断（fail-closed，缺声明按违规处理）。"
 
@@ -56,6 +56,6 @@ rules:
     is_baseline: true
     match:
       object_types: [material_asset, render_job, video_asset, final_video]
-      actions: [material.generate, render.write]
+      actions: [material.generate, render.write, render.submit, portrait.render, explainerwrite.render]
     when: "params.reference_only != true or params.first_frame_from_reference == true or params.photo_as_first_frame == true"
     note: "产品所有者 2026-09-25 口径：**图片只是实景素材参考，是用来构建真实视频场景的**——素材必须以 reference_image（reference_only=true）提交，禁止当 first_frame；成片必须是模型构建出来的视频场景（自有 机位/视差/环境运动），不是「参考图被推动」。机检口径 material-scene/v1：首帧最佳匹配 PSNR ≥32dB、首帧直比 ≥40dB、或中段最佳匹配 ≥34dB，任一命中即判「参考图被推动」，一票否决。DSL 语义：reference_only 缺失 → 左值 != true 成立 → 阻断（fail-closed）。"

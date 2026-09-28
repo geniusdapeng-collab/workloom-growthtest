@@ -69,6 +69,6 @@ rules:
     is_baseline: true
     match:
       object_types: [visual_asset]
-      actions: [publish.execute]
+      actions: [publish.execute, rpa.publish, rpa.source_publish]
     when: "params.visual_receipt_synced != true"
     note: 未取得渲染回执（sha256/尺寸/时间戳）的视觉素材不得进入社媒或信源发布队列；无回执=未核实

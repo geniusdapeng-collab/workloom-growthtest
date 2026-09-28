@@ -224,11 +224,11 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "fcbbfea8df850dbdcb8bcca2c1f4d451c049c3262358f9746ab1c5c9178c1bc2",
+    "digest": "a8bd61ae5ca205f066ca1d78f11667a0794264f6fc1bdbfb5f37c70213ade5a5",
     "assets": {
       "eval/questions.json": "49e7b69803ac4c398b812e93758d136332c9312041d894ca7b74a8a1623e7993",
-      "fences/geo-growth-baseline.yml": "f11a2d04045409168fa20f665a3852646555e99a0ece0f36afa70d7d2160eaf3",
-      "fences/geo-growth-visual.yml": "a892215c17dc0406d0328ab401d97ae7fce2ee1289c260304dc4c8fa77dd7cfd",
+      "fences/geo-growth-baseline.yml": "4a06d0a472be51a3e8922bc77e8834ef9f1f31e752b4ef3d345058ca908970c7",
+      "fences/geo-growth-visual.yml": "dd397a66ec47da7f5e013cac5e045c350543a0a1153da63926e72e9c300ba273",
       "model-policy.yml": "c2350007cf1a112c9de24231b6270e39d69344e2a9a3c05b8f17d246e571b84e",
       "pipelines/dual-content-factory.yml": "0650692f2c48ea051b2a334c92b5880f762632d4091b5fb2a48e58a227a756b6",
       "pipelines/intel-fusion.yml": "17a1b4c6dc70e47da0dffa1d91b96da2eb84925435009b9dd4b6e72eae22d092",
@@ -264,7 +264,7 @@
       "schemas/archive.schema.json": "ad08672042078f5d8a2376f855e0fe936454048fb0e4cc421d5b8082ad4e2200",
       "schemas/objects.json": "1c7330962d407572f9df3557bb61ebddb0ddd0179a1820f411b28ee51d733020",
       "schemas/stages.json": "dbb994a399bcfe9ea34fbeacda92a13bfdebb8caeef4f74960faf4461a447c93",
-      "service-front/client.json": "104f0b9f72d4a684106420af7a1502ca2e7b15cc170e6496d94a9dca8e9ae92e",
+      "service-front/client.json": "b30a525b9a398631aeb8410e2638f7085cd86c3e8ce914b1245a06fcef536cca",
       "skills/ai-answer-rewrite/SKILL.md": "ff70313de2c4488931aac01a09bb5c58ba6a0c4abdfcd63f41e97571f86b7610",
       "skills/art-direction/SKILL.md": "cc11f1494078b38f19c5d32a639ae036442163cbef00ebb98a156358036fda27",
       "skills/asset-variant-forge/SKILL.md": "cbe3a2c37c2a752b46aacd1ada967423e64479829e5cde81ec5548b9cf6994dc",

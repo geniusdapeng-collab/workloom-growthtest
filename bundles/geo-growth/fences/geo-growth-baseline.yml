@@ -6,6 +6,17 @@
 # 三大纪律：① GEO 灰帽零容忍（G-GEO3 熔断）；② 事实红线一票否决（G-GEO2）；③ 涉人设/品牌表态强制 L4（G20）
 version: geo-growth-baseline/v1
 default_level: review
+# GR-03（2026-09-28 真机审计）· 无法由工具触发的红线与原因
+# 装配检查单会逐条核对「block + is_baseline 的规则是否可能被任一岗位写工具触发」；
+# 下列规则在当前工具体系里**没有任何工具会产生对应动作**，因此显式声明为"未接线"，
+# 而不是让规则静默空膛（声明会进装配报告留痕；一旦对应工具落地，从这里删除即可）。
+unwired_blocks:
+  - rule_id: G16
+    reason: 账号登录/会话绑定类动作当前无任何岗位工具（矩阵账号自动化工具尚未落地）
+    owner: 平台工程
+  - rule_id: G17
+    reason: 围栏/宪章放宽走审批激活链（fence.rule.propose → L4 审批），不经 Quest 判定器求值
+    owner: 平台工程
 rules:
   # ---- 社媒域（沿用 ai-video 基线口径，双域版重声明） ----
   - rule_id: G9
@@ -33,8 +44,8 @@ rules:
     level: block
     is_baseline: true
     match:
-      object_types: [publish_task]
-      actions: [publish.execute]
+      object_types: [publish_task, source_task, publish_job]
+      actions: [publish.execute, rpa.publish, rpa.source_publish]
     when: "context.account_daily_published >= 5"
     note: 单账号日发布上限 5 条，超限熔断+告警（RPA 风控纪律）
 
@@ -73,8 +84,8 @@ rules:
     level: block
     is_baseline: true
     match:
-      object_types: [comment_reply]
-      actions: [comment.reply]
+      object_types: [comment_reply, comment, review]
+      actions: [comment.reply, reply.draft, dm.reply]
     when: "params.intent == 'sensitive'"
     note: 评论四档分流四档：敏感内容 block，只写「需介入」事件，不自动外发
 
@@ -129,7 +140,7 @@ rules:
     match:
       # content = 规划器按 content.* 工具前缀派生的对象视图（S9 别名并集；只收紧）
       object_types: [geo_content, script_package, platform_variant, content]
-      actions: [content.submit, geo.publish]
+      actions: [content.submit, geo.publish, geo.rewrite, script.draft, reply.draft]
     when: "context.fact_check_passed != true"
     note: ProductTruthChecker：宣称不得超出官方口径、创意前提与产品真实使用前提必须自洽、品牌实体信息与实体卡逐字一致；任一不符一票否决，双域通用
 
@@ -139,7 +150,7 @@ rules:
     is_baseline: true
     match:
       object_types: [geo_content, citation_source]
-      actions: [geo.publish, source.submit, geo.boost]
+      actions: [geo.publish, source.submit, geo.boost, rpa.publish, rpa.source_publish]
     when: "params.technique in ['corpus_pollution', 'fake_multi_source', 'machine_seeding', 'mass_ai_spam']"
     note: 灰帽零容忍：语料污染/伪造多源/机器刷量/批量 AI 垃圾内容命中即熔断+告警；我们承诺「可测量可追溯」，不承诺「保证上榜」
 
@@ -149,7 +160,7 @@ rules:
     is_baseline: true
     match:
       object_types: [source_task]
-      actions: [geo.publish]
+      actions: [geo.publish, rpa.source_publish]
     when: "context.account_daily_source_published >= 3"
     note: 信源组对称 G9b 纪律：单账号信源平台日发上限 3 条（信源平台对批量发帖更敏感），超限熔断+告警；宪章 geo_publish_per_day_cap 为其上限来源
 
@@ -161,7 +172,7 @@ rules:
     match:
       # content / comment = 规划器按工具前缀派生的对象视图（S9 别名并集；只收紧）
       object_types: [geo_content, comment_reply, publish_task, content, comment]
-      actions: [content.submit, comment.reply, publish.execute]
+      actions: [content.submit, comment.reply, publish.execute, rpa.publish, rpa.source_publish, reply.draft, geo.rewrite, script.draft]
     when: "params.involves_persona == true or params.involves_brand_stance == true"
     note: 涉人设/品牌表态内容阻断一切自动外发，强制 L4 人审后由人执行；AI 不替客户做人格化承诺
 
@@ -212,7 +223,7 @@ rules:
     is_baseline: true
     match:
       object_types: [experiment]
-      actions: [experiment.start, experiment.execute]
+      actions: [experiment.start, experiment.execute, experiment.card.write, experiment.result.write, experiment.backlog.write]
     when: "params.registered != true"
     note: 无实验卡（假设/判据/样本/预算/停止条件/伦理边界）禁止开跑；登记后方可执行（增长实验官纪律）
 
@@ -232,7 +243,7 @@ rules:
     is_baseline: true
     match:
       object_types: [referral]
-      actions: [referral.grant]
+      actions: [referral.grant, referral.program.write]
     when: "params.risk_score >= 0.8 or params.self_referral == true or params.device_collision == true"
     note: 自荐、设备撞库、异常批量等高风险转介奖励熔断并转人审；正常转介按激励规则执行
 
@@ -242,7 +253,7 @@ rules:
     is_baseline: true
     match:
       object_types: [growth_dataset, experiment_data]
-      actions: [data.export, data.share, audience.upload]
+      actions: [data.export, data.share, audience.upload, report.client, partner.outreach.write, matrix.plan.write]
     when: "context.data_boundary_ok != true"
     note: 实验与客资数据不出客户边界；导出/共享/人群上传未经数据边界确认即阻断（与 D19 上行红线同口径）
 
