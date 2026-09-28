@@ -375,6 +375,53 @@ export function LoomMate() {
     };
   }, []);
 
+  /**
+   * X-08（第五轮实测）：完成/失败播报此前只靠 StarRing 卡片**亲自轮询见证**跃迁，
+   * 于是 P8 名册抽屉派的任务、调度器自动跑的任务、以及刷新过页面后完成的任务，小织一律沉默。
+   * 现在补一条服务端投影通道：轮询 `threads.settledSince`，对"本机还没播报过"的结算线程补播报；
+   * localStorage 记 threadId+closed_at 去重（与 StarRing 的即时播报同事件去重，不重复嚷嚷）。
+   */
+  useEffect(() => {
+    let alive = true;
+    const STORAGE_KEY = "workloom:loommate-announced-settled";
+    const readSeen = (): Record<string, string> => {
+      try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}") as Record<string, string>; } catch { return {}; }
+    };
+    const writeSeen = (seen: Record<string, string>) => {
+      try {
+        // 只保留最近 200 条，避免长期运行无限膨胀
+        const entries = Object.entries(seen).slice(-200);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(Object.fromEntries(entries)));
+      } catch { /* 隐私模式/配额异常：仅当次会话去重，功能不降级 */ }
+    };
+    const pull = async () => {
+      try {
+        await ensureDemoLogin();
+        const rows = await trpc.threads.settledSince.query({ limit: 20 }) as Array<{
+          id: string; title: string; status: string; closed_at?: string | null; updated_at?: string;
+        }>;
+        if (!alive) return;
+        const seen = readSeen();
+        let changed = false;
+        for (const row of rows) {
+          const stamp = String(row.closed_at ?? row.updated_at ?? "");
+          if (seen[row.id] === stamp) continue;
+          seen[row.id] = stamp;
+          changed = true;
+          if (row.status === "completed" || row.status === "failed") {
+            announceTask({ threadId: row.id, title: row.title, status: row.status });
+          }
+        }
+        if (changed) writeSeen(seen);
+      } catch {
+        /* 拉不到就等下一拍：不猜、不补假播报 */
+      }
+    };
+    void pull();
+    const timer = window.setInterval(() => void pull(), 20_000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [announceTask]);
+
   /** 视口跨入窄屏断点时自动收起为小球（跨出时不自动展开，尊重用户当前选择） */
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 820px)");

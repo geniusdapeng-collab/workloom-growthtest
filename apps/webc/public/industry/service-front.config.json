@@ -64,21 +64,11 @@
     "me"
   ],
   "supportPhone": "",
-  "demoHistory": [
-    {
-      "role": "user",
-      "text": "我从短视频看到你们，想了解适合亲子入住的房型。"
-    },
-    {
-      "role": "ai",
-      "text": "已记录您的亲子入住需求。提交前我会请您确认日期与人数；收到服务端工单编号后才会显示受理成功。"
-    }
-  ],
   "projection": {
     "bundleId": "geo-growth",
     "bundleVersion": "1.0.0",
     "contractVersion": "2.0.0",
     "uiVersion": "0.1.1",
-    "manifestDigest": "882e6217ef46c92e6a31fb2d9711ba0c4ad68d98d459e5f9fe77743b9d6dcc9d"
+    "manifestDigest": "a8bd61ae5ca205f066ca1d78f11667a0794264f6fc1bdbfb5f37c70213ade5a5"
   }
 }

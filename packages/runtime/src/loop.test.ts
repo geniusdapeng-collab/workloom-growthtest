@@ -30,9 +30,18 @@ vi.mock("@workloom/base/evolve", () => ({
 }));
 
 import { runQuest } from "./loop.js";
+import type { QuestStep } from "./loop.js";
 
 const scope = { tenantId: "tenant-a", workspaceId: "ws-a" };
-const input = { threadId: "thread-a", goal: "提交并核验", presetKey: "operator" };
+/**
+ * GR-07 起：**确定性兜底计划**（planQuest）产出的写步骤带 params_incomplete，一律强制人工裁决。
+ * 本文件的用例聚焦"回执/重入"语义，因此显式注入带完整参数的计划器，让步骤按自动档走执行路径。
+ */
+const explicitPlanner = (): QuestStep[] => [
+  { stepId: "s1", action: "task.submit", objectType: "task", tool: "task.submit", params: {}, label: "提交" },
+  { stepId: "s2", action: "task.confirm", objectType: "task", tool: "task.confirm", params: {}, label: "核验" },
+];
+const input = { threadId: "thread-a", goal: "提交并核验", presetKey: "operator", fallbackPlanner: explicitPlanner };
 type StoredEvent = {
   payload: Record<string, unknown>;
   tenantId: string;
@@ -58,7 +67,7 @@ beforeEach(() => {
   queries = [];
   historyFailure = undefined;
   doubles.assemblePreset.mockResolvedValue({
-    agentId: "agent-a", presetKey: "operator", version: "v1", fenceBindings: [], prompt: null,
+    agentId: "agent-a", presetKey: "operator", version: "v1", highRisk: false, fenceBindings: [], prompt: null,
     essentials: { archive: { dataMode: "real" }, stage: "production", goal: input.goal },
     tools: [
       { name: "task.submit", access: "write", desc: "提交" },
@@ -80,6 +89,10 @@ beforeEach(() => {
           return { rows: events.filter((e) => e.tenantId === params[0] && e.workspaceId === params[1] && e.threadId === params[2]) };
         }
         if (/^(BEGIN|COMMIT|ROLLBACK)$/.test(sql) || sql.includes("set_config(") || sql.includes("UPDATE threads")) return { rows: [] };
+        // GR-01 计划持久化：首次运行没有持久化计划（返回空行 → 走规划并写回）
+        if (sql.includes("SELECT plan, plan_version FROM threads")) return { rows: [] };
+        // N-14 挂起去重 + review 分支写审批：旧用例关注回执行语义，这里补最小桩
+        if (sql.includes("INSERT INTO approvals")) return { rows: [] };
         if (sql.includes("FROM fence_rules") || sql.includes("FROM approvals")) return { rows: [] };
         throw new Error(`测试未定义的 SQL：${sql}`);
       },
@@ -97,7 +110,8 @@ describe("Quest 未核实回执不转完成，也不自动重发", () => {
     expect(first).toMatchObject({ status: "failed", stepsDone: 0, stepsTotal: 2, unverified: ["s1"] });
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute).toHaveBeenCalledWith("task.submit", {});
-    expect(events[0]?.payload.receipt).toEqual({ synced: false });
+    // GR-15 起回执带 mode（real/simulated），断言语义位而不是整对象相等
+    expect(events[0]?.payload.receipt).toMatchObject({ synced: false });
     const replay = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
     expect(replay).toEqual(first);
     expect(execute).toHaveBeenCalledTimes(1);
@@ -109,7 +123,8 @@ describe("Quest 未核实回执不转完成，也不自动重发", () => {
     const execute = vi.fn(async () => ({ result: {} }) as ToolResult);
     const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
     expect(result).toMatchObject({ status: "failed", stepsDone: 0, unverified: ["s1"] });
-    expect(events[0]?.payload.receipt).toEqual({ synced: false });
+    // GR-15 起回执带 mode（real/simulated），断言语义位而不是整对象相等
+    expect(events[0]?.payload.receipt).toMatchObject({ synced: false });
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
@@ -176,5 +191,15 @@ describe("Quest 未核实回执不转完成，也不自动重发", () => {
     await expect(runQuest(pool, pool, scope, { ...input, toolExecutor: execute })).rejects.toBe(historyFailure);
     expect(execute).not.toHaveBeenCalled();
     expect(events).toHaveLength(0);
+  });
+});
+
+describe("GR-07：确定性兜底计划必须人工裁决（不被自动执行，也不被算术规则假熔断）", () => {
+  it("无规划器（planQuest 兜底）→ 第一步挂起 pending_review 而不是执行", async () => {
+    const execute = vi.fn(async () => verifiedResult());
+    const result = await runQuest(pool, pool, scope, { threadId: "thread-a", goal: "提交并核验", presetKey: "operator", toolExecutor: execute });
+    expect(result.status).toBe("pending_review");
+    expect(execute).not.toHaveBeenCalled();
+    expect(result.pendingApprovalId).toBeTruthy();
   });
 });

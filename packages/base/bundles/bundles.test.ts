@@ -87,11 +87,12 @@ describe.runIf(RUN_DB)("行业装配 PG 集成（F2.10 铁律）", async () => {
   };
 
 
-  it("hotel profile：七槽 7/7 已装配 + 起飞前检查单六项全绿（F2.10 + v3.0 第⑦槽）", async () => {
+  it("hotel profile：七槽 7/7 已装配 + 起飞前检查单七项全绿（F2.10 + v3.0 第⑦槽）", async () => {
     const p = await computeAssembly(app, scope, "hotel");
     expect(p.status).toBe("active");
     expect(p.filledCount).toBe(7);
-    expect(p.checks.map((c) => c.ok)).toEqual([true, true, true, true, true, true]);
+    // GR-03 起检查单新增第⑥项「围栏-工具词表交叉校验」（红线空膛＝装配事故）
+    expect(p.checks.map((c) => c.ok)).toEqual([true, true, true, true, true, true, true]);
     expect(p.canActivate).toBe(true);
     // 班组卡：行业包声明的 preset 全部注册且围栏绑定合法（P7E2）
     // 期望值按清单推导，避免行业包扩编后测试与数据漂移
@@ -175,7 +176,7 @@ describe.runIf(RUN_DB)("行业装配 PG 集成（F2.10 铁律）", async () => {
       expect(provision.fenceRules).toBeGreaterThanOrEqual(68);
 
       const profile = await computeAssembly(app, scope2, "geo-growth");
-      expect(profile.checks.map((c) => c.ok)).toEqual([true, true, true, true, true, true]);
+      expect(profile.checks.map((c) => c.ok)).toEqual([true, true, true, true, true, true, true]);
       expect(profile.canActivate).toBe(true);
       expect(profile.agents.length).toBe(81);
 
