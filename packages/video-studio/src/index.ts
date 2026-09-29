@@ -49,3 +49,5 @@ export * from "./film-service-client.js";
 export * from "./film-contracts.js";
 /** 真实商品档案：涉及公司/品牌的片子必须绑定真实产品图（客户上传优先，系统检索次之）。 */
 export * from "./product-archive.js";
+/** 认证真人素材主档与一致性门（人物属性唯一事实源；禁止猜）。 */
+export * from "./real-person-asset.js";

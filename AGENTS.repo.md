@@ -31,3 +31,7 @@
 - 改能力面（脚本 / 包 / 技能 / 演示页）→ 必须 `pnpm capabilities` 重新生成人类版导览，再 `pnpm capabilities:check`。
 - UI 改动必须用仓内 browser/computer-use 能力打开真实页面截图核对，不能只看 curl 与日志。
 - 发布前 `pnpm release:gate` 全过（硬性门禁）；任务号与提交规范见 `docs/DEVELOPMENT-PROTOCOL.md`。
+
+## 认证真人素材：先建档再出镜（T-2026-0929-0007）
+
+拿到 `asset://` 认证真人 ID 的第一动作是**问属性（性别/年龄段/授权/有效期）并建主档** `bundles/ai-video/library/real-person-assets/<assetId>/profile.json`；镜头卡（含代词）必须与主档一致（G-RP1 门 fail-closed）；多镜片先出 1 镜 canary 并通过身份比对再渲其余。细则见 `docs/real-person-asset.md`。

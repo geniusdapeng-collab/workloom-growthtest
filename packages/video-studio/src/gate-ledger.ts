@@ -24,6 +24,8 @@ export const PIPELINE_GATE_STEP_KEYS = [
   "g8-render-submit",
   /** 素材镜生成门（G-MAT1，2026-09-25）：素材只作生成输入、禁止静态直出 */
   "material-generate",
+  /** 认证真人素材门（G-RP1）：属性与平台认证主档一致 + 先小样后全片 */
+  "g-real-person",
   /** 真实商品档案门（G-PROD1）：涉及具体公司/品牌的镜头必须绑定有效商品档案 */
   "g-product-ref",
   /** 多风格交付包：变体雷同一票否决（narrative-film.yml `deliver` 步） */
@@ -51,7 +53,7 @@ export type PipelineGateStepKey = (typeof PIPELINE_GATE_STEP_KEYS)[number];
 export type PipelineGateId =
   | "G1" | "G2" | "G3" | "G4" | "G5" | "G6" | "G7" | "G8"
   | "G9" | "G10" | "G12" | "G13"
-  | "G-MAT1" | "G-PROD1" | "G-DLV1" | "G-DLV4";
+  | "G-MAT1" | "G-PROD1" | "G-RP1" | "G-DLV1" | "G-DLV4";
 
 /** step_key → 门的编号（与 narrative-film.yml 的 `gate:` 字段一致） */
 const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
@@ -60,6 +62,7 @@ const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
   "g7-preproduction": "G7",
   "g8-render-submit": "G8",
   "g-product-ref": "G-PROD1",
+  "g-real-person": "G-RP1",
   /**
    * 素材生成门（2026-09-25 产品所有者口径）：真实素材只作生成输入、禁止静态直出。
    * step_key 在 narrative-film.yml 里紧随 render-script（素材镜的"提交生成"与 G8 同层，但判据不同）。
