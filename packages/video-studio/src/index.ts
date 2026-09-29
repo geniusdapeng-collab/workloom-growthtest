@@ -47,3 +47,5 @@ export * from "./film-worker-channel.js";
 export * from "./film-service-client.js";
 /** 影片作者合同与监制评审（服务侧固定工位用冻结原稿构建合同）。 */
 export * from "./film-contracts.js";
+/** 真实商品档案：涉及公司/品牌的片子必须绑定真实产品图（客户上传优先，系统检索次之）。 */
+export * from "./product-archive.js";
