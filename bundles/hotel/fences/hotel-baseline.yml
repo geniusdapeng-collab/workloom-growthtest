@@ -56,8 +56,8 @@ rules:
     level: block
     is_baseline: true
     match:
-      object_types: [order]
-      actions: [order.reconcile]
+      object_types: [order, payment, invoice]
+      actions: [order.reconcile, order.confirm, refund.apply]
     when: "params.guarantee_anomaly == true"
     note: 不确定不执行（L4.2），只写「需介入」事件
 
@@ -97,8 +97,8 @@ rules:
     level: block
     is_baseline: true
     match:
-      object_types: [guest, member]
-      actions: [crm.touch, guest.contact]
+      object_types: [guest, member, lead, review]
+      actions: [crm.touch, guest.contact, guest.care.send, dm.reply, review.guide.send, member.revive.campaign]
     when: "params.frequency_exceeded == true || params.unsubscribed == true"
     note: 触达频率超限或客人已退订 → block 级拒绝（私域运营硬合规，retention-manager 绑定）
 
@@ -107,8 +107,8 @@ rules:
     level: block
     is_baseline: true
     match:
-      object_types: [alert, facility]
-      actions: [safety.handle, facility.control, door.unlock]
+      object_types: [alert, facility, task]
+      actions: [safety.handle, facility.control, door.unlock, task.dispatch, maintenance.assign, escalate.human]
     when: "params.safety_event == true"
     note: 消防/门禁/监控等安全事件：AI 只告警+联动报警，绝不自行处置（无人酒店最高禁区）
 
@@ -251,8 +251,8 @@ rules:
     level: block
     is_baseline: true
     match:
-      object_types: [lead, member, guest]
-      actions: [lead.export, lead.bulk_message, member.export]
+      object_types: [lead, member, guest, review]
+      actions: [lead.export, lead.bulk_message, member.export, member.revive.campaign, guest.care.send, review.guide.send, lead.capture]
     when: "params.desensitized == false || params.batch_size > 50"
     note: 未脱敏客资明文批量导出直接熔断；客资明文不出系统边界（数据红线 R4 的获客域延伸）
 

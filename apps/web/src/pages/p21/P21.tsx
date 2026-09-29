@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { ensureDemoLogin, trpc } from "../../lib/trpc";
 import { actionText, actorText, payloadText, shortId } from "../../lib/display";
 import { Icon, Input, clientChineseText, clientValueText } from "@workloom/ui";
+import { clientNaturalText } from "../../lib/clientText";
 import { Bridge } from "../../shell/Bridge";
 
 const StatusPill = ({ tone, children }: { tone: "ok" | "warn" | "info"; children: React.ReactNode }) => (
@@ -250,7 +251,7 @@ export default function P21() {
             const params = (b.payload.decision.params ?? {}) as Record<string, unknown>;
             const text = after.text === undefined || after.text === null || after.text === ""
               ? ""
-              : clientChineseText(after.text, "简报内容暂时无法显示。");
+              : clientNaturalText(after.text, "简报内容暂时无法显示。");
             const dry = params.dry_run === true;
             return (
               <div key={b.event_id} className="rounded-lg border border-line bg-card p-3">

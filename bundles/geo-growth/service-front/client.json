@@ -63,15 +63,5 @@
     "messages",
     "me"
   ],
-  "supportPhone": "",
-  "demoHistory": [
-    {
-      "role": "user",
-      "text": "我从短视频看到你们，想了解获客增长服务和近期活动。"
-    },
-    {
-      "role": "ai",
-      "text": "已记录您的获客增长需求。提交前我会请您确认行业与目标市场；收到服务端工单编号后才会显示受理成功。"
-    }
-  ]
+  "supportPhone": ""
 }

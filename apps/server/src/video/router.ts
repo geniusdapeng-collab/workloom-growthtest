@@ -613,13 +613,36 @@ const studioRouter = router({
       `SELECT count(*)::text AS n FROM approvals WHERE workspace_id=$1 AND status='pending'`,
       [scope.workspaceId],
     );
+    /**
+     * X-01（第四轮实测，P0）：状态眼此前只认**进程内视频 run 注册表**——quest/agent/ask 的
+     * 线程域完全不在投影里，于是"对话框派了活、右下角球一直待机"，且服务端重启后连视频 run 也归零。
+     * 这里把线程域（与 approvals 同级的只读 SQL）并入活跃信号；注册表只保留视频管线的深水信息。
+     */
+    const threadRows = await scopedQuery<{ running: string; pending: string; failed: string }>(
+      getAppPool(),
+      scope,
+      `SELECT count(*) FILTER (WHERE status='running')::text AS running,
+              count(*) FILTER (WHERE status='pending_review')::text AS pending,
+              count(*) FILTER (WHERE status='failed' AND updated_at > now() - interval '15 minutes')::text AS failed
+         FROM threads WHERE workspace_id=$1`,
+      [scope.workspaceId],
+    );
+    const threadRunning = Number(threadRows[0]?.running ?? 0);
+    const threadPendingReview = Number(threadRows[0]?.pending ?? 0);
+    const threadFailedRecent = Number(threadRows[0]?.failed ?? 0);
     return {
-      activeRuns: summary.running + summary.awaitingApproval,
-      running: summary.running,
+      activeRuns: summary.running + summary.awaitingApproval + threadRunning,
+      running: summary.running + threadRunning,
       awaitingApproval: summary.awaitingApproval,
       pendingApprovals: Number(rows[0]?.n ?? 0),
-      failedRecent: summary.failedRecent,
+      failedRecent: summary.failedRecent + threadFailedRecent,
       activeRunIds: summary.activeRunIds,
+      /** 线程域明细（quest/agent/ask）：织伴状态眼与"班组在忙什么"同源 */
+      threads: {
+        running: threadRunning,
+        pendingReview: threadPendingReview,
+        failedRecent: threadFailedRecent,
+      },
     };
   }),
 

@@ -157,11 +157,11 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "51a9effebd7d047ff921f2c0e65c290b1b6639a15d0c0638112344abde4b0f45",
+    "digest": "b890e94306cc0745f82f05afec9002f82c7050ee80699c922c4ba1dc1ff9e9e1",
     "assets": {
       "connectors/connectors.json": "da242e8b9584c76bd95a5de798983fd6d8a401590f34944c64c5dd0eae86b863",
       "eval/questions.json": "072a979d79275ca4c57e84e59f9c802d802c9386fabc54fbc3af823e4589ce13",
-      "fences/hotel-baseline.yml": "3086f0e78f567997b6cf67cd4aea9ab5201bd36b3e39d8c9c8eb20d5ba043334",
+      "fences/hotel-baseline.yml": "667466baa8f484c2ff06125541e557185a51729101847caf1a7850fb7d49a3cd",
       "fences/patches/audit-only-patch.yml": "8c6f1874bf895ba0e2ceea7b5b801195e590d35650ed12a7d7b7b8290393abba",
       "fences/patches/homestay-patch.yml": "64b1b4cdca3f3a962237c9e64d791527eae86a3b39e5dae5d68a653b7d44eeb9",
       "fences/patches/low-star-single-patch.yml": "0c66b5e8df8f6ec7ec7133cce8106e191ceff36cfe4f2763fdf3e430e710738b",

@@ -387,9 +387,46 @@ function buildDesktopEnvironment(text, {
     SERVER_PORT: String(serverPort),
     WEB_PORT: String(webPort),
   };
+  /**
+   * GR-15：桌面端按**已装配桥**自动注入多桥执行器注册表——
+   * 没有这一行，桌面上任何含写步骤的 quest 都会落 `connector-required`（未核实）而无法交付。
+   * 规格与端口/工具名都从载荷内的桥源码派生（bundle 增删桥后无需改本文件）。
+   */
+  const toolExecutorModules = resolveToolExecutorModules(RUNTIME);
+  if (toolExecutorModules) values.WORKLOOM_TOOL_EXECUTOR_MODULES = toolExecutorModules;
   let next = text;
   for (const [key, value] of Object.entries(values)) next = upsertEnvValue(next, key, value);
   return { text: next, values };
+}
+
+/**
+ * 扫描载荷内 `bundles/&lt;bundle&gt;/connectors/&lt;bridge&gt;/executor.ts`，为每个桥生成一条执行器规格：
+ *   `<模块绝对路径>#<工厂名>#<工具名模式|…>#<默认端点>`
+ * 工具名模式取自桥源码的工具常量（`*_TOOLS`），端点取源码注释里的 127.0.0.1 端口（缺省则留空走共享 WORKLOOM_BRIDGE_BASE_URL）。
+ */
+function resolveToolExecutorModules(runtimeDir) {
+  const bundlesDir = path.join(runtimeDir, "bundles");
+  if (!fs.existsSync(bundlesDir)) return "";
+  const specs = [];
+  for (const bundle of fs.readdirSync(bundlesDir).sort()) {
+    const connectorsDir = path.join(bundlesDir, bundle, "connectors");
+    if (!fs.existsSync(connectorsDir)) continue;
+    for (const connector of fs.readdirSync(connectorsDir).sort()) {
+      const file = path.join(connectorsDir, connector, "executor.ts");
+      if (!fs.existsSync(file)) continue;
+      let source = "";
+      try { source = fs.readFileSync(file, "utf8"); } catch { continue; }
+      const factory = /export function (create[A-Za-z]+Executor)\s*\(/.exec(source)?.[1];
+      if (!factory) continue;
+      const toolsBlock = /export const [A-Z_]+_TOOLS\s*=\s*\[([\s\S]*?)\]\s*as const;/.exec(source)?.[1] ?? "";
+      const toolNames = [...toolsBlock.matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+      const prefixes = [...new Set(toolNames.map((name) => name.split(".")[0]).filter(Boolean))];
+      const patterns = prefixes.map((prefix) => `${prefix}.*`);
+      const port = /http:\/\/127\.0\.0\.1:(\d+)/.exec(source)?.[1];
+      specs.push([file, factory, patterns.join("|"), port ? `http://127.0.0.1:${port}` : ""].join("#"));
+    }
+  }
+  return specs.join(",");
 }
 
 const DATABASE_STATE_SCHEMA = "workloom.database-state/v1";

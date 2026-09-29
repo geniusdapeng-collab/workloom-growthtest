@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "workloom.agent-capabilities/v1",
+  "bundleId": "geo-growth",
+  "capabilities": [
+    {
+      "id": "growth.service.ticket.list",
+      "version": "1.0.0",
+      "title": "查看我的工单",
+      "description": "读取当前 C 端会话名下最近的工单（最多 100 条，包含咨询以外的类型）；结果由服务端按 C 用户与工作区范围过滤。",
+      "operation": "read",
+      "transport": {
+        "kind": "c-service",
+        "method": "GET",
+        "path": "/c/tickets"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "risk": "low",
+      "dataMode": "simulated"
+    },
+    {
+      "id": "growth.service.inquiry.preview",
+      "version": "1.0.0",
+      "title": "预览合作需求",
+      "description": "本地校验待提交的咨询或人工顾问需求，只预览输入，不访问服务端或创建工单；最终权限、归口与回执以服务端为准。",
+      "operation": "preview",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/preview.mjs",
+        "export": "previewInquiry"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["consult", "service_request"] },
+          "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "payload": { "type": "object" },
+          "conversationId": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 200 }
+        },
+        "required": ["kind", "title"],
+        "additionalProperties": false
+      },
+      "risk": "low",
+      "dataMode": "simulated"
+    },
+    {
+      "id": "growth.service.inquiry.execute",
+      "version": "1.0.0",
+      "title": "提交合作需求",
+      "description": "向当前 C 端会话提交一条合作咨询或人工顾问需求；服务端负责幂等、派单与事件记账。通知通道仍为演示，不能视为外部送达。",
+      "operation": "execute",
+      "transport": {
+        "kind": "c-service",
+        "method": "POST",
+        "path": "/c/tickets"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": { "type": "string", "enum": ["consult", "service_request"] },
+          "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "payload": { "type": "object" },
+          "conversationId": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 200 }
+        },
+        "required": ["kind", "title", "idempotencyKey"],
+        "additionalProperties": false
+      },
+      "risk": "moderate",
+      "dataMode": "simulated",
+      "enabled": false,
+      "disabledReason": "等待公共 C 工单幂等跨用户隔离修复、服务端活动 geo-growth 行业包绑定、Growth 受控同步和回归验证"
+    },
+    {
+      "id": "growth.service.ticket.receipt",
+      "version": "1.0.0",
+      "title": "核对工单进度",
+      "description": "按工单编号查询当前 C 端用户自己的工单与时间线（包含咨询以外的类型）；工单受理不等于外部通知送达。",
+      "operation": "receipt",
+      "transport": {
+        "kind": "c-service",
+        "method": "GET",
+        "path": "/c/tickets/{id}"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 120 }
+        },
+        "required": ["id"],
+        "additionalProperties": false
+      },
+      "risk": "low",
+      "dataMode": "simulated"
+    }
+  ]
+}

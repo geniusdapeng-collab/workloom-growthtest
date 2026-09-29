@@ -22,6 +22,8 @@ import pg from "pg";
 import YAML from "yaml";
 import { gatewayAppend, gatewayAppendOnClient, registerReadActions, registerWriteActions } from "../workdata/gateway.js";
 import { fenceRulesOf } from "../fence-engine/dsl.js";
+// GR-03：装配检查单⑥ 用判定器真实语义核对"红线是否可达"（命名空间后缀扩展等规则一致）
+import { actionMatches } from "../fence-engine/judge.js";
 import { parseModelPolicy } from "../model-router/policy.js";
 import {
   loadFeedbackEnumsFromBundle,
@@ -86,7 +88,7 @@ export interface SlotState {
   /** 回链管理页（围栏包→P5；班组→P8） */
   go?: "p5" | "p8";
 }
-export type CheckKey = "archive" | "enums" | "tools" | "fences" | "ui" | "model_policy";
+export type CheckKey = "archive" | "enums" | "tools" | "fences" | "fence-vocabulary" | "ui" | "model_policy";
 export interface CheckItem {
   key: CheckKey;
   label: string;
@@ -1461,6 +1463,50 @@ async function computeAssemblyScoped(
       : { key: "fences", label: "围栏绑定完整", ok: true, slot: "fences",
           detail: `基线 ${baselineCount} 条 🔒 单调守卫 · ${agentsOut.filter((a) => !a.readonly).length} 员绑定全合法` };
 
+  /**
+   * 校验⑥ 围栏-工具词表交叉校验（GR-03，2026-09-28 压测新增）。
+   *
+   * 为什么必须有机检：红线规则（is_baseline + level=block）如果 actions 对不上任何岗位写工具，
+   * 就是"空膛红线"——产品对外宣称的熔断永远不会发生（实测 geo-growth 12 条、ai-video 4 条、
+   * hotel 4 条，修复前 GEO 的"数据出域红线"就属于这一类）。
+   * 判定用**判定器真实语义** actionMatches（命名空间后缀扩展：规则 price.adjust 命中工具 pms.price.write），
+   * 不搞字符串相等，避免误报与漏报。
+   * 确实无法接线（能力未落地/由审批链而非判定器执行）时，围栏包必须显式声明 `unwired_blocks`，
+   * 把"空膛"变成"有据可查的缺口"，而不是静默失守。
+   */
+  // 复用槽③已算出的写工具清单（同一份组合视图，不另起同名变量）
+  const unwiredDeclared = new Set(
+    composed.fencePacks.flatMap((entry) => (entry.pack as { unwired_blocks?: Array<{ rule_id?: unknown }> }).unwired_blocks ?? [])
+      .map((item) => (typeof item?.rule_id === "string" ? item.rule_id : ""))
+      .filter(Boolean),
+  );
+  const emptyRedLines: string[] = [];
+  for (const entry of composed.fencePacks) {
+    for (const rule of fenceRulesOf(entry.pack)) {
+      const candidate = rule as unknown as {
+        rule_id?: unknown; name?: unknown; level?: unknown; is_baseline?: unknown;
+        match?: { actions?: unknown };
+      };
+      if (!(candidate.is_baseline !== false && candidate.level === "block")) continue;
+      const ruleId = String(candidate.rule_id ?? "");
+      if (!ruleId || unwiredDeclared.has(ruleId)) continue;
+      const ruleActions = Array.isArray(candidate.match?.actions) ? candidate.match!.actions!.map(String) : [];
+      const reachable = ruleActions.some((ruleAction) =>
+        writeToolNames.some((tool) => actionMatches(ruleAction, tool, "write")));
+      if (!reachable) emptyRedLines.push(`${ruleId}${typeof candidate.name === "string" && candidate.name ? `（${candidate.name}）` : ""}`);
+    }
+  }
+  const checkFenceVocabulary: CheckItem = emptyRedLines.length > 0
+    ? {
+      key: "fence-vocabulary", label: "围栏-工具词表交叉校验", ok: false, slot: "fences",
+      detail: `红线空膛：${emptyRedLines.join("、")}（规则声明了 block，但没有任何岗位写工具能触发）`,
+      fix: "把规则 actions 对齐真实工具名（可保留语义词），或在围栏包声明 unwired_blocks 说明未接线原因",
+    }
+    : {
+      key: "fence-vocabulary", label: "围栏-工具词表交叉校验", ok: true, slot: "fences",
+      detail: `写工具 ${writeToolNames.length} 项 · 红线全部可达（未接线声明 ${unwiredDeclared.size} 条）`,
+    };
+
   /* ---------- 槽⑥ 工作台 UI + 校验⑤ UI 用例同步 ---------- */
   const uiCases = assets.uiCases;
   const cases = uiCases?.cases ?? [];
@@ -1493,7 +1539,8 @@ async function computeAssemblyScoped(
     }
   }
 
-  const checks = [checkArchive, checkEnums, checkTools, checkFences, checkUi, checkModelPolicy];
+  // GR-03：第六项=围栏-工具词表交叉校验（红线空膛=装配事故，不允许静默通过）
+  const checks = [checkArchive, checkEnums, checkTools, checkFences, checkFenceVocabulary, checkUi, checkModelPolicy];
   const failedSlots = new Set(checks.filter((c) => !c.ok).map((c) => c.slot));
 
   const slots: SlotState[] = [

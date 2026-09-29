@@ -3,6 +3,12 @@
 # 知识库是只读资产：读取与检索一律直通；只有"改写知识库本身"才需要人审。
 version: ai-video-cine-kb/v1
 default_level: review
+
+# GR-03（2026-09-28）：知识覆写/删除动作当前无对应工具（只增不改纪律由导入链保证）→ 显式声明未接线
+unwired_blocks:
+  - rule_id: G-KB3
+    reason: cinewrite.overwrite / cinewrite.delete 无对应工具；知识条目写入走 cinewrite.enrich 且只增不改
+    owner: 平台工程
 rules:
   - rule_id: G-KB0
     name: 知识库检索直通（只读、零成本）
