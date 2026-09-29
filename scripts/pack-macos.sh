@@ -81,7 +81,8 @@ cp scripts/migrate.ts scripts/desktop-bootstrap-db.mjs scripts/product-runtime.m
 mkdir -p "$R/scripts/tools"
 cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
    scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-   scripts/tools/enhance-engine-install.mjs "$R/scripts/tools/"
+   scripts/tools/enhance-engine-install.mjs scripts/tools/uhd-lineage.mts \
+   scripts/tools/uhd-publication.mts "$R/scripts/tools/"
 # Whiteboard source and example inputs are portable; the machine-specific Python
 # venv and FFmpeg binaries are installed separately and never copied into this payload.
 mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
@@ -127,7 +128,8 @@ for f in node_modules/tsx/package.json node_modules/hono/package.json scripts/mi
          scripts/product-runtime.mjs scripts/vite-product.mjs product.manifest.json apps/web/vite.config.ts \
          scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
          scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-         scripts/tools/enhance-engine-install.mjs scripts/whiteboard/lineart_tools.py \
+         scripts/tools/enhance-engine-install.mjs scripts/tools/uhd-lineage.mts \
+         scripts/tools/uhd-publication.mts scripts/whiteboard/lineart_tools.py \
          assets/whiteboard/drawing-hand-workloom.png vendor/srt-whiteboard/LICENSE \
          vendor/srt-whiteboard/requirements.txt vendor/srt-whiteboard/scripts/prepare_env.py \
          vendor/srt-whiteboard/scripts/render_stream_whiteboard.py \

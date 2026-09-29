@@ -262,6 +262,21 @@ post-cli triage   --feedback "…"
 tsx scripts/tools/full-chain-film.mts --shots shotlist.json --project VID-1 --out 交付目录 --subtitle-mode sidecar
 ```
 
+### UHD 全链路命令的正式版本
+
+`full-chain-film.mts --quality uhd` 的封面、软字幕和字幕先写入 `--work-dir/post/<项目>/uhd/`。
+母版终审只批准候选；默认开启的 `deliver` 门也放行后，脚本把母版、主封面、软字幕、旁挂字幕、
+片头封面版（若生成）、三个变体及其封面、`delivery-manifest.json` 放进同一个暂存目录，
+核对每个文件的 SHA-256 与清单里的 `publicationArtifacts`，随后单次重命名为
+`<交付目录>/uhd/<项目>-delivery-package-<版本 ID>/`。最后原子更新
+`<交付目录>/uhd/<项目>-current.json`，其 `manifest.path` 与 `manifest.sha256` 指向该不可变版本。
+任一门拒绝、文件变化或发布失败，旧正式版本、旧指针、旧根目录封面和软字幕均不被覆盖。
+
+这条命令的清单使用 `deliverable`、`variants[].path` 和 `publicationArtifacts`；应用的
+`video.delivery` 页面读取的是 `WORKLOOM_DELIVERY_DIR` 下由 `post-bridge` 产出的
+`workloom.delivery-package/v1` 清单。两者是不同的交付入口，不能把 CLI 的版本目录直接当成
+页面返修包导入。
+
 环境变量：`WORKLOOM_POST_BRIDGE_PORT`（9777）、`WORKLOOM_POST_ALLOWED_ROOTS`（路径监狱）、
 `WORKLOOM_POST_WORK_DIR`（缓存，默认 `~/.workloom-post`）、`WORKLOOM_POST_FFMPEG_PATH` / `WORKLOOM_POST_FFPROBE_PATH`。
 

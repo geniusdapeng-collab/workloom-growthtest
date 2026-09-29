@@ -90,7 +90,8 @@ mkdir -p "$R/scripts/tools"
 # enhancer, Python venv, and FFmpeg binaries remain workstation prerequisites.
 cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
    scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-   scripts/tools/enhance-engine-install.mjs "$R/scripts/tools/"
+   scripts/tools/enhance-engine-install.mjs scripts/tools/uhd-lineage.mts \
+   scripts/tools/uhd-publication.mts "$R/scripts/tools/"
 mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
   "$R/vendor/srt-whiteboard/scripts" "$R/vendor/srt-whiteboard/assets" "$R/vendor/srt-whiteboard/examples"
 cp scripts/whiteboard/lineart_tools.py "$R/scripts/whiteboard/"
@@ -220,6 +221,7 @@ for f in runtime/node_modules/tsx/package.json runtime/node_modules/hono/package
          runtime/scripts/tools/full-chain-film.mts runtime/scripts/tools/compose-film.mts \
          runtime/scripts/tools/explainer-run.mts runtime/scripts/tools/whiteboard-film.mts \
          runtime/scripts/tools/whiteboard-env-install.mts runtime/scripts/tools/enhance-engine-install.mjs \
+         runtime/scripts/tools/uhd-lineage.mts runtime/scripts/tools/uhd-publication.mts \
          runtime/scripts/whiteboard/lineart_tools.py runtime/assets/whiteboard/drawing-hand-workloom.png \
          runtime/vendor/srt-whiteboard/LICENSE runtime/vendor/srt-whiteboard/requirements.txt \
          runtime/vendor/srt-whiteboard/scripts/prepare_env.py \
