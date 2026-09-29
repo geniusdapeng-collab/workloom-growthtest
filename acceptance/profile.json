@@ -160,6 +160,14 @@
         "baseUrlEnv": "DEEPSEEK_BASE_URL"
       },
       {
+        "id": "deepseek-v4.1-flash-gateway",
+        "kind": "llm",
+        "model": "deepseek-flash",
+        "adapter": "model-gateway",
+        "apiKeyEnv": "DEEPSEEK_API_KEY",
+        "baseUrlEnv": "LLM_BASE_URL"
+      },
+      {
         "id": "seedream-5.0",
         "kind": "image",
         "model": "doubao-seedream-5-0-pro-260628",
@@ -227,7 +235,7 @@
         "id": "LLM-G1",
         "kind": "llm",
         "chain": "model-gateway",
-        "model": "deepseek-v4.1-flash",
+        "model": "deepseek-v4.1-flash-gateway",
         "criticality": "P1",
         "title": "模型网关 · 结构化输出",
         "prompt": "只输出一行 JSON：{\"verdict\":\"ok\",\"risk\":\"low\",\"reason\":\"<20 字内>\"}。不要输出任何其他内容。",
@@ -295,6 +303,6 @@
         ]
       }
     ],
-    "notes": "P 域生产实测（本仓口径）：LLM 走 dsh harness（含围栏瀑布 + 哈希链账本）；生图/生视频走火山方舟（seedream-5.0-pro / seedance-2.5）；产品派单走本机客户端 9207。配额：图 ≤8、视频 ≤3 段且各 10–15s、总 ≤45s、LLM ≤40 次/¥120。"
+    "notes": "P 域生产实测（本仓口径）：LLM 走 dsh harness（含围栏瀑布 + 哈希链账本）；生图/生视频走火山方舟（seedream-5.0-pro / seedance-2.5）；产品派单走本机客户端 9207。配额：图 ≤8、视频 ≤3 段且各 10–15s、总 ≤45s、LLM ≤40 次/¥120。 端点方言（2026-09-29 MC-015，基座 T-2026-0929-0101 同步）：dsh-harness 走 Anthropic 兼容根（`DEEPSEEK_BASE_URL`，Messages 协议），model-gateway 走 OpenAI 兼容根（`LLM_BASE_URL`，`/chat/completions`）——两条链路各用一个模型条目声明，禁止把 Anthropic 根交给 OpenAI 兼容链路（会 404）。"
   }
 }
