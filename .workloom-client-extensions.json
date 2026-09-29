@@ -1,6 +1,6 @@
 {
   "schemaVersion": "workloom.client-extensions/v1",
-  "reason": "workloom-growthtest（AI超增长 · 实验车道）是三端壳上的产品分叉：apps/web 的页面/组件/壳/语音/引导/测试配置是获客增长产品层，不与基座三端壳逐字节一致；这些路径由本仓自己拥有，不随基座升级被覆盖。",
+  "reason": "WorkLoom-growthtest 是三端壳上的产品分叉（实验车道）：apps/web 的页面/组件/壳/语音/引导/测试配置是获客增长产品层，不与基座三端壳逐字节一致；这些路径由本仓自己拥有，不随基座升级被覆盖。",
   "scope": "repo-owned-client-paths",
   "industryExtensionPaths": [
     "apps/*/src/App.tsx",

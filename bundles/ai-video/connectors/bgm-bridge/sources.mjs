@@ -63,6 +63,46 @@ export const SOURCE_ENV = {
 
 export const SOURCES = Object.keys(SOURCE_ENV);
 
+/**
+ * 目录预设（catalog）：把"想要什么风格"翻译成各曲源能理解的检索参数。
+ *
+ * **版权边界（必须如实告知用户）**：
+ * - `western-pop` 指的是"欧美流行风格"，不是"某几首最新的商业热单"——商业热单受版权保护，
+ *   不能随开源仓库分发、也不能直接用于客户商用交付；要它们必须走**已授权的商业曲库**
+ *   （自建索引 `generic-http` 指过去，或把订阅下载的曲目放进 `WORKLOOM_BGM_LIBRARY_DIR` 本地曲库）。
+ * - `chinese-classical` 同理：传统曲目（如《春江花月夜》《高山流水》）的**曲谱**多属公有领域，
+ *   但**录音**几乎都带表演者/录音制作者权；因此走 CC0/CC BY 或已授权曲源，不自行抓取。
+ */
+export const CATALOGS = {
+  "western-pop": {
+    label: "欧美流行风格（现代流行/电子/舞曲，非具体商业热单）",
+    jamendoTags: ["pop", "dance", "electronic"],
+    freesoundQuery: "pop music loop upbeat",
+    mubertPlaylist: null,
+    mubertText: "modern pop upbeat",
+    bpmHint: 118,
+    energyHint: "high",
+  },
+  "chinese-classical": {
+    label: "中国古典/国风（古筝·二胡·琵琶·笛箫·民乐）",
+    jamendoTags: ["traditional", "chinese", "world"],
+    freesoundQuery: "guzheng erhu pipa dizi chinese traditional",
+    mubertPlaylist: null,
+    mubertText: "chinese traditional instrumental",
+    bpmHint: 72,
+    energyHint: "low",
+  },
+  "cinematic-score": {
+    label: "影视配乐（管弦/氛围/推进）",
+    jamendoTags: ["soundtrack", "classical", "cinematic"],
+    freesoundQuery: "cinematic orchestral score",
+    mubertPlaylist: null,
+    mubertText: "cinematic orchestral",
+    bpmHint: 90,
+    energyHint: "medium",
+  },
+};
+
 /** Jamendo 检索用的题材标签映射（中文题材 → Jamendo 英文标签/检索词）。 */
 const JAMENDO_TAGS = {
   "product-ad": ["pop", "corporate"],
@@ -181,19 +221,24 @@ export async function downloadToFile(url, destPath, { fetchImpl = fetch, timeout
 
 /* ============================ 各源检索 ============================ */
 
-function pickQuery({ brief, recipe }) {
-  const englishTags = recipe?.id ? JAMENDO_TAGS[recipe.id] ?? [] : [];
+function pickQuery({ brief, recipe, catalog = null }) {
+  const preset = catalog && CATALOGS[catalog] ? CATALOGS[catalog] : null;
+  const englishTags = preset
+    ? preset.jamendoTags
+    : recipe?.id ? JAMENDO_TAGS[recipe.id] ?? [] : [];
   return {
     tags: englishTags,
-    mood: brief?.mood?.length ? brief.mood.join(" ") : "",
-    bpmTarget: recipe?.bpm ? Math.round(recipe.bpm * (brief?.bpmScale ?? 1)) : null,
+    mood: brief?.mood?.length ? brief.mood.join(" ") : (preset ? preset.mubertText : ""),
+    bpmTarget: preset?.bpmHint ?? (recipe?.bpm ? Math.round(recipe.bpm * (brief?.bpmScale ?? 1)) : null),
+    catalog,
+    preset,
   };
 }
 
-async function searchJamendo({ brief, recipe, limit, env, fetchImpl }) {
+async function searchJamendo({ brief, recipe, limit, env, fetchImpl, catalog = null }) {
   const clientId = String(env.JAMENDO_CLIENT_ID ?? "").trim();
   if (!clientId) throw new MeasureError("未配置 JAMENDO_CLIENT_ID", "not_configured");
-  const query = pickQuery({ brief, recipe });
+  const query = pickQuery({ brief, recipe, catalog });
   const params = new URLSearchParams({
     client_id: clientId,
     format: "json",
@@ -232,11 +277,13 @@ async function searchJamendo({ brief, recipe, limit, env, fetchImpl }) {
   }));
 }
 
-async function searchFreesound({ brief, recipe, limit, env, fetchImpl }) {
+async function searchFreesound({ brief, recipe, limit, env, fetchImpl, catalog = null }) {
   const token = String(env.FREESOUND_API_TOKEN ?? "").trim();
   if (!token) throw new MeasureError("未配置 FREESOUND_API_TOKEN", "not_configured");
-  const query = pickQuery({ brief, recipe });
-  const words = [query.tags.join(" "), query.mood, "loop music bed"].filter(Boolean).join(" ");
+  const query = pickQuery({ brief, recipe, catalog });
+  const words = query.preset
+    ? query.preset.freesoundQuery
+    : [query.tags.join(" "), query.mood, "loop music bed"].filter(Boolean).join(" ");
   const params = new URLSearchParams({
     query: words || "music loop",
     fields: "id,name,previews,license,duration,tags,username",
@@ -266,11 +313,11 @@ async function searchFreesound({ brief, recipe, limit, env, fetchImpl }) {
   }));
 }
 
-async function searchMubert({ brief, recipe, limit, env, fetchImpl }) {
+async function searchMubert({ brief, recipe, limit, env, fetchImpl, catalog = null }) {
   const customerId = String(env.MUBERT_CUSTOMER_ID ?? "").trim();
   const accessToken = String(env.MUBERT_ACCESS_TOKEN ?? "").trim();
   if (!customerId || !accessToken) throw new MeasureError("未配置 MUBERT_CUSTOMER_ID / MUBERT_ACCESS_TOKEN", "not_configured");
-  const query = pickQuery({ brief, recipe });
+  const query = pickQuery({ brief, recipe, catalog });
   const duration = Math.max(15, Math.min(25 * 60, Math.round(brief?.durationSec ?? 60)));
   const intensity = brief?.energyLevel === "high" ? "high" : brief?.energyLevel === "low" ? "low" : "medium";
   const json = await httpJson("https://music-api.mubert.com/api/v3/public/tracks", {
@@ -284,7 +331,7 @@ async function searchMubert({ brief, recipe, limit, env, fetchImpl }) {
       format: "mp3",
       intensity,
       mode: "track",
-      ...(query.mood ? { text: query.mood } : {}),
+      ...(query.preset?.mubertText || query.mood ? { text: query.preset?.mubertText || query.mood } : {}),
     },
     timeoutMs: 120_000,
   });
@@ -307,10 +354,10 @@ async function searchMubert({ brief, recipe, limit, env, fetchImpl }) {
   }));
 }
 
-async function searchGenericHttp({ brief, recipe, limit, env, fetchImpl }) {
+async function searchGenericHttp({ brief, recipe, limit, env, fetchImpl, catalog = null }) {
   const endpoint = String(env.WORKLOOM_BGM_ONLINE_ENDPOINT ?? "").trim();
   if (!endpoint) throw new MeasureError("未配置 WORKLOOM_BGM_ONLINE_ENDPOINT", "not_configured");
-  const query = pickQuery({ brief, recipe });
+  const query = pickQuery({ brief, recipe, catalog });
   const url = new URL(endpoint);
   if (recipe?.genre) url.searchParams.set("genre", recipe.genre);
   if (query.mood) url.searchParams.set("mood", query.mood);
@@ -320,6 +367,7 @@ async function searchGenericHttp({ brief, recipe, limit, env, fetchImpl }) {
   }
   url.searchParams.set("limit", String(Math.max(1, Math.min(50, limit))));
   url.searchParams.set("commercial_only", "true");
+  if (query.catalog) url.searchParams.set("catalog", query.catalog);
   const json = await httpJson(url.toString(), { fetchImpl });
   const items = Array.isArray(json?.tracks) ? json.tracks : Array.isArray(json) ? json : [];
   // 自建索引常用相对路径（"/audio/x.mp3"）：按索引自身的 origin 解析成绝对地址
@@ -363,14 +411,14 @@ const SEARCHERS = {
  * 按简报在**已配置**的在线源检索（在线优先的第一跳）。
  * @returns {Promise<{candidates:Array, attempts:Array}>}
  */
-export async function searchOnline({ brief, recipe, limit = 8, env = process.env, fetchImpl = fetch, sources = null }) {
+export async function searchOnline({ brief, recipe, limit = 8, env = process.env, fetchImpl = fetch, sources = null, catalog = null }) {
   const configured = listSources(env).filter((entry) => entry.configured);
   const wanted = sources?.length ? configured.filter((entry) => sources.includes(entry.name)) : configured;
   const attempts = [];
   const candidates = [];
   for (const entry of wanted) {
     try {
-      const found = await SEARCHERS[entry.name]({ brief, recipe, limit, env, fetchImpl });
+      const found = await SEARCHERS[entry.name]({ brief, recipe, limit, env, fetchImpl, catalog });
       const usable = found.filter((item) => item.url);
       attempts.push({ source: entry.name, status: "ok", found: found.length, downloadable: usable.length });
       candidates.push(...usable);

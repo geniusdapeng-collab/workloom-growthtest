@@ -11,19 +11,35 @@
  *   bgm-cli compose   --out bgm.wav (--in clip.mp4 | --duration 30) [--id food] [--genre 美食]
  *                     [--seed 2026] [--bpm 96] [--bpm-strategy cut-driven]
  *   bgm-cli mix       --in clip.mp4 --out scored.mp4 --bgm bgm.wav [--policy keep-dialogue]
+ *                     --audio-stems pinned-audio-reference.json
  *                     [--music-level -22] [--ducking 12] [--lufs -14] [--evidence-dir dir]
  *                     [--track-license cc-by-4.0] [--attribution-out CREDITS.md]
  *   bgm-cli separate  --in clip.mp4 --out-dir dir [--engine auto|demucs|ffmpeg]
+ *   bgm-cli fetch     --prompt "国风古筝，中国古典" [--catalog chinese-classical]
+ *                     [--duration 30] [--recipe food] [--source-policy online-first]
+ *                     [--limit 8] [--dest-dir dir]
+ *   bgm-cli tag       --in ~/Music/曲库包 --out ~/.workloom-bgm/library --license royalty-free
+ *                     [--license-note "..."] [--license-source "..."] [--concurrency 6]
+ *                     [--max-seconds 180] [--no-recursive] [--allow-overwrite]
+ *   bgm-cli library   --scan                                   # 自动发现本机可用曲库（Downloads/Documents/Desktop/外接盘）
+ *   bgm-cli library   --rebind ~/Documents/新位置 --library ~/.workloom-bgm/library --allow-overwrite [--verify sha256]
+ *   bgm-cli library   --pack --library ~/.workloom-bgm/library [--out ~/Downloads/1200可商用纯音乐]
  *   bgm-cli best      --in clip.mp4 --out scored.mp4 [--genre 美食] [--mood 诱人温暖]
  *                     [--policy keep-dialogue] [--min-score 92] [--evidence-dir dir]
+ *                     [--prompt "..."] [--source-policy online-first] [--catalog cinematic-score]
+ *
+ * 目录预设（catalog）：western-pop（欧美流行风格）/ chinese-classical（中国古典·国风）/
+ *   cinematic-score（影视配乐）。它只改"检索条件"，不放宽许可闸——NC/ND/未知一律拒收。
  *
  * 退出码：0 成功；2 用法错误；3 工具错误（code 见 BgmError）。
  * 任何写入都落到新文件；覆盖原片一律拒绝。
  */
 
 import process from "node:process";
+import fs from "node:fs";
 
 import { BgmError, analyze, analyzeStructure, best, callTool, compose, findRecipes, findTracks, mix, separate } from "./core.mjs";
+import { CATALOGS } from "./sources.mjs";
 
 function parseArgs(argv) {
   const positional = [];
@@ -54,6 +70,22 @@ function number(value, fallback = null) {
 
 function fmt(value, digits = 2) {
   return Number.isFinite(value) ? Number(value).toFixed(digits) : "n/a";
+}
+
+/** 目录预设取值：未知名字 fail-closed（打错字不许静默降级成"随便找一首"）。 */
+function catalogFlag(value) {
+  if (value === undefined || value === true) return null;
+  const name = String(value);
+  if (!CATALOGS[name]) {
+    throw new BgmError(`未知目录预设：${name}（可选 ${Object.keys(CATALOGS).join(" / ")}）`, "catalog_unknown");
+  }
+  return name;
+}
+
+function audioStemsFlag(value) {
+  if (typeof value !== "string" || !value) throw new BgmError("--audio-stems 需要工程固定的签章分轨引用 JSON", "audio_stems_source_unverified", false);
+  try { return JSON.parse(fs.readFileSync(value, "utf8")); }
+  catch (error) { throw new BgmError(`音轨引用无法读取：${error.message}`, "bad_request", false); }
 }
 
 async function main() {
@@ -171,6 +203,7 @@ async function main() {
     }
     case "mix": {
       const result = await mix({
+        audioStems: audioStemsFlag(flags["audio-stems"]),
         input: flags.in,
         output: flags.out,
         bgmPath: flags.bgm,
@@ -225,8 +258,122 @@ async function main() {
       for (const attempt of result.attempts) line(`  引擎尝试：${attempt.engine} → ${attempt.status}${attempt.detail ? `（${attempt.detail}）` : ""}`);
       return 0;
     }
+    case "fetch": {
+      // 在线取源（可单独调用）：提示词 → 简报 → 在线优先 → 本地兜底 → 自算作曲，逐级留痕
+      const catalog = catalogFlag(flags.catalog);
+      const { result } = await callTool("bgmwrite.fetch", {
+        prompt_text: typeof flags.prompt === "string" ? flags.prompt : null,
+        duration_sec: number(flags.duration, null),
+        recipe_id: typeof flags.recipe === "string" ? flags.recipe : null,
+        source_policy: typeof flags["source-policy"] === "string" ? flags["source-policy"] : "online-first",
+        catalog,
+        limit: number(flags.limit, null),
+        dest_dir: typeof flags["dest-dir"] === "string" ? flags["dest-dir"] : null,
+      });
+      line(`取源分层：${result.layer}${result.degraded ? "（已降级，原因见下）" : ""}`);
+      if (result.brief) {
+        line(`  简报：题材 ${result.brief.recipeId ?? "n/a"} · 情绪 ${(result.brief.mood ?? []).join("/") || "n/a"} · 能量 ${result.brief.energyLevel ?? "n/a"}`);
+      }
+      if (catalog) line(`  目录预设：${catalog} —— ${CATALOGS[catalog].label}`);
+      if (result.track) {
+        line(`  曲目：${result.track.title ?? result.track.id} · ${result.track.license} · 来源 ${result.track.source ?? result.track.libraryKind ?? "n/a"}${result.track.cached ? "（命中缓存）" : ""}`);
+        line(`  时长 ${fmt(result.track.durationSec, 1)}s · BPM ${result.track.bpm ?? "n/a"} · sha256 ${result.track.sha256 ?? "n/a"}`);
+        line(`  落盘：${result.track.localPath ?? "n/a"}`);
+        if (result.track.attributionText) line(`  署名义务：${result.track.attributionText}`);
+      } else {
+        line("  未取到外部曲目：在线无合规候选且本地曲库无匹配 → 交给工位按降级链自算作曲兜底。");
+      }
+      for (const attempt of result.attempts ?? []) {
+        line(`  尝试 [${attempt.layer}]${attempt.source ? ` ${attempt.source}` : ""} → ${attempt.status}${attempt.message ? `（${attempt.message}）` : ""}`);
+      }
+      line(`  缓存目录：${result.cacheDir}`);
+      const configured = (result.sources ?? []).filter((entry) => entry.configured).map((entry) => entry.name);
+      line(`  在线源：${configured.length ? configured.join(" / ") : "未配置（凭据缺失时如实报告，不假装搜过）"}`);
+      return 0;
+    }
+    case "tag": {
+      // 曲库打标：素材目录 → 实测打标 → 曲库索引（许可必须先声明，围栏 G-BGM8）
+      const { result } = await callTool("bgmwrite.tag", {
+        input_dir: flags.in,
+        out_dir: flags.out,
+        license: typeof flags.license === "string" ? flags.license : null,
+        license_note: typeof flags["license-note"] === "string" ? flags["license-note"] : null,
+        license_source: typeof flags["license-source"] === "string" ? flags["license-source"] : null,
+        library_name: typeof flags["library-name"] === "string" ? flags["library-name"] : null,
+        concurrency: number(flags.concurrency, 4),
+        max_seconds: number(flags["max-seconds"], 180),
+        recursive: flags["no-recursive"] !== true,
+        allow_overwrite: flags["allow-overwrite"] === true,
+      });
+      line(`打标完成：扫描 ${result.counts.scanned} 首 → 入册 ${result.counts.tagged} 首 · 剔除 ${result.counts.rejected} 首 · 失败 ${result.counts.failed} 首`);
+      line(`  曲库目录：${result.outDir}`);
+      line(`  索引文件：${result.files.join(" / ")}`);
+      line(`  许可：${result.license.key}（${result.license.label}${result.license.attributionRequired ? " · 需署名" : " · 无署名义务"}）`);
+      line(`  风格分布：${Object.entries(result.counts.byStyle).map(([style, count]) => `${style}×${count}`).join(" · ")}`);
+      line(`  能量分布（包内三分位）：low×${result.counts.byEnergyBucket.low} · mid×${result.counts.byEnergyBucket.mid} · high×${result.counts.byEnergyBucket.high}`);
+      if (result.rejectedTotal) {
+        line(`  被剔除（前 ${Math.min(5, result.rejectedTotal)} 条，完整清单见 tag-report.json）：`);
+        for (const item of result.rejected.slice(0, 5)) line(`    · ${item.file} —— ${item.reasons.join("；")}`);
+      }
+      if (result.lowConfidenceTotal) {
+        line(`  ⚠ 低置信标签 ${result.lowConfidenceTotal} 首（风格判定把握不足，建议人耳复核；清单见 tag-report.json）：`);
+        for (const item of result.lowConfidence.slice(0, 5)) line(`    · ${item.file}（style=${item.style}, bpm=${item.bpmConfidence}）`);
+      }
+      if (result.errors.length) {
+        for (const item of result.errors.slice(0, 5)) line(`  ✗ 失败：${item.file} —— ${item.error}`);
+      }
+      return 0;
+    }
+    case "library": {
+      // 曲库维护：搬迁重绑 / 打进素材目录随文件夹走 / 自动发现
+      const libraryDir = typeof flags.library === "string"
+        ? flags.library
+        : (process.env.WORKLOOM_BGM_HOME ? `${process.env.WORKLOOM_BGM_HOME}/library` : `${process.env.HOME}/.workloom-bgm/library`);
+      if (flags.scan === true) {
+        const { result } = await callTool("bgmwrite.library", { action: "inspect", library_dir: libraryDir });
+        line("自动发现的本机曲库：");
+        if (!result.discovered.length) line("  （没找到带 tracks.json 的目录）");
+        for (const item of result.discovered) {
+          line(`  · ${item.dir}`);
+          line(`    ${item.libraryName} · ${item.tracks} 首 · ${item.fileMode} 路径 · ${item.note}`);
+        }
+        line("当前加载顺序：");
+        for (const root of result.roots) line(`  ${root.kind.padEnd(16)} ${root.dir}`);
+        return 0;
+      }
+      if (typeof flags.rebind === "string") {
+        const { result } = await callTool("bgmwrite.library", {
+          action: "rebind",
+          library_dir: libraryDir,
+          new_root: flags.rebind,
+          verify: flags.verify === "sha256" ? "sha256" : "size",
+          allow_overwrite: flags["allow-overwrite"] === true,
+          dry_run: flags["dry-run"] === true,
+        });
+        line(`${result.dryRun ? "试算" : "已重新绑定"}：命中 ${result.matched} · 找不到 ${result.missing} · 歧义 ${result.ambiguous}（核验方式 ${result.verify}）`);
+        line(`  旧目录：${result.oldRoot}`);
+        line(`  新目录：${result.newRoot}`);
+        for (const item of result.samples) line(`  · [${item.status}] ${item.id} → ${item.newPath ?? item.oldPath}`);
+        return 0;
+      }
+      if (flags.pack === true) {
+        const { result } = await callTool("bgmwrite.library", {
+          action: "pack",
+          library_dir: libraryDir,
+          ...(typeof flags.out === "string" ? { dest_dir: flags.out } : {}),
+          allow_overwrite: flags["allow-overwrite"] === true,
+        });
+        line(`已把索引打进素材目录：${result.destDir}（${result.tracks} 首，路径模式=${result.fileMode}）`);
+        line(`  写入文件：${result.files.join(" / ")}`);
+        line("  这个文件夹从此可以整体拷走/压缩分发：解压到任意位置都能被自动发现（相对路径索引）");
+        return 0;
+      }
+      line("用法：bgm-cli library --scan | --rebind <新素材目录> --allow-overwrite [--verify sha256] | --pack [--out <素材目录>]");
+      return 2;
+    }
     case "best": {
       const result = await best({
+        audioStems: audioStemsFlag(flags["audio-stems"]),
         input: flags.in,
         output: flags.out,
         genre: typeof flags.genre === "string" ? flags.genre : null,
@@ -235,6 +382,9 @@ async function main() {
         minScore: number(flags["min-score"], 92),
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
         seed: number(flags.seed, 0),
+        promptText: typeof flags.prompt === "string" ? flags.prompt : null,
+        sourcePolicy: typeof flags["source-policy"] === "string" ? flags["source-policy"] : "compose-only",
+        catalog: catalogFlag(flags.catalog),
       });
       if (result.verdict === "no_bgm_needed") {
         line(`结论：无需配乐 —— ${result.reason}`);
@@ -248,7 +398,8 @@ async function main() {
     }
     default:
       process.stderr.write(
-        "用法：bgm-cli <health|probe|analyze|recipes|library|compose|mix|separate|best> [--flags]\n"
+        "用法：bgm-cli <health|probe|analyze|recipes|library|compose|mix|separate|fetch|tag|best> [--flags]\n"
+        + "       bgm-cli library --scan | --rebind <新目录> --allow-overwrite | --pack [--out <目录>]\n"
         + "参见 bundles/ai-video/connectors/bgm-bridge/README.md\n",
       );
       return 2;
@@ -256,9 +407,9 @@ async function main() {
 }
 
 main()
-  .then((code) => process.exit(code))
+  .then((code) => { process.exitCode = code; })
   .catch((error) => {
-    const code = error instanceof BgmError ? error.code : "engine_failed";
+    const code = typeof error?.code === "string" ? error.code : "engine_failed";
     process.stderr.write(`${code}: ${error instanceof Error ? error.message : String(error)}\n`);
-    process.exit(3);
+    process.exitCode = 3;
   });

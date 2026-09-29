@@ -111,7 +111,12 @@ test("every packaging download is wired through the verified fetch boundary", as
   assert.match(files.pgvectorWin, /release-assets\.json/);
   assert.match(files.pgvectorWin, /release-assets\.mjs verify \$NupkgPath \$NupkgName/);
   assert.match(files.pgvectorWin, /--version=\$PostgresPackageVersion --source=\$PackageStage --require-checksums/);
-  assert.match(files.pgvectorWin, /if \(Test-Path \$PgRoot\)[\s\S]+干净 runner/);
+  assert.match(files.pgvectorWin, /if \(Test-Path -LiteralPath \$PgRoot\)/);
+  assert.match(files.pgvectorWin, /Test-Path -LiteralPath \$PgMarker -PathType Leaf/);
+  assert.match(files.pgvectorWin, /Get-FileHash -LiteralPath \$entry\.FullName -Algorithm SHA256/);
+  assert.match(files.pgvectorWin, /Assert-PgInventoryEqual \$recordedFiles \$currentFiles/);
+  assert.match(files.pgvectorWin, /Assert-PgInventoryEqual \$BaseInventory \$AfterBuildInventory/);
+  assert.doesNotMatch(files.pgvectorWin, /choco uninstall|Remove-Item\s+\$PgRoot/u);
   assert.match(files.pgvectorWin, /choco list --exact \$PostgresPackage --limit-output/);
   assert.doesNotMatch(files.pgvectorWin, /if \(-not \(Test-Path \"\$PgRoot\\bin\\pg_config\.exe\"\)\)/);
   assert.match(files.pgvectorWin, /fetch --quiet --depth 1 origin \$PgvectorCommit/);
@@ -120,7 +125,7 @@ test("every packaging download is wired through the verified fetch boundary", as
   assert.match(files.electron, /verify-windows-pg-provenance vendor\/pg-win\/WORKLOOM-PROVENANCE\.txt/);
   for (const tool of [
     "full-chain-film.mts", "compose-film.mts", "explainer-run.mts", "whiteboard-film.mts",
-    "whiteboard-env-install.mts", "enhance-engine-install.mjs", "uhd-lineage.mts", "uhd-publication.mts",
+    "whiteboard-env-install.mts", "enhance-engine-install.mjs",
   ]) {
     assert.match(files.electron, new RegExp(`scripts/tools/${tool.replaceAll(".", "\\.")}`));
     assert.match(files.mac, new RegExp(`scripts/tools/${tool.replaceAll(".", "\\.")}`));

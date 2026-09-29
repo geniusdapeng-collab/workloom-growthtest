@@ -3,10 +3,13 @@
  * vendor、PG、媒体登记用边界替身；档案写盘与重试/终态/商品摘要走实际代码。
  */
 import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { createHash } from "node:crypto";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { gatewayAppend, gatewayAppendOnClient } from "@workloom/base/workdata";
+import { applyScenePolicy, auditScenePolicy, loadScenePolicies, type ScenePolicyShot } from "@hyperreality/video-studio";
+import { verifyScenePolicyProductionSource } from "./scene-policy-render-gate.js";
 
 const doubles = vi.hoisted(() => ({
   workDir: "",
@@ -25,10 +28,12 @@ const doubles = vi.hoisted(() => ({
   finalize: vi.fn(),
   studioConfigs: [] as Array<Record<string, any>>,
   emitGates: true,
+  connect: vi.fn(),
   query: vi.fn(),
+  releaseDb: vi.fn(),
 }));
 
-vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: async () => ({ query: doubles.query, release: vi.fn() }) }), getGatewayPool: () => ({}) }));
+vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: doubles.connect }), getGatewayPool: () => ({}) }));
 vi.mock("@workloom/base/model-router", () => ({
   GatewayEventSink: class {}, poolFromEnv: () => new Map(),
 }));
@@ -114,6 +119,11 @@ beforeEach(() => {
   doubles.meta.mockReset().mockResolvedValue({ kind: "marketing", title: "结果完整性", threadId: "T1", createdAt: "2026-09-27T00:00:00Z" });
   doubles.ingest.mockResolvedValue({ scanned: 0, ingested: 0, deduped: 0, skipped: 0, errors: [] });
   doubles.project.mockResolvedValue({ profile: { productName: "商品", dossierSha256: "a".repeat(64) }, changed: true, heroIngested: false });
+  doubles.connect.mockReset().mockResolvedValue({ query: doubles.query, release: doubles.releaseDb });
+  doubles.query.mockReset().mockImplementation(async (sql: string) => ({
+    rows: sql.includes("video_projects_max_vid_no") ? [{ n: 9000 }] : [], rowCount: 1,
+  }));
+  doubles.releaseDb.mockReset();
   vi.stubEnv("ARCHIVE_ENABLED", "1");
   vi.stubEnv("MEDIA_INGEST_ENABLED", "1");
   vi.stubEnv("HR_PORTRAIT_ENABLED", "0");
@@ -130,6 +140,43 @@ const success = () => ({
     productionEngine: { shots: [{ shotId: "SC-1", prompt: "01.【场景】窗边桌面", fields: { scene: "窗边桌面" } }] },
   },
 });
+const commercialSuccess = () => {
+  const policy = loadScenePolicies(path.resolve(import.meta.dirname, "../../../../bundles/ai-video/library/scene-policies"))
+    .find((item) => item.id === "commercial-person")!;
+  const specs: Array<[string[], string, string?]> = [
+    [["wide", "moving"], "大场面全景，人物站在大厅中央", "缓推镜展示空间纵深"],
+    [["wide"], "广角全景，人物站在空间视觉主导位"],
+    [["medium", "moving"], "半身中景，人物与实体材质同框", "轨道移镜围绕访谈位"],
+    [["medium"], "腰部以上中景，人物与实体墙屏同框"],
+    [["medium"], "膝上中景，人物站在会客厅首层"],
+    [["person-close", "moving"], "面部近景特写，神态沉稳", "轻推镜到人物双眼"],
+    [["person-close"], "胸部以上人物特写，说明手势清晰"],
+    [["person-close"], "面部近景，人物直视镜头"],
+    [["environment-detail"], "实体羊毛经纬纹样特写与材质工艺微距"],
+    [["environment-detail"], "胡桃木与大理石材质特写，人物不入镜"],
+  ];
+  const shots: ScenePolicyShot[] = specs.map(([tags, composition, camera], index) => {
+    const shot: ScenePolicyShot = {
+      shotId: `SC-${index + 1}`, duration: 4.5, policyTags: tags,
+      scene: "明亮的别墅式企业会客厅首层正式访谈位",
+      composition, camera_movement: camera ?? "固定访谈机位",
+      costume: "合体商务正装，衣料挺括整洁",
+      speechMode: tags.includes("environment-detail") ? "voice-over" : "on-camera",
+      speechScene: "interview",
+      dialogue: [{ speaker: "主讲人", text: "欢迎了解方案。" }],
+      action: [
+        "正面直视镜头，以坚定眼神和从容停掌开始口播",
+        "镜头从45°侧前方看她自然微笑",
+        "侧面轮廓可辨，她用一个小手势说明重点",
+        "背影气场后转身，留下沉思瞬间",
+      ][index] ?? "自然讲述并保持专业气质",
+      ...(index === 8 ? { props: "实体羊毛交织纹样与材质工艺" } : {}),
+    };
+    return applyScenePolicy({ ...shot, prompt: `${shot.scene}；${shot.composition}` }, policy);
+  });
+  expect(auditScenePolicy({ title: "正式商务短片", shots }, policy).passed).toBe(true);
+  return { ...success(), stages: { ...success().stages, productionEngine: { shots } } };
+};
 const rejected = () => ({
   success: false,
   confirmations: { theme: { approved: false, reason: "producer-rejected(G2_THEME)：需求冲突" } },
@@ -138,11 +185,19 @@ const rejected = () => ({
 
 async function runToTerminal(isMarketing = true) {
   const projectId = `VID-result-${++projectSequence}`;
-  if (!isMarketing) doubles.meta.mockResolvedValue({ kind: "narrative", title: "叙事结果", createdAt: "2026-09-27T00:00:00Z" });
+  if (!isMarketing) useNarrativeProject();
   const runId = worker.startRun(scope, { projectId, intent: "测试预生产结果", isMarketing });
   await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
   const entry = worker.getRun(runId, scope.workspaceId)!;
   return { projectId, runId, entry };
+}
+
+/**
+ * 上游新增 PIPELINE_KIND_MISMATCH 校验：预生产管线必须与服务项目 kind 一致。
+ * 本文件默认 meta 是 marketing，叙事用例必须先声明叙事项目，否则 run 会在建档前失败。
+ */
+function useNarrativeProject() {
+  doubles.meta.mockResolvedValue({ kind: "narrative", title: "叙事结果", threadId: "T1", createdAt: "2026-09-27T00:00:00Z" });
 }
 
 async function archiveOutput(projectId: string, attempt: number) {
@@ -151,6 +206,116 @@ async function archiveOutput(projectId: string, attempt: number) {
 }
 
 describe("预生产原始结果与诚实终态", () => {
+  it("建项目之前拦截显式未知片型，未触及数据库和供应商", async () => {
+    await expect(worker.startVideoProjectRun(scope, {
+      intent: "给陈卓拍一条正式商务短片",
+      metadata: { scenePolicy: { id: "not-installed" } },
+      by: { id: "MEM-1", type: "human" },
+    })).rejects.toThrow(/未知片型/);
+    await expect(worker.startVideoProjectRun(scope, {
+      intent: "做一条母婴亲子短片",
+      by: { id: "MEM-1", type: "human" },
+    })).rejects.toThrow(/没有可核实的已安装片型知识条目/);
+    expect(doubles.connect).not.toHaveBeenCalled();
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
+  });
+
+  it("分流器加工出的 brief 不充当客户原始选型证据", async () => {
+    doubles.runPreproduction.mockResolvedValue(success());
+    const started = await worker.startVideoProjectRun(scope, {
+      rawIntent: "拍一条山间日出风景片",
+      intent: "拍一条山间日出风景片\n[需求口径] 时长：30秒",
+      customerMetadata: null,
+      metadata: { brief: { product: "企业负责人" }, pipelineRoute: { kind: "marketing" } },
+      isMarketing: true,
+      by: { id: "MEM-1", type: "human" },
+    });
+    await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(doubles.runPreproduction.mock.calls[0]?.[0].metadata).toMatchObject({
+      brief: { product: "企业负责人" }, scenePolicySelection: { id: null },
+    });
+  });
+
+  it("原始需求选出的 T1 进入建档事件、routeMeta、供应商入参与分镜/提示词包", async () => {
+    doubles.runPreproduction.mockResolvedValue(commercialSuccess());
+    useNarrativeProject();
+    const started = await worker.startVideoProjectRun(scope, {
+      rawIntent: "给企业负责人拍正式商务短片，陈卓出镜口播",
+      intent: "给企业负责人拍短片\n[需求口径] 时长：30秒",
+      metadata: { brief: { audience: "企业负责人" } },
+      isMarketing: false,
+      by: { id: "MEM-1", type: "human" },
+    });
+    await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(started.runId, scope.workspaceId)?.status).toBe("finished");
+    const creation = vi.mocked(gatewayAppendOnClient).mock.calls.find(([, , event]) => event.decision.action === "video.project.create");
+    expect(creation?.[2].decision.after).toMatchObject({ scenePolicy: { id: "commercial-person", evidence: expect.any(Array) } });
+    const selectionEvent = vi.mocked(gatewayAppend).mock.calls.find(([, , event]) => event.decision.action === "video.scene_policy.selected");
+    expect(selectionEvent?.[2].decision.after).toMatchObject({ id: "commercial-person", runId: started.runId });
+    const runInput = doubles.runPreproduction.mock.calls[0]?.[0];
+    expect(runInput.intent).toContain("[片型制作规范 commercial-person@");
+    expect(runInput.metadata.scenePolicy).toMatchObject({ id: "commercial-person" });
+    const dir = path.join(doubles.workDir, "archive", scope.workspaceId, started.projectId);
+    const manifest = JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"));
+    const prompts = JSON.parse(await readFile(path.join(dir, "stages/preproduction/attempt-1.prompts.json"), "utf8"));
+    const shotlist = JSON.parse(await readFile(path.join(dir, "stages/preproduction/attempt-1.shotlist.json"), "utf8"));
+    expect(manifest.routeMeta.scenePolicy).toMatchObject({ id: "commercial-person" });
+    expect(prompts.scenePolicy).toMatchObject({ id: "commercial-person" });
+    expect(shotlist).toMatchObject({ scenePolicy: { id: "commercial-person" }, draft: true });
+    expect(shotlist.shots).toHaveLength(10);
+    const reportBytes = await readFile(path.join(dir, "stages/preproduction/attempt-1.scene-policy-report.json"));
+    const shotlistBytes = await readFile(path.join(dir, "stages/preproduction/attempt-1.shotlist.json"));
+    const report = JSON.parse(reportBytes.toString("utf8"));
+    expect(report).toMatchObject({ passed: true, totalSeconds: 45 });
+    const output = await archiveOutput(started.projectId, 1);
+    expect(createHash("sha256").update(reportBytes).digest("hex")).toBe(output.scenePolicyReportSha256);
+    expect(createHash("sha256").update(shotlistBytes).digest("hex")).toBe(output.shotlistSha256);
+    const policy = loadScenePolicies(path.resolve(import.meta.dirname, "../../../../bundles/ai-video/library/scene-policies"))
+      .find((item) => item.id === "commercial-person")!;
+    expect(verifyScenePolicyProductionSource({
+      decision: manifest.routeMeta.scenePolicy, policy,
+      projectId: started.projectId, attempt: 1, shotId: "SC-1", output, prompts, report, shotlist,
+    })).toMatchObject({ policyId: "commercial-person", shotId: "SC-1", attempt: 1 });
+  });
+
+  it("供应商返回不合规镜头表时报告落档并在渲染前打回", async () => {
+    doubles.runPreproduction.mockResolvedValue(success());
+    useNarrativeProject();
+    const started = await worker.startVideoProjectRun(scope, {
+      rawIntent: "给企业负责人拍正式商务短片，陈卓出镜口播",
+      intent: "给企业负责人拍短片",
+      by: { id: "MEM-1", type: "human" },
+    });
+    await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(started.runId, scope.workspaceId)?.status).toBe("failed");
+    const dir = path.join(doubles.workDir, "archive", scope.workspaceId, started.projectId);
+    const report = JSON.parse(await readFile(path.join(dir, "stages/preproduction/attempt-1.scene-policy-report.json"), "utf8"));
+    expect(report.passed).toBe(false);
+    expect(report.defects.some((item: { rule: string }) => item.rule === "ratio-min")).toBe(true);
+  });
+
+  it("既有项目补跑重新选型并留下 routeMeta 变更事件", async () => {
+    doubles.runPreproduction.mockResolvedValue(success());
+    useNarrativeProject();
+    const projectId = `VID-route-${++projectSequence}`;
+    const first = worker.startRun(scope, { projectId, intent: "山间风景片" });
+    await vi.waitFor(() => expect(worker.getRun(first, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    const second = worker.startRun(scope, {
+      projectId, intent: "给企业负责人拍正式商务短片", rawIntent: "给企业负责人拍正式商务短片",
+    });
+    await vi.waitFor(() => expect(worker.getRun(second, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    const dir = path.join(doubles.workDir, "archive", scope.workspaceId, projectId);
+    const manifest = JSON.parse(await readFile(path.join(dir, "manifest.json"), "utf8"));
+    const events = (await readFile(path.join(dir, "events.jsonl"), "utf8")).trim().split("\n").map((line) => JSON.parse(line));
+    expect(manifest.routeMeta.scenePolicy.id).toBe("commercial-person");
+    expect(events).toContainEqual(expect.objectContaining({
+      kind: "scene-policy.route-changed",
+      previous: expect.objectContaining({ id: null }),
+      current: expect.objectContaining({ id: "commercial-person" }),
+    }));
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
+  });
+
   it("启用档案时，监制打回仍触发有限重试，成功结果保留 stages.dataMining 驱动商品投影", async () => {
     doubles.runPreproduction.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(success());
     const { entry, projectId, runId } = await runToTerminal();

@@ -2,7 +2,7 @@
   "schemaVersion": "workloom.acceptance-checklist/v1",
   "spec": "docs/REAL-DEVICE-ACCEPTANCE-SPEC.md",
   "specVersion": "rdas/v1.1",
-  "generatedFrom": "WorkLoom-growth 真机验收（2026-09-19）沉淀 + 业界实践映射（见规范 §11）",
+  "generatedFrom": "WorkLoom-growthtest 真机验收（2026-09-19）沉淀 + 业界实践映射（见规范 §11）",
   "howToUse": [
     "每轮验收逐条执行；不适用项必须写 'skip + 理由 + 补做时间'，禁止静默跳过。",
     "本文件由基座维护，经 base-sync 分发；行业专属的角色/旅程/阈值写在本仓 acceptance/profile.json。",

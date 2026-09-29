@@ -256,7 +256,7 @@ node_modules/.bin/tsx scripts/tools/full-chain-film.mts \
   docs/cinematography-kb-audit-round3.md（前三轮结论与缺口）
   docs/pipeline-stages-and-gates-2026-09-24.md（注入链上下游与门）
 
-工作目录：~/WorkLoom-fleet/.wt-pjl（WorkLoom-growth 的 task 工作树）
+工作目录：~/WorkLoom-fleet/.wt-pjl（WorkLoom-growthtest 的 task 工作树）
 审计对象：bundles/ai-video/connectors/cine-kb-bridge/{core.mjs,core.test.ts,audit-round3.test.ts}
           bundles/ai-video/library/cinematography-kb/*.md（只读，缺口走提案）
 

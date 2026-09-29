@@ -1814,6 +1814,116 @@ o("晨会派单：一句话调价任务跑通到 completed", async () => {
   eq(row.rows[0]!.status, "completed", "线程状态同步");
 });
 
+/**
+ * 第四/五/六批（X-01..X-10 / Y-01）联动与安全回归：
+ * 这些用例守的是"服务端事实 → 投影 → 客户可见"的最后一米，改写/删除前请先读懂对应报告卡。
+ */
+o("Y-01 高危批量审批守卫：不可逆步骤在生产路径派生 high_risk 并拒绝批量", async () => {
+  const tid = await mkThread();
+  // 用真实生产路径造一条挂起审批：不可逆写步骤 + 未覆盖写动作 → default_level=review
+  const planIrreversible: QuestPlanner = () => [{
+    stepId: "s1", action: "pms.checkin", objectType: "room", tool: "pms.checkin",
+    params: { room: "8301" }, context: { irreversible: true }, label: "不可逆入住登记",
+  }];
+  const r = await runQuest(app, gw, scope, {
+    threadId: tid, goal: "给 8301 办入住登记", presetKey: "frontdesk-agent", fallbackPlanner: planIrreversible,
+  });
+  eq(r.status, "pending_review", "不可逆步骤挂起待审");
+  const snap = await qApp<{ high_risk: boolean | null; irreversible: boolean | null }>(
+    `SELECT (snapshot->>'high_risk')::boolean AS high_risk, (snapshot->>'irreversible')::boolean AS irreversible
+       FROM approvals WHERE approval_id=$1`, [r.pendingApprovalId!]);
+  eq(snap.rows[0]?.high_risk, true, "快照按生产路径派生 high_risk（Y-01）");
+  const batch = await batchApprove(app, gw, scope, boss, [r.pendingApprovalId!]);
+  eq(batch.approved.length, 0, "高危项不得批量批准");
+  assert((batch.skipped[0]?.reason ?? "").includes("高危"), "跳过原因=高危项须逐条");
+});
+
+o("X-05/X-07 楼层联动：排队任务有归属；刚完成仍看得见庆祝（与请示共存）", async () => {
+  const { buildFloor } = await import("@workloom/base/captain");
+  /**
+   * 用**专用新员工**做断言，避免套件前面用例留下的"刚完成"信号干扰
+   * （庆祝是近 10 分钟窗口，共用种子员工会让 X-07 的排队断言偶发飘红）。
+   */
+  const presetKey = `floor-x07-${SFX}`;
+  const agentId = `agt-${presetKey}`;
+  await qApp(
+    `INSERT INTO agents (id, workspace_id, preset_key, name, version, kind, readonly, fence_bindings, skills, status)
+     VALUES ($1,$2,$3,'排队联动员工','v1','specialist',false,'[]','[]','ready')`,
+    [agentId, scope.workspaceId, presetKey]);
+
+  const queuedId = `T-SFX7-${SFX}`;
+  await qApp(
+    `INSERT INTO threads (id, tenant_id, workspace_id, title, mode, status, created_by, agent_id)
+     VALUES ($1,$2,$3,$4,'quest','queued','MEM-001',$5)`,
+    [queuedId, scope.tenantId, scope.workspaceId, "排队中的联动用例", agentId]);
+  const floorQueued = await buildFloor(app, scope);
+  const queuedRow = floorQueued.agents.find((x) => x.id === agentId);
+  eq(queuedRow?.state, "queued", "排队线程在楼层可见且归属正确（X-07）");
+  assert(queuedRow?.statusLine.includes("排队中"), "排队态文案可见");
+  eq(queuedRow?.currentThread?.id, queuedId, "排队线程可点进任务页");
+
+  // 同岗位挂一条真待审（走网关写事件 + approvals 行，who.id=preset_key，floor 据此判 asking）
+  const ev = await gatewayAppend(gw, {
+    tenantId: scope.tenantId, workspaceId: scope.workspaceId,
+    // 身份必须与 who 一致（G8 防伪造）：以该岗位 agent 身份写这条"待审探针"事件
+    actor: { id: presetKey, type: "agent", fenceBindings: [] },
+  }, {
+    who: { type: "agent", id: presetKey, version: "v1" },
+    context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString() },
+    object: { type: "task", id: queuedId },
+    decision: { action: "floor.x07.probe", step_id: "s1", params: {} },
+    rule_impact: [],
+  } as never);
+  const aprId = `apr-${ev.eventId.toLowerCase()}`;
+  await qApp(
+    `INSERT INTO approvals (approval_id, tenant_id, workspace_id, event_id, channel, status, snapshot, tier)
+     VALUES ($1,$2,$3,$4,'inapp','pending','{}','l2_captain')`,
+    [aprId, scope.tenantId, scope.workspaceId, ev.eventId]);
+  const floorAsking = await buildFloor(app, scope);
+  eq(floorAsking.agents.find((x) => x.id === agentId)?.state, "asking", "待审时显示请示");
+
+  // 再把排队线程标记为刚完成 → 同一员工既有请示又有庆祝：庆祝可见且审批直达号保留（X-05）
+  await qApp(`UPDATE threads SET status='completed', closed_at=now() WHERE id=$1`, [queuedId]);
+  const floorDone = await buildFloor(app, scope);
+  const doneRow = floorDone.agents.find((x) => x.id === agentId);
+  // X-05 最终口径：请示与庆祝共存——state 仍为 asking（审批显眼可直达），celebrating 作为独立标志
+  eq(doneRow?.state, "asking", "有请示时以 asking 为主态（审批可达）");
+  eq(doneRow?.celebrating, true, "同屏标记刚完成（庆祝不被队列堆积吃掉）");
+  assert(doneRow?.statusLine.includes("刚完成"), "气泡同时含请示与刚完成");
+  eq(doneRow?.approvalId, aprId, "共存：仍带审批直达号");
+});
+
+o("X-09 织伴查任务：问业务任务答业务任务（不再答开发场域）", async () => {
+  const { chat } = await import("../apps/server/src/service/secretary.js");
+  const tid = await mkThread();
+  await qApp(
+    `UPDATE threads SET title=$2, mode='quest', status='pending_review', updated_at=now() WHERE id=$1`,
+    [tid, "调价到 570 元（X-09 联动用例）"]);
+  const reply = await chat(scope.workspaceId, "MEM-001", "调价那个任务怎么样了？", { id: "MEM-001", type: "human" });
+  assert(reply.reply.includes("调价到 570 元"), "答出业务任务标题（不再答「没有开发任务」）");
+  assert(/等您拍板|拍板/.test(reply.reply), "状态口径与任务卡同源");
+  // 对照：明确问开发/发布仍落开发场域分支
+  const devReply = await chat(scope.workspaceId, "MEM-001", "开发任务怎么样了？", { id: "MEM-001", type: "human" });
+  assert(!devReply.reply.includes("调价到 570 元"), "开发问题不串业务任务");
+});
+
+o("X-03 织伴收件箱：任务失败/熔断进未读（红线不受勿扰压制）", async () => {
+  const { scan, inbox } = await import("../apps/server/src/service/secretary.js");
+  const tid = await mkThread();
+  /**
+   * 口径说明：勿扰时段（22:00–08:00）按纪律压制 high/mid 级推送（业务挂起/完成次日自然呈现），
+   * 只有 red（失败/熔断，红线）不受压制。用例因此走 red 路径断言——
+   * 这样白天/夜间都稳定，同时守住"任务出事必须立刻说"这条纪律。
+   */
+  await qApp(
+    `UPDATE threads SET title=$2, status='failed', error='收件箱联动用例：执行失败', updated_at=now() WHERE id=$1`,
+    [tid, "收件箱联动用例（失败）"]);
+  await scan(scope.workspaceId, "MEM-001");
+  const box = await inbox(scope.workspaceId, "MEM-001", true) as { items: Array<{ title?: string; source_key?: string }> };
+  const items = Array.isArray(box?.items) ? box.items : [];
+  assert(items.some((x) => String(x.source_key ?? "").includes(tid)), "任务失败产生红色未读（X-03）");
+});
+
 o("HP-02 失败关闭：通用规划的写类步骤无规则命中 → 挂起待审而非静默放行", async () => {
   const tid = await mkThread();
   // 不注入行业规划器 → 基座确定性规划只给「工具名 + 空参」步骤：
@@ -1826,8 +1936,20 @@ o("HP-02 失败关闭：通用规划的写类步骤无规则命中 → 挂起待
     [r1.pendingApprovalId!],
   );
   assert(apr.rows[0], "挂起步骤进审批队列（人可介入，不再静默执行）");
-  await decide(app, gw, scope, boss, r1.pendingApprovalId!, { type: "approve" });
-  const r2 = await runQuest(app, gw, scope, { threadId: tid, goal: "把周五主打款调价 5%", presetKey: "pricing-agent" });
+  /**
+   * GR-07 起：确定性兜底计划的**每个写步骤**各自挂起人工裁决（读步骤照常执行）——
+   * 因此"批准一次"只会推进到下一个挂起点；真实链路里这个循环由
+   * `scheduleQuestResumeAfterApproval`（批准 → 自动续跑 → 下一个挂起点）自动完成。
+   * 本用例显式模拟该循环，并断言最终能走到 completed。
+   */
+  let r2 = await runQuest(app, gw, scope, { threadId: tid, goal: "把周五主打款调价 5%", presetKey: "pricing-agent" });
+  let guard = 0;
+  while (r2.status === "pending_review" && guard < 6) {
+    assert(r2.pendingApprovalId, "每个写步骤都能给出待批 ID");
+    await decide(app, gw, scope, boss, r2.pendingApprovalId!, { type: "approve" });
+    r2 = await runQuest(app, gw, scope, { threadId: tid, goal: "把周五主打款调价 5%", presetKey: "pricing-agent" });
+    guard += 1;
+  }
   eq(r2.status, "completed", "批准后恢复续跑完成");
 });
 

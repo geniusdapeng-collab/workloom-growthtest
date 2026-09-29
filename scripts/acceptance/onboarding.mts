@@ -20,7 +20,7 @@ import {
 import { composeWorkforce } from "@workloom/base/bundles";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://postgres:workloom@localhost:5432/workloom";
-const PRIMARY_BUNDLE = process.env.ACCEPTANCE_PRIMARY_BUNDLE ?? "geo-growth";
+const PRIMARY_BUNDLE = process.env.ACCEPTANCE_PRIMARY_BUNDLE ?? "geo-growthtest";
 
 let failures = 0;
 function check(name: string, ok: boolean, detail = ""): void {

@@ -1,5 +1,5 @@
 /**
- * 获客用增 C 端服务前台适配器（geo-growth）。
+ * 获客用增 C 端服务前台适配器（geo-growthtest）。
  *
  * 本文件可以理解「获客增长」的服务语言（合作咨询 / 方案与报价 / 需求跟进），
  * 基座网关与通用对话层不得理解这些词。只有活动 Bundle 的完整性校验投影显式
@@ -73,7 +73,7 @@ const GROWTH_DEPARTMENTS: Record<string, string> = {
 };
 
 export const geoGrowthBizAdapter: ServiceFrontBusinessAdapter = {
-  id: "geo-growth.service-front-v1",
+  id: "geo-growthtest.service-front-v1",
 
   // 业务同义词与弱词归行业适配器所有；只有已验证活动 Bundle 选中本适配器后才生效。
   kbLexicon: {

@@ -69,7 +69,9 @@ describe("配乐复检失败关闭", () => {
     });
     expect(evaluateMixChecks({ ...measured, loudnessAfter: { integratedLufs: -14, truePeakDbtp: null } }).true_peak_ok).toBe(false);
     expect(evaluateMixChecks({ ...measured, duckingDepthDb: null }).ducking_applied).toBe(false);
-    expect(evaluateMixChecks({ ...measured, policy: "music-only", duckingDepthDb: null }).ducking_applied).toBe(true);
+    expect(evaluateMixChecks({ ...measured, policy: "music-only", duckingDepthDb: null }).ducking_applied).toBe(false);
+    expect(evaluateMixChecks({ ...measured, dialogueStatus: "not_applicable", duckingDepthDb: null }).ducking_applied).toBe(true);
+    expect(evaluateMixChecks({ ...measured, speechToMusicMarginDb: null }).dialogue_preserved).toBe(false);
     expect(measuredDuckingDepthDb(-20, -28)).toBe(-8);
     expect(measuredDuckingDepthDb(null, -28)).toBeNull();
   });

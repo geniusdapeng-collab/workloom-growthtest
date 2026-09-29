@@ -759,6 +759,24 @@ describe.runIf(RUN_DB)("媒资库活库契约", () => {
     expect(after.updated_at, "回填不得推进 updated_at").toBe(before);
   }, 90_000);
 
+  /**
+   * 存在性检查批量化回归（T-2026-0926-0019）：列表的 hasLocalFile/thumbUrl 必须仍然反映磁盘事实
+   * （改为每请求一次 readdir 建集合后，不允许出现"索引与磁盘不一致"）。
+   */
+  it("㉑ 列表存在性：文件在盘=true，删档后=false（索引口径与磁盘一致）", async () => {
+    const file = await writeFixtureFile("exists-probe.mp4", "exists-bytes");
+    const clip = await mods.registerLocalAsset(getAppPool(), getGatewayPool(), scope, {
+      absPath: file, kind: "clip", title: "存在性素材", prompt: "存在性探针", by: "vitest", probe: false, thumbnail: false,
+    });
+    const row = (await owner.query<{ local_path: string }>(`SELECT meta->>'localPath' AS local_path FROM video_assets WHERE id=$1`, [clip.assetId])).rows[0]!;
+    const before = (await mods.listAssets(getAppPool(), scope, { limit: 200 })).items.find((item) => item.id === clip.assetId);
+    expect(before?.hasLocalFile).toBe(true);
+    rmSync(join(process.env.WORKLOOM_MEDIA_DIR!, row.local_path), { force: true });
+    const after = (await mods.listAssets(getAppPool(), scope, { limit: 200 })).items.find((item) => item.id === clip.assetId);
+    expect(after?.hasLocalFile).toBe(false);
+    expect(after?.thumbUrl ?? null, "无缩略图时不得给出签名缩略图地址").toBeNull();
+  }, 90_000);
+
   it.runIf(hasFfmpeg)("⑪ 重剪：真实 ffmpeg 归一化拼接 → 新 final_cut（source_type=recut）", async () => {
     const a = await makeTinyClip("recut-a.mp4", "red");
     const b = await makeTinyClip("recut-b.mp4", "blue");

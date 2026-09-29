@@ -5,6 +5,7 @@ import { randomBytes } from "node:crypto";
 import { mkdtemp, mkdir, writeFile, realpath, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { gatewayAppend } from "@workloom/base/workdata";
 import { authorizeRenderSubmission, loadQualifiedRenderInput, qualifyProductionShot } from "./production-authority.js";
 import { prepareMarketingFacts, finalizeMarketingFacts } from "./marketing-authority.js";
 import { renderSha256 } from "./gen/compiled-request.js";
@@ -63,6 +64,13 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
     await writeFile(path.join(root, "stages/preproduction/attempt-1.output.json"), output);
     await owner.query(`INSERT INTO production_stage_runs (id,workspace_id,project_id,stage_id,attempt,status,run_id,output_ref,output_sha256)
       VALUES ($1,$2,$3,'preproduction',1,'done',$4,'stages/preproduction/attempt-1.output.json',$5)`, [sourceId, scope.workspaceId, projectId, `RUN-${seq}`, renderSha256(output)]);
+    await gatewayAppend(gateway, { ...scope, actor: { id: "video-studio", type: "system" } }, {
+      who: { id: "video-studio", type: "system" },
+      context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },
+      object: { type: "video_project", id: projectId },
+      decision: { action: "video.scene_policy.selected", after: { runId: `RUN-${seq}`, id: null, version: null, sourceSha256: null,
+        reason: "原始需求未命中已安装片型", evidence: [] } }, rule_impact: [],
+    });
   });
   afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
   // 不删除 append-only 资格/五元事件；专属测试作用域留作真实回归证据。
@@ -158,8 +166,11 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
     const stored = await owner.query("SELECT compiled_request FROM production_qualifications WHERE id=$1", [qualification.qualificationId]);
     const sent = calls.find(call => call.url.endsWith("/contents/generations/tasks"));
     expect(sent).toEqual({ url: stored.rows[0].compiled_request.endpoint, body: stored.rows[0].compiled_request.bodyJson });
-    const events = await owner.query("SELECT payload->'decision'->>'action' AS action FROM biz_events WHERE workspace_id=$1 AND (payload->'decision'->'after'->>'qualificationId'=$2 OR payload->'decision'->'after'->>'jobId'=$3) ORDER BY seq", [scope.workspaceId, qualification.qualificationId, result.jobId]);
-    expect(events.rows.map(row => row.action)).toEqual(["render.qualification", "model.call", "render.submit"]);
+    const events = await owner.query(`SELECT payload->'decision'->>'action' AS action FROM biz_events WHERE workspace_id=$1 AND (
+      payload->'decision'->'after'->>'qualificationId'=$2 OR payload->'decision'->'after'->>'jobId'=$3
+      OR (payload->'decision'->>'action'='video.scene_policy.selected' AND payload->'object'->>'id'=$4)) ORDER BY seq`,
+    [scope.workspaceId, qualification.qualificationId, result.jobId, projectId]);
+    expect(events.rows.map(row => row.action)).toEqual(["video.scene_policy.selected", "render.qualification", "model.call", "render.submit"]);
     expect((await owner.query("SELECT status FROM render_scripts WHERE id=$1", [qualification.scriptId])).rows[0].status).toBe("submitted");
     const repeatQualification = await issue(); expect(repeatQualification).toEqual(qualification);
     expect((await submitGenJob(await input(repeatQualification.qualificationToken))).deduped).toBe(true); expect(providerCalls).toBe(1);

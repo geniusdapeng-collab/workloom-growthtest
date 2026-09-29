@@ -7,13 +7,16 @@
  *  · 选段落点：把曲子高潮段的峰值对到片子高潮时刻，误差要在 1.5s 内，并且回执里要有依据。
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, readFileSync, realpathSync } from "node:fs";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { analyzeStructure, filmClimaxTime, filmEnergyArc, mix } from "./core.mjs";
 import { detectCuts, detectVoiceBandSegments, resolveBinaries, probeMedia } from "./measure.mjs";
+import { describeAudioStemSources, renderAudioStems } from "./audio-stems.mjs";
+import { audioStemReceiptPayload, createAudioStemReceiptVerifier } from "./audio-stems-trust.mjs";
 
 const bins = resolveBinaries();
 const hasFfmpeg = (() => {
@@ -26,7 +29,7 @@ const hasFfmpeg = (() => {
   }
 })();
 
-const workDir = join(tmpdir(), `bgm-structure-${Date.now().toString(36)}`);
+const workDir = join(realpathSync(tmpdir()), `bgm-structure-${Date.now().toString(36)}`);
 const musicPath = join(workDir, "music.wav");
 
 /**
@@ -54,6 +57,10 @@ function measureResidualRmsDb(reference: string, mixed: string, startSec: number
 }
 const filmPath = join(workDir, "film.mp4");
 const mixedPath = join(workDir, "film-scored.mp4");
+const scope = { tenantId: "fixture-t", workspaceId: "fixture-w", projectId: "structure", revision: 1 };
+const env = { ...process.env, WORKLOOM_AUDIO_STEM_SIGNING_SECRET: randomBytes(32).toString("hex"), WORKLOOM_AUDIO_STEM_SIGNING_KEY_ID: "synthetic-test-only" };
+let audioStems: object;
+const hash = (file: string) => createHash("sha256").update(readFileSync(file)).digest("hex");
 
 function buildStructuredMusic() {
   // 26s：0–8 安静铺底 / 8–20 高潮（带 2Hz 脉冲 = 120BPM）/ 20–26 安静收尾
@@ -99,10 +106,24 @@ function buildFilmWithClimax() {
 }
 
 describe.skipIf(!hasFfmpeg)("配乐结构识别与选段（真实 ffmpeg）", () => {
-  beforeAll(() => {
+  beforeAll(async () => {
     mkdirSync(workDir, { recursive: true });
     buildStructuredMusic();
     buildFilmWithClimax();
+    const stems: Record<string, any> = { ambience: { status: "ready", path: join(workDir, "film-audio.wav"), sha256: hash(join(workDir, "film-audio.wav")), sourceKind: "synthesized_ambience" },
+      ...Object.fromEntries(["dialogue", "foley", "music"].map((role) => [role, { status: "not_applicable", reason: "Independently generated synthetic ambience-only fixture" }])) };
+    const shot = { shotId: "film", videoSha256: hash(filmPath), durationSec: 30, stems };
+    for (const { binding, bindingSha256 } of describeAudioStemSources({ scope, shots: [shot] })) {
+      const now = Date.now();
+      const receipt: Record<string, string> = { schemaVersion: "workloom.audio-stem-receipt/v1", purpose: "independent-audio-source", bindingSha256,
+        workerId: "synthetic-worker", jobId: "structure-fixture", evidenceSha256: "a".repeat(64), issuedAt: new Date(now - 1000).toISOString(),
+        expiresAt: new Date(now + 3600000).toISOString(), keyId: "synthetic-test-only" };
+      receipt.signature = createHmac("sha256", env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET).update(audioStemReceiptPayload(receipt)).digest("hex");
+      stems[binding.role].receipt = receipt;
+    }
+    const bundle = await renderAudioStems({ scope, shots: [shot], outDir: join(workDir, "independent-stems"),
+      allowedRoots: [realpathSync(workDir)], bins, verifySource: createAudioStemReceiptVerifier({ env }) });
+    audioStems = { dir: bundle.dir, manifestSha256: bundle.manifestSha256, recipeSha256: bundle.recipeSha256, scope };
   }, 180_000);
 
   afterAll(() => {
@@ -141,8 +162,9 @@ describe.skipIf(!hasFfmpeg)("配乐结构识别与选段（真实 ffmpeg）", ()
       input: filmPath,
       output: mixedPath,
       bgmPath: musicPath,
+      audioStems, env,
       policy: "keep-all",
-      musicLevelDb: -24,
+      musicLevelDb: -10,
       duckingDb: 10,
       section: "auto",
       evidenceDir: workDir,

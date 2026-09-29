@@ -4,6 +4,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm, realpath, symlink } from "node
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type pg from "pg";
+import { applyScenePolicy, auditScenePolicy, loadScenePolicies, type ScenePolicyShot } from "@hyperreality/video-studio";
 import { authorizeRenderSubmission, loadQualifiedRenderInput, listProductionShots, qualifyProductionShot } from "./production-authority.js";
 import { renderSha256 } from "./gen/compiled-request.js";
 import { submitGenJob } from "./gen/submit.js";
@@ -15,7 +16,7 @@ const scope = { tenantId: "tenant-a", workspaceId: "ws-a" };
 const gates = ["G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"];
 type Row = Record<string, any>;
 class MemoryPool {
-  source: Row = {}; qualifications: Row[] = []; scripts: Row[] = []; submissionState = "";
+  source: Row = {}; selection: Row | null = null; qualifications: Row[] = []; scripts: Row[] = []; submissionState = "";
   locked = false; busy = false; unlockFails = false; releases: boolean[] = [];
   asPool() { return this as unknown as pg.Pool; }
   async connect() { return { query: this.query.bind(this), release: (discard = false) => { this.releases.push(discard); } }; }
@@ -25,6 +26,9 @@ class MemoryPool {
     else if (sql.startsWith("SELECT pg_advisory_unlock")) { this.locked = false; if (this.unlockFails) throw new Error("unlock failure"); rows = [{ ok: true }]; }
     else if (["BEGIN", "COMMIT", "ROLLBACK"].includes(sql) || sql.includes("set_config")) { /* transaction shell */ }
     else if (sql.includes("SELECT r.*,p.kind")) rows = values[0] === scope.tenantId && values[1] === scope.workspaceId && values[2] === this.source.project_id ? [this.source] : [];
+    else if (sql.includes("FROM biz_events") && sql.includes("video.scene_policy.selected")) rows = this.selection
+      && values[0] === scope.tenantId && values[1] === scope.workspaceId && values[2] === this.source.project_id
+      ? [{ after: this.selection }] : [];
     else if (sql.includes("SELECT q.*,s.state AS submission_state")) rows = this.submissionState ? this.qualifications.filter(row => row.payload_hash === values[5] && row.source_stage_run_id === values[4] && ["submitting", "unknown", "accepted", "finalized"].includes(this.submissionState)).slice(-1) : [];
     else if (sql.includes("INSERT INTO render_scripts")) this.scripts.push({ id: values[0], workspace_id: values[1], project_id: values[2], shot_id: values[3], script_key: values[4], version: 1, status: "draft", md: values[5], fields: JSON.parse(values[6]), created_by: values[7] });
     else if (sql.includes("INSERT INTO production_qualifications")) {
@@ -50,6 +54,60 @@ async function persist() {
   const bytes = JSON.stringify(output); await writeFile(path.join(root, pool.source.output_ref), bytes);
   pool.source.output_sha256 = renderSha256(bytes);
 }
+async function installCommercialScenePolicy() {
+  const policy = loadScenePolicies(path.resolve(import.meta.dirname, "../../../../bundles/ai-video/library/scene-policies"))
+    .find(item => item.id === "commercial-person")!;
+  const decision = { id: policy.id, version: policy.version, sourceSha256: policy.sourceSha256!, reason: "原始需求明确为正式商务短片", evidence: ["title:正式商务短片"] };
+  pool.selection = { runId: pool.source.run_id, ...decision };
+  const specs: Array<[string[], string, string?]> = [
+    [["wide", "moving"], "大场面全景，人物站在大厅中央", "缓推镜展示空间纵深"],
+    [["wide"], "广角全景，人物站在空间视觉主导位"],
+    [["medium", "moving"], "半身中景，人物与实体材质同框", "轨道移镜围绕访谈位"],
+    [["medium"], "腰部以上中景，人物与实体墙屏同框"],
+    [["medium"], "膝上中景，人物站在会客厅首层"],
+    [["person-close", "moving"], "面部近景特写，神态沉稳", "轻推镜到人物双眼"],
+    [["person-close"], "胸部以上人物特写，说明手势清晰"],
+    [["person-close"], "面部近景，人物直视镜头"],
+    [["environment-detail"], "实体羊毛经纬纹样特写与材质工艺微距"],
+    [["environment-detail"], "胡桃木与大理石材质特写，人物不入镜"],
+  ];
+  const shots: ScenePolicyShot[] = specs.map(([tags, composition, camera], index) => {
+    const shot: ScenePolicyShot = {
+      shotId: `S${index + 1}`, duration: 5, policyTags: tags,
+      scene: "明亮的别墅式企业会客厅首层正式访谈位",
+      composition, camera_movement: camera ?? "固定访谈机位",
+      costume: "合体商务正装，衣料挺括整洁",
+      speechMode: tags.includes("environment-detail") ? "voice-over" : "on-camera",
+      speechScene: "interview", dialogue: [{ speaker: "主讲人", text: "欢迎了解方案。" }],
+      action: [
+        "正面直视镜头，以坚定眼神和从容停掌开始口播",
+        "镜头从45°侧前方看她自然微笑",
+        "侧面轮廓可辨，她用一个小手势说明重点",
+        "背影气场后转身，留下沉思瞬间",
+      ][index] ?? "自然讲述并保持专业气质",
+      ...(index === 8 ? { props: "实体羊毛交织纹样与材质工艺" } : {}),
+    };
+    return applyScenePolicy({ ...shot, prompt: `${shot.scene}；${shot.composition}` }, policy);
+  });
+  const title = "正式商务短片";
+  const report = auditScenePolicy({ title, shots }, policy);
+  expect(report.passed).toBe(true);
+  report.policy.selection = decision.reason;
+  const shotlist = { title, scenePolicy: { ...decision, exceptions: [] }, scenePolicySelection: decision, draft: true, shots };
+  prompts = { stageId: "preproduction", attempt: 1, pipelineKind: "narrative", scenePolicy: decision,
+    shots: shots.map(shot => ({ shotId: shot.shotId, durationSec: shot.duration, degraded: false,
+      prompt: shot.prompt, fields: { scene: shot.scene, durationSec: shot.duration } })) };
+  const reportBytes = JSON.stringify(report), shotlistBytes = JSON.stringify(shotlist);
+  await writeFile(path.join(root, "stages/preproduction/attempt-1.scene-policy-report.json"), reportBytes);
+  await writeFile(path.join(root, "stages/preproduction/attempt-1.shotlist.json"), shotlistBytes);
+  Object.assign(output, { scenePolicyPassed: true,
+    scenePolicyReportRef: "stages/preproduction/attempt-1.scene-policy-report.json",
+    scenePolicyReportSha256: renderSha256(reportBytes),
+    shotlistRef: "stages/preproduction/attempt-1.shotlist.json",
+    shotlistSha256: renderSha256(shotlistBytes) });
+  await persist();
+  return { policy, decision, report, shotlist };
+}
 function issue(patch: Partial<Parameters<typeof qualifyProductionShot>[0]> = {}) {
   return qualifyProductionShot({ app: pool.asPool(), scope, actor: "MEM-ORIGINAL", projectId: "P1", shotId: "S1",
     modelId: "doubao-seedance-2-5", params: { aspectRatio: "16:9" }, env, workDir: dir, ...patch });
@@ -63,6 +121,7 @@ beforeEach(async () => {
   root = path.join(dir, "archive", scope.workspaceId, "P1"); await mkdir(path.join(root, "stages/preproduction"), { recursive: true });
   pool = new MemoryPool(); pool.source = { id: "SR1", workspace_id: scope.workspaceId, project_id: "P1", stage_id: "preproduction", attempt: 1, status: "done",
     output_ref: "stages/preproduction/attempt-1.output.json", output_sha256: "", run_id: "RUN1", kind: "narrative" };
+  pool.selection = { runId: "RUN1", id: null, version: null, sourceSha256: null, reason: "未命中", evidence: [] };
   const proofs: Row[] = [];
   for (const gate of gates) {
     const file = path.join(dir, "workspaces", scope.workspaceId, "gates", "P1", "attempt-1", `${gate}.md`);
@@ -142,6 +201,67 @@ describe("正式资格的正常路径和来源边界", () => {
     await expect(issue({ params: { extra: { prompt: "伪造" } } })).rejects.toThrow("REQUEST_INVALID");
     prompts.shots[0].prompt = "字".repeat(100_000); await persist(); await expect(issue()).rejects.toThrow("PROMPT_TOO_LONG");
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("商业真人片型的选型账本与 G8 供应商提交硬闸", () => {
+  it("当前选型事件、完整片单配比、报告与逐镜提示词同源时才签发，并在提交前重验", async () => {
+    await installCommercialScenePolicy();
+    const result = await issue();
+    expect(result).toMatchObject({ scriptVersion: 1, params: { durationSec: 5 } });
+    expect(pool.qualifications).toHaveLength(1);
+    const auth = await authorized(result.qualificationToken);
+    expect(auth.script.md).toBe(prompts.shots[0].prompt);
+    await auth.release();
+    expect(calls).toHaveLength(1);
+  });
+
+  it.each(["missing-event", "wrong-run", "null-bypass", "old-policy", "wrong-evidence", "missing-report-ref", "old-attempt"])(
+    "%s 在模型评审前阻断，不得借旧报告或空选型绕过",
+    async kind => {
+      await installCommercialScenePolicy();
+      if (kind === "missing-event") pool.selection = null;
+      if (kind === "wrong-run") pool.selection!.runId = "RUN-OLDER";
+      if (kind === "null-bypass") pool.selection = { runId: "RUN1", id: null, version: null, sourceSha256: null, reason: "未命中", evidence: [] };
+      if (kind === "old-policy") pool.selection!.sourceSha256 = "f".repeat(64);
+      if (kind === "wrong-evidence") pool.selection!.evidence = ["另一份原始需求"];
+      if (kind === "missing-report-ref") { delete output.scenePolicyReportRef; await persist(); }
+      if (kind === "old-attempt") pool.source.attempt = 2;
+      await expect(issue()).rejects.toThrow();
+      expect(calls).toHaveLength(0);
+      expect(pool.qualifications).toHaveLength(0);
+    },
+  );
+
+  it("已通过报告不能掩盖被改写的完整片单，提示词包也不能悄悄换镜头", async () => {
+    const { shotlist } = await installCommercialScenePolicy();
+    shotlist.shots[0]!.policyTags = ["person-close"];
+    const altered = JSON.stringify(shotlist);
+    await writeFile(path.join(root, output.shotlistRef), altered);
+    output.shotlistSha256 = renderSha256(altered);
+    await persist();
+    await expect(issue()).rejects.toThrow("SCENE_POLICY_UNVERIFIED");
+    expect(calls).toHaveLength(0);
+
+    await installCommercialScenePolicy();
+    prompts.shots[0].prompt = "未经片型审计的替换提示词";
+    await persist();
+    await expect(issue()).rejects.toThrow("SCENE_POLICY_UNVERIFIED");
+    expect(calls).toHaveLength(0);
+
+    await installCommercialScenePolicy();
+    prompts.shots[0].durationSec = 10;
+    await persist();
+    await expect(issue()).rejects.toThrow("SCENE_POLICY_UNVERIFIED");
+    expect(calls).toHaveLength(0);
+  });
+
+  it("签发后报告原始字节变化使供应商提交失效", async () => {
+    await installCommercialScenePolicy();
+    const result = await issue();
+    await writeFile(path.join(root, output.scenePolicyReportRef), "{}");
+    await expect(authorized(result.qualificationToken)).rejects.toThrow("SOURCE_HASH_MISMATCH");
+    expect(pool.locked).toBe(false);
   });
 });
 

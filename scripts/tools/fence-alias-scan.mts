@@ -19,7 +19,7 @@ import { join } from "node:path";
 import { composeWorkforce, loadComposedAssets, mergeComposedFenceRules } from "../../packages/base/bundles/index.js";
 
 const ROOT = join(import.meta.dirname, "..", "..");
-const PRIMARY = process.env.ACCEPTANCE_PRIMARY_BUNDLE ?? "geo-growth";
+const PRIMARY = process.env.ACCEPTANCE_PRIMARY_BUNDLE ?? "geo-growthtest";
 const JSON_OUT = process.argv.includes("--json");
 
 function readObjects(bundleId: string): Set<string> {

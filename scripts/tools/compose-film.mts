@@ -21,13 +21,13 @@
  *     [--keep-temp] [--json]
  */
 import { execFileSync } from "node:child_process";
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  AV_SYNC_POLICY,
+  avSyncPolicyForClipCount,
   buildCutAudioStep,
   candidateSyncWindows,
   crossCorrelationLag,
@@ -75,6 +75,12 @@ function readAllPcm(file: string, sampleRate: number): Float32Array {
   );
   const view = new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 4));
   return view.slice();
+}
+
+async function sha256File(file: string): Promise<string> {
+  const digest = createHash("sha256");
+  for await (const chunk of createReadStream(file)) digest.update(chunk);
+  return digest.digest("hex");
 }
 
 export function probeDuration(file: string): number {
@@ -218,7 +224,7 @@ if (transition && transitionDuration > 0) {
   let offset = 0;
   const steps: string[] = [];
   for (let index = 1; index < normalized.length; index += 1) {
-    // 刀口编号是「进入第 N 镜」的 1 起序号；index 是 0 起数组下标。
+    // --transition-at is the entering shot's 1-based number, not the zero-based input index.
     const useTransition = transitionAt.length === 0 || transitionAt.includes(index + 1);
     /** 硬切走 concat；0 秒 xfade 会在混合刀口上提前切走上一镜。 */
     const overlap = useTransition ? transitionDuration : 0;
@@ -251,7 +257,7 @@ if (transition && transitionDuration > 0) {
     "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
     "-movflags", "+faststart", raw]);
   const usedCuts = transitionAt.length === 0 ? normalized.length - 1
-    : Array.from(new Set(transitionAt)).filter((i) => Number.isInteger(i) && i >= 2 && i <= normalized.length).length;
+    : transitionAt.filter((i) => i >= 2 && i <= normalized.length).length;
   console.log(`  ② 逐刀转场：${transition} @${transitionDuration}s × ${usedCuts} 刀（其余硬切）`);
 } else {
   /**
@@ -350,9 +356,9 @@ const shotStarts: number[] = [];
   for (let index = 0; index < normalized.length; index += 1) {
     shotStarts.push(cursor);
     if (index < normalized.length - 1) {
-      const nextCut = index + 2;
+      const enteringShot = index + 2;
       const useTransition = Boolean(transition && transitionDuration > 0)
-        && (transitionAt.length === 0 || transitionAt.includes(nextCut));
+        && (transitionAt.length === 0 || transitionAt.includes(enteringShot));
       cursor += shotDurations[index]! - (useTransition ? transitionDuration : 0);
     }
   }
@@ -415,8 +421,7 @@ for (let index = 0; index < normalized.length; index += 1) {
     correlation: Number(best.correlation.toFixed(3)),
   });
 }
-/** 短片只有 1–2 镜时，要求的可测窗口数不能超过真实镜头数。 */
-const avPolicy = { ...AV_SYNC_POLICY, minMeasurable: Math.min(AV_SYNC_POLICY.minMeasurable, normalized.length) };
+const avPolicy = avSyncPolicyForClipCount(normalized.length);
 const avReport = evaluateAvSync(avSamples, avPolicy);
 const avReportPath = join(dirname(out), `${basename(out).replace(/\.mp4$/i, "")}.av-sync.json`);
 writeFileSync(avReportPath, `${JSON.stringify({
@@ -427,7 +432,7 @@ writeFileSync(avReportPath, `${JSON.stringify({
   clipCount: normalized.length,
   retimeFactor,
   output: out,
-  outputSha256: createHash("sha256").update(readFileSync(out)).digest("hex"),
+  outputSha256: await sha256File(out),
 }, null, 2)}\n`, "utf8");
 console.log(`  ③-1 ${describeAvSync(avReport)}`);
 console.log(`       报告：${avReportPath}`);

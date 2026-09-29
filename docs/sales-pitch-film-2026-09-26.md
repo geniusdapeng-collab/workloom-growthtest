@@ -89,7 +89,7 @@
 - 五段结构、六类镜头任务、台词预算（单镜 ≤ 时长 × 2.8 字）、剪辑与声音口径、交付包要求；
 - `anti_patterns` 收录本次 6 类真机打回（人脸漂移 / 服装冲突 / 手部畸变 / 屏幕文字 / 玻璃镜像第二张脸 /
   场景被写实校验替换）与对应修法；
-- `examples/workloom-growth/` 含本片 brief、shotlist、danmaku 三件，可直接复跑同一支片子。
+- `examples/workloom-growthtest/` 含本片 brief、shotlist、danmaku 三件，可直接复跑同一支片子。
 
 ## 五、未覆盖与后续建议
 

@@ -5,25 +5,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-
-/**
- * 只取肯定描述做匹配/禁词检查（隔离副本适配：本仓尚无 growth 的 `cinematic-skill-policy.ts`，
- * 因此把该模块里同一份纯函数就地内联，语义与 growth `affirmativeSkillText` 一致：
- * 负面字段整块排除，否定清单保留到句末，"但/而是/but" 恢复肯定语义）。
- */
-function affirmativeSkillText(raw: string): string {
-  const withoutNegativeBlocks = raw.replace(
-    /(?:\d{1,2}\.\s*)?【(?:负面(?:约束)?|禁止(?:项|词)?|negative(?: prompt)?)】[^【]*(?=【|$)/gi,
-    "\n"
-  );
-  return withoutNegativeBlocks.split(/[。；;\n]+/).flatMap((sentence) => {
-    const contrasts = sentence.split(/但是|然而|不过|而是|但|\bbut\b|\binstead\b/gi);
-    return contrasts.map((clause) => {
-      const match = /禁止|避免|不要|不得|不能|不许|无需|没有|未见|无(?:需|任何)?|不(?:要|再)?(?=[\u4e00-\u9fff])|\b(?:no|not|never|without|avoid)\b/i.exec(clause);
-      return (match ? clause.slice(0, match.index) : clause).trim();
-    });
-  }).filter(Boolean).join("；");
-}
+import { affirmativeSkillText } from "./cinematic-skill-policy.js";
 
 export interface ScenePolicy {
   schemaVersion: "workloom.scene-policy/v1";

@@ -17,7 +17,7 @@
  *
  * 用法：
  *   pnpm exec tsx --env-file=.env scripts/tools/archive-watch.mts [--workspace ws-geo] [--json]
- *     [--out <dir>] [--dry-run] [--issue] [--repo workloom-ai/workloom-growth]
+ *     [--out <dir>] [--dry-run] [--issue] [--repo workloom-ai/workloom-growthtest]
  *   夜班巡检建议：每 15 分钟一次（cron / fleet-run）。
  */
 import { createHash } from "node:crypto";
@@ -67,7 +67,7 @@ const OUT_DIR = resolve(arg("--out", join(WORK_DIR, "findings")));
 const AS_JSON = flag("--json");
 const DRY_RUN = flag("--dry-run");
 const CREATE_ISSUE = flag("--issue");
-const CNB_REPO = arg("--repo", "workloom-ai/workloom-growth");
+const CNB_REPO = arg("--repo", "workloom-ai/workloom-growthtest");
 
 /* ================= 类型 ================= */
 

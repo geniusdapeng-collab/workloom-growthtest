@@ -18,7 +18,7 @@ import YAML from "yaml";
 import { composeWorkforce } from "@workloom/base/bundles";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
-const BUNDLES = ["hotel", "ai-video", "geo-growth"] as const;
+const BUNDLES = ["hotel", "ai-video", "geo-growthtest"] as const;
 
 interface Manifest {
   workloom: { provides: { presets: string[]; fences: string[] } };
@@ -71,7 +71,7 @@ describe("口径说明行与装配器实测同步（防复发）", () => {
   const plain = (): string => line().replace(/\*\*/g, "");
 
   it("组合编制总岗数 / 遮蔽处数 = 装配器运行结果", () => {
-    const composed = composeWorkforce("geo-growth");
+    const composed = composeWorkforce("geo-growthtest");
     expect(plain()).toContain(`完整组合编制为三包合并 ${composed.presets.size} 岗`);
     expect(plain()).toContain(`其中 ${composed.shadowed.length} 处同名遮蔽`);
   });
@@ -79,7 +79,7 @@ describe("口径说明行与装配器实测同步（防复发）", () => {
   it("各包声明岗数 = 各包 provides.presets 资产数", () => {
     const counts = declaredPresetCounts();
     expect(plain()).toContain(
-      `各包声明 hotel ${counts.hotel} + ai-video ${counts["ai-video"]} + geo-growth ${counts["geo-growth"]}`,
+      `各包声明 hotel ${counts.hotel} + ai-video ${counts["ai-video"]} + geo-growthtest ${counts["geo-growthtest"]}`,
     );
   });
 

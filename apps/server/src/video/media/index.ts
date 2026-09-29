@@ -410,7 +410,7 @@ export const mediaRouter = router({
       return {
         enabled: syncEnabled(),
         devices: await listDevices(getAppPool(), scope),
-        log: await listSyncLog(getAppPool(), scope, 50),
+        log: (await listSyncLog(getAppPool(), scope, 50)).entries,
       };
     }),
 
@@ -419,10 +419,12 @@ export const mediaRouter = router({
     })),
 
     log: readProcedure
-      .input(z.object({ limit: z.number().int().min(1).max(500).default(100) }).optional())
-      .query(async ({ ctx, input }) => ({
-        entries: await listSyncLog(getAppPool(), collectBy(ctx).scope, input?.limit ?? 100),
-      })),
+      .input(z.object({
+        limit: z.number().int().min(1).max(500).default(100),
+        cursor: z.string().max(32).optional(),
+      }).optional())
+      .query(async ({ ctx, input }) => listSyncLog(
+        getAppPool(), collectBy(ctx).scope, input?.limit ?? 100, input?.cursor)),
 
     enroll: writeProcedure
       .input(z.object({ label: z.string().min(1).max(80) }))

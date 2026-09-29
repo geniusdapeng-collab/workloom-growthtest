@@ -36,7 +36,7 @@ const argValue = (name: string): string | undefined => {
 const hasFlag = (name: string) => argv.includes(name);
 
 const REPO_ROOT = resolve(dirname(new URL(import.meta.url).pathname), "..");
-const PRIMARY_BUNDLE = argValue("--bundle") ?? process.env.ACCEPTANCE_PRIMARY_BUNDLE ?? "geo-growth";
+const PRIMARY_BUNDLE = argValue("--bundle") ?? process.env.ACCEPTANCE_PRIMARY_BUNDLE ?? "geo-growthtest";
 const WORKSPACE_ID = argValue("--workspace") ?? process.env.ACCEPTANCE_WORKSPACE_ID ?? "ws-yunqi";
 const OUT_DIR = resolve(argValue("--out") ?? join(REPO_ROOT, "artifacts", "acceptance-matrix"));
 const FAIL_ON_ERROR = hasFlag("--fail-on-error");

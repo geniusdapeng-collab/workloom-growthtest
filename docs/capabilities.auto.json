@@ -1,7 +1,137 @@
 {
  "repo": "workloom-ai-acquisition",
- "description": "AI超增长 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）",
- "generatedAt": "2026-09-27T19:36:29.004Z",
+ "productId": "workloom-ai-growthtest",
+ "repository": "workloom-ai/WorkLoom-growthtest",
+ "displayName": "WorkLoom 获客增长系统（实验车道）",
+ "description": "企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。",
+ "generatedAt": "2026-09-27T14:42:02.507Z",
+ "evidenceNotice": "本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。",
+ "bundleDeclarations": [
+  {
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "status": "candidate",
+   "presets": 42,
+   "skills": 35,
+   "pipelines": 6,
+   "presetKeys": [
+    "ads-optimizer",
+    "audio-designer",
+    "bgm-composer",
+    "cinematographer",
+    "colorist",
+    "comment-operator",
+    "compliance-officer",
+    "continuity-reviewer",
+    "cover-designer",
+    "creative-planner",
+    "creator-partner",
+    "deal-manager",
+    "director",
+    "distribution-operator",
+    "field-inspector",
+    "hook-designer",
+    "insight-analyst",
+    "intel-binder",
+    "intel-collector",
+    "intel-competitor",
+    "intel-reviewer",
+    "intel-verifier",
+    "ip-curator",
+    "metrics-watcher",
+    "micromotion-stylist",
+    "opening-designer",
+    "portrait-artist",
+    "post-editor",
+    "prd-specialist",
+    "producer",
+    "prompt-fuser",
+    "publish-operator",
+    "render-operator",
+    "review-analyst",
+    "scene-designer",
+    "scriptwriter",
+    "settlement-clerk",
+    "subtitle-stylist",
+    "trend-researcher",
+    "visual-director",
+    "voice-artist",
+    "explainer-director"
+   ],
+   "sourcePath": "bundles/ai-video/bundle.json"
+  },
+  {
+   "bundle": "geo-growthtest",
+   "version": "1.0.0",
+   "status": "candidate",
+   "presets": 27,
+   "skills": 29,
+   "pipelines": 4,
+   "presetKeys": [
+    "geo-researcher",
+    "citation-analyst",
+    "geo-scriptwriter",
+    "production-planner",
+    "visual-designer",
+    "geo-content-planner",
+    "entity-inspector",
+    "publish-operator",
+    "source-distributor",
+    "ads-optimizer",
+    "data-board-officer",
+    "visibility-watcher",
+    "review-analyst",
+    "customer-success",
+    "private-domain-operator",
+    "company-ceo",
+    "group-ceo",
+    "material-scout",
+    "growth-lead",
+    "growth-strategist",
+    "growth-experimenter",
+    "lead-conversion-officer",
+    "media-portfolio-manager",
+    "cro-designer",
+    "live-producer",
+    "lifecycle-growth-officer",
+    "growth-partnership-officer"
+   ],
+   "sourcePath": "bundles/geo-growthtest/bundle.json"
+  },
+  {
+   "bundle": "hotel",
+   "version": "3.4.0",
+   "status": "candidate",
+   "presets": 16,
+   "skills": 30,
+   "pipelines": 1,
+   "presetKeys": [
+    "pricing-agent",
+    "review-agent",
+    "reconcile-agent",
+    "inspection-agent",
+    "content-agent",
+    "competitor-agent",
+    "desktop-agent",
+    "frontdesk-agent",
+    "housekeeper-agent",
+    "phone-agent",
+    "owner-cockpit",
+    "ai-receptionist",
+    "coupon-operator",
+    "guest-success",
+    "channel-watcher",
+    "company-ceo"
+   ],
+   "sourcePath": "bundles/hotel/bundle.json"
+  }
+ ],
+ "declarationTotals": {
+  "presets": 85,
+  "skills": 94,
+  "pipelines": 11,
+  "uniquePresetKeys": 81
+ },
  "demoPages": [
   "geo-customer-app.html",
   "geo-demo-c.html",
@@ -25,239 +155,476 @@
  "groups": [
   {
    "icon": "🖥",
-   "title": "三端应用（开箱即看）",
+   "title": "三端应用入口",
    "items": [
     {
-     "name": "PC 端 · B 端工作台",
-     "how": "`pnpm preview:all` → http://localhost:3000",
-     "desc": "经营主页/任务中心/规则中心/装配中心，全模拟运行态"
+     "name": "PC 工作台",
+     "how": "隔离演示启动后：http://localhost:3000",
+     "desc": "任务、岗位、报告、行业入口；可见内容受权限和活动行业包影响",
+     "sourcePaths": [
+      "product.manifest.json",
+      "apps/web/src/App.tsx",
+      "apps/webb/src/App.tsx",
+      "apps/webc/src/App.tsx"
+     ]
     },
     {
-     "name": "移动端 · B 端高保真",
-     "how": "`pnpm preview:all` → http://localhost:3001",
-     "desc": "12 页高保真演示页 + 手机壳容器"
+     "name": "员工移动工作台",
+     "how": "隔离演示启动后：http://localhost:3001",
+     "desc": "React 员工移动应用；与 docs/demo 的历史静态原型分开看",
+     "sourcePaths": [
+      "product.manifest.json",
+      "apps/web/src/App.tsx",
+      "apps/webb/src/App.tsx",
+      "apps/webc/src/App.tsx"
+     ]
     },
     {
-     "name": "移动端 · C 端 AI 服务前台",
-     "how": "`pnpm preview:all` → http://localhost:3002",
-     "desc": "小程序入口 H5 模拟：对话/服务/工单/消息/我的，演示直登"
+     "name": "客户 H5 服务前台",
+     "how": "隔离演示启动后：http://localhost:3002",
+     "desc": "对话/服务/工单/消息/我的；preview 脚本使用酒店服务夹具",
+     "sourcePaths": [
+      "product.manifest.json",
+      "apps/web/src/App.tsx",
+      "apps/webb/src/App.tsx",
+      "apps/webc/src/App.tsx"
+     ]
     }
+   ],
+   "sourcePaths": [
+    "product.manifest.json",
+    "apps/web/src/App.tsx",
+    "apps/webb/src/App.tsx",
+    "apps/webc/src/App.tsx"
    ]
   },
   {
-   "icon": "🏨",
-   "title": "行业 Bundle（垂直能力包）",
+   "icon": "📦",
+   "title": "行业包声明资产",
    "items": [
     {
      "name": "bundles/ai-video/",
-     "how": "见 bundles/ai-video/ 目录",
-     "desc": "围栏/技能/员工/对象/管线一键装配"
+     "how": "[manifest](../bundles/ai-video/bundle.json)",
+     "desc": "42 条岗位定义 / 35 项技能路径 / 6 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数",
+     "sourcePaths": [
+      "bundles/ai-video/bundle.json",
+      "bundles/geo-growthtest/bundle.json",
+      "bundles/hotel/bundle.json"
+     ]
     },
     {
-     "name": "bundles/geo-growth/",
-     "how": "见 bundles/geo-growth/ 目录",
-     "desc": "围栏/技能/员工/对象/管线一键装配（27 个数字员工岗位 · 29 个技能）"
+     "name": "bundles/geo-growthtest/",
+     "how": "[manifest](../bundles/geo-growthtest/bundle.json)",
+     "desc": "27 条岗位定义 / 29 项技能路径 / 4 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数",
+     "sourcePaths": [
+      "bundles/ai-video/bundle.json",
+      "bundles/geo-growthtest/bundle.json",
+      "bundles/hotel/bundle.json"
+     ]
     },
     {
      "name": "bundles/hotel/",
-     "how": "见 bundles/hotel/ 目录",
-     "desc": "围栏/技能/员工/对象/管线一键装配"
+     "how": "[manifest](../bundles/hotel/bundle.json)",
+     "desc": "16 条岗位定义 / 30 项技能路径 / 1 条管线；版本 3.4.0，状态 candidate；不等于已接通功能数",
+     "sourcePaths": [
+      "bundles/ai-video/bundle.json",
+      "bundles/geo-growthtest/bundle.json",
+      "bundles/hotel/bundle.json"
+     ]
     }
+   ],
+   "sourcePaths": [
+    "bundles/ai-video/bundle.json",
+    "bundles/geo-growthtest/bundle.json",
+    "bundles/hotel/bundle.json"
    ]
   },
   {
    "icon": "🧑‍💼",
-   "title": "数字员工与数字人（本仓自带）",
+   "title": "岗位与交互入口",
    "items": [
     {
      "name": "数字员工中心（`/agents`）",
-     "how": "`pnpm preview:all` → http://localhost:3000/agents",
-     "desc": "人机混编通讯录：员工档案 / 围栏对账 / 30 天战绩 / 派遣 / 夜班自动上线（本包 27 个岗位）"
+     "how": "按 README 准备隔离环境后：`LLM_PROVIDER=mock pnpm preview:all` → http://localhost:3000/agents",
+     "desc": "岗位档案 / 技能与围栏绑定 / 任务派遣；默认包声明 27 个岗位，不是在线员工数",
+     "sourcePaths": [
+      "apps/web/src/pages/p8/P8.tsx",
+      "apps/web/src/components/loommate/LoomMate.tsx",
+      "apps/web/src/voice/VoiceEngine.ts"
+     ]
     },
     {
-     "name": "织伴数字人（Live2D 常驻浮层）",
-     "how": "打开任一 PC 页面右下角；`pnpm preview:all`",
-     "desc": "全页面常驻数字人：语音播报 + 口型/表情/动作 + 三态（小角落 / 大形象 / 屏保）+ 记忆透明面板"
+     "name": "织伴数字人组件",
+     "how": "查看组件与语音配置",
+     "desc": "形象、语音与动作交互组件；需要对应资源与配置，不承诺每个部署均启用",
+     "sourcePaths": [
+      "apps/web/src/pages/p8/P8.tsx",
+      "apps/web/src/components/loommate/LoomMate.tsx",
+      "apps/web/src/voice/VoiceEngine.ts"
+     ]
     },
     {
      "name": "语音与口型引擎",
      "how": "docs/voice-and-avatar-delivery-contract.md",
-     "desc": "TTS 音色映射 + 中文逐字开口度时间线 + 音频振幅驱动口型；人设/音色可切换"
+     "desc": "语音播放、音色与口型相关实现；真实 TTS 需要服务或本地引擎",
+     "sourcePaths": [
+      "apps/web/src/pages/p8/P8.tsx",
+      "apps/web/src/components/loommate/LoomMate.tsx",
+      "apps/web/src/voice/VoiceEngine.ts"
+     ]
     }
+   ],
+   "sourcePaths": [
+    "apps/web/src/pages/p8/P8.tsx",
+    "apps/web/src/components/loommate/LoomMate.tsx",
+    "apps/web/src/voice/VoiceEngine.ts"
    ]
   },
   {
    "icon": "🖐",
-   "title": "操作电脑能力（本仓自带 · 可装生产工作站）",
+   "title": "电脑操作接口",
    "items": [
     {
-     "name": "computer-use 三层感知（65 动作）",
-     "how": "`pnpm computer:preflight && pnpm computer:smoke`",
-     "desc": "L1 浏览器 DOM 零 token / L2 全 GUI 语义树 / L3 像素兜底——克隆即可用，不依赖沙箱"
+     "name": "浏览器与桌面驱动接口",
+     "how": "按工位指南准备后：`pnpm computer:preflight` / `pnpm computer:smoke`",
+     "desc": "DOM、语义树与截图接口；真实登录、文件上传和平台动作需逐项联调",
+     "sourcePaths": [
+      "packages/base/computer-use/driver.ts",
+      "docs/computer-use-production.md"
+     ]
     },
     {
-     "name": "HTTP 远程驱动 + MCP server",
+     "name": "HTTP / MCP 工位入口",
      "how": "`pnpm computer:serve` / `pnpm computer:mcp`",
-     "desc": "大脑/手分离：专用工作站被云端 Agent/CI 远程驱动（docs/computer-use-production.md）"
+     "desc": "远程工位服务入口；需要驱动、设备权限、认证与网络配置",
+     "sourcePaths": [
+      "packages/base/computer-use/driver.ts",
+      "docs/computer-use-production.md"
+     ]
     }
+   ],
+   "sourcePaths": [
+    "packages/base/computer-use/driver.ts",
+    "docs/computer-use-production.md"
    ]
   },
   {
-   "icon": "🤖",
-   "title": "AI 自动化引擎（系统内置能力）",
+   "icon": "⚙",
+   "title": "共享基础模块（目录存在性）",
    "items": [
     {
-     "name": "围栏 DSL 引擎",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "事前裁决：支持 in/contains_any 列表语义"
+     "name": "围栏判定",
+     "how": "[源码](../packages/base/fence-engine/)",
+     "desc": "auto/review/block 判定组件；仍需核对业务调用点",
+     "sourcePaths": [
+      "packages/base/fence-engine"
+     ]
     },
     {
-     "name": "技能保鲜环（下行分发）",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "官方技能一键投放：五道预检 + L0/L1 静默/L2 审批 + 一键回滚 + 全事件留痕"
+     "name": "技能分发组件",
+     "how": "[源码](../packages/base/skill-ops/)",
+     "desc": "技能预检、分发与回滚基础模块",
+     "sourcePaths": [
+      "packages/base/skill-ops"
+     ]
     },
     {
-     "name": "L2 编排（ASK/QUEST）",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "一句话目标自动拆解多步骤并派发"
+     "name": "任务编排基础组件",
+     "how": "[源码](../packages/base/captain/)",
+     "desc": "任务与协作基础模块；Ask/Quest 实际执行见 packages/runtime",
+     "sourcePaths": [
+      "packages/base/captain"
+     ]
     },
     {
-     "name": "夜班自动运行",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "离线任务推进，次日晨报"
+     "name": "夜班状态与调度",
+     "how": "[源码](../packages/base/night-shift/)",
+     "desc": "确认、暂停、恢复与触发器；暂停记录不等于中断全部外部动作",
+     "sourcePaths": [
+      "packages/base/night-shift"
+     ]
     },
     {
-     "name": "模型路由",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "离线确定性模型，无密钥可跑"
+     "name": "模型路由与用量记录",
+     "how": "[源码](../packages/base/model-router/)",
+     "desc": "模拟与真实提供器入口；真实端点、成本和预算链需验收",
+     "sourcePaths": [
+      "packages/base/model-router"
+     ]
     },
     {
-     "name": "全平台 RPA 发布",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "抖音/小红书/B站/YouTube，BrowserDriver 注入接真浏览器"
+     "name": "发布适配层（默认演练）",
+     "how": "[源码](../packages/base/publish-rpa/)",
+     "desc": "浏览器发布参考适配器；真实登录、上传和发布回执待逐平台接通",
+     "sourcePaths": [
+      "packages/base/publish-rpa"
+     ]
     },
     {
-     "name": "五元事件 + RLS 隔离",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "全链路可追溯、可验链"
+     "name": "业务事件与权限网关",
+     "how": "[源码](../packages/base/workdata/)",
+     "desc": "追加事件、哈希链与权限组件；不承诺外部动作重放零丢失",
+     "sourcePaths": [
+      "packages/base/workdata"
+     ]
     },
     {
-     "name": "IM 渠道",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "企微等出入站，审批卡片直达手机"
+     "name": "消息渠道适配层",
+     "how": "[源码](../packages/base/im-channels/)",
+     "desc": "消息接口模块；实际送达取决于已配置渠道与回执",
+     "sourcePaths": [
+      "packages/base/im-channels"
+     ]
     },
     {
-     "name": "C 端 AI 服务前台",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "对话/知识库 385 问/工单/SLA"
+     "name": "服务对话基础模块",
+     "how": "[源码](../packages/base/service-dialog/)",
+     "desc": "对话组件；客户 H5 实际接口见 apps/server/src/service",
+     "sourcePaths": [
+      "packages/base/service-dialog"
+     ]
     },
     {
-     "name": "自动巡检",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "异常发现→派发→处置闭环"
+     "name": "巡检基础模块",
+     "how": "[源码](../packages/base/inspection/)",
+     "desc": "巡检规则与任务组件；具体数据源和处置链需接入",
+     "sourcePaths": [
+      "packages/base/inspection"
+     ]
     },
     {
-     "name": "人审台",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "必审事项人拍板，AI 不越权"
+     "name": "审批后端",
+     "how": "[源码](../packages/base/review-console/)",
+     "desc": "决定与审计 API 保留；PC 通用审批页已移除，业务关卡就地处理",
+     "sourcePaths": [
+      "packages/base/review-console"
+     ]
     },
     {
-     "name": "资产管理",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "素材/成片全生命周期"
+     "name": "资产管理基础模块",
+     "how": "[源码](../packages/base/asset-cms/)",
+     "desc": "资产元数据组件；视频媒资实现见 apps/server/src/video/media",
+     "sourcePaths": [
+      "packages/base/asset-cms"
+     ]
     },
     {
-     "name": "成本台账",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "每次模型调用可计量"
+     "name": "成本台账组件",
+     "how": "[源码](../packages/base/cost-ledger/)",
+     "desc": "成本记录与投影；目录存在不代表全部调用已有预算强制",
+     "sourcePaths": [
+      "packages/base/cost-ledger"
+     ]
     },
     {
-     "name": "交易流",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "商机到成交全链路"
+     "name": "交易流程组件",
+     "how": "[源码](../packages/base/deal-flow/)",
+     "desc": "商机与交易状态模块；不代表真实支付和收入归因已完成",
+     "sourcePaths": [
+      "packages/base/deal-flow"
+     ]
     },
     {
-     "name": "社媒监听",
-     "how": "见 docs/capability-map.md L3",
-     "desc": "评论/询盘意图雷达"
+     "name": "社媒监听组件",
+     "how": "[源码](../packages/base/social-listening/)",
+     "desc": "监听相关基础模块；实际采集来源需逐项接入",
+     "sourcePaths": [
+      "packages/base/social-listening"
+     ]
     }
+   ],
+   "sourcePaths": [
+    "packages/base",
+    "packages/runtime/src"
+   ]
+  },
+  {
+   "icon": "🎬",
+   "title": "内容生产专用入口",
+   "items": [
+    {
+     "name": "视频工位",
+     "how": "PC /ai-video/assets?tab=studio",
+     "desc": "预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置",
+     "sourcePaths": [
+      "apps/server/src/video/router.ts",
+      "apps/server/src/video/studio-worker.ts"
+     ]
+    },
+    {
+     "name": "媒资与交付",
+     "how": "媒资：/ai-video/media；交付：/ai-video/assets?tab=delivery",
+     "desc": "媒资检索、商品档案、合集、成片和交付记录；需要数据库与媒体文件",
+     "sourcePaths": [
+      "apps/server/src/video/media/index.ts",
+      "apps/web/src/extensions/ai-video/pages/AssetsOrStudio.tsx",
+      "apps/web/src/extensions/ai-video/routes.tsx"
+     ]
+    },
+    {
+     "name": "白板与口播解释片",
+     "how": "CLI / 服务端接口",
+     "desc": "白板和口播制作链已提供代码入口；当前没有独立 React 编辑页，需要对应引擎与后期工具",
+     "sourcePaths": [
+      "apps/server/src/video/whiteboard/router.ts",
+      "apps/server/src/video/explainer/router.ts"
+     ]
+    }
+   ],
+   "sourcePaths": [
+    "apps/server/src/video"
    ]
   },
   {
    "icon": "✅",
-   "title": "验证与质量（工程纪律）",
+   "title": "验证与维护命令",
    "items": [
     {
-     "name": "一键安装（bootstrap）",
-     "how": "`pnpm setup`",
-     "desc": "克隆后一条命令装好全部能力：环境/依赖/PG/迁移种子/桌面栈，幂等"
+     "name": "环境安装脚本",
+     "how": "`pnpm setup`；先读 README 的当前限制",
+     "desc": "安装依赖并尝试数据库、迁移与种子；当前会枚举缺失 ai-pm 包的种子，推荐按 README 手动初始化",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     },
     {
      "name": "主测试套件",
      "how": "`pnpm suite`",
-     "desc": "数百条场景用例逐条执行"
+     "desc": "运行已定义场景；需要测试数据库和种子，不能由脚本存在推断测试已通过",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     },
     {
      "name": "GEO 域套件",
      "how": "`pnpm suite:geo`",
-     "desc": "GEO 双域专项"
+     "desc": "GEO 双域专项",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     },
     {
      "name": "酒店域套件",
      "how": "`pnpm suite:hotel`",
-     "desc": "酒店域专项"
+     "desc": "酒店域专项",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     },
     {
      "name": "发布门禁",
      "how": "`pnpm release:gate`",
-     "desc": "未全过禁止发布（硬性）"
+     "desc": "未全过禁止发布（硬性）",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     },
     {
      "name": "五元事件验链",
      "how": "`pnpm db:verify-chain`",
-     "desc": "事件链完整性校验"
+     "desc": "事件链完整性校验",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     },
     {
-     "name": "Agent 能力巡游",
+     "name": "能力巡游脚本",
      "how": "`pnpm agent:tour`",
-     "desc": "AI Agent 一键自检全部能力"
+     "desc": "按脚本范围巡游；完整模式可能启动服务、灌种子和运行测试",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     },
     {
      "name": "环境自检",
      "how": "`pnpm doctor`",
-     "desc": "一屏排查环境问题"
+     "desc": "一屏排查环境问题",
+     "sourcePaths": [
+      "package.json",
+      "scripts/bootstrap.sh",
+      ".cnb.yml"
+     ]
     }
+   ],
+   "sourcePaths": [
+    "package.json",
+    "scripts/bootstrap.sh",
+    ".cnb.yml"
    ]
   },
   {
-   "icon": "🎁",
-   "title": "演示与交付资产",
+   "icon": "📚",
+   "title": "演示与说明资产",
    "items": [
     {
-     "name": "高保真演示页 ×12",
-     "how": "http://localhost:3001",
-     "desc": "糖果色，含手机壳容器"
+     "name": "静态演示原型 ×12",
+     "how": "docs/demo/index.html",
+     "desc": "按 HTML 文件枚举；历史原型不作为当前 React 页面证明",
+     "sourcePaths": [
+      "docs/demo",
+      "skills/official",
+      "mock/README.md"
+     ]
     },
     {
-     "name": "官网静态站",
+     "name": "官网静态页面",
      "how": "apps/site/index.html",
-     "desc": "对外产品故事"
+     "desc": "网站素材；文字和截图需按当前代码复核",
+     "sourcePaths": [
+      "docs/demo",
+      "skills/official",
+      "mock/README.md"
+     ]
     },
     {
-     "name": "自带技能 ×9",
+     "name": "official 技能目录 ×9",
      "how": "skills/official/",
-     "desc": "client-demo-recorder / component-integration / cross-platform-review / deal-flow 等"
+     "desc": "按目录枚举；与 Bundle 技能声明计数不同，也不等于真实执行器数量",
+     "sourcePaths": [
+      "docs/demo",
+      "skills/official",
+      "mock/README.md"
+     ]
     },
     {
-     "name": "能力导览 PPT",
+     "name": "历史能力导览 PPT",
      "how": "docs/capability-tour.pptx",
-     "desc": "路演/汇报直接用"
+     "desc": "历史参考资产；其中旧文案和截图需要独立更新，不作为当前实现证明",
+     "sourcePaths": [
+      "docs/demo",
+      "skills/official",
+      "mock/README.md"
+     ]
     },
     {
-     "name": "Mock 数据体系",
+     "name": "模拟数据说明",
      "how": "mock/README.md",
-     "desc": "种子 + 离线模型 + 演示直登，开箱即用"
+     "desc": "种子、模拟提供器与演示身份；真实数据和生产模式单独配置",
+     "sourcePaths": [
+      "docs/demo",
+      "skills/official",
+      "mock/README.md"
+     ]
     }
+   ],
+   "sourcePaths": [
+    "docs/demo",
+    "skills/official",
+    "mock/README.md"
    ]
   }
  ]

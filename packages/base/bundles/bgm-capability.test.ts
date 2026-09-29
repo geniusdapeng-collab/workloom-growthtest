@@ -51,18 +51,18 @@ const when = (ruleId: string): string => fencePack.rules.find((rule) => rule.rul
 const evaluate = (ruleId: string, params: Record<string, unknown> = {}, context: Record<string, unknown> = {}): boolean =>
   evalCondition(when(ruleId), { params, context } as never);
 
-describe("配乐围栏（G-BGM0..G-BGM5）语义", () => {
-  it("六条规则齐备，级别与基线口径正确", () => {
+describe("配乐围栏（G-BGM0..G-BGM9）语义", () => {
+  it("十条规则齐备，级别与基线口径正确", () => {
     expect(fencePack.version).toBe("ai-video-bgm/v1");
     expect(fencePack.rules.map((rule) => rule.rule_id)).toEqual([
-      "G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5", "G-BGM6", "G-BGM7",
+      "G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5", "G-BGM6", "G-BGM7", "G-BGM8", "G-BGM9",
     ]);
     expect(fencePack.rules.every((rule) => rule.is_baseline === true)).toBe(true);
     const levels = Object.fromEntries(fencePack.rules.map((rule) => [rule.rule_id, rule.level]));
     expect(levels).toEqual({
       "G-BGM0": "auto", "G-BGM1": "review", "G-BGM2": "block",
       "G-BGM3": "block", "G-BGM4": "block", "G-BGM5": "block",
-      "G-BGM6": "review", "G-BGM7": "block",
+      "G-BGM6": "review", "G-BGM7": "block", "G-BGM8": "block", "G-BGM9": "review",
     });
   });
 
@@ -118,6 +118,20 @@ describe("配乐围栏（G-BGM0..G-BGM5）语义", () => {
     expect(evaluate("G-BGM7", { allow_unlicensed_source: true })).toBe(true);
     expect(evaluate("G-BGM7", { url_scheme_ok: false })).toBe(true);
     expect(evaluate("G-BGM7", { url_scheme_ok: true, unregistered_source: false })).toBe(false);
+
+    // G-BGM8：曲库打标必须声明许可 / 不许覆盖既有曲库 / 不许把索引写进素材目录 → block
+    expect(evaluate("G-BGM8", { license_declared: false })).toBe(true);
+    expect(evaluate("G-BGM8", { license_ok: false })).toBe(true);
+    expect(evaluate("G-BGM8", { overwrite_existing: true })).toBe(true);
+    expect(evaluate("G-BGM8", { out_dir_inside_source: true })).toBe(true);
+    expect(evaluate("G-BGM8", {})).toBe(false);
+    expect(evaluate("G-BGM8", { license_declared: true, license_ok: true, overwrite_existing: false })).toBe(false);
+
+    // G-BGM9：低置信标签入册 → review（允许入册，但交付前人耳复核）
+    expect(evaluate("G-BGM9", { low_confidence_count: 1 })).toBe(true);
+    expect(evaluate("G-BGM9", { low_confidence_count: 0 })).toBe(false);
+    // 缺字段按 fail-closed：求值异常 → 运行时按 block 处理，故调用方必须带上该计数
+    expect(() => evalCondition(when("G-BGM9"), { params: {}, context: {} } as never)).toThrow();
   });
 });
 
@@ -181,20 +195,20 @@ describe("岗位 / 技能 / 管线 / 对象四层引用", () => {
     coverage: Array<{ eventPrefix: string }>; write_back: string[];
   };
 
-  it("岗位卡：5 技能 / 12 工具 / 8 围栏 / 事件域 bgm.", () => {
+  it("岗位卡：5 技能 / 14 工具 / 10 围栏 / 事件域 bgm.", () => {
     expect(preset.preset_key).toBe("bgm-composer");
     expect(preset.name).toBe("BGM配乐师");
     expect(preset.kind).toBe("operator");
     expect(preset.readonly).toBe(false);
     expect(preset.high_risk).toBe(false);
-    expect(preset.fence_bindings).toEqual(["G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5", "G-BGM6", "G-BGM7"]);
+    expect(preset.fence_bindings).toEqual(["G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5", "G-BGM6", "G-BGM7", "G-BGM8", "G-BGM9"]);
     expect(preset.skills).toEqual([
       "bgm-score-design", "bgm-audio-layering", "bgm-vocal-separation", "bgm-library-license", "bgm-delivery-spec",
     ]);
     expect(preset.tools.map((tool) => tool.name)).toEqual([...BGM_TOOLS]);
     expect(preset.tools.some((tool) => tool.access === "write")).toBe(true);
     expect(preset.tools.filter((tool) => tool.access === "write").map((tool) => tool.name)).toEqual([
-      "bgmwrite.compose", "bgmwrite.fetch", "bgmwrite.mix", "bgmwrite.separate", "bgmwrite.best",
+      "bgmwrite.compose", "bgmwrite.fetch", "bgmwrite.mix", "bgmwrite.separate", "bgmwrite.best", "bgmwrite.tag", "bgmwrite.library",
     ]);
     expect(preset.write_back).toEqual(["bgmwrite.compose", "bgmwrite.mix"]);
     expect(preset.coverage.map((coverage) => coverage.eventPrefix)).toEqual(["bgm."]);
@@ -585,48 +599,60 @@ function envelopeOf(dbBySecond: number[][], windowSec = 0.25) {
   };
 }
 
-describe("随仓兜底曲库（50 首可商用纯音乐选段）", () => {
+describe("本地曲库：随仓精选（50 首可商用纯音乐选段）+ 缺失根目录如实上报", () => {
   const curatedDir = join(BUNDLE_DIR, "library/bgm-library-curated");
   const manifestPath = join(curatedDir, "tracks.json");
 
-  it("客户自建曲库目录缺失时如实报告（该根 present=false），随仓兜底曲库仍可加载", () => {
+  it("客户自建曲库目录缺失时如实报告（该根 present=false），随仓精选仍可兜底", () => {
     const loaded = loadAllLocalTracks({ WORKLOOM_BGM_LIBRARY_DIR: "/tmp/definitely-missing-bgm-library" });
     expect(loaded.sources.find((entry) => entry.kind === "local-custom")?.present).toBe(false);
     expect(loaded.sources.find((entry) => entry.kind === "local-curated")?.present).toBe(true);
     expect(loaded.tracks.filter((track) => track.libraryKind === "local-curated").length).toBe(50);
   });
 
-  it("清单齐备：50 首 / 多风格族 / 可商用许可 / 字段完整 / 选段信息可追溯", () => {
+  it("随仓精选曲库清单齐备：50 首 / 11 种风格族 / 可商用许可 / 字段完整", () => {
     expect(existsSync(manifestPath), "缺少 tracks.json（用 scripts/bgm-curate-library.mjs 生成）").toBe(true);
     const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as {
       library: { tracks: number; provider: string; selection: { byStyle: Record<string, number> } };
       tracks: Array<Record<string, unknown>>;
     };
     expect(doc.tracks).toHaveLength(50);
+    expect(doc.library.tracks).toBe(50);
     expect(doc.library.provider).toBe("owner-provided-pack");
-    expect(Object.keys(doc.library.selection.byStyle).length).toBeGreaterThanOrEqual(10);
+    expect(Object.keys(doc.library.selection.byStyle).length).toBeGreaterThanOrEqual(10); // 不同风格都要有货
     for (const track of doc.tracks) {
       expect(track.license).toBe("royalty-free");
       expect(existsSync(join(curatedDir, String(track.file))), `缺文件 ${track.file}`).toBe(true);
+      expect(String(track.file)).toMatch(/\.m4a$/);
+      expect(Number(track.bpm)).toBeGreaterThan(40);
+      expect(Number(track.durationSec)).toBeGreaterThan(30);
       const loudness = track.loudness as { integratedLufs: number; truePeakDbtp: number };
       const deviation = Math.abs(loudness.integratedLufs + 14);
-      expect(deviation, `${track.id} 响度偏离 -14`).toBeLessThan(6);
+      expect(deviation, `${track.id} 响度偏离 -14`).toBeLessThan(6); // 峰值贴顶的选段走"峰值保护优先"，允许低于 -14
       if (deviation > 2) {
         expect((track.excerpt as { peakProtected?: boolean }).peakProtected, `${track.id} 偏低必须标明是峰值保护所致`).toBe(true);
       }
-      expect(loudness.truePeakDbtp, `${track.id} 真峰值越界`).toBeLessThanOrEqual(-0.4);
-      const excerpt = track.excerpt as { durationSec: number; reason: string };
+      expect(loudness.truePeakDbtp, `${track.id} 真峰值越界`).toBeLessThanOrEqual(-0.4); // 目标 -1 dBTP；AAC 交调过冲实测最差 -0.33，逐首实测值登记在索引里
+      const structure = track.structure as { hasDrop: boolean; segments: unknown[] };
+      expect(structure.segments.length).toBeGreaterThanOrEqual(1);
+      const excerpt = track.excerpt as { startSec: number; durationSec: number; reason: string };
       expect(excerpt.durationSec).toBeGreaterThan(30);
       expect(excerpt.reason.length).toBeGreaterThan(0);
     }
   });
 
-  it("每首选段的 sha256 与磁盘文件一致（随仓分发的是可核验产物）", () => {
-    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as { tracks: Array<{ file: string; sha256: string }> };
+  it("每首选段的 sha256 与磁盘文件一致，且能按三级合并被加载器读到", () => {
+    const doc = JSON.parse(readFileSync(manifestPath, "utf8")) as { tracks: Array<{ id: string; file: string; sha256: string }> };
     for (const track of doc.tracks) {
-      const actual = createHash("sha256").update(readFileSync(join(curatedDir, track.file))).digest("hex");
+      const bytes = readFileSync(join(curatedDir, track.file));
+      const actual = createHash("sha256").update(bytes).digest("hex");
       expect(actual, `${track.file} 摘要不一致`).toBe(track.sha256);
     }
+    const loaded = loadAllLocalTracks({ WORKLOOM_BGM_LIBRARY_DIR: "/tmp/definitely-missing-bgm-library" });
+    const curated = loaded.tracks.filter((track) => track.libraryKind === "local-curated");
+    expect(curated.length).toBe(50);
+    expect(curated.every((track) => track.localPath && existsSync(track.localPath))).toBe(true);
+    expect(loaded.sources.some((entry) => entry.kind === "local-curated" && entry.present && entry.tracks === 50)).toBe(true);
   }, 60_000);
 });
 

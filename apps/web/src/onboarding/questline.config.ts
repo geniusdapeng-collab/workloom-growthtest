@@ -6,7 +6,7 @@
  * 形象必须是系统内真实形象（`/live2d/mao/poster.png`），禁止手绘/自创替代品。
  *
  * 结构上刻意与行业包对齐：人设 / 员工卡 / 目标模板 / 首单任务卡 / 成就 / 价值口径 / 下一步。
- * 三套内容包（hotel / geo-growth / ai-video）的员工卡与首单卡引用的 presetKey 必须真实存在于
+ * 三套内容包（hotel / geo-growthtest / ai-video）的员工卡与首单卡引用的 presetKey 必须真实存在于
  * 对应 `bundles/<bundle>/presets/*.yml`，驳回原因必须命中该 Bundle 的反馈枚举表——
  * 两条都由 questline.test.ts 设门禁。
  *
@@ -369,11 +369,11 @@ export const QUESTLINE: QuestlineConfig = {
   ],
 };
 
-/* ================= GEO 获客内容包（geo-growth Bundle） ================= */
+/* ================= GEO 获客内容包（geo-growthtest Bundle） ================= */
 
 /**
- * GEO 双域获客内容包：员工卡只引用 `bundles/geo-growth/presets/*.yml` 里真实存在的岗位，
- * 围栏口径与 `geo-growth-baseline` 逐条对齐（G-GEO1/G-GEO2/G12/G9a/G10b…）。
+ * GEO 双域获客内容包：员工卡只引用 `bundles/geo-growthtest/presets/*.yml` 里真实存在的岗位，
+ * 围栏口径与 `geo-growthtest-baseline` 逐条对齐（G-GEO1/G-GEO2/G12/G9a/G10b…）。
  * 派单指令写的是「可交付的活」——必须能被意图路由判成 quest，否则首单没有产出可验收。
  */
 export const QUESTLINE_GEO: QuestlineConfig = {
@@ -383,110 +383,89 @@ export const QUESTLINE_GEO: QuestlineConfig = {
   ownerTitle: "董事长",
   mateVoice: MATE_GUIDE_VOICE,
 
-  /**
-   * 第 1 关（认人）话术与编制（2026-09-21 产品所有者真机反馈：本页人员介绍要换成
-   * 视频制作相关的角色）。只覆盖本包的"认人"关，其余关卡沿用通用话术，
-   * 避免把酒店/视频包的引导文案一起改掉。
-   */
-  stages: genericStages().map((stage) => (stage.id === "meet"
-    ? {
-        ...stage,
-        title: "第 1 关 · 认识您的视频制作班组",
-        objective: "知道谁在把选题变成能发的成片——剧本、镜头、剪辑各自管什么，以及他们什么时候必须来问您。",
-        script: {
-          ...stage.script,
-          enter: "董事长，还是我织伴——在这个系统里我的岗位是首席增长官。三句话汇报：视频制作班组已上岗，今天就能出片，但您得先认识几位当家人。",
-          success: "认全了。要剧本、要镜头、要成片，直接找他们。",
-        },
-      }
-    : stage)),
+  stages: genericStages(),
 
-  /**
-   * 编制卡片（前 3 张 = "第 1 关"与"三位当家人"成就口径，见 coreCardIds）。
-   * 全部取自本工作区真实装配的 ai-video 岗位（presetKey 与 bundles/ai-video/presets/*.yml 对齐），
-   * 围栏编号取自 bundles/ai-video/fences/ai-video-baseline.yml，不编造门槛。
-   */
   employees: [
     {
-      id: "director",
-      presetKey: "director",
-      title: "总导演",
-      duty: "把一个选题拆成剧本、分镜与镜头单，盯全片节奏与交付；每个确认门都按规则来问您。",
-      fences: ["G6 · 预生产确认门", "G8 · 渲染提交必审（烧算力）"],
-      tasks: ["生成一集剧本与分镜", "验收成片镜头", "核对预算消耗"],
-      sample: "一集 60 秒短片的剧本 + 18 个镜头的分镜表",
+      id: "content",
+      presetKey: "geo-content-planner",
+      title: "GEO 内容策划",
+      duty: "把选题写成 AI 搜索与短视频都能用的内容；对外发布一律先过审。",
+      fences: ["G-GEO1 · 内容外发必审", "G-GEO2 · 事实红线一票否决"],
+      tasks: ["生成本周双域内容", "整理引用源清单", "改写短视频脚本"],
+      sample: "本周 5 条选题的双域版本 + 每条引用的来源链",
       sampleIsDemo: true,
     },
     {
-      id: "scriptwriter",
-      presetKey: "scriptwriter",
-      title: "剧本师",
-      duty: "写剧本蓝图（全片叙事的单一事实源），管台词纪律与场景规范：台词只说人话，时长对不上就重写。",
-      fences: ["G2 · 主题确认门", "G6 · 提示词审核"],
-      tasks: ["生成本集剧本蓝图", "校验台词时长", "改写不合规台词"],
-      sample: "本集剧本蓝图 + 3 处台词时长校准记录",
+      id: "ads",
+      presetKey: "ads-optimizer",
+      title: "投放优化师",
+      duty: "盯投放成本与转化，给出加投/停投建议；加投必须您点头才执行。",
+      fences: ["G12 · 投放加投必审", "G9b · 单账号日发布超限熔断"],
+      tasks: ["复核今日加投建议", "核对投放成本", "排查停投异常"],
+      sample: "两个渠道的加投建议 + ROI 与成本依据",
       sampleIsDemo: true,
     },
     {
-      id: "post-editor",
-      presetKey: "post-editor",
-      title: "剪辑师",
-      duty: "把渲染片段剪成可发布的成片：字幕、音乐、多平台版本一次出齐，成片带版本与来源链入库。",
-      fences: ["G8 · 渲染提交（合成烧额度）", "平台文字政策逐版本校验"],
-      tasks: ["合成多平台版本", "校字幕与卡点", "回传成片入库"],
-      sample: "同一支片子的横版/竖版两套成片 + 字幕与音乐方案",
+      id: "attribution",
+      presetKey: "review-analyst",
+      title: "复盘分析师",
+      duty: "把曝光、询盘、成交和内容对上账，回答哪条内容真的带来了生意。",
+      fences: ["只读复盘，不改任何渠道数据"],
+      tasks: ["生成本周归因复盘", "核对归因链", "查转化异常波动"],
+      sample: "上周归因成交额 + 三条高转化内容的来源链",
       sampleIsDemo: true,
     },
     {
-      id: "portrait",
-      presetKey: "portrait-artist",
-      title: "定妆照美术指导",
-      duty: "定主演与道具的定妆照，锚定跨镜头一致性；形象偏差在开拍前拦住，不留到成片返工。",
-      fences: ["G5 · 定妆照确认门", "G10 · 资产与版权校验"],
-      tasks: ["生成角色定妆照", "锚定一致性锚点", "复核形象偏差"],
-      sample: "两位主演的定妆照 + 与上一集的形象对照结论",
+      id: "visibility",
+      presetKey: "visibility-watcher",
+      title: "AI 能见度监测官",
+      duty: "盯品牌词在 AI 搜索里的引用与排名变化，掉榜先告警不猜测原因。",
+      fences: ["只读监测，异常只推送与派单"],
+      tasks: ["查看今日能见度", "核对引用源变化", "派单处理掉榜"],
+      sample: "今晨品牌词引用数变化 + 新增/丢失的引用源",
       sampleIsDemo: true,
     },
     {
-      id: "metrics-video",
-      presetKey: "metrics-watcher",
-      title: "数据看板官",
-      duty: "盯播放、完播与转化，把哪条片子真的带来了生意讲清楚；只读统计，不改任何渠道数据。",
-      fences: ["只读统计，不改渠道数据"],
-      tasks: ["查看今日看板", "生成周复盘数据", "查异常波动"],
-      sample: "近 7 天完播与转化曲线 + 三条高转化片子的归因",
+      id: "intake",
+      presetKey: "private-domain-operator",
+      title: "私域承接专员",
+      duty: "接住评论、私信与落地页的询盘，30 秒首响；报价与承诺必过人审。",
+      fences: ["G10b · 咨询/售后回复必审", "G-GEO1 · 对外内容外发必审"],
+      tasks: ["处理今日询盘", "核对首响时长", "整理待拍板方案"],
+      sample: "今日 6 条询盘的处置记录 + 1 条待拍板的报价方案",
       sampleIsDemo: true,
     },
   ],
 
   goals: [
     {
-      id: "one-film",
-      title: "今天出一条能发的片子",
-      metric: "从选题到成片当天交付率",
-      ownerPresetKey: "director",
-      ownerTitle: "总导演",
-      artifact: "剧本 + 分镜表 + 成片",
-      steps: 5,
+      id: "geo-visible",
+      title: "AI 搜索里找得到",
+      metric: "品牌词被 AI 回答引用的次数周环比上升",
+      ownerPresetKey: "geo-content-planner",
+      ownerTitle: "GEO 内容策划",
+      artifact: "能见度周报（含引用源清单）",
+      steps: 4,
       approvals: 1,
     },
     {
-      id: "script-solid",
-      title: "剧本先立住",
-      metric: "台词时长与场景规范一次通过率",
-      ownerPresetKey: "scriptwriter",
-      ownerTitle: "剧本师",
-      artifact: "剧本蓝图 + 台词时长校准表",
+      id: "ads-safe",
+      title: "投放不失控",
+      metric: "加投全部经审，单账号日发布不超限",
+      ownerPresetKey: "ads-optimizer",
+      ownerTitle: "投放优化师",
+      artifact: "加投审批清单（含 ROI 依据）",
       steps: 3,
       approvals: 1,
     },
     {
-      id: "post-clean",
-      title: "成片不返工",
-      metric: "字幕/音乐/多平台版本一次过审率",
-      ownerPresetKey: "post-editor",
-      ownerTitle: "剪辑师",
-      artifact: "横竖两版成片 + 平台合规校验记录",
+      id: "lead-fast",
+      title: "询盘不过夜",
+      metric: "私域询盘 30 秒首响率 100%",
+      ownerPresetKey: "private-domain-operator",
+      ownerTitle: "私域承接专员",
+      artifact: "询盘处置记录",
       steps: 3,
       approvals: 1,
     },
@@ -494,40 +473,40 @@ export const QUESTLINE_GEO: QuestlineConfig = {
 
   tasks: [
     {
-      id: "video-episode",
-      title: "把本周选题做成一集短片",
-      ownerPresetKey: "director",
-      ownerTitle: "总导演",
-      steps: 5,
-      eta: "约 5 分钟",
-      artifact: "剧本蓝图 + 分镜表 + 成片",
+      id: "geo-content",
+      title: "把本周选题做成双域内容",
+      ownerPresetKey: "geo-content-planner",
+      ownerTitle: "GEO 内容策划",
+      steps: 4,
+      eta: "约 4 分钟",
+      artifact: "短视频脚本 + GEO 图文 + 引用源清单",
       approvals: 1,
-      credits: 28,
-      dispatchTitle: "把本周选题做成一集 60 秒短片：出剧本与分镜、排定镜头单、合成成片，渲染与发布前提交审批",
+      credits: 24,
+      dispatchTitle: "生成本周双域内容（短视频脚本与 GEO 图文），整理引用源清单，发布前提请审批",
     },
     {
-      id: "script-check",
-      title: "先校验这集剧本的台词与时长",
-      ownerPresetKey: "scriptwriter",
-      ownerTitle: "剧本师",
+      id: "ads-review",
+      title: "复核今天的投放加投建议",
+      ownerPresetKey: "ads-optimizer",
+      ownerTitle: "投放优化师",
       steps: 3,
       eta: "约 3 分钟",
-      artifact: "台词时长校准表 + 需要您拍板的改写方案",
+      artifact: "加投建议 + ROI 依据（加投部分提请审批）",
       approvals: 1,
-      credits: 14,
-      dispatchTitle: "校验本集剧本的台词语速与时长带是否自洽，列出不合规台词与改写方案，改动提请审批",
+      credits: 18,
+      dispatchTitle: "复核今天的投放数据，整理加投建议与 ROI 依据，加投部分提请审批",
     },
     {
-      id: "post-versions",
-      title: "出横竖两版成片并做平台校验",
-      ownerPresetKey: "post-editor",
-      ownerTitle: "剪辑师",
+      id: "intake-clear",
+      title: "处理今天的询盘与评论",
+      ownerPresetKey: "private-domain-operator",
+      ownerTitle: "私域承接专员",
       steps: 3,
       eta: "约 3 分钟",
-      artifact: "横版/竖版成片 + 字幕与音乐方案",
+      artifact: "询盘处置记录 + 需要拍板的话术方案",
       approvals: 1,
-      credits: 16,
-      dispatchTitle: "把成片剪成横竖两版并做平台文字政策校验，输出字幕与音乐方案，对外发布前提请审批",
+      credits: 12,
+      dispatchTitle: "处理今天各渠道的询盘与评论，输出处置记录与需要拍板的话术方案",
     },
   ],
 
@@ -535,7 +514,7 @@ export const QUESTLINE_GEO: QuestlineConfig = {
   values: QUEST_VALUES,
   nextSteps: QUEST_NEXT_STEPS,
 
-  // geo-growth 枚举表（bundles/geo-growth/feedback-enums.yml）里的 reject 适用码
+  // geo-growthtest 枚举表（bundles/geo-growthtest/feedback-enums.yml）里的 reject 适用码
   rejectReasons: [
     { code: "fact.risk", label: "事实红线风险" },
     { code: "geo.citation_missing", label: "引用源缺失或不可核验" },
@@ -699,7 +678,7 @@ export const QUESTLINE_VIDEO: QuestlineConfig = {
  */
 export const QUESTLINE_PACKS: Readonly<Record<string, QuestlineConfig>> = Object.freeze({
   hotel: QUESTLINE,
-  "geo-growth": QUESTLINE_GEO,
+  "geo-growthtest": QUESTLINE_GEO,
   "ai-video": QUESTLINE_VIDEO,
 });
 

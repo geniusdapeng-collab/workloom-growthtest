@@ -765,3 +765,100 @@ describe("T7 美妆时尚知识条目", () => {
     expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "BF-01" }));
   });
 });
+
+/**
+ * T8 美食餐饮（2026-09-28）：菜品特写≥30% / 食欲瞬间≥20% / 制作过程≥25% / 食材≥10% / 环境人物≤15%；
+ * 诱惑链条三环齐备、食欲瞬间≥3 个、卫生零风险联想为不可突破底线。
+ */
+const t8 = policies.find((item) => item.id === "food-dining")!;
+
+function foodShot(index: number, tags: string[], duration: number, fields: Partial<ScenePolicyShot>): ScenePolicyShot {
+  return {
+    shotId: `FD-${String(index).padStart(2, "0")}`, duration, policyTags: tags,
+    scene: "明厨亮灶的烹饪操作台，台面干净整洁、调料有序",
+    composition: "侧逆光下打亮打透，菜品油润水润、色泽诱人",
+    camera_movement: "固定机位",
+    ...fields,
+  } as ScenePolicyShot;
+}
+
+function foodCompliant(): ScenePolicyInput {
+  return {
+    title: "餐厅菜品宣传：黑松露芝士焗饭",
+    shots: [
+      foodShot(1, ["dish-close"], 10, { scene: "精致餐桌，质感餐具与木质桌面，画面干净整洁", composition: "成品特写摆盘，侧逆光打亮打透、色泽诱人" }),
+      foodShot(2, ["dish-close"], 10, { composition: "菜品特写成品呈现，油润水润、水珠质感清楚" }),
+      foodShot(3, ["dish-close"], 10, { composition: "菜品成品特写，热气可见、画面干净" }),
+      foodShot(4, ["appetite"], 10, { composition: "拉丝垂坠的食欲瞬间：芝士拉丝半米、打亮打透，切开横截面汁水清楚、油润光泽" }),
+      foodShot(5, ["appetite"], 10, { composition: "浇汁流动与热气升腾的第一口食欲瞬间，侧逆光让热气可见、打亮打透" }),
+      foodShot(6, ["cooking"], 12.5, { composition: "明火灶台翻炒制作过程，锅气十足、热气升腾、打亮打透，操作台干净规范作业" }),
+      foodShot(7, ["cooking"], 12.5, { composition: "炙烤与淋酱的制作过程，动作真实、打亮打透、油润清晰，画面整洁有序" }),
+      foodShot(8, ["ingredient"], 10, { scene: "木质砧板与竹编容器，自然光下台面干净整洁", composition: "食材特写：带水珠的蔬果与纹理清晰的原料，新鲜可见、画面干净" }),
+      foodShot(9, ["ambience-host"], 7.5, { composition: "餐厅氛围环境镜头，堂食整洁、画面干净有序，菜品打亮打透", scene: "整洁版烟火气餐厅堂食区，桌面干净" }),
+      foodShot(10, ["ambience-host"], 7.5, { composition: "主理人厨师出镜讲述，厨师服围裙整洁、经营养规范，菜品打亮打透、色泽诱人", scene: "开放式厨房前台，台面干净整洁" }),
+    ],
+  };
+}
+
+describe("T8 美食餐饮知识条目", () => {
+  it("按美食信号选中，合规十镜满足配比与诱惑链条", () => {
+    expect(t8.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+    expect(selectScenePolicy({ title: "餐厅菜品宣传：黑松露芝士焗饭", shots: [] }, null, policies).policy?.id).toBe("food-dining");
+    expect(selectScenePolicy({ title: "烹饪教程：家常红烧肉", shots: [] }, null, policies).policy?.id).toBe("food-dining");
+    const report = auditScenePolicy(foodCompliant(), t8);
+    expect(report.defects).toEqual([]);
+    expect(report.passed).toBe(true);
+    expect(report.ratios["dish-close"]?.share ?? 0).toBeGreaterThanOrEqual(0.3);
+    expect(report.ratios.appetite?.share ?? 0).toBeGreaterThanOrEqual(0.2);
+    expect(report.ratios.cooking?.share ?? 0).toBeGreaterThanOrEqual(0.25);
+    expect(report.ratios.ingredient?.share ?? 0).toBeGreaterThanOrEqual(0.1);
+    expect(report.ratios["ambience-host"]?.share ?? 1).toBeLessThanOrEqual(0.15);
+    expect(report.planCues["制作过程（锅气）"]?.found).toBe(true);
+    expect(report.planCues["食欲瞬间·切开或拉丝"]?.found).toBe(true);
+    expect(report.planCues["食欲瞬间·热气或油花"]?.found).toBe(true);
+    expect(report.planCues["食欲瞬间·第一口或浇汁"]?.found).toBe(true);
+  });
+
+  it("食欲瞬间不足/缺制作过程/环境超配/脏乱后厨与食材翻车都判硬失败", () => {
+    const broken = foodCompliant();
+    /** ① 去掉全部食欲瞬间与制作过程镜 → 必备画面缺失、两类配比不足 */
+    broken.shots = broken.shots.filter((item) => !["FD-04", "FD-05", "FD-06", "FD-07"].includes(item.shotId));
+    /** ② 剩下镜头全改成环境/人物 → 环境人物超 15% 上限 */
+    broken.shots = broken.shots.map((item) => ({ ...item, policyTags: ["ambience-host"] }));
+    /** ③ 脏乱后厨与食材翻车 */
+    broken.shots = broken.shots.map((item) => item.shotId === "FD-01"
+      ? { ...item, scene: "油污灶台与发黑抹布，地面积水、食材乱堆", composition: "发蔫青菜与氧化切面，饱和拉满的荧光色" } : item);
+    const report = auditScenePolicy(broken, t8);
+    const rules = report.defects.map((item) => item.rule);
+    expect(report.passed).toBe(false);
+    expect(rules).toContain("required-plan-cue");
+    expect(rules).toContain("ratio-min");
+    expect(rules).toContain("ratio-max");
+    expect(rules).toContain("quality-floor");
+  });
+
+  it("街边摊位可凭客户原话例外（大众餐饮），但卫生与食欲底线不豁免", () => {
+    const input = foodCompliant();
+    input.shots = input.shots.map((item) => item.shotId === "FD-09"
+      ? { ...item, scene: "整洁版街边摊位，操作台干净有序、锅气十足", composition: "摊位环境镜头，画面整洁、菜品打亮打透" } : item);
+    input.scenePolicy = { exceptions: [{ rule: "restricted-location", shotId: "FD-09", term: "街边摊位",
+      customerRequest: "客户是街边小吃品牌，要求在街边摊位拍整洁版烟火气场景", source: "brief#scene" }] };
+    const withException = auditScenePolicy(input, t8);
+    expect(withException.defects.some((item) => item.rule === "restricted-location")).toBe(false);
+    expect(withException.exceptionsApplied).toContainEqual(expect.objectContaining({ shotId: "FD-09", term: "街边摊位" }));
+
+    const broken = foodCompliant();
+    broken.shots = broken.shots.map((item) => item.shotId === "FD-08"
+      ? { ...item, scene: "砧板旁有烟头与苍蝇，垃圾桶敞开", composition: "徒手抓熟食，惨白闪光" } : item);
+    const report = auditScenePolicy(broken, t8);
+    expect(report.defects.filter((item) => item.rule === "quality-floor" && item.shotId === "FD-08").length).toBeGreaterThan(0);
+  });
+
+  it("贬低同行话术从实际台词取证", () => {
+    const fluent = foodCompliant();
+    fluent.shots = fluent.shots.map((item) => item.shotId === "FD-10"
+      ? { ...item, dialogue: [{ speaker: "主理人", text: "我们家最好，贬低同行的都别去。" }], speechMode: "on-camera", speechScene: "host" } : item);
+    const report = auditScenePolicy(fluent, t8);
+    expect(report.defects).toContainEqual(expect.objectContaining({ rule: "speech-prohibition", shotId: "FD-10" }));
+  });
+});

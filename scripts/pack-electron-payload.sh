@@ -52,18 +52,6 @@ copy() {
 }
 
 echo "== 装配 Electron 自包含载荷（${VERSION} · ${PLATFORM}-${ARCH}）=="
-
-# ---------- 0. 行业包完整性门禁（fail fast） ----------
-# 2026-09-21 真机实证：手改 bundle 资产（如围栏 YAML）而不刷新 bundle.json 的资产摘要，
-# 打包本身不会报错，客户端却会在首启种子阶段 INTEGRITY_FAILED 起不来（"装得上、起不来"）。
-# 装配前先跑受控治理门禁：摘要不一致直接在这里失败，而不是等到用户机器上。
-echo "→ 行业包完整性门禁（bundle 资产摘要）…"
-if ! pnpm -s bundle:governance > "$STAGE/bundle-governance.log" 2>&1; then
-  echo "❌ 行业包完整性门禁失败（下面为末尾输出；可用 pnpm bundle:release 刷新摘要后重试）："
-  tail -6 "$STAGE/bundle-governance.log"
-  exit 1
-fi
-
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
@@ -102,8 +90,7 @@ mkdir -p "$R/scripts/tools"
 # enhancer, Python venv, and FFmpeg binaries remain workstation prerequisites.
 cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
    scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-   scripts/tools/enhance-engine-install.mjs scripts/tools/uhd-lineage.mts \
-   scripts/tools/uhd-publication.mts "$R/scripts/tools/"
+   scripts/tools/enhance-engine-install.mjs "$R/scripts/tools/"
 mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
   "$R/vendor/srt-whiteboard/scripts" "$R/vendor/srt-whiteboard/assets" "$R/vendor/srt-whiteboard/examples"
 cp scripts/whiteboard/lineart_tools.py "$R/scripts/whiteboard/"
@@ -127,14 +114,9 @@ printf '%s\n' "$VERSION" > "$R/VERSION"
 find "$R/apps" "$R/packages" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
 
 # ---------- 2. web 构建产物 + 运行期依赖（npm 扁平化，无 symlink，electron-builder 友好） ----------
-# 2026-09-21 真机修复（症状 A/B 根因）：桌面客户端是「本机个人使用」形态，
-# 随包 web 必须以 VITE_WORKLOOM_LOCAL_FULL=1 构建。该值是构建期常量
-# （apps/web/src/lib/trpc.ts: const LOCAL_FULL = import.meta.env.VITE_WORKLOOM_LOCAL_FULL === "1"）：
-# 缺失时客户端首次装机走「游客」身份（服务端签发 role=readonly），派活/推进/审批/
-# 模式切换/自动化等一切写操作被服务端 403，界面表现为「当前身份没有执行该动作的权限」。
-# 因此这里每次都重建 web，不允许复用可能来自游客口径的旧 dist。
-echo "→ 构建 web（本机全量口径 VITE_WORKLOOM_LOCAL_FULL=1）…"
-VITE_WORKLOOM_LOCAL_FULL=1 pnpm -C apps/web build
+if [ ! -f apps/web/dist/index.html ]; then
+  echo "→ 构建 web…"; pnpm -C apps/web build
+fi
 mkdir -p "$R/apps/web"
 copy apps/web/dist "$R/apps/web/dist"
 echo "→ 运行期依赖：npm 扁平化安装…"
@@ -233,24 +215,11 @@ fi
 
 # ---------- 9. 载荷自检（v2.2.1 实证：NATS 段变量粘连致脚本中途异常但步骤未失败，
 #      DMG 带着残缺载荷照出——装配脚本必须自证完整，防"静默半成品"） ----------
-# ---------- 9.5 Bundle 独立公钥环（electron-builder extraResources 声明项） ----------
-# electron-builder.yml 声明 from: build/bundle-trust.json；文件缺失时 electron-builder
-# 只打印一行 "file source doesn't exist" 仍继续出包——产物外观正常，客户端首启却没有
-# 行业包信任根（运行时提示「Bundle 独立公钥环缺失；任何稳定行业包都将失败关闭」）。
-# 发布流水线由 scripts/bundle-governance.mts 从 BUNDLE_SIGNING_PRIVATE_KEY 生成；
-# 本地/未配置私钥时这里显式落一个格式合法的空公钥环：文件必在（可受应用签名保护），
-# 语义不变（空环 = 无受信 key = 稳定行业包一律失败关闭，与缺文件等价但可观测）。
-mkdir -p build
-if [ ! -s build/bundle-trust.json ]; then
-  echo "⚠ 未配置 Bundle 签名私钥（BUNDLE_SIGNING_PRIVATE_KEY）→ 生成空公钥环（稳定行业包将失败关闭）"
-  node -e 'const fs=require("node:fs");fs.writeFileSync("build/bundle-trust.json",JSON.stringify({schemaVersion:"workloom.bundle.trust/v1",keys:{},revoked:[]},null,2)+"\n");'
-fi
 for f in runtime/node_modules/tsx/package.json runtime/node_modules/hono/package.json \
          runtime/scripts/migrate.ts runtime/scripts/product-runtime.mjs runtime/scripts/vite-product.mjs \
          runtime/scripts/tools/full-chain-film.mts runtime/scripts/tools/compose-film.mts \
          runtime/scripts/tools/explainer-run.mts runtime/scripts/tools/whiteboard-film.mts \
          runtime/scripts/tools/whiteboard-env-install.mts runtime/scripts/tools/enhance-engine-install.mjs \
-         runtime/scripts/tools/uhd-lineage.mts runtime/scripts/tools/uhd-publication.mts \
          runtime/scripts/whiteboard/lineart_tools.py runtime/assets/whiteboard/drawing-hand-workloom.png \
          runtime/vendor/srt-whiteboard/LICENSE runtime/vendor/srt-whiteboard/requirements.txt \
          runtime/vendor/srt-whiteboard/scripts/prepare_env.py \

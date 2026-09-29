@@ -33,7 +33,7 @@ seed_bundle_dir() {
   case "$1" in
     db:seed) printf '%s' "bundles/hotel" ;;
     db:seed:video) printf '%s' "bundles/ai-video" ;;
-    db:seed:geo|db:seed:acq) printf '%s' "bundles/geo-growth" ;;
+    db:seed:geo|db:seed:acq) printf '%s' "bundles/geo-growthtest" ;;
     db:seed:aipm) printf '%s' "bundles/ai-pm" ;;
     *) printf '' ;;
   esac

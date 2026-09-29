@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   AV_SYNC_POLICY,
+  avSyncPolicyForClipCount,
   buildCutAudioStep,
   candidateSyncWindows,
   crossCorrelationLag,
   describeAvSync,
   evaluateAvSync,
+  verifyAvSyncEvidence,
   type AvSyncSample,
 } from "./av-sync.js";
 
@@ -96,6 +98,40 @@ describe("evaluateAvSync", () => {
     const report = evaluateAvSync([]);
     expect(report.ok).toBe(false);
     expect(report.violations[0]).toMatch(/没有任何可测窗口/);
+  });
+});
+
+describe("verifyAvSyncEvidence", () => {
+  const output = "/work/post/uhd/master-raw.mp4";
+  const outputSha256 = "a".repeat(64);
+  const samples: AvSyncSample[] = [0, 1, 2].map((index) => ({ shotId: `S-${index + 1}`, index, lagMs: 0, correlation: 0.9 }));
+  const report = () => ({ ...evaluateAvSync(samples), output, outputSha256, clipCount: 3, policy: AV_SYNC_POLICY });
+  const expected = { output, outputSha256, clipCount: 3 };
+
+  it("当前 raw SHA、镜数、逐镜样本与现行判据一致才放行", () => {
+    expect(verifyAvSyncEvidence(report(), expected).ok).toBe(true);
+    expect(verifyAvSyncEvidence(report(), { ...expected, outputSha256: "b".repeat(64) }).ok).toBe(false);
+    expect(verifyAvSyncEvidence(report(), { ...expected, clipCount: 4 }).ok).toBe(false);
+    expect(verifyAvSyncEvidence({ ...report(), samples: samples.slice(1) }, expected).ok).toBe(false);
+    expect(verifyAvSyncEvidence({ ...report(), ok: false }, expected).ok).toBe(false);
+  });
+
+  it("两镜片采用两镜可测策略，仍须两镜都实测", () => {
+    const two = samples.slice(0, 2);
+    const short = { ...evaluateAvSync(two, avSyncPolicyForClipCount(2)), output, outputSha256,
+      clipCount: 2, policy: avSyncPolicyForClipCount(2) };
+    expect(verifyAvSyncEvidence(short, { ...expected, clipCount: 2 }).ok).toBe(true);
+    expect(verifyAvSyncEvidence({ ...short, samples: two.slice(0, 1) }, { ...expected, clipCount: 2 }).ok).toBe(false);
+  });
+
+  it("未测偏移不准借显式放行；已测超阈值必须显式声明", () => {
+    const driftSamples = samples.map((sample, index) => ({ ...sample, lagMs: index * 40 }));
+    const measured = { ...evaluateAvSync(driftSamples), samples: driftSamples, output, outputSha256, clipCount: 3, policy: AV_SYNC_POLICY };
+    expect(measured.ok).toBe(false);
+    expect(verifyAvSyncEvidence(measured, expected).ok).toBe(false);
+    expect(verifyAvSyncEvidence(measured, { ...expected, allowMeasuredDrift: true }).ok).toBe(true);
+    const unmeasured = { ...evaluateAvSync(samples.map((sample) => ({ ...sample, correlation: 0 }))), output, outputSha256, clipCount: 3, policy: AV_SYNC_POLICY };
+    expect(verifyAvSyncEvidence(unmeasured, { ...expected, allowMeasuredDrift: true }).ok).toBe(false);
   });
 });
 

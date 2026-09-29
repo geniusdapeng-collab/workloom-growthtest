@@ -2,7 +2,7 @@
 /**
  * agent-knowhow-audit.mts —— 数字员工「配套技能行业 Know-How 结构」只读审计器（T-2026-0926-0101）
  *
- * 定位：把 `scripts/tools/knowhow-depth.mts`（只覆盖 geo-growth 15 个自研技能）扩展到
+ * 定位：把 `scripts/tools/knowhow-depth.mts`（只覆盖 geo-growthtest 15 个自研技能）扩展到
  * 三个行业包 + 包外官方技能，并按技能分型判定「结构等价」而不是「章节名一致」：
  *   S-A 经营/决策型：决策原则（含阈值/失败关闭）+ 打法库（主线+分支）+ SOP（触发/回执/失败）
  *                    + 关键指标（含基准/阈值/来源）+ 失败模式（症状→检测器→处置）
@@ -14,7 +14,7 @@
  *
  * 纪律：本工具**只读**，默认不作为门禁（退出码 0）；`--strict` 时任一技能不达标即退出码 1。
  * 用法：
- *   pnpm exec tsx scripts/tools/agent-knowhow-audit.mts [--bundle ai-video|geo-growth|hotel|all]
+ *   pnpm exec tsx scripts/tools/agent-knowhow-audit.mts [--bundle ai-video|geo-growthtest|hotel|all]
  *     [--type S-A|S-B|S-C] [--skill <name>] [--json] [--md=<path>] [--strict]
  */
 import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
@@ -22,7 +22,7 @@ import { join, resolve } from "node:path";
 import YAML from "yaml";
 
 const ROOT = resolve(import.meta.dirname, "..", "..");
-const BUNDLES = ["ai-video", "geo-growth", "hotel"] as const;
+const BUNDLES = ["ai-video", "geo-growthtest", "hotel"] as const;
 type Bundle = (typeof BUNDLES)[number];
 
 const arg = (name: string, fallback = ""): string => {
@@ -42,7 +42,7 @@ const OVERRIDES: Record<string, KnowhowType> = {
   "producer-gate-review": "S-C",
   "cinematography-kb": "S-B",
   "shot-prompt-craft": "S-B",
-  // geo-growth 视觉栈属制作/工艺型（岗位 kind=content 会误判为 S-A）
+  // geo-growthtest 视觉栈属制作/工艺型（岗位 kind=content 会误判为 S-A）
   "art-direction": "S-B",
   "asset-variant-forge": "S-B",
   "brand-guard": "S-B",

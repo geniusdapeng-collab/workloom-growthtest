@@ -23,6 +23,20 @@ import { RemotionProvider } from "../explainer/remotion-provider.js";
 function classify(status: number, body: string): ProviderError {
   const text = body.slice(0, 300);
   if (status === 401 || status === 403) return new ProviderError("AUTH", `鉴权失败：HTTP ${status} ${text}`, status);
+  /**
+   * 真人隐私闸（真机 2026-09-23 实测）：seedance 对"可能包含真人"的输入图一律 400，
+   * `reference_image` 与 `first_frame` 都被拦（真人照片、以及用真人照片生成的定妆照同样被拦；
+   * 纯合成人脸可以通过）。这条是**平台政策**，不能靠重试或换供应商绕，必须显式告知并走官方通道。
+   */
+  if (status === 400 && /InputImageSensitiveContentDetected|may contain real person/i.test(body)) {
+    return new ProviderError(
+      "MODERATION",
+      "平台隐私检测拒绝真人图像输入（InputImageSensitiveContentDetected.PrivacyInformation）：seedance 不接受"
+      + "真人照片，reference_image / first_frame 均被拦。请走方舟「含肖像视频」官方授权通道，或改用非真人素材"
+      + `（例如 Seedream 生成的合成人物）。原始响应：${text}`,
+      status
+    );
+  }
   if (status === 400 && /concurrent/i.test(body)) return new ProviderError("CONCURRENCY", `供应商并发已满：${text}`, status);
   if (status === 404 || status === 423) return new ProviderError("MODEL_UNAVAILABLE", `模型不可用：HTTP ${status} ${text}`, status, "not-accepted");
   if (status === 429) return new ProviderError("RETRYABLE", `限流：HTTP 429 ${text}`, status, "not-accepted");

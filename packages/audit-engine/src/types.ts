@@ -3,7 +3,7 @@
  * 质检模式（audit_only）「获客全链路快照快扫」的确定性检测引擎数据模型。
  * 方法论事实源：bundles/hotel/skills/fast-scan/SKILL.md（双线扫描）。
  * 阈值口径：bundles/hotel/fences/hotel-baseline.yml（R2 保底价 ¥380 / R17 倒挂 / R18 超售漏售 / R19 差评 24h SLA）
- *          + bundles/geo-growth/fences/geo-growth-baseline.yml（G9/G16 账号纪律、GEO 能见度口径）。
+ *          + bundles/geo-growthtest/fences/geo-growthtest-baseline.yml（G9/G16 账号纪律、GEO 能见度口径）。
  *
  * 数据流：连接器只读快照（PMS/OTA + 社媒 + GEO）→ AuditSnapshot（归一化数据集）
  *        → 七个分析器（酒店运营线 4 + 获客转化线 3）→ Finding[] → AuditReport。

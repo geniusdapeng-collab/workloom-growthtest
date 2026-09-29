@@ -1,10 +1,10 @@
-# WorkLoom 开源组件清单 · workloom-ai-growth
+# WorkLoom 开源组件清单 · workloom-ai-growthtest
 
 <!-- 自动生成，请勿手改：node scripts/oss-inventory.mjs --write -->
 
 > 生成器：`scripts/oss-inventory.mjs`（离线事实）＋ `scripts/oss-watch.sh`（上游最新版本）
-> 仓库：workloom-ai/workloom-growthtest ｜ 最近一次上游扫描：2026-09-19T10:10:43.000Z
-> 统计：登记组件 103 个 ｜ npm 直接依赖 163 个 ｜ Python 依赖 5 个 ｜ 容器镜像 2 个
+> 仓库：workloom-ai/workloom-growthtest ｜ 最近一次上游扫描：2026-09-29T10:59:50.000Z
+> 统计：登记组件 98 个 ｜ npm 直接依赖 163 个 ｜ Python 依赖 5 个 ｜ 容器镜像 2 个
 
 ## 0. 维护机制（四件事）
 
@@ -21,8 +21,8 @@
 
 | # | 组件 | 开源地址 / 许可 | 当前使用版本 | 上游最新 | 状态 | 使用位置 | 注意事项 |
 |---|---|---|---|---|---|---|---|
-| 1 | DeepSeek Harness（dsh） | [github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) · MIT | 0.1.6-alpha.2 | 0.1.5-rc.2 | 运行时 | vendor/dsh（审计基线）、packages/runtime/dsh-gate（锁定运行时） | Agent 运行时地基：锁版 + 内部 fork 镜像，任何新版本（含 rc 预发布）即触发升级；永远单独一批，必过 E6 回归与 H-5 kill -9 重放；升级前必须 diff 依赖树（0.1.2-rc.1 已移除 node-pty；rc.2 起要求 Node ≥24 的 zstd API） |
-| 2 | Cordis（插件元框架） | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) · MIT | 4.0.2 | 4.0.2 | 运行时 | 随 dsh 分发（插件元框架）、packages/runtime/plugins | 插件可撤销效果是技能绑定围栏、插件卸载即撤销的运行时保证；实际版本以 dsh 锁定树为准（上游独立仓为 4.0.0-rc 线，跟随 dsh 升级） |
+| 1 | DeepSeek Harness（dsh） | [github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) · MIT | 0.1.6-alpha.2 | **0.1.7-rc.2** ⬆ | 运行时 | vendor/dsh（审计基线）、packages/runtime/dsh-gate（锁定运行时） | Agent 运行时地基：锁版 + 内部 fork 镜像，任何新版本（含 rc 预发布）即触发升级；永远单独一批，必过 E6 回归与 H-5 kill -9 重放；升级前必须 diff 依赖树（0.1.2-rc.1 已移除 node-pty；rc.2 起要求 Node ≥24 的 zstd API） |
+| 2 | Cordis（插件元框架） | [github.com/cordiverse/cordis](https://github.com/cordiverse/cordis) · MIT | 4.0.2 | **4.0.4** ⬆ | 运行时 | 随 dsh 分发（插件元框架）、packages/runtime/plugins | 插件可撤销效果是技能绑定围栏、插件卸载即撤销的运行时保证；实际版本以 dsh 锁定树为准（上游独立仓为 4.0.0-rc 线，跟随 dsh 升级） |
 | 3 | Schemastery | [github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) · MIT | 3.18.2 | 3.18.2 | 运行时 | 随 dsh 分发（配置 schema 引擎） | 配置文件校验引擎；随 dsh 锁定树升级，不单独升级 |
 | 4 | node-addon-require-builtin | [github.com/deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) · MIT | 0.1.6 | 0.1.6 | 运行时 | 随 dsh 分发（原生插件加载） | dsh 原生插件加载依赖；随 dsh 锁定树升级 |
 | 5 | dsh-im 多平台 IM 接入插件 | [github.com/xmanrui/dsh-im](https://github.com/xmanrui/dsh-im) · MIT | 0.2.2 | **4.21.2** ⬆ | 运行时 | vendor/dsh-im（文档锁定）、scripts/install-im-channels.sh | 钉钉/企微/飞书官方通道首批启用；安装走 pin 版本 + integrity 校验；观察名单（微信 iLink、WhatsApp baileys 等非官方协议）不启用；Slack 枚举位保留未接线 |
@@ -48,7 +48,7 @@
 | 25 | react-dom | [github.com/facebook/react](https://github.com/facebook/react) · MIT | 19.2.8 | **19.3.0** ⬆ | 运行时 | apps/web、apps/webc、apps/webb | 必须与 react 严格同版 |
 | 26 | React Router | [github.com/remix-run/react-router](https://github.com/remix-run/react-router) · MIT | 8.3.0 | **8.4.0** ⬆ | 运行时 | apps/web | 路由与数据加载；大版本升级需核对路由表与深链（含 bare 路由返回出口） |
 | 27 | TanStack Query | [github.com/TanStack/query](https://github.com/TanStack/query) · MIT | 5.102.5 | **5.103.1** ⬆ | 运行时 | apps/web | 服务端状态缓存；升级复核轮询失效策略（心跳类页面） |
-| 28 | Vite | [github.com/vitejs/vite](https://github.com/vitejs/vite) · MIT | 8.2.2 | **8.3.0** ⬆ | 开发/构建 | apps/web、apps/webc、apps/webb | 构建工具链；与 @vitejs/plugin-react、@tailwindcss/vite 同批联动；v8 走 rolldown 内核，升级后必须过三端生产构建 |
+| 28 | Vite | [github.com/vitejs/vite](https://github.com/vitejs/vite) · MIT | 8.2.2 | **8.3.1** ⬆ | 开发/构建 | apps/web、apps/webc、apps/webb | 构建工具链；与 @vitejs/plugin-react、@tailwindcss/vite 同批联动；v8 走 rolldown 内核，升级后必须过三端生产构建 |
 | 29 | @vitejs/plugin-react | [github.com/vitejs/vite-plugin-react](https://github.com/vitejs/vite-plugin-react) · MIT | 6.1.0 | **6.1.1** ⬆ | 开发/构建 | apps/web、apps/webc、apps/webb | 与 vite 同批升级 |
 | 30 | Tailwind CSS | [github.com/tailwindlabs/tailwindcss](https://github.com/tailwindlabs/tailwindcss) · MIT | 4.3.3 | 4.3.3 | 开发/构建 | apps/web、apps/webc、apps/webb、packages/ui | v4 令牌制；升级后必须过 Candy 设计系统纯色验证与三端视觉基线 |
 | 31 | @tailwindcss/vite | [github.com/tailwindlabs/tailwindcss](https://github.com/tailwindlabs/tailwindcss) · MIT | 4.3.3 | 4.3.3 | 开发/构建 | apps/web、apps/webc、apps/webb | 必须与 tailwindcss 严格同版 |
@@ -59,7 +59,7 @@
 | 36 | three-stdlib | [github.com/pmndrs/three-stdlib](https://github.com/pmndrs/three-stdlib) · MIT | 2.36.1 | 2.36.1 | 运行时 | apps/web | three 官方 examples 的 TS 移植；与 three 主版本对齐 |
 | 37 | pixi.js | [github.com/pixijs/pixijs](https://github.com/pixijs/pixijs) · MIT | 6.5.10 | **8.21.0** ⬆ | 运行时 | apps/web（数字人/2D 舞台） | 当前锁 v6 线（pixi-live2d-display 兼容上限）；升级 v7/v8 必须同步替换 live2d 显示层 |
 | 38 | pixi-live2d-display | [github.com/guansss/pixi-live2d-display](https://github.com/guansss/pixi-live2d-display) · MIT | 0.4.0 | 0.4.0 | 运行时 | apps/web（Live2D 数字人） | 0.4.0 仅支持 pixi v6 线；升级前先确认上游是否已适配 pixi v7+，否则锁版不动 |
-| 39 | grok-ball（织球 LoomBall 上游引擎） | [github.com/tycoding/grok-ball](https://github.com/tycoding/grok-ball) · MIT | 1.0.0 | —（未扫描） | 运行时 | apps/web/src/vendor/loomball（单文件 SVG 表情球引擎，118KB，零运行依赖，随仓 vendor + PINNED 锁 commit） | AI 班组状态可视化引擎：用 emotionId 表达岗位/班组工作状态（T-2026-0926-0002，点名单向移植自 workloom-growth T-2026-0926-0019）。产品内命名「织球 LoomBall」，上游兼容门面已在适配层删除（见 vendor/loomball/NOTICE.md）；升级走评审 + 重跑织球四份单测 + 三接入面真机走查，永不自动升级 |
+| 39 | grok-ball（织球 LoomBall 上游引擎） | [github.com/tycoding/grok-ball](https://github.com/tycoding/grok-ball) · MIT | 1.0.0 | —（未扫描） | 运行时 | apps/web/src/vendor/loomball（单文件 SVG 表情球引擎，118KB，零运行依赖，随仓 vendor + PINNED 锁 commit） | AI 班组状态可视化引擎：用 emotionId 表达岗位/班组工作状态（T-2026-0926-0019）。产品内命名「织球 LoomBall」，上游兼容门面已在适配层删除（见 vendor/loomball/NOTICE.md）；升级走评审 + 重跑织球四份单测 + 三接入面真机走查，永不自动升级 |
 | 40 | Electron | [github.com/electron/electron](https://github.com/electron/electron) · MIT | 44.1.1 | **44.4.2** ⬆ | 运行时 | apps/desktop | 桌面壳（正式产品形态）；升级必须过打包载荷校验、真实窗口响应式与托盘/夜班行为验收 |
 | 41 | electron-builder | [github.com/electron-userland/electron-builder](https://github.com/electron-userland/electron-builder) · MIT | 26.15.3 | 26.15.3 | 开发/构建 | apps/desktop（打包/签名） | 安装包与签名链路；升级后过 app:pack / app:dist 与发布资产校验 |
 | 42 | Playwright | [github.com/microsoft/playwright](https://github.com/microsoft/playwright) · Apache-2.0 | 1.63.0 | 1.63.0 | 开发/构建 | 三端 E2E（apps/*）、packages/base/computer-use/toolkit（Python 版，随工具链安装） | E2E 与 computer-use 浏览器驱动共用；升级必须重建 Linux 视觉基线（CNB ui-gate 在同一镜像内跑）；Python 侧版本由 toolkit/requirements.txt 约束 |
@@ -85,7 +85,7 @@
 | 62 | browser-use | [github.com/browser-use/browser-use](https://github.com/browser-use/browser-use) · MIT | 停车场（L4 冷启动探索，规划位） | 0.13.10 | 停车场（已选型未引入） | 浏览器自动化分层执行面（L4 探索） | 只用于新平台冷启动，探明后必须固化为 L3 剧本；不得直接进生产主路径 |
 | 63 | Skyvern | [github.com/Skyvern-AI/skyvern](https://github.com/Skyvern-AI/skyvern) · AGPL-3.0 | 停车场（视觉抗改版降级路径，规划位） | 1.0.48 | 停车场（已选型未引入） | 浏览器自动化（视觉驱动降级路径） | ⚠ AGPL-3.0：只允许独立进程形态，禁止链接进分发包；启用前过法务与出站声明 |
 | 64 | computer-use（vendored 工具箱） | [github.com/anthropics/anthropic-quickstarts](https://github.com/anthropics/anthropic-quickstarts) · MIT | repo-vendored-2026-08 | —（未扫描） | 运行时 | packages/base/computer-use（三层感知：CDP/AXTree/截图） | vendored 进仓并本地加固；上游为参考实现（无版本号），升级=人工比对；生产部署纪律见 docs/computer-use-production.md；publish-rpa 的 BrowserDriver 上游 |
-| 65 | SRT Whiteboard Animation（手绘白板渲染器，vendored） | [github.com/geeklee/srt-whiteboard-animation](https://github.com/geeklee/srt-whiteboard-animation) · MIT | vendor-696a724 | —（未扫描） | 运行时 | vendor/srt-whiteboard（scripts/：parse_srt / render_stream_whiteboard / stream_render / merge_scenes / render_annotation_preview / prepare_env）、apps/server/src/video/whiteboard（引擎桥 + 编排：provider/router/srt/narration/lineart/annotate/mux）、scripts/whiteboard/lineart_tools.py（本仓扩展：sketch / analyze / check / hand） | 字幕驱动的手绘白板渲染器：本地确定性 CPU 渲染、零 API 依赖、MIT 可商用。随仓携带上游源码 + 自有中性执笔手素材（assets/whiteboard/drawing-hand-workloom.png）。Python 依赖闭包见 vendor/srt-whiteboard/requirements.txt，venv 由 scripts/tools/whiteboard-env-install.mts 幂等安装、不入库。升级=人工比对上游 + 重跑官方样例与全链路出片 |
+| 65 | SRT Whiteboard Animation（手绘白板渲染器，vendored） | [github.com/geeklee/srt-whiteboard-animation](https://github.com/geeklee/srt-whiteboard-animation) · MIT | vendor-696a724 | —（未扫描） | 运行时 | vendor/srt-whiteboard（scripts/：parse_srt / render_stream_whiteboard / stream_render / merge_scenes / render_annotation_preview / prepare_env）、apps/server/src/video/whiteboard（引擎桥 + 编排：provider/router/srt/narration/lineart/annotate/mux）、scripts/whiteboard/lineart_tools.py（本仓扩展：sketch / analyze / check / hand） | 字幕驱动的手绘白板渲染器：本地确定性 CPU 渲染、零 API 依赖、无授权闸门（MIT 可商用）。随仓携带上游源码 + 执笔手素材（本仓改用自有中性素材 assets/whiteboard/drawing-hand-workloom.png，不用上游带作者标识的 drawing-hand.png）。运行时 Python 依赖闭包见 vendor/srt-whiteboard/requirements.txt（opencv-python/numpy/av/Pillow，全部宽松许可），venv 由 scripts/tools/whiteboard-env-install.mts 幂等安装、不入库。升级=人工比对上游 + 重跑官方样例与全链路出片（流程见 vendor/srt-whiteboard/PINNED.md） |
 | 66 | BrowserAct 技能包 | [github.com/browser-act/skills](https://github.com/browser-act/skills) · MIT | 观察项（技能市场执行面技能，L2 审批安装） | —（未扫描） | 观察项 | skills/registry/browser-act（执行面技能·可选） | freemium 云依赖（stealth/代理/打码付费）：适配纪律 proxyMode=custom-only、凭据留在客户本机、出站 api.browseract.com 全声明；未进入默认运行时 |
 | 67 | Tencent BrowserSkill | [github.com/Tencent/BrowserSkill](https://github.com/Tencent/BrowserSkill) · MIT | 观察项（2026-08-26 评估：Borrow 协议可借鉴） | cli-v0.3.0 | 观察项 | 浏览器桥接对照组（publish-rpa 权限模型参照） | 只作对照评估，暂不入运行时；publish-rpa 真机发布的权限模型参照对象 |
 | 68 | Scrapling | [github.com/D4Vinci/Scrapling](https://github.com/D4Vinci/Scrapling) · BSD-3-Clause | 观察项（技能市场执行面技能） | v0.4.15 | 观察项 | skills/registry/scrapling-collector（纯本地零出站） | 纯本地零出站采集技能；经 skill:forge 集成，随技能市场分发 |
@@ -113,17 +113,12 @@
 | 90 | npm（桌面载荷安装器） | [github.com/npm/cli](https://github.com/npm/cli) · Artistic-2.0 | 11.17.0 | **12.0.2** ⬆ | 随包二进制 | .workloom-runtime-deps（受控 npm ci 安装桌面运行载荷） | 载荷安装器版本与 package-lock.json 绑定；升级需重跑 runtime:deps:refresh/verify |
 | 91 | python-pptx | [github.com/scanny/python-pptx](https://github.com/scanny/python-pptx) · MIT | 按需安装（未锁定版本） | 1.0.2 | 开发/构建 | scripts/build-capability-pptx.py（能力清单 PPT 生成） | 本地工具链依赖，不随产品分发；版本未锁定属已知缺口（建议后续补 requirements 引脚） |
 | 92 | Playwright（Python · computer-use 工具链） | [github.com/microsoft/playwright-python](https://github.com/microsoft/playwright-python) · Apache-2.0 | >=1.40.0 | **1.46.0** ⬆ | 开发/构建 | packages/base/computer-use/toolkit（安装脚本按 requirements 拉取） | 与 Node 侧 @playwright/test 独立版本线；浏览器二进制由 playwright install 管理，升级需同步预检脚本断言 |
-| 93 | Compositor（Mac 图像编辑器 / 视觉工位渲染内核） | [github.com/robbietilton/Compositor](https://github.com/robbietilton/Compositor) · MIT | 1.0.4 | 1.0.4 | 运行时 | Mac 视觉工位 headless 引擎（复用 ProjectStore/ImageExporter/LayerRenderer 源码）、人机协作精修：Compositor.app（macOS 26.5+） | MIT；上游 2026-09-16 创建、单作者，无 CLI/API/AppleScript，故采用源码 headless 裁剪 + 工位 pin 版本；生产工位关闭 Sparkle 自动更新；升级永不自动（先 selftest + golden 对比再灰度） |
-| 94 | FFmpeg（调色工位内核） | [github.com/FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) · LGPL-2.1-or-later（本工位静态构建 configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不可随产品分发） | b6.1.1 | b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0） | 随包二进制 | bundles/ai-video/connectors/color-bridge/kit（受控下载 + sha256 pin）、bundles/ai-video/connectors/color-bridge（core/cli/server/executor）、Mac 调色工位 ~/.workloom-color/bin（运行时二进制，不进仓库） | 成片调色内核：signalstats/lut3d/colorbalance/colortemperature/curves/eq/normalize/waveform/vectorscope/histogram。受控下载 + sha256 校验（kit/ffmpeg-pin.json，含 darwin-arm64 实测摘要）；ffmpeg-static 静态构建含 nonfree，仅工位本地使用、不可随产品分发，如需分发请换 LGPL 构建。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）以及 LUT 黄金文件校验。LUT 资产为自算（bundles/ai-video/library/luts/generate-luts.mjs），本仓不携带第三方 LUT。 |
-| 95 | FFmpeg（配乐工位内核） | [github.com/FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) · LGPL-2.1-or-later（本工位静态构建 configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不可随产品分发） | b6.1.1 | b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0） | 随包二进制 | bundles/ai-video/connectors/bgm-bridge/kit（受控下载 + sha256 pin + 必需滤镜清单）、bundles/ai-video/connectors/bgm-bridge（core/measure/synth/cli/server/executor）、Mac 配乐工位 ~/.workloom-bgm/bin（运行时二进制，不进仓库） | 成片配乐内核：loudnorm/ebur128/volumedetect/silencedetect/aspectralstats/astats/sidechaincompress/pan/amix/adelay/afade/apad/atrim/showwavespic/showspectrumpic。受控下载 + sha256 校验（与调色工位共用 ffmpeg-static b6.1.1 构建，但安装目录、pin 与滤镜清单独立）。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）。音频素材全部自算（synth.mjs 合成 WAV），本仓不携带任何第三方音源或曲库文件。 |
-| 96 | python-audio-separator（人声分离·可选引擎） | [github.com/nomadkaraoke/python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator) · MIT | v0.47.0（2026-08-27，活跃维护，推荐档位 A 引擎） | v0.47.0（2026-08-27，GitHub Releases） | external-optional | bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）、Mac 配乐工位（外部安装，不随仓分发；WORKLOOM_BGM_DEMUCS 指定可执行文件） | UVR 模型族（MDX/VR/Demucs 系）的 CLI/Python 封装，是配乐工位「档位 A」深度学习分离的首选引擎（活跃维护、MIT）。未安装时工位按档位 B（ffmpeg 中心声道近似）执行并如实标注 quality=approximate；安装与否不影响作曲/混音主链路。 |
-| 97 | Demucs（人声分离·可选引擎） | [github.com/facebookresearch/demucs](https://github.com/facebookresearch/demucs) · MIT | v4.0.1（2023-09-07，上游仓库已归档） | v4.0.1（2023-09-07；仓库已归档） | external-optional | bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）、Mac 配乐工位（外部安装，不随仓分发） | htdemucs 两轨分离（vocals / no_vocals），MIT；**上游仓库已归档（2026-09-22 核验，最后推送 2024-04，最新发布 v4.0.1 / 2023-09）**，故只作兼容引擎保留，推荐改用 python-audio-separator。工位不内置其模型权重，也不随产品分发。 |
-| 98 | MusicGen / AudioCraft（评估后不采用） | [github.com/facebookresearch/audiocraft](https://github.com/facebookresearch/audiocraft) · 代码 MIT；**模型权重 CC-BY-NC 4.0（禁止商用）** | 未引入 | v1.3.0（2024-05-02） | evaluated-not-adopted | bundles/ai-video/skills/bgm-library-license/SKILL.md（许可陷阱条款）、bundles/ai-video/library/bgm-library/README.md（曲库对比表） | 文本生成音乐（MusicGen / MAGNeT / JASCO）与音频编解码（EnCodec）。**权重为 CC-BY-NC 4.0，输出不可直接用于商用交付**，因此配乐工位的默认路径是自算作曲（synth.mjs），而非该模型；仅在客户另行取得授权或纯研究场景才可评估接入。许可结论来自官方 README 的 License 段（2026-09-22 核验）。 |
-| 99 | font-library v1.1（字幕工位字体库：思源/Noto 系列） | [github.com/adobe-fonts/source-han-sans](https://github.com/adobe-fonts/source-han-sans) · SIL OFL 1.1 | 未引入 | Source Han Sans 2.004（release 分支，实测直链逐字节一致） | 素材/资产 | bundles/ai-video/library/font-catalog（打标档案 + 许可 + 逐文件 sha256）、bundles/ai-video/connectors/subtitle-bridge/kit（fonts-pin.json 引脚 + install-fonts.sh 安装）、Mac 字幕工位 ~/.workloom-subtitle/fonts（运行时字体，不进仓库） | 字幕工位字体：思源黑体/思源宋体（Source Han Sans/Serif CN、Noto Sans/Serif SC）。仓库只保存档案（打标/许可/sha256）与引脚，不携带字体二进制；安装走 kit/install-fonts.sh（--from-dir 离线导入或 --download 已核验直链），逐文件 sha256 校验并把 LICENSES.md 一并落盘（OFL 再分发要求）。本能力不做子集化（OFL 修改后再发布需改名）。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts。 |
-| 100 | 霞鹜文楷 LXGW WenKai（字幕工位字体） | [github.com/lxgw/LxgwWenKai](https://github.com/lxgw/LxgwWenKai) · SIL OFL 1.1 | 未引入 | v1.522（GitHub Releases，实测直链逐字节一致） | 素材/资产 | bundles/ai-video/library/font-catalog/font_db.json#fonts（lxgw-wen-kai）、Mac 字幕工位 ~/.workloom-subtitle/fonts/cn（运行时字体，不进仓库） | 知识区字幕首选（楷体/印刷体，艺术气息 5、粗细 2）。受控下载 release 资产 LXGWWenKai-Regular.ttf 并核验 sha256；未核验前不得用 --download。 |
-| 101 | 得意黑 Smiley Sans（字幕工位字体） | [github.com/atelier-anchor/smiley-sans](https://github.com/atelier-anchor/smiley-sans) · SIL OFL 1.1 | 未引入 | v2.0.1（GitHub Releases，实测摘包后逐字节一致） | 素材/资产 | bundles/ai-video/library/font-catalog/font_db.json#fonts（smiley-sans-oblique）、Mac 字幕工位 ~/.workloom-subtitle/fonts/cn（运行时字体，不进仓库） | 现代倾斜标题体（对标造字工房悦黑系列）。release 资产为 zip，安装脚本按 zipMember 取 SmileySans-Oblique.ttf 后再校验 sha256。 |
-| 102 | Google Fonts 字体组（字幕工位字体：ZCOOL 系列/马善政/志莽行书/流建毛草/龙藏体 + 15 款英文字体） | [github.com/google/fonts](https://github.com/google/fonts) · SIL OFL 1.1（站酷系列为站酷免费商用授权，Google Fonts 以 OFL-1.1 发布） | 未引入 | google/fonts main（滚动分支；逐文件 sha256 已核验部分见 fonts-pin.json#upstream.verifiedAt） | 素材/资产 | bundles/ai-video/library/font-catalog/font_db.json#fonts（25 款：中文 9 + 英文 16）、Mac 字幕工位 ~/.workloom-subtitle/fonts（运行时字体，不进仓库） | ZCOOL 快乐体/庆科黄油体/小薇、马善政毛笔楷书、志莽行书、流建毛草、龙藏体 + Inter/Montserrat/Playfair Display/Oswald/Cinzel/Dancing Script/Roboto/Bebas Neue/Anton/Archivo Black/Lobster/Pacifico/Bangers/Caveat/Poppins（Regular/Bold）。上游为 google/fonts main 分支 raw 直链，逐文件 sha256 核验结果写进 fonts-pin.json；未核验条目不得用 --download（走 --from-dir）。 |
-| 103 | FFmpeg + libass（字幕工位内核） | [github.com/FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) · LGPL-2.1-or-later（libass 为 ISC；本工位使用本机 ffmpeg 构建，不随产品分发） | 未引入 | ffmpeg 6.0（工位实装自报）/ n8.0（上游）。仓内不 pin 版本：跟随工位安装，自检时如实上报版本号 | 随包二进制 | bundles/ai-video/connectors/subtitle-bridge（core/measure/cli/server/executor）、Mac 字幕工位（运行时二进制，不进仓库；WORKLOOM_SUBTITLE_FFMPEG_PATH 指定） | 字幕烧录内核：ass/subtitles（libass）+ bbox（文字墨迹实测）+ signalstats/edgedetect（画面可读性）+ crop。工位自检（kit/selftest.sh）会校验 ass 滤镜与编码器；缺 libass 直接判工位不可用，不做降级渲染。 |
+| 93 | Compositor（Mac 图像编辑器 / 视觉工位渲染内核） | [github.com/robbietilton/Compositor](https://github.com/robbietilton/Compositor) · MIT | 1.0.4 | **v1.4.1** ⬆ | 运行时 | Mac 视觉工位 headless 引擎（复用 ProjectStore/ImageExporter/LayerRenderer 源码）、人机协作精修：Compositor.app（macOS 26.5+） | MIT；上游 2026-09-16 创建、单作者，无 CLI/API/AppleScript，故采用源码 headless 裁剪 + 工位 pin 版本；生产工位关闭 Sparkle 自动更新；升级永不自动（先 selftest + golden 对比再灰度） |
+| 94 | FFmpeg（调色工位内核） | [github.com/FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) · LGPL-2.1-or-later（本工位静态构建 configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不可随产品分发） | b6.1.1 | v0.6.1 | 随包二进制 | bundles/ai-video/connectors/color-bridge/kit（受控下载 + sha256 pin）、bundles/ai-video/connectors/color-bridge（core/cli/server/executor）、Mac 调色工位 ~/.workloom-color/bin（运行时二进制，不进仓库） | 成片调色内核：signalstats/lut3d/colorbalance/colortemperature/curves/eq/normalize/waveform/vectorscope/histogram。受控下载 + sha256 校验（kit/ffmpeg-pin.json，含 darwin-arm64 实测摘要）；ffmpeg-static 静态构建含 nonfree，仅工位本地使用、不可随产品分发，如需分发请换 LGPL 构建。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）以及 LUT 黄金文件校验。LUT 资产为自算（bundles/ai-video/library/luts/generate-luts.mjs），本仓不携带第三方 LUT。 |
+| 95 | FFmpeg（配乐工位内核） | [github.com/FFmpeg/FFmpeg](https://github.com/FFmpeg/FFmpeg) · LGPL-2.1-or-later（本工位静态构建 configure 含 --enable-gpl --enable-nonfree：仅限工位本地使用，不可随产品分发） | b6.1.1 | v0.6.1 | 随包二进制 | bundles/ai-video/connectors/bgm-bridge/kit（受控下载 + sha256 pin + 必需滤镜清单）、bundles/ai-video/connectors/bgm-bridge（core/measure/synth/cli/server/executor）、Mac 配乐工位 ~/.workloom-bgm/bin（运行时二进制，不进仓库） | 成片配乐内核：loudnorm/ebur128/volumedetect/silencedetect/aspectralstats/astats/sidechaincompress/pan/amix/adelay/afade/apad/atrim/showwavespic/showspectrumpic。受控下载 + sha256 校验（与调色工位共用 ffmpeg-static b6.1.1 构建，但安装目录、pin 与滤镜清单独立）。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）。音频素材全部自算（synth.mjs 合成 WAV），本仓不携带任何第三方音源或曲库文件。 |
+| 96 | python-audio-separator（人声分离·可选引擎） | [github.com/nomadkaraoke/python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator) · MIT | v0.47.0（2026-08-27，活跃维护，推荐档位 A 引擎） | v0.47.0 | external-optional | bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）、Mac 配乐工位（外部安装，不随仓分发；WORKLOOM_BGM_DEMUCS 指定可执行文件） | UVR 模型族（MDX/VR/Demucs 系）的 CLI/Python 封装，是配乐工位「档位 A」深度学习分离的首选引擎（活跃维护、MIT）。未安装时工位按档位 B（ffmpeg 中心声道近似）执行并如实标注 quality=approximate；安装与否不影响作曲/混音主链路。 |
+| 97 | Demucs（人声分离·可选引擎） | [github.com/facebookresearch/demucs](https://github.com/facebookresearch/demucs) · MIT | v4.0.1（2023-09-07，上游仓库已归档） | v4.0.1 | external-optional | bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）、Mac 配乐工位（外部安装，不随仓分发） | htdemucs 两轨分离（vocals / no_vocals），MIT；**上游仓库已归档（2026-09-22 核验，最后推送 2024-04，最新发布 v4.0.1 / 2023-09）**，故只作兼容引擎保留，推荐改用 python-audio-separator。工位不内置其模型权重，也不随产品分发。 |
+| 98 | MusicGen / AudioCraft（评估后不采用） | [github.com/facebookresearch/audiocraft](https://github.com/facebookresearch/audiocraft) · 代码 MIT；**模型权重 CC-BY-NC 4.0（禁止商用）** | 未引入 | v1.3.0 | evaluated-not-adopted | bundles/ai-video/skills/bgm-library-license/SKILL.md（许可陷阱条款）、bundles/ai-video/library/bgm-library/README.md（曲库对比表） | 文本生成音乐（MusicGen / MAGNeT / JASCO）与音频编解码（EnCodec）。**权重为 CC-BY-NC 4.0，输出不可直接用于商用交付**，因此配乐工位的默认路径是自算作曲（synth.mjs），而非该模型；仅在客户另行取得授权或纯研究场景才可评估接入。许可结论来自官方 README 的 License 段（2026-09-22 核验）。 |
 
 ## 2. 全量直接依赖（本仓事实，含上游最新）
 
@@ -131,22 +126,22 @@
 
 | 包 | 当前版本 | 声明 | 类型 | 出现位置 | 上游最新 |
 |---|---|---|---|---|---|
-| `@agentclientprotocol/sdk` | 1.4.0（声明） | 1.4.0 | 开发 | vendor/dsh/package.json | 1.4.0 |
+| `@agentclientprotocol/sdk` | 1.4.0（声明） | 1.4.0 | 开发 | vendor/dsh/package.json | **1.5.1** ⬆ |
 | `@axe-core/playwright` | 4.13.0 | 4.13.0 | 开发 | package.json | 4.13.0 |
-| `@deepseek-ai/cordis` | 4.0.2（声明） | ^4.0.2 | 生产 | vendor/dsh/package.json | 4.0.2 |
-| `@deepseek-ai/cordis-plugin-include` | 1.0.7（声明） | ^1.0.7 | 生产 | vendor/dsh/package.json | 1.0.7 |
-| `@deepseek-ai/cordis-plugin-loader` | 1.0.3（声明） | ^1.0.3 | 生产 | vendor/dsh/package.json | 1.0.3 |
-| `@deepseek-ai/cordis-plugin-timer` | 1.1.4（声明） | ^1.1.4 | 生产 | vendor/dsh/package.json | 1.1.4 |
-| `@deepseek-ai/dsh` | 0.1.6-alpha.2 | 0.1.6-alpha.2 | 生产 | packages/runtime/dsh-gate/package.json | 0.1.5-rc.2 |
+| `@deepseek-ai/cordis` | 4.0.2（声明） | ^4.0.2 | 生产 | vendor/dsh/package.json | **4.0.4** ⬆ |
+| `@deepseek-ai/cordis-plugin-include` | 1.0.7（声明） | ^1.0.7 | 生产 | vendor/dsh/package.json | **1.0.9** ⬆ |
+| `@deepseek-ai/cordis-plugin-loader` | 1.0.3（声明） | ^1.0.3 | 生产 | vendor/dsh/package.json | **1.0.5** ⬆ |
+| `@deepseek-ai/cordis-plugin-timer` | 1.1.4（声明） | ^1.1.4 | 生产 | vendor/dsh/package.json | **1.1.6** ⬆ |
+| `@deepseek-ai/dsh` | 0.1.6-alpha.2 | 0.1.6-alpha.2 | 生产 | packages/runtime/dsh-gate/package.json | **0.1.7-rc.2** ⬆ |
 | `@deepseek-ai/dsh-acp` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-acp-app` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.2-alpha.2 |
 | `@deepseek-ai/dsh-agent` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.1.0-rc.6 |
 | `@deepseek-ai/dsh-agent-instructions` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.0-rc.6 |
-| `@deepseek-ai/dsh-agent-loop` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | —（未扫描） |
-| `@deepseek-ai/dsh-agent-loop-testkit` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-agent-loop` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.1.0-rc.6 |
+| `@deepseek-ai/dsh-agent-loop-testkit` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-agent-tool-presentation` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.0-rc.6 |
 | `@deepseek-ai/dsh-app-boot` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.0-rc.6 |
-| `@deepseek-ai/dsh-atomic-write` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-atomic-write` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-attachment-local` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-base` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-bash-local` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
@@ -162,8 +157,8 @@
 | `@deepseek-ai/dsh-deepseek-llm-api-extensions` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.1.2-alpha.2 |
 | `@deepseek-ai/dsh-experimental-agent-team` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.1.5-alpha.2 |
 | `@deepseek-ai/dsh-experimental-agent-team-profile` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.5-alpha.2 |
-| `@deepseek-ai/dsh-experimental-agent-team-web-profile` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
-| `@deepseek-ai/dsh-experimental-ptc-runtime-python` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-experimental-agent-team-web-profile` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.5-alpha.2 |
+| `@deepseek-ai/dsh-experimental-ptc-runtime-python` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.1.6-alpha.1 |
 | `@deepseek-ai/dsh-experimental-tool-agent-team` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.1.5-alpha.2 |
 | `@deepseek-ai/dsh-fs-local` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-fs-observation-policy` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.3 |
@@ -171,13 +166,13 @@
 | `@deepseek-ai/dsh-goal` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-goal-round-driver` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.3 |
 | `@deepseek-ai/dsh-headless` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
-| `@deepseek-ai/dsh-hmr` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-hmr` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.6-alpha.2 |
 | `@deepseek-ai/dsh-home-paths` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.3 |
 | `@deepseek-ai/dsh-hooks-claude-code` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.5 |
 | `@deepseek-ai/dsh-hooks-codex` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-host-frontend-static` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.3 |
 | `@deepseek-ai/dsh-host-webserver` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
-| `@deepseek-ai/dsh-http-proxy` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-http-proxy` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.3-alpha.2 |
 | `@deepseek-ai/dsh-jobs-local` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.3 |
 | `@deepseek-ai/dsh-launch-environment` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.3 |
 | `@deepseek-ai/dsh-llm` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
@@ -187,10 +182,10 @@
 | `@deepseek-ai/dsh-llm-replay` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-loader-smoke` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-mcp-client` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
-| `@deepseek-ai/dsh-mcp-resources` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-mcp-resources` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.6-alpha.1 |
 | `@deepseek-ai/dsh-persona` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-plan-mode` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
-| `@deepseek-ai/dsh-plugin-manager` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-plugin-manager` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.6-alpha.2 |
 | `@deepseek-ai/dsh-plugin-package-inventory-deepseek` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 开发 | vendor/dsh/package.json | 0.1.2-alpha.2 |
 | `@deepseek-ai/dsh-pwsh-local` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-pwsh-sandbox` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
@@ -229,7 +224,7 @@
 | `@deepseek-ai/dsh-tool-fs-search` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-tool-goal` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-tool-jobs` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.3 |
-| `@deepseek-ai/dsh-tool-present` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
+| `@deepseek-ai/dsh-tool-present` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.5-alpha.2 |
 | `@deepseek-ai/dsh-tool-pwsh` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-tool-pwsh-persistent` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.0-rc.8 |
 | `@deepseek-ai/dsh-tool-ralph` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
@@ -245,36 +240,36 @@
 | `@deepseek-ai/dsh-web-app` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.0.1-rc.1 |
 | `@deepseek-ai/dsh-webhook` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.2-alpha.2 |
 | `@deepseek-ai/dsh-webhook-github` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.2-alpha.2 |
-| `@deepseek-ai/dsh-workflow-ptc` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | —（未扫描） |
-| `@deepseek-ai/schemastery` | 3.18.2（声明） | ^3.18.2 | 生产 | vendor/dsh/package.json | 3.18.2 |
-| `@hono/node-server` | 2.1.1（声明） | 2.1.1 | 生产 | .workloom-runtime-deps/package.json、apps/server/package.json | 2.1.1 |
+| `@deepseek-ai/dsh-workflow-ptc` | 0.1.6-alpha.2（声明） | ^0.1.6-alpha.2 | 生产 | vendor/dsh/package.json | 0.1.6-alpha.1 |
+| `@deepseek-ai/schemastery` | 3.18.2（声明） | ^3.18.2 | 生产 | vendor/dsh/package.json | **3.18.4** ⬆ |
+| `@hono/node-server` | 2.1.1（声明） | 2.1.1 | 生产 | .workloom-runtime-deps/package.json、apps/server/package.json | **2.1.3** ⬆ |
 | `@playwright/test` | 1.63.0（声明） | 1.63.0 | 开发 | apps/web/package.json | 1.63.0 |
-| `@react-three/drei` | 10.7.8（声明） | ^10.7.8 | 生产 | apps/web/package.json | 10.7.8 |
-| `@react-three/fiber` | 9.7.0（声明） | ^9.7.0 | 生产 | apps/web/package.json | 9.7.0 |
-| `@react-three/postprocessing` | 3.1.1（声明） | ^3.1.1 | 生产 | apps/web/package.json | 3.1.1 |
+| `@react-three/drei` | 10.7.8（声明） | ^10.7.8 | 生产 | apps/web/package.json | **10.7.9** ⬆ |
+| `@react-three/fiber` | 9.7.0（声明） | ^9.7.0 | 生产 | apps/web/package.json | **9.8.1** ⬆ |
+| `@react-three/postprocessing` | 3.1.1（声明） | ^3.1.1 | 生产 | apps/web/package.json | **3.1.3** ⬆ |
 | `@tailwindcss/vite` | 4.3.3（声明） | 4.3.3 | 开发/生产 | .workloom-runtime-deps/package.json、apps/web/package.json、apps/webc/package.json | 4.3.3 |
-| `@tanstack/react-query` | 5.102.5（声明） | 5.102.5 | 生产 | apps/web/package.json | **5.103.1** ⬆ |
+| `@tanstack/react-query` | 5.102.5（声明） | 5.102.5 | 生产 | apps/web/package.json | **5.104.0** ⬆ |
 | `@trpc/client` | 11.18.0（声明） | 11.18.0 | 生产 | apps/web/package.json、apps/webb/package.json | **11.19.0** ⬆ |
 | `@trpc/server` | 11.19.0（声明） | 11.19.0 | 生产 | .workloom-runtime-deps/package.json、apps/server/package.json | 11.19.0 |
 | `@types/js-yaml` | 4.0.9（声明） | ^4.0.9 | 开发 | vendor/dsh/package.json | 4.0.9 |
-| `@types/node` | 24.0.0 / 24.13.3 | ^24.0.0 | 开发 | apps/server/package.json、package.json、packages/video-studio/package.json | **26.6.1** ⬆ |
+| `@types/node` | 24.0.0 / 24.13.3 | ^24.0.0 | 开发 | apps/server/package.json、package.json、packages/video-studio/package.json | **26.6.3** ⬆ |
 | `@types/pg` | 8.23.1（声明） | ^8.23.1 | 开发 | apps/server/package.json、packages/base/package.json、packages/db/package.json 等 4 处 | 8.23.1 |
 | `@types/react` | 19.2.0（声明） | ^19.2.0 | 开发 | apps/web/package.json、apps/webb/package.json、apps/webc/package.json | **19.3.0** ⬆ |
 | `@types/react-dom` | 19.2.0（声明） | ^19.2.0 | 开发 | apps/web/package.json、apps/webb/package.json、apps/webc/package.json | **19.3.0** ⬆ |
 | `@types/three` | 0.185.4（声明） | ^0.185.4 | 开发 | apps/web/package.json | **0.186.0** ⬆ |
-| `@types/ws` | 8.18.1（声明） | 8.18.1 | 开发 | vendor/dsh/package.json | 8.18.1 |
+| `@types/ws` | 8.18.1（声明） | 8.18.1 | 开发 | vendor/dsh/package.json | **8.18.2** ⬆ |
 | `@vitejs/plugin-react` | 6.1.0（声明） | 6.1.0 | 开发/生产 | .workloom-runtime-deps/package.json、apps/web/package.json、apps/webb/package.json 等 4 处 | **6.1.1** ⬆ |
 | `@workloom/ui` | 0.1.1（声明） | 0.1.1 | 生产 | apps/web/package.json、apps/webb/package.json、apps/webc/package.json | —（未扫描） |
 | `commander` | 15.0.0（声明） | ^15.0.0 | 生产 | vendor/dsh/package.json | 15.0.0 |
 | `concurrently` | 9.2.4 | ^9.1.0 | 开发 | package.json | **10.0.5** ⬆ |
-| `drizzle-orm` | 0.45.2（声明） | 0.45.2 / ^0.45.2 | 生产 | .workloom-runtime-deps/package.json、packages/db/package.json | 0.45.2 |
-| `electron` | 44.1.1 | ^44.1.1 | 开发 | package.json | **44.4.2** ⬆ |
+| `drizzle-orm` | 0.45.2（声明） | 0.45.2 / ^0.45.2 | 生产 | .workloom-runtime-deps/package.json、packages/db/package.json | **0.45.3** ⬆ |
+| `electron` | 44.1.1 | ^44.1.1 | 开发 | package.json | **44.4.5** ⬆ |
 | `electron-builder` | 26.15.3 | ^26.15.3 | 开发 | package.json | 26.15.3 |
 | `execa` | 10.0.0（声明） | ^10.0.0 | 开发 | vendor/dsh/package.json | **10.0.1** ⬆ |
-| `hono` | 4.13.8（声明） | 4.13.8 | 生产 | .workloom-runtime-deps/package.json、apps/server/package.json | 4.13.8 |
+| `hono` | 4.13.8（声明） | 4.13.8 | 生产 | .workloom-runtime-deps/package.json、apps/server/package.json | **4.13.11** ⬆ |
 | `jose` | 6.2.12（声明） | 6.2.12 | 生产 | .workloom-runtime-deps/package.json、apps/server/package.json、packages/base/package.json | 6.2.12 |
 | `js-yaml` | 4.2.0（声明） | ^4.2.0 | 生产 | vendor/dsh/package.json | **5.4.2** ⬆ |
-| `jsdom` | 30.1.0（声明） | ^30.1.0 | 开发 | apps/web/package.json、apps/webc/package.json | 30.1.0 |
+| `jsdom` | 30.1.0（声明） | ^30.1.0 | 开发 | apps/web/package.json、apps/webc/package.json | **30.1.1** ⬆ |
 | `node-addon-require-builtin` | 0.1.6（声明） | ^0.1.6 | 生产 | vendor/dsh/package.json | 0.1.6 |
 | `pg` | 8.23.0 | 8.23.0 | 生产 | .workloom-runtime-deps/package.json、package.json、packages/base/package.json 等 5 处 | 8.23.0 |
 | `pixi-live2d-display` | 0.4.0（声明） | ^0.4.0 | 生产 | apps/web/package.json | 0.4.0 |
@@ -283,14 +278,14 @@
 | `react-dom` | 19.2.8（声明） | 19.2.8 | 生产 | apps/web/package.json、apps/webb/package.json、apps/webc/package.json | **19.3.0** ⬆ |
 | `react-router` | 8.3.0（声明） | 8.3.0 | 生产 | apps/web/package.json | **8.4.0** ⬆ |
 | `tailwindcss` | 4.3.3（声明） | 4.3.3 | 开发 | apps/web/package.json、apps/webc/package.json | 4.3.3 |
-| `three` | 0.185.1（声明） | ^0.185.1 | 生产 | apps/web/package.json | **0.186.0** ⬆ |
+| `three` | 0.185.1（声明） | ^0.185.1 | 生产 | apps/web/package.json | **0.186.1** ⬆ |
 | `three-stdlib` | 2.36.1（声明） | ^2.36.1 | 生产 | apps/web/package.json | 2.36.1 |
-| `tsx` | 4.23.12 / 4.23.13 | 4.23.12 / ^4.23.12 / ^4.23.13 | 开发/生产 | .workloom-runtime-deps/package.json、apps/server/package.json、package.json 等 4 处 | 4.23.13 |
+| `tsx` | 4.23.12 / 4.23.13 | 4.23.12 / ^4.23.12 / ^4.23.13 | 开发/生产 | .workloom-runtime-deps/package.json、apps/server/package.json、package.json 等 4 处 | **4.23.15** ⬆ |
 | `typescript` | 5.9.0 / 7.0.2 | ^5.9.0 / ^7.0.2 | 开发 | apps/server/package.json、apps/web/package.json、apps/webb/package.json 等 12 处 | 7.0.2 |
 | `typescript-governance → npm:typescript` | 5.9.3 | npm:typescript@5.9.3 | 开发 | package.json | **7.0.2** ⬆ |
-| `vite` | 8.2.2（声明） | 8.2.2 | 开发/生产 | .workloom-runtime-deps/package.json、apps/web/package.json、apps/webb/package.json 等 4 处 | **8.3.0** ⬆ |
-| `vitest` | 3.2.0 / 4.1.11 | 4.1.11 / ^3.2.0 / ^4.1.11 | 开发 | apps/webb/package.json、package.json、packages/audit-engine/package.json 等 8 处 | **5.0.1** ⬆ |
-| `ws` | 8.21.0（声明） | 8.21.0 | 开发 | vendor/dsh/package.json | **8.21.3** ⬆ |
+| `vite` | 8.2.2（声明） | 8.2.2 | 开发/生产 | .workloom-runtime-deps/package.json、apps/web/package.json、apps/webb/package.json 等 4 处 | **8.3.1** ⬆ |
+| `vitest` | 3.2.0 / 4.1.11 | 4.1.11 / ^3.2.0 / ^4.1.11 | 开发 | apps/webb/package.json、package.json、packages/audit-engine/package.json 等 8 处 | **5.0.2** ⬆ |
+| `ws` | 8.21.0（声明） | 8.21.0 | 开发 | vendor/dsh/package.json | **8.22.0** ⬆ |
 | `yaml` | 2.9.0 | 2.9.0 | 开发/生产 | .workloom-runtime-deps/package.json、apps/server/package.json、package.json 等 4 处 | **2.9.1** ⬆ |
 | `yaml-governance → npm:yaml` | 2.9.0 | npm:yaml@2.9.0 | 开发 | package.json | **2.9.1** ⬆ |
 | `zod` | 4.6.5（声明） | 4.6.5 / ^4.6.5 | 生产 | .workloom-runtime-deps/package.json、apps/server/package.json、packages/base/package.json 等 7 处 | 4.6.5 |
@@ -299,11 +294,11 @@
 
 | 包 | 当前版本 | 声明 | 出现位置 | 上游最新 |
 |---|---|---|---|---|
-| `av` | 18.1.0 | ==18.1.0 | vendor/srt-whiteboard/requirements.txt | —（未扫描） |
-| `numpy` | 2.5.3 | ==2.5.3 | vendor/srt-whiteboard/requirements.txt | —（未扫描） |
-| `opencv-python` | 5.0.0.93 | ==5.0.0.93 | vendor/srt-whiteboard/requirements.txt | —（未扫描） |
-| `Pillow` | 12.3.0 | ==12.3.0 | vendor/srt-whiteboard/requirements.txt | —（未扫描） |
-| `playwright` | >=1.40.0（下限声明） | >=1.40.0 | packages/base/computer-use/toolkit/requirements.txt | 1.46.0 |
+| `av` | 18.1.0 | ==18.1.0 | vendor/srt-whiteboard/requirements.txt | 12.3.0 |
+| `numpy` | 2.5.3 | ==2.5.3 | vendor/srt-whiteboard/requirements.txt | 2.0.1 |
+| `opencv-python` | 5.0.0.93 | ==5.0.0.93 | vendor/srt-whiteboard/requirements.txt | 4.10.0.84 |
+| `Pillow` | 12.3.0 | ==12.3.0 | vendor/srt-whiteboard/requirements.txt | 12.3.0 |
+| `playwright` | >=1.40.0（下限声明） | >=1.40.0 | packages/base/computer-use/toolkit/requirements.txt | 1.45.1 |
 
 ### 2.3 容器镜像（2 个）
 
@@ -323,7 +318,9 @@
 
 ## 3. 有可用更新
 
-登记组件滞后 23 个，直接依赖滞后 22 个 —— 逐项执行单见 `docs/oss-update-plan.md`。
+登记组件滞后 26 个，直接依赖滞后 38 个 —— 逐项执行单见 `docs/oss-update-plan.md`。
+- `DeepSeek Harness（dsh）` 0.1.6-alpha.2 → **0.1.7-rc.2**（门禁 runtime-gate）
+- `Cordis（插件元框架）` 4.0.2 → **4.0.4**（门禁 runtime-gate）
 - `dsh-im 多平台 IM 接入插件` 0.2.2 → **4.21.2**（门禁 standard）
 - `yaml` 2.9.0 → **2.9.1**（门禁 standard）
 - `js-yaml` 4.2.0 → **5.4.2**（门禁 standard）
@@ -334,7 +331,7 @@
 - `react-dom` 19.2.8 → **19.3.0**（门禁 full）
 - `React Router` 8.3.0 → **8.4.0**（门禁 full）
 - `TanStack Query` 5.102.5 → **5.103.1**（门禁 full）
-- `Vite` 8.2.2 → **8.3.0**（门禁 standard）
+- `Vite` 8.2.2 → **8.3.1**（门禁 standard）
 - `@vitejs/plugin-react` 6.1.0 → **6.1.1**（门禁 standard）
 - `three.js` 0.185.1 → **0.186.0**（门禁 full）
 - `pixi.js` 6.5.10 → **8.21.0**（门禁 full）
@@ -347,4 +344,5 @@
 - `pnpm` 10.14.0 → **12.4.2**（门禁 standard）
 - `npm（桌面载荷安装器）` 11.17.0 → **12.0.2**（门禁 standard）
 - `Playwright（Python · computer-use 工具链）` >=1.40.0 → **1.46.0**（门禁 standard）
+- `Compositor（Mac 图像编辑器 / 视觉工位渲染内核）` 1.0.4 → **v1.4.1**（门禁 runtime-gate）
 

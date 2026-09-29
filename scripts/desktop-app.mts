@@ -298,31 +298,14 @@ async function main() {
      * 构建只认生产口径；服务端进程仍用上面继承的环境（candidate bundle 等开发授权不受影响）。
      */
     const build = spawnSync("pnpm", ["-C", "apps/web", "build"], {
-      cwd: ROOT,
-      stdio: "inherit",
-      // 2026-09-21 真机修复：启动器必须真正注入本机全量口径（此前只在注释里声明）。
-      // 缺这个构建期常量时客户端以游客（readonly）身份进场，一切写操作 403。
-      env: {
-        ...process.env,
-        NODE_ENV: "production",
-        VITE_WORKLOOM_LOCAL_FULL: process.env.VITE_WORKLOOM_LOCAL_FULL ?? "1",
-      },
-      shell: process.platform === "win32",
+      cwd: ROOT, stdio: "inherit", env: { ...process.env, NODE_ENV: "production" }, shell: process.platform === "win32",
     });
     if (build.status !== 0) { warn("web 构建失败"); stopAll(1); return; }
     say(`启动 web 预览（:${WEB_PORT}）…`);
-    run("pnpm", ["-C", "apps/web", "preview"], "web", {
-      WEB_PORT: String(WEB_PORT),
-      SERVER_PORT: String(SERVER_PORT),
-      VITE_WORKLOOM_LOCAL_FULL: process.env.VITE_WORKLOOM_LOCAL_FULL ?? "1",
-    });
+    run("pnpm", ["-C", "apps/web", "preview"], "web", { WEB_PORT: String(WEB_PORT), SERVER_PORT: String(SERVER_PORT) });
   } else {
     say(`启动 web dev server（:${WEB_PORT}，HMR）…`);
-    run("pnpm", ["-C", "apps/web", "dev"], "web", {
-      WEB_PORT: String(WEB_PORT),
-      SERVER_PORT: String(SERVER_PORT),
-      VITE_WORKLOOM_LOCAL_FULL: process.env.VITE_WORKLOOM_LOCAL_FULL ?? "1",
-    });
+    run("pnpm", ["-C", "apps/web", "dev"], "web", { WEB_PORT: String(WEB_PORT), SERVER_PORT: String(SERVER_PORT) });
   }
   if (!(await waitHealth(`http://localhost:${WEB_PORT}/`, 30))) {
     warn(`web ${WEB_PORT} 未就绪`); stopAll(1); return;

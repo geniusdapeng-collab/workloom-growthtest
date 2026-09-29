@@ -13,7 +13,7 @@
  *      （不在白名单 = 平台/CLI 两侧都不会按 step_key 记账）。
  *
  * 用法：
- *   pnpm exec tsx scripts/tools/audit-fence-coverage.mts [--bundle ai-video|geo-growth|hotel|all]
+ *   pnpm exec tsx scripts/tools/audit-fence-coverage.mts [--bundle ai-video|geo-growthtest|hotel|all]
  *     [--json] [--strict] [--out <path.md>]
  * 退出码：默认 0；`--strict` 且存在 A 类未覆盖动作时退出 1（B/C 类不阻断，仅登记）。
  */
@@ -24,7 +24,7 @@ import YAML from "yaml";
 import { actionMatches } from "../../packages/base/fence-engine/judge.js";
 
 const ROOT = resolve(import.meta.dirname, "..", "..");
-const BUNDLES = ["ai-video", "geo-growth", "hotel"] as const;
+const BUNDLES = ["ai-video", "geo-growthtest", "hotel"] as const;
 const arg = (name: string, fallback = ""): string => {
   const i = process.argv.indexOf(name);
   return i >= 0 ? (process.argv[i + 1] ?? fallback) : fallback;

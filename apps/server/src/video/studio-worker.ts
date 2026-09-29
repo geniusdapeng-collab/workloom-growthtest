@@ -25,6 +25,7 @@ import {
   WorkloomLLMEngine,
   ArchiveStore,
   StageRunner,
+  auditScenePolicy,
   attachStructuredLog,
   classifyError,
   installVendorEngineBridge,
@@ -41,6 +42,8 @@ import {
   type ProducerStage,
   type ProducerVerdict,
   type RunInput,
+  type ScenePolicyException,
+  type ScenePolicyShot,
   type StudioConfig,
   type StudioPortraitConfig,
 } from "@hyperreality/video-studio";
@@ -51,6 +54,7 @@ import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta } from "./archive-host.js";
 import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
+import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-policy-routing.js";
 import {
   AUTO_GATES,
   GATE_PRODUCER_STAGE,
@@ -440,7 +444,28 @@ function portraitConfig(metadata?: Record<string, unknown>): StudioPortraitConfi
  * 异步启动一条预生产流水线（不阻塞 tRPC 响应；失败只反映在注册表投影）
  * @throws StudioWorkerError LLM_MISSING —— LLM_* 四环境变量未配齐（禁止静默降级）
  */
-export function startRun(scope: Scope, input: RunInput): string {
+type StudioRunInput = RunInput & {
+  /** 原始客户需求；pipelineIntent 可能清理过路由语句并追加了系统口径。 */
+  rawIntent?: string;
+  /** 同一入口已经做过选型时复用其受控结果，避免二次选型改写取证依据。 */
+  selectedScenePolicy?: ReturnType<typeof resolveScenePolicyForIntent>;
+};
+
+export function startRun(scope: Scope, input: StudioRunInput): string {
+  // 补跑/恢复同样经过选型；歧义或知识库损坏在任何供应商调用之前同步失败。
+  const selectedScenePolicy = input.selectedScenePolicy
+    ?? resolveScenePolicyForIntent(input.rawIntent ?? input.intent, input.metadata);
+  const resolvedMetadata: Record<string, unknown> = {
+    ...(input.metadata ?? {}),
+    scenePolicySelection: selectedScenePolicy.decision,
+    ...(selectedScenePolicy.policy ? { scenePolicy: selectedScenePolicy.metadata.scenePolicy } : {}),
+  };
+  const runInput: RunInput = {
+    projectId: input.projectId,
+    intent: appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy),
+    metadata: resolvedMetadata,
+    isMarketing: input.isMarketing,
+  };
   if ((process.env.ARCHIVE_ENABLED ?? "1") === "0") {
     throw new StudioWorkerError("ARCHIVE_REQUIRED", "生产预生产必须启用档案与运行租约，拒绝 ARCHIVE_ENABLED=0");
   }
@@ -515,7 +540,8 @@ export function startRun(scope: Scope, input: RunInput): string {
    */
   const pipelineKind: PipelineKind = input.isMarketing ? "marketing" : "narrative";
   const archive = new ArchiveStore(path.resolve(WORK_DIR), scope.workspaceId, input.projectId, pipelineKind, {
-    aspectRatio: (input.metadata as Record<string, unknown> | undefined)?.aspectRatio ?? null,
+    aspectRatio: runInput.metadata?.aspectRatio ?? null,
+    scenePolicy: selectedScenePolicy.decision,
   });
   /** 结构化日志镜像的"当前环节"（StageRunner 在环节边界更新；与文本 tee 并行） */
   const stageRef: { name: string | null; attempt: number } = { name: null, attempt: 0 };
@@ -750,10 +776,11 @@ export function startRun(scope: Scope, input: RunInput): string {
     onApproval,
     onEvent,
     totalDeadlineMs: TOTAL_DEADLINE_MS,
-    deferRender: (process.env.HR_DEFER_RENDER ?? "1") !== "0",
-    portraits: portraitConfig(input.metadata),
+    // 片型硬闸必须在 G8 之前审完整分镜，禁止 env 让 vendor 在审计前直接渲染。
+    deferRender: selectedScenePolicy.policy ? true : (process.env.HR_DEFER_RENDER ?? "1") !== "0",
+    portraits: portraitConfig(runInput.metadata),
     /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
-    dataMining: input.isMarketing ? undefined : dataMiningConfigFor(input.metadata, llm, scope.workspaceId),
+    dataMining: input.isMarketing ? undefined : dataMiningConfigFor(runInput.metadata, llm, scope.workspaceId),
     log: (line) => console.log(line),
   };
 
@@ -775,6 +802,21 @@ export function startRun(scope: Scope, input: RunInput): string {
       if (!projectMeta) throw new Error(`PROJECT_NOT_FOUND: 项目 ${input.projectId} 不存在或不属于当前工作区`);
       if (projectMeta.kind !== pipelineKind) throw new Error("PIPELINE_KIND_MISMATCH：预生产管线与服务项目类型不一致");
       await archive.ensure({ kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt });
+      // 既有项目补跑可能改用新的明确片型；manifest 保存当前决策，旧值留在追加事件中。
+      const manifest = await archive.readManifest();
+      if (!manifest) throw new Error(`项目 ${input.projectId} 制片档案 manifest 缺失`);
+      if (JSON.stringify(manifest.routeMeta?.scenePolicy ?? null) !== JSON.stringify(selectedScenePolicy.decision)) {
+        const previous = manifest.routeMeta?.scenePolicy ?? null;
+        await archive.writeJsonAtomic("manifest.json", {
+          ...manifest,
+          routeMeta: { ...(manifest.routeMeta ?? {}), scenePolicy: selectedScenePolicy.decision },
+          updatedAt: new Date().toISOString(),
+        });
+        await archive.appendJsonl("events.jsonl", {
+          kind: "scene-policy.route-changed", runId: entry.runId,
+          previous, current: selectedScenePolicy.decision,
+        });
+      }
       detachStructuredLog = attachStructuredLog(archive, {
         currentStage: () => stageRef.name,
         currentAttempt: () => stageRef.attempt,
@@ -782,6 +824,21 @@ export function startRun(scope: Scope, input: RunInput): string {
       await archive.appendJsonl("events.jsonl", {
         kind: "run.started", runId: entry.runId, pipelineKind,
         threadId: projectMeta.threadId, intent: input.intent.slice(0, 200),
+        scenePolicy: selectedScenePolicy.decision,
+      });
+      await gatewayAppend(getGatewayPool(), { ...scope, actor: { ...WORKER_ACTOR } }, {
+        who: { ...WORKER_ACTOR },
+        context: {
+          tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
+          time: new Date().toISOString(), channel: "inapp",
+        },
+        object: { type: "video_project", id: input.projectId },
+        decision: {
+          action: "video.scene_policy.selected",
+          after: { runId: entry.runId, ...selectedScenePolicy.decision },
+          basis: ["原始需求与已安装片型知识条目在生成前确定性匹配；未命中仍留空选择证据"],
+        },
+        rule_impact: [],
       });
       /**
        * AI 监制打回 → **有上限的自动重跑**（T-2026-0925-0002）。
@@ -801,7 +858,7 @@ export function startRun(scope: Scope, input: RunInput): string {
         let rawResult: Awaited<ReturnType<VideoStudio["runPreproduction"]>> | undefined;
         await runner.run(
           "preproduction",
-          { intent: input.intent, isMarketing: input.isMarketing ?? false, pipelineKind },
+          { intent: runInput.intent, isMarketing: input.isMarketing ?? false, pipelineKind, scenePolicy: selectedScenePolicy.decision },
           async (ctx) => {
             gateProofs.clear();
             completedVendorResult = null;
@@ -839,7 +896,11 @@ export function startRun(scope: Scope, input: RunInput): string {
               mode: "api", storeRoot: marketing.storeRoot, refresh: true,
               verifiedRaw: { projectId: input.projectId, rawJson: canonicalRenderJson(marketing.raw), sha256: marketing.bundle.rawSha256, productQuery: marketing.bundle.productQuery },
             } } : {}) });
-            const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Approved ? await studio.runPreproduction(input) : {
+            /**
+             * 传入 runInput（而不是 input）：它带上了本轮的片型选型结论与注入指引，
+             * vendor 的提示词/分镜必须按本次选中的知识条目生成；G1 营销事实仍取自原始 input。
+             */
+            const r: Awaited<ReturnType<VideoStudio["runPreproduction"]>> = g1Approved ? await studio.runPreproduction(runInput) : {
               success: false, stages: {}, confirmations: { hostG1: { approved: false, reason: "producer-rejected(G1_DOSSIER)：本次来源与事实未通过真实监制" } },
             };
             completedVendorResult = r;
@@ -927,6 +988,7 @@ export function startRun(scope: Scope, input: RunInput): string {
                   stageId: "preproduction",
                   attempt: ctx.attempt,
                   pipelineKind,
+                  scenePolicy: selectedScenePolicy.decision,
                   generatedAt: new Date().toISOString(),
                   shotCount: shots.length,
                   totalPromptChars: shots.reduce((sum, shot) => sum + String(shot.prompt ?? "").length, 0),
@@ -950,6 +1012,22 @@ export function startRun(scope: Scope, input: RunInput): string {
                   })),
                 }
               : null;
+            // 可供 full-chain-film 接续的分镜草稿：只传政策身份与 vendor 原始镜头，
+            // policyTags/必备画面仍须按知识条目补齐并通过全片硬闸，不能把草稿当成已放行分镜。
+            const shotlistArtifact = selectedScenePolicy.policy && shots.length
+              ? await ctx.writeArtifact(`stages/preproduction/attempt-${ctx.attempt}.shotlist.json`, {
+                  title: projectMeta?.title ?? input.rawIntent ?? input.intent,
+                  scenePolicy: {
+                    id: selectedScenePolicy.policy.id,
+                    version: selectedScenePolicy.policy.version,
+                    sourceSha256: selectedScenePolicy.policy.sourceSha256 ?? null,
+                    exceptions: (selectedScenePolicy.metadata.scenePolicy as { exceptions?: ScenePolicyException[] } | undefined)?.exceptions ?? [],
+                  },
+                  scenePolicySelection: selectedScenePolicy.decision,
+                  draft: true,
+                  shots: shots.map((shot) => ({ ...shot, shotId: shot.shotId ?? shot.shot_id ?? null })),
+                })
+              : null;
             const promptsArtifact = promptPack
               ? await ctx.writeArtifact(`stages/preproduction/attempt-${ctx.attempt}.prompts.json`, promptPack, {
                   // 超 4MB 时先丢 fields 明细（保留 prompt 全文与字段名），绝不丢整包
@@ -960,6 +1038,59 @@ export function startRun(scope: Scope, input: RunInput): string {
                   }),
                 })
               : null;
+            const scenePolicyReport = selectedScenePolicy.policy
+              ? auditScenePolicy({
+                  title: input.rawIntent ?? input.intent,
+                  scenePolicy: {
+                    id: selectedScenePolicy.policy.id,
+                    exceptions: ((selectedScenePolicy.metadata.scenePolicy as { exceptions?: ScenePolicyException[] } | undefined)?.exceptions ?? []),
+                  },
+                  shots: shots.map((shot): ScenePolicyShot => ({
+                    ...shot,
+                    shotId: typeof (shot.shotId ?? shot.shot_id) === "string" ? String(shot.shotId ?? shot.shot_id) : "",
+                    duration: Number(shot.duration ?? 0),
+                  })),
+                }, selectedScenePolicy.policy)
+              : null;
+            if (scenePolicyReport) scenePolicyReport.policy.selection = selectedScenePolicy.decision.reason;
+            const scenePolicyReportRef = `stages/preproduction/attempt-${ctx.attempt}.scene-policy-report.json`;
+            const scenePolicyReportArtifact = scenePolicyReport
+              ? await ctx.writeArtifact(scenePolicyReportRef, scenePolicyReport)
+              : null;
+            if (scenePolicyReport && (!scenePolicyReportArtifact || scenePolicyReportArtifact.truncated)) {
+              throw new Error("片型硬闸：分镜审计报告未完整归档，拒绝继续渲染接续");
+            }
+            if (scenePolicyReport) {
+              await gatewayAppend(getGatewayPool(), { ...scope, actor: { ...WORKER_ACTOR } }, {
+                who: { ...WORKER_ACTOR },
+                context: {
+                  tenant_id: scope.tenantId, workspace_id: scope.workspaceId,
+                  time: new Date().toISOString(), channel: "inapp",
+                },
+                object: { type: "video_project", id: input.projectId },
+                decision: {
+                  action: "video.scene_policy.audited",
+                  after: {
+                    runId: entry.runId, attempt: ctx.attempt,
+                    policyId: selectedScenePolicy.policy!.id,
+                    passed: scenePolicyReport.passed,
+                    defects: scenePolicyReport.defects.slice(0, 30),
+                    reportRef: scenePolicyReportRef,
+                    reportSha256: scenePolicyReportArtifact!.sha256,
+                  },
+                  basis: ["完整镜头表按时长配比和逐镜证据执行片型硬闸；报告先落档案再裁决"],
+                },
+                rule_impact: [],
+              });
+              if (!scenePolicyReport.passed && r.success) {
+                const first = scenePolicyReport.defects.slice(0, 5)
+                  .map((item) => `${item.shotId ?? "全片"}[${item.rule}] ${item.detail}`).join("；");
+                throw new Error(`片型硬闸打回（${scenePolicyReport.defects.length} 项）：${first}；详见 ${scenePolicyReportRef}`);
+              }
+            }
+            if (selectedScenePolicy.policy && (!shotlistArtifact || shotlistArtifact.truncated || !promptsArtifact)) {
+              throw new Error("片型硬闸打回：完整分镜草稿或提示词包未归档，拒绝继续渲染接续");
+            }
             if (promptsArtifact) {
               decisionLog.push(
                 `提示词包已归档：${promptPack!.shotCount} 镜 / ${promptPack!.totalPromptChars} 字符`
@@ -983,6 +1114,19 @@ export function startRun(scope: Scope, input: RunInput): string {
                       promptsRef: `stages/preproduction/attempt-${ctx.attempt}.prompts.json`,
                       promptsSha256: promptsArtifact.sha256,
                       promptShotCount: promptPack!.shotCount,
+                    }
+                  : {}),
+                ...(shotlistArtifact
+                  ? {
+                      shotlistRef: `stages/preproduction/attempt-${ctx.attempt}.shotlist.json`,
+                      shotlistSha256: shotlistArtifact.sha256,
+                    }
+                  : {}),
+                ...(scenePolicyReportArtifact
+                  ? {
+                      scenePolicyReportRef,
+                      scenePolicyReportSha256: scenePolicyReportArtifact.sha256,
+                      scenePolicyPassed: scenePolicyReport!.passed,
                     }
                   : {}),
                 ...(preCheckpoints.files > 0
@@ -1188,6 +1332,9 @@ export function startRun(scope: Scope, input: RunInput): string {
  */
 export interface StartVideoProjectInput {
   intent: string;
+  rawIntent?: string;
+  /** 分流器写入商品信息之前的客户 metadata，供片型选择只取客户来源证据。 */
+  customerMetadata?: Record<string, unknown> | null;
   metadata?: Record<string, unknown>;
   isMarketing?: boolean;
   by: { id: string; type: "human" | "system" };
@@ -1198,6 +1345,8 @@ export async function startVideoProjectRun(
   scope: { tenantId: string; workspaceId: string },
   input: StartVideoProjectInput,
 ): Promise<{ projectId: string; runId: string }> {
+  const selectionMetadata = Object.hasOwn(input, "customerMetadata") ? input.customerMetadata ?? undefined : input.metadata;
+  const selectedScenePolicy = resolveScenePolicyForIntent(input.rawIntent ?? input.intent, selectionMetadata);
   const client = await getAppPool().connect();
   let projectId = "";
   try {
@@ -1227,6 +1376,7 @@ export async function startVideoProjectRun(
         action: "video.project.create",
         after: {
           projectId, kind, intent: input.intent.slice(0, 500),
+          scenePolicy: selectedScenePolicy.decision,
           ...(input.threadId ? { threadId: input.threadId } : {}),
         },
         basis: ["视频标准管线立项（§5：一部片子/一个营销 Campaign）"],
@@ -1245,6 +1395,8 @@ export async function startVideoProjectRun(
     intent: input.intent,
     metadata: input.metadata,
     isMarketing: input.isMarketing,
+    rawIntent: input.rawIntent,
+    selectedScenePolicy,
   });
   return { projectId, runId };
 }

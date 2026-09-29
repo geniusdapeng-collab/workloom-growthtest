@@ -1,14 +1,14 @@
-# AI超增长 · 系统详解（给 AI Coding Agent）
+# WorkLoom 获客系统 · 系统详解（给 AI Coding Agent）
 
 > 这份文档回答一个问题：**这套系统到底是什么、怎么运转、你该怎样在其中工作。**
 > 阅读顺序建议：本文（认知）→ AGENTS.md（行动入口）→ docs/capability-map.md（全量能力清单）。
-> 适用仓库：workloom-growthtest（AI超增长 · 实验副本）。workloom-im / workloom-hotel / hyperreality-system 共享同一底座，差异见文末。
+> 适用仓库：workloom（主仓）。workloom-im / workloom-hotel / hyperreality-system 共享同一底座，差异见文末。
 
 ---
 
 ## 1. 一句话定位
 
-**AI超增长是一套面向 B 端商家的「AI 获客经营系统」**：以短视频社媒营销 × GEO（生成式引擎优化）双引擎触达客户，以「获客五环」（意图洞察→双域触达→四路承接→线索转化→归因复盘）闭环经营，每一环可度量到钱。首个深度垂直行业是**酒店**，底座支持按 Bundle 复制到各行业。
+**WorkLoom 获客系统是一套面向 B 端商家的「AI 获客经营系统」**：以短视频社媒营销 × GEO（生成式引擎优化）双引擎触达客户，以「获客五环」（意图洞察→双域触达→四路承接→线索转化→归因复盘）闭环经营，每一环可度量到钱。首个深度垂直行业是**酒店**，底座支持按 Bundle 复制到各行业。
 
 它不是 demo 玩具：有完整的多租户底座、围栏安全体系、人审机制、事件溯源和 400+ 条场景测试。
 
@@ -46,7 +46,7 @@ packages/
   runtime/     意图路由（规则+LLM 分类器）、QUEST 执行、L3 工具注册
   shared/      跨端共享类型
   video-studio/ 视频成片管线
-bundles/       行业垂直包：hotel(获客 v3.3.0) / geo-growth(GEO 双域) / ai-video(短视频)
+bundles/       行业垂直包：hotel(获客 v3.3.0) / geo-growthtest(GEO 双域) / ai-video(短视频)
 skills/official/ 自带技能 7 个（release-gate / industry-entry / demo-mirror 等）
 scripts/       套件/种子/门禁/巡游/预览/生成器
 docs/          设计规范、方案、能力地图、本文
@@ -117,10 +117,10 @@ pnpm capabilities:check                    # 能力产物与代码同步校验
 
 | 仓 | 定位 | 与主仓差异 |
 |---|---|---|
-| **workloom**（本仓） | 获客系统主仓 | 全量：geo-growth + ai-video + hotel 获客域 + publish-rpa |
+| **workloom**（本仓） | 获客系统主仓 | 全量：geo-growthtest + ai-video + hotel 获客域 + publish-rpa |
 | workloom-im | IM 底座仓 | 无 geo/video/publish-rpa； bundles/hotel 基础版 |
 | workloom-hotel | 酒店垂直仓 | + 数字孪生演示（demo:twin 系列） |
-| hyperreality-system | 视频制作仓 | ai-video + video-studio + publish-rpa；无 geo-growth |
+| hyperreality-system | 视频制作仓 | ai-video + video-studio + publish-rpa；无 geo-growthtest |
 
 四仓共享 WorkLoom 底座（fence/captain/workdata/night-shift/RLS），同一套验证纪律与 Agent 引导体系（AGENTS.md / agent:tour / capability-map / preview:all）。
 

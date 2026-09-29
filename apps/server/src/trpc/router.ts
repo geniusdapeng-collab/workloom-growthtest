@@ -43,6 +43,7 @@ import {
   runQuestForThread,
 } from "../runtime/thread-runner.js";
 import { startVideoProjectRun, StudioWorkerError } from "../video/studio-worker.js";
+import { resolveScenePolicyForIntent, ScenePolicyRouteError } from "../video/scene-policy-routing.js";
 import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
 import { creditsRouter, modelFeedbackRouter } from "./credits-router.js";
 import { runRouterReviewBeat } from "@workloom/base/model-router";
@@ -552,7 +553,7 @@ const onboardingRouter = router({
    *  - patch.default_level 写入 profiles.archive.fence 作工作区事实源（运行时 loadActiveRules 读工作区
    *    active 规则行，收紧后的规则行即时生效；archive.fence.defaultLevel 供审计/报表消费）
    * 本仓适配：hotel 客群 patch 为复合系统纪律（audit-only patch 注释）——rule_id 跨三域基线
-   *  （R 系列=hotel-baseline 酒店运营线；G/G-GEO 系列=ai-video/geo-growth 获客转化线），
+   *  （R 系列=hotel-baseline 酒店运营线；G/G-GEO 系列=ai-video/geo-growthtest 获客转化线），
    *  故基线装载为「hotel 主基线（patch.base 严格校验）+ 两域获客基线合并查规则」，缺一即断链抛错。
    */
   chooseSegment: writeProcedure
@@ -585,7 +586,7 @@ const onboardingRouter = router({
       if (patch && baseline && patch.base && patch.base !== baseline.version) {
         throw new TRPCError({ code: "BAD_REQUEST", message: `围栏 patch 基线错配：patch.base=${patch.base} ≠ 当前基线 ${baseline.version}` });
       }
-      // 获客转化线两域基线合并（ai-video/geo-growth 与 hotel 同仓 bundles/ 平级；rule_id 全局唯一）
+      // 获客转化线两域基线合并（ai-video/geo-growthtest 与 hotel 同仓 bundles/ 平级；rule_id 全局唯一）
       // 注：两域 rule_id 为 G*/G-GEO* 命名，不走 loadFencePack 的 R\d+ 严格 DSL——
       //     与 scripts/seed-geo.ts/seed-video.ts 同款裸 YAML 解析口径（字段形状三域一致）
       interface RawBaseRule {
@@ -601,7 +602,7 @@ const onboardingRouter = router({
       const acquisitionRules = patch
         ? [
             ...loadRawBaseline("../ai-video/fences/ai-video-baseline.yml"),
-            ...loadRawBaseline("../geo-growth/fences/geo-growth-baseline.yml"),
+            ...loadRawBaseline("../geo-growthtest/fences/geo-growthtest-baseline.yml"),
           ]
         : [];
       const baseRuleOf = (ruleId: string) =>
@@ -729,7 +730,7 @@ const onboardingRouter = router({
 
         /**
          * ⑤·组合编制上岗（融合获客系统）：段装配只装了租户起步方式那一套（酒店经营），
-         * 但本产品的获客闭环还需要内容生产（ai-video）与 GEO 分发（geo-growth）的岗位同时在场。
+         * 但本产品的获客闭环还需要内容生产（ai-video）与 GEO 分发（geo-growthtest）的岗位同时在场。
          * 按 product.manifest.json 的主包做一次幂等组合上岗：编制并集 + 围栏并集（只紧不松）。
          */
         const primaryBundle = locateProductPrimaryBundle();
@@ -1161,16 +1162,20 @@ const threadsRouter = router({
           },
         };
       }
-      /**
-       * 注（growthtest 隔离副本移植口径，T-2026-0929-0001）：
-       * growth 主干在本位置还有一段「片型歧义前置校验」——它依赖 growth 侧的
-       * `apps/server/src/video/scene-policy-routing.ts` 与 `bundles/ai-video/library/scene-policies/*`
-       * 片型目录（该目录属于 growth 视频车道的后续工作，本仓没有）。
-       * 本仓的视频分流走自己的 `routeVideoPipeline` + `applyRouteToMetadata` 通路（见下方 isVideoQuest 分支，
-       * 真机口径 VID-AUDIT-M1），故此处不引入 growth 的片型目录，避免把一个半套依赖链带进来；
-       * 其余交付链路修复（N-14 岗位语义解析、GR-14 目标档案、X-01..X-10、Y-01）已全量并入。
-       */
-
+      if (isVideoQuest) {
+        // 在线程建档前处理片型歧义；失败时不留下无项目的 queued 线程。
+        try {
+          resolveScenePolicyForIntent(input.title);
+        } catch (error) {
+          if (error instanceof ScenePolicyRouteError) {
+            throw new TRPCError({
+              code: error.kind === "catalog" ? "PRECONDITION_FAILED" : "BAD_REQUEST",
+              message: error.message,
+            });
+          }
+          throw error;
+        }
+      }
       // N-14：岗位解析带任务语义（视觉/视频/发布/增长四域偏好），不再只认 Bundle 清单顺序
       const presetKey = input.presetKey ?? (await resolveDispatchPresetKey(scope, input.title));
       /**
@@ -1310,6 +1315,8 @@ const threadsRouter = router({
             aspectRatio: decision.route === "marketing" ? "9:16" : undefined,
           });
           const started = await startVideoProjectRun(scope, {
+            rawIntent: input.title,
+            customerMetadata: null,
             intent: pipelineIntent,
             metadata: seededMetadata,
             isMarketing: decision.route === "marketing",
@@ -1358,6 +1365,12 @@ const threadsRouter = router({
             },
           };
         } catch (error) {
+          if (error instanceof ScenePolicyRouteError) {
+            throw new TRPCError({
+              code: error.kind === "catalog" ? "PRECONDITION_FAILED" : "BAD_REQUEST",
+              message: error.message,
+            });
+          }
           if (error instanceof StudioWorkerError && error.code === "LLM_MISSING") {
             throw new TRPCError({ code: "PRECONDITION_FAILED", message: error.message });
           }
@@ -2978,7 +2991,7 @@ const rosterRouter = router({
           },
           workspaceName: ws.rows[0]?.name ?? "",
           /**
-           * 来源行业包：组合编制下每个岗位由不同包提供（hotel / ai-video / geo-growth），
+           * 来源行业包：组合编制下每个岗位由不同包提供（hotel / ai-video / geo-growthtest），
            * 事实源是装配器写入的 meta.sourceBundleId；旧单包数据回落工作区已装配行业。
            * 禁止再写死单一 Bundle（曾固定为 hyperreality-ai-video，对当时组合编制的全部岗位都错）。
            */

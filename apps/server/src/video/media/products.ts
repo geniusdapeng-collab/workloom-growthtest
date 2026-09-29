@@ -9,7 +9,8 @@
  *  - 档案主图（manifest 首图）登记进媒资库 kind=product_image，回填 hero_asset_id。
  */
 import { createHash, randomUUID } from "node:crypto";
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, mkdirSync } from "node:fs";
+import { writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
 import type pg from "pg";
 import { newId } from "@workloom/shared";
@@ -173,7 +174,7 @@ async function fetchHeroImage(url: string, targetAbs: string, maxBytes = 15 * 10
     const buf = Buffer.from(await res.arrayBuffer());
     if (buf.byteLength === 0 || buf.byteLength > maxBytes) return false;
     mkdirSync(dirname(targetAbs), { recursive: true });
-    writeFileSync(targetAbs, buf);
+    await writeFile(targetAbs, buf);   // 异步落盘：主图最大 15MB，不该阻塞事件循环
     return true;
   } catch {
     return false;
@@ -249,8 +250,13 @@ export async function upsertProductProfileFromDossier(
         const localCandidates = existsSync(localDir)
           ? readdirSync(localDir).filter((f) => f !== "manifest.json").map((f) => join(localDir, f))
           : [];
+        // 精确匹配优先（`img-1` 不能命中 `img-10`）：同名/`id.` 前缀/`id-` 边界三种写法
+        const matchId = (f: string, id: string) => {
+          const name = basename(f);
+          return name === id || name.startsWith(`${id}.`) || name.startsWith(`${id}-`) || name.startsWith(`${id}_`);
+        };
         const localMatch = heroEntry.id
-          ? localCandidates.find((f) => basename(f).includes(heroEntry.id!))
+          ? localCandidates.find((f) => matchId(f, heroEntry.id!)) ?? localCandidates.find((f) => basename(f).includes(heroEntry.id!))
           : undefined;
         const localFile = localMatch ?? localCandidates[0] ?? null;
         if (localFile && existsSync(localFile)) {

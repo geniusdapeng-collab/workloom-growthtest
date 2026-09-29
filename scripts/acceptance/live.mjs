@@ -315,16 +315,7 @@ async function runTask(task) {
         });
       } else {
         const image = task.imageFixture ? readImageFixture(resolve(REPO_ROOT, task.imageFixture)) : null;
-        /**
-         * model-gateway 走 OpenAI 兼容 `/chat/completions`：
-         *   `DEEPSEEK_BASE_URL` 可能被 dsh 链路指到 Anthropic 兼容根（`…/anthropic`），
-         *   直接复用会 404（2026-09-20 实测）。这里优先用 `LLM_BASE_URL`，并剥掉 `/anthropic` 后缀。
-         */
-        const gatewayResolved = {
-          ...resolved,
-          baseUrl: String(runnerEnv.LLM_BASE_URL || resolved.baseUrl || "").replace(/\/anthropic\/?$/u, ""),
-        };
-        out = await runChatTask({ resolved: gatewayResolved, prompt: task.prompt, timeoutMs: TASK_TIMEOUT_MS, image, env: runnerEnv });
+        out = await runChatTask({ resolved, prompt: task.prompt, timeoutMs: TASK_TIMEOUT_MS, image, env: runnerEnv });
       }
       budget.commit({ taskId: task.id, kind: "llm", tokens: out.tokens ?? 0, detail: chain });
       const verified = verifyExpectations(effectiveTask, out);

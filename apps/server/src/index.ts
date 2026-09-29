@@ -350,7 +350,7 @@ serve({ fetch: app.fetch, port, hostname: host }, (info) => {
    */
   startThreadScheduler();
   /**
-   * GR-19：装载各行业 ask 事实面（geo-growth 等）——不装的话，右侧对话框问领域问题只会得到
+   * GR-19：装载各行业 ask 事实面（geo-growthtest 等）——不装的话，右侧对话框问领域问题只会得到
    * 底座通用事实（实测"问什么都是没有相关记录"）。失败不阻塞启动（回落通用事实面）。
    */
   void registerBundleAskFacts()

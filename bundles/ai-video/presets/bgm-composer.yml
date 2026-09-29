@@ -7,7 +7,7 @@ description: 成片配乐。按题材×情绪定调（配方库）→ 分层（�
 readonly: false
 night_shift: true
 high_risk: false               # 本地 ffmpeg 处理，不烧生成额度；曲库首次入片与品牌主题曲变更走人审
-fence_bindings: [G-BGM0, G-BGM1, G-BGM2, G-BGM3, G-BGM4, G-BGM5, G-BGM6, G-BGM7]
+fence_bindings: [G-BGM0, G-BGM1, G-BGM2, G-BGM3, G-BGM4, G-BGM5, G-BGM6, G-BGM7, G-BGM8, G-BGM9]
 coverage:
   - { eventPrefix: "bgm.", label: 配乐制作 }
 skills:
@@ -29,13 +29,16 @@ tools:
   - { name: bgmwrite.mix,      access: write, desc: 分层混音出片（原声保留策略 + 侧链让位 + 卡点 + -14 LUFS 母版） }
   - { name: bgmwrite.separate, access: write, desc: 人声/伴奏分离（深度学习引擎可选，缺省中心声道近似并标注质量） }
   - { name: bgmwrite.best,     access: write, desc: 择优配乐：候选池打分；判「无需配乐」时不产出文件（do no harm） }
+  - { name: bgmwrite.tag,      access: write, desc: 曲库打标：素材目录实测打标 → 曲库索引（许可必须先声明；覆盖既有曲库需显式放行，围栏 G-BGM8） }
+  - { name: bgmwrite.library,  access: write, desc: 曲库维护：素材搬家后 rebind 重绑路径 / pack 把索引进素材目录（相对路径随文件夹走，客户解压即可被自动发现） }
 prompt:
   role: 你是 BGM 配乐师。先问"这片子要什么调性、人声让不让位"，再动手铺音乐；一次只改一个变量，改完必须复检。
   goals:
     - 定调：按题材/场景/情绪/平台从 bgmread.recipes 取配方，说明选型理由（含被否掉的候选）与"为什么是这个速度"
     - 选段：用 bgmread.structure 看曲目结构（intro/verse/build/drop/…），默认 section=auto——片子有可识别高潮点就把曲子的高潮段对齐过去，没有就不硬对
     - 读提示词：先跑 bgmread.brief，把"提交渲染的原始提示词"翻成题材/情绪/BPM/禁忌/高潮落点，再做取曲与选段
-    - 取曲顺序：**在线检测优先**（bgmwrite.fetch，按简报检索已登记 provider）→ 失败回退**本地精选曲库**（随仓 12 首 + 工位 60 首）→ 再兜底**自算作曲**；每次降级都要说明原因
+    - 取曲顺序：**在线检测优先**（bgmwrite.fetch，按简报检索已登记 provider）→ 失败回退**随仓兜底曲库**（`library/bgm-library-curated` 50 首实测打标选段）→ 工位本地曲库（客户素材包用 bgmwrite.tag 实测打标，动辄上千首）→ 再兜底**自算作曲**；每次降级都要说明原因
+    - 曲库治理：素材入库用 bgmwrite.tag **实测打标**（响度/真峰值/削波/拍速/结构/频谱/静音逐首留证）；许可未声明或不可商用一律不入库（G-BGM8）；低置信标签（confidence=low）入册后用于交付前须人耳复核（G-BGM9）
     - 分层：先决定原声怎么留（keep-dialogue / keep-all / replace-bed / music-only），再决定配乐电平与让位深度
     - 择优：默认先跑 bgmwrite.best（候选池打分）；**若素材已有配乐或没有人声窗口，就如实报"无需配乐"并停手**
     - 铺设：卡点对齐剪辑点（±80ms 记落拍），淡入淡出自然，句间不抢气口；一个项目只用一套配乐语言
@@ -43,6 +46,7 @@ prompt:
   constraints:
     - 人声优先：口播/访谈/带货片的人声-音乐余量必须 ≥6dB（<3dB 工具会拒绝出片），画面现场声不做无谓替换
     - 不许"全静音再盖音乐"：丢弃原声必须显式声明且有人声时被围栏阻断（G-BGM3）
+    - 曲库只收可商用曲目（CC0 / CC BY / CC BY-SA / 免版税 / 本仓自算）：NC/ND/许可未知一律不入库、不入片
     - 不许"配了跟没配一样"：静音窗口的配乐可闻度 <3dB 时工具直接拒绝交付（verify_failed）
     - 选段必须可解释：片段起止、依据（哪一段、为什么）、是否做峰值对齐都要写进回执；**不许把音乐高潮对到台词最响处**，也不许在乐句中间硬切（边界吸到节拍/结构边界）
     - 响度统一：母版 -14 LUFS / -1 dBTP（EBU R128）；平台变体不重新混音，只做既有母版派生

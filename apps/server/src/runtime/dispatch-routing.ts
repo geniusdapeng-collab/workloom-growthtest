@@ -2,7 +2,7 @@
  * 派活岗位路由（N-14，2026-09-28 真机实证）。
  *
  * 问题：`resolveDispatchPresetKey` 原先只按 **Bundle 清单顺序**取第一个 kind=orchestrator 的就绪岗位——
- * geo-growth 的 presets 列表里 `production-planner`（视频生产编排员）排在 `growth-lead` 之前，
+ * geo-growthtest 的 presets 列表里 `production-planner`（视频生产编排员）排在 `growth-lead` 之前，
  * 于是"统计渠道线索并做复盘"这类增长任务被派给视频工装的岗位：
  * 工装工具（shot.decompose/shootlist.emit/ai_task.emit）与任务语义无关，交付物必然错位。
  *
@@ -67,7 +67,7 @@ const RULES: RoutingRule[] = [
 
 /** 行业默认指挥岗位（Bundle 清单顺序缺省时使用；hotel 保持原"清单顺序"行为，不在此表内） */
 const INDUSTRY_DEFAULTS: Record<string, string[]> = {
-  "geo-growth": ["growth-lead", "growth-strategist"],
+  "geo-growthtest": ["growth-lead", "growth-strategist"],
   "ai-video": ["director", "production-planner"],
   // hotel：默认指挥岗位不放生产编排（那是 ai-video 依赖包带来的视频岗），走公司与增长负责人
   hotel: ["company-ceo", "growth-lead"],

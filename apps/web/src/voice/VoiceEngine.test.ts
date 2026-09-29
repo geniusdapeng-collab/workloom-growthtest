@@ -60,13 +60,9 @@ describe("VoiceEngine single-consumer orchestration", () => {
   });
 
   it("does not start the next sentence before the previous onend", async () => {
-    // 音色表就绪（无性别约束等待）时只用验证串行编排本身
-    voiceList = [{ name: "婷婷", lang: "zh-CN" }];
     const engine = new VoiceEngineImpl();
     const first = engine.speakAndWait(line("第一句完整说完"));
     const second = engine.speakAndWait(line("第二句随后开始"));
-    // 2026-09-21：挑声前多了一次 await（性别约束先做音色决策），起点改为微任务后
-    await vi.advanceTimersByTimeAsync(0);
     expect(starts).toEqual(["第一句完整说完"]);
     await vi.advanceTimersByTimeAsync(99);
     expect(starts).toEqual(["第一句完整说完"]);
@@ -86,8 +82,7 @@ describe("VoiceEngine single-consumer orchestration", () => {
     expect(starts).toEqual([]);
     release();
     const welcome = engine.speakAndWait(line("织伴开场"));
-    // 2026-09-21：性别有约束的角色首次开口前会等音色表（本用例里表始终为空 → 等满上限后锁定默认声）
-    await vi.advanceTimersByTimeAsync(VoiceEngineImpl.VOICE_READY_TIMEOUT_MS + 400);
+    await vi.advanceTimersByTimeAsync(100);
     await expect(welcome).resolves.toBe("spoken");
   });
 
@@ -104,26 +99,14 @@ describe("VoiceEngine single-consumer orchestration", () => {
     expect(usedVoices).toEqual([female, female]);
   });
 
-  it("waits for the voice list so the very first line is not the system default (2026-09-21 真机修复)", async () => {
-    // 冷启动：getVoices() 先返回空数组，音色表稍后才到——旧实现会把第一句说成系统默认声（男声）
+  it("does not change speaker mid-session when the browser voice list arrives late", async () => {
     const engine = new VoiceEngineImpl();
     const one = engine.speakAndWait(line("列表未就绪"));
-    await vi.advanceTimersByTimeAsync(160);
-    expect(usedVoices).toEqual([]);                     // 等表期间不出声（字幕先行）
-    voiceList = [{ name: "Tingting", lang: "zh-CN" }];  // 音色表到位
-    await vi.advanceTimersByTimeAsync(1000);
-    await one;
-    expect(usedVoices).toEqual([voiceList[0]]);         // 第一句就用女声，不再"先男后女"
-  });
-
-  it("locks to the system default when the voice list never arrives (no mid-session switch)", async () => {
-    const engine = new VoiceEngineImpl();
-    const one = engine.speakAndWait(line("列表未就绪"));
-    await vi.advanceTimersByTimeAsync(VoiceEngineImpl.VOICE_READY_TIMEOUT_MS + 200);
+    await vi.advanceTimersByTimeAsync(100);
     await one;
     voiceList = [{ name: "Tingting", lang: "zh-CN" }];
     const two = engine.speakAndWait(line("列表已就绪"));
-    await vi.advanceTimersByTimeAsync(200);
+    await vi.advanceTimersByTimeAsync(100);
     await two;
     expect(usedVoices).toEqual([null, null]);
     expect(engine.voiceDiagnostics.loommate).toBe("system-default-locked");

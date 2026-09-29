@@ -656,7 +656,7 @@ export function loadComposedAssets(slug: string, root = bundlesRoot()): Composed
     const manifest = loadVerifiedBundleManifest(bundleId, root);
     for (const assetPath of manifest.workloom.provides.fences) {
       /**
-       * 只合并各行业包的**基线**围栏（hotel-baseline / ai-video-baseline / geo-growth-baseline）。
+       * 只合并各行业包的**基线**围栏（hotel-baseline / ai-video-baseline / geo-growthtest-baseline）。
        * fences/patches/* 是「按客群二选一」的客户级收紧包（体检期/低星单体/民宿/无人），
        * 把它们全并进基线等于同时叠加四套客户配置——会把不该拦的动作拦下。
        * 客群补丁由落地向导按所选客群单独应用；组合上岗只做单调守卫（更严的补丁保留）。
@@ -1467,7 +1467,7 @@ async function computeAssemblyScoped(
    * 校验⑥ 围栏-工具词表交叉校验（GR-03，2026-09-28 压测新增）。
    *
    * 为什么必须有机检：红线规则（is_baseline + level=block）如果 actions 对不上任何岗位写工具，
-   * 就是"空膛红线"——产品对外宣称的熔断永远不会发生（实测 geo-growth 12 条、ai-video 4 条、
+   * 就是"空膛红线"——产品对外宣称的熔断永远不会发生（实测 geo-growthtest 12 条、ai-video 4 条、
    * hotel 4 条，修复前 GEO 的"数据出域红线"就属于这一类）。
    * 判定用**判定器真实语义** actionMatches（命名空间后缀扩展：规则 price.adjust 命中工具 pms.price.write），
    * 不搞字符串相等，避免误报与漏报。

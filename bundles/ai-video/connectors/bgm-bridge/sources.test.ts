@@ -44,20 +44,27 @@ let mode: "mixed" | "nc-only" | "empty" = "mixed";
 const server = createServer((req, res) => {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   if (url.pathname === "/index") {
+    // nc-only 模式**只**返回 NC 曲目（此前写成"去掉 NC"，导致该用例实际测的是合规曲目——夹具 bug）
     const tracks = mode === "empty"
       ? []
-      : [
-        {
-          id: "ok-by", title: "Warm Bed", artist: "Mock Artist", license: "cc-by-4.0",
-          url: "/audio/ok-by.wav", durationSec: 60, bpm: 96, genre: "美食 / 餐饮", mood: "诱人温暖",
-          tags: ["美食", "warm"], energy: 0.5,
-        },
-        ...(mode === "nc-only" ? [] : [{
+      : mode === "nc-only"
+        ? [{
           id: "blocked-nc", title: "Night Drive", artist: "Mock Artist", license: "cc-by-nc-4.0",
           url: "/audio/blocked-nc.wav", durationSec: 180, bpm: 92, genre: "夜景 / 都市", mood: "戏剧现代",
           tags: ["night"], energy: 0.8,
-        }]),
-      ];
+        }]
+        : [
+          {
+            id: "ok-by", title: "Warm Bed", artist: "Mock Artist", license: "cc-by-4.0",
+            url: "/audio/ok-by.wav", durationSec: 60, bpm: 96, genre: "美食 / 餐饮", mood: "诱人温暖",
+            tags: ["美食", "warm"], energy: 0.5,
+          },
+          {
+            id: "blocked-nc", title: "Night Drive", artist: "Mock Artist", license: "cc-by-nc-4.0",
+            url: "/audio/blocked-nc.wav", durationSec: 180, bpm: 92, genre: "夜景 / 都市", mood: "戏剧现代",
+            tags: ["night"], energy: 0.8,
+          },
+        ];
     const body = JSON.stringify({ tracks });
     res.writeHead(200, { "content-type": "application/json", "content-length": Buffer.byteLength(body) });
     res.end(body);
@@ -134,12 +141,9 @@ describe("在线曲源层（真实 HTTP mock 音乐站）", () => {
       brief, recipe: { id: "night-city", genre: "夜景 / 都市", bpm: 92 }, policy: "online-first",
       durationSec: 30, env: env(), destDir: join(workDir, "cache-nc"),
     });
-    // 本仓随包精选曲库里一定有可商用曲目 → 期望回退到 local
-    expect(["local", "online"]).toContain(result.layer);
-    if (result.layer === "local") {
-      expect(result.degraded).toBe(true);
-      expect(result.attempts.some((attempt) => attempt.status === "no_compliant_match" || attempt.status === "license_rejected")).toBe(true);
-    }
+    // 随仓曲库已按产品要求清理：此时应如实降级（本地无匹配 → 自算作曲兜底），而不是假装命中
+    expect(result.layer === "local" || result.fallbackToCompose === true).toBe(true);
+    expect(result.attempts.some((attempt) => attempt.status === "no_compliant_match" || attempt.status === "license_rejected")).toBe(true);
     mode = "mixed";
   });
 
@@ -151,7 +155,7 @@ describe("在线曲源层（真实 HTTP mock 音乐站）", () => {
       env: { WORKLOOM_BGM_ONLINE_ENDPOINT: "http://127.0.0.1:9/index", WORKLOOM_BGM_LIBRARY_DIR: join(workDir, "empty-library") },
       destDir: join(workDir, "cache-down"),
     });
-    expect(result.layer).toBe("local");
+    expect(result.layer === "local" || result.fallbackToCompose === true).toBe(true);
     expect(result.degraded).toBe(true);
     expect(result.attempts.some((attempt) => attempt.layer === "online" && ["network_error", "timeout"].includes(String(attempt.status)))).toBe(true);
   });
