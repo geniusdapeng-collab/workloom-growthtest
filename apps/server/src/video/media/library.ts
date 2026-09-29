@@ -12,7 +12,7 @@
  *      写操作（改名/打标/归档）与五元事件同一事务同一 COMMIT（D16）。
  */
 import type pg from "pg";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, resolve } from "node:path";
 import { gatewayAppendOnClient } from "@workloom/base/workdata";
 import { newId } from "@workloom/shared";
@@ -153,6 +153,26 @@ function cursorClause(builder: WhereBuilder, cursor?: string | null): void {
   builder.clauses.push(`(a.created_at, a.id) < (${p1}::timestamptz, ${p2}::text)`);
 }
 
+/**
+ * 媒体仓「本机文件」索引：一次 `readdir(recursive)` 覆盖 video/image/audio/upload 四个分仓，
+ * 取代原来"每行 1~2 次 existsSync"（列表 200 行 = 400 次同步 stat，阻塞事件循环）。
+ */
+export function mediaFileIndex(workspaceId: string): Set<string> {
+  const index = new Set<string>();
+  for (const subdir of ["video", "image", "audio", "upload"]) {
+    const dir = join(mediaRoot(), subdir, workspaceId);
+    if (!existsSync(dir)) continue;
+    try {
+      for (const entry of readdirSync(dir, { recursive: true }) as string[]) {
+        index.add(`${subdir}/${workspaceId}/${String(entry).split("\\").join("/")}`);
+      }
+    } catch {
+      /* 索引失败退化为空集合：列表仍可用（hasLocalFile=false），不阻断 */
+    }
+  }
+  return index;
+}
+
 export function toAssetView(row: MediaAssetRow, opts: { thumbExists?: (rel: string) => boolean } = {}): MediaAssetView {
   const tags = Array.isArray(row.tags) ? row.tags.map((t) => String(t)) : [];
   const exists = opts.thumbExists ?? ((rel: string) => existsSync(join(mediaRoot(), rel)));
@@ -233,7 +253,7 @@ function whereBuilder(scope: Scope, input: ListAssetsInput): WhereBuilder {
  */
 async function searchTrgm(
   app: AppPool, scope: Scope, input: ListAssetsInput, query: string, limit: number,
-  trace: NonNullable<ListAssetsResult["searchTrace"]>,
+  trace: NonNullable<ListAssetsResult["searchTrace"]>, viewScope?: Scope,
 ): Promise<ListAssetsResult> {
   const w = whereBuilder(scope, { ...input, cursor: undefined });
   const q = w.add(query);
@@ -258,7 +278,7 @@ async function searchTrgm(
     `SELECT ${ASSET_COLUMNS}, ${simExpr} AS similarity
        FROM video_assets a WHERE ${w.clauses.join(" AND ")}
       ORDER BY similarity DESC, a.created_at DESC, a.id DESC LIMIT ${pLimit}`, w.params);
-  return finishList(rows, limit, { ...trace, layer: "trgm" });
+  return finishList(rows, limit, { ...trace, layer: "trgm" }, viewScope ?? scope);
 }
 
 export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsInput): Promise<ListAssetsResult> {
@@ -283,7 +303,7 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
         `SELECT ${ASSET_COLUMNS} FROM video_assets a WHERE ${w.clauses.join(" AND ")}
           ORDER BY array_position($${w.params.length}::text[], a.id), a.created_at DESC, a.id DESC LIMIT ${p}`,
         [...w.params, ids]);
-      if (rows.length > 0) return finishList(rows, limit, { ...trace, layer: "semantic" });
+      if (rows.length > 0) return finishList(rows, limit, { ...trace, layer: "semantic" }, scope);
       if (pinned === "semantic") return finishList([], limit, { ...trace, layer: "semantic" });
       trace.layer = "tsv";
     }
@@ -297,16 +317,16 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
     const tsvRows = await scopedQuery<MediaAssetRow>(app, scope,
       `SELECT ${ASSET_COLUMNS} FROM video_assets a WHERE ${w.clauses.join(" AND ")}
         ORDER BY a.created_at DESC, a.id DESC LIMIT ${p}`, w.params);
-    if (tsvRows.length > 0) return finishList(tsvRows, limit, { ...trace, layer: "tsv" });
+    if (tsvRows.length > 0) return finishList(tsvRows, limit, { ...trace, layer: "tsv" }, scope);
     // 已钉在 tsv 层（翻页中）：不能掉进 trgm，否则排序口径突变 → 返回空由上层结束翻页
     if (pinned === "tsv") return finishList([], limit, { ...trace, layer: "tsv" });
 
     // ③ trgm / 子串兜底：中文的实际主路（tsv 零命中才走到这里）
-    return searchTrgm(app, scope, input, query, limit, trace);
+    return searchTrgm(app, scope, input, query, limit, trace, scope);
   }
 
   if (query && pinned === "trgm") {
-    return searchTrgm(app, scope, input, query, limit, trace);
+    return searchTrgm(app, scope, input, query, limit, trace, scope);
   }
 
   const w = whereBuilder(scope, input);
@@ -314,11 +334,12 @@ export async function listAssets(app: AppPool, scope: Scope, input: ListAssetsIn
   const plainRows = await scopedQuery<MediaAssetRow>(app, scope,
     `SELECT ${ASSET_COLUMNS} FROM video_assets a WHERE ${w.clauses.join(" AND ")}
       ORDER BY a.created_at DESC, a.id DESC LIMIT ${p}`, w.params);
-  return finishList(plainRows, limit, trace);
+  return finishList(plainRows, limit, trace, scope);
 }
 
-function finishList(rows: MediaAssetRow[], limit: number, trace: NonNullable<ListAssetsResult["searchTrace"]>): ListAssetsResult {
-  const items = rows.map((row) => toAssetView(row));
+function finishList(rows: MediaAssetRow[], limit: number, trace: NonNullable<ListAssetsResult["searchTrace"]>, scope?: Scope): ListAssetsResult {
+  const index = scope ? mediaFileIndex(scope.workspaceId) : null;
+  const items = rows.map((row) => toAssetView(row, { thumbExists: index ? (rel) => index.has(rel) : undefined }));
   const last = rows.at(-1);
   return {
     items,
@@ -371,8 +392,9 @@ export async function getAsset(app: AppPool, scope: Scope, assetId: string): Pro
     ? join(resolve(archiveWorkDir()), "archive", scope.workspaceId, row.project_id)
     : null;
 
+  const fileIndex = mediaFileIndex(scope.workspaceId);
   return {
-    ...toAssetView(row),
+    ...toAssetView(row, { thumbExists: (rel) => fileIndex.has(rel) }),
     provenance: row.provenance ?? {},
     meta: row.meta ?? {},
     licenseRisk: row.license_risk,
@@ -487,30 +509,38 @@ export async function archiveAsset(app: AppPool, scope: Scope, input: { assetId:
 export interface TagGroup { group: string; tags: Array<{ name: string; usage: number }> }
 
 export async function tagGroups(app: AppPool, scope: Scope): Promise<TagGroup[]> {
-  const rows = await scopedQuery<{ group_name: string; name: string }>(
+  // 一条 SQL 取"受管标签 + 用量"（原实现：全表扫一遍 media_tags + 再全表扫一遍 JSONB 标签，再内存合并）
+  const managed = await scopedQuery<{ group_name: string; name: string; usage: string }>(
     app, scope,
-    `SELECT group_name, name FROM media_tags WHERE workspace_id = $1 ORDER BY group_name ASC, name ASC`,
+    `SELECT g.group_name, g.name, COALESCE(u.usage, 0)::text AS usage
+       FROM media_tags g
+       LEFT JOIN (
+         SELECT tag, COUNT(*) AS usage
+           FROM video_assets a, jsonb_array_elements_text(a.tags) AS tag
+          WHERE a.workspace_id = $1 AND a.status <> 'archived'
+          GROUP BY tag
+       ) u ON u.tag = g.name
+      WHERE g.workspace_id = $1
+      ORDER BY g.group_name ASC, g.name ASC`,
     [scope.workspaceId]);
-  const counts = await scopedQuery<{ tag: string; usage: string }>(
+  // 自由标签（JSONB 快用轨）：只取"未被受管标签登记过"的，避免重复计数
+  const free = await scopedQuery<{ tag: string; usage: string }>(
     app, scope,
     `SELECT tag, COUNT(*)::text AS usage
        FROM video_assets a, jsonb_array_elements_text(a.tags) AS tag
       WHERE a.workspace_id = $1 AND a.status <> 'archived'
-      GROUP BY tag`,
+        AND NOT EXISTS (SELECT 1 FROM media_tags t WHERE t.workspace_id = $1 AND t.name = tag)
+      GROUP BY tag ORDER BY tag ASC`,
     [scope.workspaceId]);
-  const usage = new Map(counts.map((c) => [c.tag, Number(c.usage)]));
   const groups = new Map<string, Array<{ name: string; usage: number }>>();
-  for (const row of rows) {
+  for (const row of managed) {
     const list = groups.get(row.group_name) ?? [];
-    list.push({ name: row.name, usage: usage.get(row.name) ?? 0 });
+    list.push({ name: row.name, usage: Number(row.usage) });
     groups.set(row.group_name, list);
   }
-  // 自由标签（JSONB 快用轨）也要可见：未受管但已被用过的标签进 default 组
-  const managed = new Set(rows.map((r) => r.name));
-  const free = [...usage.keys()].filter((tag) => !managed.has(tag)).sort();
   if (free.length > 0) {
     const list = groups.get("default") ?? [];
-    for (const tag of free) list.push({ name: tag, usage: usage.get(tag) ?? 0 });
+    for (const row of free) list.push({ name: row.tag, usage: Number(row.usage) });
     groups.set("default", list);
   }
   return [...groups.entries()].map(([group, tags]) => ({ group, tags }));
@@ -572,18 +602,21 @@ export async function listFilms(
     project_title: string | null; publish_total: string; publish_done: string; publish_failed: string;
   }>(app, scope,
     `SELECT ${ASSET_COLUMNS}, p.title AS project_title,
-            (SELECT COUNT(*)::text FROM publish_tasks t
-              WHERE t.workspace_id = a.workspace_id AND t.asset_id = a.id) AS publish_total,
-            (SELECT COUNT(*)::text FROM publish_tasks t
-              WHERE t.workspace_id = a.workspace_id AND t.asset_id = a.id AND t.status = 'succeeded') AS publish_done,
-            (SELECT COUNT(*)::text FROM publish_tasks t
-              WHERE t.workspace_id = a.workspace_id AND t.asset_id = a.id AND t.status = 'failed') AS publish_failed
+            pt.publish_total, pt.publish_done, pt.publish_failed
        FROM video_assets a
        LEFT JOIN video_projects p ON p.id = a.project_id AND p.workspace_id = a.workspace_id
+       LEFT JOIN LATERAL (
+         SELECT COUNT(*)::text AS publish_total,
+                COUNT(*) FILTER (WHERE t.status = 'succeeded')::text AS publish_done,
+                COUNT(*) FILTER (WHERE t.status = 'failed')::text AS publish_failed
+           FROM publish_tasks t
+          WHERE t.workspace_id = a.workspace_id AND t.asset_id = a.id
+       ) pt ON TRUE
       WHERE ${clauses.join(" AND ")}
       ORDER BY a.created_at DESC, a.id DESC LIMIT $${params.length}`, params);
+  const fileIndex = mediaFileIndex(scope.workspaceId);
   const items: FilmRow[] = rows.map((row) => {
-    const view = toAssetView(row);
+    const view = toAssetView(row, { thumbExists: (rel) => fileIndex.has(rel) });
     return {
       id: view.id,
       title: view.title,

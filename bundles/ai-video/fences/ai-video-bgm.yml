@@ -83,3 +83,23 @@ rules:
       actions: [bgmwrite.fetch]
     when: "params.allow_unlicensed_source == true or params.unregistered_source == true or params.url_scheme_ok == false"
     note: 在线取源只允许已登记 provider 与客户自建索引（generic-http），且只接受 http(s)；任何"未知域/绕过鉴权/允许未授权源"的调用一票否决。连接器层同时做协议校验与体积上限（双保险）。
+
+  - rule_id: G-BGM8
+    name: 曲库打标必须声明许可 / 不许覆盖既有曲库
+    level: block
+    is_baseline: true
+    match:
+      object_types: [bgm_track, bgm_report, video_asset]
+      actions: [bgmwrite.tag, bgmwrite.library]
+    when: "params.license_declared == false or params.license_ok == false or params.overwrite_existing == true or params.out_dir_inside_source == true"
+    note: 打标是把外部素材**写进可交付曲库**的动作，两道硬闸：① 没有许可声明（或声明的许可不在可商用白名单）一票否决——来源不明的音频不许入册；② 目标目录已有曲库索引（tracks.json）而调用未显式 allow_overwrite=true 一票否决，避免一次误调用冲掉客户积累的曲库；③ 输出目录落在素材目录内部（会把索引混进素材包）同样阻断。连接器层（bgmwrite.tag / bgmwrite.library 的 rebind·pack）对这三条做同等校验，双保险。
+
+  - rule_id: G-BGM9
+    name: 低置信标签入册须人审复核
+    level: review
+    is_baseline: true
+    match:
+      object_types: [bgm_track, bgm_report]
+      actions: [bgmwrite.tag]
+    when: "params.low_confidence_count >= 1"
+    note: 风格族/拍速把握不足（confidence=low）的曲目**允许**入册并照常用作兜底，但用于客户交付前须人耳复核——索引里逐条标注了 low 与候选排名，复核结论随配乐报告归档（不许把机器标签当已核验事实）。求值语义：`low_confidence_count` 缺失会抛异常，运行时按 block 处理（fail-closed），因此调用方打标后必须带上该计数（与 G-BGM4 同一纪律）。

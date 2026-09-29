@@ -226,6 +226,13 @@ export default function P10() {
       )}
       <button
         type="button"
+        onClick={() => nav("/ai-video/assets?tab=studio&project=" + encodeURIComponent(projectId))}
+        className="mt-2 w-full cursor-pointer rounded-md gold-grad px-3 py-2 text-caption font-bold text-ongold"
+      >
+        🎬 打开生成工作室（选模型 · 报价 · 出片 · 发布）
+      </button>
+      <button
+        type="button"
         onClick={() => nav("/")}
         className="mt-2 w-full cursor-pointer rounded-lg border border-line px-3 py-2 text-caption text-ink3 hover:border-holo/40 hover:text-ink2"
       >

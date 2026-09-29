@@ -132,7 +132,7 @@ try {
       console.log(`未登记设备（${DEVICE_FILE} 不存在）：先跑 enroll`);
     } else {
       const scope = await scopeOfWorkspace(device.workspaceId);
-      const log = await listSyncLog(app, scope, 10);
+      const { entries: log } = await listSyncLog(app, scope, 10);
       console.log(`设备：${device.deviceId} → ${device.cloudUrl}（工作区 ${device.workspaceId}）`);
       console.log(`游标：pull=${device.lastPullCursor ?? "—"} push=${device.lastPushCursor ?? "—"}`);
       console.log(`最近台账：${log.length} 条`);

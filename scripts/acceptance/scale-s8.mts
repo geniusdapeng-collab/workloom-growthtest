@@ -54,7 +54,7 @@ function percentile(values: number[], p: number): number {
 try {
   await provisionShadowWorkspace(app, {
     tenantId, workspaceId, workspaceName: `S8 压测 · ${COUNT} 账号`,
-    slug: workspaceId, primaryBundle: "geo-growth", by: "acceptance:scale-s8",
+    slug: workspaceId, primaryBundle: "geo-growthtest", by: "acceptance:scale-s8",
   });
   await inTx(async (c) => {
     const charter = await loadCharter(app, scope);

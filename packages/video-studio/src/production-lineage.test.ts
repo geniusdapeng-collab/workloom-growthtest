@@ -52,6 +52,18 @@ describe("生产血缘检查（实际文件，非供应商回执）", () => {
     record.lineage!.projectId = scope.projectId; record.lineage!.sourceHash = productionHash({ shot: "NC-02" });
     expect(reuse([record])).toBe(false);
   });
+  it("UHD 增强逐镜回执同时绑定质量档和整份分镜 SHA", () => {
+    const uhdScope = { projectId: "VID-甲", sourceHash: productionHash({ quality: "uhd", shotlistSha256: "a".repeat(64), shotId: "NC-01" }) };
+    const uhdRecipe = { quality: "uhd", shotlistSha256: "a".repeat(64), engine: "pinned" };
+    const row: LineageRecord = { stage: "enhance", shotId: "NC-01", ok: true,
+      lineage: createLineageReceipt({ ...uhdScope, runId: "RUN-UHD", stage: "enhance", shotId: "NC-01",
+        recipe: uhdRecipe, status: "passed", inputs: [source], outputs: [output] }) };
+    const inspect = (sourceHash: string, recipe = uhdRecipe) => stageLineageApproved({ records: [row],
+      projectId: uhdScope.projectId, stage: "enhance", shotIds: ["NC-01"], sourceHash: () => sourceHash, recipe });
+    expect(inspect(uhdScope.sourceHash).ok).toBe(true);
+    expect(inspect(productionHash({ quality: "uhd", shotlistSha256: "b".repeat(64), shotId: "NC-01" })).ok).toBe(false);
+    expect(inspect(uhdScope.sourceHash, { ...uhdRecipe, quality: "hd" }).ok).toBe(false);
+  });
   it("后续其它项目记录不污染当前项目", () => {
     const other = make(); other.lineage!.projectId = "VID-乙"; other.ok = false;
     expect(reuse([make(), other])).toBe(true);

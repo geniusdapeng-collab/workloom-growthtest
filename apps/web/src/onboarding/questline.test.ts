@@ -270,7 +270,7 @@ describe("内容包完整性（行业可替换的硬约束）", () => {
 
   it("内容包按 Bundle 解析：未知 Bundle 不显示引导（禁止张冠李戴）", () => {
     expect(questlineForBundle("hotel")).toBe(QUESTLINE);
-    expect(questlineForBundle("geo-growth")).toBe(QUESTLINE_GEO);
+    expect(questlineForBundle("geo-growthtest")).toBe(QUESTLINE_GEO);
     expect(questlineForBundle("ai-video")).toBe(QUESTLINE_VIDEO);
     expect(questlineForBundle("some-other-industry")).toBeNull();
     expect(questlineForBundle(null)).toBeNull();
@@ -303,38 +303,16 @@ describe("内容包完整性（行业可替换的硬约束）", () => {
     }
   });
 
-  /**
-   * 读取某个行业包**组合编制**后真实存在的岗位：自身 presets + `bundle.json` 声明的
-   * 依赖包 presets（递归）。2026-09-21：geo-growth 工作区实际装配 geo-growth + ai-video + hotel，
-   * 员工卡可以引用依赖包岗位（产品所有者要求第 1 关介绍视频制作班组）；
-   * 只扫自身目录会把这种合法引用误判成"幽灵岗位"。
-   */
-  const composedPresetKeys = (bundlesRoot: string, bundleId: string, seen = new Set<string>()): Set<string> => {
-    const keys = new Set<string>();
-    if (seen.has(bundleId)) return keys;
-    seen.add(bundleId);
-    const dir = join(bundlesRoot, bundleId);
-    const presetsDir = join(dir, "presets");
-    if (existsSync(presetsDir)) {
-      for (const file of readdirSync(presetsDir).filter((name) => name.endsWith(".yml"))) {
-        keys.add(readFileSync(join(presetsDir, file), "utf-8").match(/^preset_key:\s*(\S+)/m)?.[1] ?? file.replace(/\.yml$/, ""));
-      }
-    }
-    try {
-      const manifest = JSON.parse(readFileSync(join(dir, "bundle.json"), "utf-8")) as { workloom?: { dependencies?: Array<{ bundleId?: string }> } };
-      for (const dep of manifest.workloom?.dependencies ?? []) {
-        if (!dep.bundleId) continue;
-        for (const key of composedPresetKeys(bundlesRoot, dep.bundleId, seen)) keys.add(key);
-      }
-    } catch { /* 无 bundle.json 的旧包只认自身 presets */ }
-    return keys;
-  };
-
-  /** 逐包门禁：员工卡/目标/任务引用的岗位必须真实存在于该行业包（含其声明的依赖包），否则界面会出现点不开的幽灵岗位 */
+  /** 逐包门禁：员工卡/目标/任务引用的岗位必须真实存在于该行业包，否则界面会出现点不开的幽灵岗位 */
   for (const [bundleId, content] of Object.entries(QUESTLINE_PACKS)) {
     it(`[${bundleId}] 四关齐备且引用岗位与行业包一致`, () => {
       const bundlesRootDir = join(dirname(fileURLToPath(import.meta.url)), "../../../../bundles");
-      const available = composedPresetKeys(bundlesRootDir, bundleId);
+      const presetsDir = join(bundlesRootDir, bundleId, "presets");
+      const available = new Set(
+        readdirSync(presetsDir)
+          .filter((file) => file.endsWith(".yml"))
+          .map((file) => (readFileSync(join(presetsDir, file), "utf-8").match(/^preset_key:\s*(\S+)/m)?.[1] ?? file.replace(/\.yml$/, ""))),
+      );
       expect(available.size).toBeGreaterThan(0);
 
       // ① 四关与台词齐备

@@ -1,6 +1,6 @@
 # WorkLoom 获客用增系统 · 本仓专属规则
 
-> 本文件只适用于 workloom-ai/WorkLoom-growth（及其隔离实验副本的对应版本）。
+> 本文件只适用于 workloom-ai/WorkLoom-growthtest（及其隔离实验副本的对应版本）。
 > 开始实质性工作前，必须先完整阅读根级 `AGENTS.md` 与 `WORKLOOM_PRODUCT_CONTEXT.md`；
 > 本文件只补充本仓的运行、验证与目录约定，**不替代、也不放宽**共享安全不变量与产品边界。
 

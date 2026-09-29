@@ -113,17 +113,6 @@ function Worker({
   const hoverTimer = useRef<number | null>(null);
   const target = useMemo(() => targetOf(agent, scene, crowdSlot), [agent, scene, crowdSlot]);
   const color = STATE_COLOR[agent.state] ?? "#8ad8ff";
-  /**
-   * 常驻任务牌的挂载条件（产品口径 2026-09-21，见下方名牌注释）：
-   * 只有"有在办任务 / 待拍板 / 异常 / 捷报 / 协作中"的成员挂任务牌；
-   * 待命与停用成员只显示数字人本体，避免 70+ 人全员同屏时任务牌互相压叠。
-   * 该常量是产品门禁（scripts/verify-product-content.mjs）的校验锚点，改名需同步改门禁。
-   */
-  const showTaskPlate = Boolean(agent.currentThread)
-    || agent.state === "asking"
-    || agent.state === "blocked"
-    || agent.state === "celebrating"
-    || agent.state === "collab";
   const toWorld = (lx: number, ly: number) => ({
     x: (lx - scene.grid.w / 2) * tile,
     z: (ly - scene.grid.h / 2) * tile,
@@ -218,13 +207,8 @@ function Worker({
        *  2026-09-21 产品所有者口径（本机单人运行）：asking 不再提供审批卡入口；
        *  业务链路自带的关卡在各自业务页面就地放行。
        *  数据随 theater 5s 轮询自动刷新（状态机即数据）。
-       *
-       * 2026-09-21 密度口径（产品所有者："团队舞台没有展示全面"；门禁要求防任务牌重叠）：
-       *  人**全员在岗同屏**（不再 18 人分批轮播），但常驻任务牌只挂在"有在办任务 / 待拍板 /
-       *  异常 / 捷报 / 协作中"的成员上；待命与停用的成员只显示数字人本体（点本体进档案），
-       *  这样 70+ 人编制也不会出现任务牌叠成一团。
        */}
-      {!dimmed && showTaskPlate && (
+      {!dimmed && (
         <Html center position={[0, 1.5 + (hash(agent.id) % 4) * 0.22, 0]} zIndexRange={[25, 0]} distanceFactor={7.5}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, pointerEvents: "none" }}>
             <button

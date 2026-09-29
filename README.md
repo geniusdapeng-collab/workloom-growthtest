@@ -1,20 +1,254 @@
-<div align="center">
+# WorkLoom GrowthTest · 获客增长系统（实验车道）
 
-# AI超增长（实验版）
+WorkLoom GrowthTest 面向企业增长与内容运营团队，把目标、数字员工岗位、内容生产、任务协作和过程记录放进同一个工作空间。产品目标是连接意图洞察、社媒与 GEO 触达、线索承接、转化和复盘；当前代码中，**视频生产与交付有专用执行链，通用工作台和行业包提供组织与治理机制，部分增长工具仍处于声明或接入阶段**。
 
-**短视频社媒营销 × GEO × 获客五环——把获客从玄学，变成一门可测量、可追溯、可归因的生意。**
+[CNB 仓库](https://cnb.cool/workloom-ai/WorkLoom-growthtest) · [产品身份](product.manifest.json) · [代码入口导览](docs/capabilities.auto.md) · [开发指引](AGENTS.md) · [Apache-2.0](LICENSE)
 
-一支 AI 获客班组住进你的通讯录：找人群、做内容、接询盘、跟线索、算成交——
-你只做三件事：**定方向、拍板、收钱。**
+> 本页按当前源码说明“有什么、从哪里进入、还依赖什么”，不把岗位或技能数量当作已交付能力数，也不把模拟结果当作生产效果。旧方案、截图和演示 PPT 可帮助理解背景；发生差异时，以 manifest、当前路由和实际执行代码为准。
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-9A7B2D)](LICENSE)
-[![CNB](https://img.shields.io/badge/repo-workloom--growthtest-1B2A4E)](https://cnb.cool/workloom-ai/workloom-growthtest)
+## 给首次接手团队的阅读顺序
 
-</div>
+1. 产品经理先看“使用场景”和“功能状态”，区分产品目标、已经有代码的链路与尚待接通的外部动作。
+2. 技术团队先看“系统架构”“行业包组合”和“快速开始”，再沿源码入口追到实际执行器、数据库与回执。
+3. 准备交付时，以真实环境的输入、产物、费用、失败恢复和外部回执验收；本页不提供未经实测的容量、延迟或经营收益承诺。
 
----
+## 使用场景与产品边界
 
-> 🧪 **实验副本说明（growth-test）**：本仓 `workloom-ai/workloom-growthtest` 是 [`workloom-ai/WorkLoom-growth`](https://cnb.cool/workloom-ai/workloom-growth) 的完整复制（复制基线 `a6dc89a`，2026-09-21），产品名定为 **AI超增长**，用于在稳定版之外做**激进改造实验**。实验语义只在本仓存在：**不下发、不覆盖、不回流**主仓；验证成功的通用能力必须先走提案任务卡（L2→L1→L0）才能进入基座。
+| 使用者 | 具体场景 | 系统中的工作方式 | 当前边界 |
+|---|---|---|---|
+| 内容策划与视频制作人员 | 把产品资料做成短片，管理脚本、渲染、返修与交付 | 在视频工位创建制作作业，分阶段推进预生产、渲染和后期，保留素材与成片记录 | 模型、媒体引擎、供应商账户与后期环境需要配置；公开发布另走授权链 |
+| 企业负责人、项目负责人 | 看清任务交给谁、交付什么、哪里待决定 | 工作台、任务线程、协作契约与组合看板组织交接和状态 | 看板和事件存在不等于营收归因已接通；演示订单不能当实际收入 |
+| 增长策略与渠道运营人员 | 同一选题用于社媒内容与 GEO，并积累可复用作业规范 | `geo-growthtest` 声明岗位、技能、围栏和管线，复用视频与视觉制作能力 | query 采集、能见度监测、线索评分和分发等专用工具仍需逐项接线与验收 |
+
+本仓身份是 `workloom-ai-growthtest`，角色为 `industry`，默认行业包为 `geo-growthtest`，属于 WorkLoom 的实验车道。它与 `workloom-growthtest`、`workloom-growthtestmatrix` 两个隔离副本是不同实例；不把其它仓库的实验能力合并算入本仓。酒店包是组合依赖和垂直业务样例，不代表这里已经接通真实 PMS、OTA、支付或所有酒店经营数据。来源：[product.manifest.json](product.manifest.json)、[主包 manifest](bundles/geo-growthtest/bundle.json)。
+
+## 功能状态：代码做到哪里
+
+下表的“有实现”指已能定位代码链路；“依赖外部”意味着还需要引擎、账户、数据源或驱动。“声明/SOP”描述预期作业方式，不能据此认定已经自动执行。
+
+| 模块 | 当前实现与入口 | 使用前需要知道 |
+|---|---|---|
+| 通用问答与任务 | [runtime](packages/runtime/src/) 实现 Ask、Agent、Quest；Ask 读取工作区事实，Quest 规划步骤、检查围栏并调用工具 | 无模型时可回退规则答复。真实数据态下，缺执行器的声明工具返回 `connector-required` 与 `receipt.synced=false` |
+| 岗位与协作 | PC `/agents` 查看岗位；`/portfolio` 聚合任务契约、交接和待决定事项。实现见 [协作服务](apps/server/src/service/collaboration.ts) | 组织与状态链路已存在；增长北极星等数据投影仍有待接字段 |
+| 视频工位 | 自然语言任务派遣或制片 API 启动前期；`/ai-video/assets?tab=studio` 消费已有脚本进行生成。实现见 [视频路由](apps/server/src/video/router.ts) 与 [生产 worker](apps/server/src/video/studio-worker.ts) | 默认按阶段推进。预生产完成不等于渲染完成，后期另由工位生成交付包；内部部分关卡默认自动，具体业务门按策略处理 |
+| 视频媒资与交付 | `/ai-video/media` 管理媒资，`/ai-video/assets?tab=delivery` 查看交付；另有商品档案、合集与成片历史。实现见 [媒资模块](apps/server/src/video/media/) | 支持媒体与制作记录管理；需要文件、数据库和对应作业产物，不能把空目录当作已交付成片 |
+| 白板、口播解释片 | [白板服务](apps/server/src/video/whiteboard/)、[口播解释片服务](apps/server/src/video/explainer/) 与 CLI 工具 | 有专用制作链；需要 TTS、渲染与后期依赖。当前没有独立 React 可视编辑页 |
+| GEO 与增长作业 | [主包岗位/技能/管线](bundles/geo-growthtest/) 声明双域情报、内容、能见度、线索与复盘流程 | 多项工具尚无专用执行实现；先把声明映射到执行器、数据源和真实回执 |
+| 视觉制作桥 | [visual-bridge](bundles/geo-growthtest/connectors/visual-bridge/executor.ts) 提供白名单视觉动作、幂等标识与端点调用 | 桥接代码存在；真实工位端点、认证和供应商额度仍需配置与联调 |
+| 平台发布 | [发布服务](apps/server/src/video/gen/publish.ts) 与 [浏览器适配层](packages/base/publish-rpa/) | 默认是 `dry-run` 演练。部分平台只有参考适配器，部分明确未接；不承诺六平台可直接自动发布 |
+| 获客经营报表 | [acquisition-router](apps/server/src/trpc/acquisition-router.ts) 提供只读聚合 | 订单与收益的部分查询来自 `demo_orders`；真实交易、支付和收入归因需要另外接入 |
+| 客户 H5 前台 | 对话、服务、工单、消息、我的；[服务网关](apps/server/src/service/) | 工单有持久化链路；当前通知存在 mock/pending 路径。增长包关闭身份绑定，不能当完整会员/订单系统 |
+| 模型、账号与治理 | 模型路由、会话、角色权限、围栏、审批后端、事件账本和组织记忆 | 真实短信/微信账号通道未全部接入；模型目录存在不代表供应商就绪。费用累计、取消与失败恢复需按实际调用链验收 |
+
+**当前 PC 通用审批、服务前台、成员管理、伙伴授权和个人账号管理入口已移除。** 底层 API 和业务专用关卡可以继续存在，但旧 `/approvals`、`/service` 等截图不再代表当前产品入口。具体路由与权限以 [App.tsx](apps/web/src/App.tsx)、[NavigationAccess.tsx](apps/web/src/shell/NavigationAccess.tsx) 和 [视频行业路由](apps/web/src/extensions/ai-video/routes.tsx) 为准。
+
+## 产品架构
+
+```mermaid
+flowchart TB
+  People[负责人、内容团队、增长运营] --> Workbench[目标、任务、岗位与组合看板]
+  Workbench --> Video[视频生产与交付工位]
+  Workbench --> Growth[GEO 与增长作业规范]
+  Workbench --> Collaboration[协作契约与交接回执]
+  Video --> Assets[脚本、素材、作业、成片与交付记录]
+  Growth -.专用工具逐项接入.-> External[采集、监测、线索、平台分发]
+  Collaboration --> Decisions[责任、状态与待决定事项]
+  Workbench --> Shared[身份、模型、围栏、事件、记忆与评测]
+```
+
+社媒与 GEO 共用工作空间和制作能力，但“获客五环”是产品目标模型。只有采集、制作、分发、承接、订单与归因分别有真实数据和回执，才能宣称某一客户的经营链路已经闭合。
+
+## 系统架构与关键调用链
+
+这是 TypeScript monorepo 中的模块化单体：三端 Web 和 Electron 壳消费 Hono/tRPC 服务；PostgreSQL 保存业务数据与事件；媒体文件与外部制作/浏览器工位承担文件和长耗时动作。
+
+```mermaid
+flowchart TB
+  PC[PC：apps/web] --> API[Hono 与 tRPC]
+  Mobile[员工移动：apps/webb] --> API
+  Customer[客户 H5：apps/webc] --> Gateway[C 端网关 /c]
+  Desktop[Electron 桌面壳] --> PC
+  API --> Access[会话、当前成员权限、工作区上下文]
+  Access --> Runtime[Ask / Agent / Quest]
+  Access --> Studio[视频专用生产链]
+  Bundle[行业 Bundle：岗位、技能、围栏、投影] --> Runtime
+  Bundle --> Studio
+  Runtime --> Fence[围栏与业务审批]
+  Fence --> Executor[部署工具执行器]
+  Studio --> Station[模型、媒体引擎与后期工位]
+  Executor --> Station
+  Runtime --> Ledger[WorkData 事件网关]
+  Studio --> Ledger
+  Ledger --> DB[(PostgreSQL + pgvector)]
+  API --> DB
+  Gateway --> DB
+  Station --> Media[媒体文件与签名访问]
+```
+
+| 研发关心的问题 | 从哪里追代码 | 关键边界 |
+|---|---|---|
+| 请求怎样进入系统 | [server/index.ts](apps/server/src/index.ts)、[tRPC context](apps/server/src/trpc/context.ts) | JWT 会话与当前成员/租户权限共同决定访问；数据库 scope 与 RLS 仍需沿调用链检查 |
+| 自然语言怎样变成动作 | [intent.ts](packages/runtime/src/intent.ts) → [assembly.ts](packages/runtime/src/assembly.ts) → [loop.ts](packages/runtime/src/loop.ts) | 通用 Quest 与视频专用 worker 是两条路径；声明工具必须有真实执行器 |
+| 外部工具怎样接入 | [tool-executor.ts](apps/server/src/runtime/tool-executor.ts)、[ToolExecutor/receipt](packages/runtime/src/tools.ts) | 补齐参数校验、租户范围、授权、幂等、超时、重试和回执；不能只返回“成功”字符串 |
+| 事件怎样留痕 | [workdata/gateway.ts](packages/base/workdata/gateway.ts)、[events.ts](packages/base/workdata/events.ts) | 账本追加与哈希链保护不等于所有业务表不可变，也不等于外部动作 exactly-once |
+| 模型怎样选择和记费 | [service/llm.ts](apps/server/src/service/llm.ts)、[model-router](packages/base/model-router/) | 策略能力与每个调用点是否传入套餐、累计预算和取消信号要分开验证 |
+| 数据表在哪里定义 | [SQL migrations](packages/db/migrations/)、[连接池与 scope](packages/db/src/client.ts) | SQL 迁移为 DDL 事实源；不要只读早期类型镜像推断当前 schema |
+
+NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未见创建接线；不要据此把它画成已经运行的消息骨干。通用 Quest 的计划固定、未核实回执后的恢复、审批编辑与在途取消仍是接手时应优先验证的边界。目录与代码不构成高可用、零丢失或生产 SLA 证明。
+
+## 行业包组合
+
+[`geo-growthtest`](bundles/geo-growthtest/bundle.json) 是主包，按精确版本依赖 [`hotel`](bundles/hotel/bundle.json) 与 [`ai-video`](bundles/ai-video/bundle.json)。岗位、技能、围栏、对象、阶段、模型策略和 UI 投影随包声明；[装配器](packages/base/bundles/assembly.ts) 负责依赖、完整性和同名归属。
+
+同名岗位由主包 `composition.presetOwners` 裁决：`ads-optimizer`、`publish-operator`、`review-analyst` 归 `geo-growthtest`，`company-ceo` 归 `hotel`。下方数量从 manifest 和岗位标识自动派生，避免手工维护另一套总数。当前三包均为 `candidate`；稳定包签名校验能力的存在不能变成“这些候选包已经完成生产验收”的结论。
+
+<!-- CAPABILITIES:BEGIN -->
+<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-09-27），请勿手改；重跑 pnpm capabilities 更新 -->
+
+## 代码与资产速览（自动生成）
+
+本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。
+
+- 🖥 **三端应用入口**：PC 工作台 · 员工移动工作台 · 客户 H5 服务前台
+- 📦 **行业包声明资产**：bundles/ai-video/ · bundles/geo-growthtest/ · bundles/hotel/
+- 🧑‍💼 **岗位与交互入口**：数字员工中心（`/agents`） · 织伴数字人组件 · 语音与口型引擎
+- 🖐 **电脑操作接口**：浏览器与桌面驱动接口 · HTTP / MCP 工位入口
+- ⚙ **共享基础模块（目录存在性）**：围栏判定 · 技能分发组件 · 任务编排基础组件 · 夜班状态与调度 · 模型路由与用量记录 · 发布适配层（默认演练） 等 15 项
+- 🎬 **内容生产专用入口**：视频工位 · 媒资与交付 · 白板与口播解释片
+- ✅ **验证与维护命令**：环境安装脚本 · 主测试套件 · GEO 域套件 · 酒店域套件 · 发布门禁 · 五元事件验链 等 8 项
+- 📚 **演示与说明资产**：静态演示原型 ×12 · 官网静态页面 · official 技能目录 ×9 · 历史能力导览 PPT · 模拟数据说明
+
+本仓 manifest 共声明 **85 条岗位定义、94 项技能路径、11 条管线**；岗位按 `preset_key` 去重为 **81 个不同标识**。实际组合以主包与装配器为准。
+
+完整来源与边界见 [自动导览](docs/capabilities.auto.md) 和 [机器清单](docs/capabilities.auto.json)；首次体验按下文“快速开始”准备隔离环境。
+<!-- CAPABILITIES:END -->
+
+## 内置角色：陈卓 `chen-zhuo`
+
+仓库自带默认模特陈卓的角色档案与定妆照，入口是 [`characters/registry.json`](bundles/ai-video/library/characters/registry.json)，默认标识为 `chen-zhuo`。在使用该角色库的出片链路中，镜头未显式指定角色时按 registry 的默认选角规则处理；需要换人或多人时再提供角色名/档案，无需重复建立默认角色。
+
+**角色资产随仓存在，不等于克隆后即可生成成片。** 出片仍需要对应模型或媒体供应商、授权素材通道、渲染引擎与后期依赖。真人肖像应按供应商授权路径使用，不能把仓库内参考图视为绕过平台授权检查的方式。
+
+- [角色规则与 FAQ](docs/character-registry.md)
+- [角色库目录说明](bundles/ai-video/library/characters/README.md)
+- 自检：`node scripts/verify-builtin-character-assets.mjs`；该检查要求在 Git checkout 根目录运行，并校验默认角色、必需角度资产与各处声明。
+
+## 快速开始
+
+以下是当前源码对应的本地开发/模拟体验步骤，面向已准备 Bash、Node.js **≥24.0.0**、本仓指定的 **pnpm 10.14.0** 和可用 PostgreSQL 环境的机器。版本以 [package.json](package.json) 为准；数据库示例用 [PostgreSQL 17 + pgvector 的 Compose 配置](docker-compose.yml)。这些步骤说明代码约定，不代表本次文档更新已经完成空白机器安装验收。
+
+### 1. 克隆、依赖与专用数据库
+
+```bash
+git clone https://cnb.cool/workloom-ai/WorkLoom-growthtest.git
+cd WorkLoom-growthtest
+pnpm install --frozen-lockfile
+test -f .env || cp .env.example .env
+docker compose up -d postgres
+docker inspect -f '{{.State.Health.Status}}' workloom-im-pg
+```
+
+等待最后一条输出 `healthy` 再继续。使用自己的 PostgreSQL 时，配置 pgvector，并在 `.env` 中同时核对迁移 owner、应用角色和网关角色三条连接串；不要只改其中一条。首次体验用专用演示库：种子会创建或刷新演示资料，部分脚本会重建演示指标，不能指向已有客户业务库。
+
+### 2. 选择入口
+
+**三端演示：**数据库准备好后运行下列命令。它会执行迁移、为本仓实际存在的包灌演示种子，再启动服务和三端。
+
+```bash
+LLM_PROVIDER=mock pnpm preview:all
+```
+
+| 入口 | 默认地址 | 说明 |
+|---|---|---|
+| PC 工作台 | http://localhost:3000 | 默认产品工作区 `geo-growthtest`，演示成员 `MEM-G01`；已有会话和权限会影响显示 |
+| 员工移动端 | http://localhost:3001 | `apps/webb` 的 React 应用，并非 `docs/demo` 静态原型 |
+| 客户 H5 | http://localhost:3002 | 该预览脚本固定到 `ws-yunqi` 酒店服务夹具，不能当作 GEO 客户前台演示 |
+| 服务端 | http://localhost:8787/health | 进程探活；仍需页面、数据库和具体场景检查 |
+
+`preview:all` 会尝试终止占用 3000/3001/3002/8787/5173/5176 的进程，运行前先确保这些端口没有需要保留的工作。预览的“已就绪”横幅不能替代健康核验；失败时查看 `/tmp/preview-all-*.log`。`LLM_PROVIDER=mock` 只控制通用模型路由，媒体供应商、浏览器发布和其它工位有各自的配置，不能据此宣称所有外部调用都被统一模拟。
+
+**PC 开发：**也可以显式初始化后只启动 server 与 PC，无须先跑三端预览。
+
+```bash
+pnpm db:migrate
+pnpm db:seed
+# 可选：补充视频工作室与获客演示资料
+pnpm db:seed:video
+pnpm db:seed:acq
+LLM_PROVIDER=mock pnpm dev
+```
+
+`pnpm dev` 默认 server 为 8787、PC 为 5173。另开终端运行 `pnpm -C apps/webb dev` 或 `pnpm -C apps/webc dev`，默认端口分别是 5175、5176。源码桌面入口 `pnpm app` 还需要 Electron，默认使用 server 8787、PC preview 4173；`app:dev` 使用 PC 5173。manifest 的桌面 `portOffset` 不被所有源码启动脚本共同采用，不应把其计算值套到这里。
+
+**增长客户前台：**需要观察 `geo-growthtest` 的 C 端配置时，先完成上述种子初始化，单独启动服务与 C 端，不使用会覆盖工作区的 `preview:all`：
+
+先停止已有的 `preview:all` / `pnpm dev` / `pnpm app`，确认 8787 空闲。若曾在 5176 连接过其它工作区，使用新的浏览器会话，或在“我的 → 退出当前服务”后重新进入，避免沿用旧工作区会话。
+
+```bash
+# 终端一：服务端（只用于本地演示）
+SERVICE_C_WORKSPACE_ID=ws-geo SERVICE_C_DEMO_AUTH=true LLM_PROVIDER=mock pnpm -C apps/server dev
+# 终端二：客户 H5
+pnpm -C apps/webc dev
+```
+
+这是增长服务目录与工单接入面的演示。它不代表身份、会员订单、消息实发及 GEO 对话全部已经接通；具体边界见上方功能表和服务代码。
+
+### 3. 当前安装脚本限制
+
+`pnpm setup` 仍会遍历所有 `db:seed*`，其中 `db:seed:aipm` 读取本仓未携带的 `bundles/ai-pm`；到该步骤可能因缺包失败。`setup:lite` 只直接执行基础种子，未完整覆盖默认 GEO 工作区初始化。因此本页以显式步骤为推荐入口，不再承诺“一条命令安装全部能力”。本次只更新文档与生成器，未修改这些启动脚本。来源：[bootstrap.sh](scripts/bootstrap.sh)、[setup-lite.mts](scripts/setup-lite.mts)、[preview-all.sh](scripts/preview-all.sh)。
+
+### 4. 从模拟到真实环境
+
+先按具体业务链列出必需依赖，再逐项连接。配置说明见 [`.env.example`](.env.example)；不要把真实凭据写进 README、提交或日志。
+
+| 目标 | 必须补齐的内容 | 验收产物 |
+|---|---|---|
+| 真实通用模型 | 实际端点、model ID、密钥、路由策略和费用配置 | 一次带用量/来源的真实响应，以及失败与降级记录 |
+| 视频、图像、白板、口播 | 相应供应商或本地引擎、授权素材、TTS、媒体目录与后期工具 | 原始作业、成片、声音/字幕、失败恢复与费用记录 |
+| 真实平台发布 | 已授权账户、真实浏览器驱动、文件上传、平台适配与业务批准 | 可核对的远端发布结果和回执；dry-run 不计入 |
+| GEO、线索与归因 | 真实采集源、工具执行器、线索/订单标识、数据权限 | 从输入到落库和结果的证据链，演示数据单独标识 |
+| 账号与消息 | 实际短信/身份供应商、消息渠道与送达回执 | 登录/撤销/权限测试和真实送达结果 |
+
+## 目录与文档索引
+
+| 路径 | 接手用途 |
+|---|---|
+| [`apps/server`](apps/server/) | Hono/tRPC、服务前台与视频专用链路 |
+| [`apps/web`](apps/web/)、[`apps/webb`](apps/webb/)、[`apps/webc`](apps/webc/) | PC、员工移动与客户 H5 |
+| [`packages/runtime`](packages/runtime/) | 意图、问答、岗位装配、通用任务循环和工具回执 |
+| [`packages/base`](packages/base/) | 账号、围栏、事件、模型、协作、夜班等共享模块 |
+| [`packages/db`](packages/db/)、[`packages/industry-contract`](packages/industry-contract/) | 数据迁移与连接、行业包契约 |
+| [`packages/video-studio`](packages/video-studio/) | 视频制作引擎适配与制作数据结构 |
+| [`bundles`](bundles/) | 岗位、技能、围栏、对象、管线、UI 投影、内容库与连接器资产 |
+| [`scripts`](scripts/) | 初始化、种子、开发、制作 CLI、校验和文档生成 |
+| [`docs/demo`](docs/demo/)、[`apps/site`](apps/site/) | 静态演示与网站资产，不能替代当前路由事实 |
+
+- **当前入口与统计**：[自动导览](docs/capabilities.auto.md)、[结构化清单](docs/capabilities.auto.json)、[产品 manifest](product.manifest.json)。
+- **视频与角色**：[角色库与默认模特](docs/character-registry.md)、[视频交付与返修](docs/video-delivery-and-revision.md)、[口播解释片](docs/talkcraft-explainer.md)、[白板引擎](docs/whiteboard-engine.md)。
+- **接入与运行**：[电脑工位指南](docs/computer-use-production.md)、[连接器退出 mock 的约定](docs/connectors-mock-exit.md)、[发布清单](docs/release-checklist.md)。
+- **产品方案背景**：[社媒与 GEO 融合方案](docs/geo-fusion-plan.md)、[获客方案](docs/plan-acquisition.md)。这些文档含目标与历史设计，不能单独证明当前运行能力。
+- **开发治理**：[AGENTS.md](AGENTS.md)、[本仓规则](AGENTS.repo.md)、[全景认知](WORKLOOM_PRODUCT_CONTEXT.md)、[开发协作协议](docs/DEVELOPMENT-PROTOCOL.md)。
+
+## 贡献与验证
+
+修改前读取仓库指引，记录分支、HEAD 和已有改动；按协议建立任务卡、独立分支与 PR。只提交本次路径，不修改受控共享副本来绕过治理。
+
+文档生成链修改的最小验证命令是：
+
+```bash
+node --check scripts/generate-capabilities.mjs
+pnpm capabilities
+pnpm capabilities:check
+node scripts/verify-builtin-character-assets.mjs
+node scripts/secret-scan.mjs --staged
+git diff --check
+```
+
+同时核对本地链接、manifest 数字和生成区块。业务修改再按影响运行相关类型检查、单测、数据库/场景套件；UI 修改实际打开页面核对；发布前执行仓库发布门禁。检查命令存在或文档检查通过，都不能代替对应生产场景的验证结果。
+
+## 产品理念与长期目标
+
+下面是 WorkLoom 体系共享的自主经营纲领引用，描述理念与终态目标。它是受控内容，**不作为上表各功能已经生产可用的证明**；本仓实际范围以本页实现状态及源码为准。
 
 <!-- WORKLOOM-AUTONOMOUS-OPERATIONS:BEGIN -->
 ## 🧭 理论纲领 · AI 自主经营模式
@@ -30,337 +264,6 @@
 - **度量即货币**：自治率、客户干预率、回测命中率三条曲线决定自治权扩张；模拟成功不计入自治率。
 <!-- WORKLOOM-AUTONOMOUS-OPERATIONS:END -->
 
-## 产品定位
-
-AI超增长是一套**面向 B 端商家的 AI 获客经营系统**：以「短视频社媒营销 + GEO（生成式引擎优化）」双引擎触达客户，以「获客五环」（意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘）闭环经营，每一环都可度量到钱。首个深度垂直行业是**酒店**（社媒营销 × GEO × 获客 × 酒店运营一体），底座支持向各行业复制 Bundle。
-
-> **主题边界（全仓口径）**：本仓产品主题只有一个——**获客用增**（意图洞察 → 双域触达 → 承接转化 → 归因复盘 → 增长实验）。酒店是**首个深度垂直行业试点**：仓内的酒店业务对象（客房/住客/房态/送物/报修等）只作为试点行业的经营底座与 C 端契约夹具保留，**不属于产品主题，也不得进入获客用增的对外叙事**。获客用增的产品演示工作区是 `geo-growth`（`ws-geo`）；酒店工作区（`yunqi-hotel`）是试点业务前台夹具。
-
-开过店、做过生意的人，都懂这三笔账：
-
-> **第一笔：流量越来越贵。** 投流成本年年涨，内容不发就没声量，发了没转化就是给平台打工。
-> **第二笔：询盘接不住。** 评论区一句「怎么订」半小时没人回，客户就去别家了——夜间、高峰期的询盘流失率超过 70%。
-> **第三笔：佣金被抽走。** 以酒店为例，OTA 佣金 15-25%——你辛苦服务一整晚，平台躺着抽走四分之一。
-
-还有一个正在发生、但大多数人没看见的变化：**42% 的消费者已经开始用生成式 AI 查消费信息**——「杭州亲子酒店哪家好」「xx 牌子的激光切割机靠谱吗」。AI 搜索里没有你，你就失去了一个爆发中的新入口。
-
-| 传统获客的死法 | AI超增长的活法 |
-|---|---|
-| 广撒网做内容，不知道给谁看 | **意图雷达**：竞对评论区 / 搜索 query / 差评里萃取「谁在为这个问题找答案」，先有人群再有内容 |
-| 内容发完就完，转化靠缘分 | **双域触达**：短视频社媒种草 + GEO 六段式占领 AI 搜索答案，一次生产两处变现 |
-| 询盘半夜流失，白天排队回复 | **四路承接**：AI 接待员 7×24（评论 / 私信 / 落地页 / AI 搜索行动锚点），30 秒首响，报价必过人审 |
-| 线索躺在表格里没人跟 | **线索分级**：A 级 1 小时内派单到人，B 级进培育池，C 级私域喂养 |
-| 不知道哪条内容赚了钱 | **归因到钱**：每条线索带来源链，成交回写——北极星就是「归因成交额」 |
-
-**获客的精髓就一句话：在对的地方，用对的内容，接住有意图的人，并且每一环都能度量到钱。**
-
-<!-- CAPABILITIES:BEGIN -->
-<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-09-27），请勿手改；重跑 pnpm capabilities 更新 -->
-
-## 🧩 系统能力速览（自动生成 · 与代码同步）
-
-- 🖥 **三端应用（开箱即看）**：PC 端 · B 端工作台 · 移动端 · B 端高保真 · 移动端 · C 端 AI 服务前台
-- 🏨 **行业 Bundle（垂直能力包）**：bundles/ai-video/ · bundles/geo-growth/ · bundles/hotel/
-- 🧑‍💼 **数字员工与数字人（本仓自带）**：数字员工中心（`/agents`） · 织伴数字人（Live2D 常驻浮层） · 语音与口型引擎
-- 🖐 **操作电脑能力（本仓自带 · 可装生产工作站）**：computer-use 三层感知（65 动作） · HTTP 远程驱动 + MCP server
-- 🤖 **AI 自动化引擎（系统内置能力）**：围栏 DSL 引擎 · 技能保鲜环（下行分发） · L2 编排（ASK/QUEST） · 夜班自动运行 · 模型路由 · 全平台 RPA 发布 等 15 项
-- ✅ **验证与质量（工程纪律）**：一键安装（bootstrap） · 主测试套件 · GEO 域套件 · 酒店域套件 · 发布门禁 · 五元事件验链 等 8 项
-- 🎁 **演示与交付资产**：高保真演示页 ×12 · 官网静态站 · 自带技能 ×9 · 能力导览 PPT · Mock 数据体系
-
-> 📖 完整能力导览（含截图与体验路径）：[docs/capabilities.auto.md](docs/capabilities.auto.md) ｜ 🤖 AI Agent 入口：[AGENTS.md](AGENTS.md) ｜ 🎯 首启必跑：`pnpm preview:all`
-<!-- CAPABILITIES:END -->
-
----
-
-## 核心能力
-
-### 获客五环：每一环都可度量到钱
-
-系统里每天都在自动运转的五环闭环：
-
-1. **意图雷达**：竞对评论区 / OTA 差评 / query 词 / 本店私信四矿源萃取，每周《意图雷达报告》反向指挥选题——先有人群，再有内容；
-2. **双域触达**：短视频 + 直播卖券 + GEO 六段式（问题前置 → 直接答案 → 参数表格 → 清单建议 → 实体锚点 → 信源引用），一次生产、社媒与 AI 搜索两处变现；
-3. **四路承接**：AI 接待员 7×24 在线（评论区 / 私信 / 落地页 / AI 搜索行动锚点），30 秒首响；询价自动转人审（围栏 R21，AI 不许私自报价）；
-4. **线索转化**：通兑券「先囤后约」+ 库存熔断（R22）+ 定价红线（R26）；A 级线索 1 小时派单到人，B 级培育，C 级私域喂养；
-5. **归因复盘**：六级漏斗（曝光 → 互动 → 询盘 → 留资 → 成交 → 复购）+ **归因成交额**北极星 + **OTA 佣金节省对照**——每条成交都知道自己从哪来。
-
-### 双域融合：短视频社媒营销 × GEO
-
-AI 搜索月活破 8.2 亿、AI 问答流量占比首超传统搜索——客户越来越多地先问 AI，再决定买谁。**GEO 就是让 AI 替你说话的生意**。两个经营域共享一个情报站、一条内容生产线、一套分发基建、一张战报、一条私域转化链路：
-
-| 协同机制 | 一句话 |
-|---|---|
-| 选题情报双向流动 | 情报站每日统一情报卡，双用选题优先排产——一条 AI 高频问题，同时产出短视频和 GEO 图文 |
-| 内容一次生产、两处变现 | 脚本成套包固定字段「AI 答案适配版」：人审通过后 GEO 改写自动触发（六段式），零边际成本，双审不省 |
-| 分发渠道统一编排 | publish-rpa 分两组：社媒组（抖音 / TikTok / 小红书 / YouTube / Meta）+ 信源组（知乎 / 头条号 / 百家号 / 公众号 / 新闻稿 / 垂媒 / 百科），同一套模拟人工纪律 |
-| 全网存在感战报 | 固定三栏：社媒侧（播放 / 涨粉 / 互动 / 询盘）/ GEO 侧（提及率 / 首推率 / SOV / 引用源变化）/ 交叉侧（双入口询盘对比） |
-| 询盘双入口进同一私域 | 社媒私信 vs AI 搜索 → 官网 → WhatsApp，全部来源打标进同一私域 |
-
-**GEO 不是灰帽**：四条围栏焊死底线——GEO 内容外发必审、事实红线一票否决（品牌实体信息与实体卡逐字一致）、语料污染 / 伪造多源 / 机器刷量熔断、信源日发超限熔断。每个能见度数据都有原始答案截图存证，每个 AI 决策都进回测账本。完整方案见 [社媒短视频营销 × GEO 融合经营系统落地执行方案](docs/geo-fusion-plan.md)，代码全部在 [`bundles/geo-growth/`](bundles/geo-growth/)——**底座零改动，一切能力经 Bundle 注入**。
-
-### 酒店垂直：社媒营销 × GEO × 获客 × 运营一体
-
-把双域能力扎进一个垂直行业：酒店运营域（围栏基线 R1-R26、29 个官方技能、16 个数码员工、低星单体 / 民宿 / 无人酒店三客群分型）+ 酒店获客域（获客五环）+ 外部连接器（PMS / 抖音本地生活 / OTA 监测 / 企微，mock 先行）。运营与获客一个 Bundle 承载，一店一档只有一份。
-
-> **一句话价值主张**：「白天空房不用愁——短视频 + AI 搜索帮你接客；晚上店长放心睡——夜班 + 语音前台帮你守店；OTA 佣金不用交——直连成交帮你省钱。」
-
-### 夜班模式：你睡了，店还开着
-
-夜班锚的不是「AI 的工作时间」——AI 本来就 24 小时全勤——而是**人的离线时间**，获客链路 24 小时不断：
-
-- **触达免打扰**：非 P0 不叫人，一切聚合为 08:30 晨报
-- **权限自降级**：夜间防守性动作自治，对外承诺一律留痕可审
-- **高峰窗口三线合一**：内容线抓流量晚高峰排期发布与评论区承接；转化线夜间客询即时应答（GEO / 线索跟进不断线）；运营线夜班值守兜底（差评 SLA 扫描 / 价格巡检 / FAQ 萃取）
-- **成本洼地**：视频渲染与批量内容生产落在谷时算力窗口执行
-
-### 数字 CEO：获客团队的总经理
-
-数码员工解决「手」的问题，数字 CEO 解决「脑」的问题。它统领双域班组（14 员 + 2 指挥官：情报组 / 内容组 / 分发组 / 数据组 / 经营组，公司 CEO 管客户、集团 CEO 管全盘），做决策、带团队、向你汇报：
-
-- 常规选题按策略自动排产；重大方向调整走六步深度分析报你拍板
-- 小额投流测试自主，超预算上限必请示；连续不达标的员工出具汰换诊断书报你批准
-- 出厂默认关闭，启用须完成六步深度授权；先当 3 天「影子」只模拟不执行，再 7 天试用（权限减半），到期不自动续期；五级权限，禁区物理熔断，每个决策都写进不可篡改的事件账
-
-### 通用模型路由：获客链路的每一分钱都花得清楚
-
-三个行业 Bundle 共享同一底座路由内核，每一次模型调用按场景定档、按倍率计量、按事件可审：
-
-- **三行业场景路由表**：`bundles/hotel`（客服 / 语音前台 L1、六步深度 L3、体检报告平台成本）· `bundles/ai-video`（预生产 / 导演评审谷时 L2、渲染三供应商降级链）· `bundles/geo-growth`（询盘应答 L1 秒级保转化、GEO 内容批量谷时 L2、投放战役策略 L3 noDowngrade）
-- **渲染额度台账 + 预算闸**：套餐秒数配额，围栏后超支未确认即熔断；Seedance → 可灵 → 即梦降级链 + 轮询回填
-- **积分三池账本 + 加油包**：P1 积分账本面板，五档加油包；售前体检 `bill_to: platform` 平台成本——获客补贴烧在刀刃上
-- **👍/👎 反馈环**：Ask 应答卡一键升级重答（点踩换更强大脑，首次免费），反馈数据回流驱动路由调表
-
-**商业化锚点**：智享 499 / 标准 1,299 / 智能 2,999 元每店每月——用不到一个获客专员的月薪，买下「流量 → 询盘 → 成交」全链路的 AI 获客团队。
-
-### 内置人物资产：视频出片**开箱即用**（别重复造角色）
-
-本仓**自带 1 号模特「陈卓」（`chen-zhuo`）**——角色档案（外貌 / 服装 / 气质 / 授权信息）+ **8 角度定妆照** +
-默认选角规则随仓分发，克隆下来就能出片：**镜头卡里不写 `character` 时，出片链路自动采用默认模特**
-（运行日志会打印 `未显式指定模特 → 使用系统默认模特：陈卓（chen-zhuo，1 号）`），不需要先建角色、也不需要准备照片。
-
-- **在哪**：`bundles/ai-video/library/characters/`（事实源 `registry.json`，目录说明见该目录的 README）
-- **怎么用**：镜头卡写 `"character": "陈卓"`（别名「卓卓」同样解析）即点名；**什么都不写就是默认**；
-  多人项目里写了名字的按名字解析，其余未指定角色才回落到默认模特
-- **真人边界**：真人肖像只走平台授权通道（火山方舟「私域真人人像库」→ `asset://<asset ID>`），
-  直传真人照片会被平台隐私闸拦（`InputImageSensitiveContentDetected.PrivacyInformation`）——本仓不提供绕过手段
-- **加新 / 换默认**：新建 `model-02-<拼音>/` + 在 `registry.json#models` 追加一条；改默认就改 `defaultModel`
-- **规则与 FAQ**：[内置角色库与默认模特](docs/character-registry.md) ｜ **自检**：`node scripts/verify-builtin-character-assets.mjs`（资产齐备 + 声明四处同步）
-
-### WorkData 数据底座：素材、线索与过程全留痕
-
-- **素材库**：商品图、参考图、定妆照、片段、成片，全部带版本链和溯源，sha256 幂等去重
-- **渲染脚本 CMS**：每条镜头脚本都是版本化的 Markdown，改完自动重跑质量校验；手动单镜渲染、整片批量渲染、全自动连锁三档任选
-- **组织记忆**：每条片子、每次投放的创作与决策过程沉淀为可检索的记忆
-- **全程留痕**：每个镜头、每次审批、每次发布、每条回复都是 append-only 五元事件，SHA-256 哈希链防篡改，崩溃重放零丢失
-
-### 数字员工名册与数字人：获客班组的在岗证明
-
-- **编制可查（`/agents`）**：获客用增主包 27 个岗位（组合编制 **78 岗**：各包声明 hotel 16 + ai-video 36 + geo-growth 26（同名遮蔽 4 处按主包裁决））与人类员工同一本通讯录——每个岗位都有平台档案：来源 Bundle、**围栏授权逐条对账**（悬空标红）、绑定技能包、运行约束、**30 天战绩**（动作数 / 采纳率 / 被驳回 / 积分与谷时占比）与等级段位；点「派遣」当场建任务线程；夜班岗位 22:00–08:00 自动上线，只读岗位标绿（无写工具）。
-- **数字人织伴（LoomMate）**：PC 端全页面常驻的 Live2D 秘书——语音 + 口型播报「昨夜内容发布 / 询盘承接 / 今日待拍板」，三态（小角落 / 大形象 / 屏保）可切；你不在电脑前时她聚合非 P0 事项、屏保守着全场，点她就能问数据、派活、看记忆。
-
----
-
-## 系统架构与业务闭环
-
-<p align="center"><img src="docs/images/architecture.png" alt="AI超增长架构（体验层 / 服务层 / geo-growth Bundle + 基座十域 / 运行时地基 / 数据层）" width="92%"/></p>
-
-五层结构自上而下：**体验层**（B 端工作台 / 移动端 / C 端 AI 服务前台 / 织伴数字人 + IM 通道）→ **服务层**（Hono + tRPC v11，工作区上下文 + RLS）→ **能力层**（geo-growth Bundle：27 个岗位 / 29 个技能 / 4 条管线，与 hotel + ai-video 组合后 **78 岗 / 10 管线** + 获客五环与双域触达 ＋ 基座十域零改动继承）→ **运行时地基**（DeepSeek Harness seam 适配）→ **数据层**（PostgreSQL 17 + pgvector：素材与线索全留痕、组织记忆、五元事件哈希链）。
-
-<p align="center"><img src="docs/images/business-loop.png" alt="获客一天的业务闭环：意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘 → 老板拍板" width="92%"/></p>
-
-**意图洞察 → 双域触达 → 四路承接 → 线索转化 → 归因复盘 → 老板拍板**，六节点闭环；夜间询盘由夜班班组接住、晨间战报报到手机，两条回流（线索归因回写 / 内容门道固化）让每一分投放都更值钱。
-
----
-
-## 系统截图（模拟运行态实拍）
-
-以下截图均来自系统**模拟运行态**（`pnpm preview:all` + 种子数据 + 离线确定性模型），页面顶部琥珀色横幅「当前为全模拟运行态」为系统原生标识；PC 端为「WorkLoom GEO · 双域经营演示工作室」（`ws-geo` · geo-growth 行业包）。
-
-### PC 端 · B 端工作台
-
-| 经营剧场（默认首页 `/`） | 数字员工 · 人机混编通讯录（`/agents`，组合 75 岗） |
-|---|---|
-| ![经营剧场](docs/images/shots/pc-home.png) | ![数字员工](docs/images/shots/pc-agents.png) |
-
-| 统一待办（`/inbox`） | 审批中心（`/approvals`） |
-|---|---|
-| ![统一待办](docs/images/shots/pc-inbox.png) | ![审批中心](docs/images/shots/pc-approval.png) |
-
-| 经营报告 · 获客战报（`/reports`） | 服务前台（`/service`） |
-|---|---|
-| ![获客战报](docs/images/shots/pc-reports.png) | ![服务前台](docs/images/shots/pc-service.png) |
-
-| 技能中心（`/skills`） | 夜班中心（`/night`） |
-|---|---|
-| ![技能中心](docs/images/shots/pc-skills.png) | ![夜班中心](docs/images/shots/pc-night.png) |
-
-| 围栏与权限（`/guardrails`） | 事件账本（`/events`） |
-|---|---|
-| ![围栏与权限](docs/images/shots/pc-rules.png) | ![事件账本](docs/images/shots/pc-events.png) |
-
-| 组织记忆（`/memory`） | 经营驾驶舱 · 数字CEO（`/executive`） |
-|---|---|
-| ![组织记忆](docs/images/shots/pc-memory.png) | ![经营驾驶舱](docs/images/shots/pc-chairman.png) |
-
-### 数字人 · 织伴（Live2D 常驻）
-
-| 织伴开场（S0–S4 全身像登场） | 织伴面板（聊聊 / 设置 / 记忆） |
-|---|---|
-| ![织伴开场](docs/images/shots/pc-mate-welcome.png) | ![织伴面板](docs/images/shots/pc-mate-chat.png) |
-
-### 移动端
-
-| B 端 · 经营驾驶舱 | B 端 · 数字员工名册 | C 端 · AI 服务对话 | C 端 · 服务大厅 |
-|---|---|---|---|
-| ![经营驾驶舱](docs/images/shots/mb-owner.png) | ![B端数字员工](docs/images/shots/mb-agents.png) | ![AI服务对话](docs/images/shots/mc-chat.png) | ![服务大厅](docs/images/shots/mc-service.png) |
-
----
-
-## 使用方式
-
-### 三种姿势，融入经营日常
-
-**Ask · 问答模式 —— 你的经营参谋。**「本周获客链路数据怎么样？」「这周哪条内容效果最好？」随口问，系统基于事件库实时数据、历史归因和组织记忆回答。不问过程，只要答案。
-
-**Quest · 目标模式 —— 你出目标，它出结果。**「给亲子房出 3 条抖音种草片，周五前要。」系统自动拆解成任务卡链条：调研 → 策划 → PRD → 剧本 → 分镜 → 提示词 → 定妆照 → 渲染 → 后期 → 发布 → 监控。断点续跑——中途改主意、改素材、改预算，接着跑，不重来。
-
-**自动化编排 —— 睡后收入的基础设施。**「每周一三五晚 8 点发抖音，发完自动盯数据，差评 30 分钟内给我处置建议。」用触发器把重复性经营动作编排成 7×24 自动流：定时发布 → 数据采集 → 评论分流 → 战报生成。编排一次，天天受益。
-
-### 先体检，再托管
-
-把店交给系统之前，先知道**链路现在漏在哪个环节**。质检模式（Audit-Only）是前置闸：**系统只读扫描、一个字都不写回**，先出体检报告，再谈托管：
-
-- **快照快扫**（fast-scan 技能）：授权 PMS / OTA + 社媒账号 + GEO 数据后 15–30 分钟完成双线静态扫描，当场出《获客全链路快速体检报告》——按「流量 → 转化 → 成交」链路排序的 Top10 行动清单，每条带证据与估算挽回金额
-- **持续体检**（1–2 周）：捕捉只有时间能回答的问题——首响时长实测、差评 SLA 履约、内容节律趋势、能见度周环比
-- **双线扫描**：酒店运营线（价格倒挂 / 超售漏售 / 渠道对账差异 / 存量差评 / 担保异常）+ 获客转化线（账号健康 / 内容节律 / 未承接高意向 / GEO 可见度缺口 / 线索流失点）
-- **围栏纪律**：体检期一切对外写操作物理阻断（调价 / 退款 / 排房 / 发布 / 回评论 / 私信 / 投放），上岗员工全部是只读 / 分析岗；体检基线自动留存，托管后每月 diff 产出《整改闭环率》
-
-看到漏的钱之后，再一键切换影子模式（3 天只看不做）→ 正式托管（低星单体 / 民宿 / 无人酒店三客群）。
-
----
-
-## 账号体系（基座自带 · 获客团队开箱即用）
-
-获客版开箱自带完整账号体系（基座 `packages/base/accounts` 同步而来，无需配置）：
-
-- **团队角色**：老板（owner）/获客主管（manager）/内容与线索专员（staff）/查看（readonly）四角色；多渠道线索的审批与跟进待办聚合在**统一待办**一屏；
-- **获客代运营（伙伴域）**：agency 白名单授权（内容执行/线索跟进/报表查看）——**广告投放充值等资金类永不开放**；随时吊销、动作逐条可见；
-- **被服务企业（客户的客户）**：observer 观察者——只看自己那份线索看板与获客周报，交付透明本身就是获客服务的卖点；
-- **页面**：/login 登录 · /activate 自助开通 · /invite 接受邀请 · P28 统一待办 · P29 我的 · P30 成员管理 · P31 伙伴授权。
-
-## 快速开始
-
-### 一键跑起来（推荐）
-
-```bash
-git clone https://cnb.cool/workloom-ai/workloom-growthtest.git
-cd workloom-growthtest
-pnpm setup && pnpm preview:all
-```
-
-`pnpm setup` 是一键安装：环境检查 → `.env` → 依赖 → PostgreSQL（docker compose 自动建容器）→ 迁移种子 → 可选「操作电脑」桌面栈，幂等可重复跑。`pnpm preview:all` 一键拉起**三端全貌**并自动固化 Mock 模拟数据（无需任何真实后端 / 密钥）：
-
-| 端 | 地址 | 说明 |
-|---|---|---|
-| PC 端 · B 端工作台 | http://localhost:3000 | 经营剧场 / 任务中心 / 规则中心 / 装配中心 |
-| 移动端 · B 端 | http://localhost:3001 | 高保真演示页 + 手机壳容器（12 页自动发现） |
-| 移动端 · C 端 | http://localhost:3002 | AI 服务前台 H5（小程序入口模拟，演示直登） |
-
-> **首次启动必须执行 `pnpm preview:all`**，否则视为未完成环境初始化。Mock 数据口径见 [`mock/README.md`](mock/README.md)；验收清单见 [`PREVIEW_CHECKLIST.md`](PREVIEW_CHECKLIST.md)。
-
-### 手动分步（三套演示工作区任选）
-
-```bash
-docker compose up -d postgres     # PostgreSQL 17 + pgvector
-cp .env.example .env              # 首次必须（db:* 脚本依赖 --env-file=.env）
-pnpm install
-pnpm db:migrate
-pnpm db:seed         # 一键产出两个工作区：获客用增演示（geo-growth / ws-geo，产品主题）+ 酒店试点业务前台夹具（yunqi-hotel，C 端契约与试点）
-pnpm db:seed:video   # AI 视频制作经营演示（video-studio 工作区）
-pnpm db:seed:geo     # 社媒×GEO 双域代运营演示（geo-growth 工作区）
-pnpm dev             # server :8787 / web :5173
-```
-
-PC 端默认进入 **获客用增演示工作区**（`geo-growth` / `ws-geo`，成员 `MEM-G01`）；如需切换演示工作区：启动 web 时设置 `VITE_DEMO_WORKSPACE=<slug>`（如 `video-studio` / `yunqi-hotel`）与 `VITE_DEMO_MEMBER=<member_no>`。
-
-**双端演示原型**（浏览器直接打开）：`docs/demo/geo-demo-pc.html`（获客用增 B 端）/ `docs/demo/geo-demo-mobile.html`（移动端）/ `docs/demo/geo-demo-c.html`（C 端）。酒店试点夹具原型：`docs/demo/hotel-owner-app.html` / `docs/demo/hotel-guest-app.html`。
-
-### 开户即托管（P0：没开箱就在运营）
-
-平台侧一次接管：**自动装配组合编制 → 默认影子档（只推理、不执行）→ 产出《影子对照报告》→ 客户首次登录即见 → 客户一键转正进入试用**。全部动作幂等，账本 append-only。
-
-```bash
-pnpm onboarding provision --tenant tn-demo --workspace ws-demo --name "XX 获客用增" --slug xx-growth
-pnpm onboarding cycle     --tenant tn-demo --workspace ws-demo          # 影子周期：简报/队列裁决/偏差扫描（全 dry_run）
-pnpm onboarding report    --tenant tn-demo --workspace ws-demo --name "XX 获客用增"
-pnpm onboarding first-login --tenant tn-demo --workspace ws-demo        # 客户首次登录所见（影子报告 + 最新简报）
-pnpm onboarding advance   --tenant tn-demo --workspace ws-demo --by MEM-001 --confirm   # 转正：shadow → trial
-
-pnpm acceptance:onboarding   # 全链验收门禁（CI test-gate 已接入；非 0 退出即阻断）
-pnpm scan:fences             # S9 围栏别名扫描：每条规则必须覆盖「工具前缀派生的对象视图」（G12 同类风险门禁）
-```
-
-### 从模拟运行态到真实数据
-
-种子完成后系统即进入**全模拟运行态**：经营剧场、数字 CEO 简报、待决策请示、实况字幕流，全部为演示数据 + 内置确定性模型（零外部依赖）。页面顶部常显琥珀色横幅提示「当前为全模拟运行态」，点击「接入真实数据 →」进入**落地向导**（`/onboarding`）：
-
-1. 环境自检（自动）
-2. 接入真实大模型（DeepSeek / Kimi / 智谱 / OpenAI 预设一键填，真实试调通过才落盘，保存即全链生效免重启）
-3. 登记经营主体
-4. 启用真实模式（横幅熄灭，全程五元事件留痕）
-
-Ask 问询另支持联网实时检索事实面（`ASK_WEB_SEARCH=1`，Bing RSS，免密钥）。
-
----
-
-## 面向 AI Coding Agent
-
-本仓库对 AI Coding Agent 原生友好，进仓请按以下顺序：
-
-1. **先读 [`AGENTS.md`](AGENTS.md) 与 [`.ai-prompt`](.ai-prompt)**——仓库的强制约定与入场指引；
-2. **首启必跑 `pnpm preview:all`**，未完成视为环境初始化未完成；
-3. **一键能力巡游 `pnpm agent:tour`**（`--full` 追加种子编排 + 全部测试套件 + 发布门禁），全量能力清单见 [`docs/capability-map.md`](docs/capability-map.md)；
-4. **本仓自带「操作电脑」能力**（`packages/base/computer-use/`，65 动作三层感知：L1 浏览器 DOM 级 / L2 全 GUI 语义树 / L3 截图像素级，不依赖任何沙箱）：`pnpm computer:preflight && pnpm computer:smoke` 即验；可装到生产专用工作站，HTTP / MCP 远程驱动见 [`docs/computer-use-production.md`](docs/computer-use-production.md)；
-5. **验证纪律**：改完代码必跑 `pnpm suite`；发布前必跑 `pnpm release:gate`；改事件 / 号源后跑 `pnpm db:verify-chain`；UI 改动必须用浏览器能力实际打开页面截图核对；改了能力面必须跑 `pnpm capabilities` 重新生成导览。
-
----
-
-## 技术要点
-
-| 能力 | 一句话 |
-|---|---|
-| 获客五环引擎 | 意图雷达 → 双域触达 → 四路承接 → 线索转化 → 归因复盘，北极星「归因成交额」+ OTA 佣金节省对照 |
-| GEO 六段式 | 问题前置 → 直接答案 → 参数表格 → 清单建议 → 实体锚点 → 信源引用；能见度数据原始答案截图存证，敢拿命中率接效果对赌 |
-| 好莱坞级制作引擎 | 融合 SuperMickey 四层架构（剧本 → 制作 → 渲染 → 后期），25/30 字段镜头卡、5 维导演评分、203 个导演级技能库 |
-| 审批门与围栏 | 情报 / 主题 / PRD / 定妆照 / 提示词 / 渲染 / 发布 / 评论等原生审批门，围栏三级授权（自动 / 审批 / 禁止），报价 / 外发必过人 |
-| 事件溯源底座 | 五元事件 append-only + SHA-256 哈希链（WorkData），「模型可见即已记录」，崩溃重放零丢失 |
-| Quest 引擎 | 目标自动拆解为任务卡，replay 断点续跑——长链路生产不怕中断 |
-| 全平台 RPA 分发 | 社媒组 + 信源组双组编排，模拟人工节奏防风控，单账号 / 单信源日上限熔断 |
-| 行业 Bundle | 垂直能力包机制：`bundles/hotel/`（酒店运营+获客）、`bundles/ai-video/`、`bundles/geo-growth/`，围栏 / 技能 / 管线 / UI 随包分发，底座零改动 |
-
-## 仓库结构
-
-| 目录 | 内容 |
-|---|---|
-| `apps/server` | tRPC 服务端（:8787） |
-| `apps/web` / `apps/webc` | B 端 PC 工作台 / C 端 AI 服务前台 H5 |
-| `apps/site` | 官网静态站（含实机截图） |
-| `packages/base` | 底座包：workdata（事件 / RLS）、fence-engine（围栏 DSL）、publish-rpa（全平台分发）、computer-use 等 |
-| `bundles/` | 行业 Bundle：`hotel/`、`ai-video/`、`geo-growth/` |
-| `skills/official/` | 自带技能 ×7 |
-| `scripts/` | 测试套件（主套件 / GEO 域 / 酒店域）、种子、发布门禁、能力巡游、三端预览 |
-| `docs/` | 方案文档、能力地图、用户指南、12 页高保真演示页 |
-
-## 文档索引
-
-- [完整能力导览（自动生成）](docs/capabilities.auto.md) ｜ [全量能力清单](docs/capability-map.md)
-- [内置角色库与默认模特（视频出片开箱即用）](docs/character-registry.md) ｜ [角色档案设计与授权边界](docs/character-archive-design.md)
-- [获客系统升级方案（获客五环 / 酒店垂直 / 分期落地）](docs/plan-acquisition.md)
-- [社媒短视频营销 × GEO 融合经营系统落地执行方案](docs/geo-fusion-plan.md)
-- [酒店资产迁移判断与架构方案](docs/plan-hotel-migration.md)
-- [操作电脑能力生产部署指南](docs/computer-use-production.md) ｜ [浏览器自动化指南](docs/agent-computer-guide.md)
-- [酒店销售一页纸 ×3 客群](docs/sales/) ｜ [行业落地三技能体系](docs/methodology/01-行业落地三技能体系.md)
-
 ## 许可证
 
-Apache-2.0（vendor/dsh 与 vendor/dsh-im 为 MIT）。
+主仓许可证见 [Apache-2.0 LICENSE](LICENSE)。第三方组件与 vendor 资产分别遵循其许可证和使用条件；清单见 [OPEN_SOURCE_COMPONENTS.md](docs/OPEN_SOURCE_COMPONENTS.md) 与 [oss-components.json](oss-components.json)。

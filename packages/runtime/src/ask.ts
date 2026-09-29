@@ -136,9 +136,9 @@ export const defaultAskFactProvider: AskFactProvider = async (app, scope, questi
  * 行业事实采集器注册位（落地向导/行业包启动时调用）。
  *
  * GR-19（N-09，2026-09-28 实测）：此前是**进程级单例**且全仓零调用点——
- * geo-growth 工作区问"本月获客成本/线索转化"时，facts 里只有底座通用面（事件条数/待审批数），
+ * geo-growthtest 工作区问"本月获客成本/线索转化"时，facts 里只有底座通用面（事件条数/待审批数），
  * 模型只能答非所问（问什么都是"没有相关记录"）。现在按**行业**注册：
- *  - 同一进程可同时服务多行业工作区（hotel / geo-growth / ai-video 各自的事实面）；
+ *  - 同一进程可同时服务多行业工作区（hotel / geo-growthtest / ai-video 各自的事实面）；
  *  - 未注册行业回落底座通用面（不报错，行为与旧版一致）；
  *  - 注册表进程级、不持久——服务端启动时按活动 Bundle 重装（与 feedback-enums 同范式）。
  */

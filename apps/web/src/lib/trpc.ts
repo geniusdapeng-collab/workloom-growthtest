@@ -9,9 +9,13 @@ import type { AppRouter } from "@workloom/server/router";
 import { DEMO_MEMBER, DEMO_WORKSPACE, storageKey } from "./product";
 
 const TOKEN_KEY = storageKey("access-token");
-/** 本机个人使用：隐藏游客/注册入口，并默认以种子成员身份全量登录（客户端启动器注入，见 design-studio/acceptance 文档）。 */
-const LOCAL_FULL = import.meta.env.VITE_WORKLOOM_LOCAL_FULL === "1";
-/** 本机全量模式开关（客户端启动器注入 VITE_WORKLOOM_LOCAL_FULL=1；用于隐藏试用/游客类入口）。 */
+/**
+ * 本机个人使用为**默认形态**（T-2026-0921-0002，产品所有者口径）：
+ * B 端默认隐藏游客/注册入口，并以**店主（种子成员）**身份自动登录——打开即用。
+ * 只有显式设置 `VITE_WORKLOOM_LOCAL_FULL=0` 才关闭（用于演示游客态与权限回归）。
+ */
+const LOCAL_FULL = import.meta.env.VITE_WORKLOOM_LOCAL_FULL !== "0";
+/** 全量模式开关：默认开；`VITE_WORKLOOM_LOCAL_FULL=0` 时关闭（游客/试用入口恢复）。 */
 export function isLocalFull(): boolean { return LOCAL_FULL; }
 // 身份切换代次：显式登录开始后，较早发出的游客请求不得再覆盖正式令牌。
 let identityRevision = 0;
@@ -44,30 +48,15 @@ const REFRESH_KEY = storageKey("refresh-token");
 export function getRefreshToken(): string | null { return localStorage.getItem(REFRESH_KEY); }
 export function setRefreshToken(token: string): void { localStorage.setItem(REFRESH_KEY, token); }
 
-/* ================= 游客模式（F-GUEST1 首次装机体验） =================
- * 首次安装后默认游客身份：只读浏览示例工作区（数字人/汇报/页面能力完整体验），
- * 进入配置引导（/onboarding）时才引导正式登录。游客令牌由 accounts.auth.guestEnter
- * 签发（readonly 角色；服务端 writeProcedure 403 一切写操作——体验全程零写入）。 */
+/* ================= 身份策略（2026-09-21 产品所有者口径：取消游客只读进入） =================
+ * B 端不再提供"游客（只读）"进入方式：打开即以**店主（种子成员）**身份登录，直接进生产模式。
+ * 旧版本可能已在浏览器里留下游客标记——保留清理入口，登录时一并摘除，升级用户不会卡在只读态。 */
 const GUEST_KEY = storageKey("guest");
-/**
- * 2026-09-21 真机修复（升级路径）：游客标记描述的是「当前令牌就是游客令牌」，与构建口径无关。
- * 旧实现写成 `!LOCAL_FULL && guestFlag`，于是本机全量客户端（VITE_WORKLOOM_LOCAL_FULL=1）
- * 会把上一次装机残留的游客令牌（role=readonly）误判为正式会话：
- * ensureDemoLogin → `if (!isGuest() && await validateStoredSession()) return;` 直接返回，
- * 令牌不升级 → 派活/推进/审批/模式切换继续 403。改为只认令牌标记，游客令牌必然被升级。
- */
+/** 历史游客标记查询（新版本不再写入）。仅用于清理旧状态与登录页文案判断。 */
 export function isGuest(): boolean { return localStorage.getItem(GUEST_KEY) === "1"; }
 export function clearGuestFlag(): void { localStorage.removeItem(GUEST_KEY); }
 
-function setGuestToken(token: string): void {
-  identityRevision += 1;
-  localStorage.setItem(TOKEN_KEY, token);
-  localStorage.setItem(GUEST_KEY, "1");
-  announceIdentityChange();
-}
-
 let validatedToken: string | null = null;
-let guestSessionPromise: Promise<void> | null = null;
 
 /** 桌面升级可能轮换本机 JWT 密钥；不能只凭 localStorage 中“有字符串”判断会话有效。 */
 async function validateStoredSession(): Promise<boolean> {
@@ -91,25 +80,12 @@ async function validateStoredSession(): Promise<boolean> {
   }
 }
 
-/** 无令牌时静默进场游客会话（幂等；正式登录后不再触发） */
+/**
+ * 兼容别名（历史页面挂载点仍在调用）：**不再签发游客身份**。
+ * 任何调用都直接落到店主登录——"打开即生产模式"的唯一入口（2026-09-21 产品所有者口径）。
+ */
 export async function ensureGuestSession(): Promise<void> {
-  // 登录页正在换取正式身份时不再签发临时身份，避免页面短暂降级为游客。
-  if (formalLoginsInFlight > 0) return;
-  if (guestSessionPromise) return guestSessionPromise;
-  guestSessionPromise = (async () => {
-    if (formalLoginsInFlight > 0) return;
-    if (await validateStoredSession()) return;
-    if (formalLoginsInFlight > 0 || getToken()) return;
-    const requestRevision = identityRevision;
-    const r = await (trpc.accounts.auth as unknown as {
-      guestEnter: { mutate: (i: Record<string, never>) => Promise<{ token: string }> };
-    }).guestEnter.mutate({});
-    // 登录页可能在游客请求尚未返回时完成正式登录。旧响应只能作废，不能降级身份。
-    if (formalLoginsInFlight > 0 || identityRevision !== requestRevision || getToken()) return;
-    setGuestToken(r.token);
-    validatedToken = r.token;
-  })();
-  try { await guestSessionPromise; } finally { guestSessionPromise = null; }
+  return ensureDemoLogin(DEV_DEMO_MEMBER);
 }
 
 export const trpc: ReturnType<typeof createTRPCClient<AppRouter>> = createTRPCClient<AppRouter>({
@@ -129,29 +105,24 @@ export const trpc: ReturnType<typeof createTRPCClient<AppRouter>> = createTRPCCl
  * 工作区与成员均可经 VITE_DEMO_WORKSPACE / VITE_DEMO_MEMBER 覆盖——
  * 不写死在调用侧，客户自建工作区（非种子库默认工作区）时演示登录仍可用。
  *
- * F-GUEST1 语义升级：无参调用 = 游客进场（readonly 只读体验，各页面挂载点沿用）；
- * 仅显式传 memberNo 时才走旧的种子成员真身份登录（开发后门专用，生产不出现）。
+ * 默认身份（2026-09-21 起）：**无参调用 = 店主（种子成员）真身份登录**；
+ * 已不存在"游客（只读）进场"分支——传 memberNo 仅用于演示/权限回归时指定其他成员。
  */
 export const DEV_DEMO_MEMBER = DEMO_MEMBER;
 export async function ensureDemoLogin(memberNo?: string): Promise<void> {
-  // 本机全量模式：任何"游客进场"调用都升级为种子成员正式登录（无注册、无游客限制）。
-  if (!memberNo && LOCAL_FULL) memberNo = DEV_DEMO_MEMBER;
-  if (memberNo) {
-    // 先使并发中的游客请求失效；只允许最后一次显式登录写入正式身份。
-    const loginEpoch = ++formalLoginEpoch;
-    formalLoginsInFlight += 1;
-    identityRevision += 1;
-    try {
-      if (!isGuest() && await validateStoredSession()) return;
-      if (isGuest()) clearToken();
-      const r = await trpc.auth.loginAs.mutate({ workspaceSlug: DEMO_WORKSPACE, memberNo });
-      if (loginEpoch !== formalLoginEpoch) return;
-      setToken(r.token);
-      validatedToken = r.token;
-      return;
-    } finally {
-      formalLoginsInFlight = Math.max(0, formalLoginsInFlight - 1);
-    }
+  const target = memberNo ?? DEV_DEMO_MEMBER; // 默认店主：不再存在"无参=游客"的旧语义
+  const loginEpoch = ++formalLoginEpoch;
+  formalLoginsInFlight += 1;
+  identityRevision += 1;
+  try {
+    if (!isGuest() && await validateStoredSession()) return;
+    if (isGuest()) clearToken(); // 历史游客态一律清理，避免只读身份残留
+    const r = await trpc.auth.loginAs.mutate({ workspaceSlug: DEMO_WORKSPACE, memberNo: target });
+    if (loginEpoch !== formalLoginEpoch) return;
+    setToken(r.token);
+    validatedToken = r.token;
+    return;
+  } finally {
+    formalLoginsInFlight = Math.max(0, formalLoginsInFlight - 1);
   }
-  return ensureGuestSession();
 }

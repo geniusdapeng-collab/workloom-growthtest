@@ -12,7 +12,7 @@ import { hotelBizAdapter } from "./hotel/service-front-adapter.js";
 export const BUNDLED_BUSINESS_ADAPTERS: readonly BusinessAdapterRegistration[] = Object.freeze([
   Object.freeze({
     adapter: geoGrowthBizAdapter,
-    bundleIds: Object.freeze(["geo-growth"]),
+    bundleIds: Object.freeze(["geo-growthtest"]),
   }),
   Object.freeze({
     adapter: hotelBizAdapter,

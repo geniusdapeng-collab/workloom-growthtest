@@ -33,6 +33,12 @@ export const AV_SYNC_POLICY: AvSyncPolicy = {
   monotonicRatio: 0.6,
 };
 
+/** A film shorter than three shots must still measure every available shot. */
+export function avSyncPolicyForClipCount(clipCount: number): AvSyncPolicy {
+  if (!Number.isInteger(clipCount) || clipCount < 1) throw new Error("AV_SYNC_INVALID_CLIP_COUNT");
+  return { ...AV_SYNC_POLICY, minMeasurable: Math.min(AV_SYNC_POLICY.minMeasurable, clipCount) };
+}
+
 export interface AvSyncSample {
   shotId: string;
   /** 在成片里的序号（从 0 起），用于判漂移方向 */
@@ -181,6 +187,55 @@ export function evaluateAvSync(
     monotonic,
     samples: ordered,
   };
+}
+
+/**
+ * A saved measurement is evidence for this master only when it names the exact
+ * raw bytes and the current shot count. Recompute the verdict from samples so
+ * a stale or edited `ok: true` field cannot approve another render.
+ */
+export function verifyAvSyncEvidence(
+  value: unknown,
+  expected: { output: string; outputSha256: string; clipCount: number; allowMeasuredDrift?: boolean },
+): { ok: boolean; detail: string; measured: number } {
+  const fail = (detail: string) => ({ ok: false, detail, measured: 0 });
+  if (!value || typeof value !== "object" || Array.isArray(value)) return fail("音画报告缺失或格式错误");
+  const report = value as Partial<AvSyncReport> & {
+    output?: unknown; outputSha256?: unknown; clipCount?: unknown; policy?: unknown;
+  };
+  if (report.output !== expected.output || report.outputSha256 !== expected.outputSha256
+    || !/^[a-f0-9]{64}$/.test(expected.outputSha256)) {
+    return fail("音画报告未绑定当前原始母版路径与 SHA-256");
+  }
+  if (!Number.isInteger(expected.clipCount) || expected.clipCount < 1 || report.clipCount !== expected.clipCount) {
+    return fail("音画报告镜头数量与当前分镜不一致");
+  }
+  const policy = avSyncPolicyForClipCount(expected.clipCount);
+  if (JSON.stringify(report.policy) !== JSON.stringify(policy)) return fail("音画报告使用的判据不是当前版本");
+  if (!Array.isArray(report.samples) || report.samples.length !== expected.clipCount) {
+    return fail("音画报告缺少逐镜测量样本");
+  }
+  const indexes = new Set<number>();
+  for (const sample of report.samples) {
+    if (!sample || typeof sample.shotId !== "string" || !sample.shotId
+      || !Number.isInteger(sample.index) || sample.index < 0 || sample.index >= expected.clipCount
+      || !Number.isFinite(sample.lagMs) || !Number.isFinite(sample.correlation)
+      || sample.correlation < -1 || sample.correlation > 1 || indexes.has(sample.index)) {
+      return fail("音画报告样本编号、偏移或相关性无效");
+    }
+    indexes.add(sample.index);
+  }
+  const measured = evaluateAvSync(report.samples, policy);
+  if (report.ok !== measured.ok || report.measured !== measured.measured
+    || report.maxAbsLagMs !== measured.maxAbsLagMs || report.driftMs !== measured.driftMs
+    || JSON.stringify(report.violations) !== JSON.stringify(measured.violations)) {
+    return fail("音画报告结论与逐镜实测值不一致");
+  }
+  if (measured.ok) return { ok: true, detail: `当前母版 ${measured.measured} 镜音画实测通过`, measured: measured.measured };
+  if (expected.allowMeasuredDrift && measured.measured >= policy.minMeasurable) {
+    return { ok: true, detail: `显式带瑕疵放行：${measured.violations.join("；")}`, measured: measured.measured };
+  }
+  return { ok: false, detail: measured.violations.join("；") || "音画实测未通过", measured: measured.measured };
 }
 
 /** 一句话结论（写进阶段日志/终审证据）。 */

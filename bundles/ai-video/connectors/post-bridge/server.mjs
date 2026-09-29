@@ -51,7 +51,7 @@ function readBody(req) {
 
 function gcCache(now) {
   for (const [key, entry] of cache) {
-    if (now - entry.at > IDEMPOTENCY_TTL_MS) cache.delete(key);
+    if (entry.payload && now - entry.at > IDEMPOTENCY_TTL_MS) cache.delete(key);
   }
 }
 
@@ -120,42 +120,51 @@ const server = http.createServer(async (req, res) => {
 
   const now = Date.now();
   gcCache(now);
+  const fingerprint = STABLE_JSON({ tool, params });
   const hit = cache.get(idempotencyKey);
   if (hit) {
-    json(res, 200, { ...hit.payload, idempotent_replay: true });
+    if (hit.fingerprint !== fingerprint) {
+      json(res, 409, { ok: false, error: "idempotency_conflict", message: "幂等键已绑定另一组参数" });
+      return;
+    }
+    if (hit.payload) {
+      // A completed response is not fresh media/source authority. Never replay its old success.
+      json(res, 409, { ok: false, error: "idempotency_revalidation_required", message: "作业已结束；请读取工程和当前签章后发起新的明确请求", job_id: hit.payload.job_id });
+      return;
+    }
+    const payload = await hit.promise;
+    json(res, 200, { ...payload, idempotent_inflight: true });
     return;
   }
 
   const jobId = `postjob-${now.toString(36)}-${(seq += 1).toString(36)}`;
   const started = Date.now();
-  try {
-    const outcome = await callTool(tool, params);
-    const payload = {
-      ok: true,
-      job_id: jobId,
-      tool,
-      result: outcome.result,
-      receipt: {
-        ...outcome.receipt,
-        verified_at: outcome.receipt?.verified_at ?? new Date().toISOString(),
-      },
-      elapsed_ms: Date.now() - started,
-    };
-    cache.set(idempotencyKey, { at: now, payload });
-    await jobAppend(jobsDir(), {
-      jobId, tool, ok: true, elapsedMs: payload.elapsed_ms,
-      sha256: payload.receipt.sha256 ?? null, tenant: params.tenant_id ?? null,
-    });
-    json(res, 200, payload);
-  } catch (error) {
-    const code = error instanceof PostError ? error.code : "engine_failed";
-    const retryable = error instanceof PostError ? error.retryable : true;
-    const message = error instanceof Error ? error.message : String(error);
-    await jobAppend(jobsDir(), { jobId, tool, ok: false, code, message, tenant: params.tenant_id ?? null });
-    json(res, code === "tenant_mismatch" ? 403 : 200, { ok: false, job_id: jobId, tool, error: code, message, retryable });
-  }
+  const entry = { at: now, fingerprint, payload: null, promise: null };
+  cache.set(idempotencyKey, entry);
+  entry.promise = (async () => {
+    try {
+      const outcome = await callTool(tool, params);
+      const payload = { ok: true, job_id: jobId, tool, result: outcome.result,
+        receipt: { ...outcome.receipt, verified_at: outcome.receipt?.verified_at ?? new Date().toISOString() },
+        elapsed_ms: Date.now() - started };
+      await jobAppend(jobsDir(), { jobId, tool, ok: true, elapsedMs: payload.elapsed_ms,
+        sha256: payload.receipt.sha256 ?? null, tenant: params.tenant_id ?? null });
+      return payload;
+    } catch (error) {
+      const code = typeof error?.code === "string" ? error.code : "engine_failed";
+      const retryable = error?.retryable === true;
+      const message = error instanceof Error ? error.message : String(error);
+      try { await jobAppend(jobsDir(), { jobId, tool, ok: false, code, message, tenant: params.tenant_id ?? null }); }
+      catch (recordError) { return { ok: false, job_id: jobId, tool, error: "job_receipt_failed", message: recordError.message, retryable: false }; }
+      return { ok: false, job_id: jobId, tool, error: code, message, retryable };
+    }
+  })();
+  const payload = await entry.promise;
+  entry.payload = payload;
+  json(res, payload.error === "tenant_mismatch" ? 403 : 200, payload);
+
 });
 
 server.listen(PORT, HOST, () => {
-  process.stdout.write(`[post-bridge] listening on http://${HOST}:${PORT} tools=${POST_TOOLS.length} tenant=${TENANT || "(unbound)"}\n`);
+  process.stdout.write(`[post-bridge] listening on http://${HOST}:${server.address().port} tools=${POST_TOOLS.length} tenant=${TENANT || "(unbound)"}\n`);
 });

@@ -3,12 +3,14 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { constants } from "node:fs";
 import { mkdir, open, realpath, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type pg from "pg";
 import { newId } from "@workloom/shared";
 import { gatewayAppendOnClient } from "@workloom/base/workdata";
-import { reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
+import { loadScenePolicies, reviewStage, type ProducerVerdict, type ScenePolicyReport } from "@hyperreality/video-studio";
 import { verifyMarketingFacts } from "./marketing-authority.js";
 import { archiveWorkDir, projectRunLockKey } from "./archive-host.js";
+import { ScenePolicyRenderGateError, verifyScenePolicyProductionSource, type ScenePolicySourceDecision } from "./scene-policy-render-gate.js";
 import { getModel, providerConfigured } from "./gen/catalog.js";
 import type { AppPool, Scope } from "./gen/db.js";
 import type { RenderScriptLike } from "./gen/submit.js";
@@ -20,6 +22,7 @@ const ISSUER = "workloom.production-authority";
 const SCHEMA = "workloom.render-qualification/v1";
 const PURPOSE = "render-submit";
 const REQUIRED_GATES = ["G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"];
+const SCENE_POLICY_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../../../bundles/ai-video/library/scene-policies");
 type Mode = "manual" | "batch" | "auto";
 type SourceRow = { id: string; project_id: string; workspace_id: string; stage_id: string; attempt: number; status: string; output_ref: string; output_sha256: string; run_id: string; kind: string };
 type JsonRecord = Record<string, unknown>;
@@ -113,7 +116,7 @@ async function archiveRoot(scope: Scope, projectId: string, workDir: string): Pr
   if (await realpath(root) !== root) fail("SOURCE_PATH_INVALID", "项目档案经过符号链接");
   return root;
 }
-async function currentSource(app: AppPool, scope: Scope, projectId: string): Promise<SourceRow> {
+async function currentSource(app: AppPool, scope: Scope, projectId: string): Promise<{ row: SourceRow; decision: ScenePolicySourceDecision }> {
   return scopedTx(app, scope, async client => {
     const rows = await client.query<SourceRow>(`SELECT r.*,p.kind FROM production_stage_runs r
       JOIN video_projects p ON p.id=r.project_id AND p.workspace_id=r.workspace_id
@@ -123,11 +126,25 @@ async function currentSource(app: AppPool, scope: Scope, projectId: string): Pro
     const row = rows.rows[0];
     if (!row || row.status !== "done" || !/^[a-f0-9]{64}$/.test(row.output_sha256 ?? "")) fail("PREPRODUCTION_REQUIRED", "缺少当前作用域已完成且可核实的预生产执行回执");
     if (!["narrative", "marketing"].includes(row.kind)) fail("PIPELINE_QUALIFICATION_UNAVAILABLE", "当前正式资格签发只支持已核实的叙事/营销预生产；其他管线需完成各自的资格链路");
-    return row;
+    // 以只增事件账本的最新选型为准，并绑定当前 attempt 的 runId；旧 run 的通过报告不能借给新 run。
+    const selection = await client.query<{ after: JsonRecord }>(`SELECT payload->'decision'->'after' AS after FROM biz_events
+      WHERE tenant_id=$1 AND workspace_id=$2 AND payload->'object'->>'type'='video_project'
+        AND payload->'object'->>'id'=$3 AND payload->'decision'->>'action'='video.scene_policy.selected'
+        AND payload->'who'->>'type'='system' AND payload->'who'->>'id'='video-studio'
+      ORDER BY seq DESC LIMIT 1`, [scope.tenantId, scope.workspaceId, projectId]);
+    const after = selection.rows[0]?.after;
+    if (!after || after.runId !== row.run_id || typeof after.reason !== "string"
+      || !Array.isArray(after.evidence) || after.evidence.some(item => typeof item !== "string")
+      || !((after.id === null && after.version === null && after.sourceSha256 === null)
+        || (typeof after.id === "string" && after.id.length > 0 && typeof after.version === "string"
+          && after.version.length > 0 && typeof after.sourceSha256 === "string" && /^[a-f0-9]{64}$/.test(after.sourceSha256))))
+      fail("SCENE_POLICY_SELECTION_REQUIRED", "缺少与当前预生产执行同源的客户原始需求片型选型事件");
+    return { row, decision: { id: after.id as string | null, version: after.version as string | null,
+      sourceSha256: after.sourceSha256 as string | null, reason: after.reason, evidence: after.evidence } };
   });
 }
 async function sourceForShot(app: AppPool, scope: Scope, projectId: string, shotId: string | null, workDir: string): Promise<Source> {
-  const row = await currentSource(app, scope, projectId);
+  const { row, decision } = await currentSource(app, scope, projectId);
   const root = await archiveRoot(scope, projectId, workDir);
   if (row.output_ref !== `stages/preproduction/attempt-${row.attempt}.output.json`) fail("SOURCE_PATH_INVALID", "预生产输出引用不符合当前执行编号");
   const output = record(JSON.parse((await readBytes(root, row.output_ref, row.output_sha256)).toString("utf8")), "预生产输出结构非法");
@@ -177,6 +194,35 @@ async function sourceForShot(app: AppPool, scope: Scope, projectId: string, shot
   const shot = matching[0]!;
   if (shot.degraded === true || typeof shot.prompt !== "string" || !shot.prompt.trim()) fail("SOURCE_INVALID", "镜头提示词缺失或已降级");
   record(shot.fields, "镜头结构字段缺失或被裁剪");
+  let policies: ReturnType<typeof loadScenePolicies>;
+  try {
+    policies = loadScenePolicies(SCENE_POLICY_DIR);
+    if (!policies.length) throw new Error("片型知识目录为空");
+  } catch (error) {
+    fail("SCENE_POLICY_CATALOG_UNAVAILABLE", `片型知识库不可核实：${error instanceof Error ? error.message : String(error)}`);
+  }
+  const policy = decision.id === null ? null : policies.find(item => item.id === decision.id) ?? null;
+  const reportRef = `stages/preproduction/attempt-${row.attempt}.scene-policy-report.json`;
+  const shotlistRef = `stages/preproduction/attempt-${row.attempt}.shotlist.json`;
+  let report: ScenePolicyReport | null = null;
+  let shotlist: JsonRecord | null = null;
+  if (decision.id !== null) {
+    if (output.scenePolicyReportRef !== reportRef || typeof output.scenePolicyReportSha256 !== "string"
+      || !/^[a-f0-9]{64}$/.test(output.scenePolicyReportSha256)
+      || output.shotlistRef !== shotlistRef || typeof output.shotlistSha256 !== "string"
+      || !/^[a-f0-9]{64}$/.test(output.shotlistSha256))
+      fail("SCENE_POLICY_UNVERIFIED", "当前执行缺少片型报告和完整片单的摘要引用");
+    report = record(JSON.parse((await readBytes(root, reportRef, output.scenePolicyReportSha256)).toString("utf8")), "片型报告结构非法") as unknown as ScenePolicyReport;
+    shotlist = record(JSON.parse((await readBytes(root, shotlistRef, output.shotlistSha256)).toString("utf8")), "完整片单结构非法");
+  }
+  if (typeof shot.shotId !== "string" || !shot.shotId.trim()) fail("SOURCE_INVALID", "镜头号非法");
+  try {
+    verifyScenePolicyProductionSource({ decision, policy, projectId, attempt: row.attempt, shotId: shotId ?? shot.shotId,
+      output, prompts, report, shotlist });
+  } catch (error) {
+    if (error instanceof ScenePolicyRenderGateError) fail("SCENE_POLICY_UNVERIFIED", error.message);
+    throw error;
+  }
   return { row, root, output, prompts, promptsHash: output.promptsSha256, shot };
 }
 

@@ -21,6 +21,7 @@
       script: |
         set -eu
         node --test scripts/ci/protocol-rules.test.mjs
+        node --test scripts/ci/cnb-desktop-release.test.mjs
         node scripts/ci/verify-commit-msg.mjs --self-test
         node scripts/ci/verify-lock-conflict.mjs --self-test
         node scripts/ci/verify-commit-msg.mjs
@@ -220,6 +221,260 @@ main:
     - *static_gate
     - *db_gate
     - *test_gate
+
+  # 只由有仓库触发权限的操作者调用 api_trigger_desktop_release。
+  # 请求须指定 branch=main、sha=main 当前 HEAD，env 须有 RELEASE_TAG、RELEASE_SHA、
+  # PLATFORM_SIGNING=signed。三个 Pipeline 同属一个事件；publisher 等双平台 resolve。
+  # Mac/Windows 自托管 runner 与 Node/npm/pnpm 须先配好；签名/公证/Bundle 密钥
+  # 应从仅允许本仓 main + 此事件读取的 CNB KeyStore 注入，不得放在 build/start
+  # 请求 env 中。KeyStore 路径尚未由平台确认，故未硬编码虚构 URL；缺任一凭据时
+  # 下面的预检会失败关闭。候选经提交附件传递，保留 1 天。
+  api_trigger_desktop_release:
+    - name: desktop-macos
+      runner:
+        namespace: group
+        tags:
+          - workloom-growthtest-desktop-macos
+      stages:
+        - name: 校验发布身份、工具链和签名凭据
+          script: |
+            set -eu
+            test "$(uname -s)" = Darwin
+            test "$(uname -m)" = arm64
+            test "$(node --version)" = v24.19.0
+            test "$(npm --version)" = 11.17.0
+            test "$(pnpm --version)" = 10.14.0
+            test -n "${BUNDLE_SIGNING_PRIVATE_KEY:-}"
+            test -n "${BUNDLE_SIGNING_KEY_ID:-}"
+            test -n "${CSC_LINK:-}" && test -n "${CSC_KEY_PASSWORD:-}"
+            test -n "${APPLE_ID:-}" && test -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && test -n "${APPLE_TEAM_ID:-}"
+            node scripts/ci/cnb-desktop-release.mjs preflight
+
+        - name: 构建受信行业 Bundle、投影和 Web
+          script: |
+            set -eu
+            export VITE_DEMO_WORKSPACE=geo-growthtest VITE_DEMO_MEMBER=MEM-G01
+            pnpm install --frozen-lockfile
+            pnpm bundle:release
+            test -s build/bundle-trust.json
+            pnpm projections:generate
+            pnpm product:verify
+            pnpm projections:check
+            pnpm exec vitest run apps/web/src/voice/VoiceEngine.test.ts
+            pnpm -C packages/industry-contract build
+            pnpm -C apps/web build
+
+        - name: 打包签名与公证的 arm64 DMG，执行真实首启与渲染冒烟
+          script: |
+            set -eu
+            bash scripts/pack-electron-payload.sh --platform mac --arch arm64 --version "$RELEASE_TAG"
+            pnpm exec electron-builder --mac dmg --arm64 --publish never "-c.extraMetadata.version=${RELEASE_TAG#v}"
+            DMG="$(find release -maxdepth 1 -type f -name '*-mac-arm64.dmg' -print -quit)"
+            test -n "$DMG"
+            hdiutil verify "$DMG"
+            APP="$(find release/mac-arm64 -maxdepth 1 -name '*.app' -print -quit)"
+            test -n "$APP" && test -d "$APP"
+            codesign --verify --deep --strict "$APP"
+            xcrun stapler validate "$APP"
+            RES="$APP/Contents/Resources"
+            test -s "$RES/bundle-trust.json" && test -s "$RES/payload.tar.gz" && test -s "$RES/payload/PAYLOAD_VERSION"
+            SMOKE_ROOT="$(mktemp -d)"
+            trap 'rm -rf "$SMOKE_ROOT"' EXIT
+            tar -tzf "$RES/payload.tar.gz" > "$SMOKE_ROOT/payload-list.txt"
+            grep -q 'runtime/node_modules/tsx/package.json' "$SMOKE_ROOT/payload-list.txt"
+            grep -q 'nats/nats-server' "$SMOKE_ROOT/payload-list.txt"
+            node apps/desktop/electron/bootstrap.cjs --smoke --resources "$RES" --support "$SMOKE_ROOT/bootstrap"
+            BIN="$(find "$APP/Contents/MacOS" -maxdepth 1 -type f -perm -111 -print -quit)"
+            test -n "$BIN"
+            WORKLOOM_APP_SMOKE=1 WORKLOOM_SUPPORT_DIR="$SMOKE_ROOT/app" "$BIN"
+            test -f "$SMOKE_ROOT/app/.bootstrapped"
+            WORKLOOM_RENDER_SMOKE=1 WORKLOOM_SUPPORT_DIR="$SMOKE_ROOT/render-default" "$BIN"
+            test -f "$SMOKE_ROOT/render-default/logs/render-default.json"
+            WORKLOOM_RENDER_SMOKE=1 WORKLOOM_SAFE_RENDERING=1 WORKLOOM_SUPPORT_DIR="$SMOKE_ROOT/render-safe" "$BIN"
+            test -f "$SMOKE_ROOT/render-safe/logs/render-safe.json"
+
+        - name: 打包签名与公证的 x64 DMG并核验载荷
+          script: |
+            set -eu
+            bash scripts/pack-electron-payload.sh --platform mac --arch x64 --version "$RELEASE_TAG"
+            pnpm exec electron-builder --mac dmg --x64 --publish never "-c.extraMetadata.version=${RELEASE_TAG#v}"
+            DMG="$(find release -maxdepth 1 -type f -name '*-mac-x64.dmg' -print -quit)"
+            test -n "$DMG"
+            hdiutil verify "$DMG"
+            APP="$(find release/mac -maxdepth 1 -name '*.app' -print -quit)"
+            test -n "$APP" && test -d "$APP"
+            codesign --verify --deep --strict "$APP"
+            xcrun stapler validate "$APP"
+            RES="$APP/Contents/Resources"
+            test -s "$RES/bundle-trust.json" && test -s "$RES/payload.tar.gz" && test -s "$RES/payload/PAYLOAD_VERSION"
+            LIST="$(mktemp)"
+            trap 'rm -f "$LIST"' EXIT
+            tar -tzf "$RES/payload.tar.gz" > "$LIST"
+            grep -q 'runtime/node_modules/tsx/package.json' "$LIST"
+
+        - name: 封存并回读 macOS 候选 SHA-512
+          script: |
+            set -eu
+            node scripts/ci/cnb-desktop-release.mjs stage-platform --platform macos --release-dir release
+          exports:
+            candidate_manifest_sha512: MACOS_CANDIDATE_MANIFEST_SHA512
+        - name: 通知发布者 macOS 候选已验真
+          type: cnb:resolve
+          options:
+            key: desktop-macos-candidate-ready
+            data:
+              buildId: $CNB_BUILD_ID
+              manifestSha512: $MACOS_CANDIDATE_MANIFEST_SHA512
+        - name: 销毁临时 CNB 令牌
+          type: cnb:destroy-token
+
+    - name: desktop-windows
+      runner:
+        namespace: group
+        tags:
+          - workloom-growthtest-desktop-windows
+      # PG17/pgvector use a system-wide installation on a persistent runner.
+      # Serialize entire Windows producers across release events before Choco/nmake.
+      lock:
+        key: workloom-desktop-windows-pg17-install
+        expires: 64800
+        wait: true
+        timeout: 64800
+      stages:
+        - name: 校验发布身份、工具链和签名凭据
+          script: |
+            $ErrorActionPreference = 'Stop'
+            if ([Environment]::OSVersion.Platform -ne 'Win32NT') { throw 'Windows runner required' }
+            if ([Environment]::Is64BitOperatingSystem -ne $true) { throw 'Windows x64 runner required' }
+            if ((node --version) -ne 'v24.19.0') { throw 'Node toolchain mismatch' }
+            if ((npm --version) -ne '11.17.0') { throw 'npm toolchain mismatch' }
+            if ((pnpm --version) -ne '10.14.0') { throw 'pnpm toolchain mismatch' }
+            if (-not $env:BUNDLE_SIGNING_PRIVATE_KEY -or -not $env:BUNDLE_SIGNING_KEY_ID) { throw 'Bundle signing credentials missing' }
+            if (-not $env:WIN_CSC_LINK -or -not $env:WIN_CSC_KEY_PASSWORD) { throw 'Windows signing credentials missing' }
+            if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw 'Git Bash required for payload assembly' }
+            if (-not (Get-Command pwsh -ErrorAction SilentlyContinue)) { throw 'PowerShell 7 required for pgvector build' }
+            node scripts/ci/cnb-desktop-release.mjs preflight
+            if ($LASTEXITCODE -ne 0) { throw 'release preflight failed' }
+
+        - name: 编译锁定的 PostgreSQL 与 pgvector
+          script: |
+            $ErrorActionPreference = 'Stop'
+            & pwsh -NoProfile -File scripts/build-pgvector-win.ps1
+            if ($LASTEXITCODE -ne 0) { throw 'Windows PostgreSQL provenance build failed' }
+
+        - name: 构建受信行业 Bundle、投影和 Web
+          script: |
+            $ErrorActionPreference = 'Stop'
+            function Run([string]$file, [string[]]$arguments) {
+              & $file @arguments
+              if ($LASTEXITCODE -ne 0) { throw "$file failed with exit code $LASTEXITCODE" }
+            }
+            $env:VITE_DEMO_WORKSPACE = 'geo-growthtest'
+            $env:VITE_DEMO_MEMBER = 'MEM-G01'
+            Run pnpm @('install', '--frozen-lockfile')
+            Run pnpm @('bundle:release')
+            if (-not (Test-Path build/bundle-trust.json -PathType Leaf)) { throw 'Bundle trust ring missing' }
+            Run pnpm @('projections:generate')
+            Run pnpm @('product:verify')
+            Run pnpm @('projections:check')
+            Run pnpm @('exec', 'vitest', 'run', 'apps/web/src/voice/VoiceEngine.test.ts')
+            Run pnpm @('-C', 'packages/industry-contract', 'build')
+            Run pnpm @('-C', 'apps/web', 'build')
+
+        - name: 打包 Authenticode NSIS 并执行真实首启与渲染冒烟
+          script: |
+            $ErrorActionPreference = 'Stop'
+            function Run([string]$file, [string[]]$arguments) {
+              & $file @arguments
+              if ($LASTEXITCODE -ne 0) { throw "$file failed with exit code $LASTEXITCODE" }
+            }
+            $version = $env:RELEASE_TAG.Substring(1)
+            Run bash @('scripts/pack-electron-payload.sh', '--platform', 'win', '--arch', 'x64', '--version', $env:RELEASE_TAG)
+            Run pnpm @('exec', 'electron-builder', '--win', 'nsis', '--x64', '--publish', 'never', "-c.extraMetadata.version=$version")
+            $installers = @(Get-ChildItem release -File -Filter '*-win-x64.exe')
+            if ($installers.Count -ne 1) { throw 'Exactly one Windows installer required' }
+            $appExecutables = @(Get-ChildItem release/win-unpacked -File -Filter '*.exe' | Where-Object { $_.Name -notlike '*uninstall*' })
+            if ($appExecutables.Count -ne 1) { throw 'Exactly one Windows application executable required' }
+            foreach ($file in @($installers[0], $appExecutables[0])) {
+              $signature = Get-AuthenticodeSignature -FilePath $file.FullName
+              if ($signature.Status -ne 'Valid') { throw "Authenticode validation failed for $($file.Name)" }
+            }
+            $resources = 'release/win-unpacked/resources'
+            foreach ($required in @('bundle-trust.json', 'payload.tar.gz', 'payload/PAYLOAD_VERSION')) {
+              if (-not (Test-Path (Join-Path $resources $required) -PathType Leaf)) { throw "Missing packaged resource $required" }
+            }
+            $listing = & tar -tzf (Join-Path $resources 'payload.tar.gz')
+            if ($LASTEXITCODE -ne 0 -or -not ($listing | Select-String 'runtime/node_modules/tsx/package.json')) { throw 'Payload archive lacks tsx runtime' }
+            $smokeRoot = Join-Path ([IO.Path]::GetTempPath()) ("workloom-smoke-" + $env:CNB_BUILD_ID)
+            if (Test-Path $smokeRoot) { throw 'Smoke directory collision' }
+            New-Item -ItemType Directory -Path $smokeRoot | Out-Null
+            try {
+              $env:WORKLOOM_PG_PORT = '55432'
+              $env:WORKLOOM_SERVER_PORT = '58787'
+              $env:WORKLOOM_WEB_PORT = '55173'
+              $env:WORKLOOM_NATS_PORT = '54222'
+              Run node @('apps/desktop/electron/bootstrap.cjs', '--smoke', '--resources', $resources, '--support', (Join-Path $smokeRoot 'bootstrap'))
+              $appSmoke = Join-Path $smokeRoot 'app'
+              $renderSmoke = Join-Path $smokeRoot 'render'
+              $spawn = 'const {spawnSync}=require("node:child_process");const r=spawnSync(process.argv[1],[],{stdio:"inherit",env:{...process.env,WORKLOOM_APP_SMOKE:"1",WORKLOOM_SUPPORT_DIR:process.argv[2]}});process.exit(r.status??1)'
+              Run node @('-e', $spawn, $appExecutables[0].FullName, $appSmoke)
+              if (-not (Test-Path (Join-Path $appSmoke '.bootstrapped'))) { throw 'Packaged app first boot failed' }
+              $render = 'const {spawnSync}=require("node:child_process");const r=spawnSync(process.argv[1],[],{stdio:"inherit",env:{...process.env,WORKLOOM_RENDER_SMOKE:"1",WORKLOOM_SUPPORT_DIR:process.argv[2]}});process.exit(r.status??1)'
+              Run node @('-e', $render, $appExecutables[0].FullName, $renderSmoke)
+              if (-not (Test-Path (Join-Path $renderSmoke 'logs/render-default.json'))) { throw 'Packaged render probe failed' }
+            } finally {
+              Remove-Item -LiteralPath $smokeRoot -Recurse -Force
+            }
+
+        - name: 封存并回读 Windows 候选 SHA-512
+          script: |
+            node scripts/ci/cnb-desktop-release.mjs stage-platform --platform windows --release-dir release
+            if ($LASTEXITCODE -ne 0) { throw 'Windows candidate staging failed' }
+          exports:
+            candidate_manifest_sha512: WINDOWS_CANDIDATE_MANIFEST_SHA512
+        - name: 通知发布者 Windows 候选已验真
+          type: cnb:resolve
+          options:
+            key: desktop-windows-candidate-ready
+            data:
+              buildId: $CNB_BUILD_ID
+              manifestSha512: $WINDOWS_CANDIDATE_MANIFEST_SHA512
+        - name: 销毁临时 CNB 令牌
+          type: cnb:destroy-token
+
+    - name: desktop-publisher
+      docker:
+        image: node:24.19.0-bookworm
+      lock:
+        key: desktop-production-release
+        expires: 21600
+        wait: true
+        timeout: 21600
+      stages:
+        - name: 校验 main、稳定 tag 和发布提交
+          script: |
+            set -eu
+            node scripts/ci/cnb-desktop-release.mjs preflight
+        - name: 等待 macOS 已验真候选
+          type: cnb:await
+          options:
+            key: desktop-macos-candidate-ready
+          exports:
+            buildId: MACOS_CANDIDATE_BUILD_ID
+            manifestSha512: MACOS_CANDIDATE_MANIFEST_SHA512
+        - name: 等待 Windows 已验真候选
+          type: cnb:await
+          options:
+            key: desktop-windows-candidate-ready
+          exports:
+            buildId: WINDOWS_CANDIDATE_BUILD_ID
+            manifestSha512: WINDOWS_CANDIDATE_MANIFEST_SHA512
+        - name: 单一发布者创建草稿、核验五资产远端字节并公开 Latest
+          script: |
+            set -eu
+            node scripts/ci/cnb-desktop-release.mjs publish
+        - name: 销毁临时 CNB 令牌
+          type: cnb:destroy-token
 
 "**":
   pull_request:

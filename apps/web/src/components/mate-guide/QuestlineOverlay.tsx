@@ -356,10 +356,7 @@ export function QuestlineOverlay({
               const done = state.stageDone.includes(id);
               const skipped = state.skipped.includes(id);
               const active = state.stage === id && !completed;
-              // 2026-09-21 真机修复：这里此前漏传 content，stageDef 退回默认包（基座/酒店），
-              // 于是引导 HUD 的关卡名永远显示别的行业包的文案（GEO 工作区里出现"认识您的增长班组"
-              // 这类与当前编制不符的标题）。标题必须跟随当前 Bundle 内容包。
-              const meta = stageDef(id, content);
+              const meta = stageDef(id);
               return (
                 <div key={id} className="flex min-w-0 items-center gap-1.5">
                   <span

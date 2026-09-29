@@ -22,13 +22,6 @@ import { CineFloor, SpotBeam, CineRig, CinePost, SkyDome, Skyline, NamePlate, Du
 
 export interface StageAgent { id: string; presetKey?: string; name: string; alias?: string | null; grade: string }
 
-/**
- * 舞台画布高度上限（px）。产品门禁 scripts/verify-product-content.mjs 校验该常量存在：
- * 没有上限时，高窗口会把画布拉成正方形，团队队列被挤出取景框（2026-09-21 真机事故：
- * 产品所有者反馈"团队舞台没有展示全面"）。
- */
-export const STAGE_MAX_HEIGHT = 620;
-
 const GRADE_COLOR: Record<string, string> = {
   表扬: "#6adf8a",
   辅导: "#ff8a8a",
@@ -242,12 +235,7 @@ export function Stage3D({
     <div
       data-product-scene="report-stage-3d"
       data-product-scene-actors={String(agents.length + 1)}
-      /**
-       * 2026-09-21 真机修复：旧样式 height:"100%" 会把画布拉到主区全高（实测 872×872），
-       * 相机取景固定 → 全队只挤在画面上部一小条、下面一大片黑，看起来就是"没展示全"。
-       * 现在给画布高度上限，团队环形队列才能完整入镜。
-       */
-      style={{ width: "100%", height: STAGE_MAX_HEIGHT, maxHeight: "100%", minHeight: 440, borderRadius: 12, overflow: "hidden", background: "#0b0d10" }}
+      style={{ width: "100%", height: "100%", minHeight: 440, borderRadius: 12, overflow: "hidden", background: "#0b0d10" }}
     >
       <Canvas camera={{ position: [8.6, 0.9, 11.2], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: false }}>
         <SkyDome night={night} />

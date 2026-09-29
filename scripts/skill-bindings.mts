@@ -1,8 +1,8 @@
 /**
- * 组合技能围栏绑定表（ai-video / geo-growth）。
+ * 组合技能围栏绑定表（ai-video / geo-growthtest）。
  *
  * 2026-09-20 真机验收修复：该表原先只存在于 `scripts/seed.ts` 内部，`scripts/seed-geo.ts`
- * 安装组合技能（hotel + ai-video + geo-growth）时无从复用，只能落空绑定——
+ * 安装组合技能（hotel + ai-video + geo-growthtest）时无从复用，只能落空绑定——
  * 结果是 ai-video 技能注册表 `fence_bindings=[]`，而 SKILL.md 显式声明 G10/G6/G1…，
  * RDAS matrix 的 SA3_fences 判「声明未进绑定」（0/67）。绑定表收口到本模块（唯一事实源），
  * 两个 seed 共用；未声明的技能保持空绑定（不臆造）。
@@ -42,7 +42,7 @@ export const HOTEL_SKILL_BINDINGS: Record<string, string[]> = {
   "intent-radar": [],
 };
 
-export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<string, string[]>> = {
+export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growthtest", Record<string, string[]>> = {
   "ai-video": {
     "comment-ops": ["G10a", "G10b", "G10c", "G10d"],
     "director-review": ["G6"],
@@ -61,6 +61,8 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<s
     "bgm-library-license": ["G-BGM1", "G-BGM5"],
     "bgm-delivery-spec": ["G-BGM0", "G-BGM1", "G-BGM2", "G-BGM3", "G-BGM4", "G-BGM5"],
     // 后期字幕师五件套（2026-09-23）：安装即绑定标题字幕门 G-SUB0..G-SUB5，卸载即撤销。
+    // 注：字幕与围栏的关系不是"一对一"——选型看到品牌视觉锤与许可，烧录看到覆盖原片与安全区，
+    // 交付规范看全量，所以按技能职责分配绑定，不做并集兜底。
     "font-selection": ["G-SUB0", "G-SUB1", "G-SUB3", "G-SUB5"],
     "subtitle-layout-design": ["G-SUB0", "G-SUB3", "G-SUB6"],
     "caption-burnin-ops": ["G-SUB0", "G-SUB2", "G-SUB3", "G-SUB6"],
@@ -74,7 +76,7 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<s
     "voice-dubbing-sync": ["G-VOICE2", "G-VOICE3", "G-VOICE4"],
     "voice-delivery-spec": ["G-VOICE0", "G-VOICE1", "G-VOICE2", "G-VOICE3", "G-VOICE4", "G-VOICE5", "G-VOICE6"],
   },
-  "geo-growth": {
+  "geo-growthtest": {
     "ai-answer-rewrite": ["G-GEO1", "G-GEO2"],
     "entity-consistency-check": ["G-GEO2"],
     // 获客用增班组技能（v1.2）：预算带/实验登记与停止/价格承诺/转介与数据边界
@@ -97,6 +99,6 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<s
  */
 export function skillBindingsFor(bundle: string | null | undefined, name: string): string[] | null {
   if (bundle === "hotel") return HOTEL_SKILL_BINDINGS[name] ?? null;
-  if (bundle === "ai-video" || bundle === "geo-growth") return COMPOSED_SKILL_BINDINGS[bundle][name] ?? null;
+  if (bundle === "ai-video" || bundle === "geo-growthtest") return COMPOSED_SKILL_BINDINGS[bundle][name] ?? null;
   return null;
 }

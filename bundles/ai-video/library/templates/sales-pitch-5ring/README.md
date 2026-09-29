@@ -14,11 +14,11 @@
 
 ```bash
 node_modules/.bin/tsx scripts/tools/full-chain-film.mts \
-  --shots    bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growth/shotlist.json \
+  --shots    bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growthtest/shotlist.json \
   --project  VID-GR01 \
   --library  <项目自有角色库，可省略（默认用内置 1 号模特陈卓）> \
   --work-dir <.vm-work 根> --out <交付目录> \
-  --brief    bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growth/brief.json \
+  --brief    bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growthtest/brief.json \
   --stages   cine-kb,continuity,micromotion,spec,plates,videos,voice,compose,color,subtitle,bgm,cover,mux,deliver \
   --subtitle-mode both \
   --cover-hero person --cover-hook "获客，算得清" \
@@ -67,11 +67,11 @@ node_modules/.bin/tsx scripts/tools/full-chain-film.mts \
 ```bash
 # 改造前口径（看镜头卡原文；本模板改造前的实测：硬缺陷 12 · 软提示 18）
 node_modules/.bin/tsx scripts/tools/environment-realism-audit.mts \
-  --shots bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growth/shotlist.json
+  --shots bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growthtest/shotlist.json
 
 # 管线真实口径（先把圣经展开进每镜；本模板现在应为 0 硬缺陷 / 0 软提示）
 node_modules/.bin/tsx scripts/tools/environment-realism-audit.mts \
-  --shots bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growth/shotlist.json --expand
+  --shots bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growthtest/shotlist.json --expand
 ```
 
 口径细节见 `docs/environment-realism.md` 与 `docs/opening-hook.md`；两类真机 badcase 见
@@ -84,5 +84,5 @@ node_modules/.bin/tsx scripts/tools/environment-realism-audit.mts \
 
 ## 示例
 
-`examples/workloom-growth/` 是 VID-GR01 的原始镜头卡与简报（18 镜 / 89.5s），
+`examples/workloom-growthtest/` 是 VID-GR01 的原始镜头卡与简报（18 镜 / 89.5s），
 可直接复跑同一支片子，或替换产品内容后按同一结构改写。

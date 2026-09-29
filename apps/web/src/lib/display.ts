@@ -215,7 +215,7 @@ export function chineseDisplayName(value: string | null | undefined, fallback: s
 
 /**
  * 技能展示名（Bundles 技能口径）：优先从技能说明首段解析中文名
- * （如「入住退房全流程套件。…」「GEO 六段式改写官方套件（随 bundles/geo-growth 分发）：…」），
+ * （如「入住退房全流程套件。…」「GEO 六段式改写官方套件（随 bundles/geo-growthtest 分发）：…」），
  * 未命中时回落 @workloom/ui 词典与原始 id。
  * 首段里夹带技术记号（「评论三级分流 SOP 官方套件」「线索管家——四路承接应答留资 SOP」）
  * 时先剔除记号再取中文名，避免整串回落成裸 id 上屏。

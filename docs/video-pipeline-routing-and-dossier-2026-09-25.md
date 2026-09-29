@@ -1,7 +1,7 @@
 # 视频管线自动化分流 + 商品情报档案激活（T-2026-0925-0002）
 
-**范围**：`WorkLoom-growth`（实验车道，ai-video 行业包）→ 定向同步 `workloom-growthtest` / `workloom-growthmatrix`
-**基线**：`WorkLoom-growth@9cf18c4`（2026-09-25 云端 main）
+**范围**：`WorkLoom-growthtest`（实验车道，ai-video 行业包）→ 定向同步 `workloom-growthtest` / `workloom-growthtestmatrix`
+**基线**：`WorkLoom-growthtest@9cf18c4`（2026-09-25 云端 main）
 **一句话结论**：营销片/叙事片的「自动分流 + 不确定就问」已落地；商品情报档案从「只产出任务书、无人回填」
 变成「真检索 + 结构化回填 + 无源剔除 + G1 门 + Brief 摘要卡注入」的可用链路；跑批暴露的 **6 类真缺陷**
 已修（含 AI 监制只看到 600 字摘录这个系统性误杀根因），仍有 3 项明确遗留（见 §6）。

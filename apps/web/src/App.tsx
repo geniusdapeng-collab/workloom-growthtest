@@ -137,10 +137,8 @@ function Shell() {
       <Route path="/login" element={<Login />} />
       <Route path="/activate" element={<Activate />} />
       <Route path="/invite" element={<InviteAccept />} />
-      <Route path="/onboarding" element={
-        // F-GUEST1：游客可完整体验系统，进入配置引导（正式开通）才要求登录
-        isGuest() ? <Navigate to="/login?next=/onboarding" replace /> : <Onboarding />
-      } />
+      {/* 取消游客入口（2026-09-21）：打开即店主身份，配置引导不再需要"游客→登录"跳转 */}
+      <Route path="/onboarding" element={<Onboarding />} />
       <Route path="/dev" element={<UiDiagnosticsRoute />} />
             {INDUSTRY_ROUTE_REGISTRY.routes.map((definition) => (
               <Route

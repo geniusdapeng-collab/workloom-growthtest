@@ -19,17 +19,17 @@
 | 包 | 声明写动作 | 规则命中 | 完全无规则 | 未命中兜底 |
 |---|---:|---:|---:|---|
 | ai-video | 80 | 32（宽口径 0） | 48 | `review` |
-| geo-growth | 67 | 13（宽口径 2） | 54 | `review` |
+| geo-growthtest | 67 | 13（宽口径 2） | 54 | `review` |
 | hotel | 28 | 6 | 22 | `review` / 只读体检补丁 `block` |
 
 **口径澄清（A 级，避免误读）**：
 
-1. **未命中 ≠ 绕过**：围栏引擎对"写类动作无规则命中"按包级 `default_level` 处理（ai-video / geo-growth 全为 `review`），
+1. **未命中 ≠ 绕过**：围栏引擎对"写类动作无规则命中"按包级 `default_level` 处理（ai-video / geo-growthtest 全为 `review`），
    属于 fail-closed 的保守挂起；hotel 的 `audit-only-patch` 更是 `block`（体检期写动作一律拒）。
 2. **preset 的 `tools` 是"岗位能力声明"，不是运行时动作字面值**：例如卡片写 `ads.boost.request`，
    而运行时/种子/套件用的 canonical 动作是 `ads.boost`（`scripts/seed-video.ts`、`scripts/seed-geo.ts`、`scripts/suite-geo.ts` 均为 `ads.boost`，与 G12 规则一致）。
    因此矩阵度量的是**声明一致性**，不是"规则是否失效"。
-3. **宽口径命中是可用的**：geo-growth 的 `shootlist.emit` 由规则动词段 `emit` 命中
+3. **宽口径命中是可用的**：geo-growthtest 的 `shootlist.emit` 由规则动词段 `emit` 命中
    （HP-02 DSL ②：单段动作词按动词段匹配），属有意的域级覆盖；审计器已把这类单独列出，不与精确命中混算。
 
 **建议（提案，不改契约）**：把 3 处与 canonical 动作漂移的声明对齐——`ads.boost.request → ads.boost`、

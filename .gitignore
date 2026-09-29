@@ -36,14 +36,16 @@ release/
 vendor/srt-whiteboard/.venv/
 var/whiteboard-jobs/
 
+# 制片档案运行目录：HR_WORK_DIR 指向哪个目录，那个目录就整体不入库
+# （真机踩到：本机把 HR_WORK_DIR 设成 .vm-work-wb 后，档案被 `git add -A` 扫进提交）
+.vm-work*/
+
 # C 层评测运行产物（本地/评审侧生成）
 outputs/c-layer/
 
 # 桌面自包含载荷与验收产物（本地构建/跑验收生成，不入库）
 dist-payload/
 dist-payload.tar.gz
-# Bundle 公钥环由发布流水线生成（build/ 为构建产物落点，不入库、不随仓同步）
-build/bundle-trust.json
 
 # ============================================================================
 # talkcraft 引擎与口播解说片产物（T-2026-0926-0008）

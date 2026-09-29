@@ -4,8 +4,8 @@ import { bindVerifiedActiveBundle, validateProjectionStructure } from "./active-
 
 function projection(overrides: Partial<BundleUiProjection> = {}): BundleUiProjection {
   return {
-    primaryBundleId: "geo-growth",
-    bundleId: "geo-growth",
+    primaryBundleId: "geo-growthtest",
+    bundleId: "geo-growthtest",
     bundleName: "获客经营组合",
     bundleVersion: "1.0.0",
     bundleStatus: "candidate",
@@ -15,9 +15,9 @@ function projection(overrides: Partial<BundleUiProjection> = {}): BundleUiProjec
     sources: [{
       bundleId: "hotel", bundleName: "酒店经营", bundleVersion: "1.0.0",
       bundleStatus: "candidate", integrityDigest: "b".repeat(64), signatureKeyId: null,
-      role: "dependency", parentBundleId: "geo-growth",
+      role: "dependency", parentBundleId: "geo-growthtest",
     }, {
-      bundleId: "geo-growth", bundleName: "获客经营组合", bundleVersion: "1.0.0",
+      bundleId: "geo-growthtest", bundleName: "获客经营组合", bundleVersion: "1.0.0",
       bundleStatus: "candidate", integrityDigest: "a".repeat(64), signatureKeyId: null,
       role: "primary", parentBundleId: null,
     }],
@@ -35,28 +35,28 @@ function projection(overrides: Partial<BundleUiProjection> = {}): BundleUiProjec
 describe("活动主 Bundle 与组合投影绑定", () => {
   it("唯一 active 主包可绑定经过独立完整性校验的组合来源", () => {
     const result = bindVerifiedActiveBundle({
-      workspaceBundleId: "geo-growth",
-      activeInstalls: [{ id: "install-primary", bundleId: "geo-growth" }],
+      workspaceBundleId: "geo-growthtest",
+      activeInstalls: [{ id: "install-primary", bundleId: "geo-growthtest" }],
     }, () => projection());
-    expect(result).toMatchObject({ state: "ready", bundleId: "geo-growth", installId: "install-primary" });
+    expect(result).toMatchObject({ state: "ready", bundleId: "geo-growthtest", installId: "install-primary" });
   });
 
   it.each([
     {
       label: "没有活动装配",
-      facts: { workspaceBundleId: "geo-growth", activeInstalls: [] },
+      facts: { workspaceBundleId: "geo-growthtest", activeInstalls: [] },
       state: "not-installed",
     },
     {
       label: "存在多条活动装配",
-      facts: { workspaceBundleId: "geo-growth", activeInstalls: [
-        { id: "one", bundleId: "geo-growth" }, { id: "two", bundleId: "hotel" },
+      facts: { workspaceBundleId: "geo-growthtest", activeInstalls: [
+        { id: "one", bundleId: "geo-growthtest" }, { id: "two", bundleId: "hotel" },
       ] },
       state: "not-installed",
     },
     {
       label: "工作区指针指向其他包",
-      facts: { workspaceBundleId: "other-tenant-bundle", activeInstalls: [{ id: "one", bundleId: "geo-growth" }] },
+      facts: { workspaceBundleId: "other-tenant-bundle", activeInstalls: [{ id: "one", bundleId: "geo-growthtest" }] },
       state: "bundle-mismatch",
     },
   ])("$label时在加载磁盘投影前失败关闭", ({ facts, state }) => {
@@ -67,8 +67,8 @@ describe("活动主 Bundle 与组合投影绑定", () => {
 
   it("投影伪造主包身份、重复来源或缺少依赖摘要时失败关闭", () => {
     const facts = {
-      workspaceBundleId: "geo-growth",
-      activeInstalls: [{ id: "install-primary", bundleId: "geo-growth" }],
+      workspaceBundleId: "geo-growthtest",
+      activeInstalls: [{ id: "install-primary", bundleId: "geo-growthtest" }],
     };
     expect(bindVerifiedActiveBundle(facts, () => projection({ primaryBundleId: "hotel" })).state)
       .toBe("projection-invalid");
@@ -125,10 +125,10 @@ describe("活动主 Bundle 与组合投影绑定", () => {
         : source),
     })],
     ["权限全集额外注入未投影权限", () => projection({
-      navigationPermissionUniverse: ["geo-growth.internal.read"],
+      navigationPermissionUniverse: ["geo-growthtest.internal.read"],
     })],
   ] satisfies Array<[string, () => BundleUiProjection]>)('%s时纯结构校验失败关闭', (_label, forged) => {
-    expect(validateProjectionStructure(forged(), "geo-growth")).not.toBeNull();
+    expect(validateProjectionStructure(forged(), "geo-growthtest")).not.toBeNull();
   });
 
   it("依赖父链形成循环、不能收敛到唯一活动主包时失败关闭", () => {
@@ -144,7 +144,7 @@ describe("活动主 Bundle 与组合投影绑定", () => {
         base.sources![1]!,
       ],
     });
-    expect(validateProjectionStructure(cyclic, "geo-growth")).toMatch(/循环/);
+    expect(validateProjectionStructure(cyclic, "geo-growthtest")).toMatch(/循环/);
   });
 
   it("多级依赖只要父链完整收敛到主包即可通过", () => {
@@ -155,11 +155,11 @@ describe("活动主 Bundle 与组合投影绑定", () => {
         {
           bundleId: "ai-video", bundleName: "视频生产", bundleVersion: "1.0.0",
           bundleStatus: "candidate", integrityDigest: "c".repeat(64), signatureKeyId: null,
-          role: "dependency", parentBundleId: "geo-growth",
+          role: "dependency", parentBundleId: "geo-growthtest",
         },
         base.sources![1]!,
       ],
     });
-    expect(validateProjectionStructure(nested, "geo-growth")).toBeNull();
+    expect(validateProjectionStructure(nested, "geo-growthtest")).toBeNull();
   });
 });

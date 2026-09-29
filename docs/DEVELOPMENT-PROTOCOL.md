@@ -1,14 +1,15 @@
-# WorkLoom 开发协作协议（轻量版 v1）
+# WorkLoom 开发协作协议（轻量版 v1，2026-09-22 修订）
 
-> 生效范围：workloom-im 唯一定义，base-sync 分发各仓只读副本（舰队清单见 `sync/child-repos.json`；新仓由每日舰队扫描自动纳管）。
+> 生效范围：workloom-im 唯一定义，base-sync 分发各订阅仓只读副本（舰队清单见 `sync/child-repos.json`；新仓由每日舰队扫描自动纳管；隔离副本仓不适用，见 §11）。
 > 定位：**不新造系统**——用 CNB 原生能力（Issue / 分支保护 / 流水线 / PR）+ 三个校验脚本，管住"谁在改什么、别撞车、会话断了能接上"。
 > 优先级：十二条系统不变量（《产品与代码全景认知》§8）> 本协议 > 本仓 `AGENTS.md` > 会话内临时指令。
 > 与《WorkLoom 分布式 AI 开发 Agent 协作机制 v0.1》的关系：本文件是它的**最小可执行子集**；账本服务、租约看门狗、考试院、错题本、蜂群经验属"重装备"，触发条件见 §7，未触发前不建。
+> 修订记录：2026-09-22 · 新增 §11「隔离副本车道」（growthtest / growthmatrix 双向不同步）；统一任务号书写为 `T-YYYY-MMDD-XXXX` 并同步提交门禁提示。
 
 ## 1. 五条硬规则
 
-1. **一任务一分支一 PR**：任务卡 = CNB Issue（标题 `[T-YYYYMMDD-XXXX] 目标`），分支 = `task/T-YYYYMMDD-XXXX`，一个会话同时只开一个任务。
-2. **任务号进提交信息**：`<type>(<layer>): <摘要> [T-YYYYMMDD-XXXX]`，由 `scripts/ci/verify-commit-msg.mjs` 校验。
+1. **一任务一分支一 PR**：任务卡 = CNB Issue（标题 `[T-YYYY-MMDD-XXXX] 目标`），分支 = `task/T-YYYY-MMDD-XXXX`，一个会话同时只开一个任务。
+2. **任务号进提交信息**：`<type>(<layer>): <摘要> [T-YYYY-MMDD-XXXX]`，由 `scripts/ci/verify-commit-msg.mjs` 校验（正则 `\[T-\d{4}-\d{4}-\d{4}\]`）。
 3. **先声明后落笔**：PR 描述里写明本次改动的路径清单；`scripts/ci/verify-lock-conflict.mjs` 会与同仓其它 open PR 比对，**模块级互斥路径重叠即拒**。
 4. **合并在机器、串行执行、人保留叫停权**：AI 只提 PR；**门禁全绿且无冲突时，由 AI 按队列一次一个直接合并**（默认 squash）；合并后其余分支先 rebase 再继续。人不再承担逐 PR 合并操作，保留随时叫停、要求回滚与例外裁决的权利；涉及真实资金 / 实盘、生产秘密与生产配置、协议文本语义变更的 PR，必须在描述中显著标注并提供回滚路径。
    - 在途 / 未完成的 PR 必须置为 **WIP（草稿）**——WIP PR 不参与任何合并；
@@ -41,11 +42,12 @@
 - **普通路径**：同一文件被两个 open PR 同时修改 → 后到者拒（`LOCK_OVERLAP_MODE=warn` 可临时降级为告警）。
 - 检测由 `scripts/ci/verify-lock-conflict.mjs` 在 PR 流水线自动执行，无需手工维护锁表；脚本按「PR 编号 / 分支名 / 源分支提交 SHA」三重排除自身 PR。
 - 冲突处置：排队等待先到者合并；紧急任务转人工调度。
+- **事件语义（2026-09-27 修订）**：拦截只发生在 **PR 事件**（先到先得，后到者排队）；**push 事件**（main 上的合并提交）下重叠降级为**提醒**——合并已经发生，门禁拦不住任何东西，若仍判红则每次并发合并都会把 main 打红（实测：`workloom-growthtest` #211 合入后，因在途 #206/#209 同改 `bundles/ai-video/bundle.json` 被判红，同一内容 PR 门禁全绿）。需要 push 也按 fail 处理时用 `LOCK_OVERLAP_MODE=fail` 或 `--strict`。
 
 ## 5. 提交规范（放宽版）
 
 ```
-<type>(<layer>): <摘要> [T-YYYYMMDD-XXXX]
+<type>(<layer>): <摘要> [T-YYYY-MMDD-XXXX]
 ```
 
 - `type`：`feat | fix | sync | protocol | exam | docs | test | chore | ci`（`test` 测试类、`ci` 流水线/脚本类）
@@ -73,7 +75,7 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 | `src/auto` | 来源：漂移报告 / 事故 / 考试失败（自动生成） |
 | `protocol` | 协议类任务 |
 
-配套：九仓均已创建这 10 个标签；任务集看板按 `t/*` 分列即可（无需 18 个细粒度状态）。
+配套：十个订阅仓均已创建这 10 个标签（隔离副本仓不参与纳管，见 §11）；任务集看板按 `t/*` 分列即可（无需 18 个细粒度状态）。
 
 ## 6. 交接与恢复
 
@@ -90,7 +92,7 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 
 ## 10. 实验车道（fox / growth 等深度定制仓）
 
-问题：`workroom-fox` 与 `WorkLoom-growth` 在共享壳之上做了**深度游戏化定制**（fox：3D 汇报舞台 + 实景商业游戏 M2-a；growth：hud/star-ring/P0 的经营游戏化）。这些**不是基座能力**，如果强行与基座保持一致，会被两类机制抹掉或卡死：
+问题：`workroom-fox` 与 `WorkLoom-growthtest` 在共享壳之上做了**深度游戏化定制**（fox：3D 汇报舞台 + 实景商业游戏 M2-a；growth：hud/star-ring/P0 的经营游戏化）。这些**不是基座能力**，如果强行与基座保持一致，会被两类机制抹掉或卡死：
 
 1. **普通 base-sync**：若实验路径落在 `include` 内，同步会覆盖；
 2. **三端客户端基座升级**：受管根 `apps/{web,webb,webc}` 内的差异，只要不在 `allowedIndustryExtensionPaths` 白名单里，就会被判 `ILLEGAL_INDUSTRY_APP_PATH` / `MANAGED_FILE_MODIFIED` 并 **fail-close**（升级被拒）。
@@ -125,6 +127,68 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 2. **公共化必须提案**：实验里验证成功的通用交互能力，先写提案任务卡（L2→L1→L0），不得整包搬进基座；
 3. **新实验仓接入即声明**：舰队扫描发现新仓 → 纳管时同步填写 `lane/experimentNote/experimentPaths/industryExtensionPaths`，否则护栏会报警（`MISSING_NOTE` / `MISSING_PATHS` / `UI_UPGRADE_WOULD_FAIL`）。
 
+### 10.3 受管文件分叉容差（2026-09-27 新增，解除 fox 波次暂停）
+
+**问题**：实验仓声明的自有路径（`industryExtensionPaths`）如果**同时**出现在稳定客户端基座快照里
+（例如 fox 的 `apps/*/src/pages/p0/**`、`apps/*/src/voice/**`），或**已被旧 state 登记成基座受管文件**，
+`client-foundation` 会 fail closed（`客户端基座快照不得占用行业扩展路径` /
+`state 不得把行业扩展登记成基座受管文件`），波次永久卡住。fox 自 0.1.8 起就停在这里。
+
+**决策（产品所有者指令：解决 fox/tiger 覆盖）**：实验车道引入**受管文件分叉容差**，但不是"放宽校验"，而是**退管迁移**：
+
+| 项 | 规则 |
+|---|---|
+| 生效范围 | 仅 `lane: experiment` 的仓；非实验车道（含 tiger 这类行业仓）保持严格 fail closed |
+| 触发条件 | 稳定快照占用该仓声明的 `industryExtensionPaths`，或旧 state 已把这类路径登记为受管文件 |
+| 动作 | 这些路径**不覆盖、不删除**，从新 state 的 `managedFiles` 移除，并在 `state.retiredManagedForks` 留痕（路径 + 退管版本 + 原因） |
+| 代价（必须知情） | 退管路径**从此不再接收基座更新**，由该仓自持；要拿回基座版本需先删除声明并另开迁移任务卡 |
+| 门禁一致性 | rollout 把 `lane` 与 `industryExtensionPaths` 写入仓内 `.workloom-ui-governance.json`；仓内自包含门禁（`verify-client-foundation-consumer.mjs`）据此豁免这些路径，不再要求各仓自持一份扩展声明文件 |
+| 单一事实源 | 仓级扩展路径只认 `sync/child-repos.json#children[].industryExtensionPaths`；仓内私改该声明会在下一次 rollout fail closed |
+
+**暂停仓恢复步骤**：① 在 `sync/child-repos.json` 把 `uiRolloutWave` 从 `paused` 改回真实波次；
+② `node sync/ui-upgrade-pr.mjs --rollout --wave <波次>`（默认按波次顺序，先到先得）；
+③ 升级 PR 门禁全绿后合并；④ 确认 `state.retiredManagedForks` 与仓内文件一一对应。
+
+## 11. 隔离副本车道（isolated：双向不同步，2026-09-22 新增）
+
+**背景**：`workloom-growthtest`（AI超增长·实验版）与 `workloom-growthtestmatrix`（骇客帝国·实验版）是 2026-09-21 从
+`WorkLoom-growthtest@a6dc89a` 完整复制出来的**激进改造实验副本**，内容暂时与基座拆分：基座内容不直接同步进这两仓，
+这两仓的内容也不直接回流基座（产品所有者 2026-09-22 明确指令）。
+
+**与 §10 实验车道的区别**：实验车道仍在同步队列内（拿基座资产、只是实验路径受护栏保护）；隔离副本**完全不在同步队列内**，
+既不收也不发。因此二者用不同登记位：
+
+| 车道 | 登记位 | 是否收基座资产 | 是否回流基座 | 纳管/门禁 |
+|---|---|---|---|---|
+| 实验车道（fox / growth） | `children[].lane = experiment` | 收（实验路径受白名单保护） | 不回流（需提案） | 纳管（10 标签 + 门禁） |
+| 隔离副本（growthtest / growthmatrix） | `isolatedRepos[]`（顶层） | **不收** | **不回流** | **不纳管**：扫描跳过、不建扫描卡/纳管 PR、不新增/修改分支保护 |
+
+**机器可读事实源**（`sync/child-repos.json`）：
+
+```json
+{
+  "repo": "workloom-ai/workloom-growthtest",
+  "lane": "isolated",
+  "syncPolicy": "none-in-none-out",
+  "copiedFrom": "workloom-ai/WorkLoom-growthtest@a6dc89a",
+  "isolatedSince": "2026-09-21",
+  "declaredBy": "product-owner",
+  "declaredAt": "2026-09-22",
+  "note": "为什么隔离 / 解除条件"
+}
+```
+
+**四条硬规则**：
+
+1. **不进 children**：隔离仓一旦出现在 `children` 里，fanout 会把基座内容推过去；`experiment-guard --check` 会报 `ISOLATED_IN_CHILDREN` 并在基座门禁判红；
+2. **不纳管**：`fleet-scan.mjs` 把隔离仓从「新发现 WorkLoom 仓」里剔除（只单列报告）；`provision-protocol.mjs` 默认拒绝为隔离仓建纳管 PR，确需恢复必须由产品所有者明确指令 + 显式传 `--allow-isolated`；
+3. **不下发**：`sync/fanout-cnb.mjs` 读取 `isolatedRepos` 并在入口过滤——即使隔离仓被误写进 `children` 也拦下（宁可少同步一个仓，也不把基座内容推给隔离副本）；
+4. **不回流**：隔离副本的改造不进入基座、不下发给任何其他仓；其中的通用能力若要公共化，必须另开提案任务卡，按 L2→L1→L0 重新实现与评审。
+
+**解除隔离（回到受控舰队）时的动作**：产品所有者明确指令 → 另开纳管任务卡 → 从 `isolatedRepos` 移除并写入 `children`
+（含 `lane` / 波次 / `extraExclude`）→ 跑 `provision-protocol.mjs --allow-isolated` 补齐协议资产与门禁 → 由 fanout 纳入正常波次。
+在收到显式指令前，不得以"顺手对齐"为名向这两仓推送任何基座资产。
+
 ## 9. 舰队维护与自动化（2026-09-18 新增）
 
 ### 9.1 自动 vs 人工（边界写死）
@@ -134,8 +198,8 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 | 提交规范校验 | **自动** | `.cnb.yml` 协议门禁 stage → `scripts/ci/verify-commit-msg.mjs` |
 | 并发冲突检测（同文件/同互斥模块） | **自动** | 同上 → `scripts/ci/verify-lock-conflict.mjs`（比对同仓 open PR） |
 | 合并前闸门（类型/测试/构建/迁移种子验链/视觉） | **自动** | 各仓 `.cnb.yml`（基座 static/db/ui 三道必需） |
-| 分支保护（禁直推/禁强推/必需状态检查） | **自动** | CNB 平台规则（九仓已配） |
-| 新仓发现与纳管 | **自动** | 每日 cron：`scripts/tools/fleet-scan.mjs --issue --provision` → 开扫描卡 + 建纳管 PR |
+| 分支保护（禁直推/禁强推/必需状态检查） | **自动** | CNB 平台规则（十个订阅仓已配；隔离副本仓不再新增/修改） |
+| 新仓发现与纳管 | **自动** | 每日 cron：`scripts/tools/fleet-scan.mjs --issue --provision` → 开扫描卡 + 建纳管 PR（**隔离副本仓跳过**，见 §11） |
 | 基座资产分发（根级受控资产 → 各仓 `sync/base-*` PR） | **自动** | 每 30 分钟 cron + `api_trigger_base_sync`：`sync/fanout-cnb.mjs`（详见《FLEET-AUTO-SYNC.md》§1） |
 | 任务卡创建/回执/关单 | **半自动** | `scripts/tools/task.mjs new|receipt|close`（一条命令，不再手写 JSON） |
 | 分支创建、提交、提 PR | 由 AI/人执行 | 用任务号命名分支即可 |
@@ -176,11 +240,11 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 ### 9.2 工具用法
 
 ```bash
-# 任务卡：建卡（自动分配 T-YYYYMMDD-XXXX，打 t/draft）
+# 任务卡：建卡（自动分配 T-YYYY-MMDD-XXXX，打 t/draft）
 node scripts/tools/task.mjs new --repo workloom-ai/workloom-hotel --title "修复差评 SLA" \
   --q1 industry --q3 workloom-hotel --q4 "单测+打包门禁；回滚=revert"
 # 任务卡：回执 + 关单
-node scripts/tools/task.mjs receipt --repo workloom-ai/workloom-hotel --id T-20260919-0001 \
+node scripts/tools/task.mjs receipt --repo workloom-ai/workloom-hotel --id T-2026-0919-0001 \
   --progress "..." --decisions "..." --next "..." --close
 
 # 舰队扫描：列出组织内所有 WorkLoom 仓，标出未纳管的新仓
@@ -191,9 +255,11 @@ node scripts/tools/fleet-scan.mjs --issue --provision   # 开扫描卡 + 自动�
 
 # 单仓纳管（幂等）：标签 + 分支保护 + 协议资产 + 门禁 stage + PR
 node scripts/tools/provision-protocol.mjs --repo workloom-ai/<name> [--dry-run]
+# 隔离副本护栏：实验路径 + 隔离登记（含"隔离仓误入 children"检查）
+node scripts/tools/experiment-guard.mjs [--check]
 ```
 
-纳管判定规则（`scripts/tools/fleet-rules.mjs`）：仓库根 `product.manifest.json` 的 `schemaVersion` 以 `workloom.product/` 开头 → WorkLoom 仓；缺失时退化为 `.workloom-base-sync.json` 或 `bundles/*/bundle.json` 的 schema 标记。已纳管集合 = 基座仓 + `sync/child-repos.json` 的 children。
+纳管判定规则（`scripts/tools/fleet-rules.mjs`）：仓库根 `product.manifest.json` 的 `schemaVersion` 以 `workloom.product/` 开头 → WorkLoom 仓；缺失时退化为 `.workloom-base-sync.json` 或 `bundles/*/bundle.json` 的 schema 标记。已纳管集合 = 基座仓 + `sync/child-repos.json` 的 children + `isolatedRepos`（隔离副本计入"已知"，但永不进入纳管/分发通道）。
 
 ### 9.3 新仓纳管后的三件事（自动完成，人工只需审 PR）
 
@@ -201,7 +267,9 @@ node scripts/tools/provision-protocol.mjs --repo workloom-ai/<name> [--dry-run]
 2. 协议资产副本 + `.cnb.yml` 协议门禁 stage；
 3. 本仓写入 `sync/child-repos.json`（舰队清单），后续 base-sync 波次照常覆盖。
 
-> 注意：新仓若与既有仓同 `productId`（例如 `WorkLoom-growth` 与 `workloom` 都是 `workloom-ai-acquisition`），说明它是同一产品的第二实例或副本——纳管只保证协议一致，**产品身份（productId/端口/演示工作区）需要人确认后统一**。
+> 注意：新仓若与既有仓同 `productId`（例如 `WorkLoom-growthtest` 与 `workloom` 都是 `workloom-ai-acquisition`），说明它是同一产品的第二实例或副本——纳管只保证协议一致，**产品身份（productId/端口/演示工作区）需要人确认后统一**。
+
+> 补充（2026-09-22）：若新仓是**有意与基座拆分的隔离副本**（如 growthtest / growthmatrix），不要纳管——按 §11 写入 `isolatedRepos` 并保持双向不同步；只有产品所有者明确要求回到受控舰队时才重新纳管。
 
 ## 8. 落地检查（每周一次，1 分钟）
 

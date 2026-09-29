@@ -71,7 +71,7 @@ describe("多 Bundle 权威投影", () => {
       terminology: { content: "营销视频" }, object: "视频内容", workflow: "视频生产",
     });
     writeProjectionBundle(root, {
-      bundleId: "geo-growth", route: "/growth-overview", widgetSlot: "home.video",
+      bundleId: "geo-growthtest", route: "/growth-overview", widgetSlot: "home.video",
       dependencies: [
         { bundleId: "hotel-core", version: "1.0.0" },
         { bundleId: "ai-video", version: "1.0.0" },
@@ -79,21 +79,21 @@ describe("多 Bundle 权威投影", () => {
       terminology: { lead: "获客线索" }, object: "获客线索", workflow: "归因复盘",
     });
 
-    const projection = loadBundleUiProjection("geo-growth", root);
-    expect(projection.primaryBundleId).toBe("geo-growth");
+    const projection = loadBundleUiProjection("geo-growthtest", root);
+    expect(projection.primaryBundleId).toBe("geo-growthtest");
     expect(projection.sources?.map((source) => [source.bundleId, source.role])).toEqual([
-      ["hotel-core", "dependency"], ["ai-video", "dependency"], ["geo-growth", "primary"],
+      ["hotel-core", "dependency"], ["ai-video", "dependency"], ["geo-growthtest", "primary"],
     ]);
     expect(projection.ui.navigation.slots.map((slot) => [slot.capabilityId, slot.sourceBundleId])).toEqual([
       ["hotel-core.console", "hotel-core"],
       ["ai-video.console", "ai-video"],
-      ["geo-growth.console", "geo-growth"],
+      ["geo-growthtest.console", "geo-growthtest"],
     ]);
     expect(projection.navigationPermissionUniverse).toEqual([
-      "ai-video.console.read", "geo-growth.console.read", "hotel-core.console.read",
+      "ai-video.console.read", "geo-growthtest.console.read", "hotel-core.console.read",
     ]);
     expect(projection.ui.home.widgets.map((widget) => widget.sourceBundleId)).toEqual([
-      "hotel-core", "geo-growth",
+      "hotel-core", "geo-growthtest",
     ]);
     expect(projection.ui.objects).toEqual(["住客诉求", "视频内容", "获客线索"]);
     expect(projection.ui.objectEntries?.[0]).toEqual({ label: "住客诉求", sourceBundleIds: ["hotel-core"] });
@@ -106,8 +106,8 @@ describe("多 Bundle 权威投影", () => {
   ])("在$label时失败关闭", ({ dependency, expected }) => {
     const root = mkdtempSync(join(tmpdir(), "wl-bundle-composition-invalid-"));
     writeProjectionBundle(root, { bundleId: "hotel-core" });
-    writeProjectionBundle(root, { bundleId: "geo-growth", dependencies: [dependency] });
-    expect(() => loadBundleUiProjection("geo-growth", root)).toThrow(expected);
+    writeProjectionBundle(root, { bundleId: "geo-growthtest", dependencies: [dependency] });
+    expect(() => loadBundleUiProjection("geo-growthtest", root)).toThrow(expected);
   });
 
   it("拒绝循环、重复引用、导航冲突与术语冲突", () => {
@@ -126,12 +126,12 @@ describe("多 Bundle 权威投影", () => {
       bundleId: "hotel-core", dependencies: [{ bundleId: "shared-core", version: "1.0.0" }],
     });
     writeProjectionBundle(duplicateRoot, {
-      bundleId: "geo-growth", dependencies: [
+      bundleId: "geo-growthtest", dependencies: [
         { bundleId: "shared-core", version: "1.0.0" },
         { bundleId: "hotel-core", version: "1.0.0" },
       ],
     });
-    expect(() => loadBundleUiProjection("geo-growth", duplicateRoot)).toThrow(/重复引用/);
+    expect(() => loadBundleUiProjection("geo-growthtest", duplicateRoot)).toThrow(/重复引用/);
 
     const conflictRoot = mkdtempSync(join(tmpdir(), "wl-bundle-composition-conflict-"));
     writeProjectionBundle(conflictRoot, {
@@ -141,35 +141,35 @@ describe("多 Bundle 权威投影", () => {
       bundleId: "ai-video", route: "/industry-dashboard", terminology: { customer: "观众" },
     });
     writeProjectionBundle(conflictRoot, {
-      bundleId: "geo-growth", dependencies: [
+      bundleId: "geo-growthtest", dependencies: [
         { bundleId: "hotel-core", version: "1.0.0" },
         { bundleId: "ai-video", version: "1.0.0" },
       ],
     });
-    expect(() => loadBundleUiProjection("geo-growth", conflictRoot)).toThrow(/术语.*冲突|导航路由.*重复/);
+    expect(() => loadBundleUiProjection("geo-growthtest", conflictRoot)).toThrow(/术语.*冲突|导航路由.*重复/);
   });
 
   it("任一依赖内容被篡改时独立完整性校验失败关闭", () => {
     const root = mkdtempSync(join(tmpdir(), "wl-bundle-composition-tamper-"));
     writeProjectionBundle(root, { bundleId: "hotel-core", route: "/hotel-operations" });
     writeProjectionBundle(root, {
-      bundleId: "geo-growth", dependencies: [{ bundleId: "hotel-core", version: "1.0.0" }],
+      bundleId: "geo-growthtest", dependencies: [{ bundleId: "hotel-core", version: "1.0.0" }],
     });
     const path = join(root, "hotel-core/bundle.json");
     const tampered = JSON.parse(readFileSync(path, "utf8"));
     tampered.workloom.displayName = "被篡改的依赖包";
     writeFileSync(path, `${JSON.stringify(tampered, null, 2)}\n`);
-    expect(() => loadBundleUiProjection("geo-growth", root)).toThrow(/完整性摘要不一致/);
+    expect(() => loadBundleUiProjection("geo-growthtest", root)).toThrow(/完整性摘要不一致/);
   });
 
   it("不能占用公共路由或借用其他包权限", () => {
     const routeRoot = mkdtempSync(join(tmpdir(), "wl-bundle-composition-base-route-"));
-    expect(() => writeProjectionBundle(routeRoot, { bundleId: "geo-growth", route: "/approvals" }))
+    expect(() => writeProjectionBundle(routeRoot, { bundleId: "geo-growthtest", route: "/approvals" }))
       .toThrow(/不得覆盖基座路由/);
 
     const permissionRoot = mkdtempSync(join(tmpdir(), "wl-bundle-composition-permission-"));
     expect(() => writeProjectionBundle(permissionRoot, {
-      bundleId: "geo-growth", route: "/growth", permission: "hotel-core.console.read",
+      bundleId: "geo-growthtest", route: "/growth", permission: "hotel-core.console.read",
     })).toThrow(/自身命名空间/);
   });
 });

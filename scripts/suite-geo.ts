@@ -15,7 +15,7 @@ import { composeWorkforce } from "@workloom/base/bundles";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
-const BUNDLE = join(REPO_ROOT, "bundles/geo-growth");
+const BUNDLE = join(REPO_ROOT, "bundles/geo-growthtest");
 const APP_URL = process.env.DATABASE_APP_URL ?? "postgres://workloom_app:workloom_dev_app@localhost:5432/workloom";
 const app = new pg.Client({ connectionString: APP_URL });
 const WS = "ws-geo";
@@ -46,7 +46,7 @@ const q = async (text: string, params: unknown[] = []) => {
 const bundleJson = JSON.parse(readFileSync(join(BUNDLE, "bundle.json"), "utf-8"));
 const presets = readdirSync(join(BUNDLE, "presets")).filter(f => f.endsWith(".yml")).sort()
   .map(f => YAML.parse(readFileSync(join(BUNDLE, "presets", f), "utf-8")));
-const fenceDoc = YAML.parse(readFileSync(join(BUNDLE, "fences/geo-growth-baseline.yml"), "utf-8"));
+const fenceDoc = YAML.parse(readFileSync(join(BUNDLE, "fences/geo-growthtest-baseline.yml"), "utf-8"));
 const fenceRules: RuntimeRule[] = (fenceDoc.rules ?? []).map((r: { rule_id: string; name: string; level: RuntimeRule["level"]; is_baseline: boolean; match: { object_types: string[]; actions: string[] }; when: string }) => ({
   rule_id: r.rule_id, version: fenceDoc.version, name: r.name, level: r.level, is_baseline: r.is_baseline,
   objectTypes: r.match.object_types, actions: r.match.actions, when: r.when,
@@ -54,7 +54,7 @@ const fenceRules: RuntimeRule[] = (fenceDoc.rules ?? []).map((r: { rule_id: stri
 const objectsJson = JSON.parse(readFileSync(join(BUNDLE, "schemas/objects.json"), "utf-8"));
 const stagesJson = JSON.parse(readFileSync(join(BUNDLE, "schemas/stages.json"), "utf-8"));
 /**
- * 对象模型校验用**组合口径**：本包围栏（如 G-C01 内部协作放行）管的是组合编制（geo-growth + hotel + ai-video），
+ * 对象模型校验用**组合口径**：本包围栏（如 G-C01 内部协作放行）管的是组合编制（geo-growthtest + hotel + ai-video），
  * 事件对象类型自然包含其它两包声明的生产对象（scene_card / shot_card / video_asset / subtitle_track …）。
  * 只用本包 objects.json 会让这类跨包对象被判"未声明"（2026-09-24 实测 A-10 因此长期报红）。
  */
@@ -71,7 +71,7 @@ const pipelines = readdirSync(join(BUNDLE, "pipelines")).filter(f => f.endsWith(
 const presetKeys = new Set<string>(presets.map(p => p.preset_key));
 const fenceIds = new Set<string>(fenceRules.map(r => r.rule_id));
 // 视觉栈围栏（G-VIS*，独立基线包）：presets 的 fence_bindings 校验必须并集，否则视觉岗被判"绑了不存在的围栏"
-const visualFenceDoc = YAML.parse(readFileSync(join(BUNDLE, "fences/geo-growth-visual.yml"), "utf-8"));
+const visualFenceDoc = YAML.parse(readFileSync(join(BUNDLE, "fences/geo-growthtest-visual.yml"), "utf-8"));
 const visualFenceRules: RuntimeRule[] = ((visualFenceDoc.rules ?? []) as Array<{ rule_id: string; name: string; level: RuntimeRule["level"]; is_baseline: boolean; match: { object_types: string[]; actions: string[] }; when: string }>).map(r => ({
   rule_id: r.rule_id, version: visualFenceDoc.version, name: r.name, level: r.level, is_baseline: r.is_baseline,
   objectTypes: r.match.object_types, actions: r.match.actions, when: r.when,
@@ -316,13 +316,13 @@ b("G-GROW8 渠道增长岗激活后放行（未命中其他规则 → 写类 def
 
 /* ================= C · 种子与运行态 ================= */
 const c = C("C");
-c("工作区存在且行业为 geo-growth", async () => {
+c("工作区存在且行业为 geo-growthtest", async () => {
   const r = await q(`SELECT industry, stage FROM workspaces WHERE id=$1`, [WS]);
-  assert(r.rows[0]?.industry === "geo-growth", `industry=${r.rows[0]?.industry}`);
+  assert(r.rows[0]?.industry === "geo-growthtest", `industry=${r.rows[0]?.industry}`);
 });
 c("组合编制全部 ready 落库（本包 27 岗 ⊆ 组合编制，无缺岗）", async () => {
   /**
-   * 2026-09-20 真机验收修复：花名册权威 = 装配器组合编制（geo-growth + hotel + ai-video，
+   * 2026-09-20 真机验收修复：花名册权威 = 装配器组合编制（geo-growthtest + hotel + ai-video，
    * 同名遮蔽按主包裁决），与基座 seed.ts（ws-yunqi 组合编制全员）同口径；seed-geo 已按组合编制上岗。
    * 旧断言写死 27（只数本包），组合上岗后必然假失败；
    * 2026-09-24 进一步：**总数不再写死**（历史写死值 72 随岗位扩充漂移），改为装配器实时推导。
@@ -330,7 +330,7 @@ c("组合编制全部 ready 落库（本包 27 岗 ⊆ 组合编制，无缺岗�
   const r = await q(`SELECT count(*) n, count(distinct preset_key) d FROM agents WHERE workspace_id=$1 AND status='ready'`, [WS]);
   const total = Number(r.rows[0].n);
   const distinct = Number(r.rows[0].d);
-  const expected = composeWorkforce("geo-growth").presets.size;
+  const expected = composeWorkforce("geo-growthtest").presets.size;
   assert(total === expected, `组合编制 agents=${total}（装配器期望 ${expected}）`);
   assert(distinct === total, `agents=${total}/distinct=${distinct}`);
   const missing = await q(
@@ -347,12 +347,12 @@ c("员工 fence_bindings 原样落库（F2.10）", async () => {
   assert(Array.isArray(fb) && fb.includes("G-GEO1") && fb.includes("G-GEO2"), "绑定丢失");
 });
 c("围栏按基线包全量 active 装载（库表 = 磁盘规则数）", async () => {
-  const r = await q(`SELECT count(*) n FROM fence_rules WHERE workspace_id=$1 AND status='active' AND version='geo-growth-baseline/v1'`, [WS]);
-  const expected = fenceRules.filter((rule) => rule.version === "geo-growth-baseline/v1").length;
+  const r = await q(`SELECT count(*) n FROM fence_rules WHERE workspace_id=$1 AND status='active' AND version='geo-growthtest-baseline/v1'`, [WS]);
+  const expected = fenceRules.filter((rule) => rule.version === "geo-growthtest-baseline/v1").length;
   assert(Number(r.rows[0].n) === expected, `fences=${r.rows[0].n}（磁盘基线规则期望 ${expected}）`);
 });
 c("29 个 GEO 技能已安装（双域 6 + 视觉 14 + 获客用增 9）", async () => {
-  const r = await q(`SELECT count(*) n FROM skill_installs si JOIN skills s ON s.id=si.skill_id WHERE si.workspace_id=$1 AND s.bundle='geo-growth'`, [WS]);
+  const r = await q(`SELECT count(*) n FROM skill_installs si JOIN skills s ON s.id=si.skill_id WHERE si.workspace_id=$1 AND s.bundle='geo-growthtest'`, [WS]);
   assert(Number(r.rows[0].n) === 29, `skills=${r.rows[0].n}`);
 });
 c("14 个触发器 enable", async () => {

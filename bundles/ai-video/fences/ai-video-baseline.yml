@@ -118,8 +118,8 @@ rules:
     level: block
     is_baseline: true
     match:
-      # GR-03（2026-09-28 装配检查单⑥ 实测）：本包 `publish-operator` 在融合体（hotel+geo-growth）
-      # 里被 geo-growth 的同名岗位遮蔽，其工具 `publish.execute` 不在组合工具面上——
+      # GR-03（2026-09-28 装配检查单⑥ 实测）：本包 `publish-operator` 在融合体（hotel+geo-growthtest）
+      # 里被 geo-growthtest 的同名岗位遮蔽，其工具 `publish.execute` 不在组合工具面上——
       # 只声明它会让这条红线在融合体里**空膛**（永远不会触发）。补上组合面上真实存在的发布类工具名，
       # 语义词保留不删（只收紧不放宽）。
       object_types: [publish_task, publish_job, source_task]

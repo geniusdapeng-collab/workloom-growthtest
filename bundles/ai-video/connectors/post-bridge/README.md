@@ -63,14 +63,47 @@ WorkLoom（大脑：岗位/技能/围栏/事件账本）         Mac 后期工�
 post-cli health
 post-cli variants
 post-cli plan     --project project.json --shots a.mp4,b.mp4 [--quality hd|uhd] [--variants warm-story,clean-tech]
-post-cli deliver  --project project.json --shots a.mp4,b.mp4 --out-dir out/ \
+post-cli deliver  --project project.json --shots signed-shots.json --out-dir out/ \
                   [--quality hd|uhd] [--srt subs.srt] [--srt-en subs.en.srt] [--burn-subtitles] [--no-soft-subtitles]
 post-cli impact   --project out/film-project.json --patch patch.json
-post-cli reedit   --project out/film-project.json --patch patch.json [--shot SC-03=/path/new.mp4]
+post-cli reedit   --project out/film-project.json --patch patch.json [--shot SC-03=/path/new.mp4] \
+                  [--audio-stems-by-shot signed-replacement-sources.json]
 post-cli triage   --feedback "配乐太吵，另外第 3 个镜头人物走形"
 ```
 
 退出码：`0` 成功；`2` 用法错误；`3` 工具错误（code 见 `PostError`）；`4` 需要人审（镜头重生成走 G8）。
+
+## 独立音轨来源合同（T-2026-0927-0037）
+
+新交付要求 `project.audioScope={tenantId,workspaceId,projectId,revision}` 和 `shots[].audioStems`。
+`revision` 是画面/原稿的生成版本，独立于后期工程 v1/v2。CLI 的 `--shots` 必须使用 JSON 清单；
+仅逗号分隔的视频路径可用于计划，不能取得生产音轨资格。工具入口采用同一 project/shots 合同。
+
+每镜必须明确 `dialogue/ambience/foley/music` 四个角色。可用源含 `status:"ready"`、音频路径、SHA256、
+`sourceKind`、权威 `receipt`，可选 `inSec/durationSec/offsetSec`；不适用角色用
+`status:"not_applicable"`、具体 `reason` 和同样的权威回执。允许来源为 TTS/独立录音对白、独立合成/录音
+环境与拟音、作曲/许可音乐；从带配乐视频抽出的混合声与近似分离声不能冒充独立角色。
+
+`../bgm-bridge/audio-stems.mjs#describeAudioStemSources` 定义签署绑定：租户、工作区、项目、原稿版本、镜头、原视频
+哈希、角色、源字节、源时长与样点放置（模块自 2026-09-28 起由 `bgm-bridge` 自持，保证配乐工位自包含）。
+`../bgm-bridge/audio-stems-trust.mjs` 只验证内部媒体工位签章，未提供生产
+签发接口。工位通过独立的 `WORKLOOM_AUDIO_STEM_SIGNING_SECRET`（至少 32 字节）和
+`WORKLOOM_AUDIO_STEM_SIGNING_KEY_ID` 配置验证能力；不得接受请求参数传入的密钥、`clean:true` 或普通
+交付封签。密钥与签发进程必须由部署层隔离，HMAC 本身不提供同 UID/同主机管理员隔离。
+未配置可信签发者时，正常链路明确拒绝 `audio_stems_source_unverified`；测试中的随机签发者只证明合同与算法。
+
+源文件从同一打开的 FD 校验并复制到独占工作目录后才交给 FFmpeg。四角色按 48kHz 样点时间线派生；
+节目轨只含对白、环境和拟音，保留的旧音乐永不进入节目轨。母版、禁用 BGM 和配乐失败草稿均只映射
+画面及该节目轨。签章、源快照、角色/节目 WAV、工具指纹与配方摘要记录在 `work/audio-stems/*/audio-stems.json`。
+工程/清单固定该文件与配方的哈希；返修重新校验当前签章、所有字节和确定性重放结果。过期回执可留档，不能授权新使用。
+
+替换镜头必须同时提供 `audioStemsByShot`（工具为 `audio_stems_by_shot`，CLI 如上），且签章绑定新视频。
+改转场会重建同样的音轨时间线；改 BGM 从独立节目轨重混。旧工程只能保留文案/封面等草稿返修，
+`independent_audio_sources=false`；不会从旧成片推断干净轨。真实音频重混每次重新执行，旧混音元数据不能授权缓存成功。
+音频回执本身有冻结哈希，失败音频不会在下一轮仅改文案后变成通过。
+
+同一 HTTP 幂等键的相同在途请求共用作业；不同参数返回 `idempotency_conflict`，完成后再次提交返回
+`idempotency_revalidation_required`，避免旧成功绕过过期签章。已存在完成工程的输出目录不得重做 package，须走返修版本。
 
 `quality` 缺省为 `hd`。`uhd` 对应竖屏 2160×3840、横屏 3840×2160、方屏 2160×2160、4:5 2160×2700。
 请求 UHD 时，低于目标画布的实拍/动画镜头先在本机增强，再进入共用后期层；增强引擎不可用、原片为可排版的文字位图、或增强回读规格不符，交付会报错。
@@ -125,10 +158,12 @@ node bundles/ai-video/connectors/post-bridge/cli.mjs health
 | 变体可辨 | 每对变体至少一个轴 measured visible（画面像素差或音轨不同） | 拒绝（G-DLV1） |
 | 封面可辨 | 两两封面像素差不为 negligible；标题墨迹必须真的检出 | 拒绝 |
 | 时长一致 | 按各变体转场口径算期望时长（xfade 会因重叠变短）±0.4s | 拒绝 |
-| 音频规格 | 母版 −14 LUFS ±1.5、真峰值 ≤ −1dBTP、人声-音乐余量 ≥ 3dB、配乐可闻度 ≥ 3dB | ① 自动降 3dB 重试一次并记账；② 仍不过则**该变体按原声降级交付**并如实标注 |
+| 音频规格 | 配乐变体 −14 LUFS ±1.5、真峰值 ≤ −1dBTP（复检容差 0.2dB）、独立对白-音乐余量 ≥3dB、配乐可闻度 ≥3dB | 可重试的人声余量不足降 3dB 再测；仍不过保留不含旧配乐的节目草稿，整包失败 |
 | 复用证据 | 复用的层给出 sha256 与"未被重算"的说明；镜头层与工程文件逐镜比对 | 拒绝（G-DLV7） |
 
 ## 真机验证数据（2026-09-24，本地 Mac + ffmpeg 6.0）
+
+以下为旧混音合同的历史记录，不能作为 T0037 的当前验收；新合同的合成媒体、签章和正常入口回归见 `docs/repairs/T-2026-0927-0037.md`。
 
 | 场景 | 结果 |
 |---|---|

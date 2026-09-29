@@ -237,13 +237,28 @@ function num(value) {
  * EBU R128 测量（不改变音频）：integrated LUFS / true peak / LRA / 阈值。
  * @returns {Promise<{integratedLufs:number|null,truePeakDbtp:number|null,lra:number|null,thresholdLufs:number|null,targetOffset:number|null,raw:object|null}>}
  */
-export async function measureLoudness(input, { bins = resolveBinaries(), targetLufs = -14, truePeak = -1.0 } = {}) {
-  const { stderr } = await runBin(bins.ffmpeg, [
-    "-hide_banner", "-nostats", "-v", "info",
+/**
+ * EBU R128 响度实测。
+ *
+ * `maxSeconds`（可选）：只测前 N 秒。曲库打标面对的是几百上千首 3-5 分钟的长曲，
+ * 逐首全解码会慢到不可用；前 3 分钟对整曲响度有代表性，且窗口会写进返回值（`windowNote`），
+ * 不做"测了一段却声称整曲"的含糊表述。
+ */
+export async function measureLoudness(input, { bins = resolveBinaries(), targetLufs = -14, truePeak = -1.0, maxSeconds = null, startSec = null } = {}) {
+  const args = ["-hide_banner", "-nostats", "-v", "info"];
+  if (startSec) args.push("-ss", String(startSec));
+  if (maxSeconds) args.push("-t", String(maxSeconds));
+  args.push(
     "-i", input,
+    /**
+     * 只处理音轨：素材包里的 MP3 常带内嵌封面图（实测有 4 首的 PNG 封面已损坏，
+     * 不隔离视频流会让 ffmpeg 在收尾阶段直接 "Conversion failed!"，整首曲子的响度就测不出来）。
+     */
+    "-vn", "-sn", "-dn", "-map", "0:a:0",
     "-af", `loudnorm=I=${targetLufs}:TP=${truePeak}:LRA=11:print_format=json`,
     "-f", "null", "-",
-  ], { label: "ffmpeg(loudnorm-measure)", timeoutMs: 600_000 });
+  );
+  const { stderr } = await runBin(bins.ffmpeg, args, { label: "ffmpeg(loudnorm-measure)", timeoutMs: 600_000 });
   const json = parseLoudnormJson(stderr);
   if (!json) throw new MeasureError("loudnorm 未返回测量 JSON（无法核验响度）", "engine_failed", true);
   return {
@@ -252,6 +267,11 @@ export async function measureLoudness(input, { bins = resolveBinaries(), targetL
     lra: num(json.input_lra),
     thresholdLufs: num(json.input_thresh),
     targetOffset: num(json.target_offset),
+    fromSec: startSec ?? 0,
+    windowSec: maxSeconds ?? null,
+    windowNote: maxSeconds
+      ? `${startSec ? `从 ${startSec}s 起 ` : ""}只测 ${maxSeconds}s（代表段）`
+      : "整曲实测",
     raw: json,
   };
 }
@@ -313,7 +333,7 @@ export async function segmentSpectralStats({ input, start = 0, duration = null, 
   const args = ["-hide_banner", "-nostats", "-v", "info"];
   if (start > 0) args.push("-ss", String(start));
   if (duration !== null) args.push("-t", String(duration));
-  args.push("-i", input, "-af", "aspectralstats=measure=centroid+flatness:win_size=2048,ametadata=print", "-f", "null", "-");
+  args.push("-i", input, "-vn", "-sn", "-dn", "-map", "0:a:0", "-af", "aspectralstats=measure=centroid+flatness:win_size=2048,ametadata=print", "-f", "null", "-");
   const { stderr } = await runBin(bins.ffmpeg, args, { label: "ffmpeg(aspectralstats)", timeoutMs: 300_000 });
   return parseSpectralStats(stderr);
 }
@@ -345,6 +365,7 @@ export async function detectVoiceBandSegments({
   const args = ["-hide_banner", "-nostats", "-v", "info", "-i", input];
   if (duration) args.push("-t", String(duration));
   args.push(
+    "-vn", "-sn", "-dn", "-map", "0:a:0",
     "-af", `highpass=f=200,lowpass=f=4000,silencedetect=noise=${noiseDb}dB:d=${minSilenceSec}`,
     "-f", "null", "-",
   );

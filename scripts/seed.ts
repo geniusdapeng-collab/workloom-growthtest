@@ -2,12 +2,12 @@
  * A5 · 演示种子数据（酒店试点业务前台夹具：云栖酒店）
  * 主题口径：本仓产品主题是「获客用增」；本文件产出的是首个垂直行业试点（酒店）的
  *          业务前台夹具（C 端行业适配器契约所需），获客用增的产品演示工作区
- *          （ws-geo，bundles/geo-growth）由 scripts/seed-geo.ts 产出，
+ *          （ws-geo，bundles/geo-growthtest）由 scripts/seed-geo.ts 产出，
  *          `pnpm db:seed` 已把两者串联为默认一键种子。
  * 用法：pnpm db:seed（读取 .env；幂等，可重复执行）
  *
  * 内容：demo 租户 / 云栖酒店工作区 / 3 人类成员 / 16 个基础 Agent preset 实例 +
- *      组合编制全员上岗（2026-09-24 实测 78 岗：hotel 16 + ai-video 36 + geo-growth 26，同名遮蔽 4 处按主包裁决，
+ *      组合编制全员上岗（2026-09-24 实测 78 岗：hotel 16 + ai-video 36 + geo-growthtest 26，同名遮蔽 4 处按主包裁决，
  *      见 provisionComposedWorkforce；口径事实源为装配器运行结果，不在此手工维护）/
  *      一店一档（含 forbidden 硬约束 + 布草/断点/FAQ 字段组）/ 基线围栏 R1–R26（hotel-baseline/v4）装载 / 53 个组合官方技能 /
  *      2 触发器 / 昨夜夜班班次 / 100 条五元事件（哈希链）/ 审批样例 / 组织记忆
@@ -195,7 +195,7 @@ function loadSkills(): SkillDoc[] {
 }
 
 /**
- * 组合并入包（ai-video / geo-growth）的技能绑定表。
+ * 组合并入包（ai-video / geo-growthtest）的技能绑定表。
  * 口径：只收录 SKILL.md 描述中显式声明的围栏（未声明即空列表，不臆造绑定）。
  */
 /**
@@ -229,18 +229,18 @@ function loadReferencedBaseOfficialSkills(bundleSkills: SkillDoc[]): SkillDoc[] 
     }));
 }
 
-/** 组合技能并集：酒店 30 + ai-video 8 + geo-growth 15（三包技能无同名冲突）+ 编制引用的包外官方技能 */
+/** 组合技能并集：酒店 30 + ai-video 8 + geo-growthtest 15（三包技能无同名冲突）+ 编制引用的包外官方技能 */
 function loadComposedSkills(): SkillDoc[] {
   const bundleSkills = [
     ...loadSkills(),
     ...loadBundleSkills("ai-video", join(REPO_ROOT, "bundles/ai-video/skills"), COMPOSED_SKILL_BINDINGS["ai-video"]),
-    ...loadBundleSkills("geo-growth", join(REPO_ROOT, "bundles/geo-growth/skills"), COMPOSED_SKILL_BINDINGS["geo-growth"]),
+    ...loadBundleSkills("geo-growthtest", join(REPO_ROOT, "bundles/geo-growthtest/skills"), COMPOSED_SKILL_BINDINGS["geo-growthtest"]),
   ];
   return [...bundleSkills, ...loadReferencedBaseOfficialSkills(bundleSkills)];
 }
 
 /**
- * 融合获客资产（bundles/geo-growth/schemas/archive.schema.json 对齐）。
+ * 融合获客资产（bundles/geo-growthtest/schemas/archive.schema.json 对齐）。
  *
  * 本产品是"酒店获客复合系统"：一店一档既要装下酒店经营（房态/布草/供应商），
  * 也要装下获客域（品牌实体卡/目标客群/内容与 GEO 资产/转化资产）。
@@ -906,8 +906,8 @@ async function main(): Promise<void> {
   // —— bundle_installs 装配台账登记（V5：组合编制口径，一键清空的精确卸载依据；幂等） ——
   // 业务口径（获客用增主题）：
   //  - ws-yunqi 是「酒店获客」的试点业务前台：C 端行业适配器契约要求唯一 active 安装为 hotel；
-  //  - 资产台账仍覆盖组合编制全部岗位/围栏/技能（hotel + ai-video + geo-growth），否则一键清空留无主资产；
-  //  - 获客用增的「产品演示工作区」是 ws-geo（bundles/geo-growth 单包示例，is_example=true）：
+  //  - 资产台账仍覆盖组合编制全部岗位/围栏/技能（hotel + ai-video + geo-growthtest），否则一键清空留无主资产；
+  //  - 获客用增的「产品演示工作区」是 ws-geo（bundles/geo-growthtest 单包示例，is_example=true）：
   //    游客首启（guestEnter）与默认演示登录（MEM-G01）都落在那里。
   const installId = `bi-${WS_ID}-hotel`;
   const agentRows = await q(`SELECT id FROM agents WHERE workspace_id=$1 ORDER BY preset_key`, [WS_ID]);
@@ -919,7 +919,7 @@ async function main(): Promise<void> {
        JOIN skills s ON s.id = si.skill_id
       WHERE si.workspace_id=$1 AND s.level='official' AND (s.bundle = ANY($2::text[]) OR s.bundle IS NULL)
       ORDER BY si.skill_id`,
-    [WS_ID, ["hotel", "ai-video", "geo-growth"]],
+    [WS_ID, ["hotel", "ai-video", "geo-growthtest"]],
   );
   const ledgerAssets = {
     preset_ids: agentRows.rows.map((r) => String(r.id)),

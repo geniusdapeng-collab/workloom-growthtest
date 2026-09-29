@@ -1,105 +1,133 @@
-# workloom-ai-acquisition · 能力导览（人类版）
+# WorkLoom 获客增长系统（实验车道） · 代码与能力入口导览
 
-> AI超增长 · 短视频社媒营销 × GEO × 获客五环 × 行业运营（首垂直：酒店）
-> 本文件由 `node scripts/generate-capabilities.mjs` 从代码事实**自动生成**（2026-09-27），
-> 请勿手改——能力变更后重跑生成器即可。Agent 版机器清单见 docs/capability-map.md。
+> 企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。
+> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-09-27）。请修改生成器或事实输入后重新生成，不手改本文件。
+> 本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。
+> 产品身份：`workloom-ai-growthtest`；默认包：`geo-growthtest`；仓库：[workloom-ai/WorkLoom-growthtest](https://cnb.cool/workloom-ai/WorkLoom-growthtest)。
 
-## 🚀 5 分钟体验路径
+## 从哪里开始
 
-```bash
-pnpm install && pnpm preview:all
-```
+先读 [README](../README.md) 的功能状态、依赖和快速开始。准备 Node >=24.0.0、pnpm@10.14.0 与隔离 PostgreSQL 后，按 README 运行模拟体验。`preview:all` 会迁移、灌种子并处理占用端口，不应指向现有生产库；模型模拟需显式设置，视频、语音、发布与消息渠道另需真实依赖。
 
 | 端 | 地址 | 看什么 |
 |---|---|---|
-| 🖥 PC · B 端工作台 | http://localhost:3000 | 经营主页全员就位、晨报、待审批、一句话目标输入 |
-| 📱 B 端移动 | http://localhost:3001 | 演示导航页 → 任选高保真页「手机壳」预览 |
-| 📱 C 端 AI 服务前台 | http://localhost:3002 | 免登对话：咨询增长服务 / 提交合作需求 / 查询跟进进度 |
+| PC 工作台 | http://localhost:3000 | 任务、岗位、报告、组合看板与视频入口 |
+| 员工移动工作台 | http://localhost:3001 | React 员工移动应用，与静态原型分开 |
+| 客户 H5 服务前台 | http://localhost:3002 | preview 默认使用酒店夹具；增长前台需按 README 单独配置 |
 
-无需任何真实后端或密钥：Mock 数据（种子 + 离线确定性模型 + 演示直登）已固化，详见 mock/README.md。
+## 行业包声明数量
 
-| PC 端 | B 端移动（手机壳） | C 端移动 |
+| 行业包 | 声明版本 | 状态 | 岗位定义 | 技能路径 | 管线 |
+|---|---|---|---:|---:|---:|
+| [ai-video](../bundles/ai-video/bundle.json) | 1.0.0 | candidate | 42 | 35 | 6 |
+| [geo-growthtest](../bundles/geo-growthtest/bundle.json) | 1.0.0 | candidate | 27 | 29 | 4 |
+| [hotel](../bundles/hotel/bundle.json) | 3.4.0 | candidate | 16 | 30 | 1 |
+| 声明合计 | — | — | 85 | 94 | 11 |
+
+岗位文件的 `preset_key` 去重得到 **81 个不同标识**；这是本仓声明去重计数，实际依赖装配和同名权威归属以主包 `composition.presetOwners` 与 [装配器](../packages/base/bundles/assembly.ts) 为准。
+
+## 代码与资产入口（42 项）
+
+### 🖥 三端应用入口
+
+来源：[product.manifest.json](../product.manifest.json) · [apps/web/src/App.tsx](../apps/web/src/App.tsx) · [apps/webb/src/App.tsx](../apps/webb/src/App.tsx) · [apps/webc/src/App.tsx](../apps/webc/src/App.tsx)。
+
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| ![PC](demo/preview-shots/pc-3000.png) | ![B移动](demo/preview-shots/shell-guest.png) | ![C移动](demo/preview-shots/mobile-c-3002.png) |
+| **PC 工作台** | 任务、岗位、报告、行业入口；可见内容受权限和活动行业包影响 | 隔离演示启动后：http://localhost:3000 |
+| **员工移动工作台** | React 员工移动应用；与 docs/demo 的历史静态原型分开看 | 隔离演示启动后：http://localhost:3001 |
+| **客户 H5 服务前台** | 对话/服务/工单/消息/我的；preview 脚本使用酒店服务夹具 | 隔离演示启动后：http://localhost:3002 |
 
-## 📦 能力总览（39 项）
+### 📦 行业包声明资产
 
-### 🖥 三端应用（开箱即看）
+来源：[bundles/ai-video/bundle.json](../bundles/ai-video/bundle.json) · [bundles/geo-growthtest/bundle.json](../bundles/geo-growthtest/bundle.json) · [bundles/hotel/bundle.json](../bundles/hotel/bundle.json)。
 
-| 能力 | 一句话 | 怎么体验 |
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **PC 端 · B 端工作台** | 经营主页/任务中心/规则中心/装配中心，全模拟运行态 | `pnpm preview:all` → http://localhost:3000 |
-| **移动端 · B 端高保真** | 12 页高保真演示页 + 手机壳容器 | `pnpm preview:all` → http://localhost:3001 |
-| **移动端 · C 端 AI 服务前台** | 小程序入口 H5 模拟：对话/服务/工单/消息/我的，演示直登 | `pnpm preview:all` → http://localhost:3002 |
+| **bundles/ai-video/** | 42 条岗位定义 / 35 项技能路径 / 6 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数 | [manifest](../bundles/ai-video/bundle.json) |
+| **bundles/geo-growthtest/** | 27 条岗位定义 / 29 项技能路径 / 4 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数 | [manifest](../bundles/geo-growthtest/bundle.json) |
+| **bundles/hotel/** | 16 条岗位定义 / 30 项技能路径 / 1 条管线；版本 3.4.0，状态 candidate；不等于已接通功能数 | [manifest](../bundles/hotel/bundle.json) |
 
-### 🏨 行业 Bundle（垂直能力包）
+### 🧑‍💼 岗位与交互入口
 
-| 能力 | 一句话 | 怎么体验 |
+来源：[apps/web/src/pages/p8/P8.tsx](../apps/web/src/pages/p8/P8.tsx) · [apps/web/src/components/loommate/LoomMate.tsx](../apps/web/src/components/loommate/LoomMate.tsx) · [apps/web/src/voice/VoiceEngine.ts](../apps/web/src/voice/VoiceEngine.ts)。
+
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **bundles/ai-video/** | 围栏/技能/员工/对象/管线一键装配 | 见 bundles/ai-video/ 目录 |
-| **bundles/geo-growth/** | 围栏/技能/员工/对象/管线一键装配（27 个数字员工岗位 · 29 个技能） | 见 bundles/geo-growth/ 目录 |
-| **bundles/hotel/** | 围栏/技能/员工/对象/管线一键装配 | 见 bundles/hotel/ 目录 |
+| **数字员工中心（`/agents`）** | 岗位档案 / 技能与围栏绑定 / 任务派遣；默认包声明 27 个岗位，不是在线员工数 | 按 README 准备隔离环境后：`LLM_PROVIDER=mock pnpm preview:all` → http://localhost:3000/agents |
+| **织伴数字人组件** | 形象、语音与动作交互组件；需要对应资源与配置，不承诺每个部署均启用 | 查看组件与语音配置 |
+| **语音与口型引擎** | 语音播放、音色与口型相关实现；真实 TTS 需要服务或本地引擎 | docs/voice-and-avatar-delivery-contract.md |
 
-### 🧑‍💼 数字员工与数字人（本仓自带）
+### 🖐 电脑操作接口
 
-| 能力 | 一句话 | 怎么体验 |
+来源：[packages/base/computer-use/driver.ts](../packages/base/computer-use/driver.ts) · [docs/computer-use-production.md](../docs/computer-use-production.md)。
+
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **数字员工中心（`/agents`）** | 人机混编通讯录：员工档案 / 围栏对账 / 30 天战绩 / 派遣 / 夜班自动上线（本包 27 个岗位） | `pnpm preview:all` → http://localhost:3000/agents |
-| **织伴数字人（Live2D 常驻浮层）** | 全页面常驻数字人：语音播报 + 口型/表情/动作 + 三态（小角落 / 大形象 / 屏保）+ 记忆透明面板 | 打开任一 PC 页面右下角；`pnpm preview:all` |
-| **语音与口型引擎** | TTS 音色映射 + 中文逐字开口度时间线 + 音频振幅驱动口型；人设/音色可切换 | docs/voice-and-avatar-delivery-contract.md |
+| **浏览器与桌面驱动接口** | DOM、语义树与截图接口；真实登录、文件上传和平台动作需逐项联调 | 按工位指南准备后：`pnpm computer:preflight` / `pnpm computer:smoke` |
+| **HTTP / MCP 工位入口** | 远程工位服务入口；需要驱动、设备权限、认证与网络配置 | `pnpm computer:serve` / `pnpm computer:mcp` |
 
-### 🖐 操作电脑能力（本仓自带 · 可装生产工作站）
+### ⚙ 共享基础模块（目录存在性）
 
-| 能力 | 一句话 | 怎么体验 |
+来源：[packages/base](../packages/base) · [packages/runtime/src](../packages/runtime/src)。
+
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **computer-use 三层感知（65 动作）** | L1 浏览器 DOM 零 token / L2 全 GUI 语义树 / L3 像素兜底——克隆即可用，不依赖沙箱 | `pnpm computer:preflight && pnpm computer:smoke` |
-| **HTTP 远程驱动 + MCP server** | 大脑/手分离：专用工作站被云端 Agent/CI 远程驱动（docs/computer-use-production.md） | `pnpm computer:serve` / `pnpm computer:mcp` |
+| **围栏判定** | auto/review/block 判定组件；仍需核对业务调用点 | [源码](../packages/base/fence-engine/) |
+| **技能分发组件** | 技能预检、分发与回滚基础模块 | [源码](../packages/base/skill-ops/) |
+| **任务编排基础组件** | 任务与协作基础模块；Ask/Quest 实际执行见 packages/runtime | [源码](../packages/base/captain/) |
+| **夜班状态与调度** | 确认、暂停、恢复与触发器；暂停记录不等于中断全部外部动作 | [源码](../packages/base/night-shift/) |
+| **模型路由与用量记录** | 模拟与真实提供器入口；真实端点、成本和预算链需验收 | [源码](../packages/base/model-router/) |
+| **发布适配层（默认演练）** | 浏览器发布参考适配器；真实登录、上传和发布回执待逐平台接通 | [源码](../packages/base/publish-rpa/) |
+| **业务事件与权限网关** | 追加事件、哈希链与权限组件；不承诺外部动作重放零丢失 | [源码](../packages/base/workdata/) |
+| **消息渠道适配层** | 消息接口模块；实际送达取决于已配置渠道与回执 | [源码](../packages/base/im-channels/) |
+| **服务对话基础模块** | 对话组件；客户 H5 实际接口见 apps/server/src/service | [源码](../packages/base/service-dialog/) |
+| **巡检基础模块** | 巡检规则与任务组件；具体数据源和处置链需接入 | [源码](../packages/base/inspection/) |
+| **审批后端** | 决定与审计 API 保留；PC 通用审批页已移除，业务关卡就地处理 | [源码](../packages/base/review-console/) |
+| **资产管理基础模块** | 资产元数据组件；视频媒资实现见 apps/server/src/video/media | [源码](../packages/base/asset-cms/) |
+| **成本台账组件** | 成本记录与投影；目录存在不代表全部调用已有预算强制 | [源码](../packages/base/cost-ledger/) |
+| **交易流程组件** | 商机与交易状态模块；不代表真实支付和收入归因已完成 | [源码](../packages/base/deal-flow/) |
+| **社媒监听组件** | 监听相关基础模块；实际采集来源需逐项接入 | [源码](../packages/base/social-listening/) |
 
-### 🤖 AI 自动化引擎（系统内置能力）
+### 🎬 内容生产专用入口
 
-| 能力 | 一句话 | 怎么体验 |
+来源：[apps/server/src/video](../apps/server/src/video)。
+
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **围栏 DSL 引擎** | 事前裁决：支持 in/contains_any 列表语义 | 见 docs/capability-map.md L3 |
-| **技能保鲜环（下行分发）** | 官方技能一键投放：五道预检 + L0/L1 静默/L2 审批 + 一键回滚 + 全事件留痕 | 见 docs/capability-map.md L3 |
-| **L2 编排（ASK/QUEST）** | 一句话目标自动拆解多步骤并派发 | 见 docs/capability-map.md L3 |
-| **夜班自动运行** | 离线任务推进，次日晨报 | 见 docs/capability-map.md L3 |
-| **模型路由** | 离线确定性模型，无密钥可跑 | 见 docs/capability-map.md L3 |
-| **全平台 RPA 发布** | 抖音/小红书/B站/YouTube，BrowserDriver 注入接真浏览器 | 见 docs/capability-map.md L3 |
-| **五元事件 + RLS 隔离** | 全链路可追溯、可验链 | 见 docs/capability-map.md L3 |
-| **IM 渠道** | 企微等出入站，审批卡片直达手机 | 见 docs/capability-map.md L3 |
-| **C 端 AI 服务前台** | 对话/知识库 385 问/工单/SLA | 见 docs/capability-map.md L3 |
-| **自动巡检** | 异常发现→派发→处置闭环 | 见 docs/capability-map.md L3 |
-| **人审台** | 必审事项人拍板，AI 不越权 | 见 docs/capability-map.md L3 |
-| **资产管理** | 素材/成片全生命周期 | 见 docs/capability-map.md L3 |
-| **成本台账** | 每次模型调用可计量 | 见 docs/capability-map.md L3 |
-| **交易流** | 商机到成交全链路 | 见 docs/capability-map.md L3 |
-| **社媒监听** | 评论/询盘意图雷达 | 见 docs/capability-map.md L3 |
+| **视频工位** | 预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置 | PC /ai-video/assets?tab=studio |
+| **媒资与交付** | 媒资检索、商品档案、合集、成片和交付记录；需要数据库与媒体文件 | 媒资：/ai-video/media；交付：/ai-video/assets?tab=delivery |
+| **白板与口播解释片** | 白板和口播制作链已提供代码入口；当前没有独立 React 编辑页，需要对应引擎与后期工具 | CLI / 服务端接口 |
 
-### ✅ 验证与质量（工程纪律）
+### ✅ 验证与维护命令
 
-| 能力 | 一句话 | 怎么体验 |
+来源：[package.json](../package.json) · [scripts/bootstrap.sh](../scripts/bootstrap.sh) · [.cnb.yml](../.cnb.yml)。
+
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **一键安装（bootstrap）** | 克隆后一条命令装好全部能力：环境/依赖/PG/迁移种子/桌面栈，幂等 | `pnpm setup` |
-| **主测试套件** | 数百条场景用例逐条执行 | `pnpm suite` |
+| **环境安装脚本** | 安装依赖并尝试数据库、迁移与种子；当前会枚举缺失 ai-pm 包的种子，推荐按 README 手动初始化 | `pnpm setup`；先读 README 的当前限制 |
+| **主测试套件** | 运行已定义场景；需要测试数据库和种子，不能由脚本存在推断测试已通过 | `pnpm suite` |
 | **GEO 域套件** | GEO 双域专项 | `pnpm suite:geo` |
 | **酒店域套件** | 酒店域专项 | `pnpm suite:hotel` |
 | **发布门禁** | 未全过禁止发布（硬性） | `pnpm release:gate` |
 | **五元事件验链** | 事件链完整性校验 | `pnpm db:verify-chain` |
-| **Agent 能力巡游** | AI Agent 一键自检全部能力 | `pnpm agent:tour` |
+| **能力巡游脚本** | 按脚本范围巡游；完整模式可能启动服务、灌种子和运行测试 | `pnpm agent:tour` |
 | **环境自检** | 一屏排查环境问题 | `pnpm doctor` |
 
-### 🎁 演示与交付资产
+### 📚 演示与说明资产
 
-| 能力 | 一句话 | 怎么体验 |
+来源：[docs/demo](../docs/demo) · [skills/official](../skills/official) · [mock/README.md](../mock/README.md)。
+
+| 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **高保真演示页 ×12** | 糖果色，含手机壳容器 | http://localhost:3001 |
-| **官网静态站** | 对外产品故事 | apps/site/index.html |
-| **自带技能 ×9** | client-demo-recorder / component-integration / cross-platform-review / deal-flow 等 | skills/official/ |
-| **能力导览 PPT** | 路演/汇报直接用 | docs/capability-tour.pptx |
-| **Mock 数据体系** | 种子 + 离线模型 + 演示直登，开箱即用 | mock/README.md |
+| **静态演示原型 ×12** | 按 HTML 文件枚举；历史原型不作为当前 React 页面证明 | docs/demo/index.html |
+| **官网静态页面** | 网站素材；文字和截图需按当前代码复核 | apps/site/index.html |
+| **official 技能目录 ×9** | 按目录枚举；与 Bundle 技能声明计数不同，也不等于真实执行器数量 | skills/official/ |
+| **历史能力导览 PPT** | 历史参考资产；其中旧文案和截图需要独立更新，不作为当前实现证明 | docs/capability-tour.pptx |
+| **模拟数据说明** | 种子、模拟提供器与演示身份；真实数据和生产模式单独配置 | mock/README.md |
 
 ## 🧭 下一步
 
-- 想二次开发：读 AGENTS.md → 跑 `pnpm agent:tour` → 看 docs/capability-map.md（全量机器清单）
-- 想改 UI：必须遵守 docs/design-system.md（Candy Design System），改完用浏览器能力截图核对
-- 想发布：`pnpm release:gate` 全过是硬性门禁，清单见 docs/release-checklist.md
+- 开始开发先读 [AGENTS.md](../AGENTS.md)、[本仓规则](../AGENTS.repo.md) 与 [开发协议](DEVELOPMENT-PROTOCOL.md)。
+- 能力入口变化后运行 `pnpm capabilities` 和 `pnpm capabilities:check`；UI 改动还需按 [设计规范](design-system.md) 实际打开页面核对。
+- 发布前按 [发布清单](release-checklist.md) 执行 `pnpm release:gate`，真实平台接入另做场景验收；本目录不替代门禁结果。

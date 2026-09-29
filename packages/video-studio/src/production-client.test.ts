@@ -11,9 +11,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 const dirs: string[] = [];
 afterEach(() => { dirs.splice(0).forEach(dir => rmSync(dir, { recursive: true, force: true })); });
 const digest = (text: string): string => createHash("sha256").update(text).digest("hex");
-/** 占位口令（test-only 前缀让仓库秘密扫描器按占位值放行；语义仍是"绝不能被日志回显的真凭据形状"）。 */
-const token = "test-only-workspace-token";
-const qualificationToken = "test-only-qualification-token";
+const token = "test-workspace-token-never-log";
+const qualificationToken = "test-qualification-never-log";
 type Call = { route: string; body: Record<string, unknown>; method: string; authorization: string | null };
 type Hook = (call: Call, value: unknown) => unknown | Promise<unknown>;
 function fixture(hook?: Hook) {

@@ -17,7 +17,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dirname, "..", "..");
-const BUNDLE = join(ROOT, "bundles", "geo-growth");
+const BUNDLE = join(ROOT, "bundles", "geo-growthtest");
 const JSON_OUT = process.argv.includes("--json");
 
 /** 获客用增自研域 15 技能（双域 6 + 获客用增 9；视觉栈 14 技能属另一册，另行审计） */

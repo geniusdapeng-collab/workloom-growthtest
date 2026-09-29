@@ -177,21 +177,28 @@ export async function logSync(
      Math.max(0, Math.round(input.bytes ?? 0)), input.peer, input.status, input.error ?? null]);
 }
 
-export async function listSyncLog(app: AppPool, scope: Scope, limit = 100): Promise<Array<{
-  id: string; assetId: string; direction: string; payloadKind: string; bytes: number;
-  peer: string; status: string; error: string | null; createdAt: string;
-}>> {
+export async function listSyncLog(app: AppPool, scope: Scope, limit = 100, beforeId?: string): Promise<{
+  entries: Array<{
+    id: string; assetId: string; direction: string; payloadKind: string; bytes: number;
+    peer: string; status: string; error: string | null; createdAt: string;
+  }>;
+  nextCursor: string | null;
+}> {
   const rows = await scopedQuery<{
     id: string; asset_id: string; direction: string; payload_kind: string; bytes: string;
     peer: string; status: string; error: string | null; created_at: string;
   }>(app, scope,
     `SELECT id, asset_id, direction, payload_kind, bytes, peer, status, error, created_at
-       FROM media_sync_log WHERE workspace_id = $1 ORDER BY created_at DESC LIMIT $2`,
-    [scope.workspaceId, Math.min(Math.max(limit, 1), 500)]);
-  return rows.map((r) => ({
+       FROM media_sync_log
+      WHERE workspace_id = $1 AND ($2::bigint IS NULL OR id < $2::bigint)
+      ORDER BY id DESC LIMIT $3`,
+    [scope.workspaceId, beforeId ? Number(beforeId) : null, Math.min(Math.max(limit, 1), 500)]);
+  const entries = rows.map((r) => ({
     id: r.id, assetId: r.asset_id, direction: r.direction, payloadKind: r.payload_kind,
     bytes: Number(r.bytes), peer: r.peer, status: r.status, error: r.error, createdAt: r.created_at,
   }));
+  const cap = Math.min(Math.max(limit, 1), 500);
+  return { entries, nextCursor: rows.length === cap ? rows.at(-1)!.id : null };
 }
 
 /* ================= 元数据：增量拉取（云端侧） ================= */

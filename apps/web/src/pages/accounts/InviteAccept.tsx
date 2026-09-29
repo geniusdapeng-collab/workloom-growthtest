@@ -48,7 +48,7 @@ export default function InviteAccept() {
       {err && <p role="alert" className="mt-3 break-words text-body leading-relaxed text-red-300">{err}</p>}
       <Button className="mt-5 w-full" variant="primary" busy={busy} busyLabel="正在加入…" disabled={phone.length < 6 || code.length !== 6} onClick={() => void submit()}>加入工作区</Button>
       <Button className="mt-4 text-neutral-300 underline" variant="quiet" onClick={() => nav("/login")}>去登录</Button>
-      <Button className="mt-2 text-neutral-300 underline" variant="quiet" onClick={() => nav("/")}>← 返回经营主页（游客体验）</Button>
+      <Button className="mt-2 text-neutral-300 underline" variant="quiet" onClick={() => nav("/")}>← 返回经营主页</Button>
     </main>
   );
 }

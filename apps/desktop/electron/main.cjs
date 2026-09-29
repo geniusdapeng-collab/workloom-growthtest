@@ -361,10 +361,6 @@ async function runRenderSmoke() {
         renderMode: avatar?.getAttribute('data-render-mode') || null,
         ceremonyMode: document.querySelector('[data-ceremony-render-mode]')?.getAttribute('data-ceremony-render-mode') || null,
         webgl,
-        // 2026-09-21 真机修复取证：VoiceEngine 把"这一句用了谁的声音"写进 <html data-wl-voice>，
-        // 渲染冒烟把它一起带出来，作为"织伴是不是女声"的可核验证据（空音色表会显示 system-default）。
-        voice: document.documentElement.dataset.wlVoice || null,
-        voices: Number(document.documentElement.dataset.wlVoices || 0),
         title: document.title,
         bodyText: document.body.innerText.slice(0, 1200)
       };
@@ -432,16 +428,6 @@ async function runRenderSmoke() {
   saveReport();
   if (!transitionTrace.some((state) => state.segment === "bridge")) throw new Error(`真实流程没有到达 bridge：${JSON.stringify(report)}`);
   if (!transitionTrace.some((state) => state.exiting === "true")) throw new Error(`真实流程没有经过 exiting：${JSON.stringify(report)}`);
-  /**
-   * 2026-09-21 真机取证：开场播报结束后再取一次"用了谁的声音"。
-   * 首次探针往往在 Chromium 音色表就绪之前执行（那时 voices=0 属正常），
-   * 仪式之后再取才有判定价值：若这里是 system-default，说明"第一句男声"的隐患仍在。
-   */
-  report.voiceAfterCeremony = await win.webContents.executeJavaScript(`(() => ({
-    voice: document.documentElement.dataset.wlVoice || null,
-    voices: Number(document.documentElement.dataset.wlVoices || 0)
-  }))()`, true).catch((error) => ({ error: String(error) }));
-  saveReport();
 
   const teamDeadline = Date.now() + 20000;
   let teamProbe = null;

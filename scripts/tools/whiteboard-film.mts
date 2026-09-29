@@ -13,7 +13,7 @@
  *     --script docs/examples/whiteboard-growth-sales-script.md \
  *     --title "WorkLoom 获客增长系统 · 销售解说" \
  *     --profile chen-zhuo-film --lineart seedream --quality uhd \
- *     --workspace-slug geo-growth --member-no MEM-G01 \
+ *     --workspace-slug geo-growthtest --member-no MEM-G01 \
  *     --evidence var/whiteboard-jobs/evidence-sales.json
  *
  * 分步重跑（会话断了接着做，不重烧算力）：
@@ -92,7 +92,7 @@ let token = process.env.WORKLOOM_TOKEN ?? "";
 
 async function login(): Promise<void> {
   if (token) return;
-  const workspaceSlug = arg("--workspace-slug", "geo-growth");
+  const workspaceSlug = arg("--workspace-slug", "geo-growthtest");
   const memberNo = arg("--member-no", "MEM-G01");
   const data = await call<{ token?: string }>("auth.loginAs", { workspaceSlug, memberNo });
   if (!data?.token) throw new Error(`auth.loginAs 未返回 token（workspaceSlug=${workspaceSlug} memberNo=${memberNo}）`);

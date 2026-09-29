@@ -13,6 +13,7 @@
  *   post-cli reedit   --project film-project.json --patch patch.json [--out-dir versions/v2]
  *                     [--delivery-dir <交付包根>] [--dry-run]
  *                     [--expected-version N --expected-project-sha256 <sha256>]
+ *                     [--audio-stems-by-shot signed-sources.json]
  *                     [--shot SC-03=/path/new.mp4]…        # 只在已重生成镜头后使用
  *   post-cli triage   --feedback "配乐太吵了，另外第 3 个镜头人物走形"
  *
@@ -68,6 +69,7 @@ function readShots(value) {
       shotId: String(shot.shotId ?? shot.shot_id ?? `SC-${String(index + 1).padStart(2, "0")}`),
       path: String(shot.path ?? shot.localPath ?? ""),
       ...(shot.kind ? { kind: String(shot.kind) } : {}),
+      ...(shot.audioStems ? { audioStems: shot.audioStems } : {}),
     }));
   }
   return value.split(",").map((file, index) => ({
@@ -175,6 +177,7 @@ async function main() {
         patch,
         outDir: typeof flags["out-dir"] === "string" ? flags["out-dir"] : null,
         shotPaths: Object.keys(shotPaths).length ? shotPaths : null,
+        audioStemsByShot: flags["audio-stems-by-shot"] ? readJson(flags["audio-stems-by-shot"], "--audio-stems-by-shot") : null,
         dryRun: flags["dry-run"] === true,
       });
       if (!outcome.executed) {
@@ -232,7 +235,7 @@ main()
     process.exitCode = code;
   })
   .catch((error) => {
-    const code = error instanceof PostError ? error.code : "engine_failed";
+    const code = typeof error?.code === "string" ? error.code : "engine_failed";
     process.stderr.write(`${code}: ${error instanceof Error ? error.message : String(error)}\n`);
     process.exitCode = 3;
   });

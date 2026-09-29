@@ -22,7 +22,7 @@ function safeLoginError(error: unknown, fallback: string): string {
 export default function Login() {
   const nav = useNavigate();
   const [params] = useSearchParams();
-  // F-GUEST1：游客进配置引导被拦到这里时，登录成功后送回原目的地
+  // 深链（例如配置引导）要求登录时，登录成功后送回原目的地
   const next = params.get("next") || "/inbox";
   const [tab, setTab] = useState<Tab>("code");
   const [phone, setPhone] = useState("");
@@ -107,8 +107,8 @@ export default function Login() {
         <Button variant="quiet" onClick={() => nav("/activate")}>注册开通</Button>
         <Button variant="quiet" onClick={() => nav("/invite")}>接受成员邀请</Button>
       </div>
-      {/* 裸页（无左侧导航）统一出口：不登录也能回到经营主页（游客体验） */}
-      <Button variant="quiet" className="mt-3 text-neutral-300 underline" onClick={() => nav("/")}>← 返回经营主页（游客体验）</Button>
+      {/* 裸页（无左侧导航）统一出口：回经营主页（已默认店主身份，无游客态） */}
+      <Button variant="quiet" className="mt-3 text-neutral-300 underline" onClick={() => nav("/")}>← 返回经营主页</Button>
 
       {import.meta.env.DEV && (
         <Button variant="quiet" className="mt-6 text-neutral-300 underline" onClick={() => void demoEnter()}>

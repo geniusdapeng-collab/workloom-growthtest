@@ -26,7 +26,7 @@ describe("技能中文展示名（不向客户端裸奔技术串）", () => {
   });
 
   it("词典认可的行业词保留原样（GEO 不被误剔）", () => {
-    expect(skillDisplayName("ai-answer-rewrite", "GEO 六段式改写官方套件（随 bundles/geo-growth 分发）：…")).toBe("GEO 六段式改写官方套件");
+    expect(skillDisplayName("ai-answer-rewrite", "GEO 六段式改写官方套件（随 bundles/geo-growthtest 分发）：…")).toBe("GEO 六段式改写官方套件");
   });
 
   it("通栏装载事件名剔除拉丁记号，无法中文化才回落中性兜底", () => {

@@ -2,7 +2,7 @@
   "meta": {
     "schema": "workloom.oss-components/v2",
     "name": "WorkLoom 开源组件登记表（oss-watch）",
-    "updated": "2026-09-27",
+    "updated": "2026-09-29",
     "doc": "docs/OPEN_SOURCE_COMPONENTS.md",
     "plan": "docs/oss-update-plan.md",
     "state": ".oss-watch-state.json",
@@ -16,7 +16,7 @@
       "docker": "https://hub.docker.com"
     },
     "evidence": "current=A 级（锁定事实文件）｜latest=B 级（上游 registry/release API）｜未扫描项在清单中显式标注",
-    "repo": "workloom-ai/WorkLoom-growth"
+    "repo": "workloom-ai/WorkLoom-growthtest"
   },
   "components": [
     {
@@ -37,8 +37,8 @@
       "cadence": "weekly",
       "gate": "runtime-gate",
       "notes": "Agent 运行时地基：锁版 + 内部 fork 镜像，任何新版本（含 rc 预发布）即触发升级；永远单独一批，必过 E6 回归与 H-5 kill -9 重放；升级前必须 diff 依赖树（0.1.2-rc.1 已移除 node-pty；rc.2 起要求 Node ≥24 的 zstd API）",
-      "latest": "0.1.5-rc.2",
-      "latest_checked_at": "2026-09-18T16:00:21.000Z"
+      "latest": "0.1.7-rc.2",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "Cordis（插件元框架）",
@@ -59,8 +59,8 @@
       "cadence": "weekly",
       "gate": "runtime-gate",
       "notes": "插件可撤销效果是技能绑定围栏、插件卸载即撤销的运行时保证；实际版本以 dsh 锁定树为准（上游独立仓为 4.0.0-rc 线，跟随 dsh 升级）",
-      "latest": "4.0.2",
-      "latest_checked_at": "2026-09-18T16:00:21.000Z"
+      "latest": "4.0.4",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "Schemastery",
@@ -521,8 +521,8 @@
       "cadence": "weekly",
       "gate": "standard",
       "notes": "构建工具链；与 @vitejs/plugin-react、@tailwindcss/vite 同批联动；v8 走 rolldown 内核，升级后必须过三端生产构建",
-      "latest": "8.3.0",
-      "latest_checked_at": "2026-09-18T16:00:21.000Z"
+      "latest": "8.3.1",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "@vitejs/plugin-react",
@@ -707,7 +707,7 @@
       ],
       "cadence": "weekly",
       "gate": "full",
-      "notes": "AI 班组状态可视化引擎：用 emotionId 表达岗位/班组工作状态（T-2026-0926-0002，点名单向移植自 workloom-growth T-2026-0926-0019）。产品内命名「织球 LoomBall」，上游兼容门面已在适配层删除（见 vendor/loomball/NOTICE.md）；升级走评审 + 重跑织球四份单测 + 三接入面真机走查，永不自动升级"
+      "notes": "AI 班组状态可视化引擎：用 emotionId 表达岗位/班组工作状态（T-2026-0926-0019）。产品内命名「织球 LoomBall」，上游兼容门面已在适配层删除（见 vendor/loomball/NOTICE.md）；升级走评审 + 重跑织球四份单测 + 三接入面真机走查，永不自动升级"
     },
     {
       "name": "Electron",
@@ -756,7 +756,7 @@
       "gate": "full",
       "notes": "E2E 与 computer-use 浏览器驱动共用；升级必须重建 Linux 视觉基线（CNB ui-gate 在同一镜像内跑）；Python 侧版本由 toolkit/requirements.txt 约束",
       "latest": "1.63.0",
-      "latest_checked_at": "2026-09-18T16:00:21.000Z"
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "@axe-core/playwright",
@@ -1140,7 +1140,7 @@
       ],
       "cadence": "monthly",
       "gate": "runtime-gate",
-      "notes": "字幕驱动的手绘白板渲染器：本地确定性 CPU 渲染、零 API 依赖、MIT 可商用。随仓携带上游源码 + 自有中性执笔手素材（assets/whiteboard/drawing-hand-workloom.png）。Python 依赖闭包见 vendor/srt-whiteboard/requirements.txt，venv 由 scripts/tools/whiteboard-env-install.mts 幂等安装、不入库。升级=人工比对上游 + 重跑官方样例与全链路出片"
+      "notes": "字幕驱动的手绘白板渲染器：本地确定性 CPU 渲染、零 API 依赖、无授权闸门（MIT 可商用）。随仓携带上游源码 + 执笔手素材（本仓改用自有中性素材 assets/whiteboard/drawing-hand-workloom.png，不用上游带作者标识的 drawing-hand.png）。运行时 Python 依赖闭包见 vendor/srt-whiteboard/requirements.txt（opencv-python/numpy/av/Pillow，全部宽松许可），venv 由 scripts/tools/whiteboard-env-install.mts 幂等安装、不入库。升级=人工比对上游 + 重跑官方样例与全链路出片（流程见 vendor/srt-whiteboard/PINNED.md）"
     },
     {
       "name": "BrowserAct 技能包",
@@ -1643,8 +1643,8 @@
       "gate": "runtime-gate",
       "notes": "MIT；上游 2026-09-16 创建、单作者，无 CLI/API/AppleScript，故采用源码 headless 裁剪 + 工位 pin 版本；生产工位关闭 Sparkle 自动更新；升级永不自动（先 selftest + golden 对比再灰度）",
       "currentSource": "docs/visual-workstation.md",
-      "latest": "1.0.4",
-      "latest_checked_at": "2026-09-19T07:30:00.000Z"
+      "latest": "v1.4.1",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "FFmpeg（调色工位内核）",
@@ -1665,8 +1665,8 @@
       "cadence": "quarterly",
       "gate": "workstation-pin",
       "notes": "成片调色内核：signalstats/lut3d/colorbalance/colortemperature/curves/eq/normalize/waveform/vectorscope/histogram。受控下载 + sha256 校验（kit/ffmpeg-pin.json，含 darwin-arm64 实测摘要）；ffmpeg-static 静态构建含 nonfree，仅工位本地使用、不可随产品分发，如需分发请换 LGPL 构建。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）以及 LUT 黄金文件校验。LUT 资产为自算（bundles/ai-video/library/luts/generate-luts.mjs），本仓不携带第三方 LUT。",
-      "latest": "b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0）",
-      "latest_checked_at": "2026-09-21T00:00:00.000Z"
+      "latest": "v0.6.1",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "FFmpeg（配乐工位内核）",
@@ -1687,8 +1687,8 @@
       "cadence": "quarterly",
       "gate": "workstation-pin",
       "notes": "成片配乐内核：loudnorm/ebur128/volumedetect/silencedetect/aspectralstats/astats/sidechaincompress/pan/amix/adelay/afade/apad/atrim/showwavespic/showspectrumpic。受控下载 + sha256 校验（与调色工位共用 ffmpeg-static b6.1.1 构建，但安装目录、pin 与滤镜清单独立）。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts（真实 PG + 真实围栏 + 真实 ffmpeg）。音频素材全部自算（synth.mjs 合成 WAV），本仓不携带任何第三方音源或曲库文件。",
-      "latest": "b6.1.1（ffmpeg-static release；工位实装自报 ffmpeg 6.0）",
-      "latest_checked_at": "2026-09-22T00:00:00.000Z"
+      "latest": "v0.6.1",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "python-audio-separator（人声分离·可选引擎）",
@@ -1708,8 +1708,8 @@
       "cadence": "quarterly",
       "gate": "optional-engine",
       "notes": "UVR 模型族（MDX/VR/Demucs 系）的 CLI/Python 封装，是配乐工位「档位 A」深度学习分离的首选引擎（活跃维护、MIT）。未安装时工位按档位 B（ffmpeg 中心声道近似）执行并如实标注 quality=approximate；安装与否不影响作曲/混音主链路。",
-      "latest": "v0.47.0（2026-08-27，GitHub Releases）",
-      "latest_checked_at": "2026-09-22T00:00:00.000Z"
+      "latest": "v0.47.0",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "Demucs（人声分离·可选引擎）",
@@ -1729,8 +1729,8 @@
       "cadence": "quarterly",
       "gate": "optional-engine",
       "notes": "htdemucs 两轨分离（vocals / no_vocals），MIT；**上游仓库已归档（2026-09-22 核验，最后推送 2024-04，最新发布 v4.0.1 / 2023-09）**，故只作兼容引擎保留，推荐改用 python-audio-separator。工位不内置其模型权重，也不随产品分发。",
-      "latest": "v4.0.1（2023-09-07；仓库已归档）",
-      "latest_checked_at": "2026-09-22T00:00:00.000Z"
+      "latest": "v4.0.1",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     },
     {
       "name": "MusicGen / AudioCraft（评估后不采用）",
@@ -1745,109 +1745,8 @@
       "cadence": "quarterly",
       "gate": "license-review",
       "notes": "文本生成音乐（MusicGen / MAGNeT / JASCO）与音频编解码（EnCodec）。**权重为 CC-BY-NC 4.0，输出不可直接用于商用交付**，因此配乐工位的默认路径是自算作曲（synth.mjs），而非该模型；仅在客户另行取得授权或纯研究场景才可评估接入。许可结论来自官方 README 的 License 段（2026-09-22 核验）。",
-      "latest": "v1.3.0（2024-05-02）",
-      "latest_checked_at": "2026-09-22T00:00:00.000Z"
-    },
-    {
-      "name": "font-library v1.1（字幕工位字体库：思源/Noto 系列）",
-      "repo": "https://github.com/adobe-fonts/source-han-sans",
-      "license": "SIL OFL 1.1",
-      "channel": "manual",
-      "usage": "asset",
-      "probe": {
-        "kind": "regex",
-        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
-        "pattern": "\"component\":\\s*\"字体库 font-library v1\\.1[^\"]*\""
-      },
-      "scope": [
-        "bundles/ai-video/library/font-catalog（打标档案 + 许可 + 逐文件 sha256）",
-        "bundles/ai-video/connectors/subtitle-bridge/kit（fonts-pin.json 引脚 + install-fonts.sh 安装）",
-        "Mac 字幕工位 ~/.workloom-subtitle/fonts（运行时字体，不进仓库）"
-      ],
-      "cadence": "quarterly",
-      "gate": "workstation-pin",
-      "notes": "字幕工位字体：思源黑体/思源宋体（Source Han Sans/Serif CN、Noto Sans/Serif SC）。仓库只保存档案（打标/许可/sha256）与引脚，不携带字体二进制；安装走 kit/install-fonts.sh（--from-dir 离线导入或 --download 已核验直链），逐文件 sha256 校验并把 LICENSES.md 一并落盘（OFL 再分发要求）。本能力不做子集化（OFL 修改后再发布需改名）。升级必须重跑 kit/selftest.sh 与 runtime-smoke.mts。",
-      "latest": "Source Han Sans 2.004（release 分支，实测直链逐字节一致）"
-    },
-    {
-      "name": "霞鹜文楷 LXGW WenKai（字幕工位字体）",
-      "repo": "https://github.com/lxgw/LxgwWenKai",
-      "license": "SIL OFL 1.1",
-      "channel": "github",
-      "usage": "asset",
-      "probe": {
-        "kind": "regex",
-        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
-        "pattern": "lxgw[^\\\"]*"
-      },
-      "scope": [
-        "bundles/ai-video/library/font-catalog/font_db.json#fonts（lxgw-wen-kai）",
-        "Mac 字幕工位 ~/.workloom-subtitle/fonts/cn（运行时字体，不进仓库）"
-      ],
-      "cadence": "quarterly",
-      "gate": "workstation-pin",
-      "notes": "知识区字幕首选（楷体/印刷体，艺术气息 5、粗细 2）。受控下载 release 资产 LXGWWenKai-Regular.ttf 并核验 sha256；未核验前不得用 --download。",
-      "latest": "v1.522（GitHub Releases，实测直链逐字节一致）"
-    },
-    {
-      "name": "得意黑 Smiley Sans（字幕工位字体）",
-      "repo": "https://github.com/atelier-anchor/smiley-sans",
-      "license": "SIL OFL 1.1",
-      "channel": "github",
-      "usage": "asset",
-      "probe": {
-        "kind": "regex",
-        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
-        "pattern": "smiley[^\\\"]*"
-      },
-      "scope": [
-        "bundles/ai-video/library/font-catalog/font_db.json#fonts（smiley-sans-oblique）",
-        "Mac 字幕工位 ~/.workloom-subtitle/fonts/cn（运行时字体，不进仓库）"
-      ],
-      "cadence": "quarterly",
-      "gate": "workstation-pin",
-      "notes": "现代倾斜标题体（对标造字工房悦黑系列）。release 资产为 zip，安装脚本按 zipMember 取 SmileySans-Oblique.ttf 后再校验 sha256。",
-      "latest": "v2.0.1（GitHub Releases，实测摘包后逐字节一致）"
-    },
-    {
-      "name": "Google Fonts 字体组（字幕工位字体：ZCOOL 系列/马善政/志莽行书/流建毛草/龙藏体 + 15 款英文字体）",
-      "repo": "https://github.com/google/fonts",
-      "license": "SIL OFL 1.1（站酷系列为站酷免费商用授权，Google Fonts 以 OFL-1.1 发布）",
-      "channel": "github",
-      "usage": "asset",
-      "probe": {
-        "kind": "regex",
-        "file": "bundles/ai-video/connectors/subtitle-bridge/kit/fonts-pin.json",
-        "pattern": "google/fonts"
-      },
-      "scope": [
-        "bundles/ai-video/library/font-catalog/font_db.json#fonts（25 款：中文 9 + 英文 16）",
-        "Mac 字幕工位 ~/.workloom-subtitle/fonts（运行时字体，不进仓库）"
-      ],
-      "cadence": "quarterly",
-      "gate": "workstation-pin",
-      "notes": "ZCOOL 快乐体/庆科黄油体/小薇、马善政毛笔楷书、志莽行书、流建毛草、龙藏体 + Inter/Montserrat/Playfair Display/Oswald/Cinzel/Dancing Script/Roboto/Bebas Neue/Anton/Archivo Black/Lobster/Pacifico/Bangers/Caveat/Poppins（Regular/Bold）。上游为 google/fonts main 分支 raw 直链，逐文件 sha256 核验结果写进 fonts-pin.json；未核验条目不得用 --download（走 --from-dir）。",
-      "latest": "google/fonts main（滚动分支；逐文件 sha256 已核验部分见 fonts-pin.json#upstream.verifiedAt）"
-    },
-    {
-      "name": "FFmpeg + libass（字幕工位内核）",
-      "repo": "https://github.com/FFmpeg/FFmpeg",
-      "license": "LGPL-2.1-or-later（libass 为 ISC；本工位使用本机 ffmpeg 构建，不随产品分发）",
-      "channel": "github",
-      "usage": "binary",
-      "probe": {
-        "kind": "regex",
-        "file": "bundles/ai-video/connectors/subtitle-bridge/README.md",
-        "pattern": "libass"
-      },
-      "scope": [
-        "bundles/ai-video/connectors/subtitle-bridge（core/measure/cli/server/executor）",
-        "Mac 字幕工位（运行时二进制，不进仓库；WORKLOOM_SUBTITLE_FFMPEG_PATH 指定）"
-      ],
-      "cadence": "quarterly",
-      "gate": "workstation-pin",
-      "notes": "字幕烧录内核：ass/subtitles（libass）+ bbox（文字墨迹实测）+ signalstats/edgedetect（画面可读性）+ crop。工位自检（kit/selftest.sh）会校验 ass 滤镜与编码器；缺 libass 直接判工位不可用，不做降级渲染。",
-      "latest": "ffmpeg 6.0（工位实装自报）/ n8.0（上游）。仓内不 pin 版本：跟随工位安装，自检时如实上报版本号"
+      "latest": "v1.3.0",
+      "latest_checked_at": "2026-09-29T10:59:50.000Z"
     }
   ]
 }

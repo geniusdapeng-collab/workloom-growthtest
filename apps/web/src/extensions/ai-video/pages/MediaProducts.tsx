@@ -176,15 +176,7 @@ export default function MediaProducts() {
                 <button
                   type="button"
                   className="wl-button wl-button--primary cursor-pointer rounded-lg bg-holo px-3 py-1 text-caption text-white"
-                  /**
-                   * 本仓（隔离副本）没有独立的工作室页：`/ai-video/assets` 是「片库 + 交付」双视图，
-                   * 因此这里把商品名复制到剪贴板并跳到生产页，由操作者在立项时引用该商品档案。
-                   */
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(profile.productName);
-                    setNotice(`商品名已复制：${profile.productName}（到生产页立项时引用该商品）`);
-                    navigate("/ai-video/assets");
-                  }}
+                  onClick={() => navigate(`/ai-video/assets?tab=studio&product=${encodeURIComponent(profile.productName)}`)}
                 >
                   用此商品开拍 →
                 </button>

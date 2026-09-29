@@ -1,0 +1,296 @@
+{
+  "$id": "workloom://bundles/geo-growthtest/schemas/objects",
+  "description": "社媒×GEO 双域融合经营事件 Object 类型枚举 v1（融合方案 §2.2 双域对象模型；社媒域对象沿用 ai-video 口径，GEO 域与双域交叉对象为新增）",
+  "objects": [
+    {
+      "type": "ads",
+      "label": "投放数据视图",
+      "note": "通用任务规划器按工具名前缀派生的投放对象视图（ads.watch 盯盘 / ads.boost 加投）；预算治理以 ads_campaign 为准，G12 同时覆盖两种命名（真机验收发现）"
+    },
+    {
+      "type": "creative",
+      "label": "投放素材",
+      "note": "通用任务规划器按工具名前缀派生的素材对象（creative.reedit 低效素材二剪迭代）；素材版本与合规由 content 域同源管理"
+    },
+    {
+      "type": "intel_card",
+      "label": "统一情报卡",
+      "note": "情报站每日产物：来源域（热榜/评论/AI问答）/问题原文/热度/置信度三级/适配人设/建议形式（短视频/GEO图文/双用）；双用选题优先排产"
+    },
+    {
+      "type": "topic_card",
+      "label": "选题卡",
+      "note": "选题池条目：双用标记位驱动「一次生产两处变现」排产优先级"
+    },
+    {
+      "type": "script_package",
+      "label": "脚本成套包",
+      "note": "脚本+标题+文案+标签+分镜成套；固定字段含「AI 答案适配版」接口位（核心问答对/参数事实点/实体锚点清单）"
+    },
+    {
+      "type": "shoot_list",
+      "label": "拍摄清单",
+      "note": "生产编排产物：实拍镜头道具/场景/口径提示，渠道拍摄日排程依据"
+    },
+    {
+      "type": "platform_variant",
+      "label": "平台变体",
+      "note": "一片多发的平台化产物；GEO 域扩展「AI 答案版」变体类型"
+    },
+    {
+      "type": "geo_content",
+      "label": "GEO 内容（AI 答案版）",
+      "note": "六段式：问题前置→直接答案→参数表格→清单建议→实体锚点→信源引用；外发受 G-GEO1 必审/G-GEO2 事实红线约束"
+    },
+    {
+      "type": "publish_task",
+      "label": "发布任务",
+      "note": "社媒组渠道发布载体：G9 必审/G9a 首发审/G9b 日发熔断"
+    },
+    {
+      "type": "source_task",
+      "label": "信源分发任务",
+      "note": "信源组渠道分发载体：知乎/百科/新闻源/垂媒/公众号；失败重试 3 次挂起转人工"
+    },
+    {
+      "type": "query_set",
+      "label": "query 集",
+      "note": "GEO 资产核心：四词类（品牌/品类/场景/竞品对比）×中英双语 50-100 条；每词带语言/目标市场/优先级/当前能见度状态/关联 GEO 内容/关联短视频选题"
+    },
+    {
+      "type": "visibility_snapshot",
+      "label": "能见度快照",
+      "note": "AI 能见度监测产物：提及率/首推率/SOV/引用源/情感五维；原始答案截图存证（snapshot_uri）供双方核验"
+    },
+    {
+      "type": "citation_source",
+      "label": "引用源",
+      "note": "AI 答案引用页逆向分析对象：平台权重/结构特征/更新频率/已占待建状态；灰帽建设受 G-GEO3 熔断"
+    },
+    {
+      "type": "entity_card",
+      "label": "品牌实体卡",
+      "note": "GEO 实体一致性唯一权威源：产品线/型号/参数/材质/应用/价格逻辑/核心卖点；Agent 提炼+客户逐项确认（L4）"
+    },
+    {
+      "type": "conflict_item",
+      "label": "口径冲突项",
+      "note": "实体巡检产物：哪个信源说错了哪句话+修复计划（L2 执行）；月节拍口径冲突清零是续约检查项"
+    },
+    {
+      "type": "client_archive",
+      "label": "一客一档 v2",
+      "note": "双域版档案七模块：①企业与品牌 ②产品与方案（品牌实体卡）③目标市场 ④内容资产 ⑤运营资产 ⑥GEO 资产 ⑦转化资产；档案厚度=客户迁移成本=续约率"
+    },
+    {
+      "type": "account_metric",
+      "label": "账号指标",
+      "note": "社媒侧时序指标（播放/涨粉/互动/询盘）；G16 复用其登录风控上下文"
+    },
+    {
+      "type": "comment",
+      "label": "评论",
+      "note": "意图分类 praise/thanks/consult/after_sale/negative/crisis/sensitive 驱动 G10 四档分流"
+    },
+    {
+      "type": "comment_reply",
+      "label": "评论回复",
+      "note": "G10 四档分流执行载体；涉人设回应升级 G20"
+    },
+    {
+      "type": "ads_campaign",
+      "label": "投放计划",
+      "note": "Meta/千川投放主档：加投必审（G12 不可降级）；投放优化师只建议不执行"
+    },
+    {
+      "type": "inquiry",
+      "label": "询盘",
+      "note": "双入口打标对象：社媒入口（私信/表单/Message）vs AI 搜索入口（官网/落地页→WhatsApp）；北极星指标「双入口有效询盘数（月）」的计量单元"
+    },
+    {
+      "type": "commercial_doc",
+      "label": "对外商务文件",
+      "note": "报价/结案/承诺/合同：G15 必审后外发，不得自动发送"
+    },
+    {
+      "type": "battle_report",
+      "label": "全网存在感战报",
+      "note": "固定三栏：社媒侧/GEO侧/交叉侧；复盘分析师生成、人签发后外发——本身就是续约工具"
+    },
+    {
+      "type": "decision_memo",
+      "label": "决策备忘",
+      "note": "异常处理载体：情况-选项-建议-依据四段式；负面舆情/口径冲突等 L4 裁决附件"
+    },
+    {
+      "type": "backtest_record",
+      "label": "回测账本",
+      "note": "AI 决策 expected vs 实际逐条核对；命中率 ≥60% 为 90 天验收指标；敢接效果对赌的独占武器"
+    },
+    {
+      "type": "shadow_report",
+      "label": "影子模式对照报告",
+      "note": "建档期 shadow 影子模式（3-7 天）每日产物：模拟决策 vs 实际经营对照；对被「承诺-落空」伤害过的客户唯一有效的信任建立方式"
+    },
+    {
+      "type": "circuit_breaker",
+      "label": "熔断事件",
+      "note": "G18 载体：熔断触发即时通知+边界快照+事件链留痕三件套，不得静默熔断"
+    },
+    {
+      "type": "fence_rule",
+      "label": "围栏规则",
+      "note": "G17 载体：自治边界放宽必须 L4，只紧不松（单调守卫）"
+    },
+    {
+      "type": "content_calendar",
+      "label": "内容日历",
+      "note": "双域统一排期：社媒错峰+信源节奏+GEO 引用源建设计划"
+    },
+    {
+      "type": "content",
+      "label": "内容资产视图",
+      "note": "通用任务规划器按 content.* 工具前缀派生的内容对象视图（G-GEO2 事实红线的 object_types 并集：geo_content/script_package/platform_variant/content）；内容资产版本与 content_calendar 排期同源"
+    },
+    {
+      "type": "risk_list",
+      "label": "风险清单",
+      "note": "风险识别任务交付物：逐条风险（来源/影响/等级/缓解建议）；planner 步骤 emit_risk_list 产出，对外表述受 G-GEO2/G-VIS2 并集判定"
+    },
+    {
+      "type": "risk_identification_task",
+      "label": "风险识别任务",
+      "note": "通用任务规划器按动作名派生的风险识别工单对象（planner 步骤 emit_risk_identification_task）；越围栏写动作按 default_level 挂审"
+    },
+    {
+      "type": "risk_dimension_set",
+      "label": "风险维度集",
+      "note": "风险识别过程对象：按维度拆解的风险候选集合（planner 步骤 decompose_risk_dimensions）"
+    },
+    {
+      "type": "risk_assessment",
+      "label": "风险评估",
+      "note": "风险评估结论对象：逐条风险的等级/影响/缓解建议（planner 步骤 assess_plan_risks）"
+    },
+    {
+      "type": "goal",
+      "label": "目标",
+      "note": "规划器目标对象：线程目标与原话口径（Quest 规划输入，供拆解与复盘对齐）"
+    },
+    {
+      "type": "task_list",
+      "label": "任务清单",
+      "note": "多步骤交付物对象：按顺序排列的待办条目（如「整理本周线索清单」的产物）"
+    },
+    {
+      "type": "checklist",
+      "label": "检查单",
+      "note": "核对型交付物对象：逐项打勾的检查条目与结论"
+    },
+    {
+      "type": "geo_content_publish_plan",
+      "label": "GEO 发布计划",
+      "note": "双域发布排期对象：内容/信源/社媒节奏与门槛（G-GEO1 外发必审）"
+    },
+    {
+      "type": "render_script",
+      "label": "渲染脚本",
+      "note": "视频渲染脚本版本对象（render_scripts 行）：G8 烧额度门与 Seedance 提交的对象；外发成片以 render.complete 回执为准"
+    },
+    {
+      "type": "budget_ledger",
+      "label": "预算台账",
+      "note": "投放/算力台账：G12 加投必审计量依据；算力成本穿透不加价"
+    },
+    {
+      "type": "query_item",
+      "label": "query 词条",
+      "note": "query 集成员：每词带语言/目标市场/优先级/当前能见度状态/关联 GEO 内容/关联短视频选题六字段（geo-query-craft 技能口径）"
+    },
+    {
+      "type": "deal_order",
+      "label": "商单订单",
+      "note": "商单主档：线索→报价→合同→履约→回款全周期；对外文件外发受 G15 必审约束（与 ai-video Bundle 同口径）"
+    },
+    {
+      "type": "workspace",
+      "label": "工作区",
+      "note": "系统级对象：CEO 晨报/经营简报等以工作区为对象的留痕载体"
+    },
+    {
+      "type": "visual_brief",
+      "label": "视觉需求单",
+      "note": "视觉设计师的开工输入：平台规格/用途（封面/首图/投流/信源配图）/钩子版本/交付时限；由选题卡或发布任务派生，人审口径由此传入"
+    },
+    {
+      "type": "brand_kit",
+      "label": "品牌视觉资产包",
+      "note": "品牌色板/字体授权/LOGO 与安全区/禁用表达：客户逐项确认后作为唯一视觉权威源（与品牌实体卡同纪律，变更须重新人审）"
+    },
+    {
+      "type": "design_recipe",
+      "label": "设计配方",
+      "note": "可复现版式配方：画布/图层/位置尺寸/混合模式/蒙版/导出规格；首次使用或变更须人审（recipe_status=approved，G-VIS4），复用时同配方同产出"
+    },
+    {
+      "type": "render_job",
+      "label": "渲染任务",
+      "note": "视觉工位作业单：配方引用/输出规格/重试次数/回执（sha256、尺寸、引擎版本、时间戳）；无回执标未核实，受 G-VIS3 日配额约束"
+    },
+    {
+      "type": "visual_asset",
+      "label": "视觉成品素材",
+      "note": "可投放成品：封面/图文/投流变体/信源配图；入库命名「题材_钩子_版本」，携配方与工程文件链、QC 结果与审批引用；外发受 G9/G-GEO1，无回执禁发（G-VIS5）"
+    },
+    {
+      "type": "offer",
+      "label": "对外 offer",
+      "note": "增长 offer 载体（权益/价格表述/有效期）；价格与绑定承诺受 G-GROW2 必审，非绑定框架走实验卡（G-GROW3）"
+    },
+    {
+      "type": "price_change",
+      "label": "价格变更",
+      "note": "价格调整主档；G-GROW2 强制 L4 人审（与 R21-R26 价格红线并集取严）"
+    },
+    {
+      "type": "commitment",
+      "label": "对外承诺",
+      "note": "对客户/平台的绑定承诺（赔付/保价/时效）；G-GROW2 强制 L4，AI 不得自行承诺"
+    },
+    {
+      "type": "coupon_sku",
+      "label": "券 SKU",
+      "note": "团购/预售券 SKU：库存、核销、有效期；上架/改价受 G-GROW2，售罄熔断联动 G-GROW4"
+    },
+    {
+      "type": "referral",
+      "label": "转介",
+      "note": "老带新转介记录：推荐人/被推荐人/奖励；自荐、设备撞库等高风险受 G-GROW5 熔断"
+    },
+    {
+      "type": "experiment",
+      "label": "增长实验",
+      "note": "实验卡与执行主档：假设/判据/样本/预算/停止条件；未登记禁跑（G-GROW3），停止条件触发自动停（G-GROW4）"
+    },
+    {
+      "type": "experiment_data",
+      "label": "实验数据",
+      "note": "实验过程数据视图（脱敏聚合）；导出/共享受 G-GROW6 数据边界约束"
+    },
+    {
+      "type": "growth_dataset",
+      "label": "增长数据产品",
+      "note": "增长班组对外的数据产品（意图雷达/线索池/预算账/实验账聚合视图）；导出/上传受 G-GROW6 约束"
+    },
+    {
+      "type": "lifecycle_program",
+      "label": "生命周期计划",
+      "note": "跨渠道生命周期与 LTV 计划（P2 条件岗）；未激活受 G-GROW7 阻断，酒店住客生命周期归 guest-success"
+    },
+    {
+      "type": "partnership",
+      "label": "渠道合作",
+      "note": "异业/联盟/平台与达人矩阵增长合作（P2 按客户规模启用）；未激活受 G-GROW8 阻断，内容商单归 creator-partner"
+    }
+  ]
+}

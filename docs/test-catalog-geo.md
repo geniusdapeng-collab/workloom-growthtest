@@ -190,7 +190,7 @@
 
 | ID | 用例 | 状态 |
 |---|---|---|
-| G-01 | 工作区 industry=geo-growth | ✅ suite-geo C-01 |
+| G-01 | 工作区 industry=geo-growthtest | ✅ suite-geo C-01 |
 | G-02 | 16 员工 ready | ✅ C-02 |
 | G-03 | fence_bindings 原样落库 | ✅ C-03 |
 | G-04 | 17 围栏 active | ✅ C-04 |
