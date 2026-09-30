@@ -4777,8 +4777,11 @@ if (STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
   log(`  ⓘ ${characterConsistency.detail}`);
   for (const warning of characterConsistency.warnings.slice(0, 5)) log(`  ⚠ ${warning.detail}`);
   for (const issue of characterConsistency.issues.slice(0, 5)) log(`  ⛔ ${issue.detail}`);
+  /** 客户口径 2026-10-01：跨镜造型主色差异（换发型/服装/品牌配饰）**降为咨询项**，不阻断交付；
+   *  身份是否同一个人由 G-RP1 / 像不像门（≥88）负责。`--review-policy blocking` 时恢复硬闸语义。 */
+  const characterAdvisory = REVIEW_POLICY !== "blocking" && !characterConsistency.ok;
   record({
-    stage: "character-consistency", shotId: null, invoked: true, ok: characterConsistency.ok,
+    stage: "character-consistency", shotId: null, invoked: true, ok: characterConsistency.ok || characterAdvisory,
     cached: false, degraded: false, attempt: 1, ms: Date.now() - sampleStart, artifact: null,
     evidence: {
       checked: characterConsistency.checked,
@@ -4786,9 +4789,12 @@ if (STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
       anchors: characterConsistency.anchors,
       issues: characterConsistency.issues,
       warnings: characterConsistency.warnings,
+      advisory: characterAdvisory,
     },
     verdict: null,
-    note: "跨镜造型主色一致性（非人脸识别；命中需人工确认或显式放行）",
+    note: characterAdvisory
+      ? "跨镜造型主色差异（咨询项，不阻断；身份判据见 G-RP1 / 像不像门）"
+      : "跨镜造型主色一致性（非人脸识别；命中需人工确认或显式放行）",
   });
 }
 
