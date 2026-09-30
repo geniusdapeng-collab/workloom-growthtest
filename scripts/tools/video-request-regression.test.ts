@@ -21,6 +21,8 @@ function runChain(shots: Card[], options: { stages?: string; args?: string[]; di
   const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/tools/full-chain-film.mts",
     "--shots", shotsFile, "--project", options.project ?? "regression", "--work-dir", dir, "--out", join(dir, "out"),
     "--keys-file", join(dir, "no-credentials.env"), "--library", join(dir, "no-characters"),
+    /** 出片入口要求分流结论（T-2026-0930-0015）：回归夹具是叙事片，显式声明即可（不猜商品） */
+    "--route-kind", "narrative",
     "--platform", "youtube", "--stages", options.stages ?? "cine-kb,micromotion", ...(options.dryRun === false ? [] : ["--dry-run"]), ...(options.args ?? [])
   ], { cwd: root, encoding: "utf8", timeout: 30_000, env: { ...process.env, ARK_API_KEY: "", LLM_API_KEY: "" } });
   return {

@@ -602,6 +602,7 @@ const records: StageRecord[] = [];
 if (!Array.isArray(sourceDocument.shots) || !sourceDocument.shots.length) throw new Error("SHOT_REGISTRY_REQUIRED");
 const sourceIds = sourceDocument.shots.map((shot) => String(shot.shotId ?? ""));
 if (sourceIds.some((id) => !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(id) || id.includes("..")) || new Set(sourceIds).size !== sourceIds.length) throw new Error("SHOT_REGISTRY_INVALID: 镜号缺失、重复或包含路径字符");
+if (ONLY.some((id) => !sourceIds.includes(id))) throw new Error("SHOT_SCOPE_UNKNOWN: --only 包含未登记镜号");
 /**
  * 视频类型分流前置（T-2026-0930-0015-PORT）：分流器原来只接在服务端派活上，
  * 直接跑本 CLI 会跳过"先判营销片 / 叙事片"。这里变成**出片入口的 fail-closed 前置**：
@@ -5556,6 +5557,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
     if (index <= 0) return 0;
     return CUT_GRID[index - 1] ?? shots.slice(0, index).reduce((sum, s) => sum + Number(s.duration ?? 5), 0);
   };
+  const personShots = shots.filter((s) => String(s.character ?? "").length > 0);
   /**
    * 人物来源镜硬闸（T-2026-0930-0015-PORT）：卡片里有人物镜、管线也知道主角是谁，但没有任何一张卡的 `character`
    * 写了主角名/ID 时，封面"人物为主"版式必然找不到来源镜 → 设计师稿非法 → 退最小稿 → 母版终审被拦。
