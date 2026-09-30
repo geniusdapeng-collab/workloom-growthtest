@@ -21,6 +21,9 @@
       script: |
         set -eu
         node --test scripts/ci/protocol-rules.test.mjs
+        # 硬闸口径（T-2026-0930-0015）：创作/审美口径不得写成 hard: true（硬闸只允许事实类）
+        node --test scripts/ci/hard-gate-policy.test.mjs
+        node scripts/ci/verify-hard-gate-policy.mjs
         node --test scripts/ci/cnb-desktop-release.test.mjs
         node scripts/ci/verify-commit-msg.mjs --self-test
         node scripts/ci/verify-lock-conflict.mjs --self-test

@@ -92,6 +92,30 @@ cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plate
 
 ## 6. 认证真人（asset://）：定妆照/角度槽位怎么落实
 
+### 6.0 先跟客户要一样东西：**平台侧资产清单**（通用动作，别靠人肉登记）
+
+> 真机（2026-09-30）：主档里 10 个同组素材 ID 有 8 个在控制台**查无此素材**，而管线取
+> "主素材 + 前两张"作参考图 → 多参考图**静默失效**，表现只是"像不像不稳定"，日志里查不出错。
+> **任何客户、任何一次建档都按下面这条走。**
+
+请客户提供（任选其一，能复制文本最好）：① 控制台「资产详情」列表的 **源文件名 + asset ID** 两列
+（截图也可以——Agent 会把两列转成文本）；② 或直接粘贴/导出 `asset-…` 列表；③ 素材组 ID（`group-…`）；
+④ 明确**哪一张是主素材**（主档 `assetId`）与**授权范围/有效期**。
+
+```bash
+pnpm video:assets list --asset <assetId>                          # 现状（含管线实取的前 3 张）
+pnpm video:assets reconcile --asset <assetId> --from <清单.txt>    # dry-run：新增/删除/不变
+pnpm video:assets reconcile --asset <assetId> --from <清单.txt> --primary <主素材ID> --apply
+```
+
+纪律（工具已强制）：顺序=优先级（管线取"主素材 + 前两张"，前两张必须最像本人）；
+**新 ID 一律标"待客户确认"，不猜角度**；写前备份 `profile.json.bak`，写后落
+`asset-list-evidence.json`（清单 sha256 + 逐条来源文件名）并自动自检（主档可装载 + 属性校验 + 打印实取参考图）。
+
+> 抽象口径：截图/清单只是"客户输入"；对账逻辑在 `packages/video-studio/src/real-person-asset-sync.ts`
+> （纯函数、无客户常量），CLI 在 `scripts/tools/real-person-assets.mts`。**不要为某个客户写死 ID。**
+
+
 真人素材在本地只有主档 ID，**没有图片文件**；角色档案的角度槽位必须由"客户导出的原图"或
 "以授权素材为参考的派生图"逐张落实，否则"像不像门/首镜身份锚"没有真实基准：
 
