@@ -1,8 +1,8 @@
-# WorkLoom GrowthTest · 获客增长系统（实验车道）
+# WorkLoom Growth · 获客增长系统（实验车道）
 
-WorkLoom GrowthTest 面向企业增长与内容运营团队，把目标、数字员工岗位、内容生产、任务协作和过程记录放进同一个工作空间。产品目标是连接意图洞察、社媒与 GEO 触达、线索承接、转化和复盘；当前代码中，**视频生产与交付有专用执行链，通用工作台和行业包提供组织与治理机制，部分增长工具仍处于声明或接入阶段**。
+WorkLoom Growth 面向企业增长与内容运营团队，把目标、数字员工岗位、内容生产、任务协作和过程记录放进同一个工作空间。产品目标是连接意图洞察、社媒与 GEO 触达、线索承接、转化和复盘；当前代码中，**视频生产与交付有专用执行链，通用工作台和行业包提供组织与治理机制，部分增长工具仍处于声明或接入阶段**。
 
-[CNB 仓库](https://cnb.cool/workloom-ai/WorkLoom-growthtest) · [产品身份](product.manifest.json) · [代码入口导览](docs/capabilities.auto.md) · [开发指引](AGENTS.md) · [Apache-2.0](LICENSE)
+[CNB 仓库](https://cnb.cool/workloom-ai/WorkLoom-growth) · [产品身份](product.manifest.json) · [代码入口导览](docs/capabilities.auto.md) · [开发指引](AGENTS.md) · [Apache-2.0](LICENSE)
 
 > 本页按当前源码说明“有什么、从哪里进入、还依赖什么”，不把岗位或技能数量当作已交付能力数，也不把模拟结果当作生产效果。旧方案、截图和演示 PPT 可帮助理解背景；发生差异时，以 manifest、当前路由和实际执行代码为准。
 
@@ -18,9 +18,9 @@ WorkLoom GrowthTest 面向企业增长与内容运营团队，把目标、数字
 |---|---|---|---|
 | 内容策划与视频制作人员 | 把产品资料做成短片，管理脚本、渲染、返修与交付 | 在视频工位创建制作作业，分阶段推进预生产、渲染和后期，保留素材与成片记录 | 模型、媒体引擎、供应商账户与后期环境需要配置；公开发布另走授权链 |
 | 企业负责人、项目负责人 | 看清任务交给谁、交付什么、哪里待决定 | 工作台、任务线程、协作契约与组合看板组织交接和状态 | 看板和事件存在不等于营收归因已接通；演示订单不能当实际收入 |
-| 增长策略与渠道运营人员 | 同一选题用于社媒内容与 GEO，并积累可复用作业规范 | `geo-growthtest` 声明岗位、技能、围栏和管线，复用视频与视觉制作能力 | query 采集、能见度监测、线索评分和分发等专用工具仍需逐项接线与验收 |
+| 增长策略与渠道运营人员 | 同一选题用于社媒内容与 GEO，并积累可复用作业规范 | `geo-growth` 声明岗位、技能、围栏和管线，复用视频与视觉制作能力 | query 采集、能见度监测、线索评分和分发等专用工具仍需逐项接线与验收 |
 
-本仓身份是 `workloom-ai-growthtest`，角色为 `industry`，默认行业包为 `geo-growthtest`，属于 WorkLoom 的实验车道。它与 `workloom-growthtest`、`workloom-growthtestmatrix` 两个隔离副本是不同实例；不把其它仓库的实验能力合并算入本仓。酒店包是组合依赖和垂直业务样例，不代表这里已经接通真实 PMS、OTA、支付或所有酒店经营数据。来源：[product.manifest.json](product.manifest.json)、[主包 manifest](bundles/geo-growthtest/bundle.json)。
+本仓身份是 `workloom-ai-growth`，角色为 `industry`，默认行业包为 `geo-growth`，属于 WorkLoom 的实验车道。它与 `workloom-growthtest`、`workloom-growthmatrix` 两个隔离副本是不同实例；不把其它仓库的实验能力合并算入本仓。酒店包是组合依赖和垂直业务样例，不代表这里已经接通真实 PMS、OTA、支付或所有酒店经营数据。来源：[product.manifest.json](product.manifest.json)、[主包 manifest](bundles/geo-growth/bundle.json)。
 
 ## 功能状态：代码做到哪里
 
@@ -33,8 +33,8 @@ WorkLoom GrowthTest 面向企业增长与内容运营团队，把目标、数字
 | 视频工位 | 自然语言任务派遣或制片 API 启动前期；`/ai-video/assets?tab=studio` 消费已有脚本进行生成。实现见 [视频路由](apps/server/src/video/router.ts) 与 [生产 worker](apps/server/src/video/studio-worker.ts) | 默认按阶段推进。预生产完成不等于渲染完成，后期另由工位生成交付包；内部部分关卡默认自动，具体业务门按策略处理 |
 | 视频媒资与交付 | `/ai-video/media` 管理媒资，`/ai-video/assets?tab=delivery` 查看交付；另有商品档案、合集与成片历史。实现见 [媒资模块](apps/server/src/video/media/) | 支持媒体与制作记录管理；需要文件、数据库和对应作业产物，不能把空目录当作已交付成片 |
 | 白板、口播解释片 | [白板服务](apps/server/src/video/whiteboard/)、[口播解释片服务](apps/server/src/video/explainer/) 与 CLI 工具 | 有专用制作链；需要 TTS、渲染与后期依赖。当前没有独立 React 可视编辑页 |
-| GEO 与增长作业 | [主包岗位/技能/管线](bundles/geo-growthtest/) 声明双域情报、内容、能见度、线索与复盘流程 | 多项工具尚无专用执行实现；先把声明映射到执行器、数据源和真实回执 |
-| 视觉制作桥 | [visual-bridge](bundles/geo-growthtest/connectors/visual-bridge/executor.ts) 提供白名单视觉动作、幂等标识与端点调用 | 桥接代码存在；真实工位端点、认证和供应商额度仍需配置与联调 |
+| GEO 与增长作业 | [主包岗位/技能/管线](bundles/geo-growth/) 声明双域情报、内容、能见度、线索与复盘流程 | 多项工具尚无专用执行实现；先把声明映射到执行器、数据源和真实回执 |
+| 视觉制作桥 | [visual-bridge](bundles/geo-growth/connectors/visual-bridge/executor.ts) 提供白名单视觉动作、幂等标识与端点调用 | 桥接代码存在；真实工位端点、认证和供应商额度仍需配置与联调 |
 | 平台发布 | [发布服务](apps/server/src/video/gen/publish.ts) 与 [浏览器适配层](packages/base/publish-rpa/) | 默认是 `dry-run` 演练。部分平台只有参考适配器，部分明确未接；不承诺六平台可直接自动发布 |
 | 获客经营报表 | [acquisition-router](apps/server/src/trpc/acquisition-router.ts) 提供只读聚合 | 订单与收益的部分查询来自 `demo_orders`；真实交易、支付和收入归因需要另外接入 |
 | 客户 H5 前台 | 对话、服务、工单、消息、我的；[服务网关](apps/server/src/service/) | 工单有持久化链路；当前通知存在 mock/pending 路径。增长包关闭身份绑定，不能当完整会员/订单系统 |
@@ -98,9 +98,9 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 
 ## 行业包组合
 
-[`geo-growthtest`](bundles/geo-growthtest/bundle.json) 是主包，按精确版本依赖 [`hotel`](bundles/hotel/bundle.json) 与 [`ai-video`](bundles/ai-video/bundle.json)。岗位、技能、围栏、对象、阶段、模型策略和 UI 投影随包声明；[装配器](packages/base/bundles/assembly.ts) 负责依赖、完整性和同名归属。
+[`geo-growth`](bundles/geo-growth/bundle.json) 是主包，按精确版本依赖 [`hotel`](bundles/hotel/bundle.json) 与 [`ai-video`](bundles/ai-video/bundle.json)。岗位、技能、围栏、对象、阶段、模型策略和 UI 投影随包声明；[装配器](packages/base/bundles/assembly.ts) 负责依赖、完整性和同名归属。
 
-同名岗位由主包 `composition.presetOwners` 裁决：`ads-optimizer`、`publish-operator`、`review-analyst` 归 `geo-growthtest`，`company-ceo` 归 `hotel`。下方数量从 manifest 和岗位标识自动派生，避免手工维护另一套总数。当前三包均为 `candidate`；稳定包签名校验能力的存在不能变成“这些候选包已经完成生产验收”的结论。
+同名岗位由主包 `composition.presetOwners` 裁决：`ads-optimizer`、`publish-operator`、`review-analyst` 归 `geo-growth`，`company-ceo` 归 `hotel`。下方数量从 manifest 和岗位标识自动派生，避免手工维护另一套总数。当前三包均为 `candidate`；稳定包签名校验能力的存在不能变成“这些候选包已经完成生产验收”的结论。
 
 <!-- CAPABILITIES:BEGIN -->
 <!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-09-27），请勿手改；重跑 pnpm capabilities 更新 -->
@@ -110,7 +110,7 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。
 
 - 🖥 **三端应用入口**：PC 工作台 · 员工移动工作台 · 客户 H5 服务前台
-- 📦 **行业包声明资产**：bundles/ai-video/ · bundles/geo-growthtest/ · bundles/hotel/
+- 📦 **行业包声明资产**：bundles/ai-video/ · bundles/geo-growth/ · bundles/hotel/
 - 🧑‍💼 **岗位与交互入口**：数字员工中心（`/agents`） · 织伴数字人组件 · 语音与口型引擎
 - 🖐 **电脑操作接口**：浏览器与桌面驱动接口 · HTTP / MCP 工位入口
 - ⚙ **共享基础模块（目录存在性）**：围栏判定 · 技能分发组件 · 任务编排基础组件 · 夜班状态与调度 · 模型路由与用量记录 · 发布适配层（默认演练） 等 15 项
@@ -127,6 +127,12 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 
 仓库自带默认模特陈卓的角色档案与定妆照，入口是 [`characters/registry.json`](bundles/ai-video/library/characters/registry.json)，默认标识为 `chen-zhuo`。在使用该角色库的出片链路中，镜头未显式指定角色时按 registry 的默认选角规则处理；需要换人或多人时再提供角色名/档案，无需重复建立默认角色。
 
+**认证真人（客户在火山方舟「私域人像库」认证的真人素材，`asset://…`）怎么用**：素材在客户账号里，本地没有原图，
+标准流程是「客户给一张**资产详情页截图** → 清单对账 → Agent 判读缩略图角度 → 两段式出**专业定妆照** → 机器像不像校验 → 装档」。
+完整 SOP 见 [`docs/real-person-portrait-set.md`](docs/real-person-portrait-set.md)，速查见
+[`bundles/ai-video/README.md`](bundles/ai-video/README.md) §6/§6.1；工具：`scripts/tools/real-person-assets.mts`（清单对账，不猜角度）、
+`scripts/tools/portrait-set-from-asset.mts`（两段式出图 + 机器校验）、`scripts/tools/portrait-set-install.mts`（装档 + 写后复核）。
+
 **角色资产随仓存在，不等于克隆后即可生成成片。** 出片仍需要对应模型或媒体供应商、授权素材通道、渲染引擎与后期依赖。真人肖像应按供应商授权路径使用，不能把仓库内参考图视为绕过平台授权检查的方式。
 
 - [角色规则与 FAQ](docs/character-registry.md)
@@ -140,8 +146,8 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 ### 1. 克隆、依赖与专用数据库
 
 ```bash
-git clone https://cnb.cool/workloom-ai/WorkLoom-growthtest.git
-cd WorkLoom-growthtest
+git clone https://cnb.cool/workloom-ai/WorkLoom-growth.git
+cd WorkLoom-growth
 pnpm install --frozen-lockfile
 test -f .env || cp .env.example .env
 docker compose up -d postgres
@@ -160,7 +166,7 @@ LLM_PROVIDER=mock pnpm preview:all
 
 | 入口 | 默认地址 | 说明 |
 |---|---|---|
-| PC 工作台 | http://localhost:3000 | 默认产品工作区 `geo-growthtest`，演示成员 `MEM-G01`；已有会话和权限会影响显示 |
+| PC 工作台 | http://localhost:3000 | 默认产品工作区 `geo-growth`，演示成员 `MEM-G01`；已有会话和权限会影响显示 |
 | 员工移动端 | http://localhost:3001 | `apps/webb` 的 React 应用，并非 `docs/demo` 静态原型 |
 | 客户 H5 | http://localhost:3002 | 该预览脚本固定到 `ws-yunqi` 酒店服务夹具，不能当作 GEO 客户前台演示 |
 | 服务端 | http://localhost:8787/health | 进程探活；仍需页面、数据库和具体场景检查 |
@@ -180,7 +186,7 @@ LLM_PROVIDER=mock pnpm dev
 
 `pnpm dev` 默认 server 为 8787、PC 为 5173。另开终端运行 `pnpm -C apps/webb dev` 或 `pnpm -C apps/webc dev`，默认端口分别是 5175、5176。源码桌面入口 `pnpm app` 还需要 Electron，默认使用 server 8787、PC preview 4173；`app:dev` 使用 PC 5173。manifest 的桌面 `portOffset` 不被所有源码启动脚本共同采用，不应把其计算值套到这里。
 
-**增长客户前台：**需要观察 `geo-growthtest` 的 C 端配置时，先完成上述种子初始化，单独启动服务与 C 端，不使用会覆盖工作区的 `preview:all`：
+**增长客户前台：**需要观察 `geo-growth` 的 C 端配置时，先完成上述种子初始化，单独启动服务与 C 端，不使用会覆盖工作区的 `preview:all`：
 
 先停止已有的 `preview:all` / `pnpm dev` / `pnpm app`，确认 8787 空闲。若曾在 5176 连接过其它工作区，使用新的浏览器会话，或在“我的 → 退出当前服务”后重新进入，避免沿用旧工作区会话。
 
