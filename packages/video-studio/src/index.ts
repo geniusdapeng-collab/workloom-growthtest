@@ -53,3 +53,5 @@ export * from "./product-archive.js";
 export * from "./real-person-asset.js";
 /** 花钱前的提示词红线 linter（提高一次过率）。 */
 export * from "./prompt-redlines.js";
+/** 一次过就绪度（花钱前判定风险与改卡建议；高风险先渲）。 */
+export * from "./first-pass.js";
