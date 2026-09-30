@@ -28,7 +28,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -54,9 +54,13 @@ const ANGLE_PROMPTS: Record<string, string> = {
   threeQuarterRight: "右侧四分之三定妆照：人物向画面左侧转身约 45°，右肩靠近镜头；",
   smileCloseup: "微笑近景定妆照：胸部以上近景，自然真诚的微笑，眼神看向镜头；",
 };
-const SKIN_AND_LIGHT = "写实商业人像摄影，干净中性背景（纯色影棚背幕）、柔和均匀中性光（约 5500K）、"
-  + "白平衡中性；皮肤保留真实纹理与毛孔、不磨皮不美颜、不做网红滤镜；服装与发型保持与参考素材一致；"
-  + "竖版 3:4 人像构图；无文字、无水印、无道具、无第二人。";
+/**
+ * 拍摄口径（2026-10-01 客户口径修订）：**只对"人脸是真的"负责**。
+ * 不再强制"同发型同发色/无商标/统一 5600K 中性灰"——真实生活里本人也会换发型、戴品牌首饰衣物；
+ * 这些差异不是缺陷（评审里也一律降为咨询项）。保留的只有：写实、自然皮肤质感、竖版人像、无文字水印、无第二人。
+ */
+const SKIN_AND_LIGHT = "写实人像（自然光或影棚光皆可，白平衡中性）、皮肤保留真实纹理与毛孔、不磨皮不美颜、"
+  + "不做网红滤镜；发型/配饰/服装可保持参考素材的自然状态；竖版 3:4 人像构图；无文字、无水印、无第二人。";
 
 const assetRef = arg("--asset").trim();
 const characterId = arg("--character").trim();
@@ -80,8 +84,8 @@ const identityBinding = (() => {
     return `与参考素材中的同一人（${who}，${certified.ageBand ?? "年龄段以素材为准"}，`
       + `${certified.hair ?? "发型与参考素材一致"}，${certified.wardrobeBaseline ?? "服装与参考素材一致"}）；`
       + `面孔、五官比例、脸型、发型与身份必须与参考素材完全一致——不得换人、不得改年龄、不得改发型；`
-      + `服装必须为现代商务造型：${certified.wardrobeBaseline ?? "与参考素材一致的高定套装"}＋珍珠耳饰；`
-      + `**严禁**古装、汉服、旗袍、影楼写真服饰、发簪头饰、折扇等道具；背景为现代影棚纯色背幕；`;
+      + `造型要求（软性，不作不合格理由）：优先现代商务造型（${certified.wardrobeBaseline ?? "与参考素材一致的高定套装"}）；`
+      + `尽量避开与商务场景明显冲突的古装/汉服/旗袍/影楼戏服；发型发饰与佩戴物保持本人自然状态即可，品牌首饰衣物不算缺陷；`;
   } catch {
     return "与参考素材中的同一人（面孔、发型与身份完全一致，不得换人）：";
   }
@@ -205,6 +209,11 @@ mkdirSync(outDir, { recursive: true });
  */
 const verifyAgainst = arg("--verify-against").trim();
 /**
+ * 身份阈值（`--min-likeness`，默认 **88**）：客户口径是"人脸一定要真"，
+ * 70 分档容易"差不多就过"——低于阈值宁可打回重出，也不用弱锚图去生成整片。
+ */
+const minLikeness = Number(arg("--min-likeness", "88"));
+/**
  * 校验模型必须用**仓内监制同款**配置（`LLM_*` 优先）：
  * `~/.workloom/live.env` 里的 `DEEPSEEK_BASE_URL` 指向的是 **anthropic 兼容端点**
  * （`https://api.deepseek.com/anthropic`），拿它拼 `/chat/completions` 会 404 —— 真机踩过：
@@ -257,7 +266,7 @@ async function likenessCheck(png: Buffer, angle: string): Promise<{ ok: boolean;
     const raw = (JSON.parse(text) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
     const parsed = JSON.parse(raw.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim()) as { same?: boolean; score?: number; reason?: string };
     const score = Number.isFinite(Number(parsed.score)) ? Number(parsed.score) : null;
-    const same = parsed.same === true && (score === null || score >= 70);
+    const same = parsed.same === true && (score === null || score >= (Number.isFinite(minLikeness) ? minLikeness : 88));
     return { ok: same, same: parsed.same === true, score, reason: String(parsed.reason ?? "").slice(0, 200) };
   } catch {
     return { ok: false, same: false, score: null, reason: `校验结论结构非法：${text.slice(0, 160)}` };
@@ -442,6 +451,36 @@ if (engineArg === "two-stage") {
 }
 const masterDataUrls: string[] = [];
 for (const [angle, master] of stageAMasters) masterDataUrls.push(await toDataUrl(master, `master-${angle}`));
+/**
+ * **追加模式**（`--archive-refs <角色目录>`，客户口径 2026-10-01）：
+ * 后续生产要"补角度"时，新角度必须以**档案里已发布的定妆照**为参考——否则新定的锚图与之前出片用的
+ * 不是同一套，客户平台上先后发布的视频人物会不一致。因此追加时优先用已装档的 front/threeQuarter 当参考，
+ * 而不是重新从素材生成一套新 look。旧版本一律保留（installer 只新增版本，不覆盖）。
+ */
+const archiveRefsDir = arg("--archive-refs").trim();
+if (archiveRefsDir) {
+  const dir = resolve(archiveRefsDir);
+  const portraitsDir = join(dir, "portraits");
+  const files: string[] = [];
+  if (existsSync(portraitsDir)) {
+    for (const version of readdirSync(portraitsDir).filter((name) => /^v\d+$/.test(name)).sort()) {
+      for (const name of readdirSync(join(portraitsDir, version))) {
+        if (/\.(png|jpe?g|webp)$/i.test(name)) files.push(join(portraitsDir, version, name));
+      }
+    }
+  }
+  const pick = (keyword: string): string | undefined => files.find((file) => file.includes(keyword));
+  const chosen = [pick("front"), pick("threeQuarter"), pick("closeup")].filter(Boolean).slice(0, 2) as string[];
+  if (chosen.length > 0) {
+    masterDataUrls.length = 0;
+    for (const [index, file] of chosen.entries()) {
+      masterDataUrls.push(await toDataUrl(readFileSync(file), `archive-${index}`));
+    }
+    console.log(`↻ 追加模式：以档案已有定妆照为参考（${chosen.map((file) => basename(file)).join(" / ")}）——与已发布视频保持人物一致性`);
+  } else {
+    console.log(`⚠ 追加模式：档案里没有可用定妆照（${portraitsDir}）→ 退回用新生成的身份母版`);
+  }
+}
 
 for (const entry of plan.angles) {
   /** 参考集在每个角度开跑前重算：已确认失效的 assetId 不再送（避免每个角度都白试一次） */

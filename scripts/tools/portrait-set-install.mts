@@ -67,6 +67,21 @@ const dryRun = flag("--dry-run");
 const activate = flag("--activate");
 const allowUnverified = flag("--allow-unverified");
 const sourceKind = arg("--source", "customer-export").trim();
+/**
+ * 身份基准照片（`--anchor`）：拷进角色目录 `sources/` 并登记到该版本 set 的 `anchors`。
+ * 为什么必须有：定妆照评审（`portrait-agent review`）的"同一张脸"判据要拿基准照片做人脸比对，
+ * 没有基准就只能"缺证据拒绝"（真机：评分 45 打回，理由第一条就是 anchor-present failed）。
+ * 建议传**该真人已通过验收的成片帧**（既有权威性，又不依赖客户再提供材料）。
+ */
+const anchorArg = arg("--anchor").trim();
+let anchorSourceFile: string | null = null;
+if (anchorArg) {
+  anchorSourceFile = resolve(anchorArg);
+  if (!existsSync(anchorSourceFile)) {
+    console.error(`--anchor 不存在：${anchorSourceFile}`);
+    process.exit(2);
+  }
+}
 if (!["customer-export", "asset-derived"].includes(sourceKind)) {
   console.error(`--source 只支持 customer-export（客户导出原图）/ asset-derived（以授权素材为参考的派生图），收到：${sourceKind}`);
   process.exit(2);
@@ -85,6 +100,10 @@ if (!existsSync(mappingFile)) {
 }
 
 const profile = JSON.parse(readFileSync(join(characterDir, "profile.json"), "utf8")) as CharacterProfile;
+/** 基准照片落在角色目录内（评审按 <characterDir>/sources 找）——文件名带角色名，便于区分版本来源 */
+const anchorRelative = anchorSourceFile
+  ? `sources/${profile.name}-anchor${extname(anchorSourceFile).toLowerCase() || ".png"}`
+  : null;
 const mappingRaw = JSON.parse(readFileSync(mappingFile, "utf8")) as Record<string, unknown>;
 const mapping: Array<{ angle: string; file: string }> = [];
 for (const [angle, value] of Object.entries(mappingRaw)) {
@@ -172,6 +191,11 @@ if (!dryRun) {
       const source = resolve(fromDir, entry.originalName);
       copyFileSync(source, join(targetDir, `${profile.name}-${entry.angle}${extname(source).toLowerCase()}`));
     }
+    /** 身份基准照片落进角色目录（评审与后续追加重出都用它当"同一张脸"的锚） */
+    if (anchorRelative) {
+      mkdirSync(join(characterDir, "sources"), { recursive: true });
+      copyFileSync(anchorSourceFile!, join(characterDir, anchorRelative));
+    }
     const sourceManifest = {
       schemaVersion: "workloom.portrait-source-map/v1",
       characterId,
@@ -198,6 +222,7 @@ if (!dryRun) {
       files: Object.fromEntries(perAngle.map((entry) => [entry.angle, `portraits/v${version}/${profile.name}-${entry.angle}${extname(entry.originalName).toLowerCase()}`])),
       source: "real-authorized",
       active: activate,
+      ...(anchorRelative ? { anchors: [anchorRelative] } : (previousActive?.anchors ? { anchors: previousActive.anchors } : {})),
       note: `${sourceKind === "customer-export" ? "客户导出原图" : "派生定妆照"}逐张落实（证据见 portraits/v${version}/source-map.json）`,
       ...(previousActive?.assets ? { assets: previousActive.assets } : {}),
     } as PortraitSet;

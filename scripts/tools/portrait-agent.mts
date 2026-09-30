@@ -160,10 +160,21 @@ async function main(): Promise<void> {
     }
     if (selected!.verification.status !== "passed") throw new Error(`候选尚不可评审：${selected!.verification.issues.join("；")}`);
     const produced = Object.values(selected!.files);
+    /**
+     * 基准照片（身份锚）来源，按优先级：
+     *   ① `--anchor a.jpg,b.jpg`（显式指定；真机踩过：以前 review 分支根本不读 --anchor → 永远是"无基准照片"）；
+     *   ② 该版本 set 里登记的 `anchors`；
+     *   ③ 角色目录 `sources/` 下的照片（installer 会把已验收成片帧拷到这里）。
+     */
+    const cliAnchors = arg("--anchor")
+      ? arg("--anchor").split(",").map((value) => resolve(value.trim())).filter(existsSync)
+      : [];
     const anchors = (target.anchors ?? []).map((p) => resolve(characterDir, p)).filter(existsSync);
-    const fallbackAnchors = anchors.length > 0
-      ? anchors
-      : (existsSync(join(characterDir, "sources")) ? readdirSync(join(characterDir, "sources")).filter((f) => IMAGE_EXT.test(f)).slice(0, 4).map((f) => join(characterDir, "sources", f)) : []);
+    const fallbackAnchors = cliAnchors.length > 0
+      ? cliAnchors
+      : anchors.length > 0
+        ? anchors
+        : (existsSync(join(characterDir, "sources")) ? readdirSync(join(characterDir, "sources")).filter((f) => IMAGE_EXT.test(f)).slice(0, 4).map((f) => join(characterDir, "sources", f)) : []);
     const required = ["front", "threeQuarter", "closeup", "side"];
     const verdict = await reviewStage({
       stage: "keyframe",
@@ -181,9 +192,16 @@ async function main(): Promise<void> {
         kind: entry.kind,
         source: target.source,
         version: target.version,
-        discipline: "定妆照按设计口径**场景解耦**：中性浅灰无缝背景、中性柔光 5600K、只描述人——因此「没有实景/没有道具」不是缺陷，不要据此扣分。",
-        note: "评审要点：定妆照必须与基准照片是同一张脸（五官比例/眼型/鼻型/唇形/脸型），同一发型与发色；允许妆造与服装变化。不确定时以「能不能认出是同一个人」为唯一硬标准。"
+        discipline: "定妆照口径（2026-10-01 客户口径修订）：**唯一硬标准是「人脸是真的」**——与基准照片为同一张脸（五官比例/眼型/鼻型/唇形/脸型）。"
+          + "真实生活里同一个人本来就会有发型/发色/妆造/服装/配饰的变化，也可能佩戴品牌首饰衣物；"
+          + "背景灰调、光位、景别差异属正常拍摄差异。"
+          + "**因此：发型、发色、服装、配饰、品牌标识、背景色温/明度等一律不作为不合格理由**，最多作为咨询建议。"
+          + "「没有实景/没有道具」也不是缺陷。",
+        note: "评审要点：只看「是不是同一个人」。像不像的判据是五官比例/眼型/鼻型/唇形/脸型；"
+          + "不要因为造型变化、品牌标识、背景灰调漂移而判不合格；缺基准照片或无法判断时才拒绝（缺证据不得猜测通过）。"
       },
+      /** 身份阈值提高到 88（客户口径：人脸一定要真）——低于它宁可打回重出，也不要用"差不多"的锚图生成全片 */
+      minScore: Number(arg("--min-score", "88")),
       allowFallbackApprove: false,
       /**
        * 必须显式传 env（2026-09-24 真机）：`reviewStage` 缺省只读 `process.env`，
