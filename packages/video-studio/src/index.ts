@@ -50,3 +50,5 @@ export * from "./film-contracts.js";
 export * from "./product-archive.js";
 /** 认证真人素材主档与一致性门（人物属性唯一事实源；禁止猜）。 */
 export * from "./real-person-asset.js";
+/** 花钱前的提示词红线 linter（提高一次过率）。 */
+export * from "./prompt-redlines.js";
