@@ -30,6 +30,7 @@
  * 阶段汇总：`<work-dir>/logs/stages.json`
  */
 import { execFileSync, spawnSync } from "node:child_process";
+import { auditFilmRedlines, PROMPT_REDLINE_POLICY_VERSION } from "../../packages/video-studio/src/prompt-redlines.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
   accessSync, appendFileSync, closeSync, constants as fsConstants, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync,
@@ -3400,6 +3401,26 @@ if (STAGES.has("material-gen")) {
 
 
 /* ---------- ③ 逐镜视频（监制：shot） ---------- */
+/* ---------- 提示词红线门（G-RL1，T-2026-0929-0008）：花钱前清零屏幕文字/证件文字/道具重复/落幅/帧率 ---------- */
+if (["videos", "material-gen"].some((stage) => STAGES.has(stage))) {
+  const redlines = auditFilmRedlines(shots as unknown as Array<Record<string, unknown>>, { fps: FPS });
+  const checks = [
+    {
+      id: "redlines-clear", pass: redlines.hard.length === 0, hard: true,
+      detail: redlines.hard.length === 0
+        ? `${PROMPT_REDLINE_POLICY_VERSION}：${shots.length} 镜红线清零（soft ${redlines.soft.length} 项已记录）`
+        : redlines.hard.map((issue) => `${issue.id}｜${issue.detail}｜为什么：${issue.why}`).join("；")
+    },
+    ...(redlines.soft.length > 0 ? [{ id: "redlines-soft", pass: true, hard: false, detail: redlines.soft.map((i) => `${i.id}｜${i.detail}`).join("；") }] : [])
+  ];
+  const gate = recordGate({ stepKey: "g-prompt-redlines", sourceStage: "prompt", checks,
+    shotIds: shots.map((shot) => String(shot.shotId)),
+    evidence: { policy: PROMPT_REDLINE_POLICY_VERSION, perShot: redlines.perShot },
+    reason: redlines.hard.length === 0 ? `提示词红线 hard 0 · soft ${redlines.soft.length}` : `提示词红线未清零（${redlines.hard.length} 项 hard）` });
+  if (!gate.approved) throw new Error(`提示词红线未清零（花钱前拦住）：${redlines.hard.map((i) => `[${i.id}] ${i.detail}`).join("；")}`);
+  for (const issue of redlines.soft.slice(0, 6)) log(`⚠ 提示词红线（软）${issue.id}：${issue.detail}`);
+}
+
 if (STAGES.has("videos")) {
   /**
    * G7 预生产最终确认（step_key: g7-preproduction）。
