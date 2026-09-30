@@ -89,3 +89,22 @@ cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plate
 `subtitles/`（srt/ass/vtt + 清单）、`*-softsub.mp4`、变体 3 支 + 变体封面、
 `*-cover.png`、`*-delivery-manifest.json`（sha256/变体差异/审核口径/组装声明）。
 质量口径见 `docs/video-delivery-and-revision.md`；监制门设计见 `docs/producer-gate-design.md`。
+
+## 6. 认证真人（asset://）：定妆照/角度槽位怎么落实
+
+真人素材在本地只有主档 ID，**没有图片文件**；角色档案的角度槽位必须由"客户导出的原图"或
+"以授权素材为参考的派生图"逐张落实，否则"像不像门/首镜身份锚"没有真实基准：
+
+```bash
+# 客户从平台导出原图后（保留原文件名即可）：
+pnpm exec tsx scripts/tools/portrait-set-install.mts \
+  --character <角色ID> --library <角色库目录> \
+  --from "<导出目录>" --mapping <角度映射.json> \
+  --source customer-export --activate --out report.json
+```
+
+工具会校验（缺必需角度/同图占多角度/越界/非图片一律拒绝）、不覆盖历史版本、
+写 `portraits/v<N>/source-map.json` 来源证据、更新档案并**写后复核**（未过即 exit 2）。
+映射里必填 `front / threeQuarter / closeup / side`；可选 `frontFull / threeQuarterLeft /
+threeQuarterRight / smileCloseup / back / actionPose / emotionCloseup / handDetail`。
+派生（充值后 img2img）用 `scripts/tools/portrait-agent.mts`，产物必须标注"派生·非权威原图"。
