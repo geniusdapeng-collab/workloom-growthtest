@@ -15,12 +15,14 @@ describe("一次过就绪度（花钱前判定）", () => {
     const r = assessShotFirstPass({ shotId: "S3", timeline: "T00:02.5–T00:06 完全定住", camera_movement: "缓推后定住" });
     expect(r.blockers.map((b) => b.id)).toContain("timing-lock-vs-motion");
   });
-  it("服装锁到面料配饰、同镜多诉求 → 中风险（计入分数但不阻塞）", () => {
+  it("客户的造型意图（面料/配饰）与同镜多诉求只作提示，不再当风险打分", () => {
     const r = assessShotFirstPass({ shotId: "S4", costume: "黑色粗花呢套装配珍珠耳饰及膝裙", composition: "广角全景，人物中近景占比并保持视觉主导，机身清晰可辨" });
     const ids = r.findings.map((f) => f.id);
-    expect(ids).toContain("costume-over-specified");
+    expect(ids).toContain("costume-design-intent");
     expect(ids).toContain("competing-subjects");
+    expect(r.findings.filter((f) => f.level !== "low")).toEqual([]);   // 不进分数
     expect(r.blockers).toEqual([]);
+    expect(r.ready).toBe(true);                                        // 不因创作意图被拦
   });
   it("整片：给 canary 渲染顺序（风险高的先渲），policy 版本可追溯", () => {
     const film = assessFilmFirstPass([

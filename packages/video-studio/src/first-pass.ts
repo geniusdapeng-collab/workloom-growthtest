@@ -84,9 +84,14 @@ export function assessShotFirstPass(shot: FirstPassShot, options: { fps?: number
   // ③ 服装/配饰细节锁定
   const costumeLocks = /粗花呢|金扣|金色纽扣|珍珠|及膝|高定|礼服/.test(costume);
   if (costumeLocks) {
-    add("costume-over-specified", "medium",
-      `服装锁到面料/配饰级（粗花呢/金扣/珍珠/及膝裙）→ 一次成功率低（真机已出现西装长裤版）`,
-      `只锁"主色 + 正式商务套装"这类可稳定复现的类别；面料与配饰细节留给角色档案`);
+    /**
+     * 修正（2026-09-30 客户质询）：面料/配饰是**客户明确的造型意图**（高定小黑裙），
+     * 不能因为"模型可能做不到"就把它当风险打压。这里只作为设计意图记录，不参与就绪度评分；
+     * 达标与否交给逐镜监制评审 + 客户看片决定。
+     */
+    add("costume-design-intent", "low",
+      `造型为定制级（面料/配饰有明确要求）——这是客户的设计意图，不是缺陷`,
+      `保留造型描述；若成片与意图有偏差，按"逐镜重做该镜"处理，而不是在卡片层削弱要求`);
   }
   const noChange = /全片不换装|不换装|不换发型/.test(full);
   if (noChange && !/角色档案|定妆照/.test(full)) {
@@ -98,7 +103,7 @@ export function assessShotFirstPass(shot: FirstPassShot, options: { fps?: number
   const wantsProductClear = /机身|产品|机器/.test(visual) && /清晰可辨|材质工艺|可辨/.test(visual);
   const conflicts = [wantsWide && wantsPersonDominant, wantsPersonDominant && wantsProductClear].filter(Boolean).length;
   if (conflicts >= 1) {
-    add("competing-subjects", "medium",
+    add("competing-subjects", "low",
       `${[wantsWide ? "广角全景" : "", wantsPersonDominant ? "人物视觉主导" : "", wantsProductClear ? "产品细节可辨" : ""].filter(Boolean).join(" + ")} 塞在同一镜 → 监制必然在"构图/主导/可辨"里挑一条打回`,
       `拆镜：人物镜（人为主体）与产品镜（机器为主体）分开；或明确"本镜只保 XX"`);
   }
@@ -121,7 +126,8 @@ export function assessShotFirstPass(shot: FirstPassShot, options: { fps?: number
   return {
     policy: FIRST_PASS_POLICY_VERSION,
     score,
-    ready: blockers.length === 0 && score <= 3,
+    /** 就绪度只看高风险（可枚举的机械红线）；中/低风险是提示，不阻断——避免用"我觉得有风险"挡掉客户的创作意图 */
+    ready: blockers.length === 0,
     findings,
     blockers,
     suggestions: [...new Set(findings.filter((f) => f.level !== "low").map((f) => f.suggestion))]
