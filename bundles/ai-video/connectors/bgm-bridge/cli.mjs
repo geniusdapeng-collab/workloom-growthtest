@@ -11,7 +11,9 @@
  *   bgm-cli compose   --out bgm.wav (--in clip.mp4 | --duration 30) [--id food] [--genre 美食]
  *                     [--seed 2026] [--bpm 96] [--bpm-strategy cut-driven]
  *   bgm-cli mix       --in clip.mp4 --out scored.mp4 --bgm bgm.wav [--policy keep-dialogue]
- *                     --audio-stems pinned-audio-reference.json
+ *                     [--audio-stems pinned-audio-reference.json | --declared-program-mix]
+ *                     # --declared-program-mix：源片是对白+环境混音成品、无可独立取证的干净分轨时，
+ *                     # 调用方**显式声明**直混；回执写 sourceAuthority=declared-unverified（不冒充签章分轨）
  *                     [--music-level -22] [--ducking 12] [--lufs -14] [--evidence-dir dir]
  *                     [--track-license cc-by-4.0] [--attribution-out CREDITS.md]
  *   bgm-cli separate  --in clip.mp4 --out-dir dir [--engine auto|demucs|ffmpeg]
@@ -202,8 +204,10 @@ async function main() {
       return 0;
     }
     case "mix": {
+      const declaredProgramMix = flags["declared-program-mix"] === true;
       const result = await mix({
-        audioStems: audioStemsFlag(flags["audio-stems"]),
+        audioStems: declaredProgramMix ? null : audioStemsFlag(flags["audio-stems"]),
+        declaredProgramMix,
         input: flags.in,
         output: flags.out,
         bgmPath: flags.bgm,
@@ -372,8 +376,10 @@ async function main() {
       return 2;
     }
     case "best": {
+      const declaredProgramMix = flags["declared-program-mix"] === true;
       const result = await best({
-        audioStems: audioStemsFlag(flags["audio-stems"]),
+        audioStems: declaredProgramMix ? null : audioStemsFlag(flags["audio-stems"]),
+        declaredProgramMix,
         input: flags.in,
         output: flags.out,
         genre: typeof flags.genre === "string" ? flags.genre : null,

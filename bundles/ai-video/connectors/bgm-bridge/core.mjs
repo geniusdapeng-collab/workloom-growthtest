@@ -1369,6 +1369,27 @@ export async function verifyIndependentAudio(audioStems, { env = process.env, bi
     allowedRoots: allowedRoots(env), bins });
 }
 
+/**
+ * 声明式直混（`--declared-program-mix`）的节目轨准备：
+ * 把输入片的音轨抽成 wav（放在**允许根内的目录**里——`allowedRoots` 会 realpath，
+ * 直接用 os.tmpdir() 会因 /var→/private/var 软链被路径监狱拒绝，实测踩过），
+ * 同时作为 program 与"近似 dialogue"两条来源。**不产生任何签章**，回执里必须如实标注。
+ */
+async function declaredProgramStems({ input, nearDir, bins = resolveBinaries() }) {
+  const dir = await fsp.mkdtemp(path.join(nearDir, ".bgm-declared-"));
+  const programWav = path.join(dir, "program.wav");
+  await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-y", "-i", input,
+    "-vn", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", programWav],
+  { label: "ffmpeg(declared-program-audio)", timeoutMs: 600_000 });
+  const sha256 = await sha256File(programWav);
+  const probe = await probeMedia(programWav, { bins });
+  return {
+    declared: true,
+    program: { path: programWav, sha256, durationSec: probe.duration },
+    roles: { dialogue: { status: "declared-unverified", path: programWav, sha256 } },
+  };
+}
+
 /** Frozen source bundle first; snapshot every consumed byte into an exclusive evidence directory. */
 export async function mix(options = {}) {
   const { audioStems, env = process.env, bins = resolveBinaries() } = options;
@@ -1378,11 +1399,26 @@ export async function mix(options = {}) {
       throw new BgmError(`${key} 必须是 ${min} 至 ${max} 的有限数值`, "bad_request", false);
     }
   }
-  const stems = await verifyIndependentAudio(audioStems, { env, bins });
   const roots = allowedRoots(env);
+  /**
+   * **声明式直混**（`declaredProgramMix`，2026-09-30 T-2026-0930-0014）：
+   * 现实里最常见的交付是"源片本身就是对白+环境混在一起的成品 + 本地无版权曲库"，
+   * 此时不存在可独立取证的干净分轨。工位不再硬卡死，而是要求调用方**显式声明**：
+   *   · 不分轨、不冒充签章 —— 回执写 `sourceAuthority=declared-unverified`、`stemsVerified=false`；
+   *   · 让位压缩的侧链源如实标注为"节目混音近似"（`duckingSource=program-mix(approximate)`）；
+   *   · 旧配乐是否排除 **无法证明**（`retainedMusicExcluded=false`）。
+   * 有签发者时仍走签章路径（`audioStems`），声明路径不能替代签章。
+   */
+  const declaredProgramMix = options.declaredProgramMix === true;
   const output = assertPathAllowed(options.output, roots, "output");
   const source = assertPathAllowed(options.input, roots, "input");
   const music = assertPathAllowed(options.bgmPath, roots, "bgmPath");
+  let stems;
+  if (declaredProgramMix) {
+    stems = await declaredProgramStems({ input: source, nearDir: path.dirname(output), bins });
+  } else {
+    stems = await verifyIndependentAudio(audioStems, { env, bins });
+  }
   if (output === source || output === music) throw new BgmError("禁止覆盖媒体源", "overwrite_source_forbidden", false);
   if (fs.existsSync(output)) throw new BgmError("混音输出已存在，不能覆盖", "idempotency_conflict", false);
   if (!["keep-dialogue", "keep-all", "replace-bed", "music-only"].includes(options.policy ?? "keep-dialogue")) {
@@ -1408,13 +1444,21 @@ export async function mix(options = {}) {
     const report = await mixVerified({ ...options, input, bgmPath, output: candidate, bins,
       programPath, dialoguePath, dialogueStatus: stems.roles.dialogue.status, workDir: work, keepWork: true });
     // Expiry can change during a long render. Revalidate before publishing.
-    await verifyIndependentAudio(audioStems, { env, bins });
+    if (!declaredProgramMix) await verifyIndependentAudio(audioStems, { env, bins });
     report.output.path = output;
     report.input = source;
     report.bgm.path = music;
-    report.independentAudio = { ...audioStems, sourceAuthority: "passed", embeddedAudioUsed: false,
-      programSha256: stems.program.sha256, dialogueSha256: stems.roles.dialogue.sha256,
-      dialogueStatus: stems.roles.dialogue.status, retainedMusicExcluded: true };
+    report.independentAudio = declaredProgramMix
+      ? {
+        sourceAuthority: "declared-unverified", stemsVerified: false,
+        basis: "调用方显式声明 --declared-program-mix：源片是对白+环境混音成品，无可独立取证的干净分轨；"
+          + "本次只把新配乐叠在节目混音上，未冒充签章分轨",
+        programSha256: stems.program.sha256, dialogueStatus: "declared-unverified",
+        duckingSource: "program-mix(approximate)", retainedMusicExcluded: false, embeddedAudioUsed: true
+      }
+      : { ...audioStems, sourceAuthority: "passed", embeddedAudioUsed: false,
+        programSha256: stems.program.sha256, dialogueSha256: stems.roles.dialogue.sha256,
+        dialogueStatus: stems.roles.dialogue.status, retainedMusicExcluded: true };
     report.workDir = work;
     await fsp.writeFile(path.join(work, "mix-report.json"), `${JSON.stringify(report, null, 2)}\n`, { flag: "wx", mode: 0o600 });
     await fsp.link(candidate, output);
@@ -2261,8 +2305,12 @@ export async function best({
   bpmStrategy = "cut-driven",
   promptText = null, sourcePolicy = "compose-only", destDir = null, env = process.env, fetchImpl = fetch,
   catalog = null, platform = null, genreMismatchPolicy = null, audioStems = null,
+  /** 声明式直混（同 mix）：源片是混音成品、无可独立取证分轨时由调用方显式声明 */
+  declaredProgramMix = false,
 }) {
-  const independent = await verifyIndependentAudio(audioStems, { env, bins });
+  const independent = declaredProgramMix
+    ? await declaredProgramStems({ input, nearDir: path.dirname(path.resolve(input)), bins })
+    : await verifyIndependentAudio(audioStems, { env, bins });
   const probe = await probeMedia(input, { bins });
   const duration = probe.duration;
 
@@ -2454,7 +2502,7 @@ export async function best({
     composed = await composeToWav({ recipe, durationSec: duration, output: bgmPath, seed, bpmOverride: winner.bpm });
   }
   const mixed = await mix({
-    audioStems, env,
+    audioStems, declaredProgramMix, env,
     input,
     output,
     bgmPath,

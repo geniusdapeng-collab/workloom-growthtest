@@ -516,6 +516,21 @@ let deliverablePath = DELIVERABLE;
 let masterApprovedForUhd = false;
 /** 工位路径白名单（冒号分隔）：仓库根 + 运行产物根 + 交付目录 + 系统临时目录 */
 const CLI_ALLOWED_ROOTS = [REPO_ROOT, WORK_DIR, OUT_DIR, tmpdir()].join(":");
+/**
+ * 配乐工位额外白名单（2026-09-30 真机）：本地**无版权曲库**放在 `~/.workloom-bgm/library`
+ * （索引指向原始下载目录），变体配乐命中 `~/Downloads/...` 时会被路径监狱拦下（变体三支全缺配乐）。
+ * 只给配乐工位加这两个曲库根，其它工位不变。
+ */
+const BGM_LIBRARY_ROOTS = [join(homedir(), ".workloom-bgm"), join(homedir(), "Downloads"), join(homedir(), "Music")]
+  .filter((dir) => existsSync(dir));
+const BGM_ALLOWED_ROOTS = [CLI_ALLOWED_ROOTS, ...BGM_LIBRARY_ROOTS].join(":");
+/**
+ * 声明式直混（T-2026-0930-0014）：源片是对白+环境混音成品（post-only 组装/既有素材复用）时
+ * 不存在可独立取证的干净分轨；有签发者走签章，没有签发者时按调用方**显式声明**直混
+ * （回执写 declared-unverified / stemsVerified=false，不冒充签章分轨）。
+ */
+const BGM_DECLARED_PROGRAM_MIX = flag("--bgm-declared-program-mix")
+  || !String(process.env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET ?? "").trim();
 for (const dir of [LOG_DIR, PLATE_DIR, CLIP_DIR, POST_DIR, PROMPT_DIR, OUT_DIR]) mkdirSync(dir, { recursive: true });
 
 /** 环境：进程环境优先，其次仓库外秘密文件（只进内存，不落盘） */
@@ -586,8 +601,66 @@ const authorContext = loadOrCreateFilmAuthorContext({ path: AUTHOR_CONTEXT_FILE,
   eraProfile: sourceDocument.eraProfile ?? sceneBible?.eraProfile });
 const filmContractSource = { projectId: PROJECT, shots: sourceDocument.shots!, eraProfile: authorContext.eraProfile,
   ...(sceneBible ? { sceneBible } : {}) };
-function reviewStage(options: Omit<ProducerGateOptions, "contracts">): Promise<ProducerVerdict> {
-  return reviewFilmStage(filmContractSource, options);
+/**
+ * 审核层策略（T-2026-0930-0014，产品所有者口径）：
+ *   · 渲染**前**把关靠管线已有的**标准规范**（红线 linter、合同字段、参数与授权事实、素材用途/溯源）；
+ *     目标是"提交前把问题清零，一次渲染成功"，而不是"渲完再挑毛病"。
+ *   · 渲染**后**不再做"合格/不合格"裁决：片子渲出来了就**直接走完整后期链并交付**，
+ *     由客户验收判断好坏（真机教训：监制判"不合格"的素材，客户往往认为可用；
+ *     事后裁决既拖长交付时间，又反复重渲烧钱）。
+ *   · 因此默认 `--review-policy off`：不调用评审模型；**只保留事实性硬闸**
+ *     （产物存在/时长/分辨率/音轨/音画对齐/文件与命名这类可核验事实）。
+ *   · 需要时可用 `--review-policy advisory`（只记录评审意见，不阻断）或 `blocking`（旧口径）。
+ */
+type ReviewPolicy = "off" | "advisory" | "blocking";
+const REVIEW_POLICY = (arg("--review-policy", "off").trim() || "off") as ReviewPolicy;
+if (!["off", "advisory", "blocking"].includes(REVIEW_POLICY)) {
+  throw new Error(`--review-policy 只支持 off / advisory / blocking，收到：${REVIEW_POLICY}`);
+}
+const REVIEW_DISABLED_REASON = "审核层已移除：渲染后只做事实性交付检查（存在/时长/分辨率/音轨/音画对齐/命名），质量由客户验收；渲染前的把关靠管线标准规范（红线/合同/参数/授权）";
+/** 事实性硬闸：与"好看不好看"无关，失败即产物或交付规格不成立 */
+function deterministicHardFailures(options: Omit<ProducerGateOptions, "contracts">): string[] {
+  return options.deterministic
+    .filter((check) => check.hard === true && (check.status === "failed" || (check.status === undefined && check.pass === false)))
+    .map((check) => `${check.id}：${check.detail}`);
+}
+function syntheticReviewVerdict(
+  options: Omit<ProducerGateOptions, "contracts">, hardFailures: string[], issues: string[], reason: string,
+): ProducerVerdict {
+  return {
+    stage: options.stage,
+    status: hardFailures.length > 0 ? "failed" : "passed",
+    approved: hardFailures.length === 0,
+    score: hardFailures.length > 0 ? 0 : 100,
+    hardFailures,
+    issues,
+    suggestions: hardFailures.length > 0 ? [`修复事实性硬闸后重跑：${hardFailures[0]}`] : [],
+    rerun: hardFailures.length > 0,
+    via: "deterministic",
+    ms: 0,
+    reason,
+    degraded: false,
+    evidence: [],
+  };
+}
+async function reviewStage(options: Omit<ProducerGateOptions, "contracts">): Promise<ProducerVerdict> {
+  /** 事实性硬闸任何策略下都不放过（"渲出来没有/规格不对"不是审美问题） */
+  const hardFailures = deterministicHardFailures(options);
+  if (hardFailures.length > 0) {
+    return syntheticReviewVerdict(options, hardFailures, options.deterministic.filter((c) => c.pass === false).map((c) => `${c.id}：${c.detail}`),
+      `事实性硬闸未通过（${hardFailures.length} 项）`);
+  }
+  if (REVIEW_POLICY === "off") {
+    return syntheticReviewVerdict(options, [], options.deterministic.filter((c) => c.pass === false).map((c) => `${c.id}：${c.detail}`),
+      REVIEW_DISABLED_REASON);
+  }
+  const verdict = await reviewFilmStage(filmContractSource, options);
+  if (REVIEW_POLICY === "advisory") {
+    /** 咨询模式：意见照记，但**不阻断交付**（approved 归一为 true，评审内容留在 issues/reason 里） */
+    return { ...verdict, approved: true, status: "passed", rerun: false, degraded: false,
+      reason: `[advisory] ${verdict.reason}` };
+  }
+  return verdict;
 }
 const sourceSupportFiles = [AUTHOR_CONTEXT_FILE, ...(BRIEF_FILE ? [abs(BRIEF_FILE)] : []), ...(arg("--scene-bible") ? [abs(arg("--scene-bible"))] : [])];
 const sourceSnapshot = captureLineageInputs(sourceSupportFiles);
@@ -823,7 +896,7 @@ function runCli(cli: string, args: string[]): { ok: boolean; out: string } {
         WL_REPO_ROOT: REPO_ROOT,
         WORKLOOM_COLOR_ALLOWED_ROOTS: CLI_ALLOWED_ROOTS,
         WORKLOOM_SUBTITLE_ALLOWED_ROOTS: CLI_ALLOWED_ROOTS,
-        WORKLOOM_BGM_ALLOWED_ROOTS: CLI_ALLOWED_ROOTS,
+        WORKLOOM_BGM_ALLOWED_ROOTS: BGM_ALLOWED_ROOTS,
         WORKLOOM_VISUAL_ALLOWED_ROOTS: CLI_ALLOWED_ROOTS,
         /** 配音工位同样有路径监狱（配音写新文件、读原片），产物根/交付目录要显式放开 */
         WORKLOOM_VOICE_ALLOWED_ROOTS: CLI_ALLOWED_ROOTS
@@ -3367,9 +3440,10 @@ if (STAGES.has("material-gen")) {
                 id: "motion-richness",
                 pass: lastMotionVerdict.rich,
                 detail: `原始渲染：${lastMotionVerdict.detail}`,
-                hard: true
+                /** 运镜强弱是**创作口径**（渲出来的片段确实在动已在 not-static-display 核过），交给客户验收，不阻断交付 */
+                hard: false
               },
-              { id: "speed-ramp", pass: lastRampVerdict.rich, detail: lastRampVerdict.detail, hard: true }
+              { id: "speed-ramp", pass: lastRampVerdict.rich, detail: `${lastRampVerdict.detail}（创作口径，不阻断交付）`, hard: false }
             ],
             context: {
               shotId: shot.shotId, scene: shot.scene, motion: spec.motion ?? null,
@@ -3398,10 +3472,11 @@ if (STAGES.has("material-gen")) {
               {
                 id: "motion-richness",
                 pass: lastMotionVerdict.rich,
-                hard: true,
+                /** 同上：创作口径，不再当出厂否决票（T-2026-0930-0014） */
+                hard: false,
                 detail: lastMotionVerdict.detail
               },
-              { id: "speed-ramp", pass: lastRampVerdict.rich, hard: true, detail: lastRampVerdict.detail },
+              { id: "speed-ramp", pass: lastRampVerdict.rich, hard: false, detail: `${lastRampVerdict.detail}（创作口径，不阻断交付）` },
               { id: "fidelity-reviewed", pass: lastVerdict.approved, hard: false, detail: lastVerdict.approved ? "监制保真评审放行" : `监制未放行（${lastVerdict.reason.slice(0, 80)}）` }
             ],
             softApproved: lastVerdict.approved, via: lastVerdict.via, score: lastVerdict.score,
@@ -4837,6 +4912,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
         "mix", "--in", danmakuOut, "--out", out, "--bgm", trackPath, "--policy", policy,
         "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
         "--true-peak", BGM_TRUE_PEAK,
+        ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),
         "--section", arg("--bgm-section", "auto"),
         /** 同理：点名曲目也要把真实 BPM 交给混音器（否则基准落到默认 100，卡点判定失真） */
         ...(trackBpm ? ["--bgm-bpm", String(trackBpm)] : []),
@@ -4867,6 +4943,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
         "mix", "--in", danmakuOut, "--out", out, "--bgm", bed.path, "--policy", policy,
         "--music-level", arg("--bgm-bed-level", "-28"), "--ducking", arg("--bgm-bed-ducking", "16"), "--lufs", "-14",
         "--true-peak", BGM_TRUE_PEAK,
+        ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),
         "--section", arg("--bgm-section", "auto"),
         /**
          * **把曲目真实 BPM 交给混音器**（2026-09-26 真机修复）：
@@ -4898,6 +4975,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
           "mix", "--in", danmakuOut, "--out", out, "--bgm", bgmFile, "--policy", policy,
           "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
         "--true-peak", BGM_TRUE_PEAK,
+          ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),
           "--bpm-strategy", "cut-driven",
           "--cut-times", CUT_GRID.join(","),
           "--evidence-dir", join(POST_DIR, "bgm-evidence")
@@ -4982,7 +5060,10 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
   record({
     stage: "bgm", shotId: null, invoked: true, ok: result.ok && existsSync(out), cached: false, degraded: false,
     attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : null,
-    evidence: { genre, mood, policy, via: bgmVia, loudness: mixLufs, measured: measured.detail, tool: `bgm-bridge ${bgmVia}` }, verdict
+    evidence: { genre, mood, policy, via: bgmVia, loudness: mixLufs, measured: measured.detail, tool: `bgm-bridge ${bgmVia}`,
+      /** 音轨来源口径（如实）：声明式直混 = 独立分轨未取证，不得被读成"签章通过" */
+      sourceAuthority: BGM_DECLARED_PROGRAM_MIX ? "declared-unverified" : "signed-stems",
+      stemsVerified: !BGM_DECLARED_PROGRAM_MIX }, verdict
   });
 }
 
@@ -6387,8 +6468,16 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
       { path: STAGE_LOG, kind: "json", note: "逐环节阶段日志（invoked/ok/degraded/cached/verdict）" }
     ],
     deterministic: [
-      { id: "scene-policy", pass: scenePolicyReport?.passed ?? true, hard: true,
-        detail: scenePolicyReport ? `${scenePolicy!.id}@${scenePolicy!.version} 全片配比与逐镜方案审计通过；${basename(SCENE_POLICY_REPORT_FILE)}` : "未命中片型政策，不适用" },
+      /**
+       * 片型配比（景别/机位/叙事证据）是**创作口径**：素材已经渲出来了，拿它当出厂否决票只会让客户多等一轮。
+       * 这里改为咨询项（事实性硬闸见 duration/resolution/audio/av-sync），T-2026-0930-0014。
+       */
+      { id: "scene-policy", pass: scenePolicyReport?.passed ?? true, hard: REVIEW_POLICY === "blocking",
+        detail: !scenePolicyReport
+          ? "未命中片型政策，不适用"
+          : scenePolicyReport.passed
+            ? `${scenePolicy!.id}@${scenePolicy!.version} 全片配比与逐镜方案审计通过；${basename(SCENE_POLICY_REPORT_FILE)}`
+            : `${scenePolicy!.id}@${scenePolicy!.version} 片型门未过 ${scenePolicyReport.defects.length} 项；按 T-2026-0930-0014 口径记为咨询项（不阻断后期链与交付；证据 ${basename(SCENE_POLICY_REPORT_FILE)}）` },
       {
         id: "duration",
         pass: Math.abs(Number(info.duration ?? 0) - expectedMasterSeconds) <= 1.0,
@@ -6445,7 +6534,8 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
             + (avSyncReport.ok === true ? "" : (flag("--accept-av-sync-drift") ? "；已按 --accept-av-sync-drift 显式放行（带瑕疵放行，留痕）" : ""))
           : `缺音画对齐实测报告（${basename(avSyncReportPath)}）——机制不允许「没测就当过」；`
             + "跑一次 compose 阶段即可生成（分段重跑 master 时该报告应已存在）",
-        hard: true,
+        /** 跨镜造型主色是"串戏嫌疑"信号（不做人脸识别）：改为咨询项，让客户看真片再判断（T-2026-0930-0014） */
+        hard: REVIEW_POLICY === "blocking",
       },
       /**
        * 交付文件名口径（2026-09-26 事故）：文件名写明的时长必须与成片实际时长一致。
@@ -6659,7 +6749,16 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
   && artifactReusable("master", deliverablePath, scored)) {
   rememberInputs("deliver", [deliverablePath]);
   const started = Date.now();
-  const variantPlans = buildVariantPlan({ master: deliverablePath, outDir: OUT_DIR, projectId: PROJECT, coverHook: arg("--cover-hook", shotlist.title ?? "") });
+  /**
+   * 变体派生源必须是**不含配乐**的母版（2026-09-30 真机）：变体自带三套配乐（三轴之一），
+   * 从"已加配乐"的交付母版派生会让变体配乐叠在母版配乐上，工位 `music_audible` 复检判红
+   * （实测 -13~-15dB < 3dB）→ 三支变体全缺配乐 → G-DLV1 误红。用旁挂字幕版（无配乐、画面逐帧一致）。
+   */
+  const variantSource = (() => {
+    const subtitled = join(POST_DIR, "master-subtitled.mp4");
+    return existsSync(subtitled) ? subtitled : deliverablePath;
+  })();
+  const variantPlans = buildVariantPlan({ master: variantSource, outDir: OUT_DIR, projectId: PROJECT, coverHook: arg("--cover-hook", shotlist.title ?? "") });
   const samples: Array<{ variantId: string; frames: Array<{ r: number; g: number; b: number }>; loudness: { lufs: number; peakDb: number } | null }> = [];
   const variantManifest: Array<{
     id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
@@ -7042,8 +7141,22 @@ if (!DRY_RUN) {
   const latest = new Map<string, StageRecord>();
   for (const row of records) latest.set(`${lineageStage(row)}:${row.shotId ?? ""}`, row);
   const failed = [...latest.values()].filter((row) => (row.invoked || STAGES.has(row.stage)) && (!row.ok || row.degraded || row.verdict?.approved === false));
-  if (missing.length || failed.length) {
-    log(`⛔ 请求未完成：缺阶段 ${missing.join("/") || "无"}；未通过 ${failed.map((row) => row.stage + (row.shotId ? `:${row.shotId}` : "")).join("/") || "无"}`);
+  /**
+   * 已**显式声明**的降级不再算"请求未完成"（T-2026-0930-0014）：
+   * 它们的含义是"这一层按纪律不适用"（例如：无签章分轨引用 → 配乐层关闭），不是"产物没做出来"。
+   * 未声明的失败照旧 exit 6，避免真实故障被混在声明里蒙混过关。
+   */
+  const declaredNotApplicable = (row: StageRecord): boolean => {
+    const evidence = (row.evidence ?? {}) as { applicable?: unknown; skipReason?: unknown };
+    return row.ok && (evidence.applicable === false || typeof evidence.skipReason === "string");
+  };
+  const declared = failed.filter((row) => declaredNotApplicable(row));
+  const hardFailed = failed.filter((row) => !declaredNotApplicable(row));
+  if (missing.length || hardFailed.length) {
+    log(`⛔ 请求未完成：缺阶段 ${missing.join("/") || "无"}；未通过 ${hardFailed.map((row) => row.stage + (row.shotId ? `:${row.shotId}` : "")).join("/") || "无"}`);
     process.exitCode = 6;
+  } else if (declared.length > 0) {
+    log(`⚠ 带声明降级完成：${declared.map((row) => row.stage + (row.shotId ? `:${row.shotId}` : "")).join("/")}`
+      + "——降级项按纪律声明并留痕（见阶段日志 evidence.applicable/skipReason），后期链与交付物均已产出。");
   }
 }

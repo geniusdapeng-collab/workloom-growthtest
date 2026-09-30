@@ -72,7 +72,14 @@ export interface VariantAxesReport {
  * 除了"阶段没被调用"这个执行问题，约束本身也只有"≥2 且画面/音轨可测差异"，
  * 允许"三支只有滤镜不同、封面与配乐完全一样"混过去。这里把口径收紧到产品意图。
  */
-export function assessVariantAxes(variants: VariantAxesEntry[]): VariantAxesReport {
+export function assessVariantAxes(variants: VariantAxesEntry[], options: { bgmRequired?: boolean } = {}): VariantAxesReport {
+  /**
+   * 配乐轴可选（2026-09-30，T-2026-0930-0014 配套）：
+   * 独立音轨纪律要求配乐只与**签章分轨**合流，而签章目前**没有生产者**——本机没有内部媒体验证工位时，
+   * 配乐层按声明关闭（bgm_layer=false）。此时变体差异仍必须落在"调色 + 封面"两轴上，
+   * 不能因为"没有配乐轴"就把整包判死（那不是交付质量问题，是授权/工位边界）。
+   */
+  const bgmRequired = options.bgmRequired !== false;
   const count = variants.length;
   const missing: string[] = [];
   const duplicate = (key: "gradeProfile" | "coverSha" | "bgmSha", label: string): string | null => {
@@ -80,7 +87,8 @@ export function assessVariantAxes(variants: VariantAxesEntry[]): VariantAxesRepo
     for (const variant of variants) {
       const value = variant[key];
       if (value === null || value === undefined || value === "") {
-        missing.push(`${variant.id} 缺${label}`);
+        /** bgm 轴关掉时，缺配乐是**声明事实**而不是缺陷（证据在 bgm 环节记录里） */
+        if (!(key === "bgmSha" && !bgmRequired)) missing.push(`${variant.id} 缺${label}`);
         continue;
       }
       const previous = seen.get(String(value));
@@ -95,12 +103,14 @@ export function assessVariantAxes(variants: VariantAxesEntry[]): VariantAxesRepo
   }
   const dupGrade = duplicate("gradeProfile", "调色档");
   const dupCover = duplicate("coverSha", "封面");
-  const dupBgm = duplicate("bgmSha", "配乐");
+  const dupBgm = bgmRequired ? duplicate("bgmSha", "配乐") : null;
   for (const item of [dupGrade, dupCover, dupBgm]) if (item) problems.push(item);
   if (problems.length === 0 && missing.length === 0) {
     return {
       ok: true, count, missing,
-      detail: `${count} 支变体在 调色/封面/配乐 三轴上两两不同（${variants.map((v) => v.id).join("、")}）`,
+      detail: bgmRequired
+        ? `${count} 支变体在 调色/封面/配乐 三轴上两两不同（${variants.map((v) => v.id).join("、")}）`
+        : `${count} 支变体在 调色/封面两轴上两两不同（配乐轴按声明关闭：无签章分轨引用 → bgm_layer=false）`,
     };
   }
   return {
