@@ -21,7 +21,9 @@ prompt:
     - 明确总时长与逐镜时长带，作为全链路时长唯一权威源
   constraints:
     - 时长一经 G4 确认，下游一律以 PRD 为准，任何环节不得另立时长
-    - 单镜时长 4-30 秒（上限＝媒体目录里该模型的供应商能力；Seedance 2.5 真机实测 2026-09-23），语速 3.5 字/秒（slow 2.5）为硬约束
+    - 单镜时长 4-30 秒（上限＝媒体目录里该模型的供应商能力；Seedance 2.5 真机实测 2026-09-23）
+    - 语速按**目标平台档**为硬约束（唯一事实源 `packages/video-studio/src/platform-intent.ts#SPEECH_RATE_POLICY`）：抖音 4.8 / 快手 4.6 / 小红书 4.2 / 视频号 4.0 / B站与 YouTube 3.5 字/秒，未识别平台回落 3.5；slow 档仍为 2.5
+    - 台词超出「镜时长 × 平台上限」必须改文案；不得用配音加速把长文案硬塞进短镜（voice-bridge fitTempo 上限 1.25 不得上调）
     - Schema 校验不过不提交，不输出半成品
 write_back:
   - prd.generate

@@ -44,6 +44,7 @@ import {
 } from "../runtime/thread-runner.js";
 import { startVideoProjectRun, StudioWorkerError } from "../video/studio-worker.js";
 import { resolveScenePolicyForIntent, ScenePolicyRouteError } from "../video/scene-policy-routing.js";
+import { resolvePlatformForIntent } from "../video/platform-routing.js";
 import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
 import { creditsRouter, modelFeedbackRouter } from "./credits-router.js";
 import { runRouterReviewBeat } from "@workloom/base/model-router";
@@ -1309,16 +1310,21 @@ const threadsRouter = router({
            * ① 「走营销片」这类分流行指令不能进创意解析（否则主题被解析成「走营销片」，质量 0/5）；
            * ② 营销片默认竖屏 30s（与本仓 brief 默认一致），显式写进口径块，
            *    否则生成器按类型推导出 45s，G2 监制以「时长自相矛盾 + 缺画幅」打回。
+           * ③ 画幅与平台口径按目标平台取（T-2026-0930-0005）：需求里写「小红书」走 3:4，
+           *    未指定平台时按默认抖音口径落地——与平台化之前逐像素一致。
            */
+          const platform = resolvePlatformForIntent(input.title, null);
           const pipelineIntent = buildPipelineIntent(input.title, {
             durationSec: 30,
-            aspectRatio: decision.route === "marketing" ? "9:16" : undefined,
+            aspectRatio: decision.route === "marketing" ? platform.decision.aspectRatio : undefined,
+            platform: platform.decision.id,
           });
           const started = await startVideoProjectRun(scope, {
             rawIntent: input.title,
             customerMetadata: null,
             intent: pipelineIntent,
             metadata: seededMetadata,
+            platform: platform.decision.id,
             isMarketing: decision.route === "marketing",
             by: { id: ctx.identity.memberNo, type: "human" },
             threadId,

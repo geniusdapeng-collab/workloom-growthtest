@@ -48,6 +48,7 @@ export type { PollReport } from "./render-poller.js";
 import { dealRouter } from "./deal.js";
 import { getRun, startRun, startVideoProjectRun, summarizeWorkspaceRuns, StudioWorkerError } from "./studio-worker.js";
 import { resolveScenePolicyForIntent, ScenePolicyRouteError } from "./scene-policy-routing.js";
+import { resolvePlatformForIntent } from "./platform-routing.js";
 import { makeStageArchive } from "./archive-host.js";
 import { readArchiveSummary, resumeProject, scanStaleRunsOnStartup } from "./archive-resume.js";
 import { applyRouteToMetadata, buildPipelineIntent, routeVideoPipeline } from "@hyperreality/video-studio";
@@ -494,16 +495,19 @@ const studioRouter = router({
         let runId: string;
         try {
           const selectedScenePolicy = resolveScenePolicyForIntent(input.intent, input.metadata);
+          const selectedPlatform = resolvePlatformForIntent(input.intent, input.metadata);
           runId = startRun(scope, {
             projectId: input.projectId,
             rawIntent: input.intent,
             intent: buildPipelineIntent(input.intent, {
               durationSec: 30,
-              aspectRatio: decision.route === "marketing" ? "9:16" : undefined,
+              aspectRatio: decision.route === "marketing" ? selectedPlatform.decision.aspectRatio : undefined,
+              platform: selectedPlatform.decision.id,
             }),
             metadata: applyRouteToMetadata(input.metadata, decision),
             isMarketing: decision.route === "marketing",
             selectedScenePolicy,
+            selectedPlatform,
           });
         } catch (err) {
           scenePolicyRethrow(err);
@@ -554,14 +558,17 @@ const studioRouter = router({
       }
       try {
         // 与「右栏派活识别出视频目标」共用同一条标准管线入口（studio-worker#startVideoProjectRun）
+        const standardPlatform = resolvePlatformForIntent(input.intent, input.metadata);
         const started = await startVideoProjectRun(scope, {
           rawIntent: input.intent,
           customerMetadata: input.metadata ?? null,
           intent: buildPipelineIntent(input.intent, {
             durationSec: 30,
-            aspectRatio: decision.route === "marketing" ? "9:16" : undefined,
+            aspectRatio: decision.route === "marketing" ? standardPlatform.decision.aspectRatio : undefined,
+            platform: standardPlatform.decision.id,
           }),
           metadata: applyRouteToMetadata(input.metadata, decision),
+          platform: standardPlatform.decision.id,
           isMarketing: decision.route === "marketing",
           by: { id: ctx.identity.memberNo, type: "human" },
         });

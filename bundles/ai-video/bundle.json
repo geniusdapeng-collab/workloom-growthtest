@@ -760,7 +760,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "255dbdf7fa2a218d24b228f5654821d84edc071a62b53864a00aaf3606ad46f2",
+    "digest": "2fbb14db9b4587cb97136d17b5c22eb4d02f1dd4da66f67ed63c65170b4388c4",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "9180a2cb1fbac95f4c5ec835041e98436ccc2de6d7a874abb651bf6b74124425",
@@ -1242,7 +1242,7 @@
       "presets/distribution-operator.yml": "64cb2950a4ffb5d6cd9014404d8964bb5d667fa0703a1d34299049d4ff932a4e",
       "presets/explainer-director.yml": "a1586c23ad2cf5303d19b6381b55678086765d387834431d4a583ff341dc5f37",
       "presets/field-inspector.yml": "6d472d55b25f2c5129ad018cf14cb764eef25bcd020e00d226e1bd568fcad05e",
-      "presets/hook-designer.yml": "c0943751b44d0fd1bc95039ca415208f0771c1993c33c83c97292e59a6eca693",
+      "presets/hook-designer.yml": "945c7e93f2fb135262b91740ecf4fb659fc1d9e92ecb1597d5f54e3839679f45",
       "presets/insight-analyst.yml": "e9889db8a6992de9cdb9b42d938edfad419e1dbaebe6643a46f52a0335c94183",
       "presets/intel-binder.yml": "b6fa870dc45a0996963d4ed6ccce4fd829fe921f03f0bfc2b14bd4c30b376844",
       "presets/intel-collector.yml": "4ef715261b008ad664cb40a53d1c922c2a94b6be6659f77d63aef4ba4f36fa98",
@@ -1255,7 +1255,7 @@
       "presets/opening-designer.yml": "6a860c8dc8990514a46ca14b5cf7b57e5e1a119f224e45a16cb0d3349749f620",
       "presets/portrait-artist.yml": "7fcf4d17d6e0d4aae8a62206f68215292319694c407eeba65b51a170d799ddaf",
       "presets/post-editor.yml": "7312f58c57fc5066d31adeff375f87de9d77e07bc6b2c3c36167c8c311ed4258",
-      "presets/prd-specialist.yml": "8b26aa5c4441d92944fc06bf720666181b579ea6c7b01a22b276d18bf8b0ba93",
+      "presets/prd-specialist.yml": "e8d6c7e0aa79235e78049ae5844ba537513adc0b0849003fcb5121f547cfcb01",
       "presets/producer.yml": "a754ca8c5d1ed3701f52ded1094b09344bbd3ae6bb3ad427d12b7705466b1d09",
       "presets/prompt-fuser.yml": "019952c79c5770875ca59e6415324194d2300368a36c3b4e28ef0c1d12ac7894",
       "presets/publish-operator.yml": "303b23a76c094f2ae3778c712edf71ec63de27d67b2ccd1bfe9f577f4b695dce",

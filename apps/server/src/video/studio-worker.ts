@@ -55,6 +55,7 @@ import { acquireProjectLease, archiveWorkDir, makeLedgerWriter, readProjectMeta 
 import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
 import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-policy-routing.js";
+import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
 import {
   AUTO_GATES,
   GATE_PRODUCER_STAGE,
@@ -449,20 +450,30 @@ type StudioRunInput = RunInput & {
   rawIntent?: string;
   /** 同一入口已经做过选型时复用其受控结果，避免二次选型改写取证依据。 */
   selectedScenePolicy?: ReturnType<typeof resolveScenePolicyForIntent>;
+  /** 同一入口已经做过平台识别时复用其受控结果。 */
+  selectedPlatform?: ReturnType<typeof resolvePlatformForIntent>;
 };
 
 export function startRun(scope: Scope, input: StudioRunInput): string {
   // 补跑/恢复同样经过选型；歧义或知识库损坏在任何供应商调用之前同步失败。
   const selectedScenePolicy = input.selectedScenePolicy
     ?? resolveScenePolicyForIntent(input.rawIntent ?? input.intent, input.metadata);
+  /**
+   * 平台识别同样在任何供应商调用之前完成：未识别到平台时按默认口径（抖音）落地，
+   * 并把画幅/语速/钩子窗口口径写进需求正文——此前只在 CLI 传 --platform 时生效。
+   */
+  const selectedPlatform = input.selectedPlatform
+    ?? resolvePlatformForIntent(input.rawIntent ?? input.intent, input.metadata);
   const resolvedMetadata: Record<string, unknown> = {
     ...(input.metadata ?? {}),
+    platform: selectedPlatform.decision.id,
     scenePolicySelection: selectedScenePolicy.decision,
+    platformSelection: selectedPlatform.decision,
     ...(selectedScenePolicy.policy ? { scenePolicy: selectedScenePolicy.metadata.scenePolicy } : {}),
   };
   const runInput: RunInput = {
     projectId: input.projectId,
-    intent: appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy),
+    intent: appendPlatformGuidance(appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy), selectedPlatform.decision),
     metadata: resolvedMetadata,
     isMarketing: input.isMarketing,
   };
@@ -1336,6 +1347,8 @@ export interface StartVideoProjectInput {
   /** 分流器写入商品信息之前的客户 metadata，供片型选择只取客户来源证据。 */
   customerMetadata?: Record<string, unknown> | null;
   metadata?: Record<string, unknown>;
+  /** 调用方显式指定的目标平台（ID 或中文别名）；缺省由需求文本识别，仍缺省则走抖音口径。 */
+  platform?: string;
   isMarketing?: boolean;
   by: { id: string; type: "human" | "system" };
   threadId?: string;
@@ -1347,6 +1360,12 @@ export async function startVideoProjectRun(
 ): Promise<{ projectId: string; runId: string }> {
   const selectionMetadata = Object.hasOwn(input, "customerMetadata") ? input.customerMetadata ?? undefined : input.metadata;
   const selectedScenePolicy = resolveScenePolicyForIntent(input.rawIntent ?? input.intent, selectionMetadata);
+  const selectedPlatform = resolvePlatformForIntent(input.rawIntent ?? input.intent, selectionMetadata, input.platform);
+  const platformMetadata: Record<string, unknown> = {
+    ...(input.metadata ?? {}),
+    platform: selectedPlatform.decision.id,
+    platformSelection: selectedPlatform.decision,
+  };
   const client = await getAppPool().connect();
   let projectId = "";
   try {
@@ -1377,6 +1396,7 @@ export async function startVideoProjectRun(
         after: {
           projectId, kind, intent: input.intent.slice(0, 500),
           scenePolicy: selectedScenePolicy.decision,
+          platform: selectedPlatform.decision,
           ...(input.threadId ? { threadId: input.threadId } : {}),
         },
         basis: ["视频标准管线立项（§5：一部片子/一个营销 Campaign）"],
@@ -1393,10 +1413,11 @@ export async function startVideoProjectRun(
   const runId = startRun(scope, {
     projectId,
     intent: input.intent,
-    metadata: input.metadata,
+    metadata: platformMetadata,
     isMarketing: input.isMarketing,
     rawIntent: input.rawIntent,
     selectedScenePolicy,
+    selectedPlatform,
   });
   return { projectId, runId };
 }
