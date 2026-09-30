@@ -3475,6 +3475,45 @@ if (["videos", "material-gen"].some((stage) => STAGES.has(stage))) {
   for (const issue of redlines.soft.slice(0, 6)) log(`⚠ 提示词红线（软）${issue.id}：${issue.detail}`);
 }
 
+/**
+ * 提交前硬闸（T-2026-0929-0013，客户口径："问题要在提交提示词之前发现，不要反复重试烧钱"）：
+ * 在**每一次真正花钱的提交之前**，对最终编译出来的提示词做确定性体检；命中红线即拒绝提交（fail-closed），
+ * 并把结论写进门账本（G-PRE1）。同时禁止"同一提示词重试"（指纹相同 = 同一注押两次）。
+ */
+function preflightSubmitGuard(input: { shotId: string; stage: string; prompt: string; fps: number; attempt: number; prevFingerprint: string | null }): void {
+  const text = input.prompt;
+  const issues: string[] = [];
+  const hasScreen = /屏幕|触控|界面/.test(text);
+  const screenOk = /(虚化|不可辨|光晕|过曝成色块|背对|不出现)/.test(text);
+  if (hasScreen && !screenOk) issues.push("屏幕类元素未声明虚化/背对/不入画——模型会把界面渲染成可读文字（真机返修 6 次）");
+  const hasDoc = /身份证|证件|护照|单据|票据/.test(text);
+  const docOk = /(不可辨|背面|无证件文字|无身份证|不出现)/.test(text);
+  if (hasDoc && !docOk) issues.push("证件类道具未声明不可辨认/背面/不入画——会出现可辨字迹与号码（隐私红线，真机返修 5 次）");
+  if (/定住|稳住|定格/.test(text) && /推|拉|移|摇|环绕/.test(text)) issues.push("同一镜同时锁\"定住\"时点与推拉运镜——模型做不到，落幅必漂（真机返修 3 次）");
+  const fpsMatch = text.match(/(\d{2})\s*fps/i);
+  if (fpsMatch && Number(fpsMatch[1]) !== input.fps) issues.push(`提示词写 ${fpsMatch[1]}fps，管线按 ${input.fps}fps 出片`);
+  const fingerprint = createHash("sha256").update(text).digest("hex").slice(0, 12);
+  const identicalRetry = input.prevFingerprint !== null && input.prevFingerprint === fingerprint;
+  if (identicalRetry) issues.push("本次重试的提示词与上一次完全相同（指纹 " + fingerprint + "）——禁止同注押两次");
+  const gate = recordGate({
+    stepKey: "g-pre-submit",
+    sourceStage: input.stage,
+    checks: [
+      { id: "no-text-redline", pass: !issues.some((i) => i.includes("可读文字") || i.includes("可辨字迹")), hard: true, detail: issues.filter((i) => i.includes("可读文字") || i.includes("可辨字迹")).join("；") || "无文字类红线" },
+      { id: "no-timing-conflict", pass: !issues.some((i) => i.includes("落幅必漂")), hard: true, detail: issues.find((i) => i.includes("落幅必漂")) ?? "无时点/运镜冲突" },
+      { id: "no-identical-retry", pass: !identicalRetry, hard: true, detail: identicalRetry ? "同提示词重试被拒" : `提示词指纹 ${fingerprint}（第 ${input.attempt} 次提交）` },
+      { id: "fps-consistent", pass: !issues.some((i) => i.includes("fps")), hard: true, detail: issues.find((i) => i.includes("fps")) ?? "帧率一致" }
+    ],
+    shotIds: [input.shotId],
+    evidence: { stage: input.stage, attempt: input.attempt, promptChars: text.length, fingerprint, issues },
+    reason: issues.length === 0 ? `提交前体检通过（${input.stage}/${input.shotId}，指纹 ${fingerprint}）` : `提交前体检未通过：${issues.join("；")}`
+  });
+  if (!gate.approved) {
+    throw new Error(`PREFLIGHT_BLOCKED（未花钱）：${input.shotId} — ${issues.join("；")}｜修好提示词再提交，不要靠重试`);
+  }
+  if (issues.length === 0) log(`  ✓ 提交前体检（G-PRE1）：${input.shotId} 指纹 ${fingerprint}`);
+}
+
 if (STAGES.has("videos")) {
   /**
    * G7 预生产最终确认（step_key: g7-preproduction）。
@@ -3711,6 +3750,7 @@ if (STAGES.has("videos")) {
      * 让日志能自证"这次重试确实改了东西"。
      */
     let lastVerdict: ProducerVerdict | null = null;
+    let lastPromptFingerprint: string | null = null;
     for (let attempt = 1; attempt <= MAX_ATTEMPTS && !approved; attempt += 1) {
       const started = Date.now();
       const attemptPrompt = attempt === 1 ? prompt : `${prompt}\n\n${retryInstruction(lastVerdict, attempt, MAX_ATTEMPTS)}`;
@@ -3761,6 +3801,8 @@ if (STAGES.has("videos")) {
           });
           break;
         }
+        preflightSubmitGuard({ shotId: String(shot.shotId), stage: "videos", prompt: attemptPrompt, fps: FPS, attempt, prevFingerprint: lastPromptFingerprint });
+        lastPromptFingerprint = promptFingerprint;
         const submitted = await arkVideo({
           prompt: attemptPrompt,
           firstFrame,
