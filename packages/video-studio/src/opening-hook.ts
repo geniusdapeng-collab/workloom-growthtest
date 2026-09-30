@@ -1,3 +1,5 @@
+import { platformIdOf, speechRateProfile } from "./platform-intent.js";
+
 /**
  * opening-hook.ts —— **开场钩子 · 前 3 秒机制**（2026-09-27 产品所有者要求：新增岗位/机制）
  *
@@ -77,8 +79,17 @@ export const HOOK_WINDOW_SEC = 3;
 export const HOOK_SFX_WINDOW_SEC = 0.6;
 
 /** 平台 → 钩子窗口（秒）。短平台更苛刻。 */
+/**
+ * 开场钩子窗口（秒）。
+ *
+ * 口径来源：已登记平台一律取 `platform-intent.ts#SPEECH_RATE_POLICY[platform].hookWindowSec`
+ * （短平台 3s / 长视频 5s），与语速档共用同一张表；未登记平台回落到历史正则口径，
+ * 保证旧调用零行为变化。两处口径由 `platform-intent.test.ts` 逐平台比对锁死。
+ */
 export function hookWindowFor(platform: string): number {
-  return /抖音|快手|视频号|小红书|TikTok|Reels|Shorts/i.test(platform) ? HOOK_WINDOW_SEC : 5;
+  const id = platformIdOf(platform);
+  if (id) return speechRateProfile(id).hookWindowSec;
+  return /抖音|快手|视频号|小红书|TikTok|Reels|Shorts/i.test(String(platform ?? "")) ? HOOK_WINDOW_SEC : 5;
 }
 
 /** 钩子卡自身完备性（硬错误逐条返回） */

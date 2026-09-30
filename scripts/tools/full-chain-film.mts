@@ -70,6 +70,7 @@ import {
   environmentDefects, expandShotWithBible, summarizeDefects, validateSceneBible, spaceSummary,
   applyScenePolicy, auditScenePolicy, loadScenePolicies, selectScenePolicy, PRODUCER_RUBRICS,
   openingHookChecks, summarizeHookChecks, validateHookCard, defaultHookSfx, hookWindowFor, HOOK_TYPE_LABELS, HOOK_WINDOW_SEC,
+  checkSpeechFit, speechRateProfile,
   deviceDefects, summarizeDeviceDefects, DEVICE_POLICY_VERSION, DEVICE_POLICY_VERIFIED_AT, allowedModelSummary,
   planMicromotion, MICROMOTION_MARKER, MICROMOTION_POLICY_VERSION,
   type CoverAccountProfile, type CoverDesignInput, type CoverMeasurements, type CoverPlan,
@@ -1170,6 +1171,59 @@ if (hookSummary.hard > 0 && !hookAccepted) {
   log("   修法：在 shotlist 顶层写 hook{ type, promise, payoffShotId, firstShotTemplate{visual,line}, sfx{kind,atSec} }；");
   log("   确需带瑕疵继续：--accept-rejected hook（会记为 degraded 留痕）。");
   process.exit(8);
+}
+/**
+ * 平台语速门（T-2026-0930-0005）：把"抖音的语速要明显更快"从形容词变成可机检的判据。
+ *
+ * 起因（产品所有者 2026-09-30 口径）：客户对抖音快节奏的感知就是"说话语速要明显更快"，
+ * 而此前全链路只有一个全局语速口径（3.5 字/秒，仅在 prd-specialist / hook-designer 的提示词里），
+ * 平台维度完全没有；"念得完"也不在任何门里核过——长文案配短镜会一路跑到配音才暴露。
+ *
+ * 口径与数值来源：`packages/video-studio/src/platform-intent.ts#SPEECH_RATE_POLICY`
+ * （抖音 4.8 目标 / 5.6 上限；长视频沿用既有 3.5 / 4.2）。
+ * 判据输入是**完整 shotlist.shots**，与钩子门同口径：`--only` 补渲不能改变语速判据的输入。
+ * 语速靠"文案写得更紧"，不靠 atempo 硬拉（voice-bridge fitTempo 上限 1.25 不动）。
+ */
+const speechProfile = speechRateProfile(PLATFORM);
+const speechRows = shotlist.shots.map((shot) => ({
+  shotId: String(shot.shotId ?? ""),
+  fit: checkSpeechFit({
+    shotId: String(shot.shotId ?? ""),
+    text: dialogueText(shot),
+    durationSec: Number(shot.duration),
+    profile: speechProfile,
+  }),
+}));
+const speechOver = speechRows.filter((row) => row.fit.severity === "over");
+const speechLoose = speechRows.filter((row) => row.fit.severity === "loose");
+/** 时长缺失/非法按"无法判定"处理，计软提示——时长本身另有门管，不在本门重复判死。 */
+const speechUnknown = speechRows.filter((row) => row.fit.severity === "invalid");
+const speechMeasured = speechRows.filter((row) => row.fit.units > 0);
+const speechAccepted = ACCEPT_REJECTED.includes("speech-rate");
+log(`平台语速：${PLATFORM} → ${speechProfile.tier} 档（目标 ${speechProfile.target} · 上限 ${speechProfile.max} 字/秒 · 配音基础速率 ${speechProfile.ttsSpeed}×）`);
+log(`  台词镜 ${speechMeasured.length} 个｜念不完 ${speechOver.length} · 节奏偏松 ${speechLoose.length} · 无法判定 ${speechUnknown.length}`);
+for (const row of speechOver) log(`  ✗ [${row.shotId}] ${row.fit.detail}`);
+for (const row of speechLoose) log(`  · [${row.shotId}] ${row.fit.detail}`);
+record({
+  stage: "speech-rate", shotId: null, invoked: true,
+  ok: speechOver.length === 0 || speechAccepted, cached: false,
+  degraded: speechOver.length > 0 && speechAccepted,
+  attempt: 1, ms: 0, artifact: null,
+  evidence: {
+    platform: PLATFORM, profile: speechProfile,
+    measured: speechMeasured.length, over: speechOver.length, loose: speechLoose.length, unknown: speechUnknown.length,
+    rows: speechRows.map((row) => ({ shotId: row.shotId, units: row.fit.units, unitsPerSecond: row.fit.unitsPerSecond, severity: row.fit.severity })),
+    acceptedBy: speechAccepted ? "ACCEPT_REJECTED(speech-rate)" : null
+  },
+  verdict: null,
+  note: "平台语速门（逐镜按镜时长折算可念字数；超上限判念不完）"
+});
+if (speechOver.length > 0 && !speechAccepted) {
+  log("⛔ 平台语速硬失败：台词在镜时长内念不完，配音阶段才发现会直接毁掉节奏与对齐。");
+  log(`   修法（择一）：① 把文案改写到「镜时长 × ${speechProfile.max} 字」以内；② 加长该镜时长；③ 拆成两镜。`);
+  log("   禁止把配音速率拉上去硬塞（voice-bridge fitTempo 上限 1.25 不得上调）；");
+  log("   确需带瑕疵继续：--accept-rejected speech-rate（会记为 degraded 留痕）。");
+  process.exit(9);
 }
 /** 只计算真实存在的刀口；单镜片不能进入 compose 的逐刀转场分支。 */
 const EFFECTIVE_CUT_TRANSITION = shots.length > 1 ? CUT_TRANSITION : "";
@@ -3494,6 +3548,13 @@ if (STAGES.has("videos")) {
         detail: scenePolicyReport
           ? `${scenePolicy!.id}@${scenePolicy!.version} 全片配比和逐镜品质门：${scenePolicyReport.defects.length} 项硬缺陷；报告 ${basename(SCENE_POLICY_REPORT_FILE)}`
           : "需求未命中已安装的片型知识条目（本门不适用）"
+      },
+      /** 平台语速门（2026-09-30）：与 hook-first-3s 同口径，结论必须在这道花钱前的门里可见 */
+      {
+        id: "speech-rate", pass: speechOver.length === 0 || speechAccepted, hard: true,
+        detail: speechOver.length === 0
+          ? `${PLATFORM} ${speechProfile.tier} 档（${speechProfile.target}–${speechProfile.max} 字/秒）：${speechMeasured.length} 个台词镜全部念得完${speechLoose.length > 0 ? `；节奏偏松 ${speechLoose.length} 项（软提示）` : ""}`
+          : `${speechOver.length} 个台词镜念不完：${speechOver.map((row) => row.shotId).join("、")}（配音阶段才发现会毁掉节奏与对齐）${speechAccepted ? "——已显式声明带瑕疵放行" : "——必须改写文案或加长该镜"}`
       },
       /** 开场钩子（2026-09-27 新增岗位/机制）：同 env-realism，结论必须在这道花钱前的门里可见 */
       {
