@@ -47,6 +47,14 @@ export interface RealPersonAsset {
    * 约定：文件放在主档目录下（如 anchor.jpg），此处登记相对文件名。
    */
   anchorPhoto?: string;
+  /**
+   * 同一**授权素材组**里的其它素材（T-2026-0929-0010）：火山方舟「私域人像库」的素材组里通常有多张
+   * 同一授权人的参考图（不同角度/光线）。Seedance 单次可带最多 3 张参考图，
+   * 多带几张同组素材能显著提升"像不像"的稳定性（真机：只带 1 张时侧脸/三分之四侧容易漂）。
+   */
+  referenceAssets?: string[];
+  /** 素材组 ID（如 group-20260101000000-demo），用于审计时回溯授权范围 */
+  assetGroupId?: string;
   authorization: {
     status: "real-authorized" | "pending" | "revoked";
     scope?: string;
@@ -178,6 +186,16 @@ export function identityAnchorContext(asset: RealPersonAsset): Record<string, un
     discipline: "第 1 张图是该真人的**平台认证基准照**，其余是该镜抽帧。请判断抽帧中出镜人是否为同一人（五官比例/眼型/鼻型/唇形/脸型/发际线），"
       + "同一人判通过；明显不像（尤其侧脸走形、换脸）判不合格；只给「证据不足」必须说明缺什么，不得猜测。"
   };
+}
+
+/**
+ * 单次生成的参考素材列表：主素材在前，随后是同组素材，去重后按 Seedance 上限截断。
+ * 全部必须以 `asset://` 形式提交（真人照片不可直传）。
+ */
+export function referenceAssetRefs(asset: RealPersonAsset, limit = 3): string[] {
+  const ids = [assetIdOf(asset.assetId), ...(asset.referenceAssets ?? []).map((id) => assetIdOf(id))]
+    .map((id) => id.trim()).filter(Boolean);
+  return [...new Set(ids)].slice(0, Math.max(1, limit)).map((id) => `asset://${id}`);
 }
 
 /** 主档是否带可用的认证基准照（文件存在才算） */

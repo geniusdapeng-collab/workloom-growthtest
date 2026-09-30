@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   REAL_PERSON_ASSET_SCHEMA,
+  referenceAssetRefs,
   ageBandInText,
   assertShotMatchesCertifiedAsset,
   assetIdOf,
@@ -68,5 +69,12 @@ describe("认证真人素材一致性门（T-2026-0929-0007 事故机制化）",
     expect([...gendersInText("她站在大堂里")]).toEqual(["female"]);
     expect(ageBandInText("三十岁上下的女士")).toBe("三十岁上下");
     expect(assetIdOf("asset://asset-20260101000000-demo")).toBe("asset-20260101000000-demo");
+  });
+
+  it("同组多张参考素材：主素材在前、去重、按 Seedance 上限 3 张截断", () => {
+    const withGroup = { ...certified, assetId: "asset-A", referenceAssets: ["asset-B", "asset-A", "asset-C", "asset-D"] };
+    expect(referenceAssetRefs(withGroup)).toEqual(["asset://asset-A", "asset://asset-B", "asset://asset-C"]);
+    expect(referenceAssetRefs(withGroup, 2)).toEqual(["asset://asset-A", "asset://asset-B"]);
+    expect(referenceAssetRefs(certified)).toEqual(["asset://asset-20260101000000-demo"]);
   });
 });

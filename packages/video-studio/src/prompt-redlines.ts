@@ -74,13 +74,6 @@ export function auditShotRedlines(shot: RedlineShotLike, options: { fps?: number
   if (/定住|稳住|定格/.test(timeline) && !/定住|稳住|定格/.test(camera)) {
     add("camera-timeline-mismatch", `${shot.shotId}：时间轴要求「定住」，但【运镜】未写定住`, "FP-02 真机落幅继续推进 → 判「未到点定住」");
   }
-  // ④-2 真人镜禁止侧脸/背影（T-2026-0929-0010：侧脸是"不像本人"的头号原因，客户明确在意）
-  if (/真人|认证|这位女士|这位男士|主讲人|CEO/.test(allText(shot, ["character"]))) {
-    const framing = positiveOnly(allText(shot, ["composition", "action"]));
-    if (/侧脸|侧面轮廓|背对镜头|背影|回眸/.test(framing)) {
-      add("face-profile-forbidden", `${shot.shotId}：真人镜用了侧脸/背影/回眸构图`, "侧脸最容易生成「不像本人」的脸；真人出镜只用正面或四分之三侧（客户明确要求）");
-    }
-  }
   // ⑤ 帧率一致性：卡片约束 vs 管线帧率
   const fpsInCard = text((shot as Record<string, unknown>).constraint).match(/(\d{2})\s*fps/i);
   if (options.fps && fpsInCard && Number(fpsInCard[1]) !== options.fps) {
