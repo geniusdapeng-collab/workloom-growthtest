@@ -178,6 +178,23 @@ pnpm exec tsx scripts/tools/portrait-set-from-asset.mts \
 > 角度映射由 **Agent 读截图缩略图**给出（标 `angleGuess`，属"机器/Agent 判读、非客户逐张确认"）；
 > 平台侧权威清单只提供 ID 与文件名，**不猜角度**——两者分工不要混。
 
+### 6.2 职责边界：两套工具是**一条流水线的两层**（以哪个为准）
+
+> 2026-10-01 收口：§6.0/§6.1 是同一件事的前后两段，**不存在两套竞争实现**，也不是"看谁先跑"。
+> 以后遇到"到底用哪个"按下面这张表走；只有一处例外需要顺序约束（见末尾）。
+
+| 问题 | 以谁为准 | 实现位置 |
+|---|---|---|
+| 客户截图/清单里**哪些 asset ID 有效**、顺序、来源文件名、组 ID、证据 | **清单对账层**（§6.0） | `real-person-assets.mts` + `packages/video-studio/src/real-person-asset-sync.ts` |
+| 主档 `assetId` / `referenceAssets` / `referenceAssetSources` 的写回 | **清单对账层** | 同上（`reconcile --apply`，写前备份、写后自检） |
+| 每个**角度槽位**怎么来、"像不像"谁判、产物写哪 | **出图/装机层**（§6.1） | `portrait-set-from-asset.mts`（两段式 + 逐张机器校验）→ `portrait-set-install.mts`（写档 + `verifyPortraitSet` 复核） |
+| 角色档案 `portraitSets`（`files`/`artifacts`/`active`/`source-map.json`） | **出图/装机层** | 同上；本层不对 `referenceAssets` 做任何推断 |
+| 管线消费 | G-RP1/像不像门读**主档**（对账层）；封面/关键帧读**角色档案**（装机层） | `scripts/tools/full-chain-film.mts` |
+
+**唯一顺序约束**：`reconcile` 会按清单重排 `referenceAssets`，并把**同 ID 保留的 `angleGuess` 之外的新 ID 标成"待客户确认"**。
+因此正确顺序是：**先 §6.0 对账（ID 对了）→ 再 §6.1 出图装机（角度对了）**；对账后发现 ID 有变化，必须重跑角度映射那一遍，
+不要拿旧的 `portraitSets` 当"已确认"。两层各写各的文件（主档 vs 角色档案），所以重跑任一层都不会覆盖另一层的产物。
+
 四条硬经验（真机实测，别再踩）：
 1. **图端点不吃 `asset://`**（400 `invalid url`）——asset 参考只能走**视频端点**取首帧；
 2. **参考图 2 张最好**（角度对应那张 + 主素材）；4 张不同服装/光位混投会让脸跑偏；
