@@ -41,6 +41,12 @@ export interface RealPersonAsset {
     verifiedAt?: string;
     evidence?: string;
   };
+  /**
+   * 认证基准照（客户提供的本人照片；**只用于出片后的"像不像"比对与封面选帧**，
+   * 绝不作为生成输入——平台禁止直传真人照片，生成只走 asset://）。
+   * 约定：文件放在主档目录下（如 anchor.jpg），此处登记相对文件名。
+   */
+  anchorPhoto?: string;
   authorization: {
     status: "real-authorized" | "pending" | "revoked";
     scope?: string;
@@ -157,6 +163,31 @@ export function assertShotMatchesCertifiedAsset(shot: Record<string, unknown>, a
     push("asset-mismatch", `${shotId}：镜头卡 assetRef=${assetRef} 与主档 ${asset.assetId} 不一致`);
   }
   return issues;
+}
+
+/**
+ * 像不像门（T-2026-0929-0010）：客户提供 anchorPhoto 时，出片后把"认证基准照 + 抽帧"一起交给监制，
+ * 要求判断"是否同一人"；判不是同一人 → 该镜不合格（禁止把不像的素材交付）。
+ */
+export function identityAnchorContext(asset: RealPersonAsset): Record<string, unknown> | null {
+  if (!asset.anchorPhoto) return null;
+  return {
+    policy: "workloom.identity-anchor/v1",
+    assetId: assetIdOf(asset.assetId),
+    displayName: asset.displayName,
+    discipline: "第 1 张图是该真人的**平台认证基准照**，其余是该镜抽帧。请判断抽帧中出镜人是否为同一人（五官比例/眼型/鼻型/唇形/脸型/发际线），"
+      + "同一人判通过；明显不像（尤其侧脸走形、换脸）判不合格；只给「证据不足」必须说明缺什么，不得猜测。"
+  };
+}
+
+/** 主档是否带可用的认证基准照（文件存在才算） */
+export function hasIdentityAnchor(asset: RealPersonAsset, dir: string): boolean {
+  return Boolean(asset.anchorPhoto && existsSync(resolve(dir, asset.anchorPhoto)));
+}
+export function identityAnchorPath(asset: RealPersonAsset, dir: string): string | null {
+  if (!asset.anchorPhoto) return null;
+  const abs = resolve(dir, asset.anchorPhoto);
+  return existsSync(abs) ? abs : null;
 }
 
 /** 出片后身份比对的判据文本（交给监制模型按主档属性核对抽帧，缺证据必须拒绝） */

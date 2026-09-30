@@ -21,19 +21,32 @@ export interface RedlineShotLike {
   [key: string]: unknown;
 }
 
+
+/**
+ * 只保留"肯定画面描述"（与仓库其它审计同一纪律：先剥否定语境）。
+ * 真机 2026-09-29：卡片写"屏幕背对镜头、不可见""画面不出现证件"时，
+ * 旧版 linter 仍按关键词触发风险，反而把**已经规避了风险**的卡片拦下。
+ */
+function positiveOnly(value: string): string {
+  return value
+    .split(/[；。，、]/)
+    .filter((clause) => clause.trim().length > 0)
+    .filter((clause) => !/(不出现|不可见|不露|无需|不得|禁止|避免|无[^，。；]*|没有)/.test(clause))
+    .join("；");
+}
 const text = (value: unknown): string => String(value ?? "");
 const allText = (shot: RedlineShotLike, keys: string[]): string => keys.map((key) => text(shot[key])).join("；");
 
 export function auditShotRedlines(shot: RedlineShotLike, options: { fps?: number } = {}): RedlineIssue[] {
   const issues: RedlineIssue[] = [];
   const add = (id: string, detail: string, why: string, hard = true): void => { issues.push({ id, detail, why, hard }); };
-  const visual = allText(shot, ["scene", "sceneDescription", "composition", "action", "props"]);
+  const visual = positiveOnly(allText(shot, ["scene", "sceneDescription", "composition", "action", "props"]));
   const negative = text((shot as Record<string, unknown>).negative);
   const camera = text((shot as Record<string, unknown>).camera_movement);
   const timeline = text((shot as Record<string, unknown>).timeline);
 
   // ① 屏幕文字：出现屏幕就必须写明"虚化/不可辨认/光晕"，并把文字与 LOGO 放进负面清单
-  if (/屏幕|触控|显示|界面/.test(visual)) {
+  if (/屏幕|触控|显示|界面/.test(visual) && !/(背对|不可见|不朝镜头)/.test(allText(shot, ["sceneDescription","composition"]))) {
     if (!/(虚化|不可辨|光晕|过曝成色块|不出现任何可读)/.test(visual)) {
       add("screen-must-be-blurred", `${shot.shotId}：画面含屏幕，但没有写「界面虚化/不可辨认/只保留柔光光晕」`, "模型默认会把界面渲染成可读文字（FP-02 真机返修）");
     }
@@ -60,6 +73,13 @@ export function auditShotRedlines(shot: RedlineShotLike, options: { fps?: number
   // ④ 运镜与时间轴一致性：timeline 说定住，运镜必须写定住
   if (/定住|稳住|定格/.test(timeline) && !/定住|稳住|定格/.test(camera)) {
     add("camera-timeline-mismatch", `${shot.shotId}：时间轴要求「定住」，但【运镜】未写定住`, "FP-02 真机落幅继续推进 → 判「未到点定住」");
+  }
+  // ④-2 真人镜禁止侧脸/背影（T-2026-0929-0010：侧脸是"不像本人"的头号原因，客户明确在意）
+  if (/真人|认证|这位女士|这位男士|主讲人|CEO/.test(allText(shot, ["character"]))) {
+    const framing = positiveOnly(allText(shot, ["composition", "action"]));
+    if (/侧脸|侧面轮廓|背对镜头|背影|回眸/.test(framing)) {
+      add("face-profile-forbidden", `${shot.shotId}：真人镜用了侧脸/背影/回眸构图`, "侧脸最容易生成「不像本人」的脸；真人出镜只用正面或四分之三侧（客户明确要求）");
+    }
   }
   // ⑤ 帧率一致性：卡片约束 vs 管线帧率
   const fpsInCard = text((shot as Record<string, unknown>).constraint).match(/(\d{2})\s*fps/i);
