@@ -80,15 +80,28 @@ WORKLOOM_PRODUCT_ROOT = "/abs/path/to/WorkLoom-growth"
 
 ## 4. DeepSeek Harness（DSH）接入
 
-DSH 桌面端（v0.2 预览版，macOS/Windows 安装包，MIT 开源）"一切皆插件"。两条路线：
+### 4.0 先分清：本仓有**两个**"DeepSeek Harness"，别混
 
-**路线 A｜用它的终端工具直接跑本仓 CLI（最省事，今天可用）**
+| | **内置 DSH 组件**（本仓自带，产品自己在用） | **DSH 桌面端**（DeepSeek 官方客户端，人用） |
+|---|---|---|
+| 是什么 | 运行时 Agent 底座：`vendor/dsh`（审计基线）+ `packages/runtime` 的 **dsh seam**（意图路由 / Ask·Agent·Quest 循环 / 装配 / 工具 / 剧本）+ 围栏插件 + 事件桥 | DeepSeek 官方桌面应用（macOS / Windows，v0.2 预览版，MIT 开源） |
+| 谁在用 | **产品自己**：服务端派活、通用任务循环、夜班 | **人**：资深用户 / 内部同事的工作台 |
+| 版本 | **`0.2.0-rc.2`**：`packages/runtime/dsh-gate/package.json` 的 pin；`vendor/dsh` 审计基线同为该版本 | v0.2 预览版（上游 npm `@deepseek-ai/dsh@0.2.0-rc.2`，2026-09-29） |
+| 怎么验收 | `bash scripts/dsh-gate.sh`：headless → 工具调用过围栏瀑布 → 事件落哈希链 → `kill -9` 重放零重复 | 客户端侧：`tools/list` 能看到本仓工具（见 §4.2） |
+| 怎么"接本仓能力" | **不需要 MCP**：它就在进程内，走服务端过程 + 围栏 + 事件账本（与 `scripts/AGENT-CAPABILITIES.md` 同一批过程） | 需要接入：§4.1 用 `bash` 跑 CLI；§4.2 用 MCP 插件挂 `workloom-agent-mcp.mjs` |
+
+> 一句话：**内置组件 = 我们的执行底座；桌面端 = 给人用的工作台。**
+> 本节 4.1 / 4.2 讲桌面端怎么接进来；内置组件不需要"接入"，只需按 `dsh-gate` 验版本与门禁。
+
+### 4.1 桌面端接入 · 路线 A（用它的终端工具直接跑本仓 CLI，最省事）
+
+DSH 桌面端（v0.2 预览版，macOS/Windows 安装包，MIT 开源）"一切皆插件"。两条路线：
 
 1. 在 DSH 里把本仓目录设为工作区；
 2. 让它读 `bundles/ai-video/README.md`（§0–§6 是给 Agent 的 runbook）；
 3. 用它的 `bash` 工具执行同一套命令（`pnpm video:doctor` → `route-video.mts` → `full-chain-film.mts`）。
 
-**路线 B｜把本仓 MCP 挂成 DSH 插件（能力进菜单）**
+### 4.2 桌面端接入 · 路线 B（把本仓 MCP 挂成 DSH 插件，能力进菜单）
 
 DSH 官方扩展手册明确："**MCP：每个服务器一个插件：发现工具 → `ctx.tools.register()`**"
 （见 [extension-cookbook.zh.md](https://github.com/deepseek-ai/deepseek-harness/blob/master/docs/cookbook/extension-cookbook.zh.md)）。
@@ -146,3 +159,5 @@ DSH 官方扩展手册明确："**MCP：每个服务器一个插件：发现工�
   + `scripts/workloom-agent-mcp.mjs` + `scripts/agent-capabilities.{mjs,core.json,test.mjs}`；
 - 视频能力模块：`bundles/geo-growthtest/capabilities/video.mjs`（只读/预览；本仓 6 条视频能力，见 §5）；
 - 自检：`node --test scripts/agent-capabilities.test.mjs`（清单驱动的断言，基座与行业仓共用同一份）。
+- **内置 DSH 组件升级到 `0.2.0-rc.2`**：`packages/runtime/dsh-gate/**` 与 `scripts/dsh-gate.sh` 同步自基座
+  （`vendor/dsh` 审计基线一并同步）；真机跑过 `bash scripts/dsh-gate.sh`（24 条哈希链 + `kill -9` 后 18 条链 + 重放零重复）。
