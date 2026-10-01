@@ -26,9 +26,9 @@ printf '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion
   | node scripts/workloom-agent-mcp.mjs
 ```
 
-成功标志：`list` 打印**本仓清单**（本仓为 18 条，其中视频能力 6 条）；`invoke` 返回单行 JSON，形如
+成功标志：`list` 打印**本仓清单**（本仓为 22 条：核心 8 + 服务 4 + 视频 6 + 仓库通用只读 4）；`invoke` 返回单行 JSON，形如
 `{"schemaVersion":"workloom.agent-capability-result/v1","status":"succeeded",...}`；MCP 冒烟返回
-`tools/list`（本仓 17 个工具，禁用项不出现在列表里）。
+`tools/list`（本仓 21 个工具，禁用项不出现在列表里）。
 
 > 产物根：默认 = 仓库根。若你的工作目录在仓外（客户常见），用**运行者**环境变量指定：
 > `WORKLOOM_VIDEO_ARTIFACT_ROOT=/abs/path/to/work`（调用方仍只能给相对路径，边界由环境变量而非请求决定）。
@@ -114,7 +114,7 @@ DSH 官方扩展手册明确："**MCP：每个服务器一个插件：发现工�
    ```
 
    并把 `WORKLOOM_PRODUCT_ROOT=/abs/path/to/WorkLoom-growth` 等环境变量注入插件进程；
-2. 重新加载插件后，在 DSH 的工具列表里应能看到 `workloom_growth_*` 工具（本仓 17 个，视频 6 个）。
+2. 重新加载插件后，在 DSH 的工具列表里应能看到 `workloom_growth_*` 工具（本仓 21 个：视频 6 + 仓库通用只读 4，另加核心 8 与服务 3）。
 
 > 说明：DSH 侧"自定义 STDIO MCP"的具体配置键以**你所用 DSH 版本的官方文档/插件页为准**；
 > 我们这侧只保证"标准 stdio JSON-RPC + 工具清单"这一契约（协议版本含 2024-11-05 / 2025-03-26 /
@@ -139,6 +139,17 @@ DSH 官方扩展手册明确："**MCP：每个服务器一个插件：发现工�
 
 ---
 
+### 5.1 仓库通用只读（4 条，本轮补齐，与行业仓同一份模板）
+
+| 能力 | 何时用 | 备注 |
+|---|---|---|
+| `growth.repo.status` | 接手本仓第一件事：看清产品标识/默认行业包/文档与脚本规模 | 读 `product.manifest.json` + 目录计数 |
+| `growth.repo.docs` | 找 runbook／规范：列出 `docs/*.md` 与一级标题 | 可传 `limit`（1–60），默认 60 |
+| `growth.bundle.summary` | 看行业包家底：skills / fences / pipelines / presets / library 计数 + 围栏规则样例 | 围栏样例最多 12 条 |
+| `growth.repo.readiness` | 上手前自检：Node / 依赖 / 运行时资产 / 密钥是否存在 / MCP 入口 / 内置 DSH pin | **预览**：只读本地文件，不联网 |
+
+---
+
 ## 6. 安全与排错
 
 - **令牌三类**：`WORKLOOM_ACCESS_TOKEN`（B 端成员，远程地址必需）、`WORKLOOM_C_TOKEN`（C 端，单独）、
@@ -157,6 +168,7 @@ DSH 官方扩展手册明确："**MCP：每个服务器一个插件：发现工�
 
 - 入口：`scripts/AGENT-CAPABILITIES.md`（基座受控资产，随 base-sync 下发）+ `scripts/workloom-agent.mjs`
   + `scripts/workloom-agent-mcp.mjs` + `scripts/agent-capabilities.{mjs,core.json,test.mjs}`；
+- 仓库通用只读模块：`bundles/geo-growthtest/capabilities/repo.mjs`（4 条：`repo.status` / `repo.docs` / `bundle.summary` / `repo.readiness`，只读/预览；路径监狱 + 8MB/2 万行上限，不回显密钥值）；
 - 视频能力模块：`bundles/geo-growthtest/capabilities/video.mjs`（只读/预览；本仓 6 条视频能力，见 §5）；
 - 自检：`node --test scripts/agent-capabilities.test.mjs`（清单驱动的断言，基座与行业仓共用同一份）。
 - **内置 DSH 组件升级到 `0.2.0-rc.2`**：`packages/runtime/dsh-gate/**` 与 `scripts/dsh-gate.sh` 同步自基座
