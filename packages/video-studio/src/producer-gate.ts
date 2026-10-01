@@ -192,6 +192,16 @@ export interface ProducerGateOptions {
   rubric?: string[];
   /** 画面类环节可附视觉基准（如定妆照）做一致性比对 */
   referenceImages?: string[];
+  /**
+   * 单批判审的**产物图**张数上限（默认 6）。
+   *
+   * 为什么可调（T-2026-1001-0006 真机事故）：定妆照成套评审（8 张 + 1 张基准）会被切成 6+2 两批，
+   * 而合并口径是"每批都须通过且每批分数 ≥ 阈值"——第二批只拿到 2 张角度图，却要独立做
+   * "与基准照片是不是同一张脸"这个**全集判据**，于是出现同一份结论里前半段"判为同一人"、
+   * 后半段"非同一人故不通过"的自相矛盾记录（分数取两批最小值 = 32）。
+   * 同一角色的多角度一致性是**整批判据**，不能被切碎；调用方可按上下文预算抬到能一批装下。
+   */
+  batchSize?: number;
   context?: Record<string, unknown>;
   contracts?: ProducerReviewContracts;
   /** @deprecated 仅为旧调用方保留；不会授予正式通过资格。 */
@@ -500,7 +510,12 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
     const context = options.context ? JSON.stringify(options.context) : "";
     const contractText = contract ? JSON.stringify(contract) : "未提供结构化镜头合同；不得宣称已核实年代、人数、空间或设备型号。";
     if (context.length + contractText.length > 30_000) throw new Error("评审上下文超预算，禁止截断事实");
-    const batches = Math.max(1, Math.ceil(artifactImages / 6));
+    /**
+     * 批次大小：默认 6 张/批；成套定妆照（同一角色的多角度）必须能一批看完再判"是不是同一个人"。
+     * 非法/缺省值回落到 6（调小只会切得更碎，不构成风险；调大由调用方自证上下文预算）。
+     */
+    const batchSize = Number.isInteger(options.batchSize) && (options.batchSize as number) > 0 ? options.batchSize as number : 6;
+    const batches = Math.max(1, Math.ceil(artifactImages / batchSize));
     const answers: Array<{ approved: boolean; score: number; issues: string[]; suggestions: string[]; reason: string }> = [];
     for (let batch = 0; batch < batches; batch += 1) {
       const content = [{ type: "text", text: [
@@ -512,7 +527,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         context,
         "结构化原镜头合同优先于通用rubric；只对实际适用项目评审，不得把合同当产物质量证明。", contractText,
         '只输出 JSON: {"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}'
-      ].join("\n") }, ...textContent, ...encoded.slice(batch * 6, Math.min(artifactImages, (batch + 1) * 6)).flat(), ...encoded.slice(artifactImages).flat()];
+      ].join("\n") }, ...textContent, ...encoded.slice(batch * batchSize, Math.min(artifactImages, (batch + 1) * batchSize)).flat(), ...encoded.slice(artifactImages).flat()];
       const res = await (options.fetchImpl ?? fetch)(`${llm.baseUrl}/chat/completions`, {
         method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
         body: JSON.stringify({ model: llm.model, messages: [{ role: "user", content }], temperature: 0.2, response_format: { type: "json_object" } }),

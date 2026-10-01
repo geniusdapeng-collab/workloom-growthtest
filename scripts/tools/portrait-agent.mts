@@ -8,18 +8,26 @@
  *        [--version 3] [--angles front,threeQuarter,closeup,side] [--no-activate]
  *        [--anchor <角色目录相对路径或绝对路径，可逗号分隔；也可给目录>]
  *   node scripts/tools/portrait-agent.mts review --character <characterId> [--version N] [--anchor <参考照片>]
+ *        [--min-score 88] [--batch-size 12]
  *        # AI 监制评审：拿授权真人照片当基准，判断定妆照"是不是同一个人"；不合格即判 rerun
+ *        # 成套定妆照默认一批看完（batch-size 12）：切批会让"同一人"这个整批判据被切碎
+ *   node scripts/tools/portrait-agent.mts accept --character <characterId> [--version N]
+ *        --by "<验收人>" --note "<依据/原话>" [--min-likeness 80]
+ *        # 所有者验收：逐角度 1:1 机器像不像实测 + 所有者验收，两条并列留痕；门记录 via=owner-acceptance
  *
  * 纪律：纯写实 + 场景解耦（中性背景/中性光，只描述人）；默认 4 角度；产物写回档案库并置 active。
  * 授权真人：`--anchor` 给定本人照片即走图生图（source=img2img），锁面部与身形；不给则纯文生图。
  * 设计见 `docs/character-archive-design.md`（附录 A.1/A.2）。
  */
-import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  appendGateEvent, assertCharacterComponent, buildGateEvent, buildPortraitPlan, loadCharacterEntry, reviewStage, runPortraitAgent
+  appendGateEvent, assertCharacterComponent, buildGateEvent, buildPortraitPlan, loadCharacterEntry, resolveProducerLlm,
+  reviewStage, runPortraitAgent
 } from "../../packages/video-studio/src/index.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -83,6 +91,35 @@ function resolveAnchors(spec: string, characterDir: string): string[] {
   if (out.length === 0) throw new Error("显式锚点目录没有图片，不能静默改成纯文生图");
   return out;
 }
+
+/**
+ * 基准照片（身份锚）来源，按优先级：
+ *   ① `--anchor a.jpg,b.jpg`（显式指定；真机踩过：以前 review 分支根本不读 --anchor → 永远是"无基准照片"）；
+ *   ② 该版本 set 里登记的 `anchors`；
+ *   ③ 角色目录 `sources/` 下的照片（installer 会把已验收成片帧拷到这里）。
+ */
+function anchorListFor(characterDir: string, target: { anchors?: string[] }, anchorSpec: string): string[] {
+  const cliAnchors = anchorSpec ? resolveAnchors(anchorSpec, characterDir) : [];
+  if (cliAnchors.length > 0) return cliAnchors;
+  const registered = (target.anchors ?? []).map((p) => resolve(characterDir, p)).filter(existsSync);
+  if (registered.length > 0) return registered;
+  const sources = join(characterDir, "sources");
+  return existsSync(sources)
+    ? readdirSync(sources).filter((f) => IMAGE_EXT.test(f)).slice(0, 4).map((f) => join(sources, f))
+    : [];
+}
+
+/** 送审图压缩（最长边 ≤1536 的 JPEG）：3–5MB 的 PNG 直接 base64 会被评审端点拒/断连 */
+function toJudgeJpeg(file: string, tmpDir: string, name: string): string | null {
+  const out = join(tmpDir, `${name}.jpg`);
+  const bin = process.env.WL_FFMPEG ?? resolve(homedir(), ".workloom-color", "bin", "ffmpeg");
+  const result = spawnSync(existsSync(bin) ? bin : "ffmpeg",
+    ["-v", "error", "-y", "-i", file, "-vf", "scale='min(1536,iw)':-2", "-q:v", "3", out],
+    { timeout: 120_000 });
+  return result.status === 0 && existsSync(out) ? out : null;
+}
+
+const sha256File = (file: string): string => createHash("sha256").update(readFileSync(file)).digest("hex");
 
 async function main(): Promise<void> {
   if (!characterId) {
@@ -160,21 +197,7 @@ async function main(): Promise<void> {
     }
     if (selected!.verification.status !== "passed") throw new Error(`候选尚不可评审：${selected!.verification.issues.join("；")}`);
     const produced = Object.values(selected!.files);
-    /**
-     * 基准照片（身份锚）来源，按优先级：
-     *   ① `--anchor a.jpg,b.jpg`（显式指定；真机踩过：以前 review 分支根本不读 --anchor → 永远是"无基准照片"）；
-     *   ② 该版本 set 里登记的 `anchors`；
-     *   ③ 角色目录 `sources/` 下的照片（installer 会把已验收成片帧拷到这里）。
-     */
-    const cliAnchors = arg("--anchor")
-      ? arg("--anchor").split(",").map((value) => resolve(value.trim())).filter(existsSync)
-      : [];
-    const anchors = (target.anchors ?? []).map((p) => resolve(characterDir, p)).filter(existsSync);
-    const fallbackAnchors = cliAnchors.length > 0
-      ? cliAnchors
-      : anchors.length > 0
-        ? anchors
-        : (existsSync(join(characterDir, "sources")) ? readdirSync(join(characterDir, "sources")).filter((f) => IMAGE_EXT.test(f)).slice(0, 4).map((f) => join(characterDir, "sources", f)) : []);
+    const fallbackAnchors = anchorListFor(characterDir, target, arg("--anchor"));
     const required = ["front", "threeQuarter", "closeup", "side"];
     const verdict = await reviewStage({
       stage: "keyframe",
@@ -202,6 +225,12 @@ async function main(): Promise<void> {
       },
       /** 身份阈值提高到 88（客户口径：人脸一定要真）——低于它宁可打回重出，也不要用"差不多"的锚图生成全片 */
       minScore: Number(arg("--min-score", "88")),
+      /**
+       * 成套评审必须**一批看完**（T-2026-1001-0006 真机事故）：8 张定妆照按默认 6 张/批切成 6+2，
+       * 第二批只拿 2 张也要独立判"与基准是不是同一张脸"，导致同一份结论自相矛盾、分数取最小值 32。
+       * 定妆照集最多 12 个角度，默认一批装下；图片仍受单张 900KB 与压缩预算保护。
+       */
+      batchSize: Number(arg("--batch-size", "12")),
       allowFallbackApprove: false,
       /**
        * 必须显式传 env（2026-09-24 真机）：`reviewStage` 缺省只读 `process.env`，
@@ -248,7 +277,157 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error(`未知子命令：${command}（可用：plan / run）`);
+  /**
+   * `accept` —— **所有者验收**（owner-acceptance，T-2026-1001-0006）。
+   *
+   * 为什么需要这条通道：「像不像」这类判据，机器（生成器 1:1 像不像门 + 监制）会给出互相矛盾或低于阈值的分数，
+   * 而产品所有者/客户本人是**唯一见过真人的裁判**。本命令把两件事并列留痕、谁也不冒充谁：
+   *   ① 机器证据：逐角度 1:1 对基准照片的像不像分（重新实测，不引用旧结论）；
+   *   ② 所有者验收：验收人 + 依据原话 + 时间（`--by` / `--note`，缺一即拒）。
+   * 落账 `g5-portrait-confirm` 时 `via=owner-acceptance`（**不写成 llm/监制通过**），审计一眼可分辨。
+   */
+  if (command === "accept") {
+    const characterDir = join(LIBRARY_ROOT, characterId);
+    const versionArg = arg("--version") ? Number(arg("--version")) : null;
+    const selected = loadCharacterEntry(characterDir, versionArg === null ? {} : { pinnedVersion: versionArg });
+    const target = selected?.activeSet;
+    if (!target) {
+      console.error(`未找到定妆照集（version=${versionArg ?? "active"}）`);
+      process.exitCode = 1;
+      return;
+    }
+    if (selected!.verification.status !== "passed") throw new Error(`候选尚不可验收：${selected!.verification.issues.join("；")}`);
+    const acceptedBy = arg("--by").trim();
+    const note = arg("--note").trim();
+    if (!acceptedBy || note.length < 8) {
+      throw new Error("所有者验收必须写明验收人（--by）与依据（--note，≥8 字）：不接受「有人点过头」式的无凭放行");
+    }
+    const anchors = anchorListFor(characterDir, target, arg("--anchor"));
+    if (anchors.length === 0) throw new Error("所有者验收缺基准照片（身份锚）：像不像无从比对，fail-closed");
+    const anchor = anchors[0]!;
+    /**
+     * 机器像不像**默认不跑**（2026-10-01 产品所有者口径）：出图后的评审决策交给人类，
+     * 机器判据不稳定（同一批文件实测 threeQuarterLeft 92↔15–86、threeQuarterRight 82↔12–20），
+     * 拿它当闸门只会误杀或误放。需要留机器证据时显式 `--with-likeness`（结果只作记录，不参与裁决）。
+     */
+    const withLikeness = flag("--with-likeness");
+    const minLikeness = Number(arg("--min-likeness", "80"));
+    const perAngle: Array<{ angle: string; file: string; sha256: string; score: number | null; same: boolean; ok: boolean; reason: string }> = [];
+    let likenessError: string | null = null;
+    if (withLikeness) {
+      if (!Number.isFinite(minLikeness) || minLikeness < 0 || minLikeness > 100) throw new Error("--min-likeness 非法（0–100）");
+      const llm = resolveProducerLlm(ENV);
+      if (!llm) throw new Error("--with-likeness 需要评审模型（LLM_BASE_URL / LLM_API_KEY 或 DEEPSEEK_*）");
+      const tmpDir = mkdtempSync(join(homedir(), ".workloom-portrait-"));
+      try {
+        /** 基准同样压到可发包再送（真机：5.9MB PNG 直接 base64 会被端点拒或断连） */
+        const anchorJpeg = toJudgeJpeg(anchor, tmpDir, "anchor") ?? anchor;
+        const anchorMime = anchorJpeg.toLowerCase().endsWith(".png") ? "image/png" : anchorJpeg.toLowerCase().endsWith(".webp") ? "image/webp" : "image/jpeg";
+        const anchorDataUrl = `data:${anchorMime};base64,${readFileSync(anchorJpeg).toString("base64")}`;
+        console.log(`逐角度像不像实测（1:1 对基准，仅留证不裁决）：${anchor}`);
+        for (const [angle, file] of Object.entries(selected!.files)) {
+        const jpeg = toJudgeJpeg(file, tmpDir, angle);
+        if (!jpeg) throw new Error(`送审图压缩失败：${file}`);
+        const response = await fetch(`${llm.baseUrl}/chat/completions`, {
+          method: "POST",
+          headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
+          body: JSON.stringify({
+            model: llm.model, temperature: 0,
+            response_format: { type: "json_object" },
+            messages: [{
+              role: "user",
+              content: [
+                { type: "text", text: "图1 = 已通过验收的成片帧（认证真人的事实锚）；图2 = 定妆照候选。" +
+                  "只判\"是不是同一个人\"：看面孔五官比例、脸型、年龄段；服装/背景/光线差异不影响判定。" +
+                  `只输出 JSON：{"same":true|false,"score":0-100,"reason":"一句话"}。当前角度：${angle}` },
+                { type: "image_url", image_url: { url: anchorDataUrl } },
+                { type: "image_url", image_url: { url: `data:image/jpeg;base64,${readFileSync(jpeg).toString("base64")}` } }
+              ]
+            }]
+          }),
+          signal: AbortSignal.timeout(180_000)
+        });
+        const body = await response.text();
+        if (!response.ok) throw new Error(`像不像校验调用失败 HTTP ${response.status}：${body.slice(0, 160)}`);
+        const content = (JSON.parse(body) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
+        const parsed = JSON.parse(content.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim()) as { same?: boolean; score?: number; reason?: string };
+        const score = Number.isFinite(Number(parsed.score)) ? Number(parsed.score) : null;
+        const same = parsed.same === true;
+        const ok = same && (score === null || score >= minLikeness);
+        perAngle.push({ angle, file, sha256: sha256File(file), score, same, ok, reason: String(parsed.reason ?? "").slice(0, 200) });
+        console.log(`  ${ok ? "✓" : "✗"} ${angle}：${same ? "同一人" : "疑似不一致"}${score === null ? "" : `（${score}）`}`);
+        }
+      } catch (error) {
+        likenessError = error instanceof Error ? error.message : String(error);
+        console.log(`  ⚠ 机器像不像实测未完成：${likenessError}（不影响人类裁决）`);
+      } finally {
+        rmSync(tmpDir, { recursive: true, force: true });
+      }
+    }
+    const summary = {
+      angles: perAngle.length,
+      sameAngles: perAngle.filter((entry) => entry.same).length,
+      minScore: perAngle.every((entry) => entry.score !== null) ? Math.min(...perAngle.map((entry) => entry.score as number)) : null,
+      allSame: perAngle.every((entry) => entry.ok)
+    };
+    const belowThreshold = perAngle.filter((entry) => !entry.ok).map((entry) => `${entry.angle}(${entry.score ?? "n/a"})`);
+    const reviewDir = join(characterDir, "reviews");
+    mkdirSync(reviewDir, { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const likenessFile = withLikeness ? join(reviewDir, `v${target.version}-likeness-${stamp}.json`) : null;
+    if (likenessFile) {
+      writeFileSync(likenessFile, `${JSON.stringify({
+        at: new Date().toISOString(), characterId: entry.id, version: target.version, kind: "machine-likeness",
+        note: "仅留证，不参与裁决（机器判据不稳定：同一批文件实测 92↔15–86 / 82↔12–20）",
+        anchor: { file: anchor, sha256: sha256File(anchor) }, threshold: minLikeness, perAngle, summary, error: likenessError
+      }, null, 2)}\n`, "utf8");
+    }
+    const artifacts = Object.entries(selected!.files).map(([angle, file]) => ({ angle, file, sha256: sha256File(file) }));
+    const ownerFile = join(reviewDir, `v${target.version}-owner-acceptance-${stamp}.json`);
+    writeFileSync(ownerFile, `${JSON.stringify({
+      at: new Date().toISOString(), characterId: entry.id, version: target.version, kind: "owner-acceptance",
+      /** 裁决口径：出图后的评审决策交给人类（产品所有者 2026-10-01）；机器判据不参与放行 */
+      basis: "human-review",
+      acceptedBy, note,
+      likenessReport: likenessFile,
+      likeness: withLikeness ? { ...summary, belowThreshold, error: likenessError } : { status: "not-run", why: "机器判据不参与裁决（口径：评审决策交给人类）" },
+      artifacts,
+      anchors: anchors.map((file) => ({ file, sha256: sha256File(file) }))
+    }, null, 2)}\n`, "utf8");
+    const checks = [
+      { id: "required-angles", pass: ["front", "threeQuarter", "closeup", "side"].every((a) => (target.angles ?? []).includes(a)), hard: true, detail: `实际角度 ${(target.angles ?? []).join("/")}` },
+      { id: "file-size", pass: Object.values(selected!.files).every((f) => statSync(f).size > 50_000), hard: true, detail: `${Object.keys(selected!.files).length} 张均 >50KB` },
+      { id: "anchor-present", pass: true, hard: true, detail: `基准照片 1 张（${anchor.split("/").slice(-1)[0]}，sha256 ${sha256File(anchor).slice(0, 12)}…）` },
+      /** 形式判据：资产本身齐备（角度/体积/文件指纹），这些是事实项，不是质量裁决 */
+      { id: "artifacts-present", pass: artifacts.every((item) => existsSync(item.file) && statSync(item.file).size > 50_000), hard: true, detail: `${artifacts.length} 张角度图齐备且已记指纹 sha256` },
+      /** 裁决判据：**人类验收**（产品所有者/客户本人看过原图后的决定） */
+      { id: "owner-acceptance", pass: true, hard: true, detail: `人类验收：${acceptedBy}｜依据：${note.slice(0, 120)}` }
+    ];
+    if (withLikeness) {
+      checks.splice(4, 0, { id: "machine-likeness-evidence", pass: perAngle.length > 0, hard: false, detail: `机器像不像留证 ${perAngle.length} 个角度（不参与裁决）：最低分 ${summary.minScore ?? "n/a"}` });
+    }
+    const gateEvent = buildGateEvent({
+      stepKey: "g5-portrait-confirm",
+      projectId: `portrait:${entry.id}:v${target.version}`,
+      sourceStage: "owner-acceptance",
+      shotIds: [],
+      checks,
+      softApproved: true,
+      via: "owner-acceptance",
+      score: withLikeness ? summary.minScore : null,
+      reason: `人类验收放行（via=owner-acceptance，非机器监制通过）：${acceptedBy} 看过原图后确认可用。`
+        + `口径：出图后的评审决策交给人类，机器判据不参与放行`
+        + (withLikeness ? `；机器证据仅留档（${summary.sameAngles}/${summary.angles} 判同一人，最低 ${summary.minScore ?? "n/a"}）` : ""),
+      evidence: { likenessReport: likenessFile, ownerAcceptance: ownerFile, anchors, characterId: entry.id, version: target.version, basis: "human-review" }
+    });
+    appendGateEvent(join(characterDir, "gates.jsonl"), gateEvent);
+    console.log(`\n门记录（g5-portrait-confirm）：${gateEvent.ok ? "放行" : "未过"}（via=owner-acceptance）`);
+    if (likenessFile) console.log(`  机器像不像留证（不裁决）：${likenessFile}`);
+    console.log(`  所有者验收记录：${ownerFile}`);
+    return;
+  }
+
+  console.error(`未知子命令：${command}（可用：plan / run / review / accept）`);
   process.exitCode = 2;
 }
 

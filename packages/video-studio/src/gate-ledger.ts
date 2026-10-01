@@ -117,7 +117,12 @@ export interface GateEvent {
   ok: boolean;
   approved: boolean;
   /** skip：该门对本片不适用（例：全素材项目没有文生镜 → 提示词门不适用），留痕而非静默通过 */
-  via: "deterministic" | "llm" | "fallback" | "skip";
+  /**
+   * 门的裁决途径。`owner-acceptance`（T-2026-1001-0006）＝**产品所有者/客户本人验收**：
+   * 当机器监制因口径或能力受限给不出可信结论（例如"像不像"这种只有认识本人才判得准的事），
+   * 由所有者明确验收并留痕放行——**不得伪造成 llm 通过**，审计要能一眼区分。
+   */
+  via: "deterministic" | "llm" | "fallback" | "skip" | "owner-acceptance";
   score: number | null;
   /** 触发该门的环节（portrait / prompt-review / keyframe / shot） */
   sourceStage: string | null;
