@@ -598,6 +598,11 @@ type StageRecord = {
   score?: number | null;
   reason?: string;
 };
+/**
+ * 配乐层状态（交付清单留痕，T-2026-0930-0015）：bgm 阶段在自己的块作用域里算出结论，
+ * 这里提升到模块作用域供交付清单引用（off 时写明原因）。
+ */
+let bgmManifestInfo: Record<string, unknown> | null = null;
 const records: StageRecord[] = [];
 if (!Array.isArray(sourceDocument.shots) || !sourceDocument.shots.length) throw new Error("SHOT_REGISTRY_REQUIRED");
 const sourceIds = sourceDocument.shots.map((shot) => String(shot.shotId ?? ""));
@@ -5185,18 +5190,61 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
       log("⛔ 配乐：曲库内无网格相容曲目，且未允许自算作曲 → 本环节判失败（不静默降级）");
     }
   }
+  /**
+   * 声明降级（T-2026-0930-0015，通用口径）：
+   *   · 工位按「不劣化优先」判定 **无需配乐**（人声太满/无可闻窗口），且曲库无网格相容音乐床时，
+   *     旧口径判硬失败（scored 未产出 + 无音轨）→ 整片卡在母版终审；
+   *   · 无独立音轨签发者时工位也会 fail-closed 拒收。
+   * 两种都按"配乐层不适用"如实记账（不伪造音乐轨），继续走完交付；
+   * 需要旧口径（必须带配乐轨否则阻断）时用 `--review-policy blocking`。
+   */
+  const bgmNoBgmDeclared = !existsSync(out)
+    && /no_bgm_needed|无需配乐/.test(`${bgmDetail}\n${String(result.out ?? "")}`);
+  const bgmDeclaredOff = (!existsSync(out)
+    && /audio_stems_source_unverified|签章分轨引用|独立音轨.*(未配置|缺失)/.test(bgmDetail))
+    || bgmNoBgmDeclared;
+  /** 配乐层状态（交付清单留痕）：off 时写明原因，不让"没配乐"变成查不到的黑盒 */
+  bgmManifestInfo = {
+    layer: bgmDeclaredOff ? "off" : "on",
+    notRequired: bgmNoBgmDeclared,
+    declaredOff: bgmDeclaredOff,
+    reason: bgmDeclaredOff
+      ? (bgmNoBgmDeclared
+        ? "配乐工位按「不劣化优先」判定无需配乐（人声太满 / 无可闻窗口），且曲库无网格相容音乐床——不伪造音乐轨"
+        : "本机无独立音轨签发者（WORKLOOM_AUDIO_STEM_SIGNING_SECRET 未配置）→ 声明式关闭配乐层，不冒充签章分轨")
+      : null,
+    output: existsSync(out) ? out.split("/").slice(-1)[0] : null,
+    evidence: bgmDetail.slice(-400)
+  };
+  if (bgmDeclaredOff) {
+    log(bgmNoBgmDeclared
+      ? "⚠ 配乐层不适用（bgm_layer=false）：工位判定无需配乐且曲库无相容音乐床——不伪造音乐轨，交付清单如实标注"
+      : "⚠ 配乐层按独立音轨纪律关闭（bgm_layer=false）：本机未配置签发者（不伪造干净轨）");
+  }
   const info = existsSync(out) ? probe(out) : {};
   const lufs = (result.out.match(/-?\d+(\.\d+)?\s*LUFS/) ?? ["无响度读数"])[0] ?? "";
   const mixLufs = (bgmDetail.match(/-?\d+(\.\d+)?\s*LUFS/) ?? ["无响度读数"])[0] ?? lufs;
   /** 成品响度实测（工位没给读数时由宿主补测，避免"无证据"卡门） */
-  const measured = existsSync(out) ? measureLoudness(out) : { lufs: null, peakDb: null, detail: "无产物" };
+  const measured = existsSync(out) ? measureLoudness(out)
+    : (bgmDeclaredOff ? measureLoudness(danmakuOut) : { lufs: null, peakDb: null, detail: "无产物" });
   const verdict = await reviewStage({
     stage: "bgm", projectId: PROJECT,
     artifacts: [{ path: existsSync(out) ? out : danmakuOut, kind: "video", probe: info }],
     deterministic: [
-      { id: "scored", pass: existsSync(out), detail: existsSync(out) ? "配乐版已产出" : "配乐版未产出", hard: true },
-      { id: "tool-exit", pass: result.ok, detail: result.ok ? "配乐工位退出码 0" : `配乐工位失败：${result.out.slice(-300)}`, hard: true },
-      { id: "audio-track", pass: Boolean(info.hasAudio), detail: info.hasAudio ? `音轨 ${info.acodec}` : "无音轨", hard: !info.hasAudio },
+      { id: "scored", pass: existsSync(out) || bgmDeclaredOff,
+        detail: existsSync(out) ? "配乐版已产出"
+          : bgmNoBgmDeclared ? "配乐层不适用（工位判定无需配乐：人声太满/无可闻窗口，曲库无相容音乐床）——不伪造音乐轨"
+          : bgmDeclaredOff ? "配乐层不适用（声明降级 bgm_layer=false）：无签章分轨引用，不伪造干净轨"
+            : "配乐版未产出",
+        hard: !bgmDeclaredOff || REVIEW_POLICY === "blocking" },
+      { id: "tool-exit", pass: result.ok || bgmDeclaredOff,
+        detail: result.ok ? "配乐工位退出码 0" : `配乐工位失败：${result.out.slice(-300)}`,
+        hard: !result.ok && !bgmDeclaredOff },
+      { id: "audio-track",
+        pass: bgmNoBgmDeclared ? true : Boolean(info.hasAudio),
+        detail: bgmNoBgmDeclared ? "配乐层不适用（bgm_layer=false）：母版音轨继承上游（对白+环境），不叠加音乐"
+          : info.hasAudio ? `音轨 ${info.acodec}` : "无音轨",
+        hard: !info.hasAudio && !bgmNoBgmDeclared },
       {
         id: "loudness", pass: measured.lufs === null ? false : measured.lufs >= -17 && measured.lufs <= -12,
         detail: `${measured.detail}（母版口径 −14 LUFS ±2）`
@@ -7232,6 +7280,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     productAnchor: ROUTE_PREFLIGHT.productAnchor,
     notes: ROUTE_PREFLIGHT.notes,
   },
+  bgm: bgmManifestInfo,
   renderLedger,
   renderLedgerFile: publicDeliveryPath(renderLedgerFile) }, null, 2)}\n`, "utf8");
   if (QUALITY === "uhd") {
