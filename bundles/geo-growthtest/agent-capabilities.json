@@ -35,13 +35,36 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "kind": { "type": "string", "enum": ["consult", "service_request"] },
-          "title": { "type": "string", "minLength": 1, "maxLength": 120 },
-          "payload": { "type": "object" },
-          "conversationId": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 200 }
+          "kind": {
+            "type": "string",
+            "enum": [
+              "consult",
+              "service_request"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "payload": {
+            "type": "object"
+          },
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200
+          }
         },
-        "required": ["kind", "title"],
+        "required": [
+          "kind",
+          "title"
+        ],
         "additionalProperties": false
       },
       "risk": "low",
@@ -61,13 +84,37 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "kind": { "type": "string", "enum": ["consult", "service_request"] },
-          "title": { "type": "string", "minLength": 1, "maxLength": 120 },
-          "payload": { "type": "object" },
-          "conversationId": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "idempotencyKey": { "type": "string", "minLength": 8, "maxLength": 200 }
+          "kind": {
+            "type": "string",
+            "enum": [
+              "consult",
+              "service_request"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "payload": {
+            "type": "object"
+          },
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200
+          }
         },
-        "required": ["kind", "title", "idempotencyKey"],
+        "required": [
+          "kind",
+          "title",
+          "idempotencyKey"
+        ],
         "additionalProperties": false
       },
       "risk": "moderate",
@@ -89,13 +136,217 @@
       "inputSchema": {
         "type": "object",
         "properties": {
-          "id": { "type": "string", "minLength": 1, "maxLength": 120 }
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
         },
-        "required": ["id"],
+        "required": [
+          "id"
+        ],
         "additionalProperties": false
       },
       "risk": "low",
       "dataMode": "simulated"
+    },
+    {
+      "id": "growth.video.route.record",
+      "version": "1.0.0",
+      "title": "读取视频分流结论",
+      "description": "读取已落盘的视频类型分流记录（work/route.json，由 route-video.mts 产出）：营销片/叙事片/口播解说片/待澄清、置信度、商品锚点与澄清问题。只读文件，不重新跑分流、不访问服务端。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growthtest/capabilities/video.mjs",
+        "export": "routeRecord"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.production.status",
+      "version": "1.0.0",
+      "title": "读取视频生产状态",
+      "description": "读取某项目的逐阶段账本（logs/<project>/stages.jsonl）：各阶段 invoked/ok/failed/degraded、最近一次失败原因，以及渲染台账（提交次数/渲后判不合格/平台拒收/canary 止损）。只读本地账本，用于判断「卡在哪一步」，不触发任何渲染。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growthtest/capabilities/video.mjs",
+        "export": "productionStatus"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "workDir": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.delivery.inspect",
+      "version": "1.0.0",
+      "title": "核验视频交付清单",
+      "description": "读取交付清单（<out>/<project>-delivery-manifest.json）并逐个检查清单所列文件是否存在、大小，回传审核口径（reviewPolicy）、分流结论、配乐层状态与渲染台账；缺件/越界会如实列出。只读，不重新交付。",
+      "operation": "receipt",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growthtest/capabilities/video.mjs",
+        "export": "deliveryInspect"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "outDir": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.production.plan",
+      "version": "1.0.0",
+      "title": "预览出片计划（不执行）",
+      "description": "给出「出片建议命令 + 前置检查清单」（分流是否就绪、镜头卡是否在场、火山方舟密钥是否配置、欠费提示）。这是预览：不跑管线、不提交渲染、不花钱；真正的执行走 CLI（full-chain-film.mts）。",
+      "operation": "preview",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growthtest/capabilities/video.mjs",
+        "export": "productionPlan"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "projectId": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "platform": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "shotlistPath": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "routePath": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "outDir": {
+            "type": "string",
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.gen.catalog",
+      "version": "1.0.0",
+      "title": "读取视频模型目录",
+      "description": "读取服务端可提交的视频/图片/音频模型目录（服务端按运行时就绪度过滤）。只读服务端过程，不含密钥与账户信息。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.gen.catalog",
+        "method": "query",
+        "module": "bundles/geo-growthtest/capabilities/video.mjs"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "video",
+              "image",
+              "audio"
+            ]
+          },
+          "mode": {
+            "type": "string"
+          },
+          "includeUnavailable": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.production.shots",
+      "version": "1.0.0",
+      "title": "读取项目镜头与生产资格",
+      "description": "按项目读取服务端侧的镜头清单与生产资格状态（Studio 页同源过程）。只读；不提交渲染、不改变资格。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.production.shots",
+        "method": "query",
+        "module": "bundles/geo-growthtest/capabilities/video.mjs"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      }
     }
   ]
 }
