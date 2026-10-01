@@ -18,7 +18,7 @@
  *      本实现改为 `analyze` 从像素反推，并在 `annotate` 里过 Zod 契约校验 + 自愈重生成。
  *
  * 纪律：全部 workspace 作用域 + 事务级 RLS；渲染烧算力前置门沿用 G8
- * （`render_auto` 默认放行；判定为 review 且脚本未 approved 时拒绝）。
+ * （T-2026-1001-0007 起 `render_auto` 默认关闭：脚本须先 approved；`WORKLOOM_RENDER_AUTO=1` 才恢复自动放行）。
  */
 import { z } from "zod";
 import { createHash } from "node:crypto";
@@ -28,6 +28,7 @@ import { gatewayAppendOnClient } from "@workloom/base/workdata";
 import { judge, loadActiveRulesInTx, type RuntimeRule } from "@workloom/base/fence-engine";
 import { create as createRenderScript } from "@workloom/base/asset-cms";
 import { newId } from "@workloom/shared";
+import { renderSubmitAutoAllowed } from "../gate-policy.js";
 import { writeFileSync } from "node:fs";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../../trpc/context.js";
 import { scopedQuery, type Scope } from "../gen/db.js";
@@ -639,7 +640,7 @@ export const whiteboardRouter = router({
         action: "render.submit",
         params: { engine: "whiteboard-local", scenes: scenes.length, quality,
           capLongEdge, resolution: quality === "uhd" ? "3840x2160" : null },
-        context: { render_auto: (process.env.WORKLOOM_RENDER_AUTO ?? "1") !== "0" },
+        context: { render_auto: renderSubmitAutoAllowed() },
       }, rules, "review");
       if (verdict.level === "block") {
         throw new TRPCError({

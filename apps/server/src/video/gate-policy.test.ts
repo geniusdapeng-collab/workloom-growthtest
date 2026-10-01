@@ -2,7 +2,10 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, realpathSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { GATE_PRODUCER_STAGE, portraitGateEvidence, gateDeterministicChecks } from "./gate-policy.js";
+import {
+  AUTO_GATES, GATE_PRODUCER_STAGE, gateDeterministicChecks, portraitGateEvidence, portraitReviewManifest,
+  renderSubmitAutoAllowed,
+} from "./gate-policy.js";
 let dir: string;
 beforeEach(() => { dir = mkdtempSync(path.join(tmpdir(), "portrait-proof-")); });
 afterEach(() => rmSync(dir, { recursive: true, force: true }));
@@ -43,6 +46,30 @@ describe("服务预生产 G5/G7", () => {
     const input = { workDir: dir, projectId: "P1", stage: { status: "skipped", reason: "no-characters-or-products" }, scriptReport: { characters_count: 0 } };
     expect(portraitGateEvidence(input)).toMatchObject({ notApplicable: true, deterministic: [{ status: "not_applicable" }] });
     expect(portraitGateEvidence({ ...input, scriptReport: { characters_count: 1 } }).notApplicable).toBe(false);
+  });
+});
+
+describe("默认门策略（T-2026-1001-0007）：机器不替人类做决定", () => {
+  it("G5 定妆照默认人审：不在 AUTO_GATES 默认表里", () => {
+    expect(AUTO_GATES.has("G5_PORTRAIT")).toBe(false);
+    expect(AUTO_GATES.has("G2_THEME")).toBe(true);
+  });
+
+  it("渲染提交默认人审：只有显式 WORKLOOM_RENDER_AUTO=1 才自动放行", () => {
+    expect(renderSubmitAutoAllowed({})).toBe(false);
+    expect(renderSubmitAutoAllowed({ WORKLOOM_RENDER_AUTO: "0" })).toBe(false);
+    expect(renderSubmitAutoAllowed({ WORKLOOM_RENDER_AUTO: "1" })).toBe(true);
+  });
+
+  it("人类验收清单逐张列出定妆照文件与指纹（放行前可核对原图）", () => {
+    const f = fixture();
+    const manifest = portraitReviewManifest({ workDir: dir, projectId: "P1" });
+    expect(manifest.files).toHaveLength(4);
+    expect(manifest.markdown).toContain("放行前请逐张看过原图");
+    expect(manifest.markdown).toContain("角色 c1（front）");
+    expect(manifest.markdown).toContain("sha256");
+    expect(manifest.files.every((entry) => entry.sha256.length === 64)).toBe(true);
+    expect(f.files.front).toBeTruthy();
   });
 });
 

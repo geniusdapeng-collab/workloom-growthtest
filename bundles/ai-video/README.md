@@ -73,7 +73,7 @@ cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plate
 > `spec` 阶段；此时它按"25 字段 P0 规范"判（不要求生成用提示词）。真机事故：手写组装卡的 `character`
 > 只写"这位女士…"、没写主角名/ID（P0 字段），一路漏到封面才炸。
 
-## 3. 两条已定稿的执行口径（2026-09-30，产品所有者）
+## 3. 三条已定稿的执行口径（2026-09-30 / 10-01，产品所有者）
 
 1. **渲染后不做"合格/不合格"裁决**：`--review-policy off`（默认）。渲染成功就**直接走完整后期链并交付**，
    质量由客户验收。只保留**事实性硬闸**（产物存在/时长/分辨率/音轨/音画对齐/字幕文件/命名/变体差异）。
@@ -81,6 +81,9 @@ cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plate
 2. **渲染前一次性过关**：红线 linter（屏幕文字/证件文字/道具重复/落幅/帧率）、合同字段与参数、
    授权与素材用途、商品绑定、就绪度（风险优先渲染）——这些是 fail-closed 的**事前**闸；
    默认 `--max-attempts 1`，**禁止同提示词重试**（要重试必须先改卡）。
+3. **定妆照（G5）决策交人类**（T-2026-1001-0007）：8 张出满后**直接交人类验收**
+   （`portrait-agent accept`，`via=owner-acceptance`）；机器像不像/监制结论只留证，**不参与放行、不触发自动重做**。
+   服务端 Web 预生产同样默认在 G5 停下等人放行（G5 已移出 `HR_AUTO_GATES` 默认表），AI 打回也不再自动重跑。
 
 ## 4. 踩过的坑（务必遵守）
 
@@ -167,12 +170,16 @@ threeQuarterRight / smileCloseup / back / actionPose / emotionCloseup / handDeta
 pnpm exec tsx scripts/tools/real-person-assets.mts reconcile \
   --asset asset-xxxxxxxx --from <清单文件.txt|json> --apply --label "客户控制台资产详情页截图"
 
-# ② 两段式出定妆照（第一段视频路出身份母版；第二段图生图出其余角度；逐张机器像不像校验）
+# ② 两段式出定妆照（第一段视频路出身份母版；第二段图生图出其余角度；机器像不像只留证，不触发重做）
 pnpm exec tsx scripts/tools/portrait-set-from-asset.mts \
   --asset asset://asset-xxxxxxxx --character <角色ID> --library <角色库> \
   --out-dir <角色目录>/portraits/_derived --angles front,threeQuarter,closeup,side \
   --engine two-stage --stage-a-angles front --refs 2 \
-  --verify-against <已验收成片帧.jpg> --install --activate
+  --verify-against <已验收成片帧.jpg> --install --activate   # 机器像不像只留证；--require-likeness 才整批拒绝（旧行为）
+
+# ③ 人类看过 8 张后记录验收（机器不代替签字；人类明确否决才阻断）
+pnpm exec tsx scripts/tools/portrait-agent.mts accept --character <角色ID> \
+  --by "<验收人>" --note "<依据/原话，例如：这 8 张可以的，都 ok 的>"
 ```
 
 > 角度映射由 **Agent 读截图缩略图**给出（标 `angleGuess`，属"机器/Agent 判读、非客户逐张确认"）；
@@ -187,7 +194,7 @@ pnpm exec tsx scripts/tools/portrait-set-from-asset.mts \
 |---|---|---|
 | 客户截图/清单里**哪些 asset ID 有效**、顺序、来源文件名、组 ID、证据 | **清单对账层**（§6.0） | `real-person-assets.mts` + `packages/video-studio/src/real-person-asset-sync.ts` |
 | 主档 `assetId` / `referenceAssets` / `referenceAssetSources` 的写回 | **清单对账层** | 同上（`reconcile --apply`，写前备份、写后自检） |
-| 每个**角度槽位**怎么来、"像不像"谁判、产物写哪 | **出图/装机层**（§6.1） | `portrait-set-from-asset.mts`（两段式 + 逐张机器校验）→ `portrait-set-install.mts`（写档 + `verifyPortraitSet` 复核） |
+| 每个**角度槽位**怎么来、"像不像"谁判、产物写哪 | **出图/装机层**（§6.1） | `portrait-set-from-asset.mts`（两段式出图 + 机器像不像**只留证**）→ `portrait-set-install.mts`（写档 + `verifyPortraitSet` 复核）→ `portrait-agent accept`（**人类验收放行**，机器不决策） |
 | 角色档案 `portraitSets`（`files`/`artifacts`/`active`/`source-map.json`） | **出图/装机层** | 同上；本层不对 `referenceAssets` 做任何推断 |
 | 管线消费 | G-RP1/像不像门读**主档**（对账层）；封面/关键帧读**角色档案**（装机层） | `scripts/tools/full-chain-film.mts` |
 
@@ -200,5 +207,6 @@ pnpm exec tsx scripts/tools/portrait-set-from-asset.mts \
 2. **参考图 2 张最好**（角度对应那张 + 主素材）；4 张不同服装/光位混投会让脸跑偏；
 3. **只对"人脸是真的"负责**（客户口径 2026-10-01）：发型/发色/妆造/服装/配饰/品牌标识/背景灰调差异**不得**判不合格
    （真人本来就会变），造型只作软性偏好；主素材若是古装/生活照，也**不要**因此把造型一致性当硬闸；
-4. **像不像必须机器判**、阈值 **88**（对已验收成片帧，`--min-likeness` / 评审 `--min-score`），判不过**整批拒绝**；
+4. **机器像不像只留证、不决策**（T-2026-1001-0007）：阈值 88 的逐张实测保留为证据，但**不阻断、不触发重做**；
+   8 张直接交人类验收（`portrait-agent accept`，`via=owner-acceptance`），人类明确否决才可以退回；只有显式 `--require-likeness` 才恢复"整批拒绝"旧口径；
 5. **追加不重来**：后续补角度用 `--archive-refs <角色目录>`，以**已发布定妆照**为参考、旧版本保留——保证客户先后发布的视频人物一致。

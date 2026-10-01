@@ -32,6 +32,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { assessLikenessBatch } from "../../packages/video-studio/src/likeness-policy.js";
 
 function arg(name: string, fallback = ""): string {
   const index = process.argv.indexOf(name);
@@ -432,7 +433,8 @@ async function toDataUrl(png: Buffer, tag: string): Promise<string> {
  * **两段式生产**（默认引擎，产品所有者口径：要"专业定妆照"、不要单图派生）：
  *   第一段：用 `asset://` 参考（视频路，唯一吃 asset 的入口）先出 1–2 张**身份母版**（默认 front，可加 threeQuarter）；
  *   第二段：以身份母版**多图**为参考走图端点 img2img（2K、便宜、专业布光），逐角度出图。
- * 任何一张不过"机器像不像"留证 → 单张回退视频路（asset 参考）重做一次；仍不过**只记录**（`--require-likeness` 时整批拒绝）。
+ * 任何一张不过"机器像不像"→ **只记录，不自动重做**（T-2026-1001-0007）；默认整批照常出图交人类验收，
+ * 只有显式 `--require-likeness` 才整批拒绝（旧行为 opt-in）。
  */
 const stageAAngles = arg("--stage-a-angles", "front").split(",").map((value) => value.trim()).filter(Boolean);
 const stageAMasters = new Map<string, Buffer>();
@@ -526,14 +528,12 @@ for (const entry of plan.angles) {
   }
   const file = join(outDir, `${characterId}-${entry.angle}.png`);
   writeFileSync(file, image);
-  let likeness = await likenessCheck(image, entry.angle);
-  /** 两段式下若图生图不像 → 单张回退视频路（asset 参考）重做一次；仍不过就保持失败（整批会拒绝） */
-  if (!likeness.ok && engineArg === "two-stage" && !stageAMasters.has(entry.angle)) {
-    console.log(`  ↻ ${entry.angle} 像不像未过（${likeness.reason.slice(0, 60)}）→ 回退视频路（asset 参考）重做一次`);
-    image = await generateViaVideo(entry.prompt, liveRefs);
-    writeFileSync(file, image);
-    likeness = await likenessCheck(image, entry.angle);
-  }
+  const likeness = await likenessCheck(image, entry.angle);
+  /**
+   * 机器像不像结论**不触发任何自动重做**（T-2026-1001-0007）：本文件已经写盘并进入本批产物，
+   * 是否重做由人类看过 8 张后决定。曾经这里是“图生图不像 → 回退视频路重做一次”，
+   * 那正是“机器判不合格 → 自己重新提交生成”的残留路径，已删除。
+   */
   perAngle.push({
     angle: entry.angle, file, sha256: createHash("sha256").update(image).digest("hex"),
     bytes: image.byteLength, refs: entry.refs, likeness,
@@ -547,16 +547,20 @@ for (const entry of plan.angles) {
  *
  * 为什么不再当闸门：这个机器判据本身不稳定——同一批文件实测同一张图出现 92 / 15 / 86 三种结论，
  * 拿它当门只会误杀（把像的拦下）或误放（把不像的放过）。需要旧行为时显式加 `--require-likeness`。
+ * `assessLikenessBatch` 固化“默认不阻断、不重做；只有显式 --require-likeness 才整批拒绝”。
  */
-const failedLikeness = perAngle.filter((entry) => !entry.likeness.ok);
-if (failedLikeness.length > 0) {
-  const detail = failedLikeness.map((entry) => `${entry.angle}（score ${entry.likeness.score ?? "n/a"}）：${entry.likeness.reason}`);
-  if (flag("--require-likeness")) {
+const likenessDecision = assessLikenessBatch(
+  perAngle.map((entry) => ({ angle: entry.angle, ok: entry.likeness.ok, score: entry.likeness.score, reason: entry.likeness.reason })),
+  { requireLikeness: flag("--require-likeness") },
+);
+if (likenessDecision.failed.length > 0) {
+  const detail = likenessDecision.failed.map((entry) => `${entry.angle}（score ${entry.score ?? "n/a"}）：${entry.reason ?? ""}`);
+  if (likenessDecision.blocking) {
     console.error(`\n以下角度未过自动像不像校验（--require-likeness：整批拒绝）：`);
     for (const line of detail) console.error(`  ${line}`);
     process.exit(2);
   }
-  console.log(`\n⚠ 机器像不像留证（不阻断出图，按口径交人类评审）：${failedLikeness.length}/${perAngle.length} 个角度低于阈值`);
+  console.log(`\n⚠ ${likenessDecision.summary}——不自动重做，请人类看过原图后决定`);
   for (const line of detail) console.log(`  ${line}`);
 }
 

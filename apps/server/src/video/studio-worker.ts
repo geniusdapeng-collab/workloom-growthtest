@@ -64,6 +64,7 @@ import {
   isProducerRejection,
   producerModeFromEnv,
   portraitGateEvidence,
+  portraitReviewManifest,
   writeGateArtifact,
   type ProducerMode,
 } from "./gate-policy.js";
@@ -729,6 +730,38 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
           }
         : { approved: false, reason: `producer-unavailable(${req.gate})`, fatal: "producer_unavailable" };
     }
+    /**
+     * G5 定妆照：**默认人审**（T-2026-1001-0007，G5 已移出 AUTO_GATES 默认表）。
+     * ① 事实核验先行：实际出图 / 必需角度 / 文件可读，不成立即 fail-closed（不占用人类时间，也不自动重出）；
+     * ② 事实成立 → 把逐张文件清单写进审批内容，交给人类看过原图后放行或退回；
+     * ③ 机器像不像/监制判据不参与这里的决策，也不会触发自动重做。
+     */
+    let humanContentMd = req.contentMd ?? "";
+    if (gate === "G5_PORTRAIT") {
+      const portrait = portraitGateEvidence({
+        workDir: runWorkDir,
+        projectId: input.projectId,
+        stage: completedVendorResult?.stages?.portraitStudio,
+        scriptReport: (completedVendorResult?.stages?.scriptEngine as { report?: unknown } | undefined)?.report,
+      });
+      if (portrait.notApplicable) {
+        gateProofs.set("G5_PORTRAIT", { gate, approved: true, status: "not_applicable", via: "deterministic",
+          degraded: false, model: null, evidence: [], basis: "no-characters-or-products" });
+        return { approved: true, reason: "no-characters-or-products", suggestions: [] };
+      }
+      const evidenceFailed = portrait.deterministic.filter((check) => check.hard === true && check.pass === false);
+      if (evidenceFailed.length > 0) {
+        gateProofs.set("G5_PORTRAIT", { gate, approved: false, status: "failed", via: "deterministic",
+          degraded: false, model: null, evidence: portrait.deterministic });
+        return {
+          approved: false,
+          reason: `portrait-evidence-failed：${evidenceFailed.map((check) => check.detail).join("；")}`,
+          suggestions: [],
+          fatal: "portrait_evidence_missing",
+        };
+      }
+      humanContentMd = `${humanContentMd}\n\n${portraitReviewManifest({ workDir: runWorkDir, projectId: input.projectId }).markdown}`;
+    }
     /* HR_PRODUCER=human 或门不在 AUTO_GATES 内 → 落到下面的人工审批分支（插 approvals 行等人点） */
     // D16（#1/A）：门动作事件与 approvals 行同一事务同一 COMMIT（模仿 fence.confirmDryRun 口径）
     const client = await getAppPool().connect();
@@ -758,7 +791,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
          ON CONFLICT (event_id, channel) DO NOTHING`,
         [
           approvalId, scope.tenantId, scope.workspaceId, ev.eventId,
-          JSON.stringify({ contentMd: req.contentMd, gate: req.gate, vendorType: req.vendorType }),
+          JSON.stringify({ contentMd: humanContentMd, gate: req.gate, vendorType: req.vendorType }),
         ],
       );
       await client.query("COMMIT");
@@ -776,6 +809,11 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     entry.currentGate = null;
     entry.pendingApprovalId = null;
     if (entry.status === "awaiting_approval") entry.status = "running";
+    /** G5 的放行/否决来自人类验收（T-2026-1001-0007）：把人类裁决写进本次门证据，供终态完整性核对与审计 */
+    if (gate === "G5_PORTRAIT") {
+      gateProofs.set(gate, { gate, approved: verdict.approved, status: verdict.approved ? "passed" : "failed",
+        via: "owner-acceptance", degraded: false, model: null, evidence: [] });
+    }
     return verdict;
   };
 
@@ -852,16 +890,17 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
         rule_impact: [],
       });
       /**
-       * AI 监制打回 → **有上限的自动重跑**（T-2026-0925-0002）。
+       * AI 监制打回 → **默认打回即停，不再自动重跑**（T-2026-1001-0007）。
        *
-       * 门语义是"打回重跑"：此前一次被打回就整条停线，等于把返工成本丢给用户
-       * （真机 VID-AUDIT-M2/M3/M5 均因单次打回停线）。默认重跑 1 次，
-       * `VM_PRODUCER_RETRY` 可调（0 = 打回即停，与旧行为一致）。
+       * 为什么改：自动重跑会把"AI 认为不合适"直接变成"再花钱重出一遍"，
+       * 真机上正是"打回 → 自动重跑（含重新出图）→ 再打回"的烧钱循环。
+       * 现在 AI 监制只负责**把问题提前暴露**；打回即停并如实上报，是否重做由人决定。
+       * 显式设 `VM_PRODUCER_RETRY=1`（或更大）才恢复旧的有上限自动重跑口径。
        *
        * 制片档案口径（T-2026-0926-0001）：每次重跑 = 新 attempt（`claimRun` 原子递增），
        * 「第几次尝试、耗时、错误分类」全部落盘，历史不丢。
        */
-      const maxAttempts = Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 1) + 1);
+      const maxAttempts = Math.max(1, Number(process.env.VM_PRODUCER_RETRY ?? 0) + 1);
       const runOnce = async (): Promise<Awaited<ReturnType<VideoStudio["runPreproduction"]>>> => {
         const runnerStore = archive;
         // 档案 output 是给索引/交接包使用的摘要，不能取代 vendor 业务结果。
@@ -926,7 +965,8 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
             if (r.success) {
               const missing = [...(input.isMarketing ? ["G1_DOSSIER"] : []), "G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"].filter(gate => {
                 const proof = gateProofs.get(gate);
-                return !(proof?.approved === true && (proof.status === "passed" && proof.via === "llm" && proof.degraded === false
+                return !(proof?.approved === true && (proof.status === "passed" && ((proof.via === "llm" && proof.degraded === false)
+                  || (gate === "G5_PORTRAIT" && proof.via === "owner-acceptance" && proof.degraded === false))
                   || gate === "G5_PORTRAIT" && proof.status === "not_applicable" && proof.basis === "no-characters-or-products"));
               });
               if (missing.length) {

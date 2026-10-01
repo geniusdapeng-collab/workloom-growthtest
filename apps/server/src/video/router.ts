@@ -41,6 +41,7 @@ import { canonicalRenderJson } from "./gen/compiled-request.js";
 import { loadQualifiedRenderInput } from "./production-authority.js";
 import { productionRouter } from "./production-router.js";
 import { filmRouter } from "./film-router.js";
+import { renderSubmitAutoAllowed } from "./gate-policy.js";
 import { createPublishTask, executePublishTask, fenceOverrideEnabled } from "./gen/publish.js";
 import { mediaUrl } from "./gen/ingest.js";
 /** PollReport 类型再导出（web 端 AppRouter 类型可移植性，TS2883） */
@@ -924,10 +925,11 @@ const renderRouter = router({
       // G8 围栏预检（纯函数判定；impacts 随事件落库）
       const { rules, defaultLevel } = await loadActiveRules(app, scope);
       /**
-       * 素材制作默认全自动（2026-09-21 产品所有者口径）：
-       * 「制作投放素材」（图片 / 视频 / 渲染脚本）不设人审卡点；需要人审的是**投放领域**
-       * （加投 G12）与**改价**场景，以及算力**超预算**（G11：project_compute_used ≥ cap）时暂停提交。
-       * 这里显式给判定器上下文：render_auto=true ⇒ G8（渲染提交必审）自动放行；
+       * 渲染提交（花钱动作）默认人审（T-2026-1001-0007 产品所有者口径）：
+       * 渲出来的第一版给人类看，是否再花钱重做由人决定；`render_auto=false` ⇒ G8（渲染提交必审）
+       * 要求脚本先经 `cms.approveScript` 审批。2026-09-21 的"素材制作默认全自动"旧口径已停用，
+       * 只有显式 `WORKLOOM_RENDER_AUTO=1` 才恢复自动放行。
+       * 需要人审的还有**投放领域**（加投 G12）、**改价**场景，以及算力**超预算**（G11：project_compute_used ≥ cap）时暂停提交。
        * 预算上限可由 WORKLOOM_PROJECT_COMPUTE_CAP（秒）配置，未配置视为不设上限。
        * 注意：缺失路径的数值比较会触发求值异常→block，所以两个数值必须显式给出。
        */
@@ -937,7 +939,7 @@ const renderRouter = router({
         action: "render.submit",
         params: modeParams,
         context: {
-          render_auto: (process.env.WORKLOOM_RENDER_AUTO ?? "1") !== "0",
+          render_auto: renderSubmitAutoAllowed(),
           project_compute_used: 0,
           project_compute_cap: Number.isFinite(computeCap) && computeCap > 0 ? computeCap : Number.MAX_SAFE_INTEGER,
         },

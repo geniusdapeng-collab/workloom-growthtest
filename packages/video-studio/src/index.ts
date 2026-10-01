@@ -17,6 +17,8 @@ export * from "./portrait-runtime.js";
 export * from "./portrait-binding.js";
 export * from "./character-archive.js";
 export * from "./portrait-agent.js";
+export * from "./portrait-decision.js";
+export * from "./likeness-policy.js";
 export * from "./producer-gate.js";
 export * from "./shot-spec.js";
 export * from "./route-preflight.js";

@@ -1,5 +1,29 @@
 # Changelog
 
+## [video-governance] - 2026-10-01 · 决策权归人类：定妆照 G5 人审 + AI 打回不再自动重跑（T-2026-1001-0007）
+
+> 真机事故：AI 监制认为"不合适"就自动重跑（含重新出图），把客户额度烧在反复重做上；
+> 定妆照"像不像"这类机器判据本身不稳定（同一批文件实测 92 / 15 / 86），不该成为放行与否决依据。
+> 本版把决策权收回人类：机器只负责把问题提前暴露，重做与否由人决定。
+
+- **服务端预生产**：`AUTO_GATES` 默认移除 `G5_PORTRAIT`——定妆照默认**人审**；人审分支先做事实核验
+  （实际出图/必需角度/文件可读），通过后把**逐张定妆照清单**（路径 + sha256）写进审批内容供人类核对；
+  事实不成立直接 fail-closed，不占用人类时间。
+- **不再自动重跑**：`VM_PRODUCER_RETRY` 默认从 1 改为 **0**（AI 打回即停并如实上报）；显式设为 1 或更大
+  才恢复旧的有上限自动重跑口径。
+- **花钱动作人审**：渲染提交 `WORKLOOM_RENDER_AUTO` 默认从 1 改为 **0**（脚本须先 `cms.approveScript` 审批），
+  白板片渲染同口径；显式 `WORKLOOM_RENDER_AUTO=1` 才恢复旧自动放行。
+- **CLI 定妆照**：`portrait-set-from-asset.mts` 删除"机器像不像不过 → 自动回退视频路重做一次"的路径；
+  机器判据默认只留证，`--require-likeness` 才整批拒绝（旧行为 opt-in）。`portrait-agent review` 改为
+  **advisory**（不再写"打回"、不再 exit 4、不再阻断 G5）；`full-chain-film.mts` 的 G5 只认人类验收记录
+  （`via=owner-acceptance`），旧版被机器判据带成 `approved=false` 的记录按留证处理、不再误阻断。
+- **口径层同步**：`bundles/ai-video/README.md` §3/§6.1/§6.2、`docs/real-person-portrait-set.md`、
+  `docs/capability-map.md`、`docs/producer-gate-design.md`、`docs/video-pipeline-routing-and-dossier-2026-09-25.md`、
+  `bundles/ai-video/presets/{portrait-artist,producer}.yml`、`bundles/ai-video/skills/{portrait-studio,producer-gate-review}/SKILL.md`。
+- **断言兜底**：新增 `portrait-decision`（人类验收是唯一决策来源）与 `likeness-policy`（默认不阻断、不重做）
+  纯函数与单测；`gate-policy` 断言 G5 默认人审与渲染默认人审；`studio-worker` 断言默认打回即停；
+  `production-router` 断言未设开关时 `render_auto=false`。
+
 ## [client-delivery] - 2026-09-28 · 右侧「织伴」对话框交付链路修复（T-2026-0928-0001）
 
 > 客户报障「右侧 AI 对话框安排任何任务都无法交付」。沙箱真机复现 + 逐行审计后按三轮问题清单

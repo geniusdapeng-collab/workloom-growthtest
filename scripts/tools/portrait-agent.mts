@@ -9,7 +9,7 @@
  *        [--anchor <角色目录相对路径或绝对路径，可逗号分隔；也可给目录>]
  *   node scripts/tools/portrait-agent.mts review --character <characterId> [--version N] [--anchor <参考照片>]
  *        [--min-score 88] [--batch-size 12]
- *        # AI 监制评审：拿授权真人照片当基准，判断定妆照"是不是同一个人"；不合格即判 rerun
+ *        # 机器监制评审（T-2026-1001-0007 起仅留证，不参与放行、不触发重做）：判断"是不是同一个人"
  *        # 成套定妆照默认一批看完（batch-size 12）：切批会让"同一人"这个整批判据被切碎
  *   node scripts/tools/portrait-agent.mts accept --character <characterId> [--version N]
  *        --by "<验收人>" --note "<依据/原话>" [--min-likeness 80]
@@ -263,17 +263,21 @@ async function main(): Promise<void> {
       via: verdict.via,
       score: verdict.score,
       degraded: verdict.degraded,
-      reason: verdict.reason,
-      evidence: { reviewFile, artifacts: produced.length, references: fallbackAnchors.length, characterId: entry.id, version: target.version }
+      reason: `【机器留证·不参与放行】${verdict.reason}`,
+      evidence: {
+        reviewFile, artifacts: produced.length, references: fallbackAnchors.length, characterId: entry.id, version: target.version,
+        /** T-2026-1001-0007：机器评审判据退出决策链，只作证据；放行请走 `accept`（via=owner-acceptance） */
+        advisory: true, decisionPolicy: "machine-evidence-only", decisionOwner: "human",
+      }
     });
     appendGateEvent(join(characterDir, "gates.jsonl"), gateEvent);
-    console.log(`门记录（g5-portrait-confirm）：${gateEvent.ok ? "放行" : "未过"} → ${join(characterDir, "gates.jsonl")}`);
-    console.log(`监制结论：${verdict.approved ? "放行" : "打回重跑"}（score=${verdict.score} · via=${verdict.via}）`);
+    console.log(`门记录（g5-portrait-confirm）：机器留证已写入（不参与放行）→ ${join(characterDir, "gates.jsonl")}`);
+    console.log(`机器结论（仅留证，不决定放行/重做）：${verdict.approved ? "机器认为合格" : "机器认为不合格"}（score=${verdict.score} · via=${verdict.via}）`);
     console.log(`  理由：${verdict.reason}`);
     if (verdict.issues.length > 0) console.log(`  问题：${verdict.issues.join("；")}`);
     if (verdict.suggestions.length > 0) console.log(`  建议：${verdict.suggestions.join("；")}`);
     console.log(`  评审记录：${reviewFile}`);
-    if (!verdict.approved) process.exitCode = 4;
+    console.log(`  （T-2026-1001-0007：机器判据不触发重做；请人类看过原图后执行 accept 记录验收）`);
     return;
   }
 
