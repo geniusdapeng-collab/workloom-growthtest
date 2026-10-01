@@ -760,7 +760,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "908256cd99cfa8c8ca6cbd37d73c9f2e3553f53b0717f02a9d5018ca2f589757",
+    "digest": "ef814f35e07bcc7374a2676af8c9a064e7044922e9c1dcb046aa938d82421e9a",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "9180a2cb1fbac95f4c5ec835041e98436ccc2de6d7a874abb651bf6b74124425",

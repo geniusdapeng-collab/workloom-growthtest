@@ -17,11 +17,20 @@
 | [`model-02-lin-yu-an/profile.json`](model-02-lin-yu-an/profile.json) | **2 号模特林予安**档案正文（`kind: generated`，原创虚构 AI 角色，非真人、非 1 号替身） |
 | `model-02-lin-yu-an/portraits/v1/*.jpg` | 林予安定妆照集 **8 个角度**（同上角度表，纯文生图，逐张过 `clean-background/v2` 背景闸） |
 | `model-02-lin-yu-an/provenance.json` | 逐角度生成溯源：实际模型/创建时间/HTTP 请求 id、提示词摘要与 SHA-256、产物 SHA-256、自定义 ProduceID（**不是**平台 task_id；隐式水印未验证） |
+| [`model-03-demo-character/profile.json`](model-03-demo-character/profile.json) | **3 号「客户方CEO」**档案正文（`kind: authorized-real`，客户方 CEO；形象来自火山方舟私域真人人像库认证素材 `asset://asset-20260101000000-demo` 的**派生定妆照**） |
+| `model-03-demo-character/portraits/v1/*.jpg` | 该角色定妆照集：**已验收 8 张**（front / threeQuarter / closeup / side ＋ frontFull / threeQuarterLeft / threeQuarterRight / smileCloseup） |
+| `model-03-demo-character/reviews/*.json`、`gates.jsonl` | 评审与门留痕：**客户验收放行**（`via=owner-acceptance`）＋ 机器监制记录（只留证、不裁决） |
+| `model-03-demo-character/provenance.json`、`portraits/v1/source-map.json` | 生成方式与逐角度溯源（含未生成角度的如实登记） |
 
+> **3 号的待补角度（如实登记，不冒充齐备）**：标准 8 角度里的 `back / actionPose / emotionCloseup / handDetail`
+> 尚未生成——2026-10-01 平台账户欠费（403 AccountOverdueError），充值后用
+> `scripts/tools/portrait-set-from-asset.mts`（默认就是标准 8 角度）补出并装新版本即可。
+>
 > **在册资产（完整性索引）**：`registry.json` + 1 号 `profile.json` + `portraits/v3/` 的 8 张定妆照、
-> 2 号 `profile.json` + `provenance.json` + `portraits/v1/` 的 8 张定妆照
+> 2 号 `profile.json` + `provenance.json` + `portraits/v1/` 的 8 张定妆照、
+> 3 号 `profile.json` + `provenance.json` + `portraits/v1/source-map.json` + `portraits/v1/` 的 8 张定妆照
 > 已登记在 `bundles/ai-video/bundle.json#provides.library`，装载时校验 sha256（稳定包另验 Ed25519 签名）。
-> **改动这 10 件必须在同一提交重算摘要**：`tsx scripts/bundle-governance.mts --refresh-digests`
+> **改动这些在册文件必须在同一提交重算摘要**：`tsx scripts/bundle-governance.mts --refresh-digests`
 > （稳定包另需 `BUNDLE_SIGNING_PRIVATE_KEY` / `BUNDLE_SIGNING_KEY_ID` 重签），否则行业包会装载失败。
 > `gates.jsonl` / `reviews/*.json` / 本 README 刻意不入册（运行期账本与文档）。
 

@@ -9,6 +9,9 @@ import { loadCharacterEntry, loadCharacterLibrary, resolveShotCast } from "./cha
  *   ① 1 号陈卓仍是**唯一默认**（defaultModel 不得被 2 号顶替）；
  *   ② 2 号林予安是原创虚构 AI 角色，档案可装载、8 角度齐备、按名字可解析；
  *   ③ 清单里每个内置模特都要有可解析档案（防止"只加清单不加资产"）。
+ *   ④ 3 号"客户方CEO"是**客户授权真人**（平台认证素材派生定妆照）：必需要的 4 个角度齐备、
+ *      已声明角度逐张有文件；标准 8 角度里的 4 个（back/actionPose/emotionCloseup/handDetail）
+ *      因平台欠费尚未生成，按如实登记处理（缺角度不许冒充齐备）。
  */
 const REPO_ROOT = resolve(fileURLToPath(new URL(".", import.meta.url)), "../../..");
 const CHARACTERS_ROOT = resolve(REPO_ROOT, "bundles/ai-video/library/characters");
@@ -19,18 +22,25 @@ describe("随仓内置角色库", () => {
     models: Array<{ ordinal: number; id: string; name: string; archive: string }>;
   };
 
-  it("默认模特仍是 1 号陈卓，2 号只在点名时使用", () => {
+  it("默认模特仍是 1 号陈卓；2/3 号只在点名时使用", () => {
     expect(registry.defaultModel).toBe("chen-zhuo");
-    expect(registry.models.map((model) => [model.ordinal, model.id])).toEqual([[1, "chen-zhuo"], [2, "lin-yu-an"]]);
+    expect(registry.models.map((model) => [model.ordinal, model.id]))
+      .toEqual([[1, "chen-zhuo"], [2, "lin-yu-an"], [3, "demo-character"]]);
   });
 
-  it("登记的内置模特都有可装载档案，8 角度齐备", () => {
+  it("登记的内置模特都有可装载档案；必需角度齐备，声明了标准 8 角度的必须 8 角度齐备", () => {
+    const required = ["front", "threeQuarter", "closeup", "side"];
+    /** 随仓内置的原创 AI 模特（1/2 号）承诺标准 8 角度；客户授权真人的档案按其已声明角度验收 */
+    const mustHaveStandardEight = new Set(["chen-zhuo", "lin-yu-an"]);
     for (const model of registry.models) {
       const entry = loadCharacterEntry(resolve(REPO_ROOT, model.archive));
       expect(entry, model.id).not.toBeNull();
       expect(entry!.id).toBe(model.id);
       expect(entry!.verification.status, `${model.id}: ${entry!.verification.issues.join("；")}`).toBe("passed");
-      for (const angle of ["front", "threeQuarter", "closeup", "side", "back", "actionPose", "emotionCloseup", "handDetail"]) {
+      const declined = mustHaveStandardEight.has(model.id)
+        ? [...required, "back", "actionPose", "emotionCloseup", "handDetail"]
+        : [...required, ...(entry!.activeSet?.angles ?? [])];
+      for (const angle of declined) {
         expect(Object.keys(entry!.files), `${model.id} ${angle}`).toContain(angle);
       }
     }
