@@ -97,7 +97,7 @@
 | 4 | 创意主题 LLM 提取连续两轮「未找到 JSON」→ 规则兜底 | `temperature=1` 且未开 `response_format` | `_extractFieldsWithLLM`：`forceJson` + 低温度 + 失败按「只输出 JSON」重试一次 |
 | 5 | 基调反复判成「史诗悲壮」，G2 以"基调与内容冲突"打回 | 生成器自由发挥 | 输入侧声明可选基调并禁用宏大/惊悚项；`_applyBriefProfile` 加**基调护栏**（按品类落 温暖治愈/冷酷精密/轻快明朗，标注覆盖原因） |
 | 6 | G3 连续三轮「四类契约缺失」 | ①确认单**根本没有契约区**；②监制只看得到门内容**前 600 字摘录**（服务端把 `GATE:vendorType` 当路径传给评审，读文件失败 → 文档后半段等于不存在） | ①`_renderRequirementContract()` 输出角色/场景/道具/动作 + 受众/风险结论摘要（结构化资料优先、噪声过滤、角色从场景文本兜底）；②`writeGateArtifact()` 把门内容落盘成真实文件再送审（生产与审计工具同一口径） |
-| 7 | 内部门打回即整条停线 | 门语义是"打回重跑"，宿主没有重跑循环 | `isProducerRejection()` + 宿主**有上限自动重跑**（`VM_PRODUCER_RETRY` 默认 1 次；审计工具 `--producer-retry`） |
+| 7 | 内部门打回即整条停线 | 门语义是"打回重跑"，宿主没有重跑循环 | `isProducerRejection()` + 宿主 fail-closed 停线并**如实上报**（T-2026-1001-0007：`VM_PRODUCER_RETRY` 默认 **0 = 打回即停**，显式 ≥1 才恢复旧的有上限自动重跑；审计工具 `--producer-retry`） |
 
 ---
 
@@ -170,6 +170,7 @@
 - 应急开关：
   - `VM_DATA_MINING=0` → 关闭情报层装配（回到无档案运行）；
   - `VM_DATA_MINING_MODE=spec` → 只出采集任务书（旧口径）；
-  - `HR_AUTO_GATES=`（空）→ 内部门恢复人审；
-  - `VM_PRODUCER_RETRY=0` → 打回即停（旧行为）；
+  - `HR_AUTO_GATES=`（空）→ 内部门恢复人审；默认表不含 `G5_PORTRAIT`（T-2026-1001-0007：定妆照默认人审）；
+  - `HR_AUTO_GATES` 显式包含 `G5_PORTRAIT` → 恢复 G5 的 AI 自动裁决（不推荐，机器像不像判据不稳定）；
+  - `VM_PRODUCER_RETRY=1`（或更大）→ 恢复旧的有上限自动重跑；默认 **0 = 打回即停**；
   - `WL_SEARCH_PROVIDERS=...` / `--prime-search` → 切换检索通道。

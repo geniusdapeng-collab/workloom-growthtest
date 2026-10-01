@@ -127,7 +127,6 @@ beforeEach(() => {
   vi.stubEnv("ARCHIVE_ENABLED", "1");
   vi.stubEnv("MEDIA_INGEST_ENABLED", "1");
   vi.stubEnv("HR_PORTRAIT_ENABLED", "0");
-  vi.stubEnv("VM_PRODUCER_RETRY", "1");
 });
 
 const success = () => ({
@@ -316,7 +315,8 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
   });
 
-  it("启用档案时，监制打回仍触发有限重试，成功结果保留 stages.dataMining 驱动商品投影", async () => {
+  it("显式 VM_PRODUCER_RETRY=1 时才恢复有限重试；成功结果保留 stages.dataMining 驱动商品投影", async () => {
+    vi.stubEnv("VM_PRODUCER_RETRY", "1");
     doubles.runPreproduction.mockResolvedValueOnce(rejected()).mockResolvedValueOnce(success());
     const { entry, projectId, runId } = await runToTerminal();
     expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
@@ -340,13 +340,13 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.uninstall).toHaveBeenCalledTimes(1);
   });
 
-  it("监制连续打回到上限后 status=failed，保留具体拒绝原因", async () => {
+  it("默认：监制打回即停，不自动重跑（不再把 AI 打回变成重复烧钱）", async () => {
     doubles.runPreproduction.mockResolvedValue(rejected());
     const { entry } = await runToTerminal();
-    expect(doubles.runPreproduction).toHaveBeenCalledTimes(2);
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
     expect(entry.status).toBe("failed");
     expect(entry.error).toContain("producer-rejected(G2_THEME)：需求冲突");
-    expect(entry.resultSummary).toMatchObject({ success: false, producerAttempts: 2, stages: ["creativeTheme"] });
+    expect(entry.resultSummary).toMatchObject({ success: false, producerAttempts: 1, stages: ["creativeTheme"] });
     expect(worker.summarizeWorkspaceRuns(scope.workspaceId).failedRecent).toBeGreaterThan(0);
   });
 
@@ -467,13 +467,15 @@ describe("预生产原始结果与诚实终态", () => {
     expect(entry.status).toBe("failed"); expect(entry.error).toContain("缺少服务监制裁决");
     expect(doubles.finish.mock.calls.every(([row]) => row.status === "failed")).toBe(true);
   });
-  it("定妆照只完成计划却缺实际图片时host G5打回，不能被vendor success:true掩盖", async () => {
+  it("定妆照只完成计划却缺实际图片时，G5 事实核验先行失败关闭（不占用人类时间、不调 AI 评审）", async () => {
     doubles.runPreproduction.mockImplementation(async () => ({ ...success(), stages: { ...success().stages,
       portraitStudio: { status: "completed", completedPortraits: 0, pendingPortraits: 4, characters: 1, products: 0 },
       scriptEngine: { report: { characters_count: 1 } } } }));
     const { entry } = await runToTerminal(false);
-    expect(entry.status).toBe("failed"); expect(entry.error).toContain("producer-rejected");
-    expect(doubles.review.mock.calls.some(([options]) => options.context.gate === "G5_PORTRAIT" && options.deterministic.some((check: { pass: boolean }) => !check.pass))).toBe(true);
+    expect(entry.status).toBe("failed");
+    expect(entry.error).toMatch(/portrait-evidence-failed|定妆照未完整生成/);
+    /** T-2026-1001-0007：G5 不再走 AI 监制自动裁决，也不自动重出 */
+    expect(doubles.review.mock.calls.some(([options]) => options.context.gate === "G5_PORTRAIT")).toBe(false);
   });
 
 });

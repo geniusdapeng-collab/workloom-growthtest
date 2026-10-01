@@ -21,6 +21,13 @@
 - **原始照片不进仓库**（仅本地保留）；仓库内只放 AI 生成的定妆照与档案正文。
 - **2 号模特不是任何真人的数字化身**：生成时仅人工参考旧素材里可概括的一般五官词，未把旧图或真人原图作为图片输入；
   档案里不主张与任何真人身份等同。
+- **3 号模特：客户方CEO（`demo-character`）** — 客户方 CEO 的**认证真人**（火山方舟「私域真人人像库」
+  `asset://asset-20260101000000-demo` 的派生定妆照；`kind: authorized-real`）。档案：
+  `bundles/ai-video/library/characters/model-03-demo-character/`；**只在镜头卡点名时使用**，`defaultModel` 仍指向 1 号陈卓。
+  8 张定妆照（front/threeQuarter/closeup/side ＋ frontFull/threeQuarterLeft/threeQuarterRight/smileCloseup）由**产品所有者本人**
+  验收放行：`gates.jsonl` 的 `g5-portrait-confirm` 记录 `via=owner-acceptance`、`basis=human-review`；
+  机器像不像判据只留证、不参与放行、不触发自动重做（T-2026-1001-0007）。标准 8 角度里的
+  `back/actionPose/emotionCloseup/handDetail` 因平台账户 2026-10-01 欠费尚未生成，已如实登记待补。
 - **在册资产（完整性索引）**：`registry.json`、`model-01-chen-zhuo/profile.json`、`model-01-chen-zhuo/portraits/v3/*.png`（8 张，
   合计 10 件）已登记在 `bundles/ai-video/bundle.json#provides.library`——装载时会校验 sha256，稳定包还会验 Ed25519 签名。
   因此**改动这些文件必须在同一提交里重算摘要**（`pnpm bundle:release` 或在仓内跑

@@ -12,19 +12,31 @@
  */
 import type { GateKey } from "@hyperreality/video-studio";
 import type { ProducerStage } from "@hyperreality/video-studio";
-import { mkdirSync, writeFileSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, resolve, relative, sep } from "node:path";
 import type { ProducerArtifact, DeterministicCheck, PortraitIndex } from "@hyperreality/video-studio";
 
 /**
- * 自动放行的「内部准备门」。默认包含 G1–G7；`HR_AUTO_GATES` 可覆盖
- * （逗号分隔；设为空字符串即恢复"全部门人审"的旧口径）。
+ * 自动放行的「内部准备门」。默认包含 G1–G4 / G6 / G7；**G5 定妆照默认人审**（T-2026-1001-0007）。
+ * `HR_AUTO_GATES` 可覆盖（逗号分隔；设为空字符串即"全部门人审"；显式把 G5_PORTRAIT 加回来即恢复旧口径，不推荐）。
+ *
+ * 为什么 G5 不再默认自动：机器像不像判据本身不稳定（同一批文件实测 92 / 15 / 86），
+ * 让 AI 监制裁决会误杀或误放，还会触发"打回 → 自动重出"重复烧钱；定妆照是否可用必须由人类看过原图决定。
  */
 export const AUTO_GATES = new Set(
   (process.env.HR_AUTO_GATES
-    ?? "G1_DOSSIER,G2_THEME,G3_INSIGHT,G4_PRD,G5_PORTRAIT,G6_PROMPT,G7_FINAL")
+    ?? "G1_DOSSIER,G2_THEME,G3_INSIGHT,G4_PRD,G6_PROMPT,G7_FINAL")
     .split(",").map((value) => value.trim()).filter(Boolean),
 );
+
+/**
+ * 渲染提交（花钱动作）默认要求人审（T-2026-1001-0007）：
+ * 缺省 **不自动放行**，脚本必须先经 `cms.approveScript` 审批；`WORKLOOM_RENDER_AUTO=1` 才恢复旧的自动放行口径。
+ */
+export function renderSubmitAutoAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.WORKLOOM_RENDER_AUTO === "1";
+}
 
 /** 内部门三档处置：review=AI 监制（默认）/ auto=无条件放行（应急）/ human=等人点 */
 export type ProducerMode = "review" | "auto" | "human";
@@ -174,4 +186,49 @@ export function portraitGateEvidence(input: {
       { id: "required-angles", pass: true, hard: true, detail: "所有人物四角度完整，商品有实际视图" },
     ] };
   } catch (error) { return fail(`实际定妆照证据不可读取：${error instanceof Error ? error.message : String(error)}`); }
+}
+
+/**
+ * 人类验收用的定妆照清单（T-2026-1001-0007）：
+ * 把本次实际产出的逐张文件（主体/角度/绝对路径/sha256/字节）整理成 Markdown 写进审批快照，
+ * 让人类在放行 G5 前能逐张核对原图。机器判据只作证据，不参与放行、不触发自动重出。
+ */
+export function portraitReviewManifest(input: { workDir: string; projectId: string }): {
+  markdown: string;
+  files: Array<{ subject: string; angle: string; file: string; sha256: string; bytes: number }>;
+} {
+  const base = realpathSync(input.workDir);
+  const root = resolve(base, "characters", input.projectId);
+  const indexPath = join(root, "portrait-index.json");
+  if (!existsSync(indexPath)) {
+    return {
+      markdown: "## 定妆照人工验收\n\n（未找到 portrait-index.json，无法列出本次定妆照文件；请先确认定妆照阶段已执行）",
+      files: [],
+    };
+  }
+  const index = JSON.parse(readFileSync(indexPath, "utf8")) as PortraitIndex;
+  const files: Array<{ subject: string; angle: string; file: string; sha256: string; bytes: number }> = [];
+  for (const item of [...Object.values(index.characters ?? {}), ...Object.values(index.products ?? {})]) {
+    const subject = `${item.kind === "character" ? "角色" : "商品"} ${item.id ?? "(未命名)"}`;
+    for (const [angle, file] of Object.entries(item.files ?? {})) {
+      const raw = resolve(input.workDir, file);
+      if (!existsSync(raw) || !statSync(raw).isFile()) continue;
+      /** 清单只展示落在本项目定妆照目录内的文件（realpath 归一再判，越界/符号链接一律不列） */
+      const absolute = realpathSync(raw);
+      if (!absolute.startsWith(`${root}${sep}`)) continue;
+      const bytes = statSync(absolute).size;
+      const sha256 = createHash("sha256").update(readFileSync(absolute)).digest("hex");
+      files.push({ subject, angle, file: absolute, sha256, bytes });
+    }
+  }
+  const lines = [
+    "## 定妆照人工验收（放行前请逐张看过原图）",
+    "",
+    `本次实际产出 ${files.length} 张：`,
+    "",
+    ...files.map((entry) => `- ${entry.subject}（${entry.angle}）：${entry.file}（${(entry.bytes / 1024).toFixed(0)}KB，sha256 ${entry.sha256.slice(0, 12)}…）`),
+    "",
+    "口径：机器像不像/监制结论只作证据，不参与放行、不触发自动重出；是否可用由人类验收人决定。",
+  ];
+  return { markdown: lines.join("\n"), files };
 }

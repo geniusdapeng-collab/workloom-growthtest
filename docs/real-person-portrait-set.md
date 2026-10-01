@@ -1,7 +1,8 @@
 # 认证真人 → 专业定妆照：标准操作流程（SOP）
 
 > 适用场景：客户在**火山方舟「私域人像库」**完成真人认证，只给了 `asset://…`（素材在**客户账号**里）。
-> 目标：不打扰客户、不依赖人工确认，产出**可直接用于生成锚定的多角度专业定妆照**并写进角色档案。
+> 目标：不打扰客户；机器像不像只留证，产出**可直接用于生成锚定的多角度专业定妆照**，
+> 由**人类验收**（`portrait-agent accept`，`via=owner-acceptance`）后写进角色档案。
 > 本文是标准流程（任何客户通用）；`bundles/ai-video/README.md` §6/§6.1 是速查版。
 
 ## 0. 一句话流程
@@ -11,8 +12,9 @@
    → Agent 读图：把「资源文件名 + asset-… ID」两列贴成文本（程序不直接吃截图）
    → real-person-assets.mts reconcile    # 清单对账：ID/分组/授权写进主档（不猜角度）
    → Agent 读缩略图：给出角度映射（标 angleGuess，机器/Agent 判读、非客户确认）
-   → portrait-set-from-asset.mts         # 两段式出图 + 逐张机器像不像校验
+   → portrait-set-from-asset.mts         # 两段式出图 + 逐张机器像不像留证（不阻断、不重做）
    → portrait-set-install.mts            # 写角色档案 + 写后复核（fail-closed）
+   → portrait-agent.mts accept           # 人类看过后验收放行（机器不代替签字）
 ```
 
 ## 1. 输入（客户只需要给两样，通常一张截图就够）
@@ -43,7 +45,7 @@ Agent 看截图缩略图，把八个角度（front / threeQuarter / threeQuarter
 side / closeup / smileCloseup / frontFull）落到具体 assetId，写入主档 `portraitSet.assets[].angleGuess`
 并标 `mappingEvidence`（截图 sha256 + 判读模型）。**这是机器/Agent 判读，不是客户逐张确认**——如实标注。
 
-## 4. 出图（两段式 + 机器像不像校验）
+## 4. 出图（两段式 + 机器像不像留证）
 
 ```bash
 pnpm exec tsx scripts/tools/portrait-set-from-asset.mts \
@@ -51,7 +53,7 @@ pnpm exec tsx scripts/tools/portrait-set-from-asset.mts \
   --out-dir <角色目录>/portraits/_derived \
   --angles front,threeQuarter,closeup,side \
   --engine two-stage --stage-a-angles front --refs 2 \
-  --verify-against <已验收成片帧.jpg>        # 事实锚：该真人已通过验收的画面
+  --verify-against <已验收成片帧.jpg>        # 事实锚：该真人已通过验收的画面（机器判据只留证，不触发重做）
   [--reuse-masters] [--install --activate]
 ```
 
@@ -60,7 +62,7 @@ pnpm exec tsx scripts/tools/portrait-set-from-asset.mts \
 | 第一段（身份母版） | **视频端点**是唯一吃 `asset://` 的通道（图端点 `image: asset://…` 400）；参考取「角度对应那张 + 主素材」共 **2 张**（4 张混投会把脸带偏，实测） |
 | 第二段（其余角度） | 以母版为参考走**图端点 img2img**（2K、便宜）；当天端点 ECONNRESET 时**自动回退视频路** |
 | 身份绑定 | 提示词必须显式写"与参考素材同一人"（**主素材常是古装/生活照**，实测）；造型只作**软性偏好**（现代商务优先）——真人本来就会换发型、戴品牌首饰衣物，**不作为不合格理由** |
-| 机器像不像 | 逐张对「已验收成片帧」判"同一人"（judge 用 `LLM_*` 配置；`DEEPSEEK_BASE_URL` 是 anthropic 端点，拼 `/chat/completions` 会 404 假失败）；阈值 **`--min-likeness 88`**（客户口径：人脸一定要真）→ **任一不过整批拒绝，不装半套** |
+| 机器像不像 | 逐张对「已验收成片帧」判"同一人"（judge 用 `LLM_*` 配置；`DEEPSEEK_BASE_URL` 是 anthropic 端点，拼 `/chat/completions` 会 404 假失败）；阈值 `--min-likeness 88` 作**留证**——**不阻断、不触发自动重做**（实测同一批文件 92/15/86）；只有显式 `--require-likeness` 才整批拒绝（旧行为 opt-in） |
 | 断点续跑 | `--reuse-masters`：母版是最贵的一步，网络抖动不该重复烧钱 |
 | **追加模式** | 后续补角度用 `--archive-refs <角色目录>`：新角度以**档案里已发布的定妆照**为参考（保人物与已发视频一致）；旧版本保留不覆盖 |
 
@@ -76,8 +78,18 @@ pnpm exec tsx scripts/tools/portrait-set-install.mts \
 来源证据 → 更新 `profile.json`（`files` 精确指向 + 保留权威 `assets`）→ `verifyPortraitSet` **写后复核**（未过 exit 2）。
 
 **身份基准照片（`--anchor`）**：把该真人**已通过验收的成片帧**传进来，installer 会拷进角色目录 `sources/` 并登记到该版本
-`anchors`；`portrait-agent review` 靠它做"同一张脸"比对（不传就是"缺证据拒绝"，真机评分 45 被拦）。
-评审阈值同样提高到 **`--min-score 88`**。
+`anchors`；`portrait-agent accept` 要求有它才受理人类验收（缺证据不受理，避免"有人点过头"式无凭放行）。
+`portrait-agent review` 的机器比对只是留证，不再作为放行/打回依据。
+
+### 4.1 人类验收（决策权在人，T-2026-1001-0007）
+
+```bash
+pnpm exec tsx scripts/tools/portrait-agent.mts accept --character <角色ID> \
+  --by "<验收人>" --note "<依据/原话>"          # 需要机器证据留档时加 --with-likeness（仍不参与裁决）
+```
+
+门记录落 `g5-portrait-confirm`，`via=owner-acceptance`、`basis=human-review`；**人类明确否决才可以退回**，
+机器判据永远不触发重做。8 张出满 → 人类看过原图 → 验收 → 装档，这是唯一放行路径。
 
 ## 6. 与配音/字段的关系（旁白怎么承接）
 
@@ -92,5 +104,6 @@ pnpm exec tsx scripts/tools/portrait-set-install.mts \
 1. 图端点**不吃** `asset://`（400）——asset 参考只能走视频端点取首帧；
 2. 参考**2 张最优**；把不同服装/光位的 4 张混投会让脸跑偏；
 3. 主素材可能是古装/生活照——造型只作**软性偏好**（"人脸是真的"是唯一硬标准；发型/服装/品牌/背景差异**不得**判不合格）；
-4. 像不像**必须机器判**（对已验收成片帧，阈值 88），不指望客户/人工确认；判不过整批拒绝；
+4. 像不像的机器判据**只留证**（阈值 88 的逐张实测保留），**不阻断、不触发重做**；8 张交人类验收
+   （`accept`，`via=owner-acceptance`），人类否决才退回；只有显式 `--require-likeness` 才恢复"整批拒绝"旧口径；
 5. **追加不重来**：补角度用 `--archive-refs` 挂在已发布定妆照上，旧版本保留——保证客户平台上先后发布的视频人物一致。

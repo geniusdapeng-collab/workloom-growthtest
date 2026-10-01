@@ -42,6 +42,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import YAML from "yaml";
 import { filmReviewContracts, loadOrCreateFilmAuthorContext, reviewFilmStage } from "../../packages/video-studio/src/film-contracts.js";
 import { buildProducerReviewContract, type ProducerGateOptions } from "../../packages/video-studio/src/producer-gate.js";
+import { assessPortraitDecision } from "../../packages/video-studio/src/portrait-decision.js";
 import { executeRevision } from "../../packages/video-studio/src/revision-executor.js";
 import { assessVoiceArtifact, fingerprintFile, fingerprintText, promoteDubCandidate, type VoiceArtifactRecord } from "./film-voice-artifact.js";
 import {
@@ -1660,10 +1661,13 @@ if (lead && characterRegistry.defaultModel && lead.id === characterRegistry.defa
 /**
  * 管线 yml 的 `g5-portrait-confirm` 门：确认"这组定妆照可用于本片"。
  *
- * CLI 口径 = **资产硬闸 + 定妆照监制记录**：
+ * CLI 口径 = **资产硬闸 + 人类验收记录**（T-2026-1001-0007）：
  *   · 硬闸：角色档案在、四个必需角度齐备、单张 >50KB（占位图/失败图直接拦）；
- *   · 监制记录：读角色目录 `reviews/*.json` 的**最近一次**定妆照评审（`portrait-agent review` 产出），
- *     最近一次是"打回"就不放行；没有记录则如实标 degraded（说明这个门只做了确定性校验）。
+ *   · 人类验收：读角色目录 `gates.jsonl` 最近一条 `g5-portrait-confirm`（`portrait-agent accept` 产出，
+ *     `via=owner-acceptance`）；只有人类记录能做放行/否决，人类否决即阻断；
+ *   · 机器评审（`portrait-agent review` 的 reviews/*.json / gates.jsonl 的 llm 记录）**只留证、不参与放行**，
+ *     既不会因"机器判不合格"卡住交付，也不冒充人类签字；
+ *   · 两条记录都没有时照常做资产闸但标 degraded（不冒充已验收），需先执行 `accept`。
  * 与 §⑤ 的 `keyframe`/`shot` 门不同，G5 管的是**角色资产**，不是本片画面。
  */
 if (!DRY_RUN) {
@@ -1683,7 +1687,10 @@ if (!DRY_RUN) {
     const ledger = join(lead.dir, "gates.jsonl");
     if (!existsSync(ledger)) return null;
     try {
-      const events = readFileSync(ledger, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as { stepKey?: string; at?: string; approved?: boolean; score?: number | null; reason?: string });
+      const events = readFileSync(ledger, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as {
+        stepKey?: string; at?: string; approved?: boolean; score?: number | null; reason?: string;
+        via?: string | null; sourceStage?: string | null; evidence?: { basis?: string | null } | null;
+      });
       const mine = events.filter((e) => e.stepKey === "g5-portrait-confirm");
       return mine.length > 0 ? mine[mine.length - 1]! : null;
     } catch { return null; }
@@ -1701,6 +1708,18 @@ if (!DRY_RUN) {
       return JSON.parse(readFileSync(reviewFile, "utf8")) as { at?: string; verdict?: { approved?: boolean; score?: number; reason?: string } };
     } catch { return null; }
   })();
+  /**
+   * 决策语义（T-2026-1001-0007）：只有人类验收记录可放行/否决；机器记录（含旧版被机器判据带成
+   * approved=false 的记录）一律按留证处理。口径单测见 `packages/video-studio/src/portrait-decision.test.ts`。
+   */
+  const portraitDecision = assessPortraitDecision(
+    gateRecord ?? (review
+      ? {
+          at: review.at ?? null, approved: review.verdict?.approved, score: review.verdict?.score ?? null,
+          reason: review.verdict?.reason ?? null, via: "llm", sourceStage: "portrait-review",
+        }
+      : null),
+  );
   const checks: GateCheck[] = lead
     ? [
         { id: "character-present", pass: true, detail: `角色 ${lead.name}（${lead.id}）`, hard: true },
@@ -1721,17 +1740,15 @@ if (!DRY_RUN) {
           id: "archive-angles", pass: Object.keys(lead.files).length >= 4, hard: false,
           detail: `档案可用角度 ${Object.keys(lead.files).join("/") || "无"}（共 ${Object.keys(lead.files).length} 个）`
         },
-        ...(gateRecord
-          ? [{
-              id: "portrait-review", pass: gateRecord.approved !== false, hard: true,
-              detail: `定妆照门记录（gates.jsonl）：${gateRecord.approved === false ? "打回" : "放行"}（score=${gateRecord.score ?? "?"}，${gateRecord.at ?? "无时间"}）`
-            }]
-          : review
-          ? [{
-              id: "portrait-review", pass: review.verdict?.approved !== false, hard: true,
-              detail: `最近一次定妆照监制：${review.verdict?.approved === false ? "打回" : "放行"}（score=${review.verdict?.score ?? "?"}，${review.at ?? "无时间"}）`
-            }]
-          : [])
+        ...(portraitDecision.kind === "none"
+          ? []
+          : [{
+              id: "portrait-decision",
+              /** 人类否决才阻断；机器记录只留证（hard=false，pass 恒为 true） */
+              pass: !portraitDecision.blocking,
+              hard: portraitDecision.decisive,
+              detail: `${portraitDecision.detail}（来源：${gateRecord ? "gates.jsonl" : "reviews/*.json"}）`
+            }])
       ]
     : [{ id: "applicable", pass: true, detail: "镜头卡未涉及人物（空镜片）→ 定妆照门不适用", hard: false }];
   const gate = recordGate({
@@ -1742,17 +1759,22 @@ if (!DRY_RUN) {
      * 没有定妆照监制记录时**不冒充实质评审**：确定性闸照跑，但 degraded 置位，
      * 让审计一眼看到"这个门这次只做了资产校验"。
      */
-    degraded: Boolean(lead) && !review && !gateRecord,
+    degraded: Boolean(lead) && portraitDecision.kind === "none",
     evidence: {
       character: lead ? { id: lead.id, name: lead.name, angles: Object.keys(lead.files) } : null,
       reviewFile,
       gateLedger: lead ? join(lead.dir, "gates.jsonl") : null,
       gateApproved: gateRecord?.approved ?? null,
       reviewApproved: review?.verdict?.approved ?? null,
-      note: gateRecord ? "含定妆照门记录（gates.jsonl）" : review ? "含定妆照监制评审文件（reviews/）" : "无定妆照监制记录：本次仅做资产硬闸（角度/尺寸/字节）"
+      portraitDecision: { kind: portraitDecision.kind, decisive: portraitDecision.decisive, blocking: portraitDecision.blocking, detail: portraitDecision.detail },
+      note: portraitDecision.kind === "human"
+        ? "含人类验收记录（gates.jsonl，via=owner-acceptance）：放行/否决由人类决定"
+        : portraitDecision.kind === "machine"
+          ? "含机器评审留证（不参与放行）：机器判据不触发重做，决策交人类"
+          : "无人类验收记录：本次仅做资产硬闸（角度/尺寸/字节）"
     },
     reason: lead
-      ? (gateRecord || review ? undefined : "定妆照资产齐备（无监制评审记录，已标 degraded）")
+      ? (portraitDecision.kind === "none" ? "定妆照资产齐备（无人类验收记录，已标 degraded；请先由人类执行 portrait-agent accept）" : undefined)
       : "本片无人物，定妆照门不适用"
   });
   if (!gate.approved && !ACCEPT_REJECTED.includes("G5")) {
