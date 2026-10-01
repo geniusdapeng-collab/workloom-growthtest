@@ -760,7 +760,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "ef814f35e07bcc7374a2676af8c9a064e7044922e9c1dcb046aa938d82421e9a",
+    "digest": "2c7b1c807899a6b264c37dfaaa9a5130af9e40f687ea6293cc74920cc654abb7",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "9180a2cb1fbac95f4c5ec835041e98436ccc2de6d7a874abb651bf6b74124425",
@@ -1170,7 +1170,7 @@
       "library/scene-policies/beauty-fashion.source.md": "8ca27e9a3aa2981c81cb88a071e206b9755c28e69bc1ad4e62048609f7703e89",
       "library/scene-policies/commerce-seeding.json": "3ef8c65dbfb0072634d125195c3181522637652dc386a22d32793931caebef3b",
       "library/scene-policies/commerce-seeding.source.md": "363e2bab86f4cdaa39c08ab1bfa3a067a0597165a91185c5734b37d5bc3557b2",
-      "library/scene-policies/commercial-person.json": "92e5d5ac79eac0b64e75cc3cb740fe65319d493689eead54833ea4f611de73d1",
+      "library/scene-policies/commercial-person.json": "befd371296eb711f35dbc1e6b53cc140f61fa0d595dbf7c62b116f7775f14f9c",
       "library/scene-policies/commercial-person.source.md": "445541407ea1e568301214e2dfdc6b07cfe9ad6b0e05355ec5e5ad3052fa96c6",
       "library/scene-policies/enterprise-brand.json": "e85d4a6d1a90bea639c76fd16744827b1c28a356c21191cb4c8292f4d8416357",
       "library/scene-policies/enterprise-brand.source.md": "be6e8a05242a91fb6ac73d44fa4170156553fe74a757f60dcde15f802a599461",
