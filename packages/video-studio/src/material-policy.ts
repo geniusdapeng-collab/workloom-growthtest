@@ -30,7 +30,19 @@ export const MATERIAL_POLICY_VERSION = "material-usage/v1";
  *   · 画面位移镜头必须有真实三维视差；主体与环境变化遵循场景（云/水/光/人群/车流/植被）；
  *   · 参考图没拍到的画面边缘要合理补全，不得出现参考图边界/黑边/复刻构图。
  */
-export const MATERIAL_SCENE_POLICY_VERSION = "material-scene/v1";
+export const MATERIAL_SCENE_POLICY_VERSION = "material-scene/v2";
+
+/**
+ * 台词注入策略版本（material-dialogue/v1，T-2026-1001-0006 真机事故）。
+ *
+ * 事故：FP-04「取卡细节」素材镜的提示词由 `buildMaterialScenePrompt` 组装，
+ * 而它此前**通篇没有台词段** → 模型只出环境声（峰值 −31dB），台词只能靠后期 TTS 补录
+ * （阶段回执 `voice.source = "tts-narration"`，产品所有者当场听出"没有台词"）。
+ * 对照：同模型、同 `generate_audio` 的真人镜 FP-01 走文生提示词（含【台词】段），
+ * 原片直接带人声（`voice.source = "clip-audio"`、转写匹配 1.000）。
+ * 结论：素材镜"渲出台词"缺的不是模型能力，而是提示词里的台词段——本模块补齐后才允许出片。
+ */
+export const MATERIAL_DIALOGUE_POLICY_VERSION = "material-dialogue/v1";
 
 /** 场景构建策略原文（提示词、错误信息、文档共用） */
 export const MATERIAL_SCENE_POLICY_STATEMENT = [
@@ -351,11 +363,123 @@ export interface MaterialScenePromptOptions extends MaterialMotionPromptOptions 
   mustKeep?: string[];
 }
 
+/** 素材镜的一句台词（与文生镜共用同一份卡片字段，避免两套口径漂移） */
+export interface MaterialDialogueLine {
+  /** 说话人（角色名/职务；画外音也写真名，用于音色与语气参考） */
+  speaker?: string;
+  /** 台词原文（逐字照说，不允许模型改写） */
+  text: string;
+  /** 语气/情绪 */
+  emotion?: string;
+  /** 开口时机与表演提示（如"取卡瞬间开口（画外音）"） */
+  trigger?: string;
+}
+
+/** 台词的呈现方式：画内口播（要口型同步）还是画外音（人不在画面里） */
+export type MaterialSpeechMode = "on-camera" | "voice-over";
+
+const VOICE_OVER_PATTERN = /画外音|旁白|画外|voice[-_ ]?over|off[-_ ]?screen|不出镜/;
+const ON_CAMERA_PATTERN = /画内|口播|出镜|面对镜头|on[-_ ]?camera|in[-_]?frame/;
+/** "本镜没有面孔/人物入画"的描述——决定台词是画外音还是画内口播 */
+const NO_FACE_PATTERN = /不出现人脸|不出现面孔|不出现人物|不出现身体|无人入画|空镜|仅有?一只手|只有一只手|手部入画/;
+
 /**
- * **场景构建提示词**（material-scene/v1，当前素材镜的唯一合法出片路径）。
+ * 从镜头卡抽取台词（`dialogue` 为主，兼容既有 `n` / `narration` 形态）。
+ * 与 `platform-intent.ts#nText` 的三种既有形态保持一致，避免素材镜与文生镜读出不同的句子。
+ */
+export function materialDialogueLines(shot: Record<string, unknown>): MaterialDialogueLine[] {
+  const raw = shot.dialogue ?? shot.n ?? shot.narration;
+  const out: MaterialDialogueLine[] = [];
+  const push = (entry: unknown): void => {
+    if (typeof entry === "string") {
+      const text = entry.trim();
+      if (text) out.push({ text });
+      return;
+    }
+    if (!entry || typeof entry !== "object") return;
+    const record = entry as Record<string, unknown>;
+    const text = String(record.text ?? record.line ?? record.content ?? "").trim();
+    if (!text) return;
+    const speaker = String(record.speaker ?? record.character ?? record.who ?? "").trim();
+    const emotion = String(record.emotion ?? record.tone ?? "").trim();
+    const trigger = String(record.trigger ?? record.timing ?? "").trim();
+    out.push({
+      text,
+      ...(speaker ? { speaker } : {}),
+      ...(emotion ? { emotion } : {}),
+      ...(trigger ? { trigger } : {})
+    });
+  };
+  if (Array.isArray(raw)) raw.forEach(push);
+  else if (raw !== undefined && raw !== null) push(raw);
+  return out;
+}
+
+/**
+ * 判定台词呈现方式。优先级：显式 `speechMode` → 台词开口提示里的"画外音" → 画面描述里的"无人入画" → 默认画内。
+ * 为什么要显式判：画外音的台词要求"有清晰人声、不要求口型"，画内口播要求"口型与语音逐字同步"——
+ * 两者写反会让模型为了对口型硬塞一张脸（素材镜 FP-04 明确"不出现人脸"）。
+ */
+export function materialSpeechMode(shot: Record<string, unknown>): MaterialSpeechMode | null {
+  const lines = materialDialogueLines(shot);
+  if (lines.length === 0) return null;
+  const explicit = String(shot.speechMode ?? shot.dialogueMode ?? "").trim();
+  if (VOICE_OVER_PATTERN.test(explicit)) return "voice-over";
+  if (ON_CAMERA_PATTERN.test(explicit)) return "on-camera";
+  if (lines.some((line) => VOICE_OVER_PATTERN.test(line.trigger ?? ""))) return "voice-over";
+  const visual = [
+    shot.character,
+    shot.character_constraint,
+    shot.composition,
+    shot.sceneDescription,
+    shot.action
+  ].map((value) => String(value ?? "")).join("；");
+  if (NO_FACE_PATTERN.test(visual)) return "voice-over";
+  return ON_CAMERA_PATTERN.test(visual) || shot.portraits || shot.assetRef ? "on-camera" : "voice-over";
+}
+
+/**
+ * 素材镜的**台词段**（T-2026-1001-0006）。返回空串表示本镜没有台词（空镜/纯环境声），
+ * 由调用方决定是否追加——不做"没台词也塞一句"的兜底。
+ */
+export function buildMaterialDialogueBlock(
+  shot: Record<string, unknown>,
+  options: { durationSec?: number } = {}
+): string {
+  const lines = materialDialogueLines(shot);
+  if (lines.length === 0) return "";
+  const mode = materialSpeechMode(shot) ?? "voice-over";
+  const duration = Number(options.durationSec ?? shot.duration ?? 5);
+  const spoken = lines.map((line) => {
+    const meta = [
+      line.speaker ? `说话人：${line.speaker}` : "",
+      line.emotion ? `语气：${line.emotion}` : "",
+      line.trigger ? `开口时机：${line.trigger}` : ""
+    ].filter(Boolean).join("；");
+    return `「${line.text}」${meta ? `（${meta}）` : ""}`;
+  }).join("；");
+  const presentation = mode === "voice-over"
+    ? "画外音——台词由画面外的说话人自然说出（本镜不需要露脸、也不需要口型），人声清晰靠前、与画面动作同频"
+    : "画内口播——画面中的人物开口说出这句台词，口型与语音逐字同步（开口/闭口与语音对齐），说完自然收口";
+  const audioDesign = String(shot.audio ?? "").trim();
+  return [
+    "【台词与声音（必须真的说出来）】本镜有台词：必须由你在生成时**同步产出可听见的人声**，不得只给环境声，不得用字幕或文字代替。",
+    `· 台词（逐字照说，不改写、不增删、不翻译）：${spoken}`,
+    `· 呈现方式：${presentation}`,
+    `· 时长纪律：整句在本镜 ${duration} 秒内自然说完（语速正常，不拖长、不吞字，宁早不晚）`,
+    audioDesign ? `· 声音设计：${audioDesign}` : "",
+    "· 禁止：画面内出现任何台词文字/字幕/歌词（字幕一律由后期添加）；不叠加背景音乐。"
+  ].filter((line) => line.length > 0).join("\n");
+}
+
+/**
+ * **场景构建提示词**（material-scene/v2，当前素材镜的唯一合法出片路径）。
  *
  * 与 `buildMaterialMotionPrompt`（旧：把参考图当首帧做动效）的区别就在第一句：
  * 这里要求模型"以参考为依据**构建**一段真实拍摄的视频场景"，并明确"禁止复刻参考图构图"。
+ *
+ * v2（T-2026-1001-0006）：补上台词段。此前素材镜提示词里没有台词 → 模型只出环境声，
+ * 台词被"后期 TTS 补录"遮住（产品所有者听出"这一镜没有台词"）。
  */
 export function buildMaterialScenePrompt(shot: Record<string, unknown>, options: MaterialScenePromptOptions = {}): string {
   const spec = readMaterialSpec(shot);
@@ -369,6 +493,11 @@ export function buildMaterialScenePrompt(shot: Record<string, unknown>, options:
   const propsLine = String(shot.props ?? "").trim();
   const negative = String(shot.negative ?? "").trim();
   const motionIntent = spec.motion ?? String(shot.camera_movement ?? "").trim();
+  /**
+   * 台词段（material-dialogue/v1）：素材镜此前没有这一段，模型只出环境声——
+   * 与文生镜（`prepareShotPrompt` 会渲染【台词】块）口径对齐，两条出片路径都必须"台词由渲染直接产出"。
+   */
+  const dialogueBlock = buildMaterialDialogueBlock(shot, { durationSec: duration });
   const mustKeep = (options.mustKeep ?? [
     "地标/建筑的形制与层叠关系", "匾额与牌匾文字标识", "水域、地形与城市天际线的相对关系", "材质与天色的真实感"
   ]).join("、");
@@ -385,7 +514,9 @@ export function buildMaterialScenePrompt(shot: Record<string, unknown>, options:
     lighting ? `【光线】${lighting}` : "",
     colorPalette ? `【色调】${colorPalette}` : "",
     propsLine ? `【画面元素】${propsLine}` : "",
-    `【约束】${aspect} 画幅 ${resolution}；无水印、无字幕、无标题字、无 LOGO、无边框；画面内不出现任何新增文字。`,
+    dialogueBlock,
+    `【约束】${aspect} 画幅 ${resolution}；无水印、无字幕、无标题字、无 LOGO、无边框；画面内不出现任何新增文字`
+      + (dialogueBlock ? "；台词只以人声呈现（字幕由后期添加）" : "") + "。",
     negative ? `【负面】${negative}；照片复刻、贴图平移、参考图边界、静止画面、建筑臆造、文字变化、水印字幕。`
       : "【负面】照片复刻、贴图平移、参考图边界、静止画面、建筑臆造、文字变化、水印字幕。",
     options.injection ? String(options.injection).trim() : "",

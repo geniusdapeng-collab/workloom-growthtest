@@ -182,6 +182,77 @@ describe("场景构建口径", () => {
   });
 });
 
+/**
+ * 台词注入（material-dialogue/v1，T-2026-1001-0006 真机事故）：
+ * 素材镜提示词此前**没有台词段** → 模型只出环境声（FP-04 峰值 −31dB），台词靠后期 TTS 补录
+ * （阶段回执 `voice.source = "tts-narration"`）。对照：同模型文生镜 FP-01 提示词含【台词】段 →
+ * 原片直接带人声（`voice.source = "clip-audio"`、转写匹配 1.000）。
+ */
+describe("台词注入（素材镜也必须由渲染直出台词）", () => {
+  const voiceOverShot = {
+    ...baseShot,
+    shotId: "FP-04",
+    duration: 4,
+    speechMode: "voice-over",
+    dialogue: [{ speaker: "示例品牌负责人", text: "房卡到手，客人自己上楼。", emotion: "轻快笃定", trigger: "取卡瞬间开口（画外音）" }],
+    audio: "保留画外音人声、房卡吐出的机械声与极轻环境底噪",
+    character_constraint: "不得出现任何面孔与身体；只允许该女士的一只手与前臂入画",
+    composition: "物件特写（微距）——画面内不出现人脸与身体"
+  };
+
+  it("没有台词的镜头不塞兜底台词段（空镜/纯环境声照旧）", () => {
+    const prompt = buildMaterialScenePrompt(baseShot, { durationSec: 5 });
+    expect(prompt).not.toContain("【台词与声音");
+    expect(prompt).toContain("画面内不出现任何新增文字。");
+  });
+
+  it("画外音台词逐字进提示词，并要求真的产出人声（不是字幕）", () => {
+    const prompt = buildMaterialScenePrompt(voiceOverShot, { durationSec: 4 });
+    expect(prompt).toContain("【台词与声音（必须真的说出来）】");
+    expect(prompt).toContain("「房卡到手，客人自己上楼。」");
+    expect(prompt).toContain("必须由你在生成时");
+    expect(prompt).toContain("同步产出可听见的人声");
+    expect(prompt).toContain("不得用字幕或文字代替");
+    expect(prompt).toContain("画外音");
+    expect(prompt).toContain("说话人：示例品牌负责人");
+    expect(prompt).toContain("语气：轻快笃定");
+    expect(prompt).toContain("整句在本镜 4 秒内自然说完");
+    expect(prompt).toContain("保留画外音人声、房卡吐出的机械声");
+    expect(prompt).toContain("字幕一律由后期添加");
+    expect(prompt).toContain("台词只以人声呈现");
+    /** 画外音不得要求口型同步——那会把"本镜不出现人脸"的硬约束顶掉 */
+    expect(prompt).not.toContain("口型与语音逐字同步");
+  });
+
+  it("画内口播要求口型同步（与画外音是两种呈现）", () => {
+    const prompt = buildMaterialScenePrompt({
+      ...baseShot,
+      speechMode: "on-camera",
+      dialogue: [{ speaker: "示例品牌负责人", text: "酒店前台，半夜还在排队？" }]
+    }, { durationSec: 5 });
+    expect(prompt).toContain("画内口播");
+    expect(prompt).toContain("口型与语音逐字同步");
+  });
+
+  it("兼容旧卡字段 n（字符串 / {text} 数组），读法不与文生镜分叉", () => {
+    const asString = buildMaterialScenePrompt({ ...baseShot, n: "桥下的船，走得比人慢。" }, { durationSec: 5 });
+    expect(asString).toContain("「桥下的船，走得比人慢。」");
+    const asBlocks = buildMaterialScenePrompt({ ...baseShot, n: [{ speaker: "旁白", text: "第一句。" }, { text: "第二句。" }] }, { durationSec: 5 });
+    expect(asBlocks).toContain("「第一句。」");
+    expect(asBlocks).toContain("「第二句。」");
+  });
+
+  it("未显式声明呈现方式时按画面描述推断：无人入画的台词判画外音", () => {
+    const inferred = buildMaterialScenePrompt({
+      ...baseShot,
+      dialogue: [{ text: "房卡到手。" }],
+      composition: "物件特写；本镜不出现人脸与身体"
+    }, { durationSec: 4 });
+    expect(inferred).toContain("画外音");
+    expect(inferred).not.toContain("口型与语音逐字同步");
+  });
+});
+
 describe("参考独立性判定（是构建场景，还是参考图被推动）", () => {
   it("首帧就是参考图（最佳匹配 ≥32dB）判复刻", () => {
     const verdict = assessReferenceIndependence({ firstFrameBestPsnrDb: 41.2, midFrameBestPsnrDb: 18.4, directPsnrDb: 36.0 });
