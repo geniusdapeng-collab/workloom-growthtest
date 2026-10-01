@@ -4196,6 +4196,13 @@ if (STAGES.has("videos")) {
  */
 const NARRATION_PROFILE = arg("--narration-profile", "zh-xiaozhi");
 /**
+ * **全片统一配音**（`--narration-unified`，T-2026-1001-0004）：
+ * 逐镜"能用原声就用原声"会让同一条片子里出现两种音色（现场原声 vs 后期 TTS）——真机反馈：
+ * 第 1 镜是渲染生成的原声、第 2 镜起是后期配音，听感割裂。本开关让**所有有台词的镜头都用
+ * 同一个音色档重配**（含第 1 镜），全片一条音色；口型不受影响（同人同台词）。
+ */
+const UNIFIED_NARRATION = flag("--narration-unified");
+/**
  * 核查**工具故障**时是否仍补旁白（默认否；2026-09-27 真机事故的开关）。
  *
  * 事故：配音工位 ASR 首次调用超时（引擎请求超时 600s）→ 人声核查被判"未过" →
@@ -4367,7 +4374,7 @@ if (STAGES.has("voice")) {
           continue;
         }
       }
-      if (before.ok) {
+      if (before.ok && !UNIFIED_NARRATION) {
         narrationCoverage.push({ shotId: shot.shotId, speaker, text, ok: true, source: "clip-audio", detail: before.detail });
         record({
           stage: "voice", shotId: shot.shotId, invoked: true, ok: true, cached: true, degraded: false, attempt: 1,
@@ -4376,6 +4383,9 @@ if (STAGES.has("voice")) {
           verdict: null, note: `人声核查通过（${before.detail}）`
         });
         continue;
+      }
+      if (before.ok && UNIFIED_NARRATION) {
+        log(`  ↻ ${shot.shotId} 原声可用，但已启用 --narration-unified（全片统一音色）→ 用 ${NARRATION_PROFILE} 重配`);
       }
       /** 复用必须同时匹配原片、台词、音色、配音产物的指纹，并再次核查可听人声。 */
       const existingVoiced = voicedFile(shot.shotId);
@@ -4418,7 +4428,8 @@ if (STAGES.has("voice")) {
        *     （2026-09-27 真机：CF-04/CF-05 用 replace-bed 重配后 ASR 转写恢复为 CEO / 种草）。
        */
       const termBroken = (before.termMissing ?? []).length > 0;
-      const dubPolicy = termBroken ? "replace-bed" : "keep-dialogue";
+      /** 统一配音必须**换掉**原声（replace-bed），否则 keep-dialogue 会把 TTS 叠在原声上 → 同句两遍（已有防线会判失败并回退） */
+      const dubPolicy = termBroken || UNIFIED_NARRATION ? "replace-bed" : "keep-dialogue";
       log(`  ⚠ ${shot.shotId} 人声核查未过（${before.detail.slice(0, 90)}）→ ${termBroken ? `术语读错（${(before.termMissing ?? []).join("/")}）→ 用克隆音色替换该镜人声` : "补旁白"}（音色 ${NARRATION_PROFILE}）`);
       const out = voicedFile(shot.shotId);
       const candidate = `${out}.pending-${randomUUID()}.mp4`;
