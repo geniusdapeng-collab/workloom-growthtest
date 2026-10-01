@@ -72,6 +72,33 @@ tsx scripts/tools/full-chain-film.mts \
 2. 在 `registry.json#models` 追加一条（`ordinal` 递增、`aliases` 写中文名与常用称呼、`archive` 写仓库相对路径）；
 3. 要改默认：把 `defaultModel` 指向新 id（**一次只有一个默认**）。
 
+## 四·一、认证真人「一次性出满 8 张定妆照」（客户零操作，2026-10-01 定为系统方案）
+
+客户侧只有平台认证素材（`asset://<asset ID>`，本地没有原图、平台也没有下载接口）时，用**同一条命令**出满标准 8 角度：
+
+```bash
+tsx scripts/tools/portrait-set-from-asset.mts \
+  --asset asset://asset-20260101000000-demo \
+  --character <角色目录名> --library <角色库目录> \
+  --out-dir <产物目录> --install --activate      # 去掉 --install 只出图；--dry-run 先看不花钱
+```
+
+**固定的四件事**：
+
+1. **默认就是标准 8 角度**（front / threeQuarter / closeup / side / back / actionPose / emotionCloseup / handDetail）——
+   出满即可直接入库（`builtin-character-library.test.ts` 会逐角度校验）；备选角度 `frontFull / threeQuarterLeft /
+   threeQuarterRight / smileCloseup` 用 `--angles` 追加；
+2. **整批只提交一次**：任一角度失败即整体失败（不装半套），账户欠费（403 `AccountOverdueError`）立即停并如实报告；
+3. **装档走复核**：`portrait-set-install.mts` 写 `portraits/v<N>/` + `source-map.json`（逐角度 sha256 与来源），
+   缺必需角度 / 同一张图指到多个角度 / 覆盖旧版本一律拒绝；
+4. **评审决策交给人类**（产品所有者 2026-10-01 口径）：机器像不像判据**只留证、不参与放行**——它本身不稳定
+   （同一批文件实测同一张图出现 92 / 15 / 86 三种结论）。验收用
+   `portrait-agent.mts accept --character <id> --by <验收人> --note <依据>`，落账 `g5-portrait-confirm` 且
+   `via=owner-acceptance`（**不写成监制通过**）；需要留机器证据时加 `--with-likeness`（仅记录）。
+
+> 本仓 3 号「客户方CEO」就是这条路的产物：客户 2026-10-01 验收通过了 8 张（见该目录 `reviews/`）；
+> 标准 8 角度里的 4 个（back / actionPose / emotionCloseup / handDetail）因平台欠费待补。
+
 ## 五、合规红线（不可绕过）
 
 - **真人肖像只走平台授权通道**：火山方舟「私域真人人像库」→ 以 `asset://<asset ID>` 引用；
