@@ -41,7 +41,12 @@ const flag = (name: string): boolean => process.argv.includes(name);
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const INSTALLER = join(REPO_ROOT, "scripts/tools/portrait-set-install.mts");
-const DEFAULT_ANGLES = ["front", "threeQuarter", "closeup", "side", "frontFull", "threeQuarterLeft", "threeQuarterRight", "smileCloseup"];
+/**
+ * 默认角度 = **仓内角色库的标准 8 角度**（`REQUIRED_PORTRAIT_ANGLES` + back/actionPose/emotionCloseup/handDetail）——
+ * 这样"一次出满 8 张"直接就是可入库、可驱动全片的标准套（旧默认那 4 个角度 frontFull/threeQuarterLeft/
+ * threeQuarterRight/smileCloseup 仍可用 `--angles` 追加，属备选角度）。
+ */
+const DEFAULT_ANGLES = ["front", "threeQuarter", "closeup", "side", "back", "actionPose", "emotionCloseup", "handDetail"];
 
 /** 逐角度提示词：与角色档案的生成纪律同源（纯写实 + 中性背景/中性光 + 保留真实皮肤纹理） */
 const ANGLE_PROMPTS: Record<string, string> = {
@@ -49,6 +54,10 @@ const ANGLE_PROMPTS: Record<string, string> = {
   threeQuarter: "四分之三侧角定妆照：人物身体与面部约 45° 朝向镜头，露出两侧脸颊轮廓；",
   closeup: "面部近景定妆照：胸部以上近景，面部占据画面主体，眼神自然看向镜头；",
   side: "正侧面定妆照：人物 90° 正侧对镜头，完整呈现鼻梁、下颌与发型轮廓；",
+  back: "背面全身定妆照：人物背对镜头站立、全身入画、肩线水平，用于侧面/背影镜头的身份锚；",
+  actionPose: "标志性动作全身像：自然生活姿态（站立、重心稳定、双手自然摆放），身体结构与动态张力清晰，不作夸张动作；",
+  emotionCloseup: "情绪特写：胸部以上近景，完整呈现核心情绪状态，微表情层次清晰、眼神有交流感；",
+  handDetail: "手部特写：手部自然摆放或持物的姿态清晰，手指结构正确、指甲自然，不出现第二只手；",
   frontFull: "正全身定妆照：人物正面站立、全身入画、重心自然、双手放松；",
   threeQuarterLeft: "左侧四分之三定妆照：人物向画面右侧转身约 45°，左肩靠近镜头；",
   threeQuarterRight: "右侧四分之三定妆照：人物向画面左侧转身约 45°，右肩靠近镜头；",
@@ -136,7 +145,7 @@ function refsForAngle(angle: string): string[] {
   return unique.slice(0, limit).map((id) => `asset://${id}`);
 }
 if (!assetRef || !/^asset:\/\/[A-Za-z0-9._-]+$/.test(assetRef)) {
-  console.error("用法：portrait-set-from-asset.mts --asset asset://asset-xxxx --character <角色ID> --library <角色库> [--angles a,b,...] [--out-dir <目录>] [--dry-run] [--install --activate] [--keys-file ~/.workloom/live.env]");
+  console.error("用法：portrait-set-from-asset.mts --asset asset://asset-xxxx --character <角色ID> --library <角色库> [--angles a,b,...] [--out-dir <目录>] [--dry-run] [--install --activate] [--keys-file ~/.workloom/live.env] [--verify-against <锚帧>] [--require-likeness]");
   process.exit(2);
 }
 if (!characterId) {
@@ -205,7 +214,8 @@ mkdirSync(outDir, { recursive: true });
 /**
  * **自动像不像校验**（产品所有者口径：不能指望客户/人工确认）：
  * `--verify-against <已通过验收的成片帧>` 作为"事实锚"，逐张送评审模型判"是不是同一个人"
- * （只看人：面孔/五官比例/脸型/发型/年龄段；服装差异不影响判定）。未过即整批失败。
+ * （只看人：面孔/五官比例/脸型/发型/年龄段；服装差异不影响判定）。
+ * **结果只作留证**（2026-10-01 口径：出图后的评审决策交给人类）；要旧行为加 `--require-likeness`。
  */
 const verifyAgainst = arg("--verify-against").trim();
 /**
@@ -422,7 +432,7 @@ async function toDataUrl(png: Buffer, tag: string): Promise<string> {
  * **两段式生产**（默认引擎，产品所有者口径：要"专业定妆照"、不要单图派生）：
  *   第一段：用 `asset://` 参考（视频路，唯一吃 asset 的入口）先出 1–2 张**身份母版**（默认 front，可加 threeQuarter）；
  *   第二段：以身份母版**多图**为参考走图端点 img2img（2K、便宜、专业布光），逐角度出图。
- * 任何一张不过"机器像不像"校验 → 单张回退视频路（asset 参考）重做一次；仍不过则整批拒绝。
+ * 任何一张不过"机器像不像"留证 → 单张回退视频路（asset 参考）重做一次；仍不过**只记录**（`--require-likeness` 时整批拒绝）。
  */
 const stageAAngles = arg("--stage-a-angles", "front").split(",").map((value) => value.trim()).filter(Boolean);
 const stageAMasters = new Map<string, Buffer>();
@@ -532,13 +542,22 @@ for (const entry of plan.angles) {
     + ` 像不像：${likeness.same ? "同一人" : "疑似不一致"}${likeness.score === null ? "" : `（score ${likeness.score}）`} ${likeness.reason.slice(0, 60)}`);
 }
 
-/** 自动校验未过的角度一律不许装（宁缺毋滥：一套里混进不像的图比没有更糟） */
+/**
+ * 像不像**只作留证**（2026-10-01 产品所有者口径：出图后的评审决策交给人类）。
+ *
+ * 为什么不再当闸门：这个机器判据本身不稳定——同一批文件实测同一张图出现 92 / 15 / 86 三种结论，
+ * 拿它当门只会误杀（把像的拦下）或误放（把不像的放过）。需要旧行为时显式加 `--require-likeness`。
+ */
 const failedLikeness = perAngle.filter((entry) => !entry.likeness.ok);
 if (failedLikeness.length > 0) {
-  console.error(`\n以下角度未过自动像不像校验，整批拒绝（不安装）：`);
-  for (const entry of failedLikeness) console.error(`  ${entry.angle}：${entry.likeness.reason}`);
-  console.error("修法：调提示词/参考图组合重跑（角度提示词或 --refs 数），或换 --verify-against 锚帧。");
-  process.exit(2);
+  const detail = failedLikeness.map((entry) => `${entry.angle}（score ${entry.likeness.score ?? "n/a"}）：${entry.likeness.reason}`);
+  if (flag("--require-likeness")) {
+    console.error(`\n以下角度未过自动像不像校验（--require-likeness：整批拒绝）：`);
+    for (const line of detail) console.error(`  ${line}`);
+    process.exit(2);
+  }
+  console.log(`\n⚠ 机器像不像留证（不阻断出图，按口径交人类评审）：${failedLikeness.length}/${perAngle.length} 个角度低于阈值`);
+  for (const line of detail) console.log(`  ${line}`);
 }
 
 /** 模型偷懒防线：两个角度拿到同一张图 → 整套拒绝 */
