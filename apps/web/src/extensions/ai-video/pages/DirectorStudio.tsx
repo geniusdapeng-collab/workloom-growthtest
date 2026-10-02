@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router";
 import type { DirectorFilmPlan } from "@hyperreality/video-studio";
 import { ensureDemoLogin, trpc } from "../../../lib/trpc";
 import { useNavigationAccess } from "../../../shell/NavigationAccess";
+import { PageExitLink } from "../../../shell/PageExitLink";
 import "./DirectorStudio.css";
 
 type Job=Awaited<ReturnType<typeof trpc.video.creative.job.query>>;
@@ -109,6 +110,7 @@ export default function DirectorStudio(){
   });
 
   return <main className="director-studio" aria-busy={loading||Boolean(busy)}>
+    <PageExitLink to="/ai-video/assets" label="返回片库" className="director-secondary" />
     <header className="director-heading"><div><p className="director-eyebrow">一句话，交给导演</p>
       <h1>把你的想法，拍成电影。</h1><p>先说想表达什么。妆造、光线、表演、剪辑和声音，由制作团队安排。</p></div>
       <Link className="director-link" to="/ai-video/assets?tab=studio&advanced=1">专业工作台 ↗</Link></header>
