@@ -124,6 +124,7 @@
         "pipelines/explainer-film.yml"
       ],
       "library": [
+        "library/root-list.mjs",
         "library/bgm-library-curated/acoustic-warm-ghostrifter-official-zeal-456.m4a",
         "library/bgm-library-curated/acoustic-warm-john-bartmann-a-kwela-fella-461.m4a",
         "library/bgm-library-curated/acoustic-warm-liqwyd-shine-552.m4a",
@@ -760,7 +761,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "cd363449207fc807893f27409b2806adbe528402f4c1675ef434cfc252db93dd",
+    "digest": "7e14cdccfe9841c76f0a54dfaaadd6ff27fb40282f232baaaf69c131e6a1c314",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "9180a2cb1fbac95f4c5ec835041e98436ccc2de6d7a874abb651bf6b74124425",
@@ -1166,6 +1167,7 @@
       "library/luts/slog3-to-rec709.cube": "63ff904e3535404f23f6f23048233726b5c09839a87c0f436724ccba0e43d01e",
       "library/media-catalog/media-catalog.json": "569f9a0f05a8bb66eb48d67b742bd53a3bd64ea213a79cb0f4925c7ecf627d27",
       "library/README.md": "791f05f2cd3f60d1ac343ce09c5bab841cb7157847f87bc0bc9eaa735f6b7730",
+      "library/root-list.mjs": "d760d157f058e3f1e61fee6016152835c08dc64b9c354290764a4533bef310c0",
       "library/scene-policies/beauty-fashion.json": "915aa70789f1deab4f81a0948b4c2de17390fb9eeb2a91523d3f3a04a94816e6",
       "library/scene-policies/beauty-fashion.source.md": "8ca27e9a3aa2981c81cb88a071e206b9755c28e69bc1ad4e62048609f7703e89",
       "library/scene-policies/commerce-seeding.json": "3ef8c65dbfb0072634d125195c3181522637652dc386a22d32793931caebef3b",
