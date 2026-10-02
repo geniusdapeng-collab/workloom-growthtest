@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "cards": 15,
+  "invariants": 4,
+  "codeCommit": "5f02a02830f8d0dbb337ab94aef354296e0eb5a4",
+  "meaning": "ledger structure and assertions only",
+  "independentM6": "not-run",
+  "command": "bash ~/.codex/skills/mine-clear-delivery/scripts/run-mine-clear.sh --repo <repo> -- gate --ledger outputs/mine-clear/T-2026-1002-0001/ledger.json"
+}

@@ -1,0 +1,25 @@
+{
+  "status": "passed",
+  "ownedFixturePorts": [
+    {
+      "port": 56624,
+      "listening": false
+    },
+    {
+      "port": 59082,
+      "listening": false
+    },
+    {
+      "port": 55142,
+      "listening": false
+    },
+    {
+      "port": 54642,
+      "listening": false
+    },
+    {
+      "port": 59432,
+      "listening": false
+    }
+  ]
+}

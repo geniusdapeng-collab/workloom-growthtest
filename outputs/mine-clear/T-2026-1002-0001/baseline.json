@@ -1,0 +1,27 @@
+{
+  "schema": "workloom.mine-clear/baseline@1",
+  "task_id": "T-2026-1002-0001",
+  "repo": "workloom-growthtest",
+  "repo_path": ".",
+  "remote": "origin",
+  "audit": {
+    "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+    "branch": "task/T-2026-1002-0001",
+    "remote": "origin",
+    "remote_main": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+    "fetched_at": "2026-10-02T01:15:37.099Z",
+    "dirty_count": 0,
+    "notes": []
+  },
+  "smoke": {
+    "status": "pass",
+    "environment": "client-runtime Mac ARM64",
+    "evidence": "evidence/mac-final-firstboot.json",
+    "notes": "全新客户目录真实首启及窗口；不代表 paid 成片生产域"
+  },
+  "created_at": "2026-10-02T01:15:37.553Z",
+  "repair": {
+    "commit": "5f02a02830f8d0dbb337ab94aef354296e0eb5a4",
+    "is_descendant_of_audit": true
+  }
+}

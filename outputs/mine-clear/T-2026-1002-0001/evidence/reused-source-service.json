@@ -1,0 +1,236 @@
+{
+  "status": "passed",
+  "dataMode": "real-authenticated-service-local-synthetic-media-captured-real-text-plan",
+  "jobId": "DJ-64b10e5c",
+  "projectId": "VID-1037",
+  "elapsedMs": 158412,
+  "network": {
+    "loopbackRequests": 4,
+    "blockedExternalRequests": 0,
+    "textRequests": 0,
+    "imageRequests": 0,
+    "videoRequests": 0
+  },
+  "mediaReady": true,
+  "difference": {
+    "approved": true,
+    "errors": [],
+    "basis": "实际独立 EDL + 至少两个可感知附加轴；响度差/文件名不作差异证据",
+    "pairs": [
+      {
+        "a": "douyin-impact",
+        "b": "xiaohongshu-editorial",
+        "structural": true,
+        "axes": [
+          "sound",
+          "cover"
+        ],
+        "distinct": true
+      },
+      {
+        "a": "douyin-impact",
+        "b": "wechat-channels-documentary",
+        "structural": true,
+        "axes": [
+          "sound",
+          "cover"
+        ],
+        "distinct": true
+      },
+      {
+        "a": "douyin-impact",
+        "b": "director-surprise",
+        "structural": true,
+        "axes": [
+          "sound",
+          "cover"
+        ],
+        "distinct": true
+      },
+      {
+        "a": "xiaohongshu-editorial",
+        "b": "wechat-channels-documentary",
+        "structural": true,
+        "axes": [
+          "sound",
+          "cover"
+        ],
+        "distinct": true
+      },
+      {
+        "a": "xiaohongshu-editorial",
+        "b": "director-surprise",
+        "structural": true,
+        "axes": [
+          "sound",
+          "cover"
+        ],
+        "distinct": true
+      },
+      {
+        "a": "wechat-channels-documentary",
+        "b": "director-surprise",
+        "structural": true,
+        "axes": [
+          "sound",
+          "cover"
+        ],
+        "distinct": true
+      }
+    ],
+    "humanAestheticReview": "not_run"
+  },
+  "playable": [
+    {
+      "id": "douyin-impact",
+      "status": 200,
+      "contentType": "video/mp4"
+    },
+    {
+      "id": "xiaohongshu-editorial",
+      "status": 200,
+      "contentType": "video/mp4"
+    },
+    {
+      "id": "wechat-channels-documentary",
+      "status": 200,
+      "contentType": "video/mp4"
+    },
+    {
+      "id": "director-surprise",
+      "status": 200,
+      "contentType": "video/mp4"
+    }
+  ],
+  "sourceClips": 6,
+  "audioLedgerRows": 24,
+  "versions": [
+    {
+      "id": "douyin-impact",
+      "status": "complete",
+      "reusedLayers": {
+        "copy": true,
+        "audio": false,
+        "color": true,
+        "cover": true,
+        "picture": true,
+        "program": true,
+        "personQc": true,
+        "subtitles": false
+      },
+      "personQc": {
+        "status": "detection-unverified",
+        "samples": 39,
+        "temporalFramesCollected": true,
+        "identityVerified": false,
+        "beautyImprovementVerified": false,
+        "limitation": "已抽取时间序列与动作边界；未配置人物检测器时，不把全帧检查写成人脸、手部或颜值通过"
+      }
+    },
+    {
+      "id": "xiaohongshu-editorial",
+      "status": "complete",
+      "reusedLayers": {
+        "copy": true,
+        "audio": true,
+        "color": true,
+        "cover": true,
+        "picture": true,
+        "program": true,
+        "personQc": true,
+        "subtitles": true
+      },
+      "personQc": {
+        "status": "detection-unverified",
+        "samples": 38,
+        "temporalFramesCollected": true,
+        "identityVerified": false,
+        "beautyImprovementVerified": false,
+        "limitation": "已抽取时间序列与动作边界；未配置人物检测器时，不把全帧检查写成人脸、手部或颜值通过"
+      }
+    },
+    {
+      "id": "wechat-channels-documentary",
+      "status": "complete",
+      "reusedLayers": {
+        "copy": true,
+        "audio": true,
+        "color": true,
+        "cover": true,
+        "picture": true,
+        "program": true,
+        "personQc": true,
+        "subtitles": true
+      },
+      "personQc": {
+        "status": "detection-unverified",
+        "samples": 38,
+        "temporalFramesCollected": true,
+        "identityVerified": false,
+        "beautyImprovementVerified": false,
+        "limitation": "已抽取时间序列与动作边界；未配置人物检测器时，不把全帧检查写成人脸、手部或颜值通过"
+      }
+    },
+    {
+      "id": "director-surprise",
+      "status": "complete",
+      "reusedLayers": {
+        "copy": true,
+        "audio": true,
+        "color": true,
+        "cover": true,
+        "picture": true,
+        "program": true,
+        "personQc": true,
+        "subtitles": true
+      },
+      "personQc": {
+        "status": "detection-unverified",
+        "samples": 45,
+        "temporalFramesCollected": true,
+        "identityVerified": false,
+        "beautyImprovementVerified": false,
+        "limitation": "已抽取时间序列与动作边界；未配置人物检测器时，不把全帧检查写成人脸、手部或颜值通过"
+      }
+    }
+  ],
+  "choiceRecorded": true,
+  "calibrationSamples": 1,
+  "explicitPreferences": 1,
+  "eventCounts": [
+    {
+      "action": "video.director.complete",
+      "n": 2
+    },
+    {
+      "action": "video.director.interrupted",
+      "n": 1
+    },
+    {
+      "action": "video.director.queued",
+      "n": 3
+    },
+    {
+      "action": "video.project.create",
+      "n": 1
+    },
+    {
+      "action": "video.creative.feedback",
+      "n": 1
+    },
+    {
+      "action": "video.director.choice",
+      "n": 1
+    },
+    {
+      "action": "video.director.audio.completed",
+      "n": 24
+    },
+    {
+      "action": "video.director.plan.frozen",
+      "n": 3
+    }
+  ],
+  "planPreparation": "trusted captured real-LLM fixture; no fresh model call in this test",
+  "beautyImprovement": "not-tested"
+}

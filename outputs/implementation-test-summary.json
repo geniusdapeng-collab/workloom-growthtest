@@ -1,0 +1,44 @@
+{
+  "groups": [
+    {
+      "group": "relevant-vitest",
+      "files": 75,
+      "numTotalTests": 1120,
+      "numPassedTests": 1119,
+      "numFailedTests": 0,
+      "numPendingTests": 1
+    },
+    {
+      "group": "director-postgres",
+      "files": 1,
+      "numTotalTests": 15,
+      "numPassedTests": 15,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    {
+      "group": "model-router-postgres",
+      "files": 1,
+      "numTotalTests": 11,
+      "numPassedTests": 11,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    {
+      "group": "node-runtime-contracts",
+      "tests": 105,
+      "pass": 105,
+      "fail": 0,
+      "skipped": 0
+    },
+    {
+      "group": "release-gate-false-green",
+      "tests": 10,
+      "pass": 10,
+      "fail": 0,
+      "skipped": 0
+    }
+  ],
+  "sumWarning": "重复回归可能重叠，不合计为独立测试总数",
+  "casesExported": 1261
+}

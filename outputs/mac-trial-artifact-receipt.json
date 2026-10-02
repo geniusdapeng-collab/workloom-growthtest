@@ -1,0 +1,20 @@
+{
+  "artifact": "WorkLoom-growthtest-mac-arm64-trial.zip",
+  "status": "native-firstboot-passed-trial",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "bytes": 644534574,
+  "sha256": "3bdfa9cd751dab00b6ef5e0c48bec895e8ed541db05637112bc2793ae5bf38c1",
+  "sha512": "3d2b545de378487e65a97c1c2096b227b6ccd185e1beb6bdf3b807d164b7668801ebda724bc4e1d04b920f8c8455766de78a6cb050b45b41122548ed2c3b9862",
+  "codeCommit": "5f02a02830f8d0dbb337ab94aef354296e0eb5a4",
+  "payloadVersion": "v0.1.0-director-20261002-clean2",
+  "payloadSha256": "20ae060c759fd809267264e5e818ff8cbe9eaf773674b132434ea33a95c82edf",
+  "zipPayloadMatchesFreshNativeTest": true,
+  "sourceFilesMatch": true,
+  "platformSigning": "ad-hoc trial",
+  "developerIdSigning": "not-verified",
+  "notarization": "not-verified",
+  "stableBundleReleaseQualification": "not-verified",
+  "firstbootEvidence": "mac-native/final-firstboot-receipt.json",
+  "firstbootElapsedSec": 51.605
+}

@@ -1,0 +1,772 @@
+{
+  "schema": "workloom.mine-clear/ledger@1",
+  "task_id": "T-2026-1002-0001",
+  "repo": "workloom-growthtest",
+  "title": "一句话导演 V2、四版本与客户首启：已修与未验证资格分开记录",
+  "created_at": "2026-10-02T01:15:37.553Z",
+  "updated_at": "2026-10-02T12:33:42.548582+00:00",
+  "baseline": {
+    "audit": {
+      "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+      "branch": "task/T-2026-1002-0001",
+      "remote": "origin",
+      "fetched_at": "2026-10-02T01:15:37.099Z",
+      "notes": ""
+    },
+    "repair": {
+      "commit": "5f02a02830f8d0dbb337ab94aef354296e0eb5a4",
+      "branch": "task/T-2026-1002-0001",
+      "remote": "origin",
+      "reverified_problem_ids": [
+        "MC-001",
+        "MC-002",
+        "MC-003",
+        "MC-004",
+        "MC-005",
+        "MC-007",
+        "MC-008"
+      ],
+      "notes": "remote main 多次 fetch 后仍为审计基线；修复者回归证据已记录，不冒充独立验证"
+    },
+    "acceptance": {
+      "commit": null,
+      "is_descendant_of_repair": null,
+      "notes": "没有独立验证者；不签发正式 M6"
+    }
+  },
+  "environment": {
+    "kind": "client-runtime",
+    "notes": "本机真实 Mac ARM64 打包客户首启；文本真实模型；视频只用本地合成片。Windows 与 paid 生产域未运行。"
+  },
+  "invariants": [
+    {
+      "id": "E3.7",
+      "text": "无回执保持未核实，不转成功且不自动重发",
+      "source": "AGENTS.md"
+    },
+    {
+      "id": "SCOPE",
+      "text": "租户、工作区、项目、运行、素材字节、冻结版本全链绑定",
+      "source": "0054 migration and director contracts"
+    },
+    {
+      "id": "BUDGET",
+      "text": "普通创作委托不替代本人授权、费用审批或发布授权",
+      "source": "director policy"
+    },
+    {
+      "id": "NO-MEDIA-API",
+      "text": "本次验证禁止调用图像和视频 API",
+      "source": "用户本轮明确要求"
+    }
+  ],
+  "cards": [
+    {
+      "id": "MC-001",
+      "kind": "problem",
+      "level": "L1",
+      "severity": "P1",
+      "title": "Mac/Windows 共用首启环境构造引用未定义 RUNTIME",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/desktop/electron/bootstrap.cjs",
+        "line": 395,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "buildDesktopEnvironment"
+      },
+      "trigger_path": "新客户第一次启动走到环境组装；函数访问另一个函数内部的局部 RUNTIME",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/bootstrap.cjs:395@da06fdf1e1ead0cafc078ea27695397d2e9209db"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/desktop-bootstrap-baseline.txt",
+          "note": "bootstrap fixtures + packaged fresh firstboot"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "新客户第一次启动走到环境组装；函数访问另一个函数内部的局部 RUNTIME",
+          "expect": "环境组装无 ReferenceError；全新中文空格路径、最小 PATH 实际进入原生窗口",
+          "command": "node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs",
+          "last_result": "pass",
+          "evidence": "evidence/mac-final-firstboot.json"
+        }
+      ],
+      "regression": {
+        "command": "node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs",
+        "evidence": "evidence/mac-final-firstboot.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。"
+    },
+    {
+      "id": "MC-101",
+      "kind": "fix",
+      "title": "修复：Mac/Windows 共用首启环境构造引用未定义 RUNTIME",
+      "state": "fixed",
+      "covers": [
+        "MC-001"
+      ],
+      "batch": 1,
+      "fix_plan": "明确传 runtimeDir；在数据库启动前执行 payload 导入/Bundle/行业装配预检",
+      "conflict_paths": [
+        "apps/desktop/electron/bootstrap.cjs"
+      ],
+      "blast_radius": "所有桌面产品共享该 bootstrap；本次只改隔离 growthtest，不 fanout",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/bootstrap.cjs@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/mac-final-firstboot.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "新客户第一次启动走到环境组装；函数访问另一个函数内部的局部 RUNTIME",
+          "expect": "环境组装无 ReferenceError；全新中文空格路径、最小 PATH 实际进入原生窗口",
+          "command": "node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs",
+          "last_result": "pass",
+          "evidence": "evidence/mac-final-firstboot.json"
+        }
+      ],
+      "regression": {
+        "command": "node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs",
+        "evidence": "evidence/mac-final-firstboot.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。"
+    },
+    {
+      "id": "MC-002",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "title": "首启可能把占用 NATS 端口的外来实例当成自己的总线",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/desktop/electron/bootstrap.cjs",
+        "line": 1101,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "bootstrap NATS branch"
+      },
+      "trigger_path": "同机多个客户端使用相同 NATS 端口；旧逻辑检测监听即连接",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/bootstrap.cjs:1101@da06fdf1e1ead0cafc078ea27695397d2e9209db"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/desktop-bootstrap-fixed.txt",
+          "note": "actual packaged bootstrap with owned foreign-port occupant; memory fallback and occupant preservation"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "同机多个客户端使用相同 NATS 端口；旧逻辑检测监听即连接",
+          "expect": "只有自己启动并存活的 NATS 才连接；外来占用返回可读诊断并使用本实例 memory",
+          "command": "node --test apps/desktop/electron/bootstrap-startup.test.cjs",
+          "last_result": "pass",
+          "evidence": "evidence/nats-foreign-port.json"
+        }
+      ],
+      "regression": {
+        "command": "node --test apps/desktop/electron/bootstrap-startup.test.cjs",
+        "evidence": "evidence/nats-foreign-port.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。"
+    },
+    {
+      "id": "MC-102",
+      "kind": "fix",
+      "title": "修复：首启可能把占用 NATS 端口的外来实例当成自己的总线",
+      "state": "fixed",
+      "covers": [
+        "MC-002"
+      ],
+      "batch": 1,
+      "fix_plan": "检查端口占用、保留错误码、验证子进程；停止时仅清理本实例进程",
+      "conflict_paths": [
+        "apps/desktop/electron/bootstrap.cjs"
+      ],
+      "blast_radius": "事件总线连接归属及降级路径；没有修改其它产品",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/bootstrap.cjs@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/nats-foreign-port.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "同机多个客户端使用相同 NATS 端口；旧逻辑检测监听即连接",
+          "expect": "只有自己启动并存活的 NATS 才连接；外来占用返回可读诊断并使用本实例 memory",
+          "command": "node --test apps/desktop/electron/bootstrap-startup.test.cjs",
+          "last_result": "pass",
+          "evidence": "evidence/nats-foreign-port.json"
+        }
+      ],
+      "regression": {
+        "command": "node --test apps/desktop/electron/bootstrap-startup.test.cjs",
+        "evidence": "evidence/nats-foreign-port.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。"
+    },
+    {
+      "id": "MC-003",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "title": "旧后期主时间线不足以满足 V2 实质版本差异",
+      "state": "fixed",
+      "root_cause": {
+        "file": "bundles/ai-video/connectors/post-bridge/core.mjs",
+        "line": 1251,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "buildDeliveryPackage"
+      },
+      "trigger_path": "同一镜头池要求三平台或单平台多风格，旧入口沿用共同主时间线",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "bundles/ai-video/connectors/post-bridge/core.mjs:1251@da06fdf1e1ead0cafc078ea27695397d2e9209db"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/local-ffmpeg.json",
+          "note": "four synthetic variants and six pair checks"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "同一镜头池要求三平台或单平台多风格，旧入口沿用共同主时间线",
+          "expect": "新导演入口默认四目标；实际本地四片每一对均有结构差异和至少两个实际附加轴",
+          "command": "node scripts/test-director-local-media.mjs --work-dir \"$DIRECTOR_TEST_DIR\" --ffmpeg \"$VERIFIED_FFMPEG\" --ffprobe \"$VERIFIED_FFPROBE\"",
+          "last_result": "pass",
+          "evidence": "evidence/local-ffmpeg.json"
+        }
+      ],
+      "regression": {
+        "command": "node scripts/test-director-local-media.mjs --work-dir \"$DIRECTOR_TEST_DIR\" --ffmpeg \"$VERIFIED_FFMPEG\" --ffprobe \"$VERIFIED_FFPROBE\"",
+        "evidence": "evidence/local-ffmpeg.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。 此项是新需求与旧实现差距；旧大桥接文件为 C 级抽样，不宣称全量旧后期审计。"
+    },
+    {
+      "id": "MC-103",
+      "kind": "fix",
+      "title": "修复：旧后期主时间线不足以满足 V2 实质版本差异",
+      "state": "fixed",
+      "covers": [
+        "MC-003"
+      ],
+      "batch": 2,
+      "fix_plan": "新增独立 picture/audio EDL 与 V2 executor；旧专业入口保留；实际字幕、调色、封面和音轨证据逐版保存",
+      "conflict_paths": [
+        "bundles/ai-video/connectors/post-bridge/core.mjs"
+      ],
+      "blast_radius": "新导演服务、Web、CLI、只读 MCP 使用同一目标和配方；旧长 Runner 不冒充 V2",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "bundles/ai-video/connectors/post-bridge/core.mjs@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/local-ffmpeg.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "同一镜头池要求三平台或单平台多风格，旧入口沿用共同主时间线",
+          "expect": "新导演入口默认四目标；实际本地四片每一对均有结构差异和至少两个实际附加轴",
+          "command": "node scripts/test-director-local-media.mjs --work-dir \"$DIRECTOR_TEST_DIR\" --ffmpeg \"$VERIFIED_FFMPEG\" --ffprobe \"$VERIFIED_FFPROBE\"",
+          "last_result": "pass",
+          "evidence": "evidence/local-ffmpeg.json"
+        }
+      ],
+      "regression": {
+        "command": "node scripts/test-director-local-media.mjs --work-dir \"$DIRECTOR_TEST_DIR\" --ffmpeg \"$VERIFIED_FFMPEG\" --ffprobe \"$VERIFIED_FFPROBE\"",
+        "evidence": "evidence/local-ffmpeg.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。 此项是新需求与旧实现差距；旧大桥接文件为 C 级抽样，不宣称全量旧后期审计。"
+    },
+    {
+      "id": "MC-004",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "title": "G5 人审与生产资格对审批来源的要求不一致",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/server/src/video/production-authority.ts",
+        "line": 157,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "qualifyRenderRequest preproduction gate validation"
+      },
+      "trigger_path": "旧人审分支记录 owner-acceptance，而生产资格把非 LLM 来源拒绝；同时 V2 需要合法创作委托",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/production-authority.ts:157@da06fdf1e1ead0cafc078ea27695397d2e9209db"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/test-summary.json",
+          "note": "source contracts and actual scoped grants"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "旧人审分支记录 owner-acceptance，而生产资格把非 LLM 来源拒绝；同时 V2 需要合法创作委托",
+          "expect": "委托必须有真实作用域事件；人审必须有本人审批记录与实际图像证据；不能只靠 payload 哈希取得权限",
+          "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/test-summary.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "evidence": "evidence/test-summary.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。 人审旧冲突为静态代码证据，未声称修前真实人像付费链已复现。"
+    },
+    {
+      "id": "MC-104",
+      "kind": "fix",
+      "title": "修复：G5 人审与生产资格对审批来源的要求不一致",
+      "state": "fixed",
+      "covers": [
+        "MC-004"
+      ],
+      "batch": 2,
+      "fix_plan": "明确合法来源；在资格层验证人审审批/事件和创作委托；预算审批与排队在一个事务",
+      "conflict_paths": [
+        "apps/server/src/video/production-authority.ts"
+      ],
+      "blast_radius": "只影响该仓 G5 资格接线及新导演委托；G8、本人授权与其他门保留",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/production-authority.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/test-summary.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "旧人审分支记录 owner-acceptance，而生产资格把非 LLM 来源拒绝；同时 V2 需要合法创作委托",
+          "expect": "委托必须有真实作用域事件；人审必须有本人审批记录与实际图像证据；不能只靠 payload 哈希取得权限",
+          "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/test-summary.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "evidence": "evidence/test-summary.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。 人审旧冲突为静态代码证据，未声称修前真实人像付费链已复现。"
+    },
+    {
+      "id": "MC-005",
+      "kind": "problem",
+      "level": "L4",
+      "severity": "P0",
+      "title": "发布门禁把 failed/零步任务误报为成功",
+      "state": "fixed",
+      "root_cause": {
+        "file": "scripts/release-gate.ts",
+        "line": 232,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "Q-01 and Q-02"
+      },
+      "trigger_path": "实际 GEO mock QUEST status=failed, stepsDone=0，旧 Q-01 只检查已建线程与拆解数量",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "scripts/release-gate.ts:232@da06fdf1e1ead0cafc078ea27695397d2e9209db"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/corrected-release-gate.txt",
+          "note": "actual release gate red + ten negative/positive assertions"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "实际 GEO mock QUEST status=failed, stepsDone=0，旧 Q-01 只检查已建线程与拆解数量",
+          "expect": "失败、取消、零进度、伪回执、线程不一致均拒绝；本次实际门禁 exit 1，Q-01 为红",
+          "command": "node --experimental-strip-types --test scripts/release-gate-quest.test.mjs",
+          "last_result": "pass",
+          "evidence": "evidence/release-gate-quest-final.txt"
+        }
+      ],
+      "regression": {
+        "command": "node --experimental-strip-types --test scripts/release-gate-quest.test.mjs",
+        "evidence": "evidence/release-gate-quest-final.txt"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。"
+    },
+    {
+      "id": "MC-105",
+      "kind": "fix",
+      "title": "修复：发布门禁把 failed/零步任务误报为成功",
+      "state": "fixed",
+      "covers": [
+        "MC-005"
+      ],
+      "batch": 0,
+      "fix_plan": "抽取严格 assertQuestExecution；Q-02 只检查本次精确线程，不拿其他事件替代",
+      "conflict_paths": [
+        "scripts/release-gate.ts"
+      ],
+      "blast_radius": "发布资格更严格；现有 mock 缺回执因此不再绿色，不修改账本或供应商回执",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "scripts/release-gate.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/release-gate-quest-final.txt"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "实际 GEO mock QUEST status=failed, stepsDone=0，旧 Q-01 只检查已建线程与拆解数量",
+          "expect": "失败、取消、零进度、伪回执、线程不一致均拒绝；本次实际门禁 exit 1，Q-01 为红",
+          "command": "node --experimental-strip-types --test scripts/release-gate-quest.test.mjs",
+          "last_result": "pass",
+          "evidence": "evidence/release-gate-quest-final.txt"
+        }
+      ],
+      "regression": {
+        "command": "node --experimental-strip-types --test scripts/release-gate-quest.test.mjs",
+        "evidence": "evidence/release-gate-quest-final.txt"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "跨窗口修复记录与既有测试回填；只有 RUNTIME 和发布门禁保留实际失败输出，其余不虚构修前失败测试。测试为修复者回归，不是独立 M6。"
+    },
+    {
+      "id": "MC-007",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "title": "成片冻结把空和非空 JavaScript 数组当作 PostgreSQL 数组保存",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/server/src/video/director-jobs.ts",
+        "line": 88,
+        "commit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+        "symbol": "freezeDirectorPlan"
+      },
+      "trigger_path": "先保存文字计划时空数组被保存成对象；四支作品编码完成后非空 variant_plans/source_refs 触发 JSON 语法错误，任务转失败",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/director-jobs.ts:88@35041db94f1c354e46973f38ca3b585067ba5f25"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/director-json-roundtrip-before.json",
+          "note": "actual service failure plus a failing real PostgreSQL roundtrip assertion"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "先保存文字计划时空数组被保存成对象；四支作品编码完成后非空 variant_plans/source_refs 触发 JSON 语法错误，任务转失败",
+          "expect": "空/非空数组、嵌套计划、Unicode/引号/换行与计划哈希准确回读；实际服务四版冻结、播放、选择和音轨反馈完成",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/reused-source-service.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "evidence": "evidence/reused-source-service.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "本项保留实际服务 JSON 保存失败回执和新增修前真实 PG 断言：14 通过 1 失败；修后 15/15 和完整素材服务通过。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-106",
+      "kind": "fix",
+      "title": "修复：成片冻结把空和非空 JavaScript 数组当作 PostgreSQL 数组保存",
+      "state": "fixed",
+      "covers": [
+        "MC-007"
+      ],
+      "batch": 2,
+      "fix_plan": "五个 JSONB 参数显式 JSON.stringify 并声明 jsonb 类型；保留事务与计划只增纪律",
+      "conflict_paths": [
+        "apps/server/src/video/director-jobs.ts"
+      ],
+      "blast_radius": "新导演计划冻结；不更改已有只增业务记录，失败任务证据保留",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/director-jobs.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/reused-source-service.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "先保存文字计划时空数组被保存成对象；四支作品编码完成后非空 variant_plans/source_refs 触发 JSON 语法错误，任务转失败",
+          "expect": "空/非空数组、嵌套计划、Unicode/引号/换行与计划哈希准确回读；实际服务四版冻结、播放、选择和音轨反馈完成",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/reused-source-service.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "evidence": "evidence/reused-source-service.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "本项保留实际服务 JSON 保存失败回执和新增修前真实 PG 断言：14 通过 1 失败；修后 15/15 和完整素材服务通过。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-008",
+      "kind": "problem",
+      "level": "L4",
+      "severity": "P2",
+      "title": "十版本目标与六个盲选标签边界不一致",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/server/src/video/director-router.ts",
+        "line": 147,
+        "commit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+        "symbol": "choose blindLabel schema and DirectorStudio choose"
+      },
+      "trigger_path": "三个平台每平台三风格加惊喜产生十目标；旧 API 只接受 A-F，旧页面索引模六造成 G-J 重复标签",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/director-router.ts:147@35041db94f1c354e46973f38ca3b585067ba5f25"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/test-summary.json",
+          "note": "static boundary mismatch and actual target/label regression"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "三个平台每平台三风格加惊喜产生十目标；旧 API 只接受 A-F，旧页面索引模六造成 G-J 重复标签",
+          "expect": "十个目标标签唯一 A-J，全部合法；K/AA 非法；页面和 API 使用同一集合",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/test-summary.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "evidence": "evidence/test-summary.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "边界不兼容为代码证据，未虚构修前失败运行；十目标标签及非法标签用例实际通过。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-107",
+      "kind": "fix",
+      "title": "修复：十版本目标与六个盲选标签边界不一致",
+      "state": "fixed",
+      "covers": [
+        "MC-008"
+      ],
+      "batch": 3,
+      "fix_plan": "扩展 API enum 与页面标签数组到 A-J，移除索引模六，并更新契约文档",
+      "conflict_paths": [
+        "apps/server/src/video/director-router.ts"
+      ],
+      "blast_radius": "选择记录和网页标签边界；不把计划选择计数当作真人美观提升",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/director-router.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/test-summary.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "三个平台每平台三风格加惊喜产生十目标；旧 API 只接受 A-F，旧页面索引模六造成 G-J 重复标签",
+          "expect": "十个目标标签唯一 A-J，全部合法；K/AA 非法；页面和 API 使用同一集合",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/test-summary.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "evidence": "evidence/test-summary.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "边界不兼容为代码证据，未虚构修前失败运行；十目标标签及非法标签用例实际通过。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-006",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "title": "GEO mock 环境缺真实步骤回执，正式发布资格未满足",
+      "state": "unfixed",
+      "root_cause": {
+        "file": "packages/runtime/src/loop.ts",
+        "line": 1135,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "unverified receipt stop mechanism; connector cause not fully localized"
+      },
+      "trigger_path": "正确门禁在当前演示工作区派发复盘任务；第一个工具步骤无可信回执，运行停为 failed",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/runtime/src/loop.ts:1135@da06fdf1e1ead0cafc078ea27695397d2e9209db",
+          "note": "停线机制定位，不把合法停线当作代码错误；适配器缺口尚未完整定位"
+        },
+        {
+          "type": "log",
+          "ref": "evidence/corrected-release-gate.txt"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "已启动工作区及真实工具适配器",
+          "expect": "实际所有任务步骤都有可信回执，Q-01 通过，完整门禁 exit 0",
+          "command": "node --import tsx scripts/release-gate.ts",
+          "last_result": "fail",
+          "evidence": "evidence/corrected-release-gate.txt"
+        }
+      ],
+      "regression": {
+        "command": "node --import tsx scripts/release-gate.ts",
+        "evidence": "evidence/corrected-release-gate.txt"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "发现未修。属于正式发布环境资格，不靠伪造 mock 回执修复；当前任务的导演文字服务链另有实际通过证据。"
+    }
+  ],
+  "gates": [
+    {
+      "name": "relevant-unit-regressions",
+      "command": "vitest run packages/video-studio/src and four bridge regression files",
+      "result": "pass",
+      "evidence": "evidence/test-summary.json",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    },
+    {
+      "name": "actual-postgres-director",
+      "command": "RUN_DIRECTOR_DB_TESTS=1 vitest run apps/server/src/video/director.pg.test.ts",
+      "result": "pass",
+      "evidence": "evidence/test-summary.json",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    },
+    {
+      "name": "real-text-service",
+      "command": "owned authenticated caller -> director worker -> real text model -> frozen DB plan",
+      "result": "pass",
+      "evidence": "evidence/real-text-llm.json",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    },
+    {
+      "name": "reused-source-service",
+      "command": "authenticated renderVariants + media GET + choose + feedback with captured real text fixture",
+      "result": "pass",
+      "evidence": "evidence/reused-source-service.json",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    },
+    {
+      "name": "mac-clean-firstboot",
+      "command": "packaged Electron with fresh support, minimal PATH, Chinese-space path",
+      "result": "pass",
+      "evidence": "evidence/mac-final-firstboot.json",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    },
+    {
+      "name": "corrected-generic-release",
+      "command": "node --import tsx scripts/release-gate.ts",
+      "result": "fail",
+      "evidence": "evidence/corrected-release-gate.txt",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    },
+    {
+      "name": "independent-M6",
+      "command": "independent RDAS client-runtime acceptance at repair descendant",
+      "result": "not-run",
+      "evidence": "no independent verifier available",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    },
+    {
+      "name": "windows-native",
+      "command": "actual Windows installer fresh firstboot",
+      "result": "not-run",
+      "evidence": "no Windows host in current environment",
+      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+    }
+  ],
+  "issue": {
+    "slug": "workloom-ai/workloom-growthtest",
+    "number": 94
+  }
+}

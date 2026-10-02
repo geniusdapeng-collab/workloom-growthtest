@@ -1,0 +1,178 @@
+{
+  "dataMode": "synthetic-scenarios-real-llm",
+  "chains": [
+    {
+      "case": "hotel",
+      "round": 1,
+      "success": true,
+      "elapsedMs": 12844,
+      "shots": 6,
+      "versions": 4,
+      "planHash": "f5eb63f60c6303a68bdb768945b7705e22c507ff3f513f1cf8d06eec085bc3ed",
+      "identity": "unverified"
+    },
+    {
+      "case": "birthday",
+      "round": 1,
+      "success": true,
+      "elapsedMs": 15259,
+      "shots": 7,
+      "versions": 4,
+      "planHash": "c098c8fcea7c0a03319a81f67f1670243dbeac57bd7824f2ed562a81a292c921",
+      "identity": "unverified"
+    },
+    {
+      "case": "founder",
+      "round": 1,
+      "success": true,
+      "elapsedMs": 13248,
+      "shots": 7,
+      "versions": 4,
+      "planHash": "eea8700e25e364d19db7c09cb4553cafb7664735e3fd4a8615a2757ccf6814f2",
+      "identity": "unverified"
+    },
+    {
+      "case": "period",
+      "round": 1,
+      "success": true,
+      "elapsedMs": 12290,
+      "shots": 7,
+      "versions": 1,
+      "planHash": "25b1e4e582ad6d7394630fe869eb61e722043769dafeb173bd6f89c5c4ef09ba",
+      "identity": "unverified"
+    },
+    {
+      "case": "product",
+      "round": 1,
+      "success": true,
+      "elapsedMs": 10794,
+      "shots": 7,
+      "versions": 2,
+      "planHash": "0dc78213ca794ca303acd90227bdc814808db56452e556643af00c255857045f",
+      "identity": "unverified"
+    },
+    {
+      "case": "night",
+      "round": 1,
+      "success": true,
+      "elapsedMs": 15379,
+      "shots": 7,
+      "versions": 4,
+      "planHash": "3f3ee90f0ef9074facf48f0e13de5909686925ec3e8100705bfb393e68312f20",
+      "identity": "unverified"
+    },
+    {
+      "case": "period",
+      "round": 2,
+      "success": true,
+      "elapsedMs": 12445,
+      "shots": 7,
+      "versions": 1,
+      "planHash": "e226f5080a3d48c5ae6e1e41266f20a44b6788cb7f39e9135ff1dc7f3db01dd1",
+      "identity": "unverified"
+    },
+    {
+      "case": "birthday",
+      "round": 2,
+      "success": true,
+      "elapsedMs": 12693,
+      "shots": 6,
+      "versions": 4,
+      "planHash": "b4197e51bfa9c93aba6b5a65df5288f5f14020448377156bf3d9b3bc6709f4b4",
+      "identity": "unverified"
+    },
+    {
+      "case": "hotel",
+      "round": 2,
+      "success": true,
+      "elapsedMs": 14105,
+      "shots": 7,
+      "versions": 4,
+      "planHash": "60369ff64e023cdab1763b6abd34c49816a453241db461e415835a923fea7516",
+      "identity": "unverified"
+    },
+    {
+      "case": "founder",
+      "round": 2,
+      "success": true,
+      "elapsedMs": 14874,
+      "shots": 8,
+      "versions": 4,
+      "planHash": "a599aa0b1f8f0bb01ea910ba3f64c1da72f8fb105e70954c7b9e0b5c8d4475b4",
+      "identity": "unverified"
+    },
+    {
+      "case": "product",
+      "round": 2,
+      "success": true,
+      "elapsedMs": 12441,
+      "shots": 6,
+      "versions": 2,
+      "planHash": "9cddad9637bf55d6639adbba246ec5a3dd237fad1e4a5ad3a2e413ccbb3690b9",
+      "identity": "unverified"
+    },
+    {
+      "case": "night",
+      "round": 2,
+      "success": true,
+      "elapsedMs": 13805,
+      "shots": 6,
+      "versions": 4,
+      "planHash": "f47f37659b3c1c7c584670b0d91b541011f15d07bc79482473e6fd496b07e8a3",
+      "identity": "unverified"
+    }
+  ],
+  "network": {
+    "llmRequests": 48,
+    "imageRequests": 0,
+    "videoRequests": 0,
+    "blockedOtherRequests": 0
+  },
+  "concurrencyByRound": {
+    "1": 2,
+    "2": 4
+  },
+  "usage": {
+    "promptTokens": 122221,
+    "completionTokens": 28132
+  },
+  "service": {
+    "status": "passed",
+    "jobId": "DJ-387bec77",
+    "projectId": "VID-1002",
+    "elapsedMs": 17852,
+    "network": {
+      "textRequests": 4,
+      "healthRequests": 4,
+      "imageRequests": 0,
+      "videoRequests": 0,
+      "otherRequests": 0
+    },
+    "eventCounts": [
+      {
+        "action": "model.call",
+        "n": 4
+      },
+      {
+        "action": "video.director.complete",
+        "n": 1
+      },
+      {
+        "action": "video.director.plan.frozen",
+        "n": 1
+      },
+      {
+        "action": "video.director.queued",
+        "n": 1
+      },
+      {
+        "action": "video.project.create",
+        "n": 1
+      }
+    ],
+    "dataMode": "real-service-real-text-model-synthetic-brief",
+    "mediaAesthetics": "not-tested"
+  },
+  "beautyImprovement": "not-tested",
+  "paidImageVideoApiCalls": 0
+}

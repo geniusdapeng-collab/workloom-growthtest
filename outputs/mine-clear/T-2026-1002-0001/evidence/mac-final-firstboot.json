@@ -1,0 +1,31 @@
+{
+  "status": "passed",
+  "exitCode": 0,
+  "observerExitCode": 0,
+  "elapsedSec": 51.605,
+  "freshSupportDirectory": true,
+  "minimalSystemPath": true,
+  "supportPathContainsChineseAndSpaces": true,
+  "surface": "final clean packaged Electron",
+  "paidImageVideoApiCalls": 0,
+  "payloadSha256": "20ae060c759fd809267264e5e818ff8cbe9eaf773674b132434ea33a95c82edf",
+  "payloadVersion": "v0.1.0-director-20261002-clean2",
+  "signing": "ad-hoc trial",
+  "notarization": "not-verified",
+  "installState": {
+    "schemaVersion": "workloom.install-state/v1",
+    "updatedAt": "2026-10-02T12:12:27.336Z",
+    "status": "complete",
+    "phase": "ready",
+    "detail": "安装与启动检查已完成",
+    "recoverable": true,
+    "targetVersion": "v0.1.0-director-20261002-clean2",
+    "percent": 100,
+    "etaSeconds": 0
+  },
+  "onboardingUiAction": {
+    "method": "existing native UI action over loopback CDP",
+    "dismissedOnboarding": true,
+    "pageErrors": []
+  }
+}
