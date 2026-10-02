@@ -12,6 +12,7 @@ const message=(error:unknown)=>error instanceof Error?error.message:String(error
 const key=()=>`director-${crypto.randomUUID()}`;
 const active=(job:Job|null)=>job?.status==="queued"||job?.status==="running";
 const platformName:Record<string,string>={douyin:"抖音",xiaohongshu:"小红书","wechat-channels":"视频号"};
+const blindLabels=["A","B","C","D","E","F","G","H","I","J"] as const;
 const placeholder="为江边民宿拍一支电影：雨后的光落在窗边，一个人终于慢下来。";
 
 export default function DirectorStudio(){
@@ -103,7 +104,7 @@ export default function DirectorStudio(){
   const choose=(variant:Variant,index:number)=>operation(`choose-${variant.id}`,async()=>{
     if(!job?.planHash||!job.planRevision)throw new Error("作品版本未就绪。");
     await trpc.video.creative.choose.mutate({projectId:job.projectId,expectedPlanHash:job.planHash,revision:job.planRevision,
-      variantId:variant.id,blindLabel:blind?(["A","B","C","D","E","F"][index%6] as "A"|"B"|"C"|"D"|"E"|"F"):undefined});
+      variantId:variant.id,blindLabel:blind?blindLabels[index]:undefined});
     setNotice(`已记录你对${blind?`版本 ${String.fromCharCode(65+index)}`:variant.label}的选择。`);
   });
 

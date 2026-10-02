@@ -85,8 +85,11 @@ export async function freezeDirectorPlan(scope:CreativeScope,projectId:string,in
     if(revision!==(latest?.revision??0)+1) throw new DirectorJobError("REVISION_CONFLICT","冻结版本必须接在当前版本之后");
     const body={filmPlan:input.filmPlan,targetPlan:input.filmPlan.deliveryTargetPlan,sourceManifest:input.sourceManifest??{},variantPlans:input.variantPlans??[],sourceRefs:input.sourceRefs??[],revision};
     const planHash=directorHash(body);
+    // pg treats JavaScript arrays as PostgreSQL arrays. Explicit JSON encoding
+    // preserves both [] and populated media manifests in JSONB columns.
     await client.query(`INSERT INTO video_director_plans(tenant_id,workspace_id,project_id,revision,plan_hash,target_plan,source_manifest,variant_plans,film_plan,source_refs,created_by)
-      VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[scope.tenantId,scope.workspaceId,projectId,revision,planHash,body.targetPlan,body.sourceManifest,body.variantPlans,input.filmPlan,body.sourceRefs,input.by]);
+      VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8::jsonb,$9::jsonb,$10::jsonb,$11)`,[scope.tenantId,scope.workspaceId,projectId,revision,planHash,
+      JSON.stringify(body.targetPlan),JSON.stringify(body.sourceManifest),JSON.stringify(body.variantPlans),JSON.stringify(input.filmPlan),JSON.stringify(body.sourceRefs),input.by]);
     await directorEvent(client,scope,projectId,"video.director.plan.frozen",{revision,planHash,filmPlanHash:input.filmPlan.planHash,
       expectedOutputs:input.filmPlan.deliveryTargetPlan.expectedOutputs},{id:"video-director",type:"system"});return {revision,planHash};
   });

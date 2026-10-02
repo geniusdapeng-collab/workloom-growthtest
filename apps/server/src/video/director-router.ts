@@ -16,6 +16,7 @@ const read=navigationPermissionProcedure("ai-video.assets.read");
 const write=navigationPermissionWriteProcedure("ai-video.assets.read");
 const id=z.string().min(1).max(200);
 const hash=z.string().regex(/^[a-f0-9]{64}$/u);
+export const directorBlindLabel=z.enum(["A","B","C","D","E","F","G","H","I","J"]);
 const options=z.object({platforms:z.array(z.enum(["douyin","xiaohongshu","wechat-channels"])).min(1).max(3).optional(),
   includeSurprise:z.boolean().optional(),versionCount:z.number().int().min(1).max(6).optional(),stylesPerPlatform:z.literal(3).optional()}).strict();
 const by=(identity:{memberId:string;memberNo:string})=>identity.memberId||identity.memberNo;
@@ -144,7 +145,7 @@ export const directorRouter=router({
     })),
   preferences:read.query(({ctx})=>api(()=>readExplicitDirectorPreferences(scopeOf(ctx.identity),by(ctx.identity)))),
   choose:write.input(z.object({projectId:id,expectedPlanHash:hash,revision:z.number().int().positive(),variantId:id,
-    score:z.number().int().min(1).max(5).optional(),blindLabel:z.enum(["A","B","C","D","E","F"]).optional(),
+    score:z.number().int().min(1).max(5).optional(),blindLabel:directorBlindLabel.optional(),
     feedback:z.string().trim().max(10000).optional()}).strict()).mutation(({ctx,input})=>api(async()=>{
       const scope=scopeOf(ctx.identity),plan=await latestDirectorPlan(scope,input.projectId);
       if(!plan || plan.plan_hash!==input.expectedPlanHash || plan.revision!==input.revision) throw new DirectorJobError("REVISION_CONFLICT","版本变化，请刷新后选择");

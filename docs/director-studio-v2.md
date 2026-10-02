@@ -85,7 +85,7 @@ node scripts/workloom-director.mjs versions --input-file project.json
 | `authorizeIdentity` / `authorize-identity` | POST | `assetId,selfConsent=true` | 当前本人素材授权记录 |
 | `approveBudget` / `budget` | POST | `jobId,approve=true,expectedPlanHash,idempotencyKey` | 当前 G8 批次的后续任务 |
 | `preferences` / `preferences` | GET | 无 | 本人明确偏好与来源 |
-| `choose` / `choose` | POST | 冻结版本三字段、`variantId`；可选评分 1–5、盲选标签 A–F、意见 | 实际选择记录 id |
+| `choose` / `choose` | POST | 冻结版本三字段、`variantId`；可选评分 1–5、盲选标签 A–J、意见 | 实际选择记录 id |
 | `calibration` / `calibration` | GET | 无 | 当前工作区样本、评分、盲选计数 |
 
 冻结版本三字段指 `projectId,expectedPlanHash,revision`，哈希为 64 位小写十六进制。所有公共对象拒绝额外字段。
@@ -159,6 +159,19 @@ Electron 的 Mac/Windows 客户端共用 bootstrap。包内 Node、PostgreSQL、
 
 本次真实文字测试覆盖六场景、两轮链路与并发；本地 FFmpeg 测试验证四版、逐对差异、字幕、声音、ROI、缓存和局部返工。
 测试严格禁用图像和视频 API。完整 paid 生产链、真人审美对照、Windows 原生启动、DSH 原生 GUI、正式签名公证和独立 M6 不由这些测试推导为通过。
+
+可在仓库根目录重跑本地合成集成回归。三个路径参数必须显式提供；媒体二进制应先由本仓媒体运行时安装器完成锁定文件与能力校验。
+测试目录使用独立临时目录；脚本生成合成镜头、声音和带明确测试来源的音轨回执，不接供应商。
+
+```bash
+node scripts/test-director-local-media.mjs \
+  --work-dir "$DIRECTOR_TEST_DIR" \
+  --ffmpeg "$VERIFIED_FFMPEG" \
+  --ffprobe "$VERIFIED_FFPROBE"
+```
+
+结果写入该目录的 `verification.json`。正常四版、音乐/封面/时间线修改、幂等重放、旧版本冲突、并发写入排斥、文件篡改与缺失授权音乐都必须通过。
+缺失音乐应让对应版本失败并保留其它三版；测试不允许隐式生成替代配乐。
 
 ## 功能优先级与必要性
 

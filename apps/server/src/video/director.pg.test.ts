@@ -7,7 +7,7 @@ import { buildDirectorDefaults, directorHash, resolveDeliveryTargets, type Direc
 import { directorTx, createDirectorGrantOnClient, verifyDirectorGrant, saveExplicitDirectorPreference, readExplicitDirectorPreferences } from "./director-store.js";
 import { queueDirectorJob, readDirectorJob, updateDirectorJob, freezeDirectorPlan, latestDirectorPlan, acquireDirectorLease,
   recoverInterruptedDirectorJob, directorEvent } from "./director-jobs.js";
-import { directorRouter, publicDirectorJob } from "./director-router.js";
+import { directorRouter, publicDirectorJob, directorBlindLabel } from "./director-router.js";
 
 const enabled=(process.env.RUN_DIRECTOR_DB_TESTS==="1"||process.env.RUN_DB_TESTS==="1")&&Boolean(process.env.DATABASE_APP_URL);
 describe.runIf(enabled)("director real PostgreSQL contracts",()=>{
@@ -36,6 +36,15 @@ describe.runIf(enabled)("director real PostgreSQL contracts",()=>{
     expect((await owner.query("SELECT name FROM _migrations WHERE name='0054_video_director_v2.sql'")).rowCount).toBe(1);
     const rows=(await owner.query("SELECT relname,relrowsecurity,relforcerowsecurity FROM pg_class WHERE relname IN ('video_creative_delegations','video_director_plans','video_director_jobs','video_director_preferences','video_director_audio_sources','video_director_choices')")).rows;
     expect(rows).toHaveLength(6);expect(rows.every(r=>r.relrowsecurity&&r.relforcerowsecurity)).toBe(true);
+  });
+  it("explicit nine regular outputs plus surprise have unique accepted blind labels",()=>{
+    const targets=resolveDeliveryTargets("抖音、小红书、视频号每平台三个风格");
+    expect(targets.targets).toHaveLength(10);
+    const labels=targets.targets.map((_target,index)=>String.fromCharCode(65+index));
+    expect(new Set(labels).size).toBe(10);
+    expect(labels.every(label=>directorBlindLabel.safeParse(label).success)).toBe(true);
+    expect(directorBlindLabel.safeParse("K").success).toBe(false);
+    expect(directorBlindLabel.safeParse("AA").success).toBe(false);
   });
   it("parallel duplicate input creates one job and one queue event",async()=>{
     const id=await project(),key=`parallel-${suffix}`;
@@ -83,6 +92,23 @@ describe.runIf(enabled)("director real PostgreSQL contracts",()=>{
     await expect(queueDirectorJob(scope,{projectId:id,revision:first.revision,expectedPlanHash:first.planHash,idempotencyKey:`stale-${suffix}`,by:"MEM-test",payload:{kind:"revise"}})).rejects.toMatchObject({code:"REVISION_CONFLICT"});
     await expect(owner.query("UPDATE video_director_plans SET target_plan='{}' WHERE project_id=$1",[id])).rejects.toThrow(/append-only/u);
     expect((await latestDirectorPlan(scope,id))?.revision).toBe(2);
+  });
+  it("frozen JSONB arrays roundtrip empty and populated media plans without changing their hash",async()=>{
+    const id=await project();
+    await freezeDirectorPlan(scope,id,{filmPlan,by:"MEM-test"});
+    const empty=await latestDirectorPlan(scope,id);
+    expect(empty?.variant_plans).toEqual([]);expect(empty?.source_refs).toEqual([]);
+    const variantPlans=[{id:"douyin-impact",pictureEdl:[{sourceId:"SC-1",inSec:0,takeSec:2}],title:"雨后 \\\"窗边\\\" 🎬"}];
+    const sourceRefs=[{shotId:"SC-1",assetId:"fixture-asset",sha256:directorHash("fixture source")}];
+    const sourceManifest={sources:[{shotId:"SC-1",tags:["江边","雨后"]}],note:"保留换行\n和引号 \""};
+    const frozen=await freezeDirectorPlan(scope,id,{filmPlan,variantPlans,sourceRefs,sourceManifest,by:"MEM-test"});
+    const saved=await latestDirectorPlan(scope,id);
+    expect(saved?.variant_plans).toEqual(variantPlans);expect(saved?.source_refs).toEqual(sourceRefs);
+    expect(saved?.source_manifest).toEqual(sourceManifest);
+    expect(frozen.planHash).toBe(directorHash({filmPlan,targetPlan:filmPlan.deliveryTargetPlan,sourceManifest,variantPlans,sourceRefs,revision:2}));
+    expect(saved?.plan_hash).toBe(frozen.planHash);
+    const types=(await owner.query("SELECT jsonb_typeof(variant_plans) AS variants,jsonb_typeof(source_refs) AS sources FROM video_director_plans WHERE project_id=$1 AND revision=2",[id])).rows[0];
+    expect(types).toEqual({variants:"array",sources:"array"});
   });
   it("creative grant requires the real scoped event and an exact payload",async()=>{
     const id=await project(),grantScope={...scope,projectId:id,runId:`run-${suffix}`};
