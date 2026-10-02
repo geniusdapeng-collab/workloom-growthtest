@@ -314,17 +314,16 @@ export async function qualifyProductionShot(input: {
       fields: { ...source.shot.fields as JsonRecord, durationSec: duration,
         production: { qualificationId: id, sourceStageRunId: source.row.id, sourceAttempt: source.row.attempt, promptsSha256: source.promptsHash } } };
     const built = compileRenderRequest({ script, model, params, scope, mode, env });
-    // UI 网络失败后再次按同一镜头点提交，不能通过重新签发随机 scriptId 绕过已派发任务的幂等键。
+    // 已派发任务必须复用原资格，不能通过随机 scriptId 绕过幂等键。
+    // 尚未派发时重新审核必须追加最新裁决，旧通过不能掩盖新的拒绝。
     const dispatched = await scopedTx(leased.app, scope, async client => {
       const found = await client.query<QualificationRow & { submission_state: string }>(`SELECT q.*,s.state AS submission_state
-        FROM production_qualifications q LEFT JOIN generation_submissions s
+        FROM production_qualifications q JOIN generation_submissions s
           ON s.tenant_id=q.tenant_id AND s.workspace_id=q.workspace_id AND s.request_hash=q.request_hash
         WHERE q.tenant_id=$1 AND q.workspace_id=$2 AND q.project_id=$3 AND q.shot_id=$4
           AND q.source_stage_run_id=$5 AND q.payload_hash=$6 AND q.model_id=$7 AND q.mode=$8 AND q.params=$9::jsonb
-          AND q.status='passed' AND (s.state IN ('submitting','unknown','accepted','finalized')
-            OR (s.id IS NULL AND q.expires_at>now() AND NOT EXISTS (SELECT 1 FROM production_qualifications newer
-              WHERE newer.tenant_id=q.tenant_id AND newer.workspace_id=q.workspace_id AND newer.project_id=q.project_id
-                AND newer.shot_id=q.shot_id AND newer.seq>q.seq))) ORDER BY q.seq DESC LIMIT 1`,
+          AND q.status='passed' AND s.state IN ('submitting','unknown','accepted','finalized')
+        ORDER BY q.seq DESC LIMIT 1`,
         [scope.tenantId, scope.workspaceId, input.projectId, input.shotId, source.row.id, built.compiled.payloadHash, model.id, mode, JSON.stringify(params)]);
       return found.rows[0];
     });

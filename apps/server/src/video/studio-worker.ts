@@ -1519,10 +1519,11 @@ export async function startVideoProjectRun(
   }
   const allocatedRunId=newId("RUN");
   const deliveryTargetPlan=directorMode?resolveDeliveryTargets(input.rawIntent??input.intent,input.deliveryOptions??{}):undefined;
-  const preferences=directorMode?await readExplicitDirectorPreferences(scope,input.by.id):[];
   const selectionMetadata = Object.hasOwn(input, "customerMetadata") ? input.customerMetadata ?? undefined : input.metadata;
   const selectedScenePolicy = resolveScenePolicyForIntent(input.rawIntent ?? input.intent, selectionMetadata);
   const selectedPlatform = resolvePlatformForIntent(input.rawIntent ?? input.intent, selectionMetadata, input.platform);
+  // 无效片型和平台在偏好查询之前拒绝，避免为不可执行的需求开启任何数据库事务。
+  const preferences=directorMode?await readExplicitDirectorPreferences(scope,input.by.id):[];
   const platformMetadata: Record<string, unknown> = {
     ...(input.metadata ?? {}),
     platform: selectedPlatform.decision.id,
@@ -1532,6 +1533,7 @@ export async function startVideoProjectRun(
   const client = await getAppPool().connect();
   let projectId = "";
   let creativeDelegation:CreativeDelegation|undefined;
+  let discard = false;
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
@@ -1573,10 +1575,15 @@ export async function startVideoProjectRun(
       {identityAssetRefs:input.identityAssetRefs??[],maxBudgetCny:0});
     await client.query("COMMIT");
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => undefined);
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      discard = true;
+      throw new AggregateError([err, rollbackError], "video project and creative delegation rollback failed");
+    }
     throw err;
   } finally {
-    client.release();
+    client.release(discard);
   }
   const runId = startRun(scope, {
     projectId,
