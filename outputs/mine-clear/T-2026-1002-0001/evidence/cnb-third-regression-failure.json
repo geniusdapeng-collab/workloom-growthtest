@@ -1,0 +1,14 @@
+{
+  "evidenceLevel": "B",
+  "source": "public CNB SSR stage metadata; whitelist only",
+  "sha": "de94f7806bc45c03b7d18416075ebcca67d7db7b",
+  "prCommitSha": "a053b59a93d5fbd355c2730d8119fff5775738f4",
+  "sn": "cnb-etr-1k3ue43se",
+  "associatedWithCurrentHead": true,
+  "failedPipelines": [
+    {
+      "name": "test-gate",
+      "error": "Too large to show the beginning...\n\n\nnt.query(`INSERT INTO video_creative_delegations (tenant_i…\napps/server test:      26|     VALUES ($1,$2,$3,$4,$5,$6,$7)`,[scope.tenantId,scope.workspaceId,s…\napps/server test:  ❯ Module.startVideoProjectRun src/video/studio-worker.ts:1572:41\napps/server test:  ❯ src/video/studio-worker.test.ts:262:21\napps/server test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/11]⎯\napps/server test:  FAIL  src/video/studio-worker.test.ts > 预生产原始结果与诚实终态 > 供应商返回不合规镜头表时报告落档并在渲染前打回\napps/server test: TypeError: Cannot read properties of undefined (reading 'eventId')\napps/server test:  ❯ createDirectorGrantOnClient src/video/director-store.ts:24:93\napps/server test:      22|       excludes:[\"identity-authorization\",\"extra-charge\",\"publish\",\"cre…\napps/server test:      23|       basis:[\"用户发起一句话委托；普通导演制作决策由 AI 承担，资金和对外权限沿用原围栏\"]},rule_impact:[]…\napps/server test:      24|   const delegation=createCreativeDelegation({...scope,grantedBy:actor.…\napps/server test:        |                                                                                             ^\napps/server test:      25|   await client.query(`INSERT INTO video_creative_delegations (tenant_i…\napps/server test:      26|     VALUES ($1,$2,$3,$4,$5,$6,$7)`,[scope.tenantId,scope.workspaceId,s…\napps/server test:  ❯ Module.startVideoProjectRun src/video/studio-worker.ts:1572:41\napps/server test:  ❯ src/video/studio-worker.test.ts:304:21\napps/server test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/11]⎯\napps/server test:  Test Files  3 failed | 65 passed (68)\napps/server test:       Tests  11 failed | 978 passed | 2 skipped (991)\napps/server test:    Start at  21:52:54\napps/server test:    Duration  45.42s (transform 3.18s, setup 0ms, import 19.63s, tests 17.55s, environment 6ms)\napps/server test: Failed\n/workspace/apps/server:\n ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workloom/server@0.1.0 test: `../../node_modules/.bin/vitest run --testTimeout 30000`\nExit status 1\n ELIFECYCLE  Test failed. See above for more details.\n"
+    }
+  ]
+}

@@ -57,8 +57,8 @@
 test at apps/desktop/electron/bootstrap.test.cjs:309:3
 ✖ 托管环境只重写数据库与服务端口，保留其他用户配置 (1.166125ms)
   ReferenceError: RUNTIME is not defined
-      at buildDesktopEnvironment (<workspace>/work/workloom-growthtest/apps/desktop/electron/bootstrap.cjs:395:58)
-      at TestContext.<anonymous> (<workspace>/work/workloom-growthtest/apps/desktop/electron/bootstrap.test.cjs:322:20)
+      at buildDesktopEnvironment (/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/apps/desktop/electron/bootstrap.cjs:395:58)
+      at TestContext.<anonymous> (/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/apps/desktop/electron/bootstrap.test.cjs:322:20)
       at Test.runInAsyncScope (node:async_hooks:227:14)
       at Test.run (node:internal/test_runner/test:1382:25)
       at Suite.processPendingSubtests (node:internal/test_runner/test:960:18)

@@ -1,31 +1,40 @@
 {
-  "status": "passed",
+  "status": "partial-native-startup-passed-observer-failed",
   "exitCode": 0,
-  "observerExitCode": 0,
-  "elapsedSec": 51.605,
+  "observerExitCode": 1,
+  "elapsedSec": 438.383,
   "freshSupportDirectory": true,
   "minimalSystemPath": true,
   "supportPathContainsChineseAndSpaces": true,
   "surface": "final clean packaged Electron",
   "paidImageVideoApiCalls": 0,
-  "payloadSha256": "20ae060c759fd809267264e5e818ff8cbe9eaf773674b132434ea33a95c82edf",
-  "payloadVersion": "v0.1.0-director-20261002-clean2",
+  "payloadSha256": "4bd7f6299f1eba7e28ac224a1cfe6d619e4b76293c35f07026b954bb80151146",
+  "payloadVersion": "v0.1.0-director-20261002-clean6",
   "signing": "ad-hoc trial",
   "notarization": "not-verified",
   "installState": {
     "schemaVersion": "workloom.install-state/v1",
-    "updatedAt": "2026-10-02T12:12:27.336Z",
+    "updatedAt": "2026-10-02T15:06:20.126Z",
     "status": "complete",
     "phase": "ready",
     "detail": "安装与启动检查已完成",
     "recoverable": true,
-    "targetVersion": "v0.1.0-director-20261002-clean2",
+    "targetVersion": "v0.1.0-director-20261002-clean6",
     "percent": 100,
     "etaSeconds": 0
   },
   "onboardingUiAction": {
     "method": "existing native UI action over loopback CDP",
-    "dismissedOnboarding": true,
-    "pageErrors": []
-  }
+    "dismissedOnboarding": false,
+    "pageErrors": [],
+    "lastConnectionError": "browserType.connectOverCDP: Timeout 1000ms exceeded.",
+    "error": "locator.click: Timeout 3000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('dialog', { name: '首日上岗引导', exact: true }).getByRole('button', { name: '稍后再来', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"min-h-8 rounded border border-line px-2 py-0.5 text-body text-ink3 hover:border-gline hover:text-ink\">稍后再来</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n"
+  },
+  "nativeStartupStatus": "passed",
+  "nativeRenderingProbeStatus": "passed",
+  "overallVisualAcceptance": "not-qualified",
+  "startupToReadySec": 293,
+  "startupToReadyTiming": "approximate wall-clock log difference 23:01:27 to 23:06:20; elapsedSec includes render and safe shutdown",
+  "visualFollowupEvidence": "clean6-native-followup-failure/final-native-followup-receipt.json",
+  "visualFollowupStatus": "failed-workplace-scene-readiness"
 }

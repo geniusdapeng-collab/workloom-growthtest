@@ -25,6 +25,38 @@
       "numPendingTests": 0
     },
     {
+      "group": "ci-linked-regressions",
+      "files": 2,
+      "numTotalTests": 55,
+      "numPassedTests": 55,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    {
+      "group": "ci-third-focused",
+      "files": 5,
+      "numTotalTests": 105,
+      "numPassedTests": 105,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    {
+      "group": "server-full-postgres",
+      "files": 68,
+      "numTotalTests": 996,
+      "numPassedTests": 994,
+      "numFailedTests": 0,
+      "numPendingTests": 2
+    },
+    {
+      "group": "web-full",
+      "files": 26,
+      "numTotalTests": 142,
+      "numPassedTests": 142,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    {
       "group": "node-runtime-contracts",
       "tests": 105,
       "pass": 105,
@@ -37,8 +69,18 @@
       "pass": 10,
       "fail": 0,
       "skipped": 0
+    },
+    {
+      "group": "final-packaged-director-ui",
+      "files": 1,
+      "numTotalTests": 2,
+      "numPassedTests": 2,
+      "numFailedTests": 0,
+      "numPendingTests": 0,
+      "priorTimeoutEvidence": "director-final-ui-loading-before.json",
+      "scope": "input and navigation only; no completed-film UI playback"
     }
   ],
   "sumWarning": "重复回归可能重叠，不合计为独立测试总数",
-  "casesExported": 1261
+  "casesExported": 2561
 }

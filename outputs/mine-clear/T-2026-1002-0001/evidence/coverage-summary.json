@@ -1,14 +1,14 @@
 {
-  "codeCommit": "5f02a02830f8d0dbb337ab94aef354296e0eb5a4",
+  "codeCommit": "df019d6be6a5a9409d8b5da5d255364ad8332c61",
   "auditCommit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
   "scopeTotal": 3138,
   "counts": {
-    "A": 129,
-    "B": 2994,
-    "C": 15
+    "A": 160,
+    "B": 2958,
+    "C": 20
   },
   "unprocessed": 0,
-  "humanUnread": 2994,
+  "humanUnread": 2958,
   "scope": "目标仓受控源代码、配置、文档及资产；不含outputs证据、node_modules与运行数据",
-  "limitation": "B仅机检，C仅抽样；不声称全仓业务审计。新V2、首启、相关直接依赖完整阅读；大型旧桥接文件保守为C。"
+  "limitation": "B仅机检，C仅抽样；不声称全仓业务审计。新增V2核心、首启和本次修改的测试完整阅读；大型旧桥接文件及关联旧种子按C计。"
 }

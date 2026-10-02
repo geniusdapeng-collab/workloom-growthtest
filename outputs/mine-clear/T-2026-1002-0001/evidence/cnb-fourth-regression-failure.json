@@ -1,0 +1,90 @@
+{
+  "sn": "cnb-vaf-1k3ug7ema",
+  "sha": "b4eda4e107e3bbf87935870666840ed434ba28a9",
+  "prCommitSha": "fde6e46d860144f2da6f780a94ea7ec145edebac",
+  "status": "error",
+  "associatedWithCurrentHead": true,
+  "buildLogUrl": "https://cnb.cool/workloom-ai/workloom-growthtest/-/build/logs/cnb-vaf-1k3ug7ema",
+  "pipelines": [
+    {
+      "name": "static-gate",
+      "status": "success",
+      "stages": [
+        {
+          "name": "依赖安装（frozen lockfile）",
+          "status": "success"
+        },
+        {
+          "name": "协议门禁（提交规范 + 并发冲突）",
+          "status": "success"
+        },
+        {
+          "name": "开源组件清单一致性（oss-watch）",
+          "status": "success"
+        },
+        {
+          "name": "产品身份与行业包治理（含内置角色资产与声明一致性）",
+          "status": "success"
+        },
+        {
+          "name": "三端生产构建",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "name": "db-gate",
+      "status": "success",
+      "stages": [
+        {
+          "name": "准备 Node 24 与 pnpm",
+          "status": "success"
+        },
+        {
+          "name": "启动 PostgreSQL 17 + pgvector",
+          "status": "success"
+        },
+        {
+          "name": "迁移 + 种子（幂等复跑）+ 哈希链",
+          "status": "success"
+        }
+      ]
+    },
+    {
+      "name": "test-gate",
+      "status": "error",
+      "stages": [
+        {
+          "name": "准备 Node 24 与 pnpm",
+          "status": "success"
+        },
+        {
+          "name": "typecheck 全包（非阻断）",
+          "status": "success"
+        },
+        {
+          "name": "主测试套件（非阻断）",
+          "status": "error"
+        },
+        {
+          "name": "全场景套件（非阻断）",
+          "status": "skipped"
+        },
+        {
+          "name": "P0 门禁：开户即托管验收 + 围栏别名扫描（S9）",
+          "status": "skipped"
+        }
+      ]
+    }
+  ],
+  "failure": {
+    "file": "apps/web/src/shell/PageExitAffordance.test.ts",
+    "line": 141,
+    "missingExit": "extensions/ai-video/pages/DirectorStudio.tsx",
+    "webCounts": {
+      "passed": 141,
+      "failed": 1,
+      "total": 142
+    }
+  }
+}

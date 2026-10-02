@@ -4,7 +4,7 @@
   "repo": "workloom-growthtest",
   "title": "一句话导演 V2、四版本与客户首启：已修与未验证资格分开记录",
   "created_at": "2026-10-02T01:15:37.553Z",
-  "updated_at": "2026-10-02T12:33:42.548582+00:00",
+  "updated_at": "2026-10-02T16:03:45.726751+00:00",
   "baseline": {
     "audit": {
       "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
@@ -14,7 +14,7 @@
       "notes": ""
     },
     "repair": {
-      "commit": "5f02a02830f8d0dbb337ab94aef354296e0eb5a4",
+      "commit": "df019d6be6a5a9409d8b5da5d255364ad8332c61",
       "branch": "task/T-2026-1002-0001",
       "remote": "origin",
       "reverified_problem_ids": [
@@ -24,7 +24,14 @@
         "MC-004",
         "MC-005",
         "MC-007",
-        "MC-008"
+        "MC-008",
+        "MC-009",
+        "MC-010",
+        "MC-011",
+        "MC-012",
+        "MC-013",
+        "MC-014",
+        "MC-015"
       ],
       "notes": "remote main 多次 fetch 后仍为审计基线；修复者回归证据已记录，不冒充独立验证"
     },
@@ -122,7 +129,7 @@
       "evidence": [
         {
           "type": "code",
-          "ref": "apps/desktop/electron/bootstrap.cjs@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+          "ref": "apps/desktop/electron/bootstrap.cjs@df019d6be6a5a9409d8b5da5d255364ad8332c61"
         },
         {
           "type": "receipt",
@@ -208,7 +215,7 @@
       "evidence": [
         {
           "type": "code",
-          "ref": "apps/desktop/electron/bootstrap.cjs@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+          "ref": "apps/desktop/electron/bootstrap.cjs@df019d6be6a5a9409d8b5da5d255364ad8332c61"
         },
         {
           "type": "receipt",
@@ -294,7 +301,7 @@
       "evidence": [
         {
           "type": "code",
-          "ref": "bundles/ai-video/connectors/post-bridge/core.mjs@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+          "ref": "bundles/ai-video/connectors/post-bridge/core.mjs@df019d6be6a5a9409d8b5da5d255364ad8332c61"
         },
         {
           "type": "receipt",
@@ -330,7 +337,7 @@
         "file": "apps/server/src/video/production-authority.ts",
         "line": 157,
         "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
-        "symbol": "qualifyRenderRequest preproduction gate validation"
+        "symbol": "sourceForShot preproduction gate validation"
       },
       "trigger_path": "旧人审分支记录 owner-acceptance，而生产资格把非 LLM 来源拒绝；同时 V2 需要合法创作委托",
       "evidence": [
@@ -349,13 +356,13 @@
           "kind": "property",
           "given": "旧人审分支记录 owner-acceptance，而生产资格把非 LLM 来源拒绝；同时 V2 需要合法创作委托",
           "expect": "委托必须有真实作用域事件；人审必须有本人审批记录与实际图像证据；不能只靠 payload 哈希取得权限",
-          "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "command": "RUN_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
           "last_result": "pass",
           "evidence": "evidence/test-summary.json"
         }
       ],
       "regression": {
-        "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "command": "RUN_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
         "evidence": "evidence/test-summary.json"
       },
       "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
@@ -380,7 +387,7 @@
       "evidence": [
         {
           "type": "code",
-          "ref": "apps/server/src/video/production-authority.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+          "ref": "apps/server/src/video/production-authority.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
         },
         {
           "type": "receipt",
@@ -392,13 +399,13 @@
           "kind": "property",
           "given": "旧人审分支记录 owner-acceptance，而生产资格把非 LLM 来源拒绝；同时 V2 需要合法创作委托",
           "expect": "委托必须有真实作用域事件；人审必须有本人审批记录与实际图像证据；不能只靠 payload 哈希取得权限",
-          "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+          "command": "RUN_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
           "last_result": "pass",
           "evidence": "evidence/test-summary.json"
         }
       ],
       "regression": {
-        "command": "RUN_DIRECTOR_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
+        "command": "RUN_DB_TESTS=1 node --import tsx node_modules/vitest/vitest.mjs run apps/server/src/video/director.pg.test.ts",
         "evidence": "evidence/test-summary.json"
       },
       "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
@@ -466,7 +473,7 @@
       "evidence": [
         {
           "type": "code",
-          "ref": "scripts/release-gate.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+          "ref": "scripts/release-gate.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
         },
         {
           "type": "receipt",
@@ -552,7 +559,7 @@
       "evidence": [
         {
           "type": "code",
-          "ref": "apps/server/src/video/director-jobs.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+          "ref": "apps/server/src/video/director-jobs.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
         },
         {
           "type": "receipt",
@@ -638,7 +645,7 @@
       "evidence": [
         {
           "type": "code",
-          "ref": "apps/server/src/video/director-router.ts@5f02a02830f8d0dbb337ab94aef354296e0eb5a4"
+          "ref": "apps/server/src/video/director-router.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
         },
         {
           "type": "receipt",
@@ -662,6 +669,610 @@
       "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
       "verified_by": null,
       "notes": "边界不兼容为代码证据，未虚构修前失败运行；十目标标签及非法标签用例实际通过。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-009",
+      "kind": "problem",
+      "level": "L1",
+      "severity": "P1",
+      "title": "网页导演类型依赖未声明，借用依赖掩盖干净安装失败",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/web/package.json",
+        "line": 15,
+        "commit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+        "symbol": "dependencies and DirectorStudio type import"
+      },
+      "trigger_path": "DirectorStudio.tsx 引用 video-studio 类型，网页包未声明该 workspace 依赖；CNB 全包 typecheck 得到 TS2307 与两个隐式 any",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/web/package.json:15@35041db94f1c354e46973f38ca3b585067ba5f25"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/cnb-first-typecheck-failure.json",
+          "note": "actual CNB clean-install typecheck failure followed by isolated frozen-install regression"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "DirectorStudio.tsx 引用 video-studio 类型，网页包未声明该 workspace 依赖；CNB 全包 typecheck 得到 TS2307 与两个隐式 any",
+          "expect": "无借用 node_modules 的干净安装中，所有 11 个工作区 typecheck 通过，所需内部包在本测试目录内解析，三端构建通过；锁定 UI 完整性与其它依赖版本保留",
+          "command": "pnpm install --frozen-lockfile --ignore-scripts && pnpm -C packages/industry-contract build && pnpm -r --if-present typecheck",
+          "last_result": "pass",
+          "evidence": "evidence/clean-dependency-install.json"
+        }
+      ],
+      "regression": {
+        "command": "pnpm install --frozen-lockfile --ignore-scripts && pnpm -C packages/industry-contract build && pnpm -r --if-present typecheck",
+        "evidence": "evidence/clean-dependency-install.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "本项保留真实 CNB 首次 test-gate 的类型错误；修后用全新目录、frozen lockfile 与物理依赖实跑 11 包类型检查和三端构建。原本借用依赖的类型检查不足以证明干净安装。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-108",
+      "kind": "fix",
+      "title": "修复：网页导演类型依赖未声明，借用依赖掩盖干净安装失败",
+      "state": "fixed",
+      "covers": [
+        "MC-009"
+      ],
+      "batch": 2,
+      "fix_plan": "显式声明 workspace:* 内部包，使用既定 pnpm 更新锁文件并刷新桌面运行时输入摘要；用独立物理依赖安装复核",
+      "conflict_paths": [
+        "apps/web/package.json",
+        "pnpm-lock.yaml",
+        ".workloom-runtime-deps/metadata.json"
+      ],
+      "blast_radius": "网页类型依赖与打包摘要；不升级外部依赖，不改运行中客户配置或其它仓",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/web/package.json@df019d6be6a5a9409d8b5da5d255364ad8332c61"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/clean-dependency-install.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "DirectorStudio.tsx 引用 video-studio 类型，网页包未声明该 workspace 依赖；CNB 全包 typecheck 得到 TS2307 与两个隐式 any",
+          "expect": "无借用 node_modules 的干净安装中，所有 11 个工作区 typecheck 通过，所需内部包在本测试目录内解析，三端构建通过；锁定 UI 完整性与其它依赖版本保留",
+          "command": "pnpm install --frozen-lockfile --ignore-scripts && pnpm -C packages/industry-contract build && pnpm -r --if-present typecheck",
+          "last_result": "pass",
+          "evidence": "evidence/clean-dependency-install.json"
+        }
+      ],
+      "regression": {
+        "command": "pnpm install --frozen-lockfile --ignore-scripts && pnpm -C packages/industry-contract build && pnpm -r --if-present typecheck",
+        "evidence": "evidence/clean-dependency-install.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "本项保留真实 CNB 首次 test-gate 的类型错误；修后用全新目录、frozen lockfile 与物理依赖实跑 11 包类型检查和三端构建。原本借用依赖的类型检查不足以证明干净安装。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-010",
+      "kind": "problem",
+      "level": "L1",
+      "severity": "P1",
+      "title": "共享目录解析器未登记为行业包资产，原工位依赖断言也不再对应包边界",
+      "state": "fixed",
+      "root_cause": {
+        "file": "bundles/ai-video/bundle.json",
+        "line": 126,
+        "commit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+        "symbol": "workloom.provides.library and BGM import closure"
+      },
+      "trigger_path": "五个桥接器改用包内 library/root-list.mjs，但新模块未加入 provides/integrity；原 BGM 测试仍只接受当前目录 ./ 导入，CI 报非自包含依赖",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "bundles/ai-video/bundle.json:126@35041db94f1c354e46973f38ca3b585067ba5f25"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/cnb-second-regression-failure.json",
+          "note": "actual CI failure, new negative missing-asset test, complete import-closure checks and frozen physical dependency fixture"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "五个桥接器改用包内 library/root-list.mjs，但新模块未加入 provides/integrity；原 BGM 测试仍只接受当前目录 ./ 导入，CI 报非自包含依赖",
+          "expect": "实际完整 BGM 导入闭包中每个模块均在同一 Bundle、登记且摘要匹配；包外/未知内置模块/非字面量/未登记/摘要篡改/软链逃逸均拒绝；49/49 通过",
+          "command": "node node_modules/vitest/vitest.mjs run packages/base/bundles/bgm-capability.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-linked-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/base/bundles/bgm-capability.test.ts",
+        "evidence": "evidence/ci-linked-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留实际 CI 失败和新闭包校验登记前 48 通过/1 失败；登记后49/49。共享模块现已进入声明和完整性索引，测试完整追踪传递依赖。BGM旧大内核仍为C级阅读，不外推为全量算法审计。"
+    },
+    {
+      "id": "MC-109",
+      "kind": "fix",
+      "title": "修复：共享目录解析器未登记为行业包资产，原工位依赖断言也不再对应包边界",
+      "state": "fixed",
+      "covers": [
+        "MC-010"
+      ],
+      "batch": 2,
+      "fix_plan": "登记共享模块并通过原治理器刷新摘要；以现有 AST 依赖递归验证完整包内导入闭包，保留 Node 内置模块边界",
+      "conflict_paths": [
+        "bundles/ai-video/bundle.json"
+      ],
+      "blast_radius": "ai-video 的已声明资产和配乐回归测试；未扩张包外依赖、未改配乐算法、未改变稳定签名闸",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "bundles/ai-video/bundle.json@df019d6be6a5a9409d8b5da5d255364ad8332c61"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/ci-linked-regressions.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "五个桥接器改用包内 library/root-list.mjs，但新模块未加入 provides/integrity；原 BGM 测试仍只接受当前目录 ./ 导入，CI 报非自包含依赖",
+          "expect": "实际完整 BGM 导入闭包中每个模块均在同一 Bundle、登记且摘要匹配；包外/未知内置模块/非字面量/未登记/摘要篡改/软链逃逸均拒绝；49/49 通过",
+          "command": "node node_modules/vitest/vitest.mjs run packages/base/bundles/bgm-capability.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-linked-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run packages/base/bundles/bgm-capability.test.ts",
+        "evidence": "evidence/ci-linked-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留实际 CI 失败和新闭包校验登记前 48 通过/1 失败；登记后49/49。共享模块现已进入声明和完整性索引，测试完整追踪传递依赖。BGM旧大内核仍为C级阅读，不外推为全量算法审计。"
+    },
+    {
+      "id": "MC-011",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "title": "新增事件外键使防 TRUNCATE 探针未触达 append-only 触发器",
+      "state": "fixed",
+      "root_cause": {
+        "file": "packages/base/workdata/security-audit.test.ts",
+        "line": 159,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "owner truncate probe"
+      },
+      "trigger_path": "0054 的事件引用外键先拒绝 TRUNCATE，原安全测试期待 append-only，完整 CI 收到外键错误而失败",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/base/workdata/security-audit.test.ts:159@da06fdf1e1ead0cafc078ea27695397d2e9209db"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/cnb-second-regression-failure.json",
+          "note": "actual CI foreign-key error followed by true PostgreSQL trigger probe with standard hotel demo seeds"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "0054 的事件引用外键先拒绝 TRUNCATE，原安全测试期待 append-only，完整 CI 收到外键错误而失败",
+          "expect": "owner 的 CASCADE 探针仍被 append-only 触发器拒绝；探针无论结果均 ROLLBACK；测试前每个事件 ID 仍存在；6/6 通过",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run packages/base/workdata/security-audit.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-linked-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run packages/base/workdata/security-audit.test.ts",
+        "evidence": "evidence/ci-linked-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留真实 CI 外键错误。新本机首次运行因仅有 geo 客户种子，3个酒店夹具断言失败；执行现有标准 CI 酒店种子后55/55。未弱化append-only断言，未修改数据库保护触发器。"
+    },
+    {
+      "id": "MC-110",
+      "kind": "fix",
+      "title": "修复：新增事件外键使防 TRUNCATE 探针未触达 append-only 触发器",
+      "state": "fixed",
+      "covers": [
+        "MC-011"
+      ],
+      "batch": 2,
+      "fix_plan": "探针使用同一事务客户端 BEGIN/TRUNCATE CASCADE/无条件 ROLLBACK，再按测试前事件 ID 验证保留；不放宽错误断言或修改触发器",
+      "conflict_paths": [
+        "packages/base/workdata/security-audit.test.ts"
+      ],
+      "blast_radius": "仅安全审计测试；保护实际已有事件及所有外键引用表，生产只增语义未改变",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/base/workdata/security-audit.test.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/ci-linked-regressions.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "0054 的事件引用外键先拒绝 TRUNCATE，原安全测试期待 append-only，完整 CI 收到外键错误而失败",
+          "expect": "owner 的 CASCADE 探针仍被 append-only 触发器拒绝；探针无论结果均 ROLLBACK；测试前每个事件 ID 仍存在；6/6 通过",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run packages/base/workdata/security-audit.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-linked-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run packages/base/workdata/security-audit.test.ts",
+        "evidence": "evidence/ci-linked-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留真实 CI 外键错误。新本机首次运行因仅有 geo 客户种子，3个酒店夹具断言失败；执行现有标准 CI 酒店种子后55/55。未弱化append-only断言，未修改数据库保护触发器。"
+    },
+    {
+      "id": "MC-012",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "title": "尚未派发的旧资格缓存阻止后续拒绝裁决生效",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/server/src/video/production-authority.ts",
+        "line": 317,
+        "commit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+        "symbol": "qualifyProductionShot cached qualification query"
+      },
+      "trigger_path": "项目已有 passed 资格但从未提交供应商，后续重新审核命中旧资格；最新拒绝和释放后的新裁决都被跳过",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/production-authority.ts:317@35041db94f1c354e46973f38ca3b585067ba5f25"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/cnb-third-regression-failure.json",
+          "note": "actual CNB authority failures and local real PostgreSQL supersession/lease assertions"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "项目已有 passed 资格但从未提交供应商，后续重新审核命中旧资格；最新拒绝和释放后的新裁决都被跳过",
+          "expect": "尚未派发的请求重新取得最新裁决；最新拒绝使旧资格不可消费；已提交/未知回执继续复用以防重复计费；12/12 活库断言通过",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/production-authority.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/production-authority.pg.test.ts",
+        "evidence": "evidence/ci-third-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留 CNB 实际资格失败与真实 PG 最新拒绝/lease 复测。已派发记录仍缓存，不把重新资格审核变成供应商重发。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-111",
+      "kind": "fix",
+      "title": "修复：尚未派发的旧资格缓存阻止后续拒绝裁决生效",
+      "state": "fixed",
+      "covers": [
+        "MC-012"
+      ],
+      "batch": 2,
+      "fix_plan": "缓存仅 JOIN 实际提交记录并限定 submitting/unknown/accepted/finalized；保持来源锁、关卡复核和正式消费校验",
+      "conflict_paths": [
+        "apps/server/src/video/production-authority.ts"
+      ],
+      "blast_radius": "本仓正式渲染资格缓存；不触发供应商、不放宽最新审核和预算，历史通过与拒绝记录均保留",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/production-authority.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "项目已有 passed 资格但从未提交供应商，后续重新审核命中旧资格；最新拒绝和释放后的新裁决都被跳过",
+          "expect": "尚未派发的请求重新取得最新裁决；最新拒绝使旧资格不可消费；已提交/未知回执继续复用以防重复计费；12/12 活库断言通过",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/production-authority.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/production-authority.pg.test.ts",
+        "evidence": "evidence/ci-third-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留 CNB 实际资格失败与真实 PG 最新拒绝/lease 复测。已派发记录仍缓存，不把重新资格审核变成供应商重发。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-013",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "title": "默认创作委托缺少忠实回归且立项失败路径未完整处理",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/server/src/video/studio-worker.ts",
+        "line": 1511,
+        "commit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+        "symbol": "startVideoProjectRun"
+      },
+      "trigger_path": "默认 auto 创建可验证委托，旧人工场景夹具无事件回执；非法片型先读数据库，委托失败后回滚再次失败未保留两个错误或销毁连接",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/studio-worker.ts:1511@35041db94f1c354e46973f38ca3b585067ba5f25"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/ci-third-regressions.json",
+          "note": "CI three legacy fixture failures plus new failing default-auto/rollback assertions before repair"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "默认 auto 创建可验证委托，旧人工场景夹具无事件回执；非法片型先读数据库，委托失败后回滚再次失败未保留两个错误或销毁连接",
+          "expect": "原人工模式显式 manual；默认 auto 产生真实 SQL 边界委托并验证 actor，错误输入不访问 DB，事务失败回滚、二次失败 AggregateError 并丢弃连接，供应商调用为 0；72/72 通过",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/studio-worker.test.ts apps/server/src/video/production-authority.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/studio-worker.test.ts apps/server/src/video/production-authority.test.ts",
+        "evidence": "evidence/ci-third-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留 CI 失败与新增断言修前 32 中 29 通过、3 失败；修后 72/72。模型网络为明确测试替代，无媒体请求。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-112",
+      "kind": "fix",
+      "title": "修复：默认创作委托缺少忠实回归且立项失败路径未完整处理",
+      "state": "fixed",
+      "covers": [
+        "MC-013"
+      ],
+      "batch": 2,
+      "fix_plan": "片型/平台先校验；回滚异常保留原错误与 rollback 错误并 release(true)；忠实事件回执和路由装配夹具；新增默认委托正反例",
+      "conflict_paths": [
+        "apps/server/src/video/studio-worker.ts"
+      ],
+      "blast_radius": "旧专业项目立项、新默认委托和相关测试；不取消授权/事件校验，不把 mock 当真实生产回执",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/studio-worker.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "默认 auto 创建可验证委托，旧人工场景夹具无事件回执；非法片型先读数据库，委托失败后回滚再次失败未保留两个错误或销毁连接",
+          "expect": "原人工模式显式 manual；默认 auto 产生真实 SQL 边界委托并验证 actor，错误输入不访问 DB，事务失败回滚、二次失败 AggregateError 并丢弃连接，供应商调用为 0；72/72 通过",
+          "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/studio-worker.test.ts apps/server/src/video/production-authority.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "node node_modules/vitest/vitest.mjs run apps/server/src/video/studio-worker.test.ts apps/server/src/video/production-authority.test.ts",
+        "evidence": "evidence/ci-third-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留 CI 失败与新增断言修前 32 中 29 通过、3 失败；修后 72/72。模型网络为明确测试替代，无媒体请求。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-014",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P2",
+      "title": "客户 PostgreSQL 的 C locale 使中文完全相同素材也无法复用",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/server/src/video/media/reuse.ts",
+        "line": 45,
+        "commit": "da06fdf1e1ead0cafc078ea27695397d2e9209db",
+        "symbol": "findReusable exact-text SQL similarity"
+      },
+      "trigger_path": "打包客户数据库 LC_CTYPE=C，中文完全相同文本的 pg_trgm similarity 为 0、trigrams 为空，既有中文命中断言失败",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/media/reuse.ts:45@da06fdf1e1ead0cafc078ea27695397d2e9209db"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/packaged-pg-chinese-locale.json",
+          "note": "actual packaged database locale probe and failing existing reuse test"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "打包客户数据库 LC_CTYPE=C，中文完全相同文本的 pg_trgm similarity 为 0、trigrams 为空，既有中文命中断言失败",
+          "expect": "同租户有效 clip 的完全相同 prompt/title 显式匹配；保留时长、画幅、归档状态与候选边界；完整 server 996 中 994 通过、0 失败、2 FFmpeg 环境跳过",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/media/media.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/media/media.pg.test.ts",
+        "evidence": "evidence/ci-third-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "本机真实 C locale 自相似度为 0，既有媒体测试修前失败。仅添加完全相等路径；一般中文模糊匹配、其它 OS 数据库 locale 没有外推。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-113",
+      "kind": "fix",
+      "title": "修复：客户 PostgreSQL 的 C locale 使中文完全相同素材也无法复用",
+      "state": "fixed",
+      "covers": [
+        "MC-014"
+      ],
+      "batch": 3,
+      "fix_plan": "完全相同 prompt/title 用 CASE 返回 1::real，其它文本仍使用原 pg_trgm similarity",
+      "conflict_paths": [
+        "apps/server/src/video/media/reuse.ts"
+      ],
+      "blast_radius": "仅完全相同中文素材命中；未声明修复一般中文模糊检索或改变跨租户、状态和长度过滤",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/media/reuse.ts@df019d6be6a5a9409d8b5da5d255364ad8332c61"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "打包客户数据库 LC_CTYPE=C，中文完全相同文本的 pg_trgm similarity 为 0、trigrams 为空，既有中文命中断言失败",
+          "expect": "同租户有效 clip 的完全相同 prompt/title 显式匹配；保留时长、画幅、归档状态与候选边界；完整 server 996 中 994 通过、0 失败、2 FFmpeg 环境跳过",
+          "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/media/media.pg.test.ts",
+          "last_result": "pass",
+          "evidence": "evidence/ci-third-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "RUN_DB_TESTS=1 node --env-file=\"$DIRECTOR_TEST_ENV_FILE\" node_modules/vitest/vitest.mjs run apps/server/src/video/media/media.pg.test.ts",
+        "evidence": "evidence/ci-third-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "本机真实 C locale 自相似度为 0，既有媒体测试修前失败。仅添加完全相等路径；一般中文模糊匹配、其它 OS 数据库 locale 没有外推。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-015",
+      "kind": "problem",
+      "level": "L4",
+      "severity": "P2",
+      "title": "新导演独立页面未提供返回片库入口",
+      "state": "fixed",
+      "root_cause": {
+        "file": "apps/web/src/extensions/ai-video/pages/DirectorStudio.tsx",
+        "line": 112,
+        "commit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+        "symbol": "DirectorStudio page exit"
+      },
+      "trigger_path": "扩展页出口门禁逐页扫描 DirectorStudio 未找到返回/关闭入口；该组件被直接渲染时不能回到片库",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/web/src/extensions/ai-video/pages/DirectorStudio.tsx:112@35041db94f1c354e46973f38ca3b585067ba5f25"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/cnb-fourth-regression-failure.json",
+          "note": "actual CNB web exit gate failure; unchanged strict test and full web regression"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "扩展页出口门禁逐页扫描 DirectorStudio 未找到返回/关闭入口；该组件被直接渲染时不能回到片库",
+          "expect": "导演页使用现有 PageExitLink 返回 /ai-video/assets，缺 tab 时进入片库；完整网页 142/142、类型、生产构建和边界检查通过；实际浏览器出口见后续回执",
+          "command": "cd apps/web && node ../../node_modules/vitest/vitest.mjs run",
+          "last_result": "pass",
+          "evidence": "evidence/ci-fourth-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "cd apps/web && node ../../node_modules/vitest/vitest.mjs run",
+        "evidence": "evidence/ci-fourth-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留真实 CI 网页 141 通过/1 失败；不放宽出口门禁，修后完整网页142/142。实际路由跳转与截图另行检查。修复者回归，不冒充独立 M6。"
+    },
+    {
+      "id": "MC-114",
+      "kind": "fix",
+      "title": "修复：新导演独立页面未提供返回片库入口",
+      "state": "fixed",
+      "covers": [
+        "MC-015"
+      ],
+      "batch": 3,
+      "fix_plan": "复用 PageExitLink，显式目标 /ai-video/assets 和返回片库文案；保留已有专业工作台入口",
+      "conflict_paths": [
+        "apps/web/src/extensions/ai-video/pages/DirectorStudio.tsx"
+      ],
+      "blast_radius": "仅导演页面出口，路由注册、作用域权限和后台工作不变",
+      "rollback": "合并前可保留 main；部署后用新回滚提交恢复相关代码。0054 如已落业务数据不删表，不回滚账本，先停写与导出对账。",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/web/src/extensions/ai-video/pages/DirectorStudio.tsx@df019d6be6a5a9409d8b5da5d255364ad8332c61"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/ci-fourth-regressions.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "扩展页出口门禁逐页扫描 DirectorStudio 未找到返回/关闭入口；该组件被直接渲染时不能回到片库",
+          "expect": "导演页使用现有 PageExitLink 返回 /ai-video/assets，缺 tab 时进入片库；完整网页 142/142、类型、生产构建和边界检查通过；实际浏览器出口见后续回执",
+          "command": "cd apps/web && node ../../node_modules/vitest/vitest.mjs run",
+          "last_result": "pass",
+          "evidence": "evidence/ci-fourth-regressions.json"
+        }
+      ],
+      "regression": {
+        "command": "cd apps/web && node ../../node_modules/vitest/vitest.mjs run",
+        "evidence": "evidence/ci-fourth-regressions.json"
+      },
+      "fixed_by": "Codex/root/01a0f80b-d853-70b1-aab5-b0a2f297181f",
+      "verified_by": null,
+      "notes": "保留真实 CI 网页 141 通过/1 失败；不放宽出口门禁，修后完整网页142/142。实际路由跳转与截图另行检查。修复者回归，不冒充独立 M6。"
     },
     {
       "id": "MC-006",
@@ -705,6 +1316,49 @@
       "fixed_by": null,
       "verified_by": null,
       "notes": "发现未修。属于正式发布环境资格，不靠伪造 mock 回执修复；当前任务的导演文字服务链另有实际通过证据。"
+    },
+    {
+      "id": "MC-016",
+      "kind": "problem",
+      "level": "L4",
+      "severity": "P2",
+      "title": "旧全局原生视觉验收仍有遮挡、拥挤及不稳定结果",
+      "state": "unfixed",
+      "root_cause": {
+        "file": "apps/desktop/electron/main.cjs",
+        "line": 389,
+        "commit": "df019d6be6a5a9409d8b5da5d255364ad8332c61",
+        "symbol": "runRenderSmoke/captureProductScene observation point; underlying visual or timing cause not fully localized"
+      },
+      "trigger_path": "最终 clean6 包全新中文空格目录：首轮口型峰值为零，二轮外部240秒限时，三轮原生exit0但弹窗观察失败；同DB复测3D职场未就绪。此前可见页面有团队名牌重叠、织伴遮挡和舞台黑区",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/main.cjs:389@df019d6be6a5a9409d8b5da5d255364ad8332c61",
+          "note": "这是验收观测点，不把未定位的底层原因伪称为该行代码错误"
+        },
+        {
+          "type": "receipt",
+          "ref": "evidence/mac-native-attempts.json"
+        }
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "Mac ARM64试运行包、隔离中文空格支持目录、最小系统PATH、默认Live2D与3D场景",
+          "expect": "首启ready后正常走完欢迎，真实可见职场和舞台无遮罩/黑区/标签重叠，口型与场景检查可重复通过；启动成功不外推全面视觉合格",
+          "command": "WORKLOOM_RENDER_SMOKE=1 WORKLOOM_SUPPORT_DIR=\"$VISUAL_TEST_SUPPORT_DIR\" \"$DIRECTOR_TRIAL_APP/Contents/MacOS/Electron\"",
+          "last_result": "fail",
+          "evidence": "evidence/mac-native-attempts.json"
+        }
+      ],
+      "regression": {
+        "command": "WORKLOOM_RENDER_SMOKE=1 WORKLOOM_SUPPORT_DIR=\"$VISUAL_TEST_SUPPORT_DIR\" \"$DIRECTOR_TRIAL_APP/Contents/MacOS/Electron\"",
+        "evidence": "evidence/mac-native-attempts.json"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "发现未修。首启环境/依赖修复和实际ready/原生exit0有独立记录；旧全局视觉与测试时序没有借本次导演改造扩写成已修。另保留浏览器权限加载超过30秒的历史失败；同一应用字节最终两宽度输入、片库出口、重新进入和专业跳转通过，未声称代码修复了先前等待。具体底层原因D；截图和失败记录B；正式发布与独立M6保持未通过资格。"
     }
   ],
   "gates": [
@@ -713,56 +1367,98 @@
       "command": "vitest run packages/video-studio/src and four bridge regression files",
       "result": "pass",
       "evidence": "evidence/test-summary.json",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     },
     {
       "name": "actual-postgres-director",
-      "command": "RUN_DIRECTOR_DB_TESTS=1 vitest run apps/server/src/video/director.pg.test.ts",
+      "command": "RUN_DB_TESTS=1 vitest run apps/server/src/video/director.pg.test.ts",
       "result": "pass",
       "evidence": "evidence/test-summary.json",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     },
     {
       "name": "real-text-service",
       "command": "owned authenticated caller -> director worker -> real text model -> frozen DB plan",
       "result": "pass",
       "evidence": "evidence/real-text-llm.json",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     },
     {
       "name": "reused-source-service",
       "command": "authenticated renderVariants + media GET + choose + feedback with captured real text fixture",
       "result": "pass",
       "evidence": "evidence/reused-source-service.json",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
+    },
+    {
+      "name": "clean-dependency-install",
+      "command": "frozen pnpm install, industry contract build, 11 workspace typechecks and three client builds in an isolated byte-copy fixture",
+      "result": "pass",
+      "evidence": "evidence/clean-dependency-install.json",
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
+    },
+    {
+      "name": "ci-linked-regressions",
+      "command": "49 BGM closure checks + 6 actual PostgreSQL security audit cases with standard CI demo seed",
+      "result": "pass",
+      "evidence": "evidence/ci-linked-regressions.json",
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
+    },
+    {
+      "name": "ci-third-server-regressions",
+      "command": "105 focused real PostgreSQL/contract cases and full 996 server cases (994 pass, 2 FFmpeg-environment skips)",
+      "result": "pass",
+      "evidence": "evidence/ci-third-regressions.json",
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
+    },
+    {
+      "name": "ci-fourth-web-regressions",
+      "command": "142 full web tests, typecheck, production build and client boundary",
+      "result": "pass",
+      "evidence": "evidence/ci-fourth-regressions.json",
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
+    },
+    {
+      "name": "final-director-browser-navigation",
+      "command": "actual packaged-runtime Chrome at 1440/390: input, exit to library, reload director and navigate to advanced; no generation submit",
+      "result": "pass",
+      "evidence": "evidence/director-final-ui.json",
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     },
     {
       "name": "mac-clean-firstboot",
-      "command": "packaged Electron with fresh support, minimal PATH, Chinese-space path",
+      "command": "packaged Electron with fresh support, minimal PATH, Chinese-space path; ready and native exit 0 only",
       "result": "pass",
       "evidence": "evidence/mac-final-firstboot.json",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
+    },
+    {
+      "name": "mac-global-visual-acceptance",
+      "command": "native visible scene inspection and repeated render probes, observer failures retained",
+      "result": "fail",
+      "evidence": "evidence/mac-native-attempts.json",
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     },
     {
       "name": "corrected-generic-release",
       "command": "node --import tsx scripts/release-gate.ts",
       "result": "fail",
       "evidence": "evidence/corrected-release-gate.txt",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     },
     {
       "name": "independent-M6",
       "command": "independent RDAS client-runtime acceptance at repair descendant",
       "result": "not-run",
       "evidence": "no independent verifier available",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     },
     {
       "name": "windows-native",
       "command": "actual Windows installer fresh firstboot",
       "result": "not-run",
       "evidence": "no Windows host in current environment",
-      "ran_at": "2026-10-02T12:33:42.548582+00:00"
+      "ran_at": "2026-10-02T16:03:45.726751+00:00"
     }
   ],
   "issue": {
