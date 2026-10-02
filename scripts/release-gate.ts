@@ -15,6 +15,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { charterSchema } from "@workloom/base/captain";
+import { assertQuestExecution, type QuestGateDispatch } from "./release-gate-quest.js";
 
 const BASE = process.env.SERVER_BASE ?? "http://localhost:8787";
 const REPO_ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -226,9 +227,10 @@ for (const [i, question] of ASK_SCENARIOS.entries()) {
 }
 
 /* ---------- 链路二：QUEST 任务模式 ---------- */
+let questThreadId: string | null = null;
 await check("Q-01", "QUEST · 一句话目标自动拆解多步骤", async () => {
   assert(TARGET && token, "无可执行的验收工作区身份");
-  const r = await call<{ kind: string; mode?: string; threadId?: string; status?: string; stepsTotal?: number; stepsDone?: number }>(
+  const r = await call<QuestGateDispatch>(
     "threads.dispatch", token,
     { title: "生成一份本周运行复盘，并列出三项下一步任务", presetKey: TARGET.presetKey, runImmediately: true },
     60000,
@@ -236,14 +238,15 @@ await check("Q-01", "QUEST · 一句话目标自动拆解多步骤", async () =>
   assert(r.kind === "routed" && r.mode === "quest", `未按 quest 路由（${r.kind}/${r.mode}）`);
   assert(r.threadId, "未建线程");
   assert(typeof r.stepsTotal === "number" && r.stepsTotal >= 2, `未拆解多步骤（stepsTotal=${r.stepsTotal}）`);
-  // 任务创建→拆解→执行流程完整：线程可查、进度在推进或已完成
+  questThreadId = r.threadId;
+  // 线程创建与拆解不是执行成功；状态、有效步数和回执都必须成立。
   const t = await call<{ id: string; status: string }>("threads.get", token, { threadId: r.threadId }, 30000, "query");
-  assert(t && t.id === r.threadId, "线程回读失败");
-  return `拆解 ${r.stepsTotal} 步 · 已执行 ${r.stepsDone} 步 · 状态 ${r.status}`;
+  return assertQuestExecution(r, t);
 });
 await check("Q-02", "QUEST · 任务事件流留痕可回读", async () => {
   assert(TARGET, "无可执行的验收工作区");
-  // 复用 Q-01 的线程：近 30 分钟内应有 quest 线程及其事件
+  assert(questThreadId, "Q-01 未创建可验收的线程");
+  // 只读取本次 Q-01 线程，旧任务事件不得替代本次执行证据。
   const app = new pg.Client({ connectionString: APP_URL });
   await app.connect();
   try {
@@ -252,8 +255,8 @@ await check("Q-02", "QUEST · 任务事件流留痕可回读", async () => {
     await app.query("SELECT set_config('app.workspace_id',$1,false)", [wsId]);
     const r = await app.query(
       `SELECT count(DISTINCT session_id) tc, count(*) ec FROM biz_events
-       WHERE workspace_id=$1 AND session_id IS NOT NULL AND created_at > now() - interval '30 minutes'`,
-      [wsId],
+       WHERE workspace_id=$1 AND session_id=$2 AND created_at > now() - interval '30 minutes'`,
+      [wsId, questThreadId],
     );
     assert(Number(r.rows[0].tc) >= 1 && Number(r.rows[0].ec) >= 1, "无线程事件留痕");
     return `线程事件 ${r.rows[0].ec} 条`;

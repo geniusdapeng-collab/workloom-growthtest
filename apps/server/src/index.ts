@@ -54,7 +54,9 @@ app.use(
 );
 
 /** 裸健康检查（不进 tRPC，供 start.sh/编排探活） */
-app.get("/health", (c) => c.json({ ok: true, service: "workloom-im-server" }));
+app.get("/health", (c) => c.json({ ok: true, service: "workloom-im-server",
+  productId: process.env.WORKLOOM_PRODUCT_ID ?? null,
+  desktopInstanceId: process.env.WORKLOOM_DESKTOP_INSTANCE_ID ?? null }));
 
 /**
  * 本机克隆音色（小织/织伴的默认音色）[VOICE-DEFAULT]

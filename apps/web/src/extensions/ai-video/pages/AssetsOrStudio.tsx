@@ -14,6 +14,7 @@ import { PageExitLink } from "../../../shell/PageExitLink";
 import Assets from "./Assets";
 import Delivery from "./Delivery";
 import Studio from "./Studio";
+import DirectorStudio from "./DirectorStudio";
 
 export default function AssetsOrStudio() {
   const [params] = useSearchParams();
@@ -36,7 +37,7 @@ export default function AssetsOrStudio() {
       <div className="px-1 pt-1">
         <PageExitLink label="返回工作台" />
       </div>
-      <Studio />
+      {params.get("advanced") === "1" ? <Studio /> : <DirectorStudio />}
     </>
   );
 }

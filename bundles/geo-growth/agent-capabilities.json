@@ -427,6 +427,163 @@
         "properties": {},
         "additionalProperties": false
       }
+    },
+    {
+      "id": "growth.video.director.preview",
+      "version": "2.0.0",
+      "title": "预览一句话导演合同",
+      "description": "本地预览四版本目标、专业默认值和素材缺口；不调用模型或生成媒体。",
+      "operation": "preview",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/director.mjs",
+        "export": "previewDirector"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "platforms": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "douyin",
+                    "xiaohongshu",
+                    "wechat-channels"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 3
+              },
+              "includeSurprise": {
+                "type": "boolean"
+              },
+              "versionCount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6
+              },
+              "stylesPerPlatform": {
+                "type": "integer",
+                "enum": [
+                  3
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "intent"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.job",
+      "version": "2.0.0",
+      "title": "读取导演任务",
+      "description": "读取当前工作区导演任务、文本模型回执统计和真实媒体就绪状态。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.job",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.versions",
+      "version": "2.0.0",
+      "title": "读取四版本交付",
+      "description": "读取当前工作区作品版本、授权播放地址和差异证据摘要。",
+      "operation": "receipt",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.getVersions",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.preferences",
+      "version": "2.0.0",
+      "title": "读取明确创作偏好",
+      "description": "读取本人明确表达的创作偏好及来源，不推断未表达的喜好。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.preferences",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.calibration",
+      "version": "2.0.0",
+      "title": "读取选择标定记录",
+      "description": "读取当前工作区选片和盲选的实际样本统计，不把偏好记录当质量提升证明。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.calibration",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
     }
   ]
 }

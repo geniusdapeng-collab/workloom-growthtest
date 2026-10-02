@@ -10,7 +10,7 @@
 # 用法：
 #   bash scripts/pack-electron-payload.sh --platform mac|win --arch arm64|x64 [--version vX.Y.Z]
 # 前置：
-#   - 已 pnpm install（web dist 不存在时本脚本自动 pnpm -C apps/web build）
+#   - 已 pnpm install（本脚本每次从当前源码构建 web dist）
 #   - Windows：已跑 scripts/build-pgvector-win.ps1（产出 vendor/pg-win 与 vendor/pgvector-win）
 #   - macOS：需在 macOS 上执行（Postgres.app 需 hdiutil 挂载）
 # 下载源回退链：Node nodejs.org → npmmirror；PG(Postgres.app) GitHub Releases；nats GitHub Releases
@@ -54,6 +54,7 @@ copy() {
 echo "== 装配 Electron 自包含载荷（${VERSION} · ${PLATFORM}-${ARCH}）=="
 rm -rf "$OUT"
 mkdir -p "$OUT"
+if [ -f build/bundle-trust.json ]; then cp build/bundle-trust.json "$OUT/bundle-trust.json"; fi
 
 # 产品边界只能来自受保护 product.manifest.json。platform-ops 属于仙女座，不能因
 # 基座仓里物理残留该目录就进入 WorkLoom IM 或行业安装包。
@@ -67,56 +68,10 @@ esac
 # ---------- 1. 产品载荷 runtime/（与 pack-macos/pack-windows 同白名单口径） ----------
 echo "→ 装配产品载荷…"
 R="$OUT/runtime"
-mkdir -p "$R/apps" "$R/scripts"
-for f in package.json pnpm-workspace.yaml tsconfig.base.json .env.example; do
-  [ -f "$f" ] && cp "$f" "$R/"
-done
-[ -f "$PRODUCT_MANIFEST_PATH" ] || { echo "❌ 缺受保护产品清单"; exit 1; }
-cp "$PRODUCT_MANIFEST_PATH" "$R/product.manifest.json"
-[ -f "$R/.env.defaults" ] || cp .env.example "$R/.env.defaults"
-RUNTIME_SOURCE_DIRS=(
-  apps/server apps/web/src apps/web/index.html apps/web/public apps/web/package.json
-  apps/web/vite.config.ts apps/web/tsconfig.json packages bundles
-)
-[ "$PLATFORM_OPS_MODE" = "include" ] && RUNTIME_SOURCE_DIRS+=(platform-ops)
-for d in "${RUNTIME_SOURCE_DIRS[@]}"; do
-  [ -e "$d" ] || continue
-  mkdir -p "$R/$(dirname "$d")"
-  copy "$d" "$R/$(dirname "$d")/"
-done
-cp scripts/migrate.ts scripts/desktop-bootstrap-db.mjs scripts/product-runtime.mjs scripts/vite-product.mjs "$R/scripts/"
-mkdir -p "$R/scripts/tools"
-# Film CLIs keep their repo-relative paths in the installed runtime. Native
-# enhancer, Python venv, and FFmpeg binaries remain workstation prerequisites.
-cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
-   scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-   scripts/tools/enhance-engine-install.mjs "$R/scripts/tools/"
-mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
-  "$R/vendor/srt-whiteboard/scripts" "$R/vendor/srt-whiteboard/assets" "$R/vendor/srt-whiteboard/examples"
-cp scripts/whiteboard/lineart_tools.py "$R/scripts/whiteboard/"
-cp assets/whiteboard/drawing-hand-workloom.png "$R/assets/whiteboard/"
-cp vendor/srt-whiteboard/LICENSE vendor/srt-whiteboard/PINNED.md vendor/srt-whiteboard/VENDOR.md \
-   vendor/srt-whiteboard/README.md vendor/srt-whiteboard/SKILL.md \
-   vendor/srt-whiteboard/requirements.txt "$R/vendor/srt-whiteboard/"
-cp vendor/srt-whiteboard/scripts/*.py "$R/vendor/srt-whiteboard/scripts/"
-cp vendor/srt-whiteboard/assets/drawing-hand.png "$R/vendor/srt-whiteboard/assets/"
-cp vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
-   vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
-   "$R/vendor/srt-whiteboard/examples/"
-cp scripts/seed*.ts "$R/scripts/"  # 全部行业种子随包（seed/seed-aipm/seed-geo/seed-video/seed-consulting/seed-boost/seed-platform…按仓配置选用）
-# 种子共享模块：seed-*.ts 会 import 这些 .mts（不只是 seed* 前缀的文件）。
-# 2026-09-20 客户端首启实证：漏拷 skill-bindings.mts → 种子 ERR_MODULE_NOT_FOUND，客户端起不来。
-for shared in scripts/skill-bindings.mts; do
-  [ -f "$shared" ] && cp "$shared" "$R/scripts/"
-done
-printf '%s\n' "$VERSION" > "$R/VERSION"
-# 源码不携带 node_modules：运行期统一由下方 npm 扁平化安装的根 node_modules 提供（v2.0.8 实证）
-find "$R/apps" "$R/packages" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
+node scripts/product-runtime-assets.mjs copy "$R" --version "$VERSION"
 
 # ---------- 2. web 构建产物 + 运行期依赖（npm 扁平化，无 symlink，electron-builder 友好） ----------
-if [ ! -f apps/web/dist/index.html ]; then
-  echo "→ 构建 web…"; pnpm -C apps/web build
-fi
+echo "→ 构建当前 web 源码…"; pnpm -C apps/web build
 mkdir -p "$R/apps/web"
 copy apps/web/dist "$R/apps/web/dist"
 echo "→ 运行期依赖：npm 扁平化安装…"
@@ -127,19 +82,8 @@ copy "$NM_STAGE/node_modules" "$R/node_modules"
 # 内部工作区包以实体目录入 node_modules（v2.0.14 @workloom 缺失实证）——
 # 按各包 package.json 的 name 动态注册（行业仓有自定义包，如 @hyperreality/video-studio；
 # 仓根级一方包 platform-ops 仅在仙女座精确身份下注册；目录存在本身不构成授权。
-INTERNAL_PACKAGE_MANIFESTS=(packages/*/package.json)
-[ "$PLATFORM_OPS_MODE" = "include" ] && INTERNAL_PACKAGE_MANIFESTS+=(platform-ops/package.json)
-for pkgjson in "${INTERNAL_PACKAGE_MANIFESTS[@]}"; do
-  [ -f "$pkgjson" ] || continue
-  pname="$(node -p "try{require('./$pkgjson').name||''}catch(e){''}" 2>/dev/null)"
-  [ -n "$pname" ] || continue
-  pdir="$(dirname "$pkgjson")"
-  mkdir -p "$R/node_modules/$(dirname "$pname")"
-  copy "$pdir" "$R/node_modules/$pname"
-done
-find "$R/node_modules" -mindepth 2 -maxdepth 4 -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
-# ⚠️ 必须 -mindepth 2：根目录本身也叫 node_modules，不带 mindepth 会整目录自毁
-#（hyperreality/workloom v1.0.0 冒烟「tsx 缺失」实证）；maxdepth 4 覆盖 @scope/pkg/node_modules
+node scripts/product-runtime-assets.mjs install "$R"
+node scripts/product-runtime-assets.mjs preflight "$R" --platform "$TARGET_OS" --arch "$TARGET_CPU"
 
 # ---------- 3. Node 官方二进制（按平台/架构） ----------
 echo "→ Node ${NODE_VER} ${PLATFORM}-${ARCH}…"

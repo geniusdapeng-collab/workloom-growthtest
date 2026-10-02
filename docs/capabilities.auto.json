@@ -4,7 +4,7 @@
  "repository": "workloom-ai/WorkLoom-growth",
  "displayName": "WorkLoom 获客增长系统（实验车道）",
  "description": "企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。",
- "generatedAt": "2026-09-27T14:42:02.507Z",
+ "generatedAt": "2026-10-02T06:23:27.425Z",
  "evidenceNotice": "本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。",
  "bundleDeclarations": [
   {
@@ -443,12 +443,13 @@
    "title": "内容生产专用入口",
    "items": [
     {
-     "name": "视频工位",
-     "how": "PC /ai-video/assets?tab=studio",
-     "desc": "预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置",
+     "name": "一句话导演工位",
+     "how": "PC /ai-video/assets?tab=studio；docs/director-studio-v2.md",
+     "desc": "默认三支常规版与导演惊喜版；独立画面/声音时间线、真实文字方案和逐版反馈；生产仍需本人授权、预算与可用供应商",
      "sourcePaths": [
-      "apps/server/src/video/router.ts",
-      "apps/server/src/video/studio-worker.ts"
+      "apps/server/src/video/director-router.ts",
+      "apps/server/src/video/director-worker.ts",
+      "docs/director-studio-v2.md"
      ]
     },
     {

@@ -1,7 +1,7 @@
 # WorkLoom 获客增长系统（实验车道） · 代码与能力入口导览
 
 > 企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。
-> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-09-27）。请修改生成器或事实输入后重新生成，不手改本文件。
+> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-10-02）。请修改生成器或事实输入后重新生成，不手改本文件。
 > 本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。
 > 产品身份：`workloom-ai-growth`；默认包：`geo-growth`；仓库：[workloom-ai/WorkLoom-growth](https://cnb.cool/workloom-ai/WorkLoom-growth)。
 
@@ -95,7 +95,7 @@
 
 | 入口 | 用途与边界 | 查阅或运行 |
 |---|---|---|
-| **视频工位** | 预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置 | PC /ai-video/assets?tab=studio |
+| **一句话导演工位** | 默认三支常规版与导演惊喜版；独立画面/声音时间线、真实文字方案和逐版反馈；生产仍需本人授权、预算与可用供应商 | PC /ai-video/assets?tab=studio；docs/director-studio-v2.md |
 | **媒资与交付** | 媒资检索、商品档案、合集、成片和交付记录；需要数据库与媒体文件 | 媒资：/ai-video/media；交付：/ai-video/assets?tab=delivery |
 | **白板与口播解释片** | 白板和口播制作链已提供代码入口；当前没有独立 React 编辑页，需要对应引擎与后期工具 | CLI / 服务端接口 |
 

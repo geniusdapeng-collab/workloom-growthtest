@@ -129,7 +129,7 @@ if (engine.length) groups.push({
 if (existsSync(join(ROOT, "apps/server/src/video/router.ts"))) groups.push({
   icon: "🎬", title: "内容生产专用入口",
   items: [
-    { name: "视频工位", how: "PC /ai-video/assets?tab=studio", desc: "预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置", sourcePaths: ["apps/server/src/video/router.ts", "apps/server/src/video/studio-worker.ts"] },
+    { name: "一句话导演工位", how: "PC /ai-video/assets?tab=studio；docs/director-studio-v2.md", desc: "默认三支常规版与导演惊喜版；独立画面/声音时间线、真实文字方案和逐版反馈；生产仍需本人授权、预算与可用供应商", sourcePaths: ["apps/server/src/video/director-router.ts", "apps/server/src/video/director-worker.ts", "docs/director-studio-v2.md"] },
     { name: "媒资与交付", how: "媒资：/ai-video/media；交付：/ai-video/assets?tab=delivery", desc: "媒资检索、商品档案、合集、成片和交付记录；需要数据库与媒体文件", sourcePaths: ["apps/server/src/video/media/index.ts", "apps/web/src/extensions/ai-video/pages/AssetsOrStudio.tsx", "apps/web/src/extensions/ai-video/routes.tsx"] },
     { name: "白板与口播解释片", how: "CLI / 服务端接口", desc: "白板和口播制作链已提供代码入口；当前没有独立 React 编辑页，需要对应引擎与后期工具", sourcePaths: ["apps/server/src/video/whiteboard/router.ts", "apps/server/src/video/explainer/router.ts"] },
   ],

@@ -31,6 +31,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { parseRootList } from "../../library/root-list.mjs";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -45,6 +46,7 @@ import { findTracks, loadAllLocalTracks, mix as bgmMix } from "../bgm-bridge/cor
 import { audioStemDigest, renderAudioStems, verifyAudioStemBundle,
   muxAudioProgram, snapshotAudioStemArtifact } from "../bgm-bridge/audio-stems.mjs";
 import { createAudioStemReceiptVerifier } from "../bgm-bridge/audio-stems-trust.mjs";
+import { findDirectorRecipe, attributeCreativeFeedback, directorHash } from "../../library/director-system/core.mjs";
 
 /* ============================ 工具面与错误 ============================ */
 
@@ -114,8 +116,7 @@ function realpathDeepest(target) {
 
 /** 允许根目录：环境变量优先，缺省只放行进程工作目录与系统临时目录。 */
 export function allowedRoots(env = process.env) {
-  const raw = (env.WORKLOOM_POST_ALLOWED_ROOTS ?? "").trim();
-  const list = raw ? raw.split(":").map((entry) => entry.trim()).filter(Boolean) : [process.cwd(), os.tmpdir()];
+  const list = parseRootList(env.WORKLOOM_POST_ALLOWED_ROOTS, { fallback: [process.cwd(), os.tmpdir()] });
   return list.map((entry) => {
     try {
       return fs.realpathSync(entry);
@@ -156,6 +157,8 @@ export function loadVariantIndex(file = path.join(VARIANT_DIR, "index.json")) {
 
 /** 变体包：一个变体 = 一套「调色 + 转场 + BGM + 封面 + 文案」的完整风格配方。 */
 export function findVariantPack(id, { file = path.join(VARIANT_DIR, "index.json") } = {}) {
+  const director = findDirectorRecipe(id);
+  if (director) return { ...director, _file: path.join(BUNDLE_ROOT,"library/director-system/recipes.json") };
   const index = loadVariantIndex(file);
   const entry = index.variants.find((item) => item.id === id);
   if (!entry) {
@@ -259,8 +262,12 @@ export function resolveResolution(project = {}) {
 
 /** 交付计划：只读素材与配方，产出"要出哪些变体、差异在哪、预计几步"的计划（不动文件）。 */
 export async function planDelivery({
-  project = {}, shots = [], variants = null, bins = resolveBinaries(),
+  project = {}, shots = [], variants = null, bins = resolveBinaries(), env = process.env,
 } = {}) {
+  if (project.creativeMode === "director_auto" || project.deliveryTargetPlan) {
+    const { planDirectorDelivery } = await import("./director-delivery.mjs");
+    return planDirectorDelivery({project,shots,bins,env});
+  }
   const projectId = text(project.projectId ?? project.project_id, "project.projectId");
   if (!Array.isArray(shots) || shots.length === 0) throw new PostError("shots 不能为空（交付要从镜头产物出发）", "bad_request");
   const index = loadVariantIndex();
@@ -1224,6 +1231,10 @@ export async function buildDeliveryPackage({
   reuse = true,
   env = process.env,
 } = {}) {
+  if (project.creativeMode === "director_auto" || project.deliveryTargetPlan) {
+    const { buildDirectorDelivery } = await import("./director-delivery.mjs");
+    return buildDirectorDelivery({ project,shots,subtitles,outDir,burnSubtitles,softSubtitles,bins,env });
+  }
   const projectId = text(project.projectId ?? project.project_id, "project.projectId");
   audioScope(project);
   if (!shots.length || shots.some((shot) => !shot.audioStems)) throw new PostError("每镜必须提供独立音轨或已签署的不适用决定", "audio_stems_source_unverified");
@@ -2191,6 +2202,9 @@ export async function reedit({
   expectedVersion = null,
   expectedProjectSha256 = null,
   patch = {},
+  feedback = null,
+  variantId = null,
+  idempotencyKey = null,
   outDir = null,
   shotPaths = null,
   audioStemsByShot = null,
@@ -2198,6 +2212,18 @@ export async function reedit({
   dryRun = false,
   env = process.env,
 } = {}) {
+  const v2file=assertPathAllowed(projectPath,allowedRoots(env));
+  const v2project=JSON.parse(await fsp.readFile(v2file,"utf8"));
+  if(v2project.schemaVersion==="workloom.film-project/v2") {
+    const message=feedback??"按已登记后期层调整";
+    const baseHash=await sha256File(v2file);
+    if(dryRun) return {executed:false,version:v2project.version,projectSha256:baseHash,
+      attribution:attributeCreativeFeedback(message,{variantId,variants:v2project.variants}),patch,renderApiCalls:0};
+    const { reviseDirectorDelivery }=await import("./director-delivery.mjs");
+    return reviseDirectorDelivery({projectPath:v2file,feedback:message,variantId,patch:Object.keys(patch).length?patch:null,
+      expectedVersion:expectedVersion??v2project.version,expectedProjectSha256:expectedProjectSha256??baseHash,
+      idempotencyKey:idempotencyKey??directorHash({file:v2file,version:v2project.version,feedback,patch,variantId}),outDir:outDir??undefined,bins,env});
+  }
   const snapshot = readRevisionBase(projectPath);
   const projectFile = snapshot.file;
   const project = snapshot.project;
@@ -2833,6 +2859,9 @@ export function extractShotIds(feedback, knownShotIds = []) {
 }
 
 export function triageFeedback({ feedback, project = null, variants = null } = {}) {
+  if(project?.schemaVersion==="workloom.film-project/v2" || project?.creativeMode==="director_auto") {
+    return attributeCreativeFeedback(feedback,{variants:project.variants??(variants??[]).map(id=>({id}))});
+  }
   const message = text(feedback, "feedback");
   const knownShotIds = (project?.layers?.shots ?? []).map((shot) => String(shot.shotId));
   const hits = REVISION_RULES.filter((rule) => rule.patterns.some((pattern) => pattern.test(message)));
@@ -2953,7 +2982,7 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
     case "postread.plan": {
       const project = params.project ?? {};
       const shots = (params.shots ?? []).map((shot) => ({ ...shot, path: assertPathAllowed(shot.path ?? shot.localPath, roots, "shots[].path") }));
-      const result = await planDelivery({ project, shots, variants: params.variants ?? null, bins });
+      const result = await planDelivery({ project, shots, variants: params.variants ?? null, bins, env });
       return { result, receipt: { synced: true, verified_at: new Date().toISOString() } };
     }
     case "postread.impact": {
@@ -3011,6 +3040,9 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         expectedVersion: params.expected_version ?? null,
         expectedProjectSha256: params.expected_project_sha256 ?? null,
         patch: params.patch ?? {},
+        feedback: params.feedback ?? null,
+        variantId: params.variant_id ?? null,
+        idempotencyKey: params.idempotency_key ?? null,
         outDir: params.out_dir ? assertPathAllowed(params.out_dir, roots, "out_dir") : null,
         shotPaths,
         audioStemsByShot: params.audio_stems_by_shot ?? null,

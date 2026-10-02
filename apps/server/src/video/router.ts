@@ -41,6 +41,7 @@ import { canonicalRenderJson } from "./gen/compiled-request.js";
 import { loadQualifiedRenderInput } from "./production-authority.js";
 import { productionRouter } from "./production-router.js";
 import { filmRouter } from "./film-router.js";
+import { directorRouter } from "./director-router.js";
 import { renderSubmitAutoAllowed } from "./gate-policy.js";
 import { createPublishTask, executePublishTask, fenceOverrideEnabled } from "./gen/publish.js";
 import { mediaUrl } from "./gen/ingest.js";
@@ -1381,6 +1382,7 @@ const genRouter = router({
 });
 
 export const videoRouter = router({
+  creative: directorRouter,
   studio: studioRouter,
   production: productionRouter,
   /** 固定影片工位（T-2026-0927-0039）：公开 full-chain 入口只提作业与读状态，外呼在服务通道内留账。 */

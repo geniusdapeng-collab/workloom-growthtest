@@ -1,3 +1,4 @@
+import { videoRuntimeRoot } from "./runtime-root.js";
 /**
  * shot-spec.ts —— 镜头卡字段规范（内容镜 25 字段 / 片头 30 字段）与交付闸
  *
@@ -504,8 +505,7 @@ let vendorCache: {
 } | null = null;
 
 function repoRoot(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return resolvePath(here, "../../..");
+  return videoRuntimeRoot(import.meta.url);
 }
 
 function vendorRequire(): NodeRequire {

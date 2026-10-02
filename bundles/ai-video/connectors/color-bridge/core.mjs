@@ -20,6 +20,8 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseRootList } from "../../library/root-list.mjs";
 
 /* ============================ 常量与错误 ============================ */
 
@@ -85,7 +87,7 @@ export function isColorTool(name) {
 
 /** ffmpeg/ffprobe 解析顺序：显式环境变量 → 仓内工位工具链 → PATH。 */
 export function resolveBinaries(env = process.env) {
-  const here = path.dirname(new URL(import.meta.url).pathname);
+  const here = path.dirname(fileURLToPath(import.meta.url));
   const bundled = path.resolve(here, "../../../../.workloom-tools/color");
   const pick = (explicit, name) => {
     if (explicit && fs.existsSync(explicit)) return explicit;
@@ -119,8 +121,7 @@ function realpathDeepest(target) {
 
 /** 允许根目录：环境变量优先，缺省只放行进程工作目录与系统临时目录。 */
 export function allowedRoots(env = process.env) {
-  const raw = (env.WORKLOOM_COLOR_ALLOWED_ROOTS ?? "").trim();
-  const list = raw ? raw.split(":").map((s) => s.trim()).filter(Boolean) : [process.cwd(), os.tmpdir()];
+  const list = parseRootList(env.WORKLOOM_COLOR_ALLOWED_ROOTS, { fallback: [process.cwd(), os.tmpdir()] });
   return list.map((entry) => {
     const abs = path.resolve(entry);
     return fs.existsSync(abs) ? fs.realpathSync(abs) : abs;
@@ -881,10 +882,10 @@ export async function detectDefects({ input, at = [0], maxFrames = 4, bins = res
 /* ---------- 题材×场景调色配方库（调色师的专业知识底座） ---------- */
 
 const RECIPE_FILE = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../library/color-recipes/recipes.json",
 );
-const LUT_DIR = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../library/luts");
+const LUT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../library/luts");
 
 let recipeCache = null;
 
