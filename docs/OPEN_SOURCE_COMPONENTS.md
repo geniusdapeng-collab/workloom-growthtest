@@ -4,7 +4,7 @@
 
 > 生成器：`scripts/oss-inventory.mjs`（离线事实）＋ `scripts/oss-watch.sh`（上游最新版本）
 > 仓库：workloom-ai/workloom-growthtest ｜ 最近一次上游扫描：2026-09-19T10:10:43.000Z
-> 统计：登记组件 101 个 ｜ npm 直接依赖 172 个 ｜ Python 依赖 5 个 ｜ 容器镜像 2 个
+> 统计：登记组件 102 个 ｜ npm 直接依赖 172 个 ｜ Python 依赖 5 个 ｜ 容器镜像 2 个
 
 ## 0. 维护机制（四件事）
 
@@ -119,9 +119,10 @@
 | 96 | python-audio-separator（人声分离·可选引擎） | [github.com/nomadkaraoke/python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator) · MIT | v0.47.0（2026-08-27，活跃维护，推荐档位 A 引擎） | v0.47.0（2026-08-27，GitHub Releases） | external-optional | bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）、Mac 配乐工位（外部安装，不随仓分发；WORKLOOM_BGM_DEMUCS 指定可执行文件） | UVR 模型族（MDX/VR/Demucs 系）的 CLI/Python 封装，是配乐工位「档位 A」深度学习分离的首选引擎（活跃维护、MIT）。未安装时工位按档位 B（ffmpeg 中心声道近似）执行并如实标注 quality=approximate；安装与否不影响作曲/混音主链路。 |
 | 97 | Demucs（人声分离·可选引擎） | [github.com/facebookresearch/demucs](https://github.com/facebookresearch/demucs) · MIT | v4.0.1（2023-09-07，上游仓库已归档） | v4.0.1（2023-09-07；仓库已归档） | external-optional | bundles/ai-video/connectors/bgm-bridge/kit/ffmpeg-pin.json#optionalEngines（登记 + 降级路径）、Mac 配乐工位（外部安装，不随仓分发） | htdemucs 两轨分离（vocals / no_vocals），MIT；**上游仓库已归档（2026-09-22 核验，最后推送 2024-04，最新发布 v4.0.1 / 2023-09）**，故只作兼容引擎保留，推荐改用 python-audio-separator。工位不内置其模型权重，也不随产品分发。 |
 | 98 | MusicGen / AudioCraft（评估后不采用） | [github.com/facebookresearch/audiocraft](https://github.com/facebookresearch/audiocraft) · 代码 MIT；**模型权重 CC-BY-NC 4.0（禁止商用）** | 未引入 | v1.3.0（2024-05-02） | evaluated-not-adopted | bundles/ai-video/skills/bgm-library-license/SKILL.md（许可陷阱条款）、bundles/ai-video/library/bgm-library/README.md（曲库对比表） | 文本生成音乐（MusicGen / MAGNeT / JASCO）与音频编解码（EnCodec）。**权重为 CC-BY-NC 4.0，输出不可直接用于商用交付**，因此配乐工位的默认路径是自算作曲（synth.mjs），而非该模型；仅在客户另行取得授权或纯研究场景才可评估接入。许可结论来自官方 README 的 License 段（2026-09-22 核验）。 |
-| 99 | Kokoro-82M（织伴本机女声模型） | [github.com/hexgrad/kokoro](https://github.com/hexgrad/kokoro) · Apache-2.0 | a71e4d38b236d968966a2002c4c895dbd12b1c3c | —（未扫描） | 素材/资产 | 本机可选织伴语音包（zf_xiaoni，不随基础客户端打包） | 模型事实源为 loommate-voice.json：HF 固定修订与 SHA-256 校验；Apple Silicon 独立回环推理服务，128 MiB Metal 缓存。中文自然韵律，不支持任意情绪指令。模型升级需同句试听、延迟与回退回归。 |
+| 99 | Kokoro-82M（织伴本机女声模型） | [github.com/hexgrad/kokoro](https://github.com/hexgrad/kokoro) · Apache-2.0 | ae315a79b623f244700e4afb9246c46a26066782e049ba174bf3ba433970ee9c | —（未扫描） | 素材/资产 | 本机可选织伴语音包（zf_xiaoni，不随基础客户端打包） | 模型事实源为 loommate-voice.json：固定 Kokoro ONNX INT8 图与声线集 SHA-256；约 142 MB，本机 CPU 子进程推理，两个计算线程与有界队列。中文自然韵律，不支持任意情绪指令。导出来源 thewh1teagle/kokoro-onnx（MIT），模型 Apache-2.0。更新需同句试听、延迟与回退回归。 |
 | 100 | Misaki（织伴中文文本转发音） | [github.com/hexgrad/misaki](https://github.com/hexgrad/misaki) · Apache-2.0 | 0.9.4 | 0.9.4 | 独立服务 | 已有语音工位 venv；scripts/install-loommate-voice.py 安装可选 zh 依赖 | 仅可选本机语音环境，既有业务和 Agent 运行时不增加 Python 依赖；复核中文、数字、英文混读后才升级。 |
-| 101 | mlx-audio（织伴独立轻量推理服务） | [github.com/Blaizzy/mlx-audio](https://github.com/Blaizzy/mlx-audio) · MIT | 0.5.5 | **0.5.7** ⬆ | 独立服务 | 复用已有本机语音工位 venv；scripts/loommate-voice-engine.py | 复用已安装且实测的 0.5.5，安装器只校验版本；共享影视/个人克隆引擎配置保持独立。独立服务只加载固定 Kokoro 资产；版本升级需重跑本机真实 HTTP 与冷启动、热机、缓存测试。 |
+| 101 | mlx-audio（既有个人克隆工位） | [github.com/Blaizzy/mlx-audio](https://github.com/Blaizzy/mlx-audio) · MIT | 0.5.5 | **0.5.7** ⬆ | 独立服务 | 现有个人克隆/影视工位；女声安装器不升级该共享环境的 mlx-audio | 保留已安装且实测的 0.5.5，女声安装器只校验版本。织伴默认使用独立 CPU ONNX 后端；现有影视和个人克隆模型配置保持独立。升级需重跑原工位回归。 |
+| 102 | ONNX Runtime（织伴 CPU 女声推理） | [github.com/microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) · MIT | 1.30.0 | 1.30.0 | 独立服务 | 可选本机织伴工位；scripts/loommate-voice-engine.py | 固定并实测 1.30.0，显式 CPUExecutionProvider；导入前禁用遥测。不改 Node 或行业依赖锁。模型与声音不联网推理；更新需真实合成、并发、进程恢复回归。 |
 
 ## 2. 全量直接依赖（本仓事实，含上游最新）
 
@@ -351,5 +352,5 @@
 - `pnpm` 10.14.0 → **12.4.2**（门禁 standard）
 - `npm（桌面载荷安装器）` 11.17.0 → **12.0.2**（门禁 standard）
 - `Playwright（Python · computer-use 工具链）` >=1.40.0 → **1.46.0**（门禁 standard）
-- `mlx-audio（织伴独立轻量推理服务）` 0.5.5 → **0.5.7**（门禁 standard）
+- `mlx-audio（既有个人克隆工位）` 0.5.5 → **0.5.7**（门禁 standard）
 
