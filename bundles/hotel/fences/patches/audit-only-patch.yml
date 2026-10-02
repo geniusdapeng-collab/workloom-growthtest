@@ -2,7 +2,7 @@
 # 定位：新客户接入的「第 0 阶段」——系统只读扫描、只出报告与建议，不写回任何平台。
 # 叠加于 hotel-baseline/v4 之上，只可收紧不可放宽（F2.3 单调守卫）。
 # 复合系统纪律：本 patch 按 applies_to=audit_only 同时叠加于三域基线（hotel-baseline/v4、
-#   ai-video-baseline/v2、geo-growthtest-baseline/v1）——酒店运营侧（调价/退款/排房/回复差评）
+#   ai-video-baseline/v2、geo-growth-baseline/v1）——酒店运营侧（调价/退款/排房/回复差评）
 #   与营销获客侧（发布内容/回评论/私信/投放）一切对外写操作物理阻断。
 # 纪律：本 patch 生效期间，一切写类动作默认即拒（block）；客户确认整改项时由人类在平台侧执行，
 #   系统只跟踪闭环。体检期结束（通常 1–2 周）后，客户切换为影子模式 → 正式托管客群
@@ -90,7 +90,7 @@ patches:
     note: 券定价红线维持 block（基线纪律）
 
   # ========== 获客转化线：发布/回评论/私信/投放 一律阻断 ==========
-  # （ai-video-baseline/v2 与 geo-growthtest-baseline/v1 同 applies_to 叠加）
+  # （ai-video-baseline/v2 与 geo-growth-baseline/v1 同 applies_to 叠加）
   - rule_id: G9
     tighten: { level: block }
     note: 公网发布一律阻断（质检期内容线只读：账号健康/内容节律/主页组件盘点）

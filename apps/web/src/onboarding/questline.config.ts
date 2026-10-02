@@ -6,7 +6,7 @@
  * 形象必须是系统内真实形象（`/live2d/mao/poster.png`），禁止手绘/自创替代品。
  *
  * 结构上刻意与行业包对齐：人设 / 员工卡 / 目标模板 / 首单任务卡 / 成就 / 价值口径 / 下一步。
- * 三套内容包（hotel / geo-growthtest / ai-video）的员工卡与首单卡引用的 presetKey 必须真实存在于
+ * 三套内容包（hotel / geo-growth / ai-video）的员工卡与首单卡引用的 presetKey 必须真实存在于
  * 对应 `bundles/<bundle>/presets/*.yml`，驳回原因必须命中该 Bundle 的反馈枚举表——
  * 两条都由 questline.test.ts 设门禁。
  *
@@ -369,11 +369,11 @@ export const QUESTLINE: QuestlineConfig = {
   ],
 };
 
-/* ================= GEO 获客内容包（geo-growthtest Bundle） ================= */
+/* ================= GEO 获客内容包（geo-growth Bundle） ================= */
 
 /**
- * GEO 双域获客内容包：员工卡只引用 `bundles/geo-growthtest/presets/*.yml` 里真实存在的岗位，
- * 围栏口径与 `geo-growthtest-baseline` 逐条对齐（G-GEO1/G-GEO2/G12/G9a/G10b…）。
+ * GEO 双域获客内容包：员工卡只引用 `bundles/geo-growth/presets/*.yml` 里真实存在的岗位，
+ * 围栏口径与 `geo-growth-baseline` 逐条对齐（G-GEO1/G-GEO2/G12/G9a/G10b…）。
  * 派单指令写的是「可交付的活」——必须能被意图路由判成 quest，否则首单没有产出可验收。
  */
 export const QUESTLINE_GEO: QuestlineConfig = {
@@ -514,7 +514,7 @@ export const QUESTLINE_GEO: QuestlineConfig = {
   values: QUEST_VALUES,
   nextSteps: QUEST_NEXT_STEPS,
 
-  // geo-growthtest 枚举表（bundles/geo-growthtest/feedback-enums.yml）里的 reject 适用码
+  // geo-growth 枚举表（bundles/geo-growth/feedback-enums.yml）里的 reject 适用码
   rejectReasons: [
     { code: "fact.risk", label: "事实红线风险" },
     { code: "geo.citation_missing", label: "引用源缺失或不可核验" },
@@ -678,7 +678,7 @@ export const QUESTLINE_VIDEO: QuestlineConfig = {
  */
 export const QUESTLINE_PACKS: Readonly<Record<string, QuestlineConfig>> = Object.freeze({
   hotel: QUESTLINE,
-  "geo-growthtest": QUESTLINE_GEO,
+  "geo-growth": QUESTLINE_GEO,
   "ai-video": QUESTLINE_VIDEO,
 });
 

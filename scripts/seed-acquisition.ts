@@ -9,7 +9,7 @@
  * 纪律：与 scripts/seed.ts 同——事件走 append_event_insert 特权函数 + E-SEED- 前缀 + zod 校验。
  */
 import pg from "pg";
-import { eventHash, safeParseReplayAwareEvent } from "@workloom/base/workdata";
+import { alignReadableIdSequences, eventHash, safeParseReplayAwareEvent } from "@workloom/base/workdata";
 
 const DATABASE_URL = process.env.DATABASE_URL ?? "postgres://postgres:workloom@localhost:5432/workloom";
 const GATEWAY_URL = process.env.DATABASE_GATEWAY_URL ?? "postgres://workloom_gateway:workloom_dev_gateway@localhost:5432/workloom";
@@ -246,6 +246,11 @@ async function main() {
     aprNew++;
   }
   console.log(`✓ 待审批：新写入 ${aprNew} 条（协议价/券定价/线索出域）`);
+
+  // GR-02（2026-09-29 第二次修复）：手写号段写入方收尾对齐号源（取号函数只做 nextval）
+  const seqFloor = await alignReadableIdSequences(owner);
+  console.log(`✓ 可读号源对齐：threads→${seqFloor.threads}，video_projects→${seqFloor.videoProjects}`);
+
   await owner.end();
 
   // 事件：网关写入（哈希链接龙 + 存在即跳过）

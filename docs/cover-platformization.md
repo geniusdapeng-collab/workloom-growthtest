@@ -121,7 +121,7 @@ node bundles/ai-video/connectors/cover-kb-bridge/cli.mjs enrich --platform bilib
    未做主体/人脸检测驱动的智能裁剪；
 3. **KB 增强机检**：拼接接缝扫描、底图 OCR/水印匹配、人脸闭眼检测、scrim 边缘梯度检测
    仍是"建议增强"（未实现，见 `CRAFT-003` 模板 A 的增强清单），实现前由监制人工拦；
-4. **B 链（`bundles/geo-growthtest` 视觉工位）对齐**：本期只强化 A 链，B 链 `video-cover` 技能保持原状。
+4. **B 链（`bundles/geo-growth` 视觉工位）对齐**：本期只强化 A 链，B 链 `video-cover` 技能保持原状。
 
 ## 六-1、真机测试中发现并修复的问题（2026-09-27）
 

@@ -118,7 +118,7 @@ jobs:
 
       - name: 安装依赖 + 构建 web
         env:
-          VITE_DEMO_WORKSPACE: geo-growthtest
+          VITE_DEMO_WORKSPACE: geo-growth
           VITE_DEMO_MEMBER: MEM-G01
           BUNDLE_SIGNING_PRIVATE_KEY: ${{ secrets.BUNDLE_SIGNING_PRIVATE_KEY }}
           BUNDLE_SIGNING_KEY_ID: ${{ vars.BUNDLE_SIGNING_KEY_ID || 'workloom-acquisition-release-v1' }}
@@ -313,7 +313,7 @@ jobs:
 
       - name: 安装依赖 + 构建 web
         env:
-          VITE_DEMO_WORKSPACE: geo-growthtest
+          VITE_DEMO_WORKSPACE: geo-growth
           VITE_DEMO_MEMBER: MEM-G01
           BUNDLE_SIGNING_PRIVATE_KEY: ${{ secrets.BUNDLE_SIGNING_PRIVATE_KEY }}
           BUNDLE_SIGNING_KEY_ID: ${{ vars.BUNDLE_SIGNING_KEY_ID || 'workloom-acquisition-release-v1' }}

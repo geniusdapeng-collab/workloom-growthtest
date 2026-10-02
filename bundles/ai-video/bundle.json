@@ -760,7 +760,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "148e9da75336a7853c4ff80dd657aa37ea07a3d88325c518cfc13f1614ae1091",
+    "digest": "279d8b6be0f1dc91a82611e25f73eb6922d1378a1f5136d61ecb19a643f598e4",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "9180a2cb1fbac95f4c5ec835041e98436ccc2de6d7a874abb651bf6b74124425",
@@ -783,8 +783,8 @@
       "connectors/cine-kb-bridge/shot-intent.d.mts": "509d9d429e33e62ba472e8674fc281678e9fe500374dab505d47455b72441118",
       "connectors/cine-kb-bridge/shot-intent.mjs": "31a03c0700252cbd384c90c79baa1adff4f1d366396cdbda8501780f3006efb4",
       "connectors/color-bridge/cli.mjs": "e3593d7e9aecb5d1e58aa8d99a0e668d41302f8674df0f1fb8928de7d7f56d9e",
-      "connectors/color-bridge/core.mjs": "ac4c64b76fad9d9727230a6edc45596325a5a99d4aa352af0f8ff1a238613add",
-      "connectors/color-bridge/executor.ts": "4532b3e7416881ce3866f70300d6430a294dbd0e72fb8b9c48c11117b1f3ab57",
+      "connectors/color-bridge/core.mjs": "66c1661b1fcf0223751ea8587e6cfb6643ebf4ce152a0584a715d31e1eccf8a4",
+      "connectors/color-bridge/executor.ts": "b9f548d8604dd2b3e2150dfeb544562ee7e2ad209402378f0c6eab2903fbd0fa",
       "connectors/color-bridge/kit/ffmpeg-pin.json": "505945ae35bfb1a5d42066ece3bb264b580ae54bbf863b3537136ba3130105a9",
       "connectors/color-bridge/kit/install.sh": "b602835b3038dc7e561b18b662dab746c48e6bbaa1c584dea5c37edc215066be",
       "connectors/color-bridge/kit/selftest.sh": "737b693cf134c3cc1e1723c1e625ad72e982e18f71d854728a3dca32dda1dbcf",
@@ -815,7 +815,7 @@
       "connectors/subtitle-bridge/server-adapter.mts": "f09160b620a5f96cf61480e855c758a773280c1399ecb25035bc342bf3a52f04",
       "connectors/subtitle-bridge/server.mjs": "77be6773cb3f5a25ea4ff191f4971684fe0f7026de92c4d7b39e7b2e800bf839",
       "eval/questions.json": "3f74cf24979c998ed863fa6609d34a37afad3f26ad79342b2698295d1f7c1ffe",
-      "fences/ai-video-baseline.yml": "f437f10c76c0cfb68e7ab91aef3837876408e8dff20454f54c31d38260ceaef4",
+      "fences/ai-video-baseline.yml": "3d4aa78bff9458972abff4173cd4cc685461b56dc731aea5d7b0aab1be86580b",
       "fences/ai-video-bgm.yml": "4d5c8e2e961c18157578bd4cfc47763e4ef3f6d75b973caa3a062fd8e2676dff",
       "fences/ai-video-cine-kb.yml": "93e9b8fb8b812e29892b2889a66777c2ee6335ac4fbd11fe841007df651730e6",
       "fences/ai-video-color.yml": "709cb9fc3cba47a4ee2b4ee233d714277223cb23f9ca210ed3712de54c597ed6",

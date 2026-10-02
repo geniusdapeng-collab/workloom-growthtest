@@ -30,7 +30,6 @@
  * 阶段汇总：`<work-dir>/logs/stages.json`
  */
 import { execFileSync, spawnSync } from "node:child_process";
-import { auditFilmRedlines, PROMPT_REDLINE_POLICY_VERSION } from "../../packages/video-studio/src/prompt-redlines.js";
 import { createHash, randomUUID } from "node:crypto";
 import {
   accessSync, appendFileSync, closeSync, constants as fsConstants, copyFileSync, existsSync, mkdirSync, openSync, readFileSync, readSync, readdirSync,
@@ -61,6 +60,7 @@ import {
   getCoverSpec, isKnownCoverPlatform, COVER_PLATFORM_IDS,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm,
+  detectProductAnchor, resolveRoutePreflight, RoutePreflightError, type RoutePreflightResult,
   buildSfxArgs, cutTimesFromShots, planCutSfxDetailed, CUT_SFX_POLICY, planHookSfx, HOOK_SFX_POLICY,
   measureBpm, beatGridReport, checkShotOrder, assessVariantAxes, VARIANT_MIN_COUNT, auditDeliverableNaming,
   assessCharacterConsistency, medianColor, type CharacterConsistencyReport, type RgbColor,
@@ -78,11 +78,14 @@ import {
   type CoverAccountProfile, type CoverDesignInput, type CoverMeasurements, type CoverPlan,
   type CoverPlatformSpec, type GateCheck, type GateEvent, type PipelineGateStepKey,
   type DeviceCategory, type DeviceDefect, type EnvDefect, type HookCard, type MicromotionTrace, type PlatePromptShot,
-  detectProductAnchor, resolveRoutePreflight, RoutePreflightError, type RoutePreflightResult, // T-2026-0930-0015-PORT
   type ProducerVerdict, type SceneBible, type ScenePolicyReport
 } from "../../packages/video-studio/src/index.js";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "../../packages/video-studio/src/shot-intent.js";
 import { verifyAvSyncEvidence } from "../../packages/video-studio/src/av-sync.js";
+import { loadProductArchives, productArchivePromptLines, productHeroPhoto, productPhotoPath, selectProductArchive } from "../../packages/video-studio/src/product-archive.js";
+import { assertShotMatchesCertifiedAsset, assetIdOf, hasIdentityAnchor, identityAnchorContext, identityAnchorPath, identityReviewContext, loadRealPersonAssets, realPersonUsageReceipt, referenceAssetRefs, REAL_PERSON_POLICY_VERSION } from "../../packages/video-studio/src/real-person-asset.js";
+import { auditFilmRedlines, PROMPT_REDLINE_POLICY_VERSION } from "../../packages/video-studio/src/prompt-redlines.js";
+import { assessFilmFirstPass, FIRST_PASS_POLICY_VERSION } from "../../packages/video-studio/src/first-pass.js";
 import { publishUhdDelivery, sha256UhdAsset } from "../../packages/video-studio/src/uhd-delivery.js";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
@@ -130,8 +133,9 @@ const log = (line: string): void => process.stdout.write(`[${stamp().slice(11, 1
 /* ================= 参数 ================= */
 
 /**
- * 服务端"固定影片工位"（--worker / FILM_WORKER_MODE=worker）在 **CLI 侧尚未接线**（第二批，T-2026-0930-0015-PORT）。
- * 显式 fail-closed：否则子进程在读不到作业上下文的情况下继续跑，报错位置与原因都不可读。
+ * 服务端"固定影片工位"（--worker / FILM_WORKER_MODE=worker）在 **CLI 侧尚未接线**（第二批，见
+ * `docs/repairs/T-2026-0927-0039.md` 第 57 行：full-chain-film.mts 未改动，工位子进程端到端待第二批）。
+ * 这里显式 fail-closed：否则子进程会在读不到作业上下文的情况下继续跑，报错位置与原因都不可读。
  */
 if (flag("--worker") || String(process.env.FILM_WORKER_MODE ?? "") === "worker") {
   throw new Error(
@@ -217,7 +221,7 @@ if (!["live-action", "animation"].includes(ENHANCE_KIND)) {
 }
 const ENHANCE_ENGINE_DIR = arg("--enhance-engine-dir", "");
 const FPS = Number(arg("--fps", "30"));
-const MAX_ATTEMPTS = Number(arg("--max-attempts", "2"));
+const MAX_ATTEMPTS = Math.max(1, Number(arg("--max-attempts", "1")) || 1);   // 默认不做盲重试（T-2026-0929-0009）
 /** 转场淡入淡出时长（秒）：快剪片（小红书/瞭望塔风格）用 0.1–0.2，抒情片用 0.5 */
 const XFADE = Number(arg("--xfade", "0.5"));
 /**
@@ -300,6 +304,35 @@ if (arg("--accept-weak-material-motion")) {
 }
 /** 只做后期运镜增强、不提交新渲染（额度受限/只想换运镜设计时用） */
 const MATERIAL_POST_ONLY = flag("--material-post-only");
+/**
+ * 纯后期组装模式（T-2026-0929-0012，真机事故沉淀）：
+ * 当源镜头是**外部拿到的成品片段**（未过本片 shot/voice 回执）时，允许继续走完整后期链
+ * （合成→调色→字幕→配乐→封面设计师→母版→变体交付包），但必须：
+ *   1 显式传 `--assembly-mode post-only --assembly-reason "<原因>"`；
+ *   2 落一条 degraded 门记录（哪些镜头无回执）；
+ *   3 交付清单里标 assemblyMode=post-only、shotReceiptsMissing=[…]。
+ * 目的：把"绕开管线、手工做封面/BGM"这条歪路堵死——要么走完整链并留痕，要么不做。
+ */
+const POST_ONLY_ASSEMBLY = arg("--assembly-mode", "") === "post-only";
+const POST_ONLY_REASON = arg("--assembly-reason", "").trim();
+if (POST_ONLY_ASSEMBLY && POST_ONLY_REASON.length < 8) {
+  throw new Error("post-only 组装必须显式给出 --assembly-reason \"<至少 8 字原因>\"（说明源镜头为何没有本片回执）");
+}
+/** post-only 组装时"无本片回执"的镜头清单（交付清单里如实列出，供客户/审计复核） */
+let postOnlyMissingReceipts: string[] = [];
+/**
+ * 配乐层状态（交付清单留痕，T-2026-0930-0015）：声明式直混 / 工位判定无需配乐 / 签章路径。
+ * bgm 阶段在自己的块作用域里算出结论，这里提升到模块作用域供交付清单与母版终审引用。
+ */
+let bgmManifestInfo: Record<string, unknown> | null = null;
+/**
+ * 声明式直混（T-2026-0930-0014，配本机"无版权曲库直用"口径）：
+ * 源片是对白+环境混在一起的成品（post-only 组装/既有素材复用）时**不存在**可独立取证的干净分轨；
+ * 有签发者走签章路径，没有签发者时按调用方**显式声明**直混（回执写 declared-unverified / stemsVerified=false）。
+ * 提升到模块作用域：母版配乐与变体配乐必须共用同一口径（否则变体缺配乐 → G-DLV1 三轴判据误红）。
+ */
+const BGM_DECLARED_PROGRAM_MIX = flag("--bgm-declared-program-mix")
+  || !String(process.env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET ?? "").trim();
 /** 后期速度坡道只由显式参数或镜头意图启用，默认保持原速度 */
 const MATERIAL_SPEED_RAMP = flag("--material-speed-ramp") && !flag("--no-material-speed-ramp");
 /**
@@ -508,6 +541,16 @@ const SUBTITLE_MODE = (() => {
 const VALID_STAGES = new Set(["cine-kb", "continuity", "micromotion", "spec", "plates", "material-gen", "videos", "voice", "compose", "color", "subtitle", "danmaku", "bgm", "sfx", "cover", "mux", "master", "deliver", "revise"]);
 for (const stage of STAGES) if (!VALID_STAGES.has(stage)) throw new Error(`UNKNOWN_STAGE: ${stage}`);
 if (STAGES.has("deliver")) STAGES.add("master");
+/**
+ * post-only 组装**必须**过字段规范闸（T-2026-0930-0015）。
+ * 真机事故：手写组装卡没跑 `spec` → `character` 只写了"这位女士…"、没写主角名/ID（P0 字段不合格），
+ * 一路漏到封面环节才炸（人物卡找不到来源镜 → 退最小稿 → 母版终审被拦）。
+ * 这里不靠"记得加 spec"，而是入口自动补上；spec 阶段在 post-only 下按"字段规范"判（见下方 spec 块）。
+ */
+if (POST_ONLY_ASSEMBLY && !STAGES.has("spec")) {
+  STAGES.add("spec");
+  log("ℹ post-only 组装：自动补上 spec 阶段（25 字段规范闸）——手写组装卡同样要过字段规范");
+}
 assertSelectedShotStageScope(STAGES, ONLY);
 if (!DRY_RUN && (ACCEPT_REJECTED.length || ALLOW_FALLBACK_APPROVE || flag("--accept-env-defects") || flag("--accept-av-sync-drift"))) {
   throw new Error("PRODUCTION_BYPASS_REJECTED: 生产不能通过豁免参数把未通过或未核实变为合格；请调用对应组件修复后重新验证。");
@@ -530,20 +573,15 @@ let masterApprovedForUhd = false;
 /** 工位路径白名单（冒号分隔）：仓库根 + 运行产物根 + 交付目录 + 系统临时目录 */
 const CLI_ALLOWED_ROOTS = [REPO_ROOT, WORK_DIR, OUT_DIR, tmpdir()].join(":");
 /**
- * 配乐工位额外白名单（2026-09-30 真机）：本地**无版权曲库**放在 `~/.workloom-bgm/library`
- * （索引指向原始下载目录），变体配乐命中 `~/Downloads/...` 时会被路径监狱拦下（变体三支全缺配乐）。
- * 只给配乐工位加这两个曲库根，其它工位不变。
+ * 配乐工位额外白名单（2026-09-30 真机）：本地**无版权曲库**是产品所有者自己放在
+ * `~/.workloom-bgm/library`（索引指向原始下载目录）里的——变体配乐的"按曲风挑曲"会命中
+ * `~/Downloads/...` 的真实文件路径。工位路径监狱只放行 CLI_ALLOWED_ROOTS 时，
+ * 混音会被 `path_not_allowed` 拦下（真机：变体三支全部缺配乐 → G-DLV1 三轴判据误红）。
+ * 这里只给**配乐工位**加这两个曲库根；其它工位白名单不变。
  */
 const BGM_LIBRARY_ROOTS = [join(homedir(), ".workloom-bgm"), join(homedir(), "Downloads"), join(homedir(), "Music")]
   .filter((dir) => existsSync(dir));
 const BGM_ALLOWED_ROOTS = [CLI_ALLOWED_ROOTS, ...BGM_LIBRARY_ROOTS].join(":");
-/**
- * 声明式直混（T-2026-0930-0014）：源片是对白+环境混音成品（post-only 组装/既有素材复用）时
- * 不存在可独立取证的干净分轨；有签发者走签章，没有签发者时按调用方**显式声明**直混
- * （回执写 declared-unverified / stemsVerified=false，不冒充签章分轨）。
- */
-const BGM_DECLARED_PROGRAM_MIX = flag("--bgm-declared-program-mix")
-  || !String(process.env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET ?? "").trim();
 for (const dir of [LOG_DIR, PLATE_DIR, CLIP_DIR, POST_DIR, PROMPT_DIR, OUT_DIR]) mkdirSync(dir, { recursive: true });
 
 /** 环境：进程环境优先，其次仓库外秘密文件（只进内存，不落盘） */
@@ -599,21 +637,19 @@ type StageRecord = {
   score?: number | null;
   reason?: string;
 };
-/**
- * 配乐层状态（交付清单留痕，T-2026-0930-0015）：bgm 阶段在自己的块作用域里算出结论，
- * 这里提升到模块作用域供交付清单引用（off 时写明原因）。
- */
-let bgmManifestInfo: Record<string, unknown> | null = null;
 const records: StageRecord[] = [];
 if (!Array.isArray(sourceDocument.shots) || !sourceDocument.shots.length) throw new Error("SHOT_REGISTRY_REQUIRED");
 const sourceIds = sourceDocument.shots.map((shot) => String(shot.shotId ?? ""));
 if (sourceIds.some((id) => !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(id) || id.includes("..")) || new Set(sourceIds).size !== sourceIds.length) throw new Error("SHOT_REGISTRY_INVALID: 镜号缺失、重复或包含路径字符");
 if (ONLY.some((id) => !sourceIds.includes(id))) throw new Error("SHOT_SCOPE_UNKNOWN: --only 包含未登记镜号");
 /**
- * 视频类型分流前置（T-2026-0930-0015-PORT）：分流器原来只接在服务端派活上，
- * 直接跑本 CLI 会跳过"先判营销片 / 叙事片"。这里变成**出片入口的 fail-closed 前置**：
- * `--route work/route.json`（route-video.mts 产物）或 `--route-kind marketing|narrative`（已确认过的补跑）。
- * 营销片必须有商品锚点（不猜商品）；分流结论是"判不准"时必须先问用户。
+ * 视频类型分流前置（T-2026-0930-0015，2026-09-30 真机复盘沉淀）。
+ *
+ * 分流器 `pipeline-router.ts` 此前只接在**服务端派活**上；AI agent / 交付同学直接跑本 CLI 时会
+ * 跳过"先判营销片 / 叙事片 / 口播解说片"。这里把它变成**出片入口的 fail-closed 前置**：
+ *   · `--route work/route.json`（由 scripts/tools/route-video.mts 生成）；或
+ *   · `--route-kind marketing|narrative`（已确认过的补跑项目，显式声明并留痕）。
+ * 营销片必须有商品锚点（纪律：**不猜商品**）；分流结论是"判不准"时必须先问用户，不许替用户花钱。
  */
 const ROUTE_FILE = arg("--route", "");
 const ROUTE_KIND_ARG = arg("--route-kind", "");
@@ -653,7 +689,6 @@ const ROUTE_PREFLIGHT: RoutePreflightResult = (() => {
 })();
 log(`✅ 分流前置：${ROUTE_PREFLIGHT.kind}（来源：${ROUTE_PREFLIGHT.source}）`
   + `${ROUTE_PREFLIGHT.productAnchor ? ` · 商品锚点「${ROUTE_PREFLIGHT.productAnchor}」` : ""}`);
-
 const lineageComponentHash = sha256FileSync(join(REPO_ROOT, "scripts/tools/full-chain-film.mts"));
 const SCENE_BIBLE_FILE = arg("--scene-bible");
 const sceneBible: SceneBible | null = SCENE_BIBLE_FILE
@@ -862,15 +897,23 @@ function readStageHistory(): StageRecord[] {
   });
 }
 /**
- * 渲染 / 返工台账（T-2026-0930-0015-PORT）：客户要能看到"每一次花钱的账"——提交几次、判不合格几次、
- * 平台拒收几次、canary 止损几次、后期返工几次。只统计事实，不做费用估算。
+ * 渲染 / 返工台账（T-2026-0930-0015）。
+ *
+ * 产品所有者口径（2026-09-30 真机复盘）：客户要能看到"**每一次花钱的账**"——
+ * 提交了几次渲染、几次渲出后判不合格、几次被平台拒收（欠费/限额）、几次 canary 止损、
+ * 后期各环节返工几次。只统计事实，不做费用估算（渲染单价未登记在仓库里）。
  */
 interface RenderLedgerShot {
   shotId: string;
+  /** 真的提交并拿到产物（或尝试渲染）的次数 */
   attempts: number;
+  /** 渲出来后判不合格的次数 */
   rejected: number;
+  /** 最近一次不合格原因（硬闸/监制/机检，取第一条） */
   lastReason: string | null;
+  /** 平台拒收（未渲染）：欠费/限额等 */
   platformRejections: number;
+  /** canary 止损中止（未渲染） */
   canaryAborts: number;
 }
 interface RenderLedger {
@@ -1260,7 +1303,14 @@ const writeScenePolicyReport = (): void => {
 };
 writeScenePolicyReport();
 /**
- * 分流结论留痕（T-2026-0930-0015-PORT）：`--route` / `--route-kind` 的结论与来源写进阶段账本，交付清单同样带 `route` 字段。
+ * post-only 组装（T-2026-0929-0012）：片型门是生成前/生成后的**创作口径**检查，
+ * 本模式不生成新镜头 → 未命中时按**已声明降级**记账（`degraded + assemblyMode=post-only`），
+ * 后续收尾检查不会把它当成"请求未完成"（否则片子已交付、退出码却是 6，误导自动化）。
+ */
+const scenePolicyDeclaredDegraded = POST_ONLY_ASSEMBLY && scenePolicyReport !== null && !scenePolicyReport.passed;
+/**
+ * 分流结论留痕（T-2026-0930-0015）：`--route` / `--route-kind` 的结论与来源写进阶段账本，
+ * 交付清单同样带 `route` 字段——审计能回答"这条片子当时按哪条管线做的、商品锚点是什么"。
  */
 record({
   stage: "route", shotId: null, invoked: true, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
@@ -1273,13 +1323,34 @@ record({
   verdict: null, note: `视频类型：${ROUTE_PREFLIGHT.kind}（${ROUTE_PREFLIGHT.source}）`
 });
 record({ stage: "scene-policy-audit", shotId: null, invoked: true, ok: scenePolicyReport?.passed ?? true,
-  cached: false, degraded: false, attempt: 1, ms: 0, artifact: SCENE_POLICY_REPORT_FILE,
+  cached: false, degraded: scenePolicyDeclaredDegraded, attempt: 1, ms: 0, artifact: SCENE_POLICY_REPORT_FILE,
   evidence: { policy: scenePolicy?.id ?? null, version: scenePolicy?.version ?? null,
     sourceSha256: scenePolicy?.sourceSha256 ?? null, selection: scenePolicySelection.reason,
-    defects: scenePolicyReport?.defects ?? [], ratios: scenePolicyReport?.ratios ?? null }, verdict: null });
+    defects: scenePolicyReport?.defects ?? [], ratios: scenePolicyReport?.ratios ?? null,
+    ...(scenePolicyDeclaredDegraded ? { assemblyMode: "post-only" } : {}) }, verdict: null });
 if (scenePolicyReport && !scenePolicyReport.passed) {
-  log(`⛔ ${scenePolicy.title} 生成前门禁未通过（${scenePolicyReport.defects.length} 项）：${scenePolicyReport.defects.map((item) => `${item.shotId ?? "全片"}[${item.rule}] ${item.detail}`).join("；")}`);
-  process.exit(7);
+  /**
+   * post-only 组装（T-2026-0929-0012）：片型门是**生成前**门（管"别拍跑偏的片子"），
+   * 而本模式不生成任何新镜头、只是把已有成品片段走完整后期链——因此降级为**告警 + 门记录**，
+   * 不阻断；真正的把关点在 cover/deliver（平台规范、差异实测）与人工验收。
+   */
+  const defects = scenePolicyReport.defects.map((item) => `${item.shotId ?? "全片"}[${item.rule}] ${item.detail}`);
+  if (POST_ONLY_ASSEMBLY) {
+    log(`⚠ ${scenePolicy.title} 生成前门禁未通过（${scenePolicyReport.defects.length} 项），但本片为 post-only 组装（不生成新镜头）→ 记为 degraded，不阻断`);
+    for (const defect of defects.slice(0, 6)) log(`   · ${defect}`);
+    recordGate({
+      stepKey: "g-post-only-assembly",
+      sourceStage: "scene-policy",
+      checks: [{ id: "scene-policy-degraded", pass: true, hard: false, detail: `片型门 ${scenePolicy.id} 未通过 ${scenePolicyReport.defects.length} 项：${defects.slice(0, 6).join("；")}` }],
+      shotIds: sourceDocument.shots.map((shot) => String(shot.shotId)),
+      degraded: true,
+      reason: `post-only 组装：片型生成前门降级（${scenePolicyReport.defects.length} 项）`,
+      evidence: { assemblyMode: "post-only", policy: scenePolicy.id, defects: scenePolicyReport.defects, ratios: scenePolicyReport.ratios }
+    });
+  } else {
+    log(`⛔ ${scenePolicy.title} 生成前门禁未通过（${scenePolicyReport.defects.length} 项）：${defects.join("；")}`);
+    process.exit(7);
+  }
 }
 const shotsSelected = ONLY.length > 0 ? shotlist.shots.filter((s) => ONLY.includes(s.shotId)) : shotlist.shots;
 if (!Array.isArray(shotsSelected) || shotsSelected.length === 0) throw new Error("shotlist 里没有镜头");
@@ -1530,8 +1601,345 @@ const CUT_GRID: number[] = (() => {
  * 相关环节按"生成镜/素材镜"分流，否则 G7 会因为"素材镜没有文生关键帧"而误判缺件。
  */
 const isMaterialShot = (shot: ShotCard): boolean => String((shot as Record<string, unknown>).photo ?? "").trim().length > 0;
-const generatedShots = (): ShotCard[] => shots.filter((shot) => !isMaterialShot(shot));
+/**
+ * **授权真人素材镜**（T-2026-0929-0003，真机探针 2026-09-29）：
+ * 镜头卡给出 `assetRef: "asset://<asset ID>"` 时，主角是**火山方舟「私域真人人像库」里已认证的真人**。
+ *   · Seedream 图片接口**不接受** `asset://`（真机 400 `invalid url specified`）→ 跳过文生关键帧；
+ *   · Seedance 视频接口**接受** `asset://` 作参考图（真机 200 受理并出片，口型/台词可用）→ 以参考图出片，
+ *     **不传首帧**（首帧会给一张 AI 生成的脸，顶掉真人身份）；
+ *   · 授权有效性属平台侧事实：本工具只校验引用格式并如实标记
+ *     `external-asset-id-not-provider-verified`，不把"格式合法"当"授权有效"。
+ */
+const ASSET_REF_PATTERN = /^asset:\/\/[A-Za-z0-9][A-Za-z0-9_-]*$/;
+/** 注意：**不要**写成 `value is string` 的类型谓词——那会把 `string` 在否定分支收窄成 `never`（TS 实测） */
+const isAssetRefLocal = (value: unknown): boolean => typeof value === "string" && ASSET_REF_PATTERN.test(value.trim());
+const assetRefOf = (shot: ShotCard): string => String((shot as Record<string, unknown>).assetRef ?? "").trim();
+const isAssetShot = (shot: ShotCard): boolean => isAssetRefLocal(assetRefOf(shot));
+/** 送审基准图只投本地文件：asset:// 是平台引用、不是文件路径（真机 ENOENT 事故） */
+const localReviewRefsEarly = (list: string[]): string[] => list.filter((ref) => !isAssetRefLocal(ref) && existsSync(ref));
+const generatedShots = (): ShotCard[] => shots.filter((shot) => !isMaterialShot(shot) && !isAssetShot(shot));
 const materialShots = (): ShotCard[] => shots.filter((shot) => isMaterialShot(shot));
+/** 商品镜：素材镜里由 G-PROD1 绑定真实商品档案的镜头（参考图锁的是**产品外观**，不要求复刻参考构图） */
+const isProductMaterialShot = (shot: ShotCard): boolean => Boolean((shot as Record<string, unknown>).productRef);
+/** 需要提示词文生关键帧/台词的人镜两类：生成镜 + 授权真人素材镜（素材镜另有动效提示词） */
+const promptShots = (): ShotCard[] => shots.filter((shot) => !isMaterialShot(shot));
+const assetShots = (): ShotCard[] => shots.filter((shot) => isAssetShot(shot) && !isMaterialShot(shot));
+/** 开跑前 fail-fast：`assetRef` 存在但格式不合法（例如漏了 `asset://` 前缀）要当场停，不能静默降级成生成镜 */
+for (const shot of shots) {
+  const raw = (shot as Record<string, unknown>).assetRef;
+  if (raw !== undefined && String(raw).trim().length > 0 && !isAssetRefLocal(raw)) {
+    throw new Error(`授权真人素材引用格式非法（${shot.shotId}）：${String(raw).slice(0, 80)}（应为 asset://<asset ID>）`);
+  }
+}
+if (assetShots().length > 0) {
+  log(`授权真人素材镜 ${assetShots().length} 镜：${assetShots().map((s) => `${s.shotId}→${assetRefOf(s)}`).join(" · ")}（外部素材 ID，未向平台核验授权有效性）`);
+}
+
+/**
+ * 提交前硬闸（T-2026-0929-0013，客户口径："问题要在提交提示词之前发现，不要反复重试烧钱"）：
+ * 在**每一次真正花钱的提交之前**，对最终编译出来的提示词做确定性体检；命中红线即拒绝提交（fail-closed），
+ * 并把结论写进门账本（G-PRE1）。同时禁止"同一提示词重试"（指纹相同 = 同一注押两次）。
+ */
+function preflightSubmitGuard(input: { shotId: string; stage: string; prompt: string; fps: number; attempt: number; prevFingerprint: string | null }): void {
+  const text = input.prompt;
+  const issues: string[] = [];
+  const hasScreen = /屏幕|触控|界面/.test(text);
+  const screenOk = /(虚化|不可辨|光晕|过曝成色块|背对|不出现)/.test(text);
+  if (hasScreen && !screenOk) issues.push("屏幕类元素未声明虚化/背对/不入画——模型会把界面渲染成可读文字（真机返修 6 次）");
+  const hasDoc = /身份证|证件|护照|单据|票据/.test(text);
+  const docOk = /(不可辨|背面|无证件文字|无身份证|不出现)/.test(text);
+  if (hasDoc && !docOk) issues.push("证件类道具未声明不可辨认/背面/不入画——会出现可辨字迹与号码（隐私红线，真机返修 5 次）");
+  if (/定住|稳住|定格/.test(text) && /推|拉|移|摇|环绕/.test(text)) issues.push("同一镜同时锁\"定住\"时点与推拉运镜——模型做不到，落幅必漂（真机返修 3 次）");
+  const fpsMatch = text.match(/(\d{2})\s*fps/i);
+  if (fpsMatch && Number(fpsMatch[1]) !== input.fps) issues.push(`提示词写 ${fpsMatch[1]}fps，管线按 ${input.fps}fps 出片`);
+  const fingerprint = createHash("sha256").update(text).digest("hex").slice(0, 12);
+  const identicalRetry = input.prevFingerprint !== null && input.prevFingerprint === fingerprint;
+  if (identicalRetry) issues.push("本次重试的提示词与上一次完全相同（指纹 " + fingerprint + "）——禁止同注押两次");
+  const gate = recordGate({
+    stepKey: "g-pre-submit",
+    sourceStage: input.stage,
+    checks: [
+      { id: "no-text-redline", pass: !issues.some((i) => i.includes("可读文字") || i.includes("可辨字迹")), hard: true, detail: issues.filter((i) => i.includes("可读文字") || i.includes("可辨字迹")).join("；") || "无文字类红线" },
+      { id: "no-timing-conflict", pass: !issues.some((i) => i.includes("落幅必漂")), hard: true, detail: issues.find((i) => i.includes("落幅必漂")) ?? "无时点/运镜冲突" },
+      { id: "no-identical-retry", pass: !identicalRetry, hard: true, detail: identicalRetry ? "同提示词重试被拒" : `提示词指纹 ${fingerprint}（第 ${input.attempt} 次提交）` },
+      { id: "fps-consistent", pass: !issues.some((i) => i.includes("fps")), hard: true, detail: issues.find((i) => i.includes("fps")) ?? "帧率一致" }
+    ],
+    shotIds: [input.shotId],
+    evidence: { stage: input.stage, attempt: input.attempt, promptChars: text.length, fingerprint, issues },
+    reason: issues.length === 0 ? `提交前体检通过（${input.stage}/${input.shotId}，指纹 ${fingerprint}）` : `提交前体检未通过：${issues.join("；")}`
+  });
+  if (!gate.approved) {
+    throw new Error(`PREFLIGHT_BLOCKED（未花钱）：${input.shotId} — ${issues.join("；")}｜修好提示词再提交，不要靠重试`);
+  }
+  if (issues.length === 0) log(`  ✓ 提交前体检（G-PRE1）：${input.shotId} 指纹 ${fingerprint}`);
+}
+
+/* ---------- ⓪-0.3 一次过就绪度门（G-FP1，T-2026-0929-0009：不再盲重试烧额度） ---------- */
+/**
+ * 真机归因：本会话每一次返修都能在卡片里提前看到——让模型"别写屏幕字"、6 秒里锁"2.5s 定住"又要推镜、
+ * 服装锁到面料配饰、一镜塞三个互相打架的诉求。这里在花钱前给出**就绪度 + 改卡建议**，
+ * 并把**最险的镜头排到渲染队列最前面**（canary 先错，只花一镜的钱）。
+ */
+let FIRST_PASS_ORDER: ShotCard[] = shots;
+{
+  const readiness = assessFilmFirstPass(shots as unknown as Array<Record<string, unknown>>, { fps: FPS });
+  const shotIds = shots.map((shot) => String(shot.shotId));
+  const order = readiness.renderOrder;
+  FIRST_PASS_ORDER = order.map((id) => shots.find((shot) => String(shot.shotId) === id)!).filter(Boolean);
+  const gate = recordGate({
+    stepKey: "g-first-pass",
+    sourceStage: "prompt",
+    checks: [
+      {
+        id: "first-pass-ready", pass: readiness.ready, hard: true,
+        detail: readiness.ready
+          ? `${FIRST_PASS_POLICY_VERSION}：${shots.length} 镜无高风险项（就绪度通过；渲染顺序按风险降序：${order.join(" → ")}）`
+          : readiness.blockers.map((entry) => `${entry.shotId}｜${entry.finding.id}｜${entry.finding.detail}｜改卡建议：${entry.finding.suggestion}`).join("；")
+      }
+    ],
+    shotIds,
+    evidence: { policy: FIRST_PASS_POLICY_VERSION, perShot: readiness.perShot, renderOrder: order },
+    reason: readiness.ready ? `${FIRST_PASS_POLICY_VERSION}：就绪` : `存在 ${readiness.blockers.length} 项高风险（花钱前拦住）`
+  });
+  if (!gate.approved) {
+    log(`⛔ 一次过就绪度未通过（未花任何渲染额度）：`);
+    for (const entry of readiness.blockers) log(`   · ${entry.shotId} ${entry.finding.id}：${entry.finding.detail}\n     改卡建议：${entry.finding.suggestion}`);
+    throw new Error(`FIRST_PASS_NOT_READY: ${readiness.blockers.map((entry) => `${entry.shotId}:${entry.finding.id}`).join(",")}`);
+  }
+  log(`一次过就绪度 G-FP1 通过（渲染顺序按风险降序：${order.join(" → ")}）`);
+}
+
+
+/**
+ * 身份锚帧（T-2026-0929-0011）：第一个通过监制的真人镜，取中段帧落盘，
+ * 后续真人镜出片时把它作为**第 4 张参考图**（与同组 3 张素材并列）——
+ * 这样侧脸/背影等非正面构图也能保住本人长相，而不是靠禁止构图来回避。
+ */
+function rememberIdentityAnchor(shot: ShotCard, clip: string): void {
+  if (!isAssetShot(shot) || ceoIdentityAnchorFrame) return;
+  try {
+    if (!existsSync(clip)) return;
+    const dir = join(WORK_DIR, "identity-anchor");
+    mkdirSync(dir, { recursive: true });
+    const out = join(dir, `${PROJECT}-${shot.shotId}.jpg`);
+    const duration = Number(probe(clip).duration ?? 0) || 2;
+    run(FFMPEG, ["-y", "-v", "error", "-ss", (duration * 0.5).toFixed(2), "-i", clip, "-frames:v", "1", "-q:v", "2", out]);
+    if (existsSync(out)) {
+      ceoIdentityAnchorFrame = out;
+      log(`  ⚓ 身份锚帧已登记：${shot.shotId} → ${basename(out)}（后续真人镜将带此帧参考，保长相不靠删构图）`);
+    }
+  } catch (error) {
+    log(`  ⚠ 身份锚帧登记失败（${shot.shotId}）：${error instanceof Error ? error.message.slice(0, 100) : String(error)}`);
+  }
+}
+
+/* ---------- ⓪-0.4 提示词红线门（G-RL1，T-2026-0929-0008：提高一次过率） ---------- */
+/**
+ * 每一次"渲完才发现"的返修，都对应一条可以提前写死在卡片里的红线。这里在**花钱之前**统一清零：
+ * 屏幕文字/图标/LOGO、证件字迹与号码、卡片类道具重复、timeline 定住而运镜没定住、卡片与管线帧率不一致。
+ * hard 项不清零就 fail-closed；soft 项进证据与日志（不阻断，但必须被看见）。
+ */
+{
+  const redlines = auditFilmRedlines(shots as unknown as Array<Record<string, unknown>>, { fps: FPS });
+  const shotIds = shots.map((shot) => String(shot.shotId));
+  const redlineGate = recordGate({
+    stepKey: "g-prompt-redlines",
+    sourceStage: "prompt",
+    checks: [
+      {
+        id: "redlines-clear", pass: redlines.hard.length === 0, hard: true,
+        detail: redlines.hard.length === 0
+          ? `${PROMPT_REDLINE_POLICY_VERSION}：${shots.length} 镜红线清零（soft ${redlines.soft.length} 项已记录）`
+          : redlines.hard.map((issue) => `${issue.id}｜${issue.detail}｜为什么：${issue.why}`).join("；")
+      },
+      ...(redlines.soft.length > 0
+        ? [{ id: "redlines-soft", pass: true, hard: false, detail: redlines.soft.map((issue) => `${issue.id}｜${issue.detail}`).join("；") }]
+        : [])
+    ],
+    shotIds,
+    evidence: { policy: PROMPT_REDLINE_POLICY_VERSION, perShot: redlines.perShot, soft: redlines.soft },
+    reason: redlines.hard.length === 0
+      ? `提示词红线 ${PROMPT_REDLINE_POLICY_VERSION}：hard 0 · soft ${redlines.soft.length}`
+      : `提示词红线未清零（${redlines.hard.length} 项 hard）`
+  });
+  if (!redlineGate.approved) {
+    throw new Error(`提示词红线未清零（花钱前拦住）：${redlines.hard.map((issue) => `[${issue.id}] ${issue.detail}`).join("；")}`);
+  }
+  for (const issue of redlines.soft.slice(0, 6)) log(`⚠ 提示词红线（软）${issue.id}：${issue.detail}`);
+}
+
+/* ---------- ⓪-0.5 认证真人素材一致性门（T-2026-0929-0007，事故机制化） ---------- */
+/**
+ * 事故复盘（2026-09-29）：客户给了平台已认证的真人素材 ID，但系统只校验"引用能不能提交"，
+ * 没有任何地方记录"这位真人是谁"；镜头卡文案写男性 → 模型跟文案 → 6 镜渲成男性全部被拒收。
+ * 本门把人物属性变成硬闸：
+ *   ① 每个 `asset://` 必须有**真人主档**（bundles/ai-video/library/real-person-assets/<assetId>/profile.json）；
+ *   ② 主档必须 real-authorized 且在有效期内，性别等关键属性不许为空（缺了先问客户，禁止先生成）；
+ *   ③ 镜头卡文本与主档属性**逐项一致**（性别/年龄段/assetRef），冲突即 fail-closed；
+ *   ④ 多镜真人片**先渲 1 镜 canary 并通过身份比对**，再渲其余镜头（见 videos 阶段的 canary 判据）。
+ */
+const REAL_PERSON_LIBRARY = resolve(arg("--real-person-library", join(REPO_ROOT, "bundles/ai-video/library/real-person-assets")));
+const realPersonLibrary = loadRealPersonAssets(REAL_PERSON_LIBRARY);
+const realPersonChecks: GateCheck[] = [];
+const identityAnchors = new Map<string, string>();   // shotId → 认证基准照（本地文件，仅用于像不像比对）
+/** 首镜放行后抽出的"身份锚帧"：后续真人镜带上它一起出片（保长相，同时允许侧脸/背影构图） */
+let ceoIdentityAnchorFrame: string | null = null;
+const realPersonByShot = new Map<string, { assetId: string; displayName: string; scopeText: string }>();
+for (const shot of assetShots()) {
+  const id = assetIdOf(assetRefOf(shot));
+  const entry = realPersonLibrary.byAssetId.get(id);
+  if (!entry) {
+    throw new Error(`镜头 ${shot.shotId} 使用认证真人素材 ${id}，但真人主档库里没有该素材（${REAL_PERSON_LIBRARY}）→ 先建主档（性别/年龄段/授权/证据），禁止临时编人物属性`);
+  }
+  const hard = entry.issues.filter((issue) => issue.hard);
+  if (hard.length > 0) {
+    throw new Error(`认证真人主档 ${id} 不可用：${hard.map((issue) => `[${issue.code}] ${issue.detail}`).join("；")}`
+      + `（缺关键属性时**先向客户确认**，不允许先拍后猜）`);
+  }
+  const conflicts = assertShotMatchesCertifiedAsset(shot as unknown as Record<string, unknown>, entry.asset);
+  const hardConflicts = conflicts.filter((issue) => issue.hard);
+  if (hardConflicts.length > 0) {
+    throw new Error(`认证真人一致性门未通过（${REAL_PERSON_POLICY_VERSION}）：${hardConflicts.map((issue) => `[${issue.code}] ${issue.detail}`).join("；")}`);
+  }
+  realPersonChecks.push({
+    id: `certified-consistent:${shot.shotId}`, pass: true, hard: true,
+    detail: `${shot.shotId} 与主档一致（${entry.asset.displayName}｜${entry.asset.certified.gender}｜${entry.asset.certified.ageBand ?? "年龄段未声明"}）`
+  });
+  realPersonByShot.set(String(shot.shotId), { assetId: id, displayName: entry.asset.displayName, scopeText: identityReviewContext(entry.asset).discipline as string });
+  const anchor = identityAnchorPath(entry.asset, entry.dir);
+  if (anchor) identityAnchors.set(String(shot.shotId), anchor);
+}
+if (realPersonChecks.length > 0) {
+  const realPersonGate = recordGate({
+    stepKey: "g-real-person",
+    sourceStage: "portrait",
+    checks: [
+      ...realPersonChecks,
+      {
+        id: "canary-policy", pass: true, hard: true,
+        detail: `多镜真人片先出 canary：本片 ${realPersonChecks.length} 镜用认证真人素材，第 1 镜通过身份比对后才继续其余镜头`
+      }
+    ],
+    shotIds: [...realPersonByShot.keys()],
+    evidence: {
+      library: REAL_PERSON_LIBRARY,
+      policy: REAL_PERSON_POLICY_VERSION,
+      usage: assetShots().map((shot) => realPersonUsageReceipt({ asset: realPersonLibrary.byAssetId.get(assetIdOf(assetRefOf(shot)))!.asset, projectId: PROJECT, shots: [String(shot.shotId)] }))
+    },
+    reason: `认证真人一致性门通过：${realPersonChecks.length} 镜与平台认证主档属性一致（资产 ID 与授权证据已留痕）`
+  });
+  if (!realPersonGate.approved) throw new Error(`认证真人门未通过：${realPersonGate.reason}`);
+  log(`认证真人素材门 G-RP1 通过：${realPersonChecks.length} 镜（主档 ${REAL_PERSON_LIBRARY}）`);
+}
+
+/* ---------- ⓪-0 真实商品档案绑定（T-2026-0929-0004） ---------- */
+/**
+ * 产品口径（产品所有者 2026-09-29）：涉及**具体公司名或品牌名**的片子，默认必须用该公司/品牌的**真实产品**。
+ *   · 系统里有档案（`bundles/ai-video/library/products/*`）就用它：客户上传的档案优先于系统检索生成的档案；
+ *   · 没有档案 → **fail-closed**：先跑 `scripts/tools/product-archive.mts search|build` 建档，不拿 AI 编产品；
+ *   · 绑定后该镜自动成为**素材镜**（真实产品照片只作生成输入，materialUsage=generation-reference），
+ *     并把"外观以参考照片为准、不得改结构/标识"写进道具口径——由 material-gen 阶段按 G-MAT1 把关。
+ */
+const PRODUCT_LIBRARY = resolve(arg("--product-library", join(REPO_ROOT, "bundles/ai-video/library/products")));
+const productLibrary = loadProductArchives(PRODUCT_LIBRARY, {
+  probeImage: (file: string) => {
+    try {
+      const info = probe(file);
+      const width = Number(info.width ?? 0);
+      const height = Number(info.height ?? 0);
+      return width > 0 && height > 0 ? { width, height } : null;
+    } catch { return null; }
+  }
+});
+const productSelectorOf = (shot: ShotCard): string => String((shot as Record<string, unknown>).product ?? "").trim();
+const declaredProducts = Array.isArray((shotlist as Record<string, unknown>).products) ? ((shotlist as Record<string, unknown>).products as unknown[]).map((item) => String(item).trim()).filter(Boolean) : [];
+const declaredCompany = String((shotlist as Record<string, unknown>).company ?? "").trim();
+const declaredBrand = String((shotlist as Record<string, unknown>).brand ?? "").trim();
+const productBindingGuide = `请先建档：tsx scripts/tools/product-archive.mts search --name "<公司/品牌>"（系统检索，priority=1）`
+  + `，或由客户提供照片后 tsx scripts/tools/product-archive.mts build --name "<商品名>" --photo <图…> --company "<公司>"（priority=10）`;
+/**
+ * 档案库整体只做**告警**：一个多商品方案库里难免有"只有参数、没有产品图"的成员（例如同页多型号）。
+ * 真正 fail-closed 的时机是**本片引用它**的时候（下面解析不到可用档案即报错），而不是别人家的档案不完整就拦住本片。
+ */
+const brokenArchives = productLibrary.archives.filter((entry) => entry.issues.some((issue) => issue.hard));
+if (brokenArchives.length > 0) {
+  log(`⚠ 商品档案库有 ${brokenArchives.length} 份档案存在硬问题（本片未引用则不拦截）：`
+    + brokenArchives.map((entry) => `${entry.archive.id}[${entry.issues.filter((issue) => issue.hard).map((issue) => issue.code).join(",")}]`).join("、"));
+}
+if (declaredCompany || declaredBrand) {
+  const ownerSelector = declaredCompany || declaredBrand;
+  const ownerMatch = selectProductArchive(productLibrary.archives, ownerSelector);
+  if (!ownerMatch.archive) {
+    throw new Error(`本片声明了公司/品牌「${ownerSelector}」，但商品档案库里没有对应档案（${ownerMatch.reason}）。`
+      + `涉及具体公司/品牌的片子必须使用真实产品：${productBindingGuide}`);
+  }
+}
+const productBindings: Array<{ shotId: string; selector: string; archiveId: string; sourceKind: string; priority: number; matchedBy: string; photoFile: string; photoSha256: string; bound: boolean }> = [];
+for (const selector of declaredProducts) {
+  if (!selectProductArchive(productLibrary.archives, selector).archive) {
+    throw new Error(`shotlist.products 声明的商品「${selector}」没有可用档案：${productBindingGuide}`);
+  }
+}
+for (const shot of shots) {
+  const selector = productSelectorOf(shot);
+  if (!selector) continue;
+  const match = selectProductArchive(productLibrary.archives, selector);
+  if (!match.archive || !match.dir) {
+    throw new Error(`镜头 ${shot.shotId} 声明了商品「${selector}」，但没有可用的真实商品档案（${match.reason}）。${productBindingGuide}`);
+  }
+  const entry = productLibrary.byId.get(match.archive.id)!;
+  const hero = productHeroPhoto(match.archive);
+  if (!hero) throw new Error(`镜头 ${shot.shotId} 绑定的商品档案 ${match.archive.id} 没有主图（role=hero）`);
+  const card = shot as Record<string, unknown>;
+  const existingPhoto = String(card.photo ?? "").trim();
+  const photoAbs = productPhotoPath(entry, hero);
+  const bound = !existingPhoto;
+  if (bound) {
+    card.photo = photoAbs;
+    card.materialUsage = "generation-reference";
+    card.focus = { x: 0.5, y: 0.5 };
+  }
+  card.productRef = {
+    id: match.archive.id,
+    sourceKind: match.archive.source.kind,
+    priority: match.archive.source.priority,
+    matchedBy: match.matchedBy,
+    photo: hero.file,
+    photoSha256: hero.sha256,
+    reviewStatus: match.archive.source.reviewStatus ?? null,
+    bound
+  };
+  card.props = [String(card.props ?? "").trim(), productArchivePromptLines(match.archive).join("｜")].filter(Boolean).join("｜");
+  productBindings.push({
+    shotId: String(shot.shotId), selector, archiveId: match.archive.id, sourceKind: match.archive.source.kind,
+    priority: match.archive.source.priority, matchedBy: String(match.matchedBy), photoFile: photoAbs, photoSha256: hero.sha256, bound
+  });
+  log(`真实商品绑定 ${shot.shotId} ← ${match.archive.id}（${match.archive.source.kind}，priority=${match.archive.source.priority}）主图 ${hero.file}`);
+}
+if (productBindings.length > 0) {
+  const systemGenerated = productBindings.filter((entry) => entry.sourceKind === "system-generated");
+  const productGate = recordGate({
+    stepKey: "g-product-ref",
+    sourceStage: "product",
+    checks: [
+      { id: "product-archive-present", pass: productBindings.length > 0, hard: true, detail: `${productBindings.length} 镜绑定真实商品档案（库 ${PRODUCT_LIBRARY}）` },
+      { id: "product-photo-verified", pass: productBindings.every((entry) => existsSync(entry.photoFile)), hard: true, detail: productBindings.map((entry) => `${entry.shotId}→${basename(entry.photoFile)}`).join("、") },
+      {
+        id: "product-source-priority", pass: true, hard: true,
+        detail: systemGenerated.length > 0
+          ? `${systemGenerated.length} 镜用的是**系统检索生成**的商品档案（priority=1，带检索证据与免责声明，未经客户确认）；客户上传档案（priority=10）可随时替换`
+          : `全部使用客户上传的商品档案（priority=10）`
+      },
+      { id: "product-binding", pass: productBindings.every((entry) => entry.bound), hard: false, detail: productBindings.map((entry) => `${entry.shotId}:${entry.bound ? "已自动绑定主图" : "沿用镜头卡自带素材"}`).join("、") }
+    ],
+    shotIds: productBindings.map((entry) => entry.shotId),
+    evidence: { library: PRODUCT_LIBRARY, bindings: productBindings, declaredProducts, company: declaredCompany || null, brand: declaredBrand || null },
+    reason: `真实商品档案绑定 ${productBindings.length} 镜（客户上传优先，系统检索次之）`
+  });
+  if (!productGate.approved) throw new Error(`真实商品档案门未通过：${productGate.reason}`);
+} else if (declaredCompany || declaredBrand || declaredProducts.length > 0) {
+  log(`ℹ️ 本片声明了公司/品牌（${declaredCompany || declaredBrand}）但没有任何镜头绑定商品（shot.product 未声明）：未做真实商品绑定`);
+}
 /**
  * 素材用途**在开跑前先验一遍**（fail-fast）：缺声明/写成静态直出用途时当场停，
  * 不等到出片阶段才发现"这一镜本来就不该这么做"。错误信息里带规则原文。
@@ -1592,11 +2000,19 @@ function loadCharacterRoot(root: string, library: Map<string, CharacterEntryLike
       identity?: Record<string, unknown>;
       appearance?: Record<string, unknown>;
       wardrobe?: Array<Record<string, unknown>>;
-      portraitSets?: Array<{ dir: string; angles: string[]; active?: boolean; version: number }>;
+      portraitSets?: Array<{ dir: string; angles: string[]; active?: boolean; version: number; assets?: Record<string, string> }>;
     };
     const sets = profile.portraitSets ?? [];
     const active = sets.find((s) => s.active) ?? sets[sets.length - 1];
     const files: Record<string, string> = {};
+    /**
+     * 授权真人素材（T-2026-0929-0003）：档案里可以只给平台素材引用（`assets` 映射），
+     * 没有本地定妆照文件。此时角度 → `asset://<asset ID>`，由 Seedance 作参考图承担人物身份；
+     * 与本地文件角度可混用（本地文件优先）。
+     */
+    for (const [angle, ref] of Object.entries(active?.assets ?? {})) {
+      if (isAssetRefLocal(ref)) files[angle] = ref.trim();
+    }
     if (active) {
       const setDir = join(dir, active.dir);
       if (existsSync(setDir)) {
@@ -1673,10 +2089,16 @@ if (lead && characterRegistry.defaultModel && lead.id === characterRegistry.defa
 if (!DRY_RUN) {
   const requiredAngles = ["front", "threeQuarter", "closeup", "side"];
   const published = lead ? requiredAngles.map((angle) => ({ angle, path: lead.files[angle] ?? "" })) : [];
-  const missing = published.filter((f) => !f.path || !existsSync(f.path));
+  /**
+   * 授权真人素材引用（`asset://<asset ID>`）**不是本地文件**：没有文件、没有字节数可量。
+   * 判据改为"引用格式合法即算在场"，并在 checks 里单列一条如实说明
+   * `external-asset-id-not-provider-verified`（本工具不向平台核验授权有效性）。
+   */
+  const missing = published.filter((f) => !f.path || (!isAssetRefLocal(f.path) && !existsSync(f.path)));
   /** 安全取字节数：缺失/空路径返回 0（真机 2026-09-24：空路径直接 statSync 抛 ENOENT 把整个运行打断） */
   const sizeOf = (path: string): number => (path && existsSync(path) ? statSync(path).size : 0);
-  const tiny = published.filter((f) => sizeOf(f.path) > 0 && sizeOf(f.path) < 50_000);
+  const tiny = published.filter((f) => !isAssetRefLocal(f.path) && sizeOf(f.path) > 0 && sizeOf(f.path) < 50_000);
+  const externalRefs = published.filter((f) => isAssetRefLocal(f.path)).map((f) => `${f.angle}=${f.path}`);
   /**
    * 定妆照监制记录：**优先读角色目录的门账本 `gates.jsonl`**（`g5-portrait-confirm`，
    * 由 `portrait-agent review` 落账，2026-09-24 起）；没有门记录时回退到 `reviews/*.json`。
@@ -1732,9 +2154,16 @@ if (!DRY_RUN) {
         {
           id: "file-size", pass: tiny.length === 0, hard: true,
           detail: tiny.length === 0
-            ? `四角度均 >50KB（${published.map((f) => `${f.angle}=${(sizeOf(f.path) / 1024).toFixed(0)}KB`).join(" ")}）`
+            ? `四角度均 >50KB 或为授权素材引用（${published.map((f) => `${f.angle}=${isAssetRefLocal(f.path) ? "asset://" : `${(sizeOf(f.path) / 1024).toFixed(0)}KB`}`).join(" ")}）`
             : `以下角度文件过小（疑似占位图）：${tiny.map((f) => f.angle).join("/")}`
         },
+        ...(externalRefs.length > 0
+          ? [{
+              id: "external-asset-ref", pass: true, hard: true,
+              detail: `授权真人素材引用 ${externalRefs.length} 个角度（${externalRefs.join("、")}）——`
+                + "外部素材 ID：本工具只校验引用格式，未向平台核验授权有效期与归属（external-asset-id-not-provider-verified）"
+            }]
+          : []),
         {
           /** 附加信息（不参与硬闸）：档案里一共有多少角度可用——只有 4 个必需角度时也能拍，但选择面更窄 */
           id: "archive-angles", pass: Object.keys(lead.files).length >= 4, hard: false,
@@ -1758,8 +2187,13 @@ if (!DRY_RUN) {
     /**
      * 没有定妆照监制记录时**不冒充实质评审**：确定性闸照跑，但 degraded 置位，
      * 让审计一眼看到"这个门这次只做了资产校验"。
+     *
+     * 例外（T-2026-0929-0003）：**全角度为平台授权真人素材引用**（asset://）时，
+     * 人物同一性由平台在「私域真人人像库」建档时做了一致性校验与授权，本地没有图片可评——
+     * 此时"external-asset-ref"判据就是这道门的实质判据，不再因"没有本地监制记录"降级；
+     * 授权有效期与归属仍如实标注为未由本工具核验（external-asset-id-not-provider-verified）。
      */
-    degraded: Boolean(lead) && portraitDecision.kind === "none",
+    degraded: Boolean(lead) && portraitDecision.kind === "none" && externalRefs.length === 0,
     evidence: {
       character: lead ? { id: lead.id, name: lead.name, angles: Object.keys(lead.files) } : null,
       reviewFile,
@@ -1785,6 +2219,8 @@ if (!DRY_RUN) {
 /* ================= 关键帧 / 视频 出图出片 ================= */
 
 function dataUrl(file: string): string {
+  /** 方舟授权真人素材（`asset://<asset ID>`）不是本地文件：**原样透传**给平台，不能 base64 编码 */
+  if (isAssetRefLocal(file)) return file;
   const ext = file.toLowerCase().endsWith(".png") ? "png" : file.toLowerCase().endsWith(".webp") ? "webp" : "jpeg";
   return `data:image/${ext};base64,${readFileSync(file).toString("base64")}`;
 }
@@ -2165,7 +2601,13 @@ function cineKbConsumption(shot: ShotCard, trace: Record<string, unknown>, polic
   }
 }
 
-const micromotionTraces = new Map<ShotCard, MicromotionTrace>();
+/**
+ * 微动作证据按**镜号**索引，而不是按对象引用：
+ * 片型后置复核（`scene-policy-postplan`）会对当前镜头卡重新执行 `applyScenePolicy`，
+ * 每次都会返回**新对象**（内容同构）。真机 2026-09-29：对象引用做键 → 后置复核之后
+ * G7 的 `micromotion-applied` 判据全部报"缺少当前镜头的微动作证据"，环节被自己的记账方式卡死。
+ */
+const micromotionTraces = new Map<string, MicromotionTrace>();
 
 /* ---------- ⓪ 摄影知识库注入（监制：cine-kb） ---------- */
 /**
@@ -2320,7 +2762,7 @@ if (STAGES.has("micromotion")) {
     const { card, trace } = applyMicromotion(shot as unknown as Record<string, unknown>);
     // Even a reused/N/A result may restore prior owned text. Always consume the returned card.
     shots[index] = card as ShotCard;
-    micromotionTraces.set(shots[index]!, trace);
+    micromotionTraces.set(String(shots[index]!.shotId), trace);
     traces.push(trace);
     perShot.push(micromotionConsumption(shots[index]!, trace));
   }
@@ -2376,10 +2818,27 @@ if (scenePolicy) {
   scenePolicyReport = auditScenePolicy({ ...shotlist, shots: shotlist.shots.map((shot) => current.get(shot.shotId) ?? shot) }, scenePolicy);
   scenePolicyReport.policy.selection = scenePolicySelection.reason;
   writeScenePolicyReport();
+  /**
+   * post-only 组装：片型门是"生成前/生成后"的**创作口径**检查，本模式不生成新镜头，
+   * 该结论只作证据留痕（degraded + assemblyMode=post-only），不阻断后期链与交付。
+   */
+  const postOnlyPostplanDegraded = POST_ONLY_ASSEMBLY && !scenePolicyReport.passed;
   record({ stage: "scene-policy-postplan", shotId: null, invoked: true, ok: scenePolicyReport.passed,
-    cached: false, degraded: false, attempt: 1, ms: 0, artifact: SCENE_POLICY_REPORT_FILE,
-    evidence: { policy: scenePolicy.id, version: scenePolicy.version, defects: scenePolicyReport.defects, ratios: scenePolicyReport.ratios }, verdict: null });
-  if (!scenePolicyReport.passed) throw new Error(`${scenePolicy.title} 后置分镜门禁未过：${scenePolicyReport.defects.map((item) => `${item.shotId ?? "全片"}[${item.rule}] ${item.detail}`).join("；")}`);
+    cached: false, degraded: postOnlyPostplanDegraded, attempt: 1, ms: 0, artifact: SCENE_POLICY_REPORT_FILE,
+    evidence: {
+      policy: scenePolicy.id, version: scenePolicy.version, defects: scenePolicyReport.defects, ratios: scenePolicyReport.ratios,
+      ...(postOnlyPostplanDegraded ? { assemblyMode: "post-only" } : {})
+    }, verdict: null });
+  if (!scenePolicyReport.passed) {
+    const defects = scenePolicyReport.defects.map((item) => `${item.shotId ?? "全片"}[${item.rule}] ${item.detail}`);
+    /** post-only 组装：后置片型门同样是"生成前/生成后"的拍摄质量门，不生成新镜头时降级为告警（G-POST1 已留痕） */
+    if (POST_ONLY_ASSEMBLY) {
+      log(`⚠ ${scenePolicy.title} 后置分镜门禁未过（${defects.length} 项），post-only 组装降级不阻断`);
+      for (const defect of defects.slice(0, 4)) log(`   · ${defect}`);
+    } else {
+      throw new Error(`${scenePolicy.title} 后置分镜门禁未过：${defects.join("；")}`);
+    }
+  }
 }
 
 /** 后续审核与生成共享这份当前镜头快照；每次替换镜头卡后均从 shots 重建视图。 */
@@ -2391,6 +2850,11 @@ if (STAGES.has("spec")) {
   const started = Date.now();
   const checks: Array<{ id: string; pass: boolean; detail: string; hard?: boolean }> = [];
   let rateFail = 0;
+  /** post-only 字段闸用：声明了主角出镜的镜号（`shotlist.character.appearanceInShots`，缺省为空） */
+  const leadAppearanceShotIds = (() => {
+    const raw = (shotlist as unknown as { character?: { appearanceInShots?: unknown } }).character?.appearanceInShots;
+    return new Set<string>(Array.isArray(raw) ? raw.map(String) : []);
+  })();
   for (const shot of shots) {
     /** 素材镜不参与文生提示词融合（它的提示词是"图生视频"的动效提示词，由 material-gen 组装） */
     if (isMaterialShot(shot)) {
@@ -2449,7 +2913,8 @@ if (STAGES.has("spec")) {
     specReports.push({
       shotId: shot.shotId, charCount: finalPrompt.length, promptSource: report.promptSource,
       deliveryPass: report.delivery.pass, issues: report.delivery.issues,
-      missingSpecFields: report.missingSpecFields, redlines: report.redlines, degraded: report.degraded,
+      missingSpecFields: report.missingSpecFields, missingP0Fields: report.missingP0Fields,
+      redlines: report.redlines, degraded: report.degraded,
       sceneSubstituted: report.sceneSubstituted, sceneSubstitution: report.sceneSubstitution,
       languageNormalized: {
         replacements: normalized.replacements, dedupedRefs: normalized.dedupedRefs,
@@ -2474,23 +2939,56 @@ if (STAGES.has("spec")) {
     }
     writeFileSync(join(PROMPT_DIR, `${shot.shotId}.txt`), `${finalPrompt}\n`, "utf8");
     const promptFile = join(PROMPT_DIR, `${shot.shotId}.txt`);
+    /**
+     * post-only 组装（T-2026-0930-0015）：本片不产出新提示词，"**提示词载体类**检查"（交付闸/字数/
+     * 片型约束/语速/台词窗/朝向互斥）不作出厂否决票——素材已经渲出来了，拿去交付。
+     * 但 **25 字段 P0 规范**照旧是硬闸：真机事故就是组装卡 `character` 没写主角名/ID，
+     * 一路漏到封面才炸（人物卡找不到来源镜）。字段规范与"有没有生成提示词"无关。
+     */
+    const promptCarrierHard = !POST_ONLY_ASSEMBLY;
+    /**
+     * post-only 字段闸（只拦"组装卡该有却没有"的字段）：
+     *   · `scene` / `duration` 是所有镜头的事实必需项；
+     *   · `character` 只在**声明了主角出镜**（`shotlist.character.appearanceInShots` 含本镜，
+     *     或卡里已写了人物描述）时才要求写主角名/ID——商品微距、品牌尾卡本来就没有人物。
+     * 生成片不改口径（本检查记为咨询项，硬闸仍是"交付闸 + 字数 + 片型约束"）。
+     */
+    const postOnlyFieldIssues: string[] = [];
+    if (POST_ONLY_ASSEMBLY) {
+      if (!String(shot.scene ?? "").trim()) postOnlyFieldIssues.push("scene");
+      if (!(Number(shot.duration ?? 0) > 0)) postOnlyFieldIssues.push("duration");
+      const characterText = String(shot.character ?? "");
+      const declaredLead = Boolean(lead) && (leadAppearanceShotIds.has(shot.shotId) || characterText.trim().length > 0);
+      const mentionsLead = Boolean(lead) && (characterText.includes(lead!.name) || characterText.includes(lead!.id));
+      if (declaredLead && !mentionsLead) postOnlyFieldIssues.push(`character（必须写主角名/ID：${lead!.name}（${lead!.id}））`);
+    }
     checks.push({
-      id: `delivery:${shot.shotId}`, pass: report.delivery.pass, hard: true,
+      id: `p0-fields:${shot.shotId}`,
+      pass: POST_ONLY_ASSEMBLY ? postOnlyFieldIssues.length === 0 : report.missingP0Fields.length === 0,
+      hard: POST_ONLY_ASSEMBLY,
+      detail: POST_ONLY_ASSEMBLY
+        ? (postOnlyFieldIssues.length === 0
+          ? "post-only 组装：必需字段齐备（scene/duration/主角 character）"
+          : `post-only 组装：缺 ${postOnlyFieldIssues.join("、")}——先补镜头卡再出片`)
+        : `P0 字段缺失 ${report.missingP0Fields.length} 项（咨询项；生成片以交付闸为准）`
+    });
+    checks.push({
+      id: `delivery:${shot.shotId}`, pass: report.delivery.pass, hard: promptCarrierHard,
       detail: report.delivery.pass ? `交付闸通过（${finalPrompt.length} 字 · ${report.promptSource}）` : `交付闸未过：${report.delivery.issues.join("；")}`
     });
     const primaryPolicyTag = scenePolicy ? shot.policyTags?.find((tag) => scenePolicy.primaryTags.includes(tag)) : undefined;
     const policyPromptPresent = !scenePolicy || (finalPrompt.includes(scenePolicy.prompt.scene)
       && Boolean(primaryPolicyTag && finalPrompt.includes(scenePolicy.prompt.byTag[primaryPolicyTag] ?? "\u0000")));
     checks.push({
-      id: `scene-policy-prompt:${shot.shotId}`, pass: policyPromptPresent, hard: true,
+      id: `scene-policy-prompt:${shot.shotId}`, pass: policyPromptPresent, hard: promptCarrierHard,
       detail: policyPromptPresent ? "片型场景与景别约束已进入最终视频提示词" : "最终视频提示词缺片型场景或景别约束，禁止生成"
     });
     checks.push({
-      id: `char-count:${shot.shotId}`, pass: finalPrompt.length >= 1200, hard: true,
+      id: `char-count:${shot.shotId}`, pass: finalPrompt.length >= 1200, hard: promptCarrierHard,
       detail: `提示词 ${finalPrompt.length} 字（交付口径 ≥1200）`
     });
     checks.push({
-      id: `speech-rate:${shot.shotId}`, pass: rate <= 3.6, hard: true,
+      id: `speech-rate:${shot.shotId}`, pass: rate <= 3.6, hard: promptCarrierHard,
       detail: `台词 ${chars} 字 / ${duration}s = ${rate.toFixed(2)} 字每秒（上限 3.6）`
     });
     /**
@@ -2501,7 +2999,7 @@ if (STAGES.has("spec")) {
       .filter((item, index, list) => list.findIndex((other) => other[0] === item[0]) === index);
     const windowOverrun = duration > 0 ? dialogueWindows.filter((item) => Number(item[2]) > duration + 1e-9) : [];
     checks.push({
-      id: `dialogue-window:${shot.shotId}`, pass: windowOverrun.length === 0, hard: true,
+      id: `dialogue-window:${shot.shotId}`, pass: windowOverrun.length === 0, hard: promptCarrierHard,
       detail: dialogueWindows.length === 0
         ? "无台词时间窗（无需核验）"
         : windowOverrun.length > 0
@@ -2528,7 +3026,7 @@ if (STAGES.has("spec")) {
     const wantsTurn = /转身|回眸|侧身|侧转|背对|背身|转正脸|转回/.test(actionText);
     const sequenced = /先[^。；]{0,24}(再|随后|然后)|随后|然后|之后|最后|再转身|再转回|停下(后|之后)?|停留一拍|走(三|两)步后/.test(actionRaw);
     checks.push({
-      id: `pose-contradiction:${shot.shotId}`, pass: !(wantsFront && wantsTurn && !sequenced), hard: true,
+      id: `pose-contradiction:${shot.shotId}`, pass: !(wantsFront && wantsTurn && !sequenced), hard: promptCarrierHard,
       detail: wantsFront && wantsTurn && !sequenced
         ? "同一镜同时要求「面向镜头/眼神交流」与「转身/回头/侧身」——动作互斥，模型只能满足一半（真机 SC-02 连续 4 次被打回）。请拆成两镜，或改成「正面站定/正面走近」的重述。"
         : wantsFront && wantsTurn && sequenced
@@ -2575,11 +3073,16 @@ if (STAGES.has("spec")) {
     motionBudgetNotes.push({ shotId: shot.shotId, beats, advice: beats > 8 ? "节拍偏多（建议 ≤8），可合并同拍的连续位移" : "节拍在预算内" });
     if (rate > 3.6) rateFail += 1;
     record({
-      stage: "spec", shotId: shot.shotId, invoked: true, ok: report.delivery.pass && report.charCount >= 1200 && policyPromptPresent,
+      stage: "spec", shotId: shot.shotId, invoked: true,
+      /** post-only 组装：以 25 字段 P0 规范为准（不产出提示词）；生成片：沿用"交付闸 + 字数 + 片型约束"口径 */
+      ok: POST_ONLY_ASSEMBLY
+        ? postOnlyFieldIssues.length === 0
+        : report.delivery.pass && report.charCount >= 1200 && policyPromptPresent,
       cached: false, degraded: report.degraded, attempt: 1, ms: Date.now() - started,
       artifact: promptFile,
       evidence: {
         charCount: report.charCount, promptSource: report.promptSource, missing: report.missingSpecFields,
+        missingP0: report.missingP0Fields, postOnlyFieldGate: POST_ONLY_ASSEMBLY,
         sceneSubstituted: report.sceneSubstituted, sceneSubstitution: report.sceneSubstitution
       },
       verdict: null
@@ -2629,11 +3132,11 @@ if (STAGES.has("spec")) {
     artifacts: [
       { path: join(PROMPT_DIR, "spec-report.json"), kind: "json" },
       /** 只送**生成镜**的提示词；真实素材段没有提示词文件（硬塞路径会让监制读到空文件） */
-      ...generatedShots().map((s) => ({ path: join(PROMPT_DIR, `${s.shotId}.txt`), kind: "text" as const }))
+      ...promptShots().map((s) => ({ path: join(PROMPT_DIR, `${s.shotId}.txt`), kind: "text" as const }))
     ],
     deterministic: checks,
     context: {
-      title: shotlist.title, shots: generatedShots().length, materialShots: materialShots().map((s) => s.shotId), rateFail,
+      title: shotlist.title, shots: promptShots().length, materialShots: materialShots().map((s) => s.shotId), rateFail,
       scenePolicy: scenePolicyReport ? { id: scenePolicy!.id, version: scenePolicy!.version, ratios: scenePolicyReport.ratios,
         exceptionsApplied: scenePolicyReport.exceptionsApplied } : null,
       /** 节拍预算：只报数不拦（监制可据情权衡，不作 PASS/FAIL） */
@@ -2657,7 +3160,7 @@ if (STAGES.has("spec")) {
     // aggregate only after all shot verdicts exist. The global deterministic checks remain on G6.
     const scoped: Array<{ shotId: string; verdict: ProducerVerdict }> = [];
     const allShotIds = shots.map((item) => item.shotId);
-    for (const shot of generatedShots()) {
+    for (const shot of promptShots()) {
       const report = specReports.find((item) => item.shotId === shot.shotId);
       if (!report) throw new Error(`PROMPT_REVIEW_SCOPE_MISSING: ${shot.shotId}`);
       const reportFile = join(PROMPT_DIR, `spec-report-${shot.shotId}.json`);
@@ -2673,7 +3176,7 @@ if (STAGES.has("spec")) {
       });
       scoped.push({ shotId: shot.shotId, verdict: perShot });
     }
-    if (scoped.length !== generatedShots().length) throw new Error("PROMPT_REVIEW_SCOPE_INCOMPLETE");
+    if (scoped.length !== promptShots().length) throw new Error("PROMPT_REVIEW_SCOPE_INCOMPLETE");
     scopedReviewFile = join(PROMPT_DIR, "prompt-review-scoped.json");
     writeFileSync(scopedReviewFile, `${JSON.stringify(scoped, null, 2)}\n`, "utf8");
     const approved = scoped.every((item) => item.verdict.approved);
@@ -2766,6 +3269,20 @@ if (STAGES.has("plates")) {
       continue;
     }
     /**
+     * 授权真人素材镜：Seedream 图片接口不接受 `asset://`（真机 400 invalid url），
+     * 且**关键帧本来就不该有脸**——人物身份由 Seedance 参考图承担（见 videos 阶段）。
+     * 这里如实记录"跳过文生关键帧"，不产出任何 AI 生成的人脸首帧。
+     */
+    if (isAssetShot(shot)) {
+      record({
+        stage: "keyframe", shotId: shot.shotId, invoked: false, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
+        artifact: null,
+        evidence: { assetRef: assetRefOf(shot), skipReason: "授权真人素材镜：人物身份由 Seedance 参考图承担，不产文生关键帧" },
+        verdict: null, note: "授权真人素材镜：跳过文生关键帧（Seedream 不接受 asset://；首帧会顶掉真人身份）"
+      });
+      continue;
+    }
+    /**
      * 关键帧缓存必须过**两道失效判据**（2026-09-26 真机 T-2026-0926-0007）：
      *
      *  1. **提示词指纹**：出图时写 `GR-xx.plate-meta.json`（prompt sha256 + 锚点模式 + 模型）。
@@ -2852,7 +3369,7 @@ if (STAGES.has("plates")) {
             { id: "bytes", pass: Number(info.bytes ?? 0) > 50_000, detail: `文件 ${((Number(info.bytes ?? 0)) / 1024).toFixed(0)}KB`, hard: true },
             { id: "aspect", pass: Math.abs(ratio - expected) < 0.06, detail: `${width}x${height}（期望比例 ${expected.toFixed(3)}，实测 ${ratio.toFixed(3)}）`, hard: true }
           ],
-          referenceImages: portraitRefs.slice(0, 2), context: { shotId: shot.shotId, scene: shot.scene, action: shot.action,
+          referenceImages: localReviewRefsEarly(portraitRefs).slice(0, 2), context: { shotId: shot.shotId, scene: shot.scene, action: shot.action,
             scenePolicy: scenePolicy ? { id: scenePolicy.id, tags: shot.policyTags, speechScene: shot.speechScene } : null }, env: ENV,
           allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
         });
@@ -3362,7 +3879,7 @@ function applyCameraMovePunchCut(input: string, output: string, options: {
 
 if (STAGES.has("material-gen")) {
   const { width: pw, height: ph } = SOURCE_SIZE;
-  for (const shot of materialShots()) {
+  for (const shot of FIRST_PASS_ORDER.filter((item) => isMaterialShot(item))) {
     const shotStarted = Date.now();
     const card = shot as Record<string, unknown>;
     const spec = readMaterialSpec(card);
@@ -3475,6 +3992,7 @@ if (STAGES.has("material-gen")) {
       let accepted = false;
       let usedAttempt = 0;
       let lastVerdict: ProducerVerdict | null = null;
+    let lastPromptFingerprint: string | null = null;
       let lastMotion = { meanEnergy: 0, maxEnergy: 0, rampRatio: 0, frames: 0, peakAtSec: 0 };
       let lastRawMotion = { meanEnergy: 0, maxEnergy: 0, rampRatio: 0, frames: 0, peakAtSec: 0 };
       const motionPolicy = motionPolicyForShot(card);
@@ -3636,27 +4154,49 @@ if (STAGES.has("material-gen")) {
               "无文字与水印：画面内不得出现新增文字、字幕、LOGO、边框、角标",
               ...(scenePolicy ? [scenePolicy.prompt.visualReview] : [])
             ],
-            referenceImages: [prepared],
+            referenceImages: (() => {
+              const refs: string[] = [prepared];
+              const productRef = (shot as Record<string, unknown>).productRef as { id?: string } | undefined;
+              const entry = productRef?.id ? productLibrary.byId.get(String(productRef.id)) : undefined;
+              if (isProductMaterialShot(shot) && entry) {
+                const hero = productHeroPhoto(entry.archive);
+                if (hero) refs.push(productPhotoPath(entry, hero));
+              }
+              return refs;
+            })(),
             deterministic: [
               { id: "duration", pass: Math.abs(Number(lastInfo.duration ?? 0) - duration) <= 0.6, detail: `期望 ${duration}s 实测 ${Number(lastInfo.duration ?? 0).toFixed(2)}s`, hard: true },
               { id: "resolution", pass: Number(lastInfo.width ?? 0) >= 720 && Number(lastInfo.height ?? 0) >= 720, detail: `${lastInfo.width}x${lastInfo.height}`, hard: true },
               { id: "audio-track", pass: Boolean(lastInfo.hasAudio), detail: lastInfo.hasAudio ? `音轨 ${lastInfo.acodec}` : "缺音轨（配音环节会补旁白）", hard: false },
               { id: "generation-provenance", pass: provenance.ok, detail: provenance.detail, hard: true },
-              { id: "not-static-display", pass: lastReuseVerdict.passed, detail: `素材复用度：${lastReuseVerdict.detail}（候选窗口 ${lastReuse.candidates} 个）`, hard: true },
-              {
-                id: "scene-constructed",
-                pass: independenceVerdict.independent,
-                detail: `${independenceVerdict.detail}（候选窗口 ${independence.candidates} 个；口径 ${MATERIAL_SCENE_POLICY_VERSION}）`,
-                hard: true
-              },
+              isProductMaterialShot(shot)
+                /** 商品镜：参考图只锁产品外观，**要求**重建机位 → 用"真实运动"判非静态直出，不用像素复用度 */
+                ? { id: "not-static-display", pass: lastMotionVerdict.rich || Number(lastMotion.meanEnergy ?? 0) >= 2.5, hard: true,
+                    detail: `商品镜非静态直出：运动能量 ${Number(lastMotion.meanEnergy ?? 0).toFixed(2)}/255 · 坡道 ${lastMotion.rampRatio.toFixed(2)}（参考图仅锁产品外观，允许且要求换机位：复用度 ${lastReuseVerdict.detail.slice(0, 80)}）` }
+                : { id: "not-static-display", pass: lastReuseVerdict.passed, detail: `素材复用度：${lastReuseVerdict.detail}（候选窗口 ${lastReuse.candidates} 个）`, hard: true },
+              isProductMaterialShot(shot)
+                /** 商品镜不评"场景构建独立性"（它的参考图是产品白底图，不是场景照片） */
+                ? { id: "product-identity-reviewed", pass: Boolean((shot as Record<string, unknown>).productRef), hard: false,
+                    detail: `商品镜：产品外观由 G-PROD1 绑定的真实商品档案与监制外观比对把关（${String((shot as Record<string, unknown>).productRef && (shot as Record<string, unknown>).productRef === undefined ? "" : "")}参考图不作场景保真基准）` }
+                : {
+                    id: "scene-constructed",
+                    pass: independenceVerdict.independent,
+                    detail: `${independenceVerdict.detail}（候选窗口 ${independence.candidates} 个；口径 ${MATERIAL_SCENE_POLICY_VERSION}）`,
+                    hard: true
+                  },
               {
                 id: "motion-richness",
                 pass: lastMotionVerdict.rich,
                 detail: `原始渲染：${lastMotionVerdict.detail}`,
-                /** 运镜强弱是**创作口径**（渲出来的片段确实在动已在 not-static-display 核过），交给客户验收，不阻断交付 */
+                /**
+                 * 运镜强弱是**创作口径**，不是事实（T-2026-0930-0015 收口，与下方 verifyGate 同口径）：
+                 * 渲出来的片段确实在动（not-static-display 已核），是否"够热闹"交给客户验收。
+                 * 旧口径在这里当硬闸，正是"渲出来→判不合格→再渲"烧钱循环的最后一条残留路径。
+                 */
                 hard: false
               },
-              { id: "speed-ramp", pass: lastRampVerdict.rich, detail: `${lastRampVerdict.detail}（创作口径，不阻断交付）`, hard: false }
+              { id: "speed-ramp", pass: lastRampVerdict.rich, hard: false,
+                detail: `${lastRampVerdict.detail}（创作口径，不阻断交付）` }
             ],
             context: {
               shotId: shot.shotId, scene: shot.scene, motion: spec.motion ?? null,
@@ -3677,7 +4217,10 @@ if (STAGES.has("material-gen")) {
             shotIds: [shot.shotId],
             checks: [
               { id: "generation-provenance", pass: provenance.ok, hard: true, detail: provenance.detail },
-              { id: "not-static-display", pass: lastReuseVerdict.passed, hard: true, detail: lastReuseVerdict.detail },
+              isProductMaterialShot(shot)
+                ? { id: "not-static-display", pass: lastMotionVerdict.rich || Number(lastMotion.meanEnergy ?? 0) >= 2.5, hard: true,
+                    detail: `商品镜非静态直出：运动能量 ${Number(lastMotion.meanEnergy ?? 0).toFixed(2)}/255（参考图仅锁产品外观）` }
+                : { id: "not-static-display", pass: lastReuseVerdict.passed, hard: true, detail: lastReuseVerdict.detail },
               {
                 id: "scene-constructed", pass: independenceVerdict.independent, hard: true,
                 detail: independenceVerdict.detail
@@ -3685,11 +4228,15 @@ if (STAGES.has("material-gen")) {
               {
                 id: "motion-richness",
                 pass: lastMotionVerdict.rich,
-                /** 同上：创作口径，不再当出厂否决票（T-2026-0930-0014） */
+                /**
+                 * 运镜强弱是**创作口径**，不是事实：渲出来的片段确实在动（not-static-display 已核），
+                 * 是否"够热闹"交给客户验收。旧口径把它当硬闸，直接导致"渲出来→判不合格→再渲"的烧钱循环。
+                 */
                 hard: false,
                 detail: lastMotionVerdict.detail
               },
-              { id: "speed-ramp", pass: lastRampVerdict.rich, hard: false, detail: `${lastRampVerdict.detail}（创作口径，不阻断交付）` },
+              { id: "speed-ramp", pass: lastRampVerdict.rich, hard: false,
+                detail: `${lastRampVerdict.detail}（创作口径，不阻断交付）` },
               { id: "fidelity-reviewed", pass: lastVerdict.approved, hard: false, detail: lastVerdict.approved ? "监制保真评审放行" : `监制未放行（${lastVerdict.reason.slice(0, 80)}）` }
             ],
             softApproved: lastVerdict.approved, via: lastVerdict.via, score: lastVerdict.score,
@@ -3729,7 +4276,17 @@ if (STAGES.has("material-gen")) {
           });
         }
       }
-      if (!accepted) log(`  ⚠ ${shot.shotId} 素材镜 ${usedAttempt} 次尝试仍未达标：${lastMotionVerdict.detail}`);
+      if (!accepted) {
+        log(`  ⚠ ${shot.shotId} 素材镜 ${usedAttempt} 次尝试仍未达标：${lastMotionVerdict.detail}`);
+        /**
+         * canary 快速止损（T-2026-0929-0008）：真人镜/商品镜反复不过时，**立刻停**，
+         * 先修卡片再重跑，不要继续把后面的镜头一起渲完（真机教训：6 镜白烧 2 轮）。
+         */
+        if (isProductMaterialShot(shot) || isAssetShot(shot)) {
+          log(`⛔ canary 止损：${shot.shotId}（真人/商品镜）未过 → 停止后续渲染，请先按监制意见修卡片再重跑`);
+          throw new Error(`CANARY_ABORT: ${shot.shotId} 未过监制，已停止后续渲染以节省算力`);
+        }
+      }
     } catch (err) {
       record({
         stage: "material-gen", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt: 1,
@@ -3743,65 +4300,6 @@ if (STAGES.has("material-gen")) {
 
 
 /* ---------- ③ 逐镜视频（监制：shot） ---------- */
-/* ---------- 提示词红线门（G-RL1，T-2026-0929-0008）：花钱前清零屏幕文字/证件文字/道具重复/落幅/帧率 ---------- */
-if (["videos", "material-gen"].some((stage) => STAGES.has(stage))) {
-  const redlines = auditFilmRedlines(shots as unknown as Array<Record<string, unknown>>, { fps: FPS });
-  const checks = [
-    {
-      id: "redlines-clear", pass: redlines.hard.length === 0, hard: true,
-      detail: redlines.hard.length === 0
-        ? `${PROMPT_REDLINE_POLICY_VERSION}：${shots.length} 镜红线清零（soft ${redlines.soft.length} 项已记录）`
-        : redlines.hard.map((issue) => `${issue.id}｜${issue.detail}｜为什么：${issue.why}`).join("；")
-    },
-    ...(redlines.soft.length > 0 ? [{ id: "redlines-soft", pass: true, hard: false, detail: redlines.soft.map((i) => `${i.id}｜${i.detail}`).join("；") }] : [])
-  ];
-  const gate = recordGate({ stepKey: "g-prompt-redlines", sourceStage: "prompt", checks,
-    shotIds: shots.map((shot) => String(shot.shotId)),
-    evidence: { policy: PROMPT_REDLINE_POLICY_VERSION, perShot: redlines.perShot },
-    reason: redlines.hard.length === 0 ? `提示词红线 hard 0 · soft ${redlines.soft.length}` : `提示词红线未清零（${redlines.hard.length} 项 hard）` });
-  if (!gate.approved) throw new Error(`提示词红线未清零（花钱前拦住）：${redlines.hard.map((i) => `[${i.id}] ${i.detail}`).join("；")}`);
-  for (const issue of redlines.soft.slice(0, 6)) log(`⚠ 提示词红线（软）${issue.id}：${issue.detail}`);
-}
-
-/**
- * 提交前硬闸（T-2026-0929-0013，客户口径："问题要在提交提示词之前发现，不要反复重试烧钱"）：
- * 在**每一次真正花钱的提交之前**，对最终编译出来的提示词做确定性体检；命中红线即拒绝提交（fail-closed），
- * 并把结论写进门账本（G-PRE1）。同时禁止"同一提示词重试"（指纹相同 = 同一注押两次）。
- */
-function preflightSubmitGuard(input: { shotId: string; stage: string; prompt: string; fps: number; attempt: number; prevFingerprint: string | null }): void {
-  const text = input.prompt;
-  const issues: string[] = [];
-  const hasScreen = /屏幕|触控|界面/.test(text);
-  const screenOk = /(虚化|不可辨|光晕|过曝成色块|背对|不出现)/.test(text);
-  if (hasScreen && !screenOk) issues.push("屏幕类元素未声明虚化/背对/不入画——模型会把界面渲染成可读文字（真机返修 6 次）");
-  const hasDoc = /身份证|证件|护照|单据|票据/.test(text);
-  const docOk = /(不可辨|背面|无证件文字|无身份证|不出现)/.test(text);
-  if (hasDoc && !docOk) issues.push("证件类道具未声明不可辨认/背面/不入画——会出现可辨字迹与号码（隐私红线，真机返修 5 次）");
-  if (/定住|稳住|定格/.test(text) && /推|拉|移|摇|环绕/.test(text)) issues.push("同一镜同时锁\"定住\"时点与推拉运镜——模型做不到，落幅必漂（真机返修 3 次）");
-  const fpsMatch = text.match(/(\d{2})\s*fps/i);
-  if (fpsMatch && Number(fpsMatch[1]) !== input.fps) issues.push(`提示词写 ${fpsMatch[1]}fps，管线按 ${input.fps}fps 出片`);
-  const fingerprint = createHash("sha256").update(text).digest("hex").slice(0, 12);
-  const identicalRetry = input.prevFingerprint !== null && input.prevFingerprint === fingerprint;
-  if (identicalRetry) issues.push("本次重试的提示词与上一次完全相同（指纹 " + fingerprint + "）——禁止同注押两次");
-  const gate = recordGate({
-    stepKey: "g-pre-submit",
-    sourceStage: input.stage,
-    checks: [
-      { id: "no-text-redline", pass: !issues.some((i) => i.includes("可读文字") || i.includes("可辨字迹")), hard: true, detail: issues.filter((i) => i.includes("可读文字") || i.includes("可辨字迹")).join("；") || "无文字类红线" },
-      { id: "no-timing-conflict", pass: !issues.some((i) => i.includes("落幅必漂")), hard: true, detail: issues.find((i) => i.includes("落幅必漂")) ?? "无时点/运镜冲突" },
-      { id: "no-identical-retry", pass: !identicalRetry, hard: true, detail: identicalRetry ? "同提示词重试被拒" : `提示词指纹 ${fingerprint}（第 ${input.attempt} 次提交）` },
-      { id: "fps-consistent", pass: !issues.some((i) => i.includes("fps")), hard: true, detail: issues.find((i) => i.includes("fps")) ?? "帧率一致" }
-    ],
-    shotIds: [input.shotId],
-    evidence: { stage: input.stage, attempt: input.attempt, promptChars: text.length, fingerprint, issues },
-    reason: issues.length === 0 ? `提交前体检通过（${input.stage}/${input.shotId}，指纹 ${fingerprint}）` : `提交前体检未通过：${issues.join("；")}`
-  });
-  if (!gate.approved) {
-    throw new Error(`PREFLIGHT_BLOCKED（未花钱）：${input.shotId} — ${issues.join("；")}｜修好提示词再提交，不要靠重试`);
-  }
-  if (issues.length === 0) log(`  ✓ 提交前体检（G-PRE1）：${input.shotId} 指纹 ${fingerprint}`);
-}
-
 if (STAGES.has("videos")) {
   /**
    * G7 预生产最终确认（step_key: g7-preproduction）。
@@ -3811,16 +4309,26 @@ if (STAGES.has("videos")) {
    * 判据全部看**产物 + 历史裁决**（支持分段重跑：只跑 videos 时，plate/prompt 的放行记录在 stages.jsonl 里）。
    */
   const gateHistory = readStageHistory();
-  /** 素材镜不产出文生关键帧，G7 的提示词/关键帧判据只对**生成镜**成立（素材镜由 G-MAT1 门管） */
-  const promptReady = generatedShots().every((s) => {
+  /**
+   * 素材镜不产出文生关键帧，G7 的**提示词**判据对"生成镜 + 授权真人素材镜"成立
+   * （素材镜由 G-MAT1 门管，授权真人素材镜由下方 external-asset-shots 判据管）。
+   */
+  const promptReady = promptShots().every((s) => {
     const file = join(PROMPT_DIR, `${s.shotId}.txt`);
     return existsSync(file) && readFileSync(file, "utf8").trim().length >= 1200;
   });
+  /** 授权真人素材镜就绪判据：引用格式合法 + 提示词齐备（≥1200 字）；**不要求关键帧**（这类镜头本就不产） */
+  const assetShotDetail = assetShots().map((s) => {
+    const file = join(PROMPT_DIR, `${s.shotId}.txt`);
+    const promptOk = existsSync(file) && readFileSync(file, "utf8").trim().length >= 1200;
+    return { shotId: s.shotId, ref: assetRefOf(s), ok: isAssetRefLocal(assetRefOf(s)) && promptOk };
+  });
+  const assetShotsReady = assetShotDetail.every((entry) => entry.ok);
   const plateReady = generatedShots().every((s) => {
     const plate = join(PLATE_DIR, `${s.shotId}-plate.png`);
     return existsSync(plate) && statSync(plate).size > 50_000;
   });
-  const promptApproved = generatedShots().length === 0 || stageApproved("prompt-review", [null], gateHistory);
+  const promptApproved = promptShots().length === 0 || stageApproved("prompt-review", [null], gateHistory);
   /**
    * 关键帧放行判据（2026-09-27 真机 v2 修正）：**放行必须晚于磁盘上这一版关键帧**。
    *
@@ -3857,7 +4365,7 @@ if (STAGES.has("videos")) {
     return existsSync(clip) && statSync(clip).size > 100_000 && materialGateVerified(s.shotId);
   });
   const micromotionEvidence = STAGES.has("micromotion")
-    ? generatedShots().map((shot) => micromotionConsumption(shot, micromotionTraces.get(shot)))
+    ? promptShots().map((shot) => micromotionConsumption(shot, micromotionTraces.get(String(shot.shotId))))
     : [];
   const micromotionReady = !STAGES.has("micromotion") || micromotionEvidence.every((entry) => entry.verified);
   const g7 = recordGate({
@@ -3865,8 +4373,16 @@ if (STAGES.has("videos")) {
     sourceStage: "keyframe",
     shotIds: shots.map((s) => s.shotId),
     checks: [
-      { id: "prompt-files", pass: promptReady, hard: true, detail: promptReady ? `${generatedShots().length} 个生成镜提示词齐备且 ≥1200 字（另有 ${materialShots().length} 个素材镜走 material-gen 的动效提示词）` : "有生成镜缺提示词或字数不足 1200" },
+      { id: "prompt-files", pass: promptReady, hard: true, detail: promptReady ? `${promptShots().length} 个文生镜头（生成镜 + 授权真人素材镜）提示词齐备且 ≥1200 字（另有 ${materialShots().length} 个素材镜走 material-gen 的动效提示词）` : "有生成镜/授权真人素材镜缺提示词或字数不足 1200" },
       { id: "plate-files", pass: plateReady, hard: true, detail: plateReady ? `${generatedShots().length} 个生成镜关键帧齐备（>50KB）` : "有生成镜关键帧缺失或过小" },
+      {
+        id: "external-asset-shots", pass: assetShotsReady, hard: true,
+        detail: assetShots().length === 0
+          ? "本片无授权真人素材镜（不适用）"
+          : assetShotsReady
+            ? `${assetShots().length} 个授权真人素材镜就绪：${assetShotDetail.map((e) => `${e.shotId}→${e.ref}（提示词齐备，无文生关键帧）`).join("；")}——外部素材 ID，未向平台核验授权有效性`
+            : `授权真人素材镜未就绪：${assetShotDetail.filter((e) => !e.ok).map((e) => e.shotId).join("、")}`
+      },
       { id: "prompt-approved", pass: promptApproved, hard: true, detail: promptApproved ? "提示词环节有放行裁决（历史/本轮）" : "提示词环节无放行裁决" },
       {
         id: "plates-approved", pass: plateApproved, hard: true,
@@ -3892,9 +4408,15 @@ if (STAGES.has("videos")) {
           : `环境真实性硬缺陷 ${envSummary.hard} 项 + 设备口径硬缺陷 ${devSummary.hard} 项（${Object.entries({ ...envSummary.byRule, ...devSummary.byRule }).map(([rule, count]) => `${rule}×${count}`).join(" · ")}）${envAccepted ? "——已显式声明带瑕疵放行" : "——渲染前必须清零"}`
       },
       {
-        id: "scene-policy", pass: scenePolicyReport?.passed ?? true, hard: REVIEW_POLICY === "blocking", // T-2026-0930-0015
+        /**
+         * 片型配比（景别/机位/叙事证据）是**创作口径**（T-2026-0930-0014 产品所有者口径）：
+         * 默认降为咨询项（不挡花钱前的放行）；需要旧口径时用 `--review-policy blocking`。
+         */
+        id: "scene-policy", pass: scenePolicyReport?.passed ?? true, hard: REVIEW_POLICY === "blocking",
         detail: scenePolicyReport
-          ? `${scenePolicy!.id}@${scenePolicy!.version} 全片配比和逐镜品质门：${scenePolicyReport.defects.length} 项缺陷（默认咨询项；--review-policy blocking 下作硬闸）；报告 ${basename(SCENE_POLICY_REPORT_FILE)}`
+          ? `${scenePolicy!.id}@${scenePolicy!.version} 全片配比和逐镜品质门：${scenePolicyReport.defects.length} 项缺陷`
+            + `（按 T-2026-0930-0014 口径默认记为咨询项${REVIEW_POLICY === "blocking" ? "；--review-policy blocking 下仍作硬闸" : ""}）；`
+            + `报告 ${basename(SCENE_POLICY_REPORT_FILE)}`
           : "需求未命中已安装的片型知识条目（本门不适用）"
       },
       /** 平台语速门（2026-09-30）：与 hook-first-3s 同口径，结论必须在这道花钱前的门里可见 */
@@ -3944,7 +4466,34 @@ if (STAGES.has("videos")) {
   const refs = usePortraitRefs && lead
     ? (["front", "closeup"].map((a) => lead.files[a]).filter(Boolean) as string[])
     : [];
-  for (const shot of shots) {
+  /**
+   * 授权真人素材镜的参考图口径（T-2026-0929-0003）：
+   * 该镜**只**带平台授权素材引用（`asset://<asset ID>`）作 `reference_image`，且**不带首帧**——
+   * 首帧会给一张 AI 生成的脸，把真人身份顶掉。人物身份、口型与台词都交给 Seedance 按参考图生成。
+   */
+  /**
+   * 真人镜参考图：**主素材 + 同组素材（最多 3 张）**——单张参考容易漂脸，同组多张显著更稳。
+   * 资质与授权范围来自真人主档（referenceAssets / assetGroupId）。
+   */
+  /**
+   * 真人镜参考图：**同组多张素材（最多 3）+ 首镜已放行帧（身份锚）**，总计不超过 4 张。
+   * 侧脸/背影等非正面构图靠这套锚定保长相——不靠删构图。
+   */
+  const refsForShot = (shot: ShotCard): string[] => {
+    if (!isAssetShot(shot)) return refs;
+    const id = assetIdOf(assetRefOf(shot));
+    const entry = realPersonLibrary.byAssetId.get(id);
+    const base = entry ? referenceAssetRefs(entry.asset, 3) : [assetRefOf(shot)];
+    const anchor = ceoIdentityAnchorFrame && !base.includes(ceoIdentityAnchorFrame) ? [ceoIdentityAnchorFrame] : [];
+    return [...base, ...anchor].slice(0, 4);
+  };
+  /**
+   * 送审基准图口径：评审组件按**本地文件**读图，`asset://` 是平台素材引用、不是文件路径
+   * （真机 2026-09-29：把 asset 引用当基准图投递 → `ENOENT: open 'asset://…'`，监制直接不可用）。
+   * 因此送审时只投递本地存在的图片；授权素材引用只进生成请求（`arkVideo` 的 reference_image）。
+   */
+  const localReviewRefs = localReviewRefsEarly;
+  for (const shot of FIRST_PASS_ORDER) {
     const clip = join(CLIP_DIR, `${shot.shotId}.mp4`);
     const duration = Number(shot.duration ?? 5);
     /**
@@ -3969,7 +4518,15 @@ if (STAGES.has("videos")) {
       });
       continue;
     }
-    rememberInputs("shot", [join(PROMPT_DIR, `${shot.shotId}.txt`), join(PLATE_DIR, `${shot.shotId}-plate.png`), ...refs], shot.shotId);
+    const shotRefs = refsForShot(shot);
+    const shotIsAsset = isAssetShot(shot);
+    rememberInputs(
+      "shot",
+      shotIsAsset
+        ? [join(PROMPT_DIR, `${shot.shotId}.txt`), assetRefOf(shot)]
+        : [join(PROMPT_DIR, `${shot.shotId}.txt`), join(PLATE_DIR, `${shot.shotId}-plate.png`), ...shotRefs],
+      shot.shotId
+    );
     const cached = RESUME && existsSync(clip) && statSync(clip).size > 100_000 && artifactReusable("shot", clip, undefined, shot.shotId);
     /**
      * 复用产物**仍要过监制**（2026-09-24 真机修复）：
@@ -3985,7 +4542,7 @@ if (STAGES.has("videos")) {
         rubric: scenePolicy ? [...PRODUCER_RUBRICS.shot, scenePolicy.prompt.visualReview] : undefined,
         artifacts: [{ path: clip, kind: "video", bytes: Number(info.bytes ?? 0), probe: info }, ...settings.frames.map((f) => ({ path: f, kind: "image" as const }))],
         deterministic: settings.checks,
-        referenceImages: refs.slice(0, 2),
+        referenceImages: [...(identityAnchors.has(String(shot.shotId)) ? [identityAnchors.get(String(shot.shotId))!] : []), ...localReviewRefs(shotRefs)].slice(0, 3),
         context: { shotId: shot.shotId, dialogue: dialogueText(shot), action: shot.action, note: "复用既有成片的复检",
           scenePolicy: scenePolicy ? { id: scenePolicy.id, tags: shot.policyTags, speechScene: shot.speechScene } : null },
         env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
@@ -4018,7 +4575,7 @@ if (STAGES.has("videos")) {
         evidence: { mode: "recheck", note: "复用产物复核：本次未向渲染服务提交", seconds: duration, cached: true }
       });
       if (!g8Recheck.approved) log(`  ⚠ ${shot.shotId} G8 复用复核存在未过项（复用放行以上方复检裁决为准）：${g8Recheck.reason.slice(0, 120)}`);
-      if (verdict.approved && g8Recheck.approved) continue;
+      if (verdict.approved && g8Recheck.approved) { rememberIdentityAnchor(shot, clip); continue; }
       log(`↻ ${shot.shotId} 既有成片复检未过（${verdict.reason}），重新渲染`);
       log(`  （复用判据：${actual.toFixed(2)}s / ${info.width}x${info.height}）`);
     }
@@ -4049,9 +4606,14 @@ if (STAGES.has("videos")) {
          * 真机实测 base64 真人图会被隐私校验拒（见 `hostedUrlFile` 注释与探针脚本）。
          * 托管 URL 过期（>20h）时退回 base64 并如实记录——让监制看到这是降级路径，而不是假装成功。
          */
-        const hosted = loadHostedUrl(shot.shotId);
-        const firstFrame = hosted ?? (existsSync(plate) ? dataUrl(plate) : undefined);
-        if (!hosted && existsSync(plate)) {
+        /**
+         * 授权真人素材镜（T-2026-0929-0003）：**不要首帧**。
+         * 首帧是一张 AI 生成的人脸，会把平台素材里的真人身份顶掉（Seedance 以首帧为画面基准）；
+         * 这类镜头改由 `reference_image = asset://<asset ID>` 承担人物身份，让模型按真实长相生成。
+         */
+        const hosted = shotIsAsset ? null : loadHostedUrl(shot.shotId);
+        const firstFrame = shotIsAsset ? undefined : hosted ?? (existsSync(plate) ? dataUrl(plate) : undefined);
+        if (!shotIsAsset && !hosted && existsSync(plate)) {
           log(`  ⚠ ${shot.shotId} 无有效托管 URL，退回 base64 首帧（真人题材大概率被隐私校验拒）`);
         }
         /**
@@ -4071,8 +4633,16 @@ if (STAGES.has("videos")) {
             { id: "no-hard-params", pass: !/f\/\d/.test(promptText), hard: true, detail: /f\/\d/.test(promptText) ? "提示词正文出现 f 值（KB 纪律：正文只写画面语言，f 值只进 trace）" : "正文不含 f 值等技术参数" },
             { id: "aspect-constraint", pass: /【约束】/.test(promptText) && promptText.includes(ASPECT), hard: true, detail: `含【约束】与画幅 ${ASPECT}` },
             { id: "duration-limit", pass: duration > 0 && duration <= 30, hard: true, detail: `单镜时长 ${duration}s（上限 30s）` },
-            { id: "first-frame", pass: Boolean(hosted) || existsSync(plate), hard: true, detail: hosted ? `首帧用 Ark 托管 URL（${basename(hosted)}）` : existsSync(plate) ? "首帧退回本地关键帧 base64（隐私校验风险，已记录）" : "既无托管 URL 也无关键帧" },
-            { id: "plate-size", pass: !existsSync(plate) || statSync(plate).size > 50_000, hard: false, detail: existsSync(plate) ? `关键帧 ${(statSync(plate).size / 1024).toFixed(0)}KB` : "无关键帧文件" }
+            {
+              id: "first-frame", pass: shotIsAsset ? true : Boolean(hosted) || existsSync(plate), hard: true,
+              detail: shotIsAsset
+                ? `授权真人素材镜：不带首帧，人物身份由参考图 ${assetRefOf(shot)} 承担（外部素材 ID，未平台核验）`
+                : hosted ? `首帧用 Ark 托管 URL（${basename(hosted)}）` : existsSync(plate) ? "首帧退回本地关键帧 base64（隐私校验风险，已记录）" : "既无托管 URL 也无关键帧"
+            },
+            {
+              id: "plate-size", pass: shotIsAsset || !existsSync(plate) || statSync(plate).size > 50_000, hard: false,
+              detail: shotIsAsset ? "授权真人素材镜不产关键帧（合规口径，不是缺件）" : existsSync(plate) ? `关键帧 ${(statSync(plate).size / 1024).toFixed(0)}KB` : "无关键帧文件"
+            }
           ],
           evidence: {
             model: VIDEO_MODEL, seconds: duration, attempt,
@@ -4094,7 +4664,7 @@ if (STAGES.has("videos")) {
         const submitted = await arkVideo({
           prompt: attemptPrompt,
           firstFrame,
-          refs: refs.map(dataUrl),
+          refs: shotRefs.map(dataUrl),
           /** 同素材镜：Seedance 时长下限 4s → 先渲染合法时长，再变速归一化到分镜时长 */
           seconds: renderSecondsFor(duration),
           generateAudio: ENV.SEEDANCE_GENERATE_AUDIO !== "0",
@@ -4159,10 +4729,12 @@ if (STAGES.has("videos")) {
                 + (expectsMotion && motion.energy < 2.5 ? "：动作幅度偏低，可能是「站着念完」而非分镜要求的走/挥手" : "")
             }
           ],
-          referenceImages: refs.slice(0, 2),
-          context: { shotId: shot.shotId, dialogue: dialogueText(shot), action: shot.action, taskId: submitted.taskId },
+          referenceImages: [...(identityAnchors.has(String(shot.shotId)) ? [identityAnchors.get(String(shot.shotId))!] : []), ...localReviewRefs(shotRefs)].slice(0, 3),
+          context: { shotId: shot.shotId, dialogue: dialogueText(shot), action: shot.action, taskId: submitted.taskId,
+            ...(identityAnchors.has(String(shot.shotId)) ? { identityAnchor: identityAnchorContext(realPersonLibrary.byAssetId.get(assetIdOf(assetRefOf(shot)))!.asset), identityAnchorNote: "第 1 张基准照用于比对；不像本人即判不合格" } : {}) },
           env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
         });
+        if (verdict.approved) rememberIdentityAnchor(shot, clip);
         record({
           stage: "shot", shotId: shot.shotId, invoked: true, ok: verdict.approved, cached: false, degraded: verdict.degraded,
           attempt, ms: Date.now() - started, artifact: clip,
@@ -4576,8 +5148,25 @@ if (STAGES.has("compose") && !DRY_RUN) {
       : artifactReusable("shot", join(CLIP_DIR, `${shot.shotId}.mp4`), undefined, shot.shotId);
     return !generated || (dialogueText(shot).length > 0 && !stageApproved("voice", [shot.shotId]));
   }).map((shot) => shot.shotId);
-  if (blocked.length) log(`⛔ 缺少当前镜头或人声的通过回执，合成中止：${blocked.join("、")}`);
-  if (!orderCheck.ok || missing.length > 0 || blocked.length > 0) {
+  if (blocked.length && POST_ONLY_ASSEMBLY) {
+    postOnlyMissingReceipts = [...blocked];
+    recordGate({
+      stepKey: "g-post-only-assembly",
+      sourceStage: "compose",
+      checks: [{
+        id: "post-only-declared", pass: true, hard: false,
+        detail: `post-only 组装：${blocked.length} 镜无本片 shot/voice 回执（${blocked.join("、")}）；原因：${POST_ONLY_REASON}`
+      }],
+      shotIds: blocked,
+      degraded: true,
+      reason: "post-only 组装（degraded）：源镜头为外部成品片段，缺本片回执",
+      evidence: { assemblyMode: "post-only", reason: POST_ONLY_REASON, blocked }
+    });
+    log(`⚠ post-only 组装模式：${blocked.length} 镜无本片回执（已落 degraded 门记录）→ 继续走完整后期链`);
+  } else if (blocked.length) log(`⛔ 缺少当前镜头或人声的通过回执，合成中止：${blocked.join("、")}`);
+  /** post-only 组装：回执缺失（blocked）不阻断合成；顺序错误或缺片仍然阻断（那是事实性缺陷，不是"没回执"） */
+  const receiptsBlock = blocked.length > 0 && !POST_ONLY_ASSEMBLY;
+  if (!orderCheck.ok || missing.length > 0 || receiptsBlock) {
     record({ stage: "compose", shotId: null, invoked: false, ok: false, cached: false, degraded: false, attempt: 1, ms: 0, artifact: null,
       evidence: { orderOk: orderCheck.ok, missing, blocked }, verdict: null, note: "镜头顺序、镜头产物或人声未过门，跳过合成" });
     if (QUALITY === "uhd") {
@@ -4815,8 +5404,11 @@ if (STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
   log(`  ⓘ ${characterConsistency.detail}`);
   for (const warning of characterConsistency.warnings.slice(0, 5)) log(`  ⚠ ${warning.detail}`);
   for (const issue of characterConsistency.issues.slice(0, 5)) log(`  ⛔ ${issue.detail}`);
-  /** 客户口径 2026-10-01：跨镜造型主色差异（换发型/服装/品牌配饰）**降为咨询项**，不阻断交付；
-   *  身份是否同一个人由 G-RP1 / 像不像门（≥88）负责。`--review-policy blocking` 时恢复硬闸语义。 */
+  /**
+   * 跨镜造型主色：**客户口径 2026-10-01 已降为咨询项**——真人本来就会换发型/服装/戴品牌配饰，
+   * "主色差"不能当串戏证据；身份是否同一个人由 G-RP1/像不像门（≥88）负责。
+   * 保留记录（谁、差多少、建议人工看一眼），但不阻断交付（`blocking` 模式下才恢复硬闸语义）。
+   */
   const characterAdvisory = REVIEW_POLICY !== "blocking" && !characterConsistency.ok;
   record({
     stage: "character-consistency", shotId: null, invoked: true, ok: characterConsistency.ok || characterAdvisory,
@@ -4828,6 +5420,9 @@ if (STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
       issues: characterConsistency.issues,
       warnings: characterConsistency.warnings,
       advisory: characterAdvisory,
+      advisoryReason: characterAdvisory
+        ? "客户口径：真人可有发型/服装/配饰变化，造型主色差不作为不合格理由（身份由像不像门/主档判定）"
+        : null,
     },
     verdict: null,
     note: characterAdvisory
@@ -5060,7 +5655,8 @@ if (DANMAKU_ENABLED && STAGES.has("danmaku") && existsSync(subtitled)) {
     "--platform", arg("--platform", "B站"),
     "--evidence-dir", join(POST_DIR, "danmaku-evidence")
   ]);
-  const info = existsSync(out) ? probe(out) : {};
+  /** 声明关闭配乐层时，作品的音轨事实以"未加配乐的母版"为准（不是空对象——否则 audio-track 硬闸会误红） */
+  const info = existsSync(out) ? probe(out) : (bgmDeclaredOff ? probe(danmakuOut) : {});
   const density = (result.out.match(/条数[^\n]*/) ?? ["无密度信息"])[0] ?? "";
   const verdict = await reviewStage({
     stage: "danmaku", projectId: PROJECT,
@@ -5105,9 +5701,13 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
    */
   const BGM_TRUE_PEAK = arg("--bgm-true-peak", "-1.5");
   const chosenTrack = arg("--bgm-track", "");
+  if (BGM_DECLARED_PROGRAM_MIX) {
+    log("ℹ 配乐：本机无独立音轨签发者 → 走**声明式直混**（declared-program-mix，回执标注 stemsVerified=false，不冒充签章分轨）");
+  }
   const result = runCli(BGM_CLI, [
     "best", "--in", danmakuOut, "--out", out, "--genre", genre, "--mood", mood, "--policy", policy,
     "--source-policy", sourcePolicy,
+    ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),
     "--evidence-dir", join(POST_DIR, "bgm-evidence")
   ]);
   /**
@@ -5205,7 +5805,6 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
           "mix", "--in", danmakuOut, "--out", out, "--bgm", bgmFile, "--policy", policy,
           "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
         "--true-peak", BGM_TRUE_PEAK,
-          ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),
           "--bpm-strategy", "cut-driven",
           "--cut-times", CUT_GRID.join(","),
           "--evidence-dir", join(POST_DIR, "bgm-evidence")
@@ -5223,22 +5822,38 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
       log("⛔ 配乐：曲库内无网格相容曲目，且未允许自算作曲 → 本环节判失败（不静默降级）");
     }
   }
+  const info = existsSync(out) ? probe(out) : {};
   /**
-   * 声明降级（T-2026-0930-0015，通用口径）：
-   *   · 工位按「不劣化优先」判定 **无需配乐**（人声太满/无可闻窗口），且曲库无网格相容音乐床时，
-   *     旧口径判硬失败（scored 未产出 + 无音轨）→ 整片卡在母版终审；
-   *   · 无独立音轨签发者时工位也会 fail-closed 拒收。
-   * 两种都按"配乐层不适用"如实记账（不伪造音乐轨），继续走完交付；
-   * 需要旧口径（必须带配乐轨否则阻断）时用 `--review-policy blocking`。
+   * 独立音轨纪律（T-2026-0927-0037）下的**声明关闭**通路：
+   * 配乐工位要求"签章分轨引用"（audio-stems），而该签章**没有生产者**（bridge 里明确没有签发者）。
+   * 本机没有内部媒体验证工位的密钥时，工位会 fail-closed 拒收——此时正确做法**不是**伪造干净轨，
+   * 也不是把整片卡死，而是：**不加配乐（bgm_layer=false）、留痕声明、继续走完后期链交付**；
+   * 恢复路径 = 接入签发者（WORKLOOM_AUDIO_STEM_SIGNING_SECRET）后重跑 bgm 环节补上音乐层。
+   */
+  /**
+   * 「工位判定无需配乐」的声明降级（T-2026-0930-0015）。
+   *
+   * 真机（2026-09-30 post-only 复跑）：`best` 按"不劣化优先"给出 `no_bgm_needed`（人声太满 /
+   * 找不到安全可闻窗口），曲库里也没有与剪辑网格相容的音乐床 → 工位**退出码 0 但没有产物**。
+   * 旧口径把这种情况判成硬失败（`scored：配乐版未产出` + `audio-track：无音轨`），整片被卡在母版终审。
+   * 按产品口径（渲后不做质量裁决、能交付先交付），这里记为"配乐层不适用"：
+   *   如实写明工位结论与曲库原因，不伪造音乐轨；需要旧口径时用 `--review-policy blocking`。
    */
   const bgmNoBgmDeclared = !existsSync(out)
     && /no_bgm_needed|无需配乐/.test(`${bgmDetail}\n${String(result.out ?? "")}`);
   const bgmDeclaredOff = (!existsSync(out)
     && /audio_stems_source_unverified|签章分轨引用|独立音轨.*(未配置|缺失)/.test(bgmDetail))
     || bgmNoBgmDeclared;
-  /** 配乐层状态（交付清单留痕）：off 时写明原因，不让"没配乐"变成查不到的黑盒 */
+  /**
+   * 实际出产物的是 `mix`（点名曲目/音乐床两条路径）；`best` 只是自动择曲的前置探测。
+   * 声明式直混下 `best` 的择曲探测失败不该判"配乐工位失败"——判据落在**产物是否产出**上，
+   * 前置探测的结论单独留痕（preselectTool）。
+   */
+  const bgmToolOk = existsSync(out) || result.ok;
+  /** 配乐层状态（交付清单留痕）：声明式直混 / 工位判定无需配乐 / 签章路径，三态如实写 */
   bgmManifestInfo = {
     layer: bgmDeclaredOff ? "off" : "on",
+    via: bgmVia,
     notRequired: bgmNoBgmDeclared,
     declaredOff: bgmDeclaredOff,
     reason: bgmDeclaredOff
@@ -5246,19 +5861,23 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
         ? "配乐工位按「不劣化优先」判定无需配乐（人声太满 / 无可闻窗口），且曲库无网格相容音乐床——不伪造音乐轨"
         : "本机无独立音轨签发者（WORKLOOM_AUDIO_STEM_SIGNING_SECRET 未配置）→ 声明式关闭配乐层，不冒充签章分轨")
       : null,
-    output: existsSync(out) ? out.split("/").slice(-1)[0] : null,
+    sourceAuthority: bgmDeclaredOff ? "declared-unverified" : "signed-stems",
+    stemsVerified: !bgmDeclaredOff,
+    output: existsSync(out) ? basename(out) : null,
     evidence: bgmDetail.slice(-400)
   };
   if (bgmDeclaredOff) {
     log(bgmNoBgmDeclared
-      ? "⚠ 配乐层不适用（bgm_layer=false）：工位判定无需配乐且曲库无相容音乐床——不伪造音乐轨，交付清单如实标注"
-      : "⚠ 配乐层按独立音轨纪律关闭（bgm_layer=false）：本机未配置签发者（不伪造干净轨）");
+      ? "⚠ 配乐层不适用（bgm_layer=false）：工位按「不劣化优先」判定无需配乐（人声太满/无可闻窗口），"
+        + "且曲库无网格相容音乐床——不伪造音乐轨，交付清单如实标注（--review-policy blocking 可恢复硬失败）"
+      : "⚠ 配乐层按独立音轨纪律关闭（bgm_layer=false）：工位要求签章分轨引用，本机未配置签发者（不伪造干净轨）；"
+        + " 恢复路径：接入签发者后重跑 bgm 环节");
   }
-  const info = existsSync(out) ? probe(out) : {};
   const lufs = (result.out.match(/-?\d+(\.\d+)?\s*LUFS/) ?? ["无响度读数"])[0] ?? "";
   const mixLufs = (bgmDetail.match(/-?\d+(\.\d+)?\s*LUFS/) ?? ["无响度读数"])[0] ?? lufs;
   /** 成品响度实测（工位没给读数时由宿主补测，避免"无证据"卡门） */
-  const measured = existsSync(out) ? measureLoudness(out)
+  const measured = existsSync(out)
+    ? measureLoudness(out)
     : (bgmDeclaredOff ? measureLoudness(danmakuOut) : { lufs: null, peakDb: null, detail: "无产物" });
   const verdict = await reviewStage({
     stage: "bgm", projectId: PROJECT,
@@ -5270,14 +5889,20 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
           : bgmDeclaredOff ? "配乐层不适用（声明降级 bgm_layer=false）：无签章分轨引用，不伪造干净轨"
             : "配乐版未产出",
         hard: !bgmDeclaredOff || REVIEW_POLICY === "blocking" },
-      { id: "tool-exit", pass: result.ok || bgmDeclaredOff,
-        detail: result.ok ? "配乐工位退出码 0" : `配乐工位失败：${result.out.slice(-300)}`,
-        hard: !result.ok && !bgmDeclaredOff },
-      { id: "audio-track",
+      { id: "tool-exit", pass: bgmToolOk || bgmDeclaredOff,
+        detail: existsSync(out) ? "配乐版已产出（混音工位退出码 0）"
+          : result.ok ? "配乐工位退出码 0"
+          : bgmDeclaredOff ? "配乐工位按独立音轨纪律拒收（预期边界：本机无签发者）"
+            : `配乐工位失败：${result.out.slice(-300)}`,
+        hard: !bgmToolOk && !bgmDeclaredOff },
+      {
+        id: "audio-track",
         pass: bgmNoBgmDeclared ? true : Boolean(info.hasAudio),
-        detail: bgmNoBgmDeclared ? "配乐层不适用（bgm_layer=false）：母版音轨继承上游（对白+环境），不叠加音乐"
+        detail: bgmNoBgmDeclared
+          ? "配乐层不适用（bgm_layer=false）：母版音轨继承上游调色/字幕版（对白+环境），不叠加音乐"
           : info.hasAudio ? `音轨 ${info.acodec}` : "无音轨",
-        hard: !info.hasAudio && !bgmNoBgmDeclared },
+        hard: !info.hasAudio && !bgmNoBgmDeclared
+      },
       {
         id: "loudness", pass: measured.lufs === null ? false : measured.lufs >= -17 && measured.lufs <= -12,
         detail: `${measured.detail}（母版口径 −14 LUFS ±2）`
@@ -5331,12 +5956,28 @@ if (STAGES.has("bgm") && existsSync(danmakuOut)) {
     }
   }
   record({
-    stage: "bgm", shotId: null, invoked: true, ok: result.ok && existsSync(out), cached: false, degraded: false,
-    attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : null,
-    evidence: { genre, mood, policy, via: bgmVia, loudness: mixLufs, measured: measured.detail, tool: `bgm-bridge ${bgmVia}`,
+    /**
+     * 声明关闭（bgmDeclaredOff）时按 `not_applicable` 记账：不是"配乐做失败了"，而是"配乐层不适用"。
+     * `invoked: false` + `evidence.applicable === false` + `attempted: true` 让审计能同时看到
+     * "这一层没有配乐"与"工位确实被调用过、且因为缺签发者被拒"。
+     */
+    stage: "bgm", shotId: null, invoked: !bgmDeclaredOff, ok: bgmDeclaredOff ? true : Boolean(existsSync(out) && bgmToolOk),
+    cached: false, degraded: false,
+    attempt: 1, ms: Date.now() - started, artifact: existsSync(out) ? out : (bgmDeclaredOff ? danmakuOut : null),
+    evidence: {
+      genre, mood, policy, via: bgmVia, loudness: mixLufs, measured: measured.detail, tool: `bgm-bridge ${bgmVia}`,
       /** 音轨来源口径（如实）：声明式直混 = 独立分轨未取证，不得被读成"签章通过" */
       sourceAuthority: BGM_DECLARED_PROGRAM_MIX ? "declared-unverified" : "signed-stems",
-      stemsVerified: !BGM_DECLARED_PROGRAM_MIX }, verdict
+      stemsVerified: !BGM_DECLARED_PROGRAM_MIX,
+      /** 自动择曲前置探测的结论（失败不影响"混音已产出"这一事实，但必须留痕） */
+      preselectTool: { ok: result.ok, detail: String(result.out ?? "").slice(-300) },
+      ...(bgmDeclaredOff ? {
+        applicable: false, attempted: true,
+        skipReason: "独立音轨签章签发者未接入：按 fail-closed 纪律关闭配乐层（bgm_layer=false），不伪造干净轨；接入签发者后重跑 bgm 可补回音乐层",
+        layer: { bgm: false, dialogue: true },
+        toolError: bgmDetail.slice(-400)
+      } : {})
+    }, verdict
   });
 }
 
@@ -5646,9 +6287,11 @@ if (STAGES.has("cover") && existsSync(colored)) {
   };
   const personShots = shots.filter((s) => String(s.character ?? "").length > 0);
   /**
-   * 人物来源镜硬闸（T-2026-0930-0015-PORT）：卡片里有人物镜、管线也知道主角是谁，但没有任何一张卡的 `character`
-   * 写了主角名/ID 时，封面"人物为主"版式必然找不到来源镜 → 设计师稿非法 → 退最小稿 → 母版终审被拦。
-   * 这里在做封面之前**显式报错**并指出改哪一处，不再静默退化；显式 `--cover-archetype subject-led` 不拦。
+   * 人物来源镜硬闸（T-2026-0930-0015，产品所有者口径）：
+   * 卡片里有人物镜、管线也知道主角是谁，但**没有任何一张卡的 character 写了主角名/ID** 时，
+   * 封面"人物为主"版式必然找不到来源镜 → 设计师稿非法 → 退最小稿 → 母版终审被拦（真机事故）。
+   * 这里在做封面之前**显式报错**并指出改哪一处，不再静默退化；显式声明 `--cover-archetype subject-led`
+   * （本来就不要人物卡）时不拦。
    */
   const leadMatchedPersons = lead
     ? personShots.filter((s) => String(s.character ?? "").includes(lead.name) || String(s.character ?? "").includes(lead.id))
@@ -5671,7 +6314,6 @@ if (STAGES.has("cover") && existsSync(colored)) {
     });
     throw new Error(detail);
   }
-
   const coverBrief = BRIEF_FILE && existsSync(abs(BRIEF_FILE))
     ? (JSON.parse(readFileSync(abs(BRIEF_FILE), "utf8")) as CoverDesignInput["brief"])
     : null;
@@ -5965,8 +6607,9 @@ if (STAGES.has("cover") && existsSync(colored)) {
   const wantsLandmark = /滕王阁/.test(planText);
   const isNightShot = (shot: ShotCard): boolean => {
     /**
-     * 判定口径（T-2026-0930-0015-PORT 补）：场景正文 + 场景描述一起看，并认"晚 20:05 / 深夜 / 傍晚"。
-     * 旧口径只看 scene 且不认"晚 HH:MM" → 夜景底图被判成日景，被 5.5 的白天清晰度下限否掉。
+     * 判定口径（T-2026-0930-0015 补）：**场景正文 + 场景描述一起看**，并认"晚 20:05 / 深夜 / 傍晚"。
+     * 真机：卡片把时刻写在 `scene`（"晚 20:05"）、把"灯火通明"写在 `sceneDescription`，
+     * 旧口径只看 `scene` 且不认"晚 HH:MM" → 夜景底图被判成日景，被 5.5 的白天清晰度下限否掉。
      */
     const scene = `${String(shot.scene ?? "")} ${String((shot as Record<string, unknown>).sceneDescription ?? "")}`;
     if (!/夜景|夜色|夜间|夜晚|夜里|深夜|傍晚|晚\s?\d{1,2}[:：]\d{2}|灯光秀|灯火|夜市/.test(scene)) return false;
@@ -6371,9 +7014,9 @@ if (STAGES.has("cover") && existsSync(colored)) {
       + `${bgSubstituted && !(COVER_HERO === "person" || COVER_HERO === "person-solo") ? "（已自动改取全片最清晰帧）" : ""}`
       + `${COVER_HERO === "person" || COVER_HERO === "person-solo" ? `（人物底图：${heroShot.shotId} @ ${heroAt}s）` : ""}`,
     /**
-     * 清晰度是**画质口径**而不是事实（T-2026-0930-0015-PORT）：已经自动改取过全片最清晰帧，仍达不到阈值时，
+     * 清晰度是**画质口径**而不是事实：已经自动改取过全片最清晰帧，仍达不到阈值时，
      * 继续判硬失败只会让整片交不出去（真机：夜景底图 3.34 被 5.5 否掉 → 封面/母版连环打回）。
-     * 默认记为咨询项；`--review-policy blocking` 恢复旧硬闸。
+     * 按 T-2026-0930-0015 口径默认记为咨询项；`--review-policy blocking` 恢复旧硬闸。
      */
     hard: REVIEW_POLICY === "blocking"
   });
@@ -6778,15 +7421,16 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
     ],
     deterministic: [
       /**
-       * 片型配比（景别/机位/叙事证据）是**创作口径**：素材已经渲出来了，拿它当出厂否决票只会让客户多等一轮。
-       * 这里改为咨询项（事实性硬闸见 duration/resolution/audio/av-sync），T-2026-0930-0014。
+       * 片型配比（景别/机位/叙事证据）是**创作口径**：渲出来的素材已经存在，
+       * 拿它当"出厂否决票"只会让客户等更久。这里改为咨询项（事实性硬闸见 duration/resolution/audio/av-sync）。
        */
       { id: "scene-policy", pass: scenePolicyReport?.passed ?? true, hard: REVIEW_POLICY === "blocking",
         detail: !scenePolicyReport
           ? "未命中片型政策，不适用"
           : scenePolicyReport.passed
             ? `${scenePolicy!.id}@${scenePolicy!.version} 全片配比与逐镜方案审计通过；${basename(SCENE_POLICY_REPORT_FILE)}`
-            : `${scenePolicy!.id}@${scenePolicy!.version} 片型门未过 ${scenePolicyReport.defects.length} 项；按 T-2026-0930-0014 口径记为咨询项（不阻断后期链与交付；证据 ${basename(SCENE_POLICY_REPORT_FILE)}）` },
+            : `${scenePolicy!.id}@${scenePolicy!.version} 片型门未过 ${scenePolicyReport.defects.length} 项；`
+              + `按 T-2026-0930-0014 口径记为咨询项（不阻断后期链与交付；证据 ${basename(SCENE_POLICY_REPORT_FILE)}）` },
       {
         id: "duration",
         pass: Math.abs(Number(info.duration ?? 0) - expectedMasterSeconds) <= 1.0,
@@ -6843,8 +7487,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
             + (avSyncReport.ok === true ? "" : (flag("--accept-av-sync-drift") ? "；已按 --accept-av-sync-drift 显式放行（带瑕疵放行，留痕）" : ""))
           : `缺音画对齐实测报告（${basename(avSyncReportPath)}）——机制不允许「没测就当过」；`
             + "跑一次 compose 阶段即可生成（分段重跑 master 时该报告应已存在）",
-        /** 跨镜造型主色是"串戏嫌疑"信号（不做人脸识别）：改为咨询项，让客户看真片再判断（T-2026-0930-0014） */
-        hard: REVIEW_POLICY === "blocking",
+        hard: true,
       },
       /**
        * 交付文件名口径（2026-09-26 事故）：文件名写明的时长必须与成片实际时长一致。
@@ -6871,8 +7514,8 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
             + (ACCEPT_REJECTED.includes("character-consistency") ? "（已显式放行，留痕在阶段记录）" : "")
           : "未跑合成阶段，角色一致性未实测（跨镜造型主色判据不适用）",
         /**
-         * 跨镜造型主色是**串戏嫌疑信号**（能力边界：不做人脸识别），命中需人工确认；
-         * 旧口径直接当硬闸否决交付；新口径（T-2026-0930-0015）默认记为咨询项，
+         * 跨镜造型主色是**串戏嫌疑信号**（能力边界：不做人脸识别），命中需人工确认：
+         * 旧口径直接当硬闸否决交付；新口径（T-2026-0930-0014）记为咨询项，
          * 让客户看到真片再判断——素材已经渲出来了，不再为"疑似"重跑。
          */
         hard: REVIEW_POLICY === "blocking",
@@ -7064,15 +7707,21 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
   rememberInputs("deliver", [deliverablePath]);
   const started = Date.now();
   /**
-   * 变体派生源必须是**不含配乐**的母版（2026-09-30 真机）：变体自带三套配乐（三轴之一），
-   * 从"已加配乐"的交付母版派生会让变体配乐叠在母版配乐上，工位 `music_audible` 复检判红
-   * （实测 -13~-15dB < 3dB）→ 三支变体全缺配乐 → G-DLV1 误红。用旁挂字幕版（无配乐、画面逐帧一致）。
+   * 变体派生源必须是**不含配乐**的母版（2026-09-30 真机）：
+   * 变体自带三套配乐（三轴之一）——若从"已加配乐"的交付母版派生，变体配乐会叠在母版配乐上，
+   * 工位的 `music_audible` 复检直接判红（实测：配乐可闻度 -13~-15dB < 3dB）→ 三支变体全缺配乐 → G-DLV1 误红。
+   * 用旁挂字幕版（`master-subtitled`，画面与交付母版逐帧一致、无配乐）作为派生源。
    */
   const variantSource = (() => {
     const subtitled = join(POST_DIR, "master-subtitled.mp4");
     return existsSync(subtitled) ? subtitled : deliverablePath;
   })();
   const variantPlans = buildVariantPlan({ master: variantSource, outDir: OUT_DIR, projectId: PROJECT, coverHook: arg("--cover-hook", shotlist.title ?? "") });
+  /**
+   * 配乐层是否可用：见 bgm 环节的"声明关闭"记录（无签章分轨引用 → bgm_layer=false）。
+   * 关掉时变体不再尝试混音（工位必然拒收），三轴判据降为"调色+封面"两轴（证据仍留痕）。
+   */
+  const bgmLayerOff = records.some((row) => row.stage === "bgm" && (row.evidence as { applicable?: unknown }).applicable === false);
   const samples: Array<{ variantId: string; frames: Array<{ r: number; g: number; b: number }>; loudness: { lufs: number; peakDb: number } | null }> = [];
   const variantManifest: Array<{
     id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
@@ -7137,7 +7786,9 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
        * 选不到就留空（三轴判据随后会拦下，而不是静默用同一条曲子糊过去）。
        */
       let variantBgm: { track: string; sha256: string; measuredBpm?: number; gridErrorMs?: number } | null = null;
-      try {
+      if (bgmLayerOff) {
+        log(`  变体 ${plan.variant.id} 配乐：按声明关闭（无签章分轨引用 → bgm_layer=false），跳过混音`);
+      } else try {
         const variantDuration = Number(probe(plan.output).duration ?? 0);
         const bed = await pickGridCompatibleBed(variantDuration, CUT_GRID, {
           genre: plan.variant.bgmGenre, mood: plan.variant.bgmMood,
@@ -7148,6 +7799,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
             "mix", "--in", plan.output, "--out", mixed, "--bgm", bed.path, "--policy", "keep-dialogue",
             "--music-level", String(-26 + plan.variant.musicLevelDeltaDb),
             "--ducking", "14", "--lufs", "-14", "--section", "auto",
+            ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),
             "--bpm-strategy", "cut-driven", "--cut-times", CUT_GRID.join(","),
             "--evidence-dir", join(POST_DIR, "bgm-evidence"),
           ]);
@@ -7208,7 +7860,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     gradeProfile: variant.gradeProfile,
     coverSha: variant.cover?.sha256 ?? null,
     bgmSha: variant.bgm?.sha256 ?? null,
-  })));
+  })), { bgmRequired: !bgmLayerOff });
   const gate = recordGate({
     stepKey: "deliver",
     sourceStage: "deliver",
@@ -7259,7 +7911,8 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
   const coverFile = join(OUT_DIR, `${PROJECT}-cover.png`);
   const withCover = join(OUT_DIR, `${PROJECT}-with-cover.mp4`);
   /**
-   * 渲染 / 返工台账（T-2026-0930-0015-PORT）：清单与 Markdown 同时落盘（UHD 走暂存发布，一并纳入）。
+   * 渲染 / 返工台账（T-2026-0930-0015）：客户要能看到"**每一次花钱的账**"——几次提交、几次判不合格、
+   * 几次平台拒收、几次 canary 止损、后期返工几次。清单与 Markdown 同时落盘（UHD 走暂存发布，一并纳入）。
    */
   const renderLedger = buildRenderLedger(readStageHistory());
   const renderLedgerFile = join(OUT_DIR, `${PROJECT}-render-ledger.md`);
@@ -7304,16 +7957,29 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     width: OUTPUT_SIZE.width, height: OUTPUT_SIZE.height,
     localEnhancement: QUALITY === "uhd" ? "per-shot, verified receipt in stages.jsonl" : "not requested"
   },
-  /** 审核口径 / 分流结论 / 渲染台账（T-2026-0930-0015-PORT）：客户侧一眼可见"按哪条管线做的、事后检查是否移除、花了多少次" */
+  /**
+   * 交付口径留痕（T-2026-0930-0014）：审核层状态 + post-only 组装声明。
+   * 客户侧应能一眼看到"哪些是既有素材复用、哪些事后检查被移除、质量由谁验收"。
+   */
   reviewPolicy: REVIEW_POLICY,
   reviewPolicyNote: REVIEW_DISABLED_REASON,
+  assembly: {
+    mode: POST_ONLY_ASSEMBLY ? "post-only" : "generated",
+    reason: POST_ONLY_REASON || null,
+    shotReceiptsMissing: POST_ONLY_ASSEMBLY ? postOnlyMissingReceipts : [],
+  },
+  /**
+   * 视频类型分流结论（T-2026-0930-0015）：审计能回答"这条片子按哪条管线做的、商品锚点是什么"。
+   */
   route: {
     kind: ROUTE_PREFLIGHT.kind,
     source: ROUTE_PREFLIGHT.source,
     productAnchor: ROUTE_PREFLIGHT.productAnchor,
     notes: ROUTE_PREFLIGHT.notes,
   },
+  /** 配乐层状态（T-2026-0930-0015）：off 时写明原因，不让"没配乐"变成查不到的黑盒 */
   bgm: bgmManifestInfo,
+  /** 渲染/返工台账（次数与原因；不做费用估算） */
   renderLedger,
   renderLedgerFile: publicDeliveryPath(renderLedgerFile) }, null, 2)}\n`, "utf8");
   if (QUALITY === "uhd") {
@@ -7475,21 +8141,20 @@ if (!DRY_RUN) {
   for (const row of records) latest.set(`${lineageStage(row)}:${row.shotId ?? ""}`, row);
   const failed = [...latest.values()].filter((row) => (row.invoked || STAGES.has(row.stage)) && (!row.ok || row.degraded || row.verdict?.approved === false));
   /**
-   * 已**显式声明**的降级不再算"请求未完成"（T-2026-0930-0014）：
-   * 它们的含义是"这一层按纪律不适用"（例如：无签章分轨引用 → 配乐层关闭），不是"产物没做出来"。
+   * post-only 组装（T-2026-0929-0012）与"咨询项不阻断交付"（T-2026-0930-0014）：
+   * 已**显式声明**的降级（evidence.assemblyMode=post-only）与咨询性结论不再算作"请求未完成"——
+   * 它们的含义是"源素材是既有成品片段/某项创作口径未命中"，不是"产物没做出来"。
    * 未声明的失败照旧 exit 6，避免真实故障被混在声明里蒙混过关。
    */
-  const declaredNotApplicable = (row: StageRecord): boolean => {
-    const evidence = (row.evidence ?? {}) as { applicable?: unknown; skipReason?: unknown };
-    return row.ok && (evidence.applicable === false || typeof evidence.skipReason === "string");
-  };
-  const declared = failed.filter((row) => declaredNotApplicable(row));
-  const hardFailed = failed.filter((row) => !declaredNotApplicable(row));
+  const declaredPostOnly = (row: StageRecord): boolean =>
+    row.degraded && (row.evidence as { assemblyMode?: unknown } | undefined)?.assemblyMode === "post-only";
+  const declared = failed.filter((row) => declaredPostOnly(row));
+  const hardFailed = failed.filter((row) => !declaredPostOnly(row));
   if (missing.length || hardFailed.length) {
     log(`⛔ 请求未完成：缺阶段 ${missing.join("/") || "无"}；未通过 ${hardFailed.map((row) => row.stage + (row.shotId ? `:${row.shotId}` : "")).join("/") || "无"}`);
     process.exitCode = 6;
   } else if (declared.length > 0) {
-    log(`⚠ 带声明降级完成：${declared.map((row) => row.stage + (row.shotId ? `:${row.shotId}` : "")).join("/")}`
-      + "——降级项按纪律声明并留痕（见阶段日志 evidence.applicable/skipReason），后期链与交付物均已产出。");
+    log(`⚠ 带声明降级完成（post-only 组装）：${declared.map((row) => row.stage + (row.shotId ? `:${row.shotId}` : "")).join("/")}`
+      + "——降级项已留痕在阶段日志与交付清单（assemblyMode=post-only），后期链与交付物均已产出。");
   }
 }

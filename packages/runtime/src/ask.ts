@@ -136,9 +136,9 @@ export const defaultAskFactProvider: AskFactProvider = async (app, scope, questi
  * 行业事实采集器注册位（落地向导/行业包启动时调用）。
  *
  * GR-19（N-09，2026-09-28 实测）：此前是**进程级单例**且全仓零调用点——
- * geo-growthtest 工作区问"本月获客成本/线索转化"时，facts 里只有底座通用面（事件条数/待审批数），
+ * geo-growth 工作区问"本月获客成本/线索转化"时，facts 里只有底座通用面（事件条数/待审批数），
  * 模型只能答非所问（问什么都是"没有相关记录"）。现在按**行业**注册：
- *  - 同一进程可同时服务多行业工作区（hotel / geo-growthtest / ai-video 各自的事实面）；
+ *  - 同一进程可同时服务多行业工作区（hotel / geo-growth / ai-video 各自的事实面）；
  *  - 未注册行业回落底座通用面（不报错，行为与旧版一致）；
  *  - 注册表进程级、不持久——服务端启动时按活动 Bundle 重装（与 feedback-enums 同范式）。
  */
@@ -180,7 +180,14 @@ export function mergeKbFacts(base: AskFactResult, hits: AskKbHit[]): AskFactResu
     value: hit.content.replace(/\s+/g, " ").slice(0, 160),
   }));
   const sources = picked.map((hit) => `kb:${hit.documentId}`);
-  return { facts: [...base.facts, ...facts], sources: [...base.sources, ...sources] };
+  /**
+   * 顺序即优先级（2026-09-29 第二次修复，X-04 × GR-09 联动缺陷）：
+   * 知识库 facts 必须排在**前面**。此前追加在末尾——而 composeAnswer 是顺序输出、
+   * enforceAnswerLimits 又是 120 字硬闸，通用统计（事件库规模/近 7 天动作分布）先占满预算，
+   * 客户自己的活动政策永远被截掉（出厂 mock 态必现；via=llm 时模型读全量 prompt 反而看不见这个坑）。
+   * 知识命中是问题的最直接答案，先于系统统计。
+   */
+  return { facts: [...facts, ...base.facts], sources: [...sources, ...base.sources] };
 }
 
 /** 工作区行业（进程级缓存；读失败/无行业 → null → 底座通用面） */
@@ -258,10 +265,43 @@ export async function webSearchFacts(question: string): Promise<AskFactResult> {
   return { facts, sources };
 }
 
+/** GR-09：回答长度硬闸（超长截断并标注，避免一次性糊屏） */
+export const ASK_ANSWER_MAX_CHARS = 120;
+
 /** mock 口径的确定性合成（数字全真，文案模板） */
 function composeAnswer(question: string, facts: AskFact[]): string {
   const lines = facts.map((f) => `· ${f.label}：${f.value}`);
-  return `关于「${question}」，基于工作区实时数据：\n${lines.join("\n")}\n以上数字均来自事件库实时取数，可下钻溯源。`;
+  /**
+   * 标题里的问题**必须截断**：GR-09 是 120 字硬闸，标题若跟着用户原话膨胀，
+   * 光"关于「…」"就把预算吃光，事实一条都留不下（2026-09-29 实测：长问句下答案只剩标题+截断标记）。
+   *
+   * 标题也**不再复述"基于工作区实时数据"**：120 字预算要优先留给事实本身
+   * （实测：这句话占 10 字，正好等于"第二条知识命中能否放下"的差额）；
+   * 数据来源由末尾固定句式交代，预算不够时它先让位。
+   */
+  const asked = question.length > 24 ? `${question.slice(0, 24)}…` : question;
+  const header = `关于「${asked}」：`;
+  const footer = "以上数字均来自事件库实时取数，可下钻溯源。";
+  /**
+   * 预算内**按优先级装行**（facts 已按 知识库 > 领域/系统统计 排序）：
+   * 装不下的次要事实直接不展示——那是"次要数据未展示"，不是"答案被截断"。
+   * 此前整文硬截会把"次要统计没放下"报成"已截断"，客户会误以为问到的知识内容被吃了
+   * （2026-09-29 实测误报）。连第一条事实都放不下时，仍交给 enforceAnswerLimits
+   * 如实截断并标注——那才是真的截断。
+   */
+  const kept: string[] = [];
+  let used = header.length;
+  for (const line of lines) {
+    if (used + 1 + line.length > ASK_ANSWER_MAX_CHARS) break;
+    kept.push(line);
+    used += 1 + line.length;
+  }
+  if (kept.length === 0 && lines.length > 0) {
+    return `${header}\n${lines[0]!}\n${footer}`; // 超预算 → 由 enforceAnswerLimits 截断并标注
+  }
+  const body = [header, ...kept].join("\n");
+  // 页脚是样板句：装不下就整句不写，同样不触发"已截断"
+  return used + 1 + footer.length <= ASK_ANSWER_MAX_CHARS ? `${body}\n${footer}` : body;
 }
 
 export interface AskResult {
@@ -271,18 +311,35 @@ export interface AskResult {
   answer: string;
 }
 
-/** GR-09：回答长度硬闸（超长截断并标注，避免一次性糊屏） */
-export const ASK_ANSWER_MAX_CHARS = 120;
-
-/** GR-09 第①层：硬约束执行（超长截断；空答案交给上层兜底） */
+/**
+ * GR-09 第①层：硬约束执行（超长截断；空答案交给上层兜底）。
+ *
+ * 2026-09-29 第二次修复：由"整文硬截"改为"**按行保留**"——
+ * facts 已按优先级排序（知识库 > 领域/系统统计），整文切片会把排列在后面但同样重要的事实
+ * 拦腰砍断，甚至只剩半行字；按行保留至少保证"能放下的整条事实都完整"。
+ * 首行（最高优先级事实）即使单条超预算也保留其开头——露头比全丢有价值。
+ */
 function enforceAnswerLimits(text: string): string {
   const clean = text.trim();
   if (clean.length <= ASK_ANSWER_MAX_CHARS) return clean;
-  return `${clean.slice(0, ASK_ANSWER_MAX_CHARS)}…（已截断）`;
+  const lines = clean.split("\n");
+  const kept: string[] = [];
+  let used = 0;
+  for (const line of lines) {
+    const cost = kept.length === 0 ? line.length : line.length + 1; // +1 = 换行符
+    if (used + cost <= ASK_ANSWER_MAX_CHARS) {
+      kept.push(line);
+      used += cost;
+      continue;
+    }
+    if (kept.length === 0) kept.push(line.slice(0, ASK_ANSWER_MAX_CHARS));
+    break;
+  }
+  return `${kept.join("\n").trimEnd()}…（已截断）`;
 }
 
-/** 读取本工作区生效围栏规则（ask 输出闸门用；读失败不阻塞回答，只是闸门退化为仅长度限制） */
-async function loadAskRules(app: pg.Pool, scope: Scope): Promise<RuntimeRule[]> {
+/** 读取本工作区生效围栏规则（ask 输出闸门用；返回 null=加载失败——A-06：与"无规则"区分，闸门失效必须留痕不得静默放行） */
+async function loadAskRules(app: pg.Pool, scope: Scope): Promise<RuntimeRule[] | null> {
   const client = await app.connect();
   try {
     await client.query("BEGIN");
@@ -305,7 +362,7 @@ async function loadAskRules(app: pg.Pool, scope: Scope): Promise<RuntimeRule[]> 
     }));
   } catch {
     await client.query("ROLLBACK").catch(() => undefined);
-    return [];
+    return null; // A-06：加载失败返回 null（闸门不可用），下游必须显式标注而非按空规则集静默放行
   } finally {
     client.release();
   }
@@ -336,6 +393,12 @@ export async function runAsk(
   scope: Scope,
   input: { threadId: string; goal: string; presetKey: string; llmCall?: (prompt: string) => Promise<string> },
 ): Promise<AskResult> {
+  // A-02 修复：ask 执行期间先认领线程（queued→running CAS）——问询全程最长 45s LLM 预算，
+  // 此前线程一直挂 queued，调度器 7s 扫描会把它当 quest 重入执行（问询变真实派单）。
+  await app.query(
+    `UPDATE threads SET status='running', updated_at=now() WHERE id=$1 AND workspace_id=$2 AND status='queued'`,
+    [input.threadId, scope.workspaceId],
+  );
   const { facts, sources } = await gatherFacts(app, scope, input.goal);
   // 联网实时检索（ASK_WEB_SEARCH=1）：与库内事实合并，供模型合成
   if ((process.env.ASK_WEB_SEARCH ?? "") === "1") {
@@ -379,7 +442,12 @@ ${input.goal}
   /* ---------- GR-09：三层输出闸门（硬约束 → 事实软校验 → 合成标识） ---------- */
   answer = enforceAnswerLimits(answer);
   const askRules = await loadAskRules(app, scope);
-  const gate = judgeAnswer(askRules, answer);
+  // A-06 修复：规则加载失败（DB 抖动等）此前按空规则集恒 auto 静默放行——行业 ask.deliver
+  // block 红线失效且无留痕。现在显式标注闸门不可用（保守口径：可见降级，不假装闸门生效）。
+  if (askRules === null) {
+    answer = `${answer}\n（输出闸门暂不可用，本回答未经行业规则校验，请人工核对关键事实）`;
+  }
+  const gate = judgeAnswer(askRules ?? [], answer);
   if (gate.level === "block") {
     // 行业事实红线：不投递原答案，改为安全回执（并把触发规则写进 basis 供复盘）
     answer = `该回答触发了行业事实红线（${gate.triggeredBy.join("、")}），已拦截。请核对账本事实后人工确认。`;

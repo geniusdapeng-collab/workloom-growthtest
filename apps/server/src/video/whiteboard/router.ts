@@ -752,7 +752,18 @@ export const whiteboardRouter = router({
       const app = getAppPool();
       const film = await loadFilm(app, scope, input.filmId);
       const report = await pollRenderJobs(app, getGatewayPool(), scope, { limit: input.limit });
-      if (report.done > 0) {
+      /**
+       * C-02 修复：rendered 判定必须是"本 film 所属项目的渲染任务已完成且产物已入库"，
+       * 此前用全工作区聚合计数 report.done>0——同批次里他项目/mock 任务完成就会把
+       * 本影片误标 rendered（界面显示渲染完成但没有任何成片字节，假交付）。
+       */
+      const own = await scopedQuery<{ c: string }>(
+        app, scope,
+        `SELECT count(*) AS c FROM render_jobs
+          WHERE workspace_id=$1 AND project_id=$2 AND status='done' AND asset_id IS NOT NULL`,
+        [scope.workspaceId, film.project_id],
+      );
+      if (Number(own[0]?.c ?? 0) > 0) {
         await scopedQuery(
           app, scope,
           `UPDATE whiteboard_films SET status='rendered' WHERE workspace_id=$1 AND id=$2`,

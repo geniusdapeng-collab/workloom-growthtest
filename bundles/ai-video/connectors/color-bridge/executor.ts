@@ -4,7 +4,7 @@
  * 结构兼容 `packages/runtime/src/tools.ts` 的 ToolExecutor seam（不直接 import，
  * 避免行业包反向依赖运行时内部；部署时把返回值注入宿主的 toolExecutor 即可）。
  *
- * 与 geo-growthtest/connectors/visual-bridge 同款纪律：
+ * 与 geo-growth/connectors/visual-bridge 同款纪律：
  * - 工具白名单：不在表内的工具直接拒绝（或软失败），不猜测、不透传；
  * - 多端点故障转移 + 租户注入 + 幂等键（tool+params 哈希，重试/切端点不重复出片）；
  * - 软失败：桥不可达/超时/引擎错误 → `receipt.synced=false` 的结构化结果，由 runQuest

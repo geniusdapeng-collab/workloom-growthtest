@@ -1,6 +1,6 @@
 # 三端客户端基座 · 本仓产品分叉声明（growth 专用）
 
-> 适用：`WorkLoom-growthtest` ｜ 首次落地：2026-09-19 ｜ 关联任务：`[T-2026-0919-0006]`
+> 适用：`WorkLoom-growth` ｜ 首次落地：2026-09-19 ｜ 关联任务：`[T-2026-0919-0006]`
 
 ## 1. 背景：为什么本仓会"门禁失败"
 
@@ -17,17 +17,14 @@
 
 ## 2. 机制：本仓自有路径声明
 
-新增仓内声明文件 **`.workloom-client-extensions.json`**：
+**唯一事实源（2026-09-30 起）**：基座 `sync/child-repos.json#children[].industryExtensionPaths`
+（+ `tolerateExtensionSnapshotOverlap: true`，协议 §10.4「仓级扩展路径全链路」）。
+rollout 会把它写进仓内的 **`.workloom-ui-governance.json`**，本仓的
+`scripts/verify-client-foundation-consumer.mjs` 读取该治理状态并把其中路径视为**本仓自有**：
 
-```json
-{
-  "schemaVersion": "workloom.client-extensions/v1",
-  "reason": "为什么这些路径属于本仓产品层",
-  "industryExtensionPaths": ["apps/*/src/pages/**", "apps/*/src/voice/**", "..."]
-}
-```
+> 仓内旧的 `.workloom-client-extensions.json` 自 2026-09-30 起**不再被门禁读取**（保留作为历史说明）。
+> 仓内私改治理状态（增删路径或开关）会在下一次 rollout fail closed。
 
-本仓的 `scripts/verify-client-foundation-consumer.mjs` 读取它，并把其中路径视为**本仓自有**：
 
 - 豁免「客户端根存在非白名单行业文件」检查；
 - 豁免受管文件的**指纹比对**（这些文件的维护责任在本仓，基座历史指纹不再是判据）；

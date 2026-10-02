@@ -1,0 +1,79 @@
+{
+  "$id": "workloom://bundles/geo-growth/schemas/archive",
+  "title": "一客一档 v2 字段组（社媒×GEO 双域版 · 融合方案 §3.2；交付即建档，每个 Agent 的结果都写回档案——档案厚度=客户迁移成本=续约率）",
+  "type": "object",
+  "required": ["enterprise", "forbidden"],
+  "properties": {
+    "enterprise": {
+      "type": "object",
+      "description": "模块①企业与品牌：公司简介、资质、产能、工厂、品牌规范、禁用表达（D1 启动会建档，渠道运营+产品理解 Agent）",
+      "properties": {
+        "name": { "type": "string" },
+        "profile": { "type": "string", "description": "公司简介" },
+        "qualifications": { "type": "array", "description": "资质认证清单", "items": { "type": "string" } },
+        "capacity": { "type": "string", "description": "产能说明" },
+        "brand_guideline": { "type": "object", "description": "品牌规范（文案口径/视觉规范）" }
+      }
+    },
+    "entity_card": {
+      "type": "object",
+      "description": "模块②产品与方案（品牌实体卡）：产品线、型号、参数、材质、应用、价格/交付逻辑、核心卖点——GEO 实体一致性的唯一权威源（D1-D3 产品理解 Agent 提炼，客户逐项确认 L4）",
+      "properties": {
+        "product_lines": { "type": "array", "items": { "type": "object" } },
+        "core_selling_points": { "type": "array", "items": { "type": "string" } },
+        "price_logic": { "type": "string" },
+        "confirmed": { "type": "boolean", "description": "客户逐项确认标记" }
+      }
+    },
+    "target_market": {
+      "type": "object",
+      "description": "模块③目标市场：国家、语言、客户类型、采购角色、渠道、竞争对手（D3 市场分析 Agent 出报告，人裁决）",
+      "properties": {
+        "countries": { "type": "array", "items": { "type": "string" } },
+        "languages": { "type": "array", "items": { "type": "string" } },
+        "buyer_roles": { "type": "array", "items": { "type": "string" } },
+        "competitors": { "type": "array", "items": { "type": "object" } }
+      }
+    },
+    "content_assets": {
+      "type": "object",
+      "description": "模块④内容资产：图片/视频素材、历史脚本、高表现结构库、提示词模板（素材理解 Agent 持续沉淀）"
+    },
+    "operation_assets": {
+      "type": "object",
+      "description": "模块⑤运营资产：账号清单（防关联标注）、平台、阶段、发布纪律、表现基线（D3-D7 账号规划 Agent）",
+      "properties": {
+        "accounts": { "type": "array", "items": { "type": "object" }, "description": "账号清单（含防关联分组标注）" },
+        "stage": { "type": "string", "description": "账号成长六阶段机当前阶段" },
+        "baseline": { "type": "object", "description": "表现基线" }
+      }
+    },
+    "geo_assets": {
+      "type": "object",
+      "description": "模块⑥GEO 资产：query 集、能见度基线、引用源清单、口径冲突清单（D5-D10 引用源分析师+能见度监测官）",
+      "properties": {
+        "query_set": { "type": "array", "items": { "type": "object" }, "description": "四词类×中英双语 50-100 条，每词带语言/目标市场/优先级/能见度状态/关联内容" },
+        "visibility_baseline": { "type": "object", "description": "全平台首轮采集基线（提及率/首推率/SOV）" },
+        "citation_sources": { "type": "array", "items": { "type": "object" }, "description": "引用源清单（已占/待建）" },
+        "conflict_list": { "type": "array", "items": { "type": "object" }, "description": "口径冲突清单" }
+      }
+    },
+    "conversion_assets": {
+      "type": "object",
+      "description": "模块⑦转化资产：广告数据、线索画像、WhatsApp 沟通阶段、成交反馈（私域承接专员持续沉淀；数据红线——客资明细留客户系统，此处仅存画像与阶段聚合）"
+    },
+    "charter": {
+      "type": "object",
+      "description": "数字CEO 宪章（深度授权六步：shadow 影子模式 3-7 天→试用；授权边界/熔断/简报节拍）"
+    },
+    "forbidden": {
+      "type": "array",
+      "description": "事实红线与禁用表达（双写 L1.6 同源纪律；G-GEO2 一票否决的判定依据）",
+      "items": { "type": "string" }
+    },
+    "data_boundary": {
+      "type": "object",
+      "description": "数据边界声明：客户业务数据（客资/聊天/线索）留客户系统；事件链只记经营动作留痕（谁、何时、批了什么），不含聊天内容"
+    }
+  }
+}

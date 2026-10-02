@@ -13,7 +13,7 @@
  *   review  —— 品牌 look 变更：G-COL1 review，线程 pending_review，产生审批行
  *   outage  —— 工位不可达：软失败，步骤全部标未核实，线程 failed（不伪造回执）
  *
- * 运行（在 WorkLoom-growthtest 仓库内，需 DATABASE_URL / DATABASE_GATEWAY_URL，且工作区 ws-video 已 seed）：
+ * 运行（在 WorkLoom-growth 仓库内，需 DATABASE_URL / DATABASE_GATEWAY_URL，且工作区 ws-video 已 seed）：
  *   set -a; source .env; set +a
  *   node_modules/.bin/tsx bundles/ai-video/connectors/color-bridge/runtime-smoke.mts
  */

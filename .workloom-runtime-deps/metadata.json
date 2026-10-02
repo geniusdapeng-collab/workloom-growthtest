@@ -1,9 +1,9 @@
 {
   "schemaVersion": "workloom.runtime-deps/v1",
   "product": {
-    "productId": "workloom-ai-growthtest",
+    "productId": "workloom-ai-growth",
     "role": "industry",
-    "repository": "workloom-ai/WorkLoom-growthtest",
+    "repository": "workloom-ai/WorkLoom-growth",
     "includePlatformOps": false
   },
   "npmVersion": "11.17.0",

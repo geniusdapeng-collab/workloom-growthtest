@@ -18,7 +18,7 @@ import { fileURLToPath } from "node:url";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { GatewayEventSink, poolFromEnv } from "@workloom/base/model-router";
 import { modelPolicyFor } from "../service/llm.js";
-import { gatewayAppend, gatewayAppendOnClient } from "@workloom/base/workdata";
+import { gatewayAppend, gatewayAppendOnClient, insertWithReadableId, VIDEO_PROJECT_ID_SOURCE } from "@workloom/base/workdata";
 import { makeReadableId, newId } from "@workloom/shared";
 import {
   VideoStudio,
@@ -146,6 +146,57 @@ function dataMiningConfigFor(
  * 这里在 run 期间把 console 输出旁路落盘到 `.vm-work/logs/<projectId>.log`（原样透传，不改语义），
  * 供 `scripts/tools/pipeline-audit.mts` 逐环节核对"是否正常产出/是否流转".
  */
+/**
+ * C-07 修复：全局 console 劫持改为"单一包装 + 订阅者引用计数"。
+ * 此前每个 run 各自捕获"当前"console 为 originals——并发两个 run 时 B 捕获的是 A 的包装器，
+ * A 先结束恢复后，B 结束会把 console 永久还原成 A 的包装器（日志继续写入已结束 run 的文件，
+ * 且后续 run 的恢复链彻底错位）。
+ * 现在：console 只被包装一次（真正 originals 只捕获一次），各 run 以订阅者身份注册自己的
+ * 日志文件，取消订阅时引用计数归零才还原 console——先后结束顺序任意都不错位。
+ */
+const teeSubscribers = new Map<string, (level: string, args: unknown[]) => void>();
+let teeInstalled: { originals: Array<(...args: unknown[]) => void> } | null = null;
+
+function formatTeeLine(args: unknown[]): string {
+  return args
+    .map((a) => (typeof a === "string" ? a : a instanceof Error ? `${a.name}: ${a.message}` : (() => {
+      try {
+        return JSON.stringify(a);
+      } catch {
+        return String(a);
+      }
+    })()))
+    .join(" ");
+}
+
+function installTee(): void {
+  if (teeInstalled) return;
+  const methods = ["log", "warn", "error"] as const;
+  const originals = methods.map((m) => console[m] as (...args: unknown[]) => void);
+  methods.forEach((m, i) => {
+    (console as unknown as Record<string, unknown>)[m] = (...args: unknown[]) => {
+      for (const write of teeSubscribers.values()) {
+        try {
+          write(m.toUpperCase(), args);
+        } catch {
+          /* 单个订阅者失败不影响其他订阅者与原输出 */
+        }
+      }
+      originals[i]!.apply(console, args);
+    };
+  });
+  teeInstalled = { originals };
+}
+
+function uninstallTeeIfIdle(): void {
+  if (!teeInstalled || teeSubscribers.size > 0) return;
+  const methods = ["log", "warn", "error"] as const;
+  methods.forEach((m, i) => {
+    (console as unknown as Record<string, unknown>)[m] = teeInstalled!.originals[i];
+  });
+  teeInstalled = null;
+}
+
 function teeRunLogs(projectId: string): () => void {
   const logDir = path.join(WORK_DIR, "logs");
   const logFile = path.join(logDir, `${projectId}.log`);
@@ -154,34 +205,21 @@ function teeRunLogs(projectId: string): () => void {
   } catch {
     return () => undefined;
   }
-  const methods = ["log", "warn", "error"] as const;
-  const originals = methods.map((m) => console[m]);
   const write = (level: string, args: unknown[]) => {
-    const line = args
-      .map((a) => (typeof a === "string" ? a : a instanceof Error ? `${a.name}: ${a.message}` : (() => {
-        try {
-          return JSON.stringify(a);
-        } catch {
-          return String(a);
-        }
-      })()))
-      .join(" ");
     try {
-      appendFileSync(logFile, `[${new Date().toISOString()}] ${level} ${line}\n`, "utf8");
+      appendFileSync(logFile, `[${new Date().toISOString()}] ${level} ${formatTeeLine(args)}\n`, "utf8");
     } catch {
       /* 日志落盘失败不影响运行 */
     }
   };
-  methods.forEach((m, i) => {
-    (console as unknown as Record<string, unknown>)[m] = (...args: unknown[]) => {
-      write(m.toUpperCase(), args);
-      (originals[i] as (...a: unknown[]) => void).apply(console, args);
-    };
-  });
+  teeSubscribers.set(projectId, write);
+  installTee();
+  let released = false;
   return () => {
-    methods.forEach((m, i) => {
-      (console as unknown as Record<string, unknown>)[m] = originals[i];
-    });
+    if (released) return; // 幂等：重复调用不破坏其他 run 的订阅
+    released = true;
+    teeSubscribers.delete(projectId);
+    uninstallTeeIfIdle();
   };
 }
 
@@ -358,7 +396,31 @@ async function pollApproval(
   const deadline = Date.now() + APPROVAL_TIMEOUT_MS;
   for (;;) {
     if (entry.aborted) return { approved: false, reason: "run-aborted", fatal: "abort" };
-    if (Date.now() >= deadline) return { approved: false, reason: "approval-timeout", fatal: "timeout" };
+    if (Date.now() >= deadline) {
+      // C-05 修复：超时出口把审批行置 expired——否则审批中心仍显示可办，
+      // 人后来批准了也没有任何消费者（僵尸审批；与 expireSweep 口径一致）
+      try {
+        const client = await getAppPool().connect();
+        try {
+          await client.query("BEGIN");
+          await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+          await client.query(
+            `UPDATE approvals SET status='expired' WHERE approval_id=$1 AND workspace_id=$2 AND status='pending'`,
+            [approvalId, scope.workspaceId],
+          );
+          await client.query("COMMIT");
+        } catch (inner) {
+          // 事务不得带着未决状态归还连接池（否则后续借用者接手一个已中止事务）
+          await client.query("ROLLBACK").catch(() => undefined);
+          throw inner;
+        } finally {
+          client.release();
+        }
+      } catch (err) {
+        console.warn(`[studio-worker] 审批超时置 expired 失败（${approvalId}）：`, err instanceof Error ? err.message : err);
+      }
+      return { approved: false, reason: "approval-timeout", fatal: "timeout" };
+    }
     const row = await readApproval(scope, approvalId);
     if (row && row.status !== "pending") {
       if (row.status === "approved") return { approved: true };
@@ -791,7 +853,18 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
          ON CONFLICT (event_id, channel) DO NOTHING`,
         [
           approvalId, scope.tenantId, scope.workspaceId, ev.eventId,
-          JSON.stringify({ contentMd: humanContentMd, gate: req.gate, vendorType: req.vendorType }),
+          /**
+           * W-04 举一反三：这一支是"人工确认门"（HR_PRODUCER=human 或门不在 AUTO_GATES 内），
+           * 按模块自述"人审只保留给花钱与对外动作"——必须在快照上显式声明高危，
+           * 否则批量采纳入口会把"逐门确认"降级成一键放行（第三方实测同类的 l4 种子审批即被批量放行）。
+           */
+          // B-01 修复：G8 渲染提交/G9 发布/G10 对外评论均为花钱/对外门，快照必须显式携带高危标记——
+          // 批量审批守卫与演示脚本的 lowRisk 过滤都读 high_risk，缺失即守卫空转（此前可一键批量照批对外发布）。
+          // B-07 修复：补 expires_at（与 pollApproval 超时同口径）——此前快照无过期位，decide/expireSweep 永不标 expired
+          JSON.stringify({
+            contentMd: humanContentMd, gate: req.gate, vendorType: req.vendorType, high_risk: true,
+            expires_at: new Date(Date.now() + APPROVAL_TIMEOUT_MS).toISOString(),
+          }),
         ],
       );
       await client.query("COMMIT");
@@ -1412,14 +1485,16 @@ export async function startVideoProjectRun(
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-    const max = await client.query<{ n: number }>(`SELECT public.video_projects_max_vid_no() AS n`);
-    projectId = makeReadableId("VID", Number(max.rows[0]?.n ?? 0) + 1);
+    // GR-02（2026-09-29 第二次修复）：视频项目号与线程号同口径——纯 nextval 取号 + SAVEPOINT 换号重试
     const kind = input.isMarketing ? "marketing" : "narrative";
-    await client.query(
-      `INSERT INTO video_projects (id, workspace_id, title, kind, created_by)
-       VALUES ($1,$2,$3,$4,$5)`,
-      [projectId, scope.workspaceId, input.intent.slice(0, 200), kind, input.by.id],
-    );
+    projectId = (await insertWithReadableId(client, VIDEO_PROJECT_ID_SOURCE, async (id) => {
+      await client.query(
+        `INSERT INTO video_projects (id, workspace_id, title, kind, created_by)
+         VALUES ($1,$2,$3,$4,$5)`,
+        [id, scope.workspaceId, input.intent.slice(0, 200), kind, input.by.id],
+      );
+      return id;
+    })).id;
     await gatewayAppendOnClient(client, {
       ...scope,
       actor: { ...input.by },

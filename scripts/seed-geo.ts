@@ -1,11 +1,11 @@
 /**
- * seed-geo.ts —— WorkLoom GEO（geo-growthtest Bundle）双域融合经营演示种子
+ * seed-geo.ts —— WorkLoom GEO（geo-growth Bundle）双域融合经营演示种子
  *
  * 与 scripts/seed-video.ts（ai-video Bundle）同构，装载：
- *  - 演示租户/工作区（industry: geo-growthtest）
+ *  - 演示租户/工作区（industry: geo-growth）
  *  - 人类成员（客户老板/渠道运营——全托管线最小配置）
- *  - bundles/geo-growthtest 的 16 个数码员工 preset（情报组 2 + 内容组 4 + 分发组 3 + 数据组 3 + 经营组 2 + 指挥层 2；fence_bindings 原样落库）
- *  - geo-growthtest-baseline/v1 双域基线围栏（社媒域 G9/G10/G12/G15/G16 + GEO 域 G-GEO1/2/3 + 双域 G17/G18/G20 共 17 条）
+ *  - bundles/geo-growth 的 16 个数码员工 preset（情报组 2 + 内容组 4 + 分发组 3 + 数据组 3 + 经营组 2 + 指挥层 2；fence_bindings 原样落库）
+ *  - geo-growth-baseline/v1 双域基线围栏（社媒域 G9/G10/G12/G15/G16 + GEO 域 G-GEO1/2/3 + 双域 G17/G18/G20 共 17 条）
  *  - 6 个 GEO 官方技能（安装即绑定围栏）
  *  - 一客一档 v2（七模块：企业品牌/产品实体卡/目标市场/内容资产/运营资产/GEO 资产/转化资产 + 数据边界声明）
  *  - 自动化触发器（情报站 07:00 / 清晨决策包 08:30 / 能见度品牌词日频+全量周频 / 周一经营会 / 月度回测 / 夜班值守 / CEO 节拍）
@@ -19,7 +19,7 @@ import YAML from "yaml";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { safeParseReplayAwareEvent } from "@workloom/base/workdata";
+import { alignReadableIdSequences, safeParseReplayAwareEvent } from "@workloom/base/workdata";
 // 哈希链统一生产口径（events.ts 的 canonicalJson/eventHash），与 seed.ts/seed-video.ts 同一纪律
 import { eventHash } from "@workloom/base/workdata";
 // 技能围栏绑定表（与基座 seed.ts 共用同一事实源；见 scripts/skill-bindings.mts）
@@ -27,7 +27,7 @@ import { skillBindingsFor } from "./skill-bindings.mts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
-const BUNDLE_DIR = join(REPO_ROOT, "bundles/geo-growthtest");
+const BUNDLE_DIR = join(REPO_ROOT, "bundles/geo-growth");
 
 const DATABASE_URL =
   process.env.DATABASE_URL ?? "postgres://postgres:workloom@localhost:5432/workloom";
@@ -40,8 +40,8 @@ const GATEWAY_URL =
 const TENANT_ID = "tenant-demo";
 const WS_ID = "ws-geo";
 const WS_NAME = "WorkLoom GEO · 双域经营演示工作室";
-const WS_SLUG = "geo-growthtest";
-const FENCE_VERSION = "geo-growthtest-baseline/v1";
+const WS_SLUG = "geo-growth";
+const FENCE_VERSION = "geo-growth-baseline/v1";
 
 const MEMBERS = [
   { id: "MEM-G01", name: "梁老板", role: "owner" },
@@ -89,14 +89,14 @@ interface FenceRule {
 /**
  * 装载 bundle.json `provides.fences` 声明的全部基线围栏包。
  * `fences/patches/*` 是客群二选一的客户级补丁，由落地向导按需应用，此处跳过。
- * 之前只读 geo-growthtest-baseline.yml，导致新增的行业围栏包（如视觉工位 G-VIS 系列）
+ * 之前只读 geo-growth-baseline.yml，导致新增的行业围栏包（如视觉工位 G-VIS 系列）
  * 永远进不了 fence_rules 表——判定器看不到规则，写动作只能落保守 review。
  */
 function loadFences(): FenceRule[] {
   const manifest = JSON.parse(readFileSync(join(BUNDLE_DIR, "bundle.json"), "utf-8")) as {
     workloom?: { provides?: { fences?: string[] } };
   };
-  const declared = manifest.workloom?.provides?.fences ?? ["fences/geo-growthtest-baseline.yml"];
+  const declared = manifest.workloom?.provides?.fences ?? ["fences/geo-growth-baseline.yml"];
   const rules: FenceRule[] = [];
   for (const assetPath of declared) {
     if (assetPath.includes("/patches/")) continue;
@@ -145,14 +145,14 @@ function loadSkills(): SkillDoc[] {
 
 /**
  * 组合技能并集（2026-09-20 真机验收修复）：
- * 组合编制（hotel + ai-video + geo-growthtest）里的酒店/视频岗位引用各自包的 official 技能；
+ * 组合编制（hotel + ai-video + geo-growth）里的酒店/视频岗位引用各自包的 official 技能；
  * 只装本包 29 条技能时，那些岗位被判「技能已声明未装备」（ui 探针 skillsOk=false）。
  * 这里按各包 bundle.json 的 provides.skills 逐条落 skills 行 + ws-geo 安装行，
  * 与基座 seed.ts 的组合技能安装同口径（安装快照取 skills 表当前值）。
  */
 function loadComposedSkillDocs(): Array<{ bundle: string | null; doc: SkillDoc }> {
   const out: Array<{ bundle: string | null; doc: SkillDoc }> = [];
-  for (const bundleId of ["hotel", "ai-video", "geo-growthtest"]) {
+  for (const bundleId of ["hotel", "ai-video", "geo-growth"]) {
     const manifestPath = join(REPO_ROOT, "bundles", bundleId, "bundle.json");
     if (!existsSync(manifestPath)) continue;
     const manifest = JSON.parse(readFileSync(manifestPath, "utf-8")) as {
@@ -357,8 +357,8 @@ async function main() {
   );
   await q(
     `INSERT INTO workspaces (id, tenant_id, name, slug, industry, stage, night_config, bundle_id, is_example)
-     VALUES ($1,$2,$3,$4,'geo-growthtest','stable',$5,'geo-growthtest',true)
-     ON CONFLICT (id) DO UPDATE SET bundle_id='geo-growthtest', is_example=true`,
+     VALUES ($1,$2,$3,$4,'geo-growth','stable',$5,'geo-growth',true)
+     ON CONFLICT (id) DO UPDATE SET bundle_id='geo-growth', is_example=true`,
     [
       WS_ID,
       TENANT_ID,
@@ -419,7 +419,7 @@ async function main() {
 
   /**
    * 组合编制上岗（2026-09-20 真机验收修复）：
-   * geo-growthtest 的 bundle.json 声明 composition（hotel + ai-video 依赖，presetOwners 含 company-ceo 等），
+   * geo-growth 的 bundle.json 声明 composition（hotel + ai-video 依赖，presetOwners 含 company-ceo 等），
    * 权威花名册 = 装配器 composeWorkforce 的运行结果（2026-09-24 实测 78 岗，含同名遮蔽裁决）。此前 seed 只落本包 27 岗，
    * 与基座 seed.ts（ws-yunqi 已按组合编制上岗，2026-09-24 实测 78 岗）口径不一致——RDAS L1 矩阵因此判 0/组合编制。
    * 这里与基座同口径补齐；围栏按组合并集落库（只紧不松，不滚动客户已收紧的规则）。
@@ -428,7 +428,7 @@ async function main() {
   const composed = await provisionComposedWorkforce(
     { query: (sql: string, params?: unknown[]) => owner.query(sql, params as never[]) },
     { tenantId: TENANT_ID, workspaceId: WS_ID },
-    "geo-growthtest",
+    "geo-growth",
     "system:seed",
   );
   console.log(
@@ -468,13 +468,13 @@ async function main() {
       [skillId, WS_ID],
     );
   }
-  console.log(`✓ 组合官方技能 ×${composedSkills.length} 已安装（hotel + ai-video + geo-growthtest 三包并集）`);
+  console.log(`✓ 组合官方技能 ×${composedSkills.length} 已安装（hotel + ai-video + geo-growth 三包并集）`);
 
   // 一客一档 v2（dataMode=simulated：D24 落地向导横幅事实源——种子库即「全模拟运行态」）
   const archive = { ...clientArchive(), dataMode: "simulated" };
   await q(
     `INSERT INTO profiles (workspace_id, tenant_id, industry, archive, forbidden, pii_vault)
-     VALUES ($1,$2,'geo-growthtest',$3,$4,NULL)
+     VALUES ($1,$2,'geo-growth',$3,$4,NULL)
      ON CONFLICT (workspace_id) DO UPDATE SET archive = EXCLUDED.archive, forbidden = EXCLUDED.forbidden, updated_at = now()`,
     [WS_ID, TENANT_ID, JSON.stringify(archive), JSON.stringify(archive.forbidden)],
   );
@@ -512,7 +512,7 @@ async function main() {
     const skillId = `skill-${s.name}`;
     await q(
       `INSERT INTO skills (id, level, bundle, name, version, description, fence_bindings, body, desensitized)
-       VALUES ($1,'official','geo-growthtest',$2,'1.0.0',$3,'[]',$4,false)
+       VALUES ($1,'official','geo-growth',$2,'1.0.0',$3,'[]',$4,false)
        ON CONFLICT (id) DO NOTHING`,
       [skillId, s.name, s.description, s.body],
     );
@@ -533,15 +533,15 @@ async function main() {
    * 装配台账登记（bundle_installs）。
    *
    * 游客首启入口（accounts.guestEnter）按「is_example=true + 该 Bundle 有 active 安装行」
-   * 自动发现示例工作区；漏登记这一行时，产品默认演示工作区（geo-growthtest）根本进不去——
+   * 自动发现示例工作区；漏登记这一行时，产品默认演示工作区（geo-growth）根本进不去——
    * 前端只会看到"示例工作区未就绪（首启种子未完成）"。与 scripts/seed.ts 同口径。
    */
   await q(
     `INSERT INTO bundle_installs (id, workspace_id, bundle_id, assets, status)
-     VALUES ($1,$2,'geo-growthtest',$3,'active')
+     VALUES ($1,$2,'geo-growth',$3,'active')
      ON CONFLICT (id) DO NOTHING`,
     [
-      `bi-${WS_ID}-geo-growthtest`,
+      `bi-${WS_ID}-geo-growth`,
       WS_ID,
       JSON.stringify({
         preset_ids: presets.map((p) => `agt-${p.preset_key}`),
@@ -761,6 +761,10 @@ async function main() {
 
   await gw.end();
   console.log("✓ 运行态剧本完成（情报/能见度/双域分发/私域/晨报/审批全量有数）");
+
+  // GR-02（2026-09-29 第二次修复）：种子/手写 id 写入方收尾对齐号源（取号函数只做 nextval）
+  const seqFloor = await alignReadableIdSequences(owner);
+  console.log(`✓ 可读号源对齐：threads→${seqFloor.threads}，video_projects→${seqFloor.videoProjects}`);
 
   await owner.end();
   console.log("\nWorkLoom GEO 双域演示种子完成。下一步：pnpm dev 后在工作台查看（ws-geo 工作区）。");

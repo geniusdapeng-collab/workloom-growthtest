@@ -35,7 +35,7 @@ export interface ProvisionShadowInput {
   workspaceId: string;
   workspaceName: string;
   slug: string;
-  /** 组合主包（product.manifest.json#defaultBundle，例如 geo-growthtest）。 */
+  /** 组合主包（product.manifest.json#defaultBundle，例如 geo-growth）。 */
   primaryBundle: string;
   /** 开户发起方（平台运营/系统账号），进账本。 */
   by: string;

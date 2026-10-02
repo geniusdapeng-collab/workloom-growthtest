@@ -1,0 +1,67 @@
+{
+  "workspaceKey": "geo-growth-demo",
+  "brandName": "云栖增长中心",
+  "agentName": "小栖",
+  "logoText": "增",
+  "theme": {
+    "primary": "#0f766e",
+    "secondary": "#B45309"
+  },
+  "welcomeText": "您好，欢迎来到{brand}。我是获客服务助手{agent}，可以接待咨询、记录需求并同步真实跟进进度。",
+  "quickReplies": [
+    {
+      "label": "咨询增长服务",
+      "sendText": "我想了解获客增长服务和近期活动"
+    },
+    {
+      "label": "提交合作需求",
+      "serviceKind": "consult"
+    },
+    {
+      "label": "查询跟进进度",
+      "sendText": "请帮我查询已提交需求的跟进进度"
+    },
+    {
+      "label": "联系人工顾问",
+      "serviceKind": "service_request"
+    }
+  ],
+  "serviceEntries": [
+    {
+      "kind": "consult",
+      "title": "合作需求",
+      "desc": "记录意向、预算和期望时间",
+      "icon": "合",
+      "sla": "提交后可在工单中查看进度",
+      "titlePlaceholder": "请描述您的合作目标"
+    },
+    {
+      "kind": "service_request",
+      "title": "人工顾问",
+      "desc": "复杂问题转交经营顾问",
+      "icon": "人",
+      "sla": "以受理回执中的时间为准",
+      "titlePlaceholder": "请描述需要协助的问题"
+    }
+  ],
+  "profile": {
+    "identityBinding": false,
+    "membership": false,
+    "orders": false,
+    "labels": {
+      "identity": "客户身份",
+      "membership": "客户权益",
+      "points": "合作值",
+      "orders": "近期需求",
+      "emptyOrders": "暂无需求记录"
+    }
+  },
+  "enableTabs": [
+    "chat",
+    "service",
+    "tickets",
+    "messages",
+    "me"
+  ],
+  "supportPhone": ""
+}

@@ -27,7 +27,7 @@ pnpm -C apps/server dev &                  # API :8787（web 非必需）
 
 # ② 底座回归（双保险）
 pnpm suite          # 全场景套件（445 用例，含 E2E 权限矩阵）
-pnpm suite:geo      # 存在 bundles/geo-growthtest 时执行（77 用例）
+pnpm suite:geo      # 存在 bundles/geo-growth 时执行（77 用例）
 pnpm suite:hotel    # 存在 bundles/hotel 时执行（43 用例，v3.3 获客域）
 
 # ③ 三链路门禁（强制红线）

@@ -4,7 +4,7 @@
  * 定位：把「成片调色」这件事做成可审计的确定性工具层，工位本地执行，零外部依赖
  * （只用 node 内置模块 + 工位本地 ffmpeg/ffprobe）。
  *
- * 纪律（与 geo-growthtest/connectors/visual-bridge 同构）：
+ * 纪律（与 geo-growth/connectors/visual-bridge 同构）：
  * - 原片只读：任何写入都落到新文件，覆盖原片直接拒绝（overwrite_source_forbidden）；
  * - 路径监狱：只允许访问白名单根目录内的路径（WORKLOOM_COLOR_ALLOWED_ROOTS）；
  * - 无回执=未核实：产物必须能给出 sha256 与指标复检结果；

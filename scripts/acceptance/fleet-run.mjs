@@ -6,7 +6,7 @@
  * 产出该仓的 outputs/acceptance/** 与 fleet-run-<repo>.json（供舰队级汇总）。
  *
  * 用法：
- *   node scripts/acceptance/fleet-run.mjs --repo WorkLoom-growthtest --db workloom_growthtest
+ *   node scripts/acceptance/fleet-run.mjs --repo WorkLoom-growth --db workloom_growth
  *   [--fleet-dir ~/WorkLoom-fleet] [--skip-install] [--skip-seed] [--skip-regression] [--keep-running]
  *   [--regression "suite,suite:hotel,db:verify-chain,typecheck"] [--timeout-min 40]
  *   [--env local-preview|client-runtime|deployed] [--live] [--live-only] [--require-live] [--allow-prod-writes]
@@ -229,7 +229,7 @@ if (PRODUCTION) {
   const pkg = JSON.parse(readFileSync(join(REPO_DIR, "package.json"), "utf-8"));
   const scripts = pkg.scripts ?? {};
   const bundleDirOf = (name) => {
-    const guess = { "db:seed": "hotel", "db:seed:video": "ai-video", "db:seed:geo": "geo-growthtest", "db:seed:acq": "geo-growthtest", "db:seed:aipm": "ai-pm", "db:seed:ecom": "ecommerce" }[name];
+    const guess = { "db:seed": "hotel", "db:seed:video": "ai-video", "db:seed:geo": "geo-growth", "db:seed:acq": "geo-growth", "db:seed:aipm": "ai-pm", "db:seed:ecom": "ecommerce" }[name];
     if (!guess) return null;
     return existsSync(join(REPO_DIR, "bundles", guess)) ? null : join("bundles", guess);
   };

@@ -4,7 +4,7 @@
  * 为什么引擎**不入库**（规格书 v2.0 review 修复 F1）：
  *   上游 `Vincentwei1021/video-talkcraft` 的许可是 **PolyForm Noncommercial 1.0.0**——
  *   "noncommercial use is free; any commercial use of the toolkit requires prior authorization from the author"。
- *   把它的源码（108 张卡 tsx + 12 个管线脚本）复制进 WorkLoom-growthtest 这个商用产品仓库即构成再分发，
+ *   把它的源码（108 张卡 tsx + 12 个管线脚本）复制进 WorkLoom-growth 这个商用产品仓库即构成再分发，
  *   且默认商用未获授权。因此本仓只保留**我方代码**（模板 / 调度 / 数据契约），引擎改为：
  *     ① 安装期从上游按 PINNED commit 拉取到 `vendor/talkcraft/`（已进 .gitignore，不进仓）；
  *     ② 运行前过三关：文件齐备 → LICENSE/PINNED 在场 → 许可范围与授权记录匹配；

@@ -270,7 +270,7 @@ describe("内容包完整性（行业可替换的硬约束）", () => {
 
   it("内容包按 Bundle 解析：未知 Bundle 不显示引导（禁止张冠李戴）", () => {
     expect(questlineForBundle("hotel")).toBe(QUESTLINE);
-    expect(questlineForBundle("geo-growthtest")).toBe(QUESTLINE_GEO);
+    expect(questlineForBundle("geo-growth")).toBe(QUESTLINE_GEO);
     expect(questlineForBundle("ai-video")).toBe(QUESTLINE_VIDEO);
     expect(questlineForBundle("some-other-industry")).toBeNull();
     expect(questlineForBundle(null)).toBeNull();

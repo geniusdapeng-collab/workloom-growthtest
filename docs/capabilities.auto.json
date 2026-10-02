@@ -1,7 +1,7 @@
 {
  "repo": "workloom-ai-acquisition",
- "productId": "workloom-ai-growthtest",
- "repository": "workloom-ai/WorkLoom-growthtest",
+ "productId": "workloom-ai-growth",
+ "repository": "workloom-ai/WorkLoom-growth",
  "displayName": "WorkLoom 获客增长系统（实验车道）",
  "description": "企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。",
  "generatedAt": "2026-09-27T14:42:02.507Z",
@@ -61,7 +61,7 @@
    "sourcePath": "bundles/ai-video/bundle.json"
   },
   {
-   "bundle": "geo-growthtest",
+   "bundle": "geo-growth",
    "version": "1.0.0",
    "status": "candidate",
    "presets": 27,
@@ -96,7 +96,7 @@
     "lifecycle-growth-officer",
     "growth-partnership-officer"
    ],
-   "sourcePath": "bundles/geo-growthtest/bundle.json"
+   "sourcePath": "bundles/geo-growth/bundle.json"
   },
   {
    "bundle": "hotel",
@@ -208,17 +208,17 @@
      "desc": "42 条岗位定义 / 35 项技能路径 / 6 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数",
      "sourcePaths": [
       "bundles/ai-video/bundle.json",
-      "bundles/geo-growthtest/bundle.json",
+      "bundles/geo-growth/bundle.json",
       "bundles/hotel/bundle.json"
      ]
     },
     {
-     "name": "bundles/geo-growthtest/",
-     "how": "[manifest](../bundles/geo-growthtest/bundle.json)",
+     "name": "bundles/geo-growth/",
+     "how": "[manifest](../bundles/geo-growth/bundle.json)",
      "desc": "27 条岗位定义 / 29 项技能路径 / 4 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数",
      "sourcePaths": [
       "bundles/ai-video/bundle.json",
-      "bundles/geo-growthtest/bundle.json",
+      "bundles/geo-growth/bundle.json",
       "bundles/hotel/bundle.json"
      ]
     },
@@ -228,14 +228,14 @@
      "desc": "16 条岗位定义 / 30 项技能路径 / 1 条管线；版本 3.4.0，状态 candidate；不等于已接通功能数",
      "sourcePaths": [
       "bundles/ai-video/bundle.json",
-      "bundles/geo-growthtest/bundle.json",
+      "bundles/geo-growth/bundle.json",
       "bundles/hotel/bundle.json"
      ]
     }
    ],
    "sourcePaths": [
     "bundles/ai-video/bundle.json",
-    "bundles/geo-growthtest/bundle.json",
+    "bundles/geo-growth/bundle.json",
     "bundles/hotel/bundle.json"
    ]
   },

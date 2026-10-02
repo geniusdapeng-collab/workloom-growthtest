@@ -2,7 +2,7 @@
 /**
  * 开户即托管 CLI（《GROWTH 深度产品方案》§3）
  *
- *   pnpm onboarding provision --tenant tn-x --workspace ws-x --name "XX 获客用增" --slug xx-growth [--bundle geo-growthtest] [--by platform:ops]
+ *   pnpm onboarding provision --tenant tn-x --workspace ws-x --name "XX 获客用增" --slug xx-growth [--bundle geo-growth] [--by platform:ops]
  *   pnpm onboarding cycle      --tenant tn-x --workspace ws-x
  *   pnpm onboarding report     --tenant tn-x --workspace ws-x [--hours 24] [--name "XX 获客用增"]
  *   pnpm onboarding first-login --tenant tn-x --workspace ws-x

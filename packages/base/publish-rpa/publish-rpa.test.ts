@@ -20,6 +20,8 @@ type Row = Record<string, any>;
 class MockDb {
   tasks: Row[] = [];
   events: Array<{ seq: number; event_id: string; hash: string; payload: any }> = [];
+  /** C-03（排雷台账）：G9 挂起须插审批单，此处登记以便断言「挂起有单、单带高危标记」 */
+  approvals: Row[] = [];
   private seq = 8800;
 
   query(sql: string, params: any[] = []): { rows: Row[]; rowCount: number } {
@@ -72,6 +74,17 @@ if (s.includes("append_event_insert")) {
           && x.executed_at && x.executed_at >= params[2] && x.executed_at <= params[3],
       ).length;
       return { rows: [{ c: String(c) }], rowCount: 1 };
+    }
+
+    // ---- approvals（C-03：G9 挂起插审批单，人可见可批；批准后的回迁在 review-console.decide 内） ----
+    if (/INSERT INTO approvals/.test(s)) {
+      this.approvals.push({
+        approval_id: params[0], tenant_id: params[1], workspace_id: params[2], event_id: params[3],
+        channel: "inapp", status: "pending", snapshot: JSON.parse(params[4]),
+        // tier 是 SQL 里的字面量（非绑定参数），按原文取值以便断言分级
+        tier: (s.match(/'(l[24]_[a-z]+)'/) ?? [])[1],
+      });
+      return { rows: [], rowCount: 1 };
     }
 
     // ---- 事件号源函数（D29：appendEventInTx 号尾查询，SECURITY DEFINER 全租户口径） ----
@@ -156,6 +169,12 @@ describe("执行器：G9 围栏预检", () => {
     const ev = db.events.find((e) => e.payload.decision.action === "publish.fence_hold")!;
     expect(ev.payload.rule_impact).toEqual([{ rule_id: "G9", version: "v1", result: "review" }]);
     expect(ev.payload.object).toMatchObject({ type: "publish_task", id: "pt-1" });
+    // C-03（排雷台账）：挂起不能只写事件——必须在审批中心可查可批，且带高危标记（不可被批量照批）
+    expect(db.approvals).toHaveLength(1);
+    expect(db.approvals[0]).toMatchObject({ status: "pending", tier: "l2_captain" });
+    expect(db.approvals[0]!.snapshot).toMatchObject({
+      gate: "G9", object_type: "publish_task", object_id: "pt-1", high_risk: true,
+    });
   });
 
   it("非 pending 任务幂等退出（not_claimable）", async () => {

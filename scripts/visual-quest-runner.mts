@@ -26,7 +26,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import pg from "pg";
 import { runQuest } from "@workloom/runtime";
-import { createToolExecutorForScope } from "../bundles/geo-growthtest/connectors/visual-bridge/server-adapter.mts";
+import { createToolExecutorForScope } from "../bundles/geo-growth/connectors/visual-bridge/server-adapter.mts";
 
 type PlanName = "cover";
 

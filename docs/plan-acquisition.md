@@ -136,7 +136,7 @@
 
 ## 四、酒店垂直化：hotel-acquisition Bundle
 
-按「底座零改动，能力经 Bundle 注入」的既定纪律，酒店获客能力落为新 Bundle，与现有 hotel（运营域）、geo-growthtest（通用双域）并存。
+按「底座零改动，能力经 Bundle 注入」的既定纪律，酒店获客能力落为新 Bundle，与现有 hotel（运营域）、geo-growth（通用双域）并存。
 
 ### 4.1 酒店获客对象模型（新增 8 类）
 

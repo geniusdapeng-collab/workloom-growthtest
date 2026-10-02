@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * CNB desktop Release publisher for WorkLoom-growthtest.
+ * CNB desktop Release publisher for WorkLoom-growth.
  *
  * The api_trigger_desktop_release event runs a Mac producer, a Windows producer,
  * and one publisher in parallel. Producers put sealed candidates in the commit
@@ -42,7 +42,7 @@ import {
   verifyRelease,
 } from "../desktop-release-finalizer.mjs";
 
-const REPOSITORY = "workloom-ai/WorkLoom-growthtest";
+const REPOSITORY = "workloom-ai/WorkLoom-growth";
 const EVENT = "api_trigger_desktop_release";
 const API_ORIGIN = "https://api.cnb.cool";
 const TAG_PATTERN = /^v\d+\.\d+\.\d+$/u;

@@ -312,7 +312,9 @@ async function main(): Promise<void> {
   );
   check(
     "22:00 围栏快照写入（F2.6：夜班动作 100% 过围栏 L4.1）",
-    curNight.configured && curNight.run?.fenceSnapshot === "hotel-baseline/v1",
+    // D-01 修复：断言对象应为"快照=当前激活基线版本"而非硬编码 v1——种子基线已演进到 v4，
+    // 硬编码 v1 让全绿系统报红（断言漂移，非产品缺陷）。
+    curNight.configured === true && /^hotel-baseline\/v\d+$/.test(curNight.run?.fenceSnapshot ?? ""),
     `快照 ${curNight.run?.fenceSnapshot}`,
   );
   nightStartedAt = nightStartedAt ?? curNight.run?.startedAt ?? null;

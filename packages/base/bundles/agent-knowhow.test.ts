@@ -261,7 +261,7 @@ describe("数字员工配套技能 · 行业 Know-How 结构（S-C 工具/纪律
   }
 });
 
-/** geo-growthtest 视觉栈（S-B 制作/工艺型）：获客系统的成套视觉生产能力 */
+/** geo-growth 视觉栈（S-B 制作/工艺型）：获客系统的成套视觉生产能力 */
 const GEO_VISUAL_SKILLS: Array<{ name: string; boundBy: string[] }> = [
   { name: "compositor-designer", boundBy: ["visual-designer"] },
   { name: "art-direction", boundBy: ["material-scout", "visual-designer"] },
@@ -279,8 +279,8 @@ const GEO_VISUAL_SKILLS: Array<{ name: string; boundBy: string[] }> = [
   { name: "promo-banner", boundBy: ["visual-designer"] },
 ];
 
-describe("geo-growthtest 视觉栈 · 行业 Know-How 结构（S-B 制作/工艺型）", () => {
-  const GEO_DIR = join(ROOT, "geo-growthtest");
+describe("geo-growth 视觉栈 · 行业 Know-How 结构（S-B 制作/工艺型）", () => {
+  const GEO_DIR = join(ROOT, "geo-growth");
   const geoSkillText = (name: string): string => readFileSync(join(GEO_DIR, "skills", name, "SKILL.md"), "utf8");
   const expectGeoBound = (name: string, boundBy: string[]): void => {
     const bound: string[] = [];

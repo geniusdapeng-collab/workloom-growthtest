@@ -1,7 +1,7 @@
 /**
  * compose.mjs · 组合编制/围栏的**可移植**读取层（RDAS v1）
  *
- * 两类仓的现实差异：获客仓（workloom / WorkLoom-growthtest）带 `composeWorkforce` 之类的组合 API；
+ * 两类仓的现实差异：获客仓（workloom / WorkLoom-growth）带 `composeWorkforce` 之类的组合 API；
  * 基座与其他行业仓只有单包装配。验收器必须两种都能跑，否则「同一套标准验 10 个仓」就是空话。
  *
  * 顺序：① 能用组合 API 就用（最权威）→ ② 否则按 bundle.json 的依赖顺序做**本地组合**，

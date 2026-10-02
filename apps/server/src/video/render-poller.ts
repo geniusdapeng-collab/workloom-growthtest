@@ -32,8 +32,23 @@ interface OpenJob {
   provider_model: string | null;
   est_cny: string | null;
   est_usd: string | null;
+  created_at: string;
   /** 提交事件原文（provider / request.aspectRatio 等留痕字段一次取回，避免重复扫事件表） */
   submit_payload: { decision?: { after?: { provider?: string; request?: { aspectRatio?: string } } } } | null;
+}
+
+/**
+ * C-04 修复：渲染任务终态超时（小时）。此前 provider.poll 任何异常都被当作"仍在跑"，
+ * 供应商网关持续故障时作业永远卡 submitted/rendering（无出口状态，实锤见排雷台账）。
+ * 超龄任务无论 poll 返回什么都判 failed（原因留痕），给交付链一个终态出口。
+ * 默认 24h（长片型渲染最慢以小时计）；可用 RENDER_JOB_TIMEOUT_H 调整，0 关闭。
+ */
+const RENDER_JOB_TIMEOUT_H = Number(process.env.RENDER_JOB_TIMEOUT_H ?? 24);
+function renderJobTimedOut(job: OpenJob): boolean {
+  if (!(RENDER_JOB_TIMEOUT_H > 0)) return false;
+  // created_at 由 pg 返回 Date（也兼容驱动配成字符串的部署），统一走 Date 构造避免格式猜测
+  const ageMs = Date.now() - new Date(job.created_at).getTime();
+  return Number.isFinite(ageMs) && ageMs > RENDER_JOB_TIMEOUT_H * 3600_000;
 }
 
 export interface PollReport {
@@ -120,7 +135,7 @@ export async function pollRenderJobs(
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
     // 开放任务 + 提交事件留痕的供应商（event 回放取 provider，无留痕回退推断）
     const rows = await client.query<OpenJob>(
-      `SELECT j.id, j.task_id, j.script_id, j.project_id, j.provider_model, j.est_cny, j.est_usd,
+      `SELECT j.id, j.task_id, j.script_id, j.project_id, j.provider_model, j.est_cny, j.est_usd, j.created_at,
               (SELECT e.payload
                  FROM biz_events e
                 WHERE e.workspace_id=j.workspace_id
@@ -147,11 +162,21 @@ export async function pollRenderJobs(
     report.checked += 1;
     const provider = resolveProvider(realPool, job, mockPool);
     if (!provider) {
-      report.details.push({
-        jobId: job.id,
-        status: "skip",
-        error: `供应商 ${job.submit_payload?.decision?.after?.provider ?? "seedance"} 未配置`,
-      });
+      // C-04：供应商未配置也不能让作业永远悬停——超龄判 failed（有终态出口）
+      if (renderJobTimedOut(job)) {
+        await app.query(
+          `UPDATE render_jobs SET status='failed', updated_at=now() WHERE id=$1 AND workspace_id=$2`,
+          [job.id, scope.workspaceId],
+        );
+        report.failed += 1;
+        report.details.push({ jobId: job.id, status: "failed", error: `供应商未配置且已超 ${RENDER_JOB_TIMEOUT_H}h（C-04 超时判死）` });
+      } else {
+        report.details.push({
+          jobId: job.id,
+          status: "skip",
+          error: `供应商 ${job.submit_payload?.decision?.after?.provider ?? "seedance"} 未配置`,
+        });
+      }
       continue;
     }
     let result: { status: string; uri?: string; actualUnits?: number; error?: string };
@@ -159,6 +184,13 @@ export async function pollRenderJobs(
       result = await provider.poll(job.task_id);
     } catch (err) {
       result = { status: "running", error: err instanceof Error ? err.message : String(err) };
+    }
+    // C-04：超龄任务无论 poll 返回什么都判 failed——poll 持续异常/供应商挂起不再永远悬停
+    if (result.status === "running" && renderJobTimedOut(job)) {
+      result = {
+        status: "failed",
+        error: `渲染超时判死（已超 ${RENDER_JOB_TIMEOUT_H}h；${result.error ?? "供应商持续无终态"}）`,
+      };
     }
 
     if (result.status === "succeeded" || result.status === "failed") {
@@ -247,6 +279,8 @@ export async function pollRenderJobs(
             action: done ? "render.complete" : "render.failed",
             after: {
               task_id: job.task_id, provider: provider.providerId,
+              /** C-01 修复：mock 产物必须可辨识——此前只能靠 task_id 前缀推断，事件面与真实成片同形 */
+              mock: job.task_id.startsWith("mock-"),
               result_url: result.uri ?? null, error: result.error ?? null,
               actual_seconds: actualUnits,
               est_cny: job.est_cny === null ? null : Number(job.est_cny),
@@ -264,10 +298,14 @@ export async function pollRenderJobs(
           /**
            * 2026-09-20 真机测试修复：渲染完成必须带**外部回执**（无回执不算完成）。
            * 成功=Seedance 返回的成片 URL（synced:true，可回溯到供应商对象）；失败=无回执并标原因。
+           * C-01 修复：mock 任务（task_id 前缀 mock-）的"成功"是本地模拟，不得携带 synced:true 假回执——
+           * 此前 mock 完成事件写 synced:true+verified_at，账本层面与真实外部回执无法区分（假交付）。
            */
-          ...(done && result.uri
+          ...(done && result.uri && !job.task_id.startsWith("mock-")
             ? { receipt: { synced: true, snapshot_uri: result.uri, verified_at: new Date().toISOString() } }
-            : { receipt: { synced: false } }),
+            : done && result.uri
+              ? { receipt: { synced: false, mode: "simulated", snapshot_uri: result.uri } }
+              : { receipt: { synced: false } }),
         });
         await gw.query("COMMIT");
       } catch (err) {

@@ -14,7 +14,7 @@
 4. **合并在机器、串行执行、人保留叫停权**：AI 只提 PR；**门禁全绿且无冲突时，由 AI 按队列一次一个直接合并**（默认 squash）；合并后其余分支先 rebase 再继续。人不再承担逐 PR 合并操作，保留随时叫停、要求回滚与例外裁决的权利；涉及真实资金 / 实盘、生产秘密与生产配置、协议文本语义变更的 PR，必须在描述中显著标注并提供回滚路径。
    - 在途 / 未完成的 PR 必须置为 **WIP（草稿）**——WIP PR 不参与任何合并；
    - `risk/review` 标签的 PR 需人审放行（移除该标签，或 Issue / 会话里有明确指令）后由 AI 合并；`risk/block` 永不合并；
-   - 无人值守通道（`sync/merge-sync-prs.mjs`，每 30 分钟随 fanout 运行）只碰**门禁全绿、冷却期已过、无风险标签、且不落在治理路径**的 PR；其余 PR 仍由会话内 AI 在拿到放行后显式合并。
+   - 无人值守通道（`sync/merge-sync-prs.mjs`，每 30 分钟随 fanout 运行）只碰**门禁全绿、无风险标签、且不落在治理路径**的 PR；代码类 PR 另需最近提交过 10 分钟冷却期。其余 PR 仍由会话内 AI 在拿到放行后显式合并。
 5. **无回执不算完成**：任务收尾必须在 Issue 留 5 行回执——进展 / 决策 / 未完成 / 下一步 / 分支状态。
 
 ## 2. 四问（每次落笔前必答，答案写进 Issue）
@@ -36,13 +36,15 @@
 
 > 说明：基座内置示例 bundle（`bundles/ai-pm`、`bundles/hotel`、`bundles/platform`）是产品资产，**其正常维护不属于 block**；block 针对的是"把行业语义写进公共层"。
 
+> 凭据纪律（2026-09-30 修订）：凭据**来源不设限**——受控秘密存储、本地环境配置，或当前任务中由产品所有者提供的会话令牌（含对话中给出的令牌）都可用于执行已授权操作；但**任何凭据的落盘与外发一律 block**（源码、提交、文档、提示词模板、日志、报告、Issue/PR 正文与评论、同步产物、Git remote URL、shell 历史）。会话凭据只在需要它的那条命令内注入、用完即弃，疑似外泄立即停止并轮换。完整条款见 `AGENTS.md` §7。
+
 ## 4. 锁：模块级互斥 + 路径重叠检测
 
 - **模块级互斥**（同一时刻全网仅一个任务可动）：`sync/**`、`protocol/**`、`**/migrations/**`、根 `package.json`、`AGENTS.md`、`.cnb.yml`、`docs/DEVELOPMENT-PROTOCOL.md`。
 - **普通路径**：同一文件被两个 open PR 同时修改 → 后到者拒（`LOCK_OVERLAP_MODE=warn` 可临时降级为告警）。
 - 检测由 `scripts/ci/verify-lock-conflict.mjs` 在 PR 流水线自动执行，无需手工维护锁表；脚本按「PR 编号 / 分支名 / 源分支提交 SHA」三重排除自身 PR。
 - 冲突处置：排队等待先到者合并；紧急任务转人工调度。
-- **事件语义（2026-09-27 修订）**：拦截只发生在 **PR 事件**（先到先得，后到者排队）；**push 事件**（main 上的合并提交）下重叠降级为**提醒**——合并已经发生，门禁拦不住任何东西，若仍判红则每次并发合并都会把 main 打红（实测：`workloom-growthtest` #211 合入后，因在途 #206/#209 同改 `bundles/ai-video/bundle.json` 被判红，同一内容 PR 门禁全绿）。需要 push 也按 fail 处理时用 `LOCK_OVERLAP_MODE=fail` 或 `--strict`。
+- **事件语义（2026-09-27 修订）**：拦截只发生在 **PR 事件**（先到先得，后到者排队）；**push 事件**（main 上的合并提交）下重叠降级为**提醒**——合并已经发生，门禁拦不住任何东西，若仍判红则每次并发合并都会把 main 打红（实测：`workloom-growth` #211 合入后，因在途 #206/#209 同改 `bundles/ai-video/bundle.json` 被判红，同一内容 PR 门禁全绿）。需要 push 也按 fail 处理时用 `LOCK_OVERLAP_MODE=fail` 或 `--strict`。
 
 ## 5. 提交规范（放宽版）
 
@@ -92,7 +94,7 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 
 ## 10. 实验车道（fox / growth 等深度定制仓）
 
-问题：`workroom-fox` 与 `WorkLoom-growthtest` 在共享壳之上做了**深度游戏化定制**（fox：3D 汇报舞台 + 实景商业游戏 M2-a；growth：hud/star-ring/P0 的经营游戏化）。这些**不是基座能力**，如果强行与基座保持一致，会被两类机制抹掉或卡死：
+问题：`workroom-fox` 与 `WorkLoom-growth` 在共享壳之上做了**深度游戏化定制**（fox：3D 汇报舞台 + 实景商业游戏 M2-a；growth：hud/star-ring/P0 的经营游戏化）。这些**不是基座能力**，如果强行与基座保持一致，会被两类机制抹掉或卡死：
 
 1. **普通 base-sync**：若实验路径落在 `include` 内，同步会覆盖；
 2. **三端客户端基座升级**：受管根 `apps/{web,webb,webc}` 内的差异，只要不在 `allowedIndustryExtensionPaths` 白名单里，就会被判 `ILLEGAL_INDUSTRY_APP_PATH` / `MANAGED_FILE_MODIFIED` 并 **fail-close**（升级被拒）。
@@ -151,8 +153,8 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 
 ## 11. 隔离副本车道（isolated：双向不同步，2026-09-22 新增）
 
-**背景**：`workloom-growthtest`（AI超增长·实验版）与 `workloom-growthtestmatrix`（骇客帝国·实验版）是 2026-09-21 从
-`WorkLoom-growthtest@a6dc89a` 完整复制出来的**激进改造实验副本**，内容暂时与基座拆分：基座内容不直接同步进这两仓，
+**背景**：`workloom-growthtest`（AI超增长·实验版）与 `workloom-growthmatrix`（骇客帝国·实验版）是 2026-09-21 从
+`WorkLoom-growth@a6dc89a` 完整复制出来的**激进改造实验副本**，内容暂时与基座拆分：基座内容不直接同步进这两仓，
 这两仓的内容也不直接回流基座（产品所有者 2026-09-22 明确指令）。
 
 **与 §10 实验车道的区别**：实验车道仍在同步队列内（拿基座资产、只是实验路径受护栏保护）；隔离副本**完全不在同步队列内**，
@@ -170,7 +172,7 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
   "repo": "workloom-ai/workloom-growthtest",
   "lane": "isolated",
   "syncPolicy": "none-in-none-out",
-  "copiedFrom": "workloom-ai/WorkLoom-growthtest@a6dc89a",
+  "copiedFrom": "workloom-ai/WorkLoom-growth@a6dc89a",
   "isolatedSince": "2026-09-21",
   "declaredBy": "product-owner",
   "declaredAt": "2026-09-22",
@@ -204,22 +206,20 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
 | 任务卡创建/回执/关单 | **半自动** | `scripts/tools/task.mjs new|receipt|close`（一条命令，不再手写 JSON） |
 | 分支创建、提交、提 PR | 由 AI/人执行 | 用任务号命名分支即可 |
 | **合并（代码类 PR）** | **AI / 流水线**（门禁全绿 + 串行，一次一个） | 协议 §1；会话内由 AI 直接合并，无人值守时由 `sync/merge-sync-prs.mjs` 按 §9.5 车道合并 |
-| **合并（纯同步 PR）** | **自动** | 仅 `sync/base-*` 且改动全在根级受控资产白名单、全部门禁 success 时由 `sync/merge-sync-prs.mjs` 合并（协议 §9.4） |
+| **合并（纯同步 PR）** | **条件自动** | 仅 `sync/base-*` 且改动全在非执行性资产白名单、全部门禁 success 时由 `sync/merge-sync-prs.mjs` 合并；含治理资产则显式审查（协议 §9.4） |
 | 高风险裁决与叫停 / 回滚 | **人来** | 协议 §3；协议文本语义变更由 AI 按 §1 合并，人保留叫停权 |
 
-结论：门禁、扫描、纳管、**根级资产分发**与**全部 PR 合并（门禁全绿 + 串行，一次一个）**是自动的；
-必须由人按的按钮只剩一个：**高风险裁决与叫停 / 回滚**（真实资金 / 实盘、生产秘密与生产配置、协议文本语义变更）。
+结论：门禁、扫描、纳管与根级资产**开同步 PR**是自动的；非执行性资产和符合 §9.5 的普通代码可无人值守合并。治理资产同步 PR 须显式审查后由会话内 AI 合并，人保留高风险裁决、叫停与回滚权。
 
 ### 9.4 纯同步 PR 的自动合并（2026-09-19 新增）
 
 - 自动合并的判定逻辑在 `sync/fanout-rules.mjs#autoMergeEligibility`（纯函数、有单测），执行器是
   `sync/merge-sync-prs.mjs`；两者与 fanout（`sync/fanout-cnb.mjs`）共同构成"基座改一次、
   舰队跟一次"的闭环，机制说明见 `docs/FLEET-AUTO-SYNC.md`。
-- 白名单只覆盖根级受控资产：`WORKLOOM_PRODUCT_CONTEXT.md`、`AI-AUTONOMOUS-OPERATIONS.md`、`AGENTS.md`、
-  `docs/DEVELOPMENT-PROTOCOL.md`、`.workloom-base-sync.json`、
-  `.github/workflows/base-sync-heartbeat.yml`、`sync/**`。
-- 门禁仍然先行：PR 必须全部门禁 success 且平台可合并；**没有状态检查结果的 PR 不自动合并**。
-- 白名单外的任何路径（含行业 bundle、服务层、三端页面、脚本）：门禁全绿后由 AI 按 §1 队列合并（不再等待人工点击）；白名单只决定"是否无需 AI 操作即可自动合并"。
+- 免审白名单只含非执行性根级资产：`WORKLOOM_PRODUCT_CONTEXT.md`、`AI-AUTONOMOUS-OPERATIONS.md`、`.workloom-base-sync.json`。
+  `sync/**`、`AGENTS.md`、本协议、验收规范/执行器和工作流均可改变治理行为，**即使位于 `sync/base-*` 分支也不得由无人值守通道合并**；需按 §3 显式审查后由会话内 AI 合并。
+- 门禁仍然先行：PR 必须全部门禁 success、平台状态明确为 `mergeable`、非 WIP、无 `risk/review` / `risk/block` 标签；**缺少状态检查、风险标签清单或可合并状态时不自动合并**。入队后、实际合并前重读源分支 HEAD、目标 `main`、路径、门禁、标签和 WIP；变化则退出本轮并重新判定。
+- 白名单外的普通代码按 §9.5 进入代码车道；治理路径不因从同步车道回落而获得免审资格。一次同步 PR 同时包含普通资产和治理文件时，整条 PR 等待显式审查，不能把“已开 PR”写成“已下发完成”。
 
 ### 9.5 代码类 PR 的机器合并（2026-09-19 修订）
 
@@ -229,11 +229,11 @@ CNB 每仓**最多 10 个标签**（实测：创建第 11 个返回 201 但不�
   全部门禁 success；平台 `mergeable_state=mergeable`；非 WIP；无 `risk/review`、`risk/block` 标签；
   分支最近一次提交已过 **10 分钟冷却期**（避免合并"会话仍在写"的 PR）；改动不落在治理/高风险路径
   （`platform-ops/**`、`bundles/platform/**`、`protocol/**`、`sync/**`、`docs/DEVELOPMENT-PROTOCOL.md`、
-  `AGENTS.md`、`.cnb.yml`、`.github/**`、`**/migrations/**`——其中受控资产在同步波次里按 §9.4 白名单放行）。
+  `AGENTS.md`、`.cnb.yml`、`.github/**`、`**/migrations/**`、验收规范与执行器——只有 §9.4 的非执行性资产在同步波次里放行）。
 - 串行约束：**同一仓库每轮最多合并一条代码类 PR**；其余候选项留待下一轮（先 rebase 再合），
   与 §1 规则 4 的"合并后其余分支先 rebase 再继续"一致。
 - 非纯同步的 `sync/base-*-full` 波次（携带运行时代码的基座升级）同样走代码车道：门禁全绿 + 冷却期
-  已过才由机器合并；任何一个条件不满足都只报告、不合并。
+  已过才由机器合并；若混有 §9.4 的治理路径则停在显式审查队列。任何一个条件不满足都只报告、不合并。
 - 治理路径（协议文本、`.cnb.yml`、迁移、平台工程等）永远不进无人值守通道：由会话内 AI 在
   获得明确指令/放行后显式合并，人保留叫停权。
 
@@ -267,7 +267,7 @@ node scripts/tools/experiment-guard.mjs [--check]
 2. 协议资产副本 + `.cnb.yml` 协议门禁 stage；
 3. 本仓写入 `sync/child-repos.json`（舰队清单），后续 base-sync 波次照常覆盖。
 
-> 注意：新仓若与既有仓同 `productId`（例如 `WorkLoom-growthtest` 与 `workloom` 都是 `workloom-ai-acquisition`），说明它是同一产品的第二实例或副本——纳管只保证协议一致，**产品身份（productId/端口/演示工作区）需要人确认后统一**。
+> 注意：新仓若与既有仓同 `productId`（例如 `WorkLoom-growth` 与 `workloom` 都是 `workloom-ai-acquisition`），说明它是同一产品的第二实例或副本——纳管只保证协议一致，**产品身份（productId/端口/演示工作区）需要人确认后统一**。
 
 > 补充（2026-09-22）：若新仓是**有意与基座拆分的隔离副本**（如 growthtest / growthmatrix），不要纳管——按 §11 写入 `isolatedRepos` 并保持双向不同步；只有产品所有者明确要求回到受控舰队时才重新纳管。
 
@@ -278,3 +278,19 @@ node scripts/tools/experiment-guard.mjs [--check]
 - 是否有门禁全绿却超过 24h 未合并的 PR？（应 0——由 AI 按 §1/§9.5 直接合并，或已在 Issue 说明阻塞原因）
 - `risk/review` PR 是否都在拿到放行后由 AI 执行了合并（而不是等人来点）？（应「是」）
 - 合并是否严格串行？（应「是」）
+
+## 12. 交付排雷机制（MCD v1.0，2026-09-29 新增）
+
+**定位**：本协议解决"别撞车、可交接、门禁全绿"；MCD 解决"问题是否被系统性挖出、修复是否真有断言兜底、验收是否独立"。两者叠加使用，不新造并行流程。
+
+**触发（调用声明）**：命中「排雷 / 排雷式交付 / 系统性排查 / 交付前排查 / 交付体检 / 挖问题 / 问题台账 / 修复排期 / 假修复 / 联动地雷 / MCD / mine-clear」任一意图 → 先读 `docs/MINE-CLEAR-DELIVERY-SPEC.md`，再用 `node scripts/delivery/mine-clear.mjs` 建台账。"独立验收 / 上线前验收"仍走 RDAS v3.1（§6 最低验证标准）。
+
+**五条硬约束**（与 §1 五条硬规则同级）：
+
+1. **一轮排雷/修复 = 一张任务卡 + 一条 `task/T-…` 分支**；台账落 `outputs/mine-clear/<任务号>/`，`ledger.json` 必须随 PR 提交（证据文件可按体量决定是否入库，但断言输出路径必须可追溯）；
+2. **无证据不上账**：问题卡必须有 `文件:行号@commit` 与触发路径；断言必须可运行——`node scripts/delivery/mine-clear.mjs gate --ledger <台账>` 是硬闸，判红不得交付；
+3. **修复者不自验**：`verified_by ≠ fixed_by`（独立会话/角色），无法满足时必须写 `waiver.reason` 与批准来源；
+4. **P0（突破核心不变量 / 安全）未闭环** → 不得进入 RDAS 验收，不得并入发布分支；
+5. **M6 交接**必须用 `mine-clear.mjs handoff`（未闭环项逐条给回归路径），验收结论只许三档：完全通过 / 有条件通过 / 不通过。
+
+**风险分级**：MCD 本体是规范 + 台账 schema/模板 + 本地编排脚本（`scripts/delivery/**`），不改产品运行时；一旦排雷结论落到运行时代码改动，按 §3 目录围栏照常判 `auto / review / block`，治理路径仍需人审放行。

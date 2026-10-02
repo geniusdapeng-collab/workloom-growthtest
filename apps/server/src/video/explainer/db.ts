@@ -7,7 +7,7 @@
 import type pg from "pg";
 import { createHash } from "node:crypto";
 import { getAppPool, getGatewayPool } from "@workloom/db";
-import { gatewayAppendOnClient } from "@workloom/base/workdata";
+import { gatewayAppendOnClient, insertWithReadableId, VIDEO_PROJECT_ID_SOURCE } from "@workloom/base/workdata";
 import { newId } from "@workloom/shared";
 import type { ExplainerShotbook, QaReport } from "./types.js";
 import { emptyShotbook, splitScript } from "./script.js";
@@ -186,12 +186,14 @@ export async function createExplainerProject(
       await client.query("BEGIN");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
       await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-      const max = await client.query<{ n: number }>(`SELECT public.video_projects_max_vid_no() AS n`);
-      const id = `VID-${String(Number(max.rows[0]?.n ?? 0) + 1).padStart(4, "0")}`;
-      await client.query(
-        `INSERT INTO video_projects (id, workspace_id, title, kind, created_by) VALUES ($1,$2,$3,'explainer',$4)`,
-        [id, scope.workspaceId, input.intent.slice(0, 200), input.by],
-      );
+      // GR-02（2026-09-29 第二次修复）：与 studio-worker 同口径，避免第二处实现各写各的
+      const id = (await insertWithReadableId(client, VIDEO_PROJECT_ID_SOURCE, async (projectId) => {
+        await client.query(
+          `INSERT INTO video_projects (id, workspace_id, title, kind, created_by) VALUES ($1,$2,$3,'explainer',$4)`,
+          [projectId, scope.workspaceId, input.intent.slice(0, 200), input.by],
+        );
+        return projectId;
+      })).id;
       await gatewayAppendOnClient(client, { ...scope, actor: { id: input.by, type: "human" } }, {
         who: { type: "human", id: input.by },
         context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },

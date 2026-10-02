@@ -76,3 +76,5 @@ vendor/supermickey/deliverables/
 vendor/supermickey/hyperreality-system/skills/*/usage-stats.jsonl
 # 工位本地工具链（ffmpeg/ffprobe 等受控下载的二进制，绝不进仓；见 kit/ffmpeg-pin.json）
 .workloom-tools/
+# 主档对账的本地备份（T-2026-0930-0015：`video:assets reconcile --apply` 写前备份；证据文件进仓、备份不进）
+**/real-person-assets/**/profile.json.bak

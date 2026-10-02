@@ -1,8 +1,8 @@
 /**
- * 组合技能围栏绑定表（ai-video / geo-growthtest）。
+ * 组合技能围栏绑定表（ai-video / geo-growth）。
  *
  * 2026-09-20 真机验收修复：该表原先只存在于 `scripts/seed.ts` 内部，`scripts/seed-geo.ts`
- * 安装组合技能（hotel + ai-video + geo-growthtest）时无从复用，只能落空绑定——
+ * 安装组合技能（hotel + ai-video + geo-growth）时无从复用，只能落空绑定——
  * 结果是 ai-video 技能注册表 `fence_bindings=[]`，而 SKILL.md 显式声明 G10/G6/G1…，
  * RDAS matrix 的 SA3_fences 判「声明未进绑定」（0/67）。绑定表收口到本模块（唯一事实源），
  * 两个 seed 共用；未声明的技能保持空绑定（不臆造）。
@@ -42,7 +42,7 @@ export const HOTEL_SKILL_BINDINGS: Record<string, string[]> = {
   "intent-radar": [],
 };
 
-export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growthtest", Record<string, string[]>> = {
+export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growth", Record<string, string[]>> = {
   "ai-video": {
     "comment-ops": ["G10a", "G10b", "G10c", "G10d"],
     "director-review": ["G6"],
@@ -76,7 +76,7 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growthtest", Reco
     "voice-dubbing-sync": ["G-VOICE2", "G-VOICE3", "G-VOICE4"],
     "voice-delivery-spec": ["G-VOICE0", "G-VOICE1", "G-VOICE2", "G-VOICE3", "G-VOICE4", "G-VOICE5", "G-VOICE6"],
   },
-  "geo-growthtest": {
+  "geo-growth": {
     "ai-answer-rewrite": ["G-GEO1", "G-GEO2"],
     "entity-consistency-check": ["G-GEO2"],
     // 获客用增班组技能（v1.2）：预算带/实验登记与停止/价格承诺/转介与数据边界
@@ -99,6 +99,6 @@ export const COMPOSED_SKILL_BINDINGS: Record<"ai-video" | "geo-growthtest", Reco
  */
 export function skillBindingsFor(bundle: string | null | undefined, name: string): string[] | null {
   if (bundle === "hotel") return HOTEL_SKILL_BINDINGS[name] ?? null;
-  if (bundle === "ai-video" || bundle === "geo-growthtest") return COMPOSED_SKILL_BINDINGS[bundle][name] ?? null;
+  if (bundle === "ai-video" || bundle === "geo-growth") return COMPOSED_SKILL_BINDINGS[bundle][name] ?? null;
   return null;
 }

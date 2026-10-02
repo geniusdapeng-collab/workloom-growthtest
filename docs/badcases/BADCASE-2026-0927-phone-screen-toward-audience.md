@@ -40,7 +40,7 @@
 | 3 | 审计规则 `prop-screen-orientation`：声明了朝向但写成"屏幕正对镜头/朝观众"→ 硬失败；要求写成"屏幕朝向使用者本人，观众只见机身背面或侧缘" | 同上 |
 | 4 | 提示词侧条件硬约束：画面含可交互器物时追加 `PROP_INTERACTION_CONSTRAINT`（屏幕朝向使用者 + 承重 + 手指正常 + 禁止漂浮穿模） | `plate-prompt.ts` |
 | 5 | 评审侧类目：`keyframe`「道具-人体交互逻辑（必判）」+ `shot`「在时间上保持」（防止镜内朝向翻转） | `producer-gate.ts#PRODUCER_RUBRICS` |
-| 6 | 模板 18 镜升级：7 镜补齐 `propInteraction`，模板示例即正例 | `bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growthtest/shotlist.json` |
+| 6 | 模板 18 镜升级：7 镜补齐 `propInteraction`，模板示例即正例 | `bundles/ai-video/library/templates/sales-pitch-5ring/examples/workloom-growth/shotlist.json` |
 
 ### 规则边界（避免误伤）
 

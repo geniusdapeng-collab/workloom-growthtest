@@ -1,6 +1,6 @@
 # 基座提案：部署层 ToolExecutor 注入 seam（workloom-im）
 
-> **状态：暂缓（2026-09-19）**。产品所有者决定：该能力先在 WorkLoom-growthtest 实验车道验证，
+> **状态：暂缓（2026-09-19）**。产品所有者决定：该能力先在 WorkLoom-growth 实验车道验证，
 > 暂不修改/推送基座；待能力稳定后再重新开卡实施。本文件与同目录补丁
 > `0001-deployment-tool-executor-seam.patch` 是待实施版本，**不包含在本 PR 的生效改动内**。
 >
@@ -14,7 +14,7 @@
 > growth 侧的过渡生产入口：`scripts/visual-quest-runner.mts`（行业脚本，直接向 `runQuest`
 > 注入视觉工位执行器，不改任何基座文件）。
 
-> 提案人：WorkLoom-growthtest 视觉工位任务（T-20260919-9001）
+> 提案人：WorkLoom-growth 视觉工位任务（T-20260919-9001）
 > 目标：让基座服务端能把「真实连接器执行器」交给 `runQuest`，而不需要在基座里写任何行业词。
 > 背景证据：`packages/runtime/src/trpc/router.ts` 两处 `runQuest(...)` 未传 `toolExecutor`；
 > 未注入时走 `executeDeclaredTool` 兜底（真实数据态返回 `connector-required`，任务标未核实）。
@@ -72,7 +72,7 @@ export async function loadDeploymentToolExecutor(): Promise<ToolExecutor | undef
 ### 3. 部署配置（行业侧，不进基座）
 
 ```bash
-WORKLOOM_TOOL_EXECUTOR_MODULE=/srv/workloom/bundles/geo-growthtest/connectors/visual-bridge/server-adapter.mts
+WORKLOOM_TOOL_EXECUTOR_MODULE=/srv/workloom/bundles/geo-growth/connectors/visual-bridge/server-adapter.mts
 WORKLOOM_VISUAL_BRIDGE_URL=http://10.x.x.x:9773
 WORKLOOM_VISUAL_BRIDGE_TOKEN_FILE=/etc/workloom/secrets/visual-bridge.token
 ```

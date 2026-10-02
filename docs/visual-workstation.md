@@ -43,10 +43,10 @@ macOS TCC 注意：LaunchAgent 不能读取 `~/Documents` 下的脚本与二进�
 
 ## 3. 与 WorkLoom 的接线
 
-- 岗位：`bundles/geo-growthtest/presets/visual-designer.yml`（视觉设计师，写岗位，绑定 G-GEO2/G-VIS1..4）
-- 技能：`bundles/geo-growthtest/skills/compositor-designer/SKILL.md`
-- 围栏：`bundles/geo-growthtest/fences/geo-growthtest-visual.yml`（G-VIS1..G-VIS5）
-- 连接器：`bundles/geo-growthtest/connectors/visual-bridge/executor.ts`
+- 岗位：`bundles/geo-growth/presets/visual-designer.yml`（视觉设计师，写岗位，绑定 G-GEO2/G-VIS1..4）
+- 技能：`bundles/geo-growth/skills/compositor-designer/SKILL.md`
+- 围栏：`bundles/geo-growth/fences/geo-growth-visual.yml`（G-VIS1..G-VIS5）
+- 连接器：`bundles/geo-growth/connectors/visual-bridge/executor.ts`
   （结构兼容 `packages/runtime/src/tools.ts` 的 ToolExecutor；部署适配器负责注入）
 - 事件：`visualdesign.brief / compose / render / qc / publish`，回写入一客一档 `content_assets`
 
@@ -54,7 +54,7 @@ macOS TCC 注意：LaunchAgent 不能读取 `~/Documents` 下的脚本与二进�
 
 ```bash
 set -a; source .env; set +a
-./node_modules/.bin/tsx bundles/geo-growthtest/connectors/visual-bridge/runtime-smoke.mts
+./node_modules/.bin/tsx bundles/geo-growth/connectors/visual-bridge/runtime-smoke.mts
 ```
 
 - clean：3/3 `completed`，`biz_events.receipt.synced=true`，rule_impact=G-VIS0 pass；
@@ -95,7 +95,7 @@ export WORKLOOM_VISUAL_BRIDGE_OUT_DIR="$HOME/Library/Application Support/WorkLoo
 
 - 模板：`compositor-kit/templates/`（小红书 3:4、抖音 9:16、公众号首图 2.35:1 + 品牌包示例 + 平台规格注册表）；
   bridge 支持 `{"template": "...", "vars": {...}}`，缺参/未解析失败关闭；
-- 上岗考：`bundles/geo-growthtest/eval/questions.json`（10 题：4 红线 + 1 holdout，覆盖 G-VIS1/2/3/4、提示注入、无回执、归档），
+- 上岗考：`bundles/geo-growth/eval/questions.json`（10 题：4 红线 + 1 holdout，覆盖 G-VIS1/2/3/4、提示注入、无回执、归档），
   已通过基座 `loadVerifiedBundleEvalQuestions` 校验；
 - 合规：`compositor-kit/compliance/`（极限词/肖像/第三方素材/AI 标识/留存）与 G-VIS1/2/5 一一对应；
 - 工位发行：`make-release.sh`（sha256）→ `install-release.sh`（无需 Xcode）→ `doctor.sh` / `upgrade.sh` / `rollback.sh`。

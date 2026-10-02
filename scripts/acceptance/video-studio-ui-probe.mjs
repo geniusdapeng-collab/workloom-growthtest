@@ -31,12 +31,12 @@ const BASE = arg("--base", "http://127.0.0.1:5173");
 const API = arg("--api", "http://127.0.0.1:8787");
 const EXPECT_JOB = arg("--job", "");
 const OUT_DIR = resolve(arg("--out", join(REPO_ROOT, "artifacts", "video-studio")));
-const TOKEN_KEY = "workloom:workloom-ai-growthtest:b-pc:access-token";
+const TOKEN_KEY = "workloom:workloom-ai-growth:b-pc:access-token";
 
 const login = await fetch(`${API}/trpc/auth.loginAs`, {
   method: "POST",
   headers: { "content-type": "application/json" },
-  body: JSON.stringify({ workspaceSlug: "geo-growthtest", memberNo: "MEM-G01" }),
+  body: JSON.stringify({ workspaceSlug: "geo-growth", memberNo: "MEM-G01" }),
 }).then((r) => r.json());
 const token = login?.result?.data?.token;
 if (!token) {

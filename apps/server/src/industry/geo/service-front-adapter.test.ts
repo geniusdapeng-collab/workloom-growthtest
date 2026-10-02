@@ -7,9 +7,9 @@ import { geoGrowthBizAdapter } from "./service-front-adapter.js";
 
 const CTX = { workspaceId: "ws-geo", cUserId: "cu-geo", memberId: null };
 
-describe("geo-growthtest 服务前台适配器", () => {
+describe("geo-growth 服务前台适配器", () => {
   it("身份与词表：adapterId 明确、同义词归行业所有", () => {
-    expect(geoGrowthBizAdapter.id).toBe("geo-growthtest.service-front-v1");
+    expect(geoGrowthBizAdapter.id).toBe("geo-growth.service-front-v1");
     expect(geoGrowthBizAdapter.kbLexicon?.synonyms).toContainEqual(["增长", "获客"]);
     expect(geoGrowthBizAdapter.identity).toBeUndefined();
   });

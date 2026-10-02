@@ -49,7 +49,7 @@ function domainOf(presetKey: string | null | undefined, bundle: string | null | 
   if (presetKey && GROWTH_PRESETS.has(presetKey)) return "growth";
   if (bundle === "hotel") return "hotel";
   if (bundle === "ai-video") return "content";
-  if (bundle === "geo-growthtest") return "geo";
+  if (bundle === "geo-growth") return "geo";
   return "other";
 }
 

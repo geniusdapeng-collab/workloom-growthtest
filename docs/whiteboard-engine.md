@@ -1,6 +1,6 @@
 # 手绘白板解说引擎（whiteboard-local）
 
-> 任务卡：T-2026-0926-0020｜落地仓：`workloom-ai/workloom-growthtest`｜引擎来源：`vendor/srt-whiteboard`（上游 MIT，commit `696a724`）
+> 任务卡：T-2026-0926-0020｜落地仓：`workloom-ai/workloom-growth`｜引擎来源：`vendor/srt-whiteboard`（上游 MIT，commit `696a724`）
 > 规格来源与逐条修正：`docs/whiteboard-spec-review-2026-09-27.md`
 > 一句话：**字幕驱动的确定性手绘白板渲染器**——口播稿进去，带配音、带字幕轨的手绘解说片出来，全程零模型成本（线稿阶段可选用方舟出图）。
 

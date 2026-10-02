@@ -1,0 +1,300 @@
+{
+  "schemaVersion": "workloom.bundle/v1",
+  "name": "@workloom/geo-growth",
+  "version": "1.0.0",
+  "workloom": {
+    "industry": "geo-growth",
+    "displayName": "WorkLoom GEO · 社媒短视频营销 × GEO 双域融合经营系统",
+    "description": "社媒短视频营销与生成式搜索优化双域经营候选包：数字员工、围栏、技能、对象和三端行业投影；以精确版本组合酒店与智能视频能力。",
+    "status": "candidate",
+    "owner": "WorkLoom 获客增长产品组",
+    "example": false,
+    "compatibility": {
+      "base": ">=0.1.0 <1.0.0",
+      "ui": ">=0.1.0 <1.0.0",
+      "contract": "2.0.0"
+    },
+    "dependencies": [
+      {
+        "bundleId": "hotel",
+        "version": "3.4.0"
+      },
+      {
+        "bundleId": "ai-video",
+        "version": "1.0.0"
+      }
+    ],
+    "composition": {
+      "presetOwners": {
+        "ads-optimizer": "geo-growth",
+        "publish-operator": "geo-growth",
+        "review-analyst": "geo-growth",
+        "company-ceo": "hotel"
+      }
+    },
+    "provides": {
+      "presets": [
+        "presets/geo-researcher.yml",
+        "presets/citation-analyst.yml",
+        "presets/scriptwriter.yml",
+        "presets/production-planner.yml",
+        "presets/visual-designer.yml",
+        "presets/geo-content-planner.yml",
+        "presets/entity-inspector.yml",
+        "presets/publish-operator.yml",
+        "presets/source-distributor.yml",
+        "presets/ads-optimizer.yml",
+        "presets/data-board-officer.yml",
+        "presets/visibility-watcher.yml",
+        "presets/review-analyst.yml",
+        "presets/customer-success.yml",
+        "presets/private-domain-operator.yml",
+        "presets/company-ceo.yml",
+        "presets/group-ceo.yml",
+        "presets/material-scout.yml",
+        "presets/growth-lead.yml",
+        "presets/growth-strategist.yml",
+        "presets/growth-experimenter.yml",
+        "presets/lead-conversion-officer.yml",
+        "presets/media-portfolio-manager.yml",
+        "presets/cro-designer.yml",
+        "presets/live-producer.yml",
+        "presets/lifecycle-growth-officer.yml",
+        "presets/growth-partnership-officer.yml"
+      ],
+      "fences": [
+        "fences/geo-growth-baseline.yml",
+        "fences/geo-growth-visual.yml"
+      ],
+      "skills": [
+        "skills/geo-query-craft/SKILL.md",
+        "skills/ai-answer-rewrite/SKILL.md",
+        "skills/visibility-monitor/SKILL.md",
+        "skills/citation-reverse/SKILL.md",
+        "skills/entity-consistency-check/SKILL.md",
+        "skills/dual-entry-inquiry/SKILL.md",
+        "skills/compositor-designer/SKILL.md",
+        "skills/product-poster/SKILL.md",
+        "skills/video-cover/SKILL.md",
+        "skills/moments-post/SKILL.md",
+        "skills/promo-banner/SKILL.md",
+        "skills/geo-answer-card/SKILL.md",
+        "skills/image-retouch/SKILL.md",
+        "skills/asset-variant-forge/SKILL.md",
+        "skills/brand-guard/SKILL.md",
+        "skills/poster-series/SKILL.md",
+        "skills/design-brief/SKILL.md",
+        "skills/art-direction/SKILL.md",
+        "skills/design-critique/SKILL.md",
+        "skills/material-scout/SKILL.md",
+        "skills/experiment-design/SKILL.md",
+        "skills/budget-portfolio/SKILL.md",
+        "skills/lead-scoring/SKILL.md",
+        "skills/cro-playbook/SKILL.md",
+        "skills/live-commerce/SKILL.md",
+        "skills/growth-review/SKILL.md",
+        "skills/incrementality-measurement/SKILL.md",
+        "skills/lifecycle-growth/SKILL.md",
+        "skills/growth-partnership/SKILL.md"
+      ],
+      "schemas": [
+        "schemas/objects.json",
+        "schemas/stages.json",
+        "schemas/archive.schema.json"
+      ],
+      "ui": [
+        "ui/cases.json"
+      ],
+      "serviceFront": [
+        "service-front/client.json"
+      ],
+      "seeds": [],
+      "pipelines": [
+        "pipelines/dual-content-factory.yml",
+        "pipelines/intel-fusion.yml",
+        "pipelines/ops-rhythm.yml",
+        "pipelines/visibility-watch.yml"
+      ],
+      "library": [],
+      "segmentDefaults": [],
+      "connectors": [],
+      "modelPolicy": "model-policy.yml",
+      "evalQuestions": "eval/questions.json"
+    },
+    "ui": {
+      "schemaVersion": "workloom.bundle.ui/v1",
+      "terminology": {
+        "businessObject": "获客经营事项",
+        "customer": "潜在客户",
+        "operation": "获客经营"
+      },
+      "navigation": {
+        "slots": [
+          {
+            "capabilityId": "geo-growth.portfolio",
+            "title": "组合看板",
+            "route": "/portfolio",
+            "group": "operations",
+            "icon": "report",
+            "clients": [
+              "pc"
+            ],
+            "permissions": [
+              "geo-growth.portfolio.read"
+            ]
+          }
+        ]
+      },
+      "home": {
+        "widgets": [
+          {
+            "slot": "home.quick-tasks",
+            "component": "QuickTaskList",
+            "clients": [
+              "pc",
+              "b-mobile"
+            ],
+            "props": {
+              "tasks": [
+                "查看今日获客线索",
+                "复核双域内容",
+                "跟进转化任务",
+                "查看归因复盘"
+              ]
+            }
+          }
+        ]
+      },
+      "welcome": {
+        "system": [
+          "这是一套把短视频触达、生成式搜索曝光、线索承接与归因复盘连接起来的智能获客经营系统。"
+        ],
+        "keywords": [
+          "意图洞察",
+          "双域触达",
+          "线索转化",
+          "归因复盘"
+        ]
+      },
+      "objects": [
+        "市场意图",
+        "内容任务",
+        "客户线索",
+        "转化机会",
+        "归因记录"
+      ],
+      "workflows": [
+        "意图洞察",
+        "双域触达",
+        "线索承接",
+        "转化跟进",
+        "归因复盘"
+      ],
+      "serviceFront": {
+        "enabled": true,
+        "identityPolicy": "disabled",
+        "adapterId": "geo-growth.service-front-v1",
+        "tabs": [
+          "对话",
+          "服务",
+          "工单",
+          "消息",
+          "我的"
+        ],
+        "services": [
+          "咨询增长服务",
+          "提交合作需求",
+          "查询跟进进度"
+        ]
+      },
+      "inspection": {
+        "enabled": false
+      },
+      "theme": {
+        "brand": {
+          "primary": "#0f766e",
+          "accent": "#f59e0b"
+        }
+      },
+      "permissions": [
+        "geo-growth.portfolio.read"
+      ],
+      "experiments": []
+    }
+  },
+  "integrity": {
+    "algorithm": "sha256",
+    "digest": "a8bd61ae5ca205f066ca1d78f11667a0794264f6fc1bdbfb5f37c70213ade5a5",
+    "assets": {
+      "eval/questions.json": "49e7b69803ac4c398b812e93758d136332c9312041d894ca7b74a8a1623e7993",
+      "fences/geo-growth-baseline.yml": "4a06d0a472be51a3e8922bc77e8834ef9f1f31e752b4ef3d345058ca908970c7",
+      "fences/geo-growth-visual.yml": "dd397a66ec47da7f5e013cac5e045c350543a0a1153da63926e72e9c300ba273",
+      "model-policy.yml": "c2350007cf1a112c9de24231b6270e39d69344e2a9a3c05b8f17d246e571b84e",
+      "pipelines/dual-content-factory.yml": "0650692f2c48ea051b2a334c92b5880f762632d4091b5fb2a48e58a227a756b6",
+      "pipelines/intel-fusion.yml": "17a1b4c6dc70e47da0dffa1d91b96da2eb84925435009b9dd4b6e72eae22d092",
+      "pipelines/ops-rhythm.yml": "8a007c4de76d10830a05ef992bd7629399f6b0121fc6bf7ba1f5534c76857f78",
+      "pipelines/visibility-watch.yml": "c0f354e30fff3bd0f153eaf08c532c8159713b4b5ac590f3d4b79ccc6f4fda5c",
+      "presets/ads-optimizer.yml": "1c562d53e931ef922f71b44ead21bd33a3905f2befdfe1f9f6177d06cf2ed2e2",
+      "presets/citation-analyst.yml": "1267ce24d140fbf727e95be59a8b5e098b1829bfd2853c4010baddabb56750c1",
+      "presets/company-ceo.yml": "95c9c568c3aa95e7eb690dbd0325b6087f653046ccf1868a12cbac7a9c8a3b92",
+      "presets/cro-designer.yml": "e43b4e310abd796969d92af7ae2ece537412d85ca93e86cfee32426f85132eba",
+      "presets/customer-success.yml": "c939271088f6c4f619cc5d96e640a82b40bd726cd85540f50d1e27a0bd35954d",
+      "presets/data-board-officer.yml": "740214e41a91e6b1d20c549dda21f54836982579a6646f314d68b793c485f637",
+      "presets/entity-inspector.yml": "1b6d5e631ffdcbd5bb2e0517ac65caf94eeb5d7625f50f12bad8e743358d068d",
+      "presets/geo-content-planner.yml": "850c3b152b1e0d31bebe8ba58d1fd0a4df3601fe02b0c7f2029cff03e7ee28d7",
+      "presets/geo-researcher.yml": "942b41b3a1a6e330f5a72c09763406a235b4c0cea5abcf7619fc07f058f857de",
+      "presets/group-ceo.yml": "5026be4c99ed4200c5bbfa0de9a48596305f582d04cb6cb1d9a53a50070d97c6",
+      "presets/growth-experimenter.yml": "20e9afb6f9741644ab4419b7b4d555729c8e9b5e579271ededfddf162ba1a9aa",
+      "presets/growth-lead.yml": "31c8597c1df9b5b7bc1b7084ce3229b2afc1de6e89071f3c6fb9a588846dc968",
+      "presets/growth-partnership-officer.yml": "34d9bd37335033dbe9ec5731c48daf531fcbeedb42bdcf94b384a5e09c969a37",
+      "presets/growth-strategist.yml": "d2388e1b2fb40d5f15ab43a0018b1b529562b87785825afaf1611bf86e9cf0a4",
+      "presets/lead-conversion-officer.yml": "1946d8a4dd2a050481e60e0d14e8ef1a1c4f254a2cc528c636ed628f23f2bba6",
+      "presets/lifecycle-growth-officer.yml": "07e1885343d7db8f556c24f1138ee5bde7e9edff85718987a34b938213e34270",
+      "presets/live-producer.yml": "f6f82566d1d8eae51e81b19e3193e773fd052327ccb3c8c74323c8e7e8ec214e",
+      "presets/material-scout.yml": "e7becd627c741d22bda67371e54d03746d6626471bf6daa99f2cca7b7a82efdf",
+      "presets/media-portfolio-manager.yml": "4aae72fb19dad569397c4acb45050ef9c29d8fce235ad51936e39840a9fd2c79",
+      "presets/private-domain-operator.yml": "6f351e045ff799506245e1f18883d16a59f1330bfedf70242de1d97d5ea542bc",
+      "presets/production-planner.yml": "67d7cb2933a2a7603d70664b1e0fc78488fa4f20ff96aea56d6c24468193697e",
+      "presets/publish-operator.yml": "02f85e2e6bc1fcf44fdb545a199ff793b06741af9f360783a132a0a69bec2078",
+      "presets/review-analyst.yml": "a3130f43b0f48a2b63d58160e33a11c6ed7b90f8f6e8c55e565446dffa44ad1d",
+      "presets/scriptwriter.yml": "d2406b78d11082a594c68ac45031779deac13371c98ec0709c8ace479b1de357",
+      "presets/source-distributor.yml": "8cbe329b6786775def27ce43f2095feb1128567c70898e11b9a5e12dacfbaa1e",
+      "presets/visibility-watcher.yml": "05e59d7d7bfd329011cb18245938c4d37633838ce194487da69b5c4438b0b501",
+      "presets/visual-designer.yml": "8d02b6660eff1114f994959fc4432abda97bf420bfcc23cac9f57039d3c6014e",
+      "schemas/archive.schema.json": "ad08672042078f5d8a2376f855e0fe936454048fb0e4cc421d5b8082ad4e2200",
+      "schemas/objects.json": "1c7330962d407572f9df3557bb61ebddb0ddd0179a1820f411b28ee51d733020",
+      "schemas/stages.json": "dbb994a399bcfe9ea34fbeacda92a13bfdebb8caeef4f74960faf4461a447c93",
+      "service-front/client.json": "b30a525b9a398631aeb8410e2638f7085cd86c3e8ce914b1245a06fcef536cca",
+      "skills/ai-answer-rewrite/SKILL.md": "ff70313de2c4488931aac01a09bb5c58ba6a0c4abdfcd63f41e97571f86b7610",
+      "skills/art-direction/SKILL.md": "cc11f1494078b38f19c5d32a639ae036442163cbef00ebb98a156358036fda27",
+      "skills/asset-variant-forge/SKILL.md": "cbe3a2c37c2a752b46aacd1ada967423e64479829e5cde81ec5548b9cf6994dc",
+      "skills/brand-guard/SKILL.md": "f503f589579e6315bfa0d5f88ed24d3a5a7371907d8a50b430baeb9dc5f7a9e2",
+      "skills/budget-portfolio/SKILL.md": "cd7c164f5a17131be578049ddb24f697396c6472ad55cc55aab163ce69b3592f",
+      "skills/citation-reverse/SKILL.md": "6649d7132c40bafa801d96b9990935f2dd22ad20d11803af300549ef872ae8f0",
+      "skills/compositor-designer/SKILL.md": "39f7c4c5586878476e6843f2e6a382d4cda98ef26ebbdad4f0ceda9509badba1",
+      "skills/cro-playbook/SKILL.md": "ca6fa035d6da08143148006e8327e6a5ade45b83231967eb14d7d5aaccb0c2ef",
+      "skills/design-brief/SKILL.md": "3aff1aa840e204fdbade0f68698b94ad77a789886b3557ffb85345b046dfecaa",
+      "skills/design-critique/SKILL.md": "adf0543467e3347b4813ae99e6f9be9ca90c675289c50231566d8845fb825894",
+      "skills/dual-entry-inquiry/SKILL.md": "193b75b5e1558995a2fbafb6b61fc708d4b3cb905445e628503cfca95b6e10f6",
+      "skills/entity-consistency-check/SKILL.md": "b20a35eab3fee5dece0108f38f9a947cbbb84d4d78a9084c2dcab00469ff5b8e",
+      "skills/experiment-design/SKILL.md": "e58588906870d344792eecd3237333cad02e206c9e230b35ce2c1933c06c5dc5",
+      "skills/geo-answer-card/SKILL.md": "976e27f4c5f6c69534c60d9cc4c5b791981a78db27ee459af2edf7b1870fd0e6",
+      "skills/geo-query-craft/SKILL.md": "47137323c542d5fb936bdc7d56efc080411e2631df720b63474c8673cb7597fd",
+      "skills/growth-partnership/SKILL.md": "8287173d0bedbaf7085d001e187861cce1344406c993de36c686e38230cebdf5",
+      "skills/growth-review/SKILL.md": "a53d044a1bb5e31978079df09a002f6479c7824d2264bfcb3d5abd94b730f08e",
+      "skills/image-retouch/SKILL.md": "8c60ab98fb2bf2ee5b2a35d037bffe31b34459d86e0f79b67cfa614986d71c56",
+      "skills/incrementality-measurement/SKILL.md": "4b968e857003590f771add667325c740424e6356b1b23eb57fbfc0798a12e5ff",
+      "skills/lead-scoring/SKILL.md": "bbd29f97739384b10736918bf056726a5b539bfa38452e3e2acee367d05073b3",
+      "skills/lifecycle-growth/SKILL.md": "0ce68776ca764e4214f7afbbf0b595bb930a03b2e9303831c18144db50d950ef",
+      "skills/live-commerce/SKILL.md": "7c4f5109853a0341482f42e97cfe66b2643cf662d028f38199e1f1a50ecff364",
+      "skills/material-scout/SKILL.md": "43af986ca4fe262dd3829bfe8c1321d52a06137cec44292e658e0e5eaa74067d",
+      "skills/moments-post/SKILL.md": "592a5f33b337fe2a3b1bc95a2539ff67cf9f520190e41069a11bfad1e3628a3a",
+      "skills/poster-series/SKILL.md": "e73cf755dce3529a95c1149931dde4e55f1f26eeb81811af026d9fe20b11da98",
+      "skills/product-poster/SKILL.md": "eca3d17fce88eeb227eca16a743030537b7089a95ef3b64b30c55afd68b155f6",
+      "skills/promo-banner/SKILL.md": "0fbdc27dafe0b1be243261f0d67ce691906b6743da3bf3f4b8ab76ea07e22c57",
+      "skills/video-cover/SKILL.md": "77eb6e2247ee5df248ab69fa391f917598aea72dd2d5495a12b0a5915f317be9",
+      "skills/visibility-monitor/SKILL.md": "4486f68ca3e6e9d8fa345839cf1fb61aaa1d241012d358e40320c50f2e999702",
+      "ui/cases.json": "032a25657ac30c2def9240c45eeee94365adf29848bca91c526b9c7b532a9e7c"
+    }
+  }
+}

@@ -73,9 +73,17 @@ describe("ask × 客户知识库事实面（X-04 机制位）", () => {
       { content: "周年庆券后 7.5 折，暗号星火计划", heading: "促销", documentTitle: "周年庆活动说明", documentId: "kb-doc-1" },
     ]);
     expect(merged.facts).toHaveLength(2);
-    expect(merged.facts[1]!.label).toContain("知识库·周年庆活动说明");
-    expect(merged.facts[1]!.value).toContain("7.5 折");
+    /**
+     * 顺序即优先级（2026-09-29 第二次修复）：GR-09 是 120 字硬闸，
+     * 知识命中必须排在通用统计**之前**——此前追加在末尾，前一条修复"接线成功"、
+     * 后一条修复"截断正常"，合成后知识内容永远被吃掉（第三方验收 A3 实测）。
+     * 断言按不变量写：知识命中必须靠前，而不是"某个下标上恰好有它"。
+     */
+    expect(merged.facts[0]!.label).toContain("知识库·周年庆活动说明");
+    expect(merged.facts[0]!.value).toContain("7.5 折");
+    expect(merged.facts[1]!.label).toBe("事件库规模");
     expect(merged.sources).toContain("kb:kb-doc-1");
+    expect(merged.sources[0]).toBe("kb:kb-doc-1");
   });
 
   it("零命中不占位、不劣化", async () => {

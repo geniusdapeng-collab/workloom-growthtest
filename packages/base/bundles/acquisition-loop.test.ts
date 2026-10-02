@@ -131,7 +131,7 @@ describe("围栏引用完整性：管线门与员工绑定都必须有规则定�
 
   /**
    * 口径是「组合内可解析」：融合产品把三域基线围栏一起装载（service 层 chooseSegment
-   * 显式合并 hotel/ai-video/geo-growthtest 三份基线），因此组合权威岗位可以引用姐妹域的
+   * 显式合并 hotel/ai-video/geo-growth 三份基线），因此组合权威岗位可以引用姐妹域的
    * 围栏（如 hotel CEO 引用 G17/G18、geo 复盘岗引用 G13）——这正是跨域融合要表达的语义。
    */
   const composedFenceIds = new Set(VIEWS.flatMap((bundle) => [...bundle.fenceRuleIds]));
@@ -160,7 +160,7 @@ describe("围栏引用完整性：管线门与员工绑定都必须有规则定�
           // 该围栏来自其它包：只有当两个包同属一个组合（主包依赖或反向依赖）时才允许
           const others = VIEWS.filter((other) => other.id !== bundle.id && other.fenceRuleIds.has(fence));
           const inComposition = others.some((other) =>
-            bundle.id === "geo-growthtest" || other.id === "geo-growthtest" || (dependencyIds.has(bundle.id) && dependencyIds.has(other.id)));
+            bundle.id === "geo-growth" || other.id === "geo-growth" || (dependencyIds.has(bundle.id) && dependencyIds.has(other.id)));
           if (!inComposition) crossBundleRefs.push(`${bundle.id}/${key} → ${fence}`);
         }
       }
@@ -187,11 +187,11 @@ describe("员工技能资产可解析", () => {
 
 describe("多领域融合：组合岗位编制裁决", () => {
   /**
-   * 组合装载（geo-growthtest 主包依赖 hotel + ai-video）把三个领域的编制装进同一工作区，
+   * 组合装载（geo-growth 主包依赖 hotel + ai-video）把三个领域的编制装进同一工作区，
    * 而数字员工身份就是 preset_key（agents 幂等键 =(workspace_id, preset_key)）：
    * 同名不同义只能有一个权威定义，且裁决必须显式、可审计（不静默丢岗）。
    */
-  const composed = composeWorkforce("geo-growthtest");
+  const composed = composeWorkforce("geo-growth");
 
   it("组合编制内岗位标识唯一（每个 preset_key 只有一个权威定义）", () => {
     const keys = [...composed.presets.keys()];
@@ -215,9 +215,9 @@ describe("多领域融合：组合岗位编制裁决", () => {
 
   it("同名岗位按主包声明落到权威归属包", () => {
     const ownerOf = (key: string) => composed.presets.get(key)?.bundleId;
-    expect(ownerOf("ads-optimizer")).toBe("geo-growthtest");
-    expect(ownerOf("publish-operator")).toBe("geo-growthtest");
-    expect(ownerOf("review-analyst")).toBe("geo-growthtest");
+    expect(ownerOf("ads-optimizer")).toBe("geo-growth");
+    expect(ownerOf("publish-operator")).toBe("geo-growth");
+    expect(ownerOf("review-analyst")).toBe("geo-growth");
     // 酒店获客复合系统的 CEO 席位由行业包（hotel）持有：其职责覆盖酒店经营节拍与获客漏斗复盘
     expect(ownerOf("company-ceo")).toBe("hotel");
   });
@@ -225,10 +225,10 @@ describe("多领域融合：组合岗位编制裁决", () => {
   it("被遮蔽的岗位定义逐条留痕（不静默丢弃）", () => {
     const shadows = composed.shadowed.map((s) => `${s.bundleId}:${s.presetKey}→${s.winnerBundleId}`).sort();
     expect(shadows).toEqual([
-      "ai-video:ads-optimizer→geo-growthtest",
-      "ai-video:publish-operator→geo-growthtest",
-      "ai-video:review-analyst→geo-growthtest",
-      "geo-growthtest:company-ceo→hotel",
+      "ai-video:ads-optimizer→geo-growth",
+      "ai-video:publish-operator→geo-growth",
+      "ai-video:review-analyst→geo-growth",
+      "geo-growth:company-ceo→hotel",
     ]);
   });
 
@@ -246,7 +246,7 @@ describe("多领域融合：组合岗位编制裁决", () => {
     // 包内文件保持原样：单包装配校验（F2.10 围栏绑定完整）不被组合裁决污染
     const hotelCeo = VIEWS.find((b) => b.id === "hotel")!.presets.get("company-ceo")!.doc.fence_bindings!;
     expect(hotelCeo).toEqual(["R17", "R18", "R19"]);
-    const geoReview = VIEWS.find((b) => b.id === "geo-growthtest")!.presets.get("review-analyst")!.doc.fence_bindings!;
+    const geoReview = VIEWS.find((b) => b.id === "geo-growth")!.presets.get("review-analyst")!.doc.fence_bindings!;
     expect(geoReview).toEqual(["G18"]);
   });
 

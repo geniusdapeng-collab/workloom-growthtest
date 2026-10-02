@@ -52,7 +52,8 @@ export async function downloadToMediaStore(
   if (!/^https?:\/\//i.test(uri)) throw new Error(`只支持 http(s) 产物地址：${uri.slice(0, 80)}`);
   const fetchImpl = opts.fetchImpl ?? fetch;
   const maxBytes = opts.maxBytes ?? DEFAULT_MAX_BYTES;
-  const res = await fetchImpl(uri);
+  // C-06 修复：大文件下载 5 分钟超时（此前无超时，慢源/断流会永久拖住整个 poll 批次）
+  const res = await fetchImpl(uri, { signal: AbortSignal.timeout(Number(process.env.MEDIA_DOWNLOAD_TIMEOUT_MS ?? 300_000)) });
   if (!res.ok) throw new Error(`成片下载失败：HTTP ${res.status}`);
   const contentType = res.headers.get("content-type");
   const ext = contentType?.includes("webm") ? "webm" : contentType?.includes("png") ? "png"

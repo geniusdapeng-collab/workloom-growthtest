@@ -37,7 +37,28 @@ vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: doubles.connect }
 vi.mock("@workloom/base/model-router", () => ({
   GatewayEventSink: class {}, poolFromEnv: () => new Map(),
 }));
-vi.mock("@workloom/base/workdata", () => ({ gatewayAppend: vi.fn(), gatewayAppendOnClient: vi.fn() }));
+/**
+ * GR-02（2026-09-29 第二次修复）：号源改为共享的 `insertWithReadableId`（纯 nextval + SAVEPOINT 换号）。
+ * 这里按真实契约实现 stub：取号 SQL 仍走 mock 的 `video_projects_max_vid_no()`（返回 9000），
+ * 于是项目号 = VID-9000（**不再 +1**；旧实现在调用点 +1 得到 VID-9001）。
+ */
+vi.mock("@workloom/base/workdata", async () => {
+  const { makeReadableId } = await import("@workloom/shared");
+  return {
+    gatewayAppend: vi.fn(),
+    gatewayAppendOnClient: vi.fn(),
+    VIDEO_PROJECT_ID_SOURCE: { prefix: "VID", nextNumberSql: "public.video_projects_max_vid_no()", label: "视频项目号 VID-*" },
+    insertWithReadableId: async (
+      client: { query: (sql: string, params?: unknown[]) => Promise<{ rows: Array<{ n: string | number }> }> },
+      source: { prefix: string; nextNumberSql: string },
+      insert: (id: string) => Promise<unknown>,
+    ) => {
+      const r = await client.query(`SELECT ${source.nextNumberSql} AS n`);
+      const id = makeReadableId(source.prefix, Number(r.rows[0]!.n));
+      return { id, value: await insert(id) };
+    },
+  };
+});
 vi.mock("../service/llm.js", () => ({ modelPolicyFor: () => undefined }));
 vi.mock("./marketing-authority.js", () => ({ prepareMarketingFacts: doubles.prepare, finalizeMarketingFacts: doubles.finalize }));
 vi.mock("./data-mining-executor.js", () => ({ createDataMiningExecutor: vi.fn() }));

@@ -1,6 +1,6 @@
 # WorkLoom 获客用增系统 · 本仓专属规则
 
-> 本文件只适用于 workloom-ai/WorkLoom-growthtest（及其隔离实验副本的对应版本）。
+> 本文件只适用于 workloom-ai/WorkLoom-growth（及其隔离实验副本的对应版本）。
 > 开始实质性工作前，必须先完整阅读根级 `AGENTS.md` 与 `WORKLOOM_PRODUCT_CONTEXT.md`；
 > 本文件只补充本仓的运行、验证与目录约定，**不替代、也不放宽**共享安全不变量与产品边界。
 
@@ -32,6 +32,17 @@
 - UI 改动必须用仓内 browser/computer-use 能力打开真实页面截图核对，不能只看 curl 与日志。
 - 发布前 `pnpm release:gate` 全过（硬性门禁）；任务号与提交规范见 `docs/DEVELOPMENT-PROTOCOL.md`。
 
-## 认证真人素材：先建档再出镜（T-2026-0929-0007）
+## 三、认证真人素材：先建档，再出镜（T-2026-0929-0007）
 
-拿到 `asset://` 认证真人 ID 的第一动作是**问属性（性别/年龄段/授权/有效期）并建主档** `bundles/ai-video/library/real-person-assets/<assetId>/profile.json`；镜头卡（含代词）必须与主档一致（G-RP1 门 fail-closed）；多镜片先出 1 镜 canary 并通过身份比对再渲其余。细则见 `docs/real-person-asset.md`。
+**客户给出的平台认证真人素材 ID（`asset://asset-…`）不等于"人物属性已知"。** 2026-09-29 真机事故：
+镜头卡按上下文猜成"男性"，而认证素材本人是女性 → 模型跟文案、6 镜渲错人、全部被监制拒收，白烧算力。
+
+硬规则（进出片链路前必读）：
+
+1. 拿到 assetId 的**第一动作是问属性**（性别/年龄段/授权范围/有效期）并建主档
+   `bundles/ai-video/library/real-person-assets/<assetId>/profile.json`；**不许"先渲一版看看"**。
+2. 镜头卡（含代词）必须与主档一致；`g-real-person`（G-RP1）门在出片前逐镜核对，冲突即硬阻断。
+3. 多镜真人片**先渲 1 镜 canary** 并通过身份比对，再渲其余镜头。
+4. 缺属性、缺授权、素材未登记 → fail-closed；禁止在文案里临时代替平台事实。
+
+细则见 `docs/real-person-asset.md`。

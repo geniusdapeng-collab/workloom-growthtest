@@ -1,0 +1,432 @@
+{
+  "schemaVersion": "workloom.agent-capabilities/v1",
+  "bundleId": "geo-growth",
+  "capabilities": [
+    {
+      "id": "growth.service.ticket.list",
+      "version": "1.0.0",
+      "title": "查看我的工单",
+      "description": "读取当前 C 端会话名下最近的工单（最多 100 条，包含咨询以外的类型）；结果由服务端按 C 用户与工作区范围过滤。",
+      "operation": "read",
+      "transport": {
+        "kind": "c-service",
+        "method": "GET",
+        "path": "/c/tickets"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      },
+      "risk": "low",
+      "dataMode": "simulated"
+    },
+    {
+      "id": "growth.service.inquiry.preview",
+      "version": "1.0.0",
+      "title": "预览合作需求",
+      "description": "本地校验待提交的咨询或人工顾问需求，只预览输入，不访问服务端或创建工单；最终权限、归口与回执以服务端为准。",
+      "operation": "preview",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/preview.mjs",
+        "export": "previewInquiry"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "consult",
+              "service_request"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "payload": {
+            "type": "object"
+          },
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "kind",
+          "title"
+        ],
+        "additionalProperties": false
+      },
+      "risk": "low",
+      "dataMode": "simulated"
+    },
+    {
+      "id": "growth.service.inquiry.execute",
+      "version": "1.0.0",
+      "title": "提交合作需求",
+      "description": "向当前 C 端会话提交一条合作咨询或人工顾问需求；服务端负责幂等、派单与事件记账。通知通道仍为演示，不能视为外部送达。",
+      "operation": "execute",
+      "transport": {
+        "kind": "c-service",
+        "method": "POST",
+        "path": "/c/tickets"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "consult",
+              "service_request"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "payload": {
+            "type": "object"
+          },
+          "conversationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "idempotencyKey": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "kind",
+          "title",
+          "idempotencyKey"
+        ],
+        "additionalProperties": false
+      },
+      "risk": "moderate",
+      "dataMode": "simulated",
+      "enabled": false,
+      "disabledReason": "等待公共 C 工单幂等跨用户隔离修复、服务端活动 geo-growth 行业包绑定、Growth 受控同步和回归验证"
+    },
+    {
+      "id": "growth.service.ticket.receipt",
+      "version": "1.0.0",
+      "title": "核对工单进度",
+      "description": "按工单编号查询当前 C 端用户自己的工单与时间线（包含咨询以外的类型）；工单受理不等于外部通知送达。",
+      "operation": "receipt",
+      "transport": {
+        "kind": "c-service",
+        "method": "GET",
+        "path": "/c/tickets/{id}"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      },
+      "risk": "low",
+      "dataMode": "simulated"
+    },
+    {
+      "id": "growth.video.route.record",
+      "version": "1.0.0",
+      "title": "读取视频分流结论",
+      "description": "读取已落盘的视频类型分流记录（work/route.json，由 route-video.mts 产出）：营销片/叙事片/口播解说片/待澄清、置信度、商品锚点与澄清问题。只读文件，不重新跑分流、不访问服务端。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/video.mjs",
+        "export": "routeRecord"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.production.status",
+      "version": "1.0.0",
+      "title": "读取视频生产状态",
+      "description": "读取某项目的逐阶段账本（logs/<project>/stages.jsonl）：各阶段 invoked/ok/failed/degraded、最近一次失败原因，以及渲染台账（提交次数/渲后判不合格/平台拒收/canary 止损）。只读本地账本，用于判断「卡在哪一步」，不触发任何渲染。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/video.mjs",
+        "export": "productionStatus"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "workDir": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.delivery.inspect",
+      "version": "1.0.0",
+      "title": "核验视频交付清单",
+      "description": "读取交付清单（<out>/<project>-delivery-manifest.json）并逐个检查清单所列文件是否存在、大小，回传审核口径（reviewPolicy）、分流结论、配乐层状态与渲染台账；缺件/越界会如实列出。只读，不重新交付。",
+      "operation": "receipt",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/video.mjs",
+        "export": "deliveryInspect"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "outDir": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.production.plan",
+      "version": "1.0.0",
+      "title": "预览出片计划（不执行）",
+      "description": "给出「出片建议命令 + 前置检查清单」（分流是否就绪、镜头卡是否在场、火山方舟密钥是否配置、欠费提示）。这是预览：不跑管线、不提交渲染、不花钱；真正的执行走 CLI（full-chain-film.mts）。",
+      "operation": "preview",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/video.mjs",
+        "export": "productionPlan"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "projectId": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "platform": {
+            "type": "string",
+            "maxLength": 60
+          },
+          "shotlistPath": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "routePath": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "outDir": {
+            "type": "string",
+            "maxLength": 400
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.gen.catalog",
+      "version": "1.0.0",
+      "title": "读取视频模型目录",
+      "description": "读取服务端可提交的视频/图片/音频模型目录（服务端按运行时就绪度过滤）。只读服务端过程，不含密钥与账户信息。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.gen.catalog",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": [
+              "video",
+              "image",
+              "audio"
+            ]
+          },
+          "mode": {
+            "type": "string"
+          },
+          "includeUnavailable": {
+            "type": "boolean"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.production.shots",
+      "version": "1.0.0",
+      "title": "读取项目镜头与生产资格",
+      "description": "按项目读取服务端侧的镜头清单与生产资格状态（Studio 页同源过程）。只读；不提交渲染、不改变资格。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.production.shots",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.repo.status",
+      "version": "1.0.0",
+      "title": "读取本仓自述",
+      "description": "读取本仓 product.manifest 摘要与 bundles/docs/脚本计数；只读，不访问服务端。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/repo.mjs",
+        "export": "repoStatus"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.repo.docs",
+      "version": "1.0.0",
+      "title": "读取文档索引",
+      "description": "列出 docs/*.md 与一级标题（最多 60 条），供 Agent 找 runbook 与规范；只读。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/repo.mjs",
+        "export": "repoDocs"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 60
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.bundle.summary",
+      "version": "1.0.0",
+      "title": "读取行业包概览",
+      "description": "读取 bundles/geo-growth 的 skills/fences/pipelines/presets/library 计数与围栏规则样例；只读。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/repo.mjs",
+        "export": "bundleSummary"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.repo.readiness",
+      "version": "1.0.0",
+      "title": "检查接入就绪度（不执行）",
+      "description": "检查 Node 版本、依赖、运行时资产、密钥文件、MCP 入口与内置 DSH 组件 pin；只读本地文件，不联网。",
+      "operation": "preview",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/repo.mjs",
+        "export": "repoReadiness"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
+    }
+  ]
+}

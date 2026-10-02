@@ -29,7 +29,7 @@
 | Bundle | 内容包 | 三位当家人（第 1 关） | 驳回原因来源 |
 |---|---|---|---|
 | `hotel` | `QUESTLINE` | AI 接待员 / 内容主笔官 / 渠道哨兵官 | `bundles/hotel/feedback-enums.yml` |
-| `geo-growthtest` | `QUESTLINE_GEO` | GEO 内容策划 / 投放优化师 / 复盘分析师 | `bundles/geo-growthtest/feedback-enums.yml` |
+| `geo-growth` | `QUESTLINE_GEO` | GEO 内容策划 / 投放优化师 / 复盘分析师 | `bundles/geo-growth/feedback-enums.yml` |
 | `ai-video` | `QUESTLINE_VIDEO` | 总导演 / 渲染师 / 发布专员 | `bundles/ai-video/feedback-enums.yml` |
 | 其他 / 未知 | —— | 不显示引导（宁可不引导，也不把别的行业的人设与岗位塞给客户） | —— |
 

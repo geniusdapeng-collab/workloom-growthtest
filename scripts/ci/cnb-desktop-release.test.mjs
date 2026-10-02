@@ -18,7 +18,7 @@ import {
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "../..");
 const SHA = "a".repeat(40);
-const REPOSITORY = "workloom-ai/WorkLoom-growthtest";
+const REPOSITORY = "workloom-ai/WorkLoom-growth";
 const TAG = "v1.2.3";
 const BUILD_ID = "cnb-test-123";
 const PREFIX = `/${REPOSITORY}/-/`;
@@ -255,7 +255,7 @@ test("CNB config has main-only signed producers and one locked publisher", () =>
   });
   for (const [index, platform] of ["macos", "windows"].entries()) {
     assert.equal(jobs[index].runner.namespace, "group");
-    assert.ok(jobs[index].runner.tags.includes(`workloom-growthtest-desktop-${platform}`));
+    assert.ok(jobs[index].runner.tags.includes(`workloom-growth-desktop-${platform}`));
     const stage = jobs[index].stages.find((item) => item.script?.includes(`stage-platform --platform ${platform}`));
     const ready = jobs[index].stages.find((item) => item.type === "cnb:resolve");
     assert.equal(stage.exports.candidate_manifest_sha512,

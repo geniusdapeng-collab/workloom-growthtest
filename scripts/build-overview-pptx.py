@@ -142,7 +142,7 @@ bullets(s, 0.9, 1.5, 11.5, 4.6, [
 s = slide()
 text(s, 0.8, 0.45, 11.7, 0.9, [("给开发者的桥：每个业务能力背后是哪块代码", 28, MAIN, True)])
 rows = [
-    ("获客五环 · 意图洞察", "social-listening + bundles/geo-growthtest 情报管线"),
+    ("获客五环 · 意图洞察", "social-listening + bundles/geo-growth 情报管线"),
     ("内容生产与分发", "ai-video + video-studio + publish-rpa（六平台 RPA）"),
     ("询盘承接与转化", "service-* 四件（C 端）+ im-channels + bundles/hotel 获客域"),
     ("AI 班组调度", "captain（ASK/QUEST 编排）+ night-shift（夜班）+ model-router"),
@@ -181,7 +181,7 @@ text(s, 0.8, 0.45, 11.7, 0.9, [("从酒店到千行百业：Bundle 化复制", 3
 bullets(s, 0.9, 1.5, 11.5, 4.4, [
     ("底座不变", "围栏/编排/事件/隔离/人审/夜班——行业无关的经营基建"),
     ("行业打包", "每个行业一个 Bundle：员工（preset）+ 围栏 + 技能 + 对象 + 管线 + 默认客群配置"),
-    ("已有样例", "bundles/hotel（酒店获客 v3.3.0）· bundles/geo-growthtest（GEO 双域）· bundles/ai-video（短视频）"),
+    ("已有样例", "bundles/hotel（酒店获客 v3.3.0）· bundles/geo-growth（GEO 双域）· bundles/ai-video（短视频）"),
     ("四仓矩阵", "workloom（获客主仓）· workloom-im（IM 底座）· workloom-hotel（酒店垂直）· hyperreality-system（视频制作）"),
 ], size=17)
 

@@ -73,12 +73,12 @@ describe.runIf(RUN_DB)("活动 Bundle 服务前台适配器 PG 契约", () => {
 
   it("获客用增演示工作区（ws-geo）解析到产品自己的前台适配器", async () => {
     // 主题口径：获客用增是本仓产品主题；ws-geo 由 db:seed 链（seed.ts + seed-geo.ts）确定性产出，
-    // 必须解析到 geo-growthtest.service-front-v1，而不是回退到酒店试点前台。
+    // 必须解析到 geo-growth.service-front-v1，而不是回退到酒店试点前台。
     const geo = await resolveWorkspaceBusinessAdapter("ws-geo");
     expect(geo).toMatchObject({
       state: "ready",
-      bundleId: "geo-growthtest",
-      adapter: { id: "geo-growthtest.service-front-v1" },
+      bundleId: "geo-growth",
+      adapter: { id: "geo-growth.service-front-v1" },
     });
   });
 

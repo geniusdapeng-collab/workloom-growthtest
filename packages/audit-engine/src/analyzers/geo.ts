@@ -8,7 +8,7 @@
  *  3) 内容结构不利于引用：GEO 内容资产无 FAQ 块 / 无结构化数据（JSON-LD）
  *     （聚合 P2——AI 答案引用亲和度低，引用源建设清单）
  * 降级纪律：geoQueries 为空 → 整线 not-covered；geoAssets 为空 → 子项 3 跳过（engine 标 partial）。
- * 口径锚点：geo-growthtest-baseline（能见度监测/引用源建设纪律；G-GEO 灰帽零容忍——本线只诊断不优化）。
+ * 口径锚点：geo-growth-baseline（能见度监测/引用源建设纪律；G-GEO 灰帽零容忍——本线只诊断不优化）。
  */
 import type { AuditSnapshot, Finding } from "../types.js";
 import { makeFinding, type AnalyzerContext } from "./util.js";

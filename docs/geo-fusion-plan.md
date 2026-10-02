@@ -2,7 +2,7 @@
 
 > 版本：v1.0（2026-08-23）
 > 方案定位：这不是概念方案，是排产文档——每个模块有对象、有员工、有围栏、有 SOP、有验收指标、有 90 天逐周计划。
-> 代码落点：`bundles/geo-growthtest/`（底座零改动，一切新能力经 Bundle 注入）。
+> 代码落点：`bundles/geo-growth/`（底座零改动，一切新能力经 Bundle 注入）。
 
 ## 第〇章 方案总览（一页纸）
 
@@ -35,13 +35,13 @@
 ## 第二章 产品架构：一个底座、两个经营域、四层结构
 
 ### 2.1 分层纪律（防膨胀的第一原则）
-- **底座零改动**：一切新能力经 Bundle 注入；GEO 域与社媒域的所有对象、员工、围栏、技能都在 Bundle 层（`bundles/geo-growthtest/`）；
+- **底座零改动**：一切新能力经 Bundle 注入；GEO 域与社媒域的所有对象、员工、围栏、技能都在 Bundle 层（`bundles/geo-growth/`）；
 - **通道可替换**：模型 API、发布渠道、AI 平台监测通道全部走五级分层（L1 官方 API → L3 RPA 剧本 → L5 人工），任一通道失效不塌架构；
 - **数据归属红线**：客户业务数据（客资、WhatsApp 聊天、线索）留在客户系统；WorkLoom 事件链只记录经营动作留痕，不碰内容数据。
 
 ### 2.2 员工编制（GEO 双域包自身 14 员 + 2 指挥官）
 
-> **口径说明（2026-09-28 修订·本机 UHD 交付围栏落地后复算）**：本节描述的是 `bundles/geo-growthtest` 包自身的编制——双域 16 岗 + 视觉栈 2 岗（视觉设计师 / 素材寻源员）+ 获客用增班组 9 岗（核心 7 岗：增长负责人 / 增长策略师 / 增长实验官 / 线索转化官 / 投放组合经理 / 承接转化设计师 / 直播操盘手；P2 条件 2 岗：生命周期增长官 / 渠道增长官，未激活受 G-GROW7/8 硬门禁），本包共 27 个 preset。本产品（获客用增系统）的完整组合编制为三包合并 **81 岗**（各包声明 hotel 16 + ai-video 42 + geo-growthtest 27，其中 4 处同名遮蔽按主包裁决；**三包 `provides.fences` 逐文件去重后围栏并集 121 条**，含 ai-video 的 5 条成片调色门 G-COL0..G-COL4、6 条成片配乐门 G-BGM0..G-BGM5、6 条标题字幕门 G-SUB0..G-SUB5、10 条交付/返修门 G-DLV0..G-DLV9 与 5 条素材用途门 G-MAT0..G-MAT4（含"素材只作场景依据，禁止参考图复刻"）），事实源为 `bundles/geo-growthtest/bundle.json#composition.presetOwners` 与 `packages/base/bundles/assembly.ts`（装配器实测口径，README 与 `scripts/suite-hotel.ts` 同源）；岗位与围栏随包演进，引用时以装配器运行结果为准。
+> **口径说明（2026-09-28 修订·本机 UHD 交付围栏落地后复算）**：本节描述的是 `bundles/geo-growth` 包自身的编制——双域 16 岗 + 视觉栈 2 岗（视觉设计师 / 素材寻源员）+ 获客用增班组 9 岗（核心 7 岗：增长负责人 / 增长策略师 / 增长实验官 / 线索转化官 / 投放组合经理 / 承接转化设计师 / 直播操盘手；P2 条件 2 岗：生命周期增长官 / 渠道增长官，未激活受 G-GROW7/8 硬门禁），本包共 27 个 preset。本产品（获客用增系统）的完整组合编制为三包合并 **81 岗**（各包声明 hotel 16 + ai-video 42 + geo-growth 27，其中 4 处同名遮蔽按主包裁决；**三包 `provides.fences` 逐文件去重后围栏并集 121 条**，含 ai-video 的 5 条成片调色门 G-COL0..G-COL4、6 条成片配乐门 G-BGM0..G-BGM5、6 条标题字幕门 G-SUB0..G-SUB5、10 条交付/返修门 G-DLV0..G-DLV9 与 5 条素材用途门 G-MAT0..G-MAT4（含"素材只作场景依据，禁止参考图复刻"）），事实源为 `bundles/geo-growth/bundle.json#composition.presetOwners` 与 `packages/base/bundles/assembly.ts`（装配器实测口径，README 与 `scripts/suite-hotel.ts` 同源）；岗位与围栏随包演进，引用时以装配器运行结果为准。
 
 | 班组 | 员工 | 职责 | 复用/新增 |
 |---|---|---|---|
@@ -81,11 +81,11 @@
 | G17 | block | 自治边界放宽必须 L4（只紧不松） | 双域 |
 | G18 | auto+留痕 | 熔断触发即时通知+边界快照 | 双域 |
 
-> 代码落点：`bundles/geo-growthtest/fences/geo-growthtest-baseline.yml`（17 条规则实体，G10a-d 计 4 条）。
+> 代码落点：`bundles/geo-growth/fences/geo-growth-baseline.yml`（17 条规则实体，G10a-d 计 4 条）。
 
 ### 2.4 Quest 管线（4 条主干）
 
-代码落点：`bundles/geo-growthtest/pipelines/`
+代码落点：`bundles/geo-growth/pipelines/`
 1. **intel-fusion**（选题情报双向流动）：情报站 07:00 刷新 → 统一情报卡 → 双用选题识别 → 清晨决策包裁决 → 双域排产；
 2. **dual-content-factory**（一次生产两处变现）：脚本成套 → 实拍/AI 分流 → 人审 → GEO 六段式改写 → G-GEO1/G-GEO2 双审 → 社媒组+信源组统一分发 → 回写一客一档；
 3. **visibility-watch**（AI 能见度监测）：品牌词日频+全量周频采集 → 答案五维结构化 → 情感异常告警 → 口径冲突联动 → 能见度账本；
@@ -114,13 +114,13 @@
 | ⑦ 转化资产 | 广告数据、线索画像、WhatsApp 沟通阶段、成交反馈 | 持续沉淀 | 私域承接专员 |
 
 > **数据写回铁律**：每个 Agent 每次生成、分析、执行的结果都写回客户档案——**档案厚度 = 客户迁移成本 = 续约率**。
-> Schema 落点：`bundles/geo-growthtest/schemas/archive.schema.json`。
+> Schema 落点：`bundles/geo-growth/schemas/archive.schema.json`。
 
 ### 3.3 账号成长六阶段机（系统内置）
 
 1. 产品与市场 → 2. 账号搭建 → 3. 规模测试 → 4. 流量跑通 → 5. 转化验证（GEO 引用源建设启动）→ 6. 批量放大（扩编提案 L4 逐单批）
 
-> 关键设计：系统先识别阶段，再决定生成什么内容、分析什么数据、给出什么动作；扩市场/扩账号时绝不当「零数据新客户」处理。落点：`bundles/geo-growthtest/schemas/stages.json`。
+> 关键设计：系统先识别阶段，再决定生成什么内容、分析什么数据、给出什么动作；扩市场/扩账号时绝不当「零数据新客户」处理。落点：`bundles/geo-growth/schemas/stages.json`。
 
 ## 第四章 端到端 SOP：从签约到续费
 

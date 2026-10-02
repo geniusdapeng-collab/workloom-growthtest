@@ -6,7 +6,7 @@
 
 > **WorkLoom 革命纲领** · v2.0 · 2026-09-19
 > 从「人驱动、AI 辅助」到「AI 自治、人定边界」
-> 事实基线：`workloom-im` / `WorkLoom-growthtest` / `workroom-fox`，2026-09-19（数字均带 ref 与复算口径）
+> 事实基线：`workloom-im` / `WorkLoom-growth` / `workroom-fox`，2026-09-19（数字均带 ref 与复算口径）
 
 ---
 

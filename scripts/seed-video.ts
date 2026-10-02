@@ -26,7 +26,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { safeParseBusinessEvent } from "@workloom/shared";
 // 哈希链统一生产口径（events.ts 的 canonicalJson/eventHash），与 seed.ts 同一纪律
-import { eventHash } from "@workloom/base/workdata";
+import { alignReadableIdSequences, eventHash } from "@workloom/base/workdata";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
@@ -837,6 +837,10 @@ async function main() {
     [WS_ID, JSON.stringify({ text: '您的换新工单「保温杯不保温·申请换新」已受理，售后部处理中。', mock: true }), new Date(Date.now() - 299 * 60000).toISOString()],
   );
   console.log("✓ AI 服务前台运行态（星芒好物）：用户/售后政策知识库/会话/工单×2/时间线/通知");
+
+  // GR-02（2026-09-29 第二次修复）：手写 VID-*/T-* 号段写入方收尾对齐号源（取号函数只做 nextval）
+  const seqFloor = await alignReadableIdSequences(owner);
+  console.log(`✓ 可读号源对齐：threads→${seqFloor.threads}，video_projects→${seqFloor.videoProjects}`);
 
   await owner.end();
   console.log("\n视频经理演示种子完成。下一步：pnpm dev 后在工作台查看（ws-video 工作区）。");

@@ -1,0 +1,54 @@
+# GEO 双域获客 Bundle · 第⑧装配槽：反馈枚举表（D24 自我进化飞轮 M1）
+#
+# 口径（与 hotel / ai-video 同规）：
+#  - 驳回（reject）必须命中本表受控词表——自由文本无法聚类，校准信号的可信度前提是受控枚举；
+#  - 编辑（edit）手势另以 editKind 二分归因（correction 纠错→缺陷池 / preference 口味→偏好池），
+#    本表 enums 同样可用于 edit 的补充说明；
+#  - 枚举码一旦上线只增不改（历史事件里流转的是 code；改 code = 切断归因链）。
+#
+# 域划分：GEO/内容事实类（客观纠错）· 投放经营类 · 风格类（主观偏好）· 通用兜底。
+version: geo-growth-feedback-enums/v1
+enums:
+  # ---- GEO / 内容事实类（客观纠错 → 缺陷池）----
+  - code: fact.risk
+    label: 事实红线风险（参数/功效/资质宣称）
+    appliesTo: [reject, edit]
+  - code: geo.citation_missing
+    label: 引用源缺失或不可核验
+    appliesTo: [reject, edit]
+  - code: geo.keyword_drift
+    label: 偏离目标 query 集（答非所问）
+    appliesTo: [reject]
+  - code: entity.inconsistent
+    label: 实体信息不一致（店名/地址/营业时间）
+    appliesTo: [reject, edit]
+  - code: compliance.platform
+    label: 平台合规风险（违禁词/导流/医疗宣称）
+    appliesTo: [reject]
+  # ---- 投放与经营类 ----
+  - code: budget.over
+    label: 预算超支
+    appliesTo: [reject]
+  - code: audience.mismatch
+    label: 人群/渠道不匹配
+    appliesTo: [reject]
+  - code: roi.too_low
+    label: 投产比不达标
+    appliesTo: [reject]
+  # ---- 风格类（主观偏好 → 偏好池）----
+  - code: style.off_brand
+    label: 偏离账号人设
+    appliesTo: [reject, edit]
+  - code: tone.mismatch
+    label: 语气不像我们家
+    appliesTo: [reject, edit]
+  - code: hook.weak
+    label: 钩子疲软（前 3 秒无抓力）
+    appliesTo: [reject, edit]
+  # ---- 通用 ----
+  - code: data.stale
+    label: 数据陈旧/依据不足
+    appliesTo: [reject]
+  - code: other
+    label: 其他（须附自由文本说明）
+    appliesTo: [reject, edit]

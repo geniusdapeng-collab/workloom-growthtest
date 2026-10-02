@@ -5,7 +5,7 @@ description: 酒店 GEO 内容——AI 答案版探店图文创作：「XX市XX�
 
 # 酒店 GEO 内容（hotel-geo-content）
 
-> geo-growthtest「六段式 AI 答案改写」的酒店特化版。42% 住客已用生成式 AI 查住宿信息——AI 搜索是酒店获客刚爆发的新入口。
+> geo-growth「六段式 AI 答案改写」的酒店特化版。42% 住客已用生成式 AI 查住宿信息——AI 搜索是酒店获客刚爆发的新入口。
 
 ## 酒店 query 集结构（30-50 词起步）
 
@@ -27,7 +27,7 @@ description: 酒店 GEO 内容——AI 答案版探店图文创作：「XX市XX�
 
 ## 分发渠道
 
-知乎问答、头条号、百家号、公众号、大众点评攻略——与 geo-growthtest 信源分发同通道；发布即入引用源监测（channel-watcher 周频复盘收录情况）。
+知乎问答、头条号、百家号、公众号、大众点评攻略——与 geo-growth 信源分发同通道；发布即入引用源监测（channel-watcher 周频复盘收录情况）。
 
 ## 红线
 

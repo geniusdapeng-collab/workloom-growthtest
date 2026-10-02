@@ -80,7 +80,7 @@ describe("考试闸 examGate", () => {
   });
 
   it("HP-02：`rules:` 形态的围栏包同样出题（统一读取口径，不能按 0 条规则静默通过）", async () => {
-    // 本仓行业包（hotel/ai-video/geo-growthtest）用 `rules:`，出厂包用 `fences:`；
+    // 本仓行业包（hotel/ai-video/geo-growth）用 `rules:`，出厂包用 `fences:`；
     // 只读 `fences` 会让 rules 形态的包在考试闸"一条规则都不出"，出题数校验随之失真。
     const view = makeView();
     view.fencePacks = [{ rules: [

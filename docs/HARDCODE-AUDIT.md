@@ -1,7 +1,7 @@
 # 硬编码排查报告（workloom / WorkLoom 酒店获客系统）
 
 > 排查日期：2026-08-29 · 方法：六类维度自动扫描（`scripts/hardcode-scan.mjs`）→ 白名单过滤 → 逐条语义复核
-> 范围：apps/（server+web+webc+desktop+site）、packages/（base/runtime/shared/db/audit-engine/video-studio）、bundles/（hotel/ai-video/geo-growthtest）、scripts/、.github/
+> 范围：apps/（server+web+webc+desktop+site）、packages/（base/runtime/shared/db/audit-engine/video-studio）、bundles/（hotel/ai-video/geo-growth）、scripts/、.github/
 > 结果：候选 949 条 → 白名单豁免 774 条 → 疑似 175 条逐条复核 → **真问题 5 项（已全部修复）+ 测试/套件硬编码 3 处（已一并治理）**
 
 ## 一、复核结论总表
@@ -11,7 +11,7 @@
 | A 环境配置 | 98 | 0 | 全部为 CI 连接串、本地开发脚本默认值（有 env 兜底）、第三方官方端点（微信/LLM 预设/平台上传地址）、dsh-gate 本机配置、注释与 placeholder——标准实践，豁免 |
 | B 身份演示 | 17 | **3** | trpc.ts 演示登录默认值写死 slug/成员号（P1）、P7 草稿写死 MEM-V01（P1）、P1 页写死演示身份号码（P2→顺手修）；其余为 seed/demo/release-gate/e2e 白名单 |
 | C 密钥凭据 | 0 | 0 | 全仓无明文密钥（25 条候选均为白名单内变量名/示例） |
-| D 行业泄漏 | 0 | **1** | 扫描器 D1（底座纯电商词：拼多多/亚马逊/千川/ACoS）**0 命中**；人工加扫发现 service-dialog mock 兜底写死种子品牌「云栖酒店」（P1，底座品牌串味）。bundle 串味双向加扫（ai-video/geo-growthtest 内酒店词、hotel 内社媒词）**0 命中**；audit-core 注释已先行中性化（随本提交带上） |
+| D 行业泄漏 | 0 | **1** | 扫描器 D1（底座纯电商词：拼多多/亚马逊/千川/ACoS）**0 命中**；人工加扫发现 service-dialog mock 兜底写死种子品牌「云栖酒店」（P1，底座品牌串味）。bundle 串味双向加扫（ai-video/geo-growth 内酒店词、hotel 内社媒词）**0 命中**；audit-core 注释已先行中性化（随本提交带上） |
 | E 规则外溢 | 6 | **1** | charter.ts 自治额度默认值 5000/2000 经核与 seed.ts:211 完全一致，且匹配酒店获客量级（房价带 358–788），**判定合理豁免**；decision.ts 注释「1.3 倍宽限」表述不精确（P2→顺手修）；E8.3 校准系数 ×2 为有注释依据的产品逻辑常量（豁免） |
 | F 文案展示 | 54 | 0 | 唯一 F1 命中为「API Key」通用术语（豁免）；F2 命中均为角色枚举逻辑变量与 display 字典本体（豁免） |
 
@@ -22,7 +22,7 @@
 | 1 | P1 | `apps/web/src/lib/trpc.ts` | 演示登录默认值写死 `workspaceSlug: "video-studio"` + `MEM-V01`——客户自建工作区时演示登录即坏 | 抽为 `VITE_DEMO_WORKSPACE` / `VITE_DEMO_MEMBER` env 可配（保留默认值兜底，对齐电商仓口径） |
 | 2 | P1 | `apps/web/src/pages/p7/P7.tsx`（2 处） | 技能发布草稿 `ownerMemberNo: "MEM-V01"` 写死 | 默认空，页面加载时以当前登录身份 `members.me.identity.memberNo` 填充；提交后重置同样不再写死 |
 | 3 | P2 | `apps/web/src/pages/p1/P1.tsx` | 文案写死「演示身份 MEM-V01 陈主理」 | 去除写死号码，显示实际身份名 |
-| 4 | P1 | `packages/base/service-dialog/dialog.ts:251` | 无 LLM 时 mock 兜底写死种子品牌「云栖酒店智能客服」——非酒店工作区（video-studio/geo-growthtest）应答串味 | 中性化为「智能客服」，不绑定任何种子品牌 |
+| 4 | P1 | `packages/base/service-dialog/dialog.ts:251` | 无 LLM 时 mock 兜底写死种子品牌「云栖酒店智能客服」——非酒店工作区（video-studio/geo-growth）应答串味 | 中性化为「智能客服」，不绑定任何种子品牌 |
 | 5 | P2 | `packages/base/captain/decision.ts:183` | 注释「1.3 倍宽限」与代码 0.85/1.15 不对称放宽表述不精确 | 注释精确化（标准带再放宽 ±15%：下限≈0.72、上限≈1.32） |
 | 6 | 治理 | `packages/base/captain/captain.test.ts` | 断言绑死默认值魔法数（5000/2500/3000/2000…）——默认值行业化调整即破，属测试硬编码 | 引入 `CAP = defaultCharter().autonomy.procurement_cap`，断言全部动态化（对齐电商仓 CAP 模式） |
 | 7 | 治理 | `packages/base/captain/captain-v2.test.ts` | 同上（12000/800/3000） | 同上（CAP×2+1000 / ⌊CAP×0.16⌋ / ⌊CAP×0.6⌋） |

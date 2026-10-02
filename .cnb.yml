@@ -21,10 +21,10 @@
       script: |
         set -eu
         node --test scripts/ci/protocol-rules.test.mjs
+        node --test scripts/ci/cnb-desktop-release.test.mjs
         # 硬闸口径（T-2026-0930-0015）：创作/审美口径不得写成 hard: true（硬闸只允许事实类）
         node --test scripts/ci/hard-gate-policy.test.mjs
         node scripts/ci/verify-hard-gate-policy.mjs
-        node --test scripts/ci/cnb-desktop-release.test.mjs
         node scripts/ci/verify-commit-msg.mjs --self-test
         node scripts/ci/verify-lock-conflict.mjs --self-test
         node scripts/ci/verify-commit-msg.mjs
@@ -237,7 +237,7 @@ main:
       runner:
         namespace: group
         tags:
-          - workloom-growthtest-desktop-macos
+          - workloom-growth-desktop-macos
       stages:
         - name: 校验发布身份、工具链和签名凭据
           script: |
@@ -256,7 +256,7 @@ main:
         - name: 构建受信行业 Bundle、投影和 Web
           script: |
             set -eu
-            export VITE_DEMO_WORKSPACE=geo-growthtest VITE_DEMO_MEMBER=MEM-G01
+            export VITE_DEMO_WORKSPACE=geo-growth VITE_DEMO_MEMBER=MEM-G01
             pnpm install --frozen-lockfile
             pnpm bundle:release
             test -s build/bundle-trust.json
@@ -335,7 +335,7 @@ main:
       runner:
         namespace: group
         tags:
-          - workloom-growthtest-desktop-windows
+          - workloom-growth-desktop-windows
       # PG17/pgvector use a system-wide installation on a persistent runner.
       # Serialize entire Windows producers across release events before Choco/nmake.
       lock:
@@ -372,7 +372,7 @@ main:
               & $file @arguments
               if ($LASTEXITCODE -ne 0) { throw "$file failed with exit code $LASTEXITCODE" }
             }
-            $env:VITE_DEMO_WORKSPACE = 'geo-growthtest'
+            $env:VITE_DEMO_WORKSPACE = 'geo-growth'
             $env:VITE_DEMO_MEMBER = 'MEM-G01'
             Run pnpm @('install', '--frozen-lockfile')
             Run pnpm @('bundle:release')

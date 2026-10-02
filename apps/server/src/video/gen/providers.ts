@@ -45,8 +45,11 @@ function classify(status: number, body: string): ProviderError {
   return new ProviderError("PROVIDER_FAILED", `供应商失败：HTTP ${status} ${text}`, status);
 }
 
+/** C-06 修复：供应商出站调用统一 60s 超时（此前无超时，网关挂起即永久 await） */
+const FETCH_TIMEOUT_MS = Number(process.env.VIDEO_PROVIDER_FETCH_TIMEOUT_MS ?? 60_000);
+
 async function postJson(url: string, headers: Record<string, string>, body: unknown): Promise<unknown> {
-  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body) });
+  const res = await fetch(url, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify(body), signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }); // C-06：出站调用必须有限时，不得永久 await
   const text = await res.text();
   if (!res.ok) throw classify(res.status, text);
   try {
@@ -58,7 +61,7 @@ async function postJson(url: string, headers: Record<string, string>, body: unkn
 
 /** 直接发送编译后的 JSON，不在审核后再映射、追加或覆盖字段。 */
 async function postCompiled(compiled: CompiledProviderRequest, headers: Record<string, string>): Promise<unknown> {
-  const res = await fetch(compiled.endpoint, { method: compiled.method, headers: { "content-type": "application/json", ...headers }, body: compiled.bodyJson });
+  const res = await fetch(compiled.endpoint, { method: compiled.method, headers: { "content-type": "application/json", ...headers }, body: compiled.bodyJson, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }); // C-06
   const text = await res.text();
   if (!res.ok) throw classify(res.status, text);
   try { return JSON.parse(text) as unknown; }
@@ -66,7 +69,7 @@ async function postCompiled(compiled: CompiledProviderRequest, headers: Record<s
 }
 
 async function getJson(url: string, headers: Record<string, string>): Promise<{ ok: boolean; status: number; body: unknown; text: string }> {
-  const res = await fetch(url, { method: "GET", headers });
+  const res = await fetch(url, { method: "GET", headers, signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) }); // C-06
   const text = await res.text();
   let body: unknown = null;
   try { body = JSON.parse(text) as unknown; } catch { body = null; }

@@ -46,7 +46,7 @@ packages/
   runtime/     意图路由（规则+LLM 分类器）、QUEST 执行、L3 工具注册
   shared/      跨端共享类型
   video-studio/ 视频成片管线
-bundles/       行业垂直包：hotel(获客 v3.3.0) / geo-growthtest(GEO 双域) / ai-video(短视频)
+bundles/       行业垂直包：hotel(获客 v3.3.0) / geo-growth(GEO 双域) / ai-video(短视频)
 skills/official/ 自带技能 7 个（release-gate / industry-entry / demo-mirror 等）
 scripts/       套件/种子/门禁/巡游/预览/生成器
 docs/          设计规范、方案、能力地图、本文
@@ -117,10 +117,10 @@ pnpm capabilities:check                    # 能力产物与代码同步校验
 
 | 仓 | 定位 | 与主仓差异 |
 |---|---|---|
-| **workloom**（本仓） | 获客系统主仓 | 全量：geo-growthtest + ai-video + hotel 获客域 + publish-rpa |
+| **workloom**（本仓） | 获客系统主仓 | 全量：geo-growth + ai-video + hotel 获客域 + publish-rpa |
 | workloom-im | IM 底座仓 | 无 geo/video/publish-rpa； bundles/hotel 基础版 |
 | workloom-hotel | 酒店垂直仓 | + 数字孪生演示（demo:twin 系列） |
-| hyperreality-system | 视频制作仓 | ai-video + video-studio + publish-rpa；无 geo-growthtest |
+| hyperreality-system | 视频制作仓 | ai-video + video-studio + publish-rpa；无 geo-growth |
 
 四仓共享 WorkLoom 底座（fence/captain/workdata/night-shift/RLS），同一套验证纪律与 Agent 引导体系（AGENTS.md / agent:tour / capability-map / preview:all）。
 

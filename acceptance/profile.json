@@ -1,13 +1,13 @@
 {
   "schemaVersion": "workloom.acceptance-profile/v2",
-  "repo": "workloom-ai/WorkLoom-growthtest",
+  "repo": "workloom-ai/WorkLoom-growth",
   "productName": "WorkLoom 获客增长系统（实验车道）",
   "lane": "industry",
-  "primaryBundle": "geo-growthtest",
+  "primaryBundle": "geo-growth",
   "workspaceId": null,
   "dataMode": "simulated",
   "identity": {
-    "workspaceSlug": "geo-growthtest",
+    "workspaceSlug": "geo-growth",
     "human": "MEM-G01",
     "guest": "demo-direct"
   },
@@ -292,7 +292,7 @@
         "title": "产品派单链路 · 经客户端入口派单 + 状态断言",
         "input": "给手冲咖啡馆做一份 7 天获客计划（交付物：动作清单 + 每天一条内容主题，截止：今天 18:00）",
         "presetKey": "company-ceo",
-        "workspaceSlug": "geo-growthtest",
+        "workspaceSlug": "geo-growth",
         "state_asserts": [
           {
             "http": {

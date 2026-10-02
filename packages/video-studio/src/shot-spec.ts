@@ -44,6 +44,12 @@ export interface ShotSpecReport {
   charCount: number;
   /** 25 字段里为空的（P0/P1/P2/P3） */
   missingSpecFields: string[];
+  /**
+   * 25 字段里 **P0 致命级**（缺失会导致视频不可用）的字段清单。
+   * 用途（T-2026-0930-0015）：post-only 组装等"不产出提示词"的场景也要过字段闸——
+   * 真机事故：组装卡 `character` 没写主角名/ID（P0 字段有值但不含主角）→ 封面人物卡找不到来源镜。
+   */
+  missingP0Fields: string[];
   /** 片头专属 5 字段里为空的 */
   missingOpeningFields: string[];
   /** vendor PromptDeliveryGuard 判定 */
@@ -833,23 +839,25 @@ export function prepareShotPrompt(
     delivery.pass = false;
     delivery.issues = [...delivery.issues, "提示词缺少「纯写实 + 场景解耦」纪律子句（默认强制；其它风格请在卡片显式声明 style/realism）"];
   }
-  const missingSpecFields = [...spec.p0, ...spec.p1, ...spec.p2, ...spec.p3]
-    /**
-     * `dialogue` 的等价形态：vendor 交付格式是 `dialogueBlocks`（speaker/line/emotion/trigger），
-     * 标准镜头卡里没有 dialogue 时不算缺字段（真机口径：有 blocks 即视为台词已提供）。
-     *
-     * 2026-09-25 补：**无台词镜**（快剪城市片/空镜/人物只做动作）在卡片里显式声明 `dialogueFree: true`
-     * 即视为满足该字段——否则这类镜头会被逼着写一句假台词（真机：南昌片 4 个临时角色镜被"缺必备字段:台词"拦下，
-     * 而按产品口径它们是**只做动作、不说话**的镜头）。声明是显式的：没写 dialogueFree 又没台词，仍然判缺字段。
-     */
-    .filter((key) => {
-      if (key === "dialogue") {
-        const blocks = (card as Record<string, unknown>).dialogueBlocks;
-        if (Array.isArray(blocks) && blocks.length > 0) return false;
-        if (card.dialogueFree === true) return false;
-      }
-      return isEmptyValue(effective(key));
-    });
+  /**
+   * `dialogue` 的等价形态：vendor 交付格式是 `dialogueBlocks`（speaker/line/emotion/trigger），
+   * 标准镜头卡里没有 dialogue 时不算缺字段（真机口径：有 blocks 即视为台词已提供）。
+   *
+   * 2026-09-25 补：**无台词镜**（快剪城市片/空镜/人物只做动作）在卡片里显式声明 `dialogueFree: true`
+   * 即视为满足该字段——否则这类镜头会被逼着写一句假台词（真机：南昌片 4 个临时角色镜被"缺必备字段:台词"拦下，
+   * 而按产品口径它们是**只做动作、不说话**的镜头）。声明是显式的：没写 dialogueFree 又没台词，仍然判缺字段。
+   */
+  const isSpecFieldMissing = (key: string): boolean => {
+    if (key === "dialogue") {
+      const blocks = (card as Record<string, unknown>).dialogueBlocks;
+      if (Array.isArray(blocks) && blocks.length > 0) return false;
+      if (card.dialogueFree === true) return false;
+    }
+    return isEmptyValue(effective(key));
+  };
+  const missingSpecFields = [...spec.p0, ...spec.p1, ...spec.p2, ...spec.p3].filter(isSpecFieldMissing);
+  /** P0 致命级缺失单独上报（T-2026-0930-0015）：post-only 组装卡也要过字段闸，别到下游才发现 */
+  const missingP0Fields = spec.p0.filter(isSpecFieldMissing);
   const missingOpeningFields = isOpening
     ? spec.openingExclusive.filter((key) => isEmptyValue(effective(key)))
     : [];
@@ -890,6 +898,7 @@ export function prepareShotPrompt(
     promptSource,
     charCount: prompt.length,
     missingSpecFields,
+    missingP0Fields,
     missingOpeningFields,
     delivery: { pass: delivery.pass, issues: delivery.issues },
     degraded: Boolean(std.degraded),

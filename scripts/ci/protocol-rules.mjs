@@ -169,7 +169,7 @@ export function findModuleConflicts(mine, theirs) {
  *
  * 背景（2026-09-27 实测）：push 事件（即 main 上的合并提交）下，门禁会把**已经合入的提交**
  * 与**在途 PR** 比文件重叠。合并已经发生、门禁再拦也拦不住，只会把 main 打成红：
- * 实例 = workloom-growthtest PR #211 合入后，因在途 #206/#209 同改 `bundles/ai-video/bundle.json`
+ * 实例 = workloom-growth PR #211 合入后，因在途 #206/#209 同改 `bundles/ai-video/bundle.json`
  * → `cnb/push/pipeline-1(static-gate)` 红，而同一内容在 PR 门禁下三门禁全绿。
  *
  * 语义：

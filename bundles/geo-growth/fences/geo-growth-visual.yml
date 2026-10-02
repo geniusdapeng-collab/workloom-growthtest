@@ -1,0 +1,74 @@
+# 视觉素材围栏包（获客增长 · Compositor 视觉工位）
+# 与 geo-growth-baseline.yml 同口径：默认基线、只可加严、命中取严（block > review > auto）
+version: geo-growth-visual/v1
+default_level: review
+rules:
+  - rule_id: G-VIS0
+    name: 常规渲染直通（本地可逆动作）
+    level: auto
+    is_baseline: true
+    match:
+      object_types: [visual_asset, design_recipe, render_job]
+      actions: [visualwrite.text, visualwrite.compose, visualwrite.render, visualwrite.generate]
+    when: "true"
+    note: 视觉工位渲染/AI 生图属本地可逆动作：干净配方与草稿直通；风险情形由 G-VIS1（人像/第三方素材）、G-VIS2（事实红线）、G-VIS3（配额）、G-VIS4（未审配方）、G-VIS6（真人代言类提示词）叠加升级，deny 优先并集取严。运行时未命中写动作的保守默认是 review，故此处必须显式声明 auto，否则干净渲染也被挂起。2026-09-20：visualwrite.generate（Ark 生图）纳入直通——只产出本地草稿素材，外发仍走 G-VIS5/G9/G-GEO1 人审。
+
+  - rule_id: G-VIS6
+    name: 真人/代言类提示词转人审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [visual_asset]
+      actions: [visualwrite.generate]
+    when: "contains_any(params.prompt, ['真人', '肖像', '明星', '代言', '模特', '商标', 'LOGO'])"
+    note: AI 生图只对"拟真人/代言/商标"类描述保留人审（肖像权、商标与背书合规）；普通场景、产品、排版草图直通（G-VIS0 auto）。判据是最小必要——不把整类生图都挂在人审上。
+
+  - rule_id: G-VIS1
+    name: 人像与第三方素材合规审
+    level: review
+    is_baseline: true
+    match:
+      object_types: [visual_asset, design_recipe]
+      actions: [visualwrite.compose]
+    when: "params.has_portrait == true or params.has_third_party_asset == true"
+    note: 含真人肖像、客户未授权第三方素材（字体/图库/音乐截图）的配方必须人审；肖像权与版权证据随配方归档
+
+  - rule_id: G-VIS2
+    name: 视觉文案事实红线
+    level: block
+    is_baseline: true
+    match:
+      object_types: [visual_asset]
+      actions: [visualwrite.text]
+    when: "contains_any(params.spec.text, ['国家级', '世界级', '第一品牌', '100%', '永久', '根治', '治愈']) or contains_any(params.text, ['国家级', '世界级', '第一品牌', '100%', '永久', '根治', '治愈'])"
+    note: 文字预渲染前的极限词/医疗金融禁用词拦截；事实口径与品牌实体卡不一致同样一票否决（与 G-GEO2 并集取严）
+
+  - rule_id: G-VIS3
+    name: 单租户日渲染配额熔断
+    level: block
+    is_baseline: true
+    match:
+      object_types: [render_job]
+      actions: [visualwrite.render, visualwrite.compose]
+    when: "context.daily_rendered >= 50"
+    note: 每租户每日 50 张上限，超限熔断并告警；上调须人审（成本与工位产能保护）
+
+  - rule_id: G-VIS4
+    name: 未审配方不得进入生产渲染
+    level: review
+    is_baseline: true
+    match:
+      object_types: [design_recipe]
+      actions: [visualwrite.compose]
+    when: "params.recipe_status != 'approved'"
+    note: 版式配方首次使用或变更后须人审通过（recipe_status=approved）才可批量渲染；复用已审配方自动放行
+
+  - rule_id: G-VIS5
+    name: 无回执成品禁止外发
+    level: block
+    is_baseline: true
+    match:
+      object_types: [visual_asset]
+      actions: [publish.execute, rpa.publish, rpa.source_publish]
+    when: "params.visual_receipt_synced != true"
+    note: 未取得渲染回执（sha256/尺寸/时间戳）的视觉素材不得进入社媒或信源发布队列；无回执=未核实

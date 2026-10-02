@@ -131,7 +131,27 @@ export async function runPublishTask(
         [scope.workspaceId, taskId, status, opts.error ?? null,
           opts.receipt ? JSON.stringify(opts.receipt) : null],
       );
-      await emitInTx(client, scope, taskId, decision, opts);
+      const holdEventId = await emitInTx(client, scope, taskId, decision, opts);
+      /**
+       * C-03 修复：G9 挂起必须对人可见可批——此前只写事件不插审批单，
+       * pending_review 任务在审批中心不可见、无任何放行出口（永久卡死）。
+       * 审批通过后的回迁在 decide() 事务内联动（object_type='publish_task' → status 置回 pending）。
+       */
+      if (status === "pending_review") {
+        await client.query(
+          `INSERT INTO approvals (approval_id, tenant_id, workspace_id, event_id, channel, status, snapshot, tier)
+           VALUES ($1,$2,$3,$4,'inapp','pending',$5,'l2_captain')
+           ON CONFLICT (event_id, channel) DO NOTHING`,
+          [
+            `apr-pub-${taskId}`, scope.tenantId, scope.workspaceId, holdEventId,
+            JSON.stringify({
+              gate: "G9", object_type: "publish_task", object_id: taskId, action: "publish.execute",
+              platform: task.platform, level: decision.after && (decision.after as { level?: string }).level,
+              high_risk: true,
+            }),
+          ],
+        );
+      }
       await client.query("COMMIT");
     } catch (err) {
       await client.query("ROLLBACK").catch(() => undefined);

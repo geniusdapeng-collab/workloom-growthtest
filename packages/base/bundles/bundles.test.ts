@@ -166,32 +166,32 @@ describe.runIf(RUN_DB)("行业装配 PG 集成（F2.10 铁律）", async () => {
       );
 
       const scope2 = { tenantId, workspaceId: wsId };
-      const provision = await provisionComposedWorkforce(app, scope2, "geo-growthtest", "MEM-FUSION");
-      expect(provision.bundleIds).toEqual(["hotel", "ai-video", "geo-growthtest"]);
+      const provision = await provisionComposedWorkforce(app, scope2, "geo-growth", "MEM-FUSION");
+      expect(provision.bundleIds).toEqual(["hotel", "ai-video", "geo-growth"]);
       expect(provision.rosterSize).toBe(81);
-      // 每个 preset_key 只由一个包提供（同名按主包裁决）：hotel 16 / ai-video 39 / geo-growthtest 26
+      // 每个 preset_key 只由一个包提供（同名按主包裁决）：hotel 16 / ai-video 39 / geo-growth 26
       // 口径随各包编制演进（2026-09-24 新增 ai-video「摄影指导 cinematographer」→ 78 岗；
       // 2026-09-25 新增 ai-video「封面设计师 cover-designer」→ 79 岗；
       // 2026-09-26 新增 ai-video「口播编导 explainer-director」（口播解说片产品化）→ 80 岗；
       // 2026-09-27 新增 ai-video「开场钩子设计师 hook-designer」（短平台前 3 秒钩子）→ 81 岗）；
       // 数量以装配器实测为准，改包即需同步此处（历史值：76 → 77 → 78 → 79 → 80 → 81）
-      expect(provision.perBundle).toEqual({ hotel: 16, "ai-video": 39, "geo-growthtest": 26 });
+      expect(provision.perBundle).toEqual({ hotel: 16, "ai-video": 39, "geo-growth": 26 });
       expect(provision.shadowed.length).toBe(4);
       expect(provision.fenceRules).toBeGreaterThanOrEqual(68);
 
-      const profile = await computeAssembly(app, scope2, "geo-growthtest");
+      const profile = await computeAssembly(app, scope2, "geo-growth");
       expect(profile.checks.map((c) => c.ok)).toEqual([true, true, true, true, true, true, true]);
       expect(profile.canActivate).toBe(true);
       expect(profile.agents.length).toBe(81);
 
-      const activated = await activateBundle(app, gw, scope2, "geo-growthtest", "MEM-FUSION");
+      const activated = await activateBundle(app, gw, scope2, "geo-growth", "MEM-FUSION");
       expect(activated.composition.rosterSize).toBe(81);
       const ev = await qScope<{ payload: { decision: { after: { composition?: { bundles?: string[]; rosterSize?: number } } } } }>(
         `SELECT payload FROM biz_events WHERE workspace_id=$1 AND payload->'decision'->>'action'='bundle.activate'
           ORDER BY seq DESC LIMIT 1`,
         [wsId],
       );
-      expect(ev.rows[0]!.payload.decision.after.composition?.bundles).toEqual(["hotel", "ai-video", "geo-growthtest"]);
+      expect(ev.rows[0]!.payload.decision.after.composition?.bundles).toEqual(["hotel", "ai-video", "geo-growth"]);
       expect(ev.rows[0]!.payload.decision.after.composition?.rosterSize).toBe(81);
     } finally {
       await qScope(`DELETE FROM agents WHERE workspace_id=$1`, [wsId]).catch(() => undefined);

@@ -107,4 +107,22 @@ describe("full source contracts reach each review", () => {
     const v = await reviewFilmStage(s, options(), async (o) => { expect(o.contracts!.shots).toHaveLength(2); return { ...approved(o), approved: false, status: "failed", reason: "original reject" }; });
     expect(v.reason).toBe("original reject"); expect(v.approved).toBe(false);
   });
+  /**
+   * 长合同（真机 2026-09-29：6 镜富字段片）会把「原稿合同 + 结构化合同」的上下文翻倍撞穿 30k 预算，
+   * 导致全片评审环节无法运行。装不下时省略原稿、并在上下文里写明省略原因与替代证据（产物正文）。
+   */
+  it("omits the duplicate raw contract when the review budget cannot hold both copies", async () => {
+    const s = source();
+    const filler = "场景与材质的事实描述".repeat(400);
+    s.shots = Array.from({ length: 6 }, (_, index) => ({ ...structuredClone(empty), shotId: `S${index + 1}`, scene: `${empty.scene}；${filler}${index}` }));
+    let captured: Record<string, unknown> | undefined;
+    const v = await reviewFilmStage(s, options(), async (o) => { captured = o.context as Record<string, unknown>; return approved(o); });
+    expect(v.approved, v.reason).toBe(true);
+    expect(captured?.authorContracts).toBeUndefined();
+    expect(String(captured?.authorContractsOmitted)).toContain("完整原稿见本环节送审产物正文");
+    // 短合同仍然带上原稿（既有行为不回退）
+    let small: Record<string, unknown> | undefined;
+    await reviewFilmStage(source(), options(), async (o) => { small = o.context as Record<string, unknown>; return approved(o); });
+    expect(small?.authorContracts).toBeDefined();
+  });
 });

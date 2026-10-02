@@ -16,7 +16,7 @@ const { values } = parseArgs({
     seconds: { type: "string", default: "5" },
     script: { type: "string", default: "prodtest-coffee-3in1" },
     base: { type: "string", default: "http://127.0.0.1:8787" },
-    workspace: { type: "string", default: "geo-growthtest" },
+    workspace: { type: "string", default: "geo-growth" },
     member: { type: "string", default: "MEM-G01" },
     "max-wait-min": { type: "string", default: "12" },
     "poll-sec": { type: "string", default: "20" },

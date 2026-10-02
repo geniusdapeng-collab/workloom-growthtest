@@ -183,12 +183,12 @@ b("基线回归：R2 保底价熔断仍生效", () => {
 const c = C("C");
 c("16 个酒店岗全部在编（组合编制全员在编）", async () => {
   /**
-   * 组合编制口径（hotel + ai-video + geo-growthtest，主包 geo-growthtest 裁决同名遮蔽）：
+   * 组合编制口径（hotel + ai-video + geo-growth，主包 geo-growth 裁决同名遮蔽）：
    * 期望总数**从装配器实时推导**，不再写死数字——2026-09-24 实测 78 岗
    * （历史写死值 72 已随岗位扩充漂移，导致本用例长期误报）。
    * 种子走的是同一个 provisionComposedWorkforce（scripts/seed.ts），所以两者必然一致。
    */
-  const expected = composeWorkforce("geo-growthtest").presets.size;
+  const expected = composeWorkforce("geo-growth").presets.size;
   const all = await q(`SELECT count(*) n FROM agents WHERE workspace_id=$1`, [WS]);
   assert(Number(all.rows[0].n) === expected, `组合编制 agents=${all.rows[0].n}（装配器期望 ${expected}）`);
   const hotel = await q(

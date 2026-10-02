@@ -1,8 +1,10 @@
 /**
  * 本仓客户端基座门禁的"产品分叉面"回归：
  *
- * WorkLoom-growthtest 是三端壳上的产品分叉（页面/壳/语音/引导都是获客增长产品层），
- * 因此门禁允许本仓用 `.workloom-client-extensions.json` 显式声明自有路径。
+ * workloom 是三端壳上的产品分叉（页面/壳/语音/引导都是获客增长产品层），
+ * 因此门禁允许本仓声明自有路径——**声明的唯一事实源是 `.workloom-ui-governance.json`**
+ * （由 rollout 从基座 `sync/child-repos.json` 写入：`industryExtensionPaths` +
+ * `tolerateExtensionSnapshotOverlap: true`，见协议 §10.4；仓内私改会在下一次 rollout fail closed）。
  * 本测试锁定三件事：
  *  ① 没有声明时，受管指纹漂移与非白名单文件必须继续报错（声明是唯一开关，不能默认放宽）；
  *  ② 声明后这些路径被当作本仓自有（0 错误），且必备受管入口仍在受管集合里；
@@ -83,9 +85,10 @@ describe("客户端基座门禁 · 本仓产品分叉声明", () => {
 
   it("声明为本仓自有后：0 错误，且必备受管入口仍在受管集合内", () => {
     const root = fixtureRepo();
-    writeJson(join(root, ".workloom-client-extensions.json"), {
-      schemaVersion: "workloom.client-extensions/v1",
+    writeJson(join(root, ".workloom-ui-governance.json"), {
+      schemaVersion: "workloom.ui-governance-state/v1",
       industryExtensionPaths: ["apps/*/src/pages/**", "apps/*/src/shell/**"],
+      tolerateExtensionSnapshotOverlap: true,
     });
     expect(verifyClientFoundationConsumer(root)).toEqual([]);
 
@@ -97,11 +100,12 @@ describe("客户端基座门禁 · 本仓产品分叉声明", () => {
 
   it("非法声明路径（越界）必须报错，不能静默忽略", () => {
     const root = fixtureRepo();
-    writeJson(join(root, ".workloom-client-extensions.json"), {
-      schemaVersion: "workloom.client-extensions/v1",
+    writeJson(join(root, ".workloom-ui-governance.json"), {
+      schemaVersion: "workloom.ui-governance-state/v1",
       industryExtensionPaths: ["apps/../etc/**"],
+      tolerateExtensionSnapshotOverlap: true,
     });
     const errors = verifyClientFoundationConsumer(root);
-    expect(errors.some((error) => error.includes("仓级扩展路径非法"))).toBe(true);
+    expect(errors.some((error) => error.includes("仓级行业扩展路径非法"))).toBe(true);
   });
 });

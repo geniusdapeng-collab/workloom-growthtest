@@ -192,6 +192,18 @@ export function acquisitionQuestPlanner(goal: string): QuestPlanner {
         before = { price: anchor };
         after = { price: intent.value };
       }
+      /**
+       * W-01（2026-09-29 第二次修复，第三方 UI 实拍实证）：
+       * 取不到价带锚点时不造数是对的，但**必须把"参数不完整"这件事说出来**——
+       * 此前只是省略 before/after，GR-07 的强制人审只认 `context.params_incomplete` 标记，
+       * 行业规划器不打标 → 步骤照常进围栏瀑布 → R1/R2/R7/R8 的算术 when 对缺失路径求值异常
+       * （expr.ts E2.1 宁可错杀）→ 客户看到的是"围栏熔断（求值异常→block）+ 任务已暂停"，
+       * 一个"档案缺字段"被误报成"违了围栏"，且人审入口也不给。
+       */
+      const paramsIncomplete = anchor === undefined;
+      const missingNote = paramsIncomplete
+        ? "档案缺少 business.price_bands（一店一档未建价带），无法推导当前价基准：请补齐价带或直接给出目标价与基准价"
+        : undefined;
       return [
         step({ index: 1, action: "pms.price.read", objectType: "room_price", tool: "pms.price.read", params: { room_type: roomType }, label: `读取${roomType}当前价格` }),
         step({
@@ -200,8 +212,14 @@ export function acquisitionQuestPlanner(goal: string): QuestPlanner {
           ...(before ? { before } : {}), ...(after ? { after } : {}),
           // 围栏 R3/R7/R8 读 context：channel_new 对"调价"恒为 false（不是新渠道首发），
           // night_shift 由当前时间推导——两键齐备才不会因缺失路径被误熔断（见 inNightWindow 注释）。
-          context: { channel_new: false, night_shift: inNightWindow() },
-          label: intent ? `提交${roomType}调价` : "提交调价（未识别到目标价位，交围栏失败关闭）",
+          context: {
+            channel_new: false,
+            night_shift: inNightWindow(),
+            ...(paramsIncomplete ? { params_incomplete: true, params_incomplete_note: missingNote } : {}),
+          },
+          label: paramsIncomplete
+            ? `提交${roomType}调价（需人工核对目标：档案无价带，无法推导基准价）`
+            : intent ? `提交${roomType}调价` : "提交调价（未识别到目标价位，交围栏失败关闭）",
         }),
       ];
     }

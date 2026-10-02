@@ -152,6 +152,16 @@ export interface ProducerReviewContract {
   sourceHash: string;
   shots: Array<{ shotId: string; intent: ReturnType<typeof normalizeShotIntent>; constraints: string[] }>;
 }
+
+/**
+ * 单次评审上下文预算（字符）：`options.context` 与结构化合同正文之和的上限。
+ *
+ * 2026-09-29 真机（T-2026-0929-0003）：6 镜富字段片的「原稿合同 + 结构化合同」两份 JSON
+ * 会把同一个上下文算两遍（`film-contracts.ts` 的 `authorContracts` 与这里的 `contractText`），
+ * continuation/continuity 这类**无 shotId 的全片评审**因此直接撞线、环节无法运行。
+ * 预算常量在这里集中定义，供 `film-contracts.ts` 判断"还能不能带原稿"时复用同一口径。
+ */
+export const REVIEW_CONTEXT_BUDGET = 30_000;
 /** Shared author contracts are compiled before any paid review; this does not prove image quality. */
 export function buildProducerReviewContract(input: ProducerReviewContracts): ProducerReviewContract {
   if (!input || !Array.isArray(input.shots) || !input.shots.length) throw new Error("PRODUCER_CONTRACT_INVALID: shots必须为非空数组");
@@ -509,7 +519,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
     }
     const context = options.context ? JSON.stringify(options.context) : "";
     const contractText = contract ? JSON.stringify(contract) : "未提供结构化镜头合同；不得宣称已核实年代、人数、空间或设备型号。";
-    if (context.length + contractText.length > 30_000) throw new Error("评审上下文超预算，禁止截断事实");
+    if (context.length + contractText.length > REVIEW_CONTEXT_BUDGET) throw new Error("评审上下文超预算，禁止截断事实");
     /**
      * 批次大小：默认 6 张/批；成套定妆照（同一角色的多角度）必须能一批看完再判"是不是同一个人"。
      * 非法/缺省值回落到 6（调小只会切得更碎，不构成风险；调大由调用方自证上下文预算）。

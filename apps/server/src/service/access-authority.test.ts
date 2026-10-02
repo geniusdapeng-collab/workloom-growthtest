@@ -171,12 +171,12 @@ describe("三端访问权威", () => {
   it("组合包导航权限只取各槽位权限并与成员实时授权求交", async () => {
     const composite: ActiveBundleResolution = {
       state: "ready",
-      bundleId: "geo-growthtest",
+      bundleId: "geo-growth",
       installId: "install-composite",
       reason: "组合投影已验证",
       projection: {
-        primaryBundleId: "geo-growthtest",
-        bundleId: "geo-growthtest",
+        primaryBundleId: "geo-growth",
+        bundleId: "geo-growth",
         bundleName: "获客经营组合",
         bundleVersion: "1.0.0",
         bundleStatus: "candidate",
@@ -195,7 +195,7 @@ describe("三端访问权威", () => {
           serviceFront: { enabled: false, identityPolicy: "disabled", tabs: [], services: [] },
           theme: { brand: {} },
           // 这个未被任何导航槽位使用的声明不能进入 navigationPermissions。
-          permissions: ["hotel.console.read", "ai-video.console.read", "geo-growthtest.internal.read"],
+          permissions: ["hotel.console.read", "ai-video.console.read", "geo-growth.internal.read"],
           experiments: [],
         },
       },
@@ -204,19 +204,19 @@ describe("三端访问权威", () => {
       member: {
         ...memberFacts,
         role: "staff",
-        permissions: { allow: ["hotel.console.read", "geo-growthtest.internal.read"] },
+        permissions: { allow: ["hotel.console.read", "geo-growth.internal.read"] },
       },
       bundle: composite,
     }));
     expect(access.navigationPermissions).toContain("hotel.console.read");
     expect(access.navigationPermissions).not.toContain("ai-video.console.read");
-    expect(access.navigationPermissions).not.toContain("geo-growthtest.internal.read");
+    expect(access.navigationPermissions).not.toContain("geo-growth.internal.read");
 
     const incomplete = await resolveAuthoritativeClientAccess(claim, undefined, deps({
       member: {
         ...memberFacts,
         role: "staff",
-        permissions: { allow: ["hotel.console.read", "geo-growthtest.internal.read"] },
+        permissions: { allow: ["hotel.console.read", "geo-growth.internal.read"] },
       },
       bundle: {
         ...composite,
@@ -225,7 +225,7 @@ describe("三端访问权威", () => {
     }));
     expect(incomplete.navigationPermissions).not.toContain("hotel.console.read");
     expect(incomplete.navigationPermissions).not.toContain("ai-video.console.read");
-    expect(incomplete.navigationPermissions).not.toContain("geo-growthtest.internal.read");
+    expect(incomplete.navigationPermissions).not.toContain("geo-growth.internal.read");
   });
 
   it("伙伴只消费实时有效授权，不信任 JWT 内授权快照", async () => {

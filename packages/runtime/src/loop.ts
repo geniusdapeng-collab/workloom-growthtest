@@ -297,7 +297,8 @@ async function loadActiveRules(app: pg.Pool, scope: { tenantId: string; workspac
 
 export interface QuestRunResult {
   threadId: string;
-  status: "completed" | "pending_review" | "failed" | "paused";
+  /** running：A-03 并发重入被 CAS 拒绝（他方正在执行同一线程），调用方应按"已在执行"处理 */
+  status: "completed" | "pending_review" | "failed" | "paused" | "running";
   stepsDone: number;
   stepsTotal: number;
   /** 未核实步骤（E3.7：无回执不得宣称完成） */
@@ -387,11 +388,11 @@ async function updateThread(app: pg.Pool, scope: { tenantId: string; workspaceId
       sets.push(`${k} = $${params.length}`);
     }
     await client.query(`UPDATE threads SET ${sets.join(", ")} WHERE id=$1 AND workspace_id=$2`, params);
+    await client.query("COMMIT"); // A-08：显式提交，失败即抛（不再 finally 吞错）
   } catch (err) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw err;
   } finally {
-    await client.query("COMMIT").catch(() => undefined);
     client.release();
   }
 }
@@ -450,15 +451,37 @@ async function saveThreadPlan(
     );
     let superseded = 0;
     if (invalidateApprovals) {
-      const r = await client.query(
+      const r = await client.query<{ approval_id: string }>(
         `UPDATE approvals SET status='superseded'
           WHERE workspace_id=$1 AND status='pending'
             AND event_id IN (
               SELECT event_id FROM biz_events WHERE workspace_id=$1 AND session_id=$2
-            )`,
+            )
+          RETURNING approval_id`,
         [scope.workspaceId, threadId],
       );
       superseded = r.rowCount ?? 0;
+      /**
+       * B-04 修复：superseded 是关键处置（重规划作废未决审批），必须经网关留痕——
+       * 此前只改表不写事件，事件库/哈希链无痕（违反"状态变更必经网关"铁律，
+       * 与同仓 #10 修复的 expireSweep 同构）。与状态变更同一事务同一 COMMIT。
+       */
+      for (const row of r.rows) {
+        await gatewayAppendOnClient(client, {
+          ...scope,
+          actor: { id: "quest-loop", type: "system" },
+        }, {
+          who: { type: "system", id: "quest-loop" },
+          context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },
+          object: { type: "approval", id: row.approval_id },
+          decision: {
+            action: "approval.superseded",
+            after: { approvalId: row.approval_id, threadId, planVersion: version },
+            basis: ["显式重规划：旧计划未决审批作废（绝不允许被新计划消费）"],
+          },
+          rule_impact: [],
+        });
+      }
     }
     await client.query("COMMIT");
     return superseded;
@@ -501,8 +524,14 @@ async function approvedStepIds(
     const r = await client.query<{ step_id: string; approval_id: string; snapshot: Record<string, unknown> | null }>(
       `SELECT e.payload->'decision'->>'step_id' AS step_id, a.approval_id, a.snapshot
        FROM approvals a JOIN biz_events e ON e.event_id = a.event_id
-       WHERE a.workspace_id=$1 AND e.session_id=$2 AND a.status IN ('approved','edited')
-         AND e.payload->'decision'->>'step_id' IS NOT NULL`,
+        WHERE a.workspace_id=$1 AND e.session_id=$2 AND a.status IN ('approved','edited')
+         AND e.payload->'decision'->>'step_id' IS NOT NULL
+         -- B-03 修复：过期审批即使被批也不得驱动步骤执行（消费侧与 decide() 过期口径一致）
+         AND (a.snapshot->>'expires_at' IS NULL OR (a.snapshot->>'expires_at')::timestamptz > now())
+         -- T-2026-0929-0003 联动修复：已消费（B-02 一次性授权）的票据不再构成"本轮授权"——
+         -- 否则重试会挂着死票据去落库，被网关拒绝后线程停在 running（无终态、无法自愈）。
+         -- 语义：消费过的步骤要再执行，必须重新取得一张新审批（L3.5 逐次授权的原意）。
+         AND a.consumed_at IS NULL`,
       [scope.workspaceId, threadId],
     );
     await client.query("COMMIT");
@@ -650,7 +679,7 @@ export async function runQuest(
       // 显式重规划留痕（原因枚举 + 失效审批数），便于复盘"为什么又变了"
       await gatewayAppend(gateway, {
         ...scope,
-        actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings },
+        actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings, ...(preset.highRisk ? { highRisk: true } : {}) },
         sessionId: threadId,
       }, {
         who: { type: "agent", id: preset.presetKey, version: preset.version },
@@ -760,9 +789,30 @@ export async function runQuest(
         params: step.params, before: step.before, after: step.after, context: step.context,
       });
     }
-    const verdict: { level: "auto" | "review" | "block"; impacts: RuleImpact[]; triggeredBy: string[]; evalErrors: string[] } = paramsIncomplete
+    const rawVerdict: { level: "auto" | "review" | "block"; impacts: RuleImpact[]; triggeredBy: string[]; evalErrors: string[] } = paramsIncomplete
       ? { level: "review", impacts: [], triggeredBy: [], evalErrors: [] }
       : (views.length === 1 ? judge(views[0]!, rules, defaultLevel) : judgeViews(views, rules, defaultLevel));
+
+    /**
+     * 机制兜底（2026-09-29 第二次修复，W-01；与 GR-07 同口径的"缺数据宁挂起，不误熔断"）。
+     *
+     * 为什么必须放在机制层：GR-07 的强制人审是**标记驱动**的（只认 `context.params_incomplete`），
+     * 而"缺参数"的实际来源不止兜底规划器——行业规划器（acquisition-planner）刻意不猜数据、
+     * 缺价带档案时不写 before/after，于是步骤照常进围栏瀑布，命中 R1/R2/R7/R8 这类算术型 when
+     * → 缺失路径 num() 抛错 → E2.1 宁可错杀按 block → 客户看到"围栏熔断 + 任务已暂停"，
+     * 把"档案缺字段"误报成"违了围栏"，且连人审入口都没有（第三方 UI 实拍实证）。
+     *
+     * 判据只认"**全部** block 都来自求值异常"：只要有任意一条规则是**真判 block**，
+     * 熔断语义原样保留（宁可错杀的红线不动）；求值异常本身仍进 rule_impact 留痕，不做静默降级。
+     */
+    const blockedImpacts = rawVerdict.impacts.filter((impact) => impact.result === "blocked").length;
+    const fenceUnevaluable = toolAccess === "write"
+      && rawVerdict.level === "block"
+      && rawVerdict.evalErrors.length > 0
+      && blockedImpacts === rawVerdict.evalErrors.length;
+    const verdict: typeof rawVerdict = fenceUnevaluable
+      ? { level: "review", impacts: rawVerdict.impacts, triggeredBy: [], evalErrors: rawVerdict.evalErrors }
+      : rawVerdict;
 
     await updateThread(app, scope, threadId, { current_action: step.label });
 
@@ -772,7 +822,7 @@ export async function runQuest(
       await inTx(app, scope, async (c) => {
         const ev = await gatewayAppendOnClient(c, {
           ...scope,
-          actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings },
+          actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings, ...(preset.highRisk ? { highRisk: true } : {}) },
           sessionId: threadId,
         }, {
           who: { type: "agent", id: preset.presetKey, version: preset.version },
@@ -802,7 +852,20 @@ export async function runQuest(
     // agent 模式（F3.3 逐步商量）：非 block 步骤一律视为 review——每步操作前挂起等人类确认
     //（block 已在上方提前 return；此处重新取宽类型避免控制流收窄误判）
     //（block 已在上方提前 return，此处 level ∈ {auto, review}；agent 模式一律 review）
-    const effectiveLevel: "auto" | "review" | "block" = input.mode === "agent" ? "review" : (verdict.level as "auto" | "review");
+    /**
+     * A-01 联动修复（T-2026-0929-0003）：高危岗位（`meta.high_risk=true`）的写类动作必须**逐次授权**（L3.5）。
+     *
+     * 背景：actor 接入 `preset.highRisk` 后，网关段③ 会在落库时要求 approvalRef。若这里仍按围栏
+     * 判定的 `auto` 直接执行，落库必然被 GatewayReject 抛出——线程停在 running（无终态、重试复撞死票据），
+     * 客户看到的是"任务卡住"而不是"等人审批"。所以把同一条纪律**前置**到判定处：
+     * 没有新鲜授权的高危写步骤不进执行分支，直接按人审挂起；人放行后携带 approvalRef 执行，
+     * 落库时仍由网关段③ 二次把关（纵深防御不变，只是不再把"该找人"做成"抛异常"）。
+     */
+    const highRiskAuthRequired = preset.highRisk && toolAccess === "write";
+    const effectiveLevel: "auto" | "review" | "block" =
+      input.mode === "agent" || (verdict.level === "auto" && highRiskAuthRequired)
+        ? "review"
+        : (verdict.level as "auto" | "review");
 
     // #34：review 级别但已获人工批准（approved/edited）→ 不二次挂起，携带授权引用执行
     // GR-01：批准必须与**当前步骤指纹**一致；LLM 重规划换了动作/参数 → 旧审批失效，重新挂起
@@ -828,7 +891,7 @@ export async function runQuest(
       const { approvalId } = await inTx(app, scope, async (c) => {
         const ev = await gatewayAppendOnClient(c, {
           ...scope,
-          actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings },
+          actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings, ...(preset.highRisk ? { highRisk: true } : {}) },
           sessionId: threadId,
         }, {
           who: { type: "agent", id: preset.presetKey, version: preset.version },
@@ -844,11 +907,15 @@ export async function runQuest(
                 ? `越围栏挂起：${verdict.triggeredBy.join("、")}`
                 : (input.mode === "agent"
                   ? "agent 模式逐步确认：每步操作前挂起等待人工裁决"
-                  : (paramsIncomplete
-                    ? (planUnverified
-                      ? "计划与目标相关性低（目标关键词在计划中无落点）→ 一律人工裁决，请先核对是不是您要的活"
-                      : "确定性兜底计划：参数不完整 → 一律人工裁决（不做围栏自动判定）")
-                    : "越围栏挂起：写类动作无规则命中 → default_level=review")),
+                 : (paramsIncomplete
+                   ? (planUnverified
+                     ? "计划与目标相关性低（目标关键词在计划中无落点）→ 一律人工裁决，请先核对是不是您要的活"
+                     : "确定性兜底计划：参数不完整 → 一律人工裁决（不做围栏自动判定）")
+                    : (fenceUnevaluable
+                      ? `围栏无法求值（缺参数，未按熔断处理）→ 一律人工裁决：${verdict.evalErrors.slice(0, 3).join("；")}`
+                      : (highRiskAuthRequired
+                        ? `高危岗位「${preset.presetKey}」写类动作须逐次授权（L3.5）：围栏判定为 ${verdict.level} 亦须人审放行`
+                        : "越围栏挂起：写类动作无规则命中 → default_level=review")))),
               ...(approvalDrifted ? ["审批快照与当前步骤不一致，需重新裁决（approval_drift_detected）"] : []),
             ],
             ...(prefUsageRecorded ? {} : { memory_refs: preferenceMemoryRefs(prefs) }),
@@ -900,10 +967,19 @@ export async function runQuest(
               after: step.after ?? step.params ?? null,
               action: step.action,
               params: step.params,
-              ...(step.context?.params_incomplete === true
+              ...(step.context?.params_incomplete === true || fenceUnevaluable
                 ? {
                   params_incomplete: true,
-                  warning: "该步骤由确定性兜底计划生成，参数不完整，请人工补齐或驳回",
+                  /**
+                   * 告警文案按来源分流（2026-09-29 第二次修复）：
+                   * 规划器自己打了标 → 优先用它的**可执行**说明（例如"档案缺 business.price_bands，
+                   * 请补齐价带或直接给出目标价与基准价"）；机制兜底降级 → 说明"围栏为什么算不出来"。
+                   */
+                  warning: step.context?.params_incomplete === true
+                    ? (typeof step.context.params_incomplete_note === "string" && step.context.params_incomplete_note.trim()
+                      ? step.context.params_incomplete_note
+                      : "该步骤由确定性兜底计划生成，参数不完整，请人工补齐或驳回")
+                    : `围栏无法求值（缺参数，已按人工裁决而非熔断处理）：${verdict.evalErrors.slice(0, 3).join("；")}。请补齐参数或驳回。`,
                 }
                 : {}),
               ...(step.context?.plan_unverified === true && step.context?.params_incomplete !== true
@@ -966,7 +1042,7 @@ export async function runQuest(
       await inTx(app, scope, async (c) => {
         const ev = await gatewayAppendOnClient(c, {
           ...scope,
-          actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings },
+          actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings, ...(preset.highRisk ? { highRisk: true } : {}) },
           approvalRef,
           sessionId: threadId,
         }, {
@@ -1011,7 +1087,7 @@ export async function runQuest(
     await inTx(app, scope, async (c) => {
       const ev = await gatewayAppendOnClient(c, {
         ...scope,
-        actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings },
+        actor: { id: preset.presetKey, type: "agent", fenceBindings: preset.fenceBindings, ...(preset.highRisk ? { highRisk: true } : {}) },
         approvalRef, // #34：已批准步骤携带审批引用（L3.5 授权留痕）
         sessionId: threadId,
       }, {

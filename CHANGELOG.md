@@ -46,7 +46,7 @@
   running 线程转 paused；
 - **模型链路**：provider 真超时 + AbortSignal 贯通、场景化超时表、全链熔断快速失败、意图分类分场景
   （交付入口 12s）+ 问句优先规则兜底、ask 120 字硬闸 + 围栏输出闸门 + 合成/降级标识、
-  geo-growthtest 领域事实面按行业注册（实时取数）、tRPC onError 统一日志 + 5xx 事件化、goalRef 长文档案、
+  geo-growth 领域事实面按行业注册（实时取数）、tRPC onError 统一日志 + 5xx 事件化、goalRef 长文档案、
   视频 clarify 带回原目标；
 - **围栏词表**：三包红线动作对齐真实工具名（只增不减），无法接线的红线显式声明 `unwired_blocks`；
   装配检查单新增「围栏-工具词表交叉校验」（红线空膛＝装配失败），出题器改双视图；
@@ -333,11 +333,11 @@
 
 ## [2.0.0] - 2026-08-23 · WorkLoom GEO：社媒短视频营销 × GEO 双域融合经营系统
 
-### 新增（geo-growthtest Bundle，底座零改动，一切能力经 Bundle 注入）
+### 新增（geo-growth Bundle，底座零改动，一切能力经 Bundle 注入）
 
-- **`bundles/geo-growthtest/` 双域差异资产包**（依《社媒短视频营销×GEO 融合经营系统落地执行方案 v1.0》全量落地）：
+- **`bundles/geo-growth/` 双域差异资产包**（依《社媒短视频营销×GEO 融合经营系统落地执行方案 v1.0》全量落地）：
   - **16 个数码员工 preset**：情报组（调研员/引用源分析师）+ 内容组（脚本师/生产编排员/GEO 内容策划/实体一致性管理员）+ 分发组（发布专员/信源分发专员/投放优化师）+ 数据组（数据看板官/AI 能见度监测官/复盘分析师）+ 经营组（客户成功专员/私域承接专员）+ 指挥层（公司CEO captain/集团CEO fleet）；
-  - **双域基线围栏 17 条**（`fences/geo-growthtest-baseline.yml`，全部 is_baseline 只可加严）：社媒域 G9/G9a/G9b/G10a-d/G12/G15/G16 + GEO 域 G-GEO1（外发必审）/G-GEO2（事实红线一票否决）/G-GEO3（灰帽熔断）/G-GEO4（信源日发熔断）+ 双域 G17（只紧不松）/G18（熔断通知+快照）/G20（涉人设品牌表态强制 L4）；
+  - **双域基线围栏 17 条**（`fences/geo-growth-baseline.yml`，全部 is_baseline 只可加严）：社媒域 G9/G9a/G9b/G10a-d/G12/G15/G16 + GEO 域 G-GEO1（外发必审）/G-GEO2（事实红线一票否决）/G-GEO3（灰帽熔断）/G-GEO4（信源日发熔断）+ 双域 G17（只紧不松）/G18（熔断通知+快照）/G20（涉人设品牌表态强制 L4）；
   - **4 条 Quest 主干管线**：intel-fusion（选题情报双向流动）/ dual-content-factory（一次生产两处变现）/ visibility-watch（AI 能见度监测）/ ops-rhythm（日/周/月经营节拍+询盘双入口）；
   - **双域对象模型 31 类 + 阶段枚举**（schemas/）：query 集/能见度快照/引用源/品牌实体卡/一客一档 v2/双入口询盘/全网存在感战报/回测账本/影子模式对照报告等；账号成长六阶段机 + A/B/C 三层客户画像 + 三条交付线；
   - **一客一档 v2 Schema**（七模块：企业品牌/产品实体卡/目标市场/内容资产/运营资产/GEO 资产/转化资产 + 数据边界声明）；

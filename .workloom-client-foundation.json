@@ -1,9 +1,9 @@
 {
   "schemaVersion": "workloom.client-foundation-state/v1",
   "baseRepository": "workloom-ai/workloom-im",
-  "version": "0.1.1",
-  "sourceRef": "refs/tags/ui-v0.1.1",
-  "sourceCommit": "a96ac33c8c17f93f4d15c73679c1026c5e6198f0",
+  "version": "0.1.19",
+  "sourceRef": "refs/tags/ui-v0.1.19",
+  "sourceCommit": "2c5a02e8b4b3fb40b72549bc0a2c51539914c059",
   "updatePolicy": "upgrade-pr-only",
   "clients": {
     "bPc": "apps/web",
@@ -24,6 +24,10 @@
     },
     "apps/web/index.html": {
       "sha256": "ac4734f030587b91b9064ebbbbb30a7970ac5411a41f0ad9918857f2906fea6e",
+      "mode": 420
+    },
+    "apps/web/package.json": {
+      "sha256": "17273b001dea29afe53c13a4f3cdd17685cea4081bde2521ab5157ec45a1081b",
       "mode": 420
     },
     "apps/web/playwright.consumer.config.ts": {
@@ -270,24 +274,8 @@
       "sha256": "5a7891f8fe12a0c84dfbb64454b0b6b51328894011021e5c664bc8701aaf40ad",
       "mode": 420
     },
-    "apps/web/src/audio/ambience.ts": {
-      "sha256": "7d1feed9b9f4bf3429c3ff562009a09946ca705278de2ceb6674a99e5e434326",
-      "mode": 420
-    },
-    "apps/web/src/audio/AudioEngine.ts": {
-      "sha256": "05713d66be1a78f2832c0dece19475baefd5f23fad288ee48f69b33d219501f1",
-      "mode": 420
-    },
-    "apps/web/src/audio/sfx.ts": {
-      "sha256": "004ec691284b20ed39f1f3284114a8ef184b8f9b365e77851a0b4c67a1e54408",
-      "mode": 420
-    },
-    "apps/web/src/components/AgentAvatar.tsx": {
-      "sha256": "9f5bcdd6b6eb8855af280e949477d2174dbf1326c72e3910bc044c26c8086c14",
-      "mode": 420
-    },
     "apps/web/src/components/AIFeedback.tsx": {
-      "sha256": "decc92d2332c2c9c58316a37c5458205b3e3470c7aa28060f9866250b431d1de",
+      "sha256": "7d91a6899e812b0c02175d7ef9a20329005c3824ff7b0f4e4b96e39c911f7731",
       "mode": 420
     },
     "apps/web/src/components/AudioSettings.tsx": {
@@ -326,10 +314,6 @@
       "sha256": "55c4c914f2d790775b38dd64bf4e5409386448af80e13891170d09acca4b2f70",
       "mode": 420
     },
-    "apps/web/src/components/Floor3D.tsx": {
-      "sha256": "65ab3593bff75ff3bd36828777ab1158b6b4f037b1f0954449c5b81e0669a852",
-      "mode": 420
-    },
     "apps/web/src/components/GazeSystem.tsx": {
       "sha256": "6a62489c452e77594e1990df6cd530307416ef0390429eb1f607c4e14abfa424",
       "mode": 420
@@ -342,10 +326,6 @@
       "sha256": "649adf5ce106359f0ae6a8bacf8a6b711d62c34565ba8778a8d494551cc008cb",
       "mode": 420
     },
-    "apps/web/src/components/SimBanner.tsx": {
-      "sha256": "068d845c135ee2f7cfd83fdc68d90b2940422559f09285a3eeddb57be477ede7",
-      "mode": 420
-    },
     "apps/web/src/components/UrlQrCode.test.ts": {
       "sha256": "a4448aa6b38472707678d21d9993c934bb1ddc52a16e4f20e3af91e791cd5dd3",
       "mode": 420
@@ -354,176 +334,48 @@
       "sha256": "596d259c54a3faad0833833fbc67d6eee9aa450d0c531d3c8859cf693f043ca9",
       "mode": 420
     },
-    "apps/web/src/components/ValueCounters.tsx": {
-      "sha256": "f44949f948429ea6ecf5efc0ac4b6164bfb02f3670b3c00fa288c7b338a5b9a9",
-      "mode": 420
-    },
     "apps/web/src/components/welcomeScripts.test.ts": {
       "sha256": "f4fdd6640a63f9a06d3934de0f057688e06c398d48355f90a2e7e83493b9105b",
       "mode": 420
     },
-    "apps/web/src/components/welcomeScripts.ts": {
-      "sha256": "e5c2699bba185d58c06fdfec9ca6de6e80edd068ea76ddf39302516023a8d515",
-      "mode": 420
-    },
-    "apps/web/src/lib/naming.test.ts": {
-      "sha256": "8ad4a05a19e8912ad2dc0078c459c9b2531a6e5d7e356073ca76b13e2963cad1",
-      "mode": 420
-    },
-    "apps/web/src/lib/naming.ts": {
-      "sha256": "8d05e0df3b163ab4186e577af1555d1b9e389ded97a0ad1faad3f3a993b946bd",
-      "mode": 420
-    },
-    "apps/web/src/lib/product.ts": {
-      "sha256": "ae02364359cae62af8ba8fb94d46aaaabcb0ffee29d6b59a0d2ba22d3b1ef879",
-      "mode": 420
-    },
-    "apps/web/src/lib/theaterDiff.test.ts": {
-      "sha256": "a83b9f832e32e530974dfcc1ad9836a6abcf392057352c3fb5e31605576309a1",
-      "mode": 420
-    },
-    "apps/web/src/lib/theaterDiff.ts": {
-      "sha256": "04447e83cdcee7d8c99665cabb5f4ba0e804bcd59830d5785967b85814b62835",
-      "mode": 420
-    },
-    "apps/web/src/lib/trpc.test.ts": {
-      "sha256": "10aadf8037c0864e9cfc9cad65ef5a56056ab96ffe3d9e0f161fd2ff6e6c167d",
-      "mode": 420
-    },
-    "apps/web/src/lib/trpc.ts": {
-      "sha256": "292cd48a997b79e71cccabc03ef002837aba21b432b261ec49c3b640cbee5812",
-      "mode": 420
-    },
-    "apps/web/src/lib/ui-state.test.ts": {
-      "sha256": "268cb35e015a0a60884892480880fad24b0a6737884e7240ef5c463096cdc7b0",
-      "mode": 420
-    },
-    "apps/web/src/lib/ui-state.ts": {
-      "sha256": "0134a2fa44a4393ca82c50dfd574a5717cf7dbfeeb3fa81b5acfa215d081db4f",
-      "mode": 420
-    },
-    "apps/web/src/lib/useAskRail.ts": {
-      "sha256": "caa3939e518033b08e7fe0962988a0d1fc00fd4c7b8241858fa1f9a9c356737c",
-      "mode": 420
-    },
-    "apps/web/src/lib/useNightTime.ts": {
-      "sha256": "ccf604d36908f893f183f97df9381f1c1d50ee3fbc5e92fdf85cd0eae3ef6a29",
-      "mode": 420
-    },
     "apps/web/src/main.tsx": {
-      "sha256": "eb93d3542fce62f1b2b92e041988cb5ea44425b03a43f09ef83267ff081744a7",
+      "sha256": "9ec9eea9ce0a5ae01330512e7ca202b07ee3d725fbb1ffeaed00f3a094e289ec",
       "mode": 420
     },
-    "apps/web/src/pages/observability/Observability.tsx": {
-      "sha256": "a3cf4774e092eeeacd920310ba8dc26d4b6adf582fa10f1b780030e5141f1296",
-      "mode": 420
-    },
-    "apps/web/src/pages/onboarding/CustomizeWizard.tsx": {
-      "sha256": "5b1cb3446156ab7f7575c17823ad80ae8c1c9fc5093b3545b5d4c61e98cb5e74",
-      "mode": 420
-    },
-    "apps/web/src/pages/onboarding/Onboarding.tsx": {
-      "sha256": "b708c03659be52cfa619b4140aceef57e67e2400f10def14202701893a60c273",
-      "mode": 420
-    },
-    "apps/web/src/pages/onboarding/systemText.test.ts": {
-      "sha256": "adfedfdb16c61659ea023593025ae099b1cf9a7de548dcae2857f8af3afaafa7",
-      "mode": 420
-    },
-    "apps/web/src/pages/onboarding/systemText.ts": {
-      "sha256": "e17b463157627b06082fcfff651e13c10723702f3a31160a2062759f273f3289",
-      "mode": 420
-    },
-    "apps/web/src/pages/p22/P22.tsx": {
-      "sha256": "ec8ae825affa09863644deeeb5e4d0ce4deb36d69b3974915092d8906b843da2",
-      "mode": 420
-    },
-    "apps/web/src/pages/p23/P23.tsx": {
-      "sha256": "9e33eba03d607200938d275e37a9bdde7a8a35557cae0f91a267a7ed6f1ed881",
-      "mode": 420
-    },
-    "apps/web/src/pages/p23/systemText.test.ts": {
-      "sha256": "ce79c5ce23042b8d876ce6488605ac87d3164fab646cf9bf07121cdd29abc952",
-      "mode": 420
-    },
-    "apps/web/src/pages/p23/systemText.ts": {
-      "sha256": "ba4e87a84003510cb05ea4b42a13a6056a9c72d57d631f3761cf03141a990561",
-      "mode": 420
-    },
-    "apps/web/src/pages/p24/P24.tsx": {
-      "sha256": "4317f8a2d9bd142a0e097567cec5af7714a11067cc3b323b1104937bbb639a92",
-      "mode": 420
-    },
-    "apps/web/src/pages/p27/P27.tsx": {
-      "sha256": "61384de8c233796b0360c871cba075697edc40cf559b79a612f8844f7ab8b06c",
-      "mode": 420
-    },
-    "apps/web/src/pages/p28/P28.tsx": {
-      "sha256": "aafcf52ad9c4e06a9c9b5da36d26f9767a49dfa2dad394c274f1458f68daad5e",
-      "mode": 420
-    },
-    "apps/web/src/pages/p29/P29.tsx": {
-      "sha256": "3d1c759add0de8b0bf4445c2137c7184c105f0a27166677b1a583e6e430a26be",
-      "mode": 420
-    },
-    "apps/web/src/pages/p30/P30.tsx": {
-      "sha256": "b483277dce2a153904246f0090b0743b673caf215e3c085bf1b532d5b8208d06",
-      "mode": 420
-    },
-    "apps/web/src/pages/p31/P31.tsx": {
-      "sha256": "acf42b2806acf055d88978ca041379dde1a6d6b9801b90a786b673157c1cd687",
-      "mode": 420
-    },
-    "apps/web/src/pages/p4/P4.tsx": {
-      "sha256": "26399b6dccf27cfd7a8a368ce7f9b0ac57eacd8bea77254fac253152bab155d6",
-      "mode": 420
-    },
-    "apps/web/src/pages/p7/P7.tsx": {
-      "sha256": "428d779182a4c59d0c516d7341a3b9dc38d2db76c8b1e8d48c7d973bad96a3cc",
-      "mode": 420
-    },
-    "apps/web/src/pages/p9/P9.tsx": {
-      "sha256": "cb7773c2e950805968b6ef1be567c383e0d0105fd270be4f33c02b240fe981f9",
-      "mode": 420
-    },
-    "apps/web/src/shell/Bridge.tsx": {
-      "sha256": "7f8d670a2a559052defe61e37684bfda5182f1c8aac552ae7bc359004e4ee99c",
-      "mode": 420
-    },
-    "apps/web/src/shell/IndustryRoutes.tsx": {
-      "sha256": "92279df8864bb51175a5c114a3f73ac11a8d67b2d602c30abdea2f4365dca2f9",
-      "mode": 420
-    },
-    "apps/web/src/shell/NavigationAccess.tsx": {
-      "sha256": "9f0f515109233394afe2699d8d7b261896dc2f1f8e82fab02dd7fba8ae7eef6d",
-      "mode": 420
-    },
-    "apps/web/src/shell/NavMenu.test.ts": {
-      "sha256": "016abdbfa71951c8442cd92cdf0f7a1466e536f42c24f1946fc34a3896c83fd5",
-      "mode": 420
-    },
-    "apps/web/src/shell/NavMenu.tsx": {
-      "sha256": "a33ce1051af288f257d05cff60930e9dfcecee9aacdf19c6437d8af17310b311",
-      "mode": 420
-    },
-    "apps/web/src/shell/PlanSwitcher.tsx": {
-      "sha256": "8b694557ae66f62dd3fcc14529480740d4701a66b83ecc590c094c1c5358ce8b",
-      "mode": 420
-    },
-    "apps/web/src/shell/SideNav.tsx": {
-      "sha256": "8292296e769fa177a280159f305a42aa3a1dec5d9b281c671b463679b88c73e9",
+    "apps/web/src/styles/subtitle.css": {
+      "sha256": "20729481d6a885c54e6c381810cd00f0b30871fc6b3ad4a5e49fac8e7cef4bf1",
       "mode": 420
     },
     "apps/web/src/styles/tokens.css": {
       "sha256": "cc8a4da15772a62b9d122ea6afbe49262ec6d12f301c0450ed019ca9a407302e",
       "mode": 420
     },
-    "apps/web/tsconfig.json": {
-      "sha256": "b10d871fcdc0061dde770a1f473a06213c6c7cd1df966c31b680ef90c1deab1a",
+    "apps/web/src/vendor/loomball/grok-ball.js": {
+      "sha256": "d03f37f261da2e22e55e9b0fa40dcdab62f0a6c6dd419632a088a7c4c9bb79fa",
       "mode": 420
     },
-    "apps/web/vite.config.ts": {
-      "sha256": "371709d910ff2d1016397e6fde95e3b60bd1f6a5030938ac2b2d121500f27e8f",
+    "apps/web/src/vendor/loomball/grok-ball.ts": {
+      "sha256": "13f773427f7bd0617ee2bfabeed4e343ade94853820465c098f9311dc66fec98",
+      "mode": 420
+    },
+    "apps/web/src/vendor/loomball/index.ts": {
+      "sha256": "fa3f03f0c65c81fcd9b2b9aca3eaaf80c16f789f5c1d7d8a96a44f17bab9727c",
+      "mode": 420
+    },
+    "apps/web/src/vendor/loomball/LICENSE": {
+      "sha256": "b8822ea9da7704044227a433c4d3be2cadfef48307c690b1699abb77604d3532",
+      "mode": 420
+    },
+    "apps/web/src/vendor/loomball/NOTICE.md": {
+      "sha256": "b9a98234edb5167b29bb722c86529c5826a127873915f9c58a1c40764a32bd3c",
+      "mode": 420
+    },
+    "apps/web/src/vendor/loomball/PINNED": {
+      "sha256": "d6c0d3a9957bae9c8611e14d5cbdb738fbf494e922f84578e41ee91a0fad292b",
+      "mode": 420
+    },
+    "apps/web/tsconfig.json": {
+      "sha256": "b10d871fcdc0061dde770a1f473a06213c6c7cd1df966c31b680ef90c1deab1a",
       "mode": 420
     },
     "apps/webb/index.html": {
@@ -531,7 +383,7 @@
       "mode": 420
     },
     "apps/webb/package.json": {
-      "sha256": "f0148f7b05d9e36796fc11e6c3f337b876bc7dbd9de99cd1b4454f13120db52c",
+      "sha256": "0b93e3e80c3fc77b3ee5efab9db6d559b90362a1060a206611caf86afda555af",
       "mode": 420
     },
     "apps/webb/public/manifest.webmanifest": {
@@ -540,30 +392,6 @@
     },
     "apps/webb/public/sw.js": {
       "sha256": "ece3ca69197a5fce814f2c7d08f2fc48381a0428388cf780182aec441876052e",
-      "mode": 420
-    },
-    "apps/webb/src/App.tsx": {
-      "sha256": "b320827dab93dfc5a2963b6937752334cc76151c12d3f686622dce4f639c3cf6",
-      "mode": 420
-    },
-    "apps/webb/src/Auth.tsx": {
-      "sha256": "6181ae59a519396a6db3e2275714611acccb3aa63b5b2a8e88d2da27e3543d26",
-      "mode": 420
-    },
-    "apps/webb/src/lib/product.ts": {
-      "sha256": "00a4575f88b89312bdd457c1230eb1e8d75bb15d7653968f149f420c4957f7b5",
-      "mode": 420
-    },
-    "apps/webb/src/lib/trpc.ts": {
-      "sha256": "1d42c323a57e4ea87b427633c2cc03ab0b0028d81817a76a7b0f3c19625fe81b",
-      "mode": 420
-    },
-    "apps/webb/src/lib/useResource.test.ts": {
-      "sha256": "f8eda8ec7c1437eaff6992b6224fcbdce39796efe44efaa426ef53ed70074d81",
-      "mode": 420
-    },
-    "apps/webb/src/lib/useResource.ts": {
-      "sha256": "6806c3b3eec53332d909a25554f945b56618e7a0bc4b613a2bf8ca4bfe1a3161",
       "mode": 420
     },
     "apps/webb/src/main.tsx": {
@@ -586,12 +414,12 @@
       "sha256": "245c97b3d4237b939a6c6169ac9817bcaf9db1ea51169bf0eca2d9fa76c55485",
       "mode": 420
     },
-    "apps/webb/vite.config.ts": {
-      "sha256": "57984d04ed70f2c59cd226ee2542fba204c492e3c6648176b876c5637d6a8c5c",
-      "mode": 420
-    },
     "apps/webc/index.html": {
       "sha256": "0d98e1379abdff88bab678d2b5274fa210cd33a4108820dd831c686756a3fe82",
+      "mode": 420
+    },
+    "apps/webc/package.json": {
+      "sha256": "cc10ed6637745098f9caf0ad72d8db4be83c6832f5bded3bf363571dfffb78ea",
       "mode": 420
     },
     "apps/webc/public/service-front.config.json": {
@@ -614,94 +442,303 @@
       "sha256": "d9e5085eda9e91362addae6573a6353991eadd4b9886e1e2c8cd00dc0bca5827",
       "mode": 420
     },
-    "apps/webc/src/lib/api.test.ts": {
-      "sha256": "ea954a04fc1f0ad30fe9343024498021db5988fcfb8c944b453ba1d89373d9ac",
-      "mode": 420
-    },
-    "apps/webc/src/lib/api.ts": {
-      "sha256": "036cb7d7cf8036f6ab5b7d1a0c21c898a0114806d824ebb2eaa1f4ee5e08c64c",
-      "mode": 420
-    },
-    "apps/webc/src/lib/business-display.test.ts": {
-      "sha256": "1740d436e349653c0c6d5ae0709c12700b3a699d5f44f781426f3bda24165408",
-      "mode": 420
-    },
-    "apps/webc/src/lib/business-display.ts": {
-      "sha256": "d4ea0f45208596ead16aa6acb8428de34452d107853b7022edcc9fa524a8bf93",
-      "mode": 420
-    },
-    "apps/webc/src/lib/config.test.ts": {
-      "sha256": "1832a3aca893f2bd24f44db11144fe66edc869a5c56f720298cc4411d9cc11ee",
-      "mode": 420
-    },
-    "apps/webc/src/lib/config.ts": {
-      "sha256": "ff134a3fff151125366005e0f9aa012fb8e7a347a79ebbbec9fcddd56404fa66",
-      "mode": 420
-    },
-    "apps/webc/src/lib/demo.ts": {
-      "sha256": "b29c451cc5a73ed414abc778a13b0b4165391a30aee0c384950d0036b7e0b0c5",
-      "mode": 420
-    },
-    "apps/webc/src/lib/hooks.ts": {
-      "sha256": "6fe1833662dff99aae9006724eab71d88082cef6578a3074d1e01b6e783aa771",
-      "mode": 420
-    },
-    "apps/webc/src/lib/navigation.test.ts": {
-      "sha256": "0a8c5682cf381638593f5c7fbdb9b2545646c93c6062ed17c743dd47f810140c",
-      "mode": 420
-    },
-    "apps/webc/src/lib/navigation.ts": {
-      "sha256": "c565ccbf87c0d71fb1fb1ac066aaef5d8ce322498ce7398734de9ba118a28e85",
-      "mode": 420
-    },
-    "apps/webc/src/lib/prefetch.ts": {
-      "sha256": "c8ec3c80737f3868fbefe70f0df908e3a14fe0c023e3e0457baa8746a99a3ac5",
-      "mode": 420
-    },
-    "apps/webc/src/lib/product.ts": {
-      "sha256": "bda4967c764f4ace685a2ecfd59f84c6f1baf919f173b741bf22a01afde8e57e",
-      "mode": 420
-    },
-    "apps/webc/src/lib/types.ts": {
-      "sha256": "e1c82881cc36773fd3b83f7c1eaaaaf9bc28e41d66f58242ba99d13ee66edb41",
-      "mode": 420
-    },
     "apps/webc/src/main.tsx": {
       "sha256": "b6bc6821680889668aad3cb842170c856fde7a3c705ae925a14b59a02b5cceec",
       "mode": 420
     },
-    "apps/webc/src/pages/ChatPage.tsx": {
-      "sha256": "4db0d4dd19054ed4f6ac690a6a1729cae9eba38b8b365bf1f9d19fb87c10ed01",
-      "mode": 420
-    },
-    "apps/webc/src/pages/MePage.tsx": {
-      "sha256": "c5bcb26852b18430bfdeb998cb0a60daf649e5e6bf59aefb5dee3ef9eb11deb5",
-      "mode": 420
-    },
-    "apps/webc/src/pages/MessagesPage.tsx": {
-      "sha256": "b672ded08f83fa2d6cede5c2c748b1e0eeafebddd34e5d6c899d1c34e1b68bbc",
-      "mode": 420
-    },
-    "apps/webc/src/pages/ServicePage.tsx": {
-      "sha256": "e8fa8d98b21df0f44ab6ecde71c3b3f30c3a431cdb0d99835863d9ac63005154",
-      "mode": 420
-    },
-    "apps/webc/src/pages/TicketsPage.tsx": {
-      "sha256": "e934a4461d7b8a540b99168ca50f5ac8a0cf442e25fdd55884297a97c282f94a",
-      "mode": 420
-    },
     "apps/webc/src/styles/tokens.css": {
-      "sha256": "b621ef3227d7f00aa7676e844b68bc93b986953b014ecbc0118bf9f3e9cd3c59",
+      "sha256": "de2640c74725db4323c735131b7dd9a733e69adcc676c3ceb205dbbde2e53e03",
       "mode": 420
     },
     "apps/webc/tsconfig.json": {
       "sha256": "b10d871fcdc0061dde770a1f473a06213c6c7cd1df966c31b680ef90c1deab1a",
       "mode": 420
-    },
-    "apps/webc/vite.config.ts": {
-      "sha256": "aa49b080fb55cbf42f9337a20fbc621dfa275fd85150cd5d7edf490205fe4fc8",
-      "mode": 420
     }
   },
-  "note": "2026-09-20 状态迁移：把仓级实验扩展路径（App 壳 / 页面 / voice / loommate / Stage3D 等）从受管文件集移出，交回本仓自持；基座登记见 workloom-im sync/child-repos.json#children[growth].industryExtensionPaths。"
+  "retiredManagedForks": {
+    "apps/web/src/audio/ambience.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/audio/AudioEngine.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/audio/sfx.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/components/AgentAvatar.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/components/Floor3D.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/components/SimBanner.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/components/ValueCounters.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/components/welcomeScripts.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/naming.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/naming.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/product.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/theaterDiff.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/theaterDiff.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/trpc.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/trpc.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/ui-state.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/ui-state.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/useAskRail.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/lib/useNightTime.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/observability/Observability.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/onboarding/CustomizeWizard.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/onboarding/Onboarding.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/onboarding/systemText.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/onboarding/systemText.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p22/P22.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p23/P23.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p23/systemText.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p23/systemText.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p24/P24.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p27/P27.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p28/P28.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p29/P29.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p30/P30.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p31/P31.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p4/P4.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p7/P7.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/pages/p9/P9.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/shell/Bridge.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/shell/IndustryRoutes.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/shell/NavigationAccess.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/shell/NavMenu.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/shell/NavMenu.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/shell/PlanSwitcher.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/src/shell/SideNav.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/web/vite.config.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webb/src/App.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webb/src/Auth.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webb/src/lib/product.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webb/src/lib/trpc.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webb/src/lib/useResource.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webb/src/lib/useResource.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webb/vite.config.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/api.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/api.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/business-display.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/business-display.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/config.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/config.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/demo.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/hooks.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/navigation.test.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/navigation.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/prefetch.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/product.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/lib/types.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/pages/ChatPage.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/pages/MePage.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/pages/MessagesPage.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/pages/ServicePage.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/src/pages/TicketsPage.tsx": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    },
+    "apps/webc/vite.config.ts": {
+      "retiredInVersion": "0.1.19",
+      "reason": "repo-owned-extension-path"
+    }
+  }
 }

@@ -3,7 +3,7 @@
  * 出口：类型 + 七个分析器 + runFastScan 主入口 + 阈值常量（测试/调参用）。
  * 方法论锚点：bundles/hotel/skills/fast-scan/SKILL.md（双线七线）
  *            + bundles/hotel/fences/hotel-baseline.yml（R 系阈值）
- *            + bundles/geo-growthtest/fences/geo-growthtest-baseline.yml（G 系口径）。
+ *            + bundles/geo-growth/fences/geo-growth-baseline.yml（G 系口径）。
  */
 export * from "./types.js";
 export { runFastScan, DEFAULT_FLOOR_PRICE, CHAIN_OF_LINE } from "./engine.js";
