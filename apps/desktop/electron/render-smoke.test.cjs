@@ -26,14 +26,7 @@ async function runFixture(options = {}) {
   const rect = { x: 220, y: 140, width: 768, height: 440 };
   const canvasRect = { ...rect, height: options.shortCanvas ? 150 : 440 };
   const telemetry = { backend: "live2d-webgl", mouthPeak: 0.5, lipStarts: 1, blinkCount: 1, gestureCount: 1, parameterWrites: 3, parameterWriteFailures: 0 };
-  const scene = {
-    ready: true, actors: 14, totalActors: 14, labels: [], rect, canvasRect,
-    canvas: { rect: canvasRect, width: 768, height: canvasRect.height, contextLost: false, frames: 20 },
-    visibleRatio: options.covered ? 0 : 1, visibleSamples: options.covered ? 0 : 25,
-    sampleCount: 25, obstructedSamples: options.covered ? 25 : 0,
-    overlays: options.covered ? ["首日上岗引导"] : [],
-    viewport: { width: 1440, height: 872 }, pageErrors: [],
-  };
+  const sceneQueries = new Map();
   const nativeWindow = {
     isDestroyed: () => false, isVisible: () => true, show: () => {}, focus: () => {},
     webContents: {
@@ -56,7 +49,34 @@ async function runFixture(options = {}) {
         }
         if (code.includes("data-ceremony-ready")) return { ready: true, mode: "vector2d", actors: 15 };
         if (code.includes("data-product-scene=")) {
-          return { ...scene, actors: code.includes("report-stage") ? 15 : 14, totalActors: code.includes("report-stage") ? 15 : 14 };
+          const sceneName = code.includes("report-stage") ? "stage" : "workplace";
+          const count = (sceneQueries.get(sceneName) || 0) + 1;
+          sceneQueries.set(sceneName, count);
+          const actors = sceneName === "stage" ? 15 : 14;
+          const canvas = {
+            getBoundingClientRect: () => canvasRect,
+            width: options.canvasResizes ? (count === 1 ? 300 : 1536) : 768,
+            height: options.canvasResizes ? (count === 1 ? 150 : 880) : canvasRect.height,
+          };
+          const scene = {
+            getBoundingClientRect: () => rect,
+            getAttribute: (name) => name.includes("actors") ? String(actors) : null,
+            matches: () => false,
+            querySelector: () => canvas,
+            querySelectorAll: () => [],
+            contains: (node) => node === scene,
+          };
+          const overlay = { getBoundingClientRect: () => rect, getAttribute: () => "首日上岗引导" };
+          // Execute the real DOM probe so late layout/bitmap changes are measured by production code.
+          return vm.runInNewContext(code, {
+            document: {
+              querySelector: () => options.vanishedScene && count > 1 ? null : scene,
+              querySelectorAll: () => options.covered ? [overlay] : [],
+              elementFromPoint: () => options.covered ? overlay : scene,
+            },
+            getComputedStyle: () => ({ display: "block", visibility: "visible" }),
+            innerWidth: 1440, innerHeight: 872,
+          });
         }
         if (code.includes("data-product-ready")) return { productReady: true, avatarReady: true, actorCount: 14, bundle: "ai-pm", renderMode: "live2d-webgl", ceremonyMode: "vector2d", webgl: true };
         if (code.includes("data-questline-overlay")) return { open: false, dismissed: false };
@@ -105,4 +125,17 @@ test("native smoke rejects black scene pixels even when the navigation has healt
 test("native smoke captures the actual product region for its pixel verdict", async () => {
   const result = await runFixture();
   assert.ok(result.images.filter(Boolean).length >= 2, "both workplace and reporting stage must be captured independently");
+});
+
+test("native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap", async () => {
+  const result = await runFixture({ canvasResizes: true });
+  const reports = [...result.writes.entries()]
+    .filter(([file]) => /(?:workplace|stage)-default\.json$/.test(file))
+    .map(([, bytes]) => JSON.parse(bytes));
+  assert.equal(reports.length, 2);
+  for (const report of reports) assert.deepEqual(report.canvas, { width: 1536, height: 880 });
+});
+
+test("native smoke rejects a product scene removed before the camera-settled capture", async () => {
+  await assert.rejects(runFixture({ vanishedScene: true }), /未就绪|不存在/i);
 });

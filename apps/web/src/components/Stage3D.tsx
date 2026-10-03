@@ -187,7 +187,8 @@ function Theater({ night }: { night: boolean }) {
     <group>
       <CineFloor radius={5.4} color={night ? "#04070f" : "#070d1c"} mirror={night ? 0.45 : 0.6} night={night} />
       {/* 台阶外沿（一圈矮台，剧场感） */}
-      <mesh position={[0, -0.09, 0]}>
+      {/* 上表面在 -0.04，低于镜面 -0.02，避免两块不透明面同深度闪烁。 */}
+      <mesh position={[0, -0.11, 0]}>
         <cylinderGeometry args={[5.4, 5.6, 0.14, 96]} />
         <meshStandardMaterial color="#0a1122" metalness={0.7} roughness={0.4} />
       </mesh>

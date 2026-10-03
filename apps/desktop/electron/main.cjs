@@ -547,7 +547,7 @@ async function runRenderSmoke() {
     // Re-read after the camera settles and before cropping; a hidden scene can exist in the DOM.
     const settled = await win.webContents.executeJavaScript(`(() => {
       const scene = document.querySelector('[data-product-scene="${sceneName}"]');
-      if (!scene) return null;
+      if (!scene) return { ready: false };
       const r = scene.getBoundingClientRect();
       const c = scene.matches('canvas') ? scene : scene.querySelector('canvas');
       const cr = c?.getBoundingClientRect();
@@ -557,8 +557,18 @@ async function runRenderSmoke() {
         if (top && (top === scene || scene.contains(top))) visibleSamples++;
       }
       return {
+        ready: true,
+        actors: Number(scene.getAttribute('data-product-scene-actors') || 0),
+        totalActors: Number(scene.getAttribute('data-product-scene-total-actors') || scene.getAttribute('data-product-scene-actors') || 0),
         rect: { x: r.x, y: r.y, width: r.width, height: r.height },
         canvasRect: cr ? { x: cr.x, y: cr.y, width: cr.width, height: cr.height } : null,
+        canvas: c ? { width: c.width, height: c.height } : null,
+        viewport: { width: innerWidth, height: innerHeight },
+        overlays: [...document.querySelectorAll('[aria-modal="true"]')].filter((node) => {
+          const bounds = node.getBoundingClientRect();
+          const style = getComputedStyle(node);
+          return bounds.width > 0 && bounds.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+        }).map((node) => node.getAttribute('aria-label') || node.getAttribute('data-wl-surface') || '未命名模态层'),
         visibleRatio: visibleSamples / 25, visibleSamples, sampleCount: 25,
         labels: [...scene.querySelectorAll('[data-product-nameplate]')].map((node) => node.textContent?.trim() || '').filter(Boolean),
       };
