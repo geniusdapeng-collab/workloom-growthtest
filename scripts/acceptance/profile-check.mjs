@@ -2,10 +2,11 @@
 /** Isolated local G14 repair from reviewed base 85b5a948; preserves this instance raw profile and frozen product identity.
  * Raw profile and industry asset validation. 0 valid declaration, 1 invalid, 2 missing/unverified. */
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
-import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { cliArgs, bundleDirOf, findRepoRoot } from './lib/profile.mjs';
 import { resolveEnvironment } from './lib/target.mjs';
 import { validateProfileContract } from './lib/profile-contract.mjs';
+import { repositoryInstanceOf } from './lib/repository-instance.mjs';
 import { hashBytes, recordEvidenceRun, revisionOf } from '../delivery/evidence.mjs';
 
 const startedAt = new Date().toISOString();
@@ -31,6 +32,8 @@ function readAsset(path) {
 }
 async function main() {
   const args = cliArgs();
+  // revisionOf/recordEvidenceRun must read this checkout too, even with inherited Git overrides.
+  for (const key of Object.keys(process.env)) if (/^GIT_/i.test(key)) delete process.env[key];
   const requestedOut = resolve(args.outDir ?? outDir);
   const requestedRoot = resolve(value('--evidence-root', dirname(requestedOut)));
   const rel = relative(requestedRoot, requestedOut);
@@ -62,8 +65,12 @@ async function main() {
     try { suiteEntries.push({ path: relativePath, suite: YAML.parse(readAsset(path)) }); }
     catch (error) { suiteEntries.push({ path: relativePath, error: error.name }); }
   }
-  const instanceSlug = basename(repoRoot) === 'governance' ? basename(dirname(repoRoot)) : basename(repoRoot);
-  const result = validateProfileContract(raw, { manifest, bundleExists: existsSync(bundle), presetKeys, suiteEntries, instanceSlug });
+  let instanceRepository = null;
+  if (raw.repositoryInstance !== undefined) {
+    report.repositoryIdentity = repositoryInstanceOf(repoRoot);
+    instanceRepository = report.repositoryIdentity.repository;
+  }
+  const result = validateProfileContract(raw, { manifest, bundleExists: existsSync(bundle), presetKeys, suiteEntries, instanceRepository });
   report.errors.push(...result.errors); report.warnings.push(...result.warnings);
   report.suiteCount = result.suiteCount; report.taskCount = result.taskCount;
   report.configurationStatus = report.errors.length ? 'invalid' : 'valid';

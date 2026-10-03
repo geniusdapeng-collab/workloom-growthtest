@@ -12,7 +12,7 @@ const suitePath = (value) => typeof value === 'string' && /^acceptance\/outcomes
 const field = (value) => nonempty(value) && value.split('.').every((part) => /^[A-Za-z0-9_]+$/.test(part) && !['__proto__', 'prototype', 'constructor'].includes(part));
 const resultComparison = (value) => object(value) && (Object.hasOwn(value, 'equals') || nonempty(value.contains) || (Number.isSafeInteger(value.minLength) && value.minLength > 0));
 
-export function validateProfileContract(raw, { manifest, bundleExists = false, presetKeys = new Set(), suiteEntries = [], instanceSlug = null } = {}) {
+export function validateProfileContract(raw, { manifest, bundleExists = false, presetKeys = new Set(), suiteEntries = [], instanceRepository = null, instanceSlug = null } = {}) {
   const errors = []; const warnings = [];
   const fail = (condition, message) => { if (!condition) errors.push(message); };
   if (!object(raw)) return { errors: ['profile 必须是 JSON 对象'], warnings, businessVerified: false, suiteCount: 0, taskCount: 0 };
@@ -25,7 +25,9 @@ export function validateProfileContract(raw, { manifest, bundleExists = false, p
   fail(['simulated', 'real'].includes(raw.dataMode), 'dataMode 必须显式为 simulated/real');
   if (raw.repositoryInstance !== undefined) {
     const prefix = String(manifest?.repository ?? '').split('/')[0];
-    fail(nonempty(instanceSlug) && raw.repositoryInstance === `${prefix}/${instanceSlug}`, 'repositoryInstance 必须绑定实际隔离仓实例');
+    // instanceSlug remains an explicit legacy unit-test input; the CLI always supplies full identity.
+    const actualRepository = instanceRepository === null && nonempty(instanceSlug) ? `${prefix}/${instanceSlug}` : instanceRepository;
+    fail(nonempty(actualRepository) && raw.repositoryInstance === actualRepository, 'repositoryInstance 必须绑定实际隔离仓实例');
     fail(raw.isolation?.isolated === true && raw.isolation?.sourceProductRepository === manifest?.repository, 'isolation 必须披露隔离及冻结的源产品 repository，不得改写产品 manifest');
   }
 

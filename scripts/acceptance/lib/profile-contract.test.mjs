@@ -26,6 +26,15 @@ test('G14: isolated instance declares its frozen source repository and cannot si
   assert.deepEqual(validateProfileContract(isolated, { ...options, instanceSlug: 'isolate' }).errors, []);
   assert.match(errorsOf(isolated), /repositoryInstance/); assert.match(errorsOf({ ...isolated, isolation: { sourceProductRepository: 'other', isolated: true } }, { ...options, instanceSlug: 'isolate' }), /isolation/);
 });
+test('G14 CI instance: trusted complete repository identity takes precedence over a legacy unit-test slug', () => {
+  const isolated = { ...profile, repositoryInstance: 'reviewed-org/subgroup/isolate', isolation: { sourceProductRepository: manifest.repository, isolated: true } };
+  const actual = { ...options, instanceRepository: isolated.repositoryInstance, instanceSlug: 'unrelated-directory' };
+  const result = validateProfileContract(isolated, actual);
+  assert.deepEqual(result.errors, []); assert.equal(result.businessVerified, false);
+  assert.match(errorsOf(isolated, { ...actual, instanceRepository: 'other-org/subgroup/isolate' }), /repositoryInstance/);
+  assert.match(errorsOf(isolated, { ...actual, instanceRepository: '' }), /repositoryInstance/);
+  assert.match(errorsOf({ ...isolated, isolation: { sourceProductRepository: 'other-product', isolated: true } }, actual), /isolation/);
+});
 test('G14: invalid ports, credentialed targets and undeclared production write residuals are rejected', () => {
   assert.match(errorsOf(changed('startup', { command: 'pnpm preview:all', ports: { pc: 0, bMobile: 3001, cMobile: 3002, server: 8787 } })), /ports/);
   const credentialed = new URL('https://example.test'); credentialed.username = 'user'; credentialed.password = ['mock', 'private'].join('-');

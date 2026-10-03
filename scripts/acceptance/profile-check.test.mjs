@@ -10,10 +10,12 @@ import { fileURLToPath } from 'node:url';
 const source = fileURLToPath(new URL('../..', import.meta.url));
 const require = createRequire(process.env.WORKLOOM_TEST_DEPENDENCIES ?? import.meta.url);
 const yamlRoot = dirname(require.resolve('yaml/package.json'));
-function fixture(t) {
-  const root = mkdtempSync(join(tmpdir(), 'rdas-profile-'));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  for (const path of ['scripts/acceptance/profile-check.mjs', 'scripts/acceptance/lib/profile-contract.mjs', 'scripts/acceptance/lib/outcome-contract.mjs', 'scripts/acceptance/lib/profile.mjs', 'scripts/acceptance/lib/target.mjs', 'scripts/acceptance/lib/live/budget.mjs', 'scripts/delivery/evidence.mjs']) {
+function fixture(t, { directoryName = null } = {}) {
+  const parent = mkdtempSync(join(tmpdir(), 'rdas-profile-'));
+  const root = directoryName ? join(parent, directoryName) : parent;
+  mkdirSync(root, { recursive: true });
+  t.after(() => rmSync(parent, { recursive: true, force: true }));
+  for (const path of ['scripts/acceptance/profile-check.mjs', 'scripts/acceptance/lib/profile-contract.mjs', 'scripts/acceptance/lib/repository-instance.mjs', 'scripts/acceptance/lib/outcome-contract.mjs', 'scripts/acceptance/lib/profile.mjs', 'scripts/acceptance/lib/target.mjs', 'scripts/acceptance/lib/live/budget.mjs', 'scripts/delivery/evidence.mjs']) {
     mkdirSync(dirname(join(root, path)), { recursive: true }); copyFileSync(join(source, path), join(root, path));
   }
   for (const path of ['acceptance/outcomes', 'bundles/industry/presets', 'node_modules']) mkdirSync(join(root, path), { recursive: true });
@@ -29,9 +31,22 @@ function fixture(t) {
   return { root, profile };
 }
 function run(f, args = [], env = {}) {
-  const result = spawnSync(process.execPath, ['scripts/acceptance/profile-check.mjs', ...args], { cwd: f.root, encoding: 'utf8', env: { ...process.env, ACCEPTANCE_ENV_KIND: '', ACCEPTANCE_ALLOW_PROD_WRITES: '', ...env } });
+  const result = spawnSync(process.execPath, ['scripts/acceptance/profile-check.mjs', ...args], { cwd: f.root, encoding: 'utf8', env: { ...process.env, ACCEPTANCE_ENV_KIND: '', ACCEPTANCE_ALLOW_PROD_WRITES: '', CNB: '', CNB_REPO_SLUG: '', CNB_REPO_SLUG_LOWERCASE: '', ...env } });
   const path = join(f.root, 'outputs/acceptance/profile/profile-validation.json');
   return { code: result.status, output: `${result.stdout}\n${result.stderr}`, report: existsSync(path) ? JSON.parse(readFileSync(path, 'utf8')) : null };
+}
+function isolated(f, repository = 'workloom-ai/isolated-fixture') {
+  f.profile.repositoryInstance = repository;
+  f.profile.isolation = { isolated: true, sourceProductRepository: f.profile.repo };
+  writeFileSync(join(f.root, 'acceptance/profile.json'), JSON.stringify(f.profile));
+}
+function origin(f, url) {
+  execFileSync('git', ['config', '--local', '--add', 'remote.origin.url', url], { cwd: f.root, stdio: 'ignore' });
+}
+function configurationOnly(result) {
+  assert.equal(result.report.businessVerified, false);
+  assert.equal(result.report.status, result.code === 0 ? 'unverified' : 'fail');
+  for (const key of ['modelCalls', 'networkCalls', 'databaseConnections']) assert.equal(result.report[key], 0, key);
 }
 test('G14: profile CLI binds structural evidence but never emits a business or checklist pass', (t) => {
   const f = fixture(t); const result = run(f);
@@ -91,4 +106,81 @@ test('G14: root CLI resolves governance assets only when both product manifests 
   const valid = run(f); assert.equal(valid.code, 0, valid.output);
   writeFileSync(join(f.root, 'governance/product.manifest.json'), JSON.stringify({ repository: 'workloom-ai/other', defaultBundle: 'industry' }));
   const invalid = run(f); assert.equal(invalid.code, 1, invalid.output); assert.match(invalid.report.errors.join(' '), /manifest/);
+});
+
+test('G14 CI instance: canonical origin validates an isolated checkout actually named workspace', (t) => {
+  const f = fixture(t, { directoryName: 'workspace' }); isolated(f);
+  origin(f, 'https://cnb.cool/workloom-ai/isolated-fixture.git');
+  const result = run(f);
+  assert.equal(result.code, 0, result.output); assert.equal(result.report.configurationStatus, 'valid');
+  assert.deepEqual(result.report.repositoryIdentity, { repository: f.profile.repositoryInstance, source: 'git:remote.origin.url' });
+  assert.equal(result.report.suiteCount, 1); assert.equal(result.report.taskCount, 3); configurationOnly(result);
+});
+test('G14 CI instance: read-only CNB identity validates workspace without a local origin', (t) => {
+  const f = fixture(t, { directoryName: 'workspace' }); isolated(f);
+  const result = run(f, [], { CNB: 'true', CNB_REPO_SLUG: 'workloom-ai/Isolated-Fixture', CNB_REPO_SLUG_LOWERCASE: 'workloom-ai/isolated-fixture' });
+  assert.equal(result.code, 0, result.output);
+  assert.deepEqual(result.report.repositoryIdentity, { repository: f.profile.repositoryInstance, source: 'cnb:CNB_REPO_SLUG' }); configurationOnly(result);
+});
+test('G14 CI instance: complete group path is independent of the frozen source product prefix', (t) => {
+  const f = fixture(t, { directoryName: 'workspace' }); isolated(f, 'reviewed-org/isolates/isolated-fixture');
+  origin(f, 'https://cnb.cool/reviewed-org/isolates/isolated-fixture');
+  const result = run(f); assert.equal(result.code, 0, result.output);
+  assert.equal(result.report.repositoryIdentity.repository, f.profile.repositoryInstance);
+  assert.equal(f.profile.repo, 'workloom-ai/fixture'); configurationOnly(result);
+});
+test('G14 CI instance: a matching directory name cannot overrule the wrong canonical origin', (t) => {
+  const f = fixture(t, { directoryName: 'isolated-fixture' }); isolated(f);
+  origin(f, 'https://cnb.cool/another-org/isolated-fixture');
+  const result = run(f); assert.equal(result.code, 1, result.output); assert.match(result.report.errors.join(' '), /repositoryInstance/); configurationOnly(result);
+});
+test('G14 CI instance: missing origin cannot be supplied by directory, profile or rename metadata', (t) => {
+  const f = fixture(t, { directoryName: 'isolated-fixture' }); isolated(f);
+  writeFileSync(join(f.root, '.workloom-rename-policy.json'), JSON.stringify({ schema: 'workloom.rename-policy/v1', identity: { repository: f.profile.repositoryInstance } }));
+  writeFileSync(join(f.root, '.workloom-base-sync.json'), JSON.stringify({ repository: f.profile.repositoryInstance }));
+  const result = run(f); assert.equal(result.code, 1, result.output); assert.match(result.report.errors.join(' '), /repositoryInstance/); configurationOnly(result);
+});
+test('G14 CI instance: duplicate origin declarations are ambiguous even when equal', (t) => {
+  const f = fixture(t, { directoryName: 'isolated-fixture' }); isolated(f);
+  for (let i = 0; i < 2; i++) origin(f, 'https://cnb.cool/workloom-ai/isolated-fixture');
+  const result = run(f); assert.equal(result.code, 1, result.output); assert.match(result.report.errors.join(' '), /repositoryInstance/); configurationOnly(result);
+});
+const credentialedOrigin = new URL('https://cnb.cool/workloom-ai/isolated-fixture');
+credentialedOrigin.username = 'fixture-user'; credentialedOrigin.password = ['testonly', 'origin', 'opaque'].join('-');
+for (const [name, url] of [
+  ['userinfo', credentialedOrigin.href],
+  ['query', 'https://cnb.cool/workloom-ai/isolated-fixture?testonly=opaque'],
+  ['fragment', 'https://cnb.cool/workloom-ai/isolated-fixture#testonly-opaque'],
+  ['non-CNB host', 'https://example.test/workloom-ai/isolated-fixture'],
+]) test(`G14 CI instance: ${name} origin is rejected without exposing its raw value`, (t) => {
+  const f = fixture(t, { directoryName: 'isolated-fixture' }); isolated(f); origin(f, url);
+  const result = run(f); assert.equal(result.code, 1, result.output); assert.match(result.report.errors.join(' '), /repositoryInstance/);
+  assert.equal(`${result.output}\n${JSON.stringify(result.report)}`.includes(url), false);
+  assert.equal(`${result.output}\n${JSON.stringify(result.report)}`.includes(credentialedOrigin.password), false); configurationOnly(result);
+});
+for (const [name, env] of [
+  ['missing slug', { CNB: 'true' }],
+  ['malformed slug', { CNB: 'true', CNB_REPO_SLUG: 'https://cnb.cool/workloom-ai/isolated-fixture' }],
+  ['conflicting lowercase', { CNB: 'true', CNB_REPO_SLUG: 'workloom-ai/isolated-fixture', CNB_REPO_SLUG_LOWERCASE: 'wrong-org/isolated-fixture' }],
+  ['wrong canonical CNB instance', { CNB: 'true', CNB_REPO_SLUG: 'workloom-ai/another-fixture' }],
+]) test(`G14 CI instance: ${name} cannot fall back to matching local directory or origin`, (t) => {
+  const f = fixture(t, { directoryName: 'isolated-fixture' }); isolated(f); origin(f, 'https://cnb.cool/workloom-ai/isolated-fixture');
+  const result = run(f, [], env); assert.equal(result.code, 1, result.output); assert.match(result.report.errors.join(' '), /repositoryInstance/); configurationOnly(result);
+});
+test('G14 CI instance: a profile without repositoryInstance preserves existing validation without identity metadata', (t) => {
+  const f = fixture(t, { directoryName: 'workspace' }); const result = run(f, [], { CNB: 'true' });
+  assert.equal(result.code, 0, result.output); assert.equal(Object.hasOwn(result.report, 'repositoryIdentity'), false); configurationOnly(result);
+});
+test('G14 CI instance: inherited Git relocation cannot change actual CLI repository or evidence commit', (t) => {
+  const f = fixture(t, { directoryName: 'workspace' }); const other = fixture(t); isolated(f);
+  origin(f, 'https://cnb.cool/workloom-ai/isolated-fixture'); origin(other, 'https://cnb.cool/another-org/isolated-fixture');
+  writeFileSync(join(other.root, 'other-identity.txt'), 'Distinct foreign fixture identity.\n');
+  for (const args of [['add', 'other-identity.txt'], ['commit', '-qm', 'distinct foreign fixture']]) execFileSync('git', args, { cwd: other.root, stdio: 'ignore' });
+  const expectedCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: f.root, encoding: 'utf8' }).trim();
+  const otherCommit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: other.root, encoding: 'utf8' }).trim(); assert.notEqual(expectedCommit, otherCommit);
+  const result = run(f, [], { GIT_DIR: join(other.root, '.git'), GIT_WORK_TREE: other.root, GIT_COMMON_DIR: join(other.root, '.git'), GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'remote.origin.url', GIT_CONFIG_VALUE_0: 'https://cnb.cool/another-org/isolated-fixture' });
+  assert.equal(result.code, 0, result.output); assert.equal(result.report.repositoryIdentity.repository, f.profile.repositoryInstance);
+  assert.equal(result.report.revision.commit, expectedCommit); configurationOnly(result);
+  const index = JSON.parse(readFileSync(join(f.root, 'outputs/acceptance/evidence-index.json'), 'utf8')); assert.equal(index.commit, expectedCommit);
+  const record = JSON.parse(readFileSync(join(f.root, 'outputs/acceptance', index.runs[0].path), 'utf8')); assert.equal(record.commit, expectedCommit);
 });
