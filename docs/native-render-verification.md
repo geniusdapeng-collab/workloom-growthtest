@@ -25,13 +25,17 @@ node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/boots
 node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx
 ```
 
-渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 执行实际 DOM 探测，验证短画布、遮挡、纯黑、场景裁剪、停稳后位图尺寸和场景卸载反例。三份 React 回归运行真正产品组件，验证 65 人队列、1440/768/360px 布局、总经理高度变化与长姓名详情槽、ready 定时边界、员工卡内容/任务及档案入口、中文显示边界、计时器清理，以及织伴默认形态、通知、显式偏好、隐藏唤回、保存位置与视口变化。React 测试中的 GPU/投影与浏览器尺寸测量边界使用受控替身，几何断言读取真实组件样式；不能据此声称原生画面可读或投影没有重叠。
+渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 执行实际 DOM 探测，验证短画布、遮挡、纯黑、场景裁剪、停稳后位图尺寸和场景卸载反例；另验证 19 个 DOM 名牌中仅 1 个可见、祖先透明/不显示、继承或显式恢复可见性、矩形裁剪、越界/零尺寸、停稳后隐藏状态变化、五块可见牌过密及两块可见牌重叠。三份 React 回归运行真正产品组件，验证 65 人队列、1440/768/360px 布局、总经理高度变化与长姓名详情槽、ready 定时边界、员工卡内容/任务及档案入口、中文显示边界、计时器清理，以及织伴默认形态、通知、显式偏好、隐藏唤回、保存位置与视口变化。DOM、CSS 和尺寸边界在渲染冒烟单测中使用受控替身；React 测试中的 GPU/投影与浏览器尺寸测量边界也使用受控替身，几何断言读取真实组件样式。两者均不能独自证明原生画面可读或投影没有重叠。
 
 只读诊断可核对下列产品 DOM 标记，但数量和标记不单独判绿：欢迎舞台的 `data-ceremony-actors/columns/scrollable` 与每位人物的 `data-ceremony-actor`；总经理/当前详情的 `data-product-nameplate="ceremony"/"ceremony-detail"`、正常流详情槽 `data-ceremony-detail-slot` 与员工区 `data-ceremony-layout/grid`；织伴的 `data-loommate-mode/dock/anchor`、独立 `data-loommate-notices` 与 `data-loommate-notice-placement`；员工卡的 `data-product-nameplate="worker"`、`data-worker-id/card-visible` 与同卡 `data-worker-status`。隐藏的可聚焦员工卡不计为可见名牌，原生验收仍检查实际可见矩形、字号、遮挡、重叠和点击结果。
 
 原生包的应用自有冒烟由 `WORKLOOM_RENDER_SMOKE=1` 启用，使用新的 `WORKLOOM_SUPPORT_DIR` 和独立的服务端、网页、PostgreSQL、NATS 端口。`WORKLOOM_SAFE_RENDERING=1` 使用安全渲染通道。应用本身走正式欢迎/跳过、引导关闭、职场与汇报切换，并负责退出；不要另启控制脚本与其争抢输入或退出生命周期。普通产品窗口仍保持默认后台节流；自有冒烟关闭后台节流以提交持续图形帧。
 
 每个场景必须满足：已存在且完整处于窗口内；3D 画布宽高至少覆盖场景尺寸的 95%；没有可见模态引导；5×5 实际命中采样的场景可见比例至少 90%；真实场景裁剪像素不是纯黑或纯色。相机停稳后重新测量场景存在性、画布 CSS 与像素尺寸、当前/总人数、视口、任务牌和遮挡，避免使用初始 300×150 画布或已经卸载的场景。判定同时写这些字段、像素健康、整窗与场景截图。失败先保存场景 JSON 再返回非零，不能用导航栏的亮色像素代替舞台像素。
+
+初次与停稳采样共用同一个名牌采集器。`labels` 仅列当前可见名牌；`allLabels`、`hiddenLabels`、`labelCounts` 保留全部/可见/隐藏数量，`initialLabelCounts` 保留初次数量。每个 `nameplates` 项记录原始矩形、与视口/场景及祖先矩形裁剪相交后的有效矩形、累计透明度、排除原因及无法解析的裁剪。名牌自身的解析后 `visibility` 决定继承隐藏是否生效，祖先 `display:none`、零透明度或 `content-visibility:hidden` 也会排除；子元素显式恢复可见性时仍计数。`inset()` 与定位元素的 `clip:rect()` 按矩形处理，非矩形、URL 或无法解析的裁剪保守保留并记入 `unresolvedClips`，不凭未知形状移除潜在可见牌。矩形采集用于当前场景的轴向布局，任意旋转/透视或复杂遮罩须结合实际截图复验。裁剪不改变原始几何，祖先裁剪须累积相交；旧 `clip` 只对绝对定位元素生效。这些 CSS 边界依据 [W3C CSS Masking](https://www.w3.org/TR/css-masking-1/#clipping-paths) 与 [W3C CSS 2.2 可见性及裁剪](https://www.w3.org/TR/CSS22/visufx.html)。
+
+名牌数量不读取 `data-worker-card-visible` 作判定，也不按 `elementFromPoint` 命中结果删牌；该命中采样只用于场景整体遮挡。相互遮挡的可见牌保留在数量中，实际有效矩形在两轴均重叠超过 1px 时记录 `nameplateOverlaps` 并失败。职场 3D 空闲态的四块上限保持不变，其他场景保持一块上限；五块真实可见牌必失败。非有限或负尺寸名牌几何也失败，不能通过排除坏几何得到通过结果。
 
 ## 独立复验与边界
 
