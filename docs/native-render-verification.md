@@ -4,7 +4,7 @@
 
 ## 产品行为
 
-经营主页的职场与汇报舞台保留完整团队数据。较大团队每批最多显示 18 名员工，每 12 秒轮换；团队总编制与当前可见人数分别记录，员工档案仍使用完整岗位身份。3D 汇报舞台固定 440px 高度，让画布填满自身容器；剧场实体台面低于镜面，避免同深度表面出现闪烁条纹。职场常驻任务牌优先显示两个有任务、待放行、异常或完成的岗位，其他员工悬停或用 Tab 聚焦后显示。员工卡使用 184px 内容宽度与 12px 屏幕字号，不按相机距离缩放；姓名、任务和悬停/注视状态在同一卡片中显示。长任务标题使用省略显示，完整标题保留在按钮说明中；长状态最多占 72px，内容可滚动且保留完整可访问说明。有任务的卡片进入任务详情，无任务的卡片与员工本体进入员工档案。Escape 关闭临时状态并退出焦点，停用岗位没有任务卡入口。
+经营主页的职场与汇报舞台保留完整团队数据。较大团队每批最多显示 18 名员工，每 12 秒轮换；员工获得键盘焦点后保留当前批次的岗位 ID 与顺序，直到焦点离开主场景或 Escape 退出。5 秒状态刷新继续使用最新岗位对象，任务更新后的动作进入最新任务；员工移除或停用时释放保留，并将焦点退回仍连接的职场/舞台入口。团队总编制与当前可见人数分别记录，员工档案仍使用完整岗位身份。3D 汇报舞台固定 440px 高度，让画布填满自身容器；剧场实体台面低于镜面，避免同深度表面出现闪烁条纹。职场常驻任务牌优先显示两个有任务、待放行、异常或完成的岗位，其他员工悬停或用 Tab 聚焦后显示。员工卡使用 184px 内容宽度与 12px 屏幕字号，不按相机距离缩放；姓名、任务和悬停/注视状态在同一卡片中显示。长任务标题使用省略显示，完整标题保留在按钮说明中；长状态最多占 72px，内容可滚动且保留完整可访问说明。有任务的卡片进入任务详情，无任务的卡片与员工本体进入员工档案。Escape 关闭临时状态并退出焦点，停用岗位没有任务卡入口。
 
 欢迎仪式仍使用传入的完整岗位数组。总经理姓名常驻，其他岗位使用有间距的响应式队列；悬停、点击或键盘聚焦显示一块对应姓名详情，切换岗位替换该详情，Escape 关闭详情。总经理区按实际布局高度测量，字体与窗口变化后重新测量；其下方至少留 12px 间隔，再放固定 60px 的正常流详情槽，长姓名在槽内滚动。切换或关闭详情不移动员工队列。窄屏队列允许垂直滚动，全部岗位保留在 DOM 与键盘路径中。入场动画固定 580ms，每位错峰 25ms、上限 600ms，`data-ceremony-ready` 在当前阵容的入场时长结束后置为 `true`：65 人为 1180ms；阵容身份变化会重置 ready 并重新等待该时长，舞蹈切换不会重播回调。
 
@@ -14,7 +14,7 @@
 
 首日引导临时隐藏织伴，关闭时只恢复此前的可见性。恢复可见不会展开大形象，也不会写入形态偏好；无偏好、显式收起和显式展开都保持各自状态。用户需要展开时仍可使用小球上的展开按钮。
 
-织伴没有保存位置时使用距右侧栏与窗口底边各 16px 的默认停靠。所有隐藏出口及唤回保持这一默认锚点；只有拖拽或键盘移动生成保存坐标。小球按 64×64px 本体钳制位置，大形象按实际本体尺寸钳制；隐藏把手按 80px 高度保持在窗口内。收件箱、完成字幕和助手面板独立放在本体上方或下方的可滚动通知区，不改变小球/形象的位置或本机形态偏好。可用上下空间均不足时，通知区停靠在窗口内。无效或非有限保存坐标回落默认停靠。
+织伴没有保存位置时使用距右侧栏与窗口底边各 16px 的默认停靠。所有隐藏出口及唤回保持这一默认锚点；只有拖拽或键盘移动生成保存坐标。小球按 64×64px 本体钳制位置，大形象按实际本体尺寸钳制；隐藏把手按 80px 高度保持在窗口内。角落态默认只显示未读数与需关注级别的通知入口，轮询或通知恢复不自动打开正文。客户明确打开后，全部已加载通知进入最大 400px 高的可滚动非模态托盘；服务端最近 50 条上限用“至少50条”披露，处理后可刷新读取更多事项。打开/关闭不标记已读，不改变小球/形象位置或本机形态偏好。显式关闭或 Esc 回到通知入口，路由/隐藏/形态变化自动关闭时不抢焦点。查询或登录失败保留上次事项并提供重试；标记已读/已处理失败保留该项，成功后才删除或导航；更新期间禁用该项按钮并防止重复提交，迟到旧轮询不能复活已处理事项。完成字幕与助手面板独立放在本体上方或下方，不改变本体尺寸；打开托盘时字幕显示在托盘内，避免两块通知区互相叠盖。可用上下空间均不足时，通知区停靠在窗口内。无效或非有限保存坐标回落默认停靠。
 
 ## 可运行回归
 
@@ -22,12 +22,12 @@
 
 ```sh
 node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs apps/desktop/electron/render-smoke.test.cjs
-node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx
+node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx apps/web/src/components/loommate/LoomMate.inbox.test.tsx apps/web/src/pages/p0/P0.focus.test.tsx
 ```
 
-渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 执行实际 DOM 探测，验证短画布、遮挡、纯黑、场景裁剪、停稳后位图尺寸和场景卸载反例；另验证 19 个 DOM 名牌中仅 1 个可见、祖先透明/不显示、继承或显式恢复可见性、矩形裁剪、越界/零尺寸、停稳后隐藏状态变化、五块可见牌过密及两块可见牌重叠。三份 React 回归运行真正产品组件，验证 65 人队列、1440/768/360px 布局、总经理高度变化与长姓名详情槽、ready 定时边界、员工卡内容/任务及档案入口、中文显示边界、计时器清理，以及织伴默认形态、通知、显式偏好、隐藏唤回、保存位置与视口变化。DOM、CSS 和尺寸边界在渲染冒烟单测中使用受控替身；React 测试中的 GPU/投影与浏览器尺寸测量边界也使用受控替身，几何断言读取真实组件样式。两者均不能独自证明原生画面可读或投影没有重叠。
+渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 执行实际 DOM 探测，验证短画布、遮挡、纯黑、场景裁剪、停稳后位图尺寸和场景卸载反例；另验证 19 个 DOM 名牌中仅 1 个可见、祖先透明/不显示、继承或显式恢复可见性、矩形裁剪、越界/零尺寸、停稳后隐藏状态变化、五块可见牌过密及两块可见牌重叠。五份 React 回归运行真正产品组件，验证 65 人队列、1440/768/360px 布局、总经理高度变化与长姓名详情槽、ready 定时边界、员工卡内容/任务及档案入口、中文显示边界、计时器清理，以及织伴默认形态、通知、显式偏好、隐藏唤回、保存位置与视口变化。新增通知用例复用实际安装的共享表面 hook，验证非模态 Esc/焦点和失败重试；P0 用例运行真实换批/投影计时器，以受控 Floor/Stage 边界验证焦点身份、最新任务和移除/停用后的回退。DOM、CSS 和尺寸边界在渲染冒烟单测中使用受控替身；React 测试中的 GPU/投影与浏览器尺寸测量边界也使用受控替身，几何断言读取真实组件样式。两者均不能独自证明原生画面可读或投影没有重叠。
 
-只读诊断可核对下列产品 DOM 标记，但数量和标记不单独判绿：欢迎舞台的 `data-ceremony-actors/columns/scrollable` 与每位人物的 `data-ceremony-actor`；总经理/当前详情的 `data-product-nameplate="ceremony"/"ceremony-detail"`、正常流详情槽 `data-ceremony-detail-slot` 与员工区 `data-ceremony-layout/grid`；织伴的 `data-loommate-mode/dock/anchor`、独立 `data-loommate-notices` 与 `data-loommate-notice-placement`；员工卡的 `data-product-nameplate="worker"`、`data-worker-id/card-visible` 与同卡 `data-worker-status`。隐藏的可聚焦员工卡不计为可见名牌，原生验收仍检查实际可见矩形、字号、遮挡、重叠和点击结果。
+只读诊断可核对下列产品 DOM 标记，但数量和标记不单独判绿：欢迎舞台的 `data-ceremony-actors/columns/scrollable` 与每位人物的 `data-ceremony-actor`；总经理/当前详情的 `data-product-nameplate="ceremony"/"ceremony-detail"`、正常流详情槽 `data-ceremony-detail-slot` 与员工区 `data-ceremony-layout/grid`；织伴的 `data-loommate-mode/dock/anchor`、独立 `data-loommate-notices` 与 `data-loommate-notice-placement`、显式入口 `data-loommate-inbox-toggle`、托盘 `data-loommate-inbox-tray` 与条目 `data-loommate-inbox-item`；员工卡的 `data-product-nameplate="worker"`、`data-worker-id/card-visible` 与同卡 `data-worker-status`。隐藏的可聚焦员工卡不计为可见名牌，原生验收仍检查实际可见矩形、字号、遮挡、重叠和点击结果。通知检查须读取实际可见子元素矩形与场景/关键控件命中，不能只测量 64px 本体后判无遮挡。
 
 原生包的应用自有冒烟由 `WORKLOOM_RENDER_SMOKE=1` 启用，使用新的 `WORKLOOM_SUPPORT_DIR` 和独立的服务端、网页、PostgreSQL、NATS 端口。`WORKLOOM_SAFE_RENDERING=1` 使用安全渲染通道。应用本身走正式欢迎/跳过、引导关闭、职场与汇报切换，并负责退出；不要另启控制脚本与其争抢输入或退出生命周期。普通产品窗口仍保持默认后台节流；自有冒烟关闭后台节流以提交持续图形帧。
 

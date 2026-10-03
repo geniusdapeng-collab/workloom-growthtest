@@ -155,11 +155,13 @@ test("保存的小球位置按64px本体钳制，隐藏把手80px仍在屏内，
   expect(companionRoot()!.style.left).toBe("1040px");
   expect(companionRoot()!.style.top).toBe("820px");
   expect(companionRoot()!.style.width).toBe("64px");
+  expect(container.querySelector('[data-loommate-notices]')).toBeNull();
+  expect(container.querySelector('[data-loommate-inbox-toggle]')?.getAttribute("aria-expanded")).toBe("false");
+  await settleTask();
   const notices = container.querySelector<HTMLElement>('[data-loommate-notices]');
   expect(notices).toBeTruthy();
   expect(notices!.style.position).toBe("absolute");
   expect(notices!.style.maxHeight).not.toBe("");
-  await settleTask();
   expect(companionRoot()!.style.left).toBe("1040px");
   expect(companionRoot()!.style.top).toBe("820px");
   expect(container.querySelector('[role="status"]')?.closest('[data-loommate-notices]')).toBe(notices);

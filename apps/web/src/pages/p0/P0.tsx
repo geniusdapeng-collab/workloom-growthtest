@@ -173,7 +173,7 @@ function Satellites({ agents, onPick }: { agents: Satellite[]; onPick: (a: Satel
         const rx = Math.max(24, Math.min(200 + (i % 3) * 34, width / 2 - 24)), ry = 74 + (i % 3) * 12;
         const x = Math.cos(ang) * rx, y = Math.sin(ang) * ry;
         return (
-          <button key={a.id} onClick={() => onPick(a)}
+          <button key={a.id} data-worker-id={a.id} onClick={() => onPick(a)}
             className="pointer-events-auto group absolute z-10 grid h-11 w-11 -translate-x-1/2 -translate-y-1/2 place-items-center"
             style={{ left: `calc(50% + ${x}px)`, top: `calc(46% + ${y}px)` }}
             title={`${agentName} · ${clientChineseText(a.grade, "状态待确认")}`}>
@@ -228,6 +228,12 @@ export default function P0() {
    */
   const FLOOR_BATCH_SIZE = 18;
   const [waveIndex, setWaveIndex] = useState(0);
+  const sceneRef = useRef<HTMLElement | null>(null);
+  const floorViewRef = useRef<HTMLButtonElement | null>(null);
+  const stageViewRef = useRef<HTMLButtonElement | null>(null);
+  type FocusBatch = { view: "floor" | "stage"; workerId: string | null; floorIds: string[]; stageIds: string[] };
+  const focusedBatchRef = useRef<FocusBatch | null>(null);
+  const [focusedBatch, setFocusedBatch] = useState<FocusBatch | null>(null);
   const floorAgentsAll = useMemo(() => data?.floor?.agents ?? [], [data]);
   const sortedFloorAgents = useMemo(() => {
     const rank: Record<string, number> = { asking: 0, blocked: 1, celebrating: 2, collab: 3, working: 4, idle: 5, disabled: 6 };
@@ -249,12 +255,29 @@ export default function P0() {
     return waves.length ? waves : [[]];
   }, [data?.satellites]);
   const waveCount = Math.max(floorWaves.length, stageWaves.length);
-  const visibleFloorAgents = floorWaves[waveIndex % floorWaves.length] ?? [];
-  const visibleStageAgents = stageWaves[waveIndex % stageWaves.length] ?? [];
+  const currentFloorWave = floorWaves[waveIndex % floorWaves.length] ?? [];
+  const currentStageWave = stageWaves[waveIndex % stageWaves.length] ?? [];
+  // 焦点只保留批次 ID 和顺序，员工对象仍取本次投影，任务动作不会使用旧数据。
+  const visibleFloorAgents = focusedBatch
+    ? focusedBatch.floorIds.flatMap((id) => {
+      const agent = floorAgentsAll.find((candidate) => candidate.id === id);
+      return agent && agent.state !== "disabled" ? [agent] : [];
+    }) : currentFloorWave;
+  const visibleStageAgents = focusedBatch
+    ? focusedBatch.stageIds.flatMap((id) => {
+      const agent = data?.satellites.find((candidate) => candidate.id === id);
+      return agent ? [agent] : [];
+    }) : currentStageWave;
+  const releaseSceneFocus = () => {
+    focusedBatchRef.current = null;
+    setFocusedBatch(null);
+  };
   useEffect(() => { setWaveIndex((i) => (i >= waveCount ? 0 : i)); }, [waveCount]);
   useEffect(() => {
     if (waveCount <= 1) return;
-    const timer = window.setInterval(() => setWaveIndex((i) => (i + 1) % waveCount), 12_000);
+    const timer = window.setInterval(() => {
+      if (!focusedBatchRef.current) setWaveIndex((i) => (i + 1) % waveCount);
+    }, 12_000);
     return () => window.clearInterval(timer);
   }, [waveCount]);
   /* ---- 首日上岗（织伴 · 首席增长官带玩）：进度本地持久化，关卡推进只认客户操作与真实事实 ---- */
@@ -328,7 +351,25 @@ export default function P0() {
       return !!(c.getContext("webgl2") ?? c.getContext("webgl"));
     } catch { return false; }
   }, []);
-  const switchView = (v: "floor" | "stage") => { setView(v); localStorage.setItem("theater-view", v); };
+  const switchView = (v: "floor" | "stage") => {
+    releaseSceneFocus();
+    setView(v);
+    localStorage.setItem("theater-view", v);
+  };
+  useEffect(() => {
+    const held = focusedBatchRef.current;
+    if (!held?.workerId) return;
+    const floorAgent = floorAgentsAll.find((agent) => agent.id === held.workerId);
+    const present = held.view === "floor"
+      ? Boolean(floorAgent && floorAgent.state !== "disabled")
+      : Boolean(data?.satellites.some((agent) => agent.id === held.workerId));
+    if (present) return;
+    // 移除/停用会卸载可聚焦节点，退回仍连接的入口后恢复自然轮播。
+    focusedBatchRef.current = null;
+    setFocusedBatch(null);
+    const entry = held.view === "floor" ? floorViewRef.current : stageViewRef.current;
+    if (entry?.isConnected) entry.focus();
+  }, [floorAgentsAll, data?.satellites]);
   // —— M1 视听觉醒：事件源 / 环境声 / 手势启动 ——
   const directorEvent = useTheaterDiff(data);
   useAmbience();
@@ -437,8 +478,8 @@ export default function P0() {
         {msg && <span className="break-words text-body text-go">{msg}</span>}
         {/* D25 视图切换：职场=等距办公区 / 舞台=全息员工状态 */}
         <div className="flex overflow-hidden rounded border border-line text-body">
-          <button onClick={() => switchView("floor")} className={`px-2 py-0.5 ${view === "floor" ? "bg-gold/15 text-gold" : "text-ink3 hover:text-ink2"}`}>职场</button>
-          <button onClick={() => switchView("stage")} className={`px-2 py-0.5 ${view === "stage" ? "bg-gold/15 text-gold" : "text-ink3 hover:text-ink2"}`}>舞台</button>
+          <button ref={floorViewRef} onClick={() => switchView("floor")} className={`px-2 py-0.5 ${view === "floor" ? "bg-gold/15 text-gold" : "text-ink3 hover:text-ink2"}`}>职场</button>
+          <button ref={stageViewRef} onClick={() => switchView("stage")} className={`px-2 py-0.5 ${view === "stage" ? "bg-gold/15 text-gold" : "text-ink3 hover:text-ink2"}`}>舞台</button>
         </div>
         {/* 本机个人使用：银带删除后，演示数据披露由这枚小徽标承担（不占行、不可点） */}
         {isLocalFull() && (
@@ -464,7 +505,22 @@ export default function P0() {
       <SkillDistBanner />
 
       {/* 舞台 */}
-      <main className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-4">
+      <main ref={sceneRef}
+        onFocusCapture={(event) => {
+          const workerId = event.target.closest<HTMLElement>("[data-worker-id]")?.dataset.workerId ?? null;
+          const batch: FocusBatch = {
+            view, workerId,
+            floorIds: visibleFloorAgents.map((agent) => agent.id),
+            stageIds: visibleStageAgents.map((agent) => agent.id),
+          };
+          focusedBatchRef.current = batch;
+          setFocusedBatch(batch);
+        }}
+        onBlurCapture={(event) => {
+          if (event.relatedTarget instanceof Node && sceneRef.current?.contains(event.relatedTarget)) return;
+          releaseSceneFocus();
+        }}
+        className="relative z-10 flex min-h-0 flex-1 flex-col items-center justify-center px-4">
         {view === "floor" && data?.floor ? (
           <div className={`w-full max-w-3xl transition-all duration-1000 ${showCeremony && ceremony < 2 ? "scale-95 opacity-0" : "opacity-100"}`}>
             {/* 顶部状态行 / 批次控件 / 操作提示 / 任务卡：2026-09-20 产品决定全部删除（保持主视图纯粹） */}
