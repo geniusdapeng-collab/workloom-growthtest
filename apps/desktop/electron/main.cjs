@@ -260,7 +260,7 @@ function createWindow() {
     autoHideMenuBar: true,
     backgroundColor: "#F8FAFC",
     show: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false },
+    webPreferences: { contextIsolation: true, nodeIntegration: false, backgroundThrottling: !RENDER_SMOKE },
   });
 
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -303,7 +303,7 @@ function createWindow() {
     if (win && !win.isDestroyed()) win.destroy();
     win = null;
   });
-  win.once("ready-to-show", () => { closeSplash(); win.show(); });
+  win.once("ready-to-show", () => { closeSplash(); win.show(); win.focus(); });
 
   // 关窗 = 最小化到托盘（夜班/自动任务持续运行）；托盘「退出」才是真退出
   win.on("close", (e) => {
@@ -343,6 +343,9 @@ function pixelHealth(image) {
 async function runRenderSmoke() {
   const logDir = path.join(supportDirResolved, "logs");
   fs.mkdirSync(logDir, { recursive: true });
+  // This single application-owned test owns the input and shutdown lifecycle. A background
+  // CI window must still submit fresh frames; normal product windows retain throttling.
+  win.webContents.setBackgroundThrottling(false);
   const deadline = Date.now() + 60000;
   let probe = null;
   while (Date.now() < deadline && win && !win.isDestroyed()) {
@@ -473,28 +476,122 @@ async function runRenderSmoke() {
   }
   if (welcomeExitProbe?.overlay) throw new Error(`欢迎仪式未退出：${JSON.stringify({ report, welcomeExitProbe })}`);
 
+  const guideDeadline = Date.now() + 5000;
+  report.questlineDismissal = [];
+  while (Date.now() < guideDeadline) {
+    const guide = await win.webContents.executeJavaScript(`(() => {
+      const dialog = document.querySelector('[data-questline-overlay="true"]');
+      if (!dialog) return { open: false, dismissed: false };
+      const button = [...dialog.querySelectorAll('button')].find((node) => ['稍后再来', '关闭'].includes(node.textContent?.trim()));
+      button?.click();
+      return { open: true, dismissed: !!button, buttonText: button?.textContent?.trim() || null };
+    })()`, true);
+    report.questlineDismissal.push(guide);
+    saveReport();
+    if (!guide.open) break;
+    if (!guide.dismissed) throw new Error("首日上岗引导缺少可用的关闭按钮");
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  const switchedFloor = await win.webContents.executeJavaScript(`(() => {
+    const root = document.querySelector('[data-product-ready="true"]');
+    const button = [...(root?.querySelectorAll('header button') || [])].find((node) => node.textContent?.trim() === '职场');
+    button?.click();
+    return !!button;
+  })()`, true);
+  if (!switchedFloor) throw new Error("无法切换到职场视图");
+
   async function captureProductScene(sceneName, fileStem) {
     const sceneDeadline = Date.now() + 15000;
     let sceneProbe = null;
     while (Date.now() < sceneDeadline) {
       sceneProbe = await win.webContents.executeJavaScript(`(() => {
         const scene = document.querySelector('[data-product-scene="${sceneName}"]');
+        const bounds = (node) => {
+          if (!node) return null;
+          const r = node.getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height };
+        };
+        const rect = bounds(scene);
+        const canvas = scene?.matches('canvas') ? scene : scene?.querySelector('canvas');
+        let visibleSamples = 0, sampleCount = 0;
+        if (rect && rect.width > 0 && rect.height > 0) {
+          for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) {
+            sampleCount++;
+            const x = rect.x + rect.width * (col + .5) / 5;
+            const y = rect.y + rect.height * (row + .5) / 5;
+            const top = document.elementFromPoint(x, y);
+            if (top && (top === scene || scene.contains(top))) visibleSamples++;
+          }
+        }
+        const overlays = [...document.querySelectorAll('[aria-modal="true"]')].filter((node) => {
+          const r = node.getBoundingClientRect();
+          const s = getComputedStyle(node);
+          return r.width > 0 && r.height > 0 && s.display !== 'none' && s.visibility !== 'hidden';
+        }).map((node) => node.getAttribute('aria-label') || node.getAttribute('data-wl-surface') || '未命名模态层');
         return {
           ready: !!scene,
           actors: Number(scene?.getAttribute('data-product-scene-actors') || 0),
-          labels: scene ? [...document.querySelectorAll('[data-product-nameplate]')].map((node) => node.textContent?.trim() || '').filter(Boolean) : [],
+          totalActors: Number(scene?.getAttribute('data-product-scene-total-actors') || scene?.getAttribute('data-product-scene-actors') || 0),
+          labels: scene ? [...scene.querySelectorAll('[data-product-nameplate]')].map((node) => node.textContent?.trim() || '').filter(Boolean) : [],
+          rect, canvasRect: bounds(canvas),
+          canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
+          visibleRatio: sampleCount ? visibleSamples / sampleCount : 0,
+          visibleSamples, sampleCount, overlays,
+          viewport: { width: innerWidth, height: innerHeight },
         };
       })()`, true);
       if (sceneProbe?.ready) break;
       await new Promise((resolve) => setTimeout(resolve, 350));
     }
     await new Promise((resolve) => setTimeout(resolve, 3600));
+    // Re-read after the camera settles and before cropping; a hidden scene can exist in the DOM.
+    const settled = await win.webContents.executeJavaScript(`(() => {
+      const scene = document.querySelector('[data-product-scene="${sceneName}"]');
+      if (!scene) return null;
+      const r = scene.getBoundingClientRect();
+      const c = scene.matches('canvas') ? scene : scene.querySelector('canvas');
+      const cr = c?.getBoundingClientRect();
+      let visibleSamples = 0;
+      for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) {
+        const top = document.elementFromPoint(r.x + r.width * (col + .5) / 5, r.y + r.height * (row + .5) / 5);
+        if (top && (top === scene || scene.contains(top))) visibleSamples++;
+      }
+      return {
+        rect: { x: r.x, y: r.y, width: r.width, height: r.height },
+        canvasRect: cr ? { x: cr.x, y: cr.y, width: cr.width, height: cr.height } : null,
+        visibleRatio: visibleSamples / 25, visibleSamples, sampleCount: 25,
+        labels: [...scene.querySelectorAll('[data-product-nameplate]')].map((node) => node.textContent?.trim() || '').filter(Boolean),
+      };
+    })()`, true);
+    if (settled) sceneProbe = { ...sceneProbe, ...settled };
+    const sceneReport = { ...sceneProbe, checkedAt: new Date().toISOString(), captureScope: "product-scene" };
+    const sceneReportPath = path.join(logDir, `${fileStem}-${SAFE_RENDERING ? "safe" : "default"}.json`);
+    const saveSceneReport = () => fs.writeFileSync(sceneReportPath, JSON.stringify(sceneReport, null, 2));
+    saveSceneReport();
+    if (!sceneProbe?.ready) throw new Error(`${sceneName} 未就绪：${JSON.stringify(sceneReport)}`);
+    const r = sceneProbe.rect;
+    const viewport = sceneProbe.viewport;
+    if (!r || ![r.x, r.y, r.width, r.height].every(Number.isFinite) || r.width < 200 || r.height < 250 ||
+        r.x < -1 || r.y < -1 || r.x + r.width > viewport.width + 1 || r.y + r.height > viewport.height + 1) {
+      throw new Error(`${sceneName} 场景尺寸或可见区域不完整：${JSON.stringify(sceneReport)}`);
+    }
+    const cr = sceneProbe.canvasRect;
+    if (sceneName.endsWith("-3d") && (!cr || cr.width < r.width * .95 || cr.height < r.height * .95)) {
+      throw new Error(`${sceneName} 画布未填满场景：${JSON.stringify(sceneReport)}`);
+    }
+    if (sceneProbe.overlays?.length || sceneProbe.visibleRatio < .90) {
+      throw new Error(`${sceneName} 场景被引导或浮层遮挡：${JSON.stringify(sceneReport)}`);
+    }
+    const crop = { x: Math.max(0, Math.ceil(r.x)), y: Math.max(0, Math.ceil(r.y)), width: Math.floor(r.width), height: Math.floor(r.height) };
+    const croppedScene = await win.webContents.capturePage(crop, { stayAwake: true });
+    const sceneCropPath = path.join(logDir, `${fileStem}-scene-${SAFE_RENDERING ? "safe" : "default"}.png`);
+    fs.writeFileSync(sceneCropPath, croppedScene.toPNG());
     const sceneShot = await win.webContents.capturePage();
     const sceneScreenshotPath = path.join(logDir, `${fileStem}-${SAFE_RENDERING ? "safe" : "default"}.png`);
     fs.writeFileSync(sceneScreenshotPath, sceneShot.toPNG());
-    const scenePixels = pixelHealth(sceneShot);
-    const sceneReport = { ...sceneProbe, pixels: scenePixels, screenshotPath: sceneScreenshotPath };
-    if (!sceneProbe?.ready) throw new Error(`${sceneName} 未就绪：${JSON.stringify(sceneReport)}`);
+    const scenePixels = pixelHealth(croppedScene);
+    Object.assign(sceneReport, { pixels: scenePixels, screenshotPath: sceneScreenshotPath, sceneScreenshotPath: sceneCropPath });
+    saveSceneReport();
     if (report.bundle === "ai-pm" && Number(sceneProbe.actors) !== Number(report.actorCount) + (sceneName.startsWith("report-stage-") ? 1 : 0)) {
       throw new Error(`${sceneName} 团队人数不完整：${JSON.stringify(sceneReport)}`);
     }

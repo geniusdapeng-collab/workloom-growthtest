@@ -139,6 +139,7 @@ const quality = [
   has("setup") && { name: "环境安装脚本", how: "`pnpm setup`；先读 README 的当前限制", desc: "安装依赖并尝试数据库、迁移与种子；当前会枚举缺失 ai-pm 包的种子，推荐按 README 手动初始化" },
   has("suite") && { name: "主测试套件", how: "`pnpm suite`", desc: "运行已定义场景；需要测试数据库和种子，不能由脚本存在推断测试已通过" },
   has("suite:geo") && { name: "GEO 域套件", how: "`pnpm suite:geo`", desc: "GEO 双域专项" },
+  existsSync(join(ROOT, "scripts/verify-geo-tool-routing.mjs")) && { name: "GEO 工具路由与回执复验", how: "`node scripts/verify-geo-tool-routing.mjs --db`；docs/geo-tool-routing.md", desc: "逐工具覆盖、模拟绑定和真实 PG 重放回归；需专用已迁移数据库，模拟通过不证明真实平台动作", sourcePaths: ["scripts/verify-geo-tool-routing.mjs", "scripts/tools/verify-geo-tool-routing-db.mts", "docs/geo-tool-routing.md"] },
   has("suite:hotel") && { name: "酒店域套件", how: "`pnpm suite:hotel`", desc: "酒店域专项" },
   has("release:gate") && { name: "发布门禁", how: "`pnpm release:gate`", desc: "未全过禁止发布（硬性）" },
   has("db:verify-chain") && { name: "五元事件验链", how: "`pnpm db:verify-chain`", desc: "事件链完整性校验" },

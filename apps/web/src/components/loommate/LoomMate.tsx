@@ -5,7 +5,7 @@
  * 铁律：不替人决策 / 不打扰（勿扰+聚合）/ 不装在线
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { ensureDemoLogin, trpc } from "../../lib/trpc";
 import { VoiceEngine } from "../../voice/VoiceEngine";
 import { mateVoiceProfileOf } from "../../voice/mateVoice";
@@ -134,6 +134,7 @@ function MateAvatar({ size, excited }: { size: number; excited: boolean }) {
 /* ---------------- 主组件 ---------------- */
 export function LoomMate() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const railW = useAskRailPadding();
   const navW = useSideNavWidth();
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
@@ -146,6 +147,9 @@ export function LoomMate() {
   const seenIds = useRef<Set<string>>(new Set());
   const sizeToggleRef = useRef<HTMLButtonElement | null>(null);
   const size = settings?.widget_size ?? "large";
+  // 经营主页的中央舞台需要 768px；两侧各留出大形象的空间才默认展开。
+  // 默认形态只影响本次布局，用户显式的 0/1 偏好始终优先。
+  const defaultCompact = viewport.width <= 820 || viewport.width - railW - navW <= (pathname === "/" ? 1760 : 880);
 
   /* —— 浮层交互（拖拽移动 / 迷你球 / 隐藏把手；本机偏好存 localStorage，2026-09 浮层 UX 专项） —— */
   const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
@@ -175,7 +179,7 @@ export function LoomMate() {
       if (stored === "1") return true;
       if (stored === "0") return false;
     } catch { /* 本机偏好不可写时按视口判断 */ }
-    return window.matchMedia("(max-width: 820px)").matches;
+    return defaultCompact;
   });
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number; moved: boolean } | null>(null);
   const persistLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
@@ -188,17 +192,16 @@ export function LoomMate() {
    * 大形态的容器是 480×560 的矩形，角色本体只占其中一部分，空出来的矩形区域却照样吃指针事件——
    * 真机上关卡三杆（放行/改后放行/退回）滚到右下区域时，点击被小织的空盒子接走，鼠标怎么点都点不动。
    * 两条纪律：① 容器本身 pointer-events:none，只有气泡/面板/角色本体/控制条这几个真实可点区域接收事件；
-   * ② 内容区窄（与 Bridge 侧栏降级同一条 880px 口径）时默认收成 64px 小球，别用大形象压住主工作区
+   * ② 经营主页为中央舞台留出空间，其他页面在内容区不超过 880px 时默认收成 64px 小球
    *   （用户显式展开/收起后仍按其本机偏好持久化，不反复弹回）。
    */
-  const contentNarrow = viewport.width - railW - navW <= 880;
   useEffect(() => {
-    if (!contentNarrow) return;
     try {
-      if (localStorage.getItem("loommate.mini") !== null) return; // 用户已表态 → 尊重
+      const preference = localStorage.getItem("loommate.mini");
+      if (preference === "0" || preference === "1") return;
     } catch { /* 本机偏好不可读时按窄内容区处理 */ }
-    setMini(true);
-  }, [contentNarrow]);
+    setMini(defaultCompact);
+  }, [defaultCompact]);
 
   const clampPos = (x: number, y: number) => ({
     x: Math.min(Math.max(navW, x), Math.max(navW, viewport.width - railW - widgetW)),
@@ -259,9 +262,7 @@ export function LoomMate() {
     celebrateTimers.current = [];
     setWandPhase("rise");
     setCelebrate(task);
-    // 主动出来播报：小球态自动展开成形象（用户显式「隐藏」过则只发声 + 右栏高亮，不强弹）
-    setMini(false);
-    persistLocal("loommate.mini", "0");
+    // 通知保留用户当前的收起/隐藏形态；语音、字幕与右栏高亮仍按正式通道播报。
     AudioEngine.play("fanfare");
     VoiceEngine.speak({
       role: "loommate", persona: personaName,
@@ -422,14 +423,6 @@ export function LoomMate() {
     return () => { alive = false; window.clearInterval(timer); };
   }, [announceTask]);
 
-  /** 视口跨入窄屏断点时自动收起为小球（跨出时不自动展开，尊重用户当前选择） */
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 820px)");
-    const onChange = (event: MediaQueryListEvent) => { if (event.matches) setMini(true); };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-
   useEffect(() => {
     const keepVisible = () => {
       setViewport({ width: window.innerWidth, height: window.innerHeight });
@@ -443,7 +436,7 @@ export function LoomMate() {
       } catch { /* 本机偏好不可写时仍恢复当前会话 */ }
       setPos(null);
       setHidden(false);
-      setMini(false);
+      setMini(defaultCompact);
       setOpen("none");
     };
     const setVisibility = (event: Event) => {
@@ -475,7 +468,7 @@ export function LoomMate() {
     };
   // clampPos 按当前左右栏/尺寸计算；这些值变化时重新校正一次即可。
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navW, railW, viewport.width, viewport.height, widgetW, widgetH]);
+  }, [navW, railW, viewport.width, viewport.height, widgetW, widgetH, defaultCompact]);
   // 20s 心跳：先扫描事件源再拉收件箱
   useEffect(() => {
     const h = setInterval(async () => {
@@ -678,6 +671,7 @@ export function LoomMate() {
       {mini && open === "none" ? (
         /* 迷你球：64px 圆球贴在原位置，点击展开 */
         <div className="relative">
+          {celebrateLine && <div className="mb-2 max-w-48 rounded-lg border border-gline bg-bg900/95 p-2 text-body text-ink" role="status">{celebrateLine}</div>}
           <button
             onClick={() => { setMini(false); persistLocal("loommate.mini", "0"); }}
             title={loomBallEnabled ? `展开${personaName}（班组${systemEmotionText}）` : `展开${personaName}`}

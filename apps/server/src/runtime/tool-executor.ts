@@ -13,25 +13,32 @@
  *  - 工厂调用两种形态：具名工厂（通常是桥适配器）→ 收 `BridgeFactoryConfig`
  *    （baseUrl/token/tenantId/timeoutMs）；缺省工厂 `createToolExecutorForScope` / `createToolExecutor`
  *    → 收 `{ tenantId, workspaceId }`（与既有契约一致）；
- *  - 工具名路由：按规格声明的模式（支持 `前缀.*` 通配）先到先得；无模式的模块是**兜底桥**（仅第一个生效）；
+ *  - 工具名路由：按规格声明的模式（支持 `前缀.*` 通配）或模块 supportsTool 先到先得；
+ *    无任何工具范围声明的模块是**兜底桥**（仅第一个生效）；
  *  - 没有任何桥覆盖的工具 → 返回 `connector-required`（synced=false，走 E3.7「未核实」；
  *    绝不伪造成功回执），并由 `describeToolCoverage()` 供派遣前提示；
- *  - 导入失败/工厂抛错 → 该桥跳过并落服务端日志（fail-closed，不影响其它桥）。
+ *  - 导入失败/工厂抛错 → 保留已配置工具范围的失败占位并落日志；其它范围仍可路由。
+ *    模拟档案也不得用本地兜底遮住已声明覆盖的桥故障。
  */
 import { pathToFileURL } from "node:url";
 import { readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
+import type { ToolExecutionEvidence } from "@workloom/runtime";
 
 export interface DeploymentToolResult {
   result: Record<string, unknown>;
   receipt: { synced: boolean; snapshot_uri?: string; verified_at?: string; mode?: "simulated" | "real"; error?: string };
+  execution?: ToolExecutionEvidence;
 }
 
-export type DeploymentToolExecutor = (
+export type DeploymentToolExecutor = ((
   name: string,
   params: Record<string, unknown>,
-) => Promise<DeploymentToolResult>;
+) => Promise<DeploymentToolResult>) & {
+  /** 可信规格/模块声明的逐工具路由范围；包含已配置但加载失败的占位。 */
+  supportsTool?: (name: string) => boolean;
+};
 
 type Scope = { tenantId: string; workspaceId: string };
 
@@ -67,7 +74,9 @@ interface LoadedBridge {
   modulePath: string;
   patterns: string[];
   wildcard: boolean;
-  executor: DeploymentToolExecutor;
+  supportsTool?: (name: string) => boolean;
+  /** 缺少 executor 的条目保留其声明范围，让失败不能隐式转成模拟成功。 */
+  executor?: DeploymentToolExecutor;
 }
 
 /** 桥缓存：按「env 规格 + 作用域」分桶（作用域进键是因为适配器在构造期绑定 tenantId） */
@@ -76,6 +85,8 @@ const bridgeCache = new Map<string, LoadedBridge[]>();
 /**
  * 规格解析：`<path>[::<factory>][::<pattern|pattern>][::<baseUrl>]`（`#` 旧写法仍兼容）。
  * 用 `::` 是因为 Node `--env-file`/多数 dotenv 实现会把 `#` 之后当注释吃掉。
+ * 非空但缺路径的声明也必须保留：装配层会把它的工具范围注册为失败占位。
+ * 若在混合配置中丢掉坏声明，模拟档案会误把已配置工具判作未覆盖并放行。
  */
 export function parseBridgeSpecs(raw: string): BridgeSpec[] {
   return raw
@@ -91,8 +102,7 @@ export function parseBridgeSpecs(raw: string): BridgeSpec[] {
         patterns: (patternPart ?? "").split("|").map((p) => p.trim()).filter(Boolean),
         ...(urlPart?.trim() ? { baseUrlOverride: urlPart.trim() } : {}),
       };
-    })
-    .filter((spec) => spec.modulePath.length > 0);
+    });
 }
 
 function specEnv(): string {
@@ -138,6 +148,22 @@ function patternsFromModule(mod: ModuleShape): string[] {
   return (raw ?? []).filter((v): v is string => typeof v === "string" && v.trim().length > 0);
 }
 
+function bridgeCovers(bridge: LoadedBridge, name: string): boolean {
+  if (bridge.patterns.length > 0) return bridge.patterns.some((pattern) => toolMatchesPattern(name, pattern));
+  return bridge.supportsTool ? bridge.supportsTool(name) : bridge.wildcard;
+}
+
+function unavailableConnector(name: string, reason: "no-connector-for-tool" | "connector-load-failed"): DeploymentToolResult {
+  return {
+    result: { state: "connector-required", tool: name, reason },
+    receipt: { synced: false, mode: "real" },
+  };
+}
+
+function reservedFailedExecutor(): DeploymentToolExecutor {
+  return Object.assign(async (name: string) => unavailableConnector(name, "connector-load-failed"), { supportsTool: () => true });
+}
+
 async function loadBridges(scope: Scope): Promise<LoadedBridge[]> {
   const raw = specEnv();
   if (!raw) return [];
@@ -158,16 +184,23 @@ async function loadBridges(scope: Scope): Promise<LoadedBridge[]> {
   const bridges: LoadedBridge[] = [];
 
   for (const spec of specs) {
+    let patterns = spec.patterns;
+    let supportsTool: ((name: string) => boolean) | undefined;
     try {
+      if (!spec.modulePath) throw new Error("部署桥规格缺少模块路径");
       const mod = (await import(pathToFileURL(spec.modulePath).href)) as ModuleShape;
+      patterns = spec.patterns.length > 0 ? spec.patterns : patternsFromModule(mod);
+      if (patterns.length === 0 && typeof mod.supportsTool === "function") {
+        const declaration = mod.supportsTool as (name: string) => unknown;
+        supportsTool = (name) => declaration.call(mod, name) !== false;
+      }
       const scopedFactory = mod.createToolExecutorForScope;
       const bareFactory = mod.createToolExecutor;
       const namedFactory = spec.factoryName ? mod[spec.factoryName] : undefined;
       let executor: DeploymentToolExecutor | undefined;
       if (spec.factoryName) {
         if (typeof namedFactory !== "function") {
-          console.error(`[tool-executor] 模块 ${spec.modulePath} 未导出工厂 ${spec.factoryName}（fail-closed：跳过该桥）`);
-          continue;
+          throw new Error(`模块未导出工厂 ${spec.factoryName}`);
         }
         executor = (namedFactory as (cfg: BridgeFactoryConfig) => DeploymentToolExecutor | undefined)({
           baseUrl: spec.baseUrlOverride ?? sharedBaseUrl,
@@ -179,12 +212,16 @@ async function loadBridges(scope: Scope): Promise<LoadedBridge[]> {
       } else if (typeof bareFactory === "function") {
         executor = bareFactory() ?? undefined;
       }
-      if (!executor) continue;
-      const patterns = spec.patterns.length > 0 ? spec.patterns : patternsFromModule(mod);
-      bridges.push({ modulePath: spec.modulePath, patterns, wildcard: patterns.length === 0, executor });
+      if (typeof executor !== "function") throw new Error("工厂未返回可用执行器");
+      if (patterns.length === 0 && !supportsTool && typeof executor.supportsTool === "function") {
+        const declaration = executor.supportsTool;
+        supportsTool = (name) => declaration.call(executor, name) !== false;
+      }
+      bridges.push({ modulePath: spec.modulePath, patterns, wildcard: patterns.length === 0 && !supportsTool, supportsTool, executor });
     } catch (error) {
+      bridges.push({ modulePath: spec.modulePath, patterns, wildcard: patterns.length === 0 && !supportsTool, supportsTool });
       console.error(
-        `[tool-executor] 部署执行器加载失败（fail-closed：跳过该桥 ${spec.modulePath}）`,
+        `[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 ${spec.modulePath || "<缺少模块路径>"}）`,
         error instanceof Error ? error.message : String(error),
       );
     }
@@ -209,24 +246,31 @@ export async function loadDeploymentToolExecutor(scope: Scope): Promise<Deployme
   } catch (error) {
     console.error("[tool-executor] 部署执行器装配失败（fail-closed：任务将按未核实处理）",
       error instanceof Error ? error.message : String(error));
-    return undefined;
+    // 只有从未配置桥才允许 undefined；装配失败不能授权模拟档案绕过已配置连接器。
+    if (!specEnv()) return undefined;
+    return reservedFailedExecutor();
   }
-  if (bridges.length === 0) return undefined;
+  if (bridges.length === 0) {
+    if (!specEnv()) return undefined;
+    console.error("[tool-executor] 非空部署规格无法解析为模块（fail-closed：所有工具保持未核实）");
+    return reservedFailedExecutor();
+  }
 
   const fallback = bridges.find((bridge) => bridge.wildcard);
-  return async (name, params) => {
-    const bridge = bridges.find((candidate) => candidate.patterns.some((pattern) => toolMatchesPattern(name, pattern))) ?? fallback;
+  const resolveBridge = (name: string) => bridges.find((candidate) => !candidate.wildcard && bridgeCovers(candidate, name)) ?? fallback;
+  const executor: DeploymentToolExecutor = async (name, params) => {
+    const bridge = resolveBridge(name);
     if (!bridge) {
       // 有桥但都不覆盖该工具：如实标「未核实」，绝不伪造回执（E3.7）
-      return {
-        result: { state: "connector-required", tool: name, reason: "no-connector-for-tool" },
-        receipt: { synced: false, mode: "real" },
-      };
+      return unavailableConnector(name, "no-connector-for-tool");
     }
+    if (!bridge.executor) return unavailableConnector(name, "connector-load-failed");
     const result = await bridge.executor(name, params);
     // 桥回执统一标 mode=real（真连接器）；桥自身若已声明模式则尊重之
     return { ...result, receipt: { ...result.receipt, mode: result.receipt?.mode ?? "real" } };
   };
+  executor.supportsTool = (name) => resolveBridge(name) !== undefined;
+  return executor;
 }
 
 /**
@@ -237,12 +281,12 @@ export async function describeToolCoverage(
   scope: Scope,
   toolNames: string[],
 ): Promise<{ covered: string[]; uncovered: string[]; bridges: number }> {
-  const bridges = await loadBridges(scope);
+  const bridges = (await loadBridges(scope)).filter((bridge) => bridge.executor);
   if (bridges.length === 0) return { covered: [], uncovered: [], bridges: 0 };
   const covered: string[] = [];
   const uncovered: string[] = [];
   for (const name of toolNames) {
-    const hit = bridges.some((bridge) => bridge.wildcard || bridge.patterns.some((pattern) => toolMatchesPattern(name, pattern)));
+    const hit = bridges.some((bridge) => bridgeCovers(bridge, name));
     (hit ? covered : uncovered).push(name);
   }
   return { covered, uncovered, bridges: bridges.length };

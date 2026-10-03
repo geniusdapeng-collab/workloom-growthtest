@@ -4,7 +4,7 @@
  "repository": "workloom-ai/WorkLoom-growth",
  "displayName": "WorkLoom 获客增长系统（实验车道）",
  "description": "企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。",
- "generatedAt": "2026-10-02T06:23:27.425Z",
+ "generatedAt": "2026-10-03T01:12:08.093Z",
  "evidenceNotice": "本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。",
  "bundleDeclarations": [
   {
@@ -508,6 +508,16 @@
       "package.json",
       "scripts/bootstrap.sh",
       ".cnb.yml"
+     ]
+    },
+    {
+     "name": "GEO 工具路由与回执复验",
+     "how": "`node scripts/verify-geo-tool-routing.mjs --db`；docs/geo-tool-routing.md",
+     "desc": "逐工具覆盖、模拟绑定和真实 PG 重放回归；需专用已迁移数据库，模拟通过不证明真实平台动作",
+     "sourcePaths": [
+      "scripts/verify-geo-tool-routing.mjs",
+      "scripts/tools/verify-geo-tool-routing-db.mts",
+      "docs/geo-tool-routing.md"
      ]
     },
     {

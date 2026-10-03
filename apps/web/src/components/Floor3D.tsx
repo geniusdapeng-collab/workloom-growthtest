@@ -95,7 +95,7 @@ const STATE_TEXT: Record<string, string> = {
 /* ---------------- 单个数字员工 ---------------- */
 function Worker({
   agent, scene, tile, crowdSlot, onPick, onDropTask, night,
-  onOpenTask,
+  onOpenTask, showLabel,
 }: {
   agent: FloorAgent; scene: FloorScene; tile: number;
   crowdSlot: CrowdSlot;
@@ -103,6 +103,7 @@ function Worker({
   onDropTask?: (a: FloorAgent, task: string) => void;
   /** 头顶任务牌点击 → 任务详情（无任务时不响应） */
   onOpenTask?: (threadId: string) => void;
+  showLabel: boolean;
   night: boolean;
 }) {
   const group = useRef<THREE.Group>(null);
@@ -201,18 +202,19 @@ function Worker({
       </mesh>
       {/* 游戏式名牌：只显示岗位名；用户设置别名后只显示别名。状态仅在请示时出现。 */}
       {/*
-       * 头顶常驻任务牌（2026-09-20 重设计）：
+       * 头顶任务牌：优先保留两个有事的岗位；其他员工悬停时展开，避免全部常驻重叠。
        *  第一行 = 岗位名；第二行 = 当前任务（进行中/待放行/已完成…）+ 任务标题。
        *  点任务牌 → 任务详情；点员工本体 → 员工档案。
        *  2026-09-21 产品所有者口径（本机单人运行）：asking 不再提供审批卡入口；
        *  业务链路自带的关卡在各自业务页面就地放行。
        *  数据随 theater 5s 轮询自动刷新（状态机即数据）。
        */}
-      {!dimmed && (
+      {!dimmed && (showLabel || hovered) && (
         <Html center position={[0, 1.5 + (hash(agent.id) % 4) * 0.22, 0]} zIndexRange={[25, 0]} distanceFactor={7.5}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, pointerEvents: "none" }}>
             <button
               type="button"
+              data-product-nameplate="worker"
               onClick={(e) => {
                 e.stopPropagation();
                 if (agent.currentThread) onOpenTask?.(agent.currentThread.id);
@@ -452,9 +454,10 @@ function PanClamp({ controlsRef, bounds }: { controlsRef: React.RefObject<any>; 
 /* ---------------- 主组件（props 与 FloorView 全兼容） ---------------- */
 export function Floor3D({
   floor, ceoName, onPickAgent, onDropTask, directorEvent = null,
-  onOpenProfile, onOpenTask,
+  onOpenProfile, onOpenTask, totalActors = floor.agents.length,
 }: {
   floor: FloorPayload;
+  totalActors?: number;
   ceoName: string;
   /** 员工本体点击 → 员工档案（2026-09-20 重设计：派活改由拖任务卡 / 全局对话框承担） */
   onOpenProfile: (a: FloorAgent) => void;
@@ -489,10 +492,14 @@ export function Floor3D({
     }
     return slots;
   }, [floor.agents]);
+  const visibleLabels = useMemo(() => new Set(floor.agents
+    .filter((agent) => agent.state === "asking" || agent.state === "blocked" || agent.state === "celebrating" || agent.currentThread)
+    .slice(0, 2).map((agent) => agent.id)), [floor.agents]);
   return (
     <div
       data-product-scene="workplace-3d"
       data-product-scene-actors={String(floor.agents.length)}
+      data-product-scene-total-actors={String(totalActors)}
       style={{ width: "100%", height: 440, borderRadius: 12, overflow: "hidden", background: "#0b0d10", position: "relative" }}
     >
       <FuseVignette event={directorEvent} />
@@ -512,7 +519,7 @@ export function Floor3D({
 
         <OfficeScene scene={scene} tile={tile} ceoName={ceoName} night={night} />
         {floor.agents.map((a) => (
-          <Worker key={a.id} agent={a} scene={scene} tile={tile} crowdSlot={crowdSlots.get(a.id) ?? { index: 0, total: 1 }} onPick={onPick} onDropTask={onDropTask} onOpenTask={onOpenTask} night={night} />
+          <Worker key={a.id} agent={a} scene={scene} tile={tile} crowdSlot={crowdSlots.get(a.id) ?? { index: 0, total: 1 }} onPick={onPick} onDropTask={onDropTask} onOpenTask={onOpenTask} showLabel={visibleLabels.has(a.id)} night={night} />
         ))}
         <DustMotes count={46} area={[9, 2.8, 7]} color={night ? "#8aa8d8" : "#bcd6ff"} size={1.2} position={[0, 1.5, 0]} speed={0.18} />
 
