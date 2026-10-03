@@ -10,6 +10,8 @@
 
 织伴在经营主页没有本机形态偏好且内容区宽度不超过 1760px 时，默认使用角落小球；其他页面继续使用 880px 内容区阈值。用户显式展开或收起优先。任务完成通知保留当前形态，使用语音、字幕和右栏提示，不会把收起偏好改写为展开。布局恢复按当前页面与视口重新选择默认形态。
 
+首日引导临时隐藏织伴，关闭时只恢复此前的可见性。恢复可见不会展开大形象，也不会写入形态偏好；无偏好、显式收起和显式展开都保持各自状态。用户需要展开时仍可使用小球上的展开按钮。
+
 ## 可运行回归
 
 在现有仓库依赖准备完成后，从仓库根目录运行：
@@ -19,7 +21,7 @@ node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/boots
 node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/loommate/LoomMate.scene.test.tsx
 ```
 
-渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 验证短画布、遮挡、纯黑场景和场景裁剪反例。织伴测试运行真正组件，验证默认形态、通知与显式偏好。两者均属于本地夹具证据，实际原生窗口仍需复验。
+渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 验证短画布、遮挡、纯黑场景和场景裁剪反例。织伴测试运行真正组件，验证默认形态、通知、显式偏好及引导隐藏后恢复的三种形态。两者均属于本地夹具证据，实际原生窗口仍需复验。
 
 原生包的应用自有冒烟由 `WORKLOOM_RENDER_SMOKE=1` 启用，使用新的 `WORKLOOM_SUPPORT_DIR` 和独立的服务端、网页、PostgreSQL、NATS 端口。`WORKLOOM_SAFE_RENDERING=1` 使用安全渲染通道。应用本身走正式欢迎/跳过、引导关闭、职场与汇报切换，并负责退出；不要另启控制脚本与其争抢输入或退出生命周期。普通产品窗口仍保持默认后台节流；自有冒烟关闭后台节流以提交持续图形帧。
 

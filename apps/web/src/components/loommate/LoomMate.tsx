@@ -443,9 +443,8 @@ export function LoomMate() {
       const action = (event as CustomEvent<"show" | "hide" | "toggle">).detail;
       if (action === "show") {
         setHidden(false);
-        setMini(false);
         persistLocal("loommate.hidden", "0");
-        persistLocal("loommate.mini", "0");
+        // 引导关闭和布局恢复只恢复可见性；尺寸仍由响应式布局及用户显式偏好决定。
       } else if (action === "hide") {
         setHidden(true);
         setOpen("none");

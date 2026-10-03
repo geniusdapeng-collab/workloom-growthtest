@@ -87,3 +87,17 @@ test("用户显式展开仍生效，自动通知不改写其偏好", async () =>
   await settleTask();
   expect(localStorage.getItem("loommate.mini")).toBe("0");
 });
+
+test.each([null, "1", "0"])("引导暂时隐藏后恢复可见保留形态偏好 %s", async (preference) => {
+  if (preference !== null) localStorage.setItem("loommate.mini", preference);
+  await act(async () => root.render(<LoomMate />));
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent("workloom:loommate-visibility", { detail: "hide" }));
+  });
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent("workloom:loommate-visibility", { detail: "show" }));
+  });
+  expect(Boolean(miniButton())).toBe(preference !== "0");
+  expect(localStorage.getItem("loommate.mini")).toBe(preference);
+  expect(localStorage.getItem("loommate.hidden")).toBe("0");
+});
