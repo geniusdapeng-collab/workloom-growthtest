@@ -1,0 +1,20 @@
+{
+  "name": "@workloom/codex-gateway",
+  "version": "0.1.3",
+  "private": true,
+  "type": "module",
+  "description": "WorkLoom × Codex 能力网关 P0：能力目录、团队快照、SSE 事件流、只读 MCP server（实验用，独立于 pnpm workspace）",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "catalog": "node bin/cli.mjs catalog list",
+    "snapshot": "node bin/cli.mjs stage snapshot",
+    "serve": "node bin/cli.mjs stage serve",
+    "mcp": "node bin/mcp.mjs",
+    "doctor": "node bin/cli.mjs doctor",
+    "context": "node bin/cli.mjs context",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT"
+}
