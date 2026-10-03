@@ -1,0 +1,13 @@
+interface:
+  display_name: "WorkLoom 增长域"
+  short_description: "GEO 可见度、双域内容工厂、投放与发布的增长工作流。"
+  brand_color: "#8AD8FF"
+  default_prompt: "看今天增长战况；先查能力目录与待审批，再给方案。"
+policy:
+  allow_implicit_invocation: false
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "workloom-core"
+      description: "WorkLoom 能力网关（P0 只读）"
+      transport: "stdio"

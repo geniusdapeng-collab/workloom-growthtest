@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>WorkLoom 数字人团队工作台（P0 实验）</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="stars" aria-hidden="true"></div>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">WL</span>
+        <div>
+          <h1>数字人团队工作台</h1>
+          <p id="workspace">加载中…</p>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span id="mode-badge" class="badge badge-warn">模拟数据</span>
+        <span id="night-pill" class="pill">夜班 --</span>
+        <span id="connection" class="pill pill-off">连接中</span>
+      </div>
+    </header>
+
+    <section class="stats" id="stats"></section>
+
+    <main class="layout">
+      <aside class="panel sessions">
+        <div class="panel-head">
+          <h2>Codex 线程</h2>
+          <span class="panel-hint">P1 接入</span>
+        </div>
+        <div class="session-placeholder">
+          <p>这里将显示与 Codex 对齐的会话/任务线程。</p>
+          <p class="muted">点击员工工位可跳到对应 <code>codex://threads/&lt;id&gt;</code>（P1 开放）。</p>
+        </div>
+        <div class="panel-head sub">
+          <h2>能力目录</h2>
+          <span class="panel-hint" id="catalog-count">--</span>
+        </div>
+        <div id="pipelines" class="pipelines"></div>
+      </aside>
+
+      <section class="stage">
+        <div class="stage-head">
+          <h2>工位区</h2>
+          <p class="muted" id="stage-note">能力来自代码事实，运行态为模拟数据</p>
+        </div>
+        <div id="agents" class="agent-grid"></div>
+      </section>
+
+      <aside class="panel side">
+        <div class="panel-head">
+          <h2>待审批</h2>
+          <span class="panel-hint" id="approval-count">0</span>
+        </div>
+        <div id="approvals" class="approvals"></div>
+
+        <div class="panel-head sub">
+          <h2>运行中的 Run</h2>
+        </div>
+        <div id="runs" class="runs"></div>
+
+        <div class="panel-head sub">
+          <h2>KPI / 额度</h2>
+        </div>
+        <div id="kpi" class="kpi"></div>
+      </aside>
+    </main>
+
+    <footer class="ticker">
+      <span class="ticker-label">实时动态</span>
+      <div class="ticker-track"><div id="ticker" class="ticker-items"></div></div>
+      <span id="cursor" class="muted"></span>
+    </footer>
+
+    <div class="disclaimer">
+      P0 只读实验：所有运行态/审批/KPI 均为模拟夹具（<code>dataMode=mock</code>）；能力/员工/围栏/管线来自仓内代码事实。
+      写操作（审批、派遣、Run 启动）将在 P1 经能力网关的围栏 → 人审 → 五元事件 → 回执链路开放。
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
