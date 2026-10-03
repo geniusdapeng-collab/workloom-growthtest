@@ -4,7 +4,9 @@
 
 ## 产品行为
 
-经营主页的职场与汇报舞台保留完整团队数据。较大团队每批最多显示 18 名员工，每 12 秒轮换；团队总编制与当前可见人数分别记录，员工档案仍使用完整岗位身份。3D 汇报舞台固定 440px 高度，让画布填满自身容器；剧场实体台面低于镜面，避免同深度表面出现闪烁条纹。职场常驻任务牌优先显示两个有任务、待放行、异常或完成的岗位，其他员工悬停后显示，员工本体与任务牌仍进入原有档案和任务详情。
+经营主页的职场与汇报舞台保留完整团队数据。较大团队每批最多显示 18 名员工，每 12 秒轮换；团队总编制与当前可见人数分别记录，员工档案仍使用完整岗位身份。3D 汇报舞台固定 440px 高度，让画布填满自身容器；剧场实体台面低于镜面，避免同深度表面出现闪烁条纹。职场常驻任务牌优先显示两个有任务、待放行、异常或完成的岗位，其他员工悬停或用 Tab 聚焦后显示。员工卡使用 184px 内容宽度与 12px 屏幕字号，不按相机距离缩放；姓名、任务和悬停/注视状态在同一卡片中显示。长任务标题使用省略显示，完整标题保留在按钮说明中；长状态最多占 72px，内容可滚动且保留完整可访问说明。有任务的卡片进入任务详情，无任务的卡片与员工本体进入员工档案。Escape 关闭临时状态并退出焦点，停用岗位没有任务卡入口。
+
+欢迎仪式仍使用传入的完整岗位数组。总经理姓名常驻，其他岗位使用有间距的响应式队列；悬停、点击或键盘聚焦显示一块对应姓名详情，切换岗位替换该详情，Escape 关闭详情。总经理区按实际布局高度测量，字体与窗口变化后重新测量；其下方至少留 12px 间隔，再放固定 60px 的正常流详情槽，长姓名在槽内滚动。切换或关闭详情不移动员工队列。窄屏队列允许垂直滚动，全部岗位保留在 DOM 与键盘路径中。入场动画固定 580ms，每位错峰 25ms、上限 600ms，`data-ceremony-ready` 在当前阵容的入场时长结束后置为 `true`：65 人为 1180ms；阵容身份变化会重置 ready 并重新等待该时长，舞蹈切换不会重播回调。
 
 `?render=vector2d` 显式选择 2D 职场与汇报舞台，适合无法使用 WebGL 的环境。2D 舞台中的岗位点击区域随容器布局，保持在场景内；团队轮换与总人数语义相同。
 
@@ -12,16 +14,20 @@
 
 首日引导临时隐藏织伴，关闭时只恢复此前的可见性。恢复可见不会展开大形象，也不会写入形态偏好；无偏好、显式收起和显式展开都保持各自状态。用户需要展开时仍可使用小球上的展开按钮。
 
+织伴没有保存位置时使用距右侧栏与窗口底边各 16px 的默认停靠。所有隐藏出口及唤回保持这一默认锚点；只有拖拽或键盘移动生成保存坐标。小球按 64×64px 本体钳制位置，大形象按实际本体尺寸钳制；隐藏把手按 80px 高度保持在窗口内。收件箱、完成字幕和助手面板独立放在本体上方或下方的可滚动通知区，不改变小球/形象的位置或本机形态偏好。可用上下空间均不足时，通知区停靠在窗口内。无效或非有限保存坐标回落默认停靠。
+
 ## 可运行回归
 
 在现有仓库依赖准备完成后，从仓库根目录运行：
 
 ```sh
 node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs apps/desktop/electron/render-smoke.test.cjs
-node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/loommate/LoomMate.scene.test.tsx
+node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx
 ```
 
-渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 执行实际 DOM 探测，验证短画布、遮挡、纯黑、场景裁剪、停稳后位图尺寸和场景卸载反例。织伴测试运行真正组件，验证默认形态、通知、显式偏好及引导隐藏后恢复的三种形态。两者均属于本地夹具证据，实际原生窗口仍需复验。
+渲染冒烟单测运行真正的 `main.cjs`，以受控 renderer 执行实际 DOM 探测，验证短画布、遮挡、纯黑、场景裁剪、停稳后位图尺寸和场景卸载反例。三份 React 回归运行真正产品组件，验证 65 人队列、1440/768/360px 布局、总经理高度变化与长姓名详情槽、ready 定时边界、员工卡内容/任务及档案入口、中文显示边界、计时器清理，以及织伴默认形态、通知、显式偏好、隐藏唤回、保存位置与视口变化。React 测试中的 GPU/投影与浏览器尺寸测量边界使用受控替身，几何断言读取真实组件样式；不能据此声称原生画面可读或投影没有重叠。
+
+只读诊断可核对下列产品 DOM 标记，但数量和标记不单独判绿：欢迎舞台的 `data-ceremony-actors/columns/scrollable` 与每位人物的 `data-ceremony-actor`；总经理/当前详情的 `data-product-nameplate="ceremony"/"ceremony-detail"`、正常流详情槽 `data-ceremony-detail-slot` 与员工区 `data-ceremony-layout/grid`；织伴的 `data-loommate-mode/dock/anchor`、独立 `data-loommate-notices` 与 `data-loommate-notice-placement`；员工卡的 `data-product-nameplate="worker"`、`data-worker-id/card-visible` 与同卡 `data-worker-status`。隐藏的可聚焦员工卡不计为可见名牌，原生验收仍检查实际可见矩形、字号、遮挡、重叠和点击结果。
 
 原生包的应用自有冒烟由 `WORKLOOM_RENDER_SMOKE=1` 启用，使用新的 `WORKLOOM_SUPPORT_DIR` 和独立的服务端、网页、PostgreSQL、NATS 端口。`WORKLOOM_SAFE_RENDERING=1` 使用安全渲染通道。应用本身走正式欢迎/跳过、引导关闭、职场与汇报切换，并负责退出；不要另启控制脚本与其争抢输入或退出生命周期。普通产品窗口仍保持默认后台节流；自有冒烟关闭后台节流以提交持续图形帧。
 

@@ -157,6 +157,7 @@ export function LoomMate() {
       const v = localStorage.getItem("loommate.pos");
       if (!v) return null;
       const p = JSON.parse(v) as { x: number; y: number };
+      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
       /**
        * 2026-09-20 真机反馈：保存的位置若落在**主视图中央区域**（横向 25%–75%、纵向 25%–80%），
        * 会长期压住经营主页的职场/舞台。这类位置不还原，回落到默认停靠位（右/左下角）；
@@ -182,10 +183,37 @@ export function LoomMate() {
     return defaultCompact;
   });
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number; moved: boolean } | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [measuredBody, setMeasuredBody] = useState<{ key: string; width: number; height: number } | null>(null);
   const persistLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
   const availableWidth = Math.max(96, viewport.width - railW - navW - 32);
-  const widgetW = size === "large" ? Math.min(480, availableWidth) : Math.min(120, availableWidth);
-  const widgetH = size === "large" ? Math.min(560, Math.round(widgetW * 1.17)) : 170;
+  const widgetW = size === "large" ? Math.min(480, availableWidth, Math.max(96, viewport.height - 64)) : Math.min(120, availableWidth);
+  const widgetH = size === "large" ? Math.min(viewport.height - 16, widgetW + 32) : Math.min(96, widgetW) + 32;
+  const visibleMini = mini && open === "none";
+  const bodyKey = `${visibleMini ? "mini" : "expanded"}:${size}:${widgetW}:${widgetH}`;
+  const bodyW = visibleMini ? 64 : measuredBody?.key === bodyKey ? measuredBody.width : widgetW;
+  const bodyH = visibleMini ? 64 : measuredBody?.key === bodyKey ? measuredBody.height : widgetH;
+
+  useEffect(() => {
+    if (hidden || size === "fullscreen") return;
+    const measure = () => {
+      const rect = bodyRef.current?.getBoundingClientRect();
+      if (!rect?.width || !rect.height) return;
+      setMeasuredBody((current) => current?.key === bodyKey && current.width === rect.width && current.height === rect.height
+        ? current : { key: bodyKey, width: rect.width, height: rect.height });
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    if (bodyRef.current) observer?.observe(bodyRef.current);
+    return () => observer?.disconnect();
+  }, [bodyKey, hidden, size]);
+
+  const hideCompanion = () => {
+    setHidden(true);
+    setOpen("none");
+    persistLocal("loommate.hidden", "1");
+    // null 是默认右下角停靠，隐藏/唤回不能把它变成大形象的左上坐标。
+  };
 
   /**
    * 大尺寸浮层「吞点击」修复（真机验收实测）：
@@ -204,15 +232,15 @@ export function LoomMate() {
   }, [defaultCompact]);
 
   const clampPos = (x: number, y: number) => ({
-    x: Math.min(Math.max(navW, x), Math.max(navW, viewport.width - railW - widgetW)),
-    y: Math.min(Math.max(0, y), Math.max(0, viewport.height - widgetH)),
+    x: Math.min(Math.max(navW, x), Math.max(navW, viewport.width - railW - bodyW)),
+    y: Math.min(Math.max(0, y), Math.max(0, viewport.height - bodyH)),
   });
   const defaultPos = () => ({
-    x: Math.max(navW, viewport.width - railW - widgetW - 16),
-    y: Math.max(0, viewport.height - widgetH - 16),
+    x: Math.max(navW, viewport.width - railW - bodyW - 16),
+    y: Math.max(0, viewport.height - bodyH - 16),
   });
   const docked: "left" | "right" = pos
-    ? (pos.x + widgetW / 2 < navW + (viewport.width - railW - navW) / 2 ? "left" : "right")
+    ? (pos.x + bodyW / 2 < navW + (viewport.width - railW - navW) / 2 ? "left" : "right")
     : "right";
   const onDragStart = (e: React.PointerEvent) => {
     const base = pos ?? defaultPos();
@@ -234,9 +262,9 @@ export function LoomMate() {
     setPos((p) => {
       if (!p) return p;
       const snapped = {
-        x: p.x + widgetW / 2 < navW + (viewport.width - railW - navW) / 2
+        x: p.x + bodyW / 2 < navW + (viewport.width - railW - navW) / 2
           ? navW + 16
-          : Math.max(navW, viewport.width - railW - widgetW - 16),
+          : Math.max(navW, viewport.width - railW - bodyW - 16),
         y: p.y,
       };
       persistLocal("loommate.pos", JSON.stringify(snapped));
@@ -467,7 +495,7 @@ export function LoomMate() {
     };
   // clampPos 按当前左右栏/尺寸计算；这些值变化时重新校正一次即可。
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navW, railW, viewport.width, viewport.height, widgetW, widgetH, defaultCompact]);
+  }, [navW, railW, viewport.width, viewport.height, bodyW, bodyH, defaultCompact]);
   // 20s 心跳：先扫描事件源再拉收件箱
   useEffect(() => {
     const h = setInterval(async () => {
@@ -551,6 +579,7 @@ export function LoomMate() {
   if (size === "fullscreen") {
     return (
       <div {...mateSurface} className="fixed inset-0 flex flex-col items-center justify-center bg-bg950/98"
+        data-loommate-mode="fullscreen"
         style={{ zIndex: "var(--wl-z-assistant)" }}
         role="dialog" aria-modal="true" aria-label="小织屏保">
         {/* 环境微光背景 */}
@@ -615,12 +644,13 @@ export function LoomMate() {
   if (hidden) {
     return (
       <button
+        data-loommate-mode="hidden" data-loommate-dock={docked} data-loommate-anchor={pos ? "positioned" : "default"}
         onClick={() => { setHidden(false); persistLocal("loommate.hidden", "0"); }}
         title="唤回小织"
         className="fixed flex h-20 w-7 flex-col items-center justify-center gap-1 rounded-l-xl border border-gline bg-bg900/95 text-body font-semibold text-gold shadow-xl hover:bg-bg850"
         style={{ zIndex: "var(--wl-z-assistant)", ...(docked === "left"
-          ? { left: navW, top: pos?.y ?? "45%", borderRadius: "0 12px 12px 0" }
-          : { right: railW, top: pos?.y ?? "45%" }) }}
+          ? { left: navW, top: pos ? Math.max(0, Math.min(pos.y, viewport.height - 80)) : "45%", borderRadius: "0 12px 12px 0" }
+          : { right: railW, top: pos ? Math.max(0, Math.min(pos.y, viewport.height - 80)) : "45%" }) }}
       >
         <span style={{ writingMode: "vertical-rl" }}>小织</span>
         <span>{docked === "left" ? "▸" : "◂"}</span>
@@ -631,13 +661,29 @@ export function LoomMate() {
   const rootStyle: React.CSSProperties = pos
     ? { position: "fixed", left: pos.x, top: pos.y, zIndex: "var(--wl-z-assistant)" }
     : { position: "fixed", right: railW + 16, bottom: 16, zIndex: "var(--wl-z-assistant)" };
+  const anchor = pos ?? defaultPos();
+  const noticeWidth = Math.min(304, availableWidth);
+  const noticeLeft = Math.max(navW + 16, Math.min(
+    anchor.x + (docked === "right" ? bodyW - noticeWidth : 0),
+    Math.max(navW + 16, viewport.width - railW - noticeWidth - 16),
+  ));
+  const aboveSpace = Math.max(0, anchor.y - 8);
+  const belowSpace = Math.max(0, viewport.height - anchor.y - bodyH - 8);
+  const noticeAbove = aboveSpace >= belowSpace;
+  const noticeInViewport = Math.max(aboveSpace, belowSpace) < 96;
+  const noticeStyle: React.CSSProperties = noticeInViewport
+    ? { position: "fixed", top: 16, left: noticeLeft, width: noticeWidth, maxHeight: Math.max(48, viewport.height - 32), overflowY: "auto" }
+    : { position: "absolute", left: noticeLeft - anchor.x, width: noticeWidth, maxHeight: noticeAbove ? aboveSpace : belowSpace, overflowY: "auto", ...(noticeAbove ? { bottom: "100%", marginBottom: 8 } : { top: "100%", marginTop: 8 }) };
 
   return (
     <div
       {...mateSurface}
+      data-loommate-mode={visibleMini ? "mini" : "expanded"} data-loommate-dock={docked} data-loommate-anchor={pos ? "positioned" : "default"}
       className={`pointer-events-none flex flex-col gap-2 ${docked === "left" ? "items-start" : "items-end"}`}
-      style={{ fontFamily: "inherit", ...rootStyle }}
+      style={{ fontFamily: "inherit", width: bodyW, ...rootStyle }}
     >
+      {/* 通知独立停靠：收件箱、完成字幕和面板均不参与64px球/形象的定位尺寸。 */}
+      {(items.length > 0 || celebrateLine || open !== "none") && <div data-loommate-notices data-loommate-notice-placement={noticeInViewport ? "viewport" : noticeAbove ? "above" : "below"} className="pointer-events-auto flex flex-col gap-2" style={noticeStyle}>
       {/* 气泡提醒（最多叠 3 条） */}
       {open === "none" && items.slice(0, 3).map((it) => (
         <div key={it.id} className={`pointer-events-auto w-[min(19rem,calc(100vw-2rem))] max-w-full rounded-2xl border p-3 shadow-xl backdrop-blur ${LEVEL_STYLE[it.level]}`}>
@@ -655,6 +701,8 @@ export function LoomMate() {
         </div>
       ))}
 
+      {celebrateLine && <div className="rounded-lg border border-gline bg-bg900/95 p-2 text-body text-ink" role="status">{celebrateLine}</div>}
+
       {open !== "none" && (
         <div className="pointer-events-auto">
           <MatePanel
@@ -665,12 +713,12 @@ export function LoomMate() {
           />
         </div>
       )}
+      </div>}
 
       {/* 本体：形象（可拖拽·松手边缘吸附）+ 名字 + 控制条 */}
-      {mini && open === "none" ? (
+      {visibleMini ? (
         /* 迷你球：64px 圆球贴在原位置，点击展开 */
-        <div className="relative">
-          {celebrateLine && <div className="mb-2 max-w-48 rounded-lg border border-gline bg-bg900/95 p-2 text-body text-ink" role="status">{celebrateLine}</div>}
+        <div ref={bodyRef} className="relative">
           <button
             onClick={() => { setMini(false); persistLocal("loommate.mini", "0"); }}
             title={loomBallEnabled ? `展开${personaName}（班组${systemEmotionText}）` : `展开${personaName}`}
@@ -697,7 +745,7 @@ export function LoomMate() {
               底栏控制条不渲染，之前只能先展开再隐藏——这里在球体左侧常驻一个 × 直接收起浮层。 */}
           <button
             type="button"
-            onClick={() => { setHidden(true); persistLocal("loommate.hidden", "1"); setPos((p) => p ?? defaultPos()); }}
+            onClick={hideCompanion}
             title="隐藏织伴（屏幕边缘留「小织」把手，点一下唤回）"
             aria-label="隐藏织伴"
             className="pointer-events-auto absolute -left-2 top-1/2 -mt-3.5 inline-flex h-7 w-7 items-center justify-center rounded-full border border-line bg-bg900/95 text-body text-ink2 shadow-lg hover:border-gline hover:text-gold"
@@ -706,7 +754,7 @@ export function LoomMate() {
           </button>
         </div>
       ) : (
-      <div className="pointer-events-none flex flex-col items-center">
+      <div ref={bodyRef} className="pointer-events-none flex w-full flex-col items-center">
         {/* 任务完成播报的舞台样式（挥棒 / 星尘 / 指向右栏的光轨） */}
         <style>{`
           @keyframes wl-wand-swing { 0%{transform:rotate(0) translateY(0)} 16%{transform:rotate(-7deg) translateY(-4px)} 34%{transform:rotate(6deg) translateY(-7px)} 52%{transform:rotate(-5deg) translateY(-2px)} 70%{transform:rotate(3deg)} 100%{transform:rotate(0) translateY(0)} }
@@ -783,9 +831,7 @@ export function LoomMate() {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              setHidden(true);
-              persistLocal("loommate.hidden", "1");
-              setPos((p) => p ?? defaultPos());
+              hideCompanion();
             }}
             title="隐藏织伴（屏幕边缘留「小织」把手，点一下唤回）"
             aria-label="隐藏织伴"
@@ -799,9 +845,7 @@ export function LoomMate() {
             </span>
           )}
         </div>
-        {/* 播报字幕：她说的话必须看得见（VoiceEngine 纪律：发声的都要有字幕） */}
-        {celebrateLine && <div className="wl-mate-say" role="status">{celebrateLine}</div>}
-        <div className="pointer-events-auto mt-0.5 flex items-center gap-1.5">
+        <div className="pointer-events-auto mt-0.5 flex max-w-full flex-wrap items-center justify-center gap-1.5">
             <span className="rounded-full bg-bg900/90 px-2.5 py-0.5 text-body text-ink shadow">
             {personaName}
           </span>
@@ -813,7 +857,7 @@ export function LoomMate() {
             className="rounded-full border border-line bg-bg900/90 px-1.5 py-0.5 text-body text-ink2 opacity-70 shadow hover:text-ink hover:opacity-100">
             收起
           </button>
-          <button onClick={() => { setHidden(true); persistLocal("loommate.hidden", "1"); setPos((p) => p ?? defaultPos()); }} title="隐藏（屏幕边缘留「小织」把手，点一下唤回）"
+          <button onClick={hideCompanion} title="隐藏（屏幕边缘留「小织」把手，点一下唤回）"
             className="rounded-full border border-line bg-bg900/90 px-1.5 py-0.5 text-body text-ink2 opacity-70 shadow hover:text-ink hover:opacity-100">
             隐藏
           </button>

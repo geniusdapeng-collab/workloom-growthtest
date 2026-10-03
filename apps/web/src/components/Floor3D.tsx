@@ -11,14 +11,13 @@
  *  - 视觉（cinematic 工具包）：镜面反射地板 / 体积光柱 / 开场推轨运镜 /
  *    穹顶天幕 + 城市光带 / 游戏式角色名牌 / 辉光 + 暗角 + 胶片颗粒。
  */
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, Html } from "@react-three/drei";
 import * as THREE from "three";
 import type { AvatarHandle } from "./Avatar3D";
 import { BusinessAvatar3D } from "./BusinessAvatar3D";
 import { GazeSystem, GazeRegistry } from "./GazeSystem";
-import { HoverBubble } from "./HoverBubble";
 import { CineDirector, FuseVignette } from "./CineDirector";
 import type { DirectorEvent } from "../lib/theaterDiff";
 import { AudioEngine } from "../audio/AudioEngine";
@@ -101,7 +100,7 @@ function Worker({
   crowdSlot: CrowdSlot;
   onPick: (a: FloorAgent) => void;
   onDropTask?: (a: FloorAgent, task: string) => void;
-  /** 头顶任务牌点击 → 任务详情（无任务时不响应） */
+  /** 头顶任务牌点击 → 任务详情；无任务时打开员工档案 */
   onOpenTask?: (threadId: string) => void;
   showLabel: boolean;
   night: boolean;
@@ -111,7 +110,48 @@ function Worker({
   const avatarRef = useRef<AvatarHandle>(null);
   const [bubble, setBubble] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
   const hoverTimer = useRef<number | null>(null);
+  const leaveTimer = useRef<number | null>(null);
+  const bubbleTimer = useRef<number | null>(null);
+  const pointerInside = useRef(false);
+  const clearCardTimers = useCallback(() => {
+    for (const timer of [hoverTimer, leaveTimer, bubbleTimer]) {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
+    }
+  }, []);
+  const showTemporaryStatus = useCallback((duration: number) => {
+    if (leaveTimer.current !== null) window.clearTimeout(leaveTimer.current);
+    leaveTimer.current = null;
+    if (bubbleTimer.current !== null) window.clearTimeout(bubbleTimer.current);
+    setBubble(true);
+    bubbleTimer.current = window.setTimeout(() => {
+      bubbleTimer.current = null;
+      setBubble(false);
+      if (!pointerInside.current) setHovered(false);
+    }, duration);
+  }, []);
+  const hoverStart = () => {
+    pointerInside.current = true;
+    if (leaveTimer.current !== null) window.clearTimeout(leaveTimer.current);
+    leaveTimer.current = null;
+    if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+    setHovered(true);
+    hoverTimer.current = window.setTimeout(() => { hoverTimer.current = null; setBubble(true); }, 500);
+  };
+  const hoverEnd = () => {
+    pointerInside.current = false;
+    if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+    if (leaveTimer.current !== null) window.clearTimeout(leaveTimer.current);
+    // 从人物移动到头顶卡片时保留短暂热区，卡片的 pointerenter 会取消关闭。
+    leaveTimer.current = window.setTimeout(() => {
+      leaveTimer.current = null;
+      setHovered(false);
+      setBubble(false);
+    }, 1600);
+  };
   const target = useMemo(() => targetOf(agent, scene, crowdSlot), [agent, scene, crowdSlot]);
   const color = STATE_COLOR[agent.state] ?? "#8ad8ff";
   const toWorld = (lx: number, ly: number) => ({
@@ -151,16 +191,19 @@ function Worker({
       onGaze: () => {
         const cam = (window as unknown as { __wlCamera?: THREE.Camera }).__wlCamera;
         if (cam) avatarRef.current?.gazeNod(cam.position.clone());
-        setBubble(true);
-        window.setTimeout(() => setBubble(false), 4000);
+        showTemporaryStatus(4000);
         AudioEngine.play("pop");
       },
     });
-    return unregister;
-  }, [agent.id]);
+    return () => { unregister(); clearCardTimers(); };
+  }, [agent.id, clearCardTimers, showTemporaryStatus]);
 
   const dimmed = agent.state === "disabled";
   const asking = agent.state === "asking";
+  const cardVisible = showLabel || hovered || bubble || focused;
+  const roleName = roleTitleOf(agent.name, agent.presetKey);
+  const taskTitle = clientChineseText(agent.currentThread?.title, "当前任务");
+  const canOpenTask = Boolean(agent.currentThread && onOpenTask);
   return (
     <group ref={group} position={[init.x, 0, init.z]}>
       {/* 状态底座光环 */}
@@ -173,8 +216,6 @@ function Worker({
       <group scale={dimmed ? 0.5 : 0.62}>
         <BusinessAvatar3D ref={avatarRef} identity={agent.presetKey} state={agent.state} moving={movingRef.current} />
       </group>
-      {/* 一句话状态气泡（hover 0.5s / 注视触发） */}
-      <HoverBubble text={clientChineseText(agent.statusLine, "当前状态待确认")} visible={bubble} position={[0, 1.0, 0]} />
       {/* 请示金色体积光柱 */}
       {asking && (
         <SpotBeam color="#ffd98a" height={4.2} topR={0.12} bottomR={0.62} opacity={night ? 0.1 : 0.14} phase={hash(agent.id) % 3} />
@@ -187,15 +228,12 @@ function Worker({
         onClick={(e) => { e.stopPropagation(); onPick(agent); }}
         onPointerOver={(e) => {
           e.stopPropagation();
-          setHovered(true);
+          hoverStart();
           document.body.style.cursor = "pointer";
-          hoverTimer.current = window.setTimeout(() => setBubble(true), 500);
         }}
         onPointerOut={() => {
-          setHovered(false);
+          hoverEnd();
           document.body.style.cursor = "default";
-          if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-          window.setTimeout(() => setBubble(false), 1600);
         }}
       >
         <sphereGeometry args={[0.4, 8, 8]} />
@@ -204,38 +242,60 @@ function Worker({
       {/*
        * 头顶任务牌：优先保留两个有事的岗位；其他员工悬停时展开，避免全部常驻重叠。
        *  第一行 = 岗位名；第二行 = 当前任务（进行中/待放行/已完成…）+ 任务标题。
-       *  点任务牌 → 任务详情；点员工本体 → 员工档案。
+       *  点任务牌 → 任务详情；无任务卡/员工本体 → 员工档案。
        *  2026-09-21 产品所有者口径（本机单人运行）：asking 不再提供审批卡入口；
        *  业务链路自带的关卡在各自业务页面就地放行。
        *  数据随 theater 5s 轮询自动刷新（状态机即数据）。
        */}
-      {!dimmed && (showLabel || hovered) && (
-        <Html center position={[0, 1.5 + (hash(agent.id) % 4) * 0.22, 0]} zIndexRange={[25, 0]} distanceFactor={7.5}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, pointerEvents: "none" }}>
+      {!dimmed && (
+        <Html center position={[0, 1.5 + (hash(agent.id) % 4) * 0.22, 0]} zIndexRange={[25, 0]}>
+          {/* Html 的投影外壳本身没有宽度；必须给内容盒确定宽度并保留屏幕字号。
+              状态在同一盒中展开，避免另一张气泡与任务卡互相覆盖。
+              非常驻卡仍保留可聚焦按钮，Tab 到达后即时显露，不把待命岗位排除在键盘路径外。 */}
+          <div onPointerEnter={hoverStart} onPointerLeave={hoverEnd} style={{ width: 184, maxWidth: "calc(100vw - 32px)", pointerEvents: cardVisible ? "auto" : "none" }}>
             <button
               type="button"
               data-product-nameplate="worker"
+              data-worker-id={agent.id}
+              data-worker-card-visible={String(cardVisible)}
+              aria-label={`${roleName}，${FLOOR_STATE_TEXT[agent.state] ?? "待命"}；${canOpenTask ? `进入任务：${taskTitle}` : "打开员工档案"}`}
+              aria-describedby={bubble || focused ? `worker-status-${agent.id}` : undefined}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              onKeyDown={(event) => {
+                if (event.key !== "Escape") return;
+                event.stopPropagation();
+                clearCardTimers();
+                pointerInside.current = false;
+                setFocused(false);
+                setHovered(false);
+                setBubble(false);
+                event.currentTarget.blur();
+              }}
               onClick={(e) => {
                 e.stopPropagation();
-                if (agent.currentThread) onOpenTask?.(agent.currentThread.id);
+                if (canOpenTask && agent.currentThread) onOpenTask?.(agent.currentThread.id);
+                else onPick(agent);
               }}
-              title={agent.currentThread ? `进入任务：${agent.currentThread.title}` : "当前没有在办任务"}
+              title={canOpenTask ? `进入任务：${taskTitle}` : `打开${roleName}的档案`}
               style={{
-                pointerEvents: "auto", cursor: agent.currentThread ? "pointer" : "default",
-                maxWidth: 132, border: `1px solid ${asking ? "rgba(255,217,138,.65)" : "rgba(214,220,228,.28)"}`,
-                borderRadius: 7, padding: "2px 7px", textAlign: "left", lineHeight: 1.35,
+                pointerEvents: "auto", cursor: "pointer", width: "100%", minWidth: 0, boxSizing: "border-box",
+                opacity: cardVisible ? 1 : 0, clipPath: cardVisible ? undefined : "inset(50%)", height: cardVisible ? undefined : 1,
+                border: `1px solid ${asking ? "rgba(255,217,138,.65)" : "rgba(214,220,228,.28)"}`,
+                borderRadius: 8, padding: cardVisible ? "6px 9px" : 0, textAlign: "left", lineHeight: 1.45,
                 background: asking ? "rgba(52,40,16,.92)" : "rgba(14,16,19,.82)",
                 boxShadow: "0 3px 12px rgba(0,0,0,.45)",
               }}
             >
-              <span style={{ display: "block", fontSize: 10.5, fontWeight: 700, color: asking ? "#ffd98a" : "#e8edf4", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                {roleTitleOf(agent.name, agent.presetKey)}
+              <span style={{ display: "block", fontSize: 12, fontWeight: 700, color: asking ? "#ffd98a" : "#e8edf4", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {roleName}
               </span>
-              <span style={{ display: "block", fontSize: 10, color: agent.state === "idle" ? "#8a939e" : "#b3c6de", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ display: "block", fontSize: 12, color: agent.state === "idle" ? "#a8b8d8" : "#b3c6de", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {agent.currentThread
-                  ? `${FLOOR_STATE_TEXT[agent.state] ?? "进行中"} · ${agent.currentThread.title}`
+                  ? `${FLOOR_STATE_TEXT[agent.state] ?? "进行中"} · ${taskTitle}`
                   : FLOOR_STATE_TEXT[agent.state] ?? "待命"}
               </span>
+              {(bubble || focused) && <span id={`worker-status-${agent.id}`} data-worker-status={agent.id} style={{ display: "block", marginTop: 6, paddingTop: 6, maxHeight: 72, overflowY: "auto", borderTop: "1px solid rgba(214,220,228,.18)", fontSize: 12, color: "#d6dce4", whiteSpace: "normal", wordBreak: "normal", overflowWrap: "break-word", lineHeight: 1.5 }}>{clientChineseText(agent.statusLine, "当前状态待确认")}</span>}
             </button>
           </div>
         </Html>
