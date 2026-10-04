@@ -1,3 +1,4 @@
+import { videoRuntimeRoot } from "./runtime-root.js";
 /**
  * duration-projection.ts —— 镜头时长**单点守恒投影器**（唯一允许改时长的宿主位置）
  *
@@ -88,8 +89,7 @@ export interface ProjectionOptions {
   emotionRateMap?: Record<string, keyof SpeechRateConfig["RATES"]>;
 }
 
-const here = dirname(fileURLToPath(import.meta.url));
-const repoRoot = resolvePath(here, "../../..");
+const repoRoot = videoRuntimeRoot(import.meta.url);
 
 let speechRateCache: SpeechRateConfig | null = null;
 /** 语速真源：`vendor/supermickey/hyperreality-system/config/speech-rate.js` */

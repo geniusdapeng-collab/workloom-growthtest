@@ -1,0 +1,125 @@
+{
+  "evidenceLevel": "B",
+  "codeCommit": "b4eda4e107e3bbf87935870666840ed434ba28a9",
+  "dataMode": "real PostgreSQL / frozen physical dependency fixture / model network substitutes",
+  "beforeLocalFull": {
+    "numTotalTests": 991,
+    "numPassedTests": 881,
+    "numFailedTests": 12,
+    "numPendingTests": 98
+  },
+  "beforeLocalFailures": [
+    {
+      "file": "apps/server/src/video/film-ledger.pg.test.ts",
+      "case": "固定影片工位台账活库契约（T-2026-0927-0039） 工位登记：同摘要幂等复用，改摘要必须换修订并停用旧行",
+      "message": "SubmissionError: FILM_WORKER_INVALID: 工位能力必须是已支持的通道方法"
+    },
+    {
+      "file": "apps/server/src/video/film-ledger.pg.test.ts",
+      "case": "固定影片工位台账活库契约（T-2026-0927-0039） 作业认领：attempt 递增、输入摘要写死、终态回执不可覆盖",
+      "message": "SubmissionError: FILM_WORKER_INVALID: 工位能力必须是已支持的通道方法"
+    },
+    {
+      "file": "apps/server/src/video/film-ledger.pg.test.ts",
+      "case": "固定影片工位台账活库契约（T-2026-0927-0039） 先留账后外呼：同键幂等、换内容拒绝、超预算拦住",
+      "message": "SubmissionError: FILM_WORKER_INVALID: 工位能力必须是已支持的通道方法"
+    },
+    {
+      "file": "apps/server/src/video/film-ledger.pg.test.ts",
+      "case": "固定影片工位台账活库契约（T-2026-0927-0039） 组件状态机：认领一次、dispatch 记账、接受回执不可返回、作业终态后拒绝新调用",
+      "message": "SubmissionError: FILM_WORKER_INVALID: 工位能力必须是已支持的通道方法"
+    },
+    {
+      "file": "apps/server/src/video/film-ledger.pg.test.ts",
+      "case": "固定影片工位台账活库契约（T-2026-0927-0039） 状态视图汇总预占与已接受费用",
+      "message": "SubmissionError: FILM_WORKER_INVALID: 工位能力必须是已支持的通道方法"
+    },
+    {
+      "file": "apps/server/src/video/production-authority.pg.test.ts",
+      "case": "正式生成资格活库契约 最新拒绝会覆盖旧通过的消费资格；旧记录保留且不发第二份脚本",
+      "message": "Error: promise resolved \"{ …(11) }\" instead of rejecting"
+    },
+    {
+      "file": "apps/server/src/video/production-authority.pg.test.ts",
+      "case": "正式生成资格活库契约 shared提交lease阻止预生产/发行exclusive lease，不阻止另一提交；释放后可再取得",
+      "message": "AssertionError: expected 'PQ-dfc1850b' not to be 'PQ-dfc1850b' // Object.is equality"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.test.ts",
+      "case": "预生产原始结果与诚实终态 建项目之前拦截显式未知片型，未触及数据库和供应商",
+      "message": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 2 times\u001b[90m"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.test.ts",
+      "case": "预生产原始结果与诚实终态 分流器加工出的 brief 不充当客户原始选型证据",
+      "message": "TypeError: Cannot read properties of undefined (reading 'eventId')"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.test.ts",
+      "case": "预生产原始结果与诚实终态 原始需求选出的 T1 进入建档事件、routeMeta、供应商入参与分镜/提示词包",
+      "message": "TypeError: Cannot read properties of undefined (reading 'eventId')"
+    },
+    {
+      "file": "apps/server/src/video/studio-worker.test.ts",
+      "case": "预生产原始结果与诚实终态 供应商返回不合规镜头表时报告落档并在渲染前打回",
+      "message": "TypeError: Cannot read properties of undefined (reading 'eventId')"
+    },
+    {
+      "file": "apps/server/src/video/media/media.pg.test.ts",
+      "case": "媒资库活库契约 ⑥ 复用匹配：同主题命中 clip，归档/成片不进候选",
+      "message": "AssertionError: expected [] to include 'VA-0ebcb194'"
+    }
+  ],
+  "beforeLocalLimits": "E2E spawned child lacked the clean root .env; its 98 pending results differ from CNB 2 skips. Full rerun uses a task-owned temporary .env and standard hotel CI seed.",
+  "beforeDefaultGrantAssertions": {
+    "numTotalTests": 32,
+    "numPassedTests": 29,
+    "numFailedTests": 3,
+    "numPendingTests": 0
+  },
+  "beforeDefaultGrantFailures": [
+    {
+      "case": "预生产原始结果与诚实终态 建项目之前拦截显式未知片型，未触及数据库和供应商",
+      "message": "AssertionError: expected \"vi.fn()\" to not be called at all, but actually been called 2 times"
+    },
+    {
+      "case": "默认导演委托与立项事务 委托写入失败时回滚；回滚再次失败=false时销毁连接并保留两个错误",
+      "message": "AssertionError: expected last \"vi.fn()\" call to have been called with [ false ]"
+    },
+    {
+      "case": "默认导演委托与立项事务 委托写入失败时回滚；回滚再次失败=true时销毁连接并保留两个错误",
+      "message": "Error: expected Error: grant insert failed to match object { name: 'AggregateError', …(1) }"
+    }
+  ],
+  "afterFocused": {
+    "numTotalTests": 105,
+    "numPassedTests": 105,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "afterFullServer": {
+    "numTotalTests": 996,
+    "numPassedTests": 994,
+    "numFailedTests": 0,
+    "numPendingTests": 2
+  },
+  "afterOfflineStudioAuthority": {
+    "numTotalTests": 72,
+    "numPassedTests": 72,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "typechecks": {
+    "sourceScope": "current third CI fixes in physical frozen-lock install",
+    "exitCode": 0,
+    "elapsedSec": 6.506,
+    "projects": 11
+  },
+  "packagedLocale": {
+    "lc_ctype": "C",
+    "self_similarity": 0,
+    "trigrams": []
+  },
+  "actualImageVideoApiRequests": 0,
+  "note": "Network provider replies inside PG suites are explicit local substitutes; all real paid image/video generation remains untested."
+}

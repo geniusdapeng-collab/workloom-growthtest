@@ -30,6 +30,8 @@ vi.mock("@workloom/base/evolve", () => ({
 }));
 
 import { runQuest } from "./loop.js";
+import { executeDeclaredTool } from "./tools.js";
+import { stepFingerprint } from "./loop.js";
 import type { QuestStep } from "./loop.js";
 
 const scope = { tenantId: "tenant-a", workspaceId: "ws-a" };
@@ -201,5 +203,108 @@ describe("GR-07：确定性兜底计划必须人工裁决（不被自动执行�
     expect(result.status).toBe("pending_review");
     expect(execute).not.toHaveBeenCalled();
     expect(result.pendingApprovalId).toBeTruthy();
+  });
+});
+
+describe("MC-006：逐工具覆盖与模拟证据不可换绑", () => {
+  const simulatedPreset = (dataMode: "simulated" | "real" = "simulated") => {
+    doubles.assemblePreset.mockResolvedValue({
+      agentId: "agent-a", presetKey: "operator", version: "v1", highRisk: false, fenceBindings: [], prompt: null,
+      essentials: { archive: { dataMode }, stage: "stable", goal: input.goal },
+      tools: [
+        { name: "task.submit", access: "write", desc: "提交" },
+        { name: "task.confirm", access: "write", desc: "核验" },
+      ],
+    });
+  };
+
+  it("不覆盖当前工具的部署桥不能遮住明确模拟档案的本地执行器", async () => {
+    simulatedPreset();
+    const bridge = Object.assign(vi.fn(async (): Promise<ToolResult> => ({
+      result: { state: "connector-required", reason: "no-connector-for-tool" }, receipt: { synced: false, mode: "real" },
+    })), { supportsTool: () => false });
+    const first = await runQuest(pool, pool, scope, { ...input, toolExecutor: bridge });
+    expect(first).toMatchObject({ status: "completed", stepsDone: 2, unverified: [] });
+    expect(bridge).not.toHaveBeenCalled();
+    expect(events[0]?.payload.receipt).toMatchObject({ mode: "simulated", synced: true });
+    expect((events[0]?.payload.decision as Record<string, unknown>).tool_execution).toMatchObject({
+      tenant_id: scope.tenantId, workspace_id: scope.workspaceId, thread_id: input.threadId,
+      step_id: "s1", tool: "task.submit", mode: "simulated",
+    });
+    const replay = await runQuest(pool, pool, scope, { ...input, toolExecutor: bridge });
+    expect(replay).toEqual(first);
+    expect(events).toHaveLength(2);
+  });
+
+  it("真实档案未覆盖工具仍停线，不能自动改标模拟", async () => {
+    const bridge = Object.assign(vi.fn(async (): Promise<ToolResult> => ({
+      result: { state: "connector-required", reason: "no-connector-for-tool" }, receipt: { synced: false, mode: "real" },
+    })), { supportsTool: () => false });
+    const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: bridge });
+    expect(result).toMatchObject({ status: "failed", stepsDone: 0, unverified: ["s1"] });
+    expect(bridge).toHaveBeenCalledOnce();
+    expect(events[0]?.payload.receipt).toMatchObject({ mode: "real", synced: false });
+  });
+
+  it("已声明覆盖的桥出错不会回落模拟器", async () => {
+    simulatedPreset();
+    const bridge = Object.assign(vi.fn(async () => { throw new Error("bridge unavailable"); }), { supportsTool: () => true });
+    const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: bridge });
+    expect(result).toMatchObject({ status: "failed", stepsDone: 0 });
+    expect(result.error).toContain("bridge unavailable");
+    expect((events[0]?.payload.decision as Record<string, unknown>).outcome).toBe("error");
+  });
+
+  it("覆盖声明查询出错也写失败终态，不让线程悬停 running", async () => {
+    simulatedPreset();
+    const bridge = Object.assign(vi.fn(async () => verifiedResult()), { supportsTool: () => { throw new Error("coverage unavailable"); } });
+    const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: bridge });
+    expect(result).toMatchObject({ status: "failed", stepsDone: 0 });
+    expect(result.error).toContain("coverage unavailable");
+    expect(bridge).not.toHaveBeenCalled();
+    expect(events[0]?.payload.receipt).toMatchObject({ synced: false, mode: "real" });
+  });
+
+  it("真实档案拒绝绑定齐全的模拟回执", async () => {
+    const step = explicitPlanner()[0]!;
+    const out = await executeDeclaredTool(step.tool, step.params, {
+      allowedTools: [step.tool], simulated: true,
+      context: { ...scope, threadId: input.threadId, stepId: step.stepId, fingerprint: stepFingerprint(step) },
+    });
+    const execute = vi.fn(async () => out);
+    expect(await runQuest(pool, pool, scope, { ...input, toolExecutor: execute }))
+      .toMatchObject({ status: "failed", stepsDone: 0, unverified: ["s1"] });
+    expect(events[0]?.payload.receipt).toMatchObject({ synced: false, mode: "simulated" });
+  });
+
+  it("模拟执行后档案改为真实数据，重放拒绝复用旧模拟回执且不自动重发", async () => {
+    simulatedPreset();
+    expect(await runQuest(pool, pool, scope, input)).toMatchObject({ status: "completed", stepsDone: 2 });
+    simulatedPreset("real");
+    const execute = vi.fn(async () => verifiedResult());
+    expect(await runQuest(pool, pool, scope, { ...input, toolExecutor: execute }))
+      .toMatchObject({ status: "failed", stepsDone: 0, unverified: ["s1", "s2"] });
+    expect(execute).not.toHaveBeenCalled();
+    expect(events).toHaveLength(2);
+  });
+
+  it("部署器自报模拟成功但缺少绑定证据必须未核实", async () => {
+    simulatedPreset();
+    const execute = vi.fn(async (): Promise<ToolResult> => ({ result: {}, receipt: { synced: true, mode: "simulated" } }));
+    const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
+    expect(result).toMatchObject({ status: "failed", stepsDone: 0, unverified: ["s1"] });
+    expect(execute).toHaveBeenCalledOnce();
+  });
+
+  it.each(["tenant_id", "workspace_id", "thread_id", "step_id", "tool", "result"])("重放的模拟 %s 被换绑/篡改后停线，禁止重发", async (field) => {
+    simulatedPreset();
+    await runQuest(pool, pool, scope, input);
+    const decision = events[0]!.payload.decision as Record<string, unknown>;
+    if (field === "result") (decision.after as Record<string, unknown>).result = { state: "tampered" };
+    else (decision.tool_execution as Record<string, unknown>)[field] = "other";
+    const execute = vi.fn(async () => verifiedResult());
+    const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
+    expect(result).toMatchObject({ status: "failed", unverified: ["s1"] });
+    expect(execute).not.toHaveBeenCalled();
   });
 });

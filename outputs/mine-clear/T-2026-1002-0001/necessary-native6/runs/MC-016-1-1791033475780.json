@@ -1,0 +1,43 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-016-1-1791033475780",
+  "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx apps/web/src/components/loommate/LoomMate.inbox.test.tsx apps/web/src/pages/p0/P0.focus.test.tsx",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "--config",
+      "apps/web/vitest.config.ts",
+      "apps/web/src/components/CeremonyStage.layout.test.tsx",
+      "apps/web/src/components/Floor3D.nameplate.test.tsx",
+      "apps/web/src/components/loommate/LoomMate.scene.test.tsx",
+      "apps/web/src/components/loommate/LoomMate.inbox.test.tsx",
+      "apps/web/src/pages/p0/P0.focus.test.tsx"
+    ]
+  },
+  "actor": "/root",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-016",
+    "assertion_index": 1
+  },
+  "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-03T13:17:55.780Z",
+  "finished_at": "2026-10-03T13:17:58.195Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-016-1-1791033475780.txt",
+      "sha256": "04d6ad831538d4fd6b8b411f29cfdf57f90e418860cede319734c1be7220945c",
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+    }
+  ]
+}

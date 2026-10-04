@@ -339,6 +339,21 @@ describe("桌面 PostgreSQL 实例归属与端口契约", () => {
 });
 
 describe("桌面本机渲染子进程的 Node 路径", () => {
+  it("首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "workloom client 中文 -"));
+    try {
+      const bridge = path.join(root, "bundles", "ai-video", "connectors", "post-bridge");
+      fs.mkdirSync(bridge, { recursive: true });
+      fs.writeFileSync(path.join(bridge, "executor.ts"), 'export const POST_TOOLS = ["postread.plan", "postwrite.package"] as const;\nexport function createPostExecutor() {}\n// http://127.0.0.1:8199\n');
+      const result = buildDesktopEnvironment("LLM_MODEL=keep\n", {
+        pgPort: 55432, serverPort: 18787, webPort: 15173, adminPassword: "test-only",
+        appPassword: "test-only", gatewayPassword: "test-only", runtimeDir: root,
+      });
+      assert.ok(result.values.WORKLOOM_TOOL_EXECUTOR_MODULES.startsWith(path.join(bridge, "executor.ts")));
+      assert.ok(result.values.WORKLOOM_TOOL_EXECUTOR_MODULES.endsWith("#createPostExecutor#postread.*|postwrite.*#http://127.0.0.1:8199"));
+      assert.match(result.text, /^LLM_MODEL=keep$/mu);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
   it("干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径", () => {
     const pathKey = process.platform === "win32" ? "Path" : "PATH";
     const inheritedPath = process.platform === "win32" ? "C:\\Windows\\System32" : "/usr/bin:/bin";

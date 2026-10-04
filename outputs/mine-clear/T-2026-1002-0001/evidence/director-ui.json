@@ -1,0 +1,21 @@
+{
+  "status": "passed",
+  "cards": 4,
+  "desktopWidth": 1440,
+  "mobileWidth": 390,
+  "desktopOverflow": false,
+  "mobileOverflow": false,
+  "railCollapsedByUI": true,
+  "pageErrors": [],
+  "actualServerPlan": true,
+  "renderApiCalls": 0,
+  "imageApiCalls": 0,
+  "checks": [
+    "four-real-plan-cards",
+    "responsive-no-horizontal-overflow",
+    "text-only-submit",
+    "configuration-failure-explained",
+    "advanced-view-navigation"
+  ],
+  "mediaMode": "text-only-plan; local media encoding verified separately"
+}

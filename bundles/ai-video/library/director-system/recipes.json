@@ -1,0 +1,768 @@
+{
+  "schemaVersion": "workloom.director-recipes/v2",
+  "version": "2026-10-02.1",
+  "basis": "产品审美策略，非平台官方算法/流量保证；效果待真实样片标定",
+  "platforms": {
+    "douyin": [
+      "impact",
+      "cinema-story",
+      "polished"
+    ],
+    "xiaohongshu": [
+      "editorial",
+      "immersive",
+      "personal"
+    ],
+    "wechat-channels": [
+      "documentary",
+      "human-story",
+      "brand"
+    ]
+  },
+  "recipes": {
+    "impact": {
+      "name": "高燃主角版",
+      "positioning": "人物高光前置，行动推进与短促细节形成冲击",
+      "kind": "regular",
+      "color": {
+        "profile": "high-contrast-social",
+        "intensity": 0.58,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "高燃主角版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "人物高光前置，行动推进与短促细节形成冲击",
+        "roleOrder": [
+          "action",
+          "hero",
+          "detail",
+          "establishing",
+          "resolution"
+        ],
+        "takeFraction": 0.58,
+        "anchorFraction": 0.55,
+        "takeByRole": {
+          "resolution": 0.65
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "sports-hype",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 0.6,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "高燃主角版",
+        "at": 0.4,
+        "alignment": 8,
+        "marginRatio": 0.1,
+        "note": "人物高光前置，行动推进与短促细节形成冲击"
+      },
+      "copy": {
+        "tone": "人物高光前置，行动推进与短促细节形成冲击",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1.1,
+        "alignment": 2,
+        "marginRatio": 0.18,
+        "weight": 700,
+        "outline": 3,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "cinema-story": {
+      "name": "电影故事版",
+      "positioning": "建立处境，保留表演与情绪转折，以故事收束",
+      "kind": "regular",
+      "color": {
+        "profile": "warm-film",
+        "intensity": 0.62,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "电影故事版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "建立处境，保留表演与情绪转折，以故事收束",
+        "roleOrder": [
+          "establishing",
+          "hero",
+          "action",
+          "detail",
+          "resolution"
+        ],
+        "takeFraction": 0.93,
+        "anchorFraction": 0.1,
+        "takeByRole": {
+          "resolution": 0.93
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "acoustic-warm",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "电影故事版",
+        "at": 0.32,
+        "alignment": 2,
+        "marginRatio": 0.13,
+        "note": "建立处境，保留表演与情绪转折，以故事收束"
+      },
+      "copy": {
+        "tone": "建立处境，保留表演与情绪转折，以故事收束",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "polished": {
+      "name": "精致展示版",
+      "positioning": "美术材质、人物姿态和空间质感交替呈现",
+      "kind": "regular",
+      "color": {
+        "profile": "cool-technical",
+        "intensity": 0.64,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "精致展示版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "美术材质、人物姿态和空间质感交替呈现",
+        "roleOrder": [
+          "detail",
+          "hero",
+          "establishing",
+          "action",
+          "resolution"
+        ],
+        "takeFraction": 0.76,
+        "anchorFraction": 0.75,
+        "takeByRole": {
+          "resolution": 0.76
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "corporate-clean",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "精致展示版",
+        "at": 0.61,
+        "alignment": 8,
+        "marginRatio": 0.08,
+        "note": "美术材质、人物姿态和空间质感交替呈现"
+      },
+      "copy": {
+        "tone": "美术材质、人物姿态和空间质感交替呈现",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "editorial": {
+      "name": "杂志审美版",
+      "positioning": "材质和主角形象建立视觉主题，留白而有细节",
+      "kind": "regular",
+      "color": {
+        "profile": "clean-bright",
+        "intensity": 0.6,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "杂志审美版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "材质和主角形象建立视觉主题，留白而有细节",
+        "roleOrder": [
+          "hero",
+          "detail",
+          "establishing",
+          "action",
+          "resolution"
+        ],
+        "takeFraction": 0.9,
+        "anchorFraction": 0.5,
+        "takeByRole": {
+          "resolution": 0.9
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "acoustic-warm",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "杂志审美版",
+        "at": 0.22,
+        "alignment": 7,
+        "marginRatio": 0.12,
+        "note": "材质和主角形象建立视觉主题，留白而有细节"
+      },
+      "copy": {
+        "tone": "材质和主角形象建立视觉主题，留白而有细节",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.12,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "immersive": {
+      "name": "沉浸体验版",
+      "positioning": "从空间进入体验，环境与细节声音保留呼吸",
+      "kind": "regular",
+      "color": {
+        "profile": "warm-film",
+        "intensity": 0.54,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "沉浸体验版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "从空间进入体验，环境与细节声音保留呼吸",
+        "roleOrder": [
+          "establishing",
+          "detail",
+          "hero",
+          "action",
+          "resolution"
+        ],
+        "takeFraction": 0.99,
+        "anchorFraction": 0.05,
+        "takeByRole": {
+          "resolution": 0.99
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "cinematic",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "沉浸体验版",
+        "at": 0.47,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "note": "从空间进入体验，环境与细节声音保留呼吸"
+      },
+      "copy": {
+        "tone": "从空间进入体验，环境与细节声音保留呼吸",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "personal": {
+      "name": "人物表达版",
+      "positioning": "人物意图先行，清楚人声与情绪动作形成表达",
+      "kind": "regular",
+      "color": {
+        "profile": "cool-technical",
+        "intensity": 0.62,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "人物表达版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "人物意图先行，清楚人声与情绪动作形成表达",
+        "roleOrder": [
+          "hero",
+          "action",
+          "establishing",
+          "detail",
+          "resolution"
+        ],
+        "takeFraction": 0.8,
+        "anchorFraction": 0.25,
+        "takeByRole": {
+          "resolution": 0.8
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "corporate-clean",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "人物表达版",
+        "at": 0.7,
+        "alignment": 8,
+        "marginRatio": 0.09,
+        "note": "人物意图先行，清楚人声与情绪动作形成表达"
+      },
+      "copy": {
+        "tone": "人物意图先行，清楚人声与情绪动作形成表达",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "documentary": {
+      "name": "人物纪录版",
+      "positioning": "处境、行动和因果形成可信叙事，完整保留台词",
+      "kind": "regular",
+      "color": {
+        "profile": "natural",
+        "intensity": 0.9,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "人物纪录版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "处境、行动和因果形成可信叙事，完整保留台词",
+        "roleOrder": [
+          "establishing",
+          "action",
+          "hero",
+          "detail",
+          "resolution"
+        ],
+        "takeFraction": 1.0,
+        "anchorFraction": 0,
+        "takeByRole": {
+          "resolution": 1.0
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "corporate-clean",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "人物纪录版",
+        "at": 0.37,
+        "alignment": 2,
+        "marginRatio": 0.11,
+        "note": "处境、行动和因果形成可信叙事，完整保留台词"
+      },
+      "copy": {
+        "tone": "处境、行动和因果形成可信叙事，完整保留台词",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "human-story": {
+      "name": "温度故事版",
+      "positioning": "关系细节与主角情绪组织起有温度的故事",
+      "kind": "regular",
+      "color": {
+        "profile": "warm-film",
+        "intensity": 0.7,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "温度故事版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "关系细节与主角情绪组织起有温度的故事",
+        "roleOrder": [
+          "detail",
+          "establishing",
+          "hero",
+          "action",
+          "resolution"
+        ],
+        "takeFraction": 0.91,
+        "anchorFraction": 0.45,
+        "takeByRole": {
+          "resolution": 0.91
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "acoustic-warm",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "温度故事版",
+        "at": 0.54,
+        "alignment": 8,
+        "marginRatio": 0.14,
+        "note": "关系细节与主角情绪组织起有温度的故事"
+      },
+      "copy": {
+        "tone": "关系细节与主角情绪组织起有温度的故事",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "brand": {
+      "name": "品牌形象版",
+      "positioning": "凝练主角和事实证据，以形象及材质形成价值表达",
+      "kind": "regular",
+      "color": {
+        "profile": "high-contrast-social",
+        "intensity": 0.49,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "品牌形象版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "凝练主角和事实证据，以形象及材质形成价值表达",
+        "roleOrder": [
+          "hero",
+          "detail",
+          "action",
+          "establishing",
+          "resolution"
+        ],
+        "takeFraction": 0.68,
+        "anchorFraction": 0.65,
+        "takeByRole": {
+          "resolution": 0.68
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "sports-hype",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 1.2,
+        "fadeOutSec": 1.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "品牌形象版",
+        "at": 0.65,
+        "alignment": 2,
+        "marginRatio": 0.07,
+        "note": "凝练主角和事实证据，以形象及材质形成价值表达"
+      },
+      "copy": {
+        "tone": "凝练主角和事实证据，以形象及材质形成价值表达",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 1,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    },
+    "director-surprise": {
+      "name": "导演惊喜版",
+      "positioning": "视觉母题首尾呼应，表演长短对比，声音动机与静默形成电影情绪",
+      "kind": "surprise",
+      "color": {
+        "profile": "teal-orange",
+        "intensity": 0.56,
+        "protectSkin": true,
+        "protectProductColor": true,
+        "lookLabel": "导演惊喜版"
+      },
+      "transitions": {
+        "mode": "hard",
+        "fadeSec": 0
+      },
+      "timeline": {
+        "description": "视觉母题首尾呼应，表演长短对比，声音动机与静默形成电影情绪",
+        "roleOrder": [
+          "detail",
+          "hero",
+          "establishing",
+          "action",
+          "resolution"
+        ],
+        "takeFraction": 0.86,
+        "anchorFraction": 0.34,
+        "takeByRole": {
+          "hero": 0.98,
+          "action": 0.76,
+          "detail": 0.48,
+          "establishing": 0.7,
+          "resolution": 1
+        },
+        "preserveDialogue": true,
+        "useOnlyRegisteredSources": true
+      },
+      "bgm": {
+        "style": "cinematic",
+        "policy": "keep-dialogue",
+        "musicLevelDb": -24,
+        "targetLufs": -14,
+        "fadeInSec": 2.2,
+        "fadeOutSec": 2.6,
+        "section": "auto",
+        "arrangement": {
+          "introSilenceSec": 0.7,
+          "climaxAtRatio": 0.72,
+          "breathAtRatio": 0.45
+        },
+        "note": "独立节目轨和可用许可音乐合流；所有版本遵守相同响度质量口径，音量差不作风格差异证据",
+        "sourcePolicy": "只使用已登记、许可可用且文件在位的曲库；缺曲时如实失败，不自动合成或替换客户指定曲目"
+      },
+      "cover": {
+        "template": "导演惊喜版",
+        "at": 0.58,
+        "alignment": 8,
+        "marginRatio": 0.16,
+        "note": "视觉母题首尾呼应，表演长短对比，声音动机与静默形成电影情绪"
+      },
+      "copy": {
+        "tone": "视觉母题首尾呼应，表演长短对比，声音动机与静默形成电影情绪",
+        "titleTemplate": "{title}",
+        "opening": "",
+        "closing": "",
+        "cta": "",
+        "hashtags": [],
+        "factsPolicy": "只使用项目已登记事实，不编价格、优惠、额外福利或服务承诺"
+      },
+      "subtitleStyle": {
+        "scene": "字幕",
+        "fontScale": 0.91,
+        "alignment": 2,
+        "marginRatio": 0.15,
+        "weight": 400,
+        "outline": 1.5,
+        "note": "整句映射到该版本 EDL；人物与字幕安全区分别检查，软字幕不冒充保留 ASS 样式"
+      }
+    }
+  }
+}

@@ -108,13 +108,12 @@ function Member({
   const color = colorOf(agent.grade);
   const pkey = agent.presetKey ?? keyOf(agent.id);
   const label = displayNameOf({ presetKey: pkey, roleName: agent.name });
-  // 弧形列队（与上一版同语义：前排 60% / 后排 40%，全员面向董事长 +Z）
+  // 每批最多 18 人，三排各最多六人；避免把大编制挤进同一条弧线。
   const slot = useMemo(() => {
-    const front = Math.ceil(total * 0.6);
-    const isFront = index < front;
-    const rowIdx = isFront ? index : index - front;
-    const rowCount = isFront ? front : Math.max(total - front, 1);
-    const radius = isFront ? 2.9 : 4.05;
+    const row = Math.floor(index / 6);
+    const rowIdx = index % 6;
+    const rowCount = Math.min(6, total - row * 6);
+    const radius = 2.7 + row * 0.9;
     const spread = Math.PI * 0.78;
     const ang = -spread / 2 + (rowCount === 1 ? spread / 2 : (rowIdx / (rowCount - 1)) * spread);
     return {
@@ -174,7 +173,7 @@ function Member({
           sub={hovered ? agent.grade : undefined}
           spotlight={spotlight}
           spotText="向您报到"
-          position={[0, index < Math.ceil(total * 0.6) ? 1.78 : 2.14, 0]}
+          position={[0, 1.78 + Math.floor(index / 6) * 0.12, 0]}
         />
       )}
     </group>
@@ -188,7 +187,8 @@ function Theater({ night }: { night: boolean }) {
     <group>
       <CineFloor radius={5.4} color={night ? "#04070f" : "#070d1c"} mirror={night ? 0.45 : 0.6} night={night} />
       {/* 台阶外沿（一圈矮台，剧场感） */}
-      <mesh position={[0, -0.09, 0]}>
+      {/* 上表面在 -0.04，低于镜面 -0.02，避免两块不透明面同深度闪烁。 */}
+      <mesh position={[0, -0.11, 0]}>
         <cylinderGeometry args={[5.4, 5.6, 0.14, 96]} />
         <meshStandardMaterial color="#0a1122" metalness={0.7} roughness={0.4} />
       </mesh>
@@ -222,9 +222,10 @@ function Theater({ night }: { night: boolean }) {
 
 /* ---------------- 主组件 ---------------- */
 export function Stage3D({
-  agents, active = true, onPick, ceremony = false,
+  agents, totalActors = agents.length, active = true, onPick, ceremony = false,
 }: {
   agents: StageAgent[];
+  totalActors?: number;
   active?: boolean;
   onPick: (a: StageAgent) => void;
   ceremony?: boolean;
@@ -235,7 +236,8 @@ export function Stage3D({
     <div
       data-product-scene="report-stage-3d"
       data-product-scene-actors={String(agents.length + 1)}
-      style={{ width: "100%", height: "100%", minHeight: 440, borderRadius: 12, overflow: "hidden", background: "#0b0d10" }}
+      data-product-scene-total-actors={String(totalActors + 1)}
+      style={{ width: "100%", height: 440, position: "relative", borderRadius: 12, overflow: "hidden", background: "#0b0d10" }}
     >
       <Canvas camera={{ position: [8.6, 0.9, 11.2], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: false }}>
         <SkyDome night={night} />

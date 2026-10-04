@@ -1,0 +1,10 @@
+{
+  "status": "passed",
+  "environment": "actual packaged payload, owned simulation of foreign occupied NATS port",
+  "hostReady": true,
+  "fallback": "memory",
+  "foreignPortOccupantPreservedAfterStop": true,
+  "hostStopped": true,
+  "imageApiCalls": 0,
+  "videoApiCalls": 0
+}

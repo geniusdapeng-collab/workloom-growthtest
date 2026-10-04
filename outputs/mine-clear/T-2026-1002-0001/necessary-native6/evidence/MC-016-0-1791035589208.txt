@@ -1,0 +1,431 @@
+TAP version 13
+# Subtest: signing keys persist independently and a valid existing key is preserved
+ok 1 - signing keys persist independently and a valid existing key is preserved
+  ---
+  duration_ms: 1.284125
+  type: 'test'
+  ...
+# Subtest: a failed child has an actionable startup error and writes a bounded diagnostic
+ok 2 - a failed child has an actionable startup error and writes a bounded diagnostic
+  ---
+  duration_ms: 5.090125
+  type: 'test'
+  ...
+# Subtest: HTTP 200 from another local instance does not pass desktop readiness
+ok 3 - HTTP 200 from another local instance does not pass desktop readiness
+  ---
+  duration_ms: 44.870625
+  type: 'test'
+  ...
+# 21:53:09 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-mILE9f/resources）==
+# 21:53:09 正在检查本机版本与安装载荷…
+# 21:53:09 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-ri6q8m/resources）==
+# 21:53:09 正在检查本机版本与安装载荷…
+# Subtest: 桌面载荷原子装配
+    # Subtest: 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档
+    ok 1 - 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档
+      ---
+      duration_ms: 1.72725
+      type: 'test'
+      ...
+    # Subtest: 正式打包入口缺少载荷时在启动任何服务前失败关闭
+    ok 2 - 正式打包入口缺少载荷时在启动任何服务前失败关闭
+      ---
+      duration_ms: 5.579708
+      type: 'test'
+      ...
+    # Subtest: 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources
+    ok 3 - 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources
+      ---
+      duration_ms: 7.574958
+      type: 'test'
+      ...
+    # Subtest: 完整暂存后换入；提交前可回滚，提交后清理临时目录
+    ok 4 - 完整暂存后换入；提交前可回滚，提交后清理临时目录
+      ---
+      duration_ms: 8.250417
+      type: 'test'
+      ...
+    # Subtest: 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚
+    ok 5 - 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚
+      ---
+      duration_ms: 8.647459
+      type: 'test'
+      ...
+    # Subtest: 换入第一项后故障会恢复旧版目录、版本和首航状态
+    ok 6 - 换入第一项后故障会恢复旧版目录、版本和首航状态
+      ---
+      duration_ms: 7.996334
+      type: 'test'
+      ...
+    # Subtest: 首装暂存失败不会留下半套运行时
+    ok 7 - 首装暂存失败不会留下半套运行时
+      ---
+      duration_ms: 7.669958
+      type: 'test'
+      ...
+    # Subtest: 安装阶段检查点以机器可读中文状态落盘
+    ok 8 - 安装阶段检查点以机器可读中文状态落盘
+      ---
+      duration_ms: 3.708417
+      type: 'test'
+      ...
+    # Subtest: 启动页使用确定进度语义，不再显示循环假进度
+    ok 9 - 启动页使用确定进度语义，不再显示循环假进度
+      ---
+      duration_ms: 0.503792
+      type: 'test'
+      ...
+    # Subtest: 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷
+    ok 10 - 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷
+      ---
+      duration_ms: 0.706667
+      type: 'test'
+      ...
+    # Subtest: 发布渲染冒烟使用稳定动作标记走完真实欢迎流程
+    ok 11 - 发布渲染冒烟使用稳定动作标记走完真实欢迎流程
+      ---
+      duration_ms: 1.010458
+      type: 'test'
+      ...
+    1..11
+ok 4 - 桌面载荷原子装配
+  ---
+  duration_ms: 54.980542
+  type: 'suite'
+  ...
+# Subtest: 桌面 PostgreSQL 实例归属与端口契约
+    # Subtest: 严格拒绝空白、小数、非数字和越界端口
+    ok 1 - 严格拒绝空白、小数、非数字和越界端口
+      ---
+      duration_ms: 0.194708
+      type: 'test'
+      ...
+    # Subtest: 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用
+    ok 2 - 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用
+      ---
+      duration_ms: 1.929291
+      type: 'test'
+      ...
+    # Subtest: pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例
+    ok 3 - pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例
+      ---
+      duration_ms: 0.460917
+      type: 'test'
+      ...
+    # Subtest: 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop
+    ok 4 - 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop
+      ---
+      duration_ms: 0.895875
+      type: 'test'
+      ...
+    # Subtest: 托管环境只重写数据库与服务端口，保留其他用户配置
+    ok 5 - 托管环境只重写数据库与服务端口，保留其他用户配置
+      ---
+      duration_ms: 0.492667
+      type: 'test'
+      ...
+    1..5
+ok 5 - 桌面 PostgreSQL 实例归属与端口契约
+  ---
+  duration_ms: 4.152875
+  type: 'suite'
+  ...
+# Subtest: 桌面本机渲染子进程的 Node 路径
+    # Subtest: 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME
+    ok 1 - 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME
+      ---
+      duration_ms: 1.294291
+      type: 'test'
+      ...
+    # Subtest: 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径
+    ok 2 - 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径
+      ---
+      duration_ms: 39.659791
+      type: 'test'
+      ...
+    # Subtest: Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量
+    ok 3 - Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量
+      ---
+      duration_ms: 0.112833
+      type: 'test'
+      ...
+    1..3
+ok 6 - 桌面本机渲染子进程的 Node 路径
+  ---
+  duration_ms: 41.146875
+  type: 'suite'
+  ...
+# Subtest: 桌面 PostgreSQL 凭据状态与 SCRAM 围栏
+    # Subtest: 0600 状态文件生成三份互异随机凭据，重复启动不轮换
+    ok 1 - 0600 状态文件生成三份互异随机凭据，重复启动不轮换
+      ---
+      duration_ms: 1.569833
+      type: 'test'
+      ...
+    # Subtest: 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据
+    ok 2 - 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据
+      ---
+      duration_ms: 2.019792
+      type: 'test'
+      ...
+    # Subtest: pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录
+    ok 3 - pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录
+      ---
+      duration_ms: 1.379125
+      type: 'test'
+      ...
+    # Subtest: initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM
+    ok 4 - initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM
+      ---
+      duration_ms: 0.483333
+      type: 'test'
+      ...
+    # Subtest: pending 迁移复验失败会原子恢复旧 HBA 并再次 reload
+    ok 5 - pending 迁移复验失败会原子恢复旧 HBA 并再次 reload
+      ---
+      duration_ms: 0.9895
+      type: 'test'
+      ...
+    # Subtest: 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准
+    ok 6 - 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准
+      ---
+      duration_ms: 0.422875
+      type: 'test'
+      ...
+    # Subtest: 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb
+    ok 7 - 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb
+      ---
+      duration_ms: 0.218792
+      type: 'test'
+      ...
+    # Subtest: payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断
+    ok 8 - payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断
+      ---
+      duration_ms: 0.204375
+      type: 'test'
+      ...
+    # Subtest: 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM
+    ok 9 - 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM
+      ---
+      duration_ms: 0.45675
+      type: 'test'
+      ...
+    1..9
+ok 7 - 桌面 PostgreSQL 凭据状态与 SCRAM 围栏
+  ---
+  duration_ms: 7.907916
+  type: 'suite'
+  ...
+# Subtest: 应急浏览器壳与正式 Electron 共用安全引导
+    # Subtest: 原子单实例锁拒绝活进程，并可接管死进程遗留锁
+    ok 1 - 原子单实例锁拒绝活进程，并可接管死进程遗留锁
+      ---
+      duration_ms: 2.563625
+      type: 'test'
+      ...
+    # Subtest: 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支
+    ok 2 - 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支
+      ---
+      duration_ms: 1.11175
+      type: 'test'
+      ...
+    # Subtest: 浏览器壳按平台使用无 shell 拼接的固定打开命令
+    ok 3 - 浏览器壳按平台使用无 shell 拼接的固定打开命令
+      ---
+      duration_ms: 0.17725
+      type: 'test'
+      ...
+    # Subtest: CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理
+    ok 4 - CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理
+      ---
+      duration_ms: 0.194666
+      type: 'test'
+      ...
+    1..4
+ok 8 - 应急浏览器壳与正式 Electron 共用安全引导
+  ---
+  duration_ms: 4.223417
+  type: 'suite'
+  ...
+# Subtest: native smoke accepts a visible, full-height, nonblank product scene
+ok 9 - native smoke accepts a visible, full-height, nonblank product scene
+  ---
+  duration_ms: 10.057083
+  type: 'test'
+  ...
+# Subtest: native smoke rejects a canvas that renders only the top 150px of a 440px scene
+ok 10 - native smoke rejects a canvas that renders only the top 150px of a 440px scene
+  ---
+  duration_ms: 2.453417
+  type: 'test'
+  ...
+# Subtest: native smoke rejects a product scene hidden behind an onboarding overlay
+ok 11 - native smoke rejects a product scene hidden behind an onboarding overlay
+  ---
+  duration_ms: 1.8075
+  type: 'test'
+  ...
+# Subtest: native smoke rejects black scene pixels even when the navigation has healthy pixels
+ok 12 - native smoke rejects black scene pixels even when the navigation has healthy pixels
+  ---
+  duration_ms: 1.506625
+  type: 'test'
+  ...
+# Subtest: native smoke captures the actual product region for its pixel verdict
+ok 13 - native smoke captures the actual product region for its pixel verdict
+  ---
+  duration_ms: 2.092625
+  type: 'test'
+  ...
+# Subtest: native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap
+ok 14 - native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap
+  ---
+  duration_ms: 5.131792
+  type: 'test'
+  ...
+# Subtest: native smoke rejects a product scene removed before the camera-settled capture
+ok 15 - native smoke rejects a product scene removed before the camera-settled capture
+  ---
+  duration_ms: 2.034458
+  type: 'test'
+  ...
+# Subtest: native smoke keeps 19 keyboard entries but counts only the one actually visible plate
+ok 16 - native smoke keeps 19 keyboard entries but counts only the one actually visible plate
+  ---
+  duration_ms: 4.630708
+  type: 'test'
+  ...
+# Subtest: native smoke excludes an opacity-zero ancestor and records its concrete reason
+ok 17 - native smoke excludes an opacity-zero ancestor and records its concrete reason
+  ---
+  duration_ms: 2.997209
+  type: 'test'
+  ...
+# Subtest: native smoke excludes a display-none ancestor and records its concrete reason
+ok 18 - native smoke excludes a display-none ancestor and records its concrete reason
+  ---
+  duration_ms: 9.842166
+  type: 'test'
+  ...
+# Subtest: native smoke excludes inherited visibility-hidden and records its concrete reason
+ok 19 - native smoke excludes inherited visibility-hidden and records its concrete reason
+  ---
+  duration_ms: 4.587792
+  type: 'test'
+  ...
+# Subtest: native smoke excludes an ancestor whose content is skipped and records its concrete reason
+ok 20 - native smoke excludes an ancestor whose content is skipped and records its concrete reason
+  ---
+  duration_ms: 6.373959
+  type: 'test'
+  ...
+# Subtest: native smoke excludes an empty inset clip without an opacity hint and records its concrete reason
+ok 21 - native smoke excludes an empty inset clip without an opacity hint and records its concrete reason
+  ---
+  duration_ms: 5.2125
+  type: 'test'
+  ...
+# Subtest: native smoke excludes an empty legacy rectangular clip and records its concrete reason
+ok 22 - native smoke excludes an empty legacy rectangular clip and records its concrete reason
+  ---
+  duration_ms: 5.308708
+  type: 'test'
+  ...
+# Subtest: native smoke excludes an overflow-clipped ancestor and records its concrete reason
+ok 23 - native smoke excludes an overflow-clipped ancestor and records its concrete reason
+  ---
+  duration_ms: 2.312667
+  type: 'test'
+  ...
+# Subtest: native smoke excludes a rectangle outside the viewport and records its concrete reason
+ok 24 - native smoke excludes a rectangle outside the viewport and records its concrete reason
+  ---
+  duration_ms: 3.955375
+  type: 'test'
+  ...
+# Subtest: native smoke excludes a rectangle outside the scene and records its concrete reason
+ok 25 - native smoke excludes a rectangle outside the scene and records its concrete reason
+  ---
+  duration_ms: 3.823834
+  type: 'test'
+  ...
+# Subtest: native smoke excludes a zero-height rectangle and records its concrete reason
+ok 26 - native smoke excludes a zero-height rectangle and records its concrete reason
+  ---
+  duration_ms: 4.433292
+  type: 'test'
+  ...
+# Subtest: native smoke records the effective rectangle after ancestor inset and viewport clipping
+ok 27 - native smoke records the effective rectangle after ancestor inset and viewport clipping
+  ---
+  duration_ms: 2.373791
+  type: 'test'
+  ...
+# Subtest: native smoke preserves visibility explicitly restored below a hidden ancestor
+ok 28 - native smoke preserves visibility explicitly restored below a hidden ancestor
+  ---
+  duration_ms: 1.650042
+  type: 'test'
+  ...
+# Subtest: native smoke still rejects five visible plates despite a lying worker visibility attribute
+ok 29 - native smoke still rejects five visible plates despite a lying worker visibility attribute
+  ---
+  duration_ms: 4.993334
+  type: 'test'
+  ...
+# Subtest: native smoke does not discard overlapping visible plates based on elementFromPoint
+ok 30 - native smoke does not discard overlapping visible plates based on elementFromPoint
+  ---
+  duration_ms: 2.8645
+  type: 'test'
+  ...
+# Subtest: native smoke rejects two overlapping visible plates even below the density limit
+ok 31 - native smoke rejects two overlapping visible plates even below the density limit
+  ---
+  duration_ms: 3.443083
+  type: 'test'
+  ...
+# Subtest: native smoke recalculates hidden-to-visible plates after the camera settles
+ok 32 - native smoke recalculates hidden-to-visible plates after the camera settles
+  ---
+  duration_ms: 3.077708
+  type: 'test'
+  ...
+# Subtest: native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates
+ok 33 - native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates
+  ---
+  duration_ms: 5.341125
+  type: 'test'
+  ...
+# Subtest: native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate
+ok 34 - native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate
+  ---
+  duration_ms: 2.662417
+  type: 'test'
+  ...
+# Subtest: native smoke rejects invalid nameplate geometry instead of removing it from the verdict
+ok 35 - native smoke rejects invalid nameplate geometry instead of removing it from the verdict
+  ---
+  duration_ms: 1.794375
+  type: 'test'
+  ...
+# Subtest: native smoke ignores legacy clip on static positioning and still rejects its five visible plates
+ok 36 - native smoke ignores legacy clip on static positioning and still rejects its five visible plates
+  ---
+  duration_ms: 1.845583
+  type: 'test'
+  ...
+1..36
+# tests 63
+# suites 5
+# pass 63
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 173.089834
+
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[],"testSummary":{"total":63,"passed":63,"failed":0,"cancelled":0,"skipped":0,"todo":0}}

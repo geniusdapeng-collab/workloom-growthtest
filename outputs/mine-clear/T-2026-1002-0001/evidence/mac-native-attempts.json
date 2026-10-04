@@ -1,0 +1,123 @@
+{
+  "evidenceLevel": "B",
+  "payloadVersion": "v0.1.0-director-20261002-clean6",
+  "payloadSha256": "4bd7f6299f1eba7e28ac224a1cfe6d619e4b76293c35f07026b954bb80151146",
+  "firstAttempt": {
+    "evidenceLevel": "B",
+    "payloadVersion": "v0.1.0-director-20261002-clean6",
+    "payloadSha256": "4bd7f6299f1eba7e28ac224a1cfe6d619e4b76293c35f07026b954bb80151146",
+    "startupReady": true,
+    "installState": {
+      "schemaVersion": "workloom.install-state/v1",
+      "updatedAt": "2026-10-02T14:50:58.193Z",
+      "status": "complete",
+      "phase": "ready",
+      "detail": "安装与启动检查已完成",
+      "recoverable": true,
+      "targetVersion": "v0.1.0-director-20261002-clean6",
+      "percent": 100,
+      "etaSeconds": 0
+    },
+    "nativeRenderingSmoke": "failed-mouth-did-not-vary",
+    "avatarTelemetry": {
+      "backend": "live2d-webgl",
+      "modelUrl": "/live2d/mao/Mao.model3.json",
+      "mouthParameter": "ParamA",
+      "mouthPeak": 0,
+      "lipStarts": 1,
+      "lipBoundaries": 1,
+      "syntheticLipFrames": 0,
+      "blinkCount": 2,
+      "gestureCount": 1,
+      "lastMotionGroup": "TapBody",
+      "parameterWrites": 304,
+      "parameterWriteFailures": 0
+    },
+    "observerHarness": "timed-out-after-native-smoke-ended",
+    "scope": "actual packaged native first attempt; no media API calls"
+  },
+  "secondAttempt": {
+    "evidenceLevel": "B",
+    "payloadVersion": "v0.1.0-director-20261002-clean6",
+    "payloadSha256": "4bd7f6299f1eba7e28ac224a1cfe6d619e4b76293c35f07026b954bb80151146",
+    "nativeHarness": "240-second timeout during standard demo seed",
+    "nativeRenderingSmoke": "not-run-before-timeout",
+    "installState": {
+      "schemaVersion": "workloom.install-state/v1",
+      "updatedAt": "2026-10-02T14:56:50.093Z",
+      "status": "running",
+      "phase": "database",
+      "detail": "正在执行数据库迁移与示例装配",
+      "recoverable": true,
+      "targetVersion": "v0.1.0-director-20261002-clean6",
+      "percent": 70,
+      "etaSeconds": 38
+    },
+    "observerHarness": "initial 100-second observer timed out; 240-second recovery observer started",
+    "scope": "fresh packaged native second attempt; no application code changed"
+  },
+  "freshNativeCompletion": {
+    "status": "partial-native-startup-passed-observer-failed",
+    "exitCode": 0,
+    "observerExitCode": 1,
+    "elapsedSec": 438.383,
+    "freshSupportDirectory": true,
+    "minimalSystemPath": true,
+    "supportPathContainsChineseAndSpaces": true,
+    "surface": "final clean packaged Electron",
+    "paidImageVideoApiCalls": 0,
+    "payloadSha256": "4bd7f6299f1eba7e28ac224a1cfe6d619e4b76293c35f07026b954bb80151146",
+    "payloadVersion": "v0.1.0-director-20261002-clean6",
+    "signing": "ad-hoc trial",
+    "notarization": "not-verified",
+    "installState": {
+      "schemaVersion": "workloom.install-state/v1",
+      "updatedAt": "2026-10-02T15:06:20.126Z",
+      "status": "complete",
+      "phase": "ready",
+      "detail": "安装与启动检查已完成",
+      "recoverable": true,
+      "targetVersion": "v0.1.0-director-20261002-clean6",
+      "percent": 100,
+      "etaSeconds": 0
+    },
+    "onboardingUiAction": {
+      "method": "existing native UI action over loopback CDP",
+      "dismissedOnboarding": false,
+      "pageErrors": [],
+      "lastConnectionError": "browserType.connectOverCDP: Timeout 1000ms exceeded.",
+      "error": "locator.click: Timeout 3000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('dialog', { name: '首日上岗引导', exact: true }).getByRole('button', { name: '稍后再来', exact: true })\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"min-h-8 rounded border border-line px-2 py-0.5 text-body text-ink3 hover:border-gline hover:text-ink\">稍后再来</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n"
+    },
+    "nativeStartupStatus": "passed",
+    "nativeRenderingProbeStatus": "passed",
+    "overallVisualAcceptance": "not-qualified",
+    "startupToReadySec": 293,
+    "startupToReadyTiming": "approximate wall-clock log difference 23:01:27 to 23:06:20; elapsedSec includes render and safe shutdown",
+    "visualFollowupEvidence": "clean6-native-followup-failure/final-native-followup-receipt.json",
+    "visualFollowupStatus": "failed-workplace-scene-readiness"
+  },
+  "sameDatabaseFollowup": {
+    "status": "failed",
+    "exitCode": 1,
+    "observerExitCode": 1,
+    "elapsedSec": 100.546,
+    "sameInstalledDatabase": true,
+    "freshSupportDirectory": false,
+    "payloadChanged": false,
+    "payloadVersion": "v0.1.0-director-20261002-clean6",
+    "payloadSha256": "4bd7f6299f1eba7e28ac224a1cfe6d619e4b76293c35f07026b954bb80151146",
+    "paidImageVideoApiCalls": 0,
+    "onboardingUiAction": {
+      "method": "existing native UI keyboard action over loopback CDP",
+      "dismissedOnboarding": false,
+      "pageErrors": [],
+      "lastConnectionError": "browserType.connectOverCDP: Timeout 1000ms exceeded.",
+      "welcomeReplayViaAuthenticatedProcedure": true,
+      "error": "locator.focus: Target page, context or browser has been closed\nCall log:\n\u001b[2m  - waiting for getByRole('dialog', { name: '首日上岗引导', exact: true }).getByRole('button', { name: '稍后再来', exact: true })\u001b[22m\n"
+    }
+  },
+  "visualQualification": "not-qualified",
+  "underlyingFailureCause": "not-fully-localized; no claim that timeout proves product code fault",
+  "mediaApiCalls": 0,
+  "visibleGlobalSceneHistory": "Prior clean5 and earlier same-code-path screenshots show labels overlapping, default companion covering content and stage lower black area; clean6 fresh final scenes were covered by onboarding because observer failed."
+}

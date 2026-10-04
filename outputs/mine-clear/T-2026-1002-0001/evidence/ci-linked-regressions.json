@@ -1,0 +1,45 @@
+{
+  "evidenceLevel": "B",
+  "codeCommit": "de94f7806bc45c03b7d18416075ebcca67d7db7b",
+  "environment": "isolated frozen-dependency byte-copy fixture; actual owned packaged PostgreSQL; standard demo seed before audit tests",
+  "beforeBundleAssetRegistration": {
+    "counts": {
+      "numTotalTests": 49,
+      "numPassedTests": 48,
+      "numFailedTests": 1,
+      "numPendingTests": 0
+    },
+    "failures": [
+      {
+        "case": "岗位 / 技能 / 管线 / 对象四层引用 配乐连接器的完整导入闭包仅含内置模块和本 Bundle 已声明、摘要匹配的资产",
+        "failureFirstLine": "Error: 导入文件未声明为行业包资产：library/root-list.mjs"
+      }
+    ]
+  },
+  "afterBothCIRepairs": {
+    "counts": {
+      "numTotalTests": 55,
+      "numPassedTests": 55,
+      "numFailedTests": 0,
+      "numPendingTests": 0
+    },
+    "files": [
+      {
+        "source": "packages/base/bundles/bgm-capability.test.ts",
+        "cases": 49,
+        "failed": 0
+      },
+      {
+        "source": "packages/base/workdata/security-audit.test.ts",
+        "cases": 6,
+        "failed": 0
+      }
+    ]
+  },
+  "baseTypecheckExitCode": 0,
+  "bundleGovernanceRefreshExitCode": 0,
+  "appendOnlyProbe": "owner transaction: TRUNCATE biz_events CASCADE rejected with append-only; unconditional rollback; all pre-probe event IDs retained",
+  "importNegativeCases": "bare packages, remote and absolute imports, unknown builtin, cross-bundle path, computed require/import, missing assets, missing declaration, digest tamper, symlink escape",
+  "adapterAttempt": "earlier 3 failures were missing hotel test seeds in geo-only client fixture; saved in work/unseeded-ci-focused-regressions.*, corrected by standard CI seed, no production-code weakening",
+  "paidImageVideoApiCalls": 0
+}

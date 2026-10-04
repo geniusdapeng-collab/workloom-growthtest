@@ -1,0 +1,111 @@
+{
+  "checks": [
+    {
+      "name": "capabilities-generate",
+      "exitCode": 0,
+      "elapsedSec": 0.252,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "capabilities-check",
+      "exitCode": 0,
+      "elapsedSec": 0.043,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "projections-generate",
+      "exitCode": 0,
+      "elapsedSec": 0.323,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "projections-check",
+      "exitCode": 0,
+      "elapsedSec": 0.143,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "bundle-digests",
+      "exitCode": 0,
+      "elapsedSec": 0.591,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "bundle-check",
+      "exitCode": 0,
+      "elapsedSec": 0.323,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "product-content",
+      "exitCode": 0,
+      "elapsedSec": 0.081,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "builtin-assets",
+      "exitCode": 0,
+      "elapsedSec": 0.048,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "oss-inventory",
+      "exitCode": 0,
+      "elapsedSec": 1.277,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "oss-check",
+      "exitCode": 0,
+      "elapsedSec": 1.307,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "hard-gate-policy",
+      "exitCode": 0,
+      "elapsedSec": 0.09,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "production-client-boundary",
+      "exitCode": 0,
+      "elapsedSec": 0.084,
+      "trusted": true,
+      "note": ""
+    },
+    {
+      "name": "core-release-gate",
+      "exitCode": 0,
+      "elapsedSec": 0.541,
+      "trusted": false,
+      "note": "旧绿色结果无效；用 corrected-release-gate.log 的实际红灯结果替代"
+    }
+  ],
+  "correctedGenericRelease": {
+    "exitCode": 1,
+    "passed": 10,
+    "total": 11,
+    "failedCheck": "Q-01",
+    "reason": "generic GEO mock step receipt missing"
+  },
+  "typechecks": {
+    "server": 0,
+    "web": 0,
+    "video-studio": 0
+  },
+  "lockedUiBuild": {
+    "exitCode": 0,
+    "version": "0.1.19"
+  }
+}

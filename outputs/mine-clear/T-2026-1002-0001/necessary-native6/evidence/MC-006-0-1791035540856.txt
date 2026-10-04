@@ -1,0 +1,112 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/target-c94cfb6[39m
+
+ [32m✓[39m packages/runtime/src/tools.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m packages/runtime/src/loop.test.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m apps/server/src/runtime/tool-executor.test.ts [2m([22m[2m19 tests[22m[2m)[22m[32m 57[2mms[22m[39m
+ [32m✓[39m packages/runtime/src/quest-hardening.test.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m packages/runtime/src/runtime.test.ts [2m([22m[2m15 tests[22m[2m | [22m[33m6 skipped[39m[2m)[22m[32m 109[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m76 passed[39m[22m[2m | [22m[33m6 skipped[39m[90m (82)[39m
+[2m   Start at [22m 21:52:21
+[2m   Duration [22m 606ms[2m (transform 704ms, setup 0ms, import 992ms, tests 205ms, environment 0ms)[22m
+
+✔ 完成三个步骤且线程事实一致时通过 (0.544875ms)
+✔ 已实际执行一步的运行态通过 (0.068791ms)
+✔ 已有执行进度及审批回执的 pending_review 通过 (0.048584ms)
+✔ 实际发现的 failed / 0 步不得被创建和拆解结果放行 (0.172583ms)
+✔ failed / cancelled / queued 即使伪报进度也拒绝 (0.070792ms)
+✔ 无有效步数、超总数及非整数拒绝 (0.081125ms)
+✔ 未按多步骤 quest 路由或没有线程拒绝 (1.053666ms)
+✔ 线程 ID 或回读状态不一致拒绝 (0.077709ms)
+✔ 完成状态却少步骤、或存在未核实动作拒绝 (0.188208ms)
+✔ pending_review 必须有非空审批回执 (0.141333ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 160.465917
+{"id":"partial-bridge-simulation-and-parallel-isolation","result":"passed","evidence":{"threads":["T-MC006-a3de9475-c3dc-4dc7-90ae-22618863177d","T-MC006-908700b1-0fc9-402e-89f3-b33a936594d2","T-MC006-09173866-9a62-4efe-a78a-81e0877b8674"],"modes":["simulated","simulated","simulated"],"boundEvents":3}}
+{"id":"replay-is-idempotent-after-pii-masking","result":"passed","evidence":{"threadId":"T-MC006-a3de9475-c3dc-4dc7-90ae-22618863177d","stepsDone":1,"eventCount":1}}
+{"id":"rls-other-tenant-and-workspace-cannot-read-receipt","result":"passed","evidence":{"otherTenantRows":0,"otherWorkspaceRows":0}}
+{"id":"cross-tenant-binding-rejected-on-replay-without-reissue","result":"passed","evidence":{"threadId":"T-MC006-fb4f4105-767d-4ef0-a66a-8b2d673f55de","status":"failed","executorCalls":0}}
+{"id":"tampered-result-rejected-on-replay-without-reissue","result":"passed","evidence":{"threadId":"T-MC006-c7e3572c-45fc-47a6-80c4-cf7181b3e475","status":"failed","executorCalls":0}}
+{"id":"real-uncovered-tool-stays-connector-required","result":"passed","evidence":{"threadId":"T-MC006-a5139fbd-8bea-4cdf-a662-b4004ce1f2ab","status":"failed","mode":"real","synced":false}}
+{"id":"covered-runtime-failure-does-not-simulate","result":"passed","evidence":{"threadId":"T-MC006-9453b00f-a135-4eb6-87cd-e0dbfc02d0d3","status":"failed","stepsDone":0}}
+{"id":"covered-load-failure-does-not-simulate","result":"passed","evidence":{"threadId":"T-MC006-b756d272-b108-4a10-b5c2-e8e9308f72bf","status":"failed","mode":"real","synced":false}}
+{"id":"malformed-configuration-does-not-become-unconfigured-simulation","result":"passed","evidence":{"threadId":"T-MC006-718f8d85-89f8-4fd6-b04b-ab4be230468b","status":"failed","mode":"real","synced":false}}
+{"caseId":"mixed-known-malformed-keeps-failed-range-and-healthy-route","failedLast":false,"threadId":"T-MC006-b7ab5bc8-961b-4fc8-8733-235abc886d1a","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"caseId":"mixed-known-malformed-keeps-failed-range-and-healthy-route","failedLast":true,"threadId":"T-MC006-1f984c33-ffdc-4a6a-b109-dc3fa291d712","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"id":"mixed-known-malformed-keeps-failed-range-and-healthy-route","result":"passed","evidence":{"unknownFailedRange":false,"orders":[{"failedLast":false,"failedThread":"T-MC006-b7ab5bc8-961b-4fc8-8733-235abc886d1a","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-3a2b78e7-a811-4f75-909e-6b3c1caea570","healthyStepsDone":1,"localFixtureOnly":true},{"failedLast":true,"failedThread":"T-MC006-1f984c33-ffdc-4a6a-b109-dc3fa291d712","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-f9f367dd-1954-4e93-9cc0-4a37bd68bbd9","healthyStepsDone":1,"localFixtureOnly":true}],"externalBridgeRequests":0}}
+{"caseId":"mixed-unknown-malformed-keeps-failed-range-and-healthy-route","failedLast":false,"threadId":"T-MC006-b243479b-374e-455f-b386-b8f88eb65100","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"caseId":"mixed-unknown-malformed-keeps-failed-range-and-healthy-route","failedLast":true,"threadId":"T-MC006-df7a500f-ad6f-4109-8fe6-0410bafd6c0a","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"id":"mixed-unknown-malformed-keeps-failed-range-and-healthy-route","result":"passed","evidence":{"unknownFailedRange":true,"orders":[{"failedLast":false,"failedThread":"T-MC006-b243479b-374e-455f-b386-b8f88eb65100","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-f06bd6c6-24e6-4345-be56-70afed1dd1b1","healthyStepsDone":1,"localFixtureOnly":true},{"failedLast":true,"failedThread":"T-MC006-df7a500f-ad6f-4109-8fe6-0410bafd6c0a","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-9c72d63f-fe3a-4fb0-b820-cdd187dc5b99","healthyStepsDone":1,"localFixtureOnly":true}],"externalBridgeRequests":0}}
+{"id":"maximum-six-steps-and-empty-parameters-bound-individually","result":"passed","evidence":{"threadId":"T-MC006-cec77076-cd65-4ce6-836c-2d84f0416bdd","stepsDone":6,"bindings":6}}
+{"id":"simulated-receipt-cannot-complete-real-profile-after-switch","result":"passed","evidence":{"threadId":"T-MC006-a3de9475-c3dc-4dc7-90ae-22618863177d","status":"failed","executorCalls":0}}
+{"id":"all-fixture-event-chains-remain-consistent","result":"passed","evidence":{"workspaces":4,"deletedEvents":0,"mutatedEvents":0}}
+{
+  "actor": "MC006-db-assertions",
+  "runId": "adab2808-cfb4-4035-a49c-c891fe733da9",
+  "status": "passed",
+  "checks": 14,
+  "fixturePolicy": "app/gateway roles, unique new scopes, no event deletion or mutation",
+  "paidModelImageVideoApiCalls": 0
+}
+MC-006 断言通过（单元 + 真实 PG，付费模型/图像/视频 API 调用 0）。
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m已配置但加载失败的桥保留覆盖，其它工具仍可辨别为未覆盖
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-bridge-missing-YUxUI8/missing.mjs） Cannot find module 'file:///var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-bridge-missing-YUxUI8/missing.mjs' imported from /Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/target-c94cfb6/apps/server/src/runtime/tool-executor.ts
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m工厂缺失时仍使用已读取到的模块工具声明保留失败范围
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-bridge-sLHqfu/executor.mjs） 模块未导出工厂 notExported
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m工厂拒绝装配时保留规格模式，未知模式的失败桥保守接管所有工具
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-bridge-wGHZdp/executor.mjs） 工厂未返回可用执行器
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m非空配置无法解析为任何模块时仍停线，不退化成从未配置桥
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m缺模块路径的失败范围与健康桥并存：分隔 ::，失败项在后 false
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m缺模块路径的失败范围与健康桥并存：分隔 ::，失败项在后 true
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m缺模块路径的失败范围与健康桥并存：分隔 #，失败项在后 false
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m缺模块路径的失败范围与健康桥并存：分隔 #，失败项在后 true
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m混合配置的失败项无工具范围时保守停线，健康显式范围仍可用：失败项在后 false
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m混合配置的失败项无工具范围时保守停线，健康显式范围仍可用：失败项在后 true
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m旧单桥变量中的畸形声明与新规格表健康桥共存时仍保留失败范围
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+[90mstderr[2m | apps/server/src/runtime/tool-executor.test.ts[2m > [22m[2mMC-006：配置失败仍保留声明范围，不能成为模拟放行[2m > [22m[2m失败桥停在自己范围，其它已装配桥仍可执行真实工具
+[22m[39m[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-bridge-missing-tSUe8e/missing.mjs） Cannot find module 'file:///var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-bridge-missing-tSUe8e/missing.mjs' imported from /Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/target-c94cfb6/apps/server/src/runtime/tool-executor.ts
+
+[90mstderr[2m | packages/runtime/src/quest-hardening.test.ts
+[22m[39m[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+[90mstderr[2m | packages/runtime/src/runtime.test.ts
+[22m[39m[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-mc006-routing-2DYhvh/missing.mjs） Cannot find module '/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/wl-mc006-routing-2DYhvh/missing.mjs' imported from /Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/target-c94cfb6/apps/server/src/runtime/tool-executor.ts
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

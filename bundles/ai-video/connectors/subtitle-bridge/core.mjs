@@ -20,6 +20,8 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseRootList } from "../../library/root-list.mjs";
 
 import {
   MeasureError, binaryVersion, detectRenderCapabilities, escapeFilterPath, extractFrame,
@@ -78,8 +80,7 @@ function realpathDeepest(target) {
 
 /** 允许根目录：环境变量优先，缺省只放行进程工作目录与系统临时目录。 */
 export function allowedRoots(env = process.env) {
-  const raw = (env.WORKLOOM_SUBTITLE_ALLOWED_ROOTS ?? "").trim();
-  const list = raw ? raw.split(":").map((entry) => entry.trim()).filter(Boolean) : [process.cwd(), os.tmpdir()];
+  const list = parseRootList(env.WORKLOOM_SUBTITLE_ALLOWED_ROOTS, { fallback: [process.cwd(), os.tmpdir()] });
   return list.map((entry) => {
     const abs = path.resolve(entry);
     return fs.existsSync(abs) ? fs.realpathSync(abs) : abs;
@@ -106,12 +107,12 @@ export function assertPathAllowed(target, roots = allowedRoots(), label = "path"
 /* ============================ 字体档案与工位字体目录 ============================ */
 
 export const CATALOG_FILE = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../library/font-catalog/font_db.json",
 );
 
 export const RECIPE_FILE = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../library/typography-recipes/recipes.json",
 );
 
@@ -149,7 +150,7 @@ export function loadRecipes(file = RECIPE_FILE) {
 export function fontsRoot(env = process.env) {
   const raw = (env.WORKLOOM_SUBTITLE_FONTS_DIR ?? "").trim();
   if (raw) return path.resolve(raw);
-  const bundled = path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../library/fonts");
+  const bundled = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../library/fonts");
   if (fs.existsSync(bundled)) return bundled;
   return path.join(os.homedir(), ".workloom-subtitle", "fonts");
 }
@@ -1018,6 +1019,7 @@ export async function plan({
   outputDir = null,
   evidenceDir = null,
   analyze = true,
+  styleOverrides = {},
 }) {
   fontsDir = fontsDir ?? fontsRoot();
   const probe = input ? await probeMedia(input, { bins }) : null;
@@ -1077,7 +1079,7 @@ export async function plan({
   const subMarginV = Math.round(targetResolution[1] * Number(subLayout.bottom_margin_ratio ?? 0.05));
   const titleMarginV = Math.round(targetResolution[1] * Number(titleLayout.top_margin_ratio ?? 0.08));
 
-  const styles = [];
+  let styles = [];
   if (subPick) {
     styles.push({
       name: "Sub",
@@ -1163,6 +1165,8 @@ export async function plan({
     }
   }
 
+  // Measure and verify the exact style that will be rendered, including a director revision.
+  styles = styles.map(entry => ({...entry,style:{...entry.style,...styleOverrides?.[entry.name]}}));
   const assText = buildAssDocument({ resolution: targetResolution, styles, events });
   const dir = outputDir ?? (await tempDir("workloom-subtitle-plan-"));
   await fsp.mkdir(dir, { recursive: true });
@@ -1181,10 +1185,10 @@ export async function plan({
     });
   }
   if (subPick) {
-    checks.push({ kind: "subtitle_size", ...checkFontSize({ scene: "字幕", sizePx: subPick.size.sizePx, resolution: targetResolution, targets }) });
+    checks.push({ kind: "subtitle_size", ...checkFontSize({ scene: "字幕", sizePx: styles.find(entry=>entry.name==="Sub").style.fontSize, resolution: targetResolution, targets }) });
   }
   if (titleText && titlePick) {
-    checks.push({ kind: "title_size", ...checkFontSize({ scene: "标题", sizePx: titlePick.size.sizePx, resolution: targetResolution, targets }) });
+    checks.push({ kind: "title_size", ...checkFontSize({ scene: "标题", sizePx: styles.find(entry=>entry.name==="Title").style.fontSize, resolution: targetResolution, targets }) });
     checks.push({ kind: "title_line_width", ...checkLineWidth(titleText, targets) });
   }
   if (subStyleDecision) {
@@ -1410,17 +1414,9 @@ export async function renderWithSubtitles({
     fontsDir,
     bins,
     evidenceDir,
+    styleOverrides,
   });
-  let { styles } = planOutcome;
-  if (styleOverrides && Object.keys(styleOverrides).length) {
-    styles = styles.map((entry) => {
-      const override = styleOverrides[entry.name];
-      return override ? { name: entry.name, style: { ...entry.style, ...override } } : entry;
-    });
-    const assText = buildAssDocument({ resolution: planOutcome.plan.resolution, styles, events: planOutcome.events });
-    await fsp.writeFile(planOutcome.assPath, assText, "utf8");
-    planOutcome.assText = assText;
-  }
+  const { styles } = planOutcome;
 
   const encoder = await pickVideoEncoder({ bins });
   const probe = await probeMedia(input, { bins });
@@ -1462,8 +1458,17 @@ export async function renderWithSubtitles({
   const sampleAt = mode === "title"
     ? round(Math.min(1.2, Number(titleDurationSec) / 2), 2)
     : round((assistToSeconds(sampleCue.start) + Math.min(0.6, (assistToSeconds(sampleCue.end) - assistToSeconds(sampleCue.start)) / 2)), 2);
-  const band = mode === "title" ? bands.titleBand.px : bands.subtitleBand.px;
   const workDir = await tempDir("workloom-subtitle-verify-");
+  const sampleStyle=styles.find(entry=>entry.name===(mode==="title"?"Title":"Sub"));
+  const presenceAss=path.join(workDir,"presence-measure.ass");
+  await fsp.writeFile(presenceAss,buildAssDocument({resolution,styles:[sampleStyle],events:[{
+    layer:0,start:srtSecondsToAss(0),end:srtSecondsToAss(1),style:sampleStyle.name,
+    name:"presence",text:mode==="title"?titleText:sampleCue.text}]}),"utf8");
+  const presenceInk=await measureInkExtent({assPath:presenceAss,fontsDir:flatFonts.flat,resolution,bins});
+  const band=presenceInk.detected?{x:Math.max(0,presenceInk.inkX-3),y:Math.max(0,presenceInk.inkY-3),
+    w:Math.min(resolution[0]-Math.max(0,presenceInk.inkX-3),presenceInk.inkWidth+6),
+    h:Math.min(resolution[1]-Math.max(0,presenceInk.inkY-3),presenceInk.inkHeight+6)}
+    :mode==="title"?bands.titleBand.px:bands.subtitleBand.px;
   const beforeFrame = path.join(workDir, "before.png");
   const afterFrame = path.join(workDir, "after.png");
   await extractFrame({ input, at: sampleAt, output: beforeFrame, bins });
@@ -1475,7 +1480,7 @@ export async function renderWithSubtitles({
   const edgeDelta = round((afterStats.edgeDensityUnit ?? 0) - (beforeStats.edgeDensityUnit ?? 0), 4);
   const lumaDelta = round((afterStats.lumaAvgUnit ?? 0) - (beforeStats.lumaAvgUnit ?? 0), 4);
   const presenceDelta = round(Math.max(edgeDelta, Math.abs(lumaDelta)), 4);
-  const presenceOk = presenceDelta >= presenceMinDelta;
+  const presenceOk = presenceInk.detected && presenceDelta >= presenceMinDelta;
 
   const checks = checkSummary(planOutcome.checks);
   const layoutOk = checks.every((check) => check.ok);
@@ -1542,6 +1547,8 @@ export async function renderWithSubtitles({
       lumaDelta,
       delta: presenceDelta,
       threshold: presenceMinDelta,
+      region:band,
+      ink:presenceInk,
       ok: presenceOk,
       before: beforeStats,
       after: afterStats,

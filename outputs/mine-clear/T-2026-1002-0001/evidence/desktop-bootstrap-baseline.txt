@@ -1,0 +1,67 @@
+09:39:02 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-M6bHau/resources）==
+09:39:02 正在检查本机版本与安装载荷…
+09:39:02 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-CyeFqS/resources）==
+09:39:02 正在检查本机版本与安装载荷…
+▶ 桌面载荷原子装配
+  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (1.755875ms)
+  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (8.838083ms)
+  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.3ms)
+  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (9.882042ms)
+  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (3.896334ms)
+  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (3.968667ms)
+  ✔ 首装暂存失败不会留下半套运行时 (2.445375ms)
+  ✔ 安装阶段检查点以机器可读中文状态落盘 (1.266792ms)
+  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.788ms)
+  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.437084ms)
+  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (0.803917ms)
+✔ 桌面载荷原子装配 (37.22725ms)
+▶ 桌面 PostgreSQL 实例归属与端口契约
+  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.146417ms)
+  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (1.218125ms)
+  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.509334ms)
+  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (1.082209ms)
+  ✖ 托管环境只重写数据库与服务端口，保留其他用户配置 (1.166125ms)
+✖ 桌面 PostgreSQL 实例归属与端口契约 (4.247833ms)
+▶ 桌面本机渲染子进程的 Node 路径
+  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (30.037042ms)
+  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.073625ms)
+✔ 桌面本机渲染子进程的 Node 路径 (30.1605ms)
+▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏
+  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (0.857209ms)
+  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (1.135042ms)
+  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (1.050416ms)
+  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.309542ms)
+  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (0.912292ms)
+  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.526833ms)
+  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.201458ms)
+  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.20625ms)
+  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.833959ms)
+✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (6.518958ms)
+▶ 应急浏览器壳与正式 Electron 共用安全引导
+  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (1.505125ms)
+  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (1.689916ms)
+  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.087333ms)
+  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.14525ms)
+✔ 应急浏览器壳与正式 Electron 共用安全引导 (3.48425ms)
+ℹ tests 31
+ℹ suites 5
+ℹ pass 30
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 150.922792
+
+✖ failing tests:
+
+test at apps/desktop/electron/bootstrap.test.cjs:309:3
+✖ 托管环境只重写数据库与服务端口，保留其他用户配置 (1.166125ms)
+  ReferenceError: RUNTIME is not defined
+      at buildDesktopEnvironment (/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/apps/desktop/electron/bootstrap.cjs:395:58)
+      at TestContext.<anonymous> (/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/apps/desktop/electron/bootstrap.test.cjs:322:20)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1382:25)
+      at Suite.processPendingSubtests (node:internal/test_runner/test:960:18)
+      at Test.postRun (node:internal/test_runner/test:1522:19)
+      at Test.run (node:internal/test_runner/test:1447:12)
+      at async Suite.processPendingSubtests (node:internal/test_runner/test:960:7)

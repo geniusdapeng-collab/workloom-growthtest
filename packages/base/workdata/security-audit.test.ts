@@ -154,15 +154,26 @@ describe.runIf(RUN_DB)("安全审计 PG 集成（附录 H）", async () => {
   it("#30 append-only 第三道防线：TRUNCATE 全角色被拒（含 owner）", async () => {
     // owner（迁移/种子账号）此前可 TRUNCATE 清空事件库——行级触发器不拦 TRUNCATE；
     // 0004 迁移后语句级触发器对全角色生效
+    const before = await qApp<{ event_id: string }>(
+      `SELECT event_id FROM biz_events WHERE workspace_id=$1`, [scope.workspaceId]);
+    expect(before.rows.length).toBeGreaterThanOrEqual(100);
     const owner = new pg.default.Pool({ connectionString: process.env.DATABASE_URL ?? "postgres://postgres:workloom@localhost:5432/workloom" });
     try {
-      await expect(owner.query("TRUNCATE biz_events")).rejects.toThrow(/append-only/);
-    } finally {
-      await owner.end();
-    }
-    // 事件库完好（种子 100 条仍在）
-    const n = await qApp<{ c: string }>(`SELECT count(*) AS c FROM biz_events WHERE workspace_id=$1`, [scope.workspaceId]);
-    expect(Number(n.rows[0]!.c)).toBeGreaterThanOrEqual(100);
+      const client = await owner.connect();
+      try {
+        // 0054 后存在事件外键；CASCADE 让探针触达语句级触发器，而非止于外键检查。
+        // 无论触发器是否失效，本探针一律回滚，绝不清空事件库及其引用表。
+        await client.query("BEGIN");
+        await expect(client.query("TRUNCATE biz_events CASCADE")).rejects.toThrow(/append-only/);
+      } finally {
+        try { await client.query("ROLLBACK"); }
+        finally { client.release(); }
+      }
+    } finally { await owner.end(); }
+    const retained = await qApp<{ c: string }>(
+      `SELECT count(*) AS c FROM biz_events WHERE workspace_id=$1 AND event_id=ANY($2::text[])`,
+      [scope.workspaceId, before.rows.map((row) => row.event_id)]);
+    expect(Number(retained.rows[0]!.c)).toBe(before.rows.length);
   });
 
   it("#31 fence_rules 全局基线（workspace_id='*'）仅 owner 可写（F2.3 DB 收口）", async () => {

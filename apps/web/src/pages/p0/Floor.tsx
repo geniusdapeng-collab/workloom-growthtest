@@ -57,9 +57,10 @@ const FLOOR_STATE_TEXT: Record<string, string> = {
 };
 
 export function FloorView({
-  floor, ceoName, onPickAgent, onOpenProfile, onOpenTask,
+  floor, ceoName, onPickAgent, onOpenProfile, onOpenTask, totalActors = floor.agents.length,
 }: {
   floor: FloorPayload;
+  totalActors?: number;
   ceoName: string;
   onPickAgent: (a: FloorAgent) => void;
   /** 员工本体点击 → 员工档案（2026-09-20 重设计：派活改由拖任务卡 / 全局对话框承担） */
@@ -70,22 +71,32 @@ export function FloorView({
   const ref = useRef<HTMLCanvasElement>(null);
   const actors = useRef<Map<string, ActorRt>>(new Map());
   const hitboxes = useRef<Array<{ id: string; sx: number; sy: number; r: number; kind?: "agent" | "task"; threadId?: string }>>([]);
+  const hovered = useRef<string | null>(null);
   const floorRef = useRef(floor);
   floorRef.current = floor;
 
-  /* 目标点位计算（同工位多名员工按 id hash 微偏移站位；无工位溢出者才去休息角） */
+  /* 与 3D 职场保持同一占位语义：同一目的地用稳定环形槽位，避免人和任务牌挤成一团。 */
   const targetOf = (a: FloorAgent, scene: FloorScene): { x: number; y: number } => {
     const st = scene.stations.find((s) => s.id === a.stationId);
-    const jx = ((hash(a.id) % 5) - 2) * 0.16, jy = ((hash(a.id) % 3) - 1) * 0.18;
+    const destination = (agent: FloorAgent) => agent.state === "asking" ? "asking" : agent.state === "disabled" ? "entrance" : agent.stationId ?? "lounge";
+    const group = floorRef.current.agents.filter((agent) => destination(agent) === destination(a)).sort((left, right) => left.id.localeCompare(right.id));
+    const index = Math.max(0, group.findIndex((agent) => agent.id === a.id));
+    const angle = group.length <= 1 ? -Math.PI / 2 : (index / group.length) * Math.PI * 2 - Math.PI / 2;
+    const radius = group.length <= 1 ? 0 : 0.62 + Math.floor(index / 6) * 0.42;
+    const jx = Math.cos(angle) * radius, jy = Math.sin(angle) * radius * 0.72;
     switch (a.state) {
-      case "asking": return { x: scene.ceoDesk.x + 0.1 + jx, y: scene.ceoDesk.y + 1.1 + jy };
+      case "asking": {
+        const span = Math.min(1.75, 0.42 * Math.max(1, group.length - 1));
+        const arc = group.length <= 1 ? 0 : -span / 2 + (index / (group.length - 1)) * span;
+        return { x: scene.ceoDesk.x + Math.sin(arc) * 2.8, y: scene.ceoDesk.y + 1 + (1 - Math.cos(arc)) * 1.6 };
+      }
       case "blocked": return st ? { x: st.x + jx, y: st.y + 0.7 + jy } : { x: scene.grid.w / 2, y: scene.grid.h / 2 };
       case "idle":
         return st
-          ? { x: st.x + jx * 1.4, y: st.y + 0.55 + jy }
+          ? { x: st.x + jx, y: st.y + jy * 0.5 }
           : { x: scene.lounge.x + (hash(a.id) % 10) / 14 - 0.35, y: scene.lounge.y + (hash(a.id) % 6) / 12 - 0.25 };
       case "disabled": return { x: scene.entrance.x, y: scene.entrance.y };
-      default: return st ? { x: st.x + jx, y: st.y + jy * 0.5 } : { x: scene.lounge.x + jx * 2, y: scene.lounge.y + jy * 2 };
+      default: return st ? { x: st.x + jx, y: st.y + 0.45 + jy * 0.5 } : { x: scene.lounge.x + jx * 2, y: scene.lounge.y + jy * 2 };
     }
   };
 
@@ -206,6 +217,9 @@ export function FloorView({
       }
       hitboxes.current = [];
       const list = floorRef.current.agents;
+      const visibleLabels = new Set(list
+        .filter((agent) => agent.state === "asking" || agent.state === "blocked" || agent.state === "celebrating" || agent.currentThread)
+        .slice(0, 2).map((agent) => agent.id));
       const sorted = [...list].sort((a, b) => { // 远的先画（遮挡）
         const ta = targetOf(a, scene), tb = targetOf(b, scene);
         return ta.x + ta.y - (tb.x + tb.y);
@@ -241,28 +255,30 @@ export function FloorView({
         rt.confetti = rt.confetti.filter((c) => c.life > 0);
         if (a.state === "celebrating" && now - rt.enteredAt < 3 && Math.random() < 0.08) spawnConfetti(rt, 2);
 
-        /* 头顶任务牌（2026-09-20 重设计）：第一行岗位名，第二行任务/状态；点牌子进任务详情 */
-        ctx.textAlign = "center";
-        const roleLabel = roleTitleOf(a.name, a.presetKey);
-        const stateLabel = a.currentThread
-          ? `${FLOOR_STATE_TEXT[a.state] ?? "进行中"} · ${a.currentThread.title.slice(0, 14)}`
-          : FLOOR_STATE_TEXT[a.state] ?? "待命";
-        ctx.font = "700 8.5px sans-serif";
-        const w1 = ctx.measureText(roleLabel).width;
-        ctx.font = "8px sans-serif";
-        const w2 = ctx.measureText(stateLabel).width;
-        const pw = Math.max(w1, w2) + 12;
-        const py = sy + 6;
-        ctx.fillStyle = "rgba(255,255,255,.92)";
-        roundRect(ctx, sx - pw / 2, py, pw, 21, 6); ctx.fill();
-        ctx.strokeStyle = a.state === "asking" ? "rgba(232,137,12,.55)" : "rgba(51,38,43,.18)"; ctx.lineWidth = 1;
-        roundRect(ctx, sx - pw / 2, py, pw, 21, 6); ctx.stroke();
-        ctx.fillStyle = "#33262b"; ctx.font = "700 8.5px sans-serif";
-        ctx.fillText(roleLabel, sx, py + 9);
-        ctx.fillStyle = a.state === "idle" ? "#7a6a72" : "#4a5568"; ctx.font = "8px sans-serif";
-        ctx.fillText(stateLabel, sx, py + 18);
-        if (a.currentThread) {
-          hitboxes.current.push({ id: a.id, sx, sy: py + 10, r: 11, kind: "task", threadId: a.currentThread.id });
+        /* 有事的岗位优先，其他员工悬停时显示；点任务牌仍进入同一任务详情。 */
+        if (visibleLabels.has(a.id) || hovered.current === a.id) {
+          ctx.textAlign = "center";
+          const roleLabel = roleTitleOf(a.name, a.presetKey);
+          const stateLabel = a.currentThread
+            ? `${FLOOR_STATE_TEXT[a.state] ?? "进行中"} · ${a.currentThread.title.slice(0, 14)}`
+            : FLOOR_STATE_TEXT[a.state] ?? "待命";
+          ctx.font = "700 8.5px sans-serif";
+          const w1 = ctx.measureText(roleLabel).width;
+          ctx.font = "8px sans-serif";
+          const w2 = ctx.measureText(stateLabel).width;
+          const pw = Math.max(w1, w2) + 12;
+          const py = sy + 6;
+          ctx.fillStyle = "rgba(255,255,255,.92)";
+          roundRect(ctx, sx - pw / 2, py, pw, 21, 6); ctx.fill();
+          ctx.strokeStyle = a.state === "asking" ? "rgba(232,137,12,.55)" : "rgba(51,38,43,.18)"; ctx.lineWidth = 1;
+          roundRect(ctx, sx - pw / 2, py, pw, 21, 6); ctx.stroke();
+          ctx.fillStyle = "#33262b"; ctx.font = "700 8.5px sans-serif";
+          ctx.fillText(roleLabel, sx, py + 9);
+          ctx.fillStyle = a.state === "idle" ? "#7a6a72" : "#4a5568"; ctx.font = "8px sans-serif";
+          ctx.fillText(stateLabel, sx, py + 18);
+          if (a.currentThread) {
+            hitboxes.current.push({ id: a.id, sx, sy: py + 10, r: 11, kind: "task", threadId: a.currentThread.id });
+          }
         }
         if (a.state === "asking") {
           bubble(ctx, sx, sy - 46, "待放行", "#e8890c");
@@ -306,10 +322,17 @@ export function FloorView({
     <canvas
       ref={ref}
       onClick={onClick}
+      onPointerMove={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        const x = event.clientX - rect.left, y = event.clientY - rect.top;
+        hovered.current = [...hitboxes.current].reverse().find((hit) => (x - hit.sx) ** 2 + (y - hit.sy) ** 2 < hit.r ** 2 * 2.2)?.id ?? null;
+      }}
+      onPointerLeave={() => { hovered.current = null; }}
       className="h-[380px] w-full cursor-pointer sm:h-[440px]"
       data-scene={floor.scene.id}
       data-product-scene="workplace-2d"
       data-product-scene-actors={String(floor.agents.length)}
+      data-product-scene-total-actors={String(totalActors)}
     />
   );
 }

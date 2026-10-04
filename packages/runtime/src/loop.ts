@@ -37,7 +37,7 @@ async function inTx<T>(
   }
 }
 import type { BusinessEvent } from "@workloom/shared";
-import { executeDeclaredTool, type ToolExecutor } from "./tools.js";
+import { executeDeclaredTool, toolResultVerified, type ToolExecutor, type ToolExecutionEvidence } from "./tools.js";
 import { assemblePreset, type AssembledPreset } from "./assembly.js";
 import { loadCharter, routeTier, type ApprovalTier } from "@workloom/base/captain";
 import {
@@ -323,6 +323,8 @@ async function existingStepReceipts(
   gateway: pg.Pool,
   scope: { tenantId: string; workspaceId: string },
   threadId: string,
+  steps: QuestStep[],
+  simulated: boolean,
 ): Promise<{ done: Map<string, StepReceiptRecord>; unverified: string[] }> {
   const client = await gateway.connect();
   try {
@@ -358,7 +360,19 @@ async function existingStepReceipts(
       if (kind === "execute" && decision.outcome === "error") continue;
       const record = receiptOfDecision(decision);
       if (record) {
-        record.verified = row.payload.receipt?.synced === true;
+        const tool = typeof decision.tool === "string" ? decision.tool : "";
+        const params = (typeof decision.params === "object" && decision.params !== null ? decision.params : {}) as Record<string, unknown>;
+        const planned = steps.find((step) => step.stepId === sid);
+        // 网关会对事件参数做 PII 脱敏；指纹一致时从当前持久计划核对原始参数摘要。
+        const expectedParams = planned && record.fingerprint === stepFingerprint(planned) ? planned.params : params;
+        const after = (typeof decision.after === "object" && decision.after !== null ? decision.after : {}) as Record<string, unknown>;
+        const result = (typeof after.result === "object" && after.result !== null ? after.result : {}) as Record<string, unknown>;
+        record.verified = (simulated || row.payload.receipt?.mode !== "simulated") && toolResultVerified({
+          result, receipt: { ...row.payload.receipt, synced: row.payload.receipt?.synced === true },
+          ...(decision.tool_execution !== undefined ? { execution: decision.tool_execution as ToolExecutionEvidence } : {}),
+        }, {
+          ...scope, threadId, stepId: sid, fingerprint: record.fingerprint ?? "",
+        }, tool, expectedParams);
         receipts.set(sid, record);
       }
     }
@@ -716,11 +730,9 @@ export async function runQuest(
   }
   const allowedTools = preset.tools.map((tool) => tool.name);
   const simulated = preset.essentials.archive.dataMode === "simulated";
-  const runTool: ToolExecutor = input.toolExecutor
-    ?? ((name, params) => executeDeclaredTool(name, params, { allowedTools, simulated }));
   const effectOf = (toolName: string): "read" | "write" =>
     preset.tools.find((tool) => tool.name === toolName)?.access === "read" ? "read" : "write";
-  const { done, unverified } = await existingStepReceipts(gateway, scope, threadId);
+  const { done, unverified } = await existingStepReceipts(gateway, scope, threadId, steps, simulated);
   if (unverified.length > 0) {
     // receipt=false/缺失只说明外部结果未知。自动重发会重复扣费/发布，跳过又会伪称完成。
     await updateThread(app, scope, threadId, {
@@ -1034,8 +1046,17 @@ export async function runQuest(
      * 口径：异常 = 执行器出错（可重试，不写回执位），与「未核实=无回执、对账前不重发」分开建模。
      */
     let out: Awaited<ReturnType<ToolExecutor>>;
+    let verified: boolean;
+    const executionContext = { ...scope, threadId, stepId: step.stepId, fingerprint };
+    // 多桥只接管自身声明的工具。仅明确模拟档案且桥明确未覆盖时走本地模拟器；
+    // 已覆盖桥的失败/未核实，以及真实档案的缺连接器，都保留停线语义。
+    let useDeclared = !input.toolExecutor;
     try {
-      out = await runTool(step.tool, step.params);
+      useDeclared = !input.toolExecutor || (simulated && input.toolExecutor.supportsTool?.(step.tool) === false);
+      out = useDeclared
+        ? await executeDeclaredTool(step.tool, step.params, { allowedTools, simulated, context: executionContext })
+        : await input.toolExecutor!(step.tool, step.params);
+      verified = (simulated || out.receipt?.mode !== "simulated") && toolResultVerified(out, executionContext, step.tool, step.params);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const summary = message.replace(/\s+/g, " ").slice(0, 200);
@@ -1058,7 +1079,7 @@ export async function runQuest(
             ...(prefUsageRecorded ? {} : { memory_refs: preferenceMemoryRefs(prefs) }),
           },
           rule_impact: verdict.impacts,
-          receipt: { synced: false, mode: simulated ? "simulated" : "real", error: summary },
+          receipt: { synced: false, mode: useDeclared && simulated ? "simulated" : "real", error: summary },
         });
         if (!prefUsageRecorded) {
           await recordPreferenceUsageInTx(c, scope, prefs, ev.eventId);
@@ -1074,7 +1095,6 @@ export async function runQuest(
         error: `步骤 ${step.stepId} 执行失败：${summary}`,
       };
     }
-    const verified = out.receipt?.synced === true;
     if (!verified) unverified.push(step.stepId);
     const execBasis: string[] = [
       ...(approvalRef ? [`经审批 ${approvalRef} 批准执行（E3.3 恢复闭环）`] : []),
@@ -1082,6 +1102,7 @@ export async function runQuest(
       ...(drifted.includes(step.stepId) ? ["原计划同序号步骤与本步不一致，按新步骤重新过围栏执行"] : []),
       // GR-15：演示态回执与真实回执在账本上可区分（假回执不得外观同真回执）
       ...(out.receipt?.mode === "simulated" ? ["演示模式回执（dataMode=simulated）"] : []),
+      ...(!verified && out.receipt?.synced === true ? ["回执缺少有效执行绑定或与当前作用域、步骤、参数、返回结果不一致，保持未核实"] : []),
     ];
     // D16（#1/A）：执行事件与线程进度同一事务——步骤级原子提交（replay 幂等锚点不漂移）
     await inTx(app, scope, async (c) => {
@@ -1099,6 +1120,7 @@ export async function runQuest(
           action: step.action, step_id: step.stepId, tool: step.tool, effect: effectOf(step.tool), params: step.params, before: step.before,
           fingerprint,
           after: { ...(typeof step.after === "object" && step.after !== null ? step.after as Record<string, unknown> : {}), result: out.result },
+          ...(out.execution ? { tool_execution: out.execution } : {}),
           basis: execBasis.length ? execBasis : undefined,
           ...(prefUsageRecorded ? {} : { memory_refs: preferenceMemoryRefs(prefs) }),
         },
@@ -1110,10 +1132,10 @@ export async function runQuest(
          * 语义不变：synced 只在真回执到位时为 true，未核实一律 false。
          */
         /**
-         * GR-15：回执模式以**执行器**为准——注入的部署执行器（真实连接器）恒 real；
-         * 只有走底座模拟兜底（未注入执行器 + dataMode=simulated）才是 simulated。
+         * GR-15：回执模式以**执行器**为准；明确模拟档案的未覆盖工具可走本地模拟器。
+         * 缺连接器与已配置桥失败仍为 real 未核实，不能自动改标模拟。
          */
-        receipt: { ...out.receipt, synced: verified, mode: out.receipt?.mode ?? (input.toolExecutor ? "real" : simulated ? "simulated" : "real") },
+        receipt: { ...out.receipt, synced: verified, mode: out.receipt?.mode ?? (useDeclared && simulated ? "simulated" : "real") },
         model_trace: { model_id: input.modelId ?? (simulated ? "simulated-runtime" : "runtime-adapter"), tier: "standard", window: undefined, credits: 1 },
       });
       if (!prefUsageRecorded) {

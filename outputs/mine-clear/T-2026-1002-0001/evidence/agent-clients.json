@@ -1,0 +1,52 @@
+{
+  "codex": {
+    "status": "passed-required-mcp-calls",
+    "calls": [
+      {
+        "server": "growth",
+        "tool": "workloom_growth_repo_status",
+        "status": "in_progress"
+      },
+      {
+        "server": "growth",
+        "tool": "workloom_growth_video_director_preview",
+        "status": "in_progress"
+      },
+      {
+        "server": "growth",
+        "tool": "workloom_growth_video_director_preview",
+        "status": "completed"
+      },
+      {
+        "server": "growth",
+        "tool": "workloom_growth_repo_status",
+        "status": "completed"
+      }
+    ],
+    "auxiliaryErrors": [
+      {
+        "type": "transport-fallback",
+        "message": "WebSocket connection refused; client fell back to HTTPS before two successful MCP calls"
+      }
+    ],
+    "nativeGui": "not-tested"
+  },
+  "dsh": {
+    "status": "passed",
+    "client": "official @deepseek-ai/dsh-mcp-client 0.2.0-rc.2",
+    "surface": "same official plugin and tool registry used by desktop/web/headless; native GUI not exercised",
+    "toolCount": 26,
+    "modelRequests": 0,
+    "calls": [
+      {
+        "name": "mcp__workloom-growthtest__workloom_growth_video_director_preview",
+        "isError": false
+      },
+      {
+        "name": "mcp__workloom-growthtest__workloom_growth_repo_status",
+        "isError": false
+      }
+    ],
+    "nativeGui": "not-tested"
+  }
+}

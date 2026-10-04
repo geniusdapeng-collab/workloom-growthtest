@@ -1,0 +1,1217 @@
+{
+  "schema": "workloom.independent-historical-native-review/v1",
+  "actor": "/root/independent_acceptance",
+  "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+  "startedAt": "2026-10-03T23:57:52.029Z",
+  "generatedAt": "2026-10-03T23:57:52.312Z",
+  "sourceClean": true,
+  "nativeRuns": [
+    {
+      "id": "fresh-default",
+      "actualPid": 63498,
+      "startedAt": "2026-10-03T17:55:35.540654+00:00",
+      "finishedAt": "2026-10-03T18:16:09.360548+00:00",
+      "visibleProductSec": 662.578,
+      "requestedSec": 7200,
+      "resourceSamples": 18,
+      "healthFailuresAfterReady": 37,
+      "actualNativeExit": 0,
+      "forcedObserverTermination": false,
+      "failure": null,
+      "canonicalResult": "fail",
+      "safeRendering": false,
+      "support": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/独立验收 c94 首次启动",
+      "portsStillOpenAfterQuit": {
+        "server": false,
+        "web": false,
+        "pg": false,
+        "nats": false,
+        "cdp": false,
+        "inspect": false,
+        "proxy": false
+      },
+      "rendererSamples": 79,
+      "pageExceptionCount": 0,
+      "sampleErrorCount": 0,
+      "observerInputActions": 0,
+      "externalRequestAttempts": [],
+      "externalResponses": [],
+      "paidImageVideoInputActions": 0,
+      "paidApiCompletedRequests": null,
+      "httpRejectionProxy": {
+        "rejectedRequests": 1,
+        "upstreamConnections": 0,
+        "boundary": "HTTP/CONNECT rejection only; raw sockets, UDP and custom bypassing agents are not an OS-enforced policy"
+      }
+    },
+    {
+      "id": "fresh-default-direct",
+      "actualPid": 65590,
+      "startedAt": "2026-10-03T18:28:30.639501+00:00",
+      "finishedAt": "2026-10-03T20:51:50.420346+00:00",
+      "visibleProductSec": 8102.542,
+      "requestedSec": 7200,
+      "resourceSamples": 143,
+      "healthFailuresAfterReady": 0,
+      "actualNativeExit": 0,
+      "forcedObserverTermination": true,
+      "failure": "normal CUA quit did not occur after completed observation",
+      "canonicalResult": "fail",
+      "safeRendering": false,
+      "support": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/独立验收 c94 直连 首次启动",
+      "portsStillOpenAfterQuit": {
+        "server": false,
+        "web": false,
+        "pg": false,
+        "nats": false,
+        "cdp": false,
+        "inspect": false,
+        "proxy": false
+      },
+      "rendererSamples": 571,
+      "pageExceptionCount": 0,
+      "sampleErrorCount": 0,
+      "observerInputActions": 0,
+      "externalRequestAttempts": [],
+      "externalResponses": [],
+      "paidImageVideoInputActions": 0,
+      "paidApiCompletedRequests": null,
+      "httpRejectionProxy": {
+        "rejectedRequests": 1,
+        "upstreamConnections": 0,
+        "boundary": "HTTP/CONNECT rejection only; raw sockets, UDP and custom bypassing agents are not an OS-enforced policy"
+      }
+    },
+    {
+      "id": "restart-default-direct",
+      "actualPid": 98537,
+      "startedAt": "2026-10-03T21:33:55.275866+00:00",
+      "finishedAt": "2026-10-03T21:35:30.646136+00:00",
+      "visibleProductSec": 0,
+      "requestedSec": 60,
+      "resourceSamples": 2,
+      "healthFailuresAfterReady": 0,
+      "actualNativeExit": 0,
+      "forcedObserverTermination": true,
+      "failure": "UI-ready marker is not a CUA visible-product observation",
+      "canonicalResult": "fail",
+      "safeRendering": false,
+      "support": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/独立验收 c94 直连 首次启动",
+      "portsStillOpenAfterQuit": {
+        "server": false,
+        "web": false,
+        "pg": false,
+        "nats": false,
+        "cdp": false,
+        "inspect": false,
+        "proxy": false
+      },
+      "rendererSamples": 6,
+      "pageExceptionCount": 0,
+      "sampleErrorCount": 0,
+      "observerInputActions": 0,
+      "externalRequestAttempts": [],
+      "externalResponses": [],
+      "paidImageVideoInputActions": 0,
+      "paidApiCompletedRequests": null,
+      "httpRejectionProxy": {
+        "rejectedRequests": 1,
+        "upstreamConnections": 0,
+        "boundary": "HTTP/CONNECT rejection only; raw sockets, UDP and custom bypassing agents are not an OS-enforced policy"
+      }
+    },
+    {
+      "id": "restart-default-direct-v2",
+      "actualPid": 1252,
+      "startedAt": "2026-10-03T21:37:30.045070+00:00",
+      "finishedAt": "2026-10-03T21:41:52.541468+00:00",
+      "visibleProductSec": 136.165,
+      "requestedSec": 60,
+      "resourceSamples": 5,
+      "healthFailuresAfterReady": 0,
+      "actualNativeExit": 0,
+      "forcedObserverTermination": false,
+      "failure": null,
+      "canonicalResult": "pass",
+      "safeRendering": false,
+      "support": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/独立验收 c94 直连 首次启动",
+      "portsStillOpenAfterQuit": {
+        "server": false,
+        "web": false,
+        "pg": false,
+        "nats": false,
+        "cdp": false,
+        "inspect": false,
+        "proxy": false
+      },
+      "rendererSamples": 16,
+      "pageExceptionCount": 0,
+      "sampleErrorCount": 0,
+      "observerInputActions": 0,
+      "externalRequestAttempts": [],
+      "externalResponses": [],
+      "paidImageVideoInputActions": 0,
+      "paidApiCompletedRequests": null,
+      "httpRejectionProxy": {
+        "rejectedRequests": 1,
+        "upstreamConnections": 0,
+        "boundary": "HTTP/CONNECT rejection only; raw sockets, UDP and custom bypassing agents are not an OS-enforced policy"
+      }
+    },
+    {
+      "id": "restart-safe-direct",
+      "actualPid": 14982,
+      "startedAt": "2026-10-03T21:42:48.145014+00:00",
+      "finishedAt": "2026-10-03T22:00:37.837509+00:00",
+      "visibleProductSec": 964.424,
+      "requestedSec": 60,
+      "resourceSamples": 18,
+      "healthFailuresAfterReady": 0,
+      "actualNativeExit": 0,
+      "forcedObserverTermination": true,
+      "failure": "normal CUA quit did not occur after completed observation",
+      "canonicalResult": "fail",
+      "safeRendering": true,
+      "support": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/独立验收 c94 直连 首次启动",
+      "portsStillOpenAfterQuit": {
+        "server": false,
+        "web": false,
+        "pg": false,
+        "nats": false,
+        "cdp": false,
+        "inspect": false,
+        "proxy": false
+      },
+      "rendererSamples": 71,
+      "pageExceptionCount": 0,
+      "sampleErrorCount": 0,
+      "observerInputActions": 0,
+      "externalRequestAttempts": [],
+      "externalResponses": [],
+      "paidImageVideoInputActions": 0,
+      "paidApiCompletedRequests": null,
+      "httpRejectionProxy": {
+        "rejectedRequests": 1,
+        "upstreamConnections": 0,
+        "boundary": "HTTP/CONNECT rejection only; raw sockets, UDP and custom bypassing agents are not an OS-enforced policy"
+      }
+    }
+  ],
+  "originalRuns": [
+    {
+      "reference": {
+        "path": "runs/native-fresh-default.json",
+        "sha256": "7836160f59908e0cb8beac66fdd9e76531125317dcb34d88376ff2039b267d28",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "id": "native-fresh-default",
+      "actualExitCode": 1,
+      "validation": {
+        "ok": false,
+        "errors": [
+          "actual native lifecycle receipt is missing or failed"
+        ]
+      },
+      "result": "fail",
+      "subject": {
+        "type": "native-finite-observation",
+        "run": "fresh-default",
+        "durationSec": 7200,
+        "safe": false
+      }
+    },
+    {
+      "reference": {
+        "path": "runs/native-fresh-default-direct.json",
+        "sha256": "e4ac49bea04c757029d3ea137bb279f389083b992cb47f791999ccc0ef281094",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "id": "native-fresh-default-direct",
+      "actualExitCode": 1,
+      "validation": {
+        "ok": false,
+        "errors": [
+          "actual native lifecycle receipt is missing or failed"
+        ]
+      },
+      "result": "fail",
+      "subject": {
+        "type": "native-finite-observation",
+        "run": "fresh-default-direct",
+        "durationSec": 7200,
+        "safe": false
+      }
+    },
+    {
+      "reference": {
+        "path": "runs/native-restart-default-direct.json",
+        "sha256": "c90bf6324c285a5fe8f54d05782622792d90730353e6485e4621b697156b70f1",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "id": "native-restart-default-direct",
+      "actualExitCode": 1,
+      "validation": {
+        "ok": false,
+        "errors": [
+          "actual native lifecycle receipt is missing or failed"
+        ]
+      },
+      "result": "fail",
+      "subject": {
+        "type": "native-finite-observation",
+        "run": "restart-default-direct",
+        "durationSec": 60,
+        "safe": false
+      }
+    },
+    {
+      "reference": {
+        "path": "runs/native-restart-default-direct-v2.json",
+        "sha256": "cb110980a54ea1dc904320b0a7e6d1456d78cc609593a85707ca54f5845c228e",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "id": "native-restart-default-direct-v2",
+      "actualExitCode": 0,
+      "validation": {
+        "ok": true,
+        "errors": []
+      },
+      "result": "pass",
+      "subject": {
+        "type": "native-finite-observation",
+        "run": "restart-default-direct-v2",
+        "durationSec": 60,
+        "safe": false
+      }
+    },
+    {
+      "reference": {
+        "path": "runs/native-restart-safe-direct.json",
+        "sha256": "08698ae6c9619ae3f143969842cecf63b8a4bac2baa9893bd43a15740dbbb93b",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "id": "native-restart-safe-direct",
+      "actualExitCode": 1,
+      "validation": {
+        "ok": false,
+        "errors": [
+          "actual native lifecycle receipt is missing or failed"
+        ]
+      },
+      "result": "fail",
+      "subject": {
+        "type": "native-finite-observation",
+        "run": "restart-safe-direct",
+        "durationSec": 60,
+        "safe": true
+      }
+    },
+    {
+      "reference": {
+        "path": "runs/stability-fresh-default-direct.json",
+        "sha256": "434c912fe203159de7ce93c38c4ecdbb770451cf580aae2eb2ca27ac7ce75f41",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "id": "stability-fresh-default-direct",
+      "actualExitCode": 0,
+      "validation": {
+        "ok": false,
+        "errors": [
+          "actual native lifecycle/read-only capture was not a recorded pass",
+          "actual memory/FD observation failed"
+        ]
+      },
+      "result": "fail",
+      "subject": {
+        "type": "native-stability",
+        "item": "L9-05",
+        "input": {
+          "path": "runs/native-fresh-default-direct.json",
+          "sha256": "e4ac49bea04c757029d3ea137bb279f389083b992cb47f791999ccc0ef281094",
+          "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+        }
+      }
+    }
+  ],
+  "originalEvidenceIndexSha256": "9e3577b1e8f2227e811c10f7f08eb5f33490eb39a54880a99b6302d0229fb1ec",
+  "unchangedCanonicalArtifacts": 130,
+  "nativeFiles": 126,
+  "lateFilesAdditivelyBound": 8,
+  "prerequisiteInputs": [
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/final-package-provenance-c94cfb6.json",
+      "sha256": "62a80d66144bf3f32d6733767c42b22eafdf4898edd0e1f2cc92b678eb88f22f",
+      "bytes": 5644
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/native6-independent-unpack.json",
+      "sha256": "daebf279377430e86d01bae55ce17874c344d5428af9b52e2bd5b515fef283a6",
+      "bytes": 1382
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/pure-canonical-closure-readback-c94cfb6-original-context.json",
+      "sha256": "c21972afb2921ed77b2b30b95fd77113ceab3ac0cc248fa7a0428a1ba0863555",
+      "bytes": 10699
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/canonical-readback-c94cfb6.json",
+      "sha256": "2e048721c67cf9f6c95601167faac8b1b7245ed92c2ad117686a204df64f78eb",
+      "bytes": 3367
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/original-repair-closure-c94cfb6.json",
+      "sha256": "cbbcfed1002196eb62b305a87628e504d427173af57a41020e023eafdb71663f",
+      "bytes": 3070
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/repair-closure-copy-c94cfb6.json",
+      "sha256": "e0e5994760eb582589603e0523b1cee37ee78de78ebecd9d68fe41c73c66f21b",
+      "bytes": 5697
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/combined-source-read-registry-c94cfb6.json",
+      "sha256": "b1e08c7224a53e76b62e781d24bdf0b854697e8603be9aaf06e2a7730628c1f2",
+      "bytes": 38241
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/target-c94cfb6-dependencies-before-native.json",
+      "sha256": "bb22369983a4dd5eb050ccc923d2a6b2ad9c4e4fd76c40d469d74523ba273c89",
+      "bytes": 1667
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/contract-build-c94cfb6.json",
+      "sha256": "bbb79661765e4d39f27b720dac2b38c2eb39ee50ef14dbc9b53eb29be2b09071",
+      "bytes": 2017
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/web-build-c94cfb6.json",
+      "sha256": "90e3d95ad1bb646d78eb927a8b87588c39128086281228da1b654e06131bec22",
+      "bytes": 3217
+    },
+    {
+      "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/asset-fingerprint-c94cfb6.json",
+      "sha256": "86e207dd9afe349050f954fd3b724e99cdd8ea6f11050a7ff99219a4265d1233",
+      "bytes": 20727
+    }
+  ],
+  "sourceCoverage": {
+    "total": 63,
+    "counts": {
+      "A": 61,
+      "B": 1,
+      "C": 1
+    },
+    "path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/preparation/source-read-registry-c94cfb6.json"
+  },
+  "perScene": {
+    "workplace-3d": {
+      "actualSamples": 296,
+      "firstAt": "2026-10-03T18:33:36.331Z",
+      "lastAt": "2026-10-03T20:36:58.844Z",
+      "maxVisibleLabels": 6,
+      "maxOverlapPairs": 15,
+      "maxOverlapArea": 14181.28150396049,
+      "minHitRatio": 0.68,
+      "boundary": "Raw observed ready/non-welcome scene states; deliberate hover/focus or opened trays may be present. This aggregate does not relabel every state as idle."
+    },
+    "report-stage-3d": {
+      "actualSamples": 103,
+      "firstAt": "2026-10-03T19:50:40.949Z",
+      "lastAt": "2026-10-03T20:16:12.396Z",
+      "maxVisibleLabels": 1,
+      "maxOverlapPairs": 0,
+      "maxOverlapArea": 0,
+      "minHitRatio": 1,
+      "boundary": "Raw observed ready/non-welcome scene states; deliberate hover/focus or opened trays may be present. This aggregate does not relabel every state as idle."
+    }
+  },
+  "focusObservation": {
+    "actor": "/root/independent_acceptance",
+    "source": "CUA keyboard with supplemental read-only CDP identity",
+    "spanSec": 319.632,
+    "checks": {
+      "atLeast13Seconds": true,
+      "sameConnectedWorker": true,
+      "sameRenderedIdOrder": true,
+      "sameScene": true,
+      "observerInputActions0": true
+    },
+    "inputs": [
+      {
+        "path": "outputs/necessary-followup/independent-native6/native/fresh-default-direct/workplace-focus-start.json",
+        "sha256": "a47b11a8f3d649b34fcfb24780da4bd63466431aafae28feb10ee7e7cf1c04ee"
+      },
+      {
+        "path": "outputs/necessary-followup/independent-native6/native/fresh-default-direct/workplace-focus-after-hold.json",
+        "sha256": "e5d2d083a0d570f9f7cb2c4589f8bd04b4060751aecd5927de0523068cbb77e7"
+      }
+    ],
+    "boundary": "Actual single focused staff and currentbatch across timer/refresh interval; no whole-app keyboard accessibility pass."
+  },
+  "responsiveDimensions": [
+    {
+      "viewport": {
+        "height": 900,
+        "width": 1440
+      },
+      "scrollWidth": 1440,
+      "buttonCount": 2,
+      "horizontalOverflow": false,
+      "primaryButtonsInViewport": true,
+      "boundary": "B layout dimensions only; actual CUA image separately shows the mobile navigation handle overlapping the input."
+    },
+    {
+      "viewport": {
+        "height": 800,
+        "width": 360
+      },
+      "scrollWidth": 360,
+      "buttonCount": 2,
+      "horizontalOverflow": false,
+      "primaryButtonsInViewport": true,
+      "boundary": "B layout dimensions only; actual CUA image separately shows the mobile navigation handle overlapping the input."
+    }
+  ],
+  "databaseChecks": {
+    "sameCluster": true,
+    "sameWorkspace": true,
+    "sameAgentIds": true,
+    "sameSeedThreadIds": true,
+    "remindersFiredAndRetained": true
+  },
+  "databases": [
+    {
+      "path": "native/fresh-default-direct/db-start.json",
+      "sha256": "34a7fb9f2f9ba217d9e636715dbba091acc797e8e9c2b9b4a3c7b6b0084c7366",
+      "at": "2026-10-03T18:44:05.848919+00:00",
+      "cluster": "7692510325325619296",
+      "serverVersion": "17.11 (Postgres.app)",
+      "workspace": {
+        "id": "ws-geo",
+        "slug": "geo-growth",
+        "agents": 81,
+        "bundle": "geo-growth",
+        "notices": [],
+        "threads": 3,
+        "tickets": 0,
+        "dataMode": "simulated",
+        "approvals": 3,
+        "bizEvents": 63,
+        "threadIds": [
+          "T-G01",
+          "T-G02",
+          "T-G03"
+        ],
+        "unreadNotices": 0,
+        "completedThreads": 1,
+        "labelledReminders": []
+      },
+      "fixtureFilter": {
+        "scope": "entire independently owned mock-provider native test installation",
+        "eligibleBusinessN": 0,
+        "excludedRawThreads": 3,
+        "excludedRawApprovals": 3
+      }
+    },
+    {
+      "path": "native/fresh-default-direct/db-notices3-before-actions.json",
+      "sha256": "a80b943338185880f589f617d9c1a1971f8f296a97f81457b8ed152b92908bc3",
+      "at": "2026-10-03T20:25:05.963235+00:00",
+      "cluster": "7692510325325619296",
+      "serverVersion": "17.11 (Postgres.app)",
+      "workspace": {
+        "id": "ws-geo",
+        "slug": "geo-growth",
+        "agents": 81,
+        "bundle": "geo-growth",
+        "notices": [
+          {
+            "id": "si-musu170s-ccd50c",
+            "kind": "judge",
+            "level": "high",
+            "status": "unread",
+            "sourceKey": "remind-sr-mustvmyw-292aab"
+          },
+          {
+            "id": "si-musu170z-4afa35",
+            "kind": "judge",
+            "level": "high",
+            "status": "unread",
+            "sourceKey": "remind-sr-mustxfyg-197291"
+          },
+          {
+            "id": "si-musu1710-122cd9",
+            "kind": "judge",
+            "level": "high",
+            "status": "unread",
+            "sourceKey": "remind-sr-mustyzbu-12ae08"
+          }
+        ],
+        "threads": 3,
+        "tickets": 0,
+        "dataMode": "simulated",
+        "approvals": 3,
+        "bizEvents": 68,
+        "threadIds": [
+          "T-G01",
+          "T-G02",
+          "T-G03"
+        ],
+        "unreadNotices": 3,
+        "completedThreads": 1,
+        "labelledReminders": [
+          {
+            "id": "sr-mustvmyw-292aab",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          },
+          {
+            "id": "sr-mustxfyg-197291",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          },
+          {
+            "id": "sr-mustyzbu-12ae08",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          }
+        ]
+      },
+      "fixtureFilter": {
+        "scope": "entire independently owned mock-provider native test installation",
+        "eligibleBusinessN": 0,
+        "excludedRawThreads": 3,
+        "excludedRawApprovals": 3
+      }
+    },
+    {
+      "path": "native/restart-default-direct-v2/db-restart.json",
+      "sha256": "2e7b5c417a165b99d8a07fba05b9668ba738fc41b6189a4f1ce3eabffa3d612c",
+      "at": "2026-10-03T21:40:59.486297+00:00",
+      "cluster": "7692510325325619296",
+      "serverVersion": "17.11 (Postgres.app)",
+      "workspace": {
+        "id": "ws-geo",
+        "slug": "geo-growth",
+        "agents": 81,
+        "bundle": "geo-growth",
+        "notices": [
+          {
+            "id": "si-musu170s-ccd50c",
+            "kind": "judge",
+            "level": "high",
+            "status": "unread",
+            "sourceKey": "remind-sr-mustvmyw-292aab"
+          },
+          {
+            "id": "si-musu170z-4afa35",
+            "kind": "judge",
+            "level": "high",
+            "status": "acted",
+            "sourceKey": "remind-sr-mustxfyg-197291"
+          },
+          {
+            "id": "si-musu1710-122cd9",
+            "kind": "judge",
+            "level": "high",
+            "status": "read",
+            "sourceKey": "remind-sr-mustyzbu-12ae08"
+          },
+          {
+            "id": "si-muswtl60-5135c4",
+            "kind": "alert",
+            "level": "red",
+            "status": "unread",
+            "sourceKey": "thread-fail-T-G01"
+          },
+          {
+            "id": "si-muswtl67-d97523",
+            "kind": "alert",
+            "level": "red",
+            "status": "unread",
+            "sourceKey": "thread-fail-T-G02"
+          }
+        ],
+        "threads": 3,
+        "tickets": 0,
+        "dataMode": "simulated",
+        "approvals": 3,
+        "bizEvents": 68,
+        "threadIds": [
+          "T-G01",
+          "T-G02",
+          "T-G03"
+        ],
+        "unreadNotices": 3,
+        "completedThreads": 1,
+        "labelledReminders": [
+          {
+            "id": "sr-mustvmyw-292aab",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          },
+          {
+            "id": "sr-mustxfyg-197291",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          },
+          {
+            "id": "sr-mustyzbu-12ae08",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          }
+        ]
+      },
+      "fixtureFilter": {
+        "scope": "entire independently owned mock-provider native test installation",
+        "eligibleBusinessN": 0,
+        "excludedRawThreads": 3,
+        "excludedRawApprovals": 3
+      }
+    },
+    {
+      "path": "native/restart-safe-direct/db-restart.json",
+      "sha256": "afdc24d5b99e97aeb4b589f87c89616f4b2dfe9d13573e4fc6dfabc077a6463e",
+      "at": "2026-10-03T21:47:19.034017+00:00",
+      "cluster": "7692510325325619296",
+      "serverVersion": "17.11 (Postgres.app)",
+      "workspace": {
+        "id": "ws-geo",
+        "slug": "geo-growth",
+        "agents": 81,
+        "bundle": "geo-growth",
+        "notices": [
+          {
+            "id": "si-musu170s-ccd50c",
+            "kind": "judge",
+            "level": "high",
+            "status": "unread",
+            "sourceKey": "remind-sr-mustvmyw-292aab"
+          },
+          {
+            "id": "si-musu170z-4afa35",
+            "kind": "judge",
+            "level": "high",
+            "status": "acted",
+            "sourceKey": "remind-sr-mustxfyg-197291"
+          },
+          {
+            "id": "si-musu1710-122cd9",
+            "kind": "judge",
+            "level": "high",
+            "status": "read",
+            "sourceKey": "remind-sr-mustyzbu-12ae08"
+          },
+          {
+            "id": "si-muswtl60-5135c4",
+            "kind": "alert",
+            "level": "red",
+            "status": "unread",
+            "sourceKey": "thread-fail-T-G01"
+          },
+          {
+            "id": "si-muswtl67-d97523",
+            "kind": "alert",
+            "level": "red",
+            "status": "unread",
+            "sourceKey": "thread-fail-T-G02"
+          }
+        ],
+        "threads": 3,
+        "tickets": 0,
+        "dataMode": "simulated",
+        "approvals": 3,
+        "bizEvents": 68,
+        "threadIds": [
+          "T-G01",
+          "T-G02",
+          "T-G03"
+        ],
+        "unreadNotices": 3,
+        "completedThreads": 1,
+        "labelledReminders": [
+          {
+            "id": "sr-mustvmyw-292aab",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          },
+          {
+            "id": "sr-mustxfyg-197291",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          },
+          {
+            "id": "sr-mustyzbu-12ae08",
+            "dueAt": "2026-10-04T04:16:00+08:00",
+            "status": "fired"
+          }
+        ]
+      },
+      "fixtureFilter": {
+        "scope": "entire independently owned mock-provider native test installation",
+        "eligibleBusinessN": 0,
+        "excludedRawThreads": 3,
+        "excludedRawApprovals": 3
+      }
+    }
+  ],
+  "originalReminderNoticeStatesAtRestart": [
+    {
+      "id": "si-musu170s-ccd50c",
+      "kind": "judge",
+      "level": "high",
+      "status": "unread",
+      "sourceKey": "remind-sr-mustvmyw-292aab"
+    },
+    {
+      "id": "si-musu170z-4afa35",
+      "kind": "judge",
+      "level": "high",
+      "status": "acted",
+      "sourceKey": "remind-sr-mustxfyg-197291"
+    },
+    {
+      "id": "si-musu1710-122cd9",
+      "kind": "judge",
+      "level": "high",
+      "status": "read",
+      "sourceKey": "remind-sr-mustyzbu-12ae08"
+    }
+  ],
+  "fullDirectStability": {
+    "visibleProductSec": 8102.542,
+    "verdict": "fail",
+    "sampleGapMaxSec": 60.513,
+    "corePidCount": 6,
+    "monotonicGrowthCorePids": [
+      65590,
+      65705,
+      65707
+    ],
+    "coreMetrics": [
+      {
+        "pid": 65590,
+        "started": "Sun Oct 4 02:28:30 2026",
+        "command": "Electron",
+        "role": "main",
+        "wholeRunSamples": 129,
+        "stableWindowFound": true,
+        "rssKiB": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 54560,
+          "last": 53280,
+          "min": 53280,
+          "max": 78096,
+          "median": 59648,
+          "change": -1280,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "fdCount": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 64,
+          "last": 66,
+          "min": 64,
+          "max": 66,
+          "median": 66,
+          "change": 2,
+          "monotonicGrowth": true,
+          "status": "fail",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "rollingRssKiB": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        },
+        "rollingFdCount": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 10,
+          "missingMetricWindows": 0,
+          "status": "fail",
+          "firstMonotonicWindow": {
+            "fromVisibleSec": 346.187,
+            "toVisibleSec": 2153.283,
+            "first": 64,
+            "last": 66
+          },
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        }
+      },
+      {
+        "pid": 65600,
+        "started": "Sun Oct 4 02:28:31 2026",
+        "command": "Electron Helper",
+        "role": "gpu",
+        "wholeRunSamples": 129,
+        "stableWindowFound": true,
+        "rssKiB": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 73456,
+          "last": 62176,
+          "min": 62176,
+          "max": 90448,
+          "median": 78976,
+          "change": -11280,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "fdCount": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 16,
+          "last": 16,
+          "min": 16,
+          "max": 16,
+          "median": 16,
+          "change": 0,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "rollingRssKiB": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        },
+        "rollingFdCount": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        }
+      },
+      {
+        "pid": 65704,
+        "started": "Sun Oct 4 02:29:02 2026",
+        "command": "node",
+        "role": "server",
+        "wholeRunSamples": 129,
+        "stableWindowFound": true,
+        "rssKiB": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 7680,
+          "last": 5264,
+          "min": 4208,
+          "max": 7824,
+          "median": 7552,
+          "change": -2416,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "fdCount": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 17,
+          "last": 17,
+          "min": 17,
+          "max": 17,
+          "median": 17,
+          "change": 0,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "rollingRssKiB": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        },
+        "rollingFdCount": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        }
+      },
+      {
+        "pid": 65705,
+        "started": "Sun Oct 4 02:29:02 2026",
+        "command": "node",
+        "role": "web",
+        "wholeRunSamples": 129,
+        "stableWindowFound": true,
+        "rssKiB": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 15744,
+          "last": 26384,
+          "min": 15744,
+          "max": 34256,
+          "median": 29600,
+          "change": 10640,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "fdCount": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 17,
+          "last": 17,
+          "min": 17,
+          "max": 17,
+          "median": 17,
+          "change": 0,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "rollingRssKiB": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        },
+        "rollingFdCount": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 1,
+          "missingMetricWindows": 0,
+          "status": "fail",
+          "firstMonotonicWindow": {
+            "fromVisibleSec": 2574.876,
+            "toVisibleSec": 4382.563,
+            "first": 17,
+            "last": 18
+          },
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        }
+      },
+      {
+        "pid": 65707,
+        "started": "Sun Oct 4 02:29:02 2026",
+        "command": "node",
+        "role": "server",
+        "wholeRunSamples": 129,
+        "stableWindowFound": true,
+        "rssKiB": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 35104,
+          "last": 57072,
+          "min": 35104,
+          "max": 88640,
+          "median": 57312,
+          "change": 21968,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "fdCount": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 25,
+          "last": 27,
+          "min": 25,
+          "max": 27,
+          "median": 26,
+          "change": 2,
+          "monotonicGrowth": true,
+          "status": "fail",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "rollingRssKiB": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        },
+        "rollingFdCount": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 5,
+          "missingMetricWindows": 0,
+          "status": "fail",
+          "firstMonotonicWindow": {
+            "fromVisibleSec": 346.187,
+            "toVisibleSec": 2153.283,
+            "first": 25,
+            "last": 27
+          },
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        }
+      },
+      {
+        "pid": 65723,
+        "started": "Sun Oct 4 02:29:04 2026",
+        "command": "Electron Helper (Renderer)",
+        "role": "renderer",
+        "wholeRunSamples": 129,
+        "stableWindowFound": true,
+        "rssKiB": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 268832,
+          "last": 238768,
+          "min": 215392,
+          "max": 392592,
+          "median": 305600,
+          "change": -30064,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "fdCount": {
+          "samples": 31,
+          "complete": true,
+          "windowSpanSec": 1807.096,
+          "first": 16,
+          "last": 16,
+          "min": 16,
+          "max": 16,
+          "median": 16,
+          "change": 0,
+          "monotonicGrowth": false,
+          "status": "pass",
+          "boundary": "first complete stable-PID 30-minute window after five-minute warmup; finite-path observation"
+        },
+        "rollingRssKiB": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        },
+        "rollingFdCount": {
+          "completeStablePidWindows": 99,
+          "monotonicGrowthWindows": 0,
+          "missingMetricWindows": 0,
+          "status": "pass",
+          "firstMonotonicWindow": null,
+          "boundary": "every actual contiguous 30-minute window after warmup; no late window is hidden by an earlier plateau"
+        }
+      }
+    ]
+  },
+  "checklist": {
+    "fixedDenominator": 276,
+    "counts": {
+      "pass": 0,
+      "fail": 1,
+      "not-run": 260,
+      "manual-missing": 15
+    },
+    "canonicalStatus": "fail",
+    "byGroup": {
+      "L": {
+        "total": 118,
+        "counts": {
+          "pass": 0,
+          "fail": 1,
+          "not-run": 117,
+          "manual-missing": 0
+        }
+      },
+      "U": {
+        "total": 56,
+        "counts": {
+          "pass": 0,
+          "fail": 0,
+          "not-run": 43,
+          "manual-missing": 13
+        }
+      },
+      "O": {
+        "total": 71,
+        "counts": {
+          "pass": 0,
+          "fail": 0,
+          "not-run": 70,
+          "manual-missing": 1
+        }
+      },
+      "P": {
+        "total": 18,
+        "counts": {
+          "pass": 0,
+          "fail": 0,
+          "not-run": 18,
+          "manual-missing": 0
+        }
+      },
+      "M": {
+        "total": 13,
+        "counts": {
+          "pass": 0,
+          "fail": 0,
+          "not-run": 12,
+          "manual-missing": 1
+        }
+      }
+    },
+    "byTier": {
+      "T1": {
+        "total": 52,
+        "counts": {
+          "pass": 0,
+          "fail": 0,
+          "not-run": 52,
+          "manual-missing": 0
+        }
+      },
+      "T2": {
+        "total": 201,
+        "counts": {
+          "pass": 0,
+          "fail": 1,
+          "not-run": 190,
+          "manual-missing": 10
+        }
+      },
+      "T3": {
+        "total": 23,
+        "counts": {
+          "pass": 0,
+          "fail": 0,
+          "not-run": 18,
+          "manual-missing": 5
+        }
+      }
+    },
+    "actualPassedOrFailedItems": [
+      "L9-05"
+    ]
+  },
+  "eligibleBusinessN": 0,
+  "rawRoleRows": 81,
+  "realResearchParticipants": 0,
+  "productAcceptance": "fail: workplace overlap, mobile input obstruction, frozen FD predicate and incomplete successful native lifecycles",
+  "overallTask": "Coordinator relayed the user priority change: finish current cleanc94 proof/release/unlock now; no new repair package or new7200second run. Historical failures remain open follow-up debt; this review is not native qualification.",
+  "evidenceLevels": "A scoped source reading only; B metadata/actual machine observations; C finite actual native screenshots; D unverified business/production extrapolation",
+  "boundary": "Additive actual-evidence review only. Old run/receipt/item hashes and failures remain unchanged. No UI replay, product source edit, new paid request or checklist pass."
+}

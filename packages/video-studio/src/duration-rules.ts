@@ -1,3 +1,4 @@
+import { videoRuntimeRoot } from "./runtime-root.js";
 /**
  * duration-rules.ts —— 镜头时长规则**唯一真源 + 全量口径清单**（2026-09-23 修订二版）
  *
@@ -90,8 +91,7 @@ export interface DurationValidation {
 }
 
 export function repoRoot(): string {
-  const here = dirname(fileURLToPath(import.meta.url));
-  return resolvePath(here, "../../..");
+  return videoRuntimeRoot(import.meta.url);
 }
 
 /* ============================ ① 供应商能力（唯一真源） ============================ */

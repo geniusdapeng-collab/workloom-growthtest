@@ -1,3 +1,4 @@
+import { videoRuntimeRoot } from "./runtime-root.js";
 /**
  * studio.ts —— 视频工作室核心桥：HyperrealitySystem（vendor）→ 视频经理运行时
  *
@@ -152,7 +153,7 @@ function resolveVendorEntry(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   // src/ 运行（tsx）与 dist/ 运行（构建产物）两种布局都尝试
   const candidates = [
-    path.resolve(here, "../../../vendor/supermickey/hyperreality-system/index.js"),
+    path.resolve(videoRuntimeRoot(import.meta.url), "vendor/supermickey/hyperreality-system/index.js"),
     path.resolve(here, "../../../../vendor/supermickey/hyperreality-system/index.js")
   ];
   const require = createRequire(import.meta.url);
@@ -458,8 +459,8 @@ export class VideoStudio {
           if (shots.length > 0) {
             const guardMod = createRequire(import.meta.url)(
               path.resolve(
-                fileURLToPath(new URL(".", import.meta.url)),
-                "../../../vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-delivery-guard.js"
+                videoRuntimeRoot(import.meta.url),
+                "vendor/supermickey/hyperreality-system/engines/production-engine/agents/prompt-delivery-guard.js"
               )
             ) as { PromptDeliveryGuard: new () => { verifyPackage: (list: unknown[], options?: Record<string, unknown>) => { pass: boolean; issues: string[] } } };
             const check = new guardMod.PromptDeliveryGuard().verifyPackage(shots, {

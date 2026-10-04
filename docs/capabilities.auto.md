@@ -1,7 +1,7 @@
 # WorkLoom 获客增长系统（实验车道） · 代码与能力入口导览
 
 > 企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。
-> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-10-02）。请修改生成器或事实输入后重新生成，不手改本文件。
+> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-10-04）。请修改生成器或事实输入后重新生成，不手改本文件。
 > 本导览检查 manifest、脚本和文件入口。目录可发现、实际可调用、结果已验证分别记录；缺少同提交独立运行证据时后两项为未验证。岗位、技能与管线数是声明资产数，不是生产实测通过数。
 > 产品身份：`workloom-ai-growth`；默认包：`geo-growth`；仓库：[workloom-ai/WorkLoom-growth](https://cnb.cool/workloom-ai/WorkLoom-growth)。
 
@@ -26,7 +26,7 @@
 
 岗位文件的 `preset_key` 去重得到 **81 个不同标识**；这是本仓声明去重计数，实际依赖装配和同名权威归属以主包 `composition.presetOwners` 与 [装配器](../packages/base/bundles/assembly.ts) 为准。
 
-## 代码与资产入口（42 项）
+## 代码与资产入口（43 项）
 
 ### 🖥 三端应用入口
 
@@ -95,7 +95,7 @@
 
 | 入口 | 用途与边界 | 查阅或运行 | 可发现 | 可调用 | 结果已验证 / 环境 |
 |---|---|---|---|---|---|
-| **视频工位** | 预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置 | PC /ai-video/assets?tab=studio | 是 | 未验证 | 未验证 |
+| **一句话导演工位** | 默认三支常规版与导演惊喜版；独立画面/声音时间线、真实文字方案和逐版反馈；生产仍需本人授权、预算与可用供应商 | PC /ai-video/assets?tab=studio；docs/director-studio-v2.md | 是 | 未验证 | 未验证 |
 | **媒资与交付** | 媒资检索、商品档案、合集、成片和交付记录；需要数据库与媒体文件 | 媒资：/ai-video/media；交付：/ai-video/assets?tab=delivery | 是 | 未验证 | 未验证 |
 | **白板与口播解释片** | 白板和口播制作链已提供代码入口；当前没有独立 React 编辑页，需要对应引擎与后期工具 | CLI / 服务端接口 | 是 | 未验证 | 未验证 |
 
@@ -108,6 +108,7 @@
 | **环境安装脚本** | 安装依赖并尝试数据库、迁移与种子；当前会枚举缺失 ai-pm 包的种子，推荐按 README 手动初始化 | `pnpm setup`；先读 README 的当前限制 | 是 | 未验证 | 未验证 |
 | **主测试套件** | 运行已定义场景；需要测试数据库和种子，不能由脚本存在推断测试已通过 | `pnpm suite` | 是 | 未验证 | 未验证 |
 | **GEO 域套件** | GEO 双域专项 | `pnpm suite:geo` | 是 | 未验证 | 未验证 |
+| **GEO 工具路由与回执复验** | 逐工具覆盖、模拟绑定和真实 PG 重放回归；需专用已迁移数据库，模拟通过不证明真实平台动作 | `node scripts/verify-geo-tool-routing.mjs --db`；docs/geo-tool-routing.md | 是 | 未验证 | 未验证 |
 | **酒店域套件** | 酒店域专项 | `pnpm suite:hotel` | 是 | 未验证 | 未验证 |
 | **发布门禁** | 未全过禁止发布（硬性） | `pnpm release:gate` | 是 | 未验证 | 未验证 |
 | **五元事件验链** | 事件链完整性校验 | `pnpm db:verify-chain` | 是 | 未验证 | 未验证 |

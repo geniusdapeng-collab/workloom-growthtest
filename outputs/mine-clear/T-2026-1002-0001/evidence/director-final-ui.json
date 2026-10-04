@@ -1,0 +1,47 @@
+{
+  "status": "passed",
+  "surface": "actual final packaged runtime with physical frozen dependency build",
+  "results": [
+    {
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "inputEnabled": true,
+      "horizontalOverflow": false,
+      "libraryExitClicked": true,
+      "libraryHeadingVisible": true,
+      "exitQueryHasNoStudioTab": true,
+      "status": "passed",
+      "advancedNavigationPassed": true,
+      "collapsedByExistingUi": true
+    },
+    {
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "inputEnabled": true,
+      "horizontalOverflow": false,
+      "libraryExitClicked": true,
+      "libraryHeadingVisible": true,
+      "exitQueryHasNoStudioTab": true,
+      "status": "passed",
+      "advancedNavigationPassed": true,
+      "collapsedByExistingUi": false
+    }
+  ],
+  "pageErrors": [],
+  "blockedExternalRequests": 4,
+  "textModelRequests": 0,
+  "imageApiRequests": 0,
+  "videoApiRequests": 0,
+  "limitations": "Reused database initialized by clean6 fresh native trial. No film-generation submit; completed-video UI playback was not tested. Prior permission-loading timeouts are retained and have no fully localized cause.",
+  "evidenceLevel": "B",
+  "sourceCommit": "df019d6be6a5a9409d8b5da5d255364ad8332c61",
+  "payloadVersion": "v0.1.0-director-20261002-clean6",
+  "payloadSha256": "4bd7f6299f1eba7e28ac224a1cfe6d619e4b76293c35f07026b954bb80151146",
+  "freshSupportDirectoryForThisFollowup": false,
+  "priorAttemptsEvidence": "director-final-ui-loading-before.json",
+  "priorAttemptsFixedByCodeChange": false
+}

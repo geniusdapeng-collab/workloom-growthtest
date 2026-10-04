@@ -329,10 +329,16 @@ export async function routeSmart(
   task: SmartTask,
   providers: Map<string, ModelProvider>,
   sink: EventSink,
-  opts: { policy?: ModelPolicy; taskCreditLimit?: number } = {},
+  opts: { policy?: ModelPolicy; taskCreditLimit?: number; modelChain?: string[] } = {},
   now = new Date(),
 ): Promise<SmartRouteResult> {
   const policy = opts.policy ?? DEFAULT_MODEL_POLICY;
+  // This chain comes only from trusted deployment assembly. Every entry must
+  // name the actual registered provider; no catalog alias is billed as a model.
+  if (opts.modelChain && (opts.modelChain.length<1 || opts.modelChain.length>9
+    || new Set(opts.modelChain).size!==opts.modelChain.length
+    || opts.modelChain.some(id=>typeof id!=="string"||!id.trim()||id.length>200||!providers.has(id))))
+    throw new Error("Configured model chain must contain 1–9 distinct registered providers");
   const limit = opts.taskCreditLimit ?? 500;
   const scene = task.scene ?? "generic";
   const plan = task.plan ?? "standard";
@@ -398,7 +404,7 @@ export async function routeSmart(
 
   const window = currentWindow(now);
   // 降级链：noDowngrade（金融/体检等质量红线）截断跨档段，只允许同档互备
-  const chain = chainFor(tier, { longContext, allowCrossTier: !sp.noDowngrade });
+  const chain = opts.modelChain ?? chainFor(tier, { longContext, allowCrossTier: !sp.noDowngrade });
   const degraded: Array<{ from: string; to: string | null; reason: string }> = [];
 
   for (let i = 0; i < chain.length; i++) {
