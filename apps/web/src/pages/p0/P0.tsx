@@ -26,6 +26,7 @@ import { ValueCounters } from "../../components/ValueCounters";
 import { QuestlineHud } from "../../components/mate-guide/QuestlineHud";
 import { QuestlineOverlay } from "../../components/mate-guide/QuestlineOverlay";
 import { useQuestline } from "../../onboarding/useQuestline";
+import { useWelcomeProgress, type WelcomeState } from "../../onboarding/useWelcomeProgress";
 import { EMPTY_FACTS, factsFromRecentActions, type QuestFacts } from "../../onboarding/questline";
 import { questlineForBundle } from "../../onboarding/questline.config";
 import { QuestlineContentProvider } from "../../onboarding/QuestlineContent";
@@ -45,15 +46,6 @@ interface Theater {
   satellites: Satellite[];
   ticker: TickerItem[];
   floor?: FloorPayload | null;
-}
-interface WelcomeState {
-  status: "not_started" | "in_progress" | "paused" | "completed";
-  currentStep: "start" | "mate" | "team" | "summary" | "done";
-  journeyVersion: number;
-  replayCount: number;
-  shouldShow: boolean;
-  persisted: boolean;
-  role: string;
 }
 
 function safeInteractionError(error: unknown, fallback: string): string {
@@ -185,12 +177,16 @@ export default function P0() {
   const canDispatch = canAction("task.dispatch");
   const [wsName, setWsName] = useState("WorkLoom");
   const [showWelcome, setShowWelcome] = useState(false);
-  const [welcome, setWelcome] = useState<WelcomeState | null>(null);
+  const [msg, setMsg] = useState("");
   const bundleId = bundle?.bundleId ?? null;
   const setWelcomeVisible = (visible: boolean) => {
     window.dispatchEvent(new CustomEvent<boolean>("workloom:welcome", { detail: visible }));
     setShowWelcome(visible);
   };
+  const { welcome, initialize: initializeWelcome, save: saveWelcome } = useWelcomeProgress({
+    onVisibilityChange: setWelcomeVisible,
+    onError: message => { setMsg(message); setTimeout(() => setMsg(""), 3500); },
+  });
   useEffect(() => {
     void ensureDemoLogin().then(async () => {
       await Promise.all([
@@ -201,8 +197,7 @@ export default function P0() {
         }).catch(() => undefined),
         trpc.onboarding.welcomeStatus.query().then((result) => {
           const progress = result as WelcomeState;
-          setWelcome(progress);
-          if (progress.shouldShow) setWelcomeVisible(true);
+          initializeWelcome(progress);
         }).catch(() => undefined),
       ]);
     });
@@ -219,7 +214,7 @@ export default function P0() {
   const [waveIndex, setWaveIndex] = useState(0);
   const floorAgentsAll = useMemo(() => data?.floor?.agents ?? [], [data]);
   const sortedFloorAgents = useMemo(() => {
-    const rank: Record<string, number> = { asking: 0, blocked: 1, celebrating: 2, collab: 3, working: 4, idle: 5, disabled: 6 };
+    const rank: Record<string, number> = { asking: 0, blocked: 1, celebrating: 2, collab: 3, working: 4, queued: 5, idle: 6, disabled: 7 };
     return [...floorAgentsAll].sort(
       (a, b) => (rank[a.state] ?? 9) - (rank[b.state] ?? 9) || a.id.localeCompare(b.id),
     );
@@ -297,7 +292,6 @@ export default function P0() {
   };
   const [pick, setPick] = useState<Satellite | null>(null);
   const [ceremony, setCeremony] = useState(0); // 0=未演 1-4=晨间播报阶段 5=完成
-  const [msg, setMsg] = useState("");
   // D25 视图：floor=数字办公区（默认） / stage=剧场舞台（D23）
   const [view, setView] = useState<"floor" | "stage">(() =>
     (typeof localStorage !== "undefined" && localStorage.getItem("theater-view") === "stage") ? "stage" : "floor");
@@ -361,20 +355,6 @@ export default function P0() {
         : null,
     });
     hydrateAliases(t.satellites.map((a) => ({ presetKey: a.presetKey, alias: a.alias })));
-  };
-  const saveWelcome = async (
-    status: "in_progress" | "paused" | "completed",
-    currentStep: WelcomeState["currentStep"],
-  ) => {
-    try {
-      const result = await trpc.onboarding.saveWelcomeProgress.mutate({ status, currentStep }) as Omit<WelcomeState, "role">;
-      setWelcome((current) => current ? { ...result, role: current.role } : null);
-    } catch {
-      setMsg("欢迎引导进度暂时无法保存，请稍后重试。");
-      setTimeout(() => setMsg(""), 3500);
-    } finally {
-      if (status === "paused" || status === "completed") setWelcomeVisible(false);
-    }
   };
   useEffect(() => {
     void load();

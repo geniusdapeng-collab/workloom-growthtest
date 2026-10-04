@@ -8,6 +8,8 @@
  * 或已明确放行）；机器监制/像不像记录只作留证，永远不参与放行判定。
  */
 export interface PortraitDecisionRecord {
+  stepKey?: string;
+  projectId?: string;
   approved?: boolean | null;
   via?: string | null;
   sourceStage?: string | null;
@@ -29,6 +31,15 @@ export interface PortraitDecision {
 }
 
 const HUMAN_VIAS = new Set(["owner-acceptance", "human"]);
+
+/** 账本追加顺序为准：同一角色版本最新的人类决策优先，后来的机器留证不能覆盖它。 */
+export function selectPortraitDecisionRecord<T extends PortraitDecisionRecord>(records: T[], projectId: string): T | null {
+  const scoped = records.filter((entry) => entry.stepKey === "g5-portrait-confirm" && entry.projectId === projectId);
+  for (let index = scoped.length - 1; index >= 0; index--) {
+    if (assessPortraitDecision(scoped[index]).decisive) return scoped[index]!;
+  }
+  return scoped.at(-1) ?? null;
+}
 
 /**
  * 纯函数：把一条门账本/评审记录翻译成决策语义。

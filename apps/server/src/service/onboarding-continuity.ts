@@ -145,18 +145,33 @@ export async function saveWelcomeProgress(
                      account_id=EXCLUDED.account_id,
                      completed_at=CASE WHEN EXCLUDED.status='completed' THEN now() ELSE NULL END,
                      updated_at=now()
+       WHERE onboarding_progress.status <> 'completed'
        RETURNING status, current_step, journey_version, replay_count, updated_at`,
       [newId("obp"), workspaceId, subject.identityKey, subject.accountId, identity.memberId,
        identity.role, WELCOME_JOURNEY, WELCOME_JOURNEY_VERSION, input.status,
        completed ? "done" : input.currentStep],
     );
-    await appendEventOn(client, scope, { id: identity.memberNo, type: "human" }, {
-      objectType: "member",
-      objectId: identity.memberId,
-      action: completed ? "onboarding.welcome.completed" : "onboarding.welcome.progress",
-      after: { journey_version: WELCOME_JOURNEY_VERSION, status: input.status, current_step: completed ? "done" : input.currentStep },
-    });
-    const row = rows.rows[0]!;
+    // A late phase save (or a second completion request) cannot restart a finished
+    // journey. Only the explicit replay endpoint may clear its terminal state.
+    let row = rows.rows[0];
+    if (!row) {
+      const current = await client.query<WelcomeRow>(
+        `SELECT status, current_step, journey_version, replay_count, updated_at
+         FROM onboarding_progress
+         WHERE workspace_id=$1 AND identity_key=$2 AND role=$3
+           AND journey_key=$4 AND journey_version=$5`,
+        [workspaceId, subject.identityKey, identity.role, WELCOME_JOURNEY, WELCOME_JOURNEY_VERSION],
+      );
+      row = current.rows[0];
+      if (!row || row.status !== "completed") throw new Error("欢迎旅程终态读取不一致，请重试");
+    } else {
+      await appendEventOn(client, scope, { id: identity.memberNo, type: "human" }, {
+        objectType: "member",
+        objectId: identity.memberId,
+        action: completed ? "onboarding.welcome.completed" : "onboarding.welcome.progress",
+        after: { journey_version: WELCOME_JOURNEY_VERSION, status: input.status, current_step: completed ? "done" : input.currentStep },
+      });
+    }
     return {
       persisted: true,
       status: row.status,

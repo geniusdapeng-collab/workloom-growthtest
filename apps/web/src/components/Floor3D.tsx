@@ -4,7 +4,7 @@
  * 渲染层升级（Canvas 2D 等距 2.5D → Three.js 真 3D 空间 → 电影级质感），业务逻辑零改动：
  *  - 数据同源：floor payload（scene/agents）原样消费；走位目标计算与 Floor.tsx 同语义
  *    （asking→指挥台前 / blocked→工位侧 / idle→休息角 / disabled→入口 / working→工位，
- *    同工位按 id hash 微偏移站位）；
+ *    全局网格为每名员工分配独立站位，HTML 名牌按实际屏幕尺寸避让）；
  *  - 交互同义：点击员工 → onPickAgent（绩效卡/员工档案）——与 Canvas 版点击分派一致；
  *    2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，asking 只保留
  *    「待放行」状态可视化，点击不再弹出审批卡（业务关卡在各自业务页面就地放行）；
@@ -27,6 +27,10 @@ import { displayNameOf, roleTitleOf } from "../lib/naming";
 import { clientChineseText } from "@workloom/ui";
 import { CineFloor, SpotBeam, CineRig, CinePost, SkyDome, Skyline, NamePlate, DustMotes } from "./cinematic";
 import type { FloorAgent, FloorScene, FloorPayload } from "../pages/p0/Floor";
+import { floor3DCameraHeight, floor3DTargets } from "./floor3d-layout";
+import { createFloor3DLabelRegistry, Floor3DLabels, type Floor3DLabelRegistry } from "./Floor3DLabels";
+import { floorInitialScroll } from "../pages/p0/floor-layout";
+import { Floor3DTaskDrop } from "./Floor3DTaskDrop";
 
 /* ---------------- 与 Floor.tsx 同语义的工具 ---------------- */
 function hash(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
@@ -38,40 +42,10 @@ const FLOOR_STATE_TEXT: Record<string, string> = {
   blocked: "有异常",
   celebrating: "已完成",
   collab: "协作中",
+  queued: "排队中",
   idle: "待命",
   disabled: "已停用",
 };
-
-/** 走位目标（与 Floor.tsx targetOf 逐分支一致） */
-interface CrowdSlot { index: number; total: number }
-
-function targetOf(a: FloorAgent, scene: FloorScene, slot: CrowdSlot = { index: 0, total: 1 }): { x: number; y: number } {
-  const st = scene.stations.find((s) => s.id === a.stationId);
-  // 同一目的地采用确定性的环形占位，而不是 id 随机微偏移。随机微偏移会发生碰撞，
-  // 角色与 HTML 名牌就会叠成一团；环形槽位保证同工位/指挥台前每人位置唯一。
-  const angle = slot.total <= 1 ? -Math.PI / 2 : (slot.index / slot.total) * Math.PI * 2 - Math.PI / 2;
-  // 密度重设计：环半径加大 + 每环 6 人（每批 18 人时站位与头顶任务牌互不压叠）
-  const radius = slot.total <= 1 ? 0 : 0.62 + Math.floor(slot.index / 6) * 0.42;
-  const jx = Math.cos(angle) * radius;
-  const jy = Math.sin(angle) * radius * 0.72;
-  switch (a.state) {
-    case "asking": {
-      const span = Math.min(1.75, 0.42 * Math.max(1, slot.total - 1));
-      const ang = slot.total <= 1 ? 0 : -span / 2 + (slot.index / (slot.total - 1)) * span;
-      return {
-        x: scene.ceoDesk.x + Math.sin(ang) * 2.8,
-        y: scene.ceoDesk.y + 1.0 + (1 - Math.cos(ang)) * 1.6,
-      };
-    }
-    case "blocked": return st ? { x: st.x + jx, y: st.y + 0.7 + jy } : { x: scene.grid.w / 2, y: scene.grid.h / 2 };
-    case "idle":
-      return st
-        ? { x: st.x + jx, y: st.y + jy * 0.5 }
-        : { x: scene.lounge.x + (hash(a.id) % 10) / 14 - 0.35, y: scene.lounge.y + (hash(a.id) % 6) / 12 - 0.25 };
-    case "disabled": return { x: scene.entrance.x, y: scene.entrance.y };
-    default: return st ? { x: st.x + jx, y: st.y + 0.45 + jy * 0.5 } : { x: scene.lounge.x + jx * 2, y: scene.lounge.y + jy * 2 };
-  }
-}
 
 const STATE_COLOR: Record<string, string> = {
   working: "#8ad8ff",
@@ -79,6 +53,7 @@ const STATE_COLOR: Record<string, string> = {
   blocked: "#ff8a8a",
   celebrating: "#6adf8a",
   collab: "#8ad8ff",
+  queued: "#89a3c8",
   idle: "#a8b8d8",
   disabled: "#5a6478",
 };
@@ -88,30 +63,32 @@ const STATE_TEXT: Record<string, string> = {
   blocked: "受阻",
   celebrating: "捷报",
   collab: "协作中",
+  queued: "排队中",
   idle: "休整",
   disabled: "停用",
 };
 
 /* ---------------- 单个数字员工 ---------------- */
 function Worker({
-  agent, scene, tile, crowdSlot, onPick, onDropTask, night,
+  agent, scene, tile, target, labelRegistry, onPick, night,
   onOpenTask,
 }: {
   agent: FloorAgent; scene: FloorScene; tile: number;
-  crowdSlot: CrowdSlot;
+  target: { x: number; y: number };
+  labelRegistry: Floor3DLabelRegistry;
   onPick: (a: FloorAgent) => void;
-  onDropTask?: (a: FloorAgent, task: string) => void;
-  /** 头顶任务牌点击 → 任务详情（无任务时不响应） */
+  /** 头顶任务牌点击 → 任务详情，无任务时打开员工档案 */
   onOpenTask?: (threadId: string) => void;
   night: boolean;
 }) {
   const group = useRef<THREE.Group>(null);
   const ring = useRef<THREE.Mesh>(null);
   const avatarRef = useRef<AvatarHandle>(null);
+  const hitArea = useRef<THREE.Mesh>(null);
   const [bubble, setBubble] = useState(false);
   const [hovered, setHovered] = useState(false);
   const hoverTimer = useRef<number | null>(null);
-  const target = useMemo(() => targetOf(agent, scene, crowdSlot), [agent, scene, crowdSlot]);
+  const hideTimer = useRef<number | null>(null);
   const color = STATE_COLOR[agent.state] ?? "#8ad8ff";
   const toWorld = (lx: number, ly: number) => ({
     x: (lx - scene.grid.w / 2) * tile,
@@ -135,7 +112,31 @@ function Worker({
     if (ring.current) {
       (ring.current.material as THREE.MeshBasicMaterial).opacity = 0.5 + Math.sin(t * 2.2 + hash(agent.id)) * 0.15;
     }
-  });
+  }, -2);
+
+  useEffect(() => {
+    if (group.current) labelRegistry.actors.set(agent.id, group.current);
+    if (hitArea.current) labelRegistry.hitAreas.set(agent.id, hitArea.current);
+    return () => {
+      labelRegistry.actors.delete(agent.id); labelRegistry.hitAreas.delete(agent.id); labelRegistry.positions.delete(agent.id);
+      if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+      if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+      document.body.style.cursor = "default";
+    };
+  }, [agent.id, labelRegistry]);
+
+  const showBubble = (duration: number) => {
+    if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+    setBubble(true);
+    hideTimer.current = window.setTimeout(() => { hideTimer.current = null; setBubble(false); }, duration);
+  };
+
+  const calculateLabelPosition = useMemo(() => (object: THREE.Object3D, camera: THREE.Camera, size: { width: number; height: number }): [number, number] => {
+    const allocated = labelRegistry.positions.get(agent.id);
+    if (allocated) return allocated;
+    const position = new THREE.Vector3().setFromMatrixPosition(object.matrixWorld).project(camera);
+    return [(position.x + 1) * size.width / 2, (1 - position.y) * size.height / 2];
+  }, [agent.id, labelRegistry]);
 
   // 视线感知注册：getPos 供注视检测/运镜取点，onGaze 抬头点头+气泡
   useEffect(() => {
@@ -150,8 +151,7 @@ function Worker({
       onGaze: () => {
         const cam = (window as unknown as { __wlCamera?: THREE.Camera }).__wlCamera;
         if (cam) avatarRef.current?.gazeNod(cam.position.clone());
-        setBubble(true);
-        window.setTimeout(() => setBubble(false), 4000);
+        showBubble(4000);
         AudioEngine.play("pop");
       },
     });
@@ -182,19 +182,22 @@ function Worker({
       {agent.state === "celebrating" && <Confetti seed={hash(agent.id)} />}
       {/* 点击热区 */}
       <mesh
+        ref={hitArea}
         position={[0, 0.7, 0]} visible={false}
         onClick={(e) => { e.stopPropagation(); onPick(agent); }}
         onPointerOver={(e) => {
           e.stopPropagation();
           setHovered(true);
           document.body.style.cursor = "pointer";
-          hoverTimer.current = window.setTimeout(() => setBubble(true), 500);
+          if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+          hoverTimer.current = window.setTimeout(() => { hoverTimer.current = null; showBubble(4000); }, 500);
         }}
         onPointerOut={() => {
           setHovered(false);
           document.body.style.cursor = "default";
           if (hoverTimer.current) { window.clearTimeout(hoverTimer.current); hoverTimer.current = null; }
-          window.setTimeout(() => setBubble(false), 1600);
+          if (hideTimer.current !== null) window.clearTimeout(hideTimer.current);
+          hideTimer.current = window.setTimeout(() => { hideTimer.current = null; setBubble(false); }, 1600);
         }}
       >
         <sphereGeometry args={[0.4, 8, 8]} />
@@ -209,24 +212,33 @@ function Worker({
        *  数据随 theater 5s 轮询自动刷新（状态机即数据）。
        */}
       {!dimmed && (
-        <Html center position={[0, 1.5 + (hash(agent.id) % 4) * 0.22, 0]} zIndexRange={[25, 0]} distanceFactor={7.5}>
+        <Html center position={[0, 1.55, 0]} zIndexRange={[25, 25]} calculatePosition={calculateLabelPosition}
+          ref={node => {
+            if (node) { labelRegistry.nodes.set(agent.id, node); labelRegistry.measure?.(node); }
+            else labelRegistry.nodes.delete(agent.id);
+          }}
+          style={{ pointerEvents: "none", width: "max-content", visibility: "hidden", transitionProperty: "none" }}>
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3, pointerEvents: "none" }}>
             <button
               type="button"
+              data-floor-agent={agent.id}
+              data-floor-thread={agent.currentThread?.id}
+              className="wl-floor-plaque"
               onClick={(e) => {
                 e.stopPropagation();
                 if (agent.currentThread) onOpenTask?.(agent.currentThread.id);
+                else onPick(agent);
               }}
-              title={agent.currentThread ? `进入任务：${agent.currentThread.title}` : "当前没有在办任务"}
+              title={`${roleTitleOf(agent.name, agent.presetKey)} · ${agent.currentThread ? `进入任务：${agent.currentThread.title}` : "打开员工档案"}`}
               style={{
-                pointerEvents: "auto", cursor: agent.currentThread ? "pointer" : "default",
-                maxWidth: 132, border: `1px solid ${asking ? "rgba(255,217,138,.65)" : "rgba(214,220,228,.28)"}`,
+                pointerEvents: "auto", cursor: "pointer",
+                maxWidth: 148, border: `1px solid ${asking ? "rgba(255,217,138,.65)" : "rgba(214,220,228,.28)"}`,
                 borderRadius: 7, padding: "2px 7px", textAlign: "left", lineHeight: 1.35,
                 background: asking ? "rgba(52,40,16,.92)" : "rgba(14,16,19,.82)",
                 boxShadow: "0 3px 12px rgba(0,0,0,.45)",
               }}
             >
-              <span style={{ display: "block", fontSize: 10.5, fontWeight: 700, color: asking ? "#ffd98a" : "#e8edf4", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              <span style={{ display: "block", fontSize: 11, fontWeight: 700, color: asking ? "#ffd98a" : "#e8edf4", overflowWrap: "anywhere", whiteSpace: "normal" }}>
                 {roleTitleOf(agent.name, agent.presetKey)}
               </span>
               <span style={{ display: "block", fontSize: 10, color: agent.state === "idle" ? "#8a939e" : "#b3c6de", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -236,22 +248,6 @@ function Worker({
               </span>
             </button>
           </div>
-        </Html>
-      )}
-      {/* 拖拽接收锚点 */}
-      {onDropTask && (
-        <Html center position={[0, 0.8, 0]} zIndexRange={[10, 0]}>
-          <div
-            data-agent-drop={agent.id}
-            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; }}
-            onDrop={(e) => {
-              e.preventDefault();
-              const task = e.dataTransfer.getData("text/workloom-task");
-              if (task) onDropTask(agent, task);
-            }}
-            style={{ width: 72, height: 96, transform: "translateY(-48px)", borderRadius: 12 }}
-            title={`拖任务给 ${roleTitleOf(agent.name, agent.presetKey)}`}
-          />
         </Html>
       )}
     </group>
@@ -466,37 +462,91 @@ export function Floor3D({
   /** 导演运镜事件（theaterDiff 输入；null=无新事件） */
   directorEvent?: DirectorEvent | null;
 }) {
-  // 密度重设计：站位间距 0.86 → 1.02（每批 18 人时人群与头顶牌都能看清）
+  // Logical spacing separates bodies; measured screen-space allocation separates name cards.
   const tile = 1.02;
   const scene = floor.scene;
   const onPick = (a: FloorAgent) => {
     onOpenProfile(a);
   };
   const night = useNightTime();
-  const camY = Math.max(scene.grid.w, scene.grid.h) * tile * 0.95;
   const controlsRef = useRef<any>(null);
-  const crowdSlots = useMemo(() => {
-    const groups = new Map<string, FloorAgent[]>();
-    for (const agent of floor.agents) {
-      const key = agent.state === "asking" ? "asking" : agent.state === "disabled" ? "entrance" : agent.stationId ? `station:${agent.stationId}` : "lounge";
-      const list = groups.get(key) ?? [];
-      list.push(agent);
-      groups.set(key, list);
-    }
-    const slots = new Map<string, CrowdSlot>();
-    for (const list of groups.values()) {
-      list.sort((a, b) => a.id.localeCompare(b.id)).forEach((agent, index) => slots.set(agent.id, { index, total: list.length }));
-    }
-    return slots;
-  }, [floor.agents]);
+  const activeAgents = useMemo(() => floor.agents.filter(agent => agent.state !== "disabled"), [floor.agents]);
+  const targets = useMemo(() => floor3DTargets(floor.agents, scene), [floor.agents, scene]);
+  const camY = useMemo(() => floor3DCameraHeight(targets, scene, tile), [targets, scene, tile]);
+  const labelRegistry = useRef(createFloor3DLabelRegistry());
+  const viewport = useRef<HTMLDivElement>(null);
+  const scroll = useRef({ userPositioned: false, left: 0, top: 0, size: "" });
+  const [minimum, setMinimum] = useState({ width: Math.max(activeAgents.length ? 440 : 320, Math.ceil(Math.sqrt(activeAgents.length)) * 128), height: 440 });
+  const minimumRef = useRef(minimum);
+  minimumRef.current = minimum;
+  const [labelError, setLabelError] = useState(false);
+  useEffect(() => {
+    const registry = labelRegistry.current;
+    let pending = 0, stopped = false, measured = false;
+    const measure = () => {
+      pending = 0;
+      if (stopped) return;
+      const nodes = [...registry.nodes.values()];
+      const area = nodes.reduce((total, node) => total + (node.offsetWidth + 8) * (node.offsetHeight + 8), 0);
+      // Keep populated scenes at least square so the default camera fit remains valid.
+      const baseWidth = Math.max(activeAgents.length ? 440 : 320, Math.ceil(Math.sqrt(activeAgents.length)) * 128, Math.ceil(Math.sqrt(area * 2)));
+      const width = Math.max(baseWidth, measured ? minimumRef.current.width : 0);
+      const height = Math.max(440, Math.ceil(area / Math.max(1, baseWidth * .5)), measured ? minimumRef.current.height : 0);
+      // Ref/ResizeObserver callbacks also run after growth and same-size polls.
+      // Preserve the room gained for bodies until the roster size changes.
+      measured = true;
+      minimumRef.current = { width, height };
+      setMinimum(prior => prior.width === width && prior.height === height ? prior : { width, height });
+      setLabelError(false);
+    };
+    const schedule = () => { if (!pending && !stopped) pending = requestAnimationFrame(measure); };
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    registry.measure = node => { if (node) observer?.observe(node); schedule(); };
+    registry.grow = () => {
+      if (pending || stopped) return;
+      pending = requestAnimationFrame(() => {
+        pending = 0;
+        if (stopped) return;
+        const prior = minimumRef.current;
+        if (prior.width >= 4096 || prior.height >= 4096) { setLabelError(true); return; }
+        const next = { width: Math.min(4096, Math.ceil(prior.width * 1.16)), height: Math.min(4096, Math.ceil(prior.height * 1.16)) };
+        minimumRef.current = next; setMinimum(next);
+      });
+    };
+    registry.focus = (rects, width, height) => {
+      const region = viewport.current;
+      const size = `${width}/${height}`;
+      if (!region || rects.size !== activeAgents.length || !rects.size || scroll.current.userPositioned || scroll.current.size === size) return;
+      const position = floorInitialScroll([...rects.values()], region.clientWidth, region.clientHeight, width, height);
+      scroll.current.size = size; scroll.current.left = position.left; scroll.current.top = position.top;
+      region.scrollLeft = position.left; region.scrollTop = position.top;
+    };
+    for (const node of registry.nodes.values()) observer?.observe(node);
+    schedule();
+    return () => { stopped = true; if (pending) cancelAnimationFrame(pending); observer?.disconnect(); delete registry.measure; delete registry.grow; delete registry.focus; };
+  }, [activeAgents.length]);
   return (
     <div
+      ref={viewport}
       data-product-scene="workplace-3d"
-      data-product-scene-actors={String(floor.agents.length)}
-      style={{ width: "100%", height: 440, borderRadius: 12, overflow: "hidden", background: "#0b0d10", position: "relative" }}
+      data-product-scene-actors={String(activeAgents.length)}
+      tabIndex={0} role="region" aria-label="三维数字职场，可滚动查看全部员工"
+      onWheel={() => { scroll.current.userPositioned = true; }}
+      onPointerDown={() => { scroll.current.userPositioned = true; }}
+      onKeyDown={event => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) scroll.current.userPositioned = true; }}
+      onScroll={event => { if (Math.abs(event.currentTarget.scrollLeft - scroll.current.left) > 1 || Math.abs(event.currentTarget.scrollTop - scroll.current.top) > 1) scroll.current.userPositioned = true; }}
+      style={{ width: "100%", maxWidth: "100%", height: 440, borderRadius: 12, overflow: "auto", background: "#0b0d10", position: "relative" }}
     >
+      {labelError && <p role="alert">职场名牌暂时无法显示，请刷新页面后重试。</p>}
+      <div style={{ width: "100%", minWidth: minimum.width, height: minimum.height, position: "relative", transitionProperty: "none" }}>
+      <style>{`.wl-floor-plaque:hover{filter:brightness(1.25)}.wl-floor-plaque:active{filter:brightness(.85)}.wl-floor-plaque:focus-visible{outline:2px solid #8ad8ff;outline-offset:3px}`}</style>
+      <svg aria-hidden="true" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 12 }}>
+        {activeAgents.map(agent => <line key={agent.id} stroke={STATE_COLOR[agent.state] ?? "#8ad8ff"} strokeWidth={.8}
+          ref={node => { if (node) labelRegistry.current.lines.set(agent.id, node); else labelRegistry.current.lines.delete(agent.id); }} />)}
+      </svg>
       <FuseVignette event={directorEvent} />
       <Canvas
+        style={{ transitionProperty: "none" }}
         camera={{ position: [camY * 1.5, camY * 0.5, camY * 1.5], fov: 40 }}
         dpr={[1, 2]}
         gl={{ antialias: true, alpha: false }}
@@ -511,9 +561,11 @@ export function Floor3D({
         <fog attach="fog" args={[night ? "#030509" : "#080f20", 11, 26]} />
 
         <OfficeScene scene={scene} tile={tile} ceoName={ceoName} night={night} />
-        {floor.agents.map((a) => (
-          <Worker key={a.id} agent={a} scene={scene} tile={tile} crowdSlot={crowdSlots.get(a.id) ?? { index: 0, total: 1 }} onPick={onPick} onDropTask={onDropTask} onOpenTask={onOpenTask} night={night} />
+        {activeAgents.map((a) => (
+          <Worker key={a.id} agent={a} scene={scene} tile={tile} target={targets.get(a.id)!} labelRegistry={labelRegistry.current} onPick={onPick} onOpenTask={onOpenTask} night={night} />
         ))}
+        {onDropTask && <Floor3DTaskDrop registry={labelRegistry.current} agents={activeAgents} onDropTask={onDropTask} />}
+        <Floor3DLabels registry={labelRegistry.current} />
         <DustMotes count={46} area={[9, 2.8, 7]} color={night ? "#8aa8d8" : "#bcd6ff"} size={1.2} position={[0, 1.5, 0]} speed={0.18} />
 
         <GazeSystem />
@@ -538,6 +590,7 @@ export function Floor3D({
           target={[0, 0.3, 0]} duration={3.2} autoRotateSpeed={0.12} controlsRef={controlsRef}
         />
       </Canvas>
+      </div>
     </div>
   );
 }

@@ -68,7 +68,7 @@
     "bundleId": "geo-growth",
     "bundleVersion": "1.0.0",
     "contractVersion": "2.0.0",
-    "uiVersion": "0.1.1",
-    "manifestDigest": "a8bd61ae5ca205f066ca1d78f11667a0794264f6fc1bdbfb5f37c70213ade5a5"
+    "uiVersion": "0.1.19",
+    "manifestDigest": "67e52ee2f34cc9ea83e7c056cc8d9e859b8ee406ccda898bb9420781e3959593"
   }
 }

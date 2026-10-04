@@ -8,13 +8,14 @@
  * 2026-09-21 产品所有者口径（本机单人运行）：基座通用审批环节已移除，asking 只保留「待放行」状态可视化，
  * 点击不再弹出审批卡；业务链路自带的关卡在各自业务页面就地放行。
  */
-import { useEffect, useRef } from "react";
-import { displayNameOf, roleTitleOf } from "../../lib/naming";
+import { useEffect, useRef, useState } from "react";
+import { roleTitleOf } from "../../lib/naming";
+import { createFloorLayout, floorInitialScroll, FLOOR_ROLE_FONT, FLOOR_STATUS_FONT, type FloorLayout, type FloorRect } from "./floor-layout";
 
 /* ================= 类型（与 base/captain/floor.ts 对齐） ================= */
 export interface FloorAgent {
   id: string; presetKey: string; name: string;
-  state: "working" | "asking" | "blocked" | "celebrating" | "collab" | "idle" | "disabled";
+  state: "working" | "asking" | "blocked" | "celebrating" | "collab" | "queued" | "idle" | "disabled";
   stationId: string | null;
   currentThread: { id: string; title: string } | null;
   pendingTier: string | null;
@@ -45,17 +46,6 @@ interface ActorRt {
 
 const CONFETTI_COLORS = ["#ffd98a", "#8ad8ff", "#6adf8a", "#ff8a8a", "#e8a2ff"];
 
-/** 头顶任务牌状态词（与 3D 版同口径） */
-const FLOOR_STATE_TEXT: Record<string, string> = {
-  working: "进行中",
-  asking: "待放行",
-  blocked: "有异常",
-  celebrating: "已完成",
-  collab: "协作中",
-  idle: "待命",
-  disabled: "已停用",
-};
-
 export function FloorView({
   floor, ceoName, onPickAgent, onOpenProfile, onOpenTask,
 }: {
@@ -68,35 +58,57 @@ export function FloorView({
   onOpenTask?: (threadId: string) => void;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const viewport = useRef<HTMLDivElement>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const scroll = useRef({ userPositioned: false, left: 0, top: 0 });
+  const [canvasError, setCanvasError] = useState<string | null>(null);
   const actors = useRef<Map<string, ActorRt>>(new Map());
-  const hitboxes = useRef<Array<{ id: string; sx: number; sy: number; r: number; kind?: "agent" | "task"; threadId?: string }>>([]);
+  const hitboxes = useRef<Array<FloorRect & { id: string; kind: "agent" | "task"; threadId?: string }>>([]);
   const floorRef = useRef(floor);
   floorRef.current = floor;
 
-  /* 目标点位计算（同工位多名员工按 id hash 微偏移站位；无工位溢出者才去休息角） */
-  const targetOf = (a: FloorAgent, scene: FloorScene): { x: number; y: number } => {
-    const st = scene.stations.find((s) => s.id === a.stationId);
-    const jx = ((hash(a.id) % 5) - 2) * 0.16, jy = ((hash(a.id) % 3) - 1) * 0.18;
-    switch (a.state) {
-      case "asking": return { x: scene.ceoDesk.x + 0.1 + jx, y: scene.ceoDesk.y + 1.1 + jy };
-      case "blocked": return st ? { x: st.x + jx, y: st.y + 0.7 + jy } : { x: scene.grid.w / 2, y: scene.grid.h / 2 };
-      case "idle":
-        return st
-          ? { x: st.x + jx * 1.4, y: st.y + 0.55 + jy }
-          : { x: scene.lounge.x + (hash(a.id) % 10) / 14 - 0.35, y: scene.lounge.y + (hash(a.id) % 6) / 12 - 0.25 };
-      case "disabled": return { x: scene.entrance.x, y: scene.entrance.y };
-      default: return st ? { x: st.x + jx, y: st.y + jy * 0.5 } : { x: scene.lounge.x + jx * 2, y: scene.lounge.y + jy * 2 };
-    }
-  };
-
   useEffect(() => {
     const cv = ref.current!;
-    const ctx = cv.getContext("2d")!;
+    const ctx = cv.getContext("2d");
+    if (!ctx) { setCanvasError("职场画布暂时无法显示，请刷新页面后重试。"); return; }
     let raf = 0;
+    let signature = "";
+    let layout: FloorLayout | null = null;
+    let previousTime: number | null = null;
 
     const frame = () => {
       const scene = floorRef.current.scene;
-      const W = cv.offsetWidth, H = cv.offsetHeight;
+      const viewportW = viewport.current?.clientWidth || cv.offsetWidth || 320;
+      const viewportH = viewport.current?.clientHeight || cv.offsetHeight || 380;
+      const nextSignature = JSON.stringify([viewportW, viewportH, scene, floorRef.current.agents.map(a => [a.id, a.name, a.presetKey, a.state, a.stationId, a.currentThread?.title])]);
+      if (signature !== nextSignature) {
+        signature = nextSignature;
+        try {
+          layout = createFloorLayout(floorRef.current, viewportW, viewportH, ctx);
+          // The shared content-safety stylesheet limits Canvas to 100% of its
+          // parent. Give it the actual layout-sized content parent inside the
+          // scroll viewport, preserving measured text and pointer coordinates.
+          if (content.current) { content.current.style.width = `${layout.width}px`; content.current.style.height = `${layout.height}px`; }
+          cv.style.width = `${layout.width}px`; cv.style.height = `${layout.height}px`;
+          if (viewport.current && !scroll.current.userPositioned) {
+            const position = floorInitialScroll([...layout.slots.values()].map(slot => slot.card), viewportW, viewportH, layout.width, layout.height);
+            scroll.current.left = position.left; scroll.current.top = position.top;
+            viewport.current.scrollLeft = position.left; viewport.current.scrollTop = position.top;
+          }
+          // Scene/poll/resize changes allocate each actor's own slot before its first painted frame.
+          for (const [id, rt] of actors.current) {
+            const slot = layout.slots.get(id);
+            if (slot) { rt.x = rt.tx = slot.x; rt.y = rt.ty = slot.y; }
+          }
+          setCanvasError(null);
+        } catch (error) {
+          layout = null; hitboxes.current = [];
+          console.error("Floor layout unavailable", error);
+          setCanvasError("职场画布暂时无法显示，请刷新页面后重试。");
+        }
+      }
+      if (!layout) { raf = requestAnimationFrame(frame); return; }
+      const W = layout.width, H = layout.height;
       // DPR 每帧重读：Electron 固定比例画布 zoomFactor 会改变 devicePixelRatio，
       // 取常量会导致 zoom>1 时 Canvas 按旧位图放大模糊（客户端适配纪律）
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -106,11 +118,11 @@ export function FloorView({
 
       const gw = scene.grid.w, gh = scene.grid.h;
       // 等距铺满：地图宽=(gw+gh)·tileW/2，高=(gw+gh)·tileW/4；取容器 92% 宽与 78% 高的较小约束
-      const tileW = Math.min((W * 0.92 * 2) / (gw + gh), (H * 0.78 * 4) / (gw + gh));
-      const tileH = tileW / 2;
-      const cx = W / 2, cy = H * 0.1;
+      const { tileW, tileH, cx, cy } = layout;
       const iso = (x: number, y: number) => ({ sx: cx + (x - y) * (tileW / 2), sy: cy + (x + y) * (tileH / 2) });
       const now = performance.now() / 1000;
+      const dt = previousTime === null ? 1 / 60 : Math.min(1, Math.max(0, now - previousTime));
+      previousTime = now;
 
       /* 地板 */
       const p0 = iso(0, 0), p1 = iso(gw, 0), p2 = iso(gw, gh), p3 = iso(0, gh);
@@ -200,70 +212,42 @@ export function FloorView({
       ctx.fillText(ceoName, cd.sx, cd.sy + 14);
 
       /* 员工：更新目标 + 插值走位（先清理已离场员工的运行时，防泄漏） */
-      const alive = new Set(floorRef.current.agents.map((a) => a.id));
+      const alive = new Set(layout.slots.keys());
       for (const id of [...actors.current.keys()]) {
         if (!alive.has(id)) actors.current.delete(id);
       }
       hitboxes.current = [];
       const list = floorRef.current.agents;
-      const sorted = [...list].sort((a, b) => { // 远的先画（遮挡）
-        const ta = targetOf(a, scene), tb = targetOf(b, scene);
-        return ta.x + ta.y - (tb.x + tb.y);
-      });
+      const sorted = [...list].filter(a => a.state !== "disabled").sort((a, b) => layout!.slots.get(a.id)!.sy - layout!.slots.get(b.id)!.sy);
       for (const a of sorted) {
-        if (a.state === "disabled") continue;
         let rt = actors.current.get(a.id);
-        const tgt = targetOf(a, scene);
+        const tgt = layout.slots.get(a.id)!;
         if (!rt) {
-          rt = { x: scene.entrance.x, y: scene.entrance.y, tx: tgt.x, ty: tgt.y, phase: Math.random() * 6.28, state: a.state, confetti: [], enteredAt: now };
+          rt = { x: tgt.x, y: tgt.y, tx: tgt.x, ty: tgt.y, phase: hash(a.id) % 628 / 100, state: a.state, confetti: [], enteredAt: now };
           actors.current.set(a.id, rt);
         }
         if (rt.state !== a.state) { rt.state = a.state; rt.enteredAt = now; if (a.state === "celebrating") spawnConfetti(rt); }
         // blocked：绕工位踱步（往返两锚点）
         if (a.state === "blocked") {
-          const swing = Math.sin(now * 1.6 + rt.phase) * 0.55;
+          const swing = Math.sin(now * 1.6 + rt.phase) * Math.min(.15, 8 / tileW);
           rt.tx = tgt.x + swing; rt.ty = tgt.y + Math.abs(swing) * 0.3;
         } else { rt.tx = tgt.x; rt.ty = tgt.y; }
-        const speed = a.state === "asking" ? 0.06 : 0.045;
+        const speed = 1 - Math.exp(-(a.state === "asking" ? 3.7 : 2.8) * dt);
         rt.x += (rt.tx - rt.x) * speed; rt.y += (rt.ty - rt.y) * speed;
-        rt.phase += 0.08;
+        rt.phase += dt * 4.8;
 
         const { sx, sy } = iso(rt.x, rt.y);
         const walking = Math.abs(rt.tx - rt.x) + Math.abs(rt.ty - rt.y) > 0.08;
         drawAgent(ctx, sx, sy, rt, a, now, walking);
-        hitboxes.current.push({ id: a.id, sx, sy: sy - 14, r: 16, kind: "agent" });
+        hitboxes.current.push({ id: a.id, x: sx - 16, y: sy - 38, width: 36, height: 43, kind: "agent" });
 
         /* 彩带粒子 */
         for (const c of rt.confetti) {
-          c.x += c.vx; c.y += c.vy; c.vy += 0.06; c.life -= 0.016;
+          c.x += c.vx * dt * 60; c.y += c.vy * dt * 60; c.vy += 3.6 * dt; c.life -= dt;
           if (c.life > 0) { ctx.fillStyle = c.c; ctx.globalAlpha = Math.min(1, c.life); ctx.fillRect(sx + c.x, sy - 34 + c.y, 3, 3); ctx.globalAlpha = 1; }
         }
         rt.confetti = rt.confetti.filter((c) => c.life > 0);
-        if (a.state === "celebrating" && now - rt.enteredAt < 3 && Math.random() < 0.08) spawnConfetti(rt, 2);
-
-        /* 头顶任务牌（2026-09-20 重设计）：第一行岗位名，第二行任务/状态；点牌子进任务详情 */
-        ctx.textAlign = "center";
-        const roleLabel = roleTitleOf(a.name, a.presetKey);
-        const stateLabel = a.currentThread
-          ? `${FLOOR_STATE_TEXT[a.state] ?? "进行中"} · ${a.currentThread.title.slice(0, 14)}`
-          : FLOOR_STATE_TEXT[a.state] ?? "待命";
-        ctx.font = "700 8.5px sans-serif";
-        const w1 = ctx.measureText(roleLabel).width;
-        ctx.font = "8px sans-serif";
-        const w2 = ctx.measureText(stateLabel).width;
-        const pw = Math.max(w1, w2) + 12;
-        const py = sy + 6;
-        ctx.fillStyle = "rgba(255,255,255,.92)";
-        roundRect(ctx, sx - pw / 2, py, pw, 21, 6); ctx.fill();
-        ctx.strokeStyle = a.state === "asking" ? "rgba(232,137,12,.55)" : "rgba(51,38,43,.18)"; ctx.lineWidth = 1;
-        roundRect(ctx, sx - pw / 2, py, pw, 21, 6); ctx.stroke();
-        ctx.fillStyle = "#33262b"; ctx.font = "700 8.5px sans-serif";
-        ctx.fillText(roleLabel, sx, py + 9);
-        ctx.fillStyle = a.state === "idle" ? "#7a6a72" : "#4a5568"; ctx.font = "8px sans-serif";
-        ctx.fillText(stateLabel, sx, py + 18);
-        if (a.currentThread) {
-          hitboxes.current.push({ id: a.id, sx, sy: py + 10, r: 11, kind: "task", threadId: a.currentThread.id });
-        }
+        if (a.state === "celebrating" && now - rt.enteredAt < 3 && Math.random() < 1 - Math.exp(-5 * dt)) spawnConfetti(rt, 2);
         if (a.state === "asking") {
           bubble(ctx, sx, sy - 46, "待放行", "#e8890c");
           // 聚光灯
@@ -279,6 +263,22 @@ export function FloorView({
         }
       }
 
+      // Paint every plaque after all sprites/effects, so a later actor cannot cover another's text.
+      for (const a of sorted) {
+        const slot = layout.slots.get(a.id)!;
+        const card = slot.card;
+        ctx.textAlign = "center";
+        ctx.fillStyle = "rgba(255,255,255,.95)";
+        roundRect(ctx, card.x, card.y, card.width, card.height, 6); ctx.fill();
+        ctx.strokeStyle = a.state === "asking" ? "rgba(232,137,12,.55)" : "rgba(51,38,43,.18)"; ctx.lineWidth = 1;
+        roundRect(ctx, card.x, card.y, card.width, card.height, 6); ctx.stroke();
+        ctx.fillStyle = "#33262b"; ctx.font = FLOOR_ROLE_FONT;
+        slot.roleLines.forEach((line, index) => ctx.fillText(line, slot.sx, card.y + 9 + index * 11));
+        ctx.fillStyle = a.state === "idle" ? "#7a6a72" : "#4a5568"; ctx.font = FLOOR_STATUS_FONT;
+        slot.stateLines.forEach((line, index) => ctx.fillText(line, slot.sx, card.y + 18 + (slot.roleLines.length - 1 + index) * 11));
+        hitboxes.current.push({ id: a.id, ...card, kind: a.currentThread ? "task" : "agent", threadId: a.currentThread?.id });
+      }
+
       raf = requestAnimationFrame(frame);
     };
     raf = requestAnimationFrame(frame);
@@ -288,10 +288,10 @@ export function FloorView({
 
   /* 点击：命中员工 → 请示卡 / 绩效卡（绘制顺序远→近，点击逆序=上层优先） */
   const onClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const rect = (e.target as HTMLCanvasElement).getBoundingClientRect();
+    const rect = e.currentTarget.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     for (const h of [...hitboxes.current].reverse()) {
-      if ((mx - h.sx) ** 2 + (my - h.sy) ** 2 < h.r ** 2 * 2.2) {
+      if (mx >= h.x && mx <= h.x + h.width && my >= h.y && my <= h.y + h.height) {
         // 任务牌命中 → 任务详情；员工本体命中 → 员工档案（审批卡入口已随基座审批环节移除）
         if (h.kind === "task" && h.threadId) { onOpenTask?.(h.threadId); return; }
         const agent = floorRef.current.agents.find((a) => a.id === h.id);
@@ -302,15 +302,35 @@ export function FloorView({
     }
   };
 
+  const onMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const hit = [...hitboxes.current].reverse().find(h => mx >= h.x && mx <= h.x + h.width && my >= h.y && my <= h.y + h.height);
+    const agent = hit && floorRef.current.agents.find(a => a.id === hit.id);
+    e.currentTarget.title = agent ? `${roleTitleOf(agent.name, agent.presetKey)}${agent.currentThread ? ` · ${agent.currentThread.title}` : ""}` : "";
+  };
+
   return (
-    <canvas
-      ref={ref}
-      onClick={onClick}
-      className="h-[380px] w-full cursor-pointer sm:h-[440px]"
-      data-scene={floor.scene.id}
-      data-product-scene="workplace-2d"
-      data-product-scene-actors={String(floor.agents.length)}
-    />
+    <div ref={viewport} className="h-[380px] w-full max-w-full overflow-auto sm:h-[440px]" tabIndex={0} role="region" aria-label="数字职场，可滚动查看全部员工"
+      onWheel={() => { scroll.current.userPositioned = true; }}
+      onPointerDown={() => { scroll.current.userPositioned = true; }}
+      onKeyDown={event => { if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", "PageUp", "PageDown", "Home", "End", " "].includes(event.key)) scroll.current.userPositioned = true; }}
+      onScroll={event => { if (Math.abs(event.currentTarget.scrollLeft - scroll.current.left) > 1 || Math.abs(event.currentTarget.scrollTop - scroll.current.top) > 1) scroll.current.userPositioned = true; }}>
+      {canvasError && <p role="alert" className="p-4 text-sm text-rose-700">{canvasError}</p>}
+      {/* Geometry must update immediately: reduced-motion CSS can still enable a tiny transition. */}
+      <div ref={content} className="h-full w-full" style={{ transitionProperty: "none" }}>
+        <canvas
+          ref={ref}
+          onClick={onClick}
+          onMouseMove={onMouseMove}
+          className="block h-full w-full cursor-pointer"
+          style={{ transitionProperty: "none" }}
+          data-scene={floor.scene.id}
+          data-product-scene="workplace-2d"
+          data-product-scene-actors={String(floor.agents.filter(a => a.state !== "disabled").length)}
+        />
+      </div>
+    </div>
   );
 }
 
@@ -342,6 +362,7 @@ function bubble(ctx: CanvasRenderingContext2D, sx: number, sy: number, text: str
 const SKIN: Record<string, [string, string]> = {
   working: ["#22c88a", "#0e7a4a"], asking: ["#4d96ff", "#2a6ac8"], blocked: ["#ffaa33", "#c87a1a"],
   celebrating: ["#4d96ff", "#2a6ac8"], collab: ["#b678ff", "#7a3ac8"], idle: ["#7a5c64", "#4a383e"], disabled: ["#666", "#444"],
+  queued: ["#89a3c8", "#536b90"],
 };
 
 function drawAgent(ctx: CanvasRenderingContext2D, sx: number, sy: number, rt: ActorRt, a: FloorAgent, now: number, walking: boolean) {

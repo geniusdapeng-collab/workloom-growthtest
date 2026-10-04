@@ -42,7 +42,7 @@ import {
   verifyRelease,
 } from "../desktop-release-finalizer.mjs";
 
-const REPOSITORY = "workloom-ai/WorkLoom-growth";
+const REPOSITORY = "workloom-ai/workloom-growthtest";
 const EVENT = "api_trigger_desktop_release";
 const API_ORIGIN = "https://api.cnb.cool";
 const TAG_PATTERN = /^v\d+\.\d+\.\d+$/u;
@@ -295,7 +295,7 @@ function safeHttpsUrl(value) {
 
 export async function assertGitBinding(client, identity, { requireAbsentRelease = true } = {}) {
   const main = await client.api("GET", "git/branches/main");
-  assert(main?.name === "main" && main.protected === true,
+  assert(["main", "refs/heads/main"].includes(main?.name) && main.protected === true,
     "远端 main 必须已启用 CNB 分支保护");
   assert(requireSha(main?.commit?.sha, "远端 main SHA") === identity.sha,
     "远端 main 已偏离 RELEASE_SHA");
@@ -305,7 +305,7 @@ export async function assertGitBinding(client, identity, { requireAbsentRelease 
     ?? (tag?.target_type === "commit" ? tag.target : null);
   assert(requireSha(tagSha, "远端 tag 提交 SHA") === identity.sha,
     "远端稳定 tag 未精确指向 RELEASE_SHA");
-  assert(tag?.name === identity.tag, "远端 tag 名称不符");
+  assert([identity.tag, `refs/tags/${identity.tag}`].includes(tag?.name), "远端 tag 名称不符");
 
   if (requireAbsentRelease) {
     const existing = await client.api("GET", `releases/tags/${encodeURIComponent(identity.tag)}`,

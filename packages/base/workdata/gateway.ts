@@ -12,6 +12,7 @@
  * 全过 → appendEvent（events.ts）落 append-only 事件库
  */
 import type pg from "pg";
+import { createHash } from "node:crypto";
 import { safeParseBusinessEvent, type BusinessEvent } from "@workloom/shared";
 import {
   appendEventIdempotent,
@@ -148,6 +149,51 @@ export interface GatewayContext {
   /** 高风险授权的审批引用（事件 ID / approval_id），仅高危写动作需要 */
   approvalRef?: string;
   sessionId?: string | null;
+  /** Only issued in memory after a committed execution_started event. */
+  executionPermit?: ExecutionPermit;
+}
+
+export interface ExecutionPermit { readonly startedEventId: string }
+const executionPermits = new WeakMap<ExecutionPermit, string>();
+function canonical(value: unknown): string {
+  if (value === null || typeof value !== "object") return JSON.stringify(value ?? null);
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  return `{${Object.entries(value as Record<string, unknown>).filter(([, v]) => v !== undefined)
+    .sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${JSON.stringify(k)}:${canonical(v)}`).join(",")}}`;
+}
+function executionBinding(ctx: GatewayContext, draft: EventDraft): string {
+  return createHash("sha256").update(canonical({
+    tenant: ctx.tenantId, workspace: ctx.workspaceId, actor: ctx.actor,
+    session: ctx.sessionId, approval: ctx.approvalRef, who: draft.who, object: draft.object,
+    action: draft.decision.action, tool: draft.decision.tool, step: draft.decision.step_id,
+    params: draft.decision.params, effect: draft.decision.effect,
+  })).digest("hex");
+}
+function consumeExecutionPermit(ctx: GatewayContext, draft: EventDraft): boolean {
+  if (!ctx.executionPermit) return false;
+  if (draft.decision.kind !== "execute"
+    || executionPermits.get(ctx.executionPermit) !== executionBinding(ctx, draft)) {
+    throw new GatewayReject("authorization", "执行凭证不匹配或已经使用，拒绝落账");
+  }
+  executionPermits.delete(ctx.executionPermit);
+  return true;
+}
+
+/** Commit authorization and a durable attempt before any external side effect. */
+export async function authorizeToolExecution(
+  gateway: pg.Pool, ctx: GatewayContext, draft: EventDraft,
+): Promise<ExecutionPermit> {
+  if (draft.decision.kind !== "execution_started") {
+    throw new GatewayReject("authorization", "执行前授权必须记录 execution_started");
+  }
+  checkPermission(ctx.actor, draft);
+  if (typeof draft.decision.tool === "string") {
+    checkPermission(ctx.actor, { ...draft, decision: { ...draft.decision, action: draft.decision.tool } });
+  }
+  const result = await gatewayAppend(gateway, ctx, draft);
+  const permit = Object.freeze({ startedEventId: result.eventId });
+  executionPermits.set(permit, executionBinding(ctx, draft));
+  return permit;
 }
 
 export type { EventDraft } from "./events.js";
@@ -169,7 +215,7 @@ export function checkPermission(actor: ActorInfo, event: EventDraft): void {
   // HP-02 口径：段①按「显式写」约束（装配期已把 Bundle 声明的 write 工具登记为显式写，
   // 行业工具名不再漏判）；未分类动作不在此处拦截，交由判定器按写兜底（judge 的
   // "未知 → default_level" 才是 fail-closed 的落点，避免误伤基座内部只读动作）。
-  if (!isWriteAction(action)) return;
+  if (event.decision.effect !== "write" && !isWriteAction(action)) return;
   if (actor.readonly) {
     throw new GatewayReject(
       "permission",
@@ -189,12 +235,16 @@ export type GatewayQueryable = Pick<pg.Pool, "query"> | Pick<pg.PoolClient, "que
 
 interface ApprovalRow {
   status: string;
+  gesture?: { edited_after?: unknown } | null;
   snapshot: {
     expires_at?: string | null;
     object_type?: string;
     object_id?: string;
     action?: string;
     object?: { type?: string; id?: string };
+    params?: Record<string, unknown>;
+    tool?: string;
+    step_id?: string;
   } | null;
 }
 
@@ -213,9 +263,9 @@ export async function checkHighRiskAuthorization(
   event: EventDraft,
   approvalRef?: string,
 ): Promise<void> {
-  if (actor.type !== "agent" || !actor.highRisk) return;
+  if (actor.type !== "agent" || (!actor.highRisk && !approvalRef)) return;
   // 同段①口径：显式写（含装配期登记的行业工具）才要求逐次授权
-  if (!isWriteAction(event.decision.action)) return;
+  if (event.decision.effect !== "write" && !isWriteAction(event.decision.action)) return;
   /**
    * 适用面收口（T-2026-0929-0003 联动修复）：逐次授权约束的是**动作执行**，
    * 不是"围绕该动作的围栏判定留痕"。loop.ts 的 `kind` 取值只有三种：
@@ -234,8 +284,8 @@ export async function checkHighRiskAuthorization(
     );
   }
   const r = await db.query<ApprovalRow>(
-    `SELECT status, snapshot FROM approvals
-     WHERE approval_id = $1 AND tenant_id = $2 AND workspace_id = $3`,
+    `SELECT status, snapshot, gesture FROM approvals
+     WHERE approval_id = $1 AND tenant_id = $2 AND workspace_id = $3 FOR UPDATE`,
     [approvalRef, scope.tenantId, scope.workspaceId],
   );
   const row = r.rows[0];
@@ -245,14 +295,14 @@ export async function checkHighRiskAuthorization(
       `审批引用「${approvalRef}」在本工作区不存在（伪造引用拒绝，P1-8）`,
     );
   }
-  if (row.status !== "approved") {
+  if (row.status !== "approved" && row.status !== "edited") {
     throw new GatewayReject(
       "authorization",
       `审批「${approvalRef}」状态为 ${row.status}（非 approved，P1-8），拒绝放行`,
     );
   }
   const snap = row.snapshot ?? {};
-  if (snap.expires_at && Date.parse(snap.expires_at) <= Date.now()) {
+  if (snap.expires_at && (!Number.isFinite(Date.parse(snap.expires_at)) || Date.parse(snap.expires_at) <= Date.now())) {
     throw new GatewayReject(
       "authorization",
       `审批「${approvalRef}」已过期（snapshot.expires_at=${snap.expires_at}，P1-8），须重新审批`,
@@ -278,6 +328,20 @@ export async function checkHighRiskAuthorization(
       `审批「${approvalRef}」绑定动作 ${snap.action} 与当前 ${event.decision.action} 不符（P1-8），拒绝`,
     );
   }
+  if ((snap.tool && snap.tool !== event.decision.tool)
+    || (snap.step_id && snap.step_id !== event.decision.step_id)) {
+    throw new GatewayReject("authorization", `审批「${approvalRef}」工具或步骤不匹配`);
+  }
+  if (snap.params) {
+    const edited = row.status === "edited" ? row.gesture?.edited_after : undefined;
+    if (row.status === "edited" && (!edited || typeof edited !== "object" || Array.isArray(edited))) {
+      throw new GatewayReject("authorization", `审批「${approvalRef}」编辑参数不是对象，须重新审批`);
+    }
+    const effectiveParams = edited ? { ...snap.params, ...edited as Record<string, unknown> } : snap.params;
+    if (canonical(effectiveParams) !== canonical(event.decision.params ?? {})) {
+      throw new GatewayReject("authorization", `审批「${approvalRef}」参数与执行参数不一致`);
+    }
+  }
   /**
    * B-02 修复（L3.5 逐次授权）：验真通过即原子消费——同一 approvalRef 不得驱动第二次写动作。
    * 此前本函数只 SELECT 不写入，一张 approved 审批就是永久通行证（复用实锤见排雷台账 B-02）。
@@ -286,7 +350,8 @@ export async function checkHighRiskAuthorization(
    */
   const consumed = await db.query(
     `UPDATE approvals SET consumed_at = now()
-      WHERE approval_id = $1 AND tenant_id = $2 AND workspace_id = $3 AND consumed_at IS NULL`,
+      WHERE approval_id = $1 AND tenant_id = $2 AND workspace_id = $3
+        AND status IN ('approved','edited') AND consumed_at IS NULL`,
     [approvalRef, scope.tenantId, scope.workspaceId],
   );
   if ((consumed.rowCount ?? 0) === 0) {
@@ -319,7 +384,9 @@ export async function gatewayAppend(
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-    await checkHighRiskAuthorization(client, scope, ctx.actor, masked.value, ctx.approvalRef);
+    if (!consumeExecutionPermit(ctx, draft)) {
+      await checkHighRiskAuthorization(client, scope, ctx.actor, draft, ctx.approvalRef);
+    }
     const result = await appendEventInTx(client, scope, { event: masked.value, sessionId: ctx.sessionId });
     await client.query("COMMIT");
     return { ...result, piiHits: masked.hits };
@@ -346,7 +413,9 @@ export async function gatewayAppendOnClient(
   // 段② 脱敏
   const masked = maskDeep(draft);
   // 段③ 高风险授权（P1-8：复用调用方事务的 RLS 上下文查 approvals 验真）
-  await checkHighRiskAuthorization(client, { tenantId: ctx.tenantId, workspaceId: ctx.workspaceId }, ctx.actor, masked.value, ctx.approvalRef);
+  if (!consumeExecutionPermit(ctx, draft)) {
+    await checkHighRiskAuthorization(client, { tenantId: ctx.tenantId, workspaceId: ctx.workspaceId }, ctx.actor, draft, ctx.approvalRef);
+  }
   // 事务内落库（append_event_insert 特权函数；append-only + 哈希链 + 幂等）
   const result = await appendEventInTx(
     client,

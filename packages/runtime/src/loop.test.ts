@@ -9,16 +9,18 @@ import type { ToolResult } from "./tools.js";
 const doubles = vi.hoisted(() => ({
   assemblePreset: vi.fn(),
   append: vi.fn(),
+  authorize: vi.fn(),
 }));
 
 vi.mock("./assembly.js", () => ({ assemblePreset: doubles.assemblePreset }));
 vi.mock("@workloom/base/fence-engine", () => ({
-  judge: () => ({ level: "auto", impacts: [], triggeredBy: [] }),
-  judgeViews: () => ({ level: "auto", impacts: [], triggeredBy: [] }),
+  judge: () => ({ level: "auto", impacts: [], triggeredBy: [], evalErrors: [] }),
+  judgeViews: () => ({ level: "auto", impacts: [], triggeredBy: [], evalErrors: [] }),
 }));
 vi.mock("@workloom/base/workdata", () => ({
   gatewayAppend: doubles.append,
   gatewayAppendOnClient: doubles.append,
+  authorizeToolExecution: doubles.authorize,
   registerWriteActions: vi.fn(),
 }));
 vi.mock("@workloom/base/captain", () => ({ loadCharter: vi.fn(), routeTier: vi.fn() }));
@@ -51,6 +53,8 @@ type StoredEvent = {
 let events: StoredEvent[];
 let queries: Array<{ sql: string; params: unknown[] }>;
 let historyFailure: Error | undefined;
+let lockAvailable: boolean;
+let threadStatus: string;
 let pool: pg.Pool;
 
 function remember(receipt: unknown, basis?: string[], overrides: Partial<StoredEvent> = {}): void {
@@ -66,6 +70,8 @@ beforeEach(() => {
   events = [];
   queries = [];
   historyFailure = undefined;
+  lockAvailable = true;
+  threadStatus = "paused";
   doubles.assemblePreset.mockResolvedValue({
     agentId: "agent-a", presetKey: "operator", version: "v1", highRisk: false, fenceBindings: [], prompt: null,
     essentials: { archive: { dataMode: "real" }, stage: "production", goal: input.goal },
@@ -78,11 +84,19 @@ beforeEach(() => {
     events.push({ payload, tenantId: ctx.tenantId, workspaceId: ctx.workspaceId, threadId: ctx.sessionId });
     return { eventId: `E-${events.length}` };
   });
+  doubles.authorize.mockImplementation(async (client, ctx, payload) => {
+    const result = await doubles.append(client, ctx, payload);
+    return { startedEventId: result.eventId };
+  });
   pool = {
     connect: async () => ({
       release: vi.fn(),
       query: async (sql: string, params: unknown[] = []) => {
         queries.push({ sql, params });
+        if (sql.includes("pg_try_advisory_lock")) return { rows: [{ locked: lockAvailable }] };
+        if (sql.includes("pg_advisory_unlock")) return { rows: [{ pg_advisory_unlock: true }] };
+        if (sql.includes("SELECT status, progress_done")) return { rows: [{ status: threadStatus, progress_done: threadStatus === "completed" ? 2 : 0, progress_total: 2 }] };
+        if (sql.includes("SELECT status FROM threads")) return { rows: [{ status: "running" }] };
         if (sql.includes("SELECT payload FROM biz_events")) {
           if (historyFailure) throw historyFailure;
           expect(sql).toContain("ORDER BY seq");
@@ -102,6 +116,7 @@ beforeEach(() => {
 
 const verifiedResult = (): ToolResult => ({ result: { accepted: true }, receipt: { synced: true } });
 const completedUpdates = () => queries.filter(({ sql, params }) => sql.includes("UPDATE threads") && params.includes("completed"));
+const executedEvents = () => events.filter(({ payload }) => (payload.decision as { kind?: string }).kind === "execute");
 
 describe("Quest 未核实回执不转完成，也不自动重发", () => {
   it.each([false, undefined])("当次回执 synced=%s：停在第一步；再次进入仍 failed 且没有重复执行", async (synced) => {
@@ -111,11 +126,11 @@ describe("Quest 未核实回执不转完成，也不自动重发", () => {
     expect(execute).toHaveBeenCalledTimes(1);
     expect(execute).toHaveBeenCalledWith("task.submit", {});
     // GR-15 起回执带 mode（real/simulated），断言语义位而不是整对象相等
-    expect(events[0]?.payload.receipt).toMatchObject({ synced: false });
+    expect(executedEvents()[0]?.payload.receipt).toMatchObject({ synced: false });
     const replay = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
     expect(replay).toEqual(first);
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(events).toHaveLength(1);
+    expect(events).toHaveLength(2);
     expect(completedUpdates()).toHaveLength(0);
   });
 
@@ -124,7 +139,7 @@ describe("Quest 未核实回执不转完成，也不自动重发", () => {
     const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
     expect(result).toMatchObject({ status: "failed", stepsDone: 0, unverified: ["s1"] });
     // GR-15 起回执带 mode（real/simulated），断言语义位而不是整对象相等
-    expect(events[0]?.payload.receipt).toMatchObject({ synced: false });
+    expect(executedEvents()[0]?.payload.receipt).toMatchObject({ synced: false });
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
@@ -144,7 +159,7 @@ describe("Quest 未核实回执不转完成，也不自动重发", () => {
     const replay = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
     expect(replay).toEqual(first);
     expect(execute).toHaveBeenCalledTimes(2);
-    expect(events).toHaveLength(2);
+    expect(events).toHaveLength(4);
   });
 
   it("熔断/待审事件没有执行回执，不会被误判为已执行但未核实", async () => {
@@ -191,6 +206,68 @@ describe("Quest 未核实回执不转完成，也不自动重发", () => {
     await expect(runQuest(pool, pool, scope, { ...input, toolExecutor: execute })).rejects.toBe(historyFailure);
     expect(execute).not.toHaveBeenCalled();
     expect(events).toHaveLength(0);
+  });
+
+  it("授权失败时不触工具、不写执行开始事件，并释放线程锁", async () => {
+    const denied = new Error("permission denied before action");
+    doubles.authorize.mockRejectedValueOnce(denied);
+    const execute = vi.fn(async () => verifiedResult());
+    await expect(runQuest(pool, pool, scope, { ...input, toolExecutor: execute })).rejects.toBe(denied);
+    expect(execute).not.toHaveBeenCalled();
+    expect(events).toHaveLength(0);
+    expect(queries.some(({ sql }) => sql.includes("pg_advisory_unlock"))).toBe(true);
+  });
+
+  it("已经取得执行权但未落最终回执的写操作，重入不得重发", async () => {
+    events.push({ ...scope, threadId: input.threadId, payload: {
+      decision: { kind: "execution_started", action: "task.submit", step_id: "s1", tool: "task.submit", effect: "write", params: {} },
+      receipt: { synced: false },
+    } });
+    const execute = vi.fn(async () => verifiedResult());
+    const result = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
+    expect(result).toMatchObject({ status: "failed", unverified: ["s1"] });
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it("写工具抛错可能已有副作用，记录未知并禁止自动重试", async () => {
+    const execute = vi.fn(async () => { throw new Error("connection closed after submission"); });
+    const first = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
+    expect(first.status).toBe("failed");
+    expect(executedEvents()[0]?.payload.receipt).toMatchObject({ synced: false });
+    expect(executedEvents()[0]?.payload.decision).toMatchObject({ kind: "execute", effect: "write", outcome: "error" });
+    const replay = await runQuest(pool, pool, scope, { ...input, toolExecutor: execute });
+    expect(replay).toMatchObject({ status: "failed", unverified: ["s1"] });
+    expect(execute).toHaveBeenCalledTimes(1);
+  });
+
+  it("明确标为只读的执行异常允许重试，并且不会重试已经成功的后继步骤", async () => {
+    doubles.assemblePreset.mockResolvedValue({
+      agentId: "agent-a", presetKey: "operator", version: "v1", highRisk: false, fenceBindings: [], prompt: null,
+      essentials: { archive: { dataMode: "real" }, stage: "production", goal: input.goal },
+      tools: [{ name: "task.submit", access: "read", desc: "读取" }, { name: "task.confirm", access: "read", desc: "核验" }],
+    });
+    const execute = vi.fn().mockRejectedValueOnce(new Error("read unavailable")).mockResolvedValue(verifiedResult());
+    expect((await runQuest(pool, pool, scope, { ...input, toolExecutor: execute })).status).toBe("failed");
+    expect((await runQuest(pool, pool, scope, { ...input, toolExecutor: execute })).status).toBe("completed");
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("他方持锁时不规划、不消费审批、不触工具", async () => {
+    lockAvailable = false;
+    const execute = vi.fn(async () => verifiedResult());
+    expect((await runQuest(pool, pool, scope, { ...input, toolExecutor: execute })).status).toBe("running");
+    expect(doubles.assemblePreset).not.toHaveBeenCalled();
+    expect(doubles.authorize).not.toHaveBeenCalled();
+    expect(execute).not.toHaveBeenCalled();
+    expect(queries.some(({ sql }) => sql.includes("pg_advisory_unlock"))).toBe(false);
+  });
+
+  it.each(["cancelled", "completed"])("%s 终态重入不复活、不执行", async (status) => {
+    threadStatus = status;
+    const execute = vi.fn(async () => verifiedResult());
+    expect((await runQuest(pool, pool, scope, { ...input, toolExecutor: execute })).status).toBe(status);
+    expect(execute).not.toHaveBeenCalled();
+    expect(queries.filter(({ sql }) => sql.includes("UPDATE threads"))).toHaveLength(0);
   });
 });
 

@@ -48,6 +48,7 @@ export * from "./device-policy.js";
 export * from "./quality-evidence.js";
 /** 固定影片工位的受限通道与服务客户端（T-2026-0927-0039）。 */
 export * from "./film-worker-channel.js";
+export * from "./film-worker-runtime.js";
 export * from "./film-service-client.js";
 /** 影片作者合同与监制评审（服务侧固定工位用冻结原稿构建合同）。 */
 export * from "./film-contracts.js";

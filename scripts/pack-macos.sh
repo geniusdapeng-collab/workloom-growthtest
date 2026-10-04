@@ -79,7 +79,7 @@ done
 mkdir -p "$R/scripts"
 cp scripts/migrate.ts scripts/desktop-bootstrap-db.mjs scripts/product-runtime.mjs scripts/vite-product.mjs "$R/scripts/"
 mkdir -p "$R/scripts/tools"
-cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
+cp scripts/tools/full-chain-film.mts scripts/tools/film-voice-artifact.ts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
    scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
    scripts/tools/enhance-engine-install.mjs "$R/scripts/tools/"
 # Whiteboard source and example inputs are portable; the machine-specific Python
@@ -97,6 +97,7 @@ cp vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
    vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
    "$R/vendor/srt-whiteboard/examples/"
 cp scripts/seed*.ts "$R/scripts/"  # 全部行业种子随包（按 .env.defaults DESKTOP_SEED_SCRIPT 选用）
+cp scripts/skill-bindings.mts "$R/scripts/"
 printf '%s\n' "$VERSION" > "$R/VERSION"
 
 # 3. 依赖与 web 构建产物（需在装配机先 pnpm install + build）
@@ -112,20 +113,15 @@ NM_STAGE="$STAGE/nm-pkg"
 NPM_REG="${NPM_REGISTRY:-https://registry.npmjs.org}"
 node scripts/runtime-deps-lock.mjs stage "$NM_STAGE" --os darwin --cpu "$NODE_ARCH" --registry "$NPM_REG"
 copy "$NM_STAGE/node_modules" "$R/node_modules"
-INTERNAL_PACKAGE_MANIFESTS=(packages/*/package.json)
-[ "$PLATFORM_OPS_MODE" = "include" ] && INTERNAL_PACKAGE_MANIFESTS+=(platform-ops/package.json)
-for pkgjson in "${INTERNAL_PACKAGE_MANIFESTS[@]}"; do
-  [ -f "$pkgjson" ] || continue
-  pname="$(node -p "try{require('./$pkgjson').name||''}catch(e){''}" 2>/dev/null)"
-  [ -n "$pname" ] || continue
-  pdir="$(dirname "$pkgjson")"
-  mkdir -p "$R/node_modules/$(dirname "$pname")"
-  copy "$pdir" "$R/node_modules/$pname"
+for built in packages/*/dist; do
+  [ -d "$built" ] || continue
+  copy "$built" "$R/$built"
 done
+node scripts/pack-workspace-modules.mjs "$R"
 find "$R/node_modules" -mindepth 2 -maxdepth 4 -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
 for f in node_modules/tsx/package.json node_modules/hono/package.json scripts/migrate.ts \
-         scripts/product-runtime.mjs scripts/vite-product.mjs product.manifest.json apps/web/vite.config.ts \
-         scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
+         scripts/product-runtime.mjs scripts/vite-product.mjs scripts/skill-bindings.mts product.manifest.json apps/web/vite.config.ts \
+         scripts/tools/full-chain-film.mts scripts/tools/film-voice-artifact.ts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
          scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
          scripts/tools/enhance-engine-install.mjs scripts/whiteboard/lineart_tools.py \
          assets/whiteboard/drawing-hand-workloom.png vendor/srt-whiteboard/LICENSE \

@@ -79,16 +79,12 @@ RUNTIME_SOURCE_DIRS=(
   apps/web/vite.config.ts apps/web/tsconfig.json packages bundles
 )
 [ "$PLATFORM_OPS_MODE" = "include" ] && RUNTIME_SOURCE_DIRS+=(platform-ops)
-for d in "${RUNTIME_SOURCE_DIRS[@]}"; do
-  [ -e "$d" ] || continue
-  mkdir -p "$R/$(dirname "$d")"
-  copy "$d" "$R/$(dirname "$d")/"
-done
+node scripts/pack-workspace-modules.mjs --copy-sources "$R" "${RUNTIME_SOURCE_DIRS[@]}"
 cp scripts/migrate.ts scripts/desktop-bootstrap-db.mjs scripts/product-runtime.mjs scripts/vite-product.mjs "$R/scripts/"
 mkdir -p "$R/scripts/tools"
 # Film CLIs keep their repo-relative paths in the installed runtime. Native
 # enhancer, Python venv, and FFmpeg binaries remain workstation prerequisites.
-cp scripts/tools/full-chain-film.mts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
+cp scripts/tools/full-chain-film.mts scripts/tools/film-voice-artifact.ts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
    scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
    scripts/tools/enhance-engine-install.mjs "$R/scripts/tools/"
 mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
@@ -124,19 +120,9 @@ NM_STAGE="$STAGE/nm-pkg"
 NPM_REG="${NPM_REGISTRY:-https://registry.npmjs.org}"
 node scripts/runtime-deps-lock.mjs stage "$NM_STAGE" --os "$TARGET_OS" --cpu "$TARGET_CPU" --registry "$NPM_REG"
 copy "$NM_STAGE/node_modules" "$R/node_modules"
-# 内部工作区包以实体目录入 node_modules（v2.0.14 @workloom 缺失实证）——
-# 按各包 package.json 的 name 动态注册（行业仓有自定义包，如 @hyperreality/video-studio；
-# 仓根级一方包 platform-ops 仅在仙女座精确身份下注册；目录存在本身不构成授权。
-INTERNAL_PACKAGE_MANIFESTS=(packages/*/package.json)
-[ "$PLATFORM_OPS_MODE" = "include" ] && INTERNAL_PACKAGE_MANIFESTS+=(platform-ops/package.json)
-for pkgjson in "${INTERNAL_PACKAGE_MANIFESTS[@]}"; do
-  [ -f "$pkgjson" ] || continue
-  pname="$(node -p "try{require('./$pkgjson').name||''}catch(e){''}" 2>/dev/null)"
-  [ -n "$pname" ] || continue
-  pdir="$(dirname "$pkgjson")"
-  mkdir -p "$R/node_modules/$(dirname "$pname")"
-  copy "$pdir" "$R/node_modules/$pname"
-done
+# 真实源文件保留在 packages 下；复制进 node_modules 会使仓库相对引用失效。
+# 实体 ESM 入口不依赖 Windows junction 权限，也不会复制模块级单例状态。
+node scripts/pack-workspace-modules.mjs "$R"
 find "$R/node_modules" -mindepth 2 -maxdepth 4 -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
 # ⚠️ 必须 -mindepth 2：根目录本身也叫 node_modules，不带 mindepth 会整目录自毁
 #（hyperreality/workloom v1.0.0 冒烟「tsx 缺失」实证）；maxdepth 4 覆盖 @scope/pkg/node_modules
@@ -217,7 +203,7 @@ fi
 #      DMG 带着残缺载荷照出——装配脚本必须自证完整，防"静默半成品"） ----------
 for f in runtime/node_modules/tsx/package.json runtime/node_modules/hono/package.json \
          runtime/scripts/migrate.ts runtime/scripts/product-runtime.mjs runtime/scripts/vite-product.mjs \
-         runtime/scripts/tools/full-chain-film.mts runtime/scripts/tools/compose-film.mts \
+         runtime/scripts/tools/full-chain-film.mts runtime/scripts/tools/film-voice-artifact.ts runtime/scripts/tools/compose-film.mts \
          runtime/scripts/tools/explainer-run.mts runtime/scripts/tools/whiteboard-film.mts \
          runtime/scripts/tools/whiteboard-env-install.mts runtime/scripts/tools/enhance-engine-install.mjs \
          runtime/scripts/whiteboard/lineart_tools.py runtime/assets/whiteboard/drawing-hand-workloom.png \
@@ -229,7 +215,7 @@ for f in runtime/node_modules/tsx/package.json runtime/node_modules/hono/package
          runtime/vendor/srt-whiteboard/scripts/render_annotation_preview.py \
          runtime/vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
          runtime/vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
-         runtime/product.manifest.json runtime/apps/web/vite.config.ts; do
+         runtime/scripts/skill-bindings.mts runtime/product.manifest.json runtime/apps/web/vite.config.ts; do
   [ -f "$OUT/$f" ] || { echo "❌ 载荷自检失败：$f 缺失"; exit 1; }
 done
 # 种子脚本按仓各异（seed-aipm/seed-trading/seed-video…），存在其一即可

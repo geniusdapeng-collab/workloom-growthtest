@@ -207,16 +207,41 @@ function VectorCeremonyStage({ actors, occasion = "first-install", dancing = tru
   }, [onReady]);
 
   const staff = actors.slice(1);
+  const dense = actors.length > 15;
   return (
     <div data-ceremony-render-mode="vector2d" data-ceremony-ready={ready ? "true" : "false"} data-ceremony-actors={String(actors.length)} style={{ width: "100%", height, borderRadius: 12, overflow: "hidden", background: "radial-gradient(ellipse at 50% 70%,#222b39 0,#0b0d10 58%)", position: "relative" }}>
       <style>{`
         @keyframes ceremony-v2-dance { 0%,100% { transform:translateY(0) rotate(-1deg); } 35% { transform:translateY(-12px) rotate(1.5deg); } 70% { transform:translateY(-4px) rotate(-1.2deg); } }
         @keyframes ceremony-v2-arrive { from { opacity:0; transform:translateY(70px) scale(.7); } to { opacity:1; transform:none; } }
         @keyframes ceremony-v2-beam { 0%,100% { opacity:.18; } 50% { opacity:.42; } }
+        .ceremony-team-grid { position:absolute; inset:260px 32px 24px; display:grid; grid-template-columns:repeat(auto-fit,minmax(112px,1fr)); grid-auto-rows:max-content; gap:12px 10px; align-content:start; overflow-y:auto; padding:12px; scrollbar-color:#8fa9c9 #131c2a; }
+        .ceremony-team-grid:focus-visible { outline:2px solid #ffd98a; outline-offset:2px; }
+        @media(max-width:600px) { .ceremony-team-grid { inset:230px 12px 16px; grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:12px 8px; padding:8px; } }
+        @media(prefers-reduced-motion:reduce) { .ceremony-team-grid [data-ceremony-actor] { animation:none !important; } }
       `}</style>
       <div style={{ position: "absolute", left: "8%", right: "8%", bottom: "8%", height: "18%", borderRadius: "50%", border: "1px solid rgba(255,217,138,.22)", background: "radial-gradient(ellipse,rgba(255,217,138,.11),transparent 70%)", transform: "perspective(500px) rotateX(64deg)" }} />
       {[18, 34, 50, 66, 82].map((left, i) => <div key={left} style={{ position: "absolute", left: `${left}%`, top: 0, width: "14%", height: "82%", transform: "translateX(-50%)", clipPath: "polygon(42% 0,58% 0,100% 100%,0 100%)", background: i === 2 ? "linear-gradient(rgba(255,217,138,.22),transparent)" : "linear-gradient(rgba(174,202,235,.12),transparent)", animation: `ceremony-v2-beam ${2.4 + i * .17}s ease-in-out infinite` }} />)}
-      {actors.map((actor, index) => {
+      {dense ? (
+        <div className="ceremony-team-grid" data-ceremony-team-layout="grid" role="region" aria-label="团队欢迎名单" tabIndex={0}>
+          {actors.map((actor, index) => {
+            const isCeo = index === 0;
+            const slow = !isCeo && choreo.slowDancers.includes(index - 1);
+            return (
+              <div key={`${actor.presetKey}-${index}`} data-ceremony-actor={actor.presetKey}
+                style={{ minWidth: 0, minHeight: 98, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end",
+                  padding: "4px 6px", borderRadius: 12, border: `1px solid ${isCeo ? "rgba(255,217,138,.4)" : "rgba(138,216,255,.12)"}`,
+                  background: isCeo ? "rgba(255,217,138,.08)" : "rgba(12,21,34,.62)" }}>
+                <div style={{ flexShrink: 0, animation: dancing ? `ceremony-v2-dance ${slow ? 1.42 : .94}s ease-in-out ${index * .05}s infinite` : "ceremony-v2-arrive .58s ease both", transformOrigin: "50% 100%" }}>
+                  <AgentAvatarOf name={actor.name} presetKey={actor.presetKey} size={56} />
+                </div>
+                <div data-wl-meta data-ceremony-role-label style={{ width: "100%", flexShrink: 0, minHeight: 32, marginTop: 4, fontSize: 12, lineHeight: "16px", textAlign: "center", overflowWrap: "anywhere", color: isCeo ? "#ffd98a" : "#e7eef8", fontWeight: isCeo ? 750 : 600 }}>
+                  {actor.name}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : actors.map((actor, index) => {
         const isCeo = index === 0;
         const staffIndex = index - 1;
         const row = staff.length > 7 && staffIndex >= Math.ceil(staff.length / 2) ? 1 : 0;

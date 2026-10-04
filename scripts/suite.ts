@@ -607,9 +607,13 @@ e("手势事件 links 溯源被审事件", async () => {
 });
 e("驳回原因枚举回流偏好记忆（F1.7）", async () => {
   const { approvalId } = await mkApproval();
-  await decide(app, gw, scope, boss, approvalId, { type: "reject", reasonEnum: `suite_cal_${SFX}` });
+  const reason = `suite_cal_${SFX}`;
+  const decision = await decide(app, gw, scope, boss, approvalId, { type: "reject", reasonEnum: reason });
   const hits = await searchMemories(app, scope, { kind: "preference" });
-  assert(hits.some((h) => h.memory_id === `mem-reject-suite_cal_${SFX}`), "偏好记忆回流");
+  const memory = hits.find((hit) => hit.content.includes(`「${reason}」`));
+  assert(memory, "偏好记忆含本次驳回原因");
+  const sources = await getMemorySources(app, scope, memory.memory_id);
+  assert(sources.sourceEvents.some((event) => event.event_id === decision.gestureEventId), "记忆来源回链本次人类手势");
 });
 e("批量采纳：普通项通过", async () => {
   const a1 = await mkApproval();
@@ -1737,12 +1741,19 @@ n("并发 ensureReady 同日期幂等", async () => {
 n("对象写锁持锁期间他人超时（E2.5）", async () => {
   const { withObjectLock, ObjectLockTimeout } = await import("@workloom/base/fence-engine");
   let timeoutHit = false;
+  let contestedActionRan = false;
   await withObjectLock(gw, `suite-lock-${SFX}`, async () => {
-    await expect(
-      withObjectLock(gw, `suite-lock-${SFX}`, async () => undefined, 300),
-    ).rejects.toBeInstanceOf(ObjectLockTimeout).catch(() => { timeoutHit = true; });
-  }).catch(() => undefined);
-  assert(timeoutHit || true, "锁超时路径可达");
+    try {
+      await withObjectLock(gw, `suite-lock-${SFX}`, async () => { contestedActionRan = true; }, 300);
+    } catch (error) {
+      if (!(error instanceof ObjectLockTimeout)) throw error;
+      timeoutHit = true;
+    }
+  });
+  assert(timeoutHit, "竞争者须明确收到 ObjectLockTimeout");
+  eq(contestedActionRan, false, "持锁期间竞争者零执行");
+  await withObjectLock(gw, `suite-lock-${SFX}`, async () => { contestedActionRan = true; }, 300);
+  eq(contestedActionRan, true, "原持有者释放后可正常执行");
 });
 n("并发写读一致（写后立即读可见）", async () => {
   const r = await gatewayAppend(gw, agentCtx(), draftOf("order.list"));
@@ -2070,20 +2081,19 @@ o("A-01 高危岗位写步骤须逐次授权：围栏判 auto 亦不得直接落
   eq(await executedCount(), 1, "重放不得二次执行（一次授权只放行一次）");
 });
 
-o("B-02b 已消费票据不得再充当授权：重试必须重新挂人审，不得抛错悬挂线程", async () => {
+o("B-02b 已消费票据与写操作异常：保持未核实失败，不得自动重发或悬挂线程", async () => {
   /**
    * 联动地雷（本次修复发现）：A-01 把 highRisk 接进 actor + B-02 票据一次性消费之后，
-   * 「票据已被消费、步骤又需要重跑」的组合若仍把死票据当授权，落库会被网关拒绝并抛出，
-   * 线程停在 running（无终态、无法自愈）。正确口径：消费过的票据不构成本轮授权，重新挂人审。
+   * 已消费票据不能构成本轮授权；写调用抛错也不能证明远端没有产生副作用。
+   * 保持未核实失败并等待对账，不能再次挂人审后盲目重发同一写动作。
    * 造现场：审批 approved 且 consumed_at 非空、事件带 step_id 且绑定本线程；
    * 步骤动作走 default_level=review（`brief.generate` 无规则命中）。
    */
   const tid = await mkThread();
   /**
    * 用 frontdesk-agent 的写工具 `pms.checkin`：无规则命中 → default_level=review（干净的人审位）。
-   * 事件须写成 `kind=execute + outcome=error`：GR-17 口径下这类事件**不进回执集合**
-   * （执行器异常=可重试，不是"未核实"），这样步骤才不会被 replay 的 early-return 拦掉，
-   * 从而真正走到"票据是否还可充当授权"的判定点。
+   * 事件写成 `kind=execute + outcome=error`：MC006 修复后写异常进入未核实集合。
+   * 本用例同时检查终态和事件数量，不能仅改变状态断言来掩盖再次外呼。
    */
   const evId = await mkEvent("pms.checkin", {
     sessionId: tid, stepId: "s1", extraDecision: { kind: "execute", outcome: "error", error: "套件造现场：上一次执行异常" },
@@ -2102,8 +2112,11 @@ o("B-02b 已消费票据不得再充当授权：重试必须重新挂人审，�
   const r = await runQuest(app, gw, scope, {
     threadId: tid, goal: "给 8301 办入住登记（B-02b）", presetKey: "frontdesk-agent", fallbackPlanner: plan,
   });
-  eq(r.status, "pending_review", "已消费票据不得充当授权：必须重新挂人审");
-  assert(r.pendingApprovalId !== aprId, "重试必须产生新审批（不得复用死票据）");
+  eq(r.status, "failed", "远端副作用未知的写操作保持失败，等待对账");
+  assert(r.unverified.includes("s1"), "具体未知步骤可见");
+  const replayEvents = await qApp<{ c: string }>(`SELECT count(*) AS c FROM biz_events WHERE session_id=$1`, [tid]);
+  eq(Number(replayEvents.rows[0]!.c), 1, "重放没有新增执行或审批事件");
+  eq(r.pendingApprovalId, undefined, "不能通过新审批盲目重发未知写动作");
   const alive = await qApp<{ status: string }>(`SELECT status FROM threads WHERE id=$1`, [tid]);
   assert(alive.rows[0]!.status !== "running", `线程不得停在 running（实际 ${alive.rows[0]!.status}）`);
 });
@@ -2215,38 +2228,33 @@ o("A-03 线程执行必须原子认领：他方 running 时入口必须幂等退
 /**
  * A-05（启动补扫，T-2026-0930-0003 续修）：补扫取线程元数据同样必须带事务级 RLS 上下文，
  * 否则 `if (!row) continue` 会把每条候选静默跳过、`resumed` 恒为 0。
- * 造现场：review 判定事件（kind=review，不算"已完成步骤"）+ 同一 step 的 approved 审批。
+ * 造现场：真实完整参数计划挂起，再经 decide 批准；补扫必须使用该绑定计划续跑。
  */
 o("A-05 启动补扫：审批已通过而线程仍挂起时必须补续跑", async () => {
   const { resumeApprovedPendingThreads } = await import("../apps/server/src/runtime/scheduler.js");
   let tid: string | undefined;
   try {
     tid = await mkThread("queued");
-    const ev = await gatewayAppend(gw, { ...scope, actor: { id: "desktop-agent", type: "agent", fenceBindings: ["R2"] }, sessionId: tid }, {
-      who: { type: "agent", id: "desktop-agent", version: "v1" },
-      context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString() },
-      object: { type: "suite", id: `suite-a05-${SFX}` },
-      decision: { action: "desktop.gui", step_id: "s1", kind: "review", params: { clicks: 1 } },
-      rule_impact: [],
+    const goal = "回复套件差评（启动补扫）";
+    const initial = await runQuest(app, gw, scope, {
+      threadId: tid, goal, presetKey: "review-agent",
+      fallbackPlanner: () => [{
+        stepId: "s1", action: "review.reply", objectType: "review", objectId: "RV-DEMO-01", tool: "review.reply",
+        params: { review_id: "RV-DEMO-01", rating: 2, text: "感谢反馈，我们已安排专人跟进。" }, label: "回复套件差评",
+      }],
     });
+    eq(initial.status, "pending_review", "真实步骤挂起待审");
     await qApp(
-      `UPDATE threads SET status='pending_review', title='桌面助理执行一件小事',
-              agent_id=(SELECT id FROM agents WHERE workspace_id=$2 AND preset_key='desktop-agent'), updated_at=now()
-        WHERE id=$1`,
-      [tid, scope.workspaceId],
+      `UPDATE threads SET title=$2 WHERE id=$1`, [tid, goal],
     );
-    const aprId = `apr-a05-${SFX}`;
-    await qApp(
-      `INSERT INTO approvals (approval_id, tenant_id, workspace_id, event_id, channel, status, snapshot)
-       VALUES ($1,$2,$3,$4,'inapp','approved',$5)`,
-      [aprId, scope.tenantId, scope.workspaceId, ev.eventId,
-        JSON.stringify({ before: null, after: { v: 1 }, high_risk: true, expires_at: new Date(Date.now() + 864e5).toISOString() })],
-    );
+    await decide(app, gw, scope, boss, initial.pendingApprovalId!, { type: "approve" });
     const resumed = await resumeApprovedPendingThreads();
     assert(resumed >= 1, `启动补扫应至少补续跑 1 条僵尸线程（实际 ${resumed}）`);
     const after = await qApp<{ status: string }>(`SELECT status FROM threads WHERE id=$1`, [tid]);
-    assert(after.rows[0]!.status !== "pending_review",
-      `补扫后线程必须离开 pending_review（实际 ${after.rows[0]!.status}）`);
+    eq(after.rows[0]!.status, "completed", "已绑定完整计划补扫完成");
+    const executed = await qApp<{ c: string }>(
+      `SELECT count(*) AS c FROM biz_events WHERE session_id=$1 AND payload->'decision'->>'kind'='execute'`, [tid]);
+    eq(Number(executed.rows[0]!.c), 1, "批准的步骤执行恰好一次");
   } finally {
     if (tid) await qApp(`DELETE FROM threads WHERE id=$1`, [tid]).catch(() => undefined);
   }
@@ -2354,17 +2362,30 @@ o("HP-02 失败关闭：通用规划的写类步骤无规则命中 → 挂起待
    * GR-07 起：确定性兜底计划的**每个写步骤**各自挂起人工裁决（读步骤照常执行）——
    * 因此"批准一次"只会推进到下一个挂起点；真实链路里这个循环由
    * `scheduleQuestResumeAfterApproval`（批准 → 自动续跑 → 下一个挂起点）自动完成。
-   * 本用例显式模拟该循环，并断言最终能走到 completed。
+   * 不完整参数不能只靠批准放行；先断言普通批准仍挂起且零写，再编辑补参逐步续跑。
    */
+  await decide(app, gw, scope, boss, r1.pendingApprovalId!, { type: "approve" });
   let r2 = await runQuest(app, gw, scope, { threadId: tid, goal: "把周五主打款调价 5%", presetKey: "pricing-agent" });
+  eq(r2.status, "pending_review", "批准不替代缺失参数");
+  const writesBeforeEdit = await qApp<{ c: string }>(
+    `SELECT count(*) AS c FROM biz_events WHERE session_id=$1
+      AND payload->'decision'->>'kind'='execute' AND payload->'decision'->>'effect'='write'`, [tid]);
+  eq(Number(writesBeforeEdit.rows[0]!.c), 0, "缺参状态零写执行");
   let guard = 0;
   while (r2.status === "pending_review" && guard < 6) {
     assert(r2.pendingApprovalId, "每个写步骤都能给出待批 ID");
-    await decide(app, gw, scope, boss, r2.pendingApprovalId!, { type: "approve" });
+    await decide(app, gw, scope, boss, r2.pendingApprovalId!, {
+      type: "edit", editedAfter: { room_type: "雅致大床房", price: 480 },
+    });
     r2 = await runQuest(app, gw, scope, { threadId: tid, goal: "把周五主打款调价 5%", presetKey: "pricing-agent" });
     guard += 1;
   }
-  eq(r2.status, "completed", "批准后恢复续跑完成");
+  eq(r2.status, "completed", "编辑补齐参数并重新判围栏后恢复完成");
+  const writes = await qApp<{ params: Record<string, unknown> }>(
+    `SELECT payload->'decision'->'params' AS params FROM biz_events WHERE session_id=$1
+      AND payload->'decision'->>'kind'='execute' AND payload->'decision'->>'effect'='write'`, [tid]);
+  assert(writes.rows.length > 0, "实际产生写执行回执");
+  assert(writes.rows.every((row) => row.params?.price === 480 && row.params?.room_type === "雅致大床房"), "执行回执携带人类实际补齐的参数");
 });
 
 o("生产行业规划器：百分比调价落真实价带锚点 + 夜班上下文，晨会派单直接跑通", async () => {
@@ -2468,9 +2489,13 @@ o("自然语言查账：店长口语检索被驳回的调价", async () => {
 });
 o("店长看组织记忆：驳回校准偏好可见", async () => {
   const { approvalId } = await mkApproval();
-  await decide(app, gw, scope, boss, approvalId, { type: "reject", reasonEnum: `daily_cal_${SFX}` });
+  const reason = `daily_cal_${SFX}`;
+  const decision = await decide(app, gw, scope, boss, approvalId, { type: "reject", reasonEnum: reason });
   const hits = await searchMemories(app, scope, { kind: "preference" });
-  assert(hits.some((h) => h.memory_id === `mem-reject-daily_cal_${SFX}`), "校准记忆可见");
+  const memory = hits.find((hit) => hit.content.includes(`「${reason}」`));
+  assert(memory, "本次校准原因可见");
+  const sources = await getMemorySources(app, scope, memory.memory_id);
+  assert(sources.sourceEvents.some((event) => event.event_id === decision.gestureEventId), "可追溯人类驳回来源");
 });
 o("店长看技能目录：官方可见 + team 仅本工作区", async () => {
   const official = await listSkills(app, scope, { level: "official" });

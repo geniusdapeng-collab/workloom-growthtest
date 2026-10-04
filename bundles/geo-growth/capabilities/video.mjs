@@ -16,7 +16,7 @@
  *   · 单文件读取上限 8MB / 2 万行，超出即如实失败，不截断冒充完整。
  */
 import { createHash } from "node:crypto";
-import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
+import { closeSync, existsSync, lstatSync, openSync, readFileSync, readSync, realpathSync, statSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -61,7 +61,7 @@ function assertKeys(input, allowed) {
 
 function optionalText(value, key, maxChars = 200) {
   if (value === undefined) return undefined;
-  if (typeof value !== "string" || !value.trim() || value.length > maxChars) {
+  if (typeof value !== "string" || !value.trim() || value.length > maxChars || /[\0\r\n]/u.test(value)) {
     throw new VideoCapabilityError(`${key} 须为 1–${maxChars} 字符的非空字符串`);
   }
   return value.trim();
@@ -133,7 +133,14 @@ function readJsonLines(absolute, label) {
 }
 
 function sha256File(absolute) {
-  return createHash("sha256").update(readFileSync(absolute)).digest("hex");
+  const handle = openSync(absolute, "r");
+  try {
+    const hash = createHash("sha256");
+    const buffer = Buffer.allocUnsafe(1024 * 1024);
+    let bytes;
+    while ((bytes = readSync(handle, buffer, 0, buffer.length, null)) > 0) hash.update(buffer.subarray(0, bytes));
+    return hash.digest("hex");
+  } finally { closeSync(handle); }
 }
 
 /** 只报"密钥是否配置"，绝不返回值（凭据纪律） */
@@ -255,10 +262,22 @@ export function deliveryInspect(input) {
   if (manifest === null) {
     return { found: false, projectId, manifestPath, hint: "还没有交付清单（还没跑 deliver 阶段）" };
   }
+  if (!plain(manifest) || manifest.projectId !== projectId) throw new VideoCapabilityError("交付清单项目标识不符或格式非法");
+  const assets = Array.isArray(manifest.assets) ? manifest.assets : [];
+  if (assets.length > 1000) throw new VideoCapabilityError("交付清单文件数量超过 1000", "TOO_LARGE");
+  const assetHashes = new Map();
+  for (const asset of assets) {
+    if (!plain(asset) || typeof asset.path !== "string") throw new VideoCapabilityError("清单 assets 项缺少文件路径");
+    if (assetHashes.has(asset.path) && assetHashes.get(asset.path) !== asset.sha256) throw new VideoCapabilityError("清单同一路径存在相互冲突的摘要");
+    assetHashes.set(asset.path, asset.sha256);
+  }
   const checks = [];
-  const checkFile = (label, rawPath) => {
-    if (typeof rawPath !== "string" || !rawPath.trim()) return;
-    const relativePath = rawPath.startsWith("/")
+  const checkFile = (label, rawPath, expectedSha256, required = false) => {
+    if (typeof rawPath !== "string" || !rawPath.trim()) {
+      if (required || rawPath !== null && rawPath !== undefined) checks.push({ label, state: "missing-path" });
+      return;
+    }
+    const relativePath = rawPath.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(rawPath)
       ? relative(artifactRoot(), rawPath)
       : rawPath.replace(/^\.\//u, "");
     let file;
@@ -268,22 +287,32 @@ export function deliveryInspect(input) {
       checks.push({ label, path: rawPath, state: "out-of-root", detail: error instanceof Error ? error.message : String(error) });
       return;
     }
-    if (!existsSync(file)) {
-      checks.push({ label, path: relativePath, state: "missing" });
-      return;
+    const expected = expectedSha256 ?? assetHashes.get(rawPath);
+    if (expectedSha256 && assetHashes.has(rawPath) && assetHashes.get(rawPath) !== expectedSha256) {
+      checks.push({ label, path: relativePath, state: "conflicting-sha256" }); return;
     }
-    checks.push({ label, path: relativePath, state: "present", bytes: statSync(file).size });
+    try {
+      if (!existsSync(file)) { checks.push({ label, path: relativePath, state: "missing" }); return; }
+      const info = statSync(file);
+      if (!info.isFile() || info.size === 0) { checks.push({ label, path: relativePath, state: "empty-or-not-file", bytes: info.size }); return; }
+      if (typeof expected !== "string" || !/^[a-f0-9]{64}$/iu.test(expected)) { checks.push({ label, path: relativePath, state: "sha256-unavailable", bytes: info.size }); return; }
+      const actual = sha256File(file);
+      checks.push({ label, path: relativePath, state: actual === expected.toLowerCase() ? "verified" : "sha256-mismatch", bytes: info.size, expectedSha256: expected, actualSha256: actual });
+    } catch (error) {
+      checks.push({ label, path: relativePath, state: "unreadable", detail: error instanceof Error ? error.message : String(error) });
+    }
   };
-  checkFile("deliverable", manifest.deliverable?.path);
-  checkFile("cover", manifest.cover?.path);
+  checkFile("deliverable", manifest.deliverable?.path, manifest.deliverable?.sha256, true);
+  checkFile("cover", manifest.cover?.path, manifest.cover?.sha256);
   for (const variant of Array.isArray(manifest.variants) ? manifest.variants : []) {
-    checkFile(`variant:${variant.id ?? "?"}`, variant.path);
-    if (variant.cover?.path) checkFile(`variant-cover:${variant.id ?? "?"}`, variant.cover.path);
+    checkFile(`variant:${variant.id ?? "?"}`, variant.path, variant.sha256, true);
+    if (variant.cover?.path) checkFile(`variant-cover:${variant.id ?? "?"}`, variant.cover.path, variant.cover.sha256);
   }
   const subtitles = manifest.subtitles ?? {};
-  checkFile("softsub", subtitles.softsub);
-  for (const entry of Array.isArray(subtitles.files) ? subtitles.files : []) checkFile("subtitle", entry.path ?? entry);
-  const missing = checks.filter((entry) => entry.state !== "present");
+  checkFile("softsub", subtitles.softsub, subtitles.softsubSha256);
+  for (const entry of Array.isArray(subtitles.files) ? subtitles.files : []) checkFile("subtitle", entry.path ?? entry, entry.sha256, true);
+  for (const asset of assets) checkFile("asset", asset.path, asset.sha256, true);
+  const missing = checks.filter((entry) => entry.state !== "verified");
   return {
     found: true,
     projectId,
@@ -294,8 +323,8 @@ export function deliveryInspect(input) {
     renderLedger: manifest.renderLedger?.totals ?? null,
     files: checks,
     missing: missing.map((entry) => entry.path ?? entry.label),
-    integrity: missing.length === 0 ? "all-listed-files-present" : "incomplete",
-    note: "本轮只校验清单所列文件是否存在与大小；`render-ledger.md` 与 `delivery-manifest.json` 里的 sha256 由 deliver 阶段写入",
+    integrity: missing.length === 0 ? "verified" : "incomplete",
+    note: "主件必需，逐件核对实际 SHA256；旧清单缺少指纹的附件标为未核实，重新执行 deliver 可生成完整指纹",
   };
 }
 
@@ -319,13 +348,13 @@ export function productionPlan(input) {
     { id: "shotlist", ok: shotlistExists, detail: shotlistExists ? `镜头卡在场：${shotlistPath}` : `缺镜头卡：${shotlistPath}（25 字段规范）` },
     { id: "ark-key", ok: arkKey.present, detail: arkKey.present ? `火山方舟密钥已配置（${arkKey.source}）` : "缺 VOLCENGINE_ARK_API_KEY（渲染会 403）" },
   ];
-  const command = [
-    "pnpm exec tsx scripts/tools/full-chain-film.mts \\",
-    `  --shots ${shotlistPath} --project ${projectId} \\`,
-    `  --work-dir work/vm-${projectId} --out ${outDir} \\`,
-    `  --route ${routePath} --keys-file ~/.workloom/live.env --platform ${platform} --fps 24 \\`,
-    "  --subtitle-mode both --review-policy off",
-  ].join("\n");
+  const argv = ["exec", "tsx", "scripts/tools/full-chain-film.mts", "--shots", shotlistPath, "--project", projectId,
+    "--work-dir", `work/vm-${projectId}`, "--out", outDir, "--route", routePath,
+    "--keys-file", process.env.WORKLOOM_KEYS_FILE || join(process.env.HOME ?? "", ".workloom/live.env"),
+    "--platform", platform, "--fps", "24", "--subtitle-mode", "both", "--review-policy", "off"];
+  const posixQuote = (text) => `'${text.replace(/'/gu, `'"'"'`)}'`;
+  const powershellQuote = (text) => `'${text.replace(/'/gu, "''")}'`;
+  const command = ["pnpm", ...argv].map(posixQuote).join(" ");
   return {
     previewOnly: true,
     title: title || null,
@@ -334,6 +363,8 @@ export function productionPlan(input) {
     checklist,
     ready: checklist.every((entry) => entry.ok),
     recommendedCommand: command,
+    recommendedPowerShellCommand: `& ${["pnpm", ...argv].map(powershellQuote).join(" ")}`,
+    execution: { command: "pnpm", args: argv },
     beforeRun: [
       "pnpm video:doctor（环境自检：ffmpeg/密钥/配音工位/曲库路径监狱）",
       "营销片：product-archive.mts 建/取商品档案；真人出镜：video:assets reconcile 对账素材清单",
