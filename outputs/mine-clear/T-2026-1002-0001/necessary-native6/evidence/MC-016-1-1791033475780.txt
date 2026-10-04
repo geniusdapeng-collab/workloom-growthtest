@@ -1,0 +1,300 @@
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90m/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest[39m
+
+ [32m✓[39m apps/web/src/pages/p0/P0.focus.test.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 144[2mms[22m[39m
+ [32m✓[39m apps/web/src/components/loommate/LoomMate.scene.test.tsx [2m([22m[2m15 tests[22m[2m)[22m[32m 197[2mms[22m[39m
+ [32m✓[39m apps/web/src/components/Floor3D.nameplate.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+ [32m✓[39m apps/web/src/components/loommate/LoomMate.inbox.test.tsx [2m([22m[2m24 tests[22m[2m)[22m[32m 282[2mms[22m[39m
+ [32m✓[39m apps/web/src/components/CeremonyStage.layout.test.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 539[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m5 passed[39m[22m[90m (5)[39m
+[2m      Tests [22m [1m[32m58 passed[39m[22m[90m (58)[39m
+[2m   Start at [22m 21:17:56
+[2m   Duration [22m 1.80s[2m (transform 1.44s, setup 0ms, import 2.04s, tests 1.29s, environment 3.47s)[22m
+
+
+(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:
+  - import "./vite.config" without a file extension (apps/web/vitest.config.ts:10:24). Add the file extension
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/index.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/language.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/entity-presentation.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/navigation.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/icons.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/managed-surface.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/modal-document-state.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-manager.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-stack.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/color-contrast.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/layout-controls.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/components.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/primitives.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/forms.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlays.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/states.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/shell.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/patterns.js" points to missing source files
+Sourcemap for "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/data.js" points to missing source files
+[90mstderr[2m | apps/web/src/components/Floor3D.nameplate.test.tsx[2m > [22m[2m员工卡HTML拥有确定宽度与12px字号，不随相机距离缩成逐字竖排，任务点击保留真实id
+[22m[39m<ambientLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <ambientLight> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <directionalLight> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <pointLight> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+The tag <fog> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<gridHelper /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <gridHelper> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <boxGeometry> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <meshStandardMaterial> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+The tag <mesh> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <meshBasicMaterial> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+Received `true` for a non-boolean attribute `transparent`.
+
+If you want to write it to the DOM, pass a string instead: transparent="true" or transparent={value.toString()}.
+The tag <group> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <planeGeometry> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+React does not recognize the `emissiveIntensity` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `emissiveintensity` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <ringGeometry> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+React does not recognize the `depthWrite` prop on a DOM element. If you intentionally want it to appear in the DOM as a custom attribute, spell it as lowercase `depthwrite` instead. If you accidentally passed it from a parent component, remove it from the DOM element.
+<cylinderGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <cylinderGeometry> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+The tag <sphereGeometry> is unrecognized in this browser. If you meant to render a React component, start its name with an uppercase letter.
+Received `false` for a non-boolean attribute `visible`.
+
+If you want to write it to the DOM, pass a string instead: visible="false" or visible={value.toString()}.
+
+If you used to conditionally omit it with visible={condition && value}, pass visible={condition ? value : undefined} instead.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+
+[90mstderr[2m | apps/web/src/components/Floor3D.nameplate.test.tsx[2m > [22m[2m注视状态只在同一张员工卡展开，没有第二张重叠气泡，超时后回到任务卡
+[22m[39m<ambientLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<gridHelper /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<cylinderGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+
+[90mstderr[2m | apps/web/src/components/Floor3D.nameplate.test.tsx[2m > [22m[2m待命岗位可用Tab聚焦展开卡片，回车原生点击打开档案，Escape收起；停用岗位不产生入口
+[22m[39m<ambientLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<gridHelper /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<cylinderGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+
+[90mstderr[2m | apps/web/src/components/Floor3D.nameplate.test.tsx[2m > [22m[2m状态内容保留中文显示边界，连续注视刷新关闭计时，卸载取消挂起计时器
+[22m[39m<ambientLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<directionalLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<gridHelper /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<cylinderGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<pointLight /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<boxGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshStandardMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<planeGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<ringGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<meshBasicMaterial /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+<sphereGeometry /> is using incorrect casing. Use PascalCase for React components, or lowercase for HTML elements.
+
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

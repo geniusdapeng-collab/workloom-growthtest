@@ -1,0 +1,43 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-016-1-1791035589790",
+  "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx apps/web/src/components/loommate/LoomMate.inbox.test.tsx apps/web/src/pages/p0/P0.focus.test.tsx",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "node_modules/vitest/vitest.mjs",
+      "run",
+      "--config",
+      "apps/web/vitest.config.ts",
+      "apps/web/src/components/CeremonyStage.layout.test.tsx",
+      "apps/web/src/components/Floor3D.nameplate.test.tsx",
+      "apps/web/src/components/loommate/LoomMate.scene.test.tsx",
+      "apps/web/src/components/loommate/LoomMate.inbox.test.tsx",
+      "apps/web/src/pages/p0/P0.focus.test.tsx"
+    ]
+  },
+  "actor": "/root/independent_acceptance",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-016",
+    "assertion_index": 1
+  },
+  "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-03T13:53:09.790Z",
+  "finished_at": "2026-10-03T13:53:12.574Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-016-1-1791035589790.txt",
+      "sha256": "a700d25aa55b68f4596d028d05449ef8b745a91b0d45ec2d78993cdd4ee9122d",
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+    }
+  ]
+}

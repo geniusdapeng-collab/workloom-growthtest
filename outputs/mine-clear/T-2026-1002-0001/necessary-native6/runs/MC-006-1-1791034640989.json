@@ -1,0 +1,79 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-1-1791034640989",
+  "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/release-gate-quest.test.mjs",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "--test-reporter=/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/executor/scripts/delivery/node-test-reporter.mjs",
+      "--test-reporter-destination=/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/outputs/necessary-followup/mine-clear-native6/evidence/MC-006-1-1791034640989-node-tests.jsonl",
+      "--test-reporter=tap",
+      "--test-reporter-destination=stdout",
+      "--import",
+      "tsx",
+      "--test",
+      "scripts/release-gate-quest.test.mjs"
+    ]
+  },
+  "requested_exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "--import",
+      "tsx",
+      "--test",
+      "scripts/release-gate-quest.test.mjs"
+    ]
+  },
+  "node_observer": {
+    "schema": "workloom.node-test-observer/v1",
+    "reporter_path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/executor/scripts/delivery/node-test-reporter.mjs",
+    "reporter_sha256": "286448a4dee571759fc1703564477d27bf5319bcb05ff66db2186deda60bc78f",
+    "destination": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/outputs/necessary-followup/mine-clear-native6/evidence/MC-006-1-1791034640989-node-tests.jsonl",
+    "summary": {
+      "path": "evidence/MC-006-1-1791034640989-node-tests.jsonl",
+      "sha256": "2f75a3d61d84b27648557a8f62534f23399f4090dae8dd6222b5ceff0e0e074e",
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+    }
+  },
+  "node_executable": {
+    "path": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "sha256": "27db838bb204ef7c21df2931f5656e4c8fb32e6e947f363a402b49714d32b5b1"
+  },
+  "actor": "/root/geo_receipt_repair",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 1
+  },
+  "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-03T13:37:20.989Z",
+  "finished_at": "2026-10-03T13:37:21.320Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": [],
+    "testSummary": {
+      "total": 10,
+      "passed": 10,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-1-1791034640989.txt",
+      "sha256": "295bd6d665e4dd046b847b2465a7f9de0ccf021279e31048fe2947edbeaef4e1",
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+    },
+    {
+      "path": "evidence/MC-006-1-1791034640989-node-tests.jsonl",
+      "sha256": "2f75a3d61d84b27648557a8f62534f23399f4090dae8dd6222b5ceff0e0e074e",
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+    }
+  ]
+}

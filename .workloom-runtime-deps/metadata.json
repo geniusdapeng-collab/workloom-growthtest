@@ -32,7 +32,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "8250d0b7178e27a9e94b7690a48b9fa7360365134eb0fbf140baa307d72f8c47"
+      "sha256": "71b425982ba5ea04247bc871962600cbca45b657545307bbd411e5cdfe0e6914"
     },
     {
       "path": "packages/audit-engine/package.json",
@@ -88,5 +88,5 @@
     }
   ],
   "manifestSha256": "e0340ff5a9ac4cb175dfe90c7af0507a3ff10bd9e77e0bd5e7ebc72443180502",
-  "packageLockSha256": "5f43bade687d37f6f28df174310bf5bd693fcb22bc846243204ce2fc11859440"
+  "packageLockSha256": "19e76e75fe640adc59a09f405e24c9ed92fae2f24e3ead6c85d86b5430ea9118"
 }

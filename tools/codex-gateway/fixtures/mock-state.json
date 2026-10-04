@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "workloom.gateway-fixture/v1",
+  "note": "P0 实验夹具：仅用于展示 Codex 工作台的数据契约，全部为模拟数据（dataMode=mock），不得当作真实经营数据。",
+  "agents": {
+    "company-ceo": { "status": "working", "grade": "正常", "actions30": 86, "approvals30": 12, "receipts30": 84, "alias": "董事长助理" },
+    "growth-lead": { "status": "working", "grade": "表扬", "actions30": 64, "approvals30": 3, "receipts30": 62 },
+    "growth-strategist": { "status": "idle", "grade": "正常", "actions30": 41, "approvals30": 1, "receipts30": 40 },
+    "growth-experimenter": { "status": "working", "grade": "关注", "actions30": 37, "approvals30": 4, "receipts30": 33 },
+    "ads-optimizer": { "status": "blocked", "grade": "辅导", "actions30": 29, "approvals30": 6, "receipts30": 23 },
+    "publish-operator": { "status": "needs_input", "grade": "正常", "actions30": 52, "approvals30": 9, "receipts30": 43 },
+    "geo-researcher": { "status": "working", "grade": "正常", "actions30": 48, "approvals30": 0, "receipts30": 48 },
+    "visibility-watcher": { "status": "working", "grade": "正常", "actions30": 120, "approvals30": 0, "receipts30": 120 }
+  },
+  "runs": [
+    {
+      "runId": "run-mock-0001",
+      "capabilityId": "pipeline:dual-content-factory",
+      "displayName": "内容一次生产两处变现管线",
+      "agentId": "employee:company-ceo",
+      "state": "running",
+      "progress": 0.62,
+      "currentStep": "geo-rewrite",
+      "cost": { "unit": "积分", "amount": 184 },
+      "steps": [
+        { "stepId": "script-package", "label": "脚本成套输出", "state": "done" },
+        { "stepId": "production-split", "label": "实拍/AI 生成分流编排", "state": "done" },
+        { "stepId": "human-review", "label": "脚本人审（G9 系列前置）", "state": "done", "gate": "G9" },
+        { "stepId": "geo-rewrite", "label": "GEO 六段式改写（AI 答案版）", "state": "running" },
+        { "stepId": "fact-check", "label": "事实红线校验", "state": "queued", "gate": "G-GEO2" },
+        { "stepId": "geo-review", "label": "GEO 外发必审", "state": "queued", "gate": "G-GEO1" }
+      ],
+      "approvals": [],
+      "artifacts": [],
+      "receipts": [],
+      "dataMode": "mock",
+      "createdAt": "2026-09-22T01:10:00.000Z",
+      "updatedAt": "2026-09-22T01:24:00.000Z"
+    },
+    {
+      "runId": "run-mock-0002",
+      "capabilityId": "pipeline:visibility-watch",
+      "displayName": "AI 能见度监测管线",
+      "agentId": "employee:visibility-watcher",
+      "state": "waiting_approval",
+      "progress": 0.35,
+      "currentStep": "review-alert",
+      "cost": { "unit": "积分", "amount": 36 },
+      "steps": [
+        { "stepId": "sample", "label": "多平台采样", "state": "done" },
+        { "stepId": "compare", "label": "可见度对比", "state": "done" },
+        { "stepId": "review-alert", "label": "异常告警复核", "state": "waiting_approval", "gate": "G9" }
+      ],
+      "approvals": ["apr-mock-0001"],
+      "artifacts": [],
+      "receipts": [],
+      "dataMode": "mock",
+      "createdAt": "2026-09-22T00:40:00.000Z",
+      "updatedAt": "2026-09-22T01:18:00.000Z"
+    }
+  ],
+  "approvals": [
+    {
+      "approvalId": "apr-mock-0001",
+      "runId": "run-mock-0002",
+      "risk": "review",
+      "gate": "G9",
+      "summary": "信源组外发内容需人工确认（G-GEO1 双审）",
+      "objectRef": "publish_task:mock-0007",
+      "requestedBy": "employee:visibility-watcher",
+      "createdAt": "2026-09-22T01:18:00.000Z",
+      "expiresAt": "2026-09-22T03:18:00.000Z",
+      "status": "pending"
+    },
+    {
+      "approvalId": "apr-mock-0002",
+      "runId": "run-mock-0001",
+      "risk": "high",
+      "gate": "G12",
+      "summary": "投放加投建议：预算 +20%，需人拍板",
+      "objectRef": "budget_change:mock-0021",
+      "requestedBy": "employee:ads-optimizer",
+      "createdAt": "2026-09-22T01:02:00.000Z",
+      "expiresAt": "2026-09-22T05:02:00.000Z",
+      "status": "pending"
+    }
+  ],
+  "kpi": [
+    { "name": "AI 答案可见度", "value": 62, "unit": "%", "trend": 8 },
+    { "name": "线索数（7 天）", "value": 143, "unit": "条", "trend": 12 },
+    { "name": "内容产出（7 天）", "value": 38, "unit": "条", "trend": -3 },
+    { "name": "夜间自动完成", "value": 26, "unit": "件", "trend": 5 }
+  ],
+  "quota": [
+    { "pool": "模型积分", "used": 1240, "limit": 5000 },
+    { "pool": "渲染额度", "used": 320, "limit": 1000 },
+    { "pool": "发布配额", "used": 12, "limit": 60 }
+  ],
+  "night": { "status": "running", "range": "22:00–08:00" }
+}

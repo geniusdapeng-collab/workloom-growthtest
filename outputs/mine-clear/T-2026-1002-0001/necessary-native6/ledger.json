@@ -1,0 +1,441 @@
+{
+  "schema": "workloom.mine-clear/ledger@1",
+  "task_id": "T-2026-1002-0001",
+  "repo": "workloom-growthtest",
+  "repo_path": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest",
+  "title": "必要未完成项修复与独立复验",
+  "created_at": "2026-10-03T01:35:37.901Z",
+  "updated_at": "2026-10-03T13:57:20.635Z",
+  "baseline": {
+    "audit": {
+      "commit": "4da4b65e23bb3f783189038d1be9faee7f3c1973",
+      "branch": "task/T-2026-1002-0001",
+      "remote": "origin",
+      "fetched_at": null,
+      "fetch_status": "skipped",
+      "notes": "本地 HEAD 不是 origin/main 最新（云端 da06fdf1 / 本地 4da4b65e）——按 §1.2 先对齐基线；工作树不干净（22 项未提交改动）：排雷结论只对已提交内容成立"
+    },
+    "repair": {
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+      "reverified_problem_ids": []
+    },
+    "acceptance": {
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+      "is_descendant_of_repair": true
+    }
+  },
+  "environment": {
+    "kind": "local-preview",
+    "notes": ""
+  },
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "cards": [
+    {
+      "id": "MC-006",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "多桥配置遮住显式模拟工具，且坏声明被丢弃可误造模拟成功",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/runtime/src/loop.ts:719@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "7c8bcda691f416a6b625283c2dab5d7db7393986597117e639007b8ac5df13d9",
+          "note": "注入执行器一旦存在便整段取代本地显式模拟执行器，没有逐工具覆盖判定"
+        },
+        {
+          "type": "code",
+          "ref": "packages/runtime/src/tools.ts:59@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "78d110dfcf5281024d10e3dfac06c9cf719624a68b5adddf51ecb5605c03902e",
+          "note": "旧模拟回执未绑定租户、工作区、线程、步骤、输入和结果"
+        },
+        {
+          "type": "code",
+          "ref": "apps/server/src/runtime/tool-executor.ts:95@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "701ca74b129c2bbf26278bf63dbbf22a359147eb5dde46d74dfd2136a4efc423",
+          "note": "parseBridgeSpecs丢弃缺路径非空声明；混合规格坏范围因此被忽略"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/runtime/src/loop.ts",
+        "line": 719,
+        "commit": "4da4b65e23bb3f783189038d1be9faee7f3c1973",
+        "symbol": "runQuest/runTool"
+      },
+      "trigger_path": "显式simulated档案与多桥只覆盖部分工具；或缺模块路径坏声明与健康其它范围声明并存，再执行坏声明工具或重放模拟回执",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "独立作用域真实PostgreSQL，部分覆盖、已覆盖故障、混合坏配置、篡改、跨作用域和replay输入",
+          "expect": "单元、原门禁反例与真实PG14组断言退出0；显式未覆盖模拟执行保留绑定；真实和已声明故障均0步停线",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-geo-tool-routing.mjs --db",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "scripts/verify-geo-tool-routing.mjs",
+              "--db"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-006-0-1791035540856.json",
+            "sha256": "6f9f4b3ac0c2a5ef7e33f193ffcd9224cbcbbd8e628e4f770d739c48704e26a5",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "evidence": {
+            "path": "evidence/MC-006-0-1791035540856.txt",
+            "sha256": "9dd06dd707db04ed3d96998a3c418ca30d9f2cf30d43fb1e7db3b8e29e03a647",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "原始发布门禁与所有执行状态反例",
+          "expect": "原assertQuestExecution反例10例实跑通过，只有核实的同线程执行允许门禁通过",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/release-gate-quest.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--import",
+              "tsx",
+              "--test",
+              "scripts/release-gate-quest.test.mjs"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-006-1-1791035546471.json",
+            "sha256": "8f377e64f32e80c654a39ec3702d953b6cb0a916d3d6de9f0a0e8b5a75f375cc",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "evidence": {
+            "path": "evidence/MC-006-1-1791035546471.txt",
+            "sha256": "ee1e25d22243c9817e8829c7cfdc9c045e3e7f8e4d1a2f707495c8a1ab73369e",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        }
+      ],
+      "regression": {
+        "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-geo-tool-routing.mjs --db"
+      },
+      "fix_plan": "逐工具supportsTool路由，绑定模拟decision.tool_execution并校验执行与replay；失败桥保留范围占位",
+      "rollback": "普通git revert本轮完整源码提交并重跑原门禁，保留历史事件不删除",
+      "conflict_paths": [
+        "packages/runtime/src/loop.ts",
+        "packages/runtime/src/tools.ts",
+        "apps/server/src/runtime/tool-executor.ts"
+      ],
+      "blast_radius": "影响模拟工具、真实连接器停线、缓存作用域、重放、审批与门禁；共享receipt schema和assertQuestExecution保持原字节",
+      "notes": "本卡验收限定受控桥、显式模拟、真实PG结构；不证明外部平台生产经营。fixed_by由真实GEO修复agent实际run产生。",
+      "verified_by": "/root/independent_acceptance",
+      "verified_at": "2026-10-03T13:52:27.016Z",
+      "verification_evidence": {
+        "path": "runs/MC-006-0-1791035540856.json",
+        "sha256": "6f9f4b3ac0c2a5ef7e33f193ffcd9224cbcbbd8e628e4f770d739c48704e26a5",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "fixed_by": "/root/geo_receipt_repair",
+      "last_assertion_attempt": {
+        "actor": "/root/independent_acceptance",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-10-03T13:52:20.850Z",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+        "finished_at": "2026-10-03T13:52:27.016Z"
+      },
+      "last_verification_attempt": {
+        "actor": "/root/independent_acceptance",
+        "result": "pass",
+        "at": "2026-10-03T13:52:27.016Z",
+        "runs": [
+          {
+            "path": "runs/MC-006-0-1791035540856.json",
+            "sha256": "6f9f4b3ac0c2a5ef7e33f193ffcd9224cbcbbd8e628e4f770d739c48704e26a5",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          {
+            "path": "runs/MC-006-1-1791035546471.json",
+            "sha256": "8f377e64f32e80c654a39ec3702d953b6cb0a916d3d6de9f0a0e8b5a75f375cc",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-016",
+      "kind": "problem",
+      "level": "L4",
+      "severity": "P1",
+      "batch": 3,
+      "state": "verified",
+      "title": "欢迎引导遮住原生场景仍可能判绿，职场标签和舞台密度及织伴遮挡损害体验",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/main.cjs:492@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "deef7f37e40bf09886f1cf0712b8225b033d2b8958e5b053f7cf5a47c5e04c0f",
+          "note": "旧scene截图抓整窗像素，没有scene范围可见比例和顶层遮挡证明"
+        },
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/main.cjs:343@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "deef7f37e40bf09886f1cf0712b8225b033d2b8958e5b053f7cf5a47c5e04c0f",
+          "note": "旧smoke生命周期没有统一完成欢迎及正式关闭Questline再检查各场景"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/components/loommate/LoomMate.tsx:451@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "9c9e700519f3fcdc8a616ae00d7fa607e296acc0a9f0dbb927a22dbf21e3dce6",
+          "note": "引导关闭的visibility show强制setMini(false)并持久化mini=0，覆盖默认或显式收起偏好"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/components/Stage3D.tsx:191@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "97e94dd817b859b2663360237c52008d43c616e2b4475696431e4d1403c5554c",
+          "note": "剧场实心台面上缘与镜面同高-.02，真实截图出现深度闪烁"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/components/cinematic.tsx:28@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "e9e9f5875654f6f700bdf39b3d3908b31105188580b10a612f7bb8e52d4f6fc2",
+          "note": "CineFloor镜面高度-.02，与剧场原实体台面同高"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/components/CeremonyStage.tsx:258@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "b3e2bc1287367b23e1bb785a99b20f53bb042fb7e3bd5f0c455f923323c8f0bd",
+          "note": "原完整65人固定两排，姓名与人物拥挤；ready定时未覆盖实际入场错峰"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/components/Floor3D.tsx:212@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "a49a8431c28add8e30531cc0ba587b5cbfc86f6bc7bf3f4ffacd4d924fade84d",
+          "note": "Html无确定宽度并依相机缩放；另一个HoverBubble与岗位卡重叠"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/components/loommate/LoomMate.tsx:203@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "9c9e700519f3fcdc8a616ae00d7fa607e296acc0a9f0dbb927a22dbf21e3dce6",
+          "note": "隐藏把大形象defaultPos固化为坐标；mini位置钳制未按64px本体计算"
+        },
+        {
+          "type": "code",
+          "ref": "apps/desktop/electron/main.cjs:485@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "deef7f37e40bf09886f1cf0712b8225b033d2b8958e5b053f7cf5a47c5e04c0f",
+          "note": "原审计基线 collector 全量收集 DOM 文字而没有可见性判断；后续 native4 同类原生失败另保留为历史，不把后续提交冒充审计基线"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/pages/p0/P0.tsx:238@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "202ec7d40fb11a9490d4361dcca73cde9bbc029c94929dded420964db8588296",
+          "note": "原审计基线12秒无条件换批；5秒刷新状态排序联动移除获焦员工"
+        },
+        {
+          "type": "code",
+          "ref": "apps/web/src/components/loommate/LoomMate.tsx:650@4da4b65e23bb3f783189038d1be9faee7f3c1973",
+          "sha256": "9c9e700519f3fcdc8a616ae00d7fa607e296acc0a9f0dbb927a22dbf21e3dce6",
+          "note": "原审计基线在未打开表面时直接挂载前三条通知；通知溢出本体矩形仍遮挡舞台"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/desktop/electron/main.cjs",
+        "line": 492,
+        "commit": "4da4b65e23bb3f783189038d1be9faee7f3c1973",
+        "symbol": "runRenderSmoke/captureScene"
+      },
+      "trigger_path": "fresh中文带空格支持目录首次启动，欢迎和Questline覆盖主画面；默认3D或safe2D场景被旧整窗像素验收；首页宽度受浮层和标签遮挡；首日引导hide→show把默认mini强制展开，真实default2场景命中比例13/25=.52低于.90",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实应用代码在受控VM生命周期与既有bootstrap异常路径：欢迎、Questline、scene rect、canvas面积、像素和遮挡",
+          "expect": "63个Node测试实跑通过；欢迎生命周期、遮挡拒绝、短画布、裁剪像素、停稳后重测、场景卸载与实际可见名牌反例",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs apps/desktop/electron/render-smoke.test.cjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "apps/desktop/electron/bootstrap.test.cjs",
+              "apps/desktop/electron/bootstrap-startup.test.cjs",
+              "apps/desktop/electron/render-smoke.test.cjs"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-016-0-1791035589208.json",
+            "sha256": "8568a93b896e1efa732f55f8ce978b2338401c8366ae546995aa378ca95e1ead",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "evidence": {
+            "path": "evidence/MC-016-0-1791035589208.txt",
+            "sha256": "844bbf3010618e5712195f6028991976d946b94029d9c865ffb36c14670e3537",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "真实三组件，65人/窄屏/入场ready；worker内容与任务和档案入口；mini保存坐标与通知及隐藏唤回；GPU边界受控；真实共享表面Esc与焦点；24通知异步/重试/旧响应用例；6项40员工轮播和刷新焦点边界",
+          "expect": "58个实际React断言通过；保留人物、姓名发现路径、形态偏好与真实任务id，timer清理及位置边界成立；原生几何须另验；默认不挂通知内容、显式有界托盘、失败保留重试、单飞与旧响应保护；跨12/24秒保留焦点且使用同员工最新任务",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx apps/web/src/components/loommate/LoomMate.inbox.test.tsx apps/web/src/pages/p0/P0.focus.test.tsx",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "--config",
+              "apps/web/vitest.config.ts",
+              "apps/web/src/components/CeremonyStage.layout.test.tsx",
+              "apps/web/src/components/Floor3D.nameplate.test.tsx",
+              "apps/web/src/components/loommate/LoomMate.scene.test.tsx",
+              "apps/web/src/components/loommate/LoomMate.inbox.test.tsx",
+              "apps/web/src/pages/p0/P0.focus.test.tsx"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-016-1-1791035589790.json",
+            "sha256": "173b4f754db60b4b83f9fb418329a2c4d6d4c9b489295be05303f8226e5a6087",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "evidence": {
+            "path": "evidence/MC-016-1-1791035589790.txt",
+            "sha256": "a700d25aa55b68f4596d028d05449ef8b745a91b0d45ec2d78993cdd4ee9122d",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        }
+      ],
+      "regression": {
+        "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx apps/web/src/components/loommate/LoomMate.inbox.test.tsx apps/web/src/pages/p0/P0.focus.test.tsx"
+      },
+      "fix_plan": "应用单一smoke生命周期与scene裁剪证明；Stage显式高度和18人轮转；Floor有限常驻牌和hover；LoomMate紧凑默认并保留偏好；visibility show只恢复可见性，不改写mini形态；台面与镜面分离避免深度闪烁；停稳后重读canvas像素与存在性、人数、视口、遮挡；欢迎全编制响应式队列与单姓名详情、真实入场ready；worker固定宽度屏幕字号并合并状态；织伴隐藏唤回保持默认锚点及本体尺寸，通知独立布局；欢迎全编制响应式队列与单姓名详情、真实入场ready；worker固定宽度屏幕字号并合并状态；织伴隐藏唤回保持默认锚点及本体尺寸，通知独立布局；初次与停稳共用CSS/几何可见性采集，保留所有隐藏原因，未知裁剪保守计数，可见牌重叠和原密度阈值仍失败；欢迎全编制响应式队列与单姓名详情、真实入场ready；worker固定宽度屏幕字号并合并状态；织伴隐藏唤回保持默认锚点及本体尺寸，通知独立布局；初次与停稳共用CSS/几何可见性采集，保留所有隐藏原因，未知裁剪保守计数，可见牌重叠和原密度阈值仍失败；默认聚合未读入口与显式有界托盘，成功后移除、失败保留可重试；保持当前员工ID与顺序、获焦暂停轮播并用最新业务对象",
+      "rollback": "普通git revert本轮完整源码提交，保留既有用户支持目录与原始日志，重跑native回归",
+      "conflict_paths": [
+        "apps/desktop/electron/main.cjs",
+        "apps/web/src/components/Stage3D.tsx",
+        "apps/web/src/components/Floor3D.tsx",
+        "apps/web/src/pages/p0/Floor.tsx",
+        "apps/web/src/pages/p0/P0.tsx",
+        "apps/web/src/components/loommate/LoomMate.tsx",
+        "apps/web/src/components/CeremonyStage.tsx",
+        "apps/web/src/components/CeremonyStage.layout.test.tsx",
+        "apps/web/src/components/Floor3D.nameplate.test.tsx",
+        "apps/web/src/components/loommate/LoomMate.scene.test.tsx",
+        "apps/web/src/components/CeremonyStage.tsx",
+        "apps/web/src/components/CeremonyStage.layout.test.tsx",
+        "apps/web/src/components/Floor3D.nameplate.test.tsx",
+        "apps/web/src/components/loommate/LoomMate.scene.test.tsx",
+        "apps/desktop/electron/render-smoke.test.cjs",
+        "docs/native-render-verification.md",
+        "apps/web/src/components/CeremonyStage.tsx",
+        "apps/web/src/components/CeremonyStage.layout.test.tsx",
+        "apps/web/src/components/Floor3D.nameplate.test.tsx",
+        "apps/web/src/components/loommate/LoomMate.scene.test.tsx",
+        "apps/web/src/components/loommate/LoomMate.inbox.test.tsx",
+        "apps/web/src/pages/p0/P0.focus.test.tsx"
+      ],
+      "blast_radius": "触及默认3D、安全2D、首启欢迎、主舞台分页、织伴偏好与导演发现入口；UI依赖版本不变",
+      "notes": "卡内断言只证明VM和React可判定结构，不代替真实GPU窗口、CUA动作及2h观察；这些必须另外有同源新包证据。 605bddc修复记录保留历史；实际native .52失败后本卡重开，加入6例联动回归，真实新包仍须另行证明。 native2 default3机测exit0但真实截图有深度闪烁及canvas元数据陈旧；历史记录保留，新提交与新包独立复验。 native3实际像素/CUA仍发现欢迎姓名、织伴位置与worker卡可读性残留；第三次失败后交真实native_ui_repair修复。旧dd修复实跑原封保留；新卡从open重跑，不导入成功状态。 native4/default6真实首启失败：旧collector把18个透明隐藏的键盘入口计为可见名牌，截图实际只有CEO名牌。旧7dd真实repair与失败原封保留；本次修测量且不放松密度阈值，新卡从open重跑，不导入成功状态。 native4/default6真实首启失败：旧collector把18个透明隐藏的键盘入口计为可见名牌，截图实际只有CEO名牌。旧7dd真实repair与失败原封保留；本次修测量且不放松密度阈值，新卡从open重跑，不导入成功状态。 native5/normal-debug3真实CUA发现默认三通知仍覆盖舞台，12秒换批移除获焦员工；保存失败和19+5项产品改前真实红测。Root实际接手窄修复，此新cohort重置open，不导入9526通过状态。",
+      "verified_by": "/root/independent_acceptance",
+      "verified_at": "2026-10-03T13:53:12.624Z",
+      "verification_evidence": {
+        "path": "runs/MC-016-0-1791035589208.json",
+        "sha256": "8568a93b896e1efa732f55f8ce978b2338401c8366ae546995aa378ca95e1ead",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "fixed_by": "/root",
+      "last_assertion_attempt": {
+        "actor": "/root/independent_acceptance",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-10-03T13:53:09.204Z",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+        "finished_at": "2026-10-03T13:53:12.624Z"
+      },
+      "last_verification_attempt": {
+        "actor": "/root/independent_acceptance",
+        "result": "pass",
+        "at": "2026-10-03T13:53:12.624Z",
+        "runs": [
+          {
+            "path": "runs/MC-016-0-1791035589208.json",
+            "sha256": "8568a93b896e1efa732f55f8ce978b2338401c8366ae546995aa378ca95e1ead",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          {
+            "path": "runs/MC-016-1-1791035589790.json",
+            "sha256": "173b4f754db60b4b83f9fb418329a2c4d6d4c9b489295be05303f8226e5a6087",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        ]
+      }
+    }
+  ],
+  "gates": [],
+  "handoff": {
+    "generated_at": "2026-10-03T13:57:20.634Z",
+    "acceptance_command": "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest --env local-preview",
+    "open_problem_ids": []
+  }
+}

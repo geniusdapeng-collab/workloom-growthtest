@@ -9,7 +9,8 @@
   "identity": {
     "workspaceSlug": "geo-growth",
     "human": "MEM-G01",
-    "guest": "demo-direct"
+    "guest": "demo-direct",
+    "authTokenEnv": "ACCEPTANCE_AUTH_TOKEN"
   },
   "startup": {
     "command": "pnpm preview:all",
@@ -72,9 +73,81 @@
     "idleInterruptionWindowS": 20
   },
   "ux": {
-    "personas": [],
-    "journeys": [],
-    "tasks": [],
+    "personas": [
+      {
+        "id": "owner",
+        "jtbd": [
+          "看到隔离社媒指标核查的事实、缺失项与待决事项"
+        ],
+        "criticality": "P0"
+      },
+      {
+        "id": "manager",
+        "jtbd": [
+          "核对隔离社媒指标核查的来源与责任岗位"
+        ],
+        "criticality": "P0"
+      },
+      {
+        "id": "staff",
+        "jtbd": [
+          "完成隔离社媒指标核查并看到结果回执"
+        ],
+        "criticality": "P0"
+      },
+      {
+        "id": "partner",
+        "jtbd": [
+          "看到授权边界与越权拒绝原因"
+        ],
+        "criticality": "P1"
+      },
+      {
+        "id": "guest",
+        "jtbd": [
+          "得到清晰回答与转人工入口"
+        ],
+        "criticality": "P0"
+      }
+    ],
+    "journeys": [
+      {
+        "id": "U-01",
+        "persona": "owner",
+        "stage": "daily",
+        "title": "隔离社媒指标核查：事实与待决项",
+        "mot": true
+      },
+      {
+        "id": "U-02",
+        "persona": "manager",
+        "stage": "daily",
+        "title": "隔离社媒指标核查：来源核查与结果回执",
+        "mot": true
+      },
+      {
+        "id": "U-03",
+        "persona": "owner",
+        "stage": "exception",
+        "title": "隔离社媒指标核查：数据缺失与权限拒绝",
+        "mot": true
+      }
+    ],
+    "tasks": [
+      {
+        "id": "U2-T01",
+        "persona": "manager",
+        "criticality": "P0",
+        "budgetMs": 60000,
+        "paths": [
+          "normal",
+          "empty",
+          "error",
+          "permission",
+          "offline"
+        ]
+      }
+    ],
     "research": {
       "participants": [],
       "methods": [
@@ -89,9 +162,35 @@
     }
   },
   "outcome": {
-    "roles": [],
-    "taskSuites": [],
-    "receipts": []
+    "roles": [
+      {
+        "role": "data-board-officer",
+        "agentPreset": "data-board-officer",
+        "al": "AL3",
+        "deliverableUnit": "隔离社媒指标核查清单",
+        "minSubstance": "四项指标来源、基线、异常线索与未核实项；模拟数据不进入真实增长指标",
+        "kpis": [
+          {
+            "name": "已核实来源完整性",
+            "source": "threads.events/ask.answer",
+            "baseline": null,
+            "target": null
+          }
+        ],
+        "attribution": "observational",
+        "guardrails": [
+          "无依据结论",
+          "越权写入",
+          "模拟数据污染"
+        ]
+      }
+    ],
+    "taskSuites": [
+      "acceptance/outcomes/industry.yaml"
+    ],
+    "receipts": [],
+    "fixtureMarker": "suite.rdas.workloom-growthtest",
+    "residualDisclosure": "隔离社媒指标核查验收会保留带 suite.rdas.workloom-growthtest 标记的线程和事件；不会删除审计事件，需单独列入残留清单并排除 ADR/HIR 与经营指标。"
   },
   "autonomy": {
     "interventionTaxonomy": "H0-H4",
@@ -100,7 +199,8 @@
       "suite-",
       "apr-suite-",
       "apr-e-",
-      "T-suite"
+      "T-suite",
+      "suite.rdas."
     ],
     "windows": [
       "4w"
@@ -121,11 +221,48 @@
       "drift"
     ]
   },
-  "journeys": [],
-  "notes": "由 fleet-run.mjs 依据 product.manifest.json 生成：角色/旅程/阈值请本仓负责人在首轮验收后按行业细化。",
+  "journeys": [
+    {
+      "id": "EXP-01",
+      "persona": "owner",
+      "title": "隔离社媒指标核查：首启事实与待决项",
+      "script": "builtin:first-value"
+    },
+    {
+      "id": "EXP-02",
+      "persona": "owner",
+      "title": "隔离社媒指标核查：授权边界与审批留痕",
+      "script": "builtin:approval"
+    },
+    {
+      "id": "EXP-03",
+      "persona": "manager",
+      "title": "隔离社媒指标核查：结果与来源核对",
+      "script": "builtin:traceability"
+    },
+    {
+      "id": "EXP-04",
+      "persona": "staff",
+      "title": "隔离社媒指标核查：派活与结果读回",
+      "script": "builtin:dispatch"
+    },
+    {
+      "id": "EXP-05",
+      "persona": "partner",
+      "title": "隔离社媒指标核查：越权拒绝可见",
+      "script": "builtin:partner-scope"
+    },
+    {
+      "id": "EXP-06",
+      "persona": "guest",
+      "title": "隔离社媒指标核查：首响与转人工",
+      "script": "builtin:guest-service"
+    }
+  ],
+  "notes": "本仓代表任务是隔离社媒指标核查：正常结果（P0 k=5）、输入错误、无身份权限三路径。profile-check/outcome --validate-only 仅校验配置；真实行业结果、体验、长跑和完整276项仍须独立验收。",
   "environment": {
     "kind": "client-runtime",
-    "allowWrites": true,
+    "allowWrites": false,
     "supportDir": null,
     "target": {
       "apiUrl": "http://127.0.0.1:9207",
@@ -133,7 +270,7 @@
       "bMobileUrl": null,
       "cMobileUrl": null
     },
-    "notes": "本仓桌面客户端按 product.manifest.json#desktop.portOffset=420 偏移端口：server 8787+420=9207、web 5173+420=5593、PG 5432+420=5852；生产实测用 --env client-runtime。"
+    "notes": "本仓档位必须与 CLI/父执行器一致；切换环境需提供同档位的显式 profile。生产默认只读，写入需受控身份、显式授权、夹具标记与残留披露。"
   },
   "live": {
     "enabled": true,
@@ -289,20 +426,31 @@
         "id": "PROD-01",
         "kind": "product",
         "criticality": "P0",
-        "title": "产品派单链路 · 经客户端入口派单 + 状态断言",
-        "input": "给手冲咖啡馆做一份 7 天获客计划（交付物：动作清单 + 每天一条内容主题，截止：今天 18:00）",
-        "presetKey": "company-ceo",
+        "title": "隔离社媒指标核查（经产品入口与线程事件读回）",
+        "input": "suite.rdas.workloom-growthtest：当前隔离实验中的社媒播放、涨粉、互动、询盘四项指标如何核查基线和工具回执？请用“社媒”标注未核实数字与异常线索，只回答检查清单，不处置告警或改动投放。",
+        "presetKey": "data-board-officer",
         "workspaceSlug": "geo-growth",
+        "requireModel": true,
+        "fixtureMarker": "suite.rdas.workloom-growthtest",
+        "residualDisclosure": "隔离社媒指标核查验收会保留带 suite.rdas.workloom-growthtest 标记的线程和事件；不会删除审计事件，需单独列入残留清单并排除 ADR/HIR 与经营指标。",
         "state_asserts": [
           {
-            "http": {
-              "url": "http://127.0.0.1:9207/health",
-              "status": 200
+            "event": {
+              "action": "ask.answer",
+              "field": "decision.after.text",
+              "contains": "社媒",
+              "minLength": 12
             }
           }
         ]
       }
     ],
-    "notes": "P 域生产实测（本仓口径）：LLM 走 dsh harness（含围栏瀑布 + 哈希链账本）；生图/生视频走火山方舟（seedream-5.0-pro / seedance-2.5）；产品派单走本机客户端 9207。配额：图 ≤8、视频 ≤3 段且各 10–15s、总 ≤45s、LLM ≤40 次/¥120。 端点方言（2026-09-29 MC-015，基座 T-2026-0929-0101 同步）：dsh-harness 走 Anthropic 兼容根（`DEEPSEEK_BASE_URL`，Messages 协议），model-gateway 走 OpenAI 兼容根（`LLM_BASE_URL`，`/chat/completions`）——两条链路各用一个模型条目声明，禁止把 Anthropic 根交给 OpenAI 兼容链路（会 404）。"
+    "notes": "声明隔离社媒指标核查的模型/产品任务。无受控身份、实际模型或结果回执时保持未验证；配置校验与 HTTP fixture 不构成生产通过。"
+  },
+  "repositoryInstance": "workloom-ai/workloom-growthtest",
+  "isolation": {
+    "isolated": true,
+    "sourceProductRepository": "workloom-ai/WorkLoom-growth",
+    "notes": "保留源产品 manifest 与现有隔离边界；此验收配置仅属于当前实例，不解除隔离，不回流、不公共化实验业务语义。"
   }
 }

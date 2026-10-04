@@ -1,0 +1,38 @@
+{
+  "name": "workloom-workbench",
+  "version": "0.1.3",
+  "description": "把 WorkLoom 的数字员工、技能、管线与治理能力接入 Codex：能力目录、只读数字人工作台、受控执行入口（P0 只读）。",
+  "author": {
+    "name": "WorkLoom Growthtest 实验",
+    "url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+  },
+  "homepage": "https://cnb.cool/workloom-ai/workloom-growthtest",
+  "repository": "https://cnb.cool/workloom-ai/workloom-growthtest",
+  "license": "MIT",
+  "keywords": [
+    "workloom",
+    "digital-employees",
+    "mcp",
+    "growth",
+    "agent-operations"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "WorkLoom 工作台",
+    "shortDescription": "在 Codex 里发现并调用 WorkLoom 的数字员工与经营能力。",
+    "longDescription": "WorkLoom 工作台把 growthtest 实验仓的能力目录、数字员工班组、围栏与管线以 MCP 工具和资源的形式接入 Codex；同时提供一个本地数字人团队工作台页面用于观察工位、运行中的任务、待审批与实时事件。P0 为只读模式：只暴露能力查询、快照与事件订阅，不暴露任何写操作。",
+    "developerName": "WorkLoom Growthtest 实验",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "我们有哪些数字员工和能力？先列目录。",
+      "打开数字人团队工作台，让我看战况。",
+      "GEO 能见度监测怎么做？先给我方案再执行。"
+    ],
+    "brandColor": "#FFD98A"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "workloom-core": {
+      "command": "workloom-workbench-mcp"
+    }
+  }
+}

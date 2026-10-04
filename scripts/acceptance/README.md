@@ -1,7 +1,7 @@
 # 真机验收执行器（scripts/acceptance/**）
 
 > 规范：`docs/REAL-DEVICE-ACCEPTANCE-SPEC.md`（RDAS v3.1）｜检查单：`docs/acceptance/checklist.v3.json`（276 项）｜模板：`docs/acceptance/report-template.md`
-> 本目录随基座 base-sync 分发到各仓（`sync/base-scope.json#include: scripts/**`）；**行业差异只写在本仓 `acceptance/profile.json`**，不要改这里的代码。
+> 本仓为隔离实验副本，本目录由本仓维护，不进入公共 base-sync 分发。本次 T-2026-1002-9001 按产品所有者授权修复现存控制器；行业岗位与任务仍来自本仓 `acceptance/profile.json` 与 `acceptance/outcomes/`，冻结上游状态和产品身份保留。
 
 ## 命令
 
@@ -11,8 +11,10 @@ pnpm preview:all                  # 起真机（可用 profile.startup.command �
 pnpm acceptance:matrix            # L0 契约层 + L1 运行层：员工/技能/围栏矩阵
 pnpm acceptance:ui                # L3 页面层：路由 + 岗位档案页 + 技能中心 + 控制台
 pnpm acceptance:experience        # L4/L5：角色 × 旅程走查 + 术语/对比度/打扰机检
-pnpm acceptance:live              # P 域：生产环境实测（内置模型真实调用 + 配额台账 + 回执）
-pnpm acceptance:live:selftest     # P 域自检：本地替身跑通管道（非生产实测证据）
+pnpm acceptance:live              # P 域入口：缺少可信总量预算契约的真实 LLM 路线在调用前 blocked
+pnpm acceptance:live:selftest     # P 域自有替身回归；媒体需实际下载与解码，业务能力仍未验证
+node scripts/acceptance/outcome.mjs --validate-only  # 本仓岗位/任务契约，只读、零模型调用
+node scripts/acceptance/outcome.mjs --selftest       # 执行器自有 HTTP 夹具；忽略外部目标、零模型/数据库调用
 pnpm acceptance:report            # 汇总 → outputs/acceptance/REPORT.md（含四段硬性内容）
 ```
 
@@ -26,11 +28,16 @@ outputs/acceptance/
   ui/{ui-probe.json,shots/*.png}
   experience/{experience-report.json,experience-report.md,shots/*.png}
   live/{live-report.json,live-report.md,transcripts/*.json,receipts/*.json,artifacts/*,budget-ledger.jsonl,budget-summary.json}
-  regression/summary.json          # 可选：由执行者写入套件/门禁/验链结论
-  REPORT.md                        # report.mjs 生成
+  runs/*.json                     # 实际执行 argv/退出码/角色/源 SHA/输出散列
+  evidence-index.json              # 实际执行索引
+  regression/summary.json         # v2：真实阶段 JSON + execution.log + run/output/input 绑定
+  coverage.json                   # 固定 276 项逐项回读；缺证据为未验证
+  REPORT.md                       # 生成报告与 acceptancePassed 分别表示
 ```
 
 ## 生产环境实测（P 域 · v3.1）
+
+本仓真实 LLM/产品派单入口在预占、登录、派单、子进程或供应商 HTTP 前阻断：当前服务不能提供总输入、输出、重试、工具与上下文的可信硬上界，`expectedTokens`/`maxTokens`/provider 标签不构成证明。未知 usage 保留预占并冻结后续付费任务；报告为 `blocked/unverified`、退出 2。O 域真实运行同样在调用前阻断；`--selftest` 只连接由执行器创建和关闭的本地 HTTP 夹具，不连接外部服务、SQL 或审批。
 
 本机预览（`preview:all` + `LLM_PROVIDER=mock`）只能证明代码与装配；**要证明「客户端内置模型走通生产链路」必须声明环境档位并跑 P 域**：
 
@@ -70,12 +77,12 @@ pnpm acceptance:live --env deployed --require-live
 
 | 方式 | 怎么做 | 适用 |
 |---|---|---|
-| ① 进程环境 / Keychain（推荐） | 钥匙串存：`security add-generic-password -a "$USER" -s workloom-live -w '<key>' -U`；跑验收时由包装脚本导出，例如 `DEEPSEEK_API_KEY="$(security find-generic-password -s workloom-live-deepseek -w)" pnpm acceptance:live --env client-runtime` | macOS 本机、不想落任何文件 |
+| ① 进程环境 / Keychain（推荐） | 使用系统钥匙串界面或受控 stdin 工具存入命名 service；由启动器只注入验收子进程环境，避免把真实 key 放进命令参数、聊天或日志 | macOS 本机、不想落任何文件 |
 | ② 仓库外秘密文件 | 建 `~/.workloom/live.env`（`chmod 600`）写 `DEEPSEEK_API_KEY=…`、`VOLCENGINE_ARK_API_KEY=…`；默认位会被自动发现，指定别处时用 `--keys-file <path>` | 需要一次配好、多次复跑 |
 | ③ 客户端运行时 `.env` | 在真实客户端里用落地向导「真实大模型」步骤写入（或直接编辑 `<支持目录>/runtime/.env`），验收器在 `--env client-runtime` 时自动补齐缺失键 | 验“客户端内置模型”本身 |
 
 封存位置固定后**不需要每次传 `--env-file`**：钥匙串用 `-s workloom-live-deepseek` / `-s workloom-live-ark`，文件用 `~/.workloom/live.env`，验收器会自动命中。
-自证：`outputs/acceptance/live/live-report.json#credentialSources` 会列出实际来源与键名（只有键名，没有值）；三个模型 `ready=true` 才允许真实调用。
+凭据来源：`outputs/acceptance/live/live-report.json#credentialSources` 只记录来源与键名。`ready=true` 只表示凭据/配置存在；真实调用还须满足可信预算、回执、模型身份和实际媒体证据，当前不透明 LLM 入口保持 blocked。
 
 必需的键（按要跑的模型选）：
 
@@ -85,16 +92,12 @@ pnpm acceptance:live --env deployed --require-live
 
 安全纪律：key 只进 Keychain / 仓库外文件 / 客户端运行时 `.env`；**不要**贴到聊天、Issue、PR、`.env.example` 或任何入库文件里。
 
-`regression/summary.json` 约定：
-
-```json
-{ "commands": { "suite": "467/467 通过", "suite:domain": "81/81 通过", "db:verify-chain": "哈希链全绿（seq 空洞 629，已解释）", "typecheck": "通过", "release:gate": "11/11 通过" } }
-```
+`regression/summary.json` 使用 `schemaVersion: workloom.acceptance-regression/v2`，由 `fleet-run` 的真实聚合子进程生成。`required` 是非空、唯一的必需命令清单；`executions` 必须引用实际 run 文件，退出码、时间和 argv 与机器观测一致。`regression/summary-input.json`、汇总、命令原始 JSON 与日志均须绑定同一个完整 commit 和 SHA256；手写“通过”字符串不能作为验收证据。
 
 ## 环境要求
 
-- Node ≥ 20（基座 package.json 已声明）；`pg`、`yaml`、`playwright` 来自本仓依赖（`pnpm install` 后可用）；
-- 数据库：`.env` 里的 `DATABASE_URL` 指向**本次验收用的库**（默认演示库）；矩阵 B 层与 UI 探针都要读它；
+- Node ≥ 24（本仓 package.json 已声明）；`pg`、`yaml` 按本仓锁文件装配。媒体回归使用独立临时 Playwright 仪器与实际浏览器，不改变产品依赖图；
+- 数据库：矩阵 B 层与 UI 探针只连接显式声明的本次验收库；部署目标不得回落到默认本机数据库。O 域自有 selftest 不连接数据库；
 - 三端端口：profile.startup.ports（默认 3000/3001/3002/8787）。
 - 生产实测：`acceptance/profile.json#live`（模型清单/任务矩阵/配额）+ 真实凭据 + 可访问的目标环境（客户端或部署地址）。
 

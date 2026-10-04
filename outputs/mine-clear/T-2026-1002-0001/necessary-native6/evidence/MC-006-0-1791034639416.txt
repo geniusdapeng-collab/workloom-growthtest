@@ -1,0 +1,105 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest
+
+ ✓ packages/runtime/src/tools.test.ts (12 tests) 6ms
+ ✓ packages/runtime/src/loop.test.ts (27 tests) 14ms
+ ✓ apps/server/src/runtime/tool-executor.test.ts (19 tests) 43ms
+ ✓ packages/runtime/src/quest-hardening.test.ts (9 tests) 10ms
+ ✓ packages/runtime/src/runtime.test.ts (15 tests | 6 skipped) 106ms
+
+ Test Files  5 passed (5)
+      Tests  76 passed | 6 skipped (82)
+   Start at  21:37:19
+   Duration  530ms (transform 685ms, setup 0ms, import 916ms, tests 181ms, environment 0ms)
+
+✔ 完成三个步骤且线程事实一致时通过 (0.404417ms)
+✔ 已实际执行一步的运行态通过 (0.055458ms)
+✔ 已有执行进度及审批回执的 pending_review 通过 (0.0455ms)
+✔ 实际发现的 failed / 0 步不得被创建和拆解结果放行 (0.153917ms)
+✔ failed / cancelled / queued 即使伪报进度也拒绝 (0.071334ms)
+✔ 无有效步数、超总数及非整数拒绝 (0.079208ms)
+✔ 未按多步骤 quest 路由或没有线程拒绝 (0.085334ms)
+✔ 线程 ID 或回读状态不一致拒绝 (0.053875ms)
+✔ 完成状态却少步骤、或存在未核实动作拒绝 (0.066125ms)
+✔ pending_review 必须有非空审批回执 (0.103ms)
+ℹ tests 10
+ℹ suites 0
+ℹ pass 10
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 75.6535
+{"id":"partial-bridge-simulation-and-parallel-isolation","result":"passed","evidence":{"threads":["T-MC006-69b0b2ae-08d0-4358-b103-4f6c93d45b26","T-MC006-2d3fcc56-dd0f-4b74-ba01-77f13ebd7a5b","T-MC006-5d9f4827-11d1-4e35-9cb9-e281aa60f273"],"modes":["simulated","simulated","simulated"],"boundEvents":3}}
+{"id":"replay-is-idempotent-after-pii-masking","result":"passed","evidence":{"threadId":"T-MC006-69b0b2ae-08d0-4358-b103-4f6c93d45b26","stepsDone":1,"eventCount":1}}
+{"id":"rls-other-tenant-and-workspace-cannot-read-receipt","result":"passed","evidence":{"otherTenantRows":0,"otherWorkspaceRows":0}}
+{"id":"cross-tenant-binding-rejected-on-replay-without-reissue","result":"passed","evidence":{"threadId":"T-MC006-4429c254-ed56-421f-a970-e51cd266df7a","status":"failed","executorCalls":0}}
+{"id":"tampered-result-rejected-on-replay-without-reissue","result":"passed","evidence":{"threadId":"T-MC006-72928760-a346-47ed-a323-d0d9e4c21ee5","status":"failed","executorCalls":0}}
+{"id":"real-uncovered-tool-stays-connector-required","result":"passed","evidence":{"threadId":"T-MC006-a0bac296-1641-479a-b96b-bdec38f69059","status":"failed","mode":"real","synced":false}}
+{"id":"covered-runtime-failure-does-not-simulate","result":"passed","evidence":{"threadId":"T-MC006-26184067-5315-4fd7-aaee-845e68080b47","status":"failed","stepsDone":0}}
+{"id":"covered-load-failure-does-not-simulate","result":"passed","evidence":{"threadId":"T-MC006-fe240d48-71df-4abe-ad02-c1890904f98b","status":"failed","mode":"real","synced":false}}
+{"id":"malformed-configuration-does-not-become-unconfigured-simulation","result":"passed","evidence":{"threadId":"T-MC006-c1e77d5a-a0f3-43c0-ab6e-b988b81f8afe","status":"failed","mode":"real","synced":false}}
+{"caseId":"mixed-known-malformed-keeps-failed-range-and-healthy-route","failedLast":false,"threadId":"T-MC006-6da23821-a217-4b85-923c-30ade18624a1","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"caseId":"mixed-known-malformed-keeps-failed-range-and-healthy-route","failedLast":true,"threadId":"T-MC006-34111683-1783-45ec-8b69-c4a56f5db7a2","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"id":"mixed-known-malformed-keeps-failed-range-and-healthy-route","result":"passed","evidence":{"unknownFailedRange":false,"orders":[{"failedLast":false,"failedThread":"T-MC006-6da23821-a217-4b85-923c-30ade18624a1","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-f2bf5083-f7f4-4eaa-9992-4ffae29d41fc","healthyStepsDone":1,"localFixtureOnly":true},{"failedLast":true,"failedThread":"T-MC006-34111683-1783-45ec-8b69-c4a56f5db7a2","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-9c82aaf8-5d52-4497-93e2-574b700115c3","healthyStepsDone":1,"localFixtureOnly":true}],"externalBridgeRequests":0}}
+{"caseId":"mixed-unknown-malformed-keeps-failed-range-and-healthy-route","failedLast":false,"threadId":"T-MC006-46dbe720-b480-438e-8ceb-a9ff9e0d93cf","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"caseId":"mixed-unknown-malformed-keeps-failed-range-and-healthy-route","failedLast":true,"threadId":"T-MC006-54900e86-be9f-42a6-bc72-ab4a36adc818","actual":{"status":"failed","done":0,"unverified":["s1"],"mode":"real"},"phase":"before-assertion"}
+{"id":"mixed-unknown-malformed-keeps-failed-range-and-healthy-route","result":"passed","evidence":{"unknownFailedRange":true,"orders":[{"failedLast":false,"failedThread":"T-MC006-46dbe720-b480-438e-8ceb-a9ff9e0d93cf","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-012c3ca1-1969-401c-8c54-22be2c20fcfe","healthyStepsDone":1,"localFixtureOnly":true},{"failedLast":true,"failedThread":"T-MC006-54900e86-be9f-42a6-bc72-ab4a36adc818","failedMode":"real","stepsDone":0,"healthyThread":"T-MC006-fa353aed-0c28-4bf9-8c35-3a31bebe7c7a","healthyStepsDone":1,"localFixtureOnly":true}],"externalBridgeRequests":0}}
+{"id":"maximum-six-steps-and-empty-parameters-bound-individually","result":"passed","evidence":{"threadId":"T-MC006-cb90151a-65d3-4fe5-bc28-ceac4f6bad48","stepsDone":6,"bindings":6}}
+{"id":"simulated-receipt-cannot-complete-real-profile-after-switch","result":"passed","evidence":{"threadId":"T-MC006-69b0b2ae-08d0-4358-b103-4f6c93d45b26","status":"failed","executorCalls":0}}
+{"id":"all-fixture-event-chains-remain-consistent","result":"passed","evidence":{"workspaces":4,"deletedEvents":0,"mutatedEvents":0}}
+{
+  "actor": "MC006-db-assertions",
+  "runId": "c682a7f9-4098-49d0-9cb0-eac01cdbc22d",
+  "status": "passed",
+  "checks": 14,
+  "fixturePolicy": "app/gateway roles, unique new scopes, no event deletion or mutation",
+  "paidModelImageVideoApiCalls": 0
+}
+MC-006 断言通过（单元 + 真实 PG，付费模型/图像/视频 API 调用 0）。
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 已配置但加载失败的桥保留覆盖，其它工具仍可辨别为未覆盖
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /tmp/wl-bridge-missing-hKx0hw/missing.mjs） Cannot find module 'file:///tmp/wl-bridge-missing-hKx0hw/missing.mjs' imported from /Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/apps/server/src/runtime/tool-executor.ts
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 工厂缺失时仍使用已读取到的模块工具声明保留失败范围
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /tmp/wl-bridge-R4LMhh/executor.mjs） 模块未导出工厂 notExported
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 工厂拒绝装配时保留规格模式，未知模式的失败桥保守接管所有工具
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /tmp/wl-bridge-qy8WbL/executor.mjs） 工厂未返回可用执行器
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 非空配置无法解析为任何模块时仍停线，不退化成从未配置桥
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 缺模块路径的失败范围与健康桥并存：分隔 ::，失败项在后 false
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 缺模块路径的失败范围与健康桥并存：分隔 ::，失败项在后 true
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 缺模块路径的失败范围与健康桥并存：分隔 #，失败项在后 false
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 缺模块路径的失败范围与健康桥并存：分隔 #，失败项在后 true
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 混合配置的失败项无工具范围时保守停线，健康显式范围仍可用：失败项在后 false
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 混合配置的失败项无工具范围时保守停线，健康显式范围仍可用：失败项在后 true
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 旧单桥变量中的畸形声明与新规格表健康桥共存时仍保留失败范围
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+stderr | apps/server/src/runtime/tool-executor.test.ts > MC-006：配置失败仍保留声明范围，不能成为模拟放行 > 失败桥停在自己范围，其它已装配桥仍可执行真实工具
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /tmp/wl-bridge-missing-ksRdKy/missing.mjs） Cannot find module 'file:///tmp/wl-bridge-missing-ksRdKy/missing.mjs' imported from /Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/apps/server/src/runtime/tool-executor.ts
+
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 /tmp/wl-mc006-routing-XNvacy/missing.mjs） Cannot find module '/tmp/wl-mc006-routing-XNvacy/missing.mjs' imported from /Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/workloom-growthtest/apps/server/src/runtime/tool-executor.ts
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+[tool-executor] 部署执行器加载失败（fail-closed：保留该桥声明范围 <缺少模块路径>） 部署桥规格缺少模块路径
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

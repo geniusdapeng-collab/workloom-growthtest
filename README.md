@@ -103,11 +103,11 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 同名岗位由主包 `composition.presetOwners` 裁决：`ads-optimizer`、`publish-operator`、`review-analyst` 归 `geo-growth`，`company-ceo` 归 `hotel`。下方数量从 manifest 和岗位标识自动派生，避免手工维护另一套总数。当前三包均为 `candidate`；稳定包签名校验能力的存在不能变成“这些候选包已经完成生产验收”的结论。
 
 <!-- CAPABILITIES:BEGIN -->
-<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-10-03），请勿手改；重跑 pnpm capabilities 更新 -->
+<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-10-04），请勿手改；重跑 pnpm capabilities 更新 -->
 
 ## 代码与资产速览（自动生成）
 
-本导览检查 manifest、脚本和文件入口。目录存在不等于真实工具接通；岗位、技能与管线数是声明资产数，不是生产实测通过数。
+本导览检查 manifest、脚本和文件入口。目录可发现、实际可调用、结果已验证分别记录；缺少同提交独立运行证据时后两项为未验证。岗位、技能与管线数是声明资产数，不是生产实测通过数。
 
 - 🖥 **三端应用入口**：PC 工作台 · 员工移动工作台 · 客户 H5 服务前台
 - 📦 **行业包声明资产**：bundles/ai-video/ · bundles/geo-growth/ · bundles/hotel/
