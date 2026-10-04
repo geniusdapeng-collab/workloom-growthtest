@@ -4,6 +4,7 @@ import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import scene from "../../../../../bundles/geo-growth/floor-scene.json";
 import { FloorView, type FloorAgent } from "./Floor";
+import { createFloorLayout } from "./floor-layout";
 
 describe("职场真实组件的首帧与点击分派", () => {
   let root: Root;
@@ -13,6 +14,7 @@ describe("职场真实组件的首帧与点击分派", () => {
   let frames: Map<number, FrameRequestCallback>;
   let texts: Array<{ text: string; x: number; y: number; font: string }>;
   let cards: Array<{ x: number; y: number; width: number; height: number }>;
+  let bodies: Array<{ x: number; y: number }>;
   const profile = vi.fn(), task = vi.fn();
   let nextFrame: number;
   let unavailable = false;
@@ -35,9 +37,14 @@ describe("职场真实组件的首帧与点击分派", () => {
   async function click(x: number, y: number) {
     await act(async () => canvas().dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: y })));
   }
+  async function hover(x: number, y: number) {
+    await act(async () => canvas().dispatchEvent(new MouseEvent("mousemove", { bubbles: true, clientX: x, clientY: y })));
+    await advance();
+  }
+  const slotsOf = (list: FloorAgent[]) => createFloorLayout({ scene, agents: list }, width, 440, canvas().getContext("2d")!).slots;
   beforeEach(() => {
     (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    clock = 0; width = 768; frames = new Map(); nextFrame = 0; texts = []; cards = []; unavailable = false; contentSafety = false;
+    clock = 0; width = 768; frames = new Map(); nextFrame = 0; texts = []; cards = []; bodies = []; unavailable = false; contentSafety = false;
     profile.mockClear(); task.mockClear();
     vi.spyOn(performance, "now").mockImplementation(() => clock);
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { frames.set(++nextFrame, callback); return nextFrame; });
@@ -54,10 +61,12 @@ describe("职场真实组件的首帧与点击分派", () => {
     let path: Array<[number, number]> = [];
     const gradient = { addColorStop: vi.fn() };
     const ctx = { font: "", fillStyle: "", textAlign: "center",
-      setTransform: vi.fn(), clearRect: () => { texts = []; cards = []; },
+      setTransform: vi.fn(), clearRect: () => { texts = []; cards = []; bodies = []; },
       beginPath: () => { path = []; }, moveTo: (x: number, y: number) => path.push([x, y]),
       arcTo: (x: number, y: number, x2: number, y2: number) => { path.push([x, y], [x2, y2]); },
-      lineTo: vi.fn(), closePath: vi.fn(), stroke: vi.fn(), arc: vi.fn(), ellipse: vi.fn(), strokeRect: vi.fn(), fillRect: vi.fn(),
+      lineTo: vi.fn(), closePath: vi.fn(), stroke: vi.fn(), arc: vi.fn(),
+      ellipse: (x: number, y: number) => { if (ctx.fillStyle === "rgba(0,0,0,.3)") bodies.push({ x, y: y - 2 }); },
+      strokeRect: vi.fn(), fillRect: vi.fn(),
       fill: () => {
         if (typeof ctx.fillStyle === "string" && ctx.fillStyle.startsWith("rgba(255,255,255") && path.length) {
           const xs = path.map(point => point[0]), ys = path.map(point => point[1]);
@@ -77,16 +86,18 @@ describe("职场真实组件的首帧与点击分派", () => {
     host.remove(); vi.restoreAllMocks(); vi.unstubAllGlobals();
   });
 
-  it("第一帧已绘出 18 个分离名牌，每个角色与名牌都打开自己档案", async () => {
+  it("第一帧保留18个角色，待命名牌悬停显示；每个角色和完整牌都打开自己档案", async () => {
     const list = team(); await render(list); await advance();
-    expect(cards).toHaveLength(18);
-    const roles = texts.filter(item => list.some(agent => agent.name === item.text));
-    expect(roles).toHaveLength(18);
-    for (const role of roles) {
-      const expected = list.find(agent => agent.name === role.text)!;
-      await click(role.x, role.y - 29);
+    expect(cards).toHaveLength(0); expect(bodies).toHaveLength(18);
+    for (const expected of list) {
+      const slot = slotsOf(list).get(expected.id)!;
+      expect(bodies.some(body => Math.abs(body.x - slot.sx) < 1 && Math.abs(body.y - slot.sy) < 1)).toBe(true);
+      await click(slot.sx, slot.sy - 20);
       expect(profile.mock.calls.at(-1)![0].id).toBe(expected.id);
-      await click(role.x, role.y + 5);
+      await hover(slot.sx, slot.sy - 20);
+      expect(cards).toHaveLength(1);
+      expect(texts.some(text => text.text === expected.name)).toBe(true);
+      await click(slot.card.x + 1, slot.card.y + slot.card.height - 1);
       expect(profile.mock.calls.at(-1)![0].id).toBe(expected.id);
     }
     expect(profile).toHaveBeenCalledTimes(36); expect(task).not.toHaveBeenCalled();
@@ -102,12 +113,13 @@ describe("职场真实组件的首帧与点击分派", () => {
   });
   it("轮询换序、排队状态、尺寸变化与停用离场都重新使用有效绘制事实", async () => {
     const list = team(18, "queued"); await render(list); await advance();
-    expect(texts.filter(item => item.text.startsWith("排队中 · "))).toHaveLength(18);
+    expect(bodies).toHaveLength(18);
+    expect(texts.filter(item => item.text.startsWith("排队中 · "))).toHaveLength(2);
     const positions = texts.filter(item => list.some(agent => agent.name === item.text));
     await render([...list].reverse()); await advance(.5);
     expect(texts.filter(item => list.some(agent => agent.name === item.text))).toEqual(positions);
     width = 390; await advance(.5);
-    expect(cards).toHaveLength(18); expect(parseFloat(canvas().style.width)).toBeGreaterThan(390);
+    expect(cards).toHaveLength(2); expect(bodies).toHaveLength(18); expect(parseFloat(canvas().style.width)).toBeGreaterThan(390);
     expect(host.querySelector('[role="region"]')?.getAttribute("tabindex")).toBe("0");
     await render(list.map(agent => ({ ...agent, state: "disabled" }))); await advance();
     expect(cards).toHaveLength(0); expect(canvas().getAttribute("data-product-scene-actors")).toBe("0");
@@ -121,15 +133,16 @@ describe("职场真实组件的首帧与点击分派", () => {
     width = 390; contentSafety = true;
     const list = team(); await render(list); await advance();
     const ratio = canvas().getBoundingClientRect().width / parseFloat(canvas().style.width);
-    const roles = texts.filter(item => list.some(agent => agent.name === item.text));
-    expect(roles).toHaveLength(18);
-    for (const role of roles) {
-      const expected = list.find(agent => agent.name === role.text)!;
+    expect(bodies).toHaveLength(18); expect(cards).toHaveLength(0);
+    for (const expected of list) {
+      const slot = slotsOf(list).get(expected.id)!;
       const before = profile.mock.calls.length;
-      await click(role.x * ratio, role.y - 29);
+      await click(slot.sx * ratio, slot.sy - 20);
       expect(profile.mock.calls.length).toBe(before + 1);
       expect(profile.mock.calls.at(-1)![0].id).toBe(expected.id);
-      await click(role.x * ratio, role.y + 5);
+      await hover(slot.sx * ratio, slot.sy - 20);
+      expect(cards).toHaveLength(1);
+      await click((slot.card.x + 1) * ratio, slot.card.y + slot.card.height - 1);
       expect(profile.mock.calls.length).toBe(before + 2);
       expect(profile.mock.calls.at(-1)![0].id).toBe(expected.id);
     }
@@ -143,7 +156,7 @@ describe("职场真实组件的首帧与点击分派", () => {
     const list = team(65).map((agent, index) => ({ ...agent, name: `跨区域客户生命周期增长策略与特殊需求研究负责人${index}`.repeat(3) }));
     await render(list); await advance();
     const region = host.querySelector<HTMLElement>('[role="region"]')!;
-    const visible = () => cards.filter(card => card.x < region.scrollLeft + width && card.x + card.width > region.scrollLeft && card.y < region.scrollTop + 440 && card.y + card.height > region.scrollTop);
+    const visible = () => bodies.filter(body => body.x >= region.scrollLeft && body.x <= region.scrollLeft + width && body.y >= region.scrollTop && body.y <= region.scrollTop + 440);
     expect(visible().length).toBeGreaterThan(0);
     region.scrollLeft = 17; region.scrollTop = 19;
     await act(async () => region.dispatchEvent(new Event("scroll", { bubbles: true })));

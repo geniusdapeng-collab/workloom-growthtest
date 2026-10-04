@@ -1,0 +1,214 @@
+{
+  "schema": "workloom.mine-clear/handoff@1",
+  "task_id": "T-2026-1002-0001",
+  "repo": "workloom-growthtest",
+  "generated_at": "2026-10-03T13:57:20.634Z",
+  "audit_baseline": "4da4b65e23bb3f783189038d1be9faee7f3c1973",
+  "repair_baseline": "c94cfb64b4bee11448907967787800746393ccd4",
+  "acceptance_baseline": "c94cfb64b4bee11448907967787800746393ccd4",
+  "environment_claim": "local-preview",
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "closed_problems": [
+    {
+      "id": "MC-006",
+      "title": "多桥配置遮住显式模拟工具，且坏声明被丢弃可误造模拟成功",
+      "verified_by": "/root/independent_acceptance",
+      "verified_at": "2026-10-03T13:52:27.016Z",
+      "verification_evidence": {
+        "path": "runs/MC-006-0-1791035540856.json",
+        "sha256": "6f9f4b3ac0c2a5ef7e33f193ffcd9224cbcbbd8e628e4f770d739c48704e26a5",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "独立作用域真实PostgreSQL，部分覆盖、已覆盖故障、混合坏配置、篡改、跨作用域和replay输入",
+          "expect": "单元、原门禁反例与真实PG14组断言退出0；显式未覆盖模拟执行保留绑定；真实和已声明故障均0步停线",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-geo-tool-routing.mjs --db",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "scripts/verify-geo-tool-routing.mjs",
+              "--db"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-0-1791035540856.txt",
+            "sha256": "9dd06dd707db04ed3d96998a3c418ca30d9f2cf30d43fb1e7db3b8e29e03a647",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "run": {
+            "path": "runs/MC-006-0-1791035540856.json",
+            "sha256": "6f9f4b3ac0c2a5ef7e33f193ffcd9224cbcbbd8e628e4f770d739c48704e26a5",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "原始发布门禁与所有执行状态反例",
+          "expect": "原assertQuestExecution反例10例实跑通过，只有核实的同线程执行允许门禁通过",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/release-gate-quest.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--import",
+              "tsx",
+              "--test",
+              "scripts/release-gate-quest.test.mjs"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-1-1791035546471.txt",
+            "sha256": "ee1e25d22243c9817e8829c7cfdc9c045e3e7f8e4d1a2f707495c8a1ab73369e",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "run": {
+            "path": "runs/MC-006-1-1791035546471.json",
+            "sha256": "8f377e64f32e80c654a39ec3702d953b6cb0a916d3d6de9f0a0e8b5a75f375cc",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-016",
+      "title": "欢迎引导遮住原生场景仍可能判绿，职场标签和舞台密度及织伴遮挡损害体验",
+      "verified_by": "/root/independent_acceptance",
+      "verified_at": "2026-10-03T13:53:12.624Z",
+      "verification_evidence": {
+        "path": "runs/MC-016-0-1791035589208.json",
+        "sha256": "8568a93b896e1efa732f55f8ce978b2338401c8366ae546995aa378ca95e1ead",
+        "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实应用代码在受控VM生命周期与既有bootstrap异常路径：欢迎、Questline、scene rect、canvas面积、像素和遮挡",
+          "expect": "63个Node测试实跑通过；欢迎生命周期、遮挡拒绝、短画布、裁剪像素、停稳后重测、场景卸载与实际可见名牌反例",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs apps/desktop/electron/render-smoke.test.cjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "apps/desktop/electron/bootstrap.test.cjs",
+              "apps/desktop/electron/bootstrap-startup.test.cjs",
+              "apps/desktop/electron/render-smoke.test.cjs"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-016-0-1791035589208.txt",
+            "sha256": "844bbf3010618e5712195f6028991976d946b94029d9c865ffb36c14670e3537",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "run": {
+            "path": "runs/MC-016-0-1791035589208.json",
+            "sha256": "8568a93b896e1efa732f55f8ce978b2338401c8366ae546995aa378ca95e1ead",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "真实三组件，65人/窄屏/入场ready；worker内容与任务和档案入口；mini保存坐标与通知及隐藏唤回；GPU边界受控；真实共享表面Esc与焦点；24通知异步/重试/旧响应用例；6项40员工轮播和刷新焦点边界",
+          "expect": "58个实际React断言通过；保留人物、姓名发现路径、形态偏好与真实任务id，timer清理及位置边界成立；原生几何须另验；默认不挂通知内容、显式有界托盘、失败保留重试、单飞与旧响应保护；跨12/24秒保留焦点且使用同员工最新任务",
+          "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run --config apps/web/vitest.config.ts apps/web/src/components/CeremonyStage.layout.test.tsx apps/web/src/components/Floor3D.nameplate.test.tsx apps/web/src/components/loommate/LoomMate.scene.test.tsx apps/web/src/components/loommate/LoomMate.inbox.test.tsx apps/web/src/pages/p0/P0.focus.test.tsx",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "--config",
+              "apps/web/vitest.config.ts",
+              "apps/web/src/components/CeremonyStage.layout.test.tsx",
+              "apps/web/src/components/Floor3D.nameplate.test.tsx",
+              "apps/web/src/components/loommate/LoomMate.scene.test.tsx",
+              "apps/web/src/components/loommate/LoomMate.inbox.test.tsx",
+              "apps/web/src/pages/p0/P0.focus.test.tsx"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-016-1-1791035589790.txt",
+            "sha256": "a700d25aa55b68f4596d028d05449ef8b745a91b0d45ec2d78993cdd4ee9122d",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          },
+          "run": {
+            "path": "runs/MC-016-1-1791035589790.json",
+            "sha256": "173b4f754db60b4b83f9fb418329a2c4d6d4c9b489295be05303f8226e5a6087",
+            "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+          }
+        }
+      ]
+    }
+  ],
+  "open_problems": [],
+  "acceptance_commands": [
+    "pnpm acceptance:profile:check",
+    "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest --env local-preview",
+    "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest --env local-preview --live-only   # 生产最小侵入档"
+  ],
+  "notes": "环境档位为 local-preview：报告只能写『本机预览结构验收』，不得写『生产实测通过』（RDAS v3.1 §0）"
+}

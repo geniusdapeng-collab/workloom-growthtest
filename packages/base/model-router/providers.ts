@@ -64,7 +64,7 @@ export class MockProvider implements ModelProvider {
 export class OpenAiCompatibleProvider implements ModelProvider {
   constructor(
     public readonly modelId: string,
-    private readonly cfg: { baseUrl: string; apiKey?: string },
+    private readonly cfg: { baseUrl: string; apiKey?: string; maxTokens?: number; thinking?: {type:"enabled"|"disabled"} },
   ) {}
   private authHeaders(): Record<string, string> {
     return this.cfg.apiKey ? { authorization: `Bearer ${this.cfg.apiKey}` } : {};
@@ -94,7 +94,8 @@ export class OpenAiCompatibleProvider implements ModelProvider {
       res = await fetch(`${this.cfg.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", ...this.authHeaders() },
-        body: JSON.stringify({ model: this.modelId, messages: masked, temperature: 0.2 }),
+        body: JSON.stringify({ model: this.modelId, messages: masked, temperature: 0.2,
+          ...(this.cfg.maxTokens?{max_tokens:this.cfg.maxTokens}:{}),...(this.cfg.thinking?{thinking:this.cfg.thinking}:{}) }),
         signal,
       });
     } catch (err) {

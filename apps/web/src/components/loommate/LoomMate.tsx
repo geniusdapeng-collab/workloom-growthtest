@@ -4,8 +4,8 @@
  *      大/小两种尺寸手动切换（默认大尺寸）· 气泡提醒 · 对话面板 · 记忆透明面板
  * 铁律：不替人决策 / 不打扰（勿扰+聚合）/ 不装在线
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 import { ensureDemoLogin, trpc } from "../../lib/trpc";
 import { VoiceEngine } from "../../voice/VoiceEngine";
 import { mateVoiceProfileOf } from "../../voice/mateVoice";
@@ -134,11 +134,24 @@ function MateAvatar({ size, excited }: { size: number; excited: boolean }) {
 /* ---------------- 主组件 ---------------- */
 export function LoomMate() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const railW = useAskRailPadding();
   const navW = useSideNavWidth();
   const [viewport, setViewport] = useState(() => ({ width: window.innerWidth, height: window.innerHeight }));
   const [settings, setSettings] = useState<Settings | null>(null);
   const [items, setItems] = useState<InboxItem[]>([]);
+  const [inboxOpen, setInboxOpen] = useState(false);
+  const [inboxLoading, setInboxLoading] = useState(false);
+  const [inboxError, setInboxError] = useState<string | null>(null);
+  const [pendingNotices, setPendingNotices] = useState<Set<string>>(new Set());
+  const [noticeErrors, setNoticeErrors] = useState<Record<string, string>>({});
+  const pendingNoticeIds = useRef(new Set<string>());
+  const acknowledgedIds = useRef(new Set<string>());
+  const inboxRequest = useRef(0);
+  const inboxAlive = useRef(true);
+  const inboxToggleRef = useRef<HTMLButtonElement | null>(null);
+  const inboxCloseRef = useRef<HTMLButtonElement | null>(null);
+  const inboxId = useId();
   const [studioActive, setStudioActive] = useState<StudioActive | null>(null);
   const [open, setOpen] = useState<"none" | "settings" | "memory">("none");
   const [busy, setBusy] = useState(false);
@@ -146,6 +159,9 @@ export function LoomMate() {
   const seenIds = useRef<Set<string>>(new Set());
   const sizeToggleRef = useRef<HTMLButtonElement | null>(null);
   const size = settings?.widget_size ?? "large";
+  // 经营主页的中央舞台需要 768px；两侧各留出大形象的空间才默认展开。
+  // 默认形态只影响本次布局，用户显式的 0/1 偏好始终优先。
+  const defaultCompact = viewport.width <= 820 || viewport.width - railW - navW <= (pathname === "/" ? 1760 : 880);
 
   /* —— 浮层交互（拖拽移动 / 迷你球 / 隐藏把手；本机偏好存 localStorage，2026-09 浮层 UX 专项） —— */
   const [pos, setPos] = useState<{ x: number; y: number } | null>(() => {
@@ -153,6 +169,7 @@ export function LoomMate() {
       const v = localStorage.getItem("loommate.pos");
       if (!v) return null;
       const p = JSON.parse(v) as { x: number; y: number };
+      if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) return null;
       /**
        * 2026-09-20 真机反馈：保存的位置若落在**主视图中央区域**（横向 25%–75%、纵向 25%–80%），
        * 会长期压住经营主页的职场/舞台。这类位置不还原，回落到默认停靠位（右/左下角）；
@@ -175,41 +192,68 @@ export function LoomMate() {
       if (stored === "1") return true;
       if (stored === "0") return false;
     } catch { /* 本机偏好不可写时按视口判断 */ }
-    return window.matchMedia("(max-width: 820px)").matches;
+    return defaultCompact;
   });
   const dragRef = useRef<{ startX: number; startY: number; baseX: number; baseY: number; moved: boolean } | null>(null);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [measuredBody, setMeasuredBody] = useState<{ key: string; width: number; height: number } | null>(null);
   const persistLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
   const availableWidth = Math.max(96, viewport.width - railW - navW - 32);
   const widgetW = size === "large" ? Math.min(300, Math.round(viewport.height * 0.38), availableWidth) : Math.min(120, availableWidth);
   const widgetH = size === "large" ? Math.round(widgetW * 1.17) : 170;
+  const visibleMini = mini && open === "none";
+  const bodyKey = `${visibleMini ? "mini" : "expanded"}:${size}:${widgetW}:${widgetH}`;
+  const bodyW = visibleMini ? 64 : measuredBody?.key === bodyKey ? measuredBody.width : widgetW;
+  const bodyH = visibleMini ? 64 : measuredBody?.key === bodyKey ? measuredBody.height : widgetH;
+
+  useEffect(() => {
+    if (hidden || size === "fullscreen") return;
+    const measure = () => {
+      const rect = bodyRef.current?.getBoundingClientRect();
+      if (!rect?.width || !rect.height) return;
+      setMeasuredBody((current) => current?.key === bodyKey && current.width === rect.width && current.height === rect.height
+        ? current : { key: bodyKey, width: rect.width, height: rect.height });
+    };
+    measure();
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
+    if (bodyRef.current) observer?.observe(bodyRef.current);
+    return () => observer?.disconnect();
+  }, [bodyKey, hidden, size]);
+
+  const hideCompanion = () => {
+    setHidden(true);
+    setOpen("none");
+    setInboxOpen(false);
+    persistLocal("loommate.hidden", "1");
+    // null 是默认右下角停靠，隐藏/唤回不能把它变成大形象的左上坐标。
+  };
 
   /**
    * 大尺寸浮层「吞点击」修复（真机验收实测）：
    * 大形态的容器是 480×560 的矩形，角色本体只占其中一部分，空出来的矩形区域却照样吃指针事件——
    * 真机上关卡三杆（放行/改后放行/退回）滚到右下区域时，点击被小织的空盒子接走，鼠标怎么点都点不动。
    * 两条纪律：① 容器本身 pointer-events:none，只有气泡/面板/角色本体/控制条这几个真实可点区域接收事件；
-   * ② 内容区窄（与 Bridge 侧栏降级同一条 880px 口径）时默认收成 64px 小球，别用大形象压住主工作区
+   * ② 经营主页为中央舞台留出空间，其他页面在内容区不超过 880px 时默认收成 64px 小球
    *   （用户显式展开/收起后仍按其本机偏好持久化，不反复弹回）。
    */
-  const contentNarrow = viewport.width - railW - navW <= 880;
   useEffect(() => {
-    if (!contentNarrow) return;
     try {
-      if (localStorage.getItem("loommate.mini") !== null) return; // 用户已表态 → 尊重
+      const preference = localStorage.getItem("loommate.mini");
+      if (preference === "0" || preference === "1") return;
     } catch { /* 本机偏好不可读时按窄内容区处理 */ }
-    setMini(true);
-  }, [contentNarrow]);
+    setMini(defaultCompact);
+  }, [defaultCompact]);
 
   const clampPos = (x: number, y: number) => ({
-    x: Math.min(Math.max(navW, x), Math.max(navW, viewport.width - railW - widgetW)),
-    y: Math.min(Math.max(0, y), Math.max(0, viewport.height - widgetH)),
+    x: Math.min(Math.max(navW, x), Math.max(navW, viewport.width - railW - bodyW)),
+    y: Math.min(Math.max(0, y), Math.max(0, viewport.height - bodyH)),
   });
   const defaultPos = () => ({
-    x: Math.max(navW, viewport.width - railW - widgetW - 16),
-    y: Math.max(0, viewport.height - widgetH - 16),
+    x: Math.max(navW, viewport.width - railW - bodyW - 16),
+    y: Math.max(0, viewport.height - bodyH - 16),
   });
   const docked: "left" | "right" = pos
-    ? (pos.x + widgetW / 2 < navW + (viewport.width - railW - navW) / 2 ? "left" : "right")
+    ? (pos.x + bodyW / 2 < navW + (viewport.width - railW - navW) / 2 ? "left" : "right")
     : "right";
   const onDragStart = (e: React.PointerEvent) => {
     const base = pos ?? defaultPos();
@@ -231,9 +275,9 @@ export function LoomMate() {
     setPos((p) => {
       if (!p) return p;
       const snapped = {
-        x: p.x + widgetW / 2 < navW + (viewport.width - railW - navW) / 2
+        x: p.x + bodyW / 2 < navW + (viewport.width - railW - navW) / 2
           ? navW + 16
-          : Math.max(navW, viewport.width - railW - widgetW - 16),
+          : Math.max(navW, viewport.width - railW - bodyW - 16),
         y: p.y,
       };
       persistLocal("loommate.pos", JSON.stringify(snapped));
@@ -260,11 +304,7 @@ export function LoomMate() {
     celebrateTimers.current = [];
     setWandPhase("rise");
     setCelebrate(task);
-    // 主动出来播报：小球态自动展开成形象（用户显式「隐藏」过则只发声 + 右栏高亮，不强弹）
-    if (!hidden && !contentNarrow) setMini((previous) => {
-      miniBeforeNotice.current ??= previous;
-      return false;
-    });
+    // 通知保留用户当前的收起/隐藏形态；语音、字幕与右栏高亮仍按正式通道播报。
     AudioEngine.play("fanfare");
     VoiceEngine.speak({
       role: "loommate", persona: personaName,
@@ -287,7 +327,7 @@ export function LoomMate() {
         miniBeforeNotice.current = undefined;
       }, 9000),
     );
-  }, [personaName, settings?.voice_key, hidden, contentNarrow]);
+  }, [personaName, settings?.voice_key]);
   useEffect(() => {
     const onSettled = (event: Event) => {
       const detail = (event as CustomEvent<SettledTaskNotice>).detail;
@@ -332,31 +372,61 @@ export function LoomMate() {
   const systemEmotion = useStableEmotion(emotionOfSystem(systemSignal));
   const systemEmotionText = emotionLabelOf(systemEmotion);
 
-  const load = useCallback(async () => {
-    await ensureDemoLogin();
-    const [s, box] = await Promise.all([
-      svc().secretary.settings.query().catch(() => null),
-      svc().secretary.inbox.query({ unreadOnly: true }).catch(() => ({ items: [] })),
-    ]);
-    if (s) setSettings(s.settings);
-    const fresh = box.items.filter((it) => !seenIds.current.has(it.id));
-    for (const it of box.items) seenIds.current.add(it.id);
-    setItems(box.items);
-    // 新事件语音播报（红线/高，voice_on 才发声；字幕永远发——VoiceEngine 纪律）
-    if (s?.settings.voice_on) {
-      for (const it of fresh.filter((x) => x.level === "red" || x.level === "high").slice(0, 2)) {
-        VoiceEngine.speak({
-          role: "loommate", persona: personaName,
-          text: inboxSpeechText(it.title, it.body).slice(0, 120),
-          priority: it.level === "red" ? "fuse" : "ambient",
-          voiceOverride: mateVoiceProfileOf(s.settings.voice_key),
-        });
+  const load = useCallback(async (scanFirst = false) => {
+    const request = ++inboxRequest.current;
+    setInboxLoading(true);
+    try {
+      await ensureDemoLogin();
+      let scanFailed = false;
+      if (scanFirst) {
+        try { await svc().secretary.scan.mutate(); }
+        catch { scanFailed = true; }
       }
+      const [settingsResult, inboxResult] = await Promise.allSettled([
+        svc().secretary.settings.query(),
+        svc().secretary.inbox.query({ unreadOnly: true }),
+      ]);
+      if (!inboxAlive.current || request !== inboxRequest.current) return;
+      const s = settingsResult.status === "fulfilled" ? settingsResult.value : null;
+      if (s) setSettings(s.settings);
+      if (inboxResult.status === "rejected") {
+        setInboxError("通知暂时无法读取，已保留上次收到的事项。请重试。");
+        return;
+      }
+      // 成功标记后，较早发出的轮询也不能把同一 ID 放回未读列表。
+      const currentItems = inboxResult.value.items.filter((it) => !acknowledgedIds.current.has(it.id));
+      const fresh = currentItems.filter((it) => !seenIds.current.has(it.id));
+      for (const it of currentItems) seenIds.current.add(it.id);
+      setItems(currentItems);
+      setInboxError(scanFailed ? "通知扫描暂时无法更新，已保留收到的事项。请重试。" : null);
+      if (s?.settings.voice_on) {
+        for (const it of fresh.filter((x) => x.level === "red" || x.level === "high").slice(0, 2)) {
+          VoiceEngine.speak({
+            role: "loommate", persona: personaName,
+            text: inboxSpeechText(it.title, it.body).slice(0, 120),
+            priority: it.level === "red" ? "fuse" : "ambient",
+            voiceOverride: mateVoiceProfileOf(s.settings.voice_key),
+          });
+        }
+      }
+    } catch {
+      if (inboxAlive.current && request === inboxRequest.current) {
+        setInboxError("通知暂时无法读取，已保留上次收到的事项。请重试。");
+      }
+    } finally {
+      if (inboxAlive.current && request === inboxRequest.current) setInboxLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [personaName]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    inboxAlive.current = true;
+    void load();
+    return () => { inboxAlive.current = false; };
+  }, [load]);
+
+  // 路由、隐藏与形态变化只关闭托盘，不标记已读，也不抢回新页面的焦点。
+  useEffect(() => { setInboxOpen(false); }, [pathname, hidden, mini, size]);
 
   /**
    * 班组活跃度信号（织球「班组状态眼」的另一半输入）：
@@ -429,14 +499,6 @@ export function LoomMate() {
     return () => { alive = false; window.clearInterval(timer); };
   }, [announceTask]);
 
-  /** 视口跨入窄屏断点时自动收起为小球（跨出时不自动展开，尊重用户当前选择） */
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 820px)");
-    const onChange = (event: MediaQueryListEvent) => { if (event.matches) setMini(true); };
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-
   useEffect(() => {
     const keepVisible = () => {
       setViewport({ width: window.innerWidth, height: window.innerHeight });
@@ -451,20 +513,21 @@ export function LoomMate() {
       } catch { /* 本机偏好不可写时仍恢复当前会话 */ }
       setPos(null);
       setHidden(false);
-      setMini(false);
+      setMini(defaultCompact);
       setOpen("none");
+      setInboxOpen(false);
     };
     const setVisibility = (event: Event) => {
       miniBeforeNotice.current = undefined;
       const action = (event as CustomEvent<"show" | "hide" | "toggle">).detail;
       if (action === "show") {
         setHidden(false);
-        setMini(false);
         persistLocal("loommate.hidden", "0");
-        persistLocal("loommate.mini", "0");
+        // 引导关闭和布局恢复只恢复可见性；尺寸仍由响应式布局及用户显式偏好决定。
       } else if (action === "hide") {
         setHidden(true);
         setOpen("none");
+        setInboxOpen(false);
         persistLocal("loommate.hidden", "1");
       } else {
         setHidden((value) => {
@@ -484,30 +547,42 @@ export function LoomMate() {
     };
   // clampPos 按当前左右栏/尺寸计算；这些值变化时重新校正一次即可。
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navW, railW, viewport.width, viewport.height, widgetW, widgetH]);
+  }, [navW, railW, viewport.width, viewport.height, bodyW, bodyH, defaultCompact]);
   // 20s 心跳：先扫描事件源再拉收件箱
   useEffect(() => {
-    const h = setInterval(async () => {
-      await ensureDemoLogin();
-      await svc().secretary.scan.mutate().catch(() => ({ added: 0 }));
-      await load();
-    }, 20_000);
+    const h = setInterval(() => void load(true), 20_000);
     return () => clearInterval(h);
   }, [load]);
 
-  const act = async (it: InboxItem) => {
-    await svc().secretary.markInbox.mutate({ ids: [it.id], status: "acted" }).catch(() => undefined);
-    setItems((prev) => prev.filter((x) => x.id !== it.id));
-    if (it.link) navigate(canonicalNavigationPath(it.link));
+  const updateNotice = async (it: InboxItem, status: "read" | "acted") => {
+    if (pendingNoticeIds.current.has(it.id)) return;
+    pendingNoticeIds.current.add(it.id);
+    setPendingNotices(new Set(pendingNoticeIds.current));
+    setNoticeErrors((current) => { const next = { ...current }; delete next[it.id]; return next; });
+    try {
+      await svc().secretary.markInbox.mutate({ ids: [it.id], status });
+      acknowledgedIds.current.add(it.id);
+      if (!inboxAlive.current) return;
+      const focusedNotice = document.activeElement?.closest("[data-loommate-inbox-item]");
+      setItems((current) => current.filter((item) => item.id !== it.id));
+      if (status === "acted" && it.link) navigate(canonicalNavigationPath(it.link));
+      else if (focusedNotice?.getAttribute("data-loommate-inbox-item") === it.id) {
+        queueMicrotask(() => { if (inboxCloseRef.current?.isConnected) inboxCloseRef.current.focus(); });
+      }
+    } catch {
+      if (inboxAlive.current) setNoticeErrors((current) => ({ ...current, [it.id]: "通知未能更新，事项仍保留。请重试。" }));
+    } finally {
+      pendingNoticeIds.current.delete(it.id);
+      if (inboxAlive.current) setPendingNotices(new Set(pendingNoticeIds.current));
+    }
   };
-  const later = async (it: InboxItem) => {
-    await svc().secretary.markInbox.mutate({ ids: [it.id], status: "read" }).catch(() => undefined);
-    setItems((prev) => prev.filter((x) => x.id !== it.id));
-  };
+  const act = (it: InboxItem) => updateNotice(it, "acted");
+  const later = (it: InboxItem) => updateNotice(it, "read");
 
   const MODE_NEXT: Record<string, "small" | "large" | "fullscreen"> = { small: "large", large: "fullscreen", fullscreen: "small" };
   const MODE_LABEL: Record<string, string> = { small: "变大", large: "全屏", fullscreen: "变小" };
   const toggleSize = async () => {
+    setInboxOpen(false);
     const next = MODE_NEXT[size] ?? "large";
     setSettings((s) => s ? { ...s, widget_size: next } : s);
     await svc().secretary.saveSettings.mutate({ widget_size: next }).catch(() => undefined);
@@ -523,6 +598,21 @@ export function LoomMate() {
     focusOnOpen: size === "fullscreen",
     restoreFocusOnClose: size === "fullscreen",
     returnFocusRef: sizeToggleRef,
+  });
+  const closeInbox = useCallback(() => {
+    setInboxOpen(false);
+    queueMicrotask(() => { if (inboxToggleRef.current?.isConnected) inboxToggleRef.current.focus(); });
+  }, []);
+  const inboxSurface = useManagedSurface<HTMLDivElement>({
+    open: inboxOpen && !hidden && size !== "fullscreen",
+    kind: "popover",
+    onDismiss: closeInbox,
+    modal: false,
+    focusOnOpen: true,
+    // 自动关闭不能使用打开时捕获的 focus 恢复；显式 X/Esc 由 closeInbox 恢复。
+    restoreFocusOnClose: false,
+    initialFocusRef: inboxCloseRef,
+    returnFocusRef: inboxToggleRef,
   });
 
   const moveByKeyboard = (event: React.KeyboardEvent<HTMLElement>) => {
@@ -554,6 +644,7 @@ export function LoomMate() {
   }, []);
 
   const openPanel = async (p: "settings" | "memory") => {
+    setInboxOpen(false);
     setOpen(open === p ? "none" : p);
     if (p === "memory") {
       const m = await svc().secretary.memoryPanel.query().catch(() => null);
@@ -563,11 +654,26 @@ export function LoomMate() {
 
   const dim = size === "large" ? widgetW : Math.min(96, widgetW);
   const unread = items.length;
+  const unreadText = unread >= 50 ? `至少${unread}条未读通知` : `${unread}条未读通知`;
+  const unreadLabel = unread >= 50 ? `${unread}+` : String(unread);
+  const needsAttention = items.filter((item) => item.level === "red" || item.level === "high").length;
+  const inboxEntry = (
+    <button type="button" ref={inboxToggleRef} data-loommate-inbox-toggle
+      aria-label={`通知，${unreadText}，${needsAttention}条需关注${inboxError ? "，读取异常" : ""}`}
+      aria-expanded={inboxOpen} aria-controls={inboxId} aria-haspopup="dialog" aria-busy={inboxLoading}
+      onClick={() => { if (inboxOpen) closeInbox(); else { setOpen("none"); setInboxOpen(true); } }}
+      title={`${unreadText}${needsAttention ? `；${needsAttention}条需关注` : ""}${inboxError ? "；读取异常，可打开重试" : ""}`}
+      className={`pointer-events-auto inline-flex min-h-11 items-center justify-center gap-1 rounded-full border bg-bg900/95 px-2 text-body font-semibold shadow-lg hover:border-gline focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold ${needsAttention || inboxError ? "border-alert/60 text-alert" : "border-line text-ink2"}`}
+    >
+      <span>通知</span><span>{unreadLabel}</span>{inboxError && <span aria-hidden="true">!</span>}
+    </button>
+  );
 
   // —— 全屏屏保模式：她守着整个场，有事直接喊你 ——
   if (size === "fullscreen") {
     return (
       <div {...mateSurface} className="fixed inset-0 flex flex-col items-center justify-center bg-bg950/98"
+        data-loommate-mode="fullscreen"
         style={{ zIndex: "var(--wl-z-assistant)" }}
         role="dialog" aria-modal="true" aria-label="小织屏保">
         {/* 环境微光背景 */}
@@ -583,7 +689,7 @@ export function LoomMate() {
             : <MateAvatar size={Math.min(520, Math.round((typeof window !== "undefined" ? window.innerHeight : 900) * 0.55))} excited={unread > 0} />}
           {unread > 0 && (
             <span className="absolute right-4 top-4 flex h-10 min-w-10 items-center justify-center rounded-full bg-alert px-2 text-[16px] font-bold text-white shadow-xl">
-              {unread}
+              {unreadLabel}
             </span>
           )}
         </button>
@@ -595,12 +701,13 @@ export function LoomMate() {
             <div className="flex items-center gap-1.5 text-[14px] font-semibold text-ink"><Icon name={it.level === "red" ? "warning" : "notice"} label={it.level === "red" ? "紧急提醒" : "重要提醒"} size={15} />{clientValueText(it.title)}</div>
             <div className="mt-1 text-body leading-relaxed text-ink2">{clientValueText(it.body)}</div>
             <div className="wl-action-row mt-2.5 flex flex-wrap gap-2">
-              <button onClick={() => void act(it)}
+              <button disabled={pendingNotices.has(it.id)} onClick={() => void act(it)}
                 className="rounded-lg bg-gradient-to-br from-gold to-gold2 px-4 py-1.5 text-body font-semibold text-ongold">
                 {clientValueText(it.actions[0]?.label ?? "看看")}
               </button>
-              <button onClick={() => void later(it)} className="rounded-lg border border-line px-3 py-1.5 text-body text-ink2">稍后</button>
+              <button disabled={pendingNotices.has(it.id)} onClick={() => void later(it)} className="rounded-lg border border-line px-3 py-1.5 text-body text-ink2 disabled:opacity-50">稍后</button>
             </div>
+            {noticeErrors[it.id] && <div role="alert" className="mt-2 text-body text-alert">{noticeErrors[it.id]}</div>}
           </div>
         ))}
         {/* 底部团队运行串话条 */}
@@ -632,12 +739,13 @@ export function LoomMate() {
   if (hidden) {
     return (
       <button
+        data-loommate-mode="hidden" data-loommate-dock={docked} data-loommate-anchor={pos ? "positioned" : "default"}
         onClick={() => { setHidden(false); persistLocal("loommate.hidden", "0"); }}
         title="唤回小织"
         className="fixed flex h-20 w-7 flex-col items-center justify-center gap-1 rounded-l-xl border border-gline bg-bg900/95 text-body font-semibold text-gold shadow-xl hover:bg-bg850"
         style={{ zIndex: "var(--wl-z-assistant)", ...(docked === "left"
-          ? { left: navW, top: pos?.y ?? "45%", borderRadius: "0 12px 12px 0" }
-          : { right: railW, top: pos?.y ?? "45%" }) }}
+          ? { left: navW, top: pos ? Math.max(0, Math.min(pos.y, viewport.height - 80)) : "45%", borderRadius: "0 12px 12px 0" }
+          : { right: railW, top: pos ? Math.max(0, Math.min(pos.y, viewport.height - 80)) : "45%" }) }}
       >
         <span style={{ writingMode: "vertical-rl" }}>小织</span>
         <span>{docked === "left" ? "▸" : "◂"}</span>
@@ -648,30 +756,67 @@ export function LoomMate() {
   const rootStyle: React.CSSProperties = pos
     ? { position: "fixed", left: pos.x, top: pos.y, zIndex: "var(--wl-z-assistant)" }
     : { position: "fixed", right: railW + 16, bottom: 16, zIndex: "var(--wl-z-assistant)" };
+  const anchor = pos ?? defaultPos();
+  const noticeWidth = Math.min(304, availableWidth);
+  const noticeLeft = Math.max(navW + 16, Math.min(
+    anchor.x + (docked === "right" ? bodyW - noticeWidth : 0),
+    Math.max(navW + 16, viewport.width - railW - noticeWidth - 16),
+  ));
+  // 小球通知入口在本体上方44px，托盘与字幕须越过它，避免压住自己的关闭入口。
+  const noticeGap = visibleMini ? 56 : 8;
+  const aboveSpace = Math.max(0, anchor.y - noticeGap);
+  const belowSpace = Math.max(0, viewport.height - anchor.y - bodyH - 8);
+  const noticeAbove = aboveSpace >= belowSpace;
+  const noticeInViewport = Math.max(aboveSpace, belowSpace) < 96;
+  const noticeStyle: React.CSSProperties = noticeInViewport
+    ? { position: "fixed", top: 16, left: noticeLeft, width: noticeWidth, maxHeight: Math.max(48, viewport.height - 32), overflowY: "auto" }
+    : { position: "absolute", left: noticeLeft - anchor.x, width: noticeWidth, maxHeight: noticeAbove ? aboveSpace : belowSpace, overflowY: "auto", ...(noticeAbove ? { bottom: "100%", marginBottom: noticeGap } : { top: "100%", marginTop: 8 }) };
 
   return (
     <div
       {...mateSurface}
       data-loommate-display={mini && open === "none" ? "mini" : "expanded"}
+      data-loommate-mode={visibleMini ? "mini" : "expanded"} data-loommate-dock={docked} data-loommate-anchor={pos ? "positioned" : "default"}
       className={`pointer-events-none flex flex-col gap-2 ${docked === "left" ? "items-start" : "items-end"}`}
-      style={{ fontFamily: "inherit", ...rootStyle }}
+      style={{ fontFamily: "inherit", width: bodyW, ...rootStyle }}
     >
-      {/* 气泡提醒（最多叠 3 条） */}
-      {open === "none" && items.slice(0, 3).map((it) => (
-        <div key={it.id} className={`pointer-events-auto w-[min(19rem,calc(100vw-2rem))] max-w-full rounded-2xl border p-3 shadow-xl backdrop-blur ${LEVEL_STYLE[it.level]}`}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-body font-semibold text-ink">{it.level === "red" && <Icon name="warning" size={14} />}{clientValueText(it.title)}</div>
-            <button onClick={() => void later(it)} className="shrink-0 text-body text-ink3 hover:text-ink">稍后</button>
-          </div>
-          <div className="mt-1 text-body leading-relaxed text-ink2">{clientValueText(it.body)}</div>
-          <div className="wl-action-row mt-2 flex flex-wrap gap-1.5">
-            <button onClick={() => void act(it)}
-              className="rounded-lg bg-gradient-to-br from-gold to-gold2 px-3 py-1 text-body font-semibold text-ongold">
-              {clientValueText(it.actions[0]?.label ?? "看看")}
-            </button>
-          </div>
+      {/* 默认只留通知入口；正文只在客户明确打开后出现，不改变本体尺寸或形态。 */}
+      {inboxOpen && <div {...inboxSurface} id={inboxId} data-loommate-notices data-loommate-inbox-tray
+        data-loommate-notice-placement={noticeInViewport ? "viewport" : noticeAbove ? "above" : "below"}
+        role="dialog" aria-modal="false" aria-label="未读通知" aria-busy={inboxLoading}
+        className="pointer-events-auto rounded-2xl border border-gline bg-bg900/95 shadow-xl backdrop-blur"
+        style={{ ...noticeStyle, maxHeight: Math.min(Number(noticeStyle.maxHeight), 400, Math.max(48, viewport.height - 32)) }}>
+        <div className="sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-bg900 px-3 py-2">
+          <span className="min-w-0 break-words text-body font-semibold text-ink">{unreadText}</span>
+          <button type="button" disabled={inboxLoading} onClick={() => void load(true)}
+            className="shrink-0 rounded border border-line px-2 py-1 text-body text-ink2 hover:text-ink disabled:opacity-50">刷新</button>
+          <button type="button" ref={inboxCloseRef} aria-label="关闭通知" onClick={closeInbox}
+            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink2 hover:bg-bg850 focus-visible:outline focus-visible:outline-2 focus-visible:outline-gold"><Icon name="close" size={16} /></button>
         </div>
-      ))}
+        <div className="space-y-2 p-2">
+          {celebrateLine && <div className="max-h-24 overflow-y-auto break-words rounded-lg border border-gline p-2 text-body text-ink" role="status">{celebrateLine}</div>}
+          {inboxError && <div role="alert" className="rounded-lg border border-alert/50 p-2 text-body text-alert">
+            {inboxError}<button type="button" disabled={inboxLoading} onClick={() => void load(true)} className="mt-1 block rounded border border-line px-2 py-1 text-ink2 hover:text-ink disabled:opacity-50">重试读取</button>
+          </div>}
+          {inboxLoading && <div role="status" className="text-body text-ink3">正在读取通知…</div>}
+          {unread >= 50 && <div className="text-body text-ink3">当前展示最近50条未读；处理后可刷新读取更多事项。</div>}
+          {!inboxLoading && !inboxError && unread === 0 && <div className="py-4 text-center text-body text-ink3">暂无未读通知</div>}
+          {items.map((it) => (
+            <div key={it.id} data-loommate-inbox-item={it.id} aria-busy={pendingNotices.has(it.id)} className={`rounded-xl border p-3 ${LEVEL_STYLE[it.level]}`}>
+              <div className="flex min-w-0 items-start gap-1.5 break-words text-body font-semibold text-ink">{it.level === "red" && <Icon name="warning" size={14} />}{clientValueText(it.title)}</div>
+              <div className="mt-1 break-words text-body leading-relaxed text-ink2">{clientValueText(it.body)}</div>
+              <div className="wl-action-row mt-2 flex flex-wrap gap-1.5">
+                <button disabled={pendingNotices.has(it.id)} onClick={() => void act(it)} className="rounded-lg bg-gradient-to-br from-gold to-gold2 px-3 py-1 text-body font-semibold text-ongold disabled:opacity-50">{clientValueText(it.actions[0]?.label ?? "看看")}</button>
+                <button disabled={pendingNotices.has(it.id)} onClick={() => void later(it)} className="rounded-lg border border-line px-3 py-1 text-body text-ink2 hover:text-ink disabled:opacity-50">稍后</button>
+              </div>
+              {pendingNotices.has(it.id) && <div role="status" className="mt-1 text-body text-ink3">正在更新…</div>}
+              {noticeErrors[it.id] && <div role="alert" className="mt-1 text-body text-alert">{noticeErrors[it.id]}</div>}
+            </div>
+          ))}
+        </div>
+      </div>}
+      {((!inboxOpen && celebrateLine) || open !== "none") && <div data-loommate-notices data-loommate-notice-placement={noticeInViewport ? "viewport" : noticeAbove ? "above" : "below"} className="pointer-events-auto flex flex-col gap-2" style={noticeStyle}>
+      {celebrateLine && <div className="line-clamp-2 max-h-14 overflow-hidden break-words rounded-lg border border-gline bg-bg900/95 p-2 text-body text-ink" role="status" title={celebrateLine}>{celebrateLine}</div>}
 
       {open !== "none" && (
         <div className="pointer-events-auto">
@@ -683,11 +828,13 @@ export function LoomMate() {
           />
         </div>
       )}
+      </div>}
 
       {/* 本体：形象（可拖拽·松手边缘吸附）+ 名字 + 控制条 */}
-      {mini && open === "none" ? (
+      {visibleMini ? (
         /* 迷你球：64px 圆球贴在原位置，点击展开 */
-        <div className="relative">
+        <div ref={bodyRef} className="relative">
+          <div className="absolute bottom-full right-0 mb-1.5">{inboxEntry}</div>
           <button
             onClick={() => { miniBeforeNotice.current = undefined; setMini(false); persistLocal("loommate.mini", "0"); }}
             title={loomBallEnabled ? `展开${personaName}（班组${systemEmotionText}）` : `展开${personaName}`}
@@ -704,17 +851,12 @@ export function LoomMate() {
             ) : (
               <img src="/live2d/mao/poster.png" alt={personaName} draggable={false} className="h-full w-full object-cover" />
             )}
-            {unread > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-alert px-1 text-body font-bold text-white shadow-lg">
-                {unread}
-              </span>
-            )}
           </button>
           {/* 迷你球态也要有退出出口（2026-09-20 真机验收整改）：小织收起成球时，
               底栏控制条不渲染，之前只能先展开再隐藏——这里在球体左侧常驻一个 × 直接收起浮层。 */}
           <button
             type="button"
-            onClick={() => { setHidden(true); persistLocal("loommate.hidden", "1"); setPos((p) => p ?? defaultPos()); }}
+            onClick={hideCompanion}
             title="隐藏织伴（屏幕边缘留「小织」把手，点一下唤回）"
             aria-label="隐藏织伴"
             className="pointer-events-auto absolute -left-2 top-1/2 -mt-3.5 inline-flex h-7 w-7 items-center justify-center rounded-full border border-line bg-bg900/95 text-body text-ink2 shadow-lg hover:border-gline hover:text-gold"
@@ -723,7 +865,7 @@ export function LoomMate() {
           </button>
         </div>
       ) : (
-      <div className="pointer-events-none flex flex-col items-center">
+      <div ref={bodyRef} className="pointer-events-none flex w-full flex-col items-center">
         {/* 任务完成播报的舞台样式（挥棒 / 星尘 / 指向右栏的光轨） */}
         <style>{`
           @keyframes wl-wand-swing { 0%{transform:rotate(0) translateY(0)} 16%{transform:rotate(-7deg) translateY(-4px)} 34%{transform:rotate(6deg) translateY(-7px)} 52%{transform:rotate(-5deg) translateY(-2px)} 70%{transform:rotate(3deg)} 100%{transform:rotate(0) translateY(0)} }
@@ -800,9 +942,7 @@ export function LoomMate() {
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => {
               e.stopPropagation();
-              setHidden(true);
-              persistLocal("loommate.hidden", "1");
-              setPos((p) => p ?? defaultPos());
+              hideCompanion();
             }}
             title="隐藏织伴（屏幕边缘留「小织」把手，点一下唤回）"
             aria-label="隐藏织伴"
@@ -812,13 +952,12 @@ export function LoomMate() {
           </button>
           {unread > 0 && (
             <span className="absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full bg-alert px-1 text-body font-bold text-white shadow-lg">
-              {unread}
+              {unreadLabel}
             </span>
           )}
         </div>
-        {/* 播报字幕：她说的话必须看得见（VoiceEngine 纪律：发声的都要有字幕） */}
-        {celebrateLine && <div className="wl-mate-say" role="status">{celebrateLine}</div>}
-        <div className="pointer-events-auto mt-0.5 flex items-center gap-1.5">
+        <div className="pointer-events-auto mt-0.5 flex max-w-full flex-wrap items-center justify-center gap-1.5">
+          {inboxEntry}
             <span className="rounded-full bg-bg900/90 px-2.5 py-0.5 text-body text-ink shadow">
             {personaName}
           </span>
@@ -830,7 +969,7 @@ export function LoomMate() {
             className="rounded-full border border-line bg-bg900/90 px-1.5 py-0.5 text-body text-ink2 opacity-70 shadow hover:text-ink hover:opacity-100">
             收起
           </button>
-          <button onClick={() => { setHidden(true); persistLocal("loommate.hidden", "1"); setPos((p) => p ?? defaultPos()); }} title="隐藏（屏幕边缘留「小织」把手，点一下唤回）"
+          <button onClick={hideCompanion} title="隐藏（屏幕边缘留「小织」把手，点一下唤回）"
             className="rounded-full border border-line bg-bg900/90 px-1.5 py-0.5 text-body text-ink2 opacity-70 shadow hover:text-ink hover:opacity-100">
             隐藏
           </button>

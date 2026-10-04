@@ -33,6 +33,8 @@ import {
   installVendorRenderCompatBridge,
   reviewStage,
   updateContextBundle,
+  buildDirectorDefaults, directorGuidance, resolveDeliveryTargets, compilePersonPresentation, shotPresentationGuidance,
+  type CreativeDelegation, type DeliveryTargetPlan,
   type ApprovalCallback,
   type EventSink,
   type GateKey,
@@ -56,6 +58,7 @@ import { ingestPortraitsFromIndex } from "./media/library.js";
 import { upsertProductProfileFromDossier } from "./media/products.js";
 import { appendScenePolicyGuidance, resolveScenePolicyForIntent } from "./scene-policy-routing.js";
 import { appendPlatformGuidance, resolvePlatformForIntent } from "./platform-routing.js";
+import { createDirectorGrantOnClient, verifyDirectorGrant, readExplicitDirectorPreferences } from "./director-store.js";
 import {
   AUTO_GATES,
   GATE_PRODUCER_STAGE,
@@ -330,12 +333,23 @@ export function summarizeWorkspaceRuns(
 
 export class StudioWorkerError extends Error {
   constructor(
-    public readonly code: "LLM_MISSING" | "ARCHIVE_REQUIRED",
+    public readonly code: "LLM_MISSING" | "ARCHIVE_REQUIRED" | "IDENTITY_ASSET_REQUIRED" | "METADATA_RESERVED" | "DELEGATION_REQUIRED",
     message: string,
   ) {
     super(message);
     this.name = "StudioWorkerError";
   }
+}
+
+export const RESERVED_STUDIO_METADATA_ERROR = "METADATA_RESERVED：directorIdentityImages 为服务端专用字段，请使用已登记素材 ID";
+
+/** 普通metadata只承载客户意图，不能进入导演工作器已解析的本机图片通道。 */
+export function isPublicStudioMetadata(metadata?: Record<string, unknown> | null): boolean {
+  return !metadata || !Object.hasOwn(metadata, "directorIdentityImages");
+}
+
+function assertPublicStudioMetadata(metadata?: Record<string, unknown> | null): void {
+  if (!isPublicStudioMetadata(metadata)) throw new StudioWorkerError("METADATA_RESERVED", RESERVED_STUDIO_METADATA_ERROR);
 }
 
 /* ================= 门对象映射（§3 审批点矩阵逐字口径） ================= */
@@ -474,14 +488,16 @@ function collectReferenceImages(metadata?: Record<string, unknown>): string[] {
 }
 
 /** 定妆照出图配置（缺密钥则显式关闭：保持 vendor 规格包口径，不假装出图） */
-function portraitConfig(metadata?: Record<string, unknown>): StudioPortraitConfig {
+function portraitConfig(metadata?: Record<string, unknown>, directorIdentityImages: string[] = []): StudioPortraitConfig {
   const apiKey = (process.env.VOLCENGINE_ARK_API_KEY ?? process.env.ARK_API_KEY ?? "").trim();
   const model = (process.env.ARK_IMAGE_MODEL ?? process.env.SEEDREAM_MODEL ?? "").trim();
   const enabled = (process.env.HR_PORTRAIT_ENABLED ?? "1") !== "0";
   if (!enabled || !apiKey || !model) {
     return { enabled: false };
   }
-  const anchors = (process.env.HR_PORTRAIT_ANCHORS ?? "")
+  // Only the private input carries images resolved and hashed by the scoped director asset library.
+  const resolvedAnchors = directorIdentityImages.filter((value): value is string => typeof value === "string" && path.isAbsolute(value));
+  const anchors = resolvedAnchors.length ? resolvedAnchors : (process.env.HR_PORTRAIT_ANCHORS ?? "")
     .split(",").map((value) => value.trim()).filter(Boolean);
   return {
     enabled: true,
@@ -515,9 +531,26 @@ type StudioRunInput = RunInput & {
   selectedScenePolicy?: ReturnType<typeof resolveScenePolicyForIntent>;
   /** 同一入口已经做过平台识别时复用其受控结果。 */
   selectedPlatform?: ReturnType<typeof resolvePlatformForIntent>;
+  creativeDelegation?: CreativeDelegation;
+  deliveryTargetPlan?: DeliveryTargetPlan;
+  allocatedRunId?: string;
+  /** 服务端导演工位先按工作区、本人授权与字节哈希解析；不得来自客户metadata。 */
+  directorIdentityImages?: string[];
 };
 
 export function startRun(scope: Scope, input: StudioRunInput): string {
+  assertPublicStudioMetadata(input.metadata);
+  const directorMode=Boolean(input.creativeDelegation);
+  if (input.directorIdentityImages !== undefined && !directorMode) {
+    throw new StudioWorkerError("DELEGATION_REQUIRED", "内部图片参数必须绑定当前项目真实导演委托");
+  }
+  const effectiveProducerMode:ProducerMode=directorMode?"review":PRODUCER_MODE;
+  const directorProfile=directorMode?buildDirectorDefaults({intent:input.rawIntent??input.intent,
+    identityAssets:input.creativeDelegation!.identityAssetRefs,
+    history:Array.isArray(input.metadata?.directorPreferences)?input.metadata!.directorPreferences as Array<Record<string,unknown>>:[],
+    projectConstraints:{presentation:input.metadata?.presentation??{}}}):null;
+  const deliveryTargetPlan=input.deliveryTargetPlan??(directorMode?resolveDeliveryTargets(input.rawIntent??input.intent):null);
+  if(directorProfile?.requiredInputs.length) throw new StudioWorkerError("IDENTITY_ASSET_REQUIRED","本人出镜需要已有本人素材；添加一次后可复用。");
   // 补跑/恢复同样经过选型；歧义或知识库损坏在任何供应商调用之前同步失败。
   const selectedScenePolicy = input.selectedScenePolicy
     ?? resolveScenePolicyForIntent(input.rawIntent ?? input.intent, input.metadata);
@@ -533,10 +566,12 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     scenePolicySelection: selectedScenePolicy.decision,
     platformSelection: selectedPlatform.decision,
     ...(selectedScenePolicy.policy ? { scenePolicy: selectedScenePolicy.metadata.scenePolicy } : {}),
+    ...(directorMode?{creativeMode:"director_auto",directorProfile,deliveryTargetPlan}:{}),
   };
   const runInput: RunInput = {
     projectId: input.projectId,
-    intent: appendPlatformGuidance(appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy), selectedPlatform.decision),
+    intent: appendPlatformGuidance(appendScenePolicyGuidance(input.intent, selectedScenePolicy.policy), selectedPlatform.decision)
+      +(directorProfile?directorGuidance(directorProfile):""),
     metadata: resolvedMetadata,
     isMarketing: input.isMarketing,
   };
@@ -552,12 +587,13 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   }
   // v3.0 收口：注入路由配置——预生产全部 LLM 调用经 routeSmart
   // （preproduction 场景 × 降级链 × 真实计量 × model.call 事件留痕，fastModel 快速调用强制 L1）
-  llm.attachRouter({
+  const studioRouter={
     providers: poolFromEnv(),
     sink: new GatewayEventSink(getGatewayPool(), scope, { id: "video-studio" }),
     policy: modelPolicyFor("ai-video"),
     scene: "preproduction",
-  });
+  };
+  if(directorMode)llm.attachConfiguredRouter(studioRouter);else llm.attachRouter(studioRouter);
 
   /**
    * vendor 自建 LLMEngine 也要接到宿主模型路由（2026-09-21 真机修复）：
@@ -591,7 +627,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   console.log(`[studio-worker] run 日志开始落盘：${path.join(WORK_DIR, "logs", `${input.projectId}.log`)}`);
 
   const entry: RunEntry = {
-    runId: newId("RUN"),
+    runId: input.allocatedRunId??newId("RUN"),
     projectId: input.projectId,
     workspaceId: scope.workspaceId,
     status: "running",
@@ -689,27 +725,21 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
      * 裁决三类：① 评审放行 → approved；② 评审打回 → approved:false（vendor 中止本 run，由发起方重跑）；
      * ③ `HR_PRODUCER=auto` → 旧的无条件放行（应急口径，事件里标注 autoApproved 以便审计）。
      */
-    if (AUTO_GATES.has(gate) && PRODUCER_MODE !== "human") {
+    if (AUTO_GATES.has(gate) && effectiveProducerMode !== "human" && gate!=="G5_PORTRAIT") {
       const producerStage = GATE_PRODUCER_STAGE[gate] ?? "script";
       let producerVerdict: Awaited<ReturnType<typeof reviewStage>> | null = null;
-      if (PRODUCER_MODE === "review") {
+      if (effectiveProducerMode === "review") {
         /**
          * 门内容落盘后送审（真机根因修复）：此前传的是 `${gate}:${vendorType}` 标签路径，
          * `reviewStage` 读不到文件 → 监制只看到 rubric 里的 600 字摘录 → 文档后半段
          * （需求契约/结论摘要等）等于不存在，连续三轮把 G3 判成"契约缺失"。
          */
         const artifact = writeGateArtifact(runWorkDir, path.join(input.projectId, `attempt-${stageRef.attempt}`), gate, req.contentMd ?? "");
-        const portrait = gate === "G5_PORTRAIT" ? portraitGateEvidence({ workDir: runWorkDir, projectId: input.projectId,
-          stage: completedVendorResult?.stages?.portraitStudio,
-          scriptReport: (completedVendorResult?.stages?.scriptEngine as { report?: unknown } | undefined)?.report }) : null;
-        producerVerdict = portrait?.notApplicable ? {
-          stage: "keyframe", status: "not_applicable", approved: true, score: 100, hardFailures: [], issues: [], suggestions: [],
-          rerun: false, via: "deterministic", ms: 0, reason: "no-characters-or-products", degraded: false, evidence: [],
-        } : await reviewStage({
+        producerVerdict = await reviewStage({
           stage: producerStage,
           projectId: input.projectId,
-          artifacts: [{ path: artifact.path, kind: "text", note: req.title }, ...(portrait?.artifacts ?? [])],
-          deterministic: portrait?.deterministic ?? gateDeterministicChecks(gate, req.contentMd ?? ""),
+          artifacts: [{ path: artifact.path, kind: "text", note: req.title }],
+          deterministic: gateDeterministicChecks(gate, req.contentMd ?? ""),
           rubric: [
             ...((GATE_RUBRIC[gate] ?? []) as string[]),
             `门内容全长 ${artifact.chars} 字，已随附件送审；摘录（供定位，不是全文）：${(req.contentMd ?? "").slice(0, 600)}`
@@ -720,7 +750,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
           log: (line) => console.log(line)
         });
       }
-      const approved = PRODUCER_MODE === "auto" ? true : Boolean(producerVerdict?.approved);
+      const approved = effectiveProducerMode === "auto" ? true : Boolean(producerVerdict?.approved);
       /**
        * 门外账本字段（2026-09-25）：把平台门按 **step_key** 记账，与 CLI 运行时同一套口径。
        * 能一一对应的门（G5/G6/G7）在事件 payload 里带 `stepKey` 与规范化 `gateEvent`；
@@ -733,7 +763,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
         runId: entry.runId,
         approved,
         verdict: producerVerdict,
-        producerMode: PRODUCER_MODE
+        producerMode: effectiveProducerMode
       });
       const autoClient = await getAppPool().connect();
       try {
@@ -751,7 +781,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
             action: gateObj.action,
             after: withGateLedger({
               gate: req.gate, vendorType: req.vendorType, runId: entry.runId, title: req.title,
-              producerMode: PRODUCER_MODE,
+              producerMode: effectiveProducerMode,
               approved,
               ...(producerVerdict
                 ? {
@@ -761,7 +791,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
                   }
                 : { autoApproved: true }),
             }, gateRecord),
-            basis: PRODUCER_MODE === "auto"
+            basis: effectiveProducerMode === "auto"
               ? ["HR_PRODUCER=auto（应急口径）：内部准备门无条件放行，产出作为过程与时间线留痕"]
               : [`AI 监制门（${producerStage}）：确定性硬闸 + 模型评审后${approved ? "放行" : "打回重跑"}；人审只保留给花钱与对外动作`],
           },
@@ -778,7 +808,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
         via: producerVerdict?.via ?? "auto", degraded: producerVerdict?.degraded ?? true,
         model: producerVerdict?.model ?? null, evidence: producerVerdict?.evidence ?? [],
         ...(producerVerdict?.status === "not_applicable" ? { basis: producerVerdict.reason } : {}) });
-      if (PRODUCER_MODE === "auto") {
+      if (effectiveProducerMode === "auto") {
         return { approved: true, reason: `auto-approved(${req.gate})`, suggestions: [] };
       }
       return producerVerdict
@@ -799,6 +829,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
      * ③ 机器像不像/监制判据不参与这里的决策，也不会触发自动重做。
      */
     let humanContentMd = req.contentMd ?? "";
+    let portraitFiles:Array<{file:string;sha256:string;subject:string;angle:string}>=[];
     if (gate === "G5_PORTRAIT") {
       const portrait = portraitGateEvidence({
         workDir: runWorkDir,
@@ -822,7 +853,25 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
           fatal: "portrait_evidence_missing",
         };
       }
-      humanContentMd = `${humanContentMd}\n\n${portraitReviewManifest({ workDir: runWorkDir, projectId: input.projectId }).markdown}`;
+      const manifest=portraitReviewManifest({workDir:runWorkDir,projectId:input.projectId});
+      portraitFiles=manifest.files;
+      humanContentMd = `${humanContentMd}\n\n${manifest.markdown}`;
+      if(directorMode) {
+        const delegation=await verifyDirectorGrant({...scope,projectId:input.projectId,runId:entry.runId},input.creativeDelegation);
+        const artifact=writeGateArtifact(runWorkDir,path.join(input.projectId,`attempt-${stageRef.attempt}`),gate,humanContentMd);
+        // Creative acceptance is explicitly delegated. Identity authorization and image facts are still mandatory.
+        const evidence=[{scope:"complete-text",path:artifact.path,sha256:renderSha256(readFileSync(artifact.path))},
+          ...portraitFiles.map(file=>({scope:"image",path:file.file,sha256:file.sha256,subject:file.subject,angle:file.angle}))];
+        if(!evidence.some(e=>e.scope==="image")) throw new Error("PORTRAIT_EVIDENCE_REQUIRED：委托创作不能代替实际图片");
+        gateProofs.set(gate,{gate,approved:true,status:"passed",via:"delegated-creative-review",degraded:false,
+          model:null,evidence,delegation,profileHash:directorProfile!.profileHash});
+        await gatewayAppend(getGatewayPool(),{...scope,actor:WORKER_ACTOR},{who:WORKER_ACTOR,
+          context:{tenant_id:scope.tenantId,workspace_id:scope.workspaceId,time:new Date().toISOString(),channel:"inapp"},
+          object:{type:"video_project",id:input.projectId},decision:{action:"video.creative.portrait.accepted",
+            after:{runId:entry.runId,gate,policyHash:delegation.policyHash,grantEventId:delegation.grantEventId,
+              profileHash:directorProfile!.profileHash,evidence},basis:["当前项目真实委托内的创作选择；实际图片事实已核实，机器美感分不触发付费重出"]},rule_impact:[]});
+        return {approved:true,reason:"delegated-creative-review",suggestions:[]};
+      }
     }
     /* HR_PRODUCER=human 或门不在 AUTO_GATES 内 → 落到下面的人工审批分支（插 approvals 行等人点） */
     // D16（#1/A）：门动作事件与 approvals 行同一事务同一 COMMIT（模仿 fence.confirmDryRun 口径）
@@ -885,7 +934,8 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     /** G5 的放行/否决来自人类验收（T-2026-1001-0007）：把人类裁决写进本次门证据，供终态完整性核对与审计 */
     if (gate === "G5_PORTRAIT") {
       gateProofs.set(gate, { gate, approved: verdict.approved, status: verdict.approved ? "passed" : "failed",
-        via: "owner-acceptance", degraded: false, model: null, evidence: [] });
+        via: "owner-acceptance", degraded: false, model: null, approvalId:approvalId!,
+        evidence:portraitFiles.map(file=>({scope:"image",path:file.file,sha256:file.sha256,subject:file.subject,angle:file.angle})) });
     }
     return verdict;
   };
@@ -900,7 +950,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     totalDeadlineMs: TOTAL_DEADLINE_MS,
     // 片型硬闸必须在 G8 之前审完整分镜，禁止 env 让 vendor 在审计前直接渲染。
     deferRender: selectedScenePolicy.policy ? true : (process.env.HR_DEFER_RENDER ?? "1") !== "0",
-    portraits: portraitConfig(runInput.metadata),
+    portraits: portraitConfig(runInput.metadata, directorMode ? input.directorIdentityImages : undefined),
     /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
     dataMining: input.isMarketing ? undefined : dataMiningConfigFor(runInput.metadata, llm, scope.workspaceId),
     log: (line) => console.log(line),
@@ -923,6 +973,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
       projectMeta = await readProjectMeta(scope, input.projectId);
       if (!projectMeta) throw new Error(`PROJECT_NOT_FOUND: 项目 ${input.projectId} 不存在或不属于当前工作区`);
       if (projectMeta.kind !== pipelineKind) throw new Error("PIPELINE_KIND_MISMATCH：预生产管线与服务项目类型不一致");
+      if(directorMode) await verifyDirectorGrant({...scope,projectId:input.projectId,runId:entry.runId},input.creativeDelegation);
       await archive.ensure({ kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt });
       // 既有项目补跑可能改用新的明确片型；manifest 保存当前决策，旧值留在追加事件中。
       const manifest = await archive.readManifest();
@@ -1039,7 +1090,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
               const missing = [...(input.isMarketing ? ["G1_DOSSIER"] : []), "G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"].filter(gate => {
                 const proof = gateProofs.get(gate);
                 return !(proof?.approved === true && (proof.status === "passed" && ((proof.via === "llm" && proof.degraded === false)
-                  || (gate === "G5_PORTRAIT" && proof.via === "owner-acceptance" && proof.degraded === false))
+                  || (gate === "G5_PORTRAIT" && ["owner-acceptance","delegated-creative-review"].includes(String(proof.via)) && proof.degraded === false))
                   || gate === "G5_PORTRAIT" && proof.status === "not_applicable" && proof.basis === "no-characters-or-products"));
               });
               if (missing.length) {
@@ -1131,8 +1182,9 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
                       String(shot.prompt ?? "").matchAll(/\d{1,2}\.【([^】]{1,10})】/g),
                     ).map((m) => m[1]),
                     fieldKeys: shot.fields && typeof shot.fields === "object" ? Object.keys(shot.fields as object) : [],
-                    prompt: String(shot.prompt ?? ""),
+                    prompt: String(shot.prompt ?? "")+(directorProfile?`\n${shotPresentationGuidance(compilePersonPresentation({shot,profile:directorProfile}))}`:""),
                     fields: shot.fields ?? null,
+                    ...(directorProfile?{presentationContract:compilePersonPresentation({shot,profile:directorProfile})}:{}),
                   })),
                 }
               : null;
@@ -1230,7 +1282,8 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
                 ...(marketingFacts ? { marketingFactsRef: marketingFacts.ref, marketingFactsSha256: marketingFacts.sha256 } : {}),
                 productionEvidence: { schemaVersion: "workloom.preproduction-authority/v1", issuer: "workloom.studio-worker",
                   tenantId: scope.tenantId, workspaceId: scope.workspaceId, projectId: input.projectId,
-                  runId: entry.runId, attempt: ctx.attempt, pipelineKind, gates: [...gateProofs.values()] },
+                  runId: entry.runId, attempt: ctx.attempt, pipelineKind, gates: [...gateProofs.values()],
+                  ...(directorMode?{creativeDelegation:input.creativeDelegation,directorProfile,deliveryTargetPlan}:{} ) },
                 stages: Object.keys(r.stages ?? {}),
                 checkpointDir: `checkpoints/${input.projectId}`,
                 ...(promptsArtifact
@@ -1303,6 +1356,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
         success: result.success,
         stages: Object.keys(result.stages ?? {}),
         producerAttempts: attempts,
+        ...(directorMode?{creativeMode:"director_auto",confirmationSteps:0,deliveryTargetPlan,profileHash:directorProfile!.profileHash}:{}),
         ...(dataMiningStage
           ? {
               dataMining: {
@@ -1465,22 +1519,39 @@ export interface StartVideoProjectInput {
   isMarketing?: boolean;
   by: { id: string; type: "human" | "system" };
   threadId?: string;
+  creativeMode?: "director_auto"|"manual";
+  deliveryOptions?:{platforms?:string[];versionCount?:number;includeSurprise?:boolean};
+  identityAssetRefs?:string[];
 }
 
 export async function startVideoProjectRun(
   scope: { tenantId: string; workspaceId: string },
   input: StartVideoProjectInput,
 ): Promise<{ projectId: string; runId: string }> {
+  assertPublicStudioMetadata(input.metadata);
+  assertPublicStudioMetadata(input.customerMetadata);
+  const directorMode=input.creativeMode!=="manual";
+  if(directorMode) {
+    const readiness=buildDirectorDefaults({intent:input.rawIntent??input.intent,identityAssets:input.identityAssetRefs??[]});
+    if(readiness.requiredInputs.length) throw new StudioWorkerError("IDENTITY_ASSET_REQUIRED","本人出镜需要已有本人素材；添加一次后可复用。");
+  }
+  const allocatedRunId=newId("RUN");
+  const deliveryTargetPlan=directorMode?resolveDeliveryTargets(input.rawIntent??input.intent,input.deliveryOptions??{}):undefined;
   const selectionMetadata = Object.hasOwn(input, "customerMetadata") ? input.customerMetadata ?? undefined : input.metadata;
   const selectedScenePolicy = resolveScenePolicyForIntent(input.rawIntent ?? input.intent, selectionMetadata);
   const selectedPlatform = resolvePlatformForIntent(input.rawIntent ?? input.intent, selectionMetadata, input.platform);
+  // 无效片型和平台在偏好查询之前拒绝，避免为不可执行的需求开启任何数据库事务。
+  const preferences=directorMode?await readExplicitDirectorPreferences(scope,input.by.id):[];
   const platformMetadata: Record<string, unknown> = {
     ...(input.metadata ?? {}),
     platform: selectedPlatform.decision.id,
     platformSelection: selectedPlatform.decision,
+    ...(directorMode?{creativeMode:"director_auto",deliveryTargetPlan,directorPreferences:preferences.map(p=>({origin:"explicit",feedback:p.feedback}))}:{}),
   };
   const client = await getAppPool().connect();
   let projectId = "";
+  let creativeDelegation:CreativeDelegation|undefined;
+  let discard = false;
   try {
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
@@ -1518,12 +1589,19 @@ export async function startVideoProjectRun(
       },
       rule_impact: [],
     });
+    if(directorMode) creativeDelegation=await createDirectorGrantOnClient(client,{...scope,projectId,runId:allocatedRunId},input.by,
+      {identityAssetRefs:input.identityAssetRefs??[],maxBudgetCny:0});
     await client.query("COMMIT");
   } catch (err) {
-    await client.query("ROLLBACK").catch(() => undefined);
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      discard = true;
+      throw new AggregateError([err, rollbackError], "video project and creative delegation rollback failed");
+    }
     throw err;
   } finally {
-    client.release();
+    client.release(discard);
   }
   const runId = startRun(scope, {
     projectId,
@@ -1533,6 +1611,7 @@ export async function startVideoProjectRun(
     rawIntent: input.rawIntent,
     selectedScenePolicy,
     selectedPlatform,
+    ...(creativeDelegation?{creativeDelegation,allocatedRunId,deliveryTargetPlan}:{}),
   });
   return { projectId, runId };
 }

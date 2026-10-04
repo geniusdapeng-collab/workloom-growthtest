@@ -16,6 +16,7 @@ import type { AppPool, Scope } from "./gen/db.js";
 import type { RenderScriptLike } from "./gen/submit.js";
 import type { VideoGenParams } from "./gen/types.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
+import { verifyDirectorGrant } from "./director-store.js";
 import { canonicalRenderJson, compileRenderRequest, renderSha256, supportsCompiledRequest, type CompiledProviderRequest } from "./gen/compiled-request.js";
 
 const ISSUER = "workloom.production-authority";
@@ -158,7 +159,22 @@ async function sourceForShot(app: AppPool, scope: Scope, projectId: string, shot
     const matches = gates.filter(g => g.gate === key);
     const gate = matches[0];
     const na = key === "G5_PORTRAIT" && gate?.status === "not_applicable" && gate?.basis === "no-characters-or-products";
-    if (matches.length !== 1 || (!na && (gate?.status !== "passed" || gate?.approved !== true || gate?.via !== "llm" || gate?.degraded !== false))) fail("PREPRODUCTION_GATES_UNVERIFIED", `当前执行缺少有效 ${key} 裁决`);
+    const creative=key==="G5_PORTRAIT" && gate?.via==="delegated-creative-review";
+    const human=key==="G5_PORTRAIT" && gate?.via==="owner-acceptance";
+    if (matches.length !== 1 || (!na && (gate?.status !== "passed" || gate?.approved !== true || (!creative && !human && gate?.via !== "llm") || gate?.degraded !== false))) fail("PREPRODUCTION_GATES_UNVERIFIED", `当前执行缺少有效 ${key} 裁决`);
+    if(creative) {
+      await verifyDirectorGrant({...scope,projectId,runId:row.run_id},gate.delegation);
+      if(typeof gate.profileHash!=="string" || !/^[a-f0-9]{64}$/.test(gate.profileHash)) fail("DELEGATION_INVALID","人物呈现档案摘要缺失");
+    }
+    if(human) {
+      if(typeof gate.approvalId!=="string") fail("PREPRODUCTION_GATES_UNVERIFIED","G5 人审审批号缺失");
+      const approved=await scopedTx(app,scope,async client=>(await client.query<{approval_id:string}>(`SELECT a.approval_id FROM approvals a
+        JOIN biz_events e ON e.tenant_id=a.tenant_id AND e.workspace_id=a.workspace_id AND e.event_id=a.event_id
+        WHERE a.tenant_id=$1 AND a.workspace_id=$2 AND a.approval_id=$3 AND a.status IN ('approved','edited')
+          AND a.snapshot->>'gate'='G5_PORTRAIT' AND e.payload->'decision'->'after'->>'runId'=$4
+          AND e.payload->'object'->>'id'=$5`,[scope.tenantId,scope.workspaceId,gate.approvalId,row.run_id,`${projectId}:g5_portrait`])).rows);
+      if(approved.length!==1) fail("PREPRODUCTION_GATES_UNVERIFIED","G5 人审缺当前项目和执行的真实批准事件");
+    }
     if (!na && (!Array.isArray(gate.evidence) || gate.evidence.length === 0)) fail("PREPRODUCTION_GATES_UNVERIFIED", `${key} 缺少实际审核证据摘要`);
     if (!na) {
       if (key === "G5_PORTRAIT" && !(gate.evidence as JsonRecord[]).some(item => item.scope === "image")) fail("PREPRODUCTION_GATES_UNVERIFIED", "G5 缺少实际图像审核证据");
@@ -298,14 +314,16 @@ export async function qualifyProductionShot(input: {
       fields: { ...source.shot.fields as JsonRecord, durationSec: duration,
         production: { qualificationId: id, sourceStageRunId: source.row.id, sourceAttempt: source.row.attempt, promptsSha256: source.promptsHash } } };
     const built = compileRenderRequest({ script, model, params, scope, mode, env });
-    // UI 网络失败后再次按同一镜头点提交，不能通过重新签发随机 scriptId 绕过已派发任务的幂等键。
+    // 已派发任务必须复用原资格，不能通过随机 scriptId 绕过幂等键。
+    // 尚未派发时重新审核必须追加最新裁决，旧通过不能掩盖新的拒绝。
     const dispatched = await scopedTx(leased.app, scope, async client => {
       const found = await client.query<QualificationRow & { submission_state: string }>(`SELECT q.*,s.state AS submission_state
         FROM production_qualifications q JOIN generation_submissions s
           ON s.tenant_id=q.tenant_id AND s.workspace_id=q.workspace_id AND s.request_hash=q.request_hash
         WHERE q.tenant_id=$1 AND q.workspace_id=$2 AND q.project_id=$3 AND q.shot_id=$4
           AND q.source_stage_run_id=$5 AND q.payload_hash=$6 AND q.model_id=$7 AND q.mode=$8 AND q.params=$9::jsonb
-          AND q.status='passed' AND s.state IN ('submitting','unknown','accepted','finalized') ORDER BY q.seq DESC LIMIT 1`,
+          AND q.status='passed' AND s.state IN ('submitting','unknown','accepted','finalized')
+        ORDER BY q.seq DESC LIMIT 1`,
         [scope.tenantId, scope.workspaceId, input.projectId, input.shotId, source.row.id, built.compiled.payloadHash, model.id, mode, JSON.stringify(params)]);
       return found.rows[0];
     });

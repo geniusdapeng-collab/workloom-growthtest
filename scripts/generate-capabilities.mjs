@@ -130,7 +130,7 @@ if (engine.length) groups.push({
 if (existsSync(join(ROOT, "apps/server/src/video/router.ts"))) groups.push({
   icon: "🎬", title: "内容生产专用入口",
   items: [
-    { name: "视频工位", how: "PC /ai-video/assets?tab=studio", desc: "预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置", sourcePaths: ["apps/server/src/video/router.ts", "apps/server/src/video/studio-worker.ts"] },
+    { name: "一句话导演工位", how: "PC /ai-video/assets?tab=studio；docs/director-studio-v2.md", desc: "默认三支常规版与导演惊喜版；独立画面/声音时间线、真实文字方案和逐版反馈；生产仍需本人授权、预算与可用供应商", sourcePaths: ["apps/server/src/video/director-router.ts", "apps/server/src/video/director-worker.ts", "docs/director-studio-v2.md"] },
     { name: "媒资与交付", how: "媒资：/ai-video/media；交付：/ai-video/assets?tab=delivery", desc: "媒资检索、商品档案、合集、成片和交付记录；需要数据库与媒体文件", sourcePaths: ["apps/server/src/video/media/index.ts", "apps/web/src/extensions/ai-video/pages/AssetsOrStudio.tsx", "apps/web/src/extensions/ai-video/routes.tsx"] },
     { name: "白板与口播解释片", how: "CLI / 服务端接口", desc: "白板和口播制作链已提供代码入口；当前没有独立 React 编辑页，需要对应引擎与后期工具", sourcePaths: ["apps/server/src/video/whiteboard/router.ts", "apps/server/src/video/explainer/router.ts"] },
   ],
@@ -140,6 +140,7 @@ const quality = [
   has("setup") && { name: "环境安装脚本", how: "`pnpm setup`；先读 README 的当前限制", desc: "安装依赖并尝试数据库、迁移与种子；当前会枚举缺失 ai-pm 包的种子，推荐按 README 手动初始化" },
   has("suite") && { name: "主测试套件", how: "`pnpm suite`", desc: "运行已定义场景；需要测试数据库和种子，不能由脚本存在推断测试已通过" },
   has("suite:geo") && { name: "GEO 域套件", how: "`pnpm suite:geo`", desc: "GEO 双域专项" },
+  existsSync(join(ROOT, "scripts/verify-geo-tool-routing.mjs")) && { name: "GEO 工具路由与回执复验", how: "`node scripts/verify-geo-tool-routing.mjs --db`；docs/geo-tool-routing.md", desc: "逐工具覆盖、模拟绑定和真实 PG 重放回归；需专用已迁移数据库，模拟通过不证明真实平台动作", sourcePaths: ["scripts/verify-geo-tool-routing.mjs", "scripts/tools/verify-geo-tool-routing-db.mts", "docs/geo-tool-routing.md"] },
   has("suite:hotel") && { name: "酒店域套件", how: "`pnpm suite:hotel`", desc: "酒店域专项" },
   has("release:gate") && { name: "发布门禁", how: "`pnpm release:gate`", desc: "未全过禁止发布（硬性）" },
   has("db:verify-chain") && { name: "五元事件验链", how: "`pnpm db:verify-chain`", desc: "事件链完整性校验" },

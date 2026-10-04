@@ -4,7 +4,8 @@
  * 目标：拍新片时先问一句"这条提示词，库里有没有现成能用的镜头？"——命中即**免重渲**（不烧额度）。
  *
  * 判据（规格书 §7.3，按真实字段校准）：
- *  - 相似度：prompt/title 的 trgm 相似度（中文短串唯一可靠的口径，tsv 对中文无分词）；
+ *  - 相似度：prompt/title 精确匹配优先，再使用 trgm 模糊匹配；
+ *    内置数据库的 C locale 可能把中文视为非词字符，不能靠 trgm 判定相同中文文本；
  *  - 时长容差 ±1s、画幅一致（`meta.aspectRatio`，缺省不参与过滤）、未归档；
  *  - 只匹配 kind='clip'（成片/定妆照不是"镜头复用"的候选）。
  */
@@ -45,12 +46,14 @@ export async function findReusable(
   const prompt = input.prompt.trim();
   if (!prompt) return [];
   const params: unknown[] = [scope.workspaceId, prompt, minSimilarity, limit];
+  const similarity = `CASE WHEN a.prompt = $2 OR a.title = $2 THEN 1::real
+    ELSE GREATEST(similarity(COALESCE(a.prompt, ''), $2), similarity(COALESCE(a.title, ''), $2)) END`;
   const clauses = [
     "a.workspace_id = $1",
     "a.kind = 'clip'",
     "a.status <> 'archived'",
     "(COALESCE(a.prompt, '') <> '' OR COALESCE(a.title, '') <> '')",
-    "GREATEST(similarity(COALESCE(a.prompt, ''), $2), similarity(COALESCE(a.title, ''), $2)) > $3",
+    `(${similarity}) > $3`,
   ];
   if (input.durationSec !== undefined && input.durationSec !== null) {
     params.push(input.durationSec);
@@ -75,7 +78,7 @@ export async function findReusable(
   }>(app, scope,
     `SELECT a.id, a.title, a.prompt, a.duration_seconds, a.width, a.height, a.project_id, a.created_at,
             a.meta->>'localPath' AS local_path,
-            GREATEST(similarity(COALESCE(a.prompt, ''), $2), similarity(COALESCE(a.title, ''), $2)) AS similarity
+            ${similarity} AS similarity
        FROM video_assets a
       WHERE ${clauses.join(" AND ")}
       ORDER BY similarity DESC, a.created_at DESC

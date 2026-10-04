@@ -61,6 +61,7 @@ const FORBIDDEN_CHILD_ENV = Object.freeze([
   "LLM_API_KEY", "LLM_BASE_URL", "LLM_MODEL", "LLM_FAST_MODEL",
   "WORKLOOM_RENDER_SIGNING_SECRET", "WORKLOOM_RENDER_SIGNING_KEY_ID",
   "AUDIO_STEMS_SIGNING_SECRET", "AUDIO_STEMS_SIGNING_KEY_ID",
+  "WORKLOOM_AUDIO_STEM_SIGNING_SECRET", "WORKLOOM_AUDIO_STEM_SIGNING_KEY_ID",
   "HF_KEY_ID", "HF_KEY_SECRET", "MUAPI_API_KEY",
   "DATABASE_URL", "POSTGRES_URL", "APP_DB_PASSWORD", "GATEWAY_DB_PASSWORD", "PII_SALT",
   "HUMAN_CONFIRMATION_SECRET",
@@ -245,12 +246,15 @@ async function requireActiveWorker(ledger: FilmLedger, workerName: string, entry
   if (!info?.isFile()) fail("FILM_WORKER_NOT_FOUND", `工位入口文件不存在：${worker.entry_path}`);
   const digest = sha256Bytes(await readFile(file));
   if (digest !== worker.entry_sha256) fail("FILM_WORKER_DIGEST_MISMATCH", "工位代码摘要与登记不一致，必须先登记新修订");
+  if (worker.capabilities.some(method => !FILM_CHANNEL_METHODS.includes(method as FilmChannelMethod))) {
+    fail("FILM_WORKER_CAPABILITY_MISMATCH", "工位能力不是通道方法，必须重新登记");
+  }
   return worker;
 }
 
 /** 首次使用（或代码更新后）登记工位：入口固定在本仓 scripts/tools。 */
 export async function registerFilmWorker(input: {
-  scope: Scope; actor: string; workerName?: string; workerVersion?: string; entryPath?: string; capabilities?: FilmComponentKind[];
+  scope: Scope; actor: string; workerName?: string; workerVersion?: string; entryPath?: string; capabilities?: FilmChannelMethod[];
 }): Promise<FilmWorkerRow> {
   const ledger = new FilmLedger(getAppPool(), input.scope);
   const entryPath = input.entryPath ?? FILM_WORKER_ENTRY;
@@ -259,11 +263,10 @@ export async function registerFilmWorker(input: {
   const digest = sha256Bytes(await readFile(file));
   return ledger.registerWorker({
     workerName: input.workerName ?? "full-chain-film",
-    workerVersion: input.workerVersion ?? "2026-09-28.v1",
+    workerVersion: input.workerVersion ?? "2026-10-02.v2",
     entryPath,
     entrySha256: digest,
-    capabilities: input.capabilities ?? [...FILM_CHANNEL_METHODS].map((method) => FILM_CHANNEL_METHOD_COMPONENT[method]!)
-      .filter((component): component is FilmComponentKind => component !== undefined),
+    capabilities: input.capabilities ?? [...FILM_CHANNEL_METHODS],
     actor: input.actor,
   });
 }
@@ -319,7 +322,7 @@ export async function startFilmJob(input: StartFilmJobInput): Promise<FilmJobSta
     worker = await requireActiveWorker(ledger, workerName, FILM_WORKER_ENTRY);
   } catch (error) {
     // 未登记（或代码已更新）时按固定入口自动登记一次：路径不接受调用方指定，等价于显式登记。
-    if (error instanceof SubmissionError && (error.code === "FILM_WORKER_NOT_REGISTERED" || error.code === "FILM_WORKER_DIGEST_MISMATCH")) {
+    if (error instanceof SubmissionError && ["FILM_WORKER_NOT_REGISTERED", "FILM_WORKER_DIGEST_MISMATCH", "FILM_WORKER_CAPABILITY_MISMATCH"].includes(error.code)) {
       await registerFilmWorker({ scope: input.scope, actor: input.actor, workerName });
       worker = await requireActiveWorker(ledger, workerName, FILM_WORKER_ENTRY);
     } else {

@@ -1,3 +1,4 @@
+import { videoRuntimeRoot } from "./runtime-root.js";
 /**
  * vendor 运行时兼容桥（2026-09-21 真机修复）
  *
@@ -82,7 +83,7 @@ function clonePreservingServices<T>(value: T, seen = new WeakMap<object, unknown
 
 export function installVendorConfigIsolatorBridge(): () => void {
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const isolatorPath = resolvePath(
       repoRoot,
@@ -110,7 +111,7 @@ export function installVendorConfigIsolatorBridge(): () => void {
 
 export function installVendorRenderCompatBridge(): () => void {
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const enginePath = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system/engines/rendering-engine/rendering-engine.js");
     if (!existsSync(enginePath)) return () => undefined;
@@ -258,7 +259,7 @@ export function installVendorPortraitBindingBridge(options: PortraitBindingBridg
   }
 
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const enginePath = resolvePath(
       repoRoot,
@@ -385,7 +386,7 @@ export function installVendorPhaseDiagnosticsBridge(options: PhaseDiagnosticsBri
   const phases = options.phases ?? DEFAULT_PHASE_TARGETS;
   const restores: Array<() => void> = [];
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     for (const phase of phases) {
       const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system", phase.path);
@@ -436,7 +437,7 @@ export function installVendorPhaseDiagnosticsBridge(options: PhaseDiagnosticsBri
 export function installVendorFieldQualityBridge(options: { log?: (line: string) => void } = {}): () => void {
   const log = options.log ?? (() => undefined);
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const checkPath = resolvePath(
       repoRoot,
@@ -547,7 +548,7 @@ export function installVendorMicroMotionBridge(options: { log?: (line: string) =
     breathing: ["呼吸平稳"]
   };
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const adapterPath = resolvePath(
       repoRoot,
@@ -796,7 +797,7 @@ export function installVendorContractBridge(options: { log?: (line: string) => v
   const log = options.log ?? (() => undefined);
   const STRING_ITEM_FIELDS = ["cameraMovement", "camera_movement", "lighting", "timeline", "backgroundSound", "background_sound"];
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const validatorPath = resolvePath(
       repoRoot,
@@ -903,7 +904,7 @@ export function installVendorContractBridge(options: { log?: (line: string) => v
 export function installVendorDiscoveryFixBridge(options: { log?: (line: string) => void } = {}): () => void {
   const log = options.log ?? (() => undefined);
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const file = resolvePath(
       repoRoot,
@@ -1005,7 +1006,7 @@ export function installVendorPhaseInternalsDiagnostics(options: { log?: (line: s
   ];
   const restores: Array<() => void> = [];
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     for (const target of targets) {
       const file = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system", target.path);
@@ -1057,7 +1058,7 @@ export function installVendorAudioDisciplineBridge(options: {
 }): () => void {
   const log = options.log ?? (() => undefined);
   try {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const file = resolvePath(
       repoRoot,
@@ -1145,7 +1146,7 @@ export function installVendorDurationPolicyBridge(options: {
   const max = options.maxSingleShotSeconds;
   const min = options.minSingleShotSeconds ?? 4;
   const restores: Array<() => void> = [];
-  const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const repoRoot = videoRuntimeRoot(import.meta.url);
   let vendorRequire: NodeJS.Require;
   try {
     vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
@@ -1420,7 +1421,7 @@ export function installVendorDurationProjectionBridge(options: DurationProjectio
   const emit = options.onEvent ?? (() => undefined);
   const minShot = options.minShotSeconds ?? 4;
   const maxShot = options.maxShotSeconds ?? 30;
-  const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+  const repoRoot = videoRuntimeRoot(import.meta.url);
   let vendorRequire: NodeJS.Require;
   try {
     vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
@@ -1839,7 +1840,7 @@ function scopedFusionAgent(agent: FusionAgent, remaining: () => number, deadline
 
 export function installVendorPhase3FusionBridge(options: { log?: (line: string) => void } = {}): () => void {
   return installSharedBridge("phase3-fusion-policy-v1", () => {
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRoot = resolvePath(repoRoot, "vendor/supermickey/hyperreality-system");
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const phaseModule = vendorRequire(resolvePath(vendorRoot, "engines/production-engine/phases/phase-3-prompt-fusion.js")) as {

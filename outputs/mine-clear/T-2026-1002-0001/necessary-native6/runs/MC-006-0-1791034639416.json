@@ -1,0 +1,36 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-0-1791034639416",
+  "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-geo-tool-routing.mjs --db",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "scripts/verify-geo-tool-routing.mjs",
+      "--db"
+    ]
+  },
+  "actor": "/root/geo_receipt_repair",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 0
+  },
+  "commit": "c94cfb64b4bee11448907967787800746393ccd4",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-03T13:37:19.416Z",
+  "finished_at": "2026-10-03T13:37:20.952Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-0-1791034639416.txt",
+      "sha256": "d30b9587db1ab8c2ead26b6215c1540351df611911accde760f91c363324380e",
+      "commit": "c94cfb64b4bee11448907967787800746393ccd4"
+    }
+  ]
+}

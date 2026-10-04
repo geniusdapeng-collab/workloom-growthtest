@@ -22,6 +22,7 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 /* ============================ 错误与常量 ============================ */
 
@@ -74,7 +75,7 @@ export class MeasureError extends Error {
  * 配乐工位与调色工位共用 ffmpeg 静态构建（kit 受控下载），但目录独立、可分别 pin。
  */
 export function resolveBinaries(env = process.env) {
-  const here = path.dirname(new URL(import.meta.url).pathname);
+  const here = path.dirname(fileURLToPath(import.meta.url));
   const bundled = path.resolve(here, "../../../../.workloom-tools/bgm");
   const pick = (explicit, name) => {
     if (explicit && fs.existsSync(explicit)) return explicit;

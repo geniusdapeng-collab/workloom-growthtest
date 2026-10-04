@@ -91,7 +91,7 @@ vi.mock("@hyperreality/video-studio", async (importOriginal) => ({
     }
   },
   reviewStage: doubles.review,
-  WorkloomLLMEngine: { fromEnv: () => ({ attachRouter: vi.fn() }) },
+  WorkloomLLMEngine: { fromEnv: () => ({ attachRouter: vi.fn(), attachConfiguredRouter: vi.fn() }) },
   installVendorEngineBridge: vi.fn(),
   installVendorRenderCompatBridge: vi.fn(),
   installVendorPortraitBindingBridge: () => doubles.uninstall,
@@ -112,6 +112,9 @@ afterEach(() => { vi.unstubAllEnvs(); vi.restoreAllMocks(); });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  const eventReceipt = { eventId: "EVT-studio-test", seq: 1n, hash: "a".repeat(64), deduped: false, piiHits: 0 };
+  vi.mocked(gatewayAppend).mockReset().mockResolvedValue(eventReceipt);
+  vi.mocked(gatewayAppendOnClient).mockReset().mockResolvedValue(eventReceipt);
   doubles.nextAttempt = 0;
   doubles.studioConfigs.length = 0;
   doubles.prepare.mockReset().mockImplementation(async ({ scope, root }) => ({
@@ -248,6 +251,7 @@ describe("预生产原始结果与诚实终态", () => {
       customerMetadata: null,
       metadata: { brief: { product: "企业负责人" }, pipelineRoute: { kind: "marketing" } },
       isMarketing: true,
+      creativeMode: "manual",
       by: { id: "MEM-1", type: "human" },
     });
     await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
@@ -264,6 +268,7 @@ describe("预生产原始结果与诚实终态", () => {
       intent: "给企业负责人拍短片\n[需求口径] 时长：30秒",
       metadata: { brief: { audience: "企业负责人" } },
       isMarketing: false,
+      creativeMode: "manual",
       by: { id: "MEM-1", type: "human" },
     });
     await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
@@ -304,6 +309,7 @@ describe("预生产原始结果与诚实终态", () => {
     const started = await worker.startVideoProjectRun(scope, {
       rawIntent: "给企业负责人拍正式商务短片，陈卓出镜口播",
       intent: "给企业负责人拍短片",
+      creativeMode: "manual",
       by: { id: "MEM-1", type: "human" },
     });
     await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
@@ -499,6 +505,136 @@ describe("预生产原始结果与诚实终态", () => {
     expect(doubles.review.mock.calls.some(([options]) => options.context.gate === "G5_PORTRAIT")).toBe(false);
   });
 
+});
+
+describe("默认导演委托与立项事务", () => {
+  function storeGrant(verifyActor = "MEM-1") {
+    let delegation: Record<string, unknown> | undefined;
+    doubles.query.mockImplementation(async (sql: string, values: unknown[] = []) => {
+      if (sql.includes("INSERT INTO video_creative_delegations")) delegation = values[6] as Record<string, unknown>;
+      if (sql.includes("SELECT d.payload")) return { rows: delegation ? [{ payload: delegation, actor: verifyActor,
+        run_id: delegation.runId, grant_event_id: delegation.grantEventId }] : [], rowCount: delegation ? 1 : 0 };
+      return { rows: sql.includes("video_projects_max_vid_no") ? [{ n: 9000 }] : [], rowCount: 1 };
+    });
+    return () => delegation;
+  }
+
+  it("省略模式时真实创建并核验委托，同一run归档默认四版且无需专业确认", async () => {
+    useNarrativeProject(); const stored = storeGrant(); doubles.runPreproduction.mockResolvedValue(success());
+    const started = await worker.startVideoProjectRun(scope, {
+      intent: "拍一条山间日出的风景片", by: { id: "MEM-1", type: "human" },
+    });
+    await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    const entry = worker.getRun(started.runId, scope.workspaceId)!;
+    expect(entry).toMatchObject({ status: "finished", resultSummary: { creativeMode: "director_auto", confirmationSteps: 0,
+      deliveryTargetPlan: { expectedOutputs: 4, regular: expect.any(Array), surprise: { kind: "surprise" } } } });
+    expect(stored()).toMatchObject({ ...scope, projectId: started.projectId, runId: started.runId,
+      grantedBy: "MEM-1", grantEventId: "EVT-studio-test", maxBudgetCny: 0 });
+    const output = await archiveOutput(started.projectId, 1);
+    expect(output.productionEvidence).toMatchObject({ runId: started.runId, creativeDelegation: stored(),
+      directorProfile: { confirmationSteps: 0 }, deliveryTargetPlan: { expectedOutputs: 4 } });
+    expect(doubles.query.mock.calls.some(([sql]) => sql.includes("INSERT INTO approvals"))).toBe(false);
+  });
+
+  it("数据库委托事件的主体不一致时在供应商之前关闭，不能相信请求里的有效摘要", async () => {
+    useNarrativeProject(); storeGrant("MEM-other"); doubles.runPreproduction.mockResolvedValue(success());
+    const started = await worker.startVideoProjectRun(scope, {
+      intent: "拍一条山间日出的风景片", by: { id: "MEM-1", type: "human" },
+    });
+    await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(started.runId, scope.workspaceId)).toMatchObject({ status: "failed", error: expect.stringContaining("DELEGATION_INVALID") });
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
+  });
+
+  it.each([[], null, false, { path: "/synthetic/anchor.png" }, ["/synthetic/anchor.png"]].map(value => [value]))(
+    "客户metadata中的directorIdentityImages=%j在立项和供应商之前拒绝", async value => {
+      useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
+      let error: unknown;
+      let started: Awaited<ReturnType<typeof worker.startVideoProjectRun>> | undefined;
+      try {
+        started = await worker.startVideoProjectRun(scope, {
+          intent: "拍一条山间日出的风景片", creativeMode: "manual",
+          metadata: { directorIdentityImages: value }, by: { id: "MEM-1", type: "human" },
+        });
+      } catch (caught) { error = caught; }
+      // 修复前入口会启动真实工作器；先等自有边界替身运行终结，避免失败用例留下后台任务。
+      if (started) await vi.waitFor(() => expect(worker.getRun(started!.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+      expect(error).toMatchObject({ code: "METADATA_RESERVED" });
+      expect(doubles.connect).not.toHaveBeenCalled();
+      expect(doubles.lease).not.toHaveBeenCalled();
+      expect(doubles.runPreproduction).not.toHaveBeenCalled();
+    },
+  );
+
+  it("补跑的客户metadata不能把本机绝对路径送进定妆供应商配置", async () => {
+    useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
+    vi.stubEnv("HR_PORTRAIT_ENABLED", "1");
+    vi.stubEnv("VOLCENGINE_ARK_API_KEY", "synthetic-unit-test-key");
+    vi.stubEnv("ARK_API_KEY", "synthetic-unit-test-key");
+    vi.stubEnv("ARK_IMAGE_MODEL", "synthetic-unit-test-model");
+    const anchor = path.join(doubles.workDir, "不应读取的 合成图片.png");
+    let error: unknown; let runId: string | undefined;
+    try {
+      runId = worker.startRun(scope, { projectId: `VID-boundary-${++projectSequence}`, intent: "山间风景片",
+        metadata: { directorIdentityImages: [anchor] } });
+    } catch (caught) { error = caught; }
+    if (runId) await vi.waitFor(() => expect(worker.getRun(runId!, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(doubles.studioConfigs.some(config => config.portraits?.characterAnchorImages?.includes(anchor))).toBe(false);
+    expect(error).toMatchObject({ code: "METADATA_RESERVED" });
+    expect(doubles.lease).not.toHaveBeenCalled();
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
+  });
+
+  it("未提供真实导演委托不能使用内部图片参数", async () => {
+    useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
+    let error: unknown; let runId: string | undefined;
+    try {
+      runId = worker.startRun(scope, { projectId: `VID-no-grant-${++projectSequence}`, intent: "山间风景片",
+        directorIdentityImages: [path.join(doubles.workDir, "内部图片.png")] } as Parameters<typeof worker.startRun>[1]);
+    } catch (caught) { error = caught; }
+    if (runId) await vi.waitFor(() => expect(worker.getRun(runId!, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(error).toMatchObject({ code: "DELEGATION_REQUIRED" });
+    expect(doubles.lease).not.toHaveBeenCalled();
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
+  });
+
+  it("本仓受控委托核验后使用已解析图片；绝对路径不混入客户metadata", async () => {
+    useNarrativeProject(); storeGrant(); doubles.runPreproduction.mockResolvedValue(success());
+    vi.stubEnv("HR_PORTRAIT_ENABLED", "1");
+    vi.stubEnv("VOLCENGINE_ARK_API_KEY", "synthetic-unit-test-key");
+    vi.stubEnv("ARK_API_KEY", "synthetic-unit-test-key");
+    vi.stubEnv("ARK_IMAGE_MODEL", "synthetic-unit-test-model");
+    vi.stubEnv("HR_PORTRAIT_ANCHORS", "");
+    const projectId = `VID-scoped-anchor-${++projectSequence}`;
+    const runId = `RUN-scoped-anchor-${projectSequence}`;
+    const anchor = path.join(doubles.workDir, "已登记的 合成图片.png");
+    const { createDirectorGrantOnClient } = await import("./director-store.js");
+    const delegation = await createDirectorGrantOnClient({ query: doubles.query } as never,
+      { ...scope, projectId, runId }, { id: "MEM-1", type: "human" }, { identityAssetRefs: ["VA-synthetic"] });
+    worker.startRun(scope, { projectId, allocatedRunId: runId, intent: "山间风景片",
+      creativeDelegation: delegation, directorIdentityImages: [anchor], metadata: { brief: { audience: "山间游客" } },
+    } as Parameters<typeof worker.startRun>[1]);
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(runId, scope.workspaceId)?.status).toBe("finished");
+    expect(doubles.studioConfigs[0]?.portraits?.characterAnchorImages).toEqual([anchor]);
+    expect(doubles.runPreproduction.mock.calls[0]?.[0].metadata).not.toHaveProperty("directorIdentityImages");
+    expect(JSON.stringify(doubles.runPreproduction.mock.calls[0]?.[0].metadata)).not.toContain(anchor);
+  });
+
+  it.each([false, true])("委托写入失败时回滚；回滚再次失败=%s时销毁连接并保留两个错误", async rollbackFails => {
+    doubles.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("INSERT INTO video_creative_delegations")) throw new Error("grant insert failed");
+      if (sql === "ROLLBACK" && rollbackFails) throw new Error("grant rollback failed");
+      return { rows: sql.includes("video_projects_max_vid_no") ? [{ n: 9000 }] : [], rowCount: 1 };
+    });
+    const pending = worker.startVideoProjectRun(scope, { intent: "拍一条山间日出的风景片", by: { id: "MEM-1", type: "human" } });
+    if (rollbackFails) await expect(pending).rejects.toMatchObject({ name: "AggregateError",
+      errors: [expect.objectContaining({ message: "grant insert failed" }), expect.objectContaining({ message: "grant rollback failed" })] });
+    else await expect(pending).rejects.toThrow("grant insert failed");
+    expect(doubles.query.mock.calls.at(-1)?.[0]).toBe("ROLLBACK");
+    expect(doubles.releaseDb).toHaveBeenLastCalledWith(rollbackFails);
+    expect(doubles.runPreproduction).not.toHaveBeenCalled();
+  });
 });
 
  describe("宿主营销G1必须先于vendor", () => {

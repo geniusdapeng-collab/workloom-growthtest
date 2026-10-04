@@ -29,6 +29,7 @@ import http from "node:http";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
+import { parseRootList } from "../../library/root-list.mjs";
 
 import {
   MeasureError, binaryVersion, detectVoiceBandSegments, measureLoudness, probeMedia,
@@ -109,14 +110,11 @@ export function jobsDir(env = process.env) {
 }
 
 /**
- * 允许读写的根目录：工位目录 + 显式白名单（`WORKLOOM_VOICE_ALLOWED_ROOTS`，冒号分隔）。
+ * 允许读写的根目录：工位目录 + 显式白名单（`WORKLOOM_VOICE_ALLOWED_ROOTS`，JSON 数组或系统分隔符）。
  * 素材区（原片目录）由白名单显式放行；不在白名单内的路径一律拒绝。
  */
 export function allowedRoots(env = process.env) {
-  const explicit = (env.WORKLOOM_VOICE_ALLOWED_ROOTS ?? "")
-    .split(":")
-    .map((item) => item.trim())
-    .filter(Boolean);
+  const explicit = parseRootList(env.WORKLOOM_VOICE_ALLOWED_ROOTS);
   // 工位目录 + 显式白名单 + 常见素材区；另加系统临时目录——分句合成/拼接/适配的中间产物都在
   // os.tmpdir() 下（每次调用结束即清理），不属于"用户素材"，但它必须能通过路径监狱。
   const roots = [
@@ -383,12 +381,12 @@ export async function probeEngine(config = engineConfig(), { fetchImpl = fetch }
 /** 文本 → 语音：返回落盘音频的实测指标（时长/RTF/sha256）。 */
 export async function synthesize(config, {
   text, outPath, refAudio = null, refText = null, engineVoiceId = null, language = null,
-  speed = 1.0, instruct = null, bins = resolveBinaries(), fetchImpl = fetch,
+  speed = 1.0, instruct = null, bins = resolveBinaries(), fetchImpl = fetch, env = process.env,
 } = {}) {
   const clean = String(text ?? "").trim();
   if (!clean) throw new VoiceError("合成文本为空", "bad_request");
   if (!outPath) throw new VoiceError("缺少输出路径", "bad_request");
-  const out = assertPathAllowed(outPath, allowedRoots(), "output");
+  const out = assertPathAllowed(outPath, allowedRoots(env), "output");
   await fsp.mkdir(path.dirname(out), { recursive: true });
   const started = Date.now();
 
@@ -1075,6 +1073,7 @@ export async function speak(params = {}, { bins = resolveBinaries(), env = proce
         instruct: params.instruct ?? null,
         bins,
         fetchImpl,
+        env:{...env,WORKLOOM_VOICE_ALLOWED_ROOTS:JSON.stringify([...allowedRoots(env),dir])},
       });
       parts.push(partPath);
     }
@@ -1229,6 +1228,7 @@ export async function dub(params = {}, { bins = resolveBinaries(), env = process
         instruct: params.instruct ?? null,
         bins,
         fetchImpl,
+        env:{...env,WORKLOOM_VOICE_ALLOWED_ROOTS:JSON.stringify([...allowedRoots(env),dir])},
       });
       const window = segment.end - segment.start;
       const fit = fitTempo({

@@ -51,7 +51,7 @@ export function Floor3DLabels({ registry }: { registry: Floor3DLabelRegistry }) 
     // The CEO's separate HTML plaque also participates in collision avoidance.
     // Drei Html uses Fiber's connected event container, outside the canvas measurement div.
     const scene = gl.domElement.closest('[data-product-scene="workplace-3d"]') ?? gl.domElement.parentElement;
-    const ceo = scene?.querySelector<HTMLElement>("[data-product-nameplate]");
+    const ceo = scene?.querySelector<HTMLElement>("[data-product-nameplate]:not([data-worker-id])");
     if (ceo) {
       const canvas = gl.domElement.getBoundingClientRect(), rect = ceo.getBoundingClientRect();
       fixedPlaques.push({ x: rect.left - canvas.left, y: rect.top - canvas.top, width: rect.width, height: rect.height });
@@ -89,7 +89,7 @@ export function Floor3DLabels({ registry }: { registry: Floor3DLabelRegistry }) 
         const y = Math.max(rect.y, Math.min(rect.y + rect.height, head.y));
         line.setAttribute("x1", String(head.x)); line.setAttribute("y1", String(head.y));
         line.setAttribute("x2", String(x)); line.setAttribute("y2", String(y));
-        line.style.opacity = Math.hypot(x - head.x, y - head.y) > 6 ? ".42" : "0";
+        line.style.opacity = node?.querySelector("[data-worker-card-visible=\"false\"]") ? "0" : Math.hypot(x - head.x, y - head.y) > 6 ? ".42" : "0";
       }
     }
   }, -.5);

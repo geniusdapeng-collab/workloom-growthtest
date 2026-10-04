@@ -47,9 +47,10 @@ interface ActorRt {
 const CONFETTI_COLORS = ["#ffd98a", "#8ad8ff", "#6adf8a", "#ff8a8a", "#e8a2ff"];
 
 export function FloorView({
-  floor, ceoName, onPickAgent, onOpenProfile, onOpenTask,
+  floor, ceoName, onPickAgent, onOpenProfile, onOpenTask, totalActors = floor.agents.length,
 }: {
   floor: FloorPayload;
+  totalActors?: number;
   ceoName: string;
   onPickAgent: (a: FloorAgent) => void;
   /** 员工本体点击 → 员工档案（2026-09-20 重设计：派活改由拖任务卡 / 全局对话框承担） */
@@ -64,6 +65,7 @@ export function FloorView({
   const [canvasError, setCanvasError] = useState<string | null>(null);
   const actors = useRef<Map<string, ActorRt>>(new Map());
   const hitboxes = useRef<Array<FloorRect & { id: string; kind: "agent" | "task"; threadId?: string }>>([]);
+  const hovered = useRef<string | null>(null);
   const floorRef = useRef(floor);
   floorRef.current = floor;
 
@@ -218,6 +220,10 @@ export function FloorView({
       }
       hitboxes.current = [];
       const list = floorRef.current.agents;
+      const visibleLabels = new Set(list
+        .filter((agent) => agent.state === "asking" || agent.state === "blocked" || agent.state === "celebrating" || agent.currentThread)
+        .sort((left, right) => left.id.localeCompare(right.id))
+        .slice(0, 2).map((agent) => agent.id));
       const sorted = [...list].filter(a => a.state !== "disabled").sort((a, b) => layout!.slots.get(a.id)!.sy - layout!.slots.get(b.id)!.sy);
       for (const a of sorted) {
         let rt = actors.current.get(a.id);
@@ -265,6 +271,7 @@ export function FloorView({
 
       // Paint every plaque after all sprites/effects, so a later actor cannot cover another's text.
       for (const a of sorted) {
+        if (!visibleLabels.has(a.id) && hovered.current !== a.id) continue;
         const slot = layout.slots.get(a.id)!;
         const card = slot.card;
         ctx.textAlign = "center";
@@ -306,6 +313,7 @@ export function FloorView({
     const rect = e.currentTarget.getBoundingClientRect();
     const mx = e.clientX - rect.left, my = e.clientY - rect.top;
     const hit = [...hitboxes.current].reverse().find(h => mx >= h.x && mx <= h.x + h.width && my >= h.y && my <= h.y + h.height);
+    hovered.current = hit?.id ?? null;
     const agent = hit && floorRef.current.agents.find(a => a.id === hit.id);
     e.currentTarget.title = agent ? `${roleTitleOf(agent.name, agent.presetKey)}${agent.currentThread ? ` · ${agent.currentThread.title}` : ""}` : "";
   };
@@ -323,10 +331,12 @@ export function FloorView({
           ref={ref}
           onClick={onClick}
           onMouseMove={onMouseMove}
+          onMouseLeave={() => { hovered.current = null; }}
           className="block h-full w-full cursor-pointer"
           style={{ transitionProperty: "none" }}
           data-scene={floor.scene.id}
           data-product-scene="workplace-2d"
+          data-product-scene-total-actors={String(totalActors ?? floor.agents.length)}
           data-product-scene-actors={String(floor.agents.filter(a => a.state !== "disabled").length)}
         />
       </div>

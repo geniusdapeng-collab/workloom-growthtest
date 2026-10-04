@@ -291,7 +291,7 @@ function createWindow() {
     autoHideMenuBar: true,
     backgroundColor: "#F8FAFC",
     show: false,
-    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true,
+    webPreferences: { contextIsolation: true, nodeIntegration: false, sandbox: true, backgroundThrottling: !RENDER_SMOKE,
       // 渲染验收从独立内存会话开始；旧欢迎页和收起偏好不应掩盖待验后端。
       // 普通客户窗口仍用持久会话，验收不会改写客户浏览器状态。
       ...(RENDER_SMOKE ? { partition: "workloom-render-smoke" } : {}),
@@ -340,7 +340,7 @@ function createWindow() {
     if (win && !win.isDestroyed()) win.destroy();
     win = null;
   });
-  win.once("ready-to-show", () => { closeSplash(); win.show(); });
+  win.once("ready-to-show", () => { closeSplash(); win.show(); win.focus(); });
 
   // 关窗 = 最小化到托盘（夜班/自动任务持续运行）；托盘「退出」才是真退出
   win.on("close", (e) => {
@@ -377,9 +377,131 @@ function pixelHealth(image) {
   return { mean: Number(mean.toFixed(2)), variance: Number(variance.toFixed(2)), visibleRatio: Number((visible / Math.max(1, n)).toFixed(4)) };
 }
 
+// Serialized into the renderer for both initial and camera-settled samples. Keep this
+// function self-contained: CSS/geometry decide label visibility, never product data flags
+// or hit testing, which would erase a label precisely when another label overlaps it.
+function collectProductScene(sceneName) {
+  const bounds = (node) => {
+    if (!node) return null;
+    const r = node.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  };
+  const valid = (r) => r && [r.x, r.y, r.width, r.height].every(Number.isFinite) && r.width >= 0 && r.height >= 0;
+  const intersect = (a, b) => {
+    const x = Math.max(a.x, b.x), y = Math.max(a.y, b.y);
+    return { x, y, width: Math.max(0, Math.min(a.x + a.width, b.x + b.width) - x), height: Math.max(0, Math.min(a.y + a.height, b.y + b.height) - y) };
+  };
+  const viewport = { width: innerWidth, height: innerHeight };
+  const scene = document.querySelector(`[data-product-scene="${sceneName}"]`);
+  const rect = bounds(scene);
+  const canvas = scene?.matches("canvas") ? scene : scene?.querySelector("canvas");
+  const nameplates = [...(scene?.querySelectorAll("[data-product-nameplate]") || [])].map((node, index) => {
+    const rawRect = bounds(node), reasons = [], unresolvedClips = [];
+    let effectiveRect = valid(rawRect) ? { ...rawRect } : null;
+    let effectiveOpacity = 1;
+    const exclude = (reason) => { if (!reasons.includes(reason)) reasons.push(reason); };
+    const clipTo = (clipRect, reason) => {
+      if (!effectiveRect) return;
+      if (!valid(clipRect)) { exclude("invalid-geometry"); return; }
+      effectiveRect = intersect(effectiveRect, clipRect);
+      if (effectiveRect.width <= 0 || effectiveRect.height <= 0) exclude(reason);
+    };
+    if (!effectiveRect) exclude("invalid-geometry");
+    else {
+      if (rawRect.width <= 0 || rawRect.height <= 0) exclude("zero-size");
+      clipTo({ x: 0, y: 0, width: viewport.width, height: viewport.height }, "outside-viewport");
+      clipTo(rect, "outside-scene");
+    }
+    // visibility is inherited but descendants can explicitly restore it; use the
+    // label's computed value. display, opacity and content-visibility affect subtrees.
+    const ownStyle = getComputedStyle(node);
+    if (["hidden", "collapse"].includes(ownStyle.visibility)) exclude("visibility-hidden");
+    for (let current = node, depth = 0; current; current = current.parentElement, depth++) {
+      const style = getComputedStyle(current);
+      if (style.display === "none") exclude("display-none");
+      if (style.contentVisibility === "hidden") exclude("content-visibility-hidden");
+      const opacity = style.opacity === "" || style.opacity === undefined ? 1 : Number(style.opacity);
+      if (Number.isFinite(opacity)) effectiveOpacity *= opacity;
+      if (effectiveOpacity <= 0) exclude("opacity-zero");
+      const box = bounds(current);
+      const clipPath = style.clipPath || "none";
+      const inset = /^inset\(([^)]*)\)(?:\s+border-box)?$/u.exec(clipPath);
+      if (clipPath !== "none") {
+        const values = inset?.[1].split(/\s+round\s+/u)[0].trim().split(/\s+/u);
+        if (inset && values.length >= 1 && values.length <= 4 && values.every((value) => /^-?(?:\d+\.?\d*|\.\d+)(?:px|%)?$/u.test(value))) {
+          if (!valid(box)) exclude("invalid-geometry");
+          else {
+            const expanded = values.length === 1 ? [values[0], values[0], values[0], values[0]]
+              : values.length === 2 ? [values[0], values[1], values[0], values[1]]
+              : values.length === 3 ? [values[0], values[1], values[2], values[1]] : values;
+            const length = (value, size, layoutSize) => Number.parseFloat(value) * (value.endsWith("%") ? size / 100 : layoutSize > 0 ? size / layoutSize : 1);
+            const top = length(expanded[0], box.height, current.offsetHeight), right = length(expanded[1], box.width, current.offsetWidth);
+            const bottom = length(expanded[2], box.height, current.offsetHeight), left = length(expanded[3], box.width, current.offsetWidth);
+            clipTo({ x: box.x + left, y: box.y + top, width: Math.max(0, box.width - left - right), height: Math.max(0, box.height - top - bottom) }, "clip-path-empty");
+          }
+        } else unresolvedClips.push({ property: "clip-path", value: clipPath, ancestorDepth: depth });
+      }
+      const legacyClip = style.clip || "auto";
+      if (legacyClip !== "auto" && legacyClip !== "none" && ["absolute", "fixed"].includes(style.position)) {
+        const values = /^rect\(([^)]*)\)$/u.exec(legacyClip)?.[1].trim().split(/[\s,]+/u);
+        if (values?.length === 4 && values.every((value) => value === "auto" || /^-?(?:\d+\.?\d*|\.\d+)(?:px)?$/u.test(value))) {
+          if (!valid(box)) exclude("invalid-geometry");
+          else {
+            const length = (value, fallback, size, layoutSize) => value === "auto" ? fallback : Number.parseFloat(value) * (layoutSize > 0 ? size / layoutSize : 1);
+            const top = length(values[0], 0, box.height, current.offsetHeight), right = length(values[1], box.width, box.width, current.offsetWidth);
+            const bottom = length(values[2], box.height, box.height, current.offsetHeight), left = length(values[3], 0, box.width, current.offsetWidth);
+            clipTo({ x: box.x + left, y: box.y + top, width: Math.max(0, right - left), height: Math.max(0, bottom - top) }, "clip-empty");
+          }
+        } else unresolvedClips.push({ property: "clip", value: legacyClip, ancestorDepth: depth });
+      }
+      if (current !== node && effectiveRect) {
+        const clipsX = ["hidden", "clip", "auto", "scroll"].includes(style.overflowX || style.overflow);
+        const clipsY = ["hidden", "clip", "auto", "scroll"].includes(style.overflowY || style.overflow);
+        if (clipsX || clipsY) clipTo(valid(box) ? {
+          x: clipsX ? box.x : effectiveRect.x, width: clipsX ? box.width : effectiveRect.width,
+          y: clipsY ? box.y : effectiveRect.y, height: clipsY ? box.height : effectiveRect.height,
+        } : box, "overflow-empty");
+      }
+    }
+    return { index, text: node.textContent?.trim() || "", kind: node.getAttribute("data-product-nameplate"), workerId: node.getAttribute("data-worker-id"),
+      visible: reasons.length === 0, reasons, rawRect, effectiveRect, effectiveOpacity, unresolvedClips };
+  });
+  const namedPlates = nameplates.filter((plate) => plate.text);
+  const visiblePlates = namedPlates.filter((plate) => plate.visible);
+  const nameplateOverlaps = [];
+  for (let i = 0; i < visiblePlates.length; i++) for (let j = i + 1; j < visiblePlates.length; j++) {
+    const overlap = intersect(visiblePlates[i].effectiveRect, visiblePlates[j].effectiveRect);
+    if (overlap.width > 1 && overlap.height > 1) nameplateOverlaps.push({ first: visiblePlates[i].index, second: visiblePlates[j].index, rect: overlap });
+  }
+  let visibleSamples = 0, sampleCount = 0;
+  if (valid(rect) && rect.width > 0 && rect.height > 0) {
+    for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) {
+      sampleCount++;
+      const top = document.elementFromPoint(rect.x + rect.width * (col + .5) / 5, rect.y + rect.height * (row + .5) / 5);
+      if (top && (top === scene || scene.contains(top))) visibleSamples++;
+    }
+  }
+  const overlays = [...document.querySelectorAll('[aria-modal="true"]')].filter((node) => {
+    const box = bounds(node), style = getComputedStyle(node);
+    return valid(box) && box.width > 0 && box.height > 0 && style.display !== "none" && style.visibility !== "hidden";
+  }).map((node) => node.getAttribute("aria-label") || node.getAttribute("data-wl-surface") || "未命名模态层");
+  return {
+    ready: !!scene, actors: Number(scene?.getAttribute("data-product-scene-actors") || 0),
+    totalActors: Number(scene?.getAttribute("data-product-scene-total-actors") || scene?.getAttribute("data-product-scene-actors") || 0),
+    labels: visiblePlates.map((plate) => plate.text), allLabels: namedPlates.map((plate) => plate.text),
+    hiddenLabels: namedPlates.filter((plate) => !plate.visible).map((plate) => plate.text),
+    labelCounts: { all: namedPlates.length, visible: visiblePlates.length, hidden: namedPlates.length - visiblePlates.length },
+    nameplates, nameplateOverlaps, rect, canvasRect: bounds(canvas), canvas: canvas ? { width: canvas.width, height: canvas.height } : null,
+    visibleRatio: sampleCount ? visibleSamples / sampleCount : 0, visibleSamples, sampleCount, overlays, viewport,
+  };
+}
+
 async function runRenderSmoke() {
   const logDir = path.join(supportDirResolved, "logs");
   fs.mkdirSync(logDir, { recursive: true });
+  // This single application-owned test owns the input and shutdown lifecycle. A background
+  // CI window must still submit fresh frames; normal product windows retain throttling.
+  win.webContents.setBackgroundThrottling(false);
   const deadline = Date.now() + 60000;
   let probe = null;
   let webglAvailable = null;
@@ -536,29 +658,31 @@ async function runRenderSmoke() {
   );
   saveReport();
   if (!report.assistantSceneControl.collapsed) throw new Error("织伴实际收起控件未能让出产品场景");
+  const switchedFloor = await win.webContents.executeJavaScript(`(() => {
+    const root = document.querySelector('[data-product-ready="true"]');
+    const button = [...(root?.querySelectorAll('header button') || [])].find((node) => node.textContent?.trim() === '职场');
+    button?.click();
+    return !!button;
+  })()`, true);
+  if (!switchedFloor) throw new Error("无法切换到职场视图");
 
   async function captureProductScene(sceneName, fileStem) {
     const sceneDeadline = Date.now() + 15000;
     const queryScene = () => win.webContents.executeJavaScript(`(() => {
+      const collected = (${collectProductScene.toString()})(${JSON.stringify(sceneName)});
       const scene = document.querySelector('[data-product-scene="${sceneName}"]');
-      const canvas = scene?.querySelector('canvas');
-      const rectOf = (node) => {
-        if (!node) return null;
-        const rect = node.getBoundingClientRect();
-        return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
-      };
-      const ceo = rectOf(scene?.querySelector('[data-product-nameplate]'));
-      const ceoOverlapIds = scene && ceo ? [...scene.querySelectorAll('button[data-floor-agent]')].filter((node) => {
-        const rect = node.getBoundingClientRect();
-        return rect.x < ceo.x + ceo.width - .5 && ceo.x < rect.right - .5 && rect.y < ceo.y + ceo.height - .5 && ceo.y < rect.bottom - .5;
-      }).map((node) => node.getAttribute('data-floor-agent')) : [];
+      const canvas = scene?.matches('canvas') ? scene : scene?.querySelector('canvas');
       const context = canvas?.getContext('webgl2');
+      const ceo = collected.nameplates.find((plate) => !plate.workerId && plate.visible)?.effectiveRect ?? null;
+      const ceoOverlapIds = ceo ? collected.nameplates.filter((plate) => {
+        const rect = plate.effectiveRect;
+        return plate.workerId && plate.visible && rect && rect.x < ceo.x + ceo.width - .5 &&
+          ceo.x < rect.x + rect.width - .5 && rect.y < ceo.y + ceo.height - .5 && ceo.y < rect.y + rect.height - .5;
+      }).map((plate) => plate.workerId) : [];
       return {
-        ready: !!scene,
+        ...collected,
         overlayVisible: !!document.querySelector('[data-welcome-phase], [data-questline-overlay="true"]'),
-        actors: Number(scene?.getAttribute('data-product-scene-actors') || 0),
-        labels: scene ? [...scene.querySelectorAll('[data-product-nameplate]')].map((node) => node.textContent?.trim() || '').filter(Boolean) : [],
-        geometry: { scene: rectOf(scene), canvas: rectOf(canvas), ceo, ceoOverlapIds,
+        geometry: { scene: collected.rect, canvas: collected.canvasRect, ceo, ceoOverlapIds,
           contextLost: context?.isContextLost() ?? null,
           drawingBuffer: context ? { width: context.drawingBufferWidth, height: context.drawingBufferHeight } : null },
       };
@@ -569,41 +693,73 @@ async function runRenderSmoke() {
       if (sceneProbe?.ready) break;
       await new Promise((resolve) => setTimeout(resolve, 350));
     }
+    const initialLabelCounts = sceneProbe?.labelCounts || null;
     await new Promise((resolve) => setTimeout(resolve, 3600));
-    // 等待动画后 DOM 可能已被新的引导层覆盖；截图前后都必须重新取实际状态。
+    // Both CSS visibility/clipping and guide coverage must be sampled around the actual capture.
     const beforeCapture = await queryScene();
-    const sceneShot = await win.webContents.capturePage();
-    sceneProbe = await queryScene();
-    const sceneScreenshotPath = path.join(logDir, `${fileStem}-${SAFE_RENDERING ? "safe" : "default"}.png`);
-    fs.writeFileSync(sceneScreenshotPath, sceneShot.toPNG());
-    const scenePixels = pixelHealth(sceneShot);
-    const sceneReport = { ...sceneProbe, beforeCapture, pixels: scenePixels, screenshotPath: sceneScreenshotPath };
-    if (scenePixels.variance < 35 || scenePixels.visibleRatio < 0.015) throw new Error(`${sceneName} 画面疑似纯黑/纯色：${JSON.stringify(sceneReport)}`);
-    const builtInNames = ['顾云峥', '高明珏', '程既明', '任知遥', '叶言之', '唐亦舟', '万见庭', '陆闻秋', '祁含章', '祁清晏', '许诠宁'];
-    const maxIdleLabels = sceneName === "workplace-3d" ? 4 : 1;
-    for (const capturedState of [beforeCapture, sceneProbe]) {
-      if (!capturedState?.ready) throw new Error(`${sceneName} 未就绪：${JSON.stringify(sceneReport)}`);
-      if (capturedState.overlayVisible) throw new Error(`${sceneName} 仍被引导层遮挡：${JSON.stringify(sceneReport)}`);
+    const sceneReport = { ...beforeCapture, initialLabelCounts, beforeCapture,
+      checkedAt: new Date().toISOString(), captureScope: "product-scene" };
+    const sceneReportPath = path.join(logDir, `${fileStem}-${SAFE_RENDERING ? "safe" : "default"}.json`);
+    const saveSceneReport = () => fs.writeFileSync(sceneReportPath, JSON.stringify(sceneReport, null, 2));
+    saveSceneReport();
+    const assertScene = (state) => {
+      if (!state?.ready) throw new Error(`${sceneName} 未就绪：${JSON.stringify(sceneReport)}`);
+      const r = state.rect, viewport = state.viewport;
+      if (!r || ![r.x, r.y, r.width, r.height].every(Number.isFinite) || r.width < 200 || r.height < 250 ||
+          r.x < -1 || r.y < -1 || r.x + r.width > viewport.width + 1 || r.y + r.height > viewport.height + 1) {
+        throw new Error(`${sceneName} 场景尺寸或可见区域不完整：${JSON.stringify(sceneReport)}`);
+      }
+      if (state.overlayVisible || state.overlays?.length || state.visibleRatio < .90) {
+        throw new Error(`${sceneName} 仍被引导层遮挡或场景不可见：${JSON.stringify(sceneReport)}`);
+      }
       if (sceneName.endsWith("-3d")) {
-        const geometry = capturedState.geometry;
-        if (!geometry?.canvas || !geometry.scene || geometry.contextLost !== false || geometry.canvas.width <= 0 || geometry.canvas.height <= 0) {
+        const geometry = state.geometry;
+        if (!geometry?.canvas || !geometry.scene || geometry.contextLost !== false) {
           throw new Error(`${sceneName} 画布不可用：${JSON.stringify(sceneReport)}`);
         }
         if (sceneName === "report-stage-3d" && (Math.abs(geometry.scene.width - geometry.canvas.width) > 1 || Math.abs(geometry.scene.height - geometry.canvas.height) > 1)) {
           throw new Error(`${sceneName} 舞台画布未铺满实际场景：${JSON.stringify(sceneReport)}`);
         }
-        if (geometry.ceoOverlapIds?.length) throw new Error(`${sceneName} 负责人和员工名牌相交：${JSON.stringify(sceneReport)}`);
+        if (geometry.canvas.width < r.width * .95 || geometry.canvas.height < r.height * .95) {
+          throw new Error(`${sceneName} 画布未填满场景：${JSON.stringify(sceneReport)}`);
+        }
+        if (geometry.ceoOverlapIds.length) throw new Error(`${sceneName} 负责人和员工名牌相交：${JSON.stringify(sceneReport)}`);
       }
-      if (report.bundle === "ai-pm" && Number(capturedState.actors) !== Number(report.actorCount) + (sceneName.startsWith("report-stage-") ? 1 : 0)) {
-        throw new Error(`${sceneName} 团队人数不完整：${JSON.stringify(sceneReport)}`);
+      const expectedActors = Number(report.actorCount) + (sceneName.startsWith("report-stage-") ? 1 : 0);
+      if (report.bundle === "ai-pm" && (Number(state.totalActors) !== expectedActors ||
+          Number(state.actors) !== Math.min(expectedActors, sceneName.startsWith("report-stage-") ? 19 : 18))) {
+        throw new Error(`${sceneName} 团队人数不完整（含分页名单）：${JSON.stringify(sceneReport)}`);
       }
-      if ((capturedState.labels || []).some((label) => builtInNames.some((name) => label.includes(name)))) {
+      if (state.nameplates.some((plate) => plate.reasons.includes("invalid-geometry"))) {
+        throw new Error(`${sceneName} 名牌几何无效：${JSON.stringify(sceneReport)}`);
+      }
+      const builtInNames = ['顾云峥', '高明珏', '程既明', '任知遥', '叶言之', '唐亦舟', '万见庭', '陆闻秋', '祁含章', '祁清晏', '许诠宁'];
+      if (state.labels.some((label) => builtInNames.some((name) => label.includes(name)))) {
         throw new Error(`${sceneName} 默认 HUD 泄漏系统内置人名：${JSON.stringify(sceneReport)}`);
       }
-      if ((capturedState.labels || []).length > maxIdleLabels) {
+      if (state.labels.length > (sceneName.startsWith("workplace-") ? 4 : 1)) {
         throw new Error(`${sceneName} 空闲态名牌过密：${JSON.stringify(sceneReport)}`);
       }
-    }
+      if (state.nameplateOverlaps.length) {
+        throw new Error(`${sceneName} 可见名牌重叠：${JSON.stringify(sceneReport)}`);
+      }
+    };
+    assertScene(beforeCapture);
+    const r = beforeCapture.rect;
+    const crop = { x: Math.max(0, Math.ceil(r.x)), y: Math.max(0, Math.ceil(r.y)), width: Math.floor(r.width), height: Math.floor(r.height) };
+    const croppedScene = await win.webContents.capturePage(crop, { stayAwake: true });
+    const sceneCropPath = path.join(logDir, `${fileStem}-scene-${SAFE_RENDERING ? "safe" : "default"}.png`);
+    fs.writeFileSync(sceneCropPath, croppedScene.toPNG());
+    const sceneShot = await win.webContents.capturePage();
+    sceneProbe = await queryScene();
+    const sceneScreenshotPath = path.join(logDir, `${fileStem}-${SAFE_RENDERING ? "safe" : "default"}.png`);
+    fs.writeFileSync(sceneScreenshotPath, sceneShot.toPNG());
+    const scenePixels = pixelHealth(croppedScene);
+    Object.assign(sceneReport, { ...sceneProbe, beforeCapture, pixels: scenePixels,
+      screenshotPath: sceneScreenshotPath, sceneScreenshotPath: sceneCropPath });
+    saveSceneReport();
+    assertScene(sceneProbe);
+    if (scenePixels.variance < 35 || scenePixels.visibleRatio < 0.015) throw new Error(`${sceneName} 画面疑似纯黑/纯色：${JSON.stringify(sceneReport)}`);
     return sceneReport;
   }
 

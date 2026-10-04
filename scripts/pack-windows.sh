@@ -50,6 +50,7 @@ trap 'rm -rf "$STAGE"' EXIT
 PKG="$STAGE/WorkLoom"
 DIST="dist"
 mkdir -p "$DIST" "$PKG"
+if [ -f build/bundle-trust.json ]; then cp build/bundle-trust.json "$PKG/bundle-trust.json"; fi
 
 echo "== 装配 WorkLoom Windows 包（$VERSION · win-x64）=="
 
@@ -63,56 +64,14 @@ esac
 
 # ---------- 1. 产品载荷 runtime/（与 pack-macos.sh 同口径） ----------
 R="$PKG/runtime"
-mkdir -p "$R/apps/server" "$R/apps/web" "$R/packages" "$R/scripts"
-# pnpm 的 node_modules 是 junction/symlink 结构：Windows zip 往返会丢链导致模块缺失
-# （v2.0.8 冒烟实证 esbuild/vite 丢失）——拷贝必须解引用为实体目录
 copy() { cp -aL "$1" "$2"; }
-for f in package.json pnpm-workspace.yaml tsconfig.base.json .env.example; do
-  [ -f "$f" ] && copy "$f" "$R/"
-done
-[ -f "$PRODUCT_MANIFEST_PATH" ] || { echo "❌ 缺受保护产品清单"; exit 1; }
-copy "$PRODUCT_MANIFEST_PATH" "$R/product.manifest.json"
-[ -f "$R/.env.defaults" ] || copy .env.example "$R/.env.defaults"
-RUNTIME_SOURCE_DIRS=(
-  apps/server apps/web/src apps/web/index.html apps/web/public apps/web/package.json
-  apps/web/vite.config.ts apps/web/tsconfig.json packages bundles
-)
-[ "$PLATFORM_OPS_MODE" = "include" ] && RUNTIME_SOURCE_DIRS+=(platform-ops)
-node scripts/pack-workspace-modules.mjs --copy-sources "$R" "${RUNTIME_SOURCE_DIRS[@]}"
-mkdir -p "$R/scripts"
-copy scripts/migrate.ts "$R/scripts/"
-copy scripts/desktop-bootstrap-db.mjs "$R/scripts/"
-copy scripts/product-runtime.mjs "$R/scripts/"
-copy scripts/vite-product.mjs "$R/scripts/"
-for sf in scripts/seed*.ts; do copy "$sf" "$R/scripts/"; done  # 全部行业种子随包（按 DESKTOP_SEED_SCRIPT 选用）
-copy scripts/skill-bindings.mts "$R/scripts/"
-mkdir -p "$R/scripts/tools" "$R/scripts/whiteboard" "$R/assets/whiteboard" \
-  "$R/vendor/srt-whiteboard/scripts" "$R/vendor/srt-whiteboard/assets" "$R/vendor/srt-whiteboard/examples"
-for sf in scripts/tools/full-chain-film.mts scripts/tools/film-voice-artifact.ts scripts/tools/compose-film.mts \
-  scripts/tools/explainer-run.mts scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-  scripts/tools/enhance-engine-install.mjs; do copy "$sf" "$R/scripts/tools/"; done
-copy scripts/whiteboard/lineart_tools.py "$R/scripts/whiteboard/"
-copy assets/whiteboard/drawing-hand-workloom.png "$R/assets/whiteboard/"
-for sf in vendor/srt-whiteboard/LICENSE vendor/srt-whiteboard/PINNED.md vendor/srt-whiteboard/VENDOR.md \
-  vendor/srt-whiteboard/README.md vendor/srt-whiteboard/SKILL.md vendor/srt-whiteboard/requirements.txt; do
-  copy "$sf" "$R/vendor/srt-whiteboard/"
-done
-for sf in vendor/srt-whiteboard/scripts/*.py; do copy "$sf" "$R/vendor/srt-whiteboard/scripts/"; done
-copy vendor/srt-whiteboard/assets/drawing-hand.png "$R/vendor/srt-whiteboard/assets/"
-copy vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png "$R/vendor/srt-whiteboard/examples/"
-copy vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json "$R/vendor/srt-whiteboard/examples/"
-printf '%s\n' "$VERSION" > "$R/VERSION"
-# 源码不携带 node_modules：各包自带 pnpm 链接版会抢占解析且缺嵌套依赖（v2.0.8 esbuild 缺失实证），
-# 运行期统一由下方 npm 扁平化安装的根 node_modules 提供
-find "$R/apps" "$R/packages" -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
-
-# ---------- 2. 依赖与 web 构建产物 ----------
 if [ ! -d node_modules ] || [ ! -d apps/web/node_modules ]; then
   echo "→ pnpm install…"; pnpm install --frozen-lockfile
 fi
-if [ ! -f apps/web/dist/index.html ]; then
-  echo "→ 构建 web…"; pnpm -C apps/web build
-fi
+node scripts/product-runtime-assets.mjs copy "$R" --version "$VERSION"
+
+# ---------- 2. 依赖与 web 构建产物 ----------
+echo "→ 构建当前 web 源码…"; pnpm -C apps/web build
 copy apps/web/dist "$R/apps/web/dist"
 echo "→ 运行期依赖：npm 扁平化安装（pnpm 链接布局无法过 Windows zip 往返，v2.0.8 实证）…"
 # 从本产品受控 runtime lock 执行 win32-x64 npm ci；不得继承构建宿主平台。
@@ -120,8 +79,9 @@ NM_STAGE="$STAGE/nm-pkg"
 NPM_REG="${NPM_REGISTRY:-https://registry.npmjs.org}"
 node scripts/runtime-deps-lock.mjs stage "$NM_STAGE" --os win32 --cpu x64 --registry "$NPM_REG"
 copy "$NM_STAGE/node_modules" "$R/node_modules"
-node scripts/pack-workspace-modules.mjs "$R"
-find "$R/node_modules" -mindepth 2 -maxdepth 4 -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
+# 所有内部工作区包按 package name 动态注册；行业包与仙女座 platform-ops 不得遗漏。
+node scripts/product-runtime-assets.mjs install "$R"
+node scripts/product-runtime-assets.mjs preflight "$R" --platform win32 --arch x64
 
 # ---------- 3. Node win-x64 官方二进制 ----------
 echo "→ Node $NODE_VER win-x64…"

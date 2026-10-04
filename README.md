@@ -30,7 +30,7 @@ WorkLoom Growth 面向企业增长与内容运营团队，把目标、数字员�
 |---|---|---|
 | 通用问答与任务 | [runtime](packages/runtime/src/) 实现 Ask、Agent、Quest；Ask 读取工作区事实，Quest 规划步骤、检查围栏并调用工具 | 无模型时可回退规则答复。真实数据态下，缺执行器的声明工具返回 `connector-required` 与 `receipt.synced=false` |
 | 岗位与协作 | PC `/agents` 查看岗位；`/portfolio` 聚合任务契约、交接和待决定事项。实现见 [协作服务](apps/server/src/service/collaboration.ts) | 组织与状态链路已存在；增长北极星等数据投影仍有待接字段 |
-| 视频工位 | 自然语言任务派遣或制片 API 启动前期；`/ai-video/assets?tab=studio` 消费已有脚本进行生成。实现见 [视频路由](apps/server/src/video/router.ts) 与 [生产 worker](apps/server/src/video/studio-worker.ts) | 默认按阶段推进。预生产完成不等于渲染完成，后期另由工位生成交付包；内部部分关卡默认自动，具体业务门按策略处理 |
+| 视频工位 | `/ai-video/assets?tab=studio` 默认一句话导演：真实文字方案、三支常规版与导演惊喜版、逐版反馈；专业旧流程由“专业工作台”进入。实现见 [导演手册](docs/director-studio-v2.md) 与 [导演服务](apps/server/src/video/director-worker.ts) | 四版后期有独立画面/声音时间线、字幕、封面和实际差异证据；本人素材、预算与正式生产资格仍需就绪。文字方案 `mediaReady=false` 不代表已出片 |
 | 视频媒资与交付 | `/ai-video/media` 管理媒资，`/ai-video/assets?tab=delivery` 查看交付；另有商品档案、合集与成片历史。实现见 [媒资模块](apps/server/src/video/media/) | 支持媒体与制作记录管理；需要文件、数据库和对应作业产物，不能把空目录当作已交付成片 |
 | 白板、口播解释片 | [白板服务](apps/server/src/video/whiteboard/)、[口播解释片服务](apps/server/src/video/explainer/) 与 CLI 工具 | 有专用制作链；需要 TTS、渲染与后期依赖。当前没有独立 React 可视编辑页 |
 | GEO 与增长作业 | [主包岗位/技能/管线](bundles/geo-growth/) 声明双域情报、内容、能见度、线索与复盘流程 | 多项工具尚无专用执行实现；先把声明映射到执行器、数据源和真实回执 |
@@ -103,7 +103,7 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 同名岗位由主包 `composition.presetOwners` 裁决：`ads-optimizer`、`publish-operator`、`review-analyst` 归 `geo-growth`，`company-ceo` 归 `hotel`。下方数量从 manifest 和岗位标识自动派生，避免手工维护另一套总数。当前三包均为 `candidate`；稳定包签名校验能力的存在不能变成“这些候选包已经完成生产验收”的结论。
 
 <!-- CAPABILITIES:BEGIN -->
-<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-10-02），请勿手改；重跑 pnpm capabilities 更新 -->
+<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-10-04），请勿手改；重跑 pnpm capabilities 更新 -->
 
 ## 代码与资产速览（自动生成）
 
@@ -114,8 +114,8 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 - 🧑‍💼 **岗位与交互入口**：数字员工中心（`/agents`） · 织伴数字人组件 · 语音与口型引擎
 - 🖐 **电脑操作接口**：浏览器与桌面驱动接口 · HTTP / MCP 工位入口
 - ⚙ **共享基础模块（目录存在性）**：围栏判定 · 技能分发组件 · 任务编排基础组件 · 夜班状态与调度 · 模型路由与用量记录 · 发布适配层（默认演练） 等 15 项
-- 🎬 **内容生产专用入口**：视频工位 · 媒资与交付 · 白板与口播解释片
-- ✅ **验证与维护命令**：环境安装脚本 · 主测试套件 · GEO 域套件 · 酒店域套件 · 发布门禁 · 五元事件验链 等 8 项
+- 🎬 **内容生产专用入口**：一句话导演工位 · 媒资与交付 · 白板与口播解释片
+- ✅ **验证与维护命令**：环境安装脚本 · 主测试套件 · GEO 域套件 · GEO 工具路由与回执复验 · 酒店域套件 · 发布门禁 等 9 项
 - 📚 **演示与说明资产**：静态演示原型 ×12 · 官网静态页面 · official 技能目录 ×9 · 历史能力导览 PPT · 模拟数据说明
 
 本仓 manifest 共声明 **85 条岗位定义、94 项技能路径、11 条管线**；岗位按 `preset_key` 去重为 **81 个不同标识**。实际组合以主包与装配器为准。

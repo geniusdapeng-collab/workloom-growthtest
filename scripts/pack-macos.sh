@@ -61,77 +61,30 @@ copy apps/desktop/WorkLoom.app "$APP"
 chmod +x "$APP/Contents/MacOS/WorkLoom"
 mkdir -p "$APP/Contents/Resources"
 cp apps/desktop/electron/bootstrap.cjs "$APP/Contents/Resources/bootstrap.cjs"
+if [ -f build/bundle-trust.json ]; then cp build/bundle-trust.json "$APP/Contents/Resources/bundle-trust.json"; fi
 
 # 2. 产品载荷 runtime/
 echo "→ 装配产品载荷…"
 R="$APP/Contents/Resources/runtime"
-mkdir -p "$R"
-# 源码与配置（白名单制，dist/供应商/测试夹具不进包）
-for p in package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json; do cp "$p" "$R/"; done
-[ -f "$PRODUCT_MANIFEST_PATH" ] || { echo "❌ 缺受保护产品清单"; exit 1; }
-cp "$PRODUCT_MANIFEST_PATH" "$R/product.manifest.json"
-cp .env.example "$R/.env.defaults"
-RUNTIME_SOURCE_DIRS=(apps/server apps/web packages bundles)
-[ "$PLATFORM_OPS_MODE" = "include" ] && RUNTIME_SOURCE_DIRS+=(platform-ops)
-for d in "${RUNTIME_SOURCE_DIRS[@]}"; do
-  rsync -aR --exclude node_modules --exclude dist --exclude .dsh-home --exclude 'dsh-gate/out' "$d" "$R/"
-done
-mkdir -p "$R/scripts"
-cp scripts/migrate.ts scripts/desktop-bootstrap-db.mjs scripts/product-runtime.mjs scripts/vite-product.mjs "$R/scripts/"
-mkdir -p "$R/scripts/tools"
-cp scripts/tools/full-chain-film.mts scripts/tools/film-voice-artifact.ts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
-   scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-   scripts/tools/enhance-engine-install.mjs "$R/scripts/tools/"
-# Whiteboard source and example inputs are portable; the machine-specific Python
-# venv and FFmpeg binaries are installed separately and never copied into this payload.
-mkdir -p "$R/scripts/whiteboard" "$R/assets/whiteboard" \
-  "$R/vendor/srt-whiteboard/scripts" "$R/vendor/srt-whiteboard/assets" "$R/vendor/srt-whiteboard/examples"
-cp scripts/whiteboard/lineart_tools.py "$R/scripts/whiteboard/"
-cp assets/whiteboard/drawing-hand-workloom.png "$R/assets/whiteboard/"
-cp vendor/srt-whiteboard/LICENSE vendor/srt-whiteboard/PINNED.md vendor/srt-whiteboard/VENDOR.md \
-   vendor/srt-whiteboard/README.md vendor/srt-whiteboard/SKILL.md \
-   vendor/srt-whiteboard/requirements.txt "$R/vendor/srt-whiteboard/"
-cp vendor/srt-whiteboard/scripts/*.py "$R/vendor/srt-whiteboard/scripts/"
-cp vendor/srt-whiteboard/assets/drawing-hand.png "$R/vendor/srt-whiteboard/assets/"
-cp vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
-   vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
-   "$R/vendor/srt-whiteboard/examples/"
-cp scripts/seed*.ts "$R/scripts/"  # 全部行业种子随包（按 .env.defaults DESKTOP_SEED_SCRIPT 选用）
-cp scripts/skill-bindings.mts "$R/scripts/"
-printf '%s\n' "$VERSION" > "$R/VERSION"
-
-# 3. 依赖与 web 构建产物（需在装配机先 pnpm install + build）
+# The allowlist assembler compiles the internal contract before copying it.
 if [ ! -d node_modules ] || [ ! -d apps/web/node_modules ]; then
   echo "→ pnpm install…"; pnpm install --frozen-lockfile
 fi
-if [ ! -f apps/web/dist/index.html ]; then
-  echo "→ 构建 web…"; pnpm -C apps/web build
-fi
+node scripts/product-runtime-assets.mjs copy "$R" --version "$VERSION"
+
+# 3. 依赖与 web 构建产物（需在装配机先 pnpm install + build）
+echo "→ 构建当前 web 源码…"; pnpm -C apps/web build
 copy apps/web/dist "$R/apps/web/dist"
 echo "→ 运行期依赖：受控 npm ci（darwin-${NODE_ARCH}，扁平实体目录）…"
 NM_STAGE="$STAGE/nm-pkg"
 NPM_REG="${NPM_REGISTRY:-https://registry.npmjs.org}"
 node scripts/runtime-deps-lock.mjs stage "$NM_STAGE" --os darwin --cpu "$NODE_ARCH" --registry "$NPM_REG"
 copy "$NM_STAGE/node_modules" "$R/node_modules"
-for built in packages/*/dist; do
-  [ -d "$built" ] || continue
-  copy "$built" "$R/$built"
-done
-node scripts/pack-workspace-modules.mjs "$R"
-find "$R/node_modules" -mindepth 2 -maxdepth 4 -type d -name node_modules -prune -exec rm -rf {} + 2>/dev/null || true
-for f in node_modules/tsx/package.json node_modules/hono/package.json scripts/migrate.ts \
-         scripts/product-runtime.mjs scripts/vite-product.mjs scripts/skill-bindings.mts product.manifest.json apps/web/vite.config.ts \
-         scripts/tools/full-chain-film.mts scripts/tools/film-voice-artifact.ts scripts/tools/compose-film.mts scripts/tools/explainer-run.mts \
-         scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
-         scripts/tools/enhance-engine-install.mjs scripts/whiteboard/lineart_tools.py \
-         assets/whiteboard/drawing-hand-workloom.png vendor/srt-whiteboard/LICENSE \
-         vendor/srt-whiteboard/requirements.txt vendor/srt-whiteboard/scripts/prepare_env.py \
-         vendor/srt-whiteboard/scripts/render_stream_whiteboard.py \
-         vendor/srt-whiteboard/scripts/stream_render.py vendor/srt-whiteboard/scripts/merge_scenes.py \
-         vendor/srt-whiteboard/scripts/render_annotation_preview.py \
-         vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
-         vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json; do
-  [ -f "$R/$f" ] || { echo "❌ 应急载荷自检失败：runtime/$f 缺失"; exit 1; }
+node scripts/product-runtime-assets.mjs install "$R"
+node scripts/product-runtime-assets.mjs preflight "$R" --platform darwin --arch "$NODE_ARCH"
+for f in product.manifest.json scripts/product-runtime.mjs scripts/vite-product.mjs scripts/migrate.ts \
+         apps/web/dist/index.html node_modules/tsx/package.json; do
+  [ -f "$R/$f" ] || { echo "❌ macOS 载荷自检失败：runtime/$f 缺失"; exit 1; }
 done
 node scripts/payload-policy.mjs assert-runtime "$R"
 

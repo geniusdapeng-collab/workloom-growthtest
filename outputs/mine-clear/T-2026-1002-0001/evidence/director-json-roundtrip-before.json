@@ -1,0 +1,16 @@
+{
+  "evidenceLevel": "B",
+  "dataMode": "real-postgres-before-json-fix",
+  "codeCommit": "35041db94f1c354e46973f38ca3b585067ba5f25",
+  "tests": 15,
+  "passed": 14,
+  "failed": 1,
+  "cases": [
+    {
+      "name": "director real PostgreSQL contracts frozen JSONB arrays roundtrip empty and populated media plans without changing their hash",
+      "failure": [
+        "AssertionError: expected {} to deeply equal []\n    at <workspace>/work/workloom-growthtest/apps/server/src/video/director.pg.test.ts:100:34\n    at processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at file://<dependency-workspace>/WorkLoom-growth/node_modules/.pnpm/@vitest+runner@4.1.11/node_modules/@vitest/runner/dist/chunk-artifact.js:1903:20"
+      ]
+    }
+  ]
+}

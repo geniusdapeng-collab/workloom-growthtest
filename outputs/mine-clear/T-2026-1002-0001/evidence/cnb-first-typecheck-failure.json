@@ -1,0 +1,8 @@
+{
+  "evidenceLevel": "B",
+  "sourceCommit": "af90809a5a09de5b406137701665d739f9c14e36",
+  "prMergeCommit": "4cbbed2112176128ab0dd75d6a1beb056ec525c0",
+  "buildUrl": "https://cnb.cool/workloom-ai/workloom-growthtest/-/build/logs/cnb-tho-1k3uas3vb",
+  "stage": "typecheck",
+  "failure": "Scope: 11 of 12 workspace projects\napps/webc typecheck$ tsc --noEmit\npackages/audit-engine typecheck$ tsc --noEmit\npackages/industry-contract typecheck$ tsc --noEmit\npackages/shared typecheck$ tsc --noEmit\npackages/industry-contract typecheck: Done\npackages/video-studio typecheck$ tsc --noEmit\napps/webc typecheck: Done\npackages/shared typecheck: Done\npackages/audit-engine typecheck: Done\npackages/video-studio typecheck: Done\npackages/db typecheck$ tsc --noEmit\npackages/db typecheck: Done\npackages/base typecheck$ tsc --noEmit\npackages/base typecheck: Done\npackages/runtime typecheck$ tsc --noEmit\npackages/runtime typecheck: Done\napps/server typecheck$ tsc --noEmit\napps/server typecheck: Done\napps/web typecheck$ tsc --noEmit\napps/webb typecheck$ tsc --noEmit\napps/webb typecheck: Done\napps/web typecheck: src/extensions/ai-video/pages/DirectorStudio.tsx(3,39): error TS2307: Cannot find module '@hyperreality/video-studio' or its corresponding type declarations.\napps/web typecheck: src/extensions/ai-video/pages/DirectorStudio.tsx(40,72): error TS7006: Parameter 't' implicitly has an 'any' type.\napps/web typecheck: src/extensions/ai-video/pages/DirectorStudio.tsx(155,53): error TS7006: Parameter 'n' implicitly has an 'any' type.\napps/web typecheck: Failed\n/workspace/apps/web:\n ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workloom/web@0.1.0 typecheck: `tsc --noEmit`\nExit status 1\n"
+}

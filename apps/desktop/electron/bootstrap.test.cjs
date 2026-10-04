@@ -276,7 +276,7 @@ describe("真实首日引导退出的渲染冒烟", () => {
 });
 
 describe("产品截图采用捕获时的可见场景", () => {
-  async function capture(states, captureState, sceneName = "workplace-3d") {
+  async function capture(states, captureState, sceneName = "workplace-3d", actorCount = 14) {
     const source = fs.readFileSync(path.join(__dirname, "main.cjs"), "utf8");
     const start = source.indexOf("  async function captureProductScene(sceneName, fileStem) {");
     const end = source.indexOf("\n  const workplaceScene = ", start);
@@ -285,14 +285,18 @@ describe("产品截图采用捕获时的可见场景", () => {
     let probes = 0;
     const context = {
       SAFE_RENDERING: false, logDir: "/isolated-scene", path, Buffer,
-      fs: { writeFileSync() {} }, report: { bundle: "ai-pm", actorCount: 14 },
-      Date: { now: () => elapsed },
+      fs: { writeFileSync() {} }, report: { bundle: "ai-pm", actorCount },
+      Date: class extends Date { constructor() { super(elapsed); } static now() { return elapsed; } },
+      collectProductScene: vm.runInNewContext(source.slice(source.indexOf("function collectProductScene(sceneName) {"), source.indexOf("\nasync function runRenderSmoke()")) + "\ncollectProductScene"),
       setTimeout: (resolve, milliseconds) => { elapsed += milliseconds; resolve(); },
       pixelHealth: () => ({ variance: 100, visibleRatio: 1 }),
       win: { webContents: {
         executeJavaScript: async () => {
           const state = states(elapsed, probes++);
-          return { ready: true, overlayVisible: false, actors: sceneName.startsWith("report-stage-") ? 15 : 14, labels: [],
+          return { ready: true, overlayVisible: false, actors: Math.min(actorCount, 18) + (sceneName.startsWith("report-stage-") ? 1 : 0),
+            totalActors: actorCount + (sceneName.startsWith("report-stage-") ? 1 : 0),
+            labels: [], nameplates: [], nameplateOverlaps: [], overlays: [], visibleRatio: 1,
+            rect: { x: 220, y: 140, width: 768, height: 440 }, viewport: { width: 1440, height: 872 },
             geometry: { scene: { width: 768, height: 440 }, canvas: { width: 768, height: 440 }, contextLost: false, ceoOverlapIds: [] }, ...state };
         },
         capturePage: async () => {
@@ -310,6 +314,17 @@ describe("产品截图采用捕获时的可见场景", () => {
     assert.equal(result.ready, true);
     assert.equal(result.overlayVisible, false);
     assert.equal(result.actors, 14);
+  });
+
+  it("分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人", async () => {
+    const workplace = await capture(() => ({}), undefined, "workplace-3d", 25);
+    assert.equal(workplace.actors, 18);
+    assert.equal(workplace.totalActors, 25);
+    const stage = await capture(() => ({}), undefined, "report-stage-3d", 25);
+    assert.equal(stage.actors, 19);
+    assert.equal(stage.totalActors, 26);
+    await assert.rejects(capture(() => ({ totalActors: 24 }), undefined, "workplace-3d", 25), /团队人数不完整/);
+    await assert.rejects(capture(() => ({ actors: 17 }), undefined, "workplace-3d", 25), /团队人数不完整/);
   });
 
   it("稳定等待中重新出现引导层时拒绝旧无遮挡状态", async () => {
@@ -705,6 +720,21 @@ describe("桌面 PostgreSQL 实例归属与端口契约", () => {
 });
 
 describe("桌面本机渲染子进程的 Node 路径", () => {
+  it("首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME", () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "workloom client 中文 -"));
+    try {
+      const bridge = path.join(root, "bundles", "ai-video", "connectors", "post-bridge");
+      fs.mkdirSync(bridge, { recursive: true });
+      fs.writeFileSync(path.join(bridge, "executor.ts"), 'export const POST_TOOLS = ["postread.plan", "postwrite.package"] as const;\nexport function createPostExecutor() {}\n// http://127.0.0.1:8199\n');
+      const result = buildDesktopEnvironment("LLM_MODEL=keep\n", {
+        pgPort: 55432, serverPort: 18787, webPort: 15173, adminPassword: "test-only",
+        appPassword: "test-only", gatewayPassword: "test-only", runtimeDir: root,
+      });
+      assert.ok(result.values.WORKLOOM_TOOL_EXECUTOR_MODULES.startsWith(path.join(bridge, "executor.ts")));
+      assert.ok(result.values.WORKLOOM_TOOL_EXECUTOR_MODULES.endsWith("#createPostExecutor#postread.*|postwrite.*#http://127.0.0.1:8199"));
+      assert.match(result.text, /^LLM_MODEL=keep$/mu);
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
+  });
   it("干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径", () => {
     const pathKey = process.platform === "win32" ? "Path" : "PATH";
     const inheritedPath = process.platform === "win32" ? "C:\\Windows\\System32" : "/usr/bin:/bin";
