@@ -7,7 +7,7 @@
  *
  * 口径：
  *  - 进程内轻量循环（默认 7s，`WORKLOOM_SCHEDULER_MS=0` 关闭；VPC 可关）；
- *  - 每轮扫描各工作区 queued 线程，按创建时间先进先出，遵守 L3.1 并发上限（running+queued 计入）；
+ *  - 每轮扫描各工作区 queued 线程，按创建时间先进先出，遵守 L3.1 执行并发上限（仅 running 计入）；
  *  - 选中的线程走 `runQuestForThread`（与派遣/续跑同一条装配路径；agent 模式跑到第一个 review 点挂起）；
  *  - 启动恢复：`running` 且超过 N 分钟无心跳的线程标 `paused`（可人工续跑），不做静默重放；
  *  - 单进程内同线程互斥（in-flight 集合），失败只落日志并把错误交给线程终态（runQuest 自己写 failed）。
@@ -66,13 +66,15 @@ async function nextQueuedThread(app: pg.Pool, scope: Scope): Promise<QueuedThrea
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+    await client.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+      JSON.stringify([scope.tenantId, scope.workspaceId, "execution-slots"]),
+    ]);
     // 与派遣入口同口径：只把「有近期心跳的 running」计入并发（僵尸 running 不占配额，见 N-15）
     const staleMin = Number(process.env.WORKLOOM_STALE_RUNNING_MIN ?? DEFAULT_STALE_RUNNING_MIN);
     const running = await client.query<{ c: string }>(
       `SELECT count(*) AS c FROM threads
         WHERE workspace_id=$1
-          AND (status='queued'
-               OR (status='running' AND updated_at > now() - ($2::text || ' minutes')::interval))`,
+          AND status='running' AND updated_at > now() - ($2::text || ' minutes')::interval`,
       [scope.workspaceId, String(Number.isFinite(staleMin) && staleMin > 0 ? staleMin : DEFAULT_STALE_RUNNING_MIN)],
     );
     if (Number(running.rows[0]?.c ?? 0) >= MAX_CONCURRENT_THREADS) {

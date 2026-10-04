@@ -199,8 +199,8 @@ export function LoomMate() {
   const [measuredBody, setMeasuredBody] = useState<{ key: string; width: number; height: number } | null>(null);
   const persistLocal = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
   const availableWidth = Math.max(96, viewport.width - railW - navW - 32);
-  const widgetW = size === "large" ? Math.min(480, availableWidth, Math.max(96, viewport.height - 64)) : Math.min(120, availableWidth);
-  const widgetH = size === "large" ? Math.min(viewport.height - 16, widgetW + 32) : Math.min(96, widgetW) + 32;
+  const widgetW = size === "large" ? Math.min(300, Math.round(viewport.height * 0.38), availableWidth) : Math.min(120, availableWidth);
+  const widgetH = size === "large" ? Math.round(widgetW * 1.17) : 170;
   const visibleMini = mini && open === "none";
   const bodyKey = `${visibleMini ? "mini" : "expanded"}:${size}:${widgetW}:${widgetH}`;
   const bodyW = visibleMini ? 64 : measuredBody?.key === bodyKey ? measuredBody.width : widgetW;
@@ -298,6 +298,7 @@ export function LoomMate() {
   const [celebrate, setCelebrate] = useState<SettledTaskNotice | null>(null);
   const [wandPhase, setWandPhase] = useState<"rise" | "point" | "smile">("rise");
   const celebrateTimers = useRef<number[]>([]);
+  const miniBeforeNotice = useRef<boolean | undefined>(undefined);
   const announceTask = useCallback((task: SettledTaskNotice) => {
     celebrateTimers.current.forEach((t) => window.clearTimeout(t));
     celebrateTimers.current = [];
@@ -320,7 +321,11 @@ export function LoomMate() {
         // 指向右栏：让对应的任务完成卡片发光，视线与魔法棒落到同一处
         window.dispatchEvent(new CustomEvent("workloom:notify-highlight", { detail: { threadId: task.threadId } }));
       }, 1500),
-      window.setTimeout(() => setCelebrate(null), 9000),
+      window.setTimeout(() => {
+        setCelebrate(null);
+        if (miniBeforeNotice.current !== undefined) setMini(miniBeforeNotice.current);
+        miniBeforeNotice.current = undefined;
+      }, 9000),
     );
   }, [personaName, settings?.voice_key]);
   useEffect(() => {
@@ -500,6 +505,7 @@ export function LoomMate() {
       setPos((current) => current ? clampPos(current.x, current.y) : current);
     };
     const reset = () => {
+      miniBeforeNotice.current = undefined;
       try {
         localStorage.removeItem("loommate.pos");
         localStorage.removeItem("loommate.hidden");
@@ -512,6 +518,7 @@ export function LoomMate() {
       setInboxOpen(false);
     };
     const setVisibility = (event: Event) => {
+      miniBeforeNotice.current = undefined;
       const action = (event as CustomEvent<"show" | "hide" | "toggle">).detail;
       if (action === "show") {
         setHidden(false);
@@ -768,6 +775,7 @@ export function LoomMate() {
   return (
     <div
       {...mateSurface}
+      data-loommate-display={mini && open === "none" ? "mini" : "expanded"}
       data-loommate-mode={visibleMini ? "mini" : "expanded"} data-loommate-dock={docked} data-loommate-anchor={pos ? "positioned" : "default"}
       className={`pointer-events-none flex flex-col gap-2 ${docked === "left" ? "items-start" : "items-end"}`}
       style={{ fontFamily: "inherit", width: bodyW, ...rootStyle }}
@@ -828,7 +836,7 @@ export function LoomMate() {
         <div ref={bodyRef} className="relative">
           <div className="absolute bottom-full right-0 mb-1.5">{inboxEntry}</div>
           <button
-            onClick={() => { setMini(false); persistLocal("loommate.mini", "0"); }}
+            onClick={() => { miniBeforeNotice.current = undefined; setMini(false); persistLocal("loommate.mini", "0"); }}
             title={loomBallEnabled ? `展开${personaName}（班组${systemEmotionText}）` : `展开${personaName}`}
             data-loommate-emotion={loomBallEnabled ? String(systemEmotion) : undefined}
             data-loommate-signal={loomBallEnabled ? JSON.stringify(systemSignal) : undefined}
@@ -957,7 +965,7 @@ export function LoomMate() {
             className="rounded-full border border-line bg-bg900/90 px-1.5 py-0.5 text-body text-ink2 opacity-70 shadow hover:text-ink hover:opacity-100">
             {MODE_LABEL[size] ?? "变大"}
           </button>
-          <button onClick={() => { setMini(true); persistLocal("loommate.mini", "1"); }} title="收起为小球（不挡界面）"
+          <button onClick={() => { miniBeforeNotice.current = undefined; setMini(true); persistLocal("loommate.mini", "1"); }} title="收起为小球（不挡界面）"
             className="rounded-full border border-line bg-bg900/90 px-1.5 py-0.5 text-body text-ink2 opacity-70 shadow hover:text-ink hover:opacity-100">
             收起
           </button>

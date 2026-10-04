@@ -2,10 +2,11 @@
 /** One source allowlist for Electron, macOS ZIP and Windows ZIP payloads. */
 import { execFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
-import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, realpathSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assertRuntimePayloadBoundary, loadPayloadPolicy } from "./payload-policy.mjs";
+import { registerWorkspaceModules } from "./pack-workspace-modules.mjs";
 
 const ROOT=path.resolve(path.dirname(fileURLToPath(import.meta.url)),"..");
 const TOP_FILES=new Set(["package.json","pnpm-workspace.yaml","tsconfig.base.json",".env.example","product.manifest.json"]);
@@ -36,51 +37,113 @@ function inventory(root) {
     {cwd:root,encoding:"utf8",maxBuffer:16*1024*1024}).split("\0").filter(Boolean))].sort();}
   catch(error) {throw new Error("装配必须从可追溯 Git 工作区读取源码清单",{cause:error});}
 }
+function inside(root,candidate) {
+  const relative=path.relative(root,candidate);
+  return relative===""||relative!==".."&&!relative.startsWith(`..${path.sep}`)&&!path.isAbsolute(relative);
+}
+// Resolve the existing ancestor as well as a not-yet-created suffix. Checking
+// only the final file misses links in parents and allows mkdir/compiler writes
+// to escape before a copied file is inspected.
+function canonicalPath(candidate,label) {
+  const suffix=[];
+  let ancestor=path.resolve(candidate);
+  while(!lstatSync(ancestor,{throwIfNoEntry:false})) {
+    suffix.unshift(path.basename(ancestor));
+    const parent=path.dirname(ancestor);
+    if(parent===ancestor) throw new Error(`${label}路径没有可解析的父目录：${candidate}`);
+    ancestor=parent;
+  }
+  try {return path.resolve(realpathSync(ancestor),...suffix);}
+  catch(error) {throw new Error(`${label}路径包含无效链接：${candidate}`,{cause:error});}
+}
+function assertContained(root,candidate,label) {
+  if(!inside(root,canonicalPath(candidate,label))) throw new Error(`${label}路径越界：${candidate}`);
+}
 function safeTarget(root,ref) {
   const file=path.resolve(root,...ref.split("/"));
-  if(!file.startsWith(path.resolve(root)+path.sep)) throw new Error(`载荷路径越界：${ref}`);
+  if(file===root||!inside(root,file)) throw new Error(`载荷路径越界：${ref}`);
   return file;
+}
+function sourceFile(root,ref,{optional=false}={}) {
+  const file=safeTarget(root,ref);
+  assertContained(root,file,"源码");
+  const info=lstatSync(file,{throwIfNoEntry:false});
+  if(!info&&optional) return null; // deleted tracked files are absent in this revision
+  if(!info?.isFile()||info.isSymbolicLink()) throw new Error(`源码载荷不接受符号链接或特殊文件：${ref}`);
+  return {file,info};
+}
+function targetFile(root,ref,{createParent=false}={}) {
+  const file=safeTarget(root,ref);
+  assertContained(root,file,"目标");
+  if(createParent) {
+    mkdirSync(path.dirname(file),{recursive:true});
+    assertContained(root,file,"目标");
+  }
+  if(lstatSync(file,{throwIfNoEntry:false})?.isSymbolicLink()) throw new Error(`目标文件不接受符号链接：${ref}`);
+  return file;
+}
+function validateCompilerOutput(root,directory) {
+  assertContained(root,directory,"源码");
+  const info=lstatSync(directory,{throwIfNoEntry:false});
+  if(!info) return;
+  if(info.isSymbolicLink()) throw new Error(`源码编译目录不接受符号链接：${directory}`);
+  if(info.isDirectory()) {
+    for(const entry of readdirSync(directory)) validateCompilerOutput(root,path.join(directory,entry));
+  } else if(!info.isFile()) throw new Error(`源码编译目录不接受特殊文件：${directory}`);
 }
 function digest(file) {return createHash("sha256").update(readFileSync(file)).digest("hex");}
 
 export function copyRuntimeSources(root,destination,{version="v0.0.0"}={}) {
-  root=path.resolve(root);destination=path.resolve(destination);
-  if(destination===root || root.startsWith(destination+path.sep)) throw new Error("载荷目标不得覆盖源码工作区");
+  root=realpathSync(path.resolve(root));destination=canonicalPath(destination,"目标");
+  if(inside(destination,root)) throw new Error("载荷目标不得覆盖源码工作区");
+  if(SOURCE_PREFIXES.some(prefix=>inside(path.resolve(root,prefix),destination)))
+    throw new Error("载荷目标不得位于源码目录内");
+  sourceFile(root,"product.manifest.json");
+  sourceFile(root,"packages/industry-contract/tsconfig.json");
+  const contractDist=path.join(root,"packages/industry-contract/dist");
+  validateCompilerOutput(root,contractDist);
+  const policy=loadPayloadPolicy(root);
+  const files=inventory(root).filter(ref=>isRuntimeSource(ref,policy));
+  // Validate the entire source/copy/derived-output plan before starting the
+  // compiler or creating a destination, including existing output symlinks.
+  for(const ref of files) {sourceFile(root,ref,{optional:true});targetFile(destination,ref);}
+  for(const ref of [".env.defaults","VERSION","RUNTIME_ASSETS.json","vendor/supermickey/package.json"])
+    targetFile(destination,ref);
+  targetFile(destination,"packages/industry-contract/dist/index.js");
+  targetFile(destination,"packages/industry-contract/dist/index.d.ts");
   const compiler=path.join(root,"node_modules/typescript/bin/tsc");
   if(!existsSync(compiler)) throw new Error("装配缺少 TypeScript 构建器，请先安装工作区依赖");
   execFileSync(process.execPath,[compiler,"-p","packages/industry-contract/tsconfig.json"],{cwd:root,timeout:120_000,stdio:"pipe"});
-  const policy=loadPayloadPolicy(root);
-  const files=inventory(root).filter(ref=>isRuntimeSource(ref,policy));
+  validateCompilerOutput(root,contractDist);
   mkdirSync(destination,{recursive:true});
+  assertContained(destination,destination,"目标");
   const receipts=[];
   for(const ref of files) {
-    const source=safeTarget(root,ref),target=safeTarget(destination,ref);
-    if(!existsSync(source)) continue; // deleted tracked files are absent in this revision
-    const info=lstatSync(source);
-    if(!info.isFile()||info.isSymbolicLink()) throw new Error(`源码载荷不接受符号链接或特殊文件：${ref}`);
-    mkdirSync(path.dirname(target),{recursive:true});cpSync(source,target);
+    const input=sourceFile(root,ref,{optional:true});
+    if(!input) continue;
+    const {file:source,info}=input,target=targetFile(destination,ref,{createParent:true});
+    cpSync(source,target);
     receipts.push({path:ref,sha256:digest(target),bytes:info.size});
   }
   // The industry contract exports generated JS and declarations, even though its
   // source package is copied as TS. An import probe must see the same build as CI.
-  const contractDist=path.join(root,"packages/industry-contract/dist");
   if(!existsSync(path.join(contractDist,"index.js"))||!existsSync(path.join(contractDist,"index.d.ts")))
     throw new Error("载荷缺少 industry-contract 构建产物；请先构建 packages/industry-contract");
   for(const entry of readdirSync(contractDist,{withFileTypes:true})) {
     if(!entry.isFile()||!/(?:\.js|\.d\.ts)$/u.test(entry.name)) continue;
-    const ref=`packages/industry-contract/dist/${entry.name}`,source=path.join(contractDist,entry.name),target=safeTarget(destination,ref);
-    mkdirSync(path.dirname(target),{recursive:true});cpSync(source,target);
-    receipts.push({path:ref,sha256:digest(target),bytes:lstatSync(source).size,origin:"compiled-internal-contract"});
+    const ref=`packages/industry-contract/dist/${entry.name}`,{file:source,info}=sourceFile(root,ref),target=targetFile(destination,ref,{createParent:true});
+    cpSync(source,target);
+    receipts.push({path:ref,sha256:digest(target),bytes:info.size,origin:"compiled-internal-contract"});
   }
   if(!existsSync(path.join(destination,".env.example"))) throw new Error("载荷缺少无凭据的默认配置模板");
-  cpSync(path.join(destination,".env.example"),path.join(destination,".env.defaults"));
-  writeFileSync(path.join(destination,"VERSION"),`${version}\n`);
+  cpSync(targetFile(destination,".env.example"),targetFile(destination,".env.defaults"));
+  writeFileSync(targetFile(destination,"VERSION"),`${version}\n`);
   // The upstream systems/ folder contains CommonJS .js files but no package
   // boundary. Make its existing syntax explicit in the derived payload only.
   const vendor=path.join(destination,"vendor/supermickey");
-  if(existsSync(vendor)&&!existsSync(path.join(vendor,"package.json"))) writeFileSync(path.join(vendor,"package.json"),
+  if(existsSync(vendor)&&!existsSync(path.join(vendor,"package.json"))) writeFileSync(targetFile(destination,"vendor/supermickey/package.json"),
     JSON.stringify({name:"workloom-vendored-supermickey",private:true,type:"commonjs"})+"\n");
-  writeFileSync(path.join(destination,"RUNTIME_ASSETS.json"),JSON.stringify({schemaVersion:"workloom.runtime-assets/v1",
+  writeFileSync(targetFile(destination,"RUNTIME_ASSETS.json"),JSON.stringify({schemaVersion:"workloom.runtime-assets/v1",
     productId:policy.productId,manifestSha256:policy.manifestSha256,version,files:receipts},null,2)+"\n");
   assertRuntimePayloadBoundary(destination,policy);
   return {productId:policy.productId,files:receipts.length};
@@ -89,19 +152,9 @@ export function copyRuntimeSources(root,destination,{version="v0.0.0"}={}) {
 /** Only copied internal packages lose their node_modules. External npm nesting is preserved. */
 export function installInternalPackages(runtimeRoot) {
   const runtime=path.resolve(runtimeRoot),policy=loadPayloadPolicy(runtime);
-  const roots=readdirSync(path.join(runtime,"packages"),{withFileTypes:true}).filter(e=>e.isDirectory())
-    .map(e=>path.join(runtime,"packages",e.name));
-  if(policy.includePlatformOps) roots.push(path.join(runtime,"platform-ops"));
-  const names=[];
-  for(const source of roots) {
-    const manifest=path.join(source,"package.json");if(!existsSync(manifest)) continue;
-    const {name}=JSON.parse(readFileSync(manifest,"utf8"));
-    if(typeof name!=="string"||!/^(@[a-z0-9_.-]+\/)?[a-z0-9_.-]+$/iu.test(name)) throw new Error("内部包名非法");
-    const target=safeTarget(runtime,`node_modules/${name}`);
-    rmSync(target,{force:true,recursive:true});mkdirSync(path.dirname(target),{recursive:true});
-    cpSync(source,target,{recursive:true,dereference:false,filter:file=>!path.relative(source,file).split(path.sep).includes("node_modules")});
-    names.push(name);
-  }
+  // Keep canonical source paths and singleton state. Physical ESM entry files
+  // survive Windows extraction without symlinks; external npm nesting stays intact.
+  const names=registerWorkspaceModules(runtime);
   assertRuntimePayloadBoundary(runtime,policy);return names;
 }
 

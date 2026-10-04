@@ -224,7 +224,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "a8bd61ae5ca205f066ca1d78f11667a0794264f6fc1bdbfb5f37c70213ade5a5",
+    "digest": "67e52ee2f34cc9ea83e7c056cc8d9e859b8ee406ccda898bb9420781e3959593",
     "assets": {
       "eval/questions.json": "49e7b69803ac4c398b812e93758d136332c9312041d894ca7b74a8a1623e7993",
       "fences/geo-growth-baseline.yml": "4a06d0a472be51a3e8922bc77e8834ef9f1f31e752b4ef3d345058ca908970c7",
@@ -262,7 +262,7 @@
       "presets/visibility-watcher.yml": "05e59d7d7bfd329011cb18245938c4d37633838ce194487da69b5c4438b0b501",
       "presets/visual-designer.yml": "8d02b6660eff1114f994959fc4432abda97bf420bfcc23cac9f57039d3c6014e",
       "schemas/archive.schema.json": "ad08672042078f5d8a2376f855e0fe936454048fb0e4cc421d5b8082ad4e2200",
-      "schemas/objects.json": "1c7330962d407572f9df3557bb61ebddb0ddd0179a1820f411b28ee51d733020",
+      "schemas/objects.json": "56a7fd4260455e7ad73ca0dbc0f6f6bb630f6f5131e2042f14c86e5e5eae66dc",
       "schemas/stages.json": "dbb994a399bcfe9ea34fbeacda92a13bfdebb8caeef4f74960faf4461a447c93",
       "service-front/client.json": "b30a525b9a398631aeb8410e2638f7085cd86c3e8ce914b1245a06fcef536cca",
       "skills/ai-answer-rewrite/SKILL.md": "ff70313de2c4488931aac01a09bb5c58ba6a0c4abdfcd63f41e97571f86b7610",

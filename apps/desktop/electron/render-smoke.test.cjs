@@ -24,6 +24,8 @@ async function runFixture(options = {}) {
     },
   });
   let transition = 0;
+  let guideTime = 0;
+  const actorCount = options.actorCount ?? 14;
   const rect = { x: 220, y: 140, width: 768, height: 440 };
   const canvasRect = { ...rect, height: options.shortCanvas ? 150 : 440 };
   const telemetry = { backend: "live2d-webgl", mouthPeak: 0.5, lipStarts: 1, blinkCount: 1, gestureCount: 1, parameterWrites: 3, parameterWriteFailures: 0 };
@@ -48,20 +50,22 @@ async function runFixture(options = {}) {
           ];
           return stages[Math.min(transition++, stages.length - 1)];
         }
-        if (code.includes("data-ceremony-ready")) return { ready: true, mode: "vector2d", actors: 15 };
+        if (code.includes("data-ceremony-ready")) return { ready: true, mode: "vector2d", actors: actorCount + 1 };
         if (code.includes("data-product-scene=")) {
           const sceneName = code.includes("report-stage") ? "stage" : "workplace";
           const count = (sceneQueries.get(sceneName) || 0) + 1;
           sceneQueries.set(sceneName, count);
-          const actors = sceneName === "stage" ? 15 : 14;
+          const actors = sceneName === "stage" ? Math.min(actorCount, 18) + 1 : Math.min(actorCount, 18);
+          const totalActors = (options.totalActorCount ?? actorCount) + (sceneName === "stage" ? 1 : 0);
           const canvas = {
             getBoundingClientRect: () => canvasRect,
             width: options.canvasResizes ? (count === 1 ? 300 : 1536) : 768,
             height: options.canvasResizes ? (count === 1 ? 150 : 880) : canvasRect.height,
+            getContext: () => ({ isContextLost: () => false, drawingBufferWidth: 768, drawingBufferHeight: canvasRect.height }),
           };
           const scene = {
             getBoundingClientRect: () => rect,
-            getAttribute: (name) => name.includes("actors") ? String(actors) : null,
+            getAttribute: (name) => name.includes("total-actors") ? String(totalActors) : name.includes("actors") ? String(actors) : null,
             matches: () => false,
             querySelector: () => canvas,
             style: {}, parentElement: null,
@@ -98,7 +102,9 @@ async function runFixture(options = {}) {
           // Execute the real DOM probe so late layout/bitmap changes are measured by production code.
           const probe = vm.runInNewContext(code, {
             document: {
-              querySelector: () => options.vanishedScene && count > 1 ? null : scene,
+              querySelector: (selector) => selector.includes("data-product-scene=")
+                ? options.vanishedScene && count > 1 ? null : scene
+                : options.covered ? overlay : null,
               querySelectorAll: () => options.covered ? [overlay] : [],
               elementFromPoint: () => options.covered ? overlay : scene,
             },
@@ -108,8 +114,9 @@ async function runFixture(options = {}) {
           sceneProbes.push({ sceneName, count, probe: JSON.parse(JSON.stringify(probe)) });
           return probe;
         }
-        if (code.includes("data-product-ready")) return { productReady: true, avatarReady: true, actorCount: 14, bundle: "ai-pm", renderMode: "live2d-webgl", ceremonyMode: "vector2d", webgl: true };
-        if (code.includes("data-questline-overlay")) return { open: false, dismissed: false };
+        if (code.includes("data-product-ready")) return { productReady: true, avatarReady: true, actorCount, bundle: "ai-pm", renderMode: "live2d-webgl", ceremonyMode: "vector2d", webgl: true };
+        if (code.includes("data-questline-overlay")) return { shown: false, clicked: false, supported: false };
+        if (code.includes("data-loommate-display")) return code.includes("!document.querySelector") ? true : { expandedBefore: false, clicked: false, action: null };
         if (code.includes("overlay:")) return { overlay: false };
         if (code.includes("requestAnimationFrame")) return true;
         return true;
@@ -123,8 +130,14 @@ async function runFixture(options = {}) {
     process: { env: { WORKLOOM_PORT_OFFSET: "0", WORKLOOM_SUPPORT_DIR: "/fixture" }, argv: [], platform: "darwin", arch: "arm64" },
     __dirname, __filename: path.join(__dirname, "main.cjs"), __fixtureWindow: nativeWindow,
     require: (name) => {
-      if (name === "electron") return { app };
+      if (name === "electron") return { app, ipcMain: { handle: () => {} } };
       if (name === "./bootstrap.cjs") return {};
+      if (name === "./render-smoke.cjs") {
+        const actual = require(path.join(__dirname, name));
+        return { ...actual, dismissFirstDayGuide: (probe) => actual.dismissFirstDayGuide(probe, {
+          now: () => guideTime, pause: async (milliseconds) => { guideTime += milliseconds; },
+        }) };
+      }
       if (name === "node:fs") return { mkdirSync: () => {}, writeFileSync: (file, data) => writes.set(file, data) };
       if (name.startsWith("./")) return require(path.join(__dirname, name));
       return require(name);
@@ -143,6 +156,14 @@ async function runFixture(options = {}) {
 test("native smoke accepts a visible, full-height, nonblank product scene", async () => {
   const result = await runFixture();
   assert.ok(result.writes.size > 0);
+});
+
+test("native smoke retains the AI product manager's fixed 14-person composition check", async () => {
+  await assert.rejects(runFixture({ actorCount: 25 }), /编制应为 14 人/);
+});
+
+test("native smoke rejects a truncated paginated roster even when the first page is full", async () => {
+  await assert.rejects(runFixture({ totalActorCount: 13 }), /团队人数不完整/);
 });
 
 test("native smoke rejects a canvas that renders only the top 150px of a 440px scene", async () => {
@@ -198,7 +219,7 @@ test("native smoke keeps 19 keyboard entries but counts only the one actually vi
   assert.equal(report.hiddenLabels.length, 18);
   assert.deepEqual(report.labelCounts, { all: 19, visible: 1, hidden: 18 });
   assert.equal(report.nameplates.filter((plate) => !plate.visible && plate.reasons.includes("opacity-zero")).length, 18);
-  assert.equal(fixture.sceneProbes.length, 4, "both actual initial and settled probes execute for both scenes");
+  assert.equal(fixture.sceneProbes.length, 6, "actual initial, settled-before-capture and post-capture probes execute for both scenes");
   for (const sample of fixture.sceneProbes.filter((sample) => sample.sceneName === "workplace")) {
     assert.deepEqual(sample.probe.labelCounts, { all: 19, visible: 1, hidden: 18 });
   }

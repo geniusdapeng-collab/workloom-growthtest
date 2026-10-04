@@ -121,6 +121,7 @@ export function useQuestline({ ready, facts, content = QUESTLINE }: UseQuestline
   stateRef.current = state;
   /** 上一次已记账的状态：用于在 updater 之外做"差异 → 埋点/庆祝"（StrictMode 安全） */
   const bookedRef = useRef<QuestState | null>(null);
+  const automaticallyOpened = useRef(false);
   const factsKey = useMemo(() => [
     facts.goalConfirmed ? "g" : "-",
     facts.dispatched ? "d" : "-",
@@ -144,10 +145,11 @@ export function useQuestline({ ready, facts, content = QUESTLINE }: UseQuestline
 
   /* ---------- 起跑：欢迎仪式结束后自动开始（已完成则不再自动弹） ---------- */
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || automaticallyOpened.current) return;
     // 完成态只在 HUD 提供"重播"入口；自动弹层只服务"还没走完"的客户，
     // 否则每次进首页都会被引导层拦一次（审计 S1）。
     if (stateRef.current.status === "completed") return;
+    automaticallyOpened.current = true;
     setState((current) => startQuestline(current));
     setOpen(true);
     // 仅以 ready 是否到位的边沿触发

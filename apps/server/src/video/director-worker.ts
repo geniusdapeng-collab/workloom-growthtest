@@ -154,9 +154,10 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
             {id:job.created_by,type:"human"},{identityAssetRefs:identities.map(a=>a.id),maxBudgetCny:budget}));
           progress={...progress,imageApiCalls:null,imageApiCallEvidence:"preproduction-ledger",preproductionRunId:runId};
           startRun(scope,{projectId:job.project_id,allocatedRunId:runId,creativeDelegation:delegation,deliveryTargetPlan:filmPlan.deliveryTargetPlan,
+            directorIdentityImages:identities.map(a=>a.path),
             rawIntent:filmPlan.intent,intent:filmPlan.intent+`\n本次共享镜头池固定 ${filmPlan.shots.length} 镜，镜号、完整台词和角色动作不得增删。`
               +"\n冻结导演方案，按此制作："+JSON.stringify(filmPlan),
-            metadata:{creativeMode:"director_auto",directorFilmPlan:filmPlan,directorIdentityImages:identities.map(a=>a.path),maxBudgetCny:budget}});
+            metadata:{creativeMode:"director_auto",directorFilmPlan:filmPlan,maxBudgetCny:budget}});
           while(true) {
             await checkpoint("制作共享镜头方案",{preproductionRunId:runId});
             const run=getRun(runId,scope.workspaceId);

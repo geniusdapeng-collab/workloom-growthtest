@@ -11,6 +11,8 @@ const safeId = (value) => nonempty(value) && /^[A-Za-z0-9_-]+$/.test(value);
 const suitePath = (value) => typeof value === 'string' && /^acceptance\/outcomes\/[A-Za-z0-9_-]+\.ya?ml$/.test(value);
 const field = (value) => nonempty(value) && value.split('.').every((part) => /^[A-Za-z0-9_]+$/.test(part) && !['__proto__', 'prototype', 'constructor'].includes(part));
 const resultComparison = (value) => object(value) && (Object.hasOwn(value, 'equals') || nonempty(value.contains) || (Number.isSafeInteger(value.minLength) && value.minLength > 0));
+const repository = (value) => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)+$/.test(value);
+const fullCommit = (value) => typeof value === 'string' && /^[0-9a-f]{40}$/.test(value) && !/^0+$/.test(value);
 
 export function validateProfileContract(raw, { manifest, bundleExists = false, presetKeys = new Set(), suiteEntries = [], instanceRepository = null, instanceSlug = null } = {}) {
   const errors = []; const warnings = [];
@@ -23,12 +25,21 @@ export function validateProfileContract(raw, { manifest, bundleExists = false, p
   fail(nonempty(raw.primaryBundle) && raw.primaryBundle === manifest?.defaultBundle, 'primaryBundle 必须与 product.manifest.defaultBundle 一致');
   fail(bundleExists, 'primaryBundle 指向的本仓 Bundle 不存在');
   fail(['simulated', 'real'].includes(raw.dataMode), 'dataMode 必须显式为 simulated/real');
-  if (raw.repositoryInstance !== undefined) {
+  if (raw.repositoryInstance !== undefined || raw.isolation !== undefined) {
     const prefix = String(manifest?.repository ?? '').split('/')[0];
     // instanceSlug remains an explicit legacy unit-test input; the CLI always supplies full identity.
     const actualRepository = instanceRepository === null && nonempty(instanceSlug) ? `${prefix}/${instanceSlug}` : instanceRepository;
-    fail(nonempty(actualRepository) && raw.repositoryInstance === actualRepository, 'repositoryInstance 必须绑定实际隔离仓实例');
-    fail(raw.isolation?.isolated === true && raw.isolation?.sourceProductRepository === manifest?.repository, 'isolation 必须披露隔离及冻结的源产品 repository，不得改写产品 manifest');
+    fail(nonempty(actualRepository) && nonempty(raw.repositoryInstance) && raw.repositoryInstance === actualRepository, 'repositoryInstance 必须绑定实际隔离仓实例');
+    const isolation = object(raw.isolation) ? raw.isolation : {};
+    fail(isolation.isolated === true && repository(isolation.sourceProductRepository), 'isolation 必须披露隔离及规范的冻结源产品 repository');
+    // Legacy copies keep their source manifest. A reviewed local adoption must
+    // bind this product to its actual instance while preserving the original pin.
+    const adoptionDeclared = ['adoptedProductRepository', 'sourceProductCommit', 'preserveSourceLineage'].some((key) => Object.hasOwn(isolation, key));
+    if (adoptionDeclared || isolation.sourceProductRepository !== manifest?.repository) {
+      fail(isolation.adoptedProductRepository === manifest?.repository && isolation.adoptedProductRepository === raw.repositoryInstance && isolation.adoptedProductRepository === actualRepository, 'isolation.adoptedProductRepository 必须同时绑定本产品 manifest 与实际隔离仓实例');
+      fail(repository(isolation.sourceProductRepository) && isolation.sourceProductRepository !== isolation.adoptedProductRepository && fullCommit(isolation.sourceProductCommit), 'isolation 必须保留不同的冻结源产品 repository 与完整 sourceProductCommit');
+      fail(isolation.preserveSourceLineage === true, 'isolation.preserveSourceLineage 必须显式保留来源谱系；采用本仓身份不解除隔离');
+    }
   }
 
   const environment = object(raw.environment) ? raw.environment : {};

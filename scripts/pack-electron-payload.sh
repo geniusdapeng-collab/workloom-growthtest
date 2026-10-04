@@ -161,7 +161,7 @@ fi
 #      DMG 带着残缺载荷照出——装配脚本必须自证完整，防"静默半成品"） ----------
 for f in runtime/node_modules/tsx/package.json runtime/node_modules/hono/package.json \
          runtime/scripts/migrate.ts runtime/scripts/product-runtime.mjs runtime/scripts/vite-product.mjs \
-         runtime/scripts/tools/full-chain-film.mts runtime/scripts/tools/compose-film.mts \
+         runtime/scripts/tools/full-chain-film.mts runtime/scripts/tools/film-voice-artifact.ts runtime/scripts/tools/compose-film.mts \
          runtime/scripts/tools/explainer-run.mts runtime/scripts/tools/whiteboard-film.mts \
          runtime/scripts/tools/whiteboard-env-install.mts runtime/scripts/tools/enhance-engine-install.mjs \
          runtime/scripts/whiteboard/lineart_tools.py runtime/assets/whiteboard/drawing-hand-workloom.png \
@@ -173,7 +173,7 @@ for f in runtime/node_modules/tsx/package.json runtime/node_modules/hono/package
          runtime/vendor/srt-whiteboard/scripts/render_annotation_preview.py \
          runtime/vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.png \
          runtime/vendor/srt-whiteboard/examples/scene-01-monkey-mountain-banana.annotation.json \
-         runtime/product.manifest.json runtime/apps/web/vite.config.ts; do
+         runtime/scripts/skill-bindings.mts runtime/product.manifest.json runtime/apps/web/vite.config.ts; do
   [ -f "$OUT/$f" ] || { echo "❌ 载荷自检失败：$f 缺失"; exit 1; }
 done
 # 种子脚本按仓各异（seed-aipm/seed-trading/seed-video…），存在其一即可

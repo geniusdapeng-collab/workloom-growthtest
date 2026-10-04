@@ -90,6 +90,25 @@ function storedResult(event: StoredEvent): ToolResult {
   };
 }
 
+function executionEvents(events: StoredEvent[], stepIds: string[] = ["s1"]): StoredEvent[] {
+  assert.equal(events.length, stepIds.length * 2, "每次实际执行必须保留开始事件和最终回执");
+  assert.deepEqual(events.map((event) => [event.payload.decision.kind, event.payload.decision.step_id]),
+    stepIds.flatMap((id) => [["execution_started", id], ["execute", id]]));
+  const finals: StoredEvent[] = [];
+  for (let index = 0; index < events.length; index += 2) {
+    const started = events[index]!, final = events[index + 1]!;
+    assert.equal(started.payload.receipt?.synced, false, "开始事件不是完成回执");
+    for (const field of ["action", "tool", "step_id", "fingerprint"] as const) {
+      assert.equal(started.payload.decision[field], final.payload.decision[field], `开始和最终事件的 ${field} 必须一致`);
+    }
+    assert.deepEqual(started.payload.decision.params, final.payload.decision.params);
+    assert.equal(started.payload.context.tenant_id, final.payload.context.tenant_id);
+    assert.equal(started.payload.context.workspace_id, final.payload.context.workspace_id);
+    finals.push(final);
+  }
+  return finals;
+}
+
 async function appendFixture(scope: Scope, threadId: string, out: ToolResult): Promise<void> {
   await gatewayAppend(gateway, { ...scope, actor: { id: "system", type: "system" }, sessionId: threadId }, {
     who: { id: "system", type: "system" },
@@ -140,25 +159,37 @@ try {
   for (const result of results) assert.deepEqual({ status: result.status, done: result.stepsDone, unverified: result.unverified }, { status: "completed", done: 1, unverified: [] });
   const [eventsA, eventsB, eventsD] = await Promise.all([threadEvents(scopeA, threadA), threadEvents(scopeB, threadB), threadEvents(scopeD, threadD)]);
   for (const [scope, threadId, events] of [[scopeA, threadA, eventsA], [scopeB, threadB, eventsB], [scopeD, threadD, eventsD]] as const) {
-    assert.equal(events.length, 1);
-    const out = storedResult(events[0]!);
+    const final = executionEvents(events)[0]!;
+    const out = storedResult(final);
     assert.equal(out.receipt.mode, "simulated");
     assert.equal(toolResultVerified(out, { ...scope, threadId, stepId: "s1", fingerprint: stepFingerprint(step) }, step.tool, params), true);
-    assert.notEqual((events[0]!.payload.decision.params as { contact: string }).contact, params.contact, "网关必须脱敏事件参数，replay 应核对持久计划原始摘要");
+    assert.notEqual((final.payload.decision.params as { contact: string }).contact, params.contact, "网关必须脱敏事件参数，replay 应核对持久计划原始摘要");
   }
-  pass("partial-bridge-simulation-and-parallel-isolation", { threads: [threadA, threadB, threadD], modes: ["simulated", "simulated", "simulated"], boundEvents: 3 });
+  pass("partial-bridge-simulation-and-parallel-isolation", { threads: [threadA, threadB, threadD], modes: ["simulated", "simulated", "simulated"], boundEvents: 3, startedEvents: 3, totalEvents: 6 });
 
-  const replay = await runQuest(app, gateway, scopeA, input(threadA, executorA));
+  let completedReplayCalls = 0;
+  const completedReplayExecutor: ToolExecutor = async () => {
+    completedReplayCalls += 1;
+    throw new Error("completed replay must not execute a tool");
+  };
+  const replay = await runQuest(app, gateway, scopeA, {
+    ...input(threadA, completedReplayExecutor),
+    fallbackPlanner: () => { throw new Error("completed replay must not replan"); },
+  });
   assert.equal(replay.status, "completed");
-  assert.equal(replay.planReused, true);
-  assert.equal((await threadEvents(scopeA, threadA)).length, 1);
-  pass("replay-is-idempotent-after-pii-masking", { threadId: threadA, stepsDone: replay.stepsDone, eventCount: 1 });
+  assert.equal(replay.stepsDone, 1);
+  assert.equal(replay.stepsTotal, 1);
+  assert.equal(completedReplayCalls, 0);
+  const replayEvents = await threadEvents(scopeA, threadA);
+  executionEvents(replayEvents);
+  assert.deepEqual(replayEvents, eventsA, "已核实 replay 不得增加或改变原事件");
+  pass("replay-is-idempotent-after-pii-masking", { threadId: threadA, stepsDone: replay.stepsDone, eventCount: 2, finalReceipts: 1 });
   assert.equal((await threadEvents(scopeB, threadA)).length, 0);
   assert.equal((await threadEvents(scopeD, threadA)).length, 0);
   pass("rls-other-tenant-and-workspace-cannot-read-receipt", { otherTenantRows: 0, otherWorkspaceRows: 0 });
 
   const crossThread = await newThread(scopeB, "wrong tenant binding in immutable ledger");
-  await appendFixture(scopeB, crossThread, storedResult(eventsA[0]!));
+  await appendFixture(scopeB, crossThread, storedResult(executionEvents(eventsA)[0]!));
   let replayCalls = 0;
   const shouldNotExecute: ToolExecutor = async () => { replayCalls += 1; return { result: {}, receipt: { synced: true, mode: "real" } }; };
   const crossReplay = await runQuest(app, gateway, scopeB, input(crossThread, shouldNotExecute));
@@ -183,7 +214,7 @@ try {
   const realExecutor = await loadDeploymentToolExecutor(scopeC);
   const realResult = await runQuest(app, gateway, scopeC, input(realThread, realExecutor));
   assert.deepEqual({ status: realResult.status, done: realResult.stepsDone, unverified: realResult.unverified }, { status: "failed", done: 0, unverified: ["s1"] });
-  assert.deepEqual((await threadEvents(scopeC, realThread))[0]!.payload.receipt, { synced: false, mode: "real" });
+  assert.deepEqual(executionEvents(await threadEvents(scopeC, realThread))[0]!.payload.receipt, { synced: false, mode: "real" });
   pass("real-uncovered-tool-stays-connector-required", { threadId: realThread, status: realResult.status, mode: "real", synced: false });
 
   const coveredExecutor = await bridge(brokenFile, scopeA);
@@ -192,7 +223,7 @@ try {
   assert.equal(covered.status, "failed");
   assert.equal(covered.stepsDone, 0);
   assert.match(covered.error ?? "", /MC006 covered bridge failure/);
-  assert.equal((await threadEvents(scopeA, coveredThread))[0]!.payload.decision.outcome, "error");
+  assert.equal(executionEvents(await threadEvents(scopeA, coveredThread))[0]!.payload.decision.outcome, "error");
   pass("covered-runtime-failure-does-not-simulate", { threadId: coveredThread, status: covered.status, stepsDone: 0 });
 
   const loadFailureExecutor = await bridge(`${join(fixtureDir, "missing.mjs")}::createToolExecutor::metrics.read`, scopeA);
@@ -200,14 +231,14 @@ try {
   const loadFailureThread = await newThread(scopeA, "covered bridge load failure");
   const loadFailure = await runQuest(app, gateway, scopeA, input(loadFailureThread, loadFailureExecutor));
   assert.deepEqual({ status: loadFailure.status, done: loadFailure.stepsDone, unverified: loadFailure.unverified }, { status: "failed", done: 0, unverified: ["s1"] });
-  assert.equal(((await threadEvents(scopeA, loadFailureThread))[0]!.payload.decision.after as { result: { reason: string } }).result.reason, "connector-load-failed");
+  assert.equal((executionEvents(await threadEvents(scopeA, loadFailureThread))[0]!.payload.decision.after as { result: { reason: string } }).result.reason, "connector-load-failed");
   pass("covered-load-failure-does-not-simulate", { threadId: loadFailureThread, status: loadFailure.status, mode: "real", synced: false });
 
   const malformedExecutor = await bridge("::createToolExecutor::metrics.read", scopeA);
   const malformedThread = await newThread(scopeA, "malformed configured bridge");
   const malformed = await runQuest(app, gateway, scopeA, input(malformedThread, malformedExecutor));
   assert.deepEqual({ status: malformed.status, done: malformed.stepsDone, unverified: malformed.unverified }, { status: "failed", done: 0, unverified: ["s1"] });
-  assert.equal((await threadEvents(scopeA, malformedThread))[0]!.payload.receipt?.mode, "real");
+  assert.equal(executionEvents(await threadEvents(scopeA, malformedThread))[0]!.payload.receipt?.mode, "real");
   pass("malformed-configuration-does-not-become-unconfigured-simulation", { threadId: malformedThread, status: malformed.status, mode: "real", synced: false });
 
   for (const [caseId, malformedSpec, unknownRange] of [
@@ -220,22 +251,22 @@ try {
       const mixedThread = await newThread(scopeA, `${caseId} / failed-last=${failedLast}`);
       const mixed = await runQuest(app, gateway, scopeA, input(mixedThread, mixedExecutor));
       const mixedEvents = await threadEvents(scopeA, mixedThread);
-      console.log(JSON.stringify({ caseId, failedLast, threadId: mixedThread, actual: { status: mixed.status, done: mixed.stepsDone, unverified: mixed.unverified, mode: mixedEvents[0]?.payload.receipt?.mode }, phase: "before-assertion" }));
+      const mixedFinal = executionEvents(mixedEvents)[0]!;
+      console.log(JSON.stringify({ caseId, failedLast, threadId: mixedThread, actual: { status: mixed.status, done: mixed.stepsDone, unverified: mixed.unverified, mode: mixedFinal.payload.receipt?.mode }, phase: "before-assertion" }));
       assert.deepEqual({ status: mixed.status, done: mixed.stepsDone, unverified: mixed.unverified }, { status: "failed", done: 0, unverified: ["s1"] });
       assert.equal(mixedExecutor.supportsTool?.(step.tool), true);
       assert.equal(mixedExecutor.supportsTool?.("unrelated.read"), unknownRange);
-      assert.equal(mixedEvents.length, 1);
-      assert.deepEqual(mixedEvents[0]!.payload.receipt, { synced: false, mode: "real" });
-      assert.equal((mixedEvents[0]!.payload.decision.after as { result: { reason: string } }).result.reason, "connector-load-failed");
-      assert.equal(mixedEvents[0]!.payload.decision.tool_execution, undefined, "失败装配不能签发本地模拟绑定");
+      assert.deepEqual(mixedFinal.payload.receipt, { synced: false, mode: "real" });
+      assert.equal((mixedFinal.payload.decision.after as { result: { reason: string } }).result.reason, "connector-load-failed");
+      assert.equal(mixedFinal.payload.decision.tool_execution, undefined, "失败装配不能签发本地模拟绑定");
 
       const healthyThread = await newThread(scopeA, `${caseId} / independent healthy bridge`);
       const healthy = await runQuest(app, gateway, scopeA, input(healthyThread, mixedExecutor, [healthyStep]));
       assert.deepEqual({ status: healthy.status, done: healthy.stepsDone, unverified: healthy.unverified }, { status: "completed", done: 1, unverified: [] });
       const healthyEvents = await threadEvents(scopeA, healthyThread);
-      assert.equal(healthyEvents.length, 1);
-      assert.deepEqual(healthyEvents[0]!.payload.receipt, { synced: true, mode: "real" });
-      assert.equal((healthyEvents[0]!.payload.decision.after as { result: { state: string } }).result.state, "fixture-ok");
+      const healthyFinal = executionEvents(healthyEvents)[0]!;
+      assert.deepEqual(healthyFinal.payload.receipt, { synced: true, mode: "real" });
+      assert.equal((healthyFinal.payload.decision.after as { result: { state: string } }).result.state, "fixture-ok");
       orderEvidence.push({ failedLast, failedThread: mixedThread, failedMode: "real", stepsDone: 0, healthyThread, healthyStepsDone: 1, localFixtureOnly: true });
     }
     pass(caseId, { unknownFailedRange: unknownRange, orders: orderEvidence, externalBridgeRequests: 0 });
@@ -246,15 +277,29 @@ try {
   const maxSteps = Array.from({ length: 6 }, (_, index) => ({ ...step, stepId: `s${index + 1}`, params: {}, label: `metrics ${index + 1}` }));
   const maximum = await runQuest(app, gateway, scopeA, input(maxThread, maxExecutor, maxSteps));
   assert.deepEqual({ status: maximum.status, done: maximum.stepsDone }, { status: "completed", done: 6 });
-  assert.deepEqual((await threadEvents(scopeA, maxThread)).map((event) => (event.payload.decision.tool_execution as { step_id: string }).step_id), ["s1", "s2", "s3", "s4", "s5", "s6"]);
-  pass("maximum-six-steps-and-empty-parameters-bound-individually", { threadId: maxThread, stepsDone: 6, bindings: 6 });
+  const maxStepIds = ["s1", "s2", "s3", "s4", "s5", "s6"];
+  const maxEvents = await threadEvents(scopeA, maxThread);
+  assert.deepEqual(executionEvents(maxEvents, maxStepIds).map((event) => (event.payload.decision.tool_execution as { step_id: string }).step_id), maxStepIds);
+  pass("maximum-six-steps-and-empty-parameters-bound-individually", { threadId: maxThread, stepsDone: 6, bindings: 6, startedEvents: 6, totalEvents: 12 });
 
   await inScope(app, scopeA, (client) => client.query("UPDATE profiles SET archive=jsonb_set(archive,'{dataMode}','\"real\"'::jsonb) WHERE workspace_id=$1", [scopeA.workspaceId]));
-  const switched = await runQuest(app, gateway, scopeA, input(threadA, shouldNotExecute));
+  // Terminal tasks keep their final status. Verify the real-mode receipt guard
+  // on a distinct queued replay fixture whose signed simulated receipt binds
+  // to that exact scope/thread/step; append-only historical events stay intact.
+  const completedAfterSwitch = await runQuest(app, gateway, scopeA, input(threadA, shouldNotExecute));
+  assert.equal(completedAfterSwitch.status, "completed");
+  assert.deepEqual(await threadEvents(scopeA, threadA), eventsA, "已完成终态不能因档案切换回退或重发");
+  const switchedThread = await newThread(scopeA, "simulated receipt resumed under real profile");
+  const simulatedBeforeSwitch = await executeDeclaredTool(step.tool, params, { allowedTools: [step.tool], simulated: true,
+    context: { ...scopeA, threadId: switchedThread, stepId: "s1", fingerprint: stepFingerprint(step) } });
+  await appendFixture(scopeA, switchedThread, simulatedBeforeSwitch);
+  const switchedEvents = await threadEvents(scopeA, switchedThread);
+  const switched = await runQuest(app, gateway, scopeA, input(switchedThread, shouldNotExecute));
   assert.deepEqual({ status: switched.status, done: switched.stepsDone, unverified: switched.unverified }, { status: "failed", done: 0, unverified: ["s1"] });
   assert.equal(replayCalls, 0);
-  assert.equal((await threadEvents(scopeA, threadA)).length, 1);
-  pass("simulated-receipt-cannot-complete-real-profile-after-switch", { threadId: threadA, status: switched.status, executorCalls: 0 });
+  assert.deepEqual(await threadEvents(scopeA, switchedThread), switchedEvents, "模式切换后的拒绝不得增加或改变旧模拟回执");
+  pass("simulated-receipt-cannot-complete-real-profile-after-switch", { threadId: switchedThread,
+    completedHistoricalThread: threadA, historicalStatus: completedAfterSwitch.status, status: switched.status, executorCalls: 0 });
 
   for (const scope of [scopeA, scopeB, scopeC, scopeD]) {
     const events = await inScope(gateway, scope, async (client) => (await client.query<StoredEvent>("SELECT payload, prev_hash, hash FROM biz_events ORDER BY seq")).rows);
