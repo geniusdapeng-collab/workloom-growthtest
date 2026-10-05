@@ -171,7 +171,8 @@
         set -eu
         NODE_VERSION=v24.19.0
         apt-get update -qq
-        apt-get install -y -qq curl xz-utils ca-certificates git >/dev/null
+        # Media contract tests decode actual fixtures instead of skipping when tools are absent.
+        apt-get install -y -qq curl xz-utils ca-certificates git ffmpeg >/dev/null
         if [ ! -x /cnb-cache/node/bin/node ]; then
           mkdir -p /cnb-cache/node
           curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz

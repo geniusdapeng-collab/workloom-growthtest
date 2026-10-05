@@ -6,8 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { buildVariantCoverFilters, embedCoverFirstFrame } from "./cover-assembly.js";
 import { COVER_PLATFORM_IDS, getCoverSpec } from "./cover-platforms.js";
 
-const FFMPEG = process.env.WORKLOOM_TEST_FFMPEG ?? "/Users/mac/.local/bin/ffmpeg";
-const FFPROBE = process.env.WORKLOOM_TEST_FFPROBE ?? "/Users/mac/.local/bin/ffprobe";
+const FFMPEG = process.env.WORKLOOM_TEST_FFMPEG ?? process.env.WL_FFMPEG ?? "ffmpeg";
+const FFPROBE = process.env.WORKLOOM_TEST_FFPROBE ?? process.env.WL_FFPROBE ?? "ffprobe";
 const directory = mkdtempSync(join(tmpdir(), "workloom-cover-assembly-"));
 const source = join(directory, "source ' with spaces.mp4");
 const cover = join(directory, "cover blue.png");
