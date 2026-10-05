@@ -58,3 +58,49 @@ describe("普通视频入口的内部素材字段边界", () => {
     expect(d.route).not.toHaveBeenCalled(); expect(d.start).not.toHaveBeenCalled();
   });
 });
+
+
+describe("公共产品参考图路径边界", () => {
+  const referenceShapes: Array<[string, unknown]> = [
+    ["absolute-string", "/synthetic/workspace-b/private 中文 & 图片.png"],
+    ["traversal-string", "../../workspace-b/private.png"],
+    ["windows-string", "C:\\synthetic\\workspace-b\\private.png"],
+    ["file-url-string", "file:///synthetic/workspace-b/private.png"],
+    ["http-string-in-local-channel", "https://synthetic.invalid/private.png"],
+    ["localPath-object", { localPath: "/synthetic/workspace-b/link-to-private.png" }],
+    ["path-object", { path: "var/media/private.png" }],
+    ["non-http-url-object", { url: "file:///synthetic/workspace-b/private.png" }],
+    ["http-object-with-localPath", { url: "https://synthetic.invalid/public.png", localPath: "/synthetic/workspace-b/private.png" }],
+  ];
+  const localReferenceCases = ["referenceManifest", "reference_manifest"].flatMap(manifestKey =>
+    ["reference_images", "referenceImages"].flatMap(imagesKey => referenceShapes.map(([shape, value]) => ({
+      label: `${manifestKey}.${imagesKey}:${shape}`,
+      metadata: { products: [{ name: "测试商品", [manifestKey]: { [imagesKey]: [value] } }] },
+    }))),
+  );
+  const safeMetadataCases: Array<[string, Record<string, unknown>]> = [
+    ["product-description", { products: [{ name: "客房用品", description: "纯文字 中文 空格 & 标签", assetId: "VA-registered" }] }],
+    ["empty-images", { products: [{ referenceManifest: { reference_images: [] } }] }],
+    ["empty-descriptors", { products: [{ reference_manifest: { referenceImages: ["", "  ", null, {}, { localPath: " " }] } }] }],
+    ["http-object", { products: [{ referenceManifest: { reference_images: [{ url: "https://synthetic.invalid/product.png" }] } }] }],
+    ["https-object-aliases", { products: [{ reference_manifest: { referenceImages: [{ url: "HTTPs://synthetic.invalid/product.png" }] } }] }],
+    ["unrelated-customer-path", { brief: { desiredScene: "山间小路", path: "客户描述里的路径名称" } }],
+  ];
+
+  const publicCases = [undefined, "VID-existing"].flatMap(projectId =>
+    localReferenceCases.map(item => ({ ...item, projectId })),
+  );
+  it.each(publicCases)("projectId=$projectId:$label在路由/SQL/派单前拒绝", async ({ projectId, metadata }) => {
+    await expect(caller().studio.start({ projectId, intent: "山间风景片", route: "narrative", metadata }))
+      .rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(d.route).not.toHaveBeenCalled(); expect(d.query).not.toHaveBeenCalled();
+    expect(d.start).not.toHaveBeenCalled(); expect(d.existing).not.toHaveBeenCalled();
+  });
+
+  it.each(safeMetadataCases)("%s普通商品metadata保持路由并保留客户来源", async (_label, metadata) => {
+    await expect(caller().studio.start({ intent: "山间风景片", metadata, route: "narrative" }))
+      .resolves.toMatchObject({ kind: "routed", projectId: "VID-test", runId: "RUN-test" });
+    expect(d.start).toHaveBeenCalledWith({ tenantId: identity.tenantId, workspaceId: identity.workspaceId },
+      expect.objectContaining({ customerMetadata: metadata, by: { id: identity.memberNo, type: "human" } }));
+  });
+});

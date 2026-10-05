@@ -1,0 +1,51 @@
+# 已受理视频任务的恢复
+
+`full-chain-film.mts` 在 Ark 返回任务 ID 后，先把任务号和请求摘要写入项目日志下的
+`accepted-tasks/<shotId>.json`，再开始轮询。轮询或下载中断时，使用同样的镜头卡和参数重跑原阶段，
+管线会读取该任务号，继续执行 GET、下载、时长归一和原有质量检查，不再 POST 生成。
+
+旧版本没有受理日志时，可以用 `--resume-tasks <JSON文件>` 明确接续平台已经受理的任务：
+
+```json
+{
+  "GT-01": "cgt-已核实的任务号"
+}
+```
+
+映射只接受当前分镜内的镜号，一个任务不能分配给多个镜头。取回之前必须核对平台响应中的
+任务 ID、模型、渲染时长、分辨率和画幅。所有原有预生产闸、G-MAT1、G8 和后期检查继续执行。
+恢复只是取回已有生成结果；任务不存在、参数不符或平台返回失败时，不会转为生成新任务。
+
+若 POST 发生网络异常且未拿到任务 ID，日志状态为 `submission-unknown`。再次运行会停止提交，
+应先只读查询平台任务列表，查明是否受理，再用明确任务号接续。不要删除这条日志后盲目提交。
+日志不保存凭据、参考图内容和视频下载 URL。
+
+认证真人的 `asset://` 引用仍只提交给模型。文件血缘使用已登记的真人 `profile.json` 和当前提示词，
+不会把平台素材 URI 当成本地文件，也不会改写历史阶段账本。
+
+验证：`node --test scripts/tools/film-render-task.test.mjs`。
+
+## 本次实测的后期修复
+
+封面设计的 DeepSeek 官方端点显式关闭思考模式，避免默认思考耗尽短 JSON 设计稿的 token 预算。
+其它兼容端点不接收这项厂商参数。依据：[DeepSeek 思考模式文档](https://api-docs.deepseek.com/guides/thinking_mode/)。
+
+选曲仍先按标签排序，再按音频波形验证 BPM 和剪辑网格。实测候选上限从 16 提升到 128，
+以免前排错误标签使库内真实可用的曲目被漏掉。已实测的 BPM 必须传入母版及变体混音调用。
+变体选曲还会排除先前变体已使用的音频 SHA256，防止三个不同曲风线索仍选中同一首歌，
+或同一音频以多个库内 ID 被重复选择。三个版本仍须通过原有的调色、封面、配乐三轴检查。
+
+简报可声明 `footageOrigin: "generated"` 与 `claimsDiscipline`。它们会进入封面设计提示词，
+生成素材的设计稿若声称“实拍”“现场拍摄”等，会被校验拒绝并进入原有设计稿自修复流程。
+未声明该来源的旧简报保持原有行为。本次影片声明 AI 生成，避免把真实渲染实测写成真人现场实拍。
+
+声明式直混的节目源若因峰值余量无法达到响度目标，先在专属证据目录保留原 PCM 摘要，
+再用两遍动态 loudnorm 处理该混合节目源，为新增音乐留出峰值余量。回执包含
+`independentAudio.sourcePreparation` 的前后实测、处理方法和来源摘要。它仍是
+`declared-unverified`，不取得独立分轨资格。有签章分轨的路径不做这项动态处理；
+最终对白、音乐、节目三条比较轨仍共享同一线性主增益。响度、峰值、时间线、可闻度和让位闸门继续保留。
+动态处理与采样率参数依据：[FFmpeg loudnorm 文档](https://www.ffmpeg.org/ffmpeg-filters.html#loudnorm)。
+
+真实媒体回归：`node --test bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs
+bundles/ai-video/connectors/bgm-bridge/audio-stems-mix.test.mjs`，覆盖正常、峰值受限、静音拒绝、
+签章失效、数值越界和 CLI/HTTP 路径。真实成片还必须单独复检，测试夹具通过不能代替成片通过。

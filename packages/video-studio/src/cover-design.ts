@@ -17,7 +17,7 @@
  *     **douyin 默认口径与历史行为逐字/逐像素不变**（`COVER_SAFE_AREA` 仍是抖音基线值）；
  *   · 新增 `kbHints`（封面知识库 cover-kb 的注入载荷，≤3 条，带篇目 trace）与
  *     `accountProfile`（账号视觉锤：字体/色板/版式/角标）两个**可选**输入，
- *     不传时提示词与校验行为与历史完全一致。
+ *     不传时不注入账号/知识库约束；创作文案的来源/风格标签规则统一执行。
  */
 
 import {
@@ -178,7 +178,8 @@ export interface CoverDesignInput {
    * 禁止第三种"人物小图贴在地标/商品上"——两种主视觉打架，真机被打回三次。
    */
   archetype?: "person-led" | "subject-led";
-  brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string } | null;
+  brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string;
+    claimsDiscipline?: string; footageOrigin?: "generated" | "live-action" | "mixed" } | null;
   /**
    * 平台（ID 或中文别名，如 `douyin` / `抖音` / `抖音/快手`）。
    * 语义已升格为一等参数：驱动的画幅、安全区、标题带、标题字数上限与文案政策；
@@ -237,7 +238,7 @@ export function accountProfilePromptLines(profile: CoverAccountProfile | null | 
  * 封面设计师的提示词（LLM 只出设计稿，不画图；渲染由管线按稿执行）。
  *
  * 平台化口径（2026-09-27）：画幅/安全区/标题带/标题字数上限全部来自 `getCoverSpec(platform)`；
- * **douyin + 无 KB + 无账号档案时，本函数输出与平台化之前逐字一致**（有快照测试锁死）。
+ * douyin 的平台规格行保持历史口径；来源与风格属于元数据，不进入创作画面。
  */
 export function buildCoverDesignPrompt(input: CoverDesignInput): string {
   /** 平台标签用**调用方原文**（保留"抖音/快手"这类历史写法），规格按 ID 解析 */
@@ -266,6 +267,9 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
     input.brief?.goal ? `片子目标：${input.brief.goal}` : "",
     input.brief?.audience ? `受众：${input.brief.audience}` : "",
     input.brief?.tone ? `调性：${input.brief.tone}` : "",
+    input.brief?.claimsDiscipline ? `文案事实约束：${input.brief.claimsDiscipline}` : "",
+    input.brief?.footageOrigin === "generated"
+      ? "素材来源：AI生成视频（可含真实商品参考图）；封面不得声称实拍、现场拍摄或现场实录；来源记录与平台披露要求保留在交付元数据。" : "",
     "",
     "可选镜头（主视觉必须从里面选，给出 shotId 与取帧秒数）：",
     ...shotLines,
@@ -294,6 +298,7 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
       + `底部 ${ratioPercent(spec.safeArea.bottomReservedRatio)} 不放任何文字；`,
     "5. 配色与片子的调性一致（说明主标题色与强调色，用 #RRGGBB）；底图保持片子原有的光线气质，不要加冷雾或滤镜把暖调画面改成另一种天气；",
     "6. rationale 用一句话说明这个封面为什么能让人点进来（≤60 字）。",
+    "6.1 运营标签不进入创作画面：主标题、副标题、角标不得放 AI生成/AIGC 或暖色电影感、社媒冲击感、冷色科技感等风格标签；只写观众需要的内容钩子、产品名称或系列文案。来源与风格另存交付元数据。",
     /**
      * 数值边界（2026-09-27 真机发现）：这些区间由 `validateCoverPlan` 硬校验，
      * 但早先提示词里没写——真实模型因此把 `person.widthRatio` 猜成 0.55，设计稿连打两次回、退兜底稿
@@ -326,6 +331,15 @@ const visualLength = (text: string): number => [...text.replace(/\n/g, "")].leng
  */
 export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { shots: [] }): CoverPlan {
   const issues: string[] = [];
+  if (input.brief?.footageOrigin === "generated"
+    && /实拍|现场拍摄|现场实录|真实拍摄/.test([plan.headline, plan.subline, plan.badge].filter(Boolean).join(" "))) {
+    issues.push("生成素材封面不得声明实拍或现场拍摄");
+  }
+  for (const [field, text] of Object.entries({ headline: plan.headline, subline: plan.subline, badge: plan.badge })) {
+    if (text && /AI\s*生成|AIGC|AI[-\s]*generated|暖色电影感|暖调电影感|暖调胶片|社媒冲击感|社交高对比|冷色科技感|冷调技术感|科技冷调|warm[-_\s]*film|punchy[-_\s]*social|cool[-_\s]*tech/i.test(text)) {
+      issues.push(`${field} 含运营标签，来源与风格应保留在交付元数据`);
+    }
+  }
   /**
    * 平台口径（2026-09-27）：标题长度上限随平台（抖音 12 / 小红书 14 / B站 16 / 英文平台按词 ≤5）。
    * `domain="cover_design_invalid"` 的既有错误语义不变；缺省平台落 douyin，旧调用行为不变。

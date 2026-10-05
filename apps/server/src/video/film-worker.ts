@@ -12,9 +12,10 @@
  * 不声称操作系统级隔离；工位仍是本机同 UID 进程，这一点在 README/任务卡如实记录。
  */
 import { createHash, randomUUID } from "node:crypto";
-import { spawn, type ChildProcess } from "node:child_process";
+import { execFile, spawn, type ChildProcess } from "node:child_process";
 import { constants } from "node:fs";
-import { mkdir, open, readFile, realpath, stat, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, open, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { getAppPool, getGatewayPool } from "@workloom/db";
@@ -32,6 +33,19 @@ import {
   resolveEraProfile,
   storyDateAt,
   reviewFilmStage,
+  reviewStage as reviewCharacterVisualStage,
+  resolveProducerLlm,
+  buildRegisteredCharacterReleaseSource,
+  buildCharacterIdentityReviewRequest,
+  adaptCharacterVisualVerdict,
+  assessCharacterGenerationInput,
+  assessCharacterRelease,
+  buildFilmVideoSubmissionReceipt,
+  type RegisteredCharacterReleaseSource,
+  type CharacterIdentityEvidence,
+  type CharacterIdentityReviewRequest,
+  type FilmVideoSubmissionReceipt,
+  type FilmVideoReferenceInput,
   type FilmChannelFrame,
   type FilmChannelMethod,
   type FilmChannelRequestFrame,
@@ -47,6 +61,7 @@ import { canonicalRenderJson, compileProviderRequest, providerEndpointOptions, r
 import type { Scope } from "./gen/db.js";
 import { ArkImageProvider, ArkVideoProvider } from "./gen/providers.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
+import { assertFilmAudioPreflight, resolveFilmAudioContract } from "../../../../scripts/tools/film-audio-policy.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）。 */
@@ -187,7 +202,7 @@ function dataUrlFor(file: string, bytes: Buffer): string {
   return `data:image/${mime};base64,${bytes.toString("base64")}`;
 }
 
-interface RunContext {
+export interface RunContext {
   scope: Scope;
   env: NodeJS.ProcessEnv;
   job: FilmJobRow;
@@ -199,12 +214,74 @@ interface RunContext {
   shots: Map<string, Record<string, unknown>>;
   contractSource: FilmContractSource;
   /** 本作业由服务签发的供应商产物 URL（media.fetch 只允许取这些）。 */
-  issuedUrls: Map<string, { stepKey: string; shotId: string | null }>;
+  issuedUrls: Map<string, { stepKey: string; shotId: string | null; artifact: { ref: string; sha256: string; bytes: number } }>;
+  /** Current accepted provider source and its local copied targets; never reconstructed from child JSON. */
+  videoFiles: Map<string, FilmVideoSubmissionReceipt>;
+  /** Current parent-written copy/normalization fingerprints; raw receipt always stays unchanged. */
+  videoArtifacts?: Map<string, { ref: string; sha256: string; bytes: number }>;
+  identityEvidence: Map<string, CharacterIdentityEvidence>;
+  characterSource?: RegisteredCharacterReleaseSource;
+  /** Service/operator roots, never accepted from the channel or StartFilmJobInput document. */
+  registrationRoots?: { assetLibraryRoot: string; characterLibraryRoots: string[]; registryFile?: string };
   ownerToken: string;
   log: (line: string) => void;
   send: (frame: FilmChannelFrame) => void;
   signal: AbortSignal;
   deadlineAt: number;
+}
+
+function registeredCharactersFor(ctx: RunContext): RegisteredCharacterReleaseSource {
+  const roots = ctx.registrationRoots ?? {
+    assetLibraryRoot: path.join(REPO_ROOT, "bundles/ai-video/library/real-person-assets"),
+    characterLibraryRoots: [path.join(REPO_ROOT, "var/media/characters"), path.join(REPO_ROOT, "bundles/ai-video/library/characters")],
+    registryFile: path.join(REPO_ROOT, "bundles/ai-video/library/characters/registry.json"),
+  };
+  const current = buildRegisteredCharacterReleaseSource({ projectId: ctx.job.project_id,
+    shots: [...ctx.shots.values()], character: ctx.frozen.character as Record<string, unknown> | undefined, ...roots });
+  if (ctx.characterSource && current.contract.contractHash !== ctx.characterSource.contract.contractHash)
+    fail("CHARACTER_REGISTRATION_CHANGED", "人物主档、授权、服饰或基准图在作业期间变化，须重新冻结核验");
+  ctx.characterSource = current;
+  return current;
+}
+
+/** Independent parent check: the child cannot authorize a new person request with its own boolean. */
+async function requireCurrentVideoSource(ctx: RunContext, ref: string, shotId: string): Promise<FilmVideoSubmissionReceipt> {
+  const receipt = ctx.videoFiles.get(ref);
+  if (!receipt || receipt.shotId !== shotId || receipt.jobId !== ctx.job.id || receipt.inputSha256 !== ctx.job.input_sha256)
+    fail("VIDEO_SOURCE_UNVERIFIED", "视频缺当前作业父服务受理回执");
+  for (const currentRef of new Set([ref, receipt.artifact.ref])) {
+    const bytes = await readJobBytes(ctx, currentRef, MEDIA_FETCH_LIMIT_BYTES);
+    const expected = currentRef === receipt.artifact.ref ? receipt.artifact : ctx.videoArtifacts?.get(currentRef) ?? receipt.artifact;
+    if (sha256Bytes(bytes) !== expected.sha256 || bytes.byteLength !== expected.bytes)
+      fail("VIDEO_SOURCE_CHANGED", "当前视频或保留的供应商原视频字节发生变化");
+  }
+  return receipt;
+}
+
+async function validateCharacterVideoSubmission(ctx: RunContext, frame: FilmChannelRequestFrame): Promise<void> {
+  const shot = ctx.shots.get(frame.shotId!);
+  if (!shot?.assetRef) return;
+  const source = registeredCharactersFor(ctx);
+  if (source.contract.status !== "passed" || source.bindings.some(binding => !binding.identityAnchor)) fail("CHARACTER_RENDER_PREFLIGHT_BLOCKED", "人物授权、服饰和登记基准图必须完整");
+  if (!resolveProducerLlm(ctx.env)) fail("CHARACTER_VISION_UNAVAILABLE", "父服务专用人物视觉评审未配置");
+  const params = record(frame.params);
+  if (params.firstFrame !== undefined) fail("CHARACTER_FIRST_FRAME_OVERRIDE", "登记真人素材模式不得混入另一首帧覆盖授权组");
+  const generation = assessCharacterGenerationInput({ contract: source.contract, shotId: frame.shotId!,
+    prompt: text(params.prompt, "人物提示词缺失", 30_000), referenceAssets: params.refs as string[] });
+  if (generation.status !== "passed") fail("CHARACTER_GENERATION_INPUT_BLOCKED", generation.issues.map(issue => issue.detail).join("；"));
+  const person = source.contract.shots.find(row => row.shotId === frame.shotId)!;
+  const selected = String(ctx.job.options.only ?? "").split(",").filter(Boolean);
+  const canary = source.contract.shots.find(row => row.characterId === person.characterId && (!selected.length || selected.includes(row.shotId)))!;
+  if (canary.shotId === frame.shotId) return;
+  const evidence = ctx.identityEvidence.get(canary.shotId);
+  if (!evidence?.visualReview) fail("CHARACTER_CANARY_BLOCKED", "本人物首镜缺父服务专用身份与服饰回执");
+  const clipRef = path.relative(ctx.workDir, evidence.visualReview.request.clip.path).split(path.sep).join("/");
+  const receipt = await requireCurrentVideoSource(ctx, clipRef, canary.shotId);
+  const artifacts = [{ shotId: canary.shotId, clip: evidence.visualReview.request.clip, promptSha256: receipt.promptSha256,
+    referenceAssets: receipt.referenceInputs.filter(ref => ref.role === "reference-image").map(ref => ref.ref), evidence: [evidence] }];
+  const assessment = assessCharacterRelease({ contract: source.contract, shots: artifacts, phase: "canary",
+    canaryShotIds: [canary.shotId], canaryCharacterIds: [person.characterId] });
+  if (!assessment.continuePaidRendering) fail("CHARACTER_CANARY_BLOCKED", "每个人物首镜的专用身份与服饰证据通过后才能继续该人物渲染");
 }
 
 /* ================= 路径与冻结输入 ================= */
@@ -317,6 +394,17 @@ export async function startFilmJob(input: StartFilmJobInput): Promise<FilmJobSta
     document: { ...document, eraProfile: resolveEraProfile(era ?? { storyDate: storyDateAt(new Date()) }) }, env });
   const shots = Array.isArray(frozen.document.shots) ? frozen.document.shots : [];
   if (!shots.length) fail("SHOT_REGISTRY_REQUIRED", "原稿必须登记 shots[]");
+  const selectedIds = String(normalized.options.only ?? "").split(",").filter(Boolean);
+  const selectedShots = shots.map(raw => { const shot = record(raw); return { ...shot, shotId: text(shot.shotId, "原稿镜号缺失", 128) }; })
+    .filter(shot => !selectedIds.length || selectedIds.includes(shot.shotId));
+  if (selectedIds.some(id => !selectedShots.some(shot => shot.shotId === id))) fail("SHOT_REGISTRY_INVALID", "only含未登记镜号");
+  try {
+    assertFilmAudioPreflight({ shots: selectedShots, unifiedNarration: normalized.options["narration-unified"] === true,
+      generateAudio: env.SEEDANCE_GENERATE_AUDIO !== "0" });
+  } catch (error) {
+    fail(typeof (error as { code?: unknown }).code === "string" ? (error as { code: string }).code : "AUDIO_SOURCE_INVALID",
+      error instanceof Error ? error.message : "冻结音频合同无效");
+  }
   let worker: FilmWorkerRow;
   try {
     worker = await requireActiveWorker(ledger, workerName, FILM_WORKER_ENTRY);
@@ -398,6 +486,7 @@ async function runFilmJob(args: {
     allowedMethods: FILM_CHANNEL_METHODS.filter((method) => workerAllows(worker, method)),
     budgetCny: Number(job.budget_cny ?? 0),
     deadlineAt: new Date(Date.now() + JOB_DEADLINE_MS).toISOString(),
+    characterVisionAvailable: Boolean(resolveProducerLlm(env)),
   };
   const shots = new Map<string, Record<string, unknown>>();
   for (const raw of Array.isArray(args.frozen.shots) ? args.frozen.shots : []) {
@@ -429,7 +518,7 @@ async function runFilmJob(args: {
     scope, env, job, worker, ledger, workDir: workReal, archiveRoot: context.archiveRoot,
     frozen: args.frozen, shots, contractSource,
     signal: controller.signal, deadlineAt: Date.parse(context.deadlineAt),
-    issuedUrls: new Map(), ownerToken: `film-owner-${randomUUID()}`,
+    issuedUrls: new Map(), videoFiles: new Map(), videoArtifacts: new Map(), identityEvidence: new Map(), ownerToken: `film-owner-${randomUUID()}`,
     log: (line) => console.log(`[film-worker ${job.id}] ${line}`),
     send: (frame) => {
       try {
@@ -540,7 +629,7 @@ async function handleChildFrame(ctx: RunContext, raw: unknown): Promise<void> {
   }
 }
 
-async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRequestFrame): Promise<unknown> {
+export async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRequestFrame): Promise<unknown> {
   if (!(FILM_CHANNEL_METHODS as readonly string[]).includes(frame.method)) fail("METHOD_NOT_ALLOWED", `未知通道方法 ${String(frame.method)}`);
   if (ctx.signal.aborted || Date.now() >= ctx.deadlineAt) fail("JOB_DEADLINE_EXCEEDED", "工位作业已关闭或超时");
   if (!workerAllows(ctx.worker, frame.method)) fail("METHOD_NOT_ALLOWED", `工位未登记能力 ${frame.method}`);
@@ -550,9 +639,17 @@ async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRequestFr
   validateFilmChannelScope(frame, {
     stages: ctx.job.stages, projectId: ctx.job.project_id,
     shotIds: new Set([...ctx.shots.keys()].filter((id) => !selected.length || selected.includes(id))),
+    frozen: ctx.frozen, options: ctx.job.options,
   });
   const actualHash = filmRequestHash({ method: frame.method, stepKey: frame.stepKey, shotId: frame.shotId, params: frame.params });
   if (actualHash !== frame.requestHash) fail("FRAME_INVALID", "请求哈希与参数不一致");
+  if (frame.method === "video.generate") {
+    await validateCharacterVideoSubmission(ctx, frame);
+    await validateVideoReferences(ctx, frame);
+  }
+  if (frame.method === "media.fetch") await validateMediaFetchSource(ctx, frame);
+  const identityReview = frame.method === "gate.review" && record(frame.params).identityReview !== undefined
+    ? await prepareIdentityReview(ctx, frame) : undefined;
   const payloadHash = renderSha256(filmCanonicalJson(frame.params));
   const ledger = ctx.ledger;
   const reserved = ledger.reserveComponent({
@@ -572,7 +669,7 @@ async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRequestFr
   });
   const component = await reserved;
   try {
-    return await abortable(ctx.signal, () => dispatchComponent(ctx, frame, component.id));
+    return await abortable(ctx.signal, () => dispatchComponent(ctx, frame, component.id, identityReview));
   } catch (error) {
     const failureClass = error instanceof SubmissionError ? error.code.split(":")[0]! : "UNEXPECTED";
     await ledger.recordComponentFailure(component.id, ctx.ownerToken, {
@@ -587,6 +684,7 @@ async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRequestFr
 /** Validate the complete frozen step before reserving budget or dispatching a component. */
 export function validateFilmChannelScope(frame: FilmChannelRequestFrame, scope: {
   stages: readonly string[]; projectId: string; shotIds: ReadonlySet<string>;
+  frozen?: Record<string, unknown>; options?: Record<string, unknown>;
 }): void {
   if (typeof frame.stepKey !== "string" || !frame.stepKey) fail("FRAME_INVALID", "通道调用缺少步骤键");
   const stage = frame.stepKey.split(":")[0]!;
@@ -618,6 +716,38 @@ export function validateFilmChannelScope(frame: FilmChannelRequestFrame, scope: 
   if (["image.generate", "video.generate", "voice.dub", "voice.verify"].includes(frame.method) && frame.shotId === null) {
     fail("SHOT_NOT_FOUND", "逐镜组件需要冻结镜号");
   }
+  if (scope.frozen && ["video.generate", "voice.dub", "voice.verify"].includes(frame.method)) {
+    const shot = (Array.isArray(scope.frozen.shots) ? scope.frozen.shots : []).map(record).find(row => row.shotId === frame.shotId);
+    if (!shot) fail("SHOT_NOT_FOUND", "组件镜号不在冻结原稿");
+    let audio: ReturnType<typeof resolveFilmAudioContract>;
+    try { audio = resolveFilmAudioContract({ ...shot, shotId: frame.shotId! }); }
+    catch (error) { fail("AUDIO_SOURCE_INVALID", error instanceof Error ? error.message : "冻结音频合同无效"); }
+    const params = record(frame.params);
+    if (frame.method === "voice.dub" && audio.mode === "native-dialogue") fail("AUDIO_NATIVE_SOURCE_REPLACED", "父服务拒绝后配替换出镜同源对白");
+    if (frame.method.startsWith("voice.")) {
+      if (audio.mode === "none") fail("AUDIO_NO_DIALOGUE", "无台词镜头不能调用配音或语音核验");
+      const actual = frame.method === "voice.dub" ? params.text : params.expectText;
+      if (typeof actual !== "string" || actual.trim().replace(/\s+/g, " ") !== audio.text.trim().replace(/\s+/g, " ")) fail("AUDIO_TEXT_MISMATCH", "语音请求台词与冻结原稿不一致");
+    } else {
+      if (typeof params.generateAudio !== "boolean") fail("REQUEST_INVALID", "生成音频标志必须显式为布尔值");
+      if (audio.mode === "native-dialogue" && !params.generateAudio) fail("AUDIO_NATIVE_GENERATION_REQUIRED", "出镜对白必须生成原生音频");
+      const aspect = scope.options?.aspect ?? scope.frozen.aspect ?? "9:16";
+      const requestedResolution = scope.options?.resolution ?? scope.frozen.resolution ?? "1080p";
+      const resolution = requestedResolution === "2160p" ? "1080p" : requestedResolution;
+      if (params.aspect !== aspect || params.resolution !== resolution) fail("FORMAT_FROZEN_MISMATCH", "生成画幅/源分辨率与冻结作业不一致");
+      const duration = Number(shot.duration ?? shot.durationSec ?? shot.durationSeconds);
+      const expectedSeconds = Math.min(12, Math.max(4, Math.round(duration)));
+      if (!Number.isFinite(duration) || duration <= 0 || params.seconds !== expectedSeconds) fail("DURATION_FROZEN_MISMATCH", "生成时长与冻结镜头不一致");
+      if (!Array.isArray(params.refs) || params.refs.length > 3) fail("REFERENCE_LIMIT_EXCEEDED", "视频引用最多3张，禁止静默截断");
+      if (params.refs.some(ref => typeof ref !== "string" || !ref) || new Set(params.refs).size !== params.refs.length) fail("REQUEST_INVALID", "视频引用为空、重复或格式非法");
+      if (params.firstFrame !== undefined) {
+        const first = record(params.firstFrame);
+        const keys = Object.keys(first);
+        if (keys.length !== 1 || !["ref", "hostedUrl"].includes(keys[0]!) || typeof first[keys[0]!] !== "string" || !String(first[keys[0]!]).trim())
+          fail("REQUEST_INVALID", "firstFrame必须独占提供ref或hostedUrl");
+      }
+    }
+  }
 }
 function abortable<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
   if (signal.aborted) return Promise.reject(new SubmissionError("JOB_DEADLINE_EXCEEDED", "作业已关闭；调用按未核实处理"));
@@ -639,13 +769,13 @@ function reserveFor(frame: FilmChannelRequestFrame): number {
   return 0;
 }
 
-async function dispatchComponent(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
+async function dispatchComponent(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string, identityReview?: PreparedIdentityReview): Promise<unknown> {
   switch (frame.method) {
     case "llm.chat": return runLlm(ctx, frame, componentId);
     case "image.generate": return runImage(ctx, frame, componentId);
     case "media.fetch": return runMediaFetch(ctx, frame, componentId);
     case "video.generate": return runVideo(ctx, frame, componentId);
-    case "gate.review": return runGateReview(ctx, frame, componentId);
+    case "gate.review": return runGateReview(ctx, frame, componentId, identityReview);
     case "voice.dub": return runVoiceDub(ctx, frame, componentId);
     case "voice.verify": return runVoiceVerify(ctx, frame, componentId);
     default: return fail("METHOD_NOT_ALLOWED", `通道方法未实现：${String(frame.method)}`);
@@ -704,6 +834,71 @@ function requireIssuedUrl(ctx: RunContext, url: string, frame: FilmChannelReques
   if (!ctx.issuedUrls.has(url)) fail("URL_NOT_ISSUED", `该地址不是本作业服务签发的供应商产物：${frame.stepKey}`);
 }
 
+async function validateVideoReferences(ctx: RunContext, frame: FilmChannelRequestFrame): Promise<void> {
+  const params = record(frame.params);
+  await resolveWithin(ctx.workDir, text(params.targetRef, "视频缺targetRef", 1_000));
+  if (params.firstFrame !== undefined) {
+    const first = record(params.firstFrame);
+    let frameRef: string;
+    if (first.hostedUrl !== undefined) {
+      const url = text(first.hostedUrl, "首帧hostedUrl非法", 8_192);
+      requireIssuedUrl(ctx, url, frame);
+      const issued = ctx.issuedUrls.get(url)!;
+      frameRef = issued.artifact.ref;
+      const bytes = await readJobBytes(ctx, issued.artifact.ref);
+      if (sha256Bytes(bytes) !== issued.artifact.sha256 || bytes.byteLength !== issued.artifact.bytes) fail("REFERENCE_CHANGED", "已签发首帧字节发生变化");
+    } else { frameRef = text(first.ref, "首帧ref非法", 1_000); await readJobBytes(ctx, frameRef); }
+    let dimensions: { width: number; height: number };
+    try {
+      const probe = JSON.parse(await reviewMediaTool(ctx, "ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "json", await resolveWithin(ctx.workDir, frameRef)]));
+      dimensions = { width: Number(probe.streams?.[0]?.width), height: Number(probe.streams?.[0]?.height) };
+    } catch { fail("REFERENCE_UNVERIFIED", "父服务无法独立核验实际首帧尺寸"); }
+    const [width, height] = String(params.aspect).split(":").map(Number);
+    if (!(dimensions!.width > 0 && dimensions!.height > 0 && width! > 0 && height! > 0)
+      || Math.abs(dimensions!.width / dimensions!.height - width! / height!) > 0.005)
+      fail("REFERENCE_ASPECT_MISMATCH", "实际首帧画幅与冻结影片画幅不一致");
+  }
+  for (const raw of params.refs as string[]) {
+    if (/^asset:\/\//.test(raw)) {
+      const source = registeredCharactersFor(ctx);
+      if (source.contract.status !== "passed" || !source.contract.shots.find(shot => shot.shotId === frame.shotId)?.referenceAssets.includes(raw))
+        fail("ASSET_NOT_BOUND", "参考asset不属于冻结镜头的登记授权组");
+    } else await readJobBytes(ctx, raw);
+  }
+}
+
+async function validateMediaFetchSource(ctx: RunContext, frame: FilmChannelRequestFrame): Promise<void> {
+  const params = record(frame.params);
+  if ((params.url !== undefined) === (params.ref !== undefined)) fail("REQUEST_INVALID", "media.fetch必须独占提供url或ref");
+  await resolveWithin(ctx.workDir, text(params.targetRef, "media.fetch缺targetRef", 1_000));
+  const targetReceipt = ctx.videoFiles.get(String(params.targetRef));
+  if (targetReceipt && params.targetRef === targetReceipt.artifact.ref) fail("MEDIA_PROVIDER_SOURCE_PROTECTED", "后期复制与变速不能覆盖保留的供应商原档");
+  if (params.url !== undefined) {
+    const url = text(params.url, "media.fetch url非法", 8_192);
+    requireIssuedUrl(ctx, url, frame);
+    const issued = ctx.issuedUrls.get(url)!;
+    const receipt = ctx.videoFiles.get(issued.artifact.ref);
+    if (receipt) await requireCurrentVideoSource(ctx, issued.artifact.ref, receipt.shotId);
+    else {
+      const bytes = await readJobBytes(ctx, issued.artifact.ref, MEDIA_FETCH_LIMIT_BYTES);
+      if (sha256Bytes(bytes) !== issued.artifact.sha256 || bytes.byteLength !== issued.artifact.bytes) fail("MEDIA_SOURCE_CHANGED", "已受理供应商产物的本地原档字节发生变化");
+    }
+  }
+  else {
+    const ref = text(params.ref, "media.fetch ref非法", 1_000);
+    const receipt = ctx.videoFiles.get(ref);
+    if (receipt) await requireCurrentVideoSource(ctx, ref, receipt.shotId);
+    else await readJobBytes(ctx, ref, MEDIA_FETCH_LIMIT_BYTES);
+    if (params.normalizeToSeconds !== undefined) {
+      const shot = ctx.shots.get(frame.shotId ?? "");
+      const duration = Number(shot?.duration ?? shot?.durationSec ?? shot?.durationSeconds);
+      if (!receipt || receipt.shotId !== frame.shotId || params.normalizeToSeconds !== duration || !Number.isFinite(duration) || duration <= 0
+        || params.targetRef === receipt.artifact.ref) fail("MEDIA_NORMALIZATION_SCOPE_INVALID", "时长归一必须绑定冻结镜头、受理原片且保留供应商原档");
+    }
+  }
+  if (params.normalizeToSeconds !== undefined && params.url !== undefined) fail("MEDIA_NORMALIZATION_SCOPE_INVALID", "时长归一仅接受本作业当前已核验的本地视频");
+}
+
 async function anchorsToDataUrls(ctx: RunContext, refs: unknown): Promise<string[]> {
   if (refs === undefined) return [];
   if (!Array.isArray(refs) || refs.length > 4) fail("REQUEST_INVALID", "anchors 最多 4 个作业内引用");
@@ -753,7 +948,6 @@ async function runImage(ctx: RunContext, frame: FilmChannelRequestFrame, compone
   const polled = await provider.poll(submitted.taskId);
   if (polled.status !== "succeeded" || !polled.uri) fail("PROVIDER_FAILED", `出图未成功：${polled.error ?? polled.status}`);
   const written = await fetchToFile(ctx, polled.uri, targetRef);
-  ctx.issuedUrls.set(polled.uri, { stepKey: frame.stepKey, shotId: frame.shotId });
   const evidence = {
     artifactSha256: written.sha256,
     artifactRef: written.ref,
@@ -766,32 +960,78 @@ async function runImage(ctx: RunContext, frame: FilmChannelRequestFrame, compone
   await ctx.ledger.recordComponentAccepted(componentId, ctx.ownerToken, {
     provider: "seedream", providerModel: model, actualCny: null, evidence,
   });
+  ctx.issuedUrls.set(polled.uri, { stepKey: frame.stepKey, shotId: frame.shotId, artifact: written });
   ctx.log(`出图完成 ${frame.shotId ?? frame.stepKey} → ${written.ref}（${written.bytes}B）`);
   return { ...written, hostedUrl: polled.uri, provider: "seedream", providerModel: model };
 }
 
 async function runMediaFetch(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
   const params = record(frame.params);
+  if ((params.url !== undefined) === (params.ref !== undefined)) fail("REQUEST_INVALID", "media.fetch必须独占提供url或ref");
   const targetRef = text(params.targetRef, "media.fetch 需要 targetRef", 1_000);
   await resolveWithin(ctx.workDir, targetRef);
   await ctx.ledger.recordDispatch(componentId, ctx.ownerToken, "local", "media-fetch");
   let written: { ref: string; sha256: string; bytes: number };
+  let sourceReceipt: FilmVideoSubmissionReceipt | undefined;
+  let normalization: { factor: number; from: number; to: number } | undefined;
   if (params.url !== undefined) {
     const url = text(params.url, "media.fetch 的 url 非法", 8_192);
     requireIssuedUrl(ctx, url, frame);
+    const issued = ctx.issuedUrls.get(url)!;
     written = await fetchToFile(ctx, url, targetRef);
+    if (written.sha256 !== issued.artifact.sha256 || written.bytes !== issued.artifact.bytes)
+      fail("MEDIA_SOURCE_CHANGED", "重新下载的供应商产物与本作业已受理字节不一致");
+    sourceReceipt = ctx.videoFiles.get(issued.artifact.ref);
+    if (sourceReceipt) {
+      await requireCurrentVideoSource(ctx, issued.artifact.ref, sourceReceipt.shotId);
+    }
   } else if (params.ref !== undefined) {
     const sourceRef = text(params.ref, "media.fetch 的 ref 非法", 1_000);
-    const bytes = await readJobBytes(ctx, sourceRef);
-    written = await writeJobBytes(ctx, targetRef, bytes);
+    sourceReceipt = ctx.videoFiles.get(sourceRef);
+    if (sourceReceipt) await requireCurrentVideoSource(ctx, sourceRef, sourceReceipt.shotId);
+    if (params.normalizeToSeconds !== undefined) {
+      const targetSec = Number(params.normalizeToSeconds);
+      const source = await resolveWithin(ctx.workDir, sourceRef);
+      const temporaryRef = `${targetRef}.normalize-${randomUUID()}.mp4`;
+      const temporary = await resolveWithin(ctx.workDir, temporaryRef);
+      await mkdir(path.dirname(temporary), { recursive: true });
+      try {
+        const probe = JSON.parse(await reviewMediaTool(ctx, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "json", source]));
+        const from = Number(probe.format?.duration);
+        if (!Number.isFinite(from) || from <= 0) fail("MEDIA_NORMALIZATION_FAILED", "源视频时长无效");
+        const factor = Number((targetSec / from).toFixed(6));
+        const chain: string[] = [];
+        let remaining = 1 / factor;
+        while (remaining > 2) { chain.push("atempo=2"); remaining /= 2; }
+        while (remaining < 0.5) { chain.push("atempo=0.5"); remaining /= 0.5; }
+        chain.push(`atempo=${remaining.toFixed(6)}`);
+        await reviewMediaTool(ctx, "ffmpeg", ["-v", "error", "-y", "-i", source, "-vf", `setpts=PTS*${factor.toFixed(6)}`,
+          "-af", chain.join(","), "-t", targetSec.toFixed(3), "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
+          "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", temporary], 120_000);
+        await requireCurrentVideoSource(ctx, sourceRef, sourceReceipt!.shotId);
+        written = await writeJobBytes(ctx, targetRef, await readJobBytes(ctx, temporaryRef, MEDIA_FETCH_LIMIT_BYTES));
+        const result = JSON.parse(await reviewMediaTool(ctx, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "json", await resolveWithin(ctx.workDir, targetRef)]));
+        const to = Number(result.format?.duration);
+        if (!Number.isFinite(to) || Math.abs(to - targetSec) > 0.1) fail("MEDIA_NORMALIZATION_FAILED", "时长归一结果与冻结镜头不一致");
+        normalization = { factor, from: Number(from.toFixed(3)), to: Number(to.toFixed(3)) };
+      } finally { await rm(temporary, { force: true }).catch(error => ctx.log(`归一化临时文件清理失败：${String(error)}`)); }
+    } else {
+      const bytes = await readJobBytes(ctx, sourceRef, MEDIA_FETCH_LIMIT_BYTES);
+      written = await writeJobBytes(ctx, targetRef, bytes);
+    }
   } else {
     return fail("REQUEST_INVALID", "media.fetch 需要 url 或 ref");
   }
   await ctx.ledger.recordComponentAccepted(componentId, ctx.ownerToken, {
     provider: "local", providerModel: "media-fetch", actualCny: 0,
-    evidence: { artifactSha256: written.sha256, artifactRef: written.ref, artifactBytes: written.bytes },
+    evidence: { artifactSha256: written.sha256, artifactRef: written.ref, artifactBytes: written.bytes,
+      ...(normalization ? { normalization, sourceReceipt } : {}) },
   });
-  return written;
+  if (sourceReceipt) {
+    ctx.videoFiles.set(written.ref, sourceReceipt);
+    (ctx.videoArtifacts ??= new Map()).set(written.ref, written);
+  }
+  return { ...written, ...(normalization ? { normalization } : {}) };
 }
 
 async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
@@ -799,20 +1039,43 @@ async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, compone
   const prompt = text(params.prompt, "video.generate 需要非空 prompt", 30_000);
   const seconds = Number(params.seconds);
   if (!Number.isInteger(seconds) || seconds <= 0 || seconds > 30) fail("REQUEST_INVALID", "video.generate 的 seconds 必须是 1–30 的整数");
-  const generateAudio = params.generateAudio === undefined ? true : Boolean(params.generateAudio);
+  if (typeof params.generateAudio !== "boolean") fail("REQUEST_INVALID", "video.generate必须显式提供布尔generateAudio");
+  const generateAudio = params.generateAudio;
+  const aspect = text(params.aspect, "video.generate需要画幅", 16);
+  const resolution = text(params.resolution, "video.generate需要源分辨率", 16);
   const targetRef = text(params.targetRef, "video.generate 需要 targetRef", 1_000);
   await resolveWithin(ctx.workDir, targetRef);
   const firstFrame = params.firstFrame === undefined ? undefined : record(params.firstFrame);
   let firstFrameUrl: string | undefined;
+  const referenceInputs: FilmVideoReferenceInput[] = [];
   if (firstFrame?.hostedUrl !== undefined) {
     const url = text(firstFrame.hostedUrl, "firstFrame.hostedUrl 非法", 8_192);
     requireIssuedUrl(ctx, url, frame);
+    const issued = ctx.issuedUrls.get(url)!;
+    const bytes = await readJobBytes(ctx, issued.artifact.ref);
+    if (sha256Bytes(bytes) !== issued.artifact.sha256 || bytes.length !== issued.artifact.bytes) fail("REFERENCE_CHANGED", "已签发首帧字节发生变化");
+    referenceInputs.push({ role: "first-frame", ref: issued.artifact.ref, sha256: issued.artifact.sha256, hashKind: "bytes", requestUriSha256: sha256Bytes(url) });
     firstFrameUrl = url;
   } else if (firstFrame?.ref !== undefined) {
     const ref = text(firstFrame.ref, "firstFrame.ref 非法", 1_000);
-    firstFrameUrl = dataUrlFor(ref, await readJobBytes(ctx, ref));
+    const bytes = await readJobBytes(ctx, ref);
+    referenceInputs.push({ role: "first-frame", ref, sha256: sha256Bytes(bytes), hashKind: "bytes" });
+    firstFrameUrl = dataUrlFor(ref, bytes);
   }
-  const refs = await anchorsToDataUrls(ctx, params.refs);
+  if (!Array.isArray(params.refs) || params.refs.length > 3) fail("REFERENCE_LIMIT_EXCEEDED", "视频引用最多3张，禁止静默截断");
+  const refs: string[] = [];
+  for (const rawRef of params.refs) {
+    const ref = text(rawRef, "视频参考引用非法", 1_000);
+    if (/^asset:\/\//.test(ref)) {
+      const source = registeredCharactersFor(ctx);
+      const registered = source.contract.shots.find(shot => shot.shotId === frame.shotId);
+      if (source.contract.status !== "passed" || !registered?.referenceAssets.includes(ref)) fail("ASSET_NOT_BOUND", "参考asset不属于冻结镜头的登记授权组");
+      refs.push(ref); referenceInputs.push({ role: "reference-image", ref, sha256: sha256Bytes(ref), hashKind: "asset-uri" });
+    } else {
+      const bytes = await readJobBytes(ctx, ref);
+      refs.push(dataUrlFor(ref, bytes)); referenceInputs.push({ role: "reference-image", ref, sha256: sha256Bytes(bytes), hashKind: "bytes" });
+    }
+  }
   const seed = params.seed === undefined ? undefined : Number(params.seed);
   if (seed !== undefined && !Number.isFinite(seed)) fail("REQUEST_INVALID", "seed 必须是有限数");
   const { apiKey, model } = providerKey(ctx.env, "video");
@@ -826,8 +1089,10 @@ async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, compone
       durationSec: seconds,
       generateAudio,
       returnLastFrame: true,
+      resolution,
+      ...(firstFrameUrl ? {} : { aspectRatio: aspect }),
       ...(firstFrameUrl ? { firstFrameUrl } : {}),
-      ...(refs.length ? { referenceImageUrls: refs.slice(0, 3).filter((ref) => ref !== firstFrameUrl) } : {}),
+      ...(refs.length ? { referenceImageUrls: refs } : {}),
       ...(seed === undefined ? {} : { seed }),
     },
   };
@@ -848,7 +1113,10 @@ async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, compone
     fail(last.status === "failed" ? "PROVIDER_FAILED" : "PROVIDER_TIMEOUT_UNKNOWN", `出片未成功：${last.error ?? last.status}`);
   }
   const written = await fetchToFile(ctx, last.uri, targetRef);
-  ctx.issuedUrls.set(last.uri, { stepKey: frame.stepKey, shotId: frame.shotId });
+  const submissionReceipt = buildFilmVideoSubmissionReceipt({ jobId: ctx.job.id, projectId: ctx.job.project_id,
+    inputSha256: ctx.job.input_sha256, shotId: frame.shotId!, stepKey: frame.stepKey, requestHash: frame.requestHash,
+    providerRequestHash: compiled.payloadHash, taskId: submitted.taskId, artifact: written, promptSha256: sha256Bytes(prompt),
+    referenceInputs, aspect, resolution, seconds, generateAudio });
   const evidence: Record<string, unknown> = {
     artifactSha256: written.sha256,
     artifactRef: written.ref,
@@ -858,15 +1126,117 @@ async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, compone
     durationMs: Date.now() - started,
     seconds,
     generateAudio,
+    submissionReceipt,
   };
   ctx.log(`出片完成 ${frame.shotId ?? frame.stepKey} → ${written.ref}（${written.bytes}B，${seconds}s）`);
   await ctx.ledger.recordComponentAccepted(componentId, ctx.ownerToken, {
     provider: "seedance", providerModel: model, actualCny: null, evidence,
   });
-  return { ...written, taskId: submitted.taskId, hostedUrl: last.uri, provider: "seedance", providerModel: model };
+  ctx.issuedUrls.set(last.uri, { stepKey: frame.stepKey, shotId: frame.shotId, artifact: written });
+  ctx.videoFiles.set(written.ref, submissionReceipt);
+  (ctx.videoArtifacts ??= new Map()).set(written.ref, written);
+  return { ...written, taskId: submitted.taskId, hostedUrl: last.uri, provider: "seedance", providerModel: model, submissionReceipt };
 }
 
-async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
+interface PreparedIdentityReview {
+  request: CharacterIdentityReviewRequest;
+  clipRef: string;
+  contracts: ReturnType<typeof filmReviewContracts>;
+}
+
+async function reviewMediaTool(ctx: RunContext, kind: "ffmpeg" | "ffprobe", args: string[], timeout = 30_000): Promise<string> {
+  const executable = kind === "ffmpeg" ? ctx.env.WL_FFMPEG ?? ctx.env.FFMPEG_PATH ?? "ffmpeg"
+    : ctx.env.WL_FFPROBE ?? ctx.env.FFPROBE_PATH ?? "ffprobe";
+  return new Promise((resolve, reject) => {
+    execFile(executable, args, { timeout, maxBuffer: 2 * 1024 * 1024, env: ctx.env, signal: ctx.signal }, (error, stdout) => {
+      if (error) reject(new SubmissionError("IDENTITY_MEDIA_UNVERIFIED", "父服务无法独立探测视频或重建实际评审帧"));
+      else resolve(String(stdout));
+    });
+  });
+}
+
+/** Reconstruct from registered sources and actual current provider bytes before reserving model budget. */
+async function prepareIdentityReview(ctx: RunContext, frame: FilmChannelRequestFrame): Promise<PreparedIdentityReview> {
+  const params = record(frame.params);
+  const identity = record(params.identityReview);
+  const context = record(params.context);
+  if (params.stage !== "shot" || !frame.shotId || identity.purpose !== "identity-and-explicit-wardrobe"
+    || context.purpose !== "identity-and-explicit-wardrobe") fail("IDENTITY_REVIEW_SCOPE_INVALID", "专用人物评审用途或镜号非法");
+  if (!resolveProducerLlm(ctx.env)) fail("CHARACTER_VISION_UNAVAILABLE", "专用人物视觉模型不可用");
+  const source = registeredCharactersFor(ctx);
+  if (source.contract.status !== "passed") fail("CHARACTER_RENDER_PREFLIGHT_BLOCKED", "当前登记人物合同无效");
+  const clipRef = text(identity.clipRef, "专用评审缺视频引用", 1_000);
+  const clipPath = await resolveWithin(ctx.workDir, clipRef);
+  const receipt = await requireCurrentVideoSource(ctx, clipRef, frame.shotId);
+  // The actual prompt lock was checked at submission; here the private receipt, not child prose, owns its digest.
+  if (receipt.referenceInputs.filter(ref => ref.role === "reference-image").map(ref => ref.ref).join("\n")
+    !== source.contract.shots.find(shot => shot.shotId === frame.shotId)?.referenceAssets.join("\n"))
+    fail("IDENTITY_SOURCE_UNBOUND", "供应商受理引用没有绑定当前人物授权组");
+  if (!Array.isArray(identity.frames) || identity.frames.length !== 2) fail("IDENTITY_FRAMES_INVALID", "专用人物评审需要两个父服务可重建的时间帧");
+  let duration: number;
+  try {
+    const probe = JSON.parse(await reviewMediaTool(ctx, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "json", clipPath]));
+    duration = Number(probe.format?.duration);
+  } catch (error) {
+    if (error instanceof SubmissionError) throw error;
+    fail("IDENTITY_MEDIA_UNVERIFIED", "父服务视频时长探测结果无效");
+  }
+  if (!Number.isFinite(duration!) || duration! <= 0) fail("IDENTITY_MEDIA_UNVERIFIED", "父服务视频时长无效");
+  const expectedTimes = [duration! * 0.2, duration! * 0.75];
+  const dir = await mkdtemp(path.join(tmpdir(), "film-parent-identity-"));
+  const frames: CharacterIdentityReviewRequest["frames"] = [];
+  try {
+    for (const [index, raw] of identity.frames.entries()) {
+      const input = record(raw);
+      const ref = text(input.ref, "专用评审帧引用非法", 1_000);
+      if (input.atSec !== expectedTimes[index]) fail("IDENTITY_FRAMES_INVALID", "抽帧时间没有绑定当前视频独立时长");
+      const currentBytes = await readJobBytes(ctx, ref);
+      const output = path.join(dir, `sample-${index}.jpg`);
+      await reviewMediaTool(ctx, "ffmpeg", ["-v", "error", "-y", "-ss", String(expectedTimes[index]), "-i", clipPath,
+        "-frames:v", "1", "-vf", "scale=720:-2", output]);
+      const rebuilt = await readFile(output);
+      const sha256 = sha256Bytes(rebuilt);
+      if (input.sha256 !== sha256 || sha256Bytes(currentBytes) !== sha256) fail("IDENTITY_FRAME_SOURCE_MISMATCH", "送审帧与父服务从当前视频独立重建的字节不一致");
+      frames.push({ path: await resolveWithin(ctx.workDir, ref), sha256, atSec: expectedTimes[index]! });
+    }
+  } finally {
+    await rm(dir, { recursive: true, force: true }).catch(error => ctx.log(`父服务临时抽帧清理失败：${error instanceof Error ? error.message : String(error)}`));
+  }
+  const contracts = filmReviewContracts(ctx.contractSource, frame.shotId);
+  const request = buildCharacterIdentityReviewRequest({ contract: source.contract, shotId: frame.shotId,
+    clip: { path: clipPath, sha256: sha256Bytes(await readJobBytes(ctx, clipRef, MEDIA_FETCH_LIMIT_BYTES)) }, promptSha256: receipt.promptSha256, frames,
+    producerContractHash: buildProducerReviewContract(contracts).contractHash });
+  const referenceBytes = await readJobBytes(ctx, text(identity.referenceRef, "缺基准图作业内引用", 1_000));
+  if (sha256Bytes(referenceBytes) !== request.referenceImage.sha256) fail("IDENTITY_REFERENCE_MISMATCH", "子进程基准图副本与父服务登记原图不同");
+  if (identity.requestHash !== request.requestHash || filmCanonicalJson(identity.request) !== filmCanonicalJson(request))
+    fail("IDENTITY_REQUEST_MISMATCH", "子进程人物请求与父服务登记源、当前视频及实际帧重建结果不一致");
+  return { request, contracts, clipRef };
+}
+
+async function runIdentityReview(ctx: RunContext, componentId: string, prepared: PreparedIdentityReview): Promise<unknown> {
+  const { request, contracts } = prepared;
+  await ctx.ledger.recordDispatch(componentId, ctx.ownerToken, "workloom.producer-gate", "identity-and-explicit-wardrobe");
+  const verdict = await reviewCharacterVisualStage({ stage: "shot", projectId: ctx.job.project_id, contracts,
+    rubric: request.rubric, artifacts: [{ path: request.clip.path, kind: "video" }, ...request.frames.map(frame => ({ path: frame.path, kind: "image" as const }))],
+    referenceImages: [request.referenceImage.path], deterministic: [{ id: "identity-source-current", pass: true, hard: true, detail: request.requestHash }],
+    context: { ...request.context, shotId: request.shotId, identityRequestHash: request.requestHash, filmJobId: ctx.job.id },
+    env: ctx.env, batchSize: 12, allowFallbackApprove: false, log: ctx.log });
+  await requireCurrentVideoSource(ctx, prepared.clipRef, request.shotId);
+  registeredCharactersFor(ctx);
+  for (const input of [...request.frames, request.referenceImage]) {
+    if (sha256Bytes(await readFile(input.path)) !== input.sha256) fail("IDENTITY_SOURCE_CHANGED", "专用视觉评审期间帧或登记基准发生变化");
+  }
+  const identityEvidence = adaptCharacterVisualVerdict({ request, verdict });
+  await ctx.ledger.recordComponentAccepted(componentId, ctx.ownerToken, { provider: "workloom.producer-gate",
+    providerModel: verdict.model ?? "identity-and-explicit-wardrobe", actualCny: null,
+    evidence: { artifactSha256: sha256Bytes(filmCanonicalJson(identityEvidence)), identityEvidence,
+      reviewPolicy: "dedicated-identity", originalOpinion: { approved: verdict.approved, status: verdict.status, reason: verdict.reason } } });
+  ctx.identityEvidence.set(request.shotId, identityEvidence);
+  return { identityEvidence };
+}
+
+async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string, identityReview?: PreparedIdentityReview): Promise<unknown> {
+  if (identityReview) return runIdentityReview(ctx, componentId, identityReview);
   const params = record(frame.params);
   const stage = text(params.stage, "gate.review 需要 stage", 64);
   const artifacts = Array.isArray(params.artifacts) ? params.artifacts : [];

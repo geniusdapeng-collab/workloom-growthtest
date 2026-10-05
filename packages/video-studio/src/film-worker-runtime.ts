@@ -5,44 +5,104 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node
 import { FilmChannelError, FilmWorkerChannel, parseFilmWorkerJobContext, processIpcTransport,
   type FilmChannelTransport, type FilmWorkerJobContext } from "./film-worker-channel.js";
 import type { ProducerGateOptions, ProducerVerdict } from "./producer-gate.js";
+import { assertFilmVideoSubmissionReceipt, type FilmVideoReferenceInput, type FilmVideoSubmissionReceipt } from "./film-worker-provenance.js";
+import { adaptCharacterVisualVerdict, characterReleaseHash, type CharacterIdentityEvidence, type CharacterIdentityReviewRequest } from "./character-release-contract.js";
 
 export const FILM_CLI_STAGES = Object.freeze(["cine-kb", "continuity", "micromotion", "spec", "plates", "material-gen", "videos", "voice", "compose", "color", "subtitle", "danmaku", "bgm", "sfx", "cover", "mux", "master", "deliver", "revise"]);
-const valueOptions = new Set(["aspect", "resolution", "quality", "platform", "fps", "max-attempts", "xfade", "cut-transition", "cut-transition-duration", "cut-transition-at", "subtitle-mode", "subtitle-lang", "cover-platform", "cover-hero", "cover-hook", "theme", "account", "only", "review-policy", "route-kind", "assembly-mode", "assembly-reason", "revise-note", "revision-context", "narration-profile", "enhance-kind"]);
-const flagOptions = new Set(["no-resume", "no-danmaku", "no-open-with-cover", "no-cover-kb", "unified-narration", "prompt-english-gloss", "material-post-only", "material-speed-ramp", "bgm-declared-program-mix"]);
+const valueOptions = new Set(["aspect", "resolution", "quality", "platform", "fps", "max-attempts", "xfade", "cut-transition", "cut-transition-duration", "cut-transition-at", "subtitle-mode", "subtitle-lang", "cover-platform", "cover-hero", "cover-hook", "theme", "account", "only", "review-policy", "route-kind", "assembly-mode", "assembly-reason", "revise-note", "revision-context", "narration-profile", "enhance-kind", "opening-title"]);
+const flagOptions = new Set(["no-resume", "no-danmaku", "no-open-with-cover", "no-cover-kb", "narration-unified", "no-title-card", "prompt-english-gloss", "material-post-only", "material-speed-ramp", "bgm-declared-program-mix"]);
 const enumOptions: Record<string, readonly string[]> = {
   aspect: ["9:16", "16:9", "1:1", "4:5"], resolution: ["720p", "1080p", "2160p"], quality: ["hd", "uhd"],
   "subtitle-mode": ["sidecar", "burn", "both"], "review-policy": ["off", "advisory", "blocking"],
   "route-kind": ["narrative", "marketing"], "assembly-mode": ["post-only"], "enhance-kind": ["live-action", "animation"],
 };
 const numericOptions: Record<string, [number, number]> = { fps: [1, 120], "max-attempts": [1, 3], xfade: [0, 5], "cut-transition-duration": [0, 5] };
-const stageAliases: Record<string, string[]> = { spec: ["prompt-review", "prompt-package"], plates: ["keyframe"], videos: ["shot"] };
+const stageAliases: Record<string, string> = { keyframe: "plates", shot: "videos" };
+const perShotStages = new Set(["spec", "plates", "material-gen", "videos", "voice"]);
+
+function normalizeOnly(raw: unknown): string {
+  if (typeof raw !== "string" && !Array.isArray(raw)) throw new FilmChannelError("OPTION_INVALID", "only 必须是镜号字符串或字符串数组");
+  const values: unknown[] = Array.isArray(raw) ? raw : raw.split(",");
+  if (!values.length || values.some((value) => typeof value !== "string" || !value.trim() || /[\x00-\x1f\x7f,]/.test(value) || value.trim().startsWith("--"))) {
+    throw new FilmChannelError("OPTION_INVALID", "only 必须包含非空镜号，不得含控制字符或选项");
+  }
+  const value = [...new Set((values as string[]).map((item) => item.trim()))].join(",");
+  if (value.length > 5_000) throw new FilmChannelError("OPTION_INVALID", "only 超出长度上限");
+  return value;
+}
 
 /** The parent checks that requested work has evidence; a summary file alone is not a completed job. */
 export function assertFilmStageCoverage(stages: string[], options: Record<string, unknown>, source: Record<string, unknown>, records: unknown): void {
   if (!Array.isArray(records)) throw new FilmChannelError("RESULT_INVALID", "工位结果缺阶段记录");
-  const only = String(options.only ?? "").split(",").filter(Boolean);
-  const selected = (Array.isArray(source.shots) ? source.shots : []).filter((shot) =>
-    shot && typeof shot === "object" && (!only.length || only.includes(String((shot as Record<string, unknown>).shotId))));
-  const notApplicable = (stage: string): boolean =>
-    stage === "material-gen" && !selected.some((shot) => String((shot as Record<string, unknown>).photo ?? "").trim())
-    || stage === "mux" && options["subtitle-mode"] === "burn"
-    || stage === "danmaku" && options["no-danmaku"] === true
-    || stage === "revise" && !String(options["revise-note"] ?? "").trim();
-  for (const stage of stages) {
-    if (notApplicable(stage)) continue;
-    const aliases = stageAliases[stage] ?? [stage];
-    const latest = new Map<string, Record<string, unknown>>();
-    for (const raw of records) {
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new FilmChannelError("RESULT_INVALID", "阶段记录格式非法");
-      const row = raw as Record<string, unknown>;
-      if (aliases.includes(String(row.stage))) latest.set(`${row.stage}:${row.shotId ?? ""}`, row);
+  const normalized = normalizeFilmJobRequest(stages, options).options;
+  if (!source || typeof source !== "object" || !Array.isArray(source.shots) || !source.shots.length) throw new FilmChannelError("RESULT_INVALID", "冻结原稿缺非空镜头清单");
+  const all = new Map<string, Record<string, unknown>>();
+  for (const raw of source.shots) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new FilmChannelError("RESULT_INVALID", "冻结原稿镜头格式非法");
+    const shot = raw as Record<string, unknown>;
+    if (typeof shot.shotId !== "string" || !shot.shotId.trim() || shot.shotId !== shot.shotId.trim() || /[\x00-\x1f\x7f]/.test(shot.shotId) || all.has(shot.shotId)) throw new FilmChannelError("RESULT_INVALID", "冻结原稿镜号为空、重复或格式非法");
+    if (shot.dialogue != null && (!Array.isArray(shot.dialogue) || shot.dialogue.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry)))) throw new FilmChannelError("RESULT_INVALID", `冻结原稿台词格式非法：${shot.shotId}`);
+    if (shot.assetRef != null && String(shot.assetRef).trim() && (typeof shot.assetRef !== "string" || !/^asset:\/\/[A-Za-z0-9][A-Za-z0-9_-]*$/.test(shot.assetRef.trim()))) throw new FilmChannelError("RESULT_INVALID", `冻结原稿授权素材引用非法：${shot.shotId}`);
+    all.set(shot.shotId, shot);
+  }
+  const only = typeof normalized.only === "string" ? normalized.only.split(",") : [];
+  if (only.some((shotId) => !all.has(shotId))) throw new FilmChannelError("RESULT_INVALID", "only 含冻结原稿中不存在的镜号");
+  const selected = new Map([...all].filter(([shotId]) => !only.length || only.includes(shotId)));
+  const material = (shot: Record<string, unknown>): boolean => String(shot.photo ?? "").trim().length > 0;
+  const appliesToShot = (stage: string, shot: Record<string, unknown>): boolean =>
+    stage === "spec" ? !material(shot)
+      : stage === "plates" ? !material(shot) && !String(shot.assetRef ?? "").trim()
+        : stage === "material-gen" ? material(shot)
+          : stage === "voice" ? ((shot.dialogue ?? []) as Record<string, unknown>[]).map((entry) => String(entry.text ?? "")).filter(Boolean).join(" ").length > 0
+            : true;
+  const globalNotApplicable = (stage: string): boolean =>
+    stage === "mux" && normalized["subtitle-mode"] === "burn"
+    || stage === "danmaku" && normalized["no-danmaku"] === true
+    || stage === "revise" && !String(normalized["revise-note"] ?? "").trim();
+  const latest = new Map<string, Record<string, unknown>>();
+  for (const raw of records) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw new FilmChannelError("RESULT_INVALID", "阶段记录格式非法");
+    const row = raw as Record<string, unknown>;
+    if (typeof row.stage !== "string" || !row.stage.trim() || /[\x00-\x1f\x7f]/.test(row.stage)
+      || row.shotId !== null && typeof row.shotId !== "string" || typeof row.ok !== "boolean" || typeof row.degraded !== "boolean" || typeof row.invoked !== "boolean"
+      || row.cached !== undefined && typeof row.cached !== "boolean") throw new FilmChannelError("RESULT_INVALID", "阶段记录字段格式非法");
+    if (typeof row.shotId === "string" && !all.has(row.shotId)) throw new FilmChannelError("RESULT_INVALID", `阶段记录镜号不在冻结原稿：${row.shotId}`);
+    if (typeof row.shotId === "string" && !selected.has(row.shotId)) throw new FilmChannelError("RESULT_INVALID", `阶段记录越出 only 范围：${row.shotId}`);
+    const stage = Object.hasOwn(stageAliases, row.stage) ? stageAliases[row.stage]! : row.stage;
+    if (stages.includes(stage) || stages.includes("spec") && ["prompt-review", "prompt-package"].includes(stage)) {
+      if (perShotStages.has(stage) && row.shotId === null) throw new FilmChannelError("RESULT_INVALID", `逐镜阶段缺镜号：${stage}`);
+      if (!perShotStages.has(stage) && row.shotId !== null) throw new FilmChannelError("RESULT_INVALID", `全片阶段不得指定镜号：${stage}`);
     }
-    if (!latest.size) throw new FilmChannelError("RESULT_INVALID", `工位结果缺请求阶段：${stage}`);
-    for (const row of latest.values()) {
-      const declaredPostOnly = options["assembly-mode"] === "post-only" && row.assemblyMode === "post-only";
-      if (row.ok !== true || row.degraded !== false && !declaredPostOnly || row.invoked !== true && row.cached !== true) {
-        throw new FilmChannelError("RESULT_INVALID", `请求阶段没有通过：${stage}${row.shotId ? `:${row.shotId}` : ""}`);
+    latest.set(`${stage}:${row.shotId ?? ""}`, row);
+  }
+  const requirePassed = (stage: string, row: Record<string, unknown>, notApplicable = false): void => {
+    const declaredPostOnly = normalized["assembly-mode"] === "post-only" && row.assemblyMode === "post-only";
+    if (row.ok !== true || row.degraded !== false && !declaredPostOnly || !notApplicable && row.invoked !== true && row.cached !== true) {
+      throw new FilmChannelError("RESULT_INVALID", `请求阶段没有通过：${stage}${row.shotId ? `:${row.shotId}` : ""}`);
+    }
+  };
+  for (const stage of new Set(stages)) {
+    if (perShotStages.has(stage)) {
+      for (const [shotId, shot] of selected) {
+        const applicable = appliesToShot(stage, shot);
+        const row = latest.get(`${stage}:${shotId}`);
+        if (!row && applicable) throw new FilmChannelError("RESULT_INVALID", `工位结果缺请求阶段：${stage}:${shotId}`);
+        if (row) requirePassed(stage, row, !applicable);
       }
+      if (stage === "spec") {
+        const hasPrompts = [...selected.values()].some((shot) => appliesToShot("spec", shot));
+        const review = latest.get("prompt-review:");
+        const emptyPackage = latest.get("prompt-package:");
+        if (hasPrompts && emptyPackage) throw new FilmChannelError("RESULT_INVALID", "非全素材原稿不能声明 prompt-package 不适用");
+        if (hasPrompts && !review) throw new FilmChannelError("RESULT_INVALID", "工位结果缺请求阶段：prompt-review");
+        if (review) requirePassed("prompt-review", review);
+        if (emptyPackage) requirePassed("prompt-package", emptyPackage, true);
+      }
+    } else {
+      const row = latest.get(`${stage}:`);
+      const notApplicable = globalNotApplicable(stage);
+      if (!row && !notApplicable) throw new FilmChannelError("RESULT_INVALID", `工位结果缺请求阶段：${stage}`);
+      if (row) requirePassed(stage, row, notApplicable);
     }
   }
 }
@@ -50,9 +110,11 @@ export function normalizeFilmJobRequest(stages: string[], options: Record<string
   if (!Array.isArray(stages) || !stages.length || stages.some((stage) => !FILM_CLI_STAGES.includes(stage))) {
     throw new FilmChannelError("UNKNOWN_STAGE", "作业阶段必须来自固定影片管线");
   }
+  if (!options || typeof options !== "object" || Array.isArray(options)) throw new FilmChannelError("OPTION_INVALID", "作业选项格式非法");
   const normalized: Record<string, string | boolean> = {};
   for (const [original, raw] of Object.entries(options)) {
-    const key = original.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+    const hyphenated = original.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+    const key = hyphenated === "unified-narration" ? "narration-unified" : hyphenated;
     if (Object.hasOwn(normalized, key)) throw new FilmChannelError("OPTION_INVALID", `重复选项 ${key}`);
     if (flagOptions.has(key)) {
       if (typeof raw !== "boolean") throw new FilmChannelError("OPTION_INVALID", `${key} 必须是布尔值`);
@@ -60,8 +122,9 @@ export function normalizeFilmJobRequest(stages: string[], options: Record<string
       continue;
     }
     if (!valueOptions.has(key)) throw new FilmChannelError("OPTION_NOT_ALLOWED", `工位不接受选项 ${original}`);
-    const value = key === "only" && Array.isArray(raw) ? raw.join(",") : String(raw);
-    if (!["string", "number"].includes(typeof raw) && !(key === "only" && Array.isArray(raw))) throw new FilmChannelError("OPTION_INVALID", `${key} 格式非法`);
+    if (key === "only") { normalized[key] = normalizeOnly(raw); continue; }
+    if (!["string", "number"].includes(typeof raw)) throw new FilmChannelError("OPTION_INVALID", `${key} 格式非法`);
+    const value = String(raw);
     if (value.length > 5_000 || /[\0\r\n]/.test(value) || value.startsWith("--")) throw new FilmChannelError("OPTION_INVALID", `${key} 超限或含控制字符`);
     if (enumOptions[key] && !enumOptions[key]!.includes(value)) throw new FilmChannelError("OPTION_INVALID", `${key} 取值非法`);
     if (numericOptions[key]) {
@@ -85,6 +148,9 @@ export class FullChainFilmWorker {
   readonly args: string[];
   readonly inputPath: string;
   private readonly artifacts = new Map<string, WorkerArtifact>();
+  private readonly artifactStages = new Map<string, { stage: string; shotId: string }>();
+  /** Each local video descendant retains the current parent-issued provider source. */
+  private readonly providerVideoArtifacts = new Map<string, WorkerArtifact>();
   constructor(readonly context: FilmWorkerJobContext, readonly repoRoot: string, transport: FilmChannelTransport = processIpcTransport()) {
     if (Date.parse(context.deadlineAt) <= Date.now()) throw new FilmChannelError("JOB_DEADLINE_EXCEEDED", "作业已过截止时间");
     const archive = realpathSync(context.archiveRoot);
@@ -135,39 +201,176 @@ export class FullChainFilmWorker {
     if (Date.parse(this.context.deadlineAt) <= Date.now()) throw new FilmChannelError("JOB_DEADLINE_EXCEEDED", "作业已过截止时间");
     return this.channel.call(method, { stepKey: shotId ? `${stage}:${shotId}` : stage, shotId, params });
   }
-  private accept(result: unknown): WorkerArtifact {
+  private accept(result: unknown, register = true): WorkerArtifact {
     const artifact = result as WorkerArtifact;
     if (!artifact || typeof artifact.ref !== "string" || !/^[a-f0-9]{64}$/.test(artifact.sha256) || !(artifact.bytes > 0)) throw new FilmChannelError("ARTIFACT_UNVERIFIED", "父服务没有给出有效产物回执");
     const file = join(this.context.workDir, artifact.ref);
     this.ref(file);
     if (!within(this.context.workDir, realpathSync(file)) || statSync(file).size !== artifact.bytes || digest(file) !== artifact.sha256) throw new FilmChannelError("ARTIFACT_CHANGED", "产物字节与父服务回执不符");
-    this.artifacts.set(`film-artifact:${artifact.ref}`, artifact);
-    if (artifact.hostedUrl && !this.artifacts.has(artifact.hostedUrl)) this.artifacts.set(artifact.hostedUrl, artifact);
+    if (register) {
+      this.artifacts.set(`film-artifact:${artifact.ref}`, artifact);
+      if (artifact.hostedUrl && !this.artifacts.has(artifact.hostedUrl)) this.artifacts.set(artifact.hostedUrl, artifact);
+    }
     return artifact;
   }
   async image(prompt: string, anchors: string[], size: string, shotId: string, target: string): Promise<string> {
     const artifact = this.accept(await this.call("image.generate", "plates", shotId, { prompt, anchors: anchors.map((file) => this.reference(file)), size, targetRef: this.ref(target) }));
+    this.artifactStages.set(artifact.ref, { stage: "plates", shotId });
     return artifact.hostedUrl ?? `film-artifact:${artifact.ref}`;
   }
-  async video(options: { prompt: string; firstFrame?: string; refs: string[]; seconds: number; generateAudio: boolean; seed?: number; stage: string; shotId: string; target: string }): Promise<{ taskId: string; url: string; lastFrame: null }> {
+  private frozenSource(): Record<string, unknown> {
+    if (digest(this.inputPath) !== this.context.inputSha256) throw new FilmChannelError("INPUT_CHANGED", "当前工位原稿字节与冻结输入不符");
+    const input: unknown = JSON.parse(readFileSync(this.inputPath, "utf8"));
+    if (!input || typeof input !== "object" || Array.isArray(input)) throw new FilmChannelError("INPUT_INVALID", "影片冻结原稿必须是对象");
+    return input as Record<string, unknown>;
+  }
+  private videoReference(ref: string, role: FilmVideoReferenceInput["role"]): FilmVideoReferenceInput {
+    if (/^asset:\/\/[A-Za-z0-9][A-Za-z0-9._-]{0,255}$/.test(ref) && role === "reference-image") {
+      return { role, ref, sha256: createHash("sha256").update(ref).digest("hex"), hashKind: "asset-uri" };
+    }
+    const file = resolve(this.context.workDir, ref);
+    if (isAbsolute(ref) || this.ref(file) !== ref || !within(this.context.workDir, realpathSync(file)) || !statSync(file).isFile() || statSync(file).size <= 0) {
+      throw new FilmChannelError("REFERENCE_INVALID", "影片参考必须绑定本次作业中的非空真实字节");
+    }
+    return { role, ref, sha256: digest(file), hashKind: "bytes" };
+  }
+  async video(options: { prompt: string; firstFrame?: string; refs: string[]; seconds: number; generateAudio: boolean; seed?: number; aspect?: string; resolution?: string; stage: string; shotId: string; target: string }): Promise<{ taskId: string; url: string; lastFrame: null; resumed: false; requestInputVerified: true; submissionReceipt: FilmVideoSubmissionReceipt }> {
+    const frozen = this.frozenSource();
+    if (!Array.isArray(options.refs) || options.refs.length > 3 || options.refs.some((ref) => typeof ref !== "string" || !ref)) throw new FilmChannelError("REFERENCE_INVALID", "影片参考图最多三张，不得静默截断");
+    const refs = options.refs.map((ref) => ref.replace(/^film-ref:/, ""));
+    const referenceInputs = refs.map((ref) => this.videoReference(ref, "reference-image"));
     const first = options.firstFrame;
-    const firstFrame = first ? (/^https:\/\//.test(first) ? { hostedUrl: first } : { ref: first.replace(/^film-ref:/, "") }) : undefined;
-    const artifact = this.accept(await this.call("video.generate", options.stage, options.shotId, {
-      prompt: options.prompt, firstFrame, refs: options.refs.map((ref) => ref.replace(/^film-ref:/, "")), seconds: options.seconds,
-      generateAudio: options.generateAudio, seed: options.seed, targetRef: this.ref(options.target),
-    }));
+    let firstFrame: { hostedUrl: string } | { ref: string } | undefined;
+    if (first) {
+      if (/^https:\/\//.test(first)) {
+        const issued = this.artifacts.get(first);
+        if (!issued || issued.hostedUrl !== first) throw new FilmChannelError("URL_NOT_ISSUED", "首帧地址必须由本次父服务签发并绑定产物字节");
+        this.accept(issued);
+        firstFrame = { hostedUrl: first };
+        referenceInputs.unshift({ ...this.videoReference(issued.ref, "first-frame"), requestUriSha256: createHash("sha256").update(first).digest("hex") });
+      } else {
+        const issued = this.artifacts.get(first);
+        const ref = issued?.ref ?? first.replace(/^film-ref:/, "");
+        if (issued) this.accept(issued);
+        firstFrame = { ref };
+        referenceInputs.unshift(this.videoReference(ref, "first-frame"));
+      }
+    }
+    const aspect = options.aspect ?? String(this.context.options.aspect ?? frozen.aspect ?? "9:16");
+    const requestedResolution = options.resolution ?? String(this.context.options.resolution ?? frozen.resolution ?? "1080p");
+    // 2160p is the local UHD delivery target, not the provider source format.
+    const resolution = requestedResolution === "2160p" ? "1080p" : requestedResolution;
+    if (!enumOptions.aspect!.includes(aspect) || !enumOptions.resolution!.includes(resolution)) throw new FilmChannelError("OPTION_INVALID", "影片画幅或清晰度非法");
+    const params = { prompt: options.prompt, firstFrame, refs, seconds: options.seconds, generateAudio: options.generateAudio,
+      seed: options.seed, aspect, resolution, targetRef: this.ref(`${options.target}.provider.mp4`) };
+    const result = await this.call("video.generate", options.stage, options.shotId, params);
+    const artifact = this.accept(result, false);
     if (!artifact.taskId) throw new FilmChannelError("ARTIFACT_UNVERIFIED", "父服务未返回视频任务回执");
-    return { taskId: artifact.taskId, url: `film-artifact:${artifact.ref}`, lastFrame: null };
+    // A receipt is authority only at this current parent-channel response boundary.
+    // Independently retained input/reference hashes and actual sent params prevent
+    // an old receipt or a caller-asserted verified flag from granting provenance.
+    for (const reference of referenceInputs) {
+      if (this.videoReference(reference.ref, reference.role).sha256 !== reference.sha256) throw new FilmChannelError("REFERENCE_CHANGED", "参考字节在视频提交期间发生变化");
+    }
+    if (digest(this.inputPath) !== this.context.inputSha256) throw new FilmChannelError("INPUT_CHANGED", "原稿字节在视频提交期间发生变化");
+    const submissionReceipt = assertFilmVideoSubmissionReceipt((result as { submissionReceipt?: unknown }).submissionReceipt, {
+      jobId: this.context.jobId, projectId: this.context.projectId, inputSha256: this.context.inputSha256,
+      shotId: options.shotId, stepKey: `${options.stage}:${options.shotId}`, taskId: artifact.taskId,
+      artifact: { ref: artifact.ref, sha256: artifact.sha256, bytes: artifact.bytes }, promptSha256: createHash("sha256").update(options.prompt).digest("hex"),
+      referenceInputs, aspect, resolution, seconds: options.seconds, generateAudio: options.generateAudio, requestParams: params,
+    });
+    this.accept(artifact);
+    this.artifactStages.set(artifact.ref, { stage: options.stage, shotId: options.shotId });
+    this.providerVideoArtifacts.set(artifact.ref, artifact);
+    return { taskId: artifact.taskId, url: `film-artifact:${artifact.ref}`, lastFrame: null, resumed: false, requestInputVerified: true, submissionReceipt };
   }
   async download(url: string, target: string): Promise<string> {
     const artifact = this.artifacts.get(url);
     if (!artifact) throw new FilmChannelError("URL_NOT_ISSUED", "工位不得直接下载未签发的地址");
     this.accept(artifact);
     if (this.ref(target) !== artifact.ref) {
-      const stage = url.startsWith("film-artifact:") && target.endsWith(".mp4") ? (this.context.stages.includes("videos") ? "videos" : "material-gen") : "plates";
-      this.accept(await this.call("media.fetch", stage, null, { ref: artifact.ref, targetRef: this.ref(target) }));
+      const origin = this.artifactStages.get(artifact.ref);
+      const stage = origin?.stage ?? (url.startsWith("film-artifact:") && target.endsWith(".mp4") ? (this.context.stages.includes("videos") ? "videos" : "material-gen") : "plates");
+      const copied = this.accept(await this.call("media.fetch", stage, origin?.shotId ?? null, { ref: artifact.ref, targetRef: this.ref(target) }), false);
+      if (copied.ref !== this.ref(target) || copied.sha256 !== artifact.sha256 || copied.bytes !== artifact.bytes) throw new FilmChannelError("ARTIFACT_CHANGED", "复制产物没有保留父服务签发的原始字节");
+      this.accept(copied);
+      if (origin) this.artifactStages.set(copied.ref, origin);
+      const provider = this.providerVideoArtifacts.get(artifact.ref);
+      if (provider) this.providerVideoArtifacts.set(copied.ref, provider);
     }
     return target;
+  }
+  async normalizeVideo(target: string, targetSec: number, stage: string, shotId: string): Promise<{ factor: number; from: number; to: number }> {
+    if (!Number.isFinite(targetSec) || targetSec <= 0) throw new FilmChannelError("VIDEO_NORMALIZATION_INVALID", "时长归一化目标须是有限正数");
+    this.frozenSource();
+    const ref = this.ref(target);
+    const artifact = this.artifacts.get(`film-artifact:${ref}`);
+    const origin = this.artifactStages.get(ref);
+    const provider = this.providerVideoArtifacts.get(ref);
+    if (!artifact || !origin || !provider || origin.stage !== stage || origin.shotId !== shotId || ref === provider.ref) {
+      throw new FilmChannelError("VIDEO_NORMALIZATION_SOURCE_INVALID", "时长归一化只允许当前镜头已登记的供应商原档副本");
+    }
+    this.accept(artifact, false); this.accept(provider, false);
+    const result = await this.call("media.fetch", stage, shotId, { ref, targetRef: ref, normalizeToSeconds: targetSec }) as WorkerArtifact & {
+      normalization: { factor: number; from: number; to: number };
+    };
+    this.frozenSource(); this.accept(provider, false);
+    const normalization = result?.normalization;
+    if (!normalization || typeof normalization !== "object" || Array.isArray(normalization)
+      || ![normalization.factor, normalization.from, normalization.to].every((value) => typeof value === "number" && Number.isFinite(value) && value > 0)
+      || Math.abs(normalization.to - targetSec) > 0.1 + 1e-9
+      || Math.abs(normalization.factor - targetSec / normalization.from) > 1e-3
+      || result.ref !== ref) {
+      throw new FilmChannelError("VIDEO_NORMALIZATION_INVALID", "父服务时长归一化回执未绑定目标、有限倍率和实际回读时长");
+    }
+    const normalized = this.accept(result, false);
+    this.accept(normalized);
+    this.artifactStages.set(normalized.ref, origin);
+    this.providerVideoArtifacts.set(normalized.ref, provider);
+    return { factor: normalization.factor, from: normalization.from, to: normalization.to };
+  }
+  get identityVisionAvailable(): boolean { return this.context.characterVisionAvailable === true; }
+  async identityReview(request: CharacterIdentityReviewRequest): Promise<CharacterIdentityEvidence> {
+    if (!this.identityVisionAvailable) throw new FilmChannelError("IDENTITY_VISION_UNAVAILABLE", "父服务未声明专用人物视觉评审可用");
+    const frozen = this.frozenSource();
+    const retained = JSON.parse(JSON.stringify(request)) as CharacterIdentityReviewRequest;
+    const { requestHash, ...body } = retained;
+    if (retained.schemaVersion !== "workloom.character-identity-review/v1" || retained.purpose !== "identity-and-explicit-wardrobe"
+      || requestHash !== characterReleaseHash(body) || retained.projectId !== this.context.projectId || !Array.isArray(retained.frames) || retained.frames.length < 2
+      || retained.frames.some((frame) => !Number.isFinite(frame.atSec) || frame.atSec < 0)
+      || new Set(retained.frames.map((frame) => frame.path)).size !== retained.frames.length || new Set(retained.frames.map((frame) => frame.atSec)).size < 2) {
+      throw new FilmChannelError("IDENTITY_REVIEW_INVALID", "专用人物评审请求未绑定本次项目及完整合同");
+    }
+    const check = (fingerprint: { path: string; sha256: string }): string => {
+      const ref = this.ref(fingerprint.path);
+      const file = resolve(this.context.workDir, ref);
+      if (!within(this.context.workDir, realpathSync(file)) || !statSync(file).isFile() || statSync(file).size <= 0 || digest(file) !== fingerprint.sha256) {
+        throw new FilmChannelError("IDENTITY_REVIEW_CHANGED", "专用人物评审视频或抽帧字节与当前请求不符");
+      }
+      return ref;
+    };
+    const clipRef = check(retained.clip);
+    const frames = retained.frames.map((frame) => ({ ref: check(frame), sha256: frame.sha256, atSec: frame.atSec }));
+    const referenceRef = this.reference(retained.referenceImage.path);
+    if (digest(join(this.context.workDir, referenceRef)) !== retained.referenceImage.sha256) throw new FilmChannelError("IDENTITY_REVIEW_CHANGED", "登记人物基准图字节与评审请求不符");
+    const origin = this.artifactStages.get(clipRef);
+    if (origin && origin.shotId !== retained.shotId) throw new FilmChannelError("IDENTITY_REVIEW_INVALID", "人物评审产物来自另一个镜头");
+    const shot = (Array.isArray(frozen.shots) ? frozen.shots : []).find((raw) => raw && typeof raw === "object" && !Array.isArray(raw) && raw.shotId === retained.shotId) as Record<string, unknown> | undefined;
+    if (!shot) throw new FilmChannelError("IDENTITY_REVIEW_INVALID", "人物评审镜号不在冻结原稿内");
+    const stage = origin?.stage ?? (String(shot.photo ?? "").trim() || retained.context?.sourceStage === "material-gen"
+      || !this.context.stages.includes("videos") && this.context.stages.includes("material-gen") ? "material-gen" : "videos");
+    const result = await this.call("gate.review", stage, retained.shotId, { stage: "shot", projectId: retained.projectId,
+      identityReview: { purpose: "identity-and-explicit-wardrobe", request: retained, clipRef, frames, referenceRef, requestHash },
+      context: { shotId: retained.shotId, purpose: "identity-and-explicit-wardrobe" } }) as { identityEvidence?: CharacterIdentityEvidence };
+    this.frozenSource(); check(retained.clip); for (const frame of retained.frames) check(frame);
+    if (digest(join(this.context.workDir, referenceRef)) !== retained.referenceImage.sha256) throw new FilmChannelError("IDENTITY_REVIEW_CHANGED", "专用评审期间基准图复制字节发生变化");
+    const evidence = result?.identityEvidence;
+    if (!evidence?.visualReview?.request || !evidence.visualReview.verdict || characterReleaseHash(evidence.visualReview.request) !== characterReleaseHash(retained)) {
+      throw new FilmChannelError("IDENTITY_REVIEW_UNVERIFIED", "父服务没有给出绑定本次专用请求的身份评审证据");
+    }
+    const recomputed = adaptCharacterVisualVerdict({ request: retained, verdict: evidence.visualReview.verdict });
+    if (characterReleaseHash(evidence) !== characterReleaseHash(recomputed)) throw new FilmChannelError("IDENTITY_REVIEW_UNVERIFIED", "父服务身份评审证据与当前请求重算不符");
+    return recomputed;
   }
   async review(options: Omit<ProducerGateOptions, "contracts">): Promise<ProducerVerdict> {
     const aliases: Record<string, string> = { script: "spec", prompt: "spec", keyframe: "plates", shot: "videos" };

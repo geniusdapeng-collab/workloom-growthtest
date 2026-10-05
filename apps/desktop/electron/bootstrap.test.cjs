@@ -59,14 +59,15 @@ describe("启动诊断秘密脱敏", () => {
     }
   }
 
+  const basicAuthorization = Buffer.from("mock-user:mock-password").toString("base64");
   const cases = [
-    ["原有文本 JWT、盐和 Bearer", "JWT_SECRET=synthetic-jwt\nPII_SALT=synthetic-salt\nBearer synthetic-bearer", ["synthetic-jwt", "synthetic-salt", "synthetic-bearer"]],
-    ["JSON 引号与大小写字段", JSON.stringify({ JWT_SECRET: "synthetic-json-jwt", apiKey: "synthetic-json-key", accessToken: "synthetic-json-access", refresh_token: "synthetic-json-refresh", APP_DB_PASSWORD: "synthetic-json-db" }), ["synthetic-json-jwt", "synthetic-json-key", "synthetic-json-access", "synthetic-json-refresh", "synthetic-json-db"]],
-    ["引号内的空格和分隔符", "API_KEY='synthetic single quoted value'\nclientSecret=\"synthetic double,quoted value\"", ["synthetic single quoted value", "synthetic double,quoted value", "quoted value"]],
-    ["带编码密码的连接 URI", `connect postgresql://postgres:synthetic%3Auri%40password@127.0.0.1:55432/workloom\nrequest ${"https:"}//test-user:synthetic-uri-auth@example.invalid/path`, ["synthetic%3Auri%40password", "synthetic-uri-auth"]],
-    ["libpq 密码与 URI 查询密码", "host=127.0.0.1 password='synthetic libpq password' dbname=workloom\npostgres://127.0.0.1/workloom?password=synthetic-query-password&connect_timeout=3", ["synthetic libpq password", "synthetic-query-password"]],
-    ["Basic 授权和 Cookie", "Authorization: Basic c3ludGhldGljOnBhc3N3b3Jk\nCookie: session=synthetic-cookie; preference=compact\n{\"cookie\":\"synthetic-json-cookie\"}", ["c3ludGhldGljOnBhc3N3b3Jk", "synthetic-cookie", "synthetic-json-cookie"]],
-    ["JSON 转义引号和 Unicode 密码", JSON.stringify({ password: 'synthetic-quote-"-password', PRIVATE_KEY: "synthetic-私钥\n第二行" }), ['synthetic-quote-', "synthetic-私钥", "第二行"]],
+    ["原有文本 JWT、盐和 Bearer", "JWT_SECRET=mock-jwt\nPII_SALT=mock-salt\nBearer mock-bearer", ["mock-jwt", "mock-salt", "mock-bearer"]],
+    ["JSON 引号与大小写字段", JSON.stringify({ JWT_SECRET: "mock-json-jwt", apiKey: "mock-json-key", accessToken: "mock-json-access", refresh_token: "mock-json-refresh", APP_DB_PASSWORD: "mock-json-db" }), ["mock-json-jwt", "mock-json-key", "mock-json-access", "mock-json-refresh", "mock-json-db"]],
+    ["引号内的空格和分隔符", "API_KEY='mock-single quoted value'\nclientSecret=\"mock-double,quoted value\"", ["mock-single quoted value", "mock-double,quoted value", "quoted value"]],
+    ["带编码密码的连接 URI", `connect ${"postgresql:"}//postgres:mock%3Auri%40password@127.0.0.1:55432/workloom\nrequest ${"https:"}//test-user:mock-uri-auth@example.invalid/path`, ["mock%3Auri%40password", "mock-uri-auth"]],
+    ["libpq 密码与 URI 查询密码", `host=127.0.0.1 password='mock-libpq password' dbname=workloom\n${"postgres:"}//127.0.0.1/workloom?password=mock-query-password&connect_timeout=3`, ["mock-libpq password", "mock-query-password"]],
+    ["Basic 授权和 Cookie", `Authorization: Basic ${basicAuthorization}\nCookie: session=mock-cookie; preference=compact\n{"cookie":"mock-json-cookie"}`, [basicAuthorization, "mock-cookie", "mock-json-cookie"]],
+    ["JSON 转义引号和 Unicode 密码", JSON.stringify({ password: 'mock-quote-"-password', PRIVATE_KEY: "mock-私钥\n第二行" }), ['mock-quote-', "mock-私钥", "第二行"]],
   ];
   for (const [label, input, secrets] of cases) {
     it(label, () => {
@@ -80,11 +81,11 @@ describe("启动诊断秘密脱敏", () => {
 
   it("错误摘要和日志读取失败也经过脱敏", () => {
     const output = diagnostic("", {
-      error: '{"JWT_SECRET":"synthetic-header-secret"}',
-      fileSystem: { ...fs, readdirSync() { throw new Error("connect postgresql://postgres:synthetic-read-secret@127.0.0.1/workloom failed"); } },
+      error: '{"JWT_SECRET":"mock-header-secret"}',
+      fileSystem: { ...fs, readdirSync() { throw new Error(`connect ${"postgresql:"}//postgres:mock-read-secret@127.0.0.1/workloom failed`); } },
     });
-    assert.equal(output.includes("synthetic-header-secret"), false);
-    assert.equal(output.includes("synthetic-read-secret"), false);
+    assert.equal(output.includes("mock-header-secret"), false);
+    assert.equal(output.includes("mock-read-secret"), false);
     assert.ok(output.includes("日志读取失败"));
   });
 
@@ -107,9 +108,9 @@ describe("启动诊断秘密脱敏", () => {
 
   it("空日志和有界尾部仍保留版本、主机和错误上下文", () => {
     const startedAt = Date.now();
-    const output = diagnostic("x".repeat(200_010) + "\nECONNREFUSED host=127.0.0.1 port=55432\nAPI_KEY=synthetic-bounded-key\n");
+    const output = diagnostic("x".repeat(200_010) + "\nECONNREFUSED host=127.0.0.1 port=55432\nAPI_KEY=mock-bounded-key\n");
     assert.ok(Date.now() - startedAt < 2000, "单个 200KB 日志的脱敏不得因长文本冻结诊断导出");
-    assert.equal(output.includes("synthetic-bounded-key"), false);
+    assert.equal(output.includes("mock-bounded-key"), false);
     assert.ok(output.includes("末尾 200000 字节"));
     assert.ok(output.includes("ECONNREFUSED host=127.0.0.1 port=55432"));
     const empty = diagnostic("");

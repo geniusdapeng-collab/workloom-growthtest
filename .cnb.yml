@@ -20,13 +20,25 @@
     - name: 协议门禁（提交规范 + 并发冲突）
       script: |
         set -eu
-        node --test scripts/ci/protocol-rules.test.mjs
+        node --test scripts/ci/protocol-rules.test.mjs scripts/ci/verify-commit-msg.test.mjs
         node --test scripts/ci/cnb-desktop-release.test.mjs
         # 硬闸口径（T-2026-0930-0015）：创作/审美口径不得写成 hard: true（硬闸只允许事实类）
         node --test scripts/ci/hard-gate-policy.test.mjs
         node scripts/ci/verify-hard-gate-policy.mjs
         node scripts/ci/verify-commit-msg.mjs --self-test
         node scripts/ci/verify-lock-conflict.mjs --self-test
+        # PR 范围不能在浅历史上漏检；完整 checkout 无需额外网络请求。
+        if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+          git fetch --no-tags --unshallow origin
+        fi
+        # CNB 对已包含 target 的 source 可能做 fast-forward checkout；仍取得
+        # 平台声明的 merge 对象，由 checker 核对双亲及实际工作区树完全相同。
+        if [ -n "${CNB_PULL_REQUEST_MERGE_SHA:-}" ]; then
+          checked_merge_sha=$CNB_PULL_REQUEST_MERGE_SHA
+          test "${#checked_merge_sha}" -eq 40
+          case "$checked_merge_sha" in *[!0-9a-fA-F]*) exit 1 ;; esac
+          git cat-file -e "${checked_merge_sha}^{commit}" 2>/dev/null || git fetch --no-tags origin "$checked_merge_sha"
+        fi
         node scripts/ci/verify-commit-msg.mjs
         node scripts/ci/verify-lock-conflict.mjs
 
@@ -171,7 +183,10 @@
         set -eu
         NODE_VERSION=v24.19.0
         apt-get update -qq
-        apt-get install -y -qq curl xz-utils ca-certificates git >/dev/null
+        # Media contract tests decode actual fixtures instead of skipping when tools are absent.
+        apt-get install -y -qq curl xz-utils ca-certificates git ffmpeg >/dev/null
+        ffmpeg -version
+        ffprobe -version
         if [ ! -x /cnb-cache/node/bin/node ]; then
           mkdir -p /cnb-cache/node
           curl -fsSL "https://nodejs.org/dist/${NODE_VERSION}/node-${NODE_VERSION}-linux-x64.tar.xz" -o /tmp/node.tar.xz

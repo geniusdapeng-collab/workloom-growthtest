@@ -341,11 +341,12 @@ export class StudioWorkerError extends Error {
   }
 }
 
-export const RESERVED_STUDIO_METADATA_ERROR = "METADATA_RESERVED：directorIdentityImages 为服务端专用字段，请使用已登记素材 ID";
+export const RESERVED_STUDIO_METADATA_ERROR = "METADATA_RESERVED：客户 metadata 不能提供内部图片字段或本机参考图路径，请使用已登记素材 ID";
 
-/** 普通metadata只承载客户意图，不能进入导演工作器已解析的本机图片通道。 */
+/** 普通metadata只承载客户意图，不能进入服务端已解析的本机图片通道。 */
 export function isPublicStudioMetadata(metadata?: Record<string, unknown> | null): boolean {
-  return !metadata || !Object.hasOwn(metadata, "directorIdentityImages");
+  // 与实际定妆配置共用解析器，字符串和所有产品参考图字段别名都在任何 SQL/租约之前关闭。
+  return !metadata || (!Object.hasOwn(metadata, "directorIdentityImages") && collectReferenceImages(metadata).length === 0);
 }
 
 function assertPublicStudioMetadata(metadata?: Record<string, unknown> | null): void {

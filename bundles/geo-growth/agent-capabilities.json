@@ -177,9 +177,9 @@
     },
     {
       "id": "growth.video.production.status",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "读取视频生产状态",
-      "description": "读取某项目的逐阶段账本（logs/<project>/stages.jsonl）：各阶段 invoked/ok/failed/degraded、最近一次失败原因，以及渲染台账（提交次数/渲后判不合格/平台拒收/canary 止损）。只读本地账本，用于判断「卡在哪一步」，不触发任何渲染。",
+      "description": "读取某项目的逐阶段账本（logs/<project>/stages.jsonl）：各阶段成败、最近失败原因，按有效 taskId 去重的受理任务数及最新结果；GET 接续/缓存不重复计数，无任务 ID 的调用列为未知。只读，不触发渲染或费用估算。",
       "operation": "read",
       "risk": "low",
       "dataMode": "unverified",
@@ -207,9 +207,9 @@
     },
     {
       "id": "growth.video.delivery.inspect",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "核验视频交付清单",
-      "description": "读取交付清单（<out>/<project>-delivery-manifest.json）并逐个检查清单所列文件是否存在、大小，回传审核口径（reviewPolicy）、分流结论、配乐层状态与渲染台账；缺件/越界会如实列出。只读，不重新交付。",
+      "description": "读取交付清单（<out>/<project>-delivery-manifest.json）并逐个计算实际 SHA-256 与声明哈希/字节数比较；缺件、内容修改、元数据冲突及路径越界会列出。未声明哈希的文件保持 unverified。只读，不重新交付。",
       "operation": "receipt",
       "risk": "low",
       "dataMode": "unverified",
@@ -237,9 +237,9 @@
     },
     {
       "id": "growth.video.production.plan",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "预览出片计划（不执行）",
-      "description": "给出「出片建议命令 + 前置检查清单」（分流是否就绪、镜头卡是否在场、火山方舟密钥是否配置、欠费提示）。这是预览：不跑管线、不提交渲染、不花钱；真正的执行走 CLI（full-chain-film.mts）。",
+      "description": "只读预览分流、镜头结构、声明帧率、原生对白/统一配音冲突和本机 ASR 配置；有阻塞时不返回执行命令。通过时给出安全引用的命令及完整 argv/工作目录。ready 只表示已读输入和本地配置，不代表身份、余额或运行时验收。",
       "operation": "preview",
       "risk": "low",
       "dataMode": "unverified",
@@ -274,6 +274,13 @@
           "outDir": {
             "type": "string",
             "maxLength": 400
+          },
+          "workDir": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "unifiedNarration": {
+            "type": "boolean"
           }
         },
         "additionalProperties": false

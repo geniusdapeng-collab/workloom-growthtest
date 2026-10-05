@@ -12,14 +12,22 @@ function fixture(run) {
   const root = mkdtempSync(join(tmpdir(), "影片交付 空格-"));
   const oldRoot = process.env.WORKLOOM_VIDEO_ARTIFACT_ROOT;
   const oldKeys = process.env.WORKLOOM_KEYS_FILE;
+  const previousEnv = Object.fromEntries(["VOLCENGINE_ARK_API_KEY", "WORKLOOM_VOICE_ENGINE", "WORKLOOM_VOICE_ENGINE_URL"].map((key) => [key, process.env[key]]));
   process.env.WORKLOOM_VIDEO_ARTIFACT_ROOT = root;
-  process.env.WORKLOOM_KEYS_FILE = "/dev/null";
+  process.env.WORKLOOM_KEYS_FILE = join(root, "keys.env");
+  process.env.VOLCENGINE_ARK_API_KEY = "fixture-only-render-key";
+  process.env.WORKLOOM_VOICE_ENGINE = "mlx";
+  process.env.WORKLOOM_VOICE_ENGINE_URL = "http://127.0.0.1:8099";
+  writeFileSync(join(root, "keys.env"), "VOLCENGINE_ARK_API_KEY=fixture-only-render-key\n");
   mkdirSync(join(root, "out"));
   const save = (manifest) => writeFileSync(join(root, "out", "P1-delivery-manifest.json"), JSON.stringify({ projectId: "P1", ...manifest }));
   try { run({ root, save, inspect: () => deliveryInspect({ projectId: "P1", outDir: "out" }) }); }
   finally {
     if (oldRoot === undefined) delete process.env.WORKLOOM_VIDEO_ARTIFACT_ROOT; else process.env.WORKLOOM_VIDEO_ARTIFACT_ROOT = oldRoot;
     if (oldKeys === undefined) delete process.env.WORKLOOM_KEYS_FILE; else process.env.WORKLOOM_KEYS_FILE = oldKeys;
+    for (const [key, value] of Object.entries(previousEnv)) {
+      if (value === undefined) delete process.env[key]; else process.env[key] = value;
+    }
     rmSync(root, { recursive: true, force: true });
   }
 }
@@ -28,7 +36,7 @@ test("delivery hashes main, attachments and asset list; later tampering is detec
   writeFileSync(join(root, "out", "cover.png"), "cover");
   save({ deliverable: { path: "out/main.mp4", sha256: hash("master") }, cover: { path: "out/cover.png" },
     assets: [{ path: "out/cover.png", sha256: hash("cover") }] });
-  assert.equal(inspect().integrity, "verified");
+  assert.equal(inspect().integrity, "sha256-verified");
   writeFileSync(join(root, "out", "cover.png"), "tampered");
   const result = inspect();
   assert.equal(result.integrity, "incomplete");
@@ -41,15 +49,17 @@ test("empty manifest, missing or empty main, directory and missing digest never 
   }
   writeFileSync(join(root, "out", "main.mp4"), "");
   save({ deliverable: { path: "out/main.mp4", sha256: hash("") } });
-  assert.equal(inspect().files[0].state, "empty-or-not-file");
+  assert.equal(inspect().files[0].state, "empty-file");
   writeFileSync(join(root, "out", "main.mp4"), "master");
   save({ deliverable: { path: "out/main.mp4" } });
-  assert.equal(inspect().files[0].state, "sha256-unavailable");
+  assert.equal(inspect().integrity, "unverified");
+  assert.equal(inspect().files[0].verified, false);
 }));
 test("cross-project manifests, conflicting digests, invalid JSON and path escapes fail", () => fixture(({ root, save, inspect }) => {
   save({ projectId: "other" }); assert.throws(inspect, /项目标识/u);
   save({ assets: [{ path: "out/a", sha256: "a" }, { path: "out/a", sha256: "b" }] });
-  assert.throws(inspect, /冲突/u);
+  assert.equal(inspect().integrity, "incomplete");
+  assert.ok(inspect().files.some((entry) => entry.state === "invalid-metadata" && /冲突/u.test(entry.detail)));
   writeFileSync(join(root, "out", "P1-delivery-manifest.json"), "{"); assert.throws(inspect, /JSON/u);
   save({ deliverable: { path: "../escape", sha256: hash("x") } });
   assert.equal(inspect().files[0].state, "out-of-root");
@@ -62,8 +72,12 @@ test("cross-project manifests, conflicting digests, invalid JSON and path escape
   } finally { rmSync(external, { recursive: true, force: true }); }
 }));
 test("suggested POSIX command preserves every argument literally and supplies a PowerShell representation", () => fixture(({ root }) => {
-  const projectId = "客户'; printf INERT_MARKER; $(printf inert) `printf inert`";
-  const plan = productionPlan({ title: "中文标题", projectId, platform: "YouTube 中文 空格", shotlistPath: "out/镜头 卡.json", outDir: "out/成片 空格" });
+  const projectId = "P1";
+  const platform = "客户'; printf INERT_MARKER; $(printf inert) `printf inert`";
+  writeFileSync(join(root, "out", "镜头 卡.json"), JSON.stringify({ fps: 24, products: ["商品"], shots: [{ shotId: "S1", duration: 5 }] }));
+  writeFileSync(join(root, "out", "route.json"), JSON.stringify({ schemaVersion: "workloom.video-route-record/v1", decision: { route: "marketing" } }));
+  const plan = productionPlan({ title: "中文标题", projectId, platform, shotlistPath: "out/镜头 卡.json", routePath: "out/route.json", outDir: "out/成片 空格" });
+  assert.equal(plan.ready, true);
   const capture = join(root, "capture.mjs");
   writeFileSync(capture, "process.stdout.write(JSON.stringify(process.argv.slice(2)));");
   const quote = (text) => "'" + text.replace(/'/gu, "'\"'\"'") + "'";
@@ -71,7 +85,9 @@ test("suggested POSIX command preserves every argument literally and supplies a 
   const actual = JSON.parse(execFileSync("/bin/sh", ["-c", command], { encoding: "utf8" }));
   assert.deepEqual(actual, plan.execution.args);
   assert.ok(actual.includes(projectId));
+  assert.ok(actual.includes(platform));
   assert.ok(plan.recommendedPowerShellCommand.startsWith("& 'pnpm'"));
   assert.ok(plan.recommendedPowerShellCommand.includes("客户'';"));
-  assert.throws(() => productionPlan({ projectId: "line\nbreak" }), /非空字符串/u);
+  assert.throws(() => productionPlan({ projectId: platform }), /项目 ID/u);
+  assert.throws(() => productionPlan({ projectId: "line\nbreak" }), /项目 ID/u);
 }));

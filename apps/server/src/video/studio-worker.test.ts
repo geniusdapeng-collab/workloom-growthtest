@@ -664,3 +664,74 @@ describe("默认导演委托与立项事务", () => {
     expect(doubles.project).not.toHaveBeenCalled(); expect(doubles.finish.mock.calls.every(([row]) => row.status === "failed")).toBe(true);
   });
 });
+
+
+describe("公共产品参考图路径边界", () => {
+  const referenceShapes: Array<[string, unknown]> = [
+    ["absolute-string", "/synthetic/workspace-b/private 中文 & 图片.png"],
+    ["traversal-string", "../../workspace-b/private.png"],
+    ["windows-string", "C:\\synthetic\\workspace-b\\private.png"],
+    ["file-url-string", "file:///synthetic/workspace-b/private.png"],
+    ["http-string-in-local-channel", "https://synthetic.invalid/private.png"],
+    ["localPath-object", { localPath: "/synthetic/workspace-b/link-to-private.png" }],
+    ["path-object", { path: "var/media/private.png" }],
+    ["non-http-url-object", { url: "file:///synthetic/workspace-b/private.png" }],
+    ["http-object-with-localPath", { url: "https://synthetic.invalid/public.png", localPath: "/synthetic/workspace-b/private.png" }],
+  ];
+  const localReferenceCases = ["referenceManifest", "reference_manifest"].flatMap(manifestKey =>
+    ["reference_images", "referenceImages"].flatMap(imagesKey => referenceShapes.map(([shape, value]) => ({
+      label: `${manifestKey}.${imagesKey}:${shape}`,
+      metadata: { products: [{ name: "测试商品", [manifestKey]: { [imagesKey]: [value] } }] },
+    }))),
+  );
+  const safeMetadataCases: Array<[string, Record<string, unknown>]> = [
+    ["product-description", { products: [{ name: "客房用品", description: "纯文字 中文 空格 & 标签", assetId: "VA-registered" }] }],
+    ["empty-images", { products: [{ referenceManifest: { reference_images: [] } }] }],
+    ["empty-descriptors", { products: [{ reference_manifest: { referenceImages: ["", "  ", null, {}, { localPath: " " }] } }] }],
+    ["http-object", { products: [{ referenceManifest: { reference_images: [{ url: "https://synthetic.invalid/product.png" }] } }] }],
+    ["https-object-aliases", { products: [{ reference_manifest: { referenceImages: [{ url: "HTTPs://synthetic.invalid/product.png" }] } }] }],
+    ["unrelated-customer-path", { brief: { desiredScene: "山间小路", path: "客户描述里的路径名称" } }],
+  ];
+
+  const workerCases = (["new-metadata", "new-customerMetadata", "retry"] as const)
+    .flatMap(mode => localReferenceCases.map(item => ({ ...item, mode })));
+  it.each(workerCases)("$mode:$label在SQL/租约/供应商前拒绝", async ({ mode, label, metadata }) => {
+    useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
+    let error: unknown; let runId: string | undefined;
+    try {
+      if (mode === "retry") {
+        runId = worker.startRun(scope, { projectId: `VID-product-boundary-${++projectSequence}`,
+          intent: "山间风景片", metadata });
+      } else {
+        const started = await worker.startVideoProjectRun(scope, {
+          intent: "山间风景片", creativeMode: "manual", by: { id: "MEM-1", type: "human" },
+          ...(mode === "new-metadata" ? { metadata } : { customerMetadata: metadata }),
+        });
+        runId = started.runId;
+      }
+    } catch (caught) { error = caught; }
+    // 修复前等待实际工作器结束，失败用例也不留下后台任务。
+    if (runId) await vi.waitFor(() => expect(worker.getRun(runId!, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(error, label).toMatchObject({ code: "METADATA_RESERVED" });
+    expect(String((error as Error).message), label).not.toContain("/synthetic/workspace-b");
+    expect(doubles.connect, label).not.toHaveBeenCalled();
+    expect(doubles.lease, label).not.toHaveBeenCalled();
+    expect(doubles.runPreproduction, label).not.toHaveBeenCalled();
+    expect(doubles.studioConfigs, label).toHaveLength(0);
+  });
+
+  it.each(safeMetadataCases)("%s普通商品metadata保持可启动且不产生本机参考图", async (_label, metadata) => {
+    useNarrativeProject(); doubles.runPreproduction.mockResolvedValue(success());
+    vi.stubEnv("HR_PORTRAIT_ENABLED", "1");
+    vi.stubEnv("VOLCENGINE_ARK_API_KEY", "synthetic-unit-test-key");
+    vi.stubEnv("ARK_API_KEY", "synthetic-unit-test-key");
+    vi.stubEnv("ARK_IMAGE_MODEL", "synthetic-unit-test-model");
+    const started = await worker.startVideoProjectRun(scope, { intent: "山间风景片", creativeMode: "manual",
+      metadata, customerMetadata: metadata, by: { id: "MEM-1", type: "human" } });
+    await vi.waitFor(() => expect(worker.getRun(started.runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(started.runId, scope.workspaceId)?.status).toBe("finished");
+    expect(doubles.runPreproduction).toHaveBeenCalledTimes(1);
+    expect(doubles.studioConfigs[0]?.portraits?.referenceImages).toEqual([]);
+    expect(doubles.runPreproduction.mock.calls[0]?.[0].metadata.products).toEqual(metadata.products);
+  });
+});

@@ -65,3 +65,30 @@ node scripts/workloom-agent-mcp.mjs
 
 然后按仓库 `AGENTS.repo.md` 与 `docs/release-checklist.md` 运行相关类型、
 测试、secret scan、发布门禁及真实客户端验收；未全部通过不得发布可执行制品。
+
+## 视频能力的输入、计划和核验
+
+`growth.video.production.plan` 仍是只读能力。它读取分流记录与镜头卡，检查镜头 ID/时长结构、
+已声明 fps 是否一致、出镜对白与统一后配音是否冲突，以及本机 ASR 配置。
+`ready=true` 只表示这些已读输入和本地配置检查通过；余额、模型权限、ASR 进程、完整镜头规范、
+人物身份与授权仍须由执行器实际检查。失败项会进入 `checklist`，同时
+`recommendedCommand=null`、`argv=[]`，避免执行一个已知有问题的计划。
+
+计划提供 `executable`、完整 `argv` 和执行工作目录 `workDir`。调用方应直接用进程 API 传递
+参数数组，`recommendedCommand` 只是用 POSIX 单引号逐参数引用的人工查看版本。
+镜头卡、分流、生产目录与输出目录均解析为产物根内的绝对路径；在仓外存放素材时由运行者设置
+`WORKLOOM_VIDEO_ARTIFACT_ROOT`，请求本身只能给相对路径。父目录软链即使指向尚不存在的文件，
+也会进行真实路径复核。输入 `workDir` 选择阶段产物目录，返回的 `artifactWorkDir` 是其绝对路径。
+
+`unifiedNarration=true` 会检查镜头合同：只允许画外音统一音色，出镜讲话必须保留原生声画。
+计划不会查询 ASR 或调用模型，`localAsr.runtimeVerified=false` 会明确保留。
+
+`growth.video.delivery.inspect` 对 `entries`、`assets` 和旧清单指针逐文件计算实际 SHA-256，
+将同一路径的声明合并比较。`integrity=sha256-verified` 表示每个列出的文件都有一致的声明哈希；
+哈希缺失时保持 `unverified`，缺件、哈希/字节数不符、冲突声明或越界时为 `incomplete`。
+它不把哈希一致升级为内容质量、口型或授权通过。
+
+`growth.video.production.status` 与出片 CLI 共用 `scripts/tools/film-render-ledger.mjs`：
+只有带有效平台 `taskId` 的任务计入受理数，同一任务的 GET 接续、重复或缓存观察不重复计数，
+最新结果覆盖之前的失败记录。无有效 ID 的调用列入 `unacceptedRenderRecords`，受理状态未知；
+平台拒收与 canary 中止单列。台账不估算金额，也不把轮询/下载失败当作新的付费提交。

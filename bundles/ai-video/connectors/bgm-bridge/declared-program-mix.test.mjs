@@ -12,6 +12,7 @@
 import assert from "node:assert/strict";
 import { before, describe, it } from "node:test";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -99,5 +100,39 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
         return true;
       }
     );
+  });
+
+  it("高峰值混合源先做可追溯处理，最终响度、峰值和让位实测均通过", async () => {
+    const peaked = path.join(root, "high-crest.mp4");
+    encode(["-f", "lavfi", "-i", "color=c=black:s=160x120:r=24:d=8",
+      "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=8",
+      "-filter_complex", "[1:a]volume='if(between(t,0,0.04),6,if(between(t,2,4),0,0.6))':eval=frame[a]",
+      "-map", "0:v", "-map", "[a]", "-c:v", "libx264", "-c:a", "aac", "-shortest", peaked]);
+    const digest = (file) => createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+    const beforeHash = digest(peaked);
+    const result = await mix({ input: peaked, output: path.join(root, "high-crest-master.mp4"), bgmPath: music,
+      declaredProgramMix: true, policy: "keep-dialogue", musicLevelDb: -24, duckingDb: 14,
+      fadeInSec: 0.1, fadeOutSec: 0.1, align: false, section: "full",
+      env: { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: root, WORKLOOM_BGM_DISCOVER: "0" }, bins });
+    assert.equal(digest(peaked), beforeHash, "原片只读");
+    assert.ok(Object.values(result.checks).every((value) => value === true));
+    assert.equal(result.independentAudio.sourcePreparation.applied, true);
+    assert.equal(result.independentAudio.sourcePreparation.method, "declared-source-dynamic-loudnorm");
+    assert.ok(result.independentAudio.sourcePreparation.sourceSha256);
+    assert.ok(result.independentAudio.sourcePreparation.after.truePeakDbtp <= -2.8);
+    assert.equal(result.independentAudio.stemsVerified, false);
+    assert.equal(result.loudness.normalization.method, "shared-linear-gain");
+    assert.equal(result.loudness.normalization.limiterApplied, false);
+    assert.ok(Math.abs(result.output.durationSeconds - 8) < 0.04);
+  }, { timeout: 120000 });
+
+  it("不可测的静音混合源拒绝交付，不写成功产物", async () => {
+    const silent = path.join(root, "silent.mp4"), output = path.join(root, "silent-result.mp4");
+    encode(["-f", "lavfi", "-i", "color=c=black:s=160x120:d=3",
+      "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "3",
+      "-c:v", "libx264", "-c:a", "aac", "-shortest", silent]);
+    await assert.rejects(mix({ input: silent, output, bgmPath: music, declaredProgramMix: true,
+      env: { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: root }, bins }), { code: "verify_failed" });
+    assert.equal(fs.existsSync(output), false);
   });
 });

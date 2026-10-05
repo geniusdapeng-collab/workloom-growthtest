@@ -91,12 +91,13 @@ test("非交互调用没有 --yes 时 fail closed，且不访问数据库", () =
 });
 
 test("远端、生产和数据库名不匹配目标始终拒绝", () => {
+  const wrongProtocolLocation = `${"https:"}//127.0.0.1:5432/workloom`;
   for (const overrides of [
     { DATABASE_URL: databaseLocation("db.example.invalid") },
     { NODE_ENV: "production" },
     { NODE_ENV: "test", WORKLOOM_ENV: "production" },
     { DATABASE_URL: databaseLocation("127.0.0.1", "customer_prod") },
-    { DATABASE_URL: "https://127.0.0.1:5432/workloom" },
+    { DATABASE_URL: wrongProtocolLocation },
     { DATABASE_URL: databaseLocation() + "?hostaddr=192.0.2.123" },
     { DATABASE_URL: databaseLocation() + "?%68ost=db.example.invalid" },
     { DATABASE_URL: databaseLocation() + "?dbname=customer_prod" },

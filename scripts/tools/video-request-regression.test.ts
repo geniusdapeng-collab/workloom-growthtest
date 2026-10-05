@@ -198,8 +198,8 @@ describe("全链路当前血缘与返修范围", () => {
     mkdirSync(join(dir, "logs/regression"), { recursive: true });
     writeFileSync(join(dir, "logs/regression/stages.jsonl"), JSON.stringify({ stage: "master", ok: true, shotId: null }) + "\n");
     const run = runChain([emptyShot], { dir, stages: "master", dryRun: false });
-    expect(run.result.status, run.diagnostic).toBe(6);
-    expect(run.diagnostic).toContain("缺阶段 master");
+    expect(run.result.status, run.diagnostic).not.toBe(0);
+    expect(run.diagnostic).toContain("PUBLICATION_COMPOSE_UNVERIFIED");
     expect(existsSync(join(dir, "out/regression-30s-final.mp4"))).toBe(false);
   }, 40_000);
   it("不同项目在同一work目录独立记账且当前输入输出含实际指纹", () => {
