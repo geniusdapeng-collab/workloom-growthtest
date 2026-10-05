@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import fs from "node:fs";
+import { syncBuiltinESMExports } from "node:module";
+import { lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +12,11 @@ import { sealPlatform } from "../desktop-release-finalizer.mjs";
 import {
   CnbClient,
   assertGitBinding,
+  preflightRelease,
   publishRelease,
+  readPreflightObservation,
+  selectLatestRequiredChecks,
+  validatePreflightObservation,
   stagePlatform,
   validateContext,
 } from "./cnb-desktop-release.mjs";
@@ -102,6 +108,12 @@ class FakeCnb {
     this.tamperReleaseDownload = null;
     this.onCreateRelease = null;
     this.badVerifyUrl = false;
+    this.onPublicPromotion = null;
+    this.onReadMain = null;
+    this.mainReads = 0;
+    this.mergeBaseSha = SHA;
+    this.checks = requiredChecks();
+    this.override = null;
     this.fetch = this.fetch.bind(this);
   }
 
@@ -159,8 +171,16 @@ class FakeCnb {
     assert.equal(url.origin, "https://api.cnb.cool");
     assert.ok(url.pathname.startsWith(PREFIX), `unexpected path ${url.pathname}`);
     const path = url.pathname.slice(PREFIX.length);
+    const overridden = await this.override?.(path, method, init);
+    if (overridden !== undefined) return overridden;
     if (method === "GET" && path === "git/branches/main") {
+      this.mainReads += 1; this.onReadMain?.(this.mainReads);
       return json({ name: this.mainName, protected: this.mainProtected, commit: { sha: this.mainSha } });
+    }
+    if (method === "GET" && path === `git/commit-statuses/${SHA}`) return json(this.checks);
+    if (method === "GET" && path.startsWith("git/compare/")) {
+      const [base, head] = path.slice("git/compare/".length).split("...");
+      return json({ base_commit: { sha: base }, head_commit: { sha: head }, merge_base_commit: { sha: this.mergeBaseSha }, total_commits: 1, files: [] });
     }
     if (method === "GET" && path === `git/tags/${TAG}`) {
       return json({ name: this.tagName, target_type: "commit", target: this.tagSha,
@@ -234,6 +254,7 @@ class FakeCnb {
       assert.deepEqual(body, { draft: false, prerelease: false, make_latest: "true" });
       this.release.draft = false;
       this.release.latest = true;
+      this.onPublicPromotion?.();
       return new Response(null, { status: 200 });
     }
     if (method === "GET" && path === "releases/latest") {
@@ -391,8 +412,10 @@ test("publisher creates draft, uploads exactly five assets, verifies remote byte
     assert.equal(uploads.length, 5);
     assert.ok(uploads.every((call) => JSON.parse(call.body).overwrite === false));
     const patch = fake.calls.findIndex((call) => call.method === "PATCH");
-    const lastDownload = fake.calls.findLastIndex((call) => call.url.startsWith("https://downloads.invalid/release/"));
-    assert.ok(patch > lastDownload);
+    const downloads = fake.calls.flatMap((call, index) => call.url.startsWith("https://downloads.invalid/release/") ? [index] : []);
+    assert.equal(downloads.length, 10);
+    assert.ok(downloads.slice(0, 5).every((index) => index < patch), "five draft bytes must be read before public PATCH");
+    assert.ok(downloads.slice(5).every((index) => index > patch), "five public bytes must be read again after public PATCH");
   } finally { f.cleanup(); }
 });
 
@@ -473,15 +496,378 @@ test("publisher rejects a corrupted downloaded installer before the first Releas
   } finally { f.cleanup(); }
 });
 
-test("publisher keeps an incomplete draft if main moves before public promotion", async () => {
+test("publisher keeps a draft if main diverges before public promotion", async () => {
+  const f = fixture();
+  const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root);
+    fake.onCreateRelease = () => { fake.mainSha = "b".repeat(40); fake.mergeBaseSha = "c".repeat(40); };
+    await assert.rejects(publishRelease({ env: publisherEnv(fake), cwd: f.root,
+      checkoutSha: SHA, fetchImpl: fake.fetch, sleep: async () => {} }), /不是 RELEASE_SHA 的真实后继/u);
+    assert.equal(fake.release.draft, true);
+    assert.ok(!fake.calls.some((call) => call.method === "PATCH"));
+  } finally { f.cleanup(); }
+});
+
+test("a bound build can publish while protected main advances normally", async () => {
   const f = fixture();
   const fake = new FakeCnb();
   try {
     fake.addCandidates(f.root);
     fake.onCreateRelease = () => { fake.mainSha = "b".repeat(40); };
-    await assert.rejects(publishRelease({ env: publisherEnv(fake), cwd: f.root,
-      checkoutSha: SHA, fetchImpl: fake.fetch, sleep: async () => {} }), /main 已偏离/u);
-    assert.equal(fake.release.draft, true);
-    assert.ok(!fake.calls.some((call) => call.method === "PATCH"));
+    const result = await publishRelease({ env: publisherEnv(fake), cwd: f.root,
+      checkoutSha: SHA, fetchImpl: fake.fetch, sleep: async () => {},
+      preflightObservation: await preflightRelease({ env: env("publisher"), role: "publisher", cwd: f.root,
+        checkoutSha: SHA, fetchImpl: fake.fetch }) });
+    assert.equal(result.published, true);
+    assert.equal(result.verification, "complete");
+    assert.equal(fake.release.draft, false);
   } finally { f.cleanup(); }
+});
+
+test("a post-promotion tag violation reports that the release is already public", async () => {
+  const f = fixture();
+  const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root);
+    fake.onPublicPromotion = () => { fake.tagSha = "b".repeat(40); };
+    await assert.rejects(publishRelease({ env: publisherEnv(fake), cwd: f.root,
+      checkoutSha: SHA, fetchImpl: fake.fetch, sleep: async () => {} }), (error) => {
+      assert.equal(error.publicationReceipt?.published, true);
+      assert.equal(error.publicationReceipt?.publicPatchAttempted, true);
+      assert.equal(error.publicationReceipt?.verification, "violation");
+      assert.equal(error.publicationReceipt?.releaseId, "release-1");
+      return true;
+    });
+    assert.equal(fake.release.draft, false);
+  } finally { f.cleanup(); }
+});
+
+
+const PIPELINES = ["pipeline-1(static-gate)", "pipeline-2(db-gate)", "pipeline-3(test-gate)"];
+function requiredChecks(family = "push", state = "success", time = "2026-10-05T17:00:00Z") {
+  return PIPELINES.map((pipeline) => ({ context: `cnb/${family}/${pipeline}`, state, created_at: time, updated_at: time }));
+}
+function completeIdentity(role = "publisher") {
+  return { repository: REPOSITORY, tag: TAG, sha: SHA, buildId: BUILD_ID, role, platformSigning: "signed" };
+}
+async function observed(fake, f, role = "publisher", receiptPath) {
+  return preflightRelease({ env: env(role), role, cwd: f.root, checkoutSha: SHA, fetchImpl: fake.fetch, receiptPath });
+}
+async function publishFixture(fake, f, options = {}) {
+  return publishRelease({ env: publisherEnv(fake), cwd: f.root, checkoutSha: SHA, fetchImpl: fake.fetch, sleep: async () => {}, ...options });
+}
+function publicationError(promise, { published, verification, attempted = true } = {}) {
+  return assert.rejects(promise, (error) => {
+    assert.equal(error.publicationReceipt?.schema, "workloom.desktop-publication/v1");
+    assert.equal(error.publicationReceipt?.published, published);
+    assert.equal(error.publicationReceipt?.verification, verification);
+    assert.equal(error.publicationReceipt?.publicPatchAttempted, attempted);
+    assert.equal(error.publicationReceipt?.sha, SHA); assert.equal(error.publicationReceipt?.tag, TAG);
+    assert.equal(error.publicationReceipt?.repository, REPOSITORY); assert.equal(error.publicationReceipt?.buildId, BUILD_ID);
+    return true;
+  });
+}
+test("latest required checks choose full push family over prior green PR family", () => {
+  const rows = [...requiredChecks("pull_request"), ...requiredChecks("push")];
+  assert.equal(selectLatestRequiredChecks(rows).family, "push");
+  rows[3].state = "failure"; assert.throws(() => selectLatestRequiredChecks(rows), /CI_NOT_GREEN/);
+  assert.throws(() => selectLatestRequiredChecks([...requiredChecks("pull_request"), requiredChecks("push")[0]]), /CI_UNVERIFIED/);
+});
+test("absence of any push family permits exactly three latest PR checks", () => {
+  assert.equal(selectLatestRequiredChecks(requiredChecks("pull_request")).family, "pull_request");
+  assert.throws(() => selectLatestRequiredChecks(requiredChecks("pull_request").slice(0, 2)), /CI_UNVERIFIED/);
+});
+test("later failing, pending, skipped or unknown state cannot inherit an older success", () => {
+  for (const state of ["failure", "error", "pending", "skip", "cancelled"]) {
+    const rows = [...requiredChecks(), { ...requiredChecks()[0], state, created_at: "2026-10-05T18:00:00Z", updated_at: "2026-10-05T18:01:00Z" }];
+    assert.throws(() => selectLatestRequiredChecks(rows), /CI_(?:NOT_GREEN|UNVERIFIED)/);
+  }
+});
+test("latest success may replace an earlier failure and conflicting ties fail", () => {
+  const rows = [...requiredChecks("push", "error"), ...requiredChecks("push", "success", "2026-10-05T18:00:00Z")];
+  assert.ok(selectLatestRequiredChecks(rows).checks.every((check) => check.state === "success"));
+  rows.push({ ...rows.at(-1), state: "failure" }); assert.throws(() => selectLatestRequiredChecks(rows), /同时刻状态矛盾/);
+});
+test("empty, enveloped, malformed or invalid timestamp CI data is incomplete", () => {
+  for (const rows of [[], { data: requiredChecks() }, null, [null], [{ context: "cnb/push/pipeline-1(static-gate)", state: "success" }]]) {
+    assert.throws(() => selectLatestRequiredChecks(rows), /CI_UNVERIFIED/);
+  }
+  for (const patch of [{ updated_at: "yesterday" }, { created_at: "2026-10-05T18:00:00Z", updated_at: "2026-10-05T17:00:00Z" }]) {
+    const rows = requiredChecks(); rows[0] = { ...rows[0], ...patch }; assert.throws(() => selectLatestRequiredChecks(rows), /CI_UNVERIFIED/);
+  }
+});
+test("preflight writes fresh mode 0600 exact-source observation and refuses overwrite", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    const result = await observed(fake, f, "publisher", "desktop-preflight.json");
+    assert.equal(result.schema, "workloom.desktop-preflight/v1"); assert.equal(result.exactMainSha, SHA); assert.equal(result.checks.sha, SHA);
+    assert.equal(lstatSync(join(f.root, "desktop-preflight.json")).mode & 0o777, 0o600);
+    assert.deepEqual(readPreflightObservation("desktop-preflight.json", completeIdentity(), f.root), result);
+    await assert.rejects(observed(fake, f, "publisher", "desktop-preflight.json"), /不覆盖旧回执/);
+  } finally { f.cleanup(); }
+});
+test("first preflight stays exact even when a descendant compare would pass", async () => {
+  const f = fixture(); const fake = new FakeCnb(); fake.mainSha = "b".repeat(40);
+  try { await assert.rejects(observed(fake, f), /INITIAL_MAIN_MISMATCH/); assert.ok(!fake.calls.some((call) => call.url.includes("/git/compare/"))); }
+  finally { f.cleanup(); }
+});
+test("preflight observation is bound to repo, SHA, tag, build, role, signing and current checks", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    const observation = await observed(fake, f);
+    for (const patch of [{ repository: "other/repo" }, { sha: "b".repeat(40) }, { tag: "v1.2.4" }, { buildId: "other-build" },
+      { role: "macos" }, { platformSigning: "unsigned" }, { protected: false }, { exactMainSha: "b".repeat(40) },
+      { observedAt: "never" }, { observedAt: "2999-01-01T00:00:00Z" }, { checks: undefined }]) {
+      assert.throws(() => validatePreflightObservation({ ...observation, ...patch }, completeIdentity()));
+    }
+    assert.throws(() => validatePreflightObservation({ ...observation, checks: { ...observation.checks, sha: "b".repeat(40) } }, completeIdentity()));
+  } finally { f.cleanup(); }
+});
+test("receipt file rejects missing, malformed, oversized, symlink and outside workspace paths", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    await observed(fake, f, "publisher", "valid.json");
+    writeFileSync(join(f.root, "malformed.json"), "not-json"); writeFileSync(join(f.root, "oversized.json"), "x".repeat(70_000));
+    symlinkSync(join(f.root, "valid.json"), join(f.root, "linked.json"));
+    for (const path of ["missing.json", "malformed.json", "oversized.json", "linked.json", "../outside.json"]) {
+      assert.throws(() => readPreflightObservation(path, completeIdentity(), f.root));
+    }
+  } finally { f.cleanup(); }
+});
+test("later binding accepts protected exact main or a bound real descendant", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    const observation = await observed(fake, f); const client = new CnbClient({ token: "test", fetchImpl: fake.fetch });
+    const options = { phase: "later", preflightObservation: observation };
+    await assertGitBinding(client, completeIdentity(), options); fake.mainSha = "b".repeat(40);
+    const result = await assertGitBinding(client, completeIdentity(), options);
+    assert.equal(result.mainSha, fake.mainSha); assert.equal(result.phase, "later");
+    assert.ok(fake.calls.some((call) => call.url.endsWith(`git/compare/${SHA}...${fake.mainSha}`)));
+    await assert.rejects(assertGitBinding(client, completeIdentity(), { phase: "later" }), /PREFLIGHT_BINDING_INVALID/);
+  } finally { f.cleanup(); }
+});
+test("later compare refuses divergent, abbreviated or incorrectly bound source and target", async () => {
+  for (const patch of [{ merge_base_commit: { sha: "c".repeat(40) } }, { base_commit: { sha: "c".repeat(40) } },
+    { head_commit: { sha: "b".repeat(12) } }, { merge_base_commit: undefined }]) {
+    const f = fixture(); const fake = new FakeCnb();
+    try {
+      const observation = await observed(fake, f); fake.mainSha = "b".repeat(40);
+      fake.override = (path) => path.startsWith("git/compare/") ? json({ base_commit: { sha: SHA }, head_commit: { sha: fake.mainSha },
+        merge_base_commit: { sha: SHA }, ...patch }) : undefined;
+      await assert.rejects(assertGitBinding(new CnbClient({ token: "test", fetchImpl: fake.fetch }), completeIdentity(),
+        { phase: "later", preflightObservation: observation }), /(?:MAIN_ANCESTRY_VIOLATION|ANCESTRY_UNVERIFIED)/);
+    } finally { f.cleanup(); }
+  }
+});
+test("main movement during reads is retried within three attempts and continuous movement fails", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    const observation = await observed(fake, f); fake.mainReads = 0;
+    fake.onReadMain = (count) => { if (count === 2) fake.mainSha = "b".repeat(40); };
+    const options = { phase: "later", preflightObservation: observation };
+    await assertGitBinding(new CnbClient({ token: "test", fetchImpl: fake.fetch }), completeIdentity(), options);
+    assert.equal(fake.mainReads, 4);
+    fake.mainReads = 0; fake.onReadMain = (count) => { fake.mainSha = (count % 2 ? "b" : "c").repeat(40); };
+    await assert.rejects(assertGitBinding(new CnbClient({ token: "test", fetchImpl: fake.fetch }), completeIdentity(), options), /有界重读期间持续变化/);
+    assert.equal(fake.mainReads, 6);
+  } finally { f.cleanup(); }
+});
+test("post-build producer uses persisted first observation when protected main advances", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    await observed(fake, f, "macos", "macos-preflight.json"); fake.mainSha = "b".repeat(40);
+    const result = await stagePlatform({ env: env("macos"), platform: "macos", releaseDir: f.release,
+      cwd: f.root, checkoutSha: SHA, fetchImpl: fake.fetch, preflightReceiptPath: "macos-preflight.json" });
+    assert.equal(result.files, 3); assert.equal(fake.release, null);
+  } finally { f.cleanup(); }
+});
+test("publisher initial mismatch or newer red CI never performs a Release write", async () => {
+  for (const patch of ["main", "ci"]) {
+    const f = fixture(); const fake = new FakeCnb();
+    try {
+      fake.addCandidates(f.root); if (patch === "main") fake.mainSha = "b".repeat(40); else fake.checks[0].state = "failure";
+      await assert.rejects(publishFixture(fake, f)); assert.equal(fake.release, null);
+      assert.ok(!fake.calls.some((call) => call.method === "POST" && call.url.endsWith("/-/releases")));
+    } finally { f.cleanup(); }
+  }
+});
+test("publisher uses persisted first observation across candidate await and normal main movement", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); await observed(fake, f, "publisher", "publisher-preflight.json"); fake.mainSha = "b".repeat(40);
+    const result = await publishFixture(fake, f, { preflightReceiptPath: "publisher-preflight.json" });
+    assert.equal(result.published, true); assert.equal(result.verification, "complete");
+    assert.equal(result.assetEvidence.length, 5); assert.ok(result.assetEvidence.every((asset) => /^[0-9a-f]{128}$/.test(asset.sha512) && asset.size > 0));
+  } finally { f.cleanup(); }
+});
+test("binding failure before PATCH preserves an actual draft receipt", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onCreateRelease = () => { fake.checks[0].state = "pending"; };
+    await publicationError(publishFixture(fake, f), { published: false, verification: "violation", attempted: false });
+    assert.equal(fake.release.draft, true); assert.ok(!fake.calls.some((call) => call.method === "PATCH"));
+  } finally { f.cleanup(); }
+});
+test("PATCH network ambiguity after successful promotion is reconciled by GET without repeating writes", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => { throw new Error("mock network response lost with secret"); };
+    const result = await publishFixture(fake, f);
+    assert.equal(result.published, true); assert.equal(result.verification, "complete");
+    assert.equal(fake.calls.filter((call) => call.method === "PATCH").length, 1);
+    assert.equal(fake.calls.filter((call) => call.method === "POST" && call.url.endsWith("/-/releases")).length, 1);
+    assert.ok(!JSON.stringify(result).includes("secret"));
+  } finally { f.cleanup(); }
+});
+test("PATCH failure with an observed draft reports false and performs no overwrite or second promotion", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.override = (path, method) => method === "PATCH" ? json({ secret: "hidden" }, 500) : undefined;
+    await publicationError(publishFixture(fake, f), { published: false, verification: "incomplete" });
+    assert.equal(fake.release.draft, true); assert.equal(fake.calls.filter((call) => call.method === "PATCH").length, 1);
+    assert.ok(fake.calls.every((call) => call.method !== "DELETE"));
+  } finally { f.cleanup(); }
+});
+test("all state GETs failing after PATCH reports unknown rather than claiming unpublished", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => {
+      fake.override = (path, method) => method === "GET" && ["releases/release-1", "releases/latest"].includes(path) ? json({ error: "network" }, 503) : undefined;
+    };
+    await publicationError(publishFixture(fake, f), { published: "unknown", verification: "incomplete" });
+    assert.equal(fake.release.draft, false); assert.equal(fake.calls.filter((call) => call.method === "PATCH").length, 1);
+  } finally { f.cleanup(); }
+});
+test("visible public release whose Latest cannot be confirmed reports true and incomplete", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => { fake.release.latest = false; };
+    await publicationError(publishFixture(fake, f), { published: true, verification: "incomplete" });
+    assert.equal(fake.release.draft, false);
+  } finally { f.cleanup(); }
+});
+for (const change of ["ci", "protection", "ancestry"]) test("post-promotion " + change + " violation preserves published=true", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => {
+      if (change === "ci") fake.checks[0].state = "failure";
+      if (change === "protection") fake.mainProtected = false;
+      if (change === "ancestry") { fake.mainSha = "b".repeat(40); fake.mergeBaseSha = "c".repeat(40); }
+    };
+    await publicationError(publishFixture(fake, f), { published: true, verification: "violation" });
+  } finally { f.cleanup(); }
+});
+test("normal protected main advance after promotion returns complete actual publication receipt", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => { fake.mainSha = "b".repeat(40); };
+    const result = await publishFixture(fake, f);
+    assert.equal(result.published, true); assert.equal(result.verification, "complete"); assert.equal(result.publicPatchAttempted, true);
+    assert.equal(result.releaseId, "release-1"); assert.equal(result.assetEvidence.length, 5);
+    assert.ok(fake.calls.every((call) => call.method !== "DELETE"));
+  } finally { f.cleanup(); }
+});
+test("post-promotion public asset mutation is detected with actual byte evidence", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => { fake.tamperReleaseDownload = () => Buffer.from("substituted public bytes"); };
+    await publicationError(publishFixture(fake, f), { published: true, verification: "violation" });
+  } finally { f.cleanup(); }
+});
+test("post-promotion source API failure is incomplete while actual public state remains true", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => {
+      fake.override = (path, method) => method === "GET" && path.startsWith("git/") ? json({}, 503) : undefined;
+    };
+    await publicationError(publishFixture(fake, f), { published: true, verification: "incomplete" });
+  } finally { f.cleanup(); }
+});
+test("CI API authorization, throttle and schema failure cannot certify preflight", async () => {
+  for (const status of [401, 403, 429, 500]) {
+    const f = fixture(); const fake = new FakeCnb();
+    try {
+      fake.override = (path) => path.startsWith("git/commit-statuses/") ? new Response("secret signed URL", { status }) : undefined;
+      await assert.rejects(observed(fake, f), (error) => { assert.ok(!error.message.includes("secret")); return true; });
+    } finally { f.cleanup(); }
+  }
+});
+test("CI config uses role-local first observations and explicit full lock/release contract tests", () => {
+  const config = YAML.parse(readFileSync(join(ROOT, ".cnb.yml"), "utf8")); const jobs = config.main.api_trigger_desktop_release;
+  for (const job of jobs) {
+    const name = `desktop-preflight-${job.name}.json`; const scripts = job.stages.map((stage) => stage.script ?? "").join("\n");
+    assert.ok(scripts.includes(`preflight --receipt ${name}`));
+    assert.ok(scripts.includes(`--preflight-receipt ${name}`));
+  }
+  const source = readFileSync(join(ROOT, ".cnb.yml"), "utf8");
+  for (const path of ["scripts/ci/verify-lock-conflict.test.mjs", "scripts/ci/cnb-desktop-release.test.mjs", "scripts/tools/film-existing-render-edit.test.ts"]) assert.ok(source.includes(path));
+});
+
+
+async function withPublisherCleanupFailure(action) {
+  const original = fs.rmSync; const retained = [];
+  fs.rmSync = (path, options) => {
+    if (String(path).includes("workloom-desktop-publisher-")) {
+      retained.push(path); throw new Error("simulated local cleanup failure with hidden detail");
+    }
+    return original(path, options);
+  };
+  syncBuiltinESMExports();
+  try { return await action(); }
+  finally {
+    fs.rmSync = original; syncBuiltinESMExports();
+    for (const path of retained) original(path, { recursive: true, force: true });
+  }
+}
+test("a cleanup exception after successful public verification preserves the actual publication receipt", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root);
+    await withPublisherCleanupFailure(async () => {
+      await assert.rejects(publishFixture(fake, f), (error) => {
+        assert.equal(error.publicationReceipt?.published, true);
+        assert.equal(error.publicationReceipt?.verification, "complete");
+        assert.equal(error.publicationReceipt?.cleanup?.state, "failed");
+        assert.equal(error.publicationReceipt?.errorCode, "LOCAL_CLEANUP_FAILED");
+        assert.ok(!error.message.includes("hidden detail")); return true;
+      });
+    });
+    assert.equal(fake.release.draft, false); assert.equal(fake.calls.filter((call) => call.method === "PATCH").length, 1);
+  } finally { f.cleanup(); }
+});
+test("cleanup failure cannot replace a primary postpublication tag violation or its receipt", async () => {
+  const f = fixture(); const fake = new FakeCnb();
+  try {
+    fake.addCandidates(f.root); fake.onPublicPromotion = () => { fake.tagSha = "b".repeat(40); };
+    await withPublisherCleanupFailure(async () => {
+      await assert.rejects(publishFixture(fake, f), (error) => {
+        assert.match(error.message, /TAG_BINDING_VIOLATION/);
+        assert.equal(error.publicationReceipt?.published, true);
+        assert.equal(error.publicationReceipt?.verification, "violation");
+        assert.equal(error.publicationReceipt?.cleanup?.state, "failed");
+        assert.equal(error.publicationReceipt?.errorCode, "TAG_BINDING_VIOLATION"); return true;
+      });
+    });
+  } finally { f.cleanup(); }
+});
+
+test("a newer created pending or failed run cannot inherit an older run that finished later", () => {
+  for (const state of ["pending", "failure", "error", "skip"]) {
+    const rows = requiredChecks("push", "success", "2026-10-05T18:00:00Z");
+    rows[0].updated_at = "2026-10-05T18:20:00Z";
+    rows.push({ ...rows[0], state, created_at: "2026-10-05T18:10:00Z", updated_at: "2026-10-05T18:10:00Z" });
+    assert.throws(() => selectLatestRequiredChecks(rows), /CI_NOT_GREEN/);
+  }
+});
+test("same-created different run targets or unidentifiable conflicting states are ambiguous", () => {
+  const rows = requiredChecks();
+  rows[0].target_url = "https://cnb.cool/workloom-ai/workloom-growthtest/-/build/logs/old";
+  const newerUpdate = { ...rows[0], target_url: "https://cnb.cool/workloom-ai/workloom-growthtest/-/build/logs/new", updated_at: "2026-10-05T17:01:00Z" };
+  assert.throws(() => selectLatestRequiredChecks([...rows, newerUpdate]), /CI_UNVERIFIED/);
+  delete rows[0].target_url; delete newerUpdate.target_url; newerUpdate.state = "pending";
+  assert.throws(() => selectLatestRequiredChecks([...rows, newerUpdate]), /CI_UNVERIFIED/);
+  const identifiable = requiredChecks(); identifiable[0] = { ...identifiable[0], target_url: "https://cnb.cool/build/same", state: "pending" };
+  const finished = { ...identifiable[0], state: "success", updated_at: "2026-10-05T17:02:00Z" };
+  assert.equal(selectLatestRequiredChecks([...identifiable, finished]).checks[0].state, "success");
 });

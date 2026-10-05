@@ -99,6 +99,27 @@ import { publishUhdDelivery, sha256UhdAsset } from "../../packages/video-studio/
 import { FullChainFilmWorker } from "../../packages/video-studio/src/film-worker-runtime.js";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
+// Local existing-file editing is a distinct entry point, before worker IPC, SHOTS and keys.
+// It cannot reuse an automatic generation worker or claim its model/identity approvals.
+if (process.argv.includes("--existing-render-edit")) {
+  if (process.argv.includes("--worker") || process.env.FILM_WORKER_MODE === "worker") {
+    throw new Error("EXISTING_EDIT_WORKER_FORBIDDEN: existing-file editing requires the explicit local CLI");
+  }
+  const at = process.argv.indexOf("--existing-render-edit");
+  const plan = process.argv[at + 1];
+  if (!plan || plan.startsWith("--") || process.argv.slice(2).length !== 2) {
+    throw new Error("EXISTING_EDIT_PLAN_INVALID: use --existing-render-edit <plan.json> without generation options");
+  }
+  const { runExistingRenderEditPlan } = await import("./film-existing-render-edit.mjs");
+  const explicitFfmpeg = process.env.WL_FFMPEG || process.env.FFMPEG_PATH;
+  const explicitFfprobe = process.env.WL_FFPROBE || process.env.FFPROBE_PATH;
+  const local = explicitFfmpeg && explicitFfprobe ? null : verifiedLocalMediaBins();
+  const result = await runExistingRenderEditPlan(resolve(plan), { repoRoot: REPO_ROOT,
+    ffmpeg: explicitFfmpeg || local?.ffmpeg || "ffmpeg", ffprobe: explicitFfprobe || local?.ffprobe || "ffprobe" });
+  process.stdout.write(`EXISTING_RENDER_EDIT ${JSON.stringify(result)}\n`);
+  process.exit(0);
+}
+
 const WORKER_RUNTIME = process.argv.includes("--worker") || process.env.FILM_WORKER_MODE === "worker"
   ? FullChainFilmWorker.fromEnvironment(REPO_ROOT) : null;
 if (WORKER_RUNTIME) process.argv = [...process.argv.slice(0, 2), ...WORKER_RUNTIME.args];
@@ -145,8 +166,10 @@ const log = (line: string): void => { process.stdout.write(`[${stamp().slice(11,
 
 /* ================= 参数 ================= */
 
-const SHOTS_FILE = abs(arg("--shots"));
-if (!SHOTS_FILE || !existsSync(SHOTS_FILE)) throw new Error("需要 --shots <shotlist.json>");
+const SHOTS_ARGUMENT = arg("--shots");
+if (!SHOTS_ARGUMENT) throw new Error("需要 --shots <shotlist.json>");
+const SHOTS_FILE = abs(SHOTS_ARGUMENT);
+if (!existsSync(SHOTS_FILE) || !statSync(SHOTS_FILE).isFile()) throw new Error("需要 --shots <shotlist.json>（有效本地文件）");
 const sourceBytes = readFileSync(SHOTS_FILE);
 const sourceFileHash = createHash("sha256").update(sourceBytes).digest("hex");
 const sourceDocument = JSON.parse(sourceBytes.toString("utf8")) as Record<string, unknown> & { shots?: Array<Record<string, unknown>> };

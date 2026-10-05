@@ -20,7 +20,7 @@
     - name: 协议门禁（提交规范 + 并发冲突）
       script: |
         set -eu
-        node --test scripts/ci/protocol-rules.test.mjs scripts/ci/verify-commit-msg.test.mjs
+        node --test scripts/ci/protocol-rules.test.mjs scripts/ci/verify-commit-msg.test.mjs scripts/ci/verify-lock-conflict.test.mjs
         node --test scripts/ci/cnb-desktop-release.test.mjs
         # 硬闸口径（T-2026-0930-0015）：创作/审美口径不得写成 hard: true（硬闸只允许事实类）
         node --test scripts/ci/hard-gate-policy.test.mjs
@@ -239,6 +239,9 @@
         # 仓库根 scripts/ 下的 vitest 用例（行业包治理门禁、套件夹具契约）不在
         # pnpm -r 的包范围内，历史上从未被任何流水线执行过；这里显式跑一遍。
         pnpm test:scripts
+        # Post-only 的实际字节/字体/来源契约；测试不调用图像、视频、语音供应商。
+        pnpm --filter @hyperreality/video-studio exec vitest run src/local-cover-render.test.ts
+        pnpm tsx --test scripts/tools/film-existing-render-edit.test.ts
 
     - name: 全场景套件（非阻断）
       script: |
@@ -273,6 +276,8 @@ main:
   # 只由有仓库触发权限的操作者调用 api_trigger_desktop_release。
   # 请求须指定 branch=main、sha=main 当前 HEAD，env 须有 RELEASE_TAG、RELEASE_SHA、
   # PLATFORM_SIGNING=signed。三个 Pipeline 同属一个事件；publisher 等双平台 resolve。
+  # 每个角色首步写 exact main/tag/SHA/CI 的本地观察；后续可接受受保护 main 的真实后继，
+  # release SHA/tag/签名/五资产始终固定，当前 release SHA 的三项 CI 必须最新全绿。
   # Mac/Windows 自托管 runner 与 Node/npm/pnpm 须先配好；签名/公证/Bundle 密钥
   # 应从仅允许本仓 main + 此事件读取的 CNB KeyStore 注入，不得放在 build/start
   # 请求 env 中。KeyStore 路径尚未由平台确认，故未硬编码虚构 URL；缺任一凭据时
@@ -296,7 +301,7 @@ main:
             test -n "${BUNDLE_SIGNING_KEY_ID:-}"
             test -n "${CSC_LINK:-}" && test -n "${CSC_KEY_PASSWORD:-}"
             test -n "${APPLE_ID:-}" && test -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" && test -n "${APPLE_TEAM_ID:-}"
-            node scripts/ci/cnb-desktop-release.mjs preflight
+            node scripts/ci/cnb-desktop-release.mjs preflight --receipt desktop-preflight-desktop-macos.json
 
         - name: 构建受信行业 Bundle、投影和 Web
           script: |
@@ -363,7 +368,7 @@ main:
         - name: 封存并回读 macOS 候选 SHA-512
           script: |
             set -eu
-            node scripts/ci/cnb-desktop-release.mjs stage-platform --platform macos --release-dir release
+            node scripts/ci/cnb-desktop-release.mjs stage-platform --platform macos --release-dir release --preflight-receipt desktop-preflight-desktop-macos.json
           exports:
             candidate_manifest_sha512: MACOS_CANDIDATE_MANIFEST_SHA512
         - name: 通知发布者 macOS 候选已验真
@@ -401,7 +406,7 @@ main:
             if (-not $env:WIN_CSC_LINK -or -not $env:WIN_CSC_KEY_PASSWORD) { throw 'Windows signing credentials missing' }
             if (-not (Get-Command bash -ErrorAction SilentlyContinue)) { throw 'Git Bash required for payload assembly' }
             if (-not (Get-Command pwsh -ErrorAction SilentlyContinue)) { throw 'PowerShell 7 required for pgvector build' }
-            node scripts/ci/cnb-desktop-release.mjs preflight
+            node scripts/ci/cnb-desktop-release.mjs preflight --receipt desktop-preflight-desktop-windows.json
             if ($LASTEXITCODE -ne 0) { throw 'release preflight failed' }
 
         - name: 编译锁定的 PostgreSQL 与 pgvector
@@ -476,7 +481,7 @@ main:
 
         - name: 封存并回读 Windows 候选 SHA-512
           script: |
-            node scripts/ci/cnb-desktop-release.mjs stage-platform --platform windows --release-dir release
+            node scripts/ci/cnb-desktop-release.mjs stage-platform --platform windows --release-dir release --preflight-receipt desktop-preflight-desktop-windows.json
             if ($LASTEXITCODE -ne 0) { throw 'Windows candidate staging failed' }
           exports:
             candidate_manifest_sha512: WINDOWS_CANDIDATE_MANIFEST_SHA512
@@ -502,7 +507,7 @@ main:
         - name: 校验 main、稳定 tag 和发布提交
           script: |
             set -eu
-            node scripts/ci/cnb-desktop-release.mjs preflight
+            node scripts/ci/cnb-desktop-release.mjs preflight --receipt desktop-preflight-desktop-publisher.json
         - name: 等待 macOS 已验真候选
           type: cnb:await
           options:
@@ -520,7 +525,7 @@ main:
         - name: 单一发布者创建草稿、核验五资产远端字节并公开 Latest
           script: |
             set -eu
-            node scripts/ci/cnb-desktop-release.mjs publish
+            node scripts/ci/cnb-desktop-release.mjs publish --preflight-receipt desktop-preflight-desktop-publisher.json
         - name: 销毁临时 CNB 令牌
           type: cnb:destroy-token
 

@@ -8,6 +8,9 @@ import {
   isExemptSubject,
   layerForRepo,
   resolveLockOverlapMode,
+  resolveLockPolicies,
+  parseNameStatusZ,
+  requireRepositoryPath,
   validateSubject,
 } from "./protocol-rules.mjs";
 
@@ -79,9 +82,9 @@ describe("并发冲突规则", () => {
 
   it("push 事件降级为提醒：合并已发生，跨 PR 重叠不再判红（回归 2026-09-27 main 误报）", () => {
     assert.equal(resolveLockOverlapMode({ event: "push" }), "warn");
-    // PR 事件保持先到先得拦截
-    assert.equal(resolveLockOverlapMode({ event: "pull_request" }), "fail");
-    assert.equal(resolveLockOverlapMode({ event: null }), "fail");
+    // 普通路径提醒；明确模块互斥由独立策略保持 PR 硬约束。
+    assert.equal(resolveLockOverlapMode({ event: "pull_request" }), "warn");
+    assert.equal(resolveLockOverlapMode({ event: null }), "warn");
     // 显式覆盖与人工严格模式优先
     assert.equal(resolveLockOverlapMode({ event: "push", envMode: "fail" }), "fail");
     assert.equal(resolveLockOverlapMode({ event: "pull_request", envMode: "warn" }), "warn");
@@ -98,5 +101,30 @@ describe("路径解析与误判防护", () => {
   it("根级 package.json 属于互斥模块，子目录 package.json 不属于", () => {
     assert.equal(exclusiveModuleOf("package.json"), "root:package.json");
     assert.equal(exclusiveModuleOf("apps/web/package.json"), null);
+  });
+});
+
+
+describe("本仓 L2 独立策略与 NUL 路径契约", () => {
+  it("普通默认提醒，PR 模块与 API 保持独立硬失败", () => {
+    assert.deepEqual(resolveLockPolicies({ event: "pull_request", envMode: "warn" }), { ordinary: "warn", modules: "fail", api: "fail" });
+    assert.deepEqual(resolveLockPolicies({ event: "push" }), { ordinary: "warn", modules: "warn", api: "fail" });
+    assert.deepEqual(resolveLockPolicies({ event: "push", envMode: "fail" }), { ordinary: "fail", modules: "warn", api: "fail" });
+    assert.deepEqual(resolveLockPolicies({ event: "push", strict: true }), { ordinary: "fail", modules: "fail", api: "fail" });
+  });
+  it("拒绝未知模式，不能默认为宽松", () => {
+    for (const envMode of ["off", "WARN", "anything", true, 1]) assert.throws(() => resolveLockPolicies({ envMode }), /LOCK_MODE_INVALID/);
+  });
+  it("删除、类型变化、rename/copy 的旧新路径和特殊字符不丢失", () => {
+    assert.deepEqual(parseNameStatusZ("D\0gone\0T\0type\0R100\0sync/old\0new\0C75\0copy-old\0copy-new\0M\0line\nbreak\0A\0 中文 \0"),
+      ["gone", "type", "sync/old", "new", "copy-old", "copy-new", "line\nbreak", " 中文 "].sort());
+  });
+  it("合法空 diff 不制造其它范围", () => { assert.deepEqual(parseNameStatusZ(""), []); });
+  it("拒绝无 NUL、未知状态与缺 rename 新路径", () => {
+    for (const output of ["M\0a", "?\0a\0", "R100\0a\0", "M\0\0", "R101\0a\0b\0"]) assert.throws(() => parseNameStatusZ(output), /PATH_UNVERIFIED/);
+  });
+  it("保留仓内完整相对路径并拒绝逃逸", () => {
+    for (const path of ["apps/web/package.json", "tab\tname", "line\nbreak", " 中文 "]) assert.equal(requireRepositoryPath(path), path);
+    for (const path of ["", "/absolute", "C:/absolute", "../escape", "a/../escape", "a//b", "./a", "a\\b", "a\0b", "%2e%2e/escape"]) assert.throws(() => requireRepositoryPath(path), /PATH_UNVERIFIED/);
   });
 });
