@@ -35,6 +35,8 @@ test("matching IID from a different target repository is not self", () => {
 });
 
 
+// WORKLOOM_DELIVERY_BOUND_PROTOCOL_V1
+import { admitSource, emptyState, leaseOperation } from "../delivery/queue-model.mjs";
 const directories = [];
 const VALID = "fix(growth): real lock fixture [T-2026-1006-0001]";
 const OTHER = "b".repeat(40);
@@ -271,8 +273,33 @@ test("local lack of CNB context is explicit unverified skip; CI lacks token is f
   assert.equal(result.decision, "local-skip"); assert.equal(result.verified, false); assert.equal(result.complete, false);
   await rejectCode(runLockGate({ env: { CI: "true" }, cwd: f.root }), "API_INCOMPLETE");
 });
+function readyFixture() {
+  const f = gitFixture();
+  f.git("checkout", "task/current");
+  f.git("merge", "--no-ff", "-m", "Merge latest target into source fixture", f.target);
+  f.source = f.git("rev-parse", "HEAD");
+  f.merge = f.git("commit-tree", f.git("rev-parse", "HEAD^{tree}"), "-p", f.target, "-p", f.source, "-m", "Canonical current merge");
+  f.env = { ...f.env, CNB_PULL_REQUEST_SHA: f.source, CNB_COMMIT: f.source, CNB_PULL_REQUEST_MERGE_SHA: f.merge };
+  return f;
+}
+function admissionFixture(installed = true) {
+  const f = readyFixture(); const fake = new PullFixture([pull(105, { targetSha: f.target }),
+    pull(106, { sourceSha: f.source, targetSha: f.target, sourceBranch: "task/current" })]);
+  const state = emptyState(REPO); const paths = changedFiles({ context: resolveLockContext([], f.env), env: f.env, cwd: f.root }).files;
+  admitSource(state, { number: 106, headSha: f.source, mainSha: f.target, files: paths });
+  const comparison = { ...compareFor(fake.rows[1]), files: paths.map(path => ({ path, status: "modified" })) };
+  fake.override = path => {
+    if (path === "git/branches/main") return Response.json({ commit: { sha: f.target } });
+    if (path === "git/compare/" + f.target + "..." + f.source) return Response.json(comparison);
+    if (path === "git/raw/automation%2Fdelivery-state/state.json") return installed ? Response.json(state) : Response.json({}, { status: 404 });
+    if (path === "git/branches/automation%2Fdelivery-state") return Response.json({}, { status: 404 });
+    if (path === "git/raw/main/.cnb.yml") return new Response("main: {}");
+  };
+  const run = () => runLockGate({ env: f.env, cwd: f.root, fetchImpl: fake.fetch, apiOptions: { pageSize: 2 }, admissionOptions: { waitMs: 0 } });
+  return { f, fake, state, paths, run };
+}
 test("actual gate uses real PR Git source and API observation for advisory and module decisions", async () => {
-  const f = gitFixture(); const fake = new PullFixture([pull(105, { targetSha: f.target }), pull(106, { sourceSha: f.source, targetSha: f.target, sourceBranch: "task/current" })]);
+  const { f, fake } = admissionFixture(false);
   fake.compares.set("105", compareFor(fake.rows[0], ["normal.txt"]));
   const advisory = await runLockGate({ env: f.env, cwd: f.root, fetchImpl: fake.fetch, apiOptions: { pageSize: 2 } });
   assert.equal(advisory.decision, "pass"); assert.equal(advisory.verified, true); assert.equal(advisory.conflicts[0].blocking, false);
@@ -307,4 +334,38 @@ test("CNB live compare short statuses normalize without weakening rename or unkn
   for (const file of [{ path: "a", status: "remove" }, { path: "a", status: "rename" }, { path: "a", status: "copy" }]) {
     assert.throws(() => pathsFromCompare({ ...original, files: [file] }, options), /PATH_UNVERIFIED/);
   }
+});
+
+test("installed admission releases old PR-number occupation without dropping bound Git/API proof", async () => {
+  const fixture = admissionFixture(); fixture.fake.compares.set("105", compareFor(fixture.fake.rows[0], ["sync/old-open.mjs"]));
+  const result = await fixture.run(); assert.equal(result.decision, "pass"); assert.equal(result.verified, true);
+  assert.ok(result.conflicts.some(row => row.kind === "modules" && !row.blocking));
+});
+test("a live fenced development lease still blocks an installed PR even with ordinary warn", async () => {
+  const fixture = admissionFixture(); leaseOperation(fixture.state, { action: "acquire", owner: "actual-other-developer", scopes: ["sync"] });
+  await assert.rejects(fixture.run(), /有效开发租约/);
+});
+test("an expired occupation stops blocking while exact admission remains required", async () => {
+  const fixture = admissionFixture(); leaseOperation(fixture.state, { action: "acquire", owner: "expired-developer", scopes: ["sync"] }, Date.now() - 1800000);
+  assert.equal((await fixture.run()).decision, "pass");
+});
+test("missing sensitive admission and a receipt for another exact source both fail", async () => {
+  for (const mismatch of [false, true]) { const fixture = admissionFixture();
+    const replacement = emptyState(REPO); if (mismatch) admitSource(replacement, { number: 106, headSha: OTHER, mainSha: fixture.f.target, files: fixture.paths });
+    Object.assign(fixture.state, replacement); await assert.rejects(fixture.run(), /接纳回执/);
+  }
+});
+test("the installed PR cannot use a stale main or a shortened platform file set", async () => {
+  for (const drift of ["main", "files"]) { const fixture = admissionFixture(); const previous = fixture.fake.override;
+    fixture.fake.override = path => {
+      if (drift === "main" && path === "git/branches/main") return Response.json({ commit: { sha: OTHER } });
+      if (drift === "files" && path === "git/compare/" + fixture.f.target + "..." + fixture.f.source) return Response.json(compareFor(fixture.fake.rows[1], ["normal.txt"]));
+      return previous(path);
+    }; await assert.rejects(fixture.run());
+  }
+});
+test("an unreadable installed ledger is an error rather than old-number fallback", async () => {
+  const fixture = admissionFixture(); const previous = fixture.fake.override;
+  fixture.fake.override = path => path === "git/raw/automation%2Fdelivery-state/state.json" ? Response.json({}, { status: 403 }) : previous(path);
+  await assert.rejects(fixture.run(), /API_INCOMPLETE/);
 });
