@@ -14,8 +14,8 @@ import { isExemptSubject, parseCommitLog, validateCommit } from "./protocol-rule
 const FULL_SHA = /^[0-9a-f]{40}$/i;
 const ZERO_SHA = "0".repeat(40);
 const COMMIT_FORMAT = "%H\u001f%cI\u001f%s";
-// These events use a premerge checkout. target/merged/NPC events use different
-// checkouts and must not silently inherit the premerge commit-range contract.
+// These events test merged content. The CNB clone plugin can fast-forward to
+// source; target/merged/NPC events have different checkout contracts.
 const PREMERGE_EVENTS = new Set([
   "pull_request", "pull_request.update", "pull_request.approved",
   "pull_request.changes_requested", "pull_request.mergeable", "pull_request.comment",
@@ -82,10 +82,51 @@ function optionalBinding(name, expected, shaPrefix, mismatchCode) {
   if (actual !== expected) fail(mismatchCode, `${name}=${actual} 与本次绑定 ${expected} 不一致`);
 }
 
+function parentsOf(commit) {
+  return git(["show", "-s", "--format=%P", commit]).split(" ").filter(Boolean);
+}
+
+function requireMergeParents(commit, target, source) {
+  const parents = parentsOf(commit);
+  if (parents.length !== 2 || parents[0] !== target || parents[1] !== source) {
+    fail("PR_CHECKOUT_BINDING_MISMATCH", `${commit} 的父提交必须依次是 target ${target} 和 source ${source}`);
+  }
+}
+
+function verifyPrCheckout(head, target, source) {
+  const declaredMerge = process.env.CNB_PULL_REQUEST_MERGE_SHA;
+  const merge = declaredMerge === undefined ? null : fullSha(declaredMerge, "PR_MERGE_SHA");
+  if (merge) {
+    try { requireCommit(merge, "PR_MERGE"); }
+    catch (error) { fail("PR_CHECKOUT_BINDING_MISMATCH", error.message); }
+    requireMergeParents(merge, target, source);
+  }
+  if (head === source) {
+    // Real CNB Prepare runs `git merge --quiet --no-edit source`, which can
+    // fast-forward. Source-only CI is safe only when it IS the canonical merge
+    // content and the actual target history is incorporated into that source.
+    if (!merge) fail("PR_MERGE_SHA_REQUIRED", "source checkout 必须提供可核对的权威合并对象，不能仅凭源 HEAD 放行");
+    try { git(["merge-base", "--is-ancestor", target, source]); }
+    catch (error) {
+      if (error.status === 1) fail("PR_CHECKOUT_BINDING_MISMATCH", `target ${target} 不是 source ${source} 的祖先，source checkout 未证明完整合并`);
+      fail("PR_CHECKOUT_ANCESTRY_UNAVAILABLE", "不能核对 target/source 祖先关系");
+    }
+  } else {
+    requireMergeParents(head, target, source);
+  }
+  if (merge) {
+    const actualTree = git(["rev-parse", `${head}^{tree}`]);
+    const canonicalTree = git(["rev-parse", `${merge}^{tree}`]);
+    if (actualTree !== canonicalTree) {
+      fail("PR_CHECKOUT_TREE_MISMATCH", `checkout ${head} 的 tree ${actualTree} 与权威 merge ${merge} 的 tree ${canonicalTree} 不同`);
+    }
+  }
+}
+
 function resolvePrScope(explicit, event) {
   // CNB defaults: https://docs.cnb.cool/zh/build/build-in-env.html
   // CNB_COMMIT names source for pull_request, target for pull_request.mergeable;
-  // the workspace is a synthetic merge, so before..HEAD includes target history.
+  // the workspace tests merged content, so before..HEAD includes target history.
   const source = fullSha(process.env.CNB_PULL_REQUEST_SHA, "PR_SOURCE_SHA", true);
   const target = fullSha(process.env.CNB_PULL_REQUEST_TARGET_SHA, "PR_TARGET_SHA", true);
   requireCommit(source, "PR_SOURCE");
@@ -96,11 +137,7 @@ function resolvePrScope(explicit, event) {
   optionalBinding("CNB_COMMIT", event === "pull_request.mergeable" ? target : source, "PR_COMMIT_SHA", "PR_SOURCE_BINDING_MISMATCH");
   optionalBinding("CNB_BRANCH_SHA", target, "PR_BRANCH_SHA", "PR_TARGET_BINDING_MISMATCH");
   const head = resolveHead();
-  optionalBinding("CNB_PULL_REQUEST_MERGE_SHA", head, "PR_MERGE_SHA", "PR_CHECKOUT_BINDING_MISMATCH");
-  const parents = git(["show", "-s", "--format=%P", head]).split(" ").filter(Boolean);
-  if (parents.length !== 2 || parents[0] !== target || parents[1] !== source) {
-    fail("PR_CHECKOUT_BINDING_MISMATCH", `checkout ${head} 的父提交必须依次是 target ${target} 和 source ${source}`);
-  }
+  verifyPrCheckout(head, target, source);
   if (explicit !== undefined && explicit !== range) {
     fail("PR_RANGE_OVERRIDE_FORBIDDEN", `PR 只能校验已经绑定的 ${range}`);
   }

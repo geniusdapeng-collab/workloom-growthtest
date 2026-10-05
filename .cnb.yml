@@ -31,6 +31,14 @@
         if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
           git fetch --no-tags --unshallow origin
         fi
+        # CNB 对已包含 target 的 source 可能做 fast-forward checkout；仍取得
+        # 平台声明的 merge 对象，由 checker 核对双亲及实际工作区树完全相同。
+        if [ -n "${CNB_PULL_REQUEST_MERGE_SHA:-}" ]; then
+          checked_merge_sha=$CNB_PULL_REQUEST_MERGE_SHA
+          test "${#checked_merge_sha}" -eq 40
+          case "$checked_merge_sha" in *[!0-9a-fA-F]*) exit 1 ;; esac
+          git cat-file -e "${checked_merge_sha}^{commit}" 2>/dev/null || git fetch --no-tags origin "$checked_merge_sha"
+        fi
         node scripts/ci/verify-commit-msg.mjs
         node scripts/ci/verify-lock-conflict.mjs
 

@@ -87,6 +87,24 @@ function shallowFixture(f) {
   assert.equal(git("rev-parse", "--is-shallow-repository"), "true");
   return { root, git, env: f.env };
 }
+function fastForwardFixture(options = {}) {
+  const f = fixture({ sourceMergeSubject: valid, ...options });
+  f.git("checkout", "--detach", f.target);
+  // Exact real CNB Prepare command: no --no-ff, so ancestor target fast-forwards.
+  f.git("merge", "--quiet", "--no-edit", f.source);
+  assert.equal(f.git("rev-parse", "HEAD"), f.source);
+  assert.equal(f.git("rev-parse", f.merge + "^{tree}"), f.git("rev-parse", "HEAD^{tree}"));
+  return f;
+}
+function mergeProof(f, { tree = f.git("rev-parse", f.merge + "^{tree}"), parents = [f.target, f.source], message = "Canonical or local runner merge proof" } = {}) {
+  return f.git("commit-tree", tree, ...parents.flatMap((sha) => ["-p", sha]), "-m", message);
+}
+function alteredTree(f) {
+  f.commit(valid, "tampered-tree.txt");
+  const tree = f.git("rev-parse", "HEAD^{tree}");
+  f.git("checkout", "--detach", f.source);
+  return tree;
+}
 function pass(result) { assert.equal(result.status, 0, result.output); }
 function refuse(result, code) {
   assert.notEqual(result.status, 0, result.output);
@@ -262,6 +280,114 @@ describe("PR binding failures never fall back to HEAD or an empty apparent succe
     refuse(run(shallow), "PR_HISTORY_INCOMPLETE");
     shallow.git("fetch", "--unshallow", "origin");
     pass(run(shallow));
+  });
+});
+
+describe("real CNB fast-forward and local merges preserve canonical merged-tree proof", () => {
+  it("accepts actual fast-forward source HEAD only with full canonical merge/ancestry/tree proof and no token", () => {
+    const f = fastForwardFixture();
+    const result = run(f, { env: { CNB_TOKEN: undefined, HTTP_PROXY: undefined, HTTPS_PROXY: undefined } });
+    pass(result);
+    assert.ok(result.output.includes(f.source.slice(0, 12)), "source custom merge remains subject to the actual gate");
+    assert.ok(!result.output.includes(oldInvalid), "target-only history is still excluded");
+    assert.match(result.output, new RegExp(f.target + "\\.\\." + f.source));
+  });
+  it("accepts an exact explicit PR range for the same proven fast-forward checkout", () => {
+    const f = fastForwardFixture();
+    pass(run(f, { args: ["--range", f.target + ".." + f.source] }));
+  });
+  it("still rejects an invalid introduced nonmerge commit after a valid fast-forward custom source merge", () => {
+    const f = fastForwardFixture({ sourceSubject: invalid });
+    refuse(run(f), "任务号");
+  });
+  it("still rejects an invalid actual fast-forward source merge title", () => {
+    const f = fastForwardFixture({ sourceMergeSubject: invalid });
+    refuse(run(f), "任务号");
+  });
+  it("refuses fast-forward source HEAD with missing canonical merge metadata", () => {
+    const f = fastForwardFixture();
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: undefined } }), "PR_MERGE_SHA_REQUIRED");
+  });
+  it("refuses fast-forward source HEAD with blank canonical merge metadata", () => {
+    const f = fastForwardFixture();
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: " " } }), "PR_MERGE_SHA_INVALID");
+  });
+  it("refuses a missing canonical merge object without doing any network fallback", () => {
+    const f = fastForwardFixture();
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: "a".repeat(40) } }), "PR_MERGE_COMMIT_UNAVAILABLE");
+  });
+  it("refuses a tree object as a canonical merge proof", () => {
+    const f = fastForwardFixture();
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: f.git("rev-parse", f.merge + "^{tree}") } }), "PR_MERGE_COMMIT_UNAVAILABLE");
+  });
+  it("refuses the source's own integration commit as a substituted canonical merge proof", () => {
+    const f = fastForwardFixture();
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: f.source } }), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("refuses reversed canonical merge parents even with identical content", () => {
+    const f = fastForwardFixture();
+    const merge = mergeProof(f, { parents: [f.source, f.target] });
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: merge } }), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("refuses a canonical proof commit with only one parent", () => {
+    const f = fastForwardFixture();
+    const merge = mergeProof(f, { parents: [f.source] });
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: merge } }), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("refuses changed canonical merge content even when target is an actual source ancestor", () => {
+    const f = fastForwardFixture();
+    const merge = mergeProof(f, { tree: alteredTree(f) });
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: merge } }), "PR_CHECKOUT_TREE_MISMATCH");
+  });
+  it("refuses source-only checkout when real diverged target changes are not in source", () => {
+    const f = fixture();
+    f.git("checkout", "--detach", f.source);
+    refuse(run(f), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("refuses a forged same-tree merge proof for a source that does not descend from target", () => {
+    const f = fixture();
+    f.git("checkout", "--detach", f.source);
+    const merge = mergeProof(f, { tree: f.git("rev-parse", f.source + "^{tree}") });
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: merge } }), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("refuses an unrelated empty child after proven source HEAD even with the exact same tree", () => {
+    const f = fastForwardFixture();
+    f.git("commit", "--allow-empty", "-m", valid);
+    assert.equal(f.git("rev-parse", "HEAD^{tree}"), f.git("rev-parse", f.source + "^{tree}"));
+    refuse(run(f), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("accepts a local two-parent merge with a different commit hash only when canonical tree and parents agree", () => {
+    const f = fixture();
+    const local = mergeProof(f, { message: "Local runner-generated merge subject is not a source commit" });
+    assert.notEqual(local, f.merge);
+    f.git("checkout", "--detach", local);
+    const result = run(f);
+    pass(result);
+    assert.ok(result.output.includes(f.source.slice(0, 12)));
+    assert.ok(!result.output.includes(local.slice(0, 12)), "runner wrapper does not receive source-commit validation");
+  });
+  it("refuses a local two-parent merge whose tree differs from canonical merged content", () => {
+    const f = fixture();
+    const local = mergeProof(f, { tree: alteredTree(f) });
+    f.git("checkout", "--detach", local);
+    refuse(run(f), "PR_CHECKOUT_TREE_MISMATCH");
+  });
+  it("refuses reversed local merge parents even when canonical content agrees", () => {
+    const f = fixture();
+    const local = mergeProof(f, { parents: [f.source, f.target] });
+    f.git("checkout", "--detach", local);
+    refuse(run(f), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("refuses a local octopus wrapper even when canonical content agrees", () => {
+    const f = fixture();
+    const local = mergeProof(f, { parents: [f.target, f.source, f.base] });
+    f.git("checkout", "--detach", local);
+    refuse(run(f), "PR_CHECKOUT_BINDING_MISMATCH");
+  });
+  it("refuses a canonical octopus proof for an otherwise valid fast-forward source checkout", () => {
+    const f = fastForwardFixture();
+    const merge = mergeProof(f, { parents: [f.target, f.source, f.base] });
+    refuse(run(f, { env: { CNB_PULL_REQUEST_MERGE_SHA: merge } }), "PR_CHECKOUT_BINDING_MISMATCH");
   });
 });
 
