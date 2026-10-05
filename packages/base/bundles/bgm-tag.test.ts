@@ -11,13 +11,14 @@
  */
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path, { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { loadAllLocalTracks } from "../../../bundles/ai-video/connectors/bgm-bridge/core.mjs";
 import { planComposition, renderCompositionToWav } from "../../../bundles/ai-video/connectors/bgm-bridge/synth.mjs";
+import { segmentSpectralStats } from "../../../bundles/ai-video/connectors/bgm-bridge/measure.mjs";
 import {
   DEFAULT_FILTERS, FOLDER_HINTS, STYLE_FAMILIES, applyHardFilters, bpmBucketOf, buildIndexEntry,
   canonicalBpm, classifyStyle, classifyTrack, clipRiskOf, computeExcerptGain, energyScoreOf, folderHintFor,
@@ -564,6 +565,32 @@ describe("曲库打标 · 索引契约（与运行时加载器同构）", () => 
 });
 
 describe.runIf(HAS_FFMPEG)("曲库打标 · 真机量测（需要 ffmpeg）", () => {
+  it("FFmpeg 5.1 的频谱参数契约仍能量测 centroid/flatness，不能依赖新版 measure 选项", async () => {
+    const dir = tempDir("bgm-tag-spectral-compatible-");
+    const wav = join(dir, "tone.wav");
+    execFileSync("ffmpeg", ["-hide_banner", "-v", "error", "-y", "-f", "lavfi", "-i",
+      "sine=frequency=440:sample_rate=48000:duration=3", "-c:a", "pcm_s16le", wav]);
+    const observer = join(dir, "ffmpeg-compatible");
+    const argvLog = join(dir, "ffmpeg-argv.json");
+    // FFmpeg n5.1 af_aspectralstats.c supports win_size/win_func/overlap; it emits
+    // centroid and flatness by default, but rejects the later measure selector.
+    writeFileSync(observer, `#!${process.execPath}\n`
+      + `import { writeFileSync } from "node:fs";\nimport { spawnSync } from "node:child_process";\n`
+      + `const args = process.argv.slice(2); writeFileSync(${JSON.stringify(argvLog)}, JSON.stringify(args));\n`
+      + `if (args.some((value) => /aspectralstats=[^,]*\\bmeasure=/.test(value))) {\n`
+      + `  console.error("[Parsed_aspectralstats_0] Option 'measure' not found"); process.exit(1);\n}\n`
+      + `const child = spawnSync("ffmpeg", args, { stdio: "inherit" });\n`
+      + `if (child.error) throw child.error; process.exit(child.status ?? 1);\n`);
+    chmodSync(observer, 0o700);
+    const spectral = await segmentSpectralStats({ input: wav, duration: 2,
+      bins: { ffmpeg: observer, ffprobe: "ffprobe" } });
+    expect(Number.isFinite(spectral.centroidHz)).toBe(true);
+    expect(spectral.centroidHz).toBeGreaterThan(0);
+    expect(Number.isFinite(spectral.flatness)).toBe(true);
+    expect(spectral.frames).toBeGreaterThan(0);
+    expect(JSON.parse(readFileSync(argvLog, "utf8"))).toContain("-map");
+  }, 60_000);
+
   it("合成曲目打标 → 索引/证据/报告三件套齐备，且拍速/响度来自实测", async () => {
     const dir = tempDir("bgm-tag-real-");
     const wav = join(dir, "sample.wav");
@@ -579,6 +606,8 @@ describe.runIf(HAS_FFMPEG)("曲库打标 · 真机量测（需要 ffmpeg）", ()
       root: dir, license: "workloom-self-generated", licenseNote: "合成测试素材",
       maxSeconds: 60, concurrency: 1, filters: { ...DEFAULT_FILTERS, minDurationSec: 10 },
     });
+    expect(result.errors, JSON.stringify(result.errors)).toEqual([]);
+    expect(result.counts.failed).toBe(0);
     expect(result.counts.scanned).toBe(1);
     expect(result.counts.tagged + result.counts.rejected).toBe(1);
     if (result.counts.tagged === 0) {
@@ -616,6 +645,8 @@ describe.runIf(HAS_FFMPEG)("曲库打标 · 真机量测（需要 ffmpeg）", ()
       root: dir, license: "workloom-self-generated", licenseNote: "合成测试素材",
       maxSeconds: 60, concurrency: 1,
     });
+    expect(result.errors, JSON.stringify(result.errors)).toEqual([]);
+    expect(result.counts.failed).toBe(0);
     const total = result.counts.tagged + result.counts.rejected;
     expect(total).toBe(1);
     for (const rejected of result.rejected) expect(rejected.reasons.length).toBeGreaterThan(0);
