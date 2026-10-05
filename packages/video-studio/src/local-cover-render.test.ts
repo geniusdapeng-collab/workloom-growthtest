@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, linkSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, linkSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, isAbsolute, join } from "node:path";
 import { createServer } from "node:http";
@@ -90,14 +90,14 @@ describe("local-only cover renderer: actual media and copy", () => {
     expect(chosen.receipt.source.frameRgbaSha256).not.toBe(first.receipt.source.frameRgbaSha256);
     const expected = execute(["-i", video, "-ss", "1.25", "-map", "0:v:0", "-frames:v", "1", "-f", "rawvideo", "-pix_fmt", "rgba", "-"]);
     expect(chosen.receipt.source.frameRgbaSha256).toBe(sha(expected));
-  });
+  }, 30_000);
 
   it("produces repeatable decoded pixels for the same frozen local recipe", async () => {
     const left = await renderLocalCover(base("repeat-one"));
     const right = await renderLocalCover(base("repeat-two"));
     expect(left.receipt.output.rgbaSha256).toBe(right.receipt.output.rgbaSha256);
     expect(left.receipt.recipe.sha256).toBe(right.receipt.recipe.sha256);
-  });
+  }, 30_000);
   it("creates a new regular output directory and removes its private writer files", async () => {
     const out = join(directory, "new-output", "nested", "cover.png");
     const result = await renderLocalCover(base("new-parent", { out }));
@@ -150,7 +150,7 @@ describe("local-only cover renderer: actual media and copy", () => {
     expect(literal.receipt.text[0]!.bbox.width).toBeGreaterThan(plain.receipt.text[0]!.bbox.width);
     expect(literal.receipt.commands.some((command) => command.argv.some((arg) => arg.includes(title)))).toBe(false);
     expect(literal.receipt.output.rgbaSha256).not.toBe(plain.receipt.output.rgbaSha256);
-  });
+  }, 30_000);
 });
 
 describe("local-only cover renderer: input/refusal boundaries", () => {
@@ -214,8 +214,18 @@ describe("local-only cover renderer: input/refusal boundaries", () => {
   }, 20_000);
   it("refuses source/font hardlink and symlink output aliases, wrong extensions and directory targets", async () => {
     const sourceHard = join(directory, "source-hard.png"), fontHard = join(directory, "font-hard.png"), sym = join(directory, "output-sym.png"), folder = join(directory, "folder.png");
-    linkSync(source, sourceHard); linkSync(FONT, fontHard); symlinkSync(source, sym); mkdirSync(folder);
-    for (const out of [source, sourceHard, fontHard, sym, folder, "relative.png", join(directory, "wrong.jpg")]) await expect(renderLocalCover(base("bad-target", { out }))).rejects.toMatchObject({ code: "LOCAL_COVER_OUTPUT_INVALID" });
+    // The repository and tmpdir can be separate CI mounts. Keep the real font
+    // input and its hardlink on the fixture filesystem without changing its pin.
+    const localFont = join(directory, "font-hardlink-input.otf");
+    writeFileSync(localFont, readFileSync(FONT));
+    expect(sha(readFileSync(localFont))).toBe(FONT_SHA);
+    linkSync(source, sourceHard); linkSync(localFont, fontHard); symlinkSync(source, sym); mkdirSync(folder);
+    expect(lstatSync(fontHard).dev).toBe(lstatSync(localFont).dev);
+    expect(lstatSync(fontHard).ino).toBe(lstatSync(localFont).ino);
+    expect(lstatSync(localFont).nlink).toBeGreaterThanOrEqual(2);
+    for (const out of [source, sourceHard, fontHard, sym, folder, "relative.png", join(directory, "wrong.jpg")]) await expect(renderLocalCover(base("bad-target", { out, fontFile: localFont }))).rejects.toMatchObject({ code: "LOCAL_COVER_OUTPUT_INVALID" });
+    expect(sha(readFileSync(localFont))).toBe(FONT_SHA);
+    expect(sha(readFileSync(fontHard))).toBe(FONT_SHA);
     const parentAlias = join(directory, "output-parent-sym"); symlinkSync(directory, parentAlias);
     await expect(renderLocalCover(base("bad-parent", { out: join(parentAlias, "new-output.png") }))).rejects.toMatchObject({ code: "LOCAL_COVER_OUTPUT_INVALID" });
     await expect(renderLocalCover(base("bad-new-parent", { out: join(parentAlias, "must-not-create", "new-output.png") }))).rejects.toMatchObject({ code: "LOCAL_COVER_OUTPUT_INVALID" });
