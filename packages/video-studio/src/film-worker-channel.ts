@@ -70,6 +70,8 @@ export interface FilmWorkerJobContext {
   budgetCny: number;
   /** 作业截止（ISO 时间；超时服务会终止工位）。 */
   deadlineAt: string;
+  /** Parent configuration availability only; no credential/model request is delegated. */
+  characterVisionAvailable?: boolean;
 }
 
 export interface FilmChannelRequestFrame {
@@ -367,7 +369,8 @@ export function parseFilmWorkerJobContext(env: NodeJS.ProcessEnv = process.env):
     || !text(ctx.archiveRoot) || !Array.isArray(ctx.allowedMethods) || ctx.allowedMethods.length === 0
     || !ctx.allowedMethods.every((method) => FILM_CHANNEL_METHODS.includes(method as FilmChannelMethod))
     || typeof ctx.budgetCny !== "number" || !Number.isFinite(ctx.budgetCny) || ctx.budgetCny < 0
-    || !Number.isFinite(Date.parse(String(ctx.deadlineAt ?? "")))) {
+    || !Number.isFinite(Date.parse(String(ctx.deadlineAt ?? "")))
+    || ctx.characterVisionAvailable !== undefined && typeof ctx.characterVisionAvailable !== "boolean") {
     throw new FilmChannelError("CONTEXT_INVALID", "作业上下文字段缺失或格式非法");
   }
   if (env[FILM_WORKER_ENV.jobId] && env[FILM_WORKER_ENV.jobId] !== ctx.jobId) {

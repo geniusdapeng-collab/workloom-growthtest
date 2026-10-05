@@ -43,8 +43,10 @@ import YAML from "yaml";
 import { filmReviewContracts, loadOrCreateFilmAuthorContext, reviewFilmStage } from "../../packages/video-studio/src/film-contracts.js";
 import { buildProducerReviewContract, reviewStage as reviewCharacterVisualStage, type ProducerGateOptions } from "../../packages/video-studio/src/producer-gate.js";
 import { buildVariantCoverFilters, embedCoverFirstFrame, type CoverFirstFrameReceipt, type CoverVariantId } from "../../packages/video-studio/src/cover-assembly.js";
-import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, buildCharacterIdentityReviewRequest, buildCharacterReleaseContract, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
-import { assessPortraitDecision } from "../../packages/video-studio/src/portrait-decision.js";
+import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, buildCharacterIdentityReviewRequest, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
+import { buildRegisteredCharacterReleaseSource } from "../../packages/video-studio/src/character-release-source.js";
+import type { FilmVideoSubmissionReceipt } from "../../packages/video-studio/src/film-worker-provenance.js";
+import { assessPortraitDecision, selectPortraitDecisionRecord } from "../../packages/video-studio/src/portrait-decision.js";
 import { executeRevision } from "../../packages/video-studio/src/revision-executor.js";
 import { assessVoiceArtifact, fingerprintFile, fingerprintText, promoteDubCandidate, type VoiceArtifactRecord } from "./film-voice-artifact.js";
 import { readResumeTasks, runFilmRenderTask } from "./film-render-task.mjs";
@@ -94,8 +96,12 @@ import { assertShotMatchesCertifiedAsset, assetIdOf, hasIdentityAnchor, identity
 import { auditFilmRedlines, PROMPT_REDLINE_POLICY_VERSION } from "../../packages/video-studio/src/prompt-redlines.js";
 import { assessFilmFirstPass, FIRST_PASS_POLICY_VERSION } from "../../packages/video-studio/src/first-pass.js";
 import { publishUhdDelivery, sha256UhdAsset } from "../../packages/video-studio/src/uhd-delivery.js";
+import { FullChainFilmWorker } from "../../packages/video-studio/src/film-worker-runtime.js";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
+const WORKER_RUNTIME = process.argv.includes("--worker") || process.env.FILM_WORKER_MODE === "worker"
+  ? FullChainFilmWorker.fromEnvironment(REPO_ROOT) : null;
+if (WORKER_RUNTIME) process.argv = [...process.argv.slice(0, 2), ...WORKER_RUNTIME.args];
 /** GUI 启动时 PATH 常不含工位 kit；只选经过仓内 pin 摘要核验的本机二进制。 */
 function verifiedLocalMediaBins(): { ffmpeg: string; ffprobe: string } | null {
   if (process.platform !== "darwin" || !["arm64", "x64"].includes(process.arch)) return null;
@@ -139,18 +145,6 @@ const log = (line: string): void => { process.stdout.write(`[${stamp().slice(11,
 
 /* ================= 参数 ================= */
 
-/**
- * 服务端"固定影片工位"（--worker / FILM_WORKER_MODE=worker）在 **CLI 侧尚未接线**（第二批，见
- * `docs/repairs/T-2026-0927-0039.md` 第 57 行：full-chain-film.mts 未改动，工位子进程端到端待第二批）。
- * 这里显式 fail-closed：否则子进程会在读不到作业上下文的情况下继续跑，报错位置与原因都不可读。
- */
-if (flag("--worker") || String(process.env.FILM_WORKER_MODE ?? "") === "worker") {
-  throw new Error(
-    "WORKER_MODE_NOT_WIRED: 服务端固定影片工位的 CLI 侧入口尚未接线（第二批）。"
-    + "缺的是：解析 FILM_JOB_CONTEXT（冻结阶段/选项/inputRef）与受限通道（llm/image/video/media/voice/review）。"
-    + "请走公开 CLI 出片，或先完成第二批接线（docs/repairs/T-2026-0927-0039.md）。"
-  );
-}
 const SHOTS_FILE = abs(arg("--shots"));
 if (!SHOTS_FILE || !existsSync(SHOTS_FILE)) throw new Error("需要 --shots <shotlist.json>");
 const sourceBytes = readFileSync(SHOTS_FILE);
@@ -158,7 +152,7 @@ const sourceFileHash = createHash("sha256").update(sourceBytes).digest("hex");
 const sourceDocument = JSON.parse(sourceBytes.toString("utf8")) as Record<string, unknown> & { shots?: Array<Record<string, unknown>> };
 const PROJECT = arg("--project", basename(SHOTS_FILE, ".json"));
 if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(PROJECT) || PROJECT.includes("..")) throw new Error("PROJECT_ID_INVALID: 项目ID不能包含路径或特殊分隔符");
-const RUN_ID = randomUUID();
+const RUN_ID = WORKER_RUNTIME?.context.runId ?? randomUUID();
 const LIBRARY = resolve(arg("--library", join(REPO_ROOT, "var/media/characters")));
 const WORK_DIR = resolve(arg("--work-dir", join(REPO_ROOT, ".vm-work")));
 const OUT_ROOT = resolve(arg("--out", join(REPO_ROOT, "outputs", PROJECT)));
@@ -596,6 +590,10 @@ for (const dir of [LOG_DIR, PLATE_DIR, CLIP_DIR, POST_DIR, PROMPT_DIR, OUT_DIR])
 /** 环境：进程环境优先，其次仓库外秘密文件（只进内存，不落盘） */
 function loadEnv(): Record<string, string> {
   const out: Record<string, string> = {};
+  if (WORKER_RUNTIME) {
+    for (const [key, value] of Object.entries(process.env)) if (value) out[key] = value;
+    return out;
+  }
   if (existsSync(KEYS_FILE)) {
     for (const line of readFileSync(KEYS_FILE, "utf8").split("\n")) {
       const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
@@ -616,7 +614,7 @@ const ARK_KEY = ENV.VOLCENGINE_ARK_API_KEY ?? ENV.ARK_API_KEY ?? "";
 const ARK_BASE = (ENV.ARK_BASE_URL ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, "");
 const IMAGE_MODEL = ENV.SEEDREAM_MODEL ?? ENV.ARK_IMAGE_MODEL ?? "doubao-seedream-5-0-pro-260628";
 const VIDEO_MODEL = ENV.SEEDANCE_MODEL ?? ENV.ARK_VIDEO_MODEL ?? "doubao-seedance-2-5-260628";
-if (!ARK_KEY && !DRY_RUN && ["plates", "material-gen", "videos", "cover"].some((stage) => STAGES.has(stage))) throw new Error(`缺少火山方舟密钥（${KEYS_FILE} 的 VOLCENGINE_ARK_API_KEY / 环境变量）`);
+if (!WORKER_RUNTIME && !ARK_KEY && !DRY_RUN && ["plates", "material-gen", "videos", "cover"].some((stage) => STAGES.has(stage))) throw new Error(`缺少火山方舟密钥（${KEYS_FILE} 的 VOLCENGINE_ARK_API_KEY / 环境变量）`);
 
 /* ================= 阶段日志 ================= */
 
@@ -703,6 +701,8 @@ const lineageComponentHash = productionHash([
   "scripts/tools/film-voice-artifact.ts", "packages/video-studio/src/character-release-contract.ts",
   "packages/video-studio/src/cover-assembly.ts", "packages/video-studio/src/cover-design.ts",
   "packages/video-studio/src/producer-gate.ts", "packages/video-studio/src/real-person-asset.ts",
+  "packages/video-studio/src/character-release-source.ts", "packages/video-studio/src/film-worker-runtime.ts",
+  "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts",
 ].map((file) => ({ file, sha256: sha256FileSync(join(REPO_ROOT, file)) })));
 const SCENE_BIBLE_FILE = arg("--scene-bible");
 const sceneBible: SceneBible | null = SCENE_BIBLE_FILE
@@ -756,6 +756,7 @@ function syntheticReviewVerdict(
   };
 }
 async function reviewStage(options: Omit<ProducerGateOptions, "contracts">): Promise<ProducerVerdict> {
+  if (WORKER_RUNTIME) return WORKER_RUNTIME.review(options);
   /** 事实性硬闸任何策略下都不放过（"渲出来没有/规格不对"不是审美问题） */
   const hardFailures = deterministicHardFailures(options);
   if (hardFailures.length > 0) {
@@ -1873,6 +1874,7 @@ for (const shot of materialShots()) {
 
 interface CharacterEntryLike {
   id: string; name: string; files: Record<string, string>; dir: string;
+  version: number | null;
   /** 档案正文里的外貌描述（纯文生图时的唯一人物变量；真人图不可作为视频首帧时靠它保人） */
   appearanceText: string;
   wardrobeLock: { id: string; description: string };
@@ -1961,7 +1963,7 @@ function loadCharacterRoot(root: string, library: Map<string, CharacterEntryLike
       a.bodyType ? `身形：${String(a.bodyType)}` : "",
       wardrobe.name ? `穿着${String(wardrobe.name)}${wardrobe.detail ? `（${String(wardrobe.detail)}）` : ""}` : ""
     ].filter(Boolean).join("，");
-    library.set(profile.id, { id: profile.id, name: profile.name, files, dir, appearanceText,
+    library.set(profile.id, { id: profile.id, name: profile.name, files, dir, appearanceText, version: active?.version ?? null,
       wardrobeLock: { id: String(wardrobe.id ?? wardrobe.name ?? ""), description: [wardrobe.name, wardrobe.detail].filter(Boolean).join("：") } });
   }
 }
@@ -1995,27 +1997,19 @@ if (lead && characterRegistry.defaultModel && lead.id === characterRegistry.defa
 /** 人物身份、同组引用和本片明确服饰合同，独立于通用审美评审。 */
 const characterIdFor = (shot: ShotCard): string => String((shot as Record<string, unknown>).characterId ?? lead?.id ?? assetIdOf(assetRefOf(shot)));
 const allAssetShots = shotlist.shots.filter(isAssetShot);
-const characterBindings = [...new Map(allAssetShots.map((shot) => {
-  const id = characterIdFor(shot);
-  const entry = realPersonLibrary.byAssetId.get(assetIdOf(assetRefOf(shot)))!;
-  const anchor = identityAnchorPath(entry.asset, entry.dir);
-  const wardrobe = (shotlist.character as unknown as { wardrobeLock?: { id: string; description: string } } | undefined)?.wardrobeLock
-    ?? lead?.wardrobeLock ?? { id: "", description: "" };
-  return [id, { characterId: id, assetId: entry.asset.assetId, wardrobeLock: wardrobe,
-    ...(anchor ? { identityAnchor: { path: anchor, sha256: sha256FileSync(anchor), assetId: entry.asset.assetId,
-      source: `registered-real-person-profile:${join(entry.dir, "profile.json")}` } } : {}) }] as const;
-})).values()];
-const characterReleaseContract = buildCharacterReleaseContract({ projectId: PROJECT,
-  assets: realPersonLibrary.assets.map((entry) => entry.asset), characters: characterBindings,
-  shots: allAssetShots.map((shot) => ({ shotId: shot.shotId, characterId: characterIdFor(shot), assetRef: assetRefOf(shot),
-    ...((shot as Record<string, unknown>).wardrobeLock ? { wardrobeLock: (shot as unknown as { wardrobeLock: { id: string; description: string } }).wardrobeLock } : {}),
-    ...((shot as Record<string, unknown>).wardrobeChange ? { wardrobeChange: (shot as unknown as { wardrobeChange: { declaredBy: string; source: string; reason: string } }).wardrobeChange } : {}) })) });
+const registeredCharacterSource = buildRegisteredCharacterReleaseSource({ projectId: PROJECT,
+  shots: sourceDocument.shots!, character: sourceDocument.character as Record<string, unknown> | undefined,
+  assetLibraryRoot: REAL_PERSON_LIBRARY, characterLibraryRoots: [LIBRARY, join(REPO_ROOT, "bundles/ai-video/library/characters")],
+  registryFile: join(REPO_ROOT, "bundles/ai-video/library/characters/registry.json") });
+const characterBindings = registeredCharacterSource.bindings;
+const characterReleaseContract = registeredCharacterSource.contract;
 writeFileSync(join(WORK_DIR, `${PROJECT}-character-release-contract.json`), JSON.stringify(characterReleaseContract, null, 2));
 function assertCharacterRenderPreflight(): void {
   if (!characterReleaseContract.shots.length) return;
   if (characterReleaseContract.status !== "passed" || characterBindings.some((binding) => !binding.identityAnchor))
     throw new Error(`CHARACTER_RENDER_PREFLIGHT_BLOCKED: 授权身份、服饰合同或登记基准图缺失；${characterReleaseContract.issues.map((issue) => issue.detail).join("；")}`);
-  if (!resolveProducerLlm(ENV)) throw new Error("CHARACTER_VISION_UNAVAILABLE: 专用人物视觉评审不可用，禁止先花渲染额度");
+  if (!(WORKER_RUNTIME ? WORKER_RUNTIME.identityVisionAvailable : resolveProducerLlm(ENV)))
+    throw new Error("CHARACTER_VISION_UNAVAILABLE: 专用人物视觉评审不可用，禁止先花人物渲染额度");
 }
 function characterArtifact(shot: ShotCard): CharacterReleaseArtifact {
   const path = join(CLIP_DIR, `${shot.shotId}.mp4`);
@@ -2031,15 +2025,23 @@ function characterArtifact(shot: ShotCard): CharacterReleaseArtifact {
   return { shotId: shot.shotId, clip, promptSha256: String(submitted?.evidence?.generationPromptSha256 ?? ""),
     referenceAssets: (submitted?.evidence?.referenceAssets as string[] | undefined) ?? [], evidence };
 }
-function characterReleaseReport(phase: "canary" | "release") {
-  return assessCharacterRelease({ contract: characterReleaseContract, shots: allAssetShots.map(characterArtifact), phase });
+function characterReleaseReport(phase: "canary" | "release", characterId?: string) {
+  const selected = characterReleaseContract.shots.filter(shot => !ONLY.length || ONLY.includes(shot.shotId));
+  const people = characterId ? [characterId] : [...new Set(selected.map(shot => shot.characterId))];
+  const canaryShotIds = people.map(id => selected.find(shot => shot.characterId === id)?.shotId).filter((id): id is string => Boolean(id));
+  return assessCharacterRelease({ contract: characterReleaseContract, shots: allAssetShots.map(characterArtifact), phase,
+    ...(phase === "canary" ? { canaryShotIds, canaryCharacterIds: people } : {}) });
 }
 function assertCharacterCanaryBeforeSubmit(shotId: string): void {
-  if (!characterReleaseContract.shots.length) return;
+  // Canary scope follows the registered person. Unrelated product-only renders do
+  // not wait on a later person stage; each additional person shot still requires proof.
+  if (!characterReleaseContract.shots.some(shot => shot.shotId === shotId)) return;
   assertCharacterRenderPreflight();
-  const first = characterReleaseContract.characters.map((person) => characterReleaseContract.shots.find((shot) => shot.characterId === person.characterId)!.shotId);
+  const person = characterReleaseContract.shots.find(shot => shot.shotId === shotId)!;
+  const first = characterReleaseContract.shots.filter(shot => shot.characterId === person.characterId && (!ONLY.length || ONLY.includes(shot.shotId)))
+    .slice(0, 1).map(shot => shot.shotId);
   if (first.includes(shotId)) return;
-  const report = characterReleaseReport("canary");
+  const report = characterReleaseReport("canary", person.characterId);
   if (!report.continuePaidRendering) throw new Error(`CHARACTER_CANARY_BLOCKED: 先单独提交并核验人物首镜 ${first.join(",")}；${report.issues.map((issue) => issue.detail).join("；")}`);
 }
 async function verifyCharacterClip(shot: ShotCard, generationPrompt: string): Promise<boolean> {
@@ -2060,15 +2062,16 @@ async function verifyCharacterClip(shot: ShotCard, generationPrompt: string): Pr
   rememberInputs("character-identity", [artifact.clip.path, join(PROMPT_DIR, `${shot.shotId}.submitted.txt`), request.referenceImage.path,
     ...frames.map((frame) => frame.path)], shot.shotId);
   // Direct official review boundary: general review off cannot replace this visual evidence.
-  const verdict = await reviewCharacterVisualStage({ stage: "shot", projectId: PROJECT, contracts, rubric: request.rubric,
+  const verdict = WORKER_RUNTIME ? null : await reviewCharacterVisualStage({ stage: "shot", projectId: PROJECT, contracts, rubric: request.rubric,
     artifacts: [{ path: artifact.clip.path, kind: "video" }, ...frames.map((frame) => ({ path: frame.path, kind: "image" as const }))],
     referenceImages: [request.referenceImage.path], deterministic: [{ id: "identity-source-current", pass: true, hard: true, detail: request.requestHash }],
     context: { ...request.context, shotId: shot.shotId, identityRequestHash: request.requestHash },
     env: ENV, batchSize: 12, allowFallbackApprove: false, log });
-  const evidence = adaptCharacterVisualVerdict({ request, verdict });
+  const evidence = WORKER_RUNTIME ? await WORKER_RUNTIME.identityReview(request) : adaptCharacterVisualVerdict({ request, verdict: verdict! });
+  const actualVerdict = verdict ?? evidence.visualReview!.verdict;
   record({ stage: "character-identity", shotId: shot.shotId, invoked: true, ok: evidence.checks.identity === "passed" && evidence.checks.wardrobe === "passed",
-    cached: false, degraded: verdict.degraded, attempt: 1, ms: verdict.ms, artifact: artifact.clip.path,
-    evidence: { identityEvidence: evidence }, verdict, note: "专用身份与显式服饰评审；抽帧证据不冒充逐帧身份认证" });
+    cached: false, degraded: actualVerdict.degraded, attempt: 1, ms: verdict?.ms ?? 0, artifact: artifact.clip.path,
+    evidence: { identityEvidence: evidence }, verdict: verdict ?? null, note: "专用身份与显式服饰评审；抽帧证据不冒充逐帧身份认证" });
   return evidence.checks.identity === "passed" && evidence.checks.wardrobe === "passed";
 }
 
@@ -2109,12 +2112,11 @@ if (!DRY_RUN) {
     if (!existsSync(ledger)) return null;
     try {
       const events = readFileSync(ledger, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l) as {
-        stepKey?: string; at?: string; approved?: boolean; score?: number | null; reason?: string;
-        via?: string | null; sourceStage?: string | null; evidence?: { basis?: string | null } | null;
+        stepKey?: string; projectId?: string; at?: string; approved?: boolean; score?: number | null; reason?: string;
+        via?: string | null; sourceStage?: string | null; evidence?: { basis?: string | null; ownerAcceptance?: string } | null;
       });
-      const mine = events.filter((e) => e.stepKey === "g5-portrait-confirm");
-      return mine.length > 0 ? mine[mine.length - 1]! : null;
-    } catch { return null; }
+      return selectPortraitDecisionRecord(events, `portrait:${lead.id}:v${lead.version}`);
+    } catch (error) { throw new Error(`角色门账本不可读取：${error instanceof Error ? error.message : String(error)}`); }
   })();
   const reviewFile = (() => {
     if (!lead) return null;
@@ -2141,6 +2143,19 @@ if (!DRY_RUN) {
         }
       : null),
   );
+  let acceptanceBytesVerified = false;
+  if (lead && portraitDecision.decisive && !portraitDecision.blocking) {
+    const receiptFile = gateRecord?.evidence?.ownerAcceptance;
+    if (receiptFile) {
+      try {
+        const localReceipt = join(lead.dir, "reviews", basename(receiptFile));
+        const receipt = JSON.parse(readFileSync(localReceipt, "utf8")) as { characterId?: string; version?: number; artifacts?: Array<{ angle?: string; file: string; sha256: string }> };
+        acceptanceBytesVerified = receipt.characterId === lead.id && receipt.version === lead.version
+          && published.every(({ angle, path }) => !isAssetRefLocal(path) && existsSync(path)
+            && receipt.artifacts?.some((item) => (item.angle === angle || resolve(item.file) === resolve(path)) && item.sha256 === sha256FileSync(path)));
+      } catch (error) { log(`人类验收文件核验失败：${error instanceof Error ? error.message : String(error)}`); }
+    }
+  }
   const checks: GateCheck[] = lead
     ? [
         { id: "character-present", pass: true, detail: `角色 ${lead.name}（${lead.id}）`, hard: true },
@@ -2176,7 +2191,11 @@ if (!DRY_RUN) {
               pass: !portraitDecision.blocking,
               hard: portraitDecision.decisive,
               detail: `${portraitDecision.detail}（来源：${gateRecord ? "gates.jsonl" : "reviews/*.json"}）`
-            }])
+            }]),
+        ...(portraitDecision.decisive && !portraitDecision.blocking ? [{
+          id: "human-acceptance-bytes", pass: acceptanceBytesVerified, hard: true,
+          detail: acceptanceBytesVerified ? "当前角色版本的四角度字节与人类验收指纹一致" : "当前定妆照未与人类验收指纹绑定或已变化，须重新验收"
+        }] : [])
       ]
     : [{ id: "applicable", pass: true, detail: "镜头卡未涉及人物（空镜片）→ 定妆照门不适用", hard: false }];
   const gate = recordGate({
@@ -2220,11 +2239,13 @@ if (!DRY_RUN) {
 function dataUrl(file: string): string {
   /** 方舟授权真人素材（`asset://<asset ID>`）不是本地文件：**原样透传**给平台，不能 base64 编码 */
   if (isAssetRefLocal(file)) return file;
+  if (WORKER_RUNTIME) return `film-ref:${WORKER_RUNTIME.reference(file)}`;
   const ext = file.toLowerCase().endsWith(".png") ? "png" : file.toLowerCase().endsWith(".webp") ? "webp" : "jpeg";
   return `data:image/${ext};base64,${readFileSync(file).toString("base64")}`;
 }
 
-async function arkImage(prompt: string, anchors: string[], size: string): Promise<string> {
+async function arkImage(prompt: string, anchors: string[], size: string, shotId: string, target: string): Promise<string> {
+  if (WORKER_RUNTIME) return WORKER_RUNTIME.image(prompt, anchors, size, shotId, target);
   const payload: Record<string, unknown> = {
     model: IMAGE_MODEL, prompt, size, response_format: "url", watermark: false,
     ...(anchors.length > 0 ? { image: anchors.length === 1 ? dataUrl(anchors[0]!) : anchors.slice(0, 4).map(dataUrl) } : {})
@@ -2312,6 +2333,7 @@ function lastKeyframeApproved(history: StageRecord[], shotId: string): boolean {
 }
 
 async function download(url: string, file: string): Promise<string> {
+  if (WORKER_RUNTIME) return WORKER_RUNTIME.download(url, file);
   const res = await fetch(url, { signal: AbortSignal.timeout(300_000) });
   if (!res.ok) throw new Error(`下载失败 HTTP ${res.status}`);
   writeFileSync(file, Buffer.from(await res.arrayBuffer()));
@@ -2320,11 +2342,16 @@ async function download(url: string, file: string): Promise<string> {
 
 /** 逐镜视频提交（Seedance 异步任务制） */
 async function arkVideo(options: {
-  shotId: string; prompt: string; firstFrame?: string; refs: string[]; seconds: number; generateAudio: boolean; seed?: number;
-}): Promise<{ taskId: string; url: string; lastFrame: string | null; resumed: boolean; requestInputVerified: boolean }> {
+  stage: string; target: string; shotId: string; prompt: string; firstFrame?: string; refs: string[]; seconds: number; generateAudio: boolean; seed?: number;
+}): Promise<{ taskId: string; url: string; lastFrame: string | null; resumed: boolean; requestInputVerified: boolean; submissionReceipt?: FilmVideoSubmissionReceipt }> {
+  if (options.refs.length > 3) throw new Error("REFERENCE_LIMIT_EXCEEDED: 视频最多3张引用，禁止静默截断");
+  if (WORKER_RUNTIME) {
+    assertCharacterCanaryBeforeSubmit(options.shotId);
+    return WORKER_RUNTIME.video({ ...options, aspect: ASPECT, resolution: SOURCE_RESOLUTION });
+  }
   const content: Array<Record<string, unknown>> = [{ type: "text", text: options.prompt }];
   if (options.firstFrame) content.push({ type: "image_url", image_url: { url: options.firstFrame }, role: "first_frame" });
-  for (const ref of options.refs.slice(0, 3)) {
+  for (const ref of options.refs) {
     if (ref === options.firstFrame) continue;
     content.push({ type: "image_url", image_url: { url: ref }, role: "reference_image" });
   }
@@ -3327,7 +3354,7 @@ if (STAGES.has("plates")) {
         if (plateAnchorMode === "real" && attempt === 1) {
           log(`  ⚠ ${shot.shotId} 关键帧挂了真人锚点：产物会被 Seedance 隐私校验拒（仅适合做档案资产）`);
         }
-        const url = await arkImage(prompt, anchors, imageSize);
+        const url = await arkImage(prompt, anchors, imageSize, shot.shotId, plate);
         saveHostedUrl(shot.shotId, url);
         await download(url, plate);
         const info = probe(plate);
@@ -3939,6 +3966,7 @@ if (STAGES.has("material-gen")) {
       let renderModel: string | null = null;
       let taskResumed = false;
       let renderInputVerified = false;
+      let renderSubmissionReceipt: FilmVideoSubmissionReceipt | null = null;
       /**
        * 复用判据（2026-09-25 收口）：只有**原始渲染产物**在盘上、且阶段日志里能查到它的任务号时才复用
        * （坡道是后期层，每次按当前参数重算即可；旧管线留下的 `<shot>.mp4` 没有 raw 与溯源 → 重新生成）。
@@ -3964,6 +3992,7 @@ if (STAGES.has("material-gen")) {
         renderTaskId = (lastEvidence?.taskId as string | undefined) ?? null;
         renderModel = (lastEvidence?.model as string | undefined) ?? null;
         renderInputVerified = lastEvidence?.requestInputVerified === true;
+        renderSubmissionReceipt = lastEvidence?.submissionReceipt as FilmVideoSubmissionReceipt | null ?? null;
       }
       const attempts = Math.max(1, MAX_ATTEMPTS);
       let accepted = false;
@@ -4009,7 +4038,7 @@ if (STAGES.has("material-gen")) {
               break;
             }
             const submitted = await arkVideo({
-              shotId: shot.shotId,
+              stage: "material-gen", target: rawClip, shotId: shot.shotId,
               prompt: attemptPrompt,
               /**
                * **不再用 first_frame**（2026-09-25 产品所有者口径）：参考图只作实景依据，
@@ -4027,17 +4056,19 @@ if (STAGES.has("material-gen")) {
             renderModel = VIDEO_MODEL;
             taskResumed = submitted.resumed;
             renderInputVerified = submitted.requestInputVerified;
+            renderSubmissionReceipt = submitted.submissionReceipt ?? null;
             await download(submitted.url, rawClip);
             if (!renderInputVerified) {
               record({ stage: "material-gen", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: true,
                 attempt: usedAttempt, ms: Date.now() - shotStarted, artifact: rawClip,
-                evidence: { taskId: renderTaskId, model: renderModel, resumed: taskResumed, requestInputVerified: false,
+                evidence: { taskId: renderTaskId, model: renderModel, resumed: taskResumed, requestInputVerified: false, submissionReceipt: renderSubmissionReceipt,
                   source: "provider-recovery", outputFiles: [rawClip] }, verdict: null,
                 note: "既有任务已取回供内部审计；规格一致不证明当前商品照片和提示词曾提交，禁止签发生成溯源" });
               break;
             }
-            const normalized = normalizeClipDuration(rawClip, `${rawClip}.norm.mp4`, duration);
-            execFileSync("mv", [`${rawClip}.norm.mp4`, rawClip]);
+            const normalized = WORKER_RUNTIME ? await WORKER_RUNTIME.normalizeVideo(rawClip, duration, "material-gen", shot.shotId)
+              : normalizeClipDuration(rawClip, `${rawClip}.norm.mp4`, duration);
+            if (!WORKER_RUNTIME) execFileSync("mv", [`${rawClip}.norm.mp4`, rawClip]);
             log(`  ⇄ ${shot.shotId} 时长归一：渲染 ${normalized.from}s → 目标 ${normalized.to}s（×${normalized.factor}）`);
             renderTaskId = submitted.taskId;
             renderModel = VIDEO_MODEL;
@@ -4191,7 +4222,7 @@ if (STAGES.has("material-gen")) {
                 detail: `${lastRampVerdict.detail}（创作口径，不阻断交付）` }
             ],
             context: {
-              shotId: shot.shotId, scene: shot.scene, motion: spec.motion ?? null,
+              sourceStage: "material-gen", shotId: shot.shotId, scene: shot.scene, motion: spec.motion ?? null,
               policy: MATERIAL_POLICY_STATEMENT,
               motionMeasured: lastMotion,
               motionPolicy,
@@ -4234,7 +4265,7 @@ if (STAGES.has("material-gen")) {
             softApproved: lastVerdict.approved, via: lastVerdict.via, score: lastVerdict.score,
             evidence: {
               mode: "verify", attempt: usedAttempt, material: photo, materialSha256: materialSha, outputSha256: lastOutputSha,
-              taskId: renderTaskId, model: renderModel, requestInputVerified: renderInputVerified, reuseSamples: lastReuse.samples,
+              taskId: renderTaskId, model: renderModel, requestInputVerified: renderInputVerified, submissionReceipt: renderSubmissionReceipt, reuseSamples: lastReuse.samples,
               reuseVerdict: lastReuseVerdict.detail, photoTailTrim,
               motion: lastMotion, rawMotion: lastRawMotion, speedRamp: lastRamp, cameraMove,
               note: "素材镜复检口径：生成溯源 + 复用度实测 + **运动强度/速度坡道实测** + 监制"
@@ -4246,7 +4277,8 @@ if (STAGES.has("material-gen")) {
             stage: "material-gen", shotId: shot.shotId, invoked: true, ok: accepted, cached: false,
             degraded: lastVerdict.degraded, attempt: usedAttempt, ms: Date.now() - shotStarted, artifact: clip,
             evidence: {
-              ...lastInfo, resumed: taskResumed, requestInputVerified: renderInputVerified, outputFiles: [rawClip, prepared], taskId: renderTaskId, model: renderModel, material: photo, materialSha256: materialSha,
+              ...lastInfo, resumed: taskResumed, requestInputVerified: renderInputVerified, submissionReceipt: renderSubmissionReceipt,
+              outputFiles: [rawClip, prepared, ...(WORKER_RUNTIME && renderSubmissionReceipt ? [join(WORKER_RUNTIME.context.workDir, renderSubmissionReceipt.artifact.ref)] : [])], taskId: renderTaskId, model: renderModel, material: photo, materialSha256: materialSha,
               outputSha256: lastOutputSha, raw: rawClip, promptChars: attemptPrompt.trim().length, reuse: lastReuse.samples,
               reuseVerdict: lastReuseVerdict.detail, motion: lastMotion, rawMotion: lastRawMotion,
               motionVerdict: lastMotionVerdict.detail, rampVerdict: lastRampVerdict.detail,
@@ -4666,7 +4698,7 @@ if (STAGES.has("videos")) {
         if (shotIsAsset) rememberInputs("shot", [join(PROMPT_DIR, `${shot.shotId}.txt`), join(PROMPT_DIR, `${shot.shotId}.submitted.txt`),
           join(realPersonLibrary.byAssetId.get(assetIdOf(assetRefOf(shot)))!.dir, "profile.json")], shot.shotId);
         const submitted = await arkVideo({
-          shotId: shot.shotId,
+          stage: "videos", target: clip, shotId: shot.shotId,
           prompt: attemptPrompt,
           firstFrame,
           refs: shotRefs.map(dataUrl),
@@ -4680,14 +4712,15 @@ if (STAGES.has("videos")) {
          * 渲染时长 ≠ 分镜时长时的变速归一化（快剪片常态：分镜 2–4.5s，而模型下限 4s）：
          * 不截断（截断会丢动作），而是整段变速到目标时长——短镜变快、长镜变慢，节奏更可控。
          */
-        const normalized = normalizeClipDuration(clip, `${clip}.norm.mp4`, duration);
-        execFileSync("mv", [`${clip}.norm.mp4`, clip]);
+        const normalized = WORKER_RUNTIME ? await WORKER_RUNTIME.normalizeVideo(clip, duration, "videos", shot.shotId)
+          : normalizeClipDuration(clip, `${clip}.norm.mp4`, duration);
+        if (!WORKER_RUNTIME) execFileSync("mv", [`${clip}.norm.mp4`, clip]);
         log(`  ⇄ ${shot.shotId} 时长归一：渲染 ${normalized.from}s → 目标 ${normalized.to}s（×${normalized.factor}）`);
         const info = probe(clip);
         if (!submitted.requestInputVerified) {
           record({ stage: "shot", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: true,
             attempt, ms: Date.now() - started, artifact: clip,
-            evidence: { ...info, taskId: submitted.taskId, resumed: submitted.resumed, requestInputVerified: false,
+            evidence: { ...info, taskId: submitted.taskId, resumed: submitted.resumed, requestInputVerified: false, submissionReceipt: submitted.submissionReceipt ?? null,
               rawSha256: sha256FileSync(clip), generationPromptSha256: null }, verdict: null,
             note: "已接续供应商任务并保存内部候选；缺实际提示词与引用输入证明，禁止正式出片且不自动重渲" });
           break;
@@ -4756,6 +4789,8 @@ if (STAGES.has("videos")) {
             rawSha256: sha256FileSync(clip), referenceAssets: shotRefs,
             generationPromptSha256: submitted.requestInputVerified ? fingerprintText(attemptPrompt) : null,
             requestInputVerified: submitted.requestInputVerified,
+            submissionReceipt: submitted.submissionReceipt ?? null,
+            outputFiles: WORKER_RUNTIME && submitted.submissionReceipt ? [join(WORKER_RUNTIME.context.workDir, submitted.submissionReceipt.artifact.ref)] : [],
             basePromptSha256: fingerprintText(readFileSync(join(PROMPT_DIR, `${shot.shotId}.txt`), "utf8")),
             characterContractHash: shotIsAsset ? characterReleaseContract.contractHash : null,
             promptFingerprint
@@ -4862,8 +4897,9 @@ interface SpeechReport {
  * `--min-match 0` 是为了拿到数值而不是让工位直接抛错；`--no-strict` 是为了让**响度/真峰值**
  * 这类交付项不干扰"有没有人声"的判断（真机：SC-04 因 -0.69dBTP 让核查返回空值，误判成"没人声"）。
  */
-function checkSpeech(file: string, expectText: string): SpeechReport {
-  const res = runCli(VOICE_CLI, ["verify", "--in", file, "--expect-text", expectText, "--min-match", "0", "--no-strict"]);
+async function checkSpeech(file: string, expectText: string, shotId: string): Promise<SpeechReport> {
+  const res = WORKER_RUNTIME ? await WORKER_RUNTIME.speech(file, expectText, shotId)
+    : runCli(VOICE_CLI, ["verify", "--in", file, "--expect-text", expectText, "--min-match", "0", "--no-strict"]);
   if (!res.ok) {
     return { ok: false, status: "unverified", matchRatio: null, activeRatio: null, segments: null, transcript: null, termMissing: null, detail: `配音工位调用失败：${res.out.slice(-200)}` };
   }
@@ -4969,7 +5005,7 @@ if (STAGES.has("voice")) {
       const contract = resolveFilmAudioContract(shot as unknown as Parameters<typeof resolveFilmAudioContract>[0]);
       const provenance = { projectId: PROJECT, rawSha256: fingerprintFile(raw), textSha256: fingerprintText(text), audioPolicyHash: contract.policyHash };
       rememberInputs("voice", [raw], shot.shotId);
-      let before = checkSpeech(raw, text);
+      let before = await checkSpeech(raw, text, shot.shotId);
       /**
        * 工具故障 → 先重试一次；仍不可用则**保留原声、不补旁白**（避免双声叠播）。
        * 真机：首镜 ASR 冷启动超时（600s）被当成"没人声"，补进去的 TTS 与模型自己的台词人声同时播。
@@ -4977,7 +5013,7 @@ if (STAGES.has("voice")) {
       if (!before.ok && before.status === "unverified" && !DUB_ON_VERIFY_FAILURE) {
         log(`  ↻ ${shot.shotId} 人声核查工具不可用（${before.detail.slice(0, 80)}）→ 重试一次`);
         await new Promise((resolve) => setTimeout(resolve, 2_000));
-        before = checkSpeech(raw, text);
+        before = await checkSpeech(raw, text, shot.shotId);
         if (!before.ok && before.status === "unverified") {
           narrationCoverage.push({
             shotId: shot.shotId, speaker, text, ok: false, source: "clip-audio-unverified",
@@ -5030,7 +5066,7 @@ if (STAGES.has("voice")) {
         log(`  ↻ ${shot.shotId} 旧配音版不可复用（${reusable.reason}）→ 重新配音`);
       }
       if (reusable.ok && reusable.voiced) {
-        const reused = checkSpeech(existingVoiced, text);
+        const reused = await checkSpeech(existingVoiced, text, shot.shotId);
         if (reused.ok) {
           narrationCoverage.push({ shotId: shot.shotId, speaker, text, ok: true, source: "voiced-reuse", detail: reused.detail });
           record({
@@ -5066,7 +5102,7 @@ if (STAGES.has("voice")) {
       log(`  ⚠ ${shot.shotId} 人声核查未过（${before.detail.slice(0, 90)}）→ ${termBroken ? `术语读错（${(before.termMissing ?? []).join("/")}）→ 用克隆音色替换该镜人声` : "补旁白"}（音色 ${NARRATION_PROFILE}）`);
       const out = voicedFile(shot.shotId);
       const candidate = `${out}.pending-${randomUUID()}.mp4`;
-      const dub = runCli(VOICE_CLI, [
+      const dub = WORKER_RUNTIME ? await WORKER_RUNTIME.dub(raw, candidate, text, NARRATION_PROFILE, dubPolicy, shot.shotId) : runCli(VOICE_CLI, [
         "dub", "--in", raw, "--out", candidate, "--profile", NARRATION_PROFILE,
         "--text", text, "--policy", dubPolicy, "--lufs", "-16"
       ]);
@@ -5077,7 +5113,7 @@ if (STAGES.has("voice")) {
       } catch (error) {
         candidateError = error instanceof Error ? error.message : String(error);
       }
-      const after = produced ? checkSpeech(candidate, text) : before;
+      const after = produced ? await checkSpeech(candidate, text, shot.shotId) : before;
       /**
        * 重复播报防线（真机同因）：补旁白是"叠"在原声之上，若原声本已说对，
        * 复核转写就会出现两遍 → 判本次补旁白失败并**放弃配音产物**（回退原片，绝不交付"说了两遍"的音频）。
@@ -6268,6 +6304,7 @@ function imageDiff(a: string, b: string, out: string): void {
 
 /** 封面设计师（LLM）：只出设计稿，不画图 */
 async function callCoverDesigner(designInput: CoverDesignInput): Promise<string> {
+  if (WORKER_RUNTIME) return WORKER_RUNTIME.design(buildCoverDesignPrompt(designInput));
   const llm = resolveProducerLlm(ENV);
   if (!llm) throw new Error("未配置 LLM（LLM_BASE_URL / LLM_API_KEY / LLM_MODEL）");
   const res = await fetch(`${llm.baseUrl}/chat/completions`, {
@@ -7997,7 +8034,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
   ])];
   const assetHashes = QUALITY === "uhd"
     ? await Promise.all(stagedContentAssets.map(async (path) => ({ path: publicDeliveryPath(path), sha256: await sha256UhdAsset(path) })))
-    : [];
+    : stagedContentAssets.map((path) => ({ path: publicDeliveryPath(path), sha256: sha256FileSync(path) }));
   const manifestFile = join(OUT_DIR, `${PROJECT}-delivery-manifest.json`);
   writeFileSync(manifestFile, `${JSON.stringify({ ...buildDeliveryManifest({
     projectId: PROJECT,
@@ -8023,7 +8060,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     variantAxes,
     samples,
     at: stamp()
-  }), ...(QUALITY === "uhd" ? { assets: assetHashes } : {}), quality: {
+  }), assets: assetHashes, quality: {
     tier: QUALITY, sourceResolution: SOURCE_RESOLUTION, outputResolution: OUTPUT_RESOLUTION,
     width: OUTPUT_SIZE.width, height: OUTPUT_SIZE.height,
     localEnhancement: QUALITY === "uhd" ? "per-shot, verified receipt in stages.jsonl" : "not requested"
@@ -8234,3 +8271,4 @@ if (!DRY_RUN) {
       + "——降级项已留痕在阶段日志与交付清单（assemblyMode=post-only），后期链与交付物均已产出。");
   }
 }
+if (WORKER_RUNTIME) WORKER_RUNTIME.finish(records, !process.exitCode);

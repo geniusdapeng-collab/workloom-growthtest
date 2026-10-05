@@ -402,14 +402,17 @@ function existingUrlPassword(text, key) {
 }
 
 function buildDesktopEnvironment(text, {
+  runtimeDir,
   pgPort,
   serverPort,
   webPort,
   adminPassword,
   appPassword,
   gatewayPassword,
-  runtimeDir = null,
 }) {
+  if (typeof runtimeDir !== "string" || !path.isAbsolute(runtimeDir)) {
+    throw new Error("桌面运行目录必须为绝对路径");
+  }
   const values = {
     DATABASE_URL: databaseUrl("postgres", adminPassword, pgPort),
     APP_DB_PASSWORD: appPassword,
@@ -424,7 +427,7 @@ function buildDesktopEnvironment(text, {
    * 没有这一行，桌面上任何含写步骤的 quest 都会落 `connector-required`（未核实）而无法交付。
    * 规格与端口/工具名都从载荷内的桥源码派生（bundle 增删桥后无需改本文件）。
    */
-  const toolExecutorModules = runtimeDir ? resolveToolExecutorModules(runtimeDir) : "";
+  const toolExecutorModules = resolveToolExecutorModules(runtimeDir);
   if (toolExecutorModules) values.WORKLOOM_TOOL_EXECUTOR_MODULES = toolExecutorModules;
   let next = text;
   for (const [key, value] of Object.entries(values)) next = upsertEnvValue(next, key, value);
@@ -903,7 +906,18 @@ async function bootstrap(opts) {
     effResources = cacheDir;
   }
   const installedVer = readIf(path.join(supportDir, "VERSION")) || "none";
-  if (payloadVer !== installedVer) {
+  // VERSION 哨兵只说明上次提交过；缓存清理、磁盘损坏或中断恢复后还必须检查实际载荷。
+  const installedRuntimeVer = readIf(path.join(RUNTIME, "VERSION"));
+  const requiredInstalledFiles = [
+    NODE_BIN, path.join(RUNTIME, ".env.defaults"),
+    path.join(RUNTIME, "scripts", "desktop-bootstrap-db.mjs"),
+    path.join(RUNTIME, "node_modules", "vite", "bin", "vite.js"),
+    ...["postgres", "pg_ctl", "initdb"].map(pgBin),
+  ];
+  const installedTsx = [path.join(RUNTIME, "node_modules", "tsx", "dist", "cli.mjs"), path.join(RUNTIME, "node_modules", ".bin", "tsx")]
+    .some((file) => fs.existsSync(file));
+  if (payloadVer !== installedVer || installedRuntimeVer !== payloadVer || !installedTsx
+      || requiredInstalledFiles.some((file) => !fs.existsSync(file))) {
     status(`→ 装配运行时载荷（${payloadVer}）…`, { phase: "payload-staging", percent: 20, etaSeconds: 100 });
     fs.mkdirSync(supportDir, { recursive: true });
     // runtime 会在升级时整体替换；先保留用户配置，避免 JWT/API Key/模型设置被新版覆盖。
@@ -984,7 +998,8 @@ async function bootstrap(opts) {
     throw new Error("持久状态绑定的 PostgreSQL 实例已缺失，拒绝静默初始化为另一实例");
   }
 
-  if (!envExisted) {
+  const oldJwt = readEnvValue(envText, "JWT_SECRET");
+  if (!envExisted || !oldJwt || Buffer.byteLength(oldJwt) < 32 || /workloom-dev-secret|change[-_ ]?me|replace[-_ ]?me/i.test(oldJwt)) {
     const jwtValue = `wl-${crypto.randomBytes(24).toString("hex")}`;
     const piiValue = `pii-${crypto.randomBytes(24).toString("hex")}`;
     envText = upsertEnvValue(envText, "JWT_SECRET", jwtValue);
@@ -995,13 +1010,13 @@ async function bootstrap(opts) {
   const appPassword = databaseState.credentials.app;
   const gatewayPassword = databaseState.credentials.gateway;
   const desktopConfig = buildDesktopEnvironment(envText, {
+    runtimeDir: RUNTIME,
     pgPort: PG_PORT,
     serverPort: SERVER_PORT,
     webPort: WEB_PORT,
     adminPassword,
     appPassword,
     gatewayPassword,
-    runtimeDir: RUNTIME,
   });
   if (!envExisted || desktopConfig.text !== fs.readFileSync(envFile, "utf8")) atomicWrite(envFile, desktopConfig.text, 0o600);
   else {
@@ -1017,6 +1032,13 @@ async function bootstrap(opts) {
     WORKLOOM_NATS_PORT: String(NATS_PORT),
   };
   const serverEnv = withBundledNodePath({ ...desktopEnv, NODE_ENV: "production" }, NODE_BIN);
+  const desktopProduct = JSON.parse(fs.readFileSync(path.join(RUNTIME, "product.manifest.json"), "utf8"));
+  if (typeof desktopProduct.demoWorkspaceSlug !== "string" || typeof desktopProduct.demoMemberNo !== "string") {
+    throw new Error("受保护产品清单缺少本机工作区与成员配置");
+  }
+  const desktopLoginKey = crypto.randomBytes(32).toString("hex");
+  Object.assign(serverEnv, { SERVER_HOST: "127.0.0.1", WORKLOOM_DESKTOP_LOGIN_KEY: desktopLoginKey,
+    WORKLOOM_DESKTOP_WORKSPACE: desktopProduct.demoWorkspaceSlug, WORKLOOM_DESKTOP_MEMBER: desktopProduct.demoMemberNo });
   serverEnv.WORKLOOM_DESKTOP_INSTANCE_ID = crypto.randomUUID();
   serverEnv.WORKLOOM_PRODUCT_ID = JSON.parse(fs.readFileSync(path.join(RUNTIME, "product.manifest.json"), "utf8")).productId;
   serverEnv.WORKLOOM_DIRECTOR_DIR = path.join(supportDir, "director");
@@ -1243,7 +1265,19 @@ async function bootstrap(opts) {
     releaseBootstrapLock();
     say("== 已停止 ==");
   };
-  return { stop, webUrl };
+  const login = async () => {
+    if (stopped) throw new Error("本机服务已经停止");
+    const response = await fetch(`http://127.0.0.1:${SERVER_PORT}/trpc/auth.desktopLogin`, {
+      method: "POST", headers: { "content-type": "application/json", "x-workloom-desktop-key": desktopLoginKey },
+      body: "{}", signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) throw new Error(`本机登录尚未完成（${response.status}）`);
+    const value = await response.json();
+    const session = value.result?.data;
+    if (typeof session?.token !== "string" || !session.identity) throw new Error("本机登录响应不完整");
+    return session;
+  };
+  return { stop, webUrl, login };
   } catch (error) {
     const rolledBack = Boolean(payloadTransaction);
     try {

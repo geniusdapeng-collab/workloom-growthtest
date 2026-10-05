@@ -1,7 +1,23 @@
 import { describe, expect, it } from "vitest";
-import { assessPortraitDecision } from "./portrait-decision.js";
+import { assessPortraitDecision, selectPortraitDecisionRecord } from "./portrait-decision.js";
 
 describe("定妆照决策口径：人类验收是唯一放行/否决来源", () => {
+  it("同一版本的明确人类否决不能被后来的机器记录或另一版本的放行覆盖", () => {
+    const rejected = { stepKey: "g5-portrait-confirm", projectId: "portrait:actor:v2", via: "owner-acceptance", approved: false, evidence: { basis: "human-review" } };
+    const records = [rejected, { stepKey: "g5-portrait-confirm", projectId: "portrait:actor:v2", via: "llm", approved: true },
+      { stepKey: "g5-portrait-confirm", projectId: "portrait:actor:v3", via: "human", approved: true }];
+    expect(selectPortraitDecisionRecord(records, "portrait:actor:v2")).toBe(rejected);
+    expect(selectPortraitDecisionRecord(records, "portrait:other:v2")).toBeNull();
+    expect(assessPortraitDecision(selectPortraitDecisionRecord(records, "portrait:actor:v2")).blocking).toBe(true);
+  });
+  it("后续同版本的明确人类放行可替代否决；机器意见始终只是留证", () => {
+    const scope = { stepKey: "g5-portrait-confirm", projectId: "portrait:actor:v2" };
+    const accepted = { ...scope, via: "human", approved: true };
+    const records = [{ ...scope, via: "human", approved: false, evidence: { basis: "human-review" } }, accepted,
+      { ...scope, via: "llm", approved: false }];
+    expect(selectPortraitDecisionRecord(records, scope.projectId)).toBe(accepted);
+    expect(assessPortraitDecision(selectPortraitDecisionRecord(records, scope.projectId)).blocking).toBe(false);
+  });
   it("无记录：不构成放行依据，也不阻断（机器不代替人类签字）", () => {
     const decision = assessPortraitDecision(null);
     expect(decision).toMatchObject({ kind: "none", decisive: false, blocking: false });

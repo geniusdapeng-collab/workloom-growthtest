@@ -461,6 +461,25 @@ d("月度回测节拍存在（每月 1 日）", async () => {
 
 /* ================= E · 事件留痕合规 ================= */
 const e = C("E");
+// apps/server/src/index.ts records server 5xx telemetry without a model or
+// external tool receipt. Match that complete contract, never a broad actor or
+// object-name exemption that could hide a real industry execution event.
+const SERVER_ERROR_TELEMETRY_SQL = `(
+  payload->'who'->>'type' = 'system' AND payload->'who'->>'id' = 'system'
+  AND payload->'object'->>'type' = 'server_request'
+  AND payload->'decision'->>'action' = 'system.error'
+  AND payload->'decision'->'after'->>'code' = 'INTERNAL_SERVER_ERROR'
+  AND payload->'object'->>'id' = payload->'decision'->'after'->>'ref'
+  AND payload->'object'->>'id' ~ '^[0-9a-f]{8}$'
+  AND jsonb_typeof(payload->'decision'->'after'->'message') = 'string'
+  AND length(payload->'decision'->'after'->>'message') <= 200
+  AND payload->'context'->>'channel' = 'server'
+  AND payload->'context'->>'tenant_id' = tenant_id
+  AND payload->'context'->>'workspace_id' = workspace_id
+  AND payload->'rule_impact' = '[]'::jsonb
+  AND NOT (payload->'decision' ?| ARRAY['tool','kind','params'])
+  AND NOT (payload ?| ARRAY['receipt','model_trace'])
+)`;
 /**
  * 平台系统对象（不属于行业对象模型，事件合规检查统一豁免）：
  *   thread/task/approval/conversation = 门禁活火事件（dispatch/quest/审批流）
@@ -493,11 +512,13 @@ e("ws-geo 事件 ≥60 条且五元字段完整（容忍门禁活火写入）", 
   const bad = await q(`SELECT count(*) n FROM biz_events WHERE workspace_id=$1
     AND payload->'decision'->'after' IS NOT NULL
     AND COALESCE(payload->'object'->>'type','') <> ALL($2::text[])
+    AND NOT COALESCE(${SERVER_ERROR_TELEMETRY_SQL}, false)
     AND (payload->>'who' IS NULL OR payload->>'object' IS NULL OR payload->>'decision' IS NULL OR payload->>'receipt' IS NULL OR payload->>'model_trace' IS NULL)`, [WS, [...SYSTEM_TYPES]]);
   assert(Number(bad.rows[0].n) === 0, `五元缺失 ${bad.rows[0].n} 条`);
 });
 e("事件 GEO 对象类型全部在对象模型内（系统对象豁免）", async () => {
-  const r = await q(`SELECT DISTINCT payload->'object'->>'type' t FROM biz_events WHERE workspace_id=$1`, [WS]);
+  const r = await q(`SELECT DISTINCT payload->'object'->>'type' t FROM biz_events WHERE workspace_id=$1
+    AND NOT COALESCE(${SERVER_ERROR_TELEMETRY_SQL}, false)`, [WS]);
   for (const row of r.rows) assert(objectTypes.has(row.t) || SYSTEM_TYPES.has(row.t), `事件对象 ${row.t} 未在对象模型`);
 });
 e("事件 who 全部在编制内（系统/人类豁免）", async () => {
@@ -511,7 +532,8 @@ e("事件 who 全部在编制内（系统/人类豁免）", async () => {
     // render-operator = 渲染提交的生成池计量主体（gen.degraded / 提交留痕；2026-09-20 真机测试增补）
     "render-operator",
   ]);
-  const r = await q(`SELECT DISTINCT payload->'who'->>'id' id FROM biz_events WHERE workspace_id=$1`, [WS]);
+  const r = await q(`SELECT DISTINCT payload->'who'->>'id' id FROM biz_events WHERE workspace_id=$1
+    AND NOT COALESCE(${SERVER_ERROR_TELEMETRY_SQL}, false)`, [WS]);
   for (const row of r.rows) assert(presetKeys.has(row.id) || SYSTEM_ACTORS.has(row.id) || String(row.id).startsWith("MEM-"), `who=${row.id} 不在编制`);
 });
 e("rule_impact 引用的规则存在且级别一致", async () => {
@@ -530,6 +552,41 @@ e("双入口询盘打标事件两种入口均在（social + ai_search）", async
   const r = await q(`SELECT DISTINCT payload->'decision'->'after'->>'entry' entry FROM biz_events WHERE workspace_id=$1 AND payload->'decision'->>'action'='inquiry.tag'`, [WS]);
   const entries = new Set(r.rows.map(x => x.entry));
   assert(entries.has("social") && entries.has("ai_search"), `入口不全：${[...entries].join(",")}`);
+});
+const telemetryFixture = () => ({
+  who: { type: "system", id: "system" },
+  context: { tenant_id: TENANT, workspace_id: WS, channel: "server", time: "2026-10-02T15:00:00Z" },
+  object: { type: "server_request", id: "a12b34c5" },
+  decision: { action: "system.error", after: { path: "fixture.read", code: "INTERNAL_SERVER_ERROR", ref: "a12b34c5", message: "controlled failure" } },
+  rule_impact: [],
+});
+async function telemetryAllowed(payload: Record<string, unknown>) {
+  const result = await q(`SELECT COALESCE(${SERVER_ERROR_TELEMETRY_SQL}, false) allowed
+    FROM (SELECT $1::jsonb payload, $2::text tenant_id, $3::text workspace_id) fixture`, [JSON.stringify(payload), TENANT, WS]);
+  return result.rows[0]?.allowed === true;
+}
+e("服务端 5xx 完整遥测契约可留痕，不伪造模型或供应商回执", async () => {
+  assert(await telemetryAllowed(telemetryFixture()), "服务端实际遥测契约被误判为行业执行");
+});
+e("系统名字不能豁免行业动作、外部工具或作用域错配", async () => {
+  const variants: Array<Record<string, unknown>> = [];
+  for (const field of ["action", "tool", "kind", "params"] as const) {
+    const payload = telemetryFixture();
+    variants.push({ ...payload, decision: { ...payload.decision, [field]: field === "action" ? "publish.execute" : "execution_started" } });
+  }
+  const original = telemetryFixture();
+  variants.push(
+    { ...original, who: { type: "agent", id: "system" } },
+    { ...original, object: { type: "publish_task", id: "a12b34c5" } },
+    { ...original, object: { type: "server_request", id: "deadbeef" } },
+    { ...original, context: { ...original.context, workspace_id: "another-workspace" } },
+    { ...original, context: { ...original.context, tenant_id: "another-tenant" } },
+    { ...original, decision: { ...original.decision, after: { ...original.decision.after, code: "FORBIDDEN" } } },
+    { ...original, receipt: { synced: true } },
+    { ...original, model_trace: { provider: "fixture" } },
+    { ...original, rule_impact: [{ rule_id: "G9", result: "pass" }] },
+  );
+  for (const [index, payload] of variants.entries()) assert(!(await telemetryAllowed(payload)), `伪装遥测反例 ${index + 1} 获得豁免`);
 });
 
 /* ================= 执行 ================= */

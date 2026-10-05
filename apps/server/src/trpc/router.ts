@@ -24,6 +24,7 @@ import { gatewayAppend, gatewayAppendOnClient, insertWithReadableId, MockEmbedde
 import { makeReadableId } from "@workloom/shared";
 import { capabilityWriteProcedure, protectedProcedure, publicProcedure, router, scopeOf, sessionProcedure, writeProcedure } from "./context.js";
 import { accountsRouter } from "./accounts-router.js";
+import { assertDemoLoginAllowed, desktopLoginTarget } from "../service/desktop-auth.js";
 import {
   ApprovalError,
   batchApprove,
@@ -851,6 +852,7 @@ const authRouter = router({
   loginAs: publicProcedure
     .input(z.object({ workspaceSlug: z.string(), memberNo: z.string() }))
     .mutation(async ({ input }) => {
+      assertDemoLoginAllowed();
       const app = getAppPool();
       // 登录引导例外点（F7.1）：身份未建立前无法 set_config，workspace 解析走 owner 池
       const ws = await getOwnerPool().query<{ id: string; tenant_id: string }>(
@@ -875,6 +877,23 @@ const authRouter = router({
       };
       return { token: await signDemoToken(identity), identity };
     }),
+  desktopLogin: publicProcedure.mutation(async ({ ctx }) => {
+    const target = desktopLoginTarget(ctx.headers);
+    const ws = await getOwnerPool().query<{ id: string; tenant_id: string }>(
+      "SELECT id, tenant_id FROM workspaces WHERE slug=$1", [target.workspaceSlug],
+    );
+    const workspace = ws.rows[0];
+    if (!workspace) throw new TRPCError({ code: "NOT_FOUND", message: "本机工作区尚未就绪" });
+    const scope = { tenantId: workspace.tenant_id, workspaceId: workspace.id };
+    const member = await getMember(getAppPool(), scope, target.memberNo);
+    if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "本机成员尚未就绪" });
+    const tenant = await getOwnerPool().query<{ plan: Identity["plan"] }>(
+      "SELECT plan FROM tenants WHERE id=$1", [scope.tenantId],
+    );
+    const identity: Identity = { ...scope, memberId: member.id, memberNo: member.memberNo,
+      name: member.name, role: member.role, plan: tenant.rows[0]?.plan ?? "community" };
+    return { token: await signDemoToken(identity), identity };
+  }),
   /** 版本切换演示（F12 权限态：社区版/Pro/Teams/VPC 实切，F7.2 能力矩阵即时生效）
    *  owner 专属；写 tenants.plan（登录引导例外点同口径走 owner 池）+ 留痕 plan.switch（G8）+ 重签 JWT */
   setPlan: protectedProcedure

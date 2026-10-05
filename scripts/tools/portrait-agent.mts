@@ -14,6 +14,9 @@
  *   node scripts/tools/portrait-agent.mts accept --character <characterId> [--version N]
  *        --by "<验收人>" --note "<依据/原话>" [--min-likeness 80]
  *        # 所有者验收：逐角度 1:1 机器像不像实测 + 所有者验收，两条并列留痕；门记录 via=owner-acceptance
+ *   node scripts/tools/portrait-agent.mts reject --character <characterId> [--version N]
+ *        --by "<验收人>" --note "<拒绝原因，至少8字>"
+ *        # 追加当前版本的人类否决，不调用模型，不改档案或删除候选
  *
  * 纪律：纯写实 + 场景解耦（中性背景/中性光，只描述人）；默认 4 角度；产物写回档案库并置 active。
  * 授权真人：`--anchor` 给定本人照片即走图生图（source=img2img），锁面部与身形；不给则纯文生图。
@@ -38,6 +41,7 @@ function arg(name: string, fallback = ""): string {
   return index >= 0 ? String(process.argv[index + 1] ?? "") : fallback;
 }
 const flag = (name: string): boolean => process.argv.includes(name);
+const command = process.argv[2] ?? "";
 
 /**
  * 密钥加载（2026-09-24 修复）：与 `full-chain-film.mts` 同口径——**先读仓库外密钥文件**
@@ -47,7 +51,8 @@ const flag = (name: string): boolean => process.argv.includes(name);
  */
 const ENV: Record<string, string> = (() => {
   const out: Record<string, string> = {};
-  const files = [resolve(homedir(), ".workloom", "live.env"), resolve(REPO_ROOT, ".env")];
+  const files = command === "reject" || command === "accept" && !flag("--with-likeness") || command === "plan" ? []
+    : [arg("--keys-file") || resolve(homedir(), ".workloom", "live.env"), resolve(REPO_ROOT, ".env")];
   for (const file of files) {
     if (!existsSync(file)) continue;
     for (const line of readFileSync(file, "utf8").split("\n")) {
@@ -59,7 +64,6 @@ const ENV: Record<string, string> = (() => {
   return out;
 })();
 
-const command = process.argv[2] ?? "";
 const characterId = arg("--character");
 
 const IMAGE_EXT = /\.(png|jpe?g|webp)$/i;
@@ -290,6 +294,29 @@ async function main(): Promise<void> {
    *   ② 所有者验收：验收人 + 依据原话 + 时间（`--by` / `--note`，缺一即拒）。
    * 落账 `g5-portrait-confirm` 时 `via=owner-acceptance`（**不写成 llm/监制通过**），审计一眼可分辨。
    */
+  if (command === "reject") {
+    const rejectedBy = arg("--by").trim();
+    const note = arg("--note").trim();
+    if (!rejectedBy || note.length < 8) throw new Error("人类否决必须写明验收人（--by）和拒绝原因（--note，≥8 字）");
+    const characterDir = join(LIBRARY_ROOT, characterId);
+    const versionArg = arg("--version") ? Number(arg("--version")) : null;
+    const selected = loadCharacterEntry(characterDir, versionArg === null ? {} : { pinnedVersion: versionArg });
+    const target = selected?.activeSet;
+    if (!target) throw new Error(`未找到要否决的定妆照版本（version=${versionArg ?? "active"}）`);
+    const reviewDir = join(characterDir, "reviews");
+    mkdirSync(reviewDir, { recursive: true });
+    const receipt = join(reviewDir, `v${target.version}-owner-rejection-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
+    const artifacts = Object.entries(selected!.files).map(([angle, file]) => ({ angle, file, sha256: existsSync(file) ? sha256File(file) : null }));
+    writeFileSync(receipt, JSON.stringify({ at: new Date().toISOString(), characterId, version: target.version,
+      kind: "owner-rejection", basis: "human-review", approved: false, rejectedBy, note, artifacts }, null, 2) + "\n");
+    const event = buildGateEvent({ stepKey: "g5-portrait-confirm", projectId: `portrait:${characterId}:v${target.version}`,
+      sourceStage: "owner-acceptance", shotIds: [], checks: [{ id: "owner-decision", pass: false, hard: true, detail: note }],
+      softApproved: false, via: "owner-acceptance", score: null, reason: `人类验收否决：${rejectedBy}｜${note}`,
+      evidence: { basis: "human-review", characterId, version: target.version, ownerRejection: receipt } });
+    appendGateEvent(join(characterDir, "gates.jsonl"), event);
+    console.log(`人类否决已记录（当前版本不放行）：${receipt}`);
+    return;
+  }
   if (command === "accept") {
     const characterDir = join(LIBRARY_ROOT, characterId);
     const versionArg = arg("--version") ? Number(arg("--version")) : null;
@@ -392,6 +419,7 @@ async function main(): Promise<void> {
       at: new Date().toISOString(), characterId: entry.id, version: target.version, kind: "owner-acceptance",
       /** 裁决口径：出图后的评审决策交给人类（产品所有者 2026-10-01）；机器判据不参与放行 */
       basis: "human-review",
+      approved: true,
       acceptedBy, note,
       likenessReport: likenessFile,
       likeness: withLikeness ? { ...summary, belowThreshold, error: likenessError } : { status: "not-run", why: "机器判据不参与裁决（口径：评审决策交给人类）" },
@@ -431,7 +459,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  console.error(`未知子命令：${command}（可用：plan / run / review / accept）`);
+  console.error(`未知子命令：${command}（可用：plan / run / review / accept / reject）`);
   process.exitCode = 2;
 }
 

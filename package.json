@@ -24,7 +24,7 @@
     "doctor": "bash scripts/doctor.sh",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test",
-    "test:scripts": "vitest run scripts/tools/video-request-regression.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/bundle-governance.test.ts scripts/suite-fixture-preflight.test.ts scripts/verify-client-foundation-extensions.test.ts scripts/geo-fusion-plan-doc-sync.test.ts bundles/ai-video/connectors/bgm-bridge/verify-message.test.ts bundles/ai-video/connectors/bgm-bridge/genre-mismatch.test.ts bundles/ai-video/connectors/bgm-bridge/recipes-expansion.test.ts bundles/ai-video/connectors/bgm-bridge/tonality-context.test.ts bundles/ai-video/connectors/color-bridge/core.test.ts bundles/ai-video/library/luts/luts.test.ts bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts bundles/ai-video/connectors/cine-kb-bridge/audit-round3.test.ts && node --test scripts/tools/film-voice-artifact.test.mjs scripts/tools/film-audio-policy.test.mjs scripts/tools/film-publication-policy.test.mjs scripts/tools/film-render-task.test.mjs scripts/tools/film-render-ledger.test.mjs scripts/tools/film-cli-preflight.test.mjs scripts/agent-capabilities.test.mjs bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs scripts/ci/hard-gate-policy.test.mjs",
+    "test:scripts": "vitest run scripts/tools/video-request-regression.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/bundle-governance.test.ts scripts/suite-fixture-preflight.test.ts scripts/verify-client-foundation-extensions.test.ts scripts/geo-fusion-plan-doc-sync.test.ts bundles/ai-video/connectors/bgm-bridge/verify-message.test.ts bundles/ai-video/connectors/bgm-bridge/genre-mismatch.test.ts bundles/ai-video/connectors/bgm-bridge/recipes-expansion.test.ts bundles/ai-video/connectors/bgm-bridge/tonality-context.test.ts bundles/ai-video/connectors/color-bridge/core.test.ts bundles/ai-video/library/luts/luts.test.ts bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts bundles/ai-video/connectors/cine-kb-bridge/audit-round3.test.ts && node --test scripts/tools/film-voice-artifact.test.mjs scripts/tools/film-audio-policy.test.mjs scripts/tools/film-publication-policy.test.mjs scripts/tools/film-render-task.test.mjs scripts/tools/film-render-ledger.test.mjs scripts/tools/film-cli-preflight.test.mjs scripts/agent-capabilities.test.mjs scripts/video-capabilities.test.mjs bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs scripts/ci/hard-gate-policy.test.mjs && pnpm test:desktop",
     "db:verify-chain": "tsx --env-file=.env scripts/verify-chain.ts",
     "suite": "TOOL_UNVERIFIED_RATE=0 tsx --env-file=.env scripts/suite.ts",
     "db:seed:video": "tsx --env-file=.env scripts/seed-video.ts",
@@ -84,14 +84,17 @@
     "explainer:run": "tsx scripts/tools/explainer-run.mts",
     "test:talkcraft": "vitest run apps/server/src/video/explainer/explainer.test.ts",
     "test:governance": "node --test --test-concurrency=1 scripts/delivery/mine-clear.test.mjs scripts/delivery/evidence-controls.test.mjs scripts/acceptance/fleet-run.test.mjs scripts/acceptance/outcome.test.mjs scripts/acceptance/lib/profile-contract.test.mjs scripts/acceptance/lib/outcome-contract.test.mjs scripts/acceptance/profile-check.test.mjs scripts/acceptance/live-profile-dialect.test.mjs scripts/acceptance/lib/live/budget.test.mjs scripts/acceptance/lib/live/usage.test.mjs scripts/acceptance/lib/live/audit.test.mjs scripts/acceptance/lib/live/providers.test.mjs scripts/acceptance/lib/live/providers-http.test.mjs scripts/acceptance/lib/live/live-truth.test.mjs scripts/acceptance/lib/live/product.test.mjs scripts/acceptance/lib/live/media-negative.test.mjs scripts/acceptance/lib/live/dsh-process.test.mjs scripts/acceptance/lib/live/live-cli.test.mjs scripts/acceptance/lib/live/live-cli-wire.test.mjs scripts/oss-inventory.test.mjs scripts/oss-watch.test.mjs scripts/capability-status.test.mjs scripts/acceptance/lib/repository-instance.test.mjs",
-    "test:media": "node --test --test-concurrency=1 scripts/acceptance/lib/live/media-decoder.test.mjs scripts/acceptance/lib/live/live-cli-browser.test.mjs"
+    "test:media": "node --test --test-concurrency=1 scripts/acceptance/lib/live/media-decoder.test.mjs scripts/acceptance/lib/live/live-cli-browser.test.mjs",
+    "test:desktop": "node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs apps/desktop/electron/render-smoke.test.cjs scripts/desktop-bootstrap-db.test.mjs scripts/runtime-deps-lock.test.mjs scripts/pack-nm-merge.test.mjs scripts/payload-policy.test.mjs scripts/pack-workspace-modules.test.mjs scripts/product-runtime-assets.test.mjs scripts/reset-safety.test.mjs",
+    "test:video-capabilities": "node --test scripts/video-capabilities.test.mjs"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
       "node-pty"
     ],
     "overrides": {
-      "@workloom/ui@0.1.19": "https://cnb.cool/workloom-ai/workloom-im/-/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz"
+      "@workloom/ui@0.1.19": "https://cnb.cool/workloom-ai/workloom-im/-/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz",
+      "pixi-live2d-display@0.4.0>gh-pages": "-"
     }
   },
   "devDependencies": {

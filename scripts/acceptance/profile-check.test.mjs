@@ -122,6 +122,37 @@ test('G14 CI instance: read-only CNB identity validates workspace without a loca
   assert.equal(result.code, 0, result.output);
   assert.deepEqual(result.report.repositoryIdentity, { repository: f.profile.repositoryInstance, source: 'cnb:CNB_REPO_SLUG' }); configurationOnly(result);
 });
+function adoptProduct(f) {
+  const frozenRepository = f.profile.repo;
+  isolated(f);
+  f.profile.repo = f.profile.repositoryInstance;
+  f.profile.isolation = { isolated: true, sourceProductRepository: frozenRepository, sourceProductCommit: 'a6dc89a87e95eab86e202199335aecbf7fc4925b', adoptedProductRepository: f.profile.repo, preserveSourceLineage: true };
+  const manifestPath = join(f.root, 'product.manifest.json');
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')); manifest.repository = f.profile.repo;
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  writeFileSync(join(f.root, 'acceptance/profile.json'), JSON.stringify(f.profile));
+}
+test('G14 adopted identity: actual local origin and CNB workspace keep the frozen source while validating the adopted product', (t) => {
+  for (const platform of ['local', 'cnb']) {
+    const f = fixture(t, { directoryName: 'workspace' }); adoptProduct(f);
+    const env = platform === 'cnb' ? { CNB: 'true', CNB_REPO_SLUG: f.profile.repo } : {};
+    if (platform === 'local') origin(f, `https://cnb.cool/${f.profile.repo}`);
+    const result = run(f, [], env); assert.equal(result.code, 0, result.output);
+    assert.equal(result.report.repositoryIdentity.repository, f.profile.repo);
+    assert.equal(f.profile.isolation.sourceProductRepository, 'workloom-ai/fixture'); configurationOnly(result);
+  }
+});
+test('G14 adopted identity: wrong actual origin and missing lineage pin fail the real CLI without I/O', (t) => {
+  for (const wrong of ['origin', 'pin', 'instance']) {
+    const f = fixture(t, { directoryName: 'workspace' }); adoptProduct(f);
+    origin(f, `https://cnb.cool/${wrong === 'origin' ? 'workloom-ai/other' : f.profile.repo}`);
+    if (wrong === 'pin') delete f.profile.isolation.sourceProductCommit;
+    if (wrong === 'instance') delete f.profile.repositoryInstance;
+    writeFileSync(join(f.root, 'acceptance/profile.json'), JSON.stringify(f.profile));
+    const result = run(f); assert.equal(result.code, 1, result.output);
+    assert.match(result.report.errors.join(' '), /repositoryInstance|isolation/); configurationOnly(result);
+  }
+});
 test('G14 CI instance: complete group path is independent of the frozen source product prefix', (t) => {
   const f = fixture(t, { directoryName: 'workspace' }); isolated(f, 'reviewed-org/isolates/isolated-fixture');
   origin(f, 'https://cnb.cool/reviewed-org/isolates/isolated-fixture');

@@ -48,7 +48,8 @@ import { mediaUrl } from "./gen/ingest.js";
 /** PollReport 类型再导出（web 端 AppRouter 类型可移植性，TS2883） */
 export type { PollReport } from "./render-poller.js";
 import { dealRouter } from "./deal.js";
-import { getRun, startRun, startVideoProjectRun, summarizeWorkspaceRuns, StudioWorkerError } from "./studio-worker.js";
+import { getRun, startRun, startVideoProjectRun, summarizeWorkspaceRuns, StudioWorkerError,
+  isPublicStudioMetadata, RESERVED_STUDIO_METADATA_ERROR } from "./studio-worker.js";
 import { resolveScenePolicyForIntent, ScenePolicyRouteError } from "./scene-policy-routing.js";
 import { resolvePlatformForIntent } from "./platform-routing.js";
 import { makeStageArchive } from "./archive-host.js";
@@ -456,7 +457,7 @@ const studioRouter = router({
     .input(z.object({
       projectId: z.string().min(1).optional(),
       intent: z.string().min(1).max(2000),
-      metadata: z.record(z.string(), z.unknown()).optional(),
+      metadata: z.record(z.string(), z.unknown()).refine(isPublicStudioMetadata, RESERVED_STUDIO_METADATA_ERROR).optional(),
       /** 兼容旧字段：显式指定营销/叙事；与 route 同时给出时以 route 为准 */
       isMarketing: z.boolean().optional(),
       /** 管线选择：auto=按意图自动分流（默认） */

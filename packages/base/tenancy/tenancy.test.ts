@@ -12,7 +12,7 @@ import {
   PlanForbidden,
   requireCapability,
 } from "./capabilities.js";
-import { sessionTokenIssuer, signDemoToken, verifySessionToken, verifyToken, type Identity } from "./auth.js";
+import { sessionSigningKey, sessionTokenIssuer, signDemoToken, verifySessionToken, verifyToken, type Identity } from "./auth.js";
 
 describe("版本能力矩阵（F7.2 唯一口径）", () => {
   it("社区版：无 Quest preset / 无夜班 / 无巡检，事件保留 7 天", () => {
@@ -104,6 +104,29 @@ describe("演示身份 JWT", () => {
     const tampered = token.slice(0, -4) + "AAAA";
     expect(await verifyToken(tampered)).toBeNull();
     expect(await verifyToken("not-a-jwt")).toBeNull();
+  });
+  it("没有到期时间的签名令牌仍被拒绝", async () => {
+    const { SignJWT } = await import("jose");
+    const token = await new SignJWT({ ...identity, kind: "member" }).setProtectedHeader({ alg: "HS256" })
+      .setIssuedAt().setIssuer(sessionTokenIssuer()).sign(sessionSigningKey());
+    expect(await verifyToken(token)).toBeNull();
+  });
+  it("生产签发拒绝缺失、短密钥和公开占位", () => {
+    const previousNode = process.env.NODE_ENV;
+    const previousSecret = process.env.JWT_SECRET;
+    try {
+      process.env.NODE_ENV = "production";
+      for (const secret of [undefined, "short", "workloom-dev-secret-change-me", "replace-me".repeat(8)]) {
+        if (secret === undefined) delete process.env.JWT_SECRET;
+        else process.env.JWT_SECRET = secret;
+        expect(() => sessionSigningKey()).toThrow("JWT_SECRET");
+      }
+      process.env.JWT_SECRET = "a".repeat(64);
+      expect(sessionSigningKey()).toHaveLength(64);
+    } finally {
+      if (previousNode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previousNode;
+      if (previousSecret === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = previousSecret;
+    }
   });
 
   it("伙伴令牌不能混入成员保护过程", async () => {

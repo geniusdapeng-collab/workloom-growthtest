@@ -108,6 +108,28 @@ describe.runIf(RUN_DB).sequential("Onboarding PostgreSQL 集成", () => {
     expect(row.rows).toEqual([{ identity_key: `account:${accountId}`, role: "owner" }]);
   });
 
+  it("完成终态拒绝迟到进度、暂停与重复完成；事件只记一次真实完成", async () => {
+    const count = async () => (await owner.query<{ n: number }>(
+      `SELECT count(*)::int AS n FROM biz_events WHERE workspace_id=$1 AND payload->'decision'->>'action'='onboarding.welcome.completed'`, [workspaceId],
+    )).rows[0]!.n;
+    const before = await count();
+    const first = await saveWelcomeProgress(workspaceId, ownerIdentity, { status: "completed", currentStep: "done" });
+    const results = await Promise.all([
+      saveWelcomeProgress(workspaceId, ownerIdentity, { status: "in_progress", currentStep: "mate" }),
+      saveWelcomeProgress(workspaceId, ownerIdentity, { status: "paused", currentStep: "team" }),
+      saveWelcomeProgress(workspaceId, ownerIdentity, { status: "completed", currentStep: "done" }),
+    ]);
+    for (const result of results) expect(result).toMatchObject({ status: "completed", currentStep: "done", shouldShow: false, updatedAt: first.updatedAt });
+    const stored = await owner.query<{ status: string; current_step: string; completed_at: string | null }>(
+      `SELECT status,current_step,completed_at FROM onboarding_progress WHERE workspace_id=$1 AND role='owner'`, [workspaceId],
+    );
+    expect(stored.rows[0]).toMatchObject({ status: "completed", current_step: "done" });
+    expect(stored.rows[0]!.completed_at).not.toBeNull();
+    expect(await count()).toBe(before + 1);
+    await replayWelcome(workspaceId, ownerIdentity);
+    await expect(saveWelcomeProgress(workspaceId, ownerIdentity, { status: "in_progress", currentStep: "mate" })).resolves.toMatchObject({ status: "in_progress", currentStep: "mate", shouldShow: true });
+  });
+
   it("草稿真实续办、乐观锁、责任人交接与秘密白名单均生效", async () => {
     await expect(getWizardDraft(workspaceId)).resolves.toBeNull();
     const unsafePayload: WizardDraftPayload & Record<string, unknown> = {

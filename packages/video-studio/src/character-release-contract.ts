@@ -293,14 +293,21 @@ function validatedEvidence(evidence: CharacterIdentityEvidence, contract: Charac
 /** Missing identity evidence stops further paid rendering; existing clips can remain internal candidates. */
 export function assessCharacterRelease(input: {
   contract: CharacterReleaseContract; shots: readonly CharacterReleaseArtifact[]; phase: "canary" | "release";
-  canaryShotId?: string; canaryShotIds?: string[]; now?: Date;
+  canaryShotId?: string; canaryShotIds?: string[]; canaryCharacterIds?: string[]; now?: Date;
 }): CharacterReleaseReport {
   const issues = contractIssues(input.contract, input.now ?? new Date()); const contract = input.contract;
   const firstPerCharacter = contract.characters.map((c) => contract.shots.find((s) => s.characterId === c.characterId)?.shotId).filter((s): s is string => !!s);
   const canaries = input.canaryShotIds ?? (input.canaryShotId ? [input.canaryShotId] : firstPerCharacter);
-  if (input.phase === "canary" && contract.characters.some((c) => !contract.shots.some((s) => s.characterId === c.characterId && canaries.includes(s.shotId))))
+  const canaryCharacters = input.phase === "canary" && input.canaryCharacterIds !== undefined
+    ? contract.characters.filter(c => input.canaryCharacterIds!.includes(c.characterId)) : contract.characters;
+  if (input.phase === "canary" && input.canaryCharacterIds !== undefined
+    && (!input.canaryCharacterIds.length || new Set(input.canaryCharacterIds).size !== input.canaryCharacterIds.length
+      || input.canaryCharacterIds.some(id => !contract.characters.some(c => c.characterId === id))))
+    issues.push(issue("canary-character-scope-invalid", null, "canary人物范围为空、重复或未登记"));
+  if (input.phase === "canary" && canaryCharacters.some((c) => !contract.shots.some((s) => s.characterId === c.characterId && canaries.includes(s.shotId))))
     issues.push(issue("canary-character-missing", null, "每个授权人物都需要独立canary身份回执", "unverified"));
-  const expected = input.phase === "canary" ? contract.shots.filter((s) => canaries.includes(s.shotId)) : contract.shots;
+  const expected = input.phase === "canary" ? contract.shots.filter((s) => canaries.includes(s.shotId)
+    && canaryCharacters.some(c => c.characterId === s.characterId)) : contract.shots;
   if (input.phase === "canary" && contract.shots.length && !expected.length) issues.push(issue("canary-shot-unknown", null, "canary镜头不属于当前人物合同", "unverified"));
   const byShot = new Map<string, CharacterReleaseArtifact>();
   for (const artifact of input.shots) {

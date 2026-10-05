@@ -1,6 +1,6 @@
 {
   "schemaVersion": "workloom.acceptance-profile/v2",
-  "repo": "workloom-ai/WorkLoom-growth",
+  "repo": "workloom-ai/workloom-growthtest",
   "productName": "WorkLoom 获客增长系统（实验车道）",
   "lane": "industry",
   "primaryBundle": "geo-growth",
@@ -451,6 +451,9 @@
   "isolation": {
     "isolated": true,
     "sourceProductRepository": "workloom-ai/WorkLoom-growth",
-    "notes": "保留源产品 manifest 与现有隔离边界；此验收配置仅属于当前实例，不解除隔离，不回流、不公共化实验业务语义。"
+    "sourceProductCommit": "a6dc89a87e95eab86e202199335aecbf7fc4925b",
+    "adoptedProductRepository": "workloom-ai/workloom-growthtest",
+    "preserveSourceLineage": true,
+    "notes": "保留建仓时冻结的 Growth 仓库与完整来源提交；本产品发布及验收采用 Growthtest 实例身份。本仓仍双向隔离，不自动同步、不回流、不公共化实验业务语义。"
   }
 }

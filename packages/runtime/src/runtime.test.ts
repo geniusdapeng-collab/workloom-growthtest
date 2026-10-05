@@ -181,8 +181,11 @@ d("PG 集成 Quest 循环（种子库）", async () => {
     expect(r.status).toBe("completed");
     expect(r.stepsDone).toBe(3);
     const evs = await threadEvents(tid);
-    expect(evs.map((e) => e.decision.step_id)).toEqual(["s1", "s2", "s3"]);
-    const adjust = evs.find((e) => e.decision.action === "price.adjust")!;
+    expect(evs.filter((e) => e.decision.kind === "execution_started").map((e) => e.decision.step_id))
+      .toEqual(["s1", "s2", "s3"]);
+    const executed = evs.filter((e) => e.decision.kind === "execute");
+    expect(executed.map((e) => e.decision.step_id)).toEqual(["s1", "s2", "s3"]);
+    const adjust = executed.find((e) => e.decision.action === "price.adjust")!;
     expect((adjust.rule_impact as Array<{ rule_id: string }>)[0]!.rule_id).toBe("R1"); // 涨幅≤8% auto
     expect(adjust.receipt).toBeDefined(); // 回执位（L3.6）
   });

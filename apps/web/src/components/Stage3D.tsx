@@ -186,9 +186,8 @@ function Theater({ night }: { night: boolean }) {
   return (
     <group>
       <CineFloor radius={5.4} color={night ? "#04070f" : "#070d1c"} mirror={night ? 0.45 : 0.6} night={night} />
-      {/* 台阶外沿（一圈矮台，剧场感） */}
-      {/* 上表面在 -0.04，低于镜面 -0.02，避免两块不透明面同深度闪烁。 */}
-      <mesh position={[0, -0.11, 0]}>
+      {/* 台阶顶面低于 -0.02 的反射面，避免共面深度冲突破坏倒影。 */}
+      <mesh position={[0, -0.12, 0]}>
         <cylinderGeometry args={[5.4, 5.6, 0.14, 96]} />
         <meshStandardMaterial color="#0a1122" metalness={0.7} roughness={0.4} />
       </mesh>
@@ -237,7 +236,7 @@ export function Stage3D({
       data-product-scene="report-stage-3d"
       data-product-scene-actors={String(agents.length + 1)}
       data-product-scene-total-actors={String(totalActors + 1)}
-      style={{ width: "100%", height: 440, position: "relative", borderRadius: 12, overflow: "hidden", background: "#0b0d10" }}
+      style={{ width: "100%", height: 440, minHeight: 440, position: "relative", borderRadius: 12, overflow: "hidden", background: "#0b0d10" }}
     >
       <Canvas camera={{ position: [8.6, 0.9, 11.2], fov: 42 }} dpr={[1, 2]} gl={{ antialias: true, alpha: false }}>
         <SkyDome night={night} />

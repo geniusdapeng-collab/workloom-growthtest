@@ -108,6 +108,31 @@ describe("人物授权、服饰合同与正式发布", () => {
     expect(report.releaseAllowed).toBe(false); expect(report.shots[0]?.identity).toBe("passed");
   });
 
+  it("本次只选后续人物镜时可作为本次首镜，仍必须有该镜专用证据", () => {
+    const contract = fixture();
+    const passed = assessCharacterRelease({ contract, phase: "canary", canaryShotIds: ["GT-03"],
+      canaryCharacterIds: ["ceo"], shots: [withVisual("GT-03")], now: NOW });
+    expect(passed.continuePaidRendering).toBe(true);
+    expect(assessCharacterRelease({ contract, phase: "canary", canaryShotIds: ["GT-03"],
+      canaryCharacterIds: ["ceo"], shots: [artifact("GT-03")], now: NOW }).continuePaidRendering).toBe(false);
+  });
+
+  it("人物canary范围为空、重复或未登记时不得通过", () => {
+    const contract = fixture();
+    for (const canaryCharacterIds of [[], ["ceo", "ceo"], ["unregistered"]]) {
+      expect(assessCharacterRelease({ contract, phase: "canary", canaryShotIds: ["GT-01"], canaryCharacterIds,
+        shots: [withVisual("GT-01")], now: NOW }).continuePaidRendering).toBe(false);
+    }
+  });
+
+  it("局部canary范围不能裁掉正式发布必需的其他人物镜", () => {
+    const contract = fixture();
+    const report = assessCharacterRelease({ contract, phase: "release", canaryShotIds: ["GT-01"],
+      canaryCharacterIds: ["ceo"], shots: [withVisual("GT-01")], now: NOW });
+    expect(report.releaseAllowed).toBe(false);
+    expect(report.shots).toHaveLength(4);
+  });
+
   it("普通确定性approved和模型降级不能伪装专用视觉通过", () => {
     expect(visual("GT-01", { via: "deterministic", score: 100 }).checks.identity).toBe("unverified");
     expect(visual("GT-01", { degraded: true }).checks.identity).toBe("unverified");

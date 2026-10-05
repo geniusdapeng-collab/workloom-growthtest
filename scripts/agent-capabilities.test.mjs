@@ -222,7 +222,9 @@ function videoFixture(t) {
   });
   const put = (file, value) => {
     const absolute = join(dir, file); mkdirSync(dirname(absolute), { recursive: true });
-    writeFileSync(absolute, typeof value === "string" ? value : JSON.stringify(value)); return absolute;
+    const document = file.endsWith("-delivery-manifest.json") && value && typeof value === "object"
+      ? { projectId: "VID-TEST", ...value } : value;
+    writeFileSync(absolute, typeof document === "string" ? document : JSON.stringify(document)); return absolute;
   };
   put("test-keys.env", "VOLCENGINE_ARK_API_KEY=test-only-render-key\n");
   const shots = { fps: 30, products: ["已声明商品"], shots: [{
@@ -265,7 +267,7 @@ test("video status leaves acceptance unknown when invoked rows have no task ID",
 test("video delivery checks actual SHA-256 for entries and detects altered content", (t) => {
   const { put } = videoFixture(t);
   put("work/out/main.mp4", "altered media"); put("work/out/cover.png", "cover bytes");
-  put("work/out/VID-TEST-delivery-manifest.json", { projectId: "VID-TEST", entries: [
+  put("work/out/VID-TEST-delivery-manifest.json", { projectId: "VID-TEST", deliverable: { path: "work/out/main.mp4", sha256: digest("original media") }, entries: [
     { label: "main", path: "work/out/main.mp4", sha256: digest("original media") },
     { label: "cover", path: "work/out/cover.png", sha256: digest("cover bytes") },
   ] });
@@ -308,7 +310,7 @@ test("video delivery reports missing, directory and escaped assets without readi
   ]});
   const output = deliveryInspect({projectId: "VID-TEST"});
   assert.equal(output.integrity, "incomplete");
-  assert.deepEqual(output.files.map(file => file.state), ["missing", "not-file", "out-of-root"]);
+  assert.deepEqual(output.files.filter(file => file.label !== "deliverable").map(file => file.state), ["missing", "not-file", "out-of-root"]);
 });
 
 test("video delivery catches conflicting hashes, byte counts and malformed collections", (t) => {
@@ -333,7 +335,7 @@ test("video delivery hashes media larger than the JSON limit with bounded chunks
   const { put, dir } = videoFixture(t); const bytes = Buffer.alloc(9 * 1024 * 1024, 0x5a);
   const target = join(dir, "work/out/main.mp4"); mkdirSync(dirname(target), {recursive: true}); writeFileSync(target, bytes);
   symlinkSync(target, join(dir, "work/out/linked.mp4"));
-  put("work/out/VID-TEST-delivery-manifest.json", {entries: [{path: "work/out/main.mp4", sha256: digest(bytes)}]});
+  put("work/out/VID-TEST-delivery-manifest.json", {deliverable: {path: "work/out/main.mp4", sha256: digest(bytes)}, entries: [{path: "work/out/main.mp4", sha256: digest(bytes)}]});
   assert.equal(deliveryInspect({projectId: "VID-TEST"}).integrity, "sha256-verified");
   put("work/out/VID-TEST-delivery-manifest.json", {entries: [{path: "work/out/linked.mp4", sha256: digest(bytes)}]});
   assert.equal(deliveryInspect({projectId: "VID-TEST"}).files[0].state, "not-file");

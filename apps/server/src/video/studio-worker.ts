@@ -333,12 +333,24 @@ export function summarizeWorkspaceRuns(
 
 export class StudioWorkerError extends Error {
   constructor(
-    public readonly code: "LLM_MISSING" | "ARCHIVE_REQUIRED" | "IDENTITY_ASSET_REQUIRED",
+    public readonly code: "LLM_MISSING" | "ARCHIVE_REQUIRED" | "IDENTITY_ASSET_REQUIRED" | "METADATA_RESERVED" | "DELEGATION_REQUIRED",
     message: string,
   ) {
     super(message);
     this.name = "StudioWorkerError";
   }
+}
+
+export const RESERVED_STUDIO_METADATA_ERROR = "METADATA_RESERVED：客户 metadata 不能提供内部图片字段或本机参考图路径，请使用已登记素材 ID";
+
+/** 普通metadata只承载客户意图，不能进入服务端已解析的本机图片通道。 */
+export function isPublicStudioMetadata(metadata?: Record<string, unknown> | null): boolean {
+  // 与实际定妆配置共用解析器，字符串和所有产品参考图字段别名都在任何 SQL/租约之前关闭。
+  return !metadata || (!Object.hasOwn(metadata, "directorIdentityImages") && collectReferenceImages(metadata).length === 0);
+}
+
+function assertPublicStudioMetadata(metadata?: Record<string, unknown> | null): void {
+  if (!isPublicStudioMetadata(metadata)) throw new StudioWorkerError("METADATA_RESERVED", RESERVED_STUDIO_METADATA_ERROR);
 }
 
 /* ================= 门对象映射（§3 审批点矩阵逐字口径） ================= */
@@ -477,16 +489,15 @@ function collectReferenceImages(metadata?: Record<string, unknown>): string[] {
 }
 
 /** 定妆照出图配置（缺密钥则显式关闭：保持 vendor 规格包口径，不假装出图） */
-function portraitConfig(metadata?: Record<string, unknown>): StudioPortraitConfig {
+function portraitConfig(metadata?: Record<string, unknown>, directorIdentityImages: string[] = []): StudioPortraitConfig {
   const apiKey = (process.env.VOLCENGINE_ARK_API_KEY ?? process.env.ARK_API_KEY ?? "").trim();
   const model = (process.env.ARK_IMAGE_MODEL ?? process.env.SEEDREAM_MODEL ?? "").trim();
   const enabled = (process.env.HR_PORTRAIT_ENABLED ?? "1") !== "0";
   if (!enabled || !apiKey || !model) {
     return { enabled: false };
   }
-  // Director callers resolve and hash these through the scoped asset library before invoking this worker.
-  const resolvedAnchors = Array.isArray(metadata?.directorIdentityImages)
-    ? metadata.directorIdentityImages.filter((value): value is string => typeof value === "string" && path.isAbsolute(value)) : [];
+  // Only the private input carries images resolved and hashed by the scoped director asset library.
+  const resolvedAnchors = directorIdentityImages.filter((value): value is string => typeof value === "string" && path.isAbsolute(value));
   const anchors = resolvedAnchors.length ? resolvedAnchors : (process.env.HR_PORTRAIT_ANCHORS ?? "")
     .split(",").map((value) => value.trim()).filter(Boolean);
   return {
@@ -524,10 +535,16 @@ type StudioRunInput = RunInput & {
   creativeDelegation?: CreativeDelegation;
   deliveryTargetPlan?: DeliveryTargetPlan;
   allocatedRunId?: string;
+  /** 服务端导演工位先按工作区、本人授权与字节哈希解析；不得来自客户metadata。 */
+  directorIdentityImages?: string[];
 };
 
 export function startRun(scope: Scope, input: StudioRunInput): string {
+  assertPublicStudioMetadata(input.metadata);
   const directorMode=Boolean(input.creativeDelegation);
+  if (input.directorIdentityImages !== undefined && !directorMode) {
+    throw new StudioWorkerError("DELEGATION_REQUIRED", "内部图片参数必须绑定当前项目真实导演委托");
+  }
   const effectiveProducerMode:ProducerMode=directorMode?"review":PRODUCER_MODE;
   const directorProfile=directorMode?buildDirectorDefaults({intent:input.rawIntent??input.intent,
     identityAssets:input.creativeDelegation!.identityAssetRefs,
@@ -934,7 +951,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     totalDeadlineMs: TOTAL_DEADLINE_MS,
     // 片型硬闸必须在 G8 之前审完整分镜，禁止 env 让 vendor 在审计前直接渲染。
     deferRender: selectedScenePolicy.policy ? true : (process.env.HR_DEFER_RENDER ?? "1") !== "0",
-    portraits: portraitConfig(runInput.metadata),
+    portraits: portraitConfig(runInput.metadata, directorMode ? input.directorIdentityImages : undefined),
     /** 营销路由 → 情报五站真跑（叙事路由不装配，vendor 也不会进情报层） */
     dataMining: input.isMarketing ? undefined : dataMiningConfigFor(runInput.metadata, llm, scope.workspaceId),
     log: (line) => console.log(line),
@@ -1512,6 +1529,8 @@ export async function startVideoProjectRun(
   scope: { tenantId: string; workspaceId: string },
   input: StartVideoProjectInput,
 ): Promise<{ projectId: string; runId: string }> {
+  assertPublicStudioMetadata(input.metadata);
+  assertPublicStudioMetadata(input.customerMetadata);
   const directorMode=input.creativeMode!=="manual";
   if(directorMode) {
     const readiness=buildDirectorDefaults({intent:input.rawIntent??input.intent,identityAssets:input.identityAssetRefs??[]});

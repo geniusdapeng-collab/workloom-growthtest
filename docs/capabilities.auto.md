@@ -1,9 +1,9 @@
 # WorkLoom 获客增长系统（实验车道） · 代码与能力入口导览
 
 > 企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。
-> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-10-04）。请修改生成器或事实输入后重新生成，不手改本文件。
+> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-10-05）。请修改生成器或事实输入后重新生成，不手改本文件。
 > 本导览检查 manifest、脚本和文件入口。目录可发现、实际可调用、结果已验证分别记录；缺少同提交独立运行证据时后两项为未验证。岗位、技能与管线数是声明资产数，不是生产实测通过数。
-> 产品身份：`workloom-ai-growth`；默认包：`geo-growth`；仓库：[workloom-ai/WorkLoom-growth](https://cnb.cool/workloom-ai/WorkLoom-growth)。
+> 产品身份：`workloom-ai-growth`；默认包：`geo-growth`；仓库：[workloom-ai/workloom-growthtest](https://cnb.cool/workloom-ai/workloom-growthtest)。
 
 ## 从哪里开始
 

@@ -270,6 +270,7 @@ function VectorCeremonyStage({ actors, occasion = "first-install", dancing = tru
         @keyframes ceremony-v2-dance { 0%,100% { transform:translateY(0) rotate(-1deg); } 35% { transform:translateY(-6px) rotate(1.5deg); } 70% { transform:translateY(-2px) rotate(-1.2deg); } }
         @keyframes ceremony-v2-arrive { from { opacity:0; transform:translateY(70px) scale(.7); } to { opacity:1; transform:none; } }
         @keyframes ceremony-v2-beam { 0%,100% { opacity:.18; } 50% { opacity:.42; } }
+        @media(prefers-reduced-motion:reduce) { [data-ceremony-actor], [data-ceremony-actor] span { animation:none !important; } }
         .ceremony-v2-member:hover { background:rgba(138,216,255,.07)!important; }
         .ceremony-v2-member:focus-visible { outline:2px solid #8ad8ff; outline-offset:-2px; background:rgba(138,216,255,.12)!important; }
         .ceremony-v2-member:active { background:rgba(138,216,255,.18)!important; }
@@ -286,7 +287,7 @@ function VectorCeremonyStage({ actors, occasion = "first-install", dancing = tru
       <div data-ceremony-detail-slot style={{ height: detailSlotHeight, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {selected && <div data-product-nameplate="ceremony-detail" role="status" style={{ maxWidth: Math.min(400, gridWidth), maxHeight: detailSlotHeight, boxSizing: "border-box", overflowY: "auto", padding: "4px 12px", borderRadius: 12, color: "#e7eef8", fontSize: 13, lineHeight: 1.5, overflowWrap: "anywhere", textAlign: "center", background: "rgba(7,12,22,.94)", border: "1px solid rgba(138,216,255,.4)", boxShadow: "0 6px 18px rgba(0,0,0,.28)" }}>{selected.name}</div>}
       </div>
-      <div data-ceremony-grid style={{ width: gridWidth, height: gridHeight, flexShrink: 0, display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gridAutoRows: cellHeight, rowGap: gap, columnGap: gap, alignContent: scrollable ? "start" : "center", overflowY: scrollable ? "auto" : "hidden", overflowX: "hidden" }}>
+      <div data-ceremony-grid role="region" aria-label="团队欢迎名单，可滚动查看全部员工" tabIndex={0} style={{ width: gridWidth, height: gridHeight, flexShrink: 0, display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gridAutoRows: cellHeight, rowGap: gap, columnGap: gap, alignContent: scrollable ? "start" : "center", overflowY: scrollable ? "auto" : "hidden", overflowX: "hidden" }}>
       {staff.map((actor, staffIndex) => {
         const index = staffIndex + 1;
         const slow = choreo.slowDancers.includes(staffIndex);

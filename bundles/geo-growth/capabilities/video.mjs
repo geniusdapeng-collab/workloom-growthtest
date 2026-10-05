@@ -261,7 +261,10 @@ export function deliveryInspect(input) {
     return { found: false, projectId, manifestPath, hint: "还没有交付清单（还没跑 deliver 阶段）" };
   }
   if (!plain(manifest)) throw new VideoCapabilityError(`${manifestPath} 须为 JSON 对象`);
-  if (manifest.projectId !== undefined && manifest.projectId !== projectId) throw new VideoCapabilityError("交付清单的 projectId 与请求不一致");
+  if (manifest.projectId !== projectId) throw new VideoCapabilityError("交付清单的 projectId 项目标识与请求不一致或缺失");
+  const itemCount = [manifest.entries, manifest.assets, manifest.variants, manifest.subtitles?.files]
+    .reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0);
+  if (itemCount > 1000) throw new VideoCapabilityError("交付清单文件数量超过 1000", "TOO_LARGE");
   const assets = new Map(), invalid = [];
   const addFile = (label, rawEntry, required = false) => {
     if (rawEntry === undefined || rawEntry === null) {
@@ -273,7 +276,8 @@ export function deliveryInspect(input) {
       invalid.push({label, state: "invalid-metadata", verified: false, detail: "清单项须含非空路径"}); return;
     }
     const rawPath = entry.path;
-    const relativePath = rawPath.startsWith("/") ? relative(artifactRoot(), rawPath) : rawPath.replace(/^\.\//u, "");
+    const relativePath = rawPath.startsWith("/") || /^[A-Za-z]:[\\/]/u.test(rawPath)
+      ? relative(artifactRoot(), rawPath) : rawPath.replace(/^\.\//u, "");
     let absolute;
     try { absolute = insideRepo(relativePath, label); }
     catch (error) {
@@ -302,7 +306,7 @@ export function deliveryInspect(input) {
     if (!Array.isArray(manifest[name])) invalid.push({label: name, state: "invalid-metadata", verified: false, detail: "须为文件数组"});
     else for (const [index, entry] of manifest[name].entries()) addFile(entry?.label ?? `${name}:${index}`, entry, true);
   }
-  if (manifest.deliverable !== undefined) addFile("deliverable", manifest.deliverable, true);
+  addFile("deliverable", manifest.deliverable, true);
   if (manifest.cover !== undefined) addFile("cover", manifest.cover, true);
   if (manifest.variants !== undefined && !Array.isArray(manifest.variants)) invalid.push({label: "variants", state: "invalid-metadata", verified: false, detail: "须为版本数组"});
   for (const variant of Array.isArray(manifest.variants) ? manifest.variants : []) {
@@ -321,6 +325,7 @@ export function deliveryInspect(input) {
       if (!existsSync(absolute)) return {...check, state: "missing", verified: false};
       const info = lstatSync(absolute);
       if (!info.isFile() || info.isSymbolicLink()) return {...check, state: "not-file", verified: false};
+      if (info.size === 0) return {...check, state: "empty-file", bytes: 0, verified: false};
       const sha256 = sha256File(absolute);
       if (entry.expectedBytes !== undefined && entry.expectedBytes !== info.size) return {...check, state: "size-mismatch", bytes: info.size, sha256, verified: false};
       if (entry.expectedSha256 && entry.expectedSha256 !== sha256) return {...check, state: "sha256-mismatch", bytes: info.size, sha256, verified: false};
@@ -405,6 +410,7 @@ function localAsrConfiguration(env) {
 
 /** POSIX 单引号把每个 argv 元素作为字面参数；结构化 argv 是调用方首选。 */
 const quoteShell = value => `'${String(value).replaceAll("'", "'\\''")}'`;
+const quotePowerShell = value => `'${String(value).replaceAll("'", "''")}'`;
 
 /** 产出"建议命令 + 前置检查清单"；**不执行**任何生成/渲染/提交。 */
 export function productionPlan(input) {
@@ -483,6 +489,8 @@ export function productionPlan(input) {
     ready,
     readyScope: "authored-input-and-local-configuration",
     recommendedCommand: command,
+    recommendedPowerShellCommand: ready ? `& ${[executable, ...argv].map(quotePowerShell).join(" ")}` : null,
+    execution: ready ? { command: executable, args: argv, cwd: repoRoot() } : null,
     beforeRun: [
       "pnpm video:doctor（环境自检：ffmpeg/密钥/配音工位/曲库路径监狱）",
       "营销片：product-archive.mts 建/取商品档案；真人出镜：video:assets reconcile 对账素材清单",

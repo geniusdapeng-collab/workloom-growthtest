@@ -35,6 +35,39 @@ test('G14 CI instance: trusted complete repository identity takes precedence ove
   assert.match(errorsOf(isolated, { ...actual, instanceRepository: '' }), /repositoryInstance/);
   assert.match(errorsOf({ ...isolated, isolation: { sourceProductRepository: 'other-product', isolated: true } }, actual), /isolation/);
 });
+const adopted = { ...profile, repositoryInstance: manifest.repository, isolation: { isolated: true, sourceProductRepository: 'workloom-ai/Frozen-Source', sourceProductCommit: 'a6dc89a87e95eab86e202199335aecbf7fc4925b', adoptedProductRepository: manifest.repository, preserveSourceLineage: true } };
+const adoptedOptions = { ...options, instanceRepository: manifest.repository };
+test('G14 adopted identity: this isolated product keeps its frozen source and explicitly adopts its actual repository', () => {
+  const result = validateProfileContract(adopted, adoptedOptions);
+  assert.deepEqual(result.errors, []); assert.equal(result.businessVerified, false);
+  assert.equal(adopted.isolation.sourceProductRepository, 'workloom-ai/Frozen-Source');
+});
+for (const [name, change] of [
+  ['missing adoption', (p) => { delete p.isolation.adoptedProductRepository; }],
+  ['wrong adoption', (p) => { p.isolation.adoptedProductRepository = 'workloom-ai/other'; }],
+  ['missing source pin', (p) => { delete p.isolation.sourceProductCommit; }],
+  ['abbreviated pin', (p) => { p.isolation.sourceProductCommit = 'a6dc89a'; }],
+  ['non-hex pin', (p) => { p.isolation.sourceProductCommit = 'x'.repeat(40); }],
+  ['zero pin', (p) => { p.isolation.sourceProductCommit = '0'.repeat(40); }],
+  ['missing source', (p) => { delete p.isolation.sourceProductRepository; }],
+  ['source URL', (p) => { p.isolation.sourceProductRepository = 'https://cnb.cool/workloom-ai/Frozen-Source'; }],
+  ['source traversal', (p) => { p.isolation.sourceProductRepository = 'workloom-ai/../Frozen-Source'; }],
+  ['rewritten source', (p) => { p.isolation.sourceProductRepository = manifest.repository; }],
+  ['adoption removed and source rewritten', (p) => { delete p.isolation.adoptedProductRepository; p.isolation.sourceProductRepository = manifest.repository; }],
+  ['missing preservation', (p) => { delete p.isolation.preserveSourceLineage; }],
+  ['false preservation', (p) => { p.isolation.preserveSourceLineage = false; }],
+  ['missing isolation', (p) => { delete p.isolation; }],
+  ['disabled isolation', (p) => { p.isolation.isolated = false; }],
+  ['missing instance', (p) => { delete p.repositoryInstance; }],
+]) test(`G14 adopted identity: ${name} cannot silently erase frozen lineage or bypass instance binding`, () => {
+  const value = structuredClone(adopted); change(value);
+  assert.match(errorsOf(value, adoptedOptions), /isolation|repositoryInstance/);
+});
+test('G14 adopted identity: another actual origin, group or absent identity cannot be accepted', () => {
+  for (const instanceRepository of ['workloom-ai/other', 'other-org/example', '', null]) {
+    assert.match(errorsOf(adopted, { ...adoptedOptions, instanceRepository, instanceSlug: null }), /repositoryInstance|adoptedProductRepository/);
+  }
+});
 test('G14: invalid ports, credentialed targets and undeclared production write residuals are rejected', () => {
   assert.match(errorsOf(changed('startup', { command: 'pnpm preview:all', ports: { pc: 0, bMobile: 3001, cMobile: 3002, server: 8787 } })), /ports/);
   const credentialed = new URL('https://example.test'); credentialed.username = 'user'; credentialed.password = ['mock', 'private'].join('-');

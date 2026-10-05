@@ -146,7 +146,14 @@ copy apps/desktop/windows/WorkLoom.bat "$PKG/WorkLoom.bat"
 copy apps/desktop/electron/bootstrap.cjs "$PKG/bootstrap.cjs"
 
 for f in node_modules/tsx/package.json node_modules/hono/package.json scripts/migrate.ts \
-         scripts/product-runtime.mjs scripts/vite-product.mjs product.manifest.json apps/web/vite.config.ts; do
+         scripts/product-runtime.mjs scripts/vite-product.mjs scripts/skill-bindings.mts product.manifest.json apps/web/vite.config.ts \
+         scripts/tools/full-chain-film.mts scripts/tools/film-voice-artifact.ts scripts/tools/compose-film.mts \
+         scripts/tools/explainer-run.mts scripts/tools/whiteboard-film.mts scripts/tools/whiteboard-env-install.mts \
+         scripts/tools/enhance-engine-install.mjs scripts/whiteboard/lineart_tools.py \
+         assets/whiteboard/drawing-hand-workloom.png vendor/srt-whiteboard/requirements.txt \
+         vendor/srt-whiteboard/scripts/prepare_env.py vendor/srt-whiteboard/scripts/render_stream_whiteboard.py \
+         vendor/srt-whiteboard/scripts/stream_render.py vendor/srt-whiteboard/scripts/merge_scenes.py \
+         vendor/srt-whiteboard/scripts/render_annotation_preview.py; do
   [ -f "$R/$f" ] || { echo "❌ 应急载荷自检失败：runtime/$f 缺失"; exit 1; }
 done
 node scripts/payload-policy.mjs assert-runtime "$R"

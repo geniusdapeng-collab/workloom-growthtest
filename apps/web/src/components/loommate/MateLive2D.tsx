@@ -349,6 +349,8 @@ function Live2DBackend({ size, mood = "neutral", gesture = null, modelUrl = "/li
       // 动态 import：该插件在模块求值时即检查 window.Live2D（Cubism 2 runtime），
       // 必须等 core 注入后再加载（静态 import 会整包报错白屏——已踩过）
       const { Live2DModel } = await import("pixi-live2d-display");
+      // 欢迎页快进/退出可能发生在插件下载期间；每个异步边界都重新核对当前组件。
+      if (disposed || !hostRef.current) return;
 
       const capture = new URLSearchParams(location.search).has("capture");
       const app = new PIXI.Application({
@@ -374,7 +376,11 @@ function Live2DBackend({ size, mood = "neutral", gesture = null, modelUrl = "/li
       canvas.addEventListener("webglcontextlost", () => setRenderReady(false), { once: true });
 
       const model = await Live2DModel.from(modelUrl, { autoUpdate: false });
-      if (disposed) return;
+      if (disposed) {
+        // 尚未加入 stage 的迟到模型不会由 app.destroy(children) 清理。
+        model.destroy();
+        return;
+      }
       modelRef.current = model;
       // 构图：bust=头肩胸取景——模型向下多探，让脸部占据视窗上中部（shizuku 为带课桌全身模型）；
       //      full=全身像——整体缩放至视口 ~92%，脚底贴视口底部（首装仪式舞台位，完整入镜不裁切）
@@ -406,6 +412,7 @@ function Live2DBackend({ size, mood = "neutral", gesture = null, modelUrl = "/li
       // NORMAL 优先级启动，否则同为 NORMAL 的首个 TapBody 手势会被拒绝（实机验收已复现）。
       const expr = moodExprOf(modelUrl, moodRef.current);
       if (expr) await model.expression(expr).catch(() => undefined);
+      if (disposed) return;
 
       /* ================= 口型平滑引擎 =================
        * 驱动方只设「目标值」，引擎在 tick 内指数趋近：开口快（k=0.55）闭口慢（k=0.18），
