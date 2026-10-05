@@ -50,6 +50,14 @@ const validPlan: CoverPlan = {
 };
 
 describe("封面设计稿", () => {
+  it("可见文案拒绝空行、控制字符与非字符串，避免渲染静默丢字", () => {
+    for (const headline of ["酒店\n", "酒店\n\n服务", "酒店\t服务", "酒店\u0000服务", 42]) {
+      expect(() => validateCoverPlan({ ...validPlan, headline: headline as string }, input)).toThrowError(CoverDesignError);
+    }
+    for (const subline of ["双屏\n自助机", "双屏\r自助机", { text: "双屏" }]) {
+      expect(() => validateCoverPlan({ ...validPlan, subline: subline as string }, input)).toThrowError(CoverDesignError);
+    }
+  });
   it("生成素材把来源与文案约束传给设计师，并拒绝封面冒称实拍", () => {
     const generated: CoverDesignInput = { ...input,
       brief: { ...input.brief, footageOrigin: "generated", claimsDiscipline: "不编造入住秒数" } };

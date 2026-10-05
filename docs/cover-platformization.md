@@ -1,7 +1,7 @@
 # 封面平台化与封面知识库（口径文档）
 
 > 建档：2026-09-27 · 适用：`packages/video-studio/src/cover-platforms.ts`、`packages/video-studio/src/cover-design.ts`、
-> `scripts/tools/full-chain-film.mts`（cover 阶段）、`bundles/ai-video/connectors/cover-kb-bridge/**`、
+> `scripts/tools/full-chain-film.mts`（cover 阶段）、`packages/video-studio/src/local-cover-render.ts`（显式本地后期）、`bundles/ai-video/connectors/cover-kb-bridge/**`、
 > `bundles/ai-video/library/cover-kb/**`、`bundles/ai-video/library/account-profiles/**`
 >
 > 来源方案：《视频封面链路强化方案（对焦稿 v1）》+《AI Coding Agent 执行方案》
@@ -152,3 +152,55 @@ node_modules/.bin/tsx scripts/bundle-governance.mts
 # 能力导览（README 区块 + docs/capabilities.auto.*）
 pnpm capabilities && pnpm capabilities:check
 ```
+
+## 八、既有素材的确定性本地封面（T-2026-1006-0001）
+
+已经有可用商品图或视频时，本地编辑入口通过 `renderLocalCover()` 生成封面。此函数不导入设计师、监制、供应商或密钥读取器；所有输入来自指定本地文件。正常 cover 阶段继续使用原来的设计、评审和发布合同。
+
+```ts
+const cover = await renderLocalCover({
+  source: { kind: "image", path: absoluteProductImage },
+  // 视频取帧时改为 { kind: "video-frame", path: absoluteVideo, timeSec: 1.25 }
+  title: "让酒店服务\n更从容",
+  subtitle: "示例品牌 · 双屏自助机",
+  platform: "wechat-channels",
+  variant: "warm-film",
+  out: absoluteNewPng,
+  width: 720,
+  height: 1280,
+  fontId: "source-han-heavy",
+  fontFile: absoluteRegisteredFont,
+  fontSha256: registeredFontSha256,
+  ffmpeg: absoluteVerifiedFfmpeg,
+  ffprobe: absoluteVerifiedFfprobe,
+  footageOrigin: "generated",
+  durationSeconds: 30
+});
+```
+
+`source` 只接收非空普通文件，不接收 URL、符号链接及包含链接的祖先目录。图像支持 PNG、JPEG、WebP、BMP、TIFF 单帧，视频容器限 MP4/MOV、Matroska、AVI、MPEG-TS；视频取帧时间必须是有限非负数字并位于文件时长之前。图像最多 64 MiB、视频最多 128 MiB，解码源画面最多 16,777,216 像素。FFmpeg 输入显式限制 `file,pipe` 协议和相应解复用器，拒绝本地播放列表间接进入网络或另一个媒体集合。
+
+画布宽高必须是 96–4096 的整数，并与已登记平台画幅完全一致。新入口拒绝空或未知平台；旧 `getCoverSpec()` 的默认平台行为保持原样。排版同时扣除左右留白、平台右侧操作栏、顶部和底部遮挡区，以及标题带下沿。字号逐步缩小，直到**实际透明文字图层的墨迹包围盒**全部放得下；达到最小字号仍放不下就报错，不裁断文字。
+
+可见文案与正常设计稿共用 `validateCoverVisibleCopy()` / `assertCoverVisibleCopy()`：来源标签、风格标签、生成素材冒称实拍、与真实片长不符的声明都被拒绝。主标题最多两行且不能含空行，副标题最多一行；不接受控制字符或不可见方向字符。中文标题按登记字数、英文标题按词数，副标题沿用 24 个视觉字符上限。局部文字测量另有 128 个标题码点和 1024 字节上限，防止一个超长英文词绕开词数约束。文字通过私有固定文件名传给 FFmpeg，`textfile` + `expansion=none` 保留引号、冒号、反斜杠、美元符号和百分号的字面内容，不插入 shell 或滤镜表达式。
+
+字体由调用方选择已登记文件及对应 SHA256；渲染器核对当前全部字节，检查 OpenType Unicode cmap 4/12 中每个所需码点必须映射到有效的非零字形。缺字直接报错，不能把缺字方框当作“已画字”。函数不安装字体、不搜索字体、不做许可认证。
+
+`warm-film`、`punchy-social`、`cool-tech` 对应真实调色、标题衬底、文字颜色和强调色差异。它们只保留在回执元数据里，风格名称不进入封面画面。底图仍是一个连续来源画面，采用固定铺满和偏上裁切；人物识别、商品自动定位、复杂拼贴和账号自动设计不在这个本地函数范围内。
+
+每个成功结果返回 `{ path, width, height, sha256, receipt }`。回执版本为 `workloom.local-cover-render/v1`，记录源文件和取帧摘要、字体摘要及实际码点、配方摘要、每行实际墨迹边界和有变化的像素数量、PNG 与解码 RGBA 摘要，以及本地二进制摘要和实际参数数组。回执证明这些本地字节和排版行为；它不证明人物身份、画面事实正确或已通过模型视觉认证。交付前仍应实际查看商品是否可辨、裁切是否合理、文字与背景是否易读。
+
+输出使用独占 `.local-cover.lock` 和同目录私有临时空间。输入、字体、二进制、旧输出和锁在发布前重新核对，验证单 PNG 帧、精确尺寸及文字确实改变画面后才原子替换。发布前失败保留旧输出；另一位写入者修改的文件或锁会被保留。源文件、字体与二进制的路径或硬链接都不能作为输出。不用文件体积代替画质判据。若原子替换已尝试而后续读回或清理失败，异常会带 `publication`（`published` / `unknown`、`renameCompleted` 和预期输出摘要），调用方应据实记录副作用，不把异常等同于“没有生成文件”。
+
+错误码：`LOCAL_COVER_INPUT_INVALID`、`LOCAL_COVER_COPY_INVALID`、`LOCAL_COVER_SOURCE_INVALID`、`LOCAL_COVER_FONT_INVALID`、`LOCAL_COVER_FONT_GLYPH_MISSING`、`LOCAL_COVER_TEXT_FIT_FAILED`、`LOCAL_COVER_OUTPUT_BUSY`、`LOCAL_COVER_OUTPUT_INVALID`、`LOCAL_COVER_PROCESS_FAILED`、`LOCAL_COVER_INPUT_CHANGED`、`LOCAL_COVER_OUTPUT_CHANGED`、`LOCAL_COVER_VERIFY_FAILED`。默认总时限 120 秒，允许显式指定 1–600,000 毫秒；拒绝路径不会退回模型设计或另一个字体。
+
+真实媒体回归：
+
+```bash
+node_modules/.bin/vitest run packages/video-studio/src/local-cover-render.test.ts packages/video-studio/src/cover-design.test.ts packages/video-studio/src/cover-platforms.test.ts packages/video-studio/src/cover-assembly.test.ts
+node_modules/.bin/tsc --noEmit -p packages/video-studio/tsconfig.json
+```
+
+测试需要本机 FFmpeg/FFprobe，可通过 `WORKLOOM_TEST_FFMPEG` / `WORKLOOM_TEST_FFPROBE`（兼容 `WL_FFMPEG` / `WL_FFPROBE`）显式提供。缺少媒体工具或仓内固定字体会使测试失败，不会跳过真实素材用例。
+
+相关实现依据：[FFmpeg drawtext](https://ffmpeg.org/ffmpeg-filters.html#drawtext)、[FFmpeg 输入协议限制](https://ffmpeg.org/ffmpeg-protocols.html#Protocol-Options)、[FFmpeg 解复用器限制](https://ffmpeg.org/ffmpeg-formats.html#Format-Options)、[OpenType cmap](https://learn.microsoft.com/en-us/typography/opentype/spec/cmap)。

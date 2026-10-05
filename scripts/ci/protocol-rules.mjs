@@ -165,22 +165,60 @@ export function findModuleConflicts(mine, theirs) {
 }
 
 /**
- * 锁冲突门禁的处置级别（协议 §4 的 push / PR 语义分离）。
- *
- * 背景（2026-09-27 实测）：push 事件（即 main 上的合并提交）下，门禁会把**已经合入的提交**
- * 与**在途 PR** 比文件重叠。合并已经发生、门禁再拦也拦不住，只会把 main 打成红：
- * 实例 = workloom-growth PR #211 合入后，因在途 #206/#209 同改 `bundles/ai-video/bundle.json`
- * → `cnb/push/pipeline-1(static-gate)` 红，而同一内容在 PR 门禁下三门禁全绿。
- *
- * 语义：
- * - **PR 事件**：`fail`（保持先到先得拦截——这是门禁真正能拦住并发编辑的时点）；
- * - **push 事件**：`warn`（只提醒重叠的在途 PR "需要 rebase 后重跑"，不判红）；
- * - `LOCK_OVERLAP_MODE=fail|warn` 可显式覆盖事件默认；`--strict` 强制 `fail`（人工复核用）。
+ * 普通文件重叠默认提醒；显式 MODULE_EXCLUSIVE 在预合并 PR 按实际 IID 先到先得。
+ * push 已合入，普通与模块默认都提醒。LOCK_OVERLAP_MODE 只覆盖普通路径；
+ * --strict 可用于人工硬校验两类冲突，warn 始终不能软化 PR 模块或 API 缺证据。
  */
-export function resolveLockOverlapMode({ event = null, envMode = null, strict = false } = {}) {
-  if (strict) return "fail";
-  if (envMode === "fail" || envMode === "warn") return envMode;
-  return event === "push" ? "warn" : "fail";
+export function resolveLockPolicies({ event = null, envMode = null, strict = false } = {}) {
+  if (envMode !== null && envMode !== undefined && envMode !== "" && !["fail", "warn"].includes(envMode)) {
+    throw new Error("LOCK_MODE_INVALID: LOCK_OVERLAP_MODE 只能为 fail 或 warn");
+  }
+  return {
+    ordinary: strict ? "fail" : envMode || "warn",
+    modules: strict || event !== "push" ? "fail" : "warn",
+    api: "fail",
+  };
+}
+
+/** 原调用名只返回普通路径策略，不能用于模块冲突或 API 缺证据。 */
+export function resolveLockOverlapMode(options = {}) {
+  return resolveLockPolicies(options).ordinary;
+}
+
+export function requireRepositoryPath(value) {
+  if (typeof value !== "string" || !value || value.startsWith("/") || /^[A-Za-z]:/.test(value)
+    || value.includes("\\") || value.includes("\0") || value.split("/").some((part) => !part || part === "." || part === "..")) {
+    throw new Error("PATH_UNVERIFIED: 必须为仓内完整相对路径");
+  }
+  if (/%(?:2e|2f|5c)/i.test(value)) {
+    let decoded;
+    try { decoded = decodeURIComponent(value); }
+    catch { throw new Error("PATH_UNVERIFIED: 路径编码无效"); }
+    if (decoded.startsWith("/") || decoded.includes("\\") || decoded.split("/").some((part) => part === ".." || part === ".")) {
+      throw new Error("PATH_UNVERIFIED: 拒绝编码路径逃逸");
+    }
+  }
+  return value;
+}
+
+/** --name-status -z 保留路径中的换行/空格；rename/copy 同时保留旧新路径。 */
+export function parseNameStatusZ(output) {
+  const text = Buffer.isBuffer(output) ? output.toString("utf8") : String(output ?? "");
+  if (!text) return [];
+  if (!text.endsWith("\0")) throw new Error("PATH_UNVERIFIED: name-status 输出缺少终止 NUL");
+  const fields = text.split("\0");
+  fields.pop();
+  const paths = [];
+  for (let index = 0; index < fields.length;) {
+    const status = fields[index++];
+    if (!/^(?:[ADMTUXB]|[RC](?:100|\d{1,2}))$/.test(status)) throw new Error("PATH_UNVERIFIED: name-status 状态无效");
+    const count = /^[RC]/.test(status) ? 2 : 1;
+    for (let part = 0; part < count; part += 1) {
+      if (index >= fields.length) throw new Error("PATH_UNVERIFIED: name-status 路径不完整");
+      paths.push(requireRepositoryPath(fields[index++]));
+    }
+  }
+  return [...new Set(paths)].sort();
 }
 
 export function parseChangedPaths(output) {

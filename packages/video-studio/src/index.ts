@@ -12,6 +12,7 @@ export * from "./shot-order.js";
 export * from "./cover-design.js";
 export * from "./cover-platforms.js";
 export * from "./cover-assembly.js";
+export * from "./local-cover-render.js";
 export * from "./platform-intent.js";
 export * from "./sfx-synth.js";
 export * from "./portrait-runtime.js";
