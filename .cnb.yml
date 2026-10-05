@@ -20,13 +20,17 @@
     - name: 协议门禁（提交规范 + 并发冲突）
       script: |
         set -eu
-        node --test scripts/ci/protocol-rules.test.mjs
+        node --test scripts/ci/protocol-rules.test.mjs scripts/ci/verify-commit-msg.test.mjs
         node --test scripts/ci/cnb-desktop-release.test.mjs
         # 硬闸口径（T-2026-0930-0015）：创作/审美口径不得写成 hard: true（硬闸只允许事实类）
         node --test scripts/ci/hard-gate-policy.test.mjs
         node scripts/ci/verify-hard-gate-policy.mjs
         node scripts/ci/verify-commit-msg.mjs --self-test
         node scripts/ci/verify-lock-conflict.mjs --self-test
+        # PR 范围不能在浅历史上漏检；完整 checkout 无需额外网络请求。
+        if [ "$(git rev-parse --is-shallow-repository)" = true ]; then
+          git fetch --no-tags --unshallow origin
+        fi
         node scripts/ci/verify-commit-msg.mjs
         node scripts/ci/verify-lock-conflict.mjs
 
