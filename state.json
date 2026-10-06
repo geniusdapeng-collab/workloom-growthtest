@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 95,
+  "revision": 97,
   "tasks": {
     "98": {
       "number": 98,
-      "status": "waiting_ci",
+      "status": "aligning",
       "firstSeen": 1791314317242,
       "attempts": {},
       "headSha": "d8191f0bb72c33265dcc34c251e326f68ceba5b1",
@@ -35,8 +35,12 @@
       ],
       "ciSince": 1791314317242,
       "updatedAt": 1791315541834,
-      "alignmentCount": 0,
-      "alignmentIntent": null,
+      "alignmentCount": 1,
+      "alignmentIntent": {
+        "headSha": "d8191f0bb72c33265dcc34c251e326f68ceba5b1",
+        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "at": 1791315541834
+      },
       "developerReview": null,
       "alignment": {
         "sha": "d8191f0bb72c33265dcc34c251e326f68ceba5b1",
@@ -5460,6 +5464,36 @@
       },
       "previous": "4d5104c16bd6c43c9445ac1d0b6941a2f4c648ae4ce023414db2dcd5ad4c530d",
       "digest": "d492dd97cbbb5f3721a0990b7ab7f001d1d3415d9f7eb0418cac47f850e71c07"
+    },
+    {
+      "sequence": 96,
+      "at": "2026-10-06T19:39:01.834Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "d8191f0bb72c33265dcc34c251e326f68ceba5b1",
+            "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "at": 1791315541834
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "d492dd97cbbb5f3721a0990b7ab7f001d1d3415d9f7eb0418cac47f850e71c07",
+      "digest": "b934ac679143209241c4c90a4d31d6b10ec57b0237a2571bfd3787965ff181b9"
+    },
+    {
+      "sequence": 97,
+      "at": "2026-10-06T19:39:03.390Z",
+      "kind": "transaction",
+      "data": {
+        "id": "d3987c49-8976-4ee5-af2e-85d791c2d171"
+      },
+      "previous": "b934ac679143209241c4c90a4d31d6b10ec57b0237a2571bfd3787965ff181b9",
+      "digest": "ce9dd5cc7404075e1156144631d25dd3774ff027e9c885f809666f5bc8e93356"
     }
   ]
 }
