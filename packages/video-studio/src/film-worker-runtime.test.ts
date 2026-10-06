@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { FullChainFilmWorker, normalizeFilmJobRequest, assertFilmStageCoverage } from "./film-worker-runtime.js";
@@ -331,87 +331,101 @@ describe("worker current-response submission and dedicated identity contracts", 
   });
 });
 
-describe("worker verified local video normalization", () => {
+describe("worker original-native video retiming prohibition", () => {
   const prepare = async (stage = "videos") => {
     const value = fixture({ shots: [{ shotId: "S1", duration: 4 }] }, undefined, ["videos", "material-gen"]);
     const target = join(value.context.workDir, "work", "clip.mp4");
     const video = await value.worker.video({ stage, shotId: "S1", target, prompt: "test", refs: [], seconds: 5, generateAudio: true });
     await value.worker.download(video.url, target);
+    // Current-response video provenance and byte-preserving copy remain usable.
+    expect(readFileSync(target)).toEqual(readFileSync(`${target}.provider.mp4`));
+    expect(hash(readFileSync(target))).toBe(video.submissionReceipt.artifact.sha256);
     const reply = (frame: FilmChannelRequestFrame, changes: Record<string, unknown> = {}) => {
       const params = frame.params as Record<string, unknown>;
       const ref = String(changes.ref ?? params.targetRef);
-      const bytes = Buffer.from(`normalized current copy: ${value.frames.length}`);
+      const bytes = Buffer.from(`forbidden retime response: ${value.frames.length}`);
       const file = join(value.context.workDir, ref); mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, bytes);
       return { ref, sha256: hash(bytes), bytes: bytes.length, normalization: { factor: 0.8, from: 5, to: 4 }, ...changes };
     };
     value.setReply((frame) => reply(frame));
     return { ...value, target, video, reply };
   };
-  it("normalizes only the downloaded copy, retains provider bytes and replaces its registered fingerprint for later calls", async () => {
-    const { worker, target, video, frames } = await prepare();
-    const providerHash = hash(readFileSync(`${target}.provider.mp4`));
-    expect(await worker.normalizeVideo(target, 4, "videos", "S1")).toEqual({ factor: 0.8, from: 5, to: 4 });
-    expect(frames[2]).toMatchObject({ method: "media.fetch", stepKey: "videos:S1", shotId: "S1",
-      params: { ref: "work/clip.mp4", targetRef: "work/clip.mp4", normalizeToSeconds: 4 } });
-    expect(hash(readFileSync(target))).not.toBe(providerHash);
-    expect(hash(readFileSync(`${target}.provider.mp4`))).toBe(video.submissionReceipt.artifact.sha256);
-    await expect(worker.normalizeVideo(target, 4, "videos", "S1")).resolves.toEqual({ factor: 0.8, from: 5, to: 4 });
-    expect(frames.map((frame) => frame.method)).toEqual(["video.generate", "media.fetch", "media.fetch", "media.fetch"]);
-    worker.channel.dispose();
+  const originalBytes = (value: Awaited<ReturnType<typeof prepare>>) => ({
+    target: readFileSync(value.target), provider: readFileSync(`${value.target}.provider.mp4`), input: readFileSync(value.worker.inputPath),
   });
-  it("preserves the material stage when both video-generating stages are frozen", async () => {
-    const { worker, target, frames } = await prepare("material-gen");
-    await worker.normalizeVideo(target, 4, "material-gen", "S1");
-    expect(frames[2]!.stepKey).toBe("material-gen:S1"); worker.channel.dispose();
+  const assertForbidden = async (value: Awaited<ReturnType<typeof prepare>>, target = value.target, seconds = 4, stage = "videos", shotId = "S1") => {
+    const before = originalBytes(value); const framesBefore = [...value.frames];
+    await expect(value.worker.normalizeVideo(target, seconds, stage, shotId)).rejects.toMatchObject({ code: "STANDARD_NATIVE_RETIME_FORBIDDEN" });
+    expect(value.frames).toEqual(framesBefore);
+    expect(originalBytes(value)).toEqual(before);
+  };
+  it("rejects repeated retiming before IPC and retains both original provider and downloaded-copy bytes", async () => {
+    const value = await prepare();
+    await assertForbidden(value); await assertForbidden(value);
+    expect(value.frames.map((frame) => frame.method)).toEqual(["video.generate", "media.fetch"]);
+    expect(hash(readFileSync(`${value.target}.provider.mp4`))).toBe(value.video.submissionReceipt.artifact.sha256);
+    value.worker.channel.dispose();
+  });
+  it("rejects retiming in the material stage before IPC and preserves the original copy", async () => {
+    const value = await prepare("material-gen");
+    await assertForbidden(value, value.target, 4, "material-gen");
+    expect(value.frames[1]!.stepKey).toBe("material-gen:S1"); value.worker.channel.dispose();
   });
   it.each(["unknown", "wrong-stage", "wrong-shot", "provider-raw", "changed-copy", "changed-provider", "changed-input"])(
-    "refuses %s before the normalization channel call", async (invalid) => {
-      const { worker, context, target, frames } = await prepare();
-      let selected = target; let stage = "videos"; let shotId = "S1";
-      if (invalid === "unknown") { selected = join(context.workDir, "unknown.mp4"); writeFileSync(selected, "not issued"); }
+    "uses the same unconditional prohibition for %s before any file validation or IPC", async (invalid) => {
+      const value = await prepare();
+      let selected = value.target; let stage = "videos"; let shotId = "S1";
+      if (invalid === "unknown") { selected = join(value.context.workDir, "unknown.mp4"); writeFileSync(selected, "not issued"); }
       if (invalid === "wrong-stage") stage = "material-gen";
       if (invalid === "wrong-shot") shotId = "S2";
-      if (invalid === "provider-raw") selected = `${target}.provider.mp4`;
-      if (invalid === "changed-copy") writeFileSync(target, "changed without parent");
-      if (invalid === "changed-provider") writeFileSync(`${target}.provider.mp4`, "changed preserved provider");
-      if (invalid === "changed-input") writeFileSync(worker.inputPath, "{}");
-      await expect(worker.normalizeVideo(selected, 4, stage, shotId)).rejects.toThrow(/VIDEO_NORMALIZATION_SOURCE_INVALID|ARTIFACT_CHANGED|INPUT_CHANGED/);
-      expect(frames).toHaveLength(2); worker.channel.dispose();
+      if (invalid === "provider-raw") selected = `${value.target}.provider.mp4`;
+      if (invalid === "changed-copy") writeFileSync(value.target, "changed without parent");
+      if (invalid === "changed-provider") writeFileSync(`${value.target}.provider.mp4`, "changed preserved provider");
+      if (invalid === "changed-input") writeFileSync(value.worker.inputPath, "{}");
+      await assertForbidden(value, selected, 4, stage, shotId);
+      if (invalid === "unknown") {
+        await assertForbidden(value, join(value.context.workDir, "missing.mp4"));
+        await assertForbidden(value, join(value.root, "outside.mp4"));
+        await assertForbidden(value, null as unknown as string);
+      }
+      expect(value.frames).toHaveLength(2); value.worker.channel.dispose();
     },
   );
-  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("rejects invalid target duration %s before dispatch", async (seconds) => {
-    const { worker, target, frames } = await prepare();
-    await expect(worker.normalizeVideo(target, seconds, "videos", "S1")).rejects.toThrow(/VIDEO_NORMALIZATION_INVALID/);
-    expect(frames).toHaveLength(2); worker.channel.dispose();
+  it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY])("uses the prohibition for invalid target duration %s before dispatch", async (seconds) => {
+    const value = await prepare();
+    await assertForbidden(value, value.target, seconds);
+    expect(value.frames).toHaveLength(2); value.worker.channel.dispose();
   });
   it.each([
     ["missing", undefined], ["zero-factor", { factor: 0, from: 5, to: 4 }],
     ["string-factor", { factor: "0.8", from: 5, to: 4 }], ["wrong-target", { factor: 0.8, from: 5, to: 4.11 }],
     ["inconsistent-factor", { factor: 0.5, from: 5, to: 4 }], ["invalid-from", { factor: 0.8, from: -5, to: 4 }],
-  ])("rejects %s normalization metadata even for current correctly hashed bytes", async (_name, normalization) => {
-    const { worker, target, reply, setReply } = await prepare();
-    setReply((frame) => reply(frame, { normalization }));
-    await expect(worker.normalizeVideo(target, 4, "videos", "S1")).rejects.toThrow(/VIDEO_NORMALIZATION_INVALID/);
-    worker.channel.dispose();
+  ])("never requests a parent response carrying %s retiming metadata", async (_name, normalization) => {
+    const value = await prepare(); let calls = 0;
+    value.setReply((frame) => { calls += 1; return value.reply(frame, { normalization }); });
+    await assertForbidden(value);
+    expect(calls).toBe(0); value.worker.channel.dispose();
   });
-  it("accepts real frame/AAC duration rounding and validates factor against requested duration", async () => {
-    const { worker, target, reply, setReply } = await prepare();
-    setReply((frame) => reply(frame, { normalization: { factor: 0.8, from: 5, to: 4.08 } }));
-    await expect(worker.normalizeVideo(target, 4, "videos", "S1")).resolves.toEqual({ factor: 0.8, from: 5, to: 4.08 });
-    worker.channel.dispose();
+  it("does not permit retiming based on frame/AAC duration rounding", async () => {
+    const value = await prepare(); let calls = 0;
+    value.setReply((frame) => { calls += 1; return value.reply(frame, { normalization: { factor: 0.8, from: 5, to: 4.08 } }); });
+    await assertForbidden(value);
+    expect(calls).toBe(0); value.worker.channel.dispose();
   });
-  it("rejects an otherwise valid response that names another output and does not register it", async () => {
-    const { worker, context, target, reply, setReply } = await prepare();
-    setReply((frame) => reply(frame, { ref: "wrong-output.mp4" }));
-    await expect(worker.normalizeVideo(target, 4, "videos", "S1")).rejects.toThrow(/VIDEO_NORMALIZATION_INVALID/);
-    await expect(worker.download("film-artifact:wrong-output.mp4", join(context.workDir, "copy.mp4"))).rejects.toThrow(/URL_NOT_ISSUED/);
-    worker.channel.dispose();
+  it("does not issue IPC or create/register another output through a retiming response", async () => {
+    const value = await prepare(); let calls = 0;
+    value.setReply((frame) => { calls += 1; return value.reply(frame, { ref: "wrong-output.mp4" }); });
+    await assertForbidden(value);
+    expect(calls).toBe(0);
+    expect(existsSync(join(value.context.workDir, "wrong-output.mp4"))).toBe(false);
+    await expect(value.worker.download("film-artifact:wrong-output.mp4", join(value.context.workDir, "copy.mp4"))).rejects.toThrow(/URL_NOT_ISSUED/);
+    expect(value.frames).toHaveLength(2); value.worker.channel.dispose();
   });
-  it.each(["provider", "input"])("rechecks preserved %s bytes after parent processing", async (changed) => {
-    const { worker, target, reply, setReply } = await prepare();
-    setReply((frame) => { const result = reply(frame); writeFileSync(changed === "provider" ? `${target}.provider.mp4` : worker.inputPath, "changed in channel"); return result; });
-    await expect(worker.normalizeVideo(target, 4, "videos", "S1")).rejects.toThrow(/ARTIFACT_CHANGED|INPUT_CHANGED/);
-    worker.channel.dispose();
+  it.each(["provider", "input"])("prevents parent retiming code from changing preserved %s bytes", async (changed) => {
+    const value = await prepare(); let calls = 0;
+    value.setReply((frame) => { calls += 1; const result = value.reply(frame); writeFileSync(changed === "provider" ? `${value.target}.provider.mp4` : value.worker.inputPath, "changed in channel"); return result; });
+    await assertForbidden(value);
+    expect(calls).toBe(0); value.worker.channel.dispose();
   });
 });
 

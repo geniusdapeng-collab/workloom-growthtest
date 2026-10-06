@@ -8,6 +8,32 @@ describe("film worker child environment", () => {
   });
 });
 
+describe("standard original-native parent authority", () => {
+  const frozen = { shots: [{ shotId: "NATIVE", duration: 5, speechMode: "on-camera", dialogue: [{ text: "原声" }] },
+    { shotId: "VO", duration: 6, speechMode: "voice-over", dialogue: [{ text: "原稿台词" }] }, { shotId: "AMBIENT", duration: 4 }] };
+  const scope = { stages: ["videos", "material-gen", "voice"], projectId: "MOCK-NATIVE", frozen,
+    shotIds: new Set(["NATIVE", "VO", "AMBIENT"]), options: { aspect: "9:16", resolution: "1080p" } };
+  const frame = (method: string, sid: string, params: unknown): FilmChannelRequestFrame => ({ kind: "film.request", id: "mock-request", method,
+    component: FILM_CHANNEL_METHOD_COMPONENT[method]!, stepKey: `${method === "voice.dub" ? "voice" : "videos"}:${sid}`, shotId: sid,
+    params, idempotencyKey: "mock-idempotency", requestHash: "mock-scope-only" });
+  it.each(["NATIVE", "VO", "AMBIENT"])("rejects local dubbing for %s before reservation", sid => {
+    expect(() => validateFilmChannelScope(frame("voice.dub", sid, { text: "原稿台词" }), scope)).toThrow("AUDIO_NATIVE_SOURCE_REPLACED");
+  });
+  it.each([["VO", 6], ["AMBIENT", 4]])("requires rendered native audio for %s", (sid, seconds) => {
+    expect(() => validateFilmChannelScope(frame("video.generate", String(sid), { prompt: "mock", refs: [], seconds, generateAudio: false,
+      aspect: "9:16", resolution: "1080p", targetRef: `clips/${sid}.mp4` }), scope)).toThrow("AUDIO_NATIVE_GENERATION_REQUIRED");
+  });
+  it("refuses retiming before any parent component is reserved", () => {
+    expect(() => validateFilmChannelScope(frame("media.fetch", "NATIVE", { ref: "clips/NATIVE.raw.mp4", targetRef: "clips/NATIVE.mp4", normalizeToSeconds: 5 }), scope))
+      .toThrow("STANDARD_NATIVE_RETIME_FORBIDDEN");
+  });
+  it.each([3, 5.5, 13])("does not clamp or round submitted duration %s for generation", duration => {
+    const changed = { ...scope, frozen: { shots: [{ shotId: "NATIVE", duration }] } };
+    expect(() => validateFilmChannelScope(frame("video.generate", "NATIVE", { prompt: "mock", refs: [], seconds: Math.min(12, Math.max(4, Math.round(duration))),
+      generateAudio: true, aspect: "9:16", resolution: "1080p", targetRef: "clips/NATIVE.mp4" }), changed)).toThrow("DURATION_FROZEN_MISMATCH");
+  });
+});
+
 describe("film parent frozen method and shot scope", () => {
   const scope = { stages: ["cine-kb", "plates", "videos", "material-gen", "voice", "cover", "spec", "continuity"], projectId: "project-a", shotIds: new Set(["S1", "S2"]) };
   const frame = (method: string, stepKey: string, shotId: string | null, params: unknown = {}): FilmChannelRequestFrame => ({
@@ -64,13 +90,13 @@ describe("film parent frozen audio and format authority", () => {
     aspect: "16:9", resolution: "720p", generateAudio: true };
   it("rejects replacement of native on-camera dialogue before the component reservation boundary", () => {
     expect(() => validateFilmChannelScope(frame("voice.dub", "S1", { text: "同源对白" }), scope)).toThrow("AUDIO_NATIVE_SOURCE_REPLACED");
-    expect(() => validateFilmChannelScope(frame("voice.dub", "S2", { text: "画外旁白" }), scope)).not.toThrow();
-    expect(() => validateFilmChannelScope(frame("voice.dub", "S3", { text: "额外旁白" }), scope)).toThrow("AUDIO_NO_DIALOGUE");
+    expect(() => validateFilmChannelScope(frame("voice.dub", "S2", { text: "画外旁白" }), scope)).toThrow("AUDIO_NATIVE_SOURCE_REPLACED");
+    expect(() => validateFilmChannelScope(frame("voice.dub", "S3", { text: "额外旁白" }), scope)).toThrow("AUDIO_NATIVE_SOURCE_REPLACED");
   });
   it("binds verification and permitted narration text to the exact frozen shot", () => {
     expect(() => validateFilmChannelScope(frame("voice.verify", "S1", { expectText: "同源对白" }), scope)).not.toThrow();
     expect(() => validateFilmChannelScope(frame("voice.verify", "S1", { expectText: "其它文本" }), scope)).toThrow("AUDIO_TEXT_MISMATCH");
-    expect(() => validateFilmChannelScope(frame("voice.dub", "S2", { text: "其它文本" }), scope)).toThrow("AUDIO_TEXT_MISMATCH");
+    expect(() => validateFilmChannelScope(frame("voice.dub", "S2", { text: "其它文本" }), scope)).toThrow("AUDIO_NATIVE_SOURCE_REPLACED");
   });
   it.each([
     [{ ...video, aspect: "9:16" }, "FORMAT_FROZEN_MISMATCH"],
@@ -82,9 +108,9 @@ describe("film parent frozen audio and format authority", () => {
   ])("rejects altered frozen request %j", (params, code) => {
     expect(() => validateFilmChannelScope(frame("video.generate", "S1", params), scope)).toThrow(String(code));
   });
-  it("keeps explicit silent voice-over generation and UHD source resolution semantics", () => {
+  it("requires native audio for voice-over while preserving source format authority", () => {
     expect(() => validateFilmChannelScope(frame("video.generate", "S1", video), scope)).not.toThrow();
-    expect(() => validateFilmChannelScope(frame("video.generate", "S2", { ...video, seconds: 6, generateAudio: false }), scope)).not.toThrow();
+    expect(() => validateFilmChannelScope(frame("video.generate", "S2", { ...video, seconds: 6, generateAudio: false }), scope)).toThrow("AUDIO_NATIVE_GENERATION_REQUIRED");
     expect(() => validateFilmChannelScope(frame("video.generate", "S1", { ...video, resolution: "1080p" }),
       { ...scope, options: { aspect: "16:9", resolution: "2160p" } })).not.toThrow();
   });
