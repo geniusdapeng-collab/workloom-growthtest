@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 59,
+  "revision": 61,
   "tasks": {
     "98": {
       "number": 98,
-      "status": "waiting_ci",
+      "status": "aligning",
       "firstSeen": 1791314317242,
       "attempts": {},
       "headSha": "9bdb51f636c7e8a21dbd7523707988a2de17245b",
@@ -34,7 +34,14 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791314317242,
-      "updatedAt": 1791314317242
+      "updatedAt": 1791314317242,
+      "alignmentCount": 1,
+      "alignmentIntent": {
+        "headSha": "9bdb51f636c7e8a21dbd7523707988a2de17245b",
+        "mainSha": "79866e883092ff60940b213c233a345d210bc57d",
+        "at": 1791314317242
+      },
+      "developerReview": null
     },
     "109": {
       "number": 109,
@@ -4561,6 +4568,36 @@
       },
       "previous": "120cee4dd2c4c98715f53911a2758d07fd9604175507fcad6ab9f612fe8c4c56",
       "digest": "d1908f2e8f6ffe0c2af6f60b59d7cda3090e4a9c56dc39743b1af3f6435f3745"
+    },
+    {
+      "sequence": 60,
+      "at": "2026-10-06T19:18:37.242Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "9bdb51f636c7e8a21dbd7523707988a2de17245b",
+            "mainSha": "79866e883092ff60940b213c233a345d210bc57d",
+            "at": 1791314317242
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "d1908f2e8f6ffe0c2af6f60b59d7cda3090e4a9c56dc39743b1af3f6435f3745",
+      "digest": "cb2bc4a7209cb32ef3004e6c1ce1f81ffeff928277381a4714608248df570578"
+    },
+    {
+      "sequence": 61,
+      "at": "2026-10-06T19:18:39.506Z",
+      "kind": "transaction",
+      "data": {
+        "id": "320ea5f2-ca0d-4a57-b700-395c3ec52b56"
+      },
+      "previous": "cb2bc4a7209cb32ef3004e6c1ce1f81ffeff928277381a4714608248df570578",
+      "digest": "99d5055d1bf56b87b02fc760baae2466c1935b6beb28f3f65030688b2687e589"
     }
   ]
 }
