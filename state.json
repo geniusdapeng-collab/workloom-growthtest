@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 21,
+  "revision": 23,
   "tasks": {
     "109": {
       "number": 109,
@@ -1634,6 +1634,232 @@
       },
       "previous": "8b50a67d432e2c582fc646dab5c71ba036c970ad1b1dc750dce33474c1d6bc92",
       "digest": "eb2e1ff84de5e8d8f708afd1e0cb1c39fc0edc460da3ed2a336e949c093faf94"
+    },
+    {
+      "sequence": 22,
+      "at": "2026-10-06T18:08:10.494Z",
+      "kind": "installer_merge_requested",
+      "data": {
+        "number": 109,
+        "snapshot": {
+          "number": 109,
+          "pull": {
+            "number": 109,
+            "state": "open",
+            "title": "feat(base): 安装普通研发自动交付 [T-2026-1005-7878]",
+            "body": "从已激活且禁用平台 AI 的基座当前主干 83ac6ef9466e93704725f469c366cfd7b54f0a99 安装完整研发执行闭包。当前 Codex 会话 review、实际测试并保存准确回执；CNB/GitHub 模型审核、模型代理及 NPC 修复入口关闭。保留目标产品依赖、必需机器 CI、行业身份、业务围栏和隔离；敏感 fenced 租约、不可修改候选、真实依赖和准确 merge 双亲继续核验。\n\n安装准备账本与清单，当前会话实测交接后才能普通合入；缺真实证明保持等待，不伪造批准。任务卡 #108 [T-2026-1005-7878]。\n\n<!-- delivery-install:297a691536e79db662ea273fcb834270dc8df79c400d886fba9917b68e66096c -->\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1005-7878\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+            "author": {
+              "username": "cnb.dYiF05kxAGA",
+              "nickname": "Genius",
+              "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+              "is_npc": false
+            },
+            "reviewers": [],
+            "labels": [],
+            "base": {
+              "ref": "refs/heads/main",
+              "sha": "8c19e677122398fee9b9751d18ac1d5811307d2f",
+              "repo": {
+                "id": "2101830819702788096",
+                "name": "workloom-growthtest",
+                "path": "workloom-ai/workloom-growthtest",
+                "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+              }
+            },
+            "head": {
+              "ref": "refs/heads/chore/protocol-onboarding-delivery-c39db3d43ba6fb0a-3c1fcc7a4bef",
+              "sha": "f4974c6f69a5d9d3ede641aaad8af3b6d7467e7b",
+              "repo": {
+                "id": "2101830819702788096",
+                "name": "workloom-growthtest",
+                "path": "workloom-ai/workloom-growthtest",
+                "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+              }
+            },
+            "blocked_on": "waiting_review",
+            "merged_by": {
+              "is_npc": false
+            },
+            "mergeable_state": "mergeable",
+            "is_wip": false,
+            "is_merged": false,
+            "is_force_merged": false,
+            "statuses": {}
+          },
+          "headSha": "f4974c6f69a5d9d3ede641aaad8af3b6d7467e7b",
+          "mainSha": "8c19e677122398fee9b9751d18ac1d5811307d2f",
+          "checkSha": "a96dc432000802f778b38b2976b9e533bc25ef35"
+        },
+        "developerReview": {
+          "schemaVersion": 1,
+          "provider": "codex",
+          "repo": "workloom-ai/workloom-growthtest",
+          "number": 109,
+          "headSha": "f4974c6f69a5d9d3ede641aaad8af3b6d7467e7b",
+          "mainSha": "8c19e677122398fee9b9751d18ac1d5811307d2f",
+          "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+          "reviewedFiles": [
+            ".cnb.yml",
+            ".workloom-delivery-install.json",
+            "AGENTS.md",
+            "docs/AUTOMATIC-RD-DELIVERY.md",
+            "docs/OPEN_SOURCE_COMPONENTS.md",
+            "scripts/ci/verify-delivery-admission.mjs",
+            "scripts/ci/verify-lock-conflict.mjs",
+            "scripts/ci/verify-lock-conflict.test.mjs",
+            "scripts/delivery/bootstrap-cnb.yml",
+            "scripts/delivery/cnb.yml",
+            "scripts/delivery/git-state.mjs",
+            "scripts/delivery/install-cnb.yml",
+            "scripts/delivery/install-config.mjs",
+            "scripts/delivery/install-manifest.mjs",
+            "scripts/delivery/model-gateway.mjs",
+            "scripts/delivery/queue-controller.mjs",
+            "scripts/delivery/queue-model.mjs",
+            "scripts/delivery/queue-platform.mjs",
+            "scripts/delivery/queue-policy.mjs",
+            "scripts/delivery/queue-release.mjs",
+            "scripts/delivery/queue-runner.mjs",
+            "scripts/delivery/queue-work.mjs",
+            "scripts/delivery/queue.test.mjs",
+            "scripts/delivery/release-source.mjs",
+            "scripts/delivery/review-plugin.mjs",
+            "scripts/delivery/runtime/package-lock.json",
+            "scripts/delivery/runtime/package.json",
+            "scripts/tools/cnb-api.mjs",
+            "scripts/tools/task.mjs"
+          ],
+          "filesHash": "070329a91255e46be0eea5baf767d444aa3fddeb3975edcddcaca1566397a9e7",
+          "dependsOn": [],
+          "ciPolicyChanges": [
+            {
+              "id": "CI-001",
+              "rationale": "Select healthy reviewed sources independently of older failures; use immutable candidates, all original CI, real dependencies, fenced sensitive integration lease and exact ordinary merge receipts. No paid review/recovery dispatcher or shared AI capacity remains."
+            },
+            {
+              "id": "CI-002",
+              "rationale": "Retain normal source/main alignment with explicit conflicts. Legacy review preparation/publication and NPC repair dispatch fail before IO; repair diagnostics return to the current Codex session."
+            },
+            {
+              "id": "CI-003",
+              "rationale": "Require explicit frozen expected source and native repository identity before packaging/upload; current branch/main/tag alone cannot substitute for exact source proof."
+            },
+            {
+              "id": "CI-004",
+              "rationale": "Parse local CI and append only missing delivery includes. Compare the remaining complete configuration hash to preserve existing target pipelines, selectors and permissions."
+            },
+            {
+              "id": "CI-005",
+              "rationale": "Persist append-only events and exact tasks on the protected state branch via normal fast-forward CAS. Recover lost push acknowledgement by transaction ID; do not force or blindly repeat external actions."
+            },
+            {
+              "id": "CI-006",
+              "rationale": "Retain official repository-bound API/Git authentication, read retry and zero write retries. Runtime credentials remain process-only and redacted; no model service is called."
+            },
+            {
+              "id": "CI-007",
+              "rationale": "Handoff requires a clean exact checkout and actual session review/test; source and body read back before durable storage. Bootstrap/activation verify complete manifest, prepared source/main and real product CI before changing human approval counters."
+            },
+            {
+              "id": "CI-008",
+              "rationale": "Repository-local native main scheduling performs deterministic admission/session record/reconcile/release operations only. Legacy base stage names contain syntax checks and no model image or calls; original locks and five-minute recovery remain."
+            },
+            {
+              "id": "CI-009",
+              "rationale": "Normalize the bootstrap gate to delivery-bootstrap-checks and run only installation ledger/assets, syntax and existing Codex session verification. Exact onboarding branch selection and independent original product checks remain."
+            },
+            {
+              "id": "CI-010",
+              "rationale": "Historical pure receipt readers remain, but CLI and runReview reject before SDK, publisher, subprocess, network or model work. No paid platform approval is created."
+            },
+            {
+              "id": "CI-011",
+              "rationale": "Keep integration and frozen publication independent. Require exact source/build/event/tag/manifest/digests; authenticate only the initial official private download request, bound redirect/stream failures and omit token on later requests."
+            },
+            {
+              "id": "CI-012",
+              "rationale": "Validate actual Codex exact repo/PR/head/main/policy/files/tests/timestamps/dependencies and CI IDs. Missing, stale, tampered or partial review, live lease, unresolved dependency and unknown write remain blockers for that task."
+            },
+            {
+              "id": "CI-013",
+              "rationale": "Keep the exact reviewed canonical admission module beside the retained target lock implementation. Verify actual current source/main/paths and durable positive sensitive admission; no fallback on unreadable or stale evidence."
+            },
+            {
+              "id": "CI-014",
+              "rationale": "Verify schema 2 and the complete exact tracked runtime closure, upstream provenance, regular Git objects, checkout/digest identity and target adapters. Missing, altered, foreign or symlink assets fail."
+            },
+            {
+              "id": "CI-015",
+              "rationale": "Add deterministic installed queue/protocol regression as an independent required PR pipeline without weakening any original product gate or treating unrelated UI publication as tested."
+            },
+            {
+              "id": "CI-016",
+              "rationale": "Keep repository/source/main/path and required task contracts. Installed sensitive changes require accurate source admission and live lease checks; old open-PR order no longer occupies a module forever."
+            },
+            {
+              "id": "CI-017",
+              "rationale": "Preserve the actual hardened target Git/API/fork/compare coverage, and add installed admission/lease and deleted target/base URL regressions. Reject stale main, shortened file sets, changed lease owner, unreadable ledger and wrong deleted-file identities."
+            },
+            {
+              "id": "CI-018",
+              "rationale": "Use current Codex provider with platformAI=false; preserve existing target product pipelines and business holds. Require implementation-change explanations and invalidate receipts on exact policy/source/main drift."
+            },
+            {
+              "id": "CI-019",
+              "rationale": "Reject immediately before any model, credential, filesystem, network or SDK operation because the owner revoked platform AI."
+            },
+            {
+              "id": "CI-020",
+              "rationale": "Keep actual task IDs and scoped task contracts. Existing task card creation/validation and errors remain; ready handoff cannot manufacture a lease or a platform approval."
+            },
+            {
+              "id": "CI-021",
+              "rationale": "Actual post-commit tests cover exact review drift/partial receipts, leases/CAS/lost acknowledgements, candidates/permissions/dependencies, red-oldest isolation, frozen releases/private redirects and disabled model/NPC IO. Explicitly retain one non-applicable shared UI lane skip per target."
+            },
+            {
+              "id": "CI-022",
+              "rationale": "Use the exact reviewed canonical parser dependency/integrity lock; installation ignores package scripts and does not request a model service."
+            },
+            {
+              "id": "CI-023",
+              "rationale": "Bind repository, PR, source, main, complete compare files, labels, readiness and original CI in snapshots. Candidate creation/merge uses immutable protected source, unique recovery identity and exact original two-parent verification."
+            },
+            {
+              "id": "CI-024",
+              "rationale": "Keep the previously verified parser locked at the exact existing runtime version. No SDK or paid model package is introduced; actual installed parser is tested in each owned target checkout."
+            },
+            {
+              "id": "CI-025",
+              "rationale": "Append three deterministic repository-local includes while retaining all original product pipeline/stage/check signals. Tiger switches only the four legacy protocol invocations to their exact canonical root equivalents; Python, evidence and industry checks remain."
+            }
+          ],
+          "ciPolicyChangesHash": "8710345ec287dd45efa93eb7c59563cc9fde00cb367685b2e95fad7bf5fa3615",
+          "tests": [
+            {
+              "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/ci/verify-commit-msg.test.mjs scripts/ci/verify-lock-conflict.test.mjs",
+              "exitCode": 0,
+              "finishedAt": "2026-10-06T17:58:06.751Z",
+              "result": "dar time and preserves the exact boundary (0.256166ms)\n✔ legacy review capacity never reads paid build history and cannot block unrelated reviewed source (0.054833ms)\n✔ release enqueue is idempotent by frozen source/kind/version and keeps integration separate (0.400833ms)\n✔ both UI and desktop dispatch pass the explicit frozen SHA to the whole build, independently of current branch SHA (0.837875ms)\n﹣ manual UI event and delivery dispatch use the same actual publishing job and native lock; the scheduler only launches and observes (5.688666ms) # This product has no shared UI publishing lane\n✔ release launch intent survives lost acknowledgement and forbids duplicate publication (0.482916ms)\n✔ release failures use the latest durable attempt count and park after two launches (0.211541ms)\n✔ lost release launch cannot adopt a different manual build with the same source/event (0.209875ms)\n✔ UI release verifies the real Platform API JSON decoding contract and rejects unreadable registration or different bytes (2.105792ms)\n✔ release verifies actual tag source, manifest identity and every downloaded digest (0.399791ms)\n✔ private release download authenticates only the official first request and hashes the actual redirected bytes (0.513042ms)\n✔ private release permission, unsafe redirect, empty/oversized stream and malformed manifest remain explicit failures (1.002667ms)\n✔ a release redirect loop is bounded and every later same-origin or foreign request omits the token (0.221166ms)\nℹ tests 255\nℹ suites 9\nℹ pass 254\nℹ fail 0\nℹ cancelled 0\nℹ skipped 1\nℹ todo 0\nℹ duration_ms 47150.190875\n"
+            }
+          ],
+          "reviewedAt": "2026-10-06T18:02:36.559Z",
+          "summary": "Current Codex reviewed the canonical source execution code and affected dependencies in this conversation. Copied source assets were compared byte-for-byte (B evidence) to that reviewed source. Each target-specific CI/AGENTS/bootstrap diff and Tiger delegate was inspected; schema-2 manifest, exact upstream/target identities, entire changed file set, existing product CI preservation and repeat-install zero-change result were machine-verified. Hardened target original modules, when present, were completely read and retained/adapted only under the exact reviewed hash-pair contract; their tests run in the real installed checkout. Only target YAML occurrence metadata changed in its offline open-source inventory; no package upgrade or industry/isolation change. Actual tests ran after this exact target commit and their unaltered command/time/result are attached; zero failed and one shared UI publishing lane case is explicitly skipped because the product has no such lane. No unresolved blocker found. Current Codex review plus actual original native product CI authorize only normal first installation; paid platform AI/NPC/gateway and fabricated platform approvals remain disabled.",
+          "passed": true,
+          "id": "ad8f5f3377859c744c36a6304726a2b7114bed1ba2beacbb8fc4257786ca09a1"
+        }
+      },
+      "previous": "eb2e1ff84de5e8d8f708afd1e0cb1c39fc0edc460da3ed2a336e949c093faf94",
+      "digest": "364df813833948372eb478ea5dc634773a696994013d99957e4af9ab6dfcbd1b"
+    },
+    {
+      "sequence": 23,
+      "at": "2026-10-06T18:08:09.849Z",
+      "kind": "transaction",
+      "data": {
+        "id": "installer-merge:109:f4974c6f69a5d9d3ede641aaad8af3b6d7467e7b"
+      },
+      "previous": "364df813833948372eb478ea5dc634773a696994013d99957e4af9ab6dfcbd1b",
+      "digest": "1f9f4795fef6a5db795d4e3ec36e476d02a2401440ac2533cc70c77db4e01b52"
     }
   ]
 }
