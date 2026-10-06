@@ -4,7 +4,7 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
@@ -158,7 +158,7 @@ function videoParams(f: Fixture, shotId = "S1"): Record<string, unknown> {
   const actor = f.source.contract.shots.some(shot => shot.shotId === shotId);
   const identity = actor ? generationIdentityLock(f.source.contract, shotId) : undefined;
   return { prompt: `当前镜头 ${shotId} 的实际提示词${identity ? "\n" + identity.promptFragment : ""}`,
-    refs: identity?.referenceAssets ?? [], seconds: 4, generateAudio: actor, aspect: "9:16", resolution: "1080p",
+    refs: identity?.referenceAssets ?? [], seconds: 4, generateAudio: true, aspect: "9:16", resolution: "1080p",
     targetRef: `clips/${shotId}.provider.mp4` };
 }
 async function generate(f: Fixture, shotId = "S1", overrides: Record<string, unknown> = {}) {
@@ -167,13 +167,12 @@ async function generate(f: Fixture, shotId = "S1", overrides: Record<string, unk
   const result = await handle(f.ctx, request) as { ref: string; sha256: string; bytes: number; taskId: string; submissionReceipt: FilmVideoSubmissionReceipt };
   return { result, request, params };
 }
-async function prepareIdentity(f: Fixture, options: { shotId?: string; normalizeToSeconds?: number } = {}) {
+async function prepareIdentity(f: Fixture, options: { shotId?: string } = {}) {
   const shotId = options.shotId ?? "S1";
   const generated = await generate(f, shotId);
   const clipRef = `clips/${shotId}.mp4`;
-  const copied = await handle(f.ctx, frame("media.fetch", shotId, { ref: generated.result.ref, targetRef: clipRef,
-    ...(options.normalizeToSeconds === undefined ? {} : { normalizeToSeconds: options.normalizeToSeconds }) })) as {
-      ref: string; sha256: string; bytes: number; normalization?: { factor: number; from: number; to: number };
+  const copied = await handle(f.ctx, frame("media.fetch", shotId, { ref: generated.result.ref, targetRef: clipRef })) as {
+      ref: string; sha256: string; bytes: number;
     };
   const clipPath = join(f.ctx.workDir, clipRef);
   const duration = Number(JSON.parse(execFileSync(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "json", clipPath], { encoding: "utf8", timeout: 30_000 })).format.duration);
@@ -213,7 +212,10 @@ async function rejectedBeforeReserve(f: Fixture, request: FilmChannelRequestFram
   if (error) await expect(handle(f.ctx, request)).rejects.toThrow(error);
   else await expect(handle(f.ctx, request)).rejects.toBeInstanceOf(Error);
   expect(f.ledger.reserveComponent).not.toHaveBeenCalled();
+  expect(f.ledger.claimComponent).not.toHaveBeenCalled();
   expect(f.ledger.recordDispatch).not.toHaveBeenCalled();
+  expect(f.ledger.recordComponentAccepted).not.toHaveBeenCalled();
+  expect(f.ledger.recordComponentFailure).not.toHaveBeenCalled();
   expect(f.net.mock.calls).toHaveLength(before);
 }
 function evidenceOf(value: unknown): CharacterIdentityEvidence {
@@ -225,9 +227,9 @@ function evidenceOf(value: unknown): CharacterIdentityEvidence {
 describe("actual parent channel refuses frozen audio, format, and reference alterations before budget", () => {
   it.each([
     ["native-dub", "voice.dub", "S1", { text: "同源对白", inputRef: "clips/S1.mp4", outputRef: "clips/S1.voiced.mp4", profile: "test" }, "AUDIO_NATIVE_SOURCE_REPLACED"],
-    ["silent-extra-voice", "voice.dub", "P1", { text: "额外旁白" }, "AUDIO_NO_DIALOGUE"],
+    ["silent-extra-voice", "voice.dub", "P1", { text: "额外旁白" }, "AUDIO_NATIVE_SOURCE_REPLACED"],
     ["native-verify-text", "voice.verify", "S1", { expectText: "被修改的台词" }, "AUDIO_TEXT_MISMATCH"],
-    ["voiceover-dub-text", "voice.dub", "V1", { text: "被修改的旁白" }, "AUDIO_TEXT_MISMATCH"],
+    ["voiceover-dub-text", "voice.dub", "V1", { text: "被修改的旁白" }, "AUDIO_NATIVE_SOURCE_REPLACED"],
   ])("%s enters the handler but never reserves or calls a supplier", async (_label, method, shot, params, code) => {
     const f = fixture(); await rejectedBeforeReserve(f, frame(method, shot, params), code);
   });
@@ -446,18 +448,22 @@ describe("parent person canary permission binds the unchanged current media", ()
   });
 });
 
-describe("authorized parent duration normalization retains a separate provider source", () => {
-  it("normalizes actual shorter media to the frozen duration and reviews the actual derived clip", async () => {
+describe("standard parent preserves original media and rejects retiming before reservation", () => {
+  it("copies actual shorter original bytes without retiming and reviews that same original clip", async () => {
     const f = fixture(); providerOutput(f, shorterVideoBytes);
-    const prepared = await prepareIdentity(f, { normalizeToSeconds: 4 });
-    expect(prepared.copied.normalization).toMatchObject({ to: 4 });
-    expect(prepared.copied.normalization!.from).toBeLessThan(4);
-    expect(prepared.copied.normalization!.factor).toBeGreaterThan(1);
+    const prepared = await prepareIdentity(f);
+    expect(prepared.copied).not.toHaveProperty("normalization");
+    const duration = Number(JSON.parse(execFileSync(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "json", prepared.clipPath], { encoding: "utf8", timeout: 30_000 })).format.duration);
+    expect(duration).toBeLessThan(4);
     expect(hashFile(join(f.ctx.workDir, prepared.generated.result.ref))).toBe(hash(shorterVideoBytes));
     expect(prepared.copied.sha256).toBe(hashFile(prepared.clipPath));
-    expect(prepared.copied.sha256).not.toBe(hash(shorterVideoBytes));
+    expect(prepared.copied.sha256).toBe(hash(shorterVideoBytes));
+    expect(readFileSync(prepared.clipPath)).toEqual(shorterVideoBytes);
     expect(f.ctx.videoFiles.get(prepared.clipRef)).toEqual(prepared.generated.result.submissionReceipt);
     expect(f.ctx.videoArtifacts?.get(prepared.clipRef)).toMatchObject({ ref: prepared.clipRef, sha256: prepared.copied.sha256, bytes: prepared.copied.bytes });
+    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: prepared.generated.result.ref, targetRef: prepared.clipRef, normalizeToSeconds: 4 }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
+    expect(readFileSync(prepared.clipPath)).toEqual(shorterVideoBytes);
+    expect(readFileSync(join(f.ctx.workDir, prepared.generated.result.ref))).toEqual(shorterVideoBytes);
     const evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
     expect(evidence.checks.identity).toBe("passed");
     expect(evidence.clipSha256).toBe(prepared.copied.sha256);
@@ -465,14 +471,17 @@ describe("authorized parent duration normalization retains a separate provider s
     expect(evidence.visualReview!.request.frames.map(row => row.atSec)).toEqual(prepared.frames.map(row => row.atSec));
     expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
   });
-  it("normalizes a silent accepted product video without adding an audio stream", async () => {
+  it("copies a silent accepted product original byte-for-byte and refuses any duration normalization", async () => {
     const f = fixture(); providerOutput(f, silentVideoBytes);
     const { result } = await generate(f, "P1");
-    const copied = await handle(f.ctx, frame("media.fetch", "P1", { ref: result.ref, targetRef: "clips/P1.mp4", normalizeToSeconds: 4 })) as {
-      ref: string; sha256: string; normalization?: { factor: number; from: number; to: number };
+    const copied = await handle(f.ctx, frame("media.fetch", "P1", { ref: result.ref, targetRef: "clips/P1.mp4" })) as {
+      ref: string; sha256: string;
     };
-    expect(copied.normalization).toEqual({ factor: 1, from: 4, to: 4 });
-    expect(copied.sha256).not.toBe(hash(silentVideoBytes));
+    expect(copied).not.toHaveProperty("normalization");
+    expect(copied.sha256).toBe(hash(silentVideoBytes));
+    expect(readFileSync(join(f.ctx.workDir, copied.ref))).toEqual(silentVideoBytes);
+    await rejectedBeforeReserve(f, frame("media.fetch", "P1", { ref: result.ref, targetRef: copied.ref, normalizeToSeconds: 4 }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
+    expect(readFileSync(join(f.ctx.workDir, copied.ref))).toEqual(silentVideoBytes);
     const streams = JSON.parse(execFileSync(ffprobe, ["-v", "error", "-show_entries", "stream=codec_type", "-of", "json", join(f.ctx.workDir, copied.ref)], { encoding: "utf8" })).streams as Array<{ codec_type: string }>;
     expect(streams.filter(stream => stream.codec_type === "audio")).toHaveLength(0);
     expect(streams.filter(stream => stream.codec_type === "video")).toHaveLength(1);
@@ -482,24 +491,32 @@ describe("authorized parent duration normalization retains a separate provider s
     ["altered frozen duration", 6], ["string duration", "4"], ["zero duration", 0],
   ])("refuses %s before reservation", async (_label, normalizeToSeconds) => {
     const f = fixture(), { result } = await generate(f);
-    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: result.ref, targetRef: "clips/S1.mp4", normalizeToSeconds }), "MEDIA_NORMALIZATION_SCOPE_INVALID");
+    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: result.ref, targetRef: "clips/S1.mp4", normalizeToSeconds }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
+    expect(hashFile(join(f.ctx.workDir, result.ref))).toBe(hash(videoBytes));
+    expect(existsSync(join(f.ctx.workDir, "clips/S1.mp4"))).toBe(false);
   });
   it("refuses normalized output overwriting the retained provider source before reservation", async () => {
     const f = fixture(), { result } = await generate(f);
-    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: result.ref, targetRef: result.ref, normalizeToSeconds: 4 }), "MEDIA_PROVIDER_SOURCE_PROTECTED");
+    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: result.ref, targetRef: result.ref, normalizeToSeconds: 4 }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
     expect(hashFile(join(f.ctx.workDir, result.ref))).toBe(hash(videoBytes));
   });
   it("refuses normalizing another shot's accepted source before reservation", async () => {
     const f = fixture(), { result } = await generate(f);
-    await rejectedBeforeReserve(f, frame("media.fetch", "S2", { ref: result.ref, targetRef: "clips/S2.mp4", normalizeToSeconds: 4 }), "MEDIA_NORMALIZATION_SCOPE_INVALID");
+    await rejectedBeforeReserve(f, frame("media.fetch", "S2", { ref: result.ref, targetRef: "clips/S2.mp4", normalizeToSeconds: 4 }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
+    expect(hashFile(join(f.ctx.workDir, result.ref))).toBe(hash(videoBytes));
+    expect(existsSync(join(f.ctx.workDir, "clips/S2.mp4"))).toBe(false);
   });
   it("refuses normalizing a local file without an accepted provider source before reservation", async () => {
     const f = fixture(); writeFileSync(join(f.ctx.workDir, "clips/unaccepted.mp4"), videoBytes);
-    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: "clips/unaccepted.mp4", targetRef: "clips/S1.mp4", normalizeToSeconds: 4 }), "MEDIA_NORMALIZATION_SCOPE_INVALID");
+    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: "clips/unaccepted.mp4", targetRef: "clips/S1.mp4", normalizeToSeconds: 4 }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
+    expect(hashFile(join(f.ctx.workDir, "clips/unaccepted.mp4"))).toBe(hash(videoBytes));
+    expect(existsSync(join(f.ctx.workDir, "clips/S1.mp4"))).toBe(false);
   });
   it("refuses url normalization instead of trusting caller-declared time and clip identity", async () => {
     const f = fixture(); await generate(f);
-    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { url: outputUrl, targetRef: "clips/S1.mp4", normalizeToSeconds: 4 }), "MEDIA_NORMALIZATION_SCOPE_INVALID");
+    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { url: outputUrl, targetRef: "clips/S1.mp4", normalizeToSeconds: 4 }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
+    expect(hashFile(join(f.ctx.workDir, "clips/S1.provider.mp4"))).toBe(hash(videoBytes));
+    expect(existsSync(join(f.ctx.workDir, "clips/S1.mp4"))).toBe(false);
   });
   it.each(["ref", "url"])("rehashes stale accepted %s source before even reserving a copy component", async selector => {
     const f = fixture(), { result } = await generate(f);

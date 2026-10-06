@@ -2002,7 +2002,10 @@ async function mixVerified({
       "-i", input, "-i", normalized.path,
       "-map", "0:v:0", "-map", "1:a:0",
       "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-      "-movflags", "+faststart", "-shortest", output,
+      // Both inputs are finite. Let the complete retained master reach the AAC encoder;
+      // -shortest stops at a packet boundary and can discard the final native-audio samples.
+      // The copied video keeps its original clock; codec priming/padding stays separately observable.
+      "-movflags", "+faststart", output,
     ], { label: "ffmpeg(mux)", timeoutMs: 900_000 });
   } else {
     await fsp.copyFile(normalized.path, output);

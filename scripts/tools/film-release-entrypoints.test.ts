@@ -2,7 +2,7 @@
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
@@ -34,7 +34,7 @@ interface AstCompiler {
 }
 const ts = createRequire(join(REPO, "packages/video-studio/package.json"))("typescript") as AstCompiler;
 const parsed = ts.createSourceFile(CLI_FILE, cliSource, ts.ScriptTarget.Latest, true);
-const functionNames = new Set(["clipFor", "assertFactualReleaseSources"]);
+const functionNames = new Set(["originalForShot", "originalFactsForShot", "nativeAudioFactsForShot", "assertOriginalRenderMedia", "clipFor", "assertFactualReleaseSources"]);
 const declarations = parsed.statements.filter((statement) =>
   ts.isFunctionDeclaration(statement) && !!statement.name && functionNames.has(statement.name.text));
 if (declarations.length !== functionNames.size) throw new Error("ENTRYPOINT_FIXTURE_INVALID: official declarations missing");
@@ -57,7 +57,7 @@ interface FixtureRow {
   stage: string; shotId: string | null; ok: boolean; degraded: boolean;
   artifact: string | null; evidence: Record<string, unknown>; lineage: LineageReceipt;
 }
-interface FixtureShot extends FilmAudioShot { shotId: string; speechMode: "on-camera" | "voice-over"; dialogue: Array<{ speaker: string; text: string }> }
+interface FixtureShot extends FilmAudioShot { shotId: string; duration: number; speechMode: "on-camera" | "voice-over"; dialogue: Array<{ speaker: string; text: string }> }
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
 afterAll(() => { expect(sha(readFileSync(CLI_FILE)), "official source must stay stable during test").toBe(cliSourceSha256); });
@@ -70,9 +70,16 @@ function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
   writeFileSync(voiced, "fixture independently dubbed source bytes");
   writeFileSync(master, "fixture composed master bytes");
   const projectId = "VID-ENTRYPOINT-FIXTURE", sourceHash = sha("frozen fixture source");
-  const shot: FixtureShot = { shotId: "GT-01", speechMode: mode, dialogue: [{ speaker: "CEO", text: "入住不必等待。" }] };
+  const shot: FixtureShot = { shotId: "GT-01", duration: 5, speechMode: mode, dialogue: [{ speaker: "CEO", text: "入住不必等待。" }] };
   const dialogue = shot.dialogue.map((row) => row.text).join(" ");
   const contract = resolveFilmAudioContract(shot);
+  const manifestFile = join(dir, "mock-original-render-manifest.json");
+  writeFileSync(manifestFile, "mock canonical original manifest bytes, not provider authority");
+  const manifestSha256 = fingerprintFile(manifestFile);
+  const originalPostContract = { fps: 24, width: 1080, height: 1920, manifestFile, manifestSha256,
+    originals: [{ shotId: shot.shotId, path: raw, sha256: fingerprintFile(raw), bytes: statSync(raw).size,
+      media: { fps: 24, width: 1080, height: 1920, videoFrames: 120, videoDurationSec: 5,
+        audioSampleRate: 48000, audioChannels: 2, audioDurationSec: 5 } }] };
   const rows: FixtureRow[] = [];
   const recipe = (stage: string) => ({ component: cliSourceSha256, stage });
   const make = (stage: string, inputs: string[], outputs: string[], evidence: Record<string, unknown>, shotId: string | null = null, ok = true): FixtureRow => ({
@@ -81,7 +88,9 @@ function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
       recipe: recipe(stage), status: ok ? "passed" : "failed", inputs, outputs }),
   });
   rows.push(make("voice", [raw], [raw], { projectId, source: "clip-audio", rawSha256: fingerprintFile(raw),
-    textSha256: fingerprintText(dialogue), audioPolicyHash: contract.policyHash }, shot.shotId));
+    textSha256: fingerprintText(dialogue), audioPolicyHash: contract.policyHash,
+    verification: "native-audio-source-verified", originalManifestSha256: manifestSha256,
+    spokenTextVerified: false, lipSyncVerified: false }, shot.shotId));
   rows.push(make("compose", [raw], [master], {}));
   rows.push(make("shot", [], [raw], { rawSha256: fingerprintFile(raw), requestInputVerified: true }, shot.shotId));
   const stageApproved = (stage: string, shotIds: Array<string | null> = [null]) => stageLineageApproved({ records: rows,
@@ -95,7 +104,11 @@ function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
     SUBTITLE_MODE: "sidecar",
     publicationNeedsCover: false, publicationCoverReceipt: null, shots: [shot],
     isMaterialShot: (_shot: FixtureShot) => false,
-    join, existsSync, writeFileSync, sha256FileSync: fingerprintFile,
+    join, existsSync, statSync, writeFileSync, sha256FileSync: fingerprintFile,
+    FPS: 24, SOURCE_SIZE: { width: 1080, height: 1920 }, originalPostContract,
+    // Real bytes bind provenance; the media facts are explicitly a deterministic probe fixture.
+    probe: (_file: string) => ({ fps: 24, width: 1080, height: 1920, videoFrames: 120, videoDurationSec: 5,
+      hasAudio: true, audioSampleRate: 48000, audioChannels: 2, audioDurationSec: 5 }),
     dialogueText: (_shot: FixtureShot) => dialogue, voicedFile: (_id: string) => voiced, readStageHistory: () => rows,
     lineageRecords: (history: FixtureRow[], _stage: string) => history,
     latestLineageRecord, stageApproved,
@@ -147,12 +160,12 @@ describe("actual film release entrypoints with real local byte and lineage recei
   it("a current raw voiceover source also permits release", () => {
     const f = fixture("voice-over"); expect(failure(f.guard)).toBe("allowed");
   });
-  it("verified TTS voiceover permits release only when that voiced artifact actually entered compose", () => {
+  it("a historical successful TTS voiceover cannot publish even when it entered the old compose", () => {
     const f = fixture("voice-over");
     f.rows[0] = f.make("voice", [f.raw], [f.voiced], { ...row(f, "voice").evidence, source: "tts-narration",
       profile: "fixture-profile", voicedSha256: fingerprintFile(f.voiced) }, f.shot.shotId);
     f.rows[f.rows.findIndex((entry) => entry.stage === "compose")] = f.make("compose", [f.voiced], [f.master], {});
-    expect(failure(f.guard)).toBe("allowed");
+    expect(failure(f.guard)).toMatch(/AUDIO_NATIVE_SOURCE_REPLACED/);
   });
   it("an old master with no current compose receipt cannot publish", () => {
     const f = fixture(); f.rows.splice(f.rows.findIndex((entry) => entry.stage === "compose"), 1);
@@ -169,12 +182,12 @@ describe("actual film release entrypoints with real local byte and lineage recei
   });
   it("the latest failed voiceover receipt blocks publication even with older voice and compose passes", () => {
     const f = fixture("voice-over");
-    f.rows.push(f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence, source: "clip-audio-unverified" }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/PUBLICATION_VOICE_UNVERIFIED/);
+    f.rows.push(f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence }, f.shot.shotId, false));
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
   });
   it("a changed voiceover policy cannot reuse an old positive content receipt", () => {
     const f = fixture("voice-over"); row(f, "voice").evidence.audioPolicyHash = sha("another policy");
-    expect(failure(f.guard)).toMatch(/PUBLICATION_VOICE_UNVERIFIED/);
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
   });
   it("a successful old TTS receipt cannot become a native composition source", () => {
     const f = fixture(); row(f, "voice").evidence.source = "tts-narration";
@@ -182,7 +195,7 @@ describe("actual film release entrypoints with real local byte and lineage recei
   });
   it("the newest failed native receipt overrides the old voice pass", () => {
     const f = fixture(); f.rows.push(f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/NATIVE_DIALOGUE_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
   });
   it("voice and compose passes cannot publish a clip that lacks current shot proof", () => {
     const f = fixture(); f.rows.splice(f.rows.findIndex((entry) => entry.stage === "shot"), 1);
@@ -196,7 +209,33 @@ describe("actual film release entrypoints with real local byte and lineage recei
     const f = fixture(); writeFileSync(f.raw, "fixture changed raw generation bytes");
     f.rows[0] = f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence, rawSha256: fingerprintFile(f.raw) }, f.shot.shotId);
     f.rows[f.rows.findIndex((entry) => entry.stage === "compose")] = f.make("compose", [f.raw], [f.master], {});
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_CHANGED/);
+  });
+  it("changed issued original manifest blocks publication after otherwise current receipts", () => {
+    const f = fixture(); writeFileSync(f.context.originalPostContract.manifestFile, "mock changed original manifest bytes");
+    expect(failure(f.guard)).toMatch(/PUBLICATION_ORIGINAL_MANIFEST_CHANGED/);
+  });
+  it("a current voice and compose pass cannot release a shot absent from issued originals", () => {
+    const f = fixture(); f.context.originalPostContract.originals.length = 0;
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_CHANGED/);
+  });
+  it("missing actual native audio cannot be washed by source/audio receipts", () => {
+    const f = fixture(), originalProbe = f.context.probe;
+    f.context.probe = file => ({ ...originalProbe(file), hasAudio: false });
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID/);
+  });
+  it("a shorter real picture clock cannot reuse the full original metadata or compose receipt", () => {
+    const f = fixture(), originalProbe = f.context.probe;
+    f.context.probe = file => ({ ...originalProbe(file), videoDurationSec: 4.99 });
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID/);
+  });
+  it("a changed original frame rate cannot reuse the native policy receipts", () => {
+    const f = fixture(); f.context.originalPostContract.originals[0]!.media.fps = 25;
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_BINDING_INVALID/);
+  });
+  it.each(["spokenTextVerified", "lipSyncVerified"])("a native source check cannot certify %s", (key) => {
+    const f = fixture(); row(f, "voice").evidence[key] = true;
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
   });
   it("raw SHA metadata must bind the actual current file even if other lineage remains green", () => {
     const f = fixture(); row(f, "shot").evidence.rawSha256 = sha("another generation artifact");

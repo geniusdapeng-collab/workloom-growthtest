@@ -391,6 +391,105 @@ describe("real CNB fast-forward and local merges preserve canonical merged-tree 
   });
 });
 
+describe("CNB generated merge titles bind the exact real Git object", () => {
+  function canonical(f, { parents = [f.target, f.source], subject = `Merged ${f.source} into ${f.target}` } = {}) {
+    const head = mergeProof(f, { parents, message: subject });
+    f.git("checkout", "--detach", head);
+    return head;
+  }
+  function rejected(f) {
+    const result = run(f, { pr: false });
+    assert.notEqual(result.status, 0, result.output);
+    return result;
+  }
+  it("accepts the observed full-SHA title only when the two actual parents match in order", () => {
+    const f = fixture({ legacyTarget: false });
+    const head = canonical(f);
+    const result = run(f, { pr: false, env: { CNB_BEFORE_SHA: f.target } });
+    pass(result);
+    assert.ok(result.output.includes(head.slice(0, 12)));
+    assert.match(result.output, /豁免/);
+    assert.ok(result.output.includes(f.source.slice(0, 12)), "introduced source commits remain checked");
+  });
+  it("does not exempt a newly introduced invalid source commit behind the canonical merge", () => {
+    const f = fixture({ legacyTarget: false, sourceSubject: invalid });
+    canonical(f);
+    const result = run(f, { pr: false, env: { CNB_BEFORE_SHA: f.target } });
+    refuse(result, "任务号");
+    assert.ok(result.output.includes(f.source.slice(0, 12)));
+  });
+  it("rejects an ordinary single-parent commit with the full canonical-looking title", () => {
+    const f = fixture({ legacyTarget: false });
+    canonical(f, { parents: [f.target] });
+    rejected(f);
+  });
+  it("rejects a root commit with a canonical-looking title and no parents", () => {
+    const f = fixture({ legacyTarget: false });
+    canonical(f, { parents: [] });
+    rejected(f);
+  });
+  it("rejects reversed actual parent order", () => {
+    const f = fixture({ legacyTarget: false });
+    canonical(f, { parents: [f.source, f.target] });
+    rejected(f);
+  });
+  it("rejects full source SHA text that names a different existing commit", () => {
+    const f = fixture({ legacyTarget: false });
+    canonical(f, { subject: `Merged ${f.base} into ${f.target}` });
+    rejected(f);
+  });
+  it("rejects full target SHA text that names a different existing commit", () => {
+    const f = fixture({ legacyTarget: false });
+    canonical(f, { subject: `Merged ${f.source} into ${f.base}` });
+    rejected(f);
+  });
+  it("rejects an octopus merge even when the two named parents are present", () => {
+    const f = fixture({ legacyTarget: false });
+    canonical(f, { parents: [f.target, f.source, f.base] });
+    rejected(f);
+  });
+  for (const [label, change] of [
+    ["abbreviated SHAs", (s, t) => `Merged ${s.slice(0, 12)} into ${t.slice(0, 12)}`],
+    ["zero SHA", (_s, t) => `Merged ${"0".repeat(40)} into ${t}`],
+    ["extra words", (s, t) => `Merged ${s} into ${t} unchecked`],
+    ["trailing space", (s, t) => `Merged ${s} into ${t} `],
+    ["trailing tab", (s, t) => `Merged ${s} into ${t}\t`],
+    ["leading space", (s, t) => ` Merged ${s} into ${t}`],
+  ]) it("rejects a non-exact raw title: " + label, () => {
+    const f = fixture({ legacyTarget: false });
+    canonical(f, { subject: change(f.source, f.target) });
+    rejected(f);
+  });
+  for (const label of ["duplicate parents", "unavailable parent", "noncommit parent"]) {
+    it("rejects raw object header evidence with " + label, () => {
+      const f = fixture({ legacyTarget: false });
+      const source = label === "duplicate parents" ? f.target
+        : label === "unavailable parent" ? "a".repeat(40)
+        : f.git("rev-parse", f.source + "^{tree}");
+      const tree = f.git("rev-parse", f.merge + "^{tree}");
+      const raw = `tree ${tree}\nparent ${f.target}\nparent ${source}\n`
+        + "author Fixture <fixture@example.invalid> 1791194400 +0800\n"
+        + "committer Fixture <fixture@example.invalid> 1791194400 +0800\n\n"
+        + `Merged ${source} into ${f.target}\n`;
+      const path = join(f.root, "raw-merge-object.txt");
+      writeFileSync(path, raw);
+      const head = f.git("hash-object", "-w", "-t", "commit", path);
+      assert.equal(f.git("cat-file", "-t", head), "commit");
+      const result = run(f, { pr: false, args: ["--range", head] });
+      assert.notEqual(result.status, 0, result.output);
+    });
+  }
+  it("does not let git replace forge the original object's parent evidence", () => {
+    const f = fixture({ legacyTarget: false });
+    const subject = `Merged ${f.source} into ${f.target}`;
+    const actual = canonical(f, { parents: [f.target], subject });
+    const replacement = mergeProof(f, { parents: [f.target, f.source], message: subject });
+    f.git("replace", actual, replacement);
+    assert.equal(f.git("show", "-s", "--format=%P", actual), `${f.target} ${f.source}`);
+    rejected(f);
+  });
+});
+
 describe("push and manual checks preserve strict new-commit rules without history fallbacks", () => {
   it("checks all introduced commits in the actual before..HEAD push range", () => {
     const f = fixture({ sourceSubject: invalid, legacyTarget: false });

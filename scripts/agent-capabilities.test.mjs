@@ -387,21 +387,25 @@ test("video plan rejects clarify, explainer, invalid-schema and anchorless marke
   assert.equal(productionPlan({projectId: "VID-TEST"}).checklist.find(check => check.id === "route").ok, false);
 });
 
-test("video plan checks audio contract conflicts and only reports local ASR configuration", (t) => {
+test("video plan protects all original audio and has no ASR or dubbing configuration prerequisite", (t) => {
   const { put, shots } = videoFixture(t);
   const blocked = productionPlan({projectId: "VID-TEST", unifiedNarration: true});
   assert.equal(blocked.ready, false); assert.equal(blocked.checklist.find(check => check.id === "audio-contract").ok, false);
   for (const [kind, url] of [["mock", "http://127.0.0.1:8099"], ["openai", "https://external.example"], ["mlx", "http://secret:token@127.0.0.1:8099"]]) {
     process.env.WORKLOOM_VOICE_ENGINE = kind; process.env.WORKLOOM_VOICE_ENGINE_URL = url;
     const output = productionPlan({projectId: "VID-TEST"});
-    assert.equal(output.ready, false); assert.equal(output.checklist.find(check => check.id === "local-asr").ok, false);
+    assert.equal(output.ready, true);
+    assert.equal(output.audioSourcePolicy, "render-native");
+    assert.ok(output.audioContracts.every(contract => contract.sourcePolicy === "render-native"));
+    assert.equal(output.checklist.some(check => check.id === "local-asr"), false);
     assert.ok(!JSON.stringify(output).includes("secret:token"));
   }
   process.env.WORKLOOM_VOICE_ENGINE = "mlx"; process.env.WORKLOOM_VOICE_ENGINE_URL = "http://127.0.0.1:8099";
   shots.shots[0] = {...shots.shots[0], speechMode: "voice-over", action: "不开口说话", audio: "画外音"};
   put("work/film/shotlist.json", shots); const output = productionPlan({projectId: "VID-TEST", unifiedNarration: true});
-  assert.equal(output.checklist.find(check => check.id === "audio-contract").ok, true);
-  assert.equal(output.localAsr.runtimeVerified, false); assert.equal(output.argv.includes("--narration-unified"), true);
+  assert.equal(output.checklist.find(check => check.id === "audio-contract").ok, false);
+  assert.equal(output.ready, false); assert.deepEqual(output.argv, []);
+  assert.equal(output.recommendedCommand, null);
 });
 
 test("video plan rejects disabled native audio and unsafe paths before any runtime call", (t) => {

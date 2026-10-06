@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 
-/** Native generated dialogue belongs to the visible performance that produced it. */
-export const FILM_AUDIO_POLICY_VERSION = 'workloom.film-audio-policy/v1';
+/** Every rendered shot keeps its own provider audio, including offscreen speech and ambience. */
+export const FILM_AUDIO_POLICY_VERSION = 'workloom.film-audio-policy/v2';
 
 export class FilmAudioPolicyError extends Error {
   constructor(code, message, shotId = null) {
@@ -37,7 +37,7 @@ function dialogueRows(value, shotId) {
 
 function payload(contract) {
   return {
-    schemaVersion: contract.schemaVersion, shotId: contract.shotId, mode: contract.mode,
+    schemaVersion: contract.schemaVersion, shotId: contract.shotId, mode: contract.mode, sourcePolicy: contract.sourcePolicy,
     text: contract.text, semantics: contract.semantics,
   };
 }
@@ -45,13 +45,14 @@ function payload(contract) {
 function validateContract(contract) {
   if (!object(contract) || contract.schemaVersion !== FILM_AUDIO_POLICY_VERSION
     || !text(contract.shotId) || !['native-dialogue', 'voiceover', 'none'].includes(contract.mode)
+    || contract.sourcePolicy !== 'render-native'
     || typeof contract.text !== 'string' || !object(contract.semantics)
     || contract.policyHash !== hash(payload(contract))) {
     throw new FilmAudioPolicyError('AUDIO_CONTRACT_INVALID', '音频合同缺失、被修改或不属于当前策略版本');
   }
 }
 
-/** Reuse the existing shot speechMode; ambiguous dialogue is protected as native. */
+/** Keep authored speech semantics; they never authorize replacing rendered audio. */
 export function resolveFilmAudioContract(shot) {
   if (!object(shot) || !text(shot.shotId)) {
     throw new FilmAudioPolicyError('AUDIO_SHOT_INVALID', '镜头须是含非空 shotId 的对象');
@@ -85,17 +86,17 @@ export function resolveFilmAudioContract(shot) {
     : shot.speechMode === 'on-camera' || visibleSpeech ? 'native-dialogue'
     : shot.speechMode === 'voice-over' || narration || noSpeaking ? 'voiceover' : 'native-dialogue';
   const reason = mode === 'none' ? '本镜没有台词'
-    : mode === 'voiceover' ? '已声明画外音或不开口，可后配旁白'
+    : mode === 'voiceover' ? '已声明画外音或不开口，保留该镜渲染时的同源音轨'
     : shot.speechMode === 'on-camera' || visibleSpeech ? '出镜讲话须保留原生声画'
     : '有台词但未能证实为画外音，按原生对白保护';
   const contract = {
-    schemaVersion: FILM_AUDIO_POLICY_VERSION, shotId, mode, text: dialogue, reason,
+    schemaVersion: FILM_AUDIO_POLICY_VERSION, shotId, mode, sourcePolicy: 'render-native', text: dialogue, reason,
     semantics: { speechMode: shot.speechMode ?? null, action, audio, rows },
   };
   return { ...contract, policyHash: hash(payload(contract)) };
 }
 
-/** Run before paid rendering. No caller-supplied verified=true flag permits a lip-sync replacement. */
+/** Run before paid rendering. All shots require original audio; no verified=true flag permits a replacement. */
 export function assertFilmAudioPreflight({ shots, unifiedNarration, generateAudio } = {}) {
   const unified = bool(unifiedNarration, 'unifiedNarration');
   const generate = bool(generateAudio, 'generateAudio', true);
@@ -105,20 +106,19 @@ export function assertFilmAudioPreflight({ shots, unifiedNarration, generateAudi
   for (const contract of contracts) {
     if (ids.has(contract.shotId)) throw new FilmAudioPolicyError('AUDIO_DUPLICATE_SHOT_ID', '音频合同镜头 ID 重复', contract.shotId);
     ids.add(contract.shotId);
-    if (contract.mode !== 'native-dialogue') continue;
-    if (unified) throw new FilmAudioPolicyError('AUDIO_UNIFIED_NATIVE_DIALOGUE_REJECTED', '--narration-unified 会替换出镜对白；当前没有可信口型重建回执，须保留原生音轨', contract.shotId);
-    if (!generate) throw new FilmAudioPolicyError('AUDIO_NATIVE_GENERATION_REQUIRED', '出镜讲话生成必须开启原生音频', contract.shotId);
+    if (unified) throw new FilmAudioPolicyError('AUDIO_UNIFIED_NATIVE_DIALOGUE_REJECTED', '--narration-unified 会替换镜头原声；后期必须保留每镜同源原始音轨', contract.shotId);
+    if (!generate) throw new FilmAudioPolicyError('AUDIO_NATIVE_GENERATION_REQUIRED', '每个渲染镜头都必须开启原生音频，包括画外音和环境声', contract.shotId);
   }
   return contracts;
 }
 
-/** A measured missing/wrong native line blocks the film; TTS is allowed only for narration. */
+/** A measured missing/wrong line blocks the film; postproduction never synthesizes a replacement. */
 export function decideFilmVoiceAction({ contract, rawSpeech, unifiedNarration } = {}) {
   validateContract(contract);
   const unified = bool(unifiedNarration, 'unifiedNarration');
   const decision = (action, code, reason) => ({ action, code, reason, policyHash: contract.policyHash });
   if (contract.mode === 'none') return decision('none', 'AUDIO_NO_DIALOGUE', '本镜没有台词，语音核验不适用');
-  if (contract.mode === 'native-dialogue' && unified) {
+  if (unified) {
     return decision('blocked', 'AUDIO_UNIFIED_NATIVE_DIALOGUE_REJECTED', '统一重配不能替换出镜对白');
   }
   const measured = object(rawSpeech) && ['passed', 'failed', 'unverified'].includes(rawSpeech.status)
@@ -127,29 +127,18 @@ export function decideFilmVoiceAction({ contract, rawSpeech, unifiedNarration } 
     && (rawSpeech.status !== 'failed' || !rawSpeech.ok)
     && (rawSpeech.status !== 'unverified' || !rawSpeech.ok);
   if (!measured || rawSpeech.status === 'unverified') {
-    return decision('blocked', contract.mode === 'native-dialogue' ? 'AUDIO_NATIVE_UNVERIFIED' : 'AUDIO_VOICEOVER_UNVERIFIED', '语音或术语未核实，不得用 TTS 遮掩未知结果');
+    return decision('blocked', 'AUDIO_NATIVE_UNVERIFIED', '语音或术语未核实，不得用 TTS 遮掩未知结果');
   }
-  if (contract.mode === 'native-dialogue') {
-    return rawSpeech.ok
-      ? decision('preserve-native', 'AUDIO_NATIVE_PRESERVED', '原生台词通过核验，保留与口型同源的音轨')
-      : decision('blocked', 'AUDIO_NATIVE_DIALOGUE_FAILED', '出镜原生对白缺失、台词或术语不符；停线修复源镜头');
-  }
-  return rawSpeech.ok && !unified
-    ? decision('preserve-native', 'AUDIO_VOICEOVER_PRESERVED', '既有人声可用，无需重配')
-    : decision('dub-voiceover', 'AUDIO_VOICEOVER_DUB_ALLOWED', unified ? '显式统一画外音音色' : '已测得画外音台词不可用，可后配旁白');
+  return rawSpeech.ok
+    ? decision('preserve-native', 'AUDIO_NATIVE_PRESERVED', '原生台词通过核验，保留同源音轨')
+    : decision('blocked', 'AUDIO_NATIVE_DIALOGUE_FAILED', '镜头原生对白缺失、台词或术语不符；停线修复源镜头');
 }
 
 /** Apply again when selecting old voice artifacts for composition and final delivery. */
 export function assertFilmAudioSource({ contract, source } = {}) {
   validateContract(contract);
-  if (contract.mode === 'native-dialogue' && source !== 'clip-audio') {
-    throw new FilmAudioPolicyError('AUDIO_NATIVE_SOURCE_REPLACED', '出镜对白只能采用核验后的原片；旧 TTS/重配回执不可复用', contract.shotId);
-  }
-  if (contract.mode === 'none' && source != null) {
-    throw new FilmAudioPolicyError('AUDIO_UNEXPECTED_NARRATION', '无台词镜头不能复用旁白回执', contract.shotId);
-  }
-  if (contract.mode === 'voiceover' && !['clip-audio', 'tts-narration', 'tts-term-replaced', 'voiced-reuse'].includes(source)) {
-    throw new FilmAudioPolicyError('AUDIO_VOICEOVER_SOURCE_UNVERIFIED', '画外音回执来源缺失或未核实', contract.shotId);
+  if (source !== 'clip-audio') {
+    throw new FilmAudioPolicyError('AUDIO_NATIVE_SOURCE_REPLACED', '每个镜头只能采用同源原始音轨；旧 TTS、重配和配音复用回执均不可进入后期', contract.shotId);
   }
   return true;
 }

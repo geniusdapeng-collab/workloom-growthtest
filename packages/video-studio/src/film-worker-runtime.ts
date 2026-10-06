@@ -149,8 +149,6 @@ export class FullChainFilmWorker {
   readonly inputPath: string;
   private readonly artifacts = new Map<string, WorkerArtifact>();
   private readonly artifactStages = new Map<string, { stage: string; shotId: string }>();
-  /** Each local video descendant retains the current parent-issued provider source. */
-  private readonly providerVideoArtifacts = new Map<string, WorkerArtifact>();
   constructor(readonly context: FilmWorkerJobContext, readonly repoRoot: string, transport: FilmChannelTransport = processIpcTransport()) {
     if (Date.parse(context.deadlineAt) <= Date.now()) throw new FilmChannelError("JOB_DEADLINE_EXCEEDED", "作业已过截止时间");
     const archive = realpathSync(context.archiveRoot);
@@ -281,7 +279,6 @@ export class FullChainFilmWorker {
     });
     this.accept(artifact);
     this.artifactStages.set(artifact.ref, { stage: options.stage, shotId: options.shotId });
-    this.providerVideoArtifacts.set(artifact.ref, artifact);
     return { taskId: artifact.taskId, url: `film-artifact:${artifact.ref}`, lastFrame: null, resumed: false, requestInputVerified: true, submissionReceipt };
   }
   async download(url: string, target: string): Promise<string> {
@@ -295,39 +292,12 @@ export class FullChainFilmWorker {
       if (copied.ref !== this.ref(target) || copied.sha256 !== artifact.sha256 || copied.bytes !== artifact.bytes) throw new FilmChannelError("ARTIFACT_CHANGED", "复制产物没有保留父服务签发的原始字节");
       this.accept(copied);
       if (origin) this.artifactStages.set(copied.ref, origin);
-      const provider = this.providerVideoArtifacts.get(artifact.ref);
-      if (provider) this.providerVideoArtifacts.set(copied.ref, provider);
     }
     return target;
   }
-  async normalizeVideo(target: string, targetSec: number, stage: string, shotId: string): Promise<{ factor: number; from: number; to: number }> {
-    if (!Number.isFinite(targetSec) || targetSec <= 0) throw new FilmChannelError("VIDEO_NORMALIZATION_INVALID", "时长归一化目标须是有限正数");
-    this.frozenSource();
-    const ref = this.ref(target);
-    const artifact = this.artifacts.get(`film-artifact:${ref}`);
-    const origin = this.artifactStages.get(ref);
-    const provider = this.providerVideoArtifacts.get(ref);
-    if (!artifact || !origin || !provider || origin.stage !== stage || origin.shotId !== shotId || ref === provider.ref) {
-      throw new FilmChannelError("VIDEO_NORMALIZATION_SOURCE_INVALID", "时长归一化只允许当前镜头已登记的供应商原档副本");
-    }
-    this.accept(artifact, false); this.accept(provider, false);
-    const result = await this.call("media.fetch", stage, shotId, { ref, targetRef: ref, normalizeToSeconds: targetSec }) as WorkerArtifact & {
-      normalization: { factor: number; from: number; to: number };
-    };
-    this.frozenSource(); this.accept(provider, false);
-    const normalization = result?.normalization;
-    if (!normalization || typeof normalization !== "object" || Array.isArray(normalization)
-      || ![normalization.factor, normalization.from, normalization.to].every((value) => typeof value === "number" && Number.isFinite(value) && value > 0)
-      || Math.abs(normalization.to - targetSec) > 0.1 + 1e-9
-      || Math.abs(normalization.factor - targetSec / normalization.from) > 1e-3
-      || result.ref !== ref) {
-      throw new FilmChannelError("VIDEO_NORMALIZATION_INVALID", "父服务时长归一化回执未绑定目标、有限倍率和实际回读时长");
-    }
-    const normalized = this.accept(result, false);
-    this.accept(normalized);
-    this.artifactStages.set(normalized.ref, origin);
-    this.providerVideoArtifacts.set(normalized.ref, provider);
-    return { factor: normalization.factor, from: normalization.from, to: normalization.to };
+  /** Compatibility entry point: standard production preserves original native clocks and bytes. */
+  async normalizeVideo(_target: string, _targetSec: number, _stage: string, _shotId: string): Promise<{ factor: number; from: number; to: number }> {
+    throw new FilmChannelError("STANDARD_NATIVE_RETIME_FORBIDDEN", "标准制作必须保留原始渲染时长，不接受变速或时长归一化");
   }
   get identityVisionAvailable(): boolean { return this.context.characterVisionAvailable === true; }
   async identityReview(request: CharacterIdentityReviewRequest): Promise<CharacterIdentityEvidence> {

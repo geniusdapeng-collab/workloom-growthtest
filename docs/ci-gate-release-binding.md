@@ -29,6 +29,8 @@ P0 行为是完整身份/范围/路径采集、明确模块互斥、首检观察
 
 PR 使用实际提交 checker 的 source/target/checkout/canonical 双亲及 tree 契约，差异取 `target...source`。本地/显式范围和 push 使用真实 Git 对象；`--name-status -z` 保留 A/M/D/T、rename/copy 的旧新路径及路径中的换行、制表、Unicode 和首尾空格。合法空 diff 不回退另一基线，浅历史或未知显式基线直接失败。
 
+真实 main push 曾因 CNB canonical 对象的 `Merged <source 完整 SHA> into <target 完整 SHA>` 标题被旧 checker 拒绝。现在仅对原始 Git 对象的首行与这条精确标题一致、原始父提交恰为 `[target, source]`、两父均非零且不同、可读且为 commit 的对象豁免。读取原始对象显式禁用 `git replace`，不使用解析后的空白清理结果代替原文。普通单亲、零/短 SHA、错序、多亲、缺失/非 commit 父对象、额外文字或首尾空白均拒绝；新增 source 提交继续逐条按原提交规范检查。没有增加通用 `Merged` 前缀豁免、过渡期例外或流水线跳过项，原规范规则文件不变。
+
 API 的 open PR 列表逐页读到末页，详情在文件采集前后重读，再完整重扫列表。重复 IID、集合变化、PR 移动/关闭、页数超限、超时或错误响应都失败。PR 文件接口是不分页数组；完整路径取固定 base/head compare 的 `path` 和 rename/copy 的 `previous_filename`。PullFiles 交叉核对数量、状态及文件名；基名不冒充路径。存在 path/raw/blob URL 时还须相互一致，URL 绑定 CNB 来源、实际仓库和完整 source SHA。fork 先在实际 source 仓库取得同 SHA commit，权限不足或对象缺失不能回退目标仓猜测。
 
 官方 Swagger 的 compare 状态为 `added/modified/deleted/renamed/copied`；实际 CNB 留存响应中也出现 `add/modify`。实现仅将已知 `add/modify/delete/rename/copy` 五种服务短写归一化为对应长写，路径、旧路径、完整 SHA、数量和未知状态拒绝仍按同一契约执行。真实响应的 94 项文件差异和合成 rename/copy 负例均纳入回归。
@@ -80,6 +82,6 @@ node scripts/ci/cnb-desktop-release.mjs preflight --receipt desktop-preflight-de
 node scripts/ci/cnb-desktop-release.mjs publish --preflight-receipt desktop-preflight-desktop-publisher.json
 ```
 
-`.cnb.yml` 同时保留原有 static/db/test 三门禁、签名、公证、resolve 摘要和唯一 publisher 锁，明确运行新 lock 测试、既有 release 测试，以及 test-gate 中 `local-cover-render` 的真实 FFmpeg/字体用例和 `film-existing-render-edit` Node 用例。验证不得调用新图像、视频、语音或模型任务。
+`.cnb.yml` 同时保留原有 static/db/test 三门禁、签名、公证、resolve 摘要和唯一 publisher 锁，明确运行 lock 测试、release 测试，以及 test-gate 中 `local-cover-render` 的真实 FFmpeg/字体用例。原 `film-existing-render-edit.test.ts` CI 路径只 import 完整 `film-standard-post.test.ts` 标准后期套件；两条调用收集相同用例，不保留旧自由实现，也不修改流水线。标准后期验证必须沿用原提交的全部完整原片及同源原声。验证不得调用新图像、视频、语音或模型任务。
 
 依据为 [CNB 默认环境变量](https://docs.cnb.cool/zh/build/build-in-env.html)、[CNB OpenAPI](https://docs.cnb.cool/zh/develops/openapi.html) 与 [官方 Swagger](https://api.cnb.cool/swagger.json)，配合本仓完整源码和实际 Git/HTTP 回归。接口数组/字段与 PR 状态来源分别绑定，不将 PR 状态 envelope 冒充提交状态数组。

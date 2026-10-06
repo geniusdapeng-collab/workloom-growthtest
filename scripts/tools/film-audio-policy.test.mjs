@@ -19,10 +19,13 @@ test('camera dialogue and declared B-roll narration use distinct contracts', () 
   assert.equal(resolveFilmAudioContract(shot()).mode, 'native-dialogue');
   assert.equal(resolveFilmAudioContract(shot('voice-over', { action: '她背对镜头行走，不开口说话。' })).mode, 'voiceover');
   assert.equal(resolveFilmAudioContract({ shotId: 'EMPTY', action: '空镜' }).mode, 'none');
-  assert.equal(FILM_AUDIO_POLICY_VERSION, 'workloom.film-audio-policy/v1');
+  assert.equal(FILM_AUDIO_POLICY_VERSION, 'workloom.film-audio-policy/v2');
+  assert.equal(resolveFilmAudioContract(shot()).sourcePolicy, 'render-native');
+  assert.equal(resolveFilmAudioContract(shot('voice-over')).sourcePolicy, 'render-native');
+  assert.equal(resolveFilmAudioContract({ shotId: 'EMPTY' }).sourcePolicy, 'render-native');
 });
 
-test('undeclared audible speech defaults to native; only explicit narration cues allow dubbing', () => {
+test('undeclared speech defaults to visible dialogue; narration cues describe offscreen semantics only', () => {
   assert.equal(resolveFilmAudioContract(undeclared()).mode, 'native-dialogue');
   assert.equal(resolveFilmAudioContract(undeclared({ audio: '画外音讲述功能。' })).mode, 'voiceover');
   assert.equal(resolveFilmAudioContract(undeclared({ dialogue: [{ speaker: '旁白', text: '旅途从这里开始。' }] })).mode, 'voiceover');
@@ -48,7 +51,8 @@ test('unified narration with a visible speaker is rejected by render preflight',
   assert.throws(() => assertFilmAudioPreflight({ shots: [shot()], unifiedNarration: true, generateAudio: true }), error => error.code === 'AUDIO_UNIFIED_NATIVE_DIALOGUE_REJECTED');
   assert.throws(() => assertFilmAudioPreflight({ shots: [shot()], unifiedNarration: true, generateAudio: true, replacement: { verified: true } }), error => error.code === 'AUDIO_UNIFIED_NATIVE_DIALOGUE_REJECTED');
   assert.throws(() => assertFilmAudioPreflight({ shots: [shot()], unifiedNarration: false, generateAudio: false }), error => error.code === 'AUDIO_NATIVE_GENERATION_REQUIRED');
-  assert.equal(assertFilmAudioPreflight({ shots: [shot('voice-over')], unifiedNarration: true, generateAudio: false }).length, 1);
+  assert.throws(() => assertFilmAudioPreflight({ shots: [shot('voice-over')], unifiedNarration: true, generateAudio: true }), FilmAudioPolicyError);
+  assert.throws(() => assertFilmAudioPreflight({ shots: [shot('voice-over')], unifiedNarration: false, generateAudio: false }), FilmAudioPolicyError);
   assert.equal(assertFilmAudioPreflight({ shots: [shot()], unifiedNarration: false }).length, 1);
 });
 
@@ -71,11 +75,11 @@ test('native dialogue must survive ASR and term checks without a TTS fallback', 
   assert.equal(decideFilmVoiceAction({ contract, rawSpeech: speech(), unifiedNarration: true }).action, 'blocked');
 });
 
-test('voice-over may be dubbed after a measured failure or an explicit unified request', () => {
+test('voice-over preserves rendered audio and a measured failure cannot authorize dubbing', () => {
   const contract = resolveFilmAudioContract(shot('voice-over'));
   assert.equal(decideFilmVoiceAction({ contract, rawSpeech: speech(), unifiedNarration: false }).action, 'preserve-native');
-  assert.equal(decideFilmVoiceAction({ contract, rawSpeech: speech('failed'), unifiedNarration: false }).action, 'dub-voiceover');
-  assert.equal(decideFilmVoiceAction({ contract, rawSpeech: speech(), unifiedNarration: true }).action, 'dub-voiceover');
+  assert.equal(decideFilmVoiceAction({ contract, rawSpeech: speech('failed'), unifiedNarration: false }).action, 'blocked');
+  assert.equal(decideFilmVoiceAction({ contract, rawSpeech: speech(), unifiedNarration: true }).action, 'blocked');
   assert.equal(decideFilmVoiceAction({ contract, rawSpeech: speech('unverified'), unifiedNarration: true }).action, 'blocked');
 });
 
@@ -94,7 +98,7 @@ test('a stale successful TTS receipt is never a native composition source', () =
   for (const source of ['tts-narration', 'tts-term-replaced', 'voiced-reuse', 'clip-audio-unverified', undefined]) {
     assert.throws(() => assertFilmAudioSource({ contract, source }), error => error.code === 'AUDIO_NATIVE_SOURCE_REPLACED');
   }
-  assert.equal(assertFilmAudioSource({ contract: resolveFilmAudioContract(shot('voice-over')), source: 'tts-narration' }), true);
+  assert.throws(() => assertFilmAudioSource({ contract: resolveFilmAudioContract(shot('voice-over')), source: 'tts-narration' }), FilmAudioPolicyError);
 });
 
 test('policy fingerprints bind speech mode, source wording, shot identity and dialogue', () => {
@@ -107,9 +111,48 @@ test('policy fingerprints bind speech mode, source wording, shot identity and di
   assert.notEqual(resolveFilmAudioContract(shot('voice-over')).policyHash, native.policyHash);
 });
 
-test('silent B-roll needs no speech check while invalid silent receipts still fail', () => {
+test('silent B-roll keeps its rendered ambience without a speech check or narration receipt', () => {
   const contract = resolveFilmAudioContract({ shotId: 'BROLL' });
   assert.equal(decideFilmVoiceAction({ contract }).action, 'none');
-  assert.equal(assertFilmAudioSource({ contract, source: null }), true);
-  assert.throws(() => assertFilmAudioSource({ contract, source: 'tts-narration' }), error => error.code === 'AUDIO_UNEXPECTED_NARRATION');
+  assert.equal(assertFilmAudioSource({ contract, source: 'clip-audio' }), true);
+  assert.throws(() => assertFilmAudioSource({ contract, source: null }), FilmAudioPolicyError);
+  assert.throws(() => assertFilmAudioSource({ contract, source: 'tts-narration' }), FilmAudioPolicyError);
+});
+
+test('all authored speech semantics require provider audio, including silent ambience', () => {
+  const inputs = [shot(), shot('voice-over'), { shotId: 'AMBIENCE' }];
+  for (const input of inputs) {
+    assert.throws(() => assertFilmAudioPreflight({ shots: [input], generateAudio: false }), FilmAudioPolicyError);
+    assert.throws(() => assertFilmAudioPreflight({ shots: [input], unifiedNarration: true, generateAudio: true }), FilmAudioPolicyError);
+    const contracts = assertFilmAudioPreflight({ shots: [input], generateAudio: true, unifiedNarration: false });
+    assert.equal(contracts[0].sourcePolicy, 'render-native');
+  }
+});
+
+test('legacy voiced-reuse, term replacement and synthesized narration are rejected for every shot', () => {
+  for (const input of [shot(), shot('voice-over'), { shotId: 'AMBIENCE' }]) {
+    const contract = resolveFilmAudioContract(input);
+    for (const source of ['tts-narration', 'tts-term-replaced', 'voiced-reuse', 'clip-audio-unverified', 'local-tts', undefined, null]) {
+      assert.throws(() => assertFilmAudioSource({ contract, source }), FilmAudioPolicyError);
+    }
+    assert.equal(assertFilmAudioSource({ contract, source: 'clip-audio' }), true);
+  }
+});
+
+test('source policy is bound to the contract fingerprint and cannot be replaced by a success flag', () => {
+  const contract = resolveFilmAudioContract(shot('voice-over'));
+  const forged = { ...contract, sourcePolicy: 'local-tts' };
+  assert.throws(() => decideFilmVoiceAction({ contract: forged, rawSpeech: speech(), replacement: { verified: true } }), FilmAudioPolicyError);
+  assert.throws(() => assertFilmAudioSource({ contract: forged, source: 'clip-audio' }), FilmAudioPolicyError);
+});
+
+test('visible and offscreen text failures stop instead of substituting another speaker', () => {
+  for (const input of [shot(), shot('voice-over')]) {
+    const contract = resolveFilmAudioContract(input);
+    for (const status of ['failed', 'unverified']) {
+      const decision = decideFilmVoiceAction({ contract, rawSpeech: speech(status), unifiedNarration: false });
+      assert.equal(decision.action, 'blocked');
+      assert.match(decision.code, /NATIVE/);
+    }
+  }
 });

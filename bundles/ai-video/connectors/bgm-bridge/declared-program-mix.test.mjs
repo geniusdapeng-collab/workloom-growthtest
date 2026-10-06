@@ -78,6 +78,12 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
     assert.match(String(result.independentAudio.duckingSource ?? ""), /program-mix/);
     /** 不冒充签章：声明路径不得出现 signed/passed 的来源口径 */
     assert.notEqual(result.independentAudio.sourceAuthority, "passed");
+    const presentedAudio = execFileSync(bins.ffmpeg, ["-hide_banner", "-v", "error", "-i", result.output.path,
+      "-map", "0:a:0", "-ar", "48000", "-ac", "2", "-f", "s16le", "pipe:1"], { timeout: 60000, maxBuffer: 8 * 1024 * 1024 });
+    assert.ok(presentedAudio.length / 4 >= 3 * 48000, "最终AAC必须保全原画面三秒时间钟，不能因-shortest丢掉尾部采样");
+    const finalVideo = JSON.parse(execFileSync(bins.ffprobe, ["-v", "error", "-count_frames", "-select_streams", "v:0",
+      "-show_entries", "stream=nb_read_frames", "-of", "json", result.output.path], { timeout: 60000, encoding: "utf8" }));
+    assert.equal(Number(finalVideo.streams[0].nb_read_frames), 75, "合流不得修改原画面帧数");
   });
 
   it("不声明、也没有签章：仍然 fail-closed（audio_stems_source_unverified）", async () => {

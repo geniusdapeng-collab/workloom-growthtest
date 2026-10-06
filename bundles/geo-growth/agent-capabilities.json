@@ -207,9 +207,9 @@
     },
     {
       "id": "growth.video.delivery.inspect",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "title": "核验视频交付清单",
-      "description": "读取交付清单（<out>/<project>-delivery-manifest.json）并逐个计算实际 SHA-256 与声明哈希/字节数比较；缺件、内容修改、元数据冲突及路径越界会列出。未声明哈希的文件保持 unverified。只读，不重新交付。",
+      "description": "读取旧版或标准后期交付清单，逐个计算视频与封面实际SHA-256和声明哈希/字节数比较；标准outputs要求主版和唯一已知版本、封面路径与首帧回执一致。缺件、修改、元数据冲突及路径越界列出，缺哈希保持unverified。只读，不重做影片或认证内容。",
       "operation": "receipt",
       "risk": "low",
       "dataMode": "unverified",
@@ -237,9 +237,9 @@
     },
     {
       "id": "growth.video.production.plan",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "title": "预览出片计划（不执行）",
-      "description": "只读预览分流、镜头结构、声明帧率、原生对白/统一配音冲突和本机 ASR 配置；有阻塞时不返回执行命令。通过时给出安全引用的命令及完整 argv/工作目录。ready 只表示已读输入和本地配置，不代表身份、余额或运行时验收。",
+      "description": "只读预览分流、声明帧率、可精确提交的整数4至12秒镜长和每镜原声合同；拒绝统一配音或关闭原生声音，不依赖本地配音或ASR。通过时给出安全引用的命令和完整argv/工作目录。ready只表示已读输入和本地配置，不代表身份、台词、余额或运行时验收。",
       "operation": "preview",
       "risk": "low",
       "dataMode": "unverified",
@@ -280,7 +280,8 @@
             "maxLength": 400
           },
           "unifiedNarration": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "保留兼容字段；true因替换原片声音而阻断。"
           }
         },
         "additionalProperties": false

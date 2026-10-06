@@ -716,6 +716,8 @@ export function validateFilmChannelScope(frame: FilmChannelRequestFrame, scope: 
   if (["image.generate", "video.generate", "voice.dub", "voice.verify"].includes(frame.method) && frame.shotId === null) {
     fail("SHOT_NOT_FOUND", "逐镜组件需要冻结镜号");
   }
+  if (frame.method === "media.fetch" && record(frame.params).normalizeToSeconds !== undefined)
+    fail("STANDARD_NATIVE_RETIME_FORBIDDEN", "标准流程保留模型原片完整时钟，禁止父服务变速或时长归一");
   if (scope.frozen && ["video.generate", "voice.dub", "voice.verify"].includes(frame.method)) {
     const shot = (Array.isArray(scope.frozen.shots) ? scope.frozen.shots : []).map(record).find(row => row.shotId === frame.shotId);
     if (!shot) fail("SHOT_NOT_FOUND", "组件镜号不在冻结原稿");
@@ -723,21 +725,21 @@ export function validateFilmChannelScope(frame: FilmChannelRequestFrame, scope: 
     try { audio = resolveFilmAudioContract({ ...shot, shotId: frame.shotId! }); }
     catch (error) { fail("AUDIO_SOURCE_INVALID", error instanceof Error ? error.message : "冻结音频合同无效"); }
     const params = record(frame.params);
-    if (frame.method === "voice.dub" && audio.mode === "native-dialogue") fail("AUDIO_NATIVE_SOURCE_REPLACED", "父服务拒绝后配替换出镜同源对白");
+    if (frame.method === "voice.dub" && audio.sourcePolicy === "render-native") fail("AUDIO_NATIVE_SOURCE_REPLACED", "父服务拒绝后配替换出镜同源对白");
     if (frame.method.startsWith("voice.")) {
       if (audio.mode === "none") fail("AUDIO_NO_DIALOGUE", "无台词镜头不能调用配音或语音核验");
       const actual = frame.method === "voice.dub" ? params.text : params.expectText;
       if (typeof actual !== "string" || actual.trim().replace(/\s+/g, " ") !== audio.text.trim().replace(/\s+/g, " ")) fail("AUDIO_TEXT_MISMATCH", "语音请求台词与冻结原稿不一致");
     } else {
       if (typeof params.generateAudio !== "boolean") fail("REQUEST_INVALID", "生成音频标志必须显式为布尔值");
-      if (audio.mode === "native-dialogue" && !params.generateAudio) fail("AUDIO_NATIVE_GENERATION_REQUIRED", "出镜对白必须生成原生音频");
+      if (audio.sourcePolicy === "render-native" && !params.generateAudio) fail("AUDIO_NATIVE_GENERATION_REQUIRED", "出镜对白必须生成原生音频");
       const aspect = scope.options?.aspect ?? scope.frozen.aspect ?? "9:16";
       const requestedResolution = scope.options?.resolution ?? scope.frozen.resolution ?? "1080p";
       const resolution = requestedResolution === "2160p" ? "1080p" : requestedResolution;
       if (params.aspect !== aspect || params.resolution !== resolution) fail("FORMAT_FROZEN_MISMATCH", "生成画幅/源分辨率与冻结作业不一致");
       const duration = Number(shot.duration ?? shot.durationSec ?? shot.durationSeconds);
-      const expectedSeconds = Math.min(12, Math.max(4, Math.round(duration)));
-      if (!Number.isFinite(duration) || duration <= 0 || params.seconds !== expectedSeconds) fail("DURATION_FROZEN_MISMATCH", "生成时长与冻结镜头不一致");
+      const expectedSeconds = duration;
+      if (!Number.isInteger(duration) || duration < 4 || duration > 12 || params.seconds !== expectedSeconds) fail("DURATION_FROZEN_MISMATCH", "生成时长与冻结镜头不一致");
       if (!Array.isArray(params.refs) || params.refs.length > 3) fail("REFERENCE_LIMIT_EXCEEDED", "视频引用最多3张，禁止静默截断");
       if (params.refs.some(ref => typeof ref !== "string" || !ref) || new Set(params.refs).size !== params.refs.length) fail("REQUEST_INVALID", "视频引用为空、重复或格式非法");
       if (params.firstFrame !== undefined) {
@@ -889,14 +891,9 @@ async function validateMediaFetchSource(ctx: RunContext, frame: FilmChannelReque
     const receipt = ctx.videoFiles.get(ref);
     if (receipt) await requireCurrentVideoSource(ctx, ref, receipt.shotId);
     else await readJobBytes(ctx, ref, MEDIA_FETCH_LIMIT_BYTES);
-    if (params.normalizeToSeconds !== undefined) {
-      const shot = ctx.shots.get(frame.shotId ?? "");
-      const duration = Number(shot?.duration ?? shot?.durationSec ?? shot?.durationSeconds);
-      if (!receipt || receipt.shotId !== frame.shotId || params.normalizeToSeconds !== duration || !Number.isFinite(duration) || duration <= 0
-        || params.targetRef === receipt.artifact.ref) fail("MEDIA_NORMALIZATION_SCOPE_INVALID", "时长归一必须绑定冻结镜头、受理原片且保留供应商原档");
-    }
+
   }
-  if (params.normalizeToSeconds !== undefined && params.url !== undefined) fail("MEDIA_NORMALIZATION_SCOPE_INVALID", "时长归一仅接受本作业当前已核验的本地视频");
+  if (params.normalizeToSeconds !== undefined) fail("STANDARD_NATIVE_RETIME_FORBIDDEN", "标准原片禁止时长归一");
 }
 
 async function anchorsToDataUrls(ctx: RunContext, refs: unknown): Promise<string[]> {
@@ -973,7 +970,6 @@ async function runMediaFetch(ctx: RunContext, frame: FilmChannelRequestFrame, co
   await ctx.ledger.recordDispatch(componentId, ctx.ownerToken, "local", "media-fetch");
   let written: { ref: string; sha256: string; bytes: number };
   let sourceReceipt: FilmVideoSubmissionReceipt | undefined;
-  let normalization: { factor: number; from: number; to: number } | undefined;
   if (params.url !== undefined) {
     const url = text(params.url, "media.fetch 的 url 非法", 8_192);
     requireIssuedUrl(ctx, url, frame);
@@ -989,49 +985,21 @@ async function runMediaFetch(ctx: RunContext, frame: FilmChannelRequestFrame, co
     const sourceRef = text(params.ref, "media.fetch 的 ref 非法", 1_000);
     sourceReceipt = ctx.videoFiles.get(sourceRef);
     if (sourceReceipt) await requireCurrentVideoSource(ctx, sourceRef, sourceReceipt.shotId);
-    if (params.normalizeToSeconds !== undefined) {
-      const targetSec = Number(params.normalizeToSeconds);
-      const source = await resolveWithin(ctx.workDir, sourceRef);
-      const temporaryRef = `${targetRef}.normalize-${randomUUID()}.mp4`;
-      const temporary = await resolveWithin(ctx.workDir, temporaryRef);
-      await mkdir(path.dirname(temporary), { recursive: true });
-      try {
-        const probe = JSON.parse(await reviewMediaTool(ctx, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "json", source]));
-        const from = Number(probe.format?.duration);
-        if (!Number.isFinite(from) || from <= 0) fail("MEDIA_NORMALIZATION_FAILED", "源视频时长无效");
-        const factor = Number((targetSec / from).toFixed(6));
-        const chain: string[] = [];
-        let remaining = 1 / factor;
-        while (remaining > 2) { chain.push("atempo=2"); remaining /= 2; }
-        while (remaining < 0.5) { chain.push("atempo=0.5"); remaining /= 0.5; }
-        chain.push(`atempo=${remaining.toFixed(6)}`);
-        await reviewMediaTool(ctx, "ffmpeg", ["-v", "error", "-y", "-i", source, "-vf", `setpts=PTS*${factor.toFixed(6)}`,
-          "-af", chain.join(","), "-t", targetSec.toFixed(3), "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-          "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", "-movflags", "+faststart", temporary], 120_000);
-        await requireCurrentVideoSource(ctx, sourceRef, sourceReceipt!.shotId);
-        written = await writeJobBytes(ctx, targetRef, await readJobBytes(ctx, temporaryRef, MEDIA_FETCH_LIMIT_BYTES));
-        const result = JSON.parse(await reviewMediaTool(ctx, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "json", await resolveWithin(ctx.workDir, targetRef)]));
-        const to = Number(result.format?.duration);
-        if (!Number.isFinite(to) || Math.abs(to - targetSec) > 0.1) fail("MEDIA_NORMALIZATION_FAILED", "时长归一结果与冻结镜头不一致");
-        normalization = { factor, from: Number(from.toFixed(3)), to: Number(to.toFixed(3)) };
-      } finally { await rm(temporary, { force: true }).catch(error => ctx.log(`归一化临时文件清理失败：${String(error)}`)); }
-    } else {
-      const bytes = await readJobBytes(ctx, sourceRef, MEDIA_FETCH_LIMIT_BYTES);
-      written = await writeJobBytes(ctx, targetRef, bytes);
-    }
+    const bytes = await readJobBytes(ctx, sourceRef, MEDIA_FETCH_LIMIT_BYTES);
+    written = await writeJobBytes(ctx, targetRef, bytes);
   } else {
     return fail("REQUEST_INVALID", "media.fetch 需要 url 或 ref");
   }
   await ctx.ledger.recordComponentAccepted(componentId, ctx.ownerToken, {
     provider: "local", providerModel: "media-fetch", actualCny: 0,
     evidence: { artifactSha256: written.sha256, artifactRef: written.ref, artifactBytes: written.bytes,
-      ...(normalization ? { normalization, sourceReceipt } : {}) },
+      ...(sourceReceipt ? { sourceReceipt } : {}) },
   });
   if (sourceReceipt) {
     ctx.videoFiles.set(written.ref, sourceReceipt);
     (ctx.videoArtifacts ??= new Map()).set(written.ref, written);
   }
-  return { ...written, ...(normalization ? { normalization } : {}) };
+  return { ...written };
 }
 
 async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
