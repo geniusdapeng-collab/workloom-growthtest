@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 23,
+  "revision": 25,
   "tasks": {
     "109": {
       "number": 109,
@@ -1860,6 +1860,29 @@
       },
       "previous": "364df813833948372eb478ea5dc634773a696994013d99957e4af9ab6dfcbd1b",
       "digest": "1f9f4795fef6a5db795d4e3ec36e476d02a2401440ac2533cc70c77db4e01b52"
+    },
+    {
+      "sequence": 24,
+      "at": "2026-10-06T18:08:16.589Z",
+      "kind": "installer_merge_rejected",
+      "data": {
+        "number": 109,
+        "headSha": "f4974c6f69a5d9d3ede641aaad8af3b6d7467e7b",
+        "httpStatus": 409,
+        "verifiedUnmerged": true
+      },
+      "previous": "1f9f4795fef6a5db795d4e3ec36e476d02a2401440ac2533cc70c77db4e01b52",
+      "digest": "daed0cbcd7b80a2836dfdf2b365cead9cd8f4a394ed82d1a603546abd1ce090d"
+    },
+    {
+      "sequence": 25,
+      "at": "2026-10-06T18:08:15.923Z",
+      "kind": "transaction",
+      "data": {
+        "id": "eb1ea574-66a8-4b9a-ac50-a9a48723da9d"
+      },
+      "previous": "daed0cbcd7b80a2836dfdf2b365cead9cd8f4a394ed82d1a603546abd1ce090d",
+      "digest": "7c3bdf789eed0318e5d3edabd493997c8afac79a7fcbce6ff5932c1dc33cdc07"
     }
   ]
 }
