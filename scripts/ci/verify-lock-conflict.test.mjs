@@ -369,3 +369,20 @@ test("an unreadable installed ledger is an error rather than old-number fallback
   fixture.fake.override = path => path === "git/raw/automation%2Fdelivery-state/state.json" ? Response.json({}, { status: 403 }) : previous(path);
   await assert.rejects(fixture.run(), /API_INCOMPLETE/);
 });
+
+test("actual deleted-file URLs bind only the exact target/base, including fork deletions", async () => {
+  const fake = new PullFixture([pull(105, { sourceRepo: "fork/team/repository" }), pull(106, { sourceSha: SHA, sourceBranch: "task/current" })]);
+  const comparison = compareFor(fake.rows[0], []); comparison.files = [{ path: "scripts/tools/deleted.mts", status: "deleted" }];
+  fake.compares.set("105", comparison);
+  const file = { filename: "deleted.mts", status: "delete", raw_url: "https://cnb.cool/" + REPO + "/-/git/raw/" + BASE + "/scripts/tools/deleted.mts",
+    blob_url: "https://cnb.cool/" + REPO + "/-/blob/" + BASE + "/scripts/tools/deleted.mts" };
+  fake.override = path => path === "pulls/105/files" ? Response.json([file]) : undefined;
+  assert.deepEqual((await collectBoundPulls(fake.client(), fake.context())).prs[0].paths, ["scripts/tools/deleted.mts"]);
+  for (const patch of [
+    { raw_url: file.raw_url.replace(BASE, OTHER) }, { raw_url: file.raw_url.replace(BASE, BASE.slice(0, 12)) },
+    { raw_url: file.raw_url.replace(REPO, "fork/team/repository") }, { status: "modify" },
+    { blob_url: file.blob_url.replace("deleted.mts", "different.mts") },
+  ]) { fake.override = path => path === "pulls/105/files" ? Response.json([{ ...file, ...patch }]) : undefined;
+    await rejectCode(collectBoundPulls(fake.client(), fake.context()), "PATH_UNVERIFIED");
+  }
+});

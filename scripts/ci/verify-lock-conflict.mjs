@@ -251,7 +251,7 @@ function samePull(left, right, { listed = false } = {}) {
     && ((listed && !left.sourceRepo) || left.sourceRepo === right.sourceRepo);
 }
 
-export function fullPathOf(entry, { repoSlug, headSha } = {}) {
+export function fullPathOf(entry, { repoSlug, headSha, baseSha, targetRepoSlug } = {}) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) fail("PATH_UNVERIFIED", "文件记录无效");
   const explicit = entry.path === undefined ? null : requireRepositoryPath(entry.path);
   const urls = [entry.raw_url, entry.blob_url].filter((value) => value !== undefined && value !== null && value !== "");
@@ -261,7 +261,9 @@ export function fullPathOf(entry, { repoSlug, headSha } = {}) {
     let url;
     try { url = new URL(value); } catch { fail("PATH_UNVERIFIED", "文件 URL 无效"); }
     if (url.origin !== "https://cnb.cool" || url.username || url.password || url.search || url.hash) fail("PATH_UNVERIFIED", "文件 URL 来源不受信任");
-    const repo = repositorySlug(repoSlug); const sha = fullSha(headSha, "文件 head");
+    const deleted = (FILE_STATUSES.get(entry.status) ?? entry.status) === "deleted";
+    const repo = repositorySlug(deleted ? targetRepoSlug : repoSlug);
+    const sha = fullSha(deleted ? baseSha : headSha, deleted ? "文件 base" : "文件 head");
     const prefixes = [`/${repo}/-/git/raw/${sha}/`, `/${repo}/-/blob/${sha}/`];
     const prefix = prefixes.find((candidate) => url.pathname.startsWith(candidate));
     if (!prefix) fail("PATH_UNVERIFIED", "文件 URL 未绑定仓库和完整 source SHA");
@@ -339,7 +341,7 @@ export async function collectBoundPulls(client, context = {}) {
           fail("PATH_UNVERIFIED", "PR 文件声明的完整 filename 与 compare 矛盾");
         }
         if (file.path !== undefined || [file.raw_url, file.blob_url].some((value) => value !== undefined && value !== null && value !== "")) {
-          const path = fullPathOf(file, { repoSlug: before.sourceRepo, headSha: before.sourceSha });
+          const path = fullPathOf(file, { repoSlug: before.sourceRepo, headSha: before.sourceSha, baseSha: before.targetSha, targetRepoSlug: before.repo });
           if (!records.some((record) => record.path === path && record.status === FILE_STATUSES.get(file.status))) fail("PATH_UNVERIFIED", "PR 文件路径未由实际 compare 证明");
         }
         return `${FILE_STATUSES.get(file.status)}:${file.filename.split("/").at(-1)}`;
