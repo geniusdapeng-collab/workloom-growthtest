@@ -177,9 +177,9 @@
     },
     {
       "id": "growth.video.production.status",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "title": "读取视频生产状态",
-      "description": "读取某项目的逐阶段账本（logs/<project>/stages.jsonl）：各阶段 invoked/ok/failed/degraded、最近一次失败原因，以及渲染台账（提交次数/渲后判不合格/平台拒收/canary 止损）。只读本地账本，用于判断「卡在哪一步」，不触发任何渲染。",
+      "description": "读取某项目的逐阶段账本（logs/<project>/stages.jsonl）：各阶段成败、最近失败原因，按有效 taskId 去重的受理任务数及最新结果；GET 接续/缓存不重复计数，无任务 ID 的调用列为未知。只读，不触发渲染或费用估算。",
       "operation": "read",
       "risk": "low",
       "dataMode": "unverified",
@@ -207,9 +207,9 @@
     },
     {
       "id": "growth.video.delivery.inspect",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "title": "核验视频交付清单",
-      "description": "读取交付清单（<out>/<project>-delivery-manifest.json）并逐个检查清单所列文件是否存在、大小，回传审核口径（reviewPolicy）、分流结论、配乐层状态与渲染台账；缺件/越界会如实列出。只读，不重新交付。",
+      "description": "读取旧版或标准后期交付清单，逐个计算视频与封面实际SHA-256和声明哈希/字节数比较；标准outputs要求主版和唯一已知版本、封面路径与首帧回执一致。缺件、修改、元数据冲突及路径越界列出，缺哈希保持unverified。只读，不重做影片或认证内容。",
       "operation": "receipt",
       "risk": "low",
       "dataMode": "unverified",
@@ -237,9 +237,9 @@
     },
     {
       "id": "growth.video.production.plan",
-      "version": "1.0.0",
+      "version": "1.2.0",
       "title": "预览出片计划（不执行）",
-      "description": "给出「出片建议命令 + 前置检查清单」（分流是否就绪、镜头卡是否在场、火山方舟密钥是否配置、欠费提示）。这是预览：不跑管线、不提交渲染、不花钱；真正的执行走 CLI（full-chain-film.mts）。",
+      "description": "只读预览分流、声明帧率、可精确提交的整数4至12秒镜长和每镜原声合同；拒绝统一配音或关闭原生声音，不依赖本地配音或ASR。通过时给出安全引用的命令和完整argv/工作目录。ready只表示已读输入和本地配置，不代表身份、台词、余额或运行时验收。",
       "operation": "preview",
       "risk": "low",
       "dataMode": "unverified",
@@ -274,6 +274,14 @@
           "outDir": {
             "type": "string",
             "maxLength": 400
+          },
+          "workDir": {
+            "type": "string",
+            "maxLength": 400
+          },
+          "unifiedNarration": {
+            "type": "boolean",
+            "description": "保留兼容字段；true因替换原片声音而阻断。"
           }
         },
         "additionalProperties": false
@@ -425,6 +433,163 @@
       "inputSchema": {
         "type": "object",
         "properties": {},
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.preview",
+      "version": "2.0.0",
+      "title": "预览一句话导演合同",
+      "description": "本地预览四版本目标、专业默认值和素材缺口；不调用模型或生成媒体。",
+      "operation": "preview",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/director.mjs",
+        "export": "previewDirector"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 10000
+          },
+          "options": {
+            "type": "object",
+            "properties": {
+              "platforms": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "douyin",
+                    "xiaohongshu",
+                    "wechat-channels"
+                  ]
+                },
+                "minItems": 1,
+                "maxItems": 3
+              },
+              "includeSurprise": {
+                "type": "boolean"
+              },
+              "versionCount": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 6
+              },
+              "stylesPerPlatform": {
+                "type": "integer",
+                "enum": [
+                  3
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "intent"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.job",
+      "version": "2.0.0",
+      "title": "读取导演任务",
+      "description": "读取当前工作区导演任务、文本模型回执统计和真实媒体就绪状态。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.job",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "jobId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.versions",
+      "version": "2.0.0",
+      "title": "读取四版本交付",
+      "description": "读取当前工作区作品版本、授权播放地址和差异证据摘要。",
+      "operation": "receipt",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.getVersions",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.preferences",
+      "version": "2.0.0",
+      "title": "读取明确创作偏好",
+      "description": "读取本人明确表达的创作偏好及来源，不推断未表达的喜好。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.preferences",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.director.calibration",
+      "version": "2.0.0",
+      "title": "读取选择标定记录",
+      "description": "读取当前工作区选片和盲选的实际样本统计，不把偏好记录当质量提升证明。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "trpc",
+        "path": "video.creative.calibration",
+        "method": "query"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
         "additionalProperties": false
       }
     }

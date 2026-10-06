@@ -1,0 +1,36 @@
+{
+  "evidenceLevel": "B",
+  "status": "passed",
+  "frozenInstall": true,
+  "pnpmVersion": "10.14.0",
+  "industryBuildExitCode": 0,
+  "allWorkspaceTypecheckExitCode": 0,
+  "workspaceTypecheckProjects": 11,
+  "allResolvedInsideCleanFixture": true,
+  "dependencies": [
+    "@hyperreality/video-studio",
+    "typescript",
+    "react",
+    "vite",
+    "@workloom/ui"
+  ],
+  "uiVersion": "0.1.19",
+  "beforeEvidence": "cnb-first-typecheck-failure.json",
+  "clientBuilds": {
+    "web": {
+      "exitCode": 0,
+      "productionBoundary": "passed",
+      "sourceMode": "fresh frozen dependencies"
+    },
+    "webb": {
+      "exitCode": 0,
+      "productionBoundary": "not-in-this-build-script",
+      "sourceMode": "fresh frozen dependencies"
+    },
+    "webc": {
+      "exitCode": 0,
+      "productionBoundary": "not-in-this-build-script",
+      "sourceMode": "fresh frozen dependencies"
+    }
+  }
+}

@@ -17,7 +17,7 @@
  *     **douyin 默认口径与历史行为逐字/逐像素不变**（`COVER_SAFE_AREA` 仍是抖音基线值）；
  *   · 新增 `kbHints`（封面知识库 cover-kb 的注入载荷，≤3 条，带篇目 trace）与
  *     `accountProfile`（账号视觉锤：字体/色板/版式/角标）两个**可选**输入，
- *     不传时提示词与校验行为与历史完全一致。
+ *     不传时不注入账号/知识库约束；创作文案的来源/风格标签规则统一执行。
  */
 
 import {
@@ -178,7 +178,8 @@ export interface CoverDesignInput {
    * 禁止第三种"人物小图贴在地标/商品上"——两种主视觉打架，真机被打回三次。
    */
   archetype?: "person-led" | "subject-led";
-  brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string } | null;
+  brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string;
+    claimsDiscipline?: string; footageOrigin?: "generated" | "live-action" | "mixed" } | null;
   /**
    * 平台（ID 或中文别名，如 `douyin` / `抖音` / `抖音/快手`）。
    * 语义已升格为一等参数：驱动的画幅、安全区、标题带、标题字数上限与文案政策；
@@ -237,7 +238,7 @@ export function accountProfilePromptLines(profile: CoverAccountProfile | null | 
  * 封面设计师的提示词（LLM 只出设计稿，不画图；渲染由管线按稿执行）。
  *
  * 平台化口径（2026-09-27）：画幅/安全区/标题带/标题字数上限全部来自 `getCoverSpec(platform)`；
- * **douyin + 无 KB + 无账号档案时，本函数输出与平台化之前逐字一致**（有快照测试锁死）。
+ * douyin 的平台规格行保持历史口径；来源与风格属于元数据，不进入创作画面。
  */
 export function buildCoverDesignPrompt(input: CoverDesignInput): string {
   /** 平台标签用**调用方原文**（保留"抖音/快手"这类历史写法），规格按 ID 解析 */
@@ -266,6 +267,9 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
     input.brief?.goal ? `片子目标：${input.brief.goal}` : "",
     input.brief?.audience ? `受众：${input.brief.audience}` : "",
     input.brief?.tone ? `调性：${input.brief.tone}` : "",
+    input.brief?.claimsDiscipline ? `文案事实约束：${input.brief.claimsDiscipline}` : "",
+    input.brief?.footageOrigin === "generated"
+      ? "素材来源：AI生成视频（可含真实商品参考图）；封面不得声称实拍、现场拍摄或现场实录；来源记录与平台披露要求保留在交付元数据。" : "",
     "",
     "可选镜头（主视觉必须从里面选，给出 shotId 与取帧秒数）：",
     ...shotLines,
@@ -294,6 +298,7 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
       + `底部 ${ratioPercent(spec.safeArea.bottomReservedRatio)} 不放任何文字；`,
     "5. 配色与片子的调性一致（说明主标题色与强调色，用 #RRGGBB）；底图保持片子原有的光线气质，不要加冷雾或滤镜把暖调画面改成另一种天气；",
     "6. rationale 用一句话说明这个封面为什么能让人点进来（≤60 字）。",
+    "6.1 运营标签不进入创作画面：主标题、副标题、角标不得放 AI生成/AIGC 或暖色电影感、社媒冲击感、冷色科技感等风格标签；只写观众需要的内容钩子、产品名称或系列文案。来源与风格另存交付元数据。",
     /**
      * 数值边界（2026-09-27 真机发现）：这些区间由 `validateCoverPlan` 硬校验，
      * 但早先提示词里没写——真实模型因此把 `person.widthRatio` 猜成 0.55，设计稿连打两次回、退兜底稿
@@ -320,17 +325,73 @@ export function buildCoverDesignPrompt(input: CoverDesignInput): string {
 const HEX = /^#[0-9A-Fa-f]{6}$/;
 const visualLength = (text: string): number => [...text.replace(/\n/g, "")].length;
 
+/** Visible copy is shared by model-designed covers and the explicit local renderer. */
+export interface CoverVisibleCopy {
+  headline: string;
+  subline?: string;
+  badge?: string;
+}
+export interface CoverVisibleCopyInput {
+  platform?: string;
+  durationSeconds?: number;
+  footageOrigin?: "generated" | "live-action" | "mixed";
+}
+
+export function validateCoverVisibleCopy(copy: CoverVisibleCopy, input: CoverVisibleCopyInput = {}): string[] {
+  const issues: string[] = [];
+  const spec = getCoverSpec(input.platform);
+  for (const [field, value] of Object.entries(copy)) {
+    if (value === undefined && field !== "headline") continue;
+    if (typeof value !== "string") { issues.push(`${field} 必须是字符串`); continue; }
+    if (/[\u0000-\u0009\u000B-\u001F\u007F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069]/u.test(value)) {
+      issues.push(`${field} 含控制或不可见方向字符`);
+    }
+    if (field === "headline") {
+      if (!value.trim()) issues.push("缺主标题");
+      if (value.split("\n").some((line) => !line.trim())) issues.push("主标题含空行");
+      if (value.split("\n").length > 2) issues.push("主标题超过两行");
+      const units = headlineUnits(value, spec);
+      if (units > spec.headlineMaxChars) issues.push(isEnglishCoverPlatform(spec)
+        ? `主标题 ${units} 个英文单词（${spec.id} 上限 ${spec.headlineMaxChars} 词）`
+        : `主标题 ${units} 字（${spec.id} 上限 ${spec.headlineMaxChars}）`);
+    } else {
+      if (value.includes("\n")) issues.push(`${field} 不得换行`);
+      const limit = field === "subline" ? 24 : 10;
+      if (visualLength(value) > limit) issues.push(`${field === "subline" ? "副标题" : "角标"} ${visualLength(value)} 字（上限 ${limit}）`);
+    }
+    if (/AI\s*生成|AIGC|AI[-\s]*generated|暖色电影感|暖调电影感|暖调胶片|社媒冲击感|社交高对比|冷色科技感|冷调技术感|科技冷调|warm[-_\s]*film|punchy[-_\s]*social|cool[-_\s]*tech/i.test(value)) {
+      issues.push(`${field} 含运营标签，来源与风格应保留在交付元数据`);
+    }
+    if (input.footageOrigin === "generated" && /实拍|现场拍摄|现场实录|真实拍摄/.test(value)) {
+      issues.push("生成素材封面不得声明实拍或现场拍摄");
+    }
+  }
+  const durationCopy = `${typeof copy.headline === "string" ? copy.headline : ""} ${typeof copy.subline === "string" ? copy.subline : ""}`;
+  const stated = durationCopy.match(/(\d{1,3})\s*秒\s*(?:看懂|看完|了解|速览|讲清|说清|读懂|带你|全片|内讲完)/)
+    ?? durationCopy.match(/(?:全片|本片|本视频)[^0-9]{0,6}(\d{1,3})\s*秒/);
+  if (stated && Number.isFinite(input.durationSeconds) && Math.abs(Number(stated[1]) - Number(input.durationSeconds)) > 2) {
+    issues.push(`标题里的时长 ${Number(stated[1])} 秒与成片 ${Number(input.durationSeconds).toFixed(0)} 秒不符（容差 ±2s）`);
+  }
+  return issues;
+}
+
+export function assertCoverVisibleCopy(copy: CoverVisibleCopy, input: CoverVisibleCopyInput = {}): void {
+  const issues = validateCoverVisibleCopy(copy, input);
+  if (issues.length) throw new CoverDesignError(`封面可见文案不合法：${issues.join("；")}`, "cover_design_invalid");
+}
+
 /**
  * 设计稿校验：任何越界/超长/缺主角都判非法（抛错），由调用方决定"退回兜底稿"还是"打回重出"。
  * 口径从严：封面是唯一"必须一眼看懂"的产物，宁可用兜底稿也不要一张半成品。
  */
 export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { shots: [] }): CoverPlan {
-  const issues: string[] = [];
+  const issues = validateCoverVisibleCopy({ headline: plan.headline, subline: plan.subline, badge: plan.badge }, {
+    platform: input.platform, durationSeconds: input.durationSeconds, footageOrigin: input.brief?.footageOrigin
+  });
   /**
    * 平台口径（2026-09-27）：标题长度上限随平台（抖音 12 / 小红书 14 / B站 16 / 英文平台按词 ≤5）。
    * `domain="cover_design_invalid"` 的既有错误语义不变；缺省平台落 douyin，旧调用行为不变。
    */
-  const spec = getCoverSpec(input.platform);
   const warnings: string[] = [];
   /**
    * 版式一致性（2026-09-26 产品所有者口径）：
@@ -346,18 +407,6 @@ export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { s
   if (archetype === "person-led" && plan.person && plan.person.enabled === false) {
     issues.push("人物为主版式（person-led）必须开启人物层并提供人物来源镜头");
   }
-  if (!plan.headline?.trim()) issues.push("缺主标题");
-  else if (isEnglishCoverPlatform(spec)) {
-    const words = headlineUnits(plan.headline, spec);
-    if (words > spec.headlineMaxChars) {
-      issues.push(`主标题 ${words} 个英文单词（${spec.id} 上限 ${spec.headlineMaxChars} 词）`);
-    }
-  } else if (visualLength(plan.headline) > spec.headlineMaxChars) {
-    issues.push(`主标题 ${visualLength(plan.headline)} 字（${spec.id} 上限 ${spec.headlineMaxChars}）`);
-  }
-  if (plan.headline.includes("\n") && plan.headline.split("\n").length > 2) issues.push("主标题超过两行");
-  if (plan.subline && visualLength(plan.subline) > 24) issues.push(`副标题 ${visualLength(plan.subline)} 字（上限 24）`);
-  if (plan.badge && visualLength(plan.badge) > 10) issues.push(`角标 ${visualLength(plan.badge)} 字（上限 10）`);
   if (!["person-left", "person-right"].includes(plan.layout)) issues.push(`版式 ${plan.layout} 不在可选范围`);
   if (!input.shots.some((s) => s.shotId === plan.background?.shotId)) issues.push(`主视觉镜头 ${plan.background?.shotId} 不在镜头表里`);
   if (!Number.isFinite(plan.background?.atSec) || plan.background.atSec < 0) issues.push("主视觉取帧时刻非法");
@@ -389,14 +438,6 @@ export function validateCoverPlan(plan: CoverPlan, input: CoverDesignInput = { s
    *   · `N 秒 + 看懂/看完/了解/速览/讲清/说清/读懂/带你/全片/内讲完`；
    *   · 或 `全片/本片/本视频 … N 秒`。
    */
-  const stated = `${plan.headline ?? ""} ${plan.subline ?? ""}`.match(/(\d{1,3})\s*秒\s*(?:看懂|看完|了解|速览|讲清|说清|读懂|带你|全片|内讲完)/)
-    ?? `${plan.headline ?? ""} ${plan.subline ?? ""}`.match(/(?:全片|本片|本视频)[^0-9]{0,6}(\d{1,3})\s*秒/);
-  if (stated && Number.isFinite(input.durationSeconds)) {
-    const claimed = Number(stated[1]);
-    if (Math.abs(claimed - Number(input.durationSeconds)) > 2) {
-      issues.push(`标题里的时长 ${claimed} 秒与成片 ${Number(input.durationSeconds).toFixed(0)} 秒不符（容差 ±2s）`);
-    }
-  }
   /**
    * 账号视觉锤一致性（KB ACCT-001 四件套）：
    * 默认只 warn（记进设计稿 warnings 与 stages.jsonl）；`accountProfile.strict=true` 判非法打回。

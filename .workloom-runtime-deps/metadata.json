@@ -3,7 +3,7 @@
   "product": {
     "productId": "workloom-ai-growth",
     "role": "industry",
-    "repository": "workloom-ai/WorkLoom-growth",
+    "repository": "workloom-ai/workloom-growthtest",
     "includePlatformOps": false
   },
   "npmVersion": "11.17.0",
@@ -28,11 +28,11 @@
     },
     {
       "path": "apps/web/package.json",
-      "sha256": "17273b001dea29afe53c13a4f3cdd17685cea4081bde2521ab5157ec45a1081b"
+      "sha256": "2c8b05ebb6f8736deebfa5cd40219a60aef6cfeed11a3d0290221cf0f247feb5"
     },
     {
       "path": "package.json",
-      "sha256": "71b425982ba5ea04247bc871962600cbca45b657545307bbd411e5cdfe0e6914"
+      "sha256": "8ede5918465a23352a98a174f2dfc3f25d8725c894d56163d14a650a93a4b399"
     },
     {
       "path": "packages/audit-engine/package.json",
@@ -64,11 +64,11 @@
     },
     {
       "path": "pnpm-lock.yaml",
-      "sha256": "e3cff62ba8aa8aa63a06f2efaeac1b830f34dc7098e8b7f1cdd428a6b5d1493f"
+      "sha256": "d9ee7411fc6669ad60295afe66af62f0c3eeede88dcff84edbe7a7b4bae0cc50"
     },
     {
       "path": "product.manifest.json",
-      "sha256": "1aa6bf2b967cf3e7f88f024ff913a3633fb17737a54c3f495872f6c56b008df9"
+      "sha256": "df2b071de5a7975e67e47026ee1b5e5fe90f3dae85f184e06337369d15d9aaba"
     },
     {
       "path": "scripts/pack-nm-merge.mjs",

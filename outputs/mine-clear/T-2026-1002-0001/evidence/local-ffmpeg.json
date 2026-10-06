@@ -1,0 +1,345 @@
+{
+  "dataMode": "local-synthetic-ffmpeg",
+  "renderApiCalls": 0,
+  "imageApiCalls": 0,
+  "beautyImprovement": "not-tested",
+  "summaries": [
+    {
+      "operation": "create",
+      "status": "complete",
+      "failures": [],
+      "difference": true,
+      "versions": [
+        {
+          "id": "douyin-impact",
+          "status": "complete",
+          "duration": 8.166666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 32,
+          "music": "royalty-free",
+          "reusedLayers": {}
+        },
+        {
+          "id": "xiaohongshu-editorial",
+          "status": "complete",
+          "duration": 11.066666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {}
+        },
+        {
+          "id": "wechat-channels-documentary",
+          "status": "complete",
+          "duration": 12,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {}
+        },
+        {
+          "id": "director-surprise",
+          "status": "complete",
+          "duration": 10.633333333333333,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 39,
+          "music": "royalty-free",
+          "reusedLayers": {}
+        }
+      ]
+    },
+    {
+      "operation": "audio",
+      "status": "complete",
+      "failures": [],
+      "difference": true,
+      "versions": [
+        {
+          "id": "douyin-impact",
+          "status": "complete",
+          "duration": 8.166666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 32,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": false,
+            "subtitles": false,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        },
+        {
+          "id": "xiaohongshu-editorial",
+          "status": "complete",
+          "duration": 11.066666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        },
+        {
+          "id": "wechat-channels-documentary",
+          "status": "complete",
+          "duration": 12,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        },
+        {
+          "id": "director-surprise",
+          "status": "complete",
+          "duration": 10.633333333333333,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 39,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        }
+      ]
+    },
+    {
+      "operation": "cover",
+      "status": "complete",
+      "failures": [],
+      "difference": true,
+      "versions": [
+        {
+          "id": "douyin-impact",
+          "status": "complete",
+          "duration": 8.166666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 32,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": false,
+            "copy": true
+          }
+        },
+        {
+          "id": "xiaohongshu-editorial",
+          "status": "complete",
+          "duration": 11.066666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        },
+        {
+          "id": "wechat-channels-documentary",
+          "status": "complete",
+          "duration": 12,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        },
+        {
+          "id": "director-surprise",
+          "status": "complete",
+          "duration": 10.633333333333333,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 39,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        }
+      ]
+    },
+    {
+      "operation": "timeline",
+      "status": "complete",
+      "failures": [],
+      "difference": true,
+      "versions": [
+        {
+          "id": "douyin-impact",
+          "status": "complete",
+          "duration": 8.666666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": false,
+            "program": false,
+            "color": false,
+            "audio": false,
+            "subtitles": false,
+            "personQc": false,
+            "cover": false,
+            "copy": true
+          }
+        },
+        {
+          "id": "xiaohongshu-editorial",
+          "status": "complete",
+          "duration": 11.066666666666666,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        },
+        {
+          "id": "wechat-channels-documentary",
+          "status": "complete",
+          "duration": 12,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 33,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        },
+        {
+          "id": "director-surprise",
+          "status": "complete",
+          "duration": 10.633333333333333,
+          "burned": true,
+          "softsub": true,
+          "roi": true,
+          "qcSamples": 39,
+          "music": "royalty-free",
+          "reusedLayers": {
+            "picture": true,
+            "program": true,
+            "color": true,
+            "audio": true,
+            "subtitles": true,
+            "personQc": true,
+            "cover": true,
+            "copy": true
+          }
+        }
+      ]
+    },
+    {
+      "operation": "missing-licensed-music",
+      "status": "partial",
+      "failedVersion": "douyin-impact",
+      "failureCode": "not_found",
+      "otherVersions": 3,
+      "implicitScore": false
+    }
+  ],
+  "checks": {
+    "cache": true,
+    "sequentialRevisions": true,
+    "idempotentReplay": true,
+    "staleCasRejected": true,
+    "idempotencyMismatchRejected": true,
+    "newRenderRequiresApproval": true,
+    "concurrentWritersExcluded": true,
+    "tamperRejected": true,
+    "missingMusicFailsWithoutImplicitSynthesis": true
+  },
+  "output": "synthetic-videos",
+  "musicLicenseScope": "registered local fixture music; upstream rights not independently audited"
+}

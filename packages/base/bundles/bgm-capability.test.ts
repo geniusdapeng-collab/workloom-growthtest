@@ -9,10 +9,12 @@
  * 这些都能在磁盘上静态验出来，所以本组测试不触 DB、不依赖 ffmpeg。
  */
 import { createHash } from "node:crypto";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { isBuiltin } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { describe, expect, it } from "vitest";
+import ts from "typescript-governance";
 import YAML from "yaml";
 
 import { evalCondition } from "../fence-engine/expr.js";
@@ -31,6 +33,55 @@ import { normalizeLicense, listSources, SOURCE_ENV } from "../../../bundles/ai-v
 const ROOT = bundlesRoot();
 const REPO_ROOT = dirname(ROOT);
 const BUNDLE_DIR = join(ROOT, "ai-video");
+
+/** A portable connector may share declared assets in its Bundle, never external repository code. */
+function connectorImportClosure(bundleDir: string, entries: string[], assets: Record<string, string>): string[] {
+  const root = realpathSync(bundleDir);
+  const visited = new Set<string>();
+  const inside = (path: string): boolean => {
+    const part = relative(root, path);
+    return part !== ".." && !part.startsWith(`..${sep}`) && !isAbsolute(part);
+  };
+  const visit = (file: string): void => {
+    const absolute = resolve(root, file);
+    if (!inside(absolute)) throw new Error(`导入越出行业包：${file}`);
+    if (!existsSync(absolute)) throw new Error(`导入文件不存在：${file}`);
+    if (!inside(realpathSync(absolute))) throw new Error(`导入软链越出行业包：${file}`);
+    const asset = relative(root, absolute).split(sep).join("/");
+    if (!assets[asset]) throw new Error(`导入文件未声明为行业包资产：${asset}`);
+    const source = readFileSync(absolute);
+    if (createHash("sha256").update(source).digest("hex") !== assets[asset]) {
+      throw new Error(`导入资产摘要不一致：${asset}`);
+    }
+    if (visited.has(asset)) return;
+    visited.add(asset);
+    const parsed = ts.createSourceFile(asset, source.toString("utf8"), ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+    const checkImport = (node: ts.Expression | undefined): void => {
+      if (!node || !(ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node))) {
+        throw new Error(`导入必须是可核验的字面量：${asset}`);
+      }
+      const specifier = node.text;
+      if (specifier.startsWith("node:") && isBuiltin(specifier)) return;
+      if (!specifier.startsWith("./") && !specifier.startsWith("../")) {
+        throw new Error(`导入不是内置模块或包内相对路径：${asset} → ${specifier}`);
+      }
+      visit(relative(root, resolve(dirname(absolute), specifier)));
+    };
+    const walk = (node: ts.Node): void => {
+      if (ts.isImportDeclaration(node)) checkImport(node.moduleSpecifier);
+      else if (ts.isExportDeclaration(node) && node.moduleSpecifier) checkImport(node.moduleSpecifier);
+      else if (ts.isCallExpression(node)
+        && (node.expression.kind === ts.SyntaxKind.ImportKeyword
+          || ts.isIdentifier(node.expression) && node.expression.text === "require")) {
+        checkImport(node.arguments[0]);
+      }
+      ts.forEachChild(node, walk);
+    };
+    walk(parsed);
+  };
+  for (const entry of entries) visit(entry);
+  return [...visited].sort();
+}
 
 interface FenceRule {
   rule_id: string;
@@ -280,16 +331,71 @@ describe("岗位 / 技能 / 管线 / 对象四层引用", () => {
     }
   });
 
-  it("配乐连接器不依赖仓库外代码（工位自包含：只用 node 内置模块 + 相对导入）", () => {
-    for (const file of ["core.mjs", "measure.mjs", "synth.mjs"]) {
-      const source = readFileSync(join(BUNDLE_DIR, "connectors/bgm-bridge", file), "utf8");
-      const imports = [...source.matchAll(/from\s+"([^"]+)"/g)].map((match) => match[1]!);
-      for (const specifier of imports) {
-        expect(
-          specifier.startsWith("node:") || specifier.startsWith("./"),
-          `${file} 引入了非自包含依赖：${specifier}`,
-        ).toBe(true);
+  it("配乐连接器的完整导入闭包仅含内置模块和本 Bundle 已声明、摘要匹配的资产", () => {
+    const bundle = JSON.parse(readFileSync(join(BUNDLE_DIR, "bundle.json"), "utf8")) as {
+      integrity: { assets: Record<string, string> };
+    };
+    const closure = connectorImportClosure(BUNDLE_DIR,
+      ["core.mjs", "measure.mjs", "synth.mjs"].map((file) => `connectors/bgm-bridge/${file}`),
+      bundle.integrity.assets);
+    expect(closure).toContain("library/root-list.mjs");
+    expect(closure).toContain("connectors/subtitle-bridge/measure.mjs");
+  });
+
+  it("包内共享模块、静态/动态导入、重导出和循环引用仍可独立核验", () => {
+    const dir = mkdtempSync(join(tmpdir(), "bgm-imports-"));
+    try {
+      mkdirSync(join(dir, "connector"));
+      const files = {
+        "connector/core.mjs": 'import "node:fs"; import "../shared.mjs"; export * from "../shared.mjs"; await import("../shared.mjs");',
+        "shared.mjs": 'import "./connector/core.mjs";',
+      };
+      const assets: Record<string, string> = {};
+      for (const [file, source] of Object.entries(files)) {
+        writeFileSync(join(dir, file), source);
+        assets[file] = createHash("sha256").update(source).digest("hex");
       }
+      expect(connectorImportClosure(dir, ["connector/core.mjs"], assets)).toEqual(Object.keys(files).sort());
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it.each([
+    ['import "external-package";', /不是内置模块/],
+    ['export * from "external-package";', /不是内置模块/],
+    ['await import("https://example.com/module.mjs");', /不是内置模块/],
+    ['import "/tmp/external.mjs";', /不是内置模块/],
+    ['import "node:unknown-builtin";', /不是内置模块/],
+    ['import "../other-bundle/core.mjs";', /越出行业包/],
+    ['require(externalPath);', /字面量/],
+    ['await import(`./${externalPath}.mjs`);', /字面量/],
+    ['import "./missing.mjs";', /不存在/],
+  ])("闭包拒绝外部、越界、缺失和不可静态核验的依赖：%s", (source, expected) => {
+    const dir = mkdtempSync(join(tmpdir(), "bgm-imports-reject-"));
+    try {
+      writeFileSync(join(dir, "core.mjs"), source);
+      expect(() => connectorImportClosure(dir, ["core.mjs"], {
+        "core.mjs": createHash("sha256").update(source).digest("hex"),
+      })).toThrow(expected);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  it("包内模块缺登记、被篡改或用软链逃逸，闭包均拒绝", () => {
+    const dir = mkdtempSync(join(tmpdir(), "bgm-imports-integrity-"));
+    const outside = mkdtempSync(join(tmpdir(), "bgm-imports-outside-"));
+    try {
+      const source = 'import "./shared.mjs";';
+      writeFileSync(join(dir, "core.mjs"), source);
+      writeFileSync(join(dir, "shared.mjs"), "export const value = 1;");
+      const assets = { "core.mjs": createHash("sha256").update(source).digest("hex") };
+      expect(() => connectorImportClosure(dir, ["core.mjs"], assets)).toThrow(/未声明/);
+      expect(() => connectorImportClosure(dir, ["core.mjs"], { ...assets, "shared.mjs": "0".repeat(64) })).toThrow(/摘要不一致/);
+      rmSync(join(dir, "shared.mjs"));
+      writeFileSync(join(outside, "shared.mjs"), "export const value = 1;");
+      symlinkSync(join(outside, "shared.mjs"), join(dir, "shared.mjs"));
+      expect(() => connectorImportClosure(dir, ["core.mjs"], assets)).toThrow(/软链越出/);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+      rmSync(outside, { recursive: true, force: true });
     }
   });
 });

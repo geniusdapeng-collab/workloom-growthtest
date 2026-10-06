@@ -4,6 +4,7 @@
 > 定位：**不新造系统**——用 CNB 原生能力（Issue / 分支保护 / 流水线 / PR）+ 三个校验脚本，管住"谁在改什么、别撞车、会话断了能接上"。
 > 优先级：十二条系统不变量（《产品与代码全景认知》§8）> 本协议 > 本仓 `AGENTS.md` > 会话内临时指令。
 > 与《WorkLoom 分布式 AI 开发 Agent 协作机制 v0.1》的关系：本文件是它的**最小可执行子集**；账本服务、租约看门狗、考试院、错题本、蜂群经验属"重装备"，触发条件见 §7，未触发前不建。
+> 本仓增补（2026-10-06，T-2026-1006-0001）：§4 使用普通路径提醒、明确模块 PR 互斥和完整事实校验；仅 workloom-growthtest 生效，不回流冻结上游。发布源绑定见 `ci-gate-release-binding.md`。
 > 修订记录：2026-09-22 · 新增 §11「隔离副本车道」（growthtest / growthmatrix 双向不同步）；统一任务号书写为 `T-YYYY-MMDD-XXXX` 并同步提交门禁提示。
 
 ## 1. 五条硬规则
@@ -38,13 +39,19 @@
 
 > 凭据纪律（2026-09-30 修订）：凭据**来源不设限**——受控秘密存储、本地环境配置，或当前任务中由产品所有者提供的会话令牌（含对话中给出的令牌）都可用于执行已授权操作；但**任何凭据的落盘与外发一律 block**（源码、提交、文档、提示词模板、日志、报告、Issue/PR 正文与评论、同步产物、Git remote URL、shell 历史）。会话凭据只在需要它的那条命令内注入、用完即弃，疑似外泄立即停止并轮换。完整条款见 `AGENTS.md` §7。
 
-## 4. 锁：模块级互斥 + 路径重叠检测
+## 4. 锁：明确模块互斥 + 普通路径提醒（本仓增补）
 
-- **模块级互斥**（同一时刻全网仅一个任务可动）：`sync/**`、`protocol/**`、`**/migrations/**`、根 `package.json`、`AGENTS.md`、`.cnb.yml`、`docs/DEVELOPMENT-PROTOCOL.md`。
-- **普通路径**：同一文件被两个 open PR 同时修改 → 后到者拒（`LOCK_OVERLAP_MODE=warn` 可临时降级为告警）。
-- 检测由 `scripts/ci/verify-lock-conflict.mjs` 在 PR 流水线自动执行，无需手工维护锁表；脚本按「PR 编号 / 分支名 / 源分支提交 SHA」三重排除自身 PR。
-- 冲突处置：排队等待先到者合并；紧急任务转人工调度。
-- **事件语义（2026-09-27 修订）**：拦截只发生在 **PR 事件**（先到先得，后到者排队）；**push 事件**（main 上的合并提交）下重叠降级为**提醒**——合并已经发生，门禁拦不住任何东西，若仍判红则每次并发合并都会把 main 打红（实测：`workloom-growth` #211 合入后，因在途 #206/#209 同改 `bundles/ai-video/bundle.json` 被判红，同一内容 PR 门禁全绿）。需要 push 也按 fail 处理时用 `LOCK_OVERLAP_MODE=fail` 或 `--strict`。
+- **模块级互斥**：`sync/**`、`protocol/**`、`**/migrations/**`、根 `package.json`、`AGENTS.md`、`.cnb.yml`、`docs/DEVELOPMENT-PROTOCOL.md`。预合并 PR 命中同一明确模块时，按实际仓库 IID 先到先得，后到者等待；不同文件同模块也算冲突。
+- **普通路径**：同一文件被两个 open PR 修改时默认提醒。提醒包含实际另一 IID 和完整路径，后续合并仍须当前 source/target/checkout 绑定、平台保护、完整 CI 和真实可合并状态成立。
+- `LOCK_OVERLAP_MODE=fail|warn` **只覆盖普通路径**；`warn` 不能软化 PR 模块互斥或 API 缺证据。`--strict` 可供人工复核将两类冲突都改为硬失败；无效策略值拒绝执行。
+- **push 事件**已经合入，普通路径和模块冲突默认都提醒；`LOCK_OVERLAP_MODE=fail` 只收紧普通路径，`--strict` 收紧两类。API、Git 范围或身份无法核实时仍失败，不能用提醒制造绿灯。
+- **自身排除只认目标仓库 + 实际 IID**。`CNB_PULL_REQUEST` 布尔标记不是 IID；分支同名、完整 SHA 相同、12 位 SHA 前缀和祖先关系都不能排除另一 PR。当前 PR 的 source/target SHA、source 仓库和双方分支另行绑定官方字段。
+- open PR 列表显式分页至末页，再完整重扫；详情在文件采集前后核对，任何移动、关闭、重复 IID、页数/时间超限和异常响应都拒绝。当前 PR 必须出现在完整 open 集合，详情 fallback 不能证明其仍在途。
+- 变更使用真实 Git `--name-status -z`，保留删除、类型变化、rename/copy 旧新路径和路径中的空格/换行/Unicode。一个合法空 diff 是终态，不能退回其它基线制造范围；显式错误基线、浅历史和错误 checkout 都失败。
+- 另一 PR 的路径来自绑定完整 base/head 的 compare `path/previous_filename`；非分页 PullFiles 数组交叉核对数量、状态和名称。基名不是完整路径；若有 URL，来源/仓库/完整 SHA/路径必须一致；fork head 还须在实际 source 仓库取得同 SHA commit，无法取得时失败。
+- 本地缺少 CNB 上下文只输出 `local-skip`、`verified:false`、`complete:false`；CI 缺少令牌/仓库即失败。请求有独立超时、总时间和分页上界，不打印令牌、错误正文或签名 URL。
+
+详细边界、候选方案、发布观察与回执、运行命令见 [本仓 CI 和发布源绑定](ci-gate-release-binding.md)。当前 static-gate 不等待自己的 pending 状态变绿；完整三门禁在实际平台合并和桌面 Release 首检/后检阶段核对，避免门禁自等待。
 
 ## 5. 提交规范（放宽版）
 
@@ -278,7 +285,7 @@ node scripts/tools/experiment-guard.mjs [--check]
 ## 8. 落地检查（每周一次，1 分钟）
 
 - 进行中的对话是否都有任务卡？（应 100%）
-- 是否有两个 open PR 改了同一文件/同一互斥模块？（应 0）
+- 是否有后到 open PR 同改明确互斥模块？（应被阻断）；普通路径重叠是否已提醒并在当前合并上下文重跑？
 - 是否有门禁全绿却超过 24h 未合并的 PR？（应 0——由 AI 按 §1/§9.5 直接合并，或已在 Issue 说明阻塞原因）
 - `risk/review` PR 是否都在拿到放行后由 AI 执行了合并（而不是等人来点）？（应「是」）
 - 合并是否严格串行？（应「是」）

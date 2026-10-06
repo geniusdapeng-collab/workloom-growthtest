@@ -1,0 +1,54 @@
+09:39:02 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-WYPQfd/resources）==
+09:39:02 正在检查本机版本与安装载荷…
+09:39:02 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-5o5KvH/resources）==
+09:39:02 正在检查本机版本与安装载荷…
+▶ 桌面载荷原子装配
+  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.529083ms)
+  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (3.466708ms)
+  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.385ms)
+  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (5.253417ms)
+  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (3.781542ms)
+  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (4.265ms)
+  ✔ 首装暂存失败不会留下半套运行时 (2.322958ms)
+  ✔ 安装阶段检查点以机器可读中文状态落盘 (0.861458ms)
+  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.180833ms)
+  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.41125ms)
+  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (0.23925ms)
+✔ 桌面载荷原子装配 (24.298666ms)
+▶ 桌面 PostgreSQL 实例归属与端口契约
+  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.123ms)
+  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (0.883541ms)
+  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.172041ms)
+  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (0.811125ms)
+  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (0.367375ms)
+✔ 桌面 PostgreSQL 实例归属与端口契约 (2.4435ms)
+▶ 桌面本机渲染子进程的 Node 路径
+  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (1.51725ms)
+  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (24.342542ms)
+  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.07575ms)
+✔ 桌面本机渲染子进程的 Node 路径 (26.00675ms)
+▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏
+  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (0.798292ms)
+  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (1.011292ms)
+  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (1.346166ms)
+  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.263625ms)
+  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (0.740875ms)
+  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.567459ms)
+  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.189375ms)
+  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.191625ms)
+  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.068125ms)
+✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (5.2835ms)
+▶ 应急浏览器壳与正式 Electron 共用安全引导
+  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (1.451333ms)
+  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (0.321542ms)
+  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.092625ms)
+  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.143959ms)
+✔ 应急浏览器壳与正式 Electron 共用安全引导 (2.063708ms)
+ℹ tests 32
+ℹ suites 5
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 105.115542

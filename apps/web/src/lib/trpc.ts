@@ -9,6 +9,9 @@ import type { AppRouter } from "@workloom/server/router";
 import { DEMO_MEMBER, DEMO_WORKSPACE, storageKey } from "./product";
 
 const TOKEN_KEY = storageKey("access-token");
+declare global {
+  interface Window { workloomDesktop?: { login: () => Promise<{ token: string }> } }
+}
 /**
  * 本机个人使用为**默认形态**（T-2026-0921-0002，产品所有者口径）：
  * B 端默认隐藏游客/注册入口，并以**店主（种子成员）**身份自动登录——打开即用。
@@ -117,7 +120,17 @@ export async function ensureDemoLogin(memberNo?: string): Promise<void> {
   try {
     if (!isGuest() && await validateStoredSession()) return;
     if (isGuest()) clearToken(); // 历史游客态一律清理，避免只读身份残留
-    const r = await trpc.auth.loginAs.mutate({ workspaceSlug: DEMO_WORKSPACE, memberNo: target });
+    let r: { token: string };
+    if (import.meta.env.DEV || import.meta.env.MODE === "test") {
+      r = await trpc.auth.loginAs.mutate({ workspaceSlug: DEMO_WORKSPACE, memberNo: target });
+    } else if (window.workloomDesktop?.login) {
+      r = await window.workloomDesktop.login();
+    } else {
+      if (window.location.pathname !== "/login") {
+        window.location.assign(`/login?next=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+      }
+      throw new Error("请先登录账户");
+    }
     if (loginEpoch !== formalLoginEpoch) return;
     setToken(r.token);
     validatedToken = r.token;

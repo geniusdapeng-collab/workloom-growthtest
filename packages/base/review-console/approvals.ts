@@ -12,6 +12,7 @@
  *  - 手势回写（F5.5）：手势事件经安全网关落库；驳回原因枚举回流偏好模式（F1.7 校准闭环）
  */
 import type pg from "pg";
+import { createHash } from "node:crypto";
 import {
   APPROVAL_LIMITS,
   GESTURE_WEIGHT,
@@ -278,8 +279,11 @@ export async function decide(
 
     // F1.7 校准闭环：驳回原因枚举 → 偏好模式记忆（机制位；权重衰减在数据大脑侧）
     if (gesture.type === "reject" && gesture.reasonEnum) {
+      const memoryId = `mem-reject-${createHash("sha256").update(JSON.stringify([
+        scope.tenantId, scope.workspaceId, gesture.reasonEnum,
+      ])).digest("hex").slice(0, 32)}`;
       await upsertMemoryInTx(c, scope, {
-        memoryId: `mem-reject-${gesture.reasonEnum}`,
+        memoryId,
         scope: "workspace",
         kind: "preference",
         content: `驳回偏好模式：原因枚举「${gesture.reasonEnum}」被采纳为校准信号（最新来源 ${gres.eventId}）`,
@@ -290,7 +294,7 @@ export async function decide(
       // 缺列时 workspace_id 为 NULL，WITH CHECK 不通过（RLS 42501）
       await c.query(
         `INSERT INTO memory_usage (memory_id, event_id, workspace_id) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING`,
-        [`mem-reject-${gesture.reasonEnum}`, gres.eventId, scope.workspaceId],
+        [memoryId, gres.eventId, scope.workspaceId],
       );
     }
 

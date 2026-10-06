@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import pg from "pg";
 import { createHash, randomBytes } from "node:crypto";
 import { FilmLedger, filmWorkerId } from "./film-ledger.js";
+import { FILM_CHANNEL_METHODS } from "@hyperreality/video-studio";
 import type { AppPool } from "./gen/db.js";
 
 const RUN_DB = process.env.RUN_DB_TESTS === "1" && Boolean(process.env.DATABASE_URL) && Boolean(process.env.DATABASE_APP_URL);
@@ -32,7 +33,7 @@ describe.runIf(RUN_DB)("固定影片工位台账活库契约（T-2026-0927-0039�
   async function register(sha: string, version = "v1") {
     return ledger.registerWorker({
       workerName: "full-chain-film", workerVersion: version, entryPath: "scripts/tools/full-chain-film.mts",
-      entrySha256: sha, capabilities: ["llm", "image", "video", "media", "review", "voice"], actor: "MEM-T",
+      entrySha256: sha, capabilities: [...FILM_CHANNEL_METHODS], actor: "MEM-T",
     });
   }
 
@@ -57,6 +58,17 @@ describe.runIf(RUN_DB)("固定影片工位台账活库契约（T-2026-0927-0039�
     expect(old?.status).toBe("disabled");
     const active = await ledger.activeWorker("full-chain-film");
     expect(active?.entry_sha256).toBe(hash("2"));
+  });
+
+  it("组件类别和未知方法不能充当通道授权；失败不产生登记行", async () => {
+    const invalidSha = hash("invalid-method-registration");
+    for (const capabilities of [["llm"], ["image"], ["video"], ["llm.chat", "network.any"]]) {
+      await expect(ledger.registerWorker({
+        workerName: "invalid-method-worker", workerVersion: "v1", entryPath: "scripts/tools/full-chain-film.mts",
+        entrySha256: invalidSha, capabilities, actor: "MEM-T",
+      })).rejects.toMatchObject({ code: "FILM_WORKER_INVALID" });
+    }
+    expect(await ledger.workerById(filmWorkerId({ ...scope, workerName: "invalid-method-worker", entrySha256: invalidSha }))).toBeNull();
   });
 
   it("作业认领：attempt 递增、输入摘要写死、终态回执不可覆盖", async () => {

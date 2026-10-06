@@ -35,17 +35,20 @@ const DEV_SECRET = "workloom-dev-secret-change-me";
 const DEFAULT_ISSUER = "workloom-im";
 
 // 生产启动强校验（模块加载即生效）：缺 JWT_SECRET 直接抛错拒启，不回落开发占位密钥
-if (process.env.NODE_ENV === "production" && !process.env.JWT_SECRET) {
-  throw new Error("生产环境（NODE_ENV=production）必须配置 JWT_SECRET（见 .env.example），拒绝回落开发占位密钥");
-}
+if (process.env.NODE_ENV === "production") sessionSigningKey();
 // 弱密钥告警（一次性）：<32 字符熵不足，暴力可枚举
 const _secret = process.env.JWT_SECRET ?? DEV_SECRET;
 if (_secret.length < 32) {
   console.warn("[auth] JWT_SECRET 长度 <32 字符，熵不足——生产环境请配置 ≥32 字符随机密钥");
 }
 
-function key(): Uint8Array {
-  return new TextEncoder().encode(process.env.JWT_SECRET ?? DEV_SECRET);
+export function sessionSigningKey(): Uint8Array {
+  const secret = process.env.JWT_SECRET ?? DEV_SECRET;
+  if (process.env.NODE_ENV === "production" && (Buffer.byteLength(secret) < 32
+    || /workloom-dev-secret|change[-_ ]?me|replace[-_ ]?me|your[-_ ]?(?:jwt|secret)/i.test(secret))) {
+    throw new Error("生产环境必须配置至少32字节的随机 JWT_SECRET，公开占位密钥不可用于签发");
+  }
+  return new TextEncoder().encode(secret);
 }
 
 /**
@@ -93,7 +96,7 @@ export async function signDemoToken(identity: Identity): Promise<string> {
     .setIssuedAt()
     .setIssuer(sessionTokenIssuer())
     .setExpirationTime("24h")
-    .sign(key());
+    .sign(sessionSigningKey());
 }
 
 function stringClaim(value: unknown): string | null {
@@ -149,7 +152,9 @@ function partnerIdentity(payload: Record<string, unknown>): PartnerSessionIdenti
 /** 验签后按 kind 严格解析会话；未知/缺字段载荷一律失败关闭。 */
 export async function verifySessionToken(token: string): Promise<SessionIdentity | null> {
   try {
-    const { payload } = await jwtVerify(token, key(), { issuer: sessionTokenIssuer() });
+    const { payload } = await jwtVerify(token, sessionSigningKey(), {
+      issuer: sessionTokenIssuer(), algorithms: ["HS256"], requiredClaims: ["iat", "exp"], maxTokenAge: "24h",
+    });
     const record = payload as Record<string, unknown>;
     if (record.kind === "partner") return partnerIdentity(record);
     if (record.kind !== undefined && record.kind !== "member") return null;

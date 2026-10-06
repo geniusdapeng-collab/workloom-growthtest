@@ -5,8 +5,13 @@
 > 没先判视频类型、也没让分镜卡过字段规范闸"。
 
 > **要把本仓能力接进桌面客户端（Codex / DeepSeek Harness）**：见 [`docs/AGENT-CLIENTS.md`](../../docs/AGENT-CLIENTS.md)
-> —— 里面有 5 分钟接入（`list`/`invoke`/MCP 冒烟）、MCP 配置片段、**视频能力清单**（只读/预览 6 条）
+> —— 里面有 5 分钟接入（`list`/`invoke`/MCP 冒烟）、MCP 配置片段、**视频能力清单**（原 6 条 + 导演 5 条）
 > 与安全边界。本文（runbook）负责"怎么出片"，那份文档负责"怎么被 Agent 调起来"。
+
+> **默认一句话导演入口**：见 [导演制作 V2 手册](../../docs/director-studio-v2.md)，使用认证的
+> `node scripts/workloom-director.mjs plan|start|job|versions|feedback`。默认三支常规版 + 导演惊喜版，
+> 每版独立 EDL、声音和字幕；`plan` 强制只调用文字模型。以下 §0–§6 保留专业旧 CLI 流程的操作规则，
+> 不把旧 Runner 的原三版后期当作导演 V2 的四版交付。
 
 ---
 

@@ -1,0 +1,95 @@
+{
+  "sn": "cnb-4b9-1k3uh535j",
+  "sha": "df019d6be6a5a9409d8b5da5d255364ad8332c61",
+  "prCommitSha": "c65f02e8a294ddd297ad4a4c6771822680a62670",
+  "status": "success",
+  "associatedWithCurrentHead": true,
+  "buildLogUrl": "https://cnb.cool/workloom-ai/workloom-growthtest/-/build/logs/cnb-4b9-1k3uh535j",
+  "evidenceLevel": "B",
+  "pipelines": [
+    {
+      "name": "static-gate",
+      "status": "success",
+      "stages": [
+        {
+          "name": "依赖安装（frozen lockfile）",
+          "status": "success",
+          "durationMs": 4190
+        },
+        {
+          "name": "协议门禁（提交规范 + 并发冲突）",
+          "status": "success",
+          "durationMs": 1128
+        },
+        {
+          "name": "开源组件清单一致性（oss-watch）",
+          "status": "success",
+          "durationMs": 2997
+        },
+        {
+          "name": "产品身份与行业包治理（含内置角色资产与声明一致性）",
+          "status": "success",
+          "durationMs": 512
+        },
+        {
+          "name": "三端生产构建",
+          "status": "success",
+          "durationMs": 3919
+        }
+      ]
+    },
+    {
+      "name": "db-gate",
+      "status": "success",
+      "stages": [
+        {
+          "name": "准备 Node 24 与 pnpm",
+          "status": "success",
+          "durationMs": 16990
+        },
+        {
+          "name": "启动 PostgreSQL 17 + pgvector",
+          "status": "success",
+          "durationMs": 931
+        },
+        {
+          "name": "迁移 + 种子（幂等复跑）+ 哈希链",
+          "status": "success",
+          "durationMs": 12470
+        }
+      ]
+    },
+    {
+      "name": "test-gate",
+      "status": "success",
+      "stages": [
+        {
+          "name": "准备 Node 24 与 pnpm",
+          "status": "success",
+          "durationMs": 21323
+        },
+        {
+          "name": "typecheck 全包（非阻断）",
+          "status": "success",
+          "durationMs": 12978
+        },
+        {
+          "name": "主测试套件（非阻断）",
+          "status": "success",
+          "durationMs": 127513
+        },
+        {
+          "name": "全场景套件（非阻断）",
+          "status": "success",
+          "durationMs": 16484
+        },
+        {
+          "name": "P0 门禁：开户即托管验收 + 围栏别名扫描（S9）",
+          "status": "success",
+          "durationMs": 4705
+        }
+      ]
+    }
+  ],
+  "qualificationScope": "CNB configured static/db/test gates; not paid media, formal platform signing or independent M6"
+}

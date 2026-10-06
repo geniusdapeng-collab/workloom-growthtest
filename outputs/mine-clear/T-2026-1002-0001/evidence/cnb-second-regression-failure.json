@@ -1,0 +1,15 @@
+{
+  "evidenceLevel": "B",
+  "source": "public CNB build SSR stage metadata, transport fields omitted",
+  "sha": "f31e5a65162cd46c29e2e9039f05f049f9aafd70",
+  "prCommitSha": "1d76df1f2720cc600d443edd8a33161042b898a3",
+  "sn": "cnb-7ef-1k3ucdveg",
+  "associatedWithCurrentHead": true,
+  "failedPipelines": [
+    {
+      "name": "test-gate",
+      "status": "error",
+      "error": "Too large to show the beginning...\n\n\n + false\npackages/base test:  ❯ bundles/bgm-capability.test.ts:291:11\npackages/base test:     289|           specifier.startsWith(\"node:\") || specifier.startsWith(\"./\"),\npackages/base test:     290|           `${file} 引入了非自包含依赖：${specifier}`,\npackages/base test:     291|         ).toBe(true);\npackages/base test:        |           ^\npackages/base test:     292|       }\npackages/base test:     293|     }\npackages/base test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯\npackages/base test:  FAIL  workdata/security-audit.test.ts > 安全审计 PG 集成（附录 H） > #30 append-only 第三道防线：TRUNCATE 全角色被拒（含 owner）\npackages/base test: AssertionError: expected [Function] to throw error matching /append-only/ but got 'cannot truncate a table referenced in…'\npackages/base test: - Expected:\npackages/base test: /append-only/\npackages/base test: + Received:\npackages/base test: \"cannot truncate a table referenced in a foreign key constraint\"\npackages/base test:  ❯ workdata/security-audit.test.ts:159:55\npackages/base test:     157|     const owner = new pg.default.Pool({ connectionString: process.env.…\npackages/base test:     158|     try {\npackages/base test:     159|       await expect(owner.query(\"TRUNCATE biz_events\")).rejects.toThrow…\npackages/base test:        |                                                       ^\npackages/base test:     160|     } finally {\npackages/base test:     161|       await owner.end();\npackages/base test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯\npackages/base test:  Test Files  2 failed | 76 passed | 1 skipped (79)\npackages/base test:       Tests  2 failed | 1362 passed | 4 skipped (1368)\npackages/base test:    Start at  21:22:33\npackages/base test:    Duration  52.79s (transform 2.17s, setup 0ms, import 10.59s, tests 32.08s, environment 8ms)\npackages/base test: Failed\n/workspace/packages/base:\n ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workloom/base@0.1.0 test: `vitest run`\nExit status 1\n ELIFECYCLE  Test failed. See above for more details.\n"
+    }
+  ]
+}

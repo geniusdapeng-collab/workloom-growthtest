@@ -1,3 +1,4 @@
+import { videoRuntimeRoot } from "./runtime-root.js";
 /**
  * llm-adapter.ts —— WorkLoom model-router ↔ SuperMickey LLMEngine 接口适配
  *
@@ -13,7 +14,7 @@
  * 真实计量 + model.call 事件留痕 + 降级链），vendor 只读纪律不破。
  */
 import {
-  routeSmart, type EventSink, type ModelPolicy, type ModelProvider, type PlanId,
+  routeSmart, OpenAiCompatibleProvider, type EventSink, type ModelPolicy, type ModelProvider, type PlanId,
 } from "@workloom/base/model-router";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -21,6 +22,8 @@ import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface LLMReasonOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
   model?: string;
   systemPrompt?: string;
   temperature?: number;
@@ -48,6 +51,8 @@ export interface WorkloomLLMEngineConfig {
   fastModel?: string;
   timeoutMs?: number;
   maxTokens?: number;
+  /** Explicit provider setting; only configure for endpoints documented to accept it. */
+  thinking?: Record<string, unknown>;
   /**
    * v3.0 收口：注入路由配置后，全部 LLM 调用经 routeSmart
    * （场景 preproduction；opts.model===fastModel 的快速调用强制 L1 轻量档）——
@@ -60,6 +65,8 @@ export interface WorkloomLLMEngineConfig {
     plan?: PlanId;
     /** 覆盖默认场景（默认 preproduction） */
     scene?: string;
+    /** Deployment assembly only; actual model IDs remain in metering events. */
+    modelChain?: string[];
   };
 }
 
@@ -70,7 +77,7 @@ interface ChatCompletionResponse {
 }
 
 export class WorkloomLLMEngine {
-  private readonly cfg: Required<Omit<WorkloomLLMEngineConfig, "router">> & { router?: WorkloomLLMEngineConfig["router"] };
+  private readonly cfg: Required<Omit<WorkloomLLMEngineConfig, "router"|"thinking">> & { router?: WorkloomLLMEngineConfig["router"];thinking?:Record<string,unknown> };
   readonly stats = { totalCalls: 0, totalFailures: 0 };
 
   get model(): string {
@@ -95,13 +102,23 @@ export class WorkloomLLMEngine {
     this.cfg.router = router;
   }
 
+  /** Use the customer's explicit endpoint/model while retaining the shared router and PII boundary. */
+  attachConfiguredRouter(router: Omit<NonNullable<WorkloomLLMEngineConfig["router"]>,"providers"|"modelChain">): void {
+    const thinking=this.cfg.thinking?.type;
+    const provider=new OpenAiCompatibleProvider(this.cfg.model,{baseUrl:this.cfg.baseUrl.replace(/\/$/u,""),apiKey:this.cfg.apiKey,
+      maxTokens:this.cfg.maxTokens,...(thinking==="enabled"||thinking==="disabled"?{thinking:{type:thinking}}:{})});
+    this.cfg.router={...router,providers:new Map([[this.cfg.model,provider]]),modelChain:[this.cfg.model]};
+  }
+
   /** 从底座四环境变量构建（LLM_BASE_URL/LLM_API_KEY/LLM_MODEL，LLM_PROVIDER 仅作记录） */
   static fromEnv(env: NodeJS.ProcessEnv = process.env): WorkloomLLMEngine | null {
     const baseUrl = env.LLM_BASE_URL;
     const apiKey = env.LLM_API_KEY;
     const model = env.LLM_MODEL;
     if (!baseUrl || !apiKey || !model) return null;
-    return new WorkloomLLMEngine({ baseUrl, apiKey, model });
+    const toggle=env.WORKLOOM_LLM_THINKING;
+    return new WorkloomLLMEngine({ baseUrl, apiKey, model,
+      ...(["enabled","disabled"].includes(toggle??"")?{thinking:{type:toggle}}:{}) });
   }
 
   private async callChat(prompt: string, opts: LLMReasonOptions): Promise<LLMReasonResult> {
@@ -113,6 +130,7 @@ export class WorkloomLLMEngine {
         const r = await routeSmart(
           {
             action: scene, scene, plan: this.cfg.router.plan,
+            signal: opts.signal, timeoutMs: opts.timeoutMs,
             forceTier: isFast ? "L1" : undefined,
             messages: [
               {
@@ -127,7 +145,7 @@ export class WorkloomLLMEngine {
           },
           this.cfg.router.providers,
           this.cfg.router.sink,
-          { policy: this.cfg.router.policy },
+          { policy: this.cfg.router.policy, modelChain:this.cfg.router.modelChain },
         );
         if ((r.kind === "answered" || r.kind === "circuit_broken" || r.kind === "reused") && r.text) {
           return {
@@ -163,10 +181,14 @@ export class WorkloomLLMEngine {
     };
     if (opts.forceJson) body.response_format = { type: "json_object" };
     else if (opts.responseFormat) body.response_format = opts.responseFormat;
-    if (opts.thinking && typeof opts.thinking === "object") body.thinking = opts.thinking;
+    const thinking=opts.thinking??this.cfg.thinking;
+    if (thinking && typeof thinking === "object") body.thinking = thinking;
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), this.cfg.timeoutMs);
+    const forwardAbort = () => controller.abort(opts.signal?.reason);
+    opts.signal?.addEventListener("abort", forwardAbort, { once: true });
+    if (opts.signal?.aborted) forwardAbort();
+    const timer = setTimeout(() => controller.abort(), opts.timeoutMs ?? this.cfg.timeoutMs);
     try {
       const resp = await fetch(`${this.cfg.baseUrl.replace(/\/$/, "")}/chat/completions`, {
         method: "POST",
@@ -200,6 +222,7 @@ export class WorkloomLLMEngine {
       return { success: false, error: msg, retryable: true };
     } finally {
       clearTimeout(timer);
+      opts.signal?.removeEventListener("abort", forwardAbort);
     }
   }
 
@@ -230,7 +253,7 @@ export class WorkloomLLMEngine {
       } catch (err) {
         this.stats.totalFailures++;
         return {
-          success: false,
+          ...result, success: false,
           error: `JSON 解析失败: ${err instanceof Error ? err.message : String(err)}`,
           retryable: true
         };
@@ -379,7 +402,7 @@ export class WorkloomLLMEngine {
 export function installVendorEngineBridge(engine: WorkloomLLMEngine): () => void {
   try {
     // 仓库根按**本模块位置**解析（服务进程 cwd 是 apps/server，用 cwd 会找不到 vendor）
-    const repoRoot = resolvePath(dirname(fileURLToPath(import.meta.url)), "../../..");
+    const repoRoot = videoRuntimeRoot(import.meta.url);
     const vendorRequire = createRequire(resolvePath(repoRoot, "package.json"));
     const enginePath = resolvePath(repoRoot, "vendor/supermickey/systems/llm-reasoning-engine.js");
     if (!existsSync(enginePath)) return () => undefined;

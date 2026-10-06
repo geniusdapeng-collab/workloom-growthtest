@@ -50,6 +50,35 @@ const validPlan: CoverPlan = {
 };
 
 describe("封面设计稿", () => {
+  it("可见文案拒绝空行、控制字符与非字符串，避免渲染静默丢字", () => {
+    for (const headline of ["酒店\n", "酒店\n\n服务", "酒店\t服务", "酒店\u0000服务", 42]) {
+      expect(() => validateCoverPlan({ ...validPlan, headline: headline as string }, input)).toThrowError(CoverDesignError);
+    }
+    for (const subline of ["双屏\n自助机", "双屏\r自助机", { text: "双屏" }]) {
+      expect(() => validateCoverPlan({ ...validPlan, subline: subline as string }, input)).toThrowError(CoverDesignError);
+    }
+  });
+  it("生成素材把来源与文案约束传给设计师，并拒绝封面冒称实拍", () => {
+    const generated: CoverDesignInput = { ...input,
+      brief: { ...input.brief, footageOrigin: "generated", claimsDiscipline: "不编造入住秒数" } };
+    expect(buildCoverDesignPrompt(generated)).toContain("AI生成视频");
+    expect(buildCoverDesignPrompt(generated)).toContain("不编造入住秒数");
+    for (const field of ["headline", "subline", "badge"] as const) {
+      expect(() => validateCoverPlan({ ...validPlan, [field]: "30秒实拍" }, generated)).toThrow(/生成素材封面不得声明实拍/);
+    }
+    expect(buildCoverDesignPrompt(generated)).not.toContain("可用角标 AI生成");
+    expect(buildCoverDesignPrompt(generated)).toContain("运营标签不进入创作画面");
+    expect(() => validateCoverPlan({ ...validPlan, badge: "AI生成" }, generated)).toThrow(/运营标签/);
+    expect(() => validateCoverPlan({ ...validPlan, badge: "实拍" }, input)).not.toThrow();
+  });
+  it("operational AI/style labels are rejected in every raster text field while creative AI copy remains valid", () => {
+    for (const field of ["headline", "subline", "badge"] as const) {
+      for (const text of ["AI生成", "AIGC", "暖色电影感", "暖调胶片", "社媒冲击感", "社交高对比", "冷色科技感", "冷调技术感", "warm-film", "punchy-social", "cool-tech"]) {
+        expect(() => validateCoverPlan({ ...validPlan, [field]: text }, input)).toThrow(/运营标签/);
+      }
+    }
+    expect(() => validateCoverPlan({ ...validPlan, headline: "AI班组住进酒店", badge: "入住更从容" }, input)).not.toThrow();
+  });
   it("提示词把版式（两种主视觉）与安全区写清楚（设计师不能只交标题）", () => {
     const prompt = buildCoverDesignPrompt(input);
     expect(prompt).toContain("禁止只有一行标题");

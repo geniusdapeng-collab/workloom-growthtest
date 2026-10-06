@@ -1,0 +1,29 @@
+{
+  "evidenceLevel": "B",
+  "observedAt": "2026-10-02T16:12:14.890980+00:00",
+  "scope": "owned startup, PostgreSQL and UI fixture ports only",
+  "ports": [
+    {
+      "port": 56624,
+      "listening": false
+    },
+    {
+      "port": 59082,
+      "listening": false
+    },
+    {
+      "port": 55142,
+      "listening": false
+    },
+    {
+      "port": 54642,
+      "listening": false
+    },
+    {
+      "port": 59432,
+      "listening": false
+    }
+  ],
+  "allOwnedTestPortsClosed": true,
+  "otherApplicationsStopped": false
+}

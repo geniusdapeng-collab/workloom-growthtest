@@ -1,0 +1,29 @@
+{
+  "codeCommit": "c94cfb64b4bee11448907967787800746393ccd4",
+  "sourceClean": true,
+  "auditBaseline": "4da4b65e23bb3f783189038d1be9faee7f3c1973",
+  "priorProofRoot": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/outputs/necessary-followup/mine-clear-native5",
+  "resultRoot": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/outputs/necessary-followup/mine-clear-native6",
+  "auditBaselineSha256": "e0c4377d08a85a7bb3f99cac79404b966dfdb9d7ff3f6dfdc8affb735f1efa39",
+  "priorLedgerSha256": "3a23cbeed13d7948e747df634831e811a702c339a2969190ac0a4eaccce131eb",
+  "createdAt": "2026-10-03T13:17:43.427351+00:00",
+  "canonicalReopenedCards": 2,
+  "state": "open cards only; actual repair and independent acceptance pending",
+  "executorCommit": "7cf350a4a595549c8572c0a384e3b9a1a33bb5d8",
+  "nodeExecutable": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+  "roleSources": {
+    "MC-006 repair": {
+      "actor": "/root/geo_receipt_repair",
+      "source": "existing actual collaboration child agent"
+    },
+    "MC-016 repair": {
+      "actor": "/root",
+      "source": "actual root implementation and regression after native5 linked failure; prior child diagnosis read-only"
+    },
+    "acceptance": {
+      "actor": "/root/independent_acceptance",
+      "source": "existing actual collaboration child agent; no product edits"
+    }
+  },
+  "rootCurrentContextId": "01a101e3-6a89-7c20-b76a-13e73e186e40"
+}

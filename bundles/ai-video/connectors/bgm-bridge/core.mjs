@@ -20,10 +20,12 @@ import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { parseRootList } from "../../library/root-list.mjs";
 
 import {
   MeasureError, binaryVersion, classifySegments, decodePcm, detectCuts, detectVoiceBandSegments,
-  energyEnvelope, estimateBpmFromOnsets, measureLoudness, onsetStrength, probeMedia,
+  energyEnvelope, estimateBpmFromOnsets, measureLoudness, onsetStrength, parseLoudnormJson, probeMedia,
   renderWaveformCompare, resolveBinaries, round, runBin, scoreSegments, segmentMeanVolumeDb,
   segmentSpectralStats, sha256File, tempDir,
 } from "./measure.mjs";
@@ -83,8 +85,7 @@ function realpathDeepest(target) {
 
 /** 允许根目录：环境变量优先，缺省只放行进程工作目录与系统临时目录。 */
 export function allowedRoots(env = process.env) {
-  const raw = (env.WORKLOOM_BGM_ALLOWED_ROOTS ?? "").trim();
-  const list = raw ? raw.split(":").map((entry) => entry.trim()).filter(Boolean) : [process.cwd(), os.tmpdir()];
+  const list = parseRootList(env.WORKLOOM_BGM_ALLOWED_ROOTS, { fallback: [process.cwd(), os.tmpdir()] });
   return list.map((entry) => {
     const abs = path.resolve(entry);
     return fs.existsSync(abs) ? fs.realpathSync(abs) : abs;
@@ -111,7 +112,7 @@ export function assertPathAllowed(target, roots = allowedRoots(), label = "path"
 /* ============================ 配方库 ============================ */
 
 const RECIPE_FILE = path.resolve(
-  path.dirname(new URL(import.meta.url).pathname),
+  path.dirname(fileURLToPath(import.meta.url)),
   "../../library/bgm-recipes/recipes.json",
 );
 
@@ -232,7 +233,7 @@ export function findRecipes(query = {}) {
 export function libraryDir(env = process.env) {
   const override = (env.WORKLOOM_BGM_LIBRARY_DIR ?? "").trim();
   if (override) return path.resolve(override);
-  return path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../library/bgm-library");
+  return path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../library/bgm-library");
 }
 
 /**
@@ -244,7 +245,7 @@ export function libraryDir(env = process.env) {
  * 三个目录都用同一份 `tracks.json` 契约；同 id 时前面的优先（客户可以覆盖仓库版本）。
  */
 export function libraryRoots(env = process.env) {
-  const here = path.dirname(new URL(import.meta.url).pathname);
+  const here = path.dirname(fileURLToPath(import.meta.url));
   const custom = (env.WORKLOOM_BGM_LIBRARY_DIR ?? "").trim();
   const workbenchHome = (env.WORKLOOM_BGM_HOME ?? "").trim() || path.join(os.homedir(), ".workloom-bgm");
   const candidates = [
@@ -1375,16 +1376,62 @@ export async function verifyIndependentAudio(audioStems, { env = process.env, bi
  * 直接用 os.tmpdir() 会因 /var→/private/var 软链被路径监狱拒绝，实测踩过），
  * 同时作为 program 与"近似 dialogue"两条来源。**不产生任何签章**，回执里必须如实标注。
  */
-async function declaredProgramStems({ input, nearDir, bins = resolveBinaries() }) {
+async function declaredProgramStems({ input, nearDir, targetLufs = -14, truePeak = -1, bins = resolveBinaries() }) {
   const dir = await fsp.mkdtemp(path.join(nearDir, ".bgm-declared-"));
-  const programWav = path.join(dir, "program.wav");
+  const sourceWav = path.join(dir, "source-program.wav");
   await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-y", "-i", input,
-    "-vn", "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le", programWav],
+    "-vn", "-ac", "2", "-ar", "48000", "-c:a", "pcm_f32le", sourceWav],
   { label: "ffmpeg(declared-program-audio)", timeoutMs: 600_000 });
+  const before = await measureLoudness(sourceWav, { bins, targetLufs, truePeak });
+  if (!Number.isFinite(before.integratedLufs) || !Number.isFinite(before.truePeakDbtp)) {
+    throw new BgmError("声明节目轨响度或真峰值不可测", "verify_failed", false);
+  }
+  const wantedGainDb = targetLufs - before.integratedLufs;
+  const safeGainDb = truePeak - 0.5 - before.truePeakDbtp;
+  let programWav = sourceWav;
+  let preparation = { applied: false, method: "linear-compatible", sourceSha256: await sha256File(sourceWav), before };
+  // A precombined, explicitly unverified program may have speech peaks that make the
+  // final shared linear gain impossible. Master that source before adding music;
+  // never apply a hidden nonlinear gain to signed stems or their comparison tracks.
+  if (wantedGainDb - safeGainDb > 1) {
+    const programTarget = targetLufs - 2;
+    // Leave four dB for summing the music bed; two dB was insufficient on real speech.
+    const programPeak = Math.max(-9, truePeak - 4);
+    const renderPeak = Math.max(-9, programPeak - 0.5);
+    const filter = `loudnorm=I=${programTarget}:TP=${renderPeak}:LRA=7:linear=false`;
+    const scan = await runBin(bins.ffmpeg, ["-hide_banner", "-nostats", "-v", "info", "-i", sourceWav,
+      "-vn", "-af", `${filter}:print_format=json`, "-f", "null", "-"],
+    { label: "ffmpeg(declared-program-mastering-scan)", timeoutMs: 600_000 });
+    const stats = parseLoudnormJson(scan.stderr);
+    const values = ["input_i", "input_tp", "input_lra", "input_thresh", "target_offset"];
+    if (!stats || values.some((key) => !Number.isFinite(Number(stats[key])))) {
+      throw new BgmError("声明节目轨动态响度扫描不可测", "verify_failed", false);
+    }
+    programWav = path.join(dir, "program-mastered.wav");
+    await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-i", sourceWav,
+      "-af", `${filter}:measured_I=${stats.input_i}:measured_TP=${stats.input_tp}:measured_LRA=${stats.input_lra}`
+        + `:measured_thresh=${stats.input_thresh}:offset=${stats.target_offset}`,
+      "-c:a", "pcm_f32le", "-ar", "48000", "-ac", "2", programWav],
+    { label: "ffmpeg(declared-program-mastering)", timeoutMs: 600_000 });
+    const after = await measureLoudness(programWav, { bins, targetLufs: programTarget, truePeak: programPeak });
+    if (!Number.isFinite(after.integratedLufs) || !Number.isFinite(after.truePeakDbtp)
+      || Math.abs(after.integratedLufs - programTarget) > 1.5 || after.truePeakDbtp > programPeak + 0.2) {
+      throw new BgmError(`声明节目轨动态响度处理复检未通过（${after.integratedLufs} LUFS / ${after.truePeakDbtp} dBTP）`, "verify_failed", false);
+    }
+    const sourceProbe = await probeMedia(sourceWav, { bins });
+    const preparedProbe = await probeMedia(programWav, { bins });
+    if (Math.abs(sourceProbe.duration - preparedProbe.duration) > 0.04) {
+      throw new BgmError("声明节目轨响度处理改变时间线超过 40ms", "audio_stems_alignment_failed", false);
+    }
+    preparation = { applied: true, method: "declared-source-dynamic-loudnorm", sourceSha256: preparation.sourceSha256,
+      before, after, targetLufs: programTarget, truePeak: programPeak, lraTarget: 7,
+      basis: "仅处理显式声明的混合节目源；签章分轨和最终共用线性增益不变" };
+  }
   const sha256 = await sha256File(programWav);
   const probe = await probeMedia(programWav, { bins });
   return {
     declared: true,
+    preparation,
     program: { path: programWav, sha256, durationSec: probe.duration },
     roles: { dialogue: { status: "declared-unverified", path: programWav, sha256 } },
   };
@@ -1415,7 +1462,8 @@ export async function mix(options = {}) {
   const music = assertPathAllowed(options.bgmPath, roots, "bgmPath");
   let stems;
   if (declaredProgramMix) {
-    stems = await declaredProgramStems({ input: source, nearDir: path.dirname(output), bins });
+    stems = await declaredProgramStems({ input: source, nearDir: path.dirname(output),
+      targetLufs: options.targetLufs ?? -14, truePeak: options.truePeak ?? -1, bins });
   } else {
     stems = await verifyIndependentAudio(audioStems, { env, bins });
   }
@@ -1453,7 +1501,7 @@ export async function mix(options = {}) {
         sourceAuthority: "declared-unverified", stemsVerified: false,
         basis: "调用方显式声明 --declared-program-mix：源片是对白+环境混音成品，无可独立取证的干净分轨；"
           + "本次只把新配乐叠在节目混音上，未冒充签章分轨",
-        programSha256: stems.program.sha256, dialogueStatus: "declared-unverified",
+        programSha256: stems.program.sha256, sourcePreparation: stems.preparation, dialogueStatus: "declared-unverified",
         duckingSource: "program-mix(approximate)", retainedMusicExcluded: false, embeddedAudioUsed: true
       }
       : { ...audioStems, sourceAuthority: "passed", embeddedAudioUsed: false,
@@ -1933,7 +1981,7 @@ async function mixVerified({
     "-map", "[out]", "-c:a", "pcm_f32le", "-ar", "48000", "-ac", "2", premasterPath,
   ], { label: "ffmpeg(mix-down)", timeoutMs: 900_000 });
 
-  // ④ 母版响度（两遍法 loudnorm：-14 LUFS / -1 dBTP）
+  // ④ 母版响度：同一线性增益，峰值余量优先；声明节目源的动态处理已单独取证。
   let normalized = await normalizeLoudness({
     input: premasterPath, output: path.join(work, "master.wav"), targetLufs, truePeak, bins,
   });
@@ -1954,7 +2002,10 @@ async function mixVerified({
       "-i", input, "-i", normalized.path,
       "-map", "0:v:0", "-map", "1:a:0",
       "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
-      "-movflags", "+faststart", "-shortest", output,
+      // Both inputs are finite. Let the complete retained master reach the AAC encoder;
+      // -shortest stops at a packet boundary and can discard the final native-audio samples.
+      // The copied video keeps its original clock; codec priming/padding stays separately observable.
+      "-movflags", "+faststart", output,
     ], { label: "ffmpeg(mux)", timeoutMs: 900_000 });
   } else {
     await fsp.copyFile(normalized.path, output);

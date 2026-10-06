@@ -17,7 +17,7 @@ function runChain(shots: Card[], options: { stages?: string; args?: string[]; di
   const dir = options.dir ?? mkdtempSync(join(tmpdir(), "video-request-regression-"));
   if (!options.dir) temporary.push(dir);
   const shotsFile = join(dir, "shots.json");
-  writeFileSync(shotsFile, JSON.stringify({ title: "摄影增强回归", ...options.source, shots }));
+  writeFileSync(shotsFile, JSON.stringify({ projectId: options.project ?? "regression", title: "摄影增强回归", ...options.source, shots }));
   const result = spawnSync(process.execPath, ["--import", "tsx", "scripts/tools/full-chain-film.mts",
     "--shots", shotsFile, "--project", options.project ?? "regression", "--work-dir", dir, "--out", join(dir, "out"),
     "--keys-file", join(dir, "no-credentials.env"), "--library", join(dir, "no-characters"),
@@ -198,8 +198,10 @@ describe("全链路当前血缘与返修范围", () => {
     mkdirSync(join(dir, "logs/regression"), { recursive: true });
     writeFileSync(join(dir, "logs/regression/stages.jsonl"), JSON.stringify({ stage: "master", ok: true, shotId: null }) + "\n");
     const run = runChain([emptyShot], { dir, stages: "master", dryRun: false });
-    expect(run.result.status, run.diagnostic).toBe(6);
-    expect(run.diagnostic).toContain("缺阶段 master");
+    expect(run.result.status, run.diagnostic).not.toBe(0);
+    expect(run.diagnostic).toContain("STANDARD_POST_INVALID");
+    expect(run.diagnostic).toContain("captureOriginalRenderManifest");
+    expect(existsSync(join(dir, "logs/regression/submitted-original.json"))).toBe(true);
     expect(existsSync(join(dir, "out/regression-30s-final.mp4"))).toBe(false);
   }, 40_000);
   it("不同项目在同一work目录独立记账且当前输入输出含实际指纹", () => {
@@ -225,14 +227,17 @@ describe("全链路当前血缘与返修范围", () => {
     const aggregate = second.rows().findLast((entry: Card) => entry.stage === "cine-kb" && entry.shotId === null);
     expect(aggregate.lineage.sourceHash).not.toBe(first.rows().find((entry: Card) => entry.stage === "cine-kb" && entry.shotId === null).lineage.sourceHash);
   }, 40_000);
-  it("UHD 仍可复用 HD 的前期镜头源回执，后期增强单独按整份分镜绑定", () => {
+  it("原生生产在任何阶段拒绝UHD后期覆盖，并保留既有HD前期镜头回执", () => {
     const first = runChain([emptyShot, windowShot], { stages: "cine-kb", args: ["--quality", "hd", "--only", "EMPTY"] });
     expect(first.result.status, first.diagnostic).toBe(0);
     const before = first.rows().findLast((entry: Card) => entry.stage === "cine-kb" && entry.shotId === "EMPTY");
+    const beforeRows = first.rows();
     const second = runChain([emptyShot, { ...windowShot, dialogue: [{ text: "另一镜新台词" }] }], {
       dir: first.dir, stages: "cine-kb", args: ["--quality", "uhd", "--only", "EMPTY"],
     });
-    expect(second.result.status, second.diagnostic).toBe(0);
+    expect(second.result.status, second.diagnostic).not.toBe(0);
+    expect(second.diagnostic).toContain("STANDARD_NATIVE_QUALITY_OVERRIDE_REJECTED");
+    expect(second.rows()).toEqual(beforeRows);
     const after = second.rows().findLast((entry: Card) => entry.stage === "cine-kb" && entry.shotId === "EMPTY");
     expect(after.lineage.projectId).toBe(before.lineage.projectId);
     expect(after.lineage.sourceHash).toBe(before.lineage.sourceHash);
@@ -337,9 +342,8 @@ describe("成片硬切 CFR 接缝", () => {
 describe("全链路冻结年代与原合同接线", () => {
   it.each([
     { sourceResolution: "720p", args: [], expectedSource: "720p", expectedOutput: "720p", quality: "hd" },
-    { sourceResolution: "2160p", args: [], expectedSource: "1080p", expectedOutput: "2160p", quality: "uhd" },
     { sourceResolution: "720p", args: ["--resolution", "1080p"], expectedSource: "1080p", expectedOutput: "1080p", quality: "hd" },
-  ])("源规格 $sourceResolution 与明确覆盖保留4K源片/交付档边界", ({ sourceResolution, args, expectedSource, expectedOutput, quality }) => {
+  ])("原生源规格 $sourceResolution 与明确生成规格选项进入前期prompt", ({ sourceResolution, args, expectedSource, expectedOutput, quality }) => {
     const run = runChain([emptyShot], { stages: "plates", source: { aspect: "16:9", resolution: sourceResolution }, args: ["--accept-env-defects", ...args] });
     expect(run.result.status, run.diagnostic).toBe(0);
     const prompt = run.rows().find((r: Card) => r.stage === "keyframe").evidence.prompt;
@@ -348,6 +352,12 @@ describe("全链路冻结年代与原合同接线", () => {
     expect(run.diagnostic).toContain(`源 ${expectedSource} → 交付 ${expectedOutput}`);
     expect(run.diagnostic).toContain(`(${quality === "uhd" ? "3840x2160" : expectedOutput === "720p" ? "1280x720" : "1920x1080"})`);
     if (quality === "uhd") expect(prompt).not.toContain("2160p");
+  }, 40_000);
+  it("2160p旧交付档别名在前期阶段也拒绝，不能隐含新增升维后期", () => {
+    const run = runChain([emptyShot], { stages: "plates", source: { aspect: "16:9", resolution: "2160p" } });
+    expect(run.result.status, run.diagnostic).not.toBe(0);
+    expect(run.diagnostic).toContain("STANDARD_NATIVE_QUALITY_OVERRIDE_REJECTED");
+    expect(existsSync(join(run.dir, "logs/regression/stages.jsonl"))).toBe(false);
   }, 40_000);
   it("新项目默认当天且续跑保存同一日期，源合同记录进入血缘", () => {
     const first = runChain([emptyShot], { stages: "micromotion" });

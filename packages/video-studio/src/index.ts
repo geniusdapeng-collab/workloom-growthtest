@@ -11,6 +11,8 @@ export * from "./character-consistency.js";
 export * from "./shot-order.js";
 export * from "./cover-design.js";
 export * from "./cover-platforms.js";
+export * from "./cover-assembly.js";
+export * from "./local-cover-render.js";
 export * from "./platform-intent.js";
 export * from "./sfx-synth.js";
 export * from "./portrait-runtime.js";
@@ -48,6 +50,8 @@ export * from "./device-policy.js";
 export * from "./quality-evidence.js";
 /** 固定影片工位的受限通道与服务客户端（T-2026-0927-0039）。 */
 export * from "./film-worker-channel.js";
+export * from "./film-worker-runtime.js";
+export * from "./film-worker-provenance.js";
 export * from "./film-service-client.js";
 /** 影片作者合同与监制评审（服务侧固定工位用冻结原稿构建合同）。 */
 export * from "./film-contracts.js";
@@ -55,7 +59,12 @@ export * from "./film-contracts.js";
 export * from "./product-archive.js";
 /** 认证真人素材主档与一致性门（人物属性唯一事实源；禁止猜）。 */
 export * from "./real-person-asset.js";
+export * from "./character-release-contract.js";
+export * from "./character-release-source.js";
 /** 花钱前的提示词红线 linter（提高一次过率）。 */
 export * from "./prompt-redlines.js";
 /** 一次过就绪度（花钱前判定风险与改卡建议；高风险先渲）。 */
 export * from "./first-pass.js";
+export * from "./director-v2.js";
+export * from "./director-planner.js";
+export * from "./runtime-root.js";

@@ -15,6 +15,7 @@ import YAML from "yaml";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { bundlesRoot } from "@workloom/base/bundles";
 import { assemblePreset, runQuest, type QuestRunResult } from "@workloom/runtime";
+import { MAX_CONCURRENT_THREADS } from "@workloom/shared";
 import { llmCall } from "../service/llm.js";
 import { acquisitionQuestPlanner } from "../industry/hotel/acquisition-planner.js";
 import { loadDeploymentToolExecutor, describeToolCoverage } from "./tool-executor.js";
@@ -230,7 +231,7 @@ export async function runQuestForThread(scope: Scope, input: ThreadQuestInput): 
   if (!input.skipClaim) {
     const app0 = getAppPool();
     const c = await app0.connect();
-    let blocked = false;
+    let blockedStatus: QuestRunResult["status"] | undefined;
     try {
       /**
        * 认领必须带**事务级 RLS 上下文**（T-2026-0930-0003，基座 T-2026-0929-0201 实测发现）：
@@ -241,15 +242,27 @@ export async function runQuestForThread(scope: Scope, input: ThreadQuestInput): 
       await c.query("BEGIN");
       await c.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
       await c.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+      await c.query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))", [
+        JSON.stringify([scope.tenantId, scope.workspaceId, "execution-slots"]),
+      ]);
+      const slots = await c.query<{ c: string }>(
+        "SELECT count(*) AS c FROM threads WHERE workspace_id=$1 AND status='running'", [scope.workspaceId],
+      );
+      if (Number(slots.rows[0]?.c ?? 0) >= MAX_CONCURRENT_THREADS) {
+        throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "当前执行槽已满，任务保留在队列中" });
+      }
       const claimed = await c.query(
         `UPDATE threads SET status='running', updated_at=now()
-          WHERE id=$1 AND workspace_id=$2 AND status IN ('queued','paused') RETURNING id`,
-        [input.threadId, scope.workspaceId],
+          WHERE id=$1 AND workspace_id=$2
+            AND (status IN ('queued','paused','pending_review','failed') OR (status='completed' AND $3)) RETURNING id`,
+        [input.threadId, scope.workspaceId, input.replan === true],
       );
       if ((claimed.rowCount ?? 0) === 0) {
         const cur = await c.query<{ status: string }>(
           `SELECT status FROM threads WHERE id=$1 AND workspace_id=$2`, [input.threadId, scope.workspaceId]);
-        blocked = (cur.rows[0]?.status ?? "unknown") === "running";
+        const status = cur.rows[0]?.status;
+        if (!status) throw new TRPCError({ code: "NOT_FOUND", message: "任务不存在或不属于当前工作区" });
+        blockedStatus = status as QuestRunResult["status"];
       }
       await c.query("COMMIT");
     } catch (err) {
@@ -260,8 +273,8 @@ export async function runQuestForThread(scope: Scope, input: ThreadQuestInput): 
     }
     // 他方正在执行：幂等退出（不并发重入）；
     // pending_review/completed/failed 等维持原语义（审批续跑/重放由 runQuest 内部按事件态处理）
-    if (blocked) {
-      return { threadId: input.threadId, status: "running", stepsDone: 0, stepsTotal: 0, unverified: [], presetKey: "" };
+    if (blockedStatus) {
+      return { threadId: input.threadId, status: blockedStatus, stepsDone: 0, stepsTotal: 0, unverified: [], presetKey: "" };
     }
   }
   const presetKey = await resolveThreadPresetKey(scope, input.presetRef, input.goal);

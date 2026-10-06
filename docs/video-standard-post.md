@@ -1,0 +1,77 @@
+# 完整原片的标准后期
+
+本入口服务于已经取得原始渲染素材的制作方。原稿决定镜头，后期设置只决定调色、已有音乐、封面和字幕。处理全部提交镜头，保持原顺序、完整画面时长和各自同文件原声；画外音标记也不能触发另行配音。
+
+三个实际场景：六镜酒店设备短片保留人物和商品的全部原画原声；同一组原片生成主版、可关闭字幕版和三个风格版；任务中断后从已受理、已下载并有事实回执的原片继续后期。某人物原片不合意时，本入口仍保留该原片，人物整改必须另行明确授权。
+
+## 方案与边界
+
+候选一是保留自由分段计划并增加约定校验。成本较小，但调用者仍能声明一个删换后的计划为“原片”。候选二是从生成前冻结的原稿和生成后签发的原片清单构建唯一时间线，公开设置没有编辑字段。采用第二种：把不变量落实到数据结构和实际合成调用，不能只靠操作者自律。
+
+本仓没有新增服务、表或依赖。单项目最多 100 镜，源画幅 160–4096 偶数像素、整数 1–60fps；所有源必须同画幅、同帧率，镜长必须整帧且与原稿一致。正常供应商提交进一步使用本仓当前支持的整数 4–12 秒，并在提交前拒绝无法精确兑现的镜长。任务按输出目录独占，子进程超时和容量不足均失败留痕，不覆盖旧结果。
+
+不提供新增、删除、替换、拆分、重排、取段、变速、转场、升帧、画幅覆盖、独立声音和本地配音。后期不调用供应商、模型、TTS、ASR，也不发布社交账号或生成签名安装器。相似度、台词正确性、口型和商业音乐许可不由文件哈希或音频相关性认证。
+
+## 原稿、清单和签发事实
+
+正常生成前，CLI 将原始输入字节以不可覆盖写入冻结为 `<productionRoot>/logs/<projectId>/submitted-original.json`。重复执行只能沿用完全相同字节；改变原稿需要新项目。项目默认来自原稿 `projectId`，显式覆盖必须仍与原稿一致。
+
+每份实际受理并下载的原始素材立即签发 `original-issued/<shotId>.json`，绑定项目、镜头、冻结原稿 SHA-256、原片路径/大小/摘要、真实任务 ID。工位分支核对当前父进程下载回执；本地分支核对实际 accepted-task journal。另写首次签发 witness，绑定回执和原片字节；这是校验见证，不能称为签名或供应商认证。
+
+生成后写入唯一 `original-render-manifest.json`。公开入口只接受该规范位置；另存、软链、别名、自供媒体事实、重哈希 wrapper 不能替换原片。每次加载重新读取冻结原稿、签发回执和首次见证，核对实际媒体。当前历史六镜的维护采用产品所有者明确授权的 `legacy-user-adopted`，逐项绑定历史输出行字节及 accepted-task 记录；它只能证明当前历史原片字节关系，不能补造原供应商 payload 或人物认证。
+
+纯合同 `standard-post-contract.ts` 按原稿构建每镜 `shotId/video/audio/durationSec/speed`。图声共享同一路径、摘要和字节数，起点为零，速度为一。实际交给合成的完整数组再次经 `assertStandardPostTimeline` 校验；顺序、数量、隐藏字段或当前来源改变即拒绝。AAC 元数据与画面钟差在一个编码帧内时如实记录，保留原片呈现时钟；不将解码 priming/padding 写成新增对白。
+
+## 公开调用与设置
+
+```bash
+pnpm tsx scripts/tools/full-chain-film.mts \
+  --standard-post /absolute/production/logs/PROJECT/original-render-manifest.json \
+  --post-settings /absolute/post-settings.json \
+  --out /absolute/new-delivery
+```
+
+三对参数必须各出现一次；生成、工位或其它参数混入即拒绝。媒体二进制解析为实际本地可执行文件并记录摘要。子合成进程使用仓库工作目录解析现有运行时，因此入口可从其他目录调用。
+
+`workloom.standard-post-settings/v1` 只接受以下字段；未知字段拒绝：
+
+| 字段 | 完整要求 | 违反时行为 |
+|---|---|---|
+| `music` | 0–10 份已有音频，唯一 `id`、规范绝对 `path`、完整 `sha256`、正整数 `bytes`；格式 mp3/m4a/wav/flac/ogg/aiff | 原片、voiced/raw/ramped 别名、生产 clips、视频轨或字节漂移拒绝 |
+| `subtitles` | 1–1000 句，`startSec/endSec/text`，厘秒精度、原片总时长内、不重叠；不含 ASS 控制字符 | 空白、注入、重叠或越界拒绝 |
+| `subtitleFontsRoot` | 规范本地字体库，登记字体实际摘要全部核验 | 缺字库或字体变更拒绝 |
+| `cover` | 原镜 `sourceShotId`、镜内 `atSec`、明确 `title/subtitle?`、已登记 `platform`、固定 `fontFile/fontSha256/fontId?` | 未知画面、时间线改变、字体/文字验收失败拒绝 |
+| `versions` | 必有 `master` 和三个 `warm-film/cool-tech/punchy-social`；风格版调色档两两不同；配乐全开且音乐字节两两不同，或三版明确全关；明确 `profile/intensity` 和音乐 ID/电平/ducking/BPM | 缺少风格版、重复调色或音乐字节、部分缺乐、未知滤镜、无音乐源的混音参数拒绝 |
+
+主版可用 `profile=none,intensity=0`；其余实际采用 natural/warm-film/cool-technical/high-contrast-social 和 0.1–1 强度。已有音乐电平 −40 至 −12dB、ducking 4–40dB、BPM 20–300；结果仍须通过原 BGM 工位验收，参数合法不等于音频合格。
+
+## 实际处理与失败路径
+
+1. 重建原片合同并探测当前原片，限定本地直接容器和 `file,pipe` 协议，拒绝 HLS/concat/播放列表的隐藏外部素材。
+2. 独占新输出目录锁，在同卷唯一 staging 复制被消费的原片/音乐，核对当前字节；不重写原片。原始 PCM 指纹单独记录，合成输入直接采用合同的完整规范原片路径。
+3. 调用现有 `compose-film.mts`，明确原画幅/原帧率、`fade=0,color=none`。没有分段准备、图声拆配、retime、运动覆盖。保留正式 AV-sync 报告，并测试同源原声与拼接声音的时间相关性。
+4. 现有字幕工位导出 SRT/ASS/VTT；句级时间来自原作者设置，去标点，不自动从片名烧录开场标题。不声明新 ASR 或音素校准。
+5. 主版保留拼接画面；风格版使用现有调色工位，然后 copy 接回拼接原音轨。已有音乐调用同一 `bgm.mix` 和五项质量闸，源节目混音仍写 `declared-unverified/stemsVerified=false`。
+6. 现有字幕烧录、确定性封面和首帧装配依次执行。封面只替换第一帧，实际核对总帧数、钟、音频包和解码 PCM；软字幕从干净带封面主版 copy 派生。
+7. 对主版、软字幕版和每个风格版全解码，核对原总时长/帧率/帧数，并流式计算 48kHz 双声道实际 PCM 采样数和摘要。每声道必须覆盖原画面钟 `round(durationSec*48000)`；短尾立即抛出 `STANDARD_POST_NATIVE_CLOCK_INCOMPLETE`，不补零、不放宽阈值。编码额外采样单列。BGM 合流让完整有限 master WAV 自然结束，避免最短流封装截去真实原声尾部。结束时重新核对所有原片、原稿/清单、设置、字体、二进制和消费代码；原文件或代码中途变化即失败。
+8. 沿用现有 `G-DLV1`：三风格版实际封面摘要、调色档和实际消费音乐摘要两两不同；母版和软字幕是便利呈现，不占三种风格名额。配乐只改电平或把同一曲换 ID/文件名均不算不同。真实最终影片在 20%/50%/80% 时点采样画面均色，并测完整音轨 LUFS/真峰值，使用现有差异阈值；缺证据、三轴失败或可测差异失败均留在 staging，不发布。原规则允许明确全关音乐时检验调色与封面两轴。不能为满足通用风格模板擅加转场或修改原镜。
+9. 所有实际检查通过才原子移动 staging 为正式新目录。错误保留 `failed.json` 和已执行阶段，释放自己的锁；并发、新输出抢占、超时及摘要错误都不会写“交付成功”。
+
+原稿、签发回执、原片或其它规范输入缺失、不可访问时，文件验证返回 `StandardPostError/STANDARD_POST_INVALID`，消息保留文件路径和底层错误码，原异常保留为 `cause`。仍在媒体处理前停止；缺原片回执不能由旧成功日志补齐，也不会发布原片清单。
+
+主要稳定错误包括 `FREE_EDIT_REMOVED`、`STANDARD_POST_ARGUMENTS_INVALID`、`STANDARD_POST_WORKER_FORBIDDEN`、`STANDARD_POST_INVALID`、`STANDARD_POST_PROCESS_FAILED`、`STANDARD_POST_MEDIA_INVALID`、`STANDARD_POST_NATIVE_CLOCK_INCOMPLETE`、`STANDARD_POST_VARIANTS_INVALID`、`STANDARD_POST_SOURCE_SPEECH_UNVERIFIED`、`STANDARD_POST_FONT_CHANGED`、`STANDARD_POST_CODE_CHANGED`、`STANDARD_POST_TIMELINE_CHANGED`、`STANDARD_POST_OUTPUT_EXISTS`、`STANDARD_POST_BUSY`。正常生产还拒绝 `AUDIO_NATIVE_SOURCE_REPLACED` 和 `STANDARD_NATIVE_RETIME_FORBIDDEN`。
+
+## 验证与功能优先级
+
+| 优先级 | 可验证行为 | 用户不用它会怎样 |
+|---|---|---|
+| P0 | 原稿和原片事实决定唯一完整时间线，图声同源 | 删换镜头、旧配音可被当作修复重新交付 |
+| P0 | 正常生产提交前守原声/精确镜长，拒绝配音和归一变速 | 先付费后补救会继续改变用户原稿 |
+| P0 | 实际合成、音轨、封面首帧、全解码和末尾当前字节回查 | 文件存在或旧绿回执可能冒充本次合格 |
+| P1 | 主版、软字幕和三个真实风格及各自封面 | 用户只能取得单一呈现版本 |
+| P1 | 明确历史采用、字幕、音乐和身份的事实边界 | 用户无法判断已核验什么及尚未认证什么 |
+| P2 | 没有新增队列、GUI 或自由编辑器 | 本次通过现有正式 CLI 交付；后续产品设计单独授权 |
+
+回归包括纯合同全拒绝矩阵、真实 FFmpeg 原片探测、当前父回执和历史事实、公开入口、实际正常 voice/clipFor/compose 区段、服务端提交/预算前拒绝、当前发布链、源码冻结和独立媒体全帧/全原声检验。自合成夹具只验证实现，不认证付费素材或真人。测试执行方式见 `package.json`、`.cnb.yml` 和任务卡 [T-2026-1006-0002](repairs/T-2026-1006-0002.md)。
+
+普通生产 CLI 同样在主配乐、软字幕、母版发布及每支风格版实际解码声音，并绑定冻结原片画面钟；缺尾立即失败，已移除旧 `apad` 补静音并覆盖 scored 的补救路径。验收报告区分曲目及实际信号差异与主观听感，不把数学相关性当作听感认证。

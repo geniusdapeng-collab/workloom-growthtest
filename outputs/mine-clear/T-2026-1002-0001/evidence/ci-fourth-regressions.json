@@ -1,0 +1,36 @@
+{
+  "evidenceLevel": "B",
+  "sourceCommit": "df019d6be6a5a9409d8b5da5d255364ad8332c61",
+  "failureEvidence": "cnb-fourth-regression-failure.json",
+  "change": "DirectorStudio uses existing PageExitLink to /ai-video/assets (tab absent selects Assets library)",
+  "webSuite": {
+    "numTotalTests": 142,
+    "numPassedTests": 142,
+    "numFailedTests": 0,
+    "numPendingTests": 0
+  },
+  "checks": [
+    {
+      "name": "web-typecheck",
+      "exitCode": 0,
+      "elapsedSec": 4.478
+    },
+    {
+      "name": "web-build",
+      "exitCode": 0,
+      "elapsedSec": 14.817
+    },
+    {
+      "name": "production-boundary",
+      "exitCode": 0,
+      "elapsedSec": 0.297
+    }
+  ],
+  "dependencyMode": "physical frozen-lockfile fixture",
+  "behavioralBrowser": "passed both 1440 and 390 packaged-runtime input, library exit/reopen and advanced navigation; prior loading timeouts retained separately",
+  "providerRequests": {
+    "images": 0,
+    "videos": 0
+  },
+  "behavioralBrowserEvidence": "director-final-ui.json"
+}

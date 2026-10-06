@@ -2,10 +2,10 @@
  "schema": "workloom.capabilities/v2",
  "repo": "workloom-ai-acquisition",
  "productId": "workloom-ai-growth",
- "repository": "workloom-ai/WorkLoom-growth",
+ "repository": "workloom-ai/workloom-growthtest",
  "displayName": "WorkLoom 获客增长系统（实验车道）",
  "description": "企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。",
- "generatedAt": "2026-10-02T23:30:53.377Z",
+ "generatedAt": "2026-10-05T14:38:21.588Z",
  "evidenceNotice": "本导览检查 manifest、脚本和文件入口。目录可发现、实际可调用、结果已验证分别记录；缺少同提交独立运行证据时后两项为未验证。岗位、技能与管线数是声明资产数，不是生产实测通过数。",
  "bundleDeclarations": [
   {
@@ -701,14 +701,15 @@
    "title": "内容生产专用入口",
    "items": [
     {
-     "name": "视频工位",
-     "how": "PC /ai-video/assets?tab=studio",
-     "desc": "预生产、渲染与后期分阶段启动；真实模型、供应商和媒体依赖需配置",
+     "name": "一句话导演工位",
+     "how": "PC /ai-video/assets?tab=studio；docs/director-studio-v2.md",
+     "desc": "默认三支常规版与导演惊喜版；独立画面/声音时间线、真实文字方案和逐版反馈；生产仍需本人授权、预算与可用供应商",
      "sourcePaths": [
-      "apps/server/src/video/router.ts",
-      "apps/server/src/video/studio-worker.ts"
+      "apps/server/src/video/director-router.ts",
+      "apps/server/src/video/director-worker.ts",
+      "docs/director-studio-v2.md"
      ],
-     "id": "cap:607ddf2449d4b654",
+     "id": "cap:c5bc1612a4f3a157",
      "availability": {
       "discoverable": true,
       "callable": "unverified",
@@ -817,6 +818,26 @@
       ".cnb.yml"
      ],
      "id": "cap:c53c85024c716a45",
+     "availability": {
+      "discoverable": true,
+      "callable": "unverified",
+      "verified": "unverified",
+      "environment": null,
+      "lastSuccess": null,
+      "evidence": null,
+      "reason": "仅目录与入口元数据；没有对应运行证据"
+     }
+    },
+    {
+     "name": "GEO 工具路由与回执复验",
+     "how": "`node scripts/verify-geo-tool-routing.mjs --db`；docs/geo-tool-routing.md",
+     "desc": "逐工具覆盖、模拟绑定和真实 PG 重放回归；需专用已迁移数据库，模拟通过不证明真实平台动作",
+     "sourcePaths": [
+      "scripts/verify-geo-tool-routing.mjs",
+      "scripts/tools/verify-geo-tool-routing-db.mts",
+      "docs/geo-tool-routing.md"
+     ],
+     "id": "cap:a95519ccd7b216dc",
      "availability": {
       "discoverable": true,
       "callable": "unverified",

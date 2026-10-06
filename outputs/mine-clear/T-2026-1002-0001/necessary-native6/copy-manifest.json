@@ -1,0 +1,172 @@
+{
+  "schema": "workloom.necessary-proof-copy/v1",
+  "copiedAt": "2026-10-04T00:16:48.094212+00:00",
+  "evidenceLevel": "B",
+  "sourceCommit": "c94cfb64b4bee11448907967787800746393ccd4",
+  "operation": "byte-preserving copy, no new test or qualification",
+  "boundary": "Original run command/reporter/runtime paths intentionally preserved. Native qualification remains failed. Raw large native files remain in the original retained task output.",
+  "files": [
+    {
+      "path": "ledger.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/ledger.json",
+      "sha256": "136b0221a4a91b32cf3597e66d801cf73061056424c14535a21b9ef077bee72f",
+      "bytes": 24771
+    },
+    {
+      "path": "baseline.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/baseline.json",
+      "sha256": "e0c4377d08a85a7bb3f99cac79404b966dfdb9d7ff3f6dfdc8affb735f1efa39",
+      "bytes": 941
+    },
+    {
+      "path": "handoff.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/handoff.json",
+      "sha256": "6d5e3466f54f0dc40f4921ac6ffc41f76b7acb023c68fbf20a8e60e092eb5c5e",
+      "bytes": 10481
+    },
+    {
+      "path": "session-provenance.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/session-provenance.json",
+      "sha256": "f642c809a82e175577ac5fa70309c73d341265fd5bd7eb389a372d6119ae05dd",
+      "bytes": 1492
+    },
+    {
+      "path": "evidence-index.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence-index.json",
+      "sha256": "25d8295a0ad232056c87e29ed2cebfb1ef47fb442642ff1e72c597c84577ba0a",
+      "bytes": 4346
+    },
+    {
+      "path": "runs/MC-006-0-1791034639416.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-006-0-1791034639416.json",
+      "sha256": "d658204df0bbbf193ef9abccefc03f6e02e088a59e5ee0590948d40c9121a01b",
+      "bytes": 1053
+    },
+    {
+      "path": "runs/MC-006-0-1791035540856.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-006-0-1791035540856.json",
+      "sha256": "6f9f4b3ac0c2a5ef7e33f193ffcd9224cbcbbd8e628e4f770d739c48704e26a5",
+      "bytes": 1061
+    },
+    {
+      "path": "runs/MC-006-1-1791034640989.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-006-1-1791034640989.json",
+      "sha256": "2fd09095deb9c5630861a4301482ed121814de63ae7033df5a3c811bd26984ce",
+      "bytes": 3118
+    },
+    {
+      "path": "runs/MC-006-1-1791035546471.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-006-1-1791035546471.json",
+      "sha256": "8f377e64f32e80c654a39ec3702d953b6cb0a916d3d6de9f0a0e8b5a75f375cc",
+      "bytes": 3120
+    },
+    {
+      "path": "runs/MC-016-0-1791033475334.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-016-0-1791033475334.json",
+      "sha256": "3c507e5fd8c20a94e05f907a6bd6f9107554841f7d265c678b8e7aec0ee8e089",
+      "bytes": 3354
+    },
+    {
+      "path": "runs/MC-016-0-1791035589208.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-016-0-1791035589208.json",
+      "sha256": "8568a93b896e1efa732f55f8ce978b2338401c8366ae546995aa378ca95e1ead",
+      "bytes": 3375
+    },
+    {
+      "path": "runs/MC-016-1-1791033475780.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-016-1-1791033475780.json",
+      "sha256": "2580580b0bbb5b65bac4fe7c267d1fd68898c7aa086810edd03aa058bc439f23",
+      "bytes": 1673
+    },
+    {
+      "path": "runs/MC-016-1-1791035589790.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/runs/MC-016-1-1791035589790.json",
+      "sha256": "173b4f754db60b4b83f9fb418329a2c4d6d4c9b489295be05303f8226e5a6087",
+      "bytes": 1700
+    },
+    {
+      "path": "evidence/MC-006-0-1791034639416.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-006-0-1791034639416.txt",
+      "sha256": "d30b9587db1ab8c2ead26b6215c1540351df611911accde760f91c363324380e",
+      "bytes": 12107
+    },
+    {
+      "path": "evidence/MC-006-0-1791035540856.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-006-0-1791035540856.txt",
+      "sha256": "9dd06dd707db04ed3d96998a3c418ca30d9f2cf30d43fb1e7db3b8e29e03a647",
+      "bytes": 13998
+    },
+    {
+      "path": "evidence/MC-006-1-1791034640989-node-tests.jsonl",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-006-1-1791034640989-node-tests.jsonl",
+      "sha256": "2f75a3d61d84b27648557a8f62534f23399f4090dae8dd6222b5ceff0e0e074e",
+      "bytes": 154
+    },
+    {
+      "path": "evidence/MC-006-1-1791034640989.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-006-1-1791034640989.txt",
+      "sha256": "295bd6d665e4dd046b847b2465a7f9de0ccf021279e31048fe2947edbeaef4e1",
+      "bytes": 1990
+    },
+    {
+      "path": "evidence/MC-006-1-1791035546471-node-tests.jsonl",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-006-1-1791035546471-node-tests.jsonl",
+      "sha256": "2f75a3d61d84b27648557a8f62534f23399f4090dae8dd6222b5ceff0e0e074e",
+      "bytes": 154
+    },
+    {
+      "path": "evidence/MC-006-1-1791035546471.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-006-1-1791035546471.txt",
+      "sha256": "ee1e25d22243c9817e8829c7cfdc9c045e3e7f8e4d1a2f707495c8a1ab73369e",
+      "bytes": 1994
+    },
+    {
+      "path": "evidence/MC-016-0-1791033475334-node-tests.jsonl",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-016-0-1791033475334-node-tests.jsonl",
+      "sha256": "476688a2131ef5583a92b35e31db9e839e9d34817909b575e680ac26a193f4d4",
+      "bytes": 154
+    },
+    {
+      "path": "evidence/MC-016-0-1791033475334.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-016-0-1791033475334.txt",
+      "sha256": "6a67a680b4a5e04d495622809d944c45d0e4926ef7372f37857a3ccfcc42094b",
+      "bytes": 16630
+    },
+    {
+      "path": "evidence/MC-016-0-1791035589208-node-tests.jsonl",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-016-0-1791035589208-node-tests.jsonl",
+      "sha256": "476688a2131ef5583a92b35e31db9e839e9d34817909b575e680ac26a193f4d4",
+      "bytes": 154
+    },
+    {
+      "path": "evidence/MC-016-0-1791035589208.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-016-0-1791035589208.txt",
+      "sha256": "844bbf3010618e5712195f6028991976d946b94029d9c865ffb36c14670e3537",
+      "bytes": 16634
+    },
+    {
+      "path": "evidence/MC-016-1-1791033475780.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-016-1-1791033475780.txt",
+      "sha256": "04d6ad831538d4fd6b8b411f29cfdf57f90e418860cede319734c1be7220945c",
+      "bytes": 37820
+    },
+    {
+      "path": "evidence/MC-016-1-1791035589790.txt",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/work/independent-acceptance/cohort-c94cfb6/evidence/MC-016-1-1791035589790.txt",
+      "sha256": "a700d25aa55b68f4596d028d05449ef8b745a91b0d45ec2d78993cdd4ee9122d",
+      "bytes": 38180
+    },
+    {
+      "path": "historical-native-summary.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/outputs/necessary-followup/independent-native6/historical-review/summary.json",
+      "sha256": "a6d714cb2bd483f424207b372001142ca68111370e14a7e9e26d3600a9eed3b9",
+      "bytes": 40011
+    },
+    {
+      "path": "historical-276-status.json",
+      "originalPath": "/Users/mac/Documents/Codex/2026-10-01/growth-https-cnb-cool-workloom-ai/outputs/necessary-followup/independent-native6/276-status.json",
+      "sha256": "755e9e0ac2c2219feb5d2c7a635d2490a04a05a520b374773fa7ae8af31a581a",
+      "bytes": 929219
+    }
+  ]
+}

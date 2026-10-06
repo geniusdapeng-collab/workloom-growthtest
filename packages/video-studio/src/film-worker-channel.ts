@@ -70,6 +70,8 @@ export interface FilmWorkerJobContext {
   budgetCny: number;
   /** 作业截止（ISO 时间；超时服务会终止工位）。 */
   deadlineAt: string;
+  /** Parent configuration availability only; no credential/model request is delegated. */
+  characterVisionAvailable?: boolean;
 }
 
 export interface FilmChannelRequestFrame {
@@ -336,6 +338,8 @@ const FORBIDDEN_SECRET_KEYS = [
   "LLM_BASE_URL",
   "WORKLOOM_RENDER_SIGNING_SECRET",
   "AUDIO_STEMS_SIGNING_SECRET",
+  "WORKLOOM_AUDIO_STEM_SIGNING_SECRET",
+  "WORKLOOM_AUDIO_STEM_SIGNING_KEY_ID",
 ];
 
 /** 解析并校验服务下发的作业上下文；任一不符即抛错（工位不得自行拼装上下文）。 */
@@ -365,7 +369,8 @@ export function parseFilmWorkerJobContext(env: NodeJS.ProcessEnv = process.env):
     || !text(ctx.archiveRoot) || !Array.isArray(ctx.allowedMethods) || ctx.allowedMethods.length === 0
     || !ctx.allowedMethods.every((method) => FILM_CHANNEL_METHODS.includes(method as FilmChannelMethod))
     || typeof ctx.budgetCny !== "number" || !Number.isFinite(ctx.budgetCny) || ctx.budgetCny < 0
-    || !Number.isFinite(Date.parse(String(ctx.deadlineAt ?? "")))) {
+    || !Number.isFinite(Date.parse(String(ctx.deadlineAt ?? "")))
+    || ctx.characterVisionAvailable !== undefined && typeof ctx.characterVisionAvailable !== "boolean") {
     throw new FilmChannelError("CONTEXT_INVALID", "作业上下文字段缺失或格式非法");
   }
   if (env[FILM_WORKER_ENV.jobId] && env[FILM_WORKER_ENV.jobId] !== ctx.jobId) {

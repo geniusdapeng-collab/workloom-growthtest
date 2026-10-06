@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import type pg from "pg";
 import type { AppPool, Scope } from "./gen/db.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
+import { FILM_CHANNEL_METHODS, type FilmChannelMethod } from "@hyperreality/video-studio";
 
 export type FilmComponentKind = "llm" | "image" | "video" | "media" | "voice" | "review";
 export type FilmComponentState = "reserved" | "dispatched" | "accepted" | "failed" | "unknown";
@@ -167,7 +168,7 @@ export class FilmLedger {
     workerVersion: string;
     entryPath: string;
     entrySha256: string;
-    capabilities: FilmComponentKind[];
+    capabilities: FilmChannelMethod[];
     actor: string;
   }): Promise<FilmWorkerRow> {
     if (!input.workerName.trim() || !input.workerVersion.trim()) fail("FILM_WORKER_INVALID", "工位名与版本必填");
@@ -175,7 +176,8 @@ export class FilmLedger {
     if (input.entryPath.startsWith("/") || input.entryPath.split(/[\\/]/).some((part) => part === ".." || part === ".")) {
       fail("FILM_WORKER_INVALID", "工位入口必须是仓库内相对路径");
     }
-    if (!Array.isArray(input.capabilities) || input.capabilities.length === 0) fail("FILM_WORKER_INVALID", "工位能力清单不得为空");
+    if (!Array.isArray(input.capabilities) || input.capabilities.length === 0
+      || input.capabilities.some(method => !FILM_CHANNEL_METHODS.includes(method))) fail("FILM_WORKER_INVALID", "工位能力必须是已支持的通道方法");
     const id = filmWorkerId({ ...this.scope, workerName: input.workerName, entrySha256: input.entrySha256 });
     return this.transaction(async (client) => {
       await client.query("SELECT pg_advisory_xact_lock(hashtext($1))", [
@@ -193,6 +195,18 @@ export class FilmLedger {
       );
       if (existing.rows[0]) {
         const row = existing.rows[0];
+        if (JSON.stringify([...row.capabilities].sort()) !== JSON.stringify([...input.capabilities].sort())) {
+          // Repair the historical component-label registration, which admitted no
+          // channel calls. Valid method registrations cannot expand in place.
+          const legacyComponents = new Set(["llm", "image", "video", "media", "review", "voice"]);
+          if (!row.capabilities.every(value => legacyComponents.has(value))) fail("FILM_WORKER_CAPABILITY_MISMATCH", "同代码登记能力不同，拒绝静默扩大范围");
+          const repaired = await client.query<FilmWorkerRow>(
+            `UPDATE film_workers SET capabilities=$2::jsonb,worker_version=$3,updated_at=now() WHERE id=$1 RETURNING *`,
+            [row.id, JSON.stringify(input.capabilities), input.workerVersion],
+          );
+          if (!repaired.rows[0]) fail("FILM_WORKER_STATE_CONFLICT", "工位能力修复未返回行");
+          Object.assign(row, repaired.rows[0]);
+        }
         if (row.status === "active") return row;
         const revived = await client.query<FilmWorkerRow>(
           `UPDATE film_workers SET status='active', updated_at=now() WHERE id=$1 AND status='disabled' RETURNING *`,
