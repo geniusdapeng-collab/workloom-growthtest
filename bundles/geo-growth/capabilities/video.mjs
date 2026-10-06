@@ -262,7 +262,8 @@ export function deliveryInspect(input) {
   }
   if (!plain(manifest)) throw new VideoCapabilityError(`${manifestPath} 须为 JSON 对象`);
   if (manifest.projectId !== projectId) throw new VideoCapabilityError("交付清单的 projectId 项目标识与请求不一致或缺失");
-  const itemCount = [manifest.entries, manifest.assets, manifest.variants, manifest.subtitles?.files]
+  const standard = manifest.schemaVersion === "workloom.standard-post-delivery/v1";
+  const itemCount = [manifest.entries, manifest.assets, manifest.variants, manifest.outputs, manifest.subtitles?.files]
     .reduce((total, value) => total + (Array.isArray(value) ? value.length : 0), 0);
   if (itemCount > 1000) throw new VideoCapabilityError("交付清单文件数量超过 1000", "TOO_LARGE");
   const assets = new Map(), invalid = [];
@@ -306,7 +307,28 @@ export function deliveryInspect(input) {
     if (!Array.isArray(manifest[name])) invalid.push({label: name, state: "invalid-metadata", verified: false, detail: "须为文件数组"});
     else for (const [index, entry] of manifest[name].entries()) addFile(entry?.label ?? `${name}:${index}`, entry, true);
   }
-  addFile("deliverable", manifest.deliverable, true);
+  if (standard) {
+    if (!Array.isArray(manifest.outputs) || manifest.outputs.length === 0) {
+      invalid.push({label: "outputs", state: "invalid-metadata", verified: false, detail: "标准后期清单须含非空 outputs"});
+    }
+    const ids = new Set();
+    for (const [index, output] of (Array.isArray(manifest.outputs) ? manifest.outputs : []).entries()) {
+      const id = output?.id;
+      if (!plain(output) || !["master", "softsub", "warm-film", "cool-tech", "punchy-social"].includes(id) || ids.has(id)) {
+        invalid.push({label: `outputs:${index}`, state: "invalid-metadata", verified: false, detail: "标准版本 ID 无效或重复"});
+        continue;
+      }
+      ids.add(id);
+      addFile(`output:${id}`, output, true);
+      if (id !== "softsub") {
+        const claim = output.coverReceipt?.cover;
+        if (!plain(claim) || typeof output.cover !== "string" || claim.path !== output.cover) {
+          invalid.push({label: `output-cover:${id}`, state: "invalid-metadata", verified: false, detail: "封面路径与首帧回执声明缺失或冲突"});
+        } else addFile(`output-cover:${id}`, claim, true);
+      }
+    }
+    if (!ids.has("master")) invalid.push({label: "outputs:master", state: "invalid-metadata", verified: false, detail: "标准后期缺主版"});
+  } else addFile("deliverable", manifest.deliverable, true);
   if (manifest.cover !== undefined) addFile("cover", manifest.cover, true);
   if (manifest.variants !== undefined && !Array.isArray(manifest.variants)) invalid.push({label: "variants", state: "invalid-metadata", verified: false, detail: "须为版本数组"});
   for (const variant of Array.isArray(manifest.variants) ? manifest.variants : []) {
@@ -340,6 +362,8 @@ export function deliveryInspect(input) {
     found: true,
     projectId,
     manifestPath,
+    schemaVersion: manifest.schemaVersion ?? null,
+    mode: manifest.mode ?? null,
     reviewPolicy: manifest.reviewPolicy ?? null,
     route: manifest.route ?? null,
     bgm: manifest.bgm ?? null,
@@ -378,8 +402,8 @@ function validShots(doc) {
     }
     if (ids.has(shot.shotId)) throw new VideoCapabilityError(`重复镜头 ID：${shot.shotId}`);
     ids.add(shot.shotId);
-    if (typeof shot.duration !== "number" || !Number.isFinite(shot.duration) || shot.duration <= 0) {
-      throw new VideoCapabilityError(`镜头 ${shot.shotId} 的 duration 须为正数`);
+    if (!Number.isInteger(shot.duration) || shot.duration < 4 || shot.duration > 12) {
+      throw new VideoCapabilityError(`镜头 ${shot.shotId} 的 duration 须为当前生产支持的整数 4–12 秒；不能通过变速凑时长`);
     }
   }
   return doc;
@@ -390,22 +414,6 @@ function authoredProduct(doc) {
     : plain(value) ? [value.name, value.id, value.title].find(field => typeof field === "string" && field.trim())?.trim() ?? "" : "";
   const products = Array.isArray(doc?.products) ? doc.products : [];
   return products.map(from).find(Boolean) || (doc?.shots ?? []).map(shot => from(shot.productRef)).find(Boolean) || null;
-}
-
-function localAsrConfiguration(env) {
-  const kind = String(env.WORKLOOM_VOICE_ENGINE ?? "mlx").trim().toLowerCase();
-  const raw = String(env.WORKLOOM_VOICE_ENGINE_URL ?? (kind === "mlx" ? "http://127.0.0.1:8099" : "http://127.0.0.1:3900"));
-  let endpoint = null;
-  try {
-    const url = new URL(raw);
-    if (["mlx", "openai"].includes(kind) && ["http:", "https:"].includes(url.protocol)
-      && ["127.0.0.1", "localhost", "[::1]"].includes(url.hostname) && !url.username && !url.password && !url.search && !url.hash) {
-      endpoint = url.origin + (url.pathname === "/" ? "" : url.pathname.replace(/\/+$/u, ""));
-    }
-  } catch { endpoint = null; }
-  return { kind: ["mlx", "openai", "mock"].includes(kind) ? kind : "unsupported", endpoint,
-    configured: endpoint !== null, runtimeVerified: false,
-    note: "只读本机配置；尚未请求 sidecar、加载权重或执行语音识别。正式 CLI 仍须实测核验原片台词。" };
 }
 
 /** POSIX 单引号把每个 argv 元素作为字面参数；结构化 argv 是调用方首选。 */
@@ -427,7 +435,7 @@ export function productionPlan(input) {
   const shotlistFile = insideRepo(shotlistPath, "shotlistPath"), routeFile = insideRepo(routePath, "routePath");
   const outputFile = insideRepo(outDir, "outDir"), stageWorkDir = insideRepo(artifactWorkDir, "workDir");
   const checklist = [];
-  let shotlist = null, fps = null, audioContracts = [], localAsr = null;
+  let shotlist = null, fps = null, audioContracts = [];
   try {
     const doc = readJsonFile(shotlistFile, shotlistPath);
     if (doc === null) throw new VideoCapabilityError(`缺镜头卡：${shotlistPath}`);
@@ -459,17 +467,12 @@ export function productionPlan(input) {
     if (!shotlist || !configuration) throw new VideoCapabilityError("镜头卡或本地配置无效，无法核验音频合同");
     audioContracts = assertFilmAudioPreflight({shots: shotlist.shots, unifiedNarration: value.unifiedNarration === true,
       generateAudio: configuration.env.SEEDANCE_GENERATE_AUDIO !== "0"});
-    checklist.push({id: "audio-contract", ok: true, detail: `原生对白 ${audioContracts.filter(c => c.mode === "native-dialogue").length} 镜；画外音 ${audioContracts.filter(c => c.mode === "voiceover").length} 镜；生成与重配选项无冲突`});
+    checklist.push({id: "audio-contract", ok: true, detail: `${audioContracts.length} 镜均保留同文件原声；语义包括出镜对白、画外音或环境声，均不授权后配`});
   } catch (error) { checklist.push({id: "audio-contract", ok: false, detail: error.message}); }
-  localAsr = localAsrConfiguration(configuration?.env ?? {});
-  const needsAsr = audioContracts.some(contract => contract.mode !== "none");
-  checklist.push({id: "local-asr", ok: !needsAsr || localAsr.configured,
-    detail: !needsAsr ? "有效合同中没有台词；运行时检查不适用" : localAsr.configured ? "本机 ASR 配置已声明；运行状态尚未实测" : "台词核验需要本机 ASR；配置缺失、mock、远程地址或 URL 含凭据"});
   const ready = checklist.every(entry => entry.ok);
   const argv = ready ? ["exec", "tsx", "scripts/tools/full-chain-film.mts", "--shots", shotlistFile, "--project", projectId,
     "--work-dir", stageWorkDir, "--out", outputFile, "--route", routeFile, "--keys-file", configuration.keysFile,
-    "--platform", platform, "--fps", String(fps), "--subtitle-mode", "both", "--review-policy", "off",
-    ...(value.unifiedNarration === true ? ["--narration-unified"] : [])] : [];
+    "--platform", platform, "--fps", String(fps), "--subtitle-mode", "both", "--review-policy", "off"] : [];
   const executable = "pnpm";
   const command = ready ? [executable, ...argv].map(quoteShell).join(" ") : null;
   return {
@@ -483,8 +486,8 @@ export function productionPlan(input) {
     workDir: repoRoot(),
     artifactWorkDir: stageWorkDir,
     artifactRoot: artifactRoot(),
-    localAsr,
-    audioContracts: audioContracts.map(({shotId, mode, policyHash}) => ({shotId, mode, policyHash})),
+    audioSourcePolicy: "render-native",
+    audioContracts: audioContracts.map(({shotId, mode, sourcePolicy, policyHash}) => ({shotId, mode, sourcePolicy, policyHash})),
     checklist,
     ready,
     readyScope: "authored-input-and-local-configuration",
@@ -492,7 +495,7 @@ export function productionPlan(input) {
     recommendedPowerShellCommand: ready ? `& ${[executable, ...argv].map(quotePowerShell).join(" ")}` : null,
     execution: ready ? { command: executable, args: argv, cwd: repoRoot() } : null,
     beforeRun: [
-      "pnpm video:doctor（环境自检：ffmpeg/密钥/配音工位/曲库路径监狱）",
+      "pnpm video:doctor（环境自检：ffmpeg/渲染配置/曲库路径监狱；标准后期不依赖配音或 ASR）",
       "营销片：product-archive.mts 建/取商品档案；真人出镜：video:assets reconcile 对账素材清单",
       "账户欠费（AccountOverdueError 403）会拦住提交：先充值再跑，不要连点重试",
     ],

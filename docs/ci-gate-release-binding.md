@@ -80,6 +80,6 @@ node scripts/ci/cnb-desktop-release.mjs preflight --receipt desktop-preflight-de
 node scripts/ci/cnb-desktop-release.mjs publish --preflight-receipt desktop-preflight-desktop-publisher.json
 ```
 
-`.cnb.yml` 同时保留原有 static/db/test 三门禁、签名、公证、resolve 摘要和唯一 publisher 锁，明确运行新 lock 测试、既有 release 测试，以及 test-gate 中 `local-cover-render` 的真实 FFmpeg/字体用例和 `film-existing-render-edit` Node 用例。验证不得调用新图像、视频、语音或模型任务。
+`.cnb.yml` 同时保留原有 static/db/test 三门禁、签名、公证、resolve 摘要和唯一 publisher 锁，明确运行新 lock 测试、既有 release 测试，以及 test-gate 中 `local-cover-render` 的真实 FFmpeg/字体用例和 `film-standard-post` Node 用例。旧自由分段入口已撤除，标准后期验证必须沿用原提交的全部完整原片及同源原声。验证不得调用新图像、视频、语音或模型任务。
 
 依据为 [CNB 默认环境变量](https://docs.cnb.cool/zh/build/build-in-env.html)、[CNB OpenAPI](https://docs.cnb.cool/zh/develops/openapi.html) 与 [官方 Swagger](https://api.cnb.cool/swagger.json)，配合本仓完整源码和实际 Git/HTTP 回归。接口数组/字段与 PR 状态来源分别绑定，不将 PR 状态 envelope 冒充提交状态数组。

@@ -801,7 +801,7 @@ test("CI config uses role-local first observations and explicit full lock/releas
     assert.ok(scripts.includes(`--preflight-receipt ${name}`));
   }
   const source = readFileSync(join(ROOT, ".cnb.yml"), "utf8");
-  for (const path of ["scripts/ci/verify-lock-conflict.test.mjs", "scripts/ci/cnb-desktop-release.test.mjs", "scripts/tools/film-existing-render-edit.test.ts"]) assert.ok(source.includes(path));
+  for (const path of ["scripts/ci/verify-lock-conflict.test.mjs", "scripts/ci/cnb-desktop-release.test.mjs", "scripts/tools/film-standard-post.test.ts"]) assert.ok(source.includes(path));
 });
 
 

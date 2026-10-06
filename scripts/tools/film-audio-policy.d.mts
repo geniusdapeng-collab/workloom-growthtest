@@ -1,4 +1,4 @@
-export const FILM_AUDIO_POLICY_VERSION: 'workloom.film-audio-policy/v1';
+export const FILM_AUDIO_POLICY_VERSION: 'workloom.film-audio-policy/v2';
 export class FilmAudioPolicyError extends Error {
   code: string;
   shotId: string | null;
@@ -16,13 +16,14 @@ export interface FilmAudioContract {
   schemaVersion: typeof FILM_AUDIO_POLICY_VERSION;
   shotId: string;
   mode: 'native-dialogue' | 'voiceover' | 'none';
+  sourcePolicy: 'render-native';
   text: string;
   reason: string;
   semantics: { speechMode: 'on-camera' | 'voice-over' | null; action: string; audio: string; rows: Array<{ text: string; speaker?: string; trigger?: string }> };
   policyHash: string;
 }
 export interface FilmVoiceDecision {
-  action: 'none' | 'preserve-native' | 'dub-voiceover' | 'blocked';
+  action: 'none' | 'preserve-native' | 'blocked';
   code: string;
   reason: string;
   policyHash: string;

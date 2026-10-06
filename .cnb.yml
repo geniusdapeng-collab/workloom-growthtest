@@ -241,7 +241,7 @@
         pnpm test:scripts
         # Post-only 的实际字节/字体/来源契约；测试不调用图像、视频、语音供应商。
         pnpm --filter @hyperreality/video-studio exec vitest run src/local-cover-render.test.ts
-        pnpm tsx --test scripts/tools/film-existing-render-edit.test.ts
+        pnpm tsx --test scripts/tools/film-standard-post.test.ts
 
     - name: 全场景套件（非阻断）
       script: |
