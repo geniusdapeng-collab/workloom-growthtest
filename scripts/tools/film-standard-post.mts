@@ -14,7 +14,7 @@ import { COVER_FONTS } from "../../packages/video-studio/src/cover-design.js";
 import { assessVariantAxes, assessVariantDistinctness, type VariantSample } from "../../packages/video-studio/src/deliver.js";
 
 export class StandardPostError extends Error {
-  constructor(readonly code: string, message: string) { super(`${code}: ${message}`); this.name = "StandardPostError"; }
+  constructor(readonly code: string, message: string, options?: ErrorOptions) { super(`${code}: ${message}`, options); this.name = "StandardPostError"; }
 }
 interface Stream { codec_type?: string; codec_name?: string; width?: number; height?: number; avg_frame_rate?: string;
   nb_read_frames?: string; duration?: string; sample_rate?: string; channels?: number; side_data_list?: Array<{ rotation?: number }> }
@@ -66,7 +66,13 @@ const receiptPath = (root: string, project: string, shot: string) => join(root, 
 const sealPath = (root: string, project: string, shot: string) => join(root, "logs", project, "original-issued", `${shot}.seal.json`);
 async function regular(path: string): Promise<string> {
   ensure(localPath(path), "expected a canonical absolute file path");
-  const resolved = await realpath(path); ensure(resolved === path && (await lstat(path)).isFile(), "symlink, alias or non-file source refused"); return resolved;
+  try {
+    const resolved = await realpath(path); ensure(resolved === path && (await lstat(path)).isFile(), "symlink, alias or non-file source refused"); return resolved;
+  } catch (error) {
+    if (error instanceof StandardPostError) throw error;
+    const reason = (error as NodeJS.ErrnoException).code ?? (error as Error).message;
+    throw new StandardPostError("STANDARD_POST_INVALID", `source unavailable: ${path} (${reason})`, { cause: error });
+  }
 }
 async function pinned(path: string, expected?: FileBinding): Promise<FileBinding> {
   await regular(path); const bytes = (await stat(path)).size, sha256 = await standardPostFileHash(path);

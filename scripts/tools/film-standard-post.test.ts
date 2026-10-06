@@ -6,7 +6,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { adoptLegacyOriginalRenders, assertStandardPostAudioClock, assertStandardPostVariantAxes, captureOriginalRenderManifest, freezeOriginalSubmission, issueOriginalRenderReceipt,
-  loadOriginalRenderManifest, resolveStandardPostBinary, standardPostFileHash, validateStandardPostSettings, type StandardPostSettings } from "./film-standard-post.mjs";
+  loadOriginalRenderManifest, resolveStandardPostBinary, standardPostFileHash, StandardPostError, validateStandardPostSettings, type StandardPostSettings } from "./film-standard-post.mjs";
 const hash = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 const repo = resolve(import.meta.dirname, "../.."), cli = join(repo, "scripts/tools/full-chain-film.mts");
 const ffmpeg = process.env.WL_FFMPEG ?? "ffmpeg", ffprobe = process.env.WL_FFPROBE ?? "ffprobe";
@@ -50,6 +50,23 @@ test("issued original manifest rebuilds exact complete native timeline from real
   assert.equal(hash(readFileSync(join(f.clips, "S1.mp4"))), sourceBefore);
   assert.deepEqual(validateStandardPostSettings(settings(f.root), loaded.contract), settings(f.root));
 }));
+test("a missing canonical manifest returns the stable standard error before media probing", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-missing-manifest-")));
+  try {
+    await assert.rejects(loadOriginalRenderManifest(join(root, "missing.json"), { ffprobe: "must-not-be-invoked" }),
+      (error: unknown) => error instanceof StandardPostError && error.code === "STANDARD_POST_INVALID" && /ENOENT/.test(error.message));
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+test("a missing issued receipt fails capture with the stable error and publishes no manifest", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-missing-receipt-"))), projectId = "MOCK-MISSING";
+  try {
+    await freezeOriginalSubmission({ productionRoot: root, projectId,
+      bytes: Buffer.from(JSON.stringify({ projectId, shots: [{ shotId: "EMPTY", duration: 4 }] })) });
+    await assert.rejects(captureOriginalRenderManifest({ productionRoot: root, projectId }),
+      (error: unknown) => error instanceof StandardPostError && error.code === "STANDARD_POST_INVALID" && /EMPTY\.json.*ENOENT/.test(error.message));
+    assert.equal(existsSync(join(root, "logs", projectId, "original-render-manifest.json")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
 test("final audio guard counts the full real original clock and records codec boundary samples", async () => using(async f => {
   const file = join(f.clips, "S1.mp4"), before = hash(readFileSync(file));
   const result = await assertStandardPostAudioClock(file, 1, { ffmpeg, timeoutMs: 60_000 });

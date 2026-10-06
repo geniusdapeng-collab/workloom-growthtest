@@ -57,6 +57,8 @@ pnpm tsx scripts/tools/full-chain-film.mts \
 8. 沿用现有 `G-DLV1`：三风格版实际封面摘要、调色档和实际消费音乐摘要两两不同；母版和软字幕是便利呈现，不占三种风格名额。配乐只改电平或把同一曲换 ID/文件名均不算不同。真实最终影片在 20%/50%/80% 时点采样画面均色，并测完整音轨 LUFS/真峰值，使用现有差异阈值；缺证据、三轴失败或可测差异失败均留在 staging，不发布。原规则允许明确全关音乐时检验调色与封面两轴。不能为满足通用风格模板擅加转场或修改原镜。
 9. 所有实际检查通过才原子移动 staging 为正式新目录。错误保留 `failed.json` 和已执行阶段，释放自己的锁；并发、新输出抢占、超时及摘要错误都不会写“交付成功”。
 
+原稿、签发回执、原片或其它规范输入缺失、不可访问时，文件验证返回 `StandardPostError/STANDARD_POST_INVALID`，消息保留文件路径和底层错误码，原异常保留为 `cause`。仍在媒体处理前停止；缺原片回执不能由旧成功日志补齐，也不会发布原片清单。
+
 主要稳定错误包括 `FREE_EDIT_REMOVED`、`STANDARD_POST_ARGUMENTS_INVALID`、`STANDARD_POST_WORKER_FORBIDDEN`、`STANDARD_POST_INVALID`、`STANDARD_POST_PROCESS_FAILED`、`STANDARD_POST_MEDIA_INVALID`、`STANDARD_POST_NATIVE_CLOCK_INCOMPLETE`、`STANDARD_POST_VARIANTS_INVALID`、`STANDARD_POST_SOURCE_SPEECH_UNVERIFIED`、`STANDARD_POST_FONT_CHANGED`、`STANDARD_POST_CODE_CHANGED`、`STANDARD_POST_TIMELINE_CHANGED`、`STANDARD_POST_OUTPUT_EXISTS`、`STANDARD_POST_BUSY`。正常生产还拒绝 `AUDIO_NATIVE_SOURCE_REPLACED` 和 `STANDARD_NATIVE_RETIME_FORBIDDEN`。
 
 ## 验证与功能优先级
