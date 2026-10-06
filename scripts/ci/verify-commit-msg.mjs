@@ -26,10 +26,14 @@ function arg(name) {
   return index >= 0 ? process.argv[index + 1] : undefined;
 }
 
-function git(args) {
+function gitRaw(args) {
   return execFileSync("git", args, {
     encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: 15_000, maxBuffer: 16 * 1024 * 1024,
-  }).trim();
+  });
+}
+
+function git(args) {
+  return gitRaw(args).trim();
 }
 
 function fail(code, message) {
@@ -84,6 +88,35 @@ function optionalBinding(name, expected, shaPrefix, mismatchCode) {
 
 function parentsOf(commit) {
   return git(["show", "-s", "--format=%P", commit]).split(" ").filter(Boolean);
+}
+
+function isCnbCanonicalMergeCommit(sha, subject) {
+  // This title is observed on CNB's actual canonical merge objects. A similar
+  // string is not authority: bind the unmodified title and parents to the raw
+  // original object, ignoring git replace/grafts and parser whitespace cleanup.
+  const match = /^Merged ([0-9a-f]{40}) into ([0-9a-f]{40})$/.exec(subject);
+  if (!match) return false;
+  const [, source, target] = match;
+  const mismatch = () => fail("CNB_MERGE_SUBJECT_BINDING_MISMATCH", "生成合并标题必须与原始 Git 对象的两份有效父提交精确一致");
+  let original;
+  try {
+    const commit = git(["--no-replace-objects", "rev-parse", "--verify", `${sha}^{commit}`]);
+    if (!FULL_SHA.test(commit) || !commit.startsWith(sha)) mismatch();
+    original = gitRaw(["--no-replace-objects", "cat-file", "commit", commit]);
+  } catch { mismatch(); }
+  const separator = original.indexOf("\n\n");
+  if (separator < 0) mismatch();
+  const title = original.slice(separator + 2).split("\n", 1)[0];
+  const parents = original.slice(0, separator).split("\n")
+    .filter((line) => line.startsWith("parent ")).map((line) => line.slice(7));
+  if (title !== subject || parents.length !== 2 || parents[0] !== target || parents[1] !== source
+    || source === target || source === ZERO_SHA || target === ZERO_SHA) mismatch();
+  for (const parent of parents) {
+    try {
+      if (git(["--no-replace-objects", "cat-file", "-t", parent]) !== "commit") mismatch();
+    } catch { mismatch(); }
+  }
+  return true;
 }
 
 function requireMergeParents(commit, target, source) {
@@ -240,7 +273,7 @@ function main() {
 
   let failed = 0;
   for (const { sha, date, subject } of commits) {
-    if (isExemptSubject(subject)) {
+    if (isExemptSubject(subject) || isCnbCanonicalMergeCommit(sha, subject)) {
       console.log(`- ${sha} 豁免：${subject}`);
       continue;
     }
