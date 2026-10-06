@@ -13,6 +13,8 @@ import {
   requireRepositoryPath, resolveLockPolicies,
 } from "./protocol-rules.mjs";
 
+// WORKLOOM_DELIVERY_BOUND_PROTOCOL_V1
+import { verifyPrFreshness, verifyPrLeases } from "./verify-delivery-admission.mjs";
 const API = "https://api.cnb.cool";
 const FULL_SHA = /^[0-9a-f]{40}$/;
 const ZERO_SHA = "0".repeat(40);
@@ -26,9 +28,10 @@ const FILE_STATUSES = new Map([
   ["rename", "renamed"], ["copy", "copied"],
 ]);
 
-function fail(code, message) {
+function fail(code, message, status) {
   const error = new Error(`${code}: ${message}`);
   error.code = code;
+  if (status !== undefined) error.status = status;
   throw error;
 }
 
@@ -196,7 +199,7 @@ export class LockApiClient {
     this.deadline = now() + budgetMs; this.now = now; this.pageSize = pageSize; this.maxPages = maxPages;
   }
 
-  async api(path, { repoSlug = this.repoSlug } = {}) {
+  async api(path, { repoSlug = this.repoSlug, raw = false } = {}) {
     const boundRepo = repositorySlug(repoSlug);
     const remaining = this.deadline - this.now();
     if (remaining <= 0) fail("API_INCOMPLETE", "API 采集总时间已超限");
@@ -209,9 +212,10 @@ export class LockApiClient {
             headers: { Authorization: `Bearer ${this.token}`, Accept: "application/vnd.cnb.api+json" },
             redirect: "error", signal: controller.signal,
           });
-          if (response.status !== 200) fail("API_INCOMPLETE", `CNB GET 返回 HTTP ${response.status}`);
+          if (response.status !== 200) fail("API_INCOMPLETE", `CNB GET 返回 HTTP ${response.status}`, response.status);
           const text = await response.text();
           if (!text || text.length > 16 * 1024 * 1024) fail("API_INCOMPLETE", "API JSON 为空或超过大小边界");
+          if (raw) return text;
           try { return JSON.parse(text); } catch { fail("API_INCOMPLETE", "API 返回无效 JSON"); }
         })(),
         new Promise((_, reject) => {
@@ -247,7 +251,7 @@ function samePull(left, right, { listed = false } = {}) {
     && ((listed && !left.sourceRepo) || left.sourceRepo === right.sourceRepo);
 }
 
-export function fullPathOf(entry, { repoSlug, headSha } = {}) {
+export function fullPathOf(entry, { repoSlug, headSha, baseSha, targetRepoSlug } = {}) {
   if (!entry || typeof entry !== "object" || Array.isArray(entry)) fail("PATH_UNVERIFIED", "文件记录无效");
   const explicit = entry.path === undefined ? null : requireRepositoryPath(entry.path);
   const urls = [entry.raw_url, entry.blob_url].filter((value) => value !== undefined && value !== null && value !== "");
@@ -257,7 +261,9 @@ export function fullPathOf(entry, { repoSlug, headSha } = {}) {
     let url;
     try { url = new URL(value); } catch { fail("PATH_UNVERIFIED", "文件 URL 无效"); }
     if (url.origin !== "https://cnb.cool" || url.username || url.password || url.search || url.hash) fail("PATH_UNVERIFIED", "文件 URL 来源不受信任");
-    const repo = repositorySlug(repoSlug); const sha = fullSha(headSha, "文件 head");
+    const deleted = (FILE_STATUSES.get(entry.status) ?? entry.status) === "deleted";
+    const repo = repositorySlug(deleted ? targetRepoSlug : repoSlug);
+    const sha = fullSha(deleted ? baseSha : headSha, deleted ? "文件 base" : "文件 head");
     const prefixes = [`/${repo}/-/git/raw/${sha}/`, `/${repo}/-/blob/${sha}/`];
     const prefix = prefixes.find((candidate) => url.pathname.startsWith(candidate));
     if (!prefix) fail("PATH_UNVERIFIED", "文件 URL 未绑定仓库和完整 source SHA");
@@ -335,7 +341,7 @@ export async function collectBoundPulls(client, context = {}) {
           fail("PATH_UNVERIFIED", "PR 文件声明的完整 filename 与 compare 矛盾");
         }
         if (file.path !== undefined || [file.raw_url, file.blob_url].some((value) => value !== undefined && value !== null && value !== "")) {
-          const path = fullPathOf(file, { repoSlug: before.sourceRepo, headSha: before.sourceSha });
+          const path = fullPathOf(file, { repoSlug: before.sourceRepo, headSha: before.sourceSha, baseSha: before.targetSha, targetRepoSlug: before.repo });
           if (!records.some((record) => record.path === path && record.status === FILE_STATUSES.get(file.status))) fail("PATH_UNVERIFIED", "PR 文件路径未由实际 compare 证明");
         }
         return `${FILE_STATUSES.get(file.status)}:${file.filename.split("/").at(-1)}`;
@@ -358,20 +364,35 @@ export function compareConflicts(mine, others, context) {
   for (const other of others) {
     const later = context.iid ? BigInt(other.number) < BigInt(context.iid) : true;
     const modules = findModuleConflicts(mine, other.paths); const paths = findFileOverlaps(mine, other.paths);
-    if (modules.length) conflicts.push({ kind: "modules", otherIID: other.number, modules, blocking: context.policies.modules === "fail" && later, later });
+    if (modules.length) conflicts.push({ kind: "modules", otherIID: other.number, modules, blocking: context.policies.modules === "fail" && later && (context.strict || !context.deliveryLeaseInstalled), later });
     if (paths.length) conflicts.push({ kind: "ordinary", otherIID: other.number, paths, blocking: context.policies.ordinary === "fail" && later, later });
   }
   return conflicts;
 }
 
-export async function runLockGate({ argv = [], env = process.env, cwd = process.cwd(), fetchImpl = globalThis.fetch, apiOptions = {} } = {}) {
+export async function runLockGate({ argv = [], env = process.env, cwd = process.cwd(), fetchImpl = globalThis.fetch, apiOptions = {}, admissionOptions = { waitMs: 180000 } } = {}) {
   const context = resolveLockContext(argv, env); const scope = changedFiles({ context, env, cwd });
   if (!context.repoSlug || !env.CNB_TOKEN?.trim()) {
     if (context.isCI || context.isPr || context.strict) fail("API_INCOMPLETE", "缺少 CNB 仓库或令牌，不能证明并发状态");
     return { schema: "workloom.lock-conflict/v2", event: "local", decision: "local-skip", verified: false, complete: false,
       reason: "本地缺少 CNB 上下文", range: scope.range, files: scope.files };
   }
-  const client = new LockApiClient({ ...apiOptions, repoSlug: context.repoSlug, token: env.CNB_TOKEN, fetchImpl });
+  const client = new LockApiClient({ budgetMs: 240000, ...apiOptions, repoSlug: context.repoSlug, token: env.CNB_TOKEN, fetchImpl });
+  if (context.isPr) {
+    const request = (url, options) => {
+      const prefix = API + "/" + context.repoSlug + "/-/";
+      if (!url.startsWith(prefix)) fail("IDENTITY_UNVERIFIED", "Admission request escaped target repository");
+      return client.api(url.slice(prefix.length), options);
+    };
+    const snapshot = await verifyPrFreshness({ repoSlug: context.repoSlug, number: context.iid, branch: context.sourceBranch,
+      eventSourceSha: context.sourceSha, eventTargetSha: context.targetSha, request });
+    const comparison = await client.api("git/compare/" + snapshot.mainSha + "..." + snapshot.headSha);
+    const bound = pathsFromCompare(comparison, { baseSha: snapshot.mainSha, headSha: snapshot.headSha });
+    if (JSON.stringify(bound.paths) !== JSON.stringify([...scope.files].sort())) fail("PATH_UNVERIFIED", "Actual Git paths differ from bound platform compare");
+    const leases = await verifyPrLeases(context.repoSlug, scope.files, request, Date.now(),
+      { number: Number(context.iid), headSha: snapshot.headSha, mainSha: snapshot.mainSha }, admissionOptions);
+    context.deliveryLeaseInstalled = leases.installed === true;
+  }
   const collection = await collectBoundPulls(client, context); const conflicts = compareConflicts(scope.files, collection.prs, context);
   return { schema: "workloom.lock-conflict/v2", event: context.event ?? "local", decision: conflicts.some((row) => row.blocking) ? "blocked" : "pass",
     verified: true, complete: collection.complete, pages: collection.pages, observedPulls: collection.observedPulls,
