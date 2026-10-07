@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3060,
+  "revision": 3062,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "aligning",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2068,8 +2068,8 @@
         }
       },
       "updatedAt": 1791406637360,
-      "error": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
-      "blockedUntil": 0,
+      "error": "Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
+      "blockedUntil": 1791407237360,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
       "branch": "task/T-2026-1007-0001",
@@ -78986,6 +78986,31 @@
       },
       "previous": "6866102d420e66883dfbb471028d44c3313bff114f0fd6355457e577ef834396",
       "digest": "cfae5354e33e25dc199c562b2545819fef7128ae530315590a698cba85d05cad"
+    },
+    {
+      "sequence": 3061,
+      "at": "2026-10-07T20:57:17.360Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
+          "blockedUntil": 1791407237360
+        }
+      },
+      "previous": "cfae5354e33e25dc199c562b2545819fef7128ae530315590a698cba85d05cad",
+      "digest": "0077982bfc88f915fe78a3b73a428d9c74eaba34ff9876d206631b9e6c59390e"
+    },
+    {
+      "sequence": 3062,
+      "at": "2026-10-07T20:58:03.739Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f884ebe2-873c-40aa-b3b7-4b88bbdefd6b"
+      },
+      "previous": "0077982bfc88f915fe78a3b73a428d9c74eaba34ff9876d206631b9e6c59390e",
+      "digest": "0c3ce2dfcf1c918cc6582f306afd12a3bfbef7fc871f1da34ab9061f13dff26e"
     }
   ]
 }
