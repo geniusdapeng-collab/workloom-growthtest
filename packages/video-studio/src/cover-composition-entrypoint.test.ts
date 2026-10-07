@@ -40,7 +40,7 @@ const compiled = ts.transpileModule([...declarations, ...selector].map(node => n
 interface Api {
   callCoverDesigner(input: unknown): Promise<string>;
   selectActualCover(): Promise<{ plan: CoverPlan; designVia: string; designNote: string }>;
-  record(input: Record<string, unknown>): { ok: boolean; degraded: boolean; lineage: LineageReceipt };
+  record(input: Record<string, unknown>): { stage: string; ok: boolean; degraded: boolean; lineage: LineageReceipt };
   coverSourcesForShots(shots: CoverShotSource[], lead: CoverLeadSource | null): {
     personShots: CoverShotSource[]; leadMatchedPersons: CoverShotSource[]; fallbackBackground: CoverShotSource;
   };
@@ -119,7 +119,7 @@ describe("封面正式 CLI 单主视觉与来源", () => {
       writeFileSync(submitted, JSON.stringify({ projectId: "fixture" }));
       writeFileSync(original, "synthetic input bytes"); writeFileSync(cover, "synthetic output bytes");
       const inputs = [submitted, original], snapshot = captureLineageInputs(inputs), sourceHash = sha(readFileSync(submitted));
-      const rows: Array<{ ok: boolean; degraded: boolean; lineage: LineageReceipt }> = [];
+      const rows: Array<{ stage: string; ok: boolean; degraded: boolean; lineage: LineageReceipt }> = [];
       let modelCalls = 0;
       const recipe = { component: originalHash, stage: "cover" };
       const sandbox = { ...context, exports: {} as { api: Api }, REVIEW_POLICY: policy, fallbackCoverPlan, parseCoverPlan, buildCoverDesignPrompt,
