@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 635,
+  "revision": 637,
   "tasks": {
     "98": {
       "number": 98,
@@ -34,7 +34,7 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791336644957,
-      "updatedAt": 1791352820381,
+      "updatedAt": 1791353712083,
       "alignmentCount": 1,
       "alignmentIntent": null,
       "developerReview": null,
@@ -55,9 +55,9 @@
       },
       "recoveryCount": 0,
       "reviewFailures": null,
-      "blockedUntil": 1791353420381,
+      "blockedUntil": 1791354312083,
       "candidate": null,
-      "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "repairRequired": {
         "provider": "codex",
         "headSha": "c20c2606f9670aff25635b3c71bd2e138c915a58",
@@ -21046,6 +21046,31 @@
       },
       "previous": "a31edf209f37a5a56b5f7d122738741a8d1bb498645387edf73dbd3dbfedcaab",
       "digest": "cb0a50805eb967d7cdde19a270c4cb853f47a1dec909df14a17ee034d7c36b98"
+    },
+    {
+      "sequence": 636,
+      "at": "2026-10-07T06:15:12.083Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791354312083
+        }
+      },
+      "previous": "cb0a50805eb967d7cdde19a270c4cb853f47a1dec909df14a17ee034d7c36b98",
+      "digest": "3c2f36f888071b4a773c0580dc847f7ebf901bdeae75af988c5d15005da9003a"
+    },
+    {
+      "sequence": 637,
+      "at": "2026-10-07T06:15:30.985Z",
+      "kind": "transaction",
+      "data": {
+        "id": "0604232d-f5e6-4a3b-9eb7-94fba533d853"
+      },
+      "previous": "3c2f36f888071b4a773c0580dc847f7ebf901bdeae75af988c5d15005da9003a",
+      "digest": "4c1c6a87e4993fda294606b38cfd3194032e8477eb3dfd76decfeb7b22f9df19"
     }
   ]
 }
