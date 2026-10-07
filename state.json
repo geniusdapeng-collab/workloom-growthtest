@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2813,
+  "revision": 2816,
   "tasks": {
     "98": {
       "number": 98,
@@ -5105,7 +5105,7 @@
     },
     "135": {
       "number": 135,
-      "status": "waiting_ci",
+      "status": "merging",
       "firstSeen": 1791354489850,
       "attempts": {},
       "headSha": "26c39791033b78f0364331f17094f8ccd83eec15",
@@ -5342,6 +5342,105 @@
         "owner": "admission/pr-135",
         "generation": {
           "protocol": 75
+        }
+      },
+      "mergePhase": "prepared",
+      "mergeSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 153,
+        "pull": {
+          "number": 153,
+          "state": "open",
+          "title": "chore(ci): deliver #135 fix(video): 封面单一主视觉并正确识别无人产品镜 [T-2026-1007-0008]",
+          "body": "Immutable delivery candidate for #135. Exact source 26c39791033b78f0364331f17094f8ccd83eec15; tested main 868af4f45475967363b1aa7e5c8b4d3bd20a52f9.\n\n<!-- delivery-origin:135:26c39791033b78f0364331f17094f8ccd83eec15:868af4f45475967363b1aa7e5c8b4d3bd20a52f9 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[133],\"releases\":[]}\n-->",
+          "author": {
+            "username": "OCI",
+            "nickname": "Cloud Native Build",
+            "is_npc": true
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/delivery/candidate/pr-135-a57116dca9dc86bf854455362b9a76cd",
+            "sha": "26c39791033b78f0364331f17094f8ccd83eec15",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "26c39791033b78f0364331f17094f8ccd83eec15",
+        "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+        "files": [
+          "docs/capabilities.auto.json",
+          "docs/video-render-task-recovery.md",
+          "docs/video-standard-post.md",
+          "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+          "packages/video-studio/src/cover-design.ts",
+          "scripts/tools/film-native-post.test.ts",
+          "scripts/tools/full-chain-film.mts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0008",
+          "ready": true,
+          "dependsOn": [
+            133
+          ],
+          "releases": []
+        },
+        "headTime": 1791400758000,
+        "mergeBase": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+        "checkErrors": [],
+        "checkSha": "88f14ee81ff9947515a35e78dc00b8c5a0f25b35",
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "file": "scripts/tools/film-native-post.test.ts",
+            "before": {
+              "ref": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "26c39791033b78f0364331f17094f8ccd83eec15",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "digest": "4b39f71ce62616f3a611b73bad80092aaef4fd420cec0e1a7f77dd9b4b078947"
+          }
+        ],
+        "originNumber": 135,
+        "pendingDependencies": []
+      },
+      "integrationLease": {
+        "owner": "integration/pr-135",
+        "scopes": [
+          "protocol"
+        ],
+        "generation": {
+          "protocol": 77
         }
       }
     },
@@ -7582,10 +7681,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": null,
-      "generation": 76,
-      "acquiredAt": 1791401508601,
-      "expiresAt": 1791401508601
+      "owner": "integration/pr-135",
+      "generation": 77,
+      "acquiredAt": 1791402013850,
+      "expiresAt": 1791402913850
     },
     "dependencies": {
       "owner": null,
@@ -73218,6 +73317,144 @@
       },
       "previous": "ae48c7951742b597e376dff6a4067fc8937faf97357c5a1b5ebe77b5a5ddfa1e",
       "digest": "d7b6c0aa7ef4184d7f2f3a6a8c969e54a57ee549697818fa70051f7e1b75736e"
+    },
+    {
+      "sequence": 2814,
+      "at": "2026-10-07T19:40:13.850Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-135",
+        "generation": {
+          "protocol": 77
+        }
+      },
+      "previous": "d7b6c0aa7ef4184d7f2f3a6a8c969e54a57ee549697818fa70051f7e1b75736e",
+      "digest": "a5a514118637022277655048ce1f9056b524e1a050736d117b0b16047724a208"
+    },
+    {
+      "sequence": 2815,
+      "at": "2026-10-07T19:40:13.850Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 153,
+            "pull": {
+              "number": 153,
+              "state": "open",
+              "title": "chore(ci): deliver #135 fix(video): 封面单一主视觉并正确识别无人产品镜 [T-2026-1007-0008]",
+              "body": "Immutable delivery candidate for #135. Exact source 26c39791033b78f0364331f17094f8ccd83eec15; tested main 868af4f45475967363b1aa7e5c8b4d3bd20a52f9.\n\n<!-- delivery-origin:135:26c39791033b78f0364331f17094f8ccd83eec15:868af4f45475967363b1aa7e5c8b4d3bd20a52f9 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[133],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-135-a57116dca9dc86bf854455362b9a76cd",
+                "sha": "26c39791033b78f0364331f17094f8ccd83eec15",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "26c39791033b78f0364331f17094f8ccd83eec15",
+            "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+            "files": [
+              "docs/capabilities.auto.json",
+              "docs/video-render-task-recovery.md",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+              "packages/video-studio/src/cover-design.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0008",
+              "ready": true,
+              "dependsOn": [
+                133
+              ],
+              "releases": []
+            },
+            "headTime": 1791400758000,
+            "mergeBase": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+            "checkErrors": [],
+            "checkSha": "88f14ee81ff9947515a35e78dc00b8c5a0f25b35",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/film-native-post.test.ts",
+                "before": {
+                  "ref": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "26c39791033b78f0364331f17094f8ccd83eec15",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "digest": "4b39f71ce62616f3a611b73bad80092aaef4fd420cec0e1a7f77dd9b4b078947"
+              }
+            ],
+            "originNumber": 135,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-135",
+            "scopes": [
+              "protocol"
+            ],
+            "generation": {
+              "protocol": 77
+            }
+          }
+        }
+      },
+      "previous": "a5a514118637022277655048ce1f9056b524e1a050736d117b0b16047724a208",
+      "digest": "5b065c637652db4a459ce89d506444b8f11825b8a7532a2f061953f13aceeef9"
+    },
+    {
+      "sequence": 2816,
+      "at": "2026-10-07T19:41:39.724Z",
+      "kind": "transaction",
+      "data": {
+        "id": "4429c65f-f5db-45d8-97ba-d06bf2d25aab"
+      },
+      "previous": "5b065c637652db4a459ce89d506444b8f11825b8a7532a2f061953f13aceeef9",
+      "digest": "c29f3cc58a446ed4032b17f83b6f2d445ba37b0c5e80914151dc24846e36fc22"
     }
   ]
 }
