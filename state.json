@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1766,
+  "revision": 1769,
   "tasks": {
     "98": {
       "number": 98,
@@ -2598,7 +2598,7 @@
           "protocol": 53
         }
       },
-      "updatedAt": 1791386109936,
+      "updatedAt": 1791386331737,
       "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
       "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
       "branch": "task/T-2026-1007-0003",
@@ -2606,11 +2606,111 @@
         "taskId": "T-2026-1007-0003",
         "ready": true,
         "dependsOn": [
-          118
+          118,
+          146
         ],
         "releases": []
       },
-      "developerReview": null,
+      "developerReview": {
+        "schemaVersion": 1,
+        "provider": "codex",
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 123,
+        "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+        "policyHash": "2dd9d8d7996d6d3cbd5220bf94435364b6cef0a159c8ad49738332682a5bb974",
+        "reviewedFiles": [
+          "docs/capabilities.auto.json",
+          "docs/video-standard-post.md",
+          "packages/video-studio/src/standard-post-contract.test.ts",
+          "packages/video-studio/src/standard-post-contract.ts",
+          "scripts/tools/compose-film.mts",
+          "scripts/tools/compose-native-clock.test.ts",
+          "scripts/tools/film-native-post.test.ts",
+          "scripts/tools/film-release-entrypoints.test.ts",
+          "scripts/tools/film-standard-post.mts",
+          "scripts/tools/film-standard-post.test.ts",
+          "scripts/tools/full-chain-film.mts"
+        ],
+        "filesHash": "ba7fa5f05beedb5501d5139808bff88fbe52b1cfc3ae5d1796179a647d3b09bb",
+        "dependsOn": [
+          118,
+          146
+        ],
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "rationale": "实际CLI函数VM夹具加入冻结sourceDocument与独立原稿时长。合法加一端点帧允许，篡改原稿或缺镜仍拒绝，旧TTS/换原声/来源反例保留；不把派生时长当提交原稿洗白。 当前文件 scripts/tools/film-release-entrypoints.test.ts；当前 source/main 比较摘要 56da0d21804a2fd53e94a3f35a46fff62433ec1fb54eb2a6a2401e54cdadb983"
+          },
+          {
+            "id": "CI-002",
+            "rationale": "审读新增真实FFmpeg夹具：三镜315帧与每帧摘要保留、原文件哈希不变、实际AV相关性、短原声与变速参数拒绝。它验证原生图声时钟，不冒充真实供应商、身份或语音内容认证；旧媒体闸与必需CI未删除。 当前文件 scripts/tools/compose-native-clock.test.ts；当前 source/main 比较摘要 86124e96a64e3c6c5550f26f898af23ed73a38948689210996c1276fb1461fcc"
+          },
+          {
+            "id": "CI-003",
+            "rationale": "真实本地媒体签发/字节/原稿绑定及原声样点反例保留。basename绑定避免临时父目录含S2导致夹具意外重复，新增对应回归；未以模型意见替换来源证据。当前source真实Node后期22/22通过。 当前文件 scripts/tools/film-standard-post.test.ts；当前 source/main 比较摘要 ad7b2cf39e0952227730ffa7b4d5f623e08b9e1da4a2ce6f2d530d3eedafb4eb"
+          },
+          {
+            "id": "CI-004",
+            "rationale": "绑定当前validateStandardNativeClock和正常CLI的--native-clock调用断言；原片全路径、顺序、fps、无retime与原声禁止替换的旧断言保留。当前准确source实际视频回归通过。 当前文件 scripts/tools/film-native-post.test.ts；当前 source/main 比较摘要 ebd868f63d64001a0001615a33920bef60896c57029b54fe9403415b699d3044"
+          }
+        ],
+        "ciPolicyChangesHash": "ff9db64644768efd30be91b9f1dfa053ecc62de8da65004e09b620fc63c34193",
+        "tests": [
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:06:50.218100+00:00",
+            "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (312.549125ms)\n✔ temporary ancestor names containing S2 cannot turn two distinct original fixtures into duplicate media (104.093541ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (0.85275ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (4.601792ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (102.108625ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (161.280333ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (124.31275ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (104.980208ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.527458ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (107.70225ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (79.387625ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (80.451209ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (85.968583ms)\n✔ missing actual accepted input proof refuses original issuance (85.148375ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (130.138ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (384.563166ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (278.039541ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (269.487375ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (276.15875ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (269.665041ms)\n✔ media executable resolver permits only current local executables (3.412667ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.39575ms)\nℹ tests 22\nℹ suites 0\nℹ pass 22\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 3203.107291\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-rendered-material-use.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/native-source-123-after146-video-vitest.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:07:26.267986+00:00",
+            "result": "{\"numTotalTests\": 1631, \"numPassedTests\": 1630, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:scripts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:08:28.356415+00:00",
+            "result": "并安全换入运行时载荷…\n23:08:07 正在校验并安全换入运行时载荷…\n23:08:07 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-VhRLXP/resources）==\n23:08:07 正在检查本机版本与安装载荷…\n23:08:07 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-s6Crky/resources）==\n23:08:07 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (21.400709ms)\n✔ 真实首日引导退出的渲染冒烟 (26.226916ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (1.452292ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (3.585667ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (0.728708ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (1.546583ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (2.806459ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.616167ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.697709ms)\n✔ 产品截图采用捕获时的可见场景 (12.592ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (30.715583ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.322959ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (2.415833ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.568625ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (7.380417ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (8.032209ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (5.850375ms)\n  ✔ 首装暂存失败不会留下半套运行时 (3.660208ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (1.051417ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.217584ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.578458ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (4.273667ms)\n✔ 桌面载荷原子装配 (67.365125ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.144333ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (1.16725ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.177709ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (2.434792ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (19.814ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (3.758708ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (27.677666ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (1.054209ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (32.373458ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.126208ms)\n✔ 桌面本机渲染子进程的 Node 路径 (33.674125ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (1.189ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (1.22475ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (3.232958ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.252292ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (1.005584ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.379167ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.223917ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.201959ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (2.222625ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (10.066334ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (1.3905ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (7.583333ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.106416ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.150416ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (9.290084ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (28.739917ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (0.950625ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (2.74275ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (1.816958ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (2.87075ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (4.468875ms)\n✔ native smoke captures the actual product region for its pixel verdict (2.984875ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (4.556084ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (4.651334ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (6.18325ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (4.7915ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (3.513375ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (2.704584ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (2.737292ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (3.313959ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (4.260792ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (5.347375ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (3.541666ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (11.094958ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (4.473583ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (6.8545ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (2.526833ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (3.0995ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (1.939208ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (1.9655ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (2.358ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (4.029167ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (2.67525ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (1.751834ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (1.868583ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-6IYtGR/pgdata\",\"port\":55432,\"hbaFile\":\"/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-6IYtGR/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (0.357792ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.083041ms)\n✔ 客户端投影路径围栏 (0.902167ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (1.566375ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (0.566334ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (2.253584ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (1.063958ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (0.972542ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (1.690042ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (1.69725ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (0.865125ms)\n  ✔ 实例报告端口不符时失败且零写入 (0.449084ms)\n✔ 桌面数据库安全引导 (11.440834ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (2.5155ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (13.296292ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (4.872292ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (3.353208ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (7.248208ms)\n✔ 包目录创建顺序不影响依赖清单输出 (5.647334ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (154.048292ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (38.991125ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (1.701333ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (7.51675ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (4.371666ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (8.243ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (3.471458ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (130.731125ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (1.797042ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (84.607333ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.276708ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (114.954709ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (93.983709ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (6.522125ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (1.890333ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (2.024667ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (3.90475ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.279042ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (0.876709ms)\n✔ normal physical source copy records canonical source and generated contract bytes (214.814875ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (61.246833ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (53.50275ms)\n✔ existing derived-output symlink cannot replace an external file (56.159375ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (75.185125ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (88.602375ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (74.32675ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (35.654666ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (95.713708ms)\n✔ payload cannot be created inside a selected source tree (116.297167ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (63.611833ms)\n✔ canonical output aliases cannot overwrite the checkout (49.901792ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (111.837292ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (644.603083ms)\n✔ 检测到非演示工作区时拒绝删除 (2007.262333ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (1311.567708ms)\n✔ 未知参数 fail closed (4.039084ms)\n✔ 备份失败时禁止删除和后续迁移种子 (998.082541ms)\n✔ 空备份不能证明可恢复，禁止删除 (929.526416ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (2662.630334ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (5208.405666ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (2458.419167ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (1841.42325ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (2280.78475ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.595541ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.324875ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (48.940959ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (1.339875ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (7.628125ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (4.9945ms)\nℹ tests 161\nℹ suites 11\nℹ pass 161\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 20653.6075\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:08:28.790075+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project apps/server/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:08:29.921606+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:08:29.980649+00:00",
+            "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:08:30.058240+00:00",
+            "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+          },
+          {
+            "command": "git diff --check d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b...2859237b49495dca23b26f55211c18fe3cafc3f3",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T15:08:30.108070+00:00",
+            "result": "Command completed without diagnostics."
+          }
+        ],
+        "reviewedAt": "2026-10-07T15:15:13.931648+00:00",
+        "summary": "A级：原11个产品文件的实现及直接依赖已完整审读，产品差异曾分1-210/211-410/411-600读至末尾；能力JSON元数据按B级。B级：云端原生执行器普通合并已独立发布146的main d9后形成当前2859237，11个产品blob与之前3f84逐一相同，当前main...source完整600行diff字节与此前实际审读版本完全一致；不将字节比较冒充再次精读。原生图声合同保留0/+1合法端点帧、fps精确时钟与AAC元数据边界，冻结原稿不改写，整段直接拼接与同源原声覆盖；异常帧数、短原声、改原稿/路径/字节仍拒绝。当前精确source于2026-10-07T15:06:46.967586+00:00至2026-10-07T15:08:30.108070+00:00实际八项检查退出0：Node标准后期22/22，video1631项1630通过1既有跳过，脚本套件命令通过（末段161/161）、双类型、登记资产、能力一致性和targetdiff均通过，日志SHA由正式finalizer逐项核对。旧候选144的明确429拒绝与两次真实未合并回读保留，旧审查已经失效，不以旧CI/测试时间冒充本次验证。依赖118和新独立发布146；当前真实main策略2dd9已接入API故障回归，源分支CI七项实际success。只交接真实当前source/main/policy，不伪造平台批准，不强制或直推main。模型/供应商/IM为明确夹具，无新付费或渲染后质量评审；制作源89及既有产物保持原来源，回滚revert本功能。",
+        "passed": true,
+        "id": "ff04d36397cf76501c7303d06fd9e777cf7a26f01f55322f74ec0b5bb3d91ea2"
+      },
       "reviewSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 123,
@@ -2618,7 +2718,7 @@
           "number": 123,
           "state": "open",
           "title": "fix(video): preserve native endpoint frame clocks [T-2026-1007-0003]",
-          "body": "请求10秒、24fps时，供应商原片可能包含241个完整视频帧和AAC编码边界。旧链路要求240帧且按名义时间构建后期，会误拒原片或让后期时间轴与实际帧数不一致。\n\n现在只接纳请求帧数或多一个终点帧；流时长必须等于实际frames/fps，原声元数据偏差最多两个AAC帧。冻结原稿不变，派生镜头、字幕切点与母版采用完整原片时钟。正常与标准后期共用native-clock拼接：视频帧直接拷贝，解码原声必须覆盖画面时钟，拒绝裁剪、变速、补帧、缺音和短音轨。\n\n测试覆盖真实FFmpeg三镜315帧的逐帧字节摘要、音画偏移及源字节不变，包含短音轨/变速/来源篡改等反例。VM发布入口夹具绑定真实冻结原稿和同一个实际时钟函数，保留48个旧用例并增加3个入口边界反例；临时父目录含S2不会再改变夹具声纹身份。\n\n验证（固定源96299952d9dbab6bfdb03b4fd3b48ecb848f718c）：Node后期集成22/22；视频及发布回归1630通过、1跳过；完整test:scripts、video-studio类型检查、内置资产、能力生成和差异检查退出0。未放宽CI或真人服装验收。依赖PR118，原生队列合入后发布源码。Closes #122。\n\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+          "body": "请求10秒、24fps时，供应商原片可能包含241个完整视频帧和AAC编码边界。旧链路要求240帧且按名义时间构建后期，会误拒原片或让后期时间轴与实际帧数不一致。\n\n现在只接纳请求帧数或多一个终点帧；流时长必须等于实际frames/fps，原声元数据偏差最多两个AAC帧。冻结原稿不变，派生镜头、字幕切点与母版采用完整原片时钟。正常与标准后期共用native-clock拼接：视频帧直接拷贝，解码原声必须覆盖画面时钟，拒绝裁剪、变速、补帧、缺音和短音轨。\n\n测试覆盖真实FFmpeg三镜315帧的逐帧字节摘要、音画偏移及源字节不变，包含短音轨/变速/来源篡改等反例。VM发布入口夹具绑定真实冻结原稿和同一个实际时钟函数，保留48个旧用例并增加3个入口边界反例；临时父目录含S2不会再改变夹具声纹身份。\n\n验证（固定源96299952d9dbab6bfdb03b4fd3b48ecb848f718c）：Node后期集成22/22；视频及发布回归1630通过、1跳过；完整test:scripts、video-studio类型检查、内置资产、能力生成和差异检查退出0。未放宽CI或真人服装验收。依赖PR118，原生队列合入后发布源码。Closes #122。\n\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118,\n    146\n  ],\n  \"releases\": []\n}\n-->",
           "author": {
             "username": "cnb.dYiF05kxAGA",
             "nickname": "Genius",
@@ -2629,7 +2729,7 @@
           "labels": [],
           "base": {
             "ref": "refs/heads/main",
-            "sha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "sha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2639,7 +2739,7 @@
           },
           "head": {
             "ref": "refs/heads/task/T-2026-1007-0003",
-            "sha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+            "sha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2647,7 +2747,7 @@
               "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
             }
           },
-          "blocked_on": "status_check",
+          "blocked_on": "unblocked",
           "merged_by": {
             "is_npc": false
           },
@@ -2657,8 +2757,8 @@
           "is_force_merged": false,
           "statuses": {}
         },
-        "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
         "files": [
           "docs/capabilities.auto.json",
           "docs/video-standard-post.md",
@@ -2676,75 +2776,76 @@
           "taskId": "T-2026-1007-0003",
           "ready": true,
           "dependsOn": [
-            118
+            118,
+            146
           ],
           "releases": []
         },
-        "headTime": 1791375851000,
-        "mergeBase": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "headTime": 1791383769000,
+        "mergeBase": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
         "checkErrors": [],
         "checkSha": null,
         "hasFailedChecks": false,
         "ciPolicyChanges": [
           {
             "id": "CI-001",
+            "file": "scripts/tools/film-release-entrypoints.test.ts",
+            "before": {
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "digest": "56da0d21804a2fd53e94a3f35a46fff62433ec1fb54eb2a6a2401e54cdadb983"
+          },
+          {
+            "id": "CI-002",
             "file": "scripts/tools/compose-native-clock.test.ts",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
               "path": "scripts/tools/compose-native-clock.test.ts",
               "absent": true
             },
             "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
               "path": "scripts/tools/compose-native-clock.test.ts",
               "absent": false
             },
-            "digest": "908fba97749d52ebdd346278a90fb9e58b15ca024ac3d0942cbc4a6931aac9da"
-          },
-          {
-            "id": "CI-002",
-            "file": "scripts/tools/film-release-entrypoints.test.ts",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "digest": "a17fc5563c7958d673007dc3c385178cf7f0a4db4b6cdb93256673804d454759"
+            "digest": "86124e96a64e3c6c5550f26f898af23ed73a38948689210996c1276fb1461fcc"
           },
           {
             "id": "CI-003",
-            "file": "scripts/tools/film-native-post.test.ts",
+            "file": "scripts/tools/film-standard-post.test.ts",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-native-post.test.ts",
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+              "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
             "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-              "path": "scripts/tools/film-native-post.test.ts",
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+              "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
-            "digest": "aa8a1e31d39e053ef4e1ba9a11c77289d222047b6aa76ab522cb2836fdf5e884"
+            "digest": "ad7b2cf39e0952227730ffa7b4d5f623e08b9e1da4a2ce6f2d530d3eedafb4eb"
           },
           {
             "id": "CI-004",
-            "file": "scripts/tools/film-standard-post.test.ts",
+            "file": "scripts/tools/film-native-post.test.ts",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-standard-post.test.ts",
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+              "path": "scripts/tools/film-native-post.test.ts",
               "absent": false
             },
             "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-              "path": "scripts/tools/film-standard-post.test.ts",
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+              "path": "scripts/tools/film-native-post.test.ts",
               "absent": false
             },
-            "digest": "e3042b3e51fa6703f5da4aaea899efdc731eaedd7ec5888039855641a2e81ad5"
+            "digest": "ebd868f63d64001a0001615a33920bef60896c57029b54fe9403415b699d3044"
           }
         ]
       },
@@ -49483,6 +49584,292 @@
       },
       "previous": "f511d5f86f308e60a5c0d7aa5e4a905260ef72b315c86a3bab1b72d673f8e0c0",
       "digest": "20296ca4c067db2206090a9921314b91285f5e0451e8c7926213645958d4e349"
+    },
+    {
+      "sequence": 1767,
+      "at": "2026-10-07T15:18:51.737Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 123,
+        "id": "ff04d36397cf76501c7303d06fd9e777cf7a26f01f55322f74ec0b5bb3d91ea2",
+        "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b"
+      },
+      "previous": "20296ca4c067db2206090a9921314b91285f5e0451e8c7926213645958d4e349",
+      "digest": "dd679523f7c22a1b09157842e739fa8e655e457930d2f87ad5a69e51960c46d3"
+    },
+    {
+      "sequence": 1768,
+      "at": "2026-10-07T15:18:51.737Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+          "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+          "branch": "task/T-2026-1007-0003",
+          "intent": {
+            "taskId": "T-2026-1007-0003",
+            "ready": true,
+            "dependsOn": [
+              118,
+              146
+            ],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 123,
+            "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "policyHash": "2dd9d8d7996d6d3cbd5220bf94435364b6cef0a159c8ad49738332682a5bb974",
+            "reviewedFiles": [
+              "docs/capabilities.auto.json",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "filesHash": "ba7fa5f05beedb5501d5139808bff88fbe52b1cfc3ae5d1796179a647d3b09bb",
+            "dependsOn": [
+              118,
+              146
+            ],
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "rationale": "实际CLI函数VM夹具加入冻结sourceDocument与独立原稿时长。合法加一端点帧允许，篡改原稿或缺镜仍拒绝，旧TTS/换原声/来源反例保留；不把派生时长当提交原稿洗白。 当前文件 scripts/tools/film-release-entrypoints.test.ts；当前 source/main 比较摘要 56da0d21804a2fd53e94a3f35a46fff62433ec1fb54eb2a6a2401e54cdadb983"
+              },
+              {
+                "id": "CI-002",
+                "rationale": "审读新增真实FFmpeg夹具：三镜315帧与每帧摘要保留、原文件哈希不变、实际AV相关性、短原声与变速参数拒绝。它验证原生图声时钟，不冒充真实供应商、身份或语音内容认证；旧媒体闸与必需CI未删除。 当前文件 scripts/tools/compose-native-clock.test.ts；当前 source/main 比较摘要 86124e96a64e3c6c5550f26f898af23ed73a38948689210996c1276fb1461fcc"
+              },
+              {
+                "id": "CI-003",
+                "rationale": "真实本地媒体签发/字节/原稿绑定及原声样点反例保留。basename绑定避免临时父目录含S2导致夹具意外重复，新增对应回归；未以模型意见替换来源证据。当前source真实Node后期22/22通过。 当前文件 scripts/tools/film-standard-post.test.ts；当前 source/main 比较摘要 ad7b2cf39e0952227730ffa7b4d5f623e08b9e1da4a2ce6f2d530d3eedafb4eb"
+              },
+              {
+                "id": "CI-004",
+                "rationale": "绑定当前validateStandardNativeClock和正常CLI的--native-clock调用断言；原片全路径、顺序、fps、无retime与原声禁止替换的旧断言保留。当前准确source实际视频回归通过。 当前文件 scripts/tools/film-native-post.test.ts；当前 source/main 比较摘要 ebd868f63d64001a0001615a33920bef60896c57029b54fe9403415b699d3044"
+              }
+            ],
+            "ciPolicyChangesHash": "ff9db64644768efd30be91b9f1dfa053ecc62de8da65004e09b620fc63c34193",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:06:50.218100+00:00",
+                "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (312.549125ms)\n✔ temporary ancestor names containing S2 cannot turn two distinct original fixtures into duplicate media (104.093541ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (0.85275ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (4.601792ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (102.108625ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (161.280333ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (124.31275ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (104.980208ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.527458ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (107.70225ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (79.387625ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (80.451209ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (85.968583ms)\n✔ missing actual accepted input proof refuses original issuance (85.148375ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (130.138ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (384.563166ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (278.039541ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (269.487375ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (276.15875ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (269.665041ms)\n✔ media executable resolver permits only current local executables (3.412667ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.39575ms)\nℹ tests 22\nℹ suites 0\nℹ pass 22\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 3203.107291\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-rendered-material-use.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/native-source-123-after146-video-vitest.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:07:26.267986+00:00",
+                "result": "{\"numTotalTests\": 1631, \"numPassedTests\": 1630, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:scripts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:08:28.356415+00:00",
+                "result": "并安全换入运行时载荷…\n23:08:07 正在校验并安全换入运行时载荷…\n23:08:07 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-VhRLXP/resources）==\n23:08:07 正在检查本机版本与安装载荷…\n23:08:07 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-s6Crky/resources）==\n23:08:07 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (21.400709ms)\n✔ 真实首日引导退出的渲染冒烟 (26.226916ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (1.452292ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (3.585667ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (0.728708ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (1.546583ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (2.806459ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.616167ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.697709ms)\n✔ 产品截图采用捕获时的可见场景 (12.592ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (30.715583ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.322959ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (2.415833ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.568625ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (7.380417ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (8.032209ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (5.850375ms)\n  ✔ 首装暂存失败不会留下半套运行时 (3.660208ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (1.051417ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.217584ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.578458ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (4.273667ms)\n✔ 桌面载荷原子装配 (67.365125ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.144333ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (1.16725ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.177709ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (2.434792ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (19.814ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (3.758708ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (27.677666ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (1.054209ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (32.373458ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.126208ms)\n✔ 桌面本机渲染子进程的 Node 路径 (33.674125ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (1.189ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (1.22475ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (3.232958ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.252292ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (1.005584ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.379167ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.223917ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.201959ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (2.222625ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (10.066334ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (1.3905ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (7.583333ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.106416ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.150416ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (9.290084ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (28.739917ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (0.950625ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (2.74275ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (1.816958ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (2.87075ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (4.468875ms)\n✔ native smoke captures the actual product region for its pixel verdict (2.984875ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (4.556084ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (4.651334ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (6.18325ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (4.7915ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (3.513375ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (2.704584ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (2.737292ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (3.313959ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (4.260792ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (5.347375ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (3.541666ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (11.094958ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (4.473583ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (6.8545ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (2.526833ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (3.0995ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (1.939208ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (1.9655ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (2.358ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (4.029167ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (2.67525ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (1.751834ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (1.868583ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-6IYtGR/pgdata\",\"port\":55432,\"hbaFile\":\"/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-6IYtGR/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (0.357792ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.083041ms)\n✔ 客户端投影路径围栏 (0.902167ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (1.566375ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (0.566334ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (2.253584ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (1.063958ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (0.972542ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (1.690042ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (1.69725ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (0.865125ms)\n  ✔ 实例报告端口不符时失败且零写入 (0.449084ms)\n✔ 桌面数据库安全引导 (11.440834ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (2.5155ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (13.296292ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (4.872292ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (3.353208ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (7.248208ms)\n✔ 包目录创建顺序不影响依赖清单输出 (5.647334ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (154.048292ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (38.991125ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (1.701333ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (7.51675ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (4.371666ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (8.243ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (3.471458ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (130.731125ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (1.797042ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (84.607333ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.276708ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (114.954709ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (93.983709ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (6.522125ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (1.890333ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (2.024667ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (3.90475ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.279042ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (0.876709ms)\n✔ normal physical source copy records canonical source and generated contract bytes (214.814875ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (61.246833ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (53.50275ms)\n✔ existing derived-output symlink cannot replace an external file (56.159375ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (75.185125ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (88.602375ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (74.32675ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (35.654666ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (95.713708ms)\n✔ payload cannot be created inside a selected source tree (116.297167ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (63.611833ms)\n✔ canonical output aliases cannot overwrite the checkout (49.901792ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (111.837292ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (644.603083ms)\n✔ 检测到非演示工作区时拒绝删除 (2007.262333ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (1311.567708ms)\n✔ 未知参数 fail closed (4.039084ms)\n✔ 备份失败时禁止删除和后续迁移种子 (998.082541ms)\n✔ 空备份不能证明可恢复，禁止删除 (929.526416ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (2662.630334ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (5208.405666ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (2458.419167ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (1841.42325ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (2280.78475ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.595541ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.324875ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (48.940959ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (1.339875ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (7.628125ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (4.9945ms)\nℹ tests 161\nℹ suites 11\nℹ pass 161\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 20653.6075\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:08:28.790075+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project apps/server/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:08:29.921606+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:08:29.980649+00:00",
+                "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:08:30.058240+00:00",
+                "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+              },
+              {
+                "command": "git diff --check d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b...2859237b49495dca23b26f55211c18fe3cafc3f3",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T15:08:30.108070+00:00",
+                "result": "Command completed without diagnostics."
+              }
+            ],
+            "reviewedAt": "2026-10-07T15:15:13.931648+00:00",
+            "summary": "A级：原11个产品文件的实现及直接依赖已完整审读，产品差异曾分1-210/211-410/411-600读至末尾；能力JSON元数据按B级。B级：云端原生执行器普通合并已独立发布146的main d9后形成当前2859237，11个产品blob与之前3f84逐一相同，当前main...source完整600行diff字节与此前实际审读版本完全一致；不将字节比较冒充再次精读。原生图声合同保留0/+1合法端点帧、fps精确时钟与AAC元数据边界，冻结原稿不改写，整段直接拼接与同源原声覆盖；异常帧数、短原声、改原稿/路径/字节仍拒绝。当前精确source于2026-10-07T15:06:46.967586+00:00至2026-10-07T15:08:30.108070+00:00实际八项检查退出0：Node标准后期22/22，video1631项1630通过1既有跳过，脚本套件命令通过（末段161/161）、双类型、登记资产、能力一致性和targetdiff均通过，日志SHA由正式finalizer逐项核对。旧候选144的明确429拒绝与两次真实未合并回读保留，旧审查已经失效，不以旧CI/测试时间冒充本次验证。依赖118和新独立发布146；当前真实main策略2dd9已接入API故障回归，源分支CI七项实际success。只交接真实当前source/main/policy，不伪造平台批准，不强制或直推main。模型/供应商/IM为明确夹具，无新付费或渲染后质量评审；制作源89及既有产物保持原来源，回滚revert本功能。",
+            "passed": true,
+            "id": "ff04d36397cf76501c7303d06fd9e777cf7a26f01f55322f74ec0b5bb3d91ea2"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 123,
+            "pull": {
+              "number": 123,
+              "state": "open",
+              "title": "fix(video): preserve native endpoint frame clocks [T-2026-1007-0003]",
+              "body": "请求10秒、24fps时，供应商原片可能包含241个完整视频帧和AAC编码边界。旧链路要求240帧且按名义时间构建后期，会误拒原片或让后期时间轴与实际帧数不一致。\n\n现在只接纳请求帧数或多一个终点帧；流时长必须等于实际frames/fps，原声元数据偏差最多两个AAC帧。冻结原稿不变，派生镜头、字幕切点与母版采用完整原片时钟。正常与标准后期共用native-clock拼接：视频帧直接拷贝，解码原声必须覆盖画面时钟，拒绝裁剪、变速、补帧、缺音和短音轨。\n\n测试覆盖真实FFmpeg三镜315帧的逐帧字节摘要、音画偏移及源字节不变，包含短音轨/变速/来源篡改等反例。VM发布入口夹具绑定真实冻结原稿和同一个实际时钟函数，保留48个旧用例并增加3个入口边界反例；临时父目录含S2不会再改变夹具声纹身份。\n\n验证（固定源96299952d9dbab6bfdb03b4fd3b48ecb848f718c）：Node后期集成22/22；视频及发布回归1630通过、1跳过；完整test:scripts、video-studio类型检查、内置资产、能力生成和差异检查退出0。未放宽CI或真人服装验收。依赖PR118，原生队列合入后发布源码。Closes #122。\n\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118,\n    146\n  ],\n  \"releases\": []\n}\n-->",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0003",
+                "sha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "files": [
+              "docs/capabilities.auto.json",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0003",
+              "ready": true,
+              "dependsOn": [
+                118,
+                146
+              ],
+              "releases": []
+            },
+            "headTime": 1791383769000,
+            "mergeBase": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/film-release-entrypoints.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "digest": "56da0d21804a2fd53e94a3f35a46fff62433ec1fb54eb2a6a2401e54cdadb983"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/tools/compose-native-clock.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "digest": "86124e96a64e3c6c5550f26f898af23ed73a38948689210996c1276fb1461fcc"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/tools/film-standard-post.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "digest": "ad7b2cf39e0952227730ffa7b4d5f623e08b9e1da4a2ce6f2d530d3eedafb4eb"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/film-native-post.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "digest": "ebd868f63d64001a0001615a33920bef60896c57029b54fe9403415b699d3044"
+              }
+            ]
+          }
+        }
+      },
+      "previous": "dd679523f7c22a1b09157842e739fa8e655e457930d2f87ad5a69e51960c46d3",
+      "digest": "41c9a77e788e8a3d9fba323d59feeae3d52f540b56969b32fe7797c8db376a92"
+    },
+    {
+      "sequence": 1769,
+      "at": "2026-10-07T15:18:47.597Z",
+      "kind": "transaction",
+      "data": {
+        "id": "1991e0a5-02ac-43f9-b64b-34b055abdbd8"
+      },
+      "previous": "41c9a77e788e8a3d9fba323d59feeae3d52f540b56969b32fe7797c8db376a92",
+      "digest": "e8d8f5471eb078e4c904dedcb453c66fd8d674fa4c3e711bc54a10e1df487ded"
     }
   ]
 }
