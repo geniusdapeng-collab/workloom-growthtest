@@ -4,13 +4,13 @@
  * 事故：滕王阁样片的默认封面 = "取一帧 + 烧一行字"——封面职能从未真正参与，
  * 产物在发布流里就是"只有标题"的一张图。产品所有者复核时指出：**封面设计师没有发挥作用**。
  *
- * 本模块把封面变成"先出设计稿、再按稿渲染、再按稿验收"的三段式：
+ * 本模块把封面变成"先出设计稿、再按稿渲染"：默认采用确定性稿，显式诊断才调用设计模型与质量评审。
  *   ① `buildCoverDesignPrompt` —— 把 brief/镜头表/角色档案交给封面设计师（LLM）出**结构化设计稿**
  *      （主标题/副标题/角标/人物位/主视觉取哪一镜哪一秒/字级/配色/安全区），并要求给出设计理由；
  *   ② `parseCoverPlan` —— 严格校验设计稿（越界/过长/缺人物位即判非法，退回确定性兜底稿）；
  *   ③ `coverDeterministicChecks` —— 渲染后的**机检**：标题真的画上去了、人物层真的合成进去了、
  *      底图来自未烧字的干净母版、文字没有落进平台 UI 遮挡区。
- * 只有 ②③ 都过、再经监制（LLM）看整图，封面才算合格——"只有标题"的封面会在第 ③ 步被拦下。
+ * 实际绘制前归一为单一主视觉；禁止同镜或同人物在底图和小卡重复出现。
  *
  * 2026-09-27 平台化 + 知识库注入（方案：视频封面链路强化）：
  *   · 平台规格（画幅/安全区/标题带/文案政策）改由 `cover-platforms.ts` 的 `getCoverSpec()` 驱动，
@@ -199,6 +199,82 @@ export interface CoverDesignInput {
   repairFrom?: string;
   /** 自修复轮：上一版被校验拦下的原因（逐条列出） */
   repairReason?: string;
+}
+
+/** Source metadata is a declaration, never an appearance judgment on rendered frames. */
+export interface CoverShotSource {
+  shotId: string;
+  hasCharacter?: boolean;
+  character?: unknown;
+  characterId?: unknown;
+  characters?: unknown;
+}
+export interface CoverLeadSource {
+  id?: string;
+  name?: string;
+  appearanceInShots?: unknown;
+}
+export function coverShotHasCharacter(shot: CoverShotSource, lead?: CoverLeadSource | null): boolean {
+  if (typeof shot.hasCharacter === "boolean") return shot.hasCharacter;
+  if (typeof shot.characterId === "string" && shot.characterId.trim()) return true;
+  if (Array.isArray(shot.characters) && shot.characters.some(value => typeof value === "string" ? value.trim() : value && typeof value === "object")) return true;
+  const text = typeof shot.character === "string" ? shot.character.trim() : "";
+  if (/无人物|没有人物|无人(?:物|出镜)|画面无人|不含人物|人物不出镜|主角不出镜|no\s+(?:people|person|character)|without\s+(?:people|person|character)/i.test(text)) return false;
+  if (Array.isArray(lead?.appearanceInShots)) return lead.appearanceInShots.includes(shot.shotId);
+  return Boolean(text);
+}
+export function coverShotMatchesLead(shot: CoverShotSource, lead?: CoverLeadSource | null): boolean {
+  if (!coverShotHasCharacter(shot, lead)) return false;
+  if (!lead) return true;
+  if (typeof shot.characterId === "string" && shot.characterId.trim()) return shot.characterId === lead.id;
+  if (Array.isArray(lead.appearanceInShots)) return lead.appearanceInShots.includes(shot.shotId);
+  const text = typeof shot.character === "string" ? shot.character : "";
+  return Boolean((lead.id && text.includes(lead.id)) || (lead.name && text.includes(lead.name)));
+}
+export function coverShotCharacterIds(shot: CoverShotSource, lead?: CoverLeadSource | null): string[] {
+  if (!coverShotHasCharacter(shot, lead)) return [];
+  if (typeof shot.characterId === "string" && shot.characterId.trim()) return [shot.characterId.trim()];
+  return coverShotMatchesLead(shot, lead) && lead?.id ? [lead.id] : [];
+}
+export type CoverHeroMode = "landmark" | "split" | "person" | "person-solo" | "scenery" | "subject" | "object" | "product";
+export function resolveCoverHero(requested: string, hasPerson: boolean): CoverHeroMode {
+  if (requested === "auto") return hasPerson ? "person-solo" : "subject";
+  if (!["landmark", "split", "person", "person-solo", "scenery", "subject", "object", "product"].includes(requested)) {
+    throw new CoverDesignError(`未知封面主视觉：${requested}`, "cover_hero_invalid");
+  }
+  return requested as CoverHeroMode;
+}
+export interface CoverCompositionSource { shotId: string; hasCharacter: boolean; characterIds?: string[] }
+export interface CoverComposition {
+  heroMode: CoverHeroMode;
+  heroShotId: string;
+  insetShotId: string | null;
+  insetEnabled: boolean;
+  lowerBandText: boolean;
+  suppressedReason: "same-shot" | "same-character" | "second-person-visual" | "single-hero" | null;
+}
+/** Normalize actual source frames before geometry and painting, including legacy layouts. */
+export function resolveCoverComposition(input: {
+  requestedHero: string; background: CoverCompositionSource; person: CoverCompositionSource | null; personEnabled: boolean;
+}): CoverComposition {
+  let heroMode = resolveCoverHero(input.requestedHero, Boolean(input.person));
+  const personHero = heroMode === "person" || heroMode === "person-solo";
+  const hero = personHero ? input.person ?? input.background : input.background;
+  const inset = heroMode === "person" ? input.background : input.person;
+  let insetEnabled = heroMode === "person" ? Boolean(input.person)
+    : ["landmark", "split"].includes(heroMode) && input.personEnabled && Boolean(input.person);
+  let suppressedReason: CoverComposition["suppressedReason"] = insetEnabled ? null : "single-hero";
+  if (insetEnabled && inset) {
+    if (hero.shotId === inset.shotId) suppressedReason = "same-shot";
+    else if (hero.characterIds?.some(id => inset.characterIds?.includes(id))) suppressedReason = "same-character";
+    else if (hero.hasCharacter && inset.hasCharacter) suppressedReason = "second-person-visual";
+    if (suppressedReason) {
+      insetEnabled = false;
+      if (hero.hasCharacter) heroMode = "person-solo";
+    }
+  }
+  return { heroMode, heroShotId: hero.shotId, insetShotId: insetEnabled ? inset!.shotId : null,
+    insetEnabled, lowerBandText: heroMode === "person-solo", suppressedReason };
 }
 
 /**
@@ -516,7 +592,7 @@ export function parseCoverPlan(raw: string, input: CoverDesignInput, options: { 
 
 /**
  * 确定性兜底稿：设计师不可用（无 LLM / JSON 反复非法）时**必须有稿**，
- * 但兜底稿也要满足"画面 + 人物 + 标题"三件套——这正是"只有标题"事故的反面。
+ * 兜底稿保留连续主视觉与标题；人物来源可以成为满幅主视觉，不要求额外肖像小卡。
  */
 export function fallbackCoverPlan(
   input: CoverDesignInput,
@@ -560,7 +636,7 @@ export function fallbackCoverPlan(
     badge: undefined,
     layout: "person-right",
     background: { shotId: options.heroShotId, atSec: 1.2, treatment: "grade" },
-    person: { enabled: Boolean(options.personShotId), shotId: options.personShotId, atSec: 1.0, widthRatio: 0.42 },
+    person: { enabled: input.archetype !== "subject-led" && Boolean(options.personShotId), shotId: options.personShotId, atSec: 1.0, widthRatio: 0.42 },
     typography: {
       fontId: hammerFont ?? "source-han-heavy",
       headlineSizeRatio: 0.075,
@@ -570,8 +646,8 @@ export function fallbackCoverPlan(
       align: "left"
     },
     rationale: isEnglishCoverPlatform(spec)
-      ? `Fallback plan (${spec.id}): single continuous hero frame + headline, three-piece cover kept complete`
-      : "兜底稿：主视觉地标 + 主角人物卡 + 大字标题，保证封面三件套齐全",
+      ? `Fallback plan (${spec.id}): single continuous hero frame + headline`
+      : "兜底稿：一张连续主视觉 + 大字标题；人物来源用于满幅人物版式，禁止重复拼贴",
     source: "fallback"
   };
   return validateCoverPlan(plan, input);
