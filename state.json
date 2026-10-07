@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 482,
+  "revision": 484,
   "tasks": {
     "98": {
       "number": 98,
@@ -2688,7 +2688,14 @@
       "recoveryIntent": null,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "candidate": null
+      "candidate": {
+        "number": 127,
+        "branch": "delivery/candidate/pr-123-4bc741c142ac12eaf9921c11c27ffdf4",
+        "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "marker": "delivery-origin:123:96299952d9dbab6bfdb03b4fd3b48ecb848f718c:04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "at": 1791346511382
+      }
     },
     "125": {
       "number": 125,
@@ -15637,6 +15644,36 @@
       },
       "previous": "7a1dc6e65864c58986ad99911370478b2d09b4b2af1e1be72e7d62f7a63271c8",
       "digest": "caf9c5b04a2391c294700cb315f101d0109a8509b70e1188ecac00df11342036"
+    },
+    {
+      "sequence": 483,
+      "at": "2026-10-07T04:15:11.382Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "candidate": {
+            "number": 127,
+            "branch": "delivery/candidate/pr-123-4bc741c142ac12eaf9921c11c27ffdf4",
+            "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "marker": "delivery-origin:123:96299952d9dbab6bfdb03b4fd3b48ecb848f718c:04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "at": 1791346511382
+          }
+        }
+      },
+      "previous": "caf9c5b04a2391c294700cb315f101d0109a8509b70e1188ecac00df11342036",
+      "digest": "9501de0f85f3c3f11fc2419f61e9586c67b28bc49b5805e3b4aecb8900347bf9"
+    },
+    {
+      "sequence": 484,
+      "at": "2026-10-07T04:15:30.406Z",
+      "kind": "transaction",
+      "data": {
+        "id": "0756e2ab-57eb-44d8-bda1-cb56d438f142"
+      },
+      "previous": "9501de0f85f3c3f11fc2419f61e9586c67b28bc49b5805e3b4aecb8900347bf9",
+      "digest": "8baacdc8ff32cc7b427a871b174961e652502f9f7827f2be75955ddd269a4109"
     }
   ]
 }
