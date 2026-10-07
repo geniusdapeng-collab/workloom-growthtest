@@ -90,7 +90,7 @@ import {
   type DeviceCategory, type DeviceDefect, type EnvDefect, type HookCard, type MicromotionTrace, type PlatePromptShot,
   type ProducerVerdict, type SceneBible, type ScenePolicyReport
 } from "../../packages/video-studio/src/index.js";
-import { assertStandardPostTimeline } from "../../packages/video-studio/src/standard-post-contract.js";
+import { assertStandardPostTimeline, validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "../../packages/video-studio/src/shot-intent.js";
 import { verifyAvSyncEvidence } from "../../packages/video-studio/src/av-sync.js";
 import { loadProductArchives, productArchivePromptLines, productHeroPhoto, productPhotoPath, selectProductArchive } from "../../packages/video-studio/src/product-archive.js";
@@ -1554,7 +1554,7 @@ const totalSeconds = Number(shotlist.durationSeconds ?? shots.reduce((sum, s) =>
  * 逐刀 xfade 每刀吃掉 transitionDuration，15 刀 2.4s；compose 的 retime 目标与终审的时长判据都用它，
  * 保证"画面节拍网格"不被整片缩放（否则配乐卡点全乱，真机 4/15 命中）。
  */
-const expectedMasterSeconds = Number(Math.max(1, totalSeconds - transitionLoss).toFixed(3));
+let expectedMasterSeconds = Number(Math.max(1, totalSeconds - transitionLoss).toFixed(3));
 /** 剪辑网格（真实切点，秒）：配乐卡点与 BPM 反推的事实依据（去掉片尾那一个点） */
 const CUT_GRID: number[] = (() => {
   /**
@@ -3727,17 +3727,19 @@ function renderSecondsFor(durationSec: number): number {
 
 /** Validate the provider file as delivered. A wrong clock or geometry is never repaired by mutating the original. */
 function assertOriginalRenderMedia(file: string, seconds: number, shotId: string): Record<string, unknown> {
-  const info = probe(file), rate = Number(info.audioSampleRate), channels = Number(info.audioChannels);
-  const audioDuration = Number(info.audioDurationSec), videoDuration = Number(info.videoDurationSec);
-  const frames = Number(info.videoFrames);
+  const info = probe(file);
   if (info.error || Number(info.fps) !== FPS || Number(info.width) !== SOURCE_SIZE.width || Number(info.height) !== SOURCE_SIZE.height
-    || !Number.isSafeInteger(frames) || frames !== Math.round(seconds * FPS) || Math.abs(videoDuration - seconds) > 1e-6
-    || info.hasAudio !== true || !Number.isInteger(rate) || rate <= 0 || rate > 384000
-    || !Number.isInteger(channels) || channels <= 0 || channels > 32 || !(audioDuration > 0)
-    || !Number.isFinite(audioDuration) || Math.abs(audioDuration - videoDuration) > 1024 / rate + 1e-9) {
+    || info.hasAudio !== true) {
     throw new Error(`STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID: ${shotId} original video/audio metadata differs from the submitted full range: ${JSON.stringify(info)}`);
   }
-  return info;
+  try {
+    const nativeClock = validateStandardNativeClock({ fps: Number(info.fps), width: Number(info.width), height: Number(info.height),
+      videoFrames: Number(info.videoFrames), videoDurationSec: Number(info.videoDurationSec), audioDurationSec: Number(info.audioDurationSec),
+      audioSampleRate: Number(info.audioSampleRate), audioChannels: Number(info.audioChannels) }, seconds);
+    return { ...info, nativeClock };
+  } catch (error) {
+    throw new Error(`STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID: ${shotId} ${error instanceof Error ? error.message : String(error)}`, { cause: error });
+  }
 }
 
 if (STAGES.has("material-gen")) {
@@ -4608,6 +4610,19 @@ let originalPostContract!: Awaited<ReturnType<typeof loadOriginalRenderManifest>
 if (!DRY_RUN && ["voice", "compose", "color", "subtitle", "danmaku", "bgm", "sfx", "cover", "mux", "master", "deliver"].some(stage => STAGES.has(stage))) {
   const originalManifest = await captureOriginalRenderManifest({ productionRoot: WORK_DIR, projectId: PROJECT });
   originalPostContract = await loadOriginalRenderManifest(originalManifest, { ffmpeg: FFMPEG, ffprobe: FFPROBE });
+  // Freeze authored intent unchanged. Only derived post cards use the measured
+  // complete picture clock, shared by composition, subtitles, covers and BGM.
+  for (const shot of shots) {
+    const entry = originalPostContract.timeline.find(row => row.shotId === shot.shotId);
+    if (!entry) throw new Error(`STANDARD_NATIVE_ORIGINAL_BINDING_INVALID: ${shot.shotId}`);
+    shot.duration = entry.durationSec;
+  }
+  expectedMasterSeconds = originalPostContract.durationSec;
+  let elapsedFrames = 0;
+  CUT_GRID.splice(0, CUT_GRID.length, ...originalPostContract.originals.slice(0, -1).map(original => {
+    elapsedFrames += original.media.videoFrames;
+    return elapsedFrames / originalPostContract.fps;
+  }));
 }
 function originalForShot(shot: ShotCard): string {
   const original = originalPostContract?.originals.find(s => s.shotId === shot.shotId);
@@ -4617,7 +4632,7 @@ function originalForShot(shot: ShotCard): string {
 }
 function originalFactsForShot(shot: ShotCard) {
   const path = originalForShot(shot), original = originalPostContract.originals.find(s => s.shotId === shot.shotId)!;
-  return { path, sha256: original.sha256, bytes: original.bytes, durationSeconds: original.media.videoDurationSec, fps: original.media.fps,
+  return { path, sha256: original.sha256, bytes: original.bytes, durationSeconds: original.media.videoFrames / original.media.fps, fps: original.media.fps,
     audio: { present: original.media.audioChannels > 0, sampleRate: original.media.audioSampleRate, channels: original.media.audioChannels, durationSec: original.media.audioDurationSec } };
 }
 
@@ -4648,7 +4663,9 @@ function nativeAudioFactsForShot(shot: ShotCard): {
     || facts.durationSeconds !== Number(shot.duration) || facts.fps !== FPS || originalPostContract.fps !== FPS
     || originalPostContract.width !== SOURCE_SIZE.width || originalPostContract.height !== SOURCE_SIZE.height
     || facts.audio.present !== true) throw new Error(`STANDARD_NATIVE_ORIGINAL_BINDING_INVALID: ${shot.shotId}`);
-  const info = assertOriginalRenderMedia(raw, facts.durationSeconds, shot.shotId);
+  const submitted = sourceDocument.shots.find(row => row.shotId === shot.shotId);
+  if (!submitted) throw new Error(`STANDARD_NATIVE_ORIGINAL_BINDING_INVALID: ${shot.shotId}`);
+  const info = assertOriginalRenderMedia(raw, Number(submitted.duration), shot.shotId);
   const nativeAudio = { present: true as const, sampleRate: Number(info.audioSampleRate),
     channels: Number(info.audioChannels), durationSec: Number(info.audioDurationSec) };
   if (facts.audio.sampleRate !== nativeAudio.sampleRate || facts.audio.channels !== nativeAudio.channels
@@ -4739,7 +4756,7 @@ if (STAGES.has("compose") && !DRY_RUN) {
   const started = Date.now(), { width, height, fps, durationSec, totalFrames } = originalPostContract;
   const result = runCli(join(REPO_ROOT, "scripts/tools/compose-film.mts"), [
     "--clips", clips.join(","), "--out", master, "--width", String(width), "--height", String(height),
-    "--fps", String(fps), "--fade", "0", "--color", "none"
+    "--fps", String(fps), "--fade", "0", "--color", "none", "--native-clock"
   ]);
   for (const [index, shot] of shots.entries()) {
     const after = nativeAudioFactsForShot(shot), before = nativeFacts[index]!;

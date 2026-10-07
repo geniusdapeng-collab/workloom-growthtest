@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import test from "node:test";
 import { adoptLegacyOriginalRenders, assertStandardPostAudioClock, assertStandardPostVariantAxes, captureOriginalRenderManifest, freezeOriginalSubmission, issueOriginalRenderReceipt,
   loadOriginalRenderManifest, resolveStandardPostBinary, standardPostFileHash, StandardPostError, validateStandardPostSettings, type StandardPostSettings } from "./film-standard-post.mjs";
@@ -14,12 +14,12 @@ function call(args: string[]) { return spawnSync(process.execPath, ["--import", 
   env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: ffmpeg, WL_FFPROBE: ffprobe } }); }
 function media(file: string) {
   const result = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "testsrc2=s=160x288:r=24:d=1",
-    "-f", "lavfi", "-i", `sine=frequency=${file.includes("S2") ? 866 : 733}:sample_rate=48000:duration=1`, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "ultrafast",
+    "-f", "lavfi", "-i", `sine=frequency=${basename(file) === "S2.mp4" ? 866 : 733}:sample_rate=48000:duration=1`, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "ultrafast",
     "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-t", "1", file], { encoding: "utf8", timeout: 60_000 });
   assert.equal(result.status, 0, result.stderr);
 }
-async function fixture() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-original-fixture-"))), projectId = "MOCK-STANDARD";
+async function fixture(prefix = "standard-original-fixture-") {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), prefix))), projectId = "MOCK-STANDARD";
   const bytes = Buffer.from(JSON.stringify({ projectId, durationSeconds: 2, shots: [{ shotId: "S1", duration: 1 }, { shotId: "S2", duration: 1 }] }));
   const submitted = await freezeOriginalSubmission({ productionRoot: root, projectId, bytes });
   const clips = join(root, "clips", projectId); mkdirSync(clips, { recursive: true });
@@ -50,6 +50,14 @@ test("issued original manifest rebuilds exact complete native timeline from real
   assert.equal(hash(readFileSync(join(f.clips, "S1.mp4"))), sourceBefore);
   assert.deepEqual(validateStandardPostSettings(settings(f.root), loaded.contract), settings(f.root));
 }));
+test("temporary ancestor names containing S2 cannot turn two distinct original fixtures into duplicate media", async () => {
+  const f = await fixture("standard-original-fixture-S2-");
+  try {
+    assert.notEqual(hash(readFileSync(join(f.clips, "S1.mp4"))), hash(readFileSync(join(f.clips, "S2.mp4"))));
+    const loaded = await loadOriginalRenderManifest(f.manifestFile, options);
+    assert.deepEqual(loaded.timeline.map(row => row.shotId), ["S1", "S2"]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
 test("a missing canonical manifest returns the stable standard error before media probing", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-missing-manifest-")));
   try {
