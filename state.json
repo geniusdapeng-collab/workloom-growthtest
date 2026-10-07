@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2133,
+  "revision": 2135,
   "tasks": {
     "98": {
       "number": 98,
@@ -2068,7 +2068,7 @@
         }
       },
       "updatedAt": 1791390919976,
-      "error": "Command failed: git merge --no-ff --no-edit 33aef8ebdf714cd3eec6de4bef821fac13409ee4\n",
+      "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit 33aef8ebdf714cd3eec6de4bef821fac13409ee4\n",
       "blockedUntil": 1791391519976,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
@@ -2544,7 +2544,7 @@
         "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
         "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
         "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit 33aef8ebdf714cd3eec6de4bef821fac13409ee4\n",
-        "at": 1791390313841
+        "at": 1791390919976
       },
       "recoveryIntent": null
     },
@@ -58053,6 +58053,39 @@
       },
       "previous": "ca171891a9741c860a713b5f15d678f37f33478091e1a8ac4168b0b4c0099d44",
       "digest": "5261e1886654f4b8b6292c5f223450458fa2a5f233cc3fc87bbcb095b4a4aac4"
+    },
+    {
+      "sequence": 2134,
+      "at": "2026-10-07T16:35:19.976Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit 33aef8ebdf714cd3eec6de4bef821fac13409ee4\n",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit 33aef8ebdf714cd3eec6de4bef821fac13409ee4\n",
+            "at": 1791390919976
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791391519976
+        }
+      },
+      "previous": "5261e1886654f4b8b6292c5f223450458fa2a5f233cc3fc87bbcb095b4a4aac4",
+      "digest": "daeb1f83221f9e9801001692c8000b22a4e25e0264c2f88665f21ebfadeda9bf"
+    },
+    {
+      "sequence": 2135,
+      "at": "2026-10-07T16:36:50.830Z",
+      "kind": "transaction",
+      "data": {
+        "id": "2798de63-3c28-4b44-bdfb-3bcdba0d385c"
+      },
+      "previous": "daeb1f83221f9e9801001692c8000b22a4e25e0264c2f88665f21ebfadeda9bf",
+      "digest": "d8848ed9a6e2b638d6d1945f1ae619e9e9874c5f198922d421c05b4ff8c1c2ae"
     }
   ]
 }
