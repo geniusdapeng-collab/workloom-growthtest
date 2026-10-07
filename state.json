@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 931,
+  "revision": 933,
   "tasks": {
     "98": {
       "number": 98,
@@ -3949,7 +3949,7 @@
     },
     "133": {
       "number": 133,
-      "status": "waiting_dependency",
+      "status": "parked",
       "firstSeen": 1791353067543,
       "attempts": {},
       "headSha": "c0da166012554858636e7c0edf43c5f6593a9cbe",
@@ -4447,12 +4447,12 @@
           }
         ]
       },
-      "updatedAt": 1791364337786,
+      "updatedAt": 1791364509955,
       "dependencies": [
         131
       ],
       "error": "Prerequisite #131 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/131 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791362109350
+      "blockedUntil": 1791365109955
     },
     "135": {
       "number": 135,
@@ -29308,6 +29308,31 @@
       },
       "previous": "5ebbf00a8299099826dc58fd7b364a47c0609fdf04e3e2337ee77ec8fac29a41",
       "digest": "d102ac011cb0a750874f7309580c84cb7c68bbfbfc7bd3c6f7dd24f85bc0516b"
+    },
+    {
+      "sequence": 932,
+      "at": "2026-10-07T09:15:09.955Z",
+      "kind": "task",
+      "data": {
+        "number": 133,
+        "patch": {
+          "status": "parked",
+          "error": "Prerequisite #131 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/131 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791365109955
+        }
+      },
+      "previous": "d102ac011cb0a750874f7309580c84cb7c68bbfbfc7bd3c6f7dd24f85bc0516b",
+      "digest": "320a1d49146bfc70ffa7dd1a4e2b3764974df3ad2433e33a89a1f951fc4bf9a5"
+    },
+    {
+      "sequence": 933,
+      "at": "2026-10-07T09:15:48.122Z",
+      "kind": "transaction",
+      "data": {
+        "id": "3bb1cc50-f376-4195-a99f-65f57e1256e9"
+      },
+      "previous": "320a1d49146bfc70ffa7dd1a4e2b3764974df3ad2433e33a89a1f951fc4bf9a5",
+      "digest": "de8f5d0b05c07d55ab85350ed9589c969177eaf75ebf25517d55c9adc7e775d9"
     }
   ]
 }
