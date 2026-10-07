@@ -1,7 +1,9 @@
 /**
  * Compile a release contract from operator-selected registration roots and a frozen shot source.
- * The parent service and CLI call this independently; child bindings, generated portraits and
- * caller-supplied anchor fingerprints are never registration evidence. No model or network I/O.
+ * The parent service and CLI call this independently. Active portraits in the trusted character
+ * library have already completed the portrait workflow and are reusable identity references.
+ * Child bindings, generated clip frames and caller-supplied fingerprints are not registration
+ * evidence. No model or network I/O.
  */
 import { createHash } from "node:crypto";
 import {
@@ -40,7 +42,10 @@ export class CharacterReleaseSourceError extends Error {
 
 interface RegistrationRoot { lexical: string; canonical: string | null }
 interface RegisteredAsset { asset: RealPersonAsset; dir: string; profileFile: string }
-interface RegisteredCharacter { id: string; name: string; wardrobeLock: CharacterWardrobeLock }
+interface RegisteredCharacter {
+  id: string; name: string; wardrobeLock: CharacterWardrobeLock;
+  dir: string; profileFile: string; profile: Record<string, unknown>;
+}
 interface CharacterRegistry { defaultModel: string | null; aliases: Array<{ id: string; names: string[] }> }
 const MAX_PROFILE_BYTES = 4_000_000;
 const MAX_ANCHOR_BYTES = 100_000_000;
@@ -88,7 +93,7 @@ function snapshotFile(file: string, root: string, maximum: number, kind: "profil
   const invalidCode = kind === "anchor" ? "CHARACTER_SOURCE_ANCHOR_INVALID" : "CHARACTER_SOURCE_PROFILE_INVALID";
   if (!inside(root, file)) fail("CHARACTER_SOURCE_PATH_INVALID", "登记来源越过可信资料库边界，拒绝读取");
   const before = optionalStat(file);
-  if (!before) fail(missingCode, kind === "anchor" ? "登记的认证基准图缺失，不能用生成镜头替代" : "受控登记文件缺失");
+  if (!before) fail(missingCode, kind === "anchor" ? "登记的人物参考缺失，不能用本次生成镜头替代" : "受控登记文件缺失");
   if (before.isSymbolicLink()) fail("CHARACTER_SOURCE_PATH_INVALID", "登记来源含符号链接，拒绝读取其他来源");
   if (!before.isFile() || before.size < 1 || before.size > maximum) fail(invalidCode, "登记来源必须是大小有效的普通文件");
   return guarded("CHARACTER_SOURCE_READ_FAILED", "受控登记文件读取失败，请检查权限与完整性", () => {
@@ -146,10 +151,10 @@ function loadAssets(root: RegistrationRoot): RegisteredAsset[] {
 }
 function loadCharacters(roots: readonly RegistrationRoot[]): Map<string, RegisteredCharacter> {
   const library = new Map<string, RegisteredCharacter>();
-  for (const root of roots) for (const { value } of profiles(root)) {
+  for (const root of roots) for (const { value, dir, file } of profiles(root)) {
     if (!text(value.id) || !text(value.name)) fail("CHARACTER_SOURCE_PROFILE_INVALID", "角色主档缺少有效ID或姓名");
     const first = Array.isArray(value.wardrobe) && plain(value.wardrobe[0]) ? value.wardrobe[0] : {};
-    library.set(value.id, { id: value.id, name: value.name, wardrobeLock: {
+    library.set(value.id, { id: value.id, name: value.name, dir, profileFile: file, profile: value, wardrobeLock: {
       id: String(first.id ?? first.name ?? ""),
       description: [first.name, first.detail].filter(Boolean).join("："),
     } });
@@ -196,14 +201,67 @@ function selectLead(characters: Map<string, RegisteredCharacter>, registry: Char
   }
   return list[0];
 }
-function identityAnchor(entry: RegisteredAsset): CharacterIdentityAnchor {
-  const name = entry.asset.anchorPhoto;
-  if (!text(name)) fail("CHARACTER_SOURCE_ANCHOR_MISSING", "真人主档没有登记认证基准图，不能用生成首镜或角色定妆照替代");
+function relativeSourceFile(dir: string, name: string): string {
   if (isAbsolute(name) || win32.isAbsolute(name) || /[\\]/.test(name) || /[\u0000-\u001f]/.test(name)
     || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(name))
-    fail("CHARACTER_SOURCE_PATH_INVALID", "认证基准图必须是登记asset目录内的相对普通文件");
-  const file = resolve(entry.dir, name);
-  if (!inside(entry.dir, file)) fail("CHARACTER_SOURCE_PATH_INVALID", "认证基准图越过登记asset目录边界");
+    fail("CHARACTER_SOURCE_PATH_INVALID", "人物参考必须是登记目录内的相对普通文件");
+  const file = resolve(dir, name);
+  if (!inside(dir, file)) fail("CHARACTER_SOURCE_PATH_INVALID", "人物参考越过登记目录边界");
+  return file;
+}
+function registeredPortraitAnchor(entry: RegisteredAsset, character?: RegisteredCharacter): CharacterIdentityAnchor | null {
+  if (!character || character.profile.kind !== "authorized-real" || !plain(character.profile.authorization)
+    || character.profile.authorization.status !== "real-authorized") return null;
+  const sets = character.profile.portraitSets;
+  if (!Array.isArray(sets)) return null;
+  const active = sets.filter((set): set is Record<string, unknown> => plain(set) && set.active === true);
+  if (!active.length) return null;
+  if (active.some(set => !Number.isSafeInteger(set.version) || Number(set.version) < 1)
+    || new Set(active.map(set => set.version)).size !== active.length)
+    fail("CHARACTER_SOURCE_PROFILE_INVALID", "在用定妆照版本无效或重复，请修复角色登记");
+  const selected = [...active].sort((a, b) => Number(b.version) - Number(a.version))[0]!;
+  // A role's portrait must be tied to this registered person, never borrowed from another
+  // role with a similar name. Angle asset IDs remain provenance, not generation references.
+  const primary = assetIdOf(entry.asset.assetId);
+  const evidence = character.profile.authorization.evidence;
+  const assetValues = plain(selected.assets) ? Object.values(selected.assets) : [];
+  const registeredRefs = new Set([primary, ...(entry.asset.referenceAssets ?? []).map(assetIdOf)]);
+  const ownsAsset = isRealPersonAssetRef(evidence) && registeredRefs.has(assetIdOf(evidence))
+    || assetValues.some(ref => isRealPersonAssetRef(ref) && registeredRefs.has(assetIdOf(ref)));
+  if (!ownsAsset) return null;
+  if (!text(selected.dir) || !Array.isArray(selected.angles) || selected.angles.some(angle => !text(angle)))
+    fail("CHARACTER_SOURCE_PROFILE_INVALID", "在用定妆照缺有效目录或角度登记");
+  const portraitDir = relativeSourceFile(character.dir, selected.dir);
+  const declared = selected.angles as string[];
+  const files = plain(selected.files) ? selected.files : {};
+  const candidates = ["front", "threeQuarter", "closeup", "side"];
+  for (const angle of candidates.filter(value => declared.includes(value))) {
+    let file: string;
+    if (files[angle] !== undefined) {
+      if (!text(files[angle])) fail("CHARACTER_SOURCE_PROFILE_INVALID", "在用定妆照的角度路径无效");
+      file = relativeSourceFile(character.dir, files[angle]);
+      if (!inside(portraitDir, file)) fail("CHARACTER_SOURCE_PATH_INVALID", "角度参考不在登记的定妆照版本目录内");
+    } else {
+      // Legacy archives register the directory/angle rather than a files map. Resolve only
+      // their documented exact names; no wildcard or runtime-frame fallback.
+      const names = ["png", "jpg", "jpeg", "webp"].map(ext => `${character.name}-${angle}.${ext}`);
+      const matches = names.map(name => relativeSourceFile(portraitDir, name)).filter(path => optionalStat(path));
+      if (matches.length > 1) fail("CHARACTER_SOURCE_PROFILE_INVALID", "同一角度登记了多个定妆照文件，请消除歧义");
+      if (!matches.length) continue;
+      file = matches[0]!;
+    }
+    const bytes = snapshotFile(file, character.dir, MAX_ANCHOR_BYTES, "anchor");
+    return { path: file, sha256: createHash("sha256").update(bytes).digest("hex"), assetId: entry.asset.assetId,
+      source: `registered-character-portrait:${character.profileFile}#v${selected.version}/${angle}` };
+  }
+  return null;
+}
+function identityAnchor(entry: RegisteredAsset, character?: RegisteredCharacter): CharacterIdentityAnchor {
+  const portrait = registeredPortraitAnchor(entry, character);
+  if (portrait) return portrait;
+  const name = entry.asset.anchorPhoto;
+  if (!text(name)) fail("CHARACTER_SOURCE_ANCHOR_MISSING", "缺少对应授权人物的在用登记定妆照或基准图；本次生成镜头不能自证身份");
+  const file = relativeSourceFile(entry.dir, name);
   const bytes = snapshotFile(file, entry.dir, MAX_ANCHOR_BYTES, "anchor");
   return { path: file, sha256: createHash("sha256").update(bytes).digest("hex"), assetId: entry.asset.assetId,
     source: "registered-real-person-profile:" + entry.profileFile };
@@ -243,8 +301,10 @@ export function buildRegisteredCharacterReleaseSource(input: RegisteredCharacter
     const entry = byAsset.get(assetIdOf(assetRef));
     let anchor: CharacterIdentityAnchor | undefined;
     if (entry) {
-      anchor = anchors.get(entry.profileFile);
-      if (!anchor) { anchor = identityAnchor(entry); anchors.set(entry.profileFile, anchor); }
+      const registeredCharacter = characters.get(id);
+      const anchorKey = `${entry.profileFile}\0${registeredCharacter?.profileFile ?? ""}`;
+      anchor = anchors.get(anchorKey);
+      if (!anchor) { anchor = identityAnchor(entry, registeredCharacter); anchors.set(anchorKey, anchor); }
     }
     bindings.set(id, { characterId: id, assetId: entry?.asset.assetId ?? assetIdOf(assetRef),
       wardrobeLock: wardrobe(baseline), ...(anchor ? { identityAnchor: structuredClone(anchor) } : {}) });
