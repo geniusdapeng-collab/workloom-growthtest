@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 395,
+  "revision": 397,
   "tasks": {
     "98": {
       "number": 98,
@@ -2067,9 +2067,9 @@
           "protocol": 15
         }
       },
-      "updatedAt": 1791341712931,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791342312931,
+      "updatedAt": 1791342310060,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791342910060,
       "headSha": "eda8255dc676671f50e3b188058daa3a93750d05",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -13030,6 +13030,31 @@
       },
       "previous": "31c77e40f7b1a627910dd0d715dc1e21c60b887a9db8ecaca0eab563ef85e03e",
       "digest": "557c3537b7ccd461403ab33a4808f291c9b133a3be76bcea1bf5940a117748aa"
+    },
+    {
+      "sequence": 396,
+      "at": "2026-10-07T03:05:10.060Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791342910060
+        }
+      },
+      "previous": "557c3537b7ccd461403ab33a4808f291c9b133a3be76bcea1bf5940a117748aa",
+      "digest": "0baf9cc06a1d065e262b73448e0260214e5b83868fea64c8bd9163da615b7486"
+    },
+    {
+      "sequence": 397,
+      "at": "2026-10-07T03:05:18.799Z",
+      "kind": "transaction",
+      "data": {
+        "id": "13e00586-31a3-4717-b885-e5e428a50849"
+      },
+      "previous": "0baf9cc06a1d065e262b73448e0260214e5b83868fea64c8bd9163da615b7486",
+      "digest": "fc6ace875b9b09285978d3c010a191c5533e29831dfc53da4d38c6c476fdc01d"
     }
   ]
 }
