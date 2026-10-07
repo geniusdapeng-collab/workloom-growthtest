@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1636,
+  "revision": 1638,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2068,8 +2068,8 @@
         }
       },
       "updatedAt": 1791384312561,
-      "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous",
-      "blockedUntil": 0,
+      "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
+      "blockedUntil": 1791384912561,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
       "branch": "task/T-2026-1007-0001",
@@ -2537,10 +2537,10 @@
       },
       "repairRequired": {
         "provider": "codex",
-        "headSha": "0854ce12453a575b26386f135af3ef093aa71124",
-        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-        "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous",
-        "at": 1791382815340
+        "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+        "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
+        "at": 1791384312561
       },
       "recoveryIntent": null
     },
@@ -46864,6 +46864,39 @@
       },
       "previous": "80134a277f5ec665d876a3ecf967f2a5a836e1025f55d92b0633869d145274d5",
       "digest": "0959c3cc6539af6f83a17716d600287322da88c5e72419623d59f1f62c53ca8c"
+    },
+    {
+      "sequence": 1637,
+      "at": "2026-10-07T14:45:12.561Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
+            "at": 1791384312561
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791384912561
+        }
+      },
+      "previous": "0959c3cc6539af6f83a17716d600287322da88c5e72419623d59f1f62c53ca8c",
+      "digest": "5fc25f755e0a6a7782fc80c196a0d86716d7633430691838cfac6a55a87ed09f"
+    },
+    {
+      "sequence": 1638,
+      "at": "2026-10-07T14:46:41.665Z",
+      "kind": "transaction",
+      "data": {
+        "id": "a15fa782-9fad-45ee-af10-64692d9b3fb9"
+      },
+      "previous": "5fc25f755e0a6a7782fc80c196a0d86716d7633430691838cfac6a55a87ed09f",
+      "digest": "eaecd0e4b3d40703e308baafa2d64def1514e5893b9e0eff8e47e5ae5c341c39"
     }
   ]
 }
