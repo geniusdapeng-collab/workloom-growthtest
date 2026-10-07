@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 256,
+  "revision": 258,
   "tasks": {
     "98": {
       "number": 98,
@@ -1772,7 +1772,7 @@
     },
     "118": {
       "number": 118,
-      "status": "parked",
+      "status": "merging",
       "firstSeen": 1791334657026,
       "attempts": {},
       "admission": {
@@ -1945,7 +1945,85 @@
         "at": 1791335301333
       },
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791336311450
+      "blockedUntil": 1791336311450,
+      "mergePhase": "prepared",
+      "mergeSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 120,
+        "pull": {
+          "number": 120,
+          "state": "open",
+          "title": "chore(ci): deliver #118 fix(video): 默认复用已处理的登记定妆照 [T-2026-1007-0002]",
+          "body": "Immutable delivery candidate for #118. Exact source 4db4fc5265522a9c939ac119f427de57c9d38e37; tested main c28f11cd3d200770ee15d21c4ed98176d2e6bbb9.\n\n<!-- delivery-origin:118:4db4fc5265522a9c939ac119f427de57c9d38e37:c28f11cd3d200770ee15d21c4ed98176d2e6bbb9 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[],\"releases\":[]}\n-->",
+          "author": {
+            "username": "OCI",
+            "nickname": "Cloud Native Build",
+            "is_npc": true
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/delivery/candidate/pr-118-a891ac53edf6b23982d18880b6bda215",
+            "sha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "files": [
+          "README.md",
+          "bundles/ai-video/library/characters/README.md",
+          "docs/capabilities.auto.json",
+          "docs/capabilities.auto.md",
+          "docs/character-registry.md",
+          "docs/real-person-asset.md",
+          "packages/video-studio/src/character-release-source.test.ts",
+          "packages/video-studio/src/character-release-source.ts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0002",
+          "ready": true,
+          "dependsOn": [],
+          "releases": []
+        },
+        "headTime": 1791334574000,
+        "mergeBase": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "checkErrors": [],
+        "checkSha": "ff159c77e4f2ebb19d08005156693f14f376a364",
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [],
+        "originNumber": 118,
+        "pendingDependencies": []
+      },
+      "integrationLease": {
+        "owner": "integration/pr-118",
+        "scopes": [],
+        "generation": {}
+      }
     },
     "119": {
       "number": 119,
@@ -9312,6 +9390,107 @@
       },
       "previous": "8b77877cabb152d406acc121d3301c8d3c074389862c47069fcb9f1528b0d712",
       "digest": "5465caea007ea21587327b9115b48a6f542855e84b35794f9db7736f333750d8"
+    },
+    {
+      "sequence": 257,
+      "at": "2026-10-07T01:30:16.433Z",
+      "kind": "task",
+      "data": {
+        "number": 118,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 120,
+            "pull": {
+              "number": 120,
+              "state": "open",
+              "title": "chore(ci): deliver #118 fix(video): 默认复用已处理的登记定妆照 [T-2026-1007-0002]",
+              "body": "Immutable delivery candidate for #118. Exact source 4db4fc5265522a9c939ac119f427de57c9d38e37; tested main c28f11cd3d200770ee15d21c4ed98176d2e6bbb9.\n\n<!-- delivery-origin:118:4db4fc5265522a9c939ac119f427de57c9d38e37:c28f11cd3d200770ee15d21c4ed98176d2e6bbb9 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-118-a891ac53edf6b23982d18880b6bda215",
+                "sha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+            "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "files": [
+              "README.md",
+              "bundles/ai-video/library/characters/README.md",
+              "docs/capabilities.auto.json",
+              "docs/capabilities.auto.md",
+              "docs/character-registry.md",
+              "docs/real-person-asset.md",
+              "packages/video-studio/src/character-release-source.test.ts",
+              "packages/video-studio/src/character-release-source.ts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0002",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791334574000,
+            "mergeBase": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "checkErrors": [],
+            "checkSha": "ff159c77e4f2ebb19d08005156693f14f376a364",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [],
+            "originNumber": 118,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-118",
+            "scopes": [],
+            "generation": {}
+          }
+        }
+      },
+      "previous": "5465caea007ea21587327b9115b48a6f542855e84b35794f9db7736f333750d8",
+      "digest": "53bb6bb844c86f3885d1eca2ba33b27325a56660941f2ee05f438a7cdbf8066c"
+    },
+    {
+      "sequence": 258,
+      "at": "2026-10-07T01:30:25.795Z",
+      "kind": "transaction",
+      "data": {
+        "id": "23aecc60-7f7d-4d04-a2d9-e8b325ebf8dc"
+      },
+      "previous": "53bb6bb844c86f3885d1eca2ba33b27325a56660941f2ee05f438a7cdbf8066c",
+      "digest": "509c8d473d84c26d8a4b4a86bd62cc13d5ea429cfa685cb970e54c9b0dc34bd0"
     }
   ]
 }
