@@ -26,11 +26,11 @@ interface AstCompiler {
 const ts = createRequire(join(REPO, "packages/video-studio/package.json"))("typescript") as AstCompiler;
 const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
 const names = new Set(["assertCharacterRenderPreflight", "characterArtifact", "characterReleaseReport",
-  "assertCharacterCanaryBeforeSubmit", "verifyCharacterClip", "qualityAccidentsForReview"]);
+  "assertCharacterCanaryBeforeSubmit", "verifyCharacterClip", "qualityAccidentsForReview", "pickCoverFrameForPolicy", "inspectCoverForPolicy", "coverChecksPassed"]);
 const declarations = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name && names.has(node.name.text));
 if (declarations.length !== names.size) throw new Error("MATERIAL_USE_FIXTURE_INVALID: current CLI declarations missing");
 const compiled = ts.transpileModule(declarations.map(node => node.getFullText(parsed)).join("\n")
-  + "\nexports.api = { assertCharacterRenderPreflight, characterReleaseReport, assertCharacterCanaryBeforeSubmit, verifyCharacterClip, qualityAccidentsForReview };",
+  + "\nexports.api = { assertCharacterRenderPreflight, characterReleaseReport, assertCharacterCanaryBeforeSubmit, verifyCharacterClip, qualityAccidentsForReview, pickCoverFrameForPolicy, inspectCoverForPolicy, coverChecksPassed };",
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 const roots: string[] = [];
 afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
@@ -42,6 +42,10 @@ interface Api {
   assertCharacterCanaryBeforeSubmit(shotId: string): void;
   verifyCharacterClip(shot: { shotId: string }, prompt: string): Promise<boolean>;
   qualityAccidentsForReview(file: string): { blackSeconds: number; silenceSeconds: number } | null;
+  pickCoverFrameForPolicy(times: number[], inspect: (atSec: number) => number): { atSec: number; sharpness: number | null };
+  inspectCoverForPolicy(facts: { bytes: number; width: number; height: number; expectedWidth: number; expectedHeight: number; cleanSource: boolean },
+    inspect: () => { checks: { id: string; pass: boolean; hard?: boolean }[]; measurements: unknown }): { checks: { id: string; pass: boolean; hard?: boolean }[]; measurements: unknown };
+  coverChecksPassed(checks: { id: string; pass: boolean; hard?: boolean }[]): boolean;
 }
 function fixture(policy = "off") {
   const root = mkdtempSync(join(tmpdir(), "film-rendered-use-")); roots.push(root);
@@ -123,5 +127,27 @@ describe("actual CLI default adopts source-bound renders without secondary inspe
     expect(f.accidents).not.toHaveBeenCalled();
     const explicit = fixture("blocking"); expect(explicit.api.qualityAccidentsForReview("diagnostic.mp4")).toEqual({ blackSeconds: 4, silenceSeconds: 5 });
     expect(explicit.accidents).toHaveBeenCalledOnce();
+  });
+  it("default cover uses its planned frame and source facts without sharpness/PSNR/safe-area inspection", () => {
+    const f = fixture();
+    expect(f.api.pickCoverFrameForPolicy([1.2, 0.3, 5], f.forbidden)).toEqual({ atSec: 1.2, sharpness: null });
+    const facts = { bytes: 10, width: 1080, height: 1920, expectedWidth: 1080, expectedHeight: 1920, cleanSource: true };
+    const result = f.api.inspectCoverForPolicy(facts, f.forbidden);
+    expect(result.measurements).toBeNull(); expect(result.checks.map(check => check.id)).toEqual(["cover-produced", "clean-source"]);
+    expect(f.api.coverChecksPassed(result.checks)).toBe(true); expect(f.forbidden).not.toHaveBeenCalled();
+    for (const change of [{ bytes: 0 }, { width: 720 }, { cleanSource: false }]) {
+      expect(f.api.coverChecksPassed(f.api.inspectCoverForPolicy({ ...facts, ...change }, f.forbidden).checks)).toBe(false);
+    }
+  });
+  it("explicit cover diagnostics still score frames and execute real measurements", () => {
+    const f = fixture("blocking"), inspectFrame = vi.fn((time: number) => time === 5 ? 2.4 : 1.1);
+    expect(f.api.pickCoverFrameForPolicy([1.2, 5], inspectFrame)).toEqual({ atSec: 5, sharpness: 2.4 });
+    expect(inspectFrame).toHaveBeenCalledTimes(2);
+    const diagnosed = { checks: [{ id: "background-sharpness", pass: false, hard: true }], measurements: { fixture: "unacceptable actual score" } };
+    const inspect = vi.fn(() => diagnosed);
+    const result = f.api.inspectCoverForPolicy({ bytes: 1, width: 1, height: 1, expectedWidth: 1, expectedHeight: 1, cleanSource: true }, inspect);
+    expect(result).toEqual(diagnosed); expect(inspect).toHaveBeenCalledOnce(); expect(f.api.coverChecksPassed(result.checks)).toBe(false);
+    expect(f.api.coverChecksPassed([{ ...diagnosed.checks[0]!, hard: false }])).toBe(true);
+    expect(() => f.api.pickCoverFrameForPolicy([], inspectFrame)).toThrow(/COVER_FRAME_TIME_INVALID/);
   });
 });
