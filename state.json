@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2028,
+  "revision": 2031,
   "tasks": {
     "98": {
       "number": 98,
@@ -3135,7 +3135,7 @@
     },
     "126": {
       "number": 126,
-      "status": "merging",
+      "status": "integrated",
       "firstSeen": 1791346075534,
       "attempts": {},
       "admission": {
@@ -3411,7 +3411,7 @@
           }
         ]
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/126 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "error": null,
       "blockedUntil": 0,
       "dependencies": [
         123
@@ -3455,7 +3455,7 @@
         "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
         "verifiedAt": "2026-10-07T15:33:42.317Z"
       },
-      "mergePhase": "merge_verified",
+      "mergePhase": null,
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 149,
@@ -3617,7 +3617,17 @@
         "checkSha": "3b7d3901e3ec53ccfdfac994c08a52af2bb8a51e",
         "mergedBy": "cnb.dYiF05kxAGA",
         "verifiedAt": "2026-10-07T16:12:41.528Z"
-      }
+      },
+      "integrationHistory": [
+        {
+          "sha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+          "sourceSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+          "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+          "checkSha": "3b7d3901e3ec53ccfdfac994c08a52af2bb8a51e",
+          "mergedBy": "cnb.dYiF05kxAGA",
+          "verifiedAt": "2026-10-07T16:12:41.528Z"
+        }
+      ]
     },
     "127": {
       "number": 127,
@@ -7675,10 +7685,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": "integration/pr-126",
+      "owner": null,
       "generation": 60,
       "acquiredAt": 1791389415916,
-      "expiresAt": 1791390315916
+      "expiresAt": 1791389415916
     }
   },
   "releases": {},
@@ -55790,6 +55800,65 @@
       },
       "previous": "ec944ff868b115cb348f91e39d1c613898bc4f6247d6c7a9c342557bf0daf65a",
       "digest": "df1f94ecd859f64c48fb01abcc05f0670e06d52b08c65dc4e9d3746dec3408e2"
+    },
+    {
+      "sequence": 2029,
+      "at": "2026-10-07T16:10:15.916Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-126",
+        "generation": {
+          "protocol": 60
+        }
+      },
+      "previous": "df1f94ecd859f64c48fb01abcc05f0670e06d52b08c65dc4e9d3746dec3408e2",
+      "digest": "be3b1748b005b586cb14ac249a282497b4934ce5a7e200f1536a27bfbebc5ce6"
+    },
+    {
+      "sequence": 2030,
+      "at": "2026-10-07T16:10:15.916Z",
+      "kind": "task",
+      "data": {
+        "number": 126,
+        "patch": {
+          "status": "integrated",
+          "merge": {
+            "sha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "sourceSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+            "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "checkSha": "3b7d3901e3ec53ccfdfac994c08a52af2bb8a51e",
+            "mergedBy": "cnb.dYiF05kxAGA",
+            "verifiedAt": "2026-10-07T16:12:41.528Z"
+          },
+          "mergePhase": null,
+          "error": null,
+          "integrationHistory": [
+            {
+              "sha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+              "sourceSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+              "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+              "checkSha": "3b7d3901e3ec53ccfdfac994c08a52af2bb8a51e",
+              "mergedBy": "cnb.dYiF05kxAGA",
+              "verifiedAt": "2026-10-07T16:12:41.528Z"
+            }
+          ]
+        }
+      },
+      "previous": "be3b1748b005b586cb14ac249a282497b4934ce5a7e200f1536a27bfbebc5ce6",
+      "digest": "98e0ffc56552d380fbdf261d0b6375f5dc7a666dc4ae7788268ada0cbf182331"
+    },
+    {
+      "sequence": 2031,
+      "at": "2026-10-07T16:12:49.263Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f7fdb4d4-ce93-4994-b524-97425775aacf"
+      },
+      "previous": "98e0ffc56552d380fbdf261d0b6375f5dc7a666dc4ae7788268ada0cbf182331",
+      "digest": "ce9941dc49e535c0ec849776093c5692dcf2194db41a1e24cfc33ec068c15d0b"
     }
   ]
 }
