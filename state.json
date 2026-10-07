@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1537,
+  "revision": 1540,
   "tasks": {
     "98": {
       "number": 98,
@@ -7040,7 +7040,7 @@
     },
     "146": {
       "number": 146,
-      "status": "waiting_ci",
+      "status": "merging",
       "firstSeen": 1791378757788,
       "attempts": {},
       "admission": {
@@ -7376,6 +7376,212 @@
         "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
         "marker": "delivery-origin:146:ea3fe124f4c2543ae26b25f6bea23befe06d510f:80c1331ad4ed8225a676c331917debb04ab0e4f5",
         "at": 1791382815340
+      },
+      "mergePhase": "prepared",
+      "mergeSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 147,
+        "pull": {
+          "number": 147,
+          "state": "open",
+          "title": "chore(ci): deliver #146 fix(growth):原生发布读取限流恢复与总时间边界 [T-2026-1007-0012]",
+          "body": "Immutable delivery candidate for #146. Exact source ea3fe124f4c2543ae26b25f6bea23befe06d510f; tested main 80c1331ad4ed8225a676c331917debb04ab0e4f5.\n\n<!-- delivery-origin:146:ea3fe124f4c2543ae26b25f6bea23befe06d510f:80c1331ad4ed8225a676c331917debb04ab0e4f5 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[],\"releases\":[]}\n-->",
+          "author": {
+            "username": "OCI",
+            "nickname": "Cloud Native Build",
+            "is_npc": true
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/delivery/candidate/pr-146-734bddbd773d134f2fa0c9620a458b49",
+            "sha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "files": [
+          "docs/AUTOMATIC-RD-DELIVERY.md",
+          "scripts/delivery/install-cnb.yml",
+          "scripts/delivery/queue-platform.mjs",
+          "scripts/tools/cnb-api.mjs",
+          "scripts/tools/cnb-api.test.mjs"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0012",
+          "ready": true,
+          "dependsOn": [],
+          "releases": []
+        },
+        "headTime": 1791379419000,
+        "mergeBase": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "checkErrors": [],
+        "checkSha": "5a5e5973adadb9272bb427b1f9f43c5748e113e7",
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "pipeline": "delivery-regression",
+            "stage": "Durable delivery, permissions, races and actual Git regression",
+            "file": "scripts/delivery/install-cnb.yml",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+              }
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+              }
+            },
+            "origins": {
+              "before": "scripts/delivery/install-cnb.yml",
+              "after": "scripts/delivery/install-cnb.yml"
+            },
+            "binding": {
+              "branch": "**",
+              "event": "pull_request"
+            },
+            "digest": "17836814886280df4341961d552563a9e92df73c906068e3eb58196920faca17"
+          },
+          {
+            "id": "CI-002",
+            "file": "scripts/tools/cnb-api.mjs",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/tools/cnb-api.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/tools/cnb-api.mjs",
+              "absent": false
+            },
+            "digest": "1d0780323a4a7cee020964e511421b7a8975f32272c2a224e41fb6538530eb78"
+          },
+          {
+            "id": "CI-003",
+            "pipeline": "delivery-regression",
+            "stage": "Durable delivery, permissions, races and actual Git regression",
+            "file": "scripts/delivery/install-cnb.yml",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+              }
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+              }
+            },
+            "origins": {
+              "before": "scripts/delivery/install-cnb.yml",
+              "after": "scripts/delivery/install-cnb.yml"
+            },
+            "digest": "447a147543c99cc9a76f4a444a6ae24e6d7dc20dc07fba55caede521830d3dc6"
+          },
+          {
+            "id": "CI-004",
+            "file": "scripts/tools/cnb-api.test.mjs",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/tools/cnb-api.test.mjs",
+              "absent": true
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/tools/cnb-api.test.mjs",
+              "absent": false
+            },
+            "digest": "9942760f241d062313473e48d86b6baff23fceccc319dbca0949e4a1282a00fa"
+          },
+          {
+            "id": "CI-005",
+            "file": "scripts/delivery/queue-platform.mjs",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/queue-platform.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/queue-platform.mjs",
+              "absent": false
+            },
+            "digest": "9c4332d9860369ae89335bfc73bbc4ceb58c43572de2097d39c4eead80300b51"
+          },
+          {
+            "id": "CI-006",
+            "file": "scripts/delivery/install-cnb.yml",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false
+            },
+            "digest": "f7bbf6caccc277d41c4816621a64000a606d28724839f025e83f897c21649455"
+          }
+        ],
+        "originNumber": 146,
+        "pendingDependencies": []
+      },
+      "integrationLease": {
+        "owner": "integration/pr-146",
+        "scopes": [
+          "protocol"
+        ],
+        "generation": {
+          "protocol": 51
+        }
       }
     },
     "147": {
@@ -7401,10 +7607,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": null,
-      "generation": 50,
-      "acquiredAt": 1791382901334,
-      "expiresAt": 1791382901334
+      "owner": "integration/pr-146",
+      "generation": 51,
+      "acquiredAt": 1791383414151,
+      "expiresAt": 1791384314151
     }
   },
   "releases": {},
@@ -44489,6 +44695,251 @@
       },
       "previous": "7c6db699a8878f116cc7b56e2392fb1e74b8b6fc4bccce0aae554391bfa42cd7",
       "digest": "f8eb014f3e683cb4a22cac55b50127489326b39986fb072f4e4029f63f24f3f9"
+    },
+    {
+      "sequence": 1538,
+      "at": "2026-10-07T14:30:14.151Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-146",
+        "generation": {
+          "protocol": 51
+        }
+      },
+      "previous": "f8eb014f3e683cb4a22cac55b50127489326b39986fb072f4e4029f63f24f3f9",
+      "digest": "e7a12a326f5f3011cc22709853e3a18b98b1d58883a27756f5243464ea51b694"
+    },
+    {
+      "sequence": 1539,
+      "at": "2026-10-07T14:30:14.151Z",
+      "kind": "task",
+      "data": {
+        "number": 146,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 147,
+            "pull": {
+              "number": 147,
+              "state": "open",
+              "title": "chore(ci): deliver #146 fix(growth):原生发布读取限流恢复与总时间边界 [T-2026-1007-0012]",
+              "body": "Immutable delivery candidate for #146. Exact source ea3fe124f4c2543ae26b25f6bea23befe06d510f; tested main 80c1331ad4ed8225a676c331917debb04ab0e4f5.\n\n<!-- delivery-origin:146:ea3fe124f4c2543ae26b25f6bea23befe06d510f:80c1331ad4ed8225a676c331917debb04ab0e4f5 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-146-734bddbd773d134f2fa0c9620a458b49",
+                "sha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+            "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "files": [
+              "docs/AUTOMATIC-RD-DELIVERY.md",
+              "scripts/delivery/install-cnb.yml",
+              "scripts/delivery/queue-platform.mjs",
+              "scripts/tools/cnb-api.mjs",
+              "scripts/tools/cnb-api.test.mjs"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0012",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791379419000,
+            "mergeBase": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "checkErrors": [],
+            "checkSha": "5a5e5973adadb9272bb427b1f9f43c5748e113e7",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "pipeline": "delivery-regression",
+                "stage": "Durable delivery, permissions, races and actual Git regression",
+                "file": "scripts/delivery/install-cnb.yml",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+                  }
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+                  }
+                },
+                "origins": {
+                  "before": "scripts/delivery/install-cnb.yml",
+                  "after": "scripts/delivery/install-cnb.yml"
+                },
+                "binding": {
+                  "branch": "**",
+                  "event": "pull_request"
+                },
+                "digest": "17836814886280df4341961d552563a9e92df73c906068e3eb58196920faca17"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/tools/cnb-api.mjs",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/tools/cnb-api.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/tools/cnb-api.mjs",
+                  "absent": false
+                },
+                "digest": "1d0780323a4a7cee020964e511421b7a8975f32272c2a224e41fb6538530eb78"
+              },
+              {
+                "id": "CI-003",
+                "pipeline": "delivery-regression",
+                "stage": "Durable delivery, permissions, races and actual Git regression",
+                "file": "scripts/delivery/install-cnb.yml",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+                  }
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+                  }
+                },
+                "origins": {
+                  "before": "scripts/delivery/install-cnb.yml",
+                  "after": "scripts/delivery/install-cnb.yml"
+                },
+                "digest": "447a147543c99cc9a76f4a444a6ae24e6d7dc20dc07fba55caede521830d3dc6"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/cnb-api.test.mjs",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/tools/cnb-api.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/tools/cnb-api.test.mjs",
+                  "absent": false
+                },
+                "digest": "9942760f241d062313473e48d86b6baff23fceccc319dbca0949e4a1282a00fa"
+              },
+              {
+                "id": "CI-005",
+                "file": "scripts/delivery/queue-platform.mjs",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/queue-platform.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/queue-platform.mjs",
+                  "absent": false
+                },
+                "digest": "9c4332d9860369ae89335bfc73bbc4ceb58c43572de2097d39c4eead80300b51"
+              },
+              {
+                "id": "CI-006",
+                "file": "scripts/delivery/install-cnb.yml",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false
+                },
+                "digest": "f7bbf6caccc277d41c4816621a64000a606d28724839f025e83f897c21649455"
+              }
+            ],
+            "originNumber": 146,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-146",
+            "scopes": [
+              "protocol"
+            ],
+            "generation": {
+              "protocol": 51
+            }
+          }
+        }
+      },
+      "previous": "e7a12a326f5f3011cc22709853e3a18b98b1d58883a27756f5243464ea51b694",
+      "digest": "4f14f9120fb395bd53cffef856035477e4903b2479939935f0eac5ada810f7ca"
+    },
+    {
+      "sequence": 1540,
+      "at": "2026-10-07T14:31:28.785Z",
+      "kind": "transaction",
+      "data": {
+        "id": "2d3c6213-e373-40a8-999c-4079300e3a6c"
+      },
+      "previous": "4f14f9120fb395bd53cffef856035477e4903b2479939935f0eac5ada810f7ca",
+      "digest": "8bc76a5acd692bd7870d7d71c7f355ee485709562d8b0eef022fd2c6def5462f"
     }
   ]
 }
