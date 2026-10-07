@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2054,
+  "revision": 2056,
   "tasks": {
     "98": {
       "number": 98,
@@ -3656,10 +3656,10 @@
     },
     "129": {
       "number": 129,
-      "status": "aligning",
+      "status": "waiting_ci",
       "firstSeen": 1791351176589,
       "attempts": {},
-      "headSha": "052f614a8bac975a4e7e06df466d5054d7314d7a",
+      "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
       "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
       "branch": "task/T-2026-1007-0005",
       "intent": {
@@ -3897,10 +3897,12 @@
         "packages/video-studio/src/portrait-runtime.ts"
       ],
       "ciSince": 1791389597267,
-      "alignmentIntent": {
-        "headSha": "052f614a8bac975a4e7e06df466d5054d7314d7a",
+      "alignmentIntent": null,
+      "alignment": {
+        "sha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+        "previousHead": "052f614a8bac975a4e7e06df466d5054d7314d7a",
         "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
-        "at": 1791389597267
+        "verifiedAt": "2026-10-07T16:14:56.650Z"
       }
     },
     "131": {
@@ -56275,6 +56277,38 @@
       },
       "previous": "4a9af79f283067e82042960ac20659ca3a444e5e85d37e628eea1b2fa4d13129",
       "digest": "0ef13e5627def887b7ff4e95d0e2e0c8aefd25a5c1dadc2c7ee16f4f560bfd99"
+    },
+    {
+      "sequence": 2055,
+      "at": "2026-10-07T16:13:17.267Z",
+      "kind": "task",
+      "data": {
+        "number": 129,
+        "patch": {
+          "status": "waiting_ci",
+          "alignment": {
+            "sha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+            "previousHead": "052f614a8bac975a4e7e06df466d5054d7314d7a",
+            "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "verifiedAt": "2026-10-07T16:14:56.650Z"
+          },
+          "alignmentIntent": null,
+          "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+          "ciSince": 1791389597267
+        }
+      },
+      "previous": "0ef13e5627def887b7ff4e95d0e2e0c8aefd25a5c1dadc2c7ee16f4f560bfd99",
+      "digest": "1b80a5d28377cd0e970ceb8bce5c33ebfdc8d4560e423ed9b40a0b8b18411ec6"
+    },
+    {
+      "sequence": 2056,
+      "at": "2026-10-07T16:14:56.714Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f27e1465-d1b1-4e4e-b4b3-bb75e2fd2982"
+      },
+      "previous": "1b80a5d28377cd0e970ceb8bce5c33ebfdc8d4560e423ed9b40a0b8b18411ec6",
+      "digest": "791d07ee71f2382767e43e1a5b752ec034bd8e7edb24fba5fa2b29ca8a14ddd6"
     }
   ]
 }
