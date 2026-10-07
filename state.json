@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2135,
+  "revision": 2137,
   "tasks": {
     "98": {
       "number": 98,
@@ -3826,7 +3826,7 @@
         "hasFailedChecks": false,
         "ciPolicyChanges": []
       },
-      "updatedAt": 1791390620586,
+      "updatedAt": 1791390919976,
       "dependencies": [
         126
       ],
@@ -58086,6 +58086,54 @@
       },
       "previous": "daeb1f83221f9e9801001692c8000b22a4e25e0264c2f88665f21ebfadeda9bf",
       "digest": "d8848ed9a6e2b638d6d1945f1ae619e9e9874c5f198922d421c05b4ff8c1c2ae"
+    },
+    {
+      "sequence": 2136,
+      "at": "2026-10-07T16:35:19.976Z",
+      "kind": "task",
+      "data": {
+        "number": 129,
+        "patch": {
+          "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+          "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+          "branch": "task/T-2026-1007-0005",
+          "intent": {
+            "taskId": "T-2026-1007-0005",
+            "ready": true,
+            "dependsOn": [
+              126
+            ],
+            "releases": []
+          },
+          "originalBody": "同一定妆照请求在网络结果未知、下载失败或输出缓存失效后，旧实现会重新发起付费图片生成；背景诊断还会自动重做图片。\n\n生成前持久化未知状态，成功后先保存第一次响应。重跑只恢复该响应和下载，未知结果不重发 POST；显式背景诊断不自动生成另一张图片。恢复产物继续遵循角色、参考图、版本、路径和输出收据校验。私有接续响应排除 Git。\n\n验证：61 个针对性用例通过，包括真实独立 Node 进程重启和本地 HTTP 接续；video-studio 类型检查与 staged 秘密扫描通过。正在完成该准确提交的完整脚本、媒体与服务端回归；成功后填写实际 Codex 回执交给原生 CI。\n\n任务卡 #128；依赖 #126 的默认采用与后期接续修复。仅适用隔离副本，无跨仓分发。回滚使用 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0005\",\n  \"ready\": true,\n  \"depends_on\": [\n    126\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            ".gitignore",
+            "docs/capabilities.auto.json",
+            "docs/video-generation-idempotency.md",
+            "packages/video-studio/src/generation-submission.d.mts",
+            "packages/video-studio/src/generation-submission.mjs",
+            "packages/video-studio/src/generation-submission.test.ts",
+            "packages/video-studio/src/portrait-agent.test.ts",
+            "packages/video-studio/src/portrait-agent.ts",
+            "packages/video-studio/src/portrait-runtime.test.ts",
+            "packages/video-studio/src/portrait-runtime.ts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791389597267
+        }
+      },
+      "previous": "d8848ed9a6e2b638d6d1945f1ae619e9e9874c5f198922d421c05b4ff8c1c2ae",
+      "digest": "6ca8f85a7dcfded472c07f4abb905d4524bdefa8c578c112a8ad49923176cdde"
+    },
+    {
+      "sequence": 2137,
+      "at": "2026-10-07T16:37:02.041Z",
+      "kind": "transaction",
+      "data": {
+        "id": "ffd0b293-27a5-4237-a68e-e45ecf57ba73"
+      },
+      "previous": "6ca8f85a7dcfded472c07f4abb905d4524bdefa8c578c112a8ad49923176cdde",
+      "digest": "91ac7080c4aecc54aba0e8f2655d31746d826cc8a4aded74153d6905fe7f8d60"
     }
   ]
 }
