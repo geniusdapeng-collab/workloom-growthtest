@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2983,
+  "revision": 2985,
   "tasks": {
     "98": {
       "number": 98,
@@ -5903,9 +5903,9 @@
       "firstSeen": 1791358510932,
       "attempts": {},
       "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit 8256e6c0c99f32b80e5071f89f38be932e38e15f\n",
-      "blockedUntil": 1791404801768,
-      "updatedAt": 1791405299974,
-      "headSha": "89a0da71da71f3679118265ad975f5fc0f56255a",
+      "blockedUntil": 0,
+      "updatedAt": 1791405312548,
+      "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
       "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
       "branch": "task/T-2026-1007-0010",
       "intent": {
@@ -6264,18 +6264,18 @@
       "dependencies": [
         137
       ],
-      "alignmentCount": 1,
+      "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
-      "originalBody": "默认 review-policy=off 的确定性封面设计曾主动抛出模型默认标记，进入模型失败兜底，随后被来源账本误记 degraded/unverified。结果单人物封面已正确产出，但正式 mux/publication 拒绝。现在默认直接调用合法的确定性计划并记录 designVia=deterministic，正常来源事实成立后进入交付；显式模型故障仍记录 fallback/degraded。未放宽全局来源记录或手改历史回执。\n\n41项针对回归通过，包括真实CLI选稿块、实际 record() 与字节来源验收，默认零模型调用、显式故障保留降级、篡改和缺失产物拒绝。准确提交 89a0da71da71f3679118265ad975f5fc0f56255a 的8项检查通过：视频回归 1721通过、1既有跳过、0失败；真实媒体后期25通过、脚本161通过、双包类型/资产/能力/diff检查通过。随后复用既有三个付费原片重跑正式后期，不提交新增生成。\n\n任务卡 #138，依赖 #137，四文件独立功能提交及夹具类型修正。仅隔离副本，不回流分发；回滚revert本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0010\",\n  \"ready\": true,\n  \"depends_on\": [\n    137\n  ],\n  \"releases\": []\n}\n-->",
+      "originalBody": "普通 CLI 的风格差异测量忽略 FFmpeg 执行失败，并把缺失的 RGB 结果填成黑色，可能让无效样本通过三版差异检查。现在先验证退出状态、启动错误、Buffer 类型和至少三个字节，失败抛出 VARIANT_RGB_MEASUREMENT_FAILED；合法黑色继续采用，现有画面或音频差异 OR 判据和独立三轴来源规则保持原行为。\n\n确定性成功封面的正常来源链连接已提前在正式 PR135 固化。本任务保留该行为文档并完成独立审查发现的 RGB 修复。\n\n验证：纠正两个 subprocess 夹具的参数位置后，未修改的旧源在 23 个用例中 11 通过、12 个故障断言失败；补充修复的工作字节 23/23 通过，首轮夹具错误日志另存并保留。测试提取真实 CLI 私有测量、samples.push、差异与三轴计算以及三项现有硬检查；subprocess 输出和外层循环是夹具，没有执行供应商、模型、真实媒体或完整发布管线。当前提交的八项本地制片、脚本、类型、资产和能力检查均实际通过。原生源与候选七项 CI、精确合并源码核心门禁和真实 PostgreSQL 回归仍为正式发布前置。\n\n仅修改 Growthtest 隔离副本，不回流公共层。Closes #138。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0010\",\n  \"ready\": true,\n  \"depends_on\": [\n    137\n  ],\n  \"releases\": []\n}\n-->\n",
       "files": [
         "docs/capabilities.auto.json",
         "docs/video-standard-post.md",
-        "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+        "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
         "scripts/tools/full-chain-film.mts"
       ],
-      "ciSince": 1791404201768,
+      "ciSince": 1791405312548,
       "alignmentIntent": {
         "headSha": "89a0da71da71f3679118265ad975f5fc0f56255a",
         "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
@@ -77103,6 +77103,54 @@
       },
       "previous": "dc2f4ce336c666653a169bf71e3854eaffadc09acdada1d0d815b0013e60fe32",
       "digest": "fd8e6f88d61f5405ad0b66e9b728bd689ee3d9e6bf432ab4b44779de9eb891bb"
+    },
+    {
+      "sequence": 2984,
+      "at": "2026-10-07T20:35:12.548Z",
+      "kind": "task",
+      "data": {
+        "number": 139,
+        "patch": {
+          "alignmentCount": 0,
+          "recoveryCount": 0,
+          "reviewFailures": null,
+          "blockedUntil": 0,
+          "developerReview": null,
+          "candidate": null,
+          "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
+          "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+          "branch": "task/T-2026-1007-0010",
+          "intent": {
+            "taskId": "T-2026-1007-0010",
+            "ready": true,
+            "dependsOn": [
+              137
+            ],
+            "releases": []
+          },
+          "originalBody": "普通 CLI 的风格差异测量忽略 FFmpeg 执行失败，并把缺失的 RGB 结果填成黑色，可能让无效样本通过三版差异检查。现在先验证退出状态、启动错误、Buffer 类型和至少三个字节，失败抛出 VARIANT_RGB_MEASUREMENT_FAILED；合法黑色继续采用，现有画面或音频差异 OR 判据和独立三轴来源规则保持原行为。\n\n确定性成功封面的正常来源链连接已提前在正式 PR135 固化。本任务保留该行为文档并完成独立审查发现的 RGB 修复。\n\n验证：纠正两个 subprocess 夹具的参数位置后，未修改的旧源在 23 个用例中 11 通过、12 个故障断言失败；补充修复的工作字节 23/23 通过，首轮夹具错误日志另存并保留。测试提取真实 CLI 私有测量、samples.push、差异与三轴计算以及三项现有硬检查；subprocess 输出和外层循环是夹具，没有执行供应商、模型、真实媒体或完整发布管线。当前提交的八项本地制片、脚本、类型、资产和能力检查均实际通过。原生源与候选七项 CI、精确合并源码核心门禁和真实 PostgreSQL 回归仍为正式发布前置。\n\n仅修改 Growthtest 隔离副本，不回流公共层。Closes #138。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0010\",\n  \"ready\": true,\n  \"depends_on\": [\n    137\n  ],\n  \"releases\": []\n}\n-->\n",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "parked",
+          "ciSince": 1791405312548
+        }
+      },
+      "previous": "fd8e6f88d61f5405ad0b66e9b728bd689ee3d9e6bf432ab4b44779de9eb891bb",
+      "digest": "211fba98fe8586ff7294b9934787aef80d07c857403f281f178da1b746ffc9d6"
+    },
+    {
+      "sequence": 2985,
+      "at": "2026-10-07T20:35:58.882Z",
+      "kind": "transaction",
+      "data": {
+        "id": "e39ce451-c594-40ff-b51a-c612f2e7d4d6"
+      },
+      "previous": "211fba98fe8586ff7294b9934787aef80d07c857403f281f178da1b746ffc9d6",
+      "digest": "92e79005f6575d638ba41a21c994683176a81f9dbd920271e9da029efb57f59c"
     }
   ]
 }
