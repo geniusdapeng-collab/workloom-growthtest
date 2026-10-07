@@ -111,6 +111,7 @@ export function createBudget({ budgets: declaredBudgets, outDir, environmentKind
     if (existsSync(ledgerPath) && (!lstatSync(ledgerPath).isFile() || lstatSync(ledgerPath).isSymbolicLink() || lstatSync(ledgerPath).nlink !== 1)) throw new Error("预算账本必须是独立普通文件，不能通过链接替换");
     if (existsSync(ledgerPath) && ((lstatSync(ledgerPath).mode & 0o444) === 0 || (lstatSync(ledgerPath).mode & 0o222) === 0)) throw new Error("预算账本没有可读写权限，尚未占额");
     const text = existsSync(ledgerPath) ? readFileSync(ledgerPath, "utf-8") : "";
+    if (text && !text.endsWith("\n")) throw new Error("预算账本末行缺少换行；禁止追加或付费调用，需先对账");
     const records = text.split("\n").filter(Boolean).map((line) => JSON.parse(line));
     if (runId === "default" && records.some((row) => !row.runId)) throw new Error("旧预算账本缺少 runId，不能安全恢复；请使用新运行标识");
     const rows = records.filter((row) => row.runId === runId);

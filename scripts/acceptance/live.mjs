@@ -538,7 +538,10 @@ async function runTask(task) {
 for (const task of tasks) {
   const out = await runTask(task);
   const declared = task.model ? modelById.get(task.model) : resolvedModels.find((model) => model.kind === task.kind);
-  const receiptName = `${task.id}${out.budgetAlreadySettled ? "-duplicate-" + randomUUID() : ""}.json`;
+  // Early returns can happen before the budget check; retain both first-run files.
+  const originalName = `${task.id}.json`;
+  const hasOriginal = existsSync(join(OUT_DIR, "receipts", originalName)) || existsSync(join(OUT_DIR, "transcripts", originalName));
+  const receiptName = `${task.id}${out.budgetAlreadySettled || hasOriginal ? "-duplicate-" + randomUUID() : ""}.json`;
   const result = redactValue({ ...out, purpose: task.purpose ?? null, modelExpected: declared?.model ?? null, modelResolved: out.modelResolved ?? out.receipt?.model ?? null, allowedModels: task.allowedModels ?? [], fixtureMarker: task.fixtureMarker ?? null, residualDisclosure: task.residualDisclosure ?? null,
     receiptPath: evidencePath(join(OUT_DIR, "receipts", receiptName)), transcriptPath: evidencePath(join(OUT_DIR, "transcripts", receiptName)) });
   if (result.status === "ok" && result.eventEvidence && result.receipt.evidenceSha256 !== createHash("sha256").update(JSON.stringify(result.eventEvidence.events)).digest("hex")) {
@@ -548,8 +551,8 @@ for (const task of tasks) {
   const icon = result.status === "ok" ? "✓" : result.status === "blocked" ? "⏸" : result.status === "skipped" ? "–" : "✗";
   console.log(`[acceptance:live] ${icon} ${result.id} ${result.status}${result.reason ? `（${result.reason.slice(0, 120)}）` : ""}`);
   const receiptPath = join(OUT_DIR, "receipts", receiptName);
-  writeFileSync(receiptPath, JSON.stringify({ task: result.id, at: new Date().toISOString(), status: result.status, receipt: result.receipt ?? null, artifacts: result.artifacts ?? [], reason: result.reason ?? null }, null, 1));
-  writeFileSync(join(OUT_DIR, "transcripts", receiptName), JSON.stringify(result, null, 1));
+  writeFileSync(receiptPath, JSON.stringify({ task: result.id, at: new Date().toISOString(), status: result.status, receipt: result.receipt ?? null, artifacts: result.artifacts ?? [], reason: result.reason ?? null }, null, 1), { flag: "wx" });
+  writeFileSync(join(OUT_DIR, "transcripts", receiptName), JSON.stringify(result, null, 1), { flag: "wx" });
 }
 
 if (stub) await stub.close();
