@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1306,
+  "revision": 1308,
   "tasks": {
     "98": {
       "number": 98,
@@ -2067,9 +2067,9 @@
           "protocol": 34
         }
       },
-      "updatedAt": 1791373416070,
-      "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
-      "blockedUntil": 1791374016070,
+      "updatedAt": 1791373490898,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791374090898,
       "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -38322,6 +38322,31 @@
       },
       "previous": "ad93def270e04b8b899b915c71666764cf3cb34afb72a945a5b34f6a17fccd76",
       "digest": "e623d091a78ac3aa0be74e98f835d94f199370aed1473e58aa7aeeb89f28bb0e"
+    },
+    {
+      "sequence": 1307,
+      "at": "2026-10-07T11:44:50.898Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791374090898
+        }
+      },
+      "previous": "e623d091a78ac3aa0be74e98f835d94f199370aed1473e58aa7aeeb89f28bb0e",
+      "digest": "49fadd49892683c83c62f489b6e5af0f966b5d05a05e78a8103766e55cf3a50f"
+    },
+    {
+      "sequence": 1308,
+      "at": "2026-10-07T11:45:13.788Z",
+      "kind": "transaction",
+      "data": {
+        "id": "1d52f0ad-51fe-48f0-bfd0-1273e643392f"
+      },
+      "previous": "49fadd49892683c83c62f489b6e5af0f966b5d05a05e78a8103766e55cf3a50f",
+      "digest": "e45b1400dd9876563f7fc5e60aafdeac88c9d324273d2ec792ab3bce01d8cddf"
     }
   ]
 }
