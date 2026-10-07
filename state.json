@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1956,
+  "revision": 1958,
   "tasks": {
     "98": {
       "number": 98,
@@ -3151,7 +3151,7 @@
           "protocol": 58
         }
       },
-      "updatedAt": 1791388214947,
+      "updatedAt": 1791388512909,
       "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
       "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
       "branch": "task/T-2026-1007-0004",
@@ -54016,6 +54016,61 @@
       },
       "previous": "5d9ed485a75f8c56ef5b1c39c2476a2a5107a4593447e0877dee0a3cd891c4fb",
       "digest": "bbe75b168ed2de0052c70d16cb7b6f24b55daf29efb881a796a34072396235c9"
+    },
+    {
+      "sequence": 1957,
+      "at": "2026-10-07T15:55:12.909Z",
+      "kind": "task",
+      "data": {
+        "number": 126,
+        "patch": {
+          "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+          "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+          "branch": "task/T-2026-1007-0004",
+          "intent": {
+            "taskId": "T-2026-1007-0004",
+            "ready": true,
+            "dependsOn": [
+              123
+            ],
+            "releases": []
+          },
+          "originalBody": "正式视频 CLI 和父服务原本声明 review-policy=off，但仍在渲染后强制做人物/服饰评审、首镜放行及画面质量检测，导致已生成镜头停在后期之前。按产品所有者指令，现在默认直接采用实际渲染素材，不再进行二次质审；显式诊断模式保留真实评审。\n\n默认采用回执记录 qualityReviewPerformed=false，身份与服饰认证保持 unverified。历史拒收意见保留，当前原片字节、提交提示词、引用组、供应商任务及生成前登记授权继续绑定。父服务默认路径无需视觉模型或首镜意见，产品镜跳过运动、参考相似度及场景独立性检测，后期跳过造型主色、黑场与静音二次审核。\n\n本任务依赖 PR123 的完整原片时钟修复，当前分支包含其已审查提交；不会重新生成已接受的首镜。新增实际 CLI 函数 VM 测试和父服务边界测试，覆盖默认/遗漏策略、多人物后续镜、旧拒收复用、视觉模型缺失、提示词/原片/引用篡改及缺镜。既有显式评审用例保持诊断模式，不制造身份通过回执。\n\n验证：22/22 标准后期 Node 集成；视频相关回归 1658 项，1657 通过、0 失败、1 原有跳过；test:scripts、视频包与服务端类型、内置角色资产、能力导览、差异检查均退出0。真实30秒广告制作另记回执，不把夹具和回归当作生产完成。\n\n修改限 Growthtest。回滚：revert本任务提交；保留原片及历史评审。\n\nCloses #124\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0004\",\n  \"ready\": true,\n  \"depends_on\": [\n    123\n  ],\n  \"releases\": []\n}\n-->\n",
+          "files": [
+            "AGENTS.repo.md",
+            "README.md",
+            "apps/server/src/video/film-worker-identity.test.ts",
+            "apps/server/src/video/film-worker.ts",
+            "docs/capabilities.auto.json",
+            "docs/character-registry.md",
+            "docs/real-person-asset.md",
+            "docs/video-render-task-recovery.md",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/character-release-contract.test.ts",
+            "packages/video-studio/src/character-release-contract.ts",
+            "scripts/tools/film-render-task.mjs",
+            "scripts/tools/film-render-task.test.mjs",
+            "scripts/tools/film-rendered-material-use.test.ts",
+            "scripts/tools/film-standard-post.mts",
+            "scripts/tools/film-standard-post.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791387912934
+        }
+      },
+      "previous": "bbe75b168ed2de0052c70d16cb7b6f24b55daf29efb881a796a34072396235c9",
+      "digest": "98df69e518153fb72895e23e17609ff18e848a72fea81bfc8f8e6e34aaa0a4f4"
+    },
+    {
+      "sequence": 1958,
+      "at": "2026-10-07T15:57:45.037Z",
+      "kind": "transaction",
+      "data": {
+        "id": "e3a3f0fe-c891-428c-b62f-9f2d5b801d50"
+      },
+      "previous": "98df69e518153fb72895e23e17609ff18e848a72fea81bfc8f8e6e34aaa0a4f4",
+      "digest": "d61d85c58b22fb1591a58d39748c90798a10599a70bbda864e914f12abab86d7"
     }
   ]
 }
