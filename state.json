@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 579,
+  "revision": 581,
   "tasks": {
     "98": {
       "number": 98,
@@ -34,7 +34,7 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791336644957,
-      "updatedAt": 1791350412577,
+      "updatedAt": 1791351611170,
       "alignmentCount": 1,
       "alignmentIntent": null,
       "developerReview": null,
@@ -55,7 +55,7 @@
       },
       "recoveryCount": 0,
       "reviewFailures": null,
-      "blockedUntil": 1791351012577,
+      "blockedUntil": 1791352211170,
       "candidate": null,
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "repairRequired": {
@@ -18215,6 +18215,31 @@
       },
       "previous": "3188e73415047c28ffe8abfbbdecc0b3a44dbb30e27ba77e22e5e250e8d63df4",
       "digest": "c444acb7de03400ab13f7dc85051b3beef685467324c2c66f4dbe822a8a9ea7a"
+    },
+    {
+      "sequence": 580,
+      "at": "2026-10-07T05:40:11.170Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791352211170
+        }
+      },
+      "previous": "c444acb7de03400ab13f7dc85051b3beef685467324c2c66f4dbe822a8a9ea7a",
+      "digest": "2f9213d5322247f14633711cd30001cc2708f2469a429dbe2077f095d8302c74"
+    },
+    {
+      "sequence": 581,
+      "at": "2026-10-07T05:40:16.773Z",
+      "kind": "transaction",
+      "data": {
+        "id": "7e87ca2a-97b4-405f-a72c-57bf74cec7ef"
+      },
+      "previous": "2f9213d5322247f14633711cd30001cc2708f2469a429dbe2077f095d8302c74",
+      "digest": "16ffdfe1b0358c300682bde8da7d0bf9b5f0828a56038c22fb2f6f76b10c797f"
     }
   ]
 }
