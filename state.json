@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1979,
+  "revision": 1981,
   "tasks": {
     "98": {
       "number": 98,
@@ -2068,7 +2068,7 @@
         }
       },
       "updatedAt": 1791388819147,
-      "error": "Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+      "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
       "blockedUntil": 1791389419147,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
@@ -2544,7 +2544,7 @@
         "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
         "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
         "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
-        "at": 1791387912934
+        "at": 1791388819147
       },
       "recoveryIntent": null
     },
@@ -54573,6 +54573,39 @@
       },
       "previous": "316898ae602baf9582bb3002fc75190fc11f45aa34e32f098f5d859304c44a1e",
       "digest": "30ef901ca74e1b95121c93a6a60aafe6b950ecf6a4a4631cd4a06e0b27a16d5a"
+    },
+    {
+      "sequence": 1980,
+      "at": "2026-10-07T16:00:19.147Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+            "at": 1791388819147
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791389419147
+        }
+      },
+      "previous": "30ef901ca74e1b95121c93a6a60aafe6b950ecf6a4a4631cd4a06e0b27a16d5a",
+      "digest": "bffbd45ba4713e041fe3ad69c5ab868144e1b42fd8a65588e0cdb6f837f9e171"
+    },
+    {
+      "sequence": 1981,
+      "at": "2026-10-07T16:01:33.175Z",
+      "kind": "transaction",
+      "data": {
+        "id": "fed1230f-3c70-4084-afdb-4c00fa10742d"
+      },
+      "previous": "bffbd45ba4713e041fe3ad69c5ab868144e1b42fd8a65588e0cdb6f837f9e171",
+      "digest": "f9a4683fdbf13efa347080858d7c6b47602684b2ef7dae29ff369a6c6ecb8811"
     }
   ]
 }
