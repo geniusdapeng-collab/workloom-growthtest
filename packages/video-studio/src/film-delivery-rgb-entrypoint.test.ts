@@ -69,7 +69,7 @@ function optionalProperty(object: any, name: string): any {
   const matches = object.properties.filter((entry: any) => ts.isPropertyAssignment(entry)
     && (ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name)) && entry.name.text === name);
   if (!matches.length) return undefined;
-  return one(matches, name).initializer;
+  return one<any>(matches, name).initializer;
 }
 function property(object: any, name: string): any {
   const found = optionalProperty(object, name);
@@ -104,7 +104,7 @@ const gateObject = one(deliveryGates, "actual deliver recordGate");
 const gateChecks = property(gateObject, "checks");
 if (!ts.isArrayLiteralExpression(gateChecks)) throw new Error("RGB_AST_EXPECTED_GATE_CHECK_ARRAY");
 const selectedChecks = ["variants-produced", "variants-distinct", "variant-axes"].map(id =>
-  one(gateChecks.elements.filter((element: any) => ts.isObjectLiteralExpression(element)
+  one<any>(gateChecks.elements.filter((element: any) => ts.isObjectLiteralExpression(element)
     && ts.isStringLiteral(property(element, "id")) && property(element, "id").text === id), id).getText(parsed));
 const distinctness = one(declarations("distinctness").filter(entry => entry.initializer && ts.isCallExpression(entry.initializer)
   && ts.isIdentifier(entry.initializer.expression) && entry.initializer.expression.text === "assessVariantDistinctness"), "distinctness");
