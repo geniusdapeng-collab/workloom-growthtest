@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 448,
+  "revision": 450,
   "tasks": {
     "98": {
       "number": 98,
@@ -2067,9 +2067,9 @@
           "protocol": 15
         }
       },
-      "updatedAt": 1791344717767,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791344710587,
+      "updatedAt": 1791345012173,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791345612173,
       "headSha": "eda8255dc676671f50e3b188058daa3a93750d05",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -14469,6 +14469,31 @@
       },
       "previous": "18118e8b49e9193de8844bbdd7100fa3e7d8f1895c57b194b3121f27721e00ac",
       "digest": "3b26d2ba9c4620cb2d611c6b5d7b1dc2e09a703e95ccb3f71a4a17f9bc897be0"
+    },
+    {
+      "sequence": 449,
+      "at": "2026-10-07T03:50:12.173Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791345612173
+        }
+      },
+      "previous": "3b26d2ba9c4620cb2d611c6b5d7b1dc2e09a703e95ccb3f71a4a17f9bc897be0",
+      "digest": "4f62a3329d49c41f26e54091524d4f0626c5e01033f69b121b510c12d803bab6"
+    },
+    {
+      "sequence": 450,
+      "at": "2026-10-07T03:50:19.341Z",
+      "kind": "transaction",
+      "data": {
+        "id": "45313820-4d97-4b4b-b7be-fe36a499db83"
+      },
+      "previous": "4f62a3329d49c41f26e54091524d4f0626c5e01033f69b121b510c12d803bab6",
+      "digest": "0d0b1b04d54b8e8a81cdb93fbe846de6382589380970ec96cf801a937d3d0b63"
     }
   ]
 }
