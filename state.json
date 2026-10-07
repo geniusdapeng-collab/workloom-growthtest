@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2462,
+  "revision": 2464,
   "tasks": {
     "98": {
       "number": 98,
@@ -4425,7 +4425,14 @@
       "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "candidate": null,
+      "candidate": {
+        "number": 151,
+        "branch": "delivery/candidate/pr-131-dd4b3e6c11e14259e81f1b6bdfbd4808",
+        "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+        "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+        "marker": "delivery-origin:131:69ba1dfcba18c4207a39d3cf60fc49ad370d6309:e19c9325459a6df5e14914e8906c1ecce75d6af8",
+        "at": 1791396313574
+      },
       "originalBody": "实测媒体任务每次启动使用新的预算身份，且图片/视频受理响应只留在进程中；重跑下载或轮询失败的任务可能再次付费。现在同一输出目录持久化预算身份、每轮图片响应和视频任务 ID。未知提交结果不重发；已结算任务只读停止并保留原回执；未结算预占仅能恢复既有响应或 GET，不得新增生成 POST。\n\n报告分别记录 adapter 调用和实际新增提交次数，不以恢复冒充新扣费，不把未知用量记为零。临时签名地址属于私有本机状态并已排除 Git。CLI 合成夹具解析实际 pnpm Playwright 包路径，用已安装浏览器验证媒体恢复。\n\n验证：147/147 实测模块用例通过，包括真实独立进程重跑、本地 HTTP 轮询失败接续、部分图片成功/后续未知、输入变化和原预算/回执字节不变。该提交的标准脚本、视频、服务端、资产和能力检查正在完成，成功后提交准确源码的 Codex 回执给原生云端 CI。\n\n任务卡 #130；依赖 #129。修改仅在 Growthtest 隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0006\",\n  \"ready\": true,\n  \"depends_on\": [\n    129\n  ],\n  \"releases\": []\n}\n-->",
       "files": [
         ".cnb.yml",
@@ -65659,6 +65666,36 @@
       },
       "previous": "c5c10b04f56366677581568f9f7bb8d2a9b43dcdd183461d885e46b1a0f85af0",
       "digest": "3dd904c8fb7b79a877df3596d206226cb91b291dfb6a0283cf1e4369c37c899a"
+    },
+    {
+      "sequence": 2463,
+      "at": "2026-10-07T18:05:13.574Z",
+      "kind": "task",
+      "data": {
+        "number": 131,
+        "patch": {
+          "candidate": {
+            "number": 151,
+            "branch": "delivery/candidate/pr-131-dd4b3e6c11e14259e81f1b6bdfbd4808",
+            "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+            "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "marker": "delivery-origin:131:69ba1dfcba18c4207a39d3cf60fc49ad370d6309:e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "at": 1791396313574
+          }
+        }
+      },
+      "previous": "3dd904c8fb7b79a877df3596d206226cb91b291dfb6a0283cf1e4369c37c899a",
+      "digest": "86c5556a18a2ec9fc67b19dc028298d15a396ecbac4b608d0f239ff26abcd626"
+    },
+    {
+      "sequence": 2464,
+      "at": "2026-10-07T18:05:45.835Z",
+      "kind": "transaction",
+      "data": {
+        "id": "9ababbae-9a5c-42f7-a4df-8900326ba5b3"
+      },
+      "previous": "86c5556a18a2ec9fc67b19dc028298d15a396ecbac4b608d0f239ff26abcd626",
+      "digest": "b0d2af04cd4c1253cfe52019e97ba049b1182ed1e58c999907f35ef662b761f6"
     }
   ]
 }
