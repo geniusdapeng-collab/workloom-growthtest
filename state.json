@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 568,
+  "revision": 570,
   "tasks": {
     "98": {
       "number": 98,
@@ -34,7 +34,7 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791336644957,
-      "updatedAt": 1791349815368,
+      "updatedAt": 1791350412577,
       "alignmentCount": 1,
       "alignmentIntent": null,
       "developerReview": null,
@@ -55,9 +55,9 @@
       },
       "recoveryCount": 0,
       "reviewFailures": null,
-      "blockedUntil": 1791350415368,
+      "blockedUntil": 1791351012577,
       "candidate": null,
-      "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "repairRequired": {
         "provider": "codex",
         "headSha": "c20c2606f9670aff25635b3c71bd2e138c915a58",
@@ -17368,6 +17368,31 @@
       },
       "previous": "e780ea8676253e17bdfc3cd67ab6c12c8a5be0633f03513ddb9be7f6aee7e60a",
       "digest": "41684b5125de30bddaafdca99afa67fcec74cfe2216e9e1bf52924566991db40"
+    },
+    {
+      "sequence": 569,
+      "at": "2026-10-07T05:20:12.577Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791351012577
+        }
+      },
+      "previous": "41684b5125de30bddaafdca99afa67fcec74cfe2216e9e1bf52924566991db40",
+      "digest": "608773061da9419b4e1af397d610e460815150d5891f69766425a3b775a6f527"
+    },
+    {
+      "sequence": 570,
+      "at": "2026-10-07T05:20:19.453Z",
+      "kind": "transaction",
+      "data": {
+        "id": "aa6f26f2-d320-428d-b4ff-d046a4784754"
+      },
+      "previous": "608773061da9419b4e1af397d610e460815150d5891f69766425a3b775a6f527",
+      "digest": "da11f484af5a239971f54902aebc448eb83a89227f6c59090af2312274ff709c"
     }
   ]
 }
