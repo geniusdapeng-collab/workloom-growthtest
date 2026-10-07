@@ -1,4 +1,4 @@
-/** Parent channel integration: real compiler/provider adapters, local media, and producer-gate.
+/** Parent channel integration: real compiler/provider adapters, local media, and post processing.
  * Only the HTTP boundary and database ledger are replaced. These fixtures are not model
  * likeness certification, real authorization registration, or a paid supplier render.
  */
@@ -12,8 +12,7 @@ import {
   buildCharacterIdentityReviewRequest, buildProducerReviewContract, buildRegisteredCharacterReleaseSource,
   characterReleaseHash, filmCanonicalJson, filmRequestHash, filmReviewContracts, generationIdentityLock,
   FILM_CHANNEL_METHOD_COMPONENT, FILM_CHANNEL_METHODS, REAL_PERSON_ASSET_SCHEMA, resolveEraProfile,
-  type CharacterIdentityEvidence, type CharacterIdentityReviewRequest, type FilmChannelRequestFrame,
-  type FilmVideoSubmissionReceipt,
+  type FilmChannelRequestFrame, type FilmVideoSubmissionReceipt, type ProducerVerdict,
 } from "@hyperreality/video-studio";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import type { FilmComponentRow, FilmJobRow, FilmLedger, FilmWorkerRow } from "./film-ledger.js";
@@ -189,7 +188,11 @@ async function prepareIdentity(f: Fixture, options: { shotId?: string } = {}) {
     clip: { path: clipPath, sha256: hashFile(clipPath) }, promptSha256: hash(String(generated.params.prompt)),
     frames: frames.map(row => ({ path: join(f.ctx.workDir, row.ref), sha256: row.sha256, atSec: row.atSec })),
     producerContractHash: buildProducerReviewContract(filmReviewContracts(f.ctx.contractSource, shotId)).contractHash });
-  const params = { stage: "shot", projectId, identityReview: { purpose: "identity-and-explicit-wardrobe", request,
+  const params = { stage: "shot", projectId, artifacts: [{ ref: clipRef, kind: "video" }],
+    deterministic: [{ id: "provider-success", pass: true, hard: true, detail: generated.result.taskId },
+      { id: "source-bytes", pass: true, hard: true, detail: copied.sha256 },
+      { id: "old-identity-opinion", pass: false, hard: true, detail: "Historical identity and clothing opinion is not a post processing veto" }],
+    identityReview: { purpose: "identity-and-explicit-wardrobe", request,
     clipRef, frames, referenceRef, requestHash: request.requestHash }, context: { shotId, purpose: "identity-and-explicit-wardrobe" } };
   return { generated, copied, clipRef, clipPath, frames, referenceRef, request, params };
 }
@@ -218,10 +221,24 @@ async function rejectedBeforeReserve(f: Fixture, request: FilmChannelRequestFram
   expect(f.ledger.recordComponentFailure).not.toHaveBeenCalled();
   expect(f.net.mock.calls).toHaveLength(before);
 }
-function evidenceOf(value: unknown): CharacterIdentityEvidence {
-  const response = value as { identityEvidence?: CharacterIdentityEvidence };
-  expect(response.identityEvidence, "parent must return the dedicated identity receipt").toBeDefined();
-  return response.identityEvidence!;
+async function reviewProcessed(f: Fixture, prepared: Prepared): Promise<ProducerVerdict> {
+  resetLedger(f);
+  const beforeCalls = f.net.mock.calls.length;
+  const rawHash = hashFile(join(f.ctx.workDir, prepared.generated.result.ref)), clipHash = hashFile(prepared.clipPath);
+  const verdict = await handle(f.ctx, frame("gate.review", prepared.request.shotId, prepared.params)) as ProducerVerdict;
+  expect(verdict).toMatchObject({ approved: true, status: "passed", score: null, qualityReviewed: false,
+    via: "deterministic", rerun: false, hardFailures: [] });
+  expect(verdict).not.toHaveProperty("identityEvidence"); expect(verdict.contractHash).toBeUndefined();
+  expect(f.ctx.identityEvidence.size).toBe(0); expect(modelCalls(f)).toHaveLength(0);
+  expect(f.net.mock.calls).toHaveLength(beforeCalls);
+  expect(f.ledger.reserveComponent).toHaveBeenCalledTimes(1);
+  expect(f.ledger.reserveComponent.mock.calls[0]?.[0].reservedCny).toBe(0);
+  expect(f.ledger.recordComponentAccepted).toHaveBeenCalledTimes(1);
+  expect(f.ledger.recordComponentAccepted.mock.calls[0]?.[2]).toMatchObject({ evidence: { score: null, contractHash: null } });
+  expect(f.ledger.recordComponentFailure).not.toHaveBeenCalled();
+  expect(hashFile(join(f.ctx.workDir, prepared.generated.result.ref))).toBe(rawHash);
+  expect(hashFile(prepared.clipPath)).toBe(clipHash);
+  return verdict;
 }
 
 describe("actual parent channel refuses frozen audio, format, and reference alterations before budget", () => {
@@ -250,9 +267,11 @@ describe("actual parent channel refuses frozen audio, format, and reference alte
     const f = fixture(); delete (f.asset as Partial<typeof f.asset>).anchorPhoto; jsonFile(f.profileFile, f.asset);
     await rejectedBeforeReserve(f, frame("video.generate", "S1", videoParams(f)), "CHARACTER_SOURCE_ANCHOR_MISSING");
   });
-  it("requires parent visual model configuration before any person submission", async () => {
+  it("submits an authorized person request without any visual model configuration", async () => {
     const f = fixture(); delete f.ctx.env.LLM_API_KEY;
-    await rejectedBeforeReserve(f, frame("video.generate", "S1", videoParams(f)), "CHARACTER_VISION_UNAVAILABLE");
+    const { result } = await generate(f);
+    expect(result.submissionReceipt.shotId).toBe("S1"); expect(result.submissionReceipt.artifact.sha256).toBe(hash(videoBytes));
+    expect(f.ledger.reserveComponent).toHaveBeenCalledTimes(1); expect(modelCalls(f)).toHaveLength(0);
   });
   it("denies a person first-frame override even with the correct asset group and full lock", async () => {
     const f = fixture(); writeFileSync(join(f.ctx.workDir, "review/override.png"), anchorPng);
@@ -348,46 +367,34 @@ describe("actual parent compiled submission, provider download, and copied sourc
   });
 });
 
-describe("dedicated parent identity review survives off/advisory policy without false approval", () => {
-  it.each(["off", "advisory"])("%s still calls the actual visual adapter with all source, frames and registered anchor receipts", async policy => {
+describe("successful parent renders enter post under off and advisory policies without quality approval", () => {
+  it.each(["off", "advisory"])("%s processes actual accepted media without a visual model or dedicated identity receipt", async policy => {
     const f = fixture(policy), prepared = await prepareIdentity(f);
-    const evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
-    expect(evidence.checks).toEqual({ identity: "passed", wardrobe: "passed" });
-    expect(evidence.visualReview?.request).toEqual(prepared.request);
-    expect(evidence.visualReview?.verdict).toMatchObject({ via: "llm", model: "test-visual-model", approved: true, degraded: false,
-      contractHash: prepared.request.producerContractHash });
-    expect(f.ctx.identityEvidence.get("S1")).toEqual(evidence);
-    expect(modelCalls(f)).toHaveLength(1);
-    const content = (modelCalls(f)[0]!.body!.messages as Array<{ content: Array<Record<string, unknown>> }>)[0]!.content;
-    expect(content.filter(item => item.type === "image_url")).toHaveLength(8);
-    const prompt = String(content[0]!.text);
-    expect(prompt).toContain("身份事实检查"); expect(prompt).toContain("显式服饰合同检查");
-    expect(prompt).toContain("不代表逐帧");
-    expect(evidence.visualReview!.verdict.evidence).toEqual(expect.arrayContaining([
-      { path: prepared.clipPath, sha256: hashFile(prepared.clipPath), scope: "temporal-sample:0.000,0.800,1.600,2.400,3.200; audio-not-reviewed" },
-      ...prepared.request.frames.map(item => ({ path: item.path, sha256: item.sha256, scope: "image" })),
-      { path: prepared.request.referenceImage.path, sha256: prepared.request.referenceImage.sha256, scope: "reference-image" },
-    ]));
+    const legacyRequest = filmCanonicalJson(prepared.request);
+    await reviewProcessed(f, prepared);
+    expect(filmCanonicalJson(prepared.request)).toBe(legacyRequest);
+    expect(f.ctx.videoFiles.get(prepared.clipRef)).toEqual(prepared.generated.result.submissionReceipt);
+    expect(prepared.generated.result.submissionReceipt.taskId).toBeTruthy();
   });
-  it.each(["off", "advisory"])("%s cannot raise a denied dedicated identity model opinion to passed", async policy => {
+  it.each(["off", "advisory"])("%s leaves a denied historical identity opinion unchanged while processing current media", async policy => {
     const f = fixture(policy); f.response.approved = false; f.response.score = 93; f.response.reason = "mock拒绝：样本未支持同一人物和服饰";
-    const prepared = await prepareIdentity(f), evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
-    expect(evidence.checks).toEqual({ identity: "unverified", wardrobe: "unverified" }); expect(evidence.rejected).toBe(true);
-    expect(evidence.visualReview!.verdict.approved).toBe(false); expect(modelCalls(f)).toHaveLength(1);
+    const prepared = await prepareIdentity(f), historicalOpinion = filmCanonicalJson(f.response);
+    await reviewProcessed(f, prepared);
+    expect(filmCanonicalJson(f.response)).toBe(historicalOpinion);
+    expect(f.response.approved).toBe(false);
   });
-  it("model HTTP failure remains unverified and cannot authorize further paid person shots", async () => {
+  it("an unavailable visual endpoint is never called and does not block the next authorized person shot", async () => {
     const f = fixture("advisory"), prepared = await prepareIdentity(f), original = f.net.getMockImplementation()!;
     f.net.mockImplementation(async (input, init) => String(input) === `${modelBase}/chat/completions`
       ? new Response("review unavailable", { status: 503 }) : original(input, init));
-    const evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
-    expect(evidence.checks).toEqual({ identity: "unverified", wardrobe: "unverified" });
-    expect(evidence.visualReview!.verdict.degraded).toBe(true);
-    await rejectedBeforeReserve(f, frame("video.generate", "S2", videoParams(f, "S2")), "CHARACTER_CANARY_BLOCKED");
+    await reviewProcessed(f, prepared);
+    expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
+    expect(modelCalls(f)).toHaveLength(0); expect(f.ctx.identityEvidence.size).toBe(0);
   });
 });
 
-describe("parent reconstructs identity authority and independently extracts the temporal frames", () => {
-  const mutations: Array<[string, (f: Fixture, p: Prepared) => void]> = [
+describe("parent separates obsolete quality hints from the actual accepted source authority", () => {
+  const mutations: Array<[string, (f: Fixture, p: Prepared) => void, boolean?]> = [
     ["self-reported request hash", (_f, p) => { p.params.identityReview.requestHash = "f".repeat(64); }],
     ["forged current prompt hash", (_f, p) => { p.request.promptSha256 = "a".repeat(64); rehashRequest(p); }],
     ["forged registration contract", (_f, p) => { p.request.contractHash = "a".repeat(64); rehashRequest(p); }],
@@ -404,14 +411,14 @@ describe("parent reconstructs identity authority and independently extracts the 
     ["duplicated sampling timestamp", (_f, p) => { p.frames[1]!.atSec = p.frames[0]!.atSec; p.request.frames[1]!.atSec = p.frames[0]!.atSec; rehashRequest(p); }],
     ["missing second frame", (_f, p) => { p.frames.splice(1); p.request.frames.splice(1); rehashRequest(p); }],
     ["changed copied registration image", (f, p) => { writeFileSync(join(f.ctx.workDir, p.referenceRef), Buffer.concat([anchorPng, Buffer.from("other-source")])); }],
-    ["changed preserved provider raw", (f, p) => { writeFileSync(join(f.ctx.workDir, p.generated.result.ref), Buffer.concat([videoBytes, Buffer.from("changed-raw")])); }],
+    ["changed preserved provider raw", (f, p) => { writeFileSync(join(f.ctx.workDir, p.generated.result.ref), Buffer.concat([videoBytes, Buffer.from("changed-raw")])); }, true],
     ["changed copied clip with correctly updated child hash", (f, p) => {
       writeFileSync(p.clipPath, Buffer.concat([videoBytes, Buffer.from("changed-copy")])); p.request.clip.sha256 = hashFile(p.clipPath); rehashRequest(p);
-    }],
-    ["video file without parent accepted provider proof", (f, p) => {
-      copyFileSync(p.clipPath, join(f.ctx.workDir, "clips/unissued.mp4")); p.clipRef = "clips/unissued.mp4"; p.params.identityReview.clipRef = p.clipRef;
-      p.request.clip.path = join(f.ctx.workDir, p.clipRef); rehashRequest(p);
-    }],
+    }, true],
+    ["copied video bound to another job's provider proof", (f, p) => {
+      const receipt = f.ctx.videoFiles.get(p.clipRef)!;
+      f.ctx.videoFiles.set(p.clipRef, { ...receipt, jobId: "unrelated-job" });
+    }, true],
     ["registration changed after submission", (f) => {
       f.asset.authorization.evidence = "changed-registration"; jsonFile(f.profileFile, f.asset);
     }],
@@ -420,31 +427,40 @@ describe("parent reconstructs identity authority and independently extracts the 
       copyFileSync(file, outside); rmSync(file); symlinkSync(outside, file);
     }],
   ];
-  it.each(mutations)("rejects %s before reservation and model call", async (_label, mutate) => {
+  it.each(mutations)("handles %s at its actual authority boundary without a model", async (label, mutate, sourceChanged) => {
     const f = fixture(), prepared = await prepareIdentity(f); mutate(f, prepared);
-    await rejectedBeforeReserve(f, frame("gate.review", "S1", prepared.params));
+    if (sourceChanged) {
+      await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: prepared.clipRef, targetRef: "clips/S1.post-input.mp4" }));
+      expect(existsSync(join(f.ctx.workDir, "clips/S1.post-input.mp4"))).toBe(false);
+    } else {
+      await reviewProcessed(f, prepared);
+      if (label === "registration changed after submission")
+        await rejectedBeforeReserve(f, frame("video.generate", "S2", videoParams(f, "S2")), "CHARACTER_REGISTRATION_CHANGED");
+    }
     expect(f.ctx.identityEvidence.size).toBe(0); expect(modelCalls(f)).toHaveLength(0);
   });
 });
 
-describe("parent person canary permission binds the unchanged current media", () => {
-  it("blocks a later person shot while allowing an unrelated product shot", async () => {
+describe("parent person requests keep preauthorization without a rendered canary veto", () => {
+  it("allows the next authorized person and unrelated product shot without a rendered canary", async () => {
     const f = fixture(); await generate(f);
-    await rejectedBeforeReserve(f, frame("video.generate", "S2", videoParams(f, "S2")), "CHARACTER_CANARY_BLOCKED");
+    expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
     expect((await generate(f, "P1")).result.submissionReceipt.shotId).toBe("P1");
+    expect(f.ctx.identityEvidence.size).toBe(0); expect(modelCalls(f)).toHaveLength(0);
   });
-  it("opens a later person render only after the actual dedicated model receipt", async () => {
+  it("processes the first person's original without fabricating identity approval before the next request", async () => {
     const f = fixture(), prepared = await prepareIdentity(f);
-    const evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
-    expect(evidence.checks.identity).toBe("passed");
+    await reviewProcessed(f, prepared);
     const next = await generate(f, "S2"); expect(next.result.submissionReceipt.shotId).toBe("S2");
+    expect(modelCalls(f)).toHaveLength(0);
   });
-  it.each(["raw", "copied-clip"])("rehashes %s before a passed canary permits further paid rendering", async changed => {
+  it.each(["raw", "copied-clip"])("rejects changed %s before copying it into post despite an earlier processing receipt", async changed => {
     const f = fixture(), prepared = await prepareIdentity(f);
-    evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
+    await reviewProcessed(f, prepared);
     const file = changed === "raw" ? join(f.ctx.workDir, prepared.generated.result.ref) : prepared.clipPath;
     writeFileSync(file, Buffer.concat([readFileSync(file), Buffer.from("changed-after-review")]));
-    await rejectedBeforeReserve(f, frame("video.generate", "S2", videoParams(f, "S2")));
+    await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: prepared.clipRef, targetRef: "clips/S1.post-input.mp4" }), "VIDEO_SOURCE_CHANGED");
+    expect(existsSync(join(f.ctx.workDir, "clips/S1.post-input.mp4"))).toBe(false);
   });
 });
 
@@ -464,11 +480,9 @@ describe("standard parent preserves original media and rejects retiming before r
     await rejectedBeforeReserve(f, frame("media.fetch", "S1", { ref: prepared.generated.result.ref, targetRef: prepared.clipRef, normalizeToSeconds: 4 }), "STANDARD_NATIVE_RETIME_FORBIDDEN");
     expect(readFileSync(prepared.clipPath)).toEqual(shorterVideoBytes);
     expect(readFileSync(join(f.ctx.workDir, prepared.generated.result.ref))).toEqual(shorterVideoBytes);
-    const evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
-    expect(evidence.checks.identity).toBe("passed");
-    expect(evidence.clipSha256).toBe(prepared.copied.sha256);
-    expect(evidence.visualReview!.request.clip.path).toBe(prepared.clipPath);
-    expect(evidence.visualReview!.request.frames.map(row => row.atSec)).toEqual(prepared.frames.map(row => row.atSec));
+    await reviewProcessed(f, prepared);
+    expect(prepared.params.artifacts).toEqual([{ ref: prepared.clipRef, kind: "video" }]);
+    expect(hashFile(prepared.clipPath)).toBe(prepared.copied.sha256);
     expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
   });
   it("copies a silent accepted product original byte-for-byte and refuses any duration normalization", async () => {
@@ -525,19 +539,24 @@ describe("standard parent preserves original media and rejects retiming before r
   });
 });
 
-describe("parent canary permission is scoped to each registered person and selected shots", () => {
-  it("a passed first person's canary permits that person's next shot while another person is unreviewed", async () => {
+describe("parent submission authority stays scoped to registered people and selected shots", () => {
+  it("the first person's processed original does not impose a quality review on another authorized person", async () => {
     const f = fixture("off", { multiCharacter: true }), prepared = await prepareIdentity(f);
-    evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
+    await reviewProcessed(f, prepared);
     expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
-    await rejectedBeforeReserve(f, frame("video.generate", "T2", videoParams(f, "T2")), "CHARACTER_CANARY_BLOCKED");
+    expect((await generate(f, "T2")).result.submissionReceipt.shotId).toBe("T2");
+    expect(modelCalls(f)).toHaveLength(0);
   });
-  it("each person's first selected shot may be submitted independently; its review cannot authorize another person", async () => {
+  it("each person's selected shots retain their own registered asset groups without a cross-person canary", async () => {
     const f = fixture("off", { multiCharacter: true }); await generate(f);
     const second = await prepareIdentity(f, { shotId: "T1" });
-    evidenceOf(await handle(f.ctx, frame("gate.review", "T1", second.params)));
-    expect((await generate(f, "T2")).result.submissionReceipt.shotId).toBe("T2");
-    await rejectedBeforeReserve(f, frame("video.generate", "S2", videoParams(f, "S2")), "CHARACTER_CANARY_BLOCKED");
+    await reviewProcessed(f, second);
+    const nextSecond = (await generate(f, "T2")).result.submissionReceipt;
+    const nextFirst = (await generate(f, "S2")).result.submissionReceipt;
+    expect(nextSecond.shotId).toBe("T2"); expect(nextFirst.shotId).toBe("S2");
+    expect(nextSecond.referenceInputs.map(row => row.ref)).toContain("asset://asset-secondary");
+    expect(nextFirst.referenceInputs.map(row => row.ref)).toContain("asset://asset-primary");
+    expect(modelCalls(f)).toHaveLength(0);
   });
   it("only selects the first allowed shot of each person instead of demanding an out-of-scope earlier shot", async () => {
     const f = fixture("off", { multiCharacter: true, only: "S2,T2" });
@@ -547,37 +566,38 @@ describe("parent canary permission is scoped to each registered person and selec
   });
 });
 
-describe("parent rejects identity scope and evidence changes during the actual model boundary", () => {
-  it("cannot review a current clip when the dedicated model has become unavailable", async () => {
+describe("parent keeps request scope and current-source failures at the actual processing boundary", () => {
+  it("processes current accepted media after the visual model has become unavailable", async () => {
     const f = fixture(), prepared = await prepareIdentity(f); delete f.ctx.env.LLM_API_KEY;
-    await rejectedBeforeReserve(f, frame("gate.review", "S1", prepared.params), "CHARACTER_VISION_UNAVAILABLE");
+    await reviewProcessed(f, prepared);
   });
   it.each([
     ["unregistered worker method", "METHOD_NOT_ALLOWED", (f: Fixture, _request: FilmChannelRequestFrame) => { f.ctx.worker.capabilities = ["video.generate"]; }],
     ["closed job deadline", "JOB_DEADLINE_EXCEEDED", (f: Fixture, _request: FilmChannelRequestFrame) => { f.ctx.deadlineAt = Date.now() - 1; }],
     ["different project", "REVIEW_SCOPE_INVALID", (_f: Fixture, request: FilmChannelRequestFrame) => { (request.params as Prepared["params"]).projectId = "OTHER"; request.requestHash = filmRequestHash(request); }],
     ["different declared component", "FRAME_INVALID", (_f: Fixture, request: FilmChannelRequestFrame) => { request.component = "video"; }],
-  ])("refuses %s before model reservation", async (_label, code, mutate) => {
+  ])("refuses %s before even a zero-budget processing reservation", async (_label, code, mutate) => {
     const f = fixture(), prepared = await prepareIdentity(f), request = frame("gate.review", "S1", prepared.params);
     mutate(f, request); await rejectedBeforeReserve(f, request, code);
   });
-  it.each(["clip", "raw", "frame", "registered-anchor", "registered-profile"])("refuses %s changed during the model call without saving a passed identity", async changed => {
-    const f = fixture(), prepared = await prepareIdentity(f), original = f.net.getMockImplementation()!;
-    f.net.mockImplementation(async (input, init) => {
-      if (String(input) === `${modelBase}/chat/completions`) {
-        if (changed === "registered-profile") { f.asset.authorization.evidence = "changed-during-real-adapter"; jsonFile(f.profileFile, f.asset); }
-        else {
-          const file = changed === "clip" ? prepared.clipPath : changed === "raw" ? join(f.ctx.workDir, prepared.generated.result.ref)
-            : changed === "frame" ? join(f.ctx.workDir, prepared.frames[0]!.ref) : prepared.request.referenceImage.path;
-          writeFileSync(file, Buffer.concat([readFileSync(file), Buffer.from("changed-during-model-call")]));
-        }
+  it.each(["clip", "raw", "provider-proof", "missing-clip", "missing-raw"])("refuses %s changed during actual copy dispatch without accepting an output", async changed => {
+    const f = fixture(), prepared = await prepareIdentity(f), beforeCalls = f.net.mock.calls.length;
+    f.ledger.recordDispatch.mockImplementation(async (_component, _owner, provider, model) => {
+      expect([provider, model]).toEqual(["local", "media-fetch"]);
+      if (changed === "provider-proof") {
+        const receipt = f.ctx.videoFiles.get(prepared.clipRef)!;
+        f.ctx.videoFiles.set(prepared.clipRef, { ...receipt, inputSha256: "a".repeat(64) });
+      } else {
+        const file = changed === "clip" || changed === "missing-clip" ? prepared.clipPath : join(f.ctx.workDir, prepared.generated.result.ref);
+        if (changed.startsWith("missing-")) rmSync(file);
+        else writeFileSync(file, Buffer.concat([readFileSync(file), Buffer.from("changed-during-copy-dispatch")]));
       }
-      return original(input, init);
     });
     resetLedger(f);
-    await expect(handle(f.ctx, frame("gate.review", "S1", prepared.params))).rejects.toBeInstanceOf(Error);
-    expect(f.ledger.reserveComponent).toHaveBeenCalledTimes(1); expect(modelCalls(f)).toHaveLength(1);
+    await expect(handle(f.ctx, frame("media.fetch", "S1", { ref: prepared.clipRef, targetRef: "clips/S1.post-input.mp4" }))).rejects.toBeInstanceOf(Error);
+    expect(f.ledger.reserveComponent).toHaveBeenCalledTimes(1); expect(f.ledger.recordDispatch).toHaveBeenCalledTimes(1);
+    expect(modelCalls(f)).toHaveLength(0); expect(f.net.mock.calls).toHaveLength(beforeCalls);
     expect(f.ledger.recordComponentAccepted).not.toHaveBeenCalled(); expect(f.ledger.recordComponentFailure).toHaveBeenCalledTimes(1);
-    expect(f.ctx.identityEvidence.size).toBe(0);
+    expect(f.ctx.identityEvidence.size).toBe(0); expect(existsSync(join(f.ctx.workDir, "clips/S1.post-input.mp4"))).toBe(false);
   });
 });
