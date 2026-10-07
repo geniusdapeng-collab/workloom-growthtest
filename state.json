@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1829,
+  "revision": 1832,
   "tasks": {
     "98": {
       "number": 98,
@@ -2582,7 +2582,7 @@
     },
     "123": {
       "number": 123,
-      "status": "merging",
+      "status": "integrated",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2866,7 +2866,7 @@
       "ciSince": 1791383717647,
       "alignmentCount": 1,
       "alignmentIntent": null,
-      "error": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
+      "error": null,
       "blockedUntil": 0,
       "repairRequired": {
         "provider": "codex",
@@ -2886,7 +2886,7 @@
         "marker": "delivery-origin:123:2859237b49495dca23b26f55211c18fe3cafc3f3:d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
         "at": 1791386418500
       },
-      "mergePhase": "merge_verified",
+      "mergePhase": null,
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 148,
@@ -3092,7 +3092,17 @@
         "checkSha": "1dab2dc13158f2be42819982978e69e0ad0e3ba7",
         "mergedBy": "cnb.dYiF05kxAGA",
         "verifiedAt": "2026-10-07T15:31:38.805Z"
-      }
+      },
+      "integrationHistory": [
+        {
+          "sha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+          "sourceSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+          "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+          "checkSha": "1dab2dc13158f2be42819982978e69e0ad0e3ba7",
+          "mergedBy": "cnb.dYiF05kxAGA",
+          "verifiedAt": "2026-10-07T15:31:38.805Z"
+        }
+      ]
     },
     "125": {
       "number": 125,
@@ -7501,10 +7511,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": "integration/pr-123",
+      "owner": null,
       "generation": 55,
       "acquiredAt": 1791387015211,
-      "expiresAt": 1791387915211
+      "expiresAt": 1791387015211
     }
   },
   "releases": {},
@@ -51238,6 +51248,65 @@
       },
       "previous": "9dbbddb78c7a0a8627efd8dcbe88712af790bf78aacd55444f5f8b65568b5a76",
       "digest": "c75fc57edb28843b82eea7f7e7bc93fe1615a848b71b813d70323b7c6def20db"
+    },
+    {
+      "sequence": 1830,
+      "at": "2026-10-07T15:30:15.211Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-123",
+        "generation": {
+          "protocol": 55
+        }
+      },
+      "previous": "c75fc57edb28843b82eea7f7e7bc93fe1615a848b71b813d70323b7c6def20db",
+      "digest": "202cc2c9015978e66eda05e7004ca36c8f26b29e37b6dbcf56635ca74d7d1643"
+    },
+    {
+      "sequence": 1831,
+      "at": "2026-10-07T15:30:15.211Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "integrated",
+          "merge": {
+            "sha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "sourceSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "checkSha": "1dab2dc13158f2be42819982978e69e0ad0e3ba7",
+            "mergedBy": "cnb.dYiF05kxAGA",
+            "verifiedAt": "2026-10-07T15:31:38.805Z"
+          },
+          "mergePhase": null,
+          "error": null,
+          "integrationHistory": [
+            {
+              "sha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+              "sourceSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+              "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+              "checkSha": "1dab2dc13158f2be42819982978e69e0ad0e3ba7",
+              "mergedBy": "cnb.dYiF05kxAGA",
+              "verifiedAt": "2026-10-07T15:31:38.805Z"
+            }
+          ]
+        }
+      },
+      "previous": "202cc2c9015978e66eda05e7004ca36c8f26b29e37b6dbcf56635ca74d7d1643",
+      "digest": "b2f65d9e0dfa4637e1a63f994d233302f2cb6962ec8e37097998190db131ec44"
+    },
+    {
+      "sequence": 1832,
+      "at": "2026-10-07T15:31:44.055Z",
+      "kind": "transaction",
+      "data": {
+        "id": "0bd27273-abfd-4857-975c-5015ee6f81ac"
+      },
+      "previous": "b2f65d9e0dfa4637e1a63f994d233302f2cb6962ec8e37097998190db131ec44",
+      "digest": "58d309c9912296780ba0966f693e8afd11332ff0fa5b2980b6bab094c5947b9b"
     }
   ]
 }
