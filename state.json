@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 649,
+  "revision": 651,
   "tasks": {
     "98": {
       "number": 98,
@@ -2413,7 +2413,7 @@
           "protocol": 16
         }
       },
-      "updatedAt": 1791353712083,
+      "updatedAt": 1791354010585,
       "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2676,8 +2676,8 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "Prerequisite #118 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791354312083,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791354610585,
       "repairRequired": {
         "provider": "codex",
         "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
@@ -21234,6 +21234,31 @@
       },
       "previous": "c502f40ef8430cfc2d382ff78650bc3cfcc5e42c1a7efdf223429f7f07436740",
       "digest": "c9f2aba76c902fdc56a3e2ab6bf6efbeb62d5f4f7fd70784f4f68a48b13e615e"
+    },
+    {
+      "sequence": 650,
+      "at": "2026-10-07T06:20:10.585Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791354610585
+        }
+      },
+      "previous": "c9f2aba76c902fdc56a3e2ab6bf6efbeb62d5f4f7fd70784f4f68a48b13e615e",
+      "digest": "9a9326a8baee81017b4828627372331aa34017d1c746d6f4dbac038076e34a3c"
+    },
+    {
+      "sequence": 651,
+      "at": "2026-10-07T06:20:19.110Z",
+      "kind": "transaction",
+      "data": {
+        "id": "00f2f00d-58ee-4092-94df-8234b4439232"
+      },
+      "previous": "9a9326a8baee81017b4828627372331aa34017d1c746d6f4dbac038076e34a3c",
+      "digest": "1f9d0e0a7fe4626965f443b176613823af7b00cefb68716456f479907974df40"
     }
   ]
 }
