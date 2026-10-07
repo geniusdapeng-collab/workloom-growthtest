@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 301,
+  "revision": 304,
   "tasks": {
     "98": {
       "number": 98,
@@ -2300,7 +2300,7 @@
     },
     "123": {
       "number": 123,
-      "status": "developing",
+      "status": "waiting_ci",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2316,7 +2316,200 @@
           "protocol": 12
         }
       },
-      "updatedAt": 1791338153788
+      "updatedAt": 1791338303633,
+      "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+      "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+      "branch": "task/T-2026-1007-0003",
+      "intent": {
+        "taskId": "T-2026-1007-0003",
+        "ready": true,
+        "dependsOn": [
+          118
+        ],
+        "releases": []
+      },
+      "developerReview": {
+        "schemaVersion": 1,
+        "provider": "codex",
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 123,
+        "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+        "reviewedFiles": [
+          "docs/capabilities.auto.json",
+          "docs/video-standard-post.md",
+          "packages/video-studio/src/standard-post-contract.test.ts",
+          "packages/video-studio/src/standard-post-contract.ts",
+          "scripts/tools/compose-film.mts",
+          "scripts/tools/compose-native-clock.test.ts",
+          "scripts/tools/film-native-post.test.ts",
+          "scripts/tools/film-standard-post.mts",
+          "scripts/tools/full-chain-film.mts"
+        ],
+        "filesHash": "a4a98301e80f612ae69cee3accaf12f043e47f565b8ba48488c1210b27b00709",
+        "dependsOn": [
+          118
+        ],
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "rationale": "为实际普通 CLI 合成验证加入当前纯时钟函数，断言 native-clock 开关，保留所有既有拒绝矩阵与隔离证据。 不减少既有测试、必需CI上下文或保护要求；变更摘要 de8a47f018a97d2cfd9fa2da54f05deeaa44a8a4082b08a65ff2f50afe6d4fbf"
+          },
+          {
+            "id": "CI-002",
+            "rationale": "新增真实 FFmpeg 三镜端点帧、逐帧画面摘要、音画实测、来源字节不变及短音轨/变速拒绝测试。纯周期夹具的歧义已改为固定种子噪音，未放宽音画阈值。 不减少既有测试、必需CI上下文或保护要求；变更摘要 ec00d31441327b7edb5a1d3326bf02898fa085192105e46a71b8c0280a0f5782"
+          }
+        ],
+        "ciPolicyChangesHash": "f3866654ab8284cdc49fc58c1324898570f3372d0e0f726daacb7911a4e7b018",
+        "tests": [
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:55:03.060991+00:00",
+            "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (184.035958ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (0.909083ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (5.776458ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (93.136875ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (125.367709ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (101.235417ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (106.924917ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.452333ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (102.523459ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (78.28425ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (80.125458ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (81.679084ms)\n✔ missing actual accepted input proof refuses original issuance (79.009416ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (119.69575ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (218.541541ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (154.366875ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (165.415584ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (155.977125ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (154.662ms)\n✔ media executable resolver permits only current local executables (1.422667ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.349916ms)\nℹ tests 21\nℹ suites 0\nℹ pass 21\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2101.640084\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/clock-check-video-vitest.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:55:34.793210+00:00",
+            "result": "{\"numTotalTests\": 1580, \"numPassedTests\": 1579, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:55:35.120664+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:55:35.187867+00:00",
+            "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:55:35.240019+00:00",
+            "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+          },
+          {
+            "command": "git diff --check 'HEAD^' HEAD",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:55:35.271851+00:00",
+            "result": "Command completed without diagnostics."
+          }
+        ],
+        "reviewedAt": "2026-10-07T01:58:20.198956+00:00",
+        "summary": "当前 Codex 已精读变更的七个实现与测试文件及完整后期文档；能力导览 JSON 按生成器解析并校验，唯一差异是 generatedAt。独立纯时钟校验只接纳请求帧数或多一帧，保留冻结原稿并让所有派生后期共用完整帧数/fps。正常生产入口和标准后期均调用同一 native-clock 拼接模式；模式拒绝编辑及变速参数，直接拷贝完整原视频，解码声音必须覆盖画面钟才按样点合并，末尾不补静音。真实 FFmpeg 三镜夹具已逐帧比较画面摘要、核对315帧、音画偏移、来源字节不变；短音轨与变速均失败关闭。当前视频回归、Node集成、类型、资产与能力生成器校验均实际通过，原始失败/误用测试运行记录保留。未修改必需状态检查、流水线门禁或原片证据；正式真人首镜的服装拒收保持原状，不借此发布广告。",
+        "passed": true,
+        "id": "8d9ccd53600c2f76477ea263c08caec62a2196960bac15e0b00a130c3805977b"
+      },
+      "reviewSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 123,
+        "pull": {
+          "number": 123,
+          "state": "open",
+          "title": "fix(video): preserve native endpoint frame clocks [T-2026-1007-0003]",
+          "body": "请求 10 秒的原生视频实际返回 241 帧/24fps、视频流 10.041667 秒与 AAC 元数据 10.08 秒时，原片守恒检查错误拒收。现在仅允许完整请求帧数或多一个端点帧，画面钟仍严格核对帧数/fps；AAC 元数据边界限定为两个编码帧。缺帧、增加两帧、帧率或流钟不一致仍拒绝。\n\n后期从完整原片帧数派生拼接、字幕、封面及配乐切点。新增 native-clock 拼接模式直接拷贝原视频轨，要求解码原声音轨覆盖完整画面钟，不变速、不补静音、不改写冻结原稿。\n\n验证：纯合同、实际普通入口、真实 FFmpeg 三镜拼接（315 帧且逐帧 SHA-256 与源画面一致）、短音轨及变速拒绝；video-studio 回归、类型检查、内置角色资产核验与能力导览检查通过。真实生产首镜已从供应商原任务 GET 恢复并通过时钟检查。首镜人物/服装验收仍为拒收，不将模型生成或夹具测试当作广告放行。\n\n作用范围仅本隔离仓。回滚：revert 本任务提交；不会修改原片或回流基座。\n\nCloses #122\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+          "author": {
+            "username": "cnb.dYiF05kxAGA",
+            "nickname": "Genius",
+            "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+            "is_npc": false
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/task/T-2026-1007-0003",
+            "sha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "status_check",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "files": [
+          "docs/capabilities.auto.json",
+          "docs/video-standard-post.md",
+          "packages/video-studio/src/standard-post-contract.test.ts",
+          "packages/video-studio/src/standard-post-contract.ts",
+          "scripts/tools/compose-film.mts",
+          "scripts/tools/compose-native-clock.test.ts",
+          "scripts/tools/film-native-post.test.ts",
+          "scripts/tools/film-standard-post.mts",
+          "scripts/tools/full-chain-film.mts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0003",
+          "ready": true,
+          "dependsOn": [
+            118
+          ],
+          "releases": []
+        },
+        "headTime": 1791338100000,
+        "mergeBase": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+        "checkErrors": [],
+        "checkSha": null,
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "file": "scripts/tools/film-native-post.test.ts",
+            "before": {
+              "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "digest": "de8a47f018a97d2cfd9fa2da54f05deeaa44a8a4082b08a65ff2f50afe6d4fbf"
+          },
+          {
+            "id": "CI-002",
+            "file": "scripts/tools/compose-native-clock.test.ts",
+            "before": {
+              "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+              "path": "scripts/tools/compose-native-clock.test.ts",
+              "absent": true
+            },
+            "after": {
+              "ref": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+              "path": "scripts/tools/compose-native-clock.test.ts",
+              "absent": false
+            },
+            "digest": "ec00d31441327b7edb5a1d3326bf02898fa085192105e46a71b8c0280a0f5782"
+          }
+        ]
+      }
     }
   },
   "leases": {
@@ -10217,6 +10410,235 @@
       },
       "previous": "a3309c95d390c17e551e45f8527494be9b80daa7c3d179124b26d4018757169b",
       "digest": "65302d3898189a6b0382be95c2d9e7678b16bdb9a50016b607ce72965f1efed5"
+    },
+    {
+      "sequence": 302,
+      "at": "2026-10-07T01:58:23.629Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 123,
+        "id": "8d9ccd53600c2f76477ea263c08caec62a2196960bac15e0b00a130c3805977b",
+        "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0"
+      },
+      "previous": "65302d3898189a6b0382be95c2d9e7678b16bdb9a50016b607ce72965f1efed5",
+      "digest": "1f630d5e7ceec09171d54622cf84eb3e584aee46f48e8b2b343f9873b0ad56cd"
+    },
+    {
+      "sequence": 303,
+      "at": "2026-10-07T01:58:23.633Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+          "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+          "branch": "task/T-2026-1007-0003",
+          "intent": {
+            "taskId": "T-2026-1007-0003",
+            "ready": true,
+            "dependsOn": [
+              118
+            ],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 123,
+            "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+            "reviewedFiles": [
+              "docs/capabilities.auto.json",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "filesHash": "a4a98301e80f612ae69cee3accaf12f043e47f565b8ba48488c1210b27b00709",
+            "dependsOn": [
+              118
+            ],
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "rationale": "为实际普通 CLI 合成验证加入当前纯时钟函数，断言 native-clock 开关，保留所有既有拒绝矩阵与隔离证据。 不减少既有测试、必需CI上下文或保护要求；变更摘要 de8a47f018a97d2cfd9fa2da54f05deeaa44a8a4082b08a65ff2f50afe6d4fbf"
+              },
+              {
+                "id": "CI-002",
+                "rationale": "新增真实 FFmpeg 三镜端点帧、逐帧画面摘要、音画实测、来源字节不变及短音轨/变速拒绝测试。纯周期夹具的歧义已改为固定种子噪音，未放宽音画阈值。 不减少既有测试、必需CI上下文或保护要求；变更摘要 ec00d31441327b7edb5a1d3326bf02898fa085192105e46a71b8c0280a0f5782"
+              }
+            ],
+            "ciPolicyChangesHash": "f3866654ab8284cdc49fc58c1324898570f3372d0e0f726daacb7911a4e7b018",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:55:03.060991+00:00",
+                "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (184.035958ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (0.909083ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (5.776458ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (93.136875ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (125.367709ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (101.235417ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (106.924917ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.452333ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (102.523459ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (78.28425ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (80.125458ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (81.679084ms)\n✔ missing actual accepted input proof refuses original issuance (79.009416ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (119.69575ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (218.541541ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (154.366875ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (165.415584ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (155.977125ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (154.662ms)\n✔ media executable resolver permits only current local executables (1.422667ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.349916ms)\nℹ tests 21\nℹ suites 0\nℹ pass 21\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2101.640084\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/clock-check-video-vitest.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:55:34.793210+00:00",
+                "result": "{\"numTotalTests\": 1580, \"numPassedTests\": 1579, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:55:35.120664+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:55:35.187867+00:00",
+                "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:55:35.240019+00:00",
+                "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+              },
+              {
+                "command": "git diff --check 'HEAD^' HEAD",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:55:35.271851+00:00",
+                "result": "Command completed without diagnostics."
+              }
+            ],
+            "reviewedAt": "2026-10-07T01:58:20.198956+00:00",
+            "summary": "当前 Codex 已精读变更的七个实现与测试文件及完整后期文档；能力导览 JSON 按生成器解析并校验，唯一差异是 generatedAt。独立纯时钟校验只接纳请求帧数或多一帧，保留冻结原稿并让所有派生后期共用完整帧数/fps。正常生产入口和标准后期均调用同一 native-clock 拼接模式；模式拒绝编辑及变速参数，直接拷贝完整原视频，解码声音必须覆盖画面钟才按样点合并，末尾不补静音。真实 FFmpeg 三镜夹具已逐帧比较画面摘要、核对315帧、音画偏移、来源字节不变；短音轨与变速均失败关闭。当前视频回归、Node集成、类型、资产与能力生成器校验均实际通过，原始失败/误用测试运行记录保留。未修改必需状态检查、流水线门禁或原片证据；正式真人首镜的服装拒收保持原状，不借此发布广告。",
+            "passed": true,
+            "id": "8d9ccd53600c2f76477ea263c08caec62a2196960bac15e0b00a130c3805977b"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 123,
+            "pull": {
+              "number": 123,
+              "state": "open",
+              "title": "fix(video): preserve native endpoint frame clocks [T-2026-1007-0003]",
+              "body": "请求 10 秒的原生视频实际返回 241 帧/24fps、视频流 10.041667 秒与 AAC 元数据 10.08 秒时，原片守恒检查错误拒收。现在仅允许完整请求帧数或多一个端点帧，画面钟仍严格核对帧数/fps；AAC 元数据边界限定为两个编码帧。缺帧、增加两帧、帧率或流钟不一致仍拒绝。\n\n后期从完整原片帧数派生拼接、字幕、封面及配乐切点。新增 native-clock 拼接模式直接拷贝原视频轨，要求解码原声音轨覆盖完整画面钟，不变速、不补静音、不改写冻结原稿。\n\n验证：纯合同、实际普通入口、真实 FFmpeg 三镜拼接（315 帧且逐帧 SHA-256 与源画面一致）、短音轨及变速拒绝；video-studio 回归、类型检查、内置角色资产核验与能力导览检查通过。真实生产首镜已从供应商原任务 GET 恢复并通过时钟检查。首镜人物/服装验收仍为拒收，不将模型生成或夹具测试当作广告放行。\n\n作用范围仅本隔离仓。回滚：revert 本任务提交；不会修改原片或回流基座。\n\nCloses #122\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0003",
+                "sha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "status_check",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "files": [
+              "docs/capabilities.auto.json",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0003",
+              "ready": true,
+              "dependsOn": [
+                118
+              ],
+              "releases": []
+            },
+            "headTime": 1791338100000,
+            "mergeBase": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/film-native-post.test.ts",
+                "before": {
+                  "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "digest": "de8a47f018a97d2cfd9fa2da54f05deeaa44a8a4082b08a65ff2f50afe6d4fbf"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/tools/compose-native-clock.test.ts",
+                "before": {
+                  "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "digest": "ec00d31441327b7edb5a1d3326bf02898fa085192105e46a71b8c0280a0f5782"
+              }
+            ]
+          }
+        }
+      },
+      "previous": "1f630d5e7ceec09171d54622cf84eb3e584aee46f48e8b2b343f9873b0ad56cd",
+      "digest": "dc715c7dcd91c83de29a7bade7d0e50642d479a04da938e4b77d8138f3d5409f"
+    },
+    {
+      "sequence": 304,
+      "at": "2026-10-07T01:58:22.765Z",
+      "kind": "transaction",
+      "data": {
+        "id": "c42cefb6-b890-413d-954d-06b080664391"
+      },
+      "previous": "dc715c7dcd91c83de29a7bade7d0e50642d479a04da938e4b77d8138f3d5409f",
+      "digest": "66401993973f0ede7aaee80ffed2e977c76b03956dab5ba09b4ce2a59ad9fb95"
     }
   ]
 }
