@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1591,
+  "revision": 1593,
   "tasks": {
     "98": {
       "number": 98,
@@ -2582,7 +2582,7 @@
     },
     "123": {
       "number": 123,
-      "status": "aligning",
+      "status": "waiting_ci",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2599,7 +2599,7 @@
         }
       },
       "updatedAt": 1791383717647,
-      "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+      "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
       "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
       "branch": "task/T-2026-1007-0003",
       "intent": {
@@ -2762,13 +2762,9 @@
         "scripts/tools/film-standard-post.test.ts",
         "scripts/tools/full-chain-film.mts"
       ],
-      "ciSince": 1791339010301,
+      "ciSince": 1791383717647,
       "alignmentCount": 1,
-      "alignmentIntent": {
-        "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
-        "at": 1791383717647
-      },
+      "alignmentIntent": null,
       "error": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
       "blockedUntil": 0,
       "repairRequired": {
@@ -2965,6 +2961,12 @@
           }
         },
         "recordedAt": "2026-10-07T13:55:21.162Z"
+      },
+      "alignment": {
+        "sha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+        "previousHead": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+        "verifiedAt": "2026-10-07T14:36:09.760Z"
       }
     },
     "125": {
@@ -45824,6 +45826,38 @@
       },
       "previous": "16435410993bb5910c31510787306dc3b6e12dd75270d15183edc6ff7bb5e97f",
       "digest": "a4a27e5a44be7d77f930f8372614f050751ccbead175869df6bc8c4e3104a7ce"
+    },
+    {
+      "sequence": 1592,
+      "at": "2026-10-07T14:35:17.647Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "waiting_ci",
+          "alignment": {
+            "sha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+            "previousHead": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "verifiedAt": "2026-10-07T14:36:09.760Z"
+          },
+          "alignmentIntent": null,
+          "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+          "ciSince": 1791383717647
+        }
+      },
+      "previous": "a4a27e5a44be7d77f930f8372614f050751ccbead175869df6bc8c4e3104a7ce",
+      "digest": "41d4d0fd253ea67b873a60e9525343e380084d722859e44977fdff2585754f15"
+    },
+    {
+      "sequence": 1593,
+      "at": "2026-10-07T14:36:09.826Z",
+      "kind": "transaction",
+      "data": {
+        "id": "b268d2c5-a714-4b7b-8e6a-f5b5dfe29e80"
+      },
+      "previous": "41d4d0fd253ea67b873a60e9525343e380084d722859e44977fdff2585754f15",
+      "digest": "1bb8b09d6f246fc975121cb5f1220c9a29b2af8f32b12e78aaaa159433232814"
     }
   ]
 }
