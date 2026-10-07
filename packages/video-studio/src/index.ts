@@ -67,4 +67,5 @@ export * from "./prompt-redlines.js";
 export * from "./first-pass.js";
 export * from "./director-v2.js";
 export * from "./director-planner.js";
+export * from "./film-completion.mjs";
 export * from "./runtime-root.js";

@@ -20,6 +20,7 @@ import { closeSync, existsSync, lstatSync, openSync, readFileSync, readSync, rea
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { assertFilmAudioPreflight } from "../../../scripts/tools/film-audio-policy.mjs";
 import { buildFilmRenderLedger } from "../../../scripts/tools/film-render-ledger.mjs";
+import { filmCompletionPolicyForDocument, describeFilmCompletion } from "../../../packages/video-studio/src/film-completion.mjs";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
 const MAX_LINES = 20_000;
@@ -435,13 +436,18 @@ export function productionPlan(input) {
   const shotlistFile = insideRepo(shotlistPath, "shotlistPath"), routeFile = insideRepo(routePath, "routePath");
   const outputFile = insideRepo(outDir, "outDir"), stageWorkDir = insideRepo(artifactWorkDir, "workDir");
   const checklist = [];
-  let shotlist = null, fps = null, audioContracts = [];
+  let shotlist = null, fps = null, audioContracts = [], completion = null;
   try {
     const doc = readJsonFile(shotlistFile, shotlistPath);
     if (doc === null) throw new VideoCapabilityError(`缺镜头卡：${shotlistPath}`);
     shotlist = validShots(doc);
     checklist.push({id: "shotlist", ok: true, detail: `${shotlist.shots.length} 镜的 ID/时长结构有效；完整字段和规范仍由 CLI spec 检查`});
   } catch (error) { checklist.push({id: "shotlist", ok: false, detail: error.message}); }
+  try {
+    if (!shotlist) throw new VideoCapabilityError("镜头卡无效，无法读取完成度合同");
+    completion = describeFilmCompletion(filmCompletionPolicyForDocument(shotlist),shotlist.shots.reduce((sum,shot)=>sum+shot.duration,0));
+    checklist.push({id:"completion-policy",ok:true,detail:`完成度优先；目标 ${completion.policy.targetSeconds ?? "未指定"}s，完整分镜 ${completion.actualSeconds}s；仅显式硬上限约束总时长`});
+  } catch (error) { checklist.push({id:"completion-policy",ok:false,detail:error.message}); }
   try {
     const route = readJsonFile(routeFile, routePath);
     if (!plain(route) || route.schemaVersion !== "workloom.video-route-record/v1" || !plain(route.decision)) throw new VideoCapabilityError("缺少有效分流记录，请先跑 route-video.mts");
@@ -487,6 +493,7 @@ export function productionPlan(input) {
     artifactWorkDir: stageWorkDir,
     artifactRoot: artifactRoot(),
     audioSourcePolicy: "render-native",
+    completion,
     audioContracts: audioContracts.map(({shotId, mode, sourcePolicy, policyHash}) => ({shotId, mode, sourcePolicy, policyHash})),
     checklist,
     ready,

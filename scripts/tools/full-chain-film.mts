@@ -93,6 +93,7 @@ import {
 import { coverShotHasCharacter, coverShotMatchesLead, coverShotCharacterIds, resolveCoverHero, resolveCoverComposition,
   type CoverLeadSource } from "../../packages/video-studio/src/cover-design.js";
 import { assertStandardPostTimeline, validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
+import { FILM_COMPLETION_GUIDANCE, filmCompletionPolicyForDocument, describeFilmCompletion, type FilmCompletionRecord } from "../../packages/video-studio/src/film-completion.mjs";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "../../packages/video-studio/src/shot-intent.js";
 import { verifyAvSyncEvidence } from "../../packages/video-studio/src/av-sync.js";
 import { loadProductArchives, productArchivePromptLines, productHeroPhoto, productPhotoPath, selectProductArchive } from "../../packages/video-studio/src/product-archive.js";
@@ -726,6 +727,7 @@ const lineageComponentHash = productionHash([
   "scripts/tools/film-voice-artifact.ts", "packages/video-studio/src/character-release-contract.ts",
   "packages/video-studio/src/cover-assembly.ts", "packages/video-studio/src/cover-design.ts",
   "packages/video-studio/src/producer-gate.ts", "packages/video-studio/src/real-person-asset.ts",
+  "packages/video-studio/src/film-completion.mjs", "packages/video-studio/src/standard-post-contract.ts",
   "packages/video-studio/src/character-release-source.ts", "packages/video-studio/src/film-worker-runtime.ts",
   "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts",
 ].map((file) => ({ file, sha256: sha256FileSync(join(REPO_ROOT, file)) })));
@@ -768,7 +770,8 @@ function syntheticReviewVerdict(
     stage: options.stage,
     status: hardFailures.length > 0 ? "failed" : "passed",
     approved: hardFailures.length === 0,
-    score: hardFailures.length > 0 ? 0 : 100,
+    score: null,
+    qualityStatus: "unverified",
     hardFailures,
     issues,
     suggestions: hardFailures.length > 0 ? [`修复事实性硬闸后重跑：${hardFailures[0]}`] : [],
@@ -1552,13 +1555,18 @@ const EFFECTIVE_CUT_TRANSITION_AT = CUT_TRANSITION_AT.trim()
 const CUT_TRANSITION_COUNT = !EFFECTIVE_CUT_TRANSITION ? 0
   : CUT_TRANSITION_AT.trim() ? EFFECTIVE_CUT_TRANSITION_AT.split(",").filter(Boolean).length : shots.length - 1;
 const transitionLoss = Number((CUT_TRANSITION_COUNT * CUT_TRANSITION_DURATION).toFixed(3));
-const totalSeconds = Number(shotlist.durationSeconds ?? shots.reduce((sum, s) => sum + Number(s.duration ?? 0), 0));
-/**
- * 成片目标时长（秒）= 分镜总时长 − 逐刀转场损耗。
- * 逐刀 xfade 每刀吃掉 transitionDuration，15 刀 2.4s；compose 的 retime 目标与终审的时长判据都用它，
- * 保证"画面节拍网格"不被整片缩放（否则配乐卡点全乱，真机 4/15 命中）。
- */
-let expectedMasterSeconds = Number(Math.max(1, totalSeconds - transitionLoss).toFixed(3));
+/** One completion policy is used before paid rendering and again by the issued original contract. */
+function completionForShots(document: Record<string, unknown>, selected: Array<Record<string, unknown>>): FilmCompletionRecord {
+  if (!selected.length || selected.some(shot => typeof shot.duration !== "number" || !Number.isFinite(shot.duration) || shot.duration <= 0))
+    throw new Error("FILM_COMPLETION_INVALID: each selected shot needs a positive duration");
+  const actualSeconds = selected.reduce((sum, shot) => sum + Number(shot.duration), 0);
+  return describeFilmCompletion(filmCompletionPolicyForDocument(document, actualSeconds), actualSeconds);
+}
+const plannedCompletion = completionForShots(sourceDocument, sourceDocument.shots!);
+const totalSeconds = plannedCompletion.policy.targetSeconds ?? plannedCompletion.actualSeconds;
+const selectedCompletion = completionForShots(sourceDocument, shots);
+/** The complete selected picture clock owns postproduction. Never retime to the creative target. */
+let expectedMasterSeconds = selectedCompletion.actualSeconds;
 /** 剪辑网格（真实切点，秒）：配乐卡点与 BPM 反推的事实依据（去掉片尾那一个点） */
 const CUT_GRID: number[] = (() => {
   /**
@@ -2754,7 +2762,7 @@ if (STAGES.has("cine-kb")) {
 if (STAGES.has("continuity")) {
   const started = Date.now();
   const report = auditContinuity(shots as unknown as Array<Record<string, unknown>>, {
-    targetSeconds: ONLY.length > 0 ? null : totalSeconds,
+    targetSeconds: null,
     projectId: PROJECT
   });
   const checks: GateCheck[] = report.checks.map((c) => ({ id: c.id, pass: c.pass, detail: c.detail, hard: c.hard }));
@@ -2769,7 +2777,8 @@ if (STAGES.has("continuity")) {
         sixQuestions: report.questions.map((q) => `${q.question} → ${q.answer}（${q.note}）`),
         fiveDimensions: report.dimensions.map((d) => `${d.name} ${d.score}/20`),
         deterministicScore: report.score,
-        discipline: "硬阻断（打回）：造型无理由不一致、总时长不符、台词重复。其余为软信号，进问题清单但不阻断；"
+        completion: plannedCompletion,
+        discipline: FILM_COMPLETION_GUIDANCE + "硬阻断（打回）：造型无理由不一致、台词重复、显式硬上限超出。其余为软信号，进问题清单但不阻断；"
           + "跨镜判断只看镜头卡文本，不要索要额外画面证据。"
       },
       env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
@@ -3143,11 +3152,10 @@ if (STAGES.has("spec")) {
   /**
    * 总时长核对：`--only` 局部重跑时只核对被选中的镜头合计（否则局部重跑永远过不了这一闸）。
    */
-  const selectedSeconds = shots.reduce((s, x) => s + Number(x.duration ?? 0), 0);
-  const expectedSeconds = ONLY.length > 0 ? selectedSeconds : totalSeconds;
+  const completion = completionForShots(sourceDocument, shots);
   checks.push({
-    id: "duration-total", pass: Math.abs(selectedSeconds - expectedSeconds) < 0.001, hard: true,
-    detail: `镜头时长合计 ${selectedSeconds}s（目标 ${expectedSeconds}s${ONLY.length > 0 ? `，局部重跑 ${ONLY.join(",")}` : ""}）`
+    id: "duration-total", pass: true, hard: true,
+    detail: `完整镜头合计 ${completion.actualSeconds}s；创作目标 ${completion.policy.targetSeconds ?? "未指定"}s，差 ${completion.deltaFromTargetSeconds ?? "未指定"}s；完成度优先，禁止凑秒截句/压速${ONLY.length > 0 ? `，局部重跑 ${ONLY.join(",")}` : ""}`
   });
   /**
    * 全素材项目守卫（T-2026-0925-0001 真机发现，同"全真图"缺口在新版重现）：
@@ -3234,7 +3242,7 @@ if (STAGES.has("spec")) {
     const failed = scoped.find((item) => !item.verdict.approved);
     verdict = {
       stage: "prompt", status: approved ? "passed" : scoped.some((item) => item.verdict.status === "unverified") ? "unverified" : "failed",
-      approved, score: Math.min(...scoped.map((item) => item.verdict.score)),
+      approved, score: scoped.every(item => item.verdict.score !== null) ? Math.min(...scoped.map(item => item.verdict.score!)) : null,
       contractHash: buildProducerReviewContract(filmReviewContracts(filmContractSource)).contractHash,
       evidence: [...scoped.flatMap((item) => item.verdict.evidence ?? []),
         { path: scopedReviewFile, sha256: sha256FileSync(scopedReviewFile), scope: "per-shot-verdicts" }],
@@ -6978,7 +6986,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
       {
         id: "duration",
         pass: Math.abs(Number(info.duration ?? 0) - expectedMasterSeconds) <= 1.0,
-        detail: `成片 ${Number(info.duration ?? 0).toFixed(2)}s（目标 ${expectedMasterSeconds}s = 分镜 ${totalSeconds}s − 转场 ${transitionLoss.toFixed(2)}s）`,
+        detail: `成片 ${Number(info.duration ?? 0).toFixed(2)}s；完整原片画面钟 ${expectedMasterSeconds}s；创作目标 ${totalSeconds}s，不为凑秒改变源片`,
         hard: true
       },
       {
@@ -7498,7 +7506,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     variantAxes,
     samples,
     at: stamp()
-  }), assets: assetHashes, quality: {
+  }), assets: assetHashes, completion: originalPostContract.contract.completion, quality: {
     tier: QUALITY, sourceResolution: SOURCE_RESOLUTION, outputResolution: OUTPUT_RESOLUTION,
     width: OUTPUT_SIZE.width, height: OUTPUT_SIZE.height,
     localEnhancement: QUALITY === "uhd" ? "per-shot, verified receipt in stages.jsonl" : "not requested"
@@ -7675,7 +7683,7 @@ for (const r of records) {
   byStage.set(r.stage, cur);
 }
 writeFileSync(join(LOG_DIR, "stage-summary.json"), `${JSON.stringify({
-  project: PROJECT, at: stamp(), shots: shots.length, totalSeconds,
+  project: PROJECT, at: stamp(), shots: shots.length, totalSeconds, completion: originalPostContract?.contract.completion ?? plannedCompletion,
   stages: Object.fromEntries(byStage), records
 }, null, 2)}\n`, "utf8");
 log(`阶段日志：${STAGE_LOG}`);

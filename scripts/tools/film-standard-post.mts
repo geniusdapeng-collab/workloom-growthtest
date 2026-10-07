@@ -432,7 +432,7 @@ function relocate(value: unknown, staging: string, output: string): unknown {
   return value;
 }
 async function codeBinding(repo: string, timeout: number) {
-  const paths = ["scripts/tools/full-chain-film.mts", "scripts/tools/film-standard-post.mts", "packages/video-studio/src/standard-post-contract.ts", "scripts/tools/film-audio-policy.mjs", "scripts/tools/compose-film.mts",
+  const paths = ["scripts/tools/full-chain-film.mts", "scripts/tools/film-standard-post.mts", "packages/video-studio/src/standard-post-contract.ts", "packages/video-studio/src/film-completion.mjs", "scripts/tools/film-audio-policy.mjs", "scripts/tools/compose-film.mts",
     "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts", "packages/video-studio/src/production-lineage.ts",
     "packages/video-studio/src/local-cover-render.ts", "packages/video-studio/src/cover-design.ts", "packages/video-studio/src/cover-platforms.ts",
     "packages/video-studio/src/cover-assembly.ts", "packages/video-studio/src/av-sync.ts", "packages/video-studio/src/deliver.ts", "bundles/ai-video/library/root-list.mjs",
@@ -650,7 +650,7 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
     await relocateGeneratedReceipts(staging, staging, output);
     const manifest = relocate({ schemaVersion: "workloom.standard-post-delivery/v1", generatedAt: new Date().toISOString(), projectId: plan.projectId,
       mode: "original-native-standard-postproduction", planSha256: planHash, sourceCode: { ...code, currentCodeRechecked: true }, binaries,
-      width: plan.width, height: plan.height, fps: plan.fps, durationSec: plan.durationSec,
+      width: plan.width, height: plan.height, fps: plan.fps, durationSec: plan.durationSec, completion: contract.completion,
       supplierGenerationCalls: 0, modelCalls: 0, ttsCalls: 0, asrCalls: 0, sourceFilesUnchanged: true, speed: 1, frameSynthesis: false,
       scope: "Every frozen original shot in submitted order/full duration with its same-file native audio. Only color, music, cover and subtitles were added; identity remains unverified.",
       originalManifestSha256: original.manifestSha256, contractSha256: contract.contractSha256, originalTimeline: contract.timeline, sourceAuthority: contract.originals.map(s => s.authority),
