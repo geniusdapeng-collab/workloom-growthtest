@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 310,
+  "revision": 312,
   "tasks": {
     "98": {
       "number": 98,
@@ -2453,8 +2453,16 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791339019356
+      "error": "主干对齐失败：CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791339019356,
+      "repairRequired": {
+        "provider": "codex",
+        "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "reason": "主干对齐失败：CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+        "at": 1791338419356
+      },
+      "recoveryIntent": null
     }
   },
   "leases": {
@@ -10686,6 +10694,39 @@
       },
       "previous": "e6eb4cf531608bb6f476f21b7d3c6a14f1c7152bd9968c979c76f6ffa6c8f30c",
       "digest": "a4ee7a30768f96a103d15a75d2ef5f2a8d1e92163ad5dd9b1aee88640ceff0ff"
+    },
+    {
+      "sequence": 311,
+      "at": "2026-10-07T02:00:19.356Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "主干对齐失败：CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "reason": "主干对齐失败：CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+            "at": 1791338419356
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791339019356
+        }
+      },
+      "previous": "a4ee7a30768f96a103d15a75d2ef5f2a8d1e92163ad5dd9b1aee88640ceff0ff",
+      "digest": "c838078a30e318895e947287f472dd781fb5db3e32ac15a7489f77dac947e485"
+    },
+    {
+      "sequence": 312,
+      "at": "2026-10-07T02:00:36.819Z",
+      "kind": "transaction",
+      "data": {
+        "id": "2fa85772-00d8-4b03-a1ba-1a1e9c792cc9"
+      },
+      "previous": "c838078a30e318895e947287f472dd781fb5db3e32ac15a7489f77dac947e485",
+      "digest": "ba721f1cb7817592594de549c3b0300a12bd9cab0a841e57b9f17118f14d4610"
     }
   ]
 }
