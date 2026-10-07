@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1244,
+  "revision": 1246,
   "tasks": {
     "98": {
       "number": 98,
@@ -6421,7 +6421,7 @@
           "protocol": 32
         }
       },
-      "updatedAt": 1791371143371,
+      "updatedAt": 1791372564513,
       "headSha": "e6f2a55a8b6de78f51211e48b14d76b8304b41bb",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0011",
@@ -6614,7 +6614,14 @@
             "digest": "1ccdf31d6078d6b3a7b6c9a6f3738b61bcb2716f77f3af77207777cb57728ae9"
           }
         ]
-      }
+      },
+      "originalBody": "并发静态门禁完整扫描同仓 PR 时，原生候选 #140 在已通过接纳、协议测试和提交校验后，因一次 CNB GET HTTP 429 立即失败，阻止本轮视频机制逐项发布。现在同一只读请求在原采集总预算内最多退避三次，并遵守有效 Retry-After；只有实际成功响应才能继续完整证据校验。持续限流、权限错误、其他 HTTP/网络/JSON 失败、预算不足及退避期间 source/main/PR 集合漂移仍拒绝。原必需 CI、接纳租约和发布保护保持执行。\n\n验证固定提交 e6f2a55a8b6de78f51211e48b14d76b8304b41bb：协议及交付回归 425 项中 424 通过、1 本仓既有 UI 发布车道跳过、0 失败；8 项标准检查均退出 0，包括视频/父服务回归、真实媒体后期、脚本 161 项、双包类型、内置资产、能力导览及完整主干 diff。修复前同样的四个限流恢复用例实际全失败，日志与固定源摘要保留。HTTP 边界和供应商使用夹具，无付费模型或视频调用。\n\n任务卡 #141，三文件独立改动；protocol 开发租约 generation 31 已显式释放，不占用准入或等待 CI。仅隔离 Growthtest，本次追加是完成当前发布所必需的恢复修复；回滚 revert 本提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0011\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+      "files": [
+        "docs/AUTOMATIC-RD-DELIVERY.md",
+        "scripts/ci/verify-lock-conflict.mjs",
+        "scripts/ci/verify-lock-conflict.test.mjs"
+      ],
+      "ciSince": 1791372564513
     }
   },
   "leases": {
@@ -36236,6 +36243,45 @@
       },
       "previous": "0cd684c07782f23bafef4696d646bd4fc6da8f5c0c07348d5675a5b4b82bc73a",
       "digest": "9d323dd3d96f2871b6a21f83739622d5498b857371044bec9db011dcd864e05e"
+    },
+    {
+      "sequence": 1245,
+      "at": "2026-10-07T11:29:24.513Z",
+      "kind": "task",
+      "data": {
+        "number": 142,
+        "patch": {
+          "headSha": "e6f2a55a8b6de78f51211e48b14d76b8304b41bb",
+          "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+          "branch": "task/T-2026-1007-0011",
+          "intent": {
+            "taskId": "T-2026-1007-0011",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "originalBody": "并发静态门禁完整扫描同仓 PR 时，原生候选 #140 在已通过接纳、协议测试和提交校验后，因一次 CNB GET HTTP 429 立即失败，阻止本轮视频机制逐项发布。现在同一只读请求在原采集总预算内最多退避三次，并遵守有效 Retry-After；只有实际成功响应才能继续完整证据校验。持续限流、权限错误、其他 HTTP/网络/JSON 失败、预算不足及退避期间 source/main/PR 集合漂移仍拒绝。原必需 CI、接纳租约和发布保护保持执行。\n\n验证固定提交 e6f2a55a8b6de78f51211e48b14d76b8304b41bb：协议及交付回归 425 项中 424 通过、1 本仓既有 UI 发布车道跳过、0 失败；8 项标准检查均退出 0，包括视频/父服务回归、真实媒体后期、脚本 161 项、双包类型、内置资产、能力导览及完整主干 diff。修复前同样的四个限流恢复用例实际全失败，日志与固定源摘要保留。HTTP 边界和供应商使用夹具，无付费模型或视频调用。\n\n任务卡 #141，三文件独立改动；protocol 开发租约 generation 31 已显式释放，不占用准入或等待 CI。仅隔离 Growthtest，本次追加是完成当前发布所必需的恢复修复；回滚 revert 本提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0011\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/AUTOMATIC-RD-DELIVERY.md",
+            "scripts/ci/verify-lock-conflict.mjs",
+            "scripts/ci/verify-lock-conflict.test.mjs"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791372564513
+        }
+      },
+      "previous": "9d323dd3d96f2871b6a21f83739622d5498b857371044bec9db011dcd864e05e",
+      "digest": "74854b63645f2834f2352a67ebf1ad742b77b734ec1cf681315feb85ae10ae32"
+    },
+    {
+      "sequence": 1246,
+      "at": "2026-10-07T11:29:54.451Z",
+      "kind": "transaction",
+      "data": {
+        "id": "c8c95528-fe4e-4759-a411-bb102da15c3e"
+      },
+      "previous": "74854b63645f2834f2352a67ebf1ad742b77b734ec1cf681315feb85ae10ae32",
+      "digest": "bdda0573ff32275f5e29d4a405e3eb44b641dec4fc2496a767dc286e015a3ad1"
     }
   ]
 }
