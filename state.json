@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 639,
+  "revision": 641,
   "tasks": {
     "98": {
       "number": 98,
@@ -2413,7 +2413,7 @@
           "protocol": 16
         }
       },
-      "updatedAt": 1791352820381,
+      "updatedAt": 1791353712083,
       "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2676,8 +2676,8 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791353420381,
+      "error": "Prerequisite #118 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791354312083,
       "repairRequired": {
         "provider": "codex",
         "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
@@ -21101,6 +21101,31 @@
       },
       "previous": "1a0c1fb874cae45cdae3b619adc37e7bd9b12b0aee1d9e799351580950d9454b",
       "digest": "1e3c7006f69c9f6ccd2eb4664bc887be420ccdf285b4db1e6a7b9a0eeae1fe3b"
+    },
+    {
+      "sequence": 640,
+      "at": "2026-10-07T06:15:12.083Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "Prerequisite #118 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791354312083
+        }
+      },
+      "previous": "1e3c7006f69c9f6ccd2eb4664bc887be420ccdf285b4db1e6a7b9a0eeae1fe3b",
+      "digest": "6010c5d28d05bba44d1e505403e221f4e51321169c75a557a42a1c8a2454a780"
+    },
+    {
+      "sequence": 641,
+      "at": "2026-10-07T06:15:44.306Z",
+      "kind": "transaction",
+      "data": {
+        "id": "b02d4e48-4d22-4602-8911-f0146bea8a4d"
+      },
+      "previous": "6010c5d28d05bba44d1e505403e221f4e51321169c75a557a42a1c8a2454a780",
+      "digest": "0c83bbfd752afe63abb75a1dd1c98953f6270c9005e18e35e4cb521d53bcb3c4"
     }
   ]
 }
