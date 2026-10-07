@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1068,
+  "revision": 1070,
   "tasks": {
     "98": {
       "number": 98,
@@ -4468,7 +4468,7 @@
     },
     "135": {
       "number": 135,
-      "status": "waiting_dependency",
+      "status": "parked",
       "firstSeen": 1791354489850,
       "attempts": {},
       "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
@@ -4970,9 +4970,9 @@
           }
         ]
       },
-      "updatedAt": 1791368185960,
+      "updatedAt": 1791368409793,
       "error": "Prerequisite #133 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791362109350,
+      "blockedUntil": 1791369009793,
       "dependencies": [
         133
       ]
@@ -32134,6 +32134,31 @@
       },
       "previous": "e6c2d377120822e8bba4f96a6a3e4fe4684c07e9ae2ae66e64788ac96640bb00",
       "digest": "5e6b03932e26c21b44fb9be6d1c582bb0947f739989e2ea7ad0e0a43076b2770"
+    },
+    {
+      "sequence": 1069,
+      "at": "2026-10-07T10:20:09.793Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "status": "parked",
+          "error": "Prerequisite #133 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791369009793
+        }
+      },
+      "previous": "5e6b03932e26c21b44fb9be6d1c582bb0947f739989e2ea7ad0e0a43076b2770",
+      "digest": "8607d1074ff4261c0aea7d2eec72845842d4d2b80f705add36d96a97e7a496dd"
+    },
+    {
+      "sequence": 1070,
+      "at": "2026-10-07T10:20:57.792Z",
+      "kind": "transaction",
+      "data": {
+        "id": "647e48b7-6aab-4c62-b4c8-2767199e5069"
+      },
+      "previous": "8607d1074ff4261c0aea7d2eec72845842d4d2b80f705add36d96a97e7a496dd",
+      "digest": "0b7bc84837afbae89886d7d768eb0e3a3cc112e41dd6e462ea17502023e14a15"
     }
   ]
 }
