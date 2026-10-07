@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 294,
+  "revision": 296,
   "tasks": {
     "98": {
       "number": 98,
@@ -2067,9 +2067,9 @@
           "protocol": 11
         }
       },
-      "updatedAt": 1791337214484,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791337814484,
+      "updatedAt": 1791338114335,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791338714335,
       "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -10085,6 +10085,31 @@
       },
       "previous": "efdc2aa46b18e64820b11a2461b6b9ce571d766b630a953695738cf739bb3340",
       "digest": "6a7f87bc54cb9ecaa1d5f208652040c33f5d45d8bdcf4d937d6ec9e8dc11ea51"
+    },
+    {
+      "sequence": 295,
+      "at": "2026-10-07T01:55:14.335Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791338714335
+        }
+      },
+      "previous": "6a7f87bc54cb9ecaa1d5f208652040c33f5d45d8bdcf4d937d6ec9e8dc11ea51",
+      "digest": "c88ff0818a62e3c102d2a08cf6b725de9b3e308d69d436ff1346f10865e20d8a"
+    },
+    {
+      "sequence": 296,
+      "at": "2026-10-07T01:55:21.718Z",
+      "kind": "transaction",
+      "data": {
+        "id": "9638441a-f323-4b73-9de1-36f24f52a486"
+      },
+      "previous": "c88ff0818a62e3c102d2a08cf6b725de9b3e308d69d436ff1346f10865e20d8a",
+      "digest": "a1eb74534af1761b76a1c7eab7f9f438cf120fc90813c2040d4195777098df72"
     }
   ]
 }
