@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 527,
+  "revision": 529,
   "tasks": {
     "98": {
       "number": 98,
@@ -2719,7 +2719,7 @@
     },
     "126": {
       "number": 126,
-      "status": "parked",
+      "status": "waiting_dependency",
       "firstSeen": 1791346075534,
       "attempts": {},
       "admission": {
@@ -2735,8 +2735,8 @@
           "protocol": 21
         }
       },
-      "updatedAt": 1791347709298,
-      "headSha": "4aaa3faeb189bdd74bec36ba3e1663cec0dfc96d",
+      "updatedAt": 1791348013090,
+      "headSha": "179f96daf1355f11af6ce9fdb7eee997adcc9433",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0004",
       "intent": {
@@ -16366,6 +16366,41 @@
       },
       "previous": "2ba5f44af03ec90df57dd3f44b270f90da090eb7a019e3e99cad2427a8ad5570",
       "digest": "40f5646778a87eb052505587437761d6bf7dfdce56b37adcf94084420900e559"
+    },
+    {
+      "sequence": 528,
+      "at": "2026-10-07T04:40:13.090Z",
+      "kind": "task",
+      "data": {
+        "number": 126,
+        "patch": {
+          "status": "waiting_dependency",
+          "headSha": "179f96daf1355f11af6ce9fdb7eee997adcc9433",
+          "intent": {
+            "taskId": "T-2026-1007-0004",
+            "ready": true,
+            "dependsOn": [
+              123
+            ],
+            "releases": []
+          },
+          "dependencies": [
+            123
+          ]
+        }
+      },
+      "previous": "40f5646778a87eb052505587437761d6bf7dfdce56b37adcf94084420900e559",
+      "digest": "1ce4c509022ed5d967b5090e245fbf776aec4a00594fcbc8845291abfa60c9db"
+    },
+    {
+      "sequence": 529,
+      "at": "2026-10-07T04:40:26.729Z",
+      "kind": "transaction",
+      "data": {
+        "id": "45b76ad4-4618-4027-9cc3-6833463ba05d"
+      },
+      "previous": "1ce4c509022ed5d967b5090e245fbf776aec4a00594fcbc8845291abfa60c9db",
+      "digest": "faa0a8bf453eee5cc5cc9656f0f6f5e1545aef2d0e730474b9641c5799a384eb"
     }
   ]
 }
