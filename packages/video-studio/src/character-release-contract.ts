@@ -189,7 +189,7 @@ export function buildCharacterIdentityReviewRequest(input: {
 /** Minimal structural facade for the real producer-gate return, including its actual byte receipts. */
 export interface CharacterVisualVerdict {
   stage: string; status: string; approved: boolean; via: string; model?: string; degraded: boolean;
-  contractHash?: string; reason: string; score?: number; evidence?: Array<{ path: string; sha256: string; scope: string }>;
+  contractHash?: string; reason: string; score?: number | null; evidence?: Array<{ path: string; sha256: string; scope: string }>;
 }
 export interface CharacterIdentityEvidence {
   schemaVersion: "workloom.character-identity-evidence/v1"; method: "visual-identity" | "human-receipt" | "visual-observation";

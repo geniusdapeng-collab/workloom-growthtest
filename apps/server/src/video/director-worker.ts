@@ -254,7 +254,7 @@ async function loadClips(scope:{tenantId:string;workspaceId:string},projectId:st
     used.add(planned.shotId);
     const durationSec=Number(media.videoDuration??media.duration);
     if(!Number.isFinite(durationSec)||durationSec<=0) throw new DirectorJobError("SOURCE_BAD_MEDIA","源镜头没有有效视频时长");
-    clips.push({shotId:planned.shotId,assetId:asset.id,path:asset.path,sha256:asset.sha256,durationSec,role:planned.role,dialogue:planned.dialogue,audio:planned.audio});
+    clips.push({shotId:planned.shotId,assetId:asset.id,path:asset.path,sha256:asset.sha256,durationSec,role:planned.role,dialogue:planned.dialogue,lockTrim:planned.lockTrim===true,audio:planned.audio});
   }
   if(plan.shots.some(shot=>!used.has(shot.shotId))) throw new DirectorJobError("SOURCE_SHOT_MISSING","冻结导演方案的共享镜头未齐全，未开始后期交付");
   return clips;

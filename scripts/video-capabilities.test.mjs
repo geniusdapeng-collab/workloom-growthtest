@@ -49,6 +49,19 @@ function savePlanInputs(root, shot = { shotId: "S1", duration: 5 }) {
   writeFileSync(join(root, "out", "route.json"), JSON.stringify({ schemaVersion: "workloom.video-route-record/v1", decision: { route: "marketing" } }));
   return { projectId: "P1", shotlistPath: "out/shots.json", routePath: "out/route.json", outDir: "out/result" };
 }
+test('30秒预览接受28/32/35秒完整镜头池；显式硬上限在给出执行命令前阻断',()=>fixture(({root})=>{
+  const input=savePlanInputs(root);
+  for(const total of [28,32,35]) {
+    const doc={fps:24,products:['商品'],durationSeconds:30,shots:[total-24,12,12].map((duration,index)=>({shotId:`S${index+1}`,duration}))};
+    writeFileSync(join(root,'out','shots.json'),JSON.stringify(doc));
+    const plan=productionPlan(input);
+    assert.equal(plan.ready,true);assert.equal(plan.completion.actualSeconds,total);
+    assert.equal(plan.completion.deltaFromTargetSeconds,total-30);assert.equal(plan.completion.qualityScore,null);
+    writeFileSync(join(root,'out','shots.json'),JSON.stringify({...doc,durationIntent:{hardMaximumSeconds:30}}));
+    const bounded=productionPlan(input);
+    assert.equal(bounded.ready,total<=30);if(total>30) assert.deepEqual(bounded.argv,[]);
+  }
+}));
 test("standard native production has no local ASR or dubbing prerequisite", () => fixture(({ root }) => {
   const input = savePlanInputs(root, { shotId: "S1", duration: 5, speechMode: "voice-over", dialogue: [{ text: "原片旁白" }] });
   process.env.WORKLOOM_VOICE_ENGINE = "mock";

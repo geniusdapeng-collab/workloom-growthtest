@@ -8,8 +8,9 @@
 import { createHash } from "node:crypto";
 import { isAbsolute, normalize } from "node:path";
 import { productionHash } from "./production-lineage.js";
+import { filmCompletionPolicyForDocument, describeFilmCompletion, type FilmCompletionRecord } from "./film-completion.mjs";
 
-export const STANDARD_POST_SCHEMA = "workloom.standard-post/v1" as const;
+export const STANDARD_POST_SCHEMA = "workloom.standard-post/v2" as const;
 export interface StandardPostSubmitted { json: string; sha256: string; bytes: number }
 export interface StandardPostMedia {
   fps: number; width: number; height: number; videoFrames: number; videoDurationSec: number;
@@ -40,6 +41,7 @@ export interface StandardPostContract {
   readonly originals: readonly StandardOriginalRender[]; readonly timeline: readonly StandardPostTimelineEntry[];
   readonly fps: number; readonly width: number; readonly height: number;
   readonly totalFrames: number; readonly durationSec: number;
+  readonly completion: FilmCompletionRecord;
   readonly nativeAudioProof: readonly StandardPostNativeAudioProof[]; readonly contractSha256: string;
 }
 
@@ -130,7 +132,9 @@ export function buildStandardPostContract(input: StandardPostBuildInput): Standa
     seenShots.add(shot.shotId); shots.push({ shotId: shot.shotId, durationSec: shot.duration });
   }
   const submittedDurationSec = shots.reduce((total, shot) => total + shot.durationSec, 0);
-  if (!positive(source.durationSeconds) || !Number.isFinite(submittedDurationSec) || !near(submittedDurationSec, source.durationSeconds, 1e-9)) fail("SUBMITTED_INVALID", "document durationSeconds differs from original shot durations");
+  if (!positive(source.durationSeconds) || !positive(submittedDurationSec)) fail("SUBMITTED_INVALID", "document target and original shot durations must be positive");
+  const completionPolicy = filmCompletionPolicyForDocument(source, submittedDurationSec);
+  describeFilmCompletion(completionPolicy, submittedDurationSec);
   const supplied = denseArray(top.originals, "SOURCE_INVALID", "originals");
   if (supplied.length !== shots.length) fail("SOURCE_INVALID", "every submitted shot requires exactly one original");
   const originalsById = new Map<string, StandardPostOriginal>(); const paths = new Set<string>(); const digests = new Set<string>();
@@ -166,7 +170,8 @@ export function buildStandardPostContract(input: StandardPostBuildInput): Standa
   }
   const body = { schemaVersion: STANDARD_POST_SCHEMA, mode: "standard-native" as const, projectId: top.projectId,
     submitted: structuredClone(submitted) as unknown as StandardPostSubmitted, originals, timeline,
-    fps: first.fps, width: first.width, height: first.height, totalFrames, durationSec: totalFrames / first.fps, nativeAudioProof };
+    fps: first.fps, width: first.width, height: first.height, totalFrames, durationSec: totalFrames / first.fps, nativeAudioProof,
+    completion: describeFilmCompletion(completionPolicy, totalFrames / first.fps) };
   return freeze({ ...body, contractSha256: productionHash(body) });
 }
 
@@ -174,7 +179,7 @@ export function buildStandardPostContract(input: StandardPostBuildInput): Standa
 export function assertStandardPostTimeline(contract: unknown, actual: unknown): asserts actual is readonly StandardPostTimelineEntry[] {
   let expected: StandardPostContract;
   try {
-    const value = shape(contract, ["schemaVersion", "mode", "projectId", "submitted", "originals", "timeline", "fps", "width", "height", "totalFrames", "durationSec", "nativeAudioProof", "contractSha256"], "CONTRACT_INVALID", "contract");
+    const value = shape(contract, ["schemaVersion", "mode", "projectId", "submitted", "originals", "timeline", "fps", "width", "height", "totalFrames", "durationSec", "nativeAudioProof", "completion", "contractSha256"], "CONTRACT_INVALID", "contract");
     expected = buildStandardPostContract({ projectId: value.projectId as string, submitted: value.submitted as StandardPostSubmitted,
       originals: value.originals as StandardPostOriginal[] });
     if (productionHash(value) !== productionHash(expected)) fail("CONTRACT_INVALID", "contract hash/body differs from its bound original source");

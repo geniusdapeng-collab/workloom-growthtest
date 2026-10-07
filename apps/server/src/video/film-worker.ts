@@ -1279,7 +1279,7 @@ async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, co
     const missing = (reviewOptions.requiredCheckIds ?? []).filter((id) => !reviewOptions.deterministic.some((check) => check.id === id && check.pass === true));
     hardFailures.push(...missing.map((id) => `${id}：缺少实测检查`));
     if (!resolvedArtifacts.length) hardFailures.push("缺少可读产物");
-    return { stage: reviewOptions.stage, contractHash, approved: !hardFailures.length, status: hardFailures.length ? "failed" : "passed", score: hardFailures.length ? 0 : 100,
+    return { stage: reviewOptions.stage, contractHash, approved: !hardFailures.length, status: hardFailures.length ? "failed" : "passed", score: null, qualityStatus: "unverified",
       hardFailures, issues: reviewOptions.deterministic.filter((check) => !check.pass).map((check) => check.detail), suggestions: [], rerun: Boolean(hardFailures.length),
       via: "deterministic", ms: 0, reason: hardFailures.length ? "事实性交付检查未通过" : "冻结合同与事实性交付检查通过；画面质量由客户验收", degraded: false };
   } : undefined);
