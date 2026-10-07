@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2640,
+  "revision": 2642,
   "tasks": {
     "98": {
       "number": 98,
@@ -4962,7 +4962,14 @@
       "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "candidate": null,
+      "candidate": {
+        "number": 152,
+        "branch": "delivery/candidate/pr-133-43721af2b34e642a9423054b7504555d",
+        "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+        "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+        "marker": "delivery-origin:133:3ec72a7be36f22af5714b2cebc52ea89249360c3:79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+        "at": 1791399018910
+      },
       "originalBody": "肖像派生 CLI 会在网络失败时重发图片 POST，并在图片结果不明时自动转入付费视频；视频任务 ID 也未跨进程保存。现在按角度和真实请求内容保存提交状态，先保存受理响应，再下载或按原任务 ID 查询。未知、5xx、畸形响应和下载失败均不转付费入口；仅明确的 400 不支持认证 asset 拒绝允许回退。旧无受理记录的缓存不盲目重新生成。\n\n验证：9 项实际函数、本地 HTTP 与独立 CLI 进程用例通过，包含图片下载失败只提交一次、视频查询失败接续、输入变更阻断和未知结果零视频回退。准确提交 c0da166012554858636e7c0edf43c5f6593a9cbe 的 8 项完整检查均退出 0。测试未调用真实生成服务。\n\n任务卡 #132；依赖 #131。仅修改 Growthtest 隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0007\",\n  \"ready\": true,\n  \"depends_on\": [\n    131\n  ],\n  \"releases\": []\n}\n-->",
       "files": [
         "docs/capabilities.auto.json",
@@ -69595,6 +69602,36 @@
       },
       "previous": "61ddf585588f6c9bbceb05a814f2507571fc39dd49580061b0ad1739e2a02d41",
       "digest": "8273f2c8bc80b49090d3736ca9df2af817361c73d8ebc0ea5121a679ba575c7c"
+    },
+    {
+      "sequence": 2641,
+      "at": "2026-10-07T18:50:18.910Z",
+      "kind": "task",
+      "data": {
+        "number": 133,
+        "patch": {
+          "candidate": {
+            "number": 152,
+            "branch": "delivery/candidate/pr-133-43721af2b34e642a9423054b7504555d",
+            "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+            "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+            "marker": "delivery-origin:133:3ec72a7be36f22af5714b2cebc52ea89249360c3:79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+            "at": 1791399018910
+          }
+        }
+      },
+      "previous": "8273f2c8bc80b49090d3736ca9df2af817361c73d8ebc0ea5121a679ba575c7c",
+      "digest": "71b4df759a4c024d944cf67ec592e58f0116f61b336388fd0060f8970e284046"
+    },
+    {
+      "sequence": 2642,
+      "at": "2026-10-07T18:51:45.016Z",
+      "kind": "transaction",
+      "data": {
+        "id": "92eeb1e7-4894-4a47-a348-ae79831f93c0"
+      },
+      "previous": "71b4df759a4c024d944cf67ec592e58f0116f61b336388fd0060f8970e284046",
+      "digest": "875749a1f5a88b20d2b41a323e226dd6893c7a74dbb1a7fbda8c5300f4b128f1"
     }
   ]
 }
