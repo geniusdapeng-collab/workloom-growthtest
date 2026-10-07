@@ -1525,7 +1525,7 @@ export function buildChain(spec = {}) {
   // 理由：把校正也一起按 0.8 稀释，会让"欠曝修一半"，画面几乎看不出变化（早期 bug）。
   // conversion LUT 同属"还原"而非 look：恒 100%、不参与 intensity 混合、置于最前。
   const conversionParts = conversionLuts.map((p) => `lut3d='${escapeFilterPath(p)}'`);
-  // 可选降噪（T-24）：仅当调用方显式开启且噪点检测命中时由上层传入 spec.denoise；
+  // 可选降噪：仅在调用方显式开启时传入 spec.denoise；不执行噪点检测或品质验收；
   // 位置在 conversion 之后、校正之前（先还原色彩空间，再降噪，再校正）。
   // luma_spatial 保守强度，硬上限 2.0：镜间一致性场景宁可欠降也不可降出涂抹感。
   const denoiseParts = denoise
@@ -1982,14 +1982,8 @@ function averageMetrics(samples, weights = null) {
   return avg;
 }
 
-/**
- * 择优调色（"最佳效果"的实现路径）：候选择优 + 客观打分 + 允许「不动」。
- *
- *   1. 抽 N 张静帧（look dev，不整片渲染）；
- *   2. 候选池（原片不动 / 仅校正 / look×强度）在静帧上逐一评估；
- *   3. scoreQuality 打分（基准 100 = 原片）；
- *   4. **最高分没过阈值 → 判定"无需调色"，不产出任何文件**（do no harm）；
- *   5. 确有更优候选时，才整片渲染一次，并对成片复测画质。
+/** Compatibility best entry: select one declared recipe and execute it once.
+ * No candidate scoring, source-quality veto, output-quality vote or automatic retry.
  */
 export async function best({ input, output = null, candidates = null, recipe = null, genre = null, platform = null, bins = resolveBinaries() }) {
   if (!output) throw new ColorError("调色需要output路径", "bad_request");

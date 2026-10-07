@@ -351,6 +351,7 @@ test.each(["sidecar", "burn", "danmaku", "softmux"])("whole normal CLI stops aft
       "--work-dir", f.root, "--out", output, "--keys-file", join(f.root, "nonexistent.env"), "--stages", stages,
       "--subtitle-mode", kind === "burn" ? "burn" : "sidecar", "--no-open-with-cover"],
     { cwd: repo, encoding: "utf8", timeout: 180_000, env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: binary, WL_FFPROBE: ffprobe,
+      WORKLOOM_SUBTITLE_FFMPEG_PATH: binary, WORKLOOM_SUBTITLE_FFPROBE_PATH: ffprobe,
       ...(kind === "sidecar" ? { WORKLOOM_SUBTITLE_FONTS_DIR: f.root } : {}) } });
     assert.notEqual(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.match(result.stderr, /POST_PROCESSING_FAILED/);
@@ -376,6 +377,10 @@ test("whole normal CLI completes all official post stages with declared single m
     const result = spawnSync(process.execPath, ["--import", "tsx", "--import", denyNetwork, cli, "--shots", shots,
       "--work-dir", f.root, "--out", output, "--keys-file", join(f.root, "nonexistent.env"), "--stages", "voice,compose,color,subtitle,danmaku,bgm,cover,mux,master,deliver"],
     { cwd: repo, encoding: "utf8", timeout: 240_000, env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: binary, WL_FFPROBE: ffprobe,
+      WORKLOOM_POST_FFMPEG_PATH: binary, WORKLOOM_POST_FFPROBE_PATH: ffprobe,
+      WORKLOOM_COLOR_FFMPEG_PATH: binary, WORKLOOM_COLOR_FFPROBE_PATH: ffprobe,
+      WORKLOOM_SUBTITLE_FFMPEG_PATH: binary, WORKLOOM_SUBTITLE_FFPROBE_PATH: ffprobe,
+      WORKLOOM_BGM_FFMPEG_PATH: binary, WORKLOOM_BGM_FFPROBE_PATH: ffprobe,
       WORKLOOM_BGM_DISCOVER: "0", WORKLOOM_BGM_LIBRARY_DIR: join(f.root, "empty-custom-library"), WORKLOOM_BGM_HOME: join(f.root, "empty-bgm-home") } });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.equal(hash(readFileSync(f.raw)), f.rawSha256);
@@ -392,3 +397,52 @@ test("whole normal CLI completes all official post stages with declared single m
     assert.equal(actualCommands.filter(args => args.some((value: string) => value.includes('sidechaincompress'))).length, 4, "one main and one requested music mix per variant");
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 }, 300_000);
+
+
+async function partialCompletedFixture(pendingChange: Record<string, unknown> = {}) {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "partial-original-prerender-"))), projectId = "MOCK-PARTIAL";
+  const photo = join(root, "pending.jpg"), encodedPhoto = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=blue:s=64x64", "-frames:v", "1", photo], { encoding: "utf8", timeout: 30_000 });
+  assert.equal(encodedPhoto.status, 0, encodedPhoto.stderr);
+  const originalCard = { shotId: "S1", duration: 4, scene: "历史原片卡片不再改写", product: "ABSENT-HISTORICAL-PRODUCT", photo: "/absent/historical.jpg", materialUsage: "static-display", assetRef: "malformed historical reference" };
+  const pendingCard = { shotId: "S2", duration: 4, scene: "无人海边岩岸空镜", action: "无人，只有日落天光", composition: "海岸远景", depth_of_field: "全画面清晰", photo, materialUsage: "generation-reference", environmentProfile: { setting: "exterior", condition: "natural" }, ...pendingChange };
+  const source = { projectId, durationSeconds: 8, fps: 24, aspect: "9:16", resolution: "720p",
+    sceneBible: { spaceId: "coast", space: { city: "上海", building: "海边岩岸", orientation: "朝海", timeOfDay: "傍晚" }, materials: [], practicalLights: [{ type: "日落天光", direction: "西侧" }], traces: [], environmentProfile: { setting: "exterior", condition: "natural" }, eraProfile: { storyDate: "2024-01-01" } }, shots: [originalCard, pendingCard] };
+  const bytes = Buffer.from(JSON.stringify(source)), shots = join(root, "shots.json"); writeFileSync(shots, bytes);
+  const submitted = await freezeOriginalSubmission({ productionRoot: root, projectId, bytes }), clips = join(root, "clips", projectId); mkdirSync(clips, { recursive: true });
+  const raw = join(clips, "S1.raw.mp4"), encoded = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=black:s=64x64:r=24:d=4", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", raw], { encoding: "utf8", timeout: 30_000 });
+  assert.equal(encoded.status, 0, encoded.stderr);
+  const rawSha256 = hash(readFileSync(raw)), logs = join(root, "logs", projectId), accepted = join(logs, "accepted-tasks"); mkdirSync(accepted, { recursive: true });
+  const taskId = "offline-original-S1"; writeFileSync(join(accepted, "S1.json"), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted", taskId, requestHash: hash("offline accepted original") }));
+  const historyFile = join(logs, "stages.jsonl"), history = Buffer.from(JSON.stringify({ stage: "shot", shotId: "S1", ok: false, degraded: false, artifact: raw, verdict: { approved: false, score: 1, reason: "historical quality rejection" }, evidence: { taskId, requestInputVerified: true, providerSuccess: true, rawSha256 },
+    lineage: { schemaVersion: "workloom.production-lineage/v1", projectId, stage: "shot", shotId: "S1", runId: "offline-historical", sourceHash: hash("old semantic card"), recipeHash: hash("old component"), status: "failed", inputs: [{ path: shots, sha256: submitted.sha256, bytes: bytes.length }], outputs: [{ path: raw, sha256: rawSha256, bytes: statSync(raw).size }], errors: [] } }) + "\n");
+  writeFileSync(historyFile, history);
+  const promptDir = join(root, "prompts", projectId); mkdirSync(promptDir, { recursive: true }); const oldPrompt = join(promptDir, "S1.txt"); writeFileSync(oldPrompt, "IMMUTABLE HISTORICAL PROMPT");
+  const deny = join(root, "deny-network.mjs"); writeFileSync(deny, 'globalThis.fetch = async () => { throw new Error("FORBIDDEN_NETWORK_OR_PAID_CALL"); };\n');
+  const execute = () => spawnSync(process.execPath, ["--import", "tsx", "--import", deny, cli, "--shots", shots, "--work-dir", root, "--out", join(root, "out"), "--keys-file", join(root, "missing.env"), "--route-kind", "narrative", "--platform", "B站", "--stages", "cine-kb,micromotion,spec,plates"],
+    { cwd: repo, encoding: "utf8", timeout: 60_000, env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: ffmpeg, WL_FFPROBE: ffprobe, LLM_API_KEY: "", VOLCENGINE_ARK_API_KEY: "" } });
+  return { root, projectId, raw, rawSha256, source, historyFile, history, oldPrompt, execute };
+}
+test("partial completed S1 preserves old card and prompt while pending material S2 receives the requested local prerender stages", async () => {
+  const f = await partialCompletedFixture();
+  try {
+    const done = f.execute(); assert.equal(done.status, 0, done.stdout + done.stderr); assert.doesNotMatch(done.stdout + done.stderr, /FORBIDDEN_NETWORK_OR_PAID_CALL|平台已受理/);
+    assert.equal(hash(readFileSync(f.raw)), f.rawSha256); assert.equal(readFileSync(f.oldPrompt, "utf8"), "IMMUTABLE HISTORICAL PROMPT"); assert.deepEqual(readFileSync(f.historyFile).subarray(0, f.history.length), f.history);
+    const current = JSON.parse(readFileSync(join(f.root, `shotlist-current-${f.projectId}.json`), "utf8")); assert.deepEqual(current.shots[0], f.source.shots[0]);
+    const rows = readFileSync(f.historyFile, "utf8").slice(f.history.length).trim().split("\n").map(line => JSON.parse(line));
+    assert.equal(rows.filter(row => row.stage === "render-adopted" && row.shotId === "S1").length, 1);
+    assert.equal(rows.some(row => ["cine-kb", "micromotion", "spec", "keyframe"].includes(row.stage) && row.shotId === "S1"), false);
+    for (const stage of ["spec", "keyframe"]) assert.equal(rows.some(row => row.stage === stage && row.shotId === "S2" && row.ok), true, stage);
+    const pack = rows.find(row => row.stage === "prompt-package"); assert.deepEqual(pack.evidence.materialShots, ["S2"]); assert.equal(pack.invoked, false);
+    assert.equal(rows.some(row => row.stage === "prompt-review"), false); assert.equal(existsSync(join(f.root, "logs", f.projectId, "accepted-tasks", "S2.json")), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+}, 90_000);
+test.each([
+  { change: { product: "ABSENT-PENDING-PRODUCT" }, error: /镜头 S2 声明了商品/ },
+  { change: { assetRef: "malformed pending reference" }, error: /授权真人素材引用格式非法（S2）/ },
+  { change: { materialUsage: "static-display" }, error: /素材用途硬约束未通过/ },
+])("pending S2 prerequisite $change still blocks before any network or paid work", async ({ change, error }) => {
+  const f = await partialCompletedFixture(change);
+  try { const done = f.execute(); assert.notEqual(done.status, 0, done.stdout + done.stderr); assert.match(done.stdout + done.stderr, error); assert.doesNotMatch(done.stdout + done.stderr, /FORBIDDEN_NETWORK_OR_PAID_CALL|平台已受理/);
+    assert.equal(hash(readFileSync(f.raw)), f.rawSha256); assert.equal(readFileSync(f.oldPrompt, "utf8"), "IMMUTABLE HISTORICAL PROMPT"); assert.equal(existsSync(join(f.root, "logs", f.projectId, "accepted-tasks", "S2.json")), false);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+}, 90_000);

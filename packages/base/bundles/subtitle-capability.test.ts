@@ -10,6 +10,7 @@
  * 这些都能在磁盘上静态验出来，所以本组测试不触 DB、不依赖 ffmpeg。
  */
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -782,3 +783,34 @@ function readSkillBindings(): Record<string, string[]> {
   }
   return bindings;
 }
+
+
+describe("actual subtitle CLI preserves requested danmaku by default", () => {
+  it("keeps 23-character text and all nine concurrent events; explicit limits still apply and are reported", () => {
+    const dir = mkdtempSync(join(tmpdir(), "subtitle-cli-default-danmaku-"));
+    try {
+      const ffmpeg = process.env.WORKLOOM_SUBTITLE_FFMPEG_PATH || "ffmpeg", ffprobe = process.env.WORKLOOM_SUBTITLE_FFPROBE_PATH || "ffprobe";
+      const source = join(dir, "black-silent.mp4");
+      const encoded = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=black:s=160x288:r=12:d=1", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", source], { encoding: "utf8", timeout: 30_000 });
+      expect(encoded.status, encoded.stderr).toBe(0);
+      const before = createHash("sha256").update(readFileSync(source)).digest("hex");
+      const items = join(dir, "items.json"), text = "abcdefghijklmnopqrstuv";
+      writeFileSync(items, JSON.stringify(Array.from({ length: 9 }, (_, index) => ({ at: 0.1, durationSec: 0.6, text: `${text}${index}` }))));
+      const call = (name: string, extra: string[] = []) => {
+        const evidenceDir = join(dir, name), output = join(dir, `${name}.mp4`);
+        const done = spawnSync(process.execPath, [join(BRIDGE_DIR, "cli.mjs"), "danmaku", "--in", source, "--out", output, "--items", items, "--evidence-dir", evidenceDir, ...extra],
+          { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000, env: { ...process.env, WORKLOOM_SUBTITLE_FFMPEG_PATH: ffmpeg, WORKLOOM_SUBTITLE_FFPROBE_PATH: ffprobe, WORKLOOM_SUBTITLE_ALLOWED_ROOTS: dir } });
+        return { done, output, evidenceDir };
+      };
+      const normal = call("default"); expect(normal.done.status, normal.done.stdout + normal.done.stderr).toBe(0);
+      expect(normal.done.stdout).toContain("条数 9/9"); expect(normal.done.stdout).toContain("保留全部请求弹幕"); expect(normal.done.stdout).not.toMatch(/undefined|NaN/);
+      const normalEvents = parseAssEvents(readFileSync(join(normal.evidenceDir, "danmaku-plan.ass"), "utf8"));
+      expect(normalEvents).toHaveLength(9); expect(normalEvents.every((event: { text: string }) => event.text.includes(text))).toBe(true); expect(existsSync(normal.output)).toBe(true);
+      const bounded = call("explicit-concurrent", ["--max-chars", "30", "--max-concurrent", "8"]);
+      expect(bounded.done.status, bounded.done.stdout + bounded.done.stderr).toBe(0); expect(bounded.done.stdout).toContain("条数 8/9"); expect(bounded.done.stdout).toContain("按请求抽稀 1");
+      expect(parseAssEvents(readFileSync(join(bounded.evidenceDir, "danmaku-plan.ass"), "utf8"))).toHaveLength(8);
+      const tooLong = call("explicit-char", ["--max-chars", "20"]); expect(tooLong.done.status).toBe(3); expect(tooLong.done.stderr).toContain("bad_style"); expect(existsSync(tooLong.output)).toBe(false);
+      expect(createHash("sha256").update(readFileSync(source)).digest("hex")).toBe(before);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 180_000);
+});

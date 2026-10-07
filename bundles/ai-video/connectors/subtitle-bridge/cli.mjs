@@ -215,11 +215,15 @@ async function main() {
         brief: readBrief(flags),
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
         opacity: number(flags.opacity, 0.85),
-        maxChars: number(flags["max-chars"], 20),
-        maxConcurrent: number(flags["max-concurrent"], 8),
+        maxChars: number(flags["max-chars"]),
+        maxConcurrent: number(flags["max-concurrent"]),
       });
       line(`已渲染弹幕：${report.output.path}`);
-      line(`  条数 ${report.density.kept}/${report.density.total}（窗口 ${report.density.windowSec}s 并发峰值 ${report.density.peakConcurrent}/${report.density.maxConcurrent}${report.density.trimmed ? `，抽稀 ${report.density.trimmed}` : ""}）`);
+      const total = report.density.kept + report.density.trimmed;
+      line(`  条数 ${report.density.kept}/${total}${Number.isFinite(report.density.maxConcurrent)
+        ? `（显式窗口 ${report.density.windowSec}s · 并发上限 ${report.density.maxConcurrent}${report.density.trimmed ? ` · 按请求抽稀 ${report.density.trimmed}` : ""}）`
+        : "（保留全部请求弹幕；未设默认字数或并发限制）"}`);
+      line("  品质密度与像素可见性未测，qualityReviewed=false");
       line(`  字体 ${report.font.name} · 字号 ${report.style.fontSize}px · 透明度 ${report.opacity}`);
       line(`  复检：${Object.entries(report.checks).map(([k, v]) => `${k}=${v ? "ok" : "fail"}`).join(" ")}`);
       line(`  sha256 ${report.output.hash}`);

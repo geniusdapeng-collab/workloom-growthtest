@@ -20,6 +20,7 @@ const enumOptions: Record<string, readonly string[]> = {
 const numericOptions: Record<string, [number, number]> = { fps: [1, 120], "max-attempts": [1, 3], xfade: [0, 5], "cut-transition-duration": [0, 5] };
 const stageAliases: Record<string, string> = { keyframe: "plates", shot: "videos" };
 const perShotStages = new Set(["spec", "plates", "material-gen", "videos", "voice"]);
+const preRenderStages = new Set(["cine-kb", "continuity", "micromotion", "spec", "plates", "material-gen", "videos"]);
 
 function normalizeOnly(raw: unknown): string {
   if (typeof raw !== "string" && !Array.isArray(raw)) throw new FilmChannelError("OPTION_INVALID", "only 必须是镜号字符串或字符串数组");
@@ -33,7 +34,8 @@ function normalizeOnly(raw: unknown): string {
 }
 
 /** The parent checks that requested work has evidence; a summary file alone is not a completed job. */
-export function assertFilmStageCoverage(stages: string[], options: Record<string, unknown>, source: Record<string, unknown>, records: unknown): void {
+export function assertFilmStageCoverage(stages: string[], options: Record<string, unknown>, source: Record<string, unknown>, records: unknown,
+  verifiedAdoptedShotIds: readonly string[] = []): void {
   if (!Array.isArray(records)) throw new FilmChannelError("RESULT_INVALID", "工位结果缺阶段记录");
   const normalized = normalizeFilmJobRequest(stages, options).options;
   if (!source || typeof source !== "object" || !Array.isArray(source.shots) || !source.shots.length) throw new FilmChannelError("RESULT_INVALID", "冻结原稿缺非空镜头清单");
@@ -43,12 +45,26 @@ export function assertFilmStageCoverage(stages: string[], options: Record<string
     const shot = raw as Record<string, unknown>;
     if (typeof shot.shotId !== "string" || !shot.shotId.trim() || shot.shotId !== shot.shotId.trim() || /[\x00-\x1f\x7f]/.test(shot.shotId) || all.has(shot.shotId)) throw new FilmChannelError("RESULT_INVALID", "冻结原稿镜号为空、重复或格式非法");
     if (shot.dialogue != null && (!Array.isArray(shot.dialogue) || shot.dialogue.some((entry) => !entry || typeof entry !== "object" || Array.isArray(entry)))) throw new FilmChannelError("RESULT_INVALID", `冻结原稿台词格式非法：${shot.shotId}`);
-    if (shot.assetRef != null && String(shot.assetRef).trim() && (typeof shot.assetRef !== "string" || !/^asset:\/\/[A-Za-z0-9][A-Za-z0-9_-]*$/.test(shot.assetRef.trim()))) throw new FilmChannelError("RESULT_INVALID", `冻结原稿授权素材引用非法：${shot.shotId}`);
     all.set(shot.shotId, shot);
   }
   const only = typeof normalized.only === "string" ? normalized.only.split(",") : [];
   if (only.some((shotId) => !all.has(shotId))) throw new FilmChannelError("RESULT_INVALID", "only 含冻结原稿中不存在的镜号");
+  if (!Array.isArray(verifiedAdoptedShotIds) || verifiedAdoptedShotIds.some(id => typeof id !== "string" || !all.has(id))
+    || new Set(verifiedAdoptedShotIds).size !== verifiedAdoptedShotIds.length) throw new FilmChannelError("RESULT_INVALID", "已采用原片必须来自本次官方任务和字节验证");
+  const verifiedAdopted = new Set(verifiedAdoptedShotIds);
+  const adopted = new Set<string>();
+  for (const raw of records) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw) || (raw as Record<string, unknown>).stage !== "render-adopted") continue;
+    const row = raw as Record<string, unknown>;
+    if (typeof row.shotId !== "string" || !verifiedAdopted.has(row.shotId) || row.ok !== true || row.degraded !== false
+      || row.invoked !== false || row.cached !== true) throw new FilmChannelError("RESULT_INVALID", "已采用原片记录缺本次官方验证，不能用标签跳过生成前工作");
+    adopted.add(row.shotId);
+  }
   const selected = new Map([...all].filter(([shotId]) => !only.length || only.includes(shotId)));
+  if (stages.some(stage => preRenderStages.has(stage))) for (const [shotId, shot] of selected) {
+    if (adopted.has(shotId)) continue;
+    if (shot.assetRef != null && String(shot.assetRef).trim() && (typeof shot.assetRef !== "string" || !/^asset:\/\/[A-Za-z0-9][A-Za-z0-9_-]*$/.test(shot.assetRef.trim()))) throw new FilmChannelError("RESULT_INVALID", `冻结原稿授权素材引用非法：${shotId}`);
+  }
   const material = (shot: Record<string, unknown>): boolean => String(shot.photo ?? "").trim().length > 0;
   const appliesToShot = (stage: string, shot: Record<string, unknown>): boolean =>
     stage === "spec" ? !material(shot)
@@ -68,7 +84,7 @@ export function assertFilmStageCoverage(stages: string[], options: Record<string
       || row.shotId !== null && typeof row.shotId !== "string" || typeof row.ok !== "boolean" || typeof row.degraded !== "boolean" || typeof row.invoked !== "boolean"
       || row.cached !== undefined && typeof row.cached !== "boolean") throw new FilmChannelError("RESULT_INVALID", "阶段记录字段格式非法");
     if (typeof row.shotId === "string" && !all.has(row.shotId)) throw new FilmChannelError("RESULT_INVALID", `阶段记录镜号不在冻结原稿：${row.shotId}`);
-    if (typeof row.shotId === "string" && !selected.has(row.shotId)) throw new FilmChannelError("RESULT_INVALID", `阶段记录越出 only 范围：${row.shotId}`);
+    if (typeof row.shotId === "string" && row.stage !== "render-adopted" && !selected.has(row.shotId)) throw new FilmChannelError("RESULT_INVALID", `阶段记录越出 only 范围：${row.shotId}`);
     const stage = Object.hasOwn(stageAliases, row.stage) ? stageAliases[row.stage]! : row.stage;
     if (stages.includes(stage) || stages.includes("spec") && ["prompt-review", "prompt-package"].includes(stage)) {
       if (perShotStages.has(stage) && row.shotId === null) throw new FilmChannelError("RESULT_INVALID", `逐镜阶段缺镜号：${stage}`);
@@ -85,13 +101,15 @@ export function assertFilmStageCoverage(stages: string[], options: Record<string
   for (const stage of new Set(stages)) {
     if (perShotStages.has(stage)) {
       for (const [shotId, shot] of selected) {
+        if (preRenderStages.has(stage) && adopted.has(shotId)) continue;
         const applicable = appliesToShot(stage, shot);
         const row = latest.get(`${stage}:${shotId}`);
         if (!row && applicable) throw new FilmChannelError("RESULT_INVALID", `工位结果缺请求阶段：${stage}:${shotId}`);
         if (row) requirePassed(stage, row, !applicable);
       }
       if (stage === "spec") {
-        const hasPrompts = [...selected.values()].some((shot) => appliesToShot("spec", shot));
+        const pendingSelected = [...selected].filter(([shotId]) => !adopted.has(shotId));
+        const hasPrompts = pendingSelected.some(([, shot]) => appliesToShot("spec", shot));
         const review = latest.get("prompt-review:");
         const emptyPackage = latest.get("prompt-package:");
         if (hasPrompts && emptyPackage) throw new FilmChannelError("RESULT_INVALID", "非全素材原稿不能声明 prompt-package 不适用");
@@ -101,7 +119,7 @@ export function assertFilmStageCoverage(stages: string[], options: Record<string
       }
     } else {
       const row = latest.get(`${stage}:`);
-      const notApplicable = globalNotApplicable(stage);
+      const notApplicable = globalNotApplicable(stage) || preRenderStages.has(stage) && [...selected.keys()].every(shotId => adopted.has(shotId));
       if (!row && !notApplicable) throw new FilmChannelError("RESULT_INVALID", `工位结果缺请求阶段：${stage}`);
       if (row) requirePassed(stage, row, notApplicable);
     }
@@ -390,10 +408,10 @@ export class FullChainFilmWorker {
     const artifact = this.accept(await this.call("voice.dub", "voice", shotId, { inputRef: this.ref(input), outputRef: this.ref(output), text, profile, policy, lufs: -16 }));
     return { ok: true, out: JSON.stringify(artifact) };
   }
-  finish(records: Array<{ stage: string; shotId: string | null; ok: boolean; artifact: string | null; degraded: boolean; invoked: boolean; cached?: boolean; evidence?: Record<string, unknown> }>, complete: boolean): void {
+  finish(records: Array<{ stage: string; shotId: string | null; ok: boolean; artifact: string | null; degraded: boolean; invoked: boolean; cached?: boolean; evidence?: Record<string, unknown> }>, complete: boolean, verifiedAdoptedShotIds: readonly string[] = []): void {
     const stageRecords = records.map(({ stage, shotId, ok, degraded, invoked, cached, evidence }) => ({ stage, shotId, ok, degraded, invoked, cached: cached === true,
       ...(evidence?.assemblyMode === "post-only" ? { assemblyMode: "post-only" } : {}) }));
-    if (complete) assertFilmStageCoverage(this.context.stages, this.context.options, JSON.parse(readFileSync(this.inputPath, "utf8")), stageRecords);
+    if (complete) assertFilmStageCoverage(this.context.stages, this.context.options, JSON.parse(readFileSync(this.inputPath, "utf8")), stageRecords, verifiedAdoptedShotIds);
     const artifacts = [...new Set([...records.flatMap((row) => row.artifact ? [row.artifact] : []), join(this.context.workDir, "work", "logs", this.context.projectId, "stage-summary.json")])]
       .map((file) => ({ ref: this.ref(file), sha256: digest(file), bytes: statSync(file).size }));
     const result = { schemaVersion: "workloom.film-result/v1", jobId: this.context.jobId, projectId: this.context.projectId,

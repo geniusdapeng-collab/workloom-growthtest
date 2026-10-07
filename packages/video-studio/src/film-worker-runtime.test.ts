@@ -520,6 +520,38 @@ describe("frozen shot coverage and canonical CLI options", () => {
   });
 });
 
+describe("current official adoption scopes prerender work to pending shots", () => {
+  const source = { shots: [{ shotId: "S1", assetRef: "invalid historical reference", dialogue: [{ text: "old native line" }] }, { shotId: "S2" }] };
+  const adopted = { stage: "render-adopted", shotId: "S1", ok: true, degraded: false, invoked: false, cached: true };
+  const passed = (stage: string, shotId: string | null = null) => ({ stage, shotId, ok: true, degraded: false, invoked: true, cached: false });
+  const pending = [passed("spec", "S2"), passed("prompt-review"), passed("keyframe", "S2"), passed("shot", "S2")];
+  it("requires official parent verification rather than trusting a child adoption label", () => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [adopted, ...pending])).toThrow("官方验证");
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [adopted, ...pending], ["S1"])).not.toThrow();
+  });
+  it.each(["spec", "keyframe", "shot"])("still requires the pending S2 %s work", alias => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [adopted, ...pending.filter(row => row.stage !== alias)], ["S1"])).toThrow("S2");
+  });
+  it("keeps pending prompt review, asset authority and post work mandatory", () => {
+    expect(() => assertFilmStageCoverage(["spec"], {}, source, [adopted, passed("spec", "S2")], ["S1"])).toThrow("prompt-review");
+    expect(() => assertFilmStageCoverage(["plates"], {}, { shots: [...source.shots.slice(0, 1), { shotId: "S2", assetRef: "invalid pending reference" }] }, [adopted, passed("keyframe", "S2")], ["S1"])).toThrow("S2");
+    expect(() => assertFilmStageCoverage(["compose"], {}, source, [adopted], ["S1"])).toThrow("compose");
+    expect(() => assertFilmStageCoverage(["voice"], {}, source, [adopted], ["S1"])).toThrow("S1");
+  });
+  it("preserves verified adoption outside only while rejecting work outside the selection", () => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], { only: "S2" }, source, [adopted, ...pending], ["S1"])).not.toThrow();
+    expect(() => assertFilmStageCoverage(["plates"], { only: "S2" }, source, [adopted, passed("keyframe", "S1"), passed("keyframe", "S2")], ["S1"])).toThrow("范围");
+  });
+  it.each([{ ok: false }, { degraded: true }, { invoked: true }, { cached: false }, { cached: undefined }, { shotId: "S2" }])("rejects an invalid adoption record %j", change => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [{ ...adopted, ...change }, ...pending], ["S1"])).toThrow("官方验证");
+  });
+  it("only makes global preparation inapplicable when every selected shot is currently adopted", () => {
+    expect(() => assertFilmStageCoverage(["cine-kb", "continuity", "micromotion"], { only: "S1" }, source, [adopted], ["S1"])).not.toThrow();
+    expect(() => assertFilmStageCoverage(["continuity"], {}, source, [adopted], ["S1"])).toThrow("continuity");
+    for (const ids of [["FOREIGN"], ["S1", "S1"]]) expect(() => assertFilmStageCoverage(["plates"], {}, source, [adopted], ids)).toThrow("本次官方任务");
+  });
+});
+
 
 describe("worker 当前父通道默认后期回执", () => {
   const prepare = (stage: ProducerGateOptions["stage"] = "compose") => {

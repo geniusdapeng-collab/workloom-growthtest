@@ -4,8 +4,44 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { filmWorkerEnvironment, validateFilmChannelScope, handleChannelRequest, type RunContext } from "./film-worker.js";
+import { filmWorkerEnvironment, validateFilmChannelScope, handleChannelRequest, verifyCompletedFilmOriginals, type RunContext } from "./film-worker.js";
 import { FILM_CHANNEL_METHOD_COMPONENT, filmRequestHash, FullChainFilmWorker, POST_RENDER_STAGES, type ProducerGateOptions, type FilmChannelTransport, type FilmWorkerJobContext, type FilmChannelRequestFrame } from "@hyperreality/video-studio";
+import { pathToFileURL } from "node:url";
+
+describe("parent independently revalidates actual completed originals", () => {
+  const roots: string[] = [];
+  afterEach(() => roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })));
+  const prepare = async () => {
+    const root = realpathSync(mkdtempSync(join(tmpdir(), "parent-adopt-original-"))); roots.push(root);
+    const projectId = "PARENT-OFFLINE-ADOPT", bytes = Buffer.from(JSON.stringify({ projectId, shots: [{ shotId: "S1", duration: 4 }, { shotId: "S2", duration: 4 }] }));
+    const moduleFile = join(import.meta.dirname, "../../../../scripts/tools/film-standard-post.mts");
+    const { freezeOriginalSubmission, issueOriginalRenderReceipt } = await import(pathToFileURL(moduleFile).href);
+    const submitted = await freezeOriginalSubmission({ productionRoot: root, projectId, bytes });
+    const file = join(root, "clips", projectId, "S1.mp4"); mkdirSync(join(root, "clips", projectId), { recursive: true });
+    const encoded = spawnSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=black:s=64x64:r=24:d=4",
+      "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", file], { encoding: "utf8", timeout: 30_000 });
+    expect(encoded.status, encoded.stderr).toBe(0);
+    const taskId = "offline-current-task-S1", accepted = join(root, "logs", projectId, "accepted-tasks"); mkdirSync(accepted, { recursive: true });
+    writeFileSync(join(accepted, "S1.json"), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted", taskId, requestHash: createHash("sha256").update("offline original request").digest("hex") }));
+    await issueOriginalRenderReceipt({ productionRoot: root, projectId, shotId: "S1", submittedSha256: submitted.sha256,
+      artifactPath: file, taskId, requestInputVerified: true });
+    return { root, file, projectId, submittedSha256: submitted.sha256, receipt: join(root, "logs", projectId, "original-issued", "S1.json") };
+  };
+  it("returns only currently issued source-byte-bound S1 and leaves pending S2 outside the exemption", async () => {
+    const f = await prepare(), before = readFileSync(f.file);
+    expect(await verifyCompletedFilmOriginals({ productionRoot: f.root, projectId: f.projectId, submittedSha256: f.submittedSha256 })).toEqual(["S1"]);
+    expect(readFileSync(f.file)).toEqual(before);
+  });
+  it.each(["changed-source", "missing-source", "tampered-receipt", "other-project", "other-submission"])("rejects %s despite any child adoption marker", async defect => {
+    const f = await prepare();
+    if (defect === "changed-source") writeFileSync(f.file, Buffer.concat([readFileSync(f.file), Buffer.from("changed")]));
+    if (defect === "missing-source") rmSync(f.file);
+    if (defect === "tampered-receipt") { const value = JSON.parse(readFileSync(f.receipt, "utf8")); value.artifact.sha256 = "a".repeat(64); writeFileSync(f.receipt, JSON.stringify(value)); }
+    await expect(verifyCompletedFilmOriginals({ productionRoot: f.root, projectId: defect === "other-project" ? "OTHER" : f.projectId,
+      submittedSha256: defect === "other-submission" ? "a".repeat(64) : f.submittedSha256 })).rejects.toThrow();
+  });
+});
+
 describe("film worker child environment", () => {
   it("keeps public local tools while dropping every account, database, model and signing credential", () => {
     const env = filmWorkerEnvironment({ PATH: "/local/bin", WL_FFMPEG: "/local/ffmpeg", SEEDANCE_MODEL: "test-model", LLM_API_KEY: "mock-test-only-secret", JWT_SECRET: "mock-test-only-secret", CNB_TOKEN: "mock-test-only-secret", DATABASE_URL: "mock-test-only-secret", CUSTOMER_OAUTH_TOKEN: "mock-test-only-secret", NODE_OPTIONS: "--import arbitrary" });

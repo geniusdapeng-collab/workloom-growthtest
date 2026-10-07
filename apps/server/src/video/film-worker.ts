@@ -17,7 +17,7 @@ import { constants } from "node:fs";
 import { mkdir, mkdtemp, open, readFile, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import {
   FILM_CHANNEL_METHOD_COMPONENT,
@@ -337,6 +337,27 @@ export async function registerFilmWorker(input: {
   });
 }
 
+/** Revalidate adoption with the same official immutable-original implementation used by the CLI.
+ * Run through the fixed tsx loader, like the registered worker, without accepting code or paths from a result file.
+ */
+export async function verifyCompletedFilmOriginals(input: { productionRoot: string; projectId: string; submittedSha256: string }): Promise<string[]> {
+  const moduleUrl = pathToFileURL(path.join(REPO_ROOT, "scripts/tools/film-standard-post.mts")).href;
+  const program = `import { adoptCompletedOriginalRenders } from ${JSON.stringify(moduleUrl)};
+const [productionRoot, projectId, submittedSha256] = process.argv.slice(1);
+const originals = await adoptCompletedOriginalRenders({ productionRoot, projectId, submittedSha256 });
+process.stdout.write(JSON.stringify(originals.map(original => original.shotId)));`;
+  const raw = await new Promise<string>((resolve, reject) => {
+    execFile(process.execPath, ["--import", "tsx", "--input-type=module", "--eval", program,
+      input.productionRoot, input.projectId, input.submittedSha256], { cwd: REPO_ROOT, timeout: 60_000, maxBuffer: 1024 * 1024, env: filmWorkerEnvironment(process.env) }, (error, stdout) => {
+      if (error) { reject(error); return; }
+      resolve(stdout);
+    });
+  });
+  const ids: unknown = JSON.parse(raw);
+  if (!Array.isArray(ids) || ids.some(id => typeof id !== "string") || new Set(ids).size !== ids.length) fail("RESULT_INVALID", "官方原片验证返回了非法镜头清单");
+  return ids as string[];
+}
+
 /* ================= 启动作业 ================= */
 
 export async function startFilmJob(input: StartFilmJobInput): Promise<FilmJobStartReceipt> {
@@ -566,7 +587,12 @@ async function runFilmJob(args: {
           || result.runId !== job.run_id || result.attempt !== Number(job.attempt) || result.inputSha256 !== job.input_sha256
           || result.complete !== true || JSON.stringify(result.stages) !== JSON.stringify(job.stages)
           || !Array.isArray(result.artifacts) || result.artifacts.length === 0) fail("RESULT_INVALID", "工位结果与本次冻结作业不一致");
-        assertFilmStageCoverage(job.stages, record(job.options), args.frozen, result.records);
+        const adoptedRecords = Array.isArray(result.records) ? result.records.filter(raw => raw && typeof raw === "object" && !Array.isArray(raw)
+          && (raw as Record<string, unknown>).stage === "render-adopted") as Array<Record<string, unknown>> : [];
+        const verifiedAdopted = adoptedRecords.length > 0 ? await verifyCompletedFilmOriginals({ productionRoot: path.join(workReal, "work"),
+          projectId: job.project_id, submittedSha256: job.input_sha256 }) : [];
+        // Coverage only exempts recorded adoption that the parent independently bound to current originals.
+        assertFilmStageCoverage(job.stages, record(job.options), args.frozen, result.records, verifiedAdopted);
         for (const raw of result.artifacts) {
           const artifact = record(raw);
           const ref = text(artifact.ref, "结果缺产物引用", 1_000);

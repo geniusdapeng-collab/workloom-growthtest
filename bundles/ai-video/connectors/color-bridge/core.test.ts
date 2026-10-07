@@ -1,7 +1,7 @@
 /**
  * 调色内核单测：纯函数（滤镜链/路径监狱/自动校正）+ 真实 ffmpeg 端到端（有 ffmpeg 才跑）。
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -851,4 +851,29 @@ describe.runIf(hasX264)("P0 防线端到端：肤色 / 场景抽样 / 缺陷 / R
     expect(probe.video.colorTransfer).toBe("bt709");
     expect(probe.video.colorSpace).toBe("bt709");
   }, 180_000);
+});
+
+
+describe.skipIf(!hasX264)("human color CLI renders actual requests with unmeasured quality fields", () => {
+  let dir: string, source: string;
+  beforeAll(() => {
+    dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "color-human-cli-"))); source = path.join(dir, "source.mp4");
+    execFileSync(bins.ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "testsrc2=s=160x120:r=12:d=1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", source]);
+  });
+  afterAll(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+  const call = (args: string[]) => spawnSync(process.execPath, [path.join(import.meta.dirname, "cli.mjs"), ...args], { encoding: "utf8", timeout: 60_000,
+    env: { ...process.env, WORKLOOM_COLOR_FFMPEG_PATH: bins.ffmpeg, WORKLOOM_COLOR_FFPROBE_PATH: bins.ffprobe, WORKLOOM_COLOR_ALLOWED_ROOTS: dir } });
+  it.each(["grade", "best", "match"])("%s default human output succeeds with null residual/metrics and actual artifact", command => {
+    const before = fs.readFileSync(source), output = path.join(dir, `${command}.mp4`), outDir = path.join(dir, "matched");
+    const args = command === "match" ? ["match", "--ref", source, "--in", source, "--out-dir", outDir] : [command, "--in", source, "--out", output, ...(command === "best" ? ["--recipe", "food-appetite"] : ["--profile", "warm-film"])];
+    const done = call(args); expect(done.status, done.stdout + done.stderr).toBe(0);
+    expect(done.stdout).toContain("加工回执"); expect(done.stdout).toMatch(/未测|未进行候选打分/);
+    expect(done.stdout + done.stderr).not.toMatch(/Cannot read|NaN|候选得分|残差 YAVG/);
+    expect(command === "match" ? fs.readdirSync(outDir).some(file => file.endsWith(".mp4")) : fs.existsSync(output)).toBe(true);
+    expect(fs.readFileSync(source)).toEqual(before);
+  }, 90_000);
+  it("help explains explicit denoise, single recipe best and unmeasured residuals", () => {
+    const done = call(["help"]); expect(done.status, done.stderr).toBe(0);
+    expect(done.stdout).toContain("不触发分析"); expect(done.stdout).toContain("需 --out"); expect(done.stdout).toContain("不作输出残差验收");
+  });
 });

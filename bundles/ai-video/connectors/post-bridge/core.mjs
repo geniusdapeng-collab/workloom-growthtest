@@ -346,7 +346,26 @@ export async function normaliseShots({
   const quality = resolveQuality(project);
   const fps = optionalNumber(project.fps, 30);
   if (!Number.isFinite(fps) || fps <= 0 || fps > 240) throw new PostError("请求导出帧率无效", "bad_request");
-  const dir = path.join(workDir, "norm");
+  // Authorize before creating any output, and keep OS aliases above an allowed root
+  // (macOS /var -> /private/var) distinct from forbidden symlinks below that root.
+  const roots = allowedRoots(env);
+  const lexicalWork = path.resolve(text(workDir, "workDir"));
+  const canonicalWork = assertPathAllowed(lexicalWork, roots, "workDir");
+  const root = roots.find(entry => isInside(canonicalWork, entry));
+  let lexicalRoot = lexicalWork;
+  while (realpathDeepest(lexicalRoot) !== root) {
+    const parent = path.dirname(lexicalRoot);
+    if (parent === lexicalRoot) throw new PostError("工作目录别名无法绑定允许根", "path_not_allowed");
+    lexicalRoot = parent;
+  }
+  let component = lexicalRoot;
+  for (const part of path.relative(lexicalRoot, path.join(lexicalWork, "norm")).split(path.sep).filter(Boolean)) {
+    component = path.join(component, part);
+    try {
+      if (fs.lstatSync(component).isSymbolicLink()) throw new PostError("工作目录不允许符号链接", "path_not_allowed");
+    } catch (error) { if (error.code !== "ENOENT") throw error; }
+  }
+  const dir = path.join(canonicalWork, "norm");
   await fsp.mkdir(dir, { recursive: true });
   const out = [];
   const ids = new Set();

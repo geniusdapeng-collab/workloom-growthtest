@@ -1194,11 +1194,27 @@ const policyBrief: Record<string, unknown> | null = BRIEF_FILE && PRERENDER_REQU
 const scenePolicies = loadScenePolicies(join(REPO_ROOT, "bundles/ai-video/library/scene-policies"));
 const scenePolicySelection = selectScenePolicy(shotlist, policyBrief, scenePolicies);
 const scenePolicy = PRERENDER_REQUESTED ? scenePolicySelection.policy : null;
+/** Existing successful originals are outside new-generation policy checks, including partial resume. */
+const pendingSourceShots = shotlist.shots.filter(shot => !completedByShot.has(String(shot.shotId)));
+function auditPendingScenePolicy(currentShots: ShotCard[]): ScenePolicyReport {
+  const pending = currentShots.filter(shot => !completedByShot.has(String(shot.shotId)));
+  const pendingIds = new Set(pending.map(shot => String(shot.shotId)));
+  const report = auditScenePolicy({ ...shotlist, shots: pending,
+    scenePolicy: shotlist.scenePolicy ? { ...shotlist.scenePolicy,
+      exceptions: shotlist.scenePolicy.exceptions?.filter(entry => pendingIds.has(entry.shotId)) } : undefined }, scenePolicy!);
+  // Whole-plan creative ratios and cues cannot reopen already adopted provider-success originals.
+  // Individual pending-shot facts and restrictions still fail before a new submission.
+  if (completedByShot.size > 0) {
+    report.defects = report.defects.filter(defect => defect.shotId !== null);
+    report.passed = report.defects.length === 0;
+  }
+  return report;
+}
 if (scenePolicy && (ACCEPT_REJECTED.length > 0 || flag("--accept-env-defects"))) {
   throw new Error(`${scenePolicy.id} 片型的品质底线不得用 --accept-rejected / --accept-env-defects 绕过；请修复或登记客户特殊场景例外`);
 }
 const SCENE_POLICY_REPORT_FILE = join(WORK_DIR, `scene-policy-report-${PROJECT}.json`);
-let scenePolicyReport: ScenePolicyReport | null = scenePolicy ? auditScenePolicy(shotlist, scenePolicy) : null;
+let scenePolicyReport: ScenePolicyReport | null = scenePolicy ? auditPendingScenePolicy(pendingSourceShots) : null;
 if (scenePolicyReport) scenePolicyReport.policy.selection = scenePolicySelection.reason;
 const writeScenePolicyReport = (): void => {
   writeFileSync(SCENE_POLICY_REPORT_FILE, `${JSON.stringify(scenePolicyReport ?? {
@@ -1278,9 +1294,10 @@ if (!Array.isArray(shotsSelected) || shotsSelected.length === 0) throw new Error
  * 纪律：圣经只升级**环境**，不改表演/台词/时长/构图（`expandShotWithBible` 的字段白名单）。
  */
 const baseShots: ShotCard[] = sceneBible
-  ? shotsSelected.map((shot) => expandShotWithBible(shot as ShotCard & Record<string, unknown>, sceneBible))
+  ? shotsSelected.map((shot) => completedByShot.has(shot.shotId) ? shot : expandShotWithBible(shot as ShotCard & Record<string, unknown>, sceneBible))
   : shotsSelected;
-const shots: ShotCard[] = scenePolicy ? baseShots.map((shot) => applyScenePolicy(shot, scenePolicy)) : baseShots;
+const shots: ShotCard[] = scenePolicy ? baseShots.map((shot) => completedByShot.has(shot.shotId) ? shot : applyScenePolicy(shot, scenePolicy)) : baseShots;
+const pendingShots = (): ShotCard[] => PRERENDER_REQUESTED ? shots.filter(shot => !completedByShot.has(shot.shotId)) : [];
 /** 原生口播不可由旁白覆盖；在任何付费工位之前检查整片，不受 --only 缩窄。 */
 const UNIFIED_NARRATION = flag("--narration-unified");
 if (PRERENDER_REQUESTED) assertFilmAudioPreflight({ shots: shotlist.shots.filter(shot => !completedByShot.has(shot.shotId)) as unknown as Parameters<typeof assertFilmAudioPreflight>[0]["shots"],
@@ -1533,14 +1550,14 @@ const isAssetShot = (shot: ShotCard): boolean => isAssetRefLocal(assetRefOf(shot
 /** 送审基准图只投本地文件：asset:// 是平台引用、不是文件路径（真机 ENOENT 事故） */
 const localReviewRefsEarly = (list: string[]): string[] => list.filter((ref) => !isAssetRefLocal(ref) && existsSync(ref));
 const generatedShots = (): ShotCard[] => shots.filter((shot) => !completedByShot.has(shot.shotId) && !isMaterialShot(shot) && !isAssetShot(shot));
-const materialShots = (): ShotCard[] => shots.filter((shot) => isMaterialShot(shot));
+const materialShots = (): ShotCard[] => pendingShots().filter(isMaterialShot);
 /** 商品镜：素材镜里由 G-PROD1 绑定真实商品档案的镜头（参考图锁的是**产品外观**，不要求复刻参考构图） */
 const isProductMaterialShot = (shot: ShotCard): boolean => Boolean((shot as Record<string, unknown>).productRef);
 /** 需要提示词文生关键帧/台词的人镜两类：生成镜 + 授权真人素材镜（素材镜另有动效提示词） */
 const promptShots = (): ShotCard[] => shots.filter((shot) => !completedByShot.has(shot.shotId) && !isMaterialShot(shot));
 const assetShots = (): ShotCard[] => shots.filter((shot) => !completedByShot.has(shot.shotId) && isAssetShot(shot) && !isMaterialShot(shot));
 /** 开跑前 fail-fast：`assetRef` 存在但格式不合法（例如漏了 `asset://` 前缀）要当场停，不能静默降级成生成镜 */
-for (const shot of shots) {
+for (const shot of pendingShots()) {
   const raw = (shot as Record<string, unknown>).assetRef;
   if (raw !== undefined && String(raw).trim().length > 0 && !isAssetRefLocal(raw)) {
     throw new Error(`授权真人素材引用格式非法（${shot.shotId}）：${String(raw).slice(0, 80)}（应为 asset://<asset ID>）`);
@@ -1756,7 +1773,7 @@ if (brokenArchives.length > 0) {
   log(`⚠ 商品档案库有 ${brokenArchives.length} 份档案存在硬问题（本片未引用则不拦截）：`
     + brokenArchives.map((entry) => `${entry.archive.id}[${entry.issues.filter((issue) => issue.hard).map((issue) => issue.code).join(",")}]`).join("、"));
 }
-if (declaredCompany || declaredBrand) {
+if (pendingShots().length > 0 && (declaredCompany || declaredBrand)) {
   const ownerSelector = declaredCompany || declaredBrand;
   const ownerMatch = selectProductArchive(productLibrary.archives, ownerSelector);
   if (!ownerMatch.archive) {
@@ -1765,12 +1782,12 @@ if (declaredCompany || declaredBrand) {
   }
 }
 const productBindings: Array<{ shotId: string; selector: string; archiveId: string; sourceKind: string; priority: number; matchedBy: string; photoFile: string; photoSha256: string; bound: boolean }> = [];
-for (const selector of declaredProducts) {
+for (const selector of pendingShots().length > 0 ? declaredProducts : []) {
   if (!selectProductArchive(productLibrary.archives, selector).archive) {
     throw new Error(`shotlist.products 声明的商品「${selector}」没有可用档案：${productBindingGuide}`);
   }
 }
-for (const shot of shots) {
+for (const shot of pendingShots()) {
   const selector = productSelectorOf(shot);
   if (!selector) continue;
   const match = selectProductArchive(productLibrary.archives, selector);
@@ -1999,7 +2016,7 @@ function characterReleaseReport(_phase: "canary" | "release", _characterId?: str
  *   · 两条记录都没有时照常做资产闸但标 degraded（不冒充已验收），需先执行 `accept`。
  * 与 §⑤ 的 `keyframe`/`shot` 门不同，G5 管的是**角色资产**，不是本片画面。
  */
-if (!DRY_RUN) {
+if (!DRY_RUN && generatedShots().length > 0 && PRERENDER_REQUESTED) {
   const requiredAngles = ["front", "threeQuarter", "closeup", "side"];
   const published = lead ? requiredAngles.map((angle) => ({ angle, path: lead.files[angle] ?? "" })) : [];
   /**
@@ -2568,6 +2585,7 @@ if (STAGES.has("cine-kb")) {
     mkdirSync(traceDir, { recursive: true });
     const perShot: EnhancementConsumption[] = [];
     for (const [index, shot] of shots.entries()) {
+      if (completedByShot.has(shot.shotId)) continue;
       /**
        * 提示词语言口径（2026-09-24 真机）：分镜卡【语言约束】写明"全部字段必须使用中文"，
        * 因此默认只注入中文短语（英文关键词仍在 trace 里）；
@@ -2592,7 +2610,7 @@ if (STAGES.has("cine-kb")) {
       });
     }
     const projectStatus = enhancementStatus(perShot.map((entry) => entry.status));
-    const ok = perShot.length === shots.length && perShot.every((entry) => entry.verified);
+    const ok = perShot.length === pendingShots().length && perShot.every((entry) => entry.verified);
     const enrichedFile = join(WORK_DIR, `shotlist-enriched-${PROJECT}.json`);
     writeFileSync(enrichedFile, `${JSON.stringify({ projectId: PROJECT, shots, status: projectStatus, cineKbApplied: perShot.some((entry) => entry.status === "passed"), perShot }, null, 2)}\n`, "utf8");
     // The latest project row cannot let a successful last shot mask an earlier failed/unverified shot.
@@ -2616,8 +2634,8 @@ if (STAGES.has("cine-kb")) {
  */
 if (STAGES.has("continuity")) {
   const started = Date.now();
-  const report = auditContinuity(shots as unknown as Array<Record<string, unknown>>, {
-    targetSeconds: ONLY.length > 0 ? null : totalSeconds,
+  const report = auditContinuity(pendingShots() as unknown as Array<Record<string, unknown>>, {
+    targetSeconds: ONLY.length > 0 || completedByShot.size > 0 ? null : totalSeconds,
     projectId: PROJECT
   });
   const checks: GateCheck[] = report.checks.map((c) => ({ id: c.id, pass: c.pass, detail: c.detail, hard: c.hard }));
@@ -2672,7 +2690,7 @@ if (STAGES.has("micromotion")) {
   const traces: MicromotionTrace[] = [];
   const perShot: EnhancementConsumption[] = [];
   for (const [index, shot] of shots.entries()) {
-    if (isMaterialShot(shot)) continue;
+    if (completedByShot.has(shot.shotId) || isMaterialShot(shot)) continue;
     const { card, trace } = applyMicromotion(shot as unknown as Record<string, unknown>);
     // Even a reused/N/A result may restore prior owned text. Always consume the returned card.
     shots[index] = card as ShotCard;
@@ -2727,9 +2745,9 @@ if (STAGES.has("micromotion")) {
 
 /** 摄影知识库和微动作可能重写镜头卡；在真正生成前复核当前完整片型方案。 */
 if (scenePolicy) {
-  for (let index = 0; index < shots.length; index += 1) shots[index] = applyScenePolicy(shots[index]!, scenePolicy);
+  for (let index = 0; index < shots.length; index += 1) if (!completedByShot.has(shots[index]!.shotId)) shots[index] = applyScenePolicy(shots[index]!, scenePolicy);
   const current = new Map(shots.map((shot) => [shot.shotId, shot]));
-  scenePolicyReport = auditScenePolicy({ ...shotlist, shots: shotlist.shots.map((shot) => current.get(shot.shotId) ?? shot) }, scenePolicy);
+  scenePolicyReport = auditPendingScenePolicy(shotlist.shots.map((shot) => current.get(shot.shotId) ?? shot));
   scenePolicyReport.policy.selection = scenePolicySelection.reason;
   writeScenePolicyReport();
   /**
@@ -2769,7 +2787,7 @@ if (STAGES.has("spec")) {
     const raw = (shotlist as unknown as { character?: { appearanceInShots?: unknown } }).character?.appearanceInShots;
     return new Set<string>(Array.isArray(raw) ? raw.map(String) : []);
   })();
-  for (const shot of shots) {
+  for (const shot of pendingShots()) {
     /** 素材镜不参与文生提示词融合（它的提示词是"图生视频"的动效提示词，由 material-gen 组装） */
     if (isMaterialShot(shot)) {
       record({
@@ -3006,8 +3024,8 @@ if (STAGES.has("spec")) {
   /**
    * 总时长核对：`--only` 局部重跑时只核对被选中的镜头合计（否则局部重跑永远过不了这一闸）。
    */
-  const selectedSeconds = shots.reduce((s, x) => s + Number(x.duration ?? 0), 0);
-  const expectedSeconds = ONLY.length > 0 ? selectedSeconds : totalSeconds;
+  const selectedSeconds = pendingShots().reduce((s, x) => s + Number(x.duration ?? 0), 0);
+  const expectedSeconds = ONLY.length > 0 || completedByShot.size > 0 ? selectedSeconds : totalSeconds;
   checks.push({
     id: "duration-total", pass: Math.abs(selectedSeconds - expectedSeconds) < 0.001, hard: true,
     detail: `镜头时长合计 ${selectedSeconds}s（目标 ${expectedSeconds}s${ONLY.length > 0 ? `，局部重跑 ${ONLY.join(",")}` : ""}）`
@@ -3019,25 +3037,25 @@ if (STAGES.has("spec")) {
    * 把空载体送给监制必然判"无正文"打回；而素材镜的把关门是 **G-MAT1**。
    * 因此这里显式跳过 G6 并留痕（via=skip），既不静默放行，也不让监制去判不适用的载体。
    */
-  if (materialShots().length === shots.length) {
-    log(`ℹ️ 全片 ${shots.length} 镜均为素材镜：文生提示词门（G6）不适用，按 skip 留痕（素材镜由 G-MAT1 把关）`);
+  if (materialShots().length === pendingShots().length) {
+    log(`ℹ️ 待生成 ${pendingShots().length} 镜均为素材镜：文生提示词门（G6）不适用，按 skip 留痕（已采用原片不重开；素材镜由 G-MAT1 把关）`);
     record({
       stage: "prompt-package", shotId: null, invoked: false, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
       artifact: join(PROMPT_DIR, "spec-report.json"),
-      evidence: { materialShots: shots.map((s) => s.shotId), skipReason: "全片素材镜（真实素材只作生成输入）" },
-      verdict: null, note: "全素材项目：无文生镜 → G6 不适用（素材镜提示词由 material-gen 生成并由 G-MAT1 把关）"
+      evidence: { materialShots: materialShots().map((s) => s.shotId), skipReason: "待生成镜均为素材镜（已采用原片不重新准备）" },
+      verdict: null, note: "待生成范围无文生镜 → G6 不适用（素材镜提示词由 material-gen 生成并由 G-MAT1 把关）"
     });
     recordGate({
       stepKey: "g6-prompt-confirm",
       sourceStage: "prompt-package",
-      checks: [{ id: "no-generated-shots", pass: true, hard: true, detail: `${shots.length} 镜全部为素材镜（usage=generation-reference）` }],
-      shotIds: shots.map((s) => s.shotId),
+      checks: [{ id: "no-generated-shots", pass: true, hard: true, detail: `待生成 ${materialShots().length} 镜均为素材镜（usage=generation-reference）` }],
+      shotIds: materialShots().map((s) => s.shotId),
       softApproved: true,
       via: "skip",
       score: null,
       degraded: false,
-      reason: "全素材项目：无文生镜，提示词门不适用",
-      evidence: { materialShots: shots.length }
+      reason: "待生成范围无文生镜，提示词门不适用",
+      evidence: { materialShots: materialShots().length }
     });
   } else {
   const promptReviewOptions: Omit<ProducerGateOptions, "contracts"> = {
@@ -3168,10 +3186,11 @@ if (STAGES.has("plates")) {
    */
   const plateAnchorMode = arg("--plate-anchor-mode", "none");
   const portraitRefs = lead ? ["closeup", "front", "threeQuarter", "side"].map((a) => lead.files[a]).filter(Boolean) as string[] : [];
-  const venueRefs = shots.length > 0 && Array.isArray((shots[0] as Record<string, unknown>).venueRefs)
-    ? ((shots[0] as Record<string, unknown>).venueRefs as string[]).map(abs).filter(existsSync)
+  const pendingPlateShots = pendingShots();
+  const venueRefs = pendingPlateShots.length > 0 && Array.isArray((pendingPlateShots[0] as Record<string, unknown>).venueRefs)
+    ? ((pendingPlateShots[0] as Record<string, unknown>).venueRefs as string[]).map(abs).filter(existsSync)
     : [];
-  for (const shot of shots) {
+  for (const shot of pendingPlateShots) {
     const plate = join(PLATE_DIR, `${shot.shotId}-plate.png`);
     /** 素材镜没有文生关键帧（首帧就是真实素材本身），但仍要有"素材准备件"与提示词 */
     if (isMaterialShot(shot)) {
@@ -5245,4 +5264,4 @@ if (!DRY_RUN) {
       + "——降级项已留痕在阶段日志与交付清单（assemblyMode=post-only），后期链与交付物均已产出。");
   }
 }
-if (WORKER_RUNTIME) WORKER_RUNTIME.finish(records, !process.exitCode);
+if (WORKER_RUNTIME) WORKER_RUNTIME.finish(records, !process.exitCode, completedOriginals.map(original => original.shotId));
