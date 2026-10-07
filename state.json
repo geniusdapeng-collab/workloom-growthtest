@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1562,
+  "revision": 1564,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "aligning",
+      "status": "waiting_ci",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2070,7 +2070,7 @@
       "updatedAt": 1791383517776,
       "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous",
       "blockedUntil": 0,
-      "headSha": "0854ce12453a575b26386f135af3ef093aa71124",
+      "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
       "branch": "task/T-2026-1007-0001",
       "intent": {
@@ -2523,21 +2523,17 @@
         "tools/codex-gateway/test/mcp.test.mjs",
         "tools/codex-gateway/test/video-guide.test.mjs"
       ],
-      "ciSince": 1791336644957,
+      "ciSince": 1791383517776,
       "candidate": null,
       "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "alignmentIntent": {
-        "headSha": "0854ce12453a575b26386f135af3ef093aa71124",
-        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
-        "at": 1791383517776
-      },
+      "alignmentIntent": null,
       "alignment": {
-        "sha": "9fed988f818389acd4f434a14835351f2700b2c8",
-        "previousHead": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
-        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "verifiedAt": "2026-10-07T01:31:02.632Z"
+        "sha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+        "previousHead": "0854ce12453a575b26386f135af3ef093aa71124",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+        "verifiedAt": "2026-10-07T14:33:03.180Z"
       },
       "repairRequired": {
         "provider": "codex",
@@ -45188,6 +45184,38 @@
       },
       "previous": "265e589ce96ad1ef92883660f7ce70570db35f9dc8ea5ad131fe1050515aa793",
       "digest": "d6ac5caec7e77e48dfeaa17b33478c953e9d267889f831f1ba641e39e69824b3"
+    },
+    {
+      "sequence": 1563,
+      "at": "2026-10-07T14:31:57.776Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "waiting_ci",
+          "alignment": {
+            "sha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "previousHead": "0854ce12453a575b26386f135af3ef093aa71124",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "verifiedAt": "2026-10-07T14:33:03.180Z"
+          },
+          "alignmentIntent": null,
+          "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+          "ciSince": 1791383517776
+        }
+      },
+      "previous": "d6ac5caec7e77e48dfeaa17b33478c953e9d267889f831f1ba641e39e69824b3",
+      "digest": "028fdcab5152706136b7df06cd167c6cd9a08041b29457d649586fac8bdd3315"
+    },
+    {
+      "sequence": 1564,
+      "at": "2026-10-07T14:33:03.247Z",
+      "kind": "transaction",
+      "data": {
+        "id": "b59f4544-7e6c-4cca-912d-eb4865e068ef"
+      },
+      "previous": "028fdcab5152706136b7df06cd167c6cd9a08041b29457d649586fac8bdd3315",
+      "digest": "37e640d6929725a06a11e92ea8e7dee7101e4809c441448717a99d7e6a8d3eee"
     }
   ]
 }
