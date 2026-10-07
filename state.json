@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 891,
+  "revision": 893,
   "tasks": {
     "98": {
       "number": 98,
@@ -6075,7 +6075,7 @@
       "owner": "codex:01a10973-40fa:postrender:growthtest",
       "generation": 25,
       "acquiredAt": 1791360100684,
-      "expiresAt": 1791363579519
+      "expiresAt": 1791363890161
     }
   },
   "releases": {},
@@ -28631,6 +28631,32 @@
       },
       "previous": "d3eae6106e7d6ba8ec65e0c8a0a2e6397632fc0e721278d0ed7591ee6b684ef8",
       "digest": "b1324d19040d55fdb1386c6b575a2b63d896b2fb36dcff5afd193281281a893e"
+    },
+    {
+      "sequence": 892,
+      "at": "2026-10-07T08:49:50.161Z",
+      "kind": "lease_renew",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "codex:01a10973-40fa:postrender:growthtest",
+        "generation": {
+          "protocol": 25
+        }
+      },
+      "previous": "b1324d19040d55fdb1386c6b575a2b63d896b2fb36dcff5afd193281281a893e",
+      "digest": "21323301de4ad1beb38f3533e2af9b35aa1b4477cd46a0771374554d1a87412a"
+    },
+    {
+      "sequence": 893,
+      "at": "2026-10-07T08:49:47.057Z",
+      "kind": "transaction",
+      "data": {
+        "id": "0d13f948-3465-4287-bd65-672a8f4bbeb4"
+      },
+      "previous": "21323301de4ad1beb38f3533e2af9b35aa1b4477cd46a0771374554d1a87412a",
+      "digest": "4ce4baeac2a569e2b0f8a6e8e13c4a4567c62fc2bf66c1d75216d0fb942011fe"
     }
   ]
 }
