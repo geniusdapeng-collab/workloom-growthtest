@@ -61,6 +61,19 @@ function expectSourceFailure(run: () => unknown, code: string, privateValues: st
   expect(message).toContain(code);
   for (const value of privateValues) expect(message).not.toContain(value);
 }
+function portraitFixture() {
+  const f = fixture(), characterDir = join(f.characterRoot, "a-model");
+  const characterFile = join(characterDir, "profile.json"), portraitFile = join(characterDir, "portraits/v1/测试甲-front.png");
+  const set = { version: 1, dir: "portraits/v1", angles: ["front"], active: true,
+    files: { front: "portraits/v1/测试甲-front.png" } };
+  const profile = { ...f.profiles[0], kind: "authorized-real", authorization: {
+    status: "real-authorized", evidence: "asset://asset-primary",
+  }, portraitSets: [set] };
+  writeJson(characterFile, profile); mkdirSync(dirname(portraitFile), { recursive: true }); writeFileSync(portraitFile, png);
+  const { anchorPhoto: _unused, ...noAnchor } = f.registered;
+  writeJson(f.profileFile, noAnchor);
+  return { ...f, characterDir, characterFile, portraitFile, profile, set };
+}
 
 beforeEach(() => { vi.stubGlobal("fetch", vi.fn(() => { throw new Error("测试禁止外部网络或供应商请求"); })); });
 afterEach(() => {
@@ -258,15 +271,21 @@ describe("登记文件与认证基准路径失败关闭", () => {
     }), "CHARACTER_SOURCE_ANCHOR_MISSING", [f.dir]);
   });
 
-  it("当前真实CEO主档缺anchorPhoto，角色目录的来源图不能代填登记", () => {
+  it("当前真实CEO直接复用已入库定妆照，不要求重新下载或登记真人原图", () => {
     const repoRoot = resolve(import.meta.dirname, "../../..");
-    const result = () => buildRegisteredCharacterReleaseSource({
+    const result = buildRegisteredCharacterReleaseSource({
       projectId: "VID-CURRENT-CEO", shots: [{ shotId: "GT-03", assetRef: "asset://asset-20260101000000-demo" }],
       character: { id: "demo-character" },
       assetLibraryRoot: join(repoRoot, "bundles/ai-video/library/real-person-assets"),
       characterLibraryRoots: [join(repoRoot, "bundles/ai-video/library/characters")],
     });
-    expectSourceFailure(result, "CHARACTER_SOURCE_ANCHOR_MISSING");
+    const portrait = join(repoRoot, "bundles/ai-video/library/characters/model-03-demo-character/portraits/v1/客户方CEO-front.jpg");
+    expect(result.contract.status).toBe("passed");
+    expect(result.bindings[0]?.identityAnchor).toMatchObject({ path: realpathSync(portrait), sha256: hashFile(portrait),
+      assetId: "asset-20260101000000-demo" });
+    expect(result.bindings[0]?.identityAnchor?.source).toContain("registered-character-portrait:");
+    expect(result.bindings[0]?.identityAnchor?.source).toContain("#v1/front");
+    expect(JSON.stringify(result)).not.toContain("sources/客户方CEO-anchor.jpg");
   });
 
   it("登记anchor文件缺失不能返回可发布合同", () => {
@@ -332,6 +351,102 @@ describe("登记文件与认证基准路径失败关闭", () => {
   it.each(["asset-without-scheme", "asset://../private", "file:///child/generated.jpg"])("%s不是官方asset引用不能降级为不适用", assetRef => {
     const f = fixture();
     expectSourceFailure(() => buildRegisteredCharacterReleaseSource({ ...f.input, shots: [{ shotId: "S1", assetRef }] }), "CHARACTER_SOURCE_SHOT_INVALID");
+  });
+});
+
+describe("前置处理完成的登记定妆照复用", () => {
+  it("在用定妆照优先于可选真人原图，来源如实保留角色版本与实际字节", () => {
+    const f = portraitFixture(); writeJson(f.profileFile, f.registered);
+    const result = buildRegisteredCharacterReleaseSource(f.input);
+    expect(result.contract.status).toBe("passed");
+    expect(result.bindings[0]?.identityAnchor).toEqual({ path: realpathSync(f.portraitFile), sha256: hashFile(f.portraitFile),
+      assetId: "asset-primary", source: `registered-character-portrait:${realpathSync(f.characterFile)}#v1/front` });
+    expect(result.contract.shots[0]?.referenceAssets).toEqual(["asset://asset-primary", "asset://asset-close", "asset://asset-side"]);
+  });
+
+  it("父子独立解析同一在用定妆照得到相同发布合同，不接受child自报的首镜基准", () => {
+    const f = portraitFixture(); f.input.character = { id: "model-a", identityAnchor: { path: "/child/current-clip.jpg" } };
+    const first = buildRegisteredCharacterReleaseSource(f.input), second = buildRegisteredCharacterReleaseSource(structuredClone(f.input));
+    expect(first.contract.contractHash).toBe(second.contract.contractHash);
+    expect(first.bindings[0]?.identityAnchor?.path).toBe(realpathSync(f.portraitFile));
+    expect(JSON.stringify(first)).not.toContain("/child/");
+    writeFileSync(f.portraitFile, Buffer.concat([png, Buffer.from("changed-portrait-bytes")]));
+    expect(buildRegisteredCharacterReleaseSource(f.input).contract.contractHash).not.toBe(first.contract.contractHash);
+  });
+
+  it("角度asset只是已有身份的来源登记，生成参考仍以主授权素材组为准", () => {
+    const f = portraitFixture();
+    writeJson(f.characterFile, { ...f.profile, authorization: { status: "real-authorized", evidence: "已处理的角色素材" },
+      portraitSets: [{ ...f.set, assets: { front: "asset://asset-primary", side: "asset://asset-stale-angle" } }] });
+    const result = buildRegisteredCharacterReleaseSource(f.input);
+    expect(result.contract.status).toBe("passed");
+    expect(result.bindings[0]?.identityAnchor?.path).toBe(realpathSync(f.portraitFile));
+    expect(result.contract.shots[0]?.referenceAssets).not.toContain("asset://asset-stale-angle");
+  });
+
+  it("不同人物的定妆照不能借给另一主asset或不在库的角色", () => {
+    const f = portraitFixture();
+    writeJson(f.characterFile, { ...f.profile, authorization: { status: "real-authorized", evidence: "asset://asset-other-person" } });
+    expectSourceFailure(() => buildRegisteredCharacterReleaseSource(f.input), "CHARACTER_SOURCE_ANCHOR_MISSING");
+    writeJson(f.characterFile, f.profile);
+    expectSourceFailure(() => buildRegisteredCharacterReleaseSource({ ...f.input,
+      shots: [{ shotId: "S1", assetRef: "asset://asset-primary", characterId: "missing-role" }] }), "CHARACTER_SOURCE_ANCHOR_MISSING");
+  });
+
+  it.each(["inactive", "pending", "revoked", "generated"] as const)("%s定妆照不是当前授权角色的在用参考", kind => {
+    const f = portraitFixture();
+    const profile = kind === "inactive" ? { ...f.profile, portraitSets: [{ ...f.set, active: false }] }
+      : kind === "generated" ? { ...f.profile, kind: "generated" }
+      : { ...f.profile, authorization: { ...f.profile.authorization, status: kind } };
+    writeJson(f.characterFile, profile);
+    expectSourceFailure(() => buildRegisteredCharacterReleaseSource(f.input), "CHARACTER_SOURCE_ANCHOR_MISSING");
+  });
+
+  it.each(["pending", "revoked", "expired"] as const)("定妆照可复用仍不会豁免%s主素材授权", kind => {
+    const f = portraitFixture();
+    writeJson(f.profileFile, { ...f.registered, anchorPhoto: undefined, authorization: { ...f.registered.authorization,
+      ...(kind === "expired" ? { expiresAt: "2000-01-01T00:00:00Z" } : { status: kind }) } });
+    expect(buildRegisteredCharacterReleaseSource(f.input).contract.status).toBe("failed");
+  });
+
+  it("切换在用版本立即采用新版本；无files字段的历史档案按登记角度精确解析", () => {
+    const f = portraitFixture(), next = join(f.characterDir, "portraits/v2/测试甲-front.png");
+    mkdirSync(dirname(next), { recursive: true }); writeFileSync(next, Buffer.concat([png, Buffer.from("version-two")]));
+    const { files: _unused, ...legacy } = f.set;
+    writeJson(f.characterFile, { ...f.profile, portraitSets: [f.set, { ...legacy, version: 2, dir: "portraits/v2" }] });
+    expect(buildRegisteredCharacterReleaseSource(f.input).bindings[0]?.identityAnchor).toMatchObject({ path: realpathSync(next), sha256: hashFile(next) });
+  });
+
+  it.each(["absolute", "traversal", "file-url", "other-version"] as const)("%s定妆照路径不能越过登记角色和版本边界", kind => {
+    const f = portraitFixture(), outside = join(f.dir, "private-outside.png"); writeFileSync(outside, png);
+    const path = kind === "absolute" ? outside : kind === "traversal" ? "../../private-outside.png"
+      : kind === "file-url" ? "file://" + outside : "portraits/v2/front.png";
+    writeJson(f.characterFile, { ...f.profile, portraitSets: [{ ...f.set, files: { front: path } }] });
+    expectSourceFailure(() => buildRegisteredCharacterReleaseSource(f.input), "CHARACTER_SOURCE_PATH_INVALID", [f.dir]);
+  });
+
+  it.each(["file", "parent"] as const)("%s符号链接不能把外部图片包装成已处理定妆照", kind => {
+    const f = portraitFixture(), outside = join(f.dir, "outside-private"); mkdirSync(outside); writeFileSync(join(outside, "测试甲-front.png"), png);
+    if (kind === "file") { rmSync(f.portraitFile); symlinkSync(join(outside, "测试甲-front.png"), f.portraitFile); }
+    else { rmSync(dirname(f.portraitFile), { recursive: true }); symlinkSync(outside, dirname(f.portraitFile), "dir"); }
+    expectSourceFailure(() => buildRegisteredCharacterReleaseSource(f.input), "CHARACTER_SOURCE_PATH_INVALID", [f.dir]);
+  });
+
+  it.each(["missing", "empty", "directory", "oversize"] as const)("%s登记定妆照保留明确失败，不用另一张图静默顶替", kind => {
+    const f = portraitFixture();
+    if (kind === "missing") rmSync(f.portraitFile);
+    if (kind === "empty") writeFileSync(f.portraitFile, "");
+    if (kind === "directory") { rmSync(f.portraitFile); mkdirSync(f.portraitFile); }
+    if (kind === "oversize") truncateSync(f.portraitFile, 100_000_001);
+    expectSourceFailure(() => buildRegisteredCharacterReleaseSource(f.input),
+      kind === "missing" ? "CHARACTER_SOURCE_ANCHOR_MISSING" : "CHARACTER_SOURCE_ANCHOR_INVALID", [f.dir]);
+  });
+
+  it("重复在用版本拒绝歧义，空定妆照集保留外部客户原基准路径", () => {
+    const f = portraitFixture(); writeJson(f.characterFile, { ...f.profile, portraitSets: [f.set, f.set] });
+    expectSourceFailure(() => buildRegisteredCharacterReleaseSource(f.input), "CHARACTER_SOURCE_PROFILE_INVALID");
+    writeJson(f.characterFile, { ...f.profile, portraitSets: [] }); writeJson(f.profileFile, f.registered);
+    expect(buildRegisteredCharacterReleaseSource(f.input).bindings[0]?.identityAnchor?.path).toBe(realpathSync(join(f.primaryDir, "anchor.png")));
   });
 });
 
