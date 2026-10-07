@@ -41,6 +41,25 @@ test('acceptance is persisted before first poll and automatic continuation sends
   assert.deepEqual(methods, ['POST', 'GET', 'GET']);
 });
 
+test('read-only continuation preserves the first accepted journal bytes and timestamp', async (t) => {
+  const { options } = fixture(t), methods = [];
+  let time = 1000;
+  const fetchImpl = async (_url, init) => {
+    methods.push(init.method ?? 'GET');
+    return response(init.method === 'POST' ? { id: 'cgt-existing' } : result());
+  };
+  await runFilmRenderTask({ ...options, now: () => time, fetchImpl });
+  const original = readFileSync(options.journalFile);
+  time = 90_000;
+  const resumed = await runFilmRenderTask({ ...options, now: () => time, fetchImpl });
+  assert.equal(resumed.requestInputVerified, true);
+  assert.deepEqual(readFileSync(options.journalFile), original);
+  assert.deepEqual(methods, ['POST', 'GET', 'GET']);
+  time = 180_000;
+  await runFilmRenderTask({ ...options, now: () => time, resumeTaskId: 'cgt-existing', body: {}, fetchImpl });
+  assert.deepEqual(readFileSync(options.journalFile), original);
+});
+
 test('a denied beforeSubmit gate causes zero I/O and creates no unknown-outcome journal', async (t) => {
   const { options } = fixture(t); let calls = 0;
   await assert.rejects(runFilmRenderTask({ ...options,

@@ -95,6 +95,30 @@ async function sealOriginal(root: string, receipt: OriginalReceipt, serialized: 
     projectId: receipt.projectId, shotId: receipt.shotId, submittedSha256: receipt.submittedSha256,
     receiptSha256: digest(serialized), artifact: receipt.artifact, taskId: receipt.taskId }, null, 2)}\n`);
 }
+/** Only acceptance facts are immutable; old adapters rewrote updatedAt on GET. */
+function localAcceptedFacts(value: Record<string, unknown>) {
+  keys(value, ["schemaVersion", "state", "requestHash", "submissionSource", "taskId", "updatedAt"], "local accepted journal");
+  ensure(value.schemaVersion === "workloom.render-task/v1" && value.state === "accepted" && hash(value.requestHash)
+    && text(value.taskId, 256) && (value.submissionSource === undefined || value.submissionSource === "local-submit" || value.submissionSource === "provider-recovery")
+    && (value.updatedAt === undefined || typeof value.updatedAt === "string" && Number.isFinite(Date.parse(value.updatedAt))), "invalid local accepted facts");
+  return { schemaVersion: value.schemaVersion, state: value.state, requestHash: value.requestHash,
+    ...(value.submissionSource === undefined ? {} : { submissionSource: value.submissionSource }), taskId: value.taskId };
+}
+async function validateLocalAcceptedReceipt(root: string, receipt: OriginalReceipt) {
+  const e = receipt.evidence, expected = join(root, "logs", receipt.projectId, "accepted-tasks", `${receipt.shotId}.json`);
+  ensure(e.requestInputVerified === true && e.taskId === receipt.taskId && e.acceptedFile === expected
+    && hash(e.acceptedSha256) && hash(e.requestHash), "local accepted render proof missing");
+  const accepted = await readJson(expected), facts = localAcceptedFacts(accepted.value);
+  ensure(facts.taskId === receipt.taskId && facts.requestHash === e.requestHash, "local accepted render journal changed");
+  if (e.acceptedFactsSha256 !== undefined) {
+    ensure(hash(e.acceptedFactsSha256) && digest(JSON.stringify(facts)) === e.acceptedFactsSha256, "local accepted facts changed");
+  } else if (digest(accepted.bytes) !== e.acceptedSha256) {
+    // Compatibility for an already sealed local receipt: keep its original byte
+    // fingerprint, task, request and witness; only a valid local GET time may drift.
+    ensure(facts.submissionSource === "local-submit" && typeof accepted.value.updatedAt === "string",
+      "local accepted render journal changed");
+  }
+}
 /** Called before any generation from the exact submitted byte document. Never reconstructed from mutable cards. */
 export async function freezeOriginalSubmission(input: { productionRoot: string; projectId: string; bytes: Buffer }) {
   ensure(localPath(input.productionRoot) && id(input.projectId) && Buffer.isBuffer(input.bytes), "invalid submission freeze");
@@ -126,12 +150,27 @@ export async function issueOriginalRenderReceipt(input: { productionRoot: string
     const accepted = await readJson(acceptedFile);
     ensure(accepted.value.schemaVersion === "workloom.render-task/v1" && accepted.value.state === "accepted"
       && accepted.value.taskId === input.taskId && hash(accepted.value.requestHash), "current accepted render journal missing or different");
-    evidence = { requestInputVerified: true, taskId: input.taskId, acceptedFile, acceptedSha256: digest(accepted.bytes), requestHash: accepted.value.requestHash };
+    evidence = { requestInputVerified: true, taskId: input.taskId, acceptedFile, acceptedSha256: digest(accepted.bytes), requestHash: accepted.value.requestHash,
+      acceptedFactsSha256: digest(JSON.stringify(localAcceptedFacts(accepted.value))) };
   }
   const value: OriginalReceipt = { schemaVersion: "workloom.original-render/v1", projectId: input.projectId, shotId: input.shotId,
     submittedSha256: input.submittedSha256, artifact, taskId: input.taskId,
     kind: input.submissionReceipt === undefined ? "current-local-render-receipt" : "current-runtime-receipt", evidence };
   const serialized = `${JSON.stringify(value, null, 2)}\n`;
+  const issuedFile = receiptPath(input.productionRoot, input.projectId, input.shotId);
+  let exists = false;
+  try { await lstat(issuedFile); exists = true; } catch (error) { if (!missing(error)) throw error; }
+  if (exists) {
+    const original = await readJson(issuedFile), first = original.value as unknown as OriginalReceipt;
+    keys(original.value, ["schemaVersion", "projectId", "shotId", "submittedSha256", "artifact", "taskId", "kind", "evidence"], "issued receipt");
+    ensure(first.schemaVersion === value.schemaVersion && first.projectId === value.projectId && first.shotId === value.shotId
+      && first.submittedSha256 === value.submittedSha256 && first.taskId === value.taskId && first.kind === value.kind
+      && JSON.stringify(first.artifact) === JSON.stringify(value.artifact), "first issued original differs from current accepted render");
+    if (first.kind === "current-local-render-receipt") await validateLocalAcceptedReceipt(input.productionRoot, first);
+    else ensure(JSON.stringify(first.evidence) === JSON.stringify(value.evidence), "first parent accepted download differs");
+    await sealOriginal(input.productionRoot, first, original.bytes.toString("utf8"));
+    return first;
+  }
   await writeFrozen(receiptPath(input.productionRoot, input.projectId, input.shotId), serialized);
   await sealOriginal(input.productionRoot, value, serialized); return value;
 }
@@ -236,12 +275,7 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
     } else {
       ensure(receipt.kind === "current-local-render-receipt" && receipt.evidence.requestInputVerified === true && receipt.evidence.taskId === receipt.taskId,
         "original issuance missing");
-      const expectedJournal = join(manifest.productionRoot, "logs", manifest.projectId, "accepted-tasks", `${row.shotId}.json`);
-      ensure(receipt.evidence.acceptedFile === expectedJournal && hash(receipt.evidence.acceptedSha256) && hash(receipt.evidence.requestHash), "local accepted render proof missing");
-      const accepted = await readJson(expectedJournal);
-      ensure(digest(accepted.bytes) === receipt.evidence.acceptedSha256 && accepted.value.schemaVersion === "workloom.render-task/v1"
-        && accepted.value.state === "accepted" && accepted.value.taskId === receipt.taskId && accepted.value.requestHash === receipt.evidence.requestHash,
-        "local accepted render journal changed");
+      await validateLocalAcceptedReceipt(manifest.productionRoot, receipt);
     }
     const media = await probe(row.path, { ffprobe: options.ffprobe ?? "ffprobe" }, options.timeoutMs ?? 600_000), video = media.streams.filter(s => s.codec_type === "video"), audio = media.streams.filter(s => s.codec_type === "audio");
     ensure(video.length === 1 && audio.length === 1 && !video[0]!.side_data_list?.some(s => s.rotation), "one original video and native audio stream required");

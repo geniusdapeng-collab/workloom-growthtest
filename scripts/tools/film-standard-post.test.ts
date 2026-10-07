@@ -26,7 +26,8 @@ async function fixture(prefix = "standard-original-fixture-") {
   for (const shotId of ["S1", "S2"]) {
     const file = join(clips, `${shotId}.mp4`); media(file);
     const accepted = join(root, "logs", projectId, "accepted-tasks"); mkdirSync(accepted, { recursive: true });
-    writeFileSync(join(accepted, `${shotId}.json`), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted", taskId: `mock-${shotId}-accepted`, requestHash: hash(`mock-request-${shotId}`) }));
+    writeFileSync(join(accepted, `${shotId}.json`), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted", taskId: `mock-${shotId}-accepted`, requestHash: hash(`mock-request-${shotId}`),
+      submissionSource: "local-submit", updatedAt: "2026-10-07T01:00:00.000Z" }));
     await issueOriginalRenderReceipt({ productionRoot: root, projectId, shotId, submittedSha256: submitted.sha256,
       artifactPath: file, taskId: `mock-${shotId}-accepted`, requestInputVerified: true });
   }
@@ -174,6 +175,40 @@ test("frozen submission is idempotent but refuses changed project or mutable res
   await freezeOriginalSubmission({ productionRoot: f.root, projectId: f.projectId, bytes: f.bytes });
   await assert.rejects(freezeOriginalSubmission({ productionRoot: f.root, projectId: f.projectId, bytes: Buffer.concat([f.bytes, Buffer.from(" ")]) }), /frozen source differs/);
   await assert.rejects(freezeOriginalSubmission({ productionRoot: f.root, projectId: "OTHER", bytes: f.bytes }), /project/);
+}));
+for (const legacy of [false, true]) test(`${legacy ? "legacy v1" : "current"} GET timestamp change reuses the exact first original receipt and seal without rewriting evidence`, async () => using(async f => {
+  const journal = join(f.root, "logs", f.projectId, "accepted-tasks", "S1.json"), current = JSON.parse(readFileSync(journal, "utf8"));
+  const sealFile = f.receipt.replace(/\.json$/, ".seal.json");
+  if (legacy) {
+    // Reproduce a pre-fix issuance in an explicitly synthetic fixture only.
+    const old = JSON.parse(readFileSync(f.receipt, "utf8")); delete old.evidence.acceptedFactsSha256;
+    writeFileSync(f.receipt, JSON.stringify(old, null, 2) + "\n");
+    const witness = JSON.parse(readFileSync(sealFile, "utf8")); witness.receiptSha256 = hash(readFileSync(f.receipt));
+    writeFileSync(sealFile, JSON.stringify(witness, null, 2) + "\n");
+    const list = JSON.parse(readFileSync(f.manifestFile, "utf8")); list.originals[0].receiptSha256 = witness.receiptSha256;
+    writeFileSync(f.manifestFile, JSON.stringify(list, null, 2) + "\n");
+  }
+  const receipt = readFileSync(f.receipt), seal = readFileSync(sealFile), manifest = readFileSync(f.manifestFile);
+  writeFileSync(journal, JSON.stringify({ ...current, updatedAt: "2026-10-07T04:00:00.000Z" }));
+  const resumed = await issueOriginalRenderReceipt({ productionRoot: f.root, projectId: f.projectId, shotId: "S1", submittedSha256: f.submitted.sha256,
+    artifactPath: join(f.clips, "S1.mp4"), taskId: "mock-S1-accepted", requestInputVerified: true });
+  assert.deepEqual(resumed, JSON.parse(receipt.toString()));
+  assert.deepEqual(readFileSync(f.receipt), receipt); assert.deepEqual(readFileSync(sealFile), seal);
+  const loaded = await loadOriginalRenderManifest(f.manifestFile, options);
+  assert.equal(loaded.totalFrames, 48); assert.deepEqual(readFileSync(f.manifestFile), manifest);
+}));
+test("a changed accepted task, request, state, source or extra fact cannot reuse a first issuance", async () => using(async f => {
+  const journal = join(f.root, "logs", f.projectId, "accepted-tasks", "S1.json"), original = JSON.parse(readFileSync(journal, "utf8"));
+  const receipt = readFileSync(f.receipt);
+  for (const changed of [{ taskId: "mock-other" }, { requestHash: hash("other-request") }, { state: "submission-unknown" },
+    { submissionSource: "provider-recovery" }, { unexpectedAuthority: true }, { updatedAt: "not-a-timestamp" }]) {
+    writeFileSync(journal, JSON.stringify({ ...original, updatedAt: "2026-10-07T04:00:00.000Z", ...changed }));
+    await assert.rejects(issueOriginalRenderReceipt({ productionRoot: f.root, projectId: f.projectId, shotId: "S1", submittedSha256: f.submitted.sha256,
+      artifactPath: join(f.clips, "S1.mp4"), taskId: "mock-S1-accepted", requestInputVerified: true }), /STANDARD_POST_INVALID/);
+    await assert.rejects(loadOriginalRenderManifest(f.manifestFile, options), /STANDARD_POST_INVALID/);
+    assert.deepEqual(readFileSync(f.receipt), receipt);
+  }
+  writeFileSync(journal, JSON.stringify(original)); await loadOriginalRenderManifest(f.manifestFile, options);
 }));
 test("missing actual accepted input proof refuses original issuance", async () => using(async f => {
   await assert.rejects(issueOriginalRenderReceipt({ productionRoot: f.root, projectId: f.projectId, shotId: "S1", submittedSha256: f.submitted.sha256,
