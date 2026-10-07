@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2954,
+  "revision": 2956,
   "tasks": {
     "98": {
       "number": 98,
@@ -5899,7 +5899,7 @@
     },
     "139": {
       "number": 139,
-      "status": "waiting_ci",
+      "status": "aligning",
       "firstSeen": 1791358510932,
       "attempts": {},
       "error": "Prerequisite #137 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/137 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
@@ -6264,7 +6264,7 @@
       "dependencies": [
         137
       ],
-      "alignmentCount": 0,
+      "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
@@ -6275,7 +6275,12 @@
         "packages/video-studio/src/cover-composition-entrypoint.test.ts",
         "scripts/tools/full-chain-film.mts"
       ],
-      "ciSince": 1791404201768
+      "ciSince": 1791404201768,
+      "alignmentIntent": {
+        "headSha": "89a0da71da71f3679118265ad975f5fc0f56255a",
+        "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+        "at": 1791404201768
+      }
     },
     "140": {
       "number": 140,
@@ -76489,6 +76494,36 @@
       },
       "previous": "e9c9721f5acd13aeb67e5c73de9405057053e727aebec57c75aa5565ce4c1160",
       "digest": "5e7bc188a076d58dc1f6f6866bbfec7c4ded6df4fee0fb6b8698d1992f407573"
+    },
+    {
+      "sequence": 2955,
+      "at": "2026-10-07T20:16:41.768Z",
+      "kind": "task",
+      "data": {
+        "number": 139,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "89a0da71da71f3679118265ad975f5fc0f56255a",
+            "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+            "at": 1791404201768
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "5e7bc188a076d58dc1f6f6866bbfec7c4ded6df4fee0fb6b8698d1992f407573",
+      "digest": "d576e8f29f727ae7513853eae2bbace8168654b32723deccd6c1a87b5a165c17"
+    },
+    {
+      "sequence": 2956,
+      "at": "2026-10-07T20:17:44.042Z",
+      "kind": "transaction",
+      "data": {
+        "id": "3f858115-5d94-4525-af3f-81ef9a9b274c"
+      },
+      "previous": "d576e8f29f727ae7513853eae2bbace8168654b32723deccd6c1a87b5a165c17",
+      "digest": "9d5af16382b6fb148fe9ee6bc1c81ec51d51f2cbb749f2fed16f63b6fd37fa5a"
     }
   ]
 }
