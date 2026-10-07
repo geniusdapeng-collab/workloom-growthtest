@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1122,
+  "revision": 1124,
   "tasks": {
     "98": {
       "number": 98,
@@ -2397,7 +2397,7 @@
     },
     "123": {
       "number": 123,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2688,14 +2688,14 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous",
-      "blockedUntil": 1791367816988,
+      "error": "候选 #140 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+      "blockedUntil": 1791370510174,
       "repairRequired": {
         "provider": "codex",
-        "headSha": "b8e2a2e2dbd3079f12fe2fb595821298be31613e",
+        "headSha": "8de51583352811b6752fc8efe0d9fa58313f5658",
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "reason": "检查/评审阻断：Required check static-gate missing/failed/ambiguous",
-        "at": 1791367216988
+        "reason": "候选 #140 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+        "at": 1791369910174
       },
       "recoveryIntent": null,
       "recoveryCount": 0,
@@ -33057,6 +33057,39 @@
       },
       "previous": "cd26a64cbda404593a930d7c1e9124c1c2dc3a335fb60780d916861afe697a5b",
       "digest": "fbcca9b95760f43a08fbacbb8bb95a4cd7fe8f8d47bae690567f8c69a27a90b1"
+    },
+    {
+      "sequence": 1123,
+      "at": "2026-10-07T10:45:10.174Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "候选 #140 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "8de51583352811b6752fc8efe0d9fa58313f5658",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "reason": "候选 #140 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+            "at": 1791369910174
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791370510174
+        }
+      },
+      "previous": "fbcca9b95760f43a08fbacbb8bb95a4cd7fe8f8d47bae690567f8c69a27a90b1",
+      "digest": "dfa7c0c486600bd2adce6195215a78a93d00313d10528138132fd70c65b65046"
+    },
+    {
+      "sequence": 1124,
+      "at": "2026-10-07T10:45:38.669Z",
+      "kind": "transaction",
+      "data": {
+        "id": "8af40c20-ba00-4d37-ad00-2bc1f95f8597"
+      },
+      "previous": "dfa7c0c486600bd2adce6195215a78a93d00313d10528138132fd70c65b65046",
+      "digest": "5b1afc477c10d712cd1705ff573662fb2e18e6e76b5f4c512d8c80c1e8e8e845"
     }
   ]
 }
