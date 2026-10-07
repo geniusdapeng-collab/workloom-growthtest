@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1569,
+  "revision": 1571,
   "tasks": {
     "98": {
       "number": 98,
@@ -2598,9 +2598,9 @@
           "protocol": 38
         }
       },
-      "updatedAt": 1791383414151,
+      "updatedAt": 1791383517776,
       "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-      "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+      "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
       "branch": "task/T-2026-1007-0003",
       "intent": {
         "taskId": "T-2026-1007-0003",
@@ -2770,7 +2770,7 @@
         "at": 1791338419356
       },
       "error": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
-      "blockedUntil": 1791384014151,
+      "blockedUntil": 0,
       "repairRequired": {
         "provider": "codex",
         "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
@@ -2781,14 +2781,7 @@
       "recoveryIntent": null,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "candidate": {
-        "number": 144,
-        "branch": "delivery/candidate/pr-123-80fa09d5957a7456078c706f65fc3ec4",
-        "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-        "marker": "delivery-origin:123:3f84c5f6d576cf2afdf24da2f4b25940b25167c9:80c1331ad4ed8225a676c331917debb04ab0e4f5",
-        "at": 1791376924503
-      },
+      "candidate": null,
       "mergePhase": null,
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
@@ -45303,6 +45296,61 @@
       },
       "previous": "0de3fa99c88b71d548937411dc6e8d64567a7920ca790c48ab4d8df0abc6f606",
       "digest": "3b7073270e4b291a9fbc3709b39a10799034270346e70bc9f1ec0e4cb6fd203b"
+    },
+    {
+      "sequence": 1570,
+      "at": "2026-10-07T14:31:57.776Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "alignmentCount": 0,
+          "recoveryCount": 0,
+          "reviewFailures": null,
+          "blockedUntil": 0,
+          "developerReview": null,
+          "candidate": null,
+          "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+          "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+          "branch": "task/T-2026-1007-0003",
+          "intent": {
+            "taskId": "T-2026-1007-0003",
+            "ready": true,
+            "dependsOn": [
+              118
+            ],
+            "releases": []
+          },
+          "originalBody": "请求10秒、24fps时，供应商原片可能包含241个完整视频帧和AAC编码边界。旧链路要求240帧且按名义时间构建后期，会误拒原片或让后期时间轴与实际帧数不一致。\n\n现在只接纳请求帧数或多一个终点帧；流时长必须等于实际frames/fps，原声元数据偏差最多两个AAC帧。冻结原稿不变，派生镜头、字幕切点与母版采用完整原片时钟。正常与标准后期共用native-clock拼接：视频帧直接拷贝，解码原声必须覆盖画面时钟，拒绝裁剪、变速、补帧、缺音和短音轨。\n\n测试覆盖真实FFmpeg三镜315帧的逐帧字节摘要、音画偏移及源字节不变，包含短音轨/变速/来源篡改等反例。VM发布入口夹具绑定真实冻结原稿和同一个实际时钟函数，保留48个旧用例并增加3个入口边界反例；临时父目录含S2不会再改变夹具声纹身份。\n\n验证（固定源96299952d9dbab6bfdb03b4fd3b48ecb848f718c）：Node后期集成22/22；视频及发布回归1630通过、1跳过；完整test:scripts、video-studio类型检查、内置资产、能力生成和差异检查退出0。未放宽CI或真人服装验收。依赖PR118，原生队列合入后发布源码。Closes #122。\n\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/standard-post-contract.test.ts",
+            "packages/video-studio/src/standard-post-contract.ts",
+            "scripts/tools/compose-film.mts",
+            "scripts/tools/compose-native-clock.test.ts",
+            "scripts/tools/film-native-post.test.ts",
+            "scripts/tools/film-release-entrypoints.test.ts",
+            "scripts/tools/film-standard-post.mts",
+            "scripts/tools/film-standard-post.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "parked",
+          "ciSince": 1791339010301
+        }
+      },
+      "previous": "3b7073270e4b291a9fbc3709b39a10799034270346e70bc9f1ec0e4cb6fd203b",
+      "digest": "3859cfa90155503c05e592c7d04df045546d094ecfb487c4281f9ab7976a4c41"
+    },
+    {
+      "sequence": 1571,
+      "at": "2026-10-07T14:33:17.670Z",
+      "kind": "transaction",
+      "data": {
+        "id": "be039261-ea11-44f4-ac62-8b35469792ed"
+      },
+      "previous": "3859cfa90155503c05e592c7d04df045546d094ecfb487c4281f9ab7976a4c41",
+      "digest": "d05aa4ea505df9b1cd3a434de6326487e14154a335ad0e24f03d0366d33b3341"
     }
   ]
 }
