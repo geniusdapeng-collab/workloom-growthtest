@@ -110,7 +110,7 @@ describe("定妆照生成 Agent：执行", () => {
     const root = mkdtempSync(join(tmpdir(), "wl-pagent-fail-"));
     mkdirSync(join(root, "presenter"), { recursive: true });
     writeFileSync(join(root, "presenter", "profile.json"), JSON.stringify(profile(), null, 2));
-    const failing = (async () => new Response("参数被拒", { status: 400 })) as unknown as typeof fetch;
+    const failing = (async () => new Response(JSON.stringify({ error: { code: "InvalidParameter", message: "参数被拒" } }), { status: 400 })) as unknown as typeof fetch;
     await expect(runPortraitAgent({
       libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m", fetchImpl: failing,
       config: { backgroundProber: passingProber }
@@ -172,7 +172,7 @@ describe("定妆照生成 Agent：执行", () => {
     expect(repeated.version).toBe(2); expect(repeated.reused).toEqual(["front"]); expect(calls).toHaveLength(1);
   });
 
-  it("背景硬闸：不干净就用加固措辞重跑，重跑干净才登记", async () => {
+  it("显式背景诊断：不干净就记录失败，绝不自动重渲染", async () => {
     const root = mkdtempSync(join(tmpdir(), "wl-pagent-bg-"));
     const charDir = join(root, "presenter");
     mkdirSync(charDir, { recursive: true });
@@ -192,18 +192,14 @@ describe("定妆照生成 Agent：执行", () => {
       const ok = call > 1; // 第一张背景不干净，第二张干净
       return { ok, policy: CLEAN_BACKGROUND_POLICY.id, mode: "ring", bands: [], cornerSpread: ok ? 8 : 60, maxRange: ok ? 12 : 80, maxSat: 3, notes: ok ? [] : ["四角亮度极差 60.0 > 22（有暗角或方向性渐变）"] };
     };
-    const result = await runPortraitAgent({
+    await expect(runPortraitAgent({
       libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m",
-      fetchImpl: fake, config: { angles: ["front"], backgroundProber: prober }
-    });
-    expect(result.files.front).toBeTruthy();
-    expect(result.failures).toEqual([]);
-    expect(prompts).toHaveLength(2);
-    expect(prompts[1]).toContain("背景硬约束·重跑");
-    expect(result.backgroundChecks.front!.ok).toBe(true);
+      fetchImpl: fake, config: { angles: ["front"], requireCleanBackground: true, backgroundProber: prober }
+    })).rejects.toThrow("background_not_clean");
+    expect(prompts).toHaveLength(1); expect(call).toBe(1);
   });
 
-  it("背景硬闸：重跑仍不干净则该角度失败（不静默入库）", async () => {
+  it("显式背景诊断：脏角度失败并保留原产物，其他角度不重渲染", async () => {
     const root = mkdtempSync(join(tmpdir(), "wl-pagent-bg2-"));
     const charDir = join(root, "presenter");
     mkdirSync(charDir, { recursive: true });
@@ -215,7 +211,7 @@ describe("定妆照生成 Agent：执行", () => {
       : passingProber();
     const result = await runPortraitAgent({
       libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m",
-      fetchImpl: fakeArk(calls), config: { angles: ["front", "closeup"], backgroundProber: perAngle }
+      fetchImpl: fakeArk(calls), config: { angles: ["front", "closeup"], requireCleanBackground: true, backgroundProber: perAngle }
     });
     expect(result.files.closeup).toBeFalsy();
     expect(result.files.front).toBeTruthy();
@@ -258,6 +254,18 @@ describe("定妆照生成 Agent：执行", () => {
     const calls: Array<Record<string, unknown>> = [];
     return { root, dir, calls, options: { libraryRoot: root, characterId: "presenter", apiKey: "k", model: "m", fetchImpl: fakeArk(calls), config: { backgroundProber: passingProber } } };
   }
+  it("防重复：默认采用背景，不自动诊断或重渲染", async () => {
+    const fixture = archive(); let probes = 0;
+    const result = await runPortraitAgent({ ...fixture.options, config: { angles: ["front"], backgroundProber: () => { probes += 1; return { ...passingProber(), ok: probes > 1 }; } } });
+    expect(result.files.front).toBeTruthy(); expect(probes).toBe(0); expect(fixture.calls).toHaveLength(1);
+  });
+  it("防重复：已受理图片下载失败后，只读恢复同一角度响应", async () => {
+    const fixture = archive(); let unavailable = true;
+    const fetchImpl = (async (url, init) => String(url).includes("/images/generations") ? fixture.options.fetchImpl(url, init) : unavailable ? new Response("unavailable", { status: 503 }) : fixture.options.fetchImpl(url, init)) as typeof fetch;
+    await expect(runPortraitAgent({ ...fixture.options, fetchImpl })).rejects.toThrow(/下载/);
+    unavailable = false; const result = await runPortraitAgent({ ...fixture.options, fetchImpl });
+    expect(result.portraitSet.status).toBe("ready"); expect(fixture.calls).toHaveLength(4);
+  });
   it("同完整请求复用当前4角度；换服装产生独立候选，只有显式激活后默认绑定才切换", async () => {
     const fixture = archive(); const first = await runPortraitAgent(fixture.options);
     const repeat = await runPortraitAgent(fixture.options); expect(repeat.version).toBe(1); expect(repeat.reused).toHaveLength(4); expect(fixture.calls).toHaveLength(4);
@@ -300,7 +308,7 @@ describe("定妆照生成 Agent：执行", () => {
   });
   it("半套新服装保持旧active，后续补齐同一候选才激活", async () => {
     const fixture = archive(); await runPortraitAgent(fixture.options);
-    const failedSide = (async (url, init) => String(url).includes("/images/generations") && String(init?.body).includes("90 度正侧面") ? new Response("参数被拒", { status: 400 }) : fixture.options.fetchImpl(url, init)) as typeof fetch;
+    const failedSide = (async (url, init) => String(url).includes("/images/generations") && String(init?.body).includes("90 度正侧面") ? new Response(JSON.stringify({ error: { code: "InvalidParameter", message: "参数被拒" } }), { status: 400 }) : fixture.options.fetchImpl(url, init)) as typeof fetch;
     const config = { ...fixture.options.config, wardrobe: { name: "红色外套" } };
     const partial = await runPortraitAgent({ ...fixture.options, fetchImpl: failedSide, config });
     expect(partial.version).toBe(2); expect(partial.portraitSet.status).toBe("candidate"); expect(partial.portraitSet.active).toBe(false); expect(loadCharacterEntry(fixture.dir)!.activeSet?.version).toBe(1);
@@ -349,7 +357,7 @@ describe("定妆照生成 Agent：执行", () => {
   it("下载HTTP错误、NaN背景、路径逃逸和symlink输出均不产生就绪集", async () => {
     const download = archive(); const invalidDownload = (async (url, init) => String(url).includes("/images/generations") ? download.options.fetchImpl(url, init) : new Response("failed", { status: 403 })) as typeof fetch;
     await expect(runPortraitAgent({ ...download.options, fetchImpl: invalidDownload })).rejects.toThrow("下载 HTTP 403"); expect(loadCharacterEntry(download.dir)!.activeSet).toBeNull();
-    const nan = archive(); await expect(runPortraitAgent({ ...nan.options, config: { backgroundProber: () => ({ ...passingProber(), maxRange: Number.NaN }) } })).rejects.toThrow("background_not_clean"); expect(loadCharacterEntry(nan.dir)!.activeSet).toBeNull();
+    const nan = archive(); await expect(runPortraitAgent({ ...nan.options, config: { requireCleanBackground: true, backgroundProber: () => ({ ...passingProber(), maxRange: Number.NaN }) } })).rejects.toThrow("background_not_clean"); expect(loadCharacterEntry(nan.dir)!.activeSet).toBeNull();
     const unsafe = archive(); await expect(runPortraitAgent({ ...unsafe.options, characterId: "../escape" })).rejects.toThrow("CHARACTER_PATH_INVALID");
     const outside = mkdtempSync(join(tmpdir(), "wl-outside-")); symlinkSync(outside, join(unsafe.dir, "portraits"));
     await expect(runPortraitAgent(unsafe.options)).rejects.toThrow("PORTRAIT_PATH_INVALID"); expect(unsafe.calls).toHaveLength(0);
