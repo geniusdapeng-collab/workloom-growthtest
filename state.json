@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 508,
+  "revision": 510,
   "tasks": {
     "98": {
       "number": 98,
@@ -2413,7 +2413,7 @@
           "protocol": 16
         }
       },
-      "updatedAt": 1791347109853,
+      "updatedAt": 1791347414455,
       "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2677,7 +2677,7 @@
         "at": 1791338419356
       },
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791347709853,
+      "blockedUntil": 1791348014455,
       "repairRequired": {
         "provider": "codex",
         "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
@@ -16085,6 +16085,31 @@
       },
       "previous": "66545c7f2188f797c14393b37135a7651253da7d8dbbfb8d2f175ec433633fa6",
       "digest": "ae5ba292606e4f406bec2b97179d8cb67cdd742e7e867e939ded90b92df724d6"
+    },
+    {
+      "sequence": 509,
+      "at": "2026-10-07T04:30:14.455Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791348014455
+        }
+      },
+      "previous": "ae5ba292606e4f406bec2b97179d8cb67cdd742e7e867e939ded90b92df724d6",
+      "digest": "4078e417502ceb1ba67597acb44d16e9a9792825661922a058c1fa5184db59d8"
+    },
+    {
+      "sequence": 510,
+      "at": "2026-10-07T04:30:25.732Z",
+      "kind": "transaction",
+      "data": {
+        "id": "1db8c7c7-2df3-476f-a26b-9081b7d5d40e"
+      },
+      "previous": "4078e417502ceb1ba67597acb44d16e9a9792825661922a058c1fa5184db59d8",
+      "digest": "cc6e35b936cdac63d08c4b6a22276b65768e8cc14fbecb7e43c0404e7166d3b8"
     }
   ]
 }
