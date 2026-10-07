@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 315,
+  "revision": 320,
   "tasks": {
     "98": {
       "number": 98,
@@ -2387,7 +2387,7 @@
       "attempts": {},
       "admission": {
         "number": 123,
-        "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+        "headSha": "1fa0cf8f8eaca78166ca6daa0b02141845ccb37a",
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "filesHash": "a4a98301e80f612ae69cee3accaf12f043e47f565b8ba48488c1210b27b00709",
         "scopes": [
@@ -2395,10 +2395,10 @@
         ],
         "owner": "admission/pr-123",
         "generation": {
-          "protocol": 12
+          "protocol": 13
         }
       },
-      "updatedAt": 1791338419356,
+      "updatedAt": 1791338587252,
       "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2550,9 +2550,9 @@
   "leases": {
     "protocol": {
       "owner": null,
-      "generation": 12,
-      "acquiredAt": 1791338153788,
-      "expiresAt": 1791338153788
+      "generation": 13,
+      "acquiredAt": 1791338587252,
+      "expiresAt": 1791338587252
     }
   },
   "releases": {},
@@ -11082,6 +11082,93 @@
       },
       "previous": "00458b2aeaea7e3341c88402d0aaa91e883ad1edf6e7cd7399fb5c4ca1ea899a",
       "digest": "cd9dc8ce03b1009790d908c0f78392133bf3b758cbb6aff87c0464eb691de0d4"
+    },
+    {
+      "sequence": 316,
+      "at": "2026-10-07T02:03:07.252Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-123",
+        "generation": {
+          "protocol": 13
+        }
+      },
+      "previous": "cd9dc8ce03b1009790d908c0f78392133bf3b758cbb6aff87c0464eb691de0d4",
+      "digest": "441cf52f504e209265b3514a4d4b7dd5aba148d3dfeac4f553914da1f2d18253"
+    },
+    {
+      "sequence": 317,
+      "at": "2026-10-07T02:03:07.252Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-123",
+        "generation": {
+          "protocol": 13
+        }
+      },
+      "previous": "441cf52f504e209265b3514a4d4b7dd5aba148d3dfeac4f553914da1f2d18253",
+      "digest": "5739a9a71f8a76578b6b7213bb16297334259fc4fa719c2231281c5a5ff55439"
+    },
+    {
+      "sequence": 318,
+      "at": "2026-10-07T02:03:07.252Z",
+      "kind": "source_admitted",
+      "data": {
+        "number": 123,
+        "headSha": "1fa0cf8f8eaca78166ca6daa0b02141845ccb37a",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "filesHash": "a4a98301e80f612ae69cee3accaf12f043e47f565b8ba48488c1210b27b00709",
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-123",
+        "generation": {
+          "protocol": 13
+        }
+      },
+      "previous": "5739a9a71f8a76578b6b7213bb16297334259fc4fa719c2231281c5a5ff55439",
+      "digest": "28c089db8ec99cfb64fe87a7366e6e68c140d56910bf8f18e34361721f8cc623"
+    },
+    {
+      "sequence": 319,
+      "at": "2026-10-07T02:03:07.252Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "admission": {
+            "number": 123,
+            "headSha": "1fa0cf8f8eaca78166ca6daa0b02141845ccb37a",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "filesHash": "a4a98301e80f612ae69cee3accaf12f043e47f565b8ba48488c1210b27b00709",
+            "scopes": [
+              "protocol"
+            ],
+            "owner": "admission/pr-123",
+            "generation": {
+              "protocol": 13
+            }
+          }
+        }
+      },
+      "previous": "28c089db8ec99cfb64fe87a7366e6e68c140d56910bf8f18e34361721f8cc623",
+      "digest": "68afb22159c1c0d0d0a80b7277e79c5b82bf8795672c5145993e678cf0bc1fc5"
+    },
+    {
+      "sequence": 320,
+      "at": "2026-10-07T02:03:06.868Z",
+      "kind": "transaction",
+      "data": {
+        "id": "source-admit:123:1fa0cf8f8eaca78166ca6daa0b02141845ccb37a:04d2403897ad0edf0227f96fe5bed150581b41d0"
+      },
+      "previous": "68afb22159c1c0d0d0a80b7277e79c5b82bf8795672c5145993e678cf0bc1fc5",
+      "digest": "0627c2e3b3cc2b8f53fea0961e049d34002e9954e39d8207eb037d98b54dea22"
     }
   ]
 }
