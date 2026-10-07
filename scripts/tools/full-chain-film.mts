@@ -4653,6 +4653,7 @@ if (STAGES.has("videos")) {
           stage: "shot", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt,
           ms: Date.now() - started, artifact: null, evidence: { error: err instanceof Error ? err.message.slice(0, 300) : String(err) }, verdict: null
         });
+        if (shotIsAsset && REVIEW_POLICY === "off") throw err;
         if (shotIsAsset) break;
       }
     }

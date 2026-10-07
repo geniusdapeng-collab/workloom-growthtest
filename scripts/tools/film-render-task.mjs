@@ -57,6 +57,10 @@ export async function runFilmRenderTask(options) {
   const boundRequestHash = journal?.requestHash ?? requestHash;
   let submissionSource = journal?.state === 'accepted' && journal.submissionSource === 'local-submit' ? 'local-submit' : 'provider-recovery';
   const persist = (state, acceptedId) => {
+    // An accepted journal is the durable first acceptance, not a polling log.
+    // GET recovery must preserve its bytes for already issued original receipts.
+    if (state === 'accepted' && journal?.state === 'accepted' && journal.taskId === acceptedId
+      && journal.requestHash === boundRequestHash && journal.submissionSource === submissionSource) return;
     journal = { schemaVersion: 'workloom.render-task/v1', state, requestHash: boundRequestHash, submissionSource,
       ...(acceptedId ? { taskId: acceptedId } : {}), updatedAt: new Date(now()).toISOString() };
     if (state === 'submission-unknown') {
