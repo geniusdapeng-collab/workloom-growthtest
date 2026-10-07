@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 433,
+  "revision": 435,
   "tasks": {
     "98": {
       "number": 98,
@@ -2406,7 +2406,7 @@
           "protocol": 16
         }
       },
-      "updatedAt": 1791343811052,
+      "updatedAt": 1791344414162,
       "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2669,8 +2669,8 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791344411052,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791345014162,
       "repairRequired": {
         "provider": "codex",
         "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
@@ -14193,6 +14193,31 @@
       },
       "previous": "a3fe28d7bbcbcd55fa14b757de62f557a7546f28b4c535a1c67886d84e97e62b",
       "digest": "b73b38d2e0bd9272afed32d3cf653bb11a32a5084cc7521b35ad31c159032d4b"
+    },
+    {
+      "sequence": 434,
+      "at": "2026-10-07T03:40:14.162Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791345014162
+        }
+      },
+      "previous": "b73b38d2e0bd9272afed32d3cf653bb11a32a5084cc7521b35ad31c159032d4b",
+      "digest": "f71d72e3018e376e88732dcd7c1893402f07b11570455a539fa3659ad8af438e"
+    },
+    {
+      "sequence": 435,
+      "at": "2026-10-07T03:40:22.727Z",
+      "kind": "transaction",
+      "data": {
+        "id": "d20f2565-6871-4750-96e5-b84d3fcb5e90"
+      },
+      "previous": "f71d72e3018e376e88732dcd7c1893402f07b11570455a539fa3659ad8af438e",
+      "digest": "b55e352c538d1ff476fb5d191944ec45f303ff9772f5cb61d98c27bfafd6904e"
     }
   ]
 }
