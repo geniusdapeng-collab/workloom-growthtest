@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2345,
+  "revision": 2347,
   "tasks": {
     "98": {
       "number": 98,
@@ -3982,7 +3982,7 @@
     },
     "131": {
       "number": 131,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791351760990,
       "attempts": {},
       "headSha": "2a892d6aab1d94346d7164cda0e43571a8a90700",
@@ -4337,8 +4337,8 @@
       "dependencies": [
         129
       ],
-      "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
-      "blockedUntil": 0,
+      "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+      "blockedUntil": 1791394818898,
       "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
@@ -4376,10 +4376,10 @@
       },
       "repairRequired": {
         "provider": "codex",
-        "headSha": "4aecb7f1de1f0966fc9638523743a706d4ff9850",
+        "headSha": "2a892d6aab1d94346d7164cda0e43571a8a90700",
         "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-        "reason": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
-        "at": 1791393612249
+        "reason": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+        "at": 1791394218898
       },
       "recoveryIntent": null
     },
@@ -62688,6 +62688,39 @@
       },
       "previous": "4a88ba30f7147b04cec36912d5eccbca250219aebc5e841a0a9b4af86b2798d2",
       "digest": "fc838553b958b760a40a00ce081816fa7e7737809ea2350e4bded6810fae1858"
+    },
+    {
+      "sequence": 2346,
+      "at": "2026-10-07T17:30:18.898Z",
+      "kind": "task",
+      "data": {
+        "number": 131,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "2a892d6aab1d94346d7164cda0e43571a8a90700",
+            "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "reason": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+            "at": 1791394218898
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791394818898
+        }
+      },
+      "previous": "fc838553b958b760a40a00ce081816fa7e7737809ea2350e4bded6810fae1858",
+      "digest": "fd08bb9644c8006a153f6ede47a899d1e9c65b49b48b35b7955189d700cd2db0"
+    },
+    {
+      "sequence": 2347,
+      "at": "2026-10-07T17:31:34.238Z",
+      "kind": "transaction",
+      "data": {
+        "id": "bc7627b8-90e3-46cf-ae57-66666988b22f"
+      },
+      "previous": "fd08bb9644c8006a153f6ede47a899d1e9c65b49b48b35b7955189d700cd2db0",
+      "digest": "586fdd0e912dcfc95fc16aa0a8d96d4c191b53533e00857cc15fa95fe2c41892"
     }
   ]
 }
