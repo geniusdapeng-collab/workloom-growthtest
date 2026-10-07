@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1958,
+  "revision": 1963,
   "tasks": {
     "98": {
       "number": 98,
@@ -7481,14 +7481,34 @@
         }
       },
       "updatedAt": 1791386519388
+    },
+    "149": {
+      "number": 149,
+      "status": "developing",
+      "firstSeen": 1791388710825,
+      "attempts": {},
+      "admission": {
+        "number": 149,
+        "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+        "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "filesHash": "a9f709baa9efb52e83345029e7d16e9e7af5af5aaa6958a0fcb91acd1e00f329",
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-149",
+        "generation": {
+          "protocol": 59
+        }
+      },
+      "updatedAt": 1791388710825
     }
   },
   "leases": {
     "protocol": {
       "owner": null,
-      "generation": 58,
-      "acquiredAt": 1791387910181,
-      "expiresAt": 1791387910181
+      "generation": 59,
+      "acquiredAt": 1791388710825,
+      "expiresAt": 1791388710825
     }
   },
   "releases": {},
@@ -54071,6 +54091,93 @@
       },
       "previous": "98df69e518153fb72895e23e17609ff18e848a72fea81bfc8f8e6e34aaa0a4f4",
       "digest": "d61d85c58b22fb1591a58d39748c90798a10599a70bbda864e914f12abab86d7"
+    },
+    {
+      "sequence": 1959,
+      "at": "2026-10-07T15:58:30.825Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-149",
+        "generation": {
+          "protocol": 59
+        }
+      },
+      "previous": "d61d85c58b22fb1591a58d39748c90798a10599a70bbda864e914f12abab86d7",
+      "digest": "0328130d54dca083abe1bf674f8e6509b9b9452a72fa5627d4d4a8ded668ceb9"
+    },
+    {
+      "sequence": 1960,
+      "at": "2026-10-07T15:58:30.825Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-149",
+        "generation": {
+          "protocol": 59
+        }
+      },
+      "previous": "0328130d54dca083abe1bf674f8e6509b9b9452a72fa5627d4d4a8ded668ceb9",
+      "digest": "11d7095237b4be066f5d3af586b9682a8ee978513baed490a65fc439b2c8bf06"
+    },
+    {
+      "sequence": 1961,
+      "at": "2026-10-07T15:58:30.825Z",
+      "kind": "source_admitted",
+      "data": {
+        "number": 149,
+        "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+        "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "filesHash": "a9f709baa9efb52e83345029e7d16e9e7af5af5aaa6958a0fcb91acd1e00f329",
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-149",
+        "generation": {
+          "protocol": 59
+        }
+      },
+      "previous": "11d7095237b4be066f5d3af586b9682a8ee978513baed490a65fc439b2c8bf06",
+      "digest": "e4f980176e78aa03d551566ce3cd2b86818f343c9d951e3b8ab39453a4899b15"
+    },
+    {
+      "sequence": 1962,
+      "at": "2026-10-07T15:58:30.825Z",
+      "kind": "task",
+      "data": {
+        "number": 149,
+        "patch": {
+          "admission": {
+            "number": 149,
+            "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+            "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "filesHash": "a9f709baa9efb52e83345029e7d16e9e7af5af5aaa6958a0fcb91acd1e00f329",
+            "scopes": [
+              "protocol"
+            ],
+            "owner": "admission/pr-149",
+            "generation": {
+              "protocol": 59
+            }
+          }
+        }
+      },
+      "previous": "e4f980176e78aa03d551566ce3cd2b86818f343c9d951e3b8ab39453a4899b15",
+      "digest": "130c96388875d1b3e4f9986b9cf00ea6380e1143ae1f2464a8f3a23427233f53"
+    },
+    {
+      "sequence": 1963,
+      "at": "2026-10-07T15:58:24.596Z",
+      "kind": "transaction",
+      "data": {
+        "id": "source-admit:149:4dae103486e82bb3d18c1c97d0db0c403ea0b243:c865b1e8f59862d57b9044dfef959e3c0442a037"
+      },
+      "previous": "130c96388875d1b3e4f9986b9cf00ea6380e1143ae1f2464a8f3a23427233f53",
+      "digest": "a364feaa7eebd623f7a374144215806757ce5406554ae07c5c4604f38c35fbdd"
     }
   ]
 }
