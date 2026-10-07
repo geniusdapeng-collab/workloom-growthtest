@@ -90,6 +90,8 @@ import {
   type DeviceCategory, type DeviceDefect, type EnvDefect, type HookCard, type MicromotionTrace, type PlatePromptShot,
   type ProducerVerdict, type SceneBible, type ScenePolicyReport
 } from "../../packages/video-studio/src/index.js";
+import { coverShotHasCharacter, coverShotMatchesLead, coverShotCharacterIds, resolveCoverHero, resolveCoverComposition,
+  type CoverLeadSource } from "../../packages/video-studio/src/cover-design.js";
 import { assertStandardPostTimeline, validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "../../packages/video-studio/src/shot-intent.js";
 import { verifyAvSyncEvidence } from "../../packages/video-studio/src/av-sync.js";
@@ -285,7 +287,8 @@ if (XFADE !== 0 || CUT_TRANSITION || CUT_TRANSITION_DURATION !== 0 || CUT_TRANSI
 }
 /**
  * 封面主版式（2026-09-25 南昌片收口）：
- *   `landmark`（默认）= 地标满幅 + 人物卡（适合"人物镜头质量一般"的片子）；
+ *   `auto`（默认）= 有主角来源则人物满幅，否则物体满幅；只保留一个主视觉。
+ *   `landmark` = 地标满幅 + 人物卡（兼容模式，重复人物层会被移除）；
  *   `split`          = **左侧地标满幅 + 右侧人物竖带**（无卡片硬边，双主体都清晰；当"人物卡贴在地标上"反复被判 "贴图感/遮挡主体"时的收口版式）；
  *   `person`         = **人物满幅 + 地标小图**——当"人物卡贴在地标上"反复被判
  *                      "贴图感/遮挡主体/人物不是主角"时改用这一版：人物是背景（不存在贴片边缘），
@@ -294,17 +297,18 @@ if (XFADE !== 0 || CUT_TRANSITION || CUT_TRANSITION_DURATION !== 0 || CUT_TRANSI
  *                      文字块下移到**面部下方安全带**（画面 58%–88%），从根上避免"标题压在主角脸上"；
  *                      适用范围=人物本身就是唯一主视觉的片子（带货口播、讲解、访谈）。
  */
-const COVER_HERO = arg("--cover-hero", "landmark");
+const COVER_REQUESTED_HERO = arg("--cover-hero", "auto");
+let COVER_HERO = resolveCoverHero(COVER_REQUESTED_HERO, false);
 /**
  * 封面版式（2026-09-26 产品所有者口径，收敛为两种主视觉）：
  *   · `subject-led`（物体为主）：景物/商品/动物等**非人主体**满幅 + 标题（`--cover-hero subject|scenery`）；
  *   · `person-led`（人物为主）：人物是唯一主视觉，背景只作点缀（`--cover-hero person`）。
  * 旧的 `landmark`（地标 + 人物卡）与 `split`（左地标右人物竖带）保留为兼容档，但不再是推荐默认。
  */
-const COVER_ARCHETYPE: "person-led" | "subject-led" =
+let COVER_ARCHETYPE: "person-led" | "subject-led" =
   ["subject", "scenery", "object", "product"].includes(COVER_HERO) ? "subject-led" : "person-led";
 /** 人物满幅 + 无小图 + 文字下移安全带（person-solo 专属口径） */
-const COVER_LOWER_BAND_TEXT = COVER_HERO === "person-solo";
+let COVER_LOWER_BAND_TEXT = COVER_HERO === "person-solo";
 /**
  * 封面平台（2026-09-27 平台化）：
  *   `--cover-platform` 显式指定封面平台（`douyin|kuaishou|xiaohongshu|wechat-channels|bilibili|tiktok|youtube|instagram-reels`，
@@ -1243,7 +1247,7 @@ const shotlist = structuredClone(sourceDocument) as {
   logline?: string;
   scenePolicy?: { id?: string; exceptions?: Array<{ rule: "restricted-location" | "restricted-costume"; shotId: string; term: string; customerRequest: string; source: string }> };
   hook?: HookCard;
-  character?: { id?: string; name?: string }; shots: ShotCard[];
+  character?: { id?: string; name?: string; appearanceInShots?: string[] }; shots: ShotCard[];
 };
 const RESUME_TASKS: Record<string, string> = readResumeTasks(arg("--resume-tasks", ""), shotlist.shots.map((shot) => shot.shotId));
 const policyBrief: Record<string, unknown> | null = BRIEF_FILE ? (() => {
@@ -5710,6 +5714,7 @@ function imageDiff(a: string, b: string, out: string): void {
 
 /** 封面设计师（LLM）：只出设计稿，不画图 */
 async function callCoverDesigner(designInput: CoverDesignInput): Promise<string> {
+  if (REVIEW_POLICY === "off") throw new Error("COVER_DETERMINISTIC_DESIGN_DEFAULT: use the declared sources and fallback plan without model calls");
   if (WORKER_RUNTIME) return WORKER_RUNTIME.design(buildCoverDesignPrompt(designInput));
   const llm = resolveProducerLlm(ENV);
   if (!llm) throw new Error("未配置 LLM（LLM_BASE_URL / LLM_API_KEY / LLM_MODEL）");
@@ -5763,6 +5768,19 @@ function inspectCoverForPolicy(facts: { bytes: number; width: number; height: nu
   ] };
 }
 function coverChecksPassed(checks: GateCheck[]): boolean { return checks.every(check => check.hard === false || check.pass); }
+function coverSourcesForShots(shotCards: ShotCard[], character: CoverLeadSource | null) {
+  const personShots = shotCards.filter(shot => coverShotHasCharacter(shot, character));
+  const leadMatchedPersons = personShots.filter(shot => coverShotMatchesLead(shot, character));
+  const fallbackBackground = [...shotCards].reverse().find(shot => !coverShotHasCharacter(shot, character)) ?? shotCards[0];
+  if (!fallbackBackground) throw new Error("COVER_SOURCE_SHOTS_EMPTY");
+  return { personShots, leadMatchedPersons, fallbackBackground };
+}
+function coverCompositionForPlan(requestedHero: string, plan: CoverPlan, background: ShotCard, person: ShotCard | null, character: CoverLeadSource | null) {
+  const source = (shot: ShotCard) => ({ shotId: shot.shotId, hasCharacter: coverShotHasCharacter(shot, character),
+    characterIds: coverShotCharacterIds(shot, character) });
+  return resolveCoverComposition({ requestedHero, background: source(background), person: person ? source(person) : null,
+    personEnabled: plan.person.enabled });
+}
 if (STAGES.has("cover") && existsSync(colored)) {
   rememberInputs("cover", [colored]);
   const started = Date.now();
@@ -5776,6 +5794,11 @@ if (STAGES.has("cover") && existsSync(colored)) {
   const coverPng = join(OUT_DIR, `${PROJECT}-cover.png`);
   const coverDir = join(POST_DIR, "cover");
   mkdirSync(coverDir, { recursive: true });
+  const coverLead: CoverLeadSource | null = lead ? { id: lead.id, name: lead.name, appearanceInShots: shotlist.character?.appearanceInShots } : null;
+  const { personShots, leadMatchedPersons, fallbackBackground } = coverSourcesForShots(shots, coverLead);
+  COVER_HERO = resolveCoverHero(COVER_REQUESTED_HERO, leadMatchedPersons.length > 0);
+  COVER_ARCHETYPE = ["subject", "scenery", "object", "product"].includes(COVER_HERO) ? "subject-led" : "person-led";
+  COVER_LOWER_BAND_TEXT = COVER_HERO === "person-solo";
   /** UHD 封面图形按最终视频画布原生绘制，文字/装饰层不经过视频超分。 */
   const { width: CW, height: CH } = QUALITY === "uhd" ? OUTPUT_SIZE : coverSpec.canvas;
   const coverScale = Math.min(CW / coverSpec.canvas.width, CH / coverSpec.canvas.height);
@@ -5785,7 +5808,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
     titleBottomMaxRatio: coverSpec.titleBand.bottomMaxRatio,
     bottomReservedRatio: coverSpec.safeArea.bottomReservedRatio
   };
-  const coverSafeAreaForLayout = COVER_LOWER_BAND_TEXT
+  let coverSafeAreaForLayout = COVER_LOWER_BAND_TEXT
     ? { ...COVER_LOWER_BAND_SAFE_AREA, bottomReservedRatio: coverSpec.safeArea.bottomReservedRatio }
     : coverSafeArea;
   log(`封面平台：${coverSpec.name}（${coverSpec.id}｜${coverSpec.ratio} ${CW}×${CH}｜标题带 `
@@ -5800,7 +5823,6 @@ if (STAGES.has("cover") && existsSync(colored)) {
     if (index <= 0) return 0;
     return CUT_GRID[index - 1] ?? shots.slice(0, index).reduce((sum, s) => sum + Number(s.duration ?? 5), 0);
   };
-  const personShots = shots.filter((s) => String(s.character ?? "").length > 0);
   /**
    * 人物来源镜硬闸（T-2026-0930-0015，产品所有者口径）：
    * 卡片里有人物镜、管线也知道主角是谁，但**没有任何一张卡的 character 写了主角名/ID** 时，
@@ -5808,9 +5830,6 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 这里在做封面之前**显式报错**并指出改哪一处，不再静默退化；显式声明 `--cover-archetype subject-led`
    * （本来就不要人物卡）时不拦。
    */
-  const leadMatchedPersons = lead
-    ? personShots.filter((s) => String(s.character ?? "").includes(lead.name) || String(s.character ?? "").includes(lead.id))
-    : personShots;
   if (COVER_ARCHETYPE !== "subject-led" && lead && personShots.length > 0 && leadMatchedPersons.length === 0) {
     const detail = `COVER_PERSON_SOURCE_MISSING: 分镜卡里有 ${personShots.length} 个带 character 的镜头，但没有任何一个写了主角「${lead.name}（${lead.id}）」；`
       + "封面「人物为主」版式无法定位人物来源镜（真机事故：character 只写「这位女士…」）。"
@@ -5939,19 +5958,16 @@ if (STAGES.has("cover") && existsSync(colored)) {
       shotId: s.shotId,
       scene: String(s.scene ?? ""),
       dialogueText: dialogueText(s),
-      hasCharacter: String(s.character ?? "").length > 0,
+      hasCharacter: coverShotHasCharacter(s, coverLead),
       duration: Number(s.duration ?? 5)
     }))
   };
   /**
-   * ① 设计稿：设计师（LLM）→ 严格校验；不可用/不合规 → 确定性兜底稿。
-   * 兜底稿也必须是"主视觉 + 人物 + 主标题"三件套（不允许退回"只有标题"）。
+   * ① 设计稿：默认直接采用合法的确定性稿；显式诊断才调用设计师。
+   * 模型不可用的兜底与正常确定性设计分别记账，避免把默认成功误标为降级。
    */
-  const fallbackBackground = (personShots.length > 0
-    ? [...shots].reverse().find((s) => String(s.character ?? "").length === 0) ?? shots[0]!
-    : shots[shots.length - 1]!);
   let plan: CoverPlan;
-  let designVia: "llm" | "fallback" = "llm";
+  let designVia: "llm" | "fallback" | "deterministic" = REVIEW_POLICY === "off" ? "deterministic" : "llm";
   let designNote = "";
   /**
    * 人物卡来源由管线注入：优先与主视觉时段一致的人物镜（夜景封面配夜景人物），
@@ -5969,9 +5985,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
      * 结果挑到了路人（打太极的老人 / 夜跑者），监制判"人物不是主角、还是逆光背影剪影"。
      * 现在先按主角姓名过滤（陈卓），再按时段匹配；主角没有可用镜头时退回"不带人物卡"。
      */
-    const leadShots = lead
-      ? personShots.filter((shot) => String(shot.character ?? "").includes(lead.name) || String(shot.character ?? "").includes(lead.id))
-      : personShots;
+    const leadShots = leadMatchedPersons;
     const pool = leadShots.length > 0 ? leadShots : [];
     if (pool.length === 0) return null;
     const backgroundScene = String(shots.find((s) => s.shotId === backgroundShotId)?.scene ?? "");
@@ -5979,7 +5993,15 @@ if (STAGES.has("cover") && existsSync(colored)) {
     return pool.find((s) => (warmOrNight ? /夜|灯|黄昏|落霞/.test(String(s.scene ?? "")) : true))
       ?? pool[0] ?? null;
   };
-  try {
+  if (REVIEW_POLICY === "off") {
+    plan = fallbackCoverPlan(designInput, {
+      headline: arg("--cover-hook", shotlist.title ?? "封面"),
+      heroShotId: fallbackBackground.shotId,
+      personShotId: personShotFor(fallbackBackground.shotId)?.shotId
+    });
+    designNote = "默认确定性设计：直接使用已声明镜头和合法设计稿，未调用模型；不授予审美认证";
+    log(`  ⇢ ${designNote}`);
+  } else try {
     const raw = await callCoverDesigner(designInput);
     try {
       plan = parseCoverPlan(raw, designInput, { personShotId: personShotFor(undefined)?.shotId, personAtSec: 1.0 });
@@ -6180,12 +6202,14 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 不叠人物卡。产品原话："要么整个版面以人物为主（商品片则以商品为主）做点缀加标题，
    * 要么直接以景物为主"；把人物硬贴在地标上属于两种主视觉打架，正是被打回的那版。
    */
-  const insetShot = COVER_HERO === "landmark" ? personShot : COVER_HERO === "person" ? bgShot : personShot;
-  const insetEnabled = ["scenery", "subject", "object", "product", "person-solo"].includes(COVER_HERO)
-    ? false
-    : COVER_HERO === "landmark"
-      ? Boolean(plan.person.enabled && personShot)
-      : Boolean(personShot);
+  const composition = coverCompositionForPlan(COVER_HERO, plan, bgShot, personShot, coverLead);
+  COVER_HERO = composition.heroMode;
+  COVER_LOWER_BAND_TEXT = composition.lowerBandText;
+  coverSafeAreaForLayout = COVER_LOWER_BAND_TEXT
+    ? { ...COVER_LOWER_BAND_SAFE_AREA, bottomReservedRatio: coverSpec.safeArea.bottomReservedRatio } : coverSafeArea;
+  const insetShot = composition.insetShotId ? shots.find(shot => shot.shotId === composition.insetShotId) ?? null : null;
+  let insetEnabled = composition.insetEnabled;
+  if (composition.suppressedReason !== "single-hero" && composition.suppressedReason) log(`封面移除重复人物/画面层：${composition.suppressedReason}`);
   /** 母版时长：小图取帧必须夹在成片时长内（真机：inset 时刻越界 → 取不到帧 → 后续 ffmpeg 崩） */
   const masterSeconds = Number(probe(colored).duration ?? 0);
   /** split：右侧竖带（宽 40%、全高）；person：地标小图（右上）；landmark：人物卡（右下） */
@@ -6205,10 +6229,8 @@ if (STAGES.has("cover") && existsSync(colored)) {
    *   `person` 版：**人物镜取满幅做底**（人物是背景，不存在"贴片边缘"），地标帧留给右上角小图；
    *   `landmark` 版（默认）：地标取满幅做底，人物走右下卡片。
    */
-  let heroShot = COVER_HERO === "person" || COVER_HERO === "person-solo"
-    ? (personShotFor(bgShot.shotId) ?? bgShot)
-    : bgShot;
-  let heroAt = COVER_HERO === "person" || COVER_HERO === "person-solo" ? 1.0 : bgAt;
+  let heroShot = shots.find(shot => shot.shotId === composition.heroShotId) ?? bgShot;
+  let heroAt = heroShot.shotId === bgShot.shotId ? bgAt : 1.0;
   /**
    * 人物满幅版式的**底图取帧清晰度**修复（2026-09-27 真机：`person-solo` 固定取 1.0s 那一帧
    * 边缘能量只有 3.60，低于 5.5 下限 → 机检 `background-sharpness` 打回、封面被拒）。
@@ -6216,7 +6238,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
    */
   let heroSharpness = bgPick.sharpness;
   if (REVIEW_POLICY !== "off" && (COVER_HERO === "person" || COVER_HERO === "person-solo")) {
-    const withCharacter = (shot: ShotCard): boolean => /陈卓|character|主角/i.test(String(shot.character ?? ""));
+    const withCharacter = (shot: ShotCard): boolean => coverShotMatchesLead(shot, coverLead);
     const candidates = [heroShot, ...shots.filter((s) => withCharacter(s) && s.shotId !== heroShot.shotId)];
     let bestHero: { shot: ShotCard; atSec: number; sharpness: number } = { shot: heroShot, atSec: heroAt, sharpness: -1 };
     for (const candidate of candidates) {
@@ -6337,6 +6359,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
       ? `255*${edge(`X/${fadePx}`)}`
       : `255*min(${edge(`X/${fadePx}`)}\\,min(${edge(`(${cardW}-X)/${fadePx}`)}\\,${edge(`Y/${fadePx}`)}))`;
     if (!existsSync(personFrame)) {
+      insetEnabled = false;
       log(`  ⚠ 封面小图取帧失败（${insetShot.shotId}@${insetTime.toFixed(2)}s）→ 本版不叠小图，回退为单主视觉`);
       run(FFMPEG, ["-y", "-i", bgOnly, "-frames:v", "1", bgPerson]);
     } else {
@@ -6592,7 +6615,9 @@ if (STAGES.has("cover") && existsSync(colored)) {
     evidence: {
       designVia, plan, hook: plan.headline.replace(/\n/g, " "), font: plan.typography.fontId,
       qualityReviewPerformed: REVIEW_POLICY !== "off", materialUsePolicy: REVIEW_POLICY === "off" ? "default-use" : REVIEW_POLICY,
-      background: { shotId: bgShot.shotId, atSec: bgAt, source: "colored（未烧字幕母版）" },
+      composition: { ...composition, requestedHero: COVER_REQUESTED_HERO, heroShotId: heroShot.shotId, insetEnabled,
+        insetShotId: insetEnabled ? insetShot?.shotId ?? null : null },
+      background: { shotId: heroShot.shotId, atSec: heroAt, source: "colored（未烧字幕母版）" },
       backgroundPick: { sharpness: bgPick.sharpness, floor: COVER_MIN_SHARPNESS, substituted: bgSubstituted, plannedShotId: plan.background.shotId },
       headline: { text: plan.headline, fontId: plan.typography.fontId, sizePx: headSize, subSizePx: subSizeDraw },
       /** 平台口径证据（2026-09-27）：出的是哪个平台的封面、机检按哪套安全区判 */
@@ -6616,9 +6641,10 @@ if (STAGES.has("cover") && existsSync(colored)) {
         }
         : null,
       person: {
-        shotId: personShot?.shotId ?? null, atSec: plan.person.atSec ?? null,
-        card: { x: cardX, y: cardY, w: cardW, h: cardH, border: cardBorder },
-        source: "colored（片子自己的镜头帧：肖像卡，不抠像）"
+        enabled: insetEnabled, shotId: insetEnabled ? insetShot?.shotId ?? null : null,
+        atSec: insetEnabled ? plan.person.atSec ?? null : null,
+        card: insetEnabled ? { x: cardX, y: cardY, w: cardW, h: cardH, border: cardBorder } : null,
+        source: insetEnabled ? "colored（片子自己的镜头帧：肖像卡，不抠像）" : null
       },
       measurements, checks, designRaw: designNote,
       backgroundPickDetail: bgPick.sharpness === null ? "未执行锐度评分；按设计稿取帧"

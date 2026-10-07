@@ -41,7 +41,7 @@ const mediaGuardSource = parsed.statements.filter((statement) => ts.isFunctionDe
   && statement.name?.text === "assertOriginalRenderMedia").map((statement) => statement.getFullText(parsed)).join("\n");
 const voiceSource = mediaGuardSource + "\n" + block("/* ---------- ③-2", "/* ---------- ④ 合成母版");
 const composeSource = block("/* ---------- ④ 合成母版", "/* ---------- ⑤ 调色");
-const defaultsSource = block("const ENHANCE_ENGINE_DIR", "const COVER_HERO");
+const defaultsSource = block("const ENHANCE_ENGINE_DIR", "const COVER_REQUESTED_HERO");
 const bgmClockSource = block("  if (existsSync(out)) scored = out;", "  record({\n    /**\n     * 声明关闭");
 const durationSource = parsed.statements.filter((statement) => ts.isFunctionDeclaration(statement)
   && statement.name?.text === "renderSecondsFor").map((statement) => statement.getFullText(parsed)).join("\n");
