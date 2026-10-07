@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1474,
+  "revision": 1476,
   "tasks": {
     "98": {
       "number": 98,
@@ -5004,7 +5004,7 @@
     },
     "135": {
       "number": 135,
-      "status": "parked",
+      "status": "waiting_dependency",
       "firstSeen": 1791354489850,
       "attempts": {},
       "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
@@ -5506,7 +5506,7 @@
           }
         ]
       },
-      "updatedAt": 1791378309828,
+      "updatedAt": 1791381459462,
       "error": "Prerequisite #133 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 1791378909828,
       "dependencies": [
@@ -43207,6 +43207,41 @@
       },
       "previous": "3bc51abbed98ef39f456093ce521ce0b10a64c45dfd3802286563bec1c153648",
       "digest": "5e1f64bd3f74d4d4a2dc8aea33fa5c538548f16cfbf9235fc2aeda6c5540d0fd"
+    },
+    {
+      "sequence": 1475,
+      "at": "2026-10-07T13:57:39.462Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "status": "waiting_dependency",
+          "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
+          "intent": {
+            "taskId": "T-2026-1007-0008",
+            "ready": true,
+            "dependsOn": [
+              133
+            ],
+            "releases": []
+          },
+          "dependencies": [
+            133
+          ]
+        }
+      },
+      "previous": "5e1f64bd3f74d4d4a2dc8aea33fa5c538548f16cfbf9235fc2aeda6c5540d0fd",
+      "digest": "5d840198e107524964bcafa551caaef27c193ec6fda23642a3b1bdf014c7e02b"
+    },
+    {
+      "sequence": 1476,
+      "at": "2026-10-07T13:58:04.585Z",
+      "kind": "transaction",
+      "data": {
+        "id": "1c75a7da-cd81-429b-b846-d91c790fae64"
+      },
+      "previous": "5d840198e107524964bcafa551caaef27c193ec6fda23642a3b1bdf014c7e02b",
+      "digest": "6d17c9929a81120c701e94bc3a42751f378acec2770a31823f3bfea1e73c55a3"
     }
   ]
 }
