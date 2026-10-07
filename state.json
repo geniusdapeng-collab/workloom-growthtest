@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1533,
+  "revision": 1535,
   "tasks": {
     "98": {
       "number": 98,
@@ -7056,7 +7056,7 @@
           "protocol": 46
         }
       },
-      "updatedAt": 1791382815340,
+      "updatedAt": 1791383414151,
       "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
       "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
       "branch": "task/T-2026-1007-0012",
@@ -44418,6 +44418,47 @@
       },
       "previous": "8c6bcf94791999e8e3111ac5f0b441c21200a36ab63e7f047bbdacb69d54f808",
       "digest": "3068df8309a8f89ffc48660361661847896c6f0ff1cd295e4f620024247102ac"
+    },
+    {
+      "sequence": 1534,
+      "at": "2026-10-07T14:30:14.151Z",
+      "kind": "task",
+      "data": {
+        "number": 146,
+        "patch": {
+          "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+          "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+          "branch": "task/T-2026-1007-0012",
+          "intent": {
+            "taskId": "T-2026-1007-0012",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "originalBody": "原生候选 #144 的第二次回执验证在读取当前 PR 时因 CNB 429 失败。通用 GET 现有请求、响应体与等待都受 240 秒单调总预算限制，429 有限退避并遵守更长 Retry-After；队列使用三次重试。持续限流、权限拒绝、坏证据与 source/main 漂移仍失败；写请求维持单次提交和原身份回读。\n\n任务 #145 的准确范围为五个文件：API、故障测试、队列适配器、原生 delivery-regression 配置及行为文档。原生 CI 仅在原命令末尾增加 API 故障测试，原检查名、阶段、用例和时限保留。\n\n验证：当前提交 ea3fe124f4c2543ae26b25f6bea23befe06d510f 的八项制片/脚本/类型/资产/能力检查均实际通过；新增故障用例所在原生命令共 143 项，142 通过、1 项既有 UI 车道跳过。恢复逻辑包含正常、持续限流、权限、响应体/等待超时、写入未知与主线漂移。修改前实现对四个恢复用例的实际负对照均失败，历史失败日志保留。仅修改 Growthtest 隔离副本；云端完整源与候选 CI、精确合入源码核心及真实 PG 验证仍为正式发布前置。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0012\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+          "files": [
+            "docs/AUTOMATIC-RD-DELIVERY.md",
+            "scripts/delivery/install-cnb.yml",
+            "scripts/delivery/queue-platform.mjs",
+            "scripts/tools/cnb-api.mjs",
+            "scripts/tools/cnb-api.test.mjs"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791382815340
+        }
+      },
+      "previous": "3068df8309a8f89ffc48660361661847896c6f0ff1cd295e4f620024247102ac",
+      "digest": "e49c1f16b57508e8cde8195ea8d9aeba45d0d817c6e154d01fedb67fc888d047"
+    },
+    {
+      "sequence": 1535,
+      "at": "2026-10-07T14:31:20.537Z",
+      "kind": "transaction",
+      "data": {
+        "id": "165487a4-a56c-4751-81ed-55985f0b0911"
+      },
+      "previous": "e49c1f16b57508e8cde8195ea8d9aeba45d0d817c6e154d01fedb67fc888d047",
+      "digest": "2a8bef1f30afa3858e98f89faff95e19f1bea79905e7aac085b8f4070c158b4c"
     }
   ]
 }
