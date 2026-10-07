@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1847,
+  "revision": 1849,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "aligning",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2068,8 +2068,8 @@
         }
       },
       "updatedAt": 1791387124284,
-      "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
-      "blockedUntil": 0,
+      "error": "Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+      "blockedUntil": 1791387724284,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
       "branch": "task/T-2026-1007-0001",
@@ -51692,6 +51692,31 @@
       },
       "previous": "4819db09639346fd65acd0fa640037cccfa235f576c50182fb5450bc986a9bc4",
       "digest": "4c082d5573091370b07ffcf536d77ab53685eca6585745f1bd36c2b24e8995fa"
+    },
+    {
+      "sequence": 1848,
+      "at": "2026-10-07T15:32:04.284Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+          "blockedUntil": 1791387724284
+        }
+      },
+      "previous": "4c082d5573091370b07ffcf536d77ab53685eca6585745f1bd36c2b24e8995fa",
+      "digest": "421aa7d5e99dcbbff1f28b7bd417dd6353431b5403cc43efa1632a7f465625b6"
+    },
+    {
+      "sequence": 1849,
+      "at": "2026-10-07T15:33:05.458Z",
+      "kind": "transaction",
+      "data": {
+        "id": "0eebc51d-c473-42cf-aa63-b3a29ff21a90"
+      },
+      "previous": "421aa7d5e99dcbbff1f28b7bd417dd6353431b5403cc43efa1632a7f465625b6",
+      "digest": "2eb4e1f7174f6c8790e7e4655bef33fbad9798973c92b7fda36a6cbe9208c6aa"
     }
   ]
 }
