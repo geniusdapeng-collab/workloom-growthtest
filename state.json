@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1219,
+  "revision": 1224,
   "tasks": {
     "98": {
       "number": 98,
@@ -2056,7 +2056,7 @@
       "attempts": {},
       "admission": {
         "number": 119,
-        "headSha": "91bd23bc545d5239fd3c307bdb316415a6d930bb",
+        "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "filesHash": "ca0fce1c77f5680d7fd4469b9bc558cbbb7e187b339c4960cfe49320ff9e2a9b",
         "scopes": [
@@ -2064,10 +2064,10 @@
         ],
         "owner": "admission/pr-119",
         "generation": {
-          "protocol": 30
+          "protocol": 34
         }
       },
-      "updatedAt": 1791372009774,
+      "updatedAt": 1791372320967,
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 1791372609774,
       "headSha": "91bd23bc545d5239fd3c307bdb316415a6d930bb",
@@ -6620,9 +6620,9 @@
   "leases": {
     "protocol": {
       "owner": null,
-      "generation": 33,
-      "acquiredAt": 1791371168444,
-      "expiresAt": 1791372140962
+      "generation": 34,
+      "acquiredAt": 1791372320967,
+      "expiresAt": 1791372320967
     }
   },
   "releases": {},
@@ -35792,6 +35792,93 @@
       },
       "previous": "a6eb9446ddcae6ebcb6f4fd87cd4857fe398b786fa465b7a70600568a24a7977",
       "digest": "2d185148b841bdfca7afb361b91f7fe36ffd98e92607394a7ed3fd830bc153c2"
+    },
+    {
+      "sequence": 1220,
+      "at": "2026-10-07T11:25:20.967Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-119",
+        "generation": {
+          "protocol": 34
+        }
+      },
+      "previous": "2d185148b841bdfca7afb361b91f7fe36ffd98e92607394a7ed3fd830bc153c2",
+      "digest": "e0a4c8d3d78b89c4edd695ae53c2b3dc753ba163315f6f12bb0efc729949a73f"
+    },
+    {
+      "sequence": 1221,
+      "at": "2026-10-07T11:25:20.967Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-119",
+        "generation": {
+          "protocol": 34
+        }
+      },
+      "previous": "e0a4c8d3d78b89c4edd695ae53c2b3dc753ba163315f6f12bb0efc729949a73f",
+      "digest": "6b14df1aa30a8477a6a3b3d183ea9351ee0f8cc28f4eaec41654bf4b96cc2833"
+    },
+    {
+      "sequence": 1222,
+      "at": "2026-10-07T11:25:20.967Z",
+      "kind": "source_admitted",
+      "data": {
+        "number": 119,
+        "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "filesHash": "ca0fce1c77f5680d7fd4469b9bc558cbbb7e187b339c4960cfe49320ff9e2a9b",
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-119",
+        "generation": {
+          "protocol": 34
+        }
+      },
+      "previous": "6b14df1aa30a8477a6a3b3d183ea9351ee0f8cc28f4eaec41654bf4b96cc2833",
+      "digest": "10d92bd64636c112871aa0dd76a304847afcf1b55d243faa99be0275d85e16bb"
+    },
+    {
+      "sequence": 1223,
+      "at": "2026-10-07T11:25:20.967Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "admission": {
+            "number": 119,
+            "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "filesHash": "ca0fce1c77f5680d7fd4469b9bc558cbbb7e187b339c4960cfe49320ff9e2a9b",
+            "scopes": [
+              "protocol"
+            ],
+            "owner": "admission/pr-119",
+            "generation": {
+              "protocol": 34
+            }
+          }
+        }
+      },
+      "previous": "10d92bd64636c112871aa0dd76a304847afcf1b55d243faa99be0275d85e16bb",
+      "digest": "3bda77c774a94460dc3d73ffed522216b77e74720fc905b96a29942c0ec96163"
+    },
+    {
+      "sequence": 1224,
+      "at": "2026-10-07T11:25:19.583Z",
+      "kind": "transaction",
+      "data": {
+        "id": "source-admit:119:96f3e89cc3da1207eff027a2a0269f38d05e0a12:04d2403897ad0edf0227f96fe5bed150581b41d0"
+      },
+      "previous": "3bda77c774a94460dc3d73ffed522216b77e74720fc905b96a29942c0ec96163",
+      "digest": "ec96cc4abd886a22b081bd50dbf8b233df235805dc99661ce7bb7ec6042025d7"
     }
   ]
 }
