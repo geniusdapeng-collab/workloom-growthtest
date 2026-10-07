@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2607,
+  "revision": 2609,
   "tasks": {
     "98": {
       "number": 98,
@@ -4798,7 +4798,7 @@
       "status": "waiting_ci",
       "firstSeen": 1791353067543,
       "attempts": {},
-      "headSha": "a716ecf18e100926134343ca9d66018d79bf2191",
+      "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
       "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
       "branch": "task/T-2026-1007-0007",
       "intent": {
@@ -5126,23 +5126,24 @@
           }
         ]
       },
-      "updatedAt": 1791398225770,
+      "updatedAt": 1791398415152,
       "dependencies": [
         131
       ],
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 0,
-      "alignmentCount": 1,
+      "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
       "originalBody": "肖像派生 CLI 会在网络失败时重发图片 POST，并在图片结果不明时自动转入付费视频；视频任务 ID 也未跨进程保存。现在按角度和真实请求内容保存提交状态，先保存受理响应，再下载或按原任务 ID 查询。未知、5xx、畸形响应和下载失败均不转付费入口；仅明确的 400 不支持认证 asset 拒绝允许回退。旧无受理记录的缓存不盲目重新生成。\n\n验证：9 项实际函数、本地 HTTP 与独立 CLI 进程用例通过，包含图片下载失败只提交一次、视频查询失败接续、输入变更阻断和未知结果零视频回退。准确提交 c0da166012554858636e7c0edf43c5f6593a9cbe 的 8 项完整检查均退出 0。测试未调用真实生成服务。\n\n任务卡 #132；依赖 #131。仅修改 Growthtest 隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0007\",\n  \"ready\": true,\n  \"depends_on\": [\n    131\n  ],\n  \"releases\": []\n}\n-->",
       "files": [
+        "docs/capabilities.auto.json",
         "docs/video-generation-idempotency.md",
         "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
         "scripts/tools/portrait-set-from-asset.mts"
       ],
-      "ciSince": 1791396989218,
+      "ciSince": 1791398415152,
       "alignmentIntent": null,
       "alignment": {
         "sha": "a716ecf18e100926134343ca9d66018d79bf2191",
@@ -68915,6 +68916,54 @@
       },
       "previous": "cc8e261490040eb2a102b26f013045e8bad559c9590846b0e59b3e884d5dcbc1",
       "digest": "42e11f786658bd32355a7b3316f288612485411c46be752ed12ca5a2a4f23cdf"
+    },
+    {
+      "sequence": 2608,
+      "at": "2026-10-07T18:40:15.152Z",
+      "kind": "task",
+      "data": {
+        "number": 133,
+        "patch": {
+          "alignmentCount": 0,
+          "recoveryCount": 0,
+          "reviewFailures": null,
+          "blockedUntil": 0,
+          "developerReview": null,
+          "candidate": null,
+          "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+          "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+          "branch": "task/T-2026-1007-0007",
+          "intent": {
+            "taskId": "T-2026-1007-0007",
+            "ready": true,
+            "dependsOn": [
+              131
+            ],
+            "releases": []
+          },
+          "originalBody": "肖像派生 CLI 会在网络失败时重发图片 POST，并在图片结果不明时自动转入付费视频；视频任务 ID 也未跨进程保存。现在按角度和真实请求内容保存提交状态，先保存受理响应，再下载或按原任务 ID 查询。未知、5xx、畸形响应和下载失败均不转付费入口；仅明确的 400 不支持认证 asset 拒绝允许回退。旧无受理记录的缓存不盲目重新生成。\n\n验证：9 项实际函数、本地 HTTP 与独立 CLI 进程用例通过，包含图片下载失败只提交一次、视频查询失败接续、输入变更阻断和未知结果零视频回退。准确提交 c0da166012554858636e7c0edf43c5f6593a9cbe 的 8 项完整检查均退出 0。测试未调用真实生成服务。\n\n任务卡 #132；依赖 #131。仅修改 Growthtest 隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0007\",\n  \"ready\": true,\n  \"depends_on\": [\n    131\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-generation-idempotency.md",
+            "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+            "scripts/tools/portrait-set-from-asset.mts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791398415152
+        }
+      },
+      "previous": "42e11f786658bd32355a7b3316f288612485411c46be752ed12ca5a2a4f23cdf",
+      "digest": "59d93c0bcc0d7e8201a11e7592b30f792faae0e429223b3c5a588bb33f26a217"
+    },
+    {
+      "sequence": 2609,
+      "at": "2026-10-07T18:41:16.395Z",
+      "kind": "transaction",
+      "data": {
+        "id": "12dfe094-01b7-4c05-8ecf-3ad9317e847d"
+      },
+      "previous": "59d93c0bcc0d7e8201a11e7592b30f792faae0e429223b3c5a588bb33f26a217",
+      "digest": "11c672cbb7647a5cca22389fc954a6c518bc37bfc0238e83662dd56c8cb0e5c0"
     }
   ]
 }
