@@ -144,6 +144,28 @@ describe("人物授权、服饰合同与正式发布", () => {
     expect(visual("GT-03", { status: "failed", approved: false, reason: "白衣违反黑色套装合同" }).checks.identity).toBe("unverified");
   });
 
+  it("近景评审绑定可见服饰范围；画外项留未观察，不改写生成时的完整服饰锁", () => {
+    const contract = fixture(), before = characterReleaseHash(contract), evidence = visual();
+    const request = evidence.visualReview!.request;
+    expect(request.context.wardrobeEvidenceScope).toEqual({ policy: "visible-components-only", offscreen: "unobserved-no-pass-or-fail-claim",
+      visibleContradiction: "reject", visibleNecessaryDetailUnclear: "unverified", faceEvidenceInsufficient: "unverified" });
+    expect(request.wardrobeLock).toEqual(wardrobe);
+    expect(generationIdentityLock(contract, "GT-01").promptFragment).toContain(wardrobe.description);
+    expect(characterReleaseHash(contract)).toBe(before);
+    const { requestHash, ...body } = request;
+    expect(requestHash).toBe(characterReleaseHash(body));
+  });
+
+  it.each(["可见纽扣深色，违反金色纽扣合同；裙摆鞋子画外未观察", "人脸不可辨认；画外衣着不构成身份佐证"])("可见违约或身份不足仍阻止后续付费：%s", reason => {
+    const contract = fixture(), clip = artifact(), rejected = visual("GT-01", { approved: false, status: "failed", reason });
+    const report = assessCharacterRelease({ contract, phase: "canary", shots: [{ ...clip, evidence: [rejected] }], now: NOW });
+    expect(report.continuePaidRendering).toBe(false);
+    expect(report.releaseAllowed).toBe(false);
+    expect(report.internalCandidateAllowed).toBe(true);
+    expect(report.issues.map(row => row.code)).toContain("dedicated-visual-review-rejected");
+    expect(rejected.visualReview!.verdict.reason).toBe(reason);
+  });
+
   it("运行时间无效时授权不能被空比较绕过", () => {
     const contract = fixture();
     expect(assessCharacterRelease({ contract, phase: "release", shots: contract.shots.map((s) => withVisual(s.shotId)), now: new Date("invalid") }).status).toBe("failed");
