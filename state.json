@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3004,
+  "revision": 3006,
   "tasks": {
     "98": {
       "number": 98,
@@ -6066,7 +6066,14 @@
       "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "candidate": null,
+      "candidate": {
+        "number": 155,
+        "branch": "delivery/candidate/pr-139-4b25d51fd50fecec0bc2b51b3ec8cf57",
+        "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
+        "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+        "marker": "delivery-origin:139:51200b22af022c458806bd43ec7b850f0b258714:8256e6c0c99f32b80e5071f89f38be932e38e15f",
+        "at": 1791405913693
+      },
       "originalBody": "普通 CLI 的风格差异测量忽略 FFmpeg 执行失败，并把缺失的 RGB 结果填成黑色，可能让无效样本通过三版差异检查。现在先验证退出状态、启动错误、Buffer 类型和至少三个字节，失败抛出 VARIANT_RGB_MEASUREMENT_FAILED；合法黑色继续采用，现有画面或音频差异 OR 判据和独立三轴来源规则保持原行为。\n\n确定性成功封面的正常来源链连接已提前在正式 PR135 固化。本任务保留该行为文档并完成独立审查发现的 RGB 修复。\n\n验证：纠正两个 subprocess 夹具的参数位置后，未修改的旧源在 23 个用例中 11 通过、12 个故障断言失败；补充修复的工作字节 23/23 通过，首轮夹具错误日志另存并保留。测试提取真实 CLI 私有测量、samples.push、差异与三轴计算以及三项现有硬检查；subprocess 输出和外层循环是夹具，没有执行供应商、模型、真实媒体或完整发布管线。当前提交的八项本地制片、脚本、类型、资产和能力检查均实际通过。原生源与候选七项 CI、精确合并源码核心门禁和真实 PostgreSQL 回归仍为正式发布前置。\n\n仅修改 Growthtest 隔离副本，不回流公共层。Closes #138。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0010\",\n  \"ready\": true,\n  \"depends_on\": [\n    137\n  ],\n  \"releases\": []\n}\n-->\n",
       "files": [
         "docs/capabilities.auto.json",
@@ -77560,6 +77567,36 @@
       },
       "previous": "4e0d095350813b0142fb10975aa69b5930ddef85c22745322c113b48a0d9571f",
       "digest": "ea69827bbe7a539f485e14fae2625db2578e27cfdd030f183af2684ee69c1267"
+    },
+    {
+      "sequence": 3005,
+      "at": "2026-10-07T20:45:13.693Z",
+      "kind": "task",
+      "data": {
+        "number": 139,
+        "patch": {
+          "candidate": {
+            "number": 155,
+            "branch": "delivery/candidate/pr-139-4b25d51fd50fecec0bc2b51b3ec8cf57",
+            "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
+            "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+            "marker": "delivery-origin:139:51200b22af022c458806bd43ec7b850f0b258714:8256e6c0c99f32b80e5071f89f38be932e38e15f",
+            "at": 1791405913693
+          }
+        }
+      },
+      "previous": "ea69827bbe7a539f485e14fae2625db2578e27cfdd030f183af2684ee69c1267",
+      "digest": "27e6f00ffdeafd77323771f9d6db8a0e1200b159b5d84d560fb52b3a26ee95f2"
+    },
+    {
+      "sequence": 3006,
+      "at": "2026-10-07T20:46:11.976Z",
+      "kind": "transaction",
+      "data": {
+        "id": "60b5049c-6896-442c-ba6c-b71e1cfe432b"
+      },
+      "previous": "27e6f00ffdeafd77323771f9d6db8a0e1200b159b5d84d560fb52b3a26ee95f2",
+      "digest": "485fe7f66f51462122f93e42f8e35561fd16ce2bf00701af219c38f991a61438"
     }
   ]
 }
