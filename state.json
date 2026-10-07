@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 775,
+  "revision": 777,
   "tasks": {
     "98": {
       "number": 98,
@@ -34,7 +34,7 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791336644957,
-      "updatedAt": 1791357311247,
+      "updatedAt": 1791358510932,
       "alignmentCount": 1,
       "alignmentIntent": null,
       "developerReview": null,
@@ -55,9 +55,9 @@
       },
       "recoveryCount": 0,
       "reviewFailures": null,
-      "blockedUntil": 1791357911247,
+      "blockedUntil": 1791359110932,
       "candidate": null,
-      "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "repairRequired": {
         "provider": "codex",
         "headSha": "c20c2606f9670aff25635b3c71bd2e138c915a58",
@@ -25260,6 +25260,31 @@
       },
       "previous": "18b0fc3d2b7ef907eefa77c9d64cd6372db34141c45d75828dbd20edcee2bd0f",
       "digest": "0a8f7aa423874ede14d244bec0213fc0aa1a41938b894f6d7a72f7964fd6b39e"
+    },
+    {
+      "sequence": 776,
+      "at": "2026-10-07T07:35:10.932Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791359110932
+        }
+      },
+      "previous": "0a8f7aa423874ede14d244bec0213fc0aa1a41938b894f6d7a72f7964fd6b39e",
+      "digest": "dee31242fa5202832f3a6c06ee054513e4e3138305b7029edfaea6bce1c1382d"
+    },
+    {
+      "sequence": 777,
+      "at": "2026-10-07T07:35:29.448Z",
+      "kind": "transaction",
+      "data": {
+        "id": "974e1340-c164-40d5-9886-0295861fb017"
+      },
+      "previous": "dee31242fa5202832f3a6c06ee054513e4e3138305b7029edfaea6bce1c1382d",
+      "digest": "849a5d8f35aa40a8af28fccffe2e3fedf48075ee86c2cefc32212e5c7a68dea5"
     }
   ]
 }
