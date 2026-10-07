@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 370,
+  "revision": 372,
   "tasks": {
     "98": {
       "number": 98,
@@ -2406,7 +2406,7 @@
           "protocol": 14
         }
       },
-      "updatedAt": 1791340509723,
+      "updatedAt": 1791340810439,
       "headSha": "3979bcd3abd45a80913edb43bab908bf5c068e34",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2641,8 +2641,8 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791341109723,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791341410439,
       "repairRequired": {
         "provider": "codex",
         "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
@@ -12597,6 +12597,31 @@
       },
       "previous": "114badd3279174aab5305fa5a05124d1113dfd5f11583a409aef903d723a773c",
       "digest": "d13a0029c8d5b7c0a728d1e1a6a844a2ab5baaab103ed7d6064cc054a0718025"
+    },
+    {
+      "sequence": 371,
+      "at": "2026-10-07T02:40:10.439Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791341410439
+        }
+      },
+      "previous": "d13a0029c8d5b7c0a728d1e1a6a844a2ab5baaab103ed7d6064cc054a0718025",
+      "digest": "ef8d50ea9b30a07ba50915a3282db03722925a4cac8278db9693e43906c53553"
+    },
+    {
+      "sequence": 372,
+      "at": "2026-10-07T02:40:15.207Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f65a3bfc-ee6c-4ab6-8c14-d274303e1052"
+      },
+      "previous": "ef8d50ea9b30a07ba50915a3282db03722925a4cac8278db9693e43906c53553",
+      "digest": "f5813b9ce8f1038d561ceaa28b0961151fe7490aef4d7f453415138996294983"
     }
   ]
 }
