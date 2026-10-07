@@ -14,6 +14,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync, realpathSync, renameSync, unlinkSync, readdirSync } from "node:fs";
 import { join, relative, resolve as resolvePath, isAbsolute, sep } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
+import { submitGenerationOnce, generationRequestHash, readGenerationSubmissionState } from "./generation-submission.mjs";
 import { execFileSync } from "node:child_process";
 import { REQUIRED_PORTRAIT_ANGLES, assertCharacterComponent, loadCharacterEntry, readPortraitArtifact, selectPortraitWardrobe, verifyPortraitSet, withCharacterArchiveLock, writePortraitJson, type CharacterProfile, type PortraitSet, type PortraitArtifactReceipt } from "./character-archive.js";
 import { REALISM_NEGATIVE_TERMS, STYLIZED_STYLES } from "./shot-spec.js";
@@ -32,9 +33,8 @@ export interface PortraitAgentConfig {
   /** 图片接口基础地址 */
   baseUrl?: string;
   /**
-   * 背景干净度硬闸（默认开启）。定妆照背景必须**均匀、中性、无渐变/无暗角/无投影**，
-   * 否则下游 AI 视频环节抠像（matting）会把灰边、暗角与影子一起拖出来。
-   * 只有明确的"非抠像用途"（例如艺术风格设定集）才可显式关闭。
+   * 显式开启背景诊断时检查均匀、中性、无渐变/暗角/投影。
+   * 默认直接采用已生成素材；诊断失败也不自动发起另一次付费生成。
    */
   requireCleanBackground?: boolean;
   /** 背景探针（默认 ffmpeg signalstats 实现；单测注入替身以免依赖 ffmpeg） */
@@ -284,9 +284,13 @@ export function buildPortraitPlan(
   }
   const sourceHash = shotIntentHash({ characterId: profile.id, name: profile.name, kind: profile.kind, identity: profile.identity ?? {}, appearance: profile.appearance ?? {}, wardrobe, style: declaredStyle, subjectType: profile.subjectType ?? "person" });
   const wardrobeHash = shotIntentHash(wardrobe);
-  const requestHash = shotIntentHash({ schemaVersion: "workloom.portrait-plan/v2", sourceHash, model: config.model ?? null, endpoint: (config.baseUrl ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, ""), size: config.size ?? null, seed: config.seed ?? null, angles, prompts, anchors: anchorReceipts, backgroundPolicy: config.requireCleanBackground === false ? "disabled" : CLEAN_BACKGROUND_POLICY, hardenedTemplate: PHOTOREAL_TEMPLATE_HARDENED });
+  const requestInputs = { schemaVersion: "workloom.portrait-plan/v2", sourceHash, model: config.model ?? null, endpoint: (config.baseUrl ?? "https://ark.cn-beijing.volces.com/api/v3").replace(/\/$/, ""), size: config.size ?? null, seed: config.seed ?? null, angles, prompts, anchors: anchorReceipts, hardenedTemplate: PHOTOREAL_TEMPLATE_HARDENED };
+  const plannedRequestHash = shotIntentHash({ ...requestInputs, backgroundPolicy: config.requireCleanBackground === true ? CLEAN_BACKGROUND_POLICY : "disabled" });
+  // Changing a post-generation diagnostic preference does not authorize another identical paid image.
+  const compatibleHashes = [plannedRequestHash, shotIntentHash({ ...requestInputs, backgroundPolicy: CLEAN_BACKGROUND_POLICY }), shotIntentHash({ ...requestInputs, backgroundPolicy: "disabled" })];
   const existing = (profile.portraitSets ?? []).map((set) => set.version);
-  const reusable = [...(profile.portraitSets ?? [])].reverse().find((set) => set.schemaVersion === "workloom.portrait-set/v2" && set.requestHash === requestHash);
+  const reusable = [...(profile.portraitSets ?? [])].reverse().find((set) => set.schemaVersion === "workloom.portrait-set/v2" && compatibleHashes.includes(set.requestHash ?? ""));
+  const requestHash = reusable?.requestHash ?? plannedRequestHash;
   const version = config.version ?? reusable?.version ?? (existing.length > 0 ? Math.max(...existing) + 1 : 1);
   const specified = profile.portraitSets?.find((set) => set.version === version);
   if (specified && specified.requestHash !== requestHash) throw new Error("PORTRAIT_VERSION_CONFLICT: 指定版本属于不同生成来源或旧无收据版本；需新版本候选");
@@ -395,7 +399,7 @@ export async function runPortraitAgent(options: {
     const angleRequests: Record<string, string> = {};
     const failures: Array<{ angle: string; error: string }> = []; const reused: string[] = [];
     const backgroundChecks: Record<string, BackgroundCheck> = {};
-    const requireCleanBackground = config.requireCleanBackground !== false;
+    const requireCleanBackground = config.requireCleanBackground === true;
     const anchors = plan.anchors.map((file, index) => {
       const receipt = readPortraitArtifact(file);
       if (shotIntentHash(receipt) !== shotIntentHash(plan.anchorReceipts[index])) throw new Error("PORTRAIT_INPUT_CHANGED: 锚点已变化");
@@ -446,6 +450,12 @@ export async function runPortraitAgent(options: {
     };
     const bodyOf = (prompt: string): Record<string, unknown> => ({ model: options.model, prompt, response_format: "url", watermark: false,
       ...(anchors.length ? { image: anchors.length === 1 ? anchors[0] : anchors } : {}), ...(config.size ? { size: config.size } : {}), ...(config.seed !== undefined ? { seed: config.seed } : {}) });
+    const submissionDir = ensure("portrait-sets/.submissions");
+    const submissionPlanFile = join(submissionDir, `${plan.requestHash}.plan.json`);
+    const submissionPlan = { schemaVersion: "workloom.portrait-submission-plan/v1", requestHash: plan.requestHash, sourceHash: plan.sourceHash };
+    if (existsSync(submissionPlanFile)) {
+      if (lstatSync(submissionPlanFile).isSymbolicLink() || shotIntentHash(JSON.parse(readFileSync(submissionPlanFile, "utf8"))) !== shotIntentHash(submissionPlan)) throw new Error("PORTRAIT_SUBMISSION_PLAN_INVALID");
+    } else if (!prior) writePortraitJson(submissionPlanFile, submissionPlan);
     say(`[portrait-agent] ${profile.name} v${plan.version}：${plan.mode}，服装来源 ${plan.wardrobeHash.slice(0, 12)}，角度 ${plan.angles.join("/")}`);
     // Reserve a candidate before external calls. Failed or partial sets never replace the active version.
     if (!prior) persist(false);
@@ -453,26 +463,37 @@ export async function runPortraitAgent(options: {
       const file = join(setDir, `${profile.id}-${angle}.png`);
       const basePrompt = plan.prompts[angle]!; const softened = SAFETY_SOFTENED_FRAMING[angle];
       const hardened = `${basePrompt}。${PHOTOREAL_TEMPLATE_HARDENED}`;
-      const attempts = [basePrompt, ...(softened ? [`${basePrompt}。${softened}`] : []), ...(requireCleanBackground ? [hardened, ...(softened ? [`${hardened}。${softened}`] : [])] : [])];
+      const attempts = [basePrompt, ...(softened ? [`${basePrompt}。${softened}`] : [])];
+      // Successful legacy hardened outputs remain reusable. Quality feedback never starts another paid attempt.
+      const legacyPrompts = [hardened, ...(softened ? [`${hardened}。${softened}`] : [])];
       const allowedRequests = attempts.map((prompt) => shotIntentHash({ endpoint: `${base}/images/generations`, payload: bodyOf(prompt) }));
+      const reusableRequests = [...allowedRequests, ...legacyPrompts.map(prompt => shotIntentHash({ endpoint: `${base}/images/generations`, payload: bodyOf(prompt) }))];
       if (prior?.requestHash === plan.requestHash && prior.files?.[angle]) {
         try {
           const priorFile = resolvePath(dir, prior.files[angle]!); const actual = readPortraitArtifact(priorFile, dir);
           const priorBackground = prior.backgroundChecks?.[angle] as BackgroundCheck | undefined;
           const validBackground = !requireCleanBackground || Boolean(priorBackground?.ok && [priorBackground.cornerSpread, priorBackground.maxRange, priorBackground.maxSat].every(Number.isFinite));
-          if (shotIntentHash(actual) === shotIntentHash(prior.artifacts?.[angle] ?? null) && allowedRequests.includes(prior.angleRequests?.[angle] ?? "") && validBackground) {
+          if (shotIntentHash(actual) === shotIntentHash(prior.artifacts?.[angle] ?? null) && reusableRequests.includes(prior.angleRequests?.[angle] ?? "") && validBackground) {
             if (priorBackground) backgroundChecks[angle] = structuredClone(priorBackground);
             files[angle] = priorFile; artifacts[angle] = actual; angleRequests[angle] = prior.angleRequests![angle]!; reused.push(angle); continue;
           }
         } catch (error) { say(`  · ${angle} 旧候选不可复用：${error instanceof Error ? error.message : String(error)}`); }
       }
       let lastError = "";
-      for (const [attempt, prompt] of attempts.entries()) {
+      const journalFile = join(submissionDir, `${plan.requestHash}-${angle}.json`);
+      const submission = readGenerationSubmissionState(journalFile);
+      const acceptedAttempt = submission?.state === "accepted" ? attempts.findIndex(prompt => generationRequestHash(`${base}/images/generations`, JSON.stringify(bodyOf(prompt))) === submission.requestHash) : -1;
+      const attemptIndices = acceptedAttempt >= 0 ? [acceptedAttempt] : attempts.map((_, i) => i);
+      if (prior && !existsSync(submissionPlanFile) && !submission) throw new Error("PORTRAIT_LEGACY_SUBMISSION_UNKNOWN: reconcile prior incomplete generation before another POST");
+      for (const attempt of attemptIndices) {
+        const prompt = attempts[attempt]!;
         try {
           assertInputs();
-          const response = await fetchImpl(`${base}/images/generations`, { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${options.apiKey}` }, body: JSON.stringify(bodyOf(prompt)), signal: AbortSignal.timeout(240_000) });
+          const submitted = await submitGenerationOnce({ endpoint: `${base}/images/generations`, journalFile,
+            headers: { "content-type": "application/json", authorization: `Bearer ${options.apiKey}` }, body: JSON.stringify(bodyOf(prompt)), fetchImpl, timeoutMs: 240_000 });
+          const response = submitted.response;
           const text = await response.text();
-          if (!response.ok) throw new Error(`HTTP ${response.status} ${text.slice(0, 200)}`);
+          if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status} ${text.slice(0, 200)}`), { acceptance: submitted.acceptance });
           const url = (JSON.parse(text) as { data?: Array<{ url?: string }> }).data?.[0]?.url;
           if (!url) throw new Error("响应缺少url，不能自动重复已成功的生成请求");
           const download = await fetchImpl(url, { signal: AbortSignal.timeout(120_000) });
@@ -483,13 +504,13 @@ export async function runPortraitAgent(options: {
           const temporary = join(setDir, `.portrait-${randomUUID()}.tmp`);
           try { writeFileSync(temporary, bytes, { flag: "wx", mode: 0o600 }); if (lstatSync(setDir).isSymbolicLink()) throw new Error("PORTRAIT_PATH_INVALID: 输出目录发生变化"); renameSync(temporary, file); }
           finally { if (existsSync(temporary)) unlinkSync(temporary); }
-          if (requireCleanBackground && !checkBackground(file, angle).ok) { lastError = `background_not_clean：${backgroundChecks[angle]!.notes.join("；")}`; continue; }
+          if (requireCleanBackground && !checkBackground(file, angle).ok) { lastError = `background_not_clean：${backgroundChecks[angle]!.notes.join("；")}`; break; }
           files[angle] = file; artifacts[angle] = readPortraitArtifact(file, dir); angleRequests[angle] = allowedRequests[attempt]!;
           say(`  · ${angle} 当前请求与产物收据已绑定`); break;
         } catch (error) {
           lastError = error instanceof Error ? error.message : String(error);
           say(`  · ${angle} 失败：${lastError.slice(0, 160)}`);
-          if (!/SensitiveContent|Sensitive/i.test(lastError)) break;
+          if ((error as { acceptance?: string }).acceptance !== "rejected" || !/SensitiveContent|Sensitive/i.test(lastError)) break;
         }
       }
       if (!files[angle]) failures.push({ angle, error: lastError || "未得到可核验产物" });

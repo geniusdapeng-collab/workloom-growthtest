@@ -20,6 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, statSync, lstatSync, realpathSync, writeFileSync, renameSync, unlinkSync, openSync, closeSync } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
 import { shotIntentHash } from "./shot-intent.js";
+import { submitGenerationOnce } from "./generation-submission.mjs";
 import { isAbsolute, join, resolve, relative, dirname, sep } from "node:path";
 
 /** vendor → 渲染核心要求的四个角度文件名（REQUIRED_ANGLES 口径） */
@@ -112,7 +113,7 @@ export interface PortraitRuntimeOptions {
   maxReferenceImages?: number;
   log?: (line: string) => void;
   fetchImpl?: typeof fetch;
-  /** 失败重试次数（仅网络/限流/5xx 类，默认 2） */
+  /** 兼容旧配置；生成 POST 的未知结果永不自动重试，下载失败可接续已有响应。 */
   retries?: number;
 }
 
@@ -438,41 +439,18 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
     return text.length >= 8 && descriptive.test(text) ? raw.trim() : null;
   }
 
-  async function generateImage(payload: Record<string, unknown>): Promise<string> {
-    let lastError: Error | null = null;
-    for (let attempt = 0; attempt <= retries; attempt += 1) {
-      try {
-        const res = await fetchImpl(`${base}/images/generations`, {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-          body: JSON.stringify(payload),
-          signal: AbortSignal.timeout(timeoutMs)
-        });
-        const text = await res.text();
-        if (!res.ok) {
-          const err = new Error(`定妆照出图失败：HTTP ${res.status} ${text.slice(0, 200)}`);
-          if (res.status === 429 || res.status >= 500) {
-            lastError = err;
-            await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-            continue;
-          }
-          Object.assign(err, { noRetry: true });
-          throw err;
-        }
-        let data: { data?: Array<{ url?: string; size?: string }> };
-        try { data = JSON.parse(text) as typeof data; }
-        catch { throw Object.assign(new Error("定妆照出图成功响应不是有效JSON，禁止自动重复收费"), { noRetry: true }); }
-        const url = data?.data?.[0]?.url;
-        if (!url) throw Object.assign(new Error(`定妆照出图响应缺少 url：${text.slice(0, 200)}`), { noRetry: true });
-        log(`[portrait] 出图成功（${data.data?.[0]?.size ?? "?"}）`);
-        return url;
-      } catch (err) {
-        lastError = err instanceof Error ? err : new Error(String(err));
-        if ((err as { noRetry?: boolean })?.noRetry || attempt >= retries) break;
-        await new Promise((r) => setTimeout(r, 2000 * (attempt + 1)));
-      }
-    }
-    throw lastError ?? new Error("定妆照出图失败：未知错误");
+  async function generateImage(payload: Record<string, unknown>, journalFile: string): Promise<string> {
+    const { response: res } = await submitGenerationOnce({ endpoint: `${base}/images/generations`, journalFile,
+      headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, body: JSON.stringify(payload), fetchImpl, timeoutMs });
+    const text = await res.text();
+    if (!res.ok) throw new Error(`定妆照出图失败：HTTP ${res.status}`);
+    let data: { data?: Array<{ url?: string; size?: string }> };
+    try { data = JSON.parse(text) as typeof data; }
+    catch (cause) { throw new Error("定妆照已受理响应不是有效JSON，禁止重复收费", { cause }); }
+    const url = data?.data?.[0]?.url;
+    if (!url) throw new Error("定妆照已受理响应缺少url，禁止重复收费");
+    log(`[portrait] 已保存出图响应（${data.data?.[0]?.size ?? "?"}）`);
+    return url;
   }
 
   async function download(url: string): Promise<Buffer> {
@@ -520,7 +498,8 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
       if (cached) { log(`[portrait] 完整请求及产物哈希一致，复用：${kind}/${key}/${angle}`); return cached; }
       ensureOutputDirectory(dirname(file));
       log(`[portrait] 出图：${name} / ${angle}，来源 ${requestHash.slice(0, 12)}，锚点 ${anchors.length}`);
-      const url = await generateImage(payload);
+      const submissions = join(charactersRoot, ".submissions"); ensureOutputDirectory(submissions);
+      const url = await generateImage(payload, join(submissions, `${requestHash}.json`));
       const bytes = await download(url);
       if (shotIntentHash(task) !== sourceHash) throw new Error("PORTRAIT_INPUT_CHANGED: 出图期间角色任务变化，产物未纳入索引");
       for (const anchor of anchors) verifySource(anchor.receipt);
@@ -528,6 +507,7 @@ export function createPortraitRuntime(options: PortraitRuntimeOptions): Portrait
       const output = snapshotFile(file).receipt;
       if (output.sha256 !== hashBytes(bytes)) throw new Error("PORTRAIT_OUTPUT_CHANGED: 落盘期间产物变化");
       upsert(bucket, key, name, dir, { ...planned, output });
+      log(`[portrait] 出图成功，当前请求与落盘收据已绑定：${kind}/${key}/${angle}`);
       return file;
     });
     inFlight.set(flightKey, operation);
