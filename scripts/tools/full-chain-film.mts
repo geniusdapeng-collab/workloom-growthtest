@@ -43,7 +43,7 @@ import YAML from "yaml";
 import { filmReviewContracts, loadOrCreateFilmAuthorContext, reviewFilmStage } from "../../packages/video-studio/src/film-contracts.js";
 import { buildProducerReviewContract, reviewStage as reviewCharacterVisualStage, type ProducerGateOptions } from "../../packages/video-studio/src/producer-gate.js";
 import { buildVariantCoverFilters, embedCoverFirstFrame, type CoverFirstFrameReceipt, type CoverVariantId } from "../../packages/video-studio/src/cover-assembly.js";
-import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, buildCharacterIdentityReviewRequest, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
+import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, assessRenderedCharacterUse, buildCharacterIdentityReviewRequest, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
 import { buildRegisteredCharacterReleaseSource } from "../../packages/video-studio/src/character-release-source.js";
 import type { FilmVideoSubmissionReceipt } from "../../packages/video-studio/src/film-worker-provenance.js";
 import { assessPortraitDecision, selectPortraitDecisionRecord } from "../../packages/video-studio/src/portrait-decision.js";
@@ -2041,15 +2041,18 @@ function assertCharacterRenderPreflight(): void {
   if (!characterReleaseContract.shots.length) return;
   if (characterReleaseContract.status !== "passed" || characterBindings.some((binding) => !binding.identityAnchor))
     throw new Error(`CHARACTER_RENDER_PREFLIGHT_BLOCKED: 授权身份、服饰合同或登记基准图缺失；${characterReleaseContract.issues.map((issue) => issue.detail).join("；")}`);
-  if (!(WORKER_RUNTIME ? WORKER_RUNTIME.identityVisionAvailable : resolveProducerLlm(ENV)))
+  if (REVIEW_POLICY !== "off" && !(WORKER_RUNTIME ? WORKER_RUNTIME.identityVisionAvailable : resolveProducerLlm(ENV)))
     throw new Error("CHARACTER_VISION_UNAVAILABLE: 专用人物视觉评审不可用，禁止先花人物渲染额度");
 }
 function characterArtifact(shot: ShotCard): CharacterReleaseArtifact {
   const path = join(CLIP_DIR, `${shot.shotId}.mp4`);
   const clip = { path, sha256: existsSync(path) ? sha256FileSync(path) : "" };
   const base = join(PROMPT_DIR, `${shot.shotId}.txt`);
+  const submittedFile = join(PROMPT_DIR, `${shot.shotId}.submitted.txt`);
+  const submittedPromptSha256 = existsSync(submittedFile) ? fingerprintText(readFileSync(submittedFile, "utf8")) : "";
   const submitted = readStageHistory().filter((entry) => entry.stage === "shot" && entry.shotId === shot.shotId
-    && entry.evidence?.rawSha256 === clip.sha256 && entry.evidence?.generationPromptSha256
+    && entry.evidence?.rawSha256 === clip.sha256 && submittedPromptSha256
+    && entry.evidence?.generationPromptSha256 === submittedPromptSha256 && entry.evidence?.requestInputVerified === true
     && existsSync(base) && entry.evidence.basePromptSha256 === fingerprintText(readFileSync(base, "utf8"))).at(-1);
   const identityRow = latestLineageRecord(lineageRecords(readStageHistory(), "character-identity"), PROJECT, "character-identity", shot.shotId);
   const identityEvidence = identityRow?.evidence?.identityEvidence as CharacterIdentityEvidence | undefined;
@@ -2062,7 +2065,8 @@ function characterReleaseReport(phase: "canary" | "release", characterId?: strin
   const selected = characterReleaseContract.shots.filter(shot => !ONLY.length || ONLY.includes(shot.shotId));
   const people = characterId ? [characterId] : [...new Set(selected.map(shot => shot.characterId))];
   const canaryShotIds = people.map(id => selected.find(shot => shot.characterId === id)?.shotId).filter((id): id is string => Boolean(id));
-  return assessCharacterRelease({ contract: characterReleaseContract, shots: allAssetShots.map(characterArtifact), phase,
+  const assess = REVIEW_POLICY === "off" ? assessRenderedCharacterUse : assessCharacterRelease;
+  return assess({ contract: characterReleaseContract, shots: allAssetShots.map(characterArtifact), phase,
     ...(phase === "canary" ? { canaryShotIds, canaryCharacterIds: people } : {}) });
 }
 function assertCharacterCanaryBeforeSubmit(shotId: string): void {
@@ -2070,6 +2074,7 @@ function assertCharacterCanaryBeforeSubmit(shotId: string): void {
   // not wait on a later person stage; each additional person shot still requires proof.
   if (!characterReleaseContract.shots.some(shot => shot.shotId === shotId)) return;
   assertCharacterRenderPreflight();
+  if (REVIEW_POLICY === "off") return;
   const person = characterReleaseContract.shots.find(shot => shot.shotId === shotId)!;
   const first = characterReleaseContract.shots.filter(shot => shot.characterId === person.characterId && (!ONLY.length || ONLY.includes(shot.shotId)))
     .slice(0, 1).map(shot => shot.shotId);
@@ -2081,6 +2086,14 @@ async function verifyCharacterClip(shot: ShotCard, generationPrompt: string): Pr
   if (!isAssetShot(shot)) return true;
   const artifact = characterArtifact(shot);
   if (artifact.promptSha256 !== fingerprintText(generationPrompt)) return false;
+  if (REVIEW_POLICY === "off") {
+    const adoption = assessRenderedCharacterUse({ contract: characterReleaseContract, shots: [artifact], phase: "canary",
+      canaryShotIds: [shot.shotId], canaryCharacterIds: [characterReleaseContract.shots.find(row => row.shotId === shot.shotId)!.characterId] });
+    record({ stage: "character-material-use", shotId: shot.shotId, invoked: false, ok: adoption.continuePaidRendering,
+      cached: false, degraded: false, attempt: 1, ms: 0, artifact: artifact.clip.path,
+      evidence: { adoption }, note: "渲染素材按默认策略采用；未进行身份、服饰或画面质量二次审核" });
+    return adoption.continuePaidRendering;
+  }
   const duration = Number(probe(artifact.clip.path).duration ?? 0);
   const dir = join(WORK_DIR, "identity-review", PROJECT, shot.shotId);
   mkdirSync(dir, { recursive: true });
@@ -2094,7 +2107,7 @@ async function verifyCharacterClip(shot: ShotCard, generationPrompt: string): Pr
     clip: artifact.clip, promptSha256: artifact.promptSha256, frames, producerContractHash: buildProducerReviewContract(contracts).contractHash });
   rememberInputs("character-identity", [artifact.clip.path, join(PROMPT_DIR, `${shot.shotId}.submitted.txt`), request.referenceImage.path,
     ...frames.map((frame) => frame.path)], shot.shotId);
-  // Direct official review boundary: general review off cannot replace this visual evidence.
+  // Explicit review mode keeps its real source-bound opinion; default off returned above.
   const verdict = WORKER_RUNTIME ? null : await reviewCharacterVisualStage({ stage: "shot", projectId: PROJECT, contracts, rubric: request.rubric,
     artifacts: [{ path: artifact.clip.path, kind: "video" }, ...frames.map((frame) => ({ path: frame.path, kind: "image" as const }))],
     referenceImages: [request.referenceImage.path], deterministic: [{ id: "identity-source-current", pass: true, hard: true, detail: request.requestHash }],
@@ -3923,10 +3936,8 @@ if (STAGES.has("material-gen")) {
             renderModel = VIDEO_MODEL;
             taskResumed = submitted.resumed;
           }
-          // Quality assessment reads the unchanged provider original; post never manufactures motion.
+          // Source facts use the unchanged provider original. Default adoption does not inspect quality.
           if (!renderInputVerified) throw new Error("MATERIAL_INPUT_UNVERIFIED: 缺当前素材与实际提交请求的绑定，不得认证生成来源");
-          lastRawMotion = measureMotionRichness(rawClip);
-          lastMotionVerdict = assessMotionRichness(lastRawMotion, { ...motionPolicy, minRampRatio: 0 });
           copyFileSync(rawClip, clip);
           if (sha256FileSync(rawClip) !== sha256FileSync(clip)) throw new Error("STANDARD_ORIGINAL_CHANGED: material copy differs from the original render");
           assertOriginalRenderMedia(clip, duration, shot.shotId);
@@ -3935,6 +3946,24 @@ if (STAGES.has("material-gen")) {
           const provenance = assertMaterialGenerationProvenance({
             renderTaskId, model: renderModel, sourceMaterialSha256: materialSha, outputSha256: lastOutputSha
           });
+          if (REVIEW_POLICY === "off") {
+            const sourceGate = recordGate({ stepKey: "material-generate", sourceStage: "material-gen", shotIds: [shot.shotId],
+              checks: [{ id: "generation-provenance", pass: provenance.ok, hard: true, detail: provenance.detail }],
+              evidence: { mode: "verify", materialUsePolicy: "default-use", qualityReviewPerformed: false,
+                material: photo, materialSha256: materialSha, outputSha256: lastOutputSha, taskId: renderTaskId, model: renderModel,
+                requestInputVerified: renderInputVerified, submissionReceipt: renderSubmissionReceipt, originalUnchanged: true } });
+            accepted = sourceGate.approved;
+            record({ stage: "material-gen", shotId: shot.shotId, invoked: true, ok: accepted, cached: taskResumed,
+              degraded: false, attempt: usedAttempt, ms: Date.now() - shotStarted, artifact: clip,
+              evidence: { ...lastInfo, resumed: taskResumed, materialUsePolicy: "default-use", qualityReviewPerformed: false,
+                requestInputVerified: renderInputVerified, submissionReceipt: renderSubmissionReceipt, taskId: renderTaskId, model: renderModel,
+                material: photo, materialSha256: materialSha, outputSha256: lastOutputSha, raw: rawClip, originalUnchanged: true,
+                outputFiles: [rawClip, prepared, ...(WORKER_RUNTIME && renderSubmissionReceipt ? [join(WORKER_RUNTIME.context.workDir, renderSubmissionReceipt.artifact.ref)] : [])] },
+              verdict: null, note: "渲染素材默认采用；只绑定真实生成来源，未执行运动量、参考相似度、场景独立性或视觉二次审核" });
+            continue;
+          }
+          lastRawMotion = measureMotionRichness(rawClip);
+          lastMotionVerdict = assessMotionRichness(lastRawMotion, { ...motionPolicy, minRampRatio: 0 });
           lastReuse = measureMaterialReuse(clip, prepared, duration, shot.shotId);
           lastReuseVerdict = assessMaterialReuse(lastReuse.samples, { durationSec: duration });
           /** 场景构建判据：这一镜是"构建出来的视频场景"还是"参考图被推动"（material-scene/v1） */
@@ -4334,6 +4363,21 @@ if (STAGES.has("videos")) {
     if (cached) {
       const cachedGeneration = latestLineageRecord(lineageRecords(readStageHistory(), "shot"), PROJECT, "shot", shot.shotId);
       const info = probe(clip);
+      if (REVIEW_POLICY === "off") {
+        assertOriginalRenderMedia(clip, duration, shot.shotId);
+        if (cachedGeneration?.evidence.requestInputVerified !== true)
+          throw new Error(`RENDER_CACHED_INPUT_UNVERIFIED: ${shot.shotId} 缺真实提交来源，不能自动付费重渲`);
+        record({ stage: "shot", shotId: shot.shotId, invoked: false, ok: true, cached: true, degraded: false,
+          attempt: 0, ms: 0, artifact: clip, evidence: { ...cachedGeneration.evidence, ...info, rawSha256: sha256FileSync(clip),
+            materialUsePolicy: "default-use", qualityReviewPerformed: false }, verdict: null,
+          note: "复用当前来源绑定的渲染素材，直接进入后期；未二次质审" });
+        if (shotIsAsset) {
+          const submittedFile = join(PROMPT_DIR, `${shot.shotId}.submitted.txt`);
+          if (!existsSync(submittedFile) || !await verifyCharacterClip(shot, readFileSync(submittedFile, "utf8")))
+            throw new Error(`CHARACTER_CACHED_SOURCE_UNVERIFIED: ${shot.shotId} 当前生成来源不完整`);
+        }
+        continue;
+      }
       const actual = Number(info.duration ?? 0);
       const settings = cachedShotSettings(shot);
       const verdict = await reviewStage({
@@ -4502,6 +4546,18 @@ if (STAGES.has("videos")) {
         }
         await issueOriginalRenderReceipt({ productionRoot: WORK_DIR, projectId: PROJECT, shotId: shot.shotId, submittedSha256: sourceFileHash,
           artifactPath: clip, taskId: submitted.taskId, requestInputVerified: submitted.requestInputVerified, submissionReceipt: submitted.submissionReceipt, parentWorkDir: WORKER_RUNTIME?.context.workDir });
+        if (REVIEW_POLICY === "off") {
+          record({ stage: "shot", shotId: shot.shotId, invoked: true, ok: true, cached: submitted.resumed, degraded: false,
+            attempt, ms: Date.now() - started, artifact: clip,
+            evidence: { ...info, taskId: submitted.taskId, resumed: submitted.resumed, requestInputVerified: true,
+              submissionReceipt: submitted.submissionReceipt ?? null, rawSha256: sha256FileSync(clip),
+              basePromptSha256: fingerprintText(prompt), generationPromptSha256: fingerprintText(attemptPrompt), referenceAssets: shotRefs,
+              materialUsePolicy: "default-use", qualityReviewPerformed: false }, verdict: null,
+            note: "渲染素材默认采用，直接进入后期；未抽帧、测动作或进行视觉二次审核" });
+          if (!await verifyCharacterClip(shot, attemptPrompt)) throw new Error(`CHARACTER_MATERIAL_SOURCE_UNVERIFIED: ${shot.shotId}`);
+          approved = true;
+          break;
+        }
         const actual = Number(info.duration ?? 0);
         const height = Number(info.height ?? 0);
         const width = Number(info.width ?? 0);
@@ -4797,7 +4853,7 @@ if (STAGES.has("compose") && !DRY_RUN) {
  *   锚色：该角色**首个声明出镜镜头**的取样色；差 ≥90 判失败、≥45 告警（阈值在模块里显式可审计）。
  */
 let characterConsistency: CharacterConsistencyReport | null = null;
-if (STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
+if (REVIEW_POLICY !== "off" && STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
   const sampleStart = Date.now();
   const characterShots = shots.filter((shot) => {
     const character = String((shot as { character?: unknown }).character ?? "").trim();
@@ -6696,6 +6752,10 @@ if (STAGES.has("mux") && subtitleSidecar && existsSync(scored) && !DRY_RUN) {
   }
 }
 
+function qualityAccidentsForReview(file: string): ReturnType<typeof detectQualityAccidents> | null {
+  return REVIEW_POLICY === "off" ? null : detectQualityAccidents(file);
+}
+
 /* ---------- ⑪ 母版交付 + 终审 ---------- */
 if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
   rememberInputs("master", [scored]);
@@ -6728,7 +6788,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
   const reviewFile = QUALITY === "uhd" ? join(POST_DIR, `${PROJECT}-master-review.mp4`) : deliverable;
   if (QUALITY === "uhd") copyFileSync(scored, reviewFile);
   const info = probe(reviewFile);
-  const accidents = detectQualityAccidents(reviewFile);
+  const accidents = qualityAccidentsForReview(reviewFile);
   const finalNamingAudit = auditDeliverableNaming({ path: finalPath, durationSec: Number(info.duration ?? 0) });
   /**
    * 音画对齐实测报告（2026-09-26 真机事故沉淀 · 机制）：
@@ -6891,8 +6951,10 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
         detail: `${info.width}x${info.height}（${QUALITY} 目标 ${OUTPUT_SIZE.width}x${OUTPUT_SIZE.height}）`, hard: true
       },
       { id: "audio", pass: Boolean(info.hasAudio), detail: info.hasAudio ? `音轨 ${info.acodec}` : "无音轨", hard: true },
-      { id: "no-black-frame", pass: accidents.blackSeconds <= 0.2, detail: `最长黑帧 ${accidents.blackSeconds.toFixed(2)}s（阈值 ≤0.2s）· ${accidents.detail}`, hard: true },
-      { id: "silence-window", pass: accidents.silenceSeconds <= 2.0, detail: `最长静音段 ${accidents.silenceSeconds.toFixed(2)}s（阈值 ≤2.0s；配乐铺底后不应出现长静音）` },
+      ...(accidents ? [
+        { id: "no-black-frame", pass: accidents.blackSeconds <= 0.2, detail: `最长黑帧 ${accidents.blackSeconds.toFixed(2)}s（阈值 ≤0.2s）· ${accidents.detail}`, hard: true },
+        { id: "silence-window", pass: accidents.silenceSeconds <= 2.0, detail: `最长静音段 ${accidents.silenceSeconds.toFixed(2)}s（阈值 ≤2.0s；配乐铺底后不应出现长静音）` },
+      ] : []),
       { id: "post-chain-lineage", pass: lineage.ok, detail: lineage.detail, hard: true },
       ...(QUALITY === "uhd" ? [{
         id: "enhancement-lineage", pass: enhancementLineageOk, hard: true,
@@ -6952,7 +7014,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
        * 角色一致性（2026-09-26 机制）：跨镜造型主色漂移 = 串戏嫌疑。
        * 能力边界如实：**不做人脸识别**，只比"统一取样口径下的造型主色"；命中需人工确认或显式放行。
        */
-      {
+      ...(REVIEW_POLICY !== "off" ? [{
         id: "character-consistency",
         pass: characterConsistency ? characterConsistency.ok : stageApproved("character-consistency"),
         detail: characterConsistency
@@ -6968,7 +7030,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
          * 让客户看到真片再判断——素材已经渲出来了，不再为"疑似"重跑。
          */
         hard: REVIEW_POLICY === "blocking",
-      },
+      }] : []),
       /**
        * 字幕**标点口径**（2026-09-25）：正规字幕不带标点。
        * 判据看旁挂清单里的机检结果（`no_punctuation`），而不是看内存里的字幕文本——

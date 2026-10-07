@@ -263,12 +263,14 @@ async function validateCharacterVideoSubmission(ctx: RunContext, frame: FilmChan
   if (!shot?.assetRef) return;
   const source = registeredCharactersFor(ctx);
   if (source.contract.status !== "passed" || source.bindings.some(binding => !binding.identityAnchor)) fail("CHARACTER_RENDER_PREFLIGHT_BLOCKED", "人物授权、服饰和登记基准图必须完整");
-  if (!resolveProducerLlm(ctx.env)) fail("CHARACTER_VISION_UNAVAILABLE", "父服务专用人物视觉评审未配置");
+  const reviewEnabled = (ctx.job.options["review-policy"] ?? "off") !== "off";
+  if (reviewEnabled && !resolveProducerLlm(ctx.env)) fail("CHARACTER_VISION_UNAVAILABLE", "父服务专用人物视觉评审未配置");
   const params = record(frame.params);
   if (params.firstFrame !== undefined) fail("CHARACTER_FIRST_FRAME_OVERRIDE", "登记真人素材模式不得混入另一首帧覆盖授权组");
   const generation = assessCharacterGenerationInput({ contract: source.contract, shotId: frame.shotId!,
     prompt: text(params.prompt, "人物提示词缺失", 30_000), referenceAssets: params.refs as string[] });
   if (generation.status !== "passed") fail("CHARACTER_GENERATION_INPUT_BLOCKED", generation.issues.map(issue => issue.detail).join("；"));
+  if (!reviewEnabled) return;
   const person = source.contract.shots.find(row => row.shotId === frame.shotId)!;
   const selected = String(ctx.job.options.only ?? "").split(",").filter(Boolean);
   const canary = source.contract.shots.find(row => row.characterId === person.characterId && (!selected.length || selected.includes(row.shotId)))!;
@@ -648,6 +650,13 @@ export async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRe
     await validateVideoReferences(ctx, frame);
   }
   if (frame.method === "media.fetch") await validateMediaFetchSource(ctx, frame);
+  if (frame.method === "gate.review" && record(frame.params).identityReview !== undefined
+    && (ctx.job.options["review-policy"] ?? "off") === "off") {
+    // An older worker may still ask for this review. Do not reserve model budget,
+    // extract frames, or manufacture a positive identity receipt in default mode.
+    return { reviewPolicy: "off", materialUsePolicy: "default-use", qualityReviewPerformed: false,
+      identityEvidence: null, identity: "unverified", wardrobe: "unverified" };
+  }
   const identityReview = frame.method === "gate.review" && record(frame.params).identityReview !== undefined
     ? await prepareIdentityReview(ctx, frame) : undefined;
   const payloadHash = renderSha256(filmCanonicalJson(frame.params));

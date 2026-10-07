@@ -2,7 +2,8 @@
  * Factual identity and explicit wardrobe release contract. No paid I/O, face recognition,
  * ASR or RGB proxy runs here. The caller supplies current file fingerprints and preserves
  * receipts; a dedicated visual review may run through the existing producer-gate adapter.
- * General review policy and technical scores never grant identity release permission.
+ * Default material adoption is separate from optional identity certification. Neither
+ * adoption nor technical scores grant positive identity or wardrobe evidence.
  */
 import { createHash } from "node:crypto";
 import { assetIdOf, referenceAssetRefs, verifyRealPersonAsset, type RealPersonAsset } from "./real-person-asset.js";
@@ -151,7 +152,7 @@ export interface CharacterIdentityReviewRequest {
   promptSha256: string; frames: CharacterReviewFrame[]; referenceImage: CharacterIdentityAnchor;
   wardrobeLock: CharacterWardrobeLock; rubric: string[]; context: Record<string, unknown>;
 }
-/** Caller must invoke producer-gate.reviewStage directly, independently of general review off. */
+/** Explicit review callers invoke the dedicated producer-gate adapter; default off skips it. */
 export function buildCharacterIdentityReviewRequest(input: {
   contract: CharacterReleaseContract; shotId: string; clip: CharacterArtifactFingerprint; promptSha256: string;
   frames: readonly CharacterReviewFrame[]; producerContractHash: string; now?: Date;
@@ -338,4 +339,44 @@ export function assessCharacterRelease(input: {
     releaseAllowed: input.phase === "release" && (status === "passed" || status === "not_applicable"),
     continuePaidRendering: input.phase === "canary" && (status === "passed" || status === "not_applicable"),
     internalCandidateAllowed: input.shots.some((s) => fingerprint(s.clip)), authorizationScope: "registered-local-evidence-not-provider-verified", shots, issues };
+}
+
+/** Source-bound adoption of rendered materials. Historical visual opinions stay untouched. */
+export function assessRenderedCharacterUse(input: Parameters<typeof assessCharacterRelease>[0]): CharacterReleaseReport & {
+  materialUsePolicy: "default-use"; qualityReviewPerformed: false;
+} {
+  const contract = input.contract;
+  const issues = contractIssues(contract, input.now ?? new Date());
+  const people = input.phase === "canary" && input.canaryCharacterIds !== undefined
+    ? input.canaryCharacterIds : contract.characters.map(character => character.characterId);
+  const canaries = input.canaryShotIds ?? (input.canaryShotId ? [input.canaryShotId]
+    : people.map(id => contract.shots.find(shot => shot.characterId === id)?.shotId).filter((id): id is string => !!id));
+  if (input.phase === "canary" && contract.shots.length && (!people.length || new Set(people).size !== people.length
+    || people.some(id => !contract.characters.some(character => character.characterId === id))
+    || people.some(id => !contract.shots.some(shot => shot.characterId === id && canaries.includes(shot.shotId)))))
+    issues.push(issue("material-use-scope-invalid", null, "采用范围必须绑定当前登记人物及镜头"));
+  const expected = input.phase === "release" ? contract.shots
+    : contract.shots.filter(shot => people.includes(shot.characterId) && canaries.includes(shot.shotId));
+  const byShot = new Map<string, CharacterReleaseArtifact>();
+  for (const artifact of input.shots) {
+    if (!contract.shots.some(shot => shot.shotId === artifact.shotId))
+      issues.push(issue("material-use-shot-unknown", artifact.shotId, "素材镜号不属于当前人物合同"));
+    if (byShot.has(artifact.shotId)) issues.push(issue("artifact-duplicate", artifact.shotId, "同一镜头存在多个产物，不能静默选择"));
+    byShot.set(artifact.shotId, artifact);
+  }
+  const shots = expected.map(shot => {
+    const artifact = byShot.get(shot.shotId);
+    if (!artifact || !fingerprint(artifact.clip) || !sha(artifact.promptSha256))
+      issues.push(issue("material-source-missing", shot.shotId, "采用需要当前视频字节摘要和实际生成提示词摘要"));
+    else if (!same(artifact.referenceAssets, shot.referenceAssets))
+      issues.push(issue("generation-references-unbound", shot.shotId, "实际生成参考未绑定登记授权组"));
+    return { shotId: shot.shotId, identity: "unverified" as const, wardrobe: "unverified" as const };
+  });
+  const status = issues.length ? statusOf(issues) : contract.shots.length ? "passed" : "not_applicable";
+  const allowed = status === "passed" || status === "not_applicable";
+  return { schemaVersion: "workloom.character-release-report/v1", contractHash: contract.contractHash, status,
+    materialUsePolicy: "default-use", qualityReviewPerformed: false,
+    releaseAllowed: input.phase === "release" && allowed, continuePaidRendering: input.phase === "canary" && allowed,
+    internalCandidateAllowed: input.shots.some(artifact => fingerprint(artifact.clip)),
+    authorizationScope: "registered-local-evidence-not-provider-verified", shots, issues };
 }

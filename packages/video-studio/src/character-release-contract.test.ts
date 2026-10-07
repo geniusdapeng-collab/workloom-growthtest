@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease,
+  adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, assessRenderedCharacterUse,
   buildCharacterIdentityReviewRequest, buildCharacterReleaseContract, characterReleaseHash,
   generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact,
 } from "./character-release-contract.js";
@@ -230,7 +230,7 @@ describe("人物授权、服饰合同与正式发布", () => {
     expect(report.shots.find((s) => s.shotId === "GT-03")?.identity).toBe("unverified");
   });
 
-  it("白衣违反显式w1合同：真实视觉反例失败，不能被review off或另一个pass回执抹掉", () => {
+  it("显式身份认证保留真实视觉拒绝，不能被另一个pass回执抹掉", () => {
     const contract = fixture(); const shots = contract.shots.map((s) => withVisual(s.shotId));
     const third = shots.find((s) => s.shotId === "GT-03")!;
     third.evidence.push(visual("GT-03", { status: "failed", approved: false, reason: "白色露肩礼服违反本镜w1黑色套装合同" }));
@@ -260,5 +260,50 @@ describe("人物授权、服饰合同与正式发布", () => {
       [{ shotId: "S", characterId: "ceo", assetRef: "asset://asset-primary" }, { shotId: "S", characterId: "ceo", assetRef: "asset://asset-primary" }]]) {
       expect(buildCharacterReleaseContract({ ...base, shots }).status).toBe("failed");
     }
+  });
+});
+
+describe("渲染素材默认采用与身份认证分开", () => {
+  it("无视觉意见即可采用，报告不授予身份或服饰认证", () => {
+    const contract = fixture(), shots = contract.shots.map(shot => artifact(shot.shotId));
+    const report = assessRenderedCharacterUse({ contract, shots, phase: "release", now: NOW });
+    expect(report).toMatchObject({ status: "passed", releaseAllowed: true, materialUsePolicy: "default-use", qualityReviewPerformed: false });
+    expect(report.shots.every(shot => shot.identity === "unverified" && shot.wardrobe === "unverified")).toBe(true);
+    expect(assessCharacterRelease({ contract, shots, phase: "release", now: NOW }).releaseAllowed).toBe(false);
+  });
+  it("采用历史被拒片段时不修改其真实意见，显式认证仍反映原拒绝", () => {
+    const contract = fixture(), shots = contract.shots.map(shot => withVisual(shot.shotId));
+    shots[0]!.evidence = [visual("GT-01", { approved: false, status: "failed", reason: "fixture-visible-buttons-rejected" })];
+    const before = JSON.stringify(shots);
+    expect(assessRenderedCharacterUse({ contract, shots, phase: "release", now: NOW }).releaseAllowed).toBe(true);
+    expect(JSON.stringify(shots)).toBe(before);
+    expect(assessCharacterRelease({ contract, shots, phase: "release", now: NOW }).releaseAllowed).toBe(false);
+  });
+  it.each(["missing", "digest", "prompt", "refs", "duplicate", "unknown"])("%s source cannot be turned into an adopted release", kind => {
+    const contract = fixture(), shots = contract.shots.map(shot => artifact(shot.shotId));
+    if (kind === "missing") shots.pop();
+    if (kind === "digest") shots[0]!.clip.sha256 = "invalid";
+    if (kind === "prompt") shots[0]!.promptSha256 = "";
+    if (kind === "refs") shots[0]!.referenceAssets = ["asset://asset-stale"];
+    if (kind === "duplicate") shots.push(structuredClone(shots[0]!));
+    if (kind === "unknown") shots.push({ ...artifact(), shotId: "unregistered" });
+    expect(assessRenderedCharacterUse({ contract, shots, phase: "release", now: NOW }).releaseAllowed).toBe(false);
+  });
+  it("invalid, changed, revoked or expired registrations remain generation/source failures", () => {
+    const contract = fixture(), shots = contract.shots.map(shot => artifact(shot.shotId));
+    expect(assessRenderedCharacterUse({ contract, shots, phase: "release", now: new Date("invalid") }).releaseAllowed).toBe(false);
+    const expired = buildCharacterReleaseContract({ projectId: "VID-CEO", assets: [{ ...asset,
+      authorization: { ...asset.authorization, expiresAt: "2026-10-06T00:00:00Z" } }], now: NOW,
+      characters: [{ characterId: "ceo", assetId: asset.assetId, wardrobeLock: wardrobe, identityAnchor: anchor }], shots: contract.shots });
+    expect(assessRenderedCharacterUse({ contract: expired, shots, phase: "release", now: new Date("2026-10-07") }).releaseAllowed).toBe(false);
+    contract.characters[0]!.authorization.status = "revoked";
+    expect(assessRenderedCharacterUse({ contract, shots, phase: "release", now: NOW }).releaseAllowed).toBe(false);
+  });
+  it("a selected canary does not remove later shots from the final source report", () => {
+    const contract = fixture();
+    expect(assessRenderedCharacterUse({ contract, shots: [artifact()], phase: "canary", canaryShotIds: ["GT-01"],
+      canaryCharacterIds: ["ceo"], now: NOW }).continuePaidRendering).toBe(true);
+    expect(assessRenderedCharacterUse({ contract, shots: [artifact()], phase: "release", canaryShotIds: ["GT-01"],
+      canaryCharacterIds: ["ceo"], now: NOW }).releaseAllowed).toBe(false);
   });
 });
