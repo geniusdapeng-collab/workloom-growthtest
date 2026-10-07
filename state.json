@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 923,
+  "revision": 925,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "developing",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2067,9 +2067,9 @@
           "protocol": 15
         }
       },
-      "updatedAt": 1791364337786,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791360008504,
+      "updatedAt": 1791364509955,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791365109955,
       "headSha": "eda8255dc676671f50e3b188058daa3a93750d05",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -29178,6 +29178,31 @@
       },
       "previous": "684be9e175ef6ce35f013a32d3019b46c0b0a715012233d541a9d5aea8146efe",
       "digest": "fcabc2c90db6fbd087482f7fc38383caf59a270a3553db44392fee2f22f2f6c1"
+    },
+    {
+      "sequence": 924,
+      "at": "2026-10-07T09:15:09.955Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791365109955
+        }
+      },
+      "previous": "fcabc2c90db6fbd087482f7fc38383caf59a270a3553db44392fee2f22f2f6c1",
+      "digest": "c1a11c9c5ad8119f265a06a0d4679fa88036f2bfa20be8b36382c086f1b48dbd"
+    },
+    {
+      "sequence": 925,
+      "at": "2026-10-07T09:15:28.068Z",
+      "kind": "transaction",
+      "data": {
+        "id": "4b7bba40-f6a0-410b-98c0-0cb9d91dbe72"
+      },
+      "previous": "c1a11c9c5ad8119f265a06a0d4679fa88036f2bfa20be8b36382c086f1b48dbd",
+      "digest": "10b1cd58872b8292ada2e512a8e42575c668fcdafd5ef477017ba69b01567de5"
     }
   ]
 }
