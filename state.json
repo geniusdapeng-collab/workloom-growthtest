@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2687,
+  "revision": 2690,
   "tasks": {
     "98": {
       "number": 98,
@@ -4795,7 +4795,7 @@
     },
     "133": {
       "number": 133,
-      "status": "waiting_ci",
+      "status": "merging",
       "firstSeen": 1791353067543,
       "attempts": {},
       "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
@@ -4996,6 +4996,86 @@
         "owner": "admission/pr-133",
         "generation": {
           "protocol": 71
+        }
+      },
+      "mergePhase": "prepared",
+      "mergeSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 152,
+        "pull": {
+          "number": 152,
+          "state": "open",
+          "title": "chore(ci): deliver #133 fix(video): 肖像派生接续既有任务并禁止未知结果付费回退 [T-2026-1007-0007]",
+          "body": "Immutable delivery candidate for #133. Exact source 3ec72a7be36f22af5714b2cebc52ea89249360c3; tested main 79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8.\n\n<!-- delivery-origin:133:3ec72a7be36f22af5714b2cebc52ea89249360c3:79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[131],\"releases\":[]}\n-->",
+          "author": {
+            "username": "OCI",
+            "nickname": "Cloud Native Build",
+            "is_npc": true
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/delivery/candidate/pr-133-43721af2b34e642a9423054b7504555d",
+            "sha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+        "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+        "files": [
+          "docs/capabilities.auto.json",
+          "docs/video-generation-idempotency.md",
+          "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+          "scripts/tools/portrait-set-from-asset.mts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0007",
+          "ready": true,
+          "dependsOn": [
+            131
+          ],
+          "releases": []
+        },
+        "headTime": 1791398178000,
+        "mergeBase": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+        "checkErrors": [],
+        "checkSha": "b95cba1d75b13e884d55d47aa4e12b93cdaa205e",
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [],
+        "originNumber": 133,
+        "pendingDependencies": []
+      },
+      "integrationLease": {
+        "owner": "integration/pr-133",
+        "scopes": [
+          "protocol"
+        ],
+        "generation": {
+          "protocol": 73
         }
       }
     },
@@ -7727,10 +7807,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": null,
-      "generation": 72,
-      "acquiredAt": 1791399141649,
-      "expiresAt": 1791399141649
+      "owner": "integration/pr-133",
+      "generation": 73,
+      "acquiredAt": 1791399920036,
+      "expiresAt": 1791400820036
     },
     "dependencies": {
       "owner": null,
@@ -70558,6 +70638,125 @@
       },
       "previous": "741c9741aede31d4b3982077905ab28d0b2f85f6cb2df8ab405ef86025bbcbad",
       "digest": "f8daa639a1c8948d5ea6c285dd2a6d2a0943af6f2dc785d0d4c10c1b865a60a8"
+    },
+    {
+      "sequence": 2688,
+      "at": "2026-10-07T19:05:20.036Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-133",
+        "generation": {
+          "protocol": 73
+        }
+      },
+      "previous": "f8daa639a1c8948d5ea6c285dd2a6d2a0943af6f2dc785d0d4c10c1b865a60a8",
+      "digest": "a8a418ff3e78d0bf4b58693c647f4f4eebc0dde45d696e3e259d3e201af0ea60"
+    },
+    {
+      "sequence": 2689,
+      "at": "2026-10-07T19:05:20.036Z",
+      "kind": "task",
+      "data": {
+        "number": 133,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 152,
+            "pull": {
+              "number": 152,
+              "state": "open",
+              "title": "chore(ci): deliver #133 fix(video): 肖像派生接续既有任务并禁止未知结果付费回退 [T-2026-1007-0007]",
+              "body": "Immutable delivery candidate for #133. Exact source 3ec72a7be36f22af5714b2cebc52ea89249360c3; tested main 79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8.\n\n<!-- delivery-origin:133:3ec72a7be36f22af5714b2cebc52ea89249360c3:79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[131],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-133-43721af2b34e642a9423054b7504555d",
+                "sha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+            "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+            "files": [
+              "docs/capabilities.auto.json",
+              "docs/video-generation-idempotency.md",
+              "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+              "scripts/tools/portrait-set-from-asset.mts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0007",
+              "ready": true,
+              "dependsOn": [
+                131
+              ],
+              "releases": []
+            },
+            "headTime": 1791398178000,
+            "mergeBase": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+            "checkErrors": [],
+            "checkSha": "b95cba1d75b13e884d55d47aa4e12b93cdaa205e",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [],
+            "originNumber": 133,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-133",
+            "scopes": [
+              "protocol"
+            ],
+            "generation": {
+              "protocol": 73
+            }
+          }
+        }
+      },
+      "previous": "a8a418ff3e78d0bf4b58693c647f4f4eebc0dde45d696e3e259d3e201af0ea60",
+      "digest": "01c951383c5f3767a359a976ef08cb38a68e6d9562e384361881e014c8f911fa"
+    },
+    {
+      "sequence": 2690,
+      "at": "2026-10-07T19:06:24.869Z",
+      "kind": "transaction",
+      "data": {
+        "id": "5851722a-2a70-4f09-9842-a898898d37f0"
+      },
+      "previous": "01c951383c5f3767a359a976ef08cb38a68e6d9562e384361881e014c8f911fa",
+      "digest": "4fb5e14bf261946f477c339a730dfe789318acdb0e4e7eb415b3a3afba4c3afb"
     }
   ]
 }
