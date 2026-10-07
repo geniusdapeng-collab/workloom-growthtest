@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2209,
+  "revision": 2211,
   "tasks": {
     "98": {
       "number": 98,
@@ -4311,7 +4311,7 @@
           }
         ]
       },
-      "updatedAt": 1791391515792,
+      "updatedAt": 1791391819220,
       "dependencies": [
         129
       ],
@@ -59563,6 +59563,52 @@
       },
       "previous": "cd2ba69a459115c72d2e3a4eca49f7ffae99eb3b73c8c29d4c1dcbc4a1efe2b1",
       "digest": "633f1c568dc33b00691ced5d9dd32d156df73ea126996fc438fc0a48f78abb72"
+    },
+    {
+      "sequence": 2210,
+      "at": "2026-10-07T16:50:19.220Z",
+      "kind": "task",
+      "data": {
+        "number": 131,
+        "patch": {
+          "headSha": "913ca57b3ef1b74fbd482ab227b3ce48280ace6c",
+          "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+          "branch": "task/T-2026-1007-0006",
+          "intent": {
+            "taskId": "T-2026-1007-0006",
+            "ready": true,
+            "dependsOn": [
+              129
+            ],
+            "releases": []
+          },
+          "originalBody": "实测媒体任务每次启动使用新的预算身份，且图片/视频受理响应只留在进程中；重跑下载或轮询失败的任务可能再次付费。现在同一输出目录持久化预算身份、每轮图片响应和视频任务 ID。未知提交结果不重发；已结算任务只读停止并保留原回执；未结算预占仅能恢复既有响应或 GET，不得新增生成 POST。\n\n报告分别记录 adapter 调用和实际新增提交次数，不以恢复冒充新扣费，不把未知用量记为零。临时签名地址属于私有本机状态并已排除 Git。CLI 合成夹具解析实际 pnpm Playwright 包路径，用已安装浏览器验证媒体恢复。\n\n验证：147/147 实测模块用例通过，包括真实独立进程重跑、本地 HTTP 轮询失败接续、部分图片成功/后续未知、输入变化和原预算/回执字节不变。该提交的标准脚本、视频、服务端、资产和能力检查正在完成，成功后提交准确源码的 Codex 回执给原生云端 CI。\n\n任务卡 #130；依赖 #129。修改仅在 Growthtest 隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0006\",\n  \"ready\": true,\n  \"depends_on\": [\n    129\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/video-generation-idempotency.md",
+            "scripts/acceptance/lib/live/cli-fixtures.mjs",
+            "scripts/acceptance/lib/live/live-budget-scope.mjs",
+            "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+            "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+            "scripts/acceptance/lib/live/providers-http.test.mjs",
+            "scripts/acceptance/lib/live/providers.mjs",
+            "scripts/acceptance/live.mjs"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791391331672
+        }
+      },
+      "previous": "633f1c568dc33b00691ced5d9dd32d156df73ea126996fc438fc0a48f78abb72",
+      "digest": "6818abdd0533005e28269e52f82237b57eaa0d39f63a9b8e3266170a57867521"
+    },
+    {
+      "sequence": 2211,
+      "at": "2026-10-07T16:50:53.532Z",
+      "kind": "transaction",
+      "data": {
+        "id": "60d653c1-ef47-417d-a500-d046f60ae5ef"
+      },
+      "previous": "6818abdd0533005e28269e52f82237b57eaa0d39f63a9b8e3266170a57867521",
+      "digest": "8925351fdd00a3b72b0d92c419e83d49cab607b90ef2102e8cc64662f4859b54"
     }
   ]
 }
