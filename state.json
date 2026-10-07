@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 587,
+  "revision": 589,
   "tasks": {
     "98": {
       "number": 98,
@@ -3090,7 +3090,7 @@
     },
     "129": {
       "number": 129,
-      "status": "waiting_ci",
+      "status": "waiting_dependency",
       "firstSeen": 1791351176589,
       "attempts": {},
       "headSha": "052f614a8bac975a4e7e06df466d5054d7314d7a",
@@ -3437,7 +3437,10 @@
           }
         ]
       },
-      "updatedAt": 1791351176589
+      "updatedAt": 1791351611170,
+      "dependencies": [
+        126
+      ]
     }
   },
   "leases": {
@@ -18326,6 +18329,41 @@
       },
       "previous": "8b2cfca740d12397a025ec7648dd7b8bb1aaa1fe0ae0564b03dacc91ced48dcf",
       "digest": "f2eec92ae9c3a9dbbdb0bcdc4e3f77203c88e4463f9f887fba7b2f365b57a2d3"
+    },
+    {
+      "sequence": 588,
+      "at": "2026-10-07T05:40:11.170Z",
+      "kind": "task",
+      "data": {
+        "number": 129,
+        "patch": {
+          "status": "waiting_dependency",
+          "headSha": "052f614a8bac975a4e7e06df466d5054d7314d7a",
+          "intent": {
+            "taskId": "T-2026-1007-0005",
+            "ready": true,
+            "dependsOn": [
+              126
+            ],
+            "releases": []
+          },
+          "dependencies": [
+            126
+          ]
+        }
+      },
+      "previous": "f2eec92ae9c3a9dbbdb0bcdc4e3f77203c88e4463f9f887fba7b2f365b57a2d3",
+      "digest": "07cc7cfe0138d04d65f325329379210623ba430ef5eaa0697e7e44024b103c59"
+    },
+    {
+      "sequence": 589,
+      "at": "2026-10-07T05:40:35.081Z",
+      "kind": "transaction",
+      "data": {
+        "id": "919aa2f3-e6d4-4769-8799-e027bb77d9af"
+      },
+      "previous": "07cc7cfe0138d04d65f325329379210623ba430ef5eaa0697e7e44024b103c59",
+      "digest": "8c05ab82e0cfbc935a3e95c2d9e7dbd4c2a859b2eaa827c02fdaf95f7258507c"
     }
   ]
 }
