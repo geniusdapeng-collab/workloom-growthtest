@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 274,
+  "revision": 276,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "parked",
+      "status": "aligning",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2251,9 +2251,14 @@
       ],
       "ciSince": 1791336198651,
       "candidate": null,
-      "alignmentCount": 0,
+      "alignmentCount": 1,
       "recoveryCount": 0,
-      "reviewFailures": null
+      "reviewFailures": null,
+      "alignmentIntent": {
+        "headSha": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "at": 1791336644957
+      }
     },
     "120": {
       "number": 120,
@@ -9734,6 +9739,36 @@
       },
       "previous": "0d0de4dda5dd24f468c0a95e2b46229bf4e119cdd0168557fe1db0a7b65266cf",
       "digest": "f9084984be688a8a4e2a6952f787e361e8f19686b1bd2d535e7361236c1dc6a5"
+    },
+    {
+      "sequence": 275,
+      "at": "2026-10-07T01:30:44.957Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "at": 1791336644957
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "f9084984be688a8a4e2a6952f787e361e8f19686b1bd2d535e7361236c1dc6a5",
+      "digest": "704a33cce32fc9a818389d5b4690e7f50b63c35458ae03e8955b4117387f3dfc"
+    },
+    {
+      "sequence": 276,
+      "at": "2026-10-07T01:30:56.042Z",
+      "kind": "transaction",
+      "data": {
+        "id": "341bac3f-b0ec-4de8-99fd-f93b50861884"
+      },
+      "previous": "704a33cce32fc9a818389d5b4690e7f50b63c35458ae03e8955b4117387f3dfc",
+      "digest": "fb632252c3295980d9c44f2619a35fea8ce6c14ca4d6c85a268bb4049cf8ccec"
     }
   ]
 }
