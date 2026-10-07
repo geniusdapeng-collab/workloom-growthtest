@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2757,
+  "revision": 2759,
   "tasks": {
     "98": {
       "number": 98,
@@ -5108,7 +5108,7 @@
       "status": "parked",
       "firstSeen": 1791354489850,
       "attempts": {},
-      "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
+      "headSha": "26c39791033b78f0364331f17094f8ccd83eec15",
       "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
       "branch": "task/T-2026-1007-0008",
       "intent": {
@@ -5438,26 +5438,27 @@
           }
         ]
       },
-      "updatedAt": 1791400861397,
+      "updatedAt": 1791400818541,
       "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit 868af4f45475967363b1aa7e5c8b4d3bd20a52f9\n",
-      "blockedUntil": 1791400614205,
+      "blockedUntil": 0,
       "dependencies": [
         133
       ],
-      "alignmentCount": 1,
+      "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
       "originalBody": "产品镜的 character 字段含“画面没有人物”，旧流程按非空字符串误认成人物镜，默认版式又把同一个 CEO 同时画为满幅底图和小卡。现在从显式人物标记、角色 ID、出镜清单与无人说明解析来源；默认自动选择单一满幅人物或物体主视觉。旧版式也会在绘制前移除同镜、同人物或第二人物贴片，并把人物标题移到下方安全带。回执记录实际底图与实际生效的构图。\n\n默认使用确定性设计稿，按已采用原片取帧，不新增模型设计或质量评分。39 项封面设计与实际 CLI 来源/构图函数测试通过，video-studio 类型检查通过。准确提交 4bd58b7 的 8 项完整回归均通过（标准后期 HTTP/媒体测试、视频及脚本回归、双包类型、资产和导览一致性）。提交 Codex 回执给原生交付队列。现有原片将由正式后期入口刷新封面，不再付费生成镜头。\n\n任务卡 #134；依赖 #133。仅修改隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0008\",\n  \"ready\": true,\n  \"depends_on\": [\n    133\n  ],\n  \"releases\": []\n}\n-->",
       "files": [
         "docs/capabilities.auto.json",
+        "docs/video-render-task-recovery.md",
         "docs/video-standard-post.md",
         "packages/video-studio/src/cover-composition-entrypoint.test.ts",
         "packages/video-studio/src/cover-design.ts",
         "scripts/tools/film-native-post.test.ts",
         "scripts/tools/full-chain-film.mts"
       ],
-      "ciSince": 1791400014205,
+      "ciSince": 1791400818541,
       "alignmentIntent": {
         "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
         "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
@@ -71999,6 +72000,57 @@
       },
       "previous": "1b8455ee67374c4414d3e3159e91f0fd3b8f861008bc695a5b0ab448bbe7c9d1",
       "digest": "8cfd7a560da76a558d043915e5d39507a3c0bbc5b524d5d28748bc6a17ee58e4"
+    },
+    {
+      "sequence": 2758,
+      "at": "2026-10-07T19:20:18.541Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "alignmentCount": 0,
+          "recoveryCount": 0,
+          "reviewFailures": null,
+          "blockedUntil": 0,
+          "developerReview": null,
+          "candidate": null,
+          "headSha": "26c39791033b78f0364331f17094f8ccd83eec15",
+          "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+          "branch": "task/T-2026-1007-0008",
+          "intent": {
+            "taskId": "T-2026-1007-0008",
+            "ready": true,
+            "dependsOn": [
+              133
+            ],
+            "releases": []
+          },
+          "originalBody": "产品镜的 character 字段含“画面没有人物”，旧流程按非空字符串误认成人物镜，默认版式又把同一个 CEO 同时画为满幅底图和小卡。现在从显式人物标记、角色 ID、出镜清单与无人说明解析来源；默认自动选择单一满幅人物或物体主视觉。旧版式也会在绘制前移除同镜、同人物或第二人物贴片，并把人物标题移到下方安全带。回执记录实际底图与实际生效的构图。\n\n默认使用确定性设计稿，按已采用原片取帧，不新增模型设计或质量评分。39 项封面设计与实际 CLI 来源/构图函数测试通过，video-studio 类型检查通过。准确提交 4bd58b7 的 8 项完整回归均通过（标准后期 HTTP/媒体测试、视频及脚本回归、双包类型、资产和导览一致性）。提交 Codex 回执给原生交付队列。现有原片将由正式后期入口刷新封面，不再付费生成镜头。\n\n任务卡 #134；依赖 #133。仅修改隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0008\",\n  \"ready\": true,\n  \"depends_on\": [\n    133\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-render-task-recovery.md",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+            "packages/video-studio/src/cover-design.ts",
+            "scripts/tools/film-native-post.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "parked",
+          "ciSince": 1791400818541
+        }
+      },
+      "previous": "8cfd7a560da76a558d043915e5d39507a3c0bbc5b524d5d28748bc6a17ee58e4",
+      "digest": "28ecc4eeceada893e1aad45d9309ed3d852e5b3a0f9c5980acd319d84965117c"
+    },
+    {
+      "sequence": 2759,
+      "at": "2026-10-07T19:21:41.821Z",
+      "kind": "transaction",
+      "data": {
+        "id": "a403351b-fc44-4219-a067-a370047335e1"
+      },
+      "previous": "28ecc4eeceada893e1aad45d9309ed3d852e5b3a0f9c5980acd319d84965117c",
+      "digest": "de470725176ec6b2eb28e67d54bdff5ea5bb5bc9458edb5ceb68b5a64b90037e"
     }
   ]
 }
