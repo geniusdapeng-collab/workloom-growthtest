@@ -18,6 +18,23 @@ function fixture(): StandardPostBuildInput {
       authority: { kind: "legacy-user-adopted", evidenceId: `historical-receipt-${index}`, evidenceSha256: digest(`receipt-${index}`) } })) };
 }
 function changed(change: (input: StandardPostBuildInput) => void): StandardPostBuildInput { const input = fixture(); change(input); return input; }
+it.each([28,32,35])("目标30秒接受完整%d秒镜头池，仍拒绝把4秒原片截成2秒", total => {
+  const input=fixture(), selected=[total-24,12,12];
+  input.originals=input.originals.slice(0,3).map((original,index)=>({...original,
+    media:{...original.media,videoFrames:selected[index]!*24,videoDurationSec:selected[index]!,audioDurationSec:selected[index]!}}));
+  editSubmitted(input,value=>{value.shots=input.originals.map((original,index)=>({shotId:original.shotId,duration:selected[index]}));});
+  const contract=buildStandardPostContract(input);
+  expect(contract.durationSec).toBe(total); expect(contract.timeline.map(row=>row.durationSec)).toEqual(selected);
+  expect((contract as unknown as {completion:{deltaFromTargetSeconds:number;qualityScore:null}}).completion).toMatchObject({deltaFromTargetSeconds:total-30,qualityScore:null});
+  const clipped=structuredClone(contract.timeline) as StandardPostTimelineEntry[];clipped[0]!.durationSec=2;
+  expect(()=>assertStandardPostTimeline(contract,clipped)).toThrow('STANDARD_POST_TIMELINE_INVALID');
+});
+it("显式硬上限同时检查分镜合计和实测完整钟，不截去供应商端点帧",()=>{
+  const input=fixture();editSubmitted(input,value=>{value.durationIntent={hardMaximumSeconds:30};});
+  expect(()=>buildStandardPostContract(input)).not.toThrow();
+  const media=input.originals[0]!.media;media.videoFrames++;media.videoDurationSec=media.videoFrames/media.fps;media.audioDurationSec=media.videoDurationSec;
+  expect(()=>buildStandardPostContract(input)).toThrow('FILM_COMPLETION_HARD_LIMIT');
+});
 function timeline(): StandardPostTimelineEntry[] { return structuredClone(buildStandardPostContract(fixture()).timeline) as StandardPostTimelineEntry[]; }
 function rejectTimeline(change: (value: StandardPostTimelineEntry[]) => void): void {
   const contract = buildStandardPostContract(fixture()); const actual = timeline(); change(actual);
@@ -101,7 +118,7 @@ describe("标准后期只能沿用提交原稿的完整画面与同文件原声"
     ["原稿没有镜头", (input) => { editSubmitted(input, (value) => { value.shots = []; }); }],
     ["原稿重复镜头ID", (input) => { editSubmitted(input, (value) => { const shots = value.shots as Array<{shotId: string}>; shots[1]!.shotId = shots[0]!.shotId; }); }],
     ["原稿缺镜头时长", (input) => { editSubmitted(input, (value) => { delete (value.shots as Array<Record<string, unknown>>)[0]!.duration; }); }],
-    ["原稿总时长与镜头总和不符", (input) => { editSubmitted(input, (value) => { value.durationSeconds = 29; }); }],
+    ["原稿总时长不是正数", (input) => { editSubmitted(input, (value) => { value.durationSeconds = 0; }); }],
     ["原稿JSON无效", (input) => { input.submitted = { json: "{", sha256: digest("{"), bytes: 1 }; }],
     ["少原镜头", (input) => { input.originals = input.originals.slice(1); }],
     ["多原镜头", (input) => { input.originals = [...input.originals, structuredClone(input.originals[0]!)]; }],

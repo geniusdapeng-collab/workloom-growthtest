@@ -31,6 +31,29 @@ function engine(transform?:(data:Record<string,unknown>,stage:string,count:numbe
   return {value,prompts};
 }
 describe("导演语言模型真实链的执行边界与契约",()=>{
+  it.each([28,32,35])('规划30秒允许完整%d秒方案，每个岗位收到完成度优先指导',async total=>{
+    const e=engine((data,stage)=>{
+      if(stage==='摄影、表演与声音') (data.shots as Array<{durationSec:number}>)[0]!.durationSec=total-24;
+      return data;
+    });
+    const plan=await planDirectorFilm({intent:'30秒江边民宿短片',engine:e.value});
+    expect(e.prompts.every(prompt=>prompt.includes('高完成度作品是影视制作的最高优先级'))).toBe(true);
+    expect((plan as unknown as {completion:{actualSeconds:number;deltaFromTargetSeconds:number}}).completion).toMatchObject({actualSeconds:total,deltaFromTargetSeconds:total-30});
+    expect(plan.shots.every(shot=>shot.lockTrim)).toBe(true);
+    const sourceManifest={fps:24,shots:plan.shots.map((shot,index)=>({...shot,sha256:directorHash(index)}))};
+    const variants=buildPostVariantPlans({sourceManifest,targetPlan:plan.deliveryTargetPlan,narrativePlans:plan.narrativePlans});
+    for(const variant of variants) for(const edit of variant.pictureEdl) {
+      const original=sourceManifest.shots.find(shot=>shot.shotId===edit.sourceId)!;
+      expect(edit.inFrame).toBe(0);expect(edit.outFrame).toBe(original.durationSec*24);
+    }
+  });
+  it('非法硬上限在模型调用前拒绝；超出有效硬上限的文字方案有界修订后仍失败则不启动媒体',async()=>{
+    const e=engine();
+    await expect(planDirectorFilm({intent,engine:e.value,constraints:{durationIntent:{hardMaximumSeconds:0}}})).rejects.toThrow('FILM_COMPLETION_INVALID');
+    expect(e.prompts).toHaveLength(0);
+    await expect(planDirectorFilm({intent,engine:e.value,constraints:{durationIntent:{hardMaximumSeconds:29}}})).rejects.toThrow('FILM_COMPLETION_HARD_LIMIT');
+    expect(e.prompts).toHaveLength(3);expect(e.prompts.every(prompt=>!prompt.includes('当前岗位：剪辑导演'))).toBe(true);
+  });
   it("四岗位规划具有独立回执，模型自报身份不能成为授权",async()=>{
     const e=engine();const plan=await planDirectorFilm({intent,engine:e.value});
     expect(e.prompts).toHaveLength(4);expect(plan.callReceipts).toHaveLength(4);

@@ -70,8 +70,9 @@ export interface ProducerVerdict {
   evidence?: Array<{ path: string; sha256: string; scope: string }>;
   stage: ProducerStage;
   approved: boolean;
-  /** 0–100；硬闸失败为 0 */
-  score: number;
+  /** 0–100；未做质量评审为 null，事实性硬闸不能虚构质量分。 */
+  score: number | null;
+  qualityStatus?: "unverified" | "reviewed";
   hardFailures: string[];
   issues: string[];
   suggestions: string[];
@@ -91,7 +92,7 @@ export interface ProducerVerdict {
  */
 export const PRODUCER_RUBRICS: Record<ProducerStage, string[]> = {
   script: [
-    "台词速率和时长符合明确交付合同，无台词镜头不添加对白；总时长与目标一致",
+    "高完成度作品优先：完整动作、整句台词和收束高于名义秒数；总时长是软目标，只有显式硬上限约束时长，不为凑秒截句或压速",
     "动作、静止、情绪与每镜叙事目的相符，不强迫空镜或克制表演产生动作变化",
     "开场、推进和收尾服务当前 brief；年代、主体、人数与原镜头合同一致"
   ],
