@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 237,
+  "revision": 239,
   "tasks": {
     "98": {
       "number": 98,
@@ -1784,7 +1784,7 @@
         "owner": "admission/pr-118",
         "generation": {}
       },
-      "updatedAt": 1791335415654,
+      "updatedAt": 1791335711450,
       "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
       "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
       "branch": "task/T-2026-1007-0002",
@@ -1944,8 +1944,8 @@
         "marker": "delivery-origin:118:4db4fc5265522a9c939ac119f427de57c9d38e37:c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
         "at": 1791335301333
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/120/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791336015654
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791336311450
     },
     "119": {
       "number": 119,
@@ -8904,6 +8904,31 @@
       },
       "previous": "27ba0a21241402e9656bebfc1475a01f61fec7934b3a7d09cd9aeaf3a0881705",
       "digest": "75c33bb88b7716b4cb0463d425f5b8a17ec5664103347533f827b52f8ea1e393"
+    },
+    {
+      "sequence": 238,
+      "at": "2026-10-07T01:15:11.450Z",
+      "kind": "task",
+      "data": {
+        "number": 118,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791336311450
+        }
+      },
+      "previous": "75c33bb88b7716b4cb0463d425f5b8a17ec5664103347533f827b52f8ea1e393",
+      "digest": "cc66b33b6e7b2ba2967b33e03aaceb968c2cef4f4eff0752e8c7d08a52d5a311"
+    },
+    {
+      "sequence": 239,
+      "at": "2026-10-07T01:15:17.138Z",
+      "kind": "transaction",
+      "data": {
+        "id": "98b04a0d-f643-4f51-97db-62d69a3f5b23"
+      },
+      "previous": "cc66b33b6e7b2ba2967b33e03aaceb968c2cef4f4eff0752e8c7d08a52d5a311",
+      "digest": "9411f8005b0d29c8a11daa11197b8991a304b6dbbac32042aa7b430b793b05c8"
     }
   ]
 }
