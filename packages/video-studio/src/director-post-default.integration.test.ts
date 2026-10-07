@@ -3,12 +3,14 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter, join, resolve } from "node:path";
+import { delimiter, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 // Bundle modules are runtime JavaScript assets rather than this package's TypeScript sources.
 const directorModule = new URL("../../../bundles/ai-video/connectors/post-bridge/director-delivery.mjs", import.meta.url).href;
 const { buildDirectorDelivery, reviseDirectorDelivery } = await import(directorModule);
 import { resolveDeliveryTargets } from "../../../bundles/ai-video/library/director-system/core.mjs";
+const libraryRoot = fileURLToPath(new URL("../../../bundles/ai-video/library", import.meta.url));
 
 const hash = (file: string) => createHash("sha256").update(readFileSync(file)).digest("hex");
 const json = (file: string) => JSON.parse(readFileSync(file, "utf8"));
@@ -36,8 +38,8 @@ describe("Director 已完成镜头默认后期（真实本地处理）", () => {
       chmodSync(file, 0o755); return file;
     };
     bins = { ffmpeg: wrap("ffmpeg"), ffprobe: wrap("ffprobe") };
-    env = { PATH: process.env.PATH ?? "", WORKLOOM_POST_ALLOWED_ROOTS: [root, resolve("bundles/ai-video/library")].join(delimiter),
-      WORKLOOM_BGM_ALLOWED_ROOTS: [root, resolve("bundles/ai-video/library")].join(delimiter),
+    env = { PATH: process.env.PATH ?? "", WORKLOOM_POST_ALLOWED_ROOTS: [root, libraryRoot].join(delimiter),
+      WORKLOOM_BGM_ALLOWED_ROOTS: [root, libraryRoot].join(delimiter),
       WORKLOOM_BGM_DISCOVER: "0", WORKLOOM_BGM_LIBRARY_DIR: join(root, "empty-custom-library"), WORKLOOM_BGM_HOME: join(root, "empty-bgm-home") };
     expect(env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET).toBeUndefined();
   });
