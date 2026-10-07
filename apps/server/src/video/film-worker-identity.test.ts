@@ -70,7 +70,7 @@ function jsonFile(file: string, value: unknown): void {
   mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, JSON.stringify(value, null, 2));
 }
 
-function fixture(policy = "off", options: { multiCharacter?: boolean; only?: string } = {}) {
+function fixture(policy = "blocking", options: { multiCharacter?: boolean; only?: string } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "film-parent-identity-"))); temporary.push(root);
   const workDir = join(root, "work"), assets = join(root, "assets"), characters = join(root, "characters");
   mkdirSync(workDir); mkdirSync(join(workDir, "clips")); mkdirSync(join(workDir, "review"));
@@ -348,8 +348,8 @@ describe("actual parent compiled submission, provider download, and copied sourc
   });
 });
 
-describe("dedicated parent identity review survives off/advisory policy without false approval", () => {
-  it.each(["off", "advisory"])("%s still calls the actual visual adapter with all source, frames and registered anchor receipts", async policy => {
+describe("explicit dedicated parent identity review preserves its real opinion", () => {
+  it.each(["blocking", "advisory"])("%s calls the actual visual adapter with all source, frames and registered anchor receipts", async policy => {
     const f = fixture(policy), prepared = await prepareIdentity(f);
     const evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
     expect(evidence.checks).toEqual({ identity: "passed", wardrobe: "passed" });
@@ -369,7 +369,7 @@ describe("dedicated parent identity review survives off/advisory policy without 
       { path: prepared.request.referenceImage.path, sha256: prepared.request.referenceImage.sha256, scope: "reference-image" },
     ]));
   });
-  it.each(["off", "advisory"])("%s cannot raise a denied dedicated identity model opinion to passed", async policy => {
+  it.each(["blocking", "advisory"])("%s cannot raise a denied dedicated identity model opinion to passed", async policy => {
     const f = fixture(policy); f.response.approved = false; f.response.score = 93; f.response.reason = "mock拒绝：样本未支持同一人物和服饰";
     const prepared = await prepareIdentity(f), evidence = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
     expect(evidence.checks).toEqual({ identity: "unverified", wardrobe: "unverified" }); expect(evidence.rejected).toBe(true);
@@ -527,23 +527,62 @@ describe("standard parent preserves original media and rejects retiming before r
 
 describe("parent canary permission is scoped to each registered person and selected shots", () => {
   it("a passed first person's canary permits that person's next shot while another person is unreviewed", async () => {
-    const f = fixture("off", { multiCharacter: true }), prepared = await prepareIdentity(f);
+    const f = fixture("blocking", { multiCharacter: true }), prepared = await prepareIdentity(f);
     evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
     expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
     await rejectedBeforeReserve(f, frame("video.generate", "T2", videoParams(f, "T2")), "CHARACTER_CANARY_BLOCKED");
   });
   it("each person's first selected shot may be submitted independently; its review cannot authorize another person", async () => {
-    const f = fixture("off", { multiCharacter: true }); await generate(f);
+    const f = fixture("blocking", { multiCharacter: true }); await generate(f);
     const second = await prepareIdentity(f, { shotId: "T1" });
     evidenceOf(await handle(f.ctx, frame("gate.review", "T1", second.params)));
     expect((await generate(f, "T2")).result.submissionReceipt.shotId).toBe("T2");
     await rejectedBeforeReserve(f, frame("video.generate", "S2", videoParams(f, "S2")), "CHARACTER_CANARY_BLOCKED");
   });
   it("only selects the first allowed shot of each person instead of demanding an out-of-scope earlier shot", async () => {
-    const f = fixture("off", { multiCharacter: true, only: "S2,T2" });
+    const f = fixture("blocking", { multiCharacter: true, only: "S2,T2" });
     expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
     expect((await generate(f, "T2")).result.submissionReceipt.shotId).toBe("T2");
     await rejectedBeforeReserve(f, frame("video.generate", "S1", videoParams(f, "S1")), "SHOT_NOT_FOUND");
+  });
+});
+
+describe("default rendered material adoption through the actual parent channel", () => {
+  it.each(["off", "omitted"])("%s continues all person shots without a visual model or a canary opinion", async policy => {
+    const f = fixture("off", { multiCharacter: true });
+    if (policy === "omitted") delete f.ctx.job.options["review-policy"];
+    delete f.ctx.env.LLM_API_KEY;
+    for (const shotId of ["S1", "S2", "T1", "T2"])
+      expect((await generate(f, shotId)).result.submissionReceipt.shotId).toBe(shotId);
+    expect(modelCalls(f)).toHaveLength(0);
+    expect(f.ctx.identityEvidence.size).toBe(0);
+    expect(f.calls.filter(call => call.method === "POST")).toHaveLength(4);
+  });
+  it("uses a previously rejected current clip without rewriting its real visual opinion", async () => {
+    const f = fixture(), prepared = await prepareIdentity(f);
+    f.response.approved = false; f.response.reason = "fixture-visible-wardrobe-rejected";
+    const rejected = evidenceOf(await handle(f.ctx, frame("gate.review", "S1", prepared.params)));
+    expect(rejected.rejected).toBe(true);
+    const original = JSON.stringify(rejected);
+    f.ctx.job.options["review-policy"] = "off"; delete f.ctx.env.LLM_API_KEY;
+    expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
+    expect(JSON.stringify(f.ctx.identityEvidence.get("S1"))).toBe(original);
+    expect(modelCalls(f)).toHaveLength(1); // Only the earlier explicit diagnostic call.
+  });
+  it("ignores an old worker's secondary review request without budget, frames, or a positive identity receipt", async () => {
+    const f = fixture("off"); delete f.ctx.env.LLM_API_KEY;
+    f.ctx.env.WL_FFMPEG = "/unavailable/default-mode-must-not-extract-frames";
+    const result = await handle(f.ctx, frame("gate.review", "S1", { stage: "shot", projectId,
+      identityReview: { clipRef: "missing.mp4", frames: [] }, context: { shotId: "S1" } }));
+    expect(result).toEqual({ reviewPolicy: "off", materialUsePolicy: "default-use", qualityReviewPerformed: false,
+      identityEvidence: null, identity: "unverified", wardrobe: "unverified" });
+    expect(f.ledger.reserveComponent).not.toHaveBeenCalled();
+    expect(f.net).not.toHaveBeenCalled(); expect(f.ctx.identityEvidence.size).toBe(0);
+  });
+  it("default adoption still rejects an unbound generation reference before any provider reservation", async () => {
+    const f = fixture("off"); delete f.ctx.env.LLM_API_KEY;
+    await rejectedBeforeReserve(f, frame("video.generate", "S2", { ...videoParams(f, "S2"), refs: ["asset://asset-stale"] }),
+      "CHARACTER_GENERATION_INPUT_BLOCKED");
   });
 });
 

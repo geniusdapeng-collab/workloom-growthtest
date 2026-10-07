@@ -43,7 +43,7 @@ import YAML from "yaml";
 import { filmReviewContracts, loadOrCreateFilmAuthorContext, reviewFilmStage } from "../../packages/video-studio/src/film-contracts.js";
 import { buildProducerReviewContract, reviewStage as reviewCharacterVisualStage, type ProducerGateOptions } from "../../packages/video-studio/src/producer-gate.js";
 import { buildVariantCoverFilters, embedCoverFirstFrame, type CoverFirstFrameReceipt, type CoverVariantId } from "../../packages/video-studio/src/cover-assembly.js";
-import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, buildCharacterIdentityReviewRequest, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
+import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, assessRenderedCharacterUse, buildCharacterIdentityReviewRequest, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
 import { buildRegisteredCharacterReleaseSource } from "../../packages/video-studio/src/character-release-source.js";
 import type { FilmVideoSubmissionReceipt } from "../../packages/video-studio/src/film-worker-provenance.js";
 import { assessPortraitDecision, selectPortraitDecisionRecord } from "../../packages/video-studio/src/portrait-decision.js";
@@ -2041,15 +2041,18 @@ function assertCharacterRenderPreflight(): void {
   if (!characterReleaseContract.shots.length) return;
   if (characterReleaseContract.status !== "passed" || characterBindings.some((binding) => !binding.identityAnchor))
     throw new Error(`CHARACTER_RENDER_PREFLIGHT_BLOCKED: 授权身份、服饰合同或登记基准图缺失；${characterReleaseContract.issues.map((issue) => issue.detail).join("；")}`);
-  if (!(WORKER_RUNTIME ? WORKER_RUNTIME.identityVisionAvailable : resolveProducerLlm(ENV)))
+  if (REVIEW_POLICY !== "off" && !(WORKER_RUNTIME ? WORKER_RUNTIME.identityVisionAvailable : resolveProducerLlm(ENV)))
     throw new Error("CHARACTER_VISION_UNAVAILABLE: 专用人物视觉评审不可用，禁止先花人物渲染额度");
 }
 function characterArtifact(shot: ShotCard): CharacterReleaseArtifact {
   const path = join(CLIP_DIR, `${shot.shotId}.mp4`);
   const clip = { path, sha256: existsSync(path) ? sha256FileSync(path) : "" };
   const base = join(PROMPT_DIR, `${shot.shotId}.txt`);
+  const submittedFile = join(PROMPT_DIR, `${shot.shotId}.submitted.txt`);
+  const submittedPromptSha256 = existsSync(submittedFile) ? fingerprintText(readFileSync(submittedFile, "utf8")) : "";
   const submitted = readStageHistory().filter((entry) => entry.stage === "shot" && entry.shotId === shot.shotId
-    && entry.evidence?.rawSha256 === clip.sha256 && entry.evidence?.generationPromptSha256
+    && entry.evidence?.rawSha256 === clip.sha256 && submittedPromptSha256
+    && entry.evidence?.generationPromptSha256 === submittedPromptSha256 && entry.evidence?.requestInputVerified === true
     && existsSync(base) && entry.evidence.basePromptSha256 === fingerprintText(readFileSync(base, "utf8"))).at(-1);
   const identityRow = latestLineageRecord(lineageRecords(readStageHistory(), "character-identity"), PROJECT, "character-identity", shot.shotId);
   const identityEvidence = identityRow?.evidence?.identityEvidence as CharacterIdentityEvidence | undefined;
@@ -2062,7 +2065,8 @@ function characterReleaseReport(phase: "canary" | "release", characterId?: strin
   const selected = characterReleaseContract.shots.filter(shot => !ONLY.length || ONLY.includes(shot.shotId));
   const people = characterId ? [characterId] : [...new Set(selected.map(shot => shot.characterId))];
   const canaryShotIds = people.map(id => selected.find(shot => shot.characterId === id)?.shotId).filter((id): id is string => Boolean(id));
-  return assessCharacterRelease({ contract: characterReleaseContract, shots: allAssetShots.map(characterArtifact), phase,
+  const assess = REVIEW_POLICY === "off" ? assessRenderedCharacterUse : assessCharacterRelease;
+  return assess({ contract: characterReleaseContract, shots: allAssetShots.map(characterArtifact), phase,
     ...(phase === "canary" ? { canaryShotIds, canaryCharacterIds: people } : {}) });
 }
 function assertCharacterCanaryBeforeSubmit(shotId: string): void {
@@ -2070,6 +2074,7 @@ function assertCharacterCanaryBeforeSubmit(shotId: string): void {
   // not wait on a later person stage; each additional person shot still requires proof.
   if (!characterReleaseContract.shots.some(shot => shot.shotId === shotId)) return;
   assertCharacterRenderPreflight();
+  if (REVIEW_POLICY === "off") return;
   const person = characterReleaseContract.shots.find(shot => shot.shotId === shotId)!;
   const first = characterReleaseContract.shots.filter(shot => shot.characterId === person.characterId && (!ONLY.length || ONLY.includes(shot.shotId)))
     .slice(0, 1).map(shot => shot.shotId);
@@ -2081,6 +2086,14 @@ async function verifyCharacterClip(shot: ShotCard, generationPrompt: string): Pr
   if (!isAssetShot(shot)) return true;
   const artifact = characterArtifact(shot);
   if (artifact.promptSha256 !== fingerprintText(generationPrompt)) return false;
+  if (REVIEW_POLICY === "off") {
+    const adoption = assessRenderedCharacterUse({ contract: characterReleaseContract, shots: [artifact], phase: "canary",
+      canaryShotIds: [shot.shotId], canaryCharacterIds: [characterReleaseContract.shots.find(row => row.shotId === shot.shotId)!.characterId] });
+    record({ stage: "character-material-use", shotId: shot.shotId, invoked: false, ok: adoption.continuePaidRendering,
+      cached: false, degraded: false, attempt: 1, ms: 0, artifact: artifact.clip.path,
+      evidence: { adoption }, note: "渲染素材按默认策略采用；未进行身份、服饰或画面质量二次审核" });
+    return adoption.continuePaidRendering;
+  }
   const duration = Number(probe(artifact.clip.path).duration ?? 0);
   const dir = join(WORK_DIR, "identity-review", PROJECT, shot.shotId);
   mkdirSync(dir, { recursive: true });
@@ -2094,7 +2107,7 @@ async function verifyCharacterClip(shot: ShotCard, generationPrompt: string): Pr
     clip: artifact.clip, promptSha256: artifact.promptSha256, frames, producerContractHash: buildProducerReviewContract(contracts).contractHash });
   rememberInputs("character-identity", [artifact.clip.path, join(PROMPT_DIR, `${shot.shotId}.submitted.txt`), request.referenceImage.path,
     ...frames.map((frame) => frame.path)], shot.shotId);
-  // Direct official review boundary: general review off cannot replace this visual evidence.
+  // Explicit review mode keeps its real source-bound opinion; default off returned above.
   const verdict = WORKER_RUNTIME ? null : await reviewCharacterVisualStage({ stage: "shot", projectId: PROJECT, contracts, rubric: request.rubric,
     artifacts: [{ path: artifact.clip.path, kind: "video" }, ...frames.map((frame) => ({ path: frame.path, kind: "image" as const }))],
     referenceImages: [request.referenceImage.path], deterministic: [{ id: "identity-source-current", pass: true, hard: true, detail: request.requestHash }],
@@ -3923,10 +3936,8 @@ if (STAGES.has("material-gen")) {
             renderModel = VIDEO_MODEL;
             taskResumed = submitted.resumed;
           }
-          // Quality assessment reads the unchanged provider original; post never manufactures motion.
+          // Source facts use the unchanged provider original. Default adoption does not inspect quality.
           if (!renderInputVerified) throw new Error("MATERIAL_INPUT_UNVERIFIED: 缺当前素材与实际提交请求的绑定，不得认证生成来源");
-          lastRawMotion = measureMotionRichness(rawClip);
-          lastMotionVerdict = assessMotionRichness(lastRawMotion, { ...motionPolicy, minRampRatio: 0 });
           copyFileSync(rawClip, clip);
           if (sha256FileSync(rawClip) !== sha256FileSync(clip)) throw new Error("STANDARD_ORIGINAL_CHANGED: material copy differs from the original render");
           assertOriginalRenderMedia(clip, duration, shot.shotId);
@@ -3935,6 +3946,24 @@ if (STAGES.has("material-gen")) {
           const provenance = assertMaterialGenerationProvenance({
             renderTaskId, model: renderModel, sourceMaterialSha256: materialSha, outputSha256: lastOutputSha
           });
+          if (REVIEW_POLICY === "off") {
+            const sourceGate = recordGate({ stepKey: "material-generate", sourceStage: "material-gen", shotIds: [shot.shotId],
+              checks: [{ id: "generation-provenance", pass: provenance.ok, hard: true, detail: provenance.detail }],
+              evidence: { mode: "verify", materialUsePolicy: "default-use", qualityReviewPerformed: false,
+                material: photo, materialSha256: materialSha, outputSha256: lastOutputSha, taskId: renderTaskId, model: renderModel,
+                requestInputVerified: renderInputVerified, submissionReceipt: renderSubmissionReceipt, originalUnchanged: true } });
+            accepted = sourceGate.approved;
+            record({ stage: "material-gen", shotId: shot.shotId, invoked: true, ok: accepted, cached: taskResumed,
+              degraded: false, attempt: usedAttempt, ms: Date.now() - shotStarted, artifact: clip,
+              evidence: { ...lastInfo, resumed: taskResumed, materialUsePolicy: "default-use", qualityReviewPerformed: false,
+                requestInputVerified: renderInputVerified, submissionReceipt: renderSubmissionReceipt, taskId: renderTaskId, model: renderModel,
+                material: photo, materialSha256: materialSha, outputSha256: lastOutputSha, raw: rawClip, originalUnchanged: true,
+                outputFiles: [rawClip, prepared, ...(WORKER_RUNTIME && renderSubmissionReceipt ? [join(WORKER_RUNTIME.context.workDir, renderSubmissionReceipt.artifact.ref)] : [])] },
+              verdict: null, note: "渲染素材默认采用；只绑定真实生成来源，未执行运动量、参考相似度、场景独立性或视觉二次审核" });
+            continue;
+          }
+          lastRawMotion = measureMotionRichness(rawClip);
+          lastMotionVerdict = assessMotionRichness(lastRawMotion, { ...motionPolicy, minRampRatio: 0 });
           lastReuse = measureMaterialReuse(clip, prepared, duration, shot.shotId);
           lastReuseVerdict = assessMaterialReuse(lastReuse.samples, { durationSec: duration });
           /** 场景构建判据：这一镜是"构建出来的视频场景"还是"参考图被推动"（material-scene/v1） */
@@ -4334,6 +4363,21 @@ if (STAGES.has("videos")) {
     if (cached) {
       const cachedGeneration = latestLineageRecord(lineageRecords(readStageHistory(), "shot"), PROJECT, "shot", shot.shotId);
       const info = probe(clip);
+      if (REVIEW_POLICY === "off") {
+        assertOriginalRenderMedia(clip, duration, shot.shotId);
+        if (cachedGeneration?.evidence.requestInputVerified !== true)
+          throw new Error(`RENDER_CACHED_INPUT_UNVERIFIED: ${shot.shotId} 缺真实提交来源，不能自动付费重渲`);
+        record({ stage: "shot", shotId: shot.shotId, invoked: false, ok: true, cached: true, degraded: false,
+          attempt: 0, ms: 0, artifact: clip, evidence: { ...cachedGeneration.evidence, ...info, rawSha256: sha256FileSync(clip),
+            materialUsePolicy: "default-use", qualityReviewPerformed: false }, verdict: null,
+          note: "复用当前来源绑定的渲染素材，直接进入后期；未二次质审" });
+        if (shotIsAsset) {
+          const submittedFile = join(PROMPT_DIR, `${shot.shotId}.submitted.txt`);
+          if (!existsSync(submittedFile) || !await verifyCharacterClip(shot, readFileSync(submittedFile, "utf8")))
+            throw new Error(`CHARACTER_CACHED_SOURCE_UNVERIFIED: ${shot.shotId} 当前生成来源不完整`);
+        }
+        continue;
+      }
       const actual = Number(info.duration ?? 0);
       const settings = cachedShotSettings(shot);
       const verdict = await reviewStage({
@@ -4502,6 +4546,18 @@ if (STAGES.has("videos")) {
         }
         await issueOriginalRenderReceipt({ productionRoot: WORK_DIR, projectId: PROJECT, shotId: shot.shotId, submittedSha256: sourceFileHash,
           artifactPath: clip, taskId: submitted.taskId, requestInputVerified: submitted.requestInputVerified, submissionReceipt: submitted.submissionReceipt, parentWorkDir: WORKER_RUNTIME?.context.workDir });
+        if (REVIEW_POLICY === "off") {
+          record({ stage: "shot", shotId: shot.shotId, invoked: true, ok: true, cached: submitted.resumed, degraded: false,
+            attempt, ms: Date.now() - started, artifact: clip,
+            evidence: { ...info, taskId: submitted.taskId, resumed: submitted.resumed, requestInputVerified: true,
+              submissionReceipt: submitted.submissionReceipt ?? null, rawSha256: sha256FileSync(clip),
+              basePromptSha256: fingerprintText(prompt), generationPromptSha256: fingerprintText(attemptPrompt), referenceAssets: shotRefs,
+              materialUsePolicy: "default-use", qualityReviewPerformed: false }, verdict: null,
+            note: "渲染素材默认采用，直接进入后期；未抽帧、测动作或进行视觉二次审核" });
+          if (!await verifyCharacterClip(shot, attemptPrompt)) throw new Error(`CHARACTER_MATERIAL_SOURCE_UNVERIFIED: ${shot.shotId}`);
+          approved = true;
+          break;
+        }
         const actual = Number(info.duration ?? 0);
         const height = Number(info.height ?? 0);
         const width = Number(info.width ?? 0);
@@ -4597,6 +4653,7 @@ if (STAGES.has("videos")) {
           stage: "shot", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt,
           ms: Date.now() - started, artifact: null, evidence: { error: err instanceof Error ? err.message.slice(0, 300) : String(err) }, verdict: null
         });
+        if (shotIsAsset && REVIEW_POLICY === "off") throw err;
         if (shotIsAsset) break;
       }
     }
@@ -4797,7 +4854,7 @@ if (STAGES.has("compose") && !DRY_RUN) {
  *   锚色：该角色**首个声明出镜镜头**的取样色；差 ≥90 判失败、≥45 告警（阈值在模块里显式可审计）。
  */
 let characterConsistency: CharacterConsistencyReport | null = null;
-if (STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
+if (REVIEW_POLICY !== "off" && STAGES.has("compose") && !DRY_RUN && existsSync(master)) {
   const sampleStart = Date.now();
   const characterShots = shots.filter((shot) => {
     const character = String((shot as { character?: unknown }).character ?? "").trim();
@@ -5685,6 +5742,27 @@ async function callCoverDesigner(designInput: CoverDesignInput): Promise<string>
   return content;
 }
 
+/** Default-use selects the requested frame without scoring already adopted footage. */
+function pickCoverFrameForPolicy(times: number[], inspect: (atSec: number) => number): { atSec: number; sharpness: number | null } {
+  if (!times.length || times.some(time => !Number.isFinite(time) || time < 0)) throw new Error("COVER_FRAME_TIME_INVALID");
+  if (REVIEW_POLICY === "off") return { atSec: times[0]!, sharpness: null };
+  let best = { atSec: times[0]!, sharpness: -1 };
+  for (const atSec of times) {
+    const sharpness = inspect(atSec);
+    if (sharpness > best.sharpness) best = { atSec, sharpness };
+  }
+  return best;
+}
+function inspectCoverForPolicy(facts: { bytes: number; width: number; height: number; expectedWidth: number; expectedHeight: number; cleanSource: boolean },
+  inspect: () => { checks: GateCheck[]; measurements: CoverMeasurements }): { checks: GateCheck[]; measurements: CoverMeasurements | null } {
+  if (REVIEW_POLICY !== "off") return inspect();
+  return { measurements: null, checks: [
+    { id: "cover-produced", pass: facts.bytes > 0 && facts.width === facts.expectedWidth && facts.height === facts.expectedHeight,
+      hard: true, detail: `${facts.width}x${facts.height} · ${facts.bytes} bytes` },
+    { id: "clean-source", pass: facts.cleanSource, hard: true, detail: "封面帧来源与当前干净母版绑定" }
+  ] };
+}
+function coverChecksPassed(checks: GateCheck[]): boolean { return checks.every(check => check.hard === false || check.pass); }
 if (STAGES.has("cover") && existsSync(colored)) {
   rememberInputs("cover", [colored]);
   const started = Date.now();
@@ -6012,16 +6090,12 @@ if (STAGES.has("cover") && existsSync(colored)) {
     (COVER_HERO === "person" || COVER_HERO === "person-solo")
       ? COVER_MIN_SHARPNESS_PERSON
       : (isNightShot(shot) ? 2.8 : COVER_MIN_SHARPNESS);
-  const pickSharpest = (shot: ShotCard, times: number[]): { atSec: number; sharpness: number } => {
-    let best = { atSec: times[0]!, sharpness: -1 };
-    for (const t of times) {
+  const pickSharpest = (shot: ShotCard, times: number[]): { atSec: number; sharpness: number | null } =>
+    pickCoverFrameForPolicy(times, (t) => {
       const tmp = join(coverDir, `sharp-${shot.shotId}-${t}.png`);
       run(FFMPEG, ["-y", "-ss", (shotAt(shot.shotId) + t).toFixed(2), "-i", colored, "-frames:v", "1", tmp]);
-      const value = frameSharpness(tmp);
-      if (value > best.sharpness) best = { atSec: t, sharpness: value };
-    }
-    return best;
-  };
+      return frameSharpness(tmp);
+    });
   let bgShot = shots.find((s) => s.shotId === plan.background.shotId) ?? shots[0]!;
   let bgPick = pickSharpest(bgShot, bgCandidates(bgShot));
   /**
@@ -6052,12 +6126,12 @@ if (STAGES.has("cover") && existsSync(colored)) {
     if (!/夜景|夜色|夜间|夜晚|夜里|深夜|傍晚|晚\s?\d{1,2}[:：]\d{2}|灯光秀|灯火|夜市/.test(scene)) return false;
     return wantsLandmark ? /滕王阁/.test(scene) : true;
   };
-  if (wantsNight && !isNightShot(bgShot)) {
+  if (REVIEW_POLICY !== "off" && wantsNight && !isNightShot(bgShot)) {
     const nightShots = shots.filter(isNightShot);
     let bestNight: { shot: ShotCard; atSec: number; sharpness: number } | null = null;
     for (const candidate of nightShots) {
       const pick = pickSharpest(candidate, bgCandidates(candidate));
-      if (!bestNight || pick.sharpness > bestNight.sharpness) bestNight = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
+      if (pick.sharpness !== null && (!bestNight || pick.sharpness > bestNight.sharpness)) bestNight = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
     }
     if (bestNight) {
       log(`  ↻ 封面底图：标题含夜景字样而底图是日景 → 改用夜景镜 ${bestNight.shot.shotId}（${bestNight.atSec}s，边缘能量 ${bestNight.sharpness.toFixed(1)}）`);
@@ -6066,7 +6140,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
     }
   }
   let bgSubstituted = false;
-  if (bgPick.sharpness < sharpnessFloorFor(bgShot)) {
+  if (bgPick.sharpness !== null && bgPick.sharpness < sharpnessFloorFor(bgShot)) {
     let best: { shot: ShotCard; atSec: number; sharpness: number } = { shot: bgShot, atSec: bgPick.atSec, sharpness: bgPick.sharpness };
     /**
      * 替换偏好（2026-09-25 二次复核）：优先取**宽景/全景**镜头当底图——
@@ -6084,7 +6158,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
       const pick = pickSharpest(candidate, bgCandidates(candidate));
       /** 细节镜只在"没有别的选择"时上位：给它的清晰度打 0.75 折扣参与比较 */
       /** 候选自身不达标（按它自己的下限）就不参与替换 */
-      if (pick.sharpness < sharpnessFloorFor(candidate)) continue;
+      if (pick.sharpness === null || pick.sharpness < sharpnessFloorFor(candidate)) continue;
       const weighted = detailShot(candidate) ? pick.sharpness * 0.75 : pick.sharpness;
       const currentWeighted = detailShot(best.shot) ? best.sharpness * 0.75 : best.sharpness;
       if (weighted > currentWeighted) best = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
@@ -6141,7 +6215,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 口径同"地标底图"：在人物镜内挑最清晰一帧；仍不达标就换别的**含主角**的镜头帧。
    */
   let heroSharpness = bgPick.sharpness;
-  if (COVER_HERO === "person" || COVER_HERO === "person-solo") {
+  if (REVIEW_POLICY !== "off" && (COVER_HERO === "person" || COVER_HERO === "person-solo")) {
     const withCharacter = (shot: ShotCard): boolean => /陈卓|character|主角/i.test(String(shot.character ?? ""));
     const candidates = [heroShot, ...shots.filter((s) => withCharacter(s) && s.shotId !== heroShot.shotId)];
     let bestHero: { shot: ShotCard; atSec: number; sharpness: number } = { shot: heroShot, atSec: heroAt, sharpness: -1 };
@@ -6160,10 +6234,10 @@ if (STAGES.has("cover") && existsSync(colored)) {
        *      把 CF-01 的 0.8s 软帧选成底图，sharpness 3.56 < 5.5 → 整张封面被拒）。
        */
       const laterPick = pickSharpest(candidate, [0.8, duration * 0.25, duration * 0.45, duration * 0.65, Math.max(0.8, duration - 0.8)]);
-      const pick = laterPick.sharpness >= sharpnessFloorFor(candidate)
+      const pick = laterPick.sharpness !== null && laterPick.sharpness >= sharpnessFloorFor(candidate)
         ? laterPick
         : pickSharpest(candidate, [1.0, 0.5, duration * 0.5, duration * 0.75, Math.max(0.6, duration - 0.5)]);
-      if (pick.sharpness > bestHero.sharpness) bestHero = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
+      if (pick.sharpness !== null && pick.sharpness > bestHero.sharpness) bestHero = { shot: candidate, atSec: pick.atSec, sharpness: pick.sharpness };
       if (bestHero.sharpness >= sharpnessFloorFor(bestHero.shot)) break;
     }
     if (bestHero.shot.shotId !== heroShot.shotId) {
@@ -6372,92 +6446,89 @@ if (STAGES.has("cover") && existsSync(colored)) {
   run(FFMPEG, ["-y", "-i", bgPerson, "-vf", textFilters.join(","), "-frames:v", "1", coverPng]);
   /** ③ 机检（口径与阈值在 `cover-design.ts#coverDeterministicChecks`） */
   const coverInfo = probe(coverPng);
-  const diffFile = join(coverDir, "text-diff.png");
-  imageDiff(coverPng, bgPerson, diffFile);
-  const ink = inkMetrics(diffFile, CW, CH, coverSafeArea.bottomReservedRatio);
-  /** 标题带测量区随版式移动（person-solo 量下带，其余量上带）；上下限取平台规格 */
   const coverSafeAreaForCheck = coverSafeAreaForLayout;
-  const titleBand = {
-    x: 0,
-    y: Math.round(CH * coverSafeAreaForCheck.topMinRatio),
-    w: CW,
-    h: Math.round(CH * (coverSafeAreaForCheck.titleBottomMaxRatio - coverSafeAreaForCheck.topMinRatio))
-  };
-  /** 人物卡区域（机检的人工地物）：卡内 30%–75% 高度、中央 70% 宽度——避开白边与投影的干扰 */
-  const personBox = {
-    x: cardX + Math.round(cardW * 0.15), y: cardY + Math.round(cardH * 0.30),
-    w: Math.round(cardW * 0.70), h: Math.max(80, Math.round(cardH * 0.45))
-  };
-  const titleBandPsnr = psnrRegion(coverPng, bgPerson, titleBand);
-  const personBoxPsnr = insetEnabled ? psnrRegion(coverPng, bgText, personBox) : null;
-  const backgroundMatchesCleanMaster = abs(colored) === abs(join(POST_DIR, "master-graded.mp4"))
-    || (() => {
-      /** 允许"母版走了原片（调色被驳回）"的情形：只要是 **colored 这一路** 的同一帧即可 */
-      try {
-        return sha256FileSync(bgFrameA) === sha256FileSync(bgFrameB);
-      } catch {
-        return false;
-      }
-    })();
-  const measurements: CoverMeasurements = {
-    bytes: Number(coverInfo.bytes ?? 0),
-    width: Number(coverInfo.width ?? 0),
-    height: Number(coverInfo.height ?? 0),
-    titleBandPsnrDb: titleBandPsnr,
-    personBoxPsnrDb: personBoxPsnr,
-    backgroundMatchesCleanMaster,
-    titleTopRatio: ink.top / CH,
-    titleBottomRatio: ink.bottom / CH,
-    bottomBandInkRatio: ink.bottomBandInkRatio
-  };
-  /**
-   * 景物为主/物体为主版式（`--cover-hero scenery|subject`）**不合成人物层**，
-   * 因此"人物框 PSNR 必须下降"这条机检在该版式下不适用——
-   * 2026-09-26 产品所有者口径：封面只有两种主视觉，要么人物为主、要么物体（景物/商品/动物）为主；
-   * 没有人物层不是缺陷，而是版式选择。
-   */
-  /**
-   * 机检口径（2026-09-27 平台化）：画幅与安全区都按平台——把"平台规格 + 当前版式的安全区"
-   * 合成一个规格对象传进去，`cover-produced`（画幅）与 `safe-area`（标题带/遮挡区）同时生效。
-   */
-  const coverCheckSpec: CoverPlatformSpec = {
-    ...coverSpec,
-    canvas: { width: CW, height: CH },
-    safeArea: {
-      ...coverSpec.safeArea,
-      topMinRatio: coverSafeAreaForCheck.topMinRatio,
-      bottomReservedRatio: coverSafeAreaForCheck.bottomReservedRatio
-    },
-    titleBand: { topRatio: coverSafeAreaForCheck.topMinRatio, bottomMaxRatio: coverSafeAreaForCheck.titleBottomMaxRatio }
-  };
-  const checks = coverDeterministicChecks(measurements, coverCheckSpec)
-    .filter((check) => insetEnabled || check.id !== "person-layer");
-  /**
-   * 底图清晰度（硬闸，2026-09-25 二次复核新增）：监制抓到的"地标糊到不可辨识"应当由机检拦住，
-   * 而不是等 LLM 打回。口径见上面的标定（同一抽帧标准下白天 8.3–8.7 / 黄昏 3.2–4.9 / 夜景甩镜 2.4–6.1）。
-   */
-  checks.push({
-    id: "background-sharpness",
+  const backgroundMatchesCleanMaster = sha256FileSync(bgFrameA) === sha256FileSync(bgFrameB);
+  const { checks, measurements } = inspectCoverForPolicy({ bytes: Number(coverInfo.bytes ?? 0), width: Number(coverInfo.width ?? 0),
+    height: Number(coverInfo.height ?? 0), expectedWidth: CW, expectedHeight: CH, cleanSource: backgroundMatchesCleanMaster }, () => {
+    if (bgPick.sharpness === null || heroSharpness === null) throw new Error("COVER_REVIEW_MEASUREMENTS_MISSING");
+    const diffFile = join(coverDir, "text-diff.png");
+    imageDiff(coverPng, bgPerson, diffFile);
+    const ink = inkMetrics(diffFile, CW, CH, coverSafeArea.bottomReservedRatio);
+    /** 标题带测量区随版式移动（person-solo 量下带，其余量上带）；上下限取平台规格 */
+    const titleBand = {
+      x: 0,
+      y: Math.round(CH * coverSafeAreaForCheck.topMinRatio),
+      w: CW,
+      h: Math.round(CH * (coverSafeAreaForCheck.titleBottomMaxRatio - coverSafeAreaForCheck.topMinRatio))
+    };
+    /** 人物卡区域（机检的人工地物）：卡内 30%–75% 高度、中央 70% 宽度——避开白边与投影的干扰 */
+    const personBox = {
+      x: cardX + Math.round(cardW * 0.15), y: cardY + Math.round(cardH * 0.30),
+      w: Math.round(cardW * 0.70), h: Math.max(80, Math.round(cardH * 0.45))
+    };
+    const titleBandPsnr = psnrRegion(coverPng, bgPerson, titleBand);
+    const personBoxPsnr = insetEnabled ? psnrRegion(coverPng, bgText, personBox) : null;
+    const measurements: CoverMeasurements = {
+      bytes: Number(coverInfo.bytes ?? 0),
+      width: Number(coverInfo.width ?? 0),
+      height: Number(coverInfo.height ?? 0),
+      titleBandPsnrDb: titleBandPsnr,
+      personBoxPsnrDb: personBoxPsnr,
+      backgroundMatchesCleanMaster,
+      titleTopRatio: ink.top / CH,
+      titleBottomRatio: ink.bottom / CH,
+      bottomBandInkRatio: ink.bottomBandInkRatio
+    };
     /**
-     * 人物满幅版式（person / person-solo）的底图就是**人物镜那一帧**，
-     * 因此清晰度口径必须量这帧（`heroSharpness`），而不是地标帧（`bgPick`）——
-     * 2026-09-27 真机就是量错了对象：人物帧 3.60 被判"地标糊"，实际两者无关。
+     * 景物为主/物体为主版式（`--cover-hero scenery|subject`）**不合成人物层**，
+     * 因此"人物框 PSNR 必须下降"这条机检在该版式下不适用——
+     * 2026-09-26 产品所有者口径：封面只有两种主视觉，要么人物为主、要么物体（景物/商品/动物）为主；
+     * 没有人物层不是缺陷，而是版式选择。
      */
-    pass: (COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroSharpness : bgPick.sharpness)
-      >= sharpnessFloorFor(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot),
-    detail: `底图边缘能量 ${(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroSharpness : bgPick.sharpness).toFixed(2)}`
-      + `（下限 ${sharpnessFloorFor(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot)}`
-      + `${isNightShot(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot) ? "，夜景口径" : ""}；低于它基本是运动模糊/失焦）`
-      + `${bgSubstituted && !(COVER_HERO === "person" || COVER_HERO === "person-solo") ? "（已自动改取全片最清晰帧）" : ""}`
-      + `${COVER_HERO === "person" || COVER_HERO === "person-solo" ? `（人物底图：${heroShot.shotId} @ ${heroAt}s）` : ""}`,
     /**
-     * 清晰度是**画质口径**而不是事实：已经自动改取过全片最清晰帧，仍达不到阈值时，
-     * 继续判硬失败只会让整片交不出去（真机：夜景底图 3.34 被 5.5 否掉 → 封面/母版连环打回）。
-     * 按 T-2026-0930-0015 口径默认记为咨询项；`--review-policy blocking` 恢复旧硬闸。
+     * 机检口径（2026-09-27 平台化）：画幅与安全区都按平台——把"平台规格 + 当前版式的安全区"
+     * 合成一个规格对象传进去，`cover-produced`（画幅）与 `safe-area`（标题带/遮挡区）同时生效。
      */
-    hard: REVIEW_POLICY === "blocking"
+    const coverCheckSpec: CoverPlatformSpec = {
+      ...coverSpec,
+      canvas: { width: CW, height: CH },
+      safeArea: {
+        ...coverSpec.safeArea,
+        topMinRatio: coverSafeAreaForCheck.topMinRatio,
+        bottomReservedRatio: coverSafeAreaForCheck.bottomReservedRatio
+      },
+      titleBand: { topRatio: coverSafeAreaForCheck.topMinRatio, bottomMaxRatio: coverSafeAreaForCheck.titleBottomMaxRatio }
+    };
+    const checks = coverDeterministicChecks(measurements, coverCheckSpec)
+      .filter((check) => insetEnabled || check.id !== "person-layer");
+    /**
+     * 底图清晰度（硬闸，2026-09-25 二次复核新增）：监制抓到的"地标糊到不可辨识"应当由机检拦住，
+     * 而不是等 LLM 打回。口径见上面的标定（同一抽帧标准下白天 8.3–8.7 / 黄昏 3.2–4.9 / 夜景甩镜 2.4–6.1）。
+     */
+    checks.push({
+      id: "background-sharpness",
+      /**
+       * 人物满幅版式（person / person-solo）的底图就是**人物镜那一帧**，
+       * 因此清晰度口径必须量这帧（`heroSharpness`），而不是地标帧（`bgPick`）——
+       * 2026-09-27 真机就是量错了对象：人物帧 3.60 被判"地标糊"，实际两者无关。
+       */
+      pass: (COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroSharpness : bgPick.sharpness)
+        >= sharpnessFloorFor(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot),
+      detail: `底图边缘能量 ${(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroSharpness : bgPick.sharpness).toFixed(2)}`
+        + `（下限 ${sharpnessFloorFor(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot)}`
+        + `${isNightShot(COVER_HERO === "person" || COVER_HERO === "person-solo" ? heroShot : bgShot) ? "，夜景口径" : ""}；低于它基本是运动模糊/失焦）`
+        + `${bgSubstituted && !(COVER_HERO === "person" || COVER_HERO === "person-solo") ? "（已自动改取全片最清晰帧）" : ""}`
+        + `${COVER_HERO === "person" || COVER_HERO === "person-solo" ? `（人物底图：${heroShot.shotId} @ ${heroAt}s）` : ""}`,
+      /**
+       * 清晰度是**画质口径**而不是事实：已经自动改取过全片最清晰帧，仍达不到阈值时，
+       * 继续判硬失败只会让整片交不出去（真机：夜景底图 3.34 被 5.5 否掉 → 封面/母版连环打回）。
+       * 按 T-2026-0930-0015 口径默认记为咨询项；`--review-policy blocking` 恢复旧硬闸。
+       */
+      hard: REVIEW_POLICY === "blocking"
+    });
+    return { checks, measurements };
   });
-  /** ④ 监制：看整图（rubric 只问可验证的事） */
+  /** ④ Only explicit diagnostics review the rendered cover. */
   const verdict = await reviewStage({
     stage: "cover", projectId: PROJECT,
     artifacts: [
@@ -6515,11 +6586,12 @@ if (STAGES.has("cover") && existsSync(colored)) {
      * 封面"合格"必须同时满足**机检全过 + 监制放行**（2026-09-25 修正）：
      * 早先只看机检，于是"机检全过但监制打回（人物卡遮挡主体/调性冲突）"被记成 ok=true——审计会误读。
      */
-    stage: "cover", shotId: null, invoked: true, ok: checks.every((c) => c.pass) && verdict.approved, cached: false,
+    stage: "cover", shotId: null, invoked: true, ok: coverChecksPassed(checks) && verdict.approved, cached: false,
     degraded: designVia === "fallback" || verdict.degraded, attempt: 1, ms: Date.now() - started,
     artifact: existsSync(coverPng) ? coverPng : null,
     evidence: {
       designVia, plan, hook: plan.headline.replace(/\n/g, " "), font: plan.typography.fontId,
+      qualityReviewPerformed: REVIEW_POLICY !== "off", materialUsePolicy: REVIEW_POLICY === "off" ? "default-use" : REVIEW_POLICY,
       background: { shotId: bgShot.shotId, atSec: bgAt, source: "colored（未烧字幕母版）" },
       backgroundPick: { sharpness: bgPick.sharpness, floor: COVER_MIN_SHARPNESS, substituted: bgSubstituted, plannedShotId: plan.background.shotId },
       headline: { text: plan.headline, fontId: plan.typography.fontId, sizePx: headSize, subSizePx: subSizeDraw },
@@ -6549,11 +6621,12 @@ if (STAGES.has("cover") && existsSync(colored)) {
         source: "colored（片子自己的镜头帧：肖像卡，不抠像）"
       },
       measurements, checks, designRaw: designNote,
-      backgroundPickDetail: `边缘能量 ${bgPick.sharpness.toFixed(2)}／下限 ${COVER_MIN_SHARPNESS}${bgSubstituted ? "（改取全片最清晰帧）" : ""}`
+      backgroundPickDetail: bgPick.sharpness === null ? "未执行锐度评分；按设计稿取帧"
+        : `边缘能量 ${bgPick.sharpness.toFixed(2)}／下限 ${COVER_MIN_SHARPNESS}${bgSubstituted ? "（改取全片最清晰帧）" : ""}`
     },
     verdict
   });
-  if (!checks.every((c) => c.pass)) {
+  if (!coverChecksPassed(checks)) {
     log(`⛔ 封面机检未通过：${checks.filter((c) => !c.pass).map((c) => c.id).join("、")}`);
   }
   /**
@@ -6562,7 +6635,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 但片头仍把这张被打回的图合成进了成片 → 用户第一眼看到的就是那张乱版封面。
    * 纪律：**未放行的封面不进成片**（宁可没有封面卡），并如实留痕。
    */
-  const coverApproved = checks.every((c) => c.pass) && verdict.approved;
+  const coverApproved = coverChecksPassed(checks) && verdict.approved;
   if (!coverApproved && existsSync(coverPng)) {
     log(`⛔ 封面未放行（机检 ${checks.filter((c) => c.pass).length}/${checks.length} · 监制 ${verdict.approved ? "放行" : "打回"}）→ 不合成进片头`);
   }
@@ -6696,6 +6769,10 @@ if (STAGES.has("mux") && subtitleSidecar && existsSync(scored) && !DRY_RUN) {
   }
 }
 
+function qualityAccidentsForReview(file: string): ReturnType<typeof detectQualityAccidents> | null {
+  return REVIEW_POLICY === "off" ? null : detectQualityAccidents(file);
+}
+
 /* ---------- ⑪ 母版交付 + 终审 ---------- */
 if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
   rememberInputs("master", [scored]);
@@ -6728,7 +6805,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
   const reviewFile = QUALITY === "uhd" ? join(POST_DIR, `${PROJECT}-master-review.mp4`) : deliverable;
   if (QUALITY === "uhd") copyFileSync(scored, reviewFile);
   const info = probe(reviewFile);
-  const accidents = detectQualityAccidents(reviewFile);
+  const accidents = qualityAccidentsForReview(reviewFile);
   const finalNamingAudit = auditDeliverableNaming({ path: finalPath, durationSec: Number(info.duration ?? 0) });
   /**
    * 音画对齐实测报告（2026-09-26 真机事故沉淀 · 机制）：
@@ -6891,8 +6968,10 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
         detail: `${info.width}x${info.height}（${QUALITY} 目标 ${OUTPUT_SIZE.width}x${OUTPUT_SIZE.height}）`, hard: true
       },
       { id: "audio", pass: Boolean(info.hasAudio), detail: info.hasAudio ? `音轨 ${info.acodec}` : "无音轨", hard: true },
-      { id: "no-black-frame", pass: accidents.blackSeconds <= 0.2, detail: `最长黑帧 ${accidents.blackSeconds.toFixed(2)}s（阈值 ≤0.2s）· ${accidents.detail}`, hard: true },
-      { id: "silence-window", pass: accidents.silenceSeconds <= 2.0, detail: `最长静音段 ${accidents.silenceSeconds.toFixed(2)}s（阈值 ≤2.0s；配乐铺底后不应出现长静音）` },
+      ...(accidents ? [
+        { id: "no-black-frame", pass: accidents.blackSeconds <= 0.2, detail: `最长黑帧 ${accidents.blackSeconds.toFixed(2)}s（阈值 ≤0.2s）· ${accidents.detail}`, hard: true },
+        { id: "silence-window", pass: accidents.silenceSeconds <= 2.0, detail: `最长静音段 ${accidents.silenceSeconds.toFixed(2)}s（阈值 ≤2.0s；配乐铺底后不应出现长静音）` },
+      ] : []),
       { id: "post-chain-lineage", pass: lineage.ok, detail: lineage.detail, hard: true },
       ...(QUALITY === "uhd" ? [{
         id: "enhancement-lineage", pass: enhancementLineageOk, hard: true,
@@ -6952,7 +7031,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
        * 角色一致性（2026-09-26 机制）：跨镜造型主色漂移 = 串戏嫌疑。
        * 能力边界如实：**不做人脸识别**，只比"统一取样口径下的造型主色"；命中需人工确认或显式放行。
        */
-      {
+      ...(REVIEW_POLICY !== "off" ? [{
         id: "character-consistency",
         pass: characterConsistency ? characterConsistency.ok : stageApproved("character-consistency"),
         detail: characterConsistency
@@ -6968,7 +7047,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
          * 让客户看到真片再判断——素材已经渲出来了，不再为"疑似"重跑。
          */
         hard: REVIEW_POLICY === "blocking",
-      },
+      }] : []),
       /**
        * 字幕**标点口径**（2026-09-25）：正规字幕不带标点。
        * 判据看旁挂清单里的机检结果（`no_punctuation`），而不是看内存里的字幕文本——

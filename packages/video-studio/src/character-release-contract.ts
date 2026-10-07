@@ -2,7 +2,8 @@
  * Factual identity and explicit wardrobe release contract. No paid I/O, face recognition,
  * ASR or RGB proxy runs here. The caller supplies current file fingerprints and preserves
  * receipts; a dedicated visual review may run through the existing producer-gate adapter.
- * General review policy and technical scores never grant identity release permission.
+ * Default material adoption is separate from optional identity certification. Neither
+ * adoption nor technical scores grant positive identity or wardrobe evidence.
  */
 import { createHash } from "node:crypto";
 import { assetIdOf, referenceAssetRefs, verifyRealPersonAsset, type RealPersonAsset } from "./real-person-asset.js";
@@ -151,7 +152,7 @@ export interface CharacterIdentityReviewRequest {
   promptSha256: string; frames: CharacterReviewFrame[]; referenceImage: CharacterIdentityAnchor;
   wardrobeLock: CharacterWardrobeLock; rubric: string[]; context: Record<string, unknown>;
 }
-/** Caller must invoke producer-gate.reviewStage directly, independently of general review off. */
+/** Explicit review callers invoke the dedicated producer-gate adapter; default off skips it. */
 export function buildCharacterIdentityReviewRequest(input: {
   contract: CharacterReleaseContract; shotId: string; clip: CharacterArtifactFingerprint; promptSha256: string;
   frames: readonly CharacterReviewFrame[]; producerContractHash: string; now?: Date;
@@ -168,8 +169,8 @@ export function buildCharacterIdentityReviewRequest(input: {
     || new Set(input.frames.map((f) => f.atSec)).size < 2) throw new Error("CHARACTER_REVIEW_FRAMES_INVALID: 至少两个不同时间的实际帧及摘要");
   const rubric = [
     "身份事实检查：把登记基准图与本镜各时间抽帧对比，逐帧检查脸型、眼型、鼻型、唇形及五官比例是否支持同一授权人物；换脸、替代模特或额外清晰人脸即拒绝。看不清、背影或证据不足只能未验证，不能靠肤色、衣服颜色或台词猜身份。",
-    `显式服饰合同检查：本镜必须符合 ${shot.wardrobeLock.id}：${shot.wardrobeLock.description}。这项检查仅核对本片显式约定，不能把通用审美、发型偏好或品牌配饰偏好当硬闸。`,
-    "本次只核验同一授权人物与本镜显式服饰合同。两项证据都充足且成立才approved=true；不支持或未验证均approved=false，reason说明哪项证据不足或违反合同。抽帧检查不代表逐帧身份认证、口型或听音通过。",
+    `显式服饰合同检查：本镜画面中可见的服饰部分必须符合 ${shot.wardrobeLock.id}：${shot.wardrobeLock.description}。先区分可见部分与画外部分，再核对可见部分的款式、材质、颜色和配饰；可见的纽扣颜色或服装不符仍拒绝。画外鞋子、裙摆等记为未观察，不能推断其合格或违规，也不能仅因未入画而拒收近景。画面中可见但模糊不清的必要服饰细节仍属证据不足。通用审美、发型偏好或品牌配饰偏好不能作硬闸。`,
+    "本次只核验同一授权人物与本镜实际可见的显式服饰合同。身份与可见服饰两项证据都充足且成立才approved=true；不支持或未验证均approved=false。reason分别说明身份、可见服饰的检查结果，以及哪些画外项未观察；对画外项留证不授予全身服饰认证。抽帧检查不代表逐帧身份认证、口型或听音通过。",
   ];
   const body = { schemaVersion: CHARACTER_IDENTITY_REVIEW_SCHEMA, purpose: "identity-and-explicit-wardrobe" as const,
     projectId: input.contract.projectId, shotId: input.shotId, characterId: character.characterId, assetId: character.assetId,
@@ -179,6 +180,8 @@ export function buildCharacterIdentityReviewRequest(input: {
     context: { purpose: "identity-and-explicit-wardrobe", identityContractHash: input.contract.contractHash,
       characterId: character.characterId, assetId: character.assetId, assetGroupId: character.assetGroupId,
       checks: ["same-authorized-person", "explicit-wardrobe-contract"], wardrobeLock: shot.wardrobeLock,
+      wardrobeEvidenceScope: { policy: "visible-components-only", offscreen: "unobserved-no-pass-or-fail-claim",
+        visibleContradiction: "reject", visibleNecessaryDetailUnclear: "unverified", faceEvidenceInsufficient: "unverified" },
       evidenceScope: "registered-reference-and-temporal-samples; not-biometric-certification" } };
   return { ...body, requestHash: characterReleaseHash(body) };
 }
@@ -336,4 +339,44 @@ export function assessCharacterRelease(input: {
     releaseAllowed: input.phase === "release" && (status === "passed" || status === "not_applicable"),
     continuePaidRendering: input.phase === "canary" && (status === "passed" || status === "not_applicable"),
     internalCandidateAllowed: input.shots.some((s) => fingerprint(s.clip)), authorizationScope: "registered-local-evidence-not-provider-verified", shots, issues };
+}
+
+/** Source-bound adoption of rendered materials. Historical visual opinions stay untouched. */
+export function assessRenderedCharacterUse(input: Parameters<typeof assessCharacterRelease>[0]): CharacterReleaseReport & {
+  materialUsePolicy: "default-use"; qualityReviewPerformed: false;
+} {
+  const contract = input.contract;
+  const issues = contractIssues(contract, input.now ?? new Date());
+  const people = input.phase === "canary" && input.canaryCharacterIds !== undefined
+    ? input.canaryCharacterIds : contract.characters.map(character => character.characterId);
+  const canaries = input.canaryShotIds ?? (input.canaryShotId ? [input.canaryShotId]
+    : people.map(id => contract.shots.find(shot => shot.characterId === id)?.shotId).filter((id): id is string => !!id));
+  if (input.phase === "canary" && contract.shots.length && (!people.length || new Set(people).size !== people.length
+    || people.some(id => !contract.characters.some(character => character.characterId === id))
+    || people.some(id => !contract.shots.some(shot => shot.characterId === id && canaries.includes(shot.shotId)))))
+    issues.push(issue("material-use-scope-invalid", null, "采用范围必须绑定当前登记人物及镜头"));
+  const expected = input.phase === "release" ? contract.shots
+    : contract.shots.filter(shot => people.includes(shot.characterId) && canaries.includes(shot.shotId));
+  const byShot = new Map<string, CharacterReleaseArtifact>();
+  for (const artifact of input.shots) {
+    if (!contract.shots.some(shot => shot.shotId === artifact.shotId))
+      issues.push(issue("material-use-shot-unknown", artifact.shotId, "素材镜号不属于当前人物合同"));
+    if (byShot.has(artifact.shotId)) issues.push(issue("artifact-duplicate", artifact.shotId, "同一镜头存在多个产物，不能静默选择"));
+    byShot.set(artifact.shotId, artifact);
+  }
+  const shots = expected.map(shot => {
+    const artifact = byShot.get(shot.shotId);
+    if (!artifact || !fingerprint(artifact.clip) || !sha(artifact.promptSha256))
+      issues.push(issue("material-source-missing", shot.shotId, "采用需要当前视频字节摘要和实际生成提示词摘要"));
+    else if (!same(artifact.referenceAssets, shot.referenceAssets))
+      issues.push(issue("generation-references-unbound", shot.shotId, "实际生成参考未绑定登记授权组"));
+    return { shotId: shot.shotId, identity: "unverified" as const, wardrobe: "unverified" as const };
+  });
+  const status = issues.length ? statusOf(issues) : contract.shots.length ? "passed" : "not_applicable";
+  const allowed = status === "passed" || status === "not_applicable";
+  return { schemaVersion: "workloom.character-release-report/v1", contractHash: contract.contractHash, status,
+    materialUsePolicy: "default-use", qualityReviewPerformed: false,
+    releaseAllowed: input.phase === "release" && allowed, continuePaidRendering: input.phase === "canary" && allowed,
+    internalCandidateAllowed: input.shots.some(artifact => fingerprint(artifact.clip)),
+    authorizationScope: "registered-local-evidence-not-provider-verified", shots, issues };
 }
