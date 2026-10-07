@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 474,
+  "revision": 476,
   "tasks": {
     "98": {
       "number": 98,
@@ -2712,7 +2712,7 @@
     },
     "126": {
       "number": 126,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791346075534,
       "attempts": {},
       "admission": {
@@ -2728,7 +2728,7 @@
           "protocol": 18
         }
       },
-      "updatedAt": 1791346110604,
+      "updatedAt": 1791346213992,
       "headSha": "d9f68f2cc4d123bbc06075eefaf69ad9c00d1040",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0004",
@@ -3012,7 +3012,9 @@
             "digest": "ce5400c68c179bdda1511700a90b1011d01aa5d9529900d50d8eb0c6b0a9c528"
           }
         ]
-      }
+      },
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/126 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791346813992
     }
   },
   "leases": {
@@ -15506,6 +15508,31 @@
       },
       "previous": "72275ee2b0abae0541048d55a2c50f6f4c034179d5a370496c1676aa58ef7b3b",
       "digest": "0d3347181136ef3f9727733ee0763f05ca5c0c797e9d3ae455b6995f79d9d839"
+    },
+    {
+      "sequence": 475,
+      "at": "2026-10-07T04:10:13.992Z",
+      "kind": "task",
+      "data": {
+        "number": 126,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/126 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791346813992
+        }
+      },
+      "previous": "0d3347181136ef3f9727733ee0763f05ca5c0c797e9d3ae455b6995f79d9d839",
+      "digest": "85253da4a1235a96e7aaf31baab547e036903778808461079dc8ba8ff623a8ae"
+    },
+    {
+      "sequence": 476,
+      "at": "2026-10-07T04:10:21.304Z",
+      "kind": "transaction",
+      "data": {
+        "id": "a1aaf5f3-730d-4b00-b024-c79c9fda0c37"
+      },
+      "previous": "85253da4a1235a96e7aaf31baab547e036903778808461079dc8ba8ff623a8ae",
+      "digest": "52f57ac257ec6530c6dcfdc446d4c2418eedbdcb3dfcff1808278a197a5efdb8"
     }
   ]
 }
