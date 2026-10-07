@@ -16,7 +16,9 @@ export function loadBudgetRunIdentity({ outDir, environmentKind }) {
   let legacyId = null;
   if (existsSync(ledger)) {
     ordinary(ledger);
-    const rows = readFileSync(ledger, "utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
+    const text = readFileSync(ledger, "utf8");
+    if (text && !text.endsWith("\n")) throw new Error("旧预算账本末行缺少换行；需对账，禁止创建身份或继续付费调用");
+    const rows = text.split("\n").filter(Boolean).map(line => JSON.parse(line));
     const ids = [...new Set(rows.map(row => row.runId))];
     if (ids.length !== 1 || !validId(ids[0])) throw new Error("旧预算包含多个或缺失运行身份；需对账，禁止创建空预算重新付费");
     legacyId = ids[0];
