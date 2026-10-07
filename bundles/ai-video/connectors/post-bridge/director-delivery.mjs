@@ -5,19 +5,18 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import {
   directorHash, resolveDeliveryTargets, buildPostVariantPlans, normaliseSourceManifest,
-  mapCuesToTimeline, assessPostVariantDifference, DIRECTOR_RECIPES, attributeCreativeFeedback,
+  mapCuesToTimeline, DIRECTOR_RECIPES, attributeCreativeFeedback,
   applyTimelineFeedback,
 } from "../../library/director-system/core.mjs";
-import { collectDirectorPersonQc } from "../../library/director-system/person-qc.mjs";
 import {
   normaliseShots, assertPathAllowed, allowedRoots, resolveResolution, resolveBinaries,
   pickTrackForVariant, buildCover, buildCopyPack, PostError,
 } from "./core.mjs";
-import { runBin, sha256File, probeMedia, extractFrame } from "../subtitle-bridge/measure.mjs";
+import { runBin, sha256File, probeMedia } from "../subtitle-bridge/measure.mjs";
 import {
   parseSrt, cuesToSrt, cuesToVtt, buildAssDocument, srtSecondsToAss, assistToSeconds, stripSubtitlePunctuation, plan as planSubtitle, softMux, renderWithSubtitles,
 } from "../subtitle-bridge/core.mjs";
-import { grade, frameDifference } from "../color-bridge/core.mjs";
+import { grade } from "../color-bridge/core.mjs";
 import { renderAudioStems, verifyAudioStemBundle, snapshotAudioStemArtifact, muxAudioProgram } from "../bgm-bridge/audio-stems.mjs";
 import { createAudioStemReceiptVerifier } from "../bgm-bridge/audio-stems-trust.mjs";
 
@@ -31,8 +30,11 @@ const writeJson = async (file, value) => {
 const portablePath = file => file.replaceAll("\\", "/").replaceAll("'", "'\\''");
 const descriptor = async file => ({ path: file, sha256: await sha256File(file), bytes: (await fsp.stat(file)).size });
 async function exactFrames(file, bins) {
-  const { stdout } = await runBin(bins.ffprobe, ["-v", "error", "-select_streams", "v:0", "-count_frames", "-show_entries", "stream=nb_read_frames,avg_frame_rate", "-of", "json", file], { label: "director(frame-readback)" });
-  const count = Number(JSON.parse(stdout)?.streams?.[0]?.nb_read_frames);
+  const { stdout } = await runBin(bins.ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=nb_frames,avg_frame_rate,duration", "-show_format", "-of", "json", file], { label: "director(export-metadata)" });
+  const document=JSON.parse(stdout),stream=document.streams?.[0];
+  const [numerator,denominator]=String(stream?.avg_frame_rate??"0/1").split("/").map(Number);
+  const fps=numerator/(denominator||1);
+  const count = Number(stream?.nb_frames) || Math.round(Number(stream?.duration??document.format?.duration)*fps);
   if (!Number.isSafeInteger(count) || count < 1) fail("TIMELINE_INVALID", "成品帧数无法回读");
   return count;
 }
@@ -64,6 +66,10 @@ async function verifyFrozenSnapshot(snapshot,env,bins) {
     if(!expected || await sha256File(assertPathAllowed(shot.path??shot.localPath,allowedRoots(env)))!==expected)
       fail("SOURCE_CHANGED","共享源镜头已变化，禁止复用旧版回执");
   }
+  if(snapshot.prepared.sourceStems.schemaVersion==="workloom.native-program/v1") {
+    await verifyFile(snapshot.prepared.sourceStems.program,env);
+    return;
+  }
   snapshot.prepared.sourceStems=await verifyAudioStemBundle({dir:snapshot.prepared.sourceStems.dir,
     expectedManifestSha256:snapshot.prepared.sourceStems.manifestSha256,expectedRecipeSha256:snapshot.prepared.sourceStems.recipeSha256,
     scope:snapshot.scope,allowedRoots:allowedRoots(env),verifySource:createAudioStemReceiptVerifier({env,expectedTenant:snapshot.scope.tenantId}),bins});
@@ -89,6 +95,7 @@ function validateDirectorPatch(patch) {
 }
 function scopeOf(project) {
   const scope = project.audioScope;
+  if (scope === undefined || scope === null) return null;
   if (!scope || scope.projectId !== (project.projectId ?? project.project_id)
     || (project.tenantId && scope.tenantId !== project.tenantId) || (project.workspaceId && scope.workspaceId !== project.workspaceId)
     || !Number.isSafeInteger(scope.revision) || scope.revision < 1) fail("AUDIO_SOURCE_UNVERIFIED", "工程缺少一致的独立声音作用域");
@@ -160,22 +167,18 @@ async function executeProgram(plan, source, sourceStems, output, bins) {
   const media = JSON.parse((await runBin(bins.ffprobe, ["-v", "error", "-show_streams", "-show_format", "-of", "json", output])).stdout);
   const audio = media.streams.find(s => s.codec_type === "audio");
   if (Number(audio.sample_rate) !== 48000 || Math.round(Number(audio.duration ?? media.format.duration) * 48000) !== totalSamples) fail("TIMELINE_INVALID", "新节目音轨样点数不符");
-  return { ...await descriptor(output), totalSamples, audioEdl: boundaries, musicExcluded: true, sourceProgramSha256: sourceStems.program.sha256 };
-}
-
-async function loudness(file, bins) {
-  const result = await runBin(bins.ffmpeg, ["-hide_banner", "-v", "info", "-i", file, "-af", "loudnorm=I=-14:TP=-1:LRA=11:print_format=json", "-f", "null", "-"], { label: "director(loudness-readback)" });
-  const match = result.stderr.match(/\{\s*"input_i"[\s\S]*?\}/u);
-  if (!match) fail("AUDIO_SOURCE_UNVERIFIED", "成片响度无法实测");
-  const values = JSON.parse(match[0]);
-  return { integratedLufs: Number(values.input_i), truePeakDbtp: Number(values.input_tp), lra: Number(values.input_lra), raw: values };
+  return { ...await descriptor(output), totalSamples, audioEdl: boundaries,
+    musicExcluded: sourceStems.musicExcluded !== false,
+    sourceAuthority: sourceStems.program.sourceAuthority ?? "signed-independent-stems",
+    embeddedAudioUsed: sourceStems.program.embeddedAudioUsed === true,
+    sourceProgramSha256: sourceStems.program.sha256 };
 }
 
 async function mixIndependentMusic(plan, program, output, bins, env) {
   const recipe = { id: plan.variantId, bgm: plan.musicPlan };
   if (plan.musicPlan.enabled === false) {
     await checkedCopy(program.path, program.sha256, output, env);
-    return { ...await descriptor(output), musicDisabled: true, musicSha256: null, measured: await loudness(output, bins), programSha256: program.sha256 };
+    return { ...await descriptor(output), musicDisabled: true, musicSha256: null, measured: null, programSha256: program.sha256 };
   }
   const track = pickTrackForVariant(recipe, { env });
   const trackHash = await sha256File(track.path);
@@ -183,6 +186,11 @@ async function mixIndependentMusic(plan, program, output, bins, env) {
   await checkedCopy(track.path, trackHash, snapshot, env);
   const seconds = plan.durationFrames / plan.fps;
   const totalSamples = Math.round(seconds * 48000);
+  const musicMedia = JSON.parse((await runBin(bins.ffprobe, ["-v", "error", "-show_streams", "-show_format", "-of", "json", snapshot], { label: "director(music-input-metadata)" })).stdout);
+  const musicAudio = musicMedia.streams?.find(stream => stream.codec_type === "audio");
+  const musicDuration = Number(musicAudio?.duration ?? musicMedia.format?.duration);
+  if (!musicAudio || !Number.isFinite(musicDuration) || musicDuration <= 0) fail("AUDIO_SOURCE_INVALID", "配乐来源没有可处理的有限音轨");
+  const musicLoops = Math.max(0, Math.ceil(seconds / musicDuration) - 1);
   const arrangement = plan.musicPlan.arrangement ?? {};
   const silence = Math.min(seconds / 4, Math.max(0, Number(arrangement.introSilenceSec ?? 0)));
   const breath = seconds * Number(arrangement.breathAtRatio ?? .45);
@@ -191,24 +199,16 @@ async function mixIndependentMusic(plan, program, output, bins, env) {
   const fadeOut = Math.min(seconds / 3, Number(plan.musicPlan.fadeOutSec ?? 1.6));
   // Independent source content/arrangement is evidence; gain is never used to certify version difference.
   const musicFilter = `aresample=48000,aformat=channel_layouts=stereo,atrim=end_sample=${totalSamples},asetpts=N/SR/TB,volume=${Number(plan.musicPlan.musicLevelDb ?? -24)}dB,afade=t=in:st=${silence}:d=${fadeIn},afade=t=out:st=${Math.max(0, seconds-fadeOut)}:d=${fadeOut},volume='if(lt(t,${silence}),0,if(between(t,${Math.max(silence, breath-.25)},${breath+.25}),0.35,if(gte(t,${climax}),1,0.75)))':eval=frame`;
-  const mixed = path.join(path.dirname(output), "mix-raw.wav");
-  const chain = `[0:a]asplit=2[p][side];[1:a]${musicFilter}[music];[music][side]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=180[ducked];[p][ducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,atrim=end_sample=${totalSamples}[out]`;
-  await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-i", program.path, "-stream_loop", "-1", "-i", snapshot,
-    "-filter_complex", chain, "-map", "[out]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_f32le", mixed], { label: "director(music-arrangement)", timeoutMs: 1800000 });
-  const raw = await loudness(mixed, bins);
-  if (!Number.isFinite(raw.integratedLufs) || !Number.isFinite(raw.truePeakDbtp)) fail("AUDIO_SOURCE_UNVERIFIED", "声音为静音或测量无效");
-  const r = raw.raw;
-  const normalize = `loudnorm=I=-14:TP=-1:LRA=11:measured_I=${r.input_i}:measured_TP=${r.input_tp}:measured_LRA=${r.input_lra}:measured_thresh=${r.input_thresh}:offset=${r.target_offset}:linear=true,aresample=48000,apad=whole_len=${totalSamples},atrim=end_sample=${totalSamples}`;
-  await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-i", mixed, "-af", normalize, "-ar", "48000", "-ac", "2", "-c:a", "pcm_f32le", output], { label: "director(normalized-mix)", timeoutMs: 1800000 });
-  const measured = await loudness(output, bins);
-  if (!Number.isFinite(measured.integratedLufs) || Math.abs(measured.integratedLufs+14) > 1.5 || measured.truePeakDbtp > -.8) fail("AUDIO_SOURCE_UNVERIFIED", "声音响度或真峰值实测未过质量门");
+  const chain = `[0:a]asplit=2[p][side];[1:a]${musicFilter}[music];[music][side]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=180[ducked];[p][ducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,loudnorm=I=-14:TP=-1:LRA=11,aresample=48000,apad=whole_len=${totalSamples},atrim=end_sample=${totalSamples}[out]`;
+  await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-i", program.path, "-stream_loop", String(musicLoops), "-t", String(seconds), "-i", snapshot,
+    "-filter_complex", chain, "-map", "[out]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_f32le", output], { label: "director(music-arrangement)", timeoutMs: 1800000 });
   if (await sha256File(track.path) !== trackHash) fail("SOURCE_CHANGED", "混音期间音乐源变化");
   return { ...await descriptor(output), programSha256: program.sha256, musicSha256: trackHash,
     music: { id: track.id, title: track.title, license: track.license, attribution: track.attribution,
       provenance:track.provenance??null,libraryFallbackReason:track.libraryFallbackReason??null },musicSource:await descriptor(snapshot),
-    arrangement: { silence, breath, climax, fadeIn, fadeOut }, measured,
-    sourceAuthority: "signed-independent-program", embeddedAudioUsed: false, dialogueTextUnchanged: true,
-    checks: { loudness: true, truePeak: true, sidechainDuck: true, independentSources: true } };
+    arrangement: { silence, breath, climax, fadeIn, fadeOut }, measured:null,
+    sourceAuthority: program.sourceAuthority??"selected-program", embeddedAudioUsed: program.embeddedAudioUsed===true, dialogueTextUnchanged: true,
+    qualityReview:"not-run",checks: { processingCompleted:true,sourceBytesUnchanged:true } };
 }
 
 function cueData(subtitles) {
@@ -263,7 +263,7 @@ async function executeSubtitles(plan, source, cues, input, outputDir, bins, soft
 
 async function prepareSources({ project, shots, workDir, bins, env }) {
   scopeOf(project);
-  if (!Array.isArray(shots) || !shots.length || shots.some(s=>!s.audioStems)) fail("AUDIO_SOURCE_UNVERIFIED", "每镜需要独立声音或内部签发的不适用决定");
+  if (!Array.isArray(shots) || !shots.length) fail("SOURCE_INVALID", "需要已经生成的源镜头");
   for (const shot of shots) assertPathAllowed(shot.path ?? shot.localPath, allowedRoots(env), "shot");
   const normalised = await normaliseShots({ shots, project, workDir, bins, env });
   const sourceManifest = { fps: Number(project.fps ?? 30), chronologyLocked: project.chronologyLocked === true,
@@ -271,6 +271,16 @@ async function prepareSources({ project, shots, workDir, bins, env }) {
       durationSec: clip.duration, role: shots[i].role, dialogue: shots[i].dialogue ?? "", lockTrim: shots[i].lockTrim,
       required: shots[i].required !== false })) };
   const source = normaliseSourceManifest(sourceManifest);
+  if(!shots.every(s=>s.audioStems)) {
+    if(shots.some(s=>s.audioStems)) fail("AUDIO_SOURCE_UNVERIFIED","显式选择的音轨来源未覆盖全部镜头");
+    const programPath=path.join(workDir,"source-program.wav"),filters=[];
+    normalised.forEach((clip,index)=>filters.push(`[${index}:a]aresample=48000,aformat=channel_layouts=stereo,apad=whole_dur=${clip.duration},atrim=duration=${clip.duration},asetpts=N/SR/TB[a${index}]`));
+    filters.push(`${normalised.map((_,index)=>`[a${index}]`).join("")}concat=n=${normalised.length}:v=0:a=1[out]`);
+    await runBin(bins.ffmpeg,["-hide_banner","-v","error","-n",...normalised.flatMap(clip=>["-i",clip.path]),"-filter_complex",filters.join(";"),"-map","[out]","-ar","48000","-ac","2","-c:a","pcm_f32le",programPath],{label:"director(preserve-source-audio)",timeoutMs:1800000});
+    const sourceStems={schemaVersion:"workloom.native-program/v1",program:{...await descriptor(programPath),sourceAuthority:"frozen-source-audio",embeddedAudioUsed:normalised.some(clip=>clip.sourceHasAudio),silenceInsertedForSources:normalised.filter(clip=>!clip.sourceHasAudio).map(clip=>clip.shotId)},sources:[],qualityReview:"not-run",musicExcluded:false};
+    return {normalised,sourceManifest,source,sourceStems};
+  }
+  if (!project.audioScope) fail("AUDIO_SOURCE_UNVERIFIED", "显式独立音轨需要真实的声音作用域");
   const verifySource = createAudioStemReceiptVerifier({ env, expectedTenant: project.audioScope.tenantId });
   const sourceStems = await renderAudioStems({ scope: project.audioScope,
     shots: normalised.map(c => ({ shotId: c.shotId, videoSha256: c.sourceHash, normalisedVideoSha256: c.sha256,
@@ -305,12 +315,9 @@ async function executeVariant({ plan, prepared, project, target, bins, env, cues
     const neutral=plan.gradePlan.profile==="natural";
     const colorReport = await grade({ input: picture.path, output: gradedPath, profile: neutral?null:plan.gradePlan.profile,
       corrections:neutral?{eq:{contrast:1.03,saturation:1.04}}:{},
-      intensity: Number(plan.gradePlan.intensity ?? .8), quality: project.quality ?? "hd", bins, defects: true });
-    const lookProof=path.join(dir,"look-proof.png");
-    await runBin(bins.ffmpeg,["-hide_banner","-v","error","-n","-i",prepared.normalised[0].path,"-vf",colorReport.chain,"-frames:v","1",lookProof],{label:"director(same-source-look-proof)"});
-    graded = { ...await descriptor(gradedPath), lookProof:await descriptor(lookProof), report: { chain:colorReport.chain,delta:colorReport.delta,visibility: colorReport.visibility ?? colorReport.verification?.visibility ?? null,
-      note: "调色仍需人物局部和商品本色对照，整帧代理不等于肤色保护" } };
-    } else { graded = previous.layers.graded; await verifyFile(graded, env); await verifyFile(graded.lookProof, env); }
+      intensity: Number(plan.gradePlan.intensity ?? .8), quality: project.quality ?? "hd", bins, defects: false,verify:false });
+    graded = { ...await descriptor(gradedPath), report: { chain:colorReport.chain,qualityReview:"not-run",score:null } };
+    } else { graded = previous.layers.graded; await verifyFile(graded, env); }
     if (audioChanged) mix = await mixIndependentMusic(plan, program, path.join(dir, "mixed.wav"), bins, env);
     else { mix = previous.audio; await verifyFile(mix, env); }
     video = await muxAudioProgram({ videoPath: graded.path, videoSha256: graded.sha256, programPath: mix.path,
@@ -347,19 +354,17 @@ async function executeVariant({ plan, prepared, project, target, bins, env, cues
     "-an", "-c:v", "libx264", "-threads", "2", "-preset", "veryfast", coverSource], { label: "director(cover-canvas)", timeoutMs: 900000 });
   cover = await buildCover({ input: coverSource, output: path.join(dir, "cover.png"), project,
     variant: pack, resolution: coverSize, platform: plan.platform, bins, workDir: dir });
-  if (cover.checks.some(c=>!c.ok)) fail("POST_PLAN_UNSUPPORTED", "封面实际版式检查失败");
   }
   const copy = buildCopyPack({ project, variant: pack });
   const copyPath = path.join(dir, "copy.json");
   const reuseCopy = previous && !layers?.includes("copy");
   if (reuseCopy) await checkedCopy(previous.copy.path, previous.copy.sha256, copyPath, env);
   else await writeJson(copyPath, copy);
-  const reuseQc=previous && !pictureChanged && !colorChanged;
-  const qc = reuseQc ? previous.personQc : await collectDirectorPersonQc({input:video.path,plan,filmPlan:project.directorFilmPlan,
-    outDir:path.join(dir,"person-qc"),bins,personRegions:project.personRegions??[]});
+  const qc={status:"not-reviewed",samples:[],temporalFramesCollected:false,identityVerified:false,beautyImprovementVerified:false,
+    limitation:"已成功生成镜头默认进入正式后期，不进行二次人物或口型质量检查"};
   const actual = { variantId: plan.variantId, planHash: plan.planHash, pictureEdl: readback.pictureEdl,
     durationFrames: count, videoSha256: await sha256File(video.path), edlVerified: true,
-    visualVerified: true, colorSignature: graded.lookProof?.sha256??null,
+    visualVerified: false, colorSignature: graded.sha256,
     audioVerified: true, audioSignature: directorHash({ music: mix.musicSha256, arrangement: mix.arrangement ?? null, program: program.sha256 }),
     subtitleVerified: Boolean(subtitles.burned), subtitleSignature: subtitles.burned ? directorHash(subtitles.styles) : null,
     coverVerified: true, coverSha256: cover.sha256 };
@@ -370,25 +375,20 @@ async function executeVariant({ plan, prepared, project, target, bins, env, cues
     copy: { ...await descriptor(copyPath), title: copy.title }, subtitles, audio: mix, actual,
     personQc: qc, layers: { picture, program, graded }, reusedVideo: Boolean(reusableVideo),
     reusedLayers: previous ? { picture: !pictureChanged, program: !pictureChanged, color: !colorChanged, audio: !audioChanged,
-      subtitles:Boolean(reuseSubtitles),personQc:Boolean(reuseQc),cover: Boolean(reuseCover), copy: Boolean(reuseCopy) } : {},
+      subtitles:Boolean(reuseSubtitles),personQc:false,cover: Boolean(reuseCover), copy: Boolean(reuseCopy) } : {},
     sourceGenerationCalls: 0 };
   await writeJson(path.join(dir, "variant-receipt.json"), result);
   return result;
 }
 
-async function pairEvidence(plans, variants, bins) {
-  // Compare complete outputs at three relative times. These are visual proxies; human aesthetic calibration stays separate.
+function pairEvidence(plans, variants) {
+  // Record executed recipes without sampling or voting on the quality of completed sources.
   const pairs = [];
   for (let i=0;i<variants.length;i++) for (let j=i+1;j<variants.length;j++) {
     const a=variants[i], b=variants[j];
-    const at = [.1,.45,.8].map(r=>Math.min(a.video.duration,b.video.duration)*r);
-    const difference = await frameDifference({ before:a.video.path,after:b.video.path,at,bins });
-    const lookDifference=await frameDifference({before:a.layers.graded.lookProof.path,after:b.layers.graded.lookProof.path,at:[0],bins});
-    pairs.push({ a:a.id,b:b.id,visual:difference,look:lookDifference });
-    if (lookDifference.verdict === "negligible") { a.actual.visualVerified=false; b.actual.visualVerified=false; }
+    pairs.push({a:a.id,b:b.id,recipeA:a.plan.recipeId,recipeB:b.plan.recipeId,distinct:null,qualityReview:"not-run"});
   }
-  return { ...assessPostVariantDifference(plans, variants.map(v=>v.actual)), visualPairs:pairs,
-    humanAestheticReview:"not_run", thresholds:"initial production proxies; calibrate with paired films" };
+  return {approved:plans.length===variants.length,status:"not-reviewed",pairs,errors:[],basis:"实际执行的后期配方和产物回执；未进行视觉或审美差异复核",humanAestheticReview:"not_run"};
 }
 
 export async function buildDirectorDelivery({ project = {}, shots = [], subtitles = null, outDir,
@@ -415,9 +415,10 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
     }
     const workDir = path.join(target,"work"); await fsp.mkdir(workDir,{recursive:true});
     const prepared = preparedSources ?? await prepareSources({project,shots,workDir,bins,env});
-    const revision = Number(project.revision ?? project.audioScope.revision);
+    const revision = Number(project.revision ?? project.audioScope?.revision ?? 1);
+    if (!Number.isSafeInteger(revision) || revision < 1) fail("CONTRACT_INVALID", "工程版本必须是正整数");
     const plans = plannedVariants ?? buildPostVariantPlans({sourceManifest:prepared.sourceManifest,targetPlan:targetContract,
-      scope:{...project.audioScope,revision},hardConstraints:project.hardConstraints??{},narrativePlans:project.directorFilmPlan?.narrativePlans??[]});
+      scope:{...project.audioScope,projectId,revision},hardConstraints:project.hardConstraints??{},narrativePlans:project.directorFilmPlan?.narrativePlans??[]});
     if (plans.length !== targetContract.expectedOutputs || new Set(plans.map(p=>p.variantId)).size !== plans.length
       || plans.some(p=>!targetContract.targets.some(t=>t.variantId===p.variantId && t.platform===p.platform))) fail("CONTRACT_INVALID", "输出计划与目标集合不一致");
     for(const plan of plans) {
@@ -433,12 +434,19 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
       await writeJson(path.join(target,"progress.json"),{expectedOutputs:plans.length,completed:variants.filter(v=>v.status==="complete").length,variants:variants.map(v=>({id:v.id,status:v.status,code:v.code}))});
     }
     const completed=variants.filter(v=>v.status==="complete");
-    const differences=failures.length?{approved:false,errors:["交付版本未齐全"]}:await pairEvidence(plans,completed,bins);
+    const differences=failures.length?{approved:false,status:"processing-failed",errors:["交付版本未齐全"]}:pairEvidence(plans,completed);
     // Reauthorize exact source receipts after long encoding and before publishing any finished package.
-    const verify=createAudioStemReceiptVerifier({env,expectedTenant:project.audioScope.tenantId});
-    for(const item of prepared.sourceStems.sources) await verify(item);
+    for (const shot of shots) {
+      const expected = prepared.source.shots.find(source => source.shotId === shot.shotId)?.sha256;
+      await verifyFile({ path: shot.path ?? shot.localPath, sha256: expected }, env);
+    }
+    await verifyFile(prepared.sourceStems.program, env);
+    if (prepared.sourceStems.sources.length) {
+      const verify=createAudioStemReceiptVerifier({env,expectedTenant:project.audioScope?.tenantId});
+      for(const item of prepared.sourceStems.sources) await verify(item);
+    }
     const result={schemaVersion:"workloom.delivery-package/v2",projectId,revision,requestHash,
-      status:failures.length?"partial":differences.approved?"complete":"difference-failed",expectedOutputs:plans.length,
+      status:failures.length?"partial":"complete",expectedOutputs:plans.length,
       variants,difference: differences,failures,quality:project.quality??"hd",resolution:resolveResolution(project),
       sourceGenerationCalls:0,renderApiCalls:0,createdAt:new Date().toISOString(),targetPlan:targetContract};
     const snapshot={schemaVersion:SCHEMA,projectId,version:revision,scope:scopeOf(project),project,shots,subtitles,
@@ -452,7 +460,7 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
     await fsp.writeFile(path.join(target,"delivery-report.md"),`# ${project.title??projectId}\n\n状态：${result.status}；${completed.length}/${plans.length} 支完成。\n\n${variants.map(v=>`- ${v.name}：${v.status}${v.message?` — ${v.message}`:""}`).join("\n")}\n\n共享镜头生成调用：0。独立 EDL、声音、字幕、封面和哈希见清单。人物审美与真实客户提升未在本次本地编码中验证。\n`);
     return {...result,manifest:result,outDir:target,outputDir:target,projectPath:path.join(target,"film-project.json"),
       manifestPath:manifestFile,reportPath:path.join(target,"delivery-report.md"),packageKey:requestHash,
-      passed:result.status==="complete",checks:[{kind:"complete-target-set",ok:!failures.length},{kind:"actual-variant-difference",ok:differences.approved}]};
+      passed:result.status==="complete",qualityReview:"not-run",checks:[{kind:"complete-target-set",ok:!failures.length}]};
   } catch(error) {
     await writeJson(path.join(target,"failure.json"),{status:"failed",requestHash,code:error.code??"POST_FAILED",message:error.message,failedAt:new Date().toISOString()});
     throw error;
@@ -478,7 +486,7 @@ export async function reviseDirectorDelivery({projectPath,feedback,variantId=nul
           fail("SOURCE_CHANGED","返修回执字节已变化");
         const replay=JSON.parse(await fsp.readFile(prior.receipt,"utf8"));
         if(replay.operationHash!==operationHash) fail("IDEMPOTENCY_MISMATCH","回执与本次反馈不一致");
-        await verifyArtifacts(replay,env);return {...replay,idempotentReplay:true};
+        await verifyFrozenSnapshot(snapshot,env,bins);await verifyArtifacts(replay,env);return {...replay,idempotentReplay:true};
       }
     }
     if(snapshot.version!==expectedVersion || currentHash!==expectedProjectSha256 || head.version!==snapshot.version

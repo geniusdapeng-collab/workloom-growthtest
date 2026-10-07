@@ -123,17 +123,19 @@ describe("AI producer evidence gate", () => {
   });
   it("unsupported audio and missing acoustic review cannot be called passed", async () => {
     expect((await reviewStage(textOptions({ artifacts: [{ path: file("audio.wav", "data"), kind: "audio" }] }))).status).toBe("unverified");
-    expect((await reviewStage(textOptions({ stage: "bgm" }))).reason).toContain("audio-review");
+    const bodies: string[] = [];
+    const post = await reviewStage(textOptions({ stage: "bgm", fetchImpl: judge(good, bodies) }));
+    expect(post.approved).toBe(true); expect(post.score).toBeNull(); expect(bodies).toEqual([]);
   });
   const hasFfmpeg = spawnSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-version"]).status === 0;
-  it.skipIf(!hasFfmpeg)("actual video is probed and sampled at five timestamps", async () => {
+  it.skipIf(!hasFfmpeg)("actual rendered video is adopted from ordinary metadata without sampled frames or model calls", async () => {
     const path = file("video.mp4", "");
     const build = spawnSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=10", "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p", path]);
     expect(build.status).toBe(0);
     const bodies: string[] = [];
     const v = await reviewStage(textOptions({ stage: "shot", artifacts: [{ path, kind: "video" }], fetchImpl: judge(good, bodies) }));
-    expect(v.approved, v.reason).toBe(true); expect(v.evidence?.[0]?.scope).toContain("temporal-sample");
-    expect(bodies[0]).toContain("0.800s"); expect(bodies[0]?.match(/image_url/g)).toHaveLength(10);
+    expect(v.approved, v.reason).toBe(true); expect(v.score).toBeNull();
+    expect(v.evidence).toEqual([]); expect(bodies).toEqual([]);
   });
   it("credentials need all three fields", () => {
     expect(resolveProducerLlm({})).toBeNull(); expect(resolveProducerLlm({ LLM_BASE_URL: "x", LLM_API_KEY: "y" })).toBeNull();

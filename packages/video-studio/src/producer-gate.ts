@@ -39,6 +39,7 @@ import { join } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
+import { POST_RENDER_STAGES, postProcessingVerdict } from "./post-render-acceptance.js";
 import type { QualityStatus } from "./quality-evidence.js";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "./shot-intent.js";
 import { devicePolicyPromptLines } from "./device-policy.js";
@@ -70,8 +71,9 @@ export interface ProducerVerdict {
   evidence?: Array<{ path: string; sha256: string; scope: string }>;
   stage: ProducerStage;
   approved: boolean;
-  /** 0–100；硬闸失败为 0 */
-  score: number;
+  /** Creative reviews use 0–100; factual post-processing receipts have no quality score. */
+  score: number | null;
+  qualityReviewed?: boolean;
   hardFailures: string[];
   issues: string[];
   suggestions: string[];
@@ -403,6 +405,7 @@ async function repairJudgeShape(
  * 评审一个环节。返回裁决；调用方按 `approved` 决定放行或重跑。
  */
 export async function reviewStage(options: ProducerGateOptions): Promise<ProducerVerdict> {
+  if (POST_RENDER_STAGES.has(options.stage)) return postProcessingVerdict(options);
   const started = Date.now();
   const log = options.log ?? (() => undefined);
   const stage = options.stage;

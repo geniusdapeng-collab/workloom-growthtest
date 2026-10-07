@@ -5,6 +5,7 @@ import { dirname, extname, isAbsolute, join, relative, resolve, sep } from "node
 import { FilmChannelError, FilmWorkerChannel, parseFilmWorkerJobContext, processIpcTransport,
   type FilmChannelTransport, type FilmWorkerJobContext } from "./film-worker-channel.js";
 import type { ProducerGateOptions, ProducerVerdict } from "./producer-gate.js";
+import { POST_RENDER_STAGES } from "./post-render-acceptance.js";
 import { assertFilmVideoSubmissionReceipt, type FilmVideoReferenceInput, type FilmVideoSubmissionReceipt } from "./film-worker-provenance.js";
 import { adaptCharacterVisualVerdict, characterReleaseHash, type CharacterIdentityEvidence, type CharacterIdentityReviewRequest } from "./character-release-contract.js";
 
@@ -350,11 +351,30 @@ export class FullChainFilmWorker {
       else if (!this.context.stages.includes("videos") && this.context.stages.includes("material-gen")) stage = "material-gen";
     }
     const shotId = typeof options.context?.shotId === "string" ? options.context.shotId : null;
+    const post = POST_RENDER_STAGES.has(options.stage);
+    if (post) this.frozenSource();
+    const retained = post ? options.artifacts.map((artifact) => {
+      const ref = this.ref(artifact.path), file = resolve(this.context.workDir, ref), info = statSync(file);
+      if (!within(this.context.workDir, realpathSync(file)) || !info.isFile() || info.size <= 0) throw new FilmChannelError("ARTIFACT_UNVERIFIED", "后期源或输出必须是本次作业中的非空文件");
+      return { file, sha256: digest(file), bytes: info.size };
+    }) : [];
     const params = { stage: options.stage, projectId: options.projectId, artifacts: options.artifacts.map((artifact) => ({ ref: this.ref(artifact.path), kind: artifact.kind, note: artifact.note, probe: artifact.probe })),
-      referenceImages: options.referenceImages?.map((file) => this.reference(file)), deterministic: options.deterministic,
-      requiredCheckIds: options.requiredCheckIds, minScore: options.minScore, rubric: options.rubric, context: options.context };
+      deterministic: options.deterministic, context: options.context,
+      ...(!post ? { referenceImages: options.referenceImages?.map((file) => this.reference(file)), requiredCheckIds: options.requiredCheckIds,
+        minScore: options.minScore, rubric: options.rubric } : {}) };
     const verdict = await this.call("gate.review", stage, shotId, params) as ProducerVerdict;
-    if (!verdict || verdict.stage !== options.stage || typeof verdict.approved !== "boolean" || !verdict.contractHash) throw new FilmChannelError("REVIEW_UNVERIFIED", "父服务裁决未绑定作者合同");
+    if (!verdict || verdict.stage !== options.stage || typeof verdict.approved !== "boolean") throw new FilmChannelError("REVIEW_UNVERIFIED", "父服务裁决未绑定本次请求阶段");
+    if (post) {
+      this.frozenSource();
+      for (const artifact of retained) {
+        if (statSync(artifact.file).size !== artifact.bytes || digest(artifact.file) !== artifact.sha256) throw new FilmChannelError("ARTIFACT_CHANGED", "后期接收期间源或输出字节发生变化");
+      }
+      if (verdict.qualityReviewed !== false || verdict.score !== null || verdict.via !== "deterministic" || verdict.rerun !== false
+        || !Array.isArray(verdict.hardFailures) || !verdict.hardFailures.every((failure) => typeof failure === "string")
+        || verdict.status !== (verdict.approved ? "passed" : "failed") || verdict.approved !== (verdict.hardFailures.length === 0)) {
+        throw new FilmChannelError("REVIEW_UNVERIFIED", "父服务后期回执缺实际加工终态或仍声明品质裁决");
+      }
+    } else if (!verdict.contractHash) throw new FilmChannelError("REVIEW_UNVERIFIED", "父服务裁决未绑定作者合同");
     return verdict;
   }
   async design(prompt: string): Promise<string> {

@@ -22,6 +22,7 @@ export * from "./portrait-agent.js";
 export * from "./portrait-decision.js";
 export * from "./likeness-policy.js";
 export * from "./producer-gate.js";
+export * from "./post-render-acceptance.js";
 export * from "./shot-spec.js";
 export * from "./route-preflight.js";
 export * from "./real-person-asset-sync.js";

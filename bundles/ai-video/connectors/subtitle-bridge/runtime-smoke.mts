@@ -13,7 +13,7 @@
  *   blocked         —— 覆盖原片：G-SUB2 block，线程 paused，不执行工具
  *   blocked-license —— 非白名单字体许可：G-SUB5 block，线程 paused
  *   danmaku         —— 弹幕轨渲染：G-SUB0 直通，产出弹幕成片，复检全绿
- *   blocked-flood   —— 关闭弹幕刷屏熔断（allow_flood）：G-SUB6 block，线程 paused
+ *   flood           —— 旧密度/UI参数不阻断默认文字请求，保留完整条数
  *   outage          —— 工位不可达：软失败，步骤标未核实，线程 failed（不伪造回执）
  *
  * 运行（在 WorkLoom-growth 仓库内，需 DATABASE_URL / DATABASE_GATEWAY_URL，且工作区 ws-video 已 seed）：
@@ -30,6 +30,7 @@ import { fileURLToPath } from "node:url";
 import pg from "pg";
 import { runQuest } from "@workloom/runtime";
 import { createSubtitleBridgeExecutor } from "./executor.ts";
+import { SUBTITLE_TOOLS } from "./core.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const WORK_DIR = process.env.SUBTITLE_SMOKE_DIR ?? join(tmpdir(), `subtitle-smoke-${Date.now().toString(36)}`);
@@ -126,13 +127,7 @@ const BRIEF = {
 const steps = {
   clean: () => [
     {
-      stepId: "s1", action: "subtitleread.analyze", objectType: "final_video", tool: "subtitleread.analyze",
-      params: { input_path: SOURCE, platform: "抖音/快手", evidence_dir: join(WORK_DIR, "analyze") },
-      context: { tenant_daily_subtitle: 0 },
-      label: "画面可读性诊断（文字带亮度/细节密度/遮挡区）",
-    },
-    {
-      stepId: "s2", action: "subtitlewrite.burn", objectType: "subtitle_report", tool: "subtitlewrite.burn",
+      stepId: "s1", action: "subtitlewrite.burn", objectType: "subtitle_report", tool: "subtitlewrite.burn",
       params: {
         input_path: SOURCE, output_path: BURNED, srt_path: SRT, title_text: "川西之行 · WEST SICHUAN",
         brief: BRIEF, platform: "抖音/快手", evidence_dir: join(WORK_DIR, "evidence"),
@@ -150,7 +145,7 @@ const steps = {
         font_license: "ofl-1.1", commercial_use: true, license_reviewed: false, brand_font_change: true,
       },
       context: { tenant_daily_subtitle: 0 },
-      label: "品牌视觉锤变更（应被 G-SUB1 挂起）",
+      label: "字体许可未核验（应被 G-SUB1 挂起）",
     },
   ],
   blocked: () => [
@@ -193,17 +188,17 @@ const steps = {
       label: "弹幕轨渲染（密度在口径内，G-SUB0 直通）",
     },
   ],
-  "blocked-flood": () => [
+  "flood": () => [
     {
       stepId: "s1", action: "subtitlewrite.danmaku", objectType: "subtitle_report", tool: "subtitlewrite.danmaku",
       params: {
         input_path: SOURCE, output_path: FLOOD_OUT,
-        items: [{ at: 1, text: "刷屏测试" }],
+        items: Array.from({ length: 12 }, (_, i) => ({ at: 1, text: `完整请求弹幕${i + 1}` })),
         brief: BRIEF, platform: "抖音/快手", allow_flood: true,
         font_license: "ofl-1.1", commercial_use: true,
       },
       context: { tenant_daily_subtitle: 0 },
-      label: "关闭弹幕刷屏熔断（应被 G-SUB6 阻断）",
+      label: "完整弹幕请求（无 G-SUB6 品质挂起）",
     },
   ],
   outage: () => [
@@ -218,11 +213,11 @@ const steps = {
 
 const goals: Record<keyof typeof steps, string> = {
   clean: "对成片做一次完整字幕与标题制作并出证据",
-  review: "品牌视觉锤变更时渲染字幕（演练人审）",
+  review: "未核验字体许可时渲染字幕（演练许可人审）",
   blocked: "字幕烧录时直接覆盖原片（演练红线）",
   "blocked-license": "用非白名单许可字体做商用字幕（演练版权红线）",
   danmaku: "给成片做一层弹幕轨并出证据",
-  "blocked-flood": "关闭弹幕密度熔断（演练刷屏红线）",
+  "flood": "保留全量弹幕，旧品质参数不挂起",
   outage: "工位不可达时做字幕（演练软失败）",
 };
 
@@ -256,7 +251,7 @@ async function main(): Promise<number> {
     if (!(await waitForHealth(BASE_URL))) throw new Error("字幕 bridge 未在 15s 内就绪");
     // 健康探针走 HTTP，确认工位（含字体与 libass）真的可用；不可用就直接失败，不进入"看起来在跑"的假象
     const health = await fetch(`${BASE_URL}/health`).then((res) => res.json() as Promise<Record<string, unknown>>);
-    if (!Array.isArray(health.tools) || (health.tools as string[]).length !== 12) {
+    if (!Array.isArray(health.tools) || (health.tools as string[]).length !== SUBTITLE_TOOLS.length) {
       throw new Error(`字幕 bridge 工具面异常：${JSON.stringify(health.tools)}`);
     }
 
@@ -272,8 +267,8 @@ async function main(): Promise<number> {
       [SCOPE.workspaceId],
     );
     const subtitleFenceRules = Number(fenceCount.rows[0]?.c ?? 0);
-    if (subtitleFenceRules < 6) {
-      throw new Error(`标题字幕围栏未装载（期望 6 条 G-SUB*，实际 ${subtitleFenceRules}），请先跑 pnpm db:seed:video`);
+    if (subtitleFenceRules < 7) {
+      throw new Error(`标题字幕围栏未装载（期望 7 条 G-SUB*，实际 ${subtitleFenceRules}），请先跑 pnpm db:seed:video`);
     }
 
     const executor = createSubtitleBridgeExecutor({
@@ -312,6 +307,7 @@ async function main(): Promise<number> {
                 payload->'decision'->'after'->'result'->>'sha256' AS "resultSha256",
                 payload->'decision'->'after'->'result'->'checks' AS checks,
                 payload->'decision'->'after'->'result'->'presence' AS presence,
+                payload->'decision'->'after'->'result'->'qualityReviewed' AS "qualityReviewed",
                 payload->'decision'->'after'->'result'->'fonts' AS fonts
            FROM biz_events WHERE session_id=$1 ORDER BY seq`,
         [threadId],
@@ -333,7 +329,8 @@ async function main(): Promise<number> {
         rule_impact: Array<{ rule_id: string; result: string }> | null;
         resultSha256?: string | null;
         checks?: Record<string, boolean> | null;
-        presence?: { delta?: number; threshold?: number; ok?: boolean } | null;
+        presence?: { status?: string; delta?: number | null; threshold?: number | null; ok?: boolean } | null;
+        qualityReviewed?: boolean | null;
         fonts?: Record<string, { name?: string }> | null;
       }>;
     }
@@ -352,7 +349,7 @@ async function main(): Promise<number> {
   const blocked = find("blocked");
   const blockedLicense = find("blocked-license");
   const danmaku = find("danmaku");
-  const blockedFlood = find("blocked-flood");
+  const flood = find("flood");
   const outage = find("outage");
   const danmakuHash = existsSync(DANMAKU_OUT) ? createHash("sha256").update(readFileSync(DANMAKU_OUT)).digest("hex") : null;
   const danmakuEvent = danmaku?.events.find((event) => event.action === "subtitlewrite.danmaku");
@@ -368,10 +365,7 @@ async function main(): Promise<number> {
     subtitle_report_all_checks_green: Boolean(
       burnEvent?.checks && Object.values(burnEvent.checks).every((value) => value === true),
     ),
-    subtitle_presence_measured: Boolean(
-      burnEvent?.presence && typeof burnEvent.presence.delta === "number"
-      && (burnEvent.presence.delta ?? 0) >= (burnEvent.presence.threshold ?? 1),
-    ),
+    subtitle_quality_not_reviewed: burnEvent?.qualityReviewed === false && burnEvent?.presence?.status === "not-reviewed" && burnEvent?.presence?.delta === null,
     subtitle_font_resolved: Boolean(burnEvent?.fonts?.字幕?.name || burnEvent?.fonts?.Sub),
     review_pending: review?.outcome.status === "pending_review" && Boolean(review?.outcome.pendingApprovalId),
     blocked_by_overwrite_rule: blocked?.outcome.status === "paused" && (blocked?.outcome.blockedBy ?? "").includes("覆盖原片"),
@@ -380,7 +374,7 @@ async function main(): Promise<number> {
     danmaku_report_all_checks_green: Boolean(
       danmakuEvent?.checks && Object.values(danmakuEvent.checks).every((value) => value === true),
     ),
-    blocked_by_flood_rule: blockedFlood?.outcome.status === "paused" && (blockedFlood?.outcome.blockedBy ?? "").includes("弹幕刷屏"),
+    flood_completed_without_quality_gate: flood?.outcome.status === "completed" && existsSync(FLOOD_OUT),
     outage_unverified: outage?.outcome.status === "failed" && (outage?.outcome.unverified?.length ?? 0) >= 1,
   };
 
@@ -389,7 +383,7 @@ async function main(): Promise<number> {
     checks,
     workspace: SCOPE.workspaceId,
     preset: PRESET_KEY,
-    subtitle_fence_rules: "G-SUB0..G-SUB5（6 条，active）",
+    subtitle_fence_rules: "G-SUB0..G-SUB6（7 条，active）",
     artifacts: {
       source: SOURCE,
       srt: SRT,

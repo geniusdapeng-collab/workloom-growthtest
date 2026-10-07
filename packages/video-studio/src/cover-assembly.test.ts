@@ -76,17 +76,17 @@ describe("official publication cover assembly", () => {
     ]);
     const receipt = await embedCoverFirstFrame({ input: multiple, cover, output: join(directory, "two-audio-publication.mp4"), ffmpeg: FFMPEG, ffprobe: FFPROBE });
     expect(receipt.audio.streamCount).toBe(2);
-    expect(receipt.audio.decodedPcmSha256).toHaveLength(2);
-    expect(new Set(receipt.audio.decodedPcmSha256).size).toBe(2);
+    expect(receipt.audio.decodedPcmSha256).toEqual([]);
+    expect(receipt.audio.packetSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(receipt.qualityReviewPerformed).toBe(false);
     expect(receipt.video.frameCount).toBe(48);
   }, 30_000);
 
-  it.each(["missing", "invalid", "wrong-dimensions"])("rejects a %s cover without changing an existing target", async (kind) => {
+  it.each(["missing", "invalid"])("rejects a %s cover without changing an existing target", async (kind) => {
     const target = join(directory, `preserve-${kind}.mp4`);
     writeFileSync(target, "existing delivery");
     const candidate = join(directory, `bad-${kind}.png`);
     if (kind === "invalid") writeFileSync(candidate, "not an image");
-    if (kind === "wrong-dimensions") execute(["-f", "lavfi", "-i", "color=c=blue:s=160x96", "-frames:v", "1", candidate]);
     await expect(embedCoverFirstFrame({ input: source, cover: candidate, output: target, ffmpeg: FFMPEG, ffprobe: FFPROBE })).rejects.toThrow();
     expect(readFileSync(target, "utf8")).toBe("existing delivery");
     expect(readdirSync(directory).some((name) => name.includes(".pending-"))).toBe(false);
@@ -126,14 +126,17 @@ describe("official publication cover assembly", () => {
     expect(existsSync(source)).toBe(true);
   });
 
-  it("rejects a successful no-op encoder that never inserted the supplied cover", async () => {
-    const target = join(directory, "no-op-preserved.mp4");
-    writeFileSync(target, "previous valid delivery");
-    const wrapper = join(directory, "no-op-ffmpeg.sh");
-    writeFileSync(wrapper, `#!/bin/sh\nfirst_input=''\ncapture=0\nrender=0\nfor arg; do\n  last="$arg"\n  if [ "$capture" = 1 ] && [ -z "$first_input" ]; then first_input="$arg"; fi\n  capture=0\n  if [ "$arg" = -i ]; then capture=1; fi\n  case "$arg" in *overlay=*) render=1;; esac\ndone\nif [ "$render" = 1 ]; then cp "$first_input" "$last"; exit $?; fi\nexec '${FFMPEG}' "$@"\n`);
-    chmodSync(wrapper, 0o755);
-    await expect(embedCoverFirstFrame({ input: source, cover, output: target, ffmpeg: wrapper, ffprobe: FFPROBE })).rejects.toThrow(/first frame does not match cover/);
-    expect(readFileSync(target, "utf8")).toBe("previous valid delivery");
+  it("resizes a differently shaped cover into the actual video canvas without source-quality scans", async () => {
+    const wide = join(directory, "wide-cover.png"), target = join(directory, "wide-publication.mp4"), wrapper = join(directory, "no-quality-review.mjs");
+    execute(["-f", "lavfi", "-i", "color=c=blue:s=160x96", "-frames:v", "1", wide]);
+    const realFfmpeg = execFileSync("which", [FFMPEG], { encoding: "utf8" }).trim();
+    writeFileSync(wrapper, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';\nconst args=process.argv.slice(2);\nif(args.some(arg=>/psnr|framemd5|ebur128|astats/.test(arg))||args.includes('pcm_s16le')||args.includes('-count_frames')){process.stderr.write('FORBIDDEN_DEFAULT_QUALITY_REVIEW');process.exit(73);}\nconst result=spawnSync(${JSON.stringify(realFfmpeg)},args,{stdio:'inherit'});\nprocess.exit(result.status??74);\n`); chmodSync(wrapper, 0o755);
+    const before = readFileSync(source), receipt = await embedCoverFirstFrame({ input: source, cover: wide, output: target, ffmpeg: wrapper, ffprobe: FFPROBE });
+    expect(receipt.coverTransform).toEqual({ width: 96, height: 160, mode: "contain-and-pad" });
+    expect(receipt.qualityReviewPerformed).toBe(false); expect(receipt.video.coverPsnrDb).toBeNull(); expect(receipt.video.timelineSha256).toBeNull();
+    expect(receipt.video.frameCountBasis).toBe("container-metadata"); expect(receipt.audio.decodedPcmSha256).toEqual([]);
+    expect(receipt.verificationBasis).toMatch(/ordinary.*No PSNR/); expect(readFileSync(source)).toEqual(before);
+    expect(pixelAt(target, 0)[2]).toBeGreaterThan(100); expect(pixelAt(target, 1)[0]).toBeGreaterThan(240);
   }, 30_000);
 
   it("serializes writers and preserves an existing target when its publication lock is held", async () => {

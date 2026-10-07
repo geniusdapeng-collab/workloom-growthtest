@@ -1,7 +1,7 @@
 # 成片调色 bridge 连接器（ai-video）
 
 把 `colorread.* / colorwrite.*` 工具接到 Mac 调色工位（ffmpeg 内核），供「调色师」数字员工在
-后期环节对成片母版做**诊断 → 校正 → 风格化 → 匹配 → 复检**。
+后期环节执行已声明的调色/LUT/校正配方。成功镜头默认直接后期，`grade/best` 不自动诊断或用品质分数挑选候选。
 
 ## 部署形态
 
@@ -11,7 +11,7 @@ WorkLoom（大脑：岗位/技能/围栏/事件账本）        Mac 调色工位
                                             └─ ffmpeg / ffprobe（kit 受控安装）
                                                 ├─ 素材区（原片只读）
                                                 ├─ 产物区（新文件 + 版本链）
-                                                └─ 回执：sha256 / 指标 / scope / 前后对比帧
+                                                └─ 回执：真实滤镜 / 源与产物 SHA / 普通规格与标签 / 品质未评审
 ```
 
 **大文件不出工位**：服务器只传路径与参数，工位本地读写素材，只回元数据、小图（scope/对比帧）与哈希。
@@ -41,10 +41,12 @@ const toolExecutor = createColorBridgeExecutor({
 |---|---|---|
 | `colorread.health` | 读 | 工位与 ffmpeg 健康探针（含可用 profile / 白名单根目录） |
 | `colorread.probe` | 读 | 素材规格：分辨率/帧率/时长/编码/色彩空间/是否 log |
-| `colorread.analyze` | 读 | 抽帧量化诊断：曝光/裁切/偏色/饱和/肤色 + 修复建议（`auto` 校正量由它推导） |
+| `colorread.analyze` | 读 | 抽帧量化诊断：曝光/裁切/偏色/饱和/肤色 + 修复建议（显式诊断，不是 grade/best 前置条件） |
 | `colorread.scope` | 读 | 波形/矢量/直方图 + 前后对比帧 |
-| `colorwrite.grade` | 写 | 应用 look/LUT 与滤镜链产出新成片（`auto` 先校正后创作；强度 0..1） |
-| `colorwrite.match` | 写 | 以参考镜为基准匹配其余镜头，回报残差 |
+| `colorread.recipes` | 读 | 声明题材/平台配方检索 |
+| `colorwrite.best` | 写 | 兼容入口执行一个声明配方，候选为空、评分为 null |
+| `colorwrite.grade` | 写 | 单次应用声明的 look/LUT/校正滤镜产出成片；旧 `auto` 不触发品质分析 |
+| `colorwrite.match` | 写 | 显式匹配：输入统计计算请求变换，不做 after/residual 品质票决 |
 
 ## 安装与自检（工位一次性）
 
@@ -66,7 +68,7 @@ node_modules/.bin/tsx bundles/ai-video/connectors/color-bridge/runtime-smoke.mts
 |---|---|
 | clean：干净调色 | `completed`，产出成片，回执 sha256 与磁盘文件一致（G-COL0 auto 直通） |
 | blocked：覆盖原片 | `paused`，`blockedBy=覆盖原片禁止`（G-COL2 block） |
-| review：品牌 look 变更 | `pending_review` + 审批号（G-COL1 review） |
+| 品牌 look 变更 | 普通后期执行声明配方；无默认品质人审（G-COL1） |
 | outage：工位不可达 | `failed` + 全部步骤标未核实（软失败不伪造回执） |
 
 ## 安全
@@ -99,6 +101,11 @@ node_modules/.bin/tsx bundles/ai-video/connectors/color-bridge/runtime-smoke.mts
 | 先校正后创作、LUT 最后 | `core.mjs` 的 `buildChain` 顺序 + 技能 `color-grade` |
 | 强度默认不满档（0.6–0.8） | `grade.intensity` 默认 0.8；技能给出选型表 |
 | 原片只读 | `assertOutputWritable` + 围栏 G-COL2 |
-| 无回执不算完成 | 指标复检 + sha256 回执 + 围栏 G-COL3；outage 场景负例 |
-| 只调母版一次 | 技能「硬红线」+ 管线 `color` 步骤置于 `post` 之后 |
+| 无回执不算完成 | 源/输出摘要、实际媒体与处理回执；`qualityReviewPerformed=false`，不伪造品质指标 |
+| 声明配方一次执行 | 实际参数/文件/源字节回执；各请求变体记录复用或重算 |
 
+
+
+## 成功素材默认采用
+
+`grade` 单次执行请求配方，保留原片音轨，记录源/输出摘要及实际色彩标签。`best` 兼容指令执行一个声明配方，`candidates=[]/finalScore=null`，不作候选评分、缺陷/肤色/可见性复审或自动返工。旧 `onUnfixable` 不建立品质否决；微小强度和失焦源仍正常出片。显式 `analyze/scope` 是独立诊断；`match` 输入统计仅计算用户要求的变换，无成品残差/直方图票决；这些工具不能作为成功镜头的默认验收门。缺源、非法 LUT、覆盖原片、输入字节变化、真实 FFmpeg 错误和导出标签失败继续报错。

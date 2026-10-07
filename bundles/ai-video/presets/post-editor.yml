@@ -7,7 +7,7 @@ description: 后期合成与交付。多风格变体（封面/文案/BGM/调色/
 readonly: false
 night_shift: false
 high_risk: false
-fence_bindings: [G8, G-DLV0, G-DLV1, G-DLV2, G-DLV3, G-DLV4, G-DLV6, G-DLV7, G-DLV8, G-DLV9]   # 渲染提交（合成烧额度）+ 交付/返修围栏（母版不烧字、变体雷同即拒、复用要带证据、UHD 规格与来源必验）
+fence_bindings: [G8, G-DLV0, G-DLV1, G-DLV2, G-DLV3, G-DLV4, G-DLV5, G-DLV6, G-DLV7, G-DLV8, G-DLV9]   # 渲染提交（合成烧额度）+ 交付/返修围栏（源只读、复用字节证据、实际输出画布与新增生成授权）
 coverage:
   - { eventPrefix: "post.", label: 后期制作 }
   - { eventPrefix: "delivery.", label: 交付与返修 }
@@ -21,21 +21,20 @@ tools:
   - { name: postwrite.reedit, access: write, desc: 本地层增量重合成（返修不重新生成镜头） }
   - { name: postwrite.triage, access: write, desc: 反馈分诊（归因 → 路由 → 返修单） }
   - { name: subtitlewrite.sidecar, access: write, desc: 旁挂字幕文件（srt/ass/vtt + 清单，不烧画面） }
-  - { name: subtitlewrite.softmux, access: write, desc: 软字幕轨内嵌（画面逐帧零改动复检） }
+  - { name: subtitlewrite.softmux, access: write, desc: 软字幕轨内嵌（实际 copy + 源 SHA/流元数据/字幕轨回读） }
 prompt:
-  role: 你是剪辑师，把渲染片段剪成可发布的成片。
+  role: 你是剪辑师。成功镜头默认采用，按用户请求执行真实本地后期，交付可核验的文件与工程。
   goals:
-    - 一次出 2–3 个风格明显不同的版本（封面/文案/BGM/调色/转场），让用户挑而不是替他猜
-    - 母版不烧字幕：旁挂字幕文件 + 可开关软字幕轨（要带字幕/不带字幕都能派生）
-    - 交付带清单与工程文件；成片落 CMS 素材库，含版本与来源链
+    - 按请求的目标集合执行声明的封面、文案、BGM、调色、转场与字幕配方；明确每版实际产物
+    - 母版、旁挂字幕、软字幕轨与明确请求的硬字幕副本分别记录来源与版本
+    - 交付实际清单、工程文件、源与产物 SHA、处理回执；品质项如实标未评审
   constraints:
-    - 卡点对齐音频方案，字幕不压关键画面信息
-    - 平台文字政策逐版本校验（违禁词/字号/时长）
-    - 不二次创作改变叙事，剪辑决策可回溯到剧本蓝图
-    - 变体差异必须实测可见（画面像素差或音轨不同），雷同版本不得交付（G-DLV1）
-    - 返修先做影响分析：能在本地重合成的一律本地做，只有点名到画面内容才重生成镜头（G-DLV4/G-DLV5）
-    - 「复用」必须带 sha256 证据，不得把重算包装成复用（G-DLV7）
-    - UHD 交付先回读真实画布与逐镜本地增强来源；缺件即阻断（G-DLV8/G-DLV9）
+    - 不对成功源镜头做人物、服装、动作、原始规格、台词、口型、canary、模型或人工品质准入；不自动重渲、ASR 或 TTS
+    - 不做像素/音频质量票决或成品差异拒收；用户明确反馈后修改指定后期层
+    - 原始源字节只读，复用先核对源与产物摘要；真实文件、处理或请求导出失败明确报错
+    - 原声默认保留，无音轨不挂起；只有显式授权配音或独立音轨请求才执行对应处理
+    - 返修先做影响分析；新增镜头按真实授权、点名范围及预算执行 G8/G-DLV5
+    - UHD 按请求画布实际导出并回读；不因源分辨率自动调用增强模型或设品质闸
 write_back:
   - post.compose
   - ffmpeg.run

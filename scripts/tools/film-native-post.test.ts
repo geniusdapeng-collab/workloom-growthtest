@@ -39,10 +39,12 @@ function block(start: string, end: string): string {
 }
 const mediaGuardSource = parsed.statements.filter((statement) => ts.isFunctionDeclaration(statement)
   && statement.name?.text === "assertOriginalRenderMedia").map((statement) => statement.getFullText(parsed)).join("\n");
-const voiceSource = mediaGuardSource + "\n" + block("/* ---------- ③-2", "/* ---------- ④ 合成母版");
+const originalSource = parsed.statements.filter(statement => ts.isFunctionDeclaration(statement)
+  && ["originalForShot", "originalFactsForShot"].includes(statement.name?.text ?? "")).map(statement => statement.getFullText(parsed)).join("\n");
+const voiceSource = mediaGuardSource + "\n" + originalSource + "\n" + block("/* ---------- ③-2", "/* ---------- ④ 合成母版");
 const composeSource = block("/* ---------- ④ 合成母版", "/* ---------- ⑤ 调色");
 const defaultsSource = block("const ENHANCE_ENGINE_DIR", "const COVER_HERO");
-const bgmClockSource = block("  if (existsSync(out)) scored = out;", "  record({\n    /**\n     * 声明关闭");
+const bgmClockSource = block("  if (existsSync(out)) scored = out;", "  bgmManifestInfo =");
 const durationSource = parsed.statements.filter((statement) => ts.isFunctionDeclaration(statement)
   && statement.name?.text === "renderSecondsFor").map((statement) => statement.getFullText(parsed)).join("\n");
 if (!durationSource) throw new Error("NATIVE_POST_FIXTURE_INVALID: render duration declaration missing");
@@ -100,7 +102,7 @@ function fixture() {
   const context: Record<string, unknown> = {
     PROJECT: "NATIVE-CLI-FIXTURE", CLIP_DIR: dir, POST_DIR: dir, REPO_ROOT: REPO,
     ENV: {}, sourceDocument: { shots, aspect: "9:16", resolution: "1080p" }, sourceFileHash: sha("original submission fixture"),
-    originalPostContract: { ...originalContract, manifestSha256, contract: originalContract },
+    originalPostContract: { ...structuredClone(originalContract), manifestSha256, contract: originalContract },
     originalForShot: (shot: Shot): string => {
       const item = facts.get(shot.shotId);
       if (!item) throw new Error(`STANDARD_ORIGINAL_MISSING: ${shot.shotId}`);
@@ -148,7 +150,7 @@ function fixture() {
     reviewStage: async () => ({ approved: true, degraded: false, ms: 0, score: 100 }),
     probe: (file: string) => {
       const item = [...facts.values()].find((entry) => entry.path === file);
-      if (!item) return { duration: 30, videoDurationSec: 30, videoFrames: 720, fps: 24, width: 1080, height: 1920, hasAudio: true };
+      if (!item) { const size = context.OUTPUT_SIZE as { width: number; height: number }; return { duration: 30, videoDurationSec: 30, videoFrames: 720, fps: context.FPS, width: size.width, height: size.height, hasAudio: true }; }
       return { duration: item.durationSeconds + 0.016, videoDurationSec: item.durationSeconds,
         videoFrames: item.durationSeconds * 24, fps: item.fps, width: item.width, height: item.height,
         hasAudio: item.audio.present, acodec: "aac", audioDurationSec: item.audio.durationSec,
@@ -174,7 +176,7 @@ async function compose(f: ReturnType<typeof fixture>) {
 }
 
 describe("actual normal film CLI preserves every original native shot", () => {
-  it.each([1, 0.8])("BGM finalization checks real %ss audio against the original clock without rewriting it", async (audioSeconds) => {
+  it.each([1, 0.8])("BGM finalization reads requested export clock for real %ss audio without PCM inspection", async (audioSeconds) => {
     const f = fixture(), ffmpeg = process.env.WL_FFMPEG ?? "ffmpeg", ffprobe = process.env.WL_FFPROBE ?? "ffprobe";
     const out = join(f.dir, "mock-real-bgm.mp4");
     const encoded = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=s=160x288:r=24:d=1",
@@ -189,10 +191,7 @@ describe("actual normal film CLI preserves every original native shot", () => {
       } });
     const actual = evaluate<{ nativeAudioClock: { requiredSamples: number; samplesPerChannel: number } }>(bgmClockSource, f.context,
       "{ nativeAudioClock: typeof nativeAudioClock === 'undefined' ? null : nativeAudioClock }");
-    if (audioSeconds === 1) {
-      const result = await actual; expect(result.nativeAudioClock?.requiredSamples).toBe(48000);
-      expect(result.nativeAudioClock?.samplesPerChannel).toBeGreaterThanOrEqual(48000);
-    } else await expect(actual).rejects.toThrow(/STANDARD_POST_NATIVE_CLOCK_INCOMPLETE/);
+    const result = await actual; expect(result.nativeAudioClock).toMatchObject({ actualDurationSec: 1, requestedDurationSec: 1, present: true });
     expect(decodes).toEqual([out]); expect(rewrites).toEqual([]); expect(fingerprintFile(out)).toBe(before);
   });
   it("BGM finalization cannot substitute output duration for a missing original clock", async () => {
@@ -220,15 +219,15 @@ describe("actual normal film CLI preserves every original native shot", () => {
     }
     expect(f.forbiddenCalls).toEqual([]); expect(f.calls).toEqual([]);
   });
-  it.each(["on-camera", "voice-over", "none"])("a legacy TTS receipt is rejected for %s semantics", async (mode) => {
+  it.each(["on-camera", "voice-over", "none"])("a legacy TTS receipt cannot replace the pinned raw source for %s semantics", async (mode) => {
     const f = fixture(), index = mode === "on-camera" ? 0 : mode === "voice-over" ? 1 : 4;
     const shot = f.shots[index]!, row = f.rows[index]!;
     row.artifact = join(f.dir, `${shot.shotId}.voiced.mp4`); row.evidence.source = "tts-narration";
     row.evidence.voicedSha256 = fingerprintFile(row.artifact); row.evidence.profile = "zh-xiaozhi";
     const selected = await selection(f);
-    expect(() => selected.clipFor(shot)).toThrow();
+    expect(selected.clipFor(shot)).toBe(f.facts.get(shot.shotId)!.path);
   });
-  it.each(["manifest", "verification", "policy", "text", "artifact", "failed"])("an invalid %s voice receipt cannot authorize original selection", async (field) => {
+  it.each(["manifest", "verification", "policy", "text", "artifact", "failed"])("an obsolete %s voice receipt does not veto an independently pinned original", async (field) => {
     const f = fixture(), row = f.rows[1]!;
     if (field === "manifest") row.evidence.originalManifestSha256 = sha("other manifest");
     if (field === "verification") delete row.evidence.verification;
@@ -237,26 +236,30 @@ describe("actual normal film CLI preserves every original native shot", () => {
     if (field === "artifact") row.artifact = join(f.dir, "GT-02.voiced.mp4");
     if (field === "failed") f.rows.push({ ...row, ok: false, degraded: true });
     const selected = await selection(f);
-    expect(() => selected.clipFor(f.shots[1]!)).toThrow();
+    expect(selected.clipFor(f.shots[1]!)).toBe(f.facts.get("GT-02")!.path);
   });
   it("changed original bytes cannot be washed by an old native receipt", async () => {
     const f = fixture(), selected = await selection(f);
     writeFileSync(f.facts.get("GT-02")!.path, "changed original bytes");
     expect(() => selected.clipFor(f.shots[1]!)).toThrow();
   });
-  it.each(["missing", "no-audio", "hash", "duration", "fps", "dimensions", "channels", "sample-rate", "audio-gap"])("native voice rejects %s source evidence and makes no synthesis call", async (defect) => {
+  it.each(["missing", "hash"])("native source rejects %s pinned bytes and makes no synthesis call", async defect => {
     const f = fixture(), item = f.facts.get("GT-02")!;
     if (defect === "missing") rmSync(item.path);
-    if (defect === "no-audio") item.audio.present = false;
-    if (defect === "hash") item.sha256 = sha("wrong original");
-    if (defect === "duration") item.durationSeconds += 0.5;
-    if (defect === "fps") item.fps = 30;
-    if (defect === "dimensions") item.width = 720;
-    if (defect === "channels") item.audio.channels = 0;
-    if (defect === "sample-rate") item.audio.sampleRate = 0;
-    if (defect === "audio-gap") item.audio.durationSec -= 0.1;
-    await expect(voice(f)).rejects.toThrow();
-    expect(f.forbiddenCalls).toEqual([]);
+    if (defect === "hash") writeFileSync(item.path, "changed bytes");
+    await expect(voice(f)).rejects.toThrow(); expect(f.forbiddenCalls).toEqual([]);
+  });
+  it.each(["no-audio", "duration", "fps", "dimensions", "audio-gap"])("native source accepts %s media for official normalization without synthesis", async defect => {
+    const f = fixture();
+    const originals = (f.context.originalPostContract as { originals: Array<{ media: Record<string, number> }> }).originals;
+    const media = originals[1]!.media;
+    if (defect === "no-audio") Object.assign(media, { audioDurationSec: 0, audioChannels: 0, audioSampleRate: 0 });
+    if (defect === "duration") media.videoDurationSec = 6.04;
+    if (defect === "fps") media.fps = 29.97;
+    if (defect === "dimensions") media.width = 321;
+    if (defect === "audio-gap") media.audioDurationSec = 4;
+    await voice(f); expect(f.forbiddenCalls).toEqual([]);
+    expect(f.rows.filter(row => row.stage === "voice").at(-1)!.ok).toBe(true);
   });
   it("AAC four-millisecond metadata difference remains factual and does not produce narration", async () => {
     const f = fixture(); await voice(f);
@@ -266,7 +269,7 @@ describe("actual normal film CLI preserves every original native shot", () => {
   });
   it("a missing original manifest cannot issue native voice certificates", async () => {
     const f = fixture(); f.context.originalPostContract = undefined;
-    await expect(voice(f)).rejects.toThrow(/MANIFEST_REQUIRED/); expect(f.forbiddenCalls).toEqual([]);
+    await expect(voice(f)).rejects.toThrow(/ORIGINAL_CHANGED/); expect(f.forbiddenCalls).toEqual([]);
     expect(f.rows.slice(6).some((row) => row.stage === "voice" && row.ok)).toBe(false);
   });
   it("composition submits six full originals in submitted order at native fps with fade0 and no retime", async () => {
@@ -278,7 +281,7 @@ describe("actual normal film CLI preserves every original native shot", () => {
     for (const flag of ["--retime-to", "--transition", "--transition-at", "--transition-duration"]) expect(args).not.toContain(flag);
     expect(f.forbiddenCalls).toEqual([]);
   });
-  it.each(["reorder", "drop", "add", "reuse", "fade", "transition", "fps", "upscale"])("composition refuses %s before calling the compose workstation", async (edit) => {
+  it.each(["reorder", "drop", "add", "reuse", "fade", "transition"])("composition refuses %s before calling the compose workstation", async (edit) => {
     const f = fixture();
     if (edit === "reorder") f.context.COMPOSE_ORDER = [...f.shots].reverse().map((shot) => shot.shotId).join(",");
     if (edit === "drop") f.context.shots = f.shots.slice(1);
@@ -290,7 +293,13 @@ describe("actual normal film CLI preserves every original native shot", () => {
     if (edit === "upscale") f.context.OUTPUT_SIZE = { width: 2160, height: 3840 };
     await expect(compose(f)).rejects.toThrow(); expect(f.calls).toEqual([]);
   });
-  it.each(["tool", "output-fps", "output-frames", "output-duration", "output-audio", "input-change"])("composition stops on %s instead of approving a partial or changed result", async (defect) => {
+  it.each(["fps", "upscale"])("composition permits requested export %s without rejecting raw media", async edit => {
+    const f = fixture();
+    if (edit === "fps") f.context.FPS = 30;
+    else f.context.OUTPUT_SIZE = { width: 2160, height: 3840 };
+    await compose(f); expect(f.calls).toHaveLength(1); expect(f.forbiddenCalls).toEqual([]);
+  });
+  it.each(["tool", "output-fps", "output-duration", "output-audio", "input-change"])("composition stops on %s instead of approving a partial or changed result", async (defect) => {
     const f = fixture(), run = f.context.runCli as (cli: string, args: string[]) => { ok: boolean; out: string };
     const probe = f.context.probe as (file: string) => Record<string, unknown>;
     if (defect === "tool" || defect === "input-change") f.context.runCli = (cli: string, args: string[]) => {
@@ -303,7 +312,7 @@ describe("actual normal film CLI preserves every original native shot", () => {
       if (file.endsWith("master-raw.mp4")) {
         if (defect === "output-fps") info.fps = 30;
         if (defect === "output-frames") info.videoFrames = 719;
-        if (defect === "output-duration") info.videoDurationSec = 29.99;
+        if (defect === "output-duration") info.videoDurationSec = 29.5;
         if (defect === "output-audio") info.hasAudio = false;
       }
       return info;

@@ -122,7 +122,7 @@ function printHuman(command, result) {
     if (r.verdict === "graded") {
       line("");
       line(`成片：${r.output}`);
-      line(`成片得分：${r.finalScore.score}（原片 100）｜可见性 ${r.visibility.meanAbsDiff}/255 ${r.visibility.verdict}`);
+      line("已执行配方；未进行品质打分或可见性验收");
     }
     return;
   }

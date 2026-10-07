@@ -31,7 +31,7 @@ WorkLoom Growthtest 是面向企业增长与内容运营团队的隔离实验副
 |---|---|---|
 | 通用问答与任务 | [runtime](packages/runtime/src/) 实现 Ask、Agent、Quest；Ask 读取工作区事实，Quest 规划步骤、检查围栏并调用工具 | 无模型时可回退规则答复。真实数据态下，缺执行器的声明工具返回 `connector-required` 与 `receipt.synced=false` |
 | 岗位与协作 | PC `/agents` 查看岗位；`/portfolio` 聚合任务契约、交接和待决定事项。实现见 [协作服务](apps/server/src/service/collaboration.ts) | 组织与状态链路已存在；增长北极星等数据投影仍有待接字段 |
-| 视频工位 | `/ai-video/assets?tab=studio` 默认一句话导演：真实文字方案、三支常规版与导演惊喜版、逐版反馈；专业旧流程由“专业工作台”进入。实现见 [导演手册](docs/director-studio-v2.md) 与 [导演服务](apps/server/src/video/director-worker.ts) | 四版后期有独立画面/声音时间线、字幕、封面和实际差异证据；本人素材、预算与正式生产资格仍需就绪。文字方案 `mediaReady=false` 不代表已出片 |
+| 视频工位 | `/ai-video/assets?tab=studio` 默认一句话导演：真实文字方案、三支常规版与导演惊喜版、逐版反馈；专业旧流程由“专业工作台”进入。实现见 [导演手册](docs/director-studio-v2.md) 与 [导演服务](apps/server/src/video/director-worker.ts) | 成功镜头默认采用并执行声明后期，普通音轨保留供应商原声；明确授权 `audioMode=dubbing` 才配音。回执记录实际字节与处理，不作身份、服装、动作、台词、口型或多版本品质投票。本人素材、预算与正式生产资格仍须在提交前就绪；文字方案 `mediaReady=false` 不代表已出片 |
 | 视频媒资与交付 | `/ai-video/media` 管理媒资，`/ai-video/assets?tab=delivery` 查看交付；另有商品档案、合集与成片历史。实现见 [媒资模块](apps/server/src/video/media/) | 支持媒体与制作记录管理；需要文件、数据库和对应作业产物，不能把空目录当作已交付成片 |
 | 白板、口播解释片 | [白板服务](apps/server/src/video/whiteboard/)、[口播解释片服务](apps/server/src/video/explainer/) 与 CLI 工具 | 有专用制作链；需要 TTS、渲染与后期依赖。当前没有独立 React 可视编辑页 |
 | GEO 与增长作业 | [主包岗位/技能/管线](bundles/geo-growth/) 声明双域情报、内容、能见度、线索与复盘流程 | 多项工具尚无专用执行实现；先把声明映射到执行器、数据源和真实回执 |

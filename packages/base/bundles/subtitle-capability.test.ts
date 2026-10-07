@@ -68,10 +68,10 @@ describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
   it("常规渲染直通；四类红线各自命中；表达式不产生求值异常（异常=全量熔断）", () => {
     expect(evaluate("G-SUB0")).toBe(true);
 
-    // G-SUB1：品牌视觉锤变更 / 字体库首次入片 / 许可未核验 → review
+    // G-SUB1：保留真实许可处理，移除观感人审
     expect(evaluate("G-SUB1", { license_reviewed: false })).toBe(true);
-    expect(evaluate("G-SUB1", { brand_font_change: true })).toBe(true);
-    expect(evaluate("G-SUB1", { font_library_new: true })).toBe(true);
+    expect(evaluate("G-SUB1", { brand_font_change: true })).toBe(false);
+    expect(evaluate("G-SUB1", { font_library_new: true })).toBe(false);
     expect(evaluate("G-SUB1", { license_reviewed: true })).toBe(false);
     expect(evaluate("G-SUB1")).toBe(false);
 
@@ -80,11 +80,11 @@ describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
     expect(evaluate("G-SUB2", { output_path: "/a.mp4", input_path: "/a.mp4" })).toBe(true);
     expect(evaluate("G-SUB2", { output_path: "/b.mp4", input_path: "/a.mp4" })).toBe(false);
 
-    // G-SUB3：关闭复检 / 无视安全区 → block
-    expect(evaluate("G-SUB3", { skip_verify: true })).toBe(true);
-    expect(evaluate("G-SUB3", { verify: false })).toBe(true);
-    expect(evaluate("G-SUB3", { ignore_safe_area: true })).toBe(true);
-    expect(evaluate("G-SUB3", { allow_ui_overlap: true })).toBe(true);
+    // G-SUB3：旧质量参数不阻断；技术处理回执始终保留
+    expect(evaluate("G-SUB3", { skip_verify: true })).toBe(false);
+    expect(evaluate("G-SUB3", { verify: false })).toBe(false);
+    expect(evaluate("G-SUB3", { ignore_safe_area: true })).toBe(false);
+    expect(evaluate("G-SUB3", { allow_ui_overlap: true })).toBe(false);
     expect(evaluate("G-SUB3", { verify: true })).toBe(false);
     expect(evaluate("G-SUB3")).toBe(false);
 
@@ -102,10 +102,10 @@ describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
     expect(evaluate("G-SUB5", { commercial_use: true, font_license: "vendor-free-commercial" })).toBe(false);
     expect(evaluate("G-SUB5", { commercial_use: false, font_license: "unknown-vendor" })).toBe(false);
 
-    // G-SUB6：弹幕/贴纸不得绕过密度与安全区（allow_flood / ignore_density / skip_safe_area）
-    expect(evaluate("G-SUB6", { allow_flood: true })).toBe(true);
-    expect(evaluate("G-SUB6", { ignore_density: true })).toBe(true);
-    expect(evaluate("G-SUB6", { skip_safe_area: true })).toBe(true);
+    // G-SUB6：密度/安全区诊断不作为后期准入条件
+    expect(evaluate("G-SUB6", { allow_flood: true })).toBe(false);
+    expect(evaluate("G-SUB6", { ignore_density: true })).toBe(false);
+    expect(evaluate("G-SUB6", { skip_safe_area: true })).toBe(false);
     expect(evaluate("G-SUB6", { max_concurrent: 8 })).toBe(false);
   });
 

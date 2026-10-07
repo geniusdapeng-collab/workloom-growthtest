@@ -27,13 +27,7 @@ import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
-  avSyncPolicyForClipCount,
   buildCutAudioStep,
-  candidateSyncWindows,
-  crossCorrelationLag,
-  describeAvSync,
-  evaluateAvSync,
-  type AvSyncSample,
 } from "../../packages/video-studio/src/av-sync.js";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
@@ -62,21 +56,6 @@ function run(bin: string, args: string[], env?: NodeJS.ProcessEnv): string {
   }
 }
 
-/**
- * 整轨解码为 PCM（f32le 单声道）——音画对齐实测用。
- * 为什么整轨解码而不是 `-ss` 抽窗口：aac 一帧 1024 样点，局部 seek 的落点会带
- * 0–21ms 的量化误差，用它判"偏移"会自己骗自己（实测会伪造出单调漂移）。
- */
-function readAllPcm(file: string, sampleRate: number): Float32Array {
-  const buf = execFileSync(
-    FFMPEG,
-    ["-v", "error", "-i", file, "-vn", "-ac", "1", "-ar", String(sampleRate), "-f", "f32le", "-"],
-    { maxBuffer: 64 * 1024 * 1024 },
-  );
-  const view = new Float32Array(buf.buffer, buf.byteOffset, Math.floor(buf.byteLength / 4));
-  return view.slice();
-}
-
 async function sha256File(file: string): Promise<string> {
   const digest = createHash("sha256");
   for await (const chunk of createReadStream(file)) digest.update(chunk);
@@ -99,6 +78,21 @@ const width = Number(arg("--width", "1080"));
 const height = Number(arg("--height", "1920"));
 const fps = Number(arg("--fps", "30"));
 const fade = Number(arg("--fade", "0.5"));
+if (![width, height].every(n => Number.isSafeInteger(n) && n > 0 && n <= 16384 && n % 2 === 0)
+  || !Number.isFinite(fps) || fps <= 0 || fps > 240) throw new Error("COMPOSE_EXPORT_SETTINGS_INVALID");
+const requestedDurations = arg("--durations").split(",").filter(Boolean).map(Number);
+if (requestedDurations.length && (requestedDurations.length !== clips.length
+  || requestedDurations.some(n => !Number.isFinite(n) || n <= 0 || n > 7200))) throw new Error("COMPOSE_DURATIONS_INVALID");
+const inputBindings = await Promise.all(clips.map(async path => ({ path, sha256: await sha256File(path) })));
+function sourceMedia(file: string): { hasAudio: boolean; duration: number } {
+  const metadata = JSON.parse(run(FFPROBE, ["-v", "error", "-show_streams", "-show_format", "-of", "json", file])) as {
+    streams?: Array<{ codec_type?: string; duration?: string }>; format?: { duration?: string };
+  };
+  const video = metadata.streams?.find(stream => stream.codec_type === "video");
+  const duration = Number(video?.duration ?? metadata.format?.duration);
+  if (!video || !Number.isFinite(duration) || duration <= 0) throw new Error(`COMPOSE_SOURCE_UNREADABLE: ${file}`);
+  return { hasAudio: metadata.streams?.some(stream => stream.codec_type === "audio") === true, duration };
+}
 /**
  * 逐刀转场（2026-09-25 新增）：
  * 早先本工具只做 `concat`（纯硬切）+ 首尾淡入淡出，`--fade` 并不作用在刀口上——
@@ -149,6 +143,7 @@ console.log(`拼接 ${clips.length} 个镜头 → ${width}x${height} @${fps}fps�
 
 /* ---------- ① 归一化 ---------- */
 const normalized: string[] = [];
+const shotFrames: number[] = [];
 clips.forEach((clip, index) => {
   const target = join(temp, `norm-${String(index).padStart(2, "0")}.mp4`);
   /**
@@ -158,11 +153,15 @@ clips.forEach((clip, index) => {
    * 因此归一化时用 `apad` 把声音补到画面时长（补的是静音，≤20ms，听不出来），
    * 下游无论走 concat 滤镜还是 demuxer，时间轴都不会再漂。
    */
-  const inFrames = Math.max(1, Math.round(probeDuration(clip) * fps));
+  const metadata = sourceMedia(clip);
+  const inFrames = Math.max(1, Math.round((requestedDurations[index] ?? metadata.duration) * fps));
   const targetDuration = inFrames / fps;
+  shotFrames.push(inFrames);
   run(FFMPEG, [
     "-y", "-i", clip,
-    "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps}`,
+    ...(!metadata.hasAudio ? ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"] : []),
+    "-map", "0:v:0", "-map", metadata.hasAudio ? "0:a:0" : "1:a:0",
+    "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},tpad=stop_mode=clone:stop_duration=${targetDuration}`,
     "-af", "apad",
     "-t", targetDuration.toFixed(6),
     "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
@@ -190,12 +189,6 @@ const raw = join(temp, "raw.mp4");
  * 于是每段音轨比画面**长** 0–21ms；不透支这个差，逐段累计就是 33ms/6 镜的漂移。
  * 不变量：每段音轨时长 === 该段画面时长（D = 帧数 / fps）。
  */
-const shotFrames = normalized.map((file) => {
-  const out = run(FFPROBE, ["-v", "error", "-select_streams", "v:0", "-count_frames",
-    "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", file]).trim();
-  const frames = Number(out);
-  return Number.isFinite(frames) && frames > 0 ? frames : Math.round(probeDuration(file) * fps);
-});
 const shotSeconds = shotFrames.map((frames) => frames / fps);
 /**
  * concat demuxer 缺省用 MP4 容器时长移动下一镜的 PTS。AAC 帧尾可能令容器比
@@ -341,198 +334,35 @@ if (Math.abs(retimeFactor - 1) > 0.0005) {
 const outDuration = probeDuration(out);
 console.log(`  ③ 母版 → ${out}（${outDuration.toFixed(2)}s）`);
 
-/* ---------- ③-1 音画对齐实测（机制，不是建议） ---------- */
-/**
- * 为什么必修：2026-09-26 真机事故——分段拼接时声音逐镜累计漂移，尾镜 +125ms，
- * 成片里表现为"上一镜的音效/台词落到下一镜"。只靠"参数写对"是不够的：
- * 编码器 priming、帧对齐、重采样都会让每段的音轨比画面短几毫秒，
- * 所以**拼完必须实测**，并按门禁口径判能不能出厂。
- */
-const avSyncSampleRate = 16000;
-const shotDurations = shotSeconds;
-const shotStarts: number[] = [];
-{
-  let cursor = 0;
-  for (let index = 0; index < normalized.length; index += 1) {
-    shotStarts.push(cursor);
-    if (index < normalized.length - 1) {
-      const enteringShot = index + 2;
-      const useTransition = Boolean(transition && transitionDuration > 0)
-        && (transitionAt.length === 0 || transitionAt.includes(enteringShot));
-      cursor += shotDurations[index]! - (useTransition ? transitionDuration : 0);
-    }
-  }
-}
-/** 参考信号按整片倍率重采样（时长补偿时音画同倍率缩放，先对齐再比幅度） */
-const resample = (input: Float32Array, factor: number): Float32Array => {
-  if (Math.abs(factor - 1) < 0.0005) return input;
-  const length = Math.max(1, Math.round(input.length * factor));
-  const output = new Float32Array(length);
-  for (let i = 0; i < length; i += 1) {
-    const src = i / factor;
-    const i0 = Math.floor(src);
-    const frac = src - i0;
-    output[i] = (input[i0] ?? 0) * (1 - frac) + (input[i0 + 1] ?? 0) * frac;
-  }
-  return output;
-};
-const masterPcm = readAllPcm(out, avSyncSampleRate);
-const searchMs = 300;
-const searchSamples = Math.round((searchMs / 1000) * avSyncSampleRate);
-const avSamples: AvSyncSample[] = [];
-for (let index = 0; index < normalized.length; index += 1) {
-  const duration = shotDurations[index]!;
-  /**
-   * **窗口择优**（2026-09-27 真机）：单一固定窗口落在停顿/环境声上时，互相关会锁到邻近镜的
-   * 相似内容（真机：GR-06 固定窗口相关性 0.439、报出 -573.6ms 假偏移，硬闸误判；同一素材
-   * 整段包络互相关 0.995、位置正好等于期望值）。同一镜试多个候选窗口，取相关性最高者——
-   * 相关性仍低于阈值就按"不可测"处理，判据不放宽，只是不再拿一个坏窗口给整镜定罪。
-   */
-  const windows = candidateSyncWindows({ durationSec: duration });
-  if (windows.length === 0) continue;
-  const winLen = windows[0]!.lengthSec;
-  const segmentPcm = readAllPcm(normalized[index]!, avSyncSampleRate);
-  const refFull = resample(segmentPcm, retimeFactor);
-  const refLen = Math.round(winLen * retimeFactor * avSyncSampleRate);
-  let best: { lagMs: number; correlation: number } | null = null;
-  for (const { startSec: winStart } of windows) {
-    const refStart = Math.round(winStart * retimeFactor * avSyncSampleRate);
-    if (refStart + refLen > refFull.length) continue;
-    const ref = refFull.subarray(refStart, refStart + refLen);
-    const expected = Math.round((shotStarts[index]! + winStart) * retimeFactor * avSyncSampleRate);
-    const targetStart = Math.max(0, expected - searchSamples);
-    const targetEnd = Math.min(masterPcm.length, expected + refLen + searchSamples);
-    const target = masterPcm.subarray(targetStart, targetEnd);
-    if (target.length < refLen + 32) continue;
-    const measured = crossCorrelationLag(ref, target, {
-      sampleRate: avSyncSampleRate,
-      maxLagMs: searchMs,
-    });
-    const trueLagMs = measured.lagMs - (expected - targetStart) / avSyncSampleRate * 1000;
-    if (!best || measured.correlation > best.correlation) {
-      best = { lagMs: trueLagMs, correlation: measured.correlation };
-    }
-  }
-  if (!best) continue;
-  avSamples.push({
-    shotId: `#${index + 1}`,
-    index,
-    lagMs: Number(best.lagMs.toFixed(2)),
-    correlation: Number(best.correlation.toFixed(3)),
-  });
-}
-const avPolicy = avSyncPolicyForClipCount(normalized.length);
-const avReport = evaluateAvSync(avSamples, avPolicy);
+/* ---------- ③-1 处理回执（无渲后品质审核） ---------- */
+for (const binding of inputBindings) if (await sha256File(binding.path) !== binding.sha256)
+  throw new Error(`COMPOSE_SOURCE_CHANGED: ${binding.path}`);
 const avReportPath = join(dirname(out), `${basename(out).replace(/\.mp4$/i, "")}.av-sync.json`);
 writeFileSync(avReportPath, `${JSON.stringify({
-  ...avReport,
-  generatedAt: new Date().toISOString(),
-  policy: avPolicy,
-  sampleRate: avSyncSampleRate,
-  clipCount: normalized.length,
-  retimeFactor,
-  output: out,
-  outputSha256: await sha256File(out),
+  schemaVersion: "workloom.composition-process/v1", generatedAt: new Date().toISOString(),
+  output: out, outputSha256: await sha256File(out), inputBindings,
+  target: { width, height, fps, shotFrames, durationSec: shotSeconds.reduce((a, b) => a + b, 0) },
+  audioSource: "existing source audio; silent sources receive a silent processing stream",
+  sourceFilesUnchanged: true, audioAlignmentMeasured: false,
+  note: "No quality, speech, lipsync or correlation acceptance review was performed. Actual processing errors remain fatal."
 }, null, 2)}\n`, "utf8");
-console.log(`  ③-1 ${describeAvSync(avReport)}`);
-console.log(`       报告：${avReportPath}`);
-if (avReport.warnings.length > 0) {
-  for (const warning of avReport.warnings) console.log(`       ⚠ ${warning}`);
-}
-if (!avReport.ok && !flag("--accept-av-sync-drift")) {
-  throw new Error(
-    `音画对齐实测不通过：${avReport.violations.join("；")}。`
-    + `报告见 ${avReportPath}；确属客观条件必须放行时，显式加 --accept-av-sync-drift 并留痕。`,
-  );
-}
-if (!avReport.ok) {
-  console.log(`       ⚠ 已按 --accept-av-sync-drift 显式放行（留痕在报告里，属"带瑕疵放行"）`);
-}
+console.log(`  ③-1 处理回执：${avReportPath}（未执行音画品质审核）`);
 
-/* ---------- ④ 调色：择优（不劣化优先） ---------- */
+/* ---------- ④ 调色：执行配方，不复检已渲染画面 ---------- */
 let gradedPath: string | null = null;
 let colorReport: Record<string, unknown> | null = null;
 if (colorMode !== "none") {
   const cli = resolve(REPO_ROOT, "bundles/ai-video/connectors/color-bridge/cli.mjs");
-  const coreUrl = pathToFileURL(resolve(REPO_ROOT, "bundles/ai-video/connectors/color-bridge/core.mjs")).href;
   const target = abs(gradedOut || out.replace(/\.mp4$/i, "-graded.mp4"));
-  /**
-   * 调色工位有"路径监狱"（core.mjs assertPathAllowed）：只放行 WORKLOOM_COLOR_ALLOWED_ROOTS
-   * 内的路径（缺省进程工作目录 + 系统临时目录）。成片若落在别处必须显式放行，
-   * 否则 grade 直接 path_not_allowed（真机 2026-09-21 实测）。
-   */
   const roots = [dirname(out), dirname(target), REPO_ROOT, tmpdir()].join(":");
   const colorEnv = { ...process.env, WORKLOOM_COLOR_ALLOWED_ROOTS: roots };
-
-  /** 题材配方 → 候选（bundles/ai-video/library/color-recipes/recipes.json 为唯一真源） */
-  function recipeCandidates(): Array<Record<string, unknown>> {
-    if (!recipeId) return [];
-    const recipesPath = resolve(REPO_ROOT, "bundles/ai-video/library/color-recipes/recipes.json");
-    const doc = JSON.parse(readFileSync(recipesPath, "utf8")) as {
-      recipes: Array<{ id: string; genre: string; profile: string; lut?: string | null; intensity: number }>;
-    };
-    const recipe = doc.recipes.find((r) => r.id === recipeId || r.genre === recipeId);
-    if (!recipe) throw new Error(`题材配方不存在：${recipeId}（见 ${recipesPath.replace(REPO_ROOT + "/", "")}）`);
-    const lutPath = recipe.lut ? resolve(REPO_ROOT, "bundles/ai-video/library/luts", recipe.lut) : null;
-    const base = { profile: recipe.profile, lutPath, corrections: {} };
-    return [
-      { id: `${recipe.id}@${recipe.intensity}`, label: `${recipe.genre} 配方`, spec: { ...base, intensity: recipe.intensity } },
-      { id: `${recipe.profile}@0.4`, label: `${recipe.profile} 强度 0.4`, spec: { profile: recipe.profile, lutPath, corrections: {}, intensity: 0.4 } },
-      { id: `${recipe.profile}@0.7`, label: `${recipe.profile} 强度 0.7`, spec: { profile: recipe.profile, lutPath, corrections: {}, intensity: 0.7 } }
-    ];
-  }
-
-  if (colorMode === "grade") {
-    console.log(`  ④ 调色（旧口径 grade）：${gradeProfile} @${gradeIntensity} → ${target}`);
-    const result = run(process.execPath, [
-      cli, "grade", "--in", out, "--out", target,
-      "--profile", gradeProfile, "--intensity", gradeIntensity, "--auto",
-      ...(gradeLut ? ["--lut", abs(gradeLut)] : []), "--json"
-    ], colorEnv);
-    gradedPath = target;
-    colorReport = JSON.parse(result.trim()) as Record<string, unknown>;
-  } else {
-    const core = await import(coreUrl) as {
-      best(input: Record<string, unknown>): Promise<Record<string, unknown>>;
-      resolveBinaries(): unknown;
-    };
-    const candidates = recipeCandidates();
-    console.log(
-      `  ④ 调色（择优 best）：${candidates.length ? `题材配方候选 ${candidates.length} 个 + 内置候选` : "内置候选（identity/auto-correct/8 profiles × 2 强度）"}`
-      + `，阈值 +${minImprovement} 分`
-    );
-    const verdict = await core.best({
-      input: out,
-      output: target,
-      minImprovement,
-      bins: core.resolveBinaries(),
-      ...(candidates.length ? { candidates } : {})
-    });
-    colorReport = verdict;
-    const table = (verdict.candidates as Array<Record<string, unknown>> | undefined) ?? [];
-    for (const candidate of [...table].sort((a, b) => Number(b.score) - Number(a.score)).slice(0, 6)) {
-      const reasons = (candidate.reasons ?? {}) as Record<string, unknown>;
-      console.log(
-        `     ${String(Number(candidate.score).toFixed(2)).padStart(7)}  ${String(candidate.id).padEnd(22)}`
-        + ` 对比度×${reasons.contrastRatio} 饱和×${reasons.satRatio} 裁切${reasons.clipDeltaPct}% 亮度${reasons.lumaDrift}`
-      );
-    }
-    if (verdict.verdict === "graded") {
-      gradedPath = target;
-      const visibility = (verdict.visibility ?? {}) as Record<string, unknown>;
-      console.log(
-        `     判定：调色（winner=${String(verdict.winner)}，较母版 +${String(verdict.improvement)} 分，`
-        + `可见性 ${String(visibility.meanAbsDiff ?? "?")}/255 ${String(visibility.verdict ?? "")}）`
-      );
-    } else {
-      console.log(`     判定：无需调色（不劣化优先）——${String(verdict.reason ?? "")}`);
-      console.log("     母版即为交付版本，未产出调色文件");
-    }
-  }
-
+  const result = run(process.execPath, [cli, "grade", "--in", out, "--out", target,
+    "--profile", gradeProfile, "--intensity", gradeIntensity, "--no-verify", "--no-defects",
+    ...(gradeLut ? ["--lut", abs(gradeLut)] : []), "--json"], colorEnv);
+  gradedPath = target;
+  colorReport = JSON.parse(result.trim()) as Record<string, unknown>;
   const reportPath = join(dirname(out), `${basename(out).replace(/\.mp4$/i, "")}-color-report.json`);
-  writeFileSync(reportPath, `${JSON.stringify({ mode: colorMode, recipe: recipeId ?? null, report: colorReport }, null, 2)}\n`, "utf8");
-  console.log(`     调色报告：${reportPath}`);
+  writeFileSync(reportPath, `${JSON.stringify({ mode: "grade", report: colorReport, qualityReviewPerformed: false }, null, 2)}\n`, "utf8");
 }
 
 if (!flag("--keep-temp")) rmSync(temp, { recursive: true, force: true });

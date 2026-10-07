@@ -10,7 +10,7 @@
  * 场景：
  *   clean   —— 干净调色：G-COL0 auto 直通，产出成片，回执 sha256 与磁盘文件一致
  *   blocked —— 覆盖原片：G-COL2 block，线程 paused，不执行工具
- *   review  —— 品牌 look 变更：G-COL1 review，线程 pending_review，产生审批行
+ *   brand   —— 已声明品牌 look 直接真实处理，无 G-COL1 品质挂起
  *   outage  —— 工位不可达：软失败，步骤全部标未核实，线程 failed（不伪造回执）
  *
  * 运行（在 WorkLoom-growth 仓库内，需 DATABASE_URL / DATABASE_GATEWAY_URL，且工作区 ws-video 已 seed）：
@@ -67,22 +67,10 @@ function makeSourceClip(): void {
 const steps = {
   clean: () => [
     {
-      stepId: "s1", action: "colorread.analyze", objectType: "final_video", tool: "colorread.analyze",
-      params: { input_path: SOURCE, at_seconds: [1] },
+      stepId: "s1", action: "colorwrite.grade", objectType: "final_video", tool: "colorwrite.grade",
+      params: { input_path: SOURCE, output_path: GRADED, profile: "teal-orange", intensity: 0.8, verify: false },
       context: { tenant_daily_grades: 0 },
-      label: "诊断成片色彩",
-    },
-    {
-      stepId: "s2", action: "colorwrite.grade", objectType: "final_video", tool: "colorwrite.grade",
-      params: { input_path: SOURCE, output_path: GRADED, profile: "teal-orange", intensity: 0.8, auto: true },
-      context: { tenant_daily_grades: 0 },
-      label: "调色出片（G-COL0 直通）",
-    },
-    {
-      stepId: "s3", action: "colorread.scope", objectType: "color_report", tool: "colorread.scope",
-      params: { input_path: GRADED, at_seconds: 1, out_dir: join(WORK_DIR, "scopes") },
-      context: { tenant_daily_grades: 0 },
-      label: "出 scope 与前后对比证据",
+      label: "调色实际单次处理（无默认诊断）",
     },
   ],
   blocked: () => [
@@ -93,12 +81,12 @@ const steps = {
       label: "覆盖原片的调色（应被 G-COL2 阻断）",
     },
   ],
-  review: () => [
+  brand: () => [
     {
       stepId: "s1", action: "colorwrite.grade", objectType: "final_video", tool: "colorwrite.grade",
       params: { input_path: SOURCE, output_path: REVIEW_OUT, profile: "warm-film", look_change: true },
       context: { tenant_daily_grades: 0 },
-      label: "品牌 look 变更（应被 G-COL1 挂起）",
+      label: "已声明品牌 look 直接单次处理",
     },
   ],
   outage: () => [
@@ -112,9 +100,9 @@ const steps = {
 } as const;
 
 const goals: Record<keyof typeof steps, string> = {
-  clean: "对成片母版做一次调色并出证据",
+  clean: "对成片按声明滤镜处理一次并出实际回执",
   blocked: "调色时直接覆盖原片（演练红线）",
-  review: "变更品牌默认 look 后调色（演练人审）",
+  brand: "变更声明 look 后调色（无品质人审）",
   outage: "工位不可达时调色（演练软失败）",
 };
 
@@ -217,7 +205,7 @@ async function main(): Promise<number> {
   const receiptUri = gradeEvent?.receipt?.snapshot_uri ?? null;
   const eventResultHash = gradeEvent?.resultSha256 ?? null;
   const blocked = find("blocked");
-  const review = find("review");
+  const brand = find("brand");
   const outage = find("outage");
 
   const checks = {
@@ -228,7 +216,7 @@ async function main(): Promise<number> {
       && (receiptUri ?? "").includes(gradedHash),
     ),
     blocked_by_overwrite_rule: blocked?.outcome.status === "paused" && (blocked?.outcome.blockedBy ?? "").includes("覆盖原片"),
-    review_pending: review?.outcome.status === "pending_review" && Boolean(review?.outcome.pendingApprovalId),
+    brand_completed_without_quality_review: brand?.outcome.status === "completed" && !brand?.outcome.pendingApprovalId && existsSync(REVIEW_OUT),
     outage_unverified: outage?.outcome.status === "failed" && (outage?.outcome.unverified?.length ?? 0) >= 1,
   };
 

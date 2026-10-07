@@ -1,6 +1,11 @@
-import { describe, expect, it } from "vitest";
-import { filmWorkerEnvironment, validateFilmChannelScope } from "./film-worker.js";
-import { FILM_CHANNEL_METHOD_COMPONENT, type FilmChannelRequestFrame } from "@hyperreality/video-studio";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { filmWorkerEnvironment, validateFilmChannelScope, handleChannelRequest, type RunContext } from "./film-worker.js";
+import { FILM_CHANNEL_METHOD_COMPONENT, filmRequestHash, FullChainFilmWorker, POST_RENDER_STAGES, type ProducerGateOptions, type FilmChannelTransport, type FilmWorkerJobContext, type FilmChannelRequestFrame } from "@hyperreality/video-studio";
 describe("film worker child environment", () => {
   it("keeps public local tools while dropping every account, database, model and signing credential", () => {
     const env = filmWorkerEnvironment({ PATH: "/local/bin", WL_FFMPEG: "/local/ffmpeg", SEEDANCE_MODEL: "test-model", LLM_API_KEY: "mock-test-only-secret", JWT_SECRET: "mock-test-only-secret", CNB_TOKEN: "mock-test-only-secret", DATABASE_URL: "mock-test-only-secret", CUSTOMER_OAUTH_TOKEN: "mock-test-only-secret", NODE_OPTIONS: "--import arbitrary" });
@@ -113,5 +118,68 @@ describe("film parent frozen audio and format authority", () => {
     expect(() => validateFilmChannelScope(frame("video.generate", "S2", { ...video, seconds: 6, generateAudio: false }), scope)).toThrow("AUDIO_NATIVE_GENERATION_REQUIRED");
     expect(() => validateFilmChannelScope(frame("video.generate", "S1", { ...video, resolution: "1080p" }),
       { ...scope, options: { aspect: "16:9", resolution: "2160p" } })).not.toThrow();
+  });
+});
+
+
+describe("真实父处理器与固定工位 IPC 的默认后期", () => {
+  const roots: string[] = [];
+  afterEach(() => { vi.restoreAllMocks(); roots.splice(0).forEach(root => rmSync(root, { recursive: true, force: true })); });
+  const prepare = (stage: ProducerGateOptions["stage"] = "compose") => {
+    const archive = realpathSync(mkdtempSync(join(tmpdir(), "parent-worker-post-"))); roots.push(archive);
+    const workDir = join(archive, "jobs", "attempt-1"); mkdirSync(workDir, { recursive: true });
+    const source = JSON.stringify({ projectId: "LOCAL-PARENT-POST", shots: [{ shotId: "S1", duration: 5 }] });
+    writeFileSync(join(archive, "source.json"), source);
+    const file = join(workDir, "black-odd-silent.mp4");
+    const encoded = spawnSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=black:s=162x122:r=23",
+      "-vf", "crop=161:121:exact=1", "-frames:v", "5", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv444p", file], { encoding: "utf8", timeout: 30_000 });
+    expect(encoded.status, encoded.stderr).toBe(0);
+    const hash = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
+    const sourceStage = stage === "shot" ? "videos" : stage;
+    const context: FilmWorkerJobContext = { jobId: "FJ-POST", tenantId: "t", workspaceId: "w", projectId: "LOCAL-PARENT-POST", attempt: 1, runId: "run-current",
+      workerName: "full-chain-film", workerVersion: "v1", stages: [sourceStage], options: {}, archiveRoot: archive, workDir,
+      inputRef: "source.json", inputSha256: hash(source), budgetCny: 0, deadlineAt: new Date(Date.now() + 30_000).toISOString(), allowedMethods: ["gate.review"] };
+    const reserves: Array<Record<string, unknown>> = [], dispatches: unknown[][] = [], accepted: unknown[][] = [], failures: unknown[][] = [];
+    const ledger = { reserveComponent: async (request: Record<string, unknown>) => { reserves.push(request); return { row: { id: "COMP-POST" }, deduped: false }; },
+      claimComponent: async () => ({ id: "COMP-POST" }), recordDispatch: async (...args: unknown[]) => { dispatches.push(args); },
+      recordComponentAccepted: async (...args: unknown[]) => { accepted.push(args); }, recordComponentFailure: async (...args: unknown[]) => { failures.push(args); } };
+    const parent = { env: { ...process.env, LLM_API_KEY: "", VOLCENGINE_ARK_API_KEY: "" }, job: { id: context.jobId, project_id: context.projectId, attempt: 1,
+      stages: context.stages, options: { "review-policy": "blocking" } }, worker: { capabilities: ["gate.review"] }, ledger,
+      workDir, archiveRoot: archive, frozen: JSON.parse(source), shots: new Map([["S1", { shotId: "S1", duration: 5 }]]),
+      ownerToken: "LOCAL-IN-MEMORY-LEDGER", signal: new AbortController().signal, deadlineAt: Date.now() + 30_000 } as unknown as RunContext;
+    let listener: ((frame: unknown) => void) | undefined;
+    const frames: FilmChannelRequestFrame[] = [];
+    const transport: FilmChannelTransport = { subscribe(handler) { listener = handler; return () => { listener = undefined; }; }, send(raw) {
+      const frame = JSON.parse(raw) as FilmChannelRequestFrame; frames.push(frame);
+      void handleChannelRequest(parent, frame).then(result => listener?.(JSON.stringify({ kind: "film.response", id: frame.id, ok: true, result })),
+        error => listener?.(JSON.stringify({ kind: "film.response", id: frame.id, ok: false, error: { code: error.code ?? "PARENT_FAILED", message: error.message } })));
+    } };
+    const worker = new FullChainFilmWorker(context, archive, transport);
+    const options: Omit<ProducerGateOptions, "contracts"> = { stage, projectId: context.projectId, artifacts: [{ path: file, kind: "video" }],
+      deterministic: [{ id: "old-quality", pass: false, hard: true, detail: "historical clothes/black/dialogue score failed" }],
+      context: stage === "shot" ? { shotId: "S1" } : {}, minScore: Number.NaN, referenceImages: [join(archive, "missing-quality-image.png")] };
+    return { parent, worker, options, file, frames, reserves, dispatches, accepted, failures, before: hash(readFileSync(file)), hash };
+  };
+  it.each([...POST_RENDER_STAGES])("%s 贯通真实父处理器与子通道，零模型预算且无创作合同依赖", async stage => {
+    const value = prepare(stage), fetch = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("UNEXPECTED_MODEL_CALL"));
+    const result = await value.worker.review(value.options);
+    expect(result).toMatchObject({ approved: true, status: "passed", score: null, qualityReviewed: false, rerun: false, via: "deterministic" });
+    expect(result.contractHash).toBeUndefined(); expect(value.reserves).toHaveLength(1); expect(value.reserves[0]!.reservedCny).toBe(0);
+    expect(value.dispatches).toHaveLength(1); expect(value.accepted).toHaveLength(1); expect(value.failures).toEqual([]);
+    expect(fetch).not.toHaveBeenCalled(); expect(value.frames.map(frame => frame.method)).toEqual(["gate.review"]);
+    expect(value.hash(readFileSync(value.file))).toBe(value.before); value.worker.channel.dispose();
+  });
+  it("直接父请求的旧品质分数/参考/要求名单不触发隐藏参数或模型准入", async () => {
+    const value = prepare(), params = { stage: "compose", projectId: "LOCAL-PARENT-POST", artifacts: [{ ref: "black-odd-silent.mp4", kind: "video" }],
+      deterministic: [], context: {}, minScore: "obsolete-not-a-score", referenceImages: ["../../missing.png"], requiredCheckIds: [null], rubric: [null] };
+    const frame: FilmChannelRequestFrame = { kind: "film.request", id: "DIRECT-POST", component: "review", method: "gate.review", stepKey: "compose", shotId: null,
+      params, idempotencyKey: "direct-current", requestHash: filmRequestHash({ method: "gate.review", stepKey: "compose", shotId: null, params }) };
+    expect(await handleChannelRequest(value.parent, frame)).toMatchObject({ approved: true, score: null, qualityReviewed: false }); value.worker.channel.dispose();
+  });
+  it("真实工具错误终态保持失败，父服务不会发品质重渲或假通过", async () => {
+    const value = prepare(); value.options.deterministic.push({ id: "tool-exit", pass: false, hard: true, detail: "real subprocess error" });
+    const result = await value.worker.review(value.options);
+    expect(result).toMatchObject({ approved: false, status: "failed", score: null, qualityReviewed: false, rerun: false });
+    expect(result.hardFailures).toEqual(["tool-exit: real subprocess error"]); value.worker.channel.dispose();
   });
 });

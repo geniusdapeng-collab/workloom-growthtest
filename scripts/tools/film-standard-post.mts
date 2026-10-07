@@ -27,7 +27,7 @@ interface OriginalManifest {
   submitted: { json: string; sha256: string; bytes: number }; originals: OriginalRecord[];
 }
 interface OriginalReceipt { schemaVersion: "workloom.original-render/v1"; projectId: string; shotId: string;
-  submittedSha256: string; artifact: FileBinding; taskId: string; kind: "current-runtime-receipt" | "current-local-render-receipt" | "legacy-user-adopted";
+  submittedSha256: string; artifact: FileBinding; taskId: string; kind: "current-runtime-receipt" | "current-local-render-receipt" | "legacy-user-adopted" | "provider-success-adopted";
   evidence: Record<string, unknown> }
 export interface StandardPostSettings {
   schemaVersion: "workloom.standard-post-settings/v1";
@@ -44,7 +44,7 @@ interface InternalPlan extends Omit<StandardPostSettings, "cover" | "schemaVersi
   sources: InternalSource[]; cover: StandardPostSettings["cover"] & { sourceId: string };
 }
 interface PreparedSegment { segment: { id: string; durationSec: number }; path: string; timelineStartSec: number;
-  sourceAudio: { sha256: string; bytes: number; sampleRate: 48000; channels: 2 }; sha256: string }
+  sourceAudio: { present: boolean; sampleRate: number; channels: number }; sha256: string }
 const fail = (code: string, message: string): never => { throw new StandardPostError(code, message); };
 function ensure(value: unknown, message: string): asserts value { if (!value) fail("STANDARD_POST_INVALID", message); }
 function object(value: unknown, label: string): Record<string, unknown> {
@@ -115,7 +115,7 @@ export async function issueOriginalRenderReceipt(input: { productionRoot: string
     const raw = object(input.submissionReceipt, "parent receipt"), { schemaVersion, receiptHash, ...facts } = raw;
     const receipt = buildFilmVideoSubmissionReceipt(facts as unknown as Parameters<typeof buildFilmVideoSubmissionReceipt>[0]);
     ensure(schemaVersion === receipt.schemaVersion && receiptHash === receipt.receiptHash && receipt.inputSha256 === input.submittedSha256
-      && receipt.projectId === input.projectId && receipt.shotId === input.shotId && receipt.taskId === input.taskId && receipt.generateAudio === true
+      && receipt.projectId === input.projectId && receipt.shotId === input.shotId && receipt.taskId === input.taskId
       && receipt.artifact.sha256 === artifact.sha256 && receipt.artifact.bytes === artifact.bytes, "parent accepted-download receipt differs");
     const parentWorkDir = input.parentWorkDir ?? input.productionRoot;
     ensure(localPath(parentWorkDir) && await realpath(parentWorkDir) === parentWorkDir && within(input.productionRoot, parentWorkDir)
@@ -134,6 +134,94 @@ export async function issueOriginalRenderReceipt(input: { productionRoot: string
   const serialized = `${JSON.stringify(value, null, 2)}\n`;
   await writeFrozen(receiptPath(input.productionRoot, input.projectId, input.shotId), serialized);
   await sealOriginal(input.productionRoot, value, serialized); return value;
+}
+/** Historical quality votes are irrelevant; scope and input/output byte bindings remain required. */
+async function completedHistoryBinding(row: Record<string, any>, scope: { projectId: string; shotId: string; submittedSha256: string; taskId: string }, artifact: FileBinding) {
+  const lineage = row.lineage, evidence = row.evidence;
+  if (row.shotId !== scope.shotId || !["shot", "material-gen"].includes(row.stage)
+    || lineage?.schemaVersion !== "workloom.production-lineage/v1" || lineage.projectId !== scope.projectId
+    || lineage.stage !== row.stage || lineage.shotId !== scope.shotId || !text(lineage.runId, 256)
+    || !hash(lineage.sourceHash) || !hash(lineage.recipeHash) || !Array.isArray(lineage.errors) || lineage.errors.length
+    || !Array.isArray(lineage.inputs) || !lineage.inputs.length || !Array.isArray(lineage.outputs)
+    || evidence?.taskId !== scope.taskId || evidence.requestInputVerified !== true || evidence.providerSuccess === false
+    || evidence.providerFailed === true || evidence.providerError
+    || ["failed", "cancelled", "canceled", "expired", "error"].includes(String(evidence.providerStatus ?? evidence.providerState ?? "").toLowerCase())
+    || !(evidence.rawSha256 === artifact.sha256 || evidence.outputSha256 === artifact.sha256)
+    || !lineage.outputs.some((output: FileBinding) => output.path === artifact.path && output.sha256 === artifact.sha256 && output.bytes === artifact.bytes)
+    || !lineage.inputs.some((input: FileBinding) => input.sha256 === scope.submittedSha256)) return false;
+  for (const input of lineage.inputs as FileBinding[]) {
+    if (!localPath(input.path) || !hash(input.sha256) || !Number.isSafeInteger(input.bytes) || input.bytes <= 0) return false;
+    await pinned(input.path, input);
+  }
+  return true;
+}
+/**
+ * Adopt an actual completed download by task and immutable source bytes. Old quality
+ * failures remain in their original ledger rows. A code recipe change, wardrobe vote
+ * or expired submit approval cannot authorize a second paid submission.
+ */
+export async function adoptCompletedOriginalRenders(input: { productionRoot: string; projectId: string; submittedSha256: string }) {
+  ensure(localPath(input.productionRoot) && id(input.projectId) && hash(input.submittedSha256), "invalid completed render scope");
+  const submitted = await readFile(await regular(submittedPath(input.productionRoot, input.projectId)));
+  ensure(digest(submitted) === input.submittedSha256, "completed render belongs to another frozen submission");
+  const document = JSON.parse(submitted.toString("utf8")) as Record<string, any>;
+  const historyFile = join(input.productionRoot, "logs", input.projectId, "stages.jsonl");
+  let lines: string[] = [];
+  try { lines = (await readFile(await regular(historyFile), "utf8")).split(/\r?\n/).filter(Boolean); }
+  catch (error) { if (missing(error) || missing((error as Error).cause)) lines = []; else throw error; }
+  const adopted: Array<{ shotId: string; path: string; sha256: string; bytes: number; taskId: string; receiptFile: string; disposition: string }> = [];
+  for (const shot of document.shots) {
+    ensure(id(shot.shotId), "invalid completed shot id"); const sid = shot.shotId;
+    const file = receiptPath(input.productionRoot, input.projectId, sid);
+    let existing: Awaited<ReturnType<typeof readJson>> | null = null;
+    try { existing = await readJson(file); }
+    catch (error) { if (!missing(error) && !missing((error as Error).cause)) throw error; }
+    if (existing) {
+      const receipt = existing.value as unknown as OriginalReceipt;
+      ensure(receipt.schemaVersion === "workloom.original-render/v1" && receipt.projectId === input.projectId
+        && receipt.shotId === sid && receipt.submittedSha256 === input.submittedSha256 && text(receipt.taskId, 256), "issued render scope changed");
+      await pinned(receipt.artifact.path, receipt.artifact);
+      const witness = (await readJson(sealPath(input.productionRoot, input.projectId, sid))).value;
+      ensure(witness.receiptSha256 === digest(existing.bytes) && JSON.stringify(witness.artifact) === JSON.stringify(receipt.artifact)
+        && witness.taskId === receipt.taskId && witness.submittedSha256 === input.submittedSha256, "issued render witness changed");
+      adopted.push({ shotId: sid, ...receipt.artifact, taskId: receipt.taskId, receiptFile: file, disposition: "issued-provider-success-reused" });
+      continue;
+    }
+    const raw = join(input.productionRoot, "clips", input.projectId, `${sid}.raw.mp4`), ordinary = join(input.productionRoot, "clips", input.projectId, `${sid}.mp4`);
+    let path = raw;
+    try { await lstat(raw); } catch (error) { if (!missing(error)) throw error; path = ordinary; }
+    let artifact: FileBinding;
+    try { artifact = await pinned(path); } catch (error) {
+      if (!missing(error) && !missing((error as Error).cause)) throw error;
+      const priorCompleted = lines.some(line => {
+        const row = JSON.parse(line) as Record<string, any>;
+        return row.shotId === sid && ["shot", "material-gen"].includes(row.stage)
+          && row.lineage?.projectId === input.projectId && row.evidence?.requestInputVerified === true
+          && row.lineage?.outputs?.some((output: FileBinding) => output.path === raw || output.path === ordinary);
+      });
+      ensure(!priorCompleted, `completed original ${sid} is missing; automatic resubmission is refused`);
+      continue;
+    }
+    const acceptedFile = join(input.productionRoot, "logs", input.projectId, "accepted-tasks", `${sid}.json`), accepted = await readJson(acceptedFile);
+    ensure(accepted.value.schemaVersion === "workloom.render-task/v1" && accepted.value.state === "accepted"
+      && text(accepted.value.taskId, 256) && hash(accepted.value.requestHash), "existing render has no accepted task; automatic resubmission is refused");
+    let matched: { line: number; rowSha256: string } | undefined;
+    for (let index = lines.length - 1; index >= 0; index--) {
+      const line = lines[index]!, row = JSON.parse(line) as Record<string, any>;
+      if (await completedHistoryBinding(row, { ...input, shotId: sid, taskId: String(accepted.value.taskId) }, artifact)) {
+        matched = { line: index + 1, rowSha256: digest(line) }; break;
+      }
+    }
+    ensure(matched, "existing file cannot be bound to a completed task and actual source bytes; automatic resubmission is refused");
+    const receipt: OriginalReceipt = { schemaVersion: "workloom.original-render/v1", projectId: input.projectId, shotId: sid,
+      submittedSha256: input.submittedSha256, artifact, taskId: String(accepted.value.taskId), kind: "provider-success-adopted",
+      evidence: { historyFile, ...matched, acceptedFile, acceptedSha256: digest(accepted.bytes),
+        requestHash: accepted.value.requestHash, certification: "completed-task-and-byte-provenance-only-no-quality-or-identity-certification" } };
+    const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
+    await writeFrozen(file, serialized); await sealOriginal(input.productionRoot, receipt, serialized);
+    adopted.push({ shotId: sid, ...artifact, taskId: receipt.taskId, receiptFile: file, disposition: "provider-success-adopted" });
+  }
+  return adopted;
 }
 /** Explicit historical adoption is a maintenance operation, never a public free-edit plan or identity approval. */
 export async function adoptLegacyOriginalRenders(input: { productionRoot: string; submittedFile: string;
@@ -213,21 +301,24 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
     const raw = join(manifest.productionRoot, "clips", manifest.projectId, `${row.shotId}.raw.mp4`), ordinary = join(manifest.productionRoot, "clips", manifest.projectId, `${row.shotId}.mp4`);
     let canonical = raw; try { await lstat(raw); } catch (e) { if (!missing(e)) throw e; canonical = ordinary; }
     ensure(row.path === canonical, "derived, voiced, alternate or aliased source refused"); await pinned(row.path, row);
-    if (receipt.kind === "legacy-user-adopted") {
+    if (receipt.kind === "legacy-user-adopted" || receipt.kind === "provider-success-adopted") {
       const e = receipt.evidence, historyFile = join(manifest.productionRoot, "logs", manifest.projectId, "stages.jsonl");
       ensure(e.historyFile === historyFile && e.acceptedFile === join(manifest.productionRoot, "logs", manifest.projectId, "accepted-tasks", `${row.shotId}.json`), "legacy evidence path changed");
       const lines = (await readFile(await regular(historyFile), "utf8")).split(/\r?\n/).filter(Boolean), line = lines[Number(e.line) - 1];
       ensure(typeof line === "string" && digest(line) === e.rowSha256, "historical source row changed");
       const history = JSON.parse(line) as Record<string, any>, accepted = await readJson(String(e.acceptedFile));
       ensure(digest(accepted.bytes) === e.acceptedSha256 && accepted.value.schemaVersion === "workloom.render-task/v1" && accepted.value.state === "accepted" && accepted.value.taskId === receipt.taskId
-        && history.shotId === row.shotId && ["shot", "material-gen"].includes(history.stage) && history.ok === true && history.degraded === false
-        && history.lineage?.projectId === manifest.projectId && history.lineage?.status === "passed"
+        && history.shotId === row.shotId && ["shot", "material-gen"].includes(history.stage)
+        && (receipt.kind === "provider-success-adopted" ? await completedHistoryBinding(history, {
+          projectId: manifest.projectId, shotId: row.shotId, submittedSha256: manifest.submitted.sha256, taskId: receipt.taskId }, row)
+          : history.ok === true && history.degraded === false && history.lineage?.status === "passed")
+        && history.lineage?.projectId === manifest.projectId
         && history.evidence?.taskId === receipt.taskId && history.lineage?.outputs?.some((f: FileBinding) => f.path === row.path && f.sha256 === row.sha256 && f.bytes === row.bytes), "legacy accepted output no longer binds source");
     } else if (receipt.kind === "current-runtime-receipt") {
       const rawReceipt = object(receipt.evidence.submissionReceipt, "parent receipt"), { schemaVersion, receiptHash, ...facts } = rawReceipt;
       const parent = buildFilmVideoSubmissionReceipt(facts as unknown as Parameters<typeof buildFilmVideoSubmissionReceipt>[0]);
       ensure(schemaVersion === parent.schemaVersion && receiptHash === parent.receiptHash && parent.projectId === manifest.projectId && parent.shotId === row.shotId
-        && parent.inputSha256 === manifest.submitted.sha256 && parent.generateAudio === true && parent.taskId === receipt.taskId
+        && parent.inputSha256 === manifest.submitted.sha256 && parent.taskId === receipt.taskId
         && parent.seconds === Number(doc.shots[index].duration ?? doc.shots[index].durationSec ?? doc.shots[index].durationSeconds)
         && typeof receipt.evidence.parentWorkDir === "string" && localPath(receipt.evidence.parentWorkDir)
         && within(manifest.productionRoot, receipt.evidence.parentWorkDir)
@@ -244,10 +335,12 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
         "local accepted render journal changed");
     }
     const media = await probe(row.path, { ffprobe: options.ffprobe ?? "ffprobe" }, options.timeoutMs ?? 600_000), video = media.streams.filter(s => s.codec_type === "video"), audio = media.streams.filter(s => s.codec_type === "audio");
-    ensure(video.length === 1 && audio.length === 1 && !video[0]!.side_data_list?.some(s => s.rotation), "one original video and native audio stream required");
+    ensure(video.length >= 1, "original video stream is unavailable for processing");
+    const v = video[0]!, a = audio[0], videoDuration = Number(v.duration ?? media.format.duration), fps = rate(v);
     originals.push({ shotId: row.shotId, role: "original-render", path: row.path, sha256: row.sha256, bytes: row.bytes,
-      media: { fps: rate(video[0]!), width: Number(video[0]!.width), height: Number(video[0]!.height), videoFrames: Number(video[0]!.nb_read_frames),
-        videoDurationSec: Number(video[0]!.duration), audioDurationSec: Number(audio[0]!.duration), audioSampleRate: Number(audio[0]!.sample_rate), audioChannels: Number(audio[0]!.channels) },
+      media: { fps, width: Number(v.width), height: Number(v.height), videoFrames: Number(v.nb_read_frames) || Math.max(1, Math.round(videoDuration * fps)),
+        videoDurationSec: videoDuration, audioDurationSec: a ? Number(a.duration ?? media.format.duration) : 0,
+        audioSampleRate: a ? Number(a.sample_rate) : 0, audioChannels: a ? Number(a.channels) : 0 },
       authority: { kind: receipt.kind, evidenceId: row.receiptFile, evidenceSha256: row.receiptSha256 } });
   }
   const contract = buildStandardPostContract({ projectId: manifest.projectId, submitted: manifest.submitted, originals }); assertStandardPostTimeline(contract, contract.timeline);
@@ -330,61 +423,26 @@ async function run(binary: string, args: string[], timeout: number, env = proces
 }
 async function probe(path: string, bins: { ffprobe: string }, timeout: number): Promise<Media> {
   let stdout: Buffer;
-  try { ({ stdout } = await run(bins.ffprobe, ["-v", "error", ...directMediaInput(), "-count_frames", "-show_streams", "-show_format", "-of", "json", path], timeout)); }
+  try { ({ stdout } = await run(bins.ffprobe, ["-v", "error", ...directMediaInput(), "-show_streams", "-show_format", "-of", "json", path], timeout)); }
   catch (error) { return fail("STANDARD_POST_MEDIA_INVALID", `direct media probe failed: ${(error as Error).message}`); }
   let doc: Media; try { doc = JSON.parse(stdout.toString()) as Media; } catch { return fail("STANDARD_POST_MEDIA_INVALID", "malformed media probe"); }
   if (!Array.isArray(doc.streams) || !doc.format || !finite(Number(doc.format.duration), 0.001, 7200)) fail("STANDARD_POST_MEDIA_INVALID", `incomplete media probe: ${path}`);
   return doc;
 }
 function rate(s: Stream): number { const [a, b] = String(s.avg_frame_rate).split("/").map(Number); return Number(a) / Number(b); }
-async function pcm(path: string, ffmpeg: string, timeout: number): Promise<Float32Array> {
-  const b = (await run(ffmpeg, ["-v", "error", ...directMediaInput(), "-i", path, "-map", "0:a:0", "-ar", "16000", "-ac", "1", "-f", "f32le", "-"], timeout)).stdout;
-  return new Float32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
-}
-/** Count real decoded samples without padding, truncating, or keeping the full PCM in memory. */
+/** Export metadata readback only; this is not an audio quality or speech acceptance audit. */
 export async function assertStandardPostAudioClock(file: string, durationSec: number, options: StandardPostOptions = {}) {
-  ensure(finite(durationSec, 0.001, 7200), "invalid original picture clock"); await regular(file);
-  const ffmpeg = await resolveStandardPostBinary(options.ffmpeg ?? process.env.WL_FFMPEG ?? "ffmpeg");
+  ensure(finite(durationSec, 0.001, 7200), "invalid export clock"); await regular(file);
+  const ffprobe = await resolveStandardPostBinary(options.ffprobe ?? process.env.WL_FFPROBE ?? "ffprobe");
   const timeout = options.timeoutMs ?? 600_000;
-  ensure(Number.isSafeInteger(timeout) && timeout > 0 && timeout <= 900_000, "invalid audio decode timeout");
-  const decoded = await new Promise<{ bytes: number; sha256: string }>((accept, reject) => {
-    const child = spawn(ffmpeg, ["-v", "error", "-xerror", "-nostdin", ...directMediaInput(), "-i", file,
-      "-map", "0:a:0", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1"], { stdio: ["ignore", "pipe", "pipe"] });
-    let bytes = 0, stderr = "", timedOut = false; const sha = createHash("sha256");
-    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, timeout);
-    child.stdout.on("data", (chunk: Buffer) => { bytes += chunk.length; sha.update(chunk); });
-    child.stderr.on("data", (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-2400); });
-    child.on("error", (e) => { clearTimeout(timer); reject(new StandardPostError("STANDARD_POST_PROCESS_FAILED", e.message)); });
-    child.on("close", (code, signal) => {
-      clearTimeout(timer);
-      if (timedOut || code !== 0 || signal) reject(new StandardPostError("STANDARD_POST_PROCESS_FAILED", `audio decode ${timedOut ? "timed out" : `exit=${code}, signal=${signal ?? "none"}`}: ${stderr}`));
-      else accept({ bytes, sha256: sha.digest("hex") });
-    });
-  });
-  const samplesPerChannel = decoded.bytes / 4, requiredSamples = Math.round(durationSec * 48000);
-  if (!Number.isSafeInteger(samplesPerChannel) || samplesPerChannel < requiredSamples)
-    fail("STANDARD_POST_NATIVE_CLOCK_INCOMPLETE", `${basename(file)}: decoded ${samplesPerChannel} samples, original picture clock requires ${requiredSamples}`);
-  return { ...decoded, sampleRate: 48000, channels: 2, samplesPerChannel, requiredSamples,
-    codecBoundarySamples: samplesPerChannel - requiredSamples,
-    basis: "Actual decoded samples cover the entire original picture clock. No artificial padding or relaxed threshold; codec priming/padding is separately observed." };
-}
-async function verifyComposedSourceSpeech(segments: PreparedSegment[], master: string, ffmpeg: string, timeout: number) {
-  const audio = await pcm(master, ffmpeg, timeout); const observations = [];
-  for (const s of segments) {
-    const reference = await pcm(s.path, ffmpeg, timeout); let best: { lagMs: number; correlation: number } | undefined;
-    for (const w of candidateSyncWindows({ durationSec: s.segment.durationSec })) {
-      const length = Math.round(w.lengthSec * 16000), from = Math.round(w.startSec * 16000), expected = Math.round((s.timelineStartSec + w.startSec) * 16000);
-      const search = 1600, begin = Math.max(0, expected - search), end = Math.min(audio.length, expected + length + search);
-      if (from + length > reference.length || end - begin < length + 32) continue;
-      const m = crossCorrelationLag(reference.subarray(from, from + length), audio.subarray(begin, end), { sampleRate: 16000, maxLagMs: 100 });
-      const measured = { lagMs: m.lagMs - (expected - begin) / 16, correlation: m.correlation };
-      if (!best || measured.correlation > best.correlation) best = measured;
-    }
-    if (!best || best.correlation < 0.98 || Math.abs(best.lagMs) > 10) fail("STANDARD_POST_SOURCE_SPEECH_UNVERIFIED", `${s.segment.id}: ${JSON.stringify(best ?? null)}`);
-    observations.push({ segmentId: s.segment.id, ...best });
-  }
-  return { basis: "actual complete original-source PCM fingerprint and composed native audio timing correlation", sampleRate: 16000, maxLagMs: 10, minimumCorrelation: 0.98, observations,
-    limit: "Verifies speech source and timing before BGM mastering; does not certify face identity, words or phonetic lipsync." };
+  ensure(Number.isSafeInteger(timeout) && timeout > 0 && timeout <= 900_000, "invalid metadata timeout");
+  const metadata = await probe(file, { ffprobe }, timeout), video = metadata.streams.find(s => s.codec_type === "video"), audio = metadata.streams.find(s => s.codec_type === "audio");
+  const actualDurationSec = Number(video?.duration ?? metadata.format.duration);
+  if (!video || Math.abs(actualDurationSec - durationSec) > Math.max(1 / rate(video), 0.05))
+    fail("STANDARD_POST_EXPORT_CLOCK_INVALID", `${basename(file)}: requested ${durationSec}s, actual ${actualDurationSec}s`);
+  return { actualDurationSec, requestedDurationSec: durationSec, present: Boolean(audio),
+    sampleRate: audio ? Number(audio.sample_rate) : 0, channels: audio ? Number(audio.channels) : 0,
+    basis: "Export stream metadata only. No complete PCM decode, speech, lip-sync or quality certification." };
 }
 
 interface LocalCore { [name: string]: (...args: unknown[]) => unknown }
@@ -443,7 +501,6 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       ...settings.music.map(m => ({ ...m, role: "existing-music" as const }))] };
   const frozen = new Map<string, { source: InternalSource; path: string; media: Media }>();
   for (const source of plan.sources) { await pinned(source.path, source); const media = await probe(source.path, bins, timeout);
-    ensure(media.streams.some(s => s.codec_type === "audio"), "source native audio or music missing");
     if (source.role === "existing-music") ensure(!within(source.path, join(original.productionRoot, "clips"))
       && media.streams.filter(s => s.codec_type === "audio").length === 1 && !media.streams.some(s => s.codec_type === "video"), "BGM must be an audio-only music file outside generated clips");
     frozen.set(source.id, { source, path: source.path, media }); }
@@ -494,13 +551,13 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       assertStandardPostTimeline(contract, contract.timeline);
       for (const entry of contract.timeline) {
         const path = entry.video.path;
-        const native = (await run(bins.ffmpeg, ["-v", "error", "-nostdin", ...directMediaInput(), "-i", path,
-          "-map", "0:a:0", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", "-f", "s16le", "-"], timeout)).stdout;
+        const media = frozen.get(entry.shotId)!.media, audio = media.streams.find(stream => stream.codec_type === "audio");
         prepared.push({ segment: { id: entry.shotId, durationSec: entry.durationSec }, path, timelineStartSec: cursor,
-          sha256: entry.video.sha256, sourceAudio: { sha256: digest(native), bytes: native.length, sampleRate: 48000, channels: 2 } }); cursor += entry.durationSec;
+          sha256: entry.video.sha256, sourceAudio: { present: Boolean(audio), sampleRate: audio ? Number(audio.sample_rate) : 0,
+            channels: audio ? Number(audio.channels) : 0 } }); cursor += entry.durationSec;
       }
       return { contractSha256: contract.contractSha256, timeline: contract.timeline, sources: prepared,
-        boundary: "Original presented audio follows each original picture clock. Decoder priming/padding is recorded; no editorial trim or retiming." };
+        boundary: "The original bytes remain unchanged. Composition normalizes provider geometry, fps and boundary duration to the requested export; available source audio is retained, absent audio stays silent." };
     });
     const composed = join(post, "composed.mp4");
     await stage("compose", async () => {
@@ -512,12 +569,11 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       const rechecked = await loadOriginalRenderManifest(manifestFile, { ...options, ...bins });
       ensure(rechecked.manifestSha256 === original.manifestSha256 && rechecked.contract.contractSha256 === contract.contractSha256, "original sources drifted before composition");
       const argv = ["--import", "tsx", join(repo, "scripts/tools/compose-film.mts"), "--clips", prepared.map((s) => s.path).join(","), "--out", composed,
-        "--width", String(plan.width), "--height", String(plan.height), "--fps", String(plan.fps), "--fade", "0", "--color", "none", "--json"];
+        "--width", String(plan.width), "--height", String(plan.height), "--fps", String(plan.fps), "--durations", prepared.map(s => s.segment.durationSec).join(","), "--fade", "0", "--color", "none", "--json"];
       const result = await run(process.execPath, argv, timeout, { ...process.env, WL_FFMPEG: bins.ffmpeg, WL_FFPROBE: bins.ffprobe }, repo);
-      const avSync = JSON.parse(await readFile(composed.replace(/\.mp4$/, ".av-sync.json"), "utf8")) as { ok?: boolean };
-      if (avSync.ok !== true) fail("STANDARD_POST_SOURCE_SPEECH_UNVERIFIED", "official compose AV sync did not pass");
+      const processReceipt = JSON.parse(await readFile(composed.replace(/\.mp4$/, ".av-sync.json"), "utf8"));
       for (const originalSource of contract.originals) await pinned(originalSource.path, originalSource);
-      return { tool: "scripts/tools/compose-film.mts", argv, actualTimeline, stdout: result.stdout.toString().slice(-8000), avSync, sourceSpeech: await verifyComposedSourceSpeech(prepared, composed, bins.ffmpeg, timeout), sha256: await standardPostFileHash(composed) };
+      return { tool: "scripts/tools/compose-film.mts", argv, actualTimeline, stdout: result.stdout.toString().slice(-8000), processReceipt, qualityReviewPerformed: false, sha256: await standardPostFileHash(composed) };
     });
     const cues = plan.subtitles.map((c) => ({ start: subtitle.srtSecondsToAss!(c.startSec), end: subtitle.srtSecondsToAss!(c.endSec), text: subtitle.stripSubtitlePunctuation!(c.text) }));
     if (cues.some((c) => !String(c.text).trim())) fail("STANDARD_POST_PLAN_INVALID", "punctuation removal leaves an empty subtitle");
@@ -529,9 +585,6 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
     const color = await loadCore(repo, "color-bridge"), bgm = await loadCore(repo, "bgm-bridge");
     const coverModule = await import(pathToFileURL(join(repo, "packages/video-studio/src/local-cover-render.ts")).href) as { renderLocalCover: (o: Record<string, unknown>) => Promise<{ path: string; receipt: unknown }> };
     const outputs: Array<Record<string, unknown>> = [];
-    const samples: VariantSample[] = [];
-    const measureModule = await import(pathToFileURL(join(repo, "bundles/ai-video/connectors/bgm-bridge/measure.mjs")).href) as {
-      measureLoudness: (file: string, options: { bins: typeof bins }) => Promise<{ integratedLufs: number; truePeakDbtp: number }> };
     const bgmEnv = { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: [staging, ...plan.allowedRoots].join(sep === "\\" ? ";" : ":") };
     for (const version of plan.versions) {
       const label = version.id === "master" ? plan.projectId : `${plan.projectId}-variant-${version.id}`;
@@ -544,7 +597,7 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
           return { mode: "original-composition-passthrough", graded: false, applicable: false, reason: "master explicitly preserves composed source picture", source: composed, pictureSha256 };
         }
         const report = await Promise.resolve(color.grade!({ input: composed, output: graded, profile: version.profile, intensity: version.intensity, bins, auto: false,
-          verifyAt: [2, 7, 12, 18, 21, 26].filter((n) => n < plan.durationSec), defects: true, onUnfixable: "report" }));
+          verifyAt: [], defects: false, verify: false, onUnfixable: "report" }));
         await run(bins.ffmpeg, ["-v", "error", "-n", ...directMediaInput(), "-i", graded, ...directMediaInput(), "-i", composed, "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", picture], timeout);
         return { report, sourceAudioRestoredFrom: composed, pictureSha256: await standardPostFileHash(picture) };
       });
@@ -567,24 +620,11 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       const final = join(staging, `${label}.mp4`);
       const coverReceipt = await stage(`cover-assembly-${version.id}`, () => embedCoverFirstFrame({ input: burned, cover, output: final, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
       const media = await probe(final, bins, timeout), video = media.streams.find((s) => s.codec_type === "video");
-      if (Number(video?.nb_read_frames) !== Math.round(plan.durationSec * plan.fps) || rate(video!) !== plan.fps
-        || Math.abs(Number(video?.duration) - plan.durationSec) > 0.000001) fail("STANDARD_POST_TIMELINE_CHANGED", version.id);
-      await run(bins.ffmpeg, ["-v", "error", "-xerror", ...directMediaInput(), "-i", final, "-map", "0:v:0", "-map", "0:a:0", "-f", "null", "-"], timeout);
+      if (!video || Number(video.width) !== plan.width || Number(video.height) !== plan.height || Math.abs(rate(video) - plan.fps) > 0.001
+        || Math.abs(Number(video.duration ?? media.format.duration) - plan.durationSec) > Math.max(1 / plan.fps, 0.05))
+        fail("STANDARD_POST_EXPORT_SPEC_INVALID", version.id);
       const nativeAudioClock = await stage(`native-audio-clock-${version.id}`, () => assertStandardPostAudioClock(final, plan.durationSec, { ...bins, timeoutMs: timeout }));
       outputs.push({ id: version.id, path: final, sha256: await standardPostFileHash(final), bytes: (await stat(final)).size, media, cover, coverReceipt, bgm: mixReport, nativeAudioClock });
-      if (version.id !== "master") {
-        const frames = [];
-        for (const fraction of [0.2, 0.5, 0.8]) {
-          const bytes = (await run(bins.ffmpeg, ["-v", "error", "-nostdin", "-ss", String(plan.durationSec * fraction), ...directMediaInput(), "-i", final,
-            "-frames:v", "1", "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"], timeout)).stdout;
-          if (bytes.length !== 3) fail("STANDARD_POST_VARIANTS_INVALID", `${version.id}: actual style sample missing`);
-          frames.push({ r: bytes[0]!, g: bytes[1]!, b: bytes[2]! });
-        }
-        const loudness = await measureModule.measureLoudness(final, { bins });
-        if (![loudness.integratedLufs, loudness.truePeakDbtp].every(Number.isFinite))
-          fail("STANDARD_POST_VARIANTS_INVALID", `${version.id}: actual full audio measurement missing`);
-        samples.push({ variantId: version.id, frames, loudness: { lufs: loudness.integratedLufs, peakDb: loudness.truePeakDbtp } });
-      }
       if (version.id === "master") {
         const cleanWithCover = join(post, "master-clean-cover.mp4");
         await stage("clean-cover-assembly", () => embedCoverFirstFrame({ input: scored, cover, output: cleanWithCover, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
@@ -599,11 +639,8 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       }
     }
     const variantAxes = await stage("variant-axes", async () => assertStandardPostVariantAxes(settings, outputs));
-    const distinctness = await stage("variant-distinctness", async () => {
-      const report = assessVariantDistinctness(samples);
-      if (!report.approved) fail("STANDARD_POST_VARIANTS_INVALID", report.detail);
-      return { ...report, samples, basis: "Existing G-DLV1 thresholds applied to actual final frame samples and complete audio loudness measurements" };
-    });
+    const distinctness = { status: "not-reviewed", qualityReviewPerformed: false,
+      basis: "Requested style recipes, covers and consumed music are recorded by variant-axes; no source or output quality vote." };
     for (const s of frozen.values()) if ((await stat(s.path)).size !== s.source.bytes || await standardPostFileHash(s.path) !== s.source.sha256) fail("STANDARD_POST_SOURCE_CHANGED", s.source.id);
     if (await standardPostFileHash(font) !== plan.cover.fontSha256 || await standardPostFileHash(settingsFile) !== planHash) fail("STANDARD_POST_SOURCE_CHANGED", "settings or cover font changed during postproduction");
     const finalOriginal = await loadOriginalRenderManifest(manifestFile, { ...options, ...bins });
@@ -617,8 +654,8 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
     const manifest = relocate({ schemaVersion: "workloom.standard-post-delivery/v1", generatedAt: new Date().toISOString(), projectId: plan.projectId,
       mode: "original-native-standard-postproduction", planSha256: planHash, sourceCode: { ...code, currentCodeRechecked: true }, binaries,
       width: plan.width, height: plan.height, fps: plan.fps, durationSec: plan.durationSec,
-      supplierGenerationCalls: 0, modelCalls: 0, ttsCalls: 0, asrCalls: 0, sourceFilesUnchanged: true, speed: 1, frameSynthesis: false,
-      scope: "Every frozen original shot in submitted order/full duration with its same-file native audio. Only color, music, cover and subtitles were added; identity remains unverified.",
+      supplierGenerationCalls: 0, modelCalls: 0, ttsCalls: 0, asrCalls: 0, sourceFilesUnchanged: true, speed: 1, frameSynthesis: false, sourceNormalization: "fps/geometry/requested duration; absent source audio remains silent",
+      scope: "Every frozen original shot is adopted in submitted order. Actual provider media is normalized during post to the requested export. Available source audio is retained; silent sources remain silent. No identity, clothing, motion, speech or lip-sync acceptance review.",
       originalManifestSha256: original.manifestSha256, contractSha256: contract.contractSha256, originalTimeline: contract.timeline, sourceAuthority: contract.originals.map(s => s.authority),
       sourceFiles: plan.sources, originalSources: prepared, authoredSubtitles: plan.subtitles,
       subtitleAlignment: "Authored sentence timing using existing audio; no new ASR or phonetic timing proof", openingTitle: { source: "none", burned: false },

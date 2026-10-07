@@ -111,7 +111,7 @@ export async function planDirectorFilm(input:{intent:string;engine:DirectorPlann
   };
   let repairFeedback:string|null=null;
   for(let revision=0;revision<=1;revision++) {
-  const book=await call("摄影、表演与声音","{shots:[{shotId:'SC-1',role:'establishing|hero|action|detail|resolution',durationSec:4..20,dialogue:string(无对白用空串),action:string,scene:string,lighting:string,composition:string,camera:string,styling:string,audio:{dialogue:string,ambience:string,foley:string,music:'post-only'},events:[{atSec:number,kind:string}]}]}；规划5到8个共享源镜头，每镜一个明确动作，保留可剪起止余量，至少一个无人说话的细节镜；所有人声完整保留；默认只安排画外旁白，audio.dialogue明确写“画外旁白”，生成镜头人物嘴部保持自然静默，后期真实独立配音；客户原话明确要求可见口型对白时保留需求并记录需要原始分轨和口型验证。年代与商品事实不改。",
+  const book=await call("摄影、表演与声音","{shots:[{shotId:'SC-1',role:'establishing|hero|action|detail|resolution',durationSec:4..20,dialogue:string(无对白用空串),action:string,scene:string,lighting:string,composition:string,camera:string,styling:string,audio:{dialogue:string,ambience:string,foley:string,music:'post-only'},events:[{atSec:number,kind:string}]}]}；共享源镜头数量与每镜时长按内容自行规划，每镜一个明确动作，保留可剪起止余量，至少一个无人说话的细节镜；所有人声完整保留；默认使用生成素材已有的原声、对白和环境声，后期直接使用成功渲染的素材。客户明确要求后期配音时才安排独立配音并保留真实声音授权；不安排默认替声、ASR回读或口型复检。年代与商品事实不改。",
     {brief,presentation:profile.presentation,repairFeedback},validateShots);
   if(!Array.isArray(book.shots) || book.shots.length<3 || book.shots.length>12) throw new Error("DIRECTOR_MODEL_CONTRACT_INVALID: 共享镜头池数量应为3到12");
   const ids=new Set<string>();

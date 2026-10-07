@@ -165,7 +165,7 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows[0] = f.make("voice", [f.raw], [f.voiced], { ...row(f, "voice").evidence, source: "tts-narration",
       profile: "fixture-profile", voicedSha256: fingerprintFile(f.voiced) }, f.shot.shotId);
     f.rows[f.rows.findIndex((entry) => entry.stage === "compose")] = f.make("compose", [f.voiced], [f.master], {});
-    expect(failure(f.guard)).toMatch(/AUDIO_NATIVE_SOURCE_REPLACED/);
+    expect(failure(f.guard)).toMatch(/PUBLICATION_COMPOSE_SOURCE_MISMATCH/);
   });
   it("an old master with no current compose receipt cannot publish", () => {
     const f = fixture(); f.rows.splice(f.rows.findIndex((entry) => entry.stage === "compose"), 1);
@@ -180,30 +180,30 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows[f.rows.findIndex((entry) => entry.stage === "compose")] = f.make("compose", [f.voiced], [f.master], {});
     expect(failure(f.guard)).toMatch(/PUBLICATION_COMPOSE_SOURCE_MISMATCH/);
   });
-  it("the latest failed voiceover receipt blocks publication even with older voice and compose passes", () => {
+  it("historical voice quality rejection does not veto pinned originals and actual compose", () => {
     const f = fixture("voice-over");
     f.rows.push(f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a changed voiceover policy cannot reuse an old positive content receipt", () => {
+  it("obsolete voice policy metadata does not restrict adoption of pinned originals", () => {
     const f = fixture("voice-over"); row(f, "voice").evidence.audioPolicyHash = sha("another policy");
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a successful old TTS receipt cannot become a native composition source", () => {
+  it("old TTS receipt metadata cannot replace the independently pinned native composition source", () => {
     const f = fixture(); row(f, "voice").evidence.source = "tts-narration";
-    expect(failure(f.guard)).toMatch(/AUDIO_NATIVE_SOURCE_REPLACED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("the newest failed native receipt overrides the old voice pass", () => {
+  it("a later source-audio quality vote does not veto successful original bytes", () => {
     const f = fixture(); f.rows.push(f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("voice and compose passes cannot publish a clip that lacks current shot proof", () => {
+  it("issued original authority does not depend on a current quality shot row", () => {
     const f = fixture(); f.rows.splice(f.rows.findIndex((entry) => entry.stage === "shot"), 1);
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it.each([undefined, false])("unknown request input proof (%s) remains an internal candidate", (proof) => {
+  it.each([undefined, false])("historical request row (%s) does not override separate issued-original proof", (proof) => {
     const f = fixture(); row(f, "shot").evidence.requestInputVerified = proof;
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
   it("new raw bytes cannot be washed by fresh voice and compose receipts after the generation receipt", () => {
     const f = fixture(); writeFileSync(f.raw, "fixture changed raw generation bytes");
@@ -219,31 +219,31 @@ describe("actual film release entrypoints with real local byte and lineage recei
     const f = fixture(); f.context.originalPostContract.originals.length = 0;
     expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_CHANGED/);
   });
-  it("missing actual native audio cannot be washed by source/audio receipts", () => {
+  it("silent source metadata is accepted for actual post normalization", () => {
     const f = fixture(), originalProbe = f.context.probe;
     f.context.probe = file => ({ ...originalProbe(file), hasAudio: false });
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a shorter real picture clock cannot reuse the full original metadata or compose receipt", () => {
+  it("raw picture duration is normalized by official post rather than quality rejected", () => {
     const f = fixture(), originalProbe = f.context.probe;
     f.context.probe = file => ({ ...originalProbe(file), videoDurationSec: 4.99 });
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a changed original frame rate cannot reuse the native policy receipts", () => {
+  it("raw frame rate is accepted without nominal equality veto", () => {
     const f = fixture(); f.context.originalPostContract.originals[0]!.media.fps = 25;
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_BINDING_INVALID/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it.each(["spokenTextVerified", "lipSyncVerified"])("a native source check cannot certify %s", (key) => {
+  it.each(["spokenTextVerified", "lipSyncVerified"])("obsolete native quality claim %s is ignored by actual original byte authority", (key) => {
     const f = fixture(); row(f, "voice").evidence[key] = true;
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("raw SHA metadata must bind the actual current file even if other lineage remains green", () => {
+  it("old quality row hash is not the independently pinned original hash", () => {
     const f = fixture(); row(f, "shot").evidence.rawSha256 = sha("another generation artifact");
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a later rejected shot cannot hide underneath previous voice and compose passes", () => {
+  it("later wardrobe or source quality rejection does not veto pinned original adoption", () => {
     const f = fixture(); f.rows.push(f.make("shot", [], [f.raw], { ...row(f, "shot").evidence }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
   it("material release uses its current generation verification gate in the global entrypoint", () => {
     const f = fixture("voice-over"); f.context.isMaterialShot = () => true;
@@ -251,21 +251,21 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows.push(f.make("gate:material-generate:verify", [f.raw], [], {}, f.shot.shotId));
     expect(failure(f.guard)).toBe("allowed");
   });
-  it("material release cannot substitute file existence for its verification gate", () => {
+  it("issued material original has separate task authority and needs no quality verify gate", () => {
     const f = fixture("voice-over"); f.context.isMaterialShot = () => true;
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("material release respects a later rejected generation verification gate", () => {
+  it("historical material quality gate failure does not restrict pinned original byte authority", () => {
     const f = fixture("voice-over"); f.context.isMaterialShot = () => true;
     f.rows.push(f.make("gate:material-generate:verify", [f.raw], [], {}, f.shot.shotId));
     f.rows.push(f.make("gate:material-generate:verify", [f.raw], [], {}, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("current identity rejection blocks the actual release entrypoint after source, voice and compose passes", () => {
+  it("historical identity rejection is retained as data without restricting official post", () => {
     const f = fixture();
     f.context.characterReleaseReport = () => ({ releaseAllowed: false,
       issues: [{ shotId: f.shot.shotId, code: "IDENTITY_REVIEW_REJECTED" }], authorizationScope: "fixture-identity-rejection" });
-    expect(failure(f.guard)).toMatch(/CHARACTER_RELEASE_BLOCKED: GT-01:IDENTITY_REVIEW_REJECTED/);
+    expect(failure(f.guard)).toBe("allowed");
     const recorded = JSON.parse(readFileSync(join(f.context.WORK_DIR, `${f.context.PROJECT}-character-release-report.json`), "utf8"));
     expect(recorded.releaseAllowed).toBe(false);
     expect(recorded.issues).toEqual([{ shotId: f.shot.shotId, code: "IDENTITY_REVIEW_REJECTED" }]);

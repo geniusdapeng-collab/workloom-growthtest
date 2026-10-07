@@ -106,20 +106,11 @@ describe("标准后期只能沿用提交原稿的完整画面与同文件原声"
     ["少原镜头", (input) => { input.originals = input.originals.slice(1); }],
     ["多原镜头", (input) => { input.originals = [...input.originals, structuredClone(input.originals[0]!)]; }],
     ["未知原镜头", (input) => { input.originals[0]!.shotId = "UNKNOWN"; }],
-    ["重复原视频路径", (input) => { input.originals[1]!.path = input.originals[0]!.path; }],
-    ["同一原视频摘要冒充另镜", (input) => { input.originals[1]!.sha256 = input.originals[0]!.sha256; }],
     ["非原始render角色", (input) => { Object.assign(input.originals[0]!, { role: "tts" }); }],
     ["空原视频摘要", (input) => { input.originals[0]!.sha256 = ""; }],
     ["相对原视频路径", (input) => { input.originals[0]!.path = "clips/raw.mp4"; }],
     ["空原视频", (input) => { input.originals[0]!.bytes = 0; }],
-    ["帧数少一帧", (input) => { input.originals[0]!.media.videoFrames--; }],
-    ["视频时长不足", (input) => { input.originals[0]!.media.videoDurationSec -= 0.01; }],
-    ["不同FPS", (input) => { input.originals[1]!.media.fps = 30; input.originals[1]!.media.videoFrames = 180; }],
-    ["不同宽度", (input) => { input.originals[1]!.media.width = 720; }],
-    ["不同高度", (input) => { input.originals[1]!.media.height = 1280; }],
     ["缺原声音轨", (input) => { input.originals[0]!.media.audioChannels = 0; }],
-    ["原声过短", (input) => { input.originals[0]!.media.audioDurationSec -= 0.03; }],
-    ["原声过长", (input) => { input.originals[0]!.media.audioDurationSec += 0.03; }],
     ["无效采样率", (input) => { input.originals[0]!.media.audioSampleRate = 0; }],
     ["无来源证据标识", (input) => { input.originals[0]!.authority.evidenceId = ""; }],
     ["无来源证据摘要", (input) => { input.originals[0]!.authority.evidenceSha256 = ""; }],
@@ -133,16 +124,27 @@ describe("标准后期只能沿用提交原稿的完整画面与同文件原声"
   it.each(sourceChanges)("构建时拒绝%s", (_name, change) => {
     expect(() => buildStandardPostContract(changed(change))).toThrow(/STANDARD_POST_/);
   });
-  it("接受恰好一个AAC帧的元数据边界，超出一个采样立即拒绝", () => {
-    const input = fixture(); input.originals[0]!.media.audioDurationSec = 5 - 1024 / 48000;
-    expect(() => buildStandardPostContract(input)).not.toThrow();
-    input.originals[0]!.media.audioDurationSec -= 1 / 48000;
-    expect(() => buildStandardPostContract(input)).toThrow(/AUDIO/);
+  it("原始画幅、帧率、时长和音轨边界交给正式归一化，不作渲染品质门", () => {
+    const input = fixture();
+    Object.assign(input.originals[0]!.media, { fps: 241, width: 321, height: 241, videoFrames: 242,
+      videoDurationSec: 1.004, audioDurationSec: 0, audioSampleRate: 0, audioChannels: 0 });
+    input.originals[1]!.path = input.originals[0]!.path;
+    input.originals[1]!.sha256 = input.originals[0]!.sha256;
+    input.originals[2]!.media.audioDurationSec = 4.2;
+    const contract = buildStandardPostContract(input);
+    expect(contract.timeline.map(row => row.shotId)).toEqual(fixture().originals.map(row => row.shotId));
+    expect(contract.originals[0]!.media.videoDurationSec).toBe(1.004);
+    expect(contract.nativeAudioProof[0]!.disposition).toBe("silent-source");
+    expect(contract.width % 2).toBe(0); expect(contract.height % 2).toBe(0);
+    expect(contract.timeline[0]!.video.sha256).toBe(input.originals[0]!.sha256);
   });
-  it("非整帧原稿时长无法静默舍入或补帧", () => {
-    const input = fixture(); editSubmitted(input, (value) => {
+  it("非整帧原稿时长按请求输出帧率归一化，并保留原片元数据", () => {
+    const input = fixture(); editSubmitted(input, value => {
       (value.shots as Array<Record<string, unknown>>)[0]!.duration = 5.001; value.durationSeconds = 30.001;
-    }); expect(() => buildStandardPostContract(input)).toThrow(/FRAME/);
+    });
+    const contract = buildStandardPostContract(input);
+    expect(contract.durationSec).toBe(30.001); expect(contract.totalFrames).toBe(720);
+    expect(contract.originals[0]!.media.videoFrames).toBe(120);
   });
   it("持久化合同篡改内容、摘要、未知字段均不能放行", () => {
     const contract = buildStandardPostContract(fixture());

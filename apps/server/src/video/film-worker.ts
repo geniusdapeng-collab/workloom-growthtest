@@ -33,6 +33,8 @@ import {
   resolveEraProfile,
   storyDateAt,
   reviewFilmStage,
+  POST_RENDER_STAGES,
+  postProcessingVerdict,
   reviewStage as reviewCharacterVisualStage,
   resolveProducerLlm,
   buildRegisteredCharacterReleaseSource,
@@ -263,25 +265,12 @@ async function validateCharacterVideoSubmission(ctx: RunContext, frame: FilmChan
   if (!shot?.assetRef) return;
   const source = registeredCharactersFor(ctx);
   if (source.contract.status !== "passed" || source.bindings.some(binding => !binding.identityAnchor)) fail("CHARACTER_RENDER_PREFLIGHT_BLOCKED", "人物授权、服饰和登记基准图必须完整");
-  if (!resolveProducerLlm(ctx.env)) fail("CHARACTER_VISION_UNAVAILABLE", "父服务专用人物视觉评审未配置");
   const params = record(frame.params);
   if (params.firstFrame !== undefined) fail("CHARACTER_FIRST_FRAME_OVERRIDE", "登记真人素材模式不得混入另一首帧覆盖授权组");
   const generation = assessCharacterGenerationInput({ contract: source.contract, shotId: frame.shotId!,
     prompt: text(params.prompt, "人物提示词缺失", 30_000), referenceAssets: params.refs as string[] });
   if (generation.status !== "passed") fail("CHARACTER_GENERATION_INPUT_BLOCKED", generation.issues.map(issue => issue.detail).join("；"));
-  const person = source.contract.shots.find(row => row.shotId === frame.shotId)!;
-  const selected = String(ctx.job.options.only ?? "").split(",").filter(Boolean);
-  const canary = source.contract.shots.find(row => row.characterId === person.characterId && (!selected.length || selected.includes(row.shotId)))!;
-  if (canary.shotId === frame.shotId) return;
-  const evidence = ctx.identityEvidence.get(canary.shotId);
-  if (!evidence?.visualReview) fail("CHARACTER_CANARY_BLOCKED", "本人物首镜缺父服务专用身份与服饰回执");
-  const clipRef = path.relative(ctx.workDir, evidence.visualReview.request.clip.path).split(path.sep).join("/");
-  const receipt = await requireCurrentVideoSource(ctx, clipRef, canary.shotId);
-  const artifacts = [{ shotId: canary.shotId, clip: evidence.visualReview.request.clip, promptSha256: receipt.promptSha256,
-    referenceAssets: receipt.referenceInputs.filter(ref => ref.role === "reference-image").map(ref => ref.ref), evidence: [evidence] }];
-  const assessment = assessCharacterRelease({ contract: source.contract, shots: artifacts, phase: "canary",
-    canaryShotIds: [canary.shotId], canaryCharacterIds: [person.characterId] });
-  if (!assessment.continuePaidRendering) fail("CHARACTER_CANARY_BLOCKED", "每个人物首镜的专用身份与服饰证据通过后才能继续该人物渲染");
+
 }
 
 /* ================= 路径与冻结输入 ================= */
@@ -399,7 +388,7 @@ export async function startFilmJob(input: StartFilmJobInput): Promise<FilmJobSta
     .filter(shot => !selectedIds.length || selectedIds.includes(shot.shotId));
   if (selectedIds.some(id => !selectedShots.some(shot => shot.shotId === id))) fail("SHOT_REGISTRY_INVALID", "only含未登记镜号");
   try {
-    assertFilmAudioPreflight({ shots: selectedShots, unifiedNarration: normalized.options["narration-unified"] === true,
+    if (normalized.stages.some(stage => ["videos", "material-gen"].includes(stage))) assertFilmAudioPreflight({ shots: selectedShots, unifiedNarration: normalized.options["narration-unified"] === true,
       generateAudio: env.SEEDANCE_GENERATE_AUDIO !== "0" });
   } catch (error) {
     fail(typeof (error as { code?: unknown }).code === "string" ? (error as { code: string }).code : "AUDIO_SOURCE_INVALID",
@@ -418,7 +407,7 @@ export async function startFilmJob(input: StartFilmJobInput): Promise<FilmJobSta
     }
   }
   const budget = input.maxBudgetCny ?? DEFAULT_BUDGET_CNY;
-  if (!Number.isFinite(budget) || budget <= 0) fail("REQUEST_INVALID", "作业预算必须为正数");
+  if (!Number.isFinite(budget) || budget < 0 || normalized.stages.some(stage => ["videos", "material-gen", "plates"].includes(stage)) && budget === 0) fail("REQUEST_INVALID", "新生成作业预算必须为正数；本地后期可为0");
 
   const lease = await acquireProjectLease(input.scope, input.projectId);
   if (!lease) fail("FILM_PROJECT_BUSY", "该项目正在预生产、审核或另一个固定工位作业中，拒绝并发执行");
@@ -648,8 +637,7 @@ export async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRe
     await validateVideoReferences(ctx, frame);
   }
   if (frame.method === "media.fetch") await validateMediaFetchSource(ctx, frame);
-  const identityReview = frame.method === "gate.review" && record(frame.params).identityReview !== undefined
-    ? await prepareIdentityReview(ctx, frame) : undefined;
+
   const payloadHash = renderSha256(filmCanonicalJson(frame.params));
   const ledger = ctx.ledger;
   const reserved = ledger.reserveComponent({
@@ -669,7 +657,7 @@ export async function handleChannelRequest(ctx: RunContext, frame: FilmChannelRe
   });
   const component = await reserved;
   try {
-    return await abortable(ctx.signal, () => dispatchComponent(ctx, frame, component.id, identityReview));
+    return await abortable(ctx.signal, () => dispatchComponent(ctx, frame, component.id));
   } catch (error) {
     const failureClass = error instanceof SubmissionError ? error.code.split(":")[0]! : "UNEXPECTED";
     await ledger.recordComponentFailure(component.id, ctx.ownerToken, {
@@ -767,17 +755,18 @@ function reserveFor(frame: FilmChannelRequestFrame): number {
     const seconds = Number(params.seconds ?? 5);
     return Math.max(0.5, seconds * VIDEO_RESERVE_CNY_PER_SECOND);
   }
+  if (frame.method === "gate.review" && POST_RENDER_STAGES.has(String(record(frame.params).stage) as ProducerGateOptions["stage"])) return 0;
   if (frame.method === "llm.chat" || frame.method === "gate.review") return LLM_RESERVE_CNY;
   return 0;
 }
 
-async function dispatchComponent(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string, identityReview?: PreparedIdentityReview): Promise<unknown> {
+async function dispatchComponent(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
   switch (frame.method) {
     case "llm.chat": return runLlm(ctx, frame, componentId);
     case "image.generate": return runImage(ctx, frame, componentId);
     case "media.fetch": return runMediaFetch(ctx, frame, componentId);
     case "video.generate": return runVideo(ctx, frame, componentId);
-    case "gate.review": return runGateReview(ctx, frame, componentId, identityReview);
+    case "gate.review": return runGateReview(ctx, frame, componentId);
     case "voice.dub": return runVoiceDub(ctx, frame, componentId);
     case "voice.verify": return runVoiceVerify(ctx, frame, componentId);
     default: return fail("METHOD_NOT_ALLOWED", `通道方法未实现：${String(frame.method)}`);
@@ -1106,12 +1095,6 @@ async function runVideo(ctx: RunContext, frame: FilmChannelRequestFrame, compone
   return { ...written, taskId: submitted.taskId, hostedUrl: last.uri, provider: "seedance", providerModel: model, submissionReceipt };
 }
 
-interface PreparedIdentityReview {
-  request: CharacterIdentityReviewRequest;
-  clipRef: string;
-  contracts: ReturnType<typeof filmReviewContracts>;
-}
-
 async function reviewMediaTool(ctx: RunContext, kind: "ffmpeg" | "ffprobe", args: string[], timeout = 30_000): Promise<string> {
   const executable = kind === "ffmpeg" ? ctx.env.WL_FFMPEG ?? ctx.env.FFMPEG_PATH ?? "ffmpeg"
     : ctx.env.WL_FFPROBE ?? ctx.env.FFPROBE_PATH ?? "ffprobe";
@@ -1123,88 +1106,7 @@ async function reviewMediaTool(ctx: RunContext, kind: "ffmpeg" | "ffprobe", args
   });
 }
 
-/** Reconstruct from registered sources and actual current provider bytes before reserving model budget. */
-async function prepareIdentityReview(ctx: RunContext, frame: FilmChannelRequestFrame): Promise<PreparedIdentityReview> {
-  const params = record(frame.params);
-  const identity = record(params.identityReview);
-  const context = record(params.context);
-  if (params.stage !== "shot" || !frame.shotId || identity.purpose !== "identity-and-explicit-wardrobe"
-    || context.purpose !== "identity-and-explicit-wardrobe") fail("IDENTITY_REVIEW_SCOPE_INVALID", "专用人物评审用途或镜号非法");
-  if (!resolveProducerLlm(ctx.env)) fail("CHARACTER_VISION_UNAVAILABLE", "专用人物视觉模型不可用");
-  const source = registeredCharactersFor(ctx);
-  if (source.contract.status !== "passed") fail("CHARACTER_RENDER_PREFLIGHT_BLOCKED", "当前登记人物合同无效");
-  const clipRef = text(identity.clipRef, "专用评审缺视频引用", 1_000);
-  const clipPath = await resolveWithin(ctx.workDir, clipRef);
-  const receipt = await requireCurrentVideoSource(ctx, clipRef, frame.shotId);
-  // The actual prompt lock was checked at submission; here the private receipt, not child prose, owns its digest.
-  if (receipt.referenceInputs.filter(ref => ref.role === "reference-image").map(ref => ref.ref).join("\n")
-    !== source.contract.shots.find(shot => shot.shotId === frame.shotId)?.referenceAssets.join("\n"))
-    fail("IDENTITY_SOURCE_UNBOUND", "供应商受理引用没有绑定当前人物授权组");
-  if (!Array.isArray(identity.frames) || identity.frames.length !== 2) fail("IDENTITY_FRAMES_INVALID", "专用人物评审需要两个父服务可重建的时间帧");
-  let duration: number;
-  try {
-    const probe = JSON.parse(await reviewMediaTool(ctx, "ffprobe", ["-v", "error", "-show_entries", "format=duration", "-of", "json", clipPath]));
-    duration = Number(probe.format?.duration);
-  } catch (error) {
-    if (error instanceof SubmissionError) throw error;
-    fail("IDENTITY_MEDIA_UNVERIFIED", "父服务视频时长探测结果无效");
-  }
-  if (!Number.isFinite(duration!) || duration! <= 0) fail("IDENTITY_MEDIA_UNVERIFIED", "父服务视频时长无效");
-  const expectedTimes = [duration! * 0.2, duration! * 0.75];
-  const dir = await mkdtemp(path.join(tmpdir(), "film-parent-identity-"));
-  const frames: CharacterIdentityReviewRequest["frames"] = [];
-  try {
-    for (const [index, raw] of identity.frames.entries()) {
-      const input = record(raw);
-      const ref = text(input.ref, "专用评审帧引用非法", 1_000);
-      if (input.atSec !== expectedTimes[index]) fail("IDENTITY_FRAMES_INVALID", "抽帧时间没有绑定当前视频独立时长");
-      const currentBytes = await readJobBytes(ctx, ref);
-      const output = path.join(dir, `sample-${index}.jpg`);
-      await reviewMediaTool(ctx, "ffmpeg", ["-v", "error", "-y", "-ss", String(expectedTimes[index]), "-i", clipPath,
-        "-frames:v", "1", "-vf", "scale=720:-2", output]);
-      const rebuilt = await readFile(output);
-      const sha256 = sha256Bytes(rebuilt);
-      if (input.sha256 !== sha256 || sha256Bytes(currentBytes) !== sha256) fail("IDENTITY_FRAME_SOURCE_MISMATCH", "送审帧与父服务从当前视频独立重建的字节不一致");
-      frames.push({ path: await resolveWithin(ctx.workDir, ref), sha256, atSec: expectedTimes[index]! });
-    }
-  } finally {
-    await rm(dir, { recursive: true, force: true }).catch(error => ctx.log(`父服务临时抽帧清理失败：${error instanceof Error ? error.message : String(error)}`));
-  }
-  const contracts = filmReviewContracts(ctx.contractSource, frame.shotId);
-  const request = buildCharacterIdentityReviewRequest({ contract: source.contract, shotId: frame.shotId,
-    clip: { path: clipPath, sha256: sha256Bytes(await readJobBytes(ctx, clipRef, MEDIA_FETCH_LIMIT_BYTES)) }, promptSha256: receipt.promptSha256, frames,
-    producerContractHash: buildProducerReviewContract(contracts).contractHash });
-  const referenceBytes = await readJobBytes(ctx, text(identity.referenceRef, "缺基准图作业内引用", 1_000));
-  if (sha256Bytes(referenceBytes) !== request.referenceImage.sha256) fail("IDENTITY_REFERENCE_MISMATCH", "子进程基准图副本与父服务登记原图不同");
-  if (identity.requestHash !== request.requestHash || filmCanonicalJson(identity.request) !== filmCanonicalJson(request))
-    fail("IDENTITY_REQUEST_MISMATCH", "子进程人物请求与父服务登记源、当前视频及实际帧重建结果不一致");
-  return { request, contracts, clipRef };
-}
-
-async function runIdentityReview(ctx: RunContext, componentId: string, prepared: PreparedIdentityReview): Promise<unknown> {
-  const { request, contracts } = prepared;
-  await ctx.ledger.recordDispatch(componentId, ctx.ownerToken, "workloom.producer-gate", "identity-and-explicit-wardrobe");
-  const verdict = await reviewCharacterVisualStage({ stage: "shot", projectId: ctx.job.project_id, contracts,
-    rubric: request.rubric, artifacts: [{ path: request.clip.path, kind: "video" }, ...request.frames.map(frame => ({ path: frame.path, kind: "image" as const }))],
-    referenceImages: [request.referenceImage.path], deterministic: [{ id: "identity-source-current", pass: true, hard: true, detail: request.requestHash }],
-    context: { ...request.context, shotId: request.shotId, identityRequestHash: request.requestHash, filmJobId: ctx.job.id },
-    env: ctx.env, batchSize: 12, allowFallbackApprove: false, log: ctx.log });
-  await requireCurrentVideoSource(ctx, prepared.clipRef, request.shotId);
-  registeredCharactersFor(ctx);
-  for (const input of [...request.frames, request.referenceImage]) {
-    if (sha256Bytes(await readFile(input.path)) !== input.sha256) fail("IDENTITY_SOURCE_CHANGED", "专用视觉评审期间帧或登记基准发生变化");
-  }
-  const identityEvidence = adaptCharacterVisualVerdict({ request, verdict });
-  await ctx.ledger.recordComponentAccepted(componentId, ctx.ownerToken, { provider: "workloom.producer-gate",
-    providerModel: verdict.model ?? "identity-and-explicit-wardrobe", actualCny: null,
-    evidence: { artifactSha256: sha256Bytes(filmCanonicalJson(identityEvidence)), identityEvidence,
-      reviewPolicy: "dedicated-identity", originalOpinion: { approved: verdict.approved, status: verdict.status, reason: verdict.reason } } });
-  ctx.identityEvidence.set(request.shotId, identityEvidence);
-  return { identityEvidence };
-}
-
-async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string, identityReview?: PreparedIdentityReview): Promise<unknown> {
-  if (identityReview) return runIdentityReview(ctx, componentId, identityReview);
+async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
   const params = record(frame.params);
   const stage = text(params.stage, "gate.review 需要 stage", 64);
   const artifacts = Array.isArray(params.artifacts) ? params.artifacts : [];
@@ -1235,16 +1137,17 @@ async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, co
       detail: typeof check.detail === "string" ? check.detail.slice(0, 800) : "",
     };
   });
-  const requiredCheckIds = Array.isArray(params.requiredCheckIds)
+  const post = POST_RENDER_STAGES.has(stage as ProducerGateOptions["stage"]);
+  const requiredCheckIds = !post && Array.isArray(params.requiredCheckIds)
     ? params.requiredCheckIds.slice(0, 40).map((id) => text(id, "requiredCheckIds 非法", 120))
     : undefined;
-  const rubric = Array.isArray(params.rubric) ? params.rubric.slice(0, 24).map((line) => text(line, "rubric 非法", 800)) : undefined;
-  const minScore = params.minScore === undefined ? undefined : Number(params.minScore);
+  const rubric = !post && Array.isArray(params.rubric) ? params.rubric.slice(0, 24).map((line) => text(line, "rubric 非法", 800)) : undefined;
+  const minScore = post || params.minScore === undefined ? undefined : Number(params.minScore);
   if (minScore !== undefined && (!Number.isFinite(minScore) || minScore < 0 || minScore > 100)) fail("REQUEST_INVALID", "minScore 非法");
   const context = params.context === undefined ? {} : record(params.context);
   if ((context.shotId ?? null) !== frame.shotId) fail("REVIEW_SCOPE_INVALID", "评审镜号必须与请求作用域一致");
   const referenceImages = [];
-  for (const ref of Array.isArray(params.referenceImages) ? params.referenceImages.slice(0, 4) : []) {
+  for (const ref of !post && Array.isArray(params.referenceImages) ? params.referenceImages.slice(0, 4) : []) {
     const file = await resolveWithin(ctx.workDir, text(ref, "评审参考图引用非法", 1_000));
     if (!within(ctx.workDir, await realpath(file))) fail("PATH_INVALID", "评审参考图越出作业目录");
     referenceImages.push(file);
@@ -1263,7 +1166,7 @@ async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, co
     env: ctx.env,
   };
   const policy = ctx.job.options["review-policy"] ?? "off";
-  const verdict = await reviewFilmStage(ctx.contractSource, options, policy === "off" ? async (reviewOptions): Promise<ProducerVerdict> => {
+  const verdict = POST_RENDER_STAGES.has(options.stage) ? postProcessingVerdict(options) : await reviewFilmStage(ctx.contractSource, options, policy === "off" ? async (reviewOptions): Promise<ProducerVerdict> => {
     const contractHash = buildProducerReviewContract(filmReviewContracts(ctx.contractSource, frame.shotId ?? undefined)).contractHash;
     const hardFailures = reviewOptions.deterministic.filter((check) => check.hard && (check.pass !== true || check.status === "unverified" || check.status === "failed"))
       .map((check) => `${check.id}：${check.detail}`);

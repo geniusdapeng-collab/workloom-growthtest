@@ -31,7 +31,7 @@ export interface StandardPostNativeAudioProof {
   readonly shotId: string; readonly sourceDurationSec: number; readonly videoDurationSec: number;
   /** Metadata duration difference; neither a decoded sample count nor speech certification. */
   readonly deltaSec: number; readonly maximumBoundarySec: number;
-  readonly disposition: "exact" | "preserve-presented-native-clock";
+  readonly disposition: "exact" | "preserve-presented-native-clock" | "normalize-presented-native-clock" | "silent-source";
   readonly certification: "duration-only-no-speech-certification";
 }
 export interface StandardPostContract {
@@ -110,45 +110,51 @@ export function buildStandardPostContract(input: StandardPostBuildInput): Standa
   if (!positive(source.durationSeconds) || !Number.isFinite(durationSec) || !near(durationSec, source.durationSeconds, 1e-9)) fail("SUBMITTED_INVALID", "document durationSeconds differs from original shot durations");
   const supplied = denseArray(top.originals, "SOURCE_INVALID", "originals");
   if (supplied.length !== shots.length) fail("SOURCE_INVALID", "every submitted shot requires exactly one original");
-  const originalsById = new Map<string, StandardPostOriginal>(); const paths = new Set<string>(); const digests = new Set<string>();
+  const originalsById = new Map<string, StandardPostOriginal>();
   for (const value of supplied) {
     const original = shape(value, ["shotId", "role", "path", "sha256", "bytes", "media", "authority"], "SOURCE_INVALID", "original");
     if (!text(original.shotId) || !seenShots.has(original.shotId) || originalsById.has(original.shotId)
       || original.role !== "original-render" || !text(original.path) || !isAbsolute(original.path) || normalize(original.path) !== original.path
-      || !hash(original.sha256) || !integer(original.bytes) || paths.has(original.path) || digests.has(original.sha256)) fail("SOURCE_INVALID", "unknown/duplicate shot, non-original role or invalid/duplicate fingerprint");
+      || !hash(original.sha256) || !integer(original.bytes)) fail("SOURCE_INVALID", "unknown/duplicate shot, non-original role or invalid fingerprint");
     const media = shape(original.media, ["fps", "width", "height", "videoFrames", "videoDurationSec", "audioDurationSec", "audioSampleRate", "audioChannels"], "MEDIA_INVALID", "original.media");
-    if (!positive(media.fps) || media.fps > 240 || !integer(media.width) || !integer(media.height)
+    if (!positive(media.fps) || !integer(media.width) || !integer(media.height)
       || !integer(media.videoFrames) || !positive(media.videoDurationSec)) fail("MEDIA_INVALID", "invalid video measurements");
-    if (!positive(media.audioDurationSec) || !integer(media.audioSampleRate) || media.audioSampleRate > 384000
-      || !integer(media.audioChannels) || media.audioChannels > 32) fail("AUDIO_INVALID", "native audio measurements missing or invalid");
+    const silent = media.audioDurationSec === 0 && media.audioSampleRate === 0 && media.audioChannels === 0;
+    if (!silent && (!positive(media.audioDurationSec) || !integer(media.audioSampleRate) || media.audioSampleRate > 384000
+      || !integer(media.audioChannels) || media.audioChannels > 32)) fail("AUDIO_INVALID", "invalid available audio metadata");
     const authority = shape(original.authority, ["kind", "evidenceId", "evidenceSha256"], "SOURCE_INVALID", "original.authority");
     if (!text(authority.kind) || !text(authority.evidenceId) || !hash(authority.evidenceSha256)) fail("SOURCE_INVALID", "source authority evidence is missing");
-    paths.add(original.path); digests.add(original.sha256);
     originalsById.set(original.shotId, structuredClone(original) as unknown as StandardPostOriginal);
   }
   const originals = shots.map((shot) => originalsById.get(shot.shotId)!);
   const first = originals[0]!.media; const timeline: StandardPostTimelineEntry[] = []; const nativeAudioProof: StandardPostNativeAudioProof[] = [];
+  // These are the requested export settings. Provider originals keep their actual
+  // clock and geometry; postproduction performs the necessary normalization.
+  const fps = positive(source.fps) && source.fps <= 240 ? source.fps : 24;
+  const ratios: Record<string, [number, number]> = { "9:16": [9, 16], "16:9": [16, 9], "1:1": [1, 1], "4:5": [4, 5] };
+  const ratio = ratios[String(source.aspect ?? "")];
+  const edge = Number(String(source.resolution ?? "").replace(/p$/, ""));
+  const even = (value: number): number => Math.max(2, Math.round(value / 2) * 2);
+  const width = even(ratio && [720, 1080, 2160].includes(edge) ? edge * ratio[0] / Math.min(...ratio) : first.width);
+  const height = even(ratio && [720, 1080, 2160].includes(edge) ? edge * ratio[1] / Math.min(...ratio) : first.height);
   let totalFrames = 0;
   for (const [index, shot] of shots.entries()) {
     const original = originals[index]!; const media = original.media;
-    if (media.fps !== first.fps || media.width !== first.width || media.height !== first.height) fail("MEDIA_INVALID", "original fps and dimensions must agree; no silent retiming or resizing");
-    const expectedFrames = shot.durationSec * media.fps;
-    if (!Number.isSafeInteger(Math.round(expectedFrames)) || !near(expectedFrames, Math.round(expectedFrames), 1e-8)
-      || media.videoFrames !== Math.round(expectedFrames)) fail("FRAME_INVALID", `${shot.shotId} must preserve the exact full submitted frame range`);
-    if (!near(media.videoDurationSec, shot.durationSec, 1e-6)) fail("MEDIA_INVALID", `${shot.shotId} original video duration differs from the submitted full range`);
-    const deltaSec = media.audioDurationSec - media.videoDurationSec; const maximumBoundarySec = 1024 / media.audioSampleRate;
-    if (Math.abs(deltaSec) > maximumBoundarySec + 1e-9) fail("AUDIO_INVALID", `${shot.shotId} native audio duration exceeds a single AAC frame metadata boundary`);
-    totalFrames += media.videoFrames;
+    const expectedFrames = Math.round(shot.durationSec * fps);
+    if (!Number.isSafeInteger(expectedFrames) || expectedFrames < 1) fail("FRAME_INVALID", `${shot.shotId} requested export range is invalid`);
+    const deltaSec = media.audioDurationSec - media.videoDurationSec; const maximumBoundarySec = media.audioSampleRate > 0 ? 1024 / media.audioSampleRate : 0;
+    totalFrames += expectedFrames;
     if (!Number.isSafeInteger(totalFrames)) fail("FRAME_INVALID", "total frame count exceeds the exact integer range");
     const sourceFingerprint = { path: original.path, sha256: original.sha256, bytes: original.bytes, inSec: 0 };
     timeline.push({ shotId: shot.shotId, video: { ...sourceFingerprint }, audio: { ...sourceFingerprint }, durationSec: shot.durationSec, speed: 1 });
     nativeAudioProof.push({ shotId: shot.shotId, sourceDurationSec: media.audioDurationSec, videoDurationSec: media.videoDurationSec,
-      deltaSec, maximumBoundarySec, disposition: deltaSec === 0 ? "exact" : "preserve-presented-native-clock",
+      deltaSec, maximumBoundarySec, disposition: media.audioChannels === 0 ? "silent-source"
+        : deltaSec === 0 ? "exact" : Math.abs(deltaSec) <= maximumBoundarySec ? "preserve-presented-native-clock" : "normalize-presented-native-clock",
       certification: "duration-only-no-speech-certification" });
   }
   const body = { schemaVersion: STANDARD_POST_SCHEMA, mode: "standard-native" as const, projectId: top.projectId,
     submitted: structuredClone(submitted) as unknown as StandardPostSubmitted, originals, timeline,
-    fps: first.fps, width: first.width, height: first.height, totalFrames, durationSec, nativeAudioProof };
+    fps, width, height, totalFrames, durationSec, nativeAudioProof };
   return freeze({ ...body, contractSha256: productionHash(body) });
 }
 
