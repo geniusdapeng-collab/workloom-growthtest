@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2451,
+  "revision": 2454,
   "tasks": {
     "98": {
       "number": 98,
@@ -3982,7 +3982,7 @@
     },
     "131": {
       "number": 131,
-      "status": "parked",
+      "status": "waiting_ci",
       "firstSeen": 1791351760990,
       "attempts": {},
       "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
@@ -3996,7 +3996,152 @@
         ],
         "releases": []
       },
-      "developerReview": null,
+      "developerReview": {
+        "schemaVersion": 1,
+        "provider": "codex",
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 131,
+        "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+        "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+        "policyHash": "2dd9d8d7996d6d3cbd5220bf94435364b6cef0a159c8ad49738332682a5bb974",
+        "reviewedFiles": [
+          ".cnb.yml",
+          ".workloom-runtime-deps/metadata.json",
+          "docs/capabilities.auto.json",
+          "docs/video-generation-idempotency.md",
+          "package.json",
+          "scripts/acceptance/lib/live/budget-tail.test.mjs",
+          "scripts/acceptance/lib/live/budget.mjs",
+          "scripts/acceptance/lib/live/cli-fixtures.mjs",
+          "scripts/acceptance/lib/live/live-budget-scope.mjs",
+          "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+          "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+          "scripts/acceptance/lib/live/providers-http.test.mjs",
+          "scripts/acceptance/lib/live/providers.mjs",
+          "scripts/acceptance/live.mjs"
+        ],
+        "filesHash": "00eaae93fec954c3d0174b2dd9c00fdfa5b6ef860e1939e6c2d616b3fdfe70e1",
+        "dependsOn": [
+          129
+        ],
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "rationale": "完整精读普通文件与旧账本身份装载：单一可核实runId接续，混合/缺失身份、链接、环境不一致和缺换行均失败关闭，wx创建防重身份；没有删除原账本或增加额度。 当前文件 scripts/acceptance/lib/live/live-budget-scope.mjs；当前 source/main 比较摘要 058e0238f1bbe96d1cc6e055cce6c26025ff44b4820a132b14d9bb25cfa6a256"
+          },
+          {
+            "id": "CI-002",
+            "rationale": "修改前555行及其依赖完整读到末尾，当前3行补充及独立558行A核对。既有固定Playwright在治理测试前安装Chromium，显式浏览器路径传递合成CLI；既有七门、准确source/main核验和后续媒体测试保持，不能以缺解码器跳过成功回执断言。 当前文件 .cnb.yml；当前 source/main 比较摘要 0904fbe62ee7c6ef583a8ebf80bed1d1d6d479547858a922ac51a1e0393dec8d"
+          },
+          {
+            "id": "CI-003",
+            "rationale": "新增本地夹具断言重启同身份、原结算字节、同键settled、新任务额度禁止、单历史身份接续及坏JSON/环境/链接停止；不以测试夹具伪造生产验收。 当前文件 scripts/acceptance/lib/live/live-budget-scope.test.mjs；当前 source/main 比较摘要 1a8b8d95bf93fffc730d95f48c07f7bda1651df345ccd1874f46bcb3b33de7c5"
+          },
+          {
+            "id": "CI-004",
+            "rationale": "完整精读隔离仓闭包与child环境：将真实提交helper/预算scope复制至合成仓；只共享当前已安装Playwright模块解析路径，不复制供应商密钥，子进程明确no-auto-keys/no-keys-from-client，synthetic标记维持。 当前文件 scripts/acceptance/lib/live/cli-fixtures.mjs；当前 source/main 比较摘要 21a52d028c575334a0400091916dd409ba275f676590dc7d86ca39cc97237b52"
+          },
+          {
+            "id": "CI-005",
+            "rationale": "完整精读gen-http和受理helper调用链：Task/model/endpoint绑定普通文件scope，图片逐轮原响应与视频原ID持久化；resumeOnly在传输前拒绝新增POST，unknown用量不变成0，submittedCalls不借用called或恢复响应计费；无跨供应商付费回退。 当前文件 scripts/acceptance/lib/live/providers.mjs；当前 source/main 比较摘要 2c3fbc7b4273577ffaa79311eec16f9027f629dbeea6ee9fcf6d29fdd76372c0"
+          },
+          {
+            "id": "CI-006",
+            "rationale": "实际完整CLI跨进程+loopbackHTTP，增加同预算重跑零POST、unknown不重发、可解码合成image/video成功后撤key保留首文件与结算、任务不可用/孤文件保护及坏尾首POST=0；移除易变redaction文字断言仍逐字节验证真实秘密不存在，没有弱化failed/blocked计量断言。 当前文件 scripts/acceptance/lib/live/live-cli-wire.test.mjs；当前 source/main 比较摘要 440cec1b7f3bff9531a3478c2edb3c03ce1951b796147f945cbacc889c0b3220"
+          },
+          {
+            "id": "CI-007",
+            "rationale": "根文件114行修改前后完整读取，治理命令增加7个尾部与3个累计身份测试；依赖字段及版本不变，运行依赖合成/完整锁校验保持，唯一package输入SHA同步为当前源码。 当前文件 package.json；当前 source/main 比较摘要 6e6200b52b93e8448c27b88e3ea93abc3109ddf19eddbba26837cce975522ddf"
+          },
+          {
+            "id": "CI-008",
+            "rationale": "完整精读累计预算锁/回放/预占/结算：非空末行缺换行先停止；reserve与commit锁内均在非法参数deny追加前replay，正常完整账本仍记录拒绝，金额及图/视频/token硬上限未放宽。 当前文件 scripts/acceptance/lib/live/budget.mjs；当前 source/main 比较摘要 6e8715d481d98812b032c0120e12af558e20b5562d3d63261489c8fa2ec96c91"
+          },
+          {
+            "id": "CI-009",
+            "rationale": "既有timeout/HTTP/usage/model身份反例继续保持，引入普通临时受理目录；补充原视频ID GET/no第2POST、缺目录或改变输入0POST及部分图片未知第二轮不重发；明确loopback与synthetic凭据。 当前文件 scripts/acceptance/lib/live/providers-http.test.mjs；当前 source/main 比较摘要 90a148a22790e3fe05ca42e5d3b828379a462b43aa07d5eadc5e812061c60e23"
+          },
+          {
+            "id": "CI-010",
+            "rationale": "完整精读runTask与输出循环：稳定budget-run身份独立于观察RUN_ID；已结算任务先停止，未结算只读接续；任何早退与孤立首次receipt/transcript均写新UUID文件，wx不覆盖历史；called与submittedCalls分开，无mock冒充生产。 当前文件 scripts/acceptance/live.mjs；当前 source/main 比较摘要 98828a84314db50a50529393a86d9380a44b24ae94102670c67895ecf43056ce"
+          },
+          {
+            "id": "CI-011",
+            "rationale": "新增7个本地账本测试覆盖身份创建、重新打开、活跃writer零放行、正常累计预算对照、非法reserve/commit旧尾不得追加与正常拒绝对照；旧实现4失败1通过及补充旧5c两失败1通过负对照保留，不使用真实供应商。 当前文件 scripts/acceptance/lib/live/budget-tail.test.mjs；当前 source/main 比较摘要 c9ff7fe63d8329f955629e744134d531f19f5609e9f7dffa37a3f396d14913c6"
+          },
+          {
+            "id": "CI-012",
+            "rationale": "修改前555行及其依赖完整读到末尾，当前3行补充及独立558行A核对。既有固定Playwright在治理测试前安装Chromium，显式浏览器路径传递合成CLI；既有七门、准确source/main核验和后续媒体测试保持，不能以缺解码器跳过成功回执断言。 当前文件 .cnb.yml；当前 source/main 比较摘要 ede1170e3742662d81904b510284880b320b0dfae38fde70dca3b7af03216cc8"
+          }
+        ],
+        "ciPolicyChangesHash": "3ee4921f6d8cf6b7f8fbeaafb5937d2d0cb56af6e23c508df3b7e95da5b701d1",
+        "tests": [
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:54:34.127212+00:00",
+            "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (360.083333ms)\n✔ temporary ancestor names containing S2 cannot turn two distinct original fixtures into duplicate media (209.054459ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (5.888416ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (35.015125ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (322.5045ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (187.775375ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (257.570292ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (234.478167ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.549583ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (117.446041ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (97.596958ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (138.819542ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (111.778958ms)\n✔ current GET timestamp change reuses the exact first original receipt and seal without rewriting evidence (123.175ms)\n✔ legacy v1 GET timestamp change reuses the exact first original receipt and seal without rewriting evidence (120.073583ms)\n✔ a changed accepted task, request, state, source or extra fact cannot reuse a first issuance (113.763708ms)\n✔ missing actual accepted input proof refuses original issuance (98.320458ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (147.72225ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (268.432959ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (200.263542ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (265.583917ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (296.708375ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (247.577833ms)\n✔ media executable resolver permits only current local executables (1.848375ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.393958ms)\nℹ tests 25\nℹ suites 0\nℹ pass 25\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4106.294292\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-rendered-material-use.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/native-source-131-runtime-final-video-vitest.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:55:09.658266+00:00",
+            "result": "{\"numTotalTests\": 1672, \"numPassedTests\": 1671, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:scripts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:56:15.319108+00:00",
+            "result": "安全换入运行时载荷…\n01:55:39 正在校验并安全换入运行时载荷…\n01:55:39 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-wzABOJ/resources）==\n01:55:39 正在检查本机版本与安装载荷…\n01:55:39 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-AtdGt4/resources）==\n01:55:39 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (42.528541ms)\n✔ 真实首日引导退出的渲染冒烟 (45.077792ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (4.3055ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (5.719541ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (1.137292ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (6.123417ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (5.074209ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.886208ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.857292ms)\n✔ 产品截图采用捕获时的可见场景 (25.403791ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (41.470334ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.427833ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (2.013ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.221542ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (6.865ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (31.011666ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (44.078417ms)\n  ✔ 首装暂存失败不会留下半套运行时 (6.216542ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (1.118667ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.202417ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.725125ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (1.013042ms)\n✔ 桌面载荷原子装配 (137.76425ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.155166ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (0.986458ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.185625ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (0.549ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (2.79475ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (7.833042ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (12.661709ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (3.957458ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (32.19175ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (4.827583ms)\n✔ 桌面本机渲染子进程的 Node 路径 (41.397834ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (2.544875ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (1.172125ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (1.127584ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.230959ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (0.808333ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.733958ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.261625ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.233709ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.370041ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (7.657375ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (1.619125ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (0.685166ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.141625ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.173ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (2.69425ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (24.917459ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (1.78825ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (2.745417ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (2.11775ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (4.234625ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (4.729292ms)\n✔ native smoke captures the actual product region for its pixel verdict (3.008584ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (5.729167ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (3.054292ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (7.095833ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (6.271541ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (6.845417ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (5.053291ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (5.495625ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (2.986458ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (5.207625ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (4.185833ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (166.743542ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (12.216792ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (3.269208ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (8.647834ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (6.6045ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (6.616625ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (1.768333ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (9.001625ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (6.598583ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (7.599791ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (1.799ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (1.435625ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (1.556917ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-WIJ4es/pgdata\",\"port\":55432,\"hbaFile\":\"/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-WIJ4es/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (1.142625ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.104167ms)\n✔ 客户端投影路径围栏 (2.038584ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (3.825042ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (1.723334ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (1.721ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (1.000334ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (0.96375ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (0.943ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (0.632875ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (0.693708ms)\n  ✔ 实例报告端口不符时失败且零写入 (0.343375ms)\n✔ 桌面数据库安全引导 (12.117583ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (2.394ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (16.996416ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (9.858958ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (4.299708ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (6.051916ms)\n✔ 包目录创建顺序不影响依赖清单输出 (6.070583ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (166.657458ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (41.270625ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (1.81325ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (5.298375ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (3.417334ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (9.893167ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (6.171834ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (104.934708ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (1.088083ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (64.639084ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.30475ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (109.416833ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (28.690791ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (8.156291ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (1.726083ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (2.064708ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (2.874709ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.22375ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (0.689583ms)\n✔ normal physical source copy records canonical source and generated contract bytes (201.47175ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (70.645417ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (69.481292ms)\n✔ existing derived-output symlink cannot replace an external file (53.052541ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (70.3035ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (50.343291ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (55.368084ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (35.512167ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (95.6455ms)\n✔ payload cannot be created inside a selected source tree (84.739125ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (101.491875ms)\n✔ canonical output aliases cannot overwrite the checkout (57.958125ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (110.52575ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (579.757958ms)\n✔ 检测到非演示工作区时拒绝删除 (1043.190375ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (6795.54475ms)\n✔ 未知参数 fail closed (4.465042ms)\n✔ 备份失败时禁止删除和后续迁移种子 (2906.61975ms)\n✔ 空备份不能证明可恢复，禁止删除 (2564.970083ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (7975.749167ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (9131.994416ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (1284.717708ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (1175.566125ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (2366.943458ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.6595ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.290167ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (18.527625ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (0.401417ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (4.414958ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (0.841916ms)\nℹ tests 161\nℹ suites 11\nℹ pass 161\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 36152.663041\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:56:15.724798+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project apps/server/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:56:16.915946+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:56:16.974169+00:00",
+            "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:56:17.141793+00:00",
+            "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+          },
+          {
+            "command": "git diff --check e19c9325459a6df5e14914e8906c1ecce75d6af8...69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:56:17.204459+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/acceptance/lib/live/audit.test.mjs scripts/acceptance/lib/live/budget-tail.test.mjs scripts/acceptance/lib/live/budget.test.mjs scripts/acceptance/lib/live/dsh-process.test.mjs scripts/acceptance/lib/live/live-budget-scope.test.mjs scripts/acceptance/lib/live/live-cli-browser.test.mjs scripts/acceptance/lib/live/live-cli-wire.test.mjs scripts/acceptance/lib/live/live-cli.test.mjs scripts/acceptance/lib/live/live-truth.test.mjs scripts/acceptance/lib/live/media-decoder.test.mjs scripts/acceptance/lib/live/media-negative.test.mjs scripts/acceptance/lib/live/product.test.mjs scripts/acceptance/lib/live/providers-http.test.mjs scripts/acceptance/lib/live/providers.test.mjs scripts/acceptance/lib/live/usage.test.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:55:19.062636+00:00",
+            "result": "ops every later modality before HTTP (8285.5885ms)\n✔ live CLI media budget: video-download-http retains unmeasured reservations and stops every later modality before HTTP (8316.637458ms)\n✔ live CLI media budget: known supplier image usage is retained even if delivery fails, and does not invent a global usage freeze (337.180416ms)\n✔ live CLI duplicate spend: re-running a settled task never POSTs or alters its original receipt/settlement (498.102833ms)\n✔ live CLI duplicate spend: a frozen unknown POST outcome remains unknown on rerun, without another HTTP POST (538.166ms)\n✔ live CLI receipt history: image success survives a later missing-credential early return (1884.937625ms)\n✔ live CLI receipt history: video success survives a later missing-credential early return (13057.167459ms)\n✔ live CLI receipt history: an unavailable requested task cannot overwrite its earlier failure (442.496542ms)\n✔ live CLI receipt history: a lone original receipts file is retained (437.44325ms)\n✔ live CLI receipt history: a lone original transcripts file is retained (452.536166ms)\n✔ live CLI budget tail: missing final newline stops before the first actual provider POST (160.85975ms)\n✔ live CLI fixture: child resolves installed source Playwright without inherited NODE_PATH and retains explicit module paths (1101.49775ms)\n✔ live CLI: missing credentials exits unverified, captures real run evidence and does not consume quota (371.670875ms)\n✔ live CLI: disabled live configuration and empty task selection cannot become a zero-task pass (538.351416ms)\n✔ live CLI: production dispatch requires explicit writes, fixture and residual disclosure before login (430.2485ms)\n✔ live CLI: duplicate IDs, traversal and missing values fail before model admission (380.6135ms)\n✔ live CLI: an existing run lock prevents parallel evidence replacement and paid admission (160.92425ms)\n✔ G02 / N5: LLM reservations account for cumulative committed and pending tokens (55.216333ms)\n✔ G03 / N6: a failed product thread stays failed when its HTTP assertion passes (13.906209ms)\n✔ G04 / N7: image generation does not succeed when the artifact download receives 403 (31.22775ms)\n✔ P18 checks: one measured reasoning task cannot fan aggregate success out to unobserved domains (24.010708ms)\n✔ P18 checks: blocked media without receipts still produce every unverified observation (11.163708ms)\n✔ media decoder: actual PNG pixels and complete MP4/VP9 playback establish dimensions, duration and digest (2690.931708ms)\n✔ media decoder: a readable landed image has a matching receipt and tampered manifests fail (841.661708ms)\n✔ media decoder: duplicate paths cannot count as two delivered images (242.775792ms)\n✔ media decoder: valid MP4 container with corrupted frame data fails actual playback (128.933958ms)\n✔ media decoder: image adapter delivers exactly the occupied count and the shared completion verifier rereads it (616.944042ms)\n✔ media decoder: video adapter bills observed file duration and proves frames plus receipt metadata (4928.557792ms)\n✔ media: safe file identities reject traversal, separators, empty IDs and prototype-like path escapes (2.607ms)\n✔ media: URLs, directories, empty files and ungranted read permissions cannot substitute for files (2.356667ms)\n✔ media: symlink, hard link and realpath escape fail before the decoder (10.991542ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (3.558041ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (8.312167ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (2.210625ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (3.575917ms)\n✔ media: content length, CRC and container bounds are checked before decoding (9.990875ms)\n✔ media: credential URLs, unsafe task IDs and transport errors do not write artifacts (3.213542ms)\n✔ media: wrong MIME and URL-only or missing manifests are not accepted as receipts (2.914125ms)\n✔ product: completed matching thread, real receipt and every assertion jointly pass (8.635041ms)\n✔ product: failed cannot be turned into completion by a passing HTTP assertion (7.443292ms)\n✔ product: paused cannot be turned into completion by a passing HTTP assertion (3.211208ms)\n✔ product: pending_review cannot be turned into completion by a passing HTTP assertion (2.313042ms)\n✔ product: cancelled cannot be turned into completion by a passing HTTP assertion (1.056834ms)\n✔ product: canceled cannot be turned into completion by a passing HTTP assertion (1.924333ms)\n✔ product: timeout cannot be turned into completion by a passing HTTP assertion (1.814333ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.184292ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.093458ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.105792ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.085917ms)\n✔ product: another thread's completed poll response is rejected (1.146917ms)\n✔ product: a valid execution receipt for another thread cannot prove the dispatched result (2.00825ms)\n✔ product: running thread times out without a success receipt (17.068125ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (3.496375ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (4.124625ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (3.528084ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (10.635625ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (4.585125ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (2.15525ms)\n✔ product: missing, truncated or unauthorized event receipt fails closed (5.0115ms)\n✔ product: incomplete progress or latest failed receipt cannot be hidden by earlier success (2.841333ms)\n✔ product: empty, malformed and unexecuted SQL assertions cannot pass vacuously (11.007792ms)\n✔ product: SQL connector errors are explicit failed assertions (3.125916ms)\n✔ product: actual failed HTTP assertion is mandatory even with a real completed receipt (4.964292ms)\n✔ product: ASK completion uses an actual event read-back and a specific result assertion (9.395917ms)\n✔ product: ASK cannot pass from a health check, another thread or an earlier matching answer (2.383417ms)\n✔ product: opaque requireModel dispatch is blocked before any model-capable server request (0.209167ms)\n✔ product: verification recomputes event result and rejects hand-written actual/ok/target claims (2.429291ms)\n✔ product: dispatch cannot adopt stale receipts or stale ASK answer as current completion (6.270834ms)\n✔ gateway: complete identity and authoritative usage give a measured, synced receipt (5.134458ms)\n✔ gateway: missing, coerced or contradictory usage stays blocked and is never reported as measured zero (0.980583ms)\n✔ gateway: missing response model/id and malformed JSON cannot borrow request identity for a passing receipt (0.565167ms)\n✔ gateway: authentication, network and timeout failures preserve unknown usage after attempted I/O (0.42425ms)\n✔ gateway: missing credentials prevents external I/O and discloses that no call was admitted (0.088667ms)\n✔ media usage: actual HTTP timeout never becomes measured zero image count or video duration (434.328375ms)\n✔ media usage: an accepted asynchronous task with unreadable or timed out polling stays unmeasured (582.026292ms)\n✔ media usage: a reported duration without a readable media file cannot borrow the requested seconds (62.457708ms)\n✔ media usage: missing, coerced or contradictory image usage never turns returned URLs into complete supplier accounting (79.360917ms)\n✔ media usage: an explicit supplier zero is measured independently from successful delivery (16.2945ms)\n✔ media identity: image receipts retain returned model identity and never borrow the requested model (42.851375ms)\n✔ media identity: only the same video task can supply returned model identity (59.826834ms)\n✔ model identity: an actual returned route must match the declared model or an explicit exact allowedModels list (0.610459ms)\n✔ media recovery: accepted video polling failures resume the same ID with no second POST (17.147416ms)\n✔ media admission: missing durable directory and changed task inputs cannot send a POST (11.897167ms)\n✔ media recovery: partial image rounds reuse the first response and never resubmit an unknown second round (16.616583ms)\n▶ normalizeOpenAiCompatibleBaseUrl\n  ✔ 去掉 Anthropic 兼容后缀与尾斜杠，保留其它路径前缀 (0.411792ms)\n  ✔ OpenAI 兼容变量优先级里 LLM_BASE_URL 高于 DEEPSEEK_BASE_URL (0.605166ms)\n✔ normalizeOpenAiCompatibleBaseUrl (1.858084ms)\n▶ resolveLiveModels 端点方言分流\n  ✔ model-gateway 解析到 OpenAI 兼容根，绝不拼出 /anthropic/chat/completions (0.257417ms)\n  ✔ 只剩 Anthropic 根可用时也会去掉 /anthropic 并留痕（避免静默 404） (0.220417ms)\n  ✔ 显式 openAiBaseUrlEnv 优先于 Anthropic 声明值 (0.074416ms)\n  ✔ dsh-harness 保持 Anthropic 兼容根（Messages 协议），不被归一 (0.085791ms)\n  ✔ 缺任何端点变量时，两条链路使用各自官方协议默认根 (0.093583ms)\n  ✔ 缺凭据仍是 blocked（不得用 mock 顶替写通过） (0.215ms)\n✔ resolveLiveModels 端点方言分流 (1.292375ms)\n✔ usage: exact provider totals include cache buckets and never coerce unsafe counts (0.823834ms)\n✔ usage: a complete terminal turn accounts for actual attempts and model route (1.175333ms)\n✔ usage: every failed attempt and retry is accounted before its successful final message (1.194458ms)\n✔ usage: multiple steps and separate sessions accumulate rather than overwrite (0.204625ms)\n✔ usage: missing boundaries, usage, identity, truncated streams and unknown required events remain unavailable (0.973041ms)\nℹ tests 160\nℹ suites 2\nℹ pass 160\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 48981.877292\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:governance",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T17:59:21.724430+00:00",
+            "result": "ms)\n✔ G01 actual Node tests pass repair, independent acceptance and gate with both requested and observed argv bound (1496.279208ms)\n✔ G01 Node executable rejects an ordinary script before capture: fake-basename (126.614209ms)\n✔ G01 Node executable rejects an ordinary script before capture: PATH-shadow (172.49425ms)\n✔ G01 Node executable preserves real native identity and TestsStream counts: canonical-path-alias (490.092917ms)\n✔ G01 Node executable preserves real native identity and TestsStream counts: symlink-alias (466.536083ms)\n✔ G01 Node executable readback rejects source-bound forgery: rebound-fake-executable (552.129708ms)\n✔ G01 Node executable readback rejects source-bound forgery: rebound-fake-requested-executable (543.110208ms)\n✔ G01 Node executable readback rejects source-bound forgery: forged-native-hash (552.411584ms)\n✔ G01 Node executable readback rejects source-bound forgery: missing-native-binding (542.920125ms)\n✔ G05 N8a empty evidence is unverified and nonzero, with report still generated (208.541833ms)\n✔ G05 N8b four sparse evidence-present claims cannot pass (548.790291ms)\n✔ G05 complete legal synthetic fixture passes coverage and report (control test, no production claim) (717.812916ms)\n✔ G05 rejects regression aggregate --repo pointing to a different directory despite rebound hashes (643.432459ms)\n✔ G05 rejects regression aggregate --root pointing to a different directory despite rebound hashes (609.52975ms)\n✔ G05 rejects regression aggregate --input pointing to a different directory despite rebound hashes (534.790209ms)\n✔ G05 rejects regression aggregate --out pointing to a different directory despite rebound hashes (527.242375ms)\n✔ G05 report rejects missing required item (600.186417ms)\n✔ G05 report rejects duplicate checklist item (607.625166ms)\n✔ G05 report rejects forged source hash (602.086708ms)\n✔ G05 report rejects different commit (619.98975ms)\n✔ G05 report rejects unknown coverage commit (602.063541ms)\n✔ G05 report rejects item schema omitted (642.1655ms)\n✔ G05 report rejects item command omitted (618.995792ms)\n✔ G05 report rejects item expected differs from its raw observation (614.719166ms)\n✔ G05 report rejects item actual differs from its raw observation (628.206125ms)\n✔ G05 report rejects future item observation (606.139708ms)\n✔ G05 report rejects actual matching ID failed (598.29225ms)\n✔ G05 report rejects evidence-present without assertion pass (595.564458ms)\n✔ G05 report rejects unapproved not-applicable (638.948917ms)\n✔ G05 report rejects summary totals cannot hide missing items (549.253333ms)\n✔ G05 report rejects zero production tasks (595.753709ms)\n✔ G05 report rejects empty ready models (592.951875ms)\n✔ G05 report rejects empty U checks (596.982459ms)\n✔ G05 report rejects receipt says another task (613.714459ms)\n✔ G05 report rejects receipt has future verification time (616.893875ms)\n✔ G05 report rejects transcript lacks a real model answer (619.094209ms)\n✔ G05 report rejects missing UX domain (619.091083ms)\n✔ G05 report rejects selftest production substitute (636.334792ms)\n✔ G05 report rejects artifact file removed (969.041125ms)\n✔ G05 owner-approved not-applicable item is counted explicitly, with the full 276-item denominator (1086.293834ms)\n✔ G05 coverage rejects nonexistent manual evidence and cannot make 0/0 counts pass (144.007792ms)\n✔ G05 rejects budget totals forged to zero after rebinding all hashes (608.2875ms)\n✔ G05 rejects budget commit has no reservation after rebinding all hashes (597.173042ms)\n✔ G05 rejects budget initialization missing after rebinding all hashes (600.55275ms)\n✔ G05 rejects budget future ledger event after rebinding all hashes (602.400417ms)\n✔ G05 rejects budget estimate disagrees with frozen price after rebinding all hashes (595.613291ms)\n✔ G05 rejects budget task settlement failed after rebinding all hashes (602.747375ms)\n✔ G05 rejects budget supplier measurement incomplete after rebinding all hashes (609.78225ms)\n✔ G05 rejects budget measurement falsely claimed complete after rebinding all hashes (597.375083ms)\n✔ G05 rejects budget usage-unverified freeze hidden after rebinding all hashes (606.843959ms)\n✔ G05 rejects budget hard cap relaxed after rebinding all hashes (619.68475ms)\n✔ G05 rejects budget summary file missing after rebinding all hashes (611.620041ms)\n✔ G05 measured zero-output video reservation reconciles zero actual clips (synthetic arithmetic control) (619.836958ms)\n✔ G05 a null raw observation becomes unverified and still produces a report (600.3705ms)\n✔ G05 malformed outcome trials contain no objects stays unverified and report generation survives (633.2255ms)\n✔ G05 malformed redteam cases contain no objects stays unverified and report generation survives (658.84075ms)\n✔ G05 malformed soak samples contain no objects stays unverified and report generation survives (701.474334ms)\n✔ G05 malformed experience checks contain null stays unverified and report generation survives (619.885416ms)\n✔ G05 malformed UX checks are an object stays unverified and report generation survives (682.748958ms)\n✔ G05 malformed regression commands are an array stays unverified and report generation survives (570.026458ms)\n✔ G05 actual failed stage execution remains fail even if summary counts claim pass (623.602083ms)\n✔ G05 a source-bound tool product event can support report evidence (624.694375ms)\n✔ G05 a source-bound ask product event can support report evidence (650.729708ms)\n✔ G05 rejects product running terminal state after source and index hashes are rebound (632.644916ms)\n✔ G05 rejects product event hash mismatch after source and index hashes are rebound (616.17675ms)\n✔ G05 rejects product receipt names absent event after source and index hashes are rebound (609.058417ms)\n✔ G05 rejects product execute event is mock after source and index hashes are rebound (604.88125ms)\n✔ G05 rejects product tool event has another thread after source and index hashes are rebound (619.238667ms)\n✔ G05 rejects ASK answer differs from event after source and index hashes are rebound (627.505417ms)\n✔ G05 rejects ASK event has another thread after source and index hashes are rebound (655.908125ms)\n✔ G05 rejects ASK has no event assertion after source and index hashes are rebound (701.9515ms)\n✔ G05 rejects ASK event assertion fabricates its actual value after source and index hashes are rebound (665.586292ms)\n✔ G05 rejects ASK event assertion refers to an absent action after source and index hashes are rebound (628.157333ms)\n✔ G05 null run JSON remains unverified and does not crash report generation (520.447ms)\n✔ G05 false run JSON remains unverified and does not crash report generation (498.405458ms)\n✔ G05 indexed observations with a null check preserve the fixed denominator without crashing coverage (525.001459ms)\n✔ G05 real live CLI producer feeds 276-item coverage/report without turning blocked runs into production pass (614.98425ms)\n✔ help 暴露触发关键词与子命令 (28.679416ms)\n✔ init 记录审计基线并生成台账骨架 (214.493833ms)\n✔ invariants 从 AGENTS.md §4 提取不变量 (180.394625ms)\n✔ card-template 输出可直接使用的模板 (57.3275ms)\n✔ add 拒绝没有可运行断言的卡 (194.702833ms)\n✔ add 拒绝不可验收措辞（优化/提升/加强） (169.929542ms)\n✔ add 拒绝代码类证据缺少 @commit (165.394709ms)\n✔ gate 对 P0 未闭环判红，对完全闭环放行 (1287.797708ms)\n✔ gate 阻止修复者自验，只有完整独立批准来源才可豁免 (1474.419ms)\n✔ plan 输出四批计划与冲突面 (380.926708ms)\n✔ verify-baseline 识别本地不存在的提交与在线基线 (419.610791ms)\n✔ handoff 拒绝无回归路径的未闭环项，通过后生成 RDAS 交接单 (536.733458ms)\n✔ 台账缺不变量时 gate 判红（不变量是断言骨架） (208.722208ms)\n✔ 本地预览档位在交接单里给出生产口径警示 (1195.2205ms)\n✔ report 目录结构约定可写（evidence 目录） (128.230875ms)\n✔ npm 清单：优先采用 lockfile 解析版本，并保留 npm 别名行 (18.963ms)\n✔ Python 与容器镜像：解析约束、镜像来源 (1.658708ms)\n✔ probe 探测：regex / vendor / lockfile 三类来源 (1.370375ms)\n✔ 清单渲染：确定性、含上游最新与漂移标记、--check 可复现 (23.97675ms)\n✔ 版本工具：最高版本选择与滞后判定 (0.177375ms)\n✔ 仓库标识行：克隆 URL 大小写不同不算清单漂移 (0.419125ms)\n✔ 隔离仓本地运行资产：var 与 vendor/talkcraft 不计作仓库依赖，相近路径仍扫描 (2.538833ms)\n✔ 成功扫描钟：legacy last_full_scan 只显示历史未核实尝试，不能作为成功兜底 (10.539584ms)\n✔ 成功扫描钟：无效、未来或错误类型的 last_success 不能显示为成功 (28.4605ms)\n✔ 成功扫描钟：last_success 与后来失败尝试、legacy 历史字段分别保留 (9.979542ms)\n✔ failed upstream lookup never refreshes success time and is nonzero even with exit-zero (30.639709ms)\n✔ offline regeneration preserves upstream success clocks (11.061584ms)\n✔ dry-run keeps registry, cache, inventory and plan byte-identical (11.901042ms)\n✔ docker without an explicit registry image is unverified, with no fake success timestamp (11.017542ms)\n✔ successful lookup advances success time and records the precise source (11.498125ms)\n✔ npm failure keeps historical version unverified in document and out of upgrade plan; retry bypasses old TTL (20.127ms)\n✔ PyPI mirror fallback records the official source; later double failure keeps the old success clock (20.24125ms)\n✔ Docker real tags channel consumes all pages and refuses repeated or escaped next links (0.411041ms)\n✔ GitHub tags fallback keeps prerelease tags out of the stable candidate set (0.351667ms)\n✔ CI dry-run has no credential, branch, file or PR mutations (10.697541ms)\n✔ required registry missing fails before lookup and leaves facts unchanged (1.277083ms)\n✔ required registry malformed fails before lookup and leaves facts unchanged (1.106208ms)\n✔ required registry non-array fails before lookup and leaves facts unchanged (1.06275ms)\n✔ required registry empty fails before lookup and leaves facts unchanged (1.116875ms)\n✔ G15: legacy-only cannot postpone a real upstream lookup (10.907667ms)\n✔ G15: missing-status cannot postpone a real upstream lookup (10.941ms)\n✔ G15: malformed-success cannot postpone a real upstream lookup (10.146459ms)\n✔ G15: future-success cannot postpone a real upstream lookup (9.713917ms)\n✔ G15: a successful no-query cycle cannot invent a new global upstream-success time (9.720208ms)\n✔ G15: npm cache reuse retains the actual upstream observation time (10.020917ms)\n✔ G15: pypi cache reuse retains the actual upstream observation time (10.370541ms)\nℹ tests 483\nℹ suites 3\nℹ pass 483\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 242272.881292\n"
+          }
+        ],
+        "reviewedAt": "2026-10-07T18:00:39.367897+00:00",
+        "summary": "A：根完整审读849行当前diff、修改前实现与直接依赖，独立审查对准确69ba全部14改动和35个A文件/11个B输入逐blob核对。A级：原c598及直接依赖已完整精读；根完整审读当前完整diff，逐文件读取修改前与补充差异。独立只读审查24文件5483行A来源逐blob对2a B匹配，不把B字节比较冒称再次精读。第131项实现累计预算与gen-http首响应/GET接续，unknown不重发，已settled停止。独立发现三个P2均补充修复：缺key等早退覆盖原receipt/transcript；无换行合法JSON尾在reserve前失败关闭；非法参数deny追加也必须先replay。实际旧实现2/2回执负对照、旧tail4失败1正常通过、非法deny2失败1正常通过均保留；修复后准确2a全live160/160通过0跳过。当前2a八项准确源检查均退出0，标准25/25、video1672中1671通过1已有跳过、脚本89/89与161/161、双类型/资产/能力/diff均实际通过，日志SHA和时间由finalizer验证；额外live160源绑定JSON同样严格验证。漏任务号的本人最新4aec被云端门禁拒绝，保存旧Git对象后仅更正该自有task分支标题为2a，tree及parent完全同，显式fullSHA lease防覆盖，main不改且门禁未弱化；补全远端浅历史后本地原提交规范校验3/3通过。残余边界：共用helper极大多字节响应上限不一可能阻断恢复，外层肖像锁/硬断电耐久未认证，首次URL不保证永久相同图片字节；called不是新增付费数。正式制片源89冻结；全部新provider/媒体测试为明确合成回归，新增真实付费调用0。依赖129已独立正式发布；当前11文件/9CI理由与main e19及可信policy绑定，回滚revert本功能源码。 补充最终CI修复：真实2a云端治理473中471通过2失败，根因既有Chromium晚于成功媒体夹具；ac4前置同固定版浏览器准备并接入10个既有预算测试，无断言跳过。ac4本地运行锁发现根package全输入摘要过期；69ba严格依赖合成及完整锁校验后仅同步唯一package摘要，manifest与package-lock原字节均不变，未刷新依赖或降低校验。准确69ba八项检查全0，标准25/25、video1672中1671通过1既有skip、脚本89/89与161/161、双类型/资产/能力/diff通过；额外live160/160与治理483/483全0无skip。ac4治理482/483的temp仓Git身份缺失实际失败保留，69ba测试进程使用正式源提交同作者身份，不写全局配置。原2a验证仅作为历史记录，当前10项日志SHA及时间均由严格finalizer核验。",
+        "passed": true,
+        "id": "b24bbc087fc149d343941a8093e1cb255e30aa92cb880bcc46d7b667241a5e93"
+      },
       "reviewSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 131,
@@ -4025,7 +4170,7 @@
           },
           "head": {
             "ref": "refs/heads/task/T-2026-1007-0006",
-            "sha": "2a892d6aab1d94346d7164cda0e43571a8a90700",
+            "sha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -4043,11 +4188,14 @@
           "is_force_merged": false,
           "statuses": {}
         },
-        "headSha": "2a892d6aab1d94346d7164cda0e43571a8a90700",
+        "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
         "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
         "files": [
+          ".cnb.yml",
+          ".workloom-runtime-deps/metadata.json",
           "docs/capabilities.auto.json",
           "docs/video-generation-idempotency.md",
+          "package.json",
           "scripts/acceptance/lib/live/budget-tail.test.mjs",
           "scripts/acceptance/lib/live/budget.mjs",
           "scripts/acceptance/lib/live/cli-fixtures.mjs",
@@ -4066,7 +4214,7 @@
           ],
           "releases": []
         },
-        "headTime": 1791393841000,
+        "headTime": 1791395547000,
         "mergeBase": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
         "checkErrors": [],
         "checkSha": null,
@@ -4074,96 +4222,6 @@
         "ciPolicyChanges": [
           {
             "id": "CI-001",
-            "file": "scripts/acceptance/live.mjs",
-            "before": {
-              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-              "path": "scripts/acceptance/live.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
-              "path": "scripts/acceptance/live.mjs",
-              "absent": false
-            },
-            "digest": "4d4b04ef07c1a82c53745ad2673f53b395c8deba679cca64635d5945f206e28b"
-          },
-          {
-            "id": "CI-002",
-            "file": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
-            "before": {
-              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-              "path": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
-              "absent": true
-            },
-            "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
-              "path": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
-              "absent": false
-            },
-            "digest": "4d8ec3e3ccfd96b2134dc0a9b75f93471360331e67f3d5d381fd4b4b79ae3278"
-          },
-          {
-            "id": "CI-003",
-            "file": "scripts/acceptance/lib/live/cli-fixtures.mjs",
-            "before": {
-              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-              "path": "scripts/acceptance/lib/live/cli-fixtures.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
-              "path": "scripts/acceptance/lib/live/cli-fixtures.mjs",
-              "absent": false
-            },
-            "digest": "5067b423171d0b898a824c27f3156fddd906b34317d2add583f11a222c3c207b"
-          },
-          {
-            "id": "CI-004",
-            "file": "scripts/acceptance/lib/live/providers.mjs",
-            "before": {
-              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-              "path": "scripts/acceptance/lib/live/providers.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
-              "path": "scripts/acceptance/lib/live/providers.mjs",
-              "absent": false
-            },
-            "digest": "823e8dc7d65f18dda1a49c6d9b86a3e32a9d255d9db4d48ae16268058cbb4d1c"
-          },
-          {
-            "id": "CI-005",
-            "file": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
-            "before": {
-              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-              "path": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
-              "path": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
-              "absent": false
-            },
-            "digest": "919fc78f8c6b4fa375f6446543c0d15c4293d83c66f4a96e6ecf62afe402c5fb"
-          },
-          {
-            "id": "CI-006",
-            "file": "scripts/acceptance/lib/live/budget-tail.test.mjs",
-            "before": {
-              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-              "path": "scripts/acceptance/lib/live/budget-tail.test.mjs",
-              "absent": true
-            },
-            "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
-              "path": "scripts/acceptance/lib/live/budget-tail.test.mjs",
-              "absent": false
-            },
-            "digest": "9900838af5bde9fb0b24295a75ba96f6ac01b5304e2826c9273b110dde7b2487"
-          },
-          {
-            "id": "CI-007",
             "file": "scripts/acceptance/lib/live/live-budget-scope.mjs",
             "before": {
               "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
@@ -4171,11 +4229,115 @@
               "absent": true
             },
             "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
               "path": "scripts/acceptance/lib/live/live-budget-scope.mjs",
               "absent": false
             },
-            "digest": "c0c4b7049a04d8572026793b0e6de11db962763d33a5f091c4d653857f5a6d5d"
+            "digest": "058e0238f1bbe96d1cc6e055cce6c26025ff44b4820a132b14d9bb25cfa6a256"
+          },
+          {
+            "id": "CI-002",
+            "pipeline": "static-gate",
+            "stage": "交付证据、预算与行业配置回归",
+            "file": ".cnb.yml",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": ".cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "交付证据、预算与行业配置回归",
+                "script": "set -eu\n# The CLI fixture drops ambient NODE_PATH; expose only the pinned test package.\ninstrumentation_dir=$(mktemp -d)\nplaywright_link_created=0\ntrap 'if [ \"$playwright_link_created\" = 1 ]; then rm -f node_modules/playwright; fi; rm -rf \"$instrumentation_dir\"' EXIT HUP INT TERM\nnpm install --prefix \"$instrumentation_dir\" playwright@1.63.0 --ignore-scripts --no-audit --no-fund\nif [ ! -e node_modules/playwright ] && [ ! -L node_modules/playwright ]; then\n  ln -s \"$instrumentation_dir/node_modules/playwright\" node_modules/playwright\n  playwright_link_created=1\nfi\npnpm test:governance\nnode scripts/generate-capabilities.mjs --check\n# 本仓契约校验不登录、不派单、不调用模型；业务能力保持未验证。\nnode scripts/acceptance/profile-check.mjs\nnode scripts/acceptance/outcome.mjs --validate-only\nnode scripts/runtime-deps-lock.mjs verify\n"
+              }
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": ".cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "交付证据、预算与行业配置回归",
+                "script": "set -eu\n# The CLI fixture drops ambient NODE_PATH; expose only the pinned test package.\ninstrumentation_dir=$(mktemp -d)\nplaywright_link_created=0\ntrap 'if [ \"$playwright_link_created\" = 1 ]; then rm -f node_modules/playwright; fi; rm -rf \"$instrumentation_dir\"' EXIT HUP INT TERM\nnpm install --prefix \"$instrumentation_dir\" playwright@1.63.0 --ignore-scripts --no-audit --no-fund\n# Successful receipt-history fixtures decode media before the later media suite.\nexport PLAYWRIGHT_BROWSERS_PATH=\"$instrumentation_dir/browsers\"\nnode \"$instrumentation_dir/node_modules/playwright/cli.js\" install --with-deps chromium\nif [ ! -e node_modules/playwright ] && [ ! -L node_modules/playwright ]; then\n  ln -s \"$instrumentation_dir/node_modules/playwright\" node_modules/playwright\n  playwright_link_created=1\nfi\npnpm test:governance\nnode scripts/generate-capabilities.mjs --check\n# 本仓契约校验不登录、不派单、不调用模型；业务能力保持未验证。\nnode scripts/acceptance/profile-check.mjs\nnode scripts/acceptance/outcome.mjs --validate-only\nnode scripts/runtime-deps-lock.mjs verify\n"
+              }
+            },
+            "origins": {
+              "before": ".cnb.yml",
+              "after": ".cnb.yml"
+            },
+            "digest": "0904fbe62ee7c6ef583a8ebf80bed1d1d6d479547858a922ac51a1e0393dec8d"
+          },
+          {
+            "id": "CI-003",
+            "file": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+              "absent": true
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+              "absent": false
+            },
+            "digest": "1a8b8d95bf93fffc730d95f48c07f7bda1651df345ccd1874f46bcb3b33de7c5"
+          },
+          {
+            "id": "CI-004",
+            "file": "scripts/acceptance/lib/live/cli-fixtures.mjs",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": "scripts/acceptance/lib/live/cli-fixtures.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": "scripts/acceptance/lib/live/cli-fixtures.mjs",
+              "absent": false
+            },
+            "digest": "21a52d028c575334a0400091916dd409ba275f676590dc7d86ca39cc97237b52"
+          },
+          {
+            "id": "CI-005",
+            "file": "scripts/acceptance/lib/live/providers.mjs",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": "scripts/acceptance/lib/live/providers.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": "scripts/acceptance/lib/live/providers.mjs",
+              "absent": false
+            },
+            "digest": "2c3fbc7b4273577ffaa79311eec16f9027f629dbeea6ee9fcf6d29fdd76372c0"
+          },
+          {
+            "id": "CI-006",
+            "file": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+              "absent": false
+            },
+            "digest": "440cec1b7f3bff9531a3478c2edb3c03ce1951b796147f945cbacc889c0b3220"
+          },
+          {
+            "id": "CI-007",
+            "file": "package.json",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": "package.json",
+              "absent": false
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": "package.json",
+              "absent": false
+            },
+            "digest": "6e6200b52b93e8448c27b88e3ea93abc3109ddf19eddbba26837cce975522ddf"
           },
           {
             "id": "CI-008",
@@ -4186,11 +4348,11 @@
               "absent": false
             },
             "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
               "path": "scripts/acceptance/lib/live/budget.mjs",
               "absent": false
             },
-            "digest": "c29e77e9ae9d55b18c43b0f3530ba1ea016ffafe02aa3e19cfca33a6f5d919ef"
+            "digest": "6e8715d481d98812b032c0120e12af558e20b5562d3d63261489c8fa2ec96c91"
           },
           {
             "id": "CI-009",
@@ -4201,15 +4363,60 @@
               "absent": false
             },
             "after": {
-              "ref": "2a892d6aab1d94346d7164cda0e43571a8a90700",
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
               "path": "scripts/acceptance/lib/live/providers-http.test.mjs",
               "absent": false
             },
-            "digest": "fe4429575c763a032fdfde1347a166e548e98c4532d33303645ef3c293e4696c"
+            "digest": "90a148a22790e3fe05ca42e5d3b828379a462b43aa07d5eadc5e812061c60e23"
+          },
+          {
+            "id": "CI-010",
+            "file": "scripts/acceptance/live.mjs",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": "scripts/acceptance/live.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": "scripts/acceptance/live.mjs",
+              "absent": false
+            },
+            "digest": "98828a84314db50a50529393a86d9380a44b24ae94102670c67895ecf43056ce"
+          },
+          {
+            "id": "CI-011",
+            "file": "scripts/acceptance/lib/live/budget-tail.test.mjs",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": "scripts/acceptance/lib/live/budget-tail.test.mjs",
+              "absent": true
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": "scripts/acceptance/lib/live/budget-tail.test.mjs",
+              "absent": false
+            },
+            "digest": "c9ff7fe63d8329f955629e744134d531f19f5609e9f7dffa37a3f396d14913c6"
+          },
+          {
+            "id": "CI-012",
+            "file": ".cnb.yml",
+            "before": {
+              "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+              "path": ".cnb.yml",
+              "absent": false
+            },
+            "after": {
+              "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+              "path": ".cnb.yml",
+              "absent": false
+            },
+            "digest": "ede1170e3742662d81904b510284880b320b0dfae38fde70dca3b7af03216cc8"
           }
         ]
       },
-      "updatedAt": 1791396028058,
+      "updatedAt": 1791396142385,
       "dependencies": [
         129
       ],
@@ -64727,6 +64934,473 @@
       },
       "previous": "acbd93c4159ed6e239b60f4316505650042a5af152943c0eeba5bbfb267e73a8",
       "digest": "8a2cd68345e32742154a2fd8cb1c41834fc61d113ede6431d3ac1ef8883ac2b9"
+    },
+    {
+      "sequence": 2452,
+      "at": "2026-10-07T18:02:22.381Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 131,
+        "id": "b24bbc087fc149d343941a8093e1cb255e30aa92cb880bcc46d7b667241a5e93",
+        "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+        "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8"
+      },
+      "previous": "8a2cd68345e32742154a2fd8cb1c41834fc61d113ede6431d3ac1ef8883ac2b9",
+      "digest": "fc798565524e60fde3848b05ccac7bd92c3e24e3073a894efe4d855dd7d99b9d"
+    },
+    {
+      "sequence": 2453,
+      "at": "2026-10-07T18:02:22.385Z",
+      "kind": "task",
+      "data": {
+        "number": 131,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+          "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+          "branch": "task/T-2026-1007-0006",
+          "intent": {
+            "taskId": "T-2026-1007-0006",
+            "ready": true,
+            "dependsOn": [
+              129
+            ],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 131,
+            "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+            "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "policyHash": "2dd9d8d7996d6d3cbd5220bf94435364b6cef0a159c8ad49738332682a5bb974",
+            "reviewedFiles": [
+              ".cnb.yml",
+              ".workloom-runtime-deps/metadata.json",
+              "docs/capabilities.auto.json",
+              "docs/video-generation-idempotency.md",
+              "package.json",
+              "scripts/acceptance/lib/live/budget-tail.test.mjs",
+              "scripts/acceptance/lib/live/budget.mjs",
+              "scripts/acceptance/lib/live/cli-fixtures.mjs",
+              "scripts/acceptance/lib/live/live-budget-scope.mjs",
+              "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+              "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+              "scripts/acceptance/lib/live/providers-http.test.mjs",
+              "scripts/acceptance/lib/live/providers.mjs",
+              "scripts/acceptance/live.mjs"
+            ],
+            "filesHash": "00eaae93fec954c3d0174b2dd9c00fdfa5b6ef860e1939e6c2d616b3fdfe70e1",
+            "dependsOn": [
+              129
+            ],
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "rationale": "完整精读普通文件与旧账本身份装载：单一可核实runId接续，混合/缺失身份、链接、环境不一致和缺换行均失败关闭，wx创建防重身份；没有删除原账本或增加额度。 当前文件 scripts/acceptance/lib/live/live-budget-scope.mjs；当前 source/main 比较摘要 058e0238f1bbe96d1cc6e055cce6c26025ff44b4820a132b14d9bb25cfa6a256"
+              },
+              {
+                "id": "CI-002",
+                "rationale": "修改前555行及其依赖完整读到末尾，当前3行补充及独立558行A核对。既有固定Playwright在治理测试前安装Chromium，显式浏览器路径传递合成CLI；既有七门、准确source/main核验和后续媒体测试保持，不能以缺解码器跳过成功回执断言。 当前文件 .cnb.yml；当前 source/main 比较摘要 0904fbe62ee7c6ef583a8ebf80bed1d1d6d479547858a922ac51a1e0393dec8d"
+              },
+              {
+                "id": "CI-003",
+                "rationale": "新增本地夹具断言重启同身份、原结算字节、同键settled、新任务额度禁止、单历史身份接续及坏JSON/环境/链接停止；不以测试夹具伪造生产验收。 当前文件 scripts/acceptance/lib/live/live-budget-scope.test.mjs；当前 source/main 比较摘要 1a8b8d95bf93fffc730d95f48c07f7bda1651df345ccd1874f46bcb3b33de7c5"
+              },
+              {
+                "id": "CI-004",
+                "rationale": "完整精读隔离仓闭包与child环境：将真实提交helper/预算scope复制至合成仓；只共享当前已安装Playwright模块解析路径，不复制供应商密钥，子进程明确no-auto-keys/no-keys-from-client，synthetic标记维持。 当前文件 scripts/acceptance/lib/live/cli-fixtures.mjs；当前 source/main 比较摘要 21a52d028c575334a0400091916dd409ba275f676590dc7d86ca39cc97237b52"
+              },
+              {
+                "id": "CI-005",
+                "rationale": "完整精读gen-http和受理helper调用链：Task/model/endpoint绑定普通文件scope，图片逐轮原响应与视频原ID持久化；resumeOnly在传输前拒绝新增POST，unknown用量不变成0，submittedCalls不借用called或恢复响应计费；无跨供应商付费回退。 当前文件 scripts/acceptance/lib/live/providers.mjs；当前 source/main 比较摘要 2c3fbc7b4273577ffaa79311eec16f9027f629dbeea6ee9fcf6d29fdd76372c0"
+              },
+              {
+                "id": "CI-006",
+                "rationale": "实际完整CLI跨进程+loopbackHTTP，增加同预算重跑零POST、unknown不重发、可解码合成image/video成功后撤key保留首文件与结算、任务不可用/孤文件保护及坏尾首POST=0；移除易变redaction文字断言仍逐字节验证真实秘密不存在，没有弱化failed/blocked计量断言。 当前文件 scripts/acceptance/lib/live/live-cli-wire.test.mjs；当前 source/main 比较摘要 440cec1b7f3bff9531a3478c2edb3c03ce1951b796147f945cbacc889c0b3220"
+              },
+              {
+                "id": "CI-007",
+                "rationale": "根文件114行修改前后完整读取，治理命令增加7个尾部与3个累计身份测试；依赖字段及版本不变，运行依赖合成/完整锁校验保持，唯一package输入SHA同步为当前源码。 当前文件 package.json；当前 source/main 比较摘要 6e6200b52b93e8448c27b88e3ea93abc3109ddf19eddbba26837cce975522ddf"
+              },
+              {
+                "id": "CI-008",
+                "rationale": "完整精读累计预算锁/回放/预占/结算：非空末行缺换行先停止；reserve与commit锁内均在非法参数deny追加前replay，正常完整账本仍记录拒绝，金额及图/视频/token硬上限未放宽。 当前文件 scripts/acceptance/lib/live/budget.mjs；当前 source/main 比较摘要 6e8715d481d98812b032c0120e12af558e20b5562d3d63261489c8fa2ec96c91"
+              },
+              {
+                "id": "CI-009",
+                "rationale": "既有timeout/HTTP/usage/model身份反例继续保持，引入普通临时受理目录；补充原视频ID GET/no第2POST、缺目录或改变输入0POST及部分图片未知第二轮不重发；明确loopback与synthetic凭据。 当前文件 scripts/acceptance/lib/live/providers-http.test.mjs；当前 source/main 比较摘要 90a148a22790e3fe05ca42e5d3b828379a462b43aa07d5eadc5e812061c60e23"
+              },
+              {
+                "id": "CI-010",
+                "rationale": "完整精读runTask与输出循环：稳定budget-run身份独立于观察RUN_ID；已结算任务先停止，未结算只读接续；任何早退与孤立首次receipt/transcript均写新UUID文件，wx不覆盖历史；called与submittedCalls分开，无mock冒充生产。 当前文件 scripts/acceptance/live.mjs；当前 source/main 比较摘要 98828a84314db50a50529393a86d9380a44b24ae94102670c67895ecf43056ce"
+              },
+              {
+                "id": "CI-011",
+                "rationale": "新增7个本地账本测试覆盖身份创建、重新打开、活跃writer零放行、正常累计预算对照、非法reserve/commit旧尾不得追加与正常拒绝对照；旧实现4失败1通过及补充旧5c两失败1通过负对照保留，不使用真实供应商。 当前文件 scripts/acceptance/lib/live/budget-tail.test.mjs；当前 source/main 比较摘要 c9ff7fe63d8329f955629e744134d531f19f5609e9f7dffa37a3f396d14913c6"
+              },
+              {
+                "id": "CI-012",
+                "rationale": "修改前555行及其依赖完整读到末尾，当前3行补充及独立558行A核对。既有固定Playwright在治理测试前安装Chromium，显式浏览器路径传递合成CLI；既有七门、准确source/main核验和后续媒体测试保持，不能以缺解码器跳过成功回执断言。 当前文件 .cnb.yml；当前 source/main 比较摘要 ede1170e3742662d81904b510284880b320b0dfae38fde70dca3b7af03216cc8"
+              }
+            ],
+            "ciPolicyChangesHash": "3ee4921f6d8cf6b7f8fbeaafb5937d2d0cb56af6e23c508df3b7e95da5b701d1",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:54:34.127212+00:00",
+                "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (360.083333ms)\n✔ temporary ancestor names containing S2 cannot turn two distinct original fixtures into duplicate media (209.054459ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (5.888416ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (35.015125ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (322.5045ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (187.775375ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (257.570292ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (234.478167ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.549583ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (117.446041ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (97.596958ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (138.819542ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (111.778958ms)\n✔ current GET timestamp change reuses the exact first original receipt and seal without rewriting evidence (123.175ms)\n✔ legacy v1 GET timestamp change reuses the exact first original receipt and seal without rewriting evidence (120.073583ms)\n✔ a changed accepted task, request, state, source or extra fact cannot reuse a first issuance (113.763708ms)\n✔ missing actual accepted input proof refuses original issuance (98.320458ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (147.72225ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (268.432959ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (200.263542ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (265.583917ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (296.708375ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (247.577833ms)\n✔ media executable resolver permits only current local executables (1.848375ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.393958ms)\nℹ tests 25\nℹ suites 0\nℹ pass 25\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4106.294292\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-rendered-material-use.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/native-source-131-runtime-final-video-vitest.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:55:09.658266+00:00",
+                "result": "{\"numTotalTests\": 1672, \"numPassedTests\": 1671, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:scripts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:56:15.319108+00:00",
+                "result": "安全换入运行时载荷…\n01:55:39 正在校验并安全换入运行时载荷…\n01:55:39 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-wzABOJ/resources）==\n01:55:39 正在检查本机版本与安装载荷…\n01:55:39 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-AtdGt4/resources）==\n01:55:39 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (42.528541ms)\n✔ 真实首日引导退出的渲染冒烟 (45.077792ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (4.3055ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (5.719541ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (1.137292ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (6.123417ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (5.074209ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.886208ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.857292ms)\n✔ 产品截图采用捕获时的可见场景 (25.403791ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (41.470334ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.427833ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (2.013ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.221542ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (6.865ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (31.011666ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (44.078417ms)\n  ✔ 首装暂存失败不会留下半套运行时 (6.216542ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (1.118667ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.202417ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.725125ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (1.013042ms)\n✔ 桌面载荷原子装配 (137.76425ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.155166ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (0.986458ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.185625ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (0.549ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (2.79475ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (7.833042ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (12.661709ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (3.957458ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (32.19175ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (4.827583ms)\n✔ 桌面本机渲染子进程的 Node 路径 (41.397834ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (2.544875ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (1.172125ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (1.127584ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.230959ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (0.808333ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.733958ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.261625ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.233709ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.370041ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (7.657375ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (1.619125ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (0.685166ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.141625ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.173ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (2.69425ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (24.917459ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (1.78825ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (2.745417ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (2.11775ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (4.234625ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (4.729292ms)\n✔ native smoke captures the actual product region for its pixel verdict (3.008584ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (5.729167ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (3.054292ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (7.095833ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (6.271541ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (6.845417ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (5.053291ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (5.495625ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (2.986458ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (5.207625ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (4.185833ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (166.743542ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (12.216792ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (3.269208ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (8.647834ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (6.6045ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (6.616625ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (1.768333ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (9.001625ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (6.598583ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (7.599791ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (1.799ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (1.435625ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (1.556917ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-WIJ4es/pgdata\",\"port\":55432,\"hbaFile\":\"/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-WIJ4es/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (1.142625ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.104167ms)\n✔ 客户端投影路径围栏 (2.038584ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (3.825042ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (1.723334ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (1.721ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (1.000334ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (0.96375ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (0.943ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (0.632875ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (0.693708ms)\n  ✔ 实例报告端口不符时失败且零写入 (0.343375ms)\n✔ 桌面数据库安全引导 (12.117583ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (2.394ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (16.996416ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (9.858958ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (4.299708ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (6.051916ms)\n✔ 包目录创建顺序不影响依赖清单输出 (6.070583ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (166.657458ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (41.270625ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (1.81325ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (5.298375ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (3.417334ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (9.893167ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (6.171834ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (104.934708ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (1.088083ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (64.639084ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.30475ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (109.416833ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (28.690791ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (8.156291ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (1.726083ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (2.064708ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (2.874709ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.22375ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (0.689583ms)\n✔ normal physical source copy records canonical source and generated contract bytes (201.47175ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (70.645417ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (69.481292ms)\n✔ existing derived-output symlink cannot replace an external file (53.052541ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (70.3035ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (50.343291ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (55.368084ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (35.512167ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (95.6455ms)\n✔ payload cannot be created inside a selected source tree (84.739125ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (101.491875ms)\n✔ canonical output aliases cannot overwrite the checkout (57.958125ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (110.52575ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (579.757958ms)\n✔ 检测到非演示工作区时拒绝删除 (1043.190375ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (6795.54475ms)\n✔ 未知参数 fail closed (4.465042ms)\n✔ 备份失败时禁止删除和后续迁移种子 (2906.61975ms)\n✔ 空备份不能证明可恢复，禁止删除 (2564.970083ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (7975.749167ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (9131.994416ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (1284.717708ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (1175.566125ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (2366.943458ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.6595ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.290167ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (18.527625ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (0.401417ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (4.414958ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (0.841916ms)\nℹ tests 161\nℹ suites 11\nℹ pass 161\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 36152.663041\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:56:15.724798+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project apps/server/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:56:16.915946+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:56:16.974169+00:00",
+                "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:56:17.141793+00:00",
+                "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+              },
+              {
+                "command": "git diff --check e19c9325459a6df5e14914e8906c1ecce75d6af8...69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:56:17.204459+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/acceptance/lib/live/audit.test.mjs scripts/acceptance/lib/live/budget-tail.test.mjs scripts/acceptance/lib/live/budget.test.mjs scripts/acceptance/lib/live/dsh-process.test.mjs scripts/acceptance/lib/live/live-budget-scope.test.mjs scripts/acceptance/lib/live/live-cli-browser.test.mjs scripts/acceptance/lib/live/live-cli-wire.test.mjs scripts/acceptance/lib/live/live-cli.test.mjs scripts/acceptance/lib/live/live-truth.test.mjs scripts/acceptance/lib/live/media-decoder.test.mjs scripts/acceptance/lib/live/media-negative.test.mjs scripts/acceptance/lib/live/product.test.mjs scripts/acceptance/lib/live/providers-http.test.mjs scripts/acceptance/lib/live/providers.test.mjs scripts/acceptance/lib/live/usage.test.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:55:19.062636+00:00",
+                "result": "ops every later modality before HTTP (8285.5885ms)\n✔ live CLI media budget: video-download-http retains unmeasured reservations and stops every later modality before HTTP (8316.637458ms)\n✔ live CLI media budget: known supplier image usage is retained even if delivery fails, and does not invent a global usage freeze (337.180416ms)\n✔ live CLI duplicate spend: re-running a settled task never POSTs or alters its original receipt/settlement (498.102833ms)\n✔ live CLI duplicate spend: a frozen unknown POST outcome remains unknown on rerun, without another HTTP POST (538.166ms)\n✔ live CLI receipt history: image success survives a later missing-credential early return (1884.937625ms)\n✔ live CLI receipt history: video success survives a later missing-credential early return (13057.167459ms)\n✔ live CLI receipt history: an unavailable requested task cannot overwrite its earlier failure (442.496542ms)\n✔ live CLI receipt history: a lone original receipts file is retained (437.44325ms)\n✔ live CLI receipt history: a lone original transcripts file is retained (452.536166ms)\n✔ live CLI budget tail: missing final newline stops before the first actual provider POST (160.85975ms)\n✔ live CLI fixture: child resolves installed source Playwright without inherited NODE_PATH and retains explicit module paths (1101.49775ms)\n✔ live CLI: missing credentials exits unverified, captures real run evidence and does not consume quota (371.670875ms)\n✔ live CLI: disabled live configuration and empty task selection cannot become a zero-task pass (538.351416ms)\n✔ live CLI: production dispatch requires explicit writes, fixture and residual disclosure before login (430.2485ms)\n✔ live CLI: duplicate IDs, traversal and missing values fail before model admission (380.6135ms)\n✔ live CLI: an existing run lock prevents parallel evidence replacement and paid admission (160.92425ms)\n✔ G02 / N5: LLM reservations account for cumulative committed and pending tokens (55.216333ms)\n✔ G03 / N6: a failed product thread stays failed when its HTTP assertion passes (13.906209ms)\n✔ G04 / N7: image generation does not succeed when the artifact download receives 403 (31.22775ms)\n✔ P18 checks: one measured reasoning task cannot fan aggregate success out to unobserved domains (24.010708ms)\n✔ P18 checks: blocked media without receipts still produce every unverified observation (11.163708ms)\n✔ media decoder: actual PNG pixels and complete MP4/VP9 playback establish dimensions, duration and digest (2690.931708ms)\n✔ media decoder: a readable landed image has a matching receipt and tampered manifests fail (841.661708ms)\n✔ media decoder: duplicate paths cannot count as two delivered images (242.775792ms)\n✔ media decoder: valid MP4 container with corrupted frame data fails actual playback (128.933958ms)\n✔ media decoder: image adapter delivers exactly the occupied count and the shared completion verifier rereads it (616.944042ms)\n✔ media decoder: video adapter bills observed file duration and proves frames plus receipt metadata (4928.557792ms)\n✔ media: safe file identities reject traversal, separators, empty IDs and prototype-like path escapes (2.607ms)\n✔ media: URLs, directories, empty files and ungranted read permissions cannot substitute for files (2.356667ms)\n✔ media: symlink, hard link and realpath escape fail before the decoder (10.991542ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (3.558041ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (8.312167ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (2.210625ms)\n✔ media: forbidden, empty, HTML and truncated deliveries never produce a landed artifact (3.575917ms)\n✔ media: content length, CRC and container bounds are checked before decoding (9.990875ms)\n✔ media: credential URLs, unsafe task IDs and transport errors do not write artifacts (3.213542ms)\n✔ media: wrong MIME and URL-only or missing manifests are not accepted as receipts (2.914125ms)\n✔ product: completed matching thread, real receipt and every assertion jointly pass (8.635041ms)\n✔ product: failed cannot be turned into completion by a passing HTTP assertion (7.443292ms)\n✔ product: paused cannot be turned into completion by a passing HTTP assertion (3.211208ms)\n✔ product: pending_review cannot be turned into completion by a passing HTTP assertion (2.313042ms)\n✔ product: cancelled cannot be turned into completion by a passing HTTP assertion (1.056834ms)\n✔ product: canceled cannot be turned into completion by a passing HTTP assertion (1.924333ms)\n✔ product: timeout cannot be turned into completion by a passing HTTP assertion (1.814333ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.184292ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.093458ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.105792ms)\n✔ product: rejected, clarified or malformed dispatch cannot fabricate a thread identity (0.085917ms)\n✔ product: another thread's completed poll response is rejected (1.146917ms)\n✔ product: a valid execution receipt for another thread cannot prove the dispatched result (2.00825ms)\n✔ product: running thread times out without a success receipt (17.068125ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (3.496375ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (4.124625ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (3.528084ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (10.635625ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (4.585125ms)\n✔ product: completed thread with invalid or simulated execution evidence remains false success (2.15525ms)\n✔ product: missing, truncated or unauthorized event receipt fails closed (5.0115ms)\n✔ product: incomplete progress or latest failed receipt cannot be hidden by earlier success (2.841333ms)\n✔ product: empty, malformed and unexecuted SQL assertions cannot pass vacuously (11.007792ms)\n✔ product: SQL connector errors are explicit failed assertions (3.125916ms)\n✔ product: actual failed HTTP assertion is mandatory even with a real completed receipt (4.964292ms)\n✔ product: ASK completion uses an actual event read-back and a specific result assertion (9.395917ms)\n✔ product: ASK cannot pass from a health check, another thread or an earlier matching answer (2.383417ms)\n✔ product: opaque requireModel dispatch is blocked before any model-capable server request (0.209167ms)\n✔ product: verification recomputes event result and rejects hand-written actual/ok/target claims (2.429291ms)\n✔ product: dispatch cannot adopt stale receipts or stale ASK answer as current completion (6.270834ms)\n✔ gateway: complete identity and authoritative usage give a measured, synced receipt (5.134458ms)\n✔ gateway: missing, coerced or contradictory usage stays blocked and is never reported as measured zero (0.980583ms)\n✔ gateway: missing response model/id and malformed JSON cannot borrow request identity for a passing receipt (0.565167ms)\n✔ gateway: authentication, network and timeout failures preserve unknown usage after attempted I/O (0.42425ms)\n✔ gateway: missing credentials prevents external I/O and discloses that no call was admitted (0.088667ms)\n✔ media usage: actual HTTP timeout never becomes measured zero image count or video duration (434.328375ms)\n✔ media usage: an accepted asynchronous task with unreadable or timed out polling stays unmeasured (582.026292ms)\n✔ media usage: a reported duration without a readable media file cannot borrow the requested seconds (62.457708ms)\n✔ media usage: missing, coerced or contradictory image usage never turns returned URLs into complete supplier accounting (79.360917ms)\n✔ media usage: an explicit supplier zero is measured independently from successful delivery (16.2945ms)\n✔ media identity: image receipts retain returned model identity and never borrow the requested model (42.851375ms)\n✔ media identity: only the same video task can supply returned model identity (59.826834ms)\n✔ model identity: an actual returned route must match the declared model or an explicit exact allowedModels list (0.610459ms)\n✔ media recovery: accepted video polling failures resume the same ID with no second POST (17.147416ms)\n✔ media admission: missing durable directory and changed task inputs cannot send a POST (11.897167ms)\n✔ media recovery: partial image rounds reuse the first response and never resubmit an unknown second round (16.616583ms)\n▶ normalizeOpenAiCompatibleBaseUrl\n  ✔ 去掉 Anthropic 兼容后缀与尾斜杠，保留其它路径前缀 (0.411792ms)\n  ✔ OpenAI 兼容变量优先级里 LLM_BASE_URL 高于 DEEPSEEK_BASE_URL (0.605166ms)\n✔ normalizeOpenAiCompatibleBaseUrl (1.858084ms)\n▶ resolveLiveModels 端点方言分流\n  ✔ model-gateway 解析到 OpenAI 兼容根，绝不拼出 /anthropic/chat/completions (0.257417ms)\n  ✔ 只剩 Anthropic 根可用时也会去掉 /anthropic 并留痕（避免静默 404） (0.220417ms)\n  ✔ 显式 openAiBaseUrlEnv 优先于 Anthropic 声明值 (0.074416ms)\n  ✔ dsh-harness 保持 Anthropic 兼容根（Messages 协议），不被归一 (0.085791ms)\n  ✔ 缺任何端点变量时，两条链路使用各自官方协议默认根 (0.093583ms)\n  ✔ 缺凭据仍是 blocked（不得用 mock 顶替写通过） (0.215ms)\n✔ resolveLiveModels 端点方言分流 (1.292375ms)\n✔ usage: exact provider totals include cache buckets and never coerce unsafe counts (0.823834ms)\n✔ usage: a complete terminal turn accounts for actual attempts and model route (1.175333ms)\n✔ usage: every failed attempt and retry is accounted before its successful final message (1.194458ms)\n✔ usage: multiple steps and separate sessions accumulate rather than overwrite (0.204625ms)\n✔ usage: missing boundaries, usage, identity, truncated streams and unknown required events remain unavailable (0.973041ms)\nℹ tests 160\nℹ suites 2\nℹ pass 160\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 48981.877292\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:governance",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T17:59:21.724430+00:00",
+                "result": "ms)\n✔ G01 actual Node tests pass repair, independent acceptance and gate with both requested and observed argv bound (1496.279208ms)\n✔ G01 Node executable rejects an ordinary script before capture: fake-basename (126.614209ms)\n✔ G01 Node executable rejects an ordinary script before capture: PATH-shadow (172.49425ms)\n✔ G01 Node executable preserves real native identity and TestsStream counts: canonical-path-alias (490.092917ms)\n✔ G01 Node executable preserves real native identity and TestsStream counts: symlink-alias (466.536083ms)\n✔ G01 Node executable readback rejects source-bound forgery: rebound-fake-executable (552.129708ms)\n✔ G01 Node executable readback rejects source-bound forgery: rebound-fake-requested-executable (543.110208ms)\n✔ G01 Node executable readback rejects source-bound forgery: forged-native-hash (552.411584ms)\n✔ G01 Node executable readback rejects source-bound forgery: missing-native-binding (542.920125ms)\n✔ G05 N8a empty evidence is unverified and nonzero, with report still generated (208.541833ms)\n✔ G05 N8b four sparse evidence-present claims cannot pass (548.790291ms)\n✔ G05 complete legal synthetic fixture passes coverage and report (control test, no production claim) (717.812916ms)\n✔ G05 rejects regression aggregate --repo pointing to a different directory despite rebound hashes (643.432459ms)\n✔ G05 rejects regression aggregate --root pointing to a different directory despite rebound hashes (609.52975ms)\n✔ G05 rejects regression aggregate --input pointing to a different directory despite rebound hashes (534.790209ms)\n✔ G05 rejects regression aggregate --out pointing to a different directory despite rebound hashes (527.242375ms)\n✔ G05 report rejects missing required item (600.186417ms)\n✔ G05 report rejects duplicate checklist item (607.625166ms)\n✔ G05 report rejects forged source hash (602.086708ms)\n✔ G05 report rejects different commit (619.98975ms)\n✔ G05 report rejects unknown coverage commit (602.063541ms)\n✔ G05 report rejects item schema omitted (642.1655ms)\n✔ G05 report rejects item command omitted (618.995792ms)\n✔ G05 report rejects item expected differs from its raw observation (614.719166ms)\n✔ G05 report rejects item actual differs from its raw observation (628.206125ms)\n✔ G05 report rejects future item observation (606.139708ms)\n✔ G05 report rejects actual matching ID failed (598.29225ms)\n✔ G05 report rejects evidence-present without assertion pass (595.564458ms)\n✔ G05 report rejects unapproved not-applicable (638.948917ms)\n✔ G05 report rejects summary totals cannot hide missing items (549.253333ms)\n✔ G05 report rejects zero production tasks (595.753709ms)\n✔ G05 report rejects empty ready models (592.951875ms)\n✔ G05 report rejects empty U checks (596.982459ms)\n✔ G05 report rejects receipt says another task (613.714459ms)\n✔ G05 report rejects receipt has future verification time (616.893875ms)\n✔ G05 report rejects transcript lacks a real model answer (619.094209ms)\n✔ G05 report rejects missing UX domain (619.091083ms)\n✔ G05 report rejects selftest production substitute (636.334792ms)\n✔ G05 report rejects artifact file removed (969.041125ms)\n✔ G05 owner-approved not-applicable item is counted explicitly, with the full 276-item denominator (1086.293834ms)\n✔ G05 coverage rejects nonexistent manual evidence and cannot make 0/0 counts pass (144.007792ms)\n✔ G05 rejects budget totals forged to zero after rebinding all hashes (608.2875ms)\n✔ G05 rejects budget commit has no reservation after rebinding all hashes (597.173042ms)\n✔ G05 rejects budget initialization missing after rebinding all hashes (600.55275ms)\n✔ G05 rejects budget future ledger event after rebinding all hashes (602.400417ms)\n✔ G05 rejects budget estimate disagrees with frozen price after rebinding all hashes (595.613291ms)\n✔ G05 rejects budget task settlement failed after rebinding all hashes (602.747375ms)\n✔ G05 rejects budget supplier measurement incomplete after rebinding all hashes (609.78225ms)\n✔ G05 rejects budget measurement falsely claimed complete after rebinding all hashes (597.375083ms)\n✔ G05 rejects budget usage-unverified freeze hidden after rebinding all hashes (606.843959ms)\n✔ G05 rejects budget hard cap relaxed after rebinding all hashes (619.68475ms)\n✔ G05 rejects budget summary file missing after rebinding all hashes (611.620041ms)\n✔ G05 measured zero-output video reservation reconciles zero actual clips (synthetic arithmetic control) (619.836958ms)\n✔ G05 a null raw observation becomes unverified and still produces a report (600.3705ms)\n✔ G05 malformed outcome trials contain no objects stays unverified and report generation survives (633.2255ms)\n✔ G05 malformed redteam cases contain no objects stays unverified and report generation survives (658.84075ms)\n✔ G05 malformed soak samples contain no objects stays unverified and report generation survives (701.474334ms)\n✔ G05 malformed experience checks contain null stays unverified and report generation survives (619.885416ms)\n✔ G05 malformed UX checks are an object stays unverified and report generation survives (682.748958ms)\n✔ G05 malformed regression commands are an array stays unverified and report generation survives (570.026458ms)\n✔ G05 actual failed stage execution remains fail even if summary counts claim pass (623.602083ms)\n✔ G05 a source-bound tool product event can support report evidence (624.694375ms)\n✔ G05 a source-bound ask product event can support report evidence (650.729708ms)\n✔ G05 rejects product running terminal state after source and index hashes are rebound (632.644916ms)\n✔ G05 rejects product event hash mismatch after source and index hashes are rebound (616.17675ms)\n✔ G05 rejects product receipt names absent event after source and index hashes are rebound (609.058417ms)\n✔ G05 rejects product execute event is mock after source and index hashes are rebound (604.88125ms)\n✔ G05 rejects product tool event has another thread after source and index hashes are rebound (619.238667ms)\n✔ G05 rejects ASK answer differs from event after source and index hashes are rebound (627.505417ms)\n✔ G05 rejects ASK event has another thread after source and index hashes are rebound (655.908125ms)\n✔ G05 rejects ASK has no event assertion after source and index hashes are rebound (701.9515ms)\n✔ G05 rejects ASK event assertion fabricates its actual value after source and index hashes are rebound (665.586292ms)\n✔ G05 rejects ASK event assertion refers to an absent action after source and index hashes are rebound (628.157333ms)\n✔ G05 null run JSON remains unverified and does not crash report generation (520.447ms)\n✔ G05 false run JSON remains unverified and does not crash report generation (498.405458ms)\n✔ G05 indexed observations with a null check preserve the fixed denominator without crashing coverage (525.001459ms)\n✔ G05 real live CLI producer feeds 276-item coverage/report without turning blocked runs into production pass (614.98425ms)\n✔ help 暴露触发关键词与子命令 (28.679416ms)\n✔ init 记录审计基线并生成台账骨架 (214.493833ms)\n✔ invariants 从 AGENTS.md §4 提取不变量 (180.394625ms)\n✔ card-template 输出可直接使用的模板 (57.3275ms)\n✔ add 拒绝没有可运行断言的卡 (194.702833ms)\n✔ add 拒绝不可验收措辞（优化/提升/加强） (169.929542ms)\n✔ add 拒绝代码类证据缺少 @commit (165.394709ms)\n✔ gate 对 P0 未闭环判红，对完全闭环放行 (1287.797708ms)\n✔ gate 阻止修复者自验，只有完整独立批准来源才可豁免 (1474.419ms)\n✔ plan 输出四批计划与冲突面 (380.926708ms)\n✔ verify-baseline 识别本地不存在的提交与在线基线 (419.610791ms)\n✔ handoff 拒绝无回归路径的未闭环项，通过后生成 RDAS 交接单 (536.733458ms)\n✔ 台账缺不变量时 gate 判红（不变量是断言骨架） (208.722208ms)\n✔ 本地预览档位在交接单里给出生产口径警示 (1195.2205ms)\n✔ report 目录结构约定可写（evidence 目录） (128.230875ms)\n✔ npm 清单：优先采用 lockfile 解析版本，并保留 npm 别名行 (18.963ms)\n✔ Python 与容器镜像：解析约束、镜像来源 (1.658708ms)\n✔ probe 探测：regex / vendor / lockfile 三类来源 (1.370375ms)\n✔ 清单渲染：确定性、含上游最新与漂移标记、--check 可复现 (23.97675ms)\n✔ 版本工具：最高版本选择与滞后判定 (0.177375ms)\n✔ 仓库标识行：克隆 URL 大小写不同不算清单漂移 (0.419125ms)\n✔ 隔离仓本地运行资产：var 与 vendor/talkcraft 不计作仓库依赖，相近路径仍扫描 (2.538833ms)\n✔ 成功扫描钟：legacy last_full_scan 只显示历史未核实尝试，不能作为成功兜底 (10.539584ms)\n✔ 成功扫描钟：无效、未来或错误类型的 last_success 不能显示为成功 (28.4605ms)\n✔ 成功扫描钟：last_success 与后来失败尝试、legacy 历史字段分别保留 (9.979542ms)\n✔ failed upstream lookup never refreshes success time and is nonzero even with exit-zero (30.639709ms)\n✔ offline regeneration preserves upstream success clocks (11.061584ms)\n✔ dry-run keeps registry, cache, inventory and plan byte-identical (11.901042ms)\n✔ docker without an explicit registry image is unverified, with no fake success timestamp (11.017542ms)\n✔ successful lookup advances success time and records the precise source (11.498125ms)\n✔ npm failure keeps historical version unverified in document and out of upgrade plan; retry bypasses old TTL (20.127ms)\n✔ PyPI mirror fallback records the official source; later double failure keeps the old success clock (20.24125ms)\n✔ Docker real tags channel consumes all pages and refuses repeated or escaped next links (0.411041ms)\n✔ GitHub tags fallback keeps prerelease tags out of the stable candidate set (0.351667ms)\n✔ CI dry-run has no credential, branch, file or PR mutations (10.697541ms)\n✔ required registry missing fails before lookup and leaves facts unchanged (1.277083ms)\n✔ required registry malformed fails before lookup and leaves facts unchanged (1.106208ms)\n✔ required registry non-array fails before lookup and leaves facts unchanged (1.06275ms)\n✔ required registry empty fails before lookup and leaves facts unchanged (1.116875ms)\n✔ G15: legacy-only cannot postpone a real upstream lookup (10.907667ms)\n✔ G15: missing-status cannot postpone a real upstream lookup (10.941ms)\n✔ G15: malformed-success cannot postpone a real upstream lookup (10.146459ms)\n✔ G15: future-success cannot postpone a real upstream lookup (9.713917ms)\n✔ G15: a successful no-query cycle cannot invent a new global upstream-success time (9.720208ms)\n✔ G15: npm cache reuse retains the actual upstream observation time (10.020917ms)\n✔ G15: pypi cache reuse retains the actual upstream observation time (10.370541ms)\nℹ tests 483\nℹ suites 3\nℹ pass 483\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 242272.881292\n"
+              }
+            ],
+            "reviewedAt": "2026-10-07T18:00:39.367897+00:00",
+            "summary": "A：根完整审读849行当前diff、修改前实现与直接依赖，独立审查对准确69ba全部14改动和35个A文件/11个B输入逐blob核对。A级：原c598及直接依赖已完整精读；根完整审读当前完整diff，逐文件读取修改前与补充差异。独立只读审查24文件5483行A来源逐blob对2a B匹配，不把B字节比较冒称再次精读。第131项实现累计预算与gen-http首响应/GET接续，unknown不重发，已settled停止。独立发现三个P2均补充修复：缺key等早退覆盖原receipt/transcript；无换行合法JSON尾在reserve前失败关闭；非法参数deny追加也必须先replay。实际旧实现2/2回执负对照、旧tail4失败1正常通过、非法deny2失败1正常通过均保留；修复后准确2a全live160/160通过0跳过。当前2a八项准确源检查均退出0，标准25/25、video1672中1671通过1已有跳过、脚本89/89与161/161、双类型/资产/能力/diff均实际通过，日志SHA和时间由finalizer验证；额外live160源绑定JSON同样严格验证。漏任务号的本人最新4aec被云端门禁拒绝，保存旧Git对象后仅更正该自有task分支标题为2a，tree及parent完全同，显式fullSHA lease防覆盖，main不改且门禁未弱化；补全远端浅历史后本地原提交规范校验3/3通过。残余边界：共用helper极大多字节响应上限不一可能阻断恢复，外层肖像锁/硬断电耐久未认证，首次URL不保证永久相同图片字节；called不是新增付费数。正式制片源89冻结；全部新provider/媒体测试为明确合成回归，新增真实付费调用0。依赖129已独立正式发布；当前11文件/9CI理由与main e19及可信policy绑定，回滚revert本功能源码。 补充最终CI修复：真实2a云端治理473中471通过2失败，根因既有Chromium晚于成功媒体夹具；ac4前置同固定版浏览器准备并接入10个既有预算测试，无断言跳过。ac4本地运行锁发现根package全输入摘要过期；69ba严格依赖合成及完整锁校验后仅同步唯一package摘要，manifest与package-lock原字节均不变，未刷新依赖或降低校验。准确69ba八项检查全0，标准25/25、video1672中1671通过1既有skip、脚本89/89与161/161、双类型/资产/能力/diff通过；额外live160/160与治理483/483全0无skip。ac4治理482/483的temp仓Git身份缺失实际失败保留，69ba测试进程使用正式源提交同作者身份，不写全局配置。原2a验证仅作为历史记录，当前10项日志SHA及时间均由严格finalizer核验。",
+            "passed": true,
+            "id": "b24bbc087fc149d343941a8093e1cb255e30aa92cb880bcc46d7b667241a5e93"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 131,
+            "pull": {
+              "number": 131,
+              "state": "open",
+              "title": "fix(video): 实测重启复用受理状态与累计预算 [T-2026-1007-0006]",
+              "body": "实测媒体任务每次启动使用新的预算身份，且图片/视频受理响应只留在进程中；重跑下载或轮询失败的任务可能再次付费。现在同一输出目录持久化预算身份、每轮图片响应和视频任务 ID。未知提交结果不重发；已结算任务只读停止并保留原回执；未结算预占仅能恢复既有响应或 GET，不得新增生成 POST。\n\n报告分别记录 adapter 调用和实际新增提交次数，不以恢复冒充新扣费，不把未知用量记为零。临时签名地址属于私有本机状态并已排除 Git。CLI 合成夹具解析实际 pnpm Playwright 包路径，用已安装浏览器验证媒体恢复。\n\n验证：147/147 实测模块用例通过，包括真实独立进程重跑、本地 HTTP 轮询失败接续、部分图片成功/后续未知、输入变化和原预算/回执字节不变。该提交的标准脚本、视频、服务端、资产和能力检查正在完成，成功后提交准确源码的 Codex 回执给原生云端 CI。\n\n任务卡 #130；依赖 #129。修改仅在 Growthtest 隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0006\",\n  \"ready\": true,\n  \"depends_on\": [\n    129\n  ],\n  \"releases\": []\n}\n-->",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0006",
+                "sha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "status_check",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+            "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "files": [
+              ".cnb.yml",
+              ".workloom-runtime-deps/metadata.json",
+              "docs/capabilities.auto.json",
+              "docs/video-generation-idempotency.md",
+              "package.json",
+              "scripts/acceptance/lib/live/budget-tail.test.mjs",
+              "scripts/acceptance/lib/live/budget.mjs",
+              "scripts/acceptance/lib/live/cli-fixtures.mjs",
+              "scripts/acceptance/lib/live/live-budget-scope.mjs",
+              "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+              "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+              "scripts/acceptance/lib/live/providers-http.test.mjs",
+              "scripts/acceptance/lib/live/providers.mjs",
+              "scripts/acceptance/live.mjs"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0006",
+              "ready": true,
+              "dependsOn": [
+                129
+              ],
+              "releases": []
+            },
+            "headTime": 1791395547000,
+            "mergeBase": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/acceptance/lib/live/live-budget-scope.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/live-budget-scope.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/live-budget-scope.mjs",
+                  "absent": false
+                },
+                "digest": "058e0238f1bbe96d1cc6e055cce6c26025ff44b4820a132b14d9bb25cfa6a256"
+              },
+              {
+                "id": "CI-002",
+                "pipeline": "static-gate",
+                "stage": "交付证据、预算与行业配置回归",
+                "file": ".cnb.yml",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": ".cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "交付证据、预算与行业配置回归",
+                    "script": "set -eu\n# The CLI fixture drops ambient NODE_PATH; expose only the pinned test package.\ninstrumentation_dir=$(mktemp -d)\nplaywright_link_created=0\ntrap 'if [ \"$playwright_link_created\" = 1 ]; then rm -f node_modules/playwright; fi; rm -rf \"$instrumentation_dir\"' EXIT HUP INT TERM\nnpm install --prefix \"$instrumentation_dir\" playwright@1.63.0 --ignore-scripts --no-audit --no-fund\nif [ ! -e node_modules/playwright ] && [ ! -L node_modules/playwright ]; then\n  ln -s \"$instrumentation_dir/node_modules/playwright\" node_modules/playwright\n  playwright_link_created=1\nfi\npnpm test:governance\nnode scripts/generate-capabilities.mjs --check\n# 本仓契约校验不登录、不派单、不调用模型；业务能力保持未验证。\nnode scripts/acceptance/profile-check.mjs\nnode scripts/acceptance/outcome.mjs --validate-only\nnode scripts/runtime-deps-lock.mjs verify\n"
+                  }
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": ".cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "交付证据、预算与行业配置回归",
+                    "script": "set -eu\n# The CLI fixture drops ambient NODE_PATH; expose only the pinned test package.\ninstrumentation_dir=$(mktemp -d)\nplaywright_link_created=0\ntrap 'if [ \"$playwright_link_created\" = 1 ]; then rm -f node_modules/playwright; fi; rm -rf \"$instrumentation_dir\"' EXIT HUP INT TERM\nnpm install --prefix \"$instrumentation_dir\" playwright@1.63.0 --ignore-scripts --no-audit --no-fund\n# Successful receipt-history fixtures decode media before the later media suite.\nexport PLAYWRIGHT_BROWSERS_PATH=\"$instrumentation_dir/browsers\"\nnode \"$instrumentation_dir/node_modules/playwright/cli.js\" install --with-deps chromium\nif [ ! -e node_modules/playwright ] && [ ! -L node_modules/playwright ]; then\n  ln -s \"$instrumentation_dir/node_modules/playwright\" node_modules/playwright\n  playwright_link_created=1\nfi\npnpm test:governance\nnode scripts/generate-capabilities.mjs --check\n# 本仓契约校验不登录、不派单、不调用模型；业务能力保持未验证。\nnode scripts/acceptance/profile-check.mjs\nnode scripts/acceptance/outcome.mjs --validate-only\nnode scripts/runtime-deps-lock.mjs verify\n"
+                  }
+                },
+                "origins": {
+                  "before": ".cnb.yml",
+                  "after": ".cnb.yml"
+                },
+                "digest": "0904fbe62ee7c6ef583a8ebf80bed1d1d6d479547858a922ac51a1e0393dec8d"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/live-budget-scope.test.mjs",
+                  "absent": false
+                },
+                "digest": "1a8b8d95bf93fffc730d95f48c07f7bda1651df345ccd1874f46bcb3b33de7c5"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/acceptance/lib/live/cli-fixtures.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/cli-fixtures.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/cli-fixtures.mjs",
+                  "absent": false
+                },
+                "digest": "21a52d028c575334a0400091916dd409ba275f676590dc7d86ca39cc97237b52"
+              },
+              {
+                "id": "CI-005",
+                "file": "scripts/acceptance/lib/live/providers.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/providers.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/providers.mjs",
+                  "absent": false
+                },
+                "digest": "2c3fbc7b4273577ffaa79311eec16f9027f629dbeea6ee9fcf6d29fdd76372c0"
+              },
+              {
+                "id": "CI-006",
+                "file": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/live-cli-wire.test.mjs",
+                  "absent": false
+                },
+                "digest": "440cec1b7f3bff9531a3478c2edb3c03ce1951b796147f945cbacc889c0b3220"
+              },
+              {
+                "id": "CI-007",
+                "file": "package.json",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "package.json",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "package.json",
+                  "absent": false
+                },
+                "digest": "6e6200b52b93e8448c27b88e3ea93abc3109ddf19eddbba26837cce975522ddf"
+              },
+              {
+                "id": "CI-008",
+                "file": "scripts/acceptance/lib/live/budget.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/budget.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/budget.mjs",
+                  "absent": false
+                },
+                "digest": "6e8715d481d98812b032c0120e12af558e20b5562d3d63261489c8fa2ec96c91"
+              },
+              {
+                "id": "CI-009",
+                "file": "scripts/acceptance/lib/live/providers-http.test.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/providers-http.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/providers-http.test.mjs",
+                  "absent": false
+                },
+                "digest": "90a148a22790e3fe05ca42e5d3b828379a462b43aa07d5eadc5e812061c60e23"
+              },
+              {
+                "id": "CI-010",
+                "file": "scripts/acceptance/live.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/live.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/live.mjs",
+                  "absent": false
+                },
+                "digest": "98828a84314db50a50529393a86d9380a44b24ae94102670c67895ecf43056ce"
+              },
+              {
+                "id": "CI-011",
+                "file": "scripts/acceptance/lib/live/budget-tail.test.mjs",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": "scripts/acceptance/lib/live/budget-tail.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": "scripts/acceptance/lib/live/budget-tail.test.mjs",
+                  "absent": false
+                },
+                "digest": "c9ff7fe63d8329f955629e744134d531f19f5609e9f7dffa37a3f396d14913c6"
+              },
+              {
+                "id": "CI-012",
+                "file": ".cnb.yml",
+                "before": {
+                  "ref": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+                  "path": ".cnb.yml",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+                  "path": ".cnb.yml",
+                  "absent": false
+                },
+                "digest": "ede1170e3742662d81904b510284880b320b0dfae38fde70dca3b7af03216cc8"
+              }
+            ]
+          }
+        }
+      },
+      "previous": "fc798565524e60fde3848b05ccac7bd92c3e24e3073a894efe4d855dd7d99b9d",
+      "digest": "e1ccef66bbbbd9eb0864b559fd41140cd966e40d4d365941fd379fc5da85d345"
+    },
+    {
+      "sequence": 2454,
+      "at": "2026-10-07T18:02:20.284Z",
+      "kind": "transaction",
+      "data": {
+        "id": "e1428c65-7de4-4f5b-87dc-10d3b7fa996d"
+      },
+      "previous": "e1ccef66bbbbd9eb0864b559fd41140cd966e40d4d365941fd379fc5da85d345",
+      "digest": "2164c8a17e0b82f642144fe43bcfe2fd4654062c675d378ad510a277ad639239"
     }
   ]
 }
