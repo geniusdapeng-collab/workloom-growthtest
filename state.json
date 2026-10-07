@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 425,
+  "revision": 427,
   "tasks": {
     "98": {
       "number": 98,
@@ -2390,7 +2390,7 @@
     },
     "123": {
       "number": 123,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2669,8 +2669,8 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "检查/评审阻断：Developer has not handed off",
-      "blockedUntil": 1791343512207,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791344411052,
       "repairRequired": {
         "provider": "codex",
         "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
@@ -14061,6 +14061,31 @@
       },
       "previous": "3930f0324b815e823f6c36fbf43f6d168e13f6c3c1a937ea36151e0f1f2b7e3a",
       "digest": "eaa93af313727fe02b0cea09cc601a14f27eec48cdaf96160018b662fadddde5"
+    },
+    {
+      "sequence": 426,
+      "at": "2026-10-07T03:30:11.052Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791344411052
+        }
+      },
+      "previous": "eaa93af313727fe02b0cea09cc601a14f27eec48cdaf96160018b662fadddde5",
+      "digest": "1bc265c1ce1ec2238cfdadcc8a56816137b81965a996602cf8f295292d2bbe95"
+    },
+    {
+      "sequence": 427,
+      "at": "2026-10-07T03:30:30.869Z",
+      "kind": "transaction",
+      "data": {
+        "id": "a7675cc7-be2b-40b6-8b9f-dbcf43f052db"
+      },
+      "previous": "1bc265c1ce1ec2238cfdadcc8a56816137b81965a996602cf8f295292d2bbe95",
+      "digest": "815eb4e5941757b392092e2216223401fe46dde74fca102da5d5f1de30158bc4"
     }
   ]
 }
