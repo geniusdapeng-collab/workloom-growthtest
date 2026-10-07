@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2718,
+  "revision": 2720,
   "tasks": {
     "98": {
       "number": 98,
@@ -5105,7 +5105,7 @@
     },
     "135": {
       "number": 135,
-      "status": "waiting_ci",
+      "status": "aligning",
       "firstSeen": 1791354489850,
       "attempts": {},
       "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
@@ -5444,7 +5444,7 @@
       "dependencies": [
         133
       ],
-      "alignmentCount": 0,
+      "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
@@ -5457,7 +5457,12 @@
         "scripts/tools/film-native-post.test.ts",
         "scripts/tools/full-chain-film.mts"
       ],
-      "ciSince": 1791400014205
+      "ciSince": 1791400014205,
+      "alignmentIntent": {
+        "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
+        "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+        "at": 1791400014205
+      }
     },
     "137": {
       "number": 137,
@@ -71224,6 +71229,36 @@
       },
       "previous": "a7103b1125f53c480d4730c64a5cb77e6cb2e1e585214abea1ab30db3dda357a",
       "digest": "b94881a79cab03a64d41c9f25b02a76ca3aab91fd425398a45279da065b9d1d3"
+    },
+    {
+      "sequence": 2719,
+      "at": "2026-10-07T19:06:54.205Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
+            "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+            "at": 1791400014205
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "b94881a79cab03a64d41c9f25b02a76ca3aab91fd425398a45279da065b9d1d3",
+      "digest": "7b3f2fe419bccc725723d6b3e6089a226f4623eba68ba0a25867486b57bf7287"
+    },
+    {
+      "sequence": 2720,
+      "at": "2026-10-07T19:07:44.838Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f6c69953-7898-45b9-b8f5-576491d134a5"
+      },
+      "previous": "7b3f2fe419bccc725723d6b3e6089a226f4623eba68ba0a25867486b57bf7287",
+      "digest": "a266ed41c70aef3f7218c7f6afaa117c62493d0520e8e755cbe9add9285e04ff"
     }
   ]
 }
