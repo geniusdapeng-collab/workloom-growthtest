@@ -74,7 +74,7 @@ export async function resolveDirectorIdentities(scope:CreativeScope,by:string,re
   }
   return assets;
 }
-export interface SourceClip {shotId:string;assetId:string;path:string;sha256:string;durationSec:number;role?:string;dialogue:string;audio?:Record<string,unknown>}
+export interface SourceClip {shotId:string;assetId:string;path:string;sha256:string;durationSec:number;role?:string;dialogue:string;lockTrim?:boolean;audio?:Record<string,unknown>}
 export async function preflightDirectorAudio(filmPlan:DirectorFilmPlan,connectors:Awaited<ReturnType<typeof directorConnectors>>) {
   const {voice,env,bins,measure}=connectors;
   if(!env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET || Buffer.byteLength(env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET)<32)

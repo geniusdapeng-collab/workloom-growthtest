@@ -9,7 +9,7 @@ import { runInNewContext } from "node:vm";
 import { afterAll, describe, expect, it } from "vitest";
 import { coverShotHasCharacter, coverShotMatchesLead, coverShotCharacterIds, resolveCoverHero, resolveCoverComposition,
   fallbackCoverPlan, parseCoverPlan, buildCoverDesignPrompt, type CoverLeadSource, type CoverPlan, type CoverShotSource, type CoverComposition } from "./cover-design.js";
-import { captureLineageInputs, createLineageReceipt, stageLineageApproved, type LineageReceipt } from "./production-lineage.js";
+import { captureLineageInputs, createLineageReceipt, productionHash, stageLineageApproved, type LineageReceipt } from "./production-lineage.js";
 
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const file = join(repo, "scripts/tools/full-chain-film.mts"), source = readFileSync(file, "utf8");
@@ -25,7 +25,7 @@ interface Compiler {
 }
 const ts = createRequire(join(repo, "packages/video-studio/package.json"))("typescript") as Compiler;
 const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-const names = new Set(["coverSourcesForShots", "coverCompositionForPlan", "callCoverDesigner", "record", "lineageStage"]);
+const names = new Set(["coverSourcesForShots", "coverCompositionForPlan", "callCoverDesigner", "record", "lineageStage", "lineageRecords", "stageApproved"]);
 const declarations = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name && names.has(node.name.text));
 if (declarations.length !== names.size) throw new Error("COVER_FIXTURE_INVALID: actual CLI source functions missing");
 const selector = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name?.text === "selectCoverPlanForPolicy");
@@ -35,12 +35,13 @@ if (selectionStart < 0 || selectionEnd < 0) throw new Error("COVER_FIXTURE_INVAL
 const compiled = ts.transpileModule([...declarations, ...selector].map(node => node.getFullText(parsed)).join("\n")
   + "\nasync function selectActualCover() {\n" + source.slice(selectionStart, selectionEnd)
   + "\nreturn { plan, designVia, designNote }; }"
-  + "\nexports.api = { coverSourcesForShots, coverCompositionForPlan, callCoverDesigner, selectActualCover, record };",
+  + "\nexports.api = { coverSourcesForShots, coverCompositionForPlan, callCoverDesigner, selectActualCover, record, stageApproved };",
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 interface Api {
   callCoverDesigner(input: unknown): Promise<string>;
   selectActualCover(): Promise<{ plan: CoverPlan; designVia: string; designNote: string }>;
   record(input: Record<string, unknown>): { stage: string; ok: boolean; degraded: boolean; lineage: LineageReceipt };
+  stageApproved(stage: string, shotIds: Array<string | null>, rows: Array<{ stage: string; ok: boolean; degraded: boolean; lineage: LineageReceipt }>): boolean;
   coverSourcesForShots(shots: CoverShotSource[], lead: CoverLeadSource | null): {
     personShots: CoverShotSource[]; leadMatchedPersons: CoverShotSource[]; fallbackBackground: CoverShotSource;
   };
@@ -130,7 +131,7 @@ describe("封面正式 CLI 单主视觉与来源", () => {
         SHOTS_FILE: submitted, sourceFileHash: sourceHash, PROJECT: "fixture", RUN_ID: "fixture-run", REVISION_CONTEXT: null,
         sourceHashFor: () => sourceHash, lineageRecipe: () => recipe, sourceSupportFiles: inputs, sourceSnapshot: snapshot,
         lineageInputPaths: new Map(), lineageInputSnapshots: new Map(), records: rows, STAGE_LOG: join(dir, "stages.jsonl"),
-        stamp: () => "2026-10-07T00:00:00.000Z", createLineageReceipt, appendFileSync };
+        stamp: () => "2026-10-07T00:00:00.000Z", createLineageReceipt, productionHash, stageLineageApproved, appendFileSync };
       runInNewContext(compiled, sandbox);
       const selection = await sandbox.exports.api.selectActualCover();
       const result = sandbox.exports.api.record({ stage: "cover", shotId: null, invoked: true, ok: true, cached: false,
@@ -138,18 +139,18 @@ describe("封面正式 CLI 单主视觉与来源", () => {
         evidence: { designVia: selection.designVia, qualityReviewPerformed: false },
         verdict: { approved: true, degraded: false, score: null, qualityStatus: "unverified", evidence: [{ path: cover, sha256: sha(readFileSync(cover)) }] } });
       if (policy === "off") {
-        expect(modelCalls).toBe(0); expect(selection.designVia).toBe("deterministic");
         expect(result).toMatchObject({ ok: true, degraded: false, lineage: { status: "passed", errors: [] } });
-        expect(stageLineageApproved({ records: rows, projectId: "fixture", stage: "cover", sourceHash: () => sourceHash, recipe }).ok).toBe(true);
+        expect(sandbox.exports.api.stageApproved("cover", [null], rows)).toBe(true);
+        expect(modelCalls).toBe(0); expect(selection.designVia).toBe("deterministic");
       } else {
         expect(modelCalls).toBe(1); expect(selection.designVia).toBe("fallback");
         expect(result).toMatchObject({ ok: false, degraded: true, lineage: { status: "unverified", errors: [] } });
-        expect(stageLineageApproved({ records: rows, projectId: "fixture", stage: "cover", sourceHash: () => sourceHash, recipe }).ok).toBe(false);
+        expect(sandbox.exports.api.stageApproved("cover", [null], rows)).toBe(false);
       }
       expect(JSON.parse(readFileSync(join(dir, "stages.jsonl"), "utf8")).lineage).toEqual(result.lineage);
       if (policy === "off") {
         writeFileSync(cover, "changed output bytes");
-        expect(stageLineageApproved({ records: rows, projectId: "fixture", stage: "cover", sourceHash: () => sourceHash, recipe }).ok).toBe(false);
+        expect(sandbox.exports.api.stageApproved("cover", [null], rows)).toBe(false);
         rmSync(cover);
         const missing = sandbox.exports.api.record({ stage: "cover", shotId: null, invoked: true, ok: true, cached: false,
           degraded: false, attempt: 1, ms: 0, artifact: cover, evidence: {}, verdict: { approved: true, degraded: false } });
