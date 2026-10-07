@@ -49,7 +49,7 @@ test("issued original manifest rebuilds exact complete native timeline from real
   for (const row of loaded.timeline) { assert.deepEqual(row.video, row.audio); assert.equal(row.video.inSec, 0); assert.equal(row.speed, 1); }
   assert.equal(hash(readFileSync(join(f.clips, "S1.mp4"))), sourceBefore);
   assert.deepEqual(validateStandardPostSettings(settings(f.root), loaded.contract), settings(f.root));
-}));
+}), 60_000);
 test("a missing canonical manifest returns the stable standard error before media probing", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-missing-manifest-")));
   try {

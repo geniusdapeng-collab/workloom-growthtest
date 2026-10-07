@@ -761,7 +761,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "7cb3530da38ceec311f38dd2864414ccdc1598be74fbd60fec3ff21d054632ec",
+    "digest": "a59b32c7c035e1f5dac56471fd8874048f8dc35711590588d771df97f7bcf930",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "9180a2cb1fbac95f4c5ec835041e98436ccc2de6d7a874abb651bf6b74124425",
@@ -783,7 +783,7 @@
       "connectors/cine-kb-bridge/core.mjs": "41a4beede1b06a08ff17d11f4ffb999724789e3c9314845e0a599f53768f3304",
       "connectors/cine-kb-bridge/shot-intent.d.mts": "509d9d429e33e62ba472e8674fc281678e9fe500374dab505d47455b72441118",
       "connectors/cine-kb-bridge/shot-intent.mjs": "31a03c0700252cbd384c90c79baa1adff4f1d366396cdbda8501780f3006efb4",
-      "connectors/color-bridge/cli.mjs": "5cc8f2de3c277a77d7b2d68002e0ec44f098e1294a1ab1906543b0bb4469b7f4",
+      "connectors/color-bridge/cli.mjs": "491b92f5e0a84d3d8f26b264fa5a7452984201a8f655f1f8bdbfb668ace780af",
       "connectors/color-bridge/core.mjs": "57fce1613e37588b0e274588f3f9d0ca14c12598b27d0ca795d70b8bb79dc3e8",
       "connectors/color-bridge/executor.ts": "b9f548d8604dd2b3e2150dfeb544562ee7e2ad209402378f0c6eab2903fbd0fa",
       "connectors/color-bridge/kit/ffmpeg-pin.json": "505945ae35bfb1a5d42066ece3bb264b580ae54bbf863b3537136ba3130105a9",

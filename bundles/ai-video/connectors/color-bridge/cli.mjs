@@ -305,6 +305,7 @@ async function main() {
 
   if (json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   else printHuman(command, result);
+  if (command === "match" && result.results.some((item) => item.ok !== true)) process.exitCode = 3;
 }
 
 main().catch((error) => {

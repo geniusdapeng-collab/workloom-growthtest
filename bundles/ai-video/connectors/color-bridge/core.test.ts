@@ -876,4 +876,30 @@ describe.skipIf(!hasX264)("human color CLI renders actual requests with unmeasur
     const done = call(["help"]); expect(done.status, done.stderr).toBe(0);
     expect(done.stdout).toContain("不触发分析"); expect(done.stdout).toContain("需 --out"); expect(done.stdout).toContain("不作输出残差验收");
   });
+  it.each([false, true].flatMap(json => ["valid", "missing", "mixed", "all-failed"].map(kind => ({ json, kind }))))(
+    "match $kind batch reports every item and returns an honest exit code (json=$json)", ({ json, kind }) => {
+      const before = fs.readFileSync(source), missingA = path.join(dir, "absent-a.mp4"), missingB = path.join(dir, "absent-b.mp4");
+      const targets = kind === "valid" ? [source] : kind === "mixed" ? [source, missingA] : kind === "missing" ? [missingA] : [missingA, missingB];
+      const outDir = path.join(dir, `batch-${kind}-${json ? "json" : "human"}`);
+      const done = call(["match", "--ref", source, ...targets.flatMap(target => ["--in", target]), "--out-dir", outDir, ...(json ? ["--json"] : [])]);
+      expect(done.status, done.stdout + done.stderr).toBe(kind === "valid" ? 0 : 3);
+      expect(done.stderr).toBe("");
+      const successful = kind === "valid" || kind === "mixed", output = path.join(outDir, "source-matched.mp4");
+      expect(fs.existsSync(output)).toBe(successful);
+      expect(fs.readdirSync(outDir).filter(file => file.endsWith(".mp4"))).toHaveLength(successful ? 1 : 0);
+      if (json) {
+        const result = JSON.parse(done.stdout);
+        expect(result.qualityReviewPerformed).toBe(false);
+        expect(result.results.map((item: { target: string }) => item.target)).toEqual(targets);
+        expect(result.results.map((item: { ok: boolean }) => item.ok)).toEqual(targets.map(target => target === source));
+        for (const item of result.results) {
+          if (item.ok) { expect(item.output).toBe(output); expect(item.residual).toBeNull(); expect(item.qualityReviewPerformed).toBe(false); }
+          else expect(item.error).toBe("not_found");
+        }
+      } else {
+        for (const target of targets) expect(done.stdout).toContain(target === source ? output : `${target} — not_found`);
+        expect(done.stdout).not.toMatch(/Cannot read|NaN|残差 YAVG/);
+      }
+      expect(fs.readFileSync(source)).toEqual(before);
+    }, 90_000);
 });
