@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2514,
+  "revision": 2516,
   "tasks": {
     "98": {
       "number": 98,
@@ -4481,7 +4481,7 @@
         "at": 1791394218898
       },
       "recoveryIntent": null,
-      "mergePhase": "merge_requested",
+      "mergePhase": "merge_verified",
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 151,
@@ -4768,7 +4768,15 @@
           "protocol": 68
         }
       },
-      "mergeRequestedAt": 1791396912144
+      "mergeRequestedAt": 1791396912144,
+      "merge": {
+        "sha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+        "sourceSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+        "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+        "checkSha": "3f5ae6eb34d06f23fee63e3770f7958fb1002632",
+        "mergedBy": "cnb.dYiF05kxAGA",
+        "verifiedAt": "2026-10-07T18:16:08.868Z"
+      }
     },
     "133": {
       "number": 133,
@@ -67201,6 +67209,37 @@
       },
       "previous": "325a82f80ce7e0696b7131599e4b9d3fd9c3ef9b4b6cc3a06ed8c9126939c17a",
       "digest": "7cc52f0223cd3b155565efaeb3c5c8e88cecc5c25a2f24911350ff08c100fa01"
+    },
+    {
+      "sequence": 2515,
+      "at": "2026-10-07T18:15:12.144Z",
+      "kind": "task",
+      "data": {
+        "number": 131,
+        "patch": {
+          "mergePhase": "merge_verified",
+          "merge": {
+            "sha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+            "sourceSha": "69ba1dfcba18c4207a39d3cf60fc49ad370d6309",
+            "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "checkSha": "3f5ae6eb34d06f23fee63e3770f7958fb1002632",
+            "mergedBy": "cnb.dYiF05kxAGA",
+            "verifiedAt": "2026-10-07T18:16:08.868Z"
+          }
+        }
+      },
+      "previous": "7cc52f0223cd3b155565efaeb3c5c8e88cecc5c25a2f24911350ff08c100fa01",
+      "digest": "af1263ff082937b9a46e15b109e64ea3d10018b9ac1e89d64fda3a712224fd2e"
+    },
+    {
+      "sequence": 2516,
+      "at": "2026-10-07T18:16:08.868Z",
+      "kind": "transaction",
+      "data": {
+        "id": "d48bd590-5ccb-479a-b2ac-5b9fb3611be3"
+      },
+      "previous": "af1263ff082937b9a46e15b109e64ea3d10018b9ac1e89d64fda3a712224fd2e",
+      "digest": "1275b64912187c03ff70dd58d68c3742b5d420902365e4d6bdea7d5eeb0fc5d2"
     }
   ]
 }
