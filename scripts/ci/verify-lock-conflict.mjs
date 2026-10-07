@@ -189,18 +189,59 @@ export function changedFiles({ context = {}, env = {}, cwd = process.cwd() } = {
 
 export class LockApiClient {
   constructor({ repoSlug, token, fetchImpl = globalThis.fetch, timeoutMs = 10_000, budgetMs = 60_000,
-    pageSize = 10, maxPages = 100, now = Date.now } = {}) {
+    pageSize = 10, maxPages = 100, now = Date.now, rateLimitDelays = [5_000, 15_000, 45_000],
+    sleep = ms => new Promise(resolve => setTimeout(resolve, ms)) } = {}) {
     this.repoSlug = repositorySlug(repoSlug);
     if (typeof token !== "string" || !token.trim() || typeof fetchImpl !== "function") fail("API_INCOMPLETE", "缺少 API 令牌或网络实现");
     for (const [name, value] of Object.entries({ timeoutMs, budgetMs, pageSize, maxPages })) {
       if (!Number.isSafeInteger(value) || value <= 0) fail("API_INCOMPLETE", `${name} 必须为正整数`);
     }
+    if (!Array.isArray(rateLimitDelays) || rateLimitDelays.length > 3
+      || rateLimitDelays.some(ms => !Number.isSafeInteger(ms) || ms <= 0 || ms > 60_000)
+      || typeof now !== "function" || typeof sleep !== "function") fail("API_INCOMPLETE", "限流退避参数无效");
     this.token = token; this.fetchImpl = fetchImpl; this.timeoutMs = timeoutMs;
     this.deadline = now() + budgetMs; this.now = now; this.pageSize = pageSize; this.maxPages = maxPages;
+    this.rateLimitDelays = [...rateLimitDelays]; this.sleep = sleep;
   }
 
   async api(path, { repoSlug = this.repoSlug, raw = false } = {}) {
     const boundRepo = repositorySlug(repoSlug);
+    for (let attempt = 0; ; attempt += 1) {
+      try { return await this.readOnce(path, { boundRepo, raw }); }
+      catch (error) {
+        // Only the same read-only GET is retried. An unavailable proof never becomes a pass.
+        if (error.code !== "API_INCOMPLETE" || error.status !== 429 || attempt >= this.rateLimitDelays.length) throw error;
+        const retryAfter = error.retryAfter?.trim() ?? "";
+        let serverDelay = 0;
+        if (/^\d+$/.test(retryAfter)) serverDelay = Number(retryAfter) * 1000;
+        else if (/^[A-Za-z]{3,9}[, ]/.test(retryAfter)) {
+          const date = Date.parse(retryAfter);
+          if (Number.isFinite(date)) serverDelay = Math.max(0, date - this.now());
+        }
+        await this.waitForRateLimit(Math.max(this.rateLimitDelays[attempt], serverDelay));
+      }
+    }
+  }
+
+  async waitForRateLimit(delay) {
+    const remaining = this.deadline - this.now();
+    if (!Number.isSafeInteger(delay) || delay >= remaining) fail("API_INCOMPLETE", "HTTP 429 所需退避超过 API 采集总预算", 429);
+    let timer;
+    try {
+      await Promise.race([this.sleep(delay), new Promise((_, reject) => {
+        timer = setTimeout(() => {
+          const error = new Error("API_INCOMPLETE: 限流等待超过 API 采集总预算");
+          error.code = "API_INCOMPLETE"; reject(error);
+        }, remaining);
+      })]);
+      if (this.now() >= this.deadline) fail("API_INCOMPLETE", "限流等待超过 API 采集总预算");
+    } catch (error) {
+      if (error.code === "API_INCOMPLETE") throw error;
+      fail("API_INCOMPLETE", "限流等待失败");
+    } finally { clearTimeout(timer); }
+  }
+
+  async readOnce(path, { boundRepo, raw }) {
     const remaining = this.deadline - this.now();
     if (remaining <= 0) fail("API_INCOMPLETE", "API 采集总时间已超限");
     const controller = new AbortController();
@@ -209,10 +250,16 @@ export class LockApiClient {
       return await Promise.race([
         (async () => {
           const response = await this.fetchImpl(`${API}/${boundRepo}/-/${path}`, {
+            method: "GET",
             headers: { Authorization: `Bearer ${this.token}`, Accept: "application/vnd.cnb.api+json" },
             redirect: "error", signal: controller.signal,
           });
-          if (response.status !== 200) fail("API_INCOMPLETE", `CNB GET 返回 HTTP ${response.status}`, response.status);
+          if (response.status !== 200) {
+            const error = new Error(`API_INCOMPLETE: CNB GET 返回 HTTP ${response.status}`);
+            error.code = "API_INCOMPLETE"; error.status = response.status;
+            if (response.status === 429) error.retryAfter = response.headers.get("Retry-After");
+            throw error;
+          }
           const text = await response.text();
           if (!text || text.length > 16 * 1024 * 1024) fail("API_INCOMPLETE", "API JSON 为空或超过大小边界");
           if (raw) return text;
@@ -228,7 +275,7 @@ export class LockApiClient {
     } catch (error) {
       if (error.code === "API_INCOMPLETE") throw error;
       fail("API_INCOMPLETE", "API 网络读取失败");
-    } finally { clearTimeout(timer); }
+    } finally { clearTimeout(timer); controller.abort(); }
   }
 }
 
