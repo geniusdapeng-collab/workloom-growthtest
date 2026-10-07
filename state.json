@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 743,
+  "revision": 745,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "developing",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2067,9 +2067,9 @@
           "protocol": 15
         }
       },
-      "updatedAt": 1791357008993,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791356410583,
+      "updatedAt": 1791357311247,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791357911247,
       "headSha": "eda8255dc676671f50e3b188058daa3a93750d05",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -24786,6 +24786,31 @@
       },
       "previous": "9305529f67e01f20c0239d4c2f26387c0db51be9fdfe8c309ca05e73c8259ebe",
       "digest": "50cc61f0e3b1f990017af96a009c9132846d6c1dd1520c11e711c1e9b02e99b8"
+    },
+    {
+      "sequence": 744,
+      "at": "2026-10-07T07:15:11.247Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791357911247
+        }
+      },
+      "previous": "50cc61f0e3b1f990017af96a009c9132846d6c1dd1520c11e711c1e9b02e99b8",
+      "digest": "45394328d9a297cbaffaf83ba8987fa443df934a23bec31a3225861487cb5edc"
+    },
+    {
+      "sequence": 745,
+      "at": "2026-10-07T07:15:34.442Z",
+      "kind": "transaction",
+      "data": {
+        "id": "e8584d33-a3ee-4950-a7e3-ac2751b0c31e"
+      },
+      "previous": "45394328d9a297cbaffaf83ba8987fa443df934a23bec31a3225861487cb5edc",
+      "digest": "42a10dc0c730fa5eaad1119f55061def81270e15b0133b25b3be7a5c14c93b51"
     }
   ]
 }
