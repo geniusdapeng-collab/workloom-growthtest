@@ -47,3 +47,22 @@ test("budget tail: a complete persisted ledger can reopen and reserve a differen
   const reopened = createBudget(options); assert.equal(reopened.reserve({ taskId: "IMG-NEXT", kind: "image", units: 1 }).allowed, true);
   assert.equal(reopened.summary().actual.images, 1); assert.equal(reopened.summary().pending.images, 1);
 });
+
+for (const operation of ["reserve", "commit"]) {
+  test(`budget tail: invalid ${operation} arguments cannot append a denial to an incomplete ledger`, t => {
+    const { budget } = fixture(t); const broken = incompleteTail(budget);
+    assert.throws(() => budget[operation]({ taskId: "IMG-INVALID", kind: "image", units: -1 }), /末行.*换行/);
+    assert.equal(readFileSync(budget.ledgerPath, "utf8"), broken);
+  });
+}
+
+test("budget tail: a complete ledger still records invalid reserve and commit denials", t => {
+  const { budget } = fixture(t);
+  for (const operation of ["reserve", "commit"]) {
+    const result = budget[operation]({ taskId: "IMG-INVALID", kind: "image", units: -1 });
+    assert.equal(result.allowed, false); assert.equal(result.committed, false);
+  }
+  const rows = readFileSync(budget.ledgerPath, "utf8").trim().split("\n").map(line => JSON.parse(line));
+  assert.deepEqual(rows.map(row => row.event), ["budget-init", "reserve-denied", "commit-denied"]);
+  assert.equal(budget.summary().blocked.length, 2);
+});
