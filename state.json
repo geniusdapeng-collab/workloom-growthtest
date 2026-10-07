@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 498,
+  "revision": 500,
   "tasks": {
     "98": {
       "number": 98,
@@ -2413,7 +2413,7 @@
           "protocol": 16
         }
       },
-      "updatedAt": 1791346511382,
+      "updatedAt": 1791347109853,
       "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2677,7 +2677,7 @@
         "at": 1791338419356
       },
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791346511332,
+      "blockedUntil": 1791347709853,
       "repairRequired": {
         "provider": "codex",
         "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
@@ -15923,6 +15923,31 @@
       },
       "previous": "41de19dc9d51800430eccf97bd24d90971749acd419eedca095a0147b88ab09c",
       "digest": "2d3de690310ef042aafa5bdce04f43d133990aece2364092a1167f16794ab2e7"
+    },
+    {
+      "sequence": 499,
+      "at": "2026-10-07T04:25:09.853Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791347709853
+        }
+      },
+      "previous": "2d3de690310ef042aafa5bdce04f43d133990aece2364092a1167f16794ab2e7",
+      "digest": "83b4e709c3821383e2191737c4144b45e269247c68ed493e9102a3f7eafda691"
+    },
+    {
+      "sequence": 500,
+      "at": "2026-10-07T04:25:16.336Z",
+      "kind": "transaction",
+      "data": {
+        "id": "d1c1fe68-e303-4a93-92a6-d7a697f290fb"
+      },
+      "previous": "83b4e709c3821383e2191737c4144b45e269247c68ed493e9102a3f7eafda691",
+      "digest": "26d2142980f060ebd66ac564c396d4bd36443c31e3d1988cf9c41fb05648be7e"
     }
   ]
 }
