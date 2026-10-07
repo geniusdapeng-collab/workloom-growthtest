@@ -142,6 +142,23 @@ const gradeProfile = arg("--grade-profile");
 const gradeLut = arg("--grade-lut");
 const gradeIntensity = arg("--grade-intensity", "0.55");
 const gradedOut = arg("--graded-out");
+const nativeClock = flag("--native-clock");
+if (nativeClock && (fade !== 0 || transition || transitionDuration !== 0 || retimeTo !== 0 || title || subtitle || colorMode !== "none"))
+  throw new Error("STANDARD_NATIVE_COMPOSE_OPTIONS_INVALID: native clock composition only concatenates complete original shots");
+
+function nativeFrameCount(file: string): number {
+  const doc = JSON.parse(run(FFPROBE, ["-v", "error", "-count_frames", "-show_streams", "-of", "json", file])) as {
+    streams: Array<{ codec_type?: string; width?: number; height?: number; avg_frame_rate?: string; duration?: string; nb_read_frames?: string }>;
+  };
+  const video = doc.streams.filter(stream => stream.codec_type === "video"), audio = doc.streams.filter(stream => stream.codec_type === "audio");
+  const stream = video[0], [numerator, denominator] = String(stream?.avg_frame_rate ?? "").split("/").map(Number);
+  const frames = Number(stream?.nb_read_frames), duration = Number(stream?.duration);
+  if (video.length !== 1 || audio.length !== 1 || stream?.width !== width || stream.height !== height
+    || Number(numerator) / Number(denominator) !== fps || !Number.isSafeInteger(frames) || frames <= 0
+    || !Number.isFinite(duration) || Math.abs(duration - frames / fps) > 1e-6)
+    throw new Error(`STANDARD_NATIVE_COMPOSE_MEDIA_INVALID: ${basename(file)} complete frame clock or geometry differs`);
+  return frames;
+}
 
 mkdirSync(dirname(out), { recursive: true });
 const temp = mkdtempSync(join(tmpdir(), "wl-compose-"));
@@ -150,6 +167,15 @@ console.log(`拼接 ${clips.length} 个镜头 → ${width}x${height} @${fps}fps�
 /* ---------- ① 归一化 ---------- */
 const normalized: string[] = [];
 clips.forEach((clip, index) => {
+  if (nativeClock) {
+    const frames = nativeFrameCount(clip), duration = frames / fps;
+    const pcm = readAllPcm(clip, 48000), requiredSamples = Math.round(duration * 48000);
+    if (pcm.length < requiredSamples)
+      throw new Error(`STANDARD_POST_NATIVE_CLOCK_INCOMPLETE: ${basename(clip)} ${pcm.length} decoded samples < ${requiredSamples}; no silence padding`);
+    normalized.push(clip);
+    console.log(`  ① 原片完整钟 ${basename(clip)} → ${frames}帧 / ${duration}s；原声 ${pcm.length}样点（编码尾界 ${pcm.length - requiredSamples}，不补静音）`);
+    return;
+  }
   const target = join(temp, `norm-${String(index).padStart(2, "0")}.mp4`);
   /**
    * 每段音轨必须与画面**等长**（2026-09-26 真机事故修复）：
@@ -206,8 +232,9 @@ const listFile = join(temp, "concat.txt");
 writeFileSync(listFile, normalized.map((file, index) =>
   `file '${file}'\nduration ${shotSeconds[index]!.toFixed(6)}`).join("\n"), "utf8");
 const audioExact = normalized.map((_, index) =>
-  `[${index}:a]atrim=end=${shotSeconds[index]!.toFixed(6)},asetpts=N/SR/TB,`
-  + `apad=whole_dur=${shotSeconds[index]!.toFixed(6)}[aex${index}]`);
+  nativeClock
+    ? `[${index}:a]aresample=48000,atrim=end_sample=${Math.round(shotSeconds[index]! * 48000)},asetpts=N/SR/TB[aex${index}]`
+    : `[${index}:a]atrim=end=${shotSeconds[index]!.toFixed(6)},asetpts=N/SR/TB,apad=whole_dur=${shotSeconds[index]!.toFixed(6)}[aex${index}]`);
 if (transition && transitionDuration > 0) {
   /**
    * xfade 链：每刀的 offset = 到该刀为止的累计时长 − 已消耗的转场重叠。
@@ -282,7 +309,7 @@ if (transition && transitionDuration > 0) {
     "-y", "-i", videoOnly, "-i", voiceWav,
     "-map", "0:v:0", "-map", "1:a:0",
     "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
-    "-shortest", "-movflags", "+faststart", raw,
+    ...(nativeClock ? [] : ["-shortest"]), "-movflags", "+faststart", raw,
   ]);
 }
 const rawDuration = probeDuration(raw);
@@ -334,8 +361,9 @@ if (Math.abs(retimeFactor - 1) > 0.0005) {
   run(FFMPEG, [
     "-y", "-i", raw,
     ...(filters.length > 0 ? ["-vf", filters.join(",")] : []),
-    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out,
+    ...(nativeClock ? ["-c:v", "copy", "-c:a", "copy"]
+      : ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k"]),
+    "-movflags", "+faststart", out,
   ]);
 }
 const outDuration = probeDuration(out);
@@ -430,6 +458,7 @@ writeFileSync(avReportPath, `${JSON.stringify({
   policy: avPolicy,
   sampleRate: avSyncSampleRate,
   clipCount: normalized.length,
+  nativeClock,
   retimeFactor,
   output: out,
   outputSha256: await sha256File(out),

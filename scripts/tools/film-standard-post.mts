@@ -512,7 +512,7 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       const rechecked = await loadOriginalRenderManifest(manifestFile, { ...options, ...bins });
       ensure(rechecked.manifestSha256 === original.manifestSha256 && rechecked.contract.contractSha256 === contract.contractSha256, "original sources drifted before composition");
       const argv = ["--import", "tsx", join(repo, "scripts/tools/compose-film.mts"), "--clips", prepared.map((s) => s.path).join(","), "--out", composed,
-        "--width", String(plan.width), "--height", String(plan.height), "--fps", String(plan.fps), "--fade", "0", "--color", "none", "--json"];
+        "--width", String(plan.width), "--height", String(plan.height), "--fps", String(plan.fps), "--fade", "0", "--color", "none", "--native-clock", "--json"];
       const result = await run(process.execPath, argv, timeout, { ...process.env, WL_FFMPEG: bins.ffmpeg, WL_FFPROBE: bins.ffprobe }, repo);
       const avSync = JSON.parse(await readFile(composed.replace(/\.mp4$/, ".av-sync.json"), "utf8")) as { ok?: boolean };
       if (avSync.ok !== true) fail("STANDARD_POST_SOURCE_SPEECH_UNVERIFIED", "official compose AV sync did not pass");
