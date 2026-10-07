@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1589,
+  "revision": 1591,
   "tasks": {
     "98": {
       "number": 98,
@@ -2582,7 +2582,7 @@
     },
     "123": {
       "number": 123,
-      "status": "parked",
+      "status": "aligning",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2763,11 +2763,11 @@
         "scripts/tools/full-chain-film.mts"
       ],
       "ciSince": 1791339010301,
-      "alignmentCount": 0,
+      "alignmentCount": 1,
       "alignmentIntent": {
-        "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
-        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "at": 1791338419356
+        "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+        "at": 1791383717647
       },
       "error": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
       "blockedUntil": 0,
@@ -45794,6 +45794,36 @@
       },
       "previous": "40fe5f076f23dc2bbb37a099f3115e43377b6d58c2199370fc7ebb61c27395fa",
       "digest": "880921a164023e6f9804d0f70671a27aabcea8bf50faebb53fc95679b8156230"
+    },
+    {
+      "sequence": 1590,
+      "at": "2026-10-07T14:35:17.647Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "at": 1791383717647
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "880921a164023e6f9804d0f70671a27aabcea8bf50faebb53fc95679b8156230",
+      "digest": "16435410993bb5910c31510787306dc3b6e12dd75270d15183edc6ff7bb5e97f"
+    },
+    {
+      "sequence": 1591,
+      "at": "2026-10-07T14:36:02.395Z",
+      "kind": "transaction",
+      "data": {
+        "id": "6603501f-8c54-40d8-a530-885b5f4d853c"
+      },
+      "previous": "16435410993bb5910c31510787306dc3b6e12dd75270d15183edc6ff7bb5e97f",
+      "digest": "a4a27e5a44be7d77f930f8372614f050751ccbead175869df6bc8c4e3104a7ce"
     }
   ]
 }
