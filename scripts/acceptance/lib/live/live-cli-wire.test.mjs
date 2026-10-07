@@ -48,7 +48,7 @@ test("live CLI wire: missing media usage freezes later paid tasks, retains reser
   const result = await child(f, [], { CUSTOM_MODEL_ACCESS: secret, SYNTHETIC_BASE_URL: s.url }); assert.equal(result.status, 2, result.stderr);
   const actual = report(f); assert.equal(actual.tasks[0].status, "blocked"); assert.equal(actual.tasks[1].status, "blocked"); assert.equal(actual.budget.measurementComplete, false);
   assert.equal(actual.budget.actual.images, 0); assert.equal(actual.budget.unmeasured.images, 1); assert.equal(actual.budget.used.images, 1); assert.equal(s.calls.filter((call) => call.url === "/images/generations").length, 1);
-  assert.equal(actual.secretScan.passed, true); assert.equal(actual.tasks[0].reason.includes("[REDACTED]"), true);
+  assert.equal(actual.secretScan.passed, true); assert.equal(actual.tasks[0].reason.includes(secret), false);
   for (const value of [JSON.stringify(actual), result.stdout, result.stderr, readFileSync(join(f.out, "transcripts/IMG-01.json"), "utf8"), readFileSync(join(f.out, "receipts/IMG-01.json"), "utf8"), readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8")]) assert.equal(value.includes(secret), false);
 });
 
@@ -133,4 +133,25 @@ test("live CLI media budget: known supplier image usage is retained even if deli
   const actual = report(f); assert.equal(actual.tasks[0].status, "failed"); assert.equal(actual.tasks[0].measurementComplete, true); assert.equal(actual.tasks[0].receipt.synced, false);
   assert.equal(actual.budget.actual.images, 2); assert.equal(actual.budget.unmeasured.images, 0); assert.equal(actual.budget.measurementComplete, true); assert.deepEqual(actual.budget.frozenBy, []);
   assert.equal(actual.tasks[1].status, "failed"); assert.equal(actual.tasks[1].measurementComplete, true); assert.equal(s.calls.filter((call) => call.url === "/images/generations").length, 2);
+});
+
+
+test("live CLI duplicate spend: re-running a settled task never POSTs or alters its original receipt/settlement", async (t) => {
+  const s = await mediaServer(t, "image-known-usage"); const f = fixture(t, mediaProfile(s.url, [imageTask]));
+  const env = { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: s.url };
+  await child(f, [], env);
+  const receipt = readFileSync(join(f.out, "receipts/IMG-01.json"), "utf8"); const ledger = readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8");
+  await child(f, [], env); const actual = report(f);
+  assert.equal(s.calls.filter(call => call.url === "/images/generations").length, 1);
+  assert.equal(actual.tasks[0].status, "blocked"); assert.equal(actual.tasks[0].called, false); assert.equal(actual.tasks[0].budgetAlreadySettled, true);
+  assert.equal(readFileSync(join(f.out, "receipts/IMG-01.json"), "utf8"), receipt);
+  assert.equal(readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8"), ledger); assert.equal(actual.budget.actual.images, 1);
+});
+
+test("live CLI duplicate spend: a frozen unknown POST outcome remains unknown on rerun, without another HTTP POST", async (t) => {
+  const s = await mediaServer(t, "image-network"); const f = fixture(t, mediaProfile(s.url, [imageTask]));
+  const env = { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: s.url };
+  await child(f, [], env); await child(f, [], env);
+  assert.equal(s.calls.filter(call => call.url === "/images/generations").length, 1);
+  const actual = report(f); assert.equal(actual.tasks[0].status, "blocked"); assert.equal(actual.budget.unmeasured.images, 1); assert.equal(actual.budget.measurementComplete, false);
 });

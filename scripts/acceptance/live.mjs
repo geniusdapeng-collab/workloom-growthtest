@@ -40,6 +40,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { cliArgs, findRepoRoot, loadProfile } from "./lib/profile.mjs";
 import { fingerprintEnvironment, fingerprintLines, loadEnvFile, resolveEnvironment, probeEnvironment } from "./lib/target.mjs";
 import { createBudget, normalizeBudgets } from "./lib/live/budget.mjs";
+import { loadBudgetRunIdentity } from "./lib/live/live-budget-scope.mjs";
 import {
   createMultimodalFixture,
   readImageFixture, resolveLiveModels, runChatTask, runDshTask, runImageTask,
@@ -292,7 +293,8 @@ if (SELFTEST) {
 /* ---------------------------- 预算闸 ---------------------------- */
 const { budgets, warnings: budgetWarnings } = normalizeBudgets(liveProfile.budgets ?? {});
 notes.push(...budgetWarnings);
-const budgetOptions = { budgets, outDir: OUT_DIR, environmentKind: environment.kind, runId: RUN_ID };
+const budgetOptions = { budgets, outDir: OUT_DIR, environmentKind: environment.kind,
+  runId: loadBudgetRunIdentity({ outDir: OUT_DIR, environmentKind: environment.kind }) };
 const budget = createBudget(budgetOptions);
 
 /* ---------------------------- 目标探测与指纹 ---------------------------- */
@@ -458,9 +460,10 @@ async function runTask(task) {
       const units = Number(task.images ?? 1);
       const gate = budget.reserve({ taskId: task.id, kind: "image", units, detail: chain });
       if (!gate.allowed) return { ...base, status: "blocked", called: false, reason: gate.reason, ms: Date.now() - startedAt };
+      if (gate.duplicate && gate.settled) return { ...base, chain, status: "blocked", called: false, budgetAlreadySettled: true, reason: "该任务预算已结算；本次只读停止，请查看原回执，不重复生成或结算", ms: Date.now() - startedAt };
       reserved = { kind: "image" };
-      const out = await runImageTask({ resolved, task, timeoutMs: Math.max(TASK_TIMEOUT_MS, 5 * 60_000), artifactsDir: join(OUT_DIR, "artifacts"), env: runnerEnv });
-      settle(out, { units: out.called === false ? 0 : out.produced ?? out.knownProduced ?? 0, measured: out.called === false || out.measurementComplete === true });
+      const out = await runImageTask({ resolved, task, timeoutMs: Math.max(TASK_TIMEOUT_MS, 5 * 60_000), artifactsDir: join(OUT_DIR, "artifacts"), resumeOnly: gate.duplicate, env: runnerEnv });
+      settle(out, { units: out.called === false ? 0 : out.produced ?? out.knownProduced ?? 0, measured: out.called === false && !gate.duplicate || out.measurementComplete === true });
       const verified = await verifyExpectations({ ...task, expectedModel: resolved.model }, out, { artifactsDir: join(OUT_DIR, "artifacts") });
       return {
         ...base, chain, status: out.status === "ok" && verified.ok ? "ok" : out.status === "blocked" ? "blocked" : "failed",
@@ -468,7 +471,7 @@ async function runTask(task) {
         reason: failureReason(out, verified),
         artifacts: out.artifacts ?? [],
         receipt: out.receipt ?? null,
-        called: out.called ?? null,
+        called: out.called ?? null, submittedCalls: out.submittedCalls ?? null, resumed: out.resumed ?? out.resumedCalls > 0,
         measurementComplete: out.measurementComplete === true,
         produced: out.produced ?? null,
         knownProduced: out.knownProduced ?? null,
@@ -483,12 +486,13 @@ async function runTask(task) {
       const units = Number(task.durationSeconds ?? 12);
       const gate = budget.reserve({ taskId: task.id, kind: "video", units, detail: chain });
       if (!gate.allowed) return { ...base, status: "blocked", called: false, reason: gate.reason, ms: Date.now() - startedAt };
+      if (gate.duplicate && gate.settled) return { ...base, chain, status: "blocked", called: false, budgetAlreadySettled: true, reason: "该任务预算已结算；本次只读停止，请查看原回执，不重复生成或结算", ms: Date.now() - startedAt };
       reserved = { kind: "video" };
       const out = await runVideoTask({
         resolved, task, timeoutMs: Math.max(TASK_TIMEOUT_MS, 20 * 60_000),
-        artifactsDir: join(OUT_DIR, "artifacts"), pollMs: SELFTEST ? 200 : 8000, env: runnerEnv,
+        artifactsDir: join(OUT_DIR, "artifacts"), resumeOnly: gate.duplicate, pollMs: SELFTEST ? 200 : 8000, env: runnerEnv,
       });
-      settle(out, { units: out.called === false ? 0 : out.durationSeconds ?? 0, measured: out.called === false || out.measurementComplete === true });
+      settle(out, { units: out.called === false ? 0 : out.durationSeconds ?? 0, measured: out.called === false && !gate.duplicate || out.measurementComplete === true });
       const verified = await verifyExpectations({ ...task, expectedModel: resolved.model }, out, { artifactsDir: join(OUT_DIR, "artifacts") });
       return {
         ...base, chain, status: out.status === "ok" && verified.ok ? "ok" : out.status === "blocked" ? "blocked" : "failed",
@@ -496,7 +500,7 @@ async function runTask(task) {
         reason: failureReason(out, verified),
         artifacts: out.artifacts ?? [],
         receipt: out.receipt ?? null,
-        called: out.called ?? null,
+        called: out.called ?? null, submittedCalls: out.submittedCalls ?? null, resumed: out.resumed ?? out.resumedCalls > 0,
         measurementComplete: out.measurementComplete === true,
         durationSeconds: out.durationSeconds ?? null,
         units,
@@ -534,17 +538,18 @@ async function runTask(task) {
 for (const task of tasks) {
   const out = await runTask(task);
   const declared = task.model ? modelById.get(task.model) : resolvedModels.find((model) => model.kind === task.kind);
+  const receiptName = `${task.id}${out.budgetAlreadySettled ? "-duplicate-" + randomUUID() : ""}.json`;
   const result = redactValue({ ...out, purpose: task.purpose ?? null, modelExpected: declared?.model ?? null, modelResolved: out.modelResolved ?? out.receipt?.model ?? null, allowedModels: task.allowedModels ?? [], fixtureMarker: task.fixtureMarker ?? null, residualDisclosure: task.residualDisclosure ?? null,
-    receiptPath: evidencePath(join(OUT_DIR, "receipts", `${task.id}.json`)), transcriptPath: evidencePath(join(OUT_DIR, "transcripts", `${task.id}.json`)) });
+    receiptPath: evidencePath(join(OUT_DIR, "receipts", receiptName)), transcriptPath: evidencePath(join(OUT_DIR, "transcripts", receiptName)) });
   if (result.status === "ok" && result.eventEvidence && result.receipt.evidenceSha256 !== createHash("sha256").update(JSON.stringify(result.eventEvidence.events)).digest("hex")) {
     result.status = "failed"; result.reason = "线程事件包含需脱敏的凭据，脱敏后散列不再一致；不能计为完成"; result.receipt.synced = false; result.verification.ok = false;
   }
   results.push(result);
   const icon = result.status === "ok" ? "✓" : result.status === "blocked" ? "⏸" : result.status === "skipped" ? "–" : "✗";
   console.log(`[acceptance:live] ${icon} ${result.id} ${result.status}${result.reason ? `（${result.reason.slice(0, 120)}）` : ""}`);
-  const receiptPath = join(OUT_DIR, "receipts", `${result.id}.json`);
+  const receiptPath = join(OUT_DIR, "receipts", receiptName);
   writeFileSync(receiptPath, JSON.stringify({ task: result.id, at: new Date().toISOString(), status: result.status, receipt: result.receipt ?? null, artifacts: result.artifacts ?? [], reason: result.reason ?? null }, null, 1));
-  writeFileSync(join(OUT_DIR, "transcripts", `${result.id}.json`), JSON.stringify(result, null, 1));
+  writeFileSync(join(OUT_DIR, "transcripts", receiptName), JSON.stringify(result, null, 1));
 }
 
 if (stub) await stub.close();
