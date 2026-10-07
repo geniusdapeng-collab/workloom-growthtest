@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2021,
+  "revision": 2024,
   "tasks": {
     "98": {
       "number": 98,
@@ -3135,7 +3135,7 @@
     },
     "126": {
       "number": 126,
-      "status": "waiting_ci",
+      "status": "merging",
       "firstSeen": 1791346075534,
       "attempts": {},
       "admission": {
@@ -3454,6 +3454,160 @@
         "previousHead": "179f96daf1355f11af6ce9fdb7eee997adcc9433",
         "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
         "verifiedAt": "2026-10-07T15:33:42.317Z"
+      },
+      "mergePhase": "prepared",
+      "mergeSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 149,
+        "pull": {
+          "number": 149,
+          "state": "open",
+          "title": "chore(ci): deliver #126 fix(video): 渲染镜头直接采用并进入后期 [T-2026-1007-0004]",
+          "body": "Immutable delivery candidate for #126. Exact source 4dae103486e82bb3d18c1c97d0db0c403ea0b243; tested main c865b1e8f59862d57b9044dfef959e3c0442a037.\n\n<!-- delivery-origin:126:4dae103486e82bb3d18c1c97d0db0c403ea0b243:c865b1e8f59862d57b9044dfef959e3c0442a037 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[123],\"releases\":[]}\n-->",
+          "author": {
+            "username": "OCI",
+            "nickname": "Cloud Native Build",
+            "is_npc": true
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/delivery/candidate/pr-126-29d2cc1e99de23ebca32c181d0c9098d",
+            "sha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+        "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "files": [
+          "AGENTS.repo.md",
+          "README.md",
+          "apps/server/src/video/film-worker-identity.test.ts",
+          "apps/server/src/video/film-worker.ts",
+          "docs/capabilities.auto.json",
+          "docs/character-registry.md",
+          "docs/real-person-asset.md",
+          "docs/video-render-task-recovery.md",
+          "docs/video-standard-post.md",
+          "packages/video-studio/src/character-release-contract.test.ts",
+          "packages/video-studio/src/character-release-contract.ts",
+          "scripts/tools/film-render-task.mjs",
+          "scripts/tools/film-render-task.test.mjs",
+          "scripts/tools/film-rendered-material-use.test.ts",
+          "scripts/tools/film-standard-post.mts",
+          "scripts/tools/film-standard-post.test.ts",
+          "scripts/tools/full-chain-film.mts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0004",
+          "ready": true,
+          "dependsOn": [
+            123
+          ],
+          "releases": []
+        },
+        "headTime": 1791387854000,
+        "mergeBase": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "checkErrors": [],
+        "checkSha": "3b7d3901e3ec53ccfdfac994c08a52af2bb8a51e",
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "file": "scripts/tools/film-rendered-material-use.test.ts",
+            "before": {
+              "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+              "path": "scripts/tools/film-rendered-material-use.test.ts",
+              "absent": true
+            },
+            "after": {
+              "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+              "path": "scripts/tools/film-rendered-material-use.test.ts",
+              "absent": false
+            },
+            "digest": "1851a0c8895c722fac7fac5f92f4e52e136ab5c73f239f3ab78c042944794dfe"
+          },
+          {
+            "id": "CI-002",
+            "file": "scripts/tools/film-render-task.test.mjs",
+            "before": {
+              "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+              "path": "scripts/tools/film-render-task.test.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+              "path": "scripts/tools/film-render-task.test.mjs",
+              "absent": false
+            },
+            "digest": "41eb3db5b9c00b3a32106afbc9d96f77c844d11995f9b18ea1b1bd460d0193b9"
+          },
+          {
+            "id": "CI-003",
+            "file": "scripts/tools/film-render-task.mjs",
+            "before": {
+              "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+              "path": "scripts/tools/film-render-task.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+              "path": "scripts/tools/film-render-task.mjs",
+              "absent": false
+            },
+            "digest": "84e87c2497aabdcdf691ab724f9b4603a8aed7626e15057f8909ecfc814c4ee2"
+          },
+          {
+            "id": "CI-004",
+            "file": "scripts/tools/film-standard-post.test.ts",
+            "before": {
+              "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+              "path": "scripts/tools/film-standard-post.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+              "path": "scripts/tools/film-standard-post.test.ts",
+              "absent": false
+            },
+            "digest": "c11b9b5709722712ba6820c2580a844d580e83558f49df9a028074e749290a3b"
+          }
+        ],
+        "originNumber": 126,
+        "pendingDependencies": []
+      },
+      "integrationLease": {
+        "owner": "integration/pr-126",
+        "scopes": [
+          "protocol"
+        ],
+        "generation": {
+          "protocol": 60
+        }
       }
     },
     "127": {
@@ -7512,10 +7666,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": null,
-      "generation": 59,
-      "acquiredAt": 1791388710825,
-      "expiresAt": 1791388710825
+      "owner": "integration/pr-126",
+      "generation": 60,
+      "acquiredAt": 1791389415916,
+      "expiresAt": 1791390315916
     }
   },
   "releases": {},
@@ -55379,6 +55533,199 @@
       },
       "previous": "9df8989d5dc3ce72b9f6e2c5d0345820d16f769ea28d7dc881a90208124d475d",
       "digest": "159ec51eae01c39e3c60fbea2af3c417a491436e96f6a24be0a6b52c523aca76"
+    },
+    {
+      "sequence": 2022,
+      "at": "2026-10-07T16:10:15.916Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-126",
+        "generation": {
+          "protocol": 60
+        }
+      },
+      "previous": "159ec51eae01c39e3c60fbea2af3c417a491436e96f6a24be0a6b52c523aca76",
+      "digest": "af8e86432d7efff80c10893794e794d9d63bd47e578beda12574752ca578c25e"
+    },
+    {
+      "sequence": 2023,
+      "at": "2026-10-07T16:10:15.916Z",
+      "kind": "task",
+      "data": {
+        "number": 126,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 149,
+            "pull": {
+              "number": 149,
+              "state": "open",
+              "title": "chore(ci): deliver #126 fix(video): 渲染镜头直接采用并进入后期 [T-2026-1007-0004]",
+              "body": "Immutable delivery candidate for #126. Exact source 4dae103486e82bb3d18c1c97d0db0c403ea0b243; tested main c865b1e8f59862d57b9044dfef959e3c0442a037.\n\n<!-- delivery-origin:126:4dae103486e82bb3d18c1c97d0db0c403ea0b243:c865b1e8f59862d57b9044dfef959e3c0442a037 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[123],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-126-29d2cc1e99de23ebca32c181d0c9098d",
+                "sha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+            "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "files": [
+              "AGENTS.repo.md",
+              "README.md",
+              "apps/server/src/video/film-worker-identity.test.ts",
+              "apps/server/src/video/film-worker.ts",
+              "docs/capabilities.auto.json",
+              "docs/character-registry.md",
+              "docs/real-person-asset.md",
+              "docs/video-render-task-recovery.md",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/character-release-contract.test.ts",
+              "packages/video-studio/src/character-release-contract.ts",
+              "scripts/tools/film-render-task.mjs",
+              "scripts/tools/film-render-task.test.mjs",
+              "scripts/tools/film-rendered-material-use.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0004",
+              "ready": true,
+              "dependsOn": [
+                123
+              ],
+              "releases": []
+            },
+            "headTime": 1791387854000,
+            "mergeBase": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "checkErrors": [],
+            "checkSha": "3b7d3901e3ec53ccfdfac994c08a52af2bb8a51e",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/film-rendered-material-use.test.ts",
+                "before": {
+                  "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": false
+                },
+                "digest": "1851a0c8895c722fac7fac5f92f4e52e136ab5c73f239f3ab78c042944794dfe"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/tools/film-render-task.test.mjs",
+                "before": {
+                  "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+                  "path": "scripts/tools/film-render-task.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+                  "path": "scripts/tools/film-render-task.test.mjs",
+                  "absent": false
+                },
+                "digest": "41eb3db5b9c00b3a32106afbc9d96f77c844d11995f9b18ea1b1bd460d0193b9"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/tools/film-render-task.mjs",
+                "before": {
+                  "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+                  "path": "scripts/tools/film-render-task.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+                  "path": "scripts/tools/film-render-task.mjs",
+                  "absent": false
+                },
+                "digest": "84e87c2497aabdcdf691ab724f9b4603a8aed7626e15057f8909ecfc814c4ee2"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/film-standard-post.test.ts",
+                "before": {
+                  "ref": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "digest": "c11b9b5709722712ba6820c2580a844d580e83558f49df9a028074e749290a3b"
+              }
+            ],
+            "originNumber": 126,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-126",
+            "scopes": [
+              "protocol"
+            ],
+            "generation": {
+              "protocol": 60
+            }
+          }
+        }
+      },
+      "previous": "af8e86432d7efff80c10893794e794d9d63bd47e578beda12574752ca578c25e",
+      "digest": "ffd967071e58ad2b124b28f2fce8aea83c69c3b91368688b0faad5264214de97"
+    },
+    {
+      "sequence": 2024,
+      "at": "2026-10-07T16:12:24.924Z",
+      "kind": "transaction",
+      "data": {
+        "id": "1ec7a531-84d5-46c8-b3b4-62055b4e49b2"
+      },
+      "previous": "ffd967071e58ad2b124b28f2fce8aea83c69c3b91368688b0faad5264214de97",
+      "digest": "bb2f71d7528d1414546b529ad2eea2b15ad25f1382ea987195a154f8cac518b2"
     }
   ]
 }
