@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 333,
+  "revision": 335,
   "tasks": {
     "98": {
       "number": 98,
@@ -2398,8 +2398,8 @@
           "protocol": 14
         }
       },
-      "updatedAt": 1791338878890,
-      "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+      "updatedAt": 1791339010301,
+      "headSha": "3979bcd3abd45a80913edb43bab908bf5c068e34",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
       "intent": {
@@ -2526,17 +2526,18 @@
         "scripts/tools/compose-native-clock.test.ts",
         "scripts/tools/film-native-post.test.ts",
         "scripts/tools/film-standard-post.mts",
+        "scripts/tools/film-standard-post.test.ts",
         "scripts/tools/full-chain-film.mts"
       ],
-      "ciSince": 1791338419356,
-      "alignmentCount": 1,
+      "ciSince": 1791339010301,
+      "alignmentCount": 0,
       "alignmentIntent": {
         "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791339313908,
+      "blockedUntil": 0,
       "repairRequired": {
         "provider": "codex",
         "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
@@ -2544,7 +2545,10 @@
         "reason": "主干对齐失败：CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
         "at": 1791338419356
       },
-      "recoveryIntent": null
+      "recoveryIntent": null,
+      "recoveryCount": 0,
+      "reviewFailures": null,
+      "candidate": null
     }
   },
   "leases": {
@@ -11380,6 +11384,60 @@
       },
       "previous": "08ba063a53b672a93ebe4370463b4b8c5220263dd2348d311d78dacaa4fd64bc",
       "digest": "7db9bdcb6a3c15528811a37c5cf485611d63e2e2d05fa531f35e766ecc056638"
+    },
+    {
+      "sequence": 334,
+      "at": "2026-10-07T02:10:10.301Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "alignmentCount": 0,
+          "recoveryCount": 0,
+          "reviewFailures": null,
+          "blockedUntil": 0,
+          "developerReview": null,
+          "candidate": null,
+          "headSha": "3979bcd3abd45a80913edb43bab908bf5c068e34",
+          "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+          "branch": "task/T-2026-1007-0003",
+          "intent": {
+            "taskId": "T-2026-1007-0003",
+            "ready": true,
+            "dependsOn": [
+              118
+            ],
+            "releases": []
+          },
+          "originalBody": "请求 10 秒的原生视频实际返回 241 帧/24fps、视频流 10.041667 秒与 AAC 元数据 10.08 秒时，原片守恒检查错误拒收。现在仅允许完整请求帧数或多一个端点帧，画面钟仍严格核对帧数/fps；AAC 元数据边界限定为两个编码帧。缺帧、增加两帧、帧率或流钟不一致仍拒绝。\n\n后期从完整原片帧数派生拼接、字幕、封面及配乐切点。新增 native-clock 拼接模式直接拷贝原视频轨，要求解码原声音轨覆盖完整画面钟，不变速、不补静音、不改写冻结原稿。\n\n验证：纯合同、实际普通入口、真实 FFmpeg 三镜拼接（315 帧且逐帧 SHA-256 与源画面一致）、短音轨及变速拒绝；video-studio 回归、类型检查、内置角色资产核验与能力导览检查通过。真实生产首镜已从供应商原任务 GET 恢复并通过时钟检查。首镜人物/服装验收仍为拒收，不将模型生成或夹具测试当作广告放行。\n\n作用范围仅本隔离仓。回滚：revert 本任务提交；不会修改原片或回流基座。\n\nCloses #122\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/standard-post-contract.test.ts",
+            "packages/video-studio/src/standard-post-contract.ts",
+            "scripts/tools/compose-film.mts",
+            "scripts/tools/compose-native-clock.test.ts",
+            "scripts/tools/film-native-post.test.ts",
+            "scripts/tools/film-standard-post.mts",
+            "scripts/tools/film-standard-post.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "parked",
+          "ciSince": 1791339010301
+        }
+      },
+      "previous": "7db9bdcb6a3c15528811a37c5cf485611d63e2e2d05fa531f35e766ecc056638",
+      "digest": "bc6927113eb7fc594023367a3301b3eb7da10fb9488fbcabba6852d5c1bc4d94"
+    },
+    {
+      "sequence": 335,
+      "at": "2026-10-07T02:10:21.489Z",
+      "kind": "transaction",
+      "data": {
+        "id": "4997cde6-4795-41a3-bbca-e23e4fddacf4"
+      },
+      "previous": "bc6927113eb7fc594023367a3301b3eb7da10fb9488fbcabba6852d5c1bc4d94",
+      "digest": "0b960f497501b90bf319bfab87d141a4f226cc0168da3407f63f7ef48a2afd6d"
     }
   ]
 }
