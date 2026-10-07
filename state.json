@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1401,
+  "revision": 1403,
   "tasks": {
     "98": {
       "number": 98,
@@ -4859,7 +4859,7 @@
     },
     "135": {
       "number": 135,
-      "status": "waiting_dependency",
+      "status": "parked",
       "firstSeen": 1791354489850,
       "attempts": {},
       "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
@@ -5361,9 +5361,9 @@
           }
         ]
       },
-      "updatedAt": 1791376924503,
+      "updatedAt": 1791378309828,
       "error": "Prerequisite #133 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791370812188,
+      "blockedUntil": 1791378909828,
       "dependencies": [
         133
       ]
@@ -40323,6 +40323,31 @@
       },
       "previous": "be3ee001a3162d1130a6c524c4fb8becfcb7d5c02710dde2f40b8eea4fcd7a92",
       "digest": "ab9dd13982b717c4d8b9e40871e959aea57f05ddfc48169a0f5e03c1c770f6ef"
+    },
+    {
+      "sequence": 1402,
+      "at": "2026-10-07T13:05:09.828Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "status": "parked",
+          "error": "Prerequisite #133 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791378909828
+        }
+      },
+      "previous": "ab9dd13982b717c4d8b9e40871e959aea57f05ddfc48169a0f5e03c1c770f6ef",
+      "digest": "802a4c3d241fad033678bc3983f47acfccd6ee5550d8b731ecd95e6236da8c8a"
+    },
+    {
+      "sequence": 1403,
+      "at": "2026-10-07T13:05:52.884Z",
+      "kind": "transaction",
+      "data": {
+        "id": "22579ed6-355b-4c74-ae9d-e02dceb5ea40"
+      },
+      "previous": "802a4c3d241fad033678bc3983f47acfccd6ee5550d8b731ecd95e6236da8c8a",
+      "digest": "485ba294538313ed7a650a45473f913b4b939d5da20ee28cc047122549322db2"
     }
   ]
 }
