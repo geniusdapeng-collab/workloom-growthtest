@@ -12,4 +12,6 @@
 
 安装清单保存在 .workloom-delivery-install.json，列出来源提交和每个准确资产摘要。安装器不会替换 product.manifest、WORKLOOM_PRODUCT_CONTEXT、冻结同步摘要、行业业务或标签；隔离仓不会加入 children，也不会开启业务 fanout。
 
+并发静态门禁的完整 PR 采集若收到 CNB HTTP 429，会在原总预算内仅对同一 GET、仓库和凭据做最多三次只读退避，默认分别等待 5、15、45 秒；有效的 `Retry-After` 指定更长等待时予以遵守，超过剩余预算直接失败。单请求超时、前后 source/main 与 open PR 集合稳定性、完整分页、文件路径和接纳租约证据仍逐项校验。持续限流、401/403、其他错误、坏 JSON 或缺证据保持拒绝；不重试写操作，也不切换账号或凭据。退避数值是本仓选择的有界恢复策略，不代表已核实 CNB 的额度。HTTP 429 与 `Retry-After` 的依据见 [RFC 6585 §4](https://www.rfc-editor.org/rfc/rfc6585#section-4)。
+
 命令：node scripts/delivery/queue-runner.mjs status|lease|handoff|verify-review|prepare-install|verify-install|activate|reconcile|releases --repo <org/repo>。本仓执行器 CLI 和原生 CI 是行为事实源；会话审查回执不代表平台 AI 批准，也不调用外部模型；本地测试或安装标记不能替代云端通过、合并及 activation 回执。
