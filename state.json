@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1517,
+  "revision": 1519,
   "tasks": {
     "98": {
       "number": 98,
@@ -2853,7 +2853,7 @@
     },
     "123": {
       "number": 123,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -3040,14 +3040,14 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/144/merge :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791374090898,
+      "error": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
+      "blockedUntil": 1791384014151,
       "repairRequired": {
         "provider": "codex",
-        "headSha": "8de51583352811b6752fc8efe0d9fa58313f5658",
-        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "reason": "候选 #140 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
-        "at": 1791369910174
+        "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "reason": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
+        "at": 1791383414151
       },
       "recoveryIntent": null,
       "recoveryCount": 0,
@@ -44140,6 +44140,39 @@
       },
       "previous": "9bb813b7b3a21034317453d70039955a19fdbc2110e8d3762e29efebcd866761",
       "digest": "1ad821b49091676f101714727e6a15e1e03b56419d2c026971fbd56ce124a2f7"
+    },
+    {
+      "sequence": 1518,
+      "at": "2026-10-07T14:30:14.151Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+            "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "reason": "检查/评审阻断：Codex review identity differs from the exact repository/source/main/policy",
+            "at": 1791383414151
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791384014151
+        }
+      },
+      "previous": "1ad821b49091676f101714727e6a15e1e03b56419d2c026971fbd56ce124a2f7",
+      "digest": "1ced055e9cc0ff31b84838dca1588bb54cd0ff6ce1679cc105a169d769f2ad4f"
+    },
+    {
+      "sequence": 1519,
+      "at": "2026-10-07T14:30:49.099Z",
+      "kind": "transaction",
+      "data": {
+        "id": "1b9f9ef5-5b88-4905-80ca-a9125e8f69cb"
+      },
+      "previous": "1ced055e9cc0ff31b84838dca1588bb54cd0ff6ce1679cc105a169d769f2ad4f",
+      "digest": "5497891824acd62d6221042af1a2b192a5fdea725ad2b9b76c86b47c813c81be"
     }
   ]
 }
