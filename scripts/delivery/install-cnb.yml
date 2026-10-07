@@ -9,4 +9,4 @@
           script: npm ci --prefix scripts/delivery/runtime --ignore-scripts --no-audit --no-fund
         - name: Durable delivery, permissions, races and actual Git regression
           timeout: 5m
-          script: node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs
+          script: node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs

@@ -12,4 +12,8 @@
 
 安装清单保存在 .workloom-delivery-install.json，列出来源提交和每个准确资产摘要。安装器不会替换 product.manifest、WORKLOOM_PRODUCT_CONTEXT、冻结同步摘要、行业业务或标签；隔离仓不会加入 children，也不会开启业务 fanout。
 
+并发静态门禁的完整 PR 采集若收到 CNB HTTP 429，会在原总预算内仅对同一 GET、仓库和凭据做最多三次只读退避，默认分别等待 5、15、45 秒；有效的 `Retry-After` 指定更长等待时予以遵守，超过剩余预算直接失败。单请求超时、前后 source/main 与 open PR 集合稳定性、完整分页、文件路径和接纳租约证据仍逐项校验。持续限流、401/403、其他错误、坏 JSON 或缺证据保持拒绝；不重试写操作，也不切换账号或凭据。退避数值是本仓选择的有界恢复策略，不代表已核实 CNB 的额度。HTTP 429 与 `Retry-After` 的依据见 [RFC 6585 §4](https://www.rfc-editor.org/rfc/rfc6585#section-4)。
+
+通用 `api` 客户端的 GET 将请求、响应体和等待限制在单调总时间预算内（默认 240 秒，单次请求最多 30 秒）；429 的四次默认退避为 5、15、45、60 秒，队列适配器最多取前三次。有效的更长 `Retry-After` 秒数或 HTTP 日期不提前压短；超过剩余预算即失败。传输与 5xx 保留只读恢复，但不得越过总预算；同一 URL、请求正文和凭据保持不变，不复用旧成功响应。POST/PATCH/PUT/DELETE 无论丢失响应、429 或 5xx 都只尝试一次，仍须按原身份回读；401/403、持续限流、当前 source/main 漂移、缺页或审查/接纳证据不完整仍失败。原生审核的前后两次校验各读当前证据，没有取消阶段或调用平台模型。恢复时长是本仓策略，不是 CNB 已核实的限额。
+
 命令：node scripts/delivery/queue-runner.mjs status|lease|handoff|verify-review|prepare-install|verify-install|activate|reconcile|releases --repo <org/repo>。本仓执行器 CLI 和原生 CI 是行为事实源；会话审查回执不代表平台 AI 批准，也不调用外部模型；本地测试或安装标记不能替代云端通过、合并及 activation 回执。
