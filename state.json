@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 222,
+  "revision": 224,
   "tasks": {
     "98": {
       "number": 98,
@@ -1935,7 +1935,15 @@
         "packages/video-studio/src/character-release-source.test.ts",
         "packages/video-studio/src/character-release-source.ts"
       ],
-      "ciSince": 1791334818969
+      "ciSince": 1791334818969,
+      "candidate": {
+        "number": 120,
+        "branch": "delivery/candidate/pr-118-a891ac53edf6b23982d18880b6bda215",
+        "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "marker": "delivery-origin:118:4db4fc5265522a9c939ac119f427de57c9d38e37:c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "at": 1791335301333
+      }
     },
     "119": {
       "number": 119,
@@ -8652,6 +8660,36 @@
       },
       "previous": "311d5c37ab9b02f98aa1545927a9ae7876fefd4c149fdf36c9b773e41e87867d",
       "digest": "7ecf1a811f2220614ce54e7623e5902c21a917a64d3bfaad1af0f4df71e5ca38"
+    },
+    {
+      "sequence": 223,
+      "at": "2026-10-07T01:08:21.333Z",
+      "kind": "task",
+      "data": {
+        "number": 118,
+        "patch": {
+          "candidate": {
+            "number": 120,
+            "branch": "delivery/candidate/pr-118-a891ac53edf6b23982d18880b6bda215",
+            "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+            "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "marker": "delivery-origin:118:4db4fc5265522a9c939ac119f427de57c9d38e37:c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "at": 1791335301333
+          }
+        }
+      },
+      "previous": "7ecf1a811f2220614ce54e7623e5902c21a917a64d3bfaad1af0f4df71e5ca38",
+      "digest": "afd66669cc7e0d6b7dd4919e7e1f608c67a1427f8675c02ec9b954be19643fb1"
+    },
+    {
+      "sequence": 224,
+      "at": "2026-10-07T01:08:25.763Z",
+      "kind": "transaction",
+      "data": {
+        "id": "094b030f-2ccc-49dd-b9c4-dcf8be5bc03d"
+      },
+      "previous": "afd66669cc7e0d6b7dd4919e7e1f608c67a1427f8675c02ec9b954be19643fb1",
+      "digest": "a1abd84fa69ef2099114c293178e2d4e74e6615e499fb6719aa5684e2dcccbf9"
     }
   ]
 }
