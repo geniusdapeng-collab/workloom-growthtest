@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2155,
+  "revision": 2157,
   "tasks": {
     "98": {
       "number": 98,
@@ -3656,7 +3656,7 @@
     },
     "129": {
       "number": 129,
-      "status": "waiting_ci",
+      "status": "merging",
       "firstSeen": 1791351176589,
       "attempts": {},
       "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
@@ -3871,6 +3871,88 @@
         "filesHash": "6053c083124dc283643c9ffe6525a3cacbd78f6c2b8bf85efd2150b463ede596",
         "scopes": [],
         "owner": "admission/pr-129",
+        "generation": {}
+      },
+      "mergePhase": "prepared",
+      "mergeSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 150,
+        "pull": {
+          "number": 150,
+          "state": "open",
+          "title": "chore(ci): deliver #129 fix(video): 定妆照失败接续不重复收费 [T-2026-1007-0005]",
+          "body": "Immutable delivery candidate for #129. Exact source 1038789cb35c1e2bdb5e6d4218c06281506159a6; tested main 33aef8ebdf714cd3eec6de4bef821fac13409ee4.\n\n<!-- delivery-origin:129:1038789cb35c1e2bdb5e6d4218c06281506159a6:33aef8ebdf714cd3eec6de4bef821fac13409ee4 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[126],\"releases\":[]}\n-->",
+          "author": {
+            "username": "OCI",
+            "nickname": "Cloud Native Build",
+            "is_npc": true
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/delivery/candidate/pr-129-732cdbe2450a24b25e1a6b17205a0a89",
+            "sha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+        "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+        "files": [
+          ".gitignore",
+          "docs/capabilities.auto.json",
+          "docs/video-generation-idempotency.md",
+          "packages/video-studio/src/generation-submission.d.mts",
+          "packages/video-studio/src/generation-submission.mjs",
+          "packages/video-studio/src/generation-submission.test.ts",
+          "packages/video-studio/src/portrait-agent.test.ts",
+          "packages/video-studio/src/portrait-agent.ts",
+          "packages/video-studio/src/portrait-runtime.test.ts",
+          "packages/video-studio/src/portrait-runtime.ts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0005",
+          "ready": true,
+          "dependsOn": [
+            126
+          ],
+          "releases": []
+        },
+        "headTime": 1791389696000,
+        "mergeBase": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+        "checkErrors": [],
+        "checkSha": "f65ddf9249159b3f5e9c4e1a02f511fa2d84a743",
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [],
+        "originNumber": 129,
+        "pendingDependencies": []
+      },
+      "integrationLease": {
+        "owner": "integration/pr-129",
+        "scopes": [],
         "generation": {}
       }
     },
@@ -58466,6 +58548,111 @@
       },
       "previous": "d50c759fb31edce998bd71d2e4884e8a1970622f3424eaf52d41de693e323a43",
       "digest": "0ed7e4c2465e0749d2f94c58089ca5ca275050e164b0fb07681e0a9cc863265b"
+    },
+    {
+      "sequence": 2156,
+      "at": "2026-10-07T16:40:14.200Z",
+      "kind": "task",
+      "data": {
+        "number": 129,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 150,
+            "pull": {
+              "number": 150,
+              "state": "open",
+              "title": "chore(ci): deliver #129 fix(video): 定妆照失败接续不重复收费 [T-2026-1007-0005]",
+              "body": "Immutable delivery candidate for #129. Exact source 1038789cb35c1e2bdb5e6d4218c06281506159a6; tested main 33aef8ebdf714cd3eec6de4bef821fac13409ee4.\n\n<!-- delivery-origin:129:1038789cb35c1e2bdb5e6d4218c06281506159a6:33aef8ebdf714cd3eec6de4bef821fac13409ee4 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[126],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-129-732cdbe2450a24b25e1a6b17205a0a89",
+                "sha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+            "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "files": [
+              ".gitignore",
+              "docs/capabilities.auto.json",
+              "docs/video-generation-idempotency.md",
+              "packages/video-studio/src/generation-submission.d.mts",
+              "packages/video-studio/src/generation-submission.mjs",
+              "packages/video-studio/src/generation-submission.test.ts",
+              "packages/video-studio/src/portrait-agent.test.ts",
+              "packages/video-studio/src/portrait-agent.ts",
+              "packages/video-studio/src/portrait-runtime.test.ts",
+              "packages/video-studio/src/portrait-runtime.ts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0005",
+              "ready": true,
+              "dependsOn": [
+                126
+              ],
+              "releases": []
+            },
+            "headTime": 1791389696000,
+            "mergeBase": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "checkErrors": [],
+            "checkSha": "f65ddf9249159b3f5e9c4e1a02f511fa2d84a743",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [],
+            "originNumber": 129,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-129",
+            "scopes": [],
+            "generation": {}
+          }
+        }
+      },
+      "previous": "0ed7e4c2465e0749d2f94c58089ca5ca275050e164b0fb07681e0a9cc863265b",
+      "digest": "21084a9f6b254e707affd533647a0464e55f5fb5ffccd28c9e5302c3e318c52c"
+    },
+    {
+      "sequence": 2157,
+      "at": "2026-10-07T16:41:17.295Z",
+      "kind": "transaction",
+      "data": {
+        "id": "6ed5a332-dd22-433a-8bd8-a78470ecdf1e"
+      },
+      "previous": "21084a9f6b254e707affd533647a0464e55f5fb5ffccd28c9e5302c3e318c52c",
+      "digest": "a9943c3349bd29ae78ca517d09203d0345e3722a29b4dc7ae016c826debaa7fc"
     }
   ]
 }
