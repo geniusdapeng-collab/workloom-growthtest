@@ -11,7 +11,7 @@ import { runInNewContext } from "node:vm";
 import { assertFilmAudioSource, decideFilmVoiceAction, resolveFilmAudioContract, type FilmAudioShot } from "./film-audio-policy.mjs";
 import { assessVoiceArtifact, fingerprintFile, fingerprintText } from "./film-voice-artifact.js";
 import { checkShotOrder } from "../../packages/video-studio/src/shot-order.js";
-import { assertStandardPostTimeline, buildStandardPostContract } from "../../packages/video-studio/src/standard-post-contract.js";
+import { assertStandardPostTimeline, buildStandardPostContract, validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
 import { assertStandardPostAudioClock } from "./film-standard-post.mjs";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
@@ -121,7 +121,7 @@ function fixture() {
     RENDER_SECONDS_MIN: 4, RENDER_SECONDS_MAX: 12, ENHANCE_KIND: "live-action", ENHANCE_ENGINE_DIR: "",
     arg: (_name: string, fallback = "") => fallback, flag: (_name: string) => false,
     join, resolve, existsSync, statSync, writeFileSync, fingerprintFile, fingerprintText, sha256FileSync: fingerprintFile,
-    dialogueText, resolveFilmAudioContract, assertFilmAudioSource, decideFilmVoiceAction, assessVoiceArtifact, checkShotOrder,
+    dialogueText, resolveFilmAudioContract, assertFilmAudioSource, decideFilmVoiceAction, assessVoiceArtifact, checkShotOrder, validateStandardNativeClock,
     // VM objects use a different Object.prototype; clone into the validator's realm without changing data.
     assertStandardPostTimeline: (contract: unknown, actual: unknown) => assertStandardPostTimeline(contract, structuredClone(actual)),
     readStageHistory: () => rows,
@@ -275,6 +275,7 @@ describe("actual normal film CLI preserves every original native shot", () => {
     const args = f.calls[0]!.args;
     expect(args[args.indexOf("--clips") + 1]!.split(",")).toEqual(f.shots.map((shot) => f.facts.get(shot.shotId)!.path));
     expect(args[args.indexOf("--fps") + 1]).toBe("24"); expect(args[args.indexOf("--fade") + 1]).toBe("0");
+    expect(args).toContain("--native-clock");
     for (const flag of ["--retime-to", "--transition", "--transition-at", "--transition-duration"]) expect(args).not.toContain(flag);
     expect(f.forbiddenCalls).toEqual([]);
   });

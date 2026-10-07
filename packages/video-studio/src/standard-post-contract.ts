@@ -86,6 +86,29 @@ function freeze<T>(value: T): T {
   return value;
 }
 
+/** A provider's integer seconds field is not the returned picture clock. Preserve
+ * the complete measured frame range, including at most one endpoint frame. AAC
+ * priming and padding can together account for two metadata frames; this is not
+ * a decoded audio coverage or speech-content certification. */
+export function validateStandardNativeClock(media: StandardPostMedia, requestedSec: number): {
+  durationSec: number; requestedFrames: number; frameDelta: number; deltaSec: number; maximumBoundarySec: number;
+} {
+  if (!positive(media.fps) || media.fps > 240 || !integer(media.videoFrames) || !positive(media.videoDurationSec))
+    fail("MEDIA_INVALID", "invalid original picture clock");
+  const requestedFrames = requestedSec * media.fps;
+  if (!positive(requestedSec) || !Number.isSafeInteger(Math.round(requestedFrames))
+    || !near(requestedFrames, Math.round(requestedFrames), 1e-8)) fail("FRAME_INVALID", "requested duration must contain a whole frame range");
+  const frameDelta = media.videoFrames - Math.round(requestedFrames);
+  if (frameDelta !== 0 && frameDelta !== 1) fail("FRAME_INVALID", "original must contain the submitted range with at most one endpoint frame; no missing frames or retiming");
+  const durationSec = media.videoFrames / media.fps;
+  if (!near(media.videoDurationSec, durationSec, 1e-6)) fail("MEDIA_INVALID", "measured video duration differs from its complete frame clock");
+  if (!positive(media.audioDurationSec) || !integer(media.audioSampleRate) || media.audioSampleRate > 384000
+    || !integer(media.audioChannels) || media.audioChannels > 32) fail("AUDIO_INVALID", "native audio measurements missing or invalid");
+  const deltaSec = media.audioDurationSec - media.videoDurationSec, maximumBoundarySec = 2 * 1024 / media.audioSampleRate;
+  if (Math.abs(deltaSec) > maximumBoundarySec + 1e-9) fail("AUDIO_INVALID", "native audio duration exceeds two AAC metadata frames for priming and padding");
+  return { durationSec, requestedFrames: Math.round(requestedFrames), frameDelta, deltaSec, maximumBoundarySec };
+}
+
 /** Original JSON bytes, not a caller-created shot array, own duration and order. */
 export function buildStandardPostContract(input: StandardPostBuildInput): StandardPostContract {
   const top = shape(input, ["projectId", "submitted", "originals"], "INPUT_INVALID", "input");
@@ -106,8 +129,8 @@ export function buildStandardPostContract(input: StandardPostBuildInput): Standa
     if (!text(shot.shotId) || !ID.test(shot.shotId) || seenShots.has(shot.shotId) || !positive(shot.duration)) fail("SUBMITTED_INVALID", "original shot ID/duration missing, invalid or duplicate");
     seenShots.add(shot.shotId); shots.push({ shotId: shot.shotId, durationSec: shot.duration });
   }
-  const durationSec = shots.reduce((total, shot) => total + shot.durationSec, 0);
-  if (!positive(source.durationSeconds) || !Number.isFinite(durationSec) || !near(durationSec, source.durationSeconds, 1e-9)) fail("SUBMITTED_INVALID", "document durationSeconds differs from original shot durations");
+  const submittedDurationSec = shots.reduce((total, shot) => total + shot.durationSec, 0);
+  if (!positive(source.durationSeconds) || !Number.isFinite(submittedDurationSec) || !near(submittedDurationSec, source.durationSeconds, 1e-9)) fail("SUBMITTED_INVALID", "document durationSeconds differs from original shot durations");
   const supplied = denseArray(top.originals, "SOURCE_INVALID", "originals");
   if (supplied.length !== shots.length) fail("SOURCE_INVALID", "every submitted shot requires exactly one original");
   const originalsById = new Map<string, StandardPostOriginal>(); const paths = new Set<string>(); const digests = new Set<string>();
@@ -132,23 +155,18 @@ export function buildStandardPostContract(input: StandardPostBuildInput): Standa
   for (const [index, shot] of shots.entries()) {
     const original = originals[index]!; const media = original.media;
     if (media.fps !== first.fps || media.width !== first.width || media.height !== first.height) fail("MEDIA_INVALID", "original fps and dimensions must agree; no silent retiming or resizing");
-    const expectedFrames = shot.durationSec * media.fps;
-    if (!Number.isSafeInteger(Math.round(expectedFrames)) || !near(expectedFrames, Math.round(expectedFrames), 1e-8)
-      || media.videoFrames !== Math.round(expectedFrames)) fail("FRAME_INVALID", `${shot.shotId} must preserve the exact full submitted frame range`);
-    if (!near(media.videoDurationSec, shot.durationSec, 1e-6)) fail("MEDIA_INVALID", `${shot.shotId} original video duration differs from the submitted full range`);
-    const deltaSec = media.audioDurationSec - media.videoDurationSec; const maximumBoundarySec = 1024 / media.audioSampleRate;
-    if (Math.abs(deltaSec) > maximumBoundarySec + 1e-9) fail("AUDIO_INVALID", `${shot.shotId} native audio duration exceeds a single AAC frame metadata boundary`);
+    const { durationSec, deltaSec, maximumBoundarySec } = validateStandardNativeClock(media, shot.durationSec);
     totalFrames += media.videoFrames;
     if (!Number.isSafeInteger(totalFrames)) fail("FRAME_INVALID", "total frame count exceeds the exact integer range");
     const sourceFingerprint = { path: original.path, sha256: original.sha256, bytes: original.bytes, inSec: 0 };
-    timeline.push({ shotId: shot.shotId, video: { ...sourceFingerprint }, audio: { ...sourceFingerprint }, durationSec: shot.durationSec, speed: 1 });
+    timeline.push({ shotId: shot.shotId, video: { ...sourceFingerprint }, audio: { ...sourceFingerprint }, durationSec, speed: 1 });
     nativeAudioProof.push({ shotId: shot.shotId, sourceDurationSec: media.audioDurationSec, videoDurationSec: media.videoDurationSec,
       deltaSec, maximumBoundarySec, disposition: deltaSec === 0 ? "exact" : "preserve-presented-native-clock",
       certification: "duration-only-no-speech-certification" });
   }
   const body = { schemaVersion: STANDARD_POST_SCHEMA, mode: "standard-native" as const, projectId: top.projectId,
     submitted: structuredClone(submitted) as unknown as StandardPostSubmitted, originals, timeline,
-    fps: first.fps, width: first.width, height: first.height, totalFrames, durationSec, nativeAudioProof };
+    fps: first.fps, width: first.width, height: first.height, totalFrames, durationSec: totalFrames / first.fps, nativeAudioProof };
   return freeze({ ...body, contractSha256: productionHash(body) });
 }
 
