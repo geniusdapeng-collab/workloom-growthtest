@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1963,
+  "revision": 1965,
   "tasks": {
     "98": {
       "number": 98,
@@ -3419,7 +3419,14 @@
       "alignmentCount": 0,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "candidate": null,
+      "candidate": {
+        "number": 149,
+        "branch": "delivery/candidate/pr-126-29d2cc1e99de23ebca32c181d0c9098d",
+        "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+        "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "marker": "delivery-origin:126:4dae103486e82bb3d18c1c97d0db0c403ea0b243:c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "at": 1791388512909
+      },
       "originalBody": "正式视频 CLI 和父服务原本声明 review-policy=off，但仍在渲染后强制做人物/服饰评审、首镜放行及画面质量检测，导致已生成镜头停在后期之前。按产品所有者指令，现在默认直接采用实际渲染素材，不再进行二次质审；显式诊断模式保留真实评审。\n\n默认采用回执记录 qualityReviewPerformed=false，身份与服饰认证保持 unverified。历史拒收意见保留，当前原片字节、提交提示词、引用组、供应商任务及生成前登记授权继续绑定。父服务默认路径无需视觉模型或首镜意见，产品镜跳过运动、参考相似度及场景独立性检测，后期跳过造型主色、黑场与静音二次审核。\n\n本任务依赖 PR123 的完整原片时钟修复，当前分支包含其已审查提交；不会重新生成已接受的首镜。新增实际 CLI 函数 VM 测试和父服务边界测试，覆盖默认/遗漏策略、多人物后续镜、旧拒收复用、视觉模型缺失、提示词/原片/引用篡改及缺镜。既有显式评审用例保持诊断模式，不制造身份通过回执。\n\n验证：22/22 标准后期 Node 集成；视频相关回归 1658 项，1657 通过、0 失败、1 原有跳过；test:scripts、视频包与服务端类型、内置角色资产、能力导览、差异检查均退出0。真实30秒广告制作另记回执，不把夹具和回归当作生产完成。\n\n修改限 Growthtest。回滚：revert本任务提交；保留原片及历史评审。\n\nCloses #124\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0004\",\n  \"ready\": true,\n  \"depends_on\": [\n    123\n  ],\n  \"releases\": []\n}\n-->\n",
       "files": [
         "AGENTS.repo.md",
@@ -54178,6 +54185,36 @@
       },
       "previous": "130c96388875d1b3e4f9986b9cf00ea6380e1143ae1f2464a8f3a23427233f53",
       "digest": "a364feaa7eebd623f7a374144215806757ce5406554ae07c5c4604f38c35fbdd"
+    },
+    {
+      "sequence": 1964,
+      "at": "2026-10-07T15:55:12.909Z",
+      "kind": "task",
+      "data": {
+        "number": 126,
+        "patch": {
+          "candidate": {
+            "number": 149,
+            "branch": "delivery/candidate/pr-126-29d2cc1e99de23ebca32c181d0c9098d",
+            "headSha": "4dae103486e82bb3d18c1c97d0db0c403ea0b243",
+            "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "marker": "delivery-origin:126:4dae103486e82bb3d18c1c97d0db0c403ea0b243:c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "at": 1791388512909
+          }
+        }
+      },
+      "previous": "a364feaa7eebd623f7a374144215806757ce5406554ae07c5c4604f38c35fbdd",
+      "digest": "8ae52614ac47c6ca62cd0aca6decc2f9077ea0de52de619bb64c7fcbea01b4e0"
+    },
+    {
+      "sequence": 1965,
+      "at": "2026-10-07T15:58:32.238Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f23c594d-6d54-4c80-8e3a-baeb33ad20fe"
+      },
+      "previous": "8ae52614ac47c6ca62cd0aca6decc2f9077ea0de52de619bb64c7fcbea01b4e0",
+      "digest": "9c7cb3aa2e3c69c2beb629cbe5052c987c615688925fe24f1574540042d158a5"
     }
   ]
 }
