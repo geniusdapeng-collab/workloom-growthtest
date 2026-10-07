@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 364,
+  "revision": 366,
   "tasks": {
     "98": {
       "number": 98,
@@ -55,15 +55,15 @@
       },
       "recoveryCount": 0,
       "reviewFailures": null,
-      "blockedUntil": 1791338714335,
+      "blockedUntil": 1791341109723,
       "candidate": null,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
       "repairRequired": {
         "provider": "codex",
-        "headSha": "08f28053b2c17deaa61da9cc5a2f10e2df16ac70",
-        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "headSha": "c20c2606f9670aff25635b3c71bd2e138c915a58",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "reason": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
-        "at": 1791336198651
+        "at": 1791340509723
       },
       "recoveryIntent": null
     },
@@ -12514,6 +12514,39 @@
       },
       "previous": "7e6f4a6eb98f271f29aeb2d333380446be3fc6a550dc598ca0ebc1c4d95a2f9d",
       "digest": "99b14eae8ff371256698510a9210b333f0c250b85d7f283f09dfd12cda467399"
+    },
+    {
+      "sequence": 365,
+      "at": "2026-10-07T02:35:09.723Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c20c2606f9670aff25635b3c71bd2e138c915a58",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "reason": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+            "at": 1791340509723
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791341109723
+        }
+      },
+      "previous": "99b14eae8ff371256698510a9210b333f0c250b85d7f283f09dfd12cda467399",
+      "digest": "95b0bd686e84423b4b68c49c43bad2a18bc84d8ce7ddef1f5c58ef47e31ad183"
+    },
+    {
+      "sequence": 366,
+      "at": "2026-10-07T02:35:12.670Z",
+      "kind": "transaction",
+      "data": {
+        "id": "d48b7090-875c-4c73-8fee-35a06dd3df46"
+      },
+      "previous": "95b0bd686e84423b4b68c49c43bad2a18bc84d8ce7ddef1f5c58ef47e31ad183",
+      "digest": "6f182ac6eb3391c2cd2eeff0ced16f99585ff28d1058ca4ee36539ad63c4d7d3"
     }
   ]
 }
