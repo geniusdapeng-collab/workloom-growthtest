@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2799,
+  "revision": 2801,
   "tasks": {
     "98": {
       "number": 98,
@@ -5290,7 +5290,7 @@
           }
         ]
       },
-      "updatedAt": 1791401421756,
+      "updatedAt": 1791401713491,
       "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit 868af4f45475967363b1aa7e5c8b4d3bd20a52f9\n",
       "blockedUntil": 0,
       "dependencies": [
@@ -72949,6 +72949,51 @@
       },
       "previous": "e8d38b29d97ed05ac8f0e72f76e95c1d62d9083544ec8d7a4a44d4d0ce6444f6",
       "digest": "d6f1bea44bae314ac9dd6c567d498e94833e52e46f56289d152b903016b3292c"
+    },
+    {
+      "sequence": 2800,
+      "at": "2026-10-07T19:35:13.491Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "headSha": "26c39791033b78f0364331f17094f8ccd83eec15",
+          "mainSha": "868af4f45475967363b1aa7e5c8b4d3bd20a52f9",
+          "branch": "task/T-2026-1007-0008",
+          "intent": {
+            "taskId": "T-2026-1007-0008",
+            "ready": true,
+            "dependsOn": [
+              133
+            ],
+            "releases": []
+          },
+          "originalBody": "产品镜的 character 字段含“画面没有人物”，旧流程按非空字符串误认成人物镜，默认版式又把同一个 CEO 同时画为满幅底图和小卡。现在从显式人物标记、角色 ID、出镜清单与无人说明解析来源；默认自动选择单一满幅人物或物体主视觉。旧版式也会在绘制前移除同镜、同人物或第二人物贴片，并把人物标题移到下方安全带。回执记录实际底图与实际生效的构图。\n\n默认使用确定性设计稿，按已采用原片取帧，不新增模型设计或质量评分。39 项封面设计与实际 CLI 来源/构图函数测试通过，video-studio 类型检查通过。准确提交 4bd58b7 的 8 项完整回归均通过（标准后期 HTTP/媒体测试、视频及脚本回归、双包类型、资产和导览一致性）。提交 Codex 回执给原生交付队列。现有原片将由正式后期入口刷新封面，不再付费生成镜头。\n\n任务卡 #134；依赖 #133。仅修改隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0008\",\n  \"ready\": true,\n  \"depends_on\": [\n    133\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-render-task-recovery.md",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+            "packages/video-studio/src/cover-design.ts",
+            "scripts/tools/film-native-post.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791400818541
+        }
+      },
+      "previous": "d6f1bea44bae314ac9dd6c567d498e94833e52e46f56289d152b903016b3292c",
+      "digest": "19785281e1fe2b00d9abc2a1f2f64b26a541dbcb83f8947d0547df3a3dfa458c"
+    },
+    {
+      "sequence": 2801,
+      "at": "2026-10-07T19:35:38.003Z",
+      "kind": "transaction",
+      "data": {
+        "id": "842bf9f2-f654-4a19-8902-e630a04cf3b4"
+      },
+      "previous": "19785281e1fe2b00d9abc2a1f2f64b26a541dbcb83f8947d0547df3a3dfa458c",
+      "digest": "dfdfb054c453cc7bcbefde3d304252c0c4feb6ba54f27cd2deaf92a4f520d550"
     }
   ]
 }
