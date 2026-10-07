@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2541,
+  "revision": 2543,
   "tasks": {
     "98": {
       "number": 98,
@@ -4795,7 +4795,7 @@
     },
     "133": {
       "number": 133,
-      "status": "waiting_ci",
+      "status": "aligning",
       "firstSeen": 1791353067543,
       "attempts": {},
       "headSha": "c0da166012554858636e7c0edf43c5f6593a9cbe",
@@ -5132,7 +5132,7 @@
       ],
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 0,
-      "alignmentCount": 0,
+      "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
@@ -5142,7 +5142,12 @@
         "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
         "scripts/tools/portrait-set-from-asset.mts"
       ],
-      "ciSince": 1791396989218
+      "ciSince": 1791396989218,
+      "alignmentIntent": {
+        "headSha": "c0da166012554858636e7c0edf43c5f6593a9cbe",
+        "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+        "at": 1791396989218
+      }
     },
     "135": {
       "number": 135,
@@ -67655,6 +67660,36 @@
       },
       "previous": "08f9fe8461b66bdd9beaa33fe9c6392dcaace56d4fa3fd70f433f67d87762252",
       "digest": "370061610f3cf92f9c2442b6a952274658bba2600f9e7999d723d1bef61b0ed4"
+    },
+    {
+      "sequence": 2542,
+      "at": "2026-10-07T18:16:29.218Z",
+      "kind": "task",
+      "data": {
+        "number": 133,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "c0da166012554858636e7c0edf43c5f6593a9cbe",
+            "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+            "at": 1791396989218
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "370061610f3cf92f9c2442b6a952274658bba2600f9e7999d723d1bef61b0ed4",
+      "digest": "984a73c053db431bf79f295ba28461ea75c84938751d950fc5f3b03eb71e23f8"
+    },
+    {
+      "sequence": 2543,
+      "at": "2026-10-07T18:17:24.883Z",
+      "kind": "transaction",
+      "data": {
+        "id": "02d5a4e0-2805-4573-83c8-c45f05ab0bd0"
+      },
+      "previous": "984a73c053db431bf79f295ba28461ea75c84938751d950fc5f3b03eb71e23f8",
+      "digest": "bf263bafc92a4cdd6859eb791a7c60891402f403fd8075055db1eb312c9bdc97"
     }
   ]
 }
