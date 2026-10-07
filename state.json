@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 907,
+  "revision": 909,
   "tasks": {
     "98": {
       "number": 98,
@@ -2676,14 +2676,14 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "Prerequisite #118 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791361812031,
+      "error": "候选 #127 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+      "blockedUntil": 1791364937786,
       "repairRequired": {
         "provider": "codex",
         "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "reason": "检查/评审阻断：Developer has not handed off",
-        "at": 1791342912207
+        "reason": "候选 #127 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+        "at": 1791364337786
       },
       "recoveryIntent": null,
       "recoveryCount": 0,
@@ -28900,6 +28900,39 @@
       },
       "previous": "f03b6c9b0f29d6f41a0da5e93be65e973c272c55ef1edd4ebe5aaca5ba0f3a28",
       "digest": "c40070d27f73e1459a59071a1191e7f83225730bde7a66c54248271a99b54752"
+    },
+    {
+      "sequence": 908,
+      "at": "2026-10-07T09:12:17.786Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "候选 #127 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "reason": "候选 #127 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
+            "at": 1791364337786
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791364937786
+        }
+      },
+      "previous": "c40070d27f73e1459a59071a1191e7f83225730bde7a66c54248271a99b54752",
+      "digest": "e0c9c778fb3b444a8246c9f1c97595d960a276eadcaaf3c822e9567b4a9231ec"
+    },
+    {
+      "sequence": 909,
+      "at": "2026-10-07T09:12:53.631Z",
+      "kind": "transaction",
+      "data": {
+        "id": "ee1939df-b9ac-4884-a8a6-f65534e1447c"
+      },
+      "previous": "e0c9c778fb3b444a8246c9f1c97595d960a276eadcaaf3c822e9567b4a9231ec",
+      "digest": "446e990267215b1a530eab2e1939d9a4ab46a59519e6dcf553c5fec24edf3564"
     }
   ]
 }
