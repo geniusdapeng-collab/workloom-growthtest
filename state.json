@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 243,
+  "revision": 245,
   "tasks": {
     "98": {
       "number": 98,
@@ -1965,7 +1965,7 @@
           "protocol": 9
         }
       },
-      "updatedAt": 1791335415654,
+      "updatedAt": 1791336198651,
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 1791336015654,
       "headSha": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
@@ -2204,7 +2204,32 @@
             "digest": "982a5cb33a222b1b6a44c34c8ec6b3056e736037fd0f20301f4115548384f3db"
           }
         ]
-      }
+      },
+      "originalBody": "AI 工作台接到视频任务时，原有入口分散且插件网关与通用 MCP 不同，容易找不到流程或沿用错误参数。本次内置本仓唯一视频调用指南，CLI/MCP 返回同一完整正文与摘要，现有入口引导先读，运行载荷只包含这份固定指南。\n\n每条短片的镜头数、逐镜时长与编排继续由正式管线按本次需求自主规划；30 秒、6 镜、五版及 17–30 分钟仅为历史计时样本，不新增生产默认、全局超时或验收闸。指南核对人物、商品、平台、时长、账号调性、声音及特殊要求，说明正式前期、付费渲染、恢复、后期与真实交付的边界。\n\nGrowthtest 实际插件额外接入只读 workloom_video_guide、固定资源与握手/SessionStart 指引；真实启动脚本、双 CLI、MCP 和钩子已同文回读。\n固定读取只接受空输入，不接受调用方路径；缺件、产品或版本冲突、UTF-8/大小/链接边界失败均保留错误。新增回归接入原仓实际 CI 测试入口；必需 CI 和主干保护保持原口径。\n\n验证：\n- 当前提交 `a3c7f23af1248fac7cf41c99a6bca424ec2cfe31` 的离线回归 84/84 通过，0 失败或跳过。\n- 真实源码 CLI/MCP 全文和 SHA 一致；精确载荷复制及错误路径回归通过，生成器检查、diff 检查、暂存及提交范围秘密扫描通过。\n- 当前 Codex 会话和独立复核已审查变更及直接依赖，0 未解决发现；结构化实际测试及审查回执通过既有交付队列 handoff，云端原 CI 与准确候选合并继续为硬门禁。\n\n边界：本次没有模型、供应商、TTS、ASR 或新媒体调用；没有移植其它仓生产机制。载荷测试中的编译器是受控 fixture，不冒充完整签名安装包、桌面 GUI 或真实新片生产验收。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+      "files": [
+        "AGENTS.repo.md",
+        "README.md",
+        "bundles/ai-video/README.md",
+        "bundles/geo-growth/agent-capabilities.json",
+        "bundles/geo-growth/capabilities/video.mjs",
+        "bundles/geo-growth/capabilities/workbench-guide.mjs",
+        "docs/agent-computer-guide.md",
+        "docs/ai-video-workbench-guide.md",
+        "plugins/workloom-workbench/README.md",
+        "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+        "plugins/workloom-workbench/skills/workloom/SKILL.md",
+        "scripts/AGENT-CAPABILITIES.md",
+        "scripts/agent-capabilities.test.mjs",
+        "scripts/ai-video-workbench-guide.test.mjs",
+        "scripts/product-runtime-assets.mjs",
+        "scripts/product-runtime-assets.test.mjs",
+        "tools/codex-gateway/README.md",
+        "tools/codex-gateway/bin/cli.mjs",
+        "tools/codex-gateway/src/mcp.mjs",
+        "tools/codex-gateway/test/mcp.test.mjs",
+        "tools/codex-gateway/test/video-guide.test.mjs"
+      ],
+      "ciSince": 1791336198651
     },
     "120": {
       "number": 120,
@@ -9011,6 +9036,63 @@
       },
       "previous": "e278053a076b696a8c2e18d6acc3757f9f3b9b6080a386a999ce54a344b49938",
       "digest": "e9195c75cb83013654c309250185d515b1304c171c7a04ae4937937b79143fc2"
+    },
+    {
+      "sequence": 244,
+      "at": "2026-10-07T01:23:18.651Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "headSha": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
+          "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+          "branch": "task/T-2026-1007-0001",
+          "intent": {
+            "taskId": "T-2026-1007-0001",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "originalBody": "AI 工作台接到视频任务时，原有入口分散且插件网关与通用 MCP 不同，容易找不到流程或沿用错误参数。本次内置本仓唯一视频调用指南，CLI/MCP 返回同一完整正文与摘要，现有入口引导先读，运行载荷只包含这份固定指南。\n\n每条短片的镜头数、逐镜时长与编排继续由正式管线按本次需求自主规划；30 秒、6 镜、五版及 17–30 分钟仅为历史计时样本，不新增生产默认、全局超时或验收闸。指南核对人物、商品、平台、时长、账号调性、声音及特殊要求，说明正式前期、付费渲染、恢复、后期与真实交付的边界。\n\nGrowthtest 实际插件额外接入只读 workloom_video_guide、固定资源与握手/SessionStart 指引；真实启动脚本、双 CLI、MCP 和钩子已同文回读。\n固定读取只接受空输入，不接受调用方路径；缺件、产品或版本冲突、UTF-8/大小/链接边界失败均保留错误。新增回归接入原仓实际 CI 测试入口；必需 CI 和主干保护保持原口径。\n\n验证：\n- 当前提交 `a3c7f23af1248fac7cf41c99a6bca424ec2cfe31` 的离线回归 84/84 通过，0 失败或跳过。\n- 真实源码 CLI/MCP 全文和 SHA 一致；精确载荷复制及错误路径回归通过，生成器检查、diff 检查、暂存及提交范围秘密扫描通过。\n- 当前 Codex 会话和独立复核已审查变更及直接依赖，0 未解决发现；结构化实际测试及审查回执通过既有交付队列 handoff，云端原 CI 与准确候选合并继续为硬门禁。\n\n边界：本次没有模型、供应商、TTS、ASR 或新媒体调用；没有移植其它仓生产机制。载荷测试中的编译器是受控 fixture，不冒充完整签名安装包、桌面 GUI 或真实新片生产验收。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "AGENTS.repo.md",
+            "README.md",
+            "bundles/ai-video/README.md",
+            "bundles/geo-growth/agent-capabilities.json",
+            "bundles/geo-growth/capabilities/video.mjs",
+            "bundles/geo-growth/capabilities/workbench-guide.mjs",
+            "docs/agent-computer-guide.md",
+            "docs/ai-video-workbench-guide.md",
+            "plugins/workloom-workbench/README.md",
+            "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+            "plugins/workloom-workbench/skills/workloom/SKILL.md",
+            "scripts/AGENT-CAPABILITIES.md",
+            "scripts/agent-capabilities.test.mjs",
+            "scripts/ai-video-workbench-guide.test.mjs",
+            "scripts/product-runtime-assets.mjs",
+            "scripts/product-runtime-assets.test.mjs",
+            "tools/codex-gateway/README.md",
+            "tools/codex-gateway/bin/cli.mjs",
+            "tools/codex-gateway/src/mcp.mjs",
+            "tools/codex-gateway/test/mcp.test.mjs",
+            "tools/codex-gateway/test/video-guide.test.mjs"
+          ],
+          "status": "parked",
+          "ciSince": 1791336198651
+        }
+      },
+      "previous": "e9195c75cb83013654c309250185d515b1304c171c7a04ae4937937b79143fc2",
+      "digest": "932340c1a42fa52aab10b7e0f6f2b9860386016b9476ce1f437c41a9baf7c586"
+    },
+    {
+      "sequence": 245,
+      "at": "2026-10-07T01:23:22.937Z",
+      "kind": "transaction",
+      "data": {
+        "id": "55b3142c-d335-4b09-b1b6-1f2eb36d2b91"
+      },
+      "previous": "932340c1a42fa52aab10b7e0f6f2b9860386016b9476ce1f437c41a9baf7c586",
+      "digest": "a1a45e0c0a8baacfd9b0e72600988a7c557148a696a4a09f36d01bd72abf04ae"
     }
   ]
 }
