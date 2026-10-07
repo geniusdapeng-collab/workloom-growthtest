@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 476,
+  "revision": 478,
   "tasks": {
     "98": {
       "number": 98,
@@ -34,7 +34,7 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791336644957,
-      "updatedAt": 1791345616691,
+      "updatedAt": 1791346511382,
       "alignmentCount": 1,
       "alignmentIntent": null,
       "developerReview": null,
@@ -55,9 +55,9 @@
       },
       "recoveryCount": 0,
       "reviewFailures": null,
-      "blockedUntil": 1791346216691,
+      "blockedUntil": 1791347111382,
       "candidate": null,
-      "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "repairRequired": {
         "provider": "codex",
         "headSha": "c20c2606f9670aff25635b3c71bd2e138c915a58",
@@ -15533,6 +15533,31 @@
       },
       "previous": "85253da4a1235a96e7aaf31baab547e036903778808461079dc8ba8ff623a8ae",
       "digest": "52f57ac257ec6530c6dcfdc446d4c2418eedbdcb3dfcff1808278a197a5efdb8"
+    },
+    {
+      "sequence": 477,
+      "at": "2026-10-07T04:15:11.382Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/98/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791347111382
+        }
+      },
+      "previous": "52f57ac257ec6530c6dcfdc446d4c2418eedbdcb3dfcff1808278a197a5efdb8",
+      "digest": "58c387ecf10d8351fef4a1b61fdfcd0ca0ada0abfd6f794bf9e9698282ba3d2a"
+    },
+    {
+      "sequence": 478,
+      "at": "2026-10-07T04:15:19.070Z",
+      "kind": "transaction",
+      "data": {
+        "id": "12e3f59f-9856-49ce-96de-9604b108f925"
+      },
+      "previous": "58c387ecf10d8351fef4a1b61fdfcd0ca0ada0abfd6f794bf9e9698282ba3d2a",
+      "digest": "2e3c1e33444d6951187c70b3e53c3d443219858338422bb1c960299cbb933d73"
     }
   ]
 }
