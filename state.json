@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1732,
+  "revision": 1734,
   "tasks": {
     "98": {
       "number": 98,
@@ -2069,7 +2069,7 @@
       },
       "updatedAt": 1791385815468,
       "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
-      "blockedUntil": 1791385513876,
+      "blockedUntil": 1791386415468,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
       "branch": "task/T-2026-1007-0001",
@@ -2540,7 +2540,7 @@
         "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
         "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
         "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
-        "at": 1791384913876
+        "at": 1791385815468
       },
       "recoveryIntent": null
     },
@@ -48862,6 +48862,39 @@
       },
       "previous": "ceb2b19357990642272645138afbdf6718577c51b15b4692c33e95a32487ee2b",
       "digest": "794ecdee33b49df5ed292279c4699d817bedf7d45506a0ee555b72a391a0f14a"
+    },
+    {
+      "sequence": 1733,
+      "at": "2026-10-07T15:10:15.468Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
+            "at": 1791385815468
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791386415468
+        }
+      },
+      "previous": "794ecdee33b49df5ed292279c4699d817bedf7d45506a0ee555b72a391a0f14a",
+      "digest": "c6b14ff52f4affb20632e096763391f18bd306d770f5ab61fc9c82cdff51f79a"
+    },
+    {
+      "sequence": 1734,
+      "at": "2026-10-07T15:11:02.972Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f2fa0e46-fa2a-42bd-b370-ab669b342fb5"
+      },
+      "previous": "c6b14ff52f4affb20632e096763391f18bd306d770f5ab61fc9c82cdff51f79a",
+      "digest": "58a145af57159ea3a2055aefda22009708a560c83d46c835e00f30b0bd19a260"
     }
   ]
 }
