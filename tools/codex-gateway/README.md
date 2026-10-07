@@ -10,8 +10,13 @@
 
 - **能力目录**：从 `bundles/*/bundle.json`、`presets/*.yml`、`skills/*/SKILL.md`、`fences/*.yml`、`pipelines/*.yml` 自动生成，不手写第二份清单。
 - **数字人工作台投影**：`TeamProjection` 快照 + SSE 事件流；P0 的员工/能力来自代码事实，运行态/审批/KPI/额度来自 `fixtures/mock-state.json`（`dataMode=mock`）。
-- **只读 MCP server**：`workloom_catalog_search` / `workloom_catalog_describe` / `workloom_stage_snapshot` / `workloom_stage_url` / `workloom_health`。
-- **CLI**：`catalog` / `stage` / `doctor` / `context` / `mcp`。
+- **只读 MCP server**：`workloom_catalog_search` / `workloom_catalog_describe` / `workloom_stage_snapshot` / `workloom_stage_url` / `workloom_health` / `workloom_video_guide`。
+- **CLI**：`video guide` / `catalog` / `stage` / `doctor` / `context` / `mcp`。
+
+视频任务先读 [本仓完整调用指南](../../docs/ai-video-workbench-guide.md)。`workloom_video_guide({})`
+返回正文、版本、身份和实际 SHA-256；`workloom://guides/video` 资源返回同文 Markdown。
+握手和受信任 SessionStart context 提示先读指南。通用 CLI/MCP 的
+`growth.video.workbench.guide` 也是同一固定文件，读取不触发生产或收费。
 
 ## 运行（Node ≥ 24）
 

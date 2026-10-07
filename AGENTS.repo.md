@@ -26,6 +26,8 @@
 
 ## 二、本仓运行与验证约定（摘要，详情见 docs/capability-map.md）
 
+- 视频任务的第一步：完整读取 `docs/ai-video-workbench-guide.md`，或调用只读 `growth.video.workbench.guide`；实际 Codex 插件调用 `workloom_video_guide({})`。先冻结用户指定模特、商品、平台、时长、账号调性、声音和特殊要求，再走正式前期→渲染→后期→真实交付核验。方案/草案不代表已放行；不手搓生产流程，不擅自替声、变速或重渲。完整原片后期按本仓标准入口执行。
+
 - 首启：`pnpm setup` → `pnpm preview:all`（三端：PC:3000 / B 移动:3001 / C 移动:3002，Mock 直登）。
 - 能力自检：`pnpm agent:tour`；全量能力清单：`docs/capability-map.md`。
 - 改能力面（脚本 / 包 / 技能 / 演示页）→ 必须 `pnpm capabilities` 重新生成人类版导览，再 `pnpm capabilities:check`。

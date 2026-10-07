@@ -8,6 +8,7 @@
  *   node bin/cli.mjs stage serve [--port N] [--host 127.0.0.1]
  *   node bin/cli.mjs doctor [--json]
  *   node bin/cli.mjs context [--cwd DIR]     # 供 Codex hook 使用
+ *   node bin/cli.mjs video guide [--json]   # 视频任务先读完整固定指南
  *   node bin/cli.mjs mcp
  */
 import { existsSync } from "node:fs";
@@ -17,6 +18,7 @@ import { findCapability, generateCatalog, searchCapabilities } from "../src/cata
 import { DEFAULT_STAGE_PORT, buildSnapshot, shortContext } from "../src/snapshot.mjs";
 import { runMcpStdio } from "../src/mcp.mjs";
 import { startGateway } from "../src/server.mjs";
+import { readVideoWorkbenchGuideFromRoot } from "../../../bundles/geo-growth/capabilities/workbench-guide.mjs";
 
 function parseArgs(argv) {
   const args = { _: [] };
@@ -52,12 +54,19 @@ async function main() {
   const repoRoot = resolveRepoRoot(cwd);
 
   if (!command || command === "help" || command === "--help") {
-    console.log("workloom-gateway：catalog | stage | doctor | context | mcp");
+    console.log("workloom-gateway：video guide | catalog | stage | doctor | context | mcp");
     return 0;
   }
 
   if (command === "mcp") {
     runMcpStdio({ repoRoot });
+    return 0;
+  }
+
+  if (command === "video" && subcommand === "guide") {
+    if (args._.length !== 2 || Object.keys(args).some(key => !['_', 'cwd', 'json'].includes(key))) throw new Error('video guide 仅接受 --cwd 与 --json，不接受路径或覆盖项');
+    const guide = readVideoWorkbenchGuideFromRoot(repoRoot);
+    console.log(args.json ? JSON.stringify(guide) : guide.markdown);
     return 0;
   }
 
@@ -114,7 +123,12 @@ async function main() {
 
   if (command === "context") {
     const snapshot = buildSnapshot({ repoRoot, catalog });
-    const additionalContext = shortContext(snapshot);
+    const guide = readVideoWorkbenchGuideFromRoot(repoRoot);
+    const additionalContext = [
+      `视频任务第一步：完整读取 ${guide.path}；CLI=node tools/codex-gateway/bin/cli.mjs video guide；MCP=workloom_video_guide({})（版本 ${guide.guideVersion}）。`,
+      "先冻结模特、商品、平台、时长、账号调性、声音和特殊要求，再走系统前期→渲染→后期→真实交付核验；不手搓生产流程、不擅自替声或变速；缺入口就保留阻塞。",
+      shortContext(snapshot),
+    ].join('\n');
     console.log(JSON.stringify({ additionalContext, systemMessage: `WorkLoom 工作台已就绪：${snapshot.counts.agents} 个数字员工，${snapshot.counts.pendingApprovals} 项待审批（${snapshot.dataMode}）` }, null, 2));
     return 0;
   }

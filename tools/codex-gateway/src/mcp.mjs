@@ -2,8 +2,8 @@
  * WorkLoom Codex 网关 MCP server（P0，只读）。
  *
  * 传输：stdio，按行 JSON-RPC 2.0（与仓内 packages/base/computer-use/mcp.ts 同风格）。
- * 工具：catalog_search / catalog_describe / stage_snapshot / stage_url / health
- * 资源：workloom://catalog / workloom://stage/snapshot / workloom://health
+ * 工具：catalog_search / catalog_describe / stage_snapshot / stage_url / health / video_guide
+ * 资源：workloom://catalog / workloom://stage/snapshot / workloom://health / workloom://guides/video
  *
  * 纪律：P0 只暴露只读工具；写工具（run_start/approval_decide）必须等 P1 接通
  * 围栏 → 审批 → 五元事件 → 回执后再上线，禁止先给 Codex 写权限。
@@ -12,11 +12,18 @@ import { createInterface } from "node:readline";
 import { resolveRepoRoot } from "./paths.mjs";
 import { generateCatalog, findCapability, searchCapabilities } from "./catalog.mjs";
 import { DEFAULT_STAGE_PORT, buildSnapshot } from "./snapshot.mjs";
+import { readVideoWorkbenchGuideFromRoot } from "../../../bundles/geo-growth/capabilities/workbench-guide.mjs";
 
 const PROTOCOL_VERSION = "2024-11-05";
 const SERVER_INFO = { name: "workloom-codex-gateway", version: "0.1.3" };
 
 const TOOLS = [
+  {
+    name: "workloom_video_guide",
+    description: "制作视频前先读取本仓完整调用指南：冻结模特/商品/平台/时长/账号/声音要求，按系统前期→渲染→后期→真实交付核验执行。仅返回固定文档及版本/SHA，不触发生产或费用。",
+    inputSchema: { type: "object", properties: {}, additionalProperties: false },
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  },
   {
     name: "workloom_catalog_search",
     description: "搜索 WorkLoom 能力目录（数字员工/技能/管线/围栏）。当用户问“我们有哪些能力”“怎么做某件事”时先调用本工具，再决定是否执行。",
@@ -73,6 +80,9 @@ export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = gener
 
   async function callTool(name, args = {}) {
     switch (name) {
+      case "workloom_video_guide":
+        try { return toolText(readVideoWorkbenchGuideFromRoot(repoRoot)); }
+        catch (error) { return toolText({ error: error.code ?? "VIDEO_GUIDE_UNAVAILABLE", message: error.message }, true); }
       case "workloom_catalog_search": {
         const capabilities = searchCapabilities(catalog, args);
         return toolText({ dataMode: "generated", summary: catalog.summary, count: capabilities.length, capabilities });
@@ -97,7 +107,8 @@ export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = gener
     if (!message || typeof message !== 'object' || Array.isArray(message) || message.jsonrpc !== '2.0' || typeof message.method !== 'string') return { jsonrpc: '2.0', id: message?.id ?? null, error: { code: -32600, message: 'Invalid request' } };
     const { id, method, params } = message ?? {};
     if (method === "initialize") {
-      return { jsonrpc: "2.0", id, result: { protocolVersion: PROTOCOL_VERSION, capabilities: { tools: {}, resources: {} }, serverInfo: SERVER_INFO } };
+      return { jsonrpc: "2.0", id, result: { protocolVersion: PROTOCOL_VERSION, capabilities: { tools: {}, resources: {} }, serverInfo: SERVER_INFO,
+        instructions: "视频生成/制作任务先调用 workloom_video_guide({}) 或读取 workloom://guides/video 全文；按本仓指南冻结用户约束并走正式前期、渲染、后期和交付核验。目录与指南是只读，不能把读取成功当作生产完成。" } };
     }
     if (method === "notifications/initialized" || method === "initialized") return null;
     if (method === "ping") return { jsonrpc: "2.0", id, result: {} };
@@ -106,6 +117,7 @@ export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = gener
       const args = params?.arguments ?? {};
       const invalid = typeof args !== 'object' || Array.isArray(args) || args === null
         || ['query', 'domain', 'kind', 'capabilityId'].some(key => args[key] !== undefined && typeof args[key] !== 'string')
+        || (params?.name === 'workloom_video_guide' && Object.keys(args).length !== 0)
         || (args.limit !== undefined && (!Number.isInteger(args.limit) || args.limit < 1 || args.limit > 100));
       if (invalid) return { jsonrpc: '2.0', id, error: { code: -32602, message: 'Invalid tool arguments' } };
       return { jsonrpc: '2.0', id, result: await callTool(String(params?.name ?? ''), args) };
@@ -116,6 +128,7 @@ export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = gener
         id,
         result: {
           resources: [
+            { uri: "workloom://guides/video", name: "本仓 AI 工作台视频调用指南（先读）", mimeType: "text/markdown" },
             { uri: "workloom://health", name: "WorkLoom 网关健康", mimeType: "application/json" },
             { uri: "workloom://catalog", name: "WorkLoom 能力目录", mimeType: "application/json" },
             { uri: "workloom://stage/snapshot", name: "数字人工作台快照（mock）", mimeType: "application/json" },
@@ -125,6 +138,14 @@ export function createMcpHandler({ repoRoot = resolveRepoRoot(), catalog = gener
     }
     if (method === "resources/read") {
       const uri = String(params?.uri ?? "");
+      if (uri === "workloom://guides/video") {
+        try {
+          const guide = readVideoWorkbenchGuideFromRoot(repoRoot);
+          return { jsonrpc: "2.0", id, result: { contents: [{ uri, mimeType: "text/markdown", text: guide.markdown }] } };
+        } catch (error) {
+          return { jsonrpc: "2.0", id, error: { code: -32000, message: error.message, data: { code: error.code ?? "VIDEO_GUIDE_UNAVAILABLE" } } };
+        }
+      }
       const payload = uri === "workloom://health"
         ? { ok: catalog.warnings.length === 0, repo: catalog.repo, counts: catalog.summary, warnings: catalog.warnings }
         : uri === "workloom://catalog"

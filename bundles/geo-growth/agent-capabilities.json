@@ -3,6 +3,17 @@
   "bundleId": "geo-growth",
   "capabilities": [
     {
+      "id": "growth.video.workbench.guide",
+      "version": "1.0.0",
+      "title": "视频制作前先读本仓 AI 工作台调用指南",
+      "description": "读取固定本仓完整指南及身份、版本、SHA-256：如何冻结指定模特/商品/平台/时长/账号/原声与特殊要求，走正式前期、渲染、后期、恢复和真实交付核验。只读，无模型/媒体/服务调用。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": { "kind": "local", "module": "bundles/geo-growth/capabilities/workbench-guide.mjs", "export": "readVideoWorkbenchGuide" },
+      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+    },
+    {
       "id": "growth.service.ticket.list",
       "version": "1.0.0",
       "title": "查看我的工单",

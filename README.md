@@ -1,8 +1,8 @@
-# WorkLoom Growth · 获客增长系统（实验车道）
+# WorkLoom Growthtest · 获客增长系统（隔离实验副本）
 
-WorkLoom Growth 面向企业增长与内容运营团队，把目标、数字员工岗位、内容生产、任务协作和过程记录放进同一个工作空间。产品目标是连接意图洞察、社媒与 GEO 触达、线索承接、转化和复盘；当前代码中，**视频生产与交付有专用执行链，通用工作台和行业包提供组织与治理机制，部分增长工具仍处于声明或接入阶段**。
+WorkLoom Growthtest 是面向企业增长与内容运营团队的隔离实验副本，把目标、数字员工岗位、内容生产、任务协作和过程记录放进同一个工作空间。产品目标是连接意图洞察、社媒与 GEO 触达、线索承接、转化和复盘；当前代码中，**视频生产与交付有专用执行链，通用工作台和行业包提供组织与治理机制，部分增长工具仍处于声明或接入阶段**。
 
-[CNB 仓库](https://cnb.cool/workloom-ai/WorkLoom-growth) · [产品身份](product.manifest.json) · [代码入口导览](docs/capabilities.auto.md) · [开发指引](AGENTS.md) · [Apache-2.0](LICENSE)
+[CNB 仓库](https://cnb.cool/workloom-ai/workloom-growthtest) · [产品身份](product.manifest.json) · [AI 工作台视频调用指南](docs/ai-video-workbench-guide.md) · [代码入口导览](docs/capabilities.auto.md) · [开发指引](AGENTS.md) · [Apache-2.0](LICENSE)
 
 > 本页按当前源码说明“有什么、从哪里进入、还依赖什么”，不把岗位或技能数量当作已交付能力数，也不把模拟结果当作生产效果。旧方案、截图和演示 PPT 可帮助理解背景；发生差异时，以 manifest、当前路由和实际执行代码为准。
 
@@ -11,6 +11,7 @@ WorkLoom Growth 面向企业增长与内容运营团队，把目标、数字员�
 1. 产品经理先看“使用场景”和“功能状态”，区分产品目标、已经有代码的链路与尚待接通的外部动作。
 2. 技术团队先看“系统架构”“行业包组合”和“快速开始”，再沿源码入口追到实际执行器、数据库与回执。
 3. 准备交付时，以真实环境的输入、产物、费用、失败恢复和外部回执验收；本页不提供未经实测的容量、延迟或经营收益承诺。
+4. Codex / DeepSeek Harness 接手视频任务先读 [本仓调用指南](docs/ai-video-workbench-guide.md)：`node scripts/workloom-agent.mjs invoke growth.video.workbench.guide`；实际 Codex 插件用 `workloom_video_guide({})`。核对返回的仓库身份，按用户固定约束走正式流程；指南说明当前入口、失败恢复、完整原片标准后期和耗时估算的边界。
 
 ## 使用场景与产品边界
 
@@ -20,7 +21,7 @@ WorkLoom Growth 面向企业增长与内容运营团队，把目标、数字员�
 | 企业负责人、项目负责人 | 看清任务交给谁、交付什么、哪里待决定 | 工作台、任务线程、协作契约与组合看板组织交接和状态 | 看板和事件存在不等于营收归因已接通；演示订单不能当实际收入 |
 | 增长策略与渠道运营人员 | 同一选题用于社媒内容与 GEO，并积累可复用作业规范 | `geo-growth` 声明岗位、技能、围栏和管线，复用视频与视觉制作能力 | query 采集、能见度监测、线索评分和分发等专用工具仍需逐项接线与验收 |
 
-本仓身份是 `workloom-ai-growth`，角色为 `industry`，默认行业包为 `geo-growth`，属于 WorkLoom 的实验车道。它与 `workloom-growthtest`、`workloom-growthmatrix` 两个隔离副本是不同实例；不把其它仓库的实验能力合并算入本仓。酒店包是组合依赖和垂直业务样例，不代表这里已经接通真实 PMS、OTA、支付或所有酒店经营数据。来源：[product.manifest.json](product.manifest.json)、[主包 manifest](bundles/geo-growth/bundle.json)。
+本仓 `repository` 是 `workloom-ai/workloom-growthtest`，属于 `none-in-none-out` 隔离副本；manifest 保留的 `productId` 为 `workloom-ai-growth`，角色为 `industry`，默认行业包为 `geo-growth`。因此读取指南或调用能力时同时核对 repository，不能只按继承的产品显示名判断实例。Growth 与 Matrix 是另外两个仓，本仓不自动继承它们的新能力，也不向其回流生产机制。酒店包是组合依赖和垂直业务样例，不代表这里已经接通真实 PMS、OTA、支付或所有酒店经营数据。来源：[product.manifest.json](product.manifest.json)、[主包 manifest](bundles/geo-growth/bundle.json)。
 
 ## 功能状态：代码做到哪里
 
@@ -146,8 +147,8 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 ### 1. 克隆、依赖与专用数据库
 
 ```bash
-git clone https://cnb.cool/workloom-ai/WorkLoom-growth.git
-cd WorkLoom-growth
+git clone https://cnb.cool/workloom-ai/workloom-growthtest.git
+cd workloom-growthtest
 pnpm install --frozen-lockfile
 test -f .env || cp .env.example .env
 docker compose up -d postgres
@@ -232,7 +233,7 @@ pnpm -C apps/webc dev
 - **当前入口与统计**：[自动导览](docs/capabilities.auto.md)、[结构化清单](docs/capabilities.auto.json)、[产品 manifest](product.manifest.json)。
 - **视频与角色**：[角色库与默认模特](docs/character-registry.md)、[视频交付与返修](docs/video-delivery-and-revision.md)、[口播解释片](docs/talkcraft-explainer.md)、[白板引擎](docs/whiteboard-engine.md)。
 - **接入与运行**：[电脑工位指南](docs/computer-use-production.md)、[连接器退出 mock 的约定](docs/connectors-mock-exit.md)、[发布清单](docs/release-checklist.md)。
-- **桌面 Agent 接入（Codex / DeepSeek Harness）**：[客户端接入指南](docs/AGENT-CLIENTS.md)（5 分钟接入 + MCP 配置 + 视频能力清单 + 安全边界）。
+- **桌面 Agent 接入（Codex / DeepSeek Harness）**：[本仓视频调用指南](docs/ai-video-workbench-guide.md)（固定指南的 CLI/MCP 读取、完整流程、约束和恢复）与 [Agent 能力协议](scripts/AGENT-CAPABILITIES.md)；实际 Codex 插件另见 [插件入口](plugins/workloom-workbench/README.md)。
 - **产品方案背景**：[社媒与 GEO 融合方案](docs/geo-fusion-plan.md)、[获客方案](docs/plan-acquisition.md)。这些文档含目标与历史设计，不能单独证明当前运行能力。
 - **开发治理**：[AGENTS.md](AGENTS.md)、[本仓规则](AGENTS.repo.md)、[全景认知](WORKLOOM_PRODUCT_CONTEXT.md)、[开发协作协议](docs/DEVELOPMENT-PROTOCOL.md)。
 
