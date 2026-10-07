@@ -7319,8 +7319,11 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
   /** 取几个时间点的 1×1 平均色：稳定的"画面指纹"（不做逐像素对比，只判风格差异是否可测） */
   const meanColorsAt = (file: string, times: number[]): Array<{ r: number; g: number; b: number }> => times.map((at) => {
     const out = spawnSync(FFMPEG, ["-v", "error", "-ss", String(at), "-i", file, "-frames:v", "1", "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 1024 });
-    const buf = out.stdout ?? Buffer.alloc(0);
-    return buf.length >= 3 ? { r: buf[0]!, g: buf[1]!, b: buf[2]! } : { r: 0, g: 0, b: 0 };
+    if (out.status !== 0 || out.error || !Buffer.isBuffer(out.stdout) || out.stdout.length < 3) {
+      throw new Error(`VARIANT_RGB_MEASUREMENT_FAILED: ${file} at ${at}s; status=${out.status}; ${out.error?.message ?? out.stderr?.toString().slice(0, 200) ?? "missing RGB bytes"}`);
+    }
+    const buf = out.stdout;
+    return { r: buf[0]!, g: buf[1]!, b: buf[2]! };
   });
   const usedVariantBgmHashes = new Set<string>();
   for (const plan of variantPlans) {
