@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2846,
+  "revision": 2848,
   "tasks": {
     "98": {
       "number": 98,
@@ -5470,7 +5470,7 @@
     },
     "137": {
       "number": 137,
-      "status": "aligning",
+      "status": "parked",
       "firstSeen": 1791356267145,
       "attempts": {},
       "headSha": "698f6f0f739070c2e02b9a898b232bdbeb736fa5",
@@ -5833,8 +5833,8 @@
       "dependencies": [
         135
       ],
-      "error": "Prerequisite #135 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/135 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 0,
+      "error": "Command failed: git merge --no-ff --no-edit cbbbeca014061c2eac213a6e1ba433d6d750a1c6\n",
+      "blockedUntil": 1791402738296,
       "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
@@ -73970,6 +73970,31 @@
       },
       "previous": "e31063d53c16687514d5fd57b4067c882223dfd829c5af99ecb0f249a0ba3302",
       "digest": "d2c5b8ea07d285a589f25c93aa27ffad345ab91682ea9aba2c8d81d3b90084b6"
+    },
+    {
+      "sequence": 2847,
+      "at": "2026-10-07T19:42:18.296Z",
+      "kind": "task",
+      "data": {
+        "number": 137,
+        "patch": {
+          "status": "parked",
+          "error": "Command failed: git merge --no-ff --no-edit cbbbeca014061c2eac213a6e1ba433d6d750a1c6\n",
+          "blockedUntil": 1791402738296
+        }
+      },
+      "previous": "d2c5b8ea07d285a589f25c93aa27ffad345ab91682ea9aba2c8d81d3b90084b6",
+      "digest": "95540f9ce8eb27802fd2a7fda26f5758c8b47155222883bc26da82f2243ffd5e"
+    },
+    {
+      "sequence": 2848,
+      "at": "2026-10-07T19:43:40.119Z",
+      "kind": "transaction",
+      "data": {
+        "id": "26fd778c-e9d2-4f4f-a3c5-b5927f354782"
+      },
+      "previous": "95540f9ce8eb27802fd2a7fda26f5758c8b47155222883bc26da82f2243ffd5e",
+      "digest": "37fab2a47bcb3093cd3c3e6017df8b0ff72a452d9ec4fe8eadde9c7772875641"
     }
   ]
 }
