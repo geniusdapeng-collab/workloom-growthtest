@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1853,
+  "revision": 1855,
   "tasks": {
     "98": {
       "number": 98,
@@ -3135,7 +3135,7 @@
     },
     "126": {
       "number": 126,
-      "status": "waiting_ci",
+      "status": "aligning",
       "firstSeen": 1791346075534,
       "attempts": {},
       "admission": {
@@ -3362,7 +3362,7 @@
       "dependencies": [
         123
       ],
-      "alignmentCount": 0,
+      "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
@@ -3385,7 +3385,12 @@
         "scripts/tools/film-standard-post.test.ts",
         "scripts/tools/full-chain-film.mts"
       ],
-      "ciSince": 1791387124284
+      "ciSince": 1791387124284,
+      "alignmentIntent": {
+        "headSha": "179f96daf1355f11af6ce9fdb7eee997adcc9433",
+        "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "at": 1791387124284
+      }
     },
     "127": {
       "number": 127,
@@ -51713,6 +51718,36 @@
       },
       "previous": "eeda8be7ca73c29120c48ba0795b59781db764cb0e2ba4d3972c3ce8bf234def",
       "digest": "daf8aa9d385b58ef68549eb988c78a4a7b3d3b9cbc6af97c647c208617dd4c28"
+    },
+    {
+      "sequence": 1854,
+      "at": "2026-10-07T15:32:04.284Z",
+      "kind": "task",
+      "data": {
+        "number": 126,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "179f96daf1355f11af6ce9fdb7eee997adcc9433",
+            "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "at": 1791387124284
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "daf8aa9d385b58ef68549eb988c78a4a7b3d3b9cbc6af97c647c208617dd4c28",
+      "digest": "a1b5af15b493bb597de2b1375ddf07ab591b7c3edd0443810c33b79fa9bd310f"
+    },
+    {
+      "sequence": 1855,
+      "at": "2026-10-07T15:33:29.553Z",
+      "kind": "transaction",
+      "data": {
+        "id": "e0620e3c-bad2-44ee-ac31-8ad455259d05"
+      },
+      "previous": "a1b5af15b493bb597de2b1375ddf07ab591b7c3edd0443810c33b79fa9bd310f",
+      "digest": "3c1f5b52ad7f3ba011ce338ba0acc334ee9226ac075f60c5463a35c5b8390ff4"
     }
   ]
 }
