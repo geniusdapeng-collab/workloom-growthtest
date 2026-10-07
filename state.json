@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1849,
+  "revision": 1851,
   "tasks": {
     "98": {
       "number": 98,
@@ -2068,7 +2068,7 @@
         }
       },
       "updatedAt": 1791387124284,
-      "error": "Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+      "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
       "blockedUntil": 1791387724284,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
@@ -2542,9 +2542,9 @@
       "repairRequired": {
         "provider": "codex",
         "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
-        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
-        "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous; Codex review identity differs from the exact repository/source/main/policy",
-        "at": 1791386418500
+        "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+        "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+        "at": 1791387124284
       },
       "recoveryIntent": null
     },
@@ -51717,6 +51717,39 @@
       },
       "previous": "421aa7d5e99dcbbff1f28b7bd417dd6353431b5403cc43efa1632a7f465625b6",
       "digest": "2eb4e1f7174f6c8790e7e4655bef33fbad9798973c92b7fda36a6cbe9208c6aa"
+    },
+    {
+      "sequence": 1850,
+      "at": "2026-10-07T15:32:04.284Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "c865b1e8f59862d57b9044dfef959e3c0442a037",
+            "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit c865b1e8f59862d57b9044dfef959e3c0442a037\n",
+            "at": 1791387124284
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791387724284
+        }
+      },
+      "previous": "2eb4e1f7174f6c8790e7e4655bef33fbad9798973c92b7fda36a6cbe9208c6aa",
+      "digest": "d38abd2eee716cff73448b2ad42c63ed7355e83da7dd704d932df637124b1894"
+    },
+    {
+      "sequence": 1851,
+      "at": "2026-10-07T15:33:16.896Z",
+      "kind": "transaction",
+      "data": {
+        "id": "99705a5b-7cb6-4c5a-9c6e-2e6bdc30756d"
+      },
+      "previous": "d38abd2eee716cff73448b2ad42c63ed7355e83da7dd704d932df637124b1894",
+      "digest": "a05b806dea9375bf29cec0f33b8b6c650898ccaaf38834ef8da21d1990ae3e6d"
     }
   ]
 }
