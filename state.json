@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 199,
+  "revision": 202,
   "tasks": {
     "98": {
       "number": 98,
@@ -1772,7 +1772,7 @@
     },
     "118": {
       "number": 118,
-      "status": "developing",
+      "status": "waiting_ci",
       "firstSeen": 1791334657026,
       "attempts": {},
       "admission": {
@@ -1784,7 +1784,146 @@
         "owner": "admission/pr-118",
         "generation": {}
       },
-      "updatedAt": 1791334657026
+      "updatedAt": 1791334694850,
+      "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+      "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+      "branch": "task/T-2026-1007-0002",
+      "intent": {
+        "taskId": "T-2026-1007-0002",
+        "ready": true,
+        "dependsOn": [],
+        "releases": []
+      },
+      "developerReview": {
+        "schemaVersion": 1,
+        "provider": "codex",
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 118,
+        "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+        "reviewedFiles": [
+          "README.md",
+          "bundles/ai-video/library/characters/README.md",
+          "docs/capabilities.auto.json",
+          "docs/capabilities.auto.md",
+          "docs/character-registry.md",
+          "docs/real-person-asset.md",
+          "packages/video-studio/src/character-release-source.test.ts",
+          "packages/video-studio/src/character-release-source.ts"
+        ],
+        "filesHash": "2f1f688d95044e3860bb996c9416a6d59280b494dbb0577936951fa701f03f3f",
+        "dependsOn": [],
+        "ciPolicyChanges": [],
+        "ciPolicyChangesHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "tests": [
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/postcommit-video-vitest.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T00:57:30.936627+00:00",
+            "result": "{\"numTotalTests\": 1514, \"numPassedTests\": 1513, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T00:57:31.623193+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T00:57:31.671131+00:00",
+            "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T00:57:31.728756+00:00",
+            "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+          },
+          {
+            "command": "git diff --check 'HEAD^' HEAD",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T00:57:31.750074+00:00",
+            "result": "Command completed without diagnostics."
+          }
+        ],
+        "reviewedAt": "2026-10-07T00:58:11.551535+00:00",
+        "summary": "当前 Codex 对八个变化文件逐个完整阅读，并精读人物来源的直接依赖 character-release-contract.ts、real-person-asset.ts。登记角色仅限 authorized-real/real-authorized，取 active 最高有效版本，证据或角度资产必须对应主授权人物；路径限制在角色和版本目录，文件读取保留普通文件、符号链接、稳定字节、大小和 SHA-256 检查。主授权、身份引用、父子合同一致性以及外部客户原基准 fallback 保留，未把定妆照伪装成认证原图。新增错误、边界、权限和真实随仓 CEO 回归已实际运行；没有未解决审查问题。三份派生能力文件仅是仓规生成日期更新。无 CI 实现变更，无跨仓回流。",
+        "passed": true,
+        "id": "68e549f12e10ff0bffb5b92a77bf90915bca52cc9e907870c64ea66325264875"
+      },
+      "reviewSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 118,
+        "pull": {
+          "number": 118,
+          "state": "open",
+          "title": "fix(video): 默认复用已处理的登记定妆照 [T-2026-1007-0002]",
+          "body": "当前随仓出镜人物 已完成独立定妆照前置处理，出片预检仍强制要求真人主档 anchorPhoto，导致合法登记角色在渲染前被 CHARACTER_SOURCE_ANCHOR_MISSING 拦住。\n\n本次人物发布合同优先复用对应授权角色已登记、当前在用的定妆照，保留实际 SHA-256、角色主档、版本及角度，来源标为 registered-character-portrait。外部客户没有对应定妆照时仍可使用已登记原基准；无效授权、身份不对应、越界、符号链接及本次镜头自报来源继续失败。主授权素材组和生成参考不变。\n\n验证：视频工位及服务端身份回归 1,514 项，1,513 通过、1 原有跳过、0 失败；视频工位类型检查、内置角色字节校验、capabilities 生成与一致性检查通过。新增 27 个边界、错误、授权及复用用例，并把真实随仓出镜人物 回归改为默认定妆照复用。三镜头真实素材预检已通过，尚未以预检代替付费成片证据。\n\n范围：仅 Growthtest 的人物登记源、测试、三份人物文档及按仓规重生成的三份能力导览日期；任务卡 #117。回滚：revert 本提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0002\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+          "author": {
+            "username": "cnb.dYiF05kxAGA",
+            "nickname": "Genius",
+            "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+            "is_npc": false
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/task/T-2026-1007-0002",
+            "sha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "status_check",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "files": [
+          "README.md",
+          "bundles/ai-video/library/characters/README.md",
+          "docs/capabilities.auto.json",
+          "docs/capabilities.auto.md",
+          "docs/character-registry.md",
+          "docs/real-person-asset.md",
+          "packages/video-studio/src/character-release-source.test.ts",
+          "packages/video-studio/src/character-release-source.ts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0002",
+          "ready": true,
+          "dependsOn": [],
+          "releases": []
+        },
+        "headTime": 1791334574000,
+        "mergeBase": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "checkErrors": [],
+        "checkSha": null,
+        "hasFailedChecks": false,
+        "ciPolicyChanges": []
+      }
     }
   },
   "leases": {
@@ -7468,6 +7607,181 @@
       },
       "previous": "0fe5e76c86a21f8ea4176ef80640b461e714fc2eaef5c1e9888e2c81da47e2cd",
       "digest": "b8fadfcbd4f6e0c6bd24899bcf0c9a2fe25a75a0fb18d34a016b171beb1825ab"
+    },
+    {
+      "sequence": 200,
+      "at": "2026-10-07T00:58:14.850Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 118,
+        "id": "68e549f12e10ff0bffb5b92a77bf90915bca52cc9e907870c64ea66325264875",
+        "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9"
+      },
+      "previous": "b8fadfcbd4f6e0c6bd24899bcf0c9a2fe25a75a0fb18d34a016b171beb1825ab",
+      "digest": "8741be9f98cd255daac209076fb0e562cf96360c9af50e9ef4654fa041b260bc"
+    },
+    {
+      "sequence": 201,
+      "at": "2026-10-07T00:58:14.850Z",
+      "kind": "task",
+      "data": {
+        "number": 118,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+          "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+          "branch": "task/T-2026-1007-0002",
+          "intent": {
+            "taskId": "T-2026-1007-0002",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 118,
+            "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+            "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+            "reviewedFiles": [
+              "README.md",
+              "bundles/ai-video/library/characters/README.md",
+              "docs/capabilities.auto.json",
+              "docs/capabilities.auto.md",
+              "docs/character-registry.md",
+              "docs/real-person-asset.md",
+              "packages/video-studio/src/character-release-source.test.ts",
+              "packages/video-studio/src/character-release-source.ts"
+            ],
+            "filesHash": "2f1f688d95044e3860bb996c9416a6d59280b494dbb0577936951fa701f03f3f",
+            "dependsOn": [],
+            "ciPolicyChanges": [],
+            "ciPolicyChangesHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/postcommit-video-vitest.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T00:57:30.936627+00:00",
+                "result": "{\"numTotalTests\": 1514, \"numPassedTests\": 1513, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T00:57:31.623193+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T00:57:31.671131+00:00",
+                "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T00:57:31.728756+00:00",
+                "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+              },
+              {
+                "command": "git diff --check 'HEAD^' HEAD",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T00:57:31.750074+00:00",
+                "result": "Command completed without diagnostics."
+              }
+            ],
+            "reviewedAt": "2026-10-07T00:58:11.551535+00:00",
+            "summary": "当前 Codex 对八个变化文件逐个完整阅读，并精读人物来源的直接依赖 character-release-contract.ts、real-person-asset.ts。登记角色仅限 authorized-real/real-authorized，取 active 最高有效版本，证据或角度资产必须对应主授权人物；路径限制在角色和版本目录，文件读取保留普通文件、符号链接、稳定字节、大小和 SHA-256 检查。主授权、身份引用、父子合同一致性以及外部客户原基准 fallback 保留，未把定妆照伪装成认证原图。新增错误、边界、权限和真实随仓 CEO 回归已实际运行；没有未解决审查问题。三份派生能力文件仅是仓规生成日期更新。无 CI 实现变更，无跨仓回流。",
+            "passed": true,
+            "id": "68e549f12e10ff0bffb5b92a77bf90915bca52cc9e907870c64ea66325264875"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 118,
+            "pull": {
+              "number": 118,
+              "state": "open",
+              "title": "fix(video): 默认复用已处理的登记定妆照 [T-2026-1007-0002]",
+              "body": "当前随仓出镜人物 已完成独立定妆照前置处理，出片预检仍强制要求真人主档 anchorPhoto，导致合法登记角色在渲染前被 CHARACTER_SOURCE_ANCHOR_MISSING 拦住。\n\n本次人物发布合同优先复用对应授权角色已登记、当前在用的定妆照，保留实际 SHA-256、角色主档、版本及角度，来源标为 registered-character-portrait。外部客户没有对应定妆照时仍可使用已登记原基准；无效授权、身份不对应、越界、符号链接及本次镜头自报来源继续失败。主授权素材组和生成参考不变。\n\n验证：视频工位及服务端身份回归 1,514 项，1,513 通过、1 原有跳过、0 失败；视频工位类型检查、内置角色字节校验、capabilities 生成与一致性检查通过。新增 27 个边界、错误、授权及复用用例，并把真实随仓出镜人物 回归改为默认定妆照复用。三镜头真实素材预检已通过，尚未以预检代替付费成片证据。\n\n范围：仅 Growthtest 的人物登记源、测试、三份人物文档及按仓规重生成的三份能力导览日期；任务卡 #117。回滚：revert 本提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0002\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0002",
+                "sha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "status_check",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+            "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "files": [
+              "README.md",
+              "bundles/ai-video/library/characters/README.md",
+              "docs/capabilities.auto.json",
+              "docs/capabilities.auto.md",
+              "docs/character-registry.md",
+              "docs/real-person-asset.md",
+              "packages/video-studio/src/character-release-source.test.ts",
+              "packages/video-studio/src/character-release-source.ts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0002",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791334574000,
+            "mergeBase": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": []
+          }
+        }
+      },
+      "previous": "8741be9f98cd255daac209076fb0e562cf96360c9af50e9ef4654fa041b260bc",
+      "digest": "09b606e4f61036d5ac0c5474db3ef77db2e0a9d2090810a691d0c492cd64caf6"
+    },
+    {
+      "sequence": 202,
+      "at": "2026-10-07T00:58:13.919Z",
+      "kind": "transaction",
+      "data": {
+        "id": "6ebe8985-8cce-4f61-81fc-bee07e47af88"
+      },
+      "previous": "09b606e4f61036d5ac0c5474db3ef77db2e0a9d2090810a691d0c492cd64caf6",
+      "digest": "0817b0374f664ff9ba30fd591dfdb9a0507f8882b69450abb6bbb1c2c69ca7e6"
     }
   ]
 }
