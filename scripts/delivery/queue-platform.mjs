@@ -14,7 +14,7 @@ export class Platform {
     if (!validRepoSlug(repo)) throw new Error('Invalid repository slug');
     this.repo = repo; this.token = token; this.request = request;
   }
-  call(path, options = {}) { return this.request(this.repo, path, { token: this.token, retries: options.method && options.method !== 'GET' ? 0 : 2, ...options }); }
+  call(path, options = {}) { return this.request(this.repo, path, { token: this.token, retries: options.method && options.method !== 'GET' ? 0 : 3, retryBudgetMs: 240000, ...options }); }
   async pull(number) {
     const pull = await this.call(`/-/pulls/${Number(number)}`);
     const actual = Number(pull?.number);

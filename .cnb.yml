@@ -74,6 +74,9 @@
         playwright_link_created=0
         trap 'if [ "$playwright_link_created" = 1 ]; then rm -f node_modules/playwright; fi; rm -rf "$instrumentation_dir"' EXIT HUP INT TERM
         npm install --prefix "$instrumentation_dir" playwright@1.63.0 --ignore-scripts --no-audit --no-fund
+        # Successful receipt-history fixtures decode media before the later media suite.
+        export PLAYWRIGHT_BROWSERS_PATH="$instrumentation_dir/browsers"
+        node "$instrumentation_dir/node_modules/playwright/cli.js" install --with-deps chromium
         if [ ! -e node_modules/playwright ] && [ ! -L node_modules/playwright ]; then
           ln -s "$instrumentation_dir/node_modules/playwright" node_modules/playwright
           playwright_link_created=1

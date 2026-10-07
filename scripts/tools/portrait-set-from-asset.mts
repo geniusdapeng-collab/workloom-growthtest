@@ -27,8 +27,8 @@
  *   5. 装档与写后复核交给 `portrait-set-install.mts`（同一套校验与证据口径）。
  */
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -324,14 +324,82 @@ if (!["two-stage", "auto", "image", "video"].includes(engineArg)) {
 const isOverdue = (text: string): boolean => /AccountOverdueError|overdue balance/i.test(text);
 
 /** Existing unjournaled outputs cannot prove whether a former paid request was accepted. */
-function derivedSubmissionJournal(key: string, kind: "image" | "video"): string {
+function derivedSubmissionPath(key: string, kind: "image" | "video"): string {
   if (!/^[A-Za-z0-9_-]+$/.test(key)) throw new Error("DERIVED_SUBMISSION_KEY_INVALID");
-  const file = join(outDir, ".submissions", `${key}.${kind}.json`);
+  return join(outDir, ".submissions", `${key}.${kind}.json`);
+}
+
+function derivedSubmissionJournal(key: string, kind: "image" | "video"): string {
+  const file = derivedSubmissionPath(key, kind);
   const angle = key.replace(/^master-/, "");
   const legacy = [join(outDir, `${characterId}-${angle}.png`), ...(key.startsWith("master-") ? [join(outDir, `_master-${angle}.png`)] : [])];
   if (!existsSync(file) && legacy.some(path => existsSync(path)))
     throw new Error("DERIVED_LEGACY_SUBMISSION_UNKNOWN: existing output has no acceptance journal; reconcile before POST");
   return file;
+}
+
+/** A logical angle owns both engines. Changing engine cannot discard a paid acceptance. */
+function derivedAdmissionState(key: string, requested: "image" | "video" | "auto"): { kind: "image" | "video"; readOnly: boolean } {
+  const active = (["image", "video"] as const).map(kind => ({ kind, prior: readGenerationSubmissionState(derivedSubmissionPath(key, kind)) }))
+    .filter(entry => entry.prior && entry.prior.state !== "rejected");
+  if (active.length > 1) throw new Error("DERIVED_ACCEPTANCE_CONFLICT: both engines have accepted or unknown submissions; reconcile before proceeding");
+  const old = active[0];
+  if (old && requested !== "auto" && requested !== old.kind)
+    throw new Error(old.prior?.state === "submission-unknown" ? "DERIVED_SUBMISSION_UNKNOWN: another engine may already be paid"
+      : "DERIVED_ENGINE_CONFLICT: another engine is already accepted; restore that engine before proceeding");
+  return { kind: old?.kind ?? (requested === "video" ? "video" : "image"), readOnly: Boolean(old) };
+}
+
+/** Old task media must have an authoritative accepted video journal before a new POST. */
+function assertDerivedTemporaryMediaKnown(): void {
+  const temporary = readdirSync(outDir).filter(name => /^\.tmp-.*\.(?:mp4|png)$/.test(name));
+  if (!temporary.length) return;
+  const dir = join(outDir, ".submissions"), known = new Set<string>();
+  if (existsSync(dir)) {
+    const info = lstatSync(dir);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("DERIVED_SUBMISSION_DIRECTORY_INVALID");
+    for (const name of readdirSync(dir).filter(name => /^[A-Za-z0-9_-]+\.video\.json$/.test(name))) {
+      const file = join(dir, name), prior = readGenerationSubmissionState(file);
+      if (prior?.state !== "accepted") continue;
+      // readGenerationSubmissionState has checked the journal and response digest.
+      const saved = JSON.parse(readFileSync(file, "utf8")) as { responseText: string };
+      const taskId = (JSON.parse(saved.responseText) as { id?: string }).id;
+      if (typeof taskId === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(taskId)) known.add(taskId);
+    }
+  }
+  if (temporary.some(name => {
+    const taskId = /^\.tmp-([A-Za-z0-9_-]{1,160})\.(?:mp4|png)$/.exec(name)?.[1];
+    return !taskId || !known.has(taskId);
+  })) throw new Error("DERIVED_LEGACY_SUBMISSION_UNKNOWN: temporary task media lacks an accepted journal; reconcile before POST");
+}
+
+/** Hold one admission lock across the image rejection and the video fallback. Never steal an old lock. */
+async function withDerivedAdmission(key: string, requested: "image" | "video" | "auto",
+  operation: (kind: "image" | "video", readOnly: boolean) => Promise<Buffer>): Promise<Buffer> {
+  const cached = derivedAdmissionState(key, requested);
+  // The request helper still validates exact endpoint/body; beforeSubmit forbids a raced fresh POST.
+  if (cached.readOnly) return operation(cached.kind, true);
+  const dir = join(outDir, ".submissions"); mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const info = lstatSync(dir);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("DERIVED_SUBMISSION_DIRECTORY_INVALID");
+  const lock = derivedSubmissionPath(key, "image").replace(/\.image\.json$/, ".admission.lock"), owner = randomUUID();
+  try { writeFileSync(lock, owner, { flag: "wx", mode: 0o600 }); }
+  catch (cause) { throw new Error("DERIVED_SUBMISSION_BUSY: same angle admission is owned; no duplicate POST sent", { cause }); }
+  try {
+    const current = derivedAdmissionState(key, requested);
+    return await operation(current.kind, current.readOnly);
+  } finally {
+    if (!existsSync(lock)) throw new Error("DERIVED_SUBMISSION_LOCK_CHANGED");
+    const held = lstatSync(lock);
+    if (!held.isFile() || held.isSymbolicLink() || held.nlink !== 1 || readFileSync(lock, "utf8") !== owner)
+      throw new Error("DERIVED_SUBMISSION_LOCK_CHANGED");
+    unlinkSync(lock);
+  }
+}
+
+function derivedBeforeSubmit(readOnly: boolean): void {
+  if (readOnly) throw new Error("DERIVED_RECOVERY_POST_FORBIDDEN: cached acceptance changed; reconcile before POST");
+  assertDerivedTemporaryMediaKnown();
 }
 
 /** Auto fallback is safe only after an explicit rejection of unsupported asset input. */
@@ -342,7 +410,7 @@ function canFallbackToVideo(error: unknown): boolean {
     && /not supported|unsupported|does not support|不支持/i.test(value.body);
 }
 
-async function generateViaImage(prompt: string, referenceImages: string[] = [], key = "front"): Promise<Buffer> {
+async function imageGeneration(prompt: string, referenceImages: string[], key: string, readOnly: boolean): Promise<Buffer> {
   /**
    * 图端点接受**本地图 / data URL**（也接受多张，见 `portrait-agent` 的 anchors 用法）；不接受 `asset://`。
    * `referenceImages` 为多图参考（身份母版）——多图比单图稳，但张数过多会稀释，2 张左右最佳。
@@ -354,7 +422,8 @@ async function generateViaImage(prompt: string, referenceImages: string[] = [], 
   });
   const { response } = await submitGenerationOnce({ endpoint: `${baseUrl}/images/generations`,
     journalFile: derivedSubmissionJournal(key, "image"), body: requestBody,
-    headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, timeoutMs: 300_000 });
+    headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, timeoutMs: 300_000,
+    beforeSubmit: () => derivedBeforeSubmit(readOnly) });
   const text = await response.text();
   if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status} ${text.slice(0, 160)}`), { status: response.status, body: text });
   const body = JSON.parse(text) as { data?: Array<{ url?: string }> };
@@ -372,7 +441,7 @@ async function generateViaImage(prompt: string, referenceImages: string[] = [], 
  * 实测 `asset-20260929120055-d6xr` 被平台判 `not found`。这里从 400 错误里解析出失效 assetId、
  * 仅在结构化明确400拒绝后剔除；未知结果绝不重发。首次受理响应先落盘，重启只GET。
  */
-async function generateViaVideo(prompt: string, refs: string[], key = "front"): Promise<Buffer> {
+async function videoGeneration(prompt: string, refs: string[], key: string, readOnly: boolean): Promise<Buffer> {
   let activeRefs = [...refs];
   const endpoint = `${baseUrl}/contents/generations/tasks`;
   const journalFile = derivedSubmissionJournal(key, "video");
@@ -401,7 +470,7 @@ async function generateViaVideo(prompt: string, refs: string[], key = "front"): 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const accepted = await submitGenerationOnce({ endpoint, journalFile,
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-      body: requestBody(activeRefs), timeoutMs: 120_000,
+      body: requestBody(activeRefs), timeoutMs: 120_000, beforeSubmit: () => derivedBeforeSubmit(readOnly),
     });
     submit = accepted.response;
     submitText = await submit.text();
@@ -436,6 +505,26 @@ async function generateViaVideo(prompt: string, refs: string[], key = "front"): 
     return readFileSync(frame);
   }
   throw new Error("视频任务轮询超时（6 分钟）");
+}
+
+async function generateViaImage(prompt: string, referenceImages: string[] = [], key = "front"): Promise<Buffer> {
+  return withDerivedAdmission(key, "image", (_kind, readOnly) => imageGeneration(prompt, referenceImages, key, readOnly));
+}
+
+async function generateViaVideo(prompt: string, refs: string[], key = "front"): Promise<Buffer> {
+  return withDerivedAdmission(key, "video", (_kind, readOnly) => videoGeneration(prompt, refs, key, readOnly));
+}
+
+async function generateDerivedAngle(prompt: string, refs: string[], key: string, mode: "image" | "auto"): Promise<Buffer> {
+  return withDerivedAdmission(key, mode, async (kind, readOnly) => {
+    if (kind === "video") return videoGeneration(prompt, refs, key, readOnly);
+    try { return await imageGeneration(prompt, [], key, readOnly); }
+    catch (error) {
+      if (mode !== "auto" || readOnly || !canFallbackToVideo(error)) throw error;
+      console.log(`  ↻ ${key}：图片端点明确拒绝asset参考 → 退到视频路（保持同一角度准入锁）`);
+      return videoGeneration(prompt, refs, key, false);
+    }
+  });
 }
 
 /** 把一张图压成"可发包"的 data URL（图端点单次请求体过大就 fetch failed，实测过） */
@@ -524,7 +613,7 @@ for (const entry of plan.angles) {
     image = await generateViaVideo(entry.prompt, liveRefs, entry.angle);
   } else {
     try {
-      image = await generateViaImage(entry.prompt, [], entry.angle);
+      image = await generateDerivedAngle(entry.prompt, liveRefs, entry.angle, engineArg as "image" | "auto");
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const body = (error as { body?: string }).body ?? "";
@@ -532,12 +621,8 @@ for (const entry of plan.angles) {
         console.error(`${entry.angle}：账户欠费（AccountOverdueError）→ 整体失败，先充值再重跑（本轮不产出任何文件、不做部分安装）`);
         process.exit(3);
       }
-      if (engineArg === "image" || !canFallbackToVideo(error)) {
-        console.error(`${entry.angle}：图片端点失败 —— ${detail}`);
-        process.exit(3);
-      }
-      console.log(`  ↻ ${entry.angle}：图片端点不可用（${detail.slice(0, 90)}）→ 退到视频路（asset 参考已实测可用）`);
-      image = await generateViaVideo(entry.prompt, liveRefs, entry.angle);
+      console.error(`${entry.angle}：生成端点失败 —— ${detail}`);
+      process.exit(3);
     }
   }
   if (image.byteLength < 50_000) {

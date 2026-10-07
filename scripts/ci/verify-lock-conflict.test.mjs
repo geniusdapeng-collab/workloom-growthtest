@@ -101,7 +101,8 @@ class PullFixture {
     if (path.startsWith("git/commits/")) return Response.json({ sha: path.split("/").at(-1), parents: [] });
     throw new Error("Unexpected fixture request " + path);
   }
-  client(options = {}) { return new LockApiClient({ repoSlug: REPO, token: "fixture-only", fetchImpl: this.fetch, pageSize: 2, ...options }); }
+  client(options = {}) { return new LockApiClient({ repoSlug: REPO, token: "fixture-only", fetchImpl: this.fetch,
+    pageSize: 2, rateLimitDelays: [1, 3, 9], ...options }); }
   context() { return { isPr: true, iid: "106", repoSlug: REPO, sourceSha: SHA, targetSha: BASE,
     sourceRepo: REPO, sourceBranch: "task/current", targetBranch: "main", policies: resolveLockPolicies({ event: "pull_request" }) }; }
 }
@@ -259,6 +260,96 @@ test("fork head is proved by the actual source-repository commit endpoint; inacc
 for (const status of [401, 403, 429, 500]) test("HTTP " + status + " is a hard incomplete result without leaking response body", async () => {
   const fake = new PullFixture(); fake.override = () => new Response("secret signed-url=do-not-output", { status });
   await assert.rejects(collectBoundPulls(fake.client(), fake.context()), (error) => { assert.match(error.message, /API_INCOMPLETE/); assert.ok(!error.message.includes("do-not-output")); return true; });
+});
+
+function rateLimitFixture(responses, options = {}) {
+  let clock = Date.UTC(2026, 9, 7, 12); const calls = [], delays = [];
+  const client = new LockApiClient({ repoSlug: REPO, token: "fixture-only", budgetMs: 240_000,
+    now: () => clock, sleep: async ms => { delays.push(ms); clock += ms; },
+    fetchImpl: async (url, init) => {
+      calls.push({ url, init });
+      return typeof responses === "function" ? responses(calls.length) : responses[Math.min(calls.length - 1, responses.length - 1)].clone();
+    }, ...options });
+  return { client, calls, delays };
+}
+
+test("429 recovery keeps the same GET URL, credential, repository and actual response", async () => {
+  const fixture = rateLimitFixture([new Response("private rate-limit detail", { status: 429 }), Response.json({ observed: "fresh" })]);
+  assert.deepEqual(await fixture.client.api("pulls?state=open&page=1&page_size=10"), { observed: "fresh" });
+  assert.deepEqual(fixture.delays, [5000]); assert.equal(fixture.calls.length, 2);
+  for (const call of fixture.calls) {
+    assert.equal(call.url, `https://api.cnb.cool/${REPO}/-/pulls?state=open&page=1&page_size=10`);
+    assert.equal(call.init.method, "GET"); assert.equal(call.init.headers.Authorization, "Bearer fixture-only");
+    assert.equal(call.init.redirect, "error"); assert.equal(call.init.signal.aborted, true);
+  }
+});
+
+for (const header of ["30", "Wed, 07 Oct 2026 12:00:30 GMT"]) test("Retry-After is honored within the original total budget: " + header, async () => {
+  const fixture = rateLimitFixture([new Response("", { status: 429, headers: { "Retry-After": header } }), Response.json({ observed: true })]);
+  assert.deepEqual(await fixture.client.api("pulls"), { observed: true }); assert.deepEqual(fixture.delays, [30_000]);
+});
+
+for (const header of ["", "garbage", "0.5", "-1", "0", "Wed, 07 Oct 2026 11:00:00 GMT"]) test("missing, invalid or past retry hint retains bounded local backoff: " + header, async () => {
+  const fixture = rateLimitFixture([new Response("", { status: 429, headers: { "Retry-After": header } }), Response.json([])]);
+  assert.deepEqual(await fixture.client.api("pulls"), []); assert.deepEqual(fixture.delays, [5000]);
+});
+
+for (const header of ["241", "9999999999999999999999999", "Wed, 07 Oct 2026 13:00:00 GMT"]) test("a server retry window beyond the total budget is refused without another GET: " + header, async () => {
+  const fixture = rateLimitFixture([new Response("private rate-limit detail", { status: 429, headers: { "Retry-After": header } })]);
+  await assert.rejects(fixture.client.api("pulls"), /API_INCOMPLETE.*429/);
+  assert.equal(fixture.calls.length, 1); assert.deepEqual(fixture.delays, []);
+});
+
+test("persistent 429 is a hard incomplete result after exactly three bounded waits", async () => {
+  const fixture = rateLimitFixture([new Response("secret signed-url=do-not-output", { status: 429 })]);
+  await assert.rejects(fixture.client.api("pulls"), error => {
+    assert.equal(error.code, "API_INCOMPLETE"); assert.equal(error.status, 429);
+    assert.ok(!error.message.includes("do-not-output")); return true;
+  });
+  assert.equal(fixture.calls.length, 4); assert.deepEqual(fixture.delays, [5000, 15_000, 45_000]);
+});
+
+for (const status of [401, 403, 404, 500]) test("non-rate-limit HTTP failure is terminal without waiting or retry: " + status, async () => {
+  const fixture = rateLimitFixture([new Response("private upstream detail", { status })]);
+  await rejectCode(fixture.client.api("pulls"), "API_INCOMPLETE");
+  assert.equal(fixture.calls.length, 1); assert.deepEqual(fixture.delays, []);
+});
+
+test("raw GET recovery returns only the successful current response bytes", async () => {
+  const fixture = rateLimitFixture([new Response("private rate-limit detail", { status: 429 }), new Response("actual-source-bytes\n")]);
+  assert.equal(await fixture.client.api("git/raw/main/.cnb.yml", { raw: true }), "actual-source-bytes\n");
+  assert.equal(fixture.calls.length, 2);
+});
+
+test("malformed successful JSON after a 429 is still terminal and never reused as proof", async () => {
+  const fixture = rateLimitFixture([new Response("", { status: 429 }), new Response("not JSON"), Response.json([])]);
+  await rejectCode(fixture.client.api("pulls"), "API_INCOMPLETE"); assert.equal(fixture.calls.length, 2);
+});
+
+test("a failed or non-returning backoff cannot leak errors or exceed the total budget", async () => {
+  const failed = rateLimitFixture([new Response("", { status: 429 })], { sleep: async () => { throw new Error("private token do-not-output"); } });
+  await assert.rejects(failed.client.api("pulls"), error => { assert.match(error.message, /API_INCOMPLETE/); assert.ok(!error.message.includes("do-not-output")); return true; });
+  assert.equal(failed.calls.length, 1);
+  const stalled = rateLimitFixture([new Response("", { status: 429 })], { budgetMs: 20, rateLimitDelays: [1], sleep: async () => new Promise(() => {}) });
+  await rejectCode(stalled.client.api("pulls"), "API_INCOMPLETE"); assert.equal(stalled.calls.length, 1);
+});
+
+test("the full PR collection still rejects source drift across a 429 recovery window", async () => {
+  const fake = new PullFixture(); let detailReads = 0;
+  fake.override = path => {
+    if (path !== "pulls/105") return undefined;
+    detailReads += 1;
+    if (detailReads === 2) return new Response("", { status: 429 });
+    if (detailReads === 3) return Response.json({ ...fake.rows[0], head: { ...fake.rows[0].head, sha: "e".repeat(40) } });
+  };
+  await rejectCode(collectBoundPulls(fake.client(), fake.context()), "STALE_PULL");
+  assert.equal(detailReads, 3);
+});
+
+test("retry configuration is bounded and cannot create unlimited attempts", () => {
+  for (const rateLimitDelays of [null, [1, 2, 3, 4], [0], [-1], [1.5], [60_001]]) {
+    assert.throws(() => new LockApiClient({ repoSlug: REPO, token: "fixture-only", rateLimitDelays }), /API_INCOMPLETE/);
+  }
 });
 test("invalid JSON, network failure, per-request timeout and total budget all fail closed", async () => {
   for (const fetchImpl of [async () => new Response("not JSON"), async () => { throw new Error("token secret"); }, async () => new Promise(() => {})]) {
