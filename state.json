@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2919,
+  "revision": 2921,
   "tasks": {
     "98": {
       "number": 98,
@@ -5687,7 +5687,7 @@
           }
         ]
       },
-      "updatedAt": 1791403810499,
+      "updatedAt": 1791404112243,
       "dependencies": [
         135
       ],
@@ -75681,6 +75681,67 @@
       },
       "previous": "f0a5a41aa95daf9444af2425674422a01f89229bff4df14be1b89688adbb4380",
       "digest": "b90a412ada603b454ce6b95b0efdefe09a130914e04abcdae0f8611969a66f70"
+    },
+    {
+      "sequence": 2920,
+      "at": "2026-10-07T20:15:12.243Z",
+      "kind": "task",
+      "data": {
+        "number": 137,
+        "patch": {
+          "headSha": "600cac16cf79f89cc1ce3d21c5bb071f4a15cc32",
+          "mainSha": "cbbbeca014061c2eac213a6e1ba433d6d750a1c6",
+          "branch": "task/T-2026-1007-0009",
+          "intent": {
+            "taskId": "T-2026-1007-0009",
+            "ready": true,
+            "dependsOn": [
+              135
+            ],
+            "releases": []
+          },
+          "originalBody": "用户要求 30 秒时，旧标准合同和 spec 把名义时长当作精确门槛，规划配方还可能裁短明确动作；默认未评审的技术事实被记成 100 分。现在把高完成度作为影视制作最高优先级并贯穿规划、能力入口、spec、标准合同、合成、master 和交付。30 秒是创作目标，完整的 28/32/35 秒镜头池允许交付；只有显式硬上限才约束时长。明确动作锁定完整源镜，标准后期保留所有原片帧及同文件原声，不压速、不凑秒截断、不补帧冻结循环。交付写入目标、实测时长及差值。\n\n默认素材采用保持直接进入后期，未做艺术质量评审时质量分为 null/unverified，技术事实通过不冒充质量 100 分。共享纯政策模块被正式 Node 能力入口及 TS 流程共同调用，不新增渲染后质审或付费生成。\n\n166 项针对政策、完整时钟、规划、实际 CLI/父服务函数测试和 33 项能力测试通过。准确提交 698f6f0 的 8 项完整检查通过：视频回归 1719 通过、1 既有跳过、0 失败；真实媒体后期 25 通过，脚本回归 161 通过，双包类型、资产、能力导览及 diff 检查均通过。实际片源复用，随后由正式免费后期刷新交付。\n\n任务卡 #136；依赖 #135。仅修改隔离副本，不回流或分发。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0009\",\n  \"ready\": true,\n  \"depends_on\": [\n    135\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "AGENTS.repo.md",
+            "apps/server/src/video/director-sources.ts",
+            "apps/server/src/video/director-worker.ts",
+            "apps/server/src/video/film-worker.ts",
+            "bundles/geo-growth/capabilities/video.mjs",
+            "docs/capabilities.auto.json",
+            "docs/film-completion-policy.md",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/character-release-contract.ts",
+            "packages/video-studio/src/director-completion-bridge.test.ts",
+            "packages/video-studio/src/director-planner.test.ts",
+            "packages/video-studio/src/director-planner.ts",
+            "packages/video-studio/src/film-completion-entrypoint.test.ts",
+            "packages/video-studio/src/film-completion.d.mts",
+            "packages/video-studio/src/film-completion.mjs",
+            "packages/video-studio/src/film-completion.test.ts",
+            "packages/video-studio/src/index.ts",
+            "packages/video-studio/src/producer-gate.ts",
+            "packages/video-studio/src/standard-post-contract.test.ts",
+            "packages/video-studio/src/standard-post-contract.ts",
+            "scripts/tools/film-standard-post.mts",
+            "scripts/tools/full-chain-film.mts",
+            "scripts/video-capabilities.test.mjs"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791402138296
+        }
+      },
+      "previous": "b90a412ada603b454ce6b95b0efdefe09a130914e04abcdae0f8611969a66f70",
+      "digest": "ed97bb5a4086e4f9169f09c9bc3bdf4d7695ef193b3f0ae087947ff055716867"
+    },
+    {
+      "sequence": 2921,
+      "at": "2026-10-07T20:15:55.197Z",
+      "kind": "transaction",
+      "data": {
+        "id": "dddddfd9-f7e8-47c2-8e36-4584ff43399c"
+      },
+      "previous": "ed97bb5a4086e4f9169f09c9bc3bdf4d7695ef193b3f0ae087947ff055716867",
+      "digest": "9d13a292bc8c9f6f15a4615ddd0fceabd33544ac6e049a96f071191d6c779fc5"
     }
   ]
 }
