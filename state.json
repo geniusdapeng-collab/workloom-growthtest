@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1262,
+  "revision": 1264,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2068,8 +2068,8 @@
         }
       },
       "updatedAt": 1791373416070,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791372609774,
+      "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+      "blockedUntil": 1791374016070,
       "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -2749,10 +2749,10 @@
       },
       "repairRequired": {
         "provider": "codex",
-        "headSha": "eda8255dc676671f50e3b188058daa3a93750d05",
+        "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "reason": "候选 #125 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
-        "at": 1791345616691
+        "reason": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+        "at": 1791373416070
       },
       "recoveryIntent": null
     },
@@ -37331,6 +37331,39 @@
       },
       "previous": "cd37369252b95828df9059b92edd5d4f8fb338aa7f1160dbb5b7ffd8338a8ae7",
       "digest": "781867b92b8c9ba83bc9027bf7c61ec6238f6d6b8c13a52d8ea65d79f7c41965"
+    },
+    {
+      "sequence": 1263,
+      "at": "2026-10-07T11:43:36.070Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "reason": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
+            "at": 1791373416070
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791374016070
+        }
+      },
+      "previous": "781867b92b8c9ba83bc9027bf7c61ec6238f6d6b8c13a52d8ea65d79f7c41965",
+      "digest": "a7803b3e5b72d0945868bb451c20ed67a01e065d4b8974049ae6f1472a5aaa79"
+    },
+    {
+      "sequence": 1264,
+      "at": "2026-10-07T11:43:48.707Z",
+      "kind": "transaction",
+      "data": {
+        "id": "9494130e-7d21-4fe7-bcd0-06ef938633e4"
+      },
+      "previous": "a7803b3e5b72d0945868bb451c20ed67a01e065d4b8974049ae6f1472a5aaa79",
+      "digest": "2eba52644b4a246df0e7bc1fa116297843f81f97f06ca23f598527819394255e"
     }
   ]
 }
