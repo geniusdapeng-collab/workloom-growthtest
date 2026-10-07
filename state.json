@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 688,
+  "revision": 690,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "developing",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2067,9 +2067,9 @@
           "protocol": 15
         }
       },
-      "updatedAt": 1791354612245,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791353420381,
+      "updatedAt": 1791355810583,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791356410583,
       "headSha": "eda8255dc676671f50e3b188058daa3a93750d05",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0001",
@@ -22801,6 +22801,31 @@
       },
       "previous": "06f195f1eef6054127e1c18440ba6ad2bc4abf74beec91e984bc4ea76ba795fe",
       "digest": "9f767643116ca8bf230dd5d1975c55f36cbf448a816f497e08746dfb86de2544"
+    },
+    {
+      "sequence": 689,
+      "at": "2026-10-07T06:50:10.583Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791356410583
+        }
+      },
+      "previous": "9f767643116ca8bf230dd5d1975c55f36cbf448a816f497e08746dfb86de2544",
+      "digest": "884e420689e4456f3cdf64a4149719544c7f2ad94dd4a8bef9ad1f6a0a555da2"
+    },
+    {
+      "sequence": 690,
+      "at": "2026-10-07T06:50:20.164Z",
+      "kind": "transaction",
+      "data": {
+        "id": "49f90816-0017-43dc-86f6-5b2b47d3b2b5"
+      },
+      "previous": "884e420689e4456f3cdf64a4149719544c7f2ad94dd4a8bef9ad1f6a0a555da2",
+      "digest": "f6c314d955ecf6154b589741226ba3e5f994f992b787e86631a4f5ff24781226"
     }
   ]
 }
