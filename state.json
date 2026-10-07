@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1435,
+  "revision": 1438,
   "tasks": {
     "98": {
       "number": 98,
@@ -6951,7 +6951,7 @@
     },
     "146": {
       "number": 146,
-      "status": "developing",
+      "status": "waiting_ci",
       "firstSeen": 1791378757788,
       "attempts": {},
       "admission": {
@@ -6967,7 +6967,310 @@
           "protocol": 46
         }
       },
-      "updatedAt": 1791379507888
+      "updatedAt": 1791380247485,
+      "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+      "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+      "branch": "task/T-2026-1007-0012",
+      "intent": {
+        "taskId": "T-2026-1007-0012",
+        "ready": true,
+        "dependsOn": [],
+        "releases": []
+      },
+      "developerReview": {
+        "schemaVersion": 1,
+        "provider": "codex",
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 146,
+        "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+        "reviewedFiles": [
+          "docs/AUTOMATIC-RD-DELIVERY.md",
+          "scripts/delivery/install-cnb.yml",
+          "scripts/delivery/queue-platform.mjs",
+          "scripts/tools/cnb-api.mjs",
+          "scripts/tools/cnb-api.test.mjs"
+        ],
+        "filesHash": "1a5f31ed9a9349392c246460366ca5128ce172fde80877b607d749eb1d32d009",
+        "dependsOn": [],
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "rationale": "把新增API故障测试加入既有delivery-regression原命令末尾；原必需检查名称、Node镜像、阶段、原两组测试和5m时限不变，准确新命令已实际143项142通过1既有跳过。此为加强覆盖，不删除或放宽原门禁。 当前文件 scripts/delivery/install-cnb.yml；当前 source/main 比较摘要 17836814886280df4341961d552563a9e92df73c906068e3eb58196920faca17"
+          },
+          {
+            "id": "CI-002",
+            "rationale": "实际候选144第二次回执校验GET429有日志；原短退避不足。仅有界只读传输恢复，响应体和等待均有总截止；同身份实时证据读取，写入仍单次尝试，权限与來源校验保持失败闭合。 当前文件 scripts/tools/cnb-api.mjs；当前 source/main 比较摘要 1d0780323a4a7cee020964e511421b7a8975f32272c2a224e41fb6538530eb78"
+          },
+          {
+            "id": "CI-003",
+            "rationale": "把新增API故障测试加入既有delivery-regression原命令末尾；原必需检查名称、Node镜像、阶段、原两组测试和5m时限不变，准确新命令已实际143项142通过1既有跳过。此为加强覆盖，不删除或放宽原门禁。 当前文件 scripts/delivery/install-cnb.yml；当前 source/main 比较摘要 447a147543c99cc9a76f4a444a6ae24e6d7dc20dc07fba55caede521830d3dc6"
+          },
+          {
+            "id": "CI-004",
+            "rationale": "新增故障与真实本地HTTP边界回归，39用例验证限流、长Retry-After、剩余总预算、权限、未知写单次、凭据/正文冻结及snapshot漂移；无生产模型或真实业务写入。 当前文件 scripts/tools/cnb-api.test.mjs；当前 source/main 比较摘要 9942760f241d062313473e48d86b6baff23fceccc319dbca0949e4a1282a00fa"
+          },
+          {
+            "id": "CI-005",
+            "rationale": "队列GET使用三次有限重试并传递总预算；原完整分页与前后source/main/body/label稳定、精确候选及二父合并验证逐项保留。 当前文件 scripts/delivery/queue-platform.mjs；当前 source/main 比较摘要 9c4332d9860369ae89335bfc73bbc4ceb58c43572de2097d39c4eead80300b51"
+          },
+          {
+            "id": "CI-006",
+            "rationale": "把新增API故障测试加入既有delivery-regression原命令末尾；原必需检查名称、Node镜像、阶段、原两组测试和5m时限不变，准确新命令已实际143项142通过1既有跳过。此为加强覆盖，不删除或放宽原门禁。 当前文件 scripts/delivery/install-cnb.yml；当前 source/main 比较摘要 f7bbf6caccc277d41c4816621a64000a606d28724839f025e83f897c21649455"
+          }
+        ],
+        "ciPolicyChangesHash": "ba27d5ebfcb9f754281f57425207fefcb4f3444cc78ef08f535affb3dd77e630",
+        "tests": [
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:25:02.439907+00:00",
+            "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (179.919292ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (0.811959ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (9.032833ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (158.239417ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (143.628792ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (196.164625ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (206.327083ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.6195ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (351.567541ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (159.084459ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (151.422208ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (173.700875ms)\n✔ missing actual accepted input proof refuses original issuance (225.213417ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (410.117667ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (722.599041ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (621.188625ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (506.870208ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (298.571667ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (399.373584ms)\n✔ media executable resolver permits only current local executables (11.845416ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.70625ms)\nℹ tests 21\nℹ suites 0\nℹ pass 21\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 5065.16325\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-rendered-material-use.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/api-retry-wired-source-video-vitest.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:26:16.542693+00:00",
+            "result": "{\"numTotalTests\": 1618, \"numPassedTests\": 1617, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:scripts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:27:34.988223+00:00",
+            "result": "2 正在校验并安全换入运行时载荷…\n21:27:12 正在校验并安全换入运行时载荷…\n21:27:12 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-0omEDZ/resources）==\n21:27:12 正在检查本机版本与安装载荷…\n21:27:12 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-wgqVp9/resources）==\n21:27:12 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (21.917083ms)\n✔ 真实首日引导退出的渲染冒烟 (27.070083ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (1.811834ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (5.33025ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (3.764166ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (6.352042ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (1.396875ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.671833ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.823166ms)\n✔ 产品截图采用捕获时的可见场景 (21.760708ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (45.601667ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.376959ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (3.755166ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (4.05225ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (8.951083ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (8.462667ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (6.314042ms)\n  ✔ 首装暂存失败不会留下半套运行时 (2.985ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (1.042959ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.211ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.527958ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (4.838ms)\n✔ 桌面载荷原子装配 (87.478083ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.450833ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (1.18475ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.189416ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (0.607667ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (2.145833ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (3.507292ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (8.289917ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (1.253083ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (45.611334ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.117166ms)\n✔ 桌面本机渲染子进程的 Node 路径 (47.070041ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (1.014458ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (2.021708ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (3.759166ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.325625ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (1.70275ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.507833ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.26525ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.237417ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.363833ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (10.410875ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (3.610708ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (1.317ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.23175ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.745125ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (6.087917ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (22.839875ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (2.356416ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (2.8605ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (10.672ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (4.64325ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (7.143209ms)\n✔ native smoke captures the actual product region for its pixel verdict (7.79175ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (6.673ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (6.509833ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (9.191375ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (6.629958ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (8.249625ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (8.282334ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (28.506834ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (5.950917ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (23.700041ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (5.587333ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (11.462667ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (6.090042ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (3.58375ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (5.684459ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (1.998208ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (3.43075ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (2.468667ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (6.208292ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (4.770166ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (3.332666ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (5.045333ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (1.890542ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (2.03125ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-2pv3zV/pgdata\",\"port\":55432,\"hbaFile\":\"/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-2pv3zV/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (0.8055ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.106625ms)\n✔ 客户端投影路径围栏 (1.753459ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (1.339375ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (1.3135ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (4.855ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (2.039042ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (3.705792ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (0.892084ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (0.743334ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (3.423375ms)\n  ✔ 实例报告端口不符时失败且零写入 (1.29625ms)\n✔ 桌面数据库安全引导 (20.286208ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (3.863417ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (13.748167ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (7.750708ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (4.817708ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (9.888916ms)\n✔ 包目录创建顺序不影响依赖清单输出 (6.071583ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (244.58925ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (46.991833ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (2.084875ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (4.559792ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (3.597667ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (8.993208ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (3.899208ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (82.0545ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (4.259459ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (95.424458ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.27ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (127.715166ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (35.18225ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (8.442833ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (1.67125ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (1.605875ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (2.601458ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.306291ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (1.110417ms)\n✔ normal physical source copy records canonical source and generated contract bytes (199.506083ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (62.320958ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (83.222166ms)\n✔ existing derived-output symlink cannot replace an external file (71.503375ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (57.01725ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (118.294625ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (53.467042ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (47.350958ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (105.245291ms)\n✔ payload cannot be created inside a selected source tree (70.472292ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (48.145416ms)\n✔ canonical output aliases cannot overwrite the checkout (44.441084ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (119.979125ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (637.905417ms)\n✔ 检测到非演示工作区时拒绝删除 (447.310333ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (2309.335042ms)\n✔ 未知参数 fail closed (5.787792ms)\n✔ 备份失败时禁止删除和后续迁移种子 (1564.416917ms)\n✔ 空备份不能证明可恢复，禁止删除 (1802.863084ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (3372.228833ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (7825.919167ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (1491.612667ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (1148.718875ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (1761.429667ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.757084ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.740125ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (24.252042ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (0.503ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (4.118166ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (2.231625ms)\nℹ tests 161\nℹ suites 11\nℹ pass 161\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 22732.595916\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:27:35.578853+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project apps/server/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:27:37.016495+00:00",
+            "result": "Command completed without diagnostics."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:27:37.090570+00:00",
+            "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:27:37.181432+00:00",
+            "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+          },
+          {
+            "command": "git diff --check 80c1331ad4ed8225a676c331917debb04ab0e4f5...ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T13:27:37.223412+00:00",
+            "result": "Command completed without diagnostics."
+          }
+        ],
+        "reviewedAt": "2026-10-07T13:32:30.095221+00:00",
+        "summary": "当前 Codex 对准确 ea3fe124/main80c 源组的五个变化文件逐一完整精读并追踪队列、策略及来源验证调用。GET 预算采用单调时钟，请求和响应体共享每次剩余截止时间，有限等待保持同一 URL/序列化 body/token；更长 Retry-After 不提前重试。写入仍单次提交，401/403、持续限流、主线漂移及缺页/审查/准入证据维持拒绝。HTTP 本地真实不结束响应体会被终止；39 个 API 故障用例覆盖恢复、边界、权限、写未知和当前 Platform 快照。原生 delivery-regression 只在原命令末尾追加测试，原名称、阶段、时限与用例不变。当前 HEAD 的八项实际本地检查全部通过，原生同命令143项142通过1既有UI车道跳过。311版本的全CI/交付515项514通过1跳过另留历史，未冒充ea3完整测试；ea3相对311仅CI命令接线。旧实现四项恢复负对照全部失败。云端source/candidate CI与精确合入门禁另行核验，未调用平台模型、绕过保护或扩散到其他仓。",
+        "passed": true,
+        "id": "e110b8ffeecae26a1a849d7a4ebc3700ea821ec6fed5f60d9b3b1638ebdb670a"
+      },
+      "reviewSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 146,
+        "pull": {
+          "number": 146,
+          "state": "open",
+          "title": "fix(growth):原生发布读取限流恢复与总时间边界 [T-2026-1007-0012]",
+          "body": "原生候选 #144 的第二次回执验证在读取当前 PR 时因 CNB 429 失败。通用 GET 现有请求、响应体与等待都受 240 秒单调总预算限制，429 有限退避并遵守更长 Retry-After；队列使用三次重试。持续限流、权限拒绝、坏证据与 source/main 漂移仍失败；写请求维持单次提交和原身份回读。\n\n任务 #145 的准确范围为五个文件：API、故障测试、队列适配器、原生 delivery-regression 配置及行为文档。原生 CI 仅在原命令末尾增加 API 故障测试，原检查名、阶段、用例和时限保留。\n\n验证：当前提交 ea3fe124f4c2543ae26b25f6bea23befe06d510f 的八项制片/脚本/类型/资产/能力检查均实际通过；新增故障用例所在原生命令共 143 项，142 通过、1 项既有 UI 车道跳过。恢复逻辑包含正常、持续限流、权限、响应体/等待超时、写入未知与主线漂移。修改前实现对四个恢复用例的实际负对照均失败，历史失败日志保留。仅修改 Growthtest 隔离副本；云端完整源与候选 CI、精确合入源码核心及真实 PG 验证仍为正式发布前置。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0012\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+          "author": {
+            "username": "cnb.dYiF05kxAGA",
+            "nickname": "Genius",
+            "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+            "is_npc": false
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/task/T-2026-1007-0012",
+            "sha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "files": [
+          "docs/AUTOMATIC-RD-DELIVERY.md",
+          "scripts/delivery/install-cnb.yml",
+          "scripts/delivery/queue-platform.mjs",
+          "scripts/tools/cnb-api.mjs",
+          "scripts/tools/cnb-api.test.mjs"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0012",
+          "ready": true,
+          "dependsOn": [],
+          "releases": []
+        },
+        "headTime": 1791379419000,
+        "mergeBase": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "checkErrors": [],
+        "checkSha": null,
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "pipeline": "delivery-regression",
+            "stage": "Durable delivery, permissions, races and actual Git regression",
+            "file": "scripts/delivery/install-cnb.yml",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+              }
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+              }
+            },
+            "origins": {
+              "before": "scripts/delivery/install-cnb.yml",
+              "after": "scripts/delivery/install-cnb.yml"
+            },
+            "binding": {
+              "branch": "**",
+              "event": "pull_request"
+            },
+            "digest": "17836814886280df4341961d552563a9e92df73c906068e3eb58196920faca17"
+          },
+          {
+            "id": "CI-002",
+            "file": "scripts/tools/cnb-api.mjs",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/tools/cnb-api.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/tools/cnb-api.mjs",
+              "absent": false
+            },
+            "digest": "1d0780323a4a7cee020964e511421b7a8975f32272c2a224e41fb6538530eb78"
+          },
+          {
+            "id": "CI-003",
+            "pipeline": "delivery-regression",
+            "stage": "Durable delivery, permissions, races and actual Git regression",
+            "file": "scripts/delivery/install-cnb.yml",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+              }
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false,
+              "definition": {
+                "name": "Durable delivery, permissions, races and actual Git regression",
+                "timeout": "5m",
+                "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+              }
+            },
+            "origins": {
+              "before": "scripts/delivery/install-cnb.yml",
+              "after": "scripts/delivery/install-cnb.yml"
+            },
+            "digest": "447a147543c99cc9a76f4a444a6ae24e6d7dc20dc07fba55caede521830d3dc6"
+          },
+          {
+            "id": "CI-004",
+            "file": "scripts/tools/cnb-api.test.mjs",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/tools/cnb-api.test.mjs",
+              "absent": true
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/tools/cnb-api.test.mjs",
+              "absent": false
+            },
+            "digest": "9942760f241d062313473e48d86b6baff23fceccc319dbca0949e4a1282a00fa"
+          },
+          {
+            "id": "CI-005",
+            "file": "scripts/delivery/queue-platform.mjs",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/queue-platform.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/queue-platform.mjs",
+              "absent": false
+            },
+            "digest": "9c4332d9860369ae89335bfc73bbc4ceb58c43572de2097d39c4eead80300b51"
+          },
+          {
+            "id": "CI-006",
+            "file": "scripts/delivery/install-cnb.yml",
+            "before": {
+              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false
+            },
+            "after": {
+              "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+              "path": "scripts/delivery/install-cnb.yml",
+              "absent": false
+            },
+            "digest": "f7bbf6caccc277d41c4816621a64000a606d28724839f025e83f897c21649455"
+          }
+        ]
+      }
     }
   },
   "leases": {
@@ -41512,6 +41815,345 @@
       },
       "previous": "c6e930cd08b45add6edc4e0d2fae874583315b7e565eec6a95e7a95402acd56c",
       "digest": "401bfd94f9420c75d10c3338e9f003b11dc26c388d074f5f5d837ae4c60b1601"
+    },
+    {
+      "sequence": 1436,
+      "at": "2026-10-07T13:37:27.480Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 146,
+        "id": "e110b8ffeecae26a1a849d7a4ebc3700ea821ec6fed5f60d9b3b1638ebdb670a",
+        "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5"
+      },
+      "previous": "401bfd94f9420c75d10c3338e9f003b11dc26c388d074f5f5d837ae4c60b1601",
+      "digest": "cd915dd473c0573d96ed07200738bc39e5a1a6b72dd07c1169f134abbd7e7f25"
+    },
+    {
+      "sequence": 1437,
+      "at": "2026-10-07T13:37:27.485Z",
+      "kind": "task",
+      "data": {
+        "number": 146,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+          "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+          "branch": "task/T-2026-1007-0012",
+          "intent": {
+            "taskId": "T-2026-1007-0012",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 146,
+            "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+            "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+            "reviewedFiles": [
+              "docs/AUTOMATIC-RD-DELIVERY.md",
+              "scripts/delivery/install-cnb.yml",
+              "scripts/delivery/queue-platform.mjs",
+              "scripts/tools/cnb-api.mjs",
+              "scripts/tools/cnb-api.test.mjs"
+            ],
+            "filesHash": "1a5f31ed9a9349392c246460366ca5128ce172fde80877b607d749eb1d32d009",
+            "dependsOn": [],
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "rationale": "把新增API故障测试加入既有delivery-regression原命令末尾；原必需检查名称、Node镜像、阶段、原两组测试和5m时限不变，准确新命令已实际143项142通过1既有跳过。此为加强覆盖，不删除或放宽原门禁。 当前文件 scripts/delivery/install-cnb.yml；当前 source/main 比较摘要 17836814886280df4341961d552563a9e92df73c906068e3eb58196920faca17"
+              },
+              {
+                "id": "CI-002",
+                "rationale": "实际候选144第二次回执校验GET429有日志；原短退避不足。仅有界只读传输恢复，响应体和等待均有总截止；同身份实时证据读取，写入仍单次尝试，权限与來源校验保持失败闭合。 当前文件 scripts/tools/cnb-api.mjs；当前 source/main 比较摘要 1d0780323a4a7cee020964e511421b7a8975f32272c2a224e41fb6538530eb78"
+              },
+              {
+                "id": "CI-003",
+                "rationale": "把新增API故障测试加入既有delivery-regression原命令末尾；原必需检查名称、Node镜像、阶段、原两组测试和5m时限不变，准确新命令已实际143项142通过1既有跳过。此为加强覆盖，不删除或放宽原门禁。 当前文件 scripts/delivery/install-cnb.yml；当前 source/main 比较摘要 447a147543c99cc9a76f4a444a6ae24e6d7dc20dc07fba55caede521830d3dc6"
+              },
+              {
+                "id": "CI-004",
+                "rationale": "新增故障与真实本地HTTP边界回归，39用例验证限流、长Retry-After、剩余总预算、权限、未知写单次、凭据/正文冻结及snapshot漂移；无生产模型或真实业务写入。 当前文件 scripts/tools/cnb-api.test.mjs；当前 source/main 比较摘要 9942760f241d062313473e48d86b6baff23fceccc319dbca0949e4a1282a00fa"
+              },
+              {
+                "id": "CI-005",
+                "rationale": "队列GET使用三次有限重试并传递总预算；原完整分页与前后source/main/body/label稳定、精确候选及二父合并验证逐项保留。 当前文件 scripts/delivery/queue-platform.mjs；当前 source/main 比较摘要 9c4332d9860369ae89335bfc73bbc4ceb58c43572de2097d39c4eead80300b51"
+              },
+              {
+                "id": "CI-006",
+                "rationale": "把新增API故障测试加入既有delivery-regression原命令末尾；原必需检查名称、Node镜像、阶段、原两组测试和5m时限不变，准确新命令已实际143项142通过1既有跳过。此为加强覆盖，不删除或放宽原门禁。 当前文件 scripts/delivery/install-cnb.yml；当前 source/main 比较摘要 f7bbf6caccc277d41c4816621a64000a606d28724839f025e83f897c21649455"
+              }
+            ],
+            "ciPolicyChangesHash": "ba27d5ebfcb9f754281f57425207fefcb4f3444cc78ef08f535affb3dd77e630",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx --test scripts/tools/film-standard-post.test.ts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:25:02.439907+00:00",
+                "result": "✔ issued original manifest rebuilds exact complete native timeline from real current media (179.919292ms)\n✔ a missing canonical manifest returns the stable standard error before media probing (0.811959ms)\n✔ a missing issued receipt fails capture with the stable error and publishes no manifest (9.032833ms)\n✔ final audio guard counts the full real original clock and records codec boundary samples (158.239417ms)\n✔ final audio guard refuses a real short audio track without padding it or altering the file (143.628792ms)\n✔ post layer schema refuses every free-edit and malformed post setting before external work (196.164625ms)\n✔ standard delivery requires three styles and rejects repeated grade or music bytes before media work (206.327083ms)\n✔ actual final cover and consumed BGM receipts must satisfy the established three-axis gate (0.6195ms)\n✔ canonical original manifest rejects edited count/order/fingerprints/receipts and supplied media facts (351.567541ms)\n✔ copying or symlinking an issued manifest cannot create another standard authority (159.084459ms)\n✔ mutated real original and symlinked canonical clip cannot be washed by retained receipt labels (151.422208ms)\n✔ frozen submission is idempotent but refuses changed project or mutable resubmission (173.700875ms)\n✔ missing actual accepted input proof refuses original issuance (225.213417ms)\n✔ legacy adoption requires explicit exact original set and real matching accepted-task/history bytes (410.117667ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json before shots/keys/runtime (722.599041ms)\n✔ removed free-edit CLI rejects --existing-render-edit arbitrary.json --worker before shots/keys/runtime (621.188625ms)\n✔ standard CLI rejects incompatible arguments --standard-post file.json (506.870208ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --shots d (298.571667ms)\n✔ standard CLI rejects incompatible arguments --standard-post a --post-settings b --out c --worker (399.373584ms)\n✔ media executable resolver permits only current local executables (11.845416ms)\n✔ formal post adapter cannot invoke provider generation, local TTS, ASR or model adapters (0.70625ms)\nℹ tests 21\nℹ suites 0\nℹ pass 21\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 5065.16325\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/vitest/vitest.mjs run packages/video-studio apps/server/src/video/film-worker-identity.test.ts scripts/tools/film-native-post.test.ts scripts/tools/compose-native-clock.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-rendered-material-use.test.ts --maxWorkers=2 --reporter=json --outputFile=/Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/trace/api-retry-wired-source-video-vitest.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:26:16.542693+00:00",
+                "result": "{\"numTotalTests\": 1618, \"numPassedTests\": 1617, \"numFailedTests\": 0, \"numPendingTests\": 1, \"success\": true}"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node /Users/mac/Documents/Codex/2026-10-07/growth-ceo-30-growth-growthtest-codex-2/work/pnpm-10.14.0/package/bin/pnpm.cjs test:scripts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:27:34.988223+00:00",
+                "result": "2 正在校验并安全换入运行时载荷…\n21:27:12 正在校验并安全换入运行时载荷…\n21:27:12 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-payload-missing-0omEDZ/resources）==\n21:27:12 正在检查本机版本与安装载荷…\n21:27:12 == WorkLoom 织元 · 引导启动（resources=/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-packaged-no-double-payload-wgqVp9/resources）==\n21:27:12 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (21.917083ms)\n✔ 真实首日引导退出的渲染冒烟 (27.070083ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (1.811834ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (5.33025ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (3.764166ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (6.352042ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (1.396875ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.671833ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.823166ms)\n✔ 产品截图采用捕获时的可见场景 (21.760708ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (45.601667ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.376959ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (3.755166ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (4.05225ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (8.951083ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (8.462667ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (6.314042ms)\n  ✔ 首装暂存失败不会留下半套运行时 (2.985ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (1.042959ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.211ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.527958ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (4.838ms)\n✔ 桌面载荷原子装配 (87.478083ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.450833ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (1.18475ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.189416ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (0.607667ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (2.145833ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (3.507292ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (8.289917ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (1.253083ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (45.611334ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.117166ms)\n✔ 桌面本机渲染子进程的 Node 路径 (47.070041ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (1.014458ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (2.021708ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (3.759166ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.325625ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (1.70275ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (0.507833ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.26525ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.237417ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.363833ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (10.410875ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (3.610708ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (1.317ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.23175ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.745125ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (6.087917ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (22.839875ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (2.356416ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (2.8605ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (10.672ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (4.64325ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (7.143209ms)\n✔ native smoke captures the actual product region for its pixel verdict (7.79175ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (6.673ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (6.509833ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (9.191375ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (6.629958ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (8.249625ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (8.282334ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (28.506834ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (5.950917ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (23.700041ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (5.587333ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (11.462667ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (6.090042ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (3.58375ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (5.684459ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (1.998208ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (3.43075ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (2.468667ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (6.208292ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (4.770166ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (3.332666ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (5.045333ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (1.890542ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (2.03125ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-2pv3zV/pgdata\",\"port\":55432,\"hbaFile\":\"/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/workloom-helper-inspect-2pv3zV/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (0.8055ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.106625ms)\n✔ 客户端投影路径围栏 (1.753459ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (1.339375ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (1.3135ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (4.855ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (2.039042ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (3.705792ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (0.892084ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (0.743334ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (3.423375ms)\n  ✔ 实例报告端口不符时失败且零写入 (1.29625ms)\n✔ 桌面数据库安全引导 (20.286208ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (3.863417ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (13.748167ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (7.750708ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (4.817708ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (9.888916ms)\n✔ 包目录创建顺序不影响依赖清单输出 (6.071583ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (244.58925ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (46.991833ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (2.084875ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (4.559792ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (3.597667ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (8.993208ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (3.899208ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (82.0545ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (4.259459ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (95.424458ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.27ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (127.715166ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (35.18225ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (8.442833ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (1.67125ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (1.605875ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (2.601458ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.306291ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (1.110417ms)\n✔ normal physical source copy records canonical source and generated contract bytes (199.506083ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (62.320958ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (83.222166ms)\n✔ existing derived-output symlink cannot replace an external file (71.503375ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (57.01725ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (118.294625ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (53.467042ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (47.350958ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (105.245291ms)\n✔ payload cannot be created inside a selected source tree (70.472292ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (48.145416ms)\n✔ canonical output aliases cannot overwrite the checkout (44.441084ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (119.979125ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (637.905417ms)\n✔ 检测到非演示工作区时拒绝删除 (447.310333ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (2309.335042ms)\n✔ 未知参数 fail closed (5.787792ms)\n✔ 备份失败时禁止删除和后续迁移种子 (1564.416917ms)\n✔ 空备份不能证明可恢复，禁止删除 (1802.863084ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (3372.228833ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (7825.919167ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (1491.612667ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (1148.718875ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (1761.429667ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.757084ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.740125ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (24.252042ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (0.503ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (4.118166ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (2.231625ms)\nℹ tests 161\nℹ suites 11\nℹ pass 161\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 22732.595916\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project packages/video-studio/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:27:35.578853+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit --project apps/server/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:27:37.016495+00:00",
+                "result": "Command completed without diagnostics."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/verify-builtin-character-assets.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:27:37.090570+00:00",
+                "result": "内置角色资产与声明一致性检查通过：全部登记模特档案可解析、四角度定妆照齐备；默认模特声明在首页/文档/能力清单/目录说明四处同步，非默认模特在权威文档与目录说明可找到。\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:27:37.181432+00:00",
+                "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+              },
+              {
+                "command": "git diff --check 80c1331ad4ed8225a676c331917debb04ab0e4f5...ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T13:27:37.223412+00:00",
+                "result": "Command completed without diagnostics."
+              }
+            ],
+            "reviewedAt": "2026-10-07T13:32:30.095221+00:00",
+            "summary": "当前 Codex 对准确 ea3fe124/main80c 源组的五个变化文件逐一完整精读并追踪队列、策略及来源验证调用。GET 预算采用单调时钟，请求和响应体共享每次剩余截止时间，有限等待保持同一 URL/序列化 body/token；更长 Retry-After 不提前重试。写入仍单次提交，401/403、持续限流、主线漂移及缺页/审查/准入证据维持拒绝。HTTP 本地真实不结束响应体会被终止；39 个 API 故障用例覆盖恢复、边界、权限、写未知和当前 Platform 快照。原生 delivery-regression 只在原命令末尾追加测试，原名称、阶段、时限与用例不变。当前 HEAD 的八项实际本地检查全部通过，原生同命令143项142通过1既有UI车道跳过。311版本的全CI/交付515项514通过1跳过另留历史，未冒充ea3完整测试；ea3相对311仅CI命令接线。旧实现四项恢复负对照全部失败。云端source/candidate CI与精确合入门禁另行核验，未调用平台模型、绕过保护或扩散到其他仓。",
+            "passed": true,
+            "id": "e110b8ffeecae26a1a849d7a4ebc3700ea821ec6fed5f60d9b3b1638ebdb670a"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 146,
+            "pull": {
+              "number": 146,
+              "state": "open",
+              "title": "fix(growth):原生发布读取限流恢复与总时间边界 [T-2026-1007-0012]",
+              "body": "原生候选 #144 的第二次回执验证在读取当前 PR 时因 CNB 429 失败。通用 GET 现有请求、响应体与等待都受 240 秒单调总预算限制，429 有限退避并遵守更长 Retry-After；队列使用三次重试。持续限流、权限拒绝、坏证据与 source/main 漂移仍失败；写请求维持单次提交和原身份回读。\n\n任务 #145 的准确范围为五个文件：API、故障测试、队列适配器、原生 delivery-regression 配置及行为文档。原生 CI 仅在原命令末尾增加 API 故障测试，原检查名、阶段、用例和时限保留。\n\n验证：当前提交 ea3fe124f4c2543ae26b25f6bea23befe06d510f 的八项制片/脚本/类型/资产/能力检查均实际通过；新增故障用例所在原生命令共 143 项，142 通过、1 项既有 UI 车道跳过。恢复逻辑包含正常、持续限流、权限、响应体/等待超时、写入未知与主线漂移。修改前实现对四个恢复用例的实际负对照均失败，历史失败日志保留。仅修改 Growthtest 隔离副本；云端完整源与候选 CI、精确合入源码核心及真实 PG 验证仍为正式发布前置。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0012\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0012",
+                "sha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+            "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "files": [
+              "docs/AUTOMATIC-RD-DELIVERY.md",
+              "scripts/delivery/install-cnb.yml",
+              "scripts/delivery/queue-platform.mjs",
+              "scripts/tools/cnb-api.mjs",
+              "scripts/tools/cnb-api.test.mjs"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0012",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791379419000,
+            "mergeBase": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "pipeline": "delivery-regression",
+                "stage": "Durable delivery, permissions, races and actual Git regression",
+                "file": "scripts/delivery/install-cnb.yml",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+                  }
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+                  }
+                },
+                "origins": {
+                  "before": "scripts/delivery/install-cnb.yml",
+                  "after": "scripts/delivery/install-cnb.yml"
+                },
+                "binding": {
+                  "branch": "**",
+                  "event": "pull_request"
+                },
+                "digest": "17836814886280df4341961d552563a9e92df73c906068e3eb58196920faca17"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/tools/cnb-api.mjs",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/tools/cnb-api.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/tools/cnb-api.mjs",
+                  "absent": false
+                },
+                "digest": "1d0780323a4a7cee020964e511421b7a8975f32272c2a224e41fb6538530eb78"
+              },
+              {
+                "id": "CI-003",
+                "pipeline": "delivery-regression",
+                "stage": "Durable delivery, permissions, races and actual Git regression",
+                "file": "scripts/delivery/install-cnb.yml",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs"
+                  }
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false,
+                  "definition": {
+                    "name": "Durable delivery, permissions, races and actual Git regression",
+                    "timeout": "5m",
+                    "script": "node --test scripts/delivery/queue.test.mjs scripts/ci/protocol-rules.test.mjs scripts/tools/cnb-api.test.mjs"
+                  }
+                },
+                "origins": {
+                  "before": "scripts/delivery/install-cnb.yml",
+                  "after": "scripts/delivery/install-cnb.yml"
+                },
+                "digest": "447a147543c99cc9a76f4a444a6ae24e6d7dc20dc07fba55caede521830d3dc6"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/cnb-api.test.mjs",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/tools/cnb-api.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/tools/cnb-api.test.mjs",
+                  "absent": false
+                },
+                "digest": "9942760f241d062313473e48d86b6baff23fceccc319dbca0949e4a1282a00fa"
+              },
+              {
+                "id": "CI-005",
+                "file": "scripts/delivery/queue-platform.mjs",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/queue-platform.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/queue-platform.mjs",
+                  "absent": false
+                },
+                "digest": "9c4332d9860369ae89335bfc73bbc4ceb58c43572de2097d39c4eead80300b51"
+              },
+              {
+                "id": "CI-006",
+                "file": "scripts/delivery/install-cnb.yml",
+                "before": {
+                  "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+                  "path": "scripts/delivery/install-cnb.yml",
+                  "absent": false
+                },
+                "digest": "f7bbf6caccc277d41c4816621a64000a606d28724839f025e83f897c21649455"
+              }
+            ]
+          }
+        }
+      },
+      "previous": "cd915dd473c0573d96ed07200738bc39e5a1a6b72dd07c1169f134abbd7e7f25",
+      "digest": "41c70964ce45c035fdeae717dfc0163d204c52c7948885e89ccd3f2a65e7c4b5"
+    },
+    {
+      "sequence": 1438,
+      "at": "2026-10-07T13:37:25.501Z",
+      "kind": "transaction",
+      "data": {
+        "id": "caca423c-1c37-4872-92fb-6e861c36305a"
+      },
+      "previous": "41c70964ce45c035fdeae717dfc0163d204c52c7948885e89ccd3f2a65e7c4b5",
+      "digest": "0a23d3b911ca4f478fcc2686b00f8c4b8688c886e80972b579c9b90261cffb49"
     }
   ]
 }
