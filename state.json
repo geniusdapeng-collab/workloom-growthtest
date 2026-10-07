@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3096,
+  "revision": 3098,
   "tasks": {
     "98": {
       "number": 98,
@@ -2068,8 +2068,8 @@
         }
       },
       "updatedAt": 1791408912648,
-      "error": "Alignment retry budget exhausted",
-      "blockedUntil": 1791408616009,
+      "error": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
+      "blockedUntil": 1791409512648,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
       "branch": "task/T-2026-1007-0001",
@@ -2543,8 +2543,8 @@
         "provider": "codex",
         "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
         "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-        "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
-        "at": 1791408016009
+        "reason": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
+        "at": 1791408912648
       },
       "recoveryIntent": null
     },
@@ -79985,6 +79985,39 @@
       },
       "previous": "188aad0b7450b549d51834cf68fc4bb5b7dbc52d7841cb378aeba01ee0928896",
       "digest": "208934d76cedd72a83396c679a79529505c52aafbc59b51486c36d22af8a5cce"
+    },
+    {
+      "sequence": 3097,
+      "at": "2026-10-07T21:35:12.648Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "reason": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
+            "at": 1791408912648
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791409512648
+        }
+      },
+      "previous": "208934d76cedd72a83396c679a79529505c52aafbc59b51486c36d22af8a5cce",
+      "digest": "ceba6891ada3ae6cbdd652d46eb32d06f9e2aa7405e33bb657af14d8d318f39f"
+    },
+    {
+      "sequence": 3098,
+      "at": "2026-10-07T21:35:59.419Z",
+      "kind": "transaction",
+      "data": {
+        "id": "a7afb02b-a62b-4b8e-9d7b-321045e0503d"
+      },
+      "previous": "ceba6891ada3ae6cbdd652d46eb32d06f9e2aa7405e33bb657af14d8d318f39f",
+      "digest": "6b008effc2ae23efa121109128ff1d39b50a2503c0682c7297528fcee9af60c1"
     }
   ]
 }
