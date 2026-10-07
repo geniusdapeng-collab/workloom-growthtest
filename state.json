@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 322,
+  "revision": 324,
   "tasks": {
     "98": {
       "number": 98,
@@ -2398,7 +2398,7 @@
           "protocol": 13
         }
       },
-      "updatedAt": 1791338587252,
+      "updatedAt": 1791338713908,
       "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2535,8 +2535,8 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "主干对齐失败：CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791339019356,
+      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791339313908,
       "repairRequired": {
         "provider": "codex",
         "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
@@ -11194,6 +11194,31 @@
       },
       "previous": "69b90f90772d2a4e20340583afb2f205c40be781a9e113b3a0976b38aef45815",
       "digest": "dcfc457fff28bc64943ffdcbeadb937778ccf054c08f83e30b9e0dad1409401a"
+    },
+    {
+      "sequence": 323,
+      "at": "2026-10-07T02:05:13.908Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791339313908
+        }
+      },
+      "previous": "dcfc457fff28bc64943ffdcbeadb937778ccf054c08f83e30b9e0dad1409401a",
+      "digest": "688e019e669e992ef429c4972f04af69fd21dc484515d6997e874820fd234ca0"
+    },
+    {
+      "sequence": 324,
+      "at": "2026-10-07T02:05:22.113Z",
+      "kind": "transaction",
+      "data": {
+        "id": "87a82067-a555-4a5c-aa48-7b55063d80cf"
+      },
+      "previous": "688e019e669e992ef429c4972f04af69fd21dc484515d6997e874820fd234ca0",
+      "digest": "2b35c512bdfe9bfaa375f8a8e86b352d197b1042f913dd1682a5c9715618ff29"
     }
   ]
 }
