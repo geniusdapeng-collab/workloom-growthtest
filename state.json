@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 312,
+  "revision": 315,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "parked",
+      "status": "waiting_ci",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2067,7 +2067,7 @@
           "protocol": 11
         }
       },
-      "updatedAt": 1791338114335,
+      "updatedAt": 1791338529653,
       "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 1791338714335,
       "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
@@ -2079,7 +2079,89 @@
         "dependsOn": [],
         "releases": []
       },
-      "developerReview": null,
+      "developerReview": {
+        "schemaVersion": 1,
+        "provider": "codex",
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 119,
+        "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+        "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+        "reviewedFiles": [
+          "AGENTS.repo.md",
+          "README.md",
+          "bundles/ai-video/README.md",
+          "bundles/geo-growth/agent-capabilities.json",
+          "bundles/geo-growth/capabilities/video.mjs",
+          "bundles/geo-growth/capabilities/workbench-guide.mjs",
+          "docs/agent-computer-guide.md",
+          "docs/ai-video-workbench-guide.md",
+          "plugins/workloom-workbench/README.md",
+          "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+          "plugins/workloom-workbench/skills/workloom/SKILL.md",
+          "scripts/AGENT-CAPABILITIES.md",
+          "scripts/agent-capabilities.test.mjs",
+          "scripts/ai-video-workbench-guide.test.mjs",
+          "scripts/product-runtime-assets.mjs",
+          "scripts/product-runtime-assets.test.mjs",
+          "tools/codex-gateway/README.md",
+          "tools/codex-gateway/bin/cli.mjs",
+          "tools/codex-gateway/src/mcp.mjs",
+          "tools/codex-gateway/test/mcp.test.mjs",
+          "tools/codex-gateway/test/video-guide.test.mjs"
+        ],
+        "filesHash": "04e36f3e3b7ff544a97a1588f31c789da0e99ee623823d1bc6964c8a31eabc36",
+        "dependsOn": [],
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "rationale": "新增固定文档的全文/身份/版本/摘要、严格输入、缺件/大小/UTF8/软链、实际CLI/MCP和pack复制块回归；无模型或生产服务调用，真实原CI入口已静态导入。"
+          },
+          {
+            "id": "CI-002",
+            "rationale": "追加真实指南复制及缺件/软链失败断言；保留原compiler/destination/path隔离回归。受控编译器fixture明确标注，不冒充完整安装构建；未修改任何必需CI stage。"
+          },
+          {
+            "id": "CI-003",
+            "rationale": "仅将固定docs/ai-video-workbench-guide.md加入文档白名单并要求该固定源存在，沿现有规范化、软链逃逸、摘要和写入边界执行；未开放docs目录树。真实复制受控夹具和载荷CLI/MCP回读通过。"
+          },
+          {
+            "id": "CI-004",
+            "rationale": "静态导入本仓固定指南的离线回归；保留原有身份、输入、错误脱敏、权限和MCP断言。已全文审查现有入口及新增测试，实际对应回归全绿；回滚可revert本任务提交。"
+          }
+        ],
+        "ciPolicyChangesHash": "f297adc1c53033833918a460aae7bbba6267b9d4a9330ec4b684a814528a359b",
+        "tests": [
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/agent-capabilities.test.mjs scripts/video-capabilities.test.mjs scripts/product-runtime-assets.test.mjs scripts/workloom-director.test.mjs tools/codex-gateway/test/catalog.test.mjs tools/codex-gateway/test/mcp.test.mjs tools/codex-gateway/test/security.test.mjs tools/codex-gateway/test/server.test.mjs tools/codex-gateway/test/video-guide.test.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:51:25.157036Z",
+            "result": "put aliases cannot overwrite the checkout (26.013333ms)\n✔ delivery hashes main, attachments and asset list; later tampering is detected (5.641375ms)\n✔ standard native production has no local ASR or dubbing prerequisite (7.30625ms)\n✔ native plan rejects replacement narration, muted generation and unsupported exact shot clocks (4.738708ms)\n✔ standard delivery outputs and first-frame cover claims are actually hashed (4.442ms)\n✔ standard output empty, duplicate, missing master, invalid and conflicting covers never pass (5.627042ms)\n✔ empty manifest, missing or empty main, directory and missing digest never pass (5.080583ms)\n✔ cross-project manifests, conflicting digests, invalid JSON and path escapes fail (3.391084ms)\n✔ suggested POSIX command preserves every argument literally and supplies a PowerShell representation (55.617458ms)\n✔ plan enforces text-only mode and credentials remain outside the body (27.527667ms)\n✔ missing identity, unsafe remote URLs and oversized inputs reject before networking (6.638166ms)\n✔ permission and malformed response failures remain visible and redact tokens (4.76975ms)\n✔ 能力目录覆盖全部 bundle 且计数大于零 (0.39875ms)\n✔ 数字员工解析出工具、围栏与风险等级 (0.382ms)\n✔ 管线解析出步骤与闸门 (0.086708ms)\n✔ 围栏规则解析出等级与基线标记 (0.060459ms)\n✔ 目录不泄露本机绝对路径 (0.121458ms)\n✔ 搜索与模糊匹配可用 (0.557625ms)\n✔ 目录计数与仓内文件的独立正则扫描一致（防止解析漂移） (4.412167ms)\n✔ MCP handler：握手、工具、资源 (59.474ms)\n✔ MCP stdio 入口可被真实拉起 (64.135917ms)\n✔ MCP 参数错误、未知资源/工具及错误请求安全返回 (15.558458ms)\n✔ 网关强制回环绑定；外部地址和无效端口在监听前拒绝 (1.215125ms)\n✔ 跨源与 DNS rebinding 拒绝；本地同源读取正常 (58.820625ms)\n✔ 错误编码与编码路径穿越被拒绝且服务保持可用 (22.905583ms)\n✔ 启动器拒绝过旧 Node、失效的显式 repo 和仅剩目录的 gateway (2264.343917ms)\n✔ 安装启动器能处理含空格和引号的仓库路径，且只把路径作为一个参数 (33.732666ms)\n✔ HTTP 网关：health / catalog / snapshot / stage 页面 / SSE (72.73125ms)\n✔ 静态资源路径穿越被拒绝 (23.969583ms)\n✔ actual plugin MCP instructions, read-only tool and Markdown resource all expose the same canonical guide (25.775333ms)\n✔ missing plugin guide returns a failure for both read paths, never a fallback body (15.898667ms)\n✔ gateway video CLI and trusted SessionStart context resolve the canonical guide from another cwd (162.001625ms)\nℹ tests 84\nℹ suites 0\nℹ pass 84\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2471.053292\n"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:51:25.203500Z",
+            "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+          },
+          {
+            "command": "git diff --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:51:25.213141Z",
+            "result": "PASS: command completed with exit 0 and no diagnostics"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/secret-scan.mjs --range 04d2403897ad0edf0227f96fe5bed150581b41d0 HEAD",
+            "exitCode": 0,
+            "finishedAt": "2026-10-07T01:51:25.576652Z",
+            "result": "secret-scan: PASS (21 scan target(s))\n"
+          }
+        ],
+        "reviewedAt": "2026-10-07T02:00:56.882Z",
+        "summary": "当前Codex会话与三个独立子代理按本仓实际字节完成全部变更及直接发现、传输、打包依赖审查；生成能力文档按全量解析和派生校验B级，生产大入口仅相关C级区段，不冒充全生产审计。固定指南只读、严格空输入、固定代码根、产品、版本、UTF8、大小、路径边界与显式失败已核对；真实CLI和MCP正文一致，Growthtest真实插件启动、tool、resource、hook额外回读通过。用户最新要求已全文复读：每片由正式管线自主拆镜和分配逐镜时长，30秒、6镜、五版与17至30分钟仅历史计时样本，不新增生产默认、超时闸或硬编码拆镜。runtime仅固定指南白名单，缺件失败，实际复制夹具明确标记非完整installer。原有必需CI未删除或弱化，指南测试接入本仓原CI实际执行入口，敏感、隔离、付费经营边界保留。已关闭文档身份、旧接线、客户端端口、导演公开字段和Growth CI接线发现；0未解决。变化无新数据库、媒体、模型、供应商、TTS、ASR或跨仓生产机制移植；回滚为revert本任务提交。准确提交后的真实离线测试另附tests，完整云端CI及普通候选合并由现行交付队列验证；不以本地绿代替生产或桌面GUI验收。 本仓普通队列因main先合入其它任务而将源对齐到9fed；当前21任务路径保持，其中20全文审查过的文件字节不变，README继承生成日期后已重新全文阅读。原审查及实际测试时点在alignment-history原样保存，当前提交测试重新执行；独立对齐终审已完成，0未解决/0阻断严重；新源人物来源95/95、绑定110/110及当前指南84/84全绿。旧报告和日志未改写，当前对齐报告摘要独立绑定，可按新tuple生成真实审查回执与handoff。",
+        "passed": true,
+        "id": "9d103c2af973e70191d3e50ab413dc4b09ab3128a6e0e1e6316920f0fb313205"
+      },
       "reviewSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 119,
@@ -2087,7 +2169,7 @@
           "number": 119,
           "state": "open",
           "title": "feat(industry): 内置 AI 工作台视频调用指南 [T-2026-1007-0001]",
-          "body": "AI 工作台接到视频任务时，原有入口分散且插件网关与通用 MCP 不同，容易找不到流程或沿用错误参数。本次内置本仓唯一视频调用指南，CLI/MCP 返回同一完整正文与摘要，现有入口引导先读，运行载荷只包含这份固定指南。\n\n每条短片的镜头数、逐镜时长与编排继续由正式管线按本次需求自主规划；30 秒、6 镜、五版及 17–30 分钟仅为历史计时样本，不新增生产默认、全局超时或验收闸。指南核对人物、商品、平台、时长、账号调性、声音及特殊要求，说明正式前期、付费渲染、恢复、后期与真实交付的边界。\n\nGrowthtest 实际插件额外接入只读 workloom_video_guide、固定资源与握手/SessionStart 指引；真实启动脚本、双 CLI、MCP 和钩子已同文回读。\n固定读取只接受空输入，不接受调用方路径；缺件、产品或版本冲突、UTF-8/大小/链接边界失败均保留错误。新增回归接入原仓实际 CI 测试入口；必需 CI 和主干保护保持原口径。\n\n验证：\n- 当前提交 `a3c7f23af1248fac7cf41c99a6bca424ec2cfe31` 的离线回归 84/84 通过，0 失败或跳过。\n- 真实源码 CLI/MCP 全文和 SHA 一致；精确载荷复制及错误路径回归通过，生成器检查、diff 检查、暂存及提交范围秘密扫描通过。\n- 当前 Codex 会话和独立复核已审查变更及直接依赖，0 未解决发现；结构化实际测试及审查回执通过既有交付队列 handoff，云端原 CI 与准确候选合并继续为硬门禁。\n\n边界：本次没有模型、供应商、TTS、ASR 或新媒体调用；没有移植其它仓生产机制。载荷测试中的编译器是受控 fixture，不冒充完整签名安装包、桌面 GUI 或真实新片生产验收。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+          "body": "AI 工作台接到视频任务时，原有入口分散且插件网关与通用 MCP 不同，容易找不到流程或沿用错误参数。本次内置本仓唯一视频调用指南，CLI/MCP 返回同一完整正文与摘要，现有入口引导先读，运行载荷只包含这份固定指南。\n\n每条短片的镜头数、逐镜时长与编排继续由正式管线按本次需求自主规划；30 秒、6 镜、五版及 17–30 分钟仅为历史计时样本，不新增生产默认、全局超时或验收闸。指南核对人物、商品、平台、时长、账号调性、声音及特殊要求，说明正式前期、付费渲染、恢复、后期与真实交付的边界。\n\nGrowthtest 实际插件额外接入只读 workloom_video_guide、固定资源与握手/SessionStart 指引；真实启动脚本、双 CLI、MCP 和钩子已同文回读。\n固定读取只接受空输入，不接受调用方路径；缺件、产品或版本冲突、UTF-8/大小/链接边界失败均保留错误。新增回归接入原仓实际 CI 测试入口；必需 CI 和主干保护保持原口径。\n\n验证：\n- 当前提交 `9fed988f818389acd4f434a14835351f2700b2c8` 的离线回归 84/84 通过，0 失败或跳过。\n- 真实源码 CLI/MCP 全文和 SHA 一致；精确载荷复制及错误路径回归通过，生成器检查、diff 检查、暂存及提交范围秘密扫描通过。\n- 当前 Codex 会话和独立复核已审查变更及直接依赖，0 未解决发现；结构化实际测试及审查回执通过既有交付队列 handoff，云端原 CI 与准确候选合并继续为硬门禁。\n\n边界：本次没有模型、供应商、TTS、ASR 或新媒体调用；没有移植其它仓生产机制。载荷测试中的编译器是受控 fixture，不冒充完整签名安装包、桌面 GUI 或真实新片生产验收。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
           "author": {
             "username": "cnb.dYiF05kxAGA",
             "nickname": "Genius",
@@ -2098,7 +2180,7 @@
           "labels": [],
           "base": {
             "ref": "refs/heads/main",
-            "sha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+            "sha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2108,7 +2190,7 @@
           },
           "head": {
             "ref": "refs/heads/task/T-2026-1007-0001",
-            "sha": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
+            "sha": "9fed988f818389acd4f434a14835351f2700b2c8",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2126,8 +2208,8 @@
           "is_force_merged": false,
           "statuses": {}
         },
-        "headSha": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
-        "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "files": [
           "AGENTS.repo.md",
           "README.md",
@@ -2157,71 +2239,71 @@
           "dependsOn": [],
           "releases": []
         },
-        "headTime": 1791334623000,
-        "mergeBase": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+        "headTime": 1791336662000,
+        "mergeBase": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "checkErrors": [],
         "checkSha": null,
         "hasFailedChecks": false,
         "ciPolicyChanges": [
           {
             "id": "CI-001",
-            "file": "scripts/product-runtime-assets.test.mjs",
-            "before": {
-              "ref": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
-              "path": "scripts/product-runtime-assets.test.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
-              "path": "scripts/product-runtime-assets.test.mjs",
-              "absent": false
-            },
-            "digest": "05e7caec739ce0755f1fad6a48100a8745de3fbc7fb3a12f74d6c243731c205e"
-          },
-          {
-            "id": "CI-002",
-            "file": "scripts/product-runtime-assets.mjs",
-            "before": {
-              "ref": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
-              "path": "scripts/product-runtime-assets.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
-              "path": "scripts/product-runtime-assets.mjs",
-              "absent": false
-            },
-            "digest": "5b04a59e84f49c914d63a3c7f0635aae8073dc911a32f96316e7f72e33b20b3a"
-          },
-          {
-            "id": "CI-003",
             "file": "scripts/ai-video-workbench-guide.test.mjs",
             "before": {
-              "ref": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+              "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
               "path": "scripts/ai-video-workbench-guide.test.mjs",
               "absent": true
             },
             "after": {
-              "ref": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
+              "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
               "path": "scripts/ai-video-workbench-guide.test.mjs",
               "absent": false
             },
-            "digest": "76aeb4f16a85c4a31f9819f547a6a93fc21a331f218edbe0ccf3477e89103c03"
+            "digest": "299b52b971a0624d8db9e8eb7b57061202b6caff84bcdf0afdfaccb8b63866d2"
+          },
+          {
+            "id": "CI-002",
+            "file": "scripts/product-runtime-assets.test.mjs",
+            "before": {
+              "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+              "path": "scripts/product-runtime-assets.test.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
+              "path": "scripts/product-runtime-assets.test.mjs",
+              "absent": false
+            },
+            "digest": "76f9931587d966d04f4a5fda10d3f73e9de5f782c7d9fe62945384841ab1f12c"
+          },
+          {
+            "id": "CI-003",
+            "file": "scripts/product-runtime-assets.mjs",
+            "before": {
+              "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+              "path": "scripts/product-runtime-assets.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
+              "path": "scripts/product-runtime-assets.mjs",
+              "absent": false
+            },
+            "digest": "cad3a08cff9d93a067a9389dd41a28eb1634ba9f6db14af7aa836dc74170c288"
           },
           {
             "id": "CI-004",
             "file": "scripts/agent-capabilities.test.mjs",
             "before": {
-              "ref": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+              "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
               "path": "scripts/agent-capabilities.test.mjs",
               "absent": false
             },
             "after": {
-              "ref": "a3c7f23af1248fac7cf41c99a6bca424ec2cfe31",
+              "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
               "path": "scripts/agent-capabilities.test.mjs",
               "absent": false
             },
-            "digest": "982a5cb33a222b1b6a44c34c8ec6b3056e736037fd0f20301f4115548384f3db"
+            "digest": "fc5fb7656cb14787bfe509c8ee9b6f258f7bf9c1ffe44497b9d7dfab09eda659"
           }
         ]
       },
@@ -10727,6 +10809,279 @@
       },
       "previous": "c838078a30e318895e947287f472dd781fb5db3e32ac15a7489f77dac947e485",
       "digest": "ba721f1cb7817592594de549c3b0300a12bd9cab0a841e57b9f17118f14d4610"
+    },
+    {
+      "sequence": 313,
+      "at": "2026-10-07T02:02:09.649Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 119,
+        "id": "9d103c2af973e70191d3e50ab413dc4b09ab3128a6e0e1e6316920f0fb313205",
+        "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
+        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0"
+      },
+      "previous": "ba721f1cb7817592594de549c3b0300a12bd9cab0a841e57b9f17118f14d4610",
+      "digest": "29a91e4269a2319283d21900fd2f9a150ab8e99c192d9bc13bcc5ede53496d30"
+    },
+    {
+      "sequence": 314,
+      "at": "2026-10-07T02:02:09.653Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
+          "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+          "branch": "task/T-2026-1007-0001",
+          "intent": {
+            "taskId": "T-2026-1007-0001",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 119,
+            "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "policyHash": "9415e910aefdac32e44034f4e48c18745c1cf937fa1b6b335b657e0ac4a99201",
+            "reviewedFiles": [
+              "AGENTS.repo.md",
+              "README.md",
+              "bundles/ai-video/README.md",
+              "bundles/geo-growth/agent-capabilities.json",
+              "bundles/geo-growth/capabilities/video.mjs",
+              "bundles/geo-growth/capabilities/workbench-guide.mjs",
+              "docs/agent-computer-guide.md",
+              "docs/ai-video-workbench-guide.md",
+              "plugins/workloom-workbench/README.md",
+              "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+              "plugins/workloom-workbench/skills/workloom/SKILL.md",
+              "scripts/AGENT-CAPABILITIES.md",
+              "scripts/agent-capabilities.test.mjs",
+              "scripts/ai-video-workbench-guide.test.mjs",
+              "scripts/product-runtime-assets.mjs",
+              "scripts/product-runtime-assets.test.mjs",
+              "tools/codex-gateway/README.md",
+              "tools/codex-gateway/bin/cli.mjs",
+              "tools/codex-gateway/src/mcp.mjs",
+              "tools/codex-gateway/test/mcp.test.mjs",
+              "tools/codex-gateway/test/video-guide.test.mjs"
+            ],
+            "filesHash": "04e36f3e3b7ff544a97a1588f31c789da0e99ee623823d1bc6964c8a31eabc36",
+            "dependsOn": [],
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "rationale": "新增固定文档的全文/身份/版本/摘要、严格输入、缺件/大小/UTF8/软链、实际CLI/MCP和pack复制块回归；无模型或生产服务调用，真实原CI入口已静态导入。"
+              },
+              {
+                "id": "CI-002",
+                "rationale": "追加真实指南复制及缺件/软链失败断言；保留原compiler/destination/path隔离回归。受控编译器fixture明确标注，不冒充完整安装构建；未修改任何必需CI stage。"
+              },
+              {
+                "id": "CI-003",
+                "rationale": "仅将固定docs/ai-video-workbench-guide.md加入文档白名单并要求该固定源存在，沿现有规范化、软链逃逸、摘要和写入边界执行；未开放docs目录树。真实复制受控夹具和载荷CLI/MCP回读通过。"
+              },
+              {
+                "id": "CI-004",
+                "rationale": "静态导入本仓固定指南的离线回归；保留原有身份、输入、错误脱敏、权限和MCP断言。已全文审查现有入口及新增测试，实际对应回归全绿；回滚可revert本任务提交。"
+              }
+            ],
+            "ciPolicyChangesHash": "f297adc1c53033833918a460aae7bbba6267b9d4a9330ec4b684a814528a359b",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/agent-capabilities.test.mjs scripts/video-capabilities.test.mjs scripts/product-runtime-assets.test.mjs scripts/workloom-director.test.mjs tools/codex-gateway/test/catalog.test.mjs tools/codex-gateway/test/mcp.test.mjs tools/codex-gateway/test/security.test.mjs tools/codex-gateway/test/server.test.mjs tools/codex-gateway/test/video-guide.test.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:51:25.157036Z",
+                "result": "put aliases cannot overwrite the checkout (26.013333ms)\n✔ delivery hashes main, attachments and asset list; later tampering is detected (5.641375ms)\n✔ standard native production has no local ASR or dubbing prerequisite (7.30625ms)\n✔ native plan rejects replacement narration, muted generation and unsupported exact shot clocks (4.738708ms)\n✔ standard delivery outputs and first-frame cover claims are actually hashed (4.442ms)\n✔ standard output empty, duplicate, missing master, invalid and conflicting covers never pass (5.627042ms)\n✔ empty manifest, missing or empty main, directory and missing digest never pass (5.080583ms)\n✔ cross-project manifests, conflicting digests, invalid JSON and path escapes fail (3.391084ms)\n✔ suggested POSIX command preserves every argument literally and supplies a PowerShell representation (55.617458ms)\n✔ plan enforces text-only mode and credentials remain outside the body (27.527667ms)\n✔ missing identity, unsafe remote URLs and oversized inputs reject before networking (6.638166ms)\n✔ permission and malformed response failures remain visible and redact tokens (4.76975ms)\n✔ 能力目录覆盖全部 bundle 且计数大于零 (0.39875ms)\n✔ 数字员工解析出工具、围栏与风险等级 (0.382ms)\n✔ 管线解析出步骤与闸门 (0.086708ms)\n✔ 围栏规则解析出等级与基线标记 (0.060459ms)\n✔ 目录不泄露本机绝对路径 (0.121458ms)\n✔ 搜索与模糊匹配可用 (0.557625ms)\n✔ 目录计数与仓内文件的独立正则扫描一致（防止解析漂移） (4.412167ms)\n✔ MCP handler：握手、工具、资源 (59.474ms)\n✔ MCP stdio 入口可被真实拉起 (64.135917ms)\n✔ MCP 参数错误、未知资源/工具及错误请求安全返回 (15.558458ms)\n✔ 网关强制回环绑定；外部地址和无效端口在监听前拒绝 (1.215125ms)\n✔ 跨源与 DNS rebinding 拒绝；本地同源读取正常 (58.820625ms)\n✔ 错误编码与编码路径穿越被拒绝且服务保持可用 (22.905583ms)\n✔ 启动器拒绝过旧 Node、失效的显式 repo 和仅剩目录的 gateway (2264.343917ms)\n✔ 安装启动器能处理含空格和引号的仓库路径，且只把路径作为一个参数 (33.732666ms)\n✔ HTTP 网关：health / catalog / snapshot / stage 页面 / SSE (72.73125ms)\n✔ 静态资源路径穿越被拒绝 (23.969583ms)\n✔ actual plugin MCP instructions, read-only tool and Markdown resource all expose the same canonical guide (25.775333ms)\n✔ missing plugin guide returns a failure for both read paths, never a fallback body (15.898667ms)\n✔ gateway video CLI and trusted SessionStart context resolve the canonical guide from another cwd (162.001625ms)\nℹ tests 84\nℹ suites 0\nℹ pass 84\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2471.053292\n"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:51:25.203500Z",
+                "result": "  ✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）\n"
+              },
+              {
+                "command": "git diff --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:51:25.213141Z",
+                "result": "PASS: command completed with exit 0 and no diagnostics"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/secret-scan.mjs --range 04d2403897ad0edf0227f96fe5bed150581b41d0 HEAD",
+                "exitCode": 0,
+                "finishedAt": "2026-10-07T01:51:25.576652Z",
+                "result": "secret-scan: PASS (21 scan target(s))\n"
+              }
+            ],
+            "reviewedAt": "2026-10-07T02:00:56.882Z",
+            "summary": "当前Codex会话与三个独立子代理按本仓实际字节完成全部变更及直接发现、传输、打包依赖审查；生成能力文档按全量解析和派生校验B级，生产大入口仅相关C级区段，不冒充全生产审计。固定指南只读、严格空输入、固定代码根、产品、版本、UTF8、大小、路径边界与显式失败已核对；真实CLI和MCP正文一致，Growthtest真实插件启动、tool、resource、hook额外回读通过。用户最新要求已全文复读：每片由正式管线自主拆镜和分配逐镜时长，30秒、6镜、五版与17至30分钟仅历史计时样本，不新增生产默认、超时闸或硬编码拆镜。runtime仅固定指南白名单，缺件失败，实际复制夹具明确标记非完整installer。原有必需CI未删除或弱化，指南测试接入本仓原CI实际执行入口，敏感、隔离、付费经营边界保留。已关闭文档身份、旧接线、客户端端口、导演公开字段和Growth CI接线发现；0未解决。变化无新数据库、媒体、模型、供应商、TTS、ASR或跨仓生产机制移植；回滚为revert本任务提交。准确提交后的真实离线测试另附tests，完整云端CI及普通候选合并由现行交付队列验证；不以本地绿代替生产或桌面GUI验收。 本仓普通队列因main先合入其它任务而将源对齐到9fed；当前21任务路径保持，其中20全文审查过的文件字节不变，README继承生成日期后已重新全文阅读。原审查及实际测试时点在alignment-history原样保存，当前提交测试重新执行；独立对齐终审已完成，0未解决/0阻断严重；新源人物来源95/95、绑定110/110及当前指南84/84全绿。旧报告和日志未改写，当前对齐报告摘要独立绑定，可按新tuple生成真实审查回执与handoff。",
+            "passed": true,
+            "id": "9d103c2af973e70191d3e50ab413dc4b09ab3128a6e0e1e6316920f0fb313205"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 119,
+            "pull": {
+              "number": 119,
+              "state": "open",
+              "title": "feat(industry): 内置 AI 工作台视频调用指南 [T-2026-1007-0001]",
+              "body": "AI 工作台接到视频任务时，原有入口分散且插件网关与通用 MCP 不同，容易找不到流程或沿用错误参数。本次内置本仓唯一视频调用指南，CLI/MCP 返回同一完整正文与摘要，现有入口引导先读，运行载荷只包含这份固定指南。\n\n每条短片的镜头数、逐镜时长与编排继续由正式管线按本次需求自主规划；30 秒、6 镜、五版及 17–30 分钟仅为历史计时样本，不新增生产默认、全局超时或验收闸。指南核对人物、商品、平台、时长、账号调性、声音及特殊要求，说明正式前期、付费渲染、恢复、后期与真实交付的边界。\n\nGrowthtest 实际插件额外接入只读 workloom_video_guide、固定资源与握手/SessionStart 指引；真实启动脚本、双 CLI、MCP 和钩子已同文回读。\n固定读取只接受空输入，不接受调用方路径；缺件、产品或版本冲突、UTF-8/大小/链接边界失败均保留错误。新增回归接入原仓实际 CI 测试入口；必需 CI 和主干保护保持原口径。\n\n验证：\n- 当前提交 `9fed988f818389acd4f434a14835351f2700b2c8` 的离线回归 84/84 通过，0 失败或跳过。\n- 真实源码 CLI/MCP 全文和 SHA 一致；精确载荷复制及错误路径回归通过，生成器检查、diff 检查、暂存及提交范围秘密扫描通过。\n- 当前 Codex 会话和独立复核已审查变更及直接依赖，0 未解决发现；结构化实际测试及审查回执通过既有交付队列 handoff，云端原 CI 与准确候选合并继续为硬门禁。\n\n边界：本次没有模型、供应商、TTS、ASR 或新媒体调用；没有移植其它仓生产机制。载荷测试中的编译器是受控 fixture，不冒充完整签名安装包、桌面 GUI 或真实新片生产验收。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0001",
+                "sha": "9fed988f818389acd4f434a14835351f2700b2c8",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "status_check",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "9fed988f818389acd4f434a14835351f2700b2c8",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "files": [
+              "AGENTS.repo.md",
+              "README.md",
+              "bundles/ai-video/README.md",
+              "bundles/geo-growth/agent-capabilities.json",
+              "bundles/geo-growth/capabilities/video.mjs",
+              "bundles/geo-growth/capabilities/workbench-guide.mjs",
+              "docs/agent-computer-guide.md",
+              "docs/ai-video-workbench-guide.md",
+              "plugins/workloom-workbench/README.md",
+              "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+              "plugins/workloom-workbench/skills/workloom/SKILL.md",
+              "scripts/AGENT-CAPABILITIES.md",
+              "scripts/agent-capabilities.test.mjs",
+              "scripts/ai-video-workbench-guide.test.mjs",
+              "scripts/product-runtime-assets.mjs",
+              "scripts/product-runtime-assets.test.mjs",
+              "tools/codex-gateway/README.md",
+              "tools/codex-gateway/bin/cli.mjs",
+              "tools/codex-gateway/src/mcp.mjs",
+              "tools/codex-gateway/test/mcp.test.mjs",
+              "tools/codex-gateway/test/video-guide.test.mjs"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0001",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791336662000,
+            "mergeBase": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/ai-video-workbench-guide.test.mjs",
+                "before": {
+                  "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": false
+                },
+                "digest": "299b52b971a0624d8db9e8eb7b57061202b6caff84bcdf0afdfaccb8b63866d2"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/product-runtime-assets.test.mjs",
+                "before": {
+                  "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "digest": "76f9931587d966d04f4a5fda10d3f73e9de5f782c7d9fe62945384841ab1f12c"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/product-runtime-assets.mjs",
+                "before": {
+                  "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "digest": "cad3a08cff9d93a067a9389dd41a28eb1634ba9f6db14af7aa836dc74170c288"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/agent-capabilities.test.mjs",
+                "before": {
+                  "ref": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "9fed988f818389acd4f434a14835351f2700b2c8",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "digest": "fc5fb7656cb14787bfe509c8ee9b6f258f7bf9c1ffe44497b9d7dfab09eda659"
+              }
+            ]
+          }
+        }
+      },
+      "previous": "29a91e4269a2319283d21900fd2f9a150ab8e99c192d9bc13bcc5ede53496d30",
+      "digest": "00458b2aeaea7e3341c88402d0aaa91e883ad1edf6e7cd7399fb5c4ca1ea899a"
+    },
+    {
+      "sequence": 315,
+      "at": "2026-10-07T02:02:08.887Z",
+      "kind": "transaction",
+      "data": {
+        "id": "08748cd5-c3c8-493f-9517-459ca0251f60"
+      },
+      "previous": "00458b2aeaea7e3341c88402d0aaa91e883ad1edf6e7cd7399fb5c4ca1ea899a",
+      "digest": "cd9dc8ce03b1009790d908c0f78392133bf3b758cbb6aff87c0464eb691de0d4"
     }
   ]
 }
