@@ -46,50 +46,90 @@ const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * 带重试的 API 调用：CNB 对高频调用会返回 429（实测舰队级巡检连续 20+ 次即触发），
- * 只读调用默认重试 4 次（指数退避 + 抖动），并尊重 Retry-After；写入由调用方回读。
+ * 只读调用默认在总预算内重试 4 次；429 采用有限长退避，其他暂时故障保留指数退避。
+ * 更长的 Retry-After 不提前压短；写入只尝试一次，由调用方按身份回读。
+ * 退避数值是本仓恢复策略，不代表已核实的 CNB 限额。
  */
-export async function api(slug, path, options = {}) {
+export async function api(slug, path, options = {}, runtime = {}) {
   const { method = "GET", body, token = requireToken(), accept = "application/json", baseDelayMs = 700 } = options;
-  // Mutating requests can succeed while their response is lost. Their callers must reconcile by identity.
-  const retries = method === 'GET' ? (options.retries ?? 4) : 0;
+  const readOnly = method === 'GET';
+  const retries = readOnly ? (options.retries ?? 4) : 0;
+  const retryBudgetMs = readOnly ? (options.retryBudgetMs ?? 240000) : 30000;
+  if (!Number.isSafeInteger(retries) || retries < 0 || retries > 8 || !Number.isFinite(baseDelayMs) || baseDelayMs < 0 || baseDelayMs > 30000 || !Number.isFinite(retryBudgetMs) || retryBudgetMs <= 0 || retryBudgetMs > 240000) throw new Error('Invalid CNB retry bounds');
   const url = path.startsWith("http") ? path : `${API_BASE}/${slug}${path}`;
   if (new URL(url).origin !== API_BASE) throw new Error('CNB API 不允许把凭据发送到其他来源');
   const headers = { Authorization: `Bearer ${token}`, Accept: accept };
   if (body !== undefined) headers["Content-Type"] = "application/json";
+  const serializedBody = body === undefined ? undefined : JSON.stringify(body);
+  const now = runtime.now ?? (() => performance.now());
+  const wallNow = runtime.wallNow ?? Date.now;
+  const pause = runtime.sleep ?? sleep;
+  const request = runtime.fetch ?? globalThis.fetch;
+  if ([now, wallNow, pause, request].some(value => typeof value !== 'function')) throw new Error('Invalid CNB transport runtime');
+  const deadline = now() + retryBudgetMs;
+  const remaining = () => deadline - now();
   let lastError = null;
-  for (let attempt = 0; attempt <= retries; attempt += 1) {
-    let response;
+  const budgetError = () => {
+    const error = new Error(redactCredentials(`CNB request retry budget exhausted ${url}${lastError ? ': ' + lastError.message : ''}`, token));
+    if (lastError?.status) error.status = lastError.status;
+    return error;
+  };
+  const bounded = async (operation, timeoutMs, controller) => {
+    let timer;
     try {
-      response = await fetch(url, {
-        method,
-        headers,
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(30000),
-        redirect: 'error',
-      });
+      return await Promise.race([Promise.resolve().then(operation), new Promise((_, reject) => {
+        timer = setTimeout(() => { controller?.abort(); reject(new Error('CNB request/wait timed out')); }, Math.max(1, Math.ceil(timeoutMs)));
+      })]);
+    } finally { clearTimeout(timer); controller?.abort(); }
+  };
+  const waitForRetry = async delay => {
+    delay = Math.ceil(delay);
+    if (!Number.isFinite(delay) || delay < 0 || delay >= remaining()) throw budgetError();
+    const started = now();
+    do {
+      const before = now();
+      const wait = Math.max(0, Math.ceil(delay - (before - started)));
+      if (remaining() <= 0) throw budgetError();
+      try { await bounded(() => pause(wait), remaining()); }
+      catch (error) { throw new Error(redactCredentials(`CNB retry wait failed ${url}: ${error.message}`, token)); }
+      if (wait > 0 && now() <= before) throw new Error('CNB retry wait made no monotonic progress');
+    } while (now() - started < delay);
+    if (remaining() <= 0) throw budgetError();
+  };
+  const retryAfterDelay = value => {
+    if (typeof value !== 'string' || !value.trim()) return 0;
+    const raw = value.trim();
+    if (/^\d+(?:\.\d+)?$/.test(raw)) return Number(raw) * 1000;
+    const date = Date.parse(raw);
+    return Number.isFinite(date) ? Math.max(0, date - wallNow()) : 0;
+  };
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    if (remaining() <= 0) throw budgetError();
+    let response, text;
+    const controller = new AbortController();
+    try {
+      ({ response, text } = await bounded(async () => {
+        const current = await request(url, { method, headers, body: serializedBody, signal: controller.signal, redirect: 'error' });
+        return { response: current, text: await current.text() };
+      }, Math.min(30000, remaining()), controller));
     } catch (error) {
       lastError = new Error(redactCredentials(`CNB transport failed ${url}: ${error.message}`, token));
-      if (method !== 'GET' || attempt === retries) throw lastError;
-      await sleep(Math.min(baseDelayMs * 2 ** attempt, 30000));
+      if (!readOnly || attempt === retries) throw lastError;
+      await waitForRetry(Math.min(baseDelayMs * 2 ** attempt, 30000));
       continue;
     }
-    const text = await response.text();
+    if (remaining() <= 0) throw budgetError();
     if (response.ok) {
       if (!text) return null;
-      try {
-        return JSON.parse(text);
-      } catch {
-        return text;
-      }
+      try { return JSON.parse(text); } catch { return text; }
     }
     lastError = new CnbError(response.status, text, url, token);
-    if (!RETRYABLE_STATUS.has(response.status) || attempt === retries) throw lastError;
-    const retryAfter = Number.parseFloat(response.headers.get("retry-after") ?? "");
-    const delay = Number.isFinite(retryAfter) && retryAfter > 0
-      ? retryAfter * 1000
-      : baseDelayMs * 2 ** attempt + Math.floor(Math.random() * 250);
-    await sleep(Math.min(delay, 30000));
+    if (!readOnly || !RETRYABLE_STATUS.has(response.status) || attempt === retries) throw lastError;
+    const fallback = response.status === 429
+      ? [5000, 15000, 45000, 60000][Math.min(attempt, 3)]
+      : Math.min(baseDelayMs * 2 ** attempt + Math.floor(Math.random() * 250), 30000);
+    // A server's longer Retry-After is never clamped to an earlier retry.
+    await waitForRetry(Math.max(fallback, retryAfterDelay(response.headers.get('retry-after'))));
   }
   throw lastError;
 }
