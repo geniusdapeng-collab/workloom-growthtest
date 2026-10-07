@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2110,
+  "revision": 2112,
   "tasks": {
     "98": {
       "number": 98,
@@ -3835,7 +3835,14 @@
       "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
-      "candidate": null,
+      "candidate": {
+        "number": 150,
+        "branch": "delivery/candidate/pr-129-732cdbe2450a24b25e1a6b17205a0a89",
+        "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+        "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+        "marker": "delivery-origin:129:1038789cb35c1e2bdb5e6d4218c06281506159a6:33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+        "at": 1791390620586
+      },
       "originalBody": "同一定妆照请求在网络结果未知、下载失败或输出缓存失效后，旧实现会重新发起付费图片生成；背景诊断还会自动重做图片。\n\n生成前持久化未知状态，成功后先保存第一次响应。重跑只恢复该响应和下载，未知结果不重发 POST；显式背景诊断不自动生成另一张图片。恢复产物继续遵循角色、参考图、版本、路径和输出收据校验。私有接续响应排除 Git。\n\n验证：61 个针对性用例通过，包括真实独立 Node 进程重启和本地 HTTP 接续；video-studio 类型检查与 staged 秘密扫描通过。正在完成该准确提交的完整脚本、媒体与服务端回归；成功后填写实际 Codex 回执交给原生 CI。\n\n任务卡 #128；依赖 #126 的默认采用与后期接续修复。仅适用隔离副本，无跨仓分发。回滚使用 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0005\",\n  \"ready\": true,\n  \"depends_on\": [\n    126\n  ],\n  \"releases\": []\n}\n-->",
       "files": [
         ".gitignore",
@@ -57525,6 +57532,36 @@
       },
       "previous": "09e161742d2f8667719fd04ba32013d1c6ee78fd31839e2b343e7d43c613ef13",
       "digest": "8cc54efbe9c524e1fc7cccbb80c409e05fac47ebbb0ebe49668c2129d2650115"
+    },
+    {
+      "sequence": 2111,
+      "at": "2026-10-07T16:30:20.586Z",
+      "kind": "task",
+      "data": {
+        "number": 129,
+        "patch": {
+          "candidate": {
+            "number": 150,
+            "branch": "delivery/candidate/pr-129-732cdbe2450a24b25e1a6b17205a0a89",
+            "headSha": "1038789cb35c1e2bdb5e6d4218c06281506159a6",
+            "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "marker": "delivery-origin:129:1038789cb35c1e2bdb5e6d4218c06281506159a6:33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "at": 1791390620586
+          }
+        }
+      },
+      "previous": "8cc54efbe9c524e1fc7cccbb80c409e05fac47ebbb0ebe49668c2129d2650115",
+      "digest": "9f82fcb224322df4f4842c227d2e2e3d85f7fbc6d67e1df736bf1d9a75e13443"
+    },
+    {
+      "sequence": 2112,
+      "at": "2026-10-07T16:31:05.304Z",
+      "kind": "transaction",
+      "data": {
+        "id": "845193f8-e9e3-49a3-9d98-98a6319df9e3"
+      },
+      "previous": "9f82fcb224322df4f4842c227d2e2e3d85f7fbc6d67e1df736bf1d9a75e13443",
+      "digest": "be2869b944af46e8a724fbc7dda19a0ee0e7ae2b01eee67e3ff7b8da5b3744d8"
     }
   ]
 }
