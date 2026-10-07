@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2990,
+  "revision": 2992,
   "tasks": {
     "98": {
       "number": 98,
@@ -5904,7 +5904,7 @@
       "attempts": {},
       "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit 8256e6c0c99f32b80e5071f89f38be932e38e15f\n",
       "blockedUntil": 0,
-      "updatedAt": 1791405373117,
+      "updatedAt": 1791405613700,
       "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
       "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
       "branch": "task/T-2026-1007-0010",
@@ -77190,6 +77190,48 @@
       },
       "previous": "08c6efef01a5efd10bb8cf59711deea323b45a5d9afe4054ca01c96fef220ee3",
       "digest": "198743763ea47515200a8a653928aa5d57e8f08d94ce99a888e0c62c1b74fa8e"
+    },
+    {
+      "sequence": 2991,
+      "at": "2026-10-07T20:40:13.700Z",
+      "kind": "task",
+      "data": {
+        "number": 139,
+        "patch": {
+          "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
+          "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+          "branch": "task/T-2026-1007-0010",
+          "intent": {
+            "taskId": "T-2026-1007-0010",
+            "ready": true,
+            "dependsOn": [
+              137
+            ],
+            "releases": []
+          },
+          "originalBody": "普通 CLI 的风格差异测量忽略 FFmpeg 执行失败，并把缺失的 RGB 结果填成黑色，可能让无效样本通过三版差异检查。现在先验证退出状态、启动错误、Buffer 类型和至少三个字节，失败抛出 VARIANT_RGB_MEASUREMENT_FAILED；合法黑色继续采用，现有画面或音频差异 OR 判据和独立三轴来源规则保持原行为。\n\n确定性成功封面的正常来源链连接已提前在正式 PR135 固化。本任务保留该行为文档并完成独立审查发现的 RGB 修复。\n\n验证：纠正两个 subprocess 夹具的参数位置后，未修改的旧源在 23 个用例中 11 通过、12 个故障断言失败；补充修复的工作字节 23/23 通过，首轮夹具错误日志另存并保留。测试提取真实 CLI 私有测量、samples.push、差异与三轴计算以及三项现有硬检查；subprocess 输出和外层循环是夹具，没有执行供应商、模型、真实媒体或完整发布管线。当前提交的八项本地制片、脚本、类型、资产和能力检查均实际通过。原生源与候选七项 CI、精确合并源码核心门禁和真实 PostgreSQL 回归仍为正式发布前置。\n\n仅修改 Growthtest 隔离副本，不回流公共层。Closes #138。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0010\",\n  \"ready\": true,\n  \"depends_on\": [\n    137\n  ],\n  \"releases\": []\n}\n-->\n",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791405312548
+        }
+      },
+      "previous": "198743763ea47515200a8a653928aa5d57e8f08d94ce99a888e0c62c1b74fa8e",
+      "digest": "eccef5a53fdd8225dcfc418c7dcf8b8a29a3dc77ce60abb705497c2e09de0b1c"
+    },
+    {
+      "sequence": 2992,
+      "at": "2026-10-07T20:41:02.547Z",
+      "kind": "transaction",
+      "data": {
+        "id": "a3e9a236-cbe3-4dc6-a2d5-31d8e460ae1c"
+      },
+      "previous": "eccef5a53fdd8225dcfc418c7dcf8b8a29a3dc77ce60abb705497c2e09de0b1c",
+      "digest": "628c7994967b9ff19ed4a8063cc1a70ee2ceb65ec4287222b63e5f36b8f1c835"
     }
   ]
 }
