@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 717,
+  "revision": 719,
   "tasks": {
     "98": {
       "number": 98,
@@ -3446,7 +3446,7 @@
     },
     "131": {
       "number": 131,
-      "status": "waiting_dependency",
+      "status": "parked",
       "firstSeen": 1791351760990,
       "attempts": {},
       "headSha": "c59828edead37f5ef7513d57266d48ad08edecb5",
@@ -3940,12 +3940,12 @@
           }
         ]
       },
-      "updatedAt": 1791355810583,
+      "updatedAt": 1791356708691,
       "dependencies": [
         129
       ],
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/131/commit-statuses :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791354910914
+      "error": "Prerequisite #129 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/129 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791357308691
     },
     "133": {
       "number": 133,
@@ -24360,6 +24360,31 @@
       },
       "previous": "cd5ef7cc3a2a02a45dd71b4c9778f6fd6b8cd6ace8c2b14b876928cb1a6cf247",
       "digest": "421222b516b7e8bc7e138cf6519517808598be0237cb6130d79eecb4023fbb12"
+    },
+    {
+      "sequence": 718,
+      "at": "2026-10-07T07:05:08.691Z",
+      "kind": "task",
+      "data": {
+        "number": 131,
+        "patch": {
+          "status": "parked",
+          "error": "Prerequisite #129 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/129 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791357308691
+        }
+      },
+      "previous": "421222b516b7e8bc7e138cf6519517808598be0237cb6130d79eecb4023fbb12",
+      "digest": "70446a7d4dfc69a4713b38e283dc6a808ed1a94ffa5fd8586a22d92af141023d"
+    },
+    {
+      "sequence": 719,
+      "at": "2026-10-07T07:05:39.694Z",
+      "kind": "transaction",
+      "data": {
+        "id": "a9a0374d-429f-490a-92bb-8a79a58a303c"
+      },
+      "previous": "70446a7d4dfc69a4713b38e283dc6a808ed1a94ffa5fd8586a22d92af141023d",
+      "digest": "9ed03c18a461f17ac94445db002c5f44330604b20dd8c3a6ebd7d40195546bf3"
     }
   ]
 }
