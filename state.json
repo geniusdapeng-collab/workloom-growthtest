@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2052,
+  "revision": 2054,
   "tasks": {
     "98": {
       "number": 98,
@@ -3656,7 +3656,7 @@
     },
     "129": {
       "number": 129,
-      "status": "waiting_ci",
+      "status": "aligning",
       "firstSeen": 1791351176589,
       "attempts": {},
       "headSha": "052f614a8bac975a4e7e06df466d5054d7314d7a",
@@ -3879,7 +3879,7 @@
       ],
       "error": "Prerequisite #126 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/126 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 0,
-      "alignmentCount": 0,
+      "alignmentCount": 1,
       "recoveryCount": 0,
       "reviewFailures": null,
       "candidate": null,
@@ -3896,7 +3896,12 @@
         "packages/video-studio/src/portrait-runtime.test.ts",
         "packages/video-studio/src/portrait-runtime.ts"
       ],
-      "ciSince": 1791389597267
+      "ciSince": 1791389597267,
+      "alignmentIntent": {
+        "headSha": "052f614a8bac975a4e7e06df466d5054d7314d7a",
+        "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+        "at": 1791389597267
+      }
     },
     "131": {
       "number": 131,
@@ -56240,6 +56245,36 @@
       },
       "previous": "c2cda7f52a005fbd31dc2bfc63d94b2a0fc61dc012d945c80aa2377a262ff32e",
       "digest": "b9587226406b440edf4bcdb76ffb66eb2caf9bc68c633e4cbb44a6dcca108a6a"
+    },
+    {
+      "sequence": 2053,
+      "at": "2026-10-07T16:13:17.267Z",
+      "kind": "task",
+      "data": {
+        "number": 129,
+        "patch": {
+          "status": "aligning",
+          "alignmentCount": 1,
+          "alignmentIntent": {
+            "headSha": "052f614a8bac975a4e7e06df466d5054d7314d7a",
+            "mainSha": "33aef8ebdf714cd3eec6de4bef821fac13409ee4",
+            "at": 1791389597267
+          },
+          "developerReview": null
+        }
+      },
+      "previous": "b9587226406b440edf4bcdb76ffb66eb2caf9bc68c633e4cbb44a6dcca108a6a",
+      "digest": "4a9af79f283067e82042960ac20659ca3a444e5e85d37e628eea1b2fa4d13129"
+    },
+    {
+      "sequence": 2054,
+      "at": "2026-10-07T16:14:43.312Z",
+      "kind": "transaction",
+      "data": {
+        "id": "f1267c17-31af-4cc2-92f6-92099ebd6046"
+      },
+      "previous": "4a9af79f283067e82042960ac20659ca3a444e5e85d37e628eea1b2fa4d13129",
+      "digest": "0ef13e5627def887b7ff4e95d0e2e0c8aefd25a5c1dadc2c7ee16f4f560bfd99"
     }
   ]
 }
