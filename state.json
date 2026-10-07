@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2385,
+  "revision": 2390,
   "tasks": {
     "98": {
       "number": 98,
@@ -4333,7 +4333,7 @@
           }
         ]
       },
-      "updatedAt": 1791394218898,
+      "updatedAt": 1791394877463,
       "dependencies": [
         129
       ],
@@ -4367,12 +4367,18 @@
       },
       "admission": {
         "number": 131,
-        "headSha": "2a892d6aab1d94346d7164cda0e43571a8a90700",
+        "headSha": "ac4e3f8f62ca12c4626f0428ef9476d043412839",
         "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
-        "filesHash": "2c6bed0663e4a699bc56277433bfad413254f2ccd78662979ebe8c0ca0b2a315",
-        "scopes": [],
+        "filesHash": "999935da090cac57889e44d8cbdbef21c0d85fd786ef43aabeb7accce6233da1",
+        "scopes": [
+          "dependencies",
+          "protocol"
+        ],
         "owner": "admission/pr-131",
-        "generation": {}
+        "generation": {
+          "dependencies": 1,
+          "protocol": 64
+        }
       },
       "repairRequired": {
         "provider": "codex",
@@ -7577,9 +7583,15 @@
   "leases": {
     "protocol": {
       "owner": null,
-      "generation": 63,
-      "acquiredAt": 1791394367138,
-      "expiresAt": 1791394740409
+      "generation": 64,
+      "acquiredAt": 1791394877463,
+      "expiresAt": 1791394877463
+    },
+    "dependencies": {
+      "owner": null,
+      "generation": 1,
+      "acquiredAt": 1791394877463,
+      "expiresAt": 1791394877463
     }
   },
   "releases": {},
@@ -63497,6 +63509,101 @@
       },
       "previous": "b4dee0c76e5f1223196bf7eb23024a00075d884ea0db168dcd4335c526ab479c",
       "digest": "5083e31fd3feca9a0c623dc5c0eecb99f4517ecf487d22fa94042c2048942705"
+    },
+    {
+      "sequence": 2386,
+      "at": "2026-10-07T17:41:17.463Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "dependencies",
+          "protocol"
+        ],
+        "owner": "admission/pr-131",
+        "generation": {
+          "dependencies": 1,
+          "protocol": 64
+        }
+      },
+      "previous": "5083e31fd3feca9a0c623dc5c0eecb99f4517ecf487d22fa94042c2048942705",
+      "digest": "cccfa4996fbd369de8ae857f568696d74cdaa88a233f3e363c885a45b827b4b4"
+    },
+    {
+      "sequence": 2387,
+      "at": "2026-10-07T17:41:17.463Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "dependencies",
+          "protocol"
+        ],
+        "owner": "admission/pr-131",
+        "generation": {
+          "dependencies": 1,
+          "protocol": 64
+        }
+      },
+      "previous": "cccfa4996fbd369de8ae857f568696d74cdaa88a233f3e363c885a45b827b4b4",
+      "digest": "503ff6eaa46539a1dfd10c03346fa73579cdf5580171fa4244c1ac1d3e27a390"
+    },
+    {
+      "sequence": 2388,
+      "at": "2026-10-07T17:41:17.463Z",
+      "kind": "source_admitted",
+      "data": {
+        "number": 131,
+        "headSha": "ac4e3f8f62ca12c4626f0428ef9476d043412839",
+        "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+        "filesHash": "999935da090cac57889e44d8cbdbef21c0d85fd786ef43aabeb7accce6233da1",
+        "scopes": [
+          "dependencies",
+          "protocol"
+        ],
+        "owner": "admission/pr-131",
+        "generation": {
+          "dependencies": 1,
+          "protocol": 64
+        }
+      },
+      "previous": "503ff6eaa46539a1dfd10c03346fa73579cdf5580171fa4244c1ac1d3e27a390",
+      "digest": "af6c77346f04cfe6c2c245b013793def584df3a5420a4b7dbf20094cbb1385aa"
+    },
+    {
+      "sequence": 2389,
+      "at": "2026-10-07T17:41:17.463Z",
+      "kind": "task",
+      "data": {
+        "number": 131,
+        "patch": {
+          "admission": {
+            "number": 131,
+            "headSha": "ac4e3f8f62ca12c4626f0428ef9476d043412839",
+            "mainSha": "e19c9325459a6df5e14914e8906c1ecce75d6af8",
+            "filesHash": "999935da090cac57889e44d8cbdbef21c0d85fd786ef43aabeb7accce6233da1",
+            "scopes": [
+              "dependencies",
+              "protocol"
+            ],
+            "owner": "admission/pr-131",
+            "generation": {
+              "dependencies": 1,
+              "protocol": 64
+            }
+          }
+        }
+      },
+      "previous": "af6c77346f04cfe6c2c245b013793def584df3a5420a4b7dbf20094cbb1385aa",
+      "digest": "c62d5dbd35cd76a35b6b8f5993c74299829e731032e6a9b4c138e9cda0bb7ce7"
+    },
+    {
+      "sequence": 2390,
+      "at": "2026-10-07T17:41:06.937Z",
+      "kind": "transaction",
+      "data": {
+        "id": "source-admit:131:ac4e3f8f62ca12c4626f0428ef9476d043412839:e19c9325459a6df5e14914e8906c1ecce75d6af8"
+      },
+      "previous": "c62d5dbd35cd76a35b6b8f5993c74299829e731032e6a9b4c138e9cda0bb7ce7",
+      "digest": "2d1cf6c113c44db824c75014c27b4a21822e59c66104e83c0e150f1ae5265a63"
     }
   ]
 }
