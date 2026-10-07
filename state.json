@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1163,
+  "revision": 1165,
   "tasks": {
     "98": {
       "number": 98,
@@ -2715,7 +2715,7 @@
           "protocol": 27
         }
       },
-      "updatedAt": 1791369910174,
+      "updatedAt": 1791370510180,
       "headSha": "8de51583352811b6752fc8efe0d9fa58313f5658",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2990,8 +2990,8 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "候选 #140 的实际 CI 失败；在当前 Codex 会话修复原分支并重新审查实测",
-      "blockedUntil": 1791370510174,
+      "error": "Prerequisite #118 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+      "blockedUntil": 1791371110180,
       "repairRequired": {
         "provider": "codex",
         "headSha": "8de51583352811b6752fc8efe0d9fa58313f5658",
@@ -34545,6 +34545,31 @@
       },
       "previous": "3fffb523682cb82b0a944ecfe1140b803f8432063d189521473c8c2f33ef8bd4",
       "digest": "90b5418dbf4e49da53830362045bd5e8a4518670e0498ab6e6b10cf568563024"
+    },
+    {
+      "sequence": 1164,
+      "at": "2026-10-07T10:55:10.180Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "Prerequisite #118 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/118 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791371110180
+        }
+      },
+      "previous": "90b5418dbf4e49da53830362045bd5e8a4518670e0498ab6e6b10cf568563024",
+      "digest": "4afcd9564352016d64b3803173cb5f6549e716d314fe761398d6a74eaac0cc0a"
+    },
+    {
+      "sequence": 1165,
+      "at": "2026-10-07T10:55:43.047Z",
+      "kind": "transaction",
+      "data": {
+        "id": "91120480-754d-4ff7-bd0f-ed10368b5031"
+      },
+      "previous": "4afcd9564352016d64b3803173cb5f6549e716d314fe761398d6a74eaac0cc0a",
+      "digest": "3a95f5963619cc5015140d46b5cb6cc3e45c5cc5c258e9ab402698898199ab7a"
     }
   ]
 }
