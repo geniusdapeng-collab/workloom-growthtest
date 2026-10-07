@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 252,
+  "revision": 254,
   "tasks": {
     "98": {
       "number": 98,
@@ -1784,7 +1784,7 @@
         "owner": "admission/pr-118",
         "generation": {}
       },
-      "updatedAt": 1791335711450,
+      "updatedAt": 1791336616433,
       "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
       "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
       "branch": "task/T-2026-1007-0002",
@@ -9238,6 +9238,50 @@
       },
       "previous": "540d48766ecdf9646ab037786aebbc3d813db1d55e0ee409f9743a6257241438",
       "digest": "eb59ba60161292008a5f0cac18b56dc31b45ee59d77309893cb1930529921810"
+    },
+    {
+      "sequence": 253,
+      "at": "2026-10-07T01:30:16.433Z",
+      "kind": "task",
+      "data": {
+        "number": 118,
+        "patch": {
+          "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+          "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+          "branch": "task/T-2026-1007-0002",
+          "intent": {
+            "taskId": "T-2026-1007-0002",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "originalBody": "当前随仓出镜人物 已完成独立定妆照前置处理，出片预检仍强制要求真人主档 anchorPhoto，导致合法登记角色在渲染前被 CHARACTER_SOURCE_ANCHOR_MISSING 拦住。\n\n本次人物发布合同优先复用对应授权角色已登记、当前在用的定妆照，保留实际 SHA-256、角色主档、版本及角度，来源标为 registered-character-portrait。外部客户没有对应定妆照时仍可使用已登记原基准；无效授权、身份不对应、越界、符号链接及本次镜头自报来源继续失败。主授权素材组和生成参考不变。\n\n验证：视频工位及服务端身份回归 1,514 项，1,513 通过、1 原有跳过、0 失败；视频工位类型检查、内置角色字节校验、capabilities 生成与一致性检查通过。新增 27 个边界、错误、授权及复用用例，并把真实随仓出镜人物 回归改为默认定妆照复用。三镜头真实素材预检已通过，尚未以预检代替付费成片证据。\n\n范围：仅 Growthtest 的人物登记源、测试、三份人物文档及按仓规重生成的三份能力导览日期；任务卡 #117。回滚：revert 本提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0002\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+          "files": [
+            "README.md",
+            "bundles/ai-video/library/characters/README.md",
+            "docs/capabilities.auto.json",
+            "docs/capabilities.auto.md",
+            "docs/character-registry.md",
+            "docs/real-person-asset.md",
+            "packages/video-studio/src/character-release-source.test.ts",
+            "packages/video-studio/src/character-release-source.ts"
+          ],
+          "status": "parked",
+          "ciSince": 1791334818969
+        }
+      },
+      "previous": "eb59ba60161292008a5f0cac18b56dc31b45ee59d77309893cb1930529921810",
+      "digest": "a8b4e3b6ebd0b75a00f6e38d2569cd55d8877fffb2da78ae31c939552a9e50e3"
+    },
+    {
+      "sequence": 254,
+      "at": "2026-10-07T01:30:18.437Z",
+      "kind": "transaction",
+      "data": {
+        "id": "3cd29ff2-4742-4575-9c32-6ce085fb29ec"
+      },
+      "previous": "a8b4e3b6ebd0b75a00f6e38d2569cd55d8877fffb2da78ae31c939552a9e50e3",
+      "digest": "f619fa3e44b9033158dca14ef4de4cbc0c393a43a8b9c664e864d7ea9f919008"
     }
   ]
 }
