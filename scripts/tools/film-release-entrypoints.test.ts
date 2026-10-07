@@ -14,6 +14,7 @@ import {
 import { assessVoiceArtifact, fingerprintFile, fingerprintText } from "./film-voice-artifact.js";
 import { assertFilmAudioSource, resolveFilmAudioContract, type FilmAudioShot } from "./film-audio-policy.mjs";
 import { assertCoverPublication } from "./film-publication-policy.mjs";
+import { validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
 const CLI_FILE = join(REPO, "scripts/tools/full-chain-film.mts");
@@ -103,6 +104,8 @@ function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
     DANMAKU_ENABLED: false,
     SUBTITLE_MODE: "sidecar",
     publicationNeedsCover: false, publicationCoverReceipt: null, shots: [shot],
+    // Frozen submitted intent and derived picture duration are distinct in the actual CLI.
+    sourceDocument: { shots: [structuredClone(shot)] },
     isMaterialShot: (_shot: FixtureShot) => false,
     join, existsSync, statSync, writeFileSync, sha256FileSync: fingerprintFile,
     FPS: 24, SOURCE_SIZE: { width: 1080, height: 1920 }, originalPostContract,
@@ -119,6 +122,7 @@ function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
       releaseAllowed: boolean; issues: Array<{ shotId: string | null; code: string }>; authorizationScope: string;
     } => ({ releaseAllowed: true, issues: [], authorizationScope: "fixture-no-asset-character" }),
     assessVoiceArtifact, fingerprintFile, fingerprintText, resolveFilmAudioContract, assertFilmAudioSource, assertCoverPublication,
+    validateStandardNativeClock,
   };
   runInNewContext(compiled, context);
   return { raw, voiced, master, shot, rows, make, context, guard: context.exports.fixture.assertFactualReleaseSources,
@@ -159,6 +163,23 @@ describe("actual film release entrypoints with real local byte and lineage recei
   });
   it("a current raw voiceover source also permits release", () => {
     const f = fixture("voice-over"); expect(failure(f.guard)).toBe("allowed");
+  });
+  it("the actual release entrypoint accepts one native endpoint frame against immutable submitted seconds", () => {
+    const f = fixture(), measured = f.context.originalPostContract.originals[0]!.media;
+    measured.videoFrames = 121; measured.videoDurationSec = 121 / 24; measured.audioDurationSec = 121 / 24;
+    f.shot.duration = 121 / 24;
+    f.context.probe = () => ({ ...measured, hasAudio: true });
+    expect(f.context.sourceDocument.shots[0]!.duration).toBe(5);
+    expect(failure(f.guard)).toBe("allowed");
+    expect(f.context.sourceDocument.shots[0]!.duration).toBe(5);
+  });
+  it("derived duration cannot wash a native frame range that differs from frozen submitted intent", () => {
+    const f = fixture(); f.context.sourceDocument.shots[0]!.duration = 4;
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID.*STANDARD_POST_FRAME_INVALID/);
+  });
+  it("the actual release entrypoint refuses a missing frozen submitted shot", () => {
+    const f = fixture(); f.context.sourceDocument.shots.length = 0;
+    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_BINDING_INVALID/);
   });
   it("a historical successful TTS voiceover cannot publish even when it entered the old compose", () => {
     const f = fixture("voice-over");
