@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 410,
+  "revision": 412,
   "tasks": {
     "98": {
       "number": 98,
@@ -2390,7 +2390,7 @@
     },
     "123": {
       "number": 123,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2666,14 +2666,14 @@
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
         "at": 1791338419356
       },
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791342910060,
+      "error": "检查/评审阻断：Developer has not handed off",
+      "blockedUntil": 1791343512207,
       "repairRequired": {
         "provider": "codex",
-        "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+        "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
         "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "reason": "主干对齐失败：CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/123 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-        "at": 1791338419356
+        "reason": "检查/评审阻断：Developer has not handed off",
+        "at": 1791342912207
       },
       "recoveryIntent": null,
       "recoveryCount": 0,
@@ -13535,6 +13535,39 @@
       },
       "previous": "40692bcb7b87c39d92a1cf82b085da880886fd2e97364ba32ba67f00004d16d2",
       "digest": "8c770b14b80ad9d9ba645173effff6240e29155bc80c12e8fced97ea51ae5a2c"
+    },
+    {
+      "sequence": 411,
+      "at": "2026-10-07T03:15:12.207Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Developer has not handed off",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "96299952d9dbab6bfdb03b4fd3b48ecb848f718c",
+            "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+            "reason": "检查/评审阻断：Developer has not handed off",
+            "at": 1791342912207
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791343512207
+        }
+      },
+      "previous": "8c770b14b80ad9d9ba645173effff6240e29155bc80c12e8fced97ea51ae5a2c",
+      "digest": "5e54f1bc0ae320bd7c7cc0a55b059285fdfe268ae394fc1147b9ad8205233d94"
+    },
+    {
+      "sequence": 412,
+      "at": "2026-10-07T03:15:29.166Z",
+      "kind": "transaction",
+      "data": {
+        "id": "81d0d715-725e-442a-aa56-19a66b6e6838"
+      },
+      "previous": "5e54f1bc0ae320bd7c7cc0a55b059285fdfe268ae394fc1147b9ad8205233d94",
+      "digest": "2c5cb98d090fc8dd16bc34b3bbc2b7e5f7fb404c5772d24f4de8433154bd260a"
     }
   ]
 }
