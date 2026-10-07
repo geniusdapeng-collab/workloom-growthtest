@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -247,6 +248,30 @@ describe("全链路当前血缘与返修范围", () => {
 
 describe("成片硬切 CFR 接缝", () => {
   const available = [ffmpeg, ffprobe].every((bin) => spawnSync(bin, ["-version"], { stdio: "ignore" }).status === 0);
+  const hash = (file: string) => createHash("sha256").update(readFileSync(file)).digest("hex");
+  const assertComposeReceipt = (master: string, clips: string[], expectedDuration: number) => {
+    const receipt = JSON.parse(readFileSync(master.replace(/\.mp4$/i, ".av-sync.json"), "utf8"));
+    expect(receipt.schemaVersion).toBe("workloom.composition-process/v1");
+    expect(receipt.output).toBe(master);
+    expect(receipt.outputSha256).toBe(hash(master));
+    expect(receipt.inputBindings).toEqual(clips.map(path => ({ path, sha256: hash(path) })));
+    expect(receipt.target).toEqual({ width: 64, height: 96, fps: 8, shotFrames: [8, 8, 8], durationSec: 3 });
+    expect(receipt.sourceFilesUnchanged).toBe(true);
+    expect(receipt.audioAlignmentMeasured).toBe(false);
+    for (const field of ["ok", "measured", "samples", "policy"]) expect(receipt).not.toHaveProperty(field);
+    const timing = spawnSync(ffprobe, ["-v", "error", "-show_entries", "stream=codec_type,duration,start_time", "-of", "json", master],
+      { encoding: "utf8", timeout: 15_000 });
+    expect(timing.status, `${timing.error ?? ""}\n${timing.stderr}`).toBe(0);
+    const streams = JSON.parse(timing.stdout).streams as Array<{ codec_type: string; duration: string; start_time: string }>;
+    for (const type of ["video", "audio"]) {
+      const stream = streams.find(stream => stream.codec_type === type);
+      const duration = Number(stream?.duration);
+      expect(Number.isFinite(duration), `${type} has an actual output clock`).toBe(true);
+      expect(Math.abs(duration - expectedDuration), `${type} follows the composition timeline`).toBeLessThanOrEqual(0.13); // Existing one-frame tolerance @8fps.
+      expect(Number(stream?.start_time), `${type} starts on the composition clock`).toBe(0);
+    }
+    return receipt;
+  };
 
   it.skipIf(!available)("视频直拷拼接的每个接缝保持整帧间隔，音画同步按同一时长计算", () => {
     const dir = mkdtempSync(join(tmpdir(), "compose-cfr-")); temporary.push(dir);
@@ -292,9 +317,7 @@ describe("成片硬切 CFR 接缝", () => {
         expect(pts[index]! - pts[index - 1]!, `${file}: frame ${index}`).toBeCloseTo(0.125, 4);
       }
     }
-    const sync = JSON.parse(readFileSync(join(dir, "master.av-sync.json"), "utf8")) as { ok: boolean; measured: number };
-    expect(sync.ok).toBe(true);
-    expect(sync.measured).toBe(3);
+    assertComposeReceipt(master, clips, 3);
   }, 100_000);
 
   it.skipIf(!available)("--transition-at 3 只在第三镜入点转场，音画起点与刀数同源", () => {
@@ -321,10 +344,7 @@ describe("成片硬切 CFR 接缝", () => {
     expect(result.stdout).toContain("× 1 刀");
     const duration = spawnSync(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", master], { encoding: "utf8" });
     expect(Math.abs(Number(duration.stdout.trim()) - 2.75)).toBeLessThanOrEqual(0.13); // ≤1 frame @8fps
-    const report = JSON.parse(readFileSync(join(dir, "master.av-sync.json"), "utf8"));
-    expect(report.outputSha256).toMatch(/^[a-f0-9]{64}$/);
-    expect(report.clipCount).toBe(3);
-    expect(report.samples.map((sample: { index: number }) => sample.index)).toEqual([0, 1, 2]);
+    assertComposeReceipt(master, clips, 2.75);
     const pixel = (at: number) => {
       const frame = spawnSync(ffmpeg, ["-v", "error", "-ss", String(at), "-i", master, "-frames:v", "1",
         "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { encoding: "buffer" });
