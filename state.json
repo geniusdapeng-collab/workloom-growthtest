@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1822,
+  "revision": 1825,
   "tasks": {
     "98": {
       "number": 98,
@@ -2582,7 +2582,7 @@
     },
     "123": {
       "number": 123,
-      "status": "waiting_ci",
+      "status": "merging",
       "firstSeen": 1791338153788,
       "attempts": {},
       "admission": {
@@ -2886,15 +2886,15 @@
         "marker": "delivery-origin:123:2859237b49495dca23b26f55211c18fe3cafc3f3:d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
         "at": 1791386418500
       },
-      "mergePhase": null,
+      "mergePhase": "prepared",
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
-        "number": 144,
+        "number": 148,
         "pull": {
-          "number": 144,
+          "number": 148,
           "state": "open",
           "title": "chore(ci): deliver #123 fix(video): preserve native endpoint frame clocks [T-2026-1007-0003]",
-          "body": "Immutable delivery candidate for #123. Exact source 3f84c5f6d576cf2afdf24da2f4b25940b25167c9; tested main 80c1331ad4ed8225a676c331917debb04ab0e4f5.\n\n<!-- delivery-origin:123:3f84c5f6d576cf2afdf24da2f4b25940b25167c9:80c1331ad4ed8225a676c331917debb04ab0e4f5 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[118],\"releases\":[]}\n-->",
+          "body": "Immutable delivery candidate for #123. Exact source 2859237b49495dca23b26f55211c18fe3cafc3f3; tested main d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b.\n\n<!-- delivery-origin:123:2859237b49495dca23b26f55211c18fe3cafc3f3:d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[118,146],\"releases\":[]}\n-->",
           "author": {
             "username": "OCI",
             "nickname": "Cloud Native Build",
@@ -2904,7 +2904,7 @@
           "labels": [],
           "base": {
             "ref": "refs/heads/main",
-            "sha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "sha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2913,8 +2913,8 @@
             }
           },
           "head": {
-            "ref": "refs/heads/delivery/candidate/pr-123-80fa09d5957a7456078c706f65fc3ec4",
-            "sha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+            "ref": "refs/heads/delivery/candidate/pr-123-20703d9238f917a5f655b95796168b59",
+            "sha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2922,7 +2922,7 @@
               "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
             }
           },
-          "blocked_on": "status_check",
+          "blocked_on": "unblocked",
           "merged_by": {
             "is_npc": false
           },
@@ -2932,8 +2932,8 @@
           "is_force_merged": false,
           "statuses": {}
         },
-        "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
         "files": [
           "docs/capabilities.auto.json",
           "docs/video-standard-post.md",
@@ -2951,81 +2951,90 @@
           "taskId": "T-2026-1007-0003",
           "ready": true,
           "dependsOn": [
-            118
+            118,
+            146
           ],
           "releases": []
         },
-        "headTime": 1791375851000,
-        "mergeBase": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "headTime": 1791383769000,
+        "mergeBase": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
         "checkErrors": [],
-        "checkSha": "734b77caac1898239b22a10378005bfa7600cd82",
+        "checkSha": "1dab2dc13158f2be42819982978e69e0ad0e3ba7",
         "hasFailedChecks": false,
         "ciPolicyChanges": [
           {
             "id": "CI-001",
+            "file": "scripts/tools/film-release-entrypoints.test.ts",
+            "before": {
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "digest": "56da0d21804a2fd53e94a3f35a46fff62433ec1fb54eb2a6a2401e54cdadb983"
+          },
+          {
+            "id": "CI-002",
             "file": "scripts/tools/compose-native-clock.test.ts",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
               "path": "scripts/tools/compose-native-clock.test.ts",
               "absent": true
             },
             "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
               "path": "scripts/tools/compose-native-clock.test.ts",
               "absent": false
             },
-            "digest": "908fba97749d52ebdd346278a90fb9e58b15ca024ac3d0942cbc4a6931aac9da"
-          },
-          {
-            "id": "CI-002",
-            "file": "scripts/tools/film-release-entrypoints.test.ts",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "digest": "a17fc5563c7958d673007dc3c385178cf7f0a4db4b6cdb93256673804d454759"
+            "digest": "86124e96a64e3c6c5550f26f898af23ed73a38948689210996c1276fb1461fcc"
           },
           {
             "id": "CI-003",
-            "file": "scripts/tools/film-native-post.test.ts",
+            "file": "scripts/tools/film-standard-post.test.ts",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-native-post.test.ts",
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+              "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
             "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-              "path": "scripts/tools/film-native-post.test.ts",
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+              "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
-            "digest": "aa8a1e31d39e053ef4e1ba9a11c77289d222047b6aa76ab522cb2836fdf5e884"
+            "digest": "ad7b2cf39e0952227730ffa7b4d5f623e08b9e1da4a2ce6f2d530d3eedafb4eb"
           },
           {
             "id": "CI-004",
-            "file": "scripts/tools/film-standard-post.test.ts",
+            "file": "scripts/tools/film-native-post.test.ts",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-standard-post.test.ts",
+              "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+              "path": "scripts/tools/film-native-post.test.ts",
               "absent": false
             },
             "after": {
-              "ref": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
-              "path": "scripts/tools/film-standard-post.test.ts",
+              "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+              "path": "scripts/tools/film-native-post.test.ts",
               "absent": false
             },
-            "digest": "e3042b3e51fa6703f5da4aaea899efdc731eaedd7ec5888039855641a2e81ad5"
+            "digest": "ebd868f63d64001a0001615a33920bef60896c57029b54fe9403415b699d3044"
           }
         ],
         "originNumber": 123,
         "pendingDependencies": []
       },
-      "integrationLease": null,
+      "integrationLease": {
+        "owner": "integration/pr-123",
+        "scopes": [
+          "protocol"
+        ],
+        "generation": {
+          "protocol": 55
+        }
+      },
       "mergeRequestedAt": 1791380384214,
       "mergeResolution": {
         "originNumber": 123,
@@ -7484,10 +7493,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": null,
-      "generation": 54,
-      "acquiredAt": 1791386519388,
-      "expiresAt": 1791386519388
+      "owner": "integration/pr-123",
+      "generation": 55,
+      "acquiredAt": 1791387015211,
+      "expiresAt": 1791387915211
     }
   },
   "releases": {},
@@ -50978,6 +50987,194 @@
       },
       "previous": "221f542c3457a179e2473aa65a74da2b49644cc6c53da9d700f7c9af302fe719",
       "digest": "6a39e969d124edfd319ab1e4c7d451561124640b956aa310f06148bc00dedad1"
+    },
+    {
+      "sequence": 1823,
+      "at": "2026-10-07T15:30:15.211Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-123",
+        "generation": {
+          "protocol": 55
+        }
+      },
+      "previous": "6a39e969d124edfd319ab1e4c7d451561124640b956aa310f06148bc00dedad1",
+      "digest": "0f35da6c02f2d9a43641db41116bce6f8f2c45a44e3816d88264a78c89bb4089"
+    },
+    {
+      "sequence": 1824,
+      "at": "2026-10-07T15:30:15.211Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 148,
+            "pull": {
+              "number": 148,
+              "state": "open",
+              "title": "chore(ci): deliver #123 fix(video): preserve native endpoint frame clocks [T-2026-1007-0003]",
+              "body": "Immutable delivery candidate for #123. Exact source 2859237b49495dca23b26f55211c18fe3cafc3f3; tested main d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b.\n\n<!-- delivery-origin:123:2859237b49495dca23b26f55211c18fe3cafc3f3:d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[118,146],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-123-20703d9238f917a5f655b95796168b59",
+                "sha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+            "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "files": [
+              "docs/capabilities.auto.json",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0003",
+              "ready": true,
+              "dependsOn": [
+                118,
+                146
+              ],
+              "releases": []
+            },
+            "headTime": 1791383769000,
+            "mergeBase": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+            "checkErrors": [],
+            "checkSha": "1dab2dc13158f2be42819982978e69e0ad0e3ba7",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/film-release-entrypoints.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "digest": "56da0d21804a2fd53e94a3f35a46fff62433ec1fb54eb2a6a2401e54cdadb983"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/tools/compose-native-clock.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "digest": "86124e96a64e3c6c5550f26f898af23ed73a38948689210996c1276fb1461fcc"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/tools/film-standard-post.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "digest": "ad7b2cf39e0952227730ffa7b4d5f623e08b9e1da4a2ce6f2d530d3eedafb4eb"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/film-native-post.test.ts",
+                "before": {
+                  "ref": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "2859237b49495dca23b26f55211c18fe3cafc3f3",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "digest": "ebd868f63d64001a0001615a33920bef60896c57029b54fe9403415b699d3044"
+              }
+            ],
+            "originNumber": 123,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-123",
+            "scopes": [
+              "protocol"
+            ],
+            "generation": {
+              "protocol": 55
+            }
+          }
+        }
+      },
+      "previous": "0f35da6c02f2d9a43641db41116bce6f8f2c45a44e3816d88264a78c89bb4089",
+      "digest": "4c2c34ea3732d69f78cc3e8f0f1364e23a7c32b4e2abc8102496e4914127efb2"
+    },
+    {
+      "sequence": 1825,
+      "at": "2026-10-07T15:31:27.201Z",
+      "kind": "transaction",
+      "data": {
+        "id": "5d3959d4-7fb9-4bda-9607-a53c3972a28c"
+      },
+      "previous": "4c2c34ea3732d69f78cc3e8f0f1364e23a7c32b4e2abc8102496e4914127efb2",
+      "digest": "68333092b66a19ac9723c9538a8bda50ef583c844c354b9b5d901ae4cbdc54e9"
     }
   ]
 }
