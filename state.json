@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3062,
+  "revision": 3064,
   "tasks": {
     "98": {
       "number": 98,
@@ -2068,7 +2068,7 @@
         }
       },
       "updatedAt": 1791406637360,
-      "error": "Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
+      "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
       "blockedUntil": 1791407237360,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
@@ -2542,9 +2542,9 @@
       "repairRequired": {
         "provider": "codex",
         "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
-        "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
-        "reason": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
-        "at": 1791406514902
+        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+        "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
+        "at": 1791406637360
       },
       "recoveryIntent": null
     },
@@ -79011,6 +79011,39 @@
       },
       "previous": "0077982bfc88f915fe78a3b73a428d9c74eaba34ff9876d206631b9e6c59390e",
       "digest": "0c3ce2dfcf1c918cc6582f306afd12a3bfbef7fc871f1da34ab9061f13dff26e"
+    },
+    {
+      "sequence": 3063,
+      "at": "2026-10-07T20:57:17.360Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "reason": "主干对齐失败：Command failed: git merge --no-ff --no-edit ed485d4979f9e92541d7a7066df9557dfeb66f78\n",
+            "at": 1791406637360
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791407237360
+        }
+      },
+      "previous": "0c3ce2dfcf1c918cc6582f306afd12a3bfbef7fc871f1da34ab9061f13dff26e",
+      "digest": "64cb47eea44ccacfb1661f34272e2f498ad5d96f9de0799ef97efc7dfffd826e"
+    },
+    {
+      "sequence": 3064,
+      "at": "2026-10-07T20:58:19.102Z",
+      "kind": "transaction",
+      "data": {
+        "id": "d171e7ee-2b0b-45f6-b7e8-ec9ba1dd0b6f"
+      },
+      "previous": "64cb47eea44ccacfb1661f34272e2f498ad5d96f9de0799ef97efc7dfffd826e",
+      "digest": "9f68c247e249103de2d52b87dfcf6cce8614a4da2c204efc304c1380347ae45b"
     }
   ]
 }
