@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1506,
+  "revision": 1508,
   "tasks": {
     "98": {
       "number": 98,
@@ -7056,7 +7056,7 @@
           "protocol": 46
         }
       },
-      "updatedAt": 1791380247485,
+      "updatedAt": 1791382815340,
       "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
       "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
       "branch": "task/T-2026-1007-0012",
@@ -7359,7 +7359,16 @@
             "digest": "f7bbf6caccc277d41c4816621a64000a606d28724839f025e83f897c21649455"
           }
         ]
-      }
+      },
+      "originalBody": "原生候选 #144 的第二次回执验证在读取当前 PR 时因 CNB 429 失败。通用 GET 现有请求、响应体与等待都受 240 秒单调总预算限制，429 有限退避并遵守更长 Retry-After；队列使用三次重试。持续限流、权限拒绝、坏证据与 source/main 漂移仍失败；写请求维持单次提交和原身份回读。\n\n任务 #145 的准确范围为五个文件：API、故障测试、队列适配器、原生 delivery-regression 配置及行为文档。原生 CI 仅在原命令末尾增加 API 故障测试，原检查名、阶段、用例和时限保留。\n\n验证：当前提交 ea3fe124f4c2543ae26b25f6bea23befe06d510f 的八项制片/脚本/类型/资产/能力检查均实际通过；新增故障用例所在原生命令共 143 项，142 通过、1 项既有 UI 车道跳过。恢复逻辑包含正常、持续限流、权限、响应体/等待超时、写入未知与主线漂移。修改前实现对四个恢复用例的实际负对照均失败，历史失败日志保留。仅修改 Growthtest 隔离副本；云端完整源与候选 CI、精确合入源码核心及真实 PG 验证仍为正式发布前置。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0012\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+      "files": [
+        "docs/AUTOMATIC-RD-DELIVERY.md",
+        "scripts/delivery/install-cnb.yml",
+        "scripts/delivery/queue-platform.mjs",
+        "scripts/tools/cnb-api.mjs",
+        "scripts/tools/cnb-api.test.mjs"
+      ],
+      "ciSince": 1791382815340
     }
   },
   "leases": {
@@ -43896,6 +43905,47 @@
       },
       "previous": "9aa189716f88ce01f1a161eeb65d2c34a541a69dfd6138f0dd8d3b974e739984",
       "digest": "8f5c4d5b4a3acd7103630361f0b02885f3bdd533c059b2ad529a2a80b557169b"
+    },
+    {
+      "sequence": 1507,
+      "at": "2026-10-07T14:20:15.340Z",
+      "kind": "task",
+      "data": {
+        "number": 146,
+        "patch": {
+          "headSha": "ea3fe124f4c2543ae26b25f6bea23befe06d510f",
+          "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+          "branch": "task/T-2026-1007-0012",
+          "intent": {
+            "taskId": "T-2026-1007-0012",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "originalBody": "原生候选 #144 的第二次回执验证在读取当前 PR 时因 CNB 429 失败。通用 GET 现有请求、响应体与等待都受 240 秒单调总预算限制，429 有限退避并遵守更长 Retry-After；队列使用三次重试。持续限流、权限拒绝、坏证据与 source/main 漂移仍失败；写请求维持单次提交和原身份回读。\n\n任务 #145 的准确范围为五个文件：API、故障测试、队列适配器、原生 delivery-regression 配置及行为文档。原生 CI 仅在原命令末尾增加 API 故障测试，原检查名、阶段、用例和时限保留。\n\n验证：当前提交 ea3fe124f4c2543ae26b25f6bea23befe06d510f 的八项制片/脚本/类型/资产/能力检查均实际通过；新增故障用例所在原生命令共 143 项，142 通过、1 项既有 UI 车道跳过。恢复逻辑包含正常、持续限流、权限、响应体/等待超时、写入未知与主线漂移。修改前实现对四个恢复用例的实际负对照均失败，历史失败日志保留。仅修改 Growthtest 隔离副本；云端完整源与候选 CI、精确合入源码核心及真实 PG 验证仍为正式发布前置。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0012\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+          "files": [
+            "docs/AUTOMATIC-RD-DELIVERY.md",
+            "scripts/delivery/install-cnb.yml",
+            "scripts/delivery/queue-platform.mjs",
+            "scripts/tools/cnb-api.mjs",
+            "scripts/tools/cnb-api.test.mjs"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791382815340
+        }
+      },
+      "previous": "8f5c4d5b4a3acd7103630361f0b02885f3bdd533c059b2ad529a2a80b557169b",
+      "digest": "01621a34574e368bc2ba5ac4e16c6d3d00c1536a2e068fc94080cdabae6fbfd9"
+    },
+    {
+      "sequence": 1508,
+      "at": "2026-10-07T14:21:27.636Z",
+      "kind": "transaction",
+      "data": {
+        "id": "d44d395a-00bb-4bce-816d-426e4b409570"
+      },
+      "previous": "01621a34574e368bc2ba5ac4e16c6d3d00c1536a2e068fc94080cdabae6fbfd9",
+      "digest": "56ea17d5de782bcd9e84c0abde4df57f7e58025e1e22865f2b046dbc6311948f"
     }
   ]
 }
