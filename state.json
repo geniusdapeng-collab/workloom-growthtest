@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 304,
+  "revision": 306,
   "tasks": {
     "98": {
       "number": 98,
@@ -2316,7 +2316,7 @@
           "protocol": 12
         }
       },
-      "updatedAt": 1791338303633,
+      "updatedAt": 1791338419356,
       "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
       "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
       "branch": "task/T-2026-1007-0003",
@@ -2509,7 +2509,20 @@
             "digest": "ec00d31441327b7edb5a1d3326bf02898fa085192105e46a71b8c0280a0f5782"
           }
         ]
-      }
+      },
+      "originalBody": "请求 10 秒的原生视频实际返回 241 帧/24fps、视频流 10.041667 秒与 AAC 元数据 10.08 秒时，原片守恒检查错误拒收。现在仅允许完整请求帧数或多一个端点帧，画面钟仍严格核对帧数/fps；AAC 元数据边界限定为两个编码帧。缺帧、增加两帧、帧率或流钟不一致仍拒绝。\n\n后期从完整原片帧数派生拼接、字幕、封面及配乐切点。新增 native-clock 拼接模式直接拷贝原视频轨，要求解码原声音轨覆盖完整画面钟，不变速、不补静音、不改写冻结原稿。\n\n验证：纯合同、实际普通入口、真实 FFmpeg 三镜拼接（315 帧且逐帧 SHA-256 与源画面一致）、短音轨及变速拒绝；video-studio 回归、类型检查、内置角色资产核验与能力导览检查通过。真实生产首镜已从供应商原任务 GET 恢复并通过时钟检查。首镜人物/服装验收仍为拒收，不将模型生成或夹具测试当作广告放行。\n\n作用范围仅本隔离仓。回滚：revert 本任务提交；不会修改原片或回流基座。\n\nCloses #122\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+      "files": [
+        "docs/capabilities.auto.json",
+        "docs/video-standard-post.md",
+        "packages/video-studio/src/standard-post-contract.test.ts",
+        "packages/video-studio/src/standard-post-contract.ts",
+        "scripts/tools/compose-film.mts",
+        "scripts/tools/compose-native-clock.test.ts",
+        "scripts/tools/film-native-post.test.ts",
+        "scripts/tools/film-standard-post.mts",
+        "scripts/tools/full-chain-film.mts"
+      ],
+      "ciSince": 1791338419356
     }
   },
   "leases": {
@@ -10639,6 +10652,53 @@
       },
       "previous": "dc715c7dcd91c83de29a7bade7d0e50642d479a04da938e4b77d8138f3d5409f",
       "digest": "66401993973f0ede7aaee80ffed2e977c76b03956dab5ba09b4ce2a59ad9fb95"
+    },
+    {
+      "sequence": 305,
+      "at": "2026-10-07T02:00:19.356Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "headSha": "d805f830a927f30df95d9cc556ef03be0ed1fa51",
+          "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
+          "branch": "task/T-2026-1007-0003",
+          "intent": {
+            "taskId": "T-2026-1007-0003",
+            "ready": true,
+            "dependsOn": [
+              118
+            ],
+            "releases": []
+          },
+          "originalBody": "请求 10 秒的原生视频实际返回 241 帧/24fps、视频流 10.041667 秒与 AAC 元数据 10.08 秒时，原片守恒检查错误拒收。现在仅允许完整请求帧数或多一个端点帧，画面钟仍严格核对帧数/fps；AAC 元数据边界限定为两个编码帧。缺帧、增加两帧、帧率或流钟不一致仍拒绝。\n\n后期从完整原片帧数派生拼接、字幕、封面及配乐切点。新增 native-clock 拼接模式直接拷贝原视频轨，要求解码原声音轨覆盖完整画面钟，不变速、不补静音、不改写冻结原稿。\n\n验证：纯合同、实际普通入口、真实 FFmpeg 三镜拼接（315 帧且逐帧 SHA-256 与源画面一致）、短音轨及变速拒绝；video-studio 回归、类型检查、内置角色资产核验与能力导览检查通过。真实生产首镜已从供应商原任务 GET 恢复并通过时钟检查。首镜人物/服装验收仍为拒收，不将模型生成或夹具测试当作广告放行。\n\n作用范围仅本隔离仓。回滚：revert 本任务提交；不会修改原片或回流基座。\n\nCloses #122\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/standard-post-contract.test.ts",
+            "packages/video-studio/src/standard-post-contract.ts",
+            "scripts/tools/compose-film.mts",
+            "scripts/tools/compose-native-clock.test.ts",
+            "scripts/tools/film-native-post.test.ts",
+            "scripts/tools/film-standard-post.mts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791338419356
+        }
+      },
+      "previous": "66401993973f0ede7aaee80ffed2e977c76b03956dab5ba09b4ce2a59ad9fb95",
+      "digest": "7414addb2714a81b020f199bb0ec7de314991909303e8a61bbfe4c6512632339"
+    },
+    {
+      "sequence": 306,
+      "at": "2026-10-07T02:00:26.497Z",
+      "kind": "transaction",
+      "data": {
+        "id": "64a8f75f-559d-418e-ae7f-2d477ae9c497"
+      },
+      "previous": "7414addb2714a81b020f199bb0ec7de314991909303e8a61bbfe4c6512632339",
+      "digest": "739d9e6ab901f7d200e4193d7e422dc2478ab4a1f3e2e015ad7ad91560c44f08"
     }
   ]
 }
