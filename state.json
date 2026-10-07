@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 207,
+  "revision": 209,
   "tasks": {
     "98": {
       "number": 98,
@@ -1784,7 +1784,7 @@
         "owner": "admission/pr-118",
         "generation": {}
       },
-      "updatedAt": 1791334694850,
+      "updatedAt": 1791334818969,
       "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
       "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
       "branch": "task/T-2026-1007-0002",
@@ -1923,7 +1923,19 @@
         "checkSha": null,
         "hasFailedChecks": false,
         "ciPolicyChanges": []
-      }
+      },
+      "originalBody": "当前随仓出镜人物 已完成独立定妆照前置处理，出片预检仍强制要求真人主档 anchorPhoto，导致合法登记角色在渲染前被 CHARACTER_SOURCE_ANCHOR_MISSING 拦住。\n\n本次人物发布合同优先复用对应授权角色已登记、当前在用的定妆照，保留实际 SHA-256、角色主档、版本及角度，来源标为 registered-character-portrait。外部客户没有对应定妆照时仍可使用已登记原基准；无效授权、身份不对应、越界、符号链接及本次镜头自报来源继续失败。主授权素材组和生成参考不变。\n\n验证：视频工位及服务端身份回归 1,514 项，1,513 通过、1 原有跳过、0 失败；视频工位类型检查、内置角色字节校验、capabilities 生成与一致性检查通过。新增 27 个边界、错误、授权及复用用例，并把真实随仓出镜人物 回归改为默认定妆照复用。三镜头真实素材预检已通过，尚未以预检代替付费成片证据。\n\n范围：仅 Growthtest 的人物登记源、测试、三份人物文档及按仓规重生成的三份能力导览日期；任务卡 #117。回滚：revert 本提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0002\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+      "files": [
+        "README.md",
+        "bundles/ai-video/library/characters/README.md",
+        "docs/capabilities.auto.json",
+        "docs/capabilities.auto.md",
+        "docs/character-registry.md",
+        "docs/real-person-asset.md",
+        "packages/video-studio/src/character-release-source.test.ts",
+        "packages/video-studio/src/character-release-source.ts"
+      ],
+      "ciSince": 1791334818969
     },
     "119": {
       "number": 119,
@@ -7889,6 +7901,50 @@
       },
       "previous": "a84d6e5c57a96b327d9b6ca06d11f54934baec14025e2b5f6f882247d65e7753",
       "digest": "ef76e2bc2fa5b0a9f5ca75c27d007d2da5465d224562f79b08bd4caafcbd4cdb"
+    },
+    {
+      "sequence": 208,
+      "at": "2026-10-07T01:00:18.969Z",
+      "kind": "task",
+      "data": {
+        "number": 118,
+        "patch": {
+          "headSha": "4db4fc5265522a9c939ac119f427de57c9d38e37",
+          "mainSha": "c28f11cd3d200770ee15d21c4ed98176d2e6bbb9",
+          "branch": "task/T-2026-1007-0002",
+          "intent": {
+            "taskId": "T-2026-1007-0002",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "originalBody": "当前随仓出镜人物 已完成独立定妆照前置处理，出片预检仍强制要求真人主档 anchorPhoto，导致合法登记角色在渲染前被 CHARACTER_SOURCE_ANCHOR_MISSING 拦住。\n\n本次人物发布合同优先复用对应授权角色已登记、当前在用的定妆照，保留实际 SHA-256、角色主档、版本及角度，来源标为 registered-character-portrait。外部客户没有对应定妆照时仍可使用已登记原基准；无效授权、身份不对应、越界、符号链接及本次镜头自报来源继续失败。主授权素材组和生成参考不变。\n\n验证：视频工位及服务端身份回归 1,514 项，1,513 通过、1 原有跳过、0 失败；视频工位类型检查、内置角色字节校验、capabilities 生成与一致性检查通过。新增 27 个边界、错误、授权及复用用例，并把真实随仓出镜人物 回归改为默认定妆照复用。三镜头真实素材预检已通过，尚未以预检代替付费成片证据。\n\n范围：仅 Growthtest 的人物登记源、测试、三份人物文档及按仓规重生成的三份能力导览日期；任务卡 #117。回滚：revert 本提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0002\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->\n",
+          "files": [
+            "README.md",
+            "bundles/ai-video/library/characters/README.md",
+            "docs/capabilities.auto.json",
+            "docs/capabilities.auto.md",
+            "docs/character-registry.md",
+            "docs/real-person-asset.md",
+            "packages/video-studio/src/character-release-source.test.ts",
+            "packages/video-studio/src/character-release-source.ts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791334818969
+        }
+      },
+      "previous": "ef76e2bc2fa5b0a9f5ca75c27d007d2da5465d224562f79b08bd4caafcbd4cdb",
+      "digest": "f02e1b5d60582f920fc67c2c5ea1966f5e8978671daaeb39df539b2567a41d82"
+    },
+    {
+      "sequence": 209,
+      "at": "2026-10-07T01:00:20.707Z",
+      "kind": "transaction",
+      "data": {
+        "id": "07cc47e3-9767-495d-9c39-75ac51dee4c3"
+      },
+      "previous": "f02e1b5d60582f920fc67c2c5ea1966f5e8978671daaeb39df539b2567a41d82",
+      "digest": "ddc8b544d63a03d48185ac902dbfb3a720e463941ef041d8df2c88603bb789f6"
     }
   ]
 }
