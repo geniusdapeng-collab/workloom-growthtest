@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3106,
+  "revision": 3108,
   "tasks": {
     "98": {
       "number": 98,
@@ -2068,8 +2068,8 @@
         }
       },
       "updatedAt": 1791409517298,
-      "error": "Alignment retry budget exhausted",
-      "blockedUntil": 1791409512648,
+      "error": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
+      "blockedUntil": 1791410117298,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
       "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
       "branch": "task/T-2026-1007-0001",
@@ -2544,7 +2544,7 @@
         "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
         "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
         "reason": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
-        "at": 1791408912648
+        "at": 1791409517298
       },
       "recoveryIntent": null
     },
@@ -80289,6 +80289,39 @@
       },
       "previous": "3e836b2eb9dc608ac8b9149b5673963e1d25e4c02f13b5426fafa3953887ce4b",
       "digest": "d875dae7bdc8cc1872a75c7ac34865723ba4d536510f2cbe1a3182bde84c735d"
+    },
+    {
+      "sequence": 3107,
+      "at": "2026-10-07T21:45:17.298Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "reason": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
+            "at": 1791409517298
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791410117298
+        }
+      },
+      "previous": "d875dae7bdc8cc1872a75c7ac34865723ba4d536510f2cbe1a3182bde84c735d",
+      "digest": "01fe8b6281390c7a834588dc766e7d21f7a1249219b3cb751203e8e7ddb1201e"
+    },
+    {
+      "sequence": 3108,
+      "at": "2026-10-07T21:45:39.758Z",
+      "kind": "transaction",
+      "data": {
+        "id": "ef91342e-34c9-4c6c-8101-a0f76bc0d7e8"
+      },
+      "previous": "01fe8b6281390c7a834588dc766e7d21f7a1249219b3cb751203e8e7ddb1201e",
+      "digest": "8b6d3e684e28660a9c8a695eeef84189f2d6551308bc7f37c54909b220dde48c"
     }
   ]
 }
