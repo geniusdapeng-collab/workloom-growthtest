@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 2653,
+  "revision": 2655,
   "tasks": {
     "98": {
       "number": 98,
@@ -4953,7 +4953,7 @@
         "hasFailedChecks": false,
         "ciPolicyChanges": []
       },
-      "updatedAt": 1791399018910,
+      "updatedAt": 1791399308330,
       "dependencies": [
         131
       ],
@@ -69844,6 +69844,48 @@
       },
       "previous": "c064f2de1630e96a4a8abcd0b09deee7c05ff842066f4ca05d8928665292027a",
       "digest": "2345545f44324824b30f6794bfe0c5411c6c55381ab500ec8ca606fc1ea37970"
+    },
+    {
+      "sequence": 2654,
+      "at": "2026-10-07T18:55:08.330Z",
+      "kind": "task",
+      "data": {
+        "number": 133,
+        "patch": {
+          "headSha": "3ec72a7be36f22af5714b2cebc52ea89249360c3",
+          "mainSha": "79d2a11df5b1af3f4360fabd83f0e9ffe658dfe8",
+          "branch": "task/T-2026-1007-0007",
+          "intent": {
+            "taskId": "T-2026-1007-0007",
+            "ready": true,
+            "dependsOn": [
+              131
+            ],
+            "releases": []
+          },
+          "originalBody": "肖像派生 CLI 会在网络失败时重发图片 POST，并在图片结果不明时自动转入付费视频；视频任务 ID 也未跨进程保存。现在按角度和真实请求内容保存提交状态，先保存受理响应，再下载或按原任务 ID 查询。未知、5xx、畸形响应和下载失败均不转付费入口；仅明确的 400 不支持认证 asset 拒绝允许回退。旧无受理记录的缓存不盲目重新生成。\n\n验证：9 项实际函数、本地 HTTP 与独立 CLI 进程用例通过，包含图片下载失败只提交一次、视频查询失败接续、输入变更阻断和未知结果零视频回退。准确提交 c0da166012554858636e7c0edf43c5f6593a9cbe 的 8 项完整检查均退出 0。测试未调用真实生成服务。\n\n任务卡 #132；依赖 #131。仅修改 Growthtest 隔离副本。回滚 revert 本任务提交。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0007\",\n  \"ready\": true,\n  \"depends_on\": [\n    131\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-generation-idempotency.md",
+            "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+            "scripts/tools/portrait-set-from-asset.mts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791398415152
+        }
+      },
+      "previous": "2345545f44324824b30f6794bfe0c5411c6c55381ab500ec8ca606fc1ea37970",
+      "digest": "8aad65c08c0285ff0230023420ac94f51f95d1efd0eaa9cc9ff2583f8b63031e"
+    },
+    {
+      "sequence": 2655,
+      "at": "2026-10-07T18:55:12.662Z",
+      "kind": "transaction",
+      "data": {
+        "id": "da9bdc56-2f66-43fb-be44-876e8d7704fd"
+      },
+      "previous": "8aad65c08c0285ff0230023420ac94f51f95d1efd0eaa9cc9ff2583f8b63031e",
+      "digest": "9ba31f30a08b7db80ce35b3415843c4d05750b0e3976498bf1557941094a5d03"
     }
   ]
 }
