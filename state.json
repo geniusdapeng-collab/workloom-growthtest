@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1444,
+  "revision": 1446,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2068,8 +2068,8 @@
         }
       },
       "updatedAt": 1791380384214,
-      "error": "CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/119 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791374090898,
+      "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous",
+      "blockedUntil": 1791380984214,
       "headSha": "0854ce12453a575b26386f135af3ef093aa71124",
       "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
       "branch": "task/T-2026-1007-0001",
@@ -2808,10 +2808,10 @@
       },
       "repairRequired": {
         "provider": "codex",
-        "headSha": "96f3e89cc3da1207eff027a2a0269f38d05e0a12",
-        "mainSha": "04d2403897ad0edf0227f96fe5bed150581b41d0",
-        "reason": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
-        "at": 1791373416070
+        "headSha": "0854ce12453a575b26386f135af3ef093aa71124",
+        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous",
+        "at": 1791380384214
       },
       "recoveryIntent": null
     },
@@ -42388,6 +42388,39 @@
       },
       "previous": "1f06699d21d3500dc433f3c195e2b6bb2a92cae91edb9913b058d1b68520f946",
       "digest": "81004099fc73448010f64101216dec5b0fc2501987647556e0c2cce4249ae190"
+    },
+    {
+      "sequence": 1445,
+      "at": "2026-10-07T13:39:44.214Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Required check test-gate missing/failed/ambiguous",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "0854ce12453a575b26386f135af3ef093aa71124",
+            "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "reason": "检查/评审阻断：Required check test-gate missing/failed/ambiguous",
+            "at": 1791380384214
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791380984214
+        }
+      },
+      "previous": "81004099fc73448010f64101216dec5b0fc2501987647556e0c2cce4249ae190",
+      "digest": "119d56a6deb9a06df55f5709f328e46ee1beb82dc79e45b6cb6cf325d9ba088c"
+    },
+    {
+      "sequence": 1446,
+      "at": "2026-10-07T13:39:57.348Z",
+      "kind": "transaction",
+      "data": {
+        "id": "1e72ad47-685d-4323-b6ae-04295b8b6df9"
+      },
+      "previous": "119d56a6deb9a06df55f5709f328e46ee1beb82dc79e45b6cb6cf325d9ba088c",
+      "digest": "112d0dff600ad089c8f76f3061e2e82547c9f4584f2f54cea6c20c63e9820a6b"
     }
   ]
 }
