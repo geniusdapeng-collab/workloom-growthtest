@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3035,
+  "revision": 3038,
   "tasks": {
     "98": {
       "number": 98,
@@ -5899,7 +5899,7 @@
     },
     "139": {
       "number": 139,
-      "status": "waiting_ci",
+      "status": "merging",
       "firstSeen": 1791358510932,
       "attempts": {},
       "error": "主干对齐失败：Command failed: git merge --no-ff --no-edit 8256e6c0c99f32b80e5071f89f38be932e38e15f\n",
@@ -6106,6 +6106,86 @@
         "owner": "admission/pr-139",
         "generation": {
           "protocol": 83
+        }
+      },
+      "mergePhase": "prepared",
+      "mergeSnapshot": {
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 155,
+        "pull": {
+          "number": 155,
+          "state": "open",
+          "title": "chore(ci): deliver #139 fix(video): 正式封面来源链与RGB测量失败关闭 [T-2026-1007-0010]",
+          "body": "Immutable delivery candidate for #139. Exact source 51200b22af022c458806bd43ec7b850f0b258714; tested main 8256e6c0c99f32b80e5071f89f38be932e38e15f.\n\n<!-- delivery-origin:139:51200b22af022c458806bd43ec7b850f0b258714:8256e6c0c99f32b80e5071f89f38be932e38e15f -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[137],\"releases\":[]}\n-->",
+          "author": {
+            "username": "OCI",
+            "nickname": "Cloud Native Build",
+            "is_npc": true
+          },
+          "reviewers": [],
+          "labels": [],
+          "base": {
+            "ref": "refs/heads/main",
+            "sha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "head": {
+            "ref": "refs/heads/delivery/candidate/pr-139-4b25d51fd50fecec0bc2b51b3ec8cf57",
+            "sha": "51200b22af022c458806bd43ec7b850f0b258714",
+            "repo": {
+              "id": "2101830819702788096",
+              "name": "workloom-growthtest",
+              "path": "workloom-ai/workloom-growthtest",
+              "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+            }
+          },
+          "blocked_on": "unblocked",
+          "merged_by": {
+            "is_npc": false
+          },
+          "mergeable_state": "mergeable",
+          "is_wip": false,
+          "is_merged": false,
+          "is_force_merged": false,
+          "statuses": {}
+        },
+        "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
+        "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+        "files": [
+          "docs/capabilities.auto.json",
+          "docs/video-standard-post.md",
+          "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+          "scripts/tools/full-chain-film.mts"
+        ],
+        "intent": {
+          "taskId": "T-2026-1007-0010",
+          "ready": true,
+          "dependsOn": [
+            137
+          ],
+          "releases": []
+        },
+        "headTime": 1791405128000,
+        "mergeBase": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+        "checkErrors": [],
+        "checkSha": "3afaf703900b4c073f6daeeef6ddfece6bf3e457",
+        "hasFailedChecks": false,
+        "ciPolicyChanges": [],
+        "originNumber": 139,
+        "pendingDependencies": []
+      },
+      "integrationLease": {
+        "owner": "integration/pr-139",
+        "scopes": [
+          "protocol"
+        ],
+        "generation": {
+          "protocol": 85
         }
       }
     },
@@ -7282,10 +7362,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": null,
-      "generation": 84,
-      "acquiredAt": 1791405985044,
-      "expiresAt": 1791405985044
+      "owner": "integration/pr-139",
+      "generation": 85,
+      "acquiredAt": 1791406514902,
+      "expiresAt": 1791407414902
     },
     "dependencies": {
       "owner": null,
@@ -78273,6 +78353,125 @@
       },
       "previous": "6919cb324e36a93146cfea94d1704df17ac439b6c5a4af8557c36f1887417960",
       "digest": "187c43f8519c80da77d06ae9b7e026c85c2696bce3d37ad47c7ac736d6359c66"
+    },
+    {
+      "sequence": 3036,
+      "at": "2026-10-07T20:55:14.902Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-139",
+        "generation": {
+          "protocol": 85
+        }
+      },
+      "previous": "187c43f8519c80da77d06ae9b7e026c85c2696bce3d37ad47c7ac736d6359c66",
+      "digest": "81fd111b7e1d4a48fae7b08771e1a49cfec58a0dcadbf1698eaab895a34492df"
+    },
+    {
+      "sequence": 3037,
+      "at": "2026-10-07T20:55:14.902Z",
+      "kind": "task",
+      "data": {
+        "number": 139,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 155,
+            "pull": {
+              "number": 155,
+              "state": "open",
+              "title": "chore(ci): deliver #139 fix(video): 正式封面来源链与RGB测量失败关闭 [T-2026-1007-0010]",
+              "body": "Immutable delivery candidate for #139. Exact source 51200b22af022c458806bd43ec7b850f0b258714; tested main 8256e6c0c99f32b80e5071f89f38be932e38e15f.\n\n<!-- delivery-origin:139:51200b22af022c458806bd43ec7b850f0b258714:8256e6c0c99f32b80e5071f89f38be932e38e15f -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[137],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-139-4b25d51fd50fecec0bc2b51b3ec8cf57",
+                "sha": "51200b22af022c458806bd43ec7b850f0b258714",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "51200b22af022c458806bd43ec7b850f0b258714",
+            "mainSha": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+            "files": [
+              "docs/capabilities.auto.json",
+              "docs/video-standard-post.md",
+              "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+              "scripts/tools/full-chain-film.mts"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0010",
+              "ready": true,
+              "dependsOn": [
+                137
+              ],
+              "releases": []
+            },
+            "headTime": 1791405128000,
+            "mergeBase": "8256e6c0c99f32b80e5071f89f38be932e38e15f",
+            "checkErrors": [],
+            "checkSha": "3afaf703900b4c073f6daeeef6ddfece6bf3e457",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [],
+            "originNumber": 139,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-139",
+            "scopes": [
+              "protocol"
+            ],
+            "generation": {
+              "protocol": 85
+            }
+          }
+        }
+      },
+      "previous": "81fd111b7e1d4a48fae7b08771e1a49cfec58a0dcadbf1698eaab895a34492df",
+      "digest": "de343299184b6c5e9a7566dff95564305ad6df88a867074aeb5340366969eceb"
+    },
+    {
+      "sequence": 3038,
+      "at": "2026-10-07T20:56:23.407Z",
+      "kind": "transaction",
+      "data": {
+        "id": "fa49518c-8d6a-4ef3-805f-8de934738e7b"
+      },
+      "previous": "de343299184b6c5e9a7566dff95564305ad6df88a867074aeb5340366969eceb",
+      "digest": "b1d0f075fc023d476712e9b36f27a0a63fa2cb920e0d0e62f0f822b45f436f5b"
     }
   ]
 }
