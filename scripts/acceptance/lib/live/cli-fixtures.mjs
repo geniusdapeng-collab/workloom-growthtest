@@ -1,13 +1,17 @@
 /** Isolated, committed fixture repositories for real CLI tests; credentials are synthetic. */
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const source = fileURLToPath(new URL("../../../../", import.meta.url));
-const closure = ["scripts/acceptance/live.mjs", "scripts/acceptance/lib/profile.mjs", "scripts/acceptance/lib/target.mjs", "scripts/acceptance/lib/playwright.mjs", "scripts/delivery/evidence.mjs", ...["assertions", "audit.plugin", "budget", "checks", "media", "providers", "stub-provider", "test-fixtures", "usage", "verification"].map((name) => `scripts/acceptance/lib/live/${name}.mjs`)];
+const pnpmModules = join(source, "node_modules", ".pnpm");
+const browserModulePaths = existsSync(pnpmModules) ? readdirSync(pnpmModules)
+  .filter(name => name.startsWith("playwright@") || name.startsWith("@playwright+test@"))
+  .map(name => join(pnpmModules, name, "node_modules")) : [];
+const closure = ["packages/video-studio/src/generation-submission.mjs","scripts/acceptance/live.mjs", "scripts/acceptance/lib/profile.mjs", "scripts/acceptance/lib/target.mjs", "scripts/acceptance/lib/playwright.mjs", "scripts/delivery/evidence.mjs", ...["assertions", "audit.plugin", "budget", "live-budget-scope", "checks", "media", "providers", "stub-provider", "test-fixtures", "usage", "verification"].map((name) => `scripts/acceptance/lib/live/${name}.mjs`)];
 export const model = { id: "synthetic-model", kind: "llm", model: "synthetic-model", adapter: "model-gateway", apiKeyEnv: "SYNTHETIC_API_KEY", baseUrlEnv: "SYNTHETIC_BASE_URL" };
 export const llm = { id: "LLM-R1", kind: "llm", model: model.id, chain: "model-gateway", title: "synthetic reasoning", prompt: "synthetic", expect: ["STUB"] };
 export function fixture(t, overrides = {}) {
@@ -21,10 +25,13 @@ export function fixture(t, overrides = {}) {
   }
   return { repo, out: join(repo, "outputs/acceptance/live") };
 }
+export function fixtureNodePath(extraEnv = {}) {
+  return [...new Set([join(source, "node_modules"), ...browserModulePaths, ...[process.env.NODE_PATH, extraEnv.NODE_PATH].flatMap((value) => typeof value === "string" ? value.split(delimiter).filter(Boolean) : [])])].join(delimiter);
+}
 export function run(f, flags = [], extraEnv = {}, { timeoutMs = 60_000 } = {}) {
   // The committed temporary repo contains source only. Resolve browser packages
   // from this test's installed root without copying dependencies or ambient keys.
-  const nodePath = [...new Set([join(source, "node_modules"), ...[process.env.NODE_PATH, extraEnv.NODE_PATH].flatMap((value) => typeof value === "string" ? value.split(delimiter).filter(Boolean) : [])])].join(delimiter);
+  const nodePath = fixtureNodePath(extraEnv);
   return spawnSync(process.execPath, [join(f.repo, "scripts/acceptance/live.mjs"), "--out", f.out, "--no-auto-keys", "--no-keys-from-client", ...flags], { cwd: f.repo, encoding: "utf8", timeout: timeoutMs, maxBuffer: 1024 * 1024,
     env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: tmpdir(), ...(process.env.PLAYWRIGHT_BROWSERS_PATH ? { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH } : {}), ...extraEnv, NODE_PATH: nodePath } });
 }

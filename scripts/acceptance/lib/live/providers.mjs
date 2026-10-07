@@ -20,8 +20,9 @@
  * fail-closed：永不在凭据缺失时用 mock 顶替并写“通过”——一律返回 status=blocked 并列出缺失项。
  */
 import { spawn } from "node:child_process";
+import { submitGenerationOnce } from "../../../../packages/video-studio/src/generation-submission.mjs";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, lstatSync } from "node:fs";
 import { delimiter, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { maskSecret } from "../target.mjs";
 import { createBudget, LIVE_BUDGET_CAPS } from "./budget.mjs";
@@ -440,8 +441,29 @@ function supportsSequentialImageGeneration(model) {
   return false;
 }
 
+/** Bind one durable media task/manifest before any external I/O. */
+function mediaSubmissionDirectory(artifactsDir, task, kind, resolved, resumeOnly) {
+  if (typeof artifactsDir !== "string" || !artifactsDir.trim()) throw new Error("生成前必须提供持久化 artifactsDir，禁止无账本付费调用");
+  mkdirSync(artifactsDir, { recursive: true });
+  if (lstatSync(artifactsDir).isSymbolicLink() || !lstatSync(artifactsDir).isDirectory()) throw new Error("生成产物目录必须为普通目录");
+  const dir = join(artifactsDir, ".submissions");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  if (lstatSync(dir).isSymbolicLink() || !lstatSync(dir).isDirectory()) throw new Error("生成受理目录必须为普通目录");
+  const scopeFile = join(dir, `${task.id}.${kind}.scope.json`);
+  const scope = { schemaVersion: "workloom.live-generation-scope/v1", kind, requestHash: createHash("sha256").update(JSON.stringify({ task, model: resolved.model, endpoint: resolved.baseUrl })).digest("hex") };
+  if (!existsSync(scopeFile)) {
+    if (resumeOnly) throw new Error("此前已有预算预占但缺少提交来源，只能核对供应商，不得重发POST");
+    try { writeFileSync(scopeFile, JSON.stringify(scope), { flag: "wx", mode: 0o600 }); }
+    catch (error) { if (error.code !== "EEXIST") throw error; }
+  }
+  const stat = lstatSync(scopeFile);
+  if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink !== 1 || readFileSync(scopeFile, "utf8") !== JSON.stringify(scope)) throw new Error("同一生成任务的输入/模型已经变化或来源日志损坏，禁止重复付费");
+  return dir;
+}
+const forbidNewSubmission = resumeOnly => () => { if (resumeOnly) throw new Error("预算接续只能GET或复用已受理响应，禁止新的生成POST"); };
+
 /** 生图（同步 API）：POST {base}/images/generations → data[].url */
-export async function runImageTask({ resolved, task, timeoutMs = 300_000, env = process.env, artifactsDir }) {
+export async function runImageTask({ resolved, task, timeoutMs = 300_000, env = process.env, artifactsDir, resumeOnly = false }) {
   const preflight = (reason) => ({ status: "blocked", called: false, measurementComplete: false, produced: null, reason });
   if (!resolved?.ready) return preflight(resolved?.missing?.join("；") ?? "图片模型未配置");
   try { assertSafeTaskId(task.id); } catch (error) { return preflight(error.message); }
@@ -453,25 +475,27 @@ export async function runImageTask({ resolved, task, timeoutMs = 300_000, env = 
   if (["model", "prompt", "response_format", "sequential_image_generation", "sequential_image_generation_options", "n"].some((key) => Object.hasOwn(task.params ?? {}, key))) {
     return preflight("图片 params 不得覆盖模型、内容或已占额的生成数量");
   }
+  let submissionDir;
+  try { submissionDir = mediaSubmissionDirectory(artifactsDir, task, "image", resolved, resumeOnly); } catch (error) { return preflight(error.message); }
   const started = Date.now();
   const groupable = count > 1 && supportsSequentialImageGeneration(resolved.model);
   const urls = [];
   const generationUsage = [];
   let produced = 0;
-  let calls = 0;
+  let calls = 0; let submittedCalls = 0; let resumedCalls = 0;
   let lastJson = null;
   const finish = (status, reason, measurementComplete, artifacts = []) => {
     const models = generationUsage.map((row) => row.model);
     const model = measurementComplete && models.length > 0 && models.every((value) => value && value === models[0]) ? models[0] : null;
     if (status === "ok" && !model) { status = "failed"; reason = "生成/交付已完成，但缺少各轮一致的供应商实际返回模型，不能借请求配置证明路由"; }
     return {
-    status, reason, called: calls > 0, measurementComplete,
+    status, reason, called: calls > 0, submittedCalls, resumedCalls, measurementComplete,
     ms: Date.now() - started, model, requestedModel: resolved.model, calls,
     produced: measurementComplete ? produced : null,
     knownProduced: produced, observedProduced: urls.length, artifacts,
     receipt: {
       kind: "gen-http.image", model, requestedModel: resolved.model, endpoint: `${base}/images/generations`,
-      created: lastJson?.created ?? null, urls: urls.map(publicArtifactUrl), calls,
+      created: lastJson?.created ?? null, urls: urls.map(publicArtifactUrl), calls, submittedCalls, resumedCalls,
       requested: count, produced: measurementComplete ? produced : null,
       knownProduced: produced, observedProduced: urls.length,
       measurementComplete, measurementSource: measurementComplete ? "usage.generated_images" : null,
@@ -481,11 +505,10 @@ export async function runImageTask({ resolved, task, timeoutMs = 300_000, env = 
     };
   };
   /** 一次调用：组图模型一轮出 N 张；不支持组图的模型（如 5.0 pro）逐张调用 N 轮 */
-  async function callOnce(sequential) {
+  async function callOnce(sequential, round) {
     let res;
     try {
-      res = await fetch(`${base}/images/generations`, {
-        method: "POST",
+      const submitted = await submitGenerationOnce({ endpoint: `${base}/images/generations`, journalFile: join(submissionDir, `${task.id}.image.${round + 1}.json`), fetchImpl: fetch, beforeSubmit: forbidNewSubmission(resumeOnly),
         headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
         body: JSON.stringify({
           model: resolved.model,
@@ -496,9 +519,11 @@ export async function runImageTask({ resolved, task, timeoutMs = 300_000, env = 
           ...(sequential ? { sequential_image_generation: "auto", sequential_image_generation_options: { max_images: count } } : {}),
           ...(task.params ?? {}),
         }),
-        signal: AbortSignal.timeout(timeoutMs),
+        timeoutMs,
       });
+      res = submitted.response; submittedCalls += submitted.called ? 1 : 0; resumedCalls += submitted.resumed ? 1 : 0;
     } catch (err) {
+      submittedCalls += err?.called === true ? 1 : 0;
       return { error: `生图调用失败/超时，实际张数未验证：${String(err?.message ?? err).slice(0, 200)}`, urls: [], measurementComplete: false };
     }
     const text = await res.text().catch(() => "");
@@ -519,7 +544,7 @@ export async function runImageTask({ resolved, task, timeoutMs = 300_000, env = 
 
   const rounds = groupable ? 1 : Math.max(1, count);
   for (let round = 0; round < rounds; round += 1) {
-    const r = await callOnce(groupable);
+    const r = await callOnce(groupable, round);
     calls += 1;
     urls.push(...r.urls);
     // Partial/contradictory replies retain every observed lower bound while the
@@ -548,7 +573,7 @@ export async function runImageTask({ resolved, task, timeoutMs = 300_000, env = 
 }
 
 /** 生视频（异步任务制）：POST {base}/contents/generations/tasks → GET …/tasks/{id} */
-export async function runVideoTask({ resolved, task, timeoutMs = 20 * 60_000, env = process.env, artifactsDir, pollMs = 8000 }) {
+export async function runVideoTask({ resolved, task, timeoutMs = 20 * 60_000, env = process.env, artifactsDir, pollMs = 8000, resumeOnly = false }) {
   const preflight = (reason) => ({ status: "blocked", called: false, measurementComplete: false, durationSeconds: null, reason });
   if (!resolved?.ready) return preflight(resolved?.missing?.join("；") ?? "视频模型未配置");
   try { assertSafeTaskId(task.id); } catch (error) { return preflight(error.message); }
@@ -558,19 +583,21 @@ export async function runVideoTask({ resolved, task, timeoutMs = 20 * 60_000, en
   const duration = Number(task.durationSeconds ?? 12);
   if (!Number.isFinite(duration) || duration < LIVE_BUDGET_CAPS.minVideoSeconds || duration > LIVE_BUDGET_CAPS.maxVideoSeconds) return preflight("视频时长超出配额允许范围");
   if (["model", "content", "duration"].some((key) => Object.hasOwn(task.params ?? {}, key))) return preflight("视频 params 不得覆盖模型、内容或已占额时长");
+  let submissionDir;
+  try { submissionDir = mediaSubmissionDirectory(artifactsDir, task, "video", resolved, resumeOnly); } catch (error) { return preflight(error.message); }
   const started = Date.now();
+  let submittedCalls = 0; let resumed = false;
   let taskId = null;
   let last = null;
   let actualModel = null;
-  const unknown = (reason) => ({ status: "blocked", reason, called: true, measurementComplete: false,
+  const unknown = (reason) => ({ status: "blocked", reason, called: true, submittedCalls, resumed, measurementComplete: false,
     ms: Date.now() - started, model: actualModel, requestedModel: resolved.model, taskId, durationSeconds: null, artifacts: [],
-    receipt: { kind: "gen-http.video", model: actualModel, requestedModel: resolved.model, endpoint: `${base}/contents/generations/tasks`, taskId,
+    receipt: { kind: "gen-http.video", submittedCalls, resumed, model: actualModel, requestedModel: resolved.model, endpoint: `${base}/contents/generations/tasks`, taskId,
       durationSeconds: null, reportedDurationSeconds: last?.duration ?? last?.data?.duration ?? null,
       measurementComplete: false, measurementSource: null, artifacts: [], synced: false, verified_at: new Date().toISOString() } });
   let submit;
   try {
-    submit = await fetch(`${base}/contents/generations/tasks`, {
-      method: "POST",
+    const submitted = await submitGenerationOnce({ endpoint: `${base}/contents/generations/tasks`, journalFile: join(submissionDir, `${task.id}.video.json`), fetchImpl: fetch, beforeSubmit: forbidNewSubmission(resumeOnly),
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
         model: resolved.model,
@@ -581,9 +608,11 @@ export async function runVideoTask({ resolved, task, timeoutMs = 20 * 60_000, en
         generate_audio: task.generateAudio ?? false,
         ...(task.params ?? {}),
       }),
-      signal: AbortSignal.timeout(Math.max(1, Math.min(timeoutMs, 120_000))),
+      timeoutMs: Math.max(1, Math.min(timeoutMs, 120_000)),
     });
+    submit = submitted.response; submittedCalls = submitted.called ? 1 : 0; resumed = submitted.resumed;
   } catch (err) {
+    submittedCalls = err?.called === true ? 1 : 0;
     return unknown(`视频提交失败/超时，实际时长未验证：${String(err?.message ?? err).slice(0, 200)}`);
   }
   const submitText = await submit.text().catch(() => "");
@@ -621,7 +650,7 @@ export async function runVideoTask({ resolved, task, timeoutMs = 20 * 60_000, en
       return {
         status: complete ? "ok" : !measurementComplete || delivery.status === "blocked" ? "blocked" : "failed",
         reason: !delivery.ok ? delivery.reason : !validDuration ? "视频真实时长超出允许范围" : !actualModel ? "视频没有返回可核验的实际模型，不能借请求配置证明路由" : undefined,
-        called: true,
+        called: true, submittedCalls, resumed,
         measurementComplete,
         ms: Date.now() - started,
         model: actualModel,
@@ -630,7 +659,7 @@ export async function runVideoTask({ resolved, task, timeoutMs = 20 * 60_000, en
         artifacts,
         durationSeconds,
         receipt: {
-          kind: "gen-http.video",
+          kind: "gen-http.video", submittedCalls, resumed,
           model: actualModel,
           requestedModel: resolved.model,
           endpoint: `${base}/contents/generations/tasks`,

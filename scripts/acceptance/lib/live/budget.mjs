@@ -111,6 +111,7 @@ export function createBudget({ budgets: declaredBudgets, outDir, environmentKind
     if (existsSync(ledgerPath) && (!lstatSync(ledgerPath).isFile() || lstatSync(ledgerPath).isSymbolicLink() || lstatSync(ledgerPath).nlink !== 1)) throw new Error("预算账本必须是独立普通文件，不能通过链接替换");
     if (existsSync(ledgerPath) && ((lstatSync(ledgerPath).mode & 0o444) === 0 || (lstatSync(ledgerPath).mode & 0o222) === 0)) throw new Error("预算账本没有可读写权限，尚未占额");
     const text = existsSync(ledgerPath) ? readFileSync(ledgerPath, "utf-8") : "";
+    if (text && !text.endsWith("\n")) throw new Error("预算账本末行缺少换行；禁止追加或付费调用，需先对账");
     const records = text.split("\n").filter(Boolean).map((line) => JSON.parse(line));
     if (runId === "default" && records.some((row) => !row.runId)) throw new Error("旧预算账本缺少 runId，不能安全恢复；请使用新运行标识");
     const rows = records.filter((row) => row.runId === runId);
@@ -200,11 +201,11 @@ export function createBudget({ budgets: declaredBudgets, outDir, environmentKind
    */
   function reserve({ taskId, reservationId = taskId, kind, units = 0, tokens = 0, detail = "" }) {
     return locked(() => {
+      const state = replay();
       const args = { taskId, reservationId, kind, units, tokens };
       if (!identify(args) || !number(units) || !integer(tokens) || (kind === "llm" && tokens === 0) || (kind === "image" && (!integer(units) || units === 0))) {
         return deny("reserve", args, "占额参数无效：任务/幂等键/模态/数量必须明确且为有限非负值");
       }
-      const state = replay();
       const prior = state.reservations.get(reservationId);
       if (prior) {
         const same = prior.taskId === taskId && prior.kind === kind && prior.units === units && prior.tokens === tokens;
@@ -231,11 +232,11 @@ export function createBudget({ budgets: declaredBudgets, outDir, environmentKind
   /** 回填实际用量：实际超过预估的部分补记；实际少于预估**不退还**（保守口径，防超支） */
   function commit({ taskId, reservationId = taskId, kind, units = 0, tokens = 0, calls = kind === "llm" ? 1 : 0, costCny = null, measured = false, status = "ok", detail = "" }) {
     return locked(() => {
+      const state = replay();
       const args = { taskId, reservationId, kind, units, tokens, calls, costCny, measured, status };
       if (!identify(args) || !number(units) || !integer(tokens) || !integer(calls) || (kind !== "llm" && calls !== 0) || typeof measured !== "boolean" || (costCny !== null && !number(costCny)) || !["ok", "failed", "blocked"].includes(status)) {
         return deny("commit", args, "结算参数无效；原预占继续保守计量");
       }
-      const state = replay();
       const prior = state.reservations.get(reservationId);
       if (!prior || prior.taskId !== taskId || prior.kind !== kind) return deny("commit", args, "没有匹配的已放行占额；禁止凭空结算");
       if (prior.settlement) {

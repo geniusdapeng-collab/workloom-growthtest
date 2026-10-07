@@ -1,12 +1,14 @@
 /** Actual CLI + loopback HTTP; all provider keys/data are synthetic and no external calls occur. */
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { fixture, llm, model, report, run } from "./cli-fixtures.mjs";
+import { fixture, fixtureNodePath, llm, model, report, run } from "./cli-fixtures.mjs";
+import { PNG_BYTES, MP4_BYTES } from "./test-fixtures.mjs";
+import { createBudget } from "./budget.mjs";
 
 async function server(t, reply) {
   const calls = []; const instance = http.createServer(async (req, res) => {
@@ -21,7 +23,7 @@ async function server(t, reply) {
 
 function child(f, flags = [], extraEnv = {}) {
   return new Promise((resolve, reject) => {
-    const proc = spawn(process.execPath, [join(f.repo, "scripts/acceptance/live.mjs"), "--out", f.out, "--no-auto-keys", "--no-keys-from-client", ...flags], { cwd: f.repo, env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: tmpdir(), NODE_PATH: process.env.NODE_PATH ?? "", ...extraEnv } });
+    const proc = spawn(process.execPath, [join(f.repo, "scripts/acceptance/live.mjs"), "--out", f.out, "--no-auto-keys", "--no-keys-from-client", ...flags], { cwd: f.repo, env: { PATH: process.env.PATH ?? "/usr/bin:/bin", HOME: tmpdir(), ...(process.env.PLAYWRIGHT_BROWSERS_PATH ? { PLAYWRIGHT_BROWSERS_PATH: process.env.PLAYWRIGHT_BROWSERS_PATH } : {}), ...extraEnv, NODE_PATH: fixtureNodePath(extraEnv) } });
     let stdout = ""; let stderr = ""; const timer = setTimeout(() => { proc.kill("SIGKILL"); reject(new Error("synthetic CLI child timeout")); }, 30_000);
     proc.stdout.on("data", (data) => { stdout += data; }); proc.stderr.on("data", (data) => { stderr += data; });
     proc.on("error", (error) => { clearTimeout(timer); reject(error); }); proc.on("close", (status) => { clearTimeout(timer); resolve({ status, stdout, stderr }); });
@@ -48,7 +50,7 @@ test("live CLI wire: missing media usage freezes later paid tasks, retains reser
   const result = await child(f, [], { CUSTOM_MODEL_ACCESS: secret, SYNTHETIC_BASE_URL: s.url }); assert.equal(result.status, 2, result.stderr);
   const actual = report(f); assert.equal(actual.tasks[0].status, "blocked"); assert.equal(actual.tasks[1].status, "blocked"); assert.equal(actual.budget.measurementComplete, false);
   assert.equal(actual.budget.actual.images, 0); assert.equal(actual.budget.unmeasured.images, 1); assert.equal(actual.budget.used.images, 1); assert.equal(s.calls.filter((call) => call.url === "/images/generations").length, 1);
-  assert.equal(actual.secretScan.passed, true); assert.equal(actual.tasks[0].reason.includes("[REDACTED]"), true);
+  assert.equal(actual.secretScan.passed, true); assert.equal(actual.tasks[0].reason.includes(secret), false);
   for (const value of [JSON.stringify(actual), result.stdout, result.stderr, readFileSync(join(f.out, "transcripts/IMG-01.json"), "utf8"), readFileSync(join(f.out, "receipts/IMG-01.json"), "utf8"), readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8")]) assert.equal(value.includes(secret), false);
 });
 
@@ -90,11 +92,15 @@ async function mediaServer(t, mode) {
       if (mode === "image-echo-key") return json(403, { error: `synthetic echoed credential ${String(req.headers.authorization ?? "").replace(/^Bearer /u, "")}` });
       if (mode === "image-network") return req.socket.destroy();
       if (mode === "image-http" || mode === "image-partial" && calls.filter((call) => call.url === req.url).length > 1) return json(403, { error: "synthetic image denied" });
-      return json(200, { model: input.model, usage: mode === "image-missing-usage" ? undefined : { generated_images: 1 }, data: [{ url: `${url}/unreadable.png` }] });
+      return json(200, { model: input.model, usage: mode === "image-missing-usage" ? undefined : { generated_images: 1 }, data: [{ url: `${url}/${mode === "media-ok" ? "synthetic" : "unreadable"}.png` }] });
     }
     if (req.url === "/contents/generations/tasks") return mode === "video-submit-http" ? json(403, { error: "synthetic submit denied" }) : json(200, { id: "synthetic-video-1" });
     if (req.url === "/contents/generations/tasks/synthetic-video-1") return mode === "video-poll-http" ? json(403, { error: "synthetic poll denied" })
-      : json(200, { id: "synthetic-video-1", status: "succeeded", duration: 12, content: mode === "video-no-url" ? {} : { video_url: `${url}/unreadable.mp4` } });
+      : json(200, { id: "synthetic-video-1", status: "succeeded", model: mode === "media-ok" ? model.model : undefined, duration: 12, content: mode === "video-no-url" ? {} : { video_url: `${url}/${mode === "media-ok" ? "synthetic" : "unreadable"}.mp4` } });
+    if (req.url === "/synthetic.png" || req.url === "/synthetic.mp4") {
+      const image = req.url.endsWith(".png"); const bytes = image ? PNG_BYTES : MP4_BYTES;
+      res.writeHead(200, { "content-type": image ? "image/png" : "video/mp4", "content-length": bytes.length }); return res.end(bytes);
+    }
     if (req.url.startsWith("/unreadable.")) return json(403, { error: "synthetic delivery denied" });
     if (req.url === "/chat/completions") return json(200, { id: "synthetic-chat-media", model: input.model, choices: [{ message: { content: "STUB exact usage" } }], usage: { prompt_tokens: 7, completion_tokens: 3, total_tokens: 10 } });
     return json(200, { ok: true });
@@ -133,4 +139,78 @@ test("live CLI media budget: known supplier image usage is retained even if deli
   const actual = report(f); assert.equal(actual.tasks[0].status, "failed"); assert.equal(actual.tasks[0].measurementComplete, true); assert.equal(actual.tasks[0].receipt.synced, false);
   assert.equal(actual.budget.actual.images, 2); assert.equal(actual.budget.unmeasured.images, 0); assert.equal(actual.budget.measurementComplete, true); assert.deepEqual(actual.budget.frozenBy, []);
   assert.equal(actual.tasks[1].status, "failed"); assert.equal(actual.tasks[1].measurementComplete, true); assert.equal(s.calls.filter((call) => call.url === "/images/generations").length, 2);
+});
+
+
+test("live CLI duplicate spend: re-running a settled task never POSTs or alters its original receipt/settlement", async (t) => {
+  const s = await mediaServer(t, "image-known-usage"); const f = fixture(t, mediaProfile(s.url, [imageTask]));
+  const env = { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: s.url };
+  await child(f, [], env);
+  const receipt = readFileSync(join(f.out, "receipts/IMG-01.json"), "utf8"); const ledger = readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8");
+  await child(f, [], env); const actual = report(f);
+  assert.equal(s.calls.filter(call => call.url === "/images/generations").length, 1);
+  assert.equal(actual.tasks[0].status, "blocked"); assert.equal(actual.tasks[0].called, false); assert.equal(actual.tasks[0].budgetAlreadySettled, true);
+  assert.equal(readFileSync(join(f.out, "receipts/IMG-01.json"), "utf8"), receipt);
+  assert.equal(readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8"), ledger); assert.equal(actual.budget.actual.images, 1);
+});
+
+test("live CLI duplicate spend: a frozen unknown POST outcome remains unknown on rerun, without another HTTP POST", async (t) => {
+  const s = await mediaServer(t, "image-network"); const f = fixture(t, mediaProfile(s.url, [imageTask]));
+  const env = { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: s.url };
+  await child(f, [], env); await child(f, [], env);
+  assert.equal(s.calls.filter(call => call.url === "/images/generations").length, 1);
+  const actual = report(f); assert.equal(actual.tasks[0].status, "blocked"); assert.equal(actual.budget.unmeasured.images, 1); assert.equal(actual.budget.measurementComplete, false);
+});
+
+for (const task of [imageTask, videoTask]) {
+  test(`live CLI receipt history: ${task.kind} success survives a later missing-credential early return`, async (t) => {
+    const s = await mediaServer(t, "media-ok"); const f = fixture(t, mediaProfile(s.url, [task]));
+    const first = await child(f, [], { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: s.url });
+    const original = report(f); assert.equal(first.status, 2, first.stderr); assert.equal(original.tasks[0].status, "ok", original.tasks[0].reason);
+    assert.equal(original.tasks[0].receipt.synced, true); assert.equal(original.budget.reservations[0].settlement.measured, true);
+    const receiptPath = join(f.out, "receipts", `${task.id}.json`); const transcriptPath = join(f.out, "transcripts", `${task.id}.json`);
+    const receipt = readFileSync(receiptPath, "utf8"); const transcript = readFileSync(transcriptPath, "utf8"); const ledger = readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8");
+    const postCount = s.calls.filter(call => call.method === "POST").length;
+    const second = await child(f, [], { SYNTHETIC_BASE_URL: s.url }); assert.equal(second.status, 2, second.stderr);
+    const actual = report(f); const stopped = actual.tasks[0]; assert.equal(stopped.status, "blocked"); assert.equal(stopped.called, false); assert.match(stopped.reason, /SYNTHETIC_API_KEY/);
+    assert.equal(s.calls.filter(call => call.method === "POST").length, postCount);
+    assert.equal(readFileSync(receiptPath, "utf8"), receipt); assert.equal(readFileSync(transcriptPath, "utf8"), transcript);
+    assert.equal(readFileSync(join(f.out, "budget-ledger.jsonl"), "utf8"), ledger);
+    const receiptName = `${task.id}-duplicate-`; assert.ok(stopped.receiptPath.includes(receiptName)); assert.ok(stopped.transcriptPath.includes(receiptName));
+    assert.equal(JSON.parse(readFileSync(join(f.repo, "outputs/acceptance", stopped.receiptPath), "utf8")).status, "blocked");
+    assert.equal(JSON.parse(readFileSync(join(f.repo, "outputs/acceptance", stopped.transcriptPath), "utf8")).called, false);
+  });
+}
+
+test("live CLI receipt history: an unavailable requested task cannot overwrite its earlier failure", async (t) => {
+  const s = await mediaServer(t, "media-ok"); const task = { id: "UNKNOWN-01", kind: "unknown", title: "synthetic unknown task" };
+  const profile = mediaProfile(s.url, [task]); const f = fixture(t, profile);
+  await child(f); const receipt = readFileSync(join(f.out, "receipts", `${task.id}.json`), "utf8"); const transcript = readFileSync(join(f.out, "transcripts", `${task.id}.json`), "utf8");
+  writeFileSync(join(f.repo, "acceptance/profile.json"), JSON.stringify({ schemaVersion: "workloom.acceptance-profile/v2", productName: "Synthetic", lane: "base", ...profile, live: { ...profile.live, enabled: false } }));
+  await child(f, ["--tasks", task.id]); const stopped = report(f).tasks[0];
+  assert.equal(stopped.status, "blocked"); assert.match(stopped.reason, /未配置/); assert.ok(stopped.receiptPath.includes(`${task.id}-duplicate-`));
+  assert.equal(readFileSync(join(f.out, "receipts", `${task.id}.json`), "utf8"), receipt); assert.equal(readFileSync(join(f.out, "transcripts", `${task.id}.json`), "utf8"), transcript);
+  assert.equal(s.calls.filter(call => call.method === "POST").length, 0);
+});
+
+for (const retained of ["receipts", "transcripts"]) {
+  test(`live CLI receipt history: a lone original ${retained} file is retained`, async (t) => {
+    const s = await mediaServer(t, "media-ok"); const task = { id: "UNKNOWN-01", kind: "unknown", title: "synthetic unknown task" }; const f = fixture(t, mediaProfile(s.url, [task]));
+    await child(f); const removed = retained === "receipts" ? "transcripts" : "receipts";
+    const original = join(f.out, retained, `${task.id}.json`); const bytes = readFileSync(original, "utf8"); rmSync(join(f.out, removed, `${task.id}.json`));
+    await child(f); const current = report(f).tasks[0]; assert.equal(current.status, "failed"); assert.ok(current.receiptPath.includes(`${task.id}-duplicate-`)); assert.ok(current.transcriptPath.includes(`${task.id}-duplicate-`));
+    assert.equal(readFileSync(original, "utf8"), bytes); assert.equal(existsSync(join(f.out, removed, `${task.id}.json`)), false);
+    assert.equal(s.calls.filter(call => call.method === "POST").length, 0);
+  });
+}
+
+test("live CLI budget tail: missing final newline stops before the first actual provider POST", async (t) => {
+  const s = await mediaServer(t, "image-known-usage"); const f = fixture(t, mediaProfile(s.url, [imageTask]));
+  const budget = createBudget({ outDir: f.out, environmentKind: "local-preview", runId: "synthetic-tail-run", budgets: {} });
+  const original = readFileSync(budget.ledgerPath, "utf8"); assert.equal(original.endsWith("\n"), true);
+  const broken = original.slice(0, -1); writeFileSync(budget.ledgerPath, broken);
+  const result = await child(f, [], { SYNTHETIC_API_KEY: "synthetic-only-media-key", SYNTHETIC_BASE_URL: s.url });
+  assert.equal(result.status, 1, result.stderr); assert.equal(s.calls.filter(call => call.method === "POST").length, 0); assert.match(result.stderr, /末行.*换行/);
+  assert.equal(readFileSync(budget.ledgerPath, "utf8"), broken); assert.equal(existsSync(join(f.out, "budget-run.json")), false);
+  assert.equal(existsSync(join(f.out, "receipts", `${imageTask.id}.json`)), false);
 });
