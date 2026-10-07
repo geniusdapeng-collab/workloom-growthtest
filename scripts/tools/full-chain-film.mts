@@ -5963,11 +5963,11 @@ if (STAGES.has("cover") && existsSync(colored)) {
     }))
   };
   /**
-   * ① 设计稿：设计师（LLM）→ 严格校验；不可用/不合规 → 确定性兜底稿。
-   * 兜底稿也必须是"主视觉 + 人物 + 主标题"三件套（不允许退回"只有标题"）。
+   * ① 设计稿：默认直接采用合法的确定性稿；显式诊断才调用设计师。
+   * 模型不可用的兜底与正常确定性设计分别记账，避免把默认成功误标为降级。
    */
   let plan: CoverPlan;
-  let designVia: "llm" | "fallback" = "llm";
+  let designVia: "llm" | "fallback" | "deterministic" = REVIEW_POLICY === "off" ? "deterministic" : "llm";
   let designNote = "";
   /**
    * 人物卡来源由管线注入：优先与主视觉时段一致的人物镜（夜景封面配夜景人物），
@@ -5993,7 +5993,15 @@ if (STAGES.has("cover") && existsSync(colored)) {
     return pool.find((s) => (warmOrNight ? /夜|灯|黄昏|落霞/.test(String(s.scene ?? "")) : true))
       ?? pool[0] ?? null;
   };
-  try {
+  if (REVIEW_POLICY === "off") {
+    plan = fallbackCoverPlan(designInput, {
+      headline: arg("--cover-hook", shotlist.title ?? "封面"),
+      heroShotId: fallbackBackground.shotId,
+      personShotId: personShotFor(fallbackBackground.shotId)?.shotId
+    });
+    designNote = "默认确定性设计：直接使用已声明镜头和合法设计稿，未调用模型；不授予审美认证";
+    log(`  ⇢ ${designNote}`);
+  } else try {
     const raw = await callCoverDesigner(designInput);
     try {
       plan = parseCoverPlan(raw, designInput, { personShotId: personShotFor(undefined)?.shotId, personAtSec: 1.0 });
