@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1490,
+  "revision": 1492,
   "tasks": {
     "98": {
       "number": 98,
@@ -2869,7 +2869,7 @@
           "protocol": 38
         }
       },
-      "updatedAt": 1791381321162,
+      "updatedAt": 1791382815340,
       "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
       "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
       "branch": "task/T-2026-1007-0003",
@@ -43602,6 +43602,55 @@
       },
       "previous": "399c7b048ce608e217139b773ac6eb82c0fdc9e397d236a347469e6ef4afda3b",
       "digest": "e28ffb831491c727bc54fc475d6455849b5726fd5fc16708778954afa402ccf9"
+    },
+    {
+      "sequence": 1491,
+      "at": "2026-10-07T14:20:15.340Z",
+      "kind": "task",
+      "data": {
+        "number": 123,
+        "patch": {
+          "headSha": "3f84c5f6d576cf2afdf24da2f4b25940b25167c9",
+          "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+          "branch": "task/T-2026-1007-0003",
+          "intent": {
+            "taskId": "T-2026-1007-0003",
+            "ready": true,
+            "dependsOn": [
+              118
+            ],
+            "releases": []
+          },
+          "originalBody": "请求10秒、24fps时，供应商原片可能包含241个完整视频帧和AAC编码边界。旧链路要求240帧且按名义时间构建后期，会误拒原片或让后期时间轴与实际帧数不一致。\n\n现在只接纳请求帧数或多一个终点帧；流时长必须等于实际frames/fps，原声元数据偏差最多两个AAC帧。冻结原稿不变，派生镜头、字幕切点与母版采用完整原片时钟。正常与标准后期共用native-clock拼接：视频帧直接拷贝，解码原声必须覆盖画面时钟，拒绝裁剪、变速、补帧、缺音和短音轨。\n\n测试覆盖真实FFmpeg三镜315帧的逐帧字节摘要、音画偏移及源字节不变，包含短音轨/变速/来源篡改等反例。VM发布入口夹具绑定真实冻结原稿和同一个实际时钟函数，保留48个旧用例并增加3个入口边界反例；临时父目录含S2不会再改变夹具声纹身份。\n\n验证（固定源96299952d9dbab6bfdb03b4fd3b48ecb848f718c）：Node后期集成22/22；视频及发布回归1630通过、1跳过；完整test:scripts、video-studio类型检查、内置资产、能力生成和差异检查退出0。未放宽CI或真人服装验收。依赖PR118，原生队列合入后发布源码。Closes #122。\n\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0003\",\n  \"ready\": true,\n  \"depends_on\": [\n    118\n  ],\n  \"releases\": []\n}\n-->",
+          "files": [
+            "docs/capabilities.auto.json",
+            "docs/video-standard-post.md",
+            "packages/video-studio/src/standard-post-contract.test.ts",
+            "packages/video-studio/src/standard-post-contract.ts",
+            "scripts/tools/compose-film.mts",
+            "scripts/tools/compose-native-clock.test.ts",
+            "scripts/tools/film-native-post.test.ts",
+            "scripts/tools/film-release-entrypoints.test.ts",
+            "scripts/tools/film-standard-post.mts",
+            "scripts/tools/film-standard-post.test.ts",
+            "scripts/tools/full-chain-film.mts"
+          ],
+          "status": "waiting_ci",
+          "ciSince": 1791339010301
+        }
+      },
+      "previous": "e28ffb831491c727bc54fc475d6455849b5726fd5fc16708778954afa402ccf9",
+      "digest": "0bd0a8646587674d5c0fd82d621b21f624766830457ad5318bb7ce5be0eab3c1"
+    },
+    {
+      "sequence": 1492,
+      "at": "2026-10-07T14:20:58.613Z",
+      "kind": "transaction",
+      "data": {
+        "id": "64975966-ce3b-48cd-b0e0-e8aecbedbc8f"
+      },
+      "previous": "0bd0a8646587674d5c0fd82d621b21f624766830457ad5318bb7ce5be0eab3c1",
+      "digest": "957b45931527c817dd89be253fedd944bdc7133483ca9a28c2f8f06c0305d0d5"
     }
   ]
 }
