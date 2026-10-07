@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1527,
+  "revision": 1529,
   "tasks": {
     "98": {
       "number": 98,
@@ -5506,7 +5506,7 @@
           }
         ]
       },
-      "updatedAt": 1791382815340,
+      "updatedAt": 1791383414151,
       "error": "Prerequisite #133 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/133 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
       "blockedUntil": 1791378909828,
       "dependencies": [
@@ -44313,6 +44313,41 @@
       },
       "previous": "705e8116e732c5cff422f17398bcdfcc1334f8a6fe1bed407c5df0ae4ea84764",
       "digest": "d2d2e545fcf33bb682919ccd9d0430fef0457f71a28e250a9787a6d2aa04c0d1"
+    },
+    {
+      "sequence": 1528,
+      "at": "2026-10-07T14:30:14.151Z",
+      "kind": "task",
+      "data": {
+        "number": 135,
+        "patch": {
+          "status": "waiting_dependency",
+          "headSha": "4bd58b7ed18bc65f691022bdee2a8a8aaecb358f",
+          "intent": {
+            "taskId": "T-2026-1007-0008",
+            "ready": true,
+            "dependsOn": [
+              133
+            ],
+            "releases": []
+          },
+          "dependencies": [
+            133
+          ]
+        }
+      },
+      "previous": "d2d2e545fcf33bb682919ccd9d0430fef0457f71a28e250a9787a6d2aa04c0d1",
+      "digest": "aabd8ea8367421772f21b1016f98f6608d6f6c61c7f081ebf4d9e9f183d6a96c"
+    },
+    {
+      "sequence": 1529,
+      "at": "2026-10-07T14:31:08.153Z",
+      "kind": "transaction",
+      "data": {
+        "id": "e98c4913-845d-4847-a0d0-28d5a6cc7627"
+      },
+      "previous": "aabd8ea8367421772f21b1016f98f6608d6f6c61c7f081ebf4d9e9f183d6a96c",
+      "digest": "b054bd50ad5876287405e22d5a934389110fccf0bee23995583b540263c1fb48"
     }
   ]
 }
