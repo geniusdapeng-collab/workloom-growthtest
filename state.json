@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 1152,
+  "revision": 1154,
   "tasks": {
     "98": {
       "number": 98,
@@ -4979,7 +4979,7 @@
     },
     "137": {
       "number": 137,
-      "status": "waiting_dependency",
+      "status": "parked",
       "firstSeen": 1791356267145,
       "attempts": {},
       "headSha": "698f6f0f739070c2e02b9a898b232bdbeb736fa5",
@@ -5522,12 +5522,12 @@
           }
         ]
       },
-      "updatedAt": 1791369910174,
+      "updatedAt": 1791370212188,
       "dependencies": [
         135
       ],
       "error": "Prerequisite #135 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/135 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
-      "blockedUntil": 1791359110932
+      "blockedUntil": 1791370812188
     },
     "139": {
       "number": 139,
@@ -33526,6 +33526,31 @@
       },
       "previous": "ca4f3dd723b51ffe9a2d2271f1fec12078bda789669c6cb3f5191058d0e5da9b",
       "digest": "47fe465d7a6d8aa474724e7ce9294793b233df9b790b983889e140b366462bf9"
+    },
+    {
+      "sequence": 1153,
+      "at": "2026-10-07T10:50:12.188Z",
+      "kind": "task",
+      "data": {
+        "number": 137,
+        "patch": {
+          "status": "parked",
+          "error": "Prerequisite #135 is unreadable: CNB 429 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/135 :: {\"errcode\":8,\"errmsg\":\"Too many requests. Please try again later.\"}\n",
+          "blockedUntil": 1791370812188
+        }
+      },
+      "previous": "47fe465d7a6d8aa474724e7ce9294793b233df9b790b983889e140b366462bf9",
+      "digest": "d60cffbfb71121cedea6a06bbd90188aa5308f1bd79dbbdfef6a4c91ac99cc7a"
+    },
+    {
+      "sequence": 1154,
+      "at": "2026-10-07T10:51:07.737Z",
+      "kind": "transaction",
+      "data": {
+        "id": "418f90a9-bfdb-4df6-a35e-ae64573ab2c8"
+      },
+      "previous": "d60cffbfb71121cedea6a06bbd90188aa5308f1bd79dbbdfef6a4c91ac99cc7a",
+      "digest": "678ecf3919b80c7e029d02051e4951f73c8c2463cde82205a819ea36f592b9f9"
     }
   ]
 }
