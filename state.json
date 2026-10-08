@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3736,
+  "revision": 3739,
   "tasks": {
     "98": {
       "number": 98,
@@ -34,7 +34,7 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791454635414,
-      "updatedAt": 1791454635414,
+      "updatedAt": 1791454679064,
       "alignmentCount": 1,
       "alignmentIntent": null,
       "developerReview": null,
@@ -46,8 +46,8 @@
       },
       "admission": {
         "number": 98,
-        "headSha": "f324e8a94cc002cc2f2b57cbb53b07c98d4ff39f",
-        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+        "headSha": "dae795860c94b9301d86694123a07cadf8ce59b0",
+        "mainSha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
         "filesHash": "0e757a25a7edcfd99fd278d7528b12314da26bc30e8228d5c9855e1097188d54",
         "scopes": [],
         "owner": "admission/pr-98",
@@ -96150,6 +96150,53 @@
       },
       "previous": "f3cc8e21e0997e027ce7a5399538186e9d062421b80fc54695c2b21029deb1ae",
       "digest": "f55e6119fda0771691c361db873ca5c7502a3a36f92233d955d116741e6b76be"
+    },
+    {
+      "sequence": 3737,
+      "at": "2026-10-08T10:17:59.064Z",
+      "kind": "source_admitted",
+      "data": {
+        "number": 98,
+        "headSha": "dae795860c94b9301d86694123a07cadf8ce59b0",
+        "mainSha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
+        "filesHash": "0e757a25a7edcfd99fd278d7528b12314da26bc30e8228d5c9855e1097188d54",
+        "scopes": [],
+        "owner": "admission/pr-98",
+        "generation": {}
+      },
+      "previous": "f55e6119fda0771691c361db873ca5c7502a3a36f92233d955d116741e6b76be",
+      "digest": "9c4543e2664a4033f24741a0642d3b07b3d0e84dae13dcc1bff4087e37183060"
+    },
+    {
+      "sequence": 3738,
+      "at": "2026-10-08T10:17:59.064Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "admission": {
+            "number": 98,
+            "headSha": "dae795860c94b9301d86694123a07cadf8ce59b0",
+            "mainSha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
+            "filesHash": "0e757a25a7edcfd99fd278d7528b12314da26bc30e8228d5c9855e1097188d54",
+            "scopes": [],
+            "owner": "admission/pr-98",
+            "generation": {}
+          }
+        }
+      },
+      "previous": "9c4543e2664a4033f24741a0642d3b07b3d0e84dae13dcc1bff4087e37183060",
+      "digest": "3476f89cd3ba3662a521a56d5173b7424725c5abd5e5143d23708a115adeb245"
+    },
+    {
+      "sequence": 3739,
+      "at": "2026-10-08T10:17:51.267Z",
+      "kind": "transaction",
+      "data": {
+        "id": "source-admit:98:dae795860c94b9301d86694123a07cadf8ce59b0:17ec630dc1bcba1a000a9899c9da640b94fa5114"
+      },
+      "previous": "3476f89cd3ba3662a521a56d5173b7424725c5abd5e5143d23708a115adeb245",
+      "digest": "8917586644bc648d7978f8ab3bdf52f3f988105c08bd58ad98fb3008c7b25774"
     }
   ]
 }
