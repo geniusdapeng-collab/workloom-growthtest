@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3699,
+  "revision": 3702,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "parked",
+      "status": "merging",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2928,7 +2928,7 @@
         "at": 1791440115248
       },
       "recoveryIntent": null,
-      "mergePhase": null,
+      "mergePhase": "prepared",
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 156,
@@ -3349,7 +3349,7 @@
           "protocol"
         ],
         "generation": {
-          "protocol": 95
+          "protocol": 96
         }
       },
       "mergeRequestedAt": 1791453017228
@@ -8212,10 +8212,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": null,
-      "generation": 95,
-      "acquiredAt": 1791453017228,
-      "expiresAt": 1791453017228
+      "owner": "integration/pr-119",
+      "generation": 96,
+      "acquiredAt": 1791453624770,
+      "expiresAt": 1791454524770
     },
     "dependencies": {
       "owner": null,
@@ -94567,6 +94567,469 @@
       },
       "previous": "891ff5b481ec48b5966121d4a8aac51fca384a66d0c187335ce97ad28dc4ce28",
       "digest": "77302e4212fa8c5625138e3ed06f0d8d1d34ec77cf43e3300b18545aafbd178c"
+    },
+    {
+      "sequence": 3700,
+      "at": "2026-10-08T10:00:24.770Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-119",
+        "generation": {
+          "protocol": 96
+        }
+      },
+      "previous": "77302e4212fa8c5625138e3ed06f0d8d1d34ec77cf43e3300b18545aafbd178c",
+      "digest": "9036c792c6046570cdbcb80cb25570a7417f53d1e3da42a2415b7d6291b32671"
+    },
+    {
+      "sequence": 3701,
+      "at": "2026-10-08T10:00:24.770Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "merging",
+          "mergePhase": "prepared",
+          "mergeSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 156,
+            "pull": {
+              "number": 156,
+              "state": "open",
+              "title": "chore(ci): deliver #119 fix(video): 成功渲染素材直接进入正式后期 [T-2026-1007-0001]",
+              "body": "Immutable delivery candidate for #119. Exact source 07728e58d9b7a0f114cbfa37b9be0dd5ca49f066; tested main ed485d4979f9e92541d7a7066df9557dfeb66f78.\n\n<!-- delivery-origin:119:07728e58d9b7a0f114cbfa37b9be0dd5ca49f066:ed485d4979f9e92541d7a7066df9557dfeb66f78 -->\n\n<!-- workloom-delivery\n{\"ready\":true,\"depends_on\":[],\"releases\":[]}\n-->",
+              "author": {
+                "username": "OCI",
+                "nickname": "Cloud Native Build",
+                "is_npc": true
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/delivery/candidate/pr-119-71f5b285b95b548764486bd5b73a126b",
+                "sha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "status_check",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "files": [
+              "AGENTS.repo.md",
+              "README.md",
+              "apps/server/src/video/director-router.ts",
+              "apps/server/src/video/director-sources.ts",
+              "apps/server/src/video/director-worker.ts",
+              "apps/server/src/video/film-worker-identity.test.ts",
+              "apps/server/src/video/film-worker.test.ts",
+              "apps/server/src/video/film-worker.ts",
+              "bundles/ai-video/README.md",
+              "bundles/ai-video/bundle.json",
+              "bundles/ai-video/connectors/bgm-bridge/README.md",
+              "bundles/ai-video/connectors/bgm-bridge/audio-stems-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/cli.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/core.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/measure.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/color-bridge/README.md",
+              "bundles/ai-video/connectors/color-bridge/cli.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.test.ts",
+              "bundles/ai-video/connectors/color-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/post-bridge/core.mjs",
+              "bundles/ai-video/connectors/post-bridge/delivery-integration.test.ts",
+              "bundles/ai-video/connectors/post-bridge/director-delivery.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/README.md",
+              "bundles/ai-video/connectors/subtitle-bridge/cli.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/core.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts",
+              "bundles/ai-video/connectors/subtitle-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/voice-bridge/README.md",
+              "bundles/ai-video/connectors/voice-bridge/core.mjs",
+              "bundles/ai-video/fences/ai-video-bgm.yml",
+              "bundles/ai-video/fences/ai-video-color.yml",
+              "bundles/ai-video/fences/ai-video-delivery.yml",
+              "bundles/ai-video/fences/ai-video-material.yml",
+              "bundles/ai-video/fences/ai-video-subtitle.yml",
+              "bundles/ai-video/fences/ai-video-voice.yml",
+              "bundles/ai-video/library/director-system/recipes.json",
+              "bundles/ai-video/library/real-person-assets/asset-20260101000000-demo/profile.json",
+              "bundles/ai-video/pipelines/narrative-film.yml",
+              "bundles/ai-video/presets/bgm-composer.yml",
+              "bundles/ai-video/presets/colorist.yml",
+              "bundles/ai-video/presets/post-editor.yml",
+              "bundles/ai-video/presets/subtitle-stylist.yml",
+              "bundles/ai-video/presets/voice-artist.yml",
+              "bundles/ai-video/schemas/objects.json",
+              "bundles/ai-video/skills/bgm-audio-layering/SKILL.md",
+              "bundles/ai-video/skills/bgm-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/caption-burnin-ops/SKILL.md",
+              "bundles/ai-video/skills/color-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/color-grade/SKILL.md",
+              "bundles/ai-video/skills/color-look-design/SKILL.md",
+              "bundles/ai-video/skills/color-shot-matching/SKILL.md",
+              "bundles/ai-video/skills/cover-design/SKILL.md",
+              "bundles/ai-video/skills/delivery-package-ops/SKILL.md",
+              "bundles/ai-video/skills/delivery-revision-ops/SKILL.md",
+              "bundles/ai-video/skills/producer-gate-review/SKILL.md",
+              "bundles/ai-video/skills/render-ops/SKILL.md",
+              "bundles/ai-video/skills/subtitle-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/subtitle-layout-design/SKILL.md",
+              "bundles/ai-video/skills/voice-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/voice-dubbing-sync/SKILL.md",
+              "bundles/geo-growth/agent-capabilities.json",
+              "bundles/geo-growth/capabilities/video.mjs",
+              "bundles/geo-growth/capabilities/workbench-guide.mjs",
+              "docs/agent-computer-guide.md",
+              "docs/ai-video-workbench-guide.md",
+              "docs/real-person-asset.md",
+              "docs/video-standard-post.md",
+              "packages/base/bundles/bgm-capability.test.ts",
+              "packages/base/bundles/post-av-sync.test.ts",
+              "packages/base/bundles/post-delivery-capability.test.ts",
+              "packages/base/bundles/subtitle-capability.test.ts",
+              "packages/base/bundles/voice-capability.test.ts",
+              "packages/video-studio/src/character-release-contract.integration.test.ts",
+              "packages/video-studio/src/cover-assembly.test.ts",
+              "packages/video-studio/src/cover-assembly.ts",
+              "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+              "packages/video-studio/src/deliver.ts",
+              "packages/video-studio/src/director-completion-bridge.test.ts",
+              "packages/video-studio/src/director-planner.ts",
+              "packages/video-studio/src/director-post-default.integration.test.ts",
+              "packages/video-studio/src/film-completion-entrypoint.test.ts",
+              "packages/video-studio/src/film-contracts.ts",
+              "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+              "packages/video-studio/src/film-worker-runtime.test.ts",
+              "packages/video-studio/src/film-worker-runtime.ts",
+              "packages/video-studio/src/index.ts",
+              "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+              "packages/video-studio/src/post-render-acceptance.ts",
+              "packages/video-studio/src/post-render-fence-policy.test.ts",
+              "packages/video-studio/src/producer-gate.test.ts",
+              "packages/video-studio/src/producer-gate.ts",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "plugins/workloom-workbench/README.md",
+              "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+              "plugins/workloom-workbench/skills/workloom/SKILL.md",
+              "scripts/AGENT-CAPABILITIES.md",
+              "scripts/agent-capabilities.test.mjs",
+              "scripts/ai-video-workbench-guide.test.mjs",
+              "scripts/ci/cnb-desktop-release.test.mjs",
+              "scripts/product-runtime-assets.mjs",
+              "scripts/product-runtime-assets.test.mjs",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-cli-preflight.test.mjs",
+              "scripts/tools/film-existing-render-edit.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-publication-policy.d.mts",
+              "scripts/tools/film-publication-policy.mjs",
+              "scripts/tools/film-publication-policy.test.mjs",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-rendered-material-use.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts",
+              "scripts/tools/video-request-regression.test.ts",
+              "tools/codex-gateway/README.md",
+              "tools/codex-gateway/bin/cli.mjs",
+              "tools/codex-gateway/src/mcp.mjs",
+              "tools/codex-gateway/test/mcp.test.mjs",
+              "tools/codex-gateway/test/video-guide.test.mjs"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0001",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791446176000,
+            "mergeBase": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "checkErrors": [],
+            "checkSha": "0d216c05cb6b97c8228c0bef2cb87abbdb9260eb",
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/video-request-regression.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/video-request-regression.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/video-request-regression.test.ts",
+                  "absent": false
+                },
+                "digest": "0216ef0e05a3b890e21fb7baf3c372a3af4a7422446d9bbda80a7245f6974190"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/ci/cnb-desktop-release.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/ci/cnb-desktop-release.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/ci/cnb-desktop-release.test.mjs",
+                  "absent": false
+                },
+                "digest": "2e69f940ecc648e65674ffce01fadd0cce33fe09aa7ee71f643125c5a6fc17b8"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/tools/film-publication-policy.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-publication-policy.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-publication-policy.mjs",
+                  "absent": false
+                },
+                "digest": "3957c1ee2e6349b07640c807aba9d7f64e0195a37f5da762ec341c54e6f663dc"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/compose-native-clock.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "digest": "45cb9cfadd31736c770a2a89a0c719afb3425e113d7368898a1626bc0a4fbd32"
+              },
+              {
+                "id": "CI-005",
+                "file": "scripts/tools/film-cli-preflight.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-cli-preflight.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-cli-preflight.test.mjs",
+                  "absent": false
+                },
+                "digest": "4c417f466dabad31007ceff801aebd5c9435f15991fa6d4bca777bfeb9e5ab6f"
+              },
+              {
+                "id": "CI-006",
+                "file": "scripts/tools/film-standard-post.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "digest": "5d937ecf6213cfb2ad4ec2ecdc7b136886636e3c9fdddb9e94ce12282b2eae5b"
+              },
+              {
+                "id": "CI-007",
+                "file": "scripts/product-runtime-assets.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "digest": "6be2caee6ad53f98e29bfdda0415c3ba208fcec8e256a661a9c1022c6ca63030"
+              },
+              {
+                "id": "CI-008",
+                "file": "scripts/agent-capabilities.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "digest": "6d7340765c69724580c4b4b29ee207e8ced4aa1d230cd541d1565ea9fbd752e1"
+              },
+              {
+                "id": "CI-009",
+                "file": "scripts/tools/film-release-entrypoints.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "digest": "7d491db3cfd6eee9bcef1a44c258f9a40033096154ffb800d1eeb7d095e330d3"
+              },
+              {
+                "id": "CI-010",
+                "file": "scripts/tools/film-publication-policy.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-publication-policy.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-publication-policy.test.mjs",
+                  "absent": false
+                },
+                "digest": "8e23c8f619f40c3c7aebecb4df24e67e3aedc0c6bc703233de06cdafedda8ea0"
+              },
+              {
+                "id": "CI-011",
+                "file": "scripts/product-runtime-assets.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "digest": "9539664c0404b49a7a64aea4799585df2a8cb44aa7f5b00be72c0e9539aae497"
+              },
+              {
+                "id": "CI-012",
+                "file": "scripts/tools/film-native-post.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "digest": "9e6c41761e0ee4586d4071e9ba41b095cfd3e679a84429b0b10312030c1fc2f0"
+              },
+              {
+                "id": "CI-013",
+                "file": "scripts/tools/film-existing-render-edit.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-existing-render-edit.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-existing-render-edit.test.ts",
+                  "absent": false
+                },
+                "digest": "a3584a3f346707cd5e3ca48cc0b4301ebd2550acec622de539fe751f5c167387"
+              },
+              {
+                "id": "CI-014",
+                "file": "scripts/ai-video-workbench-guide.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": false
+                },
+                "digest": "d08b892bc6e593baa513d20bb72075a8a610a0ab12d0f47e88678d66a611f0ff"
+              },
+              {
+                "id": "CI-015",
+                "file": "scripts/tools/film-rendered-material-use.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": false
+                },
+                "digest": "e17d15ca4d5a28ca95b5d70229d86d2c458663b03ea59d2371f27b2493a45b2b"
+              }
+            ],
+            "originNumber": 119,
+            "pendingDependencies": []
+          },
+          "integrationLease": {
+            "owner": "integration/pr-119",
+            "scopes": [
+              "protocol"
+            ],
+            "generation": {
+              "protocol": 96
+            }
+          }
+        }
+      },
+      "previous": "9036c792c6046570cdbcb80cb25570a7417f53d1e3da42a2415b7d6291b32671",
+      "digest": "d9bb96a987d332d8f7885c0381f2924879e6a9a92d77e49bced29403e34cf440"
+    },
+    {
+      "sequence": 3702,
+      "at": "2026-10-08T10:01:17.512Z",
+      "kind": "transaction",
+      "data": {
+        "id": "6b0ad5b1-ed15-4a04-9c4a-5fe933294442"
+      },
+      "previous": "d9bb96a987d332d8f7885c0381f2924879e6a9a92d77e49bced29403e34cf440",
+      "digest": "7f6d64f03bd4e71a1531d6b058d719d89b84ed52464e97025a062e6dc1fd2ec2"
     }
   ]
 }
