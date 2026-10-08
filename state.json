@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3422,
+  "revision": 3427,
   "tasks": {
     "98": {
       "number": 98,
@@ -2056,18 +2056,18 @@
       "attempts": {},
       "admission": {
         "number": 119,
-        "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
-        "mainSha": "d9e03d3a85b7edfd60cb4f1e22c071aeef8ceb9b",
-        "filesHash": "5e05dae99a9381d5b37856626d8bf1ff3706c7fc216227fe3edf5640bb76f035",
+        "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+        "filesHash": "9e1a0bc3f8d63c4beec8c875dcd756e6d5609784abb7e812068190f8c93f312a",
         "scopes": [
           "protocol"
         ],
         "owner": "admission/pr-119",
         "generation": {
-          "protocol": 52
+          "protocol": 89
         }
       },
-      "updatedAt": 1791436510555,
+      "updatedAt": 1791437058447,
       "error": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
       "blockedUntil": 1791437110555,
       "headSha": "c48f7c2c278fc4c65b9e16ed03bf61d8308b9d19",
@@ -7387,9 +7387,9 @@
   "leases": {
     "protocol": {
       "owner": null,
-      "generation": 88,
-      "acquiredAt": 1791435893168,
-      "expiresAt": 1791436337992
+      "generation": 89,
+      "acquiredAt": 1791437058447,
+      "expiresAt": 1791437058447
     },
     "dependencies": {
       "owner": null,
@@ -86342,6 +86342,93 @@
       },
       "previous": "3383b9431e2d7220b24adc08962f34030907f2c79a6a435e1993ec039b47ca9c",
       "digest": "89958baf9a5e53223653821e7baf6a90dd55f7d09c8d8b778ae769061cfe4289"
+    },
+    {
+      "sequence": 3423,
+      "at": "2026-10-08T05:24:18.447Z",
+      "kind": "lease_acquire",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-119",
+        "generation": {
+          "protocol": 89
+        }
+      },
+      "previous": "89958baf9a5e53223653821e7baf6a90dd55f7d09c8d8b778ae769061cfe4289",
+      "digest": "2bb5265a8fe7398c5805891a309ce80003f86d17d23c38d680f117f202567413"
+    },
+    {
+      "sequence": 3424,
+      "at": "2026-10-08T05:24:18.447Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-119",
+        "generation": {
+          "protocol": 89
+        }
+      },
+      "previous": "2bb5265a8fe7398c5805891a309ce80003f86d17d23c38d680f117f202567413",
+      "digest": "71cc64f5d8ae9287eb8d519b90fa3af0af56f8348b9c8067bc0ac9bc06add1fd"
+    },
+    {
+      "sequence": 3425,
+      "at": "2026-10-08T05:24:18.447Z",
+      "kind": "source_admitted",
+      "data": {
+        "number": 119,
+        "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+        "filesHash": "9e1a0bc3f8d63c4beec8c875dcd756e6d5609784abb7e812068190f8c93f312a",
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "admission/pr-119",
+        "generation": {
+          "protocol": 89
+        }
+      },
+      "previous": "71cc64f5d8ae9287eb8d519b90fa3af0af56f8348b9c8067bc0ac9bc06add1fd",
+      "digest": "06b24efc67040121b4598e71e8d1c6b32562af413ad03c7014ebf867fbc207c7"
+    },
+    {
+      "sequence": 3426,
+      "at": "2026-10-08T05:24:18.447Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "admission": {
+            "number": 119,
+            "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "filesHash": "9e1a0bc3f8d63c4beec8c875dcd756e6d5609784abb7e812068190f8c93f312a",
+            "scopes": [
+              "protocol"
+            ],
+            "owner": "admission/pr-119",
+            "generation": {
+              "protocol": 89
+            }
+          }
+        }
+      },
+      "previous": "06b24efc67040121b4598e71e8d1c6b32562af413ad03c7014ebf867fbc207c7",
+      "digest": "0078076e88f38be85e68d818a303a3f3e964d57fcf1e521c4440725b1fa86fe0"
+    },
+    {
+      "sequence": 3427,
+      "at": "2026-10-08T05:24:07.630Z",
+      "kind": "transaction",
+      "data": {
+        "id": "source-admit:119:1d19e4686dedd364eb64466d90017c360baa21fb:ed485d4979f9e92541d7a7066df9557dfeb66f78"
+      },
+      "previous": "0078076e88f38be85e68d818a303a3f3e964d57fcf1e521c4440725b1fa86fe0",
+      "digest": "d88d59e32882335b1c360d91ae6cc50fc7a92c87a77fe8b3ac1289e6bd1fa54f"
     }
   ]
 }
