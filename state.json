@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3689,
+  "revision": 3691,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2069,7 +2069,7 @@
       },
       "updatedAt": 1791453017228,
       "error": "CNB 409 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/156/merge :: {\"errcode\":2009014,\"errmsg\":\"the pull can not merge yet\"}\n",
-      "blockedUntil": 1791447022308,
+      "blockedUntil": 1791453617228,
       "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
       "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
       "branch": "task/T-2026-1007-0001",
@@ -94270,6 +94270,31 @@
       },
       "previous": "3d21c4d2d74c2209016a45eb0ad524d3927535611e901f3853fa33b88b43063c",
       "digest": "11952fce5c863753998a3907a9598e851804bbb31618e36322ad1641751dd972"
+    },
+    {
+      "sequence": 3690,
+      "at": "2026-10-08T09:50:17.228Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "CNB 409 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/156/merge :: {\"errcode\":2009014,\"errmsg\":\"the pull can not merge yet\"}\n",
+          "blockedUntil": 1791453617228
+        }
+      },
+      "previous": "11952fce5c863753998a3907a9598e851804bbb31618e36322ad1641751dd972",
+      "digest": "0a375f8fb70b393438e2b31c43a13df6cee13792c77003653a4bcb45d6b8753e"
+    },
+    {
+      "sequence": 3691,
+      "at": "2026-10-08T09:51:24.919Z",
+      "kind": "transaction",
+      "data": {
+        "id": "8dd26b21-5464-46c3-9ad2-63dfea87b540"
+      },
+      "previous": "0a375f8fb70b393438e2b31c43a13df6cee13792c77003653a4bcb45d6b8753e",
+      "digest": "81b424c237deef72d6887fb882082eca7b4285aac1063047db6d976e3b5dae4b"
     }
   ]
 }
