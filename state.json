@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3642,
+  "revision": 3645,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "developing",
+      "status": "waiting_ci",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2067,7 +2067,7 @@
           "protocol": 93
         }
       },
-      "updatedAt": 1791451219793,
+      "updatedAt": 1791451550607,
       "error": "Platform snapshot changed while reading",
       "blockedUntil": 1791447022308,
       "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
@@ -2075,7 +2075,7 @@
       "branch": "task/T-2026-1007-0001",
       "intent": {
         "taskId": "T-2026-1007-0001",
-        "ready": false,
+        "ready": true,
         "dependsOn": [],
         "releases": []
       },
@@ -2084,7 +2084,7 @@
         "provider": "codex",
         "repo": "workloom-ai/workloom-growthtest",
         "number": 119,
-        "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+        "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
         "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
         "policyHash": "b8296b0f50fc56cdd1fadfac1e14512e3f78ebe1380072d5fb0f9a89706c12af",
         "reviewedFiles": [
@@ -2168,6 +2168,7 @@
           "packages/video-studio/src/cover-assembly.ts",
           "packages/video-studio/src/cover-composition-entrypoint.test.ts",
           "packages/video-studio/src/deliver.ts",
+          "packages/video-studio/src/director-completion-bridge.test.ts",
           "packages/video-studio/src/director-planner.ts",
           "packages/video-studio/src/director-post-default.integration.test.ts",
           "packages/video-studio/src/film-completion-entrypoint.test.ts",
@@ -2189,6 +2190,7 @@
           "scripts/AGENT-CAPABILITIES.md",
           "scripts/agent-capabilities.test.mjs",
           "scripts/ai-video-workbench-guide.test.mjs",
+          "scripts/ci/cnb-desktop-release.test.mjs",
           "scripts/product-runtime-assets.mjs",
           "scripts/product-runtime-assets.test.mjs",
           "scripts/tools/compose-film.mts",
@@ -2211,20 +2213,20 @@
           "tools/codex-gateway/test/mcp.test.mjs",
           "tools/codex-gateway/test/video-guide.test.mjs"
         ],
-        "filesHash": "9e1a0bc3f8d63c4beec8c875dcd756e6d5609784abb7e812068190f8c93f312a",
+        "filesHash": "e6c6b29ecfa39335e567e2c9c5e7c2fad399960579a11617bdc471f89f0ac9e1",
         "dependsOn": [],
         "ciPolicyChanges": [
           {
             "id": "CI-001",
-            "rationale": "A源码/B实际执行：将正式完整作品封面断言扩充为 v2 prepend-cover-frame：源正文全部帧保留，视频仅前置1帧，音频/字幕偏移均0，且当前input/cover/output SHA相符。新增正文少帧、源SHA/帧率错误与错误偏移拒绝；原显式opening-title和非法回执拒绝仍保留。兼容v1只限不要求保留源帧的旧helper调用，不能作为正式完整作品发布凭据。本人精读当前47行及完整24行diff，当前changed-node与完整test:scripts均通过。"
+            "rationale": "A源码/B实际执行：按取消渲后二次品质门的授权，把旧PCM质检报告迁为真实composition-process回执、current input/output SHA和实际AV start/duration事实；保留每个输出24帧/8fps、全部PTS间隔0.125、原0.13秒容差及原xfade像素断言。最小后续测试提交只迁移3个旧合同：UHD允许本机交付同时保留HD源source/recipe lineage及旧日志前缀，2160p别名前期仍1080p提示且无enhance，concat从6位改9位小数；新增HD/2160p冲突与未接入enhance显式参数两项执行前拒绝。旧749实际399/402/3fail保留，当前原完整脚本404/404并继续Node108/Desktop162，当前35case全部通过。UHD请求回归正例是dry-run合同，生产4K未验证。"
           },
           {
             "id": "CI-002",
-            "rationale": "A源码/B实际执行：成功原片按官方accepted task、事前授权、first witness与当前源字节进入正式后期；把来源品质门改为技术来源/加工事实，新增黑帧、奇数画布、静音、10.04秒与低帧率等实际媒体采用。真实完整ordinary CLI覆盖默认后期全阶段、部分成功镜头仅处理pending镜头、历史卡片/提示/日志保留、当前任务/回执/权限/字节否定对照；名义2秒实际4.25秒保留102正文帧+1封面帧、原AAC包、零音频/字幕偏移，分数与qualityReviewPerformed如实空值/false。保留并发唯一publisher及真实compose/subtitle/danmaku/mux失败不发布。当前canonical Node/Vitest各57/57与current-native57/57实际通过；不改必需CI集合、不以fixture耗时冒充生产。"
+            "rationale": "Migrate one obsolete static-import assertion to behavior of the exact unchanged production alias in real Node processes: canonical runner argv and working directory, success, exit17, real SIGTERM, missing runner, and canonical Vitest import success/failure. Original47 release contract cases execute;46 unaffected regions are byte-identical. No required CI stage, threshold, protected approval, source binding, or production implementation is relaxed. Current45ac postcommit actual original Node47 plus whole pnpm test and full test:scripts green; independent current test/chain review is required before ready handoff."
           },
           {
             "id": "CI-003",
-            "rationale": "A源码/B实际执行：来源选择依据独立固定raw字节，旧TTS/品质记录不替代或否决已固定原片；missing/changed bytes与缺manifest仍拒绝。原片静音、短声轨、奇数画布和异帧率进入本机官方normalize；声画品质不再以PCM质检否决，requested export clock只读真实metadata且qualityReviewPerformed/audioAlignmentMeasured=false。新process receipt严格绑定每个source SHA、源/normalized帧数、帧率、画布、每镜帧分配与全部输出；新增丢帧/加帧、分数帧率/时长错误等拒绝。真实本机compose输出2160x3840的8帧并保留尾标记和AAC包，仍拒绝顺序/删镜/加镜/复用/转场/retime及未接入模型enhance参数。当前current-native实际该文件全部通过，未证明生产4K发布。"
+            "rationale": "A源码/B实际执行：正式完整作品改用v2 prepend-cover-frame conservation凭据：sourceVideo frame/fps/duration自洽，output恰好sourceFrames+1，bodyVideoOffset=1/fps、audioOffset=subtitleOffset=0，qualityReviewPerformed=false且current input/cover/output三份SHA一致。v1 replace-first-frame只允许明确未要求preserveSourceFrames的兼容helper调用，正式preserveSourceFramesRequired调用拒绝v1。保持显式opening-title规则与全部非法凭据失败；ffprobe不报帧数的兼容仅描述not-reported事实，不替代v2正文完整性。本人精读29行及32行diff，实际publication负控与完整标准后期当前通过，不再采用旧首帧替换文案。"
           },
           {
             "id": "CI-004",
@@ -2232,106 +2234,128 @@
           },
           {
             "id": "CI-005",
-            "rationale": "A源码/B实际执行：为固定工作台指南新增运行载荷复制、正文摘要、缺文件及软链逃逸失败测试；在未产生预编译入口时继续硬失败，保留原包内路径、secret排除和hash约束。只增加一个固定docs/ai-video-workbench-guide.md，不开放任意docs树，不调整签名安装包保护。本人精读161行及56行diff，当前changed-node和原test:scripts中实际执行通过。"
-          },
-          {
-            "id": "CI-006",
-            "rationale": "A源码/B实际执行：保留原CI路径，在VITEST环境直接导入canonical全部assertions；原tsx --test入口则实际启动仓库Vitest runner运行canonical。900000ms只用于此真实子进程边界；error/signal/非零status均透传，没有改canonical assertion、skip、原测试超时或全局CI阈值。当前原Node入口实际57/57+外层1通过、Vitest alias57/57；真实FFmpeg非法option负控canonical47fail/10pass并使外层1fail、exit1，证明没有吞子失败或假绿。"
-          },
-          {
-            "id": "CI-007",
             "rationale": "A源码/B实际执行：两项生成前拒绝用真实videos阶段继续验证：非法默认合成旁白与不允许输入仍exit1且不执行shot/material-gen/voice工站。新增voice-only dry-run只记录invoked=false、ok=false、degraded与artifact=null，不伪造原声成功或spoken/lip-sync证书；真实子进程fetch/http/https拒绝器与计数证明这些前门用例零网络。当前changed-node及完整test:scripts通过，不放宽权限、不改变治理/CI超时。"
           },
           {
-            "id": "CI-008",
-            "rationale": "A源码/B实际执行：按取消渲后二次品质门的授权，把旧PCM质检报告迁为真实composition-process回执、current input/output SHA和实际AV start/duration事实；保留每个输出24帧/8fps、全部PTS间隔0.125、原0.13秒容差及原xfade像素断言。最小后续测试提交只迁移3个旧合同：UHD允许本机交付同时保留HD源source/recipe lineage及旧日志前缀，2160p别名前期仍1080p提示且无enhance，concat从6位改9位小数；新增HD/2160p冲突与未接入enhance显式参数两项执行前拒绝。旧749实际399/402/3fail保留，当前原完整脚本404/404并继续Node108/Desktop162，当前35case全部通过。UHD请求回归正例是dry-run合同，生产4K未验证。"
+            "id": "CI-006",
+            "rationale": "A源码/B实际执行：成功原片按官方accepted task、事前授权、first witness与当前源字节进入正式后期；把来源品质门改为技术来源/加工事实，新增黑帧、奇数画布、静音、10.04秒与低帧率等实际媒体采用。真实完整ordinary CLI覆盖默认后期全阶段、部分成功镜头仅处理pending镜头、历史卡片/提示/日志保留、当前任务/回执/权限/字节否定对照；名义2秒实际4.25秒保留102正文帧+1封面帧、原AAC包、零音频/字幕偏移，分数与qualityReviewPerformed如实空值/false。保留并发唯一publisher及真实compose/subtitle/danmaku/mux失败不发布。当前canonical Node/Vitest各57/57与current-native57/57实际通过；不改必需CI集合、不以fixture耗时冒充生产。"
           },
           {
-            "id": "CI-009",
-            "rationale": "A源码/B实际执行：只在原agent测试入口导入新增固定指南测试，原身份、输入、权限、脱敏与能力注册断言保留。CLI/MCP读同一固定模块/正文并返回准确UTF8 SHA，不新增任意路径读取。本人精读当前434行及13行diff，当前原test:scripts和changed-node实际通过，原云端must commands与阈值不变。"
-          },
-          {
-            "id": "CI-010",
-            "rationale": "A源码/B实际执行：发布入口允许已按accepted task/事前授权/官方来源字节固定的成功原片，历史品质/旧voice记录不再触发默认新provider/ASR/TTS；缺件、篡改、错误current receipt、非当前input与实际加工失败继续硬失败。新增composition-process receipt与真正export metadata绑定，验证wrong source/帧分配、drop/add frames、fps和duration等否定；fixture mock媒体与probe边界明确，未伪称可播放生产片。正式封面要求前置1帧和正文全帧保留，音频/字幕0offset。本人精读456行及238行diff，准确当前1d19的current-native实际全部通过，没有引用旧0854执行冒充当前。"
-          },
-          {
-            "id": "CI-011",
-            "rationale": "A源码/B实际执行：实际同次material stage在supplier success后使用正式issued receipt、first witness、task与当前源字节adapter，刷新completed map并记录render-adopted，G7不再用100000-byte门槛否决有效小原片；新增真实child constructor/context/finish及实际parent adoption/result/byte验证闭环。丢adopted事件、清空official verified IDs、源/任务/witness篡改与真实下载失败继续拒绝；off/advisory/blocking post加工如实technical error/null score，不做默认modelquality。当前305行与完整410行diff精读、current-native实际通过；补充15+10独立控制只延续六个关键实现SHA一致的原时间证据，provider/download/WORK-ledger合成边界明确，不宣称whole paid CLI或live生产job。"
-          },
-          {
-            "id": "CI-012",
+            "id": "CI-007",
             "rationale": "A源码/B实际执行：运行载荷仅增加固定docs/ai-video-workbench-guide.md白名单落点，仍执行路径规范化、missing/precompiled-entry失败、软链范围、secret排除及逐字节摘要校验。没有把任意docs目录纳入包、改安装签名或删原校验。本人精读当前197行及37行diff，相关实际current changed-node/whole-scripts载荷测试通过，557/557当前assets与provides机检另外标B。"
           },
           {
+            "id": "CI-008",
+            "rationale": "A源码/B实际执行：只在原agent测试入口导入新增固定指南测试，原身份、输入、权限、脱敏与能力注册断言保留。CLI/MCP读同一固定模块/正文并返回准确UTF8 SHA，不新增任意路径读取。本人精读当前434行及13行diff，当前原test:scripts和changed-node实际通过，原云端must commands与阈值不变。"
+          },
+          {
+            "id": "CI-009",
+            "rationale": "A源码/B实际执行：发布入口允许已按accepted task/事前授权/官方来源字节固定的成功原片，历史品质/旧voice记录不再触发默认新provider/ASR/TTS；缺件、篡改、错误current receipt、非当前input与实际加工失败继续硬失败。新增composition-process receipt与真正export metadata绑定，验证wrong source/帧分配、drop/add frames、fps和duration等否定；fixture mock媒体与probe边界明确，未伪称可播放生产片。正式封面要求前置1帧和正文全帧保留，音频/字幕0offset。本人精读456行及238行diff，准确当前1d19的current-native实际全部通过，没有引用旧0854执行冒充当前。"
+          },
+          {
+            "id": "CI-010",
+            "rationale": "A源码/B实际执行：将正式完整作品封面断言扩充为 v2 prepend-cover-frame：源正文全部帧保留，视频仅前置1帧，音频/字幕偏移均0，且当前input/cover/output SHA相符。新增正文少帧、源SHA/帧率错误与错误偏移拒绝；原显式opening-title和非法回执拒绝仍保留。兼容v1只限不要求保留源帧的旧helper调用，不能作为正式完整作品发布凭据。本人精读当前47行及完整24行diff，当前changed-node与完整test:scripts均通过。"
+          },
+          {
+            "id": "CI-011",
+            "rationale": "A源码/B实际执行：为固定工作台指南新增运行载荷复制、正文摘要、缺文件及软链逃逸失败测试；在未产生预编译入口时继续硬失败，保留原包内路径、secret排除和hash约束。只增加一个固定docs/ai-video-workbench-guide.md，不开放任意docs树，不调整签名安装包保护。本人精读161行及56行diff，当前changed-node和原test:scripts中实际执行通过。"
+          },
+          {
+            "id": "CI-012",
+            "rationale": "A源码/B实际执行：来源选择依据独立固定raw字节，旧TTS/品质记录不替代或否决已固定原片；missing/changed bytes与缺manifest仍拒绝。原片静音、短声轨、奇数画布和异帧率进入本机官方normalize；声画品质不再以PCM质检否决，requested export clock只读真实metadata且qualityReviewPerformed/audioAlignmentMeasured=false。新process receipt严格绑定每个source SHA、源/normalized帧数、帧率、画布、每镜帧分配与全部输出；新增丢帧/加帧、分数帧率/时长错误等拒绝。真实本机compose输出2160x3840的8帧并保留尾标记和AAC包，仍拒绝顺序/删镜/加镜/复用/转场/retime及未接入模型enhance参数。当前current-native实际该文件全部通过，未证明生产4K发布。"
+          },
+          {
             "id": "CI-013",
-            "rationale": "A源码/B实际执行：正式完整作品改用v2 prepend-cover-frame conservation凭据：sourceVideo frame/fps/duration自洽，output恰好sourceFrames+1，bodyVideoOffset=1/fps、audioOffset=subtitleOffset=0，qualityReviewPerformed=false且current input/cover/output三份SHA一致。v1 replace-first-frame只允许明确未要求preserveSourceFrames的兼容helper调用，正式preserveSourceFramesRequired调用拒绝v1。保持显式opening-title规则与全部非法凭据失败；ffprobe不报帧数的兼容仅描述not-reported事实，不替代v2正文完整性。本人精读29行及32行diff，实际publication负控与完整标准后期当前通过，不再采用旧首帧替换文案。"
+            "rationale": "A源码/B实际执行：保留原CI路径，在VITEST环境直接导入canonical全部assertions；原tsx --test入口则实际启动仓库Vitest runner运行canonical。900000ms只用于此真实子进程边界；error/signal/非零status均透传，没有改canonical assertion、skip、原测试超时或全局CI阈值。当前原Node入口实际57/57+外层1通过、Vitest alias57/57；真实FFmpeg非法option负控canonical47fail/10pass并使外层1fail、exit1，证明没有吞子失败或假绿。"
           },
           {
             "id": "CI-014",
             "rationale": "A源码/B实际执行：新增固定指南实际CLI --json/--full与MCP回读、版本/UTF8字节SHA一致性，验证缺件、非法参数/路径、超大、stale repo/version及软链等拒绝；正文覆盖成功镜头直接正式后期、原声和后续完整性Phase2边界。只读入口不执行模型或媒体生产，不增加任意文件读取能力。当前新增112行EOF与118行new-file diff由本人精读，实际changed-node及原agent入口中的回读测试通过。"
+          },
+          {
+            "id": "CI-015",
+            "rationale": "A源码/B实际执行：实际同次material stage在supplier success后使用正式issued receipt、first witness、task与当前源字节adapter，刷新completed map并记录render-adopted，G7不再用100000-byte门槛否决有效小原片；新增真实child constructor/context/finish及实际parent adoption/result/byte验证闭环。丢adopted事件、清空official verified IDs、源/任务/witness篡改与真实下载失败继续拒绝；off/advisory/blocking post加工如实technical error/null score，不做默认modelquality。当前305行与完整410行diff精读、current-native实际通过；补充15+10独立控制只延续六个关键实现SHA一致的原时间证据，provider/download/WORK-ledger合成边界明确，不宣称whole paid CLI或live生产job。"
           }
         ],
-        "ciPolicyChangesHash": "fdeec80c30228db74c37015f2a0929f2226e3dabb9e82590cbb46de378982de1",
+        "ciPolicyChangesHash": "9c3b8ca54c4be9a13002f079643576472dd7be7975f756934d23b85eaf724bed",
         "tests": [
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx scripts/bundle-governance.mts",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:11.130329+00:00",
+            "finishedAt": "2026-10-08T07:56:55.948792+00:00",
             "result": "✅ 行业包契约、兼容范围、资产、导航与完整性门禁通过（base 0.1.0 / ui 0.1.19）"
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-commit-msg.mjs --range ed485d4979f9e92541d7a7066df9557dfeb66f78..HEAD",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:11.245089+00:00",
-            "result": "✓ 1d19e4686ded test(video): align UHD export and CFR contracts [T-2026-1007-0001]\n✓ 455d0c1b9c39 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 0854ce12453a fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ ca640bbe0e21 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ d662ce8f66dc fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 96f3e89cc3da fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 91bd23bc545d fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ b9903fa2ce06 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 98415dee60df fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ eda8255dc676 chore(growth): 重跑限流中断的原生 CI [T-2026-1007-0001]\n\n✓ 提交信息校验通过（11 条，范围 ed485d4979f9e92541d7a7066df9557dfeb66f78..1d19e4686dedd364eb64466d90017c360baa21fb）\n! a3c7f23af124 layer \"industry\" 不在标准集合 [base|platform|hotel|video|growth|ecom|tiger|eagle|fox]（仅告警）"
+            "finishedAt": "2026-10-08T07:56:56.063279+00:00",
+            "result": "✓ 07728e58d9b7 test(video): drain finite fixture audio across FFmpeg versions [T-2026-1007-0001]\n✓ 45ac96dc2f55 test(video): verify canonical runner and retained original media [T-2026-1007-0001]\n✓ 1d19e4686ded test(video): align UHD export and CFR contracts [T-2026-1007-0001]\n✓ 455d0c1b9c39 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 0854ce12453a fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ ca640bbe0e21 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ d662ce8f66dc fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 96f3e89cc3da fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 91bd23bc545d fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ b9903fa2ce06 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 98415dee60df fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ eda8255dc676 chore(growth): 重跑限流中断的原生 CI [T-2026-1007-0001]\n\n✓ 提交信息校验通过（13 条，范围 ed485d4979f9e92541d7a7066df9557dfeb66f78..07728e58d9b7a0f114cbfa37b9be0dd5ca49f066）\n! a3c7f23af124 layer \"industry\" 不在标准集合 [base|platform|hotel|video|growth|ecom|tiger|eagle|fox]（仅告警）"
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-hard-gate-policy.mjs",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:11.337061+00:00",
+            "finishedAt": "2026-10-08T07:56:56.151338+00:00",
             "result": "[hard-gate-policy] 通过：扫描 133 个文件，未发现\"创作口径写成硬闸\"。"
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/tools/film-publication-policy.test.mjs",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:11.444125+00:00",
-            "result": "✔ project and cover metadata never become an implicit opening title (0.996708ms)\n✔ explicit title preserves the full requested text; disable remains explicit (0.183417ms)\n✔ successful assembly must still bind the actual current publication bytes (0.208833ms)\n✔ a sidecar or old prepend receipt cannot grant publication cover status (0.414083ms)\n✔ formal cover publication requires the complete body and truthful independent track offsets (0.179ms)\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 44.224958"
+            "finishedAt": "2026-10-08T07:56:56.253542+00:00",
+            "result": "✔ project and cover metadata never become an implicit opening title (0.915417ms)\n✔ explicit title preserves the full requested text; disable remains explicit (0.184458ms)\n✔ successful assembly must still bind the actual current publication bytes (0.203334ms)\n✔ a sidecar or old prepend receipt cannot grant publication cover status (0.3855ms)\n✔ formal cover publication requires the complete body and truthful independent track offsets (0.16225ms)\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 36.853916"
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p packages/video-studio/tsconfig.json",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:11.810274+00:00",
+            "finishedAt": "2026-10-08T07:56:56.669708+00:00",
             "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p apps/server/tsconfig.json",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:12.861941+00:00",
+            "finishedAt": "2026-10-08T07:56:57.737685+00:00",
             "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/ai-video-workbench-guide.test.mjs",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:13.112791+00:00",
-            "result": "✔ fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call (5.518708ms)\n✔ guide rejects all caller paths, overrides and non-object inputs (0.893583ms)\n✔ guide fails closed for missing guide (1.732584ms)\n✔ guide fails closed for empty guide (0.968625ms)\n✔ guide fails closed for oversized guide (1.051084ms)\n✔ guide fails closed for directory as guide (1.037084ms)\n✔ guide fails closed for stale guide version (1.225958ms)\n✔ guide fails closed for wrong guide identity (0.894875ms)\n✔ guide fails closed for invalid UTF-8 guide (0.904208ms)\n✔ guide fails closed for missing manifest (1.472125ms)\n✔ guide fails closed for invalid manifest (0.964042ms)\n✔ guide fails closed for wrong product repository (0.895958ms)\n✔ guide file and escaped parent symlinks cannot expose external bytes (1.600834ms)\n✔ CLI list/describe/invoke work from another cwd without credentials and preserve full guide bytes (86.6725ms)\n✔ real generic MCP discovers and reads guide; invalid extra fields fail with structured errors (33.677209ms)\nℹ tests 15\nℹ suites 0\nℹ pass 15\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 181.895917"
+            "finishedAt": "2026-10-08T07:56:57.974716+00:00",
+            "result": "✔ fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call (6.178167ms)\n✔ guide rejects all caller paths, overrides and non-object inputs (0.914208ms)\n✔ guide fails closed for missing guide (2.188209ms)\n✔ guide fails closed for empty guide (1.035708ms)\n✔ guide fails closed for oversized guide (1.667ms)\n✔ guide fails closed for directory as guide (1.085417ms)\n✔ guide fails closed for stale guide version (0.988625ms)\n✔ guide fails closed for wrong guide identity (0.857542ms)\n✔ guide fails closed for invalid UTF-8 guide (1.279792ms)\n✔ guide fails closed for missing manifest (1.110834ms)\n✔ guide fails closed for invalid manifest (0.804792ms)\n✔ guide fails closed for wrong product repository (0.789542ms)\n✔ guide file and escaped parent symlinks cannot expose external bytes (1.398583ms)\n✔ CLI list/describe/invoke work from another cwd without credentials and preserve full guide bytes (79.15925ms)\n✔ real generic MCP discovers and reads guide; invalid extra fields fail with structured errors (32.975125ms)\nℹ tests 15\nℹ suites 0\nℹ pass 15\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 171.312667"
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/runtime-deps-lock.mjs verify",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:13.190548+00:00",
+            "finishedAt": "2026-10-08T07:56:58.054456+00:00",
             "result": "✅ runtime 依赖锁有效：workloom-ai-growth · 12 个直接依赖"
           },
           {
             "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
             "exitCode": 0,
-            "finishedAt": "2026-10-08T05:12:13.269531+00:00",
+            "finishedAt": "2026-10-08T07:56:58.139264+00:00",
             "result": "✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/ci/cnb-desktop-release.test.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T07:56:58.901597+00:00",
+            "result": "✔ CNB config has main-only signed producers and one locked publisher (8.902875ms)\n✔ Windows release runner calls pwsh and creates the pgvector source directory before git -C (5.443459ms)\n✔ context rejects wrong branch, source SHA, repo, role, or unsigned mode (1.368583ms)\n✔ preflight binds remote main and tag and refuses an existing Release (15.438833ms)\n✔ Mac producer seals exact candidates, uploads them once, and reads back SHA-512 (13.555666ms)\n✔ producer rejects a substituted remote candidate and untrusted confirmation URL (4.509042ms)\n✔ publisher creates draft, uploads exactly five assets, verifies remote bytes, then makes Latest (14.168708ms)\n✔ publisher leaves a draft when remote Release bytes change; never makes it public (7.920375ms)\n✔ publisher rejects a coherently replaced installer and manifest before creating a draft (4.214333ms)\n✔ publisher refuses mixed-build candidates before creating any Release (3.869792ms)\n✔ publisher rejects unsafe remote candidate filenames before download (4.324083ms)\n✔ publisher rejects a corrupted downloaded installer before the first Release write (4.642292ms)\n✔ publisher keeps a draft if main diverges before public promotion (8.242833ms)\n✔ a bound build can publish while protected main advances normally (11.683792ms)\n✔ a post-promotion tag violation reports that the release is already public (11.058125ms)\n✔ latest required checks choose full push family over prior green PR family (0.144125ms)\n✔ absence of any push family permits exactly three latest PR checks (0.050208ms)\n✔ later failing, pending, skipped or unknown state cannot inherit an older success (0.139334ms)\n✔ latest success may replace an earlier failure and conflicting ties fail (0.063542ms)\n✔ empty, enveloped, malformed or invalid timestamp CI data is incomplete (0.099625ms)\n✔ preflight writes fresh mode 0600 exact-source observation and refuses overwrite (1.378084ms)\n✔ first preflight stays exact even when a descendant compare would pass (0.757042ms)\n✔ preflight observation is bound to repo, SHA, tag, build, role, signing and current checks (0.921625ms)\n✔ receipt file rejects missing, malformed, oversized, symlink and outside workspace paths (1.681791ms)\n✔ later binding accepts protected exact main or a bound real descendant (1.427917ms)\n✔ later compare refuses divergent, abbreviated or incorrectly bound source and target (3.888916ms)\n✔ main movement during reads is retried within three attempts and continuous movement fails (1.71775ms)\n✔ post-build producer uses persisted first observation when protected main advances (5.365208ms)\n✔ publisher initial mismatch or newer red CI never performs a Release write (4.552291ms)\n✔ publisher uses persisted first observation across candidate await and normal main movement (12.041375ms)\n✔ binding failure before PATCH preserves an actual draft receipt (8.110709ms)\n✔ PATCH network ambiguity after successful promotion is reconciled by GET without repeating writes (9.662667ms)\n✔ PATCH failure with an observed draft reports false and performs no overwrite or second promotion (8.767958ms)\n✔ all state GETs failing after PATCH reports unknown rather than claiming unpublished (7.3295ms)\n✔ visible public release whose Latest cannot be confirmed reports true and incomplete (8.02875ms)\n✔ post-promotion ci violation preserves published=true (10.438958ms)\n✔ post-promotion protection violation preserves published=true (9.100625ms)\n✔ post-promotion ancestry violation preserves published=true (10.171333ms)\n✔ normal protected main advance after promotion returns complete actual publication receipt (8.968459ms)\n✔ post-promotion public asset mutation is detected with actual byte evidence (7.5365ms)\n✔ post-promotion source API failure is incomplete while actual public state remains true (9.980625ms)\n✔ CI API authorization, throttle and schema failure cannot certify preflight (2.735292ms)\n✔ CI config uses role-local first observations and explicit full lock/release contract tests (358.117834ms)\n✔ a cleanup exception after successful public verification preserves the actual publication receipt (13.244125ms)\n✔ cleanup failure cannot replace a primary postpublication tag violation or its receipt (10.003834ms)\n✔ a newer created pending or failed run cannot inherit an older run that finished later (0.171666ms)\n✔ same-created different run targets or unidentifiable conflicting states are ambiguous (0.161834ms)\nℹ tests 47\nℹ suites 0\nℹ pass 47\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 698.885625"
+          },
+          {
+            "command": "pnpm test",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T07:58:57.079521+00:00",
+            "result": "Exit code 0. Full actual execution log is retained at /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/post-render-default-acceptance/growthtest/root-postcommit-whole-workspace-native.log; SHA-256 dc364141af872da56ea0bc584cfb9b0a17059f594857ba552029ec0cb59f2d1f; 82381 bytes. The review receipt field is bounded by the existing 20,000-character schema; these are verbatim beginning and ending excerpts.\n> workloom-ai-acquisition@0.1.0 test /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n> pnpm -r --if-present test\n\nScope: 11 of 12 workspace projects\npackages/audit-engine test$ vitest run\npackages/industry-contract test$ vitest run\npackages/shared test$ vitest run\napps/webc test$ ../../node_modules/.bin/vitest run\npackages/industry-contract test:  RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/packages/industry-contract\npackages/audit-engine test:  RUN  v3.2.7 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/packages/audit-engine\npackages/shared test:  RUN  v3.2.7 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/packages/shared\napps/webc test: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\napps/webc test:   - import \"./vite.config\" without a file extension (vitest.config.ts:6:24). Add the file extension\napps/webc test: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\napps/webc test:  RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/apps/webc\npackages/industry-contract test:  Test Files  2 passed (2)\npackages/industry-contract test:       Tests  38 passed (38)\npackages/industry-contract test:    Start at  15:56:59\npackages/industry-contract test:    Duration  809ms (transform 212ms, setup 0ms, import 695ms, tests 279ms, environment 0ms)\npackages/industry-contract test: Done\npackages/video-studio test$ vitest run\napps/webc test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/index.js\" points to missing source files\napps/webc test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/language.js\" points to missing source files\napps/webc test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/entity-presentation.js\" points to missing source f\n[Middle omitted from this receipt only; full original log remains hash-bound.]\nkloom/ui/dist/language.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/entity-presentation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/navigation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/icons.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/managed-surface.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/modal-document-state.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-manager.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-stack.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/color-contrast.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/layout-controls.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/index.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/components.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/language.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/entity-presentation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/primitives.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/navigation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/forms.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/icons.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlays.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/managed-surface.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/states.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/modal-document-state.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/shell.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-manager.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-stack.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/color-contrast.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/layout-controls.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/patterns.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/components.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/data.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/primitives.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/forms.js\" points to missing source files\napps/webb test:  Test Files  2 passed (2)\napps/webb test:       Tests  6 passed (6)\napps/webb test:    Start at  15:58:53\napps/webb test:    Duration  380ms (transform 85%, import 12%, tests 2%, worker 1%)\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlays.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/states.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/shell.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/patterns.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/data.js\" points to missing source files\napps/webb test: Done\napps/web test:  Test Files  40 passed (40)\napps/web test:       Tests  248 passed (248)\napps/web test:    Start at  15:58:53\napps/web test:    Duration  3.36s (transform 2.50s, setup 0ms, import 4.80s, tests 4.48s, environment 8.95s)\napps/web test: Done"
+          },
+          {
+            "command": "pnpm test:scripts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T07:59:48.409194+00:00",
+            "result": "Exit code 0. Full actual execution log is retained at /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/post-render-default-acceptance/growthtest/root-postcommit-original-test-scripts-native.log; SHA-256 96b083316bf610115fc874565f90f95341a9d447867311d062905bc9e71ba119; 30411 bytes. The review receipt field is bounded by the existing 20,000-character schema; these are verbatim beginning and ending excerpts.\n> workloom-ai-acquisition@0.1.0 test:scripts /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n> vitest run scripts/tools/video-request-regression.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-native-post.test.ts scripts/bundle-governance.test.ts scripts/suite-fixture-preflight.test.ts scripts/verify-client-foundation-extensions.test.ts scripts/geo-fusion-plan-doc-sync.test.ts bundles/ai-video/connectors/bgm-bridge/verify-message.test.ts bundles/ai-video/connectors/bgm-bridge/genre-mismatch.test.ts bundles/ai-video/connectors/bgm-bridge/recipes-expansion.test.ts bundles/ai-video/connectors/bgm-bridge/tonality-context.test.ts bundles/ai-video/connectors/color-bridge/core.test.ts bundles/ai-video/library/luts/luts.test.ts bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts bundles/ai-video/connectors/cine-kb-bridge/audit-round3.test.ts && node --test scripts/tools/film-voice-artifact.test.mjs scripts/tools/film-audio-policy.test.mjs scripts/tools/film-publication-policy.test.mjs scripts/tools/film-render-task.test.mjs scripts/tools/film-render-ledger.test.mjs scripts/tools/film-cli-preflight.test.mjs scripts/agent-capabilities.test.mjs scripts/video-capabilities.test.mjs bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs scripts/ci/hard-gate-policy.test.mjs && pnpm test:desktop\n\n\n RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n\n\n Test Files  15 passed (15)\n      Tests  404 passed (404)\n   Start at  15:58:57\n   Duration  17.50s (transform 1.69s, setup 0ms, import 3.09s, tests 34.86s, environment 1ms)\n\n▶ 配乐声明式直混（无签章签发者时的正常交付路径）\n  ✔ 无签发者 + 兼容显式声明：直混出片，回执如实标注原生节目且未作分轨或品质认证 (256.59ms)\n  ✔ 不声明、也没有签章：默认消费原片音轨，完成单次请求混音 (217.351542ms)\n  ✔ 高峰值混合源执行请求混音，不做响度/峰值/让位品质审核或重试 (435.822375ms)\n  ✔ 静音混合源正常配乐，静音不是二次品质否决 (180.462291ms)\n  ✔ 真实 mix/best CLI 的显式坏引用不得被兼容声明或默认原声路径吞掉 (1065.169708ms)\n✔ 配乐声明式直混（无签章签发者时的正常交付路径） (2237.075708ms)\n✔ fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call (12.545125ms)\n✔ guide rejects all caller paths, overrides and non-object inputs (2.631833ms)\n✔ guide fails closed for missing guide (2.49275ms)\n✔ guide fails closed for empty guide (1.410791ms)\n✔ guide fails closed for oversized guide (1.049291ms)\n✔ guide fails closed for directory as guide (0.99ms)\n✔ guide fails closed for stale guide version (1.011875ms)\n✔ guide fails closed for wrong guide identity (1.009041ms)\n✔ guide fails closed for invalid UTF-8 guide (0.948917ms)\n✔ guide fails closed for missing manifest (0.766375ms)\n✔ guide fails closed for invalid manifest (0.832292ms)\n✔ guide fails closed for wrong product repository (0.851708ms)\n✔ guide file and escaped parent symlinks cannot expose external bytes (1.492875ms)\n✔ CLI list/describe/invoke work from another cwd without credentials and preserve full guide bytes (113.051917ms\n[Middle omitted from this receipt only; full original log remains hash-bound.]\n verified dubbed clip is reusable only while its complete provenance matches (3.387375ms)\n✔ a newer old dub cannot hide a changed raw clip or a failed latest receipt (0.745291ms)\n✔ a raw clip accepted by ASR remains the composition choice even with a newer dub file (0.516417ms)\n✔ a failed dub cannot accept or overwrite a stale previous output (0.706334ms)\n✔ only a successful and verified new candidate is promoted (0.853291ms)\n✔ an unverified or degraded voice receipt cannot authorize a raw clip (0.47325ms)\n✔ delivery hashes main, attachments and asset list; later tampering is detected (7.376083ms)\n✔ 30秒预览接受28/32/35秒完整镜头池；显式硬上限在给出执行命令前阻断 (7.964ms)\n✔ standard native production has no local ASR or dubbing prerequisite (1.298375ms)\n✔ native plan rejects replacement narration, muted generation and unsupported exact shot clocks (4.032958ms)\n✔ standard delivery outputs and first-frame cover claims are actually hashed (2.697417ms)\n✔ standard output empty, duplicate, missing master, invalid and conflicting covers never pass (4.518791ms)\n✔ empty manifest, missing or empty main, directory and missing digest never pass (1.74025ms)\n✔ cross-project manifests, conflicting digests, invalid JSON and path escapes fail (3.93825ms)\n✔ suggested POSIX command preserves every argument literally and supplies a PowerShell representation (34.750417ms)\nℹ tests 108\nℹ suites 2\nℹ pass 108\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2314.902208\n\n> workloom-ai-acquisition@0.1.0 test:desktop /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n> node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs apps/desktop/electron/render-smoke.test.cjs scripts/desktop-bootstrap-db.test.mjs scripts/runtime-deps-lock.test.mjs scripts/pack-nm-merge.test.mjs scripts/payload-policy.test.mjs scripts/pack-workspace-modules.test.mjs scripts/product-runtime-assets.test.mjs scripts/reset-safety.test.mjs\n\n✔ signing keys persist independently and a valid existing key is preserved (2.254708ms)\n✔ a failed child has an actionable startup error and writes a bounded diagnostic (5.71225ms)\n✔ HTTP 200 from another local instance does not pass desktop readiness (36.180125ms)\n▶ 启动诊断秘密脱敏\n  ✔ 原有文本 JWT、盐和 Bearer (6.806333ms)\n  ✔ JSON 引号与大小写字段 (1.021459ms)\n  ✔ 引号内的空格和分隔符 (1.313375ms)\n  ✔ 带编码密码的连接 URI (1.022583ms)\n  ✔ libpq 密码与 URI 查询密码 (0.853334ms)\n  ✔ Basic 授权和 Cookie (0.83ms)\n  ✔ JSON 转义引号和 Unicode 密码 (0.72525ms)\n  ✔ 错误摘要和日志读取失败也经过脱敏 (0.925125ms)\n  ✔ 读取异常关闭自己的文件句柄并保留失败信息 (3.4775ms)\n  ✔ 空日志和有界尾部仍保留版本、主机和错误上下文 (5.637334ms)\n  ✔ 取消无写入；新建与覆盖后的诊断文件均为私有 (5.586958ms)\n  ✔ 保存对话框和文件写入失败均留在可恢复启动页 (2.06925ms)\n✔ 启动诊断秘密脱敏 (31.080042ms)\n▶ 渲染探针不占用产品 GPU 上下文\n  ✔ WebGL2 检测后立即释放临时上下文，不再检测 WebGL1 (0.409542ms)\n  ✔ WebGL1 回退同样释放，扩展未提供时仍如实报告能力 (0.067292ms)\n  ✔ 无上下文、创建异常、释放异常均报告不可用 (0.07ms)\n✔ 渲染探针不占用产品 GPU 上下文 (0.611875ms)\n▶ 真实首日引导退出的渲染冒烟\n  ✔ 欢迎层退出的空帧不能跳过下一次 React 提交才出现的引导 (0.291458ms)\n  ✔ 存在引导入口却一直不出现引导时不能标成退出成功 (1.639583ms)\n  ✔ 点了关闭仍持续覆盖时在原截止时间内失败关闭 (0.758708ms)\n  ✔ 未安装引导内容包时稳定无遮挡仍可验收 (0.108ms)\n  ✔ 缺退出按钮或 renderer 执行失败均不吞异常 (0.4015ms)\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-bootstrap-04wpNP/payload）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 → 装配运行时载荷（2.0.0）…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-bootstrap-T1Lpiy/payload）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 → 装配运行时载荷（2.0.0）…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-bootstrap-2Z79Rz/payload）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 → 装配运行时载荷（2.0.0）…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-packaged-payload-missing-nUPalS/resources）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-packaged-no-double-payload-Uq8KAe/resources）==\n15:59:17 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (22.42975ms)\n✔ 真实首日引导退出的渲染冒烟 (26.062875ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (2.729458ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (5.178292ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (0.607625ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (1.775792ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (1.36175ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.553959ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.827458ms)\n✔ 产品截图采用捕获时的可见场景 (14.264709ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (28.93425ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.385333ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (2.004083ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.619958ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (6.92475ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (4.5135ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (4.298875ms)\n  ✔ 首装暂存失败不会留下半套运行时 (2.63925ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (0.874583ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.169542ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.683292ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (0.900291ms)\n✔ 桌面载荷原子装配 (55.229708ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.124208ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (0.992625ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.162417ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (0.51325ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (2.318125ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (7.34075ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (11.609542ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (1.948875ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (32.604083ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.103625ms)\n✔ 桌面本机渲染子进程的 Node 路径 (34.739542ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (1.891375ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (2.118375ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (1.265083ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.214208ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (1.357792ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (1.352125ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.279875ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.547542ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.231208ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (9.450209ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (2.559292ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (0.859667ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.1515ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.17475ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (3.926792ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (12.618916ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (0.9105ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (1.909917ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (3.754083ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (2.09475ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (3.655958ms)\n✔ native smoke captures the actual product region for its pixel verdict (2.691916ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (6.891083ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (5.258667ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (7.916667ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (4.85525ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (6.469667ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (3.224375ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (6.294208ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (5.739ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (8.066833ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (6.653625ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (9.356958ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (3.437292ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (3.192459ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (9.042041ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (11.3875ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (3.017458ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (2.172ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (5.330375ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (2.963917ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (16.730209ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (2.042667ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (2.184875ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (1.645084ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-helper-inspect-kyrItW/pgdata\",\"port\":55432,\"hbaFile\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-helper-inspect-kyrItW/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (0.361ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.27275ms)\n✔ 客户端投影路径围栏 (1.724583ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (3.733917ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (1.201542ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (2.706833ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (1.827208ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (1.017666ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (0.723542ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (2.037167ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (4.172416ms)\n  ✔ 实例报告端口不符时失败且零写入 (1.934792ms)\n✔ 桌面数据库安全引导 (19.983792ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (1.1645ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (10.419ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (4.306666ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (2.631417ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (8.517125ms)\n✔ 包目录创建顺序不影响依赖清单输出 (6.019333ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (136.713541ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (40.731208ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (1.999958ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (5.045667ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (2.848834ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (7.465542ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (3.477292ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (63.816916ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (1.310208ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (45.176334ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.355542ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (90.467875ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (35.485ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (10.886292ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (4.823625ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (1.742792ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (1.824458ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.286791ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (0.735542ms)\n✔ normal physical source copy records canonical source and generated contract bytes (130.113ms)\n✔ missing fixed video guide fails before compiler or payload writes (31.441042ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (41.282667ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (41.23075ms)\n✔ existing derived-output symlink cannot replace an external file (40.00125ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (40.076875ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (40.471584ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (39.527208ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (30.542167ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (75.985ms)\n✔ payload cannot be created inside a selected source tree (29.06025ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (30.349583ms)\n✔ canonical output aliases cannot overwrite the checkout (28.839916ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (88.616583ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (476.293167ms)\n✔ 检测到非演示工作区时拒绝删除 (1102.43ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (1718.995291ms)\n✔ 未知参数 fail closed (7.4235ms)\n✔ 备份失败时禁止删除和后续迁移种子 (1096.813667ms)\n✔ 空备份不能证明可恢复，禁止删除 (1461.041208ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (6356.041625ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (5772.382042ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (5802.338125ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (2837.002083ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (3310.124584ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.580333ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.277458ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (17.209208ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (1.271458ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (4.747042ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (1.485708ms)\nℹ tests 162\nℹ suites 11\nℹ pass 162\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 30186.85275"
           }
         ],
-        "reviewedAt": "2026-10-08T06:00:45.648Z",
-        "summary": "Successful completed provider shots enter official post through actual task, first witness, current source bytes and adopted events. Default post does not veto or regenerate identity, wardrobe, action, raw specification, audio/lip/dialogue or aesthetic quality, and uses original program audio. Actual requested processing/export failures and prior authorization remain explicit. Current production completeness, normal source clock, cover assembly and generation idempotency implementations are retained by an ordinary two-parent merge. Same-run small media and worker finish now use real official adoption. The discoverable CLI/MCP workbench guide and real runtime assets follow this behavior. No paid provider/model/ASR/TTS production call. Broader Phase2 planning/integration remains a later separate authorized task. Latest minimal test-only child migrates three obsolete UHD/CFR assertions, preserving original source/recipe fingerprints, frame/PTS/audio tolerances and real failure controls; adds two front-door rejection controls. No product implementation byte changes in this child.",
+        "reviewedAt": "2026-10-08T08:40:50.680Z",
+        "summary": "Successful completed provider shots enter official post through actual task, first witness, current source bytes and adopted events. Default post does not veto or regenerate identity, wardrobe, action, raw specification, audio/lip/dialogue or aesthetic quality, and uses original program audio. Actual requested processing/export failures and prior authorization remain explicit. Current production completeness, normal source clock, cover assembly and generation idempotency implementations are retained by an ordinary two-parent merge. Same-run small media and worker finish now use real official adoption. The discoverable CLI/MCP workbench guide and real runtime assets follow this behavior. No paid provider/model/ASR/TTS production call. Broader Phase2 planning/integration remains a later separate authorized task. Latest minimal test-only child migrates three obsolete UHD/CFR assertions, preserving original source/recipe fingerprints, frame/PTS/audio tolerances and real failure controls; adds two front-door rejection controls. No product implementation byte changes in this child. Current native CI test contracts execute unchanged canonical aliases and retain original 180-frame source, final frame and program audio without implicit voice work. Real exit, signal, missing runner, explicit dubbing authority and missing FFmpeg failures remain tested. Production implementation and protected prior cases are unchanged by this final two-test delta. Finite synthetic audio/video inputs now drain independently to EOF across FFmpeg versions. The original source-frame, tail-frame, full tail-audio and error assertions remain unchanged; no production implementation or media-tool configuration change.",
         "passed": true,
-        "id": "9dfd89b029c3d3bee5b183dd940aafdab8110338883f9fcc43b316cbcb296622"
+        "id": "e43be1892e29bda6f60ebc86caf3c8e7d5624b53d643bb74654ef39f43dc2a4f"
       },
       "reviewSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
@@ -2340,7 +2364,7 @@
           "number": 119,
           "state": "open",
           "title": "fix(video): 成功渲染素材直接进入正式后期 [T-2026-1007-0001]",
-          "body": "成功镜头此前可能被渲染后的身份、服装、画面、动作、规格、声音、口型或台词质量检查阻塞，并触发再次生成或多轮后期。现在按实际供应商任务、输入作用域和当前文件摘要接受已有成功素材，直接进入官方后期；默认保留原片节目音轨，按请求执行一次真实加工。\n\nCLI、服务端/子工作器、后期连接器、围栏、预设、技能与可发现的 CLI/MCP 工作台指南已同步。真实供应商失败、源文件缺失或篡改、事前权限/授权/资金，以及请求加工或导出失败继续明确报错。\n\n验证：精确提交 `1d19e4686dedd364eb64466d90017c360baa21fb` 的正式离线 CLI、实际围栏与工作器调用链、能力、指南 CLI/MCP、两个包类型检查、官方包生成器/完整性、提交协议及秘密扫描均已实际通过。准确命令、日志和源摘要保存在本次审查回执；真实独立语义复核正在进行，完成前 ready=false。\n\n边界：没有供应商、模型、图像/视频生成、ASR/TTS 或新生产影片调用；合成夹具耗时不作为生产测速。“作品完整性优先、普通时长允许自然浮动”是后续单独任务，本 PR 不冒充已落实。源码经原生交付队列与准确候选 CI 发布；不声称签名安装包发布。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+          "body": "成功镜头此前可能被渲染后的身份、服装、画面、动作、规格、声音、口型或台词质量检查阻塞，并触发再次生成或多轮后期。现在按实际供应商任务、输入作用域和当前文件摘要接受已有成功素材，直接进入官方后期；默认保留原片节目音轨，按请求执行一次真实加工。\n\nCLI、服务端/子工作器、后期连接器、围栏、预设、技能与可发现的 CLI/MCP 工作台指南已同步。真实供应商失败、源文件缺失或篡改、事前权限/授权/资金，以及请求加工或导出失败继续明确报错。\n\n验证：精确提交 `07728e58d9b7a0f114cbfa37b9be0dd5ca49f066` 的正式离线 CLI、实际围栏与工作器调用链、能力、指南 CLI/MCP、两个包类型检查、官方包生成器/完整性、提交协议及秘密扫描均已实际通过。准确命令、日志和源摘要保存在本次审查回执；真实独立语义复核正在进行，完成前 ready=false。\n\n边界：没有供应商、模型、图像/视频生成、ASR/TTS 或新生产影片调用；合成夹具耗时不作为生产测速。“作品完整性优先、普通时长允许自然浮动”是后续单独任务，本 PR 不冒充已落实。源码经原生交付队列与准确候选 CI 发布；不声称签名安装包发布。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
           "author": {
             "username": "cnb.dYiF05kxAGA",
             "nickname": "Genius",
@@ -2361,7 +2385,7 @@
           },
           "head": {
             "ref": "refs/heads/task/T-2026-1007-0001",
-            "sha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+            "sha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2369,7 +2393,7 @@
               "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
             }
           },
-          "blocked_on": "status_check",
+          "blocked_on": "unblocked",
           "merged_by": {
             "is_npc": false
           },
@@ -2379,7 +2403,7 @@
           "is_force_merged": false,
           "statuses": {}
         },
-        "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+        "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
         "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
         "files": [
           "AGENTS.repo.md",
@@ -2462,6 +2486,7 @@
           "packages/video-studio/src/cover-assembly.ts",
           "packages/video-studio/src/cover-composition-entrypoint.test.ts",
           "packages/video-studio/src/deliver.ts",
+          "packages/video-studio/src/director-completion-bridge.test.ts",
           "packages/video-studio/src/director-planner.ts",
           "packages/video-studio/src/director-post-default.integration.test.ts",
           "packages/video-studio/src/film-completion-entrypoint.test.ts",
@@ -2483,6 +2508,7 @@
           "scripts/AGENT-CAPABILITIES.md",
           "scripts/agent-capabilities.test.mjs",
           "scripts/ai-video-workbench-guide.test.mjs",
+          "scripts/ci/cnb-desktop-release.test.mjs",
           "scripts/product-runtime-assets.mjs",
           "scripts/product-runtime-assets.test.mjs",
           "scripts/tools/compose-film.mts",
@@ -2511,7 +2537,7 @@
           "dependsOn": [],
           "releases": []
         },
-        "headTime": 1791436306000,
+        "headTime": 1791446176000,
         "mergeBase": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
         "checkErrors": [],
         "checkSha": null,
@@ -2519,48 +2545,48 @@
         "ciPolicyChanges": [
           {
             "id": "CI-001",
-            "file": "scripts/tools/film-publication-policy.test.mjs",
+            "file": "scripts/tools/video-request-regression.test.ts",
             "before": {
               "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/film-publication-policy.test.mjs",
+              "path": "scripts/tools/video-request-regression.test.ts",
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/film-publication-policy.test.mjs",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/video-request-regression.test.ts",
               "absent": false
             },
-            "digest": "000d92c6bfab195c1704e3d01d4b121b8990e0c43c0da86b4d9f01fb60219993"
+            "digest": "0216ef0e05a3b890e21fb7baf3c372a3af4a7422446d9bbda80a7245f6974190"
           },
           {
             "id": "CI-002",
-            "file": "scripts/tools/film-standard-post.test.ts",
+            "file": "scripts/ci/cnb-desktop-release.test.mjs",
             "before": {
               "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/film-standard-post.test.ts",
+              "path": "scripts/ci/cnb-desktop-release.test.mjs",
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/film-standard-post.test.ts",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/ci/cnb-desktop-release.test.mjs",
               "absent": false
             },
-            "digest": "1221881a00c17fdfa5758d79a1987757022d9722754c5d3eedc78c3d9cb0d68c"
+            "digest": "2e69f940ecc648e65674ffce01fadd0cce33fe09aa7ee71f643125c5a6fc17b8"
           },
           {
             "id": "CI-003",
-            "file": "scripts/tools/film-native-post.test.ts",
+            "file": "scripts/tools/film-publication-policy.mjs",
             "before": {
               "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/film-native-post.test.ts",
+              "path": "scripts/tools/film-publication-policy.mjs",
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/film-native-post.test.ts",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/film-publication-policy.mjs",
               "absent": false
             },
-            "digest": "15dfe1f0a6b2ef4aac83713c619c63e7ce32ec956aa249b4ce4b177d6574b259"
+            "digest": "3957c1ee2e6349b07640c807aba9d7f64e0195a37f5da762ec341c54e6f663dc"
           },
           {
             "id": "CI-004",
@@ -2571,44 +2597,14 @@
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
               "path": "scripts/tools/compose-native-clock.test.ts",
               "absent": false
             },
-            "digest": "24885b7a764dbaaa1184d9e6fa8f7457bb789a477cc0aaeb65e5ee188509b33a"
+            "digest": "45cb9cfadd31736c770a2a89a0c719afb3425e113d7368898a1626bc0a4fbd32"
           },
           {
             "id": "CI-005",
-            "file": "scripts/product-runtime-assets.test.mjs",
-            "before": {
-              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/product-runtime-assets.test.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/product-runtime-assets.test.mjs",
-              "absent": false
-            },
-            "digest": "313efef67f48e77178d3b56a527979d1edd11a89f8c6b0697182f79617709bba"
-          },
-          {
-            "id": "CI-006",
-            "file": "scripts/tools/film-existing-render-edit.test.ts",
-            "before": {
-              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/film-existing-render-edit.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/film-existing-render-edit.test.ts",
-              "absent": false
-            },
-            "digest": "3b4959b9f1ddd183bcc79aa0dd82a730f183b112149fa3c69bb2fce833f7b56c"
-          },
-          {
-            "id": "CI-007",
             "file": "scripts/tools/film-cli-preflight.test.mjs",
             "before": {
               "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
@@ -2616,74 +2612,29 @@
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
               "path": "scripts/tools/film-cli-preflight.test.mjs",
               "absent": false
             },
-            "digest": "50367b8b52cac597f15ff1f8679c0c2250a189176b0ef8ce6ce1ab16d9e7f665"
+            "digest": "4c417f466dabad31007ceff801aebd5c9435f15991fa6d4bca777bfeb9e5ab6f"
           },
           {
-            "id": "CI-008",
-            "file": "scripts/tools/video-request-regression.test.ts",
+            "id": "CI-006",
+            "file": "scripts/tools/film-standard-post.test.ts",
             "before": {
               "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/video-request-regression.test.ts",
+              "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/video-request-regression.test.ts",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
-            "digest": "66983ab41db9f184466e81a40cda13279fac2b0b3dba83d8022d1fd3b5863ae9"
+            "digest": "5d937ecf6213cfb2ad4ec2ecdc7b136886636e3c9fdddb9e94ce12282b2eae5b"
           },
           {
-            "id": "CI-009",
-            "file": "scripts/agent-capabilities.test.mjs",
-            "before": {
-              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/agent-capabilities.test.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/agent-capabilities.test.mjs",
-              "absent": false
-            },
-            "digest": "77678a7a7921284b87a01d5298f6c5c69f403a2b26b7bdd4172de9cb150ec3c3"
-          },
-          {
-            "id": "CI-010",
-            "file": "scripts/tools/film-release-entrypoints.test.ts",
-            "before": {
-              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "digest": "9285cbcba63311ceffa183642ae653ba5dfd8d6a91ec8223e95c5447c162e594"
-          },
-          {
-            "id": "CI-011",
-            "file": "scripts/tools/film-rendered-material-use.test.ts",
-            "before": {
-              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/film-rendered-material-use.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/film-rendered-material-use.test.ts",
-              "absent": false
-            },
-            "digest": "9bfe82ac19ff4726d39cb7260dde1ded45052587f4cfcc332d57a43f1f435349"
-          },
-          {
-            "id": "CI-012",
+            "id": "CI-007",
             "file": "scripts/product-runtime-assets.mjs",
             "before": {
               "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
@@ -2691,26 +2642,101 @@
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
               "path": "scripts/product-runtime-assets.mjs",
               "absent": false
             },
-            "digest": "b2929673defa656362fe6845960b6e95fe089817ff2f0edcdeaf9f9f13e9915f"
+            "digest": "6be2caee6ad53f98e29bfdda0415c3ba208fcec8e256a661a9c1022c6ca63030"
           },
           {
-            "id": "CI-013",
-            "file": "scripts/tools/film-publication-policy.mjs",
+            "id": "CI-008",
+            "file": "scripts/agent-capabilities.test.mjs",
             "before": {
               "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
-              "path": "scripts/tools/film-publication-policy.mjs",
+              "path": "scripts/agent-capabilities.test.mjs",
               "absent": false
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
-              "path": "scripts/tools/film-publication-policy.mjs",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/agent-capabilities.test.mjs",
               "absent": false
             },
-            "digest": "bac74e720f9069d9eaf407382fea085be659d92d00c510b94c27c8863c8a7461"
+            "digest": "6d7340765c69724580c4b4b29ee207e8ced4aa1d230cd541d1565ea9fbd752e1"
+          },
+          {
+            "id": "CI-009",
+            "file": "scripts/tools/film-release-entrypoints.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "digest": "7d491db3cfd6eee9bcef1a44c258f9a40033096154ffb800d1eeb7d095e330d3"
+          },
+          {
+            "id": "CI-010",
+            "file": "scripts/tools/film-publication-policy.test.mjs",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-publication-policy.test.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/film-publication-policy.test.mjs",
+              "absent": false
+            },
+            "digest": "8e23c8f619f40c3c7aebecb4df24e67e3aedc0c6bc703233de06cdafedda8ea0"
+          },
+          {
+            "id": "CI-011",
+            "file": "scripts/product-runtime-assets.test.mjs",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/product-runtime-assets.test.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/product-runtime-assets.test.mjs",
+              "absent": false
+            },
+            "digest": "9539664c0404b49a7a64aea4799585df2a8cb44aa7f5b00be72c0e9539aae497"
+          },
+          {
+            "id": "CI-012",
+            "file": "scripts/tools/film-native-post.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "digest": "9e6c41761e0ee4586d4071e9ba41b095cfd3e679a84429b0b10312030c1fc2f0"
+          },
+          {
+            "id": "CI-013",
+            "file": "scripts/tools/film-existing-render-edit.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-existing-render-edit.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/film-existing-render-edit.test.ts",
+              "absent": false
+            },
+            "digest": "a3584a3f346707cd5e3ca48cc0b4301ebd2550acec622de539fe751f5c167387"
           },
           {
             "id": "CI-014",
@@ -2721,11 +2747,26 @@
               "absent": true
             },
             "after": {
-              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
               "path": "scripts/ai-video-workbench-guide.test.mjs",
               "absent": false
             },
-            "digest": "f1862b8df839a58edc91931a5d710c238a523ccbfb2cec2f44380ddb881e2e43"
+            "digest": "d08b892bc6e593baa513d20bb72075a8a610a0ab12d0f47e88678d66a611f0ff"
+          },
+          {
+            "id": "CI-015",
+            "file": "scripts/tools/film-rendered-material-use.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-rendered-material-use.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "path": "scripts/tools/film-rendered-material-use.test.ts",
+              "absent": false
+            },
+            "digest": "e17d15ca4d5a28ca95b5d70229d86d2c458663b03ea59d2371f27b2493a45b2b"
           }
         ]
       },
@@ -91266,6 +91307,742 @@
       },
       "previous": "7d85cab8b7def84957662cad7e0ba5ffadc2e36588e36c5c9ae2e5ef53d79392",
       "digest": "b8879ba94ad42632efd2fc9b59862d35a8bec495b479f564b0e67d7c61677036"
+    },
+    {
+      "sequence": 3643,
+      "at": "2026-10-08T09:25:50.607Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 119,
+        "id": "e43be1892e29bda6f60ebc86caf3c8e7d5624b53d643bb74654ef39f43dc2a4f",
+        "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78"
+      },
+      "previous": "b8879ba94ad42632efd2fc9b59862d35a8bec495b479f564b0e67d7c61677036",
+      "digest": "500a3b65de865255968ff5864c5b76ac1794b4679d38016d8f88d7cde7d42524"
+    },
+    {
+      "sequence": 3644,
+      "at": "2026-10-08T09:25:50.607Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+          "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+          "branch": "task/T-2026-1007-0001",
+          "intent": {
+            "taskId": "T-2026-1007-0001",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 119,
+            "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "policyHash": "b8296b0f50fc56cdd1fadfac1e14512e3f78ebe1380072d5fb0f9a89706c12af",
+            "reviewedFiles": [
+              "AGENTS.repo.md",
+              "README.md",
+              "apps/server/src/video/director-router.ts",
+              "apps/server/src/video/director-sources.ts",
+              "apps/server/src/video/director-worker.ts",
+              "apps/server/src/video/film-worker-identity.test.ts",
+              "apps/server/src/video/film-worker.test.ts",
+              "apps/server/src/video/film-worker.ts",
+              "bundles/ai-video/README.md",
+              "bundles/ai-video/bundle.json",
+              "bundles/ai-video/connectors/bgm-bridge/README.md",
+              "bundles/ai-video/connectors/bgm-bridge/audio-stems-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/cli.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/core.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/measure.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/color-bridge/README.md",
+              "bundles/ai-video/connectors/color-bridge/cli.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.test.ts",
+              "bundles/ai-video/connectors/color-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/post-bridge/core.mjs",
+              "bundles/ai-video/connectors/post-bridge/delivery-integration.test.ts",
+              "bundles/ai-video/connectors/post-bridge/director-delivery.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/README.md",
+              "bundles/ai-video/connectors/subtitle-bridge/cli.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/core.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts",
+              "bundles/ai-video/connectors/subtitle-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/voice-bridge/README.md",
+              "bundles/ai-video/connectors/voice-bridge/core.mjs",
+              "bundles/ai-video/fences/ai-video-bgm.yml",
+              "bundles/ai-video/fences/ai-video-color.yml",
+              "bundles/ai-video/fences/ai-video-delivery.yml",
+              "bundles/ai-video/fences/ai-video-material.yml",
+              "bundles/ai-video/fences/ai-video-subtitle.yml",
+              "bundles/ai-video/fences/ai-video-voice.yml",
+              "bundles/ai-video/library/director-system/recipes.json",
+              "bundles/ai-video/library/real-person-assets/asset-20260101000000-demo/profile.json",
+              "bundles/ai-video/pipelines/narrative-film.yml",
+              "bundles/ai-video/presets/bgm-composer.yml",
+              "bundles/ai-video/presets/colorist.yml",
+              "bundles/ai-video/presets/post-editor.yml",
+              "bundles/ai-video/presets/subtitle-stylist.yml",
+              "bundles/ai-video/presets/voice-artist.yml",
+              "bundles/ai-video/schemas/objects.json",
+              "bundles/ai-video/skills/bgm-audio-layering/SKILL.md",
+              "bundles/ai-video/skills/bgm-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/caption-burnin-ops/SKILL.md",
+              "bundles/ai-video/skills/color-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/color-grade/SKILL.md",
+              "bundles/ai-video/skills/color-look-design/SKILL.md",
+              "bundles/ai-video/skills/color-shot-matching/SKILL.md",
+              "bundles/ai-video/skills/cover-design/SKILL.md",
+              "bundles/ai-video/skills/delivery-package-ops/SKILL.md",
+              "bundles/ai-video/skills/delivery-revision-ops/SKILL.md",
+              "bundles/ai-video/skills/producer-gate-review/SKILL.md",
+              "bundles/ai-video/skills/render-ops/SKILL.md",
+              "bundles/ai-video/skills/subtitle-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/subtitle-layout-design/SKILL.md",
+              "bundles/ai-video/skills/voice-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/voice-dubbing-sync/SKILL.md",
+              "bundles/geo-growth/agent-capabilities.json",
+              "bundles/geo-growth/capabilities/video.mjs",
+              "bundles/geo-growth/capabilities/workbench-guide.mjs",
+              "docs/agent-computer-guide.md",
+              "docs/ai-video-workbench-guide.md",
+              "docs/real-person-asset.md",
+              "docs/video-standard-post.md",
+              "packages/base/bundles/bgm-capability.test.ts",
+              "packages/base/bundles/post-av-sync.test.ts",
+              "packages/base/bundles/post-delivery-capability.test.ts",
+              "packages/base/bundles/subtitle-capability.test.ts",
+              "packages/base/bundles/voice-capability.test.ts",
+              "packages/video-studio/src/character-release-contract.integration.test.ts",
+              "packages/video-studio/src/cover-assembly.test.ts",
+              "packages/video-studio/src/cover-assembly.ts",
+              "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+              "packages/video-studio/src/deliver.ts",
+              "packages/video-studio/src/director-completion-bridge.test.ts",
+              "packages/video-studio/src/director-planner.ts",
+              "packages/video-studio/src/director-post-default.integration.test.ts",
+              "packages/video-studio/src/film-completion-entrypoint.test.ts",
+              "packages/video-studio/src/film-contracts.ts",
+              "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+              "packages/video-studio/src/film-worker-runtime.test.ts",
+              "packages/video-studio/src/film-worker-runtime.ts",
+              "packages/video-studio/src/index.ts",
+              "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+              "packages/video-studio/src/post-render-acceptance.ts",
+              "packages/video-studio/src/post-render-fence-policy.test.ts",
+              "packages/video-studio/src/producer-gate.test.ts",
+              "packages/video-studio/src/producer-gate.ts",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "plugins/workloom-workbench/README.md",
+              "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+              "plugins/workloom-workbench/skills/workloom/SKILL.md",
+              "scripts/AGENT-CAPABILITIES.md",
+              "scripts/agent-capabilities.test.mjs",
+              "scripts/ai-video-workbench-guide.test.mjs",
+              "scripts/ci/cnb-desktop-release.test.mjs",
+              "scripts/product-runtime-assets.mjs",
+              "scripts/product-runtime-assets.test.mjs",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-cli-preflight.test.mjs",
+              "scripts/tools/film-existing-render-edit.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-publication-policy.d.mts",
+              "scripts/tools/film-publication-policy.mjs",
+              "scripts/tools/film-publication-policy.test.mjs",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-rendered-material-use.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts",
+              "scripts/tools/video-request-regression.test.ts",
+              "tools/codex-gateway/README.md",
+              "tools/codex-gateway/bin/cli.mjs",
+              "tools/codex-gateway/src/mcp.mjs",
+              "tools/codex-gateway/test/mcp.test.mjs",
+              "tools/codex-gateway/test/video-guide.test.mjs"
+            ],
+            "filesHash": "e6c6b29ecfa39335e567e2c9c5e7c2fad399960579a11617bdc471f89f0ac9e1",
+            "dependsOn": [],
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "rationale": "A源码/B实际执行：按取消渲后二次品质门的授权，把旧PCM质检报告迁为真实composition-process回执、current input/output SHA和实际AV start/duration事实；保留每个输出24帧/8fps、全部PTS间隔0.125、原0.13秒容差及原xfade像素断言。最小后续测试提交只迁移3个旧合同：UHD允许本机交付同时保留HD源source/recipe lineage及旧日志前缀，2160p别名前期仍1080p提示且无enhance，concat从6位改9位小数；新增HD/2160p冲突与未接入enhance显式参数两项执行前拒绝。旧749实际399/402/3fail保留，当前原完整脚本404/404并继续Node108/Desktop162，当前35case全部通过。UHD请求回归正例是dry-run合同，生产4K未验证。"
+              },
+              {
+                "id": "CI-002",
+                "rationale": "Migrate one obsolete static-import assertion to behavior of the exact unchanged production alias in real Node processes: canonical runner argv and working directory, success, exit17, real SIGTERM, missing runner, and canonical Vitest import success/failure. Original47 release contract cases execute;46 unaffected regions are byte-identical. No required CI stage, threshold, protected approval, source binding, or production implementation is relaxed. Current45ac postcommit actual original Node47 plus whole pnpm test and full test:scripts green; independent current test/chain review is required before ready handoff."
+              },
+              {
+                "id": "CI-003",
+                "rationale": "A源码/B实际执行：正式完整作品改用v2 prepend-cover-frame conservation凭据：sourceVideo frame/fps/duration自洽，output恰好sourceFrames+1，bodyVideoOffset=1/fps、audioOffset=subtitleOffset=0，qualityReviewPerformed=false且current input/cover/output三份SHA一致。v1 replace-first-frame只允许明确未要求preserveSourceFrames的兼容helper调用，正式preserveSourceFramesRequired调用拒绝v1。保持显式opening-title规则与全部非法凭据失败；ffprobe不报帧数的兼容仅描述not-reported事实，不替代v2正文完整性。本人精读29行及32行diff，实际publication负控与完整标准后期当前通过，不再采用旧首帧替换文案。"
+              },
+              {
+                "id": "CI-004",
+                "rationale": "A源码/B实际执行：native-clock按实际输入帧与帧率换算完整自然时轴，不按名义duration截尾或强制补长；现有315帧/真实图片hash与source bytes断言保留。将静音/短声轨的后置品质拒绝迁为实际成功加工和真实metadata事实，receipt明确未做quality/audio alignment认证；重新定速仍拒绝。本人精读当前93行及60行diff，真实FFmpeg/ffprobe当前current-native全部通过，没有把false质检字段伪造为合格。"
+              },
+              {
+                "id": "CI-005",
+                "rationale": "A源码/B实际执行：两项生成前拒绝用真实videos阶段继续验证：非法默认合成旁白与不允许输入仍exit1且不执行shot/material-gen/voice工站。新增voice-only dry-run只记录invoked=false、ok=false、degraded与artifact=null，不伪造原声成功或spoken/lip-sync证书；真实子进程fetch/http/https拒绝器与计数证明这些前门用例零网络。当前changed-node及完整test:scripts通过，不放宽权限、不改变治理/CI超时。"
+              },
+              {
+                "id": "CI-006",
+                "rationale": "A源码/B实际执行：成功原片按官方accepted task、事前授权、first witness与当前源字节进入正式后期；把来源品质门改为技术来源/加工事实，新增黑帧、奇数画布、静音、10.04秒与低帧率等实际媒体采用。真实完整ordinary CLI覆盖默认后期全阶段、部分成功镜头仅处理pending镜头、历史卡片/提示/日志保留、当前任务/回执/权限/字节否定对照；名义2秒实际4.25秒保留102正文帧+1封面帧、原AAC包、零音频/字幕偏移，分数与qualityReviewPerformed如实空值/false。保留并发唯一publisher及真实compose/subtitle/danmaku/mux失败不发布。当前canonical Node/Vitest各57/57与current-native57/57实际通过；不改必需CI集合、不以fixture耗时冒充生产。"
+              },
+              {
+                "id": "CI-007",
+                "rationale": "A源码/B实际执行：运行载荷仅增加固定docs/ai-video-workbench-guide.md白名单落点，仍执行路径规范化、missing/precompiled-entry失败、软链范围、secret排除及逐字节摘要校验。没有把任意docs目录纳入包、改安装签名或删原校验。本人精读当前197行及37行diff，相关实际current changed-node/whole-scripts载荷测试通过，557/557当前assets与provides机检另外标B。"
+              },
+              {
+                "id": "CI-008",
+                "rationale": "A源码/B实际执行：只在原agent测试入口导入新增固定指南测试，原身份、输入、权限、脱敏与能力注册断言保留。CLI/MCP读同一固定模块/正文并返回准确UTF8 SHA，不新增任意路径读取。本人精读当前434行及13行diff，当前原test:scripts和changed-node实际通过，原云端must commands与阈值不变。"
+              },
+              {
+                "id": "CI-009",
+                "rationale": "A源码/B实际执行：发布入口允许已按accepted task/事前授权/官方来源字节固定的成功原片，历史品质/旧voice记录不再触发默认新provider/ASR/TTS；缺件、篡改、错误current receipt、非当前input与实际加工失败继续硬失败。新增composition-process receipt与真正export metadata绑定，验证wrong source/帧分配、drop/add frames、fps和duration等否定；fixture mock媒体与probe边界明确，未伪称可播放生产片。正式封面要求前置1帧和正文全帧保留，音频/字幕0offset。本人精读456行及238行diff，准确当前1d19的current-native实际全部通过，没有引用旧0854执行冒充当前。"
+              },
+              {
+                "id": "CI-010",
+                "rationale": "A源码/B实际执行：将正式完整作品封面断言扩充为 v2 prepend-cover-frame：源正文全部帧保留，视频仅前置1帧，音频/字幕偏移均0，且当前input/cover/output SHA相符。新增正文少帧、源SHA/帧率错误与错误偏移拒绝；原显式opening-title和非法回执拒绝仍保留。兼容v1只限不要求保留源帧的旧helper调用，不能作为正式完整作品发布凭据。本人精读当前47行及完整24行diff，当前changed-node与完整test:scripts均通过。"
+              },
+              {
+                "id": "CI-011",
+                "rationale": "A源码/B实际执行：为固定工作台指南新增运行载荷复制、正文摘要、缺文件及软链逃逸失败测试；在未产生预编译入口时继续硬失败，保留原包内路径、secret排除和hash约束。只增加一个固定docs/ai-video-workbench-guide.md，不开放任意docs树，不调整签名安装包保护。本人精读161行及56行diff，当前changed-node和原test:scripts中实际执行通过。"
+              },
+              {
+                "id": "CI-012",
+                "rationale": "A源码/B实际执行：来源选择依据独立固定raw字节，旧TTS/品质记录不替代或否决已固定原片；missing/changed bytes与缺manifest仍拒绝。原片静音、短声轨、奇数画布和异帧率进入本机官方normalize；声画品质不再以PCM质检否决，requested export clock只读真实metadata且qualityReviewPerformed/audioAlignmentMeasured=false。新process receipt严格绑定每个source SHA、源/normalized帧数、帧率、画布、每镜帧分配与全部输出；新增丢帧/加帧、分数帧率/时长错误等拒绝。真实本机compose输出2160x3840的8帧并保留尾标记和AAC包，仍拒绝顺序/删镜/加镜/复用/转场/retime及未接入模型enhance参数。当前current-native实际该文件全部通过，未证明生产4K发布。"
+              },
+              {
+                "id": "CI-013",
+                "rationale": "A源码/B实际执行：保留原CI路径，在VITEST环境直接导入canonical全部assertions；原tsx --test入口则实际启动仓库Vitest runner运行canonical。900000ms只用于此真实子进程边界；error/signal/非零status均透传，没有改canonical assertion、skip、原测试超时或全局CI阈值。当前原Node入口实际57/57+外层1通过、Vitest alias57/57；真实FFmpeg非法option负控canonical47fail/10pass并使外层1fail、exit1，证明没有吞子失败或假绿。"
+              },
+              {
+                "id": "CI-014",
+                "rationale": "A源码/B实际执行：新增固定指南实际CLI --json/--full与MCP回读、版本/UTF8字节SHA一致性，验证缺件、非法参数/路径、超大、stale repo/version及软链等拒绝；正文覆盖成功镜头直接正式后期、原声和后续完整性Phase2边界。只读入口不执行模型或媒体生产，不增加任意文件读取能力。当前新增112行EOF与118行new-file diff由本人精读，实际changed-node及原agent入口中的回读测试通过。"
+              },
+              {
+                "id": "CI-015",
+                "rationale": "A源码/B实际执行：实际同次material stage在supplier success后使用正式issued receipt、first witness、task与当前源字节adapter，刷新completed map并记录render-adopted，G7不再用100000-byte门槛否决有效小原片；新增真实child constructor/context/finish及实际parent adoption/result/byte验证闭环。丢adopted事件、清空official verified IDs、源/任务/witness篡改与真实下载失败继续拒绝；off/advisory/blocking post加工如实technical error/null score，不做默认modelquality。当前305行与完整410行diff精读、current-native实际通过；补充15+10独立控制只延续六个关键实现SHA一致的原时间证据，provider/download/WORK-ledger合成边界明确，不宣称whole paid CLI或live生产job。"
+              }
+            ],
+            "ciPolicyChangesHash": "9c3b8ca54c4be9a13002f079643576472dd7be7975f756934d23b85eaf724bed",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx scripts/bundle-governance.mts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:55.948792+00:00",
+                "result": "✅ 行业包契约、兼容范围、资产、导航与完整性门禁通过（base 0.1.0 / ui 0.1.19）"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-commit-msg.mjs --range ed485d4979f9e92541d7a7066df9557dfeb66f78..HEAD",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:56.063279+00:00",
+                "result": "✓ 07728e58d9b7 test(video): drain finite fixture audio across FFmpeg versions [T-2026-1007-0001]\n✓ 45ac96dc2f55 test(video): verify canonical runner and retained original media [T-2026-1007-0001]\n✓ 1d19e4686ded test(video): align UHD export and CFR contracts [T-2026-1007-0001]\n✓ 455d0c1b9c39 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 0854ce12453a fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ ca640bbe0e21 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ d662ce8f66dc fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 96f3e89cc3da fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 91bd23bc545d fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ b9903fa2ce06 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 98415dee60df fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ eda8255dc676 chore(growth): 重跑限流中断的原生 CI [T-2026-1007-0001]\n\n✓ 提交信息校验通过（13 条，范围 ed485d4979f9e92541d7a7066df9557dfeb66f78..07728e58d9b7a0f114cbfa37b9be0dd5ca49f066）\n! a3c7f23af124 layer \"industry\" 不在标准集合 [base|platform|hotel|video|growth|ecom|tiger|eagle|fox]（仅告警）"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-hard-gate-policy.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:56.151338+00:00",
+                "result": "[hard-gate-policy] 通过：扫描 133 个文件，未发现\"创作口径写成硬闸\"。"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/tools/film-publication-policy.test.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:56.253542+00:00",
+                "result": "✔ project and cover metadata never become an implicit opening title (0.915417ms)\n✔ explicit title preserves the full requested text; disable remains explicit (0.184458ms)\n✔ successful assembly must still bind the actual current publication bytes (0.203334ms)\n✔ a sidecar or old prepend receipt cannot grant publication cover status (0.3855ms)\n✔ formal cover publication requires the complete body and truthful independent track offsets (0.16225ms)\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 36.853916"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p packages/video-studio/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:56.669708+00:00",
+                "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p apps/server/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:57.737685+00:00",
+                "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/ai-video-workbench-guide.test.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:57.974716+00:00",
+                "result": "✔ fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call (6.178167ms)\n✔ guide rejects all caller paths, overrides and non-object inputs (0.914208ms)\n✔ guide fails closed for missing guide (2.188209ms)\n✔ guide fails closed for empty guide (1.035708ms)\n✔ guide fails closed for oversized guide (1.667ms)\n✔ guide fails closed for directory as guide (1.085417ms)\n✔ guide fails closed for stale guide version (0.988625ms)\n✔ guide fails closed for wrong guide identity (0.857542ms)\n✔ guide fails closed for invalid UTF-8 guide (1.279792ms)\n✔ guide fails closed for missing manifest (1.110834ms)\n✔ guide fails closed for invalid manifest (0.804792ms)\n✔ guide fails closed for wrong product repository (0.789542ms)\n✔ guide file and escaped parent symlinks cannot expose external bytes (1.398583ms)\n✔ CLI list/describe/invoke work from another cwd without credentials and preserve full guide bytes (79.15925ms)\n✔ real generic MCP discovers and reads guide; invalid extra fields fail with structured errors (32.975125ms)\nℹ tests 15\nℹ suites 0\nℹ pass 15\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 171.312667"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/runtime-deps-lock.mjs verify",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:58.054456+00:00",
+                "result": "✅ runtime 依赖锁有效：workloom-ai-growth · 12 个直接依赖"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:58.139264+00:00",
+                "result": "✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/ci/cnb-desktop-release.test.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:56:58.901597+00:00",
+                "result": "✔ CNB config has main-only signed producers and one locked publisher (8.902875ms)\n✔ Windows release runner calls pwsh and creates the pgvector source directory before git -C (5.443459ms)\n✔ context rejects wrong branch, source SHA, repo, role, or unsigned mode (1.368583ms)\n✔ preflight binds remote main and tag and refuses an existing Release (15.438833ms)\n✔ Mac producer seals exact candidates, uploads them once, and reads back SHA-512 (13.555666ms)\n✔ producer rejects a substituted remote candidate and untrusted confirmation URL (4.509042ms)\n✔ publisher creates draft, uploads exactly five assets, verifies remote bytes, then makes Latest (14.168708ms)\n✔ publisher leaves a draft when remote Release bytes change; never makes it public (7.920375ms)\n✔ publisher rejects a coherently replaced installer and manifest before creating a draft (4.214333ms)\n✔ publisher refuses mixed-build candidates before creating any Release (3.869792ms)\n✔ publisher rejects unsafe remote candidate filenames before download (4.324083ms)\n✔ publisher rejects a corrupted downloaded installer before the first Release write (4.642292ms)\n✔ publisher keeps a draft if main diverges before public promotion (8.242833ms)\n✔ a bound build can publish while protected main advances normally (11.683792ms)\n✔ a post-promotion tag violation reports that the release is already public (11.058125ms)\n✔ latest required checks choose full push family over prior green PR family (0.144125ms)\n✔ absence of any push family permits exactly three latest PR checks (0.050208ms)\n✔ later failing, pending, skipped or unknown state cannot inherit an older success (0.139334ms)\n✔ latest success may replace an earlier failure and conflicting ties fail (0.063542ms)\n✔ empty, enveloped, malformed or invalid timestamp CI data is incomplete (0.099625ms)\n✔ preflight writes fresh mode 0600 exact-source observation and refuses overwrite (1.378084ms)\n✔ first preflight stays exact even when a descendant compare would pass (0.757042ms)\n✔ preflight observation is bound to repo, SHA, tag, build, role, signing and current checks (0.921625ms)\n✔ receipt file rejects missing, malformed, oversized, symlink and outside workspace paths (1.681791ms)\n✔ later binding accepts protected exact main or a bound real descendant (1.427917ms)\n✔ later compare refuses divergent, abbreviated or incorrectly bound source and target (3.888916ms)\n✔ main movement during reads is retried within three attempts and continuous movement fails (1.71775ms)\n✔ post-build producer uses persisted first observation when protected main advances (5.365208ms)\n✔ publisher initial mismatch or newer red CI never performs a Release write (4.552291ms)\n✔ publisher uses persisted first observation across candidate await and normal main movement (12.041375ms)\n✔ binding failure before PATCH preserves an actual draft receipt (8.110709ms)\n✔ PATCH network ambiguity after successful promotion is reconciled by GET without repeating writes (9.662667ms)\n✔ PATCH failure with an observed draft reports false and performs no overwrite or second promotion (8.767958ms)\n✔ all state GETs failing after PATCH reports unknown rather than claiming unpublished (7.3295ms)\n✔ visible public release whose Latest cannot be confirmed reports true and incomplete (8.02875ms)\n✔ post-promotion ci violation preserves published=true (10.438958ms)\n✔ post-promotion protection violation preserves published=true (9.100625ms)\n✔ post-promotion ancestry violation preserves published=true (10.171333ms)\n✔ normal protected main advance after promotion returns complete actual publication receipt (8.968459ms)\n✔ post-promotion public asset mutation is detected with actual byte evidence (7.5365ms)\n✔ post-promotion source API failure is incomplete while actual public state remains true (9.980625ms)\n✔ CI API authorization, throttle and schema failure cannot certify preflight (2.735292ms)\n✔ CI config uses role-local first observations and explicit full lock/release contract tests (358.117834ms)\n✔ a cleanup exception after successful public verification preserves the actual publication receipt (13.244125ms)\n✔ cleanup failure cannot replace a primary postpublication tag violation or its receipt (10.003834ms)\n✔ a newer created pending or failed run cannot inherit an older run that finished later (0.171666ms)\n✔ same-created different run targets or unidentifiable conflicting states are ambiguous (0.161834ms)\nℹ tests 47\nℹ suites 0\nℹ pass 47\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 698.885625"
+              },
+              {
+                "command": "pnpm test",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:58:57.079521+00:00",
+                "result": "Exit code 0. Full actual execution log is retained at /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/post-render-default-acceptance/growthtest/root-postcommit-whole-workspace-native.log; SHA-256 dc364141af872da56ea0bc584cfb9b0a17059f594857ba552029ec0cb59f2d1f; 82381 bytes. The review receipt field is bounded by the existing 20,000-character schema; these are verbatim beginning and ending excerpts.\n> workloom-ai-acquisition@0.1.0 test /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n> pnpm -r --if-present test\n\nScope: 11 of 12 workspace projects\npackages/audit-engine test$ vitest run\npackages/industry-contract test$ vitest run\npackages/shared test$ vitest run\napps/webc test$ ../../node_modules/.bin/vitest run\npackages/industry-contract test:  RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/packages/industry-contract\npackages/audit-engine test:  RUN  v3.2.7 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/packages/audit-engine\npackages/shared test:  RUN  v3.2.7 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/packages/shared\napps/webc test: (!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to become the default in a future major version of Vite:\napps/webc test:   - import \"./vite.config\" without a file extension (vitest.config.ts:6:24). Add the file extension\napps/webc test: Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.\napps/webc test:  RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/apps/webc\npackages/industry-contract test:  Test Files  2 passed (2)\npackages/industry-contract test:       Tests  38 passed (38)\npackages/industry-contract test:    Start at  15:56:59\npackages/industry-contract test:    Duration  809ms (transform 212ms, setup 0ms, import 695ms, tests 279ms, environment 0ms)\npackages/industry-contract test: Done\npackages/video-studio test$ vitest run\napps/webc test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/index.js\" points to missing source files\napps/webc test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/language.js\" points to missing source files\napps/webc test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/entity-presentation.js\" points to missing source f\n[Middle omitted from this receipt only; full original log remains hash-bound.]\nkloom/ui/dist/language.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/entity-presentation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/navigation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/icons.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/managed-surface.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/modal-document-state.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-manager.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-stack.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/color-contrast.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/layout-controls.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/index.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/components.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/language.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/entity-presentation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/primitives.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/navigation.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/forms.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/icons.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlays.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/managed-surface.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/states.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/modal-document-state.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/shell.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-manager.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlay-stack.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/color-contrast.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/layout-controls.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/patterns.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/components.js\" points to missing source files\napps/webb test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/data.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/primitives.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/forms.js\" points to missing source files\napps/webb test:  Test Files  2 passed (2)\napps/webb test:       Tests  6 passed (6)\napps/webb test:    Start at  15:58:53\napps/webb test:    Duration  380ms (transform 85%, import 12%, tests 2%, worker 1%)\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/overlays.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/states.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/shell.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/patterns.js\" points to missing source files\napps/web test: Sourcemap for \"/Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest/node_modules/.pnpm/@workloom+ui@https+++cnb.cool+workloom-ai+workloom-im+-+releases+download+ui-v0.1.19+wo_086870d384add426af4f926c44614b7c/node_modules/@workloom/ui/dist/data.js\" points to missing source files\napps/webb test: Done\napps/web test:  Test Files  40 passed (40)\napps/web test:       Tests  248 passed (248)\napps/web test:    Start at  15:58:53\napps/web test:    Duration  3.36s (transform 2.50s, setup 0ms, import 4.80s, tests 4.48s, environment 8.95s)\napps/web test: Done"
+              },
+              {
+                "command": "pnpm test:scripts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T07:59:48.409194+00:00",
+                "result": "Exit code 0. Full actual execution log is retained at /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/post-render-default-acceptance/growthtest/root-postcommit-original-test-scripts-native.log; SHA-256 96b083316bf610115fc874565f90f95341a9d447867311d062905bc9e71ba119; 30411 bytes. The review receipt field is bounded by the existing 20,000-character schema; these are verbatim beginning and ending excerpts.\n> workloom-ai-acquisition@0.1.0 test:scripts /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n> vitest run scripts/tools/video-request-regression.test.ts scripts/tools/film-release-entrypoints.test.ts scripts/tools/film-native-post.test.ts scripts/bundle-governance.test.ts scripts/suite-fixture-preflight.test.ts scripts/verify-client-foundation-extensions.test.ts scripts/geo-fusion-plan-doc-sync.test.ts bundles/ai-video/connectors/bgm-bridge/verify-message.test.ts bundles/ai-video/connectors/bgm-bridge/genre-mismatch.test.ts bundles/ai-video/connectors/bgm-bridge/recipes-expansion.test.ts bundles/ai-video/connectors/bgm-bridge/tonality-context.test.ts bundles/ai-video/connectors/color-bridge/core.test.ts bundles/ai-video/library/luts/luts.test.ts bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts bundles/ai-video/connectors/cine-kb-bridge/audit-round3.test.ts && node --test scripts/tools/film-voice-artifact.test.mjs scripts/tools/film-audio-policy.test.mjs scripts/tools/film-publication-policy.test.mjs scripts/tools/film-render-task.test.mjs scripts/tools/film-render-ledger.test.mjs scripts/tools/film-cli-preflight.test.mjs scripts/agent-capabilities.test.mjs scripts/video-capabilities.test.mjs bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs scripts/ci/hard-gate-policy.test.mjs && pnpm test:desktop\n\n\n RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n\n\n Test Files  15 passed (15)\n      Tests  404 passed (404)\n   Start at  15:58:57\n   Duration  17.50s (transform 1.69s, setup 0ms, import 3.09s, tests 34.86s, environment 1ms)\n\n▶ 配乐声明式直混（无签章签发者时的正常交付路径）\n  ✔ 无签发者 + 兼容显式声明：直混出片，回执如实标注原生节目且未作分轨或品质认证 (256.59ms)\n  ✔ 不声明、也没有签章：默认消费原片音轨，完成单次请求混音 (217.351542ms)\n  ✔ 高峰值混合源执行请求混音，不做响度/峰值/让位品质审核或重试 (435.822375ms)\n  ✔ 静音混合源正常配乐，静音不是二次品质否决 (180.462291ms)\n  ✔ 真实 mix/best CLI 的显式坏引用不得被兼容声明或默认原声路径吞掉 (1065.169708ms)\n✔ 配乐声明式直混（无签章签发者时的正常交付路径） (2237.075708ms)\n✔ fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call (12.545125ms)\n✔ guide rejects all caller paths, overrides and non-object inputs (2.631833ms)\n✔ guide fails closed for missing guide (2.49275ms)\n✔ guide fails closed for empty guide (1.410791ms)\n✔ guide fails closed for oversized guide (1.049291ms)\n✔ guide fails closed for directory as guide (0.99ms)\n✔ guide fails closed for stale guide version (1.011875ms)\n✔ guide fails closed for wrong guide identity (1.009041ms)\n✔ guide fails closed for invalid UTF-8 guide (0.948917ms)\n✔ guide fails closed for missing manifest (0.766375ms)\n✔ guide fails closed for invalid manifest (0.832292ms)\n✔ guide fails closed for wrong product repository (0.851708ms)\n✔ guide file and escaped parent symlinks cannot expose external bytes (1.492875ms)\n✔ CLI list/describe/invoke work from another cwd without credentials and preserve full guide bytes (113.051917ms\n[Middle omitted from this receipt only; full original log remains hash-bound.]\n verified dubbed clip is reusable only while its complete provenance matches (3.387375ms)\n✔ a newer old dub cannot hide a changed raw clip or a failed latest receipt (0.745291ms)\n✔ a raw clip accepted by ASR remains the composition choice even with a newer dub file (0.516417ms)\n✔ a failed dub cannot accept or overwrite a stale previous output (0.706334ms)\n✔ only a successful and verified new candidate is promoted (0.853291ms)\n✔ an unverified or degraded voice receipt cannot authorize a raw clip (0.47325ms)\n✔ delivery hashes main, attachments and asset list; later tampering is detected (7.376083ms)\n✔ 30秒预览接受28/32/35秒完整镜头池；显式硬上限在给出执行命令前阻断 (7.964ms)\n✔ standard native production has no local ASR or dubbing prerequisite (1.298375ms)\n✔ native plan rejects replacement narration, muted generation and unsupported exact shot clocks (4.032958ms)\n✔ standard delivery outputs and first-frame cover claims are actually hashed (2.697417ms)\n✔ standard output empty, duplicate, missing master, invalid and conflicting covers never pass (4.518791ms)\n✔ empty manifest, missing or empty main, directory and missing digest never pass (1.74025ms)\n✔ cross-project manifests, conflicting digests, invalid JSON and path escapes fail (3.93825ms)\n✔ suggested POSIX command preserves every argument literally and supplies a PowerShell representation (34.750417ms)\nℹ tests 108\nℹ suites 2\nℹ pass 108\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2314.902208\n\n> workloom-ai-acquisition@0.1.0 test:desktop /Users/mac/Documents/Codex/2026-10-05/growthtest-codex-growthtest-growthtest-ceo-30/work/ai-workbench-guides/repos/growthtest\n> node --test apps/desktop/electron/bootstrap.test.cjs apps/desktop/electron/bootstrap-startup.test.cjs apps/desktop/electron/render-smoke.test.cjs scripts/desktop-bootstrap-db.test.mjs scripts/runtime-deps-lock.test.mjs scripts/pack-nm-merge.test.mjs scripts/payload-policy.test.mjs scripts/pack-workspace-modules.test.mjs scripts/product-runtime-assets.test.mjs scripts/reset-safety.test.mjs\n\n✔ signing keys persist independently and a valid existing key is preserved (2.254708ms)\n✔ a failed child has an actionable startup error and writes a bounded diagnostic (5.71225ms)\n✔ HTTP 200 from another local instance does not pass desktop readiness (36.180125ms)\n▶ 启动诊断秘密脱敏\n  ✔ 原有文本 JWT、盐和 Bearer (6.806333ms)\n  ✔ JSON 引号与大小写字段 (1.021459ms)\n  ✔ 引号内的空格和分隔符 (1.313375ms)\n  ✔ 带编码密码的连接 URI (1.022583ms)\n  ✔ libpq 密码与 URI 查询密码 (0.853334ms)\n  ✔ Basic 授权和 Cookie (0.83ms)\n  ✔ JSON 转义引号和 Unicode 密码 (0.72525ms)\n  ✔ 错误摘要和日志读取失败也经过脱敏 (0.925125ms)\n  ✔ 读取异常关闭自己的文件句柄并保留失败信息 (3.4775ms)\n  ✔ 空日志和有界尾部仍保留版本、主机和错误上下文 (5.637334ms)\n  ✔ 取消无写入；新建与覆盖后的诊断文件均为私有 (5.586958ms)\n  ✔ 保存对话框和文件写入失败均留在可恢复启动页 (2.06925ms)\n✔ 启动诊断秘密脱敏 (31.080042ms)\n▶ 渲染探针不占用产品 GPU 上下文\n  ✔ WebGL2 检测后立即释放临时上下文，不再检测 WebGL1 (0.409542ms)\n  ✔ WebGL1 回退同样释放，扩展未提供时仍如实报告能力 (0.067292ms)\n  ✔ 无上下文、创建异常、释放异常均报告不可用 (0.07ms)\n✔ 渲染探针不占用产品 GPU 上下文 (0.611875ms)\n▶ 真实首日引导退出的渲染冒烟\n  ✔ 欢迎层退出的空帧不能跳过下一次 React 提交才出现的引导 (0.291458ms)\n  ✔ 存在引导入口却一直不出现引导时不能标成退出成功 (1.639583ms)\n  ✔ 点了关闭仍持续覆盖时在原截止时间内失败关闭 (0.758708ms)\n  ✔ 未安装引导内容包时稳定无遮挡仍可验收 (0.108ms)\n  ✔ 缺退出按钮或 renderer 执行失败均不吞异常 (0.4015ms)\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-bootstrap-04wpNP/payload）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 → 装配运行时载荷（2.0.0）…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-bootstrap-T1Lpiy/payload）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 → 装配运行时载荷（2.0.0）…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-bootstrap-2Z79Rz/payload）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 → 装配运行时载荷（2.0.0）…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 正在校验并安全换入运行时载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-packaged-payload-missing-nUPalS/resources）==\n15:59:17 正在检查本机版本与安装载荷…\n15:59:17 == WorkLoom 织元 · 引导启动（resources=/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-packaged-no-double-payload-Uq8KAe/resources）==\n15:59:17 正在检查本机版本与安装载荷…\n  ✔ renderer 永不返回时也必须到截止即结束且不遗留定时器 (22.42975ms)\n✔ 真实首日引导退出的渲染冒烟 (26.062875ms)\n▶ 产品截图采用捕获时的可见场景\n  ✔ 等待后实际无遮挡且完整时仍通过 (2.729458ms)\n  ✔ 分页场景分别核对首屏实际人数和完整名单，不能用满首屏掩盖漏人 (5.178292ms)\n  ✔ 稳定等待中重新出现引导层时拒绝旧无遮挡状态 (0.607625ms)\n  ✔ 稳定等待中卸载场景或员工减少时拒绝旧完整状态 (1.775792ms)\n  ✔ 截图捕获期间出现遮罩或内置人名也必须失败 (1.36175ms)\n  ✔ 场景就绪但实际舞台 Canvas 只占 150 像素时不能用整页像素健康转绿 (0.553959ms)\n  ✔ 负责人固定牌与员工名牌相交、Canvas 缺失或上下文失效时拒绝验收 (1.827458ms)\n✔ 产品截图采用捕获时的可见场景 (14.264709ms)\n▶ 桌面载荷原子装配\n  ✔ 同版本标记不能跳过缺失运行目录、错误运行版本或缺失 Node 的恢复 (28.93425ms)\n  ✔ 解析物理路径后向 tar 传相对路径，并为 Windows 跨盘符暂存归档 (0.385333ms)\n  ✔ 正式打包入口缺少载荷时在启动任何服务前失败关闭 (2.004083ms)\n  ✔ 正式打包入口不会把源码 dist-payload 双重嵌套误认作 Resources (2.619958ms)\n  ✔ 完整暂存后换入；提交前可回滚，提交后清理临时目录 (6.92475ms)\n  ✔ 提交清理故障发生在不可逆边界之后，不会重新开放旧载荷回滚 (4.5135ms)\n  ✔ 换入第一项后故障会恢复旧版目录、版本和首航状态 (4.298875ms)\n  ✔ 首装暂存失败不会留下半套运行时 (2.63925ms)\n  ✔ 安装阶段检查点以机器可读中文状态落盘 (0.874583ms)\n  ✔ 启动页使用确定进度语义，不再显示循环假进度 (0.169542ms)\n  ✔ 源码主进程只复用已验活服务，正式安装包与渲染冒烟不能绕过载荷 (0.683292ms)\n  ✔ 发布渲染冒烟使用稳定动作标记走完真实欢迎流程 (0.900291ms)\n✔ 桌面载荷原子装配 (55.229708ms)\n▶ 桌面 PostgreSQL 实例归属与端口契约\n  ✔ 严格拒绝空白、小数、非数字和越界端口 (0.124208ms)\n  ✔ 只有 pg_ctl 确认运行且 postmaster 数据目录与端口同时匹配才允许复用 (0.992625ms)\n  ✔ pg_ctl 未确认运行时不读取残留 PID，也不把端口监听者当作自有实例 (0.162417ms)\n  ✔ 退出前重新复验实例归属，PID 文件被替换时绝不发送 stop (0.51325ms)\n  ✔ 托管环境只重写数据库与服务端口，保留其他用户配置 (2.318125ms)\n  ✔ 首装与升级分别从当前载荷生成桥注册表，不引用其他实例的运行目录 (7.34075ms)\n✔ 桌面 PostgreSQL 实例归属与端口契约 (11.609542ms)\n▶ 桌面本机渲染子进程的 Node 路径\n  ✔ 首启环境从传入载荷发现执行器，不依赖函数外不可见的 RUNTIME (1.948875ms)\n  ✔ 干净 GUI PATH 下仍能启动当前随包 Node，且保留系统工具路径 (32.604083ms)\n  ✔ Windows 只传一个不区分大小写的 Path；POSIX 不改其他同名变量 (0.103625ms)\n✔ 桌面本机渲染子进程的 Node 路径 (34.739542ms)\n▶ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏\n  ✔ 0600 状态文件生成三份互异随机凭据，重复启动不轮换 (1.891375ms)\n  ✔ 损坏状态失败关闭；绑定 system_identifier 后才能完成并清除旧凭据 (2.118375ms)\n  ✔ pending 状态可从恢复后的旧配置补充候选；hardened 后绝不重新收录 (1.265083ms)\n  ✔ initdb 只接受 pwfile + SCRAM，HBA 只允许本机 SCRAM (0.214208ms)\n  ✔ pending 迁移复验失败会原子恢复旧 HBA 并再次 reload (1.357792ms)\n  ✔ 即使磁盘 HBA 未变化也强制 reload，再以正反向凭据复验结果为准 (1.352125ms)\n  ✔ 源码固定先提交新 payload 再创建状态或改库，且不含 trust initdb (0.279875ms)\n  ✔ payload commit 前用内置 Node 语法检查安全 helper，校验失败立即阻断 (0.547542ms)\n  ✔ 所有 migrate 入口在轮换 app/gateway 角色前固定本会话 SCRAM (0.231208ms)\n✔ 桌面 PostgreSQL 凭据状态与 SCRAM 围栏 (9.450209ms)\n▶ 应急浏览器壳与正式 Electron 共用安全引导\n  ✔ 原子单实例锁拒绝活进程，并可接管死进程遗留锁 (2.559292ms)\n  ✔ 两端旧启动器只委托 bootstrap，不再维护 trust/helper 分支 (0.859667ms)\n  ✔ 浏览器壳按平台使用无 shell 拼接的固定打开命令 (0.1515ms)\n  ✔ CLI 在启动前注册 INT/TERM/HUP，并用 AbortSignal 驱动初始化清理 (0.17475ms)\n✔ 应急浏览器壳与正式 Electron 共用安全引导 (3.926792ms)\n✔ native smoke accepts a visible, full-height, nonblank product scene (12.618916ms)\n✔ native smoke retains the AI product manager's fixed 14-person composition check (0.9105ms)\n✔ native smoke rejects a truncated paginated roster even when the first page is full (1.909917ms)\n✔ native smoke rejects a canvas that renders only the top 150px of a 440px scene (3.754083ms)\n✔ native smoke rejects a product scene hidden behind an onboarding overlay (2.09475ms)\n✔ native smoke rejects black scene pixels even when the navigation has healthy pixels (3.655958ms)\n✔ native smoke captures the actual product region for its pixel verdict (2.691916ms)\n✔ native smoke records the settled canvas bitmap instead of its initial 300x150 bitmap (6.891083ms)\n✔ native smoke rejects a product scene removed before the camera-settled capture (5.258667ms)\n✔ native smoke keeps 19 keyboard entries but counts only the one actually visible plate (7.916667ms)\n✔ native smoke excludes an opacity-zero ancestor and records its concrete reason (4.85525ms)\n✔ native smoke excludes a display-none ancestor and records its concrete reason (6.469667ms)\n✔ native smoke excludes inherited visibility-hidden and records its concrete reason (3.224375ms)\n✔ native smoke excludes an ancestor whose content is skipped and records its concrete reason (6.294208ms)\n✔ native smoke excludes an empty inset clip without an opacity hint and records its concrete reason (5.739ms)\n✔ native smoke excludes an empty legacy rectangular clip and records its concrete reason (8.066833ms)\n✔ native smoke excludes an overflow-clipped ancestor and records its concrete reason (6.653625ms)\n✔ native smoke excludes a rectangle outside the viewport and records its concrete reason (9.356958ms)\n✔ native smoke excludes a rectangle outside the scene and records its concrete reason (3.437292ms)\n✔ native smoke excludes a zero-height rectangle and records its concrete reason (3.192459ms)\n✔ native smoke records the effective rectangle after ancestor inset and viewport clipping (9.042041ms)\n✔ native smoke preserves visibility explicitly restored below a hidden ancestor (11.3875ms)\n✔ native smoke still rejects five visible plates despite a lying worker visibility attribute (3.017458ms)\n✔ native smoke does not discard overlapping visible plates based on elementFromPoint (2.172ms)\n✔ native smoke rejects two overlapping visible plates even below the density limit (5.330375ms)\n✔ native smoke recalculates hidden-to-visible plates after the camera settles (2.963917ms)\n✔ native smoke recalculates visible-to-hidden plates and accepts exactly four separated visible plates (16.730209ms)\n✔ native smoke conservatively counts an unsupported clip rather than hiding a potentially visible plate (2.042667ms)\n✔ native smoke rejects invalid nameplate geometry instead of removing it from the verdict (2.184875ms)\n✔ native smoke ignores legacy clip on static positioning and still rejects its five visible plates (1.645084ms)\nworkloom-db-identity {\"dataDirectory\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-helper-inspect-kyrItW/pgdata\",\"port\":55432,\"hbaFile\":\"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/pr-g-n7dhoie7/workloom-helper-inspect-kyrItW/pgdata/pg_hba.conf\",\"systemIdentifier\":\"7654321098765432109\",\"postmasterStartTime\":\"2026-09-16 16:52:18.418+00\"}\nbootstrap-db prepare ok\nbootstrap-db verify ok\n▶ 客户端投影路径围栏\n  ✔ 同时接受 POSIX 与 Windows 的目录分隔符 (0.361ms)\n  ✔ 拒绝同目录、父目录逃逸和 Windows 跨盘路径 (0.27275ms)\n✔ 客户端投影路径围栏 (1.724583ms)\n▶ 桌面数据库安全引导\n  ✔ 经符号链接路径执行 helper 时仍识别为 CLI 入口 (3.733917ms)\n  ✔ 要求三模式、端口、PGDATA、HBA 与三角色凭据全部由启动器显式注入 (1.201542ms)\n  ✔ inspect 用旧 owner 候选只读绑定非默认端口、PGDATA、HBA 与 system_identifier (2.706833ms)\n  ✔ legacy prepare 先验归属，再轮换 owner/app/gateway 为 SCRAM 并准备业务库 (1.827208ms)\n  ✔ verify 对三角色正向连接、错误凭据反向拒绝，且全过程零写 (1.017666ms)\n  ✔ trust 仍接受错误凭据时 verify 失败，不会误标为 SCRAM 生效 (0.723542ms)\n  ✔ 错误凭据探测若得到非认证错误则失败关闭，不把网络故障当成安全证明 (2.037167ms)\n  ✔ 未知 data_directory、活动 HBA 或 system_identifier 时首条查询后零写失败 (4.172416ms)\n  ✔ 实例报告端口不符时失败且零写入 (1.934792ms)\n✔ 桌面数据库安全引导 (19.983792ms)\n✔ pnpm 锁文件在 Windows CRLF 检出后保持同一解析语义 (1.1645ms)\n✔ 基座物理存在 platform-ops 时依赖合成仍排除平台工程 (10.419ms)\n✔ 仙女座精确身份收集 platform-ops，缺包则阻断 (4.306666ms)\n✔ 范围 specifier 只输出 pnpm 锁定的精确版本 (2.631417ms)\n✔ 缺锁、specifier 漂移与同名解析版本冲突均失败关闭 (8.517125ms)\n✔ 包目录创建顺序不影响依赖清单输出 (6.019333ms)\n✔ 搬动原工作区副本会破坏仓库相对引用，新注册保留同一模块实例 (136.713541ms)\n✔ 子路径、条件 exports 和类型入口都引用保留的真实源文件 (40.731208ms)\n✔ 缺失构建产物在打包时失败，不留到客户启动时 (1.999958ms)\n✔ 包名称重复、路径越界和未支持的入口协议均失败关闭 (5.045667ms)\n✔ 行业载荷不会因目录存在而注册仙女座的 platform-ops (2.848834ms)\n✔ 源码装配不遍历 pnpm 循环链接或嵌套开发依赖，仍保留实际构建产物 (7.465542ms)\n✔ 源码装配拒绝仓库越界和目标递归，不读取外部链接 (3.477292ms)\n✔ 源码复制 CLI 保留中文空格路径并以失败退出码报告缺参 (63.816916ms)\n✔ 只有仙女座精确身份允许携带 platform-ops (1.310208ms)\n✔ 基座即使物理存在平台源码和内部包也会被装包后检查阻断 (45.176334ms)\n✔ 归档清单对大小写、Windows 分隔符和相对段统一失败关闭 (0.355542ms)\n✔ 缺失或不可校验的产品清单不能生成载荷策略 (90.467875ms)\n✔ 仙女座载荷检查允许平台源码，但不放宽其他产品 (35.485ms)\n✔ 非 Git 运行时缺少任一身份闭包文件时，目录与归档检查均失败关闭 (10.886292ms)\n✔ 非 Git 运行时伪造产品身份时与源策略精确比对失败 (4.823625ms)\n✔ 产品清单未投影字段被篡改时摘要校验仍失败关闭 (1.742792ms)\n✔ 身份闭包目录与归档完整且产品身份一致时通过 (1.824458ms)\n✔ 归档中的身份闭包必须是精确文件路径，目录或大小写伪装不能通过 (0.286791ms)\n✔ canonical allowlist preserves director/media/agent sources and rejects dev/secret assets (0.735542ms)\n✔ normal physical source copy records canonical source and generated contract bytes (130.113ms)\n✔ missing fixed video guide fails before compiler or payload writes (31.441042ms)\n✔ tracked source through an ancestor symlink is refused before copying outside bytes (41.282667ms)\n✔ destination ancestor symlink cannot redirect writes outside the nominated runtime (41.23075ms)\n✔ existing derived-output symlink cannot replace an external file (40.00125ms)\n✔ derived .env.defaults symlink is rejected before the compiler or any outside write (40.076875ms)\n✔ derived RUNTIME_ASSETS.json symlink is rejected before the compiler or any outside write (40.471584ms)\n✔ derived vendor/supermickey/package.json symlink is rejected before the compiler or any outside write (39.527208ms)\n✔ existing compiler output file symlink cannot redirect TypeScript writes (30.542167ms)\n✔ dangling destination links fail before writes and deleted tracked files remain optional (75.985ms)\n✔ payload cannot be created inside a selected source tree (29.06025ms)\n✔ compiler output ancestor symlink is rejected before the compiler can write outside (30.349583ms)\n✔ canonical output aliases cannot overwrite the checkout (28.839916ms)\n✔ 非交互调用没有 --yes 时 fail closed，且不访问数据库 (88.616583ms)\n✔ 远端、生产和数据库名不匹配目标始终拒绝 (476.293167ms)\n✔ 检测到非演示工作区时拒绝删除 (1102.43ms)\n✔ 本机 workloom 纯演示库先备份，再事务重建并执行迁移种子 (1718.995291ms)\n✔ 未知参数 fail closed (7.4235ms)\n✔ 备份失败时禁止删除和后续迁移种子 (1096.813667ms)\n✔ 空备份不能证明可恢复，禁止删除 (1461.041208ms)\n✔ 客户类型查询失败或不可识别时禁止备份与删除 (6356.041625ms)\n✔ 明确的 IPv6 环回和 .env 后备目标可以重置，缺少配置拒绝 (5772.382042ms)\n✔ 同名容器和连接路由环境变量不能替换已校验的目标 (5802.338125ms)\n✔ 删除事务发现并发客户工作区或 SQL 失败时禁止迁移和种子 (2837.002083ms)\n✔ 迁移失败立即停止，备份保留且不继续种子 (3310.124584ms)\n✔ 运行依赖锁输入摘要忽略 Git 工作树 LF/CRLF 差异 (0.580333ms)\n✔ 正式装配跨平台直接调用 Node 随附 npm CLI (0.277458ms)\n✔ 仓库提交的每产品 runtime lock 与当前依赖输入完全一致 (17.209208ms)\n✔ package-lock 必须锁定完整三目标原生包与 registry integrity (1.271458ms)\n✔ 安装后目标校验拒绝宿主架构原生包并生成稳定 inventory 摘要 (4.747042ms)\n✔ 正式与应急装配线统一使用每产品 lock、目标 OS/CPU 和身份闭包 (1.485708ms)\nℹ tests 162\nℹ suites 11\nℹ pass 162\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 30186.85275"
+              }
+            ],
+            "reviewedAt": "2026-10-08T08:40:50.680Z",
+            "summary": "Successful completed provider shots enter official post through actual task, first witness, current source bytes and adopted events. Default post does not veto or regenerate identity, wardrobe, action, raw specification, audio/lip/dialogue or aesthetic quality, and uses original program audio. Actual requested processing/export failures and prior authorization remain explicit. Current production completeness, normal source clock, cover assembly and generation idempotency implementations are retained by an ordinary two-parent merge. Same-run small media and worker finish now use real official adoption. The discoverable CLI/MCP workbench guide and real runtime assets follow this behavior. No paid provider/model/ASR/TTS production call. Broader Phase2 planning/integration remains a later separate authorized task. Latest minimal test-only child migrates three obsolete UHD/CFR assertions, preserving original source/recipe fingerprints, frame/PTS/audio tolerances and real failure controls; adds two front-door rejection controls. No product implementation byte changes in this child. Current native CI test contracts execute unchanged canonical aliases and retain original 180-frame source, final frame and program audio without implicit voice work. Real exit, signal, missing runner, explicit dubbing authority and missing FFmpeg failures remain tested. Production implementation and protected prior cases are unchanged by this final two-test delta. Finite synthetic audio/video inputs now drain independently to EOF across FFmpeg versions. The original source-frame, tail-frame, full tail-audio and error assertions remain unchanged; no production implementation or media-tool configuration change.",
+            "passed": true,
+            "id": "e43be1892e29bda6f60ebc86caf3c8e7d5624b53d643bb74654ef39f43dc2a4f"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 119,
+            "pull": {
+              "number": 119,
+              "state": "open",
+              "title": "fix(video): 成功渲染素材直接进入正式后期 [T-2026-1007-0001]",
+              "body": "成功镜头此前可能被渲染后的身份、服装、画面、动作、规格、声音、口型或台词质量检查阻塞，并触发再次生成或多轮后期。现在按实际供应商任务、输入作用域和当前文件摘要接受已有成功素材，直接进入官方后期；默认保留原片节目音轨，按请求执行一次真实加工。\n\nCLI、服务端/子工作器、后期连接器、围栏、预设、技能与可发现的 CLI/MCP 工作台指南已同步。真实供应商失败、源文件缺失或篡改、事前权限/授权/资金，以及请求加工或导出失败继续明确报错。\n\n验证：精确提交 `07728e58d9b7a0f114cbfa37b9be0dd5ca49f066` 的正式离线 CLI、实际围栏与工作器调用链、能力、指南 CLI/MCP、两个包类型检查、官方包生成器/完整性、提交协议及秘密扫描均已实际通过。准确命令、日志和源摘要保存在本次审查回执；真实独立语义复核正在进行，完成前 ready=false。\n\n边界：没有供应商、模型、图像/视频生成、ASR/TTS 或新生产影片调用；合成夹具耗时不作为生产测速。“作品完整性优先、普通时长允许自然浮动”是后续单独任务，本 PR 不冒充已落实。源码经原生交付队列与准确候选 CI 发布；不声称签名安装包发布。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0001",
+                "sha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "unblocked",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "files": [
+              "AGENTS.repo.md",
+              "README.md",
+              "apps/server/src/video/director-router.ts",
+              "apps/server/src/video/director-sources.ts",
+              "apps/server/src/video/director-worker.ts",
+              "apps/server/src/video/film-worker-identity.test.ts",
+              "apps/server/src/video/film-worker.test.ts",
+              "apps/server/src/video/film-worker.ts",
+              "bundles/ai-video/README.md",
+              "bundles/ai-video/bundle.json",
+              "bundles/ai-video/connectors/bgm-bridge/README.md",
+              "bundles/ai-video/connectors/bgm-bridge/audio-stems-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/cli.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/core.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/measure.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/color-bridge/README.md",
+              "bundles/ai-video/connectors/color-bridge/cli.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.test.ts",
+              "bundles/ai-video/connectors/color-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/post-bridge/core.mjs",
+              "bundles/ai-video/connectors/post-bridge/delivery-integration.test.ts",
+              "bundles/ai-video/connectors/post-bridge/director-delivery.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/README.md",
+              "bundles/ai-video/connectors/subtitle-bridge/cli.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/core.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts",
+              "bundles/ai-video/connectors/subtitle-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/voice-bridge/README.md",
+              "bundles/ai-video/connectors/voice-bridge/core.mjs",
+              "bundles/ai-video/fences/ai-video-bgm.yml",
+              "bundles/ai-video/fences/ai-video-color.yml",
+              "bundles/ai-video/fences/ai-video-delivery.yml",
+              "bundles/ai-video/fences/ai-video-material.yml",
+              "bundles/ai-video/fences/ai-video-subtitle.yml",
+              "bundles/ai-video/fences/ai-video-voice.yml",
+              "bundles/ai-video/library/director-system/recipes.json",
+              "bundles/ai-video/library/real-person-assets/asset-20260101000000-demo/profile.json",
+              "bundles/ai-video/pipelines/narrative-film.yml",
+              "bundles/ai-video/presets/bgm-composer.yml",
+              "bundles/ai-video/presets/colorist.yml",
+              "bundles/ai-video/presets/post-editor.yml",
+              "bundles/ai-video/presets/subtitle-stylist.yml",
+              "bundles/ai-video/presets/voice-artist.yml",
+              "bundles/ai-video/schemas/objects.json",
+              "bundles/ai-video/skills/bgm-audio-layering/SKILL.md",
+              "bundles/ai-video/skills/bgm-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/caption-burnin-ops/SKILL.md",
+              "bundles/ai-video/skills/color-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/color-grade/SKILL.md",
+              "bundles/ai-video/skills/color-look-design/SKILL.md",
+              "bundles/ai-video/skills/color-shot-matching/SKILL.md",
+              "bundles/ai-video/skills/cover-design/SKILL.md",
+              "bundles/ai-video/skills/delivery-package-ops/SKILL.md",
+              "bundles/ai-video/skills/delivery-revision-ops/SKILL.md",
+              "bundles/ai-video/skills/producer-gate-review/SKILL.md",
+              "bundles/ai-video/skills/render-ops/SKILL.md",
+              "bundles/ai-video/skills/subtitle-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/subtitle-layout-design/SKILL.md",
+              "bundles/ai-video/skills/voice-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/voice-dubbing-sync/SKILL.md",
+              "bundles/geo-growth/agent-capabilities.json",
+              "bundles/geo-growth/capabilities/video.mjs",
+              "bundles/geo-growth/capabilities/workbench-guide.mjs",
+              "docs/agent-computer-guide.md",
+              "docs/ai-video-workbench-guide.md",
+              "docs/real-person-asset.md",
+              "docs/video-standard-post.md",
+              "packages/base/bundles/bgm-capability.test.ts",
+              "packages/base/bundles/post-av-sync.test.ts",
+              "packages/base/bundles/post-delivery-capability.test.ts",
+              "packages/base/bundles/subtitle-capability.test.ts",
+              "packages/base/bundles/voice-capability.test.ts",
+              "packages/video-studio/src/character-release-contract.integration.test.ts",
+              "packages/video-studio/src/cover-assembly.test.ts",
+              "packages/video-studio/src/cover-assembly.ts",
+              "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+              "packages/video-studio/src/deliver.ts",
+              "packages/video-studio/src/director-completion-bridge.test.ts",
+              "packages/video-studio/src/director-planner.ts",
+              "packages/video-studio/src/director-post-default.integration.test.ts",
+              "packages/video-studio/src/film-completion-entrypoint.test.ts",
+              "packages/video-studio/src/film-contracts.ts",
+              "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+              "packages/video-studio/src/film-worker-runtime.test.ts",
+              "packages/video-studio/src/film-worker-runtime.ts",
+              "packages/video-studio/src/index.ts",
+              "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+              "packages/video-studio/src/post-render-acceptance.ts",
+              "packages/video-studio/src/post-render-fence-policy.test.ts",
+              "packages/video-studio/src/producer-gate.test.ts",
+              "packages/video-studio/src/producer-gate.ts",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "plugins/workloom-workbench/README.md",
+              "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+              "plugins/workloom-workbench/skills/workloom/SKILL.md",
+              "scripts/AGENT-CAPABILITIES.md",
+              "scripts/agent-capabilities.test.mjs",
+              "scripts/ai-video-workbench-guide.test.mjs",
+              "scripts/ci/cnb-desktop-release.test.mjs",
+              "scripts/product-runtime-assets.mjs",
+              "scripts/product-runtime-assets.test.mjs",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-cli-preflight.test.mjs",
+              "scripts/tools/film-existing-render-edit.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-publication-policy.d.mts",
+              "scripts/tools/film-publication-policy.mjs",
+              "scripts/tools/film-publication-policy.test.mjs",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-rendered-material-use.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts",
+              "scripts/tools/video-request-regression.test.ts",
+              "tools/codex-gateway/README.md",
+              "tools/codex-gateway/bin/cli.mjs",
+              "tools/codex-gateway/src/mcp.mjs",
+              "tools/codex-gateway/test/mcp.test.mjs",
+              "tools/codex-gateway/test/video-guide.test.mjs"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0001",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791446176000,
+            "mergeBase": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/video-request-regression.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/video-request-regression.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/video-request-regression.test.ts",
+                  "absent": false
+                },
+                "digest": "0216ef0e05a3b890e21fb7baf3c372a3af4a7422446d9bbda80a7245f6974190"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/ci/cnb-desktop-release.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/ci/cnb-desktop-release.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/ci/cnb-desktop-release.test.mjs",
+                  "absent": false
+                },
+                "digest": "2e69f940ecc648e65674ffce01fadd0cce33fe09aa7ee71f643125c5a6fc17b8"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/tools/film-publication-policy.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-publication-policy.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-publication-policy.mjs",
+                  "absent": false
+                },
+                "digest": "3957c1ee2e6349b07640c807aba9d7f64e0195a37f5da762ec341c54e6f663dc"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/compose-native-clock.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "digest": "45cb9cfadd31736c770a2a89a0c719afb3425e113d7368898a1626bc0a4fbd32"
+              },
+              {
+                "id": "CI-005",
+                "file": "scripts/tools/film-cli-preflight.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-cli-preflight.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-cli-preflight.test.mjs",
+                  "absent": false
+                },
+                "digest": "4c417f466dabad31007ceff801aebd5c9435f15991fa6d4bca777bfeb9e5ab6f"
+              },
+              {
+                "id": "CI-006",
+                "file": "scripts/tools/film-standard-post.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "digest": "5d937ecf6213cfb2ad4ec2ecdc7b136886636e3c9fdddb9e94ce12282b2eae5b"
+              },
+              {
+                "id": "CI-007",
+                "file": "scripts/product-runtime-assets.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "digest": "6be2caee6ad53f98e29bfdda0415c3ba208fcec8e256a661a9c1022c6ca63030"
+              },
+              {
+                "id": "CI-008",
+                "file": "scripts/agent-capabilities.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "digest": "6d7340765c69724580c4b4b29ee207e8ced4aa1d230cd541d1565ea9fbd752e1"
+              },
+              {
+                "id": "CI-009",
+                "file": "scripts/tools/film-release-entrypoints.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "digest": "7d491db3cfd6eee9bcef1a44c258f9a40033096154ffb800d1eeb7d095e330d3"
+              },
+              {
+                "id": "CI-010",
+                "file": "scripts/tools/film-publication-policy.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-publication-policy.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-publication-policy.test.mjs",
+                  "absent": false
+                },
+                "digest": "8e23c8f619f40c3c7aebecb4df24e67e3aedc0c6bc703233de06cdafedda8ea0"
+              },
+              {
+                "id": "CI-011",
+                "file": "scripts/product-runtime-assets.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "digest": "9539664c0404b49a7a64aea4799585df2a8cb44aa7f5b00be72c0e9539aae497"
+              },
+              {
+                "id": "CI-012",
+                "file": "scripts/tools/film-native-post.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "digest": "9e6c41761e0ee4586d4071e9ba41b095cfd3e679a84429b0b10312030c1fc2f0"
+              },
+              {
+                "id": "CI-013",
+                "file": "scripts/tools/film-existing-render-edit.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-existing-render-edit.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-existing-render-edit.test.ts",
+                  "absent": false
+                },
+                "digest": "a3584a3f346707cd5e3ca48cc0b4301ebd2550acec622de539fe751f5c167387"
+              },
+              {
+                "id": "CI-014",
+                "file": "scripts/ai-video-workbench-guide.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": false
+                },
+                "digest": "d08b892bc6e593baa513d20bb72075a8a610a0ab12d0f47e88678d66a611f0ff"
+              },
+              {
+                "id": "CI-015",
+                "file": "scripts/tools/film-rendered-material-use.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": false
+                },
+                "digest": "e17d15ca4d5a28ca95b5d70229d86d2c458663b03ea59d2371f27b2493a45b2b"
+              }
+            ]
+          }
+        }
+      },
+      "previous": "500a3b65de865255968ff5864c5b76ac1794b4679d38016d8f88d7cde7d42524",
+      "digest": "5dd142839be588603f0bd11d2a8d356382ba2cfa8b272f320c0bd69dc7c1f987"
+    },
+    {
+      "sequence": 3645,
+      "at": "2026-10-08T09:25:44.069Z",
+      "kind": "transaction",
+      "data": {
+        "id": "trusted-handoff:workloom-ai/workloom-growthtest:119:07728e58d9b7a0f114cbfa37b9be0dd5ca49f066:ed485d4979f9e92541d7a7066df9557dfeb66f78:e43be1892e29bda6f60ebc86caf3c8e7d5624b53d643bb74654ef39f43dc2a4f"
+      },
+      "previous": "5dd142839be588603f0bd11d2a8d356382ba2cfa8b272f320c0bd69dc7c1f987",
+      "digest": "cf80ea4cc0d756eecfb3934f144080bcbe903b84d883ac5d2721e55d36dc3456"
     }
   ]
 }
