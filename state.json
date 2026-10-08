@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3725,
+  "revision": 3728,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "merging",
+      "status": "integrated",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2068,7 +2068,7 @@
         }
       },
       "updatedAt": 1791454523182,
-      "error": "CNB 409 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/156/merge :: {\"errcode\":2009014,\"errmsg\":\"the pull can not merge yet\"}\n",
+      "error": null,
       "blockedUntil": 1791454224770,
       "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
       "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
@@ -2928,7 +2928,7 @@
         "at": 1791440115248
       },
       "recoveryIntent": null,
-      "mergePhase": "merge_verified",
+      "mergePhase": null,
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 156,
@@ -3360,7 +3360,17 @@
         "checkSha": "0d216c05cb6b97c8228c0bef2cb87abbdb9260eb",
         "mergedBy": "cnb.dYiF05kxAGA",
         "verifiedAt": "2026-10-08T10:16:30.557Z"
-      }
+      },
+      "integrationHistory": [
+        {
+          "sha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
+          "sourceSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+          "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+          "checkSha": "0d216c05cb6b97c8228c0bef2cb87abbdb9260eb",
+          "mergedBy": "cnb.dYiF05kxAGA",
+          "verifiedAt": "2026-10-08T10:16:30.557Z"
+        }
+      ]
     },
     "120": {
       "number": 120,
@@ -8220,10 +8230,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": "integration/pr-119",
+      "owner": null,
       "generation": 97,
       "acquiredAt": 1791454523182,
-      "expiresAt": 1791455423182
+      "expiresAt": 1791454523182
     },
     "dependencies": {
       "owner": null,
@@ -95932,6 +95942,65 @@
       },
       "previous": "d0b223381ee2291e45374a098ede784b17ba7ba85c1651ab168b3d93b88476a7",
       "digest": "87cf240876ec19810a95848c80ce870c974068639439a82eab19b7e598ea034d"
+    },
+    {
+      "sequence": 3726,
+      "at": "2026-10-08T10:15:23.182Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-119",
+        "generation": {
+          "protocol": 97
+        }
+      },
+      "previous": "87cf240876ec19810a95848c80ce870c974068639439a82eab19b7e598ea034d",
+      "digest": "daff1dac15aea9721a8aa3f5b89fe94488d69b61bd1ac230519a9e7964e4d85a"
+    },
+    {
+      "sequence": 3727,
+      "at": "2026-10-08T10:15:23.182Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "integrated",
+          "merge": {
+            "sha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
+            "sourceSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "checkSha": "0d216c05cb6b97c8228c0bef2cb87abbdb9260eb",
+            "mergedBy": "cnb.dYiF05kxAGA",
+            "verifiedAt": "2026-10-08T10:16:30.557Z"
+          },
+          "mergePhase": null,
+          "error": null,
+          "integrationHistory": [
+            {
+              "sha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
+              "sourceSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+              "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "checkSha": "0d216c05cb6b97c8228c0bef2cb87abbdb9260eb",
+              "mergedBy": "cnb.dYiF05kxAGA",
+              "verifiedAt": "2026-10-08T10:16:30.557Z"
+            }
+          ]
+        }
+      },
+      "previous": "daff1dac15aea9721a8aa3f5b89fe94488d69b61bd1ac230519a9e7964e4d85a",
+      "digest": "9e7b058b7f5ad630dbbcf258b79887fdeab043b8be58e37285ea20696e82b238"
+    },
+    {
+      "sequence": 3728,
+      "at": "2026-10-08T10:16:43.976Z",
+      "kind": "transaction",
+      "data": {
+        "id": "fc0b8e52-826c-4c08-90c8-0f30d510cbe8"
+      },
+      "previous": "9e7b058b7f5ad630dbbcf258b79887fdeab043b8be58e37285ea20696e82b238",
+      "digest": "4c220d2feba05e2f9398168b03ee1019476ed4acbf2bc3d51e6212542c6eca31"
     }
   ]
 }
