@@ -1,8 +1,8 @@
 /**
  * Exercises the actual director worker-to-picture bridge with local synthetic media.
  * It extracts the real private worker/audio/post functions without editing them.
- * Only asset/DB/audio-authority boundaries are fixtures; picture normalization,
- * EDL generation, ffmpeg frame trim/concat and frame readback are real.
+ * Only asset/DB/optional audio-authority boundaries are fixtures; default source
+ * audio, picture normalization, EDL generation and ffmpeg readback are real.
  */
 import fs from "node:fs";
 import fsp from "node:fs/promises";
@@ -131,6 +131,7 @@ async function fixture(lockTrim: boolean) {
     "-f", "lavfi", "-i", "testsrc2=s=160x288:r=30:d=6",
     "-f", "lavfi", "-i", "sine=frequency=733:sample_rate=48000:duration=6",
     "-map", "0:v:0", "-map", "1:a:0", "-frames:v", String(SOURCE_FRAMES),
+    "-vf", "drawbox=x=0:y=0:w=iw:h=ih:color=red:t=fill:enable='gte(t,5.5)'",
     "-c:v", "libx264", "-preset", "veryfast", "-threads", "2", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-ar", "48000", "-ac", "2", input],
   { label: "bridge(synthetic-six-second-source)", timeoutMs: 90_000 });
@@ -157,10 +158,9 @@ async function fixture(lockTrim: boolean) {
     },
   });
   let nextAudioJob = 0;
-  const env = { WORKLOOM_POST_ALLOWED_ROOTS: JSON.stringify([root]),
-    // Synthetic fixture sentinel solely for the producer's length guard. It is
-    // not a real key, and no HMAC/audio authority certification is exercised.
-    WORKLOOM_AUDIO_STEM_SIGNING_SECRET: "bridge-fixture-sentinel-0000000000000000" };
+  // The default source-audio route must work without a voice engine or an
+  // independent-stem signing credential.
+  const env = { WORKLOOM_POST_ALLOWED_ROOTS: JSON.stringify([root]) };
   const audio = actualFunctions<AudioApi>(SOURCES, ["prepareDirectorAudio"], ["prepareDirectorAudio"], {
     path, mkdir: fsp.mkdir, DirectorJobError: FixtureJobError, directorHash: director.directorHash,
     directorWorkRoot: () => root,
@@ -209,7 +209,7 @@ async function fixture(lockTrim: boolean) {
   return { root, input, originalHash, asset, planned, filmPlan, env, worker, audio, picture, boundaryCalls };
 }
 
-async function actualBridge(f: Awaited<ReturnType<typeof fixture>>) {
+async function actualBridge(f: Awaited<ReturnType<typeof fixture>>, pictureBins = bins) {
   const clips = await f.worker.loadClips(SCOPE, PROJECT_ID,
     [{ shotId: "SC-001", assetId: f.asset.id }], f.filmPlan, measure, bins);
   const withAudio = await f.audio.prepareDirectorAudio(SCOPE, { projectId: PROJECT_ID, revision: 1,
@@ -227,7 +227,7 @@ async function actualBridge(f: Awaited<ReturnType<typeof fixture>>) {
   const plans = director.buildPostVariantPlans({ sourceManifest: prepared.sourceManifest,
     targetPlan, scope: { ...SCOPE, projectId: PROJECT_ID, revision: 1 } });
   expect(plans).toHaveLength(1);
-  const result = await f.picture.executePicture(plans[0], prepared.normalised, outputDir, bins, f.env);
+  const result = await f.picture.executePicture(plans[0], prepared.normalised, outputDir, pictureBins, f.env);
   const frames = await f.picture.exactFrames(result.picture, bins);
   expect(await measure.sha256File(f.input), "Original generated source must not be rewritten").toBe(f.originalHash);
   // Runtime logs bind both RED and GREEN to the actual reconstructed stages.
@@ -239,8 +239,33 @@ async function actualBridge(f: Awaited<ReturnType<typeof fixture>>) {
   return { clips, withAudio, prepared, plan: plans[0], result, frames };
 }
 
+async function tailPixel(f: Awaited<ReturnType<typeof fixture>>, file: string, frame: number) {
+  const output = path.join(f.root, `tail-pixel-${randomUUID()}.rgb`);
+  await measure.runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-filter_threads", "1", "-i", file,
+    "-map", "0:v:0", "-vf", `select=eq(n\\,${frame}),crop=2:2:80:144,format=rgb24`,
+    "-frames:v", "1", "-f", "rawvideo", output], { label: "bridge(actual-tail-frame)", timeoutMs: 30_000 });
+  const bytes = await fsp.readFile(output);
+  expect(bytes).toHaveLength(12);
+  return [...bytes.subarray(0, 3)];
+}
+
+async function tailTone(f: Awaited<ReturnType<typeof fixture>>, file: string) {
+  const output = path.join(f.root, `tail-audio-${randomUUID()}.pcm`);
+  await measure.runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-i", file, "-map", "0:a:0",
+    "-af", "atrim=start_sample=264000:end_sample=288000", "-ar", "48000", "-ac", "1",
+    "-c:a", "pcm_s16le", "-f", "s16le", output], { label: "bridge(actual-source-audio-tail)", timeoutMs: 30_000 });
+  const bytes = await fsp.readFile(output), samples = bytes.length / 2;
+  let squares = 0, rising = 0, previous = 0;
+  for (let offset = 0; offset < bytes.length; offset += 2) {
+    const sample = bytes.readInt16LE(offset); squares += sample * sample;
+    if (previous <= 0 && sample > 0) rising++;
+    previous = sample;
+  }
+  return { samples, rms: Math.sqrt(squares / samples), frequency: rising / (samples / 48000) };
+}
+
 describe("actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge", () => {
-  it("keeps all 180 frames of the frozen silent six-second action through the actual worker bridge", async () => {
+  it("keeps all 180 frames, tail and original sound without new audio work through the actual worker bridge", async () => {
     const f = await fixture(true), actual = await actualBridge(f);
     // Run the complete bridge before this assertion: original loadClips reaches
     // real executePicture with 104 frames, rather than failing at a mocked flag check.
@@ -252,9 +277,32 @@ describe("actual director worker -> audio -> prepared source -> EDL -> ffmpeg pi
     expect(actual.plan.pictureEdl[0]).toMatchObject({ sourceId: "SC-1", inFrame: 0, outFrame: 180, dialogueProtected: true });
     expect(actual.plan.durationFrames).toBe(SOURCE_FRAMES);
     expect(actual.result.readback.segments[0].frames).toBe(SOURCE_FRAMES);
-    expect(f.boundaryCalls).toMatchObject({ connectors: 1, describeAudio: 1, issueAudio: 1, renderAudio: 1, forbidden: [] });
-    expect(f.boundaryCalls.audioIssueInputs[0][0].stems.dialogue.status).toBe("not_applicable");
-    expect(f.boundaryCalls.audioRenderInputs[0][0].durationSec).toBe(SOURCE_SECONDS);
+    expect(actual.withAudio).toBe(actual.clips);
+    expect(actual.clips[0]).not.toHaveProperty("audioStems");
+    expect(actual.prepared.sourceManifest.shots[0].sha256).toBe(f.originalHash);
+    expect(actual.prepared.sourceStems).toMatchObject({ schemaVersion: "workloom.native-program/v1",
+      program: { sourceAuthority: "frozen-source-audio", embeddedAudioUsed: true, silenceInsertedForSources: [] },
+      sources: [], qualityReview: "not-run", musicExcluded: false });
+    const program = actual.prepared.sourceStems.program;
+    expect(await measure.sha256File(program.path)).toBe(program.sha256);
+    const tailPixels = [];
+    for (const file of [f.input, actual.result.picture]) {
+      const [red, green, blue] = await tailPixel(f, file, SOURCE_FRAMES - 1);
+      expect(red).toBeGreaterThan(220); expect(green).toBeLessThan(20); expect(blue).toBeLessThan(20);
+      tailPixels.push({ file, frame: SOURCE_FRAMES - 1, red, green, blue });
+    }
+    const originalTone = await tailTone(f, f.input), programTone = await tailTone(f, program.path);
+    for (const tone of [originalTone, programTone]) {
+      expect(tone.samples).toBe(24_000); expect(tone.rms).toBeGreaterThan(1000);
+      expect(Math.abs(tone.frequency - 733)).toBeLessThan(4);
+    }
+    expect(Math.abs(programTone.frequency - originalTone.frequency)).toBeLessThan(4);
+    expect(await measure.sha256File(f.input)).toBe(f.originalHash);
+    expect(f.boundaryCalls).toMatchObject({ connectors: 0, describeAudio: 0, issueAudio: 0, renderAudio: 0,
+      forbidden: [], audioIssueInputs: [], audioRenderInputs: [] });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+    console.info(JSON.stringify({ fixture: "director-native-source-tail-readback", sourceSha256: f.originalHash,
+      actualFrames: actual.frames, tailPixels, originalTone, programTone, audioBoundaryCalls: f.boundaryCalls }));
   }, 120_000);
 
   it("retains an unlocked legacy control that really renders the 104-frame recipe interval", async () => {
@@ -266,6 +314,29 @@ describe("actual director worker -> audio -> prepared source -> EDL -> ffmpeg pi
     expect(actual.plan.pictureEdl[0].outFrame - actual.plan.pictureEdl[0].inFrame).toBe(104);
     expect(actual.plan.pictureEdl[0].dialogueProtected).toBe(false);
     expect(f.boundaryCalls.forbidden).toEqual([]);
+  }, 120_000);
+
+  it("an explicit dubbing request still fails before voice work when independent audio authority is unavailable", async () => {
+    const f = await fixture(true);
+    const clips = await f.worker.loadClips(SCOPE, PROJECT_ID,
+      [{ shotId: "SC-001", assetId: f.asset.id }], f.filmPlan, measure, bins);
+    await expect(f.audio.prepareDirectorAudio(SCOPE, { projectId: PROJECT_ID, revision: 1, clips,
+      filmPlan: f.filmPlan, by: "fixture-user", deadlineMs: Date.now() + 120_000, audioMode: "dubbing" }))
+      .rejects.toMatchObject({ code: "AUDIO_AUTHORITY_UNAVAILABLE" });
+    expect(f.boundaryCalls).toMatchObject({ connectors: 1, describeAudio: 0, issueAudio: 0, renderAudio: 0, forbidden: [] });
+    expect(await measure.sha256File(f.input)).toBe(f.originalHash);
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
+  }, 120_000);
+
+  it("a real missing FFmpeg process rejects picture work without a success readback or rewritten source", async () => {
+    const f = await fixture(true);
+    await expect(actualBridge(f, { ...bins, ffmpeg: path.join(f.root, "missing-ffmpeg") }))
+      .rejects.toMatchObject({ code: "ffmpeg_not_installed" });
+    expect(fs.existsSync(path.join(f.root, "picture/picture.mp4"))).toBe(false);
+    expect(fs.existsSync(path.join(f.root, "picture/picture-edl-readback.json"))).toBe(false);
+    expect(await measure.sha256File(f.input)).toBe(f.originalHash);
+    expect(f.boundaryCalls).toMatchObject({ connectors: 0, describeAudio: 0, issueAudio: 0, renderAudio: 0, forbidden: [] });
+    expect(vi.mocked(fetch)).not.toHaveBeenCalled();
   }, 120_000);
 
   it.each(["empty", "unknown", "canonical-duplicate", "missing", "license"])(
