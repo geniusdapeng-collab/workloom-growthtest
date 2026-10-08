@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3843,
+  "revision": 3845,
   "tasks": {
     "98": {
       "number": 98,
@@ -34,7 +34,7 @@
         "scripts/loommate-voice-engine.test.py"
       ],
       "ciSince": 1791454635414,
-      "updatedAt": 1791467415513,
+      "updatedAt": 1791468015571,
       "alignmentCount": 1,
       "alignmentIntent": null,
       "developerReview": null,
@@ -98149,6 +98149,55 @@
       },
       "previous": "cd48c057b1344cb22b243d124f5efd5f45ee4ef375bc67126d024ae073422a68",
       "digest": "05c0c3e3df7369d176e6309d76201734789d75fe4f0f065b76f9d4d139a4637d"
+    },
+    {
+      "sequence": 3844,
+      "at": "2026-10-08T14:00:15.571Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "headSha": "dae795860c94b9301d86694123a07cadf8ce59b0",
+          "mainSha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
+          "branch": "task/T-2026-1002-9101",
+          "intent": {
+            "taskId": "T-2026-1002-9101",
+            "dependsOn": [],
+            "releases": []
+          },
+          "originalBody": "旧版 zf_xiaoni 经产品所有者试听被否决，地域口音让数字人体验出戏。默认改为本轮 A/B/C 同句试听选定的 A / zf_001：固定 Kokoro-82M-v1.1-zh ONNX INT8 图、对应中文 1.1 发音前端与声线集，保留现有 CPU 工位和播放器。\n\n旧“小妮”缓存与新模型、声线、发音前端及依赖的缓存身份隔离；已有客户端默认档案兼容。英文通过明确的发音回调保留，不支持的音素明确失败，避免漏读文本后返回成功。安装器同时校验英文依赖、模型、声线与发音前端；保留本人克隆和系统语音回退。\n\n任务卡：https://cnb.cool/workloom-ai/workloom-growthtest/-/issues/97\n\n本仓语音 44 项、安装器 11 项、工位 13 项通过；Python 语法、开源清单与秘密扫描通过。真实所选声线的欢迎、完成反馈、安抚及数字/英文四条音频全部返回有效 WAV，分别耗时 3.31s / 2.669s / 2.718s / 4.316s。六个预开空闲连接、三次并行未缓存合成和合成期间健康检查通过，三请求含排队耗时 5.101s / 7.592s / 2.661s。性能是本机当次测量，不承诺未缓存即时响应。\n\n模型与声线约 168 MB，固定 SHA-256，词表来自固定图；依赖和各自许可证已登记。口音/甜美为人类试听判定，自动测试不代替主观验收；模型不支持任意情绪指令。安装器只在 Apple Silicon macOS 实测，新签名客户端安装包未发布。\n\n变更路径：\n- apps/server/src/voice/loommate-voice.json\n- apps/server/src/voice/station.test.ts\n- apps/server/src/voice/station.ts\n- apps/server/src/voice/wav.fixture.ts\n- apps/server/src/voice/wav.test.ts\n- apps/server/src/voice/wav.ts\n- docs/OPEN_SOURCE_COMPONENTS.md\n- docs/loommate-expressive-voice.md\n- docs/voice-and-avatar-delivery-contract.md\n- oss-components.json\n- scripts/install-loommate-voice.py\n- scripts/install-loommate-voice.test.py\n- scripts/loommate-voice-engine.py\n- scripts/loommate-voice-engine.test.py\n\n回滚：revert 本 PR 并按上一固定模型规范重新安装工位。只按现有文件锁和平台门禁合并本任务 PR；原影视配音、本人参考声音及其他任务独立。\n\n发布排队处置（2026-10-04）：按产品所有者本轮指令，本语音改动暂时退出活动 PR 队列，以释放并发文件锁、优先完成发布整改。源分支 task/T-2026-1002-9101 与提交 f784b231a88467ba5310ffefdeca3d4f99620311 完整保留；任务卡保持未完成并记录恢复路径。对应发布整改合入 main 后，再基于最新 main 恢复语音变更、生成 OSS 清单和重跑门禁。\n\n2026-10-04 发布放行更新：产品所有者在当前会话明确要求本会话所有提交批次合并发布，已有问题留痕后续优化。此前临时退出排队的决定已被本次指令取代，本 PR 恢复 open。源分支已整合当前 main bedca8ae4d398ea79d9db674657a9074c275b910；组件清单按合并后的真实依赖重建。语音44、安装器11、工位13项回归通过，Python语法、组件清单、秘密扫描与差异检查通过。本仓 server/web 类型检查通过。本次继续提交普通平台合并，远端 CI、评审和权限结果据实留证；原生签名安装包及其他平台实测另有前置，不阻塞当前源码研发批次。",
+          "files": [
+            "apps/server/src/voice/loommate-voice.json",
+            "apps/server/src/voice/station.test.ts",
+            "apps/server/src/voice/station.ts",
+            "apps/server/src/voice/wav.fixture.ts",
+            "apps/server/src/voice/wav.test.ts",
+            "apps/server/src/voice/wav.ts",
+            "docs/OPEN_SOURCE_COMPONENTS.md",
+            "docs/loommate-expressive-voice.md",
+            "docs/voice-and-avatar-delivery-contract.md",
+            "oss-components.json",
+            "scripts/install-loommate-voice.py",
+            "scripts/install-loommate-voice.test.py",
+            "scripts/loommate-voice-engine.py",
+            "scripts/loommate-voice-engine.test.py"
+          ],
+          "status": "parked",
+          "ciSince": 1791454635414
+        }
+      },
+      "previous": "05c0c3e3df7369d176e6309d76201734789d75fe4f0f065b76f9d4d139a4637d",
+      "digest": "cd352d78802fd3dbf488abaed8c20be8e86c62a28a3adc9d009ef88b39db94f0"
+    },
+    {
+      "sequence": 3845,
+      "at": "2026-10-08T14:00:16.896Z",
+      "kind": "transaction",
+      "data": {
+        "id": "204ec8ec-0874-4519-8495-ef22c9920a36"
+      },
+      "previous": "cd352d78802fd3dbf488abaed8c20be8e86c62a28a3adc9d009ef88b39db94f0",
+      "digest": "e1096717f9283fb270a30e29d790545b5c6f199654195e6fb6543cf0c02547b8"
     }
   ]
 }
