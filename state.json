@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3455,
+  "revision": 3458,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "developing",
+      "status": "waiting_ci",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2067,7 +2067,7 @@
           "protocol": 89
         }
       },
-      "updatedAt": 1791439215068,
+      "updatedAt": 1791439418842,
       "error": "需按实际代码语义更新 main 并解决冲突；自动主干对齐预算已耗尽",
       "blockedUntil": 1791437110555,
       "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
@@ -2075,11 +2075,264 @@
       "branch": "task/T-2026-1007-0001",
       "intent": {
         "taskId": "T-2026-1007-0001",
-        "ready": false,
+        "ready": true,
         "dependsOn": [],
         "releases": []
       },
-      "developerReview": null,
+      "developerReview": {
+        "schemaVersion": 1,
+        "provider": "codex",
+        "repo": "workloom-ai/workloom-growthtest",
+        "number": 119,
+        "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+        "policyHash": "b8296b0f50fc56cdd1fadfac1e14512e3f78ebe1380072d5fb0f9a89706c12af",
+        "reviewedFiles": [
+          "AGENTS.repo.md",
+          "README.md",
+          "apps/server/src/video/director-router.ts",
+          "apps/server/src/video/director-sources.ts",
+          "apps/server/src/video/director-worker.ts",
+          "apps/server/src/video/film-worker-identity.test.ts",
+          "apps/server/src/video/film-worker.test.ts",
+          "apps/server/src/video/film-worker.ts",
+          "bundles/ai-video/README.md",
+          "bundles/ai-video/bundle.json",
+          "bundles/ai-video/connectors/bgm-bridge/README.md",
+          "bundles/ai-video/connectors/bgm-bridge/audio-stems-mix.test.mjs",
+          "bundles/ai-video/connectors/bgm-bridge/cli.mjs",
+          "bundles/ai-video/connectors/bgm-bridge/core.mjs",
+          "bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs",
+          "bundles/ai-video/connectors/bgm-bridge/measure.mjs",
+          "bundles/ai-video/connectors/bgm-bridge/runtime-smoke.mts",
+          "bundles/ai-video/connectors/color-bridge/README.md",
+          "bundles/ai-video/connectors/color-bridge/cli.mjs",
+          "bundles/ai-video/connectors/color-bridge/core.mjs",
+          "bundles/ai-video/connectors/color-bridge/core.test.ts",
+          "bundles/ai-video/connectors/color-bridge/runtime-smoke.mts",
+          "bundles/ai-video/connectors/post-bridge/core.mjs",
+          "bundles/ai-video/connectors/post-bridge/delivery-integration.test.ts",
+          "bundles/ai-video/connectors/post-bridge/director-delivery.mjs",
+          "bundles/ai-video/connectors/subtitle-bridge/README.md",
+          "bundles/ai-video/connectors/subtitle-bridge/cli.mjs",
+          "bundles/ai-video/connectors/subtitle-bridge/core.mjs",
+          "bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts",
+          "bundles/ai-video/connectors/subtitle-bridge/runtime-smoke.mts",
+          "bundles/ai-video/connectors/voice-bridge/README.md",
+          "bundles/ai-video/connectors/voice-bridge/core.mjs",
+          "bundles/ai-video/fences/ai-video-bgm.yml",
+          "bundles/ai-video/fences/ai-video-color.yml",
+          "bundles/ai-video/fences/ai-video-delivery.yml",
+          "bundles/ai-video/fences/ai-video-material.yml",
+          "bundles/ai-video/fences/ai-video-subtitle.yml",
+          "bundles/ai-video/fences/ai-video-voice.yml",
+          "bundles/ai-video/library/director-system/recipes.json",
+          "bundles/ai-video/library/real-person-assets/asset-20260101000000-demo/profile.json",
+          "bundles/ai-video/pipelines/narrative-film.yml",
+          "bundles/ai-video/presets/bgm-composer.yml",
+          "bundles/ai-video/presets/colorist.yml",
+          "bundles/ai-video/presets/post-editor.yml",
+          "bundles/ai-video/presets/subtitle-stylist.yml",
+          "bundles/ai-video/presets/voice-artist.yml",
+          "bundles/ai-video/schemas/objects.json",
+          "bundles/ai-video/skills/bgm-audio-layering/SKILL.md",
+          "bundles/ai-video/skills/bgm-delivery-spec/SKILL.md",
+          "bundles/ai-video/skills/caption-burnin-ops/SKILL.md",
+          "bundles/ai-video/skills/color-delivery-spec/SKILL.md",
+          "bundles/ai-video/skills/color-grade/SKILL.md",
+          "bundles/ai-video/skills/color-look-design/SKILL.md",
+          "bundles/ai-video/skills/color-shot-matching/SKILL.md",
+          "bundles/ai-video/skills/cover-design/SKILL.md",
+          "bundles/ai-video/skills/delivery-package-ops/SKILL.md",
+          "bundles/ai-video/skills/delivery-revision-ops/SKILL.md",
+          "bundles/ai-video/skills/producer-gate-review/SKILL.md",
+          "bundles/ai-video/skills/render-ops/SKILL.md",
+          "bundles/ai-video/skills/subtitle-delivery-spec/SKILL.md",
+          "bundles/ai-video/skills/subtitle-layout-design/SKILL.md",
+          "bundles/ai-video/skills/voice-delivery-spec/SKILL.md",
+          "bundles/ai-video/skills/voice-dubbing-sync/SKILL.md",
+          "bundles/geo-growth/agent-capabilities.json",
+          "bundles/geo-growth/capabilities/video.mjs",
+          "bundles/geo-growth/capabilities/workbench-guide.mjs",
+          "docs/agent-computer-guide.md",
+          "docs/ai-video-workbench-guide.md",
+          "docs/real-person-asset.md",
+          "docs/video-standard-post.md",
+          "packages/base/bundles/bgm-capability.test.ts",
+          "packages/base/bundles/post-av-sync.test.ts",
+          "packages/base/bundles/post-delivery-capability.test.ts",
+          "packages/base/bundles/subtitle-capability.test.ts",
+          "packages/base/bundles/voice-capability.test.ts",
+          "packages/video-studio/src/character-release-contract.integration.test.ts",
+          "packages/video-studio/src/cover-assembly.test.ts",
+          "packages/video-studio/src/cover-assembly.ts",
+          "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+          "packages/video-studio/src/deliver.ts",
+          "packages/video-studio/src/director-planner.ts",
+          "packages/video-studio/src/director-post-default.integration.test.ts",
+          "packages/video-studio/src/film-completion-entrypoint.test.ts",
+          "packages/video-studio/src/film-contracts.ts",
+          "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+          "packages/video-studio/src/film-worker-runtime.test.ts",
+          "packages/video-studio/src/film-worker-runtime.ts",
+          "packages/video-studio/src/index.ts",
+          "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+          "packages/video-studio/src/post-render-acceptance.ts",
+          "packages/video-studio/src/post-render-fence-policy.test.ts",
+          "packages/video-studio/src/producer-gate.test.ts",
+          "packages/video-studio/src/producer-gate.ts",
+          "packages/video-studio/src/standard-post-contract.test.ts",
+          "packages/video-studio/src/standard-post-contract.ts",
+          "plugins/workloom-workbench/README.md",
+          "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+          "plugins/workloom-workbench/skills/workloom/SKILL.md",
+          "scripts/AGENT-CAPABILITIES.md",
+          "scripts/agent-capabilities.test.mjs",
+          "scripts/ai-video-workbench-guide.test.mjs",
+          "scripts/product-runtime-assets.mjs",
+          "scripts/product-runtime-assets.test.mjs",
+          "scripts/tools/compose-film.mts",
+          "scripts/tools/compose-native-clock.test.ts",
+          "scripts/tools/film-cli-preflight.test.mjs",
+          "scripts/tools/film-existing-render-edit.test.ts",
+          "scripts/tools/film-native-post.test.ts",
+          "scripts/tools/film-publication-policy.d.mts",
+          "scripts/tools/film-publication-policy.mjs",
+          "scripts/tools/film-publication-policy.test.mjs",
+          "scripts/tools/film-release-entrypoints.test.ts",
+          "scripts/tools/film-rendered-material-use.test.ts",
+          "scripts/tools/film-standard-post.mts",
+          "scripts/tools/film-standard-post.test.ts",
+          "scripts/tools/full-chain-film.mts",
+          "scripts/tools/video-request-regression.test.ts",
+          "tools/codex-gateway/README.md",
+          "tools/codex-gateway/bin/cli.mjs",
+          "tools/codex-gateway/src/mcp.mjs",
+          "tools/codex-gateway/test/mcp.test.mjs",
+          "tools/codex-gateway/test/video-guide.test.mjs"
+        ],
+        "filesHash": "9e1a0bc3f8d63c4beec8c875dcd756e6d5609784abb7e812068190f8c93f312a",
+        "dependsOn": [],
+        "ciPolicyChanges": [
+          {
+            "id": "CI-001",
+            "rationale": "A源码/B实际执行：将正式完整作品封面断言扩充为 v2 prepend-cover-frame：源正文全部帧保留，视频仅前置1帧，音频/字幕偏移均0，且当前input/cover/output SHA相符。新增正文少帧、源SHA/帧率错误与错误偏移拒绝；原显式opening-title和非法回执拒绝仍保留。兼容v1只限不要求保留源帧的旧helper调用，不能作为正式完整作品发布凭据。本人精读当前47行及完整24行diff，当前changed-node与完整test:scripts均通过。"
+          },
+          {
+            "id": "CI-002",
+            "rationale": "A源码/B实际执行：成功原片按官方accepted task、事前授权、first witness与当前源字节进入正式后期；把来源品质门改为技术来源/加工事实，新增黑帧、奇数画布、静音、10.04秒与低帧率等实际媒体采用。真实完整ordinary CLI覆盖默认后期全阶段、部分成功镜头仅处理pending镜头、历史卡片/提示/日志保留、当前任务/回执/权限/字节否定对照；名义2秒实际4.25秒保留102正文帧+1封面帧、原AAC包、零音频/字幕偏移，分数与qualityReviewPerformed如实空值/false。保留并发唯一publisher及真实compose/subtitle/danmaku/mux失败不发布。当前canonical Node/Vitest各57/57与current-native57/57实际通过；不改必需CI集合、不以fixture耗时冒充生产。"
+          },
+          {
+            "id": "CI-003",
+            "rationale": "A源码/B实际执行：来源选择依据独立固定raw字节，旧TTS/品质记录不替代或否决已固定原片；missing/changed bytes与缺manifest仍拒绝。原片静音、短声轨、奇数画布和异帧率进入本机官方normalize；声画品质不再以PCM质检否决，requested export clock只读真实metadata且qualityReviewPerformed/audioAlignmentMeasured=false。新process receipt严格绑定每个source SHA、源/normalized帧数、帧率、画布、每镜帧分配与全部输出；新增丢帧/加帧、分数帧率/时长错误等拒绝。真实本机compose输出2160x3840的8帧并保留尾标记和AAC包，仍拒绝顺序/删镜/加镜/复用/转场/retime及未接入模型enhance参数。当前current-native实际该文件全部通过，未证明生产4K发布。"
+          },
+          {
+            "id": "CI-004",
+            "rationale": "A源码/B实际执行：native-clock按实际输入帧与帧率换算完整自然时轴，不按名义duration截尾或强制补长；现有315帧/真实图片hash与source bytes断言保留。将静音/短声轨的后置品质拒绝迁为实际成功加工和真实metadata事实，receipt明确未做quality/audio alignment认证；重新定速仍拒绝。本人精读当前93行及60行diff，真实FFmpeg/ffprobe当前current-native全部通过，没有把false质检字段伪造为合格。"
+          },
+          {
+            "id": "CI-005",
+            "rationale": "A源码/B实际执行：为固定工作台指南新增运行载荷复制、正文摘要、缺文件及软链逃逸失败测试；在未产生预编译入口时继续硬失败，保留原包内路径、secret排除和hash约束。只增加一个固定docs/ai-video-workbench-guide.md，不开放任意docs树，不调整签名安装包保护。本人精读161行及56行diff，当前changed-node和原test:scripts中实际执行通过。"
+          },
+          {
+            "id": "CI-006",
+            "rationale": "A源码/B实际执行：保留原CI路径，在VITEST环境直接导入canonical全部assertions；原tsx --test入口则实际启动仓库Vitest runner运行canonical。900000ms只用于此真实子进程边界；error/signal/非零status均透传，没有改canonical assertion、skip、原测试超时或全局CI阈值。当前原Node入口实际57/57+外层1通过、Vitest alias57/57；真实FFmpeg非法option负控canonical47fail/10pass并使外层1fail、exit1，证明没有吞子失败或假绿。"
+          },
+          {
+            "id": "CI-007",
+            "rationale": "A源码/B实际执行：两项生成前拒绝用真实videos阶段继续验证：非法默认合成旁白与不允许输入仍exit1且不执行shot/material-gen/voice工站。新增voice-only dry-run只记录invoked=false、ok=false、degraded与artifact=null，不伪造原声成功或spoken/lip-sync证书；真实子进程fetch/http/https拒绝器与计数证明这些前门用例零网络。当前changed-node及完整test:scripts通过，不放宽权限、不改变治理/CI超时。"
+          },
+          {
+            "id": "CI-008",
+            "rationale": "A源码/B实际执行：按取消渲后二次品质门的授权，把旧PCM质检报告迁为真实composition-process回执、current input/output SHA和实际AV start/duration事实；保留每个输出24帧/8fps、全部PTS间隔0.125、原0.13秒容差及原xfade像素断言。最小后续测试提交只迁移3个旧合同：UHD允许本机交付同时保留HD源source/recipe lineage及旧日志前缀，2160p别名前期仍1080p提示且无enhance，concat从6位改9位小数；新增HD/2160p冲突与未接入enhance显式参数两项执行前拒绝。旧749实际399/402/3fail保留，当前原完整脚本404/404并继续Node108/Desktop162，当前35case全部通过。UHD请求回归正例是dry-run合同，生产4K未验证。"
+          },
+          {
+            "id": "CI-009",
+            "rationale": "A源码/B实际执行：只在原agent测试入口导入新增固定指南测试，原身份、输入、权限、脱敏与能力注册断言保留。CLI/MCP读同一固定模块/正文并返回准确UTF8 SHA，不新增任意路径读取。本人精读当前434行及13行diff，当前原test:scripts和changed-node实际通过，原云端must commands与阈值不变。"
+          },
+          {
+            "id": "CI-010",
+            "rationale": "A源码/B实际执行：发布入口允许已按accepted task/事前授权/官方来源字节固定的成功原片，历史品质/旧voice记录不再触发默认新provider/ASR/TTS；缺件、篡改、错误current receipt、非当前input与实际加工失败继续硬失败。新增composition-process receipt与真正export metadata绑定，验证wrong source/帧分配、drop/add frames、fps和duration等否定；fixture mock媒体与probe边界明确，未伪称可播放生产片。正式封面要求前置1帧和正文全帧保留，音频/字幕0offset。本人精读456行及238行diff，准确当前1d19的current-native实际全部通过，没有引用旧0854执行冒充当前。"
+          },
+          {
+            "id": "CI-011",
+            "rationale": "A源码/B实际执行：实际同次material stage在supplier success后使用正式issued receipt、first witness、task与当前源字节adapter，刷新completed map并记录render-adopted，G7不再用100000-byte门槛否决有效小原片；新增真实child constructor/context/finish及实际parent adoption/result/byte验证闭环。丢adopted事件、清空official verified IDs、源/任务/witness篡改与真实下载失败继续拒绝；off/advisory/blocking post加工如实technical error/null score，不做默认modelquality。当前305行与完整410行diff精读、current-native实际通过；补充15+10独立控制只延续六个关键实现SHA一致的原时间证据，provider/download/WORK-ledger合成边界明确，不宣称whole paid CLI或live生产job。"
+          },
+          {
+            "id": "CI-012",
+            "rationale": "A源码/B实际执行：运行载荷仅增加固定docs/ai-video-workbench-guide.md白名单落点，仍执行路径规范化、missing/precompiled-entry失败、软链范围、secret排除及逐字节摘要校验。没有把任意docs目录纳入包、改安装签名或删原校验。本人精读当前197行及37行diff，相关实际current changed-node/whole-scripts载荷测试通过，557/557当前assets与provides机检另外标B。"
+          },
+          {
+            "id": "CI-013",
+            "rationale": "A源码/B实际执行：正式完整作品改用v2 prepend-cover-frame conservation凭据：sourceVideo frame/fps/duration自洽，output恰好sourceFrames+1，bodyVideoOffset=1/fps、audioOffset=subtitleOffset=0，qualityReviewPerformed=false且current input/cover/output三份SHA一致。v1 replace-first-frame只允许明确未要求preserveSourceFrames的兼容helper调用，正式preserveSourceFramesRequired调用拒绝v1。保持显式opening-title规则与全部非法凭据失败；ffprobe不报帧数的兼容仅描述not-reported事实，不替代v2正文完整性。本人精读29行及32行diff，实际publication负控与完整标准后期当前通过，不再采用旧首帧替换文案。"
+          },
+          {
+            "id": "CI-014",
+            "rationale": "A源码/B实际执行：新增固定指南实际CLI --json/--full与MCP回读、版本/UTF8字节SHA一致性，验证缺件、非法参数/路径、超大、stale repo/version及软链等拒绝；正文覆盖成功镜头直接正式后期、原声和后续完整性Phase2边界。只读入口不执行模型或媒体生产，不增加任意文件读取能力。当前新增112行EOF与118行new-file diff由本人精读，实际changed-node及原agent入口中的回读测试通过。"
+          }
+        ],
+        "ciPolicyChangesHash": "fdeec80c30228db74c37015f2a0929f2226e3dabb9e82590cbb46de378982de1",
+        "tests": [
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx scripts/bundle-governance.mts",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:11.130329+00:00",
+            "result": "✅ 行业包契约、兼容范围、资产、导航与完整性门禁通过（base 0.1.0 / ui 0.1.19）"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-commit-msg.mjs --range ed485d4979f9e92541d7a7066df9557dfeb66f78..HEAD",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:11.245089+00:00",
+            "result": "✓ 1d19e4686ded test(video): align UHD export and CFR contracts [T-2026-1007-0001]\n✓ 455d0c1b9c39 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 0854ce12453a fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ ca640bbe0e21 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ d662ce8f66dc fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 96f3e89cc3da fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 91bd23bc545d fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ b9903fa2ce06 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 98415dee60df fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ eda8255dc676 chore(growth): 重跑限流中断的原生 CI [T-2026-1007-0001]\n\n✓ 提交信息校验通过（11 条，范围 ed485d4979f9e92541d7a7066df9557dfeb66f78..1d19e4686dedd364eb64466d90017c360baa21fb）\n! a3c7f23af124 layer \"industry\" 不在标准集合 [base|platform|hotel|video|growth|ecom|tiger|eagle|fox]（仅告警）"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-hard-gate-policy.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:11.337061+00:00",
+            "result": "[hard-gate-policy] 通过：扫描 133 个文件，未发现\"创作口径写成硬闸\"。"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/tools/film-publication-policy.test.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:11.444125+00:00",
+            "result": "✔ project and cover metadata never become an implicit opening title (0.996708ms)\n✔ explicit title preserves the full requested text; disable remains explicit (0.183417ms)\n✔ successful assembly must still bind the actual current publication bytes (0.208833ms)\n✔ a sidecar or old prepend receipt cannot grant publication cover status (0.414083ms)\n✔ formal cover publication requires the complete body and truthful independent track offsets (0.179ms)\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 44.224958"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p packages/video-studio/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:11.810274+00:00",
+            "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p apps/server/tsconfig.json",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:12.861941+00:00",
+            "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/ai-video-workbench-guide.test.mjs",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:13.112791+00:00",
+            "result": "✔ fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call (5.518708ms)\n✔ guide rejects all caller paths, overrides and non-object inputs (0.893583ms)\n✔ guide fails closed for missing guide (1.732584ms)\n✔ guide fails closed for empty guide (0.968625ms)\n✔ guide fails closed for oversized guide (1.051084ms)\n✔ guide fails closed for directory as guide (1.037084ms)\n✔ guide fails closed for stale guide version (1.225958ms)\n✔ guide fails closed for wrong guide identity (0.894875ms)\n✔ guide fails closed for invalid UTF-8 guide (0.904208ms)\n✔ guide fails closed for missing manifest (1.472125ms)\n✔ guide fails closed for invalid manifest (0.964042ms)\n✔ guide fails closed for wrong product repository (0.895958ms)\n✔ guide file and escaped parent symlinks cannot expose external bytes (1.600834ms)\n✔ CLI list/describe/invoke work from another cwd without credentials and preserve full guide bytes (86.6725ms)\n✔ real generic MCP discovers and reads guide; invalid extra fields fail with structured errors (33.677209ms)\nℹ tests 15\nℹ suites 0\nℹ pass 15\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 181.895917"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/runtime-deps-lock.mjs verify",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:13.190548+00:00",
+            "result": "✅ runtime 依赖锁有效：workloom-ai-growth · 12 个直接依赖"
+          },
+          {
+            "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+            "exitCode": 0,
+            "finishedAt": "2026-10-08T05:12:13.269531+00:00",
+            "result": "✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）"
+          }
+        ],
+        "reviewedAt": "2026-10-08T06:00:45.648Z",
+        "summary": "Successful completed provider shots enter official post through actual task, first witness, current source bytes and adopted events. Default post does not veto or regenerate identity, wardrobe, action, raw specification, audio/lip/dialogue or aesthetic quality, and uses original program audio. Actual requested processing/export failures and prior authorization remain explicit. Current production completeness, normal source clock, cover assembly and generation idempotency implementations are retained by an ordinary two-parent merge. Same-run small media and worker finish now use real official adoption. The discoverable CLI/MCP workbench guide and real runtime assets follow this behavior. No paid provider/model/ASR/TTS production call. Broader Phase2 planning/integration remains a later separate authorized task. Latest minimal test-only child migrates three obsolete UHD/CFR assertions, preserving original source/recipe fingerprints, frame/PTS/audio tolerances and real failure controls; adds two front-door rejection controls. No product implementation byte changes in this child.",
+        "passed": true,
+        "id": "9dfd89b029c3d3bee5b183dd940aafdab8110338883f9fcc43b316cbcb296622"
+      },
       "reviewSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 119,
@@ -2087,7 +2340,7 @@
           "number": 119,
           "state": "open",
           "title": "fix(video): 成功渲染素材直接进入正式后期 [T-2026-1007-0001]",
-          "body": "成功镜头此前可能被渲染后的身份、服装、画面、动作、规格、声音、口型或台词质量检查阻塞，并触发再次生成或多轮后期。现在按实际供应商任务、输入作用域和当前文件摘要接受已有成功素材，直接进入官方后期；默认保留原片节目音轨，按请求执行一次真实加工。\n\nCLI、服务端/子工作器、后期连接器、围栏、预设、技能与可发现的 CLI/MCP 工作台指南已同步。真实供应商失败、源文件缺失或篡改、事前权限/授权/资金，以及请求加工或导出失败继续明确报错。\n\n验证：精确提交 `0854ce12453a575b26386f135af3ef093aa71124` 的正式离线 CLI、实际围栏与工作器调用链、能力、指南 CLI/MCP、两个包类型检查、官方包生成器/完整性、提交协议及秘密扫描均已实际通过。准确命令、日志和源摘要保存在本次审查回执；真实独立语义复核正在进行，完成前 ready=false。\n\n边界：没有供应商、模型、图像/视频生成、ASR/TTS 或新生产影片调用；合成夹具耗时不作为生产测速。“作品完整性优先、普通时长允许自然浮动”是后续单独任务，本 PR 不冒充已落实。源码经原生交付队列与准确候选 CI 发布；不声称签名安装包发布。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+          "body": "成功镜头此前可能被渲染后的身份、服装、画面、动作、规格、声音、口型或台词质量检查阻塞，并触发再次生成或多轮后期。现在按实际供应商任务、输入作用域和当前文件摘要接受已有成功素材，直接进入官方后期；默认保留原片节目音轨，按请求执行一次真实加工。\n\nCLI、服务端/子工作器、后期连接器、围栏、预设、技能与可发现的 CLI/MCP 工作台指南已同步。真实供应商失败、源文件缺失或篡改、事前权限/授权/资金，以及请求加工或导出失败继续明确报错。\n\n验证：精确提交 `1d19e4686dedd364eb64466d90017c360baa21fb` 的正式离线 CLI、实际围栏与工作器调用链、能力、指南 CLI/MCP、两个包类型检查、官方包生成器/完整性、提交协议及秘密扫描均已实际通过。准确命令、日志和源摘要保存在本次审查回执；真实独立语义复核正在进行，完成前 ready=false。\n\n边界：没有供应商、模型、图像/视频生成、ASR/TTS 或新生产影片调用；合成夹具耗时不作为生产测速。“作品完整性优先、普通时长允许自然浮动”是后续单独任务，本 PR 不冒充已落实。源码经原生交付队列与准确候选 CI 发布；不声称签名安装包发布。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
           "author": {
             "username": "cnb.dYiF05kxAGA",
             "nickname": "Genius",
@@ -2098,7 +2351,7 @@
           "labels": [],
           "base": {
             "ref": "refs/heads/main",
-            "sha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+            "sha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2108,7 +2361,7 @@
           },
           "head": {
             "ref": "refs/heads/task/T-2026-1007-0001",
-            "sha": "0854ce12453a575b26386f135af3ef093aa71124",
+            "sha": "1d19e4686dedd364eb64466d90017c360baa21fb",
             "repo": {
               "id": "2101830819702788096",
               "name": "workloom-growthtest",
@@ -2126,8 +2379,8 @@
           "is_force_merged": false,
           "statuses": {}
         },
-        "headSha": "0854ce12453a575b26386f135af3ef093aa71124",
-        "mainSha": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
         "files": [
           "AGENTS.repo.md",
           "README.md",
@@ -2205,15 +2458,19 @@
           "packages/base/bundles/subtitle-capability.test.ts",
           "packages/base/bundles/voice-capability.test.ts",
           "packages/video-studio/src/character-release-contract.integration.test.ts",
-          "packages/video-studio/src/character-release-contract.ts",
           "packages/video-studio/src/cover-assembly.test.ts",
           "packages/video-studio/src/cover-assembly.ts",
+          "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+          "packages/video-studio/src/deliver.ts",
           "packages/video-studio/src/director-planner.ts",
           "packages/video-studio/src/director-post-default.integration.test.ts",
+          "packages/video-studio/src/film-completion-entrypoint.test.ts",
           "packages/video-studio/src/film-contracts.ts",
+          "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
           "packages/video-studio/src/film-worker-runtime.test.ts",
           "packages/video-studio/src/film-worker-runtime.ts",
           "packages/video-studio/src/index.ts",
+          "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
           "packages/video-studio/src/post-render-acceptance.ts",
           "packages/video-studio/src/post-render-fence-policy.test.ts",
           "packages/video-studio/src/producer-gate.test.ts",
@@ -2229,10 +2486,15 @@
           "scripts/product-runtime-assets.mjs",
           "scripts/product-runtime-assets.test.mjs",
           "scripts/tools/compose-film.mts",
+          "scripts/tools/compose-native-clock.test.ts",
           "scripts/tools/film-cli-preflight.test.mjs",
+          "scripts/tools/film-existing-render-edit.test.ts",
           "scripts/tools/film-native-post.test.ts",
+          "scripts/tools/film-publication-policy.d.mts",
           "scripts/tools/film-publication-policy.mjs",
+          "scripts/tools/film-publication-policy.test.mjs",
           "scripts/tools/film-release-entrypoints.test.ts",
+          "scripts/tools/film-rendered-material-use.test.ts",
           "scripts/tools/film-standard-post.mts",
           "scripts/tools/film-standard-post.test.ts",
           "scripts/tools/full-chain-film.mts",
@@ -2249,161 +2511,221 @@
           "dependsOn": [],
           "releases": []
         },
-        "headTime": 1791379185000,
-        "mergeBase": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+        "headTime": 1791436306000,
+        "mergeBase": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
         "checkErrors": [],
         "checkSha": null,
         "hasFailedChecks": false,
         "ciPolicyChanges": [
           {
             "id": "CI-001",
-            "file": "scripts/product-runtime-assets.test.mjs",
+            "file": "scripts/tools/film-publication-policy.test.mjs",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/product-runtime-assets.test.mjs",
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-publication-policy.test.mjs",
               "absent": false
             },
             "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
-              "path": "scripts/product-runtime-assets.test.mjs",
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/film-publication-policy.test.mjs",
               "absent": false
             },
-            "digest": "20ab812a1052c51de0fb1f32055df964ba5297d8fd4b07ad585508bfb607b99c"
+            "digest": "000d92c6bfab195c1704e3d01d4b121b8990e0c43c0da86b4d9f01fb60219993"
           },
           {
             "id": "CI-002",
             "file": "scripts/tools/film-standard-post.test.ts",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
               "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
             "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
               "path": "scripts/tools/film-standard-post.test.ts",
               "absent": false
             },
-            "digest": "3a5c0758bb9f4ff6c1b66dc03e7c400b723821f2e1c450250be427762c1bdeca"
+            "digest": "1221881a00c17fdfa5758d79a1987757022d9722754c5d3eedc78c3d9cb0d68c"
           },
           {
             "id": "CI-003",
+            "file": "scripts/tools/film-native-post.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/film-native-post.test.ts",
+              "absent": false
+            },
+            "digest": "15dfe1f0a6b2ef4aac83713c619c63e7ce32ec956aa249b4ce4b177d6574b259"
+          },
+          {
+            "id": "CI-004",
+            "file": "scripts/tools/compose-native-clock.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/compose-native-clock.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/compose-native-clock.test.ts",
+              "absent": false
+            },
+            "digest": "24885b7a764dbaaa1184d9e6fa8f7457bb789a477cc0aaeb65e5ee188509b33a"
+          },
+          {
+            "id": "CI-005",
+            "file": "scripts/product-runtime-assets.test.mjs",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/product-runtime-assets.test.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/product-runtime-assets.test.mjs",
+              "absent": false
+            },
+            "digest": "313efef67f48e77178d3b56a527979d1edd11a89f8c6b0697182f79617709bba"
+          },
+          {
+            "id": "CI-006",
+            "file": "scripts/tools/film-existing-render-edit.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-existing-render-edit.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/film-existing-render-edit.test.ts",
+              "absent": false
+            },
+            "digest": "3b4959b9f1ddd183bcc79aa0dd82a730f183b112149fa3c69bb2fce833f7b56c"
+          },
+          {
+            "id": "CI-007",
             "file": "scripts/tools/film-cli-preflight.test.mjs",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
               "path": "scripts/tools/film-cli-preflight.test.mjs",
               "absent": false
             },
             "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
               "path": "scripts/tools/film-cli-preflight.test.mjs",
               "absent": false
             },
-            "digest": "4b65a6a62e4c992759f0ebe8b9758180394c517e212ab0064f286dfc4b3f6c7f"
+            "digest": "50367b8b52cac597f15ff1f8679c0c2250a189176b0ef8ce6ce1ab16d9e7f665"
           },
           {
-            "id": "CI-004",
+            "id": "CI-008",
+            "file": "scripts/tools/video-request-regression.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/video-request-regression.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/video-request-regression.test.ts",
+              "absent": false
+            },
+            "digest": "66983ab41db9f184466e81a40cda13279fac2b0b3dba83d8022d1fd3b5863ae9"
+          },
+          {
+            "id": "CI-009",
+            "file": "scripts/agent-capabilities.test.mjs",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/agent-capabilities.test.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/agent-capabilities.test.mjs",
+              "absent": false
+            },
+            "digest": "77678a7a7921284b87a01d5298f6c5c69f403a2b26b7bdd4172de9cb150ec3c3"
+          },
+          {
+            "id": "CI-010",
+            "file": "scripts/tools/film-release-entrypoints.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/film-release-entrypoints.test.ts",
+              "absent": false
+            },
+            "digest": "9285cbcba63311ceffa183642ae653ba5dfd8d6a91ec8223e95c5447c162e594"
+          },
+          {
+            "id": "CI-011",
+            "file": "scripts/tools/film-rendered-material-use.test.ts",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-rendered-material-use.test.ts",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/film-rendered-material-use.test.ts",
+              "absent": false
+            },
+            "digest": "9bfe82ac19ff4726d39cb7260dde1ded45052587f4cfcc332d57a43f1f435349"
+          },
+          {
+            "id": "CI-012",
+            "file": "scripts/product-runtime-assets.mjs",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/product-runtime-assets.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/product-runtime-assets.mjs",
+              "absent": false
+            },
+            "digest": "b2929673defa656362fe6845960b6e95fe089817ff2f0edcdeaf9f9f13e9915f"
+          },
+          {
+            "id": "CI-013",
+            "file": "scripts/tools/film-publication-policy.mjs",
+            "before": {
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+              "path": "scripts/tools/film-publication-policy.mjs",
+              "absent": false
+            },
+            "after": {
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+              "path": "scripts/tools/film-publication-policy.mjs",
+              "absent": false
+            },
+            "digest": "bac74e720f9069d9eaf407382fea085be659d92d00c510b94c27c8863c8a7461"
+          },
+          {
+            "id": "CI-014",
             "file": "scripts/ai-video-workbench-guide.test.mjs",
             "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
+              "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
               "path": "scripts/ai-video-workbench-guide.test.mjs",
               "absent": true
             },
             "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
+              "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
               "path": "scripts/ai-video-workbench-guide.test.mjs",
               "absent": false
             },
-            "digest": "9bba14124952f133299a94e40462f60c82ebf53a85b03f50eeb03b487bc2b122"
-          },
-          {
-            "id": "CI-005",
-            "file": "scripts/tools/film-publication-policy.mjs",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-publication-policy.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
-              "path": "scripts/tools/film-publication-policy.mjs",
-              "absent": false
-            },
-            "digest": "a0dd6d6ce407a4153c9c0614ca93e6fb953d85e241cb2eefdc00e0e6d78b1c73"
-          },
-          {
-            "id": "CI-006",
-            "file": "scripts/product-runtime-assets.mjs",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/product-runtime-assets.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
-              "path": "scripts/product-runtime-assets.mjs",
-              "absent": false
-            },
-            "digest": "b877b8a0493ae31f64be23cbde15399a92f716914bdc8cac115fd4b961db6ac0"
-          },
-          {
-            "id": "CI-007",
-            "file": "scripts/agent-capabilities.test.mjs",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/agent-capabilities.test.mjs",
-              "absent": false
-            },
-            "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
-              "path": "scripts/agent-capabilities.test.mjs",
-              "absent": false
-            },
-            "digest": "de1f6811b16faed410f7b50302d695040cd0f871a7bdbddc9bceb22960da2be2"
-          },
-          {
-            "id": "CI-008",
-            "file": "scripts/tools/film-native-post.test.ts",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-native-post.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
-              "path": "scripts/tools/film-native-post.test.ts",
-              "absent": false
-            },
-            "digest": "e52df5926e2bba4f2ac4885cdf507708a73b1e82bfdd5c938582fd4c6e4129bf"
-          },
-          {
-            "id": "CI-009",
-            "file": "scripts/tools/film-release-entrypoints.test.ts",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
-              "path": "scripts/tools/film-release-entrypoints.test.ts",
-              "absent": false
-            },
-            "digest": "e84c563ac81374cdacc538837043951f6709889e67a786ca6dc2222e67cad7f4"
-          },
-          {
-            "id": "CI-010",
-            "file": "scripts/tools/video-request-regression.test.ts",
-            "before": {
-              "ref": "80c1331ad4ed8225a676c331917debb04ab0e4f5",
-              "path": "scripts/tools/video-request-regression.test.ts",
-              "absent": false
-            },
-            "after": {
-              "ref": "0854ce12453a575b26386f135af3ef093aa71124",
-              "path": "scripts/tools/video-request-regression.test.ts",
-              "absent": false
-            },
-            "digest": "fc6366138ae96f6d2f57d77f07cb411b8127a4065c3c8ac498b8674f71cce583"
+            "digest": "f1862b8df839a58edc91931a5d710c238a523ccbfb2cec2f44380ddb881e2e43"
           }
         ]
       },
@@ -86915,6 +87237,701 @@
       },
       "previous": "4830fea0b433c0a4d9e375f3ea89eba5b21f4fed9f06028f2845f818e3d17c07",
       "digest": "91bdd673c8dd6daa72122bafefa2dec89931770ea19a775dd78c4531b4129a9d"
+    },
+    {
+      "sequence": 3456,
+      "at": "2026-10-08T06:03:38.842Z",
+      "kind": "developer_review",
+      "data": {
+        "number": 119,
+        "id": "9dfd89b029c3d3bee5b183dd940aafdab8110338883f9fcc43b316cbcb296622",
+        "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78"
+      },
+      "previous": "91bdd673c8dd6daa72122bafefa2dec89931770ea19a775dd78c4531b4129a9d",
+      "digest": "f777ee659919959dbecfb84bde57a67f6ef843252440938a6618ba50a2ebb6bd"
+    },
+    {
+      "sequence": 3457,
+      "at": "2026-10-08T06:03:38.842Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "waiting_ci",
+          "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+          "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+          "branch": "task/T-2026-1007-0001",
+          "intent": {
+            "taskId": "T-2026-1007-0001",
+            "ready": true,
+            "dependsOn": [],
+            "releases": []
+          },
+          "developerReview": {
+            "schemaVersion": 1,
+            "provider": "codex",
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 119,
+            "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "policyHash": "b8296b0f50fc56cdd1fadfac1e14512e3f78ebe1380072d5fb0f9a89706c12af",
+            "reviewedFiles": [
+              "AGENTS.repo.md",
+              "README.md",
+              "apps/server/src/video/director-router.ts",
+              "apps/server/src/video/director-sources.ts",
+              "apps/server/src/video/director-worker.ts",
+              "apps/server/src/video/film-worker-identity.test.ts",
+              "apps/server/src/video/film-worker.test.ts",
+              "apps/server/src/video/film-worker.ts",
+              "bundles/ai-video/README.md",
+              "bundles/ai-video/bundle.json",
+              "bundles/ai-video/connectors/bgm-bridge/README.md",
+              "bundles/ai-video/connectors/bgm-bridge/audio-stems-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/cli.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/core.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/measure.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/color-bridge/README.md",
+              "bundles/ai-video/connectors/color-bridge/cli.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.test.ts",
+              "bundles/ai-video/connectors/color-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/post-bridge/core.mjs",
+              "bundles/ai-video/connectors/post-bridge/delivery-integration.test.ts",
+              "bundles/ai-video/connectors/post-bridge/director-delivery.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/README.md",
+              "bundles/ai-video/connectors/subtitle-bridge/cli.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/core.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts",
+              "bundles/ai-video/connectors/subtitle-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/voice-bridge/README.md",
+              "bundles/ai-video/connectors/voice-bridge/core.mjs",
+              "bundles/ai-video/fences/ai-video-bgm.yml",
+              "bundles/ai-video/fences/ai-video-color.yml",
+              "bundles/ai-video/fences/ai-video-delivery.yml",
+              "bundles/ai-video/fences/ai-video-material.yml",
+              "bundles/ai-video/fences/ai-video-subtitle.yml",
+              "bundles/ai-video/fences/ai-video-voice.yml",
+              "bundles/ai-video/library/director-system/recipes.json",
+              "bundles/ai-video/library/real-person-assets/asset-20260101000000-demo/profile.json",
+              "bundles/ai-video/pipelines/narrative-film.yml",
+              "bundles/ai-video/presets/bgm-composer.yml",
+              "bundles/ai-video/presets/colorist.yml",
+              "bundles/ai-video/presets/post-editor.yml",
+              "bundles/ai-video/presets/subtitle-stylist.yml",
+              "bundles/ai-video/presets/voice-artist.yml",
+              "bundles/ai-video/schemas/objects.json",
+              "bundles/ai-video/skills/bgm-audio-layering/SKILL.md",
+              "bundles/ai-video/skills/bgm-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/caption-burnin-ops/SKILL.md",
+              "bundles/ai-video/skills/color-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/color-grade/SKILL.md",
+              "bundles/ai-video/skills/color-look-design/SKILL.md",
+              "bundles/ai-video/skills/color-shot-matching/SKILL.md",
+              "bundles/ai-video/skills/cover-design/SKILL.md",
+              "bundles/ai-video/skills/delivery-package-ops/SKILL.md",
+              "bundles/ai-video/skills/delivery-revision-ops/SKILL.md",
+              "bundles/ai-video/skills/producer-gate-review/SKILL.md",
+              "bundles/ai-video/skills/render-ops/SKILL.md",
+              "bundles/ai-video/skills/subtitle-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/subtitle-layout-design/SKILL.md",
+              "bundles/ai-video/skills/voice-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/voice-dubbing-sync/SKILL.md",
+              "bundles/geo-growth/agent-capabilities.json",
+              "bundles/geo-growth/capabilities/video.mjs",
+              "bundles/geo-growth/capabilities/workbench-guide.mjs",
+              "docs/agent-computer-guide.md",
+              "docs/ai-video-workbench-guide.md",
+              "docs/real-person-asset.md",
+              "docs/video-standard-post.md",
+              "packages/base/bundles/bgm-capability.test.ts",
+              "packages/base/bundles/post-av-sync.test.ts",
+              "packages/base/bundles/post-delivery-capability.test.ts",
+              "packages/base/bundles/subtitle-capability.test.ts",
+              "packages/base/bundles/voice-capability.test.ts",
+              "packages/video-studio/src/character-release-contract.integration.test.ts",
+              "packages/video-studio/src/cover-assembly.test.ts",
+              "packages/video-studio/src/cover-assembly.ts",
+              "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+              "packages/video-studio/src/deliver.ts",
+              "packages/video-studio/src/director-planner.ts",
+              "packages/video-studio/src/director-post-default.integration.test.ts",
+              "packages/video-studio/src/film-completion-entrypoint.test.ts",
+              "packages/video-studio/src/film-contracts.ts",
+              "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+              "packages/video-studio/src/film-worker-runtime.test.ts",
+              "packages/video-studio/src/film-worker-runtime.ts",
+              "packages/video-studio/src/index.ts",
+              "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+              "packages/video-studio/src/post-render-acceptance.ts",
+              "packages/video-studio/src/post-render-fence-policy.test.ts",
+              "packages/video-studio/src/producer-gate.test.ts",
+              "packages/video-studio/src/producer-gate.ts",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "plugins/workloom-workbench/README.md",
+              "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+              "plugins/workloom-workbench/skills/workloom/SKILL.md",
+              "scripts/AGENT-CAPABILITIES.md",
+              "scripts/agent-capabilities.test.mjs",
+              "scripts/ai-video-workbench-guide.test.mjs",
+              "scripts/product-runtime-assets.mjs",
+              "scripts/product-runtime-assets.test.mjs",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-cli-preflight.test.mjs",
+              "scripts/tools/film-existing-render-edit.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-publication-policy.d.mts",
+              "scripts/tools/film-publication-policy.mjs",
+              "scripts/tools/film-publication-policy.test.mjs",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-rendered-material-use.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts",
+              "scripts/tools/video-request-regression.test.ts",
+              "tools/codex-gateway/README.md",
+              "tools/codex-gateway/bin/cli.mjs",
+              "tools/codex-gateway/src/mcp.mjs",
+              "tools/codex-gateway/test/mcp.test.mjs",
+              "tools/codex-gateway/test/video-guide.test.mjs"
+            ],
+            "filesHash": "9e1a0bc3f8d63c4beec8c875dcd756e6d5609784abb7e812068190f8c93f312a",
+            "dependsOn": [],
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "rationale": "A源码/B实际执行：将正式完整作品封面断言扩充为 v2 prepend-cover-frame：源正文全部帧保留，视频仅前置1帧，音频/字幕偏移均0，且当前input/cover/output SHA相符。新增正文少帧、源SHA/帧率错误与错误偏移拒绝；原显式opening-title和非法回执拒绝仍保留。兼容v1只限不要求保留源帧的旧helper调用，不能作为正式完整作品发布凭据。本人精读当前47行及完整24行diff，当前changed-node与完整test:scripts均通过。"
+              },
+              {
+                "id": "CI-002",
+                "rationale": "A源码/B实际执行：成功原片按官方accepted task、事前授权、first witness与当前源字节进入正式后期；把来源品质门改为技术来源/加工事实，新增黑帧、奇数画布、静音、10.04秒与低帧率等实际媒体采用。真实完整ordinary CLI覆盖默认后期全阶段、部分成功镜头仅处理pending镜头、历史卡片/提示/日志保留、当前任务/回执/权限/字节否定对照；名义2秒实际4.25秒保留102正文帧+1封面帧、原AAC包、零音频/字幕偏移，分数与qualityReviewPerformed如实空值/false。保留并发唯一publisher及真实compose/subtitle/danmaku/mux失败不发布。当前canonical Node/Vitest各57/57与current-native57/57实际通过；不改必需CI集合、不以fixture耗时冒充生产。"
+              },
+              {
+                "id": "CI-003",
+                "rationale": "A源码/B实际执行：来源选择依据独立固定raw字节，旧TTS/品质记录不替代或否决已固定原片；missing/changed bytes与缺manifest仍拒绝。原片静音、短声轨、奇数画布和异帧率进入本机官方normalize；声画品质不再以PCM质检否决，requested export clock只读真实metadata且qualityReviewPerformed/audioAlignmentMeasured=false。新process receipt严格绑定每个source SHA、源/normalized帧数、帧率、画布、每镜帧分配与全部输出；新增丢帧/加帧、分数帧率/时长错误等拒绝。真实本机compose输出2160x3840的8帧并保留尾标记和AAC包，仍拒绝顺序/删镜/加镜/复用/转场/retime及未接入模型enhance参数。当前current-native实际该文件全部通过，未证明生产4K发布。"
+              },
+              {
+                "id": "CI-004",
+                "rationale": "A源码/B实际执行：native-clock按实际输入帧与帧率换算完整自然时轴，不按名义duration截尾或强制补长；现有315帧/真实图片hash与source bytes断言保留。将静音/短声轨的后置品质拒绝迁为实际成功加工和真实metadata事实，receipt明确未做quality/audio alignment认证；重新定速仍拒绝。本人精读当前93行及60行diff，真实FFmpeg/ffprobe当前current-native全部通过，没有把false质检字段伪造为合格。"
+              },
+              {
+                "id": "CI-005",
+                "rationale": "A源码/B实际执行：为固定工作台指南新增运行载荷复制、正文摘要、缺文件及软链逃逸失败测试；在未产生预编译入口时继续硬失败，保留原包内路径、secret排除和hash约束。只增加一个固定docs/ai-video-workbench-guide.md，不开放任意docs树，不调整签名安装包保护。本人精读161行及56行diff，当前changed-node和原test:scripts中实际执行通过。"
+              },
+              {
+                "id": "CI-006",
+                "rationale": "A源码/B实际执行：保留原CI路径，在VITEST环境直接导入canonical全部assertions；原tsx --test入口则实际启动仓库Vitest runner运行canonical。900000ms只用于此真实子进程边界；error/signal/非零status均透传，没有改canonical assertion、skip、原测试超时或全局CI阈值。当前原Node入口实际57/57+外层1通过、Vitest alias57/57；真实FFmpeg非法option负控canonical47fail/10pass并使外层1fail、exit1，证明没有吞子失败或假绿。"
+              },
+              {
+                "id": "CI-007",
+                "rationale": "A源码/B实际执行：两项生成前拒绝用真实videos阶段继续验证：非法默认合成旁白与不允许输入仍exit1且不执行shot/material-gen/voice工站。新增voice-only dry-run只记录invoked=false、ok=false、degraded与artifact=null，不伪造原声成功或spoken/lip-sync证书；真实子进程fetch/http/https拒绝器与计数证明这些前门用例零网络。当前changed-node及完整test:scripts通过，不放宽权限、不改变治理/CI超时。"
+              },
+              {
+                "id": "CI-008",
+                "rationale": "A源码/B实际执行：按取消渲后二次品质门的授权，把旧PCM质检报告迁为真实composition-process回执、current input/output SHA和实际AV start/duration事实；保留每个输出24帧/8fps、全部PTS间隔0.125、原0.13秒容差及原xfade像素断言。最小后续测试提交只迁移3个旧合同：UHD允许本机交付同时保留HD源source/recipe lineage及旧日志前缀，2160p别名前期仍1080p提示且无enhance，concat从6位改9位小数；新增HD/2160p冲突与未接入enhance显式参数两项执行前拒绝。旧749实际399/402/3fail保留，当前原完整脚本404/404并继续Node108/Desktop162，当前35case全部通过。UHD请求回归正例是dry-run合同，生产4K未验证。"
+              },
+              {
+                "id": "CI-009",
+                "rationale": "A源码/B实际执行：只在原agent测试入口导入新增固定指南测试，原身份、输入、权限、脱敏与能力注册断言保留。CLI/MCP读同一固定模块/正文并返回准确UTF8 SHA，不新增任意路径读取。本人精读当前434行及13行diff，当前原test:scripts和changed-node实际通过，原云端must commands与阈值不变。"
+              },
+              {
+                "id": "CI-010",
+                "rationale": "A源码/B实际执行：发布入口允许已按accepted task/事前授权/官方来源字节固定的成功原片，历史品质/旧voice记录不再触发默认新provider/ASR/TTS；缺件、篡改、错误current receipt、非当前input与实际加工失败继续硬失败。新增composition-process receipt与真正export metadata绑定，验证wrong source/帧分配、drop/add frames、fps和duration等否定；fixture mock媒体与probe边界明确，未伪称可播放生产片。正式封面要求前置1帧和正文全帧保留，音频/字幕0offset。本人精读456行及238行diff，准确当前1d19的current-native实际全部通过，没有引用旧0854执行冒充当前。"
+              },
+              {
+                "id": "CI-011",
+                "rationale": "A源码/B实际执行：实际同次material stage在supplier success后使用正式issued receipt、first witness、task与当前源字节adapter，刷新completed map并记录render-adopted，G7不再用100000-byte门槛否决有效小原片；新增真实child constructor/context/finish及实际parent adoption/result/byte验证闭环。丢adopted事件、清空official verified IDs、源/任务/witness篡改与真实下载失败继续拒绝；off/advisory/blocking post加工如实technical error/null score，不做默认modelquality。当前305行与完整410行diff精读、current-native实际通过；补充15+10独立控制只延续六个关键实现SHA一致的原时间证据，provider/download/WORK-ledger合成边界明确，不宣称whole paid CLI或live生产job。"
+              },
+              {
+                "id": "CI-012",
+                "rationale": "A源码/B实际执行：运行载荷仅增加固定docs/ai-video-workbench-guide.md白名单落点，仍执行路径规范化、missing/precompiled-entry失败、软链范围、secret排除及逐字节摘要校验。没有把任意docs目录纳入包、改安装签名或删原校验。本人精读当前197行及37行diff，相关实际current changed-node/whole-scripts载荷测试通过，557/557当前assets与provides机检另外标B。"
+              },
+              {
+                "id": "CI-013",
+                "rationale": "A源码/B实际执行：正式完整作品改用v2 prepend-cover-frame conservation凭据：sourceVideo frame/fps/duration自洽，output恰好sourceFrames+1，bodyVideoOffset=1/fps、audioOffset=subtitleOffset=0，qualityReviewPerformed=false且current input/cover/output三份SHA一致。v1 replace-first-frame只允许明确未要求preserveSourceFrames的兼容helper调用，正式preserveSourceFramesRequired调用拒绝v1。保持显式opening-title规则与全部非法凭据失败；ffprobe不报帧数的兼容仅描述not-reported事实，不替代v2正文完整性。本人精读29行及32行diff，实际publication负控与完整标准后期当前通过，不再采用旧首帧替换文案。"
+              },
+              {
+                "id": "CI-014",
+                "rationale": "A源码/B实际执行：新增固定指南实际CLI --json/--full与MCP回读、版本/UTF8字节SHA一致性，验证缺件、非法参数/路径、超大、stale repo/version及软链等拒绝；正文覆盖成功镜头直接正式后期、原声和后续完整性Phase2边界。只读入口不执行模型或媒体生产，不增加任意文件读取能力。当前新增112行EOF与118行new-file diff由本人精读，实际changed-node及原agent入口中的回读测试通过。"
+              }
+            ],
+            "ciPolicyChangesHash": "fdeec80c30228db74c37015f2a0929f2226e3dabb9e82590cbb46de378982de1",
+            "tests": [
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --import tsx scripts/bundle-governance.mts",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:11.130329+00:00",
+                "result": "✅ 行业包契约、兼容范围、资产、导航与完整性门禁通过（base 0.1.0 / ui 0.1.19）"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-commit-msg.mjs --range ed485d4979f9e92541d7a7066df9557dfeb66f78..HEAD",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:11.245089+00:00",
+                "result": "✓ 1d19e4686ded test(video): align UHD export and CFR contracts [T-2026-1007-0001]\n✓ 455d0c1b9c39 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 0854ce12453a fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ ca640bbe0e21 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ d662ce8f66dc fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 96f3e89cc3da fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 91bd23bc545d fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ b9903fa2ce06 fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ 98415dee60df fix(video): accept completed render sources into official post [T-2026-1007-0001]\n✓ eda8255dc676 chore(growth): 重跑限流中断的原生 CI [T-2026-1007-0001]\n\n✓ 提交信息校验通过（11 条，范围 ed485d4979f9e92541d7a7066df9557dfeb66f78..1d19e4686dedd364eb64466d90017c360baa21fb）\n! a3c7f23af124 layer \"industry\" 不在标准集合 [base|platform|hotel|video|growth|ecom|tiger|eagle|fox]（仅告警）"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/ci/verify-hard-gate-policy.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:11.337061+00:00",
+                "result": "[hard-gate-policy] 通过：扫描 133 个文件，未发现\"创作口径写成硬闸\"。"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/tools/film-publication-policy.test.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:11.444125+00:00",
+                "result": "✔ project and cover metadata never become an implicit opening title (0.996708ms)\n✔ explicit title preserves the full requested text; disable remains explicit (0.183417ms)\n✔ successful assembly must still bind the actual current publication bytes (0.208833ms)\n✔ a sidecar or old prepend receipt cannot grant publication cover status (0.414083ms)\n✔ formal cover publication requires the complete body and truthful independent track offsets (0.179ms)\nℹ tests 5\nℹ suites 0\nℹ pass 5\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 44.224958"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p packages/video-studio/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:11.810274+00:00",
+                "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node node_modules/typescript/bin/tsc --noEmit -p apps/server/tsconfig.json",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:12.861941+00:00",
+                "result": "Exit code 0; command produced no stdout/stderr. Actual empty execution log SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855."
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test scripts/ai-video-workbench-guide.test.mjs",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:13.112791+00:00",
+                "result": "✔ fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call (5.518708ms)\n✔ guide rejects all caller paths, overrides and non-object inputs (0.893583ms)\n✔ guide fails closed for missing guide (1.732584ms)\n✔ guide fails closed for empty guide (0.968625ms)\n✔ guide fails closed for oversized guide (1.051084ms)\n✔ guide fails closed for directory as guide (1.037084ms)\n✔ guide fails closed for stale guide version (1.225958ms)\n✔ guide fails closed for wrong guide identity (0.894875ms)\n✔ guide fails closed for invalid UTF-8 guide (0.904208ms)\n✔ guide fails closed for missing manifest (1.472125ms)\n✔ guide fails closed for invalid manifest (0.964042ms)\n✔ guide fails closed for wrong product repository (0.895958ms)\n✔ guide file and escaped parent symlinks cannot expose external bytes (1.600834ms)\n✔ CLI list/describe/invoke work from another cwd without credentials and preserve full guide bytes (86.6725ms)\n✔ real generic MCP discovers and reads guide; invalid extra fields fail with structured errors (33.677209ms)\nℹ tests 15\nℹ suites 0\nℹ pass 15\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 181.895917"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/runtime-deps-lock.mjs verify",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:13.190548+00:00",
+                "result": "✅ runtime 依赖锁有效：workloom-ai-growth · 12 个直接依赖"
+              },
+              {
+                "command": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node scripts/generate-capabilities.mjs --check",
+                "exitCode": 0,
+                "finishedAt": "2026-10-08T05:12:13.269531+00:00",
+                "result": "✓ docs/capabilities.auto.md（已最新）\n  ✓ docs/capabilities.auto.json（已最新）\n  ✓ README.md（已最新）\n能力文档与生成器一致 ✓（不代表生产验证）"
+              }
+            ],
+            "reviewedAt": "2026-10-08T06:00:45.648Z",
+            "summary": "Successful completed provider shots enter official post through actual task, first witness, current source bytes and adopted events. Default post does not veto or regenerate identity, wardrobe, action, raw specification, audio/lip/dialogue or aesthetic quality, and uses original program audio. Actual requested processing/export failures and prior authorization remain explicit. Current production completeness, normal source clock, cover assembly and generation idempotency implementations are retained by an ordinary two-parent merge. Same-run small media and worker finish now use real official adoption. The discoverable CLI/MCP workbench guide and real runtime assets follow this behavior. No paid provider/model/ASR/TTS production call. Broader Phase2 planning/integration remains a later separate authorized task. Latest minimal test-only child migrates three obsolete UHD/CFR assertions, preserving original source/recipe fingerprints, frame/PTS/audio tolerances and real failure controls; adds two front-door rejection controls. No product implementation byte changes in this child.",
+            "passed": true,
+            "id": "9dfd89b029c3d3bee5b183dd940aafdab8110338883f9fcc43b316cbcb296622"
+          },
+          "reviewSnapshot": {
+            "repo": "workloom-ai/workloom-growthtest",
+            "number": 119,
+            "pull": {
+              "number": 119,
+              "state": "open",
+              "title": "fix(video): 成功渲染素材直接进入正式后期 [T-2026-1007-0001]",
+              "body": "成功镜头此前可能被渲染后的身份、服装、画面、动作、规格、声音、口型或台词质量检查阻塞，并触发再次生成或多轮后期。现在按实际供应商任务、输入作用域和当前文件摘要接受已有成功素材，直接进入官方后期；默认保留原片节目音轨，按请求执行一次真实加工。\n\nCLI、服务端/子工作器、后期连接器、围栏、预设、技能与可发现的 CLI/MCP 工作台指南已同步。真实供应商失败、源文件缺失或篡改、事前权限/授权/资金，以及请求加工或导出失败继续明确报错。\n\n验证：精确提交 `1d19e4686dedd364eb64466d90017c360baa21fb` 的正式离线 CLI、实际围栏与工作器调用链、能力、指南 CLI/MCP、两个包类型检查、官方包生成器/完整性、提交协议及秘密扫描均已实际通过。准确命令、日志和源摘要保存在本次审查回执；真实独立语义复核正在进行，完成前 ready=false。\n\n边界：没有供应商、模型、图像/视频生成、ASR/TTS 或新生产影片调用；合成夹具耗时不作为生产测速。“作品完整性优先、普通时长允许自然浮动”是后续单独任务，本 PR 不冒充已落实。源码经原生交付队列与准确候选 CI 发布；不声称签名安装包发布。回滚为 revert 本任务提交。\n\n任务卡：#116（T-2026-1007-0001）。\n\n<!-- workloom-delivery\n{\n  \"task_id\": \"T-2026-1007-0001\",\n  \"ready\": true,\n  \"depends_on\": [],\n  \"releases\": []\n}\n-->",
+              "author": {
+                "username": "cnb.dYiF05kxAGA",
+                "nickname": "Genius",
+                "email": "XYpmztfpCvez6l8z5BBAvJ+cnb.dYiF05kxAGA@noreply.cnb.cool",
+                "is_npc": false
+              },
+              "reviewers": [],
+              "labels": [],
+              "base": {
+                "ref": "refs/heads/main",
+                "sha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "head": {
+                "ref": "refs/heads/task/T-2026-1007-0001",
+                "sha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                "repo": {
+                  "id": "2101830819702788096",
+                  "name": "workloom-growthtest",
+                  "path": "workloom-ai/workloom-growthtest",
+                  "web_url": "https://cnb.cool/workloom-ai/workloom-growthtest"
+                }
+              },
+              "blocked_on": "status_check",
+              "merged_by": {
+                "is_npc": false
+              },
+              "mergeable_state": "mergeable",
+              "is_wip": false,
+              "is_merged": false,
+              "is_force_merged": false,
+              "statuses": {}
+            },
+            "headSha": "1d19e4686dedd364eb64466d90017c360baa21fb",
+            "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "files": [
+              "AGENTS.repo.md",
+              "README.md",
+              "apps/server/src/video/director-router.ts",
+              "apps/server/src/video/director-sources.ts",
+              "apps/server/src/video/director-worker.ts",
+              "apps/server/src/video/film-worker-identity.test.ts",
+              "apps/server/src/video/film-worker.test.ts",
+              "apps/server/src/video/film-worker.ts",
+              "bundles/ai-video/README.md",
+              "bundles/ai-video/bundle.json",
+              "bundles/ai-video/connectors/bgm-bridge/README.md",
+              "bundles/ai-video/connectors/bgm-bridge/audio-stems-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/cli.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/core.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/declared-program-mix.test.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/measure.mjs",
+              "bundles/ai-video/connectors/bgm-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/color-bridge/README.md",
+              "bundles/ai-video/connectors/color-bridge/cli.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.mjs",
+              "bundles/ai-video/connectors/color-bridge/core.test.ts",
+              "bundles/ai-video/connectors/color-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/post-bridge/core.mjs",
+              "bundles/ai-video/connectors/post-bridge/delivery-integration.test.ts",
+              "bundles/ai-video/connectors/post-bridge/director-delivery.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/README.md",
+              "bundles/ai-video/connectors/subtitle-bridge/cli.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/core.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/punctuation.test.ts",
+              "bundles/ai-video/connectors/subtitle-bridge/runtime-smoke.mts",
+              "bundles/ai-video/connectors/voice-bridge/README.md",
+              "bundles/ai-video/connectors/voice-bridge/core.mjs",
+              "bundles/ai-video/fences/ai-video-bgm.yml",
+              "bundles/ai-video/fences/ai-video-color.yml",
+              "bundles/ai-video/fences/ai-video-delivery.yml",
+              "bundles/ai-video/fences/ai-video-material.yml",
+              "bundles/ai-video/fences/ai-video-subtitle.yml",
+              "bundles/ai-video/fences/ai-video-voice.yml",
+              "bundles/ai-video/library/director-system/recipes.json",
+              "bundles/ai-video/library/real-person-assets/asset-20260101000000-demo/profile.json",
+              "bundles/ai-video/pipelines/narrative-film.yml",
+              "bundles/ai-video/presets/bgm-composer.yml",
+              "bundles/ai-video/presets/colorist.yml",
+              "bundles/ai-video/presets/post-editor.yml",
+              "bundles/ai-video/presets/subtitle-stylist.yml",
+              "bundles/ai-video/presets/voice-artist.yml",
+              "bundles/ai-video/schemas/objects.json",
+              "bundles/ai-video/skills/bgm-audio-layering/SKILL.md",
+              "bundles/ai-video/skills/bgm-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/caption-burnin-ops/SKILL.md",
+              "bundles/ai-video/skills/color-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/color-grade/SKILL.md",
+              "bundles/ai-video/skills/color-look-design/SKILL.md",
+              "bundles/ai-video/skills/color-shot-matching/SKILL.md",
+              "bundles/ai-video/skills/cover-design/SKILL.md",
+              "bundles/ai-video/skills/delivery-package-ops/SKILL.md",
+              "bundles/ai-video/skills/delivery-revision-ops/SKILL.md",
+              "bundles/ai-video/skills/producer-gate-review/SKILL.md",
+              "bundles/ai-video/skills/render-ops/SKILL.md",
+              "bundles/ai-video/skills/subtitle-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/subtitle-layout-design/SKILL.md",
+              "bundles/ai-video/skills/voice-delivery-spec/SKILL.md",
+              "bundles/ai-video/skills/voice-dubbing-sync/SKILL.md",
+              "bundles/geo-growth/agent-capabilities.json",
+              "bundles/geo-growth/capabilities/video.mjs",
+              "bundles/geo-growth/capabilities/workbench-guide.mjs",
+              "docs/agent-computer-guide.md",
+              "docs/ai-video-workbench-guide.md",
+              "docs/real-person-asset.md",
+              "docs/video-standard-post.md",
+              "packages/base/bundles/bgm-capability.test.ts",
+              "packages/base/bundles/post-av-sync.test.ts",
+              "packages/base/bundles/post-delivery-capability.test.ts",
+              "packages/base/bundles/subtitle-capability.test.ts",
+              "packages/base/bundles/voice-capability.test.ts",
+              "packages/video-studio/src/character-release-contract.integration.test.ts",
+              "packages/video-studio/src/cover-assembly.test.ts",
+              "packages/video-studio/src/cover-assembly.ts",
+              "packages/video-studio/src/cover-composition-entrypoint.test.ts",
+              "packages/video-studio/src/deliver.ts",
+              "packages/video-studio/src/director-planner.ts",
+              "packages/video-studio/src/director-post-default.integration.test.ts",
+              "packages/video-studio/src/film-completion-entrypoint.test.ts",
+              "packages/video-studio/src/film-contracts.ts",
+              "packages/video-studio/src/film-delivery-rgb-entrypoint.test.ts",
+              "packages/video-studio/src/film-worker-runtime.test.ts",
+              "packages/video-studio/src/film-worker-runtime.ts",
+              "packages/video-studio/src/index.ts",
+              "packages/video-studio/src/portrait-derived-entrypoint.test.ts",
+              "packages/video-studio/src/post-render-acceptance.ts",
+              "packages/video-studio/src/post-render-fence-policy.test.ts",
+              "packages/video-studio/src/producer-gate.test.ts",
+              "packages/video-studio/src/producer-gate.ts",
+              "packages/video-studio/src/standard-post-contract.test.ts",
+              "packages/video-studio/src/standard-post-contract.ts",
+              "plugins/workloom-workbench/README.md",
+              "plugins/workloom-workbench/skills/workloom-growth/SKILL.md",
+              "plugins/workloom-workbench/skills/workloom/SKILL.md",
+              "scripts/AGENT-CAPABILITIES.md",
+              "scripts/agent-capabilities.test.mjs",
+              "scripts/ai-video-workbench-guide.test.mjs",
+              "scripts/product-runtime-assets.mjs",
+              "scripts/product-runtime-assets.test.mjs",
+              "scripts/tools/compose-film.mts",
+              "scripts/tools/compose-native-clock.test.ts",
+              "scripts/tools/film-cli-preflight.test.mjs",
+              "scripts/tools/film-existing-render-edit.test.ts",
+              "scripts/tools/film-native-post.test.ts",
+              "scripts/tools/film-publication-policy.d.mts",
+              "scripts/tools/film-publication-policy.mjs",
+              "scripts/tools/film-publication-policy.test.mjs",
+              "scripts/tools/film-release-entrypoints.test.ts",
+              "scripts/tools/film-rendered-material-use.test.ts",
+              "scripts/tools/film-standard-post.mts",
+              "scripts/tools/film-standard-post.test.ts",
+              "scripts/tools/full-chain-film.mts",
+              "scripts/tools/video-request-regression.test.ts",
+              "tools/codex-gateway/README.md",
+              "tools/codex-gateway/bin/cli.mjs",
+              "tools/codex-gateway/src/mcp.mjs",
+              "tools/codex-gateway/test/mcp.test.mjs",
+              "tools/codex-gateway/test/video-guide.test.mjs"
+            ],
+            "intent": {
+              "taskId": "T-2026-1007-0001",
+              "ready": true,
+              "dependsOn": [],
+              "releases": []
+            },
+            "headTime": 1791436306000,
+            "mergeBase": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+            "checkErrors": [],
+            "checkSha": null,
+            "hasFailedChecks": false,
+            "ciPolicyChanges": [
+              {
+                "id": "CI-001",
+                "file": "scripts/tools/film-publication-policy.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-publication-policy.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-publication-policy.test.mjs",
+                  "absent": false
+                },
+                "digest": "000d92c6bfab195c1704e3d01d4b121b8990e0c43c0da86b4d9f01fb60219993"
+              },
+              {
+                "id": "CI-002",
+                "file": "scripts/tools/film-standard-post.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-standard-post.test.ts",
+                  "absent": false
+                },
+                "digest": "1221881a00c17fdfa5758d79a1987757022d9722754c5d3eedc78c3d9cb0d68c"
+              },
+              {
+                "id": "CI-003",
+                "file": "scripts/tools/film-native-post.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-native-post.test.ts",
+                  "absent": false
+                },
+                "digest": "15dfe1f0a6b2ef4aac83713c619c63e7ce32ec956aa249b4ce4b177d6574b259"
+              },
+              {
+                "id": "CI-004",
+                "file": "scripts/tools/compose-native-clock.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/compose-native-clock.test.ts",
+                  "absent": false
+                },
+                "digest": "24885b7a764dbaaa1184d9e6fa8f7457bb789a477cc0aaeb65e5ee188509b33a"
+              },
+              {
+                "id": "CI-005",
+                "file": "scripts/product-runtime-assets.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/product-runtime-assets.test.mjs",
+                  "absent": false
+                },
+                "digest": "313efef67f48e77178d3b56a527979d1edd11a89f8c6b0697182f79617709bba"
+              },
+              {
+                "id": "CI-006",
+                "file": "scripts/tools/film-existing-render-edit.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-existing-render-edit.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-existing-render-edit.test.ts",
+                  "absent": false
+                },
+                "digest": "3b4959b9f1ddd183bcc79aa0dd82a730f183b112149fa3c69bb2fce833f7b56c"
+              },
+              {
+                "id": "CI-007",
+                "file": "scripts/tools/film-cli-preflight.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-cli-preflight.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-cli-preflight.test.mjs",
+                  "absent": false
+                },
+                "digest": "50367b8b52cac597f15ff1f8679c0c2250a189176b0ef8ce6ce1ab16d9e7f665"
+              },
+              {
+                "id": "CI-008",
+                "file": "scripts/tools/video-request-regression.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/video-request-regression.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/video-request-regression.test.ts",
+                  "absent": false
+                },
+                "digest": "66983ab41db9f184466e81a40cda13279fac2b0b3dba83d8022d1fd3b5863ae9"
+              },
+              {
+                "id": "CI-009",
+                "file": "scripts/agent-capabilities.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/agent-capabilities.test.mjs",
+                  "absent": false
+                },
+                "digest": "77678a7a7921284b87a01d5298f6c5c69f403a2b26b7bdd4172de9cb150ec3c3"
+              },
+              {
+                "id": "CI-010",
+                "file": "scripts/tools/film-release-entrypoints.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-release-entrypoints.test.ts",
+                  "absent": false
+                },
+                "digest": "9285cbcba63311ceffa183642ae653ba5dfd8d6a91ec8223e95c5447c162e594"
+              },
+              {
+                "id": "CI-011",
+                "file": "scripts/tools/film-rendered-material-use.test.ts",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-rendered-material-use.test.ts",
+                  "absent": false
+                },
+                "digest": "9bfe82ac19ff4726d39cb7260dde1ded45052587f4cfcc332d57a43f1f435349"
+              },
+              {
+                "id": "CI-012",
+                "file": "scripts/product-runtime-assets.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/product-runtime-assets.mjs",
+                  "absent": false
+                },
+                "digest": "b2929673defa656362fe6845960b6e95fe089817ff2f0edcdeaf9f9f13e9915f"
+              },
+              {
+                "id": "CI-013",
+                "file": "scripts/tools/film-publication-policy.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/tools/film-publication-policy.mjs",
+                  "absent": false
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/tools/film-publication-policy.mjs",
+                  "absent": false
+                },
+                "digest": "bac74e720f9069d9eaf407382fea085be659d92d00c510b94c27c8863c8a7461"
+              },
+              {
+                "id": "CI-014",
+                "file": "scripts/ai-video-workbench-guide.test.mjs",
+                "before": {
+                  "ref": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": true
+                },
+                "after": {
+                  "ref": "1d19e4686dedd364eb64466d90017c360baa21fb",
+                  "path": "scripts/ai-video-workbench-guide.test.mjs",
+                  "absent": false
+                },
+                "digest": "f1862b8df839a58edc91931a5d710c238a523ccbfb2cec2f44380ddb881e2e43"
+              }
+            ]
+          }
+        }
+      },
+      "previous": "f777ee659919959dbecfb84bde57a67f6ef843252440938a6618ba50a2ebb6bd",
+      "digest": "c9d93c4d247696c202e0589b9309023c2613b7676ed402f580e7ace2f69cfc32"
+    },
+    {
+      "sequence": 3458,
+      "at": "2026-10-08T06:03:34.765Z",
+      "kind": "transaction",
+      "data": {
+        "id": "trusted-handoff:workloom-ai/workloom-growthtest:119:1d19e4686dedd364eb64466d90017c360baa21fb:ed485d4979f9e92541d7a7066df9557dfeb66f78:9dfd89b029c3d3bee5b183dd940aafdab8110338883f9fcc43b316cbcb296622"
+      },
+      "previous": "c9d93c4d247696c202e0589b9309023c2613b7676ed402f580e7ace2f69cfc32",
+      "digest": "cd79834394ff45bc5ea86b450e70fd0cbfee23c30a06bb3fa3a3c44971080b4f"
     }
   ]
 }
