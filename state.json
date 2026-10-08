@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3704,
+  "revision": 3708,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "merging",
+      "status": "waiting_ci",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2928,7 +2928,7 @@
         "at": 1791440115248
       },
       "recoveryIntent": null,
-      "mergePhase": "merge_requested",
+      "mergePhase": null,
       "mergeSnapshot": {
         "repo": "workloom-ai/workloom-growthtest",
         "number": 156,
@@ -8212,10 +8212,10 @@
   },
   "leases": {
     "protocol": {
-      "owner": "integration/pr-119",
+      "owner": null,
       "generation": 96,
       "acquiredAt": 1791453624770,
-      "expiresAt": 1791454524770
+      "expiresAt": 1791453624770
     },
     "dependencies": {
       "owner": null,
@@ -95054,6 +95054,61 @@
       },
       "previous": "0cc8101cc95e20463aa23cdb5a64fd4eb93fdc3f6c2b29eacb141f02c6ffb2fb",
       "digest": "94f018cc7d86db46b49ec7816fdef68cf9d5ed306c5cf0158fa73050d3f0df1e"
+    },
+    {
+      "sequence": 3705,
+      "at": "2026-10-08T10:00:24.770Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "protocol"
+        ],
+        "owner": "integration/pr-119",
+        "generation": {
+          "protocol": 96
+        }
+      },
+      "previous": "94f018cc7d86db46b49ec7816fdef68cf9d5ed306c5cf0158fa73050d3f0df1e",
+      "digest": "982edd3fde5a1b2d2a3c609e296c72968058e1d73adafe3e09a4adb07436bfdd"
+    },
+    {
+      "sequence": 3706,
+      "at": "2026-10-08T10:00:24.770Z",
+      "kind": "merge_rejected",
+      "data": {
+        "number": 119,
+        "candidate": 156,
+        "headSha": "07728e58d9b7a0f114cbfa37b9be0dd5ca49f066",
+        "httpStatus": 409,
+        "verifiedUnmerged": true
+      },
+      "previous": "982edd3fde5a1b2d2a3c609e296c72968058e1d73adafe3e09a4adb07436bfdd",
+      "digest": "019741a58cef1cc9138201b2c22b48ba61be18751faf121982f0f58a5320b415"
+    },
+    {
+      "sequence": 3707,
+      "at": "2026-10-08T10:00:24.770Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "error": "CNB 409 https://api.cnb.cool/workloom-ai/workloom-growthtest/-/pulls/156/merge :: {\"errcode\":2009014,\"errmsg\":\"the pull can not merge yet\"}\n",
+          "status": "waiting_ci",
+          "mergePhase": null
+        }
+      },
+      "previous": "019741a58cef1cc9138201b2c22b48ba61be18751faf121982f0f58a5320b415",
+      "digest": "da7edd706bede06921aee7722d781e2d36d7e003df559c9a996f328a7fb3c0f2"
+    },
+    {
+      "sequence": 3708,
+      "at": "2026-10-08T10:01:42.845Z",
+      "kind": "transaction",
+      "data": {
+        "id": "adf5c50e-119f-40c4-be44-50a00bb7de37"
+      },
+      "previous": "da7edd706bede06921aee7722d781e2d36d7e003df559c9a996f328a7fb3c0f2",
+      "digest": "a7153fc241681f84fa1d545ee0ef92c9c04caa85af0ac52bdebdb75892cf4711"
     }
   ]
 }
