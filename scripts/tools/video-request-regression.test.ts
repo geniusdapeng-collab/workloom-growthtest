@@ -228,7 +228,7 @@ describe("全链路当前血缘与返修范围", () => {
     const aggregate = second.rows().findLast((entry: Card) => entry.stage === "cine-kb" && entry.shotId === null);
     expect(aggregate.lineage.sourceHash).not.toBe(first.rows().find((entry: Card) => entry.stage === "cine-kb" && entry.shotId === null).lineage.sourceHash);
   }, 40_000);
-  it("原生生产在任何阶段拒绝UHD后期覆盖，并保留既有HD前期镜头回执", () => {
+  it("UHD后期交付档保留HD前期源血缘，并追加当前执行回执", () => {
     const first = runChain([emptyShot, windowShot], { stages: "cine-kb", args: ["--quality", "hd", "--only", "EMPTY"] });
     expect(first.result.status, first.diagnostic).toBe(0);
     const before = first.rows().findLast((entry: Card) => entry.stage === "cine-kb" && entry.shotId === "EMPTY");
@@ -236,10 +236,12 @@ describe("全链路当前血缘与返修范围", () => {
     const second = runChain([emptyShot, { ...windowShot, dialogue: [{ text: "另一镜新台词" }] }], {
       dir: first.dir, stages: "cine-kb", args: ["--quality", "uhd", "--only", "EMPTY"],
     });
-    expect(second.result.status, second.diagnostic).not.toBe(0);
-    expect(second.diagnostic).toContain("STANDARD_NATIVE_QUALITY_OVERRIDE_REJECTED");
-    expect(second.rows()).toEqual(beforeRows);
+    expect(second.result.status, second.diagnostic).toBe(0);
+    expect(second.diagnostic).toContain("源 1080p → 交付 2160p (2160x3840)@24fps");
+    expect(second.rows().slice(0, beforeRows.length)).toEqual(beforeRows);
+    expect(second.rows().length).toBeGreaterThan(beforeRows.length);
     const after = second.rows().findLast((entry: Card) => entry.stage === "cine-kb" && entry.shotId === "EMPTY");
+    expect(after).toMatchObject({ ok: true, evidence: { status: "not_applicable" } });
     expect(after.lineage.projectId).toBe(before.lineage.projectId);
     expect(after.lineage.sourceHash).toBe(before.lineage.sourceHash);
     expect(after.lineage.recipeHash).toBe(before.lineage.recipeHash);
@@ -298,7 +300,7 @@ describe("成片硬切 CFR 接缝", () => {
     });
     expect(result.status, `${result.error ?? ""}\n${result.stdout}\n${result.stderr}`).toBe(0);
     const work = join(dir, readdirSync(dir).find((name) => name.startsWith("wl-compose-")) ?? "missing");
-    expect(readFileSync(join(work, "concat.txt"), "utf8").match(/^duration 1\.000000$/gm)).toHaveLength(3);
+    expect(readFileSync(join(work, "concat.txt"), "utf8").match(/^duration 1\.000000000$/gm)).toHaveLength(3);
     for (const file of [join(work, "video-only.mp4"), join(work, "raw.mp4"), master]) {
       const read = spawnSync(ffprobe, [
         "-v", "error", "-select_streams", "v:0", "-show_packets",
@@ -373,10 +375,22 @@ describe("全链路冻结年代与原合同接线", () => {
     expect(run.diagnostic).toContain(`(${quality === "uhd" ? "3840x2160" : expectedOutput === "720p" ? "1280x720" : "1920x1080"})`);
     if (quality === "uhd") expect(prompt).not.toContain("2160p");
   }, 40_000);
-  it("2160p旧交付档别名在前期阶段也拒绝，不能隐含新增升维后期", () => {
-    const run = runChain([emptyShot], { stages: "plates", source: { aspect: "16:9", resolution: "2160p" } });
+  it("2160p交付档别名使用1080p前期源提示，声明本机UHD画布", () => {
+    const run = runChain([emptyShot], { stages: "plates", source: { aspect: "16:9", resolution: "2160p" }, args: ["--accept-env-defects"] });
+    expect(run.result.status, run.diagnostic).toBe(0);
+    const prompt = run.rows().find((row: Card) => row.stage === "keyframe").evidence.prompt;
+    expect(prompt).toContain("16:9 横幅 1080p");
+    expect(prompt).not.toContain("2160p");
+    expect(run.diagnostic).toContain("源 1080p → 交付 2160p (3840x2160)@24fps");
+    expect(run.rows().some((row: Card) => row.stage === "enhance")).toBe(false);
+  }, 40_000);
+  it.each([
+    { label: "2160p交付档与HD档冲突", args: ["--quality", "hd"], error: "--resolution 2160p 与 --quality hd 冲突" },
+    { label: "未接入模型增强参数", args: ["--enhance-kind", "live-action"], error: "STANDARD_ENHANCEMENT_OPTION_UNSUPPORTED" },
+  ])("$label在执行前仍拒绝", ({ args, error }) => {
+    const run = runChain([emptyShot], { stages: "plates", source: { aspect: "16:9", resolution: "2160p" }, args });
     expect(run.result.status, run.diagnostic).not.toBe(0);
-    expect(run.diagnostic).toContain("STANDARD_NATIVE_QUALITY_OVERRIDE_REJECTED");
+    expect(run.diagnostic).toContain(error);
     expect(existsSync(join(run.dir, "logs/regression/stages.jsonl"))).toBe(false);
   }, 40_000);
   it("新项目默认当天且续跑保存同一日期，源合同记录进入血缘", () => {
