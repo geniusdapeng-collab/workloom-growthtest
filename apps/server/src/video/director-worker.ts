@@ -131,7 +131,7 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
         }
         const {videoRouter}=await import("./router.js");
         await checkpoint("检查本机后期和声音工具");
-        await preflightDirectorAudio(filmPlan,connectors);
+        await preflightDirectorAudio(filmPlan,connectors,payload.audioMode==="dubbing"?"dubbing":"source");
         let caller=videoRouter.createCaller(await authority());
         const catalog=await caller.gen.catalog({kind:"video"});
         const model=catalog.models.find(m=>m.id===process.env.WORKLOOM_VIDEO_DEFAULT_MODEL)??catalog.models.find(m=>m.available);
@@ -179,7 +179,7 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
         for(const shot of source.shots) {
           await checkpoint("复核共享镜头的正式请求");caller=videoRouter.createCaller(await authority());
           const qualified=await caller.production.qualifyShot({projectId:job.project_id,shotId:shot.shotId,modelId:model.id,
-            mode:"auto",params:{durationSec:shot.durationSec,aspectRatio:"9:16",generateAudio:false,...(providerRefs.length?{referenceImageUrls:providerRefs}:{})}});
+            mode:"auto",params:{durationSec:shot.durationSec,aspectRatio:"9:16",generateAudio:payload.audioMode!=="dubbing",...(providerRefs.length?{referenceImageUrls:providerRefs}:{})}});
           qualifiedShots.push({shotId:shot.shotId,qualificationToken:qualified.qualificationToken,scriptId:qualified.scriptId,scriptVersion:qualified.scriptVersion});
         }
         const scripts=await caller.cms.listScripts({projectId:job.project_id});
@@ -211,14 +211,15 @@ async function runDirectorJob({scope,job,context}:typeof queue[number]) {
       }
       await authority();await checkpoint("重建四支作品的剪辑和声音");
       const revision=(frozen?.revision??0)+1;
-      const withAudio=await prepareDirectorAudio(scope,{projectId:job.project_id,revision,clips,filmPlan,by:job.created_by,deadlineMs});
+      const audioMode=payload.audioMode==="dubbing"?"dubbing":"source";
+      const withAudio=await prepareDirectorAudio(scope,{projectId:job.project_id,revision,clips,filmPlan,by:job.created_by,deadlineMs,audioMode});
       const project={projectId:job.project_id,...scope,revision,audioScope:{...scope,projectId:job.project_id,revision},creativeMode:"director_auto",
         deliveryTargetPlan:filmPlan.deliveryTargetPlan,directorFilmPlan:filmPlan,intent:filmPlan.intent,title:String(filmPlan.brief.title),fps:30,aspect:"9:16",
-        chronologyLocked:filmPlan.brief.chronologyLocked,quality:"hd"};
+        chronologyLocked:filmPlan.brief.chronologyLocked,quality:"hd",audioMode};
       result=await post.buildDirectorDelivery({project,shots:withAudio,outDir:path.join(base,`delivery-v${revision}`),burnSubtitles:true,softSubtitles:true,bins,env,
         subtitles:{zhCues:subtitleCues(clips)}});
     }
-    await authority();await checkpoint("复检并登记作品");
+    await authority();await checkpoint("登记实际后期产物");
     const variants=await registerDirectorVariants(scope,job.project_id,result,job.created_by);
     const snapshot=JSON.parse(await readFile(result.projectPath,"utf8"));
     const freeze=await freezeDirectorPlan(scope,job.project_id,{filmPlan,sourceManifest:snapshot.prepared.sourceManifest,

@@ -43,6 +43,7 @@ interface Api {
 }
 const exports={} as {api:Api};
 runInNewContext(compiled,{exports,filmCompletionPolicyForDocument,describeFilmCompletion,REVIEW_POLICY:'off',WORKER_RUNTIME:null,
+  POST_RENDER_STAGES:new Set(['shot','compose','color','subtitle','danmaku','bgm','sfx','cover','mux','master']),POST_TECHNICAL_CHECKS:{},
   REVIEW_DISABLED_REASON:'unreviewed by owner instruction',reviewFilmStage:()=>{throw new Error('UNEXPECTED_MODEL_REVIEW');},
   ctx:{contractSource:{}},frame:{shotId:null},resolvedArtifacts:[{path:'explicit local fixture'}],
   buildProducerReviewContract:()=>({contractHash:'explicit fixture contract'}),filmReviewContracts:()=>({})});

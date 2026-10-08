@@ -4,9 +4,10 @@
 > 目的：**别跳步**。真机事故（2026-09-30 出镜人物 片）的根因就是"直接跑出片命令、
 > 没先判视频类型、也没让分镜卡过字段规范闸"。
 
-> **要把本仓能力接进桌面客户端（Codex / DeepSeek Harness）**：见 [`docs/AGENT-CLIENTS.md`](../../docs/AGENT-CLIENTS.md)
-> —— 里面有 5 分钟接入（`list`/`invoke`/MCP 冒烟）、MCP 配置片段、**视频能力清单**（原 6 条 + 导演 5 条）
-> 与安全边界。本文（runbook）负责"怎么出片"，那份文档负责"怎么被 Agent 调起来"。
+> **Codex / DeepSeek Harness 视频任务先读**：[本仓 AI 工作台调用指南](../../docs/ai-video-workbench-guide.md)。
+> CLI：`node scripts/workloom-agent.mjs invoke growth.video.workbench.guide`；通用 MCP：
+> `workloom_growth_video_workbench_guide({})`；实际 Codex 插件：`workloom_video_guide({})`。
+> 指南连接接入、用户约束、正式前期/提示词、渲染、标准后期与真实交付核验，读取不触发生成。
 
 > **默认一句话导演入口**：见 [导演制作 V2 手册](../../docs/director-studio-v2.md)，使用认证的
 > `node scripts/workloom-director.mjs plan|start|job|versions|feedback`。默认三支常规版 + 导演惊喜版，
@@ -71,24 +72,27 @@ pnpm exec tsx scripts/tools/video-doctor.mts   # 出片环境自检（缺什么�
 | 口播解说片 | `pnpm explainer:run -- --script <稿> --profile <音色>` | 图文成片，不跑逐镜生成 |
 | 手绘白板 | `scripts/tools/whiteboard-film.mts --script <稿>` | 本地白板引擎 |
 
-`full-chain-film.mts` 阶段顺序（**按需裁剪，但别跳"规范类"阶段**）：
+`full-chain-film.mts` 专业链阶段顺序（按本仓当前执行器和冻结合同；不跳规范类阶段）：
 
 ```
 cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plates → material-gen → videos
-        → voice（逐镜人声核查/补旁白）→ compose → color → subtitle → bgm → cover → mux → master → deliver
+        → voice（同文件原声核实，禁止补旁白）→ compose → color → subtitle → bgm → cover → mux → master → deliver
 ```
 
-> **post-only 组装自动带 `spec`**（T-2026-0930-0015）：`--assembly-mode post-only` 时管线会**自动补上**
-> `spec` 阶段；此时它按"25 字段 P0 规范"判（不要求生成用提示词）。真机事故：手写组装卡的 `character`
-> 只写"这位女士…"、没写主角名/ID（P0 字段），一路漏到封面才炸。
+> **完整原片原声后期**：使用 [标准后期入口](../../docs/video-standard-post.md) 的
+> `--standard-post <规范原片清单> --post-settings <设置> --out <新目录>`，固定全部原镜、原顺序与原声。
+> 后期设置不能删换镜头、变速或替声。旧 `--existing-render-edit` 已移除；旧组装示例不能当作完整原片标准后期合同。
 
 ## 3. 三条已定稿的执行口径（2026-09-30 / 10-01，产品所有者）
 
-1. **渲染后不做"合格/不合格"裁决**：`--review-policy off`（默认）。渲染成功就**直接走完整后期链并交付**，
-   质量由客户验收。只保留**事实性硬闸**（产物存在/时长/分辨率/音轨/音画对齐/字幕文件/命名/变体差异）。
-   需要时用 `--review-policy advisory`（只记录不阻断）/ `blocking`（旧口径）。
+1. **成功渲染原片默认采用并正式后期**：先按实际生成任务、冻结原稿和原字节回执采用已有素材，
+   包括旧品质评审曾打回的成功产物；不复查原片身份、服饰、动作、画质、原片规格、口型或台词，
+   不触发 canary、模型/人工品质放行、品质重渲染、ASR 或 TTS。`--review-policy` 不恢复渲染后品质否决。
+   后期按声明配方执行一次，真实加工回执标注 `qualityReviewed=false` 或 `qualityReviewPerformed=false`、
+   品质分数/残差未测。任务或来源字节不符、权限不足、实际工具失败、输出缺失或请求导出规格未实现仍失败。
 2. **渲染前一次性过关**：红线 linter（屏幕文字/证件文字/道具重复/落幅/帧率）、合同字段与参数、
-   授权与素材用途、商品绑定、就绪度（风险优先渲染）——这些是 fail-closed 的**事前**闸；
+   授权与素材用途、商品绑定、就绪度（风险优先渲染）——这些仅对**待生成镜头** fail-closed；
+   部分续跑不会重新审查或改写已有成功原片的历史镜头卡、商品/人物档案、素材用途或提示词；
    默认 `--max-attempts 1`，**禁止同提示词重试**（要重试必须先改卡）。
 3. **定妆照（G5）决策交人类**（T-2026-1001-0007）：8 张出满后**直接交人类验收**
    （`portrait-agent accept`，`via=owner-acceptance`）；机器像不像/监制结论只留证，**不参与放行、不触发自动重做**。
@@ -96,9 +100,8 @@ cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plate
 
 ## 4. 踩过的坑（务必遵守）
 
-1. **post-only 组装（复用既有成品片段）**：必须显式 `--assembly-mode post-only --assembly-reason "<≥8 字>"`；
-   同时**把 `spec` 阶段带上**，让手写的组装卡也过 25 字段规范（本次事故：`character` 字段没写主角名/ID →
-   封面人物卡找不到来源镜 → 封面退化 → 母版终审被上游放行闸拦下）。
+1. **复用完整原片**：先核对生成前冻结原稿、逐镜签发回执与规范 `original-render-manifest.json`，
+   再走 `--standard-post`。缺正式事实不能手写自由计划或改哈希冒充原片；需要局部剪辑时另走明确授权的创作合同。
 2. **`character` 字段必须写主角名/ID**（如 `客户方CEO（demo-character…）`），
    否则封面"人物为主"版式、造型一致性判定都会失配。
    现在管线会在封面环节**显式报错**（`COVER_PERSON_SOURCE_MISSING`）而不是静默退化成"仅标题"。
@@ -109,11 +112,12 @@ cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plate
 4. **不要手工做封面 / 手工混音绕过管线**：交付清单要能核对（`delivery-manifest.json` 里有
    `reviewPolicy` / `assembly` / 封面来源 / 各变体 sha256）。
 5. **账户欠费**：`AccountOverdueError` 403 会拦住提交；**先充值**，不要连点重试。
-6. **服务端固定影片工位（`--worker`）第二批未接线**：CLI 侧还没有解析 `FILM_JOB_CONTEXT`
-   与受限通道（llm/image/video/media/voice/review）的实现，本 CLI 会显式报
-   `WORKER_MODE_NOT_WIRED`。需要"客户端 UI 派活 → 工位出片"时先完成第二批（`docs/repairs/T-2026-0927-0037.md` / `-0039.md`）。
-7. **创作口径不得写成硬闸**：片型配比、运镜强弱、造型主色这类"好不好看"的问题默认只做咨询项，
-   硬闸只允许事实类（产物/时长/分辨率/音轨/音画对齐/字幕/命名/授权与素材用途）。CI 会拦（`scripts/ci/verify-hard-gate-policy.mjs`）。
+6. **服务端固定影片工位（`--worker`）**：当前 CLI 已接入 `FullChainFilmWorker` 和受限通道；
+   工位上下文、授权、预算和回执由现有服务链核验。只读 MCP 计划不会启动工位，不能伪造父上下文；
+   完整原片标准后期独立执行，拒绝与 worker 参数混用。
+7. **后期回执只证明真实加工完成**：片型配比、运镜、造型、亮度、音量、同步或变体可见差异
+   不构成渲染后品质否决票。源任务与字节绑定、权限、明确加工参数、实际输出及请求导出规格保持校验；
+   CI `scripts/ci/verify-hard-gate-policy.mjs` 约束品质判据不得混入后期硬闸。
 
 ## 5. 交付物与验收
 

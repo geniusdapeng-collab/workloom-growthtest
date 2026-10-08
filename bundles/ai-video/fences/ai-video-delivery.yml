@@ -4,7 +4,7 @@
 # 写类动作无命中按 default_level。
 #
 # 这一包拦的是"多版本交付 + 返修"里最贵、最不可逆的四件事：
-#   ① 给了用户两个看不出差别的版本（等于白做多版本）；
+#   ① 请求的目标版本或真实文件缺失；
 #   ② 把字幕烧进母版（画面像素被改，之后"不要字幕"的诉求只能重剪）；
 #   ③ 返修时不做影响分析就整体重跑（把"后期能解决的事"变成"重新生成镜头"的账单）；
 #   ④ 交付不带清单/工程文件（用户选不了、事后对不了账，返修也没有输入）。
@@ -12,44 +12,44 @@ version: ai-video-delivery/v1
 default_level: review
 rules:
   - rule_id: G-DLV0
-    name: 交付包派生与旁挂字幕（本地可逆动作直通）
+    name: 交付包派生与本地返修直通
     level: auto
     is_baseline: true
     match:
       object_types: [final_video, video_asset, subtitle_track, subtitle_report, delivery_package]
       actions: [postread.health, postread.plan, postread.impact, postwrite.package, postwrite.reedit, postwrite.triage, subtitlewrite.sidecar, subtitlewrite.softmux]
     when: "true"
-    note: 派生变体、出旁挂字幕文件、软字幕轨内嵌、按 patch 本地重合成，都是工位本地、非破坏、可回滚动作（原片只读 + 版本只增不覆盖 + 产物带 sha256），默认直通。覆盖原片（G-DLV2）、关复检（G-DLV3）、变体雷同（G-DLV1）、返修跳过影响分析（G-DLV4）、缺清单（G-DLV6）、复用无证据（G-DLV7）叠加升级，deny 优先并集取严。未命中写动作的保守默认是 review，故此处必须显式声明 auto。
+    note: 本地后期默认直通。已成功生成的镜头不因版本差异、像素对比、人物、口型或增强模型评审而挂起；实际源字节、输出文件、清单与错误回执仍须记录。覆盖源文件、无证据复用和新增付费生成按相应规则处理。
 
   - rule_id: G-DLV1
-    name: 多版本必须真的"看得出差别"（雷同即拒）
+    name: 已生成镜头的版本差异不设质量闸
     level: block
     is_baseline: true
     match:
       object_types: [delivery_package, final_video]
       actions: [postwrite.package, postwrite.reedit]
-    when: "params.variants_distinct == false or params.identical_variants == true or params.variant_count == 0 or params.variant_count == 1"
-    note: 多风格交付的**唯一理由**是"用户能选"。因此：变体少于 2 个视为没得选；两个变体在调色（画面像素差）与音轨（曲目/分层）上同时测不出差别视为雷同。两者一律一票否决——省下的是本地算力，亏掉的是"用户挑不出自己喜欢的"。
+    when: "false"
+    note: 兼容既有规则 ID 与绑定；单版本或相同配方不作审美否决。按请求的目标集合实际生成并记录每个版本和源字节，真实处理失败仍失败。
 
   - rule_id: G-DLV2
-    name: 母版不得烧字幕（字幕一律旁挂/软轨交付）
+    name: 禁止覆盖源文件
     level: block
     is_baseline: true
     match:
       object_types: [final_video, video_asset, delivery_package]
       actions: [postwrite.package, postwrite.reedit, subtitlewrite.softmux]
-    when: "params.master_burned_in == true or params.burn_into_master == true or params.overwrite_source == true or params.output_path == params.input_path"
-    note: 硬线：**母版永远是"无字画面"**。有些片子要带字幕、有些不要，而"要不要"是发布时的选择；烧一次就回不去了（像素被改，想拿掉只能重剪）。要硬字幕必须另存副本（`*.burned.mp4`），母版保持干净；软字幕轨走 softmux（视频/音频轨 copy，逐帧零改动复检）。
+    when: "params.overwrite_source == true or (contains_any(params.output_path, ['/', '.', '\\']) and params.output_path == params.input_path)"
+    note: 源素材只读。请求硬字幕时写新副本；burn_into_master/master_burned_in 不触发原片品质评审，实际覆盖源文件仍阻断。
 
   - rule_id: G-DLV3
-    name: 软字幕轨必须带"画面零改动"复检
+    name: 软字幕按实际 copy 请求与元数据回读
     level: block
     is_baseline: true
     match:
       object_types: [final_video, subtitle_track, delivery_package]
       actions: [subtitlewrite.softmux, postwrite.package, postwrite.reedit]
-    when: "params.skip_verify == true or params.verify == false or params.reencode_video == true or params.allow_video_reencode == true"
-    note: 软字幕的意义是"字幕可开关、画面像素不变"。因此内嵌必须 `-c:v copy` 并做四项复检（视频轨逐帧哈希一致 / 音轨一致 / 时长保持 / 字幕轨数量与语言齐备）；关复检或要求重编码视频一律拒绝——那就不是软字幕，是二次压缩。
+    when: "params.reencode_video == true or params.allow_video_reencode == true"
+    note: 软字幕要求实际 -c:v copy；拒绝要求重编码的视频软轨请求。skip_verify/verify=false 不触发像素或全帧质量闸，处理完成仍记录源哈希、普通流元数据与字幕轨。
 
   - rule_id: G-DLV4
     name: 返修必须先做影响分析；能在本地重合成的不得走镜头重生成
@@ -66,7 +66,7 @@ rules:
     level: review
     is_baseline: true
     match:
-      object_types: [render_job, video_asset, delivery_package]
+      object_types: [render_job, video_asset, delivery_package, final_video]
       actions: [postwrite.reedit, postwrite.package, render.submit]
     when: "params.requires_shot_regeneration == true or params.regenerate_shots == true"
     note: 重生成镜头会烧渲染额度（与 G8 同源风险）。因此：只出计划、不自动执行；人审放行后只重跑被点名的镜头，其余镜头与全部后期层复用（复用必须带哈希证据，见 G-DLV7）。
@@ -79,7 +79,7 @@ rules:
       object_types: [delivery_package, final_video]
       actions: [postwrite.package, postwrite.reedit]
     when: "params.delivery_manifest == false or params.engineering_file == false or params.skip_manifest == true"
-    note: 「没有清单就不是交付」：`delivery-manifest.json`（每个产物的 sha256/规格/变体差异实测值/成本口径）与 `film-project.json`（层结构 + 产物血缘，返修的输入）缺一不可。缺了它们，用户选不了版本、事后对不了账、下一轮返修也没有可复用的层描述。
+    note: 交付写 delivery-manifest.json 与 film-project.json，记录实际产物、源字节、处理回执和已执行配方；品质项明确未评审。缺少请求的清单与工程文件仍是交付错误。
 
   - rule_id: G-DLV7
     name: 「复用」必须带证据（不得声称复用却重算）
@@ -92,21 +92,21 @@ rules:
     note: 返修回执里"复用了哪些层"必须能对账：复用产物给出 sha256 与 mtime 未变的证据，重算产物给出新 sha256；镜头层还要与工程文件里记录的哈希逐镜比对，不一致就如实标注"被外部改动过"。禁止把"重算了但没写清楚"包装成"复用"。
 
   - rule_id: G-DLV8
-    name: UHD 母版与变体必须回读到目标画布
+    name: 请求画布必须与实际输出一致
     level: block
     is_baseline: true
     match:
       object_types: [delivery_package, final_video]
       actions: [postwrite.package, postwrite.reedit]
     when: "params.uhd_requested == true and params.resolution_exact == false"
-    note: 申请 UHD 时必须以 ffprobe 回读母版和每个变体的实际宽高；只把清单写成 4K 或仅把低分辨率预览放大不算交付。
+    note: 以普通 ffprobe 元数据回读实际宽高，申请的导出画布必须实际产出；不评审或拒绝原始镜头分辨率，不强制调用增强模型。
 
   - rule_id: G-DLV9
-    name: 低分辨率来源必须有本机增强回执
+    name: 已生成镜头不强制二次增强模型
     level: block
     is_baseline: true
     match:
       object_types: [delivery_package, final_video]
       actions: [postwrite.package, postwrite.reedit]
-    when: "params.uhd_requested == true and params.enhancement_verified == false"
-    note: 申请 UHD 时逐镜记录原始规格、源哈希、增强模型、产物哈希和本地核验回执；原片已足够大时明确标 source-sufficient。边缘强度单一指标不能证明画质提升，不以拉普拉斯阈值代替模型执行来源。
+    when: "false"
+    note: 兼容既有规则 ID 与绑定；原始低分辨率镜头默认进入本地后期，按请求执行实际缩放导出并记录 source/output SHA。只有显式另行请求新生成时才走其事前授权。

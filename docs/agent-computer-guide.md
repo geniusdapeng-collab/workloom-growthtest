@@ -1,5 +1,9 @@
 # WorkLoom 电脑/浏览器自动操作指南（给 AI Coding Agent）
 
+> 视频生成/制作任务先读 [本仓 AI 工作台视频调用指南](ai-video-workbench-guide.md)，或调用
+> `growth.video.workbench.guide`（实际 Codex 插件为 `workloom_video_guide`）。本文介绍电脑/浏览器驱动，
+> 不能替代视频生产的正式前期、渲染、后期和真实回执，也不授权用 UI 自动化另造生产流程。
+
 > 目标读者：在**任意环境**（开发沙箱 / 自有开发机 / 生产专用工作站）中运行、调试、验证 WorkLoom 系统的 AI Coding Agent——本能力仓内自带，不依赖沙箱。
 > 读完本文，你应当能够：**自动打开浏览器操作运行中的 WorkLoom 三端页面，完成"打开 → 导航 → 点击 → 输入 → 验证 → 截图"的完整闭环**，并理解如何把这套能力接到系统内置的 publish-rpa 真机发布链路上。
 
@@ -152,8 +156,8 @@ const driver: BrowserDriver = {
 ## 5. 常见坑（踩过，别再踩）
 
 1. **忘了跑 preflight**：CDP 未起时 `browser_connect` 必失败。任何 `computer_tool.py` 调用前先预检。
-2. **残留服务打错库**：跑测试/演示前 `pkill -f "tsx.*src/index"` 与 `pkill -f vite` 清掉旧 8787/5173 进程，否则 E2E 打到旧库。
-3. **网络受限**：直连 GitHub 不通（DNS 被劫持到 198.18.0.5）。git 走 `https://oauth2:<token>@ghfast.top/https://github.com/...`，npm 用 `registry.npmmirror.com`。
+2. **残留服务打错库**：测试前核对监听进程的 PID、启动目录、产品身份和数据库，只停止本任务创建且归属明确的服务；共享端口被其它项目占用时使用自己的隔离端口，不按通用进程名批量杀服务。
+3. **网络受限**：公开仓库匿名读取；直连失败时使用运行者已配置的本机代理，例如本机已启用时 `git -c http.proxy=http://127.0.0.1:7890 ls-remote https://github.com/组织/仓库.git`。不把 token 放进 Git URL、第三方转发域、仓库配置或日志；依赖下载沿用本仓锁定来源，无法核实网络错误时保留实际失败。
 4. **数据库未起**：`docker start workloom-im-pg`，起后等 healthy 再 `pnpm dev`。
 5. **8787 404 ≠ 服务没起**：没有 /healthz，看 `ss -tlnp | grep 8787` 或 tRPC 端点。
 6. **Canvas 区域**：系统主视觉（经营剧场地板）是 Canvas 渲染，`browser_snapshot` 读不到其内部元素——Canvas 上的交互用 L3 截图定位 + 坐标点击；DOM 侧栏/按钮仍走 L1。

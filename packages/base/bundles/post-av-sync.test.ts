@@ -3,9 +3,12 @@
  *  · 纯逻辑（互相关求时延 + 漂移判定）与基座 TS 版**逐值等价**——两侧口径漂移是这类机制最容易出的静默故障；
  *  · 拼接方案必须是"画面 copy + 声音样点级 concat 滤镜"（真机事故：`-c copy` 直拼导致逐镜漂移）；
  *  · 源码级守卫：硬切/淡入淡出分支不许再出现"整条 demuxer copy"的写法。
- * 本组测试不触 DB、不依赖 ffmpeg。
+ * 本组不触 DB；纯逻辑与源码守卫不依赖 ffmpeg，实际加工回归明确要求本地 ffmpeg/ffprobe。
  */
-import { readFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -24,6 +27,7 @@ import {
   evaluateAvSync as baseEvaluate,
 } from "../../../packages/video-studio/src/av-sync.js";
 import { bundlesRoot } from "./assembly.js";
+import { assembleTimeline, normaliseShots } from "../../../bundles/ai-video/connectors/post-bridge/core.mjs";
 
 const SR = 16000;
 const BRIDGE_DIR = join(bundlesRoot(), "ai-video/connectors/post-bridge");
@@ -126,7 +130,8 @@ describe("源码守卫：拼接分支不许再整条 demuxer copy", () => {
   it("assembleTimeline 走 assembleSampleAccurate（样点级）", () => {
     expect(source).toContain("assembleSampleAccurate(");
     expect(source).toContain("buildSampleAccurateConcatPlan");
-    expect(source).toContain("verifyAssembledAvSync");
+    expect(source).not.toContain("verifyAssembledAvSync");
+    expect(source).not.toContain("measureAssembledAvSync");
   });
 
   it("不再出现「concat demuxer + 双流 -c copy」的历史写法", () => {
@@ -176,11 +181,61 @@ describe("实测不可执行的降级路径（三态口径：达标 / 偏移 / �
     expect(String(degraded.reason)).toMatch(/解码母版失败/);
   });
 
-  it("源码守卫：平台侧拼接会写 <output>.av-sync.json 并显式区分降级开关", () => {
+  it("源码守卫：平台侧拼接写真实处理回执，旧诊断开关不重新建立默认品质门", () => {
     const core = readFileSync(join(BRIDGE_DIR, "core.mjs"), "utf8");
     expect(core).toContain("writeAvSyncReport");
     expect(core).toContain(".av-sync.json");
     expect(core).toContain("allowUnverifiedAvSync");
-    expect(core).toContain("av_sync_unverifiable");
+    expect(core).not.toContain("av_sync_unverifiable");
+    expect(core).toContain("audioAlignmentMeasured: false");
+    expect(core).toContain("processingSucceeded: true");
+  });
+});
+
+describe("正式拼接的实际处理与工作目录边界", () => {
+  const ffmpeg = process.env.WORKLOOM_POST_FFMPEG_PATH || "ffmpeg", ffprobe = process.env.WORKLOOM_POST_FFPROBE_PATH || "ffprobe";
+  const hasTools = [ffmpeg, ffprobe].every(binary => spawnSync(binary, ["-version"], { stdio: "ignore" }).status === 0);
+  const hash = (file: string) => createHash("sha256").update(readFileSync(file)).digest("hex");
+  it.skipIf(!hasTools)("真实黑帧无声源经请求归一化与 hard/fade 拼接，不跑默认 PCM 或品质审计且源字节不变", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "post-default-composition-")), source = join(dir, "black.mp4");
+    try {
+      const encoded = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=black:s=64x64:r=12:d=0.5", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", source], { encoding: "utf8", timeout: 30_000 });
+      expect(encoded.status, encoded.stderr).toBe(0);
+      const before = hash(source), wrapper = join(dir, "actual-no-quality.mjs"), commands = join(dir, "commands.jsonl");
+      writeFileSync(wrapper, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';import fs from 'node:fs';const args=process.argv.slice(2);fs.appendFileSync(${JSON.stringify(commands)},JSON.stringify(args)+'\\n');if(args.includes('f32le')||args.includes('-count_frames')||args.some(arg=>/signalstats|psnr|astats|ebur128|framemd5|blurdetect/.test(arg))){process.stderr.write('forbidden default quality audit');process.exit(87)}const r=spawnSync(${JSON.stringify(ffmpeg)},args,{stdio:'inherit'});if(r.error){process.stderr.write(r.error.message);process.exit(88)}process.exit(r.status??89);\n`); chmodSync(wrapper, 0o755);
+      const bins = { ffmpeg: wrapper, ffprobe }, root = realpathSync(dir);
+      const clips = await normaliseShots({ shots: [{ shotId: "A", path: source }, { shotId: "B", path: source }], project: { resolution: [64, 64], fps: 12 }, workDir: dir, bins,
+        env: { ...process.env, WORKLOOM_POST_ALLOWED_ROOTS: root } });
+      expect(clips).toHaveLength(2); expect(clips.every((clip: { path: string }) => clip.path.startsWith(root))).toBe(true);
+      for (const mode of ["hard", "fade"]) {
+        const output = join(dir, `${mode}.mp4`), result = await assembleTimeline({ clips, transitions: { mode, fadeSec: 0.1 }, output, resolution: [64, 64], fps: 12, bins });
+        expect(result.avSync).toMatchObject({ processingSucceeded: true, audioAlignmentMeasured: false, qualityReviewed: false });
+        expect(existsSync(output)).toBe(true);
+        expect(JSON.parse(readFileSync(output.replace(/\.mp4$/, ".av-sync.json"), "utf8"))).toMatchObject({ schemaVersion: "workloom.composition-process/v1", processingSucceeded: true, audioAlignmentMeasured: false });
+      }
+      expect(hash(source)).toBe(before);
+      const failed = join(dir, "actual-failure.mjs");
+      writeFileSync(failed, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';const args=process.argv.slice(2);if(args.some(arg=>arg.includes('concat=n=2:v=0:a=1'))){process.stderr.write('actual audio concat failure');process.exit(51)}const r=spawnSync(${JSON.stringify(ffmpeg)},args,{stdio:'inherit'});process.exit(r.status??52);\n`); chmodSync(failed, 0o755);
+      const failedOutput = join(dir, "failed.mp4");
+      await expect(assembleTimeline({ clips, transitions: { mode: "hard" }, output: failedOutput, resolution: [64, 64], fps: 12, bins: { ffmpeg: failed, ffprobe } })).rejects.toMatchObject({ code: "ffmpeg_failed" });
+      expect(existsSync(failedOutput)).toBe(false); expect(existsSync(failedOutput.replace(/\.mp4$/, ".av-sync.json"))).toBe(false); expect(hash(source)).toBe(before);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 120_000);
+  it("越权 workDir 在创建 norm 或任何产物前拒绝", async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "post-work-auth-")));
+    try {
+      const allowed = join(dir, "allowed"), denied = join(dir, "denied", "must-not-exist"); mkdirSync(allowed);
+      await expect(normaliseShots({ shots: [], project: { resolution: [64, 64] }, workDir: denied, bins: { ffmpeg: "must-not-run", ffprobe: "must-not-run" }, env: { WORKLOOM_POST_ALLOWED_ROOTS: allowed } })).rejects.toMatchObject({ code: "path_not_allowed" });
+      expect(existsSync(join(dir, "denied"))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+  it.each(["norm", "work"])("允许根下的 %s 符号链接不能冒充合法工作路径，即使仍指向根内", async kind => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "post-work-symlink-")));
+    try {
+      const work = join(dir, "work"), actual = join(dir, "actual"); mkdirSync(actual);
+      if (kind === "norm") { mkdirSync(work); symlinkSync(actual, join(work, "norm")); } else symlinkSync(actual, work);
+      await expect(normaliseShots({ shots: [], project: { resolution: [64, 64] }, workDir: work, bins: { ffmpeg: "must-not-run", ffprobe: "must-not-run" }, env: { WORKLOOM_POST_ALLOWED_ROOTS: dir } })).rejects.toMatchObject({ code: "path_not_allowed" });
+      expect(existsSync(join(actual, "norm"))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

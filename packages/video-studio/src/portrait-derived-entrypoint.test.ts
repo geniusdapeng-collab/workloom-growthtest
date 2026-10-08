@@ -58,7 +58,7 @@ async function wire(handle: (request: IncomingMessage, response: ServerResponse,
 }
 const reply = (response: ServerResponse, status: number, body: unknown) => { response.writeHead(status, { "content-type": "application/json" }); response.end(JSON.stringify(body)); };
 function api(outDir: string, baseUrl: string, hooks: { afterRejected?: () => Promise<void>; extract?: boolean } = {}): Api {
-  const context = { exports: {} as { api: Api }, outDir, baseUrl, apiKey: "synthetic-only", model: "synthetic-image", env: {},
+  const context = { exports: {} as { api: Api }, outDir, baseUrl, apiKey: "test-only-synthetic-fixture", model: "synthetic-image", env: {},
     characterId: "synthetic-character", assetRef: "asset://synthetic-only", anchorDataUrl: null, invalidAssetRefs: new Set<string>(),
     process: { env: { SEEDANCE_MODEL: "synthetic-video" } }, Buffer, Response, fetch, AbortSignal, console,
     arg: (_name: string, fallback: string) => fallback, join, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync, randomUUID,

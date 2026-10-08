@@ -121,9 +121,9 @@ describe("配乐围栏（G-BGM0..G-BGM9）语义", () => {
     // G-BGM0：恒直通
     expect(evaluate("G-BGM0")).toBe(true);
 
-    // G-BGM1：曲库首次入片 / 品牌主题曲变更 → review
+    // G-BGM1：保留真实曲目许可处理，移除观感人审
     expect(evaluate("G-BGM1", { license_reviewed: false })).toBe(true);
-    expect(evaluate("G-BGM1", { theme_change: true })).toBe(true);
+    expect(evaluate("G-BGM1", { theme_change: true })).toBe(false);
     expect(evaluate("G-BGM1", { license_reviewed: true })).toBe(false);
     expect(evaluate("G-BGM1")).toBe(false);
 
@@ -132,9 +132,9 @@ describe("配乐围栏（G-BGM0..G-BGM9）语义", () => {
     expect(evaluate("G-BGM2", { output_path: "/a.mp4", input_path: "/a.mp4" })).toBe(true);
     expect(evaluate("G-BGM2", { output_path: "/b.mp4", input_path: "/a.mp4" })).toBe(false);
 
-    // G-BGM3：关闭复检 / 丢弃原声 → block
-    expect(evaluate("G-BGM3", { skip_verify: true })).toBe(true);
-    expect(evaluate("G-BGM3", { verify: false })).toBe(true);
+    // G-BGM3：移除音质复检门槛；丢弃原声仍需显式声明
+    expect(evaluate("G-BGM3", { skip_verify: true })).toBe(false);
+    expect(evaluate("G-BGM3", { verify: false })).toBe(false);
     expect(evaluate("G-BGM3", { mute_dialogue: true })).toBe(true);
     expect(evaluate("G-BGM3", { policy: "music-only" })).toBe(true);
     expect(evaluate("G-BGM3", { policy: "music-only", allow_discard_original: true })).toBe(false);
@@ -178,11 +178,11 @@ describe("配乐围栏（G-BGM0..G-BGM9）语义", () => {
     expect(evaluate("G-BGM8", {})).toBe(false);
     expect(evaluate("G-BGM8", { license_declared: true, license_ok: true, overwrite_existing: false })).toBe(false);
 
-    // G-BGM9：低置信标签入册 → review（允许入册，但交付前人耳复核）
-    expect(evaluate("G-BGM9", { low_confidence_count: 1 })).toBe(true);
+    // G-BGM9：低置信标签只记录诊断，不作后期准入
+    expect(evaluate("G-BGM9", { low_confidence_count: 1 })).toBe(false);
     expect(evaluate("G-BGM9", { low_confidence_count: 0 })).toBe(false);
-    // 缺字段按 fail-closed：求值异常 → 运行时按 block 处理，故调用方必须带上该计数
-    expect(() => evalCondition(when("G-BGM9"), { params: {}, context: {} } as never)).toThrow();
+    // 不再要求为了采用成功镜头而先进行标签或人耳品质复核
+    expect(evaluate("G-BGM9")).toBe(false);
   });
 });
 

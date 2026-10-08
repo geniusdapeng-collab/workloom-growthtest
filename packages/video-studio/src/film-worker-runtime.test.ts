@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { POST_RENDER_STAGES, postProcessingVerdict } from "./post-render-acceptance.js";
+import type { ProducerGateOptions } from "./producer-gate.js";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -177,7 +180,7 @@ describe("frozen full-chain worker adapter", () => {
     const { context, worker, frames, setReply } = fixture();
     context.stages.push("material-gen");
     const file = join(context.workDir, "clip.mp4"); writeFileSync(file, "video");
-    setReply(() => ({ stage: "shot", approved: true, contractHash: "a".repeat(64) }));
+    setReply(() => ({ stage: "shot", approved: true, status: "passed", score: null, qualityReviewed: false, via: "deterministic", rerun: false, hardFailures: [] }));
     await worker.review({ stage: "shot", projectId: context.projectId, artifacts: [{ path: file, kind: "video" }],
       deterministic: [], context: { shotId: "S1", sourceStage: "material-gen" } });
     expect(frames[0]!.stepKey).toBe("material-gen:S1");
@@ -514,5 +517,95 @@ describe("frozen shot coverage and canonical CLI options", () => {
   it("canonicalizes only to one nonempty ordered set without changing CLI selection meaning", () => {
     expect(normalizeFilmJobRequest(["videos"], { only: [" S1 ", "S2", "S1"] }).options.only).toBe("S1,S2");
     expect(normalizeFilmJobRequest(["videos"], { only: " S1, S2,S1 " }).options.only).toBe("S1,S2");
+  });
+});
+
+describe("current official adoption scopes prerender work to pending shots", () => {
+  const source = { shots: [{ shotId: "S1", assetRef: "invalid historical reference", dialogue: [{ text: "old native line" }] }, { shotId: "S2" }] };
+  const adopted = { stage: "render-adopted", shotId: "S1", ok: true, degraded: false, invoked: false, cached: true };
+  const passed = (stage: string, shotId: string | null = null) => ({ stage, shotId, ok: true, degraded: false, invoked: true, cached: false });
+  const pending = [passed("spec", "S2"), passed("prompt-review"), passed("keyframe", "S2"), passed("shot", "S2")];
+  it("requires official parent verification rather than trusting a child adoption label", () => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [adopted, ...pending])).toThrow("官方验证");
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [adopted, ...pending], ["S1"])).not.toThrow();
+  });
+  it.each(["spec", "keyframe", "shot"])("still requires the pending S2 %s work", alias => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [adopted, ...pending.filter(row => row.stage !== alias)], ["S1"])).toThrow("S2");
+  });
+  it("keeps pending prompt review, asset authority and post work mandatory", () => {
+    expect(() => assertFilmStageCoverage(["spec"], {}, source, [adopted, passed("spec", "S2")], ["S1"])).toThrow("prompt-review");
+    expect(() => assertFilmStageCoverage(["plates"], {}, { shots: [...source.shots.slice(0, 1), { shotId: "S2", assetRef: "invalid pending reference" }] }, [adopted, passed("keyframe", "S2")], ["S1"])).toThrow("S2");
+    expect(() => assertFilmStageCoverage(["compose"], {}, source, [adopted], ["S1"])).toThrow("compose");
+    expect(() => assertFilmStageCoverage(["voice"], {}, source, [adopted], ["S1"])).toThrow("S1");
+  });
+  it("preserves verified adoption outside only while rejecting work outside the selection", () => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], { only: "S2" }, source, [adopted, ...pending], ["S1"])).not.toThrow();
+    expect(() => assertFilmStageCoverage(["plates"], { only: "S2" }, source, [adopted, passed("keyframe", "S1"), passed("keyframe", "S2")], ["S1"])).toThrow("范围");
+  });
+  it.each([{ ok: false }, { degraded: true }, { invoked: true }, { cached: false }, { cached: undefined }, { shotId: "S2" }])("rejects an invalid adoption record %j", change => {
+    expect(() => assertFilmStageCoverage(["spec", "plates", "videos"], {}, source, [{ ...adopted, ...change }, ...pending], ["S1"])).toThrow("官方验证");
+  });
+  it("only makes global preparation inapplicable when every selected shot is currently adopted", () => {
+    expect(() => assertFilmStageCoverage(["cine-kb", "continuity", "micromotion"], { only: "S1" }, source, [adopted], ["S1"])).not.toThrow();
+    expect(() => assertFilmStageCoverage(["continuity"], {}, source, [adopted], ["S1"])).toThrow("continuity");
+    for (const ids of [["FOREIGN"], ["S1", "S1"]]) expect(() => assertFilmStageCoverage(["plates"], {}, source, [adopted], ids)).toThrow("本次官方任务");
+  });
+});
+
+
+describe("worker 当前父通道默认后期回执", () => {
+  const prepare = (stage: ProducerGateOptions["stage"] = "compose") => {
+    const value = fixture({}, {}, [stage === "shot" ? "videos" : stage]);
+    const file = join(value.context.workDir, "raw-black-silent.mp4");
+    const media = spawnSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i",
+      "color=black:s=162x122:r=23", "-vf", "crop=161:121:exact=1", "-frames:v", "5", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv444p", file],
+      { encoding: "utf8", timeout: 30_000 });
+    expect(media.status, media.stderr).toBe(0);
+    const options: Omit<ProducerGateOptions, "contracts"> = { stage, projectId: value.context.projectId, artifacts: [{ path: file, kind: "video" }],
+      deterministic: [{ id: "wardrobe-quality", pass: false, hard: true, detail: "obsolete quality veto" }],
+      minScore: Number.NaN, requiredCheckIds: ["obsolete-quality"], referenceImages: [join(value.root, "missing-quality-reference.png")],
+      rubric: ["obsolete raw-source quality score"], context: stage === "shot" ? { shotId: "S1" } : {} };
+    const response = (frame: FilmChannelRequestFrame) => {
+      const params = frame.params as ProducerGateOptions;
+      return postProcessingVerdict({ ...params, artifacts: (params.artifacts as unknown as Array<{ ref: string; kind: "video" }>).map((artifact) =>
+        ({ path: join(value.context.workDir, artifact.ref), kind: artifact.kind })), env: { ...process.env } });
+    };
+    value.setReply(response);
+    return { ...value, file, options, response };
+  };
+  it.each([...POST_RENDER_STAGES])("%s 接收实际文件的无品质回执，不要求创作合同或读取品质参数", async stage => {
+    const value = prepare(stage), before = hash(readFileSync(value.file));
+    const result = await value.worker.review(value.options);
+    expect(result).toMatchObject({ stage, approved: true, status: "passed", score: null, qualityReviewed: false, rerun: false, via: "deterministic" });
+    expect(result.contractHash).toBeUndefined(); expect(hash(readFileSync(value.file))).toBe(before);
+    expect(value.frames.map(frame => frame.method)).toEqual(["gate.review"]);
+    const params = value.frames[0]!.params as Record<string, unknown>;
+    for (const key of ["referenceImages", "requiredCheckIds", "minScore", "rubric"]) expect(Object.hasOwn(params, key)).toBe(false);
+    expect(value.frames[0]!.stepKey).toBe(stage === "shot" ? "videos:S1" : stage); value.worker.channel.dispose();
+  });
+  it("实际加工失败返回失败终态，不被合同兼容或默认接收洗成通过", async () => {
+    const value = prepare();
+    value.options.deterministic.push({ id: "tool-exit", pass: false, hard: true, detail: "actual ffmpeg exited 51" });
+    const result = await value.worker.review(value.options);
+    expect(result).toMatchObject({ approved: false, status: "failed", score: null, qualityReviewed: false, rerun: false });
+    expect(result.hardFailures).toEqual(["tool-exit: actual ffmpeg exited 51"]); value.worker.channel.dispose();
+  });
+  it.each(["score", "quality", "rerun", "status", "hard-failures", "missing-quality-marker"])("拒绝父通道 %s 伪品质/不完整回执", async defect => {
+    const value = prepare();
+    value.setReply(frame => { const receipt = value.response(frame);
+      if (defect === "score") receipt.score = 100;
+      if (defect === "quality") receipt.qualityReviewed = true;
+      if (defect === "rerun") receipt.rerun = true;
+      if (defect === "status") receipt.status = "failed";
+      if (defect === "hard-failures") receipt.hardFailures = ["actual error"];
+      if (defect === "missing-quality-marker") delete receipt.qualityReviewed;
+      return receipt;
+    });
+    await expect(value.worker.review(value.options)).rejects.toMatchObject({ code: "REVIEW_UNVERIFIED" }); value.worker.channel.dispose();
+  });
+  it.each(["artifact", "input"])("当前父通道期间 %s 字节改变不能继承旧通过", async kind => {
+    const value = prepare();
+    value.setReply(frame => { const receipt = value.response(frame); writeFileSync(kind === "artifact" ? value.file : value.worker.inputPath, "changed during parent response"); return receipt; });
+    await expect(value.worker.review(value.options)).rejects.toMatchObject({ code: kind === "artifact" ? "ARTIFACT_CHANGED" : "INPUT_CHANGED" }); value.worker.channel.dispose();
   });
 });

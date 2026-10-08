@@ -25,7 +25,7 @@ interface Compiler {
 }
 const ts = createRequire(join(repo, "packages/video-studio/package.json"))("typescript") as Compiler;
 const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-const names = new Set(["coverSourcesForShots", "coverCompositionForPlan", "callCoverDesigner", "record", "lineageStage", "lineageRecords", "stageApproved"]);
+const names = new Set(["coverSourcesForShots", "coverCompositionForPlan", "record", "lineageStage", "lineageRecords", "stageApproved"]);
 const declarations = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name && names.has(node.name.text));
 if (declarations.length !== names.size) throw new Error("COVER_FIXTURE_INVALID: actual CLI source functions missing");
 const selector = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name?.text === "selectCoverPlanForPolicy");
@@ -35,10 +35,9 @@ if (selectionStart < 0 || selectionEnd < 0) throw new Error("COVER_FIXTURE_INVAL
 const compiled = ts.transpileModule([...declarations, ...selector].map(node => node.getFullText(parsed)).join("\n")
   + "\nasync function selectActualCover() {\n" + source.slice(selectionStart, selectionEnd)
   + "\nreturn { plan, designVia, designNote }; }"
-  + "\nexports.api = { coverSourcesForShots, coverCompositionForPlan, callCoverDesigner, selectActualCover, record, stageApproved };",
+  + "\nexports.api = { coverSourcesForShots, coverCompositionForPlan, selectActualCover, record, stageApproved };",
   { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
 interface Api {
-  callCoverDesigner(input: unknown): Promise<string>;
   selectActualCover(): Promise<{ plan: CoverPlan; designVia: string; designNote: string }>;
   record(input: Record<string, unknown>): { stage: string; ok: boolean; degraded: boolean; lineage: LineageReceipt };
   stageApproved(stage: string, shotIds: Array<string | null>, rows: Array<{ stage: string; ok: boolean; degraded: boolean; lineage: LineageReceipt }>): boolean;
@@ -48,7 +47,7 @@ interface Api {
   coverCompositionForPlan(mode: string, plan: CoverPlan, background: CoverShotSource, person: CoverShotSource | null, lead: CoverLeadSource | null): CoverComposition;
 }
 const context = { exports: {} as { api: Api }, coverShotHasCharacter, coverShotMatchesLead, coverShotCharacterIds, resolveCoverComposition,
-  REVIEW_POLICY: "off", fetch: () => { throw new Error("default design must not call a model"); } };
+  REVIEW_POLICY: "off", POST_RENDER_STAGES: new Set(["cover"]), fetch: () => { throw new Error("default design must not call a model"); } };
 runInNewContext(compiled, context);
 const api = context.exports.api;
 afterAll(() => expect(sha(readFileSync(file)), "CLI source must remain immutable during this run").toBe(originalHash));
@@ -105,14 +104,16 @@ describe("封面正式 CLI 单主视觉与来源", () => {
     expect(coverShotMatchesLead({ shotId: "FF-01", characterId: "another-person" }, lead)).toBe(false);
     expect(coverShotHasCharacter({ shotId: "drone", character: "无人机航拍，主角口播" }, null)).toBe(true);
   });
-  it("actual default designer exits to deterministic design before any model call", async () => {
-    await expect(api.callCoverDesigner({ shots: [] })).rejects.toThrow("COVER_DETERMINISTIC_DESIGN_DEFAULT");
+  it("the actual design block has no model designer call", () => {
+    const selection = source.slice(selectionStart, selectionEnd);
+    expect(selection).not.toMatch(/callCoverDesigner|WORKER_RUNTIME\.design|fetch\(/);
+    expect(source).not.toMatch(/async function callCoverDesigner/);
   });
   it("empty sources and unknown layout fail explicitly before drawing", () => {
     expect(() => api.coverSourcesForShots([], null)).toThrow("COVER_SOURCE_SHOTS_EMPTY");
     expect(() => resolveCoverHero("unregistered", true)).toThrow(/未知封面主视觉/);
   });
-  it.each(["off", "blocking"])("actual %s selection and record preserve the correct publication state", async policy => {
+  it.each(["off", "advisory", "blocking"])("actual %s selection and record preserve the correct publication state", async policy => {
     const dir = mkdtempSync(join(tmpdir(), "cover-lineage-"));
     try {
       // These bytes exercise provenance, not image decoding or artistic review.
@@ -138,22 +139,22 @@ describe("封面正式 CLI 单主视觉与来源", () => {
         degraded: selection.designVia === "fallback", attempt: 1, ms: 0, artifact: cover,
         evidence: { designVia: selection.designVia, qualityReviewPerformed: false },
         verdict: { approved: true, degraded: false, score: null, qualityStatus: "unverified", evidence: [{ path: cover, sha256: sha(readFileSync(cover)) }] } });
-      if (policy === "off") {
-        expect(result).toMatchObject({ ok: true, degraded: false, lineage: { status: "passed", errors: [] } });
-        expect(sandbox.exports.api.stageApproved("cover", [null], rows)).toBe(true);
-        expect(modelCalls).toBe(0); expect(selection.designVia).toBe("deterministic");
-      } else {
-        expect(modelCalls).toBe(1); expect(selection.designVia).toBe("fallback");
-        expect(result).toMatchObject({ ok: false, degraded: true, lineage: { status: "unverified", errors: [] } });
-        expect(sandbox.exports.api.stageApproved("cover", [null], rows)).toBe(false);
-      }
-      expect(JSON.parse(readFileSync(join(dir, "stages.jsonl"), "utf8")).lineage).toEqual(result.lineage);
-      if (policy === "off") {
+      expect(result).toMatchObject({ ok: true, degraded: false, lineage: { status: "passed", errors: [] } });
+      expect(sandbox.exports.api.stageApproved("cover", [null], rows)).toBe(true);
+      expect(modelCalls).toBe(0); expect(selection.designVia).toBe("deterministic");
+      const failed = sandbox.exports.api.record({ stage: "historical-cover", shotId: null, invoked: true, ok: true,
+        cached: false, degraded: true, attempt: 1, ms: 0, artifact: cover, evidence: { designVia: "fallback", historicalModelError: "fixture unavailable" },
+        verdict: { approved: true, degraded: true, score: null, qualityStatus: "unverified" } });
+      expect(failed).toMatchObject({ ok: false, degraded: true, lineage: { status: "unverified" } });
+      const logRows = readFileSync(join(dir, "stages.jsonl"), "utf8").trim().split("\n").map(line => JSON.parse(line));
+      expect(logRows[0].lineage).toEqual(result.lineage);
+      {
         writeFileSync(cover, "changed output bytes");
         expect(sandbox.exports.api.stageApproved("cover", [null], rows)).toBe(false);
         rmSync(cover);
-        const missing = sandbox.exports.api.record({ stage: "cover", shotId: null, invoked: true, ok: true, cached: false,
-          degraded: false, attempt: 1, ms: 0, artifact: cover, evidence: {}, verdict: { approved: true, degraded: false } });
+        expect(() => sandbox.exports.api.record({ stage: "cover", shotId: null, invoked: true, ok: true, cached: false,
+          degraded: false, attempt: 1, ms: 0, artifact: cover, evidence: {}, verdict: { approved: true, degraded: false } })).toThrow(/POST_PROCESSING_FAILED/);
+        const missing = rows.at(-1)!;
         expect(missing.ok).toBe(false); expect(missing.lineage.status).toBe("unverified");
         expect(missing.lineage.errors.length).toBeGreaterThan(0);
       }

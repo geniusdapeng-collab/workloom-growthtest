@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import { syncBuiltinESMExports } from "node:module";
-import { lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -803,9 +804,54 @@ test("CI config uses role-local first observations and explicit full lock/releas
   const source = readFileSync(join(ROOT, ".cnb.yml"), "utf8");
   for (const path of ["scripts/ci/verify-lock-conflict.test.mjs", "scripts/ci/cnb-desktop-release.test.mjs", "scripts/tools/film-existing-render-edit.test.ts"]) assert.ok(source.includes(path));
   const legacyTestAlias = readFileSync(join(ROOT, "scripts/tools/film-existing-render-edit.test.ts"), "utf8");
-  assert.match(legacyTestAlias, /import\s+["']\.\/film-standard-post\.test\.js["'];/);
   assert.equal(fs.existsSync(join(ROOT, "scripts/tools/film-standard-post.test.ts")), true);
   assert.equal(fs.existsSync(join(ROOT, "scripts/tools/film-existing-render-edit.mts")), false);
+  // Execute the unchanged alias in real Node processes. Only the canonical
+  // runner boundary is synthetic here; its full media suite still runs in CI.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-post-alias-contract-")));
+  try {
+    const tools = join(root, "scripts/tools"), runnerRoot = join(root, "node_modules/vitest");
+    const unrelatedCwd = join(root, "outside-cwd");
+    for (const directory of [tools, runnerRoot, unrelatedCwd]) mkdirSync(directory, { recursive: true });
+    writeFileSync(join(root, "package.json"), JSON.stringify({ type: "module" }));
+    writeFileSync(join(runnerRoot, "package.json"), JSON.stringify({ name: "vitest", type: "module" }));
+    const alias = join(tools, "film-existing-render-edit.test.ts"), runner = join(runnerRoot, "vitest.mjs");
+    writeFileSync(alias, legacyTestAlias);
+    writeFileSync(runner, `console.log(JSON.stringify({ fixture: "canonical-runner-boundary", cwd: process.cwd(), args: process.argv.slice(2) }));
+if (process.env.ALIAS_FIXTURE_OUTCOME === "failure") process.exitCode = 17;
+if (process.env.ALIAS_FIXTURE_OUTCOME === "signal") process.kill(process.pid, "SIGTERM");
+`);
+    const call = (env) => spawnSync(process.execPath, [alias], {
+      cwd: unrelatedCwd, env, encoding: "utf8", timeout: 20_000,
+    });
+    for (const outcome of ["success", "failure", "signal"]) {
+      const result = call({ ALIAS_FIXTURE_OUTCOME: outcome });
+      assert.equal(result.error, undefined, result.error?.message);
+      assert.equal(result.signal, null);
+      assert.deepEqual(JSON.parse(result.stdout.trim()), { fixture: "canonical-runner-boundary",
+        cwd: root, args: ["run", "scripts/tools/film-standard-post.test.ts"] });
+      if (outcome === "signal") {
+        assert.notEqual(result.status, 0);
+        assert.match(result.stderr, /Canonical standard-post suite terminated by SIGTERM/u);
+      } else assert.equal(result.status, outcome === "success" ? 0 : 17, result.stderr);
+    }
+    rmSync(runner);
+    const missingRunner = call({});
+    assert.equal(missingRunner.error, undefined);
+    assert.notEqual(missingRunner.status, 0);
+    assert.match(missingRunner.stderr, /Cannot find module/u);
+    const canonical = join(tools, "film-standard-post.test.js");
+    writeFileSync(canonical, 'console.log("canonical-vitest-import-boundary");\n');
+    const vitestImport = call({ VITEST: "1" });
+    assert.equal(vitestImport.status, 0, vitestImport.stderr);
+    assert.equal(vitestImport.stdout.trim(), "canonical-vitest-import-boundary");
+    writeFileSync(canonical, 'throw new Error("canonical-vitest-import-failure");\n');
+    const failedImport = call({ VITEST: "1" });
+    assert.notEqual(failedImport.status, 0);
+    assert.match(failedImport.stderr, /canonical-vitest-import-failure/u);
+    assert.equal(readFileSync(alias, "utf8"), legacyTestAlias);
+    assert.equal(readFileSync(join(ROOT, "scripts/tools/film-existing-render-edit.test.ts"), "utf8"), legacyTestAlias);
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 

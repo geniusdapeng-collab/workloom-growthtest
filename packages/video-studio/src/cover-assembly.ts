@@ -1,4 +1,4 @@
-/** Publication cover assembly. The clean master stays separate; only frame zero is replaced. */
+/** Publication cover assembly. Formal exports prepend one cover frame and preserve the complete source body. */
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -63,18 +63,28 @@ export interface CoverFirstFrameInput {
   ffmpeg?: string;
   ffprobe?: string;
   timeoutMs?: number;
+  /** Keep every source picture by inserting the cover before the body. */
+  preserveSourceFrames?: boolean;
 }
 
 export interface CoverFirstFrameReceipt {
-  schemaVersion: 1;
-  mode: "replace-first-frame";
+  schemaVersion: 1 | 2;
+  mode: "replace-first-frame" | "prepend-cover-frame";
+  sourceVideo?: { frameCount: number; fps: number; durationSeconds: number };
+  sourceOffsetFrames?: 1;
+  bodyVideoOffsetSeconds?: number;
+  audioOffsetSeconds?: 0;
+  subtitleOffsetSeconds?: 0;
   coverFrameCount: 1;
   input: { path: string; sha256: string };
   cover: { path: string; sha256: string };
   output: { path: string; sha256: string };
-  video: { width: number; height: number; fps: number; frameCount: number; durationSeconds: number; timelineSha256: string; coverPsnrDb: number | null };
+  video: { width: number; height: number; fps: number; frameCount: number | null; frameCountBasis: "container-metadata" | "not-reported"; durationSeconds: number; timelineSha256: null; coverPsnrDb: null };
   audio: { preserved: true; streamCount: number; packetSha256: string; decodedPcmSha256: string[] };
   subtitles: { preserved: true; streamCount: number; packetSha256: string };
+  qualityReviewPerformed: false;
+  coverTransform: { width: number; height: number; mode: "contain-and-pad" };
+  verificationBasis: string;
 }
 
 interface MediaStream {
@@ -87,10 +97,11 @@ interface MediaStream {
   time_base?: string;
   duration?: string;
   start_time?: string;
-  nb_read_frames?: string;
+  nb_frames?: string;
   sample_rate?: string;
   channels?: number;
   channel_layout?: string;
+  pix_fmt?: string;
   tags?: Record<string, string>;
   side_data_list?: Array<{ rotation?: number }>;
 }
@@ -112,7 +123,7 @@ function execute(binary: string, args: string[], timeout: number): Promise<{ std
 }
 
 async function probe(file: string, binary: string, timeout: number): Promise<MediaProbe> {
-  const result = await execute(binary, ["-v", "error", "-count_frames", "-show_streams", "-show_format", "-of", "json", file], timeout);
+  const result = await execute(binary, ["-v", "error", "-show_streams", "-show_format", "-of", "json", file], timeout);
   const parsed = JSON.parse(result.stdout) as MediaProbe;
   if (!Array.isArray(parsed.streams) || !parsed.format) throw new CoverAssemblyError("Invalid media probe");
   return parsed;
@@ -121,16 +132,6 @@ async function probe(file: string, binary: string, timeout: number): Promise<Med
 function numericRate(rate: string | undefined): number {
   const [a, b] = String(rate ?? "").split("/").map(Number);
   return Number(a) / Number(b);
-}
-
-async function videoTimeline(file: string, ffprobe: string, timeout: number): Promise<string> {
-  const { stdout } = await execute(ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_frames",
-    "-show_entries", "frame=best_effort_timestamp_time,pkt_duration_time", "-of", "json", file], timeout);
-  const frames = (JSON.parse(stdout) as { frames?: Array<{ best_effort_timestamp_time?: string; pkt_duration_time?: string }> }).frames;
-  if (!frames?.length || frames.some((frame) => !Number.isFinite(Number(frame.best_effort_timestamp_time)))) {
-    throw new CoverAssemblyError("Missing video presentation timestamps");
-  }
-  return digest(JSON.stringify(frames.map((frame) => [frame.best_effort_timestamp_time, frame.pkt_duration_time])));
 }
 
 async function packetFingerprint(file: string, selector: "a" | "s", ffprobe: string, timeout: number): Promise<string> {
@@ -143,17 +144,6 @@ async function packetFingerprint(file: string, selector: "a" | "s", ffprobe: str
     return { ...packet, stream_index: streamOrdinals.get(packet.stream_index) };
   });
   return digest(JSON.stringify(canonical));
-}
-
-async function decodedAudioHashes(file: string, count: number, ffmpeg: string, timeout: number): Promise<string[]> {
-  const hashes: string[] = [];
-  for (let index = 0; index < count; index += 1) {
-    const { stdout } = await execute(ffmpeg, ["-v", "error", "-i", file, "-map", `0:a:${index}`, "-c:a", "pcm_s16le", "-f", "hash", "-hash", "sha256", "-"], timeout);
-    const hash = /^SHA256=([0-9a-f]{64})\s*$/i.exec(stdout)?.[1]?.toLowerCase();
-    if (!hash) throw new CoverAssemblyError("Missing decoded audio hash");
-    hashes.push(hash);
-  }
-  return hashes;
 }
 
 function streamMetadata(streams: MediaStream[], kind: "audio" | "subtitle"): string {
@@ -169,9 +159,11 @@ function assertInvariant(condition: boolean, message: string): asserts condition
 }
 
 /**
- * FFmpeg timeline enable n=0 replaces exactly one frame. No prepend, concat, audio resampling,
- * fps conversion, duration trim, or subtitle shift occurs. Checks finish before atomic publication.
- * Reference: https://www.ffmpeg.org/ffmpeg-filters.html#Timeline-editing
+ * Formal exports insert one still frame at zero and shift every body picture by 1/fps.
+ * Legacy callers can still replace frame zero. Audio/subtitle packet bytes and timestamps stay
+ * on their original clock. Ordinary metadata and copied packets are verified before atomic
+ * publication; this does not perform a picture/audio quality review.
+ * Reference: https://www.ffmpeg.org/ffmpeg-filters.html#interleave_002c-ainterleave
  */
 export async function embedCoverFirstFrame(options: CoverFirstFrameInput): Promise<CoverFirstFrameReceipt> {
   const ffmpeg = options.ffmpeg ?? "ffmpeg";
@@ -208,58 +200,69 @@ export async function embedCoverFirstFrame(options: CoverFirstFrameInput): Promi
     const videos = sourceInfo.streams.filter((stream) => stream.codec_type === "video");
     const video = videos[0];
     const image = coverInfo.streams.find((stream) => stream.codec_type === "video");
-    if (videos.length !== 1 || !video || Number(video.nb_read_frames) < 2) throw new CoverAssemblyError("Source must contain one video stream with at least two frames");
-    if (!image || Number(image.nb_read_frames) !== 1) throw new CoverAssemblyError("Cover must contain exactly one image frame");
-    if (image.width !== video.width || image.height !== video.height) throw new CoverAssemblyError("Cover dimensions must match publication video");
+    if (videos.length !== 1 || !video || !(Number(video.width) > 0) || !(Number(video.height) > 0)) throw new CoverAssemblyError("Source must contain one readable video stream");
+    if (!image || !["png", "mjpeg", "webp", "bmp", "tiff"].includes(image.codec_name ?? "") || !(Number(image.width) > 0) || !(Number(image.height) > 0)) throw new CoverAssemblyError("Cover must be a readable still image");
     if (video.side_data_list?.some((side) => side.rotation)) throw new CoverAssemblyError("Rotate source before publication cover assembly");
     const fps = numericRate(video.avg_frame_rate);
     const duration = Number(video.duration);
-    if (!(fps > 0) || !(duration > 0) || !Number.isInteger(Number(video.nb_read_frames))) throw new CoverAssemblyError("Source video timing is incomplete");
+    if (!Number.isFinite(fps) || !(fps > 0) || !Number.isFinite(duration) || !(duration > 0)) throw new CoverAssemblyError("Source video timing is incomplete");
+    const frameCount = Number.isSafeInteger(Number(video.nb_frames)) && Number(video.nb_frames) > 0 ? Number(video.nb_frames) : null;
     const audioCount = sourceInfo.streams.filter((stream) => stream.codec_type === "audio").length;
     const subtitleCount = sourceInfo.streams.filter((stream) => stream.codec_type === "subtitle").length;
-    const [timeline, audioPackets, subtitlePackets] = await Promise.all([
-      videoTimeline(input, ffprobe, timeout), packetFingerprint(input, "a", ffprobe, timeout), packetFingerprint(input, "s", ffprobe, timeout),
+    const [audioPackets, subtitlePackets] = await Promise.all([
+      packetFingerprint(input, "a", ffprobe, timeout), packetFingerprint(input, "s", ffprobe, timeout),
     ]);
+    const preserve = options.preserveSourceFrames === true;
+    if (preserve && frameCount === null) throw new CoverAssemblyError("Complete source frame metadata is required for cover insertion");
+    const pixelFormat = preserve ? video.pix_fmt : "yuv420p";
+    if (preserve && !["yuv420p", "yuv422p", "yuv444p", "gray"].includes(pixelFormat ?? "")) {
+      throw new CoverAssemblyError("Complete-source cover insertion requires a lossless-compatible source pixel format");
+    }
+    const prepareCover = `[1:v:0]scale=${video.width}:${video.height}:force_original_aspect_ratio=decrease,pad=${video.width}:${video.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=${pixelFormat},settb=AVTB,setpts=PTS-STARTPTS[cover]`;
+    const filter = preserve
+      ? `${prepareCover};[0:v:0]settb=AVTB,setpts=PTS-STARTPTS+${1 / fps}/TB[body];[cover][body]interleave=nb_inputs=2:duration=longest[v]`
+      : `${prepareCover};[0:v:0][cover]overlay=0:0:enable='eq(n,0)':eof_action=repeat:repeatlast=1:shortest=0[v]`;
     await execute(ffmpeg, ["-v", "error", "-nostdin", "-y", "-copyts", "-i", input, "-i", cover,
-      "-filter_complex", "[1:v:0]format=yuv420p,setpts=PTS-STARTPTS[cover];[0:v:0][cover]overlay=0:0:enable='eq(n,0)':eof_action=repeat:repeatlast=1:shortest=0[v]",
+      "-filter_complex", filter,
       "-map", "[v]", "-map", "0:a?", "-map", "0:s?", "-map_metadata", "0", "-map_chapters", "0",
-      "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-pix_fmt", "yuv420p", "-fps_mode:v", "passthrough",
+      "-c:v", "libx264", "-preset", "medium", "-crf", preserve ? "0" : "17", "-pix_fmt", pixelFormat!, "-fps_mode:v", preserve ? "cfr" : "passthrough",
+      ...(preserve ? ["-r:v", video.avg_frame_rate!] : []),
       "-video_track_timescale", String(Math.round(1 / numericRate(video.time_base))),
       "-c:a", "copy", "-c:s", "copy", "-movflags", "+faststart", pending], timeout);
     const produced = await probe(pending, ffprobe, timeout);
     const finalVideo = produced.streams.find((stream) => stream.codec_type === "video");
     assertInvariant(Boolean(finalVideo), "Publication has no video stream");
     assertInvariant(finalVideo!.width === video.width && finalVideo!.height === video.height, "Publication dimensions changed");
-    assertInvariant(finalVideo!.nb_read_frames === video.nb_read_frames, "Publication frame count changed");
-    assertInvariant(Math.abs(Number(finalVideo!.duration) - duration) <= 0.000001, "Publication video duration changed");
-    assertInvariant(Math.abs(Number(produced.format.duration) - Number(sourceInfo.format.duration)) <= 0.000001, "Publication container duration changed");
+    const expectedFrames = frameCount === null ? null : frameCount + (preserve ? 1 : 0);
+    const expectedDuration = duration + (preserve ? 1 / fps : 0);
+    if (expectedFrames !== null) assertInvariant(Number(finalVideo!.nb_frames) === expectedFrames, "Publication metadata frame count changed");
+    assertInvariant(Math.abs(Number(finalVideo!.duration) - expectedDuration) <= 0.000002, "Publication video duration changed");
+    const expectedContainerDuration = Math.max(expectedDuration, ...sourceInfo.streams.filter(stream => stream.codec_type !== "video").map(stream => Number(stream.start_time ?? 0) + Number(stream.duration ?? 0)));
+    if (!preserve) assertInvariant(Math.abs(Number(produced.format.duration) - Number(sourceInfo.format.duration)) <= 0.000001, "Publication container duration changed");
+    else assertInvariant(Math.abs(Number(produced.format.duration) - expectedContainerDuration) <= 0.0011, "Publication container duration differs from its complete streams");
     assertInvariant(Math.abs(numericRate(finalVideo!.avg_frame_rate) - fps) <= 0.000001, "Publication fps changed");
     assertInvariant(streamMetadata(sourceInfo.streams, "audio") === streamMetadata(produced.streams, "audio"), "Publication audio stream metadata changed");
     assertInvariant(streamMetadata(sourceInfo.streams, "subtitle") === streamMetadata(produced.streams, "subtitle"), "Publication subtitle stream metadata changed");
-    const [finalTimeline, finalAudio, finalSubtitles, sourcePcm, finalPcm] = await Promise.all([
-      videoTimeline(pending, ffprobe, timeout), packetFingerprint(pending, "a", ffprobe, timeout), packetFingerprint(pending, "s", ffprobe, timeout),
-      decodedAudioHashes(input, audioCount, ffmpeg, timeout), decodedAudioHashes(pending, audioCount, ffmpeg, timeout),
+    const [finalAudio, finalSubtitles] = await Promise.all([
+      packetFingerprint(pending, "a", ffprobe, timeout), packetFingerprint(pending, "s", ffprobe, timeout),
     ]);
-    assertInvariant(finalTimeline === timeline, "Publication video timestamps changed");
-    assertInvariant(finalAudio === audioPackets, "Publication audio packets or timestamps changed");
-    assertInvariant(finalSubtitles === subtitlePackets, "Publication subtitle packets or timestamps changed");
-    assertInvariant(JSON.stringify(sourcePcm) === JSON.stringify(finalPcm), "Publication decoded audio changed");
-    const visual = await execute(ffmpeg, ["-v", "info", "-nostdin", "-i", pending, "-i", cover,
-      "-filter_complex", "[0:v:0]select='eq(n,0)',setpts=PTS-STARTPTS[frame];[1:v:0]format=yuv420p,setpts=PTS-STARTPTS[image];[frame][image]psnr=shortest=1",
-      "-an", "-frames:v", "1", "-f", "null", "-"], timeout);
-    const match = /PSNR[^\n]*average:([0-9.]+|inf)/i.exec(visual.stderr)?.[1];
-    const coverPsnr = match === "inf" ? Infinity : Number(match);
-    assertInvariant(coverPsnr >= 32, `Publication first frame does not match cover (PSNR ${match ?? "missing"})`);
-    await execute(ffmpeg, ["-v", "error", "-xerror", "-nostdin", "-i", pending, "-map", "0:v:0", "-f", "null", "-"], timeout);
+    assertInvariant(finalAudio === audioPackets, "Publication copied audio packets or timestamps changed");
+    assertInvariant(finalSubtitles === subtitlePackets, "Publication copied subtitle packets or timestamps changed");
     const [finalInputHash, finalCoverHash, outputHash] = await Promise.all([sha256(input), sha256(cover), sha256(pending)]);
     assertInvariant(finalInputHash === sourceHash && finalCoverHash === coverHash, "Input changed during publication cover assembly");
     const receipt: CoverFirstFrameReceipt = {
-      schemaVersion: 1, mode: "replace-first-frame", coverFrameCount: 1,
+      schemaVersion: preserve ? 2 : 1, mode: preserve ? "prepend-cover-frame" : "replace-first-frame", coverFrameCount: 1,
+      ...(preserve ? { sourceVideo: { frameCount: frameCount!, fps, durationSeconds: duration }, sourceOffsetFrames: 1 as const,
+        bodyVideoOffsetSeconds: 1 / fps, audioOffsetSeconds: 0 as const, subtitleOffsetSeconds: 0 as const } : {}),
       input: { path: input, sha256: sourceHash }, cover: { path: cover, sha256: coverHash }, output: { path: output, sha256: outputHash },
-      video: { width: video.width!, height: video.height!, fps, frameCount: Number(video.nb_read_frames), durationSeconds: duration,
-        timelineSha256: timeline, coverPsnrDb: Number.isFinite(coverPsnr) ? coverPsnr : null },
-      audio: { preserved: true, streamCount: audioCount, packetSha256: audioPackets, decodedPcmSha256: finalPcm },
+      video: { width: video.width!, height: video.height!, fps, frameCount: expectedFrames, frameCountBasis: expectedFrames === null ? "not-reported" : "container-metadata", durationSeconds: Number(finalVideo!.duration),
+        timelineSha256: null, coverPsnrDb: null },
+      audio: { preserved: true, streamCount: audioCount, packetSha256: audioPackets, decodedPcmSha256: [] },
       subtitles: { preserved: true, streamCount: subtitleCount, packetSha256: subtitlePackets },
+      qualityReviewPerformed: false, coverTransform: { width: video.width!, height: video.height!, mode: "contain-and-pad" },
+      verificationBasis: preserve
+        ? "Actual cover insertion with lossless complete-source body encoding, copied audio/subtitle packets and original timestamps, ordinary stream/container metadata and unchanged input SHA. No PSNR, full video timestamps, decoded PCM or source-quality review."
+        : "Actual first-frame overlay and copied audio/subtitle packets, ordinary stream/container metadata and unchanged input SHA. No PSNR, full video timestamps, decoded PCM or source-quality review.",
     };
     await rename(pending, output);
     return receipt;

@@ -9,11 +9,15 @@ description: WorkLoom 能力总入口。当用户提到 WorkLoom、织元、digi
 
 ## 工作流
 
+视频生成/制作任务的第一步：调用 `workloom_video_guide({})`（或读取 `workloom://guides/video`）全文。
+核对本仓身份，冻结用户指定模特、商品、平台、时长、账号调性、声音与特殊要求，再按正式前期→渲染→后期→真实交付核验推进。
+方案/草案不等于渲染放行；目录和指南只读，不手搓生产流程、不擅自替声/变速/重渲。指南说明实际生产 CLI 的权限、恢复和边界。
+
 1. **先查目录，不要凭记忆**：调用 `workloom_catalog_search`（可用 query/domain/kind 过滤；domain 例：geo-growth、hotel、ai-video；kind：employee/skill/pipeline/fence）。
 2. **再看定义**：对候选调用 `workloom_catalog_describe`，确认它的工具、围栏绑定、风险等级、来源文件。
 3. **看战况**：需要了解在岗/运行/待审批时调用 `workloom_stage_snapshot`；需要把工作台给用户看时调用 `workloom_stage_url`，提示用户在 Codex 内置浏览器（Cmd+Shift+B）打开。
 4. **执行前讲清楚**：说明能力 ID、风险等级、触发的围栏/闸门、数据模式（`dataMode`）；模拟数据必须说"这是模拟数据"。
-5. **P0 边界**：当前网关只读。不要假装已经启动任务、不要承诺"已完成"。需要执行时，告诉用户该能力在 P1 接通写路径后可用，或让用户先确认方案。
+5. **P0 边界**：当前插件网关只读。不要假装已经启动任务或完成。视频真正执行使用指南中已接通的本仓正式 CLI/服务入口和实际授权；网关没有写工具时不能把读取成功当成生产执行，也不要求用户再次批准已授权的普通步骤。
 
 ## 硬纪律
 

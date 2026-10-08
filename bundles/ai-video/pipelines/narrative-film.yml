@@ -1,5 +1,7 @@
 # 叙事片管线 · fusion-design §4
 # 每步 = Quest 任务卡；断点续跑继承 dsh replay；每步产物写 biz_events 五元事件
+# 新生成保留事前授权、素材用途、任务作用域与预算；成功镜头默认采用，只执行请求的本地后期。
+# 后期不要求品质二检/canary/模型人审，不自动重渲、ASR 或 TTS；真实源字节和处理输出错误仍失败。
 quest: narrative-film
 name: 叙事片管线
 version: v1
@@ -92,20 +94,20 @@ steps:
   - step_key: subtitle
     name: 标题字幕制作
     owner: subtitle-stylist
-    outputs: [subtitle_track, subtitle_report, final_video]   # 文字层收口：字体选型 + 平台版式 + 版式体检 + 可现度复检。**字幕以旁挂文件交付（srt/ass/vtt + 清单），母版不烧字**（G-DLV2）；要带字幕的片子由软字幕轨（softmux，画面逐帧零改动）或另存烧字副本派生
+    outputs: [subtitle_track, subtitle_report, final_video]   # 声明文字层单次处理，回读时间轴/字体/普通规格和源 SHA；旁挂、实际 copy 软轨或请求烧录副本各自记录。无默认可现度、UI、密度或像素品质闸。
   - step_key: voice
-    name: 成片配音
+    name: 显式授权配音（默认保留原声）
     owner: voice-artist
-    outputs: [voice_track, voice_report, final_video]   # 克隆音色配音：时窗对齐 + 原声让位 + 视频轨 copy；授权不清不得建音色档案
+    outputs: [voice_track, voice_report, final_video]   # 成功原声音轨默认保留；只有显式授权配音才做本地合成/混音，不自动 ASR/TTS；授权、隐私和实际处理错误保持。
   - step_key: bgm
     name: 成片配乐
     owner: bgm-composer
-    outputs: [bgm_track, bgm_report, final_video]   # 后期音频链路收口：原声保留策略 + BGM 让位 + -14 LUFS 母版
+    outputs: [bgm_track, bgm_report, final_video]   # 保留原声，声明曲目/配方单次有限处理；许可、输入字节和实际错误保持，未测品质指标为 null。
   - step_key: deliver
     name: 多风格交付包
     owner: post-editor
-    gate: G-DLV1                  # 变体雷同（画面与音轨都测不出差别）一票否决
-    outputs: [delivery_package, final_video, subtitle_track]   # 干净母版 + 旁挂字幕 + 2–3 个风格变体（封面/文案/BGM/调色/转场）+ 软字幕轨版 + 交付清单 + 工程文件；quality=uhd 时先在本机增强低分辨率镜头，再实测目标画布与来源（G-DLV8/9）；镜头只生成一次，变体零 token
+    gate: G-DLV1                  # 兼容规则 ID；成功素材不按像素/音频差异设质量拒收
+    outputs: [delivery_package, final_video, subtitle_track]   # 按请求目标集合出实际变体、字幕、封面/文案、清单与工程；请求画布实际导出回读，不默认调用增强模型。记录源/产物 SHA 与真实错误，品质未评审，源生成调用 0。
   - step_key: archive
     name: 成片入库
     owner: post-editor

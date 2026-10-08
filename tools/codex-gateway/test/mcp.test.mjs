@@ -13,7 +13,7 @@ test("MCP handler：握手、工具、资源", async () => {
   assert.ok(init.result.capabilities.tools);
 
   const tools = await handler.handle({ jsonrpc: "2.0", id: 2, method: "tools/list" });
-  assert.equal(tools.result.tools.length, 5);
+  assert.equal(tools.result.tools.length, 6);
   assert.ok(tools.result.tools.every(tool => tool.annotations.readOnlyHint === true));
   const names = tools.result.tools.map((tool) => tool.name);
   assert.ok(names.includes("workloom_catalog_search"));
@@ -38,7 +38,7 @@ test("MCP handler：握手、工具、资源", async () => {
   assert.equal(missing.result.isError, true);
 
   const resources = await handler.handle({ jsonrpc: "2.0", id: 5, method: "resources/list" });
-  assert.equal(resources.result.resources.length, 3);
+  assert.equal(resources.result.resources.length, 4);
   const read = await handler.handle({ jsonrpc: "2.0", id: 6, method: "resources/read", params: { uri: "workloom://health" } });
   assert.equal(read.result.contents[0].uri, "workloom://health");
 });
@@ -73,7 +73,7 @@ test("MCP stdio 入口可被真实拉起", async (t) => {
   child.kill("SIGTERM");
 
   assert.equal(replies[0].result.serverInfo.name, "workloom-codex-gateway");
-  assert.equal(replies[1].result.tools.length, 5);
+  assert.equal(replies[1].result.tools.length, 6);
 });
 
 test('MCP 参数错误、未知资源/工具及错误请求安全返回', async () => {

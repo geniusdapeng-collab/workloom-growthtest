@@ -7,6 +7,13 @@ CLI 和 MCP 不直接写数据库，也不能绕过服务端的成员/住客范�
 
 ## 本机使用
 
+视频任务先读 `node scripts/workloom-agent.mjs invoke growth.video.workbench.guide`：返回
+`result.markdown` 全文、仓库/产品身份、版本及实际 SHA-256。对应 MCP 工具为
+`workloom_growth_video_workbench_guide`，空参数 `{}`，只读固定本仓文档。
+完整调用纪律见 [AI 工作台视频指南](../docs/ai-video-workbench-guide.md)；`production.plan.usageGuide`
+指向同一文件。Growthtest 插件的独立 P0 网关使用 `workloom_video_guide` 与
+`workloom://guides/video`，不会因为读取指南而具备生产写权限。
+
 要求 Node.js 24（与仓库 `package.json#engines` 一致）。从仓库根执行：
 
 ```sh

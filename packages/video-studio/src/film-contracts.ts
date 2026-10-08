@@ -4,6 +4,7 @@ import { closeSync, constants, fstatSync, fsyncSync, linkSync, lstatSync, mkdirS
 import { dirname, join } from "node:path";
 import { resolveEraProfile, type ResolvedEraProfile } from "./era-profile.js";
 import { buildProducerReviewContract, reviewStage, REVIEW_CONTEXT_BUDGET, type ProducerGateOptions, type ProducerReviewContracts, type ProducerVerdict } from "./producer-gate.js";
+import { POST_RENDER_STAGES, postProcessingVerdict } from "./post-render-acceptance.js";
 import type { SceneBible } from "./scene-bible.js";
 
 export interface FilmAuthorContext {
@@ -68,6 +69,8 @@ export async function reviewFilmStage(source: FilmContractSource, options: Omit<
   if (options.projectId !== source.projectId) throw new Error("FILM_REVIEW_PROJECT_MISMATCH");
   const requested = options.context?.shotId;
   if (requested !== undefined && (typeof requested !== "string" || !requested)) throw new Error("FILM_REVIEW_SCOPE_INVALID");
+  if (requested !== undefined && !source.shots.some(shot => shot.shotId === requested)) throw new Error("FILM_REVIEW_SCOPE_INVALID");
+  if (POST_RENDER_STAGES.has(options.stage)) return postProcessingVerdict(options);
   const contracts = filmReviewContracts(source, requested as string | undefined);
   // reviewStage performs structured validation and returns failed/unverified with the cause.
   /**

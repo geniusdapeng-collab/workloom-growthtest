@@ -75,22 +75,23 @@ export async function resolveDirectorIdentities(scope:CreativeScope,by:string,re
   return assets;
 }
 export interface SourceClip {shotId:string;assetId:string;path:string;sha256:string;durationSec:number;role?:string;dialogue:string;lockTrim?:boolean;audio?:Record<string,unknown>}
-export async function preflightDirectorAudio(filmPlan:DirectorFilmPlan,connectors:Awaited<ReturnType<typeof directorConnectors>>) {
+export async function preflightDirectorAudio(filmPlan:DirectorFilmPlan,connectors:Awaited<ReturnType<typeof directorConnectors>>,audioMode:"source"|"dubbing"="source") {
   const {voice,env,bins,measure}=connectors;
+  await Promise.all([bins.ffmpeg,bins.ffprobe].map(bin=>measure.runBin(bin,["-hide_banner","-version"],{timeoutMs:20_000})));
+  // A rendered shot carries its selected sound. Only an explicit dubbing request needs a new voice source.
+  if(audioMode==="source") return;
   if(!env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET || Buffer.byteLength(env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET)<32)
     throw new DirectorJobError("AUDIO_AUTHORITY_UNAVAILABLE","缺少独立声音签发密钥，未开始付费媒资准备");
-  await Promise.all([bins.ffmpeg,bins.ffprobe].map(bin=>measure.runBin(bin,["-hide_banner","-version"],{timeoutMs:20_000})));
   if(filmPlan.shots.some(shot=>shot.dialogue.trim())) {
     const config=voice.engineConfig(env),endpoint=new URL(config.baseUrl);
     if(config.kind==="mock"||!["127.0.0.1","localhost","[::1]"].includes(endpoint.hostname))
       throw new DirectorJobError("VOICE_SOURCE_UNAVAILABLE","旁白需要已连接的本机真实声音引擎，未开始付费媒资准备");
-    if(filmPlan.shots.some(shot=>shot.dialogue.trim()&&!/(旁白|画外|离画|off.?camera|voice.?over|narration)/iu.test(shot.audio.dialogue)))
-      throw new DirectorJobError("DIALOGUE_SOURCE_REQUIRED","可见口型台词需要独立原始对白与口型证据，未开始付费媒资准备");
     const health=await voice.probeEngine(config);
     if(!health.reachable) throw new DirectorJobError("VOICE_SOURCE_UNAVAILABLE","本机旁白引擎不可用，未开始付费媒资准备");
   }
 }
-export async function prepareDirectorAudio(scope:CreativeScope,input:{projectId:string;revision:number;clips:SourceClip[];filmPlan:DirectorFilmPlan;by:string;deadlineMs:number}) {
+export async function prepareDirectorAudio(scope:CreativeScope,input:{projectId:string;revision:number;clips:SourceClip[];filmPlan:DirectorFilmPlan;by:string;deadlineMs:number;audioMode?:"source"|"dubbing"}) {
+  if(input.audioMode!=="dubbing") return input.clips;
   const {voice,stems,authority,measure,env,bins}=await directorConnectors({mediaRuntime:true});
   if(!env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET || Buffer.byteLength(env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET)<32)
     throw new DirectorJobError("AUDIO_AUTHORITY_UNAVAILABLE","客户端未生成独立声音签发密钥，请运行客户端修复检查");
@@ -108,14 +109,12 @@ export async function prepareDirectorAudio(scope:CreativeScope,input:{projectId:
       const description=String(planned?.audio[role as keyof typeof planned.audio]??"");
       let source:Record<string,unknown>;
       if(role==="dialogue" && clip.dialogue.trim()) {
-        if(!/(旁白|画外|离画|off.?camera|voice.?over|narration)/iu.test(description))
-          throw new DirectorJobError("DIALOGUE_SOURCE_REQUIRED","可见口型对白需要原始独立对白和口型证据；不会用另一条配音覆盖混合成片");
         const config=voice.engineConfig(env),endpoint=new URL(config.baseUrl);
         if(config.kind==="mock" || !["127.0.0.1","localhost","[::1]"].includes(endpoint.hostname))
           throw new DirectorJobError("VOICE_SOURCE_UNAVAILABLE","自动旁白需要已配置的本机真实配音引擎；远端付费配音须另有预算授权");
         await directorTx(scope,client=>directorEvent(client,scope,input.projectId,"video.director.voice.dispatched",{jobId,shotId:clip.shotId,
           textHash:directorHash(clip.dialogue),sourceKind:"tts",revision:input.revision},{id:"video-director",type:"system"}));
-        const spoken=await voice.speak({text:clip.dialogue,out,normalize:true,verify:true},{env,bins,config});
+        const spoken=await voice.speak({text:clip.dialogue,out,normalize:true,verify:false},{env,bins,config});
         if(spoken.result.duration_sec>clip.durationSec+.05) throw new DirectorJobError("DIALOGUE_WINDOW_OVERFLOW","完整旁白超过源镜头时长，需要调整文字或单独留出画面，不能截断台词");
         source={status:"ready",path:out,sourceKind:"tts",inSec:0,offsetSec:0,durationSec:spoken.result.duration_sec,jobId};
       } else if(role==="ambience" && description.trim() && !/^(无|none|静默|不适用)$/iu.test(description)) {

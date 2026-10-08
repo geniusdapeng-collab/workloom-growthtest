@@ -7,6 +7,9 @@ description: WorkLoom 增长域（growthtest 实验）工作流。用于 GEO/AI 
 
 本技能描述 `workloom-growthtest` 的增长域能力。执行前先用 `workloom_catalog_search` 与 `workloom_catalog_describe` 核对实时能力目录，不要凭本文件里的静态描述直接执行。
 
+涉及视频时先调用 `workloom_video_guide({})` 或读 `workloom://guides/video` 全文，冻结模特/商品/平台/时长/账号/声音/特殊要求。
+使用本仓正式前期、渲染、后期和实际交付核验；读取指南不启动生产，不用手工流程绕过缺失入口或原声合同。
+
 ## 四条主管线
 
 | 管线 | 能力 ID | 作用 | 关键闸门 |
@@ -33,4 +36,4 @@ description: WorkLoom 增长域（growthtest 实验）工作流。用于 GEO/AI 
 
 ## P0 边界
 
-网关当前只读：`catalog_search`、`catalog_describe`、`stage_snapshot`、`stage_url`、`health`。任何"启动/发布/加投/审批"动作都还没有写权限；不要虚构执行结果。
+网关当前只读：`catalog_search`、`catalog_describe`、`stage_snapshot`、`stage_url`、`health`、`video_guide`。任何"启动/发布/加投/审批"动作都还没有写权限；不要虚构执行结果。

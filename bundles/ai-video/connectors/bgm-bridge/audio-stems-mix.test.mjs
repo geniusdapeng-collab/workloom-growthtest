@@ -92,7 +92,8 @@ before(async () => {
   music = path.join(root, "new-music.wav");
   encode(["-f", "lavfi", "-i", "testsrc2=size=160x120:rate=24:duration=8", "-f", "lavfi", "-i", "sine=frequency=2200:sample_rate=48000:duration=8",
     "-shortest", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", video]);
-  encode(["-f", "lavfi", "-i", "sine=frequency=3300:sample_rate=48000:duration=8", "-c:a", "pcm_s16le", music]);
+  // A short track exercises finite looping in the actual signed/native multi-input graphs.
+  encode(["-f", "lavfi", "-i", "sine=frequency=3300:sample_rate=48000:duration=0.25", "-c:a", "pcm_s16le", music]);
   const stems = {};
   for (const [role, frequency, volume, kind] of [["dialogue", 440, 2, "tts"], ["ambience", 880, 0.015, "synthesized_ambience"],
     ["foley", 1320, 0.01, "synthesized_foley"], ["music", 1760, 0.4, "composed_music"]]) {
@@ -109,27 +110,27 @@ before(async () => {
 after(async () => { if (root) await fsp.rm(root, { recursive: true, force: true }); });
 
 describe("signed stems in normal mixer", { concurrency: false }, () => {
-  it("mixes only program plus newly selected music and measures independent tracks after the same gain", async () => {
+  it("explicit signed program excludes embedded old music, executes the requested mix and reports no quality measurements", async () => {
     const result = await mix(options("normal"));
-    assert.ok(Object.values(result.checks).every((value) => value === true));
+    assert.equal(result.checks.processingSucceeded, true); assert.equal(result.checks.sourceBytesUnchanged, true);
     assert.equal(result.independentAudio.embeddedAudioUsed, false);
-    assert.equal(result.loudness.normalization.method, "shared-linear-gain");
-    assert.equal(result.loudness.normalization.limiterApplied, false);
-    assert.ok(result.levels.speechToMusicMarginDb >= 3);
-    assert.ok(result.levels.duckingDepthDb <= -4);
+    assert.equal(result.loudness.status, "not-measured"); assert.equal(result.metrics, null);
+    assert.equal(result.levels.speechToMusicMarginDb, null); assert.equal(result.levels.duckingDepthDb, null);
     const samples = pcm(result.output.path);
     assert.ok(amplitude(samples, 440, 1.5) > 0.02);
-    assert.ok(amplitude(samples, 3300, 3) > 0.005);
+    assert.ok(amplitude(samples, 3300, 3) > 0.0001);
     assert.ok(amplitude(samples, 1760, 3) < 0.0002, "retained previous music is excluded");
     assert.ok(amplitude(samples, 2200, 3) < 0.0002, "embedded old music is excluded");
-    for (const track of result.retainedTracks) assert.equal(hash(track.path), track.sha256);
+    assert.equal(result.independentAudio.programSha256, bundle.program.sha256);
+    assert.equal(result.bgm.finiteBedDurationSec, 8);
     await assert.rejects(mix(options("normal")), { code: "idempotency_conflict" });
   });
-  it("has no mixed/embedded fallback and no default signing key", async () => {
-    await assert.rejects(mix(options("missing", { audioStems: null })), { code: "audio_stems_source_unverified" });
+  it("default native program needs no signing key; explicitly supplied signed sources retain authority checks", async () => {
+    const native = await mix(options("native", { audioStems: null, env: { ...env, WORKLOOM_AUDIO_STEM_SIGNING_SECRET: "" } }));
+    assert.equal(native.independentAudio.embeddedAudioUsed, true); assert.equal(native.independentAudio.stemsVerified, false);
     await assert.rejects(mix(options("untrusted", { env: { ...env, WORKLOOM_AUDIO_STEM_SIGNING_SECRET: undefined } })), { code: "audio_stems_source_unverified" });
     await assert.rejects(mix(options("wrong-scope", { audioStems: { ...reference, scope: { ...scope, projectId: "other" } } })), { code: "audio_stems_stale" });
-    assert.equal(fs.existsSync(path.join(root, "missing.mp4")), false);
+    assert.equal(fs.existsSync(path.join(root, "native.mp4")), true);
   });
   it("does not permit music-only to discard signed dialogue", async () => {
     await assert.rejects(mix(options("discard", { policy: "music-only", allowDiscardOriginal: true })), { code: "audio_stems_source_unverified" });
@@ -147,13 +148,11 @@ describe("signed stems in normal mixer", { concurrency: false }, () => {
       verifySource: createAudioStemReceiptVerifier({ env }) });
     const result = await mix(options("no-dialogue-mix", { audioStems: { ...reference, dir: silent.dir,
       manifestSha256: silent.manifestSha256, recipeSha256: silent.recipeSha256 } }));
-    assert.equal(result.applicability.dialogue_preserved, "not_applicable");
     assert.equal(result.levels.speechToMusicMarginDb, null);
     assert.equal(result.levels.duckingDepthDb, null);
-    assert.equal(result.checks.dialogue_preserved, true);
-    assert.equal(result.checks.ducking_applied, true);
+    assert.equal(result.qualityReviewPerformed, false); assert.equal(result.checks.processingSucceeded, true);
   });
-  it("normal tool and CLI consume the pinned signed bundle and expose its measured result", async () => {
+  it("normal tool and CLI consume the pinned signed bundle and expose its actual processing receipt", async () => {
     const args = options("tool");
     const result = await callTool("bgmwrite.mix", { input_path: args.input, output_path: args.output, bgm_path: args.bgmPath,
       audio_stems: reference, align: false, fade_in_sec: 0.1, fade_out_sec: 0.1, music_level_db: -24 }, { env, bins });

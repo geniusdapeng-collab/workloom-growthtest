@@ -15,7 +15,7 @@
  * 纪律（与 bgm-bridge / color-bridge 同构）：
  * - 原片只读：任何写入都落到新文件，覆盖原片或覆盖参考音频直接拒绝（overwrite_source_forbidden）；
  * - 路径监狱：只允许访问白名单根目录内的路径（WORKLOOM_VOICE_ALLOWED_ROOTS）；
- * - 无回执=未核实：产物必须给出 sha256 + 时长 + 响度/真峰值实测复检；
+ * - 无回执=未核实：写入产物给出 sha256 + 真实时长 + 处理回执；质量诊断只由显式 verify 执行；
  * - 不伪造：引擎不可达/超时/解码失败一律抛带稳定 code 的 VoiceError，由上层决定重试或转人工；
  * - 声纹不出域：参考音频、音色档案与授权回执只写工位素材区，任何"上传声纹/导出档案"的调用一票否决；
  * - 授权优先：克隆前必须有明确的声音授权声明（`voicewrite.consent`），否则围栏 G-VOICE1 挂起人审。
@@ -986,58 +986,15 @@ async function concatWithGaps(parts, gapMs, out, bins) {
 }
 
 async function normalizeLoudness({ input, output, targetLufs, truePeak, bins }) {
-  // 标准两遍法 loudnorm：先测量（input_i/input_tp/thresh/target_offset），再带测量值线性归一。
-  // 为什么不用 volume+alimiter：实测（2026-09-23，M3）单遍 volume+alimiter 的真峰值仍会到
-  // 0.02 dBTP（超过 -1.5 上限），因为 alimiter 的 attack 窗口压不住瞬态；两遍法 loudnorm 自带
-  // 真峰值限制，再用 alimiter 兜底，才能既到响度目标又不削顶。
-  const measured = await measureLoudness(input, { bins, targetLufs, truePeak });
-  const raw = measured.raw ?? {};
-  const linearLimit = round(Math.pow(10, truePeak / 20), 4);
-  if (measured.integratedLufs === null || raw.input_i === undefined) {
-    throw new VoiceError("响度归一失败：测量通道无有效读数（无法核验交付响度）", "engine_failed", true);
-  }
-  const chain = [
-    `loudnorm=I=${targetLufs}:TP=${truePeak}:LRA=11`,
-    `measured_I=${raw.input_i}:measured_TP=${raw.input_tp}:measured_LRA=${raw.input_lra}`,
-    `measured_thresh=${raw.input_thresh}:offset=${raw.target_offset ?? 0}:linear=true:print_format=summary`,
-  ].join(":");
+  // A requested transform executes once. Physical diagnostics are a separate explicit tool.
   await runBin(bins.ffmpeg, [
     "-hide_banner", "-loglevel", "error", "-i", input,
-    "-af", `${chain},alimiter=limit=${linearLimit}:attack=5:release=50`,
+    "-af", `loudnorm=I=${targetLufs}:TP=${truePeak}:LRA=11`,
     "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", "-y", output,
   ], { label: "ffmpeg(normalize)" });
-
-  let after = await measureLoudness(output, { bins, targetLufs, truePeak });
-  let appliedOffsetDb = round(targetLufs - measured.integratedLufs, 2);
-  // 闭环校正响度：loudnorm 的线性模式在 16bit 量化 + 后续 alimiter 之后仍可能偏离目标
-  // （实测：目标 -16，输出 -14.49，偏 +1.5dB）。按实测差值再走一次 volume，只走一次。
-  if (after.integratedLufs !== null && Math.abs(after.integratedLufs - targetLufs) > 1.0) {
-    const levelFix = round(targetLufs - after.integratedLufs, 2);
-    await runBin(bins.ffmpeg, [
-      "-hide_banner", "-loglevel", "error", "-i", output,
-      "-af", `volume=${levelFix}dB`,
-      "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", "-y", `${output}.lvl.wav`,
-    ], { label: "ffmpeg(normalize-level-fix)" });
-    await fsp.rename(`${output}.lvl.wav`, output);
-    after = await measureLoudness(output, { bins, targetLufs, truePeak });
-    appliedOffsetDb = round(appliedOffsetDb + levelFix, 2);
-  }
-  // 兜底：若编码量化后真峰值仍越线，按超出量降一次电平并复测（只降一次，避免来回震荡）。
-  if (after.truePeakDbtp !== null && after.truePeakDbtp > truePeak) {
-    const correction = round(truePeak - after.truePeakDbtp - 0.3, 2);
-    await runBin(bins.ffmpeg, [
-      "-hide_banner", "-loglevel", "error", "-i", output,
-      "-af", `volume=${correction}dB`,
-      "-ar", "24000", "-ac", "1", "-c:a", "pcm_s16le", "-y", `${output}.fix.wav`,
-    ], { label: "ffmpeg(normalize-fix)" });
-    await fsp.rename(`${output}.fix.wav`, output);
-    after = await measureLoudness(output, { bins, targetLufs, truePeak });
-    appliedOffsetDb = round(appliedOffsetDb + correction, 2);
-  }
-  return { before: measured.integratedLufs, after: after.integratedLufs, truePeakDbtp: after.truePeakDbtp, appliedOffsetDb };
 }
 
-/** 播报：长文本分句 → 逐句合成 → 拼接 → 响度归一到交付口径 → 复检回执。 */
+/** 显式播报：长文本分句 → 逐句合成 → 拼接 → 单次请求的响度处理 → 字节回执。 */
 export async function speak(params = {}, { bins = resolveBinaries(), env = process.env, config = engineConfig(env), fetchImpl = fetch } = {}) {
   const textFile = typeof params.text_file === "string" && params.text_file ? params.text_file : null;
   const text = textFile
@@ -1090,15 +1047,8 @@ export async function speak(params = {}, { bins = resolveBinaries(), env = proce
   }
 
   const media = await probeMedia(out, { bins });
-  const loudness = await measureLoudness(out, { bins, targetLufs, truePeak });
+  if (!(media.duration > 0)) throw new VoiceError("播报输出没有可用音频时长", "bad_media");
   const elapsedMs = Date.now() - started;
-  const clipped = loudness.truePeakDbtp !== null && loudness.truePeakDbtp > truePeak + 0.2;
-  if (params.verify !== false && (clipped || !(media.duration > 0))) {
-    throw new VoiceError(
-      `播报产物复检未通过：真峰值 ${loudness.truePeakDbtp} dBTP（上限 ${truePeak}）/ 时长 ${media.duration}s`,
-      "verify_failed",
-    );
-  }
   return {
     result: {
       out,
@@ -1107,8 +1057,10 @@ export async function speak(params = {}, { bins = resolveBinaries(), env = proce
       model: config.ttsModel,
       chunks: chunks.length,
       duration_sec: round(media.duration, 3),
-      lufs: loudness.integratedLufs,
-      true_peak_dbtp: loudness.truePeakDbtp,
+      lufs: null,
+      true_peak_dbtp: null,
+      quality_status: "not-reviewed",
+      processing: { succeeded: true, loudnessRecipe: params.normalize === false ? null : { targetLufs, truePeak }, diagnosticsExecuted: false },
       elapsed_ms: elapsedMs,
       rtf: round(elapsedMs / 1000 / Math.max(media.duration, 0.001), 3),
       asr_unloaded_before_synthesis: freedAsr.ok,
@@ -1275,45 +1227,12 @@ export async function dub(params = {}, { bins = resolveBinaries(), env = process
   }
 
   const outMedia = await probeAnyMedia(out, { bins });
-  let loudness = await measureLoudness(out, { bins, targetLufs, truePeak });
-  // 响度闭环：画面外挂 audio 的 loudnorm 是单遍的，实测能偏到 -12.87（目标 -14）。超出 ±1.5 LUFS
-  // 容差时按实测差值重挂一次音轨（视频轨仍然 copy，代价只是一次音频编码）。
-  let loudnessFixDb = 0;
-  if (loudness.integratedLufs !== null && Math.abs(loudness.integratedLufs - targetLufs) > 1.5) {
-    loudnessFixDb = round(targetLufs - loudness.integratedLufs, 2);
-    const fixedVideo = `${out}.lvl.mp4`;
-    await runBin(bins.ffmpeg, [
-      "-hide_banner", "-loglevel", "error", "-i", out,
-      "-map", "0:v:0", "-map", "0:a:0",
-      "-c:v", "copy", "-af", `volume=${loudnessFixDb}dB`, "-c:a", "aac", "-b:a", "192k",
-      "-movflags", "+faststart", "-y", fixedVideo,
-    ], { label: "ffmpeg(dub-loudness-fix)", timeoutMs: 900_000 });
-    await fsp.rename(fixedVideo, out);
-    loudness = await measureLoudness(out, { bins, targetLufs, truePeak });
-  }
-  /**
-   * 真峰值闭环（2026-09-25 真机）：单遍 loudnorm 只保证响度目标，**不管真峰值**。
-   * 事故：SC-04 补旁白后 `verify` 直接判 `clipping（-0.69 dBTP）`——旁白与配乐 / 原声叠加时
-   * 峰值可以比目标高 1dB 以上。音频超峰是交付硬伤（平台会削波），所以这里按实测差值再压一次：
-   * 视频轨仍 copy，只重编一次音频；留 0.2dB 余量，避免 AAC 编码后再次越线。
-   */
-  let peakFixDb = 0;
-  if (loudness.truePeakDbtp !== null && loudness.truePeakDbtp > truePeak) {
-    peakFixDb = round(truePeak - 0.2 - loudness.truePeakDbtp, 2);
-    const fixedPeakVideo = `${out}.peak.mp4`;
-    await runBin(bins.ffmpeg, [
-      "-hide_banner", "-loglevel", "error", "-i", out,
-      "-map", "0:v:0", "-map", "0:a:0",
-      "-c:v", "copy", "-af", `volume=${peakFixDb}dB`, "-c:a", "aac", "-b:a", "192k",
-      "-movflags", "+faststart", "-y", fixedPeakVideo,
-    ], { label: "ffmpeg(dub-peak-fix)", timeoutMs: 900_000 });
-    await fsp.rename(fixedPeakVideo, out);
-    loudness = await measureLoudness(out, { bins, targetLufs, truePeak });
+  if (!outMedia.video || !outMedia.hasAudio || !(outMedia.duration > 0)) {
+    throw new VoiceError("配音输出缺少可用的视频、音频或时长", "bad_media");
   }
   const driftSec = round(outMedia.duration - media.duration, 3);
-  const syncOk = Math.abs(driftSec) <= Number(params.max_drift_sec ?? 0.25);
-  if (params.verify !== false && !syncOk) {
-    throw new VoiceError(`音画时长漂移 ${driftSec}s 超出容差（原片 ${media.duration}s / 成片 ${outMedia.duration}s）`, "verify_failed");
+  if (Math.abs(driftSec) > Number(params.max_drift_sec ?? 0.25)) {
+    throw new VoiceError(`配音输出时长 ${outMedia.duration}s 与原片 ${media.duration}s 不符（漂移 ${driftSec}s）`, "bad_media");
   }
   const elapsedMs = Date.now() - started;
   return {
@@ -1328,10 +1247,12 @@ export async function dub(params = {}, { bins = resolveBinaries(), env = process
       original_duration_sec: round(media.duration, 3),
       out_duration_sec: round(outMedia.duration, 3),
       drift_sec: driftSec,
-      lufs: loudness.integratedLufs,
-      true_peak_dbtp: loudness.truePeakDbtp,
-      loudness_fix_db: loudnessFixDb,
-      peak_fix_db: peakFixDb,
+      lufs: null,
+      true_peak_dbtp: null,
+      loudness_fix_db: 0,
+      peak_fix_db: 0,
+      quality_status: "not-reviewed",
+      processing: { succeeded: true, loudnessRecipe: { targetLufs, truePeak }, diagnosticsExecuted: false },
       elapsed_ms: elapsedMs,
       rtf: round(elapsedMs / 1000 / Math.max(outMedia.duration, 0.001), 3),
       discarded_original: policy === "music-only" || policy === "replace-bed",

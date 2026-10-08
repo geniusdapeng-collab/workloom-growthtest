@@ -10,6 +10,7 @@
  * 这些都能在磁盘上静态验出来，所以本组测试不触 DB、不依赖 ffmpeg。
  */
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
@@ -68,10 +69,10 @@ describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
   it("常规渲染直通；四类红线各自命中；表达式不产生求值异常（异常=全量熔断）", () => {
     expect(evaluate("G-SUB0")).toBe(true);
 
-    // G-SUB1：品牌视觉锤变更 / 字体库首次入片 / 许可未核验 → review
+    // G-SUB1：保留真实许可处理，移除观感人审
     expect(evaluate("G-SUB1", { license_reviewed: false })).toBe(true);
-    expect(evaluate("G-SUB1", { brand_font_change: true })).toBe(true);
-    expect(evaluate("G-SUB1", { font_library_new: true })).toBe(true);
+    expect(evaluate("G-SUB1", { brand_font_change: true })).toBe(false);
+    expect(evaluate("G-SUB1", { font_library_new: true })).toBe(false);
     expect(evaluate("G-SUB1", { license_reviewed: true })).toBe(false);
     expect(evaluate("G-SUB1")).toBe(false);
 
@@ -80,11 +81,11 @@ describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
     expect(evaluate("G-SUB2", { output_path: "/a.mp4", input_path: "/a.mp4" })).toBe(true);
     expect(evaluate("G-SUB2", { output_path: "/b.mp4", input_path: "/a.mp4" })).toBe(false);
 
-    // G-SUB3：关闭复检 / 无视安全区 → block
-    expect(evaluate("G-SUB3", { skip_verify: true })).toBe(true);
-    expect(evaluate("G-SUB3", { verify: false })).toBe(true);
-    expect(evaluate("G-SUB3", { ignore_safe_area: true })).toBe(true);
-    expect(evaluate("G-SUB3", { allow_ui_overlap: true })).toBe(true);
+    // G-SUB3：旧质量参数不阻断；技术处理回执始终保留
+    expect(evaluate("G-SUB3", { skip_verify: true })).toBe(false);
+    expect(evaluate("G-SUB3", { verify: false })).toBe(false);
+    expect(evaluate("G-SUB3", { ignore_safe_area: true })).toBe(false);
+    expect(evaluate("G-SUB3", { allow_ui_overlap: true })).toBe(false);
     expect(evaluate("G-SUB3", { verify: true })).toBe(false);
     expect(evaluate("G-SUB3")).toBe(false);
 
@@ -102,10 +103,10 @@ describe("标题字幕围栏（G-SUB0..G-SUB5）语义", () => {
     expect(evaluate("G-SUB5", { commercial_use: true, font_license: "vendor-free-commercial" })).toBe(false);
     expect(evaluate("G-SUB5", { commercial_use: false, font_license: "unknown-vendor" })).toBe(false);
 
-    // G-SUB6：弹幕/贴纸不得绕过密度与安全区（allow_flood / ignore_density / skip_safe_area）
-    expect(evaluate("G-SUB6", { allow_flood: true })).toBe(true);
-    expect(evaluate("G-SUB6", { ignore_density: true })).toBe(true);
-    expect(evaluate("G-SUB6", { skip_safe_area: true })).toBe(true);
+    // G-SUB6：密度/安全区诊断不作为后期准入条件
+    expect(evaluate("G-SUB6", { allow_flood: true })).toBe(false);
+    expect(evaluate("G-SUB6", { ignore_density: true })).toBe(false);
+    expect(evaluate("G-SUB6", { skip_safe_area: true })).toBe(false);
     expect(evaluate("G-SUB6", { max_concurrent: 8 })).toBe(false);
   });
 
@@ -782,3 +783,34 @@ function readSkillBindings(): Record<string, string[]> {
   }
   return bindings;
 }
+
+
+describe("actual subtitle CLI preserves requested danmaku by default", () => {
+  it("keeps 23-character text and all nine concurrent events; explicit limits still apply and are reported", () => {
+    const dir = mkdtempSync(join(tmpdir(), "subtitle-cli-default-danmaku-"));
+    try {
+      const ffmpeg = process.env.WORKLOOM_SUBTITLE_FFMPEG_PATH || "ffmpeg", ffprobe = process.env.WORKLOOM_SUBTITLE_FFPROBE_PATH || "ffprobe";
+      const source = join(dir, "black-silent.mp4");
+      const encoded = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=black:s=160x288:r=12:d=1", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", source], { encoding: "utf8", timeout: 30_000 });
+      expect(encoded.status, encoded.stderr).toBe(0);
+      const before = createHash("sha256").update(readFileSync(source)).digest("hex");
+      const items = join(dir, "items.json"), text = "abcdefghijklmnopqrstuv";
+      writeFileSync(items, JSON.stringify(Array.from({ length: 9 }, (_, index) => ({ at: 0.1, durationSec: 0.6, text: `${text}${index}` }))));
+      const call = (name: string, extra: string[] = []) => {
+        const evidenceDir = join(dir, name), output = join(dir, `${name}.mp4`);
+        const done = spawnSync(process.execPath, [join(BRIDGE_DIR, "cli.mjs"), "danmaku", "--in", source, "--out", output, "--items", items, "--evidence-dir", evidenceDir, ...extra],
+          { cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000, env: { ...process.env, WORKLOOM_SUBTITLE_FFMPEG_PATH: ffmpeg, WORKLOOM_SUBTITLE_FFPROBE_PATH: ffprobe, WORKLOOM_SUBTITLE_ALLOWED_ROOTS: dir } });
+        return { done, output, evidenceDir };
+      };
+      const normal = call("default"); expect(normal.done.status, normal.done.stdout + normal.done.stderr).toBe(0);
+      expect(normal.done.stdout).toContain("条数 9/9"); expect(normal.done.stdout).toContain("保留全部请求弹幕"); expect(normal.done.stdout).not.toMatch(/undefined|NaN/);
+      const normalEvents = parseAssEvents(readFileSync(join(normal.evidenceDir, "danmaku-plan.ass"), "utf8"));
+      expect(normalEvents).toHaveLength(9); expect(normalEvents.every((event: { text: string }) => event.text.includes(text))).toBe(true); expect(existsSync(normal.output)).toBe(true);
+      const bounded = call("explicit-concurrent", ["--max-chars", "30", "--max-concurrent", "8"]);
+      expect(bounded.done.status, bounded.done.stdout + bounded.done.stderr).toBe(0); expect(bounded.done.stdout).toContain("条数 8/9"); expect(bounded.done.stdout).toContain("按请求抽稀 1");
+      expect(parseAssEvents(readFileSync(join(bounded.evidenceDir, "danmaku-plan.ass"), "utf8"))).toHaveLength(8);
+      const tooLong = call("explicit-char", ["--max-chars", "20"]); expect(tooLong.done.status).toBe(3); expect(tooLong.done.stderr).toContain("bad_style"); expect(existsSync(tooLong.output)).toBe(false);
+      expect(createHash("sha256").update(readFileSync(source)).digest("hex")).toBe(before);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }, 180_000);
+});

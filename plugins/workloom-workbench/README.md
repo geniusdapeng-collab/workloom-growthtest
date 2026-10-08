@@ -3,7 +3,7 @@
 把 WorkLoom（growthtest 隔离实验仓）接入 Codex：
 
 - 技能：`workloom`（能力总路由，可隐式触发）、`workloom-growth`（增长域，仅显式 `$workloom-growth`）。
-- MCP：`workloom-core`（stdio，P0 只读 5 tools + 3 resources）。
+- MCP：`workloom-core`（stdio，P0 只读 6 tools + 4 resources，包含固定视频指南）。
 - Hooks：SessionStart 注入工作区/在岗/待审批摘要（P0）；写操作审计在 P1 接入。
 
 ## 为什么在仓内
@@ -43,6 +43,13 @@ sh plugins/workloom-workbench/scripts/start-mcp.sh
 ```
 
 ## P0 边界
+
+视频任务先调用 `workloom_video_guide({})` 或读取 `workloom://guides/video`，完整正文来自
+[`docs/ai-video-workbench-guide.md`](../../docs/ai-video-workbench-guide.md)。同文 CLI 为
+`node tools/codex-gateway/bin/cli.mjs video guide`；通用能力入口为
+`node scripts/workloom-agent.mjs invoke growth.video.workbench.guide`。
+握手提示与受信任 SessionStart context 指向同一指南，先冻结用户约束再走正式执行器；
+工具只读，不启动生产或证明完成。已在运行的插件需按客户端重连后实际工具清单核对；本文件不触发重启。
 
 只读。没有 run/approval 写工具；不会启动任务、不会审批、不会写业务数据。
 

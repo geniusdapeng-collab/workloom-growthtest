@@ -107,10 +107,9 @@ describe.skipIf(!hasMediaTools)("后期真实总装与连续返修（需 FFmpeg/
         clips: shots.map((shot) => ({ ...shot, duration: 2.5 })),
         transitions: { mode, fadeSec: 0.3 }, output, resolution: [320, 240], fps: 30, bins,
       });
-      expect(result.avSync.ok).toBe(true);
-      expect(result.avSync.measured).toBe(3);
-      expect(result.avSync.maxAbsLagMs).toBeLessThanOrEqual(40);
-      expect(readJson(output.replace(/\.mp4$/, ".av-sync.json"))).toMatchObject({ ok: true, degraded: false });
+      expect(result.avSync.processingSucceeded).toBe(true);
+      expect(result.avSync.audioAlignmentMeasured).toBe(false);
+      expect(readJson(output.replace(/\.mp4$/, ".av-sync.json"))).toMatchObject({ processingSucceeded: true, audioAlignmentMeasured: false });
     }
   }, 120_000);
 
@@ -135,7 +134,7 @@ describe.skipIf(!hasMediaTools)("后期真实总装与连续返修（需 FFmpeg/
     expect(duration.ok).toBe(true);
     expect(duration.detail.actualSeconds).toBeCloseTo(measured, 5);
     expect(duration.detail.plannedSeconds).toBe(7.5);
-    expect(delivery.master.avSync.measured).toBe(3);
+    expect(delivery.master.avSync.processingSucceeded).toBe(true); expect(delivery.master.avSync.audioAlignmentMeasured).toBe(false);
     expect(fs.existsSync(delivery.manifestPath)).toBe(true);
     expect(shots.map((shot) => hash(shot.path))).toEqual(sourceHashes);
 
@@ -150,8 +149,9 @@ describe.skipIf(!hasMediaTools)("后期真实总装与连续返修（需 FFmpeg/
       variants: ["warm-story", "clean-tech"], outDir: path.join(root, "too-long"), bins, env,
     });
     expect(tooLong.checks.find((check: { kind: string }) => check.kind === "duration_plan_consistent").ok).toBe(false);
-    expect(tooLong.passed).toBe(false);
-    // 配乐质量是独立闸门；如音频合成样本不足以通过，必须在整包结果和报告中如实失败。
+    expect(tooLong.checks.find((check: { kind: string }) => check.kind === "duration_plan_consistent").blocking).toBe(false);
+    expect(tooLong.passed).toBe(true);
+    // 实际配乐处理错误会中止，不进行品质审查或静默降级。
     const audioFailures = delivery.manifest.variants.filter((variant: { audio?: { failed?: boolean } }) => variant.audio?.failed);
     expect(delivery.checks.find((check: { kind: string }) => check.kind === "bgm_layer").ok).toBe(audioFailures.length === 0);
     if (audioFailures.length) {

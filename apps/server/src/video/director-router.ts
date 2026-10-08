@@ -52,13 +52,13 @@ export const directorRouter=router({
   resolveTargets:read.input(z.object({intent:z.string().min(1).max(10000),options:options.optional()}).strict())
     .query(({input})=>api(async()=>resolveDeliveryTargets(input.intent,input.options))),
   start:write.input(z.object({intent:z.string().trim().min(2).max(10000),mode:z.enum(["produce","plan"]).default("produce"),
-    deliveryOptions:options.optional(),identityAssetRefs:z.array(id).max(4).optional(),
+    deliveryOptions:options.optional(),identityAssetRefs:z.array(id).max(4).optional(),audioMode:z.enum(["source","dubbing"]).default("source"),
     maxBudgetCny:z.number().nonnegative().max(100000).optional(),idempotencyKey:z.string().min(8).max(200)}).strict())
     .mutation(({ctx,input})=>api(async()=>{
       resolveDeliveryTargets(input.intent,input.deliveryOptions);
       const scope=scopeOf(ctx.identity);
       const queued=await queueDirectorJob(scope,{intent:input.intent,by:by(ctx.identity),idempotencyKey:input.idempotencyKey,
-        payload:{kind:"create",mode:input.mode,deliveryOptions:input.deliveryOptions??null,
+        payload:{kind:"create",mode:input.mode,audioMode:input.audioMode,deliveryOptions:input.deliveryOptions??null,
           identityAssetRefs:input.identityAssetRefs??[],maxBudgetCny:input.maxBudgetCny??null}});
       dispatchDirectorJob(scope,queued.job,ctx);return {...publicDirectorJob(queued.job),reused:queued.reused};
     })),
@@ -86,11 +86,11 @@ export const directorRouter=router({
   })),
   renderVariants:write.input(z.object({projectId:id,expectedPlanHash:hash,revision:z.number().int().positive(),
     sourceRefs:z.array(z.object({shotId:id,assetId:id}).strict()).min(1).max(12).optional(),
-    identityAssetRefs:z.array(id).max(4).optional(),maxBudgetCny:z.number().positive().max(100000).optional(),
+    identityAssetRefs:z.array(id).max(4).optional(),maxBudgetCny:z.number().positive().max(100000).optional(),audioMode:z.enum(["source","dubbing"]).default("source"),
     idempotencyKey:z.string().min(8).max(200)}).strict()).mutation(({ctx,input})=>api(async()=>{
       const scope=scopeOf(ctx.identity),queued=await queueDirectorJob(scope,{projectId:input.projectId,revision:input.revision,
         expectedPlanHash:input.expectedPlanHash,idempotencyKey:input.idempotencyKey,by:by(ctx.identity),
-        payload:{kind:"render",expectedPlanHash:input.expectedPlanHash,sourceRefs:input.sourceRefs??null,
+        payload:{kind:"render",audioMode:input.audioMode,expectedPlanHash:input.expectedPlanHash,sourceRefs:input.sourceRefs??null,
           identityAssetRefs:input.identityAssetRefs??[],maxBudgetCny:input.maxBudgetCny??null}});
       dispatchDirectorJob(scope,queued.job,ctx);return publicDirectorJob(queued.job);
     })),

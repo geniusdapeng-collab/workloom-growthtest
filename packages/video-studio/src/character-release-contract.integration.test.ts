@@ -63,47 +63,29 @@ function fixtureJudge(answer: unknown, bodies: string[]): typeof fetch {
   }) as typeof fetch;
 }
 
-describe("dedicated identity adapter through the real reviewStage exit (no network)", () => {
-  it("actual video+frame+reference byte receipts and joint rubric flow through the official producer adapter", async () => {
-    const f = fixture(); const bodies: string[] = [];
-    const verdict = await reviewStage({ ...f.options, fetchImpl: fixtureJudge({ approved: true, score: 85, issues: [], suggestions: [],
-      reason: "fixture joint identity and explicit wardrobe supported" }, bodies) });
-    expect(verdict.approved, verdict.reason).toBe(true);
-    expect(verdict.contractHash).toBe(f.request.producerContractHash);
-    expect(bodies).toHaveLength(1);
-    const sent = JSON.parse(bodies[0]!) as { messages: Array<{ content: Array<{ type: string; text?: string }> }> };
-    expect(sent.messages[0]!.content.filter((item) => item.type === "image_url")).toHaveLength(8);
-    expect(bodies[0]).toContain("身份事实检查"); expect(bodies[0]).toContain("黑色粗花呢商务套装");
-    expect(bodies[0]).toContain("identity-and-explicit-wardrobe"); expect(bodies[0]).toContain("基准图");
+describe("successful source adoption bypasses historical identity quality review", () => {
+  it.each([true, false])("old identity rubric and model vote (%s) cannot restrict a readable rendered source", async approved => {
+    const f = fixture(), bodies: string[] = [];
+    const verdict = await reviewStage({ ...f.options, fetchImpl: fixtureJudge({ approved, score: approved ? 85 : 20,
+      issues: approved ? [] : ["historical wardrobe complaint"], suggestions: [], reason: "unused historical quality vote" }, bodies) });
+    expect(verdict.approved).toBe(true); expect(verdict.score).toBeNull(); expect(verdict.via).toBe("deterministic");
+    expect(verdict.evidence).toEqual([]); expect(bodies).toEqual([]);
     const evidence = adaptCharacterVisualVerdict({ request: f.request, verdict });
-    expect(evidence.checks).toEqual({ identity: "passed", wardrobe: "passed" });
-    const report = assessCharacterRelease({ contract: f.contract, phase: "canary", shots: [{ ...f.artifact, evidence: [evidence] }], now: NOW });
-    expect(report.continuePaidRendering).toBe(true); expect(report.releaseAllowed).toBe(false);
-    const release = assessCharacterRelease({ contract: f.contract, phase: "release", shots: [{ ...f.artifact, evidence: [evidence] }], now: NOW });
-    expect(release.releaseAllowed).toBe(true);
+    expect(evidence.checks).toEqual({ identity: "unverified", wardrobe: "unverified" });
   });
-
-  it("joint visual rejection blocks release without inventing a changed-face finding", async () => {
-    const f = fixture(); const bodies: string[] = [];
-    const verdict = await reviewStage({ ...f.options, fetchImpl: fixtureJudge({ approved: false, score: 20, issues: ["服装违反显式合同"], suggestions: [],
-      reason: "fixture white dress violates explicit black wardrobe lock" }, bodies) });
-    expect(verdict.status).toBe("failed"); expect(bodies).toHaveLength(1);
-    const evidence = adaptCharacterVisualVerdict({ request: f.request, verdict });
-    expect(evidence.rejected).toBe(true); expect(evidence.checks.identity).toBe("unverified");
-    const report = assessCharacterRelease({ contract: f.contract, phase: "release", shots: [{ ...f.artifact, evidence: [evidence] }], now: NOW });
-    expect(report.status).toBe("failed"); expect(report.releaseAllowed).toBe(false);
-    expect(report.issues.map((item) => item.code)).toContain("dedicated-visual-review-rejected");
-  });
-
-  it("missing model or failed HTTP cannot yield a release receipt through the dedicated path", async () => {
+  it("model credentials are unnecessary and no unavailable model is invoked for completed source adoption", async () => {
     const f = fixture(); let calls = 0;
-    const unavailable = (async () => { calls += 1; return new Response("fixture unavailable", { status: 503 }); }) as typeof fetch;
-    for (const options of [{ ...f.options, env: {}, fetchImpl: unavailable }, { ...f.options, fetchImpl: unavailable }]) {
-      const verdict = await reviewStage(options); const evidence = adaptCharacterVisualVerdict({ request: f.request, verdict });
-      expect(evidence.checks.identity).toBe("unverified");
-      const report = assessCharacterRelease({ contract: f.contract, phase: "canary", shots: [{ ...f.artifact, evidence: [evidence] }], now: NOW });
-      expect(report.status).toBe("unverified"); expect(report.continuePaidRendering).toBe(false);
+    const unavailable = (async () => { calls += 1; throw new Error("MUST_NOT_CALL_MODEL"); }) as typeof fetch;
+    for (const env of [{}, configuredFixtureEnv]) {
+      const verdict = await reviewStage({ ...f.options, env, fetchImpl: unavailable });
+      expect(verdict.approved).toBe(true); expect(verdict.score).toBeNull();
     }
-    expect(calls).toBe(1);
+    expect(calls).toBe(0);
+  });
+  it("a file renamed as video is an actual processing failure and cannot be adopted", async () => {
+    const f = fixture(); writeFileSync(f.request.clip.path, "not a video");
+    const verdict = await reviewStage({ ...f.options, env: {}, fetchImpl: (async () => { throw new Error("MUST_NOT_CALL_MODEL"); }) as typeof fetch });
+    expect(verdict.approved).toBe(false); expect(verdict.hardFailures.join(" ")).toMatch(/SOURCE_MEDIA_UNREADABLE/);
+    expect(verdict.rerun).toBe(false);
   });
 });

@@ -87,7 +87,7 @@ function makeSourceClip(): void {
     "-hide_banner", "-v", "error", "-y",
     "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", silent,
   ]);
-  // 音轨：三段"人声量级"的带通脉冲 + 全程环境底噪（对白段与静音段交替，供让位/复检使用）
+  // 音轨：三段"人声量级"的带通脉冲 + 全程环境底噪（对白段与静音段交替，供请求侧链混音使用）
   execFileSync(FFMPEG, [
     "-hide_banner", "-v", "error", "-y",
     "-f", "lavfi", "-i", "anoisesrc=duration=18:color=pink:amplitude=0.02:seed=11",
@@ -111,19 +111,13 @@ function makeSourceClip(): void {
 const steps = {
   clean: () => [
     {
-      stepId: "s1", action: "bgmread.analyze", objectType: "final_video", tool: "bgmread.analyze",
-      params: { input_path: SOURCE },
+      stepId: "s1", action: "bgmwrite.compose", objectType: "bgm_track", tool: "bgmwrite.compose",
+      params: { input_path: SOURCE, output_path: BGM, recipe_id: "food", bpm_strategy: "recipe", seed: 2026 },
       context: { tenant_daily_bgm: 0 },
-      label: "诊断成片音轨（人声活动/底噪/剪辑点）",
+      label: "按声明配方作曲出 BGM",
     },
     {
-      stepId: "s2", action: "bgmwrite.compose", objectType: "bgm_track", tool: "bgmwrite.compose",
-      params: { input_path: SOURCE, output_path: BGM, recipe_id: "food", bpm_strategy: "cut-driven", seed: 2026 },
-      context: { tenant_daily_bgm: 0 },
-      label: "自算作曲出 BGM（按剪辑点定速）",
-    },
-    {
-      stepId: "s3", action: "bgmwrite.mix", objectType: "bgm_report", tool: "bgmwrite.mix",
+      stepId: "s2", action: "bgmwrite.mix", objectType: "bgm_report", tool: "bgmwrite.mix",
       params: {
         input_path: SOURCE, output_path: MIXED, bgm_path: BGM, policy: "keep-dialogue",
         music_level_db: -22, ducking_db: 12, track_license: "workloom-self-generated", commercial_use: true,

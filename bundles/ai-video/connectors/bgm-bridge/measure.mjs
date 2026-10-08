@@ -153,7 +153,7 @@ export async function binaryVersion(bin, { timeoutMs = 20_000 } = {}) {
 
 /* ============================ 媒体探测 ============================ */
 
-export async function probeMedia(input, { bins = resolveBinaries() } = {}) {
+export async function probeMedia(input, { bins = resolveBinaries(), allowNoAudio = false } = {}) {
   const { stdout } = await runBin(bins.ffprobe, [
     "-v", "error",
     "-print_format", "json",
@@ -170,7 +170,7 @@ export async function probeMedia(input, { bins = resolveBinaries() } = {}) {
   const streams = Array.isArray(parsed.streams) ? parsed.streams : [];
   const video = streams.find((s) => s.codec_type === "video") ?? null;
   const audio = streams.find((s) => s.codec_type === "audio") ?? null;
-  if (!audio) throw new MeasureError("输入不含音频轨（配乐工位只处理带音轨的成片）", "bad_media");
+  if (!audio && !allowNoAudio) throw new MeasureError("输入不含音频轨（当前诊断需要音频）", "bad_media");
 
   const parseRate = (value) => {
     if (typeof value !== "string" || !value.includes("/")) return null;
@@ -179,7 +179,7 @@ export async function probeMedia(input, { bins = resolveBinaries() } = {}) {
   };
 
   return {
-    duration: Number(parsed.format?.duration ?? audio.duration ?? 0),
+    duration: Number(video?.duration ?? parsed.format?.duration ?? audio?.duration ?? 0),
     sizeBytes: Number(parsed.format?.size ?? 0),
     formatName: parsed.format?.format_name ?? null,
     video: video
@@ -190,13 +190,13 @@ export async function probeMedia(input, { bins = resolveBinaries() } = {}) {
         fps: parseRate(video.r_frame_rate),
       }
       : null,
-    audio: {
+    audio: audio ? {
       codec: audio.codec_name ?? null,
       channels: Number(audio.channels ?? 0),
       channelLayout: audio.channel_layout ?? null,
       sampleRate: Number(audio.sample_rate ?? 0),
       bitRate: audio.bit_rate ? Number(audio.bit_rate) : null,
-    },
+    } : null,
   };
 }
 

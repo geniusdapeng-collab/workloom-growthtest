@@ -4,18 +4,17 @@
  * 背景（2026-09-30 复盘）：本机没有"独立音轨签发者"（`WORKLOOM_AUDIO_STEM_SIGNING_SECRET` 未配置）时，
  * 旧行为是 fail-closed 直接拒绝 —— 结果"本地无版权曲库直接选曲混音"这条**正常交付路径被卡死**
  * （真机：成片迟迟出不来，配乐环节报 `audio_stems_source_unverified`）。
- * 现在：调用方**显式声明** `--declared-program-mix` 就能直混，但回执必须如实标注未取证，不冒充签章分轨。
- *
- * 本测试是"happy path 冒烟"：没有签发者时也必须能出片；同时守住 fail-closed 的另一半——
- * 不声明、也没有签章时，仍然必须拒绝。
+ * 现在默认保留原片混合音轨，回执必须如实标注 native-source，不冒充签章分轨。
+ * 显式签章引用仍须通过验证；兼容声明不能使损坏引用变成默认原声。
  */
 import assert from "node:assert/strict";
-import { before, describe, it } from "node:test";
-import { execFileSync } from "node:child_process";
+import { after, before, describe, it } from "node:test";
+import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { mix } from "./core.mjs";
 
 const bins = {
@@ -43,7 +42,7 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
     music = path.join(root, "music.wav");
     /**
      * 源片 = 对白（440Hz）+ 环境混音成品；曲库曲目 = 1760Hz（与对白频段错开，便于复检）。
-     * 1.0–2.0s 留一段静音当"安静窗口"：配乐可闻度复检需要它，否则会以"无法测量"拒绝出片（fail-closed）。
+     * 1.0–2.0s 留一段静音；静音与有声都应完成配方处理，不做源片声音品质否决。
      */
     encode(["-f", "lavfi", "-i", "color=c=black:s=320x240:d=3",
       "-f", "lavfi", "-i", "sine=frequency=440:duration=3",
@@ -53,7 +52,8 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
     encode(["-f", "lavfi", "-i", "sine=frequency=1760:duration=3", "-c:a", "pcm_s16le", music]);
   });
 
-  it("无签发者 + 显式声明：直混出片，回执如实标注 declared-unverified", async () => {
+  after(() => { if (root) fs.rmSync(root, { recursive: true, force: true }); });
+  it("无签发者 + 兼容显式声明：直混出片，回执如实标注原生节目且未作分轨或品质认证", async () => {
     const env = {
       ...process.env,
       /** 明确模拟"本机没有签发者" */
@@ -71,11 +71,11 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
       env, bins
     });
     assert.ok(fs.existsSync(result.output.path), "声明式直混必须产出成片");
-    assert.equal(result.independentAudio.sourceAuthority, "declared-unverified");
+    assert.equal(result.independentAudio.sourceAuthority, "native-source");
     assert.equal(result.independentAudio.stemsVerified, false);
     assert.equal(result.independentAudio.retainedMusicExcluded, false);
-    assert.equal(result.independentAudio.dialogueStatus, "declared-unverified");
     assert.match(String(result.independentAudio.duckingSource ?? ""), /program-mix/);
+    assert.equal(result.metrics, null); assert.equal(result.qualityReviewPerformed, false); assert.equal(result.qualityRetries, 0);
     /** 不冒充签章：声明路径不得出现 signed/passed 的来源口径 */
     assert.notEqual(result.independentAudio.sourceAuthority, "passed");
     const presentedAudio = execFileSync(bins.ffmpeg, ["-hide_banner", "-v", "error", "-i", result.output.path,
@@ -86,7 +86,7 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
     assert.equal(Number(finalVideo.streams[0].nb_read_frames), 75, "合流不得修改原画面帧数");
   });
 
-  it("不声明、也没有签章：仍然 fail-closed（audio_stems_source_unverified）", async () => {
+  it("不声明、也没有签章：默认消费原片音轨，完成单次请求混音", async () => {
     const env = {
       ...process.env,
       WORKLOOM_AUDIO_STEM_SIGNING_SECRET: "",
@@ -94,21 +94,18 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
       WORKLOOM_BGM_DISCOVER: "0",
       WORKLOOM_BGM_ALLOWED_ROOTS: root
     };
-    await assert.rejects(
-      () => mix({
+    const result = await mix({
         input: source, output: path.join(root, "unsigned.mp4"), bgmPath: music,
         policy: "keep-dialogue", musicLevelDb: -24, duckingDb: 12,
         fadeInSec: 0.1, fadeOutSec: 0.1, align: false, section: "full",
         env, bins
-      }),
-      (error) => {
-        assert.equal(error?.code, "audio_stems_source_unverified");
-        return true;
-      }
-    );
+      });
+    assert.equal(result.independentAudio.embeddedAudioUsed, true);
+    assert.equal(result.independentAudio.sourceAuthority, "native-source");
+    assert.ok(fs.existsSync(result.output.path));
   });
 
-  it("高峰值混合源先做可追溯处理，最终响度、峰值和让位实测均通过", async () => {
+  it("高峰值混合源执行请求混音，不做响度/峰值/让位品质审核或重试", async () => {
     const peaked = path.join(root, "high-crest.mp4");
     encode(["-f", "lavfi", "-i", "color=c=black:s=160x120:r=24:d=8",
       "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=8",
@@ -121,24 +118,47 @@ suite("配乐声明式直混（无签章签发者时的正常交付路径）", (
       fadeInSec: 0.1, fadeOutSec: 0.1, align: false, section: "full",
       env: { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: root, WORKLOOM_BGM_DISCOVER: "0" }, bins });
     assert.equal(digest(peaked), beforeHash, "原片只读");
-    assert.ok(Object.values(result.checks).every((value) => value === true));
-    assert.equal(result.independentAudio.sourcePreparation.applied, true);
-    assert.equal(result.independentAudio.sourcePreparation.method, "declared-source-dynamic-loudnorm");
-    assert.ok(result.independentAudio.sourcePreparation.sourceSha256);
-    assert.ok(result.independentAudio.sourcePreparation.after.truePeakDbtp <= -2.8);
+    assert.equal(result.checks.processingSucceeded, true); assert.equal(result.checks.sourceBytesUnchanged, true);
     assert.equal(result.independentAudio.stemsVerified, false);
-    assert.equal(result.loudness.normalization.method, "shared-linear-gain");
-    assert.equal(result.loudness.normalization.limiterApplied, false);
+    assert.equal(result.loudness.status, "not-measured"); assert.equal(result.qualityRetries, 0); assert.equal(result.metrics, null);
     assert.ok(Math.abs(result.output.durationSeconds - 8) < 0.04);
   }, { timeout: 120000 });
 
-  it("不可测的静音混合源拒绝交付，不写成功产物", async () => {
+  it("静音混合源正常配乐，静音不是二次品质否决", async () => {
     const silent = path.join(root, "silent.mp4"), output = path.join(root, "silent-result.mp4");
     encode(["-f", "lavfi", "-i", "color=c=black:s=160x120:d=3",
       "-f", "lavfi", "-i", "anullsrc=r=48000:cl=stereo", "-t", "3",
       "-c:v", "libx264", "-c:a", "aac", "-shortest", silent]);
-    await assert.rejects(mix({ input: silent, output, bgmPath: music, declaredProgramMix: true,
-      env: { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: root }, bins }), { code: "verify_failed" });
-    assert.equal(fs.existsSync(output), false);
+    const result = await mix({ input: silent, output, bgmPath: music, declaredProgramMix: true,
+      env: { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: root }, bins });
+    assert.equal(fs.existsSync(output), true); assert.equal(result.qualityReviewPerformed, false);
   });
+
+  it("真实 mix/best CLI 的显式坏引用不得被兼容声明或默认原声路径吞掉", () => {
+    const cli = path.join(path.dirname(fileURLToPath(import.meta.url)), "cli.mjs");
+    const invalid = [null, false, 42, "native", [], {}, { dir: path.join(root, "nonexistent-stems") }];
+    let checked = 0;
+    for (const command of ["mix", "best"]) {
+      for (const compatibilityFlag of [false, true]) {
+        for (let index = 0; index < invalid.length; index += 1) {
+          const reference = path.join(root, `invalid-${index}.json`);
+          fs.writeFileSync(reference, JSON.stringify(invalid[index]));
+          const output = path.join(root, `bad-${command}-${compatibilityFlag}-${index}.mp4`);
+          const result = spawnSync(process.execPath, [cli, command, "--in", source, "--out", output,
+            ...(command === "mix" ? ["--bgm", music] : ["--source-policy", "compose-only"]),
+            "--audio-stems", reference, ...(compatibilityFlag ? ["--declared-program-mix"] : [])],
+          { env: { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: root, WORKLOOM_AUDIO_STEM_SIGNING_SECRET: "", WORKLOOM_BGM_DISCOVER: "0" }, encoding: "utf8", timeout: 30_000 });
+          assert.equal(result.status, 3, `${command} ${JSON.stringify(invalid[index])}: ${result.stderr}`);
+          assert.match(result.stderr, /audio_stems_source_unverified|audio_stems_stale|audio_stems_invalid|bad_request|not_found/);
+          assert.equal(fs.existsSync(output), false);
+          checked += 1;
+        }
+        const noValue = spawnSync(process.execPath, [cli, command, "--in", source, "--out", path.join(root, `naked-${command}-${compatibilityFlag}.mp4`),
+          ...(command === "mix" ? ["--bgm", music] : []), "--audio-stems", ...(compatibilityFlag ? ["--declared-program-mix"] : [])],
+        { env: { ...process.env, WORKLOOM_BGM_ALLOWED_ROOTS: root }, encoding: "utf8", timeout: 30_000 });
+        assert.equal(noValue.status, 3); assert.match(noValue.stderr, /audio_stems_source_unverified/); checked += 1;
+      }
+    }
+    assert.equal(checked, 32);
+  }, { timeout: 120_000 });
 });
