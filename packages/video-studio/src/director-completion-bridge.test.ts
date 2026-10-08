@@ -127,10 +127,13 @@ async function fixture(lockTrim: boolean) {
   const temporary = await fsp.mkdtemp(path.join(os.tmpdir(), "director-worker-bridge-"));
   const root = await fsp.realpath(temporary); tempRoots.push(root);
   const input = path.join(root, "source.mp4");
+  // Both finite six-second inputs must reach EOF. A video frame limit can
+  // finish every output stream in FFmpeg 5 before the audio input is drained.
+  // The exact 180-frame fixture and the full audio tail are verified below.
   await measure.runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-filter_threads", "1",
     "-f", "lavfi", "-i", "testsrc2=s=160x288:r=30:d=6",
     "-f", "lavfi", "-i", "sine=frequency=733:sample_rate=48000:duration=6",
-    "-map", "0:v:0", "-map", "1:a:0", "-frames:v", String(SOURCE_FRAMES),
+    "-map", "0:v:0", "-map", "1:a:0",
     "-vf", "drawbox=x=0:y=0:w=iw:h=ih:color=red:t=fill:enable='gte(t,5.5)'",
     "-c:v", "libx264", "-preset", "veryfast", "-threads", "2", "-pix_fmt", "yuv420p",
     "-c:a", "aac", "-ar", "48000", "-ac", "2", input],
@@ -292,6 +295,7 @@ describe("actual director worker -> audio -> prepared source -> EDL -> ffmpeg pi
       tailPixels.push({ file, frame: SOURCE_FRAMES - 1, red, green, blue });
     }
     const originalTone = await tailTone(f, f.input), programTone = await tailTone(f, program.path);
+    console.info(JSON.stringify({ fixture: "director-native-audio-tail-before-assertions", originalTone, programTone }));
     for (const tone of [originalTone, programTone]) {
       expect(tone.samples).toBe(24_000); expect(tone.rms).toBeGreaterThan(1000);
       expect(Math.abs(tone.frequency - 733)).toBeLessThan(4);
