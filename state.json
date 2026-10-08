@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3577,
+  "revision": 3579,
   "tasks": {
     "98": {
       "number": 98,
@@ -2051,7 +2051,7 @@
     },
     "119": {
       "number": 119,
-      "status": "developing",
+      "status": "parked",
       "firstSeen": 1791334775914,
       "attempts": {},
       "admission": {
@@ -2067,9 +2067,9 @@
           "protocol": 91
         }
       },
-      "updatedAt": 1791446112109,
-      "error": "检查/评审阻断：Required check static-gate missing/failed/ambiguous; Required check test-gate missing/failed/ambiguous",
-      "blockedUntil": 1791440715248,
+      "updatedAt": 1791446422308,
+      "error": "Platform snapshot changed while reading",
+      "blockedUntil": 1791447022308,
       "headSha": "45ac96dc2f55eb6f19e6934c761e2c03d4a43a4a",
       "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
       "branch": "task/T-2026-1007-0001",
@@ -90130,6 +90130,31 @@
       },
       "previous": "154dbd0d010517200f18cea230fe5444c6e5464d3e223588baf1ba4229a24083",
       "digest": "e7f1d71f05e151e6b4069b571f09d6b2ac2629eafc59f7260713b340a8418a84"
+    },
+    {
+      "sequence": 3578,
+      "at": "2026-10-08T08:00:22.308Z",
+      "kind": "task",
+      "data": {
+        "number": 119,
+        "patch": {
+          "status": "parked",
+          "error": "Platform snapshot changed while reading",
+          "blockedUntil": 1791447022308
+        }
+      },
+      "previous": "e7f1d71f05e151e6b4069b571f09d6b2ac2629eafc59f7260713b340a8418a84",
+      "digest": "5b02ced9ae86419c8b92d3ca6750f5375feda3da87e43ea15e4d6bab9286d02d"
+    },
+    {
+      "sequence": 3579,
+      "at": "2026-10-08T08:01:04.889Z",
+      "kind": "transaction",
+      "data": {
+        "id": "47a5528c-6075-42ea-aa17-d2366cb869c5"
+      },
+      "previous": "5b02ced9ae86419c8b92d3ca6750f5375feda3da87e43ea15e4d6bab9286d02d",
+      "digest": "f13fef6f0d5629e14ee413d7dc41318415ed6249b3f170d21f6bb24de2a95ea9"
     }
   ]
 }
