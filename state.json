@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "repo": "workloom-ai/workloom-growthtest",
-  "revision": 3761,
+  "revision": 3763,
   "tasks": {
     "98": {
       "number": 98,
-      "status": "waiting_ci",
+      "status": "parked",
       "firstSeen": 1791314317242,
       "attempts": {},
       "headSha": "dae795860c94b9301d86694123a07cadf8ce59b0",
@@ -55,15 +55,15 @@
       },
       "recoveryCount": 0,
       "reviewFailures": null,
-      "blockedUntil": 0,
+      "blockedUntil": 1791459013892,
       "candidate": null,
       "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
       "repairRequired": {
         "provider": "codex",
-        "headSha": "f324e8a94cc002cc2f2b57cbb53b07c98d4ff39f",
-        "mainSha": "ed485d4979f9e92541d7a7066df9557dfeb66f78",
+        "headSha": "dae795860c94b9301d86694123a07cadf8ce59b0",
+        "mainSha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
         "reason": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
-        "at": 1791454218839
+        "at": 1791458413892
       },
       "recoveryIntent": null
     },
@@ -96736,6 +96736,39 @@
       },
       "previous": "139e28d49e41f631d304c5a0f8b55df750869c8214516512744260b50e619232",
       "digest": "8a469388f5df847acf15a1f6eca5abf73560453b89160ba39069b0dc9e677bff"
+    },
+    {
+      "sequence": 3762,
+      "at": "2026-10-08T11:20:13.892Z",
+      "kind": "task",
+      "data": {
+        "number": 98,
+        "patch": {
+          "status": "parked",
+          "error": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+          "repairRequired": {
+            "provider": "codex",
+            "headSha": "dae795860c94b9301d86694123a07cadf8ce59b0",
+            "mainSha": "17ec630dc1bcba1a000a9899c9da640b94fa5114",
+            "reason": "检查/评审阻断：Developer has not handed off; Codex review identity differs from the exact repository/source/main/policy",
+            "at": 1791458413892
+          },
+          "recoveryIntent": null,
+          "blockedUntil": 1791459013892
+        }
+      },
+      "previous": "8a469388f5df847acf15a1f6eca5abf73560453b89160ba39069b0dc9e677bff",
+      "digest": "04c9cb53a0bbf2280e635ef6310880a58fcf54866af5ee4d241e548f6fa0de7d"
+    },
+    {
+      "sequence": 3763,
+      "at": "2026-10-08T11:20:22.377Z",
+      "kind": "transaction",
+      "data": {
+        "id": "3869f28b-a114-472c-b06a-16edd1186f31"
+      },
+      "previous": "04c9cb53a0bbf2280e635ef6310880a58fcf54866af5ee4d241e548f6fa0de7d",
+      "digest": "db8d2c2d348f5065829ce1308c9850c5081e473c2fcc65f9aeecd4bb85e3cc3f"
     }
   ]
 }
