@@ -1,7 +1,7 @@
 /**
  * 调色内核单测：纯函数（滤镜链/路径监狱/自动校正）+ 真实 ffmpeg 端到端（有 ffmpeg 才跑）。
  */
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -409,7 +409,7 @@ describe.runIf(hasFfmpeg)("真实 ffmpeg 端到端", () => {
     expect(probe.duration).toBeGreaterThan(2);
   }, 60_000);
 
-  it("grade 出片并给出前后指标与哈希；覆盖原片被拒", async () => {
+  it("grade 执行请求配方并记录源与输出哈希，不签发品质指标；覆盖原片被拒", async () => {
     const result = await grade({
       input: source,
       output: gradedOut,
@@ -420,19 +420,18 @@ describe.runIf(hasFfmpeg)("真实 ffmpeg 端到端", () => {
     });
     expect(fs.existsSync(gradedOut)).toBe(true);
     expect(result.sha256).toHaveLength(64);
-    expect(result.after.YAVG).toBeGreaterThan(result.before.YAVG);
+    expect(result.sourceSha256).toHaveLength(64);
+    expect(result.before).toEqual({}); expect(result.after).toEqual({});
     expect(result.chain).toContain("eq=");
-    // 可见性：这是"调了跟没调一样"事故的回归防线
-    expect(result.visibility.verdict).not.toBe("negligible");
-    expect(result.visibility.meanAbsDiff).toBeGreaterThanOrEqual(2);
+    expect(result.visibility).toEqual({ verdict: "not-reviewed", meanAbsDiff: null });
+    expect(result.qualityReviewPerformed).toBe(false);
     await expect(grade({ input: source, output: source, bins })).rejects.toThrow(/禁止覆盖原片/);
   }, 120_000);
 
   it("look 参数可辨：teal-orange 满档必须产生肉眼可见差异（visible）", async () => {
     const out = path.join(dir, "graded-teal.mp4");
     const result = await grade({ input: source, output: out, profile: "teal-orange", intensity: 1, bins });
-    expect(result.visibility.verdict).toBe("visible");
-    expect(result.visibility.meanAbsDiff).toBeGreaterThanOrEqual(4);
+    expect(result.visibility.verdict).toBe("not-reviewed");
     const diff = await frameDifference({ before: source, after: out, at: [1], bins });
     expect(diff.frames[0]?.pctOver5).toBeGreaterThan(20);
   }, 120_000);
@@ -442,15 +441,18 @@ describe.runIf(hasFfmpeg)("真实 ffmpeg 端到端", () => {
     const full = path.join(dir, "graded-i100.mp4");
     const a = await grade({ input: source, output: weak, profile: "teal-orange", intensity: 0.25, bins });
     const b = await grade({ input: source, output: full, profile: "teal-orange", intensity: 1, bins });
-    expect(a.visibility.meanAbsDiff).toBeLessThan(b.visibility.meanAbsDiff * 0.6);
-    expect(a.visibility.meanAbsDiff).toBeLessThan(6);
+    expect(a.qualityReviewPerformed).toBe(false); expect(b.qualityReviewPerformed).toBe(false);
+    const weakDiff = await frameDifference({ before: source, after: weak, at: [1], bins });
+    const fullDiff = await frameDifference({ before: source, after: full, at: [1], bins });
+    expect(weakDiff.frames[0].meanAbsDiff).toBeLessThan(fullDiff.frames[0].meanAbsDiff * 0.6);
+    expect(weakDiff.frames[0].meanAbsDiff).toBeLessThan(6);
   }, 180_000);
 
-  it("看不出变化就拒绝交付（verify_failed，且不留产物）", async () => {
+  it("微小请求强度正常出片，不以可见性作二次否决", async () => {
     const out = path.join(dir, "graded-invisible.mp4");
-    await expect(grade({ input: source, output: out, profile: "natural", intensity: 0.02, bins }))
-      .rejects.toThrow(/未产生可见变化/);
-    expect(fs.existsSync(out)).toBe(false);
+    const result = await grade({ input: source, output: out, profile: "natural", intensity: 0.02, bins });
+    expect(result.qualityReviewPerformed).toBe(false);
+    expect(fs.existsSync(out)).toBe(true); expect(result.intensity).toBe(0.02);
   }, 120_000);
 
   it("scope 渲染三种图并各自带哈希", async () => {
@@ -464,22 +466,22 @@ describe.runIf(hasFfmpeg)("真实 ffmpeg 端到端", () => {
 
   it("LUT 非法/缺失被拒（bad_lut）", async () => {
     await expect(grade({ input: source, output: path.join(dir, "x.mp4"), lutPath: "/tmp/missing.cube", bins }))
-      .rejects.toThrow(/LUT 不存在/);
+      .rejects.toThrow(/LUT.*不存在/);
   }, 60_000);
 
-  it("择优：健康素材判「无需调色」且不产出文件（do no harm）", async () => {
+  it("兼容 best 指令执行已声明的一个配方，不打分或跳过出片", async () => {
     const out = path.join(dir, "best-none.mp4");
     const result = await best({
       input: source, output: out, sampleAt: [1],
       candidates: [{ id: "moody-dark@1", label: "moody-dark", spec: { profile: "moody-dark", intensity: 1 } }],
       bins,
     });
-    expect(result.verdict).toBe("no_change_needed");
-    expect(result.candidates.length).toBeGreaterThanOrEqual(2);
-    expect(fs.existsSync(out)).toBe(false);
+    expect(result.verdict).toBe("graded"); expect(result.profile).toBe("moody-dark");
+    expect(result.candidates).toEqual([]); expect(result.finalScore).toBeNull();
+    expect(fs.existsSync(out)).toBe(true);
   }, 180_000);
 
-  it("择优：扁平素材会选出「提升对比度」的候选并出片（且不是靠拉饱和骗分）", async () => {
+  it("扁平素材直接执行声明的首个配方并出片，不以画质评分挑选候选", async () => {
     const flat = path.join(dir, "flat.mp4");
     execFileSync(bins.ffmpeg, [
       "-hide_banner", "-v", "error", "-y",
@@ -501,23 +503,19 @@ describe.runIf(hasFfmpeg)("真实 ffmpeg 端到端", () => {
     });
     expect(result.verdict).toBe("graded");
     expect(fs.existsSync(out)).toBe(true);
-    expect(result.finalScore.score).toBeGreaterThan(100);
-    expect((result.finalScore.reasons.contrastRatio as number)).toBeGreaterThanOrEqual(1);
-    expect((result.finalScore.reasons.clipDeltaPct as number)).toBeLessThanOrEqual(0.5);
+    expect(result.profile).toBe("natural"); expect(result.finalScore).toBeNull();
+    expect(result.candidates).toEqual([]); expect(result.qualityReviewPerformed).toBe(false);
   }, 240_000);
 
-  it("配方驱动：给出题材后候选池包含该配方的强度梯度与 LUT，并在结果里回报所用配方", async () => {
+  it("配方驱动保留题材标签，显式首个配方优先且没有品质候选池", async () => {
     const out = path.join(dir, "recipe-best.mp4");
     const result = await best({
       input: source, output: out, sampleAt: [1], genre: "美食",
       candidates: [{ id: "natural@0.5", label: "natural", spec: { profile: "natural", intensity: 0.5 } }],
       bins,
     });
-    const ids = result.candidates.map((c) => c.id);
     expect(result.recipe).toBe("food-appetite");
-    expect(ids).toContain("recipe:food-appetite@0.65");
-    expect(ids).toContain("recipe-lut:food-appetite");
-    expect(result.recipeContext?.genre).toContain("美食");
+    expect(result.candidates).toEqual([]); expect(result.profile).toBe("natural"); expect(result.intensity).toBe(0.5);
   }, 180_000);
 });
 
@@ -613,41 +611,39 @@ describe.runIf(hasX264)("镜间匹配端到端：直方图残差 + 可选降噪�
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it("①亮度均值相同但分布不同：旧均值判据通过、新残差识别；fail 判负、off 关闭", async () => {
-    const res = await match({ reference: files.grad, targets: [files.bimodal], outDir: p("m-warn"), bins });
-    const item = res.results[0];
+  it("①分布不同仍执行显式匹配；旧 histogram fail 参数不形成品质准入或重试", async () => {
+    for (const histogramCheck of ["warn", "fail", "off"]) {
+      const result = await match({ reference: files.grad, targets: [files.bimodal], outDir: p(`m-${histogramCheck}`), histogramCheck, bins });
+      const item = result.results[0];
+      expect(item.ok).toBe(true);
+      expect(fs.existsSync(item.output)).toBe(true);
+      expect(item.sha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(item.sourceSha256).toMatch(/^[a-f0-9]{64}$/);
+      expect(item.residual).toBeNull();
+      expect(item.after).toBeNull();
+      expect(item.qualityReviewPerformed).toBe(false);
+      expect(item.measurementPurpose).toBe("requested-color-match-transform");
+      expect(result.histogramCheck).toBe("not-reviewed");
+      expect(result.histogramCheckRequested).toBe(histogramCheck);
+    }
+  }, 120_000);
+
+  it("②显式匹配以输入统计计算真实校正，不对已完成源或成品残差投票", async () => {
+    const result = await match({ reference: files.grad, targets: [files.gradDark], outDir: p("m-ok"), bins });
+    const item = result.results[0];
     expect(item.ok).toBe(true);
-    // 旧均值判据：同均值合成素材必须过线（证明旧判据确实漏检这类素材）
-    expect(Math.abs(item.residual.YAVG as number)).toBeLessThanOrEqual(5);
-    // 新直方图判据：默认 warn 上报，写入既有 residual 字段
-    expect(item.residual.histogram.over).toBe(true);
-    expect(item.residual.histogram.weighted).toBeGreaterThan(HIST_RESIDUAL_THRESHOLD);
-    expect(item.residual.histogram.warning).toContain("均值陷阱");
+    expect(item.corrections.eq.brightness).toBeGreaterThan(0);
+    expect(item.before.YAVG).toBeLessThan(result.referenceSummary.YAVG);
+    expect(item.residual).toBeNull();
+    expect(result.qualityReviewPerformed).toBe(false);
+    const difference = await frameDifference({ before: files.gradDark, after: item.output, at: [0.5], bins });
+    expect(difference.meanAbsDiff).toBeGreaterThan(0);
+    const missing = await match({ reference: files.grad, targets: [p("missing.mp4")], outDir: p("m-missing"), bins });
+    expect(missing.results).toEqual([{ target: p("missing.mp4"), ok: false, error: "not_found" }]);
+    await expect(match({ reference: p("missing-reference.mp4"), targets: [files.gradDark], outDir: p("m-ref-error"), bins })).rejects.toMatchObject({ code: "not_found" });
+  }, 120_000);
 
-    const failed = await match({
-      reference: files.grad, targets: [files.bimodal], outDir: p("m-fail"), histogramCheck: "fail", bins,
-    });
-    expect(failed.results[0].ok).toBe(false);
-    expect(failed.results[0].error).toBe("histogram_residual");
-
-    const off = await match({
-      reference: files.grad, targets: [files.bimodal], outDir: p("m-off"), histogramCheck: "off", bins,
-    });
-    expect(off.results[0].ok).toBe(true);
-    expect(off.results[0].residual.histogram).toBeUndefined();
-  }, 360_000);
-
-  it("②正常匹配素材：均值与直方图判据双双过线，零误报", async () => {
-    const res = await match({ reference: files.grad, targets: [files.gradDark], outDir: p("m-ok"), bins });
-    const item = res.results[0];
-    expect(item.ok).toBe(true);
-    expect(Math.abs(item.residual.YAVG as number)).toBeLessThanOrEqual(5);
-    expect(item.residual.histogram.over).toBe(false);
-    expect(item.residual.histogram.weighted).toBeLessThanOrEqual(HIST_RESIDUAL_THRESHOLD);
-    expect(item.residual.histogram.warning).toBeNull();
-  }, 240_000);
-
-  it("③降噪默认关闭；开启且噪点命中时插入 hqdn3d 且 luma_spatial≤2.0；干净素材不插入", async () => {
+  it("③降噪默认关闭；显式请求在噪片与干净素材都执行，不先做噪点审查", async () => {
     // 默认关闭：滤镜链无 hqdn3d
     const def = await grade({
       input: files.noisy, output: p("dn-default.mp4"),
@@ -662,13 +658,12 @@ describe.runIf(hasX264)("镜间匹配端到端：直方图残差 + 可选降噪�
     const m = /hqdn3d=luma_spatial=([0-9.]+)/.exec(on.chain);
     expect(m, "噪点命中时滤镜链应含 hqdn3d").not.toBeNull();
     expect(Number(m![1])).toBeLessThanOrEqual(2);
-    // 开启但噪点未命中：不插入，并在 verifyWarnings 注明原因
+    // 显式请求也适用于干净素材；不进行自动品质筛选。
     const clean = await grade({
       input: files.clean, output: p("dn-clean.mp4"),
       corrections: { eq: { brightness: 0.01 } }, denoise: true, bins,
     });
-    expect(clean.chain).not.toContain("hqdn3d");
-    expect(clean.verifyWarnings.join("\n")).toContain("未插入降噪");
+    expect(clean.chain).toContain("hqdn3d"); expect(clean.qualityReviewPerformed).toBe(false);
   }, 360_000);
 });
 
@@ -830,20 +825,19 @@ describe.runIf(hasX264)("P0 防线端到端：肤色 / 场景抽样 / 缺陷 / R
     expect(report.issues.some((i) => i.kind === "defect_blur")).toBe(true);
   }, 180_000);
 
-  it("T-03 交付闸：onUnfixable=block 时拒出片且不留产物，默认 report 只如实上报", async () => {
+  it("T-03 成功渲染的失焦素材执行后期，旧 onUnfixable 参数不建立品质否决", async () => {
     const blocked = p("blocked.mp4");
-    await expect(grade({
+    const completed = await grade({
       input: files.blurred, output: blocked,
       corrections: { eq: { brightness: 0.06 } }, onUnfixable: "block", bins,
-    })).rejects.toThrow(/不可修复/);
-    expect(fs.existsSync(blocked)).toBe(false);
+    });
+    expect(fs.existsSync(blocked)).toBe(true); expect(completed.defects).toBeNull();
 
     const reported = await grade({
       input: files.blurred, output: p("reported.mp4"),
       corrections: { eq: { brightness: 0.06 } }, bins,
     });
-    expect(reported.defects?.unfixable.some((d) => d.kind === "blur")).toBe(true);
-    expect(reported.verifyWarnings.join("\n")).toContain("不可修复");
+    expect(reported.defects).toBeNull(); expect(reported.qualityReviewPerformed).toBe(false);
   }, 300_000);
 
   it("T-04 交付元数据：输出 bt709 三标签齐全且 ffprobe 回读一致", async () => {
@@ -851,10 +845,61 @@ describe.runIf(hasX264)("P0 防线端到端：肤色 / 场景抽样 / 缺陷 / R
     const result = await grade({
       input: files.sharp, output: out, profile: "teal-orange", intensity: 1, bins,
     });
-    expect(result.outputColor).toMatchObject({ primaries: "bt709", transfer: "bt709", space: "bt709", verified: true });
+    expect(result.outputColor).toMatchObject({ primaries: "bt709", transfer: "bt709", space: "bt709" });
     const probe = await probeMedia(out, { bins });
     expect(probe.video.colorPrimaries).toBe("bt709");
     expect(probe.video.colorTransfer).toBe("bt709");
     expect(probe.video.colorSpace).toBe("bt709");
   }, 180_000);
+});
+
+
+describe.skipIf(!hasX264)("human color CLI renders actual requests with unmeasured quality fields", () => {
+  let dir: string, source: string;
+  beforeAll(() => {
+    dir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "color-human-cli-"))); source = path.join(dir, "source.mp4");
+    execFileSync(bins.ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "testsrc2=s=160x120:r=12:d=1", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", source]);
+  });
+  afterAll(() => { fs.rmSync(dir, { recursive: true, force: true }); });
+  const call = (args: string[]) => spawnSync(process.execPath, [path.join(import.meta.dirname, "cli.mjs"), ...args], { encoding: "utf8", timeout: 60_000,
+    env: { ...process.env, WORKLOOM_COLOR_FFMPEG_PATH: bins.ffmpeg, WORKLOOM_COLOR_FFPROBE_PATH: bins.ffprobe, WORKLOOM_COLOR_ALLOWED_ROOTS: dir } });
+  it.each(["grade", "best", "match"])("%s default human output succeeds with null residual/metrics and actual artifact", command => {
+    const before = fs.readFileSync(source), output = path.join(dir, `${command}.mp4`), outDir = path.join(dir, "matched");
+    const args = command === "match" ? ["match", "--ref", source, "--in", source, "--out-dir", outDir] : [command, "--in", source, "--out", output, ...(command === "best" ? ["--recipe", "food-appetite"] : ["--profile", "warm-film"])];
+    const done = call(args); expect(done.status, done.stdout + done.stderr).toBe(0);
+    expect(done.stdout).toContain("加工回执"); expect(done.stdout).toMatch(/未测|未进行候选打分/);
+    expect(done.stdout + done.stderr).not.toMatch(/Cannot read|NaN|候选得分|残差 YAVG/);
+    expect(command === "match" ? fs.readdirSync(outDir).some(file => file.endsWith(".mp4")) : fs.existsSync(output)).toBe(true);
+    expect(fs.readFileSync(source)).toEqual(before);
+  }, 90_000);
+  it("help explains explicit denoise, single recipe best and unmeasured residuals", () => {
+    const done = call(["help"]); expect(done.status, done.stderr).toBe(0);
+    expect(done.stdout).toContain("不触发分析"); expect(done.stdout).toContain("需 --out"); expect(done.stdout).toContain("不作输出残差验收");
+  });
+  it.each([false, true].flatMap(json => ["valid", "missing", "mixed", "all-failed"].map(kind => ({ json, kind }))))(
+    "match $kind batch reports every item and returns an honest exit code (json=$json)", ({ json, kind }) => {
+      const before = fs.readFileSync(source), missingA = path.join(dir, "absent-a.mp4"), missingB = path.join(dir, "absent-b.mp4");
+      const targets = kind === "valid" ? [source] : kind === "mixed" ? [source, missingA] : kind === "missing" ? [missingA] : [missingA, missingB];
+      const outDir = path.join(dir, `batch-${kind}-${json ? "json" : "human"}`);
+      const done = call(["match", "--ref", source, ...targets.flatMap(target => ["--in", target]), "--out-dir", outDir, ...(json ? ["--json"] : [])]);
+      expect(done.status, done.stdout + done.stderr).toBe(kind === "valid" ? 0 : 3);
+      expect(done.stderr).toBe("");
+      const successful = kind === "valid" || kind === "mixed", output = path.join(outDir, "source-matched.mp4");
+      expect(fs.existsSync(output)).toBe(successful);
+      expect(fs.readdirSync(outDir).filter(file => file.endsWith(".mp4"))).toHaveLength(successful ? 1 : 0);
+      if (json) {
+        const result = JSON.parse(done.stdout);
+        expect(result.qualityReviewPerformed).toBe(false);
+        expect(result.results.map((item: { target: string }) => item.target)).toEqual(targets);
+        expect(result.results.map((item: { ok: boolean }) => item.ok)).toEqual(targets.map(target => target === source));
+        for (const item of result.results) {
+          if (item.ok) { expect(item.output).toBe(output); expect(item.residual).toBeNull(); expect(item.qualityReviewPerformed).toBe(false); }
+          else expect(item.error).toBe("not_found");
+        }
+      } else {
+        for (const target of targets) expect(done.stdout).toContain(target === source ? output : `${target} — not_found`);
+        expect(done.stdout).not.toMatch(/Cannot read|NaN|残差 YAVG/);
+      }
+      expect(fs.readFileSync(source)).toEqual(before);
+    }, 90_000);
 });

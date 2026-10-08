@@ -104,7 +104,7 @@ function printHuman(command, result) {
     line(`滤镜链：${r.chain}`);
     line(`强度：${r.intensity}${r.profile ? ` · profile=${r.profile}` : ""}${r.lut ? ` · lut=${path.basename(r.lut)}` : ""}`);
     line(`时长：${fmt(r.durationSeconds)}s · 体积：${(r.sizeBytes / 1024 / 1024).toFixed(2)}MB`);
-    line(`指标：YAVG ${fmt(r.before.YAVG)} → ${fmt(r.after.YAVG)}（Δ${fmt(r.delta.YAVG)}）  SATAVG ${fmt(r.before.SATAVG)} → ${fmt(r.after.SATAVG)}`);
+    line("加工回执：已执行声明配方；品质指标未测，qualityReviewPerformed=false");
     line(`sha256：${r.sha256}`);
     for (const w of r.verifyWarnings) line(`⚠ ${w}`);
     return;
@@ -114,15 +114,11 @@ function printHuman(command, result) {
     line(`结论：${r.verdict === "graded" ? `已调色（选中 ${r.winnerLabel}）` : "无需调色（原片不动，未产出文件）"}`);
     if (r.recipe) line(`配方：${r.recipe}${r.recipeContext ? ` · ${r.recipeContext.genre} · ${r.recipeContext.scene}` : ""}`);
     line(`理由：${r.reason ?? `最佳候选比原片高 ${r.improvement} 分（阈值 ${r.minImprovement}）`}`);
-    line("");
-    line("候选得分（基准 100 = 原片）");
-    for (const c of [...r.candidates].sort((a, b) => b.score - a.score).slice(0, 6)) {
-      line(`  ${String(c.score).padStart(6)}  ${String(c.id).padEnd(22)} 对比度×${c.reasons.contrastRatio} 饱和×${c.reasons.satRatio} 裁切${c.reasons.clipDeltaPct >= 0 ? "+" : ""}${c.reasons.clipDeltaPct}% 亮度${c.reasons.lumaDrift >= 0 ? "+" : ""}${c.reasons.lumaDrift}`);
-    }
+    line("加工回执：执行一次声明配方；未进行候选打分或品质验收");
     if (r.verdict === "graded") {
       line("");
       line(`成片：${r.output}`);
-      line(`成片得分：${r.finalScore.score}（原片 100）｜可见性 ${r.visibility.meanAbsDiff}/255 ${r.visibility.verdict}`);
+      line("已执行配方；未进行品质打分或可见性验收");
     }
     return;
   }
@@ -138,7 +134,7 @@ function printHuman(command, result) {
     for (const item of r.results) {
       if (!item.ok) { line(`  ✗ ${item.target} — ${item.error}`); continue; }
       line(`  ✓ ${item.output}`);
-      line(`    残差 YAVG ${fmt(item.residual.YAVG, 2)} / UAVG ${fmt(item.residual.UAVG, 2)} / VAVG ${fmt(item.residual.VAVG, 2)}`);
+      line("    加工回执：色彩匹配已执行；输出残差与品质指标未测，qualityReviewPerformed=false");
     }
     return;
   }
@@ -290,12 +286,12 @@ async function main() {
         "  recipes [--list] [--genre <题材>] [--platform <平台>] [--keyword <词>] [--id <配方 id>]",
         "                                  题材×场景调色配方（含 profile/LUT/强度/目标区间/避免事项）",
         "  grade   --in <file> --out <file> [--profile <p>] [--lut <cube>] [--intensity 0..1] [--corrections-json <json>]",
-        "                                        [--auto] [--denoise]  自动校正（曝光/饱和/偏色，先校正后创作）；降噪仅在噪点命中时插入",
+        "                                        [--auto] [--denoise]  执行声明配方一次；--auto 为兼容参数，不触发分析；--denoise 显式开启降噪",
         "  best    --in <file> [--out <file>] [--at a,b] [--min-improvement 2]",
         "                                  可加 [--recipe <id>] / [--genre <题材>] / [--platform <平台>] 走配方驱动",
-        "                                  候选择优+画质打分；判「无需调色」时不产出文件（do no harm）",
+        "                                  兼容入口：执行选定配方一次，需 --out；不做候选打分或品质验收",
         "  match   --ref <file> --in <file> [--in <file>...] --out-dir <dir> [--profile <p>]",
-        "                                  [--histogram-check warn|fail|off] [--denoise]",
+        "                                  [--histogram-check warn|fail|off] [--denoise]；只测输入以计算匹配变换，不作输出残差验收",
         "  compare --before <file> --after <file> [--at s] --out <png>",
         "",
         `可用 profile：${Object.keys(PROFILES).join(", ")}`,
@@ -309,6 +305,7 @@ async function main() {
 
   if (json) process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
   else printHuman(command, result);
+  if (command === "match" && result.results.some((item) => item.ok !== true)) process.exitCode = 3;
 }
 
 main().catch((error) => {

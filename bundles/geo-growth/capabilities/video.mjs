@@ -20,6 +20,7 @@ import { closeSync, existsSync, lstatSync, openSync, readFileSync, readSync, rea
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { assertFilmAudioPreflight } from "../../../scripts/tools/film-audio-policy.mjs";
 import { buildFilmRenderLedger } from "../../../scripts/tools/film-render-ledger.mjs";
+import { VIDEO_WORKBENCH_GUIDE_PATH, VIDEO_WORKBENCH_GUIDE_VERSION } from './workbench-guide.mjs';
 import { filmCompletionPolicyForDocument, describeFilmCompletion } from "../../../packages/video-studio/src/film-completion.mjs";
 
 const MAX_FILE_BYTES = 8 * 1024 * 1024;
@@ -483,6 +484,7 @@ export function productionPlan(input) {
   const command = ready ? [executable, ...argv].map(quoteShell).join(" ") : null;
   return {
     previewOnly: true,
+    usageGuide: { capabilityId: 'growth.video.workbench.guide', path: VIDEO_WORKBENCH_GUIDE_PATH, version: VIDEO_WORKBENCH_GUIDE_VERSION, readFirst: true },
     title: title || null,
     projectId,
     platform,

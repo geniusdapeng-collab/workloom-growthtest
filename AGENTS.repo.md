@@ -26,6 +26,8 @@
 
 ## 二、本仓运行与验证约定（摘要，详情见 docs/capability-map.md）
 
+- 视频任务的第一步：完整读取 `docs/ai-video-workbench-guide.md`，或调用只读 `growth.video.workbench.guide`；实际 Codex 插件调用 `workloom_video_guide({})`。先冻结用户指定模特、商品、平台、时长、账号调性、声音和特殊要求，再走正式前期→渲染→后期→真实交付核验。方案/草案不代表已放行；不手搓生产流程，不擅自替声、变速或重渲。完整原片后期按本仓标准入口执行。
+
 - 首启：`pnpm setup` → `pnpm preview:all`（三端：PC:3000 / B 移动:3001 / C 移动:3002，Mock 直登）。
 - 能力自检：`pnpm agent:tour`；全量能力清单：`docs/capability-map.md`。
 - 改能力面（脚本 / 包 / 技能 / 演示页）→ 必须 `pnpm capabilities` 重新生成人类版导览，再 `pnpm capabilities:check`。
@@ -42,7 +44,7 @@
 1. 拿到 assetId 的**第一动作是问属性**（性别/年龄段/授权范围/有效期）并建主档
    `bundles/ai-video/library/real-person-assets/<assetId>/profile.json`；**不许"先渲一版看看"**。
 2. 镜头卡（含代词）必须与主档一致；`g-real-person`（G-RP1）门在出片前逐镜核对，冲突即硬阻断。
-3. 产品所有者 2026-10-07 明确采用**渲染素材默认可用、直接进入后期**。默认 `review-policy=off` 不做渲染后的人物、服饰或画面质量复审，不要求视觉模型或首镜评审再放行其余镜头。生成前仍绑定登记授权、真实素材引用和显式造型；采用回执不认证身份或衣着。仅显式选择 `advisory/blocking` 时执行专用诊断评审，保留其真实意见。
+3. 授权和人物属性在付费提交前核对；成功渲染镜头默认直接正式后期，**不做 canary、身份/服装/动作/口型/台词品质复审或因此重渲**。保留原始字节与任务事实；不能把默认采用写成人物认证。
 4. 缺属性、缺授权、素材未登记 → fail-closed；禁止在文案里临时代替平台事实。
 
 细则见 `docs/real-person-asset.md`。

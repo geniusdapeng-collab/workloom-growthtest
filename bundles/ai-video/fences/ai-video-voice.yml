@@ -20,7 +20,7 @@ rules:
         [voiceread.health, voiceread.devices, voiceread.voices, voiceread.probe,
          voicewrite.record, voicewrite.register, voicewrite.speak, voicewrite.dub, voicewrite.verify]
     when: "true"
-    note: 录音、克隆、播报与配音都是工位本地、非破坏性、可回滚动作（原片只读 + 新文件 + sha256 回执），默认直通；授权（G-VOICE1）、对外发布（G-VOICE6）、覆盖原片（G-VOICE2）、关闭校验（G-VOICE3）、日配额（G-VOICE4）、声纹出域（G-VOICE5）叠加升级，deny 优先并集取严。未命中写动作的保守默认是 review，故此处必须显式声明 auto，否则干净配音也被挂起。
+    note: 本地录音、音色建档、显式配音或播报默认直通。克隆授权、外发授权、源覆盖、租户配额与声纹隐私仍按相应规则执行；默认不进行音質评审，也不因原片口型或对白触发 ASR/TTS。
 
   - rule_id: G-VOICE1
     name: 声音克隆授权必审（没有授权声明不得建音色档案）
@@ -43,14 +43,14 @@ rules:
     note: "原片与参考音频一律只读：配音产出新文件并进版本链（视频轨 copy，不动画面），重建音色档案只替换档案内的 reference.wav 而不动调用方给的原始录音；任何覆盖原片/参考音频的调用一票否决。DSL 写法说明：路径相同判定用 `a in [b]` 而不是 `a == b`——求值器里缺失路径是 undefined，`undefined == undefined` 为真，会让「未传 output_path/input_path」的调用被误判成覆盖原片（本工位工具口径是 video/out 命名，必踩）；`in` 的左值缺失直接不命中，正是这里要的语义。"
 
   - rule_id: G-VOICE3
-    name: 配音与播报必须可核验（禁止关闭校验）
+    name: 显式配音不设后置音质闸
     level: block
     is_baseline: true
     match:
       object_types: [voice_track, voice_report, final_video]
       actions: [voicewrite.speak, voicewrite.dub, voicewrite.verify]
-    when: "params.skip_verify == true or params.verify == false"
-    note: 播报与配音必须带响度/真峰值/时长复检与 sha256 回执（无回执=未核实，不得进入入库/发布队列）；关闭校验的调用禁止执行——声音交付里"听起来差不多"不是证据。
+    when: "false"
+    note: 兼容既有规则 ID 与绑定。speak/dub 默认不做 ASR、口型、响度或品质复检，skip_verify/verify=false 不阻断已授权的请求；实际音轨、时长、源字节、产物与错误回执始终记录。voicewrite.verify 保留为显式诊断工具，诊断不触发二次生成。
 
   - rule_id: G-VOICE4
     name: 单租户日配音时长配额熔断

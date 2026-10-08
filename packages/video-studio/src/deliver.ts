@@ -309,8 +309,8 @@ export interface DeliveryManifest {
     id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
     /** 该变体自己的封面（三轴口径：封面必须互相可区分） */
     cover?: { path: string; sha256: string } | null;
-    /** 该变体自己的配乐（曲库曲目 + 实测 BPM/卡点偏差） */
-    bgm?: { track: string; sha256: string; measuredBpm?: number; gridErrorMs?: number } | null;
+    /** 曲目指纹与声明 BPM；未执行测量时，实测字段为 null。 */
+    bgm?: { track: string; sha256: string; declaredBpm?: number | null; measuredBpm?: number | null; gridErrorMs?: number | null } | null;
   }>;
   /** G-DLV1 判定结果（雷同一票否决） */
   distinctness: DistinctnessReport;

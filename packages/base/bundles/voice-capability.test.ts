@@ -93,9 +93,9 @@ describe("配音围栏（G-VOICE0..G-VOICE6）语义", () => {
     expect(evaluate("G-VOICE2", { out: "/out.mp4", video: "/in.mp4" })).toBe(false);
   });
 
-  it("G-VOICE3：关闭校验禁止执行", () => {
-    expect(evaluate("G-VOICE3", { skip_verify: true })).toBe(true);
-    expect(evaluate("G-VOICE3", { verify: false })).toBe(true);
+  it("G-VOICE3：品质诊断不作为已授权配音准入", () => {
+    expect(evaluate("G-VOICE3", { skip_verify: true })).toBe(false);
+    expect(evaluate("G-VOICE3", { verify: false })).toBe(false);
     expect(evaluate("G-VOICE3", { verify: true })).toBe(false);
   });
 

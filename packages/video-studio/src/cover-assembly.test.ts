@@ -56,6 +56,42 @@ describe("official publication cover assembly", () => {
     expect(extractSubtitles(output)).toBe(extractSubtitles(source));
   }, 30_000);
 
+  it("prepends one cover frame and preserves every moving body picture, source bytes and original AAC/subtitle timestamps", async () => {
+    const moving = join(directory, "complete moving body.mp4"), target = join(directory, "complete-publication.mp4");
+    const subtitles = join(directory, "complete.srt");
+    writeFileSync(subtitles, "1\n00:00:00,000 --> 00:00:01,000\nOriginal zero timestamp.\n");
+    execute(["-f", "lavfi", "-i", "testsrc2=s=96x160:r=24:d=1.5",
+      "-f", "lavfi", "-i", "anoisesrc=seed=931:sample_rate=48000:duration=1.5:amplitude=0.1", "-i", subtitles,
+      "-map", "0:v", "-map", "1:a", "-map", "2:s", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-c:s", "mov_text", moving]);
+    const before = readFileSync(moving);
+    const pictures = (file: string) => execute(["-i", file, "-map", "0:v:0", "-f", "framehash", "-hash", "sha256", "-"])
+      .toString().split("\n").filter(line => line && !line.startsWith("#")).map(line => line.split(",").at(-1)!.trim());
+    const packetClock = (file: string) => execFileSync(FFPROBE, ["-v", "error", "-select_streams", "a", "-show_packets", "-show_data_hash", "sha256",
+      "-show_entries", "packet=pts_time,dts_time,duration_time,size,data_hash:packet_side_data", "-of", "json", file], { encoding: "utf8" });
+    const receipt = await embedCoverFirstFrame({ input: moving, cover, output: target, ffmpeg: FFMPEG, ffprobe: FFPROBE, preserveSourceFrames: true });
+    expect(receipt).toMatchObject({ schemaVersion: 2, mode: "prepend-cover-frame", sourceOffsetFrames: 1, audioOffsetSeconds: 0,
+      subtitleOffsetSeconds: 0, qualityReviewPerformed: false, sourceVideo: { frameCount: 36, fps: 24, durationSeconds: 1.5 } });
+    expect(receipt.video.frameCount).toBe(37); expect(receipt.video.durationSeconds).toBeCloseTo(37 / 24, 6);
+    expect(receipt.bodyVideoOffsetSeconds).toBeCloseTo(1 / 24, 12);
+    expect(pictures(target).slice(1)).toEqual(pictures(moving));
+    expect(packetClock(target)).toBe(packetClock(moving)); expect(pcm(target)).toEqual(pcm(moving));
+    expect(execute(["-i", target, "-map", "0:s:0", "-f", "srt", "-"]).toString())
+      .toBe(execute(["-i", moving, "-map", "0:s:0", "-f", "srt", "-"]).toString());
+    expect(pixelAt(target, 0)[2]).toBeGreaterThan(240); expect(readFileSync(moving)).toEqual(before);
+  }, 30_000);
+
+  it("prepends a cover to a silent 17fps body without losing its final picture", async () => {
+    const silent = join(directory, "complete-silent-17.mp4"), target = join(directory, "complete-silent-publication.mp4");
+    execute(["-f", "lavfi", "-i", "testsrc2=s=96x160:r=17:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", silent]);
+    const receipt = await embedCoverFirstFrame({ input: silent, cover, output: target, ffmpeg: FFMPEG, ffprobe: FFPROBE, preserveSourceFrames: true });
+    expect(receipt.video.frameCount).toBe(35); expect(receipt.video.fps).toBe(17);
+    expect(receipt.video.durationSeconds).toBeCloseTo(35 / 17, 6);
+    expect(receipt.audio.streamCount).toBe(0); expect(receipt.subtitles.streamCount).toBe(0);
+    const frameHash = (file: string) => execute(["-i", file, "-map", "0:v", "-f", "framehash", "-hash", "sha256", "-"])
+      .toString().split("\n").filter(line => line && !line.startsWith("#")).map(line => line.split(",").at(-1)!.trim());
+    expect(frameHash(target).slice(1)).toEqual(frameHash(silent));
+  }, 30_000);
+
   it("supports a silent film with no subtitle stream and a different frame rate", async () => {
     const silent = join(directory, "silent.mp4");
     execute(["-f", "lavfi", "-i", "color=c=red:s=96x160:r=30:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", silent]);
@@ -76,17 +112,17 @@ describe("official publication cover assembly", () => {
     ]);
     const receipt = await embedCoverFirstFrame({ input: multiple, cover, output: join(directory, "two-audio-publication.mp4"), ffmpeg: FFMPEG, ffprobe: FFPROBE });
     expect(receipt.audio.streamCount).toBe(2);
-    expect(receipt.audio.decodedPcmSha256).toHaveLength(2);
-    expect(new Set(receipt.audio.decodedPcmSha256).size).toBe(2);
+    expect(receipt.audio.decodedPcmSha256).toEqual([]);
+    expect(receipt.audio.packetSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(receipt.qualityReviewPerformed).toBe(false);
     expect(receipt.video.frameCount).toBe(48);
   }, 30_000);
 
-  it.each(["missing", "invalid", "wrong-dimensions"])("rejects a %s cover without changing an existing target", async (kind) => {
+  it.each(["missing", "invalid"])("rejects a %s cover without changing an existing target", async (kind) => {
     const target = join(directory, `preserve-${kind}.mp4`);
     writeFileSync(target, "existing delivery");
     const candidate = join(directory, `bad-${kind}.png`);
     if (kind === "invalid") writeFileSync(candidate, "not an image");
-    if (kind === "wrong-dimensions") execute(["-f", "lavfi", "-i", "color=c=blue:s=160x96", "-frames:v", "1", candidate]);
     await expect(embedCoverFirstFrame({ input: source, cover: candidate, output: target, ffmpeg: FFMPEG, ffprobe: FFPROBE })).rejects.toThrow();
     expect(readFileSync(target, "utf8")).toBe("existing delivery");
     expect(readdirSync(directory).some((name) => name.includes(".pending-"))).toBe(false);
@@ -103,14 +139,20 @@ describe("official publication cover assembly", () => {
     await expect(embedCoverFirstFrame({ input: source, cover, output: hardLink, ffmpeg: FFMPEG, ffprobe: FFPROBE })).rejects.toThrow(/alias/);
   });
 
-  it("ffmpeg failure and invalid output never replace a valid existing delivery", async () => {
-    const target = join(directory, "previous.mp4");
+  it("an encoder nonzero exit never replaces a valid existing delivery", async () => {
+    const target = join(directory, "previous-encoder-failure.mp4");
     writeFileSync(target, "previous valid delivery");
     const failure = join(directory, "fail-ffmpeg.sh");
     writeFileSync(failure, "#!/bin/sh\necho fixture encoder failure >&2\nexit 7\n");
     chmodSync(failure, 0o755);
     await expect(embedCoverFirstFrame({ input: source, cover, output: target, ffmpeg: failure, ffprobe: FFPROBE })).rejects.toThrow(/fixture encoder failure/);
     expect(readFileSync(target, "utf8")).toBe("previous valid delivery");
+    expect(readdirSync(directory).some((name) => name.includes(".pending-"))).toBe(false);
+  });
+
+  it("a zero-exit encoder that writes corrupt media never replaces a valid existing delivery", async () => {
+    const target = join(directory, "previous-corrupt-output.mp4");
+    writeFileSync(target, "previous valid delivery");
     const broken = join(directory, "broken-ffmpeg.sh");
     writeFileSync(broken, "#!/bin/sh\nfor last; do :; done\nprintf not-media > \"$last\"\n");
     chmodSync(broken, 0o755);
@@ -126,14 +168,17 @@ describe("official publication cover assembly", () => {
     expect(existsSync(source)).toBe(true);
   });
 
-  it("rejects a successful no-op encoder that never inserted the supplied cover", async () => {
-    const target = join(directory, "no-op-preserved.mp4");
-    writeFileSync(target, "previous valid delivery");
-    const wrapper = join(directory, "no-op-ffmpeg.sh");
-    writeFileSync(wrapper, `#!/bin/sh\nfirst_input=''\ncapture=0\nrender=0\nfor arg; do\n  last="$arg"\n  if [ "$capture" = 1 ] && [ -z "$first_input" ]; then first_input="$arg"; fi\n  capture=0\n  if [ "$arg" = -i ]; then capture=1; fi\n  case "$arg" in *overlay=*) render=1;; esac\ndone\nif [ "$render" = 1 ]; then cp "$first_input" "$last"; exit $?; fi\nexec '${FFMPEG}' "$@"\n`);
-    chmodSync(wrapper, 0o755);
-    await expect(embedCoverFirstFrame({ input: source, cover, output: target, ffmpeg: wrapper, ffprobe: FFPROBE })).rejects.toThrow(/first frame does not match cover/);
-    expect(readFileSync(target, "utf8")).toBe("previous valid delivery");
+  it("resizes a differently shaped cover into the actual video canvas without source-quality scans", async () => {
+    const wide = join(directory, "wide-cover.png"), target = join(directory, "wide-publication.mp4"), wrapper = join(directory, "no-quality-review.mjs");
+    execute(["-f", "lavfi", "-i", "color=c=blue:s=160x96", "-frames:v", "1", wide]);
+    const realFfmpeg = execFileSync("which", [FFMPEG], { encoding: "utf8" }).trim();
+    writeFileSync(wrapper, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';\nconst args=process.argv.slice(2);\nif(args.some(arg=>/psnr|framemd5|ebur128|astats/.test(arg))||args.includes('pcm_s16le')||args.includes('-count_frames')){process.stderr.write('FORBIDDEN_DEFAULT_QUALITY_REVIEW');process.exit(73);}\nconst result=spawnSync(${JSON.stringify(realFfmpeg)},args,{stdio:'inherit'});\nprocess.exit(result.status??74);\n`); chmodSync(wrapper, 0o755);
+    const before = readFileSync(source), receipt = await embedCoverFirstFrame({ input: source, cover: wide, output: target, ffmpeg: wrapper, ffprobe: FFPROBE });
+    expect(receipt.coverTransform).toEqual({ width: 96, height: 160, mode: "contain-and-pad" });
+    expect(receipt.qualityReviewPerformed).toBe(false); expect(receipt.video.coverPsnrDb).toBeNull(); expect(receipt.video.timelineSha256).toBeNull();
+    expect(receipt.video.frameCountBasis).toBe("container-metadata"); expect(receipt.audio.decodedPcmSha256).toEqual([]);
+    expect(receipt.verificationBasis).toMatch(/ordinary.*No PSNR/); expect(readFileSync(source)).toEqual(before);
+    expect(pixelAt(target, 0)[2]).toBeGreaterThan(100); expect(pixelAt(target, 1)[0]).toBeGreaterThan(240);
   }, 30_000);
 
   it("serializes writers and preserves an existing target when its publication lock is held", async () => {

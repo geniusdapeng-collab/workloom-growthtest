@@ -1,9 +1,9 @@
 /** Execute actual CLI entrypoint declarations with local byte/lineage fixtures. No paid I/O. */
 import { afterAll, afterEach, describe, expect, it } from "vitest";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createRequire } from "node:module";
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { constants as fsConstants, copyFileSync, existsSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { runInNewContext } from "node:vm";
@@ -51,6 +51,16 @@ if (variantSourceInitializers.length !== 1) throw new Error("ENTRYPOINT_FIXTURE_
 const compiled = ts.transpileModule(declarations.map((statement) => statement.getFullText(parsed)).join("\n")
   + "\nexports.fixture = { clipFor, assertFactualReleaseSources, variantSource: () => ("
   + variantSourceInitializers[0]!.getFullText(parsed) + ") };", {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+}).outputText;
+const masterStart = cliSource.indexOf('/* ---------- ⑪ 正式母版：'), masterEnd = cliSource.indexOf('/* ---------- ⑫ 多风格交付包', masterStart);
+if (masterStart < 0 || masterEnd <= masterStart) throw new Error("ENTRYPOINT_FIXTURE_INVALID: official master export block missing");
+const masterCompiled = ts.transpileModule(cliSource.slice(masterStart, masterEnd), {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+}).outputText;
+const probeDeclaration = parsed.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === "probe");
+if (!probeDeclaration) throw new Error("ENTRYPOINT_FIXTURE_INVALID: official media probe missing");
+const probeCompiled = ts.transpileModule(probeDeclaration.getFullText(parsed) + "\nexports.probe = probe;", {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 
@@ -173,9 +183,13 @@ describe("actual film release entrypoints with real local byte and lineage recei
     expect(failure(f.guard)).toBe("allowed");
     expect(f.context.sourceDocument.shots[0]!.duration).toBe(5);
   });
-  it("derived duration cannot wash a native frame range that differs from frozen submitted intent", () => {
+  it("nominal frozen seconds do not veto a different complete source clock", () => {
     const f = fixture(); f.context.sourceDocument.shots[0]!.duration = 4;
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID.*STANDARD_POST_FRAME_INVALID/);
+    const submitted = JSON.stringify(f.context.sourceDocument);
+    expect(failure(f.guard)).toBe("allowed");
+    expect(JSON.stringify(f.context.sourceDocument)).toBe(submitted);
+    writeFileSync(f.context.originalPostContract.manifestFile, "changed issued frozen manifest authority");
+    expect(failure(f.guard)).toMatch(/PUBLICATION_ORIGINAL_MANIFEST_CHANGED/);
   });
   it("the actual release entrypoint refuses a missing frozen submitted shot", () => {
     const f = fixture(); f.context.sourceDocument.shots.length = 0;
@@ -186,7 +200,7 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows[0] = f.make("voice", [f.raw], [f.voiced], { ...row(f, "voice").evidence, source: "tts-narration",
       profile: "fixture-profile", voicedSha256: fingerprintFile(f.voiced) }, f.shot.shotId);
     f.rows[f.rows.findIndex((entry) => entry.stage === "compose")] = f.make("compose", [f.voiced], [f.master], {});
-    expect(failure(f.guard)).toMatch(/AUDIO_NATIVE_SOURCE_REPLACED/);
+    expect(failure(f.guard)).toMatch(/PUBLICATION_COMPOSE_SOURCE_MISMATCH/);
   });
   it("an old master with no current compose receipt cannot publish", () => {
     const f = fixture(); f.rows.splice(f.rows.findIndex((entry) => entry.stage === "compose"), 1);
@@ -201,30 +215,30 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows[f.rows.findIndex((entry) => entry.stage === "compose")] = f.make("compose", [f.voiced], [f.master], {});
     expect(failure(f.guard)).toMatch(/PUBLICATION_COMPOSE_SOURCE_MISMATCH/);
   });
-  it("the latest failed voiceover receipt blocks publication even with older voice and compose passes", () => {
+  it("historical voice quality rejection does not veto pinned originals and actual compose", () => {
     const f = fixture("voice-over");
     f.rows.push(f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a changed voiceover policy cannot reuse an old positive content receipt", () => {
+  it("obsolete voice policy metadata does not restrict adoption of pinned originals", () => {
     const f = fixture("voice-over"); row(f, "voice").evidence.audioPolicyHash = sha("another policy");
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a successful old TTS receipt cannot become a native composition source", () => {
+  it("old TTS receipt metadata cannot replace the independently pinned native composition source", () => {
     const f = fixture(); row(f, "voice").evidence.source = "tts-narration";
-    expect(failure(f.guard)).toMatch(/AUDIO_NATIVE_SOURCE_REPLACED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("the newest failed native receipt overrides the old voice pass", () => {
+  it("a later source-audio quality vote does not veto successful original bytes", () => {
     const f = fixture(); f.rows.push(f.make("voice", [f.raw], [f.raw], { ...row(f, "voice").evidence }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("voice and compose passes cannot publish a clip that lacks current shot proof", () => {
+  it("issued original authority does not depend on a current quality shot row", () => {
     const f = fixture(); f.rows.splice(f.rows.findIndex((entry) => entry.stage === "shot"), 1);
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it.each([undefined, false])("unknown request input proof (%s) remains an internal candidate", (proof) => {
+  it.each([undefined, false])("historical request row (%s) does not override separate issued-original proof", (proof) => {
     const f = fixture(); row(f, "shot").evidence.requestInputVerified = proof;
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
   it("new raw bytes cannot be washed by fresh voice and compose receipts after the generation receipt", () => {
     const f = fixture(); writeFileSync(f.raw, "fixture changed raw generation bytes");
@@ -240,31 +254,32 @@ describe("actual film release entrypoints with real local byte and lineage recei
     const f = fixture(); f.context.originalPostContract.originals.length = 0;
     expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_CHANGED/);
   });
-  it("missing actual native audio cannot be washed by source/audio receipts", () => {
+  it("silent source metadata is accepted for actual post normalization", () => {
     const f = fixture(), originalProbe = f.context.probe;
-    f.context.probe = file => ({ ...originalProbe(file), hasAudio: false });
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID/);
+    Object.assign(f.context.originalPostContract.originals[0]!.media, { audioChannels: 0, audioSampleRate: 0, audioDurationSec: 0 });
+    f.context.probe = file => ({ ...originalProbe(file), hasAudio: false, audioChannels: 0, audioSampleRate: 0, audioDurationSec: 0 });
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a shorter real picture clock cannot reuse the full original metadata or compose receipt", () => {
+  it("raw picture duration is normalized by official post rather than quality rejected", () => {
     const f = fixture(), originalProbe = f.context.probe;
     f.context.probe = file => ({ ...originalProbe(file), videoDurationSec: 4.99 });
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_MEDIA_INVALID/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a changed original frame rate cannot reuse the native policy receipts", () => {
+  it("raw frame rate is accepted without nominal equality veto", () => {
     const f = fixture(); f.context.originalPostContract.originals[0]!.media.fps = 25;
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_ORIGINAL_BINDING_INVALID/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it.each(["spokenTextVerified", "lipSyncVerified"])("a native source check cannot certify %s", (key) => {
+  it.each(["spokenTextVerified", "lipSyncVerified"])("obsolete native quality claim %s is ignored by actual original byte authority", (key) => {
     const f = fixture(); row(f, "voice").evidence[key] = true;
-    expect(failure(f.guard)).toMatch(/STANDARD_NATIVE_AUDIO_EVIDENCE_MISSING/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("raw SHA metadata must bind the actual current file even if other lineage remains green", () => {
+  it("old quality row hash is not the independently pinned original hash", () => {
     const f = fixture(); row(f, "shot").evidence.rawSha256 = sha("another generation artifact");
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("a later rejected shot cannot hide underneath previous voice and compose passes", () => {
+  it("later wardrobe or source quality rejection does not veto pinned original adoption", () => {
     const f = fixture(); f.rows.push(f.make("shot", [], [f.raw], { ...row(f, "shot").evidence }, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
   it("material release uses its current generation verification gate in the global entrypoint", () => {
     const f = fixture("voice-over"); f.context.isMaterialShot = () => true;
@@ -272,21 +287,21 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows.push(f.make("gate:material-generate:verify", [f.raw], [], {}, f.shot.shotId));
     expect(failure(f.guard)).toBe("allowed");
   });
-  it("material release cannot substitute file existence for its verification gate", () => {
+  it("issued material original has separate task authority and needs no quality verify gate", () => {
     const f = fixture("voice-over"); f.context.isMaterialShot = () => true;
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("material release respects a later rejected generation verification gate", () => {
+  it("historical material quality gate failure does not restrict pinned original byte authority", () => {
     const f = fixture("voice-over"); f.context.isMaterialShot = () => true;
     f.rows.push(f.make("gate:material-generate:verify", [f.raw], [], {}, f.shot.shotId));
     f.rows.push(f.make("gate:material-generate:verify", [f.raw], [], {}, f.shot.shotId, false));
-    expect(failure(f.guard)).toMatch(/PUBLICATION_GENERATION_INPUT_UNVERIFIED/);
+    expect(failure(f.guard)).toBe("allowed");
   });
-  it("current identity rejection blocks the actual release entrypoint after source, voice and compose passes", () => {
+  it("historical identity rejection is retained as data without restricting official post", () => {
     const f = fixture();
     f.context.characterReleaseReport = () => ({ releaseAllowed: false,
       issues: [{ shotId: f.shot.shotId, code: "IDENTITY_REVIEW_REJECTED" }], authorizationScope: "fixture-identity-rejection" });
-    expect(failure(f.guard)).toMatch(/CHARACTER_RELEASE_BLOCKED: GT-01:IDENTITY_REVIEW_REJECTED/);
+    expect(failure(f.guard)).toBe("allowed");
     const recorded = JSON.parse(readFileSync(join(f.context.WORK_DIR, `${f.context.PROJECT}-character-release-report.json`), "utf8"));
     expect(recorded.releaseAllowed).toBe(false);
     expect(recorded.issues).toEqual([{ shotId: f.shot.shotId, code: "IDENTITY_REVIEW_REJECTED" }]);
@@ -379,5 +394,63 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows.push(f.make("color", [f.master], [current], {}, null, false));
     f.context.colored = current;
     expect(failure(f.variantSource)).toMatch(/VARIANT_SOURCE_UNVERIFIED/);
+  });
+});
+
+describe("actual master export uses the complete requested picture frame clock", () => {
+  function masterFixture() {
+    const dir = mkdtempSync(join(tmpdir(), "film-master-entrypoint-")); roots.push(dir);
+    const source = join(dir, "master-source.mp4"), target = join(dir, "final.mp4");
+    writeFileSync(source, "source-bound fixture bytes; metadata fixture does not certify playable media");
+    const rows: Array<Record<string, unknown>> = [];
+    const media = { width: 1080, height: 1920, fps: 24, videoFrames: 241,
+      videoDurationSec: 241 / 24, duration: 241 / 24, hasAudio: false };
+    const context = {
+      STAGES: new Set(["master"]), DRY_RUN: false, scored: source, OUT_DIR: dir, DELIVERABLE: target,
+      OUTPUT_SIZE: { width: 1080, height: 1920 }, FPS: 24, expectedMasterSeconds: 241 / 24,
+      SUBTITLE_MODE: "sidecar", subtitleSidecar: null, POST_DIR: dir, QUALITY: "hd",
+      deliverablePath: "", masterApprovedForUhd: false,
+      assertFactualReleaseSources: () => {}, rememberInputs: (_stage: string, _inputs: string[]) => {},
+      probe: () => media, fingerprintArtifact: (file: string) => ({ sha256: fingerprintFile(file) }),
+      auditDeliverableNaming: () => ({ suggestedName: null }),
+      existsSync, copyFileSync, renameSync, rmSync, join, basename, randomUUID, fsConstants,
+      record: (row: Record<string, unknown>) => rows.push(row), log: (_line: string) => {},
+    };
+    return { source, target, rows, media, context, run: () => runInNewContext(masterCompiled, context) };
+  }
+  it("publishes all endpoint source frames and the same bytes when the requested clock is factual", () => {
+    const f = masterFixture(); f.run();
+    expect(fingerprintFile(f.target)).toBe(fingerprintFile(f.source));
+    expect(f.context.deliverablePath).toBe(f.target);
+    expect(f.rows).toHaveLength(1);
+    expect(f.rows[0]).toMatchObject({ ok: true, evidence: { qualityReviewPerformed: false } });
+  });
+  it.each(["added-frame", "dropped-frame", "contradictory-duration", "fractional-fps", "wrong-canvas", "missing-fps", "nonfinite-duration"])("%s cannot publish a success row", kind => {
+    const f = masterFixture();
+    if (kind === "added-frame") { f.media.videoFrames += 1; f.media.videoDurationSec = f.media.duration = f.media.videoFrames / 24; }
+    if (kind === "dropped-frame") { f.media.videoFrames -= 1; f.media.videoDurationSec = f.media.duration = f.media.videoFrames / 24; }
+    if (kind === "contradictory-duration") f.media.videoDurationSec = f.media.duration = 241 / 24 + 0.01;
+    if (kind === "fractional-fps") f.media.fps = 24.0001;
+    if (kind === "wrong-canvas") f.media.width = 720;
+    if (kind === "missing-fps") Reflect.deleteProperty(f.media, "fps");
+    if (kind === "nonfinite-duration") f.media.videoDurationSec = f.media.duration = Number.NaN;
+    expect(f.run).toThrow(/MASTER_EXPORT_SPEC_INVALID/);
+    expect(existsSync(f.target)).toBe(false); expect(f.rows).toEqual([]);
+  });
+  it("the actual probe reports an available average picture clock ahead of the advertised cadence", () => {
+    const f = masterFixture();
+    const context = { exports: {} as { probe: (file: string) => Record<string, unknown> }, FFPROBE: "fixture-ffprobe", statSync,
+      run: () => JSON.stringify({ format: { duration: 241 / 24 }, streams: [{ codec_type: "video", width: 1080,
+        height: 1920, avg_frame_rate: "23999/1000", r_frame_rate: "24/1", nb_frames: "241", duration: 241 / 24 }] }) };
+    runInNewContext(probeCompiled, context);
+    expect(context.exports.probe(f.source).fps).toBe(23.999);
+  });
+  it("the actual probe retains advertised cadence only when the average clock is unavailable", () => {
+    const f = masterFixture();
+    const context = { exports: {} as { probe: (file: string) => Record<string, unknown> }, FFPROBE: "fixture-ffprobe", statSync,
+      run: () => JSON.stringify({ format: { duration: 241 / 24 }, streams: [{ codec_type: "video", width: 1080,
+        height: 1920, avg_frame_rate: "0/0", r_frame_rate: "24/1", nb_frames: "241", duration: 241 / 24 }] }) };
+    runInNewContext(probeCompiled, context);
+    expect(context.exports.probe(f.source).fps).toBe(24);
   });
 });

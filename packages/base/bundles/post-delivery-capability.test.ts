@@ -80,26 +80,26 @@ describe("交付与返修围栏（G-DLV0..G-DLV9）语义", () => {
     }
   });
 
-  it("G-DLV1：变体雷同或数量不足即拒（这是多版本交付的唯一理由）", () => {
-    expect(evaluate("G-DLV1", { variants_distinct: false })).toBe(true);
-    expect(evaluate("G-DLV1", { identical_variants: true })).toBe(true);
-    expect(evaluate("G-DLV1", { variant_count: 1 })).toBe(true);
+  it("G-DLV1：单版本与雷同配方不作后置质量否决", () => {
+    expect(evaluate("G-DLV1", { variants_distinct: false })).toBe(false);
+    expect(evaluate("G-DLV1", { identical_variants: true })).toBe(false);
+    expect(evaluate("G-DLV1", { variant_count: 1 })).toBe(false);
     expect(evaluate("G-DLV1", { variant_count: 3, variants_distinct: true })).toBe(false);
     // 缺字段不命中（走 default_level 的保守 review），不会把正常交付一律熔断
     expect(evaluate("G-DLV1", {})).toBe(false);
   });
 
-  it("G-DLV2：母版烧字/覆盖原片一律阻断", () => {
-    expect(evaluate("G-DLV2", { master_burned_in: true })).toBe(true);
-    expect(evaluate("G-DLV2", { burn_into_master: true })).toBe(true);
+  it("G-DLV2：禁止覆盖原始字节，显式字幕另存新副本", () => {
+    expect(evaluate("G-DLV2", { master_burned_in: true })).toBe(false);
+    expect(evaluate("G-DLV2", { burn_into_master: true })).toBe(false);
     expect(evaluate("G-DLV2", { overwrite_source: true })).toBe(true);
     expect(evaluate("G-DLV2", { output_path: "/a.mp4", input_path: "/a.mp4" })).toBe(true);
     expect(evaluate("G-DLV2", { output_path: "/a.mp4", input_path: "/b.mp4" })).toBe(false);
   });
 
-  it("G-DLV3：软字幕轨必须带画面零改动复检", () => {
-    expect(evaluate("G-DLV3", { skip_verify: true })).toBe(true);
-    expect(evaluate("G-DLV3", { verify: false })).toBe(true);
+  it("G-DLV3：实际copy合同保留，关闭像素复检不阻断", () => {
+    expect(evaluate("G-DLV3", { skip_verify: true })).toBe(false);
+    expect(evaluate("G-DLV3", { verify: false })).toBe(false);
     expect(evaluate("G-DLV3", { reencode_video: true })).toBe(true);
     expect(evaluate("G-DLV3", { allow_video_reencode: true })).toBe(true);
     expect(evaluate("G-DLV3", {})).toBe(false);
@@ -129,11 +129,11 @@ describe("交付与返修围栏（G-DLV0..G-DLV9）语义", () => {
     expect(evaluate("G-DLV7", {})).toBe(false);
   });
 
-  it("G-DLV8/G-DLV9：UHD 实测画布与本地增强来源缺一即阻断", () => {
+  it("G-DLV8/G-DLV9：真实请求画布保留，源镜头不强制增强模型", () => {
     expect(evaluate("G-DLV8", { uhd_requested: true, resolution_exact: false })).toBe(true);
     expect(evaluate("G-DLV8", { uhd_requested: true, resolution_exact: true })).toBe(false);
     expect(evaluate("G-DLV8", { uhd_requested: false, resolution_exact: false })).toBe(false);
-    expect(evaluate("G-DLV9", { uhd_requested: true, enhancement_verified: false })).toBe(true);
+    expect(evaluate("G-DLV9", { uhd_requested: true, enhancement_verified: false })).toBe(false);
     expect(evaluate("G-DLV9", { uhd_requested: true, enhancement_verified: true })).toBe(false);
     expect(evaluate("G-DLV9", { uhd_requested: false, enhancement_verified: false })).toBe(false);
   });

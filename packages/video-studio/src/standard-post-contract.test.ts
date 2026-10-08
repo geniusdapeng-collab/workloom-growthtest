@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
+import { productionHash } from "./production-lineage.js";
 import {
   assertStandardPostTimeline, buildStandardPostContract, validateStandardNativeClock, STANDARD_POST_SCHEMA,
   type StandardPostBuildInput, type StandardPostTimelineEntry,
@@ -123,20 +124,11 @@ describe("标准后期只能沿用提交原稿的完整画面与同文件原声"
     ["少原镜头", (input) => { input.originals = input.originals.slice(1); }],
     ["多原镜头", (input) => { input.originals = [...input.originals, structuredClone(input.originals[0]!)]; }],
     ["未知原镜头", (input) => { input.originals[0]!.shotId = "UNKNOWN"; }],
-    ["重复原视频路径", (input) => { input.originals[1]!.path = input.originals[0]!.path; }],
-    ["同一原视频摘要冒充另镜", (input) => { input.originals[1]!.sha256 = input.originals[0]!.sha256; }],
     ["非原始render角色", (input) => { Object.assign(input.originals[0]!, { role: "tts" }); }],
     ["空原视频摘要", (input) => { input.originals[0]!.sha256 = ""; }],
     ["相对原视频路径", (input) => { input.originals[0]!.path = "clips/raw.mp4"; }],
     ["空原视频", (input) => { input.originals[0]!.bytes = 0; }],
-    ["帧数少一帧", (input) => { input.originals[0]!.media.videoFrames--; }],
-    ["视频时长不足", (input) => { input.originals[0]!.media.videoDurationSec -= 0.01; }],
-    ["不同FPS", (input) => { input.originals[1]!.media.fps = 30; input.originals[1]!.media.videoFrames = 180; }],
-    ["不同宽度", (input) => { input.originals[1]!.media.width = 720; }],
-    ["不同高度", (input) => { input.originals[1]!.media.height = 1280; }],
     ["缺原声音轨", (input) => { input.originals[0]!.media.audioChannels = 0; }],
-    ["原声过短", (input) => { input.originals[0]!.media.audioDurationSec -= 0.05; }],
-    ["原声过长", (input) => { input.originals[0]!.media.audioDurationSec += 0.05; }],
     ["无效采样率", (input) => { input.originals[0]!.media.audioSampleRate = 0; }],
     ["无来源证据标识", (input) => { input.originals[0]!.authority.evidenceId = ""; }],
     ["无来源证据摘要", (input) => { input.originals[0]!.authority.evidenceSha256 = ""; }],
@@ -150,15 +142,31 @@ describe("标准后期只能沿用提交原稿的完整画面与同文件原声"
   it.each(sourceChanges)("构建时拒绝%s", (_name, change) => {
     expect(() => buildStandardPostContract(changed(change))).toThrow(/STANDARD_POST_/);
   });
-  it("接受恰好两个AAC元数据帧的priming/padding边界，超出一个采样立即拒绝", () => {
-    const input = fixture(); input.originals[0]!.media.audioDurationSec = 5 - 2048 / 48000;
-    expect(() => buildStandardPostContract(input)).not.toThrow();
-    input.originals[0]!.media.audioDurationSec -= 1 / 48000;
-    expect(() => buildStandardPostContract(input)).toThrow(/AUDIO/);
+  it("原始画幅、帧率和音轨可不同；完整实测钟不按名义秒数裁片", () => {
+    const input = fixture();
+    Object.assign(input.originals[0]!.media, { fps: 241, width: 321, height: 241, videoFrames: 242,
+      videoDurationSec: 242 / 241, audioDurationSec: 0, audioSampleRate: 0, audioChannels: 0 });
+    input.originals[1]!.path = input.originals[0]!.path; input.originals[1]!.sha256 = input.originals[0]!.sha256;
+    input.originals[2]!.media.audioDurationSec = 4.2;
+    const contract = buildStandardPostContract(input);
+    expect(contract.timeline.map(row => row.shotId)).toEqual(fixture().originals.map(row => row.shotId));
+    expect(contract.timeline[0]!.durationSec).toBe(242 / 241);
+    expect(contract.nativeAudioProof[0]!.disposition).toBe("silent-source");
+    expect(contract.width % 2).toBe(0); expect(contract.height % 2).toBe(0);
+    expect(contract.timeline[0]!.video.sha256).toBe(input.originals[0]!.sha256);
+    expect(contract.compositionClock.entries[0]!.plannedOutputFrames).toBe(25);
+    expect(contract.compositionClock.sourceDurationSec).toBe(242 / 241 + 25);
+  });
+  it.each([-1, 1])("AAC元数据边界方向%d超出两帧仍仅留实际观察，不触发品质重做", direction => {
+    const input = fixture(), media = input.originals[0]!.media;
+    media.audioDurationSec += direction * (2048 + 1) / 48000;
+    const contract = buildStandardPostContract(input);
+    expect(contract.nativeAudioProof[0]!.disposition).toBe("preserve-available-native-audio");
+    expect(contract.nativeAudioProof[0]!.sourceDurationSec).toBe(media.audioDurationSec);
+    expect(contract.nativeAudioProof[0]!.certification).toBe("duration-only-no-speech-certification");
   });
   it("供应商5秒任务的121帧全部保留；冻结原稿不改写，派生钟不舍入", () => {
-    const input = fixture(), originalSubmitted = structuredClone(input.submitted);
-    const media = input.originals[0]!.media;
+    const input = fixture(), originalSubmitted = structuredClone(input.submitted), media = input.originals[0]!.media;
     media.videoFrames = 121; media.videoDurationSec = 5.041667; media.audioDurationSec = 5.08;
     const clock = validateStandardNativeClock(media, 5);
     expect(clock.frameDelta).toBe(1); expect(clock.requestedFrames).toBe(120); expect(clock.durationSec).toBe(121 / 24);
@@ -166,30 +174,49 @@ describe("标准后期只能沿用提交原稿的完整画面与同文件原声"
     expect(contract.totalFrames).toBe(721); expect(contract.durationSec).toBe(721 / 24);
     expect(contract.timeline[0]!.durationSec).toBe(121 / 24); expect(input.submitted).toEqual(originalSubmitted);
     expect(contract.submitted).toEqual(originalSubmitted);
-    expect(() => assertStandardPostTimeline(contract, contract.timeline)).not.toThrow();
     const trimmed = structuredClone(contract.timeline) as StandardPostTimelineEntry[]; trimmed[0]!.durationSec = 5;
     expect(() => assertStandardPostTimeline(contract, trimmed)).toThrow(/TIMELINE_INVALID/);
   });
-  it.each([-1, 2, 24])("供应商帧数相差%d仍拒绝，即使视频元数据和音轨同步改写", delta => {
+  it.each([-1, 2, 24])("成功供应商实际帧数相差%d按完整实测钟采用，旧名义范围不作品质否决", delta => {
     const input = fixture(), media = input.originals[0]!.media;
     media.videoFrames += delta; media.videoDurationSec = media.videoFrames / media.fps; media.audioDurationSec = media.videoDurationSec;
-    expect(() => buildStandardPostContract(input)).toThrow(/FRAME_INVALID/);
+    const contract = buildStandardPostContract(input);
+    expect(contract.totalFrames).toBe(720 + delta); expect(contract.timeline[0]!.durationSec).toBe(media.videoFrames / media.fps);
+    expect(() => assertStandardPostTimeline(contract, contract.timeline)).not.toThrow();
   });
-  it("一帧边界要求帧数和视频流钟一致，不能把容器或整数秒充当视频钟", () => {
+  it("实测帧数与视频流钟矛盾仍是处理事实错误，不能用整数秒替代", () => {
     const input = fixture(); input.originals[0]!.media.videoFrames++;
     expect(() => buildStandardPostContract(input)).toThrow(/MEDIA_INVALID/);
   });
-  it.each([-1, 1])("两个AAC边界的正负方向%d之外仍拒绝", direction => {
-    const input = fixture(), media = input.originals[0]!.media;
-    media.audioDurationSec += direction * 2048 / 48000;
-    expect(() => buildStandardPostContract(input)).not.toThrow();
-    media.audioDurationSec += direction / 48000;
-    expect(() => buildStandardPostContract(input)).toThrow(/AUDIO_INVALID/);
-  });
-  it("非整帧原稿时长无法静默舍入或补帧", () => {
-    const input = fixture(); editSubmitted(input, (value) => {
+  it("非整帧名义镜长不修改完整原片或补帧", () => {
+    const input = fixture(); editSubmitted(input, value => {
       (value.shots as Array<Record<string, unknown>>)[0]!.duration = 5.001; value.durationSeconds = 30.001;
-    }); expect(() => buildStandardPostContract(input)).toThrow(/FRAME/);
+    });
+    const contract = buildStandardPostContract(input);
+    expect(contract.durationSec).toBe(30); expect(contract.totalFrames).toBe(720);
+    expect(contract.originals[0]!.media.videoFrames).toBe(120);
+  });
+  it("名义2秒实际4.25秒按全部102帧自然完成，计划钟与原片钟分别记录", () => {
+    const input = fixture(), original = input.originals[0]!;
+    input.originals = [{ ...original, media: { ...original.media, videoFrames: 102, videoDurationSec: 4.25, audioDurationSec: 4.25 } }];
+    editSubmitted(input, value => { value.durationSeconds = 2; value.shots = [{ shotId: original.shotId, duration: 2 }]; });
+    const before = input.submitted.json, contract = buildStandardPostContract(input);
+    expect(contract.durationSec).toBe(4.25); expect(contract.totalFrames).toBe(102); expect(contract.timeline[0]!.durationSec).toBe(4.25);
+    expect(contract.completion.deltaFromTargetSeconds).toBe(2.25); expect(contract.submitted.json).toBe(before);
+    expect(contract.compositionClock).toMatchObject({ sourceDurationSec: 4.25, entries: [{ sourceFrames: 102, sourceFps: 24, plannedOutputFrames: 102, roundingDeltaSec: 0 }] });
+  });
+  it.each(["workloom.standard-post/v1", "workloom.standard-post/v2"])("已封存%s按原规则读取，字节不改写且篡改/新规则冒充旧规则仍拒绝", schemaVersion => {
+    const current = buildStandardPostContract(fixture());
+    const { compositionClock: _clock, completion, contractSha256: _hash, ...facts } = structuredClone(current);
+    const nativeAudioProof = facts.nativeAudioProof.map(row => ({ ...row, maximumBoundarySec: (schemaVersion.endsWith("v1") ? 1024 : 2048) / 48000 }));
+    const body = { ...facts, schemaVersion, nativeAudioProof, ...(schemaVersion.endsWith("v2") ? { completion } : {}) };
+    const sealed = { ...body, contractSha256: productionHash(body) }, serialized = JSON.stringify(sealed);
+    expect(() => assertStandardPostTimeline(sealed, sealed.timeline)).not.toThrow(); expect(JSON.stringify(sealed)).toBe(serialized);
+    const changed = structuredClone(sealed); changed.durationSec--; expect(() => assertStandardPostTimeline(changed, changed.timeline)).toThrow(/CONTRACT_INVALID/);
+    const wrongClock = structuredClone(sealed); wrongClock.originals[0]!.media.videoFrames += 24;
+    wrongClock.originals[0]!.media.videoDurationSec++; wrongClock.originals[0]!.media.audioDurationSec++;
+    const { contractSha256: ignored, ...changedBody } = wrongClock; wrongClock.contractSha256 = productionHash(changedBody);
+    expect(() => assertStandardPostTimeline(wrongClock, wrongClock.timeline)).toThrow(/CONTRACT_INVALID/);
   });
   it("持久化合同篡改内容、摘要、未知字段均不能放行", () => {
     const contract = buildStandardPostContract(fixture());

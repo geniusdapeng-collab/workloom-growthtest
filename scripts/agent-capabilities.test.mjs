@@ -6,6 +6,8 @@ import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { test } from "node:test";
+// Existing CI invokes this entry; keep the fixed guide's transport regressions in it.
+import './ai-video-workbench-guide.test.mjs';
 import { resolve, join, dirname } from "node:path";
 import {
   CapabilityError, invokeCapability, loadCatalog, mcpTools, sanitizeErrorMessage, validateInput,

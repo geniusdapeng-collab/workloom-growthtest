@@ -17,8 +17,7 @@ function run(binary: string, args: string[]) {
 }
 function fixture(frames: number, audioSeconds: number, seed: number, out: string) {
   const result = run(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", `testsrc2=s=160x288:r=24:d=${frames / 24}`,
-    // A pure periodic tone has many equally valid correlation peaks. Seeded
-    // noise provides an identifiable reference for the real AV-sync detector.
+    // Seeded local audio has a repeatable source; this fixture does not claim speech or AV quality.
     "-f", "lavfi", "-i", `anoisesrc=seed=${seed}:sample_rate=32000:duration=${audioSeconds}:amplitude=0.3`,
     "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "32000", "-ac", "2", out]);
   expect(result.status, result.stderr).toBe(0);
@@ -51,18 +50,38 @@ describe("native complete picture clock composition", () => {
     expect(video.avg_frame_rate).toBe("24/1");
     expect(Number(video.duration)).toBeCloseTo(315 / 24, 6);
     const av = JSON.parse(readFileSync(join(dir, "master.av-sync.json"), "utf8"));
-    expect(av).toMatchObject({ ok: true, clipCount: 3, nativeClock: true, retimeFactor: 1 });
-    expect(av.measured).toBe(3);
+    expect(av).toMatchObject({ schemaVersion: "workloom.composition-process/v1", nativeClock: true, retimeFactor: 1,
+      qualityReviewPerformed: false, audioAlignmentMeasured: false, sourceFilesUnchanged: true,
+      target: { fps: 24, shotFrames: counts, durationSec: 315 / 24 }, outputMedia: { videoFrames: 315, fps: 24 } });
+    expect(av.sources.map((source: { path: string; sha256: string }) => source.path)).toEqual(clips);
+    expect(av.sources.map((source: { sha256: string }) => source.sha256)).toEqual(hashes);
     expect(pictureHashes(out)).toEqual(clips.flatMap(pictureHashes));
     expect(clips.map(digest)).toEqual(hashes);
   }, 120_000);
-  it("rejects a short native audio tail before producing a master", () => {
+  it("processes a short native audio tail without padding speech or rejecting a successful picture", () => {
     const dir = mkdtempSync(join(tmpdir(), "compose-native-short-")); roots.push(dir);
     const clip = join(dir, "short.mp4"); fixture(97, 3.5, 733, clip);
-    const before = digest(clip), result = compose([clip], join(dir, "master.mp4"));
-    expect(result.status).not.toBe(0);
-    expect(result.stderr).toContain("STANDARD_POST_NATIVE_CLOCK_INCOMPLETE");
-    expect(digest(clip)).toBe(before);
+    const before = digest(clip), out = join(dir, "master.mp4"), result = compose([clip], out);
+    expect(result.status, result.stderr + result.stdout).toBe(0);
+    const streams = probe(out), video = streams.find(stream => stream.codec_type === "video")!, audio = streams.find(stream => stream.codec_type === "audio")!;
+    expect(Number(video.nb_read_frames)).toBe(97); expect(Number(video.duration)).toBeCloseTo(97 / 24, 6);
+    expect(Number(audio.duration)).toBeLessThan(4); expect(Number(audio.duration)).toBeGreaterThanOrEqual(3.5);
+    const receipt = JSON.parse(readFileSync(join(dir, "master.av-sync.json"), "utf8"));
+    expect(receipt).toMatchObject({ qualityReviewPerformed: false, audioAlignmentMeasured: false, sourceFilesUnchanged: true,
+      outputMedia: { videoFrames: 97, hasAudio: true } });
+    expect(pictureHashes(out)).toEqual(pictureHashes(clip)); expect(digest(clip)).toBe(before);
+  }, 120_000);
+  it("keeps every silent source frame and reports absent audio truthfully", () => {
+    const dir = mkdtempSync(join(tmpdir(), "compose-native-silent-")); roots.push(dir);
+    const clip = join(dir, "silent source with spaces.mp4"), out = join(dir, "master.mp4");
+    const made = run(ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=160x288:r=24:d=2", "-c:v", "libx264", "-pix_fmt", "yuv420p", clip]);
+    expect(made.status, made.stderr).toBe(0);
+    const before = digest(clip), result = compose([clip], out);
+    expect(result.status, result.stderr + result.stdout).toBe(0); expect(probe(out).filter(stream => stream.codec_type === "audio")).toHaveLength(0);
+    const receipt = JSON.parse(readFileSync(join(dir, "master.av-sync.json"), "utf8"));
+    expect(receipt).toMatchObject({ target: { shotFrames: [48] }, outputMedia: { videoFrames: 48, fps: 24, hasAudio: false },
+      qualityReviewPerformed: false, audioAlignmentMeasured: false });
+    expect(pictureHashes(out)).toEqual(pictureHashes(clip)); expect(digest(clip)).toBe(before);
   }, 120_000);
   it("rejects retiming flags before invoking media work", () => {
     const dir = mkdtempSync(join(tmpdir(), "compose-native-retime-")); roots.push(dir);
