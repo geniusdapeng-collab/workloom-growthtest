@@ -5,7 +5,8 @@
  *   · 服务读取并**冻结原稿**（内容寻址写入项目档案），按登记摘要启动固定工位子进程；
  *   · 子进程不持供应商/签发密钥（环境剥离 + 启动自检），所有外呼经受限父通道；
  *   · 每一次组件调用先留账（先预占、后外呼），产物落盘由服务写在工作目录并回摘要；
- *   · 评审（gate.review）由服务用**冻结作者合同**执行，工位不能自报通过；
+ *   · 前期 gate.review 由服务用冻结作者合同执行；成功素材的后期回执只记事实性
+ *     处理结果，不接受子进程补造品质、身份或语音认证；
  *   · 作业终态只由服务写：结果文件摘要 + 真实子进程退出码。
  *
  * 非同 UID 沙箱：本批只保证"密钥不进子进程 + 作用域/步骤受限 + 台账先留账"，
@@ -1199,7 +1200,7 @@ async function runGateReview(ctx: RunContext, frame: FilmChannelRequestFrame, co
     const missing = (reviewOptions.requiredCheckIds ?? []).filter((id) => !reviewOptions.deterministic.some((check) => check.id === id && check.pass === true));
     hardFailures.push(...missing.map((id) => `${id}：缺少实测检查`));
     if (!resolvedArtifacts.length) hardFailures.push("缺少可读产物");
-    return { stage: reviewOptions.stage, contractHash, approved: !hardFailures.length, status: hardFailures.length ? "failed" : "passed", score: hardFailures.length ? 0 : 100,
+    return { stage: reviewOptions.stage, contractHash, approved: !hardFailures.length, status: hardFailures.length ? "failed" : "passed", score: null, qualityStatus: "unverified",
       hardFailures, issues: reviewOptions.deterministic.filter((check) => !check.pass).map((check) => check.detail), suggestions: [], rerun: Boolean(hardFailures.length),
       via: "deterministic", ms: 0, reason: hardFailures.length ? "事实性交付检查未通过" : "冻结合同与事实性交付检查通过；画面质量由客户验收", degraded: false };
   } : undefined);

@@ -27,12 +27,14 @@
  *   5. 装档与写后复核交给 `portrait-set-install.mts`（同一套校验与证据口径）。
  */
 import { execFileSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import { dirname, join, resolve } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { assessLikenessBatch } from "../../packages/video-studio/src/likeness-policy.js";
+import { generationRequestHash, isDefiniteGenerationRejection, readGenerationSubmissionState,
+  submitGenerationOnce } from "../../packages/video-studio/src/generation-submission.mjs";
 
 function arg(name: string, fallback = ""): string {
   const index = process.argv.indexOf(name);
@@ -321,7 +323,94 @@ if (!["two-stage", "auto", "image", "video"].includes(engineArg)) {
 }
 const isOverdue = (text: string): boolean => /AccountOverdueError|overdue balance/i.test(text);
 
-async function generateViaImage(prompt: string, referenceImages: string[] = []): Promise<Buffer> {
+/** Existing unjournaled outputs cannot prove whether a former paid request was accepted. */
+function derivedSubmissionPath(key: string, kind: "image" | "video"): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(key)) throw new Error("DERIVED_SUBMISSION_KEY_INVALID");
+  return join(outDir, ".submissions", `${key}.${kind}.json`);
+}
+
+function derivedSubmissionJournal(key: string, kind: "image" | "video"): string {
+  const file = derivedSubmissionPath(key, kind);
+  const angle = key.replace(/^master-/, "");
+  const legacy = [join(outDir, `${characterId}-${angle}.png`), ...(key.startsWith("master-") ? [join(outDir, `_master-${angle}.png`)] : [])];
+  if (!existsSync(file) && legacy.some(path => existsSync(path)))
+    throw new Error("DERIVED_LEGACY_SUBMISSION_UNKNOWN: existing output has no acceptance journal; reconcile before POST");
+  return file;
+}
+
+/** A logical angle owns both engines. Changing engine cannot discard a paid acceptance. */
+function derivedAdmissionState(key: string, requested: "image" | "video" | "auto"): { kind: "image" | "video"; readOnly: boolean } {
+  const active = (["image", "video"] as const).map(kind => ({ kind, prior: readGenerationSubmissionState(derivedSubmissionPath(key, kind)) }))
+    .filter(entry => entry.prior && entry.prior.state !== "rejected");
+  if (active.length > 1) throw new Error("DERIVED_ACCEPTANCE_CONFLICT: both engines have accepted or unknown submissions; reconcile before proceeding");
+  const old = active[0];
+  if (old && requested !== "auto" && requested !== old.kind)
+    throw new Error(old.prior?.state === "submission-unknown" ? "DERIVED_SUBMISSION_UNKNOWN: another engine may already be paid"
+      : "DERIVED_ENGINE_CONFLICT: another engine is already accepted; restore that engine before proceeding");
+  return { kind: old?.kind ?? (requested === "video" ? "video" : "image"), readOnly: Boolean(old) };
+}
+
+/** Old task media must have an authoritative accepted video journal before a new POST. */
+function assertDerivedTemporaryMediaKnown(): void {
+  const temporary = readdirSync(outDir).filter(name => /^\.tmp-.*\.(?:mp4|png)$/.test(name));
+  if (!temporary.length) return;
+  const dir = join(outDir, ".submissions"), known = new Set<string>();
+  if (existsSync(dir)) {
+    const info = lstatSync(dir);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("DERIVED_SUBMISSION_DIRECTORY_INVALID");
+    for (const name of readdirSync(dir).filter(name => /^[A-Za-z0-9_-]+\.video\.json$/.test(name))) {
+      const file = join(dir, name), prior = readGenerationSubmissionState(file);
+      if (prior?.state !== "accepted") continue;
+      // readGenerationSubmissionState has checked the journal and response digest.
+      const saved = JSON.parse(readFileSync(file, "utf8")) as { responseText: string };
+      const taskId = (JSON.parse(saved.responseText) as { id?: string }).id;
+      if (typeof taskId === "string" && /^[A-Za-z0-9_-]{1,160}$/.test(taskId)) known.add(taskId);
+    }
+  }
+  if (temporary.some(name => {
+    const taskId = /^\.tmp-([A-Za-z0-9_-]{1,160})\.(?:mp4|png)$/.exec(name)?.[1];
+    return !taskId || !known.has(taskId);
+  })) throw new Error("DERIVED_LEGACY_SUBMISSION_UNKNOWN: temporary task media lacks an accepted journal; reconcile before POST");
+}
+
+/** Hold one admission lock across the image rejection and the video fallback. Never steal an old lock. */
+async function withDerivedAdmission(key: string, requested: "image" | "video" | "auto",
+  operation: (kind: "image" | "video", readOnly: boolean) => Promise<Buffer>): Promise<Buffer> {
+  const cached = derivedAdmissionState(key, requested);
+  // The request helper still validates exact endpoint/body; beforeSubmit forbids a raced fresh POST.
+  if (cached.readOnly) return operation(cached.kind, true);
+  const dir = join(outDir, ".submissions"); mkdirSync(dir, { recursive: true, mode: 0o700 });
+  const info = lstatSync(dir);
+  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("DERIVED_SUBMISSION_DIRECTORY_INVALID");
+  const lock = derivedSubmissionPath(key, "image").replace(/\.image\.json$/, ".admission.lock"), owner = randomUUID();
+  try { writeFileSync(lock, owner, { flag: "wx", mode: 0o600 }); }
+  catch (cause) { throw new Error("DERIVED_SUBMISSION_BUSY: same angle admission is owned; no duplicate POST sent", { cause }); }
+  try {
+    const current = derivedAdmissionState(key, requested);
+    return await operation(current.kind, current.readOnly);
+  } finally {
+    if (!existsSync(lock)) throw new Error("DERIVED_SUBMISSION_LOCK_CHANGED");
+    const held = lstatSync(lock);
+    if (!held.isFile() || held.isSymbolicLink() || held.nlink !== 1 || readFileSync(lock, "utf8") !== owner)
+      throw new Error("DERIVED_SUBMISSION_LOCK_CHANGED");
+    unlinkSync(lock);
+  }
+}
+
+function derivedBeforeSubmit(readOnly: boolean): void {
+  if (readOnly) throw new Error("DERIVED_RECOVERY_POST_FORBIDDEN: cached acceptance changed; reconcile before POST");
+  assertDerivedTemporaryMediaKnown();
+}
+
+/** Auto fallback is safe only after an explicit rejection of unsupported asset input. */
+function canFallbackToVideo(error: unknown): boolean {
+  const value = error as { status?: number; body?: string };
+  return value?.status === 400 && typeof value.body === "string" && isDefiniteGenerationRejection(400, value.body)
+    && /asset:\/\/|asset(?:[_ -]reference|\s+reference)/i.test(value.body)
+    && /not supported|unsupported|does not support|不支持/i.test(value.body);
+}
+
+async function imageGeneration(prompt: string, referenceImages: string[], key: string, readOnly: boolean): Promise<Buffer> {
   /**
    * 图端点接受**本地图 / data URL**（也接受多张，见 `portrait-agent` 的 anchors 用法）；不接受 `asset://`。
    * `referenceImages` 为多图参考（身份母版）——多图比单图稳，但张数过多会稀释，2 张左右最佳。
@@ -331,34 +420,18 @@ async function generateViaImage(prompt: string, referenceImages: string[] = []):
     model, prompt, image: images.length === 1 ? images[0] : images,
     size: arg("--size", "2K"), response_format: "url", watermark: false,
   });
-  /** 网络抖动（真机 `fetch failed` / ECONNRESET）重试 3 次（5s/15s 退避）；4xx/5xx 语义错误不重试 */
-  let response: Response;
-  let text: string;
-  let lastError: unknown = null;
-  response = undefined as unknown as Response;
-  text = "";
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      response = await fetch(`${baseUrl}/images/generations`, {
-        method: "POST",
-        headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-        body: requestBody,
-        signal: AbortSignal.timeout(300_000),
-      });
-      text = await response.text();
-      break;
-    } catch (error) {
-      lastError = error;
-      console.log(`  ↻ 图片端点第 ${attempt}/3 次网络失败（${error instanceof Error ? error.message.slice(0, 60) : String(error)}）`);
-      if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt === 1 ? 5_000 : 15_000));
-    }
-  }
-  if (!response) throw lastError;
+  const { response } = await submitGenerationOnce({ endpoint: `${baseUrl}/images/generations`,
+    journalFile: derivedSubmissionJournal(key, "image"), body: requestBody,
+    headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` }, timeoutMs: 300_000,
+    beforeSubmit: () => derivedBeforeSubmit(readOnly) });
+  const text = await response.text();
   if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status} ${text.slice(0, 160)}`), { status: response.status, body: text });
   const body = JSON.parse(text) as { data?: Array<{ url?: string }> };
   const url = body.data?.[0]?.url ?? null;
   if (!url) throw new Error(`响应里没有图片 URL：${text.slice(0, 160)}`);
-  return Buffer.from(await (await fetch(url, { signal: AbortSignal.timeout(120_000) })).arrayBuffer());
+  const download = await fetch(url, { signal: AbortSignal.timeout(120_000) });
+  if (!download.ok) throw new Error(`IMAGE_DOWNLOAD_FAILED: HTTP ${download.status}; accepted response retained`);
+  return Buffer.from(await download.arrayBuffer());
 }
 
 /**
@@ -366,29 +439,44 @@ async function generateViaImage(prompt: string, referenceImages: string[] = []):
  *
  * **失效参考自动剔除**（2026-09-30 真机）：主档里的"同组 11 张"清单可能已经过期——
  * 实测 `asset-20260929120055-d6xr` 被平台判 `not found`。这里从 400 错误里解析出失效 assetId、
- * 把它从参考集里去掉后重试（失败提交不计费），并把被剔除的 ID 记进报告，供主档校正。
+ * 仅在结构化明确400拒绝后剔除；未知结果绝不重发。首次受理响应先落盘，重启只GET。
  */
-async function generateViaVideo(prompt: string, refs: string[]): Promise<Buffer> {
+async function videoGeneration(prompt: string, refs: string[], key: string, readOnly: boolean): Promise<Buffer> {
   let activeRefs = [...refs];
+  const endpoint = `${baseUrl}/contents/generations/tasks`;
+  const journalFile = derivedSubmissionJournal(key, "video");
+  const requestBody = (selected: string[]): string => JSON.stringify({
+    model: process.env.SEEDANCE_MODEL || env.SEEDANCE_MODEL,
+    content: [{ type: "text", text: `${prompt}（人物保持静止的定妆姿态，镜头固定不动）` },
+      ...selected.map((ref) => ({ type: "image_url", image_url: { url: ref }, role: "reference_image" }))],
+    duration: Number(arg("--video-seconds", "4")), resolution: arg("--video-resolution", "1080p"),
+    generate_audio: false, watermark: false, return_last_frame: false,
+  });
+  const prior = readGenerationSubmissionState(journalFile);
+  if (prior && prior.state !== "rejected") {
+    // The accepted request may have removed an explicitly missing reference.
+    // Recover only an exact request derived from this caller's declared refs.
+    let matching: string[] | null = null;
+    if (refs.length > 4) throw new Error("DERIVED_REFERENCE_LIMIT_INVALID");
+    for (let mask = 1; mask < 2 ** refs.length; mask += 1) {
+      const selected = refs.filter((_ref, index) => mask & (1 << index));
+      if (generationRequestHash(endpoint, requestBody(selected)) === prior.requestHash) matching = selected;
+    }
+    if (!matching) throw new Error("GENERATION_REQUEST_CHANGED: previous derived video uses different input");
+    activeRefs = matching;
+  }
   let submit: Response | null = null;
   let submitText = "";
   for (let attempt = 0; attempt < 6; attempt += 1) {
-    submit = await fetch(`${baseUrl}/contents/generations/tasks`, {
-      method: "POST",
+    const accepted = await submitGenerationOnce({ endpoint, journalFile,
       headers: { "content-type": "application/json", authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model: process.env.SEEDANCE_MODEL || env.SEEDANCE_MODEL,
-        content: [{ type: "text", text: `${prompt}（人物保持静止的定妆姿态，镜头固定不动）` },
-          ...activeRefs.map((ref) => ({ type: "image_url", image_url: { url: ref }, role: "reference_image" }))],
-        duration: Number(arg("--video-seconds", "4")), resolution: arg("--video-resolution", "1080p"),
-        generate_audio: false, watermark: false, return_last_frame: false,
-      }),
-      signal: AbortSignal.timeout(120_000),
+      body: requestBody(activeRefs), timeoutMs: 120_000, beforeSubmit: () => derivedBeforeSubmit(readOnly),
     });
+    submit = accepted.response;
     submitText = await submit.text();
     if (submit.ok) break;
     const missing = /specified asset (asset-[A-Za-z0-9._-]+) is not found/.exec(submitText)?.[1];
-    if (!missing || activeRefs.length <= 1) {
+    if (submit.status !== 400 || !isDefiniteGenerationRejection(submit.status, submitText) || !missing || activeRefs.length <= 1) {
       throw Object.assign(new Error(`HTTP ${submit.status} ${submitText.slice(0, 200)}`), { status: submit.status, body: submitText });
     }
     invalidAssetRefs.add(missing);
@@ -397,21 +485,46 @@ async function generateViaVideo(prompt: string, refs: string[]): Promise<Buffer>
   }
   if (!submit?.ok) throw Object.assign(new Error(`HTTP ${submit?.status ?? "?"} ${submitText.slice(0, 200)}`), { status: submit?.status ?? 0, body: submitText });
   const taskId = (JSON.parse(submitText) as { id?: string }).id;
-  if (!taskId) throw new Error(`提交响应里没有任务 ID：${submitText.slice(0, 160)}`);
+  if (typeof taskId !== "string" || !/^[A-Za-z0-9_-]{1,160}$/.test(taskId))
+    throw new Error("VIDEO_ACCEPTED_TASK_INVALID: first response retained; reconcile provider before POST");
   for (let i = 0; i < 36; i += 1) {
     await new Promise((resolve) => setTimeout(resolve, 10_000));
     const poll = await fetch(`${baseUrl}/contents/generations/tasks/${taskId}`, { headers: { authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(60_000) });
     const pollText = await poll.text();
-    const body = JSON.parse(pollText) as { status?: string; content?: { video_url?: string }; error?: unknown };
+    if (!poll.ok) throw new Error(`VIDEO_POLL_FAILED: HTTP ${poll.status}; task ${taskId} retained`);
+    const body = JSON.parse(pollText) as { id?: string; status?: string; content?: { video_url?: string }; error?: unknown };
+    if (body.id && body.id !== taskId) throw new Error("VIDEO_POLL_TASK_MISMATCH");
     if (body.status === "failed" || body.status === "cancelled") throw new Error(`视频任务失败：${pollText.slice(0, 200)}`);
     if (body.status !== "succeeded" || !body.content?.video_url) continue;
     const video = join(outDir, `.tmp-${taskId}.mp4`);
-    writeFileSync(video, Buffer.from(await (await fetch(body.content.video_url, { signal: AbortSignal.timeout(180_000) })).arrayBuffer()));
+    const download = await fetch(body.content.video_url, { signal: AbortSignal.timeout(180_000) });
+    if (!download.ok) throw new Error(`VIDEO_DOWNLOAD_FAILED: HTTP ${download.status}; task ${taskId} retained`);
+    writeFileSync(video, Buffer.from(await download.arrayBuffer()));
     const frame = join(outDir, `.tmp-${taskId}.png`);
     execFileSync(process.env.WL_FFMPEG ?? "ffmpeg", ["-v", "error", "-y", "-ss", "0.4", "-i", video, "-frames:v", "1", frame]);
     return readFileSync(frame);
   }
   throw new Error("视频任务轮询超时（6 分钟）");
+}
+
+async function generateViaImage(prompt: string, referenceImages: string[] = [], key = "front"): Promise<Buffer> {
+  return withDerivedAdmission(key, "image", (_kind, readOnly) => imageGeneration(prompt, referenceImages, key, readOnly));
+}
+
+async function generateViaVideo(prompt: string, refs: string[], key = "front"): Promise<Buffer> {
+  return withDerivedAdmission(key, "video", (_kind, readOnly) => videoGeneration(prompt, refs, key, readOnly));
+}
+
+async function generateDerivedAngle(prompt: string, refs: string[], key: string, mode: "image" | "auto"): Promise<Buffer> {
+  return withDerivedAdmission(key, mode, async (kind, readOnly) => {
+    if (kind === "video") return videoGeneration(prompt, refs, key, readOnly);
+    try { return await imageGeneration(prompt, [], key, readOnly); }
+    catch (error) {
+      if (mode !== "auto" || readOnly || !canFallbackToVideo(error)) throw error;
+      console.log(`  ↻ ${key}：图片端点明确拒绝asset参考 → 退到视频路（保持同一角度准入锁）`);
+      return videoGeneration(prompt, refs, key, false);
+    }
+  });
 }
 
 /** 把一张图压成"可发包"的 data URL（图端点单次请求体过大就 fetch failed，实测过） */
@@ -443,19 +556,13 @@ if (engineArg === "two-stage") {
     const entry = plan.angles.find((item) => item.angle === angle);
     if (!entry) continue;
     /**
-     * 复用已生成的身份母版（`--reuse-masters`）：母版是最贵的一步（视频路），
-     * 网络抖动/后续角度失败重跑时不该重复烧钱——文件在且没被改就继续用它。
+     * 默认接续原受理任务；不盲信磁盘缓存或要求用户额外传 --reuse-masters。
+     * 母版/派生图的来源必须由相同请求的接续日志证明，GET/取帧失败不产生第二次收费。
      */
     const masterFile = join(outDir, `_master-${angle}.png`);
-    if (flag("--reuse-masters") && existsSync(masterFile)) {
-      const master = readFileSync(masterFile);
-      stageAMasters.set(angle, master);
-      console.log(`  ★ 复用已有身份母版 ${angle}：${masterFile}（${(master.byteLength / 1024).toFixed(0)}KB）`);
-      continue;
-    }
     const liveRefs = entry.refs.filter((ref) => !invalidAssetRefs.has(ref.replace(/^asset:\/\//, "")));
     console.log(`  ★ 身份母版 ${angle}：视频路 + ${liveRefs.length} 张 asset 参考（多参考=同一人多视角）`);
-    const master = await generateViaVideo(entry.prompt, liveRefs);
+    const master = await generateViaVideo(entry.prompt, liveRefs, `master-${angle}`);
     stageAMasters.set(angle, master);
     writeFileSync(masterFile, master);
     console.log(`    母版已存：${masterFile}（${(master.byteLength / 1024).toFixed(0)}KB）`);
@@ -501,12 +608,12 @@ for (const entry of plan.angles) {
   if (stageAMasters.has(entry.angle)) {
     image = stageAMasters.get(entry.angle)!;
   } else if (engineArg === "two-stage") {
-    image = await generateViaImage(entry.prompt, masterDataUrls);
+    image = await generateViaImage(entry.prompt, masterDataUrls, entry.angle);
   } else if (engineArg === "video") {
-    image = await generateViaVideo(entry.prompt, liveRefs);
+    image = await generateViaVideo(entry.prompt, liveRefs, entry.angle);
   } else {
     try {
-      image = await generateViaImage(entry.prompt);
+      image = await generateDerivedAngle(entry.prompt, liveRefs, entry.angle, engineArg as "image" | "auto");
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
       const body = (error as { body?: string }).body ?? "";
@@ -514,12 +621,8 @@ for (const entry of plan.angles) {
         console.error(`${entry.angle}：账户欠费（AccountOverdueError）→ 整体失败，先充值再重跑（本轮不产出任何文件、不做部分安装）`);
         process.exit(3);
       }
-      if (engineArg === "image") {
-        console.error(`${entry.angle}：图片端点失败 —— ${detail}`);
-        process.exit(3);
-      }
-      console.log(`  ↻ ${entry.angle}：图片端点不可用（${detail.slice(0, 90)}）→ 退到视频路（asset 参考已实测可用）`);
-      image = await generateViaVideo(entry.prompt, liveRefs);
+      console.error(`${entry.angle}：生成端点失败 —— ${detail}`);
+      process.exit(3);
     }
   }
   if (image.byteLength < 50_000) {

@@ -1,14 +1,26 @@
 # 成功原片默认采用的正式标准后期
 
-本入口供已经取得成功渲染素材的制作方使用。成功素材按原稿顺序进入合成、调色、字幕、配乐、封面和导出，不再经历身份、服装、动作、台词、口型、黑帧、精确原片规格或模型/人工品质复审；不做 canary，也不因此重复渲染、ASR 或 TTS。普通路径使用原片已有音轨；原片无音轨时，媒体处理补静音轨，不能把它写成有对白。渲染前授权、资格、预算与真实供应商失败仍有效。
+本入口供已经取得成功渲染素材的制作方使用。成功素材按原稿顺序进入合成、调色、字幕、配乐、封面和导出，不再经历身份、服装、动作、台词、口型、黑帧、精确原片规格或模型/人工品质复审；不做 canary，也不因此重复渲染、ASR 或 TTS。普通路径使用原片已有音轨；原片无音轨时保持静音；混合有声来源时，处理用静音区间明确记账，不能把它写成有对白。渲染前授权、资格、预算与真实供应商失败仍有效。
+
+**交付完整作品是最高优先级。** 原稿总秒数是创作目标，完整镜头池可以与目标不同；禁止为了凑秒截断动作或口播、压速、冻结或循环。只有 `durationIntent.hardMaximumSeconds` 显式登记的硬上限约束总时长，超出时要求修订方案。当前 v3 原片合同绑定目标、完整源钟和请求导出帧率下的逐镜整帧取整；实际合成回执另记录实际输出帧数、切点和时长。默认未做质量评审，分数为 `null/unverified`，不虚构 100 分。具体完成度行为见 [完成度政策](film-completion-policy.md)。
 
 三个具体场景：历史镜头被服装或黑帧评审打回，但供应商已经成功下载且任务/字节绑定完整，直接采用并保留旧失败行；原片为 10.04 秒、奇数画幅或不同帧率，按请求输出参数正式归一化；原片无声，照常生成主版、字幕版、风格版和封面，不偷偷补配音。
+
+正常生成 CLI 与父服务按产品所有者 2026-10-07 指令直接采用成功渲染素材；旧 `review-policy` 参数不重开后处理品质或模型审核。
+不做渲染后身份、服饰、运动、参考相似度、场景独立性或画面事故质审；旧视觉意见不改写，采用也不授予身份认证。
+正常生产封面同样按设计稿取帧，不做锐度排名、PSNR 或安全区评分；回执明确记为未执行质审，不补造通过分数。
+正常生成 CLI 的封面默认 `cover-hero=auto`：有明确主角来源时采用单一满幅人物，无主角时采用单一物体主视觉。人物来源优先使用镜头的显式标记、角色 ID 和出镜清单，不能把“画面没有人物”等非空说明认成人物镜。旧版式若把同镜或同一个人物同时用作底图和小卡，会在绘制前移除重复层，并记录实际底图和生效构图；满幅人物的文字进入下方安全带。默认封面使用确定性设计，不额外调用模型。
+正常确定性选稿记为 `designVia=deterministic`；合法设计和当前来源产物通过后可进入交付。旧模型失败证据继续保留，不能把“没有调用模型”当作失败，也不能把历史真实失败改写成成功。缺失或变化的封面字节仍由来源回执拒绝。
+文件可读取、目标画幅及干净母版来源仍须成立。后处理不调用评审模型或执行画质、听感评分；实际媒体处理错误仍停止并留痕。
+来源字节、实际受理任务、完整图声时钟和实际后期产物继续核对，确保交付对应当前原片。
+普通生成 CLI 的 `quality=uhd` 或 `resolution=2160p` 仍可使用：正式合成按请求的输出画布在本地归一化尺寸，保留完整源范围和实际导出时钟，不因 UHD 档自动调用增强模型。交付清单记录 `localEnhancement=not-requested`、`exportGeometryMode=local-compositor-normalization` 和 `enhancementModelInvoked=false`。历史 `--enhance-kind`、`--enhance-engine-dir` 在该入口没有实际适配器，显式传入会报 `STANDARD_ENHANCEMENT_OPTION_UNSUPPORTED`，不能把未消费的增强请求记为已执行。
+保留的独立 RGB 诊断函数遇到 FFmpeg 非零退出、启动错误、非 Buffer 或不足三个 RGB 字节时抛出 `VARIANT_RGB_MEASUREMENT_FAILED`，不填零伪造黑色；合法黑色仍接受。函数原有的测量失败语义保留；默认发布不调用该函数作质量否决，版本合同按已请求的配方、封面和消费音乐来源核对。
 
 ## 方案与边界
 
 候选一是在旧品质门增加开关，成本小但容易漏掉 worker、导演、母版和汇总中的第二次否决。候选二是统一使用事实性处理回执，先核对来源和真实媒体，再执行请求后期；渲染成功后的创作品质不参与默认放行。采用第二种，回执明确 `qualityReviewPerformed=false`、`score=null`、未作身份或语音认证。
 
-没有新增表、服务或依赖。文件操作仍使用本地规范路径、SHA-256、独占输出目录、超时和原子发布。此入口保持全部原镜、提交顺序、图声来源和原始字节；公开设置不提供自由删换、重排、变速、转场或独立配音字段。供应商原片的实际帧率、画幅、时长和音轨不必精确等于请求，后期按已提交的输出画布与时钟归一化。实际编解码失败、文件缺失/篡改、任务绑定不实以及导出不符合已请求规格会失败留痕。
+没有新增表、服务或依赖。文件操作仍使用本地规范路径、SHA-256、独占输出目录、超时和原子发布。此入口保持全部原镜、提交顺序、图声来源和原始字节；公开设置不提供自由删换、重排、变速、转场或独立配音字段。供应商原片的实际帧率、画幅、时长和音轨不必精确等于请求，后期按已请求的输出画布与帧率归一化，消费每镜完整源范围；时长按实际合成回读。实际编解码失败、文件缺失/篡改、任务绑定不实以及导出不符合已请求规格会失败留痕。
 
 该入口不向社交平台外发，不签发安装器，不认证人物、台词、口型、审美或音乐商用许可。普通导演与专业完整原片标准后期各有既有的交付合同；明确配音请求由导演的 `audioMode=dubbing` 进入真实授权处理，不属于此设置 schema。
 
@@ -18,9 +30,19 @@
 
 普通 CLI 启动时自动恢复当前项目的成功下载。已有签发事实必须仍与原片和 witness 一致；尚未签发的历史下载要求真实 accepted-task journal、当前输入字节、规范 lineage 的项目/镜头/阶段/运行 ID/配方摘要、无来源错误及实际输出摘要相符。历史 `verdict.approved=false`、质量分数或旧组件摘要不影响采用；旧行不改写，另记 `render-adopted`。缺失或无法绑定的已完成原片明确失败，不自动重新提交付费请求。
 
-唯一 `original-render-manifest.json` 只能从规范位置读取。每次加载核对冻结原稿、签发回执、首次 witness、当前原片字节，并用普通 FFprobe 获取合成所需媒体信息；不做全帧品质审查或全 PCM 品质解码。`standard-post-contract.ts` 构建 `shotId/video/audio/durationSec/speed`，起点零、速度一，实际合成调用再核对完整来源数组。
+同一次运行中新成功的素材镜，在进入剩余镜头的提交准备前，使用正式采用适配器重新读取已签发回执、首次见证和当前原片字节，并刷新已完成镜头状态。真实成功且字节较小的原片照常采用，没有“返回原片必须大于 100KB”的品质门；待生成的其他镜头仍执行自身提交准备和授权。缺失、空文件、当前字节或首次见证不符仍失败，不自动把失败转成另一次渲染请求。
 
-## 公开调用和设置
+重复 GET 接续保留首次受理 journal 的原字节和时间戳，重复签发也沿用首次原片回执和 witness，不覆盖历史证据。新回执另绑受理事实摘要；兼容旧版本 GET 曾更新查询时间的情况时，仍逐项核对 accepted 状态、同一 task ID、请求摘要和本地提交来源。旧字节摘要原样保留，任务、请求、来源、额外事实或原片变化仍拒绝，不能为接续重发付费 POST。
+
+生成后写入唯一 `original-render-manifest.json`。公开入口只接受该规范位置；另存、软链、别名、自供媒体事实、重哈希 wrapper 不能替换原片。每次加载重新读取冻结原稿、签发回执和首次见证，核对实际媒体。当前历史六镜的维护采用产品所有者明确授权的 `legacy-user-adopted`，逐项绑定历史输出行字节及 accepted-task 记录；它只能证明当前历史原片字节关系，不能补造原供应商 payload 或人物认证。
+
+纯合同 `standard-post-contract.ts` 按冻结原稿顺序和完整原片帧数/帧率构建每镜 `shotId/video/audio/durationSec/speed`。原稿名义时长保持原字节；图声共享同一路径、摘要和字节数，起点为零、速度为一。`compositionClock` 记录每镜完整源钟、请求输出整帧数及取整差；实际交给合成的来源数组再次经 `assertStandardPostTimeline` 校验。顺序、数量、隐藏字段或当前来源改变即拒绝。派生字幕、封面和配乐切点以实际合成回执的逐镜帧数计算。原音轨元数据差只作事实记录，不拒绝成功原片，不把它当对白正确性或解码采样覆盖证明。
+
+正式交付清单的 `compositionTimeline` 逐镜记录 `startFrame/frameCount/fps/startSec/durationSec/endSec`，来源是合成工位回读的实际帧范围。配乐处理回执的 `compositionCuts.requestedSeconds` 使用这些实测切点，标明 `basis=measured-composition-frame-clock`、`reviewed=false`；它表示本次混音消费的时间线，不认证音乐卡点品质。例如 69 帧/17fps 完整源归一化为 98 帧/24fps 时，下一镜与配乐切点从 `98/24` 秒开始，不能沿用 `69/17` 秒造成后续漂移。
+
+完整端点案例：请求 10 秒、返回 241 帧/24fps，视频流为 10.041667 秒。后期消费全部 241 帧，并将实际输出钟写入回执，不截回 240 帧。三镜同类原片的完整正文为 723 帧/24fps；正式封面在零时刻增加一帧，正文从第 1 帧开始，画面共 724 帧。已有音频包和字幕时间戳仍保持原钟零偏移；封面回执明确记录 `bodyVideoOffsetSeconds=1/fps`、`audioOffsetSeconds=0`，不以此宣称完成音画质量认证。
+
+## 公开调用与设置
 
 ```bash
 pnpm exec tsx scripts/tools/full-chain-film.mts \
@@ -45,15 +67,15 @@ pnpm exec tsx scripts/tools/full-chain-film.mts \
 
 1. 读取规范原片清单、真实任务和当前字节，普通探测媒体元数据。原片的奇数画幅、不同帧率、边界时长、黑画面及无声不构成品质否决。
 2. 独占新输出目录，在同卷 staging 复制消费输入并核对摘要；原片保持原字节。
-3. 官方 `compose-film.mts` 归一化请求画布、帧率和时间线，保留已有原音轨，无声源补静音。处理回执写明 `audioAlignmentMeasured=false`，不伪造相关性或语音认证。
+3. 官方 `compose-film.mts` 归一化请求画布、帧率和时间线，保留已有原音轨，无声源保持静音；与有声源共同合成时，仅按处理需要创建明确记账的静音区间。处理回执写明 `audioAlignmentMeasured=false`，不伪造相关性或语音认证。
 4. 官方字幕工位输出 SRT/ASS/VTT，按作者已有句级时间渲染；不运行 ASR，也不把片名擅自烧成开场标题。
 5. 主版使用拼接画面，风格版单次调色；普通原片声音保留。请求音乐才单次混音，记录源摘要、实际产物及 `metrics=null/qualityReviewPerformed=false`。
-6. 生成请求封面和首帧装配，再输出硬字幕与可关闭软字幕呈现。封面不会因源帧黑暗触发另一次选帧品质投票。
+6. 生成请求封面和首帧装配，再输出硬字幕与可关闭软字幕呈现。封面不会因源帧黑暗触发另一次选帧品质投票。正式装配在零时刻加入一帧封面，完整正文逐帧保留；源音频和字幕包及时间戳不移位。schema v2 回执记录源帧数、最终帧数、正文偏移和音频零偏移。
 7. 对实际最终输出进行普通媒体回读，核对请求画布、帧率、导出时钟、真实存在的文件及摘要。没有完整 PCM/全帧品质扫描，没有服装、口型、台词或听感审核。
 8. 记录请求的风格配方、实际封面和消费音乐字节，不采样 RGB/LUFS 给多个版本作质量投票。最后重新核对原片、输入、字体、消费代码和二进制。
 9. 处理成功后原子发布新目录；实际错误写 `failed.json` 和阶段账本，保留 staging，释放自己的锁。并发、超时、输出抢占和摘要改变不会写成功。
 
-稳定错误包括 `FREE_EDIT_REMOVED`、`STANDARD_POST_ARGUMENTS_INVALID`、`STANDARD_POST_WORKER_FORBIDDEN`、`STANDARD_POST_INVALID`、`STANDARD_POST_PROCESS_FAILED`、`STANDARD_POST_MEDIA_INVALID`、`STANDARD_POST_EXPORT_CLOCK_INVALID`、`STANDARD_POST_EXPORT_SPEC_INVALID`、`STANDARD_POST_VARIANTS_INVALID`、`STANDARD_POST_FONT_CHANGED`、`STANDARD_POST_CODE_CHANGED`、`STANDARD_POST_TIMELINE_CHANGED`、`STANDARD_POST_OUTPUT_EXISTS`、`STANDARD_POST_BUSY`。文件错误保留规范路径、底层错误码及 `cause`。
+稳定错误包括 `FREE_EDIT_REMOVED`、`STANDARD_POST_ARGUMENTS_INVALID`、`STANDARD_POST_WORKER_FORBIDDEN`、`STANDARD_ENHANCEMENT_OPTION_UNSUPPORTED`、`STANDARD_POST_INVALID`、`STANDARD_POST_PROCESS_FAILED`、`STANDARD_POST_MEDIA_INVALID`、`STANDARD_POST_EXPORT_CLOCK_INVALID`、`STANDARD_POST_EXPORT_SPEC_INVALID`、`STANDARD_POST_VARIANTS_INVALID`、`STANDARD_POST_FONT_CHANGED`、`STANDARD_POST_CODE_CHANGED`、`STANDARD_POST_TIMELINE_CHANGED`、`STANDARD_POST_OUTPUT_EXISTS`、`STANDARD_POST_BUSY`。文件错误保留规范路径、底层错误码及 `cause`。
 
 ## 验证与优先级
 

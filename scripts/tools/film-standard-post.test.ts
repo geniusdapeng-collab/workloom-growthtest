@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { basename, join, resolve } from "node:path";
 import { test } from "vitest";
-import { adoptCompletedOriginalRenders, runStandardPost, adoptLegacyOriginalRenders, assertStandardPostAudioClock, assertStandardPostVariantAxes, captureOriginalRenderManifest, freezeOriginalSubmission, issueOriginalRenderReceipt,
+import { adoptCompletedOriginalRenders, runStandardPost, adoptLegacyOriginalRenders, assertStandardPostAudioClock, assertStandardPostExportClock, assertStandardPostVariantAxes, captureOriginalRenderManifest, freezeOriginalSubmission, issueOriginalRenderReceipt,
   loadOriginalRenderManifest, resolveStandardPostBinary, standardPostFileHash, StandardPostError, validateStandardPostSettings, type StandardPostSettings } from "./film-standard-post.mjs";
 const hash = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
 const repo = resolve(import.meta.dirname, "../.."), cli = join(repo, "scripts/tools/full-chain-film.mts");
@@ -14,19 +14,20 @@ function call(args: string[]) { return spawnSync(process.execPath, ["--import", 
   env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: ffmpeg, WL_FFPROBE: ffprobe } }); }
 function media(file: string) {
   const result = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "testsrc2=s=160x288:r=24:d=1",
-    "-f", "lavfi", "-i", `sine=frequency=${file.includes("S2") ? 866 : 733}:sample_rate=48000:duration=1`, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "ultrafast",
+    "-f", "lavfi", "-i", `sine=frequency=${basename(file) === "S2.mp4" ? 866 : 733}:sample_rate=48000:duration=1`, "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "ultrafast",
     "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", "-t", "1", file], { encoding: "utf8", timeout: 60_000 });
   assert.equal(result.status, 0, result.stderr);
 }
-async function fixture() {
-  const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-original-fixture-"))), projectId = "MOCK-STANDARD";
+async function fixture(prefix = "standard-original-fixture-") {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), prefix))), projectId = "MOCK-STANDARD";
   const bytes = Buffer.from(JSON.stringify({ projectId, durationSeconds: 2, shots: [{ shotId: "S1", duration: 1 }, { shotId: "S2", duration: 1 }] }));
   const submitted = await freezeOriginalSubmission({ productionRoot: root, projectId, bytes });
   const clips = join(root, "clips", projectId); mkdirSync(clips, { recursive: true });
   for (const shotId of ["S1", "S2"]) {
     const file = join(clips, `${shotId}.mp4`); media(file);
     const accepted = join(root, "logs", projectId, "accepted-tasks"); mkdirSync(accepted, { recursive: true });
-    writeFileSync(join(accepted, `${shotId}.json`), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted", taskId: `mock-${shotId}-accepted`, requestHash: hash(`mock-request-${shotId}`) }));
+    writeFileSync(join(accepted, `${shotId}.json`), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted", taskId: `mock-${shotId}-accepted`, requestHash: hash(`mock-request-${shotId}`),
+      submissionSource: "local-submit", updatedAt: "2026-10-07T01:00:00.000Z" }));
     await issueOriginalRenderReceipt({ productionRoot: root, projectId, shotId, submittedSha256: submitted.sha256,
       artifactPath: file, taskId: `mock-${shotId}-accepted`, requestInputVerified: true });
   }
@@ -49,7 +50,15 @@ test("issued original manifest rebuilds exact complete native timeline from real
   for (const row of loaded.timeline) { assert.deepEqual(row.video, row.audio); assert.equal(row.video.inSec, 0); assert.equal(row.speed, 1); }
   assert.equal(hash(readFileSync(join(f.clips, "S1.mp4"))), sourceBefore);
   assert.deepEqual(validateStandardPostSettings(settings(f.root), loaded.contract), settings(f.root));
-}), 60_000);
+ }), 60_000);
+test("temporary ancestor names containing S2 cannot turn two distinct original fixtures into duplicate media", async () => {
+  const f = await fixture("standard-original-fixture-S2-");
+  try {
+    assert.notEqual(hash(readFileSync(join(f.clips, "S1.mp4"))), hash(readFileSync(join(f.clips, "S2.mp4"))));
+    const loaded = await loadOriginalRenderManifest(f.manifestFile, options);
+    assert.deepEqual(loaded.timeline.map(row => row.shotId), ["S1", "S2"]);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
 test("a missing canonical manifest returns the stable standard error before media probing", async () => {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-missing-manifest-")));
   try {
@@ -69,16 +78,30 @@ test("a missing issued receipt fails capture with the stable error and publishes
 });
 test("final clock readback uses ordinary ffprobe metadata without PCM quality inspection", async () => using(async f => {
   const file = join(f.clips, "S1.mp4"), before = hash(readFileSync(file));
-  const result = await assertStandardPostAudioClock(file, 1, { ffmpeg: "must-not-be-invoked", ffprobe, timeoutMs: 60_000 });
+  const result = await assertStandardPostExportClock(file, 1, { ffmpeg: "must-not-be-invoked", ffprobe, timeoutMs: 60_000 });
   assert.equal(result.actualDurationSec, 1); assert.equal(result.requestedDurationSec, 1);
   assert.match(result.basis, /metadata only.*No complete PCM decode/);
   assert.equal(hash(readFileSync(file)), before);
 }));
 test("final clock readback rejects a requested export duration mismatch and preserves bytes", async () => using(async f => {
   const file = join(f.clips, "S1.mp4"), before = hash(readFileSync(file));
-  await assert.rejects(assertStandardPostAudioClock(file, 2, { ffmpeg: "must-not-be-invoked", ffprobe, timeoutMs: 60_000 }), /STANDARD_POST_EXPORT_CLOCK_INVALID/);
+  await assert.rejects(assertStandardPostExportClock(file, 2, { ffmpeg: "must-not-be-invoked", ffprobe, timeoutMs: 60_000 }), /STANDARD_POST_EXPORT_CLOCK_INVALID/);
   assert.equal(hash(readFileSync(file)), before);
 }));
+test("final clock readback rejects even one lost frame and an unexpected fps without the former fifty-millisecond slack", async () => using(async f => {
+  const file = join(f.clips, "S1.mp4"), before = hash(readFileSync(file));
+  await assert.rejects(assertStandardPostExportClock(file, 25 / 24, { ffprobe, expectedVideoFrames: 25, expectedFps: 24 }), /STANDARD_POST_EXPORT_CLOCK_INVALID/);
+  await assert.rejects(assertStandardPostExportClock(file, 1, { ffprobe, expectedVideoFrames: 24, expectedFps: 30 }), /STANDARD_POST_EXPORT_CLOCK_INVALID/);
+  const actual = await assertStandardPostExportClock(file, 1, { ffprobe, expectedVideoFrames: 24, expectedFps: 24 });
+  assert.equal(actual.videoFrames, 24); assert.equal(actual.requestedFrames, 24); assert.equal(hash(readFileSync(file)), before);
+}));
+test("explicit audio diagnostic still decodes the whole clock and rejects short coverage at its original threshold", async () => using(async f => {
+  const file = join(f.clips, "S1.mp4"), before = hash(readFileSync(file));
+  const result = await assertStandardPostAudioClock(file, 1, { ffmpeg, timeoutMs: 60_000 });
+  assert.ok(result.samplesPerChannel >= result.requiredSamples); assert.match(result.basis, /Actual decoded samples/);
+  await assert.rejects(assertStandardPostAudioClock(file, 2, { ffmpeg, timeoutMs: 60_000 }), /STANDARD_POST_NATIVE_CLOCK_INCOMPLETE/);
+  assert.equal(hash(readFileSync(file)), before);
+}), 60_000);
 const settingsMutations: Array<[string, (s: any) => void]> = [
   ["arbitrary sources", s => { s.sources = []; }], ["arbitrary segments", s => { s.segments = []; }], ["exclusion list", s => { s.forbiddenVideoSourceIds = ["S1"]; }],
   ["replacement project", s => { s.projectId = "OTHER"; }], ["fps override", s => { s.fps = 30; }], ["dimensions override", s => { s.width = 720; }],
@@ -163,6 +186,40 @@ test("frozen submission is idempotent but refuses changed project or mutable res
   await assert.rejects(freezeOriginalSubmission({ productionRoot: f.root, projectId: f.projectId, bytes: Buffer.concat([f.bytes, Buffer.from(" ")]) }), /frozen source differs/);
   await assert.rejects(freezeOriginalSubmission({ productionRoot: f.root, projectId: "OTHER", bytes: f.bytes }), /project/);
 }));
+for (const legacy of [false, true]) test(`${legacy ? "legacy v1" : "current"} GET timestamp change reuses the exact first original receipt and seal without rewriting evidence`, async () => using(async f => {
+  const journal = join(f.root, "logs", f.projectId, "accepted-tasks", "S1.json"), current = JSON.parse(readFileSync(journal, "utf8"));
+  const sealFile = f.receipt.replace(/\.json$/, ".seal.json");
+  if (legacy) {
+    // Reproduce a pre-fix issuance in an explicitly synthetic fixture only.
+    const old = JSON.parse(readFileSync(f.receipt, "utf8")); delete old.evidence.acceptedFactsSha256;
+    writeFileSync(f.receipt, JSON.stringify(old, null, 2) + "\n");
+    const witness = JSON.parse(readFileSync(sealFile, "utf8")); witness.receiptSha256 = hash(readFileSync(f.receipt));
+    writeFileSync(sealFile, JSON.stringify(witness, null, 2) + "\n");
+    const list = JSON.parse(readFileSync(f.manifestFile, "utf8")); list.originals[0].receiptSha256 = witness.receiptSha256;
+    writeFileSync(f.manifestFile, JSON.stringify(list, null, 2) + "\n");
+  }
+  const receipt = readFileSync(f.receipt), seal = readFileSync(sealFile), manifest = readFileSync(f.manifestFile);
+  writeFileSync(journal, JSON.stringify({ ...current, updatedAt: "2026-10-07T04:00:00.000Z" }));
+  const resumed = await issueOriginalRenderReceipt({ productionRoot: f.root, projectId: f.projectId, shotId: "S1", submittedSha256: f.submitted.sha256,
+    artifactPath: join(f.clips, "S1.mp4"), taskId: "mock-S1-accepted", requestInputVerified: true });
+  assert.deepEqual(resumed, JSON.parse(receipt.toString()));
+  assert.deepEqual(readFileSync(f.receipt), receipt); assert.deepEqual(readFileSync(sealFile), seal);
+  const loaded = await loadOriginalRenderManifest(f.manifestFile, options);
+  assert.equal(loaded.totalFrames, 48); assert.deepEqual(readFileSync(f.manifestFile), manifest);
+}));
+test("a changed accepted task, request, state, source or extra fact cannot reuse a first issuance", async () => using(async f => {
+  const journal = join(f.root, "logs", f.projectId, "accepted-tasks", "S1.json"), original = JSON.parse(readFileSync(journal, "utf8"));
+  const receipt = readFileSync(f.receipt);
+  for (const changed of [{ taskId: "mock-other" }, { requestHash: hash("other-request") }, { state: "submission-unknown" },
+    { submissionSource: "provider-recovery" }, { unexpectedAuthority: true }, { updatedAt: "not-a-timestamp" }]) {
+    writeFileSync(journal, JSON.stringify({ ...original, updatedAt: "2026-10-07T04:00:00.000Z", ...changed }));
+    await assert.rejects(issueOriginalRenderReceipt({ productionRoot: f.root, projectId: f.projectId, shotId: "S1", submittedSha256: f.submitted.sha256,
+      artifactPath: join(f.clips, "S1.mp4"), taskId: "mock-S1-accepted", requestInputVerified: true }), /STANDARD_POST_INVALID/);
+    await assert.rejects(loadOriginalRenderManifest(f.manifestFile, options), /STANDARD_POST_INVALID/);
+    assert.deepEqual(readFileSync(f.receipt), receipt);
+  }
+  writeFileSync(journal, JSON.stringify(original)); await loadOriginalRenderManifest(f.manifestFile, options);
+}));
 test("missing actual accepted input proof refuses original issuance", async () => using(async f => {
   await assert.rejects(issueOriginalRenderReceipt({ productionRoot: f.root, projectId: f.projectId, shotId: "S1", submittedSha256: f.submitted.sha256,
     artifactPath: join(f.clips, "S1.mp4"), taskId: "mock-S1-accepted", requestInputVerified: false }), /accepted original generation proof/);
@@ -215,7 +272,7 @@ async function failedQualityHistory(f: Awaited<ReturnType<typeof fixture>>) {
       lineage: { schemaVersion: "workloom.production-lineage/v1", projectId: f.projectId, sourceHash: hash(`shot-source-${shotId}`),
         stage: "shot", shotId, runId: "historical-local-fixture", recipeHash: hash("old-component"), status: "failed",
         inputs: [{ path: join(f.root, "logs", f.projectId, "submitted-original.json"), sha256: f.submitted.sha256, bytes: f.bytes.length }],
-        outputs: [{ path, sha256, bytes: bytes.length }], errors: [] } };
+        outputs: [{ path, sha256, bytes: bytes.length }], errors: [] as string[] } };
   });
   const file = join(f.root, "logs", f.projectId, "stages.jsonl"), bytes = Buffer.from(rows.map(row => JSON.stringify(row)).join("\n") + "\n");
   writeFileSync(file, bytes);
@@ -258,14 +315,19 @@ test("a missing previously issued original fails instead of silently entering a 
   assert.equal(existsSync(f.receipt), true);
 }));
 
-async function unusualCompletedFixture() {
+async function unusualCompletedFixture(options: { audio?: boolean; nominalSeconds?: number; videoFrames?: number; tailMarker?: boolean; providerCanvas?: boolean } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-raw-completed-"))), projectId = "MOCK-RAW-COMPLETED";
-  const bytes = Buffer.from(JSON.stringify({ projectId, title: "原片后期", durationSeconds: 10, aspect: "9:16", resolution: "720p", fps: 24,
-    shots: [{ shotId: "S1", duration: 10, scene: "已生成的原镜头", action: "保留原镜头", dialogue: [{ speaker: "原片", text: "原片无声" }] }] }));
+  const nominalSeconds = options.nominalSeconds ?? 10, videoFrames = options.videoFrames ?? 241, actualSeconds = videoFrames / 24;
+  const bytes = Buffer.from(JSON.stringify({ projectId, title: "原片后期", durationSeconds: nominalSeconds, aspect: "9:16", resolution: options.providerCanvas ? "provider-original" : "720p", fps: 24,
+    shots: [{ shotId: "S1", duration: nominalSeconds, scene: "已生成的原镜头", action: "保留原镜头", dialogue: [{ speaker: "原片", text: options.audio ? "原片原声" : "原片无声" }] }] }));
   const submitted = await freezeOriginalSubmission({ productionRoot: root, projectId, bytes });
   const clips = join(root, "clips", projectId); mkdirSync(clips, { recursive: true });
-  const raw = join(clips, "S1.mp4"), result = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i",
-    "color=c=black:s=162x122:r=24", "-vf", "crop=161:121:exact=1", "-frames:v", "241", "-an", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv444p", raw],
+  const sourceFilter = options.providerCanvas ? "color=c=blue:s=144x256:r=24" : "color=c=black:s=162x122:r=24";
+  const videoFilter = [options.providerCanvas ? "null" : "crop=161:121:exact=1", ...(options.tailMarker ? [`drawbox=color=red:t=fill:enable='gte(t,${actualSeconds - 0.25})'`] : [])].join(",");
+  const raw = join(clips, "S1.mp4"), result = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", sourceFilter,
+    ...(options.audio ? ["-f", "lavfi", "-i", `sine=frequency=733:sample_rate=48000:duration=${actualSeconds}`] : []),
+    "-map", "0:v:0", ...(options.audio ? ["-map", "1:a:0", "-c:a", "aac", "-ar", "48000", "-ac", "2"] : ["-an"]),
+    "-vf", videoFilter, "-frames:v", String(videoFrames), "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", options.providerCanvas ? "yuv420p" : "yuv444p", raw],
   { encoding: "utf8", timeout: 60_000 });
   assert.equal(result.status, 0, result.stderr);
   const accepted = join(root, "logs", projectId, "accepted-tasks"); mkdirSync(accepted, { recursive: true });
@@ -322,7 +384,7 @@ test.each([false, true])("actual standard post creates all presentations from un
     }
     const settingsFile = join(f.root, "settings.json"), outputDir = join(f.root, "delivery"); writeFileSync(settingsFile, JSON.stringify(postSettings));
     const delivered = await runStandardPost(manifestFile, settingsFile, outputDir, { repoRoot: repo, ffmpeg, ffprobe, timeoutMs: 180_000 });
-    assert.equal(delivered.projectId, f.projectId);
+    assert.ok(delivered && typeof delivered === "object"); assert.equal(Reflect.get(delivered, "projectId"), f.projectId);
     const manifest = JSON.parse(readFileSync(join(outputDir, `${f.projectId}-delivery-manifest.json`), "utf8"));
     assert.equal(manifest.outputs.length, 5); assert.equal(manifest.modelCalls, 0); assert.equal(manifest.supplierGenerationCalls, 0);
     assert.equal(manifest.ttsCalls, 0); assert.equal(manifest.asrCalls, 0); assert.equal(manifest.sourceFilesUnchanged, true);
@@ -336,6 +398,116 @@ test.each([false, true])("actual standard post creates all presentations from un
     assert.equal(hash(readFileSync(f.raw)), f.rawSha256); assert.deepEqual(readFileSync(f.historyFile), f.history);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 }, 300_000);
+
+function decodedVideoHashes(file: string): string[] {
+  const result = spawnSync(ffmpeg, ["-v", "error", "-xerror", "-nostdin", "-i", file, "-map", "0:v:0", "-pix_fmt", "yuv420p", "-f", "framehash", "-hash", "sha256", "-"],
+    { encoding: "utf8", timeout: 60_000, maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.stderr);
+  return result.stdout.split("\n").filter(line => line && !line.startsWith("#")).map(line => line.split(",").at(-1)!.trim());
+}
+function audioPacketFacts(file: string) {
+  const result = spawnSync(ffprobe, ["-v", "error", "-select_streams", "a:0", "-show_packets", "-show_data_hash", "sha256", "-of", "json", file],
+    { encoding: "utf8", timeout: 60_000, maxBuffer: 8 * 1024 * 1024 });
+  assert.equal(result.status, 0, result.stderr);
+  return JSON.parse(result.stdout).packets.map((packet: Record<string, unknown>) => ({ pts: packet.pts, dts: packet.dts, duration: packet.duration,
+    size: packet.size, data_hash: packet.data_hash, side_data_list: packet.side_data_list }));
+}
+async function completeTailPostFixture() {
+  const f = await unusualCompletedFixture({ audio: true, nominalSeconds: 2, videoFrames: 102, tailMarker: true, providerCanvas: true });
+  await adoptCompletedOriginalRenders({ productionRoot: f.root, projectId: f.projectId, submittedSha256: f.submitted.sha256 });
+  const manifestFile = await captureOriginalRenderManifest({ productionRoot: f.root, projectId: f.projectId }), postSettings = settings(f.root);
+  const fonts = join(repo, "bundles/ai-video/library/fonts"), font = join(fonts, "cn/SourceHanSansCN-Heavy.otf");
+  postSettings.subtitleFontsRoot = fonts; Object.assign(postSettings.cover, { fontFile: font, fontSha256: hash(readFileSync(font)), fontId: "source-han-heavy" });
+  const settingsFile = join(f.root, "settings.json"); writeFileSync(settingsFile, JSON.stringify(postSettings));
+  return { ...f, manifestFile, settingsFile };
+}
+test("formal post uses measured fractional-cadence composition boundaries for every requested music cut", async () => {
+  const root = realpathSync(mkdtempSync(join(tmpdir(), "standard-fractional-cadence-"))), projectId = "MOCK-FRACTIONAL-CADENCE";
+  try {
+    const specifications = [{ shotId: "S1", fps: 17, frames: 69 }, { shotId: "S2", fps: 24, frames: 25 }];
+    const bytes = Buffer.from(JSON.stringify({ projectId, durationSeconds: 30, aspect: "9:16", resolution: "provider-original", fps: 24,
+      shots: specifications.map(source => ({ shotId: source.shotId, duration: 2 })) }));
+    const submitted = await freezeOriginalSubmission({ productionRoot: root, projectId, bytes });
+    const clips = join(root, "clips", projectId), accepted = join(root, "logs", projectId, "accepted-tasks");
+    mkdirSync(clips, { recursive: true }); mkdirSync(accepted, { recursive: true });
+    const originalHashes: string[] = [];
+    for (const source of specifications) {
+      const path = join(clips, `${source.shotId}.mp4`), duration = source.frames / source.fps;
+      const made = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", `color=c=blue:s=144x256:r=${source.fps}:d=${duration}`,
+        "-f", "lavfi", "-i", `sine=frequency=${source.fps === 17 ? 733 : 866}:sample_rate=48000:duration=${duration}`,
+        "-map", "0:v:0", "-map", "1:a:0", "-frames:v", String(source.frames), "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+        "-c:a", "aac", "-ar", "48000", "-ac", "2", path], { encoding: "utf8", timeout: 60_000 });
+      assert.equal(made.status, 0, made.stderr); originalHashes.push(hash(readFileSync(path)));
+      const taskId = `offline-${source.shotId}`;
+      writeFileSync(join(accepted, `${source.shotId}.json`), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted", taskId,
+        requestHash: hash(`offline-fractional-${source.shotId}`) }));
+      await issueOriginalRenderReceipt({ productionRoot: root, projectId, shotId: source.shotId, submittedSha256: submitted.sha256,
+        artifactPath: path, taskId, requestInputVerified: true });
+    }
+    const manifestFile = await captureOriginalRenderManifest({ productionRoot: root, projectId }), postSettings = settings(root);
+    const fonts = join(repo, "bundles/ai-video/library/fonts"), font = join(fonts, "cn/SourceHanSansCN-Heavy.otf");
+    postSettings.subtitleFontsRoot = fonts; Object.assign(postSettings.cover, { fontFile: font, fontSha256: hash(readFileSync(font)), fontId: "source-han-heavy" });
+    postSettings.music = postSettings.versions.slice(1).map((version, index) => {
+      const path = join(root, `${version.id}.wav`), made = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i",
+        `sine=frequency=${600 + index * 377}:sample_rate=48000:duration=2`, "-c:a", "pcm_s16le", path], { encoding: "utf8", timeout: 60_000 });
+      assert.equal(made.status, 0, made.stderr); Object.assign(version, { musicSourceId: version.id, musicLevelDb: -24, duckingDb: 12, musicBpm: 120 });
+      return { id: version.id, path, sha256: hash(readFileSync(path)), bytes: statSync(path).size };
+    });
+    const settingsFile = join(root, "settings.json"), output = join(root, "delivery"); writeFileSync(settingsFile, JSON.stringify(postSettings));
+    await runStandardPost(manifestFile, settingsFile, output, { repoRoot: repo, ffmpeg, ffprobe, timeoutMs: 180_000 });
+    const delivered = JSON.parse(readFileSync(join(output, `${projectId}-delivery-manifest.json`), "utf8"));
+    assert.equal(delivered.bodyFrames, 123); assert.equal(delivered.totalFrames, 124);
+    assert.deepEqual(delivered.compositionTimeline, [
+      { shotId: "S1", startFrame: 0, frameCount: 98, fps: 24, startSec: 0, durationSec: 98 / 24, endSec: 98 / 24 },
+      { shotId: "S2", startFrame: 98, frameCount: 25, fps: 24, startSec: 98 / 24, durationSec: 25 / 24, endSec: 123 / 24 },
+    ]);
+    assert.notEqual(delivered.compositionTimeline[1].startSec, 69 / 17);
+    for (const version of delivered.outputs.filter((version: { id: string }) => ["warm-film", "cool-tech", "punchy-social"].includes(version.id))) {
+      assert.deepEqual(version.bgm.compositionCuts, { requestedSeconds: [98 / 24], basis: "measured-composition-frame-clock", reviewed: false });
+      assert.equal(version.bgm.qualityReviewPerformed, false); assert.equal(version.exportClock.videoFrames, 124);
+    }
+    assert.deepEqual(specifications.map(source => hash(readFileSync(join(clips, `${source.shotId}.mp4`)))), originalHashes);
+    assert.equal(delivered.modelCalls, 0); assert.equal(delivered.supplierGenerationCalls, 0);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+}, 240_000);
+test("formal standard post preserves every nominal-two actual-4.25-second frame and native AAC packet through the soft-subtitle delivery, with one concurrent publisher", async () => {
+  const f = await completeTailPostFixture();
+  try {
+    const output = join(f.root, "delivery"), originalFrames = decodedVideoHashes(f.raw), originalPackets = audioPacketFacts(f.raw);
+    const calls = await Promise.allSettled([runStandardPost(f.manifestFile, f.settingsFile, output, { repoRoot: repo, ffmpeg, ffprobe, timeoutMs: 180_000 }),
+      runStandardPost(f.manifestFile, f.settingsFile, output, { repoRoot: repo, ffmpeg, ffprobe, timeoutMs: 180_000 })]);
+    assert.equal(calls.filter(call => call.status === "fulfilled").length, 1, calls.map(call => call.status === "rejected" ? String(call.reason) : "fulfilled").join("\n"));
+    const rejected = calls.find(call => call.status === "rejected") as PromiseRejectedResult;
+    assert.match(String(rejected.reason), /STANDARD_POST_(BUSY|OUTPUT_EXISTS)/);
+    const manifest = JSON.parse(readFileSync(join(output, `${f.projectId}-delivery-manifest.json`), "utf8"));
+    assert.equal(manifest.bodyDurationSec, 4.25); assert.equal(manifest.bodyFrames, 102); assert.equal(manifest.totalFrames, 103);
+    assert.equal(manifest.durationSec, 103 / 24); assert.equal(manifest.compositionClock.sourceDurationSec, 4.25);
+    assert.deepEqual(manifest.coverPrefix, { frames: 1, bodyVideoOffsetSeconds: 1 / 24, audioOffsetSeconds: 0, subtitleOffsetSeconds: 0,
+      basis: "One cover video frame precedes every complete body frame; original audio packets and subtitle timestamps remain on their source clock. AV quality was not reviewed." });
+    assert.equal(manifest.outputs.length, 5);
+    for (const row of manifest.outputs) { assert.equal(row.exportClock.videoFrames, 103); assert.equal(row.exportClock.fps, 24); assert.equal(hash(readFileSync(row.path)), row.sha256); }
+    const soft = manifest.outputs.find((row: { id: string }) => row.id === "softsub");
+    const finalFrames = decodedVideoHashes(soft.path);
+    assert.equal(originalFrames.length, 102); assert.equal(finalFrames.length, 103); assert.deepEqual(finalFrames.slice(1), originalFrames);
+    assert.deepEqual(audioPacketFacts(soft.path), originalPackets);
+    assert.deepEqual(readFileSync(f.historyFile), f.history); assert.equal(hash(readFileSync(f.raw)), f.rawSha256);
+    assert.equal(existsSync(`${output}.standard-post.lock`), false);
+    await assert.rejects(runStandardPost(f.manifestFile, f.settingsFile, output, { repoRoot: repo, ffmpeg, ffprobe }), /STANDARD_POST_OUTPUT_EXISTS/);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+}, 240_000);
+test("formal standard post keeps a real composition failure in staging and publishes no official directory or changed source", async () => {
+  const f = await completeTailPostFixture();
+  try {
+    const output = join(f.root, "delivery"), binary = join(f.root, "actual-composition-failure.mjs"), actualFfmpeg = await resolveStandardPostBinary(ffmpeg);
+    writeFileSync(binary, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';\nconst args=process.argv.slice(2);\nif(args.at(-1)?.endsWith('/composed.mp4')){process.stderr.write('requested composition fixture failure');process.exit(91);}\nconst result=spawnSync(${JSON.stringify(actualFfmpeg)},args,{stdio:'inherit'});\nif(result.error){process.stderr.write(result.error.message);process.exit(92);}\nprocess.exit(result.status??93);\n`); chmodSync(binary, 0o755);
+    await assert.rejects(runStandardPost(f.manifestFile, f.settingsFile, output, { repoRoot: repo, ffmpeg: binary, ffprobe, timeoutMs: 60_000 }), /STANDARD_POST_PROCESS_FAILED/);
+    assert.equal(existsSync(output), false); assert.equal(existsSync(`${output}.standard-post.lock`), false);
+    const staging = readdirSync(f.root).filter(name => name.startsWith("delivery.staging-")); assert.equal(staging.length, 1);
+    const failed = JSON.parse(readFileSync(join(f.root, staging[0]!, "failed.json"), "utf8"));
+    assert.equal(failed.officialOutputPublished, false); assert.equal(failed.stages.some((row: { stage: string; ok: boolean }) => row.stage === "compose" && row.ok === false), true);
+    assert.equal(hash(readFileSync(f.raw)), f.rawSha256); assert.deepEqual(readFileSync(f.historyFile), f.history);
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+}, 90_000);
 
 
 test.each(["sidecar", "burn", "danmaku", "softmux"])("whole normal CLI stops after actual %s processing failure without publishing a later master", async kind => {
@@ -366,7 +538,7 @@ test.each(["sidecar", "burn", "danmaku", "softmux"])("whole normal CLI stops aft
 }, 240_000);
 
 test("whole normal CLI completes all official post stages with declared single mixes and no default source-quality scans", async () => {
-  const f = await unusualCompletedFixture();
+  const f = await unusualCompletedFixture({ audio: true });
   try {
     const shots = join(f.root, "source.json"), denyNetwork = join(f.root, "deny-network.mjs"), binary = join(f.root, "no-quality-ffmpeg.mjs"), commands = join(f.root, "commands.jsonl");
     writeFileSync(shots, f.bytes);

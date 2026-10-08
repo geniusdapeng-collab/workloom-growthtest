@@ -74,7 +74,7 @@ export async function resolveDirectorIdentities(scope:CreativeScope,by:string,re
   }
   return assets;
 }
-export interface SourceClip {shotId:string;assetId:string;path:string;sha256:string;durationSec:number;role?:string;dialogue:string;audio?:Record<string,unknown>}
+export interface SourceClip {shotId:string;assetId:string;path:string;sha256:string;durationSec:number;role?:string;dialogue:string;lockTrim?:boolean;audio?:Record<string,unknown>}
 export async function preflightDirectorAudio(filmPlan:DirectorFilmPlan,connectors:Awaited<ReturnType<typeof directorConnectors>>,audioMode:"source"|"dubbing"="source") {
   const {voice,env,bins,measure}=connectors;
   await Promise.all([bins.ffmpeg,bins.ffprobe].map(bin=>measure.runBin(bin,["-hide_banner","-version"],{timeoutMs:20_000})));

@@ -6,12 +6,12 @@ import { access, appendFile, copyFile, lstat, mkdir, open, readFile, readdir, re
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { pathToFileURL } from "node:url";
 import { embedCoverFirstFrame, type CoverVariantId } from "../../packages/video-studio/src/cover-assembly.js";
-import { candidateSyncWindows, crossCorrelationLag } from "../../packages/video-studio/src/av-sync.js";
 import { buildStandardPostContract, assertStandardPostTimeline, type StandardPostContract, type StandardOriginalRender } from "../../packages/video-studio/src/standard-post-contract.js";
 import { buildFilmVideoSubmissionReceipt } from "../../packages/video-studio/src/film-worker-provenance.js";
+import { describeFilmCompletion, filmCompletionPolicyForDocument } from "../../packages/video-studio/src/film-completion.mjs";
 import { isKnownCoverPlatform } from "../../packages/video-studio/src/cover-platforms.js";
 import { COVER_FONTS } from "../../packages/video-studio/src/cover-design.js";
-import { assessVariantAxes, assessVariantDistinctness, type VariantSample } from "../../packages/video-studio/src/deliver.js";
+import { assessVariantAxes } from "../../packages/video-studio/src/deliver.js";
 
 export class StandardPostError extends Error {
   constructor(readonly code: string, message: string, options?: ErrorOptions) { super(`${code}: ${message}`, options); this.name = "StandardPostError"; }
@@ -20,6 +20,7 @@ interface Stream { codec_type?: string; codec_name?: string; width?: number; hei
   nb_read_frames?: string; duration?: string; sample_rate?: string; channels?: number; side_data_list?: Array<{ rotation?: number }> }
 interface Media { streams: Stream[]; format: { duration?: string } }
 export interface StandardPostOptions { repoRoot?: string; ffmpeg?: string; ffprobe?: string; timeoutMs?: number }
+export interface StandardPostExportClockOptions extends StandardPostOptions { expectedVideoFrames?: number; expectedFps?: number }
 interface FileBinding { path: string; sha256: string; bytes: number }
 interface OriginalRecord extends FileBinding { shotId: string; receiptFile: string; receiptSha256: string }
 interface OriginalManifest {
@@ -95,6 +96,30 @@ async function sealOriginal(root: string, receipt: OriginalReceipt, serialized: 
     projectId: receipt.projectId, shotId: receipt.shotId, submittedSha256: receipt.submittedSha256,
     receiptSha256: digest(serialized), artifact: receipt.artifact, taskId: receipt.taskId }, null, 2)}\n`);
 }
+/** Only acceptance facts are immutable; old adapters rewrote updatedAt on GET. */
+function localAcceptedFacts(value: Record<string, unknown>) {
+  keys(value, ["schemaVersion", "state", "requestHash", "submissionSource", "taskId", "updatedAt"], "local accepted journal");
+  ensure(value.schemaVersion === "workloom.render-task/v1" && value.state === "accepted" && hash(value.requestHash)
+    && text(value.taskId, 256) && (value.submissionSource === undefined || value.submissionSource === "local-submit" || value.submissionSource === "provider-recovery")
+    && (value.updatedAt === undefined || typeof value.updatedAt === "string" && Number.isFinite(Date.parse(value.updatedAt))), "invalid local accepted facts");
+  return { schemaVersion: value.schemaVersion, state: value.state, requestHash: value.requestHash,
+    ...(value.submissionSource === undefined ? {} : { submissionSource: value.submissionSource }), taskId: value.taskId };
+}
+async function validateLocalAcceptedReceipt(root: string, receipt: OriginalReceipt) {
+  const e = receipt.evidence, expected = join(root, "logs", receipt.projectId, "accepted-tasks", `${receipt.shotId}.json`);
+  ensure(e.requestInputVerified === true && e.taskId === receipt.taskId && e.acceptedFile === expected
+    && hash(e.acceptedSha256) && hash(e.requestHash), "local accepted render proof missing");
+  const accepted = await readJson(expected), facts = localAcceptedFacts(accepted.value);
+  ensure(facts.taskId === receipt.taskId && facts.requestHash === e.requestHash, "local accepted render journal changed");
+  if (e.acceptedFactsSha256 !== undefined) {
+    ensure(hash(e.acceptedFactsSha256) && digest(JSON.stringify(facts)) === e.acceptedFactsSha256, "local accepted facts changed");
+  } else if (digest(accepted.bytes) !== e.acceptedSha256) {
+    // Compatibility for an already sealed local receipt: keep its original byte
+    // fingerprint, task, request and witness; only a valid local GET time may drift.
+    ensure(facts.submissionSource === "local-submit" && typeof accepted.value.updatedAt === "string",
+      "local accepted render journal changed");
+  }
+}
 /** Called before any generation from the exact submitted byte document. Never reconstructed from mutable cards. */
 export async function freezeOriginalSubmission(input: { productionRoot: string; projectId: string; bytes: Buffer }) {
   ensure(localPath(input.productionRoot) && id(input.projectId) && Buffer.isBuffer(input.bytes), "invalid submission freeze");
@@ -126,12 +151,27 @@ export async function issueOriginalRenderReceipt(input: { productionRoot: string
     const accepted = await readJson(acceptedFile);
     ensure(accepted.value.schemaVersion === "workloom.render-task/v1" && accepted.value.state === "accepted"
       && accepted.value.taskId === input.taskId && hash(accepted.value.requestHash), "current accepted render journal missing or different");
-    evidence = { requestInputVerified: true, taskId: input.taskId, acceptedFile, acceptedSha256: digest(accepted.bytes), requestHash: accepted.value.requestHash };
+    evidence = { requestInputVerified: true, taskId: input.taskId, acceptedFile, acceptedSha256: digest(accepted.bytes), requestHash: accepted.value.requestHash,
+      acceptedFactsSha256: digest(JSON.stringify(localAcceptedFacts(accepted.value))) };
   }
   const value: OriginalReceipt = { schemaVersion: "workloom.original-render/v1", projectId: input.projectId, shotId: input.shotId,
     submittedSha256: input.submittedSha256, artifact, taskId: input.taskId,
     kind: input.submissionReceipt === undefined ? "current-local-render-receipt" : "current-runtime-receipt", evidence };
   const serialized = `${JSON.stringify(value, null, 2)}\n`;
+  const issuedFile = receiptPath(input.productionRoot, input.projectId, input.shotId);
+  let exists = false;
+  try { await lstat(issuedFile); exists = true; } catch (error) { if (!missing(error)) throw error; }
+  if (exists) {
+    const original = await readJson(issuedFile), first = original.value as unknown as OriginalReceipt;
+    keys(original.value, ["schemaVersion", "projectId", "shotId", "submittedSha256", "artifact", "taskId", "kind", "evidence"], "issued receipt");
+    ensure(first.schemaVersion === value.schemaVersion && first.projectId === value.projectId && first.shotId === value.shotId
+      && first.submittedSha256 === value.submittedSha256 && first.taskId === value.taskId && first.kind === value.kind
+      && JSON.stringify(first.artifact) === JSON.stringify(value.artifact), "first issued original differs from current accepted render");
+    if (first.kind === "current-local-render-receipt") await validateLocalAcceptedReceipt(input.productionRoot, first);
+    else ensure(JSON.stringify(first.evidence) === JSON.stringify(value.evidence), "first parent accepted download differs");
+    await sealOriginal(input.productionRoot, first, original.bytes.toString("utf8"));
+    return first;
+  }
   await writeFrozen(receiptPath(input.productionRoot, input.projectId, input.shotId), serialized);
   await sealOriginal(input.productionRoot, value, serialized); return value;
 }
@@ -216,7 +256,7 @@ export async function adoptCompletedOriginalRenders(input: { productionRoot: str
     const receipt: OriginalReceipt = { schemaVersion: "workloom.original-render/v1", projectId: input.projectId, shotId: sid,
       submittedSha256: input.submittedSha256, artifact, taskId: String(accepted.value.taskId), kind: "provider-success-adopted",
       evidence: { historyFile, ...matched, acceptedFile, acceptedSha256: digest(accepted.bytes),
-        requestHash: accepted.value.requestHash, certification: "completed-task-and-byte-provenance-only-no-quality-or-identity-certification" } };
+        requestHash: accepted.value.requestHash, acceptedFactsSha256: digest(JSON.stringify(localAcceptedFacts(accepted.value))), certification: "completed-task-and-byte-provenance-only-no-quality-or-identity-certification" } };
     const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
     await writeFrozen(file, serialized); await sealOriginal(input.productionRoot, receipt, serialized);
     adopted.push({ shotId: sid, ...artifact, taskId: receipt.taskId, receiptFile: file, disposition: "provider-success-adopted" });
@@ -307,7 +347,11 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
       const lines = (await readFile(await regular(historyFile), "utf8")).split(/\r?\n/).filter(Boolean), line = lines[Number(e.line) - 1];
       ensure(typeof line === "string" && digest(line) === e.rowSha256, "historical source row changed");
       const history = JSON.parse(line) as Record<string, any>, accepted = await readJson(String(e.acceptedFile));
-      ensure(digest(accepted.bytes) === e.acceptedSha256 && accepted.value.schemaVersion === "workloom.render-task/v1" && accepted.value.state === "accepted" && accepted.value.taskId === receipt.taskId
+      const stableAccepted = e.acceptedFactsSha256 !== undefined
+        ? hash(e.acceptedFactsSha256) && digest(JSON.stringify(localAcceptedFacts(accepted.value))) === e.acceptedFactsSha256
+          && accepted.value.requestHash === e.requestHash
+        : digest(accepted.bytes) === e.acceptedSha256;
+      ensure(stableAccepted && accepted.value.schemaVersion === "workloom.render-task/v1" && accepted.value.state === "accepted" && accepted.value.taskId === receipt.taskId
         && history.shotId === row.shotId && ["shot", "material-gen"].includes(history.stage)
         && (receipt.kind === "provider-success-adopted" ? await completedHistoryBinding(history, {
           projectId: manifest.projectId, shotId: row.shotId, submittedSha256: manifest.submitted.sha256, taskId: receipt.taskId }, row)
@@ -327,18 +371,13 @@ export async function loadOriginalRenderManifest(file: string, options: Standard
     } else {
       ensure(receipt.kind === "current-local-render-receipt" && receipt.evidence.requestInputVerified === true && receipt.evidence.taskId === receipt.taskId,
         "original issuance missing");
-      const expectedJournal = join(manifest.productionRoot, "logs", manifest.projectId, "accepted-tasks", `${row.shotId}.json`);
-      ensure(receipt.evidence.acceptedFile === expectedJournal && hash(receipt.evidence.acceptedSha256) && hash(receipt.evidence.requestHash), "local accepted render proof missing");
-      const accepted = await readJson(expectedJournal);
-      ensure(digest(accepted.bytes) === receipt.evidence.acceptedSha256 && accepted.value.schemaVersion === "workloom.render-task/v1"
-        && accepted.value.state === "accepted" && accepted.value.taskId === receipt.taskId && accepted.value.requestHash === receipt.evidence.requestHash,
-        "local accepted render journal changed");
+      await validateLocalAcceptedReceipt(manifest.productionRoot, receipt);
     }
     const media = await probe(row.path, { ffprobe: options.ffprobe ?? "ffprobe" }, options.timeoutMs ?? 600_000), video = media.streams.filter(s => s.codec_type === "video"), audio = media.streams.filter(s => s.codec_type === "audio");
-    ensure(video.length >= 1, "original video stream is unavailable for processing");
+    ensure(video.length === 1 && Number.isSafeInteger(Number(video[0]?.nb_read_frames)) && Number(video[0]?.nb_read_frames) > 0, "original complete video frame range is unavailable for processing");
     const v = video[0]!, a = audio[0], videoDuration = Number(v.duration ?? media.format.duration), fps = rate(v);
     originals.push({ shotId: row.shotId, role: "original-render", path: row.path, sha256: row.sha256, bytes: row.bytes,
-      media: { fps, width: Number(v.width), height: Number(v.height), videoFrames: Number(v.nb_read_frames) || Math.max(1, Math.round(videoDuration * fps)),
+      media: { fps, width: Number(v.width), height: Number(v.height), videoFrames: Number(v.nb_read_frames),
         videoDurationSec: videoDuration, audioDurationSec: a ? Number(a.duration ?? media.format.duration) : 0,
         audioSampleRate: a ? Number(a.sample_rate) : 0, audioChannels: a ? Number(a.channels) : 0 },
       authority: { kind: receipt.kind, evidenceId: row.receiptFile, evidenceSha256: row.receiptSha256 } });
@@ -423,7 +462,7 @@ async function run(binary: string, args: string[], timeout: number, env = proces
 }
 async function probe(path: string, bins: { ffprobe: string }, timeout: number): Promise<Media> {
   let stdout: Buffer;
-  try { ({ stdout } = await run(bins.ffprobe, ["-v", "error", ...directMediaInput(), "-show_streams", "-show_format", "-of", "json", path], timeout)); }
+  try { ({ stdout } = await run(bins.ffprobe, ["-v", "error", ...directMediaInput(), "-count_frames", "-show_streams", "-show_format", "-of", "json", path], timeout)); }
   catch (error) { return fail("STANDARD_POST_MEDIA_INVALID", `direct media probe failed: ${(error as Error).message}`); }
   let doc: Media; try { doc = JSON.parse(stdout.toString()) as Media; } catch { return fail("STANDARD_POST_MEDIA_INVALID", "malformed media probe"); }
   if (!Array.isArray(doc.streams) || !doc.format || !finite(Number(doc.format.duration), 0.001, 7200)) fail("STANDARD_POST_MEDIA_INVALID", `incomplete media probe: ${path}`);
@@ -431,18 +470,55 @@ async function probe(path: string, bins: { ffprobe: string }, timeout: number): 
 }
 function rate(s: Stream): number { const [a, b] = String(s.avg_frame_rate).split("/").map(Number); return Number(a) / Number(b); }
 /** Export metadata readback only; this is not an audio quality or speech acceptance audit. */
-export async function assertStandardPostAudioClock(file: string, durationSec: number, options: StandardPostOptions = {}) {
+export async function assertStandardPostExportClock(file: string, durationSec: number, options: StandardPostExportClockOptions = {}) {
   ensure(finite(durationSec, 0.001, 7200), "invalid export clock"); await regular(file);
   const ffprobe = await resolveStandardPostBinary(options.ffprobe ?? process.env.WL_FFPROBE ?? "ffprobe");
   const timeout = options.timeoutMs ?? 600_000;
   ensure(Number.isSafeInteger(timeout) && timeout > 0 && timeout <= 900_000, "invalid metadata timeout");
-  const metadata = await probe(file, { ffprobe }, timeout), video = metadata.streams.find(s => s.codec_type === "video"), audio = metadata.streams.find(s => s.codec_type === "audio");
-  const actualDurationSec = Number(video?.duration ?? metadata.format.duration);
-  if (!video || Math.abs(actualDurationSec - durationSec) > Math.max(1 / rate(video), 0.05))
-    fail("STANDARD_POST_EXPORT_CLOCK_INVALID", `${basename(file)}: requested ${durationSec}s, actual ${actualDurationSec}s`);
-  return { actualDurationSec, requestedDurationSec: durationSec, present: Boolean(audio),
+  if (options.expectedVideoFrames !== undefined) ensure(Number.isSafeInteger(options.expectedVideoFrames) && options.expectedVideoFrames > 0, "invalid expected export frame count");
+  if (options.expectedFps !== undefined) ensure(finite(options.expectedFps, 0.001, 240), "invalid expected export fps");
+  const metadata = await probe(file, { ffprobe }, timeout), videos = metadata.streams.filter(s => s.codec_type === "video"), video = videos[0], audio = metadata.streams.find(s => s.codec_type === "audio");
+  const actualDurationSec = Number(video?.duration), videoFrames = Number(video?.nb_read_frames), fps = video ? rate(video) : NaN;
+  const expectedFrames = options.expectedVideoFrames ?? Math.round(durationSec * fps);
+  if (videos.length !== 1 || !Number.isSafeInteger(videoFrames) || videoFrames <= 0 || !finite(fps, 0.001, 240)
+    || !finite(actualDurationSec, 0.001, 7200) || Math.abs(actualDurationSec - videoFrames / fps) > 0.000002
+    || !Number.isSafeInteger(expectedFrames) || expectedFrames <= 0 || Math.abs(expectedFrames / fps - durationSec) > 0.000002
+    || videoFrames !== expectedFrames || Math.abs(actualDurationSec - durationSec) > 0.000002
+    || options.expectedFps !== undefined && Math.abs(fps - options.expectedFps) > 0.000001)
+    fail("STANDARD_POST_EXPORT_CLOCK_INVALID", `${basename(file)}: requested ${durationSec}s/${expectedFrames}frames, actual ${actualDurationSec}s/${videoFrames}frames/${fps}fps`);
+  return { actualDurationSec, videoFrames, fps, requestedDurationSec: durationSec, requestedFrames: expectedFrames, present: Boolean(audio),
     sampleRate: audio ? Number(audio.sample_rate) : 0, channels: audio ? Number(audio.channels) : 0,
+    audioDurationSec: audio ? Number(audio.duration ?? metadata.format.duration) : 0,
     basis: "Export stream metadata only. No complete PCM decode, speech, lip-sync or quality certification." };
+}
+
+/** Optional diagnostic only: never called by the default successful-render post route. */
+/** Count real decoded samples without padding, truncating, or keeping the full PCM in memory. */
+export async function assertStandardPostAudioClock(file: string, durationSec: number, options: StandardPostOptions = {}) {
+  ensure(finite(durationSec, 0.001, 7200), "invalid original picture clock"); await regular(file);
+  const ffmpeg = await resolveStandardPostBinary(options.ffmpeg ?? process.env.WL_FFMPEG ?? "ffmpeg");
+  const timeout = options.timeoutMs ?? 600_000;
+  ensure(Number.isSafeInteger(timeout) && timeout > 0 && timeout <= 900_000, "invalid audio decode timeout");
+  const decoded = await new Promise<{ bytes: number; sha256: string }>((accept, reject) => {
+    const child = spawn(ffmpeg, ["-v", "error", "-xerror", "-nostdin", ...directMediaInput(), "-i", file,
+      "-map", "0:a:0", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", "-f", "s16le", "pipe:1"], { stdio: ["ignore", "pipe", "pipe"] });
+    let bytes = 0, stderr = "", timedOut = false; const sha = createHash("sha256");
+    const timer = setTimeout(() => { timedOut = true; child.kill("SIGKILL"); }, timeout);
+    child.stdout.on("data", (chunk: Buffer) => { bytes += chunk.length; sha.update(chunk); });
+    child.stderr.on("data", (chunk: Buffer) => { stderr = (stderr + chunk.toString()).slice(-2400); });
+    child.on("error", (e) => { clearTimeout(timer); reject(new StandardPostError("STANDARD_POST_PROCESS_FAILED", e.message)); });
+    child.on("close", (code, signal) => {
+      clearTimeout(timer);
+      if (timedOut || code !== 0 || signal) reject(new StandardPostError("STANDARD_POST_PROCESS_FAILED", `audio decode ${timedOut ? "timed out" : `exit=${code}, signal=${signal ?? "none"}`}: ${stderr}`));
+      else accept({ bytes, sha256: sha.digest("hex") });
+    });
+  });
+  const samplesPerChannel = decoded.bytes / 4, requiredSamples = Math.round(durationSec * 48000);
+  if (!Number.isSafeInteger(samplesPerChannel) || samplesPerChannel < requiredSamples)
+    fail("STANDARD_POST_NATIVE_CLOCK_INCOMPLETE", `${basename(file)}: decoded ${samplesPerChannel} samples, original picture clock requires ${requiredSamples}`);
+  return { ...decoded, sampleRate: 48000, channels: 2, samplesPerChannel, requiredSamples,
+    codecBoundarySamples: samplesPerChannel - requiredSamples,
+    basis: "Actual decoded samples cover the entire original picture clock. No artificial padding or relaxed threshold; codec priming/padding is separately observed." };
 }
 
 interface LocalCore { [name: string]: (...args: unknown[]) => unknown }
@@ -456,7 +532,7 @@ function relocate(value: unknown, staging: string, output: string): unknown {
   return value;
 }
 async function codeBinding(repo: string, timeout: number) {
-  const paths = ["scripts/tools/full-chain-film.mts", "scripts/tools/film-standard-post.mts", "packages/video-studio/src/standard-post-contract.ts", "scripts/tools/film-audio-policy.mjs", "scripts/tools/compose-film.mts",
+  const paths = ["scripts/tools/full-chain-film.mts", "scripts/tools/film-standard-post.mts", "packages/video-studio/src/standard-post-contract.ts", "packages/video-studio/src/film-completion.mjs", "scripts/tools/film-audio-policy.mjs", "scripts/tools/compose-film.mts",
     "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts", "packages/video-studio/src/production-lineage.ts",
     "packages/video-studio/src/local-cover-render.ts", "packages/video-studio/src/cover-design.ts", "packages/video-studio/src/cover-platforms.ts",
     "packages/video-studio/src/cover-assembly.ts", "packages/video-studio/src/av-sync.ts", "packages/video-studio/src/deliver.ts", "bundles/ai-video/library/root-list.mjs",
@@ -557,9 +633,11 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
             channels: audio ? Number(audio.channels) : 0 } }); cursor += entry.durationSec;
       }
       return { contractSha256: contract.contractSha256, timeline: contract.timeline, sources: prepared,
-        boundary: "The original bytes remain unchanged. Composition normalizes provider geometry, fps and boundary duration to the requested export; available source audio is retained, absent audio stays silent." };
+        boundary: "The original bytes remain unchanged. Composition normalizes provider geometry, fps and boundary duration to the requested export; available source audio is retained. No nominal crop, retiming, tail-frame or audio fit padding is performed." };
     });
     const composed = join(post, "composed.mp4");
+    let compositionReceipt: Record<string, any> = {}; let bodyDurationSec = plan.durationSec; let bodyFrames = contract.totalFrames;
+    let compositionTimeline: Array<{ shotId: string; startFrame: number; frameCount: number; fps: number; startSec: number; durationSec: number; endSec: number }> = [];
     await stage("compose", async () => {
       const actualTimeline = prepared.map(s => ({ shotId: s.segment.id,
         video: { path: s.path, sha256: s.sha256, bytes: contract.originals.find(o => o.shotId === s.segment.id)!.bytes, inSec: 0 },
@@ -569,11 +647,39 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       const rechecked = await loadOriginalRenderManifest(manifestFile, { ...options, ...bins });
       ensure(rechecked.manifestSha256 === original.manifestSha256 && rechecked.contract.contractSha256 === contract.contractSha256, "original sources drifted before composition");
       const argv = ["--import", "tsx", join(repo, "scripts/tools/compose-film.mts"), "--clips", prepared.map((s) => s.path).join(","), "--out", composed,
-        "--width", String(plan.width), "--height", String(plan.height), "--fps", String(plan.fps), "--durations", prepared.map(s => s.segment.durationSec).join(","), "--fade", "0", "--color", "none", "--json"];
+        "--width", String(plan.width), "--height", String(plan.height), "--fps", String(plan.fps), "--fade", "0", "--color", "none", "--native-clock", "--json"];
       const result = await run(process.execPath, argv, timeout, { ...process.env, WL_FFMPEG: bins.ffmpeg, WL_FFPROBE: bins.ffprobe }, repo);
       const processReceipt = JSON.parse(await readFile(composed.replace(/\.mp4$/, ".av-sync.json"), "utf8"));
+      const clock = processReceipt.outputMedia;
+      ensure(processReceipt.schemaVersion === "workloom.composition-process/v1" && processReceipt.outputSha256 === await standardPostFileHash(composed)
+        && clock && Number.isSafeInteger(clock.videoFrames) && clock.videoFrames > 0 && clock.fps === plan.fps
+        && clock.width === plan.width && clock.height === plan.height
+        && processReceipt.nativeClock === true && processReceipt.sourceFilesUnchanged === true && processReceipt.retimeFactor === 1
+        && Array.isArray(processReceipt.sources) && processReceipt.sources.length === contract.originals.length
+        && Array.isArray(processReceipt.target?.shotFrames) && processReceipt.target.shotFrames.length === contract.originals.length,
+        "composition actual output clock or source bindings are unavailable");
+      for (const [index, source] of processReceipt.sources.entries()) {
+        const original = contract.originals[index]!;
+        const planned = contract.compositionClock.entries[index]!;
+        ensure(source.path === original.path && source.sha256 === original.sha256 && source.source && source.normalized
+          && source.source.videoFrames === original.media.videoFrames && source.source.fps === original.media.fps
+          && source.normalized.videoFrames === planned.plannedOutputFrames && source.normalized.fps === plan.fps
+          && source.normalized.width === plan.width && source.normalized.height === plan.height
+          && processReceipt.target.shotFrames[index] === source.normalized.videoFrames,
+          "composition source clock differs from the frozen complete original");
+      }
+      ensure(clock.videoFrames === contract.totalFrames && clock.videoFrames === processReceipt.target.shotFrames.reduce((sum: number, frames: number) => sum + frames, 0),
+        "composition lost or added a complete source output frame");
+      bodyFrames = clock.videoFrames; bodyDurationSec = bodyFrames / clock.fps; compositionReceipt = processReceipt;
+      let startFrame = 0;
+      compositionTimeline = processReceipt.target.shotFrames.map((frameCount: number, index: number) => {
+        const entry = { shotId: contract.originals[index]!.shotId, startFrame, frameCount, fps: plan.fps,
+          startSec: startFrame / plan.fps, durationSec: frameCount / plan.fps, endSec: (startFrame + frameCount) / plan.fps };
+        startFrame += frameCount; return entry;
+      });
+      await assertStandardPostExportClock(composed, bodyDurationSec, { ...bins, timeoutMs: timeout, expectedVideoFrames: bodyFrames, expectedFps: plan.fps });
       for (const originalSource of contract.originals) await pinned(originalSource.path, originalSource);
-      return { tool: "scripts/tools/compose-film.mts", argv, actualTimeline, stdout: result.stdout.toString().slice(-8000), processReceipt, qualityReviewPerformed: false, sha256: await standardPostFileHash(composed) };
+      return { tool: "scripts/tools/compose-film.mts", argv, actualTimeline, compositionTimeline, stdout: result.stdout.toString().slice(-8000), processReceipt, qualityReviewPerformed: false, sha256: await standardPostFileHash(composed) };
     });
     const cues = plan.subtitles.map((c) => ({ start: subtitle.srtSecondsToAss!(c.startSec), end: subtitle.srtSecondsToAss!(c.endSec), text: subtitle.stripSubtitlePunctuation!(c.text) }));
     if (cues.some((c) => !String(c.text).trim())) fail("STANDARD_POST_PLAN_INVALID", "punctuation removal leaves an empty subtitle");
@@ -598,16 +704,20 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
         }
         const report = await Promise.resolve(color.grade!({ input: composed, output: graded, profile: version.profile, intensity: version.intensity, bins, auto: false,
           verifyAt: [], defects: false, verify: false, onUnfixable: "report" }));
-        await run(bins.ffmpeg, ["-v", "error", "-n", ...directMediaInput(), "-i", graded, ...directMediaInput(), "-i", composed, "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-movflags", "+faststart", picture], timeout);
+        await run(bins.ffmpeg, ["-v", "error", "-n", ...directMediaInput(), "-i", graded, ...directMediaInput(), "-i", composed, "-map", "0:v:0", "-map", "1:a:0?", "-c", "copy", "-movflags", "+faststart", picture], timeout);
         return { report, sourceAudioRestoredFrom: composed, pictureSha256: await standardPostFileHash(picture) };
       });
       let scored = picture; let mixReport: unknown = { layer: "off", reason: "no music requested", sourceAuthority: "declared-unverified", stemsVerified: false };
       if (version.musicSourceId) {
         scored = join(post, `${version.id}-scored.mp4`);
-        mixReport = await stage(`bgm-${version.id}`, () => Promise.resolve(bgm.mix!({ input: picture, output: scored, bgmPath: sources.get(version.musicSourceId!), declaredProgramMix: true,
-          env: bgmEnv, bins, policy: "keep-dialogue", musicLevelDb: version.musicLevelDb, duckingDb: version.duckingDb, targetLufs: -14, truePeak: -1.5,
-          cutTimes: prepared.slice(1).map((s) => s.timelineStartSec), bgmBpm: version.musicBpm, bpmOverride: version.musicBpm, align: true, section: "full",
-          evidenceDir: join(evidenceDir, `bgm-${version.id}-frames`), licenseReviewed: false, commercialUse: false })));
+        mixReport = await stage(`bgm-${version.id}`, async () => {
+          const cutTimes = compositionTimeline.slice(1).map(entry => entry.startSec);
+          const report = await Promise.resolve(bgm.mix!({ input: picture, output: scored, bgmPath: sources.get(version.musicSourceId!), declaredProgramMix: true,
+            env: bgmEnv, bins, policy: "keep-dialogue", musicLevelDb: version.musicLevelDb, duckingDb: version.duckingDb, targetLufs: -14, truePeak: -1.5,
+            cutTimes, bgmBpm: version.musicBpm, bpmOverride: version.musicBpm, align: true, section: "full",
+            evidenceDir: join(evidenceDir, `bgm-${version.id}-frames`), licenseReviewed: false, commercialUse: false }));
+          return { ...object(report, "BGM processing receipt"), compositionCuts: { requestedSeconds: cutTimes, basis: "measured-composition-frame-clock", reviewed: false } };
+        });
       }
       const burned = join(post, `${version.id}-subtitled.mp4`);
       await stage(`subtitle-burn-${version.id}`, () => Promise.resolve(subtitle.renderWithSubtitles!({ mode: "subtitle", input: scored, output: burned, cues, titleText: "",
@@ -616,23 +726,23 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       await stage(`cover-${version.id}`, () => coverModule.renderLocalCover({ source: { kind: "video-frame", path: sources.get(plan.cover.sourceId)!, timeSec: plan.cover.atSec },
         title: plan.cover.title, subtitle: plan.cover.subtitle, platform: plan.cover.platform, variant: version.id === "master" ? "warm-film" : version.id,
         out: cover, width: plan.width, height: plan.height, fontFile: font, fontSha256: plan.cover.fontSha256, fontId: plan.cover.fontId,
-        ffmpeg: bins.ffmpeg, ffprobe: bins.ffprobe, footageOrigin: "generated", durationSeconds: plan.durationSec, timeoutMs: Math.min(timeout, 600_000) }));
+        ffmpeg: bins.ffmpeg, ffprobe: bins.ffprobe, footageOrigin: "generated", durationSeconds: bodyDurationSec, timeoutMs: Math.min(timeout, 600_000) }));
       const final = join(staging, `${label}.mp4`);
-      const coverReceipt = await stage(`cover-assembly-${version.id}`, () => embedCoverFirstFrame({ input: burned, cover, output: final, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
+      const coverReceipt = await stage(`cover-assembly-${version.id}`, () => embedCoverFirstFrame({ input: burned, cover, output: final, preserveSourceFrames: true, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
       const media = await probe(final, bins, timeout), video = media.streams.find((s) => s.codec_type === "video");
       if (!video || Number(video.width) !== plan.width || Number(video.height) !== plan.height || Math.abs(rate(video) - plan.fps) > 0.001
-        || Math.abs(Number(video.duration ?? media.format.duration) - plan.durationSec) > Math.max(1 / plan.fps, 0.05))
+        || Math.abs(Number(video.duration ?? media.format.duration) - (bodyDurationSec + 1 / plan.fps)) > 1e-6)
         fail("STANDARD_POST_EXPORT_SPEC_INVALID", version.id);
-      const nativeAudioClock = await stage(`native-audio-clock-${version.id}`, () => assertStandardPostAudioClock(final, plan.durationSec, { ...bins, timeoutMs: timeout }));
-      outputs.push({ id: version.id, path: final, sha256: await standardPostFileHash(final), bytes: (await stat(final)).size, media, cover, coverReceipt, bgm: mixReport, nativeAudioClock });
+      const exportClock = await stage(`export-clock-${version.id}`, () => assertStandardPostExportClock(final, bodyDurationSec + 1 / plan.fps, { ...bins, timeoutMs: timeout, expectedVideoFrames: bodyFrames + 1, expectedFps: plan.fps }));
+      outputs.push({ id: version.id, path: final, sha256: await standardPostFileHash(final), bytes: (await stat(final)).size, media, cover, coverReceipt, bgm: mixReport, exportClock });
       if (version.id === "master") {
         const cleanWithCover = join(post, "master-clean-cover.mp4");
-        await stage("clean-cover-assembly", () => embedCoverFirstFrame({ input: scored, cover, output: cleanWithCover, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
+        await stage("clean-cover-assembly", () => embedCoverFirstFrame({ input: scored, cover, output: cleanWithCover, preserveSourceFrames: true, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
         const soft = join(staging, `${plan.projectId}-softsub.mp4`), srt = sidecars.files.find((f) => f.format === "srt")?.path;
         if (!srt) fail("STANDARD_POST_SUBTITLE_UNVERIFIED", "official SRT missing");
         const receipt = await stage("soft-subtitle-mux", () => Promise.resolve(subtitle.softMux!({ input: cleanWithCover, output: soft, subtitles: [{ path: srt, lang: "chi", default: true }], bins, verify: true })));
-        const nativeAudioClock = await stage("native-audio-clock-softsub", () => assertStandardPostAudioClock(soft, plan.durationSec, { ...bins, timeoutMs: timeout }));
-        outputs.push({ id: "softsub", path: soft, sha256: await standardPostFileHash(soft), bytes: (await stat(soft)).size, receipt, nativeAudioClock });
+        const exportClock = await stage("export-clock-softsub", () => assertStandardPostExportClock(soft, bodyDurationSec + 1 / plan.fps, { ...bins, timeoutMs: timeout, expectedVideoFrames: bodyFrames + 1, expectedFps: plan.fps }));
+        outputs.push({ id: "softsub", path: soft, sha256: await standardPostFileHash(soft), bytes: (await stat(soft)).size, receipt, exportClock });
       }
       for (const temporary of [graded, picture, scored, burned, join(post, "master-clean-cover.mp4")]) {
         if (temporary !== composed) await rm(temporary, { force: true });
@@ -653,9 +763,14 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
     await relocateGeneratedReceipts(staging, staging, output);
     const manifest = relocate({ schemaVersion: "workloom.standard-post-delivery/v1", generatedAt: new Date().toISOString(), projectId: plan.projectId,
       mode: "original-native-standard-postproduction", planSha256: planHash, sourceCode: { ...code, currentCodeRechecked: true }, binaries,
-      width: plan.width, height: plan.height, fps: plan.fps, durationSec: plan.durationSec,
-      supplierGenerationCalls: 0, modelCalls: 0, ttsCalls: 0, asrCalls: 0, sourceFilesUnchanged: true, speed: 1, frameSynthesis: false, sourceNormalization: "fps/geometry/requested duration; absent source audio remains silent",
-      scope: "Every frozen original shot is adopted in submitted order. Actual provider media is normalized during post to the requested export. Available source audio is retained; silent sources remain silent. No identity, clothing, motion, speech or lip-sync acceptance review.",
+      width: plan.width, height: plan.height, fps: plan.fps, durationSec: bodyDurationSec + 1 / plan.fps,
+      bodyDurationSec, bodyFrames, totalFrames: bodyFrames + 1, compositionClock: contract.compositionClock, compositionTimeline, compositionReceipt,
+      completion: describeFilmCompletion(filmCompletionPolicyForDocument(JSON.parse(contract.submitted.json), contract.compositionClock.sourceDurationSec), bodyDurationSec + 1 / plan.fps),
+      coverPrefix: { frames: 1, bodyVideoOffsetSeconds: 1 / plan.fps, audioOffsetSeconds: 0, subtitleOffsetSeconds: 0,
+        basis: "One cover video frame precedes every complete body frame; original audio packets and subtitle timestamps remain on their source clock. AV quality was not reviewed." },
+      supplierGenerationCalls: 0, modelCalls: 0, ttsCalls: 0, asrCalls: 0, sourceFilesUnchanged: true, speed: 1,
+      generativeFrameSynthesis: false, sourceNormalization: "Complete measured source intervals; only export canvas/cadence conversion when needed. No nominal crop, retiming or duration fit padding.",
+      scope: "Every frozen original shot is adopted in submitted order over its complete measured frame interval. Available same-file original audio remains on its source clock. No identity, clothing, motion, speech, lip-sync, PCM correlation or rendered-output quality acceptance review.",
       originalManifestSha256: original.manifestSha256, contractSha256: contract.contractSha256, originalTimeline: contract.timeline, sourceAuthority: contract.originals.map(s => s.authority),
       sourceFiles: plan.sources, originalSources: prepared, authoredSubtitles: plan.subtitles,
       subtitleAlignment: "Authored sentence timing using existing audio; no new ASR or phonetic timing proof", openingTitle: { source: "none", burned: false },

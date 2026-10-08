@@ -16,7 +16,7 @@ function fakeArk(options: { failStatus?: number } = {}) {
       const body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
       calls.push({ url, body });
       if (options.failStatus) {
-        return new Response("参数被拒", { status: options.failStatus });
+        return new Response(JSON.stringify({ error: { code: "InvalidParameter", message: "参数被拒" } }), { status: options.failStatus });
       }
       return new Response(
         JSON.stringify({ data: [{ url: "https://cdn.example.invalid/out.png", size: "2K" }] }),
@@ -273,6 +273,23 @@ describe("完整请求与产物绑定的定妆照缓存", () => {
     const fake = fakeArk();
     return { root, ...fake, runtime: createPortraitRuntime({ workDir: root, projectId: "PROJECT", apiKey: "k", model: "m", retries: 0, fetchImpl: fake.fetchImpl, ...extra }) };
   }
+  it("防重复：网络结果未知后重启不得再次提交POST", async () => {
+    const root = workDir(); let posts = 0;
+    const failing = (async () => { posts += 1; throw new Error("connection reset after provider acceptance"); }) as typeof fetch;
+    for (let run = 0; run < 2; run += 1) {
+      const runtime = configured(root, { fetchImpl: failing, retries: 0 }).runtime;
+      await expect(runtime.apiRender(task)).rejects.toThrow();
+    }
+    expect(posts).toBe(1);
+  });
+  it("防重复：图片受理后下载失败，重启只重试下载", async () => {
+    const root = workDir(); const fake = fakeArk(); let unavailable = true;
+    const fetchImpl = (async (url, init) => String(url).includes("/images/generations") ? fake.fetchImpl(url, init) : unavailable ? new Response("unavailable", { status: 503 }) : fake.fetchImpl(url, init)) as typeof fetch;
+    await expect(configured(root, { fetchImpl }).runtime.apiRender(task)).rejects.toThrow(/下载/);
+    unavailable = false;
+    const output = await configured(root, { fetchImpl }).runtime.apiRender(task);
+    expect(readFileSync(output).length).toBe(4096); expect(fake.calls).toHaveLength(1);
+  });
   it("相同实际请求跨实例/重启复用，记录请求、来源、输出hash且快照不可改写内部索引", async () => {
     const first = configured(); const file = await first.runtime.apiRender(task);
     const second = configured(first.root); expect(await second.runtime.apiRender(task)).toBe(file); expect(second.calls).toHaveLength(0);
@@ -310,14 +327,14 @@ describe("完整请求与产物绑定的定妆照缓存", () => {
     unlinkSync(link); symlinkSync(b, link); await next.runtime.apiRender(task); expect(next.calls).toHaveLength(2);
     unlinkSync(link); await expect(next.runtime.apiRender(task)).rejects.toThrow(); expect(next.calls).toHaveLength(2);
   });
-  it("输出被改字节/删除/替成symlink均不复用；旧无收据索引不能伪过", async () => {
+  it("输出被改/删除/替成symlink均重新下载同一已受理图片，不重新收费；旧无收据索引不能伪过", async () => {
     const next = configured(); let file = await next.runtime.apiRender(task);
-    writeFileSync(file, Buffer.alloc(4096, 8)); await next.runtime.apiRender(task); expect(next.calls).toHaveLength(2);
-    unlinkSync(file); await next.runtime.apiRender(task); expect(next.calls).toHaveLength(3);
+    writeFileSync(file, Buffer.alloc(4096, 8)); await next.runtime.apiRender(task); expect(next.calls).toHaveLength(1);
+    unlinkSync(file); await next.runtime.apiRender(task); expect(next.calls).toHaveLength(1);
     const external = writeRef(next.root, "outside.png"); unlinkSync(file); symlinkSync(external, file);
-    await next.runtime.apiRender(task); expect(next.calls).toHaveLength(4); expect(readFileSync(external)).toEqual(Buffer.alloc(2048, 3));
+    await next.runtime.apiRender(task); expect(next.calls).toHaveLength(1); expect(readFileSync(external)).toEqual(Buffer.alloc(2048, 3));
     const index = JSON.parse(readFileSync(next.runtime.indexPath(), "utf8")); delete index.characters["演员甲"].receipts; writeFileSync(next.runtime.indexPath(), JSON.stringify(index));
-    const restarted = configured(next.root); file = await restarted.runtime.apiRender(task); expect(restarted.calls).toHaveLength(1); expect(existsSync(file)).toBe(true);
+    const restarted = configured(next.root); file = await restarted.runtime.apiRender(task); expect(restarted.calls).toHaveLength(0); expect(existsSync(file)).toBe(true);
   });
   it("20个相同请求和多个runtime只发送一次，异常后不遗留inflight或锁", async () => {
     const first = configured(); const second = configured(first.root, { fetchImpl: first.fetchImpl });
@@ -387,12 +404,12 @@ describe("完整请求与产物绑定的定妆照缓存", () => {
     const fake = fakeArk(); const next = configured(workDir(), { fetchImpl: (async (url, init) => String(url).includes("/images/generations") ? fake.fetchImpl(url, init) : new Response(new Uint8Array(12))) as typeof fetch });
     await expect(next.runtime.apiRender(task)).rejects.toThrow(/下载内容过小/); expect(Object.keys(next.runtime.snapshot().characters)).toHaveLength(0); expect(existsSync(join(next.root, "characters/PROJECT/.portrait-cache.lock"))).toBe(false);
   });
-  it("收据请求或输出hash被改后不命中；特殊JS键仍按独立角色持久化", async () => {
+  it("收据请求hash被改后从已受理响应恢复；特殊JS键仍按独立角色持久化", async () => {
     const next = configured(); await next.runtime.apiRender(task);
     const index = JSON.parse(readFileSync(next.runtime.indexPath(), "utf8")); index.characters["演员甲"].receipts.front.requestHash = "0".repeat(64); writeFileSync(next.runtime.indexPath(), JSON.stringify(index));
-    await next.runtime.apiRender(task); expect(next.calls).toHaveLength(2);
+    await next.runtime.apiRender(task); expect(next.calls).toHaveLength(1);
     const file = await next.runtime.apiRender({ ...task, characterId: "__proto__" }); const entries = Object.values(next.runtime.snapshot().characters);
-    expect(entries.find(entry => entry.id === "__proto__")?.files.front).toBe(file); expect(await next.runtime.apiRender({ ...task, characterId: "__proto__" })).toBe(file); expect(next.calls).toHaveLength(3);
+    expect(entries.find(entry => entry.id === "__proto__")?.files.front).toBe(file); expect(await next.runtime.apiRender({ ...task, characterId: "__proto__" })).toBe(file); expect(next.calls).toHaveLength(2);
   });
   it("原始任务在外调中被修改时拒绝记成功", async () => {
     const changing = { ...task }; const fake = fakeArk();

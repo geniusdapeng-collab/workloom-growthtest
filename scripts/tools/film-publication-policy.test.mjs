@@ -29,3 +29,19 @@ test('a sidecar or old prepend receipt cannot grant publication cover status', (
   }
   assert.equal(assertCoverPublication({ required: false }), true);
 });
+
+const completeReceipt = () => ({ ...receipt(), schemaVersion: 2, mode: 'prepend-cover-frame', sourceVideo: { frameCount: 720, fps: 24, durationSeconds: 30 },
+  sourceOffsetFrames: 1, bodyVideoOffsetSeconds: 1 / 24, audioOffsetSeconds: 0, subtitleOffsetSeconds: 0, qualityReviewPerformed: false,
+  video: { frameCount: 721, fps: 24, durationSeconds: 721 / 24 } });
+test('formal cover publication requires the complete body and truthful independent track offsets', () => {
+  const formal = { ...input(), preserveSourceFramesRequired: true, receipt: completeReceipt() };
+  assert.equal(assertCoverPublication(formal), true);
+  assert.throws(() => assertCoverPublication({ ...formal, receipt: receipt() }), /PUBLICATION_COVER_UNVERIFIED/);
+  for (const change of [{ sourceOffsetFrames: 0 }, { bodyVideoOffsetSeconds: 0 }, { audioOffsetSeconds: 1 / 24 }, { subtitleOffsetSeconds: 1 / 24 },
+    { qualityReviewPerformed: true }, { sourceVideo: { frameCount: 719, fps: 24, durationSeconds: 30 } },
+    { video: { frameCount: 720, fps: 24, durationSeconds: 30 } }, { video: { frameCount: 721, fps: 30, durationSeconds: 721 / 24 } }]) {
+    assert.throws(() => assertCoverPublication({ ...formal, receipt: { ...completeReceipt(), ...change } }), /PUBLICATION_COVER_UNVERIFIED/);
+  }
+  for (const field of ['inputSha256', 'coverSha256', 'outputSha256'])
+    assert.throws(() => assertCoverPublication({ ...formal, [field]: sha('d') }), /PUBLICATION_COVER_UNVERIFIED/);
+});

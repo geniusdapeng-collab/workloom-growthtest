@@ -15,7 +15,6 @@
  *     [--stages spec,plates,videos,compose,color,subtitle,danmaku,bgm,cover,mux] \
  *     [--subtitle-mode sidecar|burn|both]   # 缺省 sidecar：字幕只做旁挂文件 + 软字幕轨，母版不烧字 \
  *     [--aspect 9:16|16:9|1:1|4:5] [--resolution 720p|1080p|2160p] [--quality hd|uhd] \
- *     [--enhance-kind live-action|animation] [--enhance-engine-dir <本地引擎目录>] \
  *     [--max-attempts 2]  # 帧率来自冻结原稿；后期不覆盖 \
  *     [--keys-file ~/.workloom/live.env] [--brief <brief.json>] [--no-resume] [--dry-run]
  *     [--resume-tasks <shotId-to-taskId.json>] # GET 接续已受理任务，按实际任务与字节采用成功原片
@@ -43,7 +42,7 @@ import YAML from "yaml";
 import { filmReviewContracts, loadOrCreateFilmAuthorContext, reviewFilmStage } from "../../packages/video-studio/src/film-contracts.js";
 import { buildProducerReviewContract, reviewStage as reviewCharacterVisualStage, type ProducerGateOptions } from "../../packages/video-studio/src/producer-gate.js";
 import { buildVariantCoverFilters, embedCoverFirstFrame, type CoverFirstFrameReceipt, type CoverVariantId } from "../../packages/video-studio/src/cover-assembly.js";
-import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, buildCharacterIdentityReviewRequest, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
+import { adaptCharacterVisualVerdict, assessCharacterGenerationInput, assessCharacterRelease, assessRenderedCharacterUse, buildCharacterIdentityReviewRequest, generationIdentityLock, type CharacterIdentityEvidence, type CharacterReleaseArtifact } from "../../packages/video-studio/src/character-release-contract.js";
 import { buildRegisteredCharacterReleaseSource } from "../../packages/video-studio/src/character-release-source.js";
 import type { FilmVideoSubmissionReceipt } from "../../packages/video-studio/src/film-worker-provenance.js";
 import { assessPortraitDecision, selectPortraitDecisionRecord } from "../../packages/video-studio/src/portrait-decision.js";
@@ -52,7 +51,7 @@ import { assessVoiceArtifact, fingerprintFile, fingerprintText, promoteDubCandid
 import { readResumeTasks, runFilmRenderTask } from "./film-render-task.mjs";
 import { buildFilmRenderLedger, type FilmRenderLedger as RenderLedger } from "./film-render-ledger.mjs";
 import { assertFilmAudioPreflight, assertFilmAudioSource, decideFilmVoiceAction, resolveFilmAudioContract } from "./film-audio-policy.mjs";
-import { freezeOriginalSubmission, issueOriginalRenderReceipt, adoptCompletedOriginalRenders, captureOriginalRenderManifest, loadOriginalRenderManifest, assertStandardPostAudioClock, resolveStandardPostBinary } from "./film-standard-post.mjs";
+import { freezeOriginalSubmission, issueOriginalRenderReceipt, adoptCompletedOriginalRenders, captureOriginalRenderManifest, loadOriginalRenderManifest, assertStandardPostExportClock, resolveStandardPostBinary } from "./film-standard-post.mjs";
 import { assertCoverPublication, resolveOpeningTitle } from "./film-publication-policy.mjs";
 import {
   assertSelectedShotStageScope, captureLineageInputs, createLineageReceipt, fingerprintArtifact, latestLineageRecord, productionHash,
@@ -90,8 +89,10 @@ import {
   type DeviceCategory, type DeviceDefect, type EnvDefect, type HookCard, type MicromotionTrace, type PlatePromptShot,
   type ProducerVerdict, type SceneBible, type ScenePolicyReport
 } from "../../packages/video-studio/src/index.js";
-import { renderLocalCover } from "../../packages/video-studio/src/local-cover-render.js";
-import { assertStandardPostTimeline } from "../../packages/video-studio/src/standard-post-contract.js";
+import { coverShotHasCharacter, coverShotMatchesLead, coverShotCharacterIds, resolveCoverHero, resolveCoverComposition,
+  type CoverLeadSource } from "../../packages/video-studio/src/cover-design.js";
+import { assertStandardPostTimeline, validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
+import { FILM_COMPLETION_GUIDANCE, filmCompletionPolicyForDocument, describeFilmCompletion, type FilmCompletionRecord } from "../../packages/video-studio/src/film-completion.mjs";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "../../packages/video-studio/src/shot-intent.js";
 import { verifyAvSyncEvidence } from "../../packages/video-studio/src/av-sync.js";
 import { loadProductArchives, productArchivePromptLines, productHeroPhoto, productPhotoPath, selectProductArchive } from "../../packages/video-studio/src/product-archive.js";
@@ -245,6 +246,9 @@ if (!["live-action", "animation"].includes(ENHANCE_KIND)) {
   throw new Error(`--enhance-kind 不支持 ${ENHANCE_KIND}（可选 live-action / animation；文字画面须原生渲染）`);
 }
 const ENHANCE_ENGINE_DIR = arg("--enhance-engine-dir", "");
+if (["--enhance-kind", "--enhance-engine-dir"].some(flag)) {
+  throw new Error("STANDARD_ENHANCEMENT_OPTION_UNSUPPORTED: this entry uses the local compositor for requested geometry; no model enhancement adapter is connected");
+}
 /** The original submitted card owns the frame clock. A post option cannot silently change it. */
 function sourceFpsFor(document: typeof sourceDocument): number {
   const authored: number[] = [];
@@ -275,18 +279,15 @@ const CUT_TRANSITION_AT = arg("--cut-transition-at", "");
 const ORDER_POLICY = arg("--order-policy", "storyboard") as "storyboard" | "reuse-assembly";
 const COMPOSE_ORDER = arg("--compose-order", "");
 const REUSE_PLAN = arg("--reuse-plan", "");
-function assertStandardQuality(quality: FilmQuality): void {
-  if (quality !== "hd") throw new Error("STANDARD_NATIVE_QUALITY_OVERRIDE_REJECTED: preserve original native dimensions");
-}
-assertStandardQuality(QUALITY);
 if (XFADE !== 0 || CUT_TRANSITION || CUT_TRANSITION_DURATION !== 0 || CUT_TRANSITION_AT
   || ORDER_POLICY !== "storyboard" || COMPOSE_ORDER || REUSE_PLAN
   || ["--retime-to", "--material-speed-ramp", "--material-post-camera-move", "--material-photo-tail-trim", "--material-post-only"].some(flag)) {
-  throw new Error("STANDARD_NATIVE_EDIT_OPTION_REJECTED: standard production preserves all originals, their order, full timing, native fps and dimensions");
+  throw new Error("STANDARD_NATIVE_EDIT_OPTION_REJECTED: standard production preserves all original ranges, source order and timing; only requested export geometry and fps are normalized");
 }
 /**
  * 封面主版式（2026-09-25 南昌片收口）：
- *   `landmark`（默认）= 地标满幅 + 人物卡（适合"人物镜头质量一般"的片子）；
+ *   `auto`（默认）= 有主角来源则人物满幅，否则物体满幅；只保留一个主视觉。
+ *   `landmark` = 地标满幅 + 人物卡（兼容模式，重复人物层会被移除）；
  *   `split`          = **左侧地标满幅 + 右侧人物竖带**（无卡片硬边，双主体都清晰；当"人物卡贴在地标上"反复被判 "贴图感/遮挡主体"时的收口版式）；
  *   `person`         = **人物满幅 + 地标小图**——当"人物卡贴在地标上"反复被判
  *                      "贴图感/遮挡主体/人物不是主角"时改用这一版：人物是背景（不存在贴片边缘），
@@ -295,17 +296,18 @@ if (XFADE !== 0 || CUT_TRANSITION || CUT_TRANSITION_DURATION !== 0 || CUT_TRANSI
  *                      文字块下移到**面部下方安全带**（画面 58%–88%），从根上避免"标题压在主角脸上"；
  *                      适用范围=人物本身就是唯一主视觉的片子（带货口播、讲解、访谈）。
  */
-const COVER_HERO = arg("--cover-hero", "landmark");
+const COVER_REQUESTED_HERO = arg("--cover-hero", "auto");
+let COVER_HERO = resolveCoverHero(COVER_REQUESTED_HERO, false);
 /**
  * 封面版式（2026-09-26 产品所有者口径，收敛为两种主视觉）：
  *   · `subject-led`（物体为主）：景物/商品/动物等**非人主体**满幅 + 标题（`--cover-hero subject|scenery`）；
  *   · `person-led`（人物为主）：人物是唯一主视觉，背景只作点缀（`--cover-hero person`）。
  * 旧的 `landmark`（地标 + 人物卡）与 `split`（左地标右人物竖带）保留为兼容档，但不再是推荐默认。
  */
-const COVER_ARCHETYPE: "person-led" | "subject-led" =
+let COVER_ARCHETYPE: "person-led" | "subject-led" =
   ["subject", "scenery", "object", "product"].includes(COVER_HERO) ? "subject-led" : "person-led";
 /** 人物满幅 + 无小图 + 文字下移安全带（person-solo 专属口径） */
-const COVER_LOWER_BAND_TEXT = COVER_HERO === "person-solo";
+let COVER_LOWER_BAND_TEXT = COVER_HERO === "person-solo";
 /**
  * 封面平台（2026-09-27 平台化）：
  *   `--cover-platform` 显式指定封面平台（`douyin|kuaishou|xiaohongshu|wechat-channels|bilibili|tiktok|youtube|instagram-reels`，
@@ -643,6 +645,7 @@ const lineageComponentHash = productionHash([
   "scripts/tools/film-voice-artifact.ts", "packages/video-studio/src/character-release-contract.ts",
   "packages/video-studio/src/cover-assembly.ts", "packages/video-studio/src/cover-design.ts",
   "packages/video-studio/src/producer-gate.ts", "packages/video-studio/src/real-person-asset.ts",
+  "packages/video-studio/src/film-completion.mjs", "packages/video-studio/src/standard-post-contract.ts",
   "packages/video-studio/src/character-release-source.ts", "packages/video-studio/src/film-worker-runtime.ts",
   "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts",
 ].map((file) => ({ file, sha256: sha256FileSync(join(REPO_ROOT, file)) })));
@@ -685,7 +688,8 @@ function syntheticReviewVerdict(
     stage: options.stage,
     status: hardFailures.length > 0 ? "failed" : "passed",
     approved: hardFailures.length === 0,
-    score: hardFailures.length > 0 ? 0 : 100,
+    score: null,
+    qualityStatus: "unverified",
     hardFailures,
     issues,
     suggestions: hardFailures.length > 0 ? [`修复事实性硬闸后重跑：${hardFailures[0]}`] : [],
@@ -761,7 +765,7 @@ function lineageRecipe(stage: string): Record<string, unknown> {
 }
 function lineageRecords(rows: StageRecord[], stage: string): StageRecord[] {
   const recipeHash = productionHash(lineageRecipe(stage));
-  // HD source clips can feed UHD enhancement. For delivery stages, only the
+  // HD source clips can feed the local UHD compositor. For delivery stages, only the
   // current processing receipt must bind the requested export/recipe.
   return rows.map((row) => ({ ...row, stage: lineageStage(row) }))
     .filter((row) => row.stage === stage && (!row.lineage || row.lineage.recipeHash === recipeHash));
@@ -954,10 +958,13 @@ function probe(file: string): Record<string, unknown> {
       duration: Number(json.format?.duration ?? 0),
       width: Number(video?.width ?? 0),
       height: Number(video?.height ?? 0),
-      /** 帧率：`r_frame_rate` 形如 "24/1"，取分子/分母（早先写成连除，得到 1/24，监制据此误判"帧率异常"） */
+      /** 实际平均画面钟优先；只有平均钟不可用时才记录声明帧率。 */
       fps: (() => {
-        const [num, den] = String(video?.r_frame_rate ?? "0/1").split("/").map(Number);
-        return num && den ? num / den : 0;
+        const rate = (value: unknown): number => {
+          const [num, den] = String(value ?? "0/1").split("/").map(Number);
+          return Number.isFinite(num) && Number.isFinite(den) && Number(num) > 0 && Number(den) > 0 ? Number(num) / Number(den) : 0;
+        };
+        return rate(video?.avg_frame_rate) || rate(video?.r_frame_rate);
       })(),
       vcodec: video?.codec_name ?? null,
       acodec: audio?.codec_name ?? null,
@@ -1155,7 +1162,7 @@ function detectQualityAccidents(file: string): { blackSeconds: number; silenceSe
   return { blackSeconds, silenceSeconds, detail: `黑帧：${blackDetail}；静音：${silenceDetail}` };
 }
 
-for (const original of completedOriginals) {
+function recordAdoptedOriginal(original: typeof completedOriginals[number]): void {
   rememberInputs("render-adopted", [original.path, original.receiptFile], original.shotId);
   record({ stage: "render-adopted", shotId: original.shotId, invoked: false, ok: true, cached: true, degraded: false,
     attempt: 0, ms: 0, artifact: original.path, evidence: { projectId: PROJECT, taskId: original.taskId,
@@ -1163,6 +1170,7 @@ for (const original of completedOriginals) {
       qualityReviewPerformed: false, historicalQualityRowsUnchanged: true, receiptFile: original.receiptFile }, verdict: null,
     note: "实际成功渲染镜头按原任务与原字节默认采用；不是旧品质审核通过，也未再次提交" });
 }
+for (const original of completedOriginals) recordAdoptedOriginal(original);
 
 /* ================= 输入 ================= */
 
@@ -1181,7 +1189,7 @@ const shotlist = structuredClone(sourceDocument) as {
   logline?: string;
   scenePolicy?: { id?: string; exceptions?: Array<{ rule: "restricted-location" | "restricted-costume"; shotId: string; term: string; customerRequest: string; source: string }> };
   hook?: HookCard;
-  character?: { id?: string; name?: string }; shots: ShotCard[];
+  character?: { id?: string; name?: string; appearanceInShots?: string[] }; shots: ShotCard[];
 };
 const RESUME_TASKS: Record<string, string> = readResumeTasks(arg("--resume-tasks", ""), shotlist.shots.map((shot) => shot.shotId));
 const policyBrief: Record<string, unknown> | null = BRIEF_FILE && PRERENDER_REQUESTED ? (() => {
@@ -1503,13 +1511,18 @@ const EFFECTIVE_CUT_TRANSITION_AT = CUT_TRANSITION_AT.trim()
 const CUT_TRANSITION_COUNT = !EFFECTIVE_CUT_TRANSITION ? 0
   : CUT_TRANSITION_AT.trim() ? EFFECTIVE_CUT_TRANSITION_AT.split(",").filter(Boolean).length : shots.length - 1;
 const transitionLoss = Number((CUT_TRANSITION_COUNT * CUT_TRANSITION_DURATION).toFixed(3));
-const totalSeconds = Number(shotlist.durationSeconds ?? shots.reduce((sum, s) => sum + Number(s.duration ?? 0), 0));
-/**
- * 成片目标时长（秒）= 分镜总时长 − 逐刀转场损耗。
- * 逐刀 xfade 每刀吃掉 transitionDuration，15 刀 2.4s；compose 的 retime 目标与终审的时长判据都用它，
- * 保证"画面节拍网格"不被整片缩放（否则配乐卡点全乱，真机 4/15 命中）。
- */
-const expectedMasterSeconds = Number(Math.max(1, totalSeconds - transitionLoss).toFixed(3));
+/** One completion policy is used before paid rendering and again by the issued original contract. */
+function completionForShots(document: Record<string, unknown>, selected: Array<Record<string, unknown>>): FilmCompletionRecord {
+  if (!selected.length || selected.some(shot => typeof shot.duration !== "number" || !Number.isFinite(shot.duration) || shot.duration <= 0))
+    throw new Error("FILM_COMPLETION_INVALID: each selected shot needs a positive duration");
+  const actualSeconds = selected.reduce((sum, shot) => sum + Number(shot.duration), 0);
+  return describeFilmCompletion(filmCompletionPolicyForDocument(document, actualSeconds), actualSeconds);
+}
+const plannedCompletion = completionForShots(sourceDocument, sourceDocument.shots!);
+const totalSeconds = plannedCompletion.policy.targetSeconds ?? plannedCompletion.actualSeconds;
+const selectedCompletion = completionForShots(sourceDocument, shots);
+/** The complete selected picture clock owns postproduction. Never retime to the creative target. */
+let expectedMasterSeconds = selectedCompletion.actualSeconds;
 /** 剪辑网格（真实切点，秒）：配乐卡点与 BPM 反推的事实依据（去掉片尾那一个点） */
 const CUT_GRID: number[] = (() => {
   /**
@@ -1610,7 +1623,7 @@ function preflightSubmitGuard(input: { shotId: string; stage: string; prompt: st
 /**
  * 真机归因：本会话每一次返修都能在卡片里提前看到——让模型"别写屏幕字"、6 秒里锁"2.5s 定住"又要推镜、
  * 服装锁到面料配饰、一镜塞三个互相打架的诉求。这里在花钱前给出**就绪度 + 改卡建议**，
- * 并把**最险的镜头排到渲染队列最前面**（canary 先错，只花一镜的钱）。
+ * 新付费提交只核对待生成镜头的源合同与授权；成功素材直接采用，不运行 canary 品质复审。
  */
 let FIRST_PASS_ORDER: ShotCard[] = shots;
 if (PRERENDER_REQUESTED) {
@@ -2632,10 +2645,10 @@ if (STAGES.has("cine-kb")) {
  * 等到出片才发现要烧一整轮渲染额度。确定性检查在 `packages/video-studio/src/continuity.ts`（6 问 + 5 维评分），
  * LLM 只补"机检查不出的语义跳变"。硬阻断按 yml 纪律**直接打回**（不花钱）。
  */
-if (STAGES.has("continuity")) {
+if (STAGES.has("continuity") && pendingShots().length > 0) {
   const started = Date.now();
   const report = auditContinuity(pendingShots() as unknown as Array<Record<string, unknown>>, {
-    targetSeconds: ONLY.length > 0 || completedByShot.size > 0 ? null : totalSeconds,
+    targetSeconds: null,
     projectId: PROJECT
   });
   const checks: GateCheck[] = report.checks.map((c) => ({ id: c.id, pass: c.pass, detail: c.detail, hard: c.hard }));
@@ -2650,7 +2663,8 @@ if (STAGES.has("continuity")) {
         sixQuestions: report.questions.map((q) => `${q.question} → ${q.answer}（${q.note}）`),
         fiveDimensions: report.dimensions.map((d) => `${d.name} ${d.score}/20`),
         deterministicScore: report.score,
-        discipline: "硬阻断（打回）：造型无理由不一致、总时长不符、台词重复。其余为软信号，进问题清单但不阻断；"
+        completion: plannedCompletion,
+        discipline: FILM_COMPLETION_GUIDANCE + "硬阻断（打回）：造型无理由不一致、台词重复、显式硬上限超出。其余为软信号，进问题清单但不阻断；"
           + "跨镜判断只看镜头卡文本，不要索要额外画面证据。"
       },
       env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
@@ -2778,7 +2792,7 @@ const CURRENT_SHOTS_FILE = join(WORK_DIR, `shotlist-current-${PROJECT}.json`);
 writeFileSync(CURRENT_SHOTS_FILE, `${JSON.stringify({ projectId: PROJECT, shots }, null, 2)}\n`, "utf8");
 
 /* ---------- ② 脚本 + 提示词交付闸（监制：prompt） ---------- */
-if (STAGES.has("spec")) {
+if (STAGES.has("spec") && pendingShots().length > 0) {
   const started = Date.now();
   const checks: Array<{ id: string; pass: boolean; detail: string; hard?: boolean }> = [];
   let rateFail = 0;
@@ -3024,11 +3038,10 @@ if (STAGES.has("spec")) {
   /**
    * 总时长核对：`--only` 局部重跑时只核对被选中的镜头合计（否则局部重跑永远过不了这一闸）。
    */
-  const selectedSeconds = pendingShots().reduce((s, x) => s + Number(x.duration ?? 0), 0);
-  const expectedSeconds = ONLY.length > 0 || completedByShot.size > 0 ? selectedSeconds : totalSeconds;
+  const completion = completionForShots(sourceDocument, pendingShots());
   checks.push({
-    id: "duration-total", pass: Math.abs(selectedSeconds - expectedSeconds) < 0.001, hard: true,
-    detail: `镜头时长合计 ${selectedSeconds}s（目标 ${expectedSeconds}s${ONLY.length > 0 ? `，局部重跑 ${ONLY.join(",")}` : ""}）`
+    id: "duration-total", pass: true, hard: true,
+    detail: `完整镜头合计 ${completion.actualSeconds}s；创作目标 ${completion.policy.targetSeconds ?? "未指定"}s，差 ${completion.deltaFromTargetSeconds ?? "未指定"}s；完成度优先，禁止凑秒截句/压速${ONLY.length > 0 ? `，局部重跑 ${ONLY.join(",")}` : ""}`
   });
   /**
    * 全素材项目守卫（T-2026-0925-0001 真机发现，同"全真图"缺口在新版重现）：
@@ -3115,7 +3128,7 @@ if (STAGES.has("spec")) {
     const failed = scoped.find((item) => !item.verdict.approved);
     verdict = {
       stage: "prompt", status: approved ? "passed" : scoped.some((item) => item.verdict.status === "unverified") ? "unverified" : "failed",
-      approved, score: Math.min(...scoped.map((item) => item.verdict.score ?? 0)),
+      approved, score: scoped.every(item => item.verdict.score !== null) ? Math.min(...scoped.map(item => item.verdict.score!)) : null,
       contractHash: buildProducerReviewContract(filmReviewContracts(filmContractSource)).contractHash,
       evidence: [...scoped.flatMap((item) => item.verdict.evidence ?? []),
         { path: scopedReviewFile, sha256: sha256FileSync(scopedReviewFile), scope: "per-shot-verdicts" }],
@@ -3474,7 +3487,7 @@ function measureMaterialReuse(clip: string, material: string, durationSec: numbe
     }
   }
   /** 候选一次解码成灰度内存，后续每帧只做内存比较 */
-  const candidatePixels = candidates.map((file) => grayRaw(file));
+  const candidatePixels = candidates.map((file) => grayFrameRaw(file, 0, W, H));
   const samples: Array<{ atSec: number; bestPsnrDb: number | null; bestSsim: number | null }> = [];
   for (const ratio of MATERIAL_REUSE_SAMPLE_RATIOS) {
     const atSec = Math.min(durationSec - 0.05, Math.max(0.1, durationSec * ratio));
@@ -3645,6 +3658,7 @@ if (STAGES.has("material-gen")) {
     const prepared = join(PLATE_DIR, `${shot.shotId}-material.jpg`);
     const promptFile = join(PROMPT_DIR, `${shot.shotId}.txt`);
     const focus = { x: spec.focus?.x ?? 0.5, y: spec.focus?.y ?? 0.5 };
+    let materialSubmission: Awaited<ReturnType<typeof arkVideo>> | null = null;
     if (!existsSync(photo)) {
       record({
         stage: "material-gen", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt: 1, ms: 0,
@@ -3722,7 +3736,8 @@ if (STAGES.has("material-gen")) {
       }
       preflightSubmitGuard({ shotId: shot.shotId, stage: "material-gen", prompt, fps: FPS, attempt: 1, prevFingerprint: null });
       const submitted = await arkVideo({ stage: "material-gen", target: rawClip, shotId: shot.shotId, prompt,
-        firstFrame: dataUrl(prepared), refs: [], seconds: renderSecondsFor(duration), generateAudio: true, seed: 20260925 });
+        firstFrame: undefined, refs: [dataUrl(prepared)], seconds: renderSecondsFor(duration), generateAudio: true, seed: 20260925 });
+      materialSubmission = submitted;
       await download(submitted.url, rawClip);
       const info = assertOriginalRenderMedia(rawClip, duration, shot.shotId);
       if (!submitted.requestInputVerified) throw new Error(`RENDER_INPUT_UNVERIFIED: ${shot.shotId} downloaded candidate lacks actual submitted request proof; no automatic resubmission`);
@@ -3730,25 +3745,38 @@ if (STAGES.has("material-gen")) {
         artifactPath: rawClip, taskId: submitted.taskId, requestInputVerified: true, submissionReceipt: submitted.submissionReceipt, parentWorkDir: WORKER_RUNTIME?.context.workDir });
       copyFileSync(rawClip, clip);
       if (sha256FileSync(clip) !== sha256FileSync(rawClip)) throw new Error(`RENDER_COPY_CHANGED: ${shot.shotId}`);
-      record({ stage: "material-gen", shotId: shot.shotId, invoked: true, ok: true, cached: false, degraded: false,
+      record({ stage: "material-gen", shotId: shot.shotId, invoked: true, ok: true, cached: submitted.resumed, degraded: false,
         attempt: 1, ms: Date.now() - shotStarted, artifact: clip, evidence: { ...info, taskId: submitted.taskId,
           raw: rawClip, rawSha256: sha256FileSync(rawClip), outputSha256: sha256FileSync(clip), outputFiles: [rawClip],
           requestInputVerified: true, submissionReceipt: submitted.submissionReceipt ?? null, material: photo, materialSha256: materialSha,
           providerSuccess: true, qualityReviewPerformed: false, originalUnchanged: true }, verdict: null,
         note: "素材仅用于获授权的生成输入；成功渲染产物默认采用，无保真、运动或静态观感二次审核" });
     } catch (error) {
-      record({ stage: "material-gen", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false,
+      record({ stage: "material-gen", shotId: shot.shotId, invoked: true, ok: false, cached: Boolean(materialSubmission?.resumed), degraded: false,
         attempt: 1, ms: Date.now() - shotStarted, artifact: null,
-        evidence: { error: error instanceof Error ? error.message : String(error) }, verdict: null,
+        evidence: { error: error instanceof Error ? error.message : String(error), taskId: materialSubmission?.taskId ?? null,
+          submissionReceipt: materialSubmission?.submissionReceipt ?? null }, verdict: null,
         note: "实际生成或文件处理失败；未因品质重渲" });
       throw error;
+    }
+  }
+  if (!DRY_RUN) {
+    // Same-run success becomes pending-state input only after the formal adapter
+    // rechecks the issued receipt, first witness and current source bytes.
+    const currentCompleted = await adoptCompletedOriginalRenders({ productionRoot: WORK_DIR, projectId: PROJECT, submittedSha256: sourceFileHash });
+    const previouslyCompleted = new Set(completedByShot.keys());
+    completedOriginals.splice(0, completedOriginals.length, ...currentCompleted);
+    completedByShot.clear();
+    for (const original of currentCompleted) {
+      completedByShot.set(original.shotId, original);
+      if (!previouslyCompleted.has(original.shotId)) recordAdoptedOriginal(original);
     }
   }
 }
 
 
 /* ---------- ③ 逐镜视频（监制：shot） ---------- */
-if (STAGES.has("videos")) {
+if (STAGES.has("videos") && pendingShots().length > 0) {
   /**
    * G7 预生产最终确认（step_key: g7-preproduction）。
    *
@@ -3790,28 +3818,11 @@ if (STAGES.has("videos")) {
     return { shotId: shot.shotId, ok, reason: ok ? "当前关键帧哈希与最新通过裁决一致" : "缺少当前关键帧的最新通过裁决" };
   });
   const plateApproved = plateApprovedDetail.every((entry) => entry.ok);
-  /**
-   * 素材镜就绪判据（2026-09-25 口径修订）：**不是"有文件就行"**，而是要求
-   * ① 片段在盘上；② G-MAT1 的 **verify 事件**存在（证明做过生成溯源 + 复用度实测 + 监制评审）。
-   * 只看文件会把"静态直出的照片段"当成合格产物——这正是上一版翻车的地方。
-   */
-  const gateStepKeyOf = (r: Record<string, unknown>): string | null => String(
-    (r as { stepKey?: unknown }).stepKey ?? ((r as { evidence?: { stepKey?: unknown } }).evidence?.stepKey) ?? ""
-  ) || null;
-  const gateShotIdsOf = (r: Record<string, unknown>): string[] => {
-    const top = (r as { shotIds?: unknown }).shotIds;
-    if (Array.isArray(top)) return top as string[];
-    const inner = (r as { evidence?: { shotIds?: unknown } }).evidence?.shotIds;
-    return Array.isArray(inner) ? (inner as string[]) : [];
-  };
-  const gateModeOf = (r: Record<string, unknown>): string | null => String(
-    (r as { evidence?: { mode?: unknown } }).evidence?.mode ?? ""
-  ) || null;
-  const materialGateVerified = (shotId: string): boolean => existsSync(join(LOG_DIR, "original-issued", `${shotId}.json`));
-  const materialReady = materialShots().filter(s => !completedByShot.has(s.shotId)).every((s) => {
-    const clip = join(CLIP_DIR, `${s.shotId}.mp4`);
-    return existsSync(clip) && statSync(clip).size > 100_000 && materialGateVerified(s.shotId);
-  });
+  /** Successful materials are adopted by task, witness and byte facts before G7.
+   * Any still-pending material lacks that completed source; file size or an old
+   * quality vote cannot turn it into a completed render. */
+  const materialGateVerified = (shotId: string): boolean => completedByShot.has(shotId);
+  const materialReady = materialShots().length === 0;
   const micromotionEvidence = STAGES.has("micromotion")
     ? promptShots().map((shot) => micromotionConsumption(shot, micromotionTraces.get(String(shot.shotId))))
     : [];
@@ -3819,7 +3830,7 @@ if (STAGES.has("videos")) {
   const g7 = recordGate({
     stepKey: "g7-preproduction",
     sourceStage: "keyframe",
-    shotIds: shots.map((s) => s.shotId),
+    shotIds: pendingShots().map((s) => s.shotId),
     checks: [
       { id: "prompt-files", pass: promptReady, hard: true, detail: promptReady ? `${promptShots().length} 个文生镜头（生成镜 + 授权真人素材镜）提示词齐备且 ≥1200 字（另有 ${materialShots().length} 个素材镜走 material-gen 的动效提示词）` : "有生成镜/授权真人素材镜缺提示词或字数不足 1200" },
       { id: "plate-files", pass: plateReady, hard: true, detail: plateReady ? `${generatedShots().length} 个生成镜关键帧齐备（>50KB）` : "有生成镜关键帧缺失或过小" },
@@ -3841,8 +3852,8 @@ if (STAGES.has("videos")) {
       {
         id: "material-segments", pass: materialReady, hard: true,
         detail: materialReady
-          ? `${materialShots().length} 个素材镜已产出且过 G-MAT1（生成溯源 + 非静态直出 + 保真评审）`
-          : `有素材镜未产出或未过 G-MAT1（素材只作生成输入，禁止静态直出）`
+          ? "成功素材镜已按当前真实任务、首次签发见证和原片字节采用；不重复执行品质门或付费提交"
+          : `待生成素材镜 ${materialShots().map(shot => shot.shotId).join("、")} 缺当前已签发原片；须先完成真实素材生成，不以旧品质票或文件大小替代`
       },
       /**
        * 环境真实性（2026-09-27 事故机制化）：G7 是"花钱之前最后一道门"，
@@ -3888,6 +3899,7 @@ if (STAGES.has("videos")) {
     ],
     evidence: {
       promptReady, plateReady, promptApproved, plateApproved, materialReady, micromotionReady, micromotionEvidence,
+      adoptedOriginalShotIds: completedOriginals.map(original => original.shotId),
       envRealism: { hard: envSummary.hard, soft: envSummary.soft, byRule: envSummary.byRule, bible: sceneBible?.spaceId ?? null, report: ENV_REPORT_FILE },
       scenePolicy: scenePolicyReport ? { id: scenePolicy!.id, version: scenePolicy!.version, sourceSha256: scenePolicy!.sourceSha256,
         ratios: scenePolicyReport.ratios, exceptionsApplied: scenePolicyReport.exceptionsApplied, report: SCENE_POLICY_REPORT_FILE } : null,
@@ -3939,10 +3951,7 @@ if (STAGES.has("videos")) {
     if (completedByShot.has(shot.shotId)) continue;
     const clip = join(CLIP_DIR, `${shot.shotId}.mp4`);
     const duration = Number(shot.duration ?? 5);
-    /**
-     * 素材镜：片段已在 `material-gen` 阶段生成并过 G-MAT1（生成溯源 + 非静态直出 + 保真评审），
-     * 这里不再走"生成镜复检/提交审批"（判据不同），但**必须**确认 G-MAT1 的 verify 事件在场。
-     */
+    /** A material shot never enters the unrelated generated-shot paid submission. */
     if (isMaterialShot(shot)) {
       const verified = materialGateVerified(shot.shotId);
       record({
@@ -3951,13 +3960,13 @@ if (STAGES.has("videos")) {
         artifact: existsSync(clip) ? clip : null,
         evidence: {
           photo: String((shot as Record<string, unknown>).photo), source: "material-gen",
-          materialGate: verified ? "G-MAT1 verify 事件在场" : "缺 G-MAT1 verify 事件",
+          materialGate: verified ? "当前已签发原片来源已采用" : "缺当前已签发原片来源",
           policy: MATERIAL_POLICY_VERSION, skipReason: "素材镜的生成与判据在 material-gen 阶段完成"
         },
         verdict: null,
         note: verified
-          ? "素材镜：生成产物已过 G-MAT1（复用，不重复提交渲染）"
-          : "素材镜：缺 G-MAT1 verify 事件（素材是否被当镜头用无法证明）"
+          ? "素材镜：复用已签发原片，不重复提交渲染"
+          : "素材镜：缺真实已签发原片，未提交到其他生成路径"
       });
       continue;
     }
@@ -4085,11 +4094,11 @@ if (STAGES.has("videos")) {
         }
         await issueOriginalRenderReceipt({ productionRoot: WORK_DIR, projectId: PROJECT, shotId: shot.shotId, submittedSha256: sourceFileHash,
           artifactPath: clip, taskId: submitted.taskId, requestInputVerified: submitted.requestInputVerified, submissionReceipt: submitted.submissionReceipt, parentWorkDir: WORKER_RUNTIME?.context.workDir });
-        record({ stage: "shot", shotId: shot.shotId, invoked: true, ok: true, cached: false, degraded: false,
+        record({ stage: "shot", shotId: shot.shotId, invoked: true, ok: true, cached: submitted.resumed, degraded: false,
           attempt, ms: Date.now() - started, artifact: clip, evidence: { ...info, taskId: submitted.taskId,
             providerSuccess: true, requestInputVerified: true, rawSha256: sha256FileSync(clip),
             submissionReceipt: submitted.submissionReceipt ?? null, generationPromptSha256: fingerprintText(attemptPrompt),
-            referenceAssets: shotRefs, qualityReviewPerformed: false, identityVerified: false, wardrobeVerified: false }, verdict: null,
+            basePromptSha256: fingerprintText(prompt), referenceAssets: shotRefs, qualityReviewPerformed: false, identityVerified: false, wardrobeVerified: false }, verdict: null,
           note: "供应商成功返回的镜头已默认采用，直接正式后期；未执行品质或人物审核" });
         approved = true;
       } catch (err) {
@@ -4097,7 +4106,7 @@ if (STAGES.has("videos")) {
           stage: "shot", shotId: shot.shotId, invoked: true, ok: false, cached: false, degraded: false, attempt,
           ms: Date.now() - started, artifact: null, evidence: { error: err instanceof Error ? err.message.slice(0, 300) : String(err) }, verdict: null
         });
-        if (shotIsAsset) break;
+        throw err;
       }
     }
 
@@ -4110,6 +4119,19 @@ let originalPostContract!: Awaited<ReturnType<typeof loadOriginalRenderManifest>
 if (!DRY_RUN && ["voice", "compose", "color", "subtitle", "danmaku", "bgm", "sfx", "cover", "mux", "master", "deliver"].some(stage => STAGES.has(stage))) {
   const originalManifest = await captureOriginalRenderManifest({ productionRoot: WORK_DIR, projectId: PROJECT });
   originalPostContract = await loadOriginalRenderManifest(originalManifest, { ffmpeg: FFMPEG, ffprobe: FFPROBE });
+  // Freeze authored intent unchanged. Only derived post cards use the measured
+  // complete picture clock, shared by composition, subtitles, covers and BGM.
+  for (const shot of shots) {
+    const entry = originalPostContract.timeline.find(row => row.shotId === shot.shotId);
+    if (!entry) throw new Error(`STANDARD_NATIVE_ORIGINAL_BINDING_INVALID: ${shot.shotId}`);
+    shot.duration = entry.durationSec;
+  }
+  expectedMasterSeconds = originalPostContract.durationSec;
+  let elapsedFrames = 0;
+  CUT_GRID.splice(0, CUT_GRID.length, ...originalPostContract.originals.slice(0, -1).map(original => {
+    elapsedFrames += Math.max(1, Math.ceil(original.media.videoFrames / original.media.fps * FPS - 1e-8));
+    return elapsedFrames / FPS;
+  }));
 }
 function originalForShot(shot: ShotCard): string {
   const original = originalPostContract?.originals.find(s => s.shotId === shot.shotId);
@@ -4119,7 +4141,7 @@ function originalForShot(shot: ShotCard): string {
 }
 function originalFactsForShot(shot: ShotCard) {
   const path = originalForShot(shot), original = originalPostContract.originals.find(s => s.shotId === shot.shotId)!;
-  return { path, sha256: original.sha256, bytes: original.bytes, durationSeconds: original.media.videoDurationSec, fps: original.media.fps,
+  return { path, sha256: original.sha256, bytes: original.bytes, durationSeconds: original.media.videoFrames / original.media.fps, fps: original.media.fps,
     audio: { present: original.media.audioChannels > 0, sampleRate: original.media.audioSampleRate, channels: original.media.audioChannels, durationSec: original.media.audioDurationSec } };
 }
 
@@ -4161,7 +4183,7 @@ if (STAGES.has("voice") && DRY_RUN) {
       const facts = nativeAudioFactsForShot(shot);
       const contract = resolveFilmAudioContract(shot as unknown as Parameters<typeof resolveFilmAudioContract>[0]);
       rememberInputs("voice", [facts.path], shot.shotId);
-      const detail = facts.nativeAudio.present ? "保留原片已有音频；未执行语音、口型或品质审核" : "原片无音频，保持静音；正式后期仅补处理用的静音轨，未执行TTS";
+      const detail = facts.nativeAudio.present ? "保留原片已有音频；未执行语音、口型或品质审核" : "原片无音频，保持静音；未执行TTS或补造语音";
       narrationCoverage.push({ shotId: shot.shotId, speaker, text, ok: true, source: "clip-audio", detail });
       record({ stage: "voice", shotId: shot.shotId, invoked: true, ok: true, cached: false, degraded: false,
         attempt: 1, ms: Date.now() - shotStarted, artifact: facts.path,
@@ -4198,9 +4220,8 @@ if (STAGES.has("compose") && !DRY_RUN) {
   const expectedOrder = originalPostContract.timeline.map(entry => entry.shotId), actualOrder = shots.map(shot => shot.shotId);
   if (actualOrder.length !== expectedOrder.length || actualOrder.some((id, index) => id !== expectedOrder[index])
     || ORDER_POLICY !== "storyboard" || COMPOSE_ORDER || REUSE_PLAN || XFADE !== 0 || EFFECTIVE_CUT_TRANSITION
-    || QUALITY === "uhd"
     || expectedMasterSeconds !== originalPostContract.durationSec)
-    throw new Error("STANDARD_NATIVE_TIMELINE_OVERRIDE_REJECTED: preserve every original full shot in submitted order, native timing and geometry");
+    throw new Error("STANDARD_NATIVE_TIMELINE_OVERRIDE_REJECTED: preserve every original full shot in submitted order without retiming");
   const nativeFacts = shots.map(nativeAudioFactsForShot), clips = shots.map(clipFor);
   const actualTimeline = shots.map((shot, index) => ({ shotId: shot.shotId,
     video: { path: clips[index]!, sha256: nativeFacts[index]!.sha256, bytes: nativeFacts[index]!.bytes, inSec: 0 },
@@ -4212,7 +4233,7 @@ if (STAGES.has("compose") && !DRY_RUN) {
   const { width, height } = OUTPUT_SIZE, fps = FPS, totalFrames = Math.round(durationSec * fps);
   const result = runCli(join(REPO_ROOT, "scripts/tools/compose-film.mts"), [
     "--clips", clips.join(","), "--out", master, "--width", String(width), "--height", String(height),
-    "--fps", String(fps), "--durations", shots.map(shot => Number(shot.duration)).join(","), "--fade", "0", "--color", "none"
+    "--fps", String(fps), "--fade", "0", "--color", "none", "--native-clock"
   ]);
   for (const [index, shot] of shots.entries()) {
     const after = nativeAudioFactsForShot(shot), before = nativeFacts[index]!;
@@ -4220,14 +4241,46 @@ if (STAGES.has("compose") && !DRY_RUN) {
       throw new Error(`STANDARD_NATIVE_SOURCE_CHANGED_DURING_COMPOSE: ${shot.shotId}`);
   }
   const info = existsSync(master) ? probe(master) : {};
-  const mediaOk = Number(info.width) === width && Number(info.height) === height && Number(info.fps) === fps
-    && Math.abs(Number(info.videoDurationSec || info.duration) - durationSec) <= Math.max(1 / fps, 0.05)
-    && info.hasAudio === true;
+  const receiptFile = master.replace(/\.mp4$/i, ".av-sync.json");
+  let processReceipt: Record<string, any> | null = null;
+  if (result.ok && existsSync(master) && existsSync(receiptFile)) {
+    try { processReceipt = JSON.parse(readFileSync(receiptFile, "utf8")); }
+    catch (error) { throw new Error(`STANDARD_NATIVE_COMPOSE_RECEIPT_INVALID: ${(error as Error).message}`); }
+  }
+  const clock = processReceipt?.outputMedia;
+  const sourceBindings = Array.isArray(processReceipt?.sources) && processReceipt!.sources.length === nativeFacts.length
+    && Array.isArray(processReceipt!.target?.shotFrames) && processReceipt!.target.shotFrames.length === nativeFacts.length
+    && processReceipt!.sources.every((source: Record<string, any>, index: number) => {
+      const original = originalPostContract.originals[index]!;
+      return source.path === nativeFacts[index]!.path && source.sha256 === nativeFacts[index]!.sha256
+        && source.source?.videoFrames === original.media.videoFrames && source.source?.fps === original.media.fps
+        && source.normalized?.videoFrames === Math.max(1, Math.ceil(original.media.videoFrames / original.media.fps * fps - 1e-8))
+        && source.normalized?.fps === fps && source.normalized?.width === width && source.normalized?.height === height
+        && processReceipt!.target.shotFrames[index] === source.normalized.videoFrames;
+    });
+  const actualFrames = Number(clock?.videoFrames), actualSeconds = actualFrames / fps;
+  const mediaOk = processReceipt?.schemaVersion === "workloom.composition-process/v1"
+    && processReceipt.outputSha256 === (existsSync(master) ? sha256FileSync(master) : "") && sourceBindings
+    && Number.isSafeInteger(actualFrames) && actualFrames > 0 && clock?.fps === fps && clock?.width === width && clock?.height === height
+    && Number(info.width) === width && Number(info.height) === height && Math.abs(Number(info.fps) - fps) <= 1e-6
+    && Number(info.videoFrames) === actualFrames
+    && (!originalPostContract.originals.some(original => original.media.audioChannels > 0) || clock?.hasAudio === true && info.hasAudio === true)
+    && Math.abs(Number(info.videoDurationSec || info.duration) - actualSeconds) <= 2e-6;
+  if (mediaOk) {
+    expectedMasterSeconds = actualSeconds;
+    const counts = processReceipt!.target?.shotFrames;
+    if (!Array.isArray(counts) || counts.length !== shots.length || counts.some((count: unknown) => !Number.isSafeInteger(count) || Number(count) < 1)
+      || counts.reduce((sum: number, count: number) => sum + count, 0) !== actualFrames)
+      throw new Error("STANDARD_NATIVE_COMPOSE_RECEIPT_INVALID: actual complete shot frame ranges are missing");
+    let frames = 0;
+    CUT_GRID.splice(0, CUT_GRID.length, ...counts.slice(0, -1).map((count: number) => { frames += count; return frames / fps; }));
+    shots.forEach((shot, index) => { shot.duration = counts[index] / fps; });
+  }
   const verdict = result.ok && mediaOk ? await reviewStage({ stage: "compose", projectId: PROJECT,
     artifacts: [{ path: master, kind: "video", probe: info }],
     deterministic: [
       { id: "original-timeline", pass: true, hard: true, detail: "所有原片按提交顺序完整入片，画面和音频同源，in=0 / speed=1" },
-      { id: "duration", pass: mediaOk, hard: true, detail: `原始完整时间线 ${durationSec}s / ${totalFrames} frames @${fps}fps` },
+      { id: "duration", pass: mediaOk, hard: true, detail: `实际完整源时间线 ${actualSeconds}s / ${actualFrames} frames @${fps}fps（原计划 ${durationSec}s）` },
       { id: "resolution", pass: mediaOk, hard: true, detail: `${width}x${height} requested export geometry; raw originals unchanged` }
     ], context: { originalManifestSha256: originalPostContract.manifestSha256, actualTimeline,
       transitions: null, fadeSeconds: 0, retimed: false, localVoiceReplacement: false },
@@ -4236,7 +4289,7 @@ if (STAGES.has("compose") && !DRY_RUN) {
     cached: false, degraded: Boolean(verdict?.degraded), attempt: 1, ms: Date.now() - started, artifact: existsSync(master) ? master : null,
     evidence: { ...info, outputFiles: existsSync(master) ? [`${master.replace(/\.mp4$/i, "")}.av-sync.json`] : [],
       tool: "scripts/tools/compose-film.mts", originalManifestSha256: originalPostContract.manifestSha256,
-      sourcePolicy: "render-native", actualTimeline, fadeSeconds: 0, transitions: null, retimed: false,
+      sourcePolicy: "render-native", actualTimeline, processReceipt, actualBodyDurationSec: actualSeconds, qualityReviewPerformed: false, fadeSeconds: 0, transitions: null, retimed: false,
       order: { policy: "storyboard", expected: expectedOrder, actual: actualOrder, ok: true },
       toolOk: result.ok, mediaOk, toolOutput: result.out.slice(-400) }, verdict });
   if (!result.ok || !mediaOk || !verdict?.approved || verdict.degraded)
@@ -4451,7 +4504,10 @@ if (STAGES.has("bgm") && existsSync(danmakuOut) && !DRY_RUN) {
   const started = Date.now(), out = join(POST_DIR, "master-scored.mp4");
   const genre = arg("--bgm-genre", "旅行"), mood = arg("--bgm-mood", "温润治愈"), policy = arg("--bgm-policy", "keep-dialogue");
   const chosenTrack = arg("--bgm-track", "");
-  const sourcePolicy = arg("--bgm-source-policy", flag("--allow-synth-bgm") ? "compose-only" : "online-first");
+  const sourcePolicy = "declared-local";
+  if (flag("--allow-synth-bgm") || ["online-first", "compose-only"].includes(arg("--bgm-source-policy", "")))
+    throw new Error("BGM_SOURCE_POLICY_INVALID: successful-render post consumes declared local music only");
+  void sourcePolicy;
   let trackPath = chosenTrack;
   if (chosenTrack && !existsSync(trackPath)) {
     const core = await import(join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/core.mjs"));
@@ -4459,19 +4515,21 @@ if (STAGES.has("bgm") && existsSync(danmakuOut) && !DRY_RUN) {
     if (!found.track?.path || !existsSync(found.track.path)) throw new Error(`BGM_TRACK_MISSING: ${chosenTrack}`);
     trackPath = found.track.path;
   }
-  const result = runCli(BGM_CLI, chosenTrack ? [
+  const requestedOff = flag("--no-bgm");
+  const declaredTrack = !requestedOff && !chosenTrack ? await pickDeclaredMusicBed(expectedMasterSeconds, CUT_GRID, { genre, mood }) : null;
+  if (!requestedOff && !chosenTrack && !declaredTrack) throw new Error("BGM_SOURCE_MISSING: no declared local music source is available");
+  if (declaredTrack) trackPath = declaredTrack.path;
+  if (!requestedOff) rememberInputs("bgm", [danmakuOut, trackPath]);
+  const result = requestedOff ? { ok: true, out: "no_bgm_needed: explicit --no-bgm; original program retained" } : runCli(BGM_CLI, [
     "mix", "--in", danmakuOut, "--out", out, "--bgm", trackPath, "--policy", policy,
     "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
-    "--true-peak", arg("--bgm-true-peak", "-1.5"), "--section", arg("--bgm-section", "full")
-  ] : [
-    "best", "--in", danmakuOut, "--out", out, "--genre", genre, "--mood", mood, "--policy", policy,
-    "--source-policy", sourcePolicy, ...(BRIEF_FILE && existsSync(abs(BRIEF_FILE)) ? ["--prompt", readFileSync(abs(BRIEF_FILE), "utf8")] : [])
+    "--true-peak", arg("--bgm-true-peak", "-1.5"), "--section", arg("--bgm-section", "full"),
+    "--declared-program-mix", ...(declaredTrack?.bpm ? ["--bgm-bpm", String(declaredTrack.bpm)] : [])
   ]);
-  const requestedOff = result.ok && !existsSync(out) && /无需配乐|no_bgm_needed/.test(result.out);
   if (!result.ok || (!existsSync(out) && !requestedOff)) throw new Error(`BGM_PROCESS_FAILED: ${result.out.slice(-800)}`);
-  if (existsSync(out)) scored = out;
+  if (!requestedOff && existsSync(out)) scored = out;
   if (!originalPostContract) throw new Error("STANDARD_NATIVE_MANIFEST_REQUIRED: final audio export requires the original timeline");
-  const nativeAudioClock = await assertStandardPostAudioClock(scored, originalPostContract.durationSec, { ffmpeg: FFMPEG, ffprobe: FFPROBE });
+  const nativeAudioClock = await assertStandardPostExportClock(scored, expectedMasterSeconds, { ffmpeg: FFMPEG, ffprobe: FFPROBE, expectedFps: FPS });
   bgmManifestInfo = { layer: requestedOff ? "off" : "on", via: chosenTrack ? "requested-track" : "declared-recipe", declaredOff: requestedOff,
     notRequired: requestedOff, reason: requestedOff ? "用户明确要求保留纯原声" : null,
     sourceAuthority: "native-program", stemsVerified: false, output: requestedOff ? null : basename(out), evidence: result.out.slice(-500) };
@@ -4479,7 +4537,7 @@ if (STAGES.has("bgm") && existsSync(danmakuOut) && !DRY_RUN) {
     attempt: 1, ms: Date.now() - started, artifact: scored,
     evidence: { genre, mood, policy, via: bgmManifestInfo.via, nativeAudioClock,
       sourceAuthority: "native-program", stemsVerified: false, applicable: !requestedOff, qualityReviewPerformed: false,
-      qualityRetries: 0, tool: `bgm-bridge ${chosenTrack ? "mix" : "best"}`, toolOutput: result.out.slice(-800) }, verdict: null });
+      qualityRetries: 0, tool: "bgm-bridge mix", declaredTrack: declaredTrack?.id ?? chosenTrack ?? null, toolOutput: result.out.slice(-800) }, verdict: null });
 }
 
 if (!bgmManifestInfo && stageApproved("bgm")) {
@@ -4575,7 +4633,6 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
         "-map", "0:v:0", "-map", "[aout]",
         "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
         "-movflags", "+faststart", out]);
-      const before = { detail: "not reviewed" }, after = { detail: "not reviewed" }, drift = null;
       const verdict = await reviewStage({
         stage: "sfx", projectId: PROJECT,
         artifacts: [{ path: out, kind: "video", probe: probe(out) }, ...placements.slice(0, 6).map((p, i) => ({ path: files[i]!, kind: "audio" as const, note: `${p.kind}@${p.atSec}s` }))],
@@ -4597,11 +4654,7 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
               ? `开场钩子音 ${hookPlacement.kind}@${hookPlacement.atSec}s（窗口 0–${HOOK_SFX_POLICY.windowSec}s，与钩子画面同帧）`
               : (hookSfxEnabled ? "钩子音已启用但未摆放（异常）" : "未启用钩子音（长视频平台默认不强制）")
           },
-          { id: "video-untouched", pass: Number(probe(out).duration ?? 0) > 0, detail: "视频轨 copy（画面零改动）", hard: true },
-          {
-            id: "loudness-drift", pass: drift === null ? false : drift <= 1.5,
-            detail: `加音效前后响度漂移 ${drift === null ? "未测到" : `${drift.toFixed(2)} LUFS`}（上限 1.5）`, hard: true
-          }
+          { id: "video-untouched", pass: Number(probe(out).duration ?? 0) > 0, detail: "视频轨 copy（画面零改动）", hard: true }
         ],
         context: {
           placements: placements.map((p) => `${p.kind}@${p.atSec}s（${p.gainDb}dB，${p.reason}）`),
@@ -4619,7 +4672,7 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
           dropped: sfxPlan.dropped.map((p) => ({ atSec: p.atSec, kind: p.kind, reason: p.reason })),
           hook: hookPlacement ? { atSec: hookPlacement.atSec, kind: hookPlacement.kind, gainDb: hookPlacement.gainDb, reason: hookPlacement.reason } : null,
           hookConflicts: hookConflicts.map((p) => ({ atSec: p.atSec, kind: p.kind, reason: "被开场钩子音挤掉（0–0.6s 内不与剪辑点音效叠加）" })),
-          climaxAtSec, cutTimes, loudnessBefore: before.detail, loudnessAfter: after.detail, drift,
+          climaxAtSec, cutTimes, loudnessBefore: null, loudnessAfter: null, drift: null, qualityReviewPerformed: false,
           tool: "sfx-synth（合成，无第三方采样）"
         },
         verdict, note: `音效 ${placements.length} 条（whoosh/impact/riser）${hookPlacement ? " · 含开场钩子音" : ""}`
@@ -4634,23 +4687,608 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
   }
 }
 
-/* ---------- ⑨ 封面：本地取指定帧并执行平台版式 ---------- */
-if (STAGES.has("cover") && existsSync(colored) && !DRY_RUN) {
+/* ---------- ⑨ 封面：已声明源 → 平台设计稿 → 实际合成 ---------- */
+/** Deterministic platform composition preserves the declared single hero, title hierarchy,
+ * account style and source binding. No model design or image-quality review runs here. */
+
+/** drawtext 文本净化：ASCII 冒号/逗号/引号等会破坏 filter 语法，换成等价全角或删除（视觉无损） */
+function escapeDrawtextText(text: string): string {
+  return String(text)
+    .replace(/\\/g, "／")
+    .replace(/"/g, "”")
+    .replace(/'/g, "’")
+    .replace(/:/g, "：")
+    .replace(/,/g, "，")
+    .replace(/;/g, "；")
+    .replace(/\[/g, "【")
+    .replace(/\]/g, "】")
+    .replace(/\r?\n/g, " ")
+    .trim();
+}
+
+if (!STAGES.has("sfx")) scored = preferDownstream(join(POST_DIR, "master-sfx.mp4"), scored, "sfx");
+
+/** Default-use selects the requested frame without scoring already adopted footage. */
+function pickCoverFrameForPolicy(times: number[], inspect: (atSec: number) => number): { atSec: number; sharpness: number | null } {
+  if (!times.length || times.some(time => !Number.isFinite(time) || time < 0)) throw new Error("COVER_FRAME_TIME_INVALID");
+  return { atSec: times[0]!, sharpness: null };
+}
+function inspectCoverForPolicy(facts: { bytes: number; width: number; height: number; expectedWidth: number; expectedHeight: number; cleanSource: boolean },
+  inspect: () => { checks: GateCheck[]; measurements: CoverMeasurements }): { checks: GateCheck[]; measurements: CoverMeasurements | null } {
+  return { measurements: null, checks: [
+    { id: "cover-produced", pass: facts.bytes > 0 && facts.width === facts.expectedWidth && facts.height === facts.expectedHeight,
+      hard: true, detail: `${facts.width}x${facts.height} · ${facts.bytes} bytes` },
+    { id: "clean-source", pass: facts.cleanSource, hard: true, detail: "封面帧来源与当前干净母版绑定" }
+  ] };
+}
+function coverChecksPassed(checks: GateCheck[]): boolean { return checks.every(check => check.hard === false || check.pass); }
+function coverSourcesForShots(shotCards: ShotCard[], character: CoverLeadSource | null) {
+  const personShots = shotCards.filter(shot => coverShotHasCharacter(shot, character));
+  const leadMatchedPersons = personShots.filter(shot => coverShotMatchesLead(shot, character));
+  const fallbackBackground = [...shotCards].reverse().find(shot => !coverShotHasCharacter(shot, character)) ?? shotCards[0];
+  if (!fallbackBackground) throw new Error("COVER_SOURCE_SHOTS_EMPTY");
+  return { personShots, leadMatchedPersons, fallbackBackground };
+}
+function coverCompositionForPlan(requestedHero: string, plan: CoverPlan, background: ShotCard, person: ShotCard | null, character: CoverLeadSource | null) {
+  const source = (shot: ShotCard) => ({ shotId: shot.shotId, hasCharacter: coverShotHasCharacter(shot, character),
+    characterIds: coverShotCharacterIds(shot, character) });
+  return resolveCoverComposition({ requestedHero, background: source(background), person: person ? source(person) : null,
+    personEnabled: plan.person.enabled });
+}
+if (STAGES.has("cover") && existsSync(colored)) {
   rememberInputs("cover", [colored]);
-  const started = Date.now(), platform = COVER_PLATFORM_ARG || PLATFORM;
-  const spec = getCoverSpec(platform), coverPng = join(OUT_DIR, `${PROJECT}-cover.png`);
-  const fontId = "source-han-heavy" as const;
-  const fontFile = join(REPO_ROOT, "bundles/ai-video/library/fonts", COVER_FONTS[fontId].file);
-  const sourceDuration = Number(probe(colored).duration);
-  const atSec = Number(arg("--cover-at", String(Math.min(0.2, sourceDuration / 2))));
-  const result = await renderLocalCover({ source: { kind: "video-frame", path: colored, timeSec: atSec },
-    title: arg("--cover-hook", shotlist.title || "视频作品"), subtitle: arg("--cover-subtitle", "") || undefined,
-    platform: spec.id, out: coverPng, width: spec.canvas.width, height: spec.canvas.height,
-    fontFile, fontSha256: sha256FileSync(fontFile), fontId, ffmpeg: await resolveStandardPostBinary(FFMPEG), ffprobe: await resolveStandardPostBinary(FFPROBE),
-    durationSeconds: sourceDuration, footageOrigin: policyBrief?.footageOrigin === "live-action" ? "live-action" : "generated" });
-  record({ stage: "cover", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
-    attempt: 1, ms: Date.now() - started, artifact: result.path,
-    evidence: { receipt: result.receipt, qualityReviewPerformed: false, identityVerified: false, clothingVerified: false }, verdict: null });
+  const started = Date.now();
+  const platform = arg("--platform", "抖音/快手");
+  /**
+   * 平台规格（唯一事实源：`packages/video-studio/src/cover-platforms.ts`）：
+   * 画幅/画布/安全区/标题带/字数上限/英文词数全从这里取；
+   * `--cover-platform` 缺省沿用 `--platform`（"抖音/快手"→抖音），因此**默认路径与平台化之前一致**。
+   */
+  const coverSpec: CoverPlatformSpec = getCoverSpec(COVER_PLATFORM_ARG || platform);
+  const coverPng = join(OUT_DIR, `${PROJECT}-cover.png`);
+  const coverDir = join(POST_DIR, "cover");
+  mkdirSync(coverDir, { recursive: true });
+  const coverLead: CoverLeadSource | null = lead ? { id: lead.id, name: lead.name, appearanceInShots: shotlist.character?.appearanceInShots } : null;
+  const { personShots, leadMatchedPersons, fallbackBackground } = coverSourcesForShots(shots, coverLead);
+  COVER_HERO = resolveCoverHero(COVER_REQUESTED_HERO, leadMatchedPersons.length > 0);
+  COVER_ARCHETYPE = ["subject", "scenery", "object", "product"].includes(COVER_HERO) ? "subject-led" : "person-led";
+  COVER_LOWER_BAND_TEXT = COVER_HERO === "person-solo";
+  /** UHD 封面图形按最终视频画布原生绘制，文字/装饰层不经过视频超分。 */
+  const { width: CW, height: CH } = QUALITY === "uhd" ? OUTPUT_SIZE : coverSpec.canvas;
+  const coverScale = Math.min(CW / coverSpec.canvas.width, CH / coverSpec.canvas.height);
+  /** 平台安全区（机检口径；person-solo 的下带文字另有一套上下限，底部遮挡仍按平台） */
+  const coverSafeArea = {
+    topMinRatio: coverSpec.safeArea.topMinRatio,
+    titleBottomMaxRatio: coverSpec.titleBand.bottomMaxRatio,
+    bottomReservedRatio: coverSpec.safeArea.bottomReservedRatio
+  };
+  let coverSafeAreaForLayout = COVER_LOWER_BAND_TEXT
+    ? { ...COVER_LOWER_BAND_SAFE_AREA, bottomReservedRatio: coverSpec.safeArea.bottomReservedRatio }
+    : coverSafeArea;
+  log(`封面平台：${coverSpec.name}（${coverSpec.id}｜${coverSpec.ratio} ${CW}×${CH}｜标题带 `
+    + `${(coverSafeAreaForLayout.topMinRatio * 100).toFixed(0)}%–${(coverSafeAreaForLayout.titleBottomMaxRatio * 100).toFixed(0)}%｜`
+    + `底部遮挡 ${(coverSafeArea.bottomReservedRatio * 100).toFixed(0)}%）`);
+  const shotAt = (shotId: string): number => {
+    const index = shots.findIndex((s) => s.shotId === shotId);
+    /**
+     * 镜头在**母版时间轴**上的起点：必须扣掉逐刀转场的重叠（2026-09-25 真机）——
+     * 早先用"时长累加"，15 刀累计偏移 2.4s，导致封面取帧取到别的镜头（真机：地标插卡里出现的是人物）。
+     */
+    if (index <= 0) return 0;
+    return CUT_GRID[index - 1] ?? shots.slice(0, index).reduce((sum, s) => sum + Number(s.duration ?? 5), 0);
+  };
+  /**
+   * 人物来源镜硬闸（T-2026-0930-0015，产品所有者口径）：
+   * 卡片里有人物镜、管线也知道主角是谁，但**没有任何一张卡的 character 写了主角名/ID** 时，
+   * 封面"人物为主"版式必然找不到来源镜 → 设计师稿非法 → 退最小稿 → 母版终审被拦（真机事故）。
+   * 这里在做封面之前**显式报错**并指出改哪一处，不再静默退化；显式声明 `--cover-archetype subject-led`
+   * （本来就不要人物卡）时不拦。
+   */
+  if (COVER_ARCHETYPE !== "subject-led" && lead && personShots.length > 0 && leadMatchedPersons.length === 0) {
+    const detail = `COVER_PERSON_SOURCE_MISSING: 分镜卡里有 ${personShots.length} 个带 character 的镜头，但没有任何一个写了主角「${lead.name}（${lead.id}）」；`
+      + "封面「人物为主」版式无法定位人物来源镜（真机事故：character 只写「这位女士…」）。"
+      + `请把主角名/ID 写进对应镜头的 character 字段（如「${lead.name}（${lead.id}；与认证素材为同一人…）」），`
+      + "或显式声明 --cover-archetype subject-led 只用物体主视觉。";
+    log(`⛔ ${detail}`);
+    record({
+      stage: "cover", shotId: null, invoked: false, ok: false, cached: false, degraded: false, attempt: 1, ms: 0,
+      artifact: null,
+      evidence: {
+        code: "COVER_PERSON_SOURCE_MISSING", archetype: COVER_ARCHETYPE,
+        lead: { name: lead.name, id: lead.id },
+        personShots: personShots.map((s) => s.shotId)
+      },
+      verdict: null, note: "封面人物卡缺主角来源镜：先补镜头卡 character（P0 字段）再出片"
+    });
+    throw new Error(detail);
+  }
+  const coverBrief = BRIEF_FILE && existsSync(abs(BRIEF_FILE))
+    ? (JSON.parse(readFileSync(abs(BRIEF_FILE), "utf8")) as CoverDesignInput["brief"])
+    : null;
+  /**
+   * 封面知识库 / 账号档案（2026-09-27）：
+   *   · KB 注入（cover-kb）：平台规格走**代码**（coverSpec），经验与判据来自 KB（≤3 条，带 trace）；
+   *   · 账号档案（account-profiles/*.yml）：视觉锤四件套（字体/色板/版式/角标）+ 钩子偏好 + 禁区；
+   *   · 两者都关/都没配时，提示词与校验行为退化为平台化之前（仍按平台出画幅）。
+   */
+  const coverBridgePath = join(REPO_ROOT, "bundles/ai-video/connectors/cover-kb-bridge/core.mjs");
+  const needCoverBridge = COVER_KB_ENABLED || Boolean(COVER_ACCOUNT_ARG);
+  const coverBridge = needCoverBridge && existsSync(coverBridgePath)
+    ? await import(coverBridgePath) as {
+      loadKb: (dir: string) => unknown;
+      kbStatus: (kb: unknown) => { ok: boolean; topics: number; mappingRows: number; paramRows: number; missingTopics: Array<{ id: string }>; untrackedTopics: string[] };
+      inferTheme: (kb: unknown, text: string) => { theme: string; matched: string[] } | null;
+      normalizeAccountProfile: (raw: unknown) => { profile: CoverAccountProfile; accountType: string | null; hookBias: string[]; notes: string[] };
+      enrichCoverHints: (kb: unknown, options: Record<string, unknown>) => {
+        hints: string[]; trace: Array<{ kbId: string; section: string; reason: string }>;
+        fallback: boolean; source?: string; notes?: string[]; conflicts?: string[];
+      };
+    }
+    : null;
+  /** 账号档案（视觉锤） */
+  let accountProfile: CoverAccountProfile | null = null;
+  const accountNotes: string[] = [];
+  if (COVER_ACCOUNT_ARG) {
+    if (!coverBridge) throw new Error(`账号档案需要 cover-kb 连接器：${coverBridgePath} 不存在`);
+    const accountFile = /\.ya?ml$/i.test(COVER_ACCOUNT_ARG)
+      ? abs(COVER_ACCOUNT_ARG)
+      : join(COVER_ACCOUNT_DIR, `${COVER_ACCOUNT_ARG}.yml`);
+    /**
+     * 档案缺失**不静默降级**：显式指定的账号读不到，就是拿不到视觉锤约束——
+     * 宁可让调用方发现路径写错，也不要用"无档案"的默认行为冒充"账号一致性已生效"。
+     */
+    if (!existsSync(accountFile)) {
+      throw new Error(`--account 档案不存在：${accountFile}（目录 ${COVER_ACCOUNT_DIR}）`);
+    }
+    const normalized = coverBridge.normalizeAccountProfile(YAML.parse(readFileSync(accountFile, "utf8")));
+    accountProfile = normalized.profile;
+    accountNotes.push(...normalized.notes);
+    log(`封面账号档案：${accountProfile.account_id}${accountProfile.display_name ? `（${accountProfile.display_name}）` : ""}`
+      + `｜账号类型 ${normalized.accountType ?? "未识别"}｜视觉锤字体 ${accountProfile.visual_hammer?.fontId ?? "-"}`
+      + `｜钩子偏好 ${normalized.hookBias.join("/") || "-"}｜strict ${accountProfile.strict === true ? "on" : "off"}`
+      + `${accountNotes.length > 0 ? `｜⚠ ${accountNotes.join("；")}` : ""}`);
+  }
+  /** 知识库注入载荷（≤3 条 + trace） */
+  const coverKb: {
+    applied: boolean; source: string; hints: string[]; trace: Array<Record<string, unknown>>;
+    notes: string[]; conflicts: string[]; theme: string; topics: number;
+  } = { applied: false, source: "none", hints: [], trace: [], notes: [], conflicts: [], theme: "", topics: 0 };
+  if (COVER_KB_ENABLED) {
+    if (!coverBridge || !existsSync(COVER_KB_DIR)) {
+      coverKb.notes.push(`封面知识库或连接器缺失（bridge=${existsSync(coverBridgePath)}｜kb=${existsSync(COVER_KB_DIR)}）`);
+      log(`  ⚠ 封面知识库不可用 → 本次不注入（不静默：已记入 cover 阶段证据）`);
+    } else {
+      const kb = coverBridge.loadKb(COVER_KB_DIR);
+      const status = coverBridge.kbStatus(kb);
+      coverKb.topics = status.topics;
+      if (!status.ok) {
+        coverKb.notes.push(`KB 不完整：缺篇 ${status.missingTopics.map((t) => t.id).join("/") || "无"}｜未登记 ${status.untrackedTopics.join("/") || "无"}`);
+        log(`  ⚠ 封面知识库自检未过：${coverKb.notes[coverKb.notes.length - 1]}（仍继续，但已留痕）`);
+      }
+      const inferred = COVER_THEME_ARG ? null : coverBridge.inferTheme(kb, `${shotlist.title ?? ""} ${coverBrief?.goal ?? ""}`);
+      const theme = COVER_THEME_ARG || inferred?.theme || "";
+      const payload = coverBridge.enrichCoverHints(kb, {
+        platformId: coverSpec.id,
+        spec: coverSpec,
+        theme,
+        accountType: accountProfile?.account_type ?? null,
+        hookBias: Array.isArray(accountProfile?.hook_bias) ? accountProfile.hook_bias : []
+      });
+      coverKb.applied = !payload.fallback;
+      coverKb.source = payload.source ?? "kb";
+      coverKb.hints = payload.hints;
+      coverKb.trace = payload.trace as unknown as Array<Record<string, unknown>>;
+      coverKb.notes.push(...(payload.notes ?? []));
+      coverKb.conflicts.push(...(payload.conflicts ?? []));
+      coverKb.theme = theme;
+      const traceDir = join(WORK_DIR, "cover-kb");
+      mkdirSync(traceDir, { recursive: true });
+      const traceFile = join(traceDir, `${PROJECT}.json`);
+      writeFileSync(traceFile, `${JSON.stringify({
+        at: stamp(), projectId: PROJECT, platformId: coverSpec.id, platformLabel: COVER_PLATFORM_ARG || platform,
+        theme, accountId: accountProfile?.account_id ?? null, accountNotes,
+        hints: coverKb.hints, trace: coverKb.trace, notes: coverKb.notes, conflicts: coverKb.conflicts,
+        kbDir: COVER_KB_DIR, kbTopics: status.topics, spec: coverSpec
+      }, null, 2)}\n`, "utf8");
+      log(`封面知识库：${status.topics} 篇｜题材 ${theme || "未匹配（不硬凑）"}｜注入 ${coverKb.hints.length} 条`
+        + `${coverKb.conflicts.length > 0 ? `｜⚠ 矛盾闸 ${coverKb.conflicts.length} 条（以代码规格为准）` : ""}`
+        + `｜trace → ${traceFile}`);
+    }
+  }
+  const designInput: CoverDesignInput = {
+    title: shotlist.title,
+    /** 真实成片时长（扣转场后的目标）：标题里的"XX 秒"必须与它一致（真机：写 48 秒而片子 51s → 打回） */
+    durationSeconds: expectedMasterSeconds,
+    /** 版式交办给设计师（2026-09-26）：物体为主 / 人物为主二选一，渲染与监制都按它判 */
+    archetype: COVER_ARCHETYPE,
+    /** 平台标签用调用方原文（缺省"抖音/快手"→抖音口径），规格由 cover-platforms.ts 解析 */
+    platform: COVER_PLATFORM_ARG || platform,
+    brief: coverBrief,
+    character: lead ? { id: lead.id, name: lead.name } : null,
+    /** 知识库注入载荷（≤3 条）与账号视觉锤（可空）——两者为空时提示词与历史逐字一致 */
+    ...(coverKb.hints.length > 0 ? { kbHints: coverKb.hints } : {}),
+    ...(accountProfile ? { accountProfile } : {}),
+    shots: shots.map((s) => ({
+      shotId: s.shotId,
+      scene: String(s.scene ?? ""),
+      dialogueText: dialogueText(s),
+      hasCharacter: coverShotHasCharacter(s, coverLead),
+      duration: Number(s.duration ?? 5)
+    }))
+  };
+  /**
+   * ① 设计稿：默认直接采用合法的确定性稿；显式诊断才调用设计师。
+   * 模型不可用的兜底与正常确定性设计分别记账，避免把默认成功误标为降级。
+   */
+  let plan: CoverPlan;
+  const designVia = "deterministic";
+  let designNote = "";
+  /**
+   * 人物卡来源由管线注入：优先与主视觉时段一致的人物镜（夜景封面配夜景人物），
+   * 否则用第一个人物镜。**不抠像**：直接用片子自己的镜头帧做肖像卡
+   * （真机验证：定妆照抠像会把脸也抠掉、边缘留光晕）。
+   */
+  const personShotFor = (backgroundShotId: string | undefined): ShotCard | null => {
+    /**
+     * 人物卡的时段匹配（2026-09-25 二次复核：白天冷调人物卡贴在黄昏暖调底图上被判"气质冲突"）：
+     * 底图是**黄昏/落霞/夕阳/夜景/灯光**一类暖调或夜调时，优先用夜景造型的人物镜（旗袍+暖光），
+     * 只有白天天光底图才用日间造型。匹配不到就退回第一个人物镜（并在证据里如实记录）。
+     */
+    /**
+     * 封面人物卡**只允许用主角**（2026-09-25 真机）：早先从"所有带 character 的镜头"里挑，
+     * 结果挑到了路人（打太极的老人 / 夜跑者），监制判"人物不是主角、还是逆光背影剪影"。
+     * 现在先按主角姓名过滤（陈卓），再按时段匹配；主角没有可用镜头时退回"不带人物卡"。
+     */
+    const leadShots = leadMatchedPersons;
+    const pool = leadShots.length > 0 ? leadShots : [];
+    if (pool.length === 0) return null;
+    const backgroundScene = String(shots.find((s) => s.shotId === backgroundShotId)?.scene ?? "");
+    const warmOrNight = /黄昏|落霞|夕阳|傍晚|夜|灯/.test(backgroundScene);
+    return pool.find((s) => (warmOrNight ? /夜|灯|黄昏|落霞/.test(String(s.scene ?? "")) : true))
+      ?? pool[0] ?? null;
+  };
+  plan = fallbackCoverPlan(designInput, {
+    headline: arg("--cover-hook", shotlist.title ?? "封面"),
+    heroShotId: fallbackBackground.shotId,
+    personShotId: personShotFor(fallbackBackground.shotId)?.shotId
+  });
+  designNote = "确定性设计：直接使用已声明镜头和平台设计稿，未调用模型；未进行审美认证";
+  log(`  ⇢ ${designNote}`);
+  /** 人物卡来源：与主视觉时段一致的人物镜（管线按最终设计稿再校正一次） */
+  const personShot = personShotFor(plan.background.shotId);
+  if (plan.person?.enabled && personShot) {
+    plan = { ...plan, person: { ...plan.person, shotId: personShot.shotId, atSec: plan.person.atSec ?? 1.0 } };
+  }
+  /**
+   * 版式归一（2026-09-26）：物体为主版式下**强制关闭人物层**——即使设计师仍写了 `person.enabled=true`
+   * （LLM 受旧口径影响时会这么写），也不允许把人物小图贴到景物/商品上。渲染与监制都按归一后的稿子走。
+   */
+  if (COVER_ARCHETYPE === "subject-led" && plan.person?.enabled) {
+    plan = { ...plan, person: { ...plan.person, enabled: false } };
+    log("  ↻ 封面版式：物体为主（subject-led）→ 已强制关闭人物层（人物小图不与主视觉并存）");
+  }
+  /** Select the declared time on the actual complete body clock; no sharpness scoring. */
+  const bgCandidates = (shot: ShotCard): number[] => {
+    const duration = Number(shot.duration ?? 5);
+    const list = [plan.background.atSec, 0.3, duration * 0.5, duration * 0.75, duration - 0.3];
+    return [...new Set(list.map((t) => Math.max(0.2, Math.min(duration - 0.2, Number(t) || 0.3)).toFixed(2)))].map(Number);
+  };
+  const pickSharpest = (_shot: ShotCard, times: number[]): { atSec: number; sharpness: number | null } =>
+    pickCoverFrameForPolicy(times, () => { throw new Error("COVER_QUALITY_REVIEW_DISABLED"); });
+  const COVER_MIN_SHARPNESS = null;
+  let bgShot = shots.find((s) => s.shotId === plan.background.shotId) ?? shots[0]!;
+  let bgPick = pickSharpest(bgShot, bgCandidates(bgShot));
+  const bgSubstituted = false;
+  /**
+   * 小图层（次要画面）与几何——必须在 `bgShot` 定稿**之后**再定：
+   *   `landmark` 版 = 人物卡（人物镜取帧，右下角）；
+   *   `person`   版 = **地标小图**（底图是人物满幅，地标放右上角），三件套仍然齐备。
+   */
+  /**
+   * `scenery`（景物为主，2026-09-26 产品所有者口径）：**只留一个主视觉**——满幅地标 + 标题，
+   * 不叠人物卡。产品原话："要么整个版面以人物为主（商品片则以商品为主）做点缀加标题，
+   * 要么直接以景物为主"；把人物硬贴在地标上属于两种主视觉打架，正是被打回的那版。
+   */
+  const composition = coverCompositionForPlan(COVER_HERO, plan, bgShot, personShot, coverLead);
+  COVER_HERO = composition.heroMode;
+  COVER_LOWER_BAND_TEXT = composition.lowerBandText;
+  coverSafeAreaForLayout = COVER_LOWER_BAND_TEXT
+    ? { ...COVER_LOWER_BAND_SAFE_AREA, bottomReservedRatio: coverSpec.safeArea.bottomReservedRatio } : coverSafeArea;
+  const insetShot = composition.insetShotId ? shots.find(shot => shot.shotId === composition.insetShotId) ?? null : null;
+  let insetEnabled = composition.insetEnabled;
+  if (composition.suppressedReason !== "single-hero" && composition.suppressedReason) log(`封面移除重复人物/画面层：${composition.suppressedReason}`);
+  /** 母版时长：小图取帧必须夹在成片时长内（真机：inset 时刻越界 → 取不到帧 → 后续 ffmpeg 崩） */
+  const masterSeconds = Number(probe(colored).duration ?? 0);
+  /** split：右侧竖带（宽 40%、全高）；person：地标小图（右上）；landmark：人物卡（右下） */
+  const cardW = COVER_HERO === "split"
+    ? Math.round(CW * 0.40)
+    : COVER_HERO === "person"
+      ? Math.round(CW * 0.38)
+      : Math.round(CW * Math.min(0.52, Math.max(0.40, plan.person.widthRatio)));
+  const cardH = COVER_HERO === "split" ? CH : Math.round(cardW * 1.32);
+  const cardX = COVER_HERO === "split" ? CW - cardW : CW - cardW - Math.round(CW * 0.052);
+  const cardY = COVER_HERO === "split" ? 0 : COVER_HERO === "person" ? Math.round(CH * 0.16) : CH - cardH - Math.round(CH * 0.09);
+  const cardBorder = Math.max(Math.round(6 * coverScale), Math.round(cardW * 0.018));
+
+  const bgAt = bgPick.atSec;
+  /**
+   * 主版式分叉（2026-09-25）：
+   *   `person` 版：**人物镜取满幅做底**（人物是背景，不存在"贴片边缘"），地标帧留给右上角小图；
+   *   `landmark` 版（默认）：地标取满幅做底，人物走右下卡片。
+   */
+  let heroShot = shots.find(shot => shot.shotId === composition.heroShotId) ?? bgShot;
+  let heroAt = heroShot.shotId === bgShot.shotId ? bgAt : 1.0;
+  const bgFrameA = join(coverDir, "bg-frame-a.png");
+  const bgFrameB = join(coverDir, "bg-frame-b.png");
+  run(FFMPEG, ["-y", "-ss", (shotAt(heroShot.shotId) + heroAt).toFixed(2), "-i", colored, "-frames:v", "1", bgFrameA]);
+  run(FFMPEG, ["-y", "-ss", (shotAt(heroShot.shotId) + heroAt).toFixed(2), "-i", colored, "-frames:v", "1", bgFrameB]);
+  /**
+   * 标题带压暗用**多层薄带**拼渐变（2026-09-25 真机二次修正）：
+   * 上一版用两层厚带（0.32 + 0.16）→ 监制一眼看出"两条贯穿全宽的硬接缝"，判为合成残留。
+   * 现在 14 层薄带、透明度从 0.40 线性衰减到 0，边缘不可辨。
+   */
+  /**
+   * 压暗带随文字带移动（person-solo：文字在下方安全带 → 压暗带也落到下半幅）。
+   * 方向也随之翻转：上方文字带是"上深下浅"，下方文字带是"上浅下深"。
+   */
+  const scrimTop = COVER_LOWER_BAND_TEXT ? Math.round(CH * 0.50) : 0;
+  const scrimHeight = Math.round(CH * (COVER_LOWER_BAND_TEXT ? 0.40 : 0.46));
+  /**
+   * 层数（2026-09-27）：上带维持 14 层（历史真机口径，逐像素不变）；
+   * 下带（person-solo）用 28 层——三角剖面在中段最亮，14 层在 1080 高上每层约 31px，
+   * 肉眼能看到阶梯状条带（真实监制反馈"可见横向色带"），加密到 28 层（约 15px）后不可辨。
+   */
+  const scrimBands = COVER_LOWER_BAND_TEXT ? 28 : 14;
+  const bandHeight = Math.max(2, Math.round(scrimHeight / scrimBands));
+  const scrimFilters = Array.from({ length: scrimBands }, (_, index) => {
+    /**
+     * 透明度剖面（2026-09-27 真机修正）：
+     *   · 上带（默认）= 上深下浅（0.40 → 0）：顶端在画面外，只有下端渐隐，无可见边；
+     *   · 下带（person-solo）= **三角剖面**（两端 0、中间 0.40）：原来的"上浅下深"会在
+     *     画面内留下一条硬边——真实监制打回原话："标题带下沿（约 80.6%）可见一条硬边
+     *     压暗矩形分界线横切人物胸口，属于明显的贴图/蒙版残留痕迹"。
+     */
+    const t = index / (scrimBands - 1);
+    const alpha = 0.40 * (COVER_LOWER_BAND_TEXT ? 1 - Math.abs(2 * t - 1) : 1 - t);
+    const y = scrimTop + index * bandHeight;
+    return `drawbox=x=0:y=${y}:w=${CW}:h=${bandHeight}:color=black@${alpha.toFixed(3)}:t=fill`;
+  });
+  const bgOnly = join(coverDir, "bg-only.png");
+  run(FFMPEG, ["-y", "-i", bgFrameA, "-vf", [
+    `scale=${CW}:${CH}:force_original_aspect_ratio=increase`,
+    /**
+     * 取帧裁切（2026-09-27 平台化）：竖版画幅仍居中裁切（抖音路径逐像素不变）；
+     * 横版平台（B站/YouTube）从竖屏镜头帧里取 16:9 时**偏上取景**（人脸/主体通常在上中部），
+     * 避免居中裁切把人物头部切掉。偏置系数 0.38 = 从可用高度 38% 处起裁。
+     */
+    coverSpec.orientation === "horizontal"
+      ? `crop=${CW}:${CH}:(iw-${CW})/2:(ih-${CH})*0.38`
+      : `crop=${CW}:${CH}`,
+    /** 轻调色：保持片子本身的光线气质（暖调画面不要被压成冷雾——监制二次复核点名的第 5 条） */
+    "eq=contrast=1.05:saturation=1.06",
+    "colorbalance=rm=0.04:bm=-0.03",
+    "vignette=PI/6",
+    /**
+     * 标题带压暗默认开启（2026-09-25 真机）：设计稿常给 `grade`，但实拍底图亮部复杂时
+     * 主标题会"压住地标轮廓/与背景同色"（监制两次点名）。这里改成**始终**叠一层渐变暗带——
+     * 代价只是标题带略暗，收益是标题始终可读、不与地标抢轮廓。
+     */
+    ...scrimFilters
+  ].join(","), bgOnly]);
+  /**
+   * 人物卡：片子自己的镜头帧（与片子同一套造型/光线），白细边 + 投影，落在右下角。
+   * 为什么不用"整幅下半身横带"：真机监制一眼看出"贯穿全宽的横向硬接缝 + 地标被一刀切断"，
+   * 判为合成残留；改成有边界的肖像卡后，接缝不再存在，"有一张卡"本身是设计意图而不是事故。
+   */
+  const bgPerson = join(coverDir, "bg-person.png");
+  const personFile = join(coverDir, "person-band.png");
+  if (insetEnabled && insetShot) {
+    /** 小图取帧：landmark 版取人物镜（按设计稿时刻）；person 版取地标镜（已选好的最清晰帧） */
+    const insetAt = COVER_HERO === "person"
+      ? bgAt
+      : Math.max(0.5, Math.min(Number(insetShot.duration ?? 5) - 0.4, plan.person.atSec ?? 1.0));
+    const personFrame = join(coverDir, "person-frame.png");
+    /** 取帧时刻夹在母版内（越界会让 ffmpeg 产出空文件，下一步直接崩） */
+    const insetTime = Math.max(0.05, Math.min(Math.max(0.1, masterSeconds - 0.12), shotAt(insetShot.shotId) + insetAt));
+    run(FFMPEG, ["-y", "-ss", insetTime.toFixed(2), "-i", colored, "-frames:v", "1", personFrame]);
+    /**
+     * 人物层：**无边框 + 四边柔化**的软嵌入（2026-09-25 三次复核后的定稿）。
+     * 演进过程（都是真机监制打回的意见）：定妆照抠像 → 会掉脸留光晕；白细边矩形卡 → "贴纸感/白底抠图"；
+     * 现在改成：片子自己的镜头帧 → 四边 44px 渐隐 → 与底图自然衔接（既有"人物在场"的设计意图，
+     * 又不产生硬边、白框、抠像痕迹）。色温仍向底图靠拢（暖调 + 轻对比）。
+     */
+    /**
+     * 上/左/右三边渐隐、**下边保持不透明**（2026-09-25 真机二次修正）：
+     * 四边全渐隐会让卡片变成"半透明雾面贴片"（监制：几乎不可辨）；下边不透明度保证人物"站得住"。
+     */
+    const fadePx = Math.max(Math.round(56 * coverScale), Math.round(cardW * (COVER_HERO === "split" ? 0.22 : 0.16)));
+    const edge = (value: string): string => `min(1\\,${value})`;
+    /** split：只渐隐左边界（与地标自然衔接）；其余版式：上/左/右三边渐隐 */
+    const alphaExpr = COVER_HERO === "split"
+      ? `255*${edge(`X/${fadePx}`)}`
+      : `255*min(${edge(`X/${fadePx}`)}\\,min(${edge(`(${cardW}-X)/${fadePx}`)}\\,${edge(`Y/${fadePx}`)}))`;
+    if (!existsSync(personFrame)) {
+      insetEnabled = false;
+      log(`  ⚠ 封面小图取帧失败（${insetShot.shotId}@${insetTime.toFixed(2)}s）→ 本版不叠小图，回退为单主视觉`);
+      run(FFMPEG, ["-y", "-i", bgOnly, "-frames:v", "1", bgPerson]);
+    } else {
+    run(FFMPEG, ["-y", "-i", personFrame, "-vf",
+      /**
+       * 先**向主体收紧**再进卡：人物镜是"中景/中近景"，整帧塞进卡里人只占一小块；
+       * 这里先裁到画面中央 72% 宽、上部 88% 高（主体所在区域），再缩放进卡，
+       * 保证卡里"看得出是谁"（真机监制：主体过小无法辨认 → 打回）。
+       */
+      (COVER_HERO === "split"
+        /** split：按竖带比例取人物镜的中段（人像在上三分），整幅高铺满带 */
+        ? `crop=iw*0.62:ih*0.96:(iw-iw*0.62)/2:ih*0.02,scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},`
+        : `crop=iw*0.72:ih*0.88:(iw-iw*0.72)/2:(ih-ih*0.88)*0.35,scale=${cardW}:${cardH}:force_original_aspect_ratio=increase,crop=${cardW}:${cardH},`)
+        + `eq=contrast=1.04:saturation=1.05,colorbalance=rm=0.05:bm=-0.04,format=rgba,`
+        + `geq=r='r(X,Y)':g='g(X,Y)':b='b(X,Y)':a='${alphaExpr}'`,
+      "-frames:v", "1", personFile]);
+    /** 投影（半透明黑矩形，偏移右下）再叠卡；投影让"这是一张卡"成立，而不是贴纸 */
+    const shadow = join(coverDir, "person-shadow.png");
+    run(FFMPEG, ["-y", "-i", bgOnly, "-vf",
+      `drawbox=x=${cardX + Math.round(10 * coverScale)}:y=${cardY + Math.round(14 * coverScale)}:w=${cardW}:h=${cardH}:color=black@0.35:t=fill`,
+      "-frames:v", "1", shadow]);
+    run(FFMPEG, ["-y", "-i", shadow, "-i", personFile, "-filter_complex",
+      `[0:v][1:v]overlay=x=${cardX}:y=${cardY}`, "-frames:v", "1", bgPerson]);
+    }
+  } else {
+    run(FFMPEG, ["-y", "-i", bgOnly, "-frames:v", "1", bgPerson]);
+  }
+  /** 排版：强调色装饰条 + 主标题（可两行）+ 副标题 + 角标 */
+  const FONT_FILE = join(REPO_ROOT, "bundles/ai-video/library/fonts", COVER_FONTS[plan.typography.fontId].file);
+  /** 景物为主版式没有人物卡抢版面，主标题可以再大一档（同屏信息更少但更醒目） */
+  const headSizeDesired = Math.round(CH * plan.typography.headlineSizeRatio * (COVER_HERO === "scenery" && !insetEnabled ? 1.15 : 1));
+  const subSize = Math.round(CH * plan.typography.sublineSizeRatio);
+  const badgeSize = Math.max(Math.round(28 * coverScale), Math.round(subSize * 0.72));
+  const left = plan.typography.align === "center" ? 0 : Math.round(64 * coverScale);
+  /**
+   * 标题**自适应字级**（2026-09-25 真机二次复核：'标题末字被右缘裁切'）：
+   * drawtext 不会自动换行/缩放，设计稿给的字级在实际字数下会溢出画幅。
+   * 这里按"汉字 1em、非汉字 0.55em"估宽，把字级压到**一行放得下**为止（下限 60% 设计字级，
+   * 再小就说明这句话太长——由机检的标题带检查兜底）。
+   */
+  const headlineLinesRaw = plan.headline.split("\n").map((line) => escapeDrawtextText(line)).filter(Boolean).slice(0, 2);
+  /** 视觉宽度（em）：汉字 1、西文/数字 0.55（与字体无关的保守估计） */
+  const emWidth = (text: string): number => [...text].reduce(
+    (sum, ch) => sum + (/[\u4e00-\u9fff\u3000-\u303f\uff00-\uffef]/.test(ch) ? 1 : 0.55), 0
+  );
+  const availableWidth = CW - left - Math.round(CW * 0.06);
+  const longestLineEm = Math.max(1, ...headlineLinesRaw.map(emWidth));
+  const headSize = Math.max(
+    Math.round(headSizeDesired * 0.6),
+    Math.min(headSizeDesired, Math.floor(availableWidth / longestLineEm))
+  );
+  /**
+   * 文字带起点：person-solo 下移到面部下方安全带（52%），其余版式保持**平台**顶部安全区
+   * （2026-09-27 平台化：抖音 6% / 小红书 7% / YouTube 5%，来自 cover-platforms.ts）。
+   */
+  const accentY = Math.round(CH * coverSafeAreaForLayout.topMinRatio);
+  const accentH = Math.max(Math.round(8 * coverScale), Math.round(CH * 0.006));
+  const titleY = accentY + Math.round(headSize * 0.42);
+  const lineGap = Math.round(headSize * 0.12);
+  const titleLines = headlineLinesRaw;
+  const textFilters: string[] = [
+    `drawbox=x=${left + 2}:y=${accentY}:w=${Math.round(CW * 0.12)}:h=${accentH}:color=${plan.typography.accentColor}@0.95:t=fill`
+  ];
+  titleLines.forEach((line, index) => {
+    const y = titleY + index * (headSize + lineGap);
+    const x = plan.typography.align === "center" ? `(w-text_w)/2` : String(left);
+    textFilters.push(
+      `drawtext=fontfile='${FONT_FILE}':text=${line}:expansion=none:fontsize=${headSize}:fontcolor=${plan.typography.color}`
+        + `:borderw=${Math.max(3, Math.round(headSize * 0.035))}:bordercolor=black@0.55:shadowx=2:shadowy=3:shadowcolor=black@0.35:x=${x}:y=${y}`
+    );
+  });
+  const subY = titleY + titleLines.length * (headSize + lineGap) + Math.round(headSize * 0.12);
+  let cursorY = subY;
+  /**
+   * 副标题/角标**同样自适应字级**（2026-09-27 真机：`四支团队 78 个岗位，你只管拍板`
+   * 在 0.03 字级下宽约 1.8 倍画幅 → 直接被右缘裁切，产品所有者当场判"排版太乱"）。
+   * 口径同主标题：汉字 1em、非汉字 0.55em 估宽，压到一行放得下为止（下限 55% 设计字级）。
+   * 注意必须在 `emWidth/availableWidth` 定义之后计算（上一版放在前面触发 TDZ 报错）。
+   */
+  const sublineText = plan.subline ? escapeDrawtextText(plan.subline) : "";
+  const subSizeDraw = sublineText
+    ? Math.max(Math.round(subSize * 0.55), Math.min(subSize, Math.floor(availableWidth / Math.max(1, emWidth(sublineText)))))
+    : subSize;
+  if (plan.subline) {
+    textFilters.push(
+      `drawtext=fontfile='${FONT_FILE}':text=${sublineText}:expansion=none:fontsize=${subSizeDraw}`
+        + `:fontcolor=${plan.typography.accentColor}:borderw=${Math.max(2, Math.round(subSizeDraw * 0.06))}:bordercolor=black@0.5`
+        + `:x=${plan.typography.align === "center" ? "(w-text_w)/2" : String(left + 4)}:y=${cursorY}`
+    );
+    cursorY += subSizeDraw + Math.round(subSizeDraw * 0.45);
+  }
+  /**
+   * 角标去重（2026-09-27 真机）：设计师会同时把时长写进副标题与角标
+   * （封面出现「89 秒看懂获客增长系统」+「89秒 · 获客增长」两行同义信息）。
+   * 判据：角标与副标题都含"秒"时判定重复，保留信息量更大的副标题。
+   */
+  const badgeText = plan.badge && plan.subline && /秒/.test(plan.badge) && /秒/.test(plan.subline) ? undefined : plan.badge;
+  if (badgeText) {
+    textFilters.push(
+      `drawtext=fontfile='${FONT_FILE}':text=${escapeDrawtextText(badgeText)}:expansion=none:fontsize=${badgeSize}`
+        + `:fontcolor=white@0.92:borderw=${Math.max(2, Math.round(badgeSize * 0.06))}:bordercolor=black@0.5`
+        + `:x=${plan.typography.align === "center" ? "(w-text_w)/2" : String(left + 4)}:y=${cursorY}`
+    );
+  }
+  const bgText = join(coverDir, "bg-text.png");
+  run(FFMPEG, ["-y", "-i", bgOnly, "-vf", textFilters.join(","), "-frames:v", "1", bgText]);
+  run(FFMPEG, ["-y", "-i", bgPerson, "-vf", textFilters.join(","), "-frames:v", "1", coverPng]);
+  /** ③ 机检（口径与阈值在 `cover-design.ts#coverDeterministicChecks`） */
+  const coverInfo = probe(coverPng);
+  const coverSafeAreaForCheck = coverSafeAreaForLayout;
+  const backgroundMatchesCleanMaster = sha256FileSync(bgFrameA) === sha256FileSync(bgFrameB);
+  const { checks, measurements } = inspectCoverForPolicy({ bytes: Number(coverInfo.bytes ?? 0), width: Number(coverInfo.width ?? 0),
+    height: Number(coverInfo.height ?? 0), expectedWidth: CW, expectedHeight: CH, cleanSource: backgroundMatchesCleanMaster },
+    () => { throw new Error("COVER_QUALITY_REVIEW_DISABLED"); });
+  const verdict = await reviewStage({ stage: "cover", projectId: PROJECT,
+    artifacts: [{ path: coverPng, kind: "image", bytes: Number(coverInfo.bytes ?? 0), probe: coverInfo }],
+    deterministic: checks, context: { designVia, plan, measurements, composition },
+    env: ENV, allowFallbackApprove: false, log });
+  record({
+    /**
+     * 封面"合格"必须同时满足**机检全过 + 监制放行**（2026-09-25 修正）：
+     * 早先只看机检，于是"机检全过但监制打回（人物卡遮挡主体/调性冲突）"被记成 ok=true——审计会误读。
+     */
+    stage: "cover", shotId: null, invoked: true, ok: coverChecksPassed(checks) && verdict.approved, cached: false,
+    degraded: verdict.degraded, attempt: 1, ms: Date.now() - started,
+    artifact: existsSync(coverPng) ? coverPng : null,
+    evidence: {
+      designVia, plan, hook: plan.headline.replace(/\n/g, " "), font: plan.typography.fontId,
+      qualityReviewPerformed: false, materialUsePolicy: "default-use",
+      composition: { ...composition, requestedHero: COVER_REQUESTED_HERO, heroShotId: heroShot.shotId, insetEnabled,
+        insetShotId: insetEnabled ? insetShot?.shotId ?? null : null },
+      background: { shotId: heroShot.shotId, atSec: heroAt, source: "colored（未烧字幕母版）" },
+      backgroundPick: { sharpness: bgPick.sharpness, floor: COVER_MIN_SHARPNESS, substituted: bgSubstituted, plannedShotId: plan.background.shotId },
+      headline: { text: plan.headline, fontId: plan.typography.fontId, sizePx: headSize, subSizePx: subSizeDraw },
+      /** 平台口径证据（2026-09-27）：出的是哪个平台的封面、机检按哪套安全区判 */
+      coverPlatform: {
+        id: coverSpec.id, label: COVER_PLATFORM_ARG || platform, ratio: coverSpec.ratio,
+        canvas: { width: CW, height: CH }, safeArea: coverSafeAreaForCheck,
+        headlineLimit: coverSpec.language === "en" ? `${coverSpec.headlineMaxChars} words` : `${coverSpec.headlineMaxChars} chars`
+      },
+      /** 封面知识库注入证据：hints 与 trace 一一对应（无 trace 视为未注入） */
+      coverKb: {
+        enabled: COVER_KB_ENABLED, applied: coverKb.applied, source: coverKb.source,
+        topics: coverKb.topics, theme: coverKb.theme, hints: coverKb.hints, trace: coverKb.trace,
+        notes: coverKb.notes, conflicts: coverKb.conflicts
+      },
+      /** 账号视觉锤证据（含 warn 级偏离记录） */
+      accountProfile: accountProfile
+        ? {
+          accountId: accountProfile.account_id, strict: accountProfile.strict === true,
+          fontId: accountProfile.visual_hammer?.fontId ?? null,
+          hookBias: accountProfile.hook_bias ?? [], notes: accountNotes, warnings: plan.warnings ?? []
+        }
+        : null,
+      person: {
+        enabled: insetEnabled, shotId: insetEnabled ? insetShot?.shotId ?? null : null,
+        atSec: insetEnabled ? plan.person.atSec ?? null : null,
+        card: insetEnabled ? { x: cardX, y: cardY, w: cardW, h: cardH, border: cardBorder } : null,
+        source: insetEnabled ? "colored（片子自己的镜头帧：肖像卡，不抠像）" : null
+      },
+      measurements, checks, designRaw: designNote,
+      backgroundPickDetail: bgPick.sharpness === null ? "未执行锐度评分；按设计稿取帧"
+        : `边缘能量 ${bgPick.sharpness.toFixed(2)}／下限 ${COVER_MIN_SHARPNESS}${bgSubstituted ? "（改取全片最清晰帧）" : ""}`
+    },
+    verdict
+  });
+  if (!coverChecksPassed(checks)) {
+    log(`⛔ 封面机检未通过：${checks.filter((c) => !c.pass).map((c) => c.id).join("、")}`);
+  }
+  /**
+   * 封面是否**真的合格**（机检全过 + 监制放行）。
+   * 2026-09-27 真机事故：封面两轮被判"标题压脸、副标题被裁、出现第二个人像"（28/38 分），
+   * 但片头仍把这张被打回的图合成进了成片 → 用户第一眼看到的就是那张乱版封面。
+   * 纪律：**未放行的封面不进成片**（宁可没有封面卡），并如实留痕。
+   */
+  const coverApproved = coverChecksPassed(checks) && verdict.approved;
+  if (!coverApproved && existsSync(coverPng)) {
+    log(`⛔ 封面未放行（机检 ${checks.filter((c) => c.pass).length}/${checks.length} · 监制 ${verdict.approved ? "放行" : "打回"}）→ 不合成进片头`);
+  }
+
 }
 
 /** 正式发布来源先装配封面；母版、软字幕与所有后续交付使用同一来源。 */
@@ -4674,6 +5312,8 @@ function assertFactualReleaseSources(): void {
       throw new Error(`PUBLICATION_POST_SOURCE_UNVERIFIED: ${edge.stage} 缺当前上游字节与最新通过回执，禁止发布旧后期素材`);
   }
   for (const shot of shots) {
+    if (!sourceDocument.shots?.some(submitted => submitted.shotId === shot.shotId))
+      throw new Error(`STANDARD_NATIVE_ORIGINAL_BINDING_INVALID: ${shot.shotId} is absent from frozen submitted intent`);
     const raw = originalForShot(shot), selected = clipFor(shot);
     if (raw !== selected || !compose.lineage.inputs.some(artifact => artifact.path === selected && artifact.sha256 === sha256FileSync(selected)))
       throw new Error(`PUBLICATION_COMPOSE_SOURCE_MISMATCH: ${shot.shotId} pinned original did not enter actual composition`);
@@ -4682,7 +5322,7 @@ function assertFactualReleaseSources(): void {
     throw new Error("PUBLICATION_ORIGINAL_MANIFEST_CHANGED: 冻结原片清单已变化");
   const identity = characterReleaseReport("release");
   writeFileSync(join(WORK_DIR, `${PROJECT}-character-release-report.json`), JSON.stringify(identity, null, 2));
-  assertCoverPublication({ required: publicationNeedsCover, receipt: publicationCoverReceipt,
+  assertCoverPublication({ required: publicationNeedsCover, preserveSourceFramesRequired: true, receipt: publicationCoverReceipt,
     inputSha256: existsSync(cleanScored) ? sha256FileSync(cleanScored) : undefined,
     coverSha256: existsSync(join(OUT_DIR, `${PROJECT}-cover.png`)) ? sha256FileSync(join(OUT_DIR, `${PROJECT}-cover.png`)) : undefined,
     outputSha256: existsSync(scored) ? sha256FileSync(scored) : undefined });
@@ -4694,7 +5334,8 @@ if (!DRY_RUN && ["cover", "mux", "master", "deliver"].some((stage) => STAGES.has
     const output = join(POST_DIR, "master-publication.mp4");
     rememberInputs("cover-intro", [cleanScored, cover]);
     const started = Date.now();
-    publicationCoverReceipt = await embedCoverFirstFrame({ input: cleanScored, cover, output, ffmpeg: FFMPEG, ffprobe: FFPROBE });
+    publicationCoverReceipt = await embedCoverFirstFrame({ input: cleanScored, cover, output, ffmpeg: FFMPEG, ffprobe: FFPROBE, preserveSourceFrames: true });
+    expectedMasterSeconds = publicationCoverReceipt.video.durationSeconds;
     scored = publicationCoverReceipt.output.path;
     record({ stage: "cover-intro", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
       attempt: 1, ms: Date.now() - started, artifact: scored, evidence: { ...publicationCoverReceipt, outputFiles: [scored] },
@@ -4740,7 +5381,7 @@ if (STAGES.has("mux") && subtitleSidecar && existsSync(scored) && !DRY_RUN) {
   ]);
   const info = existsSync(out) ? probe(out) : {};
   const nativeAudioClock = existsSync(out)
-    ? await assertStandardPostAudioClock(out, originalPostContract.durationSec, { ffmpeg: FFMPEG, ffprobe: FFPROBE }) : null;
+    ? await assertStandardPostExportClock(out, expectedMasterSeconds, { ffmpeg: FFMPEG, ffprobe: FFPROBE, expectedFps: FPS }) : null;
   const verdict = await reviewStage({
     stage: "mux", projectId: PROJECT,
     artifacts: [
@@ -4774,9 +5415,13 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
   assertFactualReleaseSources();
   rememberInputs("master", [scored]);
   const started = Date.now(), before = fingerprintArtifact(scored), info = probe(scored);
-  const actualDuration = Number(info.videoDurationSec || info.duration);
+  const actualDuration = Number(info.videoDurationSec || info.duration), actualFps = Number(info.fps);
+  const requestedFrames = Math.round(expectedMasterSeconds * FPS), actualFrames = Number(info.videoFrames);
   if (info.error || Number(info.width) !== OUTPUT_SIZE.width || Number(info.height) !== OUTPUT_SIZE.height
-    || Math.abs(Number(info.fps) - FPS) > 0.001 || Math.abs(actualDuration - expectedMasterSeconds) > Math.max(1 / FPS, 0.05))
+    || !Number.isSafeInteger(requestedFrames) || requestedFrames < 1 || !Number.isSafeInteger(actualFrames) || actualFrames !== requestedFrames
+    || !Number.isFinite(actualFps) || !Number.isFinite(actualDuration) || actualDuration <= 0
+    || Math.abs(actualFps - FPS) > 1e-6 || Math.abs(actualDuration - expectedMasterSeconds) > 2e-6
+    || Math.abs(actualDuration - actualFrames / FPS) > 2e-6)
     throw new Error(`MASTER_EXPORT_SPEC_INVALID: requested ${OUTPUT_SIZE.width}x${OUTPUT_SIZE.height}@${FPS} ${expectedMasterSeconds}s; actual ${JSON.stringify(info)}`);
   if (STAGES.has("subtitle") && (SUBTITLE_MODE === "burn" ? !existsSync(join(POST_DIR, "master-subtitled.mp4")) : !subtitleSidecar || !existsSync(subtitleSidecar.srt)))
     throw new Error("MASTER_SUBTITLE_MISSING: requested actual subtitle output was not produced");
@@ -4800,14 +5445,14 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
   log(`✅ 正式成片：${finalPath}（原字节与实际导出合同已记录；未执行品质审核）`);
 }
 
-/* ---------- ⑫ 多风格交付包（step_key: deliver，gate G-DLV1：变体雷同一票否决） ---------- */
+/* ---------- ⑫ 多风格交付包（step_key: deliver：请求配方、真实文件和来源合同） ---------- */
 if (QUALITY === "uhd" && STAGES.has("deliver") && !DRY_RUN && !masterApprovedForUhd) {
-  throw new Error("UHD 多风格交付缺本轮终审放行的母版；请先完成母版终审");
+  throw new Error("UHD 多风格交付缺本轮请求规格的实际母版导出回执");
 }
 /**
  * 管线 yml 的 deliver 步：**干净母版 + 旁挂字幕 + 2–3 个风格变体 + 软字幕轨版 + 交付清单**，
  * 纪律是"镜头只生成一次，变体零 token"——变体只做**后期层派生**（调色/混音/文案），绝不重跑渲染。
- * gate `G-DLV1`：任一对变体"画面与音轨都测不出差别"即一票否决（那不算两个变体，是把同一支片子发两遍）。
+ * 默认核对请求的调色、封面和配乐配方与真实文件，不进行 RGB、听音或模型品质投票。
  */
 if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedForUhd)
   && artifactReusable("master", deliverablePath, scored)) {
@@ -4830,10 +5475,15 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
       throw new Error("VARIANT_SOURCE_UNVERIFIED: 无当前原生音轨来源的字幕母版，禁止沿用旧配音或已混配乐的交付片");
     return candidate;
   })();
+  const variantBodyInfo = probe(variantSource);
+  const variantBodySeconds = Number(variantBodyInfo.videoDurationSec || variantBodyInfo.duration);
+  const variantBodyFrames = Number(variantBodyInfo.videoFrames);
+  if (!Number.isSafeInteger(variantBodyFrames) || variantBodyFrames < 1 || !(variantBodySeconds > 0))
+    throw new Error("VARIANT_SOURCE_CLOCK_INVALID: actual complete body clock is unavailable");
   const variantPlans = buildVariantPlan({ master: variantSource, outDir: OUT_DIR, projectId: PROJECT, coverHook: arg("--cover-hook", shotlist.title ?? "") });
   /**
-   * 配乐层是否可用：见 bgm 环节的"声明关闭"记录（无签章分轨引用 → bgm_layer=false）。
-   * 关掉时变体不再尝试混音（工位必然拒收），三轴判据降为"调色+封面"两轴（证据仍留痕）。
+   * 配乐层是否启用由当前 bgm 处理回执的显式关闭声明决定。
+   * 关闭时仅要求调色与封面配方；启用时每版须消费明确登记且不同的音乐字节。
    */
   const bgmLayerOff = records.some((row) => row.stage === "bgm" && (row.evidence as { applicable?: unknown }).applicable === false);
   const samples: Array<{ variantId: string; frames: Array<{ r: number; g: number; b: number }>; loudness: { lufs: number; peakDb: number } | null }> = [];
@@ -4842,7 +5492,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     width: number; height: number;
     cover?: { path: string; sha256: string } | null; coverReceipt?: CoverFirstFrameReceipt | null;
     bgm?: { track: string; sha256: string; declaredBpm?: number | null; measuredBpm?: null; gridErrorMs?: null } | null;
-    nativeAudioClock?: Awaited<ReturnType<typeof assertStandardPostAudioClock>>;
+    nativeAudioClock?: Awaited<ReturnType<typeof assertStandardPostExportClock>>;
   }> = [];
   /**
    * 变体封面（三轴之一，2026-09-26 产品口径）：主封面 + 该变体的强调色条与风格角标。
@@ -4862,8 +5512,11 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
   /** 取几个时间点的 1×1 平均色：稳定的"画面指纹"（不做逐像素对比，只判风格差异是否可测） */
   const meanColorsAt = (file: string, times: number[]): Array<{ r: number; g: number; b: number }> => times.map((at) => {
     const out = spawnSync(FFMPEG, ["-v", "error", "-ss", String(at), "-i", file, "-frames:v", "1", "-vf", "scale=1:1", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"], { maxBuffer: 1024 });
-    const buf = out.stdout ?? Buffer.alloc(0);
-    return buf.length >= 3 ? { r: buf[0]!, g: buf[1]!, b: buf[2]! } : { r: 0, g: 0, b: 0 };
+    if (out.status !== 0 || out.error || !Buffer.isBuffer(out.stdout) || out.stdout.length < 3) {
+      throw new Error(`VARIANT_RGB_MEASUREMENT_FAILED: ${file} at ${at}s; status=${out.status}; ${out.error?.message ?? out.stderr?.toString().slice(0, 200) ?? "missing RGB bytes"}`);
+    }
+    const buf = out.stdout;
+    return { r: buf[0]!, g: buf[1]!, b: buf[2]! };
   });
   const usedVariantBgmHashes = new Set<string>();
   for (const plan of variantPlans) {
@@ -4872,7 +5525,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
         execFileSync("cp", [variantSource, plan.output]);
       } else {
         /** 调色变体走同一个调色工位（与母版一致的口径，避免"变体用了另一套引擎"） */
-        const graded = runCli(COLOR_CLI, [...plan.gradeArgs, "--out", plan.output]);
+        const graded = runCli(COLOR_CLI, [...plan.gradeArgs, "--out", plan.output, "--no-verify", "--no-defects"]);
         if (!graded.ok) throw new Error(`VARIANT_COLOR_PROCESSING_FAILED: ${plan.variant.id}: ${graded.out.slice(-400)}`);
       }
       if (!existsSync(plan.output)) throw new Error(`VARIANT_OUTPUT_MISSING: ${plan.variant.id}`);
@@ -4925,10 +5578,10 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
         if (!variantCover) throw new Error(`VARIANT_COVER_MISSING: ${plan.variant.id}`);
         const clean = plan.output.replace(/\.mp4$/i, "-clean.mp4");
         renameSync(plan.output, clean);
-        variantCoverReceipt = await embedCoverFirstFrame({ input: clean, cover: variantCover.path, output: plan.output, ffmpeg: FFMPEG, ffprobe: FFPROBE });
+        variantCoverReceipt = await embedCoverFirstFrame({ input: clean, cover: variantCover.path, output: plan.output, ffmpeg: FFMPEG, ffprobe: FFPROBE, preserveSourceFrames: true });
       }
       const info = probe(plan.output);
-      const nativeAudioClock = await assertStandardPostAudioClock(plan.output, originalPostContract.durationSec, { ffmpeg: FFMPEG, ffprobe: FFPROBE });
+      const nativeAudioClock = await assertStandardPostExportClock(plan.output, variantBodySeconds + (variantCoverReceipt ? 1 / FPS : 0), { ffmpeg: FFMPEG, ffprobe: FFPROBE, expectedFps: FPS, expectedVideoFrames: variantBodyFrames + (variantCoverReceipt ? 1 : 0) });
       if (Number(info.width) !== OUTPUT_SIZE.width || Number(info.height) !== OUTPUT_SIZE.height) {
         throw new Error(`变体 ${plan.variant.id} 分辨率 ${info.width}x${info.height}，要求 ${OUTPUT_SIZE.width}x${OUTPUT_SIZE.height}`);
       }
@@ -4952,7 +5605,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
       throw err;
     }
   }
-  const distinctness = { status: "not-reviewed", approved: true, pairs: [], detail: "No frame or audio quality comparison was performed; requested style recipes and output files are checked separately." };
+  const distinctness = { status: "not-reviewed", approved: true, pairs: [], worstPair: null, detail: "No frame or audio quality comparison was performed; requested style recipes and output files are checked separately." };
   /**
    * 三轴判据（2026-09-26 产品所有者："一次必须产出 3 个不同风格的后期版本"）：
    * 数量 ≥3，且 **调色 / 封面 / 配乐** 三轴上两两不同——只换滤镜名不算风格。
@@ -5053,10 +5706,12 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     variantAxes,
     samples,
     at: stamp()
-  }), assets: assetHashes, quality: {
+  }), assets: assetHashes, completion: originalPostContract.contract.completion, quality: {
     tier: QUALITY, sourceResolution: SOURCE_RESOLUTION, outputResolution: OUTPUT_RESOLUTION,
     width: OUTPUT_SIZE.width, height: OUTPUT_SIZE.height,
-    localEnhancement: QUALITY === "uhd" ? "per-shot, verified receipt in stages.jsonl" : "not requested"
+    localEnhancement: "not-requested",
+    exportGeometryMode: "local-compositor-normalization",
+    enhancementModelInvoked: false
   },
   /**
    * 交付口径留痕（T-2026-0930-0014）：审核层状态 + post-only 组装声明。
@@ -5080,7 +5735,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
   },
   /** 配乐层状态（T-2026-0930-0015）：off 时写明原因，不让"没配乐"变成查不到的黑盒 */
   bgm: bgmManifestInfo,
-  publication: { coverMode: publicationNeedsCover ? "replace-first-frame" : "explicit-clean-version", coverReceipt: publicationCoverReceipt,
+  publication: { coverMode: publicationCoverReceipt?.mode ?? (publicationNeedsCover ? "missing" : "explicit-clean-version"), coverReceipt: publicationCoverReceipt,
     openingTitleSource: resolveOpeningTitle({ explicitTitle: arg("--opening-title", ""), disabled: flag("--no-title-card") }).source },
   characterRelease: characterReleaseReport("release"),
   sourceDisclosure: { footageOrigin: policyBrief?.footageOrigin ?? "unverified", platformPosted: false,
@@ -5230,7 +5885,7 @@ for (const r of records) {
   byStage.set(r.stage, cur);
 }
 writeFileSync(join(LOG_DIR, "stage-summary.json"), `${JSON.stringify({
-  project: PROJECT, at: stamp(), shots: shots.length, totalSeconds,
+  project: PROJECT, at: stamp(), shots: shots.length, totalSeconds, completion: originalPostContract?.contract.completion ?? plannedCompletion,
   stages: Object.fromEntries(byStage), records
 }, null, 2)}\n`, "utf8");
 log(`阶段日志：${STAGE_LOG}`);

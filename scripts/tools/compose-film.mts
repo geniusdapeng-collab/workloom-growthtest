@@ -6,22 +6,21 @@
  * 逐镜产物的编码参数（分辨率/帧率/音轨）各自不同，直接 concat 会花屏/丢音。
  *
  * 三段式（每段都可单独复跑）：
- *   ① 归一化：逐镜 → 统一 WxH / fps / yuv420p / AAC 48k 立体声（临时目录）
- *   ② 拼接：concat demuxer -c copy（归一化后参数一致，可无损拼接）
+ *   ① 完整源归一化：只转换实际不同的画幅/帧率，保留完整区间及可用原声
+ *   ② 拼接：兼容视频包直接拷贝；不同编码参数用完整帧无损编码拼接
  *   ③ 收口：淡入淡出 + 标题/字幕烧字（可选）→ 母版
- *   ④ 调色：走调色工位**择优**（color-bridge `best`：候选生成 + 画质打分 + 不劣化优先），
- *      可用 `--recipe <题材配方 id>` 把题材配方作为候选之一；判定"无需调色"时不产出调色版
+ *   ④ 调色：执行显式固定配方，默认不调色；成功素材不做渲后品质投票。
  *
  * 用法：
  *   pnpm exec tsx scripts/tools/compose-film.mts \
  *     --clips a.mp4,b.mp4,... --out outputs/nanyuan-master-30s.mp4 \
  *     [--width 1080 --height 1920 --fps 30] [--fade 0.5] \
  *     [--title "苏州南园宾馆"] [--subtitle "唯一可以入住的苏州园林"] \
- *     --recipe real-estate [--min-improvement 2] [--graded-out outputs/nanyuan-graded-30s.mp4] \
+ *     [--color grade --grade-profile natural --grade-intensity 0.55] [--graded-out outputs/nanyuan-graded-30s.mp4] \
  *     [--keep-temp] [--json]
  */
 import { execFileSync } from "node:child_process";
-import { createReadStream, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
@@ -84,14 +83,39 @@ const requestedDurations = arg("--durations").split(",").filter(Boolean).map(Num
 if (requestedDurations.length && (requestedDurations.length !== clips.length
   || requestedDurations.some(n => !Number.isFinite(n) || n <= 0 || n > 7200))) throw new Error("COMPOSE_DURATIONS_INVALID");
 const inputBindings = await Promise.all(clips.map(async path => ({ path, sha256: await sha256File(path) })));
-function sourceMedia(file: string): { hasAudio: boolean; duration: number } {
-  const metadata = JSON.parse(run(FFPROBE, ["-v", "error", "-show_streams", "-show_format", "-of", "json", file])) as {
-    streams?: Array<{ codec_type?: string; duration?: string }>; format?: { duration?: string };
+interface SourceMedia {
+  hasAudio: boolean; duration: number; videoFrames: number; fps: number; width: number; height: number;
+  audioCodec: string | null; audioSampleRate: number; audioChannels: number; audioDurationSec: number;
+}
+const localMediaInput = (): string[] => ["-protocol_whitelist", "file,pipe", "-format_whitelist", "mov,matroska,avi,mpegts,wav,mp3,aac,flac,ogg,aiff"];
+function sourceMedia(file: string): SourceMedia {
+  const metadata = JSON.parse(run(FFPROBE, ["-v", "error", ...localMediaInput(), "-count_frames", "-show_streams", "-show_format", "-of", "json", file])) as {
+    streams?: Array<{ codec_type?: string; codec_name?: string; duration?: string; nb_read_frames?: string;
+      avg_frame_rate?: string; width?: number; height?: number; sample_rate?: string; channels?: number }>; format?: { duration?: string };
   };
-  const video = metadata.streams?.find(stream => stream.codec_type === "video");
+  const videos = metadata.streams?.filter(stream => stream.codec_type === "video") ?? [], video = videos[0];
+  const audio = metadata.streams?.find(stream => stream.codec_type === "audio");
+  const [numerator, denominator] = String(video?.avg_frame_rate ?? "").split("/").map(Number);
+  const sourceFps = Number(numerator) / Number(denominator), frames = Number(video?.nb_read_frames);
   const duration = Number(video?.duration ?? metadata.format?.duration);
-  if (!video || !Number.isFinite(duration) || duration <= 0) throw new Error(`COMPOSE_SOURCE_UNREADABLE: ${file}`);
-  return { hasAudio: metadata.streams?.some(stream => stream.codec_type === "audio") === true, duration };
+  if (videos.length !== 1 || !video || !Number.isFinite(sourceFps) || sourceFps <= 0 || !Number.isSafeInteger(frames) || frames <= 0
+    || !Number.isSafeInteger(video.width) || !Number.isSafeInteger(video.height) || !Number.isFinite(duration) || duration <= 0
+    || Math.abs(duration - frames / sourceFps) > 1e-6) throw new Error(`COMPOSE_SOURCE_UNREADABLE: ${file}`);
+  return { hasAudio: Boolean(audio), duration: frames / sourceFps, videoFrames: frames, fps: sourceFps, width: video.width!, height: video.height!,
+    audioCodec: audio?.codec_name ?? null, audioSampleRate: audio ? Number(audio.sample_rate) : 0,
+    audioChannels: audio ? Number(audio.channels) : 0, audioDurationSec: audio ? Number(audio.duration ?? metadata.format?.duration) : 0 };
+}
+function picturePacketSignature(file: string): string {
+  const metadata = JSON.parse(run(FFPROBE, ["-v", "error", ...localMediaInput(), "-select_streams", "v:0", "-show_streams", "-show_data", "-of", "json", file])) as {
+    streams?: Array<Record<string, unknown>>;
+  };
+  const video = metadata.streams?.[0];
+  if (!video || typeof video.codec_name !== "string" || typeof video.time_base !== "string" || typeof video.extradata !== "string")
+    throw new Error(`COMPOSE_PACKET_PARAMETERS_UNAVAILABLE: ${file}`);
+  // FFmpeg's concat demuxer requires matching codec/time-base parameters. Equal
+  // fps and canvas alone do not make H.264 SPS/PPS and frame reordering compatible.
+  return JSON.stringify([video.codec_name, video.codec_tag_string, video.profile, video.level, video.time_base,
+    video.pix_fmt, video.sample_aspect_ratio, video.field_order, video.has_b_frames, video.extradata]);
 }
 /**
  * 逐刀转场（2026-09-25 新增）：
@@ -123,85 +147,80 @@ const title = arg("--title");
 const subtitle = arg("--subtitle");
 /**
  * 调色模式（2026-09-22 修正）：
- *   best（默认）= 走 color-bridge 的「择优」：候选生成 + 画质打分 + 允许不调（不劣化优先）；
- *   grade       = 旧口径（固定 profile/LUT/intensity），仅兼容历史调用；
- *   none        = 不调色。
- * 事故背景：旧实现固定 `clean-bright@0.55 + auto`，绕过了择优闸门；按产品自己的画质分，
- * 该结果对母版是**劣化**（score 91.99：饱和×0.79、细节×0.92、亮度漂移 +39.6）。
+ *   none（默认）= 不调色；grade 和历史 best 标签均执行显式固定配方。
+ * 成功源片不再经过候选画质打分或择优投票；实际处理失败仍然报错。
  */
-const colorMode = arg("--color", "best");
-const recipeId = arg("--recipe");
-const minImprovement = Number(arg("--min-improvement", "2"));
-const gradeProfile = arg("--grade-profile");
+const colorMode = arg("--color", "none");
+const gradeProfile = arg("--grade-profile", "natural");
 const gradeLut = arg("--grade-lut");
 const gradeIntensity = arg("--grade-intensity", "0.55");
 const gradedOut = arg("--graded-out");
+const nativeClock = flag("--native-clock");
+if (nativeClock && (fade !== 0 || transition || transitionDuration !== 0 || retimeTo !== 0 || title || subtitle || colorMode !== "none"))
+  throw new Error("STANDARD_NATIVE_COMPOSE_OPTIONS_INVALID: native clock composition only concatenates complete original shots");
 
 mkdirSync(dirname(out), { recursive: true });
+const inputCanonicalPaths = clips.map(file => realpathSync(file));
+const outputCanonicalParentPath = join(realpathSync(dirname(out)), basename(out));
+if (inputCanonicalPaths.includes(outputCanonicalParentPath)
+  || existsSync(out) && inputCanonicalPaths.includes(realpathSync(out))) throw new Error("COMPOSE_SOURCE_OVERWRITE_FORBIDDEN");
 const temp = mkdtempSync(join(tmpdir(), "wl-compose-"));
-console.log(`拼接 ${clips.length} 个镜头 → ${width}x${height} @${fps}fps（临时目录 ${temp}）`);
+console.log(`拼接 ${clips.length} 个完整镜头 → ${width}x${height} @${fps}fps（临时目录 ${temp}）`);
 
-/* ---------- ① 归一化 ---------- */
+/* ---------- ① 仅归一化画幅/帧率；不拿名义秒数裁片或补尾帧 ---------- */
 const normalized: string[] = [];
+const pictureSources: string[] = [];
+const pictureSignatures: string[] = [];
 const shotFrames: number[] = [];
+const sourceBindings: Array<{ path: string; sha256: string; source: SourceMedia; normalized: SourceMedia & { path: string }; normalizationPerformed: boolean }> = [];
 clips.forEach((clip, index) => {
-  const target = join(temp, `norm-${String(index).padStart(2, "0")}.mp4`);
-  /**
-   * 每段音轨必须与画面**等长**（2026-09-26 真机事故修复）：
-   * aac 编码器 priming + 帧对齐会让音轨流比画面短十几毫秒，逐段累计后
-   * 拼接出来的音轨时间轴会整体提前（真机：5 镜时第 3 镜就偏 -145ms）。
-   * 因此归一化时用 `apad` 把声音补到画面时长（补的是静音，≤20ms，听不出来），
-   * 下游无论走 concat 滤镜还是 demuxer，时间轴都不会再漂。
-   */
   const metadata = sourceMedia(clip);
-  const inFrames = Math.max(1, Math.round((requestedDurations[index] ?? metadata.duration) * fps));
-  const targetDuration = inFrames / fps;
-  shotFrames.push(inFrames);
-  run(FFMPEG, [
-    "-y", "-i", clip,
-    ...(!metadata.hasAudio ? ["-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=48000"] : []),
-    "-map", "0:v:0", "-map", metadata.hasAudio ? "0:a:0" : "1:a:0",
-    "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps},tpad=stop_mode=clone:stop_duration=${targetDuration}`,
-    "-af", "apad",
-    "-t", targetDuration.toFixed(6),
-    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
-    "-movflags", "+faststart", target,
-  ]);
-  const streamDurations = run(FFPROBE, [
-    "-v", "error", "-show_entries", "stream=codec_type,duration", "-of", "csv=p=0", target,
-  ]).trim().split("\n").map((line) => line.split(","));
-  const targetVideo = Number(streamDurations.find((row) => row[0] === "video")?.[1] ?? 0);
-  const targetAudio = Number(streamDurations.find((row) => row[0] === "audio")?.[1] ?? 0);
-  const avDelta = Math.abs(targetVideo - targetAudio);
-  normalized.push(target);
-  console.log(`  ① 归一化 ${basename(clip)} → ${targetVideo.toFixed(2)}s（音轨 ${targetAudio.toFixed(2)}s，Δ${(avDelta * 1000).toFixed(0)}ms）`);
-  if (avDelta > 0.01) {
-    console.log(`       ⚠ 该段音画长度差 ${(avDelta * 1000).toFixed(0)}ms > 10ms，拼接前请确认（对齐自检会再实测一次）`);
+  const normalizePicture = metadata.width !== width || metadata.height !== height || Math.abs(metadata.fps - fps) > 1e-8;
+  let target = clip;
+  if (normalizePicture) {
+    target = join(temp, `norm-${String(index).padStart(2, "0")}.mp4`);
+    run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", ...localMediaInput(), "-i", clip,
+      "-map", "0:v:0", "-map", "0:a:0?",
+      "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps}:start_time=0:round=up:eof_action=pass`,
+      "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", target]);
   }
+  const actual = normalizePicture ? sourceMedia(target) : metadata;
+  if (actual.width !== width || actual.height !== height || Math.abs(actual.fps - fps) > 1e-8)
+    throw new Error(`COMPOSE_NORMALIZATION_FAILED: ${basename(clip)}`);
+  // Read actual output frames. This is evidence of the encoding result, never a
+  // prediction dressed as a measured clock or a quality score on the original.
+  normalized.push(target); shotFrames.push(actual.videoFrames);
+  const picture = join(temp, `picture-${String(index).padStart(2, "0")}.mp4`);
+  // Strip audio before the concat demuxer establishes its first packet origin.
+  // Otherwise AAC's negative priming packet shifts the copied picture start and
+  // changes MP4's average frame clock even when every source picture frame exists.
+  run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", "-i", target, "-map", "0:v:0", "-an",
+    "-c:v", "copy", "-avoid_negative_ts", "disabled", picture]);
+  const pictureClock = sourceMedia(picture);
+  if (pictureClock.videoFrames !== actual.videoFrames || Math.abs(pictureClock.fps - fps) > 1e-8)
+    throw new Error(`COMPOSE_PACKET_CLOCK_CHANGED: ${basename(clip)}`);
+  pictureSources.push(picture);
+  pictureSignatures.push(picturePacketSignature(picture));
+  sourceBindings.push({ path: clip, sha256: inputBindings[index]!.sha256, source: metadata,
+    normalized: { path: target, ...actual }, normalizationPerformed: normalizePicture });
+  console.log(`  ① 完整源 ${basename(clip)} ${metadata.videoFrames}帧/${metadata.fps}fps → 实际 ${actual.videoFrames}帧/${fps}fps；名义秒数不裁片，原声不补齐`);
 });
 
 /* ---------- ② 拼接 ---------- */
 const raw = join(temp, "raw.mp4");
-/**
- * 每段**按画面时长**把音轨切/补到精确长度（2026-09-26 真机事故修复的关键一步）：
- * aac 把音频按 1024 样点（48k 下 21.33ms）成帧，末帧向上取整，
- * 于是每段音轨比画面**长** 0–21ms；不透支这个差，逐段累计就是 33ms/6 镜的漂移。
- * 不变量：每段音轨时长 === 该段画面时长（D = 帧数 / fps）。
- */
 const shotSeconds = shotFrames.map((frames) => frames / fps);
 /**
  * concat demuxer 缺省用 MP4 容器时长移动下一镜的 PTS。AAC 帧尾可能令容器比
  * 视频轨多出数毫秒，即使只拷视频也会在镜头接缝留下非整帧间隔。每镜用同一份
- * 帧数/fps 时长覆盖容器时长；下方音轨切补和音画实测也必须共用 shotSeconds。
+ * 帧数/fps 时长覆盖容器时长；原声另按实际镜头开始时刻放置，不裁切或补齐。
  */
 const listFile = join(temp, "concat.txt");
-writeFileSync(listFile, normalized.map((file, index) =>
-  `file '${file}'\nduration ${shotSeconds[index]!.toFixed(6)}`).join("\n"), "utf8");
-const audioExact = normalized.map((_, index) =>
-  `[${index}:a]atrim=end=${shotSeconds[index]!.toFixed(6)},asetpts=N/SR/TB,`
-  + `apad=whole_dur=${shotSeconds[index]!.toFixed(6)}[aex${index}]`);
+writeFileSync(listFile, pictureSources.map((file, index) =>
+  `file '${file.replace(/'/g, "'\\''")}'\nduration ${shotSeconds[index]!.toFixed(9)}`).join("\n"), "utf8");
+const audioExact = normalized.map((_, index) => `[${index}:a]aresample=48000,asetpts=PTS-STARTPTS[aex${index}]`);
+let pictureConcatenation = "explicit-transition";
 if (transition && transitionDuration > 0) {
+  if (sourceBindings.some(source => !source.normalized.hasAudio)) throw new Error("COMPOSE_TRANSITION_AUDIO_UNAVAILABLE: explicit AV transition requires actual audio inputs");
   /**
    * xfade 链：每刀的 offset = 到该刀为止的累计时长 − 已消耗的转场重叠。
    * 视频用 xfade（`transition` 指定名），音频用 acrossfade 同步收口；
@@ -253,32 +272,48 @@ if (transition && transitionDuration > 0) {
     : transitionAt.filter((i) => i >= 2 && i <= normalized.length).length;
   console.log(`  ② 逐刀转场：${transition} @${transitionDuration}s × ${usedCuts} 刀（其余硬切）`);
 } else {
-  /**
-   * 硬切拼接的**音画对齐纪律**（2026-09-26 真机事故修复）：
-   * 逐段 mp4 里 aac 音轨普遍比画面短几毫秒（编码器 priming + 帧对齐），
-   * `-f concat -c copy` 会让 demuxer **按各自流的时长**分别累计偏移 →
-   * 声音相对画面逐镜漂移（真机实测 15 镜尾镜 +125ms，听感="上一镜的音效串到下一镜"）。
-   * 现在：画面仍无损直拷（帧级不重编码），声音改走 **concat 滤镜**（样点级顺序拼接、
-   * 不足处按画面时长补静音），再与画面合流。代价只有一次音频重编码。
-   */
   const videoOnly = join(temp, "video-only.mp4");
-  run(FFMPEG, ["-y", "-f", "concat", "-safe", "0", "-i", listFile, "-c:v", "copy", "-an", videoOnly]);
-  const voiceWav = join(temp, "voice.wav");
-  const audioInputs = normalized.flatMap((file) => ["-i", file]);
-  const audioConcat = `${normalized.map((_, index) => `[aex${index}]`).join("")}concat=n=${normalized.length}:v=0:a=1[aout]`;
-  run(FFMPEG, [
-    "-y", ...audioInputs,
-    "-filter_complex", [...audioExact, audioConcat].join(";"),
-    "-map", "[aout]", "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2", voiceWav,
-  ]);
-  run(FFMPEG, [
-    "-y", "-i", videoOnly, "-i", voiceWav,
-    "-map", "0:v:0", "-map", "1:a:0",
-    "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
-    "-shortest", "-movflags", "+faststart", raw,
-  ]);
+  const copyCompatible = pictureSignatures.every(signature => signature === pictureSignatures[0]);
+  if (copyCompatible) {
+    pictureConcatenation = "compatible-picture-packet-copy";
+    run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", "-f", "concat", "-safe", "0", "-i", listFile,
+      "-map", "0:v:0", "-c:v", "copy", "-an", "-avoid_negative_ts", "disabled", videoOnly]);
+  } else {
+    pictureConcatenation = "complete-picture-lossless-encoding";
+    const inputs = pictureSources.flatMap(file => ["-i", file]);
+    const preparedVideo = pictureSources.map((_, index) => `[${index}:v]settb=AVTB,setpts=PTS-STARTPTS[v${index}]`);
+    const concat = `${pictureSources.map((_, index) => `[v${index}]`).join("")}concat=n=${pictureSources.length}:v=1:a=0[vout]`;
+    run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", ...inputs, "-filter_complex", [...preparedVideo, concat].join(";"),
+      "-map", "[vout]", "-an", "-c:v", "libx264", "-preset", "medium", "-crf", "0", "-r", String(fps),
+      "-avoid_negative_ts", "disabled", videoOnly]);
+  }
+  const pictureClock = sourceMedia(videoOnly);
+  if (pictureClock.videoFrames !== shotFrames.reduce((sum, frames) => sum + frames, 0)
+    || Math.abs(pictureClock.fps - fps) > 1e-8) throw new Error("COMPOSE_COMPLETE_PICTURE_CLOCK_CHANGED");
+  const audioSources = sourceBindings.map((source, index) => ({ source, index })).filter(row => row.source.normalized.hasAudio);
+  if (!audioSources.length) run(FFMPEG, ["-v", "error", "-y", "-i", videoOnly, "-c", "copy", raw]);
+  else if (normalized.length === 1) {
+    // A single source's audio packets need no concatenation. Preserve AAC
+    // priming/packet payload and keep its source timestamps without shifting video.
+    run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", "-copyts", "-i", videoOnly, "-i", normalized[0]!,
+      "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-avoid_negative_ts", "disabled", "-movflags", "+faststart", raw]);
+  } else {
+    const voice = join(temp, "available-audio.m4a"), audioInputs = audioSources.flatMap(row => ["-i", normalized[row.index]!]);
+    const placed = audioSources.map(({ index }, inputIndex) => {
+      const startSec = shotSeconds.slice(0, index).reduce((sum, seconds) => sum + seconds, 0);
+      return `[${inputIndex}:a]aresample=48000,asetpts=PTS-STARTPTS,adelay=${Math.round(startSec * 48000)}S:all=1[placed${inputIndex}]`;
+    });
+    // Whole available audio is placed at each measured shot start. No track is
+    // extended to picture EOF; short/absent source audio is an observed fact.
+    // Encoding once avoids overlapping AAC packet DTS at concatenation boundaries.
+    const mix = `${audioSources.map((_, index) => `[placed${index}]`).join("")}amix=inputs=${audioSources.length}:duration=longest:normalize=0[aout]`;
+    run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", ...audioInputs, "-filter_complex", [...placed, mix].join(";"),
+      "-map", "[aout]", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2", voice]);
+    run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", "-copyts", "-i", videoOnly, "-i", voice,
+      "-map", "0:v:0", "-map", "1:a:0", "-c", "copy", "-avoid_negative_ts", "disabled", "-movflags", "+faststart", raw]);
+  }
 }
-const rawDuration = probeDuration(raw);
+const rawDuration = sourceMedia(raw).duration;
 console.log(`  ② 拼接完成 → ${rawDuration.toFixed(2)}s`);
 
 /* ---------- ③ 收口（淡入淡出 + 标题/字幕烧字） ---------- */
@@ -327,23 +362,31 @@ if (Math.abs(retimeFactor - 1) > 0.0005) {
   run(FFMPEG, [
     "-y", "-i", raw,
     ...(filters.length > 0 ? ["-vf", filters.join(",")] : []),
-    "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p",
-    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out,
+    ...(nativeClock ? ["-c:v", "copy", "-c:a", "copy"]
+      : ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k"]),
+    "-avoid_negative_ts", "disabled", "-movflags", "+faststart", out,
   ]);
 }
-const outDuration = probeDuration(out);
+const outDuration = sourceMedia(out).duration;
 console.log(`  ③ 母版 → ${out}（${outDuration.toFixed(2)}s）`);
 
 /* ---------- ③-1 处理回执（无渲后品质审核） ---------- */
 for (const binding of inputBindings) if (await sha256File(binding.path) !== binding.sha256)
   throw new Error(`COMPOSE_SOURCE_CHANGED: ${binding.path}`);
 const avReportPath = join(dirname(out), `${basename(out).replace(/\.mp4$/i, "")}.av-sync.json`);
+const outputMedia = sourceMedia(out);
+if (nativeClock && (outputMedia.videoFrames !== shotFrames.reduce((sum, frames) => sum + frames, 0)
+  || Math.abs(outputMedia.fps - fps) > 1e-8 || outputMedia.width !== width || outputMedia.height !== height))
+  throw new Error("COMPOSE_COMPLETE_EXPORT_CLOCK_CHANGED");
+if (sourceBindings.some(source => source.normalized.hasAudio) && !outputMedia.hasAudio)
+  throw new Error("COMPOSE_AVAILABLE_SOURCE_AUDIO_LOST");
 writeFileSync(avReportPath, `${JSON.stringify({
   schemaVersion: "workloom.composition-process/v1", generatedAt: new Date().toISOString(),
-  output: out, outputSha256: await sha256File(out), inputBindings,
+  output: out, outputSha256: await sha256File(out), inputBindings, sources: sourceBindings,
   target: { width, height, fps, shotFrames, durationSec: shotSeconds.reduce((a, b) => a + b, 0) },
-  audioSource: "existing source audio; silent sources receive a silent processing stream",
-  sourceFilesUnchanged: true, audioAlignmentMeasured: false,
+  outputMedia, nativeClock, retimeFactor, pictureConcatenation,
+  audioSource: "Available same-file original audio; no audio duration is extended to fit the picture clock.",
+  sourceFilesUnchanged: true, qualityReviewPerformed: false, audioAlignmentMeasured: false,
   note: "No quality, speech, lipsync or correlation acceptance review was performed. Actual processing errors remain fatal."
 }, null, 2)}\n`, "utf8");
 console.log(`  ③-1 处理回执：${avReportPath}（未执行音画品质审核）`);
@@ -368,12 +411,12 @@ if (colorMode !== "none") {
 if (!flag("--keep-temp")) rmSync(temp, { recursive: true, force: true });
 
 const summary = {
-  clips: clips.length,
+  clips: clips.length, nativeClock, outputMedia,
   width, height, fps,
   master: out,
   masterSeconds: Number(outDuration.toFixed(3)),
   graded: gradedPath,
-  color: colorReport ? { mode: colorMode, verdict: colorReport.verdict ?? "grade", winner: colorReport.winner ?? gradeProfile ?? null } : null
+  color: colorReport ? { mode: "grade", verdict: colorReport.verdict ?? "grade", winner: colorReport.winner ?? gradeProfile ?? null } : null
 };
 if (flag("--json")) console.log(`COMPOSE ${JSON.stringify(summary)}`);
 else console.log(`成片：${out}（${outDuration.toFixed(2)}s${gradedPath ? `；调色版 ${gradedPath}` : ""}）`);

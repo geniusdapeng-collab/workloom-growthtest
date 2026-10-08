@@ -1,5 +1,5 @@
 /**
- * producer-gate —— AI 监制（制片人）门：把"人工确认"换成"机器评审 + 打回重跑"
+ * producer-gate —— 前期监制与成功素材的事实性后期处理回执
  *
  * 背景（T-2026-0924-0001）：
  *   视频链路上原有 G1–G7 七个确认门。早先实现是两道极端：要么挂人工审批卡等人点（停线），
@@ -12,8 +12,10 @@
  *   2. 确定性硬闸（调用方传入 ffprobe/文件校验结果）—— 硬失败直接打回，不消耗模型额度；
  *   3. 可选的 LLM 评审（含图像）—— 打分 + 问题清单 + 修改建议；模型不可用时**如实降级**并标注。
  *
- * 纪律：默认 fail-closed —— 硬闸失败必打回；LLM 不可用且无硬闸结论时**不放行**（返回 rerun），
- * 模型/证据不可用时保持 unverified；旧 allowFallbackApprove 参数不再授予正式通过资格。
+ * 当前纪律：前期仍核对作者合同与真实生成前提。POST_RENDER_STAGES 直接交给
+ * postProcessingVerdict：真实文件或处理失败仍失败，旧品质评分、模型不可用或缺质量
+ * 样本不构成二次否决。后期分数为 null，质量保持 unverified，不作身份或语音认证。
+ * 非后期的模型/证据不可用仍 fail-closed；旧 allowFallbackApprove 不补造品质通过。
  */
 
 export type ProducerStage =
@@ -74,6 +76,7 @@ export interface ProducerVerdict {
   /** Creative reviews use 0–100; factual post-processing receipts have no quality score. */
   score: number | null;
   qualityReviewed?: boolean;
+  qualityStatus?: "unverified" | "reviewed";
   hardFailures: string[];
   issues: string[];
   suggestions: string[];
@@ -93,7 +96,7 @@ export interface ProducerVerdict {
  */
 export const PRODUCER_RUBRICS: Record<ProducerStage, string[]> = {
   script: [
-    "台词速率和时长符合明确交付合同，无台词镜头不添加对白；总时长与目标一致",
+    "高完成度作品优先：完整动作、整句台词和收束高于名义秒数；总时长是软目标，只有显式硬上限约束时长，不为凑秒截句或压速",
     "动作、静止、情绪与每镜叙事目的相符，不强迫空镜或克制表演产生动作变化",
     "开场、推进和收尾服务当前 brief；年代、主体、人数与原镜头合同一致"
   ],

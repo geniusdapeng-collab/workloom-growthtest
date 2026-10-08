@@ -78,3 +78,5 @@ vendor/supermickey/hyperreality-system/skills/*/usage-stats.jsonl
 .workloom-tools/
 # 主档对账的本地备份（T-2026-0930-0015：`video:assets reconcile --apply` 写前备份；证据文件进仓、备份不进）
 **/real-person-assets/**/profile.json.bak
+# 私有生成接续响应含短期媒体访问地址；只在本机恢复，禁止随肖像档案提交
+**/.submissions/

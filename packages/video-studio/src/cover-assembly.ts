@@ -1,4 +1,4 @@
-/** Publication cover assembly. The clean master stays separate; only frame zero is replaced. */
+/** Publication cover assembly. Formal exports prepend one cover frame and preserve the complete source body. */
 import { execFile } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { createReadStream } from "node:fs";
@@ -63,11 +63,18 @@ export interface CoverFirstFrameInput {
   ffmpeg?: string;
   ffprobe?: string;
   timeoutMs?: number;
+  /** Keep every source picture by inserting the cover before the body. */
+  preserveSourceFrames?: boolean;
 }
 
 export interface CoverFirstFrameReceipt {
-  schemaVersion: 1;
-  mode: "replace-first-frame";
+  schemaVersion: 1 | 2;
+  mode: "replace-first-frame" | "prepend-cover-frame";
+  sourceVideo?: { frameCount: number; fps: number; durationSeconds: number };
+  sourceOffsetFrames?: 1;
+  bodyVideoOffsetSeconds?: number;
+  audioOffsetSeconds?: 0;
+  subtitleOffsetSeconds?: 0;
   coverFrameCount: 1;
   input: { path: string; sha256: string };
   cover: { path: string; sha256: string };
@@ -94,6 +101,7 @@ interface MediaStream {
   sample_rate?: string;
   channels?: number;
   channel_layout?: string;
+  pix_fmt?: string;
   tags?: Record<string, string>;
   side_data_list?: Array<{ rotation?: number }>;
 }
@@ -151,9 +159,11 @@ function assertInvariant(condition: boolean, message: string): asserts condition
 }
 
 /**
- * FFmpeg timeline enable n=0 replaces exactly one frame. No prepend, concat, audio resampling,
- * fps conversion, duration trim, or subtitle shift occurs. Ordinary export metadata and copied packet/byte checks finish before atomic publication; no source quality scan occurs.
- * Reference: https://www.ffmpeg.org/ffmpeg-filters.html#Timeline-editing
+ * Formal exports insert one still frame at zero and shift every body picture by 1/fps.
+ * Legacy callers can still replace frame zero. Audio/subtitle packet bytes and timestamps stay
+ * on their original clock. Ordinary metadata and copied packets are verified before atomic
+ * publication; this does not perform a picture/audio quality review.
+ * Reference: https://www.ffmpeg.org/ffmpeg-filters.html#interleave_002c-ainterleave
  */
 export async function embedCoverFirstFrame(options: CoverFirstFrameInput): Promise<CoverFirstFrameReceipt> {
   const ffmpeg = options.ffmpeg ?? "ffmpeg";
@@ -202,19 +212,34 @@ export async function embedCoverFirstFrame(options: CoverFirstFrameInput): Promi
     const [audioPackets, subtitlePackets] = await Promise.all([
       packetFingerprint(input, "a", ffprobe, timeout), packetFingerprint(input, "s", ffprobe, timeout),
     ]);
+    const preserve = options.preserveSourceFrames === true;
+    if (preserve && frameCount === null) throw new CoverAssemblyError("Complete source frame metadata is required for cover insertion");
+    const pixelFormat = preserve ? video.pix_fmt : "yuv420p";
+    if (preserve && !["yuv420p", "yuv422p", "yuv444p", "gray"].includes(pixelFormat ?? "")) {
+      throw new CoverAssemblyError("Complete-source cover insertion requires a lossless-compatible source pixel format");
+    }
+    const prepareCover = `[1:v:0]scale=${video.width}:${video.height}:force_original_aspect_ratio=decrease,pad=${video.width}:${video.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=${pixelFormat},settb=AVTB,setpts=PTS-STARTPTS[cover]`;
+    const filter = preserve
+      ? `${prepareCover};[0:v:0]settb=AVTB,setpts=PTS-STARTPTS+${1 / fps}/TB[body];[cover][body]interleave=nb_inputs=2:duration=longest[v]`
+      : `${prepareCover};[0:v:0][cover]overlay=0:0:enable='eq(n,0)':eof_action=repeat:repeatlast=1:shortest=0[v]`;
     await execute(ffmpeg, ["-v", "error", "-nostdin", "-y", "-copyts", "-i", input, "-i", cover,
-      "-filter_complex", `[1:v:0]scale=${video.width}:${video.height}:force_original_aspect_ratio=decrease,pad=${video.width}:${video.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=yuv420p,setpts=PTS-STARTPTS[cover];[0:v:0][cover]overlay=0:0:enable='eq(n,0)':eof_action=repeat:repeatlast=1:shortest=0[v]`,
+      "-filter_complex", filter,
       "-map", "[v]", "-map", "0:a?", "-map", "0:s?", "-map_metadata", "0", "-map_chapters", "0",
-      "-c:v", "libx264", "-preset", "medium", "-crf", "17", "-pix_fmt", "yuv420p", "-fps_mode:v", "passthrough",
+      "-c:v", "libx264", "-preset", "medium", "-crf", preserve ? "0" : "17", "-pix_fmt", pixelFormat!, "-fps_mode:v", preserve ? "cfr" : "passthrough",
+      ...(preserve ? ["-r:v", video.avg_frame_rate!] : []),
       "-video_track_timescale", String(Math.round(1 / numericRate(video.time_base))),
       "-c:a", "copy", "-c:s", "copy", "-movflags", "+faststart", pending], timeout);
     const produced = await probe(pending, ffprobe, timeout);
     const finalVideo = produced.streams.find((stream) => stream.codec_type === "video");
     assertInvariant(Boolean(finalVideo), "Publication has no video stream");
     assertInvariant(finalVideo!.width === video.width && finalVideo!.height === video.height, "Publication dimensions changed");
-    if (frameCount !== null && Number.isSafeInteger(Number(finalVideo!.nb_frames))) assertInvariant(Number(finalVideo!.nb_frames) === frameCount, "Publication metadata frame count changed");
-    assertInvariant(Math.abs(Number(finalVideo!.duration) - duration) <= 0.000001, "Publication video duration changed");
-    assertInvariant(Math.abs(Number(produced.format.duration) - Number(sourceInfo.format.duration)) <= 0.000001, "Publication container duration changed");
+    const expectedFrames = frameCount === null ? null : frameCount + (preserve ? 1 : 0);
+    const expectedDuration = duration + (preserve ? 1 / fps : 0);
+    if (expectedFrames !== null) assertInvariant(Number(finalVideo!.nb_frames) === expectedFrames, "Publication metadata frame count changed");
+    assertInvariant(Math.abs(Number(finalVideo!.duration) - expectedDuration) <= 0.000002, "Publication video duration changed");
+    const expectedContainerDuration = Math.max(expectedDuration, ...sourceInfo.streams.filter(stream => stream.codec_type !== "video").map(stream => Number(stream.start_time ?? 0) + Number(stream.duration ?? 0)));
+    if (!preserve) assertInvariant(Math.abs(Number(produced.format.duration) - Number(sourceInfo.format.duration)) <= 0.000001, "Publication container duration changed");
+    else assertInvariant(Math.abs(Number(produced.format.duration) - expectedContainerDuration) <= 0.0011, "Publication container duration differs from its complete streams");
     assertInvariant(Math.abs(numericRate(finalVideo!.avg_frame_rate) - fps) <= 0.000001, "Publication fps changed");
     assertInvariant(streamMetadata(sourceInfo.streams, "audio") === streamMetadata(produced.streams, "audio"), "Publication audio stream metadata changed");
     assertInvariant(streamMetadata(sourceInfo.streams, "subtitle") === streamMetadata(produced.streams, "subtitle"), "Publication subtitle stream metadata changed");
@@ -226,14 +251,18 @@ export async function embedCoverFirstFrame(options: CoverFirstFrameInput): Promi
     const [finalInputHash, finalCoverHash, outputHash] = await Promise.all([sha256(input), sha256(cover), sha256(pending)]);
     assertInvariant(finalInputHash === sourceHash && finalCoverHash === coverHash, "Input changed during publication cover assembly");
     const receipt: CoverFirstFrameReceipt = {
-      schemaVersion: 1, mode: "replace-first-frame", coverFrameCount: 1,
+      schemaVersion: preserve ? 2 : 1, mode: preserve ? "prepend-cover-frame" : "replace-first-frame", coverFrameCount: 1,
+      ...(preserve ? { sourceVideo: { frameCount: frameCount!, fps, durationSeconds: duration }, sourceOffsetFrames: 1 as const,
+        bodyVideoOffsetSeconds: 1 / fps, audioOffsetSeconds: 0 as const, subtitleOffsetSeconds: 0 as const } : {}),
       input: { path: input, sha256: sourceHash }, cover: { path: cover, sha256: coverHash }, output: { path: output, sha256: outputHash },
-      video: { width: video.width!, height: video.height!, fps, frameCount, frameCountBasis: frameCount === null ? "not-reported" : "container-metadata", durationSeconds: duration,
+      video: { width: video.width!, height: video.height!, fps, frameCount: expectedFrames, frameCountBasis: expectedFrames === null ? "not-reported" : "container-metadata", durationSeconds: Number(finalVideo!.duration),
         timelineSha256: null, coverPsnrDb: null },
       audio: { preserved: true, streamCount: audioCount, packetSha256: audioPackets, decodedPcmSha256: [] },
       subtitles: { preserved: true, streamCount: subtitleCount, packetSha256: subtitlePackets },
       qualityReviewPerformed: false, coverTransform: { width: video.width!, height: video.height!, mode: "contain-and-pad" },
-      verificationBasis: "Actual first-frame overlay and copied audio/subtitle packets, ordinary stream/container metadata and unchanged input SHA. No PSNR, full video timestamps, decoded PCM or source-quality review.",
+      verificationBasis: preserve
+        ? "Actual cover insertion with lossless complete-source body encoding, copied audio/subtitle packets and original timestamps, ordinary stream/container metadata and unchanged input SHA. No PSNR, full video timestamps, decoded PCM or source-quality review."
+        : "Actual first-frame overlay and copied audio/subtitle packets, ordinary stream/container metadata and unchanged input SHA. No PSNR, full video timestamps, decoded PCM or source-quality review.",
     };
     await rename(pending, output);
     return receipt;

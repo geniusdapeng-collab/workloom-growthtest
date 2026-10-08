@@ -69,7 +69,7 @@ function jsonFile(file: string, value: unknown): void {
   mkdirSync(dirname(file), { recursive: true }); writeFileSync(file, JSON.stringify(value, null, 2));
 }
 
-function fixture(policy = "off", options: { multiCharacter?: boolean; only?: string } = {}) {
+function fixture(policy = "blocking", options: { multiCharacter?: boolean; only?: string } = {}) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "film-parent-identity-"))); temporary.push(root);
   const workDir = join(root, "work"), assets = join(root, "assets"), characters = join(root, "characters");
   mkdirSync(workDir); mkdirSync(join(workDir, "clips")); mkdirSync(join(workDir, "review"));
@@ -367,8 +367,8 @@ describe("actual parent compiled submission, provider download, and copied sourc
   });
 });
 
-describe("successful parent renders enter post under off and advisory policies without quality approval", () => {
-  it.each(["off", "advisory"])("%s processes actual accepted media without a visual model or dedicated identity receipt", async policy => {
+describe("successful parent renders enter post under all historical review policies without quality approval", () => {
+  it.each(["off", "advisory", "blocking"])("%s processes actual accepted media without a visual model or dedicated identity receipt", async policy => {
     const f = fixture(policy), prepared = await prepareIdentity(f);
     const legacyRequest = filmCanonicalJson(prepared.request);
     await reviewProcessed(f, prepared);
@@ -376,7 +376,7 @@ describe("successful parent renders enter post under off and advisory policies w
     expect(f.ctx.videoFiles.get(prepared.clipRef)).toEqual(prepared.generated.result.submissionReceipt);
     expect(prepared.generated.result.submissionReceipt.taskId).toBeTruthy();
   });
-  it.each(["off", "advisory"])("%s leaves a denied historical identity opinion unchanged while processing current media", async policy => {
+  it.each(["off", "advisory", "blocking"])("%s leaves a denied historical identity opinion unchanged while processing current media", async policy => {
     const f = fixture(policy); f.response.approved = false; f.response.score = 93; f.response.reason = "mock拒绝：样本未支持同一人物和服饰";
     const prepared = await prepareIdentity(f), historicalOpinion = filmCanonicalJson(f.response);
     await reviewProcessed(f, prepared);
@@ -559,7 +559,7 @@ describe("parent submission authority stays scoped to registered people and sele
     expect(modelCalls(f)).toHaveLength(0);
   });
   it("only selects the first allowed shot of each person instead of demanding an out-of-scope earlier shot", async () => {
-    const f = fixture("off", { multiCharacter: true, only: "S2,T2" });
+    const f = fixture("blocking", { multiCharacter: true, only: "S2,T2" });
     expect((await generate(f, "S2")).result.submissionReceipt.shotId).toBe("S2");
     expect((await generate(f, "T2")).result.submissionReceipt.shotId).toBe("T2");
     await rejectedBeforeReserve(f, frame("video.generate", "S1", videoParams(f, "S1")), "SHOT_NOT_FOUND");
