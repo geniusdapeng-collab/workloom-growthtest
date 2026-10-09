@@ -24,10 +24,16 @@ export interface CoverVariantFilterInput {
 
 /** No user-visible operations labels are accepted by this renderer. */
 export function buildVariantCoverFilters(input: CoverVariantFilterInput) {
+  /**
+   * 变体封面必须**看得出风格**（2026-10-09 产品所有者打回）：
+   * 真机反馈"三个风格版的封面只有色条颜色不同、主视觉一模一样"。
+   * 旧值只在 0.018 量级微调（肉眼不可辨）；现在按各风格的调色口径给到**可见**强度，
+   * 并保留原有的强调色条作为第二重区分（封面仍来自同一主设计稿，属零 token 派生）。
+   */
   const grades: Record<CoverVariantId, string[]> = {
-    "warm-film": ["colorbalance=rs=0.018:bs=-0.018", "eq=saturation=0.97:contrast=1.015"],
-    "punchy-social": ["eq=saturation=1.10:contrast=1.055"],
-    "cool-tech": ["colorbalance=rs=-0.018:bs=0.025", "eq=saturation=0.94:contrast=1.025"],
+    "warm-film": ["colorbalance=rs=0.07:gs=0.015:bs=-0.06", "curves=all='0/0.04 0.5/0.53 1/0.97'", "eq=saturation=1.04:contrast=1.05"],
+    "punchy-social": ["eq=saturation=1.16:contrast=1.12:gamma=0.98"],
+    "cool-tech": ["colorbalance=rs=-0.05:gs=-0.01:bs=0.08", "eq=saturation=0.90:contrast=1.07:gamma=0.99"],
   };
   if (!Object.prototype.hasOwnProperty.call(grades, input.variantId)) throw new CoverAssemblyError("Unknown cover variant");
   if (!/^#[0-9a-f]{6}$/i.test(input.accent)) throw new CoverAssemblyError("Cover accent must be #RRGGBB");

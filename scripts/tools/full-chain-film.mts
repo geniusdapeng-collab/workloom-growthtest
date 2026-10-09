@@ -4522,7 +4522,12 @@ if (STAGES.has("bgm") && existsSync(danmakuOut) && !DRY_RUN) {
   if (!requestedOff) rememberInputs("bgm", [danmakuOut, trackPath]);
   const result = requestedOff ? { ok: true, out: "no_bgm_needed: explicit --no-bgm; original program retained" } : runCli(BGM_CLI, [
     "mix", "--in", danmakuOut, "--out", out, "--bgm", trackPath, "--policy", policy,
-    "--music-level", arg("--bgm-level", "-26"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
+    /**
+     * 音乐床电平（2026-10-09 产品所有者打回："几个版本听着声音都一样，是不是没加 BGM"）：
+     * 旧默认 -26dB 对以音乐为骨的片子等于听不见；现在默认 -18dB，仍由 `--bgm-level` 覆写，
+     * 语音段的让位仍由 `--bgm-ducking`（默认 14dB）保证。
+     */
+    "--music-level", arg("--bgm-level", "-18"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
     "--true-peak", arg("--bgm-true-peak", "-1.5"), "--section", arg("--bgm-section", "full"),
     "--declared-program-mix", ...(declaredTrack?.bpm ? ["--bgm-bpm", String(declaredTrack.bpm)] : [])
   ]);
@@ -4561,7 +4566,13 @@ const bgmScored = scored;
  *   ③ 合成音效 → 逐条 adelay 拼成 SFX 轨 → 与母版音轨混音（视频轨 copy）；
  *   ④ 复核：响度仍在 −14 LUFS ±1.5、剪辑点窗口内确有新增能量（"做了但听不见"要被抓出来）。
  */
-if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
+/** `--no-sfx`：整层关闭（调用方显式声明；未产出如实记档，不静默跳过）。 */
+if (STAGES.has("sfx") && flag("--no-sfx")) {
+  record({ stage: "sfx", shotId: null, invoked: true, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
+    artifact: null, evidence: { applicable: false, skipReason: "调用方显式 --no-sfx：不铺转场音效层" },
+    verdict: null, note: "SFX 层按调用方声明关闭（保留原声 + 配乐）" });
+}
+if (STAGES.has("sfx") && !flag("--no-sfx") && existsSync(scored) && !DRY_RUN) {
   rememberInputs("sfx", [scored]);
   const started = Date.now();
   const sfxDir = join(POST_DIR, "sfx");
@@ -4573,11 +4584,20 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
   /** 段落重音 = 进入快剪段的第一刀 + 最后一刀（模板可覆盖） */
   const accentTimes = cutTimes.length > 1 ? [cutTimes[0]!, cutTimes[cutTimes.length - 1]!] : cutTimes.slice(0, 1);
   /**
+   * whoosh 的摆放口径（2026-10-09 产品所有者打回：成片"镜头切换处每刀一声呲"）：
+   *   · whoosh 的设计用途是**运动掩体转场**（甩镜拖影/擦除）的气流声；原生标准生产是**硬切**，
+   *     没有掩体可掩护——每刀一铺就退化成一串噪声，听感即"呲"。
+   *   · 因此只有声明过逐刀转场时才在转场点铺 whoosh；硬切也想铺气流的片子必须显式 `--sfx-cut-whoosh`。
+   *   · 段落重音（impact）与高潮抬升（riser）不受影响。
+   */
+  const whooshCuts = EFFECTIVE_CUT_TRANSITION ? cutTimes : (flag("--sfx-cut-whoosh") ? cutTimes : []);
+  const plannedCuts = [...new Set([...whooshCuts, ...accentTimes])].sort((a, b) => a - b);
+  /**
    * 高潮那一刻 = 最后一个重音刀口（进入收尾镜之前）。
    * riser 由策划器**前置**到高潮之前（真机打回：riser 落在切点之后 = 高潮过去了才抬升）。
    */
   const climaxAtSec = accentTimes.length > 0 ? accentTimes[accentTimes.length - 1] : undefined;
-  const sfxPlan = planCutSfxDetailed({ cutTimes, durationSec: totalDuration, accentTimes, climaxAtSec }, CUT_SFX_POLICY);
+  const sfxPlan = planCutSfxDetailed({ cutTimes: plannedCuts, durationSec: totalDuration, accentTimes, climaxAtSec }, CUT_SFX_POLICY);
   /**
    * 开场钩子音（2026-09-27）：0–0.6s 是转场音效覆盖不到的窗口，单独摆一条。
    * 与转场音效的冲突在这里显式消解（不是静默丢弃）：钩子音**优先**——它是前 3 秒机制的一部分，
@@ -4613,7 +4633,7 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
       log("  ⚠ 没有剪辑点可铺音效（跳过 SFX 层）");
       record({
         stage: "sfx", shotId: null, invoked: true, ok: true, cached: false, degraded: true, attempt: 1, ms: Date.now() - started,
-        artifact: null, evidence: { placements: 0, cutTimes }, verdict: null, note: "无剪辑点：SFX 层未产出（如实记录，不静默）"
+        artifact: null, evidence: { placements: 0, cutTimes, whooshCuts, plannedCuts }, verdict: null, note: "无剪辑点：SFX 层未产出（如实记录，不静默）"
       });
     } else {
       /** 合成 SFX 轨：每条音效按 atSec 延迟后混在一起（amix 不做响度归一，避免把短音效拉爆） */
@@ -4645,7 +4665,7 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
         ],
         deterministic: [
           { id: "sfx-produced", pass: existsSync(out), detail: existsSync(out) ? "带音效母版已产出" : "带音效母版未产出", hard: true },
-          { id: "sfx-count", pass: placements.length >= Math.min(3, cutTimes.length), detail: `音效 ${placements.length} 条 / 剪辑点 ${cutTimes.length} 个`, hard: true },
+          { id: "sfx-count", pass: placements.length >= Math.min(3, plannedCuts.length), detail: `音效 ${placements.length} 条 / 计划编排点 ${plannedCuts.length} 个（剪辑点 ${cutTimes.length} 个，其中铺 whoosh ${whooshCuts.length} 个）`, hard: true },
           {
             id: "hook-sfx-window",
             pass: !hookSfxEnabled || Boolean(hookPlacement),
@@ -4658,7 +4678,7 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
         ],
         context: {
           placements: placements.map((p) => `${p.kind}@${p.atSec}s（${p.gainDb}dB，${p.reason}）`),
-          cutTimes, policy: CUT_SFX_POLICY,
+          cutTimes, whooshCuts, plannedCuts, policy: CUT_SFX_POLICY,
           discipline: "音效是**剪辑点掩体**，不是音效秀：条数与增益按口径执行；听不见=白做，盖住人声=事故。"
         },
         env: ENV, allowFallbackApprove: ALLOW_FALLBACK_APPROVE, log
@@ -4672,7 +4692,7 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
           dropped: sfxPlan.dropped.map((p) => ({ atSec: p.atSec, kind: p.kind, reason: p.reason })),
           hook: hookPlacement ? { atSec: hookPlacement.atSec, kind: hookPlacement.kind, gainDb: hookPlacement.gainDb, reason: hookPlacement.reason } : null,
           hookConflicts: hookConflicts.map((p) => ({ atSec: p.atSec, kind: p.kind, reason: "被开场钩子音挤掉（0–0.6s 内不与剪辑点音效叠加）" })),
-          climaxAtSec, cutTimes, loudnessBefore: null, loudnessAfter: null, drift: null, qualityReviewPerformed: false,
+          climaxAtSec, cutTimes, whooshCuts, plannedCuts, loudnessBefore: null, loudnessAfter: null, drift: null, qualityReviewPerformed: false,
           tool: "sfx-synth（合成，无第三方采样）"
         },
         verdict, note: `音效 ${placements.length} 条（whoosh/impact/riser）${hookPlacement ? " · 含开场钩子音" : ""}`
@@ -4690,6 +4710,46 @@ if (STAGES.has("sfx") && existsSync(scored) && !DRY_RUN) {
 /* ---------- ⑨ 封面：已声明源 → 平台设计稿 → 实际合成 ---------- */
 /** Deterministic platform composition preserves the declared single hero, title hierarchy,
  * account style and source binding. No model design or image-quality review runs here. */
+
+/**
+ * 封面设计师（数字员工）的模型调用：**只产出设计稿 JSON**，不产图、不评分。
+ * 产品口径（2026-10-09）：封面标题与副标题由封面设计师出稿，不许在管线里硬编码文案；
+ * 模型不可用/稿件非法时才退确定性兜底稿（`designVia` 如实记录）。
+ */
+async function requestCoverDesign(
+  config: { baseUrl: string; apiKey: string; model: string },
+  prompt: string,
+  timeoutMs = 45_000
+): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: config.model,
+    messages: [
+      { role: "system", content: "你是 WorkLoom 的封面设计师，只输出符合 schema 的 JSON 设计稿，不写解释文字。" },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0,
+    response_format: { type: "json_object" }
+  };
+  /** DeepSeek 官方端点默认思考模式会吃掉短 JSON 稿的预算；仅对官方端点关闭思考（其它兼容端点不发该字段）。 */
+  if (/api\.deepseek\.com/i.test(config.baseUrl)) body.thinking = { type: "disabled" };
+  const response = await fetch(`${config.baseUrl}/chat/completions`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${config.apiKey}` },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(timeoutMs)
+  });
+  const text = await response.text();
+  if (!response.ok) throw new Error(`封面设计师调用失败 HTTP ${response.status}：${text.slice(0, 200)}`);
+  let parsed: { choices?: Array<{ message?: { content?: string } }> };
+  try {
+    parsed = JSON.parse(text) as typeof parsed;
+  } catch {
+    throw new Error(`封面设计师响应不是 JSON：${text.slice(0, 160)}`);
+  }
+  const content = parsed.choices?.[0]?.message?.content ?? "";
+  if (!content.trim()) throw new Error("封面设计师返回空稿件");
+  return content;
+}
 
 /** drawtext 文本净化：ASCII 冒号/逗号/引号等会破坏 filter 语法，换成等价全角或删除（视觉无损） */
 function escapeDrawtextText(text: string): string {
@@ -4806,6 +4866,11 @@ if (STAGES.has("cover") && existsSync(colored)) {
     ? (JSON.parse(readFileSync(abs(BRIEF_FILE), "utf8")) as CoverDesignInput["brief"])
     : null;
   /**
+   * 副标题覆盖（可选）：`--cover-subline` 优先于 brief.coverSubline；
+   * 两者都没有时由封面设计师出稿，兜底稿用不含姓名的时长钩子（见 cover-design.ts）。
+   */
+  const coverSublineOverride = arg("--cover-subline", "").trim();
+  /**
    * 封面知识库 / 账号档案（2026-09-27）：
    *   · KB 注入（cover-kb）：平台规格走**代码**（coverSpec），经验与判据来自 KB（≤3 条，带 trace）；
    *   · 账号档案（account-profiles/*.yml）：视觉锤四件套（字体/色板/版式/角标）+ 钩子偏好 + 禁区；
@@ -4903,7 +4968,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
     archetype: COVER_ARCHETYPE,
     /** 平台标签用调用方原文（缺省"抖音/快手"→抖音口径），规格由 cover-platforms.ts 解析 */
     platform: COVER_PLATFORM_ARG || platform,
-    brief: coverBrief,
+    brief: coverSublineOverride ? { ...(coverBrief ?? {}), coverSubline: coverSublineOverride } : coverBrief,
     character: lead ? { id: lead.id, name: lead.name } : null,
     /** 知识库注入载荷（≤3 条）与账号视觉锤（可空）——两者为空时提示词与历史逐字一致 */
     ...(coverKb.hints.length > 0 ? { kbHints: coverKb.hints } : {}),
@@ -4921,7 +4986,13 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 模型不可用的兜底与正常确定性设计分别记账，避免把默认成功误标为降级。
    */
   let plan: CoverPlan;
-  const designVia = "deterministic";
+  /**
+   * 设计稿来源（2026-10-09 产品所有者口径）：
+   * **封面文案由封面设计师数字员工出稿，标题不许硬编码**；模型不可用或稿件非法才退确定性稿，
+   * 并如实标注 `designVia`（agent / fallback / deterministic）。`--cover-design deterministic`
+   * 供离线/省费场景显式降级（调用方声明，不算失败）。
+   */
+  let designVia: "agent" | "fallback" | "deterministic" = "deterministic";
   let designNote = "";
   /**
    * 人物卡来源由管线注入：优先与主视觉时段一致的人物镜（夜景封面配夜景人物），
@@ -4947,12 +5018,54 @@ if (STAGES.has("cover") && existsSync(colored)) {
     return pool.find((s) => (warmOrNight ? /夜|灯|黄昏|落霞/.test(String(s.scene ?? "")) : true))
       ?? pool[0] ?? null;
   };
-  plan = fallbackCoverPlan(designInput, {
-    headline: arg("--cover-hook", shotlist.title ?? "封面"),
+  const coverDesignMode = arg("--cover-design", "agent");
+  const fallbackHeadline = arg("--cover-hook", shotlist.title ?? "封面");
+  const deterministicCoverPlan = (): CoverPlan => fallbackCoverPlan(designInput, {
+    headline: fallbackHeadline,
     heroShotId: fallbackBackground.shotId,
     personShotId: personShotFor(fallbackBackground.shotId)?.shotId
   });
-  designNote = "确定性设计：直接使用已声明镜头和平台设计稿，未调用模型；未进行审美认证";
+  /**
+   * 封面文案红线（2026-10-09 产品所有者口径）：模型不得把**模特/真人的姓名**写进封面；
+   * 需要名字只能由调用方在 `brief.coverSubline` 显式给出。
+   */
+  const forbiddenCoverNames = [lead?.name, lead?.id].map((value) => String(value ?? "").trim()).filter((value) => value.length >= 2);
+  const assertCoverCopyHasNoPersonName = (candidate: CoverPlan): void => {
+    const copy = [candidate.headline, candidate.subline, candidate.badge].filter(Boolean).join(" ");
+    const hit = forbiddenCoverNames.find((name) => copy.includes(name));
+    if (hit) throw new Error(`封面文案出现真人姓名「${hit}」（除 brief.coverSubline 显式声明外，封面不得出现姓名）`);
+  };
+  const coverDesignerLlm = coverDesignMode === "agent" ? resolveProducerLlm(ENV) : null;
+  if (coverDesignMode === "agent" && coverDesignerLlm) {
+    let lastDesignError = "";
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      try {
+        const basePrompt = buildCoverDesignPrompt(designInput);
+        const prompt = attempt === 1 ? basePrompt
+          : `${basePrompt}\n\n【上一稿被拒的原因（必须修正）】${lastDesignError}\n只输出修正后的 JSON 设计稿。`;
+        const raw = await requestCoverDesign(coverDesignerLlm, prompt);
+        const candidate = parseCoverPlan(raw, designInput, { personShotId: personShotFor(undefined)?.shotId });
+        assertCoverCopyHasNoPersonName(candidate);
+        plan = candidate;
+        designVia = "agent";
+        designNote = `封面设计师（${coverDesignerLlm.model}）出稿：第 ${attempt} 次通过校验；未执行审美评分`;
+        break;
+      } catch (error) {
+        lastDesignError = error instanceof Error ? error.message.slice(0, 200) : String(error);
+      }
+    }
+    if (designVia !== "agent") {
+      plan = deterministicCoverPlan();
+      designVia = "fallback";
+      designNote = `封面设计师出稿未通过（${lastDesignError}）→ 确定性兜底稿；未执行审美评分`;
+    }
+  } else {
+    plan = deterministicCoverPlan();
+    designVia = "deterministic";
+    designNote = coverDesignMode === "agent"
+      ? "未配置封面设计师模型 → 使用确定性稿（如实记录，不冒充设计师出稿）"
+      : "调用方显式 --cover-design deterministic：使用确定性稿（未调用设计师模型）";
+  }
   log(`  ⇢ ${designNote}`);
   /** 人物卡来源：与主视觉时段一致的人物镜（管线按最终设计稿再校正一次） */
   const personShot = personShotFor(plan.background.shotId);
@@ -5233,7 +5346,8 @@ if (STAGES.has("cover") && existsSync(colored)) {
      * 早先只看机检，于是"机检全过但监制打回（人物卡遮挡主体/调性冲突）"被记成 ok=true——审计会误读。
      */
     stage: "cover", shotId: null, invoked: true, ok: coverChecksPassed(checks) && verdict.approved, cached: false,
-    degraded: verdict.degraded, attempt: 1, ms: Date.now() - started,
+    /** 设计师出稿失败退兜底稿属于"降级"（2026-10-09 口径：封面文案默认由设计师出稿，兜底不是正常路径）。 */
+    degraded: verdict.degraded || designVia === "fallback", attempt: 1, ms: Date.now() - started,
     artifact: existsSync(coverPng) ? coverPng : null,
     evidence: {
       designVia, plan, hook: plan.headline.replace(/\n/g, " "), font: plan.typography.fontId,
@@ -5545,7 +5659,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
           const mixed = plan.output.replace(/\.mp4$/i, "-bgm.mp4");
           const mix = runCli(BGM_CLI, [
             "mix", "--in", plan.output, "--out", mixed, "--bgm", bed.path, "--policy", "keep-dialogue",
-            "--music-level", String(-26 + plan.variant.musicLevelDeltaDb),
+            "--music-level", String(-18 + plan.variant.musicLevelDeltaDb),
             "--ducking", "14", "--lufs", "-14", "--section", "auto",
             "--true-peak", arg("--bgm-true-peak", "-1.5"),
             ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),

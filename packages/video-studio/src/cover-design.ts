@@ -179,6 +179,12 @@ export interface CoverDesignInput {
    */
   archetype?: "person-led" | "subject-led";
   brief?: { platform?: string; audience?: string; goal?: string; tone?: string; coverHook?: string;
+    /**
+     * 副标题覆盖（可选，≤24 字）。
+     * 2026-10-09 产品所有者口径：**封面不得默认出现模特/真人的姓名**（"封面不要显示陈卓名字"）——
+     * 需要名字时必须由调用方在这里显式给出；不给则兜底稿使用不含姓名的文案。
+     */
+    coverSubline?: string;
     claimsDiscipline?: string; footageOrigin?: "generated" | "live-action" | "mixed" } | null;
   /**
    * 平台（ID 或中文别名，如 `douyin` / `抖音` / `抖音/快手`）。
@@ -625,11 +631,18 @@ export function fallbackCoverPlan(
     ? hammer.fontId as CoverFontId
     : null;
   const hammerPalette = Array.isArray(hammer?.palette) ? hammer!.palette.filter((c) => HEX.test(String(c))) : [];
-  const sublineFallback = input.character?.name
-    ? (isEnglishCoverPlatform(spec)
-      ? (durationText ? `${input.character.name} · ${Math.round(seconds)}s` : input.character.name)
-      : (durationText ? `${input.character.name}带你 ${durationText}看懂` : `${input.character.name}带你一次看懂`))
-    : undefined;
+  /**
+   * 副标题（2026-10-09 产品所有者口径修订）：
+   *   · 旧行为把**模特/真人姓名**写进副标题（「陈卓带你 67 秒看懂」）——客户明确要求封面不出现姓名；
+   *   · 新行为：调用方显式给 `brief.coverSubline` 时用它（要写名字也由调用方负责），
+   *     否则生成不含姓名的时长钩子；无时长时不给副标题（宁缺毋滥）。
+   */
+  const sublineOverride = typeof input.brief?.coverSubline === "string" ? input.brief.coverSubline.trim() : "";
+  const sublineFallback = sublineOverride
+    ? sublineOverride
+    : (isEnglishCoverPlatform(spec)
+      ? (durationText ? `${Math.round(seconds)}s` : undefined)
+      : (durationText ? `${durationText}速览` : undefined));
   const plan: CoverPlan = {
     headline,
     subline: sublineFallback,
