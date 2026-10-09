@@ -5832,9 +5832,13 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     if (styleCoverMode !== "agent" || !styleCoverLlm) return;
     try {
       const shotLines = shots.map((s) => `- ${s.shotId}：${String(s.scene ?? "").slice(0, 60)}`).join("\n");
+      /** 简报文本就地解析（deliver 阶段看不到封面块的 `coverBrief` 变量，真机曾因作用域报错退兜底）。 */
+      const styleBriefDoc = BRIEF_FILE && existsSync(abs(BRIEF_FILE))
+        ? (JSON.parse(readFileSync(abs(BRIEF_FILE), "utf8")) as Record<string, unknown>)
+        : {};
       const prompt = `你是 WorkLoom 的封面设计师。为同一支片子设计**三支风格版封面**，每支的标题文案、主视觉镜头、字体都必须不同。
 片子：${String(shotlist.title ?? "")}
-内容目标：${String(coverBrief?.goal ?? shotlist.logline ?? "")}
+内容目标：${String(styleBriefDoc.goal ?? (shotlist as unknown as Record<string, unknown>).logline ?? "")}
 平台：${COVER_PLATFORM_ARG || platform}（画布 ${CW}×${CH}，标题 ≤14 视觉字符、最多两行用 \\n 断行；副标题 ≤24 字；角标 ≤10 字）
 可选镜头（backgroundShotId 必须来自这里）：
 ${shotLines}
