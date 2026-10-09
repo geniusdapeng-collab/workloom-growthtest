@@ -66,6 +66,7 @@ import {
   termPronunciationCheck,
   REFERENCE_INDEPENDENCE_POLICY,
   coverDeterministicChecks, coverPrefersNightBackground, COVER_FONTS, COVER_LOWER_BAND_SAFE_AREA, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
+  type CoverFontId,
   getCoverSpec, isKnownCoverPlatform, COVER_PLATFORM_IDS,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
   assertMaterialGenerationProvenance, parseCoverPlan, prepareShotPrompt, readMaterialSpec, resolveProducerLlm,
@@ -1305,6 +1306,25 @@ const baseShots: ShotCard[] = sceneBible
   ? shotsSelected.map((shot) => completedByShot.has(shot.shotId) ? shot : expandShotWithBible(shot as ShotCard & Record<string, unknown>, sceneBible))
   : shotsSelected;
 const shots: ShotCard[] = scenePolicy ? baseShots.map((shot) => completedByShot.has(shot.shotId) ? shot : applyScenePolicy(shot, scenePolicy)) : baseShots;
+
+/**
+ * 配乐师简报的输入文本（全片只算一次）：片子目标/调性/剪辑风格 + 镜头场景摘要。
+ * 供母版配乐与三支风格变体的**选曲**共用（代理读它定"配方 + 能量档"，再据此在曲库打分选曲）。
+ */
+const bgmPromptText = (() => {
+  const briefDoc = BRIEF_FILE && existsSync(abs(BRIEF_FILE))
+    ? (JSON.parse(readFileSync(abs(BRIEF_FILE), "utf8")) as Record<string, unknown>)
+    : {};
+  /** 调用方可以给一条**专供配乐师**的简报（`--bgm-prompt` 或 `brief.bgmBrief`），
+   * 用于把"片子是什么类型"喂给简报分析器（避免"片子里有一镜美食"把配方判成美食广告）。 */
+  const declared = arg("--bgm-prompt", "").trim() || String(briefDoc.bgmBrief ?? "").trim();
+  if (declared) return declared;
+  return [
+    String(briefDoc.goal ?? ""), String(briefDoc.tone ?? ""), String(briefDoc.editingStyle ?? ""),
+    String(shotlist.title ?? ""),
+    shots.map((shot) => String((shot as unknown as Record<string, unknown>).scene ?? "")).filter(Boolean).slice(0, 16).join("；")
+  ].filter(Boolean).join("\n");
+})();
 const pendingShots = (): ShotCard[] => PRERENDER_REQUESTED ? shots.filter(shot => !completedByShot.has(shot.shotId)) : [];
 /** 原生口播不可由旁白覆盖；在任何付费工位之前检查整片，不受 --only 缩窄。 */
 const UNIFIED_NARRATION = flag("--narration-unified");
@@ -4499,6 +4519,99 @@ if (DANMAKU_ENABLED && STAGES.has("danmaku") && existsSync(subtitled)) {
 /* ---------- ⑧ 配乐（bgm-bridge） ---------- */
 /** 未重跑配乐时沿用磁盘上不早于上游的配乐版；重跑则由下面的 bgm 环节覆盖 */
 let scored = STAGES.has("bgm") ? danmakuOut : preferDownstream(join(POST_DIR, "master-scored.mp4"), danmakuOut, "bgm");
+
+/**
+ * 配乐混音参数：走**配乐师（数字员工）的配方库**（bundles/ai-video/library/bgm-recipes/recipes.json）。
+ * 2026-10-09 产品所有者口径："BGM 走内置配乐 agent 流程；一个是可能不够应景，另一个是声音有点小、基本感受不到。"
+ *   · 配方（题材×情绪×平台）决定基准电平/让位深度（`musicLevelDb`/`duckingDb`，平台覆盖优先）；
+ *   · `--bgm-presence music-led` 用于"音乐是片子骨架"的城市片/旅拍片：在配方基准上给可闻度加成，
+ *     仍受上限钳制（不超过 -8dB），语音段靠 `--bgm-ducking` 让位；
+ *   · `--bgm-level` 显式给值时优先（调用方接管）。
+ */
+async function resolveBgmMixSettings(input: {
+  genre: string; mood: string; platform: string; recipeId?: string; presence: string;
+  explicitLevel: string; explicitDucking: string; boostDb: number;
+}): Promise<{ recipeId: string | null; recipeLabel: string | null; levelDb: string; duckingDb: string; levelSource: string; override: unknown }> {
+  const core = await import(join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/core.mjs")) as {
+    findRecipes: (query: { genre?: string; mood?: string; platform?: string; recipeId?: string }) => { recipe?: { id?: string; genre?: string; mood?: string } | null };
+    applyPlatformOverrides: (recipe: unknown, platform?: string | null) => { musicLevelDb: number | null; duckingDb: number | null; lufsTarget: number | null; override?: unknown };
+  };
+  /** 平台要用**规范 id**（xiaohongshu），中文标签会让配方检索落空（真机实测）。 */
+  const platformId = (() => { try { return getCoverSpec(input.platform).id; } catch { return input.platform; } })();
+  const hit = input.recipeId
+    ? core.findRecipes({ recipeId: input.recipeId })
+    : core.findRecipes({ genre: input.genre, mood: input.mood, platform: platformId });
+  const recipe = hit?.recipe ?? null;
+  const effects = core.applyPlatformOverrides(recipe, platformId);
+  const baseLevel = Number.isFinite(effects.musicLevelDb) ? Number(effects.musicLevelDb) : -18;
+  const boost = input.presence === "music-led" ? input.boostDb : 0;
+  const resolvedLevel = Math.max(-24, Math.min(-8, baseLevel + boost));
+  const explicit = input.explicitLevel.trim();
+  return {
+    recipeId: recipe?.id ?? null,
+    recipeLabel: recipe ? `${recipe.genre ?? "-"} · ${recipe.mood ?? "-"}` : null,
+    levelDb: explicit || String(resolvedLevel),
+    duckingDb: input.explicitDucking.trim() || String(effects.duckingDb ?? 14),
+    levelSource: explicit ? "explicit-flag" : (input.presence === "music-led" ? `recipe+music-led(+${boost}dB)` : "recipe"),
+    override: effects.override ?? null
+  };
+}
+
+/**
+ * 配乐师（数字员工）的**选曲**流程：提示词简报 → 题材配方 → 本地曲库按简报打分 → 选中曲目。
+ * 2026-10-09 产品所有者口径："BGM 要走内置配乐 agent 流程；不够应景 + 声音有点小。"
+ * growthtest 旧默认是"按标签找第一首"（`pickDeclaredMusicBed`），既不读简报也不打分；
+ * 这里改走 `bgm-bridge` 的 `analyzePromptBrief` + `resolveTrackForBrief(policy=local)`——
+ * 与 Growth 仓默认的 `best` 同源（brief→recipe→候选打分），最终混音仍由本脚本按可闻度口径执行。
+ */
+async function pickAgentMusicBed(input: {
+  genre: string; mood: string; platform: string; recipeId?: string; durationSec: number; promptText: string;
+}): Promise<{ id: string; title: string; path: string; bpm: number | null; durationSec: number | null;
+  recipeId: string | null; layer: string | null; score: number | null; reasons: string[] } | null> {
+  try {
+    const briefMod = await import(join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/brief.mjs")) as {
+      analyzePromptBrief: (options: { promptText: string; platform?: string | null; durationSec?: number | null }) => {
+        brief: { recipeId?: string | null; musicLevelDeltaDb?: number } };
+    };
+    const core = await import(join(REPO_ROOT, "bundles/ai-video/connectors/bgm-bridge/core.mjs")) as {
+      findRecipes: (query: { genre?: string; mood?: string; platform?: string; recipeId?: string }) => { recipe?: { id?: string } | null };
+      resolveTrackForBrief: (options: Record<string, unknown>) => Promise<{
+        track?: { id?: string; title?: string; localPath?: string; bpm?: number | null; durationSec?: number | null;
+          match?: { score?: number; reasons?: string[] } } | null;
+        layer?: string | null; attempts?: Array<{ status?: string; message?: string }>;
+      }>;
+    };
+    /** 平台用规范 id；配方优先取调用方显式声明（`--bgm-recipe`），否则按题材+情绪检索。 */
+    const platformId = (() => { try { return getCoverSpec(input.platform).id; } catch { return input.platform; } })();
+    const { brief } = briefMod.analyzePromptBrief({ promptText: input.promptText, platform: platformId, durationSec: input.durationSec });
+    const recipe = input.recipeId
+      ? core.findRecipes({ recipeId: input.recipeId }).recipe ?? null
+      : core.findRecipes({ genre: input.genre, mood: input.mood, platform: platformId }).recipe ?? null;
+    const resolution = await core.resolveTrackForBrief({ brief, recipe, policy: "local", durationSec: input.durationSec, env: ENV });
+    const track = resolution?.track ?? null;
+    const path = String(track?.localPath ?? "");
+    if (!track || !path || !existsSync(path)) {
+      log(`  ↻ 配乐师选曲：本地曲库未命中（${resolution?.attempts?.at(-1)?.message ?? "无候选"}）`);
+      return null;
+    }
+    const reasons = [
+      `配乐师简报：配方 ${brief?.recipeId ?? "-"}（能量加成 ${brief?.musicLevelDeltaDb ?? 0}dB）`,
+      ...(track.match?.reasons ?? []).slice(0, 4)
+    ];
+    log(`  ✓ 配乐师选曲：${track.title ?? track.id}（匹配分 ${track.match?.score ?? "-"}，来源层 ${resolution?.layer ?? "-"}）`);
+    return {
+      id: String(track.id ?? ""), title: String(track.title ?? ""), path,
+      bpm: Number.isFinite(Number(track.bpm)) ? Number(track.bpm) : null,
+      durationSec: Number.isFinite(Number(track.durationSec)) ? Number(track.durationSec) : null,
+      recipeId: brief?.recipeId ?? null, layer: resolution?.layer ?? null,
+      score: Number.isFinite(Number(track.match?.score)) ? Number(track.match?.score) : null,
+      reasons
+    };
+  } catch (error) {
+    log(`  ↻ 配乐师选曲失败（${error instanceof Error ? error.message.slice(0, 140) : String(error)}）→ 回退按标签选曲`);
+    return null;
+  }
+}
 if (STAGES.has("bgm") && existsSync(danmakuOut) && !DRY_RUN) {
   rememberInputs("bgm", [danmakuOut]);
   const started = Date.now(), out = join(POST_DIR, "master-scored.mp4");
@@ -4516,33 +4629,52 @@ if (STAGES.has("bgm") && existsSync(danmakuOut) && !DRY_RUN) {
     trackPath = found.track.path;
   }
   const requestedOff = flag("--no-bgm");
-  const declaredTrack = !requestedOff && !chosenTrack ? await pickDeclaredMusicBed(expectedMasterSeconds, CUT_GRID, { genre, mood }) : null;
-  if (!requestedOff && !chosenTrack && !declaredTrack) throw new Error("BGM_SOURCE_MISSING: no declared local music source is available");
-  if (declaredTrack) trackPath = declaredTrack.path;
+  const agentBed = !requestedOff && !chosenTrack
+    ? await pickAgentMusicBed({ genre, mood, platform: COVER_PLATFORM_ARG || PLATFORM, recipeId: arg("--bgm-recipe", "").trim() || undefined,
+      durationSec: expectedMasterSeconds, promptText: bgmPromptText })
+    : null;
+  const declaredTrack = !requestedOff && !chosenTrack && !agentBed ? await pickDeclaredMusicBed(expectedMasterSeconds, CUT_GRID, { genre, mood }) : null;
+  if (!requestedOff && !chosenTrack && !declaredTrack && !agentBed) throw new Error("BGM_SOURCE_MISSING: no declared local music source is available");
+  const musicBed = agentBed ?? declaredTrack;
+  if (musicBed) trackPath = musicBed.path;
   if (!requestedOff) rememberInputs("bgm", [danmakuOut, trackPath]);
+  /** 配乐师配方 → 基准电平/让位深度（平台覆盖优先），music-led 片子再加可闻度加成。 */
+  const bgmMix = await resolveBgmMixSettings({
+    genre, mood, platform: COVER_PLATFORM_ARG || PLATFORM, recipeId: arg("--bgm-recipe", "").trim() || undefined,
+    presence: arg("--bgm-presence", "standard"),
+    explicitLevel: arg("--bgm-level", ""), explicitDucking: arg("--bgm-ducking", ""),
+    boostDb: Number(arg("--bgm-presence-boost", "8"))
+  });
+  if (bgmMix.recipeId) log(`  配乐配方：${bgmMix.recipeId}（${bgmMix.recipeLabel}）· 电平 ${bgmMix.levelDb}dB（${bgmMix.levelSource}）· 让位 ${bgmMix.duckingDb}dB`);
   const result = requestedOff ? { ok: true, out: "no_bgm_needed: explicit --no-bgm; original program retained" } : runCli(BGM_CLI, [
     "mix", "--in", danmakuOut, "--out", out, "--bgm", trackPath, "--policy", policy,
     /**
-     * 音乐床电平（2026-10-09 产品所有者打回："几个版本听着声音都一样，是不是没加 BGM"）：
-     * 旧默认 -26dB 对以音乐为骨的片子等于听不见；现在默认 -18dB，仍由 `--bgm-level` 覆写，
-     * 语音段的让位仍由 `--bgm-ducking`（默认 14dB）保证。
+     * 音乐床电平（2026-10-09 产品所有者两轮反馈："听不出 BGM / 声音有点小"）：
+     * 走配乐师配方（题材×情绪×平台）的 `musicLevelDb`；`--bgm-presence music-led` 再给加成，
+     * `--bgm-level` 显式值优先。语音段让位仍由配方 `duckingDb` 保证。
      */
-    "--music-level", arg("--bgm-level", "-18"), "--ducking", arg("--bgm-ducking", "14"), "--lufs", "-14",
+    "--music-level", bgmMix.levelDb, "--ducking", bgmMix.duckingDb, "--lufs", "-14",
     "--true-peak", arg("--bgm-true-peak", "-1.5"), "--section", arg("--bgm-section", "full"),
-    "--declared-program-mix", ...(declaredTrack?.bpm ? ["--bgm-bpm", String(declaredTrack.bpm)] : [])
+    "--declared-program-mix", ...(musicBed?.bpm ? ["--bgm-bpm", String(musicBed.bpm)] : [])
   ]);
   if (!result.ok || (!existsSync(out) && !requestedOff)) throw new Error(`BGM_PROCESS_FAILED: ${result.out.slice(-800)}`);
   if (!requestedOff && existsSync(out)) scored = out;
   if (!originalPostContract) throw new Error("STANDARD_NATIVE_MANIFEST_REQUIRED: final audio export requires the original timeline");
   const nativeAudioClock = await assertStandardPostExportClock(scored, expectedMasterSeconds, { ffmpeg: FFMPEG, ffprobe: FFPROBE, expectedFps: FPS });
   bgmManifestInfo = { layer: requestedOff ? "off" : "on", via: chosenTrack ? "requested-track" : "declared-recipe", declaredOff: requestedOff,
+    recipe: bgmMix.recipeId, recipeLabel: bgmMix.recipeLabel, musicLevelDb: bgmMix.levelDb, musicLevelSource: bgmMix.levelSource,
+    agentFlow: agentBed ? { pick: "bgm-agent", track: agentBed.id, layer: agentBed.layer, score: agentBed.score,
+      briefRecipe: agentBed.recipeId, reasons: agentBed.reasons } : { pick: "declared-label-fallback" },
+    duckingDb: bgmMix.duckingDb, platformOverride: bgmMix.override,
     notRequired: requestedOff, reason: requestedOff ? "用户明确要求保留纯原声" : null,
     sourceAuthority: "native-program", stemsVerified: false, output: requestedOff ? null : basename(out), evidence: result.out.slice(-500) };
   record({ stage: "bgm", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
     attempt: 1, ms: Date.now() - started, artifact: scored,
     evidence: { genre, mood, policy, via: bgmManifestInfo.via, nativeAudioClock,
       sourceAuthority: "native-program", stemsVerified: false, applicable: !requestedOff, qualityReviewPerformed: false,
-      qualityRetries: 0, tool: "bgm-bridge mix", declaredTrack: declaredTrack?.id ?? chosenTrack ?? null, toolOutput: result.out.slice(-800) }, verdict: null });
+      qualityRetries: 0, tool: "bgm-bridge mix", declaredTrack: musicBed?.id ?? chosenTrack ?? null,
+      agentFlow: agentBed ? { track: agentBed.id, layer: agentBed.layer, score: agentBed.score, briefRecipe: agentBed.recipeId } : null,
+      toolOutput: result.out.slice(-800) }, verdict: null });
 }
 
 if (!bgmManifestInfo && stageApproved("bgm")) {
@@ -4566,13 +4698,28 @@ const bgmScored = scored;
  *   ③ 合成音效 → 逐条 adelay 拼成 SFX 轨 → 与母版音轨混音（视频轨 copy）；
  *   ④ 复核：响度仍在 −14 LUFS ±1.5、剪辑点窗口内确有新增能量（"做了但听不见"要被抓出来）。
  */
-/** `--no-sfx`：整层关闭（调用方显式声明；未产出如实记档，不静默跳过）。 */
+/**
+ * 转场音效层（whoosh/impact/riser）的**启用口径**（2026-10-09 产品所有者两轮反馈后定稿）：
+ *   · 原生硬切生产里，切点上的气流声/抬升声会被听成"呲"（第一轮：逐刀 whoosh；第二轮：高潮前 riser 收在最后一刀上）；
+ *   · 因此**默认不铺**这一层，只有显式声明才启用：`--sfx-layer`（整层：重音 impact + 高潮 riser）、
+ *     `--sfx-cut-whoosh`（连硬切也铺 whoosh），或声明了逐刀运动掩体转场（whoosh 与转场天然配对）；
+ *   · `--no-sfx` 永远优先关闭（即使声明了其它开关）。
+ */
+const SFX_EXPLICIT = flag("--sfx-layer") || flag("--sfx-cut-whoosh") || Boolean(EFFECTIVE_CUT_TRANSITION);
 if (STAGES.has("sfx") && flag("--no-sfx")) {
   record({ stage: "sfx", shotId: null, invoked: true, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
     artifact: null, evidence: { applicable: false, skipReason: "调用方显式 --no-sfx：不铺转场音效层" },
     verdict: null, note: "SFX 层按调用方声明关闭（保留原声 + 配乐）" });
 }
-if (STAGES.has("sfx") && !flag("--no-sfx") && existsSync(scored) && !DRY_RUN) {
+if (STAGES.has("sfx") && !flag("--no-sfx") && !SFX_EXPLICIT && !DRY_RUN) {
+  record({ stage: "sfx", shotId: null, invoked: true, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
+    artifact: null,
+    evidence: { applicable: false, skipReason: "原生硬切生产默认不铺转场音效层（需 --sfx-layer / --sfx-cut-whoosh 显式开启）",
+      hookSfxDeclared: hookSfxEnabled ? { kind: hookSfxSpec.kind, atSec: hookSfxSpec.atSec } : null,
+      hookSfxProduced: false },
+    verdict: null, note: "SFX 层按默认口径不适用：保留原声 + 配乐，不铺 whoosh/impact/riser" });
+}
+if (STAGES.has("sfx") && !flag("--no-sfx") && SFX_EXPLICIT && existsSync(scored) && !DRY_RUN) {
   rememberInputs("sfx", [scored]);
   const started = Date.now();
   const sfxDir = join(POST_DIR, "sfx");
@@ -5605,7 +5752,8 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
     width: number; height: number;
     cover?: { path: string; sha256: string } | null; coverReceipt?: CoverFirstFrameReceipt | null;
-    bgm?: { track: string; sha256: string; declaredBpm?: number | null; measuredBpm?: null; gridErrorMs?: null } | null;
+    bgm?: { track: string; sha256: string; declaredBpm?: number | null; measuredBpm?: null; gridErrorMs?: null;
+      recipe?: string | null; musicLevelDb?: string; musicLevelSource?: string } | null;
     nativeAudioClock?: Awaited<ReturnType<typeof assertStandardPostExportClock>>;
   }> = [];
   /**
@@ -5621,6 +5769,165 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     const design = buildVariantCoverFilters({ variantId: variantId as CoverVariantId, accent,
       platform: COVER_PLATFORM_ARG || PLATFORM, width: Number(dimensions.width), height: Number(dimensions.height) });
     run(FFMPEG, ["-v", "error", "-y", "-i", source, "-vf", design.filter, "-frames:v", "1", target]);
+    return { path: target, sha256: sha256FileSync(target) };
+  };
+
+  /**
+   * 三风格独立封面（2026-10-09 产品所有者口径）：
+   *   "不同的风格，要制作不同的封面——包括封面的整体设计、标题文案和字体。"
+   *   · 文案：首选**封面设计师数字员工**一次出三套（标题/副标题/角标/主视觉镜/取帧秒/字体/强调色），
+   *     严格校验（镜头存在、字数、字体在库、三套彼此不同、不得出现真人姓名），不合规退确定性表；
+   *   · 主视觉：各风格取自己那一镜（暖调→黄昏/灯；冷调→夜景/现代；高对比→雪/市井），从该风格版本自己的成片取帧；
+   *   · 字体：暖调=思源宋体（书卷气）、冷调=思源黑体重、高对比=得意黑；
+   *   · 版式与调色：逐风格不同（暖调低饱和暖调、冷调青蓝、高对比高饱和）。
+   */
+  const STYLE_COVER_FALLBACK: Record<string, { label: string; fontId: CoverFontId; second: string;
+    keywords: string[]; accent: string; badge: string }> = {
+    "warm-film": { label: "暖调胶片", fontId: "noto-serif", second: "黄昏再看一遍",
+      keywords: ["黄昏", "夕", "落日", "灯", "夜", "暖", "运河"], accent: "#FFB86B", badge: "暖调胶片" },
+    "cool-tech": { label: "冷调技术", fontId: "source-han-heavy", second: "夜色另一面",
+      keywords: ["夜", "灯", "天际线", "高楼", "桥", "水面", "现代"], accent: "#6FD3FF", badge: "冷调技术" },
+    "punchy-social": { label: "社交高对比", fontId: "smiley-sans", second: "高能 60 秒",
+      keywords: ["雪", "市井", "街", "吃", "人", "集市", "烟火"], accent: "#FF5A5F", badge: "高对比社交" }
+  };
+  const styleCoverGrade: Record<string, string> = {
+    "warm-film": "colorbalance=rs=0.07:gs=0.015:bs=-0.06,eq=saturation=1.04:contrast=1.05",
+    "cool-tech": "colorbalance=rs=-0.05:gs=-0.01:bs=0.08,eq=saturation=0.90:contrast=1.07",
+    "punchy-social": "eq=saturation=1.16:contrast=1.12"
+  };
+  /** 风格封面的画布尺寸：以平台规格为准（UHD 交付时跟随输出画布）。 */
+  const styleCoverSpec = getCoverSpec(COVER_PLATFORM_ARG || PLATFORM);
+  const { width: SCW, height: SCH } = QUALITY === "uhd" ? OUTPUT_SIZE : styleCoverSpec.canvas;
+  const styleShotFor = (keywords: string[]): { shotId: string; atSec: number } => {
+    const scored = shots.map((shot) => {
+      const card = shot as unknown as Record<string, unknown>;
+      const text = [card.scene, card.sceneDescription, card.color_palette, card.motion].map((v) => String(v ?? "")).join(" ");
+      const hit = keywords.reduce((sum, word) => sum + (text.includes(word) ? 1 : 0), 0);
+      return { shot, hit };
+    }).sort((a, b) => b.hit - a.hit);
+    const picked = scored[0]?.shot ?? shots[0]!;
+    const duration = Number(picked.duration ?? 4);
+    return { shotId: picked.shotId, atSec: Number(Math.min(1.2, Math.max(0.3, duration - 0.4)).toFixed(2)) };
+  };
+  const visualLengthOf = (value: string): number => [...String(value)].reduce((sum, ch) => sum + (/[\u4e00-\u9fff]/.test(ch) ? 1 : 0.55), 0);
+  const styleCoverPlans = new Map<string, { styleId: string; headline: string; subline: string; badge: string;
+    shotId: string; atSec: number; fontId: CoverFontId; accent: string; via: string }>();
+  const fallbackStylePlan = (styleId: string) => {
+    const def = STYLE_COVER_FALLBACK[styleId]!;
+    const hero = styleShotFor(def.keywords);
+    const mainTitle = String(arg("--cover-hook", "") || shotlist.title || "封面")
+      .split(/[\n·|｜（(]/)[0]!.trim().slice(0, 8) || "封面";
+    return { styleId, headline: `${mainTitle}\n${def.second}`, subline: `${def.label} · ${Math.round(expectedMasterSeconds)} 秒`,
+      badge: def.badge, shotId: hero.shotId, atSec: hero.atSec, fontId: def.fontId, accent: def.accent, via: "deterministic" };
+  };
+  /**
+   * 三套风格文案：先问封面设计师（一次调用），失败/不合规退确定性表。
+   * 校验口径与主封面一致，另加"三套必须彼此不同（标题/主视觉镜/字体）"。
+   */
+  const designStyleCovers = async (): Promise<void> => {
+    for (const styleId of Object.keys(STYLE_COVER_FALLBACK)) styleCoverPlans.set(styleId, fallbackStylePlan(styleId));
+    /** 与主封面同一口径：`--cover-design agent`（默认）时请封面设计师出稿，`deterministic` 时只用确定性表。 */
+    const styleCoverMode = arg("--cover-design", "agent");
+    const styleCoverLlm = styleCoverMode === "agent" ? resolveProducerLlm(ENV) : null;
+    if (styleCoverMode !== "agent" || !styleCoverLlm) return;
+    try {
+      const shotLines = shots.map((s) => `- ${s.shotId}：${String(s.scene ?? "").slice(0, 60)}`).join("\n");
+      const prompt = `你是 WorkLoom 的封面设计师。为同一支片子设计**三支风格版封面**，每支的标题文案、主视觉镜头、字体都必须不同。
+片子：${String(shotlist.title ?? "")}
+内容目标：${String(coverBrief?.goal ?? shotlist.logline ?? "")}
+平台：${COVER_PLATFORM_ARG || platform}（画布 ${CW}×${CH}，标题 ≤14 视觉字符、最多两行用 \\n 断行；副标题 ≤24 字；角标 ≤10 字）
+可选镜头（backgroundShotId 必须来自这里）：
+${shotLines}
+可选字体 fontId：${Object.keys(COVER_FONTS).join(" / ")}
+风格定位：warm-film=暖调胶片（黄昏/暖光/书卷气）；cool-tech=冷调技术（夜景/冷色/现代感）；punchy-social=社交高对比（短促有力/高饱和）
+硬约束：封面文案不得出现真人姓名（如「${lead?.name ?? "—"}」）；不得虚构镜头或字体；标题不得写错片长（成片 ${Math.round(expectedMasterSeconds)} 秒）。
+只输出 JSON：{"variants":[{"style":"warm-film","headline":"杭州\\n黄昏再看一遍","subline":"...","badge":"...","backgroundShotId":"HZ-12","backgroundAtSec":1.2,"fontId":"noto-serif","accentColor":"#FFB86B"},{"style":"cool-tech",...},{"style":"punchy-social",...}]}`;
+      const raw = await requestCoverDesign(styleCoverLlm, prompt);
+      const parsed = JSON.parse(raw.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim()) as { variants?: Array<Record<string, unknown>> };
+      const variants = Array.isArray(parsed.variants) ? parsed.variants : [];
+      const accepted: Array<{ styleId: string; headline: string; subline: string; badge: string; shotId: string; atSec: number; fontId: CoverFontId; accent: string; via: string }> = [];
+      const forbidden = [lead?.name, lead?.id].map((v) => String(v ?? "").trim()).filter((v) => v.length >= 2);
+      for (const entry of variants) {
+        const styleId = String(entry.style ?? "").trim();
+        if (!STYLE_COVER_FALLBACK[styleId]) continue;
+        const headline = String(entry.headline ?? "").trim();
+        const subline = String(entry.subline ?? "").trim();
+        const badge = String(entry.badge ?? "").trim();
+        const shotId = String(entry.backgroundShotId ?? "").trim();
+        const fontId = String(entry.fontId ?? "").trim() as CoverFontId;
+        const accent = String(entry.accentColor ?? "").trim();
+        const atSec = Number(entry.backgroundAtSec ?? NaN);
+        const lines = headline.split("\n");
+        const copy = [headline, subline, badge].join(" ");
+        if (!headline || lines.length > 2 || lines.some((line) => visualLengthOf(line) > 14)) continue;
+        if (visualLengthOf(subline) > 24 || visualLengthOf(badge) > 10) continue;
+        if (!shots.some((s) => s.shotId === shotId)) continue;
+        if (!Object.prototype.hasOwnProperty.call(COVER_FONTS, fontId)) continue;
+        if (!/^#[0-9a-f]{6}$/i.test(accent)) continue;
+        if (!Number.isFinite(atSec) || atSec < 0.2 || atSec > 3.5) continue;
+        if (forbidden.some((name) => copy.includes(name))) continue;
+        accepted.push({ styleId, headline, subline, badge, shotId, atSec: Number(atSec.toFixed(2)), fontId, accent, via: "agent" });
+      }
+      const distinctHeadlines = new Set(accepted.map((entry) => entry.headline)).size === accepted.length;
+      const distinctShots = new Set(accepted.map((entry) => entry.shotId)).size === accepted.length;
+      const distinctFonts = new Set(accepted.map((entry) => entry.fontId)).size === accepted.length;
+      if (accepted.length === 3 && distinctHeadlines && distinctShots && distinctFonts) {
+        for (const entry of accepted) styleCoverPlans.set(entry.styleId, entry);
+        log(`  · 三风格封面：封面设计师出稿通过（标题/主视觉/字体三套互不相同）`);
+      } else {
+        log(`  ↻ 三风格封面：设计师稿未满足"三套互不相同"（收 ${accepted.length}/3，标题差异 ${distinctHeadlines}、镜头差异 ${distinctShots}、字体差异 ${distinctFonts}）→ 确定性表`);
+      }
+    } catch (error) {
+      log(`  ↻ 三风格封面：设计师出稿失败（${error instanceof Error ? error.message.slice(0, 120) : String(error)}）→ 确定性表`);
+    }
+  };
+  await designStyleCovers();
+  /** 按风格渲染独立封面：从**该风格自己的成片**取帧，套该风格的调色/字体/文案/版式。 */
+  const renderStyledVariantCover = (styleId: string, masterPath: string): { path: string; sha256: string } | null => {
+    const style = styleCoverPlans.get(styleId);
+    if (!style || !existsSync(masterPath)) return null;
+    const fontEntry = COVER_FONTS[style.fontId];
+    const fontFile = join(REPO_ROOT, "bundles/ai-video/library/fonts", fontEntry.file);
+    if (!existsSync(fontFile)) throw new Error(`VARIANT_COVER_FONT_MISSING: ${styleId} → ${fontFile}`);
+    const shotIndex = shots.findIndex((s) => s.shotId === style.shotId);
+    if (shotIndex < 0) throw new Error(`VARIANT_COVER_SHOT_MISSING: ${styleId} → ${style.shotId}`);
+    const start = shotIndex === 0 ? 0 : (CUT_GRID[shotIndex - 1] ?? shots.slice(0, shotIndex).reduce((sum, s) => sum + Number(s.duration ?? 5), 0));
+    const duration = Number(shots[shotIndex]!.duration ?? 4);
+    const at = Math.min(Math.max(0.2, style.atSec), Math.max(0.2, duration - 0.2));
+    const target = join(OUT_DIR, `${PROJECT}-cover-${styleId}.png`);
+    const headLines = style.headline.split("\n").slice(0, 2);
+    const headSize = Math.round(SCH * 0.075);
+    const subSize = Math.round(SCH * 0.030);
+    const badgeSize = Math.round(SCH * 0.020);
+    const left = Math.round(SCW * 0.07);
+    const titleTop = styleId === "punchy-social" ? Math.round(SCH * 0.52) : Math.round(SCH * 0.58);
+    const textColor = "#FFFFFF";
+    const filters = [
+      `scale=${SCW}:${SCH}:force_original_aspect_ratio=increase`,
+      `crop=${SCW}:${SCH}`,
+      styleCoverGrade[styleId] ?? "null",
+      `drawbox=x=${left}:y=${titleTop - Math.round(headSize * 0.35)}:w=${Math.round(SCW * 0.12)}:h=${Math.max(4, Math.round(SCH * 0.006))}:color=${style.accent.replace("#", "0x")}@0.95:t=fill`
+    ];
+    headLines.forEach((line, index) => {
+      const y = titleTop + index * Math.round(headSize * 1.08);
+      filters.push(`drawtext=fontfile='${fontFile}':text=${escapeDrawtextText(line)}:expansion=none:fontsize=${headSize}:fontcolor=${textColor}`
+        + `:borderw=${Math.max(3, Math.round(headSize * 0.04))}:bordercolor=black@0.55:shadowx=2:shadowy=3:shadowcolor=black@0.35:x=${left}:y=${y}`);
+    });
+    if (style.subline) {
+      const subY = titleTop + headLines.length * Math.round(headSize * 1.08) + Math.round(headSize * 0.1);
+      filters.push(`drawtext=fontfile='${fontFile}':text=${escapeDrawtextText(style.subline)}:expansion=none:fontsize=${subSize}`
+        + `:fontcolor=${style.accent}:borderw=${Math.max(2, Math.round(subSize * 0.08))}:bordercolor=black@0.5:x=${left}:y=${subY}`);
+    }
+    if (style.badge) {
+      const badgeY = Math.round(SCH * 0.90);
+      filters.push(`drawtext=fontfile='${fontFile}':text=${escapeDrawtextText(style.badge)}:expansion=none:fontsize=${badgeSize}`
+        + `:fontcolor=white@0.92:borderw=2:bordercolor=black@0.5:x=${left}:y=${badgeY}`);
+    }
+    run(FFMPEG, ["-v", "error", "-y", "-ss", String((start + at).toFixed(3)), "-i", masterPath,
+      "-vf", filters.join(","), "-frames:v", "1", target]);
+    const info = probe(target);
+    if (Number(info.width) !== SCW || Number(info.height) !== SCH) throw new Error(`VARIANT_COVER_CANVAS_INVALID: ${styleId} → ${info.width}x${info.height}`);
+    log(`  风格封面 ${styleId}（${style.via}）：${style.headline.replace(/\n/g, " / ")} · ${style.fontId} · ${style.shotId}@${style.atSec}s`);
     return { path: target, sha256: sha256FileSync(target) };
   };
   /** 取几个时间点的 1×1 平均色：稳定的"画面指纹"（不做逐像素对比，只判风格差异是否可测） */
@@ -5652,15 +5959,31 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
         log(`  变体 ${plan.variant.id} 配乐：按声明关闭（无签章分轨引用 → bgm_layer=false），跳过混音`);
       } else try {
         const variantDuration = Number(probe(plan.output).duration ?? 0);
-        const bed = await pickDeclaredMusicBed(variantDuration, CUT_GRID, {
-          genre: plan.variant.bgmGenre, mood: plan.variant.bgmMood, excludeTrackHashes: usedVariantBgmHashes,
+        /** 变体同样走配乐师流程（按该风格的曲风线索打简报分），选中曲目不得与已用曲目同字节。 */
+        const agentVariantBed = await pickAgentMusicBed({
+          genre: plan.variant.bgmGenre ?? genre, mood: plan.variant.bgmMood ?? mood,
+          platform: COVER_PLATFORM_ARG || PLATFORM, recipeId: arg("--bgm-recipe", "").trim() || undefined,
+          durationSec: variantDuration, promptText: bgmPromptText
         });
+        const bed = agentVariantBed && !usedVariantBgmHashes.has(sha256FileSync(agentVariantBed.path))
+          ? agentVariantBed
+          : await pickDeclaredMusicBed(variantDuration, CUT_GRID, {
+            genre: plan.variant.bgmGenre, mood: plan.variant.bgmMood, excludeTrackHashes: usedVariantBgmHashes,
+          });
         if (bed) {
           const mixed = plan.output.replace(/\.mp4$/i, "-bgm.mp4");
+          /** 变体同样走配乐师配方（该风格的曲风线索）× 同一 music-led 口径，保证"风格不同、声音也不同"。 */
+          const variantMix = await resolveBgmMixSettings({
+            genre: plan.variant.bgmGenre ?? genre, mood: plan.variant.bgmMood ?? mood,
+            platform: COVER_PLATFORM_ARG || PLATFORM, recipeId: arg("--bgm-recipe", "").trim() || undefined,
+            presence: arg("--bgm-presence", "standard"),
+            explicitLevel: arg("--bgm-level", ""), explicitDucking: arg("--bgm-ducking", ""),
+            boostDb: Number(arg("--bgm-presence-boost", "8"))
+          });
           const mix = runCli(BGM_CLI, [
             "mix", "--in", plan.output, "--out", mixed, "--bgm", bed.path, "--policy", "keep-dialogue",
-            "--music-level", String(-18 + plan.variant.musicLevelDeltaDb),
-            "--ducking", "14", "--lufs", "-14", "--section", "auto",
+            "--music-level", String(Math.max(-24, Math.min(-8, Number(variantMix.levelDb) + Number(plan.variant.musicLevelDeltaDb ?? 0)))),
+            "--ducking", variantMix.duckingDb, "--lufs", "-14", "--section", "auto",
             "--true-peak", arg("--bgm-true-peak", "-1.5"),
             ...(BGM_DECLARED_PROGRAM_MIX ? ["--declared-program-mix"] : []),
             ...(bed.bpm ? ["--bgm-bpm", String(bed.bpm)] : []),
@@ -5674,6 +5997,9 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
               declaredBpm: bed.bpm,
               measuredBpm: null,
               gridErrorMs: null,
+              recipe: variantMix.recipeId,
+              musicLevelDb: variantMix.levelDb,
+              musicLevelSource: variantMix.levelSource,
             };
             usedVariantBgmHashes.add(variantBgm.sha256);
             log(`  变体 ${plan.variant.id} 配乐：${bed.id}（声明曲目；未作声音或卡点品质复检）`);
@@ -5686,7 +6012,9 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
       } catch (err) {
         throw err;
       }
-      const variantCover = renderVariantCover(plan.variant.id, plan.variant.coverAccent);
+      /** 三风格独立封面优先；渲染失败（缺字体/缺镜头/取帧异常）才退"主封面+强调色条"的兼容路径。 */
+      const variantCover = renderStyledVariantCover(plan.variant.id, plan.output)
+        ?? renderVariantCover(plan.variant.id, plan.variant.coverAccent);
       let variantCoverReceipt: CoverFirstFrameReceipt | null = null;
       if (publicationNeedsCover) {
         if (!variantCover) throw new Error(`VARIANT_COVER_MISSING: ${plan.variant.id}`);
@@ -5708,6 +6036,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
         note: plan.variant.note, gradeProfile: plan.variant.gradeProfile,
         width: Number(info.width), height: Number(info.height),
         cover: variantCover, coverReceipt: variantCoverReceipt, bgm: variantBgm, nativeAudioClock,
+        coverDesign: styleCoverPlans.get(plan.variant.id) ?? null,
       });
       log(`  变体 ${plan.variant.id}（${plan.variant.label}）→ ${basename(plan.output)}`);
     } catch (err) {
