@@ -710,7 +710,14 @@ describe("本地曲库：随仓精选（50 首可商用纯音乐选段）+ 缺�
   const manifestPath = join(curatedDir, "tracks.json");
 
   it("客户自建曲库目录缺失时如实报告（该根 present=false），随仓精选仍可兜底", () => {
-    const loaded = loadAllLocalTracks({ WORKLOOM_BGM_LIBRARY_DIR: "/tmp/definitely-missing-bgm-library" });
+    /**
+     * 本用例要验证"随仓 50 首兜底"，必须**显式隔离工位本地库**：
+     * 2026-10-11 起曲库优先级改为「本地大库在前、随仓兜底在后」（产品所有者口径），
+     * 若开发机上存在 `~/.workloom-bgm/library`（本地打标大库，且是 50 首的超集），
+     * 兜底库的曲目 id 会先被本地根认领，`local-curated` 计数变 0——CI 空机过、开发机红的假通过/假失败。
+     * 传 WORKLOOM_BGM_HOME 指向不存在的目录后，任何机器上的结论都一致。
+     */
+    const loaded = loadAllLocalTracks({ WORKLOOM_BGM_LIBRARY_DIR: "/tmp/definitely-missing-bgm-library", WORKLOOM_BGM_HOME: "/tmp/definitely-missing-bgm-home" });
     expect(loaded.sources.find((entry) => entry.kind === "local-custom")?.present).toBe(false);
     expect(loaded.sources.find((entry) => entry.kind === "local-curated")?.present).toBe(true);
     expect(loaded.tracks.filter((track) => track.libraryKind === "local-curated").length).toBe(50);
@@ -754,7 +761,8 @@ describe("本地曲库：随仓精选（50 首可商用纯音乐选段）+ 缺�
       const actual = createHash("sha256").update(bytes).digest("hex");
       expect(actual, `${track.file} 摘要不一致`).toBe(track.sha256);
     }
-    const loaded = loadAllLocalTracks({ WORKLOOM_BGM_LIBRARY_DIR: "/tmp/definitely-missing-bgm-library" });
+    // 同上：隔离工位本地库，保证「随仓 50 首可被加载」的结论与开发机状态无关
+    const loaded = loadAllLocalTracks({ WORKLOOM_BGM_LIBRARY_DIR: "/tmp/definitely-missing-bgm-library", WORKLOOM_BGM_HOME: "/tmp/definitely-missing-bgm-home" });
     const curated = loaded.tracks.filter((track) => track.libraryKind === "local-curated");
     expect(curated.length).toBe(50);
     expect(curated.every((track) => track.localPath && existsSync(track.localPath))).toBe(true);
