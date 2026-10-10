@@ -5846,7 +5846,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
       const prompt = `你是 WorkLoom 的封面设计师。为同一支片子设计**三支风格版封面**，每支的标题文案、主视觉镜头、字体都必须不同。
 片子：${String(shotlist.title ?? "")}
 内容目标：${String(styleBriefDoc.goal ?? (shotlist as unknown as Record<string, unknown>).logline ?? "")}
-平台：${COVER_PLATFORM_ARG || platform}（画布 ${CW}×${CH}，标题 ≤14 视觉字符、最多两行用 \\n 断行；副标题 ≤24 字；角标 ≤10 字）
+平台：${COVER_PLATFORM_ARG || PLATFORM}（画布 ${SCW}×${SCH}，标题 ≤14 视觉字符、最多两行用 \\n 断行；副标题 ≤24 字；角标 ≤10 字）
 可选镜头（backgroundShotId 必须来自这里）：
 ${shotLines}
 可选字体 fontId：${Object.keys(COVER_FONTS).join(" / ")}
