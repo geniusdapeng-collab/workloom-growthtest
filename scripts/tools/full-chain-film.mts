@@ -66,6 +66,7 @@ import {
   termPronunciationCheck,
   REFERENCE_INDEPENDENCE_POLICY,
   coverDeterministicChecks, coverPrefersNightBackground, COVER_FONTS, COVER_LOWER_BAND_SAFE_AREA, COVER_REVIEW_RUBRIC, COVER_SAFE_AREA,
+  COVER_INTERNAL_LABEL_BLOCKLIST,
   type CoverFontId,
   getCoverSpec, isKnownCoverPlatform, COVER_PLATFORM_IDS,
   fallbackCoverPlan, findAngleFile, MATERIAL_POLICY_STATEMENT, MATERIAL_POLICY_VERSION, assessMaterialReuse,
@@ -5781,14 +5782,19 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
    *   · 字体：暖调=思源宋体（书卷气）、冷调=思源黑体重、高对比=得意黑；
    *   · 版式与调色：逐风格不同（暖调低饱和暖调、冷调青蓝、高对比高饱和）。
    */
-  const STYLE_COVER_FALLBACK: Record<string, { label: string; fontId: CoverFontId; second: string;
-    keywords: string[]; accent: string; badge: string }> = {
-    "warm-film": { label: "暖调胶片", fontId: "noto-serif", second: "黄昏再看一遍",
-      keywords: ["黄昏", "夕", "落日", "灯", "夜", "暖", "运河"], accent: "#FFB86B", badge: "暖调胶片" },
-    "cool-tech": { label: "冷调技术", fontId: "source-han-heavy", second: "夜色另一面",
-      keywords: ["夜", "灯", "天际线", "高楼", "桥", "水面", "现代"], accent: "#6FD3FF", badge: "冷调技术" },
-    "punchy-social": { label: "社交高对比", fontId: "smiley-sans", second: "高能 60 秒",
-      keywords: ["雪", "市井", "街", "吃", "人", "集市", "烟火"], accent: "#FF5A5F", badge: "高对比社交" }
+  /**
+   * 兜底表的 `label`（暖调胶片/冷调技术/社交高对比）是**内部风格名**，只用于日志与证据，
+   * **绝不进封面文案**（2026-10-10：封面默认对外投放，内部标签一律不得出现）；
+   * 对外只使用 `audienceTag`（面向观众的题材词）+ 时长/看点文案。
+   */
+  const STYLE_COVER_FALLBACK: Record<string, { label: string; audienceTag: string; fontId: CoverFontId; second: string;
+    keywords: string[]; accent: string }> = {
+    "warm-film": { label: "暖调胶片", audienceTag: "城市漫游", fontId: "noto-serif", second: "黄昏再看一遍",
+      keywords: ["黄昏", "夕", "落日", "灯", "夜", "暖", "运河"], accent: "#FFB86B" },
+    "cool-tech": { label: "冷调技术", audienceTag: "城市夜景", fontId: "source-han-heavy", second: "夜色另一面",
+      keywords: ["夜", "灯", "天际线", "高楼", "桥", "水面", "现代"], accent: "#6FD3FF" },
+    "punchy-social": { label: "社交高对比", audienceTag: "城市快剪", fontId: "smiley-sans", second: "高能 60 秒",
+      keywords: ["雪", "市井", "街", "吃", "人", "集市", "烟火"], accent: "#FF5A5F" }
   };
   const styleCoverGrade: Record<string, string> = {
     "warm-film": "colorbalance=rs=0.07:gs=0.015:bs=-0.06,eq=saturation=1.04:contrast=1.05",
@@ -5817,8 +5823,9 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     const hero = styleShotFor(def.keywords);
     const mainTitle = String(arg("--cover-hook", "") || shotlist.title || "封面")
       .split(/[\n·|｜（(]/)[0]!.trim().slice(0, 8) || "封面";
-    return { styleId, headline: `${mainTitle}\n${def.second}`, subline: `${def.label} · ${Math.round(expectedMasterSeconds)} 秒`,
-      badge: def.badge, shotId: hero.shotId, atSec: hero.atSec, fontId: def.fontId, accent: def.accent, via: "deterministic" };
+    /** 对外文案只用观众向词（audienceTag + 时长），不使用内部风格名。 */
+    return { styleId, headline: `${mainTitle}\n${def.second}`, subline: `${def.audienceTag} · ${Math.round(expectedMasterSeconds)} 秒`,
+      badge: def.audienceTag, shotId: hero.shotId, atSec: hero.atSec, fontId: def.fontId, accent: def.accent, via: "deterministic" };
   };
   /**
    * 三套风格文案：先问封面设计师（一次调用），失败/不合规退确定性表。
@@ -5843,8 +5850,8 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
 可选镜头（backgroundShotId 必须来自这里）：
 ${shotLines}
 可选字体 fontId：${Object.keys(COVER_FONTS).join(" / ")}
-风格定位：warm-film=暖调胶片（黄昏/暖光/书卷气）；cool-tech=冷调技术（夜景/冷色/现代感）；punchy-social=社交高对比（短促有力/高饱和）
-硬约束：封面文案不得出现真人姓名（如「${lead?.name ?? "—"}」）；不得虚构镜头或字体；标题不得写错片长（成片 ${Math.round(expectedMasterSeconds)} 秒）。
+风格定位：warm-film=黄昏暖光（书卷气）；cool-tech=夜景冷色（现代感）；punchy-social=高饱和短促（快剪节奏）
+硬约束：\n1. 封面文案不得出现真人姓名（如「${lead?.name ?? "—"}」）；\n2. **不得出现任何内部风格/工序标签**（如"暖调胶片""冷调技术""高对比社交"）——封面默认对外投放，角标只写面向观众的题材词（城市漫游/城市夜景/城市快剪这类）；\n3. 不得虚构镜头或字体；标题不得写错片长（成片 ${Math.round(expectedMasterSeconds)} 秒）。
 只输出 JSON：{"variants":[{"style":"warm-film","headline":"杭州\\n黄昏再看一遍","subline":"...","badge":"...","backgroundShotId":"HZ-12","backgroundAtSec":1.2,"fontId":"noto-serif","accentColor":"#FFB86B"},{"style":"cool-tech",...},{"style":"punchy-social",...}]}`;
       const raw = await requestCoverDesign(styleCoverLlm, prompt);
       const parsed = JSON.parse(raw.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim()) as { variants?: Array<Record<string, unknown>> };
@@ -5870,6 +5877,8 @@ ${shotLines}
         if (!/^#[0-9a-f]{6}$/i.test(accent)) continue;
         if (!Number.isFinite(atSec) || atSec < 0.2 || atSec > 3.5) continue;
         if (forbidden.some((name) => copy.includes(name))) continue;
+        /** 内部标签硬闸：设计师稿同样不得出现内部风格/工序名（2026-10-10）。 */
+        if (COVER_INTERNAL_LABEL_BLOCKLIST.some((label) => copy.includes(label))) continue;
         accepted.push({ styleId, headline, subline, badge, shotId, atSec: Number(atSec.toFixed(2)), fontId, accent, via: "agent" });
       }
       const distinctHeadlines = new Set(accepted.map((entry) => entry.headline)).size === accepted.length;

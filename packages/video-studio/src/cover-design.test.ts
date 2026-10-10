@@ -245,6 +245,18 @@ describe("封面设计稿", () => {
   });
 
   /**
+   * 2026-10-10 产品所有者口径：**封面默认对外投放**，不得出现内部风格/工序标签
+   * （真机反馈："暖调胶片/冷调技术"这类词被圈出来要求去掉）。
+   */
+  it("封面文案出现内部风格标签时判非法（设计师稿与兜底稿同一硬闸）", () => {
+    for (const label of ["暖调胶片", "冷调技术", "高对比社交"]) {
+      expect(() => validateCoverPlan({ ...validPlan, subline: `${label} · 67 秒` }, input)).toThrow(/内部标签/);
+      expect(() => validateCoverPlan({ ...validPlan, badge: label }, input)).toThrow(/内部标签/);
+    }
+    expect(validateCoverPlan({ ...validPlan, subline: "城市漫游 · 67 秒", badge: "城市快剪" }, input)).toBeTruthy();
+  });
+
+  /**
    * 2026-09-27 真机两条：
    *   · 副标题里的「30 秒首响」是产品指标，不是片长声明——不得被判"时长与成片不符"；
    *   · 兜底标题来自片名（常带"· 副标题"），硬截 12 字会留尾随「·」，要先取主标题再截。
