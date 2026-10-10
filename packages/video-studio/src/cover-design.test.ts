@@ -154,7 +154,12 @@ describe("封面设计稿", () => {
     const prompt = buildCoverDesignPrompt({ ...input, platform: "抖音", accountProfile: profile });
     expect(prompt).toContain("【账号视觉锤】陈卓（chen-zhuo）");
     expect(prompt).toContain("smiley-sans");
-    expect(prompt).toContain("系列角标「跟着陈卓走」");
+    /**
+     * 2026-10-10 口径：账号档案的系列角标若含**真人姓名**，进入提示词前必须被剥掉
+     * （对外投放封面不得出现真人姓名；真机实测该角标会让设计师出稿连撞姓名红线）。
+     */
+    expect(prompt).not.toContain("系列角标「跟着陈卓走」");
+    expect(prompt).toContain("系列角标已移除");
     expect(prompt).toContain("【账号定位】城市人文旅行人设号");
     expect(prompt).toContain("【账号禁区】硬广话术");
     /** 优先级必须写明（真机：监制把"题材配色 vs 账号视觉锤"判成互相冲突而打回） */

@@ -310,7 +310,18 @@ export function accountProfilePromptLines(profile: CoverAccountProfile | null | 
   if (palette.length >= 1) bits.push(`主标题色 ${palette[0]}`);
   if (palette.length >= 2) bits.push(`强调色 ${palette[1]}`);
   if (hammer?.archetype_bias) bits.push(`版式偏好 ${hammer.archetype_bias}`);
-  if (hammer?.badge_series) bits.push(`系列角标「${String(hammer.badge_series).slice(0, 10)}」`);
+  /**
+   * 账号档案的系列角标同样是**对外文案**：含真人姓名时（如样例档案的「跟着陈卓走」）直接注入，
+   * 会让设计师写出违反"封面不得出现真人姓名"的稿件（真机 2026-10-10：连续两次出稿被红线拒 → 退兜底）。
+   * 这里在进入提示词之前剥掉并如实提示；需要写名字的场景仍可用 `brief.coverSubline` 显式声明。
+   */
+  const badgeSeries = hammer?.badge_series ? String(hammer.badge_series).slice(0, 10) : "";
+  const profileRealName = String(profile.display_name ?? "").trim();
+  if (badgeSeries && profileRealName.length >= 2 && badgeSeries.includes(profileRealName)) {
+    bits.push(`系列角标已移除（原角标含真人姓名「${profileRealName}」——对外投放封面不得出现真人姓名）`);
+  } else if (badgeSeries) {
+    bits.push(`系列角标「${badgeSeries}」`);
+  }
   const who = profile.display_name ? `${profile.display_name}（${profile.account_id}）` : profile.account_id;
   if (bits.length > 0) lines.push(`【账号视觉锤】${who}：${bits.join("；")}。同一账号的封面必须"长一个样"，不得偏离。`);
   /**
