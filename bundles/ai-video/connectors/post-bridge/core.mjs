@@ -625,7 +625,16 @@ export function pickTrackForVariant(variant, { env = process.env } = {}) {
           .filter(Boolean).join(" ").toLowerCase(),
       }))
       .filter((entry) => entry.haystack.includes(requestedStyle))
-      .sort((a, b) => String(a.track.id).localeCompare(String(b.track.id)));
+      /**
+       * 本地大曲库优先、随仓 50 首兜底（产品所有者口径 2026-10-11）：
+       * 同风格候选中先排 `library-local`（工位/客户/自动发现），`library-curated` 恒排最后；
+       * 同来源再按 id 稳定排序（可复现）。
+       */
+      .sort((a, b) => {
+        const rank = (track) => (track.libraryKind === "local-curated" ? 1 : 0);
+        const delta = rank(a.track) - rank(b.track);
+        return delta !== 0 ? delta : String(a.track.id).localeCompare(String(b.track.id));
+      });
     if (matches.length === 0) {
       throw new PostError(
         `曲库里没有「${variant.bgm.style}」风格的曲目：请换一个风格关键词（可用风格见 library/bgm-library-curated/tracks.json 的 style 字段）`,

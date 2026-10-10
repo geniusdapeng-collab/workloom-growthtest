@@ -248,10 +248,15 @@ export function libraryRoots(env = process.env) {
   const here = path.dirname(fileURLToPath(import.meta.url));
   const custom = (env.WORKLOOM_BGM_LIBRARY_DIR ?? "").trim();
   const workbenchHome = (env.WORKLOOM_BGM_HOME ?? "").trim() || path.join(os.homedir(), ".workloom-bgm");
+  /**
+   * 优先级（2026-10-11 修正，产品所有者口径）：**本地大曲库优先，随仓 50 首只作兜底**。
+   * 旧顺序把 `local-curated`（随仓 50 首）排在本工位曲库之前，导致"库里 1000+ 首"在选曲时被 50 首抢先，
+   * 与"客户把 1200 首带过来后应优先使用"的设计相反。
+   */
   const candidates = [
     custom ? { dir: path.resolve(custom), kind: "local-custom", label: "客户自建曲库" } : null,
+    { dir: path.join(workbenchHome, "library"), kind: "local-workbench", label: "工位本地曲库（1200 首打标包）" },
     { dir: path.resolve(here, "../../library/bgm-library-curated"), kind: "local-curated", label: "随仓兜底曲库（50 首选段）" },
-    { dir: path.join(workbenchHome, "library"), kind: "local-workbench", label: "工位本地曲库" },
   ].filter(Boolean);
   const seen = new Set(candidates.map((entry) => entry.dir));
   const roots = [...candidates];

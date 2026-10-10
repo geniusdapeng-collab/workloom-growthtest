@@ -58,6 +58,11 @@ describe("曲库多根合并（bgm-cli library 可见性）", () => {
     expect(roots).toContain("local-custom");
     expect(roots).toContain("local-workbench");
     expect(roots.indexOf("local-custom")).toBeLessThan(roots.indexOf("local-workbench"));
+    /**
+     * 优先级（2026-10-11 产品所有者口径）：**本地大库在前、随仓 50 首兜底在后**。
+     * 旧顺序把 local-curated 排在 local-workbench 之前，导致 1000+ 首的本地库被 50 首选段抢先。
+     */
+    expect(roots.indexOf("local-workbench")).toBeLessThan(roots.indexOf("local-curated"));
 
     /** 合并读取：两首都在（随仓兜底库同时在场，所以只断言"包含"） */
     const merged = loadAllLocalTracks(env);
