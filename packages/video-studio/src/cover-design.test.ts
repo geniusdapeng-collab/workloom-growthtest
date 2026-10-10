@@ -154,7 +154,12 @@ describe("封面设计稿", () => {
     const prompt = buildCoverDesignPrompt({ ...input, platform: "抖音", accountProfile: profile });
     expect(prompt).toContain("【账号视觉锤】陈卓（chen-zhuo）");
     expect(prompt).toContain("smiley-sans");
-    expect(prompt).toContain("系列角标「跟着陈卓走」");
+    /**
+     * 2026-10-10 口径：账号档案的系列角标若含**真人姓名**，进入提示词前必须被剥掉
+     * （对外投放封面不得出现真人姓名；真机实测该角标会让设计师出稿连撞姓名红线）。
+     */
+    expect(prompt).not.toContain("系列角标「跟着陈卓走」");
+    expect(prompt).toContain("系列角标已移除");
     expect(prompt).toContain("【账号定位】城市人文旅行人设号");
     expect(prompt).toContain("【账号禁区】硬广话术");
     /** 优先级必须写明（真机：监制把"题材配色 vs 账号视觉锤"判成互相冲突而打回） */
@@ -223,12 +228,37 @@ describe("封面设计稿", () => {
   });
 
   it("兜底稿也必须是三件套（人物 + 画面 + 标题），不能退化回只有标题", () => {
-    const plan = fallbackCoverPlan(input, { headline: "滕王阁 落霞秋水", heroShotId: "SC-05", personShotId: "SC-01" });
+    const plan = fallbackCoverPlan({ ...input, durationSeconds: 30 }, { headline: "滕王阁 落霞秋水", heroShotId: "SC-05", personShotId: "SC-01" });
     expect(plan.source).toBe("fallback");
     expect(plan.person.enabled).toBe(true);
-    expect(plan.subline).toContain("陈卓");
+    /**
+     * 2026-10-09 产品所有者口径：封面文案由封面设计师出稿，**兜底稿不得把模特/真人姓名写上去**
+     * （旧行为是「陈卓带你 30 秒看懂」；现在只保留不含姓名的时长钩子）。
+     */
+    expect(plan.subline ?? "").not.toContain("陈卓");
+    expect(plan.subline ?? "").toContain("秒");
     expect(plan.background.shotId).toBe("SC-05");
     expect(plan.headline.length).toBeLessThanOrEqual(12);
+  });
+
+  it("brief.coverSubline 显式给定副标题时优先使用（要写名字由调用方负责）", () => {
+    const plan = fallbackCoverPlan(
+      { ...input, durationSeconds: 66, brief: { coverSubline: "雪后西湖到钱江夜色" } },
+      { headline: "杭州", heroShotId: "SC-05", personShotId: "SC-01" }
+    );
+    expect(plan.subline).toBe("雪后西湖到钱江夜色");
+  });
+
+  /**
+   * 2026-10-10 产品所有者口径：**封面默认对外投放**，不得出现内部风格/工序标签
+   * （真机反馈："暖调胶片/冷调技术"这类词被圈出来要求去掉）。
+   */
+  it("封面文案出现内部风格标签时判非法（设计师稿与兜底稿同一硬闸）", () => {
+    for (const label of ["暖调胶片", "冷调技术", "高对比社交"]) {
+      expect(() => validateCoverPlan({ ...validPlan, subline: `${label} · 67 秒` }, input)).toThrow(/内部标签/);
+      expect(() => validateCoverPlan({ ...validPlan, badge: label }, input)).toThrow(/内部标签/);
+    }
+    expect(validateCoverPlan({ ...validPlan, subline: "城市漫游 · 67 秒", badge: "城市快剪" }, input)).toBeTruthy();
   });
 
   /**

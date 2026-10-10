@@ -25,7 +25,7 @@ interface Compiler {
 }
 const ts = createRequire(join(repo, "packages/video-studio/package.json"))("typescript") as Compiler;
 const parsed = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
-const names = new Set(["coverSourcesForShots", "coverCompositionForPlan", "record", "lineageStage", "lineageRecords", "stageApproved"]);
+const names = new Set(["coverSourcesForShots", "coverCompositionForPlan", "record", "lineageStage", "lineageRecords", "stageApproved", "requestCoverDesign"]);
 const declarations = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name && names.has(node.name.text));
 if (declarations.length !== names.size) throw new Error("COVER_FIXTURE_INVALID: actual CLI source functions missing");
 const selector = parsed.statements.filter(node => ts.isFunctionDeclaration(node) && node.name?.text === "selectCoverPlanForPolicy");
@@ -47,7 +47,13 @@ interface Api {
   coverCompositionForPlan(mode: string, plan: CoverPlan, background: CoverShotSource, person: CoverShotSource | null, lead: CoverLeadSource | null): CoverComposition;
 }
 const context = { exports: {} as { api: Api }, coverShotHasCharacter, coverShotMatchesLead, coverShotCharacterIds, resolveCoverComposition,
-  REVIEW_POLICY: "off", POST_RENDER_STAGES: new Set(["cover"]), fetch: () => { throw new Error("default design must not call a model"); } };
+  REVIEW_POLICY: "off", POST_RENDER_STAGES: new Set(["cover"]), ENV: {} as Record<string, string>,
+  lead: { id: "ceo", name: "女CEO", appearanceInShots: ["FF-01", "FF-03"] },
+  /** 未配置设计师模型 → 正式管线如实退确定性稿（真机口径：不冒充设计师出稿）。 */
+  resolveProducerLlm: () => null,
+  buildCoverDesignPrompt, parseCoverPlan, fallbackCoverPlan,
+  requestCoverDesign: async () => { throw new Error("fixture: designer model is not configured"); },
+  fetch: () => { throw new Error("designer must not be called when the model is unconfigured"); } };
 runInNewContext(compiled, context);
 const api = context.exports.api;
 afterAll(() => expect(sha(readFileSync(file)), "CLI source must remain immutable during this run").toBe(originalHash));
@@ -104,10 +110,17 @@ describe("封面正式 CLI 单主视觉与来源", () => {
     expect(coverShotMatchesLead({ shotId: "FF-01", characterId: "another-person" }, lead)).toBe(false);
     expect(coverShotHasCharacter({ shotId: "drone", character: "无人机航拍，主角口播" }, null)).toBe(true);
   });
-  it("the actual design block has no model designer call", () => {
+  /**
+   * 2026-10-09 产品所有者口径变更：封面标题/副标题**由封面设计师数字员工出稿**，不许硬编码；
+   * 因此正式 CLI 的选择块必须调用设计师（并对"封面出现真人姓名"做红线校验），
+   * 同时保留 `--cover-design deterministic` 的显式降级开关。
+   */
+  it("the actual design block routes cover copy through the designer agent (with explicit opt-out)", () => {
     const selection = source.slice(selectionStart, selectionEnd);
-    expect(selection).not.toMatch(/callCoverDesigner|WORKER_RUNTIME\.design|fetch\(/);
-    expect(source).not.toMatch(/async function callCoverDesigner/);
+    expect(selection).toMatch(/requestCoverDesign/);
+    expect(selection).toMatch(/--cover-design/);
+    expect(selection).toMatch(/assertCoverCopyHasNoPersonName/);
+    expect(source).toMatch(/async function requestCoverDesign/);
   });
   it("empty sources and unknown layout fail explicitly before drawing", () => {
     expect(() => api.coverSourcesForShots([], null)).toThrow("COVER_SOURCE_SHOTS_EMPTY");
@@ -125,6 +138,9 @@ describe("封面正式 CLI 单主视觉与来源", () => {
       let modelCalls = 0;
       const recipe = { component: originalHash, stage: "cover" };
       const sandbox = { ...context, exports: {} as { api: Api }, REVIEW_POLICY: policy, fallbackCoverPlan, parseCoverPlan, buildCoverDesignPrompt,
+        lead,
+        resolveProducerLlm: () => null, ENV: {} as Record<string, string>,
+        requestCoverDesign: async () => { throw new Error("fixture: designer model is not configured"); },
         WORKER_RUNTIME: { design: async () => { modelCalls++; throw new Error("fixture model unavailable"); } },
         designInput: { title: "前台排队了", archetype: "person-led", character: lead, shots: shots.map(shot => ({ shotId: shot.shotId })) },
         leadMatchedPersons: [shots[0], shots[2]], shots, fallbackBackground: shots[1], shotlist: { title: "前台排队了" },
