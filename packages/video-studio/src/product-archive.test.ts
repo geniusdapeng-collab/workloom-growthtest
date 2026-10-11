@@ -45,6 +45,61 @@ function archiveFixture(dir: string, overrides: Partial<ProductArchive> = {}): P
 }
 
 describe("product archive（真实商品档案）", () => {
+  /**
+   * T-2026-1011-0001 真机样本（张雪机车 820RR-RC）：
+   * 单张侧前 45° 图 + 无尺寸 → 重型机车被渲染成到人物腰部的玩具比例。
+   * 机动车档案必须多角度 + 登记真实尺寸，否则不可用（fail-closed）。
+   */
+  it("vehicle 档案：缺多角度真实产品图与真实尺寸 → 硬问题；补齐后消失", () => {
+    const dir = directory();
+    const base = archiveFixture(dir, { category: "vehicle", id: "demo-bike", displayName: "演示机车" });
+    const missing = verifyProductArchive(base, { dir }).filter((issue) => issue.hard).map((issue) => issue.code);
+    expect(missing).toContain("vehicle-angles");
+    expect(missing).toContain("vehicle-dimensions");
+
+    const front = writePhoto(dir, "front.jpg");
+    const side = writePhoto(dir, "side.jpg");
+    const fixed: ProductArchive = {
+      ...base,
+      photos: [
+        { id: "hero", file: front.file, role: "hero", angle: "three-quarter", sha256: front.sha256, bytes: front.bytes, width: 1200, height: 900 },
+        { id: "side", file: side.file, role: "detail", angle: "side", sha256: side.sha256, bytes: side.bytes, width: 1200, height: 900 },
+      ],
+      specs: {
+        appearance: "红黑冠军涂装全包围整流罩",
+        dimensions: { lengthMm: 2080, seatHeightMm: 825, curbWeightKg: 190 },
+      },
+    };
+    const issues = verifyProductArchive(fixed, { dir }).filter((issue) => issue.hard).map((issue) => issue.code);
+    expect(issues).not.toContain("vehicle-angles");
+    expect(issues).not.toContain("vehicle-dimensions");
+  });
+
+  it("vehicle 档案：尺寸与角度进入提示词（比例锚 + 使用规则）", () => {
+    const dir = directory();
+    const front = writePhoto(dir, "front.jpg");
+    const side = writePhoto(dir, "side.jpg");
+    const bike = archiveFixture(dir, {
+      category: "vehicle",
+      id: "demo-bike",
+      displayName: "演示机车 820RR-RC",
+      photos: [
+        { id: "p1", file: front.file, role: "hero", angle: "three-quarter", sha256: front.sha256, bytes: front.bytes },
+        { id: "p2", file: side.file, role: "detail", angle: "side", sha256: side.sha256, bytes: side.bytes },
+      ],
+      specs: { appearance: "红黑涂装", dimensions: { lengthMm: 2080, seatHeightMm: 825, curbWeightKg: 190 } },
+    });
+    const lines = productArchivePromptLines(bike);
+    const body = lines.join("\n");
+    expect(body).toContain("真实尺寸（比例锚");
+    expect(body).toContain("车长约 2.08 m");
+    expect(body).toContain("座高约 0.82 m");
+    expect(body).toContain("严禁玩具比例");
+    expect(body).toContain("已登记产品图角度");
+    expect(body).toContain("使用规则（机动车硬约束）");
+    expect(body).toContain("全盔");
+  });
+
   it("用户上传档案通过校验，缺证据的系统生成档案不通过", () => {
     const dir = directory();
     const user = archiveFixture(dir);

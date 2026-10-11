@@ -3,6 +3,7 @@ import { normalizeShotIntent, shotText, splitShotAssertions } from "./shot-inten
 import { DEVICE_PRESENCE_PATTERNS, devicePolicyPromptLines, type DeviceShotFields } from "./device-policy.js";
 import { environmentProfilePromptLines, expandShotWithBible, propInteractionPromptLines, sceneBiblePromptLines, type EnvShotFields, type SceneBible } from "./scene-bible.js";
 import type { EraProfile } from "./era-profile.js";
+import { REALISM_CLAUSE, REALISM_NEGATIVE_TERMS } from "./shot-spec.js";
 
 export interface PlatePromptShot {
   shotId?: string; costume?: string; makeup?: string; props?: unknown; scene?: string;
@@ -76,6 +77,10 @@ export function buildPlatePrompt(shot: PlatePromptShot, options: PlatePromptOpti
     ...(hasInteractiveProp(shot) ? [PROP_INTERACTION_CONSTRAINT] : []),
     ...devicePolicyPromptLines(deviceShot, { eraProfile: options.eraProfile }),
     ...(hasElectronicDevice(shot) ? [DEVICE_STANDARD_CONSTRAINT] : []),
+    /** 写实纪律 + 身份不可替换（机械提示；真实感/比例/身份是否成立由常识审核 agent 看关键帧判定）。 */
+    ...(person ? [REALISM_CLAUSE] : []),
+    REALISM_NEGATIVE_TERMS,
+    ...(person ? ["【身份不可替换】画面中的人物必须与角色合同为同一人（同一张脸、同性别、同年龄、同发型）；不得替换为其他人、不得出现第二张脸或第二个人。"] : []),
     "禁止：未要求的文字、字幕、水印、logo，非写实渲染，超出主体合同的人物或肢体，悬空无落点的建筑结构。",
   ];
   return lines.join("\n");

@@ -35,6 +35,13 @@ export const PIPELINE_GATE_STEP_KEYS = [
   /** 提交前硬闸（G-PRE1）：花钱之前体检最终提示词，并禁止同提示词重试 */
   "g-pre-submit",
   /**
+   * 实体与物理常识审核门（G-PLB1，T-2026-1011-0001）：
+   * ① pre-render（关键帧之前，卡片+提示词+商品档案）② pre-submit（视频提交之前，附关键帧画面）。
+   * 用模型的世界模型判断"主体在真实世界里怎么存在/被使用"，不枚举品类规则；unverified/blocker 一律 fail-closed。
+   */
+  "g-plausibility-pre-render",
+  "g-plausibility-pre-submit",
+  /**
    * 真实商品档案门（G-PROD1，T-2026-0929-0004）：涉及具体公司/品牌的镜头必须绑定到有效商品档案，
    * 且绑定的产品图来自"客户上传（priority 10）"或"系统检索生成（priority 1，须带证据与免责声明）"。
    */
@@ -64,7 +71,9 @@ export type PipelineGateStepKey = (typeof PIPELINE_GATE_STEP_KEYS)[number];
 export type PipelineGateId =
   | "G1" | "G2" | "G3" | "G4" | "G5" | "G6" | "G7" | "G8"
   | "G9" | "G10" | "G12" | "G13"
-  | "G-MAT1" | "G-PROD1" | "G-RP1" | "G-RL1" | "G-FP1" | "G-POST1" | "G-PRE1" | "G-DLV1" | "G-DLV4";
+  | "G-MAT1" | "G-PROD1" | "G-RP1" | "G-RL1" | "G-FP1" | "G-POST1" | "G-PRE1" | "G-DLV1" | "G-DLV4"
+  /** 实体与物理常识审核（T-2026-1011-0001）：PLB1=前期（卡片+提示词），PLB2=出片前（附关键帧） */
+  | "G-PLB1" | "G-PLB2";
 
 /** step_key → 门的编号（与 narrative-film.yml 的 `gate:` 字段一致） */
 const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
@@ -76,6 +85,8 @@ const GATE_BY_STEP_KEY: Record<PipelineGateStepKey, PipelineGateId> = {
   "g-real-person": "G-RP1",
   "g-prompt-redlines": "G-RL1",
   "g-first-pass": "G-FP1",
+  "g-plausibility-pre-render": "G-PLB1",
+  "g-plausibility-pre-submit": "G-PLB2",
   "g-post-only-assembly": "G-POST1",
   "g-pre-submit": "G-PRE1",
   /**

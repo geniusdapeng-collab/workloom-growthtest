@@ -13,7 +13,9 @@
  *   ⑥ 渲染顺序按镜号 → 最险的镜头没先渲，前面的钱白花
  * 本模块只做**确定性文本判定**（零 token、可复算、可考试），产出高/中/低风险项与"改卡建议"。
  */
-export const FIRST_PASS_POLICY_VERSION = "workloom.first-pass-readiness/v1" as const;
+import { dialogueContractFindings, dialogueLines, DIALOGUE_CONTRACT_VERSION } from "./dialogue-contract.js";
+
+export const FIRST_PASS_POLICY_VERSION = "workloom.first-pass-readiness/v2" as const;
 
 export type RiskLevel = "high" | "medium" | "low";
 export interface FirstPassFinding {
@@ -44,7 +46,7 @@ const joined = (shot: FirstPassShot, keys: string[]): string => keys.map((key) =
 /** 只保留肯定描述（剥掉"不出现/不可见/无…"的否定语境，与仓库其它审计同纪律） */
 const positive = (value: string): string => value.split(/[；。，、]/).filter((c) => c.trim() && !/(不出现|不可见|不露|不得|禁止|避免|没有|无[^，。；]*)/.test(c)).join("；");
 
-export function assessShotFirstPass(shot: FirstPassShot, options: { fps?: number } = {}): FirstPassReadiness {
+export function assessShotFirstPass(shot: FirstPassShot, options: { fps?: number; language?: string | null } = {}): FirstPassReadiness {
   const visual = positive(joined(shot, ["scene", "sceneDescription", "composition", "action", "props"]));
   const full = joined(shot, ["scene", "sceneDescription", "composition", "action", "props", "timeline", "camera_movement", "costume", "character"]);
   const camera = str(shot.camera_movement);
@@ -120,6 +122,25 @@ export function assessShotFirstPass(shot: FirstPassShot, options: { fps?: number
     add("mirror", "low", `含玻璃/镜面但未排除镜像第二张人脸`, `负面清单加"无镜像第二张脸"`);
   }
 
+  /**
+   * ⑦ 台词合同（T-2026-1011-0001，机械事实）：引用式台词逐字一致、语言与影片一致、无台词镜禁人声。
+   * 世界知识（主体怎么被使用、比例、装备、真实感）**不在本模块**——由 `plausibility-review.ts` 的
+   * 实体与物理常识审核 agent 用模型的世界模型判断（品类无法穷举，不枚举规则）。
+   */
+  for (const finding of dialogueContractFindings(shot as never, { language: options.language ?? null })) {
+    add(finding.id, finding.level, finding.detail, finding.suggestion);
+  }
+  /** 有台词却无可见面部：模型没有身份锚会自造面孔——中风险提示，最终由常识审核 agent 判定。 */
+  const hasDialogue = dialogueLines(shot as never).length > 0;
+  const declaredSubject = shot.subject && typeof shot.subject === "object" && !Array.isArray(shot.subject)
+    ? shot.subject as Record<string, unknown> : {};
+  if (hasDialogue && declaredSubject.faceVisible === false
+    && /不露(?:脸|面部)|仅(?:手部|侧脸)|背影|背对镜头|剪影|侧脸轮廓/.test(full)) {
+    add("dialogue-without-visible-face", "medium",
+      `有台词的镜头没有可见说话人面部——模型没有身份锚，容易自造面孔/换人`,
+      `改成可见正脸，或去掉台词/去掉人物；本条为中风险提示，最终由实体与物理常识审核 agent 判定`);
+  }
+
   const weight = { high: 3, medium: 2, low: 1 } as const;
   const score = findings.filter((f) => f.level !== "low").reduce((sum, f) => sum + weight[f.level], 0);
   const blockers = findings.filter((finding) => finding.level === "high");
@@ -135,7 +156,7 @@ export function assessShotFirstPass(shot: FirstPassShot, options: { fps?: number
 }
 
 /** 整片就绪度 + 建议的渲染顺序（高风险先渲 = canary，先错只花一镜的钱） */
-export function assessFilmFirstPass(shots: readonly FirstPassShot[], options: { fps?: number } = {}): {
+export function assessFilmFirstPass(shots: readonly FirstPassShot[], options: { fps?: number; language?: string | null } = {}): {
   policy: typeof FIRST_PASS_POLICY_VERSION;
   ready: boolean;
   blockers: Array<{ shotId: string; finding: FirstPassFinding }>;
