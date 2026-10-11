@@ -1,4 +1,7 @@
 import { videoRuntimeRoot } from "./runtime-root.js";
+import {
+  dialogueLines, inferShotSpeechLanguage, speechLanguageClause, exactDialogueClause, noSpeechClause, speechNegativeTerms,
+} from "./dialogue-contract.js";
 /**
  * shot-spec.ts —— 镜头卡字段规范（内容镜 25 字段 / 片头 30 字段）与交付闸
  *
@@ -158,6 +161,8 @@ export interface PrepareOptions {
   resolution?: string;
   /** 实际提交帧率；不指定时保留历史 24fps 口径。 */
   fps?: number;
+  /** 影片人声语言（T-2026-1011-0001）：用于台词语言锁定；缺省按台词文本推断。 */
+  language?: string;
   /**
    * 内容红线词表（默认取自 vendor `field-standardizer` 的 scene 禁词 + 本车道补充观察到的漂移词）。
    * 命中即判不合格，除非在 `allowRedlines` 中显式放行。
@@ -412,7 +417,8 @@ export const EXTRAS_REALISM_CLAUSE =
 /** 写实模式下并入负面约束（与 vendor negative 同语言） */
 export const REALISM_NEGATIVE_TERMS =
   "no cartoon, no anime, no illustration, no cgi look, no 3d render, no plastic skin, no wax figure, "
-  + "no beauty filter, no airbrushed face, no mannequin crowd, no duplicated faces";
+  + "no beauty filter, no airbrushed face, no mannequin crowd, no duplicated faces, "
+  + "no video game look, no game cutscene";
 
 /** 允许显式声明的非写实风格（客户明确要求时才可开启） */
 export const STYLIZED_STYLES = ["cartoon", "anime", "illustration", "3d", "cg", "stylized", "pixar", "comic"] as const;
@@ -718,6 +724,22 @@ export function prepareShotPrompt(
   } else {
     log(`[shot-spec] ${shotId} 写实约束豁免：${realismPolicy.reason}（如属误判请在卡片显式声明 style/subjectType）`);
   }
+
+  /**
+   * 台词合同条款（T-2026-1011-0001，机械事实）：语言锁定 + 逐字 + 无台词镜禁人声。
+   */
+  const declaredSpeechLanguage = String(
+    (normalizedCard as Record<string, unknown>).speechLanguage ?? options.language ?? inferShotSpeechLanguage(card as never) ?? "zh"
+  ).toLowerCase();
+  const dialogueLineList = dialogueLines(card as never);
+  if (dialogueLineList.length > 0) {
+    if (!prompt.includes("【台词语言】")) prompt += ` | ${speechLanguageClause(declaredSpeechLanguage, dialogueLineList)}`;
+    const exactClause = exactDialogueClause(dialogueLineList);
+    if (exactClause && !prompt.includes("【逐字台词】")) prompt += ` | ${exactClause}`;
+  } else if ((card as Record<string, unknown>).dialogueFree === true) {
+    if (!prompt.includes("【无台词】")) prompt += ` | ${noSpeechClause()}`;
+  }
+  if (!/no improvised lines/i.test(prompt)) prompt += ` | ${speechNegativeTerms(declaredSpeechLanguage)}`;
   const constraint = normalizeConstraintSegment(prompt, ratio, resolution, options.fps ?? 24);
   if (constraint.changed) {
     log(
@@ -838,6 +860,18 @@ export function prepareShotPrompt(
     && (!prompt.includes("【写实纪律】") || !prompt.includes("【场景解耦】") || !/no cartoon/i.test(prompt))) {
     delivery.pass = false;
     delivery.issues = [...delivery.issues, "提示词缺少「纯写实 + 场景解耦」纪律子句（默认强制；其它风格请在卡片显式声明 style/realism）"];
+  }
+  /** 台词合同自检（T-2026-1011-0001，机械事实） */
+  if (dialogueLineList.length > 0) {
+    if (!prompt.includes("【台词语言】") || !/no improvised lines/i.test(prompt)) {
+      delivery.pass = false;
+      delivery.issues = [...delivery.issues, "提示词缺少台词合同子句（【台词语言】（含逐字要求）/禁止即兴人声的负面词）"];
+    }
+  } else if ((card as Record<string, unknown>).dialogueFree === true) {
+    if (!prompt.includes("【无台词】")) {
+      delivery.pass = false;
+      delivery.issues = [...delivery.issues, "无台词镜提示词缺少【无台词】子句（禁任何人声词句）"];
+    }
   }
   /**
    * `dialogue` 的等价形态：vendor 交付格式是 `dialogueBlocks`（speaker/line/emotion/trigger），

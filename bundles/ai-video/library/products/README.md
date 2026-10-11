@@ -13,6 +13,19 @@ bundles/ai-video/library/products/
     sources.json          # 系统检索档案的原始检索结果与抓图尝试记录（客户上传档案可无）
 ```
 
+## 机动车 / 大件商品：多角度 + 真实尺寸（T-2026-1011-0001 硬要求）
+
+真机事故（2026-10-11，张雪机车 820RR-RC 30s 品牌片）：只登记**一张侧前 45° 图**、且**没有任何真实尺寸**，
+成片把重型机车渲染成"到人物腰部的玩具比例"，且全片缺少机车最标志性的**骑手与全盔**——
+根因就是档案没给比例锚与使用规则。因此：
+
+- `profile.json` 顶层必须写 `"category": "vehicle"`（机动车/大件载具）；
+- `photos[]` 必须 **≥2 个不同角度**，逐张登记 `angle`：`front | three-quarter | side | rear | detail | action | top`；
+  收集口径：**优先官网与主流媒体（含厂商新闻稿/官图）的多角度高清大图**，逐张记录来源页；
+- `specs.dimensions` 至少登记 2 项真实尺寸：`lengthMm / widthMm / heightMm / seatHeightMm / wheelbaseMm / curbWeightKg`；
+- 校验器对 `category=vehicle` **硬拦**缺角度或缺尺寸的档案（fail-closed，进不了出片链路）；
+- 提示词侧自动带出：真实尺寸（比例锚）+ 已登记角度 + "行驶镜必须有骑手与全盔、禁止无人自行行驶"的使用规则。
+
 ## 两种来源
 
 | 来源 | 生成方式 | priority | 必备字段 | 语义 |

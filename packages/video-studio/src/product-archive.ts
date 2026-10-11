@@ -35,6 +35,11 @@ export interface ProductArchivePhoto {
   /** 相对档案目录的路径（posix 风格，禁止绝对路径与 .. 逃逸） */
   file: string;
   role?: "hero" | "detail" | "scene" | "packaging";
+  /**
+   * 机位角度（T-2026-1011-0001）：机动车/大件商品必须多角度建档。
+   * front/three-quarter/side/rear/detail/action/top 为受控词表；缺省视为未登记。
+   */
+  angle?: "front" | "three-quarter" | "side" | "rear" | "detail" | "action" | "top";
   sha256: string;
   bytes: number;
   width?: number;
@@ -78,6 +83,20 @@ export interface ProductArchiveSpecs {
   features?: string[];
   material?: string;
   notes?: string[];
+  /**
+   * 真实尺寸（T-2026-1011-0001）：**比例锚**。
+   * 真机样本：重型机车被渲染成到人物腰部的玩具尺寸——根因是提示词没有任何真实尺寸。
+   * 机动车/大件商品必须登记至少两项；数值只登记能核实的来源。
+   */
+  dimensions?: {
+    lengthMm?: number;
+    widthMm?: number;
+    heightMm?: number;
+    seatHeightMm?: number;
+    wheelbaseMm?: number;
+    curbWeightKg?: number;
+    note?: string;
+  };
   /** 只登记能核实来源的参数；没有来源的一律留空（不许编） */
   parameters?: Array<{ name: string; value: string; source?: string }>;
 }
@@ -93,6 +112,8 @@ export interface ProductArchive {
    *   company  = 公司/品牌档案（官方资料、品牌别名、成员商品与方案索引）
    */
   type?: "product" | "solution" | "company";
+  /** 商品大类（T-2026-1011-0001）：`vehicle` 触发"多角度 + 真实尺寸"硬校验与骑行规则提示词。 */
+  category?: string;
   /** 商品型号（例如 DEMO-02）；产品镜可以按型号点单 */
   model?: string;
   variants?: Array<{ name: string; model?: string; note?: string }>;
@@ -204,6 +225,25 @@ export function verifyProductArchive(
         if (photo.height !== undefined && photo.height !== dims.height) push("photo-height", `图片高度与登记不一致：${photo.file}`, false);
         if (Math.max(dims.width, dims.height) < 600) push("photo-resolution", `图片分辨率过低（最长边 ${Math.max(dims.width, dims.height)}px < 600px）：${photo.file}`, false);
       }
+    }
+  }
+  /**
+   * 机动车类档案硬校验（T-2026-1011-0001，真机样本 820RR-RC）：
+   *   · 多角度：至少 2 张**不同角度**的真实产品图（单张 hero 不足以还原整车，
+   *     真机事故：只有一张侧前 45° 图 → 关键帧把重型机车画成玩具比例/换脸徽标）；
+   *   · 真实尺寸：至少 2 项尺寸（车长/座高/轴距/整备质量…），否则提示词没有比例锚。
+   * 只在显式声明 `category: "vehicle"` 时生效——其它品类不因本规则被拦。
+   */
+  if (String(archive.category ?? "").toLowerCase() === "vehicle") {
+    const angles = [...new Set(photos.map((photo) => photo.angle).filter(Boolean))] as string[];
+    if (type === "product" && angles.length < 2) {
+      push("vehicle-angles", `机动车档案必须登记 ≥2 个不同角度的真实产品图（当前 ${angles.length} 个：${angles.join("/") || "未登记"}）；单张图无法支撑整车还原`);
+    }
+    const dims = archive.specs?.dimensions ?? {};
+    const dimKeys = ["lengthMm", "widthMm", "heightMm", "seatHeightMm", "wheelbaseMm", "curbWeightKg"]
+      .filter((key) => typeof (dims as Record<string, unknown>)[key] === "number");
+    if (dimKeys.length < 2) {
+      push("vehicle-dimensions", `机动车档案必须登记 ≥2 项真实尺寸（车长/座高/轴距/整备质量等，当前 ${dimKeys.length} 项）；缺尺寸锚会把重型机车画成玩具比例`);
     }
   }
   return issues;
@@ -324,6 +364,40 @@ export function productArchivePromptLines(archive: ProductArchive): string[] {
   if (appearance) lines.push(`产品外观（以参考照片为准）：${appearance}`);
   const features = (archive.specs?.features ?? []).filter((item) => String(item).trim());
   if (features.length) lines.push(`可见结构与功能（只描述画面能看到的）：${features.join("；")}`);
+  /**
+   * 真实尺寸（比例锚，T-2026-1011-0001）：
+   * 缺这条 → 模型没有人车尺度参照，重型机车会被画成玩具比例（真机样本 820RR-RC）。
+   */
+  const dims = archive.specs?.dimensions;
+  if (dims) {
+    const parts: string[] = [];
+    if (typeof dims.lengthMm === "number") parts.push(`车长约 ${(dims.lengthMm / 1000).toFixed(2)} m`);
+    if (typeof dims.widthMm === "number") parts.push(`车宽约 ${(dims.widthMm / 1000).toFixed(2)} m`);
+    if (typeof dims.heightMm === "number") parts.push(`车高约 ${(dims.heightMm / 1000).toFixed(2)} m`);
+    if (typeof dims.seatHeightMm === "number") parts.push(`座高约 ${(dims.seatHeightMm / 1000).toFixed(2)} m`);
+    if (typeof dims.wheelbaseMm === "number") parts.push(`轴距约 ${(dims.wheelbaseMm / 1000).toFixed(2)} m`);
+    if (typeof dims.curbWeightKg === "number") parts.push(`整备质量约 ${dims.curbWeightKg} kg`);
+    if (parts.length) {
+      lines.push(`真实尺寸（比例锚，必须遵守）：${parts.join("、")}${dims.note ? `；${dims.note}` : ""}；`
+        + "人物与车辆同框时必须按真实尺寸还原相对比例（重型机车整车长度明显超过成年人身高、座高接近人物腰部以上），"
+        + "严禁玩具比例、微缩模型感与「缩小版」整车。");
+    }
+  }
+  /**
+   * 多角度参考（T-2026-1011-0001）：档案已登记角度时列出，供生成侧逐角度对齐车身结构。
+   */
+  const angles = [...new Set((archive.photos ?? []).map((photo) => photo.angle).filter(Boolean))] as string[];
+  if (angles.length > 0) {
+    lines.push(`已登记产品图角度：${angles.join(" / ")}（front=车头正前、three-quarter=前 3/4、side=正侧、rear=车尾、detail=细节、action=行驶）；`
+      + "车身结构、轮胎与轮毂形态、导流罩开口与配色分区必须与对应角度照片一致");
+  }
+  /**
+   * 机动车使用规则（T-2026-1011-0001）：运动镜必须有骑手与头盔，禁止无人自行行驶。
+   */
+  if (String(archive.category ?? "").toLowerCase() === "vehicle") {
+    lines.push("使用规则（机动车硬约束）：行驶/起步/压弯等运动镜必须由画面内可见的成年骑手操控并佩戴全盔与护具；"
+      + "禁止无人驾驶、禁止车辆自行启动或自行行驶；骑手姿态、重心与轮胎接地符合真实物理");
+  }
   lines.push("产品一致性硬约束：机身轮廓、屏幕比例、按键与卡口布局、品牌标识位置必须与参考照片完全一致，不得重新设计外观、不得替换为相似机型");
   if (archive.source.kind === "system-generated") lines.push("素材来源声明：本商品资料由系统检索生成、未经客户确认，正式投放前须由客户核对产品外观与参数");
   return lines;
