@@ -86,13 +86,33 @@ function scopeOf(value) {
   };
 }
 
-/** The same hard/fade/xfade durations as post-bridge's video assembly, in samples. */
-export function buildAudioStemTimeline({ shots, transitions = {} }) {
+/**
+ * The same hard/fade/xfade durations as post-bridge's video assembly, in samples.
+ *
+ * `cuts`（2026-10-13 修复）：可选的**逐刀回执**（`[{ toShotId, durationSeconds }]`，来自转场引擎的
+ * transition-receipt）。有它时按每一刀的**实际重叠**对齐（硬切 = 0）；没有它才退回"整段一个 fadeSec"
+ * 的历史口径。背景：逐切计划（perCut）里每刀时长可以不同、也可以有硬切，旧口径把整条链按同一个
+ * fadeSec 折叠，节目声时间线与画面必然错位，`muxAudioProgram` 会以 `audio_stems_alignment_failed`
+ * 失败关闭——即"独立音轨 × 逐切转场"根本交付不出去。
+ */
+export function buildAudioStemTimeline({ shots, transitions = {}, cuts = null, padToSeconds = null }) {
   if (!Array.isArray(shots) || !shots.length || shots.length > 256) fail("分轨需要 1–256 个已归一化镜头");
   record(transitions, "transitions");
   const mode = transitions.mode ?? "hard";
   if (!["hard", "fade", "xfade"].includes(mode)) fail("音轨转场必须为 hard、fade 或 xfade");
   const fadeSec = Math.max(0.05, finite(transitions.fadeSec ?? 0.5, "fadeSec", { max: 30 }));
+  const overlapByShotId = new Map();
+  if (cuts != null) {
+    if (!Array.isArray(cuts)) fail("cuts 必须是逐刀回执数组");
+    for (const cut of cuts) {
+      record(cut, "cuts[]");
+      const id = String(cut.toShotId ?? cut.incomingSegmentId ?? "");
+      if (!id) continue;
+      const seconds = Number(cut.durationSeconds ?? 0);
+      if (!Number.isFinite(seconds) || seconds < 0) fail(`切点时长非法：${id}`);
+      overlapByShotId.set(id, (overlapByShotId.get(id) ?? 0) + seconds);
+    }
+  }
   const ids = new Set();
   const entries = shots.map((shot) => {
     record(shot, "shot");
@@ -115,16 +135,30 @@ export function buildAudioStemTimeline({ shots, transitions = {} }) {
     }
     const next = entries[index + 1];
     if (next && mode === "xfade") {
-      entry.overlapAfterSamples = sampleCount(Math.min(fadeSec, Math.max(0.05, Math.min(entry.durationSec, next.durationSec) / 2)), "overlap");
+      /** 有逐刀回执：按该刀实际时长（硬切=0）；无回执：沿用整段 fadeSec。 */
+      const planned = overlapByShotId.has(next.shotId)
+        ? overlapByShotId.get(next.shotId)
+        : (cuts ? 0 : fadeSec);
+      const headroom = Math.max(0, Math.min(entry.durationSec, next.durationSec) / 2);
+      const seconds = Math.min(planned, headroom);
+      entry.overlapAfterSamples = seconds > 0 ? sampleCount(seconds, "overlap") : 0;
       if (entry.overlapAfterSamples >= Math.min(entry.samples, next.samples)) fail("交叉转场必须短于相邻镜头");
     }
     if (next) next.startSample = entry.startSample + entry.samples - entry.overlapAfterSamples;
   }
   const last = entries.at(-1);
-  const samples = last.startSample + last.samples;
+  const naturalSamples = last.startSample + last.samples;
+  /**
+   * `padToSeconds`（2026-10-13）：画面是逐帧/逐采样量化的（xfade 边界落在帧上），独立音轨的
+   * 理论总长与画面实测时长会差几十毫秒；`muxAudioProgram` 的 40ms 闸因此会把**量化噪声**当成
+   * "音轨与画面不同步"。这里允许调用方用**画面实测时长**给节目轨尾部补静音，把差值归零；
+   * 补的只是尾部空白（逐镜头样点不变），并在时间线里如实记录自然长度。
+   */
+  const padSamples = padToSeconds == null ? naturalSamples : sampleCount(padToSeconds, "padToSeconds");
+  const samples = Math.max(naturalSamples, padSamples);
   if (samples > 7200 * AUDIO_STEM_SAMPLE_RATE) fail("分轨时间线超过 2 小时上限");
   return { sampleRate: AUDIO_STEM_SAMPLE_RATE, channels: 2, mode, fadeSec, samples,
-    durationSec: samples / AUDIO_STEM_SAMPLE_RATE, shots: entries };
+    naturalSamples, durationSec: samples / AUDIO_STEM_SAMPLE_RATE, shots: entries };
 }
 
 function allowedRootsOf(roots) {
@@ -239,9 +273,9 @@ function sourceBinding(scope, shot, role, descriptor) {
 }
 
 /** Canonical source bindings for an internal authority. This does not issue or approve receipts. */
-export function describeAudioStemSources({ scope, shots, transitions = {} }) {
+export function describeAudioStemSources({ scope, shots, transitions = {}, cuts = null }) {
   const identity = scopeOf(scope);
-  const timeline = buildAudioStemTimeline({ shots, transitions });
+  const timeline = buildAudioStemTimeline({ shots, transitions, cuts });
   return timeline.shots.flatMap((shot, index) => AUDIO_STEM_ROLES.map((role) => {
     const binding = sourceBinding(identity, shot, role, shots[index].stems?.[role]);
     return { binding, bindingSha256: audioStemDigest(binding) };
@@ -320,10 +354,34 @@ async function combineRole({ files, timeline, output, bins }) {
   const chains = files.map((_, index) => `[${index}:a]asetpts=N/SR/TB[a${index}]`);
   let last = "[a0]";
   if (timeline.mode === "xfade") {
+    /**
+     * 逐刀回执允许 0 重叠（硬切）——`acrossfade` 的 ns 必须 ≥1 样本，硬切那一刀走 concat 而不是叠化。
+     * 做法与视频引擎同构：按"有没有重叠"把镜头拆成 run，run 内 acrossfade、run 间 concat。
+     */
+    const runs = [];
+    let current = [0];
     for (let index = 1; index < files.length; index += 1) {
-      const next = `[joined${index}]`;
-      chains.push(`${last}[a${index}]acrossfade=ns=${timeline.shots[index - 1].overlapAfterSamples}:c1=tri:c2=tri${next}`);
-      last = next;
+      if (timeline.shots[index - 1].overlapAfterSamples > 0) current.push(index);
+      else { runs.push(current); current = [index]; }
+    }
+    runs.push(current);
+    const runOutputs = [];
+    for (const [runIndex, run] of runs.entries()) {
+      if (run.length === 1) { runOutputs.push(`[a${run[0]}]`); continue; }
+      let runLast = `[a${run[0]}]`;
+      for (let position = 1; position < run.length; position += 1) {
+        const index = run[position];
+        const next = `[run${runIndex}x${position}]`;
+        chains.push(`${runLast}[a${index}]acrossfade=ns=${timeline.shots[index - 1].overlapAfterSamples}:c1=tri:c2=tri${next}`);
+        runLast = next;
+      }
+      runOutputs.push(runLast);
+    }
+    if (runOutputs.length > 1) {
+      chains.push(`${runOutputs.join("")}concat=n=${runOutputs.length}:v=0:a=1[joined]`);
+      last = "[joined]";
+    } else {
+      last = runOutputs[0];
     }
   } else if (files.length > 1) {
     chains.push(`${files.map((_, index) => `[a${index}]`).join("")}concat=n=${files.length}:v=0:a=1[joined]`);
@@ -353,13 +411,13 @@ function stableError(error) {
  * is explicit (inSec/durationSec/offsetSec); this renderer never changes speed.
  * outDir must be new. Success is the final manifest, never file existence alone.
  */
-export async function renderAudioStems({ scope, shots, transitions = {}, outDir, allowedRoots, verifySource, bins = resolveBinaries() }) {
+export async function renderAudioStems({ scope, shots, transitions = {}, cuts = null, padToSeconds = null, outDir, allowedRoots, verifySource, bins = resolveBinaries() }) {
   let target = null;
   let created = false;
   let runId = null;
   try {
     const identity = scopeOf(scope);
-    const timeline = buildAudioStemTimeline({ shots, transitions });
+    const timeline = buildAudioStemTimeline({ shots, transitions, cuts, padToSeconds });
     const roots = allowedRootsOf(allowedRoots);
     target = guardedPath(outDir, roots, { missing: true });
     const sources = await authorizedSources({ scope: identity, shots, timeline, verifySource });
@@ -487,7 +545,22 @@ export async function verifyAudioStemBundle({ dir, expectedManifestSha256, expec
     const shots = priorTimeline.shots?.map((shot) => ({ shotId: shot.shotId, videoSha256: shot.videoSha256,
       normalisedVideoSha256: shot.normalisedVideoSha256, sourceDurationSec: shot.sourceSamples / AUDIO_STEM_SAMPLE_RATE,
       durationSec: shot.samples / AUDIO_STEM_SAMPLE_RATE, stems: {} }));
-    const timeline = buildAudioStemTimeline({ shots, transitions: { mode: priorTimeline.mode, fadeSec: priorTimeline.fadeSec } });
+    /**
+     * 复用缓存时按**已生效的逐刀重叠**回放时间线（2026-10-13）：逐切计划里每刀时长可以不同，
+     * 只拿 mode/fadeSec 重建必然与缓存不一致，缓存会被误判为"时间线不一致"而拒绝复用。
+     * 逐刀值取缓存里**实际生效**的 overlapAfterSamples（已完成头寸夹取），保证回放可复现。
+     */
+    const replayCuts = shots.slice(1).map((entry, index) => ({
+      toShotId: entry.shotId,
+      durationSeconds: (priorTimeline.shots?.[index]?.overlapAfterSamples ?? 0) / AUDIO_STEM_SAMPLE_RATE,
+    }));
+    const timeline = buildAudioStemTimeline({
+      shots,
+      transitions: { mode: priorTimeline.mode, fadeSec: priorTimeline.fadeSec },
+      cuts: priorTimeline.mode === "xfade" ? replayCuts : null,
+      /** 缓存里已按画面实测时长补过尾部静音：回放必须带上同一个总长，摘要才对得上。 */
+      padToSeconds: priorTimeline.samples / AUDIO_STEM_SAMPLE_RATE,
+    });
     if (audioStemDigest(priorTimeline) !== audioStemDigest(timeline)
       || !Array.isArray(manifest.sources) || manifest.sources.length !== shots.length * AUDIO_STEM_ROLES.length) {
       fail("音轨缓存时间线或来源个数不一致", "audio_stems_stale");
@@ -551,6 +624,9 @@ export async function verifyAudioStemBundle({ dir, expectedManifestSha256, expec
     // every derived PCM file before accepting a cache as an independent stem.
     const replay = await renderAudioStems({ scope: identity, shots,
       transitions: { mode: timeline.mode, fadeSec: timeline.fadeSec },
+      /** 回放必须带同一份逐刀口径，否则"重建 PCM"与缓存不是同一条时间线。 */
+      cuts: timeline.mode === "xfade" ? replayCuts : null,
+      padToSeconds: timeline.samples / AUDIO_STEM_SAMPLE_RATE,
       outDir: path.join(temporary, "derived"), allowedRoots, verifySource, bins });
     if (replay.recipeSha256 !== expectedRecipeSha256 || replay.program.sha256 !== program.sha256
       || AUDIO_STEM_ROLES.some((role) => replay.roles[role].sha256 !== roles[role].sha256)

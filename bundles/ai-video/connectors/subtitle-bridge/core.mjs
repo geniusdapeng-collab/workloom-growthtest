@@ -2050,6 +2050,137 @@ function loadCatalog() {
   return loadFontCatalog();
 }
 
+/* ============== 转场交叠时间映射（字幕随转场对齐，2026-10-12 客户实测事故） ============== */
+
+/**
+ * 为什么单独有这一段：
+ * 转场会把相邻两镜**交叠**——每一刀让成片比时间轴短 `durationSeconds`（成片 = Σ镜头 − Σ转场重叠）。
+ * 字幕 SRT 是按**时间轴**写的时间；不映射就会整体后移，并在片尾溢出成片时长。
+ * 溢出不是"少显示一个字"这么轻：软字幕轨内嵌时，尾部字幕会把容器时长拉回时间轴长度，
+ * `duration_kept` 硬闸判失败——实测母版 6.933s 被尾字幕拉回 7.4s，"转场 + 字幕"组合直接交付不出去。
+ * 变体的转场时长由各变体配方的 intentMap/scale 解析（同一剪辑计划 → 各风格转场不同），
+ * 因此映射必须**按每个形态自己的实际转场回执**分别计算，不能只按母版计划算一次。
+ */
+export function buildTransitionTimemap(segments = [], cuts = [], { outputDurationSeconds } = {}) {
+  const overlapInto = new Map();
+  for (const cut of Array.isArray(cuts) ? cuts : []) {
+    const id = String(cut?.incomingSegmentId ?? cut?.toShotId ?? "");
+    if (!id) continue;
+    const overlap = Math.max(0, Number(cut?.durationSeconds) || 0);
+    overlapInto.set(id, (overlapInto.get(id) ?? 0) + overlap);
+  }
+  const boundaries = [];
+  let timelineCursor = 0;
+  let overlapCursor = 0;
+  for (const segment of Array.isArray(segments) ? segments : []) {
+    const id = String(segment?.segmentId ?? segment?.shotId ?? "");
+    const duration = Math.max(0, Number(segment?.durationSeconds ?? segment?.duration) || 0);
+    /** 该镜承接的重叠把它在成片里的起点整体前移（xfade 链上逐刀累加）。 */
+    overlapCursor += overlapInto.get(id) ?? 0;
+    boundaries.push({
+      segmentId: id,
+      timelineStart: round(timelineCursor, 3),
+      outputStart: round(timelineCursor - overlapCursor, 3),
+    });
+    timelineCursor += duration;
+  }
+  const timelineDurationSeconds = round(timelineCursor, 3);
+  const explicitDuration = Number(outputDurationSeconds);
+  const outputDuration = Math.max(0, Number.isFinite(explicitDuration) && explicitDuration > 0
+    ? explicitDuration
+    : timelineCursor - overlapCursor);
+  const mapSeconds = (seconds) => {
+    const t = Number.isFinite(Number(seconds)) ? Math.max(0, Number(seconds)) : 0;
+    let hit = boundaries[0] ?? null;
+    for (const boundary of boundaries) {
+      if (t + 1e-6 >= boundary.timelineStart) hit = boundary;
+      else break;
+    }
+    if (!hit) return round(t, 3);
+    return round(Math.max(0, hit.outputStart + (t - hit.timelineStart)), 3);
+  };
+  return {
+    boundaries,
+    timelineDurationSeconds,
+    outputDurationSeconds: round(outputDuration, 3),
+    totalOverlapSeconds: round(overlapCursor, 3),
+    mapSeconds,
+  };
+}
+
+/** 把按时间轴写时间的 cue 映射到成片时间；越界丢弃、尾部夹到片尾（字幕不允许比画面长）。 */
+export function retimeCuesForTransitions(cues = [], timemap, { minCueSeconds = 0 } = {}) {
+  if (!timemap || typeof timemap.mapSeconds !== "function") {
+    throw new SubtitleError("转场时间映射缺失（先调 buildTransitionTimemap）", "bad_request", false);
+  }
+  const output = [];
+  const dropped = [];
+  (Array.isArray(cues) ? cues : []).forEach((cue, index) => {
+    const start = timemap.mapSeconds(assistToSeconds(cue.start));
+    const mappedEnd = timemap.mapSeconds(assistToSeconds(cue.end));
+    if (!(start < timemap.outputDurationSeconds - 1e-3)) {
+      dropped.push(index);
+      return;
+    }
+    let end = Math.min(mappedEnd, timemap.outputDurationSeconds);
+    if (minCueSeconds > 0 && end - start < minCueSeconds) {
+      end = Math.min(timemap.outputDurationSeconds, start + minCueSeconds);
+    }
+    if (!(end - start > 1e-3)) {
+      dropped.push(index);
+      return;
+    }
+    const retimed = { ...cue, start: srtSecondsToAss(start), end: srtSecondsToAss(end) };
+    /** 百分秒取整可能把极短条压平——压平的条明确丢弃并留痕，不落一条非法时间轴。 */
+    if (!(assistToSeconds(retimed.end) > assistToSeconds(retimed.start))) {
+      dropped.push(index);
+      return;
+    }
+    output.push(retimed);
+  });
+  return {
+    cues: output,
+    dropped,
+    shiftSeconds: round(timemap.timelineDurationSeconds - timemap.outputDurationSeconds, 3),
+    outputDurationSeconds: timemap.outputDurationSeconds,
+  };
+}
+
+/** 软轨内嵌兜底：把 cue 尾钳到容器时长（上游已按形态重映射时通常无事发生）。 */
+export function clampCuesToDuration(cues = [], durationSeconds) {
+  const limit = Number.isFinite(Number(durationSeconds)) && Number(durationSeconds) > 0 ? Number(durationSeconds) : null;
+  if (!limit) {
+    return { cues: Array.isArray(cues) ? cues.map((cue) => ({ ...cue })) : [], clamped: [], removed: [], limitSeconds: null, maxOvershootSeconds: 0 };
+  }
+  const kept = [];
+  const clamped = [];
+  const removed = [];
+  let maxOvershootSeconds = 0;
+  (Array.isArray(cues) ? cues : []).forEach((cue, index) => {
+    const start = assistToSeconds(cue.start);
+    const end = assistToSeconds(cue.end);
+    if (start >= limit - 1e-3) {
+      removed.push(index);
+      return;
+    }
+    if (end <= limit + 1e-3) {
+      kept.push({ ...cue });
+      return;
+    }
+    /** 越界幅度要留痕：≤0.1s 属编码量化噪声，更大就是"重映射没生效"的材料级缺陷。 */
+    maxOvershootSeconds = Math.max(maxOvershootSeconds, end - limit);
+    /** 留 5ms 余量：百分秒取整只允许向下，避免"钳完仍然比容器长 1ms"。 */
+    const next = { ...cue, end: srtSecondsToAss(Math.max(start, limit - 0.005)) };
+    if (!(assistToSeconds(next.end) > assistToSeconds(next.start))) {
+      removed.push(index);
+      return;
+    }
+    clamped.push(index);
+    kept.push(next);
+  });
+  return { cues: kept, clamped, removed, limitSeconds: round(limit, 3), maxOvershootSeconds: round(maxOvershootSeconds, 3) };
+}
+
 /* ============== 旁挂字幕交付（只出文件，不动画面）与软字幕轨 ============== */
 
 /**
@@ -2371,6 +2502,48 @@ export async function softMux({
   const subtitleCodec = container === ".mov" ? "mov_text" : container === ".mp4" ? "mov_text" : null;
   const probe = await probeMedia(input, { bins });
   await fsp.mkdir(path.dirname(path.resolve(output)), { recursive: true });
+  /**
+   * 尾字幕不得比画面长（2026-10-12 客户实测事故兜底）：
+   * 上游按形态重映射后（post-bridge 按各变体的**实际转场回执**逐变体重映射）仍可能有残余越界——
+   * 例如变体配方把转场拉长、成片更短，尾部字幕就会在内嵌时把容器时长拉回去（`duration_kept` 硬闸失败）。
+   * 这里在 mux 前把可解析字幕轨（SRT/VTT）的 cue 尾钳到容器时长；改过的字幕写临时目录，原文件保持只读。
+   */
+  const containerSeconds = Number(probe.videoDuration ?? probe.duration ?? 0) || null;
+  let clampDir = null;
+  for (const track of tracks) {
+    if (![".srt", ".vtt"].includes(track.ext)) {
+      track.clamp = { supported: false, note: `该格式不做自动钳制（${track.ext}）` };
+      continue;
+    }
+    let parsed;
+    try {
+      parsed = parseSrt(await fsp.readFile(track.path, "utf8"));
+    } catch (error) {
+      track.clamp = { supported: true, parsed: false, error: error instanceof Error ? error.message : String(error) };
+      continue;
+    }
+    const clamped = clampCuesToDuration(parsed, containerSeconds ?? 0);
+    const changed = clamped.clamped.length > 0 || clamped.removed.length > 0;
+    track.clamp = {
+      supported: true,
+      parsed: true,
+      containerSeconds: clamped.limitSeconds,
+      cues: parsed.length,
+      kept: clamped.cues.length,
+      clampedCues: clamped.clamped.length,
+      removedCues: clamped.removed.length,
+      maxOvershootSeconds: clamped.maxOvershootSeconds,
+      changed,
+    };
+    if (!changed) continue;
+    if (!clamped.cues.length) throw new SubtitleError(`软字幕轨在容器时长内没有任何可用字幕条：${track.path}`, "bad_srt", false);
+    clampDir = clampDir ?? await tempDir("workloom-subtitle-clamp-");
+    const clampedFile = path.join(clampDir, `${path.basename(track.path, track.ext)}.clamped${track.ext}`);
+    await fsp.writeFile(clampedFile, track.ext === ".vtt" ? cuesToVtt(clamped.cues) : cuesToSrt(clamped.cues), "utf8");
+    track.sourcePath = track.path;
+    track.path = clampedFile;
+  }
+
 
   const sourceSha256 = await sha256File(input);
   const beforeVideo = await streamSignature(input, { bins, kind: "video", at: [] });
@@ -2390,7 +2563,12 @@ export async function softMux({
   });
   if (container === ".mp4") args.push("-movflags", "+faststart");
   args.push(output);
-  await runBin(bins.ffmpeg, args, { label: "ffmpeg(softmux)", timeoutMs: 600_000 });
+  try {
+    await runBin(bins.ffmpeg, args, { label: "ffmpeg(softmux)", timeoutMs: 600_000 });
+  } finally {
+    /** 钳制副本只服务本次 mux：临时目录用完即清。 */
+    if (clampDir) await fsp.rm(clampDir, { recursive: true, force: true }).catch(() => {});
+  }
   if (!fs.existsSync(output)) throw new SubtitleError(`软字幕内嵌未产出文件：${output}`, "ffmpeg_failed", true);
 
   const afterVideo = await streamSignature(output, { bins, kind: "video", at: beforeVideo.frames.map((frame) => frame.at) });
@@ -2412,12 +2590,22 @@ export async function softMux({
   const audioUnchanged = signaturesEqual(beforeAudio, afterAudio);
   const durationOk = Math.abs((outputProbe.duration ?? 0) - (probe.duration ?? 0)) <= 0.15;
   const tracksOk = outputSubtitleStreams.length === tracks.length;
+  const clampReports = tracks.map((track) => ({
+    path: track.sourcePath ?? track.path,
+    ...(track.clamp ?? { supported: false, note: "未做钳制检查" }),
+  }));
   const checks = [
     { kind: "video_unchanged", ok: videoUnchanged, detail: { basis: "actual copy command and ordinary stream metadata; no frame quality analysis", before: beforeVideo, after: afterVideo } },
     { kind: "audio_unchanged", ok: audioUnchanged, detail: { before: beforeAudio, after: afterAudio } },
     { kind: "duration_kept", ok: durationOk, detail: { source: probe.duration, output: outputProbe.duration } },
     { kind: "source_bytes_unchanged", ok: await sha256File(input) === sourceSha256, detail: { sourceSha256 } },
     { kind: "subtitle_tracks", ok: tracksOk, detail: { expected: tracks.length, actual: outputSubtitleStreams.length, streams: outputSubtitleStreams } },
+    {
+      kind: "subtitle_within_container",
+      ok: clampReports.every((report) => report.supported === false || report.parsed === true),
+      hard: false,
+      detail: { containerSeconds, tracks: clampReports },
+    },
   ];
   const failed = checks.filter((check) => check.ok !== true);
   if (failed.length) {
@@ -2435,7 +2623,15 @@ export async function softMux({
     container,
     subtitleCodec: subtitleCodec ?? "copy",
     qualityReviewed: false, qualityReview: "not-reviewed", sourceSha256,
-    tracks: tracks.map((track, index) => ({ ...track, index: outputSubtitleStreams[index]?.index ?? null, lang: outputSubtitleStreams[index]?.lang ?? track.lang })),
+    /** 回执里的 `path` 始终指向调用方给的字幕文件；钳制副本只是一次性中间产物。 */
+    tracks: tracks.map((track, index) => ({
+      ...track,
+      path: track.sourcePath ?? track.path,
+      clamped: track.clamp?.changed === true,
+      index: outputSubtitleStreams[index]?.index ?? null,
+      lang: outputSubtitleStreams[index]?.lang ?? track.lang,
+    })),
+    clamps: clampReports,
     probe: outputProbe,
     sha256: await sha256File(output),
     defaultTrack: tracks.findIndex((track) => track.default) ?? 0,

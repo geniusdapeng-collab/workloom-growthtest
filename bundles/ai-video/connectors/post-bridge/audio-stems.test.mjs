@@ -140,6 +140,38 @@ describe("independent audio stem derivation", { concurrency: false }, () => {
     assert.ok(amplitude(dialogue, 550, 0.81, 0.1) > 0.01);
   });
 
+  it("按逐刀回执对齐节目声：每刀时长各自生效、硬切不重叠（2026-10-13 修复）", async () => {
+    const second = shot("SC-02"); second.stems.dialogue = source("dialogue", files.second);
+    const third = shot("SC-03"); third.stems.dialogue = source("dialogue", files.long, { durationSec: 1 });
+    /**
+     * 三镜 1s：第 1 刀叠化 0.25s、第 2 刀硬切（回执里给了 0）。
+     * 旧的"整段 fadeSec=0.5"口径会把第 2 刀也叠 0.5s → 节目声比画面短 0.5s，
+     * `muxAudioProgram` 直接以 audio_stems_alignment_failed 失败关闭。
+     */
+    const result = await renderAudioStems(params({
+      shots: [shot(), second, third],
+      transitions: { mode: "xfade", fadeSec: 0.5 },
+      cuts: [{ toShotId: "SC-02", durationSeconds: 0.25 }, { toShotId: "SC-03", durationSeconds: 0 }],
+    }));
+    assert.deepEqual(result.recipe.timeline.shots.map((entry) => entry.overlapAfterSamples), [12000, 0, 0]);
+    assert.deepEqual(result.recipe.timeline.shots.map((entry) => entry.startSample), [0, 36000, 84000]);
+    assert.equal(result.program.samples, 132000);
+  });
+
+  it("逐刀回执缺席的切点按硬切处理，整段回执缺席时才退回 fadeSec 历史口径", async () => {
+    const second = shot("SC-02"); second.stems.dialogue = source("dialogue", files.second);
+    const withPartialCuts = await renderAudioStems(params({
+      shots: [shot(), second], outDir: path.join(root, "stems-empty-cuts"),
+      transitions: { mode: "xfade", fadeSec: 0.5 },
+      cuts: [],
+    }));
+    assert.deepEqual(withPartialCuts.recipe.timeline.shots.map((entry) => entry.overlapAfterSamples), [0, 0]);
+    assert.equal(withPartialCuts.program.samples, 96000);
+
+    const legacy = await renderAudioStems(params({ shots: [shot(), shot("SC-02")], outDir: path.join(root, "stems-legacy"), transitions: { mode: "xfade", fadeSec: 0.5 } }));
+    assert.deepEqual(legacy.recipe.timeline.shots.map((entry) => entry.overlapAfterSamples), [24000, 0]);
+  });
+
   it("supports an aligned segment with explicit source trim and placement, and pads silence", async () => {
     const item = shot();
     item.stems.dialogue = source("dialogue", files.long, { inSec: 0.4, durationSec: 0.3, offsetSec: 0.2 });

@@ -165,6 +165,26 @@ describe.skipIf(!hasMediaTools)("后期真实总装与连续返修（需 FFmpeg/
     }));
   }, 300_000);
 
+  it("转场 + 字幕可交付：旁挂按母版、各变体按自身转场重映射（T-2026-1013-0002 移植回归）", async () => {
+    const outDir = path.join(root, "转场字幕");
+    const timelineSubtitles = { zhText: "1\n00:00:00,000 --> 00:00:02,000\n开场\n\n2\n00:00:06,400 --> 00:00:07,500\n收尾一句话\n\n" };
+    const outcome = await buildDeliveryPackage({
+      project: { ...project, transitions: { mode: "xfade", fadeSec: 0.5 } },
+      shots, subtitles: timelineSubtitles, variants: ["warm-story", "bold-promo"], outDir, bins, env,
+    });
+    expect(outcome.passed).toBe(true);
+    const subtitlesDir = path.join(outDir, "subtitles");
+    const timelineSrt = fs.readFileSync(path.join(subtitlesDir, "post-p1-fixture.timeline.zh.srt"), "utf8");
+    expect(timelineSrt).toContain("00:00:06,400 --> 00:00:07,500");
+    const masterSrt = fs.readFileSync(path.join(subtitlesDir, "post-p1-fixture.zh.srt"), "utf8");
+    expect(masterSrt).not.toContain("00:00:07,500");
+    const warmSrt = fs.readFileSync(path.join(outcome.outDir, "variants", "warm-story", "warm-story.zh.srt"), "utf8");
+    expect(warmSrt).toContain("00:00:06,400 --> 00:00:07,500");
+    const boldSrt = fs.readFileSync(path.join(outcome.outDir, "variants", "bold-promo", "bold-promo.zh.srt"), "utf8");
+    expect(boldSrt).not.toContain("00:00:07,500");
+    expect(boldSrt).not.toBe(masterSrt);
+  }, 300_000);
+
   it("显式换镜后 v2→v3 持续指向新素材和新归一化文件，未点名镜头保持哈希及 mtime", async () => {
     expect(delivery).toBeDefined();
     const replacement = path.join(root, "新 镜头.mp4");

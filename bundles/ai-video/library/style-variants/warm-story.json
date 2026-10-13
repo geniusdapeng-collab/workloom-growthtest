@@ -3,13 +3,18 @@
   "id": "warm-story",
   "name": "暖调故事版",
   "positioning": "情感/文旅/民宿/人物：暖调胶片、慢转场、留白文案",
-  "platforms": ["抖音/快手", "视频号", "小红书", "B站"],
+  "platforms": [
+    "抖音/快手",
+    "视频号",
+    "小红书",
+    "B站"
+  ],
   "color": {
-    "profile": "warm-film",
+    "profile": "high-contrast-social",
     "lut": "look-warm-film.cube",
-    "intensity": 0.75,
-    "lookLabel": "暖调胶片",
-    "note": "肤色友好、轻提黑位；调色在拼接之后、配乐之前（音轨不受影响）"
+    "intensity": 0.5,
+    "lookLabel": "暖调故事（对比打底 + 暖调胶片 50%）",
+    "note": "2026-10-13 客户实测重定标：原 warm-film@0.75 的提黑会把灰雾/平光镜头压得更灰（山路/日出段实测动态范围仅 76–93）。改为高对比打底 + 暖调 LUT 50%。"
   },
   "transitions": {
     "mode": "fade",
@@ -40,7 +45,11 @@
     "opening": "有些地方，值得慢一点看。",
     "closing": "收藏起来，等一个合适的周末。",
     "cta": "想去的扣个「想去」，我把路线发你",
-    "hashtags": ["#旅行推荐", "#慢生活", "#周末去哪儿"]
+    "hashtags": [
+      "#旅行推荐",
+      "#慢生活",
+      "#周末去哪儿"
+    ]
   },
   "subtitleStyle": {
     "scene": "字幕",
