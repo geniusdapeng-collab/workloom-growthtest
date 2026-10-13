@@ -225,7 +225,7 @@ describe("正式拼接的实际处理与工作目录边界", () => {
     const dir = realpathSync(mkdtempSync(join(tmpdir(), "post-work-auth-")));
     try {
       const allowed = join(dir, "allowed"), denied = join(dir, "denied", "must-not-exist"); mkdirSync(allowed);
-      await expect(normaliseShots({ shots: [], project: { resolution: [64, 64] }, workDir: denied, bins: { ffmpeg: "must-not-run", ffprobe: "must-not-run" }, env: { WORKLOOM_POST_ALLOWED_ROOTS: allowed } })).rejects.toMatchObject({ code: "path_not_allowed" });
+      await expect(normaliseShots({ shots: [{ shotId: "A", path: join(dir, "unused-source.mp4") }], project: { resolution: [64, 64] }, workDir: denied, bins: { ffmpeg: "must-not-run", ffprobe: "must-not-run" }, env: { WORKLOOM_POST_ALLOWED_ROOTS: allowed } })).rejects.toMatchObject({ code: "path_not_allowed" });
       expect(existsSync(join(dir, "denied"))).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
@@ -234,7 +234,7 @@ describe("正式拼接的实际处理与工作目录边界", () => {
     try {
       const work = join(dir, "work"), actual = join(dir, "actual"); mkdirSync(actual);
       if (kind === "norm") { mkdirSync(work); symlinkSync(actual, join(work, "norm")); } else symlinkSync(actual, work);
-      await expect(normaliseShots({ shots: [], project: { resolution: [64, 64] }, workDir: work, bins: { ffmpeg: "must-not-run", ffprobe: "must-not-run" }, env: { WORKLOOM_POST_ALLOWED_ROOTS: dir } })).rejects.toMatchObject({ code: "path_not_allowed" });
+      await expect(normaliseShots({ shots: [{ shotId: "A", path: join(dir, "unused-source.mp4") }], project: { resolution: [64, 64] }, workDir: work, bins: { ffmpeg: "must-not-run", ffprobe: "must-not-run" }, env: { WORKLOOM_POST_ALLOWED_ROOTS: dir } })).rejects.toMatchObject({ code: "path_not_allowed" });
       expect(existsSync(join(actual, "norm"))).toBe(false);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });

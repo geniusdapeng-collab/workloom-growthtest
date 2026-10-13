@@ -35,6 +35,9 @@ jobs:
         run: |
           (cd "$WORKLOOM_DIR" && node scripts/verify-product-content.mjs)
           (cd "$WORKLOOM_DIR" && pnpm exec tsx scripts/bundle-governance.mts)
+      # 媒体夹具执行真实加工，测试前需要 ffmpeg 和 ffprobe。
+      - name: 媒体工具（ffmpeg/ffprobe）
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
       - name: 执行仓库已有测试
         run: |
           set -euo pipefail

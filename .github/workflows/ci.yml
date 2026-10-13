@@ -50,6 +50,10 @@ jobs:
           node-version: 24
       - run: corepack enable && corepack prepare pnpm@10.14.0 --activate
 
+      # 包内媒体回归真实调用 ffmpeg/ffprobe，先安装再跑成功与失败路径。
+      - name: 媒体工具（ffmpeg/ffprobe）
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+
       - name: 依赖
         run: pnpm install --frozen-lockfile
 
