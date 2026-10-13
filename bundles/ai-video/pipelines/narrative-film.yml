@@ -108,6 +108,11 @@ steps:
     owner: post-editor
     gate: G-DLV1                  # 兼容规则 ID；成功素材不按像素/音频差异设质量拒收
     outputs: [delivery_package, final_video, subtitle_track]   # 按请求目标集合出实际变体、字幕、封面/文案、清单与工程；请求画布实际导出回读，不默认调用增强模型。记录源/产物 SHA 与真实错误，品质未评审，源生成调用 0。
+  - step_key: post-quality
+    name: 交付前后期技术质检
+    owner: post-quality-inspector
+    outputs: [qa_report]
+    note: 重新读取当前媒体与真实加工链；失败仅本地返修，技术状态与艺术审片分别记录
   - step_key: archive
     name: 成片入库
     owner: post-editor

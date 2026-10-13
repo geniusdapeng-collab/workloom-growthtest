@@ -1,4 +1,5 @@
 import type { QualityStatus } from "./quality-evidence.js";
+import { sanitizeAudioField } from "./shot-spec.js";
 
 /**
  * material-policy —— 真实素材（实拍照片/视频）的**用途硬约束**（2026-09-25 产品所有者规定）。
@@ -469,7 +470,7 @@ export function buildMaterialDialogueBlock(
   const presentation = mode === "voice-over"
     ? "画外音——台词由画面外的说话人自然说出（本镜不需要露脸、也不需要口型），人声清晰靠前、与画面动作同频"
     : "画内口播——画面中的人物开口说出这句台词，口型与语音逐字同步（开口/闭口与语音对齐），说完自然收口";
-  const audioDesign = String(shot.audio ?? "").trim();
+  const audioDesign = String(sanitizeAudioField(shot.audio).value ?? "").trim();
   return [
     "【台词与声音（必须真的说出来）】本镜有台词：必须由你在生成时**同步产出可听见的人声**，不得只给环境声，不得用字幕或文字代替。",
     `· 台词（逐字照说，不改写、不增删、不翻译）：${spoken}`,

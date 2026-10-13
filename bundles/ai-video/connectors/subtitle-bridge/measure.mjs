@@ -176,19 +176,44 @@ export async function probeMedia(input, { bins = resolveBinaries() } = {}) {
   }
   const durationRaw = Number(doc.format?.duration ?? video.duration);
   const fps = parseFps(video.avg_frame_rate) ?? parseFps(video.r_frame_rate);
-  const framesRaw = Number(video.nb_frames);
+  let framesRaw = Number(video.nb_frames);
   const videoDurationRaw = Number(video.duration);
-  const videoDuration = Number.isFinite(videoDurationRaw) && videoDurationRaw > 0
+  let videoDuration = Number.isFinite(videoDurationRaw) && videoDurationRaw > 0
     ? videoDurationRaw
     : (Number.isInteger(framesRaw) && framesRaw > 0 && fps > 0 ? framesRaw / fps : null);
+  let videoDurationBasis = Number.isFinite(videoDurationRaw) && videoDurationRaw > 0 ? "video-stream-duration" : videoDuration !== null ? "declared-video-frame-count" : "unavailable";
+  if (videoDuration === null && fps > 0) {
+    // Containers such as Matroska can omit stream duration and nb_frames. Count
+    // the entire video; never substitute a longer audio/container duration.
+    const counted = await runBin(bins.ffprobe, ["-v", "error", "-select_streams", "v:0", "-count_frames",
+      "-show_entries", "stream=nb_read_frames,avg_frame_rate,r_frame_rate", "-of", "json", input],
+    { label: "ffprobe(full-video-frame-clock)", timeoutMs: 900_000 });
+    let clock;
+    try { clock = JSON.parse(counted.stdout).streams?.[0]; }
+    catch (error) { throw new MeasureError(`完整视频帧计数无法解析：${error.message}`, "bad_media", false); }
+    const countedFrames = Number(clock?.nb_read_frames);
+    const measuredFps = parseFps(clock?.avg_frame_rate) ?? parseFps(clock?.r_frame_rate);
+    if (Number.isSafeInteger(countedFrames) && countedFrames > 0 && measuredFps > 0) {
+      framesRaw = countedFrames; videoDuration = countedFrames / measuredFps;
+      videoDurationBasis = "complete-decoded-video-frame-count";
+    }
+  }
+  const rotation = Number(video.side_data_list?.find(entry => entry.rotation != null)?.rotation ?? video.tags?.rotate ?? 0);
+  const normalizedRotation = ((rotation % 360) + 360) % 360;
+  const rotateSize = Math.abs(normalizedRotation - 90) < 0.01 || Math.abs(normalizedRotation - 270) < 0.01;
   return {
     path: input,
     duration: Number.isFinite(durationRaw) ? round(durationRaw, 3) : null,
     videoDuration: videoDuration === null ? null : round(videoDuration, 6),
+    videoDurationBasis,
+    videoFrames: Number.isSafeInteger(framesRaw) && framesRaw > 0 ? framesRaw : null,
     width,
     height,
+    displayWidth: rotateSize ? height : width,
+    displayHeight: rotateSize ? width : height,
+    rotationDegrees: rotation,
     shortSide: Math.min(width, height),
-    orientation: height >= width ? "portrait" : "landscape",
+    orientation: (rotateSize ? width : height) >= (rotateSize ? height : width) ? "portrait" : "landscape",
     fps: fps === null ? null : round(fps, 3),
     videoCodec: video.codec_name ?? null,
     pixFmt: video.pix_fmt ?? null,

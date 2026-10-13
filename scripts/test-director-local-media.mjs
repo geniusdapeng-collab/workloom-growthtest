@@ -16,7 +16,7 @@ const root=path.resolve(option('--work-dir'));
 if(root===repo||repo.startsWith(root+path.sep))throw new Error('Fixture directory cannot be the repository or its parent');
 await fs.mkdir(root,{recursive:true});
 const bins={ffmpeg:path.resolve(option('--ffmpeg')),ffprobe:path.resolve(option('--ffprobe'))};
-const env={...process.env,WORKLOOM_BGM_DISCOVER:"0",WORKLOOM_BGM_HOME:path.join(root,"absent-music"),WORKLOOM_AUDIO_STEM_SIGNING_SECRET:randomBytes(32).toString('hex'),WORKLOOM_POST_ALLOWED_ROOTS:JSON.stringify([root,repo]),WORKLOOM_BGM_ALLOWED_ROOTS:JSON.stringify([root,repo]),WORKLOOM_COLOR_ALLOWED_ROOTS:JSON.stringify([root,repo]),WORKLOOM_SUBTITLE_ALLOWED_ROOTS:JSON.stringify([root,repo])};
+const env={...process.env,WL_TSX_PATH:path.join(root,"unavailable-native-entity-adapter"),WORKLOOM_BGM_DISCOVER:"0",WORKLOOM_BGM_HOME:path.join(root,"absent-music"),WORKLOOM_AUDIO_STEM_SIGNING_SECRET:randomBytes(32).toString('hex'),WORKLOOM_POST_ALLOWED_ROOTS:JSON.stringify([root,repo]),WORKLOOM_BGM_ALLOWED_ROOTS:JSON.stringify([root,repo]),WORKLOOM_COLOR_ALLOWED_ROOTS:JSON.stringify([root,repo]),WORKLOOM_SUBTITLE_ALLOWED_ROOTS:JSON.stringify([root,repo])};
 const scope={tenantId:'fixture-tenant',workspaceId:'fixture-workspace',projectId:'fixture-film',revision:1};
 const roles=['establishing','hero','action','detail','resolution'];let shots=[];
 for(let i=0;i<roles.length;i++){
@@ -37,9 +37,10 @@ const output=path.join(root,`delivery-${Date.now()}`);
 const result=await buildDirectorDelivery({project:{projectId:scope.projectId,audioScope:scope,title:'共享素材四版本',intent:'民宿的晨光，精致电影感',creativeMode:'director_auto',resolution:[320,568],fps:30,personRegions:[{sourceId:'SC-2',x:.25,y:.1,width:.5,height:.6,origin:'human-registered'}]},shots,subtitles:{zhCues:[{startSec:2.55,endSec:4.3,text:'这是合成素材回归字幕'}]},outDir:output,bins,env,softSubtitles:true,burnSubtitles:true});
 await fs.writeFile(path.join(root,'result.json'),JSON.stringify(result,null,2));
 const summaries=[];
-function summary(r){return {status:r.status,failures:r.failures,difference:r.difference?.approved,versions:r.variants.map(v=>({id:v.id,status:v.status,duration:v.video?.duration,burned:Boolean(v.burned),softsub:Boolean(v.softsub),roi:v.personQc?.personRegionsCollected,qcSamples:v.personQc?.samples.length,music:v.audio?.music?.license,reusedLayers:v.reusedLayers}))};}
+function summary(r){return {status:r.status,failures:r.failures,technicalPassed:r.postQuality?.passed,differenceReviewed:r.difference?.status,artisticQualityReviewed:r.qualityReport?.artisticQualityReviewed,versions:r.variants.map(v=>({id:v.id,status:v.status,durationFrames:v.actual?.durationFrames,burned:Boolean(v.burned),softsub:Boolean(v.softsub),personQualityReviewed:v.personQc?.status,entityApplied:v.entity?.receipt?.applied,music:v.audio?.music?.license,reusedLayers:v.reusedLayers}))};}
 const first=summary(result);summaries.push({operation:'create',...first});
 if(result.status!=='complete') {console.log(JSON.stringify({output,...first}));process.exit(1);}
+if(!result.postQuality?.passed||result.qualityReport?.stages.length!==7||result.qualityReport?.artisticQualityReviewed!==false||result.variants.some(v=>v.personQc.status!=='not-reviewed'))throw new Error('real technical quality or explicit artistic boundary missing');
 const cached=await buildDirectorDelivery({project:JSON.parse(await fs.readFile(result.projectPath,'utf8')).project,shots,subtitles:{zhCues:[{startSec:2.55,endSec:4.3,text:'这是合成素材回归字幕'}]},outDir:output,bins,env,softSubtitles:true,burnSubtitles:true});
 if(!cached.reused)throw new Error('cache was not reused');
 const id=result.variants[0].id;
@@ -47,7 +48,7 @@ const revise=async(previous,feedback,key)=>reviseDirectorDelivery({projectPath:p
 const audio=await revise(result,'第一版配乐轻一点','fixture-audio');summaries.push({operation:'audio',...summary(audio)});
 if(audio.status!=='complete'||!audio.variants[0].reusedLayers.picture||!audio.variants[0].reusedLayers.color||audio.variants[0].reusedLayers.audio)throw new Error('audio layer reuse incorrect');
 const cover=await revise(audio,'第一版封面简洁一点','fixture-cover');summaries.push({operation:'cover',...summary(cover)});
-if(cover.status!=='complete'||!cover.variants[0].reusedVideo||!cover.variants[0].reusedLayers.subtitles||!cover.variants[0].reusedLayers.personQc)throw new Error('cover layer reuse incorrect');
+if(cover.status!=='complete'||!cover.variants[0].reusedVideo||!cover.variants[0].reusedLayers.subtitles||cover.variants[0].personQc.status!=='not-reviewed')throw new Error('cover layer reuse or unreviewed person state incorrect');
 const timeline=await revise(cover,'第一版第三镜太快，多留一点','fixture-timeline');summaries.push({operation:'timeline',...summary(timeline)});
 if(timeline.status!=='complete'||timeline.variants[0].reusedLayers.picture)throw new Error('timeline feedback did not execute');
 const replay=await revise(cover,'第一版第三镜太快，多留一点','fixture-timeline');if(!replay.idempotentReplay)throw new Error('replay failed');
@@ -63,10 +64,10 @@ const frozen=JSON.parse(await fs.readFile(current.projectPath,'utf8'));
 const missingMusicPlans=structuredClone(frozen.plans);delete missingMusicPlans[0].planHash;
 missingMusicPlans[0].musicPlan={...missingMusicPlans[0].musicPlan,trackId:'fixture-missing-licensed-track'};
 missingMusicPlans[0].planHash=directorHash(missingMusicPlans[0]);
-const missingMusic=await buildDirectorDelivery({project:frozen.project,shots:frozen.shots,subtitles:frozen.subtitles,
+const missingMusic=await buildDirectorDelivery({project:{...frozen.project,revision:frozen.version+1},shots:frozen.shots,subtitles:frozen.subtitles,
  targetPlan:frozen.targetPlan,plannedVariants:missingMusicPlans,preparedSources:frozen.prepared,previousVariants:frozen.variants,
  impactLayers:Object.fromEntries(frozen.variants.map((v,i)=>[v.id,i===0?['audio']:[]])),
- softSubtitles:frozen.softSubtitles,burnSubtitles:frozen.burnSubtitles,outDir:path.join(root,'missing-music-'+Date.now()),bins,env});
+ softSubtitles:frozen.softSubtitles,burnSubtitles:frozen.burnSubtitles,outDir:path.join(frozen.revisionRoot,'revisions',`v${frozen.version+1}`),bins,env});
 if(missingMusic.status!=='partial'||missingMusic.failures.length!==1||missingMusic.failures[0].code!=='not_found'||missingMusic.variants.filter(v=>v.status==='complete').length!==3)throw new Error('missing licensed track was silently replaced');
 summaries.push({operation:'missing-licensed-music',status:missingMusic.status,failedVersion:missingMusic.failures[0].id,failureCode:missingMusic.failures[0].code,otherVersions:3,implicitScore:false});
 const receipt={dataMode:'local-synthetic-ffmpeg',output,renderApiCalls:0,imageApiCalls:0,beautyImprovement:'not-tested',summaries,checks:{cache:true,sequentialRevisions:true,idempotentReplay:true,staleCasRejected:conflict,idempotencyMismatchRejected:mismatch,newRenderRequiresApproval:true,concurrentWritersExcluded:true,tamperRejected:tamper,missingMusicFailsWithoutImplicitSynthesis:true}};

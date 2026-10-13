@@ -23,6 +23,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseRootList } from "../../library/root-list.mjs";
 
+import { assessProcessingQuality, clarityFilter, resolveColorManagement } from "./processing-quality.mjs";
+
 /* ============================ 常量与错误 ============================ */
 
 /** 本连接器提供的工具面；不在表内的工具直接拒绝（与 visual-bridge 同款白名单纪律）。 */
@@ -412,23 +414,13 @@ export async function estimateNoise({ input, at = 0, bins = resolveBinaries() })
   }
 }
 
-/**
- * RGB 判读路径的统一输入色域口径（T-04 配套纪律）。
- *
- * 为什么必须固定：交付链是 Rec.709，T-04 起输出显式打 bt709 三标签。若判读时不固定输入解释，
- * ffmpeg 会按每个文件自己的标签做 YUV→RGB 转换（未打标的源按 SD/601 猜），于是"同一份像素、
- * 只差一个标签"也会被算成画面差异——本仓实测均值差 7.61/255，足以把"没调"误判成"调了"。
- * 所有产 RGB 的判读路径统一按 bt709 解释输入，与交付口径一致。
- */
-const RGB_INPUT_COLOR_ARGS = ["-colorspace", "bt709", "-color_primaries", "bt709", "-color_trc", "bt709"];
-
 /** 区域平均 RGB（把区域缩放到 1×1 取像素），用于白平衡/肤色取证。 */
 export async function regionAverageRgb({ input, at = 0, patch, bins = resolveBinaries() }) {
-  const filters = [patchToCrop(patch), "scale=1:1:flags=area", "format=rgb24"].filter(Boolean).join(",");
+  const management = resolveColorManagement({ probe: await probeMedia(input, { bins }), ErrorClass: ColorError });
+  const filters = [management.chain, patchToCrop(patch), "scale=1:1:flags=area", "format=rgb24"].filter(Boolean).join(",");
   const { stdout } = await runBin(bins.ffmpeg, [
     "-hide_banner", "-v", "error",
     "-ss", String(at),
-    ...RGB_INPUT_COLOR_ARGS,
     "-i", input,
     "-frames:v", "1",
     "-vf", filters,
@@ -1545,12 +1537,12 @@ export function buildChain(spec = {}) {
   const lookChain = lookParts.join(",");
   const head = [conversionChain, denoiseChain, correctionChain].filter(Boolean).join(",");
   if (!lookChain) return head;  // 转换/降噪/校正，无创作
-  if (intensity >= 1) return [head, lookChain].filter(Boolean).join(",");
-  const headPrefix = head ? `${head},` : "";
+  if (intensity >= 1) return [head, "format=gbrp", lookChain].filter(Boolean).join(",");
+  const headPrefix = [head, "format=gbrp"].filter(Boolean).join(",") + ",";
   // 强度混合：`blend` 的 all_opacity 权重作用在**第一个输入**上（ffmpeg 语义，已实测校准）。
   // 因此把「已调色」放前面、opacity=intensity，才是"按 intensity 叠加 look"。
   // 反着写（原片在前 + opacity=intensity）会让 look 恒接近满档——2026-09-21 的"强度参数失效"事故根因。
-  return `${headPrefix}split=2[__orig][__tograde];[__tograde]${lookChain}[__graded];[__graded][__orig]blend=all_mode=normal:all_opacity=${intensity}`;
+  return `${headPrefix}split=2[__orig][__tograde];[__tograde]${lookChain},format=gbrp[__graded];[__graded][__orig]blend=all_mode=normal:all_opacity=${intensity}`;
 }
 
 /* ============================ 调色 / 匹配 ============================ */
@@ -1558,6 +1550,12 @@ export function buildChain(spec = {}) {
 async function assertOutputWritable(outputPath, inputPath, inputSize) {
   if (path.resolve(outputPath) === path.resolve(inputPath)) {
     throw new ColorError("禁止覆盖原片（原片只读）", "overwrite_source_forbidden");
+  }
+  if (fs.existsSync(outputPath)) {
+    const [source, target] = await Promise.all([fsp.stat(inputPath), fsp.stat(outputPath)]);
+    if ((source.dev === target.dev && source.ino === target.ino) || await fsp.realpath(inputPath) === await fsp.realpath(outputPath)) {
+      throw new ColorError("禁止通过软链或硬链别名覆盖原片", "overwrite_source_forbidden");
+    }
   }
   const dir = path.dirname(outputPath);
   await fsp.mkdir(dir, { recursive: true });
@@ -1588,36 +1586,84 @@ export async function sha256File(file) {
 /**
  * 执行已声明调色一次；返回实际滤镜、源与产物摘要、普通元数据，品质指标明确未测。
  */
+
+/** Engineering evidence compares the processed output with the same source normalized to Rec.709. */
+async function processingQualityEvidence({ input, output, probe, outProbe, sourceSha256, colorManagement, conversionLuts, clarity, qualityGuard, bins }) {
+  if (qualityGuard === "off") return null;
+  const times = defaultTimestamps(Math.min(probe.duration, outProbe.duration));
+  const width = Math.max(2, Math.min(480, Math.floor(probe.video.width / 2) * 2));
+  const sourceChain = [colorManagement.chain, ...conversionLuts.map((lut) => `lut3d='${escapeFilterPath(lut)}'`)].join(",");
+  const outputManagement = resolveColorManagement({ probe: outProbe, ErrorClass: ColorError });
+  const sample = async (file, at, chain) => {
+    const { stdout } = await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-ss", String(at), "-i", file,
+      "-frames:v", "1", "-vf", `${chain},scale=${width}:-2,format=rgb24`, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+      { label: "ffmpeg(processing-evidence)", timeoutMs: 120_000 });
+    const height = stdout.length / 3 / width;
+    if (!Number.isInteger(height) || height < 2) throw new ColorError("后期证据帧解码规格非法", "decode_failed");
+    return frameQuality(stdout, width, height);
+  };
+  try {
+    const before = [], after = [];
+    for (const at of times) { before.push(await sample(input, at, sourceChain)); after.push(await sample(output, at, outputManagement.chain)); }
+    const evidence = assessProcessingQuality({ before, after, sampledAt: times, sourceSha256, outputSha256: await sha256File(output),
+      sourceDimensions: { width: probe.video.width, height: probe.video.height, fps: probe.video.fps, duration: probe.duration },
+      outputDimensions: { width: outProbe.video.width, height: outProbe.video.height, fps: outProbe.video.fps, duration: outProbe.duration },
+      colorManagement, clarity });
+    if (qualityGuard === "block" && !evidence.passed) throw new ColorError(`后期质量护栏未通过：${evidence.issues.join("/")}`, "quality_regression");
+    return evidence;
+  } catch (error) {
+    if (qualityGuard === "block") { await fsp.rm(output, { force: true }); throw error; }
+    return { schema: "workloom/processing-quality/v1", reviewed: false, passed: false, purpose: "post-processing-damage-guard",
+      sourceSha256, outputSha256: await sha256File(output), sampledAt: times, issues: ["quality_evidence_failed"],
+      error: error instanceof Error ? error.message : String(error) };
+  }
+}
+async function verifyGradeIntegrity({ input, output, sourceSha256, probe, outProbe }) {
+  if (await sha256File(input) !== sourceSha256 || outProbe.video.width !== probe.video.width || outProbe.video.height !== probe.video.height
+    || (probe.video.fps && outProbe.video.fps && Math.abs(outProbe.video.fps - probe.video.fps) > 0.01)
+    || Math.abs(outProbe.duration - probe.duration) > Math.max(0.12, 1 / (probe.video.fps || 30) + 0.025)) {
+    await fsp.rm(output, { force: true });
+    throw new ColorError("调色源片哈希、时间线、尺寸或帧率校验失败", "verify_failed");
+  }
+}
+
 export async function grade({
   input, output, profile = null, lutPath = null, corrections = {}, intensity = 0.8,
   bins = resolveBinaries(), auto = false, sourceTransfer = null, sourceGamut = null,
-  denoise = false, quality = "hd",
+  denoise = false, quality = "hd", clarity = "off", qualityGuard = "off",
 }) {
+  if (!Number.isFinite(intensity) || intensity <= 0 || intensity > 1) throw new ColorError("intensity 必须在 (0,1]", "bad_request");
+  if (!["off", "report", "block"].includes(qualityGuard)) throw new ColorError("qualityGuard 只能为 off/report/block", "bad_request");
+  const clarityChain = clarityFilter(clarity, ColorError);
   if (!["hd", "uhd"].includes(quality)) throw new ColorError(`未知清晰度档位：${quality}`, "bad_request");
   const sourceSha256 = await sha256File(input), probe = await probeMedia(input, { bins });
   await assertOutputWritable(output, input, probe.sizeBytes);
   if (lutPath && (!fs.existsSync(lutPath) || !/\.cube$/i.test(lutPath))) throw new ColorError("LUT不存在或格式非法", "bad_lut");
   const sourceColor = resolveSourceColor({ probe, sourceTransfer, sourceGamut });
   const conversion = resolveConversionLuts(sourceColor);
+  const colorManagement = resolveColorManagement({ probe, sourceTransfer: sourceColor.transfer ?? sourceTransfer, sourceGamut: sourceColor.gamut ?? sourceGamut, ErrorClass: ColorError });
   for (const lut of conversion.luts) if (!fs.existsSync(lut)) throw new ColorError(`转换 LUT 缺失：${lut}`, "bad_lut");
   // Automatic analysis is not part of the post acceptance contract. Apply the explicit recipe once.
-  const chain = buildChain({ profile, lutPath, corrections, intensity, conversionLuts: conversion.luts,
-    denoise: denoise ? { lumaSpatial: 1.5 } : null });
+  const requestedChain = profile || lutPath || Object.keys(corrections ?? {}).length || conversion.luts.length || denoise ? buildChain({ profile, lutPath, corrections, intensity, conversionLuts: conversion.luts,
+    denoise: denoise ? { lumaSpatial: 1.5 } : null }) : "null";
+  const chain = [colorManagement.chain, requestedChain, clarityChain, "format=gbrp16le,zscale=primariesin=bt709:transferin=bt709:matrixin=gbr:rangein=full:primaries=bt709:transfer=bt709:matrix=bt709:range=limited:dither=error_diffusion,format=yuv420p"].filter(Boolean).join(",");
   await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-y", "-i", input, "-vf", chain,
     "-c:v", "libx264", "-preset", "medium", "-crf", quality === "uhd" ? "16" : "20", "-threads", "2", "-filter_threads", "1", "-pix_fmt", "yuv420p",
-    "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709",
+    "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-color_range", "tv",
     ...(probe.audio ? ["-c:a", "copy"] : ["-an"]), "-movflags", "+faststart", output], { label: "ffmpeg(grade)", timeoutMs: 900_000 });
   if (!fs.existsSync(output)) throw new ColorError("ffmpeg 未产出文件", "ffmpeg_failed", true);
   const outProbe = await probeMedia(output, { bins });
+  await verifyGradeIntegrity({ input, output, sourceSha256, probe, outProbe });
+  const processingQuality = await processingQualityEvidence({ input, output, probe, outProbe, sourceSha256, colorManagement, conversionLuts: conversion.luts, clarity, qualityGuard, bins });
   if (await sha256File(input) !== sourceSha256) throw new ColorError("调色期间原片字节变化", "source_changed");
   const outputColor = { primaries: outProbe.video.colorPrimaries, transfer: outProbe.video.colorTransfer, space: outProbe.video.colorSpace };
   if (Object.values(outputColor).some(value => value && value !== "bt709")) throw new ColorError("实际输出色彩标签与请求的bt709不符", "export_spec_invalid");
-  return { input, output, sourceSha256, chain, profile, lut: lutPath, intensity, quality, auto: null, autoRequested: auto,
+  return { clarity, colorManagement, processingQuality, input, output, sourceSha256, chain, profile, lut: lutPath, intensity, quality, auto: null, autoRequested: auto,
     conversion: { transfer: sourceColor.transfer, gamut: sourceColor.gamut, luts: conversion.luts.map(p => path.basename(p)), note: conversion.note },
     durationSeconds: outProbe.duration, sizeBytes: outProbe.sizeBytes, outputColor, sha256: await sha256File(output),
     before: {}, after: {}, delta: {}, defects: null, visibility: { verdict: "not-reviewed", meanAbsDiff: null },
-    sampling: { mode: "not-reviewed", times: [] }, qualityReviewPerformed: false,
-    verifyWarnings: [], note: "Executed one requested post recipe. No source, candidate or output quality acceptance review." };
+    sampling: { mode: "not-reviewed", times: [] }, qualityReviewPerformed: processingQuality?.reviewed === true,
+    verifyWarnings: processingQuality && !processingQuality.passed ? (processingQuality.issues ?? []).map(issue => `后期质量提示：${issue}`) : [], note: "Executed one requested post recipe. No source, candidate or output quality acceptance review." };
 }
 
 /**
@@ -1756,7 +1802,7 @@ export async function renderScopes({ input, at = 0, kinds = SCOPE_KINDS, outDir,
     const out = path.join(outDir, `${path.basename(input, path.extname(input))}-${kind}-t${at}s.png`);
     await runBin(bins.ffmpeg, [
       "-hide_banner", "-v", "error", "-y",
-      "-ss", String(at), ...RGB_INPUT_COLOR_ARGS, "-i", input,
+      "-ss", String(at), "-i", input,
       "-frames:v", "1", "-vf", filter,
       "-update", "1", out,
     ], { label: `ffmpeg(scope:${kind})`, timeoutMs: 120_000 });
@@ -1766,16 +1812,33 @@ export async function renderScopes({ input, at = 0, kinds = SCOPE_KINDS, outDir,
 }
 
 export async function compareFrames({ before, after, at = 0, output, bins = resolveBinaries() }) {
-  await fsp.mkdir(path.dirname(output), { recursive: true });
+  if (!Number.isFinite(at) || at < 0) throw new ColorError("对照采样时间必须为非负有限数", "bad_request");
+  const [beforeProbe, afterProbe] = await Promise.all([probeMedia(before, { bins }), probeMedia(after, { bins })]);
+  if ([beforeProbe, afterProbe].some((probe) => probe.duration > 0 && at >= probe.duration)) {
+    throw new ColorError("对照采样时间超出输入视频时长", "bad_request");
+  }
+  await assertOutputWritable(output, before, beforeProbe.sizeBytes);
+  await assertOutputWritable(output, after, afterProbe.sizeBytes);
+  const colorManagement = {
+    before: resolveColorManagement({ probe: beforeProbe, ErrorClass: ColorError }),
+    after: resolveColorManagement({ probe: afterProbe, ErrorClass: ColorError }),
+  };
+  const [beforeSha256, afterSha256] = await Promise.all([sha256File(before), sha256File(after)]);
+  // Both views use their own observed input tags, then the same 709 RGB preview space.
+  const rgb = "zscale=matrixin=bt709:rangein=limited:matrix=gbr:range=full,format=gbrp";
+  const previewHeight = 2 * Math.ceil(Math.max(...[beforeProbe, afterProbe].map((probe) => 854 * probe.video.height / probe.video.width)) / 2);
+  const view = (management) => `${management.chain},${rgb},setpts=PTS-STARTPTS,scale=854:${previewHeight}:force_original_aspect_ratio=decrease,pad=854:${previewHeight}:(ow-iw)/2:(oh-ih)/2,setsar=1,format=gbrp`;
   await runBin(bins.ffmpeg, [
     "-hide_banner", "-v", "error", "-y",
-    "-ss", String(at), ...RGB_INPUT_COLOR_ARGS, "-i", before,
-    "-ss", String(at), ...RGB_INPUT_COLOR_ARGS, "-i", after,
-    "-filter_complex",
-    "[0:v]setpts=PTS-STARTPTS,scale=854:-2[l];[1:v]setpts=PTS-STARTPTS,scale=854:-2[r];[l][r]hstack=inputs=2[v]",
-    "-map", "[v]", "-frames:v", "1", output,
+    "-ss", String(at), "-i", before,
+    "-ss", String(at), "-i", after,
+    "-filter_complex", `[0:v]${view(colorManagement.before)}[l];[1:v]${view(colorManagement.after)}[r];[l][r]hstack=inputs=2,format=rgb24[v]`,
+    "-map", "[v]", "-frames:v", "1", "-update", "1", output,
   ], { label: "ffmpeg(compare)", timeoutMs: 120_000 });
-  return { path: output, sha256: await sha256File(output) };
+  const [currentBeforeSha, currentAfterSha] = await Promise.all([sha256File(before), sha256File(after)]);
+  if (currentBeforeSha !== beforeSha256 || currentAfterSha !== afterSha256) throw new ColorError("对照处理期间输入字节变化", "bad_media");
+  return { path: output, sha256: await sha256File(output), beforeSha256, afterSha256, colorManagement,
+    preview: { width: 1708, height: previewHeight, primaries: "bt709", transfer: "bt709", pixelFormat: "rgb24" } };
 }
 
 /* ============================ 可见性度量 ============================ */
@@ -1941,12 +2004,13 @@ async function qualityWithChain({ framePath, chain, width, bins }) {
 
 
 async function rawFrame(input, at, bins, width = 640) {
-  // 统一缩到固定宽度再比较：与分辨率/编码无关，只回答"画面变了吗、变得好不好"。
+  // 在读取 RGB 前实际转换已知源色彩空间，未知 SDR 标签的假设由管理计划记录。
+  const management = resolveColorManagement({ probe: await probeMedia(input, { bins }), ErrorClass: ColorError });
   const { stdout } = await runBin(bins.ffmpeg, [
     "-hide_banner", "-v", "error",
-    "-ss", String(at), ...RGB_INPUT_COLOR_ARGS, "-i", input,
+    "-ss", String(at), "-i", input,
     "-frames:v", "1",
-    "-vf", `scale=${width}:-2,format=rgb24`,
+    "-vf", `${management.chain},scale=${width}:-2,format=rgb24`,
     "-f", "rawvideo", "-pix_fmt", "rgb24", "-",
   ], { label: "ffmpeg(rgb-frame)", timeoutMs: 60_000 });
   return stdout;
@@ -1985,13 +2049,14 @@ function averageMetrics(samples, weights = null) {
 /** Compatibility best entry: select one declared recipe and execute it once.
  * No candidate scoring, source-quality veto, output-quality vote or automatic retry.
  */
-export async function best({ input, output = null, candidates = null, recipe = null, genre = null, platform = null, bins = resolveBinaries() }) {
+export async function best({ input, output = null, candidates = null, recipe = null, genre = null, platform = null, bins = resolveBinaries(), clarity = "off", qualityGuard = "off",
+}) {
   if (!output) throw new ColorError("调色需要output路径", "bad_request");
   const selected = recipe || genre || platform ? findRecipes({ recipeId: recipe, genre, platform }).recipe : null;
   const requested = Array.isArray(candidates) ? candidates.find(candidate => candidate?.spec)?.spec : null;
   const spec = requested ?? (selected ? { profile: selected.profile, intensity: selected.intensity, lutPath: selected.lutExists ? selected.lut : null }
     : { profile: "natural", intensity: 0.3 });
-  const graded = await grade({ input, output, ...spec, bins });
+  const graded = await grade({ input, output, ...spec, bins, clarity, qualityGuard });
   return { ...graded, verdict: "graded", winner: spec.profile ?? selected?.id ?? "requested-recipe", winnerLabel: selected?.id ?? "requested-recipe",
     recipe: selected?.id ?? null, candidates: [], finalScore: null, improvement: null, qualityReviewPerformed: false,
     reason: "Legacy best command executes one declared recipe without scoring or secondary acceptance checks" };
@@ -2140,6 +2205,8 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         denoise: params.denoise === true,
         sourceTransfer: params.source_transfer ?? null,
         sourceGamut: params.source_gamut ?? null,
+        clarity: params.clarity ?? "off",
+        qualityGuard: params.quality_guard ?? "off",
         sampling: params.sampling ? String(params.sampling) : "scene",
         sceneThreshold: params.scene_threshold === undefined ? SCENE_CUT_THRESHOLD : Number(params.scene_threshold),
         defects: params.defects !== false,
@@ -2176,6 +2243,8 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         recipe: params.recipe_id ?? null,
         genre: params.genre ?? null,
         platform: params.platform ?? null,
+        clarity: params.clarity ?? "off",
+        qualityGuard: params.quality_guard ?? "off",
         sampling: params.sampling ? String(params.sampling) : "scene",
         sceneThreshold: params.scene_threshold === undefined ? SCENE_CUT_THRESHOLD : Number(params.scene_threshold),
         defects: params.defects !== false,

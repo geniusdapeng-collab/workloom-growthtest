@@ -104,7 +104,7 @@ function printHuman(command, result) {
     line(`滤镜链：${r.chain}`);
     line(`强度：${r.intensity}${r.profile ? ` · profile=${r.profile}` : ""}${r.lut ? ` · lut=${path.basename(r.lut)}` : ""}`);
     line(`时长：${fmt(r.durationSeconds)}s · 体积：${(r.sizeBytes / 1024 / 1024).toFixed(2)}MB`);
-    line("加工回执：已执行声明配方；品质指标未测，qualityReviewPerformed=false");
+    line(r.processingQuality ? `后期质量证据：${r.processingQuality.reviewed ? "已抽样测量" : "测量失败"} · ${r.processingQuality.passed ? "护栏通过" : (r.processingQuality.issues ?? []).join("/")}` : "加工回执：已执行声明配方；品质指标未测，qualityReviewPerformed=false");
     line(`sha256：${r.sha256}`);
     for (const w of r.verifyWarnings) line(`⚠ ${w}`);
     return;
@@ -118,7 +118,7 @@ function printHuman(command, result) {
     if (r.verdict === "graded") {
       line("");
       line(`成片：${r.output}`);
-      line("已执行配方；未进行品质打分或可见性验收");
+      line(r.processingQuality ? `后期质量证据：${r.processingQuality.reviewed ? "已抽样测量" : "测量失败"} · ${r.processingQuality.passed ? "护栏通过" : (r.processingQuality.issues ?? []).join("/")}` : "已执行配方；未进行品质打分或可见性验收");
     }
     return;
   }
@@ -217,6 +217,8 @@ async function main() {
         intensity: flags.intensity === undefined ? 0.8 : Number(flags.intensity),
         verifyAt: flags.at ? String(flags.at).split(",").map(Number) : null,
         auto: flags.auto === true,
+        clarity: flags.clarity ? String(flags.clarity) : "off",
+        qualityGuard: flags["quality-guard"] ? String(flags["quality-guard"]) : "off",
         denoise: flags.denoise === true,
         sampling: flags.sampling ? String(flags.sampling) : undefined,
         sceneThreshold: flags["scene-threshold"] === undefined ? undefined : Number(flags["scene-threshold"]),
@@ -231,6 +233,8 @@ async function main() {
     case "best": {
       result = await best({
         input: needPath(flags.in, "--in"),
+        clarity: flags.clarity ? String(flags.clarity) : "off",
+        qualityGuard: flags["quality-guard"] ? String(flags["quality-guard"]) : "off",
         output: flags.out ? needPath(flags.out, "--out") : null,
         sampleAt: flags.at ? String(flags.at).split(",").map(Number) : null,
         minImprovement: flags["min-improvement"] === undefined ? 2 : Number(flags["min-improvement"]),
@@ -295,6 +299,7 @@ async function main() {
         "  compare --before <file> --after <file> [--at s] --out <png>",
         "",
         `可用 profile：${Object.keys(PROFILES).join(", ")}`,
+        "调色护栏：--clarity off|conservative --quality-guard off|report|block（默认均关闭）",
         "通用开关：--json（输出原始 JSON）",
       ].join("\n") + "\n");
       return;

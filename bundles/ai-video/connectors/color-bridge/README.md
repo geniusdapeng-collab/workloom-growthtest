@@ -85,7 +85,7 @@ node_modules/.bin/tsx bundles/ai-video/connectors/color-bridge/runtime-smoke.mts
 可重试：`network_error` / `timeout` / `ffmpeg_failed` / `decode_failed` / `engine_failed` / `bad_response`
 
 不可重试：`path_not_allowed` / `tenant_mismatch` / `overwrite_source_forbidden` / `disk_quota_exceeded` /
-`ffmpeg_not_installed` / `bad_media` / `bad_lut` / `bad_profile` / `bad_patch` / `not_found` / `not_provided` / `not_configured`
+`ffmpeg_not_installed` / `bad_media` / `bad_lut` / `bad_profile` / `bad_patch` / `not_found` / `not_provided` / `not_configured` / `unsupported_color_space` / `quality_regression` / `verify_failed`
 
 ## LUT 与许可
 
@@ -109,3 +109,15 @@ node_modules/.bin/tsx bundles/ai-video/connectors/color-bridge/runtime-smoke.mts
 ## 成功素材默认采用
 
 `grade` 单次执行请求配方，保留原片音轨，记录源/输出摘要及实际色彩标签。`best` 兼容指令执行一个声明配方，`candidates=[]/finalScore=null`，不作候选评分、缺陷/肤色/可见性复审或自动返工。旧 `onUnfixable` 不建立品质否决；微小强度和失焦源仍正常出片。显式 `analyze/scope` 是独立诊断；`match` 输入统计仅计算用户要求的变换，无成品残差/直方图票决；这些工具不能作为成功镜头的默认验收门。缺源、非法 LUT、覆盖原片、输入字节变化、真实 FFmpeg 错误和导出标签失败继续报错。
+
+## 色彩管理、清晰度与处理证据
+
+`grade` 在创作 look 前先按输入的色域、转移函数、矩阵与范围实际转换到 Rec.709。已知 sRGB、BT.601、BT.2020 与 full range 不再仅改标签；PQ/HLG 先进入线性浮点链，执行 tone map，再编码 709。HDR 缺少可核实色域或遇到未支持色彩标签会返回 `unsupported_color_space`。未知 SDR 标签采用回执中列明的假设，调用方应核对这些假设。
+
+独立调色的默认值仍是 `clarity='off'`、`qualityGuard='off'`。`clarity='conservative'` 使用 3×3 亮度锐化、增益 0.25、色度增益 0；它保留输出尺寸，不承诺恢复源片已丢失的细节。`qualityGuard='report'` 返回同时间点归一化前后帧、源/输出 SHA、实际尺寸、局部最坏帧和阈值来源，出现处理损伤时保留产物并提示。`qualityGuard='block'` 仅在明确请求时删除不通过的本次后期产物并返回 `quality_regression`，不会触发付费源镜重生成。阈值是本地工程启发式，不能当作审美得分或整片保证。
+
+无需创作 look 的技术处理可调用 `grade({ input, output, profile:null, lutPath:null, corrections:{}, auto:false, clarity:'conservative', qualityGuard:'report' })`。输出不得指向源片及其软链/硬链别名。现有 `best/match/auto/denoise` 各仓默认策略保持原语义，新的工程证据与源镜采用相互独立。
+
+实体层适配器是 `entity-post.mjs` 的 `applyPostEntity({ input, output, workDir, fps, intensity, bins, env })`，用于最终创作 look 后、BGM 前。它通过本地 CLI 对每个当前帧产生掩膜，目标消失即清零；完成后核验源片不变、实际输出与逐帧掩膜 SHA、规格和应用数量。工位或 tsx 入口不可用时 `applied=0` 并返回原因，输出为输入的复制件，不能把跳过当成实体层已经执行。完整边界、命令和回执见 [实体调色说明](../../../../docs/ai-video-entity-color.md)。
+
+`compare` 对两个输入分别读取并实际处理色彩标签后生成统一 709 RGB 对照图，保持各自画幅并填充预览空余区域。返回对照图 SHA、两输入 SHA 与独立 `colorManagement` 证据；非法采样时间、源路径及其软链/硬链作为输出会被拒绝，输入哈希在执行后复核。

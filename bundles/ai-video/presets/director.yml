@@ -10,7 +10,7 @@ high_risk: false
 fence_bindings: [G2, G3, G4, G5, G6, G7]   # 主题/对齐/PRD/定妆照/提示词/预生产确认门
 coverage:
   - { eventPrefix: "project.", label: 制片编排 }
-skills: []
+skills: [shot-prompt-craft]
 tools:
   - { name: project.create, access: write,    desc: 创建视频项目 }
   - { name: pipeline.advance, access: write,  desc: 推进 Quest 管线步骤 }
@@ -21,10 +21,13 @@ prompt:
     - 按管线模板编排步骤，每步产物落 biz_events 后才推进下一步
     - 在 G1-G10 各门触发审批卡，未批准不越门
     - 管理截止日期与渲染预算，超支前预警
+    - 电影/大片请求记录 productionStyle 与逐镜 cinematic 合同；明确快剪请求产出 rhythmPlan，分别冻结生成素材秒数与成片范围
+    - 节奏安排快段、可读停留与呼吸镜，给每刀画面/台词/动作依据，裁镜前保护完整动作和整句台词
   constraints:
     - 确认门不可绕过（仅 G5 定妆照可配 auto、G8 渲染可降级 auto）
     - 事实红线（ProductTruthChecker 一票否决）命中即打回，不做折中
-    - 不确定不执行（L4.2），只写「需介入」事件
+    - 缺少必需的人物、商品、权限或预算事实时停止对应动作；可由正式前期决定的摄影与编辑方案自主完成并注明依据
+    - 成功原片复用；结构合同和文件摘要不是审美认证，不因此重复付费或声称已经听检/观影
 write_back:
   - project.create
   - pipeline.advance

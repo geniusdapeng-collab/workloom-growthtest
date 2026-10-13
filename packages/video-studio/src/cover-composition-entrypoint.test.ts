@@ -11,6 +11,8 @@ import { coverShotHasCharacter, coverShotMatchesLead, coverShotCharacterIds, res
   fallbackCoverPlan, parseCoverPlan, buildCoverDesignPrompt, type CoverLeadSource, type CoverPlan, type CoverShotSource, type CoverComposition } from "./cover-design.js";
 import { captureLineageInputs, createLineageReceipt, productionHash, stageLineageApproved, type LineageReceipt } from "./production-lineage.js";
 
+import { createGenerationQuality } from "../../../scripts/tools/generation-quality.mjs";
+
 const repo = fileURLToPath(new URL("../../../", import.meta.url));
 const file = join(repo, "scripts/tools/full-chain-film.mts"), source = readFileSync(file, "utf8");
 const sha = (value: string | Buffer) => createHash("sha256").update(value).digest("hex");
@@ -138,6 +140,8 @@ describe("封面正式 CLI 单主视觉与来源", () => {
       let modelCalls = 0;
       const recipe = { component: originalHash, stage: "cover" };
       const sandbox = { ...context, exports: {} as { api: Api }, REVIEW_POLICY: policy, fallbackCoverPlan, parseCoverPlan, buildCoverDesignPrompt,
+        // This fixture uses synthetic bytes for lineage; technical media rendering is tested by the actual CLI suites.
+        generationQuality: createGenerationQuality({ root: dir, enabled: false }),
         lead,
         resolveProducerLlm: () => null, ENV: {} as Record<string, string>,
         requestCoverDesign: async () => { throw new Error("fixture: designer model is not configured"); },

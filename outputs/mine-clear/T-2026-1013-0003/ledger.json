@@ -1,0 +1,470 @@
+{
+  "schema": "workloom.mine-clear/ledger@1",
+  "task_id": "T-2026-1013-0003",
+  "repo": "workloom-growthtest",
+  "repo_path": "/Users/mac/Documents/Codex/2026-10-13/https-cnb-cool-workloom-ai-workloom/work/repos/github/workloom-growthtest",
+  "title": "完整后期出口、实体与色彩、真实节奏和生成链路的本机结构验收",
+  "created_at": "2026-10-13T18:47:33.107Z",
+  "updated_at": "2026-10-13T18:47:33.614Z",
+  "baseline": {
+    "audit": {
+      "commit": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+      "branch": "task/T-2026-1013-0003",
+      "remote": "origin",
+      "fetched_at": null,
+      "fetch_status": "skipped",
+      "notes": "工作树不干净（84 项未提交改动）：排雷结论只对已提交内容成立"
+    },
+    "repair": {
+      "commit": null,
+      "reverified_problem_ids": []
+    },
+    "acceptance": {
+      "commit": null,
+      "is_descendant_of_repair": null
+    }
+  },
+  "environment": {
+    "kind": "local-preview",
+    "notes": "local-preview；合成本地真实媒体和用户提供成片检查；未调用付费生成服务，未执行 RDAS 276 项或 P 域生产经营任务。"
+  },
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "cards": [
+    {
+      "id": "MC-001",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "title": "后期出口缺当前媒体与逐环节实际加工的硬验收",
+      "state": "open",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "bundles/ai-video/connectors/post-bridge/core.mjs:1026@be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+          "sha256": "682a9f36ab642854a91190147f59cd0c04220263b9accaeb2f9364154fc0036f",
+          "note": "审计提交的完整文件字节；根因判断来自对应链路精读或单独标注的镜像增量核对。"
+        }
+      ],
+      "root_cause": {
+        "file": "bundles/ai-video/connectors/post-bridge/core.mjs",
+        "line": 1026,
+        "commit": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+        "symbol": "export async function buildDeliveryPackage"
+      },
+      "trigger_path": "通过 postwrite.package /返修/外部 AI 调用交付缺字幕、错误画布、旧字节或缺实际加工凭证的包。",
+      "fix_plan": "在构建、返修和独立外部质检入口绑定真实源/产物 SHA、七个请求阶段、全片解码和已批准原生画布；安装包带齐执行闭包。",
+      "blast_radius": "相关 CLI/HTTP/MCP、工程返修、安装包运行依赖和当前文件复核；保持已成功源片只读，失败不启动新付费生成。",
+      "conflict_paths": [
+        "bundles/ai-video/connectors/post-bridge/core.mjs"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实媒体、中文字幕路径、尺寸/FPS声明与缺件/截断/旧 SHA",
+          "expect": "合法媒体放行；任何硬项、路径或当前字节不符返回 passed=false。",
+          "command": "node --test --test-concurrency=1 bundles/ai-video/connectors/post-bridge/quality-gate.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "bundles/ai-video/connectors/post-bridge/quality-gate.test.mjs"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "property",
+          "given": "真实后期加工链、伪造 passed、缺请求形态、重复加工和目录别名",
+          "expect": "缺真实加工或参数链拒绝，允许根外/子链接拒绝；安装载荷的新执行模块能够导入。",
+          "command": "node --test --test-concurrency=1 bundles/ai-video/connectors/post-bridge/quality-contract.test.mjs scripts/post-runtime-assets.test.mjs bundles/ai-video/connectors/post-bridge/path-roots.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "bundles/ai-video/connectors/post-bridge/quality-contract.test.mjs",
+              "scripts/post-runtime-assets.test.mjs",
+              "bundles/ai-video/connectors/post-bridge/path-roots.test.mjs"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "sample",
+          "given": "已成功导演V2返修目录经外部quality capability",
+          "expect": "实际V2当前媒体通过；改封面字节失败；恢复通过；伪造deliveryRoot拒绝。",
+          "command": "node --test --test-concurrency=1 bundles/ai-video/connectors/post-bridge/director-quality.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "bundles/ai-video/connectors/post-bridge/director-quality.test.mjs"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "pnpm test:post-quality; pnpm -C packages/video-studio test"
+      },
+      "rollback": "以普通 revert 回滚本任务对应源码提交，保留已接受源片和历史交付文件；重新运行当前版本技术检查后才放行。",
+      "notes": "本台账整理既有发现与已先行执行的红/绿测试，不声称所有卡片都在编码前上账。当前状态待干净提交的真实 repair 和独立 acceptance 运行更新。共同文件镜像按 SHA/差异核对 B 级，相关实际精读见任务覆盖率清单。艺术质量和实际新模型生成未由本卡证明。"
+    },
+    {
+      "id": "MC-002",
+      "kind": "problem",
+      "level": "L1",
+      "severity": "P1",
+      "title": "源色彩仅贴709标签与实体处理缺真实时序/源片保护",
+      "state": "open",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "bundles/ai-video/connectors/color-bridge/core.mjs:1591@be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+          "sha256": "57fce1613e37588b0e274588f3f9d0ca14c12598b27d0ca795d70b8bb79dc3e8",
+          "note": "审计提交的完整文件字节；根因判断来自对应链路精读或单独标注的镜像增量核对。"
+        }
+      ],
+      "root_cause": {
+        "file": "bundles/ai-video/connectors/color-bridge/core.mjs",
+        "line": 1591,
+        "commit": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+        "symbol": "export async function grade"
+      },
+      "trigger_path": "不同 SDR/HDR 标签素材进入 grade；实拍人物/食物进入实体处理，静态三帧掩模可能错位或原片被改写。",
+      "fix_plan": "执行可解释的 SDR 色彩转换并拒绝未支持的 HDR；实体使用时间戳逐帧掩模、置信度门槛和真实 applied/skipped 回执；源与输出隔离。",
+      "blast_radius": "相关 CLI/HTTP/MCP、工程返修、安装包运行依赖和当前文件复核；保持已成功源片只读，失败不启动新付费生成。",
+      "conflict_paths": [
+        "bundles/ai-video/connectors/color-bridge/core.mjs"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实本地实体 CLI、有效/缺失掩模与并发输出",
+          "expect": "来源 SHA 始终不变；输出实际 applied/skipped 与文件证据一致。",
+          "command": "node node_modules/vitest/vitest.mjs run --maxWorkers 1 --no-file-parallelism scripts/tools/edit-entity.test.ts bundles/ai-video/connectors/color-bridge/entity-post.test.ts",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "--maxWorkers",
+              "1",
+              "--no-file-parallelism",
+              "scripts/tools/edit-entity.test.ts",
+              "bundles/ai-video/connectors/color-bridge/entity-post.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "property",
+          "given": "SDR/HDR 输入、时序掩模、缺帧、置信度与清晰度合同边界",
+          "expect": "仅支持的实际转换成立；不可靠掩模安全跳过并给理由，未支持色彩不伪造成功。",
+          "command": "node node_modules/vitest/vitest.mjs run --maxWorkers 1 --no-file-parallelism bundles/ai-video/connectors/color-bridge/processing-quality.test.ts packages/video-studio/src/edit/entity-color.test.ts",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "--maxWorkers",
+              "1",
+              "--no-file-parallelism",
+              "bundles/ai-video/connectors/color-bridge/processing-quality.test.ts",
+              "packages/video-studio/src/edit/entity-color.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "pnpm test:post-quality; pnpm -C packages/video-studio test"
+      },
+      "rollback": "以普通 revert 回滚本任务对应源码提交，保留已接受源片和历史交付文件；重新运行当前版本技术检查后才放行。",
+      "notes": "本台账整理既有发现与已先行执行的红/绿测试，不声称所有卡片都在编码前上账。当前状态待干净提交的真实 repair 和独立 acceptance 运行更新。共同文件镜像按 SHA/差异核对 B 级，相关实际精读见任务覆盖率清单。艺术质量和实际新模型生成未由本卡证明。"
+    },
+    {
+      "id": "MC-003",
+      "kind": "problem",
+      "level": "L1",
+      "severity": "P1",
+      "title": "快剪缺源区间、帧时钟和受保护原速声音的一致执行",
+      "state": "open",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "scripts/tools/full-chain-film.mts:4317@be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+          "sha256": "e553dc62b2c5101c9c80c1695249aea981ea1706efb429eeab67fe45179c6106",
+          "note": "审计提交的完整文件字节；根因判断来自对应链路精读或单独标注的镜像增量核对。"
+        }
+      ],
+      "root_cause": {
+        "file": "scripts/tools/full-chain-film.mts",
+        "line": 4317,
+        "commit": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+        "symbol": "shot.duration"
+      },
+      "trigger_path": "原声成功镜头复用把 nominal duration 改为全部源时长，原接口拒绝 timeline override，无法表达作者指定的短源区间。",
+      "fix_plan": "显式 rhythm plan 编译帧安全源 in/out；台词/动作保护和呼吸点实际验证；编辑与生成都使用1x源裁切并将 SFX 映射到真实刀点，未实测BPM明确未验证。",
+      "blast_radius": "相关 CLI/HTTP/MCP、工程返修、安装包运行依赖和当前文件复核；保持已成功源片只读，失败不启动新付费生成。",
+      "conflict_paths": [
+        "scripts/tools/full-chain-film.mts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实有声/静音源、显式短区间与 fullchain 入口调用链",
+          "expect": "视频和声音裁同一源区间且1x；源 SHA不变；音效在请求时刻实作；不得先变速再声明原速裁切。",
+          "command": "node node_modules/vitest/vitest.mjs run --maxWorkers 1 --no-file-parallelism scripts/tools/rhythm-edit.test.ts scripts/tools/film-rhythm-contract.test.ts",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "--maxWorkers",
+              "1",
+              "--no-file-parallelism",
+              "scripts/tools/rhythm-edit.test.ts",
+              "scripts/tools/film-rhythm-contract.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "property",
+          "given": "帧边界、越界、保护段、最大密度、呼吸点、音乐证据和电影镜头字段",
+          "expect": "非法时钟/保护冲突拒绝；未实测节拍不写已匹配；电影合同必需字段与连续性可复算。",
+          "command": "node node_modules/vitest/vitest.mjs run --maxWorkers 1 --no-file-parallelism packages/video-studio/src/rhythm-plan.test.ts packages/video-studio/src/cinematic-contract.test.ts",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "--maxWorkers",
+              "1",
+              "--no-file-parallelism",
+              "packages/video-studio/src/rhythm-plan.test.ts",
+              "packages/video-studio/src/cinematic-contract.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "pnpm test:post-quality; pnpm -C packages/video-studio test"
+      },
+      "rollback": "以普通 revert 回滚本任务对应源码提交，保留已接受源片和历史交付文件；重新运行当前版本技术检查后才放行。",
+      "notes": "本台账整理既有发现与已先行执行的红/绿测试，不声称所有卡片都在编码前上账。当前状态待干净提交的真实 repair 和独立 acceptance 运行更新。共同文件镜像按 SHA/差异核对 B 级，相关实际精读见任务覆盖率清单。艺术质量和实际新模型生成未由本卡证明。"
+    },
+    {
+      "id": "MC-004",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "title": "生成正式出口缺可复核的完整加工链与当前发布证据",
+      "state": "open",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "scripts/tools/full-chain-film.mts:6344@be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+          "sha256": "e553dc62b2c5101c9c80c1695249aea981ea1706efb429eeab67fe45179c6106",
+          "note": "审计提交的完整文件字节；根因判断来自对应链路精读或单独标注的镜像增量核对。"
+        }
+      ],
+      "root_cause": {
+        "file": "scripts/tools/full-chain-film.mts",
+        "line": 6344,
+        "commit": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+        "symbol": "const manifestFile = join(OUT_DIR"
+      },
+      "trigger_path": "生成/已有成功镜头导出 HD/UHD/default/master-only 后，用旧 verdict 或报告判断当前成片完成。",
+      "fix_plan": "所有实际 compose/trim/enhance/grade/audio/subtitle/cover 操作记录前后 SHA；HD/UHD 发布前检查实际清单；先在 staging 成功才推进不可变 current 指针。",
+      "blast_radius": "相关 CLI/HTTP/MCP、工程返修、安装包运行依赖和当前文件复核；保持已成功源片只读，失败不启动新付费生成。",
+      "conflict_paths": [
+        "scripts/tools/full-chain-film.mts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实外部CLI/MCP、HD/UHD current指针、截断成片、缺加工记录",
+          "expect": "当前媒体通过后能交付；换字节/加工链丢失/伪指针拒绝；旧 passed字段不能替代检查。",
+          "command": "node --test --test-concurrency=1 scripts/post-quality-capabilities.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "scripts/post-quality-capabilities.test.mjs"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "property",
+          "given": "实际生成加工生命周期、硬链源输出、旋转画布、增强/trim因果边与发布并发",
+          "expect": "保留源 SHA、视频显示时钟与当前发布一致；实际因果链缺失或源别名拒绝，失败不替换已发布版本。",
+          "command": "node --test --test-concurrency=1 scripts/tools/generation-quality.test.mjs bundles/ai-video/connectors/subtitle-bridge/timeline.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "scripts/tools/generation-quality.test.mjs",
+              "bundles/ai-video/connectors/subtitle-bridge/timeline.test.mjs"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "pnpm test:post-quality; pnpm -C packages/video-studio test"
+      },
+      "rollback": "以普通 revert 回滚本任务对应源码提交，保留已接受源片和历史交付文件；重新运行当前版本技术检查后才放行。",
+      "notes": "本台账整理既有发现与已先行执行的红/绿测试，不声称所有卡片都在编码前上账。当前状态待干净提交的真实 repair 和独立 acceptance 运行更新。共同文件镜像按 SHA/差异核对 B 级，相关实际精读见任务覆盖率清单。艺术质量和实际新模型生成未由本卡证明。"
+    },
+    {
+      "id": "MC-005",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "title": "独立导演EDL出口缺原生画布和当前技术质检",
+      "state": "open",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "bundles/ai-video/connectors/post-bridge/director-delivery.mjs:292@be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+          "sha256": "c2d1ea24d55e9a909615c59eb7b009793f8c43e900b2a743c9679bfc72243082",
+          "note": "审计提交的完整文件字节；根因判断来自对应链路精读或单独标注的镜像增量核对。"
+        }
+      ],
+      "root_cause": {
+        "file": "bundles/ai-video/connectors/post-bridge/director-delivery.mjs",
+        "line": 292,
+        "commit": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+        "symbol": "async function executeVariant"
+      },
+      "trigger_path": "导演独立EDL和分轨回合绕开普通 buildDeliveryPackage，在多版本/返修/重放时按局部状态宣告complete。",
+      "fix_plan": "每个独立画面/音轨EDL保留原生轴与源时钟；实际调色、实体、声音、字幕、封面及每次修订重查；没有真实技术证据不得推进head。",
+      "blast_radius": "相关 CLI/HTTP/MCP、工程返修、安装包运行依赖和当前文件复核；保持已成功源片只读，失败不启动新付费生成。",
+      "conflict_paths": [
+        "bundles/ai-video/connectors/post-bridge/director-delivery.mjs"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实不同画幅镜头、原声节目、0.5s impact、初版/返修/篡改",
+          "expect": "原生双轴满足、真实impact在0.5s音频中可测；缺加工/旧字节/错误版本拒绝。",
+          "command": "node --test --test-concurrency=1 bundles/ai-video/connectors/post-bridge/director-quality.test.mjs",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "--test",
+              "--test-concurrency=1",
+              "bundles/ai-video/connectors/post-bridge/director-quality.test.mjs"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "property",
+          "given": "默认导演交付和worker completion成功/失败/缓存重放",
+          "expect": "每个完成任务输出与当前质量证明一致，失败清晰保留且不冒充成功，不重生成成功源。",
+          "command": "node node_modules/vitest/vitest.mjs run --maxWorkers 1 --no-file-parallelism packages/video-studio/src/director-post-default.integration.test.ts packages/video-studio/src/director-completion-bridge.test.ts",
+          "exec": {
+            "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+            "args": [
+              "node_modules/vitest/vitest.mjs",
+              "run",
+              "--maxWorkers",
+              "1",
+              "--no-file-parallelism",
+              "packages/video-studio/src/director-post-default.integration.test.ts",
+              "packages/video-studio/src/director-completion-bridge.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "pnpm test:post-quality; pnpm -C packages/video-studio test"
+      },
+      "rollback": "以普通 revert 回滚本任务对应源码提交，保留已接受源片和历史交付文件；重新运行当前版本技术检查后才放行。",
+      "notes": "本台账整理既有发现与已先行执行的红/绿测试，不声称所有卡片都在编码前上账。当前状态待干净提交的真实 repair 和独立 acceptance 运行更新。共同文件镜像按 SHA/差异核对 B 级，相关实际精读见任务覆盖率清单。艺术质量和实际新模型生成未由本卡证明。"
+    }
+  ],
+  "gates": [],
+  "execution_policy": {
+    "tracked_snapshot": "This committed ledger contains audit cards and executable assertions. Clean-commit repair/acceptance execute against the copy under the task outputs directory outside the source worktree, avoiding self-modifying evidence in the tested commit. The external execution ledger, hashes and raw runs are the authoritative current HEAD acceptance artifacts.",
+    "evidence_directory": "/Users/mac/Documents/Codex/2026-10-13/https-cnb-cool-workloom-ai-workloom/outputs/mcd-acceptance/github/workloom-growthtest",
+    "repair_sessions": {
+      "MC-001": "/root",
+      "MC-002": "/root/entity_color_upgrade",
+      "MC-003": "/root + /root/rhythm_generation_upgrade",
+      "MC-004": "/root/color_rhythm_research",
+      "MC-005": "/root/entity_color_upgrade"
+    }
+  }
+}

@@ -34,7 +34,7 @@ describe("Director 已完成镜头默认后期（真实本地处理）", () => {
     sourceHash = hash(source); commands = join(root, "processing-commands.jsonl");
     const wrap = (name: "ffmpeg" | "ffprobe") => {
       const file = join(root, `${name}-default-only`);
-      writeFileSync(file, `#!${process.execPath}\nimport { spawnSync } from 'node:child_process';\nimport fs from 'node:fs';\nconst args=process.argv.slice(2);\nfs.appendFileSync(${JSON.stringify(commands)},JSON.stringify({bin:${JSON.stringify(name)},args})+'\\n');\nif(args.includes('-count_frames')||args.includes('-xerror')||args.some(arg=>/signalstats|psnr|framemd5|edgedetect|ebur128|astats|blurdetect|bbox=/.test(arg))){process.stderr.write('forbidden default quality review');process.exit(87);}\nconst result=spawnSync(${JSON.stringify(name)},args,{stdio:'inherit'});\nif(result.error){process.stderr.write(result.error.message);process.exit(86);}\nprocess.exit(result.status??85);\n`);
+      writeFileSync(file, `#!${process.execPath}\nimport { spawnSync } from 'node:child_process';\nimport fs from 'node:fs';\nconst args=process.argv.slice(2);\nfs.appendFileSync(${JSON.stringify(commands)},JSON.stringify({bin:${JSON.stringify(name)},args})+'\\n');\n\nconst result=spawnSync(${JSON.stringify(name)},args,{stdio:'inherit'});\nif(result.error){process.stderr.write(result.error.message);process.exit(86);}\nprocess.exit(result.status??85);\n`);
       chmodSync(file, 0o755); return file;
     };
     bins = { ffmpeg: wrap("ffmpeg"), ffprobe: wrap("ffprobe") };
@@ -45,10 +45,14 @@ describe("Director 已完成镜头默认后期（真实本地处理）", () => {
   });
   afterAll(() => { if (root) rmSync(root, { recursive: true, force: true }); });
 
-  it("黑帧、奇数原始画布和无音轨无需签名密钥/品质审查即可实际交付", async () => {
+  it("黑帧、奇数原始画布和无音轨经过真实技术质检交付，不声称人物审美通过", async () => {
     delivered = await buildDirectorDelivery({ project, shots: shots(), subtitles, targetPlan, outDir: join(root, "delivery"), bins, env });
     expect(delivered.status, JSON.stringify(delivered.failures)).toBe("complete");
     expect(delivered.passed).toBe(true); expect(delivered.revision).toBe(1);
+    expect(delivered.postQuality.passed).toBe(true);
+    expect(delivered.qualityReport.assets.filter((asset: any) => asset.media === "video").every((asset: any) => asset.decoded)).toBe(true);
+    expect(delivered.qualityReport.artisticQualityReviewed).toBe(false);
+    expect(delivered.variants[0].processing.length).toBeGreaterThanOrEqual(8);
     expect(delivered.sourceGenerationCalls).toBe(0); expect(delivered.renderApiCalls).toBe(0);
     expect(delivered.difference.status).toBe("not-reviewed");
     expect(delivered.variants).toHaveLength(1);
@@ -81,7 +85,11 @@ describe("Director 已完成镜头默认后期（真实本地处理）", () => {
     expect(replay.idempotentReplay).toBe(true); expect(replay.variants[0].video.sha256).toBe(revised.variants[0].video.sha256);
     expect(hash(source)).toBe(sourceHash);
     const rows = readFileSync(commands, "utf8").trim().split("\n").map(line => JSON.parse(line));
-    expect(rows.filter(row => row.args.includes('-count_frames') || row.args.some((arg: string) => /signalstats|psnr|framemd5|edgedetect|ebur128|astats|blurdetect|bbox=/.test(arg)))).toEqual([]);
+    expect(rows.some(row => row.args.includes('-xerror'))).toBe(true);
+    expect(rows.some(row => row.args.some((arg: string) => /loudnorm=.+print_format=json/.test(arg)))).toBe(true);
+    expect(revised.qualityReport.assets.filter((asset: any) => asset.media === "video" && asset.probe?.hasAudio)
+      .every((asset: any) => asset.audioMeasurement?.policy?.mode === "report")).toBe(true);
+    expect(revised.qualityReport.artisticQualityReviewed).toBe(false);
   }, 120_000);
 
   it("源字节漂移、错误版本和实际 FFmpeg 故障仍失败，不能伪造完整交付", async () => {

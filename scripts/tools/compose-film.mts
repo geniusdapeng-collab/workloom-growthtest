@@ -19,6 +19,9 @@
  *     [--color grade --grade-profile natural --grade-intensity 0.55] [--graded-out outputs/nanyuan-graded-30s.mp4] \
  *     [--keep-temp] [--json]
  */
+import { probeMedia as probeColorMedia } from "../../bundles/ai-video/connectors/color-bridge/core.mjs";
+import { resolveColorManagement } from "../../bundles/ai-video/connectors/color-bridge/processing-quality.mjs";
+import { probeMedia as probeVideoFacts } from "../../bundles/ai-video/connectors/subtitle-bridge/measure.mjs";
 import { execFileSync } from "node:child_process";
 import { createReadStream, existsSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
@@ -97,7 +100,7 @@ function sourceMedia(file: string): SourceMedia {
   const audio = metadata.streams?.find(stream => stream.codec_type === "audio");
   const [numerator, denominator] = String(video?.avg_frame_rate ?? "").split("/").map(Number);
   const sourceFps = Number(numerator) / Number(denominator), frames = Number(video?.nb_read_frames);
-  const duration = Number(video?.duration ?? metadata.format?.duration);
+  const duration = video?.duration === undefined ? frames / sourceFps : Number(video.duration);
   if (videos.length !== 1 || !video || !Number.isFinite(sourceFps) || sourceFps <= 0 || !Number.isSafeInteger(frames) || frames <= 0
     || !Number.isSafeInteger(video.width) || !Number.isSafeInteger(video.height) || !Number.isFinite(duration) || duration <= 0
     || Math.abs(duration - frames / sourceFps) > 1e-6) throw new Error(`COMPOSE_SOURCE_UNREADABLE: ${file}`);
@@ -173,15 +176,18 @@ const pictureSources: string[] = [];
 const pictureSignatures: string[] = [];
 const shotFrames: number[] = [];
 const sourceBindings: Array<{ path: string; sha256: string; source: SourceMedia; normalized: SourceMedia & { path: string }; normalizationPerformed: boolean }> = [];
-clips.forEach((clip, index) => {
+for (const [index, clip] of clips.entries()) {
+  const sourceColor = resolveColorManagement({ probe: await probeColorMedia(clip, { bins: { ffmpeg: FFMPEG, ffprobe: FFPROBE } }) });
+
   const metadata = sourceMedia(clip);
-  const normalizePicture = metadata.width !== width || metadata.height !== height || Math.abs(metadata.fps - fps) > 1e-8;
+  const normalizePicture = metadata.width !== width || metadata.height !== height || Math.abs(metadata.fps - fps) > 1e-8
+    || sourceColor.kind !== "range-normalization" || sourceColor.source.range === "full";
   let target = clip;
   if (normalizePicture) {
     target = join(temp, `norm-${String(index).padStart(2, "0")}.mp4`);
     run(FFMPEG, ["-v", "error", "-xerror", "-nostdin", "-y", ...localMediaInput(), "-i", clip,
       "-map", "0:v:0", "-map", "0:a:0?",
-      "-vf", `scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps}:start_time=0:round=up:eof_action=pass`,
+      "-vf", `${sourceColor.chain},scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black,setsar=1,fps=${fps}:start_time=0:round=up:eof_action=pass`,
       "-c:v", "libx264", "-preset", "medium", "-crf", "18", "-pix_fmt", "yuv420p", "-c:a", "copy", "-movflags", "+faststart", target]);
   }
   const actual = normalizePicture ? sourceMedia(target) : metadata;
@@ -202,9 +208,9 @@ clips.forEach((clip, index) => {
   pictureSources.push(picture);
   pictureSignatures.push(picturePacketSignature(picture));
   sourceBindings.push({ path: clip, sha256: inputBindings[index]!.sha256, source: metadata,
-    normalized: { path: target, ...actual }, normalizationPerformed: normalizePicture });
+    normalized: { path: target, ...actual }, normalizationPerformed: normalizePicture, colorManagement: sourceColor } as typeof sourceBindings[number]);
   console.log(`  ① 完整源 ${basename(clip)} ${metadata.videoFrames}帧/${metadata.fps}fps → 实际 ${actual.videoFrames}帧/${fps}fps；名义秒数不裁片，原声不补齐`);
-});
+}
 
 /* ---------- ② 拼接 ---------- */
 const raw = join(temp, "raw.mp4");
@@ -217,6 +223,7 @@ const shotSeconds = shotFrames.map((frames) => frames / fps);
 const listFile = join(temp, "concat.txt");
 writeFileSync(listFile, pictureSources.map((file, index) =>
   `file '${file.replace(/'/g, "'\\''")}'\nduration ${shotSeconds[index]!.toFixed(9)}`).join("\n"), "utf8");
+const executedCuts: Array<{ type: string; at: number; duration: number; enteringShot: number }> = [];
 const audioExact = normalized.map((_, index) => `[${index}:a]aresample=48000,asetpts=PTS-STARTPTS[aex${index}]`);
 let pictureConcatenation = "explicit-transition";
 if (transition && transitionDuration > 0) {
@@ -241,6 +248,7 @@ if (transition && transitionDuration > 0) {
     /** 硬切走 concat；0 秒 xfade 会在混合刀口上提前切走上一镜。 */
     const overlap = useTransition ? transitionDuration : 0;
     offset += durations[index - 1]! - overlap;
+    executedCuts.push({ type: useTransition ? transition : "hard-cut", at: Math.max(0, offset), duration: overlap, enteringShot: index + 1 });
     const vOut = `[v${index}]`;
     const aOut = `[a${index}]`;
     steps.push(useTransition
@@ -271,7 +279,12 @@ if (transition && transitionDuration > 0) {
   const usedCuts = transitionAt.length === 0 ? normalized.length - 1
     : transitionAt.filter((i) => i >= 2 && i <= normalized.length).length;
   console.log(`  ② 逐刀转场：${transition} @${transitionDuration}s × ${usedCuts} 刀（其余硬切）`);
-} else {
+ } else {
+  let cutAt = 0;
+  for (let index = 1; index < normalized.length; index += 1) {
+    cutAt += shotSeconds[index - 1]!;
+    executedCuts.push({ type: "hard-cut", at: cutAt, duration: 0, enteringShot: index + 1 });
+  }
   const videoOnly = join(temp, "video-only.mp4");
   const copyCompatible = pictureSignatures.every(signature => signature === pictureSignatures[0]);
   if (copyCompatible) {
@@ -383,6 +396,7 @@ if (sourceBindings.some(source => source.normalized.hasAudio) && !outputMedia.ha
 writeFileSync(avReportPath, `${JSON.stringify({
   schemaVersion: "workloom.composition-process/v1", generatedAt: new Date().toISOString(),
   output: out, outputSha256: await sha256File(out), inputBindings, sources: sourceBindings,
+  shotCount: normalized.length, cuts: executedCuts.map(cut => ({ ...cut, at: cut.at * retimeFactor })),
   target: { width, height, fps, shotFrames, durationSec: shotSeconds.reduce((a, b) => a + b, 0) },
   outputMedia, nativeClock, retimeFactor, pictureConcatenation,
   audioSource: "Available same-file original audio; no audio duration is extended to fit the picture clock.",

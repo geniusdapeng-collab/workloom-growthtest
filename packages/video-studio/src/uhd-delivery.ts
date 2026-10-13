@@ -14,6 +14,9 @@ export interface UhdPublishInput {
   assets: string[];
   manifestName: string;
   approved: boolean;
+  masterOnly?: boolean;
+  qualityRequired?: boolean;
+  bins?: { ffmpeg: string; ffprobe: string };
 }
 
 export async function sha256UhdAsset(file: string): Promise<string> {
@@ -35,7 +38,7 @@ function safeRelative(file: string): string {
   return file;
 }
 
-function manifestReferences(manifest: Record<string, unknown>): Array<{ path: string; sha256: string }> {
+function manifestReferences(manifest: Record<string, unknown>, masterOnly = false): Array<{ path: string; sha256: string }> {
   const result: Array<{ path: string; sha256: string }> = [];
   const deliverable = manifest.deliverable as { path?: unknown; sha256?: unknown } | undefined;
   if (typeof deliverable?.path !== "string" || typeof deliverable.sha256 !== "string") {
@@ -43,7 +46,7 @@ function manifestReferences(manifest: Record<string, unknown>): Array<{ path: st
   }
   result.push({ path: deliverable.path, sha256: deliverable.sha256 });
   const variants = manifest.variants;
-  if (!Array.isArray(variants) || variants.length === 0) throw new Error("UHD_PUBLISH_MANIFEST_MISSING_VARIANTS");
+  if (!Array.isArray(variants) || (variants.length === 0 && !(masterOnly && manifest.scope === "master"))) throw new Error("UHD_PUBLISH_MANIFEST_MISSING_VARIANTS");
   for (const value of variants) {
     const item = value as { path?: unknown; sha256?: unknown; cover?: { path?: unknown; sha256?: unknown } | null };
     if (typeof item.path !== "string" || typeof item.sha256 !== "string") {
@@ -104,7 +107,7 @@ export async function publishUhdDelivery(
       }
     }
     const manifest = JSON.parse(readFileSync(join(pending, manifestName), "utf8")) as Record<string, unknown>;
-    const refs = manifestReferences(manifest);
+    const refs = manifestReferences(manifest, input.masterOnly === true);
     const declaredAssets = (manifest.assets as Array<{ path: string }>).map((entry) => {
       const rel = safeRelative(relative(releaseDir, resolve(entry.path)));
       return rel;
@@ -119,6 +122,17 @@ export async function publishUhdDelivery(
       if (!assets.includes(rel) || await sha256UhdAsset(join(pending, rel)) !== entry.sha256) {
         throw new Error(`UHD_PUBLISH_MANIFEST_DIGEST_MISMATCH: ${entry.path}`);
       }
+    }
+    if (input.qualityRequired) {
+      const quality = manifest.qualityReport as { path?: unknown; sha256?: unknown } | undefined;
+      if (typeof quality?.path !== "string" || typeof quality.sha256 !== "string") throw new Error("GENERATION_PUBLISH_QUALITY_REPORT_MISSING");
+      const rel = safeRelative(quality.path);
+      if (!assets.includes(rel) || await sha256UhdAsset(join(pending, rel)) !== quality.sha256) throw new Error("GENERATION_PUBLISH_QUALITY_REPORT_CHANGED");
+      const inspector = await import(resolve(import.meta.dirname, "../../../scripts/tools/generation-quality.mjs")) as {
+        inspectGenerationManifest: (input: { root: string; manifest: Record<string, unknown>; bins?: UhdPublishInput["bins"]; phase: string }) => Promise<{ passed: boolean }>;
+      };
+      const current = await inspector.inspectGenerationManifest({ root: pending, manifest, bins: input.bins, phase: "published-copy" });
+      if (!current.passed) throw new Error("GENERATION_PUBLISH_CURRENT_MEDIA_QUALITY_FAILED");
     }
     const manifestSha256 = await sha256UhdAsset(join(pending, manifestName));
     const pointer = { schemaVersion: "workloom.uhd-release/v1", releaseId: input.releaseId,
