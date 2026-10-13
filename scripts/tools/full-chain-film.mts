@@ -97,7 +97,7 @@ import { assertStandardPostTimeline, validateStandardNativeClock } from "../../p
 import { FILM_COMPLETION_GUIDANCE, filmCompletionPolicyForDocument, describeFilmCompletion, type FilmCompletionRecord } from "../../packages/video-studio/src/film-completion.mjs";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "../../packages/video-studio/src/shot-intent.js";
 import { verifyAvSyncEvidence } from "../../packages/video-studio/src/av-sync.js";
-import { loadProductArchives, productArchivePromptLines, productHeroPhoto, productPhotoPath, selectProductArchive } from "../../packages/video-studio/src/product-archive.js";
+import { loadProductArchives, productArchivePromptLines, productHeroPhoto, productPhotoPath, selectProductArchive, autoBindProductSelector } from "../../packages/video-studio/src/product-archive.js";
 import { assertShotMatchesCertifiedAsset, assetIdOf, hasIdentityAnchor, identityAnchorContext, identityAnchorPath, identityReviewContext, loadRealPersonAssets, realPersonUsageReceipt, referenceAssetRefs, REAL_PERSON_POLICY_VERSION } from "../../packages/video-studio/src/real-person-asset.js";
 import { auditFilmRedlines, PROMPT_REDLINE_POLICY_VERSION } from "../../packages/video-studio/src/prompt-redlines.js";
 import { assessFilmFirstPass, FIRST_PASS_POLICY_VERSION } from "../../packages/video-studio/src/first-pass.js";
@@ -1824,6 +1824,20 @@ if (pendingShots().length > 0 && (declaredCompany || declaredBrand)) {
   if (!ownerMatch.archive) {
     throw new Error(`本片声明了公司/品牌「${ownerSelector}」，但商品档案库里没有对应档案（${ownerMatch.reason}）。`
       + `涉及具体公司/品牌的片子必须使用真实产品：${productBindingGuide}`);
+  }
+}
+/**
+ * 商品提及自动绑定（T-2026-1013-0001）：文本点名了档案主体、卡片却没声明 `product` 的镜头，
+ * 默认按真实产品图参考生成（与商品镜同一条 material 路径）；`--no-auto-product-binding` 可关闭。
+ */
+if (!flag("--no-auto-product-binding")) {
+  for (const shot of pendingShots()) {
+    if (productSelectorOf(shot)) continue;
+    const auto = autoBindProductSelector(productLibrary.archives, shot as unknown as Record<string, unknown>);
+    if (!auto) continue;
+    (shot as Record<string, unknown>).product = auto;
+    record({ stage: "product-auto-bind", shotId: shot.shotId, invoked: true, ok: true, cached: false, degraded: false, attempt: 1, ms: 0, artifact: null,
+      evidence: { selector: auto, source: "text-mention" }, verdict: null, note: `商品提及自动绑定：${auto}` });
   }
 }
 const productBindings: Array<{ shotId: string; selector: string; archiveId: string; sourceKind: string; priority: number; matchedBy: string; photoFile: string; photoSha256: string; bound: boolean }> = [];
