@@ -100,6 +100,8 @@ export interface PlausibilityResult {
   reason: string;
   model: string | null;
   ms: number;
+  /** 评审模型调用次数（T-2026-1013-0001：解析失败/5xx 时最多重试一次） */
+  attempts?: number;
 }
 
 /** 组装送审上下文：把"事实"给足（档案/角色/平台/卡片/提示词），不作任何品类规则注入。 */
@@ -136,10 +138,40 @@ export function buildPlausibilityContext(input: PlausibilityContextInput): Recor
 
 const trim = (value: unknown): string => String(value ?? "").trim();
 
+/**
+ * 容错解析（T-2026-1013-0001）：评审模型常在 JSON 前后带说明文字或尾注，直接 JSON.parse 会把
+ * "可用的判定"判成 unverified → 整轮白跑（真机 2026-10-12 run-25b / run-92 各一次）。
+ * 这里只做**提取**：取第一个平衡的 {...}（跳过字符串内的括号与转义）；提取失败时保持原行为（上层仍 fail-closed）。
+ */
+export function parseJsonObjectLoose(text: string): unknown {
+  const start = text.indexOf("{");
+  if (start < 0) throw new Error("PLAUSIBILITY_JSON_MISSING: 输出中找不到 JSON 对象");
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = start; index < text.length; index += 1) {
+    const char = text[index]!;
+    if (inString) {
+      if (escaped) { escaped = false; continue; }
+      if (char === "\\") { escaped = true; continue; }
+      if (char === '"') inString = false;
+      continue;
+    }
+    if (char === '"') { inString = true; continue; }
+    if (char === "{") depth += 1;
+    else if (char === "}") {
+      depth -= 1;
+      if (depth === 0) return JSON.parse(text.slice(start, index + 1));
+    }
+  }
+  return JSON.parse(text);
+}
+
+
 /** 解析模型输出（容错：去 markdown 围栏；结构非法即抛错→上层 fail-closed）。 */
 export function parsePlausibilityAnswer(raw: string): { verdict: "pass" | "block"; findings: PlausibilityFinding[]; promptPatches: PlausibilityPromptPatch[]; reason: string } {
   const stripped = trim(raw).replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
-  const value = JSON.parse(stripped) as Record<string, unknown>;
+  const value = parseJsonObjectLoose(stripped) as Record<string, unknown>;
   const verdict = value.verdict === "block" ? "block" : value.verdict === "pass" ? "pass" : null;
   if (!verdict) throw new Error("PLAUSIBILITY_VERDICT_INVALID: 缺少 verdict(pass|block)");
   const findingsRaw = Array.isArray(value.findings) ? value.findings : [];
@@ -237,6 +269,11 @@ export async function reviewPlausibility(
     ...images,
   ];
   try {
+    let parsedAnswer: ReturnType<typeof parsePlausibilityAnswer> | null = null;
+    let unverifiedReason: string | null = null;
+    let attempts = 0;
+    for (let attempt = 1; attempt <= 2 && !parsedAnswer; attempt += 1) {
+      attempts = attempt;
     const response = await (options.fetchImpl ?? fetch)(`${llm.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
@@ -245,11 +282,20 @@ export async function reviewPlausibility(
     });
     const bodyText = await response.text();
     if (!response.ok) {
-      return { ...base, verdict: "unverified", reason: `评审模型 HTTP ${response.status}：${bodyText.slice(0, 200)}`, ms: Date.now() - started };
+      unverifiedReason = `评审模型 HTTP ${response.status}：${bodyText.slice(0, 200)}`;
+      if (attempt < 2 && (response.status >= 500 || response.status === 429)) continue;
+      break;
     }
     const raw = JSON.parse(bodyText).choices?.[0]?.message?.content;
-    if (typeof raw !== "string") return { ...base, verdict: "unverified", reason: "评审模型缺少文本结果", ms: Date.now() - started };
-    const parsed = parsePlausibilityAnswer(raw);
+    if (typeof raw !== "string") { unverifiedReason = "评审模型缺少文本结果"; break; }
+    try { parsedAnswer = parsePlausibilityAnswer(raw); }
+    catch (error) {
+      unverifiedReason = `评审输出解析失败：${error instanceof Error ? error.message : String(error)}`;
+      if (attempt >= 2) break;
+    }
+    }
+    if (!parsedAnswer) return { ...base, verdict: "unverified", reason: unverifiedReason ?? "评审模型不可用", ms: Date.now() - started, attempts };
+    const parsed = parsedAnswer;
     const blockers = parsed.findings.filter((finding) => finding.severity === "blocker");
     const verdict = parsed.verdict === "block" && blockers.length > 0 ? "block" : "pass";
     log(`[plausibility][${input.stage}] ${verdict}：blocker ${blockers.length} · warning ${parsed.findings.length - blockers.length}`);

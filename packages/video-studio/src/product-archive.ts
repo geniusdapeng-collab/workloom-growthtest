@@ -258,6 +258,25 @@ export function loadProductArchive(dir: string, options: { probeImage?: (file: s
 }
 
 /** 装载整个档案库（每个子目录一个档案；缺 profile.json 的目录被忽略） */
+/**
+ * 商品提及自动绑定（T-2026-1013-0001）：卡片没写 `product`，但场景/动作/道具里点名了档案主体
+ * （id / displayName / 型号 / 品牌 / 别名）时，该镜应默认按**真实产品图参考**生成，而不是纯文生图——
+ * 真机样本 820RR-RC：未绑定商品档案的镜头反复被出片前闸判"车身被改写/换了另一台车"。
+ * 只做确定性匹配：命中多个档案或命中不明确时返回 null，由调用方保持原行为（不猜）。
+ */
+export function autoBindProductSelector(archives: readonly LoadedProductArchive[], shot: Record<string, unknown>): string | null {
+  const text = [shot.scene, shot.sceneDescription, shot.action, shot.props, shot.composition, shot.character]
+    .map((value) => String(value ?? "")).join(" ");
+  if (!text.trim()) return null;
+  const hits = new Set<string>();
+  for (const entry of archives) {
+    const tokens = [entry.archive.id, entry.archive.displayName, entry.archive.model, entry.archive.brand, ...(entry.archive.aliases ?? [])]
+      .map((token) => String(token ?? "").trim()).filter((token) => token.length >= 3);
+    if (tokens.some((token) => text.includes(token))) hits.add(entry.archive.id);
+  }
+  return hits.size === 1 ? [...hits][0]! : null;
+}
+
 export function loadProductArchives(root: string, options: { probeImage?: (file: string) => { width: number; height: number } | null } = {}): {
   root: string;
   archives: LoadedProductArchive[];
