@@ -55,7 +55,7 @@ const compiled = ts.transpileModule(declarations.map((statement) => statement.ge
 }).outputText;
 const masterStart = cliSource.indexOf('/* ---------- ⑪ 正式母版：'), masterEnd = cliSource.indexOf('/* ---------- ⑫ 多风格交付包', masterStart);
 if (masterStart < 0 || masterEnd <= masterStart) throw new Error("ENTRYPOINT_FIXTURE_INVALID: official master export block missing");
-const masterCompiled = ts.transpileModule(cliSource.slice(masterStart, masterEnd), {
+const masterCompiled = ts.transpileModule("(async () => {\n" + cliSource.slice(masterStart, masterEnd) + "\n})()", {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 const probeDeclaration = parsed.statements.find(statement => ts.isFunctionDeclaration(statement) && statement.name?.text === "probe");
@@ -403,29 +403,59 @@ describe("actual master export uses the complete requested picture frame clock",
     const source = join(dir, "master-source.mp4"), target = join(dir, "final.mp4");
     writeFileSync(source, "source-bound fixture bytes; metadata fixture does not certify playable media");
     const rows: Array<Record<string, unknown>> = [];
+    const inspections: Array<{ phase: string; scope: string; file: string; sha256: string }> = [];
     const media = { width: 1080, height: 1920, fps: 24, videoFrames: 241,
       videoDurationSec: 241 / 24, duration: 241 / 24, hasAudio: false };
     const context = {
-      STAGES: new Set(["master"]), DRY_RUN: false, scored: source, OUT_DIR: dir, DELIVERABLE: target,
+      // Capture the candidate export that precedes the separately tested delivery stage.
+      STAGES: new Set(["master", "deliver"]), DRY_RUN: false, scored: source, OUT_DIR: dir, DELIVERABLE: target,
       OUTPUT_SIZE: { width: 1080, height: 1920 }, FPS: 24, expectedMasterSeconds: 241 / 24,
       SUBTITLE_MODE: "sidecar", subtitleSidecar: null, POST_DIR: dir, QUALITY: "hd",
-      deliverablePath: "", masterApprovedForUhd: false,
+      deliverablePath: "", masterApprovedForUhd: false, masterGenerationQuality: null as unknown,
+      // This boundary fixture records current bytes and awaits; it is not a media quality verdict.
+      inspectCurrentGeneration: async (phase: string, scope: string, file: string) => {
+        inspections.push({ phase, scope, file, sha256: fingerprintFile(file) });
+        await Promise.resolve();
+        return { fixtureOnly: true };
+      },
       assertFactualReleaseSources: () => {}, rememberInputs: (_stage: string, _inputs: string[]) => {},
       probe: () => media, fingerprintArtifact: (file: string) => ({ sha256: fingerprintFile(file) }),
       auditDeliverableNaming: () => ({ suggestedName: null }),
       existsSync, copyFileSync, renameSync, rmSync, join, basename, randomUUID, fsConstants,
       record: (row: Record<string, unknown>) => rows.push(row), log: (_line: string) => {},
     };
-    return { source, target, rows, media, context, run: () => runInNewContext(masterCompiled, context) };
+    return { source, target, rows, media, inspections, context,
+      run: (): Promise<void> => runInNewContext(masterCompiled, context) as Promise<void> };
   }
-  it("publishes all endpoint source frames and the same bytes when the requested clock is factual", () => {
-    const f = masterFixture(); f.run();
+  it("exports all endpoint source frames and the same bytes after the asynchronous candidate inspection", async () => {
+    const f = masterFixture(), before = fingerprintFile(f.source), pending = f.run();
+    expect(existsSync(f.target)).toBe(false); expect(f.rows).toEqual([]);
+    await pending;
     expect(fingerprintFile(f.target)).toBe(fingerprintFile(f.source));
+    expect(fingerprintFile(f.source)).toBe(before);
     expect(f.context.deliverablePath).toBe(f.target);
+    expect(f.inspections).toEqual([{ phase: "master-candidate", scope: "master", file: f.source, sha256: before }]);
     expect(f.rows).toHaveLength(1);
-    expect(f.rows[0]).toMatchObject({ ok: true, evidence: { qualityReviewPerformed: false } });
+    expect(f.rows[0]).toMatchObject({ ok: true, artifact: f.target, evidence: { videoFrames: 241,
+      videoDurationSec: 241 / 24, fps: 24, sourceSha256: before,
+      exportSettings: { width: 1080, height: 1920, fps: 24, durationSec: 241 / 24 },
+      qualityReviewPerformed: false, identityVerified: false, clothingVerified: false,
+      speechVerified: false, lipSyncVerified: false }, verdict: null });
   });
-  it.each(["added-frame", "dropped-frame", "contradictory-duration", "fractional-fps", "wrong-canvas", "missing-fps", "nonfinite-duration"])("%s cannot publish a success row", kind => {
+  it("an asynchronous candidate inspection rejection leaves the source intact and emits no success", async () => {
+    const f = masterFixture(), before = fingerprintFile(f.source);
+    f.context.inspectCurrentGeneration = async (phase, scope, file) => {
+      f.inspections.push({ phase, scope, file, sha256: fingerprintFile(file) });
+      await Promise.resolve();
+      throw new Error("FIXTURE_CURRENT_INSPECTION_REJECTED");
+    };
+    await expect(f.run()).rejects.toThrow(/FIXTURE_CURRENT_INSPECTION_REJECTED/);
+    expect(fingerprintFile(f.source)).toBe(before);
+    expect(existsSync(f.target)).toBe(false); expect(f.rows).toEqual([]);
+    expect(f.context.deliverablePath).toBe("");
+    expect(f.inspections).toEqual([{ phase: "master-candidate", scope: "master", file: f.source, sha256: before }]);
+  });
+  it.each(["added-frame", "dropped-frame", "contradictory-duration", "fractional-fps", "wrong-canvas", "missing-fps", "nonfinite-duration"])("%s cannot publish a success row", async kind => {
     const f = masterFixture();
     if (kind === "added-frame") { f.media.videoFrames += 1; f.media.videoDurationSec = f.media.duration = f.media.videoFrames / 24; }
     if (kind === "dropped-frame") { f.media.videoFrames -= 1; f.media.videoDurationSec = f.media.duration = f.media.videoFrames / 24; }
@@ -434,8 +464,9 @@ describe("actual master export uses the complete requested picture frame clock",
     if (kind === "wrong-canvas") f.media.width = 720;
     if (kind === "missing-fps") Reflect.deleteProperty(f.media, "fps");
     if (kind === "nonfinite-duration") f.media.videoDurationSec = f.media.duration = Number.NaN;
-    expect(f.run).toThrow(/MASTER_EXPORT_SPEC_INVALID/);
+    await expect(f.run()).rejects.toThrow(/MASTER_EXPORT_SPEC_INVALID/);
     expect(existsSync(f.target)).toBe(false); expect(f.rows).toEqual([]);
+    expect(f.inspections).toEqual([]);
   });
   it("the actual probe reports an available average picture clock ahead of the advertised cadence", () => {
     const f = masterFixture();

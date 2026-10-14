@@ -41,7 +41,7 @@
 
 ### 2.2 员工编制（GEO 双域包自身 14 员 + 2 指挥官）
 
-> **口径说明（2026-09-28 修订·本机 UHD 交付围栏落地后复算）**：本节描述的是 `bundles/geo-growth` 包自身的编制——双域 16 岗 + 视觉栈 2 岗（视觉设计师 / 素材寻源员）+ 获客用增班组 9 岗（核心 7 岗：增长负责人 / 增长策略师 / 增长实验官 / 线索转化官 / 投放组合经理 / 承接转化设计师 / 直播操盘手；P2 条件 2 岗：生命周期增长官 / 渠道增长官，未激活受 G-GROW7/8 硬门禁），本包共 27 个 preset。本产品（获客用增系统）的完整组合编制为三包合并 **81 岗**（各包声明 hotel 16 + ai-video 42 + geo-growth 27，其中 4 处同名遮蔽按主包裁决；**三包 `provides.fences` 逐文件去重后围栏并集 121 条**，含 ai-video 的 5 条成片调色门 G-COL0..G-COL4、6 条成片配乐门 G-BGM0..G-BGM5、6 条标题字幕门 G-SUB0..G-SUB5、10 条交付/返修门 G-DLV0..G-DLV9 与 5 条素材用途门 G-MAT0..G-MAT4（含"素材只作场景依据，禁止参考图复刻"）），事实源为 `bundles/geo-growth/bundle.json#composition.presetOwners` 与 `packages/base/bundles/assembly.ts`（装配器实测口径，README 与 `scripts/suite-hotel.ts` 同源）；岗位与围栏随包演进，引用时以装配器运行结果为准。
+> **口径说明（2026-10-14 修订·后期质检岗并入后复算）**：本节描述的是 `bundles/geo-growth` 包自身的编制——双域 16 岗 + 视觉栈 2 岗（视觉设计师 / 素材寻源员）+ 获客用增班组 9 岗（核心 7 岗：增长负责人 / 增长策略师 / 增长实验官 / 线索转化官 / 投放组合经理 / 承接转化设计师 / 直播操盘手；P2 条件 2 岗：生命周期增长官 / 渠道增长官，未激活受 G-GROW7/8 硬门禁），本包共 27 个 preset。本产品（获客用增系统）的完整组合编制为三包合并 **82 岗**（各包声明 hotel 16 + ai-video 43 + geo-growth 27，其中 4 处同名遮蔽按主包裁决；**三包 `provides.fences` 逐文件去重后围栏并集 121 条**，含 ai-video 的 5 条成片调色门 G-COL0..G-COL4、6 条成片配乐门 G-BGM0..G-BGM5、6 条标题字幕门 G-SUB0..G-SUB5、10 条交付/返修门 G-DLV0..G-DLV9 与 5 条素材用途门 G-MAT0..G-MAT4（含"素材只作场景依据，禁止参考图复刻"）），事实源为 `bundles/geo-growth/bundle.json#composition.presetOwners` 与 `packages/base/bundles/assembly.ts`（装配器实测口径，README 与 `scripts/suite-hotel.ts` 同源）；岗位与围栏随包演进，引用时以装配器运行结果为准。
 
 | 班组 | 员工 | 职责 | 复用/新增 |
 |---|---|---|---|
