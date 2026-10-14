@@ -1,10 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { runInNewContext } from "node:vm";
+import ts from "typescript-governance";
+import { freezeOriginalSubmission, issueOriginalRenderReceipt } from "./film-standard-post.mjs";
 import { normalizeShotIntent, shotIntentHash } from "../../packages/video-studio/src/shot-intent.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -14,7 +17,7 @@ const temporary: string[] = [];
 afterEach(() => { for (const dir of temporary.splice(0)) rmSync(dir, { recursive: true, force: true }); });
 
 type Card = Record<string, unknown>;
-function runChain(shots: Card[], options: { stages?: string; args?: string[]; dir?: string; dryRun?: boolean; project?: string; source?: Card } = {}) {
+function runChain(shots: Card[], options: { stages?: string; args?: string[]; dir?: string; dryRun?: boolean; project?: string; source?: Card; env?: Record<string, string> } = {}) {
   const dir = options.dir ?? mkdtempSync(join(tmpdir(), "video-request-regression-"));
   if (!options.dir) temporary.push(dir);
   const shotsFile = join(dir, "shots.json");
@@ -25,12 +28,62 @@ function runChain(shots: Card[], options: { stages?: string; args?: string[]; di
     /** 出片入口要求分流结论（T-2026-0930-0015）：回归夹具是叙事片，显式声明即可（不猜商品） */
     "--route-kind", "narrative",
     "--platform", "youtube", "--stages", options.stages ?? "cine-kb,micromotion", ...(options.dryRun === false ? [] : ["--dry-run"]), ...(options.args ?? [])
-  ], { cwd: root, encoding: "utf8", timeout: 30_000, env: { ...process.env, ARK_API_KEY: "", LLM_API_KEY: "" } });
+  ], { cwd: root, encoding: "utf8", timeout: 30_000, env: { ...process.env, ARK_API_KEY: "", LLM_API_KEY: "", ...options.env } });
   return {
     dir, result, diagnostic: `${result.error ?? ""}\n${result.stdout}\n${result.stderr}`,
     read: (file: string) => JSON.parse(readFileSync(join(dir, file), "utf8")),
     rows: () => readFileSync(join(dir, "logs", options.project ?? "regression", "stages.jsonl"), "utf8").trim().split("\n").map((line) => JSON.parse(line)),
   };
+}
+
+/** Real local media and one declared output-write fault; neither implies provider or quality approval. */
+function currentOriginalAndComposeFault(dir: string) {
+  const source = join(dir, "clips/regression/EMPTY.mp4"), master = join(dir, "post/regression/master-raw.mp4");
+  mkdirSync(dirname(source), { recursive: true });
+  const made = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "testsrc2=s=64x96:r=24:d=1",
+    "-f", "lavfi", "-i", "sine=frequency=733:sample_rate=48000:duration=1", "-map", "0:v:0", "-map", "1:a:0",
+    "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", source],
+    { encoding: "utf8", timeout: 15_000 });
+  expect(made.status, `${made.error ?? ""}\n${made.stderr}`).toBe(0);
+  const measured = spawnSync(ffprobe, ["-v", "error", "-show_streams", "-of", "json", source], { encoding: "utf8", timeout: 15_000 });
+  expect(measured.status, `${measured.error ?? ""}\n${measured.stderr}`).toBe(0);
+  const video = JSON.parse(measured.stdout).streams.find((stream: { codec_type: string }) => stream.codec_type === "video");
+  expect(video).toMatchObject({ width: 64, height: 96, avg_frame_rate: "24/1", nb_frames: "24" });
+  expect(Number(video.duration)).toBe(1);
+  const sourceSha256 = createHash("sha256").update(readFileSync(source)).digest("hex");
+  const faultLog = join(dir, "compose-output-fault.json"), fault = join(dir, "fixture-ffmpeg.mjs");
+  writeFileSync(fault, `#!${process.execPath}
+import { spawnSync } from "node:child_process";
+import { writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+if (args.includes(process.env.WORKLOOM_TEST_COMPOSE_TARGET)) {
+  writeFileSync(process.env.WORKLOOM_TEST_COMPOSE_FAULT_LOG, JSON.stringify({ fixture: "compose-output-fault", target: process.env.WORKLOOM_TEST_COMPOSE_TARGET, argv: args }));
+  process.stderr.write("FIXTURE_COMPOSE_NO_OUTPUT" + String.fromCharCode(10)); process.exit(73);
+}
+const result = spawnSync(process.env.WORKLOOM_TEST_REAL_FFMPEG, args, { stdio: "inherit" });
+if (result.error) { process.stderr.write(String(result.error.message)); process.exit(74); }
+process.exit(result.status ?? 75);
+`);
+  chmodSync(fault, 0o700);
+  return { source, master, sourceSha256, faultLog, env: { WL_FFMPEG: fault, WL_FFPROBE: ffprobe,
+    WORKLOOM_TEST_REAL_FFMPEG: ffmpeg, WORKLOOM_TEST_COMPOSE_TARGET: master, WORKLOOM_TEST_COMPOSE_FAULT_LOG: faultLog } };
+}
+
+/** Run the entire current master region in its real async context; absence must stop before inspection or output. */
+function currentMissingMaster(dir: string): Promise<void> {
+  const file = join(root, "scripts/tools/full-chain-film.mts"), source = readFileSync(file, "utf8");
+  const start = source.indexOf("/* ---------- ⑪"), end = source.indexOf("/* ---------- ⑫", start);
+  if (start < 0 || end <= start) throw new Error("CURRENT_MASTER_FIXTURE_INVALID: actual master region missing");
+  const code = ts.transpileModule(`(async () => {\n${source.slice(start, end)}\n})()`, {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+  }).outputText;
+  const records: unknown[] = [], scored = join(dir, "post/regression/master-raw.mp4"), deliverablePath = join(dir, "out/regression-30s-final.mp4");
+  return (runInNewContext(code, { STAGES: new Set(["master"]), DRY_RUN: false, scored, deliverablePath, existsSync,
+    masterGenerationQuality: null, record: (row: unknown) => records.push(row),
+    inspectCurrentGeneration: async () => { throw new Error("UNEXPECTED_INSPECTION_WITHOUT_MASTER"); },
+  }, { timeout: 1000 }) as Promise<void>).finally(() => {
+    expect(records).toEqual([]); expect(readFileSync(file, "utf8")).toBe(source);
+  });
 }
 
 const emptyShot = { shotId: "EMPTY", duration: 10, scene: "无人的办公室空镜", depth_of_field: "原定深景深" };
@@ -194,17 +247,45 @@ describe("全链路当前血缘与返修范围", () => {
     expect(run.result.status, run.diagnostic).not.toBe(0);
     expect(run.diagnostic).toContain("PRODUCTION_BYPASS_REJECTED");
   }, 40_000);
-  it("只有旧成功日志、没有本次母版时以非零退出，不能报告请求完成", () => {
-    const dir = mkdtempSync(join(tmpdir(), "video-current-proof-")); temporary.push(dir);
+  it("只有旧成功日志、本次合成不产出母版时不能报告请求完成", async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "video-current-proof-"))); temporary.push(dir);
     mkdirSync(join(dir, "logs/regression"), { recursive: true });
-    writeFileSync(join(dir, "logs/regression/stages.jsonl"), JSON.stringify({ stage: "master", ok: true, shotId: null }) + "\n");
-    const run = runChain([emptyShot], { dir, stages: "master", dryRun: false });
-    expect(run.result.status, run.diagnostic).not.toBe(0);
-    expect(run.diagnostic).toContain("STANDARD_POST_INVALID");
-    expect(run.diagnostic).toContain("captureOriginalRenderManifest");
-    expect(existsSync(join(dir, "logs/regression/submitted-original.json"))).toBe(true);
-    expect(existsSync(join(dir, "out/regression-30s-final.mp4"))).toBe(false);
+    const oldRow = JSON.stringify({ stage: "master", ok: true, shotId: null });
+    writeFileSync(join(dir, "logs/regression/stages.jsonl"), oldRow + "\n");
+    const media = currentOriginalAndComposeFault(dir), shot = { ...emptyShot, duration: 1 }, document = { durationSeconds: 1 };
+    const submitted = await freezeOriginalSubmission({ productionRoot: dir, projectId: "regression",
+      bytes: Buffer.from(JSON.stringify({ projectId: "regression", title: "摄影增强回归", ...document, shots: [shot] })) });
+    const acceptedDir = join(dir, "logs/regression/accepted-tasks"); mkdirSync(acceptedDir, { recursive: true });
+    const taskId = "local-fixture-no-provider-call";
+    writeFileSync(join(acceptedDir, "EMPTY.json"), JSON.stringify({ schemaVersion: "workloom.render-task/v1", state: "accepted",
+      taskId, requestHash: createHash("sha256").update("local-fixture-request").digest("hex"), submissionSource: "local-submit" }));
+    await issueOriginalRenderReceipt({ productionRoot: dir, projectId: "regression", shotId: "EMPTY", submittedSha256: submitted.sha256,
+      artifactPath: media.source, taskId, requestInputVerified: true });
+    const run = runChain([shot], { dir, stages: "master", dryRun: false, source: document, env: media.env,
+      args: ["--assembly-mode", "post-only", "--assembly-reason", "Declared local media fixture; no provider or quality authority"] });
+    expect(run.result.status, run.diagnostic).toBe(1);
+    expect(run.diagnostic, run.diagnostic).toContain("POST_PROCESSING_FAILED: compose");
+    const fault = JSON.parse(readFileSync(media.faultLog, "utf8"));
+    expect(fault).toMatchObject({ fixture: "compose-output-fault", target: media.master });
+    expect(fault.argv.at(-1)).toBe(media.master);
+    expect(createHash("sha256").update(readFileSync(media.source)).digest("hex")).toBe(media.sourceSha256);
+    expect(readFileSync(join(dir, "logs/regression/stages.jsonl"), "utf8").split("\n")[0]).toBe(oldRow);
+    const rows = run.rows();
+    expect(rows.filter((row: Card) => row.stage === "compose")).toHaveLength(1);
+    expect(rows.find((row: Card) => row.stage === "compose")).toMatchObject({ invoked: true, ok: false });
+    expect(rows.slice(1).some((row: Card) => ["master", "deliver"].includes(String(row.stage)) && row.ok === true)).toBe(false);
+    expect(existsSync(media.master)).toBe(false);
+    expect(existsSync(join(dir, "out"))).toBe(false);
   }, 40_000);
+  it("当前母版出口不能用旧成功日志放行缺失的本次文件", async () => {
+    const dir = realpathSync(mkdtempSync(join(tmpdir(), "video-missing-master-entry-"))); temporary.push(dir);
+    mkdirSync(join(dir, "logs/regression"), { recursive: true });
+    const old = JSON.stringify({ stage: "master", ok: true, shotId: null }) + "\n";
+    writeFileSync(join(dir, "logs/regression/stages.jsonl"), old);
+    await expect(currentMissingMaster(dir)).rejects.toThrow(/GENERATION_MASTER_CANDIDATE_UNVERIFIED/);
+    expect(readFileSync(join(dir, "logs/regression/stages.jsonl"), "utf8")).toBe(old);
+    expect(existsSync(join(dir, "out/regression-30s-final.mp4"))).toBe(false);
+  });
   it("不同项目在同一work目录独立记账且当前输入输出含实际指纹", () => {
     const first = runChain([emptyShot], { stages: "micromotion", project: "project-a" });
     expect(first.result.status, first.diagnostic).toBe(0);
@@ -401,7 +482,7 @@ describe("全链路冻结年代与原合同接线", () => {
     const next = runChain([emptyShot], { stages: "micromotion", dir: first.dir });
     expect(next.result.status, next.diagnostic).toBe(0);
     expect(next.read("logs/regression/project-context.json")).toEqual(context);
-    expect(next.rows().findLast((r: Card) => r.stage === "micromotion").lineage.inputs.some((input: Card) => input.path.endsWith("project-context.json"))).toBe(true);
+    expect(next.rows().findLast((r: Card) => r.stage === "micromotion").lineage.inputs.some((input: Card) => typeof input.path === "string" && input.path.endsWith("project-context.json"))).toBe(true);
   }, 40_000);
   it("片级历史日期与局部闪回进入实际关键帧prompt，并继承源横幅", () => {
     const shot = { shotId: "PAIR", duration: 8, scene: "两个女人在海边岩石上相对站立", action: "两人不笑，保持站姿", composition: "双人中景", lighting: "2200K 暖烛光，日落余光", depth_of_field: "两人与海岸同时清晰", eraProfile: { storyDate: "1995-08-02" }, environmentProfile: { setting: "exterior", condition: "natural" } };
