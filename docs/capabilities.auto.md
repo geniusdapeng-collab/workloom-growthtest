@@ -1,7 +1,7 @@
 # WorkLoom 获客增长系统（实验车道） · 代码与能力入口导览
 
 > 企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。
-> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-10-07）。请修改生成器或事实输入后重新生成，不手改本文件。
+> 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（2026-10-14）。请修改生成器或事实输入后重新生成，不手改本文件。
 > 本导览检查 manifest、脚本和文件入口。目录可发现、实际可调用、结果已验证分别记录；缺少同提交独立运行证据时后两项为未验证。岗位、技能与管线数是声明资产数，不是生产实测通过数。
 > 产品身份：`workloom-ai-growth`；默认包：`geo-growth`；仓库：[workloom-ai/workloom-growthtest](https://cnb.cool/workloom-ai/workloom-growthtest)。
 
@@ -19,12 +19,12 @@
 
 | 行业包 | 声明版本 | 状态 | 岗位定义 | 技能路径 | 管线 |
 |---|---|---|---:|---:|---:|
-| [ai-video](../bundles/ai-video/bundle.json) | 1.0.0 | candidate | 42 | 35 | 6 |
+| [ai-video](../bundles/ai-video/bundle.json) | 1.0.0 | candidate | 43 | 36 | 6 |
 | [geo-growth](../bundles/geo-growth/bundle.json) | 1.0.0 | candidate | 27 | 29 | 4 |
 | [hotel](../bundles/hotel/bundle.json) | 3.4.0 | candidate | 16 | 30 | 1 |
-| 声明合计 | — | — | 85 | 94 | 11 |
+| 声明合计 | — | — | 86 | 95 | 11 |
 
-岗位文件的 `preset_key` 去重得到 **81 个不同标识**；这是本仓声明去重计数，实际依赖装配和同名权威归属以主包 `composition.presetOwners` 与 [装配器](../packages/base/bundles/assembly.ts) 为准。
+岗位文件的 `preset_key` 去重得到 **82 个不同标识**；这是本仓声明去重计数，实际依赖装配和同名权威归属以主包 `composition.presetOwners` 与 [装配器](../packages/base/bundles/assembly.ts) 为准。
 
 ## 代码与资产入口（43 项）
 
@@ -44,7 +44,7 @@
 
 | 入口 | 用途与边界 | 查阅或运行 | 可发现 | 可调用 | 结果已验证 / 环境 |
 |---|---|---|---|---|---|
-| **bundles/ai-video/** | 42 条岗位定义 / 35 项技能路径 / 6 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数 | [manifest](../bundles/ai-video/bundle.json) | 是 | 未验证 | 未验证 |
+| **bundles/ai-video/** | 43 条岗位定义 / 36 项技能路径 / 6 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数 | [manifest](../bundles/ai-video/bundle.json) | 是 | 未验证 | 未验证 |
 | **bundles/geo-growth/** | 27 条岗位定义 / 29 项技能路径 / 4 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数 | [manifest](../bundles/geo-growth/bundle.json) | 是 | 未验证 | 未验证 |
 | **bundles/hotel/** | 16 条岗位定义 / 30 项技能路径 / 1 条管线；版本 3.4.0，状态 candidate；不等于已接通功能数 | [manifest](../bundles/hotel/bundle.json) | 是 | 未验证 | 未验证 |
 
