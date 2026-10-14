@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "repo": "geniusdapeng-collab/workloom-growthtest",
-  "revision": 43,
+  "revision": 45,
   "tasks": {
     "6": {
       "number": 6,
@@ -4893,16 +4893,16 @@
       "expiresAt": 1791940588835
     },
     "protocol": {
-      "owner": "github-final-ci-session/9d09b423-7bbd-4c0f-89b5-d42b2b4e9f0d",
+      "owner": null,
       "generation": 4,
       "acquiredAt": 1791992543408,
-      "expiresAt": 1791993529992
+      "expiresAt": 1791992689058
     },
     "main": {
-      "owner": "github-final-ci-session/9d09b423-7bbd-4c0f-89b5-d42b2b4e9f0d",
+      "owner": null,
       "generation": 2,
       "acquiredAt": 1791992543408,
-      "expiresAt": 1791993529992
+      "expiresAt": 1791992689058
     }
   },
   "releases": {},
@@ -10485,6 +10485,36 @@
       },
       "previous": "4a917b73e2f72c40f67add4fd4a1630b9a49b7497c967f54ba7af3d0532688cd",
       "digest": "3e4c4e7a93b32c84db3c995dcc3581745dbb3218a71f40e3882671e90355cd52"
+    },
+    {
+      "sequence": 44,
+      "at": "2026-10-14T15:44:49.058Z",
+      "kind": "lease_release",
+      "data": {
+        "scopes": [
+          "main",
+          "protocol"
+        ],
+        "owner": "github-final-ci-session/9d09b423-7bbd-4c0f-89b5-d42b2b4e9f0d",
+        "generation": {
+          "main": 2,
+          "protocol": 4
+        }
+      },
+      "previous": "3e4c4e7a93b32c84db3c995dcc3581745dbb3218a71f40e3882671e90355cd52",
+      "digest": "5a808994bba9a300c4cce23eadf4e41caf2fd5a72606324dd8c1b95e535fd7ce"
+    },
+    {
+      "sequence": 45,
+      "at": "2026-10-14T15:44:44.113Z",
+      "kind": "transaction",
+      "data": {
+        "id": "github-final-ci-session-release:8:639bada28a038ada12ae30909b6e534e3b8c6f4a:502146b9c98ea5821b88c09d75ea2eef39f08eb6:a7cac8377d440330671616d79c44e03ffbda481a7073eb3eb6f356c850c84237:github-final-ci-session/9d09b423-7bbd-4c0f-89b5-d42b2b4e9f0d",
+        "controller": "current-session-github-final-ci-api",
+        "nativeQueue": false
+      },
+      "previous": "5a808994bba9a300c4cce23eadf4e41caf2fd5a72606324dd8c1b95e535fd7ce",
+      "digest": "3cbe340dc9fffb04f890f188f3e38675e218d0a4713ba9f44b67ad423d081439"
     }
   ]
 }
