@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
   "repo": "geniusdapeng-collab/workloom-growthtest",
-  "revision": 16,
+  "revision": 22,
   "tasks": {
     "6": {
       "number": 6,
-      "status": "merging",
+      "status": "delivered",
       "firstSeen": 1791940521342,
       "attempts": {},
       "admission": {
@@ -23,7 +23,7 @@
           "protocol": 1
         }
       },
-      "updatedAt": 1791940565309,
+      "updatedAt": 1791940578685,
       "headSha": "6e86be14bb711fbe68bde037df9c2e8c338808fe",
       "mainSha": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
       "branch": "task/T-2026-1013-0003",
@@ -2689,6 +2689,39 @@
         "status": null,
         "at": "2026-10-14T01:16:01.480Z",
         "validationPassed": false
+      },
+      "integrated": {
+        "number": 6,
+        "url": "https://github.com/geniusdapeng-collab/workloom-growthtest/pull/6",
+        "merged": true,
+        "mergedAt": "2026-10-14T01:16:00Z",
+        "mergeSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "validationPassed": true,
+        "prAssociation": {
+          "repository": "geniusdapeng-collab/workloom-growthtest",
+          "number": 6,
+          "nodeId": "PR_kwDOVCRo188AAAABIP-QyQ",
+          "headSha": "6e86be14bb711fbe68bde037df9c2e8c338808fe",
+          "merged": true,
+          "state": "MERGED",
+          "mergeSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+          "source": "current-GraphQL-pullRequest.mergeCommit"
+        },
+        "mainSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "parents": [
+          "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+          "6e86be14bb711fbe68bde037df9c2e8c338808fe"
+        ],
+        "treeSha": "85edec120f8c4f886bdb6ea0dcf2699e7ea0141e",
+        "mergedBy": "geniusdapeng-collab",
+        "method": "merge",
+        "force": false,
+        "readbackAttempts": 1
+      },
+      "delivered": {
+        "at": "2026-10-14T01:16:18.685Z",
+        "mainSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "releases": []
       }
     }
   },
@@ -2697,19 +2730,19 @@
       "owner": "github-session/4fe34073-5583-453a-860c-9c8e7921fa4c",
       "generation": 2,
       "acquiredAt": 1791940521343,
-      "expiresAt": 1791941440634
+      "expiresAt": 1791941478683
     },
     "protocol": {
       "owner": "github-session/4fe34073-5583-453a-860c-9c8e7921fa4c",
       "generation": 2,
       "acquiredAt": 1791940521343,
-      "expiresAt": 1791941440634
+      "expiresAt": 1791941478683
     },
     "main": {
       "owner": "github-session/4fe34073-5583-453a-860c-9c8e7921fa4c",
       "generation": 1,
       "acquiredAt": 1791940521343,
-      "expiresAt": 1791941440634
+      "expiresAt": 1791941478683
     }
   },
   "releases": {},
@@ -5670,6 +5703,154 @@
       },
       "previous": "507de5432639fa97d211e7b63a10c787dab1a11d3b93168616c730bf0be07ba7",
       "digest": "21f6086ea10fde1bdd5f05e653d8d095fe00b92dc3a9a9ae34cfa5371c0b16e6"
+    },
+    {
+      "sequence": 17,
+      "at": "2026-10-14T01:16:18.683Z",
+      "kind": "lease_renew",
+      "data": {
+        "scopes": [
+          "dependencies",
+          "main",
+          "protocol"
+        ],
+        "owner": "github-session/4fe34073-5583-453a-860c-9c8e7921fa4c",
+        "generation": {
+          "dependencies": 2,
+          "main": 1,
+          "protocol": 2
+        }
+      },
+      "previous": "21f6086ea10fde1bdd5f05e653d8d095fe00b92dc3a9a9ae34cfa5371c0b16e6",
+      "digest": "84c50d2b0bf5dc3a97d7bfec1c62a52f86b6001462b037094e1456c5c824e6be"
+    },
+    {
+      "sequence": 18,
+      "at": "2026-10-14T01:16:18.684Z",
+      "kind": "integrated",
+      "data": {
+        "number": 6,
+        "url": "https://github.com/geniusdapeng-collab/workloom-growthtest/pull/6",
+        "merged": true,
+        "mergedAt": "2026-10-14T01:16:00Z",
+        "mergeSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "validationPassed": true,
+        "prAssociation": {
+          "repository": "geniusdapeng-collab/workloom-growthtest",
+          "number": 6,
+          "nodeId": "PR_kwDOVCRo188AAAABIP-QyQ",
+          "headSha": "6e86be14bb711fbe68bde037df9c2e8c338808fe",
+          "merged": true,
+          "state": "MERGED",
+          "mergeSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+          "source": "current-GraphQL-pullRequest.mergeCommit"
+        },
+        "mainSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "parents": [
+          "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+          "6e86be14bb711fbe68bde037df9c2e8c338808fe"
+        ],
+        "treeSha": "85edec120f8c4f886bdb6ea0dcf2699e7ea0141e",
+        "mergedBy": "geniusdapeng-collab",
+        "method": "merge",
+        "force": false,
+        "readbackAttempts": 1,
+        "headSha": "6e86be14bb711fbe68bde037df9c2e8c338808fe",
+        "previousMainSha": "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+        "reviewId": "4d4137acd895bdd5385f1efa87b13ec7648d7f41108b432cce0f3e40b351380d",
+        "controller": "current-session-github-api",
+        "nativeQueue": false,
+        "platformAI": false
+      },
+      "previous": "84c50d2b0bf5dc3a97d7bfec1c62a52f86b6001462b037094e1456c5c824e6be",
+      "digest": "4457fb8b594439ddc1c336d1abca171849d1dd70183f1b43487d3b25d89b1d89"
+    },
+    {
+      "sequence": 19,
+      "at": "2026-10-14T01:16:18.684Z",
+      "kind": "task",
+      "data": {
+        "number": 6,
+        "patch": {
+          "status": "integrated",
+          "integrated": {
+            "number": 6,
+            "url": "https://github.com/geniusdapeng-collab/workloom-growthtest/pull/6",
+            "merged": true,
+            "mergedAt": "2026-10-14T01:16:00Z",
+            "mergeSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+            "validationPassed": true,
+            "prAssociation": {
+              "repository": "geniusdapeng-collab/workloom-growthtest",
+              "number": 6,
+              "nodeId": "PR_kwDOVCRo188AAAABIP-QyQ",
+              "headSha": "6e86be14bb711fbe68bde037df9c2e8c338808fe",
+              "merged": true,
+              "state": "MERGED",
+              "mergeSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+              "source": "current-GraphQL-pullRequest.mergeCommit"
+            },
+            "mainSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+            "parents": [
+              "be5baa8c43cb34d89d5e8f233f20a75b9b475e02",
+              "6e86be14bb711fbe68bde037df9c2e8c338808fe"
+            ],
+            "treeSha": "85edec120f8c4f886bdb6ea0dcf2699e7ea0141e",
+            "mergedBy": "geniusdapeng-collab",
+            "method": "merge",
+            "force": false,
+            "readbackAttempts": 1
+          }
+        }
+      },
+      "previous": "4457fb8b594439ddc1c336d1abca171849d1dd70183f1b43487d3b25d89b1d89",
+      "digest": "ea89ae9b6651e8d5eb9ae6b9ee30c6ed7856365db1ba718ea7e41fcea0f948cb"
+    },
+    {
+      "sequence": 20,
+      "at": "2026-10-14T01:16:18.685Z",
+      "kind": "delivered",
+      "data": {
+        "number": 6,
+        "mergeSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "mainSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "releases": [],
+        "scope": "verified-main-integration",
+        "controller": "current-session-github-api",
+        "nativeQueue": false
+      },
+      "previous": "ea89ae9b6651e8d5eb9ae6b9ee30c6ed7856365db1ba718ea7e41fcea0f948cb",
+      "digest": "494a85a0bcbebead2f6efa61c238793cd42eb0eb301877415145e5f16c186eb7"
+    },
+    {
+      "sequence": 21,
+      "at": "2026-10-14T01:16:18.685Z",
+      "kind": "task",
+      "data": {
+        "number": 6,
+        "patch": {
+          "status": "delivered",
+          "delivered": {
+            "at": "2026-10-14T01:16:18.685Z",
+            "mainSha": "502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+            "releases": []
+          }
+        }
+      },
+      "previous": "494a85a0bcbebead2f6efa61c238793cd42eb0eb301877415145e5f16c186eb7",
+      "digest": "e23ba7849b375d277983ab15efc37f278d14f8569210ab5f0b50cdfc7e91fcc1"
+    },
+    {
+      "sequence": 22,
+      "at": "2026-10-14T01:16:16.031Z",
+      "kind": "transaction",
+      "data": {
+        "id": "github-session-delivered:6:6e86be14bb711fbe68bde037df9c2e8c338808fe:be5baa8c43cb34d89d5e8f233f20a75b9b475e02:4d4137acd895bdd5385f1efa87b13ec7648d7f41108b432cce0f3e40b351380d:502146b9c98ea5821b88c09d75ea2eef39f08eb6",
+        "controller": "current-session-github-api",
+        "nativeQueue": false
+      },
+      "previous": "e23ba7849b375d277983ab15efc37f278d14f8569210ab5f0b50cdfc7e91fcc1",
+      "digest": "7222b277717fb3bedc3612f13f5d982b8692d041e57467d7453653da3a8654e0"
     }
   ]
 }
