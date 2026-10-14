@@ -121,7 +121,8 @@ const server = http.createServer(async (req, res) => {
   const now = Date.now();
   gcCache(now);
   const fingerprint = STABLE_JSON({ tool, params });
-  const hit = cache.get(idempotencyKey);
+  const freshQualityRead = tool === "postread.quality";
+  const hit = freshQualityRead ? null : cache.get(idempotencyKey);
   if (hit) {
     if (hit.fingerprint !== fingerprint) {
       json(res, 409, { ok: false, error: "idempotency_conflict", message: "幂等键已绑定另一组参数" });
@@ -140,7 +141,7 @@ const server = http.createServer(async (req, res) => {
   const jobId = `postjob-${now.toString(36)}-${(seq += 1).toString(36)}`;
   const started = Date.now();
   const entry = { at: now, fingerprint, payload: null, promise: null };
-  cache.set(idempotencyKey, entry);
+  if (!freshQualityRead) cache.set(idempotencyKey, entry);
   entry.promise = (async () => {
     try {
       const outcome = await callTool(tool, params);

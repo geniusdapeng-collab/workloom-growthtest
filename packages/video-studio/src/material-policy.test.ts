@@ -234,6 +234,16 @@ describe("台词注入（素材镜也必须由渲染直出台词）", () => {
     expect(prompt).toContain("口型与语音逐字同步");
   });
 
+  it("素材台词音频清理保留画内实况声源，移除后期配乐指令", () => {
+    const prompt = buildMaterialScenePrompt({ ...voiceOverShot,
+      audio: "保留人声和房卡机械声；远处评弹与店内音响；背景音乐使用交响配乐",
+    }, { durationSec: 4 });
+    expect(prompt).toContain("保留人声和房卡机械声");
+    expect(prompt).toContain("远处评弹与店内音响");
+    expect(prompt).not.toContain("交响配乐");
+    expect(prompt).toContain("不叠加背景音乐");
+  });
+
   it("兼容旧卡字段 n（字符串 / {text} 数组），读法不与文生镜分叉", () => {
     const asString = buildMaterialScenePrompt({ ...baseShot, n: "桥下的船，走得比人慢。" }, { durationSec: 5 });
     expect(asString).toContain("「桥下的船，走得比人慢。」");

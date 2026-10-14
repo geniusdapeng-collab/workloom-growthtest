@@ -256,9 +256,27 @@ export function deliveryInspect(input) {
   const projectId = optionalText(value.projectId, "projectId") ?? "VID-FF02-FULL";
   const outDir = optionalText(value.outDir, "outDir") ?? "work/out";
   const base = outDir.replace(/\/+$/u, "");
-  const manifestPath = `${base}/${projectId}-delivery-manifest.json`;
-  const absolute = insideRepo(manifestPath, "outDir/projectId");
+  let manifestPath = `${base}/${projectId}-delivery-manifest.json`;
+  let absolute = insideRepo(manifestPath, "outDir/projectId");
+  let pointerSha256 = null;
+  const pointerPath = insideRepo(`${base}/current.json`, "current.json");
+  if (existsSync(pointerPath)) {
+    const pointer = readJsonFile(pointerPath, "current.json");
+    if (!plain(pointer) || pointer.schemaVersion !== "workloom.uhd-release/v1" || typeof pointer.releaseId !== "string"
+        || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(pointer.releaseId) || pointer.releaseId.includes("..")
+        || typeof pointer.manifest !== "string" || typeof pointer.releaseDir !== "string" || !/^[a-f0-9]{64}$/u.test(pointer.manifestSha256 ?? "")) {
+      throw new VideoCapabilityError("当前交付发布指针非法");
+    }
+    const expectedRelease = insideRepo(`${base}/releases/${pointer.releaseId}`, "current.release");
+    absolute = insideRepo(relative(artifactRoot(), pointer.manifest), "current.manifest");
+    if (dirname(absolute) !== expectedRelease || resolve(pointer.releaseDir) !== expectedRelease || sha256File(absolute) !== pointer.manifestSha256) {
+      throw new VideoCapabilityError("当前交付指针与清单摘要/目录不一致", "CONFLICT");
+    }
+    manifestPath = relative(artifactRoot(), absolute);
+    pointerSha256 = sha256File(pointerPath);
+  }
   const manifest = readJsonFile(absolute, manifestPath);
+  const manifestSha256 = manifest === null ? null : sha256File(absolute);
   if (manifest === null && !existsSync(absolute)) {
     return { found: false, projectId, manifestPath, hint: "还没有交付清单（还没跑 deliver 阶段）" };
   }
@@ -360,6 +378,9 @@ export function deliveryInspect(input) {
   }).concat(invalid);
   const missing = checks.filter(entry => entry.state !== "present");
   const integrity = !checks.length || missing.length ? "incomplete" : checks.every(entry => entry.verified) ? "sha256-verified" : "unverified";
+  if (sha256File(absolute) !== manifestSha256 || pointerSha256 && sha256File(pointerPath) !== pointerSha256) {
+    throw new VideoCapabilityError("核验期间发布版本发生变化", "CONFLICT");
+  }
   return {
     found: true,
     projectId,
@@ -373,6 +394,9 @@ export function deliveryInspect(input) {
     files: checks,
     missing: missing.map((entry) => entry.path ?? entry.label),
     integrity,
+    technicalQuality: "unverified",
+    complete: false,
+    requiredNextCapability: "growth.video.post.quality",
     note: "逐个读取清单文件并计算实际 SHA-256；与 entries/assets/旧指针的声明合并比较。缺少声明哈希只记 unverified，不提升为核验通过。",
   };
 }
@@ -511,3 +535,5 @@ export function productionPlan(input) {
     notExecuted: "只读配置与已声明输入；未请求模型/ASR，未核验授权、身份、余额或完整规范，也未提交渲染。执行时 CLI 必须继续完成实际预检。",
   };
 }
+
+export { deliveryQuality } from "./post-quality.mjs";

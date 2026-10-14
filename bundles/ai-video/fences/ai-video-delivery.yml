@@ -17,19 +17,20 @@ rules:
     is_baseline: true
     match:
       object_types: [final_video, video_asset, subtitle_track, subtitle_report, delivery_package]
-      actions: [postread.health, postread.plan, postread.impact, postwrite.package, postwrite.reedit, postwrite.triage, subtitlewrite.sidecar, subtitlewrite.softmux]
+      actions: [postread.health, postread.plan, postread.impact, postread.quality, postwrite.package, postwrite.reedit, postwrite.triage, subtitlewrite.sidecar, subtitlewrite.softmux]
     when: "true"
     note: 本地后期默认直通。已成功生成的镜头不因版本差异、像素对比、人物、口型或增强模型评审而挂起；实际源字节、输出文件、清单与错误回执仍须记录。覆盖源文件、无证据复用和新增付费生成按相应规则处理。
 
   - rule_id: G-DLV1
-    name: 已生成镜头的版本差异不设质量闸
+    name: 请求产物与当前媒体的技术验收
     level: block
     is_baseline: true
     match:
       object_types: [delivery_package, final_video]
       actions: [postwrite.package, postwrite.reedit]
-    when: "false"
-    note: 兼容既有规则 ID 与绑定；单版本或相同配方不作审美否决。按请求的目标集合实际生成并记录每个版本和源字节，真实处理失败仍失败。
+    when: "params.post_quality_failed == true or params.output_missing == true or params.output_unreadable == true"
+    note: 保留本仓请求的版本数量合同；实际缺件、完整解码失败、原生或明确目标规格不符、请求环节及真实加工证据缺失均失败。执行器出口重新检查当前字节，调用方通过标志不能替代。艺术评分不作通用硬闸；技术失败只本地返修，不自动付费重生成。
+
 
   - rule_id: G-DLV2
     name: 禁止覆盖源文件

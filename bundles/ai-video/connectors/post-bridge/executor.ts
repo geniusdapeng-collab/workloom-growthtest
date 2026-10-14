@@ -64,6 +64,7 @@ export const POST_BRIDGE_TOOLS = [
   "postread.health",
   "postread.plan",
   "postread.impact",
+  "postread.quality",
   "postwrite.package",
   "postwrite.reedit",
   "postwrite.triage",
@@ -80,7 +81,7 @@ export const NEVER_RETRY_CODES = new Set([
   "idempotency_conflict", "bad_request", "not_found", "not_provided",
   "ffmpeg_not_installed", "bad_media", "bad_font", "font_not_found", "bad_style", "bad_srt",
   "bad_recipe", "bad_lut", "license_blocked", "overwrite_source_forbidden", "not_configured",
-  "verify_failed", "version_exists",
+  "verify_failed", "post_quality_failed", "entity_processing_failed", "rhythm_processing_failed", "entity_receipt_failed", "color_management_unsupported", "processing_quality_failed", "version_exists",
   "revision_conflict", "revision_busy", "revision_io_failed",
 ]);
 

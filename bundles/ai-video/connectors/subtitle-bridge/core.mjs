@@ -611,6 +611,7 @@ export function srtToAssTime(value) {
   const match = SRT_TIME.exec(String(value));
   if (!match) throw new SubtitleError(`SRT 时间格式无法解析：${value}`, "bad_srt", false);
   const [, h, m, s, frac] = match;
+  if (Number(m) >= 60 || Number(s) >= 60) throw new SubtitleError(`SRT 分秒越界：${value}`, "bad_srt", false);
   const cs = frac.length === 3 ? Math.floor(Number(frac) / 10) : Number(frac);
   return `${Number(h)}:${String(Number(m)).padStart(2, "0")}:${String(Number(s)).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
 }
@@ -618,16 +619,20 @@ export function srtToAssTime(value) {
 export function assistToSeconds(value) {
   const match = /^(\d+):(\d{2}):(\d{2})\.(\d{1,2})$/.exec(String(value));
   if (!match) throw new SubtitleError(`ASS 时间格式无法解析：${value}`, "bad_srt", false);
+  if (Number(match[2]) >= 60 || Number(match[3]) >= 60) throw new SubtitleError(`ASS 分秒越界：${value}`, "bad_srt", false);
   const cs = match[4].length === 1 ? Number(match[4]) * 10 : Number(match[4]);
   return Number(match[1]) * 3600 + Number(match[2]) * 60 + Number(match[3]) + cs / 100;
 }
 
 export function srtSecondsToAss(seconds) {
-  const safe = Math.max(0, Number(seconds) || 0);
-  const h = Math.floor(safe / 3600);
-  const m = Math.floor((safe % 3600) / 60);
-  const s = safe % 60;
-  return `${h}:${String(m).padStart(2, "0")}:${s.toFixed(2).padStart(5, "0")}`;
+  const safe = Number(seconds);
+  if (!Number.isFinite(safe) || safe < 0) throw new SubtitleError(`字幕秒数非法：${seconds}`, "bad_srt", false);
+  const centiseconds = Math.round(safe * 100);
+  const h = Math.floor(centiseconds / 360000);
+  const m = Math.floor((centiseconds % 360000) / 6000);
+  const s = Math.floor((centiseconds % 6000) / 100);
+  const cs = centiseconds % 100;
+  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
 }
 
 /**
@@ -646,7 +651,7 @@ export function parseSrt(text) {
   const cues = [];
   for (const block of blocks) {
     const lines = block.split(/\r?\n/).filter((line) => line.trim() !== "");
-    if (lines.length < 2) continue;
+    if (lines.length < 2) throw new SubtitleError(`SRT 块被截断：${block.slice(0, 60)}`, "bad_srt", false);
     const timeIndex = lines[0].includes("-->") ? 0 : 1;
     const timeLine = lines[timeIndex];
     if (!timeLine || !timeLine.includes("-->")) {
@@ -740,20 +745,48 @@ export function buildAssDocument({ resolution, styles, events }) {
 /** 回读 ASS 事件（时间轴复检用：写出去的 ASS 必须能读回来且与源一致）。 */
 export function parseAssEvents(assText) {
   const events = [];
-  for (const line of String(assText).split("\n")) {
-    if (!line.startsWith("Dialogue:")) continue;
-    const parts = line.slice("Dialogue:".length).split(",");
-    if (parts.length < 10) continue;
-    events.push({
-      layer: Number(parts[0]),
-      start: parts[1],
-      end: parts[2],
-      style: parts[3],
-      text: parts.slice(9).join(",").trim(),
-    });
+  for (const line of String(assText).split(/\r?\n/)) {
+    if (!line.trimStart().startsWith("Dialogue:")) continue;
+    const parts = line.trimStart().slice("Dialogue:".length).split(",");
+    if (parts.length < 10) throw new SubtitleError("ASS Dialogue 字段缺失", "bad_srt", false);
+    const event = {
+      layer: Number(parts[0]), start: parts[1].trim(), end: parts[2].trim(),
+      style: parts[3].trim(), text: parts.slice(9).join(",").trim(),
+    };
+    const start = assistToSeconds(event.start), end = assistToSeconds(event.end);
+    if (!parts[0].trim() || !Number.isInteger(event.layer) || event.layer < 0 || !event.style || !event.text || end <= start) {
+      throw new SubtitleError("ASS Dialogue 的图层、时间、样式或文本非法", "bad_srt", false);
+    }
+    events.push(event);
   }
   return events;
 }
+
+/** Validate the actual ASS events against the video stream, without deleting or shortening user text. */
+export function validateTextEvents(events, probe, { allowClippedEnd = false } = {}) {
+  const videoDuration = Number(probe?.videoDuration);
+  if (!Number.isFinite(videoDuration) || videoDuration <= 0) {
+    throw new SubtitleError("无法核实视频流时长，不能证明文字时间轴在成片内", "bad_media", false);
+  }
+  if (!Array.isArray(events) || events.length === 0) {
+    throw new SubtitleError("ASS 没有可渲染文字事件", "bad_srt", false);
+  }
+  // ASS timestamps have centisecond precision; tolerate only that serialization quantum at the end.
+  const toleranceSec = 0.01;
+  let first = Infinity, last = 0;
+  for (const [index, event] of events.entries()) {
+    const start = assistToSeconds(event.start), end = assistToSeconds(event.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end <= start
+      || start >= videoDuration || (!allowClippedEnd && end > videoDuration + toleranceSec + 1e-9)) {
+      throw new SubtitleError(`文字事件 #${index + 1} 时间轴 ${event.start}–${event.end} 越出实际视频 ${videoDuration}s 或没有正时长`, "bad_srt", false);
+    }
+    first = Math.min(first, start);
+    last = Math.max(last, end);
+  }
+  return { ok: true, count: events.length, videoDuration, first, last, toleranceSec,
+    allowClippedEnd, basis: "actual ASS readback and probed video stream duration" };
+}
+
 
 /* ============================ 版式决策与校验 ============================ */
 
@@ -916,7 +949,7 @@ export async function analyzeVideo({
 }) {
   const probe = await probeMedia(input, { bins });
   const { key, layout } = layoutFor(platform, catalog);
-  const resolution = [probe.width, probe.height];
+  const resolution = [probe.displayWidth ?? probe.width, probe.displayHeight ?? probe.height];
   const bands = textBands({ resolution, layout });
   const stamps = (times && times.length ? times : sampleTimes(probe.duration)).slice(0, maxFrames);
   const dir = evidenceDir ?? (await tempDir("workloom-subtitle-analyze-"));
@@ -1025,7 +1058,7 @@ export async function plan({
   const probe = input ? await probeMedia(input, { bins }) : null;
   const resolvedPlatform = platform ?? brief.平台 ?? "默认";
   const { key: platformKey, layout } = layoutFor(resolvedPlatform, catalog);
-  const targetResolution = resolution ?? (probe ? [probe.width, probe.height] : brief.分辨率 ?? [1080, 1920]);
+  const targetResolution = resolution ?? (probe ? [probe.displayWidth ?? probe.width, probe.displayHeight ?? probe.height] : brief.分辨率 ?? [1080, 1920]);
   const targets = loadRecipes().targets;
   const fonts = scanFonts({ catalog, root: fontsDir });
   const installedIds = new Set(fonts.entries.filter((entry) => entry.present).map((entry) => entry.id));
@@ -1331,9 +1364,14 @@ export const FONT_SOURCE = {
 /* ============================ 烧录与复检 ============================ */
 
 /** Render the declared ASS once; verify actual outputs, fonts and source bytes without source quality sampling. */
-async function encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, extraFilter = ",format=yuv420p" }) {
+async function encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, extraFilter = ",format=yuv420p", allowClippedEnd = false }) {
+  assertRenderable({ input, output });
   const encoder = await pickVideoEncoder({ bins });
   const probe = await probeMedia(input, { bins });
+  const assText = await fsp.readFile(assPath, "utf8");
+  const textTimeline = validateTextEvents(parseAssEvents(assText), probe, { allowClippedEnd });
+  const sourceSha256 = await sha256File(input);
+  const assSha256 = await sha256File(assPath);
   const renderWorkDir = await tempDir("workloom-subtitle-render-");
   const flatFonts = prepareFlatFontsDir({ fontsDir, catalog, workDir: renderWorkDir });
   if (flatFonts.missing.length) {
@@ -1352,11 +1390,19 @@ async function encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, 
   const outputProbe = await probeMedia(output, { bins });
   const hash = await sha256File(output);
   const fontResolution = parseFontSelections(log, flatFonts.flat);
-  return { encoder, probe, outputProbe, hash, fontResolution, flatFonts };
+  if (fontResolution.allFromFontsDir !== true || fontResolution.selections.length === 0) {
+    await removeOnFailure(output);
+    throw new SubtitleError("实际 libass 渲染没有核实工位字体（fontselect 缺失或回落）：候选输出已删除", "verify_failed", false);
+  }
+  if (await sha256File(input) !== sourceSha256 || await sha256File(assPath) !== assSha256) {
+    await removeOnFailure(output);
+    throw new SubtitleError("渲染期间源片或 ASS 字节发生变化：候选输出已删除", "verify_failed", false);
+  }
+  return { encoder, probe, outputProbe, hash, fontResolution, flatFonts, sourceSha256, assSha256, textTimeline };
 }
 
 export async function renderWithSubtitles({
-  mode = "subtitle", input, output, cues = [], titleText = "", titleDurationSec = 3,
+  mode = "subtitle", input, output, cues = [], titleText = "", titleDurationSec = null,
   secondaryCues = [], secondaryLabel = "EN", brief = {}, platform = null,
   fontsDir = null, evidenceDir = null, bins = resolveBinaries(), catalog = loadFontCatalog(),
   styleOverrides = {}, skipVerify = false,
@@ -1366,6 +1412,17 @@ export async function renderWithSubtitles({
   if (!["subtitle", "title", "both"].includes(mode)) throw new SubtitleError("未知字幕处理模式", "bad_request", false);
   if (mode !== "title" && !cues.length) throw new SubtitleError("字幕烧录需要 SRT 字幕条", "bad_request", false);
   if (mode !== "subtitle" && !titleText) throw new SubtitleError("标题烧录需要 title_text", "bad_request", false);
+  if (mode !== "subtitle") {
+    if (titleDurationSec == null) {
+      const titleProbe = await probeMedia(input, { bins });
+      if (!Number.isFinite(titleProbe.videoDuration) || titleProbe.videoDuration <= 0) {
+        throw new SubtitleError("默认标题无法核实实际视频时长", "bad_media", false);
+      }
+      titleDurationSec = Math.min(3, titleProbe.videoDuration);
+    } else if (!Number.isFinite(Number(titleDurationSec)) || Number(titleDurationSec) <= 0) {
+      throw new SubtitleError("标题时长必须为有限正数", "bad_srt", false);
+    }
+  }
   const started = Date.now();
   const sourceSha256 = await sha256File(input);
   const scenes = mode === "title" ? ["标题"] : mode === "subtitle" ? ["字幕"] : ["标题", "字幕"];
@@ -1380,14 +1437,15 @@ export async function renderWithSubtitles({
   const timelineOk = mode === "title" ? titleEvents.length === 1 : subEvents.length === cues.length
     && subEvents.every((event, index) => event.start === cues[index].start && event.end === cues[index].end);
   const checks = { timeline_ok: timelineOk,
+    timeline_within_video: encoded.textTimeline.ok,
     punctuation_ok: subEvents.every(event => findSubtitlePunctuation(event.text).length === 0),
-    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir !== false,
-    resolution_preserved: encoded.outputProbe.width === encoded.probe.width && encoded.outputProbe.height === encoded.probe.height,
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir === true && encoded.fontResolution.selections.length > 0,
+    resolution_preserved: encoded.outputProbe.width === (encoded.probe.displayWidth ?? encoded.probe.width) && encoded.outputProbe.height === (encoded.probe.displayHeight ?? encoded.probe.height),
     audio_preserved: encoded.outputProbe.hasAudio === encoded.probe.hasAudio,
     source_bytes_unchanged: await sha256File(input) === sourceSha256,
     output_present: (await fsp.stat(output)).size > 0 };
   const report = { schemaVersion: "workloom.subtitle-report/v1", mode, input,
-    sourceSha256, output: { path: output, hash: encoded.hash, bytes: (await fsp.stat(output)).size },
+    sourceSha256, assSha256: encoded.assSha256, textTimeline: encoded.textTimeline, output: { path: output, hash: encoded.hash, bytes: (await fsp.stat(output)).size },
     encoder: encoded.encoder.name, elapsedMs: Date.now() - started,
     duration: { input: encoded.probe.duration, output: encoded.outputProbe.duration },
     resolution: [encoded.outputProbe.width, encoded.outputProbe.height], platform: planOutcome.plan.platform,
@@ -1610,6 +1668,19 @@ function assertRenderable({ input, output }) {
   if (path.resolve(input) === path.resolve(output)) {
     throw new SubtitleError("禁止覆盖原片（输出路径等于输入路径）", "overwrite_source_forbidden", false);
   }
+  if (fs.existsSync(input)) {
+    const source = fs.statSync(input);
+    const sourceReal = fs.realpathSync(input);
+    if (fs.existsSync(output)) {
+      const target = fs.statSync(output);
+      if (sourceReal === fs.realpathSync(output) || (source.dev === target.dev && source.ino === target.ino)) {
+        throw new SubtitleError("禁止通过符号链接或硬链接覆盖原片", "overwrite_source_forbidden", false);
+      }
+    } else if (fs.existsSync(path.dirname(output))
+      && path.join(fs.realpathSync(path.dirname(output)), path.basename(output)) === sourceReal) {
+      throw new SubtitleError("禁止通过目录别名覆盖原片", "overwrite_source_forbidden", false);
+    }
+  }
 }
 
 async function removeOnFailure(output) {
@@ -1642,6 +1713,9 @@ export async function renderDanmaku({
   fontsDir = fontsDir ?? fontsRoot();
   assertRenderable({ input, output, skipVerify });
   const parsed = parseDanmaku(items);
+  const inputTiming = await probeMedia(input, { bins });
+  validateTextEvents(parsed.map(item => ({ start: srtSecondsToAss(item.at),
+    end: srtSecondsToAss(item.at + 1), text: item.text })), inputTiming, { allowClippedEnd: true });
   const tooLong = Number.isFinite(maxChars) && maxChars > 0
     ? parsed.filter((item) => Array.from(item.text).length > maxChars) : [];
   if (tooLong.length) {
@@ -1658,7 +1732,7 @@ export async function renderDanmaku({
   const probe = await probeMedia(input, { bins });
   const platformKey = platform ?? brief.平台 ?? "默认";
   const { key: layoutKey, layout } = layoutFor(platformKey, catalog);
-  const resolution = [probe.width, probe.height];
+  const resolution = [probe.displayWidth ?? probe.width, probe.displayHeight ?? probe.height];
   const selection = selectFonts({ brief, scene: "弹幕", top: 1, catalog, fontsDir, resolution });
   const pick = selection.top.find((item) => item.installed !== false) ?? selection.top[0];
   if (!pick) throw new SubtitleError("弹幕场景没有可用字体", "font_not_found", false);
@@ -1717,15 +1791,16 @@ export async function renderDanmaku({
   const assPath = path.join(dir, "danmaku-plan.ass");
   const assText = buildAssDocument({ resolution, styles, events });
   await fsp.writeFile(assPath, assText, "utf8");
-  const encoded = await encodeWithAss({ input, output, assPath, fontsDir, catalog, bins });
+  const encoded = await encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, allowClippedEnd: true });
   const presence = { status: "not-reviewed", delta: null };
   const evidence = [];
   const backRead = parseAssEvents(assText).filter((event) => event.style.startsWith("Danmaku"));
   const checks = {
+    timeline_within_video: encoded.textTimeline.ok,
     event_count_ok: backRead.length === tracks.length,
     declared_density_applied: !densityRequested || checkDanmakuDensity(trimming.kept, { windowSec, maxConcurrent }).ok,
-    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir !== false,
-    resolution_preserved: encoded.outputProbe.width === probe.width && encoded.outputProbe.height === probe.height,
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir === true && encoded.fontResolution.selections.length > 0,
+    resolution_preserved: encoded.outputProbe.width === (probe.displayWidth ?? probe.width) && encoded.outputProbe.height === (probe.displayHeight ?? probe.height),
     audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
     source_bytes_unchanged: await sha256File(input) === sourceSha256,
   };
@@ -1735,6 +1810,8 @@ export async function renderDanmaku({
     qualityReviewed: false, qualityReview: "not-reviewed",
     input,
     sourceSha256,
+    assSha256: encoded.assSha256,
+    textTimeline: encoded.textTimeline,
     output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
     encoder: encoded.encoder.name,
     platform: layoutKey,
@@ -1754,7 +1831,7 @@ export async function renderDanmaku({
     presence,
     evidence,
     assPath,
-    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies },
+    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies, selections: encoded.fontResolution.selections },
     checks,
   };
   if (!Object.values(checks).every(Boolean)) {
@@ -1787,7 +1864,7 @@ export async function renderSticker({
   const probe = await probeMedia(input, { bins });
   const platformKey = platform ?? brief.平台 ?? "默认";
   const { key: layoutKey, layout } = layoutFor(platformKey, catalog);
-  const resolution = [probe.width, probe.height];
+  const resolution = [probe.displayWidth ?? probe.width, probe.displayHeight ?? probe.height];
   const short = probe.shortSide;
   const selection = selectFonts({ brief, scene: "贴纸", top: 1, catalog, fontsDir, resolution });
   const pick = selection.top.find((item) => item.installed !== false) ?? selection.top[0];
@@ -1856,9 +1933,10 @@ export async function renderSticker({
   const presence = { status: "not-reviewed", delta: null };
   const evidence = [];
   const checks = {
+    timeline_within_video: encoded.textTimeline.ok,
     event_timing_ok: placements.every((item) => item.holdSec > 0),
-    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir !== false,
-    resolution_preserved: encoded.outputProbe.width === probe.width && encoded.outputProbe.height === probe.height,
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir === true && encoded.fontResolution.selections.length > 0,
+    resolution_preserved: encoded.outputProbe.width === (probe.displayWidth ?? probe.width) && encoded.outputProbe.height === (probe.displayHeight ?? probe.height),
     audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
     source_bytes_unchanged: await sha256File(input) === sourceSha256,
   };
@@ -1868,6 +1946,8 @@ export async function renderSticker({
     qualityReviewed: false, qualityReview: "not-reviewed",
     input,
     sourceSha256,
+    assSha256: encoded.assSha256,
+    textTimeline: encoded.textTimeline,
     output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
     encoder: encoded.encoder.name,
     platform: layoutKey,
@@ -1878,7 +1958,7 @@ export async function renderSticker({
     presence,
     evidence,
     assPath,
-    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies },
+    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies, selections: encoded.fontResolution.selections },
     checks,
   };
   if (!Object.values(checks).every(Boolean)) {
@@ -1917,7 +1997,7 @@ export async function renderKaraoke({
   const probe = await probeMedia(input, { bins });
   const platformKey = platform ?? brief.平台 ?? "默认";
   const { key: layoutKey, layout } = layoutFor(platformKey, catalog);
-  const resolution = [probe.width, probe.height];
+  const resolution = [probe.displayWidth ?? probe.width, probe.displayHeight ?? probe.height];
   const selection = selectFonts({ brief, scene: "字幕", top: 1, catalog, fontsDir, resolution });
   const pick = selection.top.find((item) => item.installed !== false) ?? selection.top[0];
   if (!pick) throw new SubtitleError("字幕场景没有可用字体", "font_not_found", false);
@@ -1987,12 +2067,13 @@ export async function renderKaraoke({
   const presence = { status: "not-reviewed", delta: null };
   const evidence = [];
   const checks = {
+    timeline_within_video: encoded.textTimeline.ok,
     timing_sum_ok: timingRows.every((row) => Math.abs(row.sumErrorSec) <= 0.05),
     karaoke_tags_present: events
       .filter((event) => event.style === "Kara")
       .every((event) => /\\kf?\d+/.test(event.text)),
-    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir !== false,
-    resolution_preserved: encoded.outputProbe.width === probe.width && encoded.outputProbe.height === probe.height,
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir === true && encoded.fontResolution.selections.length > 0,
+    resolution_preserved: encoded.outputProbe.width === (probe.displayWidth ?? probe.width) && encoded.outputProbe.height === (probe.displayHeight ?? probe.height),
     audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
     source_bytes_unchanged: await sha256File(input) === sourceSha256,
   };
@@ -2002,6 +2083,8 @@ export async function renderKaraoke({
     qualityReviewed: false, qualityReview: "not-reviewed",
     input,
     sourceSha256,
+    assSha256: encoded.assSha256,
+    textTimeline: encoded.textTimeline,
     output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
     encoder: encoded.encoder.name,
     platform: layoutKey,
@@ -2014,7 +2097,7 @@ export async function renderKaraoke({
     presence,
     evidence,
     assPath,
-    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies },
+    fontResolution: { allFromFontsDir: encoded.fontResolution.allFromFontsDir, fallbackFamilies: encoded.fontResolution.fallbackFamilies, selections: encoded.fontResolution.selections },
     checks,
   };
   if (!Object.values(checks).every((ok) => ok)) {
@@ -2476,6 +2559,7 @@ export async function softMux({
   if (path.resolve(input) === path.resolve(output)) {
     throw new SubtitleError("禁止覆盖原片（输出路径等于输入路径）", "overwrite_source_forbidden", false);
   }
+  assertRenderable({ input, output });
   const tracks = (Array.isArray(subtitles) ? subtitles : []).map((entry, index) => {
     const file = typeof entry === "string" ? entry : entry?.path;
     if (typeof file !== "string" || !file.trim()) throw new SubtitleError(`第 ${index + 1} 条软字幕轨缺少 path`, "bad_request", false);
@@ -2484,6 +2568,7 @@ export async function softMux({
     if (![".srt", ".ass", ".ssa", ".vtt"].includes(ext)) {
       throw new SubtitleError(`软字幕文件格式不支持：${ext || "(无扩展名)"}（支持 .srt/.ass/.ssa/.vtt）`, "bad_srt", false);
     }
+    assertRenderable({ input: file, output });
     const lang = String(entry?.lang ?? (index === 0 ? "chi" : "eng"));
     return {
       path: file,
@@ -2567,7 +2652,7 @@ export async function softMux({
     await runBin(bins.ffmpeg, args, { label: "ffmpeg(softmux)", timeoutMs: 600_000 });
   } finally {
     /** 钳制副本只服务本次 mux：临时目录用完即清。 */
-    if (clampDir) await fsp.rm(clampDir, { recursive: true, force: true }).catch(() => {});
+    if (clampDir) await fsp.rm(clampDir, { recursive: true, force: true });
   }
   if (!fs.existsSync(output)) throw new SubtitleError(`软字幕内嵌未产出文件：${output}`, "ffmpeg_failed", true);
 
@@ -2853,7 +2938,7 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         secondaryCues: resolveCues({ srt_path: params.srt_path_en ?? undefined, srt_text: params.srt_text_en ?? undefined }),
         secondaryLabel: String(params.secondary_label ?? "EN"),
         titleText: params.title_text ?? "",
-        titleDurationSec: optionalNumber(params.title_duration_sec) ?? 3,
+        titleDurationSec: optionalNumber(params.title_duration_sec),
         brief: resolveBrief(params),
         platform: params.platform ?? null,
         fontsDir: params.fonts_dir ? assertPathAllowed(String(params.fonts_dir), roots, "fonts_dir") : fontRoot,
@@ -2885,7 +2970,7 @@ export async function callTool(name, params = {}, { bins = resolveBinaries(), en
         output,
         cues: resolveCues(params),
         titleText: text(params.title_text, "title_text"),
-        titleDurationSec: optionalNumber(params.title_duration_sec) ?? 3,
+        titleDurationSec: optionalNumber(params.title_duration_sec),
         brief: resolveBrief(params),
         platform: params.platform ?? null,
         fontsDir: params.fonts_dir ? assertPathAllowed(String(params.fonts_dir), roots, "fonts_dir") : fontRoot,

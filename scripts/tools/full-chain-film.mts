@@ -29,6 +29,9 @@
  * 阶段日志：`<work-dir>/logs/stages.jsonl`（逐条：stage/shotId/invoked/ok/degraded/cached/verdict）
  * 阶段汇总：`<work-dir>/logs/stages.json`
  */
+import { auditRhythmPlan, rhythmSfxPlacements, type RhythmPlanInput } from "../../packages/video-studio/src/rhythm-plan.js";
+import { appendCinematicContract, auditCinematicContracts, buildCinematicContract, cinematicStyleRequested } from "../../packages/video-studio/src/cinematic-contract.js";
+import { executeRhythmEdit, executeRhythmSound, rhythmMediaFacts, rhythmFileSha256 } from "./rhythm-edit.mjs";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -104,6 +107,7 @@ import { assessFilmFirstPass, FIRST_PASS_POLICY_VERSION } from "../../packages/v
 import { REALISM_CLAUSE, REALISM_NEGATIVE_TERMS } from "../../packages/video-studio/src/shot-spec.js";
 import { resolveFilmSpeechLanguage, dialogueLines, speechLanguageClause, exactDialogueClause, noSpeechClause, speechNegativeTerms } from "../../packages/video-studio/src/dialogue-contract.js";
 import { reviewPlausibility, applyPromptPatches, PLAUSIBILITY_POLICY_VERSION } from "../../packages/video-studio/src/plausibility-review.js";
+import { createGenerationQuality } from "./generation-quality.mjs";
 import { publishUhdDelivery, sha256UhdAsset } from "../../packages/video-studio/src/uhd-delivery.js";
 import { FullChainFilmWorker } from "../../packages/video-studio/src/film-worker-runtime.js";
 
@@ -211,10 +215,9 @@ const SOURCE_RESOLUTION = REQUESTED_RESOLUTION === "2160p" ? "1080p" : REQUESTED
 const OUTPUT_RESOLUTION = QUALITY === "uhd" ? "2160p" : SOURCE_RESOLUTION;
 /** UHD 全套交付文件先留在与正式目录同卷的源版本暂存区，交付门全过后整体发布。 */
 const PUBLIC_OUT_DIR = QUALITY === "uhd" ? join(OUT_ROOT, "uhd") : OUT_ROOT;
-const PUBLIC_RELEASE_DIR = QUALITY === "uhd" ? join(PUBLIC_OUT_DIR, "releases", RUN_ID) : PUBLIC_OUT_DIR;
-const OUT_DIR = QUALITY === "uhd" ? join(OUT_ROOT, ".uhd-staging", RUN_ID) : OUT_ROOT;
+const PUBLIC_RELEASE_DIR = join(PUBLIC_OUT_DIR, "releases", RUN_ID);
+const OUT_DIR = join(dirname(OUT_ROOT), `.${basename(OUT_ROOT)}-post-staging`, RUN_ID);
 function publicDeliveryPath(path: string): string {
-  if (QUALITY !== "uhd") return path;
   const rel = relative(OUT_DIR, path);
   if (!rel || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) {
     throw new Error(`UHD_DELIVERY_PATH_OUTSIDE_STAGING: ${path}`);
@@ -525,6 +528,73 @@ const BGM_LIBRARY_ROOTS = [join(homedir(), ".workloom-bgm"), join(homedir(), "Do
   .filter((dir) => existsSync(dir));
 const BGM_ALLOWED_ROOTS = [CLI_ALLOWED_ROOTS, ...BGM_LIBRARY_ROOTS].join(":");
 for (const dir of [LOG_DIR, PLATE_DIR, CLIP_DIR, POST_DIR, PROMPT_DIR, OUT_DIR]) mkdirSync(dir, { recursive: true });
+
+/** Current invocation evidence; local post work can be repeated without new provider calls. */
+const generationQuality = createGenerationQuality({ root: OUT_DIR, bins: { ffmpeg: FFMPEG, ffprobe: FFPROBE }, enabled: !DRY_RUN });
+let generationNativeResolution: [number, number] | null = null;
+let masterGenerationQuality: Awaited<ReturnType<typeof generationQuality.inspect>> | null = null;
+function pinGenerationSources(files: string[], ids: string[]): void {
+  if (files.length !== ids.length || files.length === 0) throw new Error("GENERATION_SOURCE_BINDINGS_MISSING");
+  const facts = files.map((file, index) => {
+    if (!existsSync(file)) throw new Error(`COMPOSE_INPUT_FAILED: current original source missing: ${ids[index]}`);
+    try { generationQuality.preserveSource(file, ids[index]!); return rhythmMediaFacts(file, FFPROBE); }
+    catch (error) { throw new Error(`COMPOSE_SOURCE_TIMELINE_UNREADABLE: ${ids[index]}: ${error instanceof Error ? error.message : String(error)}`); }
+  });
+  const native: [number, number] = [Math.max(...facts.map(row => row.width)), Math.max(...facts.map(row => row.height))];
+  generationNativeResolution = native;
+  if (!process.argv.includes("--resolution") && !process.argv.includes("--quality")) {
+    // 4:2:0 export needs even axes. Pad upward by at most one pixel, never shrink the native picture.
+    OUTPUT_SIZE.width = Math.ceil(native[0] / 2) * 2; OUTPUT_SIZE.height = Math.ceil(native[1] / 2) * 2;
+  }
+  const sameAspect = facts.every(row => Math.abs(row.width / row.height - OUTPUT_SIZE.width / OUTPUT_SIZE.height) < 0.005);
+  const reframe = flag("--allow-reframe") && arg("--reframe-reason", "").trim().length > 0;
+  if (!sameAspect && !reframe) throw new Error("GENERATION_NATIVE_REFRAME_REQUIRES_REASON");
+  if (!flag("--allow-downscale") && (native[0] > OUTPUT_SIZE.width || native[1] > OUTPUT_SIZE.height)) throw new Error("GENERATION_NATIVE_DOWNSCALE_REQUIRES_EXPLICIT_APPROVAL");
+}
+function generationRequirements(hasVariants = false): Array<Record<string, unknown>> {
+  const requested: Record<string, boolean> = {
+    cover: STAGES.has("cover"), bgm: !flag("--no-bgm") && !flag("--no-music") && (bgmManifestInfo?.layer === "on" || hasVariants),
+    subtitles: STAGES.has("subtitle") || STAGES.has("mux"), danmaku: DANMAKU_ENABLED && STAGES.has("danmaku"),
+    transitions: true, color: STAGES.has("color") || hasVariants, resolution: true,
+  };
+  return Object.entries(requested).map(([name, required]) => required ? { name, requirement: "required" }
+    : { name, requirement: "not_applicable", reason: `本次明确请求的阶段及开关未启用 ${name}` });
+}
+function generationArtifacts(scope: "master" | "delivery", masterFile: string,
+  variants: Array<{ id: string; path: string; gradeProfile: string | null; cover?: { path: string; sha256: string } | null; bgm?: unknown }> = [],
+  sidecars: string[] = []): Array<Record<string, any>> {
+  const requested = ["transitions", ...(STAGES.has("color") ? ["color"] : []),
+    ...(STAGES.has("subtitle") && SUBTITLE_MODE !== "sidecar" ? ["subtitles"] : []),
+    ...(DANMAKU_ENABLED && STAGES.has("danmaku") ? ["danmaku"] : []), ...(bgmManifestInfo?.layer === "on" ? ["bgm"] : [])];
+  const artifacts: Array<Record<string, any>> = [{ id: "master", path: masterFile, media: "video", role: "master", requiredStages: requested, fps: FPS, durationSeconds: expectedMasterSeconds }];
+  for (const variant of variants) {
+    artifacts.push({ id: `variant:${variant.id}`, path: variant.path, media: "video", role: "variant",
+      requiredStages: ["transitions", "color", ...(variant.bgm ? ["bgm"] : [])], expectedColorProfile: variant.gradeProfile, fps: FPS });
+    if (variant.cover) artifacts.push({ id: `cover:${variant.id}`, path: variant.cover.path, media: "image", role: "cover" });
+  }
+  const cover = join(OUT_DIR, `${PROJECT}-cover.png`);
+  if (existsSync(cover)) artifacts.push({ id: "cover:master", path: cover, media: "image", role: "cover" });
+  if (STAGES.has("cover") && !existsSync(cover)) throw new Error("GENERATION_REQUIRED_COVER_MISSING");
+  if (softsubFile) artifacts.push({ id: "softsub", path: softsubFile, media: "video", role: "softsub", requireSubtitleStream: true, requiredStages: ["transitions", "subtitles"] });
+  if (STAGES.has("mux") && !softsubFile) throw new Error("GENERATION_REQUIRED_SOFTSUB_MISSING");
+  const files = sidecars.length ? sidecars : subtitleSidecar ? [subtitleSidecar.srt, subtitleSidecar.ass] : [];
+  if (STAGES.has("subtitle") && SUBTITLE_MODE !== "burn" && (!subtitleSidecar || files.filter(file => /\.(srt|ass)$/i.test(file)).length < 2)) throw new Error("GENERATION_REQUIRED_SIDECARS_MISSING");
+  for (const [index, file] of files.filter(file => /\.(srt|ass|vtt)$/i.test(file)).entries()) artifacts.push({ id: `subtitle:${index}`, path: file, media: "subtitle", durationSeconds: expectedMasterSeconds });
+  const intro = join(OUT_DIR, `${PROJECT}-with-cover.mp4`);
+  if (existsSync(intro) && stageApproved("cover-intro")) artifacts.push({ id: "cover-intro", path: intro, media: "video", role: "cover-intro", requiredStages: ["transitions", "cover"] });
+  return artifacts;
+}
+async function inspectCurrentGeneration(phase: string, scope: "master" | "delivery", masterFile: string,
+  variants: Parameters<typeof generationArtifacts>[2] = [], sidecars: string[] = []) {
+  if (!generationNativeResolution) throw new Error("GENERATION_NATIVE_SOURCES_UNVERIFIED");
+  const artifacts = generationArtifacts(scope, masterFile, variants, sidecars);
+  return generationQuality.inspect({ phase, scope, artifacts, requirements: generationRequirements(variants.length > 0),
+    resolution: [OUTPUT_SIZE.width, OUTPUT_SIZE.height], sourceResolution: generationNativeResolution,
+    variantIds: variants.map(row => row.id), requiredOutputIds: artifacts.map(row => row.id), minimumVariantCount: variants.length === 1 ? 1 : 2,
+    allowDownscale: flag("--allow-downscale"), allowReframe: flag("--allow-reframe"), reframeReason: arg("--reframe-reason", "") || null });
+}
+
+if (STAGES.has("master") || STAGES.has("deliver")) { STAGES.add("compose"); STAGES.add("master"); }
 if (!DRY_RUN) await freezeOriginalSubmission({ productionRoot: WORK_DIR, projectId: PROJECT, bytes: sourceBytes });
 const completedOriginals = !DRY_RUN ? await adoptCompletedOriginalRenders({ productionRoot: WORK_DIR, projectId: PROJECT, submittedSha256: sourceFileHash }) : [];
 const completedByShot = new Map(completedOriginals.map(original => [original.shotId, original]));
@@ -789,8 +859,10 @@ function rememberInputs(stage: string, paths: string[], shotId: string | null = 
   const all = [...new Set([...sourceSupportFiles, ...paths])];
   lineageInputPaths.set(key, all);
   lineageInputSnapshots.set(key, captureLineageInputs(all));
+  if (!DRY_RUN) generationQuality.beginStage(stage, paths.filter(file => !file.startsWith("asset://") && existsSync(file)), { shotId });
 }
 function artifactReusable(stage: string, candidate: string, upstream?: string, shotId: string | null = null): boolean {
+  if (["compose", "color", "subtitle", "danmaku", "bgm", "sfx", "cover", "cover-intro", "mux", "master"].includes(stage) && !generationQuality.ownsOutput(candidate)) return false;
   return reusableLineageArtifact({ records: lineageRecords(readStageHistory(), stage),
     scope: { projectId: PROJECT, sourceHash: sourceHashFor(shotId, stage) },
     stage, shotId, recipe: lineageRecipe(stage), candidate, upstream });
@@ -809,6 +881,7 @@ function record(rec: Omit<StageRecord, "at">): StageRecord {
   const ok = lineage.status === "passed" || lineage.status === "not_applicable";
   const full: StageRecord = { at: stamp(), ...rec, evidence: { ...rec.evidence, ...(REVISION_CONTEXT ? { revisionContext: REVISION_CONTEXT } : {}) }, ok, degraded: lineage.status === "unverified", lineage,
     ...(rec.stage === "gate" ? { approved: ok } : {}) };
+  generationQuality.recordStage(full);
   records.push(full);
   appendFileSync(STAGE_LOG, `${JSON.stringify(full)}\n`, "utf8");
   const tag = full.ok ? (full.degraded ? "DEGRADED" : "ok") : "FAIL";
@@ -991,7 +1064,20 @@ function probe(file: string): Record<string, unknown> {
   }
 }
 function runCli(cli: string, args: string[]): { ok: boolean; out: string } {
+  let qualityToken: ReturnType<typeof generationQuality.beginCli> = null;
+  let actualReportFile: string | null = null;
   try {
+    args = [...args];
+    const actualCommand = args[0];
+    if (/color-bridge[\/]cli\.mjs$/.test(cli) && ["grade", "best"].includes(actualCommand ?? "")) {
+      if (!args.includes("--json")) args.push("--json");
+      args.push("--clarity", "conservative", "--quality-guard", "report");
+    } else if (/(subtitle|bgm)-bridge[\/]cli\.mjs$/.test(cli)
+      && ["sidecar", "burn", "best", "title", "karaoke", "softmux", "danmaku", "sticker", "mix"].includes(actualCommand ?? "")) {
+      actualReportFile = join(POST_DIR, `processor-${RUN_ID}-${randomUUID()}.json`);
+      args.push("--report", actualReportFile);
+    }
+    qualityToken = generationQuality.beginCli(cli, args);
     /**
      * TypeScript 工具（`.ts/.mts`，例如 `compose-film.mts`）必须经 tsx 载入器运行：
      * 本工具的其它工位都是 `.mjs`（plain node 即可），但 TS 工具里会出现 `import "./x.js"`
@@ -1035,8 +1121,16 @@ function runCli(cli: string, args: string[]): { ok: boolean; out: string } {
         WORKLOOM_VOICE_ALLOWED_ROOTS: CLI_ALLOWED_ROOTS
       }
     });
+    if (qualityToken) {
+      const targetIndex = args.indexOf("--out"), target = targetIndex >= 0 ? args[targetIndex + 1] : null;
+      const compositionFile = /compose-film\.mts$/.test(cli) && target ? target.replace(/\.mp4$/i, ".av-sync.json") : null;
+      const receiptFile = compositionFile || actualReportFile;
+      const report = receiptFile ? JSON.parse(readFileSync(receiptFile, "utf8")) : /color-bridge[\/]cli\.mjs$/.test(cli) ? JSON.parse(out) : null;
+      generationQuality.finishCli(qualityToken, { report, receiptFile });
+    }
     return { ok: true, out };
   } catch (err) {
+    generationQuality.abort(qualityToken);
     const e = err as { stdout?: string; stderr?: string; message?: string };
     return { ok: false, out: `${e.stdout ?? ""}\n${e.stderr ?? e.message ?? ""}`.slice(-1500) };
   }
@@ -2385,13 +2479,14 @@ function dialogueText(shot: ShotCard): string {
  * 现在实现搬进模块并加了退化哨兵断言（不得出现 NaN/undefined/[object Object]）+ 桥类结构硬约束测试。
  */
 function platePrompt(shot: ShotCard, characterName: string, appearanceText = ""): string {
-  return buildPlatePrompt(shot as unknown as PlatePromptShot, {
+  const basePrompt = buildPlatePrompt(shot as unknown as PlatePromptShot, {
     characterName,
     appearanceText,
     aspect: ASPECT,
     resolution: SOURCE_RESOLUTION,
     title: shotlist.title, eraProfile: authorContext.eraProfile, ...(sceneBible ? { sceneBible } : {})
   });
+  return appendCinematicContract(basePrompt, buildCinematicContract(shot as unknown as Record<string, unknown>), "plate");
 }
 function buildSrt(): string {
   const lines: string[] = [];
@@ -2425,7 +2520,7 @@ function buildSrt(): string {
      */
     const stripCuePunctuation = (line: string): string =>
       line.replace(/[，。！？；、,.!?;:："“”'‘’（）()【】《》—…·]/g, "").replace(/\s{2,}/g, " ").trim();
-    return wrapped.slice(0, 2).map(stripCuePunctuation).filter(Boolean).join("\n");
+    return wrapped.map(stripCuePunctuation).filter(Boolean).join("\n");
   };
   shots.forEach((shot, index) => {
     const duration = Number(shot.duration ?? 5);
@@ -2438,7 +2533,8 @@ function buildSrt(): string {
        */
       const shotStart = index === 0 ? 0 : (CUT_GRID[index - 1] ?? cursor);
       const start = shotStart + Math.min(0.6, duration * 0.12);
-      const end = Math.min(shotStart + duration - 0.35, expectedMasterSeconds - 0.15);
+      const end = Math.min(shotStart + duration - Math.min(0.35, duration * 0.08), expectedMasterSeconds);
+      if (!(duration > 0) || !(end > start)) throw new Error(`GENERATION_SUBTITLE_INTERVAL_INVALID: ${shot.shotId}`);
       lines.push(
         String(index + 1),
         `${srtTime(start)} --> ${srtTime(end)}`,
@@ -2451,10 +2547,12 @@ function buildSrt(): string {
   return lines.join("\n");
 }
 function srtTime(seconds: number): string {
-  const hh = String(Math.floor(seconds / 3600)).padStart(2, "0");
-  const mm = String(Math.floor((seconds % 3600) / 60)).padStart(2, "0");
-  const ss = String(Math.floor(seconds % 60)).padStart(2, "0");
-  const ms = String(Math.round((seconds % 1) * 1000)).padStart(3, "0");
+  if (!Number.isFinite(seconds) || seconds < 0) throw new Error("GENERATION_SUBTITLE_CLOCK_INVALID");
+  const total = Math.round(seconds * 1000);
+  const hh = String(Math.floor(total / 3_600_000)).padStart(2, "0");
+  const mm = String(Math.floor(total / 60_000) % 60).padStart(2, "0");
+  const ss = String(Math.floor(total / 1000) % 60).padStart(2, "0");
+  const ms = String(total % 1000).padStart(3, "0");
   return `${hh}:${mm}:${ss},${ms}`;
 }
 
@@ -2839,6 +2937,34 @@ if (scenePolicy) {
 const CURRENT_SHOTS_FILE = join(WORK_DIR, `shotlist-current-${PROJECT}.json`);
 writeFileSync(CURRENT_SHOTS_FILE, `${JSON.stringify({ projectId: PROJECT, shots }, null, 2)}\n`, "utf8");
 
+/** Author concrete editorial/cinematic decisions before any new paid generation. */
+const cinematicRequiredIds = shots.filter((shot) => !completedByShot.has(String(shot.shotId))).map((shot) => String(shot.shotId));
+const cinematicContractAudit = auditCinematicContracts(shots as unknown as Array<Record<string, unknown>>, {
+  required: cinematicStyleRequested(sourceDocument), requiredShotIds: cinematicRequiredIds,
+});
+const cinematicContractFile = join(WORK_DIR, `cinematic-contract-${PROJECT}.json`);
+writeFileSync(cinematicContractFile, `${JSON.stringify(cinematicContractAudit, null, 2)}\n`, "utf8");
+record({ stage: "cinematic-contract", shotId: null, invoked: true, ok: cinematicContractAudit.pass,
+  cached: false, degraded: false, attempt: 1, ms: 0, artifact: cinematicContractFile,
+  evidence: { required: cinematicContractAudit.required, requiredShotIds: cinematicRequiredIds,
+    issues: cinematicContractAudit.issues, pictureQuality: "unverified", soundQuality: "unverified" }, verdict: null });
+if (!cinematicContractAudit.pass) throw new Error(`CINEMATIC_CONTRACT_FAILED: ${cinematicContractAudit.issues.filter((issue) => issue.severity === "error").map((issue) => `${issue.shotId}/${issue.code}: ${issue.detail}`).join("; ")}`);
+if (sourceDocument.rhythmPlan !== undefined) {
+  const rhythm = auditRhythmPlan(sourceDocument.rhythmPlan as RhythmPlanInput);
+  if (!rhythm.pass || !rhythm.plan) throw new Error(`RHYTHM_PREFLIGHT_FAILED: ${rhythm.issues.map((issue) => issue.detail).join("; ")}`);
+  if (rhythm.plan.segments.length !== shots.length || rhythm.plan.segments.some((segment, index) => segment.sourceId !== shots[index]!.shotId))
+    throw new Error("RHYTHM_STORYBOARD_COVERAGE_REQUIRED: plan must cover all selected shots in their declared order");
+  if (XFADE !== 0 || EFFECTIVE_CUT_TRANSITION) throw new Error("RHYTHM_EXPLICIT_TRANSITION_UNSUPPORTED: explicit source-range rhythm uses hard cuts; remove fade/transition overrides");
+  if (rhythmSfxPlacements(sourceDocument.rhythmPlan as RhythmPlanInput).length) STAGES.add("sfx");
+  const rhythmPlanFile = join(WORK_DIR, `rhythm-plan-${PROJECT}.json`);
+  writeFileSync(rhythmPlanFile, `${JSON.stringify(rhythm, null, 2)}\n`, "utf8");
+  record({ stage: "rhythm-plan", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
+    attempt: 1, ms: 0, artifact: rhythmPlanFile, evidence: { profile: rhythm.plan.profile, planSha256: rhythm.plan.inputSha256,
+      timeline: "declared", beatAlignment: rhythm.evidence.beatAlignment, artisticQuality: "unverified" }, verdict: null });
+} else if (/^(?:fast-cut|fastcut|快剪|快切)$/i.test(String(sourceDocument.editingProfile ?? ""))) {
+  throw new Error("RHYTHM_FASTCUT_PLAN_REQUIRED: declare mixed fast/hold/breath source ranges, cut reasons and speech/action protection");
+}
+
 /* ---------- ② 脚本 + 提示词交付闸（监制：prompt） ---------- */
 if (STAGES.has("spec") && pendingShots().length > 0) {
   const started = Date.now();
@@ -2904,7 +3030,7 @@ if (STAGES.has("spec") && pendingShots().length > 0) {
      * 与合同「每镜 4.5 秒」冲突，生成端可能照 5s 拉长口播。这里按真实小数时长重排。
      */
     const dialogueFixed = normalizeDialogueWindow(timelineFixed.prompt, duration);
-    const finalPrompt = dialogueFixed.prompt;
+    const finalPrompt = appendCinematicContract(dialogueFixed.prompt, buildCinematicContract(shot as unknown as Record<string, unknown>));
     specReports.push({
       shotId: shot.shotId, charCount: finalPrompt.length, promptSource: report.promptSource,
       deliveryPass: report.delivery.pass, issues: report.delivery.issues,
@@ -3857,6 +3983,7 @@ if (STAGES.has("material-gen")) {
       let prompt = buildMaterialScenePrompt(card, {
         aspect: ASPECT, resolution: SOURCE_RESOLUTION, durationSec: duration, title: shotlist.title
       });
+      prompt = appendCinematicContract(prompt, buildCinematicContract(card as unknown as Record<string, unknown>));
       /** 素材镜同样挂"写实 + 台词/语言"条款（T-2026-1011-0001）；主体常识由审核 agent 判。 */
       {
         const extraLines: string[] = [REALISM_CLAUSE, REALISM_NEGATIVE_TERMS];
@@ -4406,6 +4533,71 @@ if (STAGES.has("voice") && DRY_RUN) {
 let master = join(POST_DIR, "master-raw.mp4");
 if (STAGES.has("compose") && DRY_RUN) log("dry-run：跳过合成，不签发原片或成片认证");
 if (STAGES.has("compose") && !DRY_RUN) {
+  pinGenerationSources(shots.map(clipFor), shots.map(shot => shot.shotId));
+  if (sourceDocument.rhythmPlan && (sourceDocument.rhythmPlan as RhythmPlanInput).profile === "fast-cut") {
+    if (!originalPostContract) throw new Error("STANDARD_NATIVE_MANIFEST_REQUIRED: fast-cut editing requires the pinned successful originals");
+    const originalOrder = originalPostContract.timeline.map((entry) => entry.shotId);
+    if (shots.length !== originalOrder.length || shots.some((shot, index) => shot.shotId !== originalOrder[index])
+      || ORDER_POLICY !== "storyboard" || COMPOSE_ORDER || REUSE_PLAN || XFADE !== 0 || EFFECTIVE_CUT_TRANSITION)
+      throw new Error("RHYTHM_ORIGINAL_SEQUENCE_CONFLICT: explicit source slices preserve the frozen storyboard order");
+    const started = Date.now();
+    const nativeFacts = shots.map(nativeAudioFactsForShot);
+    rememberInputs("rhythm-edit", nativeFacts.map(facts => facts.path));
+    const rhythmEdit = await executeRhythmEdit({ plan: sourceDocument.rhythmPlan as RhythmPlanInput,
+      sources: shots.map((shot, index) => {
+        const card = shot as unknown as Record<string, unknown>;
+        return { sourceId: shot.shotId, file: nativeFacts[index]!.path, lockTrim: card.lockTrim === true,
+          hasSpeech: dialogueLines(card as never).length > 0,
+          protectedRanges: Array.isArray(card.protectedRanges) ? card.protectedRanges as never : undefined };
+      }), outputDir: join(POST_DIR, "rhythm-edit"), ffmpeg: FFMPEG, ffprobe: FFPROBE, fps: FPS });
+    const editReceipt = JSON.parse(readFileSync(rhythmEdit.reportFile, "utf8")) as { outputs: Array<{ file: string; sha256: string; media: { videoFrames: number; fps: number; hasAudio: boolean } }> };
+    record({ stage: "rhythm-edit", shotId: null, invoked: true, ok: true, cached: false, degraded: false, attempt: 1, ms: 0, artifact: rhythmEdit.reportFile, evidence: { outputFiles: rhythmEdit.clips, speed: 1 }, verdict: null });
+    rememberInputs("compose", [...nativeFacts.map((facts) => facts.path), ...rhythmEdit.clips, rhythmEdit.reportFile]);
+    const result = runCli(join(REPO_ROOT, "scripts/tools/compose-film.mts"), [
+      "--clips", rhythmEdit.clips.join(","), "--out", master, "--width", String(OUTPUT_SIZE.width), "--height", String(OUTPUT_SIZE.height),
+      "--fps", String(FPS), "--fade", "0", "--color", "none", "--native-clock",
+    ]);
+    if (!result.ok || !existsSync(master)) throw new Error(`RHYTHM_COMPOSE_PROCESS_FAILED: ${result.out.slice(-400)}`);
+    const processReceiptFile = master.replace(/\.mp4$/i, ".av-sync.json");
+    if (!existsSync(processReceiptFile)) throw new Error("RHYTHM_COMPOSE_RECEIPT_MISSING");
+    const processReceipt = JSON.parse(readFileSync(processReceiptFile, "utf8")) as Record<string, any>;
+    const media = rhythmMediaFacts(master, FFPROBE);
+    const bindingsOk = Array.isArray(processReceipt.sources) && processReceipt.sources.length === editReceipt.outputs.length
+      && processReceipt.sources.every((source: Record<string, any>, index: number) => source.path === editReceipt.outputs[index]!.file
+        && source.sha256 === editReceipt.outputs[index]!.sha256 && source.source?.videoFrames === editReceipt.outputs[index]!.media.videoFrames
+        && source.source?.fps === editReceipt.outputs[index]!.media.fps && source.normalized?.videoFrames === editReceipt.outputs[index]!.media.videoFrames
+        && source.normalized?.fps === FPS && source.normalized?.width === OUTPUT_SIZE.width && source.normalized?.height === OUTPUT_SIZE.height)
+      && Array.isArray(processReceipt.target?.shotFrames) && processReceipt.target.shotFrames.length === editReceipt.outputs.length
+      && processReceipt.target.shotFrames.every((frames: number, index: number) => frames === editReceipt.outputs[index]!.media.videoFrames);
+    const expectedFrames = editReceipt.outputs.reduce((sum, output) => sum + output.media.videoFrames, 0);
+    if (!bindingsOk || processReceipt.schemaVersion !== "workloom.composition-process/v1" || processReceipt.nativeClock !== true
+      || processReceipt.sourceFilesUnchanged !== true || processReceipt.outputSha256 !== await rhythmFileSha256(master) || processReceipt.retimeFactor !== 1
+      || media.videoFrames !== expectedFrames || processReceipt.outputMedia?.videoFrames !== expectedFrames
+      || processReceipt.outputMedia?.fps !== FPS || processReceipt.outputMedia?.width !== OUTPUT_SIZE.width || processReceipt.outputMedia?.height !== OUTPUT_SIZE.height
+      || editReceipt.outputs.some((output) => output.media.hasAudio) && (media.hasAudio !== true || processReceipt.outputMedia?.hasAudio !== true)
+      || Math.abs(media.videoSeconds - rhythmEdit.durationSeconds) > 1 / FPS + 0.005
+      || Math.abs(media.fps - FPS) > 0.001 || media.width !== OUTPUT_SIZE.width || media.height !== OUTPUT_SIZE.height)
+      throw new Error("RHYTHM_COMPOSE_BINDING_OR_CLOCK_FAILED");
+    for (const output of editReceipt.outputs) if (await rhythmFileSha256(output.file) !== output.sha256) throw new Error("RHYTHM_EDIT_SOURCE_CHANGED_DURING_COMPOSE");
+    for (const [index, shot] of shots.entries()) {
+      const after = nativeAudioFactsForShot(shot), before = nativeFacts[index]!;
+      if (after.path !== before.path || after.sha256 !== before.sha256 || after.bytes !== before.bytes) throw new Error(`RHYTHM_ORIGINAL_CHANGED: ${shot.shotId}`);
+    }
+    expectedMasterSeconds = media.videoSeconds;
+    CUT_GRID.splice(0, CUT_GRID.length, ...rhythmEdit.cutTimesSeconds);
+    shots.forEach((shot, index) => { shot.duration = rhythmEdit.actualDurationsSeconds[index]!; });
+    record({ stage: "rhythm-edit", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
+      attempt: 1, ms: Date.now() - started, artifact: rhythmEdit.reportFile,
+      evidence: { mode: "explicit-fast-cut", cutTimesSeconds: rhythmEdit.cutTimesSeconds, originalSpeed: 1,
+        originalManifestSha256: originalPostContract.manifestSha256, outputFiles: rhythmEdit.clips, artisticQuality: "unverified" }, verdict: null });
+    record({ stage: "compose", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
+      attempt: 1, ms: Date.now() - started, artifact: master,
+      evidence: { ...probe(master), mode: "explicit-fast-cut", originalManifestSha256: originalPostContract.manifestSha256,
+        rhythmReceipt: rhythmEdit.reportFile, processReceipt, originalSpeed: 1, qualityReviewPerformed: false,
+        outputFiles: [processReceiptFile, rhythmEdit.reportFile], cutTimesSeconds: rhythmEdit.cutTimesSeconds,
+        actualBodyDurationSec: expectedMasterSeconds }, verdict: null });
+  } else {
+
   if (!originalPostContract) throw new Error("STANDARD_NATIVE_MANIFEST_REQUIRED: composition requires the issued original contract");
   const expectedOrder = originalPostContract.timeline.map(entry => entry.shotId), actualOrder = shots.map(shot => shot.shotId);
   if (actualOrder.length !== expectedOrder.length || actualOrder.some((id, index) => id !== expectedOrder[index])
@@ -4417,6 +4609,14 @@ if (STAGES.has("compose") && !DRY_RUN) {
     video: { path: clips[index]!, sha256: nativeFacts[index]!.sha256, bytes: nativeFacts[index]!.bytes, inSec: 0 },
     audio: { path: clips[index]!, sha256: nativeFacts[index]!.sha256, bytes: nativeFacts[index]!.bytes, inSec: 0 },
     durationSec: Number(shot.duration), speed: 1 }));
+  if (sourceDocument.rhythmPlan !== undefined) {
+    const rhythm = auditRhythmPlan(sourceDocument.rhythmPlan as RhythmPlanInput, {
+      sourceDurationsSeconds: Object.fromEntries(shots.map((shot) => [shot.shotId, Number(shot.duration)])),
+      actualDurationsSeconds: shots.map((shot) => Number(shot.duration)), frameToleranceSeconds: 1 / FPS + 0.005,
+    });
+    if (!rhythm.pass || !rhythm.plan || rhythm.plan.segments.some((segment) => segment.inSeconds !== 0))
+      throw new Error("STANDARD_NATIVE_RHYTHM_CONFLICT: trimming requires an explicit fast-cut production plan");
+  }
   assertStandardPostTimeline(originalPostContract.contract, actualTimeline);
   rememberInputs("compose", clips);
   const started = Date.now(), { durationSec } = originalPostContract;
@@ -4484,6 +4684,7 @@ if (STAGES.has("compose") && !DRY_RUN) {
       toolOk: result.ok, mediaOk, toolOutput: result.out.slice(-400) }, verdict });
   if (!result.ok || !mediaOk || !verdict?.approved || verdict.degraded)
     throw new Error(`STANDARD_NATIVE_COMPOSE_FAILED: ${result.ok ? mediaOk ? "composition review unverified" : "requested output clock or geometry mismatch" : result.out.slice(-400)}`);
+  }
 }
 
 /* ---------- ⑤ 调色：执行所选配方，不进行素材或候选品质审核 ---------- */
@@ -4646,24 +4847,17 @@ if (DANMAKU_ENABLED && STAGES.has("danmaku") && existsSync(subtitled)) {
   if (!DANMAKU_FILE) {
     /** 无现成弹幕稿：按镜头内容即时报文生成（评论语气，与画面语境一致） */
     const items: Array<Record<string, unknown>> = [];
-    let cursor = 0.5;
     const pool = (shot: ShotCard): string[] => {
-      const mood = String(shot.mood ?? "");
-      return mood.includes("食")
-        ? ["桂花糖粥绝了", "想吃海棠糕", "这条街有味道"]
-        : mood.includes("俏皮") || mood.includes("生活气")
-          ? ["评弹一响就上头", "巷子好好逛", "本地人路过"]
-          : mood.includes("夜")
-            ? ["夜景太温柔了", "灯笼好看", "已收藏"]
-            : ["这也太好看了吧", "苏州真会养人", "想去走走"];
+      const caption = dialogueText(shot).replace(/[，。！？；、,.!?;:：]/g, " ").trim();
+      return [caption ? [...caption].slice(0, 16).join("") : "看看这一镜的细节", "这一刻值得多看一眼", "继续往下看"];
     };
-    for (const shot of shots) {
+    for (const [shotIndex, shot] of shots.entries()) {
       const duration = Number(shot.duration ?? 5);
-      const texts = pool(shot);
-      texts.forEach((text, i) => {
-        items.push({ text, at: Number((cursor + 0.8 + i * 1.4).toFixed(2)), mode: i === 1 ? "top" : "scroll" });
-      });
-      cursor += duration;
+      const start = shotIndex === 0 ? 0 : CUT_GRID[shotIndex - 1]!;
+      const end = Math.min(expectedMasterSeconds, start + duration);
+      if (!(end > start)) throw new Error(`GENERATION_DANMAKU_INTERVAL_INVALID: ${shot.shotId}`);
+      const texts = pool(shot).slice(0, duration <= 1.2 ? 1 : 3);
+      texts.forEach((text, i) => items.push({ text, at: start + (end - start) * (i + 1) / (texts.length + 1), mode: i === 1 ? "top" : "scroll" }));
     }
     writeFileSync(itemsFile, `${JSON.stringify(items, null, 2)}\n`, "utf8");
   }
@@ -4883,7 +5077,8 @@ const bgmScored = scored;
  *     `--sfx-cut-whoosh`（连硬切也铺 whoosh），或声明了逐刀运动掩体转场（whoosh 与转场天然配对）；
  *   · `--no-sfx` 永远优先关闭（即使声明了其它开关）。
  */
-const SFX_EXPLICIT = flag("--sfx-layer") || flag("--sfx-cut-whoosh") || Boolean(EFFECTIVE_CUT_TRANSITION);
+const SFX_EXPLICIT = flag("--sfx-layer") || flag("--sfx-cut-whoosh") || Boolean(EFFECTIVE_CUT_TRANSITION)
+  || sourceDocument.rhythmPlan !== undefined && rhythmSfxPlacements(sourceDocument.rhythmPlan as RhythmPlanInput).length > 0;
 if (STAGES.has("sfx") && flag("--no-sfx")) {
   record({ stage: "sfx", shotId: null, invoked: true, ok: true, cached: false, degraded: false, attempt: 1, ms: 0,
     artifact: null, evidence: { applicable: false, skipReason: "调用方显式 --no-sfx：不铺转场音效层" },
@@ -4897,15 +5092,26 @@ if (STAGES.has("sfx") && !flag("--no-sfx") && !SFX_EXPLICIT && !DRY_RUN) {
       hookSfxProduced: false },
     verdict: null, note: "SFX 层按默认口径不适用：保留原声 + 配乐，不铺 whoosh/impact/riser" });
 }
-if (STAGES.has("sfx") && !flag("--no-sfx") && SFX_EXPLICIT && existsSync(scored) && !DRY_RUN) {
+if (STAGES.has("sfx") && !flag("--no-sfx") && sourceDocument.rhythmPlan !== undefined
+  && rhythmSfxPlacements(sourceDocument.rhythmPlan as RhythmPlanInput).length > 0 && existsSync(scored) && !DRY_RUN) {
+  const soundInput = scored, started = Date.now();
+  rememberInputs("sfx", [soundInput]);
+  const sound = await executeRhythmSound({ plan: sourceDocument.rhythmPlan as RhythmPlanInput,
+    file: soundInput, outputDir: join(POST_DIR, "rhythm-sound"), ffmpeg: FFMPEG, ffprobe: FFPROBE });
+  scored = sound.file;
+  record({ stage: "sfx", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
+    attempt: 1, ms: Date.now() - started, artifact: scored,
+    evidence: { mode: "declared-rhythm-cues", placements: sound.placements, cutTimes: CUT_GRID,
+      outputFiles: [sound.reportFile], programmeSpeed: 1, videoPacketsUnchanged: true,
+      qualityReviewPerformed: false, artisticQuality: "unverified" }, verdict: null });
+} else if (STAGES.has("sfx") && !flag("--no-sfx") && SFX_EXPLICIT && existsSync(scored) && !DRY_RUN) {
   rememberInputs("sfx", [scored]);
   const started = Date.now();
   const sfxDir = join(POST_DIR, "sfx");
   mkdirSync(sfxDir, { recursive: true });
   const totalDuration = Number(probe(scored).duration ?? 0);
-  const shotDurations = shots.map((s) => Number(s.duration ?? 5));
-  const cutTimes = cutTimesFromShots(shotDurations, EFFECTIVE_CUT_TRANSITION ? CUT_TRANSITION_DURATION : 0,
-    EFFECTIVE_CUT_TRANSITION ? EFFECTIVE_CUT_TRANSITION_AT.split(",").map((v) => Number(v.trim())).filter((v) => Number.isFinite(v) && v > 0) : []);
+  // Compose has already measured these output cuts; never re-probe unsliced providers.
+  const cutTimes = CUT_GRID.filter((time) => Number.isFinite(time) && time > 0 && time < totalDuration);
   /** 段落重音 = 进入快剪段的第一刀 + 最后一刀（模板可覆盖） */
   const accentTimes = cutTimes.length > 1 ? [cutTimes[0]!, cutTimes[cutTimes.length - 1]!] : cutTimes.slice(0, 1);
   /**
@@ -5029,6 +5235,7 @@ if (STAGES.has("sfx") && !flag("--no-sfx") && SFX_EXPLICIT && existsSync(scored)
       ms: Date.now() - started, artifact: null,
       evidence: { error: err instanceof Error ? err.message.slice(0, 300) : String(err) }, verdict: null
     });
+    throw err;
   }
 }
 
@@ -5310,7 +5517,6 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * ① 设计稿：默认直接采用合法的确定性稿；显式诊断才调用设计师。
    * 模型不可用的兜底与正常确定性设计分别记账，避免把默认成功误标为降级。
    */
-  let plan: CoverPlan;
   /**
    * 设计稿来源（2026-10-09 产品所有者口径）：
    * **封面文案由封面设计师数字员工出稿，标题不许硬编码**；模型不可用或稿件非法才退确定性稿，
@@ -5354,6 +5560,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
    * 封面文案红线（2026-10-09 产品所有者口径）：模型不得把**模特/真人的姓名**写进封面；
    * 需要名字只能由调用方在 `brief.coverSubline` 显式给出。
    */
+  let plan: CoverPlan = deterministicCoverPlan();
   const forbiddenCoverNames = [lead?.name, lead?.id].map((value) => String(value ?? "").trim()).filter((value) => value.length >= 2);
   const assertCoverCopyHasNoPersonName = (candidate: CoverPlan): void => {
     const copy = [candidate.headline, candidate.subline, candidate.badge].filter(Boolean).join(" ");
@@ -5733,7 +5940,7 @@ if (STAGES.has("cover") && existsSync(colored)) {
 /** 正式发布来源先装配封面；母版、软字幕与所有后续交付使用同一来源。 */
 const cleanScored = scored;
 let publicationCoverReceipt: CoverFirstFrameReceipt | null = null;
-const publicationNeedsCover = !flag("--no-open-with-cover");
+const publicationNeedsCover = !flag("--no-open-with-cover") && (!(sourceDocument.rhythmPlan as RhythmPlanInput | undefined)?.profile?.includes("fast-cut") || flag("--open-with-cover"));
 function assertFactualReleaseSources(): void {
   const compose = latestLineageRecord(lineageRecords(readStageHistory(), "compose"), PROJECT, "compose", null);
   const rawMaster = join(POST_DIR, "master-raw.mp4");
@@ -5866,6 +6073,7 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
     throw new Error("MASTER_SUBTITLE_MISSING: requested actual subtitle output was not produced");
   const naming = auditDeliverableNaming({ path: DELIVERABLE, durationSec: actualDuration });
   const finalPath = naming.suggestedName ? join(OUT_DIR, naming.suggestedName) : DELIVERABLE;
+  masterGenerationQuality = await inspectCurrentGeneration("master-candidate", "master", scored);
   const pending = join(OUT_DIR, `.${basename(finalPath)}.${randomUUID()}.pending`);
   try {
     copyFileSync(scored, pending, fsConstants.COPYFILE_EXCL);
@@ -5881,7 +6089,31 @@ if (STAGES.has("master") && existsSync(scored) && !DRY_RUN) {
       qualityReviewPerformed: false, identityVerified: false, clothingVerified: false,
       speechVerified: false, lipSyncVerified: false }, verdict: null,
     note: "正式母版已按请求规格真实导出并原子发布；成功渲染镜头默认采用，无品质终审" });
-  log(`✅ 正式成片：${finalPath}（原字节与实际导出合同已记录；未执行品质审核）`);
+  log(`✅ 候选成片：${finalPath}（原字节与实际导出合同已记录；未执行品质审核）`);
+}
+
+if (STAGES.has("master") && !STAGES.has("deliver") && !DRY_RUN) {
+  if (!masterGenerationQuality || !existsSync(deliverablePath)) throw new Error("GENERATION_MASTER_CANDIDATE_UNVERIFIED");
+  const sidecars: string[] = [];
+  if (subtitleSidecar) {
+    const dir = join(OUT_DIR, "subtitles"); mkdirSync(dir, { recursive: true });
+    for (const name of readdirSync(subtitleSidecar.dir)) if (/\.(srt|ass|vtt|json)$/i.test(name)) {
+      const file = join(dir, name); if (resolve(file) !== resolve(join(subtitleSidecar.dir, name))) copyFileSync(join(subtitleSidecar.dir, name), file); sidecars.push(file);
+    }
+  }
+  const accepted = await inspectCurrentGeneration("master-release", "master", deliverablePath, [], sidecars);
+  const media = generationArtifacts("master", deliverablePath, [], sidecars).map(row => resolve(OUT_DIR, row.path));
+  const content = [...new Set([...media.filter(file => file.startsWith(OUT_DIR + sep)), ...sidecars, ...accepted.files])];
+  const manifestFile = join(OUT_DIR, `${PROJECT}-delivery-manifest.json`);
+  const manifest = { schemaVersion: "workloom.generation-delivery/v1", projectId: PROJECT, scope: "master", variants: [],
+    deliverable: { path: publicDeliveryPath(deliverablePath), sha256: await sha256UhdAsset(deliverablePath) },
+    assets: await Promise.all(content.map(async file => ({ path: publicDeliveryPath(file), sha256: await sha256UhdAsset(file) }))),
+    generationQuality: accepted.manifest, qualityReport: { path: relative(OUT_DIR, accepted.qualityFile.path), sha256: accepted.qualityFile.sha256 } };
+  writeFileSync(manifestFile, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
+  const published = await publishUhdDelivery({ stagingDir: OUT_DIR, publicRoot: PUBLIC_OUT_DIR, releaseId: RUN_ID,
+    assets: [...content, manifestFile].map(file => relative(OUT_DIR, file)), manifestName: basename(manifestFile), approved: accepted.report.passed,
+    masterOnly: true, qualityRequired: true, bins: { ffmpeg: FFMPEG, ffprobe: FFPROBE } });
+  log(`✅ 当前原生母版及技术验收已原子发布：${published.releaseDir}（${published.files} 个文件）`);
 }
 
 /* ---------- ⑫ 多风格交付包（step_key: deliver：请求配方、真实文件和来源合同） ---------- */
@@ -5933,6 +6165,7 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     bgm?: { track: string; sha256: string; declaredBpm?: number | null; measuredBpm?: null; gridErrorMs?: null;
       recipe?: string | null; musicLevelDb?: string; musicLevelSource?: string } | null;
     nativeAudioClock?: Awaited<ReturnType<typeof assertStandardPostExportClock>>;
+    coverDesign?: ReturnType<typeof styleCoverPlans.get> | null;
   }> = [];
   /**
    * 变体封面（三轴之一，2026-09-26 产品口径）：主封面 + 该变体的强调色条与风格角标。
@@ -5946,7 +6179,9 @@ if (STAGES.has("deliver") && !DRY_RUN && (QUALITY !== "uhd" || masterApprovedFor
     const dimensions = probe(source);
     const design = buildVariantCoverFilters({ variantId: variantId as CoverVariantId, accent,
       platform: COVER_PLATFORM_ARG || PLATFORM, width: Number(dimensions.width), height: Number(dimensions.height) });
+    const qualityToken = generationQuality.begin("cover", `variant-cover-${variantId}`, [source], { mode: "variant-cover", request: { variantId, accent, filter: design.filter } });
     run(FFMPEG, ["-v", "error", "-y", "-i", source, "-vf", design.filter, "-frames:v", "1", target]);
+    generationQuality.finish(qualityToken, { outputs: [target], execution: { tool: FFMPEG, exitCode: 0 } });
     return { path: target, sha256: sha256FileSync(target) };
   };
 
@@ -6160,7 +6395,8 @@ ${shotLines}
   for (const plan of variantPlans) {
     try {
       if (plan.passthrough) {
-        execFileSync("cp", [variantSource, plan.output]);
+        const technical = runCli(COLOR_CLI, ["grade", "--in", variantSource, "--out", plan.output, "--no-auto", "--no-verify", "--no-defects"]);
+        if (!technical.ok) throw new Error(`VARIANT_TECHNICAL_COLOR_FAILED: ${technical.out}`);
       } else {
         /** 调色变体走同一个调色工位（与母版一致的口径，避免"变体用了另一套引擎"） */
         const graded = runCli(COLOR_CLI, [...plan.gradeArgs, "--out", plan.output, "--no-verify", "--no-defects"]);
@@ -6171,14 +6407,14 @@ ${shotLines}
        * 变体配乐（三轴之一）：按该变体声明曲风线索从**曲库**选择实际源；
        * 缺请求曲源或实际混音失败明确报错，不自动替换或降级。
        */
-      let variantBgm: { track: string; sha256: string; declaredBpm?: number | null; measuredBpm?: null; gridErrorMs?: null } | null = null;
+      let variantBgm: NonNullable<(typeof variantManifest)[number]["bgm"]> | null = null;
       if (bgmLayerOff) {
         log(`  变体 ${plan.variant.id} 配乐：按声明关闭（无签章分轨引用 → bgm_layer=false），跳过混音`);
       } else try {
         const variantDuration = Number(probe(plan.output).duration ?? 0);
         /** 变体同样走配乐师流程（按该风格的曲风线索打简报分），选中曲目不得与已用曲目同字节。 */
         const agentVariantBed = await pickAgentMusicBed({
-          genre: plan.variant.bgmGenre ?? genre, mood: plan.variant.bgmMood ?? mood,
+          genre: plan.variant.bgmGenre ?? arg("--bgm-genre", "旅行"), mood: plan.variant.bgmMood ?? arg("--bgm-mood", "温润治愈"),
           platform: COVER_PLATFORM_ARG || PLATFORM, recipeId: arg("--bgm-recipe", "").trim() || undefined,
           durationSec: variantDuration, promptText: bgmPromptText
         });
@@ -6191,7 +6427,7 @@ ${shotLines}
           const mixed = plan.output.replace(/\.mp4$/i, "-bgm.mp4");
           /** 变体同样走配乐师配方（该风格的曲风线索）× 同一 music-led 口径，保证"风格不同、声音也不同"。 */
           const variantMix = await resolveBgmMixSettings({
-            genre: plan.variant.bgmGenre ?? genre, mood: plan.variant.bgmMood ?? mood,
+            genre: plan.variant.bgmGenre ?? arg("--bgm-genre", "旅行"), mood: plan.variant.bgmMood ?? arg("--bgm-mood", "温润治愈"),
             platform: COVER_PLATFORM_ARG || PLATFORM, recipeId: arg("--bgm-recipe", "").trim() || undefined,
             presence: arg("--bgm-presence", "standard"),
             explicitLevel: arg("--bgm-level", ""), explicitDucking: arg("--bgm-ducking", ""),
@@ -6237,7 +6473,9 @@ ${shotLines}
         if (!variantCover) throw new Error(`VARIANT_COVER_MISSING: ${plan.variant.id}`);
         const clean = plan.output.replace(/\.mp4$/i, "-clean.mp4");
         renameSync(plan.output, clean);
+        const qualityToken = generationQuality.begin("cover", `variant-intro-${plan.variant.id}`, [clean, variantCover.path], { mode: "cover-first-frame", request: { variantId: plan.variant.id, preserveSourceFrames: true } });
         variantCoverReceipt = await embedCoverFirstFrame({ input: clean, cover: variantCover.path, output: plan.output, ffmpeg: FFMPEG, ffprobe: FFPROBE, preserveSourceFrames: true });
+        generationQuality.finish(qualityToken, { outputs: [plan.output], execution: { tool: "cover-assembly", exitCode: 0, processorReport: variantCoverReceipt } });
       }
       const info = probe(plan.output);
       const nativeAudioClock = await assertStandardPostExportClock(plan.output, variantBodySeconds + (variantCoverReceipt ? 1 / FPS : 0), { ffmpeg: FFMPEG, ffprobe: FFPROBE, expectedFps: FPS, expectedVideoFrames: variantBodyFrames + (variantCoverReceipt ? 1 : 0) });
@@ -6307,7 +6545,7 @@ ${shotLines}
   });
   /** UHD sidecars join the same pending package; no public delivery file exists before G-DLV1. */
   const stagedSubtitles: string[] = [];
-  if (QUALITY === "uhd" && subtitleSidecar) {
+  if (subtitleSidecar) {
     const dir = join(OUT_DIR, "subtitles");
     mkdirSync(dir, { recursive: true });
     for (const name of readdirSync(subtitleSidecar.dir)) {
@@ -6341,6 +6579,10 @@ ${shotLines}
   const assetHashes = QUALITY === "uhd"
     ? await Promise.all(stagedContentAssets.map(async (path) => ({ path: publicDeliveryPath(path), sha256: await sha256UhdAsset(path) })))
     : stagedContentAssets.map((path) => ({ path: publicDeliveryPath(path), sha256: sha256FileSync(path) }));
+  const deliveryGenerationQuality = await inspectCurrentGeneration("delivery", "delivery", deliverablePath, variantManifest, stagedSubtitles);
+  for (const file of deliveryGenerationQuality.files) {
+    if (!stagedContentAssets.includes(file)) { stagedContentAssets.push(file); assetHashes.push({ path: publicDeliveryPath(file), sha256: await sha256UhdAsset(file) }); }
+  }
   const manifestFile = join(OUT_DIR, `${PROJECT}-delivery-manifest.json`);
   writeFileSync(manifestFile, `${JSON.stringify({ ...buildDeliveryManifest({
     projectId: PROJECT,
@@ -6357,7 +6599,7 @@ ${shotLines}
       namingAudit: auditDeliverableNaming({ path: deliverablePath, durationSec: Number(probe(deliverablePath).duration ?? 0) }),
     },
     subtitles: { sidecarDir: subtitleSidecar
-        ? (QUALITY === "uhd" ? publicDeliveryPath(join(OUT_DIR, "subtitles")) : subtitleSidecar.dir)
+        ? publicDeliveryPath(join(OUT_DIR, "subtitles"))
         : null,
       softsub: softsubFile ? publicDeliveryPath(softsubFile) : null, burned: SUBTITLE_MODE !== "sidecar" },
     cover: { path: existsSync(join(OUT_DIR, `${PROJECT}-cover.png`)) ? publicDeliveryPath(join(OUT_DIR, `${PROJECT}-cover.png`)) : null, hook: arg("--cover-hook", shotlist.title ?? "") },
@@ -6366,7 +6608,9 @@ ${shotLines}
     variantAxes,
     samples,
     at: stamp()
-  }), assets: assetHashes, completion: originalPostContract.contract.completion, quality: {
+  }), assets: assetHashes, generationQuality: deliveryGenerationQuality.manifest,
+  qualityReport: { path: relative(OUT_DIR, deliveryGenerationQuality.qualityFile.path), sha256: deliveryGenerationQuality.qualityFile.sha256 },
+  completion: originalPostContract.contract.completion, quality: {
     tier: QUALITY, sourceResolution: SOURCE_RESOLUTION, outputResolution: OUTPUT_RESOLUTION,
     width: OUTPUT_SIZE.width, height: OUTPUT_SIZE.height,
     localEnhancement: "not-requested",
@@ -6403,7 +6647,7 @@ ${shotLines}
   /** 渲染/返工台账（次数与原因；不做费用估算） */
   renderLedger,
   renderLedgerFile: publicDeliveryPath(renderLedgerFile) }, null, 2)}\n`, "utf8");
-  if (QUALITY === "uhd") {
+  {
     if (!gate.approved || gate.degraded) {
       record({ stage: "deliver", shotId: null, invoked: true, ok: false, cached: false, degraded: gate.degraded,
         attempt: 1, ms: Date.now() - started, artifact: manifestFile,
@@ -6418,6 +6662,7 @@ ${shotLines}
         stagingDir: OUT_DIR, publicRoot: PUBLIC_OUT_DIR, releaseId: RUN_ID,
         assets: stagedAssets.map((path) => relative(OUT_DIR, path)),
         manifestName: basename(manifestFile), approved: gate.approved && !gate.degraded,
+        qualityRequired: true, bins: { ffmpeg: FFMPEG, ffprobe: FFPROBE },
       });
       const publishedManifest = publicDeliveryPath(manifestFile);
       record({ stage: "deliver", shotId: null, invoked: true, ok: true, cached: false, degraded: false,
@@ -6433,16 +6678,6 @@ ${shotLines}
         evidence: { publishError: error instanceof Error ? error.message : String(error) }, verdict: null,
         note: "UHD 交付发布失败，正式目录保留上一版" });
       throw error;
-    }
-  } else {
-    record({
-      stage: "deliver", shotId: null, invoked: true, ok: gate.approved, cached: false, degraded: gate.degraded, attempt: 1,
-      ms: Date.now() - started, artifact: manifestFile,
-      evidence: { variants: variantManifest.map((v) => v.id), distinctness: distinctness.pairs, manifest: manifestFile }, verdict: null, note: "多风格交付包（G-DLV1：变体雷同否决）"
-    });
-    if (!gate.approved && !ACCEPT_REJECTED.includes("deliver")) {
-      log(`⛔ 交付包未放行（G-DLV1）：${gate.reason}`);
-      process.exit(6);
     }
   }
 }

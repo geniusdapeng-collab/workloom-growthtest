@@ -3,6 +3,8 @@
 把「一支片子交给用户」这件事做成可审计的确定性流程：**母版不烧字幕 → 同一批镜头派生多个风格变体 →
 交付清单 + 工程文件 → 用户反馈按层增量本地重合成（不重新生成镜头）**。
 
+**当前交付合同（2026-10-14）**：成功源素材核对任务、来源和当前字节后直接进入正式后期；交付出口必须重新检查实际母版及每个请求变体的完整解码、画布、时间轴、字幕/弹幕和真实加工链。技术失败只进入本地修复，不能以旧绿色报告、`passed` 或关闭复检参数放行。人物、服装、动作、观感与经营效果仍需独立艺术审片，报告保留 `artisticQualityReviewed=false`；技术验收不授权付费重生成。
+
 ## 为什么单独做一层
 
 镜头生成（Seedance 渲染）是链路里唯一"贵且慢"的环节，后期（剪、调、配、加字、出封面）几乎只吃本地算力。
@@ -17,24 +19,25 @@
 WorkLoom（大脑：岗位/技能/围栏/事件账本）         Mac 后期工位（手，独立内网）
   runtime ToolExecutor ──HTTP/Bearer──▶  post-bridge (127.0.0.1:9777)
                                             ├─ ffmpeg / ffprobe（归一化/拼接/封面/软轨）
-                                            ├─ enhance-bridge（UHD 档：M3 本机逐帧增强低分辨率镜头）
+                                            ├─ ffmpeg scale/pad（明确画布编码；模型增强须另行明确请求）
                                             ├─ subtitle-bridge 内核（旁挂字幕 + 软字幕轨 + 标题版式）
-                                            ├─ color-bridge 内核（调色，自带可见性校验）
-                                            ├─ bgm-bridge 内核（选曲 + 让位混音，自带 LUFS 复检）
+                                            ├─ color-bridge 内核（真实色彩转换、技术调色与实体区域证据）
+                                            ├─ bgm-bridge 内核（选曲、实际混音参数与成片响度实测）
                                             ├─ library/style-variants（风格配方：调色/BGM/转场/封面/文案）
                                             ├─ 产物区（新文件 + 版本链 + 缓存：enhanced/norm/assemble/graded/audio）
-                                            └─ 回执：sha256 / 变体差异实测 / 复用证据 / 成本口径
+                                            └─ 回执：源/产物 SHA / 加工链 / 当前技术报告 / 复用与成本
 ```
 
 **大文件不出工位**：服务器只传路径与参数，工位本地读写素材，只回元数据与小图。
 
-## 工具面（6 个）
+## 工具面（7 个：读 4 / 写 3）
 
 | 工具 | 类型 | 用途 |
 |---|---|---|
 | `postread.health` | 读 | 工位体检（ffmpeg / 变体包 / LUT / 曲库 / 字幕工位） |
 | `postread.plan` | 读 | 交付计划：镜头清单、变体差异轴、步骤与成本口径（不动文件） |
 | `postread.impact` | 读 | **变更影响分析**：patch → 重算哪些层 / 是否需重生成镜头 / 花钱闸 |
+| `postread.quality` | 读 | 回读当前交付目录：完整解码、原生或明确目标画布、请求环节及输入/输出 SHA 绑定的真实加工凭证 |
 | `postwrite.package` | 写 | 出交付包：干净母版 + 旁挂字幕 + 多风格变体 + 封面/文案 + 软字幕轨 + 清单 + 工程文件 |
 | `postwrite.reedit` | 写 | **本地层增量重合成**：读工程文件 + patch → 新版本目录；镜头不动、复用带哈希证据 |
 | `postwrite.triage` | 写 | 反馈分诊：自由文本 → 归因码 / 受影响层 / 是否重生成点名镜头 / 给用户的话 / patch 提示 |
@@ -54,6 +57,8 @@ WorkLoom（大脑：岗位/技能/围栏/事件账本）         Mac 后期工�
   film-project.json                          工程文件（层结构 + 产物血缘）——返修入口
   delivery-manifest.json                     交付清单（全产物 sha256 + 变体差异实测 + 成本口径）
   delivery-report.md                         人看版说明（变体对照表 + 返修路径 + 未达标项）
+  quality/post-quality-release.json          当前最终产物技术报告（源/产物 SHA、各环节状态、艺术未审）
+  quality/processing/*.json                      操作前输入 SHA、实际参数与操作后输出 SHA 的加工凭证
   versions/v2/…                              返修版本目录（只增不覆盖）
 ```
 
@@ -65,6 +70,7 @@ post-cli variants
 post-cli plan     --project project.json --shots a.mp4,b.mp4 [--quality hd|uhd] [--variants warm-story,clean-tech]
 post-cli deliver  --project project.json --shots signed-shots.json --out-dir out/ \
                   [--quality hd|uhd] [--srt subs.srt] [--srt-en subs.en.srt] [--burn-subtitles] [--no-soft-subtitles]
+post-cli quality  --delivery-dir out/
 post-cli impact   --project out/film-project.json --patch patch.json
 post-cli reedit   --project out/film-project.json --patch patch.json [--shot SC-03=/path/new.mp4] \
                   [--audio-stems-by-shot signed-replacement-sources.json]
@@ -73,11 +79,9 @@ post-cli triage   --feedback "配乐太吵，另外第 3 个镜头人物走形"
 
 退出码：`0` 成功；`2` 用法错误；`3` 工具错误（code 见 `PostError`）；`4` 需要人审（镜头重生成走 G8）。
 
-## 独立音轨来源合同（T-2026-0927-0037）
+## 默认原节目音与显式独立音轨合同
 
-新交付要求 `project.audioScope={tenantId,workspaceId,projectId,revision}` 和 `shots[].audioStems`。
-`revision` 是画面/原稿的生成版本，独立于后期工程 v1/v2。CLI 的 `--shots` 必须使用 JSON 清单；
-仅逗号分隔的视频路径可用于计划，不能取得生产音轨资格。工具入口采用同一 project/shots 合同。
+默认接受视频路径或 JSON 镜头清单，保留源片已有原节目声；没有音轨时由拼接器按实际画面时间轴补静音，不自动合成对白。只有显式提供 `shots[].audioStems` 才启用下述独立音轨授权合同，并要求 `project.audioScope={tenantId,workspaceId,projectId,revision}`；`revision` 是源画面版本，与后期 v1/v2 独立。显式的空值、错误来源或缺角色不被当作省略，也不能回退原声。CLI 用 JSON 清单携带这些引用。
 
 每镜必须明确 `dialogue/ambience/foley/music` 四个角色。可用源含 `status:"ready"`、音频路径、SHA256、
 `sourceKind`、权威 `receipt`，可选 `inSec/durationSec/offsetSec`；不适用角色用
@@ -90,34 +94,30 @@ post-cli triage   --feedback "配乐太吵，另外第 3 个镜头人物走形"
 签发接口。工位通过独立的 `WORKLOOM_AUDIO_STEM_SIGNING_SECRET`（至少 32 字节）和
 `WORKLOOM_AUDIO_STEM_SIGNING_KEY_ID` 配置验证能力；不得接受请求参数传入的密钥、`clean:true` 或普通
 交付封签。密钥与签发进程必须由部署层隔离，HMAC 本身不提供同 UID/同主机管理员隔离。
-未配置可信签发者时，正常链路明确拒绝 `audio_stems_source_unverified`；测试中的随机签发者只证明合同与算法。
+显式请求独立音轨但未配置可信签发者时拒绝 `audio_stems_source_unverified`；测试中的随机签发者只证明合同与算法。
 
 源文件从同一打开的 FD 校验并复制到独占工作目录后才交给 FFmpeg。四角色按 48kHz 样点时间线派生；
 节目轨只含对白、环境和拟音，保留的旧音乐永不进入节目轨。母版、禁用 BGM 和配乐失败草稿均只映射
 画面及该节目轨。签章、源快照、角色/节目 WAV、工具指纹与配方摘要记录在 `work/audio-stems/*/audio-stems.json`。
 工程/清单固定该文件与配方的哈希；返修重新校验当前签章、所有字节和确定性重放结果。过期回执可留档，不能授权新使用。
 
-替换镜头必须同时提供 `audioStemsByShot`（工具为 `audio_stems_by_shot`，CLI 如上），且签章绑定新视频。
-改转场会重建同样的音轨时间线；改 BGM 从独立节目轨重混。旧工程只能保留文案/封面等草稿返修，
-`independent_audio_sources=false`；不会从旧成片推断干净轨。真实音频重混每次重新执行，旧混音元数据不能授权缓存成功。
+原工程启用独立音轨时，替换镜头必须同时提供 `audioStemsByShot`（工具为 `audio_stems_by_shot`，CLI 如上），且签章绑定新视频。
+改转场会重建对应音轨时间线；改 BGM 从授权节目轨或原节目声重混。未启用独立音轨的工程保持已有原节目声，不从混音成片推断干净角色。真实音频重混每次重新执行，旧混音元数据不能授权缓存成功。
 音频回执本身有冻结哈希，失败音频不会在下一轮仅改文案后变成通过。
 
 同一 HTTP 幂等键的相同在途请求共用作业；不同参数返回 `idempotency_conflict`，完成后再次提交返回
 `idempotency_revalidation_required`，避免旧成功绕过过期签章。已存在完成工程的输出目录不得重做 package，须走返修版本。
 
-`quality` 缺省为 `hd`。`uhd` 对应竖屏 2160×3840、横屏 3840×2160、方屏 2160×2160、4:5 2160×2700。
-请求 UHD 时，低于目标画布的实拍/动画镜头先在本机增强，再进入共用后期层；增强引擎不可用、原片为可排版的文字位图、或增强回读规格不符，交付会报错。
-已达目标的原片直接使用并在清单标 `source-sufficient`。`delivery-manifest.json#enhancements` 与 `film-project.json#layers.shots[].enhancement` 留逐镜源哈希、模型、增强哈希和来源文件；`resolution_exact` 与 `enhancement_provenance` 检查不通过时不判交付完成。
+`quality` 缺省为 `hd`。没有显式 `project.resolution` 时，计划回读源素材的显示宽高，选取能保留每个源轴的原生画布；明确画布必须是正、安全整数、偶数边长，支持自定义尺寸及 UHD。换画幅须提供 `project.resolutionPolicy.reframeApproved=true` 和 `reframeReason`；降采样另需 `project.allowDownscale=true` 或 `resolutionPolicy.downscaleApproved=true`。明确输出画布由 FFmpeg 实际编码，不自动调用增强模型；请求增强另走其执行合同。清单记录 `nativeResolution`、`resolutionPolicy`、逐镜来源与实际宽高，名称含 UHD 不能替代实际规格。帧率采用本次明确请求或工位默认设置，报告回读实际帧时钟，不声称所有源帧率均原样复制。
 
 在 Apple Silicon macOS 工位上先安装本机工具（安装脚本校验固定版本与哈希）：
 
 ```bash
 bash bundles/ai-video/connectors/color-bridge/kit/install.sh
-node scripts/tools/enhance-engine-install.mjs
 node bundles/ai-video/connectors/post-bridge/cli.mjs health
 ```
 
-桌面安装包包含上述脚本与后期代码，不内置模型和 FFmpeg 二进制。现有 FFmpeg kit 的构建含 `--enable-nonfree`，不可随产品再分发；安装器把它下载到当前 Mac 的 `~/.workloom-color/bin`。后期工位优先使用显式 `WORKLOOM_POST_FFMPEG_PATH` / `WORKLOOM_POST_FFPROBE_PATH`，否则寻找该 kit，最后才查系统 `PATH`。无本机引擎或 ffmpeg 时 UHD 请求失败并给出健康探针结果；Windows 与 Intel Mac 的 UHD 增强尚未经过本机验收。
+桌面安装包包含上述脚本与后期代码，不内置模型和 FFmpeg 二进制。现有 FFmpeg kit 的构建含 `--enable-nonfree`，不可随产品再分发；安装器把它下载到当前 Mac 的 `~/.workloom-color/bin`。后期工位优先使用显式 `WORKLOOM_POST_FFMPEG_PATH` / `WORKLOOM_POST_FFPROBE_PATH`，否则寻找该 kit，最后才查系统 `PATH`。无 FFmpeg 时请求失败并给出健康探针结果；本合同不把本机离线合成验证称作真实模型增强验收。
 
 ## 返修并发与版本前置条件
 
@@ -147,23 +147,24 @@ node bundles/ai-video/connectors/post-bridge/cli.mjs health
 | `clean-tech` | 产品/科技/知识 | cool-technical 0.7 · hard · corporate-clean -25dB · 参数卡封面 · 简洁理性口吻 |
 | `bold-promo` | 带货/本地生活 | high-contrast-social 0.9 · xfade 0.35s · sports-hype -21dB · 促销横幅 · 直接叫卖口吻 |
 
-真机实测（3 镜 / 27s / 3 变体）：两两画面平均像素差 16.7 / 19.9 / 9.8（均判 `visible`），音轨曲目两两不同，
-封面两两像素差 25–35（`visible`）。**变体雷同一律拒绝交付**（围栏 G-DLV1）。
+配方给出明确风格意图；技术出口保证请求的文件和实际加工链成立。配方差异、像素差或曲目不同不等于观感出色，不能替代看过和听过后的审片结论。静黑、静音和单个版本仍按本仓请求数量合同处理；技术报告如实保留艺术未审状态。
 
-## 复检口径（不达标不交付）
+## 当前媒体技术验收（失败不发布）
 
-| 复检 | 口径 | 失败处置 |
+| 项目 | 可复算依据 | 失败处置 |
 |---|---|---|
-| 母版零烧字 | 母版与软字幕轨版画面逐帧哈希一致；旁挂字幕文件存在且时间轴可回读 | 拒绝（G-DLV2/G-DLV3） |
-| 变体可辨 | 每对变体至少一个轴 measured visible（画面像素差或音轨不同） | 拒绝（G-DLV1） |
-| 封面可辨 | 两两封面像素差不为 negligible；标题墨迹必须真的检出 | 拒绝 |
-| 时长一致 | 按各变体转场口径算期望时长（xfade 会因重叠变短）±0.4s | 拒绝 |
-| 音频规格 | 配乐变体 −14 LUFS ±1.5、真峰值 ≤ −1dBTP（复检容差 0.2dB）、独立对白-音乐余量 ≥3dB、配乐可闻度 ≥3dB | 可重试的人声余量不足降 3dB 再测；仍不过保留不含旧配乐的节目草稿，整包失败 |
-| 复用证据 | 复用的层给出 sha256 与"未被重算"的说明；镜头层与工程文件逐镜比对 | 拒绝（G-DLV7） |
+| 母版与请求变体 | 当前非空文件、SHA、FFprobe 和全片 FFmpeg 解码 | 缺件、截断、坏编码或请求变体缺失停止出口 |
+| 原生画布与明确导出 | 源显示宽高、目标每轴、实际成片画布与批准的换画幅/降采样 | 规格不符或未批准的降采样失败 |
+| 转场/调色/实体/配乐 | 实际输入 SHA、请求、加工结果与输出 SHA；每刀实际切点及音效放置 | 任意 JSON、旧回执或他变体凭证不能放行 |
+| 字幕与弹幕 | 所有条目的时间、字体解析和实际文件；软轨完整视频/音频编码包 SHA | 越片尾、空请求产物或丢台词失败 |
+| 声音 | 实际编码成片的响度/真峰值，默认 report；明确 block 合同按其阈值 | 留实测建议或按明确阈值失败，不自动再混/付费重生成 |
+| 返修与整理 | 复用层当前 SHA、版本前置条件、最终 copied 字节与当前报告一致 | 来源被换、旧文件混入或加工链缺失失败 |
+
+`postread.quality`/CLI quality 每次回读当前文件，服务器不缓存这类成功。七个必需状态为 cover / bgm / subtitles / danmaku / transitions / color / resolution；本次不适用时必须有具体理由。报告的技术通过与 `artisticQualityReviewed=false` 同时存在。艺术审片另外观察肤色、产品色、清晰度、快慢段、呼吸点、声音层次与文字可读性；未实看片段不得声称“大片品质”。
 
 ## 真机验证数据（2026-09-24，本地 Mac + ffmpeg 6.0）
 
-以下为旧混音合同的历史记录，不能作为 T0037 的当前验收；新合同的合成媒体、签章和正常入口回归见 `docs/repairs/T-2026-0927-0037.md`。
+以下为旧混音合同的历史记录，不能作为当前技术合同或本轮耗时验收；新合同的合成媒体、签章和正常入口回归见 `docs/repairs/T-2026-0927-0037.md`。
 
 | 场景 | 结果 |
 |---|---|
@@ -192,7 +193,7 @@ const toolExecutor = createPostBridgeExecutor({
 ## 与其它工位的关系
 
 - **字幕工位**：旁挂字幕文件与软字幕轨由它产出（`subtitlewrite.sidecar` / `subtitlewrite.softmux`），本工位负责编排与复检；
-- **调色/配乐工位**：变体的调色与混音直接调用其内核（含可见性、LUFS、人声余量等红线复检），本工位不重复实现；
+- **调色/配乐工位**：变体的调色与混音直接调用其内核（保留真实加工参数、响度实测与明确声明的阈值合同），本工位不重复实现；
 - **渲染链路**：画面内容问题退回渲染侧（点名镜头 + G8 人审），本工位只做"重生成之后的本地合成"。
 
 ## 纪律

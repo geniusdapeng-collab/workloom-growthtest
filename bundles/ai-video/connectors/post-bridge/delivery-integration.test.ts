@@ -9,6 +9,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { assembleTimeline, buildDeliveryPackage, readRevisionBase, reedit, resolveBinaries } from "./core.mjs";
 import { describeAudioStemSources } from "../bgm-bridge/audio-stems.mjs";
 import { audioStemReceiptPayload } from "../bgm-bridge/audio-stems-trust.mjs";
+import { inspectEditedRhythm } from "../../../../scripts/tools/lib/edit-rhythm.mts";
+import type { EditTimeline } from "../../../../packages/video-studio/src/edit/timeline.js";
+import type { RhythmPlanInput } from "../../../../packages/video-studio/src/rhythm-plan.js";
 
 const bins = resolveBinaries();
 const hasMediaTools = (() => {
@@ -27,6 +30,22 @@ const expectedBase = (file: string) => {
   const base = readRevisionBase(file);
   return { expectedVersion: base.version, expectedProjectSha256: base.sha256 };
 };
+
+function testLibrary(root: string) {
+  const dir = path.join(root, "custom-library");
+  fs.mkdirSync(dir);
+  const tracks = [
+    ["acoustic-warm", "温暖自在"], ["corporate-clean", "干净可信"], ["sports-hype", "激昂有力"],
+  ].map(([style, mood], index) => {
+    const file = `${style}.wav`;
+    execFileSync(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-f", "lavfi", "-i",
+      `sine=frequency=${600 + index * 200}:duration=8`, "-c:a", "pcm_s16le", path.join(dir, file)]);
+    return { id: `000-growth-${style}`, title: style, style, mood, file, durationSec: 8,
+      license: "workloom-self-generated", source: "offline-synthetic-fixture", artist: "test fixture" };
+  });
+  fs.writeFileSync(path.join(dir, "tracks.json"), JSON.stringify({ tracks }));
+  return dir;
+}
 
 describe.skipIf(!hasMediaTools)("后期真实总装与连续返修（需 FFmpeg/FFprobe）", () => {
   let root: string;
@@ -84,7 +103,7 @@ describe.skipIf(!hasMediaTools)("后期真实总装与连续返修（需 FFmpeg/
 
   beforeAll(() => {
     root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "post-p1-")));
-    env.WORKLOOM_POST_ALLOWED_ROOTS = root;
+    env.WORKLOOM_POST_ALLOWED_ROOTS = [root, path.resolve("bundles/ai-video/library")].join(path.delimiter);
     env.WORKLOOM_BGM_ALLOWED_ROOTS = [root, path.resolve("bundles/ai-video/library")].join(path.delimiter);
     env.WORKLOOM_BGM_LIBRARY_DIR = path.join(root, "custom-library");
     env.WORKLOOM_BGM_HOME = path.join(root, "bgm-home");
@@ -259,5 +278,181 @@ describe.skipIf(!hasMediaTools)("后期真实总装与连续返修（需 FFmpeg/
       ...expectedBase(noMusic.projectPath), patch: { copy: { body: "保留无配乐版本" } }, bins, env });
     expect(copyOnly.variants.map((variant: any) => variant.video.sha256)).toEqual(noMusic.variants.map((variant: any) => variant.video.sha256));
     expect(copyOnly.revision.checks.find((check: { kind: string }) => check.kind === "bgm_layer").ok).toBe(true);
+  }, 300_000);
+});
+
+describe.skipIf(!hasMediaTools)("独立音轨、声明音效与配乐返修的真实最终成片", () => {
+  it("授权节目先合流再加 impact，最终配乐和音频返修均保留音效、原速和当前原生帧时钟", async () => {
+    const root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "post-stems-sfx-")));
+    const env: NodeJS.ProcessEnv = { ...process.env, WORKLOOM_BGM_DISCOVER: "0",
+      WORKLOOM_POST_ALLOWED_ROOTS: root, WORKLOOM_BGM_ALLOWED_ROOTS: root,
+      WORKLOOM_BGM_HOME: path.join(root, "bgm-home"),
+      WORKLOOM_AUDIO_STEM_SIGNING_SECRET: randomBytes(32).toString("hex"),
+      WORKLOOM_AUDIO_STEM_SIGNING_KEY_ID: "independent-stems-sfx-fixture" };
+    const scope = { tenantId: "fixture-t", workspaceId: "fixture-w", projectId: "independent-stems-sfx", revision: 1 };
+    const sources = new Map<string, string>();
+    const frequencies = { dialogue: 440, ambience: 880, foley: 1320, music: 1760 };
+    const sourceKinds = { dialogue: "isolated_recording", ambience: "synthesized_ambience", foley: "synthesized_foley", music: "composed_music" };
+    const pcm = (file: string, at: number, duration = 0.2, filter?: string) => execFileSync(bins.ffmpeg,
+      ["-v", "error", "-i", file, "-ss", String(at), "-t", String(duration), "-map", "0:a:0",
+        ...(filter ? ["-af", filter] : []), "-ac", "1", "-ar", "48000", "-f", "f32le", "-"], { maxBuffer: 8 << 20 });
+    const amplitude = (data: Buffer, frequency: number) => {
+      let cosine = 0, sine = 0; const samples = data.byteLength / 4;
+      for (let index = 0; index < samples; index++) {
+        const phase = 2 * Math.PI * frequency * index / 48000, sample = data.readFloatLE(index * 4);
+        cosine += sample * Math.cos(phase); sine += sample * Math.sin(phase);
+      }
+      return 2 * Math.hypot(cosine, sine) / samples;
+    };
+    const rms = (data: Buffer) => {
+      let squared = 0; for (let index = 0; index < data.byteLength; index += 4) squared += data.readFloatLE(index) ** 2;
+      return Math.sqrt(squared / (data.byteLength / 4));
+    };
+    const packets = (file: string) => JSON.parse(execFileSync(bins.ffprobe,
+      ["-v", "error", "-select_streams", "v:0", "-show_packets", "-show_data_hash", "sha256",
+        "-show_entries", "packet=data_hash", "-of", "json", file], { encoding: "utf8" }))
+      .packets.map((packet: { data_hash: string }) => packet.data_hash);
+    const evidence: Array<Record<string, any>> = [];
+    const verifyFinal = (file: string, sound: { file: string; reportFile: string }, step: string) => {
+      const probe = JSON.parse(execFileSync(bins.ffprobe,
+        ["-v", "error", "-count_frames", "-show_streams", "-show_format", "-of", "json", file], { encoding: "utf8" }));
+      const video = probe.streams.find((stream: any) => stream.codec_type === "video");
+      expect(video).toMatchObject({ width: 320, height: 180, avg_frame_rate: "30/1", nb_read_frames: "165" });
+      expect(Number(video.duration)).toBeCloseTo(5.5, 3);
+      execFileSync(bins.ffmpeg, ["-v", "error", "-xerror", "-i", file, "-map", "0:v:0", "-map", "0:a:0", "-f", "null", "-"], { stdio: "pipe" });
+      const report = readJson(sound.reportFile);
+      expect(report).toMatchObject({ schemaVersion: "workloom.rhythm-sound/v1", programmeSpeed: 1, videoPacketsUnchanged: true,
+        qualityReviewPerformed: false, artisticQuality: "unverified" });
+      expect(hash(report.source.file)).toBe(report.source.sha256);
+      expect(hash(sound.file)).toBe(report.output.sha256);
+      expect(packets(file)).toEqual(packets(sound.file));
+      const dialogue = pcm(file, 1.2), tones = Object.fromEntries(Object.entries(frequencies).map(([role, hz]) => [role, amplitude(dialogue, hz)]));
+      const originalMixedMusic = amplitude(dialogue, 2200);
+      expect(tones.dialogue).toBeGreaterThan(0.004);
+      expect(tones.ambience).toBeGreaterThan(0.004);
+      expect(tones.foley).toBeGreaterThan(0.004);
+      expect(tones.music).toBeLessThan(tones.dialogue * 0.025);
+      expect(originalMixedMusic).toBeLessThan(tones.dialogue * 0.025);
+      const pitch = Array.from({ length: 11 }, (_, index) => 435 + index)
+        .sort((a, b) => amplitude(dialogue, b) - amplitude(dialogue, a))[0];
+      expect(pitch).toBe(440);
+      const activeImpact = rms(pcm(file, 0.53, 0.15, "highpass=f=30,lowpass=f=180"));
+      const quietBreath = rms(pcm(file, 1.3, 0.15, "highpass=f=30,lowpass=f=180"));
+      expect(activeImpact).toBeGreaterThan(quietBreath * 4);
+      for (const [source, digest] of sources) expect(hash(source)).toBe(digest);
+      evidence.push({ step, outputSha256: hash(file), videoFrames: Number(video.nb_read_frames), fps: video.avg_frame_rate,
+        canvas: [video.width, video.height], programmePitchHz: pitch, tones, originalMixedMusic, activeImpact, quietBreath,
+        soundSha256: report.output.sha256, soundSourceSha256: report.source.sha256, packetPayloadUnchanged: true });
+    };
+    try {
+      env.WORKLOOM_BGM_LIBRARY_DIR = testLibrary(root);
+      const shots = [0.5, 2, 3].map((seconds, index) => {
+        const shotId = `S${index + 1}`, file = path.join(root, `${shotId}.mp4`);
+        execFileSync(bins.ffmpeg, ["-v", "error", "-n", "-f", "lavfi", "-i", `testsrc2=size=320x180:rate=30:duration=${seconds}`,
+          "-f", "lavfi", "-i", `sine=frequency=2200:sample_rate=48000:duration=${seconds}`,
+          "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p",
+          "-c:a", "aac", "-ar", "48000", "-ac", "2", file], { stdio: "pipe" });
+        sources.set(file, hash(file));
+        const stems = Object.fromEntries(Object.entries(frequencies).map(([role, frequency]) => {
+          const audio = path.join(root, `${shotId}-${role}.wav`);
+          execFileSync(bins.ffmpeg, ["-v", "error", "-n", "-f", "lavfi", "-i", `sine=frequency=${frequency}:sample_rate=48000:duration=${seconds}`,
+            "-af", "volume=0.15", "-ac", "2", "-c:a", "pcm_f32le", audio], { stdio: "pipe" });
+          sources.set(audio, hash(audio));
+          return [role, { status: "ready", path: audio, sha256: hash(audio), sourceKind: sourceKinds[role as keyof typeof sourceKinds] }];
+        })) as Record<string, any>;
+        for (const { binding, bindingSha256 } of describeAudioStemSources({ scope,
+          shots: [{ shotId, videoSha256: hash(file), durationSec: seconds, stems }] })) {
+          const now = Date.now(), receipt: Record<string, string> = { schemaVersion: "workloom.audio-stem-receipt/v1",
+            purpose: "independent-audio-source", bindingSha256, workerId: "independent-stems-sfx-fixture",
+            jobId: `${shotId}-${binding.role}`, evidenceSha256: "d".repeat(64),
+            issuedAt: new Date(now - 1000).toISOString(), expiresAt: new Date(now + 3600000).toISOString(),
+            keyId: "independent-stems-sfx-fixture" };
+          receipt.signature = createHmac("sha256", env.WORKLOOM_AUDIO_STEM_SIGNING_SECRET!).update(audioStemReceiptPayload(receipt)).digest("hex");
+          stems[binding.role].receipt = receipt;
+        }
+        return { shotId, path: file, audioStems: stems };
+      });
+      const rhythmPlan: RhythmPlanInput = { profile: "fast-cut", segments: [
+        { id: "S1", sourceId: "S1", inSeconds: 0, outSeconds: 0.5, role: "fast", cutReason: "动作完成即进入展开" },
+        { id: "S2", sourceId: "S2", inSeconds: 0, outSeconds: 2, role: "hold", cutReason: "保留展开动作" },
+        { id: "S3", sourceId: "S3", inSeconds: 0, outSeconds: 3, role: "breath", cutReason: "原环境声呼吸" },
+      ], soundCues: [{ atSeconds: 0.5, kind: "impact", gainDb: 0, reason: "仅明确段落重音" }] };
+      const project = { projectId: scope.projectId, audioScope: scope, title: "分轨音效实测", fps: 30, targetDurationSec: 5.5,
+        transitions: { mode: "hard", fadeSec: 0, perCut: {} }, rhythmPlan,
+        copy: { title: "分轨音效实测", hook: "原速节目音与重音", body: "当前文件实测" } };
+      const timeline: EditTimeline = { schemaVersion: "workloom.video-edit/edit-timeline/v2", timelineId: "independent-stems-sfx",
+        target: { durationSeconds: 5.5, aspectRatio: "16:9", fps: 30, platform: "test" },
+        sources: shots.map((shot, index) => ({ sourceId: shot.shotId, path: shot.path, sha256: hash(shot.path), fps: 30,
+          durationSeconds: [0.5, 2, 3][index], hasAudio: true })),
+        segments: rhythmPlan.segments.map((segment, seq) => ({ seq, segmentId: segment.id, sourceId: segment.sourceId,
+          sourceIn: segment.inSeconds, sourceOut: segment.outSeconds, durationSeconds: segment.outSeconds - segment.inSeconds,
+          speed: 1, motive: segment.cutReason })), audioDesign: { originalAudioPolicy: "keep" } };
+      const rhythmRequest = { timeline, profile: "fast-cut" as const, declared: rhythmPlan,
+        clips: shots, ffprobe: bins.ffprobe };
+      const measured = await inspectEditedRhythm(rhythmRequest);
+      expect(measured).toMatchObject({ status: "passed", passed: true, artisticQuality: "unverified", paidCalls: 0 });
+      await expect(inspectEditedRhythm({ ...rhythmRequest, declared: { ...rhythmPlan, profile: "cinematic" } }))
+        .rejects.toThrow("RHYTHM_PROFILE_CONFLICT");
+      await expect(inspectEditedRhythm({ ...rhythmRequest, declared: { ...rhythmPlan,
+        segments: rhythmPlan.segments.map((segment, index) => index === 0 ? { ...segment, inSeconds: 0.1 } : segment) } }))
+        .rejects.toThrow("RHYTHM_TIMELINE_PLAN_CONFLICT");
+      await expect(inspectEditedRhythm({ ...rhythmRequest, clips: [...shots].reverse() }))
+        .rejects.toThrow("RHYTHM_CLIP_SEQUENCE_CONFLICT");
+      await expect(inspectEditedRhythm({ ...rhythmRequest, clips: shots.map((shot, index) => index === 1 ? { ...shot, path: shots[0]!.path } : shot) }))
+        .rejects.toThrow("RHYTHM_EDIT_FAILED");
+      const fastTimeline = { ...timeline, segments: timeline.segments.map((segment) => ({ ...segment, speed: 2 })) };
+      await expect(inspectEditedRhythm({ ...rhythmRequest, timeline: fastTimeline }))
+        .rejects.toThrow("RHYTHM_EXPLICIT_1X_REQUIRED");
+      expect(await inspectEditedRhythm({ ...rhythmRequest, timeline: fastTimeline, profile: "natural", declared: null }))
+        .toMatchObject({ status: "unverified", passed: true, artisticQuality: "unverified" });
+      await expect(inspectEditedRhythm({ ...rhythmRequest, timeline: { ...timeline,
+        sources: timeline.sources.map((source, index) => index === 0 ? { ...source, sha256: "a".repeat(64) } : source) } }))
+        .rejects.toThrow("RHYTHM_SOURCE_HASH_CHANGED");
+      await expect(inspectEditedRhythm({ ...rhythmRequest, ffprobe: path.join(root, "missing-ffprobe") })).rejects.toThrow();
+      // The JavaScript engine accepts the documented runtime contract; its inferred TS signature treats default [] as never[].
+      const build = buildDeliveryPackage as (options: Record<string, unknown>) => Promise<any>;
+      const base = await build({ project, shots, variants: ["clean-tech", "bold-promo"],
+        outDir: path.join(root, "delivery"), bins, env });
+      expect(base.passed).toBe(true);
+      for (const variant of base.variants) verifyFinal(variant.artifacts.video.path, variant.layers.sound, `build-${variant.id}`);
+      const oldSounds = base.variants.map((variant: any) => ({ file: variant.layers.sound.file, sha256: hash(variant.layers.sound.file),
+        source: readJson(variant.layers.sound.reportFile).source.file, sourceSha256: readJson(variant.layers.sound.reportFile).source.sha256 }));
+      const noMusic = await reedit({ projectPath: base.projectPath, deliveryDir: base.outDir, ...expectedBase(base.projectPath),
+        patch: { bgm: { variantId: "clean-tech", enabled: false } }, bins, env });
+      expect(noMusic.executed).toBe(true);
+      const noMusicProject = readJson(noMusic.projectPath);
+      for (const variant of noMusic.variants) {
+        const stored = noMusicProject.layers.variants.find((entry: any) => entry.id === variant.id);
+        verifyFinal(variant.video.path, { file: path.resolve(noMusic.targetDir, stored.sound.path),
+          reportFile: path.resolve(noMusic.targetDir, stored.sound.receiptPath) }, `bgm-off-${variant.id}`);
+      }
+      for (const value of oldSounds) { expect(hash(value.file)).toBe(value.sha256); expect(hash(value.source)).toBe(value.sourceSha256); }
+      const backToMusic = await reedit({ projectPath: noMusic.projectPath, deliveryDir: base.outDir, ...expectedBase(noMusic.projectPath),
+        patch: { bgm: { variantId: "clean-tech", enabled: true, style: "corporate-clean", policy: "keep-all" } }, bins, env });
+      expect(backToMusic.executed).toBe(true);
+      const restoredProject = readJson(backToMusic.projectPath);
+      for (const variant of backToMusic.variants) {
+        const stored = restoredProject.layers.variants.find((entry: any) => entry.id === variant.id);
+        verifyFinal(variant.video.path, { file: path.resolve(backToMusic.targetDir, stored.sound.path),
+          reportFile: path.resolve(backToMusic.targetDir, stored.sound.receiptPath) }, `bgm-on-${variant.id}`);
+      }
+      const copyOnly = await reedit({ projectPath: backToMusic.projectPath, deliveryDir: base.outDir, ...expectedBase(backToMusic.projectPath),
+        patch: { copy: { body: "仅文字修改保留现有节目与音效" } }, bins, env });
+      expect(copyOnly.variants.map((variant: any) => variant.video.sha256)).toEqual(backToMusic.variants.map((variant: any) => variant.video.sha256));
+      const copiedProject = readJson(copyOnly.projectPath);
+      for (const variant of copyOnly.variants) {
+        const stored = copiedProject.layers.variants.find((entry: any) => entry.id === variant.id);
+        verifyFinal(variant.video.path, { file: path.resolve(copyOnly.targetDir, stored.sound.path),
+          reportFile: path.resolve(copyOnly.targetDir, stored.sound.receiptPath) }, `copy-only-${variant.id}`);
+      }
+      for (const value of oldSounds) { expect(hash(value.file)).toBe(value.sha256); expect(hash(value.source)).toBe(value.sourceSha256); }
+      console.info("independent stems sound final evidence", JSON.stringify({ paidCalls: 0, sourceFiles: sources.size,
+        sourceFilesUnchanged: true, independentMusicExcluded: true, embeddedOldMusicExcluded: true, evidence }));
+    } catch (error) {
+      const report = (error as { report?: { checks?: Array<{ hard?: boolean; ok?: boolean }>; stages?: unknown } }).report;
+      if (report) console.error("independent stems sound failure evidence", JSON.stringify({
+        checks: report.checks?.filter((check) => check.hard && !check.ok), stages: report.stages }));
+      throw error;
+    } finally { fs.rmSync(root, { recursive: true, force: true }); }
   }, 300_000);
 });

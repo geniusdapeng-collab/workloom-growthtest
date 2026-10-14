@@ -5,6 +5,7 @@ import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSy
 import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { test } from "vitest";
+import { inspectGenerationManifest } from "./generation-quality.mjs";
 import { adoptCompletedOriginalRenders, runStandardPost, adoptLegacyOriginalRenders, assertStandardPostAudioClock, assertStandardPostExportClock, assertStandardPostVariantAxes, captureOriginalRenderManifest, freezeOriginalSubmission, issueOriginalRenderReceipt,
   loadOriginalRenderManifest, resolveStandardPostBinary, standardPostFileHash, StandardPostError, validateStandardPostSettings, type StandardPostSettings } from "./film-standard-post.mjs";
 const hash = (bytes: Buffer | string) => createHash("sha256").update(bytes).digest("hex");
@@ -366,7 +367,7 @@ test("full normal CLI accepts historical rejected black odd-sized 10.04s silent 
     assert.equal(newRows.filter(row => row.stage === "compose").every(row => row.ok && row.verdict?.score === null), true);
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 }, 240_000);
-test.each([false, true])("actual standard post creates all presentations from unusual completed media without quality/model review (music=%s)", async withMusic => {
+test.each([false, true])("actual standard post creates all presentations with current technical QA and no model review (music=%s)", async withMusic => {
   const f = await unusualCompletedFixture();
   try {
     await adoptCompletedOriginalRenders({ productionRoot: f.root, projectId: f.projectId, submittedSha256: f.submitted.sha256 });
@@ -389,6 +390,11 @@ test.each([false, true])("actual standard post creates all presentations from un
     assert.equal(manifest.outputs.length, 5); assert.equal(manifest.modelCalls, 0); assert.equal(manifest.supplierGenerationCalls, 0);
     assert.equal(manifest.ttsCalls, 0); assert.equal(manifest.asrCalls, 0); assert.equal(manifest.sourceFilesUnchanged, true);
     assert.equal(manifest.distinctness.qualityReviewPerformed, false);
+    assert.equal(manifest.generationQuality.schemaVersion, "workloom.generation-quality/v1");
+    const currentQuality = await inspectGenerationManifest({ root: outputDir, manifest, bins: { ffmpeg, ffprobe } });
+    assert.equal(currentQuality.passed, true, JSON.stringify(currentQuality.checks.filter((row: { hard: boolean; ok: boolean }) => row.hard && !row.ok)));
+    assert.equal(currentQuality.artisticQualityReviewed, false); assert.equal(currentQuality.paidCalls, 0);
+    assert.equal(currentQuality.generationQuality.sourceCount, 1);
     for (const output of manifest.outputs) { assert.equal(existsSync(output.path), true); assert.equal(hash(readFileSync(output.path)), output.sha256); }
     if (withMusic) for (const output of manifest.outputs.filter((row: { id: string }) => ["warm-film", "cool-tech", "punchy-social"].includes(row.id))) {
       assert.equal(output.bgm.independentAudio.sourceAuthority, "native-source"); assert.equal(output.bgm.independentAudio.stemsVerified, false);
@@ -487,6 +493,7 @@ test("formal standard post preserves every nominal-two actual-4.25-second frame 
     assert.equal(manifest.outputs.length, 5);
     for (const row of manifest.outputs) { assert.equal(row.exportClock.videoFrames, 103); assert.equal(row.exportClock.fps, 24); assert.equal(hash(readFileSync(row.path)), row.sha256); }
     const soft = manifest.outputs.find((row: { id: string }) => row.id === "softsub");
+    assert.equal(soft.colorMode, "native-composed-program");
     const finalFrames = decodedVideoHashes(soft.path);
     assert.equal(originalFrames.length, 102); assert.equal(finalFrames.length, 103); assert.deepEqual(finalFrames.slice(1), originalFrames);
     assert.deepEqual(audioPacketFacts(soft.path), originalPackets);
@@ -537,14 +544,14 @@ test.each(["sidecar", "burn", "danmaku", "softmux"])("whole normal CLI stops aft
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 }, 240_000);
 
-test("whole normal CLI completes all official post stages with declared single mixes and no default source-quality scans", async () => {
+test("whole normal CLI completes all official post stages with current technical QA and no source artistic or model review", async () => {
   const f = await unusualCompletedFixture({ audio: true });
   try {
     const shots = join(f.root, "source.json"), denyNetwork = join(f.root, "deny-network.mjs"), binary = join(f.root, "no-quality-ffmpeg.mjs"), commands = join(f.root, "commands.jsonl");
     writeFileSync(shots, f.bytes);
     writeFileSync(denyNetwork, 'globalThis.fetch = async () => { throw new Error("FORBIDDEN_NETWORK_OR_PAID_CALL"); };\n');
     const actualFfmpeg = await resolveStandardPostBinary(ffmpeg);
-    writeFileSync(binary, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';\nimport fs from 'node:fs';\nconst args=process.argv.slice(2);\nfs.appendFileSync(${JSON.stringify(commands)},JSON.stringify(args)+'\\n');\nif(args.includes('-count_frames')||args.some(arg=>/signalstats|psnr|framemd5|edgedetect|ebur128|astats|blurdetect|bbox=/.test(arg))||args.includes('f32le')){process.stderr.write('forbidden default quality review');process.exit(87); }\nconst result=spawnSync(${JSON.stringify(actualFfmpeg)},args,{stdio:'inherit'});\nif(result.error){process.stderr.write(result.error.message);process.exit(52); }\nprocess.exit(result.status??53);\n`); chmodSync(binary, 0o755);
+    writeFileSync(binary, `#!${process.execPath}\nimport {spawnSync} from 'node:child_process';\nimport fs from 'node:fs';\nconst args=process.argv.slice(2);\nfs.appendFileSync(${JSON.stringify(commands)},JSON.stringify(args)+'\\n');\nif(args.some(arg=>/edgedetect|blurdetect|bbox=/.test(arg))){process.stderr.write('forbidden source artistic review');process.exit(87); }\nconst result=spawnSync(${JSON.stringify(actualFfmpeg)},args,{stdio:'inherit'});\nif(result.error){process.stderr.write(result.error.message);process.exit(52); }\nprocess.exit(result.status??53);\n`); chmodSync(binary, 0o755);
     const output = join(f.root, "delivery");
     const result = spawnSync(process.execPath, ["--import", "tsx", "--import", denyNetwork, cli, "--shots", shots,
       "--work-dir", f.root, "--out", output, "--keys-file", join(f.root, "nonexistent.env"), "--stages", "voice,compose,color,subtitle,danmaku,bgm,cover,mux,master,deliver"],
@@ -556,17 +563,28 @@ test("whole normal CLI completes all official post stages with declared single m
       WORKLOOM_BGM_DISCOVER: "0", WORKLOOM_BGM_LIBRARY_DIR: join(f.root, "empty-custom-library"), WORKLOOM_BGM_HOME: join(f.root, "empty-bgm-home") } });
     assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
     assert.equal(hash(readFileSync(f.raw)), f.rawSha256);
-    assert.doesNotMatch(result.stdout + result.stderr, /FORBIDDEN_NETWORK_OR_PAID_CALL|forbidden default quality review|平台已受理/);
+    assert.doesNotMatch(result.stdout + result.stderr, /FORBIDDEN_NETWORK_OR_PAID_CALL|forbidden source artistic review|平台已受理/);
     const records = readFileSync(f.historyFile, "utf8").slice(f.history.length).trim().split("\n").map(line => JSON.parse(line));
     for (const stage of ["compose", "color", "subtitle", "danmaku", "bgm", "cover", "mux", "master", "deliver"]) {
       assert.equal(records.some(row => row.stage === stage && row.ok === true), true, stage);
     }
-    const manifest = JSON.parse(readFileSync(join(output, `${f.projectId}-delivery-manifest.json`), "utf8"));
+    const pointer = JSON.parse(readFileSync(join(output, "current.json"), "utf8"));
+    const manifest = JSON.parse(readFileSync(join(pointer.releaseDir, `${f.projectId}-delivery-manifest.json`), "utf8"));
     assert.equal(manifest.variants.length, 3);
     assert.equal(manifest.distinctness.status, "not-reviewed");
     assert.equal(manifest.variants.every((row: { bgm: { measuredBpm: unknown; gridErrorMs: unknown } }) => row.bgm.measuredBpm === null && row.bgm.gridErrorMs === null), true);
     const actualCommands = readFileSync(commands, "utf8").trim().split("\n").map(line => JSON.parse(line));
     assert.equal(actualCommands.filter(args => args.some((value: string) => value.includes('sidechaincompress'))).length, 4, "one main and one requested music mix per variant");
+    assert.ok(actualCommands.some(args => args.includes('-xerror')), "current generated video is fully decoded before formal publication");
+    assert.ok(actualCommands.some(args => args.some((value: string) => value.includes('loudnorm=') && value.includes('print_format=json'))), "actual final audio loudness and true peak are recorded without a paid model");
+    const currentQuality = await inspectGenerationManifest({ root: pointer.releaseDir, manifest, bins: { ffmpeg, ffprobe } });
+    assert.equal(currentQuality.passed, true); assert.equal(currentQuality.artisticQualityReviewed, false);
+    for (const id of ["master", ...manifest.variants.map((variant: { id: string }) => `variant:${variant.id}`)]) {
+      const asset = currentQuality.assets.find((row: { id: string }) => row.id === id);
+      assert.ok(Number.isFinite(asset?.audioMeasurement?.integratedLufs), `actual current ${id} has measured LUFS`);
+      assert.ok(Number.isFinite(asset?.audioMeasurement?.truePeakDbtp), `actual current ${id} has measured true peak`);
+      assert.equal(asset?.audioMeasurement?.windowSec, null, "final audio measurement covers the whole file");
+    }
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 }, 300_000);
 
@@ -591,7 +609,8 @@ async function partialCompletedFixture(pendingChange: Record<string, unknown> = 
   const promptDir = join(root, "prompts", projectId); mkdirSync(promptDir, { recursive: true }); const oldPrompt = join(promptDir, "S1.txt"); writeFileSync(oldPrompt, "IMMUTABLE HISTORICAL PROMPT");
   const deny = join(root, "deny-network.mjs"); writeFileSync(deny, 'globalThis.fetch = async () => { throw new Error("FORBIDDEN_NETWORK_OR_PAID_CALL"); };\n');
   const execute = () => spawnSync(process.execPath, ["--import", "tsx", "--import", deny, cli, "--shots", shots, "--work-dir", root, "--out", join(root, "out"), "--keys-file", join(root, "missing.env"), "--route-kind", "narrative", "--platform", "B站", "--stages", "cine-kb,micromotion,spec,plates"],
-    { cwd: repo, encoding: "utf8", timeout: 60_000, env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: ffmpeg, WL_FFPROBE: ffprobe, LLM_API_KEY: "", VOLCENGINE_ARK_API_KEY: "" } });
+    // This explicitly offline local pre-production fixture records plausibility as unverified; the production model gate stays fail-closed.
+    { cwd: repo, encoding: "utf8", timeout: 60_000, env: { ...process.env, FILM_WORKER_MODE: "", WL_FFMPEG: ffmpeg, WL_FFPROBE: ffprobe, LLM_PROVIDER: "mock", LLM_API_KEY: "", VOLCENGINE_ARK_API_KEY: "" } });
   return { root, projectId, raw, rawSha256, source, historyFile, history, oldPrompt, execute };
 }
 test("partial completed S1 preserves old card and prompt while pending material S2 receives the requested local prerender stages", async () => {

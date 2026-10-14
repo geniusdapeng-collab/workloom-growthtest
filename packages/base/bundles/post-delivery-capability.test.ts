@@ -85,6 +85,10 @@ describe("交付与返修围栏（G-DLV0..G-DLV9）语义", () => {
     expect(evaluate("G-DLV1", { identical_variants: true })).toBe(false);
     expect(evaluate("G-DLV1", { variant_count: 1 })).toBe(false);
     expect(evaluate("G-DLV1", { variant_count: 3, variants_distinct: true })).toBe(false);
+    expect(evaluate("G-DLV1", { post_quality_failed: true })).toBe(true);
+    expect(evaluate("G-DLV1", { output_missing: true })).toBe(true);
+    expect(evaluate("G-DLV1", { output_unreadable: true })).toBe(true);
+    expect(evaluate("G-DLV1", { post_quality_failed: false, output_missing: false, output_unreadable: false })).toBe(false);
     // 缺字段不命中（走 default_level 的保守 review），不会把正常交付一律熔断
     expect(evaluate("G-DLV1", {})).toBe(false);
   });
@@ -140,10 +144,13 @@ describe("交付与返修围栏（G-DLV0..G-DLV9）语义", () => {
 });
 
 describe("后期工位桥（工具面与连接器纪律）", () => {
-  it("只声明 6 个后期工具（读 3 / 写 3），且不提供他人工具", () => {
-    expect(POST_TOOLS).toHaveLength(6);
+  it("只声明 7 个后期工具（读 4 / 写 3），且不提供他人工具", () => {
+    expect(POST_TOOLS).toHaveLength(7);
+    expect(POST_TOOLS.filter((tool) => tool.startsWith("postread."))).toHaveLength(4);
+    expect(POST_TOOLS.filter((tool) => tool.startsWith("postwrite."))).toHaveLength(3);
     expect([...POST_TOOLS].sort()).toEqual([...POST_BRIDGE_TOOLS].sort());
     expect(isPostBridgeTool("postread.plan")).toBe(true);
+    expect(isPostBridgeTool("postread.quality")).toBe(true);
     expect(isPostBridgeTool("postwrite.package")).toBe(true);
     expect(isPostBridgeTool("postwrite.reedit")).toBe(true);
     expect(isPostBridgeTool("subtitlewrite.burn")).toBe(false);
@@ -164,7 +171,7 @@ describe("后期工位桥（工具面与连接器纪律）", () => {
 
   it("幂等键稳定（同参数同键），且不可重试码覆盖交付类硬错误", () => {
     expect(stableKey({ b: 1, a: [{ d: 2, c: 3 }] })).toBe(stableKey({ a: [{ c: 3, d: 2 }], b: 1 }));
-    for (const code of ["verify_failed", "version_exists", "bad_recipe", "not_configured", "overwrite_source_forbidden", "bad_lut"]) {
+    for (const code of ["verify_failed", "version_exists", "bad_recipe", "not_configured", "overwrite_source_forbidden", "bad_lut", "post_quality_failed", "entity_processing_failed", "rhythm_processing_failed", "processing_quality_failed", "color_management_unsupported"]) {
       expect(NEVER_RETRY_CODES.has(code), `${code} 应为不可重试`).toBe(true);
     }
     expect(NEVER_RETRY_CODES.has("timeout")).toBe(false);
@@ -364,21 +371,26 @@ describe("文案包与画幅口径", () => {
     expect(resolveQuality({})).toBe("hd");
     expect(resolveQuality({ quality: "uhd" })).toBe("uhd");
     expect(() => resolveQuality({ quality: "4k" })).toThrow(/未知清晰度/);
-    expect(() => resolveResolution({ quality: "uhd", resolution: [1920, 1080] })).toThrow(/uhd 仅支持/);
+    expect(resolveResolution({ quality: "uhd", resolution: [1920, 1080] })).toEqual([1920, 1080]);
+    expect(resolveResolution({ resolution: [162, 122] })).toEqual([162, 122]);
+    expect(resolveResolution({ quality: "uhd", resolution: [4096, 2160] })).toEqual([4096, 2160]);
+    for (const resolution of [[721, 1280], [0, 720], [-2, 720], [Number.MAX_SAFE_INTEGER + 1, 720], [Infinity, 720], [NaN, 720]]) {
+      expect(() => resolveResolution({ resolution }), String(resolution)).toThrow(/分辨率非法/);
+    }
     expect(() => resolveResolution({ aspect: "21:9" })).toThrow(/未知画幅/);
   });
 });
 
 describe("岗位 / 技能 / 管线 / 反馈枚举四层接线", () => {
-  it("剪辑师岗位绑定交付围栏、装上两个交付技能，并声明写工具与回写", () => {
+  it("剪辑师岗位绑定交付围栏、装上交付、返修与质检技能，并声明写工具与回写", () => {
     expect(preset.preset_key).toBe("post-editor");
     expect(preset.readonly).toBe(false);
     for (const fence of ["G-DLV0", "G-DLV1", "G-DLV2", "G-DLV3", "G-DLV4", "G-DLV6", "G-DLV7", "G-DLV8", "G-DLV9"]) {
       expect(preset.fence_bindings, `岗位未绑定 ${fence}`).toContain(fence);
     }
-    expect(preset.skills).toEqual(["delivery-package-ops", "delivery-revision-ops"]);
+    expect(preset.skills).toEqual(["delivery-package-ops", "delivery-revision-ops", "post-quality-inspection"]);
     const toolNames = preset.tools.map((tool) => tool.name);
-    for (const tool of ["postread.plan", "postread.impact", "postwrite.package", "postwrite.reedit", "postwrite.triage", "subtitlewrite.sidecar", "subtitlewrite.softmux"]) {
+    for (const tool of ["postread.plan", "postread.impact", "postread.quality", "postwrite.package", "postwrite.reedit", "postwrite.triage", "subtitlewrite.sidecar", "subtitlewrite.softmux"]) {
       expect(toolNames, `岗位未声明 ${tool}`).toContain(tool);
     }
     for (const tool of ["postwrite.package", "postwrite.reedit"]) {
@@ -387,7 +399,7 @@ describe("岗位 / 技能 / 管线 / 反馈枚举四层接线", () => {
     expect(preset.coverage.map((coverage) => coverage.eventPrefix)).toContain("delivery.");
   });
 
-  it("两个技能目录都有 SKILL.md，frontmatter 名与目录一致且引用围栏", () => {
+  it("岗位每个技能目录都有 SKILL.md，frontmatter 名与目录一致且引用围栏", () => {
     for (const skill of preset.skills) {
       const file = join(BUNDLE_DIR, "skills", skill, "SKILL.md");
       expect(existsSync(file), `${skill} 缺 SKILL.md`).toBe(true);
@@ -429,7 +441,7 @@ describe("岗位 / 技能 / 管线 / 反馈枚举四层接线", () => {
     }
   });
 
-  it("bundle 清单登记了交付围栏 / 两个技能 / 变体配方 / 后期连接器", () => {
+  it("bundle 清单登记了交付围栏 / 三个技能 / 变体配方 / 后期连接器", () => {
     const manifest = JSON.parse(readFileSync(join(BUNDLE_DIR, "bundle.json"), "utf8")) as {
       workloom: { provides: Record<string, string[]> };
     };
@@ -438,6 +450,7 @@ describe("岗位 / 技能 / 管线 / 反馈枚举四层接线", () => {
       "fences/ai-video-delivery.yml",
       "skills/delivery-package-ops/SKILL.md",
       "skills/delivery-revision-ops/SKILL.md",
+      "skills/post-quality-inspection/SKILL.md",
       "library/style-variants/index.json",
       "library/style-variants/warm-story.json",
       "connectors/post-bridge/core.mjs",

@@ -28,9 +28,10 @@
 
 import fs from "node:fs";
 import process from "node:process";
+import path from "node:path";
 
 import {
-  SubtitleError, best, callTool, exportSidecars, findRecipes, health, parseSrt, plan, renderDanmaku,
+  allowedRoots, assertPathAllowed, SubtitleError, best, callTool, exportSidecars, findRecipes, health, parseSrt, plan, renderDanmaku,
   renderKaraoke, renderSticker, renderTitle, renderWithSubtitles, selectFonts, softMux,
 } from "./core.mjs";
 
@@ -76,6 +77,12 @@ async function main() {
   const [command, ...rest] = process.argv.slice(2);
   const { flags } = parseArgs(rest);
   const line = (text = "") => process.stdout.write(`${text}\n`);
+  const reportFile = flags.report === undefined ? null : assertPathAllowed(String(flags.report), allowedRoots(), "report");
+  const writeReport = (value) => {
+    if (!reportFile) return;
+    fs.mkdirSync(path.dirname(reportFile), { recursive: true });
+    fs.writeFileSync(reportFile, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  };
 
   switch (command) {
     case "health": {
@@ -182,6 +189,7 @@ async function main() {
         platform: typeof flags.platform === "string" ? flags.platform : null,
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
       });
+      writeReport(report);
       line(`已烧录：${report.output.path}（${report.encoder}）`);
       line(`  字幕字体 ${report.fonts.字幕?.name ?? "-"} · 标题字体 ${report.fonts.标题?.name ?? "-"}`);
       line(`  时间轴回读 ${report.timeline.cues}/${report.timeline.sourceCues} 条（${report.timeline.ok ? "一致" : "不一致"}）`);
@@ -201,6 +209,7 @@ async function main() {
         platform: typeof flags.platform === "string" ? flags.platform : null,
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
       });
+      writeReport(report);
       line(`已渲染标题：${report.output.path}`);
       line(`  标题字体 ${report.fonts.标题?.name ?? "-"} · 事件 ${report.timeline.titleEvents} 条`);
       line(`  sha256 ${report.output.hash}`);
@@ -218,6 +227,7 @@ async function main() {
         maxChars: number(flags["max-chars"]),
         maxConcurrent: number(flags["max-concurrent"]),
       });
+      writeReport(report);
       line(`已渲染弹幕：${report.output.path}`);
       const total = report.density.kept + report.density.trimmed;
       line(`  条数 ${report.density.kept}/${total}${Number.isFinite(report.density.maxConcurrent)
@@ -238,6 +248,7 @@ async function main() {
         brief: readBrief(flags),
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
       });
+      writeReport(report);
       line(`已渲染贴纸：${report.output.path}`);
       for (const item of report.placements) {
         line(`  「${item.text}」 ${item.preset} · ${item.start}s~${item.end}s（停留 ${item.holdSec}s）· 中心 ${item.centre.x},${item.centre.y}`);
@@ -262,6 +273,7 @@ async function main() {
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
         highlightColour: typeof flags["highlight"] === "string" ? flags["highlight"] : "#FFE066",
       });
+      writeReport(report);
       line(`已渲染卡拉OK：${report.output.path}`);
       for (const row of report.timing) {
         line(`  cue#${row.cue} 口径 ${row.basis} · 字幕时长 ${row.cueDuration}s · 逐字合计 ${row.sum}s（误差 ${row.sumErrorSec}s）`);
@@ -286,6 +298,7 @@ async function main() {
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
         analyze: flags.analyze === true,
       });
+      writeReport(outcome);
       line(`旁挂字幕交付：${outcome.outputDir}`);
       for (const file of outcome.files) {
         line(`  ${file.path.split("/").pop()} · ${file.role}/${file.lang}/${file.format} · ${file.bytes}B · sha256 ${file.sha256.slice(0, 12)}`);
@@ -306,6 +319,7 @@ async function main() {
       if (flags.srt) tracks.push({ path: flags.srt, lang: typeof flags.lang === "string" ? flags.lang : "chi", title: "中文", default: true });
       if (flags["srt-en"]) tracks.push({ path: flags["srt-en"], lang: typeof flags["lang-en"] === "string" ? flags["lang-en"] : "eng", title: "English", default: tracks.length === 0 });
       const report = await softMux({ input: flags.in, output: flags.out, subtitles: tracks });
+      writeReport(report);
       line(`软字幕轨：${report.output}`);
       line(`  字幕轨 ${report.tracks.map((track) => `${track.lang}/${track.title}${track.default ? "(默认)" : ""}`).join("、")} · 编码 ${report.subtitleCodec}`);
       line(`  复检：${report.checks.map((check) => `${check.kind}=${check.ok ? "ok" : "fail"}`).join(" ")}`);
@@ -324,6 +338,7 @@ async function main() {
         evidenceDir: typeof flags["evidence-dir"] === "string" ? flags["evidence-dir"] : null,
         hasBurnedInSubtitles: flags["has-burned-in-subtitles"] === true,
       });
+      writeReport(outcome);
       if (outcome.verdict === "no_change_needed") {
         line(`结论：无需加字幕/无需改动 —— ${outcome.reason}`);
         return 0;

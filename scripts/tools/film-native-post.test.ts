@@ -13,6 +13,8 @@ import { assessVoiceArtifact, fingerprintFile, fingerprintText } from "./film-vo
 import { checkShotOrder } from "../../packages/video-studio/src/shot-order.js";
 import { assertStandardPostTimeline, buildStandardPostContract, validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
 import { assertStandardPostExportClock } from "./film-standard-post.mjs";
+import { executeRhythmEdit, rhythmFileSha256, rhythmMediaFacts } from "./rhythm-edit.mjs";
+import { dialogueLines } from "../../packages/video-studio/src/dialogue-contract.js";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
 // An immutable prior official source is allowed only for the local RED regression run.
@@ -134,6 +136,11 @@ function fixture() {
     }),
     artifactReusable: (_stage: string, _candidate: string) => true,
     isMaterialShot: (shot: Shot) => shot.shotId === "GT-04",
+    // AST-only provenance fixtures expose their declared media facts above;
+    // real full-CLI generation quality tests exercise the physical native probe.
+    pinGenerationSources: (files: string[], ids: string[]) => {
+      if (files.length !== ids.length || files.some((file, index) => !existsSync(file) || fingerprintFile(file) !== facts.get(ids[index]!)?.sha256)) throw new Error("GENERATION_SOURCE_BINDINGS_MISSING");
+    },
     rememberInputs: (_stage: string, _files: string[], _shotId?: string) => {},
     record: (row: Row) => { rows.push(row); }, recordGate: (_row: Record<string, unknown>) => ({ approved: true }),
     log: (_line: string) => {},
@@ -191,6 +198,44 @@ async function compose(f: ReturnType<typeof fixture>) {
 }
 
 describe("actual normal film CLI preserves every original native shot", () => {
+  it("explicit fast-cut production trims actual pinned sources, composes their native 1x sound, and retains the complete original files", async () => {
+    const f = fixture(), ffmpeg = process.env.WL_FFMPEG ?? "ffmpeg", ffprobe = process.env.WL_FFPROBE ?? "ffprobe";
+    const media = join(f.dir, "real-source.mp4");
+    const made = spawnSync(ffmpeg, ["-v", "error", "-nostdin", "-n", "-f", "lavfi", "-i", "color=c=blue:s=160x90:r=24:d=4",
+      "-f", "lavfi", "-i", "sine=frequency=733:sample_rate=48000:duration=4", "-map", "0:v:0", "-map", "1:a:0",
+      "-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ar", "48000", "-ac", "2", media], { encoding: "utf8", timeout: 60_000 });
+    expect(made.status, made.stderr).toBe(0);
+    const bytes = readFileSync(media), originals = (f.context.originalPostContract as { originals: Array<Record<string, any>> }).originals;
+    for (const [index, shot] of f.shots.entries()) {
+      const facts = f.facts.get(shot.shotId)!; writeFileSync(facts.path, bytes);
+      Object.assign(facts, { sha256: fingerprintFile(facts.path), bytes: bytes.length, durationSeconds: 4, width: 160, height: 90,
+        audio: { present: true, sampleRate: 48000, channels: 2, durationSec: 4 } });
+      Object.assign(originals[index]!, { sha256: facts.sha256, bytes: facts.bytes,
+        media: { fps: 24, width: 160, height: 90, videoFrames: 96, videoDurationSec: 4, audioDurationSec: 4, audioSampleRate: 48000, audioChannels: 2 } });
+    }
+    const ranges = [0.5, 2, 3, 0.5, 2, 3], before = f.shots.map(shot => fingerprintFile(f.facts.get(shot.shotId)!.path));
+    Object.assign(f.context, { FFMPEG: ffmpeg, FFPROBE: ffprobe, executeRhythmEdit, rhythmFileSha256, rhythmMediaFacts, dialogueLines,
+      OUTPUT_SIZE: { width: 160, height: 90 }, sourceDocument: { shots: f.shots, rhythmPlan: { profile: "fast-cut",
+        segments: f.shots.map((shot, index) => ({ id: shot.shotId, sourceId: shot.shotId, inSeconds: 0, outSeconds: ranges[index],
+          role: index % 3 === 0 ? "fast" : index % 3 === 1 ? "hold" : "breath", cutReason: "authored action/story cut",
+          protectedRanges: [{ inSeconds: 0, outSeconds: 0.4, kind: "speech", reason: "complete source sentence" }] })) } },
+      runCli: (cli: string, args: string[]) => {
+        f.calls.push({ cli, args });
+        const result = spawnSync(process.execPath, ["--import", "tsx", cli, ...args], { cwd: REPO, encoding: "utf8", timeout: 60_000, maxBuffer: 16 * 1024 * 1024 });
+        return { ok: result.status === 0, out: result.stdout + result.stderr };
+      }, probe: (file: string) => ({ ...rhythmMediaFacts(file, ffprobe), hasAudio: true }) });
+    await compose(f);
+    const row = f.rows.find(entry => entry.stage === "compose")!;
+    expect(row).toMatchObject({ ok: true, evidence: { mode: "explicit-fast-cut", originalSpeed: 1, qualityReviewPerformed: false, actualBodyDurationSec: 11 } });
+    expect(f.calls).toHaveLength(1); expect(f.calls[0]!.args).toContain("--native-clock"); expect(f.calls[0]!.args).not.toContain("--retime-to");
+    expect(f.shots.map(shot => fingerprintFile(f.facts.get(shot.shotId)!.path))).toEqual(before);
+    expect(f.forbiddenCalls).toEqual([]);
+  }, 120_000);
+  it("explicit fast-cut production rejects a reordered frozen storyboard before any media tool runs", async () => {
+    const f = fixture(); f.context.sourceDocument = { rhythmPlan: { profile: "fast-cut" } };
+    f.context.shots = [...f.shots].reverse(); await expect(compose(f)).rejects.toThrow(/RHYTHM_ORIGINAL_SEQUENCE_CONFLICT/);
+    expect(f.calls).toEqual([]); expect(f.forbiddenCalls).toEqual([]);
+  });
   it.each([1, 0.8])("BGM finalization reads requested export clock for real %ss audio without PCM inspection", async (audioSeconds) => {
     const f = fixture(), ffmpeg = process.env.WL_FFMPEG ?? "ffmpeg", ffprobe = process.env.WL_FFPROBE ?? "ffprobe";
     const out = join(f.dir, "mock-real-bgm.mp4");

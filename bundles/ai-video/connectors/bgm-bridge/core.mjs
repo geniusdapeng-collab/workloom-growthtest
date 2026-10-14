@@ -1495,7 +1495,9 @@ export async function mix(options = {}) {
     if (await sha256File(source) !== sourceSha256 || await sha256File(music) !== musicSha256) throw new BgmError("混音期间源字节发生变化", "audio_stems_stale", false);
     if (stems) await verifyIndependentAudio(audioStems, { env, bins });
     const outputHash = await sha256File(candidate);
-    const report = { schemaVersion: "workloom.bgm-process/v1", input: source, policy,
+    const beforeInputs = [{ path: source, sha256: sourceSha256 }, { path: music, sha256: musicSha256 }];
+    if (stems) beforeInputs.push({ path: stems.program.path, sha256: stems.program.sha256 });
+    const report = { beforeInputs, schemaVersion: "workloom.bgm-process/v1", input: source, policy,
       output: { path: output, hash: outputHash, sha256: outputHash, bytes, durationSec: actual.duration, durationSeconds: actual.duration },
       bgm: { path: music, sha256: musicSha256, playedSha256, finiteBedSha256: await sha256File(musicBed), finiteBedDurationSec: duration },
       mix: { musicLevelDb, duckingDb, targetLufs, truePeak, fadeInSec, fadeOutSec },

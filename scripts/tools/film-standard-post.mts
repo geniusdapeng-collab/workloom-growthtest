@@ -1,3 +1,4 @@
+import { createGenerationQuality } from "./generation-quality.mjs";
 /** Standard postproduction: immutable submitted originals; only four post layers are configurable. */
 import { execFile, spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
@@ -532,7 +533,7 @@ function relocate(value: unknown, staging: string, output: string): unknown {
   return value;
 }
 async function codeBinding(repo: string, timeout: number) {
-  const paths = ["scripts/tools/full-chain-film.mts", "scripts/tools/film-standard-post.mts", "packages/video-studio/src/standard-post-contract.ts", "packages/video-studio/src/film-completion.mjs", "scripts/tools/film-audio-policy.mjs", "scripts/tools/compose-film.mts",
+  const paths = ["scripts/tools/generation-quality.mjs", "bundles/ai-video/connectors/post-bridge/quality-gate.mjs", "scripts/tools/full-chain-film.mts", "scripts/tools/film-standard-post.mts", "packages/video-studio/src/standard-post-contract.ts", "packages/video-studio/src/film-completion.mjs", "scripts/tools/film-audio-policy.mjs", "scripts/tools/compose-film.mts",
     "packages/video-studio/src/film-worker-provenance.ts", "packages/video-studio/src/film-worker-channel.ts", "packages/video-studio/src/production-lineage.ts",
     "packages/video-studio/src/local-cover-render.ts", "packages/video-studio/src/cover-design.ts", "packages/video-studio/src/cover-platforms.ts",
     "packages/video-studio/src/cover-assembly.ts", "packages/video-studio/src/av-sync.ts", "packages/video-studio/src/deliver.ts", "bundles/ai-video/library/root-list.mjs",
@@ -552,7 +553,7 @@ async function relocateGeneratedReceipts(directory: string, staging: string, out
   for (const entry of await readdir(directory, { withFileTypes: true })) {
     const path = join(directory, entry.name);
     if (entry.isDirectory()) await relocateGeneratedReceipts(path, staging, output);
-    else if (entry.isFile() && entry.name !== "post-settings.json" && /\.json$/.test(entry.name)) {
+    else if (entry.isFile() && entry.name !== "post-settings.json" && !path.includes(`${sep}quality${sep}`) && /\.json$/.test(entry.name)) {
       const value = JSON.parse(await readFile(path, "utf8"));
       await writeFile(path, `${JSON.stringify(relocate(value, staging, output), null, 2)}\n`);
     }
@@ -593,6 +594,14 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
   catch (e) { await lock.close(); await rm(lockPath, { force: true }); throw e; }
   const evidenceDir = join(staging, "evidence"), post = join(staging, "post"), inputDir = join(staging, "inputs");
   const records: unknown[] = [];
+  const quality = createGenerationQuality({ root: staging, bins });
+  const qualityStep = async <T,>(name: string, id: string, inputs: string[], parameters: Record<string, unknown>,
+    action: () => Promise<T>, outputs: (result: T) => string[], execution: (result: T) => Record<string, unknown> = result => ({ processorReport: result })) => {
+    const token = quality.begin(name, id, inputs, { ...parameters, request: { id, inputs, ...parameters } });
+    try { const result = await action(); quality.finish(token, { outputs: outputs(result), execution: { ...execution(result), exitCode: 0 } }); return result; }
+    catch (error) { quality.abort(token); throw error; }
+  };
+
   const evidence = async (name: string, value: unknown) => { const relocated = relocate(value, staging, output); await writeFile(join(evidenceDir, `${name}.json`), `${JSON.stringify(relocated, null, 2)}\n`, { flag: "wx" }); return relocated; };
   const stage = async (name: string, action: () => Promise<unknown>) => {
     const start = Date.now(); try {
@@ -612,6 +621,7 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       const rows = [];
       for (const [sid, s] of frozen) {
         const snapshot = join(inputDir, sid + extname(s.path)); await copyFile(s.path, snapshot);
+        if (s.source.role === "original-render") quality.preserveSource(s.path, sid);
         if (await standardPostFileHash(snapshot) !== s.source.sha256) fail("STANDARD_POST_SOURCE_CHANGED", sid);
         sources.set(sid, snapshot); rows.push({ ...s.source, resolvedSource: s.path, snapshot, media: s.media });
       }
@@ -648,6 +658,7 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       ensure(rechecked.manifestSha256 === original.manifestSha256 && rechecked.contract.contractSha256 === contract.contractSha256, "original sources drifted before composition");
       const argv = ["--import", "tsx", join(repo, "scripts/tools/compose-film.mts"), "--clips", prepared.map((s) => s.path).join(","), "--out", composed,
         "--width", String(plan.width), "--height", String(plan.height), "--fps", String(plan.fps), "--fade", "0", "--color", "none", "--native-clock", "--json"];
+      const composeToken = quality.beginCli(join(repo, "scripts/tools/compose-film.mts"), argv.slice(3));
       const result = await run(process.execPath, argv, timeout, { ...process.env, WL_FFMPEG: bins.ffmpeg, WL_FFPROBE: bins.ffprobe }, repo);
       const processReceipt = JSON.parse(await readFile(composed.replace(/\.mp4$/, ".av-sync.json"), "utf8"));
       const clock = processReceipt.outputMedia;
@@ -670,6 +681,7 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       }
       ensure(clock.videoFrames === contract.totalFrames && clock.videoFrames === processReceipt.target.shotFrames.reduce((sum: number, frames: number) => sum + frames, 0),
         "composition lost or added a complete source output frame");
+      quality.finishCli(composeToken, { report: processReceipt, receiptFile: composed.replace(/\.mp4$/, ".av-sync.json") });
       bodyFrames = clock.videoFrames; bodyDurationSec = bodyFrames / clock.fps; compositionReceipt = processReceipt;
       let startFrame = 0;
       compositionTimeline = processReceipt.target.shotFrames.map((frameCount: number, index: number) => {
@@ -685,8 +697,10 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
     if (cues.some((c) => !String(c.text).trim())) fail("STANDARD_POST_PLAN_INVALID", "punctuation removal leaves an empty subtitle");
     const platform = plan.cover.platform === "wechat-channels" ? "视频号" : plan.cover.platform;
     const brief = { 平台: platform, 题材: "酒店自助设备", 调性: "清晰可信", 分辨率: [plan.width, plan.height] };
-    const sidecars = await stage("subtitle-sidecars", () => Promise.resolve(subtitle.exportSidecars!({ input: composed, outputDir: join(staging, "subtitles"), name: plan.projectId,
-      cues, platform, brief, bins, fontsDir: plan.subtitleFontsRoot, catalog, titleText: "", evidenceDir: join(evidenceDir, "subtitle-sidecars") }))) as { passed?: boolean; files: Array<{ path: string; format: string }> };
+    const sidecars = await stage("subtitle-sidecars", () => qualityStep("subtitles", "sidecars", [composed], { mode: "sidecar", cues },
+      () => Promise.resolve(subtitle.exportSidecars!({ input: composed, outputDir: join(staging, "subtitles"), name: plan.projectId,
+      cues, platform, brief, bins, fontsDir: plan.subtitleFontsRoot, catalog, titleText: "", evidenceDir: join(evidenceDir, "subtitle-sidecars") })),
+      result => (result as { files: Array<{ path: string }> }).files.map(file => file.path), result => ({ processorReport: result, cueCount: cues.length }))) as { passed?: boolean; files: Array<{ path: string; format: string }> };
     if (sidecars.passed !== true) fail("STANDARD_POST_SUBTITLE_UNVERIFIED", "official subtitle sidecar checks failed");
     const color = await loadCore(repo, "color-bridge"), bgm = await loadCore(repo, "bgm-bridge");
     const coverModule = await import(pathToFileURL(join(repo, "packages/video-studio/src/local-cover-render.ts")).href) as { renderLocalCover: (o: Record<string, unknown>) => Promise<{ path: string; receipt: unknown }> };
@@ -695,40 +709,44 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
     for (const version of plan.versions) {
       const label = version.id === "master" ? plan.projectId : `${plan.projectId}-variant-${version.id}`;
       const graded = join(post, `${version.id}-graded.mp4`), picture = join(post, `${version.id}-picture.mp4`);
-      await stage(`color-${version.id}`, async () => {
-        if (version.profile === "none") {
-          await copyFile(composed, picture);
-          const pictureSha256 = await standardPostFileHash(picture);
-          if (pictureSha256 !== await standardPostFileHash(composed)) fail("STANDARD_POST_SOURCE_CHANGED", "picture copy differs from composition");
-          return { mode: "original-composition-passthrough", graded: false, applicable: false, reason: "master explicitly preserves composed source picture", source: composed, pictureSha256 };
-        }
-        const report = await Promise.resolve(color.grade!({ input: composed, output: graded, profile: version.profile, intensity: version.intensity, bins, auto: false,
-          verifyAt: [], defects: false, verify: false, onUnfixable: "report" }));
-        await run(bins.ffmpeg, ["-v", "error", "-n", ...directMediaInput(), "-i", graded, ...directMediaInput(), "-i", composed, "-map", "0:v:0", "-map", "1:a:0?", "-c", "copy", "-movflags", "+faststart", picture], timeout);
-        return { report, sourceAudioRestoredFrom: composed, pictureSha256: await standardPostFileHash(picture) };
-      });
+      await stage(`color-${version.id}`, () => qualityStep("color", `color-${version.id}`, [composed],
+        { profile: version.profile === "none" ? null : version.profile, technicalOnly: version.profile === "none", mode: "grade", intensity: version.profile === "none" ? 1 : version.intensity }, async () => {
+          const report = await Promise.resolve(color.grade!({ input: composed, output: graded, profile: version.profile === "none" ? null : version.profile,
+            intensity: version.profile === "none" ? 1 : version.intensity, bins, auto: false, clarity: "conservative", qualityGuard: "report",
+            verifyAt: [], defects: false, verify: false, onUnfixable: "report" }));
+          await run(bins.ffmpeg, ["-v", "error", "-n", ...directMediaInput(), "-i", graded, ...directMediaInput(), "-i", composed,
+            "-map", "0:v:0", "-map", "1:a:0?", "-c", "copy", "-movflags", "+faststart", picture], timeout);
+          return { report, sourceAudioRestoredFrom: composed, pictureSha256: await standardPostFileHash(picture) };
+        }, () => [picture, graded]));
       let scored = picture; let mixReport: unknown = { layer: "off", reason: "no music requested", sourceAuthority: "declared-unverified", stemsVerified: false };
       if (version.musicSourceId) {
         scored = join(post, `${version.id}-scored.mp4`);
-        mixReport = await stage(`bgm-${version.id}`, async () => {
+        mixReport = await stage(`bgm-${version.id}`, () => qualityStep("bgm", `bgm-${version.id}`, [picture, sources.get(version.musicSourceId!)!],
+          { mode: "mix", policy: "keep-dialogue", musicLevelDb: version.musicLevelDb, duckingDb: version.duckingDb }, async () => {
           const cutTimes = compositionTimeline.slice(1).map(entry => entry.startSec);
           const report = await Promise.resolve(bgm.mix!({ input: picture, output: scored, bgmPath: sources.get(version.musicSourceId!), declaredProgramMix: true,
             env: bgmEnv, bins, policy: "keep-dialogue", musicLevelDb: version.musicLevelDb, duckingDb: version.duckingDb, targetLufs: -14, truePeak: -1.5,
             cutTimes, bgmBpm: version.musicBpm, bpmOverride: version.musicBpm, align: true, section: "full",
             evidenceDir: join(evidenceDir, `bgm-${version.id}-frames`), licenseReviewed: false, commercialUse: false }));
           return { ...object(report, "BGM processing receipt"), compositionCuts: { requestedSeconds: cutTimes, basis: "measured-composition-frame-clock", reviewed: false } };
-        });
+        }, () => [scored], result => {
+          const actual = result as unknown as { bgm: { id?: string; path: string; sha256: string } };
+          return { processorReport: result, trackId: actual.bgm.id ?? basename(actual.bgm.path), trackSha256: actual.bgm.sha256 };
+        }));
       }
       const burned = join(post, `${version.id}-subtitled.mp4`);
-      await stage(`subtitle-burn-${version.id}`, () => Promise.resolve(subtitle.renderWithSubtitles!({ mode: "subtitle", input: scored, output: burned, cues, titleText: "",
-        platform, brief, fontsDir: plan.subtitleFontsRoot, catalog, bins, evidenceDir: join(evidenceDir, `subtitle-${version.id}-frames`) })));
+      await stage(`subtitle-burn-${version.id}`, () => qualityStep("subtitles", `burn-${version.id}`, [scored], { mode: "burn", cues },
+        () => Promise.resolve(subtitle.renderWithSubtitles!({ mode: "subtitle", input: scored, output: burned, cues, titleText: "",
+        platform, brief, fontsDir: plan.subtitleFontsRoot, catalog, bins, evidenceDir: join(evidenceDir, `subtitle-${version.id}-frames`) })),
+        () => [burned], result => ({ processorReport: result, cueCount: cues.length })));
       const cover = join(staging, `${label}-cover.png`);
-      await stage(`cover-${version.id}`, () => coverModule.renderLocalCover({ source: { kind: "video-frame", path: sources.get(plan.cover.sourceId)!, timeSec: plan.cover.atSec },
+      await stage(`cover-${version.id}`, () => qualityStep("cover", `cover-${version.id}`, [sources.get(plan.cover.sourceId)!, font], { mode: "cover", title: plan.cover.title, subtitle: plan.cover.subtitle }, () => coverModule.renderLocalCover({ source: { kind: "video-frame", path: sources.get(plan.cover.sourceId)!, timeSec: plan.cover.atSec },
         title: plan.cover.title, subtitle: plan.cover.subtitle, platform: plan.cover.platform, variant: version.id === "master" ? "warm-film" : version.id,
         out: cover, width: plan.width, height: plan.height, fontFile: font, fontSha256: plan.cover.fontSha256, fontId: plan.cover.fontId,
-        ffmpeg: bins.ffmpeg, ffprobe: bins.ffprobe, footageOrigin: "generated", durationSeconds: bodyDurationSec, timeoutMs: Math.min(timeout, 600_000) }));
+        ffmpeg: bins.ffmpeg, ffprobe: bins.ffprobe, footageOrigin: "generated", durationSeconds: bodyDurationSec, timeoutMs: Math.min(timeout, 600_000) }), () => [cover]));
       const final = join(staging, `${label}.mp4`);
-      const coverReceipt = await stage(`cover-assembly-${version.id}`, () => embedCoverFirstFrame({ input: burned, cover, output: final, preserveSourceFrames: true, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
+      const coverReceipt = await stage(`cover-assembly-${version.id}`, () => qualityStep("cover", `cover-assembly-${version.id}`, [burned, cover], { mode: "cover-first-frame" },
+        () => embedCoverFirstFrame({ input: burned, cover, output: final, preserveSourceFrames: true, ...bins, timeoutMs: Math.min(timeout, 600_000) }), () => [final]));
       const media = await probe(final, bins, timeout), video = media.streams.find((s) => s.codec_type === "video");
       if (!video || Number(video.width) !== plan.width || Number(video.height) !== plan.height || Math.abs(rate(video) - plan.fps) > 0.001
         || Math.abs(Number(video.duration ?? media.format.duration) - (bodyDurationSec + 1 / plan.fps)) > 1e-6)
@@ -737,12 +755,19 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
       outputs.push({ id: version.id, path: final, sha256: await standardPostFileHash(final), bytes: (await stat(final)).size, media, cover, coverReceipt, bgm: mixReport, exportClock });
       if (version.id === "master") {
         const cleanWithCover = join(post, "master-clean-cover.mp4");
-        await stage("clean-cover-assembly", () => embedCoverFirstFrame({ input: scored, cover, output: cleanWithCover, preserveSourceFrames: true, ...bins, timeoutMs: Math.min(timeout, 600_000) }));
+        // A clean, unscored soft-subtitle presentation retains every current compositor frame and AAC packet.
+        // HDR/CST normalization has already run inside the compositor when its input requires it.
+        const cleanProgramme = version.profile === "none" && !version.musicSourceId ? composed : scored;
+        await stage("clean-cover-assembly", () => qualityStep("cover", "clean-cover-assembly", [cleanProgramme, cover], { mode: "cover-first-frame", source: cleanProgramme === composed ? "native-composed-program" : "requested-graded-program" },
+          () => embedCoverFirstFrame({ input: cleanProgramme, cover, output: cleanWithCover, preserveSourceFrames: true, ...bins, timeoutMs: Math.min(timeout, 600_000) }), () => [cleanWithCover]));
         const soft = join(staging, `${plan.projectId}-softsub.mp4`), srt = sidecars.files.find((f) => f.format === "srt")?.path;
         if (!srt) fail("STANDARD_POST_SUBTITLE_UNVERIFIED", "official SRT missing");
-        const receipt = await stage("soft-subtitle-mux", () => Promise.resolve(subtitle.softMux!({ input: cleanWithCover, output: soft, subtitles: [{ path: srt, lang: "chi", default: true }], bins, verify: true })));
+        const receipt = await stage("soft-subtitle-mux", () => qualityStep("subtitles", "softmux", [cleanWithCover, srt!], { mode: "softmux" },
+          () => Promise.resolve(subtitle.softMux!({ input: cleanWithCover, output: soft, subtitles: [{ path: srt, lang: "chi", default: true }], bins, verify: true })),
+          () => [soft], result => ({ processorReport: result, cueCount: cues.length })));
         const exportClock = await stage("export-clock-softsub", () => assertStandardPostExportClock(soft, bodyDurationSec + 1 / plan.fps, { ...bins, timeoutMs: timeout, expectedVideoFrames: bodyFrames + 1, expectedFps: plan.fps }));
-        outputs.push({ id: "softsub", path: soft, sha256: await standardPostFileHash(soft), bytes: (await stat(soft)).size, receipt, exportClock });
+        outputs.push({ id: "softsub", path: soft, sha256: await standardPostFileHash(soft), bytes: (await stat(soft)).size, receipt, exportClock,
+          colorMode: cleanProgramme === composed ? "native-composed-program" : "requested-graded-program" });
       }
       for (const temporary of [graded, picture, scored, burned, join(post, "master-clean-cover.mp4")]) {
         if (temporary !== composed) await rm(temporary, { force: true });
@@ -760,6 +785,23 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
     const finalCode = await codeBinding(repo, timeout);
     if (JSON.stringify(finalCode) !== JSON.stringify(code)) fail("STANDARD_POST_CODE_CHANGED", "consumed code, commit or working tree changed during editing");
     for (const binary of binaries) if (await standardPostFileHash(binary.path) !== binary.sha256) fail("STANDARD_POST_BINARY_CHANGED", binary.name);
+    const qualityArtifacts: Array<Record<string, any>> = [];
+    for (const item of outputs) {
+      const outputId = item.id === "master" || item.id === "softsub" ? String(item.id) : `variant:${item.id}`;
+      const version = plan.versions.find(version => version.id === item.id);
+      qualityArtifacts.push({ id: outputId, path: String(item.path), media: "video", role: item.id === "softsub" ? "softsub" : "final",
+        fps: plan.fps, durationSeconds: bodyDurationSec + 1 / plan.fps, requireSubtitleStream: item.id === "softsub",
+        requiredStages: ["transitions", ...(item.colorMode === "native-composed-program" ? [] : ["color"]), "subtitles", "cover", ...(version?.musicSourceId ? ["bgm"] : [])],
+        ...(version ? { expectedColorProfile: version.profile === "none" ? null : version.profile } : {}) });
+      if (item.cover) qualityArtifacts.push({ id: `cover:${item.id}`, path: String(item.cover), media: "image", role: "cover" });
+    }
+    for (const file of sidecars.files.filter(file => /\.(srt|ass|vtt)$/i.test(file.path))) qualityArtifacts.push({ id: `subtitle:${file.format}`, path: file.path, media: "subtitle", durationSeconds: bodyDurationSec + 1 / plan.fps });
+    const accepted = await quality.inspect({ phase: "standard-delivery", scope: "delivery", artifacts: qualityArtifacts,
+      variantIds: plan.versions.filter(version => version.id !== "master").map(version => version.id), requiredOutputIds: qualityArtifacts.map(row => row.id),
+      resolution: [plan.width, plan.height], sourceResolution: [contract.width, contract.height], requirements: [
+        ...["cover", "subtitles", "transitions", "color", "resolution"].map(name => ({ name, requirement: "required" })),
+        plan.versions.some(version => version.musicSourceId) ? { name: "bgm", requirement: "required" } : { name: "bgm", requirement: "not_applicable", reason: "冻结标准后期设置没有请求配乐" },
+        { name: "danmaku", requirement: "not_applicable", reason: "冻结标准后期设置没有请求弹幕" } ] });
     await relocateGeneratedReceipts(staging, staging, output);
     const manifest = relocate({ schemaVersion: "workloom.standard-post-delivery/v1", generatedAt: new Date().toISOString(), projectId: plan.projectId,
       mode: "original-native-standard-postproduction", planSha256: planHash, sourceCode: { ...code, currentCodeRechecked: true }, binaries,
@@ -770,14 +812,19 @@ export async function runStandardPost(manifestFile: string, settingsFile: string
         basis: "One cover video frame precedes every complete body frame; original audio packets and subtitle timestamps remain on their source clock. AV quality was not reviewed." },
       supplierGenerationCalls: 0, modelCalls: 0, ttsCalls: 0, asrCalls: 0, sourceFilesUnchanged: true, speed: 1,
       generativeFrameSynthesis: false, sourceNormalization: "Complete measured source intervals; only export canvas/cadence conversion when needed. No nominal crop, retiming or duration fit padding.",
-      scope: "Every frozen original shot is adopted in submitted order over its complete measured frame interval. Available same-file original audio remains on its source clock. No identity, clothing, motion, speech, lip-sync, PCM correlation or rendered-output quality acceptance review.",
+      scope: "Every frozen original shot is adopted in submitted order over its complete measured frame interval. Available same-file original audio remains on its source clock. Current files receive objective technical QA. Identity, clothing, motion, speech, lip-sync, PCM correlation and artistic quality remain unverified.",
       originalManifestSha256: original.manifestSha256, contractSha256: contract.contractSha256, originalTimeline: contract.timeline, sourceAuthority: contract.originals.map(s => s.authority),
       sourceFiles: plan.sources, originalSources: prepared, authoredSubtitles: plan.subtitles,
       subtitleAlignment: "Authored sentence timing using existing audio; no new ASR or phonetic timing proof", openingTitle: { source: "none", burned: false },
       musicLicenseReview: { reviewed: false, commercialUse: false, basis: "Private local derived delivery using existing music files. Existing source declarations are retained; no upstream per-track license verification is claimed." },
-      outputs, variantAxes, distinctness, stages: records }, staging, output);
+      outputs, variantAxes, distinctness, stages: records }, staging, output) as Record<string, unknown>;
+    manifest.generationQuality = accepted.manifest;
+    manifest.qualityReport = { path: relative(staging, accepted.qualityFile.path), sha256: accepted.qualityFile.sha256 };
     await writeFile(join(staging, `${plan.projectId}-delivery-manifest.json`), `${JSON.stringify(manifest, null, 2)}\n`, { flag: "wx" });
     try { await lstat(output); fail("STANDARD_POST_OUTPUT_EXISTS", "output appeared while editing"); } catch (e) { if (!missing(e)) throw e; }
+    const independent = await import("./generation-quality.mjs");
+    const pendingQuality = await independent.inspectGenerationManifest({ root: staging, manifest, bins, phase: "standard-before-publish" });
+    if (!pendingQuality.passed) fail("STANDARD_POST_QUALITY_FAILED", "current staged native media failed independent readback");
     await rename(staging, output);
     return manifest;
   } catch (e) {

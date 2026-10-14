@@ -10,7 +10,7 @@ import {
 } from "../../library/director-system/core.mjs";
 import {
   normaliseShots, assertPathAllowed, allowedRoots, resolveResolution, resolveBinaries,
-  pickTrackForVariant, buildCover, buildCopyPack, PostError,
+  pickTrackForVariant, buildCover, buildCopyPack, PostError, resolveNativePostCanvas,
 } from "./core.mjs";
 import { runBin, sha256File, probeMedia } from "../subtitle-bridge/measure.mjs";
 import {
@@ -19,6 +19,11 @@ import {
 import { grade } from "../color-bridge/core.mjs";
 import { renderAudioStems, verifyAudioStemBundle, snapshotAudioStemArtifact, muxAudioProgram } from "../bgm-bridge/audio-stems.mjs";
 import { createAudioStemReceiptVerifier } from "../bgm-bridge/audio-stems-trust.mjs";
+import { captureProcessingInputs, writeProcessingProof, assertPostQuality, writePostQuality } from "./quality-gate.mjs";
+import { inspectDirectorDeliveryManifest, directorPictureRequest } from "./director-quality.mjs";
+import { applyPostEntity } from "../color-bridge/entity-post.mjs";
+import { applyPostRhythmSound } from "./rhythm-post.mjs";
+export { inspectDirectorDeliveryManifest } from "./director-quality.mjs";
 
 const SCHEMA = "workloom.film-project/v2";
 const fail = (code, message) => { throw new PostError(message, code); };
@@ -29,6 +34,8 @@ const writeJson = async (file, value) => {
 };
 const portablePath = file => file.replaceAll("\\", "/").replaceAll("'", "'\\''");
 const descriptor = async file => ({ path: file, sha256: await sha256File(file), bytes: (await fsp.stat(file)).size });
+const audioOutput = value => ({ path: value.path, sha256: value.sha256, media: "audio" });
+const videoOutput = value => ({ path: value.path, sha256: value.sha256, media: "video" });
 async function exactFrames(file, bins) {
   const { stdout } = await runBin(bins.ffprobe, ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=nb_frames,avg_frame_rate,duration", "-show_format", "-of", "json", file], { label: "director(export-metadata)" });
   const document=JSON.parse(stdout),stream=document.streams?.[0];
@@ -60,7 +67,7 @@ async function verifyArtifacts(value, env, checked = new Set(), baseDir = null) 
 }
 async function verifyFrozenSnapshot(snapshot,env,bins) {
   if(snapshot.schemaVersion!==SCHEMA) fail("CONTRACT_INVALID","不是 V2 后期工程");
-  await verifyArtifacts(snapshot,env);
+  await verifyArtifacts(snapshot,env,new Set(),assertPathAllowed(snapshot.revisionRoot,allowedRoots(env)));
   for(const shot of snapshot.shots) {
     const expected=snapshot.prepared.source.shots.find(source=>source.shotId===shot.shotId)?.sha256;
     if(!expected || await sha256File(assertPathAllowed(shot.path??shot.localPath,allowedRoots(env)))!==expected)
@@ -174,10 +181,16 @@ async function executeProgram(plan, source, sourceStems, output, bins) {
     sourceProgramSha256: sourceStems.program.sha256 };
 }
 
-async function mixIndependentMusic(plan, program, output, bins, env) {
+async function mixIndependentMusic(plan, program, output, bins, env, proofContext = null) {
   const recipe = { id: plan.variantId, bgm: plan.musicPlan };
   if (plan.musicPlan.enabled === false) {
-    await checkedCopy(program.path, program.sha256, output, env);
+    const before = proofContext ? await captureProcessingInputs([program.path]) : null;
+    await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-i", program.path, "-map", "0:a:0", "-c:a", "pcm_f32le", "-ar", "48000", "-ac", "2", output], { label: "director(original-programme)" });
+    if (await sha256File(program.path) !== program.sha256) fail("SOURCE_CHANGED", "节目源在无配乐导出期间变化");
+    if (proofContext) proofContext.replace(await writeProcessingProof({ root: proofContext.root, stage: "bgm",
+      id: `${plan.variantId}-mix`, inputs: before, outputs: [{ path: output, media: "audio" }],
+      parameters: { mode: "original-program", request: plan.musicPlan },
+      execution: { programSha256: program.sha256, outputSha256: await sha256File(output) } }));
     return { ...await descriptor(output), musicDisabled: true, musicSha256: null, measured: null, programSha256: program.sha256 };
   }
   const track = pickTrackForVariant(recipe, { env });
@@ -200,9 +213,14 @@ async function mixIndependentMusic(plan, program, output, bins, env) {
   // Independent source content/arrangement is evidence; gain is never used to certify version difference.
   const musicFilter = `aresample=48000,aformat=channel_layouts=stereo,atrim=end_sample=${totalSamples},asetpts=N/SR/TB,volume=${Number(plan.musicPlan.musicLevelDb ?? -24)}dB,afade=t=in:st=${silence}:d=${fadeIn},afade=t=out:st=${Math.max(0, seconds-fadeOut)}:d=${fadeOut},volume='if(lt(t,${silence}),0,if(between(t,${Math.max(silence, breath-.25)},${breath+.25}),0.35,if(gte(t,${climax}),1,0.75)))':eval=frame`;
   const chain = `[0:a]asplit=2[p][side];[1:a]${musicFilter}[music];[music][side]sidechaincompress=threshold=0.03:ratio=6:attack=15:release=180[ducked];[p][ducked]amix=inputs=2:duration=first:dropout_transition=0:normalize=0,loudnorm=I=-14:TP=-1:LRA=11,aresample=48000,apad=whole_len=${totalSamples},atrim=end_sample=${totalSamples}[out]`;
+  const before = proofContext ? await captureProcessingInputs([program.path, snapshot]) : null;
   await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-i", program.path, "-stream_loop", String(musicLoops), "-t", String(seconds), "-i", snapshot,
     "-filter_complex", chain, "-map", "[out]", "-ar", "48000", "-ac", "2", "-c:a", "pcm_f32le", output], { label: "director(music-arrangement)", timeoutMs: 1800000 });
   if (await sha256File(track.path) !== trackHash) fail("SOURCE_CHANGED", "混音期间音乐源变化");
+  if (proofContext) proofContext.replace(await writeProcessingProof({ root: proofContext.root, stage: "bgm",
+    id: `${plan.variantId}-mix`, inputs: before, outputs: [{ path: output, media: "audio" }],
+    parameters: { mode: "bgm", request: plan.musicPlan, policy: plan.musicPlan.policy ?? "keep-dialogue", filterChain: chain },
+    execution: { trackId: track.id, trackSha256: trackHash, programSha256: program.sha256, outputSha256: await sha256File(output) } }));
   return { ...await descriptor(output), programSha256: program.sha256, musicSha256: trackHash,
     music: { id: track.id, title: track.title, license: track.license, attribution: track.attribution,
       provenance:track.provenance??null,libraryFallbackReason:track.libraryFallbackReason??null },musicSource:await descriptor(snapshot),
@@ -222,7 +240,7 @@ function cueData(subtitles) {
   return { zh: read("zh"), en: read("en") };
 }
 
-async function executeSubtitles(plan, source, cues, input, outputDir, bins, softSubtitles, burnSubtitles) {
+async function executeSubtitles(plan, source, cues, input, outputDir, bins, softSubtitles, burnSubtitles, proofContext = null) {
   const mapped = mapCuesToTimeline(cues.zh, plan, source);
   const mappedEn = mapCuesToTimeline(cues.en, plan, source);
   if (!mapped.length) return { state: "not_applicable", files: [], mapped: [], softsub: null, visibleStyle: null };
@@ -250,11 +268,21 @@ async function executeSubtitles(plan, source, cues, input, outputDir, bins, soft
     files.push(await descriptor(enFile)); tracks.push({ path: enFile, lang: "eng", title: "English" });
   }
   const softPath = path.join(outputDir, "film.softsub.mp4");
+  const softBefore = softSubtitles && proofContext ? await captureProcessingInputs([input, ...tracks.map(track => track.path)]) : null;
   const soft = softSubtitles ? await softMux({ input, output: softPath, subtitles: tracks, bins }) : null;
+  if (soft && proofContext) proofContext.processing.push(await writeProcessingProof({ root: proofContext.root,
+    stage: "subtitles", id: `${plan.variantId}-softsub`, inputs: softBefore,
+    outputs: [{ path: softPath, media: "video", requireAudio: true }], parameters: { mode: "softsub", mapped, style: plan.subtitlePlan.style },
+    execution: { cueCount: mapped.length, outputSha256: await sha256File(softPath) } }));
   const burnedPath = path.join(outputDir, "film.burned.mp4");
+  const burnBefore = burnSubtitles && proofContext ? await captureProcessingInputs([input, assPath]) : null;
   const burned = burnSubtitles ? await renderWithSubtitles({ input, output: burnedPath, cues: normalized,
     platform: plan.platform, bins, evidenceDir:outputDir,
     styleOverrides: Object.fromEntries(styles.map(entry => [entry.name, entry.style])) }) : null;
+  if (burned && proofContext) proofContext.processing.push(await writeProcessingProof({ root: proofContext.root,
+    stage: "subtitles", id: `${plan.variantId}-burned`, inputs: burnBefore,
+    outputs: [{ path: burnedPath, media: "video", requireAudio: true }], parameters: { mode: "burned", mapped, style: plan.subtitlePlan.style },
+    execution: { cueCount: mapped.length, checks: burned.checks, outputSha256: await sha256File(burnedPath) } }));
   return { state: "ready", files, mapped, mappedEn, styles, softsub: soft ? await descriptor(softPath) : null,
     burned: burned ? { ...await descriptor(burnedPath), checks: burned.checks, evidence: burned.evidence } : null,
     visibleStyle: { styles, assSha256: (await descriptor(assPath)).sha256 },
@@ -289,94 +317,177 @@ async function prepareSources({ project, shots, workDir, bins, env }) {
   return { normalised, sourceManifest, source, sourceStems };
 }
 
+function directorSoundRequest(project, plan, source) {
+  const authored = project.directorSoundCues ?? project.rhythmPlan?.soundCues ?? [];
+  if (!Array.isArray(authored)) fail("TIMELINE_INVALID", "导演声音 cue 必须为数组");
+  const cues = [];
+  for (const cue of authored) {
+    if (!cue || typeof cue !== "object") fail("TIMELINE_INVALID", "导演声音 cue 非法");
+    const frame = cue.atFrame ?? Number(cue.atSeconds) * source.fps;
+    if (!Number.isFinite(frame) || frame < 0) fail("TIMELINE_INVALID", "导演声音 cue 时钟非法");
+    const shot = cue.sourceId ? source.shots.find(entry => entry.shotId === cue.sourceId)
+      : source.shots.find(entry => frame >= entry.sourceStartFrame && frame < entry.sourceStartFrame + entry.frames);
+    if (!shot) fail("TIMELINE_INVALID", "导演声音 cue 不属于冻结源");
+    const local = cue.sourceId ? frame : frame - shot.sourceStartFrame;
+    const placements = plan.pictureEdl.filter(edit => edit.sourceId === shot.shotId && local >= edit.inFrame && local < edit.outFrame);
+    if (!placements.length) fail("TIMELINE_INVALID", "导演时间线没有保留点名的声音时点，禁止假装已执行");
+    for (const edit of placements) cues.push({ atSeconds: (edit.startFrame + local - edit.inFrame) / source.fps,
+      kind: cue.kind, gainDb: cue.gainDb, reason: cue.reason });
+  }
+  return { profile: "natural", segments: plan.pictureEdl.map(edit => ({ id: edit.segmentId, sourceId: edit.sourceId,
+    inSeconds: edit.inFrame / plan.fps, outSeconds: edit.outFrame / plan.fps, role: "story", cutReason: plan.narrativePlan.description ?? String(plan.narrativePlan) })),
+    soundCues: cues };
+}
+
 async function executeVariant({ plan, prepared, project, target, bins, env, cues, softSubtitles, burnSubtitles, previous = null, layers = null }) {
   const dir = path.join(target, "variants", plan.variantId); await fsp.mkdir(dir, { recursive: true });
-  let picture, readback, program, graded, mix, video;
-  const pictureChanged = !previous || ["shots", "assemble"].some(layer=>layers?.includes(layer));
+  const proofRoot = assertPathAllowed(project.revisionRoot ?? target, allowedRoots(env));
+  const id = plan.variantId;
+  const processing = structuredClone(previous?.processing ?? []);
+  const replace = proof => {
+    for (let index = processing.length - 1; index >= 0; index--) if (processing[index].stage === proof.stage && processing[index].id === proof.id) processing.splice(index, 1);
+    processing.push(proof); return proof;
+  };
+  const proof = async (stage, suffix, inputs, outputs, parameters, execution) => replace(await writeProcessingProof({
+    root: proofRoot, stage, id: `${id}-${suffix}`, inputs, outputs, parameters, execution }));
+  let picture, readback, program, graded, mix, video, entity, programme, sound = null;
+  const pictureChanged = !previous || ["shots", "assemble"].some(layer => layers?.includes(layer));
   const colorChanged = pictureChanged || layers?.includes("color");
-  const audioChanged = pictureChanged || layers?.includes("audio");
+  // A new picture container must receive a current programme/sound/music chain even when the audio recipe is unchanged.
+  const audioChanged = pictureChanged || colorChanged || layers?.includes("audio");
   const reusableVideo = previous && !colorChanged && !audioChanged;
   if (reusableVideo) {
     await verifyFile(previous.video, env);
-    picture = previous.layers.picture; readback = previous.actual;
-    program = previous.layers.program; graded = previous.layers.graded; mix = previous.audio;
+    picture = previous.layers.picture; readback = previous.actual; program = previous.layers.program;
+    graded = previous.layers.graded; mix = previous.audio; entity = previous.entity; programme = previous.layers.programme; sound = previous.sound;
+    const before = await captureProcessingInputs([previous.video.path]);
     video = await checkedCopy(previous.video.path, previous.video.sha256, path.join(dir, "film.mp4"), env);
+    await proof("bgm", "publish-copy", before, [{ ...videoOutput(video), requireAudio: true }],
+      { mode: "original-program", operation: "verified-byte-copy" }, { outputSha256: video.sha256 });
   } else {
     if (pictureChanged) {
+      const before = await captureProcessingInputs(prepared.normalised.map(clip => clip.path));
       const pictureResult = await executePicture(plan, prepared.normalised, dir, bins, env);
       picture = await descriptor(pictureResult.picture); readback = pictureResult.readback;
+      await proof("transitions", "picture", before, [videoOutput(picture)], { mode: "hard", request: directorPictureRequest(plan) },
+        { shotCount: plan.pictureEdl.length, cuts: plan.pictureEdl.slice(1).map(edit => ({ type: "hard", at: edit.startFrame / plan.fps, duration: 0 })),
+          outputSha256: picture.sha256, exactFrames: plan.durationFrames });
+      const programmeBefore = await captureProcessingInputs([prepared.sourceStems.program.path]);
       program = await executeProgram(plan, prepared.source, prepared.sourceStems, path.join(dir, "program.wav"), bins);
+      await proof("bgm", "program", programmeBefore, [audioOutput(program)],
+        { mode: "original-program", request: { audioEdl: plan.audioEdl, fps: plan.fps, durationFrames: plan.durationFrames } },
+        { totalSamples: program.totalSamples, sourceProgramSha256: program.sourceProgramSha256, outputSha256: program.sha256 });
     } else {
       picture = previous.layers.picture; readback = previous.actual; program = previous.layers.program;
       await verifyFile(picture, env); await verifyFile(program, env);
     }
     if (colorChanged) {
-    const gradedPath = path.join(dir, "graded.mp4");
-    const neutral=plan.gradePlan.profile==="natural";
-    const colorReport = await grade({ input: picture.path, output: gradedPath, profile: neutral?null:plan.gradePlan.profile,
-      corrections:neutral?{eq:{contrast:1.03,saturation:1.04}}:{},
-      intensity: Number(plan.gradePlan.intensity ?? .8), quality: project.quality ?? "hd", bins, defects: false,verify:false });
-    graded = { ...await descriptor(gradedPath), report: { chain:colorReport.chain,qualityReview:"not-run",score:null } };
-    } else { graded = previous.layers.graded; await verifyFile(graded, env); }
-    if (audioChanged) mix = await mixIndependentMusic(plan, program, path.join(dir, "mixed.wav"), bins, env);
-    else { mix = previous.audio; await verifyFile(mix, env); }
-    video = await muxAudioProgram({ videoPath: graded.path, videoSha256: graded.sha256, programPath: mix.path,
+      const gradedPath = path.join(dir, "graded.mp4"), neutral = plan.gradePlan.profile === "natural";
+      const before = await captureProcessingInputs([picture.path]);
+      const colorReport = await grade({ input: picture.path, output: gradedPath, profile: neutral ? null : plan.gradePlan.profile,
+        corrections: neutral ? { eq: { contrast: 1.03, saturation: 1.04 } } : {},
+        intensity: Number(plan.gradePlan.intensity ?? .8), quality: project.quality ?? "hd", bins, defects: false, verify: false,
+        clarity: "conservative", qualityGuard: "report" });
+      graded = { ...await descriptor(gradedPath), report: { chain: colorReport.chain, colorManagement: colorReport.colorManagement,
+        clarity: colorReport.clarity, processingQuality: colorReport.processingQuality, qualityReview: "technical-sampling", score: null } };
+      await proof("color", "grade", before, [videoOutput(graded)],
+        { profile: neutral ? null : plan.gradePlan.profile, technicalOnly: neutral, request: plan.gradePlan },
+        { outputSha256: graded.sha256, colorManagement: colorReport.colorManagement, processingQuality: colorReport.processingQuality });
+      const entityBefore = await captureProcessingInputs([graded.path]);
+      const entityRequest = { enabled: true, intensity: 1, fps: plan.fps };
+      const entityReport = await applyPostEntity({ input: graded.path, output: path.join(dir, "entity.mp4"),
+        workDir: path.join(dir, "entity-work"), fps: plan.fps, intensity: 1, bins, env });
+      entity = { ...await descriptor(entityReport.output), request: entityRequest, receipt: entityReport };
+      await proof("color", "entity", entityBefore, [videoOutput(entity)],
+        { technicalOnly: true, mode: "entity", request: entityRequest },
+        { outputSha256: entity.sha256, actualApplied: entityReport.applied, actualSkipped: entityReport.skipped, receipt: entityReport });
+    } else {
+      graded = previous.layers.graded; entity = previous.entity;
+      await verifyFile(graded, env); await verifyFile(entity, env);
+    }
+    const before = await captureProcessingInputs([entity.path, program.path]);
+    programme = await muxAudioProgram({ videoPath: entity.path, videoSha256: entity.sha256, programPath: program.path,
+      programSha256: program.sha256, output: path.join(dir, "programme.mp4"), allowedRoots: allowedRoots(env), bins });
+    await proof("bgm", "programme", before, [{ ...videoOutput(programme), requireAudio: true }],
+      { mode: "original-program", policy: "independent-edl-programme-before-sound" }, { outputSha256: programme.sha256 });
+    const soundRequest = directorSoundRequest(project, plan, prepared.source);
+    let scored = programme;
+    if (soundRequest.soundCues.some(cue => ["impact", "whoosh"].includes(cue.kind))) {
+      const soundBefore = await captureProcessingInputs([programme.path]);
+      const result = await applyPostRhythmSound({ input: programme.path, plan: soundRequest, workDir: dir, bins, env });
+      scored = { ...await descriptor(result.file), sourceAuthority: program.sourceAuthority, embeddedAudioUsed: program.embeddedAudioUsed };
+      sound = { ...scored, applied: true, request: soundRequest, receipt: result.receipt };
+      await proof("bgm", "sound", soundBefore, [{ ...videoOutput(scored), requireAudio: true }],
+        { mode: "original-program", request: soundRequest }, { outputSha256: scored.sha256, cueCount: result.receipt.executedCues?.length,
+          videoPacketsUnchanged: result.receipt.videoPacketsUnchanged, programmeSpeed: result.receipt.programmeSpeed });
+    } else sound = { applied: false, request: soundRequest, reason: "本次未声明可合成 impact/whoosh；没有虚构音效执行" };
+    mix = await mixIndependentMusic(plan, { ...scored, sourceAuthority: program.sourceAuthority, embeddedAudioUsed: program.embeddedAudioUsed },
+      path.join(dir, "mixed.wav"), bins, env, { root: proofRoot, replace });
+    const muxBefore = await captureProcessingInputs([scored.path, mix.path]);
+    video = await muxAudioProgram({ videoPath: scored.path, videoSha256: scored.sha256, programPath: mix.path,
       programSha256: mix.sha256, output: path.join(dir, "film.mp4"), allowedRoots: allowedRoots(env), bins });
+    await proof("bgm", "mux", muxBefore, [{ ...videoOutput(video), requireAudio: true }],
+      { mode: "original-program", policy: "music-after-declared-sound", requestedMusic: plan.musicPlan }, { outputSha256: video.sha256 });
+    for (let index = processing.length - 1; index >= 0; index--) if (processing[index].id === `${id}-publish-copy`) processing.splice(index, 1);
   }
-  const probe = await probeMedia(video.path, { bins });
-  const count = await exactFrames(video.path, bins);
-  if (count !== plan.durationFrames || Math.abs(Number(probe.videoDuration)-count/plan.fps) > 1/plan.fps+.001) fail("TIMELINE_INVALID", "成品与实际 EDL 时长不一致");
+  const probe = await probeMedia(video.path, { bins }), count = await exactFrames(video.path, bins);
+  if (count !== plan.durationFrames || Math.abs(Number(probe.videoDuration) - count / plan.fps) > 1 / plan.fps + .001) fail("TIMELINE_INVALID", "成品与实际 EDL 时长不一致");
   const subtitleDir = path.join(dir, "subtitles"); await fsp.mkdir(subtitleDir, { recursive: true });
   const reuseSubtitles = reusableVideo && !layers?.includes("text");
+  for (let index = processing.length - 1; index >= 0; index--) if ([`${id}-softsub`, `${id}-burned`].includes(processing[index].id)) processing.splice(index, 1);
   let subtitles;
-  if(reuseSubtitles) {
-    subtitles=structuredClone(previous.subtitles);
-    for(const key of ["softsub","burned"]) if(subtitles[key]) {
-      const copied=await checkedCopy(subtitles[key].path,subtitles[key].sha256,path.join(subtitleDir,path.basename(subtitles[key].path)),env);
-      subtitles[key]={...subtitles[key],...copied};
+  if (reuseSubtitles) {
+    subtitles = structuredClone(previous.subtitles);
+    for (const key of ["softsub", "burned"]) if (subtitles[key]) {
+      const before = await captureProcessingInputs([video.path, subtitles[key].path]);
+      const copied = await checkedCopy(subtitles[key].path, subtitles[key].sha256, path.join(subtitleDir, path.basename(subtitles[key].path)), env);
+      subtitles[key] = { ...subtitles[key], ...copied };
+      await proof("subtitles", key, before, [{ ...videoOutput(copied), requireAudio: true }],
+        { mode: key, operation: "verified-byte-copy", mapped: subtitles.mapped, style: plan.subtitlePlan.style },
+        { cueCount: subtitles.mapped.length, outputSha256: copied.sha256 });
     }
-    subtitles.files=await Promise.all((subtitles.files??[]).map(async artifact=>({...artifact,
-      ...await checkedCopy(artifact.path,artifact.sha256,path.join(subtitleDir,path.basename(artifact.path)),env)})));
-  } else subtitles=await executeSubtitles(plan, prepared.source, cues, video.path, subtitleDir, bins, softSubtitles, burnSubtitles);
-  const pack = { ...structuredClone(DIRECTOR_RECIPES.recipes[plan.recipeId]), id: plan.variantId,
+    subtitles.files = await Promise.all((subtitles.files ?? []).map(async artifact => ({ ...artifact,
+      ...await checkedCopy(artifact.path, artifact.sha256, path.join(subtitleDir, path.basename(artifact.path)), env) })));
+  } else subtitles = await executeSubtitles(plan, prepared.source, cues, video.path, subtitleDir, bins, softSubtitles, burnSubtitles,
+    { root: proofRoot, processing });
+  const pack = { ...structuredClone(DIRECTOR_RECIPES.recipes[plan.recipeId]), id,
     cover: plan.coverPlan, copy: plan.copyPlan, bgm: plan.musicPlan, color: plan.gradePlan };
-  const coverSize = plan.platform === "xiaohongshu" ? [Math.round(probe.width/2)*2, Math.round(probe.width*4/3/2)*2] : [probe.width, probe.height];
-  // Cover is a separate canvas. Letterboxing preserves the subject when ratios differ.
-  let cover;
+  const coverSize = plan.platform === "xiaohongshu" ? [Math.round(probe.width / 2) * 2, Math.round(probe.width * 4 / 3 / 2) * 2] : [probe.width, probe.height];
   const reuseCover = previous && !pictureChanged && !colorChanged && !layers?.includes("cover");
+  let cover, coverBefore;
   if (reuseCover) {
+    coverBefore = await captureProcessingInputs([previous.cover.path]);
     const copied = await checkedCopy(previous.cover.path, previous.cover.sha256, path.join(dir, "cover.png"), env);
     cover = { ...copied, output: copied.path, text: previous.cover.text, checks: [] };
   } else {
-  const coverSource = path.join(dir, "cover-canvas.mp4");
-  await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-filter_threads", "1", "-i", video.path,
-    "-vf", `scale=${coverSize[0]}:${coverSize[1]}:force_original_aspect_ratio=decrease,pad=${coverSize[0]}:${coverSize[1]}:(ow-iw)/2:(oh-ih)/2`,
-    "-an", "-c:v", "libx264", "-threads", "2", "-preset", "veryfast", coverSource], { label: "director(cover-canvas)", timeoutMs: 900000 });
-  cover = await buildCover({ input: coverSource, output: path.join(dir, "cover.png"), project,
-    variant: pack, resolution: coverSize, platform: plan.platform, bins, workDir: dir });
+    const coverSource = path.join(dir, "cover-canvas.mp4");
+    await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-n", "-filter_threads", "1", "-i", video.path,
+      "-vf", `scale=${coverSize[0]}:${coverSize[1]}:force_original_aspect_ratio=decrease,pad=${coverSize[0]}:${coverSize[1]}:(ow-iw)/2:(oh-ih)/2`,
+      "-an", "-c:v", "libx264", "-threads", "2", "-preset", "veryfast", coverSource], { label: "director(cover-canvas)", timeoutMs: 900000 });
+    coverBefore = await captureProcessingInputs([coverSource]);
+    cover = await buildCover({ input: coverSource, output: path.join(dir, "cover.png"), project,
+      variant: pack, resolution: coverSize, platform: plan.platform, bins, workDir: dir });
   }
-  const copy = buildCopyPack({ project, variant: pack });
-  const copyPath = path.join(dir, "copy.json");
+  await proof("cover", "cover", coverBefore, [{ path: cover.output, sha256: cover.sha256, media: "image", resolution: coverSize }],
+    { mode: reuseCover ? "verified-byte-copy" : "cover", request: plan.coverPlan }, { checks: cover.checks, outputSha256: cover.sha256 });
+  const copy = buildCopyPack({ project, variant: pack }), copyPath = path.join(dir, "copy.json");
   const reuseCopy = previous && !layers?.includes("copy");
-  if (reuseCopy) await checkedCopy(previous.copy.path, previous.copy.sha256, copyPath, env);
-  else await writeJson(copyPath, copy);
-  const qc={status:"not-reviewed",samples:[],temporalFramesCollected:false,identityVerified:false,beautyImprovementVerified:false,
-    limitation:"已成功生成镜头默认进入正式后期，不进行二次人物或口型质量检查"};
-  const actual = { variantId: plan.variantId, planHash: plan.planHash, pictureEdl: readback.pictureEdl,
-    durationFrames: count, videoSha256: await sha256File(video.path), edlVerified: true,
-    visualVerified: false, colorSignature: graded.sha256,
-    audioVerified: true, audioSignature: directorHash({ music: mix.musicSha256, arrangement: mix.arrangement ?? null, program: program.sha256 }),
+  if (reuseCopy) await checkedCopy(previous.copy.path, previous.copy.sha256, copyPath, env); else await writeJson(copyPath, copy);
+  const qc = { status: "not-reviewed", samples: [], temporalFramesCollected: false, identityVerified: false, beautyImprovementVerified: false,
+    limitation: "已成功生成镜头进入正式后期；技术解码、规格与血缘质检独立执行，不认证人物或口型审美" };
+  const actual = { variantId: id, planHash: plan.planHash, pictureEdl: readback.pictureEdl,
+    durationFrames: count, videoSha256: video.sha256, edlVerified: true, visualVerified: false, colorSignature: entity.sha256,
+    audioVerified: true, audioSignature: directorHash({ music: mix.musicSha256, arrangement: mix.arrangement ?? null, program: program.sha256, sound: sound?.applied ? sound.sha256 : null }),
     subtitleVerified: Boolean(subtitles.burned), subtitleSignature: subtitles.burned ? directorHash(subtitles.styles) : null,
     coverVerified: true, coverSha256: cover.sha256 };
-  const result = { id: plan.variantId, name: plan.label, label: plan.label, platform: plan.platform, kind: plan.kind,
+  const result = { id, name: plan.label, label: plan.label, platform: plan.platform, kind: plan.kind,
     recommended: plan.recommended, recommendationReason: plan.recommendationReason, status: "complete", plan,
-    video: { ...await descriptor(video.path), duration: count/plan.fps, resolution: [probe.width, probe.height] },
-    softsub: subtitles.softsub, burned: subtitles.burned, cover: { ...await descriptor(cover.output), text: cover.text, resolution: coverSize },
-    copy: { ...await descriptor(copyPath), title: copy.title }, subtitles, audio: mix, actual,
-    personQc: qc, layers: { picture, program, graded }, reusedVideo: Boolean(reusableVideo),
-    reusedLayers: previous ? { picture: !pictureChanged, program: !pictureChanged, color: !colorChanged, audio: !audioChanged,
-      subtitles:Boolean(reuseSubtitles),personQc:false,cover: Boolean(reuseCover), copy: Boolean(reuseCopy) } : {},
-    sourceGenerationCalls: 0 };
+    video: { ...await descriptor(video.path), duration: count / plan.fps, resolution: [probe.width, probe.height] },
+    softsub: subtitles.softsub, burned: subtitles.burned, cover: { ...await descriptor(cover.output), text: cover.text, resolution: coverSize, checks: cover.checks },
+    copy: { ...await descriptor(copyPath), title: reuseCopy ? JSON.parse(await fsp.readFile(copyPath, "utf8")).title : copy.title },
+    subtitles, audio: mix, actual, entity, sound, processing, personQc: qc, layers: { picture, program, graded, programme },
+    reusedVideo: Boolean(reusableVideo), reusedLayers: previous ? { picture: !pictureChanged, program: !pictureChanged, color: !colorChanged,
+      audio: !audioChanged, subtitles: Boolean(reuseSubtitles), personQc: false, cover: Boolean(reuseCover), copy: Boolean(reuseCopy) } : {}, sourceGenerationCalls: 0 };
   await writeJson(path.join(dir, "variant-receipt.json"), result);
   return result;
 }
@@ -396,6 +507,11 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
   targetPlan = null, plannedVariants = null, preparedSources = null, previousVariants = null, impactLayers = null } = {}) {
   const projectId = String(project.projectId ?? project.project_id ?? "");
   if (!projectId || !outDir) fail("CONTRACT_INVALID", "工程 ID 或输出目录缺失");
+  for (const shot of shots) assertPathAllowed(shot.path ?? shot.localPath, allowedRoots(env), "shot");
+  const canvas = await resolveNativePostCanvas({ project, shots, bins });
+  canvas.resolutionPolicy.inputDimensions = canvas.resolutionPolicy.sourceScales.map(row => ({ shotId: row.shotId,
+    width: row.sourceResolution[0], height: row.sourceResolution[1] }));
+  const processingProject = { ...project, resolution: canvas.resolution };
   const target = assertPathAllowed(outDir, allowedRoots(env), "outDir");
   const targetContract = targetPlan ?? project.deliveryTargetPlan ?? resolveDeliveryTargets(project.intent ?? project.rawIntent ?? project.title ?? "", project.deliveryOptions ?? {});
   const requestHash = directorHash({ project, shots, subtitles, targetContract, plannedVariants, softSubtitles, burnSubtitles });
@@ -409,12 +525,14 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
       if(!existing.projectSha256 || await sha256File(projectFile)!==existing.projectSha256) fail("SOURCE_CHANGED","已完成工程快照已变化");
       const snapshot=JSON.parse(await fsp.readFile(projectFile,"utf8"));
       if(snapshot.requestHash!==requestHash) fail("SOURCE_CHANGED","已完成工程与输入快照不一致");
-      await verifyFrozenSnapshot(snapshot,env,bins);await verifyArtifacts(existing,env);
+      await verifyFrozenSnapshot(snapshot,env,bins);await verifyArtifacts(existing,env,new Set(),snapshot.revisionRoot);
+      const currentQuality = await inspectDirectorDeliveryManifest({ root: target, manifest: existing, bins, phase: "director-cache", env });
+      assertPostQuality(currentQuality);
       return { ...existing,manifest:existing,reused:true,outputDir:target,outDir:target,
-        passed:existing.status==="complete",manifestPath:manifestFile,projectPath:path.join(target,"film-project.json") };
+        passed:currentQuality.passed,qualityReport:currentQuality,manifestPath:manifestFile,projectPath:path.join(target,"film-project.json") };
     }
     const workDir = path.join(target,"work"); await fsp.mkdir(workDir,{recursive:true});
-    const prepared = preparedSources ?? await prepareSources({project,shots,workDir,bins,env});
+    const prepared = preparedSources ?? await prepareSources({project:processingProject,shots,workDir,bins,env});
     const revision = Number(project.revision ?? project.audioScope?.revision ?? 1);
     if (!Number.isSafeInteger(revision) || revision < 1) fail("CONTRACT_INVALID", "工程版本必须是正整数");
     const plans = plannedVariants ?? buildPostVariantPlans({sourceManifest:prepared.sourceManifest,targetPlan:targetContract,
@@ -428,7 +546,7 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
     const cues = cueData(subtitles);
     const variants = [],failures=[];
     for(const plan of plans) {
-      try { variants.push(await executeVariant({plan,prepared,project,target,bins,env,cues,softSubtitles,burnSubtitles,
+      try { variants.push(await executeVariant({plan,prepared,project:processingProject,target,bins,env,cues,softSubtitles,burnSubtitles,
         previous:previousVariants?.find(v=>v.id===plan.variantId),layers:impactLayers?.[plan.variantId]??null})); }
       catch(error) { const failure={id:plan.variantId,name:plan.label,platform:plan.platform,kind:plan.kind,status:"failed",code:error.code??"POST_FAILED",message:error.message}; variants.push(failure); failures.push(failure); }
       await writeJson(path.join(target,"progress.json"),{expectedOutputs:plans.length,completed:variants.filter(v=>v.status==="complete").length,variants:variants.map(v=>({id:v.id,status:v.status,code:v.code}))});
@@ -447,11 +565,21 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
     }
     const result={schemaVersion:"workloom.delivery-package/v2",projectId,revision,requestHash,
       status:failures.length?"partial":"complete",expectedOutputs:plans.length,
-      variants,difference: differences,failures,quality:project.quality??"hd",resolution:resolveResolution(project),
+      variants,difference: differences,failures,quality:project.quality??"hd",resolution:canvas.resolution,
+      nativeResolution:canvas.nativeResolution,resolutionPolicy:canvas.resolutionPolicy,fps:prepared.source.fps,
+      sourceInputs:await Promise.all(shots.map(async shot=>({shotId:shot.shotId,path:shot.path??shot.localPath,
+        sha256:prepared.source.shots.find(source=>source.shotId===shot.shotId)?.sha256}))),
+      deliveryRoot:path.relative(target,project.revisionRoot??target)||".",
+      postRequirements:{subtitles:cues.zh.length>0||cues.en.length>0,softSubtitles:softSubtitles&&(cues.zh.length>0||cues.en.length>0),
+        burnSubtitles:burnSubtitles&&(cues.zh.length>0||cues.en.length>0),danmaku:false},audioQuality:project.audioQuality??null,
       sourceGenerationCalls:0,renderApiCalls:0,createdAt:new Date().toISOString(),targetPlan:targetContract};
+    const qualityReport=await inspectDirectorDeliveryManifest({root:target,manifest:result,bins,phase:`director-v${revision}`,env});
+    result.postQuality=await writePostQuality(project.revisionRoot??target,qualityReport);
+    if(!failures.length) assertPostQuality(qualityReport);
     const snapshot={schemaVersion:SCHEMA,projectId,version:revision,scope:scopeOf(project),project,shots,subtitles,
       targetPlan:targetContract,plans,prepared,variants,requestHash,deliveryManifest:"delivery-manifest.json",
-      revisionRoot:project.revisionRoot??target,softSubtitles,burnSubtitles};
+      revisionRoot:project.revisionRoot??target,softSubtitles,burnSubtitles,postQuality:result.postQuality,
+      resolution:canvas.resolution,nativeResolution:canvas.nativeResolution,resolutionPolicy:canvas.resolutionPolicy};
     await writeJson(path.join(target,"film-project.json"),snapshot);
     result.projectSha256=await sha256File(path.join(target,"film-project.json"));
     if (!project.revisionRoot) await writeJson(path.join(target,"revision-head.json"), { version:revision,
@@ -460,7 +588,8 @@ export async function buildDirectorDelivery({ project = {}, shots = [], subtitle
     await fsp.writeFile(path.join(target,"delivery-report.md"),`# ${project.title??projectId}\n\n状态：${result.status}；${completed.length}/${plans.length} 支完成。\n\n${variants.map(v=>`- ${v.name}：${v.status}${v.message?` — ${v.message}`:""}`).join("\n")}\n\n共享镜头生成调用：0。独立 EDL、声音、字幕、封面和哈希见清单。人物审美与真实客户提升未在本次本地编码中验证。\n`);
     return {...result,manifest:result,outDir:target,outputDir:target,projectPath:path.join(target,"film-project.json"),
       manifestPath:manifestFile,reportPath:path.join(target,"delivery-report.md"),packageKey:requestHash,
-      passed:result.status==="complete",qualityReview:"not-run",checks:[{kind:"complete-target-set",ok:!failures.length}]};
+      passed:result.status==="complete"&&qualityReport.passed,qualityReport,qualityReview:"technical-current-media",
+      checks:[{kind:"complete-target-set",ok:!failures.length},{kind:"post-quality",ok:qualityReport.passed}]};
   } catch(error) {
     await writeJson(path.join(target,"failure.json"),{status:"failed",requestHash,code:error.code??"POST_FAILED",message:error.message,failedAt:new Date().toISOString()});
     throw error;
@@ -486,7 +615,9 @@ export async function reviseDirectorDelivery({projectPath,feedback,variantId=nul
           fail("SOURCE_CHANGED","返修回执字节已变化");
         const replay=JSON.parse(await fsp.readFile(prior.receipt,"utf8"));
         if(replay.operationHash!==operationHash) fail("IDEMPOTENCY_MISMATCH","回执与本次反馈不一致");
-        await verifyFrozenSnapshot(snapshot,env,bins);await verifyArtifacts(replay,env);return {...replay,idempotentReplay:true};
+        await verifyFrozenSnapshot(snapshot,env,bins);await verifyArtifacts(replay,env,new Set(),snapshot.revisionRoot);
+        const currentQuality=await inspectDirectorDeliveryManifest({root:replay.outDir,manifest:replay.manifest??replay,bins,phase:"director-replay",env});
+        assertPostQuality(currentQuality);return {...replay,qualityReport:currentQuality,idempotentReplay:true};
       }
     }
     if(snapshot.version!==expectedVersion || currentHash!==expectedProjectSha256 || head.version!==snapshot.version
@@ -525,6 +656,7 @@ export async function reviseDirectorDelivery({projectPath,feedback,variantId=nul
     const result=await buildDirectorDelivery({project:{...snapshot.project,revision:snapshot.version+1,revisionRoot:base},shots:snapshot.shots,subtitles:snapshot.subtitles,
       targetPlan:snapshot.targetPlan,plannedVariants:plans,preparedSources:prepared,previousVariants:snapshot.variants,impactLayers:layerMap,
       softSubtitles:snapshot.softSubtitles,burnSubtitles:snapshot.burnSubtitles,outDir:destination,bins,env});
+    if(!result.passed) fail("post_quality_failed","导演返修未完成真实技术验收；保留旧版头指针");
     const receipt=path.join(destination,"feedback-receipt.json");
     const response={...result,attribution,baseVersion:snapshot.version,newVersion:snapshot.version+1,idempotencyKey,operationHash,
       regeneratedSourceShots:0,impactLayers:layerMap};
@@ -537,16 +669,18 @@ export async function reviseDirectorDelivery({projectPath,feedback,variantId=nul
 
 /** Read-only V2 plan; no signing, media creation or network submissions. */
 export async function planDirectorDelivery({project={},shots=[],bins=resolveBinaries(),env=process.env}={}) {
+  for(const shot of shots) assertPathAllowed(shot.path??shot.localPath,allowedRoots(env));
+  const canvas=await resolveNativePostCanvas({project,shots,bins});
   const probed=[];
   for(const [i,shot] of shots.entries()) {
     const file=assertPathAllowed(shot.path??shot.localPath,allowedRoots(env));
     const media=await probeMedia(file,{bins});
     probed.push({shotId:shot.shotId??`SC-${i+1}`,sha256:await sha256File(file),durationSec:media.videoDuration??media.duration,
-      role:shot.role,dialogue:shot.dialogue,lockTrim:shot.lockTrim,required:shot.required});
+      role:shot.role,dialogue:shot.dialogue??"",lockTrim:shot.lockTrim,required:shot.required!==false});
   }
   const sourceManifest={fps:Number(project.fps??30),chronologyLocked:project.chronologyLocked===true,shots:probed};
   const targetPlan=project.deliveryTargetPlan??resolveDeliveryTargets(project.intent??project.title??"",project.deliveryOptions??{});
-  return {schemaVersion:"workloom.delivery-plan/v2",projectId:project.projectId??project.project_id,targetPlan,sourceManifest,
+  return {schemaVersion:"workloom.delivery-plan/v2",projectId:project.projectId??project.project_id,targetPlan,sourceManifest,...canvas,
     variants:buildPostVariantPlans({sourceManifest,targetPlan,scope:project.audioScope??{},hardConstraints:project.hardConstraints??{},narrativePlans:project.directorFilmPlan?.narrativePlans??[]}),
     renderApiCalls:0,sourceGenerationCalls:0,cost:{localEncoding:"按实际编码时长计；不重复源镜头生成",llmPlanning:"以原任务预算计"}};
 }

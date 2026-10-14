@@ -23,6 +23,7 @@
 
 import fs from "node:fs";
 import process from "node:process";
+import { createHash } from "node:crypto";
 
 import {
   PostError, analyzeImpact, buildDeliveryPackage, callTool, findVariantPack, listVariantPacks,
@@ -69,7 +70,7 @@ function readShots(value) {
       shotId: String(shot.shotId ?? shot.shot_id ?? `SC-${String(index + 1).padStart(2, "0")}`),
       path: String(shot.path ?? shot.localPath ?? ""),
       ...(shot.kind ? { kind: String(shot.kind) } : {}),
-      ...(shot.audioStems ? { audioStems: shot.audioStems } : {}),
+      ...(Object.hasOwn(shot, "audioStems") ? { audioStems: shot.audioStems } : {}),
     }));
   }
   return value.split(",").map((file, index) => ({
@@ -87,6 +88,12 @@ async function main() {
     case "health":
       line(JSON.stringify((await callTool("postread.health", {})).result, null, 2));
       return 0;
+    case "quality": {
+      if (typeof flags["delivery-dir"] !== "string") throw new PostError("--delivery-dir 缺失", "bad_request");
+      const outcome = await callTool("postread.quality", { delivery_dir: flags["delivery-dir"] });
+      line(JSON.stringify(outcome.result, null, 2));
+      return outcome.receipt.synced ? 0 : 3;
+    }
     case "variants": {
       for (const pack of listVariantPacks()) {
         line(`${pack.id} · ${pack.name} —— ${pack.positioning}`);
@@ -100,6 +107,7 @@ async function main() {
       if (shots.length === 0) throw new PostError("--shots 缺失（a.mp4,b.mp4 或 shots.json）", "bad_request");
       const variants = typeof flags.variants === "string" ? flags.variants.split(",").map((id) => id.trim()).filter(Boolean) : null;
       const plan = await planDelivery({ project, shots, variants });
+      if (plan.schemaVersion === "workloom.delivery-plan/v2") { line(JSON.stringify(plan, null, 2)); return 0; }
       line(`交付计划 · ${plan.projectId} · ${plan.shots.length} 镜 / ${plan.totalSeconds}s / ${plan.resolution.join("×")}@${plan.fps}fps`);
       line("变体：");
       for (const variant of plan.variants) {
@@ -121,10 +129,12 @@ async function main() {
           ? { zhPath: flags.srt, enPath: typeof flags["srt-en"] === "string" ? flags["srt-en"] : null }
           : null,
         variants,
+        danmaku: flags.danmaku ? readJson(flags.danmaku, "--danmaku") : null,
         outDir: flags["out-dir"],
         burnSubtitles: flags["burn-subtitles"] === true,
         softSubtitles: flags["no-soft-subtitles"] !== true,
       });
+      if (outcome.manifest.schemaVersion === "workloom.delivery-package/v2") { line(JSON.stringify(outcome, null, 2)); return outcome.passed ? 0 : 3; }
       line(`交付包：${outcome.outDir}`);
       line(`  干净母版 ${outcome.manifest.master.path} · ${outcome.manifest.master.duration}s · 不含字幕`);
       if (outcome.manifest.subtitles) {
@@ -163,7 +173,8 @@ async function main() {
       }
       // --project is the user's chosen base. Capture its exact bytes once;
       // the core still rejects it if a different request has already advanced.
-      const base = readRevisionBase(flags.project);
+      const supplied = readJson(flags.project, "--project");
+      const base = supplied.schemaVersion === "workloom.film-project/v2" ? { version: supplied.version, sha256: createHash("sha256").update(fs.readFileSync(flags.project)).digest("hex") } : readRevisionBase(flags.project);
       const shotPaths = Object.fromEntries((repeated["shot"] ?? []).map((entry) => {
         const index = entry.indexOf("=");
         if (index < 0) throw new PostError(`--shot 需要形如 SC-03=/path/new.mp4，收到：${entry}`, "bad_request");
@@ -177,9 +188,10 @@ async function main() {
         patch,
         outDir: typeof flags["out-dir"] === "string" ? flags["out-dir"] : null,
         shotPaths: Object.keys(shotPaths).length ? shotPaths : null,
-        audioStemsByShot: flags["audio-stems-by-shot"] ? readJson(flags["audio-stems-by-shot"], "--audio-stems-by-shot") : null,
+        ...(Object.hasOwn(flags, "audio-stems-by-shot") ? { audioStemsByShot: readJson(flags["audio-stems-by-shot"], "--audio-stems-by-shot") } : {}),
         dryRun: flags["dry-run"] === true,
       });
+      if (outcome.manifest?.schemaVersion === "workloom.delivery-package/v2") { line(JSON.stringify(outcome, null, 2)); return outcome.passed ? 0 : 3; }
       if (!outcome.executed) {
         if (outcome.dryRun) line(JSON.stringify({ expectedVersion: outcome.expectedVersion, expectedProjectSha256: outcome.expectedProjectSha256 }));
         line(`未执行（${outcome.blocked?.code ?? outcome.impact?.layers.join("/") ?? "planned"}）：${outcome.blocked?.message ?? "dry-run"}`);
@@ -215,7 +227,7 @@ async function main() {
     }
     default:
       process.stderr.write(
-        "用法：post-cli <health|variants|plan|deliver|impact|reedit|triage> [--flags]\n"
+        "用法：post-cli <health|quality|variants|plan|deliver|impact|reedit|triage> [--flags]\n"
         + "参见 bundles/ai-video/connectors/post-bridge/README.md\n",
       );
       return 2;

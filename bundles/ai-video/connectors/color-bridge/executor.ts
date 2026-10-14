@@ -77,7 +77,7 @@ export const NEVER_RETRY_CODES = new Set([
   "quota_exceeded", "disk_quota_exceeded", "path_not_allowed", "tenant_mismatch",
   "idempotency_conflict", "bad_request", "not_found", "not_provided",
   "ffmpeg_not_installed", "bad_media", "bad_lut", "bad_profile", "bad_patch",
-  "overwrite_source_forbidden", "not_configured", "verify_failed",
+  "overwrite_source_forbidden", "not_configured", "verify_failed", "unsupported_color_space", "quality_regression", "source_changed",
 ]);
 
 export function isColorBridgeTool(name: string): boolean {

@@ -10,8 +10,16 @@
       "operation": "read",
       "risk": "low",
       "dataMode": "unverified",
-      "transport": { "kind": "local", "module": "bundles/geo-growth/capabilities/workbench-guide.mjs", "export": "readVideoWorkbenchGuide" },
-      "inputSchema": { "type": "object", "properties": {}, "additionalProperties": false }
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/workbench-guide.mjs",
+        "export": "readVideoWorkbenchGuide"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "additionalProperties": false
+      }
     },
     {
       "id": "growth.service.ticket.list",
@@ -218,9 +226,9 @@
     },
     {
       "id": "growth.video.delivery.inspect",
-      "version": "1.2.0",
+      "version": "1.1.0",
       "title": "核验视频交付清单",
-      "description": "读取旧版或标准后期交付清单，逐个计算视频与封面实际SHA-256和声明哈希/字节数比较；标准outputs要求主版和唯一已知版本、封面路径与首帧回执一致。缺件、修改、元数据冲突及路径越界列出，缺哈希保持unverified。只读，不重做影片或认证内容。",
+      "description": "读取当前发布指针及交付清单，逐件核对当前文件摘要；仅提供字节完整性，complete 始终为 false。完整技术交付须继续调用 growth.video.post.quality 重新验收实际媒体与加工凭证。只读，零付费调用。",
       "operation": "receipt",
       "risk": "low",
       "dataMode": "unverified",
@@ -601,6 +609,44 @@
         "type": "object",
         "properties": {},
         "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "id": "growth.video.post.quality",
+      "version": "1.0.0",
+      "title": "验收当前后期交付质量",
+      "description": "读取本地后期或生成交付清单，对当前媒体、原生画幅、帧率、哈希、必需处理回执及完整解码重新验收；旧 passed 标志不算证据。返回技术完成与未验证艺术质量。只读，零付费调用。",
+      "operation": "read",
+      "risk": "low",
+      "dataMode": "unverified",
+      "transport": {
+        "kind": "local",
+        "module": "bundles/geo-growth/capabilities/post-quality.mjs",
+        "export": "deliveryQuality"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "outDir": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 400
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "auto",
+              "post",
+              "generation"
+            ]
+          }
+        },
         "additionalProperties": false
       }
     }

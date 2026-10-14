@@ -7,7 +7,7 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { callTool, readRevisionBase, reedit, resolveBinaries } from "./core.mjs";
+import { buildDeliveryPackage, callTool, readRevisionBase, reedit, resolveBinaries } from "./core.mjs";
 import { createPostBridgeExecutor } from "./executor.ts";
 
 const bins = resolveBinaries();
@@ -36,32 +36,31 @@ function child(args: string[]) {
   });
 }
 
-beforeAll(() => {
-  fixtureDir = fs.mkdtempSync(path.join(os.tmpdir(), "revision-cas-media-"));
+beforeAll(async () => {
+  fixtureDir = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "revision-cas-media-")));
   fixture = path.join(fixtureDir, "source.mp4");
   execFileSync(bins.ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=size=160x120:rate=12:duration=1",
     "-f", "lavfi", "-i", "sine=frequency=523:sample_rate=48000:duration=1", "-shortest",
     "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", fixture], { timeout: 30_000 });
   execFileSync(bins.ffprobe, ["-v", "error", "-show_format", fixture], { stdio: "ignore", timeout: 30_000 });
+  const library = path.join(fixtureDir, "music"); fs.mkdirSync(library);
+  execFileSync(bins.ffmpeg, ["-v", "error", "-y", "-f", "lavfi", "-i", "sine=frequency=330:duration=3", "-c:a", "pcm_s16le", path.join(library, "warm.wav")]);
+  writeJson(path.join(library, "tracks.json"), { tracks: [{ id: "cas-synthetic-warm", title: "Synthetic warm fixture", style: "acoustic-warm", mood: "温暖自在",
+    file: "warm.wav", durationSec: 3, license: "workloom-self-generated", source: "offline-synthetic-fixture", artist: "test fixture" }, { id: "cas-synthetic-clean", title: "Synthetic clean fixture", style: "corporate-clean", mood: "干净可信",
+    file: "warm.wav", durationSec: 3, license: "workloom-self-generated", source: "offline-synthetic-fixture", artist: "test fixture" }] });
+  await buildDeliveryPackage({ project: { projectId: "cas-project", title: "test", resolution: [160, 120], fps: 12,
+    copy: { title: "test", hook: "test", body: "before" } }, shots: [{ shotId: "SC-01", path: fixture }], variants: ["warm-story", "clean-tech"],
+    outDir: path.join(fixtureDir, "template"), bins, env: { ...process.env, WORKLOOM_BGM_DISCOVER: "0",
+      WORKLOOM_POST_ALLOWED_ROOTS: fixtureDir, WORKLOOM_BGM_ALLOWED_ROOTS: fixtureDir,
+      WORKLOOM_BGM_LIBRARY_DIR: library, WORKLOOM_BGM_HOME: path.join(fixtureDir, "bgm-home") } });
+
 }, 60_000);
 afterAll(() => { if (fixtureDir) fs.rmSync(fixtureDir, { recursive: true, force: true }); });
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), "revision-cas-"));
-  const video = path.join(root, "norm.mp4");
-  fs.copyFileSync(fixture, video);
-  fs.writeFileSync(path.join(root, "cover.png"), "test-only-cover-copy");
-  const videoSha256 = createHash("sha256").update(fs.readFileSync(video)).digest("hex");
-  const coverSha256 = createHash("sha256").update(fs.readFileSync(path.join(root, "cover.png"))).digest("hex");
+  fs.cpSync(path.join(fixtureDir, "template"), root, { recursive: true });
   projectPath = path.join(root, "film-project.json");
-  writeJson(projectPath, {
-    schemaVersion: "workloom.film-project/v1", projectId: "cas-project", version: 1, resolution: [160, 120], fps: 12,
-    layers: {
-      shots: [{ shotId: "SC-01", source: "norm.mp4", normalised: "norm.mp4", sha256: videoSha256, sourceSha256: videoSha256, duration: 1 }],
-      variants: [{ id: "warm-story", assembly: { path: "norm.mp4", sha256: videoSha256 }, color: { path: "norm.mp4", sha256: videoSha256 },
-        artifacts: { video: { path: "norm.mp4", sha256: videoSha256 }, cover: { path: "cover.png", sha256: coverSha256 } } }],
-      copy: { title: "test", hook: "test", body: "before" },
-    },
-  });
+
 });
 afterEach(() => { vi.restoreAllMocks(); if (root) fs.rmSync(root, { recursive: true, force: true }); });
 
@@ -113,6 +112,7 @@ describe("revision compare-and-swap and exclusive ownership", () => {
   }, 30_000);
   it("a failed reservation is kept for audit and a retry consumes a fresh version", async () => {
     const project = json(projectPath);
+    const originalVideo = path.resolve(root, project.layers.variants[0].artifacts.video.path);
     project.layers.variants[0].artifacts.video.path = "missing-video.mp4";
     writeJson(projectPath, project);
     await expect(revise()).rejects.toThrow();
@@ -120,7 +120,7 @@ describe("revision compare-and-swap and exclusive ownership", () => {
     expect(json(path.join(failed, "revision-failed.json"))).toMatchObject({ schemaVersion: "workloom.delivery-revision-failure/v1", baseVersion: 1 });
     expect(fs.existsSync(path.join(failed, "film-project.json"))).toBe(false);
     expect(fs.existsSync(path.join(root, ".revision.lock"))).toBe(false);
-    fs.copyFileSync(fixture, path.join(root, "missing-video.mp4"));
+    fs.copyFileSync(originalVideo, path.join(root, "missing-video.mp4"));
     const retry = await revise();
     expect(retry.version).toBe(3);
     expect(fs.existsSync(path.join(failed, "revision-failed.json"))).toBe(true);
