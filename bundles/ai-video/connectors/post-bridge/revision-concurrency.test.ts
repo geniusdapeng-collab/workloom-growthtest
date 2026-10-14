@@ -132,12 +132,14 @@ describe("revision compare-and-swap and exclusive ownership", () => {
     }
     expect(fs.existsSync(path.join(root, "versions"))).toBe(false);
   });
+  // Two real revisions each re-probe and fully decode both variants under the same CAS checks.
+  // CI may run other media files concurrently; this checks structure, not a five-second SLA.
   it("infers the package root on the next revision and keeps versions flat", async () => {
     const first = await revise();
     const second = await reedit({ projectPath: first.projectPath, ...expectBase(first.projectPath), patch: { copy: { body: "third" } }, bins });
     expect(second.targetDir).toBe(path.join(root, "versions", "v3"));
     expect(fs.existsSync(path.join(root, "versions", "v2", "versions"))).toBe(false);
-  });
+  }, 30_000);
   it("detects a base mutation during the real copy and does not publish a success project", async () => {
     const original = fsp.copyFile.bind(fsp);
     let changed = false;
