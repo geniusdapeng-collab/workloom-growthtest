@@ -9,7 +9,7 @@
  * 文案变体：行业版按 bundle 显示名与团队人数替换（八仓通用）；织伴 S2 话术按 bundle id 切换（缺省回落通用版）。
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CeremonyStage, type CeremonyActor } from "./CeremonyStage";
+import { CeremonyStage, type CeremonyActor } from "../extensions/workplace/CeremonyStage";
 import { MateWelcome } from "./MateWelcome";
 import type { BundleWelcomeProjection } from "./welcomeScripts";
 import { Icon, useManagedSurface } from "@workloom/ui";

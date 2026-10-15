@@ -1,7 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import { useRef } from "react";
 import * as THREE from "three";
-import { floorRectsOverlap, type FloorRect } from "../pages/p0/floor-layout";
+import { floorRectsOverlap, type FloorRect } from "../../pages/p0/floor-layout";
 import { placeFloor3DLabels, type FloorLabelAnchor } from "./floor3d-layout";
 
 export interface Floor3DLabelRegistry {

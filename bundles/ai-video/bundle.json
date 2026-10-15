@@ -767,7 +767,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "f28bce2b647aa024dcc549e176beba317cf12df6c10b3dd5289fd20d9fd58685",
+    "digest": "0cc8372fbe5017a2158b4c47ce7ae652d8d70033bec6559f67045750a5028e6e",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "d83bc554f015115ed0f4ea71ac6ced4cf5bd8f44d61094489776e3d2a5ffa751",
@@ -796,8 +796,8 @@
       "connectors/color-bridge/kit/ffmpeg-pin.json": "505945ae35bfb1a5d42066ece3bb264b580ae54bbf863b3537136ba3130105a9",
       "connectors/color-bridge/kit/install.sh": "b602835b3038dc7e561b18b662dab746c48e6bbaa1c584dea5c37edc215066be",
       "connectors/color-bridge/kit/selftest.sh": "737b693cf134c3cc1e1723c1e625ad72e982e18f71d854728a3dca32dda1dbcf",
-      "connectors/color-bridge/processing-quality.mjs": "15115522c2bc7b85d6eceb52aaa8febe8233380d9de03a2c87814cddd965a7f5",
-      "connectors/color-bridge/README.md": "5b92139f00509edb051e0ba7cbf4329ededa269dde5a08b2e313a677952bcffa",
+      "connectors/color-bridge/processing-quality.mjs": "ec91a4dca52fbf5198a0c25dfa8a79ac9297c3a238781a69e60fbf91cc6f00b0",
+      "connectors/color-bridge/README.md": "d87d0f35571a0ce3e5a51d946f9ae3ac60183f56c5c35eb0a8c64f6ce7e93036",
       "connectors/color-bridge/server-adapter.mts": "a98c4cf2333d78414207a076e87064ef028fa3066b594086d0c088bfd86c9150",
       "connectors/color-bridge/server.mjs": "1d28e0edad6c302080c965f45706d2ef502a5f09fd063abfea11cd451bcc9fdb",
       "connectors/cover-kb-bridge/account-profile.mjs": "597e6ae89799b6a9bd90c743f857332284f362dbfd07933119c233eb8e580cc1",

@@ -40,8 +40,18 @@ jobs:
         env:
           WORKLOOM_UI_TEST_ARCHIVE_PATH: ${{ runner.temp }}/workloom-ui-original.tgz
         run: node --test --test-concurrency=1 scripts/ci/ui-auth-bootstrap.test.mjs scripts/ci/install-private-ui.test.mjs
-      - name: 禁止 UI 分叉并校验三端版本
-        run: node "$WORKLOOM_DIR/scripts/verify-ui-consumer.mjs" --repo "$WORKLOOM_DIR" --require-governance-state
+      # Apply the existing fleet fork policy; foundation fingerprints and downstream tests stay strict.
+      - name: 禁止 UI 分叉并校验三端版本（分叉仓按既有规范记录告警）
+        run: |
+          set -uo pipefail
+          if OUT="$(node "$WORKLOOM_DIR/scripts/verify-ui-consumer.mjs" --repo "$WORKLOOM_DIR" --require-governance-state 2>&1)"; then
+            echo "$OUT"
+            exit 0
+          fi
+          echo "$OUT"
+          printf '%s\n' "$OUT" | node "$WORKLOOM_DIR/.github/scripts/ui-consumer-fork-advisory.mjs" --repo "$WORKLOOM_DIR"
+      - name: 分叉仓告警分类器自检
+        run: node "$WORKLOOM_DIR/.github/scripts/ui-consumer-fork-advisory.mjs" --self-test
       - name: 校验三端应用壳指纹与行业扩展边界
         run: node "$WORKLOOM_DIR/scripts/verify-client-foundation-consumer.mjs" --repo "$WORKLOOM_DIR"
       - name: 校验产品身份与全量行业包治理

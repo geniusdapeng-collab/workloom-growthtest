@@ -112,7 +112,7 @@ node_modules/.bin/tsx bundles/ai-video/connectors/color-bridge/runtime-smoke.mts
 
 ## 色彩管理、清晰度与处理证据
 
-`grade` 在创作 look 前先按输入的色域、转移函数、矩阵与范围实际转换到 Rec.709。已知 sRGB、BT.601、BT.2020 与 full range 不再仅改标签；PQ/HLG 先进入线性浮点链，执行 tone map，再编码 709。HDR 缺少可核实色域或遇到未支持色彩标签会返回 `unsupported_color_space`。未知 SDR 标签采用回执中列明的假设，调用方应核对这些假设。
+`grade` 对 SDR 输入按已知色域、转移函数、矩阵与范围转换到 Rec.709。PQ/HLG 默认恢复旧版像素处理路径，不隐式执行 HDR tone map；回执标为 `legacy-hdr-pass-through`，`toneMap=null`，并在 `assumptions` 明示兼容性边界。旧路径的 BT.709 输出标签不能证明完成了正确的 HDR→SDR 转换；有该要求的项目需先提供经核实的受控 SDR 母版。HDR 缺少可核实色域或遇到未支持标签仍返回 `unsupported_color_space`。未知 SDR 标签采用回执中列明的假设，调用方应核对。
 
 独立调色的默认值仍是 `clarity='off'`、`qualityGuard='off'`。`clarity='conservative'` 使用 3×3 亮度锐化、增益 0.25、色度增益 0；它保留输出尺寸，不承诺恢复源片已丢失的细节。`qualityGuard='report'` 返回同时间点归一化前后帧、源/输出 SHA、实际尺寸、局部最坏帧和阈值来源，出现处理损伤时保留产物并提示。`qualityGuard='block'` 仅在明确请求时删除不通过的本次后期产物并返回 `quality_regression`，不会触发付费源镜重生成。阈值是本地工程启发式，不能当作审美得分或整片保证。
 

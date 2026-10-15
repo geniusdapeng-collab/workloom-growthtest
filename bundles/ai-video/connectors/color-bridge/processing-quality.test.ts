@@ -16,12 +16,12 @@ describe("色彩转换与后期损伤护栏", () => {
     const sd = resolveColorManagement({ probe: { video: { ...video, colorSpace: "smpte170m", colorPrimaries: "smpte170m", colorRange: "pc" } } });
     expect(sd.chain).toContain("matrixin=smpte170m:rangein=full"); expect(sd.chain).toContain("primaries=bt709");
   });
-  it.each(["smpte2084", "arib-std-b67"])("%s 必须在线性浮点中压缩动态范围再输出 709", (transfer) => {
+  it.each(["smpte2084", "arib-std-b67"])("%s 默认沿用旧像素路径，不隐式压缩动态范围", (transfer) => {
     const result = resolveColorManagement({ probe: { video: { ...video, colorPrimaries: "bt2020", colorSpace: "bt2020nc", colorTransfer: transfer } } });
-    expect(result.kind).toBe("hdr-to-sdr");
-    expect(result.chain.indexOf("transfer=linear")).toBeLessThan(result.chain.indexOf("format=gbrpf32le"));
-    expect(result.chain.indexOf("format=gbrpf32le")).toBeLessThan(result.chain.indexOf("tonemap="));
-    expect(result.chain.slice(result.chain.indexOf("tonemap="))).toContain("transfer=bt709");
+    expect(result.kind).toBe("legacy-hdr-pass-through");
+    expect(result.chain).toBe("null");
+    expect(result.toneMap).toBeNull();
+    expect(result.removedHdrSideData).toEqual([]);
   });
   it("未知 SDR 标签记录假设；HDR 缺色域或未支持传递函数不能伪装 709", () => {
     const unknown = resolveColorManagement({ probe: { video: { pixelFormat: "yuv420p" } } });
@@ -112,18 +112,18 @@ describe.runIf(hasEngine)("真实 ffmpeg 后期颜色与质量证据", () => {
     await expect(grade({ input: source, output: blocked, corrections: { eq: { brightness: 0.8 } }, qualityGuard: "block", bins })).rejects.toMatchObject({ code: "quality_regression" });
     expect(fs.existsSync(blocked)).toBe(false);
   });
-  it.each(["smpte2084", "arib-std-b67"])("真实 %s 10-bit BT.2020 输入经过 tone map 后才标记 709", async (transfer) => {
+  it.each(["smpte2084", "arib-std-b67"])("真实 %s 10-bit BT.2020 输入默认不加入 tone map", async (transfer) => {
     const hdr = path.join(dir, `${transfer}.mkv`), output = path.join(dir, `${transfer}.mp4`);
     const chain = `zscale=primariesin=bt709:transferin=bt709:matrixin=bt709:rangein=limited:primaries=bt2020:transfer=${transfer}:matrix=bt2020nc:range=limited,format=yuv420p10le`;
     execFileSync(bins.ffmpeg, ["-hide_banner", "-v", "error", "-y", "-i", source, "-vf", chain, "-c:v", "ffv1", "-color_primaries", "bt2020", "-color_trc", transfer, "-colorspace", "bt2020nc", hdr]);
     const sourceSha = sha(hdr), result = await grade({ input: hdr, output, profile: "natural", intensity: 0.1, qualityGuard: "report", bins });
-    expect(sha(hdr)).toBe(sourceSha); expect(result.colorManagement.kind).toBe("hdr-to-sdr");
-    expect(result.chain).toContain("format=gbrpf32le"); expect(result.chain).toContain("tonemap=tonemap=mobius");
+    expect(sha(hdr)).toBe(sourceSha); expect(result.colorManagement.kind).toBe("legacy-hdr-pass-through");
+    expect(result.chain).not.toContain("format=gbrpf32le"); expect(result.chain).not.toContain("tonemap=");
     const probed = await probeMedia(output, { bins });
     expect(probed.video).toMatchObject({ width: 320, height: 240, colorTransfer: "bt709", colorPrimaries: "bt709", colorSpace: "bt709", colorRange: "tv" });
     expect(result.processingQuality.reviewed).toBe(true);
     const compare = await compareFrames({ before: hdr, after: output, at: 0.5, output: path.join(dir, `${transfer}-compare.png`), bins });
-    expect(compare.colorManagement.before.kind).toBe("hdr-to-sdr"); expect(compare.colorManagement.after.source.transfer).toBe("bt709");
+    expect(compare.colorManagement.before.kind).toBe("legacy-hdr-pass-through"); expect(compare.colorManagement.after.source.transfer).toBe("bt709");
     expect(compare.beforeSha256).toBe(sourceSha); expect(sha(hdr)).toBe(sourceSha); expect(compare.sha256).toBe(sha(compare.path));
   });
   it("同画面 full-range 输入经过范围转换后亮度保持，不能只贴 tv 标签", async () => {

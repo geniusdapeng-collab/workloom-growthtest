@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import * as THREE from "three";
-import scene from "../../../../bundles/geo-growth/floor-scene.json";
-import type { FloorAgent } from "../pages/p0/Floor";
-import { floorRectsOverlap } from "../pages/p0/floor-layout";
+import scene from "../../../../../bundles/geo-growth/floor-scene.json";
+import type { FloorAgent } from "../../pages/p0/Floor";
+import { floorRectsOverlap } from "../../pages/p0/floor-layout";
 import { floor3DCameraHeight, floor3DTargets, placeFloor3DLabels } from "./floor3d-layout";
 
 const agents = (state: FloorAgent["state"], stationId: string | null = null) => Array.from({ length: 18 }, (_, index) => ({

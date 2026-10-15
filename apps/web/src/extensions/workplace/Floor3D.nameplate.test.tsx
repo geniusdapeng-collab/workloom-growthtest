@@ -2,8 +2,8 @@
 import { act, type PropsWithChildren } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import { Floor3D } from "./Floor3D";
-import type { FloorAgent, FloorPayload } from "../pages/p0/Floor";
+import { Floor3D } from "../../components/Floor3D";
+import type { FloorAgent, FloorPayload } from "../../pages/p0/Floor";
 
 const gaze = vi.hoisted(() => new Map<string, { onGaze: () => void }>());
 // 正式 Worker 与其 HTML 内容保持真实实现；GPU/三维投影边界另由 native 验收负责。
@@ -17,8 +17,8 @@ vi.mock("@react-three/drei", () => ({
     <div data-test-html data-test-distance-factor={distanceFactor ?? "fixed"}>{children}</div>
   ),
 }));
-vi.mock("./BusinessAvatar3D", () => ({ BusinessAvatar3D: () => null }));
-vi.mock("./GazeSystem", () => ({
+vi.mock("../../components/BusinessAvatar3D", () => ({ BusinessAvatar3D: () => null }));
+vi.mock("../../components/GazeSystem", () => ({
   GazeSystem: () => null,
   GazeRegistry: { register: (entry: { id: string; onGaze: () => void }) => {
     gaze.set(entry.id, entry);
@@ -26,10 +26,10 @@ vi.mock("./GazeSystem", () => ({
   } },
 }));
 vi.mock("./HoverBubble", () => ({ HoverBubble: ({ text, visible }: { text: string; visible: boolean }) => visible ? <div data-test-separate-bubble>{text}</div> : null }));
-vi.mock("./CineDirector", () => ({ CineDirector: () => null, FuseVignette: () => null }));
-vi.mock("../audio/AudioEngine", () => ({ AudioEngine: { play: vi.fn() } }));
-vi.mock("../lib/useNightTime", () => ({ useNightTime: () => false }));
-vi.mock("./cinematic", () => ({
+vi.mock("../../components/CineDirector", () => ({ CineDirector: () => null, FuseVignette: () => null }));
+vi.mock("../../audio/AudioEngine", () => ({ AudioEngine: { play: vi.fn() } }));
+vi.mock("../../lib/useNightTime", () => ({ useNightTime: () => false }));
+vi.mock("../../components/cinematic", () => ({
   CineFloor: () => null, SpotBeam: () => null, CineRig: () => null, CinePost: () => null,
   SkyDome: () => null, Skyline: () => null, NamePlate: () => null, DustMotes: () => null,
 }));

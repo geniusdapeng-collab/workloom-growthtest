@@ -271,21 +271,24 @@ describe("登记文件与认证基准路径失败关闭", () => {
     }), "CHARACTER_SOURCE_ANCHOR_MISSING", [f.dir]);
   });
 
-  it("当前真实CEO直接复用已入库定妆照，不要求重新下载或登记真人原图", () => {
-    const repoRoot = resolve(import.meta.dirname, "../../..");
+  it("授权负责人复用已登记定妆照，原图不在公开仓也不要求重新下载", () => {
+    const f = portraitFixture();
+    // Keep the registration and ownership checks real, using an isolated
+    // synthetic archive rather than a customer portrait absent from public Git.
+    rmSync(join(f.primaryDir, "anchor.png"));
+    const portraitHash = hashFile(f.portraitFile);
     const result = buildRegisteredCharacterReleaseSource({
-      projectId: "VID-CURRENT-CEO", shots: [{ shotId: "GT-03", assetRef: "asset://asset-20260101000000-demo" }],
-      character: { id: "demo-character" },
-      assetLibraryRoot: join(repoRoot, "bundles/ai-video/library/real-person-assets"),
-      characterLibraryRoots: [join(repoRoot, "bundles/ai-video/library/characters")],
+      ...f.input, projectId: "VID-REGISTERED-CEO",
+      shots: [{ shotId: "GT-03", assetRef: "asset://asset-primary" }],
+      character: { id: "model-a" },
     });
-    const portrait = join(repoRoot, "bundles/ai-video/library/characters/model-03-demo-character/portraits/v1/客户方CEO-front.jpg");
     expect(result.contract.status).toBe("passed");
-    expect(result.bindings[0]?.identityAnchor).toMatchObject({ path: realpathSync(portrait), sha256: hashFile(portrait),
-      assetId: "asset-20260101000000-demo" });
+    expect(result.bindings[0]?.identityAnchor).toMatchObject({ path: realpathSync(f.portraitFile), sha256: portraitHash,
+      assetId: "asset-primary" });
     expect(result.bindings[0]?.identityAnchor?.source).toContain("registered-character-portrait:");
     expect(result.bindings[0]?.identityAnchor?.source).toContain("#v1/front");
-    expect(JSON.stringify(result)).not.toContain("sources/客户方CEO-anchor.jpg");
+    expect(JSON.stringify(result)).not.toContain(join(f.primaryDir, "anchor.png"));
+    expect(hashFile(f.portraitFile)).toBe(portraitHash);
   });
 
   it("登记anchor文件缺失不能返回可发布合同", () => {
