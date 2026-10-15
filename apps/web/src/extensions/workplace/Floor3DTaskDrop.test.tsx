@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
-import type { FloorAgent } from "../pages/p0/Floor";
+import type { FloorAgent } from "../../pages/p0/Floor";
 import { createFloor3DLabelRegistry } from "./Floor3DLabels";
 import { Floor3DTaskDrop } from "./Floor3DTaskDrop";
 

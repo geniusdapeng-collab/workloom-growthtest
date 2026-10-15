@@ -198,111 +198,58 @@ function hasWebGL(): boolean {
 /** WebGL 不可用时的动态团队舞台：人物、岗位、队形、舞蹈和聚光均保留。 */
 function VectorCeremonyStage({ actors, occasion = "first-install", dancing = true, height = 460, onReady }: CeremonyStageProps) {
   const choreo = useMemo(() => choreographyOf(actors.length, occasion), [actors.length, occasion]);
-  const stageRef = useRef<HTMLDivElement>(null);
-  const ceoRef = useRef<HTMLDivElement>(null);
-  const [ceoHeight, setCeoHeight] = useState(0);
-  const [bounds, setBounds] = useState(() => ({
-    width: typeof window === "undefined" ? 960 : window.innerWidth,
-    height: typeof height === "number" ? height : typeof window === "undefined" ? 460 : window.innerHeight,
-  }));
-  const [activeActor, setActiveActor] = useState<number | null>(null);
   const [ready, setReady] = useState(false);
-  const readyCallback = useRef(onReady);
-  readyCallback.current = onReady;
-  const actorIdentity = JSON.stringify(actors.map(({ presetKey, name }) => [presetKey, name]));
-  const entryDelay = (index: number) => Math.min(index * 25, 600);
-  const arrivalDuration = actors.length ? 580 + entryDelay(actors.length - 1) : 0;
   useEffect(() => {
-    const measure = () => {
-      const rect = stageRef.current?.getBoundingClientRect();
-      const width = rect?.width || window.innerWidth;
-      const measuredHeight = rect?.height || (typeof height === "number" ? height : window.innerHeight);
-      setBounds((current) => current.width === width && current.height === measuredHeight
-        ? current : { width, height: measuredHeight });
-    };
-    measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    if (stageRef.current) observer?.observe(stageRef.current);
-    window.addEventListener("resize", measure);
-    return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
-  }, [height]);
-  useEffect(() => {
-    // 与每个演员实际使用的 .58s 入场 + 最长 .6s 错峰共用时长。
-    // 入场独立于舞蹈层，切换舞蹈或更换回调不会把全员就绪误报/重播。
-    setReady(false);
-    setActiveActor(null);
-    const id = window.setTimeout(() => { setReady(true); readyCallback.current?.(); }, arrivalDuration);
+    // data-ready 代表全员（含最后一个错峰入场的人）已经完成首帧，不再把“容器已挂载”
+    // 误报为“团队画面已就绪”。
+    const id = window.setTimeout(() => { setReady(true); onReady?.(); }, 1050);
     return () => window.clearTimeout(id);
-  }, [actorIdentity, arrivalDuration]);
+  }, [onReady]);
 
   const staff = actors.slice(1);
-  const gridWidth = Math.max(1, bounds.width - Math.min(32, bounds.width * .04) * 2);
-  const columns = Math.max(1, Math.min(16, staff.length || 1, Math.floor(gridWidth / 72)));
-  const rows = Math.ceil(staff.length / columns);
-  const gap = 8;
-  const ceoSize = Math.round(Math.max(48, Math.min(128, bounds.width * .3, bounds.height * .18)));
-  // 全屏仪式给上方横幅留出位置；普通嵌入舞台按自身高度分配。
-  const ceoTop = Math.max(12, bounds.height >= 600 ? Math.max(230, bounds.height * .27) : bounds.height * .14);
-  const detailSlotHeight = 60;
-  // offsetHeight 读布局尺寸，避开入场/舞蹈 transform；字体加载后也重测姓名牌。
-  useEffect(() => {
-    const measure = () => {
-      const measuredHeight = ceoRef.current?.offsetHeight ?? 0;
-      setCeoHeight((current) => current === measuredHeight ? current : measuredHeight);
-    };
-    measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    if (ceoRef.current) observer?.observe(ceoRef.current);
-    return () => observer?.disconnect();
-  }, [ceoSize, gridWidth, actorIdentity]);
-  const ceoBottom = ceoTop + (actors[0] ? ceoHeight || ceoSize + 36 : 0);
-  const teamTop = Math.max(bounds.height * .48 - detailSlotHeight - gap, ceoBottom + 12);
-  const gridTop = teamTop + detailSlotHeight + gap;
-  const gridHeight = Math.max(48, bounds.height - gridTop - Math.max(12, Math.min(24, bounds.height * .025)));
-  const cellWidth = (gridWidth - gap * (columns - 1)) / columns;
-  const cellHeight = Math.max(48, Math.min(96, (gridHeight - gap * Math.max(0, rows - 1)) / Math.max(1, rows)));
-  const avatarSize = Math.floor(Math.max(24, Math.min(64, cellWidth - 8, cellHeight - 12)));
-  const scrollable = rows * cellHeight + gap * Math.max(0, rows - 1) > gridHeight;
-  const selected = activeActor === null ? null : actors[activeActor];
   return (
-    <div ref={stageRef} data-ceremony-render-mode="vector2d" data-ceremony-ready={ready ? "true" : "false"} data-ceremony-actors={String(actors.length)} data-ceremony-columns={String(columns)} data-ceremony-scrollable={String(scrollable)} style={{ width: "100%", height, borderRadius: 12, overflow: "hidden", background: "radial-gradient(ellipse at 50% 70%,#222b39 0,#0b0d10 58%)", position: "relative" }}>
+    <div data-ceremony-render-mode="vector2d" data-ceremony-ready={ready ? "true" : "false"} data-ceremony-actors={String(actors.length)} style={{ width: "100%", height, borderRadius: 12, overflow: "hidden", background: "radial-gradient(ellipse at 50% 70%,#222b39 0,#0b0d10 58%)", position: "relative" }}>
       <style>{`
-        @keyframes ceremony-v2-dance { 0%,100% { transform:translateY(0) rotate(-1deg); } 35% { transform:translateY(-6px) rotate(1.5deg); } 70% { transform:translateY(-2px) rotate(-1.2deg); } }
+        @keyframes ceremony-v2-dance { 0%,100% { transform:translateY(0) rotate(-1deg); } 35% { transform:translateY(-12px) rotate(1.5deg); } 70% { transform:translateY(-4px) rotate(-1.2deg); } }
         @keyframes ceremony-v2-arrive { from { opacity:0; transform:translateY(70px) scale(.7); } to { opacity:1; transform:none; } }
         @keyframes ceremony-v2-beam { 0%,100% { opacity:.18; } 50% { opacity:.42; } }
-        @media(prefers-reduced-motion:reduce) { [data-ceremony-actor], [data-ceremony-actor] span { animation:none !important; } }
-        .ceremony-v2-member:hover { background:rgba(138,216,255,.07)!important; }
-        .ceremony-v2-member:focus-visible { outline:2px solid #8ad8ff; outline-offset:-2px; background:rgba(138,216,255,.12)!important; }
-        .ceremony-v2-member:active { background:rgba(138,216,255,.18)!important; }
       `}</style>
       <div style={{ position: "absolute", left: "8%", right: "8%", bottom: "8%", height: "18%", borderRadius: "50%", border: "1px solid rgba(255,217,138,.22)", background: "radial-gradient(ellipse,rgba(255,217,138,.11),transparent 70%)", transform: "perspective(500px) rotateX(64deg)" }} />
       {[18, 34, 50, 66, 82].map((left, i) => <div key={left} style={{ position: "absolute", left: `${left}%`, top: 0, width: "14%", height: "82%", transform: "translateX(-50%)", clipPath: "polygon(42% 0,58% 0,100% 100%,0 100%)", background: i === 2 ? "linear-gradient(rgba(255,217,138,.22),transparent)" : "linear-gradient(rgba(174,202,235,.12),transparent)", animation: `ceremony-v2-beam ${2.4 + i * .17}s ease-in-out infinite` }} />)}
-      {actors[0] && <div ref={ceoRef} data-ceremony-actor={actors[0].presetKey} style={{ position: "absolute", left: "50%", top: ceoTop, width: Math.min(240, gridWidth), marginLeft: -Math.min(240, gridWidth) / 2, textAlign: "center", zIndex: 5, animation: "ceremony-v2-arrive .58s ease both" }}>
-        <div style={{ animation: dancing ? "ceremony-v2-dance .94s ease-in-out infinite" : undefined }}>
-          <AgentAvatarOf name={actors[0].name} presetKey={actors[0].presetKey} size={ceoSize} />
-        </div>
-        <div data-wl-meta data-product-nameplate="ceremony" className="truncate text-body" title={actors[0].name} style={{ display: "inline-block", maxWidth: "100%", marginTop: 3, padding: "3px 9px", borderRadius: 99, color: "#ffd98a", fontWeight: 750, lineHeight: 1.35, textShadow: "0 2px 10px #000", background: "rgba(7,12,22,.78)", border: "1px solid rgba(255,217,138,.34)" }}>{actors[0].name}</div>
-      </div>}
-      <div data-ceremony-layout style={{ position: "absolute", left: "50%", top: teamTop, transform: "translateX(-50%)", width: gridWidth, display: "flex", flexDirection: "column", gap, zIndex: 4 }}>
-      <div data-ceremony-detail-slot style={{ height: detailSlotHeight, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>
-        {selected && <div data-product-nameplate="ceremony-detail" role="status" style={{ maxWidth: Math.min(400, gridWidth), maxHeight: detailSlotHeight, boxSizing: "border-box", overflowY: "auto", padding: "4px 12px", borderRadius: 12, color: "#e7eef8", fontSize: 13, lineHeight: 1.5, overflowWrap: "anywhere", textAlign: "center", background: "rgba(7,12,22,.94)", border: "1px solid rgba(138,216,255,.4)", boxShadow: "0 6px 18px rgba(0,0,0,.28)" }}>{selected.name}</div>}
-      </div>
-      <div data-ceremony-grid role="region" aria-label="团队欢迎名单，可滚动查看全部员工" tabIndex={0} style={{ width: gridWidth, height: gridHeight, flexShrink: 0, display: "grid", gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`, gridAutoRows: cellHeight, rowGap: gap, columnGap: gap, alignContent: scrollable ? "start" : "center", overflowY: scrollable ? "auto" : "hidden", overflowX: "hidden" }}>
-      {staff.map((actor, staffIndex) => {
-        const index = staffIndex + 1;
-        const slow = choreo.slowDancers.includes(staffIndex);
+      {actors.map((actor, index) => {
+        const isCeo = index === 0;
+        const staffIndex = index - 1;
+        const row = staff.length > 7 && staffIndex >= Math.ceil(staff.length / 2) ? 1 : 0;
+        const rowActors = staff.length > 7 ? (row === 0 ? Math.ceil(staff.length / 2) : Math.floor(staff.length / 2)) : staff.length;
+        const rowIndex = row === 0 ? staffIndex : staffIndex - Math.ceil(staff.length / 2);
+        const leftCount = Math.ceil(rowActors / 2);
+        const rightCount = rowActors - leftCount;
+        const left = isCeo ? 50 : rowIndex < leftCount
+          ? 13 + (leftCount <= 1 ? 15 : (rowIndex / (leftCount - 1)) * 30)
+          : 57 + (rightCount <= 1 ? 15 : ((rowIndex - leftCount) / (rightCount - 1)) * 30);
+        const bottom = isCeo ? 28 : row === 0 ? 18 : 6;
+        const avatarSize = isCeo ? 158 : row === 0 ? 106 : 88;
+        const slow = !isCeo && choreo.slowDancers.includes(staffIndex);
         return (
-          <button key={`${actor.presetKey}-${index}`} type="button" data-ceremony-actor={actor.presetKey} className="ceremony-v2-member" aria-label={`查看${actor.name}`} aria-pressed={activeActor === index}
-            onMouseEnter={() => setActiveActor(index)} onMouseLeave={(event) => { if (document.activeElement !== event.currentTarget) setActiveActor((current) => current === index ? null : current); }}
-            onFocus={() => setActiveActor(index)} onBlur={() => setActiveActor((current) => current === index ? null : current)} onClick={() => setActiveActor(index)}
-            onKeyDown={(event) => { if (event.key === "Escape") { event.stopPropagation(); setActiveActor(null); } }}
-            style={{ width: "100%", minWidth: 0, height: cellHeight, display: "flex", alignItems: "center", justifyContent: "center", padding: 6, border: 0, borderRadius: 10, background: "transparent", cursor: "pointer", animation: `ceremony-v2-arrive .58s ease ${entryDelay(index) / 1000}s both`, transformOrigin: "50% 100%" }}>
-            <span style={{ display: "block", pointerEvents: "none", animation: dancing ? `ceremony-v2-dance ${slow ? 1.42 : .94}s ease-in-out ${index * .05}s infinite` : undefined }}><AgentAvatarOf name={actor.name} presetKey={actor.presetKey} size={avatarSize} /></span>
-          </button>
+          <div key={`${actor.presetKey}-${index}`} style={{ position: "absolute", left: `${left}%`, bottom: `${bottom}%`, zIndex: isCeo ? 5 : row === 0 ? 4 : 3, width: avatarSize + 74, marginLeft: -(avatarSize + 74) / 2, textAlign: "center", animation: dancing ? `ceremony-v2-dance ${slow ? 1.42 : .94}s ease-in-out ${index * .05}s infinite` : `ceremony-v2-arrive .58s ease ${index * .025}s both`, transformOrigin: "50% 100%" }}>
+            <AgentAvatarOf name={actor.name} presetKey={actor.presetKey} size={avatarSize} />
+            <div
+              data-wl-meta
+              className={isCeo ? "truncate text-body" : "truncate text-caption"}
+              title={actor.name}
+              style={{
+                display: "inline-block", maxWidth: "100%",
+                marginTop: 3, padding: "3px 9px", borderRadius: 99,
+                color: isCeo ? "#ffd98a" : "#e7eef8", fontWeight: isCeo ? 750 : 600,
+                lineHeight: 1.35,
+                textShadow: "0 2px 10px #000", background: "rgba(7,12,22,.78)",
+                border: `1px solid ${isCeo ? "rgba(255,217,138,.34)" : "rgba(138,216,255,.18)"}`,
+                boxShadow: "0 6px 18px rgba(0,0,0,.28)",
+              }}
+            >{actor.name}</div>
+          </div>
         );
       })}
-      </div>
-      </div>
     </div>
   );
 }

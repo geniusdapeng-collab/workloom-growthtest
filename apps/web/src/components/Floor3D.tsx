@@ -26,10 +26,10 @@ import { displayNameOf, roleTitleOf } from "../lib/naming";
 import { clientChineseText } from "@workloom/ui";
 import { CineFloor, SpotBeam, CineRig, CinePost, SkyDome, Skyline, NamePlate, DustMotes } from "./cinematic";
 import type { FloorAgent, FloorScene, FloorPayload } from "../pages/p0/Floor";
-import { floor3DCameraHeight, floor3DTargets } from "./floor3d-layout";
-import { createFloor3DLabelRegistry, Floor3DLabels, type Floor3DLabelRegistry } from "./Floor3DLabels";
+import { floor3DCameraHeight, floor3DTargets } from "../extensions/workplace/floor3d-layout";
+import { createFloor3DLabelRegistry, Floor3DLabels, type Floor3DLabelRegistry } from "../extensions/workplace/Floor3DLabels";
 import { floorInitialScroll } from "../pages/p0/floor-layout";
-import { Floor3DTaskDrop } from "./Floor3DTaskDrop";
+import { Floor3DTaskDrop } from "../extensions/workplace/Floor3DTaskDrop";
 
 /* ---------------- 与 Floor.tsx 同语义的工具 ---------------- */
 function hash(s: string): number { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }

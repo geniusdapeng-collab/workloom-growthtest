@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
-import type { DirectorFilmPlan } from "@hyperreality/video-studio";
+import type { DirectorFilmPlan } from "../../../../../../packages/video-studio/src/director-planner";
 import { ensureDemoLogin, trpc } from "../../../lib/trpc";
 import { useNavigationAccess } from "../../../shell/NavigationAccess";
 import { PageExitLink } from "../../../shell/PageExitLink";

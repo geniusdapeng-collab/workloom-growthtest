@@ -23,7 +23,7 @@ node_modules/.bin/tsx scripts/tools/edit-entity.mts \
 
 人物的肤色支持与食物支持相互排除。食物由前景实例裁图分类决定，且使用完整词匹配，`table/mealworm/bunting/面包车` 等相似词不充当食物证据。移除旧中心椭圆和整格矩形猜测区域；分类证据不足时保持原样。该工位不是专用食物语义分割模型，存在漏检和分类误判风险，回执明确说明这一限制。
 
-已知源色域/传递函数/矩阵/范围先实际归一化到 709，再做局部修正，最后显式从 RGB 转换至 709 limited。PQ/HLG 进入线性浮点 tone map 后输出 709；未支持源标签或 HDR 缺少色域会失败，不能仅贴 709 标签。缺失 SDR 标签的假设列在 `colorManagement.assumptions`。
+SDR 输入按已知色域、传递函数、矩阵与范围归一化到 709，再做局部修正，最后从 RGB 转换至 709 limited。PQ/HLG 默认恢复旧版像素路径，不隐式 tone map；`colorManagement.kind` 为 `legacy-hdr-pass-through`、`toneMap=null`，兼容性限制写入 `assumptions`。BT.709 输出标签不能作为 HDR→SDR 转换正确性的证明。未支持源标签或 HDR 缺少色域仍会失败；有严格 SDR 交付要求时，先提供经核实的受控 SDR 母版。
 
 ## 后期适配器与回执
 

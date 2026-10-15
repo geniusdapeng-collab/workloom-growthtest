@@ -6,8 +6,8 @@ import { CeremonyStage, type CeremonyActor } from "./CeremonyStage";
 
 // GPU 后端在此不是被测对象；正式 VectorCeremonyStage 与 AgentAvatarOf 保持真实实现。
 vi.mock("@react-three/fiber", () => ({ Canvas: () => null, useFrame: () => {} }));
-vi.mock("./BusinessAvatar3D", () => ({ BusinessAvatar3D: () => null }));
-vi.mock("./cinematic", () => ({ CineFloor: () => null, SpotBeam: () => null, CinePost: () => null }));
+vi.mock("../../components/BusinessAvatar3D", () => ({ BusinessAvatar3D: () => null }));
+vi.mock("../../components/cinematic", () => ({ CineFloor: () => null, SpotBeam: () => null, CinePost: () => null }));
 
 let root: Root;
 let container: HTMLDivElement;

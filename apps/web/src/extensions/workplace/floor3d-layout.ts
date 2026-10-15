@@ -1,5 +1,5 @@
-import type { FloorAgent, FloorScene } from "../pages/p0/Floor";
-import { floorRectsOverlap, type FloorRect } from "../pages/p0/floor-layout";
+import type { FloorAgent, FloorScene } from "../../pages/p0/Floor";
+import { floorRectsOverlap, type FloorRect } from "../../pages/p0/floor-layout";
 import * as THREE from "three";
 
 export interface FloorLabelAnchor { id: string; x: number; y: number; width: number; height: number }

@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
-import { Stage3D } from "./Stage3D";
+import { Stage3D } from "../../components/Stage3D";
 
 const lighting = vi.hoisted(() => ({ night: false }));
 // Resolve the real Stage3D -> Theater -> CineFloor JSX without creating a GPU.
@@ -27,7 +27,7 @@ vi.mock("@react-three/postprocessing", () => ({
   Vignette: vi.fn(() => null),
   Noise: vi.fn(() => null),
 }));
-vi.mock("../lib/useNightTime", () => ({ useNightTime: () => lighting.night }));
+vi.mock("../../lib/useNightTime", () => ({ useNightTime: () => lighting.night }));
 
 function numbers(node: Element, attribute: string, count?: number): number[] {
   const value = node.getAttribute(attribute);

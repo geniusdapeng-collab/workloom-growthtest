@@ -3,7 +3,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as THREE from "three";
-import { floorRectsOverlap } from "../pages/p0/floor-layout";
+import { floorRectsOverlap } from "../../pages/p0/floor-layout";
 import { createFloor3DLabelRegistry, Floor3DLabels } from "./Floor3DLabels";
 
 const frame = vi.hoisted(() => ({ callback: null as null | ((state: any) => void) }));

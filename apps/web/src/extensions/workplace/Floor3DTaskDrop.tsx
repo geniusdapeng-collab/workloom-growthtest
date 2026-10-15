@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import type { FloorAgent } from "../pages/p0/Floor";
+import type { FloorAgent } from "../../pages/p0/Floor";
 import type { Floor3DLabelRegistry } from "./Floor3DLabels";
 
 const TASK_TYPE = "text/workloom-task";
