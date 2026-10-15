@@ -1,14 +1,14 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { assessVariantDistinctness, buildDeliveryManifest, buildVariantPlan, DELIVERY_VARIANTS } from "./deliver.js";
+import { assessVariantDistinctness, buildDeliveryManifest, buildVariantPlan, LEGACY_DELIVERY_VARIANTS } from "./deliver.js";
 import { buildRevisionPlan, buildRevisionReport, classifyRevision } from "./revise.js";
 
 const gray = (v: number) => ({ r: v, g: v, b: v });
 
 describe("多风格交付包（deliver · G-DLV1 变体雷同否决）", () => {
-  it("变体计划：每个变体都走 color-bridge 调色（干净母版本体是交付主件，不占变体名额）", () => {
-    const plans = buildVariantPlan({ master: "/m/master.mp4", outDir: "/out", projectId: "VID-1", coverHook: "滕王阁 落霞秋水" });
-    expect(plans).toHaveLength(DELIVERY_VARIANTS.length);
+  it("显式旧变体计划保留历史配方与参数", () => {
+    const plans = buildVariantPlan({ master: "/m/master.mp4", outDir: "/out", projectId: "VID-1", coverHook: "滕王阁 落霞秋水", variants: LEGACY_DELIVERY_VARIANTS });
+    expect(plans).toHaveLength(LEGACY_DELIVERY_VARIANTS.length);
     const cool = plans.find((p) => p.variant.id === "cool-tech")!;
     expect(cool.passthrough).toBe(false);
     expect(cool.gradeArgs).toContain("grade");

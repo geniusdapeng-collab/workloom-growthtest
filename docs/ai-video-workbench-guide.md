@@ -1,6 +1,6 @@
 # Growthtest 视频调用指南：AI 工作台先读，再制作
 
-> guideVersion: 2026-10-14.1
+> guideVersion: 2026-10-15.2
 > 适用仓库：`workloom-ai/workloom-growthtest`（隔离副本）；本次引导改动前生产基线：`c28f11cd3d200770ee15d21c4ed98176d2e6bbb9`。
 > 读者：Codex、DeepSeek Harness 桌面端及其它可调用本仓 CLI / stdio MCP 的 AI 工作台。
 
@@ -225,6 +225,24 @@ git diff --check
 ```
 
 官方客户端依据：[Codex AGENTS.md 发现规则](https://learn.chatgpt.com/docs/agent-configuration/agents-md)。stdio 客户端通过实际握手和工具读取验证；本地协议回归不等于 Codex/DSH 原生 GUI、付费生成或真人质量验收。
+
+## AI 生成普通全链的默认配色（2026-10-15）
+
+普通 `full-chain-film.mts` 的默认母版保持渲染素材的创作色彩，`color` 阶段记为 `preserve`，不调用调色工位；字幕、弹幕、原声、配乐、封面与请求的导出仍执行。默认三个呈现版本按下表输出，镜头只生成一次。
+
+| 顺序 / ID | 实际处理 | 用途 |
+|---|---|---|
+| 1 / `original` | 从未做创作调色的共同源直接复制，调色次数为 0；后续按请求封装声音和字幕 | 保留渲染时已经形成的颜色 |
+| 2 / `warm-story` | `high-contrast-social` + `look-warm-film.cube`，`intensity=0.5`，关闭自动调整 | 产品所有者选定的 D 组暖调 |
+| 3 / `content-auto` | 依据分镜声明的题材、光线、人物等属性及镜头时长选择一个克制的全片配方 | 给出可以复核依据的内容调色版本 |
+
+三个版本分别从同一份未调色、未混配乐的共同源派生；不从暖调母版继续叠加滤镜。`content-auto` 在商品颜色准确性、夜景、人像、美食、风光、运动及混合题材之间选择，并在 `colorDecision` 留下属性、时长权重、原因和局限；缺属性时保守处理并明确未判定。它没有像素分析、实体分割或艺术评分，也不保证每个镜头的观感都是最优。
+
+显式母版调色需同时设置 `--color-mode grade` 与 `--color-profile` / `--color-intensity`；保留原有显式 `best` 请求。母版的选择不会改变三个变体的共同源。默认不沿用旧的已调色缓存；策略、参数和源摘要均参与恢复核验。显式 `--variants` 仍支持旧 ID `cool-tech,warm-film,punchy-social`，未知或重复 ID 明确失败。
+
+交付清单记录 `colorPolicy`、共同源 SHA-256、每个版本的 profile / LUT / intensity 和自动方案依据；技术验收追踪实际加工链，原色版须为 0 次调色，其它两版各 1 次，且输入绑定共同源。渲染片段及旧账本保持只读。
+
+素材剪辑 `edit-post.mts` / package 的既有首推 `warm-story` 仍采用同一套 D 配方。Growthtest 中显式 `--standard-post` 的版本清单与一句话导演的独立作品合同继续服从各自已提交设置；本节描述普通生成全链的默认三版，不把不同入口的交付数量混为一谈。
 
 ## 所有 AI 工作台共用的交付技术检查（2026-10-14）
 

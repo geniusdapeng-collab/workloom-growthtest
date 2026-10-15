@@ -50,6 +50,16 @@ beforeAll(() => {
 afterAll(() => rmSync(directory, { recursive: true, force: true }));
 
 describe("local-only cover renderer: actual media and copy", () => {
+  it.each(["original", "warm-story", "content-auto"] as const)("accepts %s without grading the already styled cover frame again", async (variant) => {
+    const before = sha(readFileSync(source));
+    const result = await renderLocalCover(base(`ai-${variant}`, { variant }));
+    expect(result.receipt.recipe.variant).toBe(variant);
+    expect(result.receipt.recipe.backgroundFilters.join(",")).not.toMatch(/eq=|curves=|colorbalance=|lut3d=|tonemap=/);
+    expect(result.receipt.text.every((line) => line.changedPixelCount > 0)).toBe(true);
+    expect(result.receipt.source.sha256).toBe(before);
+    expect(sha(readFileSync(source))).toBe(before);
+  });
+
   it("renders CJK title/subtitle pixels and current file/font/recipe proofs with zero network calls", async () => {
     const network = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("Local renderer must not use fetch"));
     try {

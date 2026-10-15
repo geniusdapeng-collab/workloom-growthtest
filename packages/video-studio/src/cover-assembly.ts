@@ -13,7 +13,7 @@ export class CoverAssemblyError extends Error {
   }
 }
 
-export type CoverVariantId = "warm-film" | "punchy-social" | "cool-tech";
+export type CoverVariantId = "original" | "warm-story" | "content-auto" | "warm-film" | "punchy-social" | "cool-tech";
 export interface CoverVariantFilterInput {
   variantId: CoverVariantId;
   accent: string;
@@ -31,6 +31,7 @@ export function buildVariantCoverFilters(input: CoverVariantFilterInput) {
    * 并保留原有的强调色条作为第二重区分（封面仍来自同一主设计稿，属零 token 派生）。
    */
   const grades: Record<CoverVariantId, string[]> = {
+    "original": [], "warm-story": [], "content-auto": [],
     "warm-film": ["colorbalance=rs=0.07:gs=0.015:bs=-0.06", "curves=all='0/0.04 0.5/0.53 1/0.97'", "eq=saturation=1.04:contrast=1.05"],
     "punchy-social": ["eq=saturation=1.16:contrast=1.12:gamma=0.98"],
     "cool-tech": ["colorbalance=rs=-0.05:gs=-0.01:bs=0.08", "eq=saturation=0.90:contrast=1.07:gamma=0.99"],

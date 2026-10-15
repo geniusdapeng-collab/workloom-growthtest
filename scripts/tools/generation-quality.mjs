@@ -164,6 +164,7 @@ export function createGenerationQuality({ root, bins, enabled = true } = {}) {
     if (token.stage === 'color') {
       parameters.profile = detail?.profile ?? report?.winnerLabel ?? cliFlag(args, '--profile');
       parameters.lut = detail?.lut ?? cliFlag(args, '--lut');
+      parameters.intensity = Number(detail?.intensity ?? cliFlag(args, '--intensity'));
       parameters.technicalOnly = !parameters.profile && !parameters.lut;
       execution.processingQuality = detail?.processingQuality ?? report?.processingQuality ?? null;
     } else if (token.stage === 'transitions') {
@@ -323,6 +324,17 @@ export async function inspectGenerationManifest({ root, manifest, bins, phase = 
     const consumed = documents.filter(({ proof }) => steps.has(proof.id));
     for (const stage of artifact.requiredStages ?? []) extra.push({ kind: `chain:${artifact.id}:${stage}`, hard: true,
       ok: consumed.some(({ proof }) => proof.stage === stage), detail: '该文件自己的实际加工链包含请求步骤' });
+    const colorCalls = consumed.filter(({ proof }) => proof.stage === 'color');
+    if (artifact.expectedColorCount !== undefined) extra.push({ kind: `chain:${artifact.id}:color-count`, hard: true,
+      ok: Number.isInteger(artifact.expectedColorCount) && artifact.expectedColorCount >= 0 && colorCalls.length === artifact.expectedColorCount });
+    if (artifact.expectedColorInputSha256 !== undefined) extra.push({ kind: `chain:${artifact.id}:color-input`, hard: true,
+      ok: validHash(artifact.expectedColorInputSha256) && colorCalls.length === 1
+        && colorCalls[0].document.inputs?.[0]?.sha256 === artifact.expectedColorInputSha256 });
+    if (artifact.expectedColorLut !== undefined) extra.push({ kind: `chain:${artifact.id}:color-lut`, hard: true,
+      ok: colorCalls.length === 1 && (colorCalls[0].document.parameters.lut ? path.basename(colorCalls[0].document.parameters.lut) : null) === artifact.expectedColorLut });
+    if (artifact.expectedColorIntensity !== undefined) extra.push({ kind: `chain:${artifact.id}:color-intensity`, hard: true,
+      ok: Number.isFinite(artifact.expectedColorIntensity) && colorCalls.length === 1
+        && colorCalls[0].document.parameters.intensity === artifact.expectedColorIntensity });
     if (artifact.expectedColorProfile !== undefined) extra.push({ kind: `chain:${artifact.id}:color-profile`, hard: true,
       ok: consumed.some(({ proof, document }) => proof.stage === 'color' && (document.parameters.profile ?? null) === artifact.expectedColorProfile), detail: artifact.expectedColorProfile });
   }

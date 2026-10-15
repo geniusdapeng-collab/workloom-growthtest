@@ -1,3 +1,6 @@
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { defaultAiColorVariants, type ContentColorDecision } from "./ai-color-policy.js";
 /**
  * deliver —— 多风格交付包（管线 step_key `deliver`，gate `G-DLV1`）
  *
@@ -18,6 +21,8 @@ export interface DeliveryVariant {
   /** 调色档（交给 color-bridge 的 profile；null = 不调色，用母版原样） */
   gradeProfile: string | null;
   gradeIntensity: number;
+  gradeLut?: string | null;
+  colorDecision?: ContentColorDecision;
   /** 音乐电平偏移（dB；0 = 与母版一致） */
   musicLevelDeltaDb: number;
   /** 封面/文案后缀（标题党护栏：只做风格前缀，不改钩子语义） */
@@ -31,7 +36,7 @@ export interface DeliveryVariant {
 }
 
 /**
- * 三个变体（"风格"要真的是风格，不是换一个滤镜名字）：
+ * 旧版显式变体（兼容已有 --variants 参数；新默认见下方 DELIVERY_VARIANTS）：
  *   · cool-tech 冷调技术感：低饱和冷调（城市/地标/科技题材）
  *   · warm-film 暖调胶片：暖色胶片颗粒（人文/旅行/情绪题材）
  *   · punchy-social 社交高对比：对比与饱和提起来（信息流里"跳出来"，小红书/抖音）
@@ -40,12 +45,26 @@ export interface DeliveryVariant {
  * 2026-09-26 产品所有者口径：**一次必须产出 3 个不同风格的后期版本**，
  * 且三支要在**封面 / 配乐 / 调色**三个维度上都不同（只换滤镜名不算）。
  */
-export const DELIVERY_VARIANTS: DeliveryVariant[] = [
+export const LEGACY_DELIVERY_VARIANTS: DeliveryVariant[] = [
   /** 曲风线索用 `|` 分隔多个候选词，与曲库标签（如「游戏 / 电子」「旅拍 / 生活」「卡点 / 律动」）对齐 */
   { id: "cool-tech", label: "冷调技术感", gradeProfile: "cool-technical", gradeIntensity: 0.55, musicLevelDeltaDb: 0, copySuffix: "｜冷调", coverAccent: "#6FD3E8", bgmGenre: "游戏|电子|史诗", bgmMood: "律动兴奋|宏大推进|安静舒缓", note: "低饱和冷调，适合城市/地标" },
   { id: "warm-film", label: "暖调胶片", gradeProfile: "warm-film", gradeIntensity: 0.5, musicLevelDeltaDb: 1.5, copySuffix: "｜暖调", coverAccent: "#E8B44A", bgmGenre: "旅拍|生活", bgmMood: "温暖自在|松弛平和", note: "暖色胶片，适合人文/旅行" },
   { id: "punchy-social", label: "社交高对比", gradeProfile: "high-contrast-social", gradeIntensity: 0.45, musicLevelDeltaDb: 0.5, copySuffix: "｜高对比", coverAccent: "#FF6A5A", bgmGenre: "轻快|卡点", bgmMood: "律动兴奋|明快愉悦", note: "信息流跳脱，适合小红书/抖音封面流" }
 ];
+
+/** Default AI outputs: original, D warm story and a content-derived look. */
+export const DELIVERY_VARIANTS: DeliveryVariant[] = defaultAiColorVariants();
+export function resolveDeliveryVariants(content?: unknown, ids: string[] = []): DeliveryVariant[] {
+  const defaults = defaultAiColorVariants(content);
+  if (!ids.length) return defaults;
+  if (new Set(ids).size !== ids.length) throw new Error("VARIANT_REQUEST_INVALID: duplicate variant ID");
+  const catalog = [...defaults, ...LEGACY_DELIVERY_VARIANTS];
+  return ids.map(id => {
+    const variant = catalog.find(item => item.id === id);
+    if (!variant) throw new Error(`VARIANT_REQUEST_INVALID: unknown variant ${id}`);
+    return { ...variant };
+  });
+}
 
 /** 交付包最少变体数（产品口径：一次产出 3 个不同风格的后期版本让用户选） */
 export const VARIANT_MIN_COUNT = 3;
@@ -53,6 +72,8 @@ export const VARIANT_MIN_COUNT = 3;
 export interface VariantAxesEntry {
   id: string;
   gradeProfile: string | null;
+  gradeIntensity?: number;
+  gradeLut?: string | null;
   /** 变体封面指纹（缺 = 该变体没出封面） */
   coverSha?: string | null;
   /** 变体配乐指纹（缺 = 该变体没换曲） */
@@ -85,7 +106,10 @@ export function assessVariantAxes(variants: VariantAxesEntry[], options: { bgmRe
   const duplicate = (key: "gradeProfile" | "coverSha" | "bgmSha", label: string): string | null => {
     const seen = new Map<string, string>();
     for (const variant of variants) {
-      const value = variant[key];
+      const value = key === "gradeProfile"
+        ? variant.id === "original" && variant.gradeProfile === null ? "original-preserved"
+          : variant.gradeProfile ? JSON.stringify([variant.gradeProfile, variant.gradeLut ?? null, variant.gradeIntensity ?? null]) : null
+        : variant[key];
       if (value === null || value === undefined || value === "") {
         /** bgm 轴关掉时，缺配乐是**声明事实**而不是缺陷（证据在 bgm 环节记录里） */
         if (!(key === "bgmSha" && !bgmRequired)) missing.push(`${variant.id} 缺${label}`);
@@ -130,22 +154,21 @@ export interface VariantPlan {
 }
 
 export function buildVariantPlan(options: {
-  master: string;
-  outDir: string;
-  projectId: string;
-  coverHook: string;
-  variants?: DeliveryVariant[];
+  master: string; outDir: string; projectId: string; coverHook: string;
+  variants?: DeliveryVariant[]; variantIds?: string[]; content?: unknown; lutDir?: string;
 }): VariantPlan[] {
-  const variants = options.variants ?? DELIVERY_VARIANTS;
-  return variants.map((variant) => ({
-    variant,
-    output: `${options.outDir}/${options.projectId}-variant-${variant.id}.mp4`,
-    passthrough: variant.gradeProfile === null,
-    gradeArgs: variant.gradeProfile
-      ? ["grade", "--in", options.master, "--profile", variant.gradeProfile, "--intensity", String(variant.gradeIntensity)]
-      : [],
-    coverCopy: `${options.coverHook}${variant.copySuffix}`
-  }));
+  const variants = options.variants ?? resolveDeliveryVariants(options.content, options.variantIds);
+  const lutDir = options.lutDir ?? fileURLToPath(new URL("../../../bundles/ai-video/library/luts/", import.meta.url));
+  return variants.map(variant => {
+    if (variant.gradeProfile !== null && (!Number.isFinite(variant.gradeIntensity) || variant.gradeIntensity <= 0 || variant.gradeIntensity > 1))
+      throw new Error(`VARIANT_COLOR_INTENSITY_INVALID: ${variant.id}`);
+    if (variant.gradeLut && !/^[a-zA-Z0-9_-]+\.cube$/.test(variant.gradeLut)) throw new Error("VARIANT_LUT_INVALID");
+    return { variant, output: `${options.outDir}/${options.projectId}-variant-${variant.id}.mp4`,
+      passthrough: variant.gradeProfile === null,
+      gradeArgs: variant.gradeProfile ? ["grade", "--in", options.master, "--profile", variant.gradeProfile,
+        "--intensity", String(variant.gradeIntensity), "--no-auto", ...(variant.gradeLut ? ["--lut", join(lutDir, variant.gradeLut)] : [])] : [],
+      coverCopy: `${options.coverHook}${variant.copySuffix}` };
+  });
 }
 
 export interface VariantSample {
@@ -307,6 +330,7 @@ export interface DeliveryManifest {
   cover: { path: string | null; hook: string };
   variants: Array<{
     id: string; label: string; path: string; sha256: string; note: string; gradeProfile: string | null;
+    gradeIntensity?: number; gradeLut?: string | null; colorSourceSha256?: string; colorDecision?: ContentColorDecision;
     /** 该变体自己的封面（三轴口径：封面必须互相可区分） */
     cover?: { path: string; sha256: string } | null;
     /** 曲目指纹与声明 BPM；未执行测量时，实测字段为 null。 */
