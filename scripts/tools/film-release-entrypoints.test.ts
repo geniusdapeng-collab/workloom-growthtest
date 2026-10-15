@@ -14,6 +14,7 @@ import {
 import { assessVoiceArtifact, fingerprintFile, fingerprintText } from "./film-voice-artifact.js";
 import { assertFilmAudioSource, resolveFilmAudioContract, type FilmAudioShot } from "./film-audio-policy.mjs";
 import { assertCoverPublication } from "./film-publication-policy.mjs";
+import { createGenerationQuality, type GenerationLifecycle } from "./generation-quality.mjs";
 import { validateStandardNativeClock } from "../../packages/video-studio/src/standard-post-contract.js";
 
 const REPO = fileURLToPath(new URL("../../", import.meta.url));
@@ -48,9 +49,14 @@ const visit = (node: AstNode | AstSource): void => {
 };
 visit(parsed);
 if (variantSourceInitializers.length !== 1) throw new Error("ENTRYPOINT_FIXTURE_INVALID: official variant source initializer missing or ambiguous");
+const variantBlockStart = cliSource.indexOf("  const variantSource =", cliSource.indexOf('/* ---------- ⑫ 多风格交付包'));
+const variantBlockEnd = cliSource.indexOf("  const variantBodyInfo =", variantBlockStart);
+if (variantBlockStart < 0 || variantBlockEnd <= variantBlockStart)
+  throw new Error("ENTRYPOINT_FIXTURE_INVALID: official variant ownership guard missing");
 const compiled = ts.transpileModule(declarations.map((statement) => statement.getFullText(parsed)).join("\n")
-  + "\nexports.fixture = { clipFor, assertFactualReleaseSources, variantSource: () => ("
-  + variantSourceInitializers[0]!.getFullText(parsed) + ") };", {
+  + "\nexports.fixture = { clipFor, assertFactualReleaseSources, variantSource: () => {\n"
+  + "assertFactualReleaseSources();\n" + cliSource.slice(variantBlockStart, variantBlockEnd)
+  + "\nreturn variantSource; } };", {
   compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
 }).outputText;
 const masterStart = cliSource.indexOf('/* ---------- ⑪ 正式母版：'), masterEnd = cliSource.indexOf('/* ---------- ⑫ 多风格交付包', masterStart);
@@ -70,7 +76,11 @@ interface FixtureRow {
 }
 interface FixtureShot extends FilmAudioShot { shotId: string; duration: number; speechMode: "on-camera" | "voice-over"; dialogue: Array<{ speaker: string; text: string }> }
 const roots: string[] = [];
-afterEach(() => { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); });
+const qualityTrackers: GenerationLifecycle[] = [];
+afterEach(async () => {
+  try { await Promise.all(qualityTrackers.splice(0).map(tracker => tracker.flush())); }
+  finally { for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true }); }
+});
 afterAll(() => { expect(sha(readFileSync(CLI_FILE)), "official source must stay stable during test").toBe(cliSourceSha256); });
 
 function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
@@ -92,12 +102,19 @@ function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
       media: { fps: 24, width: 1080, height: 1920, videoFrames: 120, videoDurationSec: 5,
         audioSampleRate: 48000, audioChannels: 2, audioDurationSec: 5 } }] };
   const rows: FixtureRow[] = [];
+  const generationQuality = createGenerationQuality({ root: dir }); qualityTrackers.push(generationQuality);
+  const qualityStage: Record<string, string> = { compose: "transitions", subtitle: "subtitles", danmaku: "danmaku", color: "color", bgm: "bgm", sfx: "bgm" };
   const recipe = (stage: string) => ({ component: cliSourceSha256, stage });
-  const make = (stage: string, inputs: string[], outputs: string[], evidence: Record<string, unknown>, shotId: string | null = null, ok = true): FixtureRow => ({
-    stage, shotId, ok, degraded: !ok, artifact: outputs[0] ?? null, evidence,
+  const make = (stage: string, inputs: string[], outputs: string[], evidence: Record<string, unknown>, shotId: string | null = null, ok = true): FixtureRow => {
+    if (ok && qualityStage[stage] && inputs.length && outputs.length) {
+      const token = generationQuality.begin(qualityStage[stage]!, `fixture-${stage}-${randomUUID()}`, inputs, { fixtureOnly: true });
+      generationQuality.finish(token, { outputs, execution: { exitCode: 0, fixtureOnly: true, playableMediaVerified: false } });
+    }
+    return { stage, shotId, ok, degraded: !ok, artifact: outputs[0] ?? null, evidence,
     lineage: createLineageReceipt({ projectId, sourceHash, runId: "fixture", stage, shotId,
       recipe: recipe(stage), status: ok ? "passed" : "failed", inputs, outputs }),
-  });
+    };
+  };
   rows.push(make("voice", [raw], [raw], { projectId, source: "clip-audio", rawSha256: fingerprintFile(raw),
     textSha256: fingerprintText(dialogue), audioPolicyHash: contract.policyHash,
     verification: "native-audio-source-verified", originalManifestSha256: manifestSha256,
@@ -109,7 +126,7 @@ function fixture(mode: FixtureShot["speechMode"] = "on-camera") {
   const context = {
     exports: {} as { fixture: { clipFor: (shot: FixtureShot) => string; assertFactualReleaseSources: () => void; variantSource: () => string } },
     PROJECT: projectId, POST_DIR: dir, CLIP_DIR: dir, OUT_DIR: dir, WORK_DIR: dir, NARRATION_PROFILE: "fixture-profile",
-    master, colored: master, subtitled: master, danmakuOut: master, bgmScored: master,
+    master, colored: master, subtitled: master, variantColorSource: master, danmakuOut: master, bgmScored: master, generationQuality,
     cleanScored: master, scored: master, deliverablePath: master,
     DANMAKU_ENABLED: false,
     SUBTITLE_MODE: "sidecar",
@@ -148,7 +165,7 @@ function row(f: ReturnType<typeof fixture>, stage: string): FixtureRow {
   return found;
 }
 const POST_EDGES = [
-  ["color", "colored"], ["subtitle", "subtitled"], ["danmaku", "danmakuOut"],
+  ["subtitle", "subtitled"], ["danmaku", "variantColorSource"], ["color", "colored"],
   ["bgm", "bgmScored"], ["sfx", "cleanScored"],
 ] as const;
 function wireCurrentPostChain(f: ReturnType<typeof fixture>) {
@@ -162,6 +179,7 @@ function wireCurrentPostChain(f: ReturnType<typeof fixture>) {
     edges.set(stage, { upstream, output });
     upstream = output;
   }
+  f.context.danmakuOut = f.context.colored;
   f.context.scored = f.context.cleanScored;
   f.context.DANMAKU_ENABLED = true;
   return edges;
@@ -339,7 +357,7 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.context.SUBTITLE_MODE = "burn";
     writeFileSync(candidate, "current subtitle artifact derived from current master");
     f.rows.push(f.make("subtitle", [f.master], [candidate], {}));
-    f.context.subtitled = candidate;
+    Object.assign(f.context, { subtitled: candidate, variantColorSource: candidate, colored: candidate, bgmScored: candidate, cleanScored: candidate, scored: candidate });
     expect(f.variantSource()).toBe(candidate);
   });
   it("changed subtitle bytes cannot be reused as a current variant source", () => {
@@ -347,9 +365,9 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.context.SUBTITLE_MODE = "burn";
     writeFileSync(candidate, "current subtitle artifact derived from current master");
     f.rows.push(f.make("subtitle", [f.master], [candidate], {}));
-    f.context.subtitled = candidate;
+    Object.assign(f.context, { subtitled: candidate, variantColorSource: candidate, colored: candidate, bgmScored: candidate, cleanScored: candidate, scored: candidate });
     writeFileSync(candidate, "old substituted subtitle master");
-    expect(failure(f.variantSource)).toMatch(/VARIANT_SOURCE_UNVERIFIED/);
+    expect(failure(f.variantSource)).toMatch(/PUBLICATION_POST_SOURCE_UNVERIFIED/);
   });
   it("a later rejected subtitle record overrides its previous approved variant source", () => {
     const f = fixture(), candidate = join(f.context.POST_DIR, "master-subtitled.mp4");
@@ -357,23 +375,43 @@ describe("actual film release entrypoints with real local byte and lineage recei
     writeFileSync(candidate, "current subtitle artifact derived from current master");
     f.rows.push(f.make("subtitle", [f.master], [candidate], {}));
     f.rows.push(f.make("subtitle", [f.master], [candidate], {}, null, false));
-    f.context.subtitled = candidate;
-    expect(failure(f.variantSource)).toMatch(/VARIANT_SOURCE_UNVERIFIED/);
+    Object.assign(f.context, { subtitled: candidate, variantColorSource: candidate, colored: candidate, bgmScored: candidate, cleanScored: candidate, scored: candidate });
+    expect(failure(f.variantSource)).toMatch(/PUBLICATION_POST_SOURCE_UNVERIFIED/);
   });
   it.each(["burn", "both"])("%s subtitle mode requires a current approved burned source even when a file exists", (mode) => {
     const f = fixture(), candidate = join(f.context.POST_DIR, "master-subtitled.mp4");
     f.context.SUBTITLE_MODE = mode;
     writeFileSync(candidate, "old independently dubbed subtitle master");
-    expect(failure(f.variantSource)).toMatch(/VARIANT_SOURCE_UNVERIFIED/);
+    Object.assign(f.context, { subtitled: candidate, variantColorSource: candidate, colored: candidate, bgmScored: candidate, cleanScored: candidate, scored: candidate });
+    expect(failure(f.variantSource)).toMatch(/PUBLICATION_POST_SOURCE_UNVERIFIED/);
   });
-  it("sidecar mode selects the current verified colored source with no music mixed into it", () => {
+  it("sidecar mode keeps the common ungraded source independent of explicit master color", () => {
     const f = fixture(), current = join(f.context.POST_DIR, "master-graded.mp4");
     writeFileSync(current, "current graded master with original speech and no BGM");
     f.rows.push(f.make("color", [f.master], [current], {}));
-    f.context.colored = current;
-    f.context.subtitled = current;
+    Object.assign(f.context, { colored: current, bgmScored: current, cleanScored: current, scored: current });
+    f.context.subtitled = f.master;
     writeFileSync(join(f.context.POST_DIR, "master-subtitled.mp4"), "old dubbed subtitle master");
-    expect(f.variantSource()).toBe(current);
+    expect(f.variantSource()).toBe(f.master);
+  });
+  it("variants consume the complete owned subtitle and danmaku source before master color and music", () => {
+    const f = fixture(), edges = wireCurrentPostChain(f);
+    expect(f.variantSource()).toBe(edges.get("danmaku")!.output);
+    expect(f.variantSource()).not.toBe(f.context.colored);
+    expect(f.variantSource()).not.toBe(f.context.bgmScored);
+  });
+  it("a lineage-approved source without a current processing ownership record cannot become a variant", () => {
+    const f = fixture(), source = join(f.context.POST_DIR, "unowned.mp4");
+    writeFileSync(source, "different bytes with no current local processing call");
+    // A passed lineage record alone cannot manufacture generation ownership.
+    const r = f.make("untracked-fixture", [f.master], [source], {});
+    f.rows.push({ ...r, stage: "subtitle", lineage: createLineageReceipt({ projectId: f.context.PROJECT,
+      sourceHash: sha("frozen fixture source"), runId: "fixture", stage: "subtitle", shotId: null,
+      recipe: { component: cliSourceSha256, stage: "subtitle" }, status: "passed", inputs: [f.master], outputs: [source] }) });
+    f.context.subtitled = source; f.context.variantColorSource = source;
+    f.context.colored = source; f.context.bgmScored = source; f.context.cleanScored = source; f.context.scored = source;
+    expect(failure(f.guard)).toBe("allowed");
+    expect(failure(f.variantSource)).toMatch(/VARIANT_SOURCE_UNVERIFIED/);
   });
   it("a changed colored source cannot be washed by a fresh subtitle pass", () => {
     const f = fixture(), current = join(f.context.POST_DIR, "master-graded.mp4"), candidate = join(f.context.POST_DIR, "master-subtitled.mp4");
@@ -384,8 +422,8 @@ describe("actual film release entrypoints with real local byte and lineage recei
     writeFileSync(current, "old swapped colored bytes");
     writeFileSync(candidate, "subtitle freshly derived from swapped bytes");
     f.rows.push(f.make("subtitle", [current], [candidate], {}));
-    f.context.subtitled = candidate;
-    expect(failure(f.variantSource)).toMatch(/VARIANT_SOURCE_UNVERIFIED/);
+    Object.assign(f.context, { subtitled: candidate, variantColorSource: candidate, colored: candidate, bgmScored: candidate, cleanScored: candidate, scored: candidate });
+    expect(failure(f.variantSource)).toMatch(/PUBLICATION_POST_SOURCE_UNVERIFIED/);
   });
   it("a latest rejected color receipt prevents source selection even while its bytes still exist", () => {
     const f = fixture(), current = join(f.context.POST_DIR, "master-graded.mp4");
@@ -393,7 +431,7 @@ describe("actual film release entrypoints with real local byte and lineage recei
     f.rows.push(f.make("color", [f.master], [current], {}));
     f.rows.push(f.make("color", [f.master], [current], {}, null, false));
     f.context.colored = current;
-    expect(failure(f.variantSource)).toMatch(/VARIANT_SOURCE_UNVERIFIED/);
+    expect(failure(f.variantSource)).toMatch(/PUBLICATION_POST_SOURCE_UNVERIFIED/);
   });
 });
 
