@@ -40,14 +40,15 @@ export function resolveColorManagement({ probe, sourceTransfer = null, sourceGam
   if (!MATRICES.has(matrix)) fail(`不支持的源矩阵 ${matrix}；拒绝仅改标签`, ErrorClass);
   const input = `primariesin=${primaries}:transferin=${transfer}:matrixin=${matrix}:rangein=${range}`;
   const output = "primaries=bt709:transfer=bt709:matrix=bt709:range=limited:dither=error_diffusion";
+  if (hdr) assumptions.push("Legacy HDR pixel processing restored by product-owner rollback; BT.709 output tags do not certify an HDR-to-SDR conversion");
   const chain = hdr
-    ? `zscale=${input}:transfer=linear:npl=100,format=gbrpf32le,zscale=primaries=bt709,tonemap=tonemap=mobius:param=0.3:desat=2,zscale=${output},format=yuv444p10le,sidedata=mode=delete:type=MASTERING_DISPLAY_METADATA,sidedata=mode=delete:type=CONTENT_LIGHT_LEVEL,sidedata=mode=delete:type=DYNAMIC_HDR_PLUS`
+    ? "null" // Compatibility rollback: no implicit HDR tone mapping; preserve the pre-2026-10-14 pixel path.
     : `zscale=${input}:${output},format=yuv444p10le`;
   return { schema: "workloom/color-management/v1", source: { primaries, transfer, matrix, range },
     observed: { primaries: video.colorPrimaries ?? null, transfer: video.colorTransfer ?? null, matrix: video.colorSpace ?? null, range: video.colorRange ?? null },
     declared, destination: { primaries: "bt709", transfer: "bt709", matrix: "bt709", range: "limited", pixelFormat: "yuv420p" },
-    kind: log ? "log-lut" : hdr ? "hdr-to-sdr" : primaries !== "bt709" || transfer !== "bt709" ? "sdr-conversion" : "range-normalization",
-    chain, assumptions, removedHdrSideData: hdr ? ["MASTERING_DISPLAY_METADATA", "CONTENT_LIGHT_LEVEL", "DYNAMIC_HDR_PLUS"] : [], toneMap: hdr ? { operator: "mobius", param: 0.3, desat: 2, nominalPeakLuminance: 100, peak: "metadata-or-filter-default" } : null };
+    kind: log ? "log-lut" : hdr ? "legacy-hdr-pass-through" : primaries !== "bt709" || transfer !== "bt709" ? "sdr-conversion" : "range-normalization",
+    chain, assumptions, removedHdrSideData: [], toneMap: null };
 }
 export function clarityFilter(mode = "off", ErrorClass = Error) {
   if (!["off", "conservative"].includes(mode)) throw new ErrorClass("clarity 只能为 off/conservative", "bad_request");
