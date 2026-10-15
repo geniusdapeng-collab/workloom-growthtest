@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { tsImport } from 'tsx/esm/api';
 import { createGenerationQuality, generationFileSha256, inspectGenerationManifest } from './generation-quality.mjs';
 import { publishUhdDelivery } from '../../packages/video-studio/src/uhd-delivery.ts';
 const REPO = path.resolve(import.meta.dirname, '../..');
@@ -146,4 +147,49 @@ test('real trims and enhancements remain causal edges between original clips and
       assert.equal(rejected.passed,false);assert.ok(rejected.checks.some(row=>row.kind==='processing:resolution-proof:actual-trim-enhance-0'&&row.ok===false),JSON.stringify(rejected.checks));
     }finally{writeFileSync(file,before);}
   });
+});
+
+test('AI variants preserve original bytes and prove two independent exact color operations', {timeout:150000}, async t => {
+  const { buildVariantPlan } = await tsImport('../../packages/video-studio/src/deliver.ts', import.meta.url);
+  const { copyFileSync } = await import('node:fs');
+  const f = await actualFixture(t), sourceSha = generationFileSha256(f.output);
+  const cli = path.join(REPO, 'bundles/ai-video/connectors/color-bridge/cli.mjs');
+  const plans = buildVariantPlan({ master:f.output, outDir:f.root, projectId:'AI', coverHook:'Family', content:{ shots:[{ scene:'family portrait',duration:1 }] } });
+  const variants = [];
+  for (const plan of plans) {
+    if (plan.passthrough) copyFileSync(f.output,plan.output);
+    else {
+      const args=[...plan.gradeArgs,'--out',plan.output,'--clarity','conservative','--quality-guard','report','--json'];
+      const token=f.quality.beginCli(cli,args), report=JSON.parse(execute(process.execPath,[cli,...args]));
+      f.quality.finishCli(token,{report});
+    }
+    variants.push({id:`variant:${plan.variant.id}`,path:plan.output,media:'video',fps:30,durationSeconds:1,
+      requiredStages:['transitions',...(plan.passthrough?[]:['color'])],expectedColorCount:plan.passthrough?0:1,
+      ...(plan.passthrough?{}:{expectedColorProfile:plan.variant.gradeProfile,expectedColorLut:plan.variant.gradeLut??null,
+        expectedColorIntensity:plan.variant.gradeIntensity,expectedColorInputSha256:sourceSha})});
+  }
+  assert.equal(generationFileSha256(plans[0].output),sourceSha);
+  const accepted=await f.quality.inspect({phase:'independent-ai-colors',scope:'delivery',
+    artifacts:[{id:'master',path:f.output,media:'video',requiredStages:['transitions'],expectedColorCount:0,fps:30,durationSeconds:1},...variants],
+    requirements:requirements.map(row=>row.name==='color'?{name:'color',requirement:'required'}:row),
+    resolution:[160,90],sourceResolution:[160,90],variantIds:plans.map(plan=>plan.variant.id)});
+  assert.equal(accepted.report.passed,true);
+  assert.equal(accepted.manifest.processing.filter(proof=>proof.stage==='color').length,2);
+  for (const [field, value, expected] of [
+    ['expectedColorCount',2,'color-count'], ['expectedColorLut','look-cool-technical.cube','color-lut'],
+    ['expectedColorIntensity',0.8,'color-intensity'], ['expectedColorInputSha256','a'.repeat(64),'color-input'],
+  ]) await t.test(`wrong ${field} cannot pass actual receipt verification`,async()=>{
+    const contract=structuredClone(accepted.manifest);contract.artifacts.find(row=>row.id==='variant:warm-story')[field]=value;
+    const result=await inspectGenerationManifest({root:f.root,manifest:{generationQuality:contract},bins});
+    assert.equal(result.passed,false);assert.ok(result.checks.some(row=>row.kind.endsWith(`chain:variant:warm-story:${expected}`)&&!row.ok));
+  });
+  await t.test('stacking a second real grade fails the independent-parent contract',async()=>{
+    const output=path.join(f.root,'stacked.mp4'),args=['grade','--in',plans[1].output,'--out',output,'--profile','natural','--intensity','0.12','--no-auto','--clarity','conservative','--quality-guard','report','--json'];
+    const token=f.quality.beginCli(cli,args),report=JSON.parse(execute(process.execPath,[cli,...args]));f.quality.finishCli(token,{report});
+    await assert.rejects(f.quality.inspect({phase:'stack-rejected',scope:'delivery',
+      artifacts:[{id:'master',path:f.output,media:'video',requiredStages:['transitions'],expectedColorCount:0},...variants.map(row=>row.id==='variant:content-auto'?{...row,path:output}:row)],
+      requirements:requirements.map(row=>row.name==='color'?{name:'color',requirement:'required'}:row),
+      resolution:[160,90],sourceResolution:[160,90],variantIds:plans.map(plan=>plan.variant.id)}),error=>error.report?.checks.some(row=>row.kind.endsWith('chain:variant:content-auto:color-count')&&!row.ok));
+  });
+  assert.equal(generationFileSha256(f.output),sourceSha);assert.deepEqual(f.sources.map(generationFileSha256),f.sourceHashes);
 });

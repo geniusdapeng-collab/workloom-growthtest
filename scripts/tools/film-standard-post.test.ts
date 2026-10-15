@@ -1,3 +1,4 @@
+import { assertDefaultAiColors } from './ai-color-cli-assertions.mjs';
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -571,6 +572,7 @@ test("whole normal CLI completes all official post stages with current technical
     const pointer = JSON.parse(readFileSync(join(output, "current.json"), "utf8"));
     const manifest = JSON.parse(readFileSync(join(pointer.releaseDir, `${f.projectId}-delivery-manifest.json`), "utf8"));
     assert.equal(manifest.variants.length, 3);
+    assertDefaultAiColors(manifest, records);
     assert.equal(manifest.distinctness.status, "not-reviewed");
     assert.equal(manifest.variants.every((row: { bgm: { measuredBpm: unknown; gridErrorMs: unknown } }) => row.bgm.measuredBpm === null && row.bgm.gridErrorMs === null), true);
     const actualCommands = readFileSync(commands, "utf8").trim().split("\n").map(line => JSON.parse(line));

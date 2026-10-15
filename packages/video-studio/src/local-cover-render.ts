@@ -221,7 +221,7 @@ export async function renderLocalCover(input: LocalCoverRenderInput): Promise<Lo
   if (!input || !input.source || !["image", "video-frame"].includes(input.source.kind)
     || typeof input.platform !== "string" || !input.platform.trim() || !isKnownCoverPlatform(input.platform)) fail("Unknown source kind or cover platform", code);
   const spec = getCoverSpec(input.platform), variant = input.variant ?? "warm-film", fontId = input.fontId ?? "source-han-heavy";
-  if (!["warm-film", "punchy-social", "cool-tech"].includes(variant) || !Object.prototype.hasOwnProperty.call(COVER_FONTS, fontId)) fail("Unknown style or font ID", code);
+  if (!["original", "warm-story", "content-auto", "warm-film", "punchy-social", "cool-tech"].includes(variant) || !Object.prototype.hasOwnProperty.call(COVER_FONTS, fontId)) fail("Unknown style or font ID", code);
   const { width, height } = input;
   if (![width, height].every((value) => Number.isSafeInteger(value) && value >= 96 && value <= 4096)
     || width * spec.canvas.height !== height * spec.canvas.width) fail("Dimensions must be integers 96..4096 matching the platform ratio", code);
@@ -354,6 +354,9 @@ export async function renderLocalCover(input: LocalCoverRenderInput): Promise<Lo
     if (!frame || Number(frame.nb_read_frames) !== 1 || !frame.width || !frame.height || frame.width * frame.height > 16_777_216) fail("No bounded frame was extracted", "LOCAL_COVER_SOURCE_INVALID");
     const frameData = await readFile(join(scratch, "frame.png")), frameRgba = await decode("frame.png", frame.width, frame.height);
     const colors = {
+      "original": { title: "#FFFFFF", accent: "#E2E8F0", scrim: "0x15202B", opacity: 0.78 },
+      "warm-story": { title: "#161E25", accent: "#C39A58", scrim: "0xFFFAEF", opacity: 0.92 },
+      "content-auto": { title: "#FFFFFF", accent: "#F2B65D", scrim: "0x172B32", opacity: 0.80 },
       "warm-film": { title: "#161E25", accent: "#C39A58", scrim: "0xFFFAEF", opacity: 0.92 },
       "punchy-social": { title: "#FFFFFF", accent: "#FFCF40", scrim: "0x071118", opacity: 0.77 },
       "cool-tech": { title: "#FFFFFF", accent: "#59C5D3", scrim: "0x102333", opacity: 0.83 }

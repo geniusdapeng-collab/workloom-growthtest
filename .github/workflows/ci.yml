@@ -83,6 +83,22 @@ jobs:
       - name: 哈希链全库验证（#32 口径）
         run: pnpm db:verify-chain
 
+      - name: 发布前核心链路（真实数据库与服务，mock 模型）
+        timeout-minutes: 10
+        run: |
+          set -eu
+          export LLM_PROVIDER=mock IM_DRIVER=mock TOOL_UNVERIFIED_RATE=0
+          pnpm -C apps/server start > /tmp/workloom-release-server.log 2>&1 &
+          release_server_pid=$!
+          trap 'kill "$release_server_pid" 2>/dev/null || true; cat /tmp/workloom-release-server.log' EXIT HUP INT TERM
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8787/health >/dev/null 2>&1; then break; fi
+            kill -0 "$release_server_pid"
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8787/health
+          pnpm release:gate
+
       - name: shared/base/runtime 测试（DB 集成全开）
         run: |
           pnpm -C packages/shared test
