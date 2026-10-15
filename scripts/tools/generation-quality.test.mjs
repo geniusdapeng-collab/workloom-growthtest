@@ -4,6 +4,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, 
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { tsImport } from 'tsx/esm/api';
 import { createGenerationQuality, generationFileSha256, inspectGenerationManifest } from './generation-quality.mjs';
 import { publishUhdDelivery } from '../../packages/video-studio/src/uhd-delivery.ts';
 const REPO = path.resolve(import.meta.dirname, '../..');
@@ -149,7 +150,7 @@ test('real trims and enhancements remain causal edges between original clips and
 });
 
 test('AI variants preserve original bytes and prove two independent exact color operations', {timeout:150000}, async t => {
-  const { buildVariantPlan } = await import('../../packages/video-studio/src/deliver.ts');
+  const { buildVariantPlan } = await tsImport('../../packages/video-studio/src/deliver.ts', import.meta.url);
   const { copyFileSync } = await import('node:fs');
   const f = await actualFixture(t), sourceSha = generationFileSha256(f.output);
   const cli = path.join(REPO, 'bundles/ai-video/connectors/color-bridge/cli.mjs');

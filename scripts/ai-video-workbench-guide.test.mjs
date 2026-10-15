@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 import { invokeCapability, loadCatalog, mcpTools } from './agent-capabilities.mjs';
-import { readVideoWorkbenchGuide, readVideoWorkbenchGuideFromRoot } from '../bundles/geo-growth/capabilities/workbench-guide.mjs';
+import { readVideoWorkbenchGuide, readVideoWorkbenchGuideFromRoot, VIDEO_WORKBENCH_GUIDE_VERSION } from '../bundles/geo-growth/capabilities/workbench-guide.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const ref = 'docs/ai-video-workbench-guide.md';
@@ -27,6 +27,7 @@ function fixture(t) {
 test('fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call', async () => {
   const direct = readVideoWorkbenchGuide({});
   assert.equal(direct.repository, 'workloom-ai/workloom-growthtest');
+  assert.equal(direct.guideVersion, VIDEO_WORKBENCH_GUIDE_VERSION);
   assert.equal(direct.path, ref); assert.equal(direct.markdown, bytes.toString('utf8'));
   assert.equal(direct.sha256, digest(bytes)); assert.equal(direct.bytes, bytes.length);
   const catalog = await loadCatalog(root);
@@ -56,8 +57,8 @@ for (const [name, mutate, code] of [
   ['empty guide', f => writeFileSync(f.guide, ''), 'VIDEO_GUIDE_UNAVAILABLE'],
   ['oversized guide', f => writeFileSync(f.guide, Buffer.alloc(256 * 1024 + 1)), 'VIDEO_GUIDE_UNAVAILABLE'],
   ['directory as guide', f => { rmSync(f.guide); mkdirSync(f.guide); }, 'VIDEO_GUIDE_UNAVAILABLE'],
-  ['stale guide version', f => writeFileSync(f.guide, bytes.toString().replace('2026-10-14.1', 'old-version')), 'VIDEO_GUIDE_UNAVAILABLE'],
-  ['wrong guide identity', f => writeFileSync(f.guide, 'guideVersion: 2026-10-14.1\nwrong repository\n'), 'VIDEO_GUIDE_UNAVAILABLE'],
+  ['stale guide version', f => writeFileSync(f.guide, bytes.toString().replace(VIDEO_WORKBENCH_GUIDE_VERSION, 'old-version')), 'VIDEO_GUIDE_UNAVAILABLE'],
+  ['wrong guide identity', f => writeFileSync(f.guide, `guideVersion: ${VIDEO_WORKBENCH_GUIDE_VERSION}\nwrong repository\n`), 'VIDEO_GUIDE_UNAVAILABLE'],
   ['invalid UTF-8 guide', f => writeFileSync(f.guide, Buffer.concat([bytes, Buffer.from([0xff])])), 'VIDEO_GUIDE_UNAVAILABLE'],
   ['missing manifest', f => rmSync(join(f.repository, 'product.manifest.json')), 'VIDEO_GUIDE_UNAVAILABLE'],
   ['invalid manifest', f => writeFileSync(join(f.repository, 'product.manifest.json'), '{'), 'VIDEO_GUIDE_UNAVAILABLE'],
