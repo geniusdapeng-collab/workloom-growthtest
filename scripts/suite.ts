@@ -1777,14 +1777,19 @@ n("网关并发不同工作区互不串链（各自 workspace 链独立）", asy
   assert(r1.eventId !== r2.eventId, "独立编号");
 });
 n("压测：100 条事件连写链不断", async () => {
-  let prev = "";
   for (let idx = 0; idx < 100; idx++) {
     const r = await gatewayAppend(gw, agentCtx(), draftOf("order.list"));
-    if (prev) {
-      const row = await qApp<{ prev_hash: string }>(`SELECT prev_hash FROM biz_events WHERE event_id=$1`, [r.eventId]);
-      eq(row.rows[0]!.prev_hash, prev, `第 ${idx} 条接龙`);
-    }
-    prev = r.hash;
+    const row = await qApp<{ seq: string; prev_hash: string }>(
+      `SELECT seq, prev_hash FROM biz_events WHERE event_id=$1`,
+      [r.eventId],
+    );
+    const predecessor = await qApp<{ hash: string }>(
+      `SELECT hash FROM biz_events
+       WHERE tenant_id=$1 AND workspace_id=$2 AND seq < $3
+       ORDER BY seq DESC LIMIT 1`,
+      [scope.tenantId, scope.workspaceId, row.rows[0]!.seq],
+    );
+    eq(row.rows[0]!.prev_hash, predecessor.rows[0]?.hash ?? GENESIS_HASH, `第 ${idx} 条接龙`);
   }
 });
 n("压测：审批批量 50 建 50 批", async () => {
