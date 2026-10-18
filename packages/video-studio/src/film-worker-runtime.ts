@@ -11,7 +11,7 @@ import { adaptCharacterVisualVerdict, characterReleaseHash, type CharacterIdenti
 
 export const FILM_CLI_STAGES = Object.freeze(["cine-kb", "continuity", "micromotion", "spec", "plates", "material-gen", "videos", "voice", "compose", "color", "subtitle", "danmaku", "bgm", "sfx", "cover", "mux", "master", "deliver", "revise"]);
 const valueOptions = new Set(["aspect", "resolution", "quality", "platform", "fps", "max-attempts", "xfade", "cut-transition", "cut-transition-duration", "cut-transition-at", "subtitle-mode", "subtitle-lang", "cover-platform", "cover-hero", "cover-hook", "theme", "account", "only", "review-policy", "route-kind", "assembly-mode", "assembly-reason", "revise-note", "revision-context", "narration-profile", "enhance-kind", "opening-title"]);
-const flagOptions = new Set(["no-resume", "no-danmaku", "no-open-with-cover", "no-cover-kb", "narration-unified", "no-title-card", "prompt-english-gloss", "material-post-only", "material-speed-ramp", "bgm-declared-program-mix"]);
+const flagOptions = new Set(["no-resume", "auto-danmaku", "no-danmaku", "no-open-with-cover", "no-cover-kb", "narration-unified", "no-title-card", "prompt-english-gloss", "material-post-only", "material-speed-ramp", "bgm-declared-program-mix"]);
 const enumOptions: Record<string, readonly string[]> = {
   aspect: ["9:16", "16:9", "1:1", "4:5"], resolution: ["720p", "1080p", "2160p"], quality: ["hd", "uhd"],
   "subtitle-mode": ["sidecar", "burn", "both"], "review-policy": ["off", "advisory", "blocking"],
@@ -155,6 +155,7 @@ export function normalizeFilmJobRequest(stages: string[], options: Record<string
   }
   const effective = [...new Set(stages)];
   if (effective.includes("deliver") && !effective.includes("master")) effective.push("master");
+  if (normalized["auto-danmaku"] === true && normalized["no-danmaku"] !== true && !effective.includes("danmaku")) effective.push("danmaku");
   if (normalized["assembly-mode"] === "post-only" && !effective.includes("spec")) effective.push("spec");
   return { stages: effective, options: normalized };
 }

@@ -8,7 +8,7 @@ import test from 'node:test';
 import {pathToFileURL} from 'node:url';
 import {copyRuntimeSources} from './pack-workspace-modules.mjs';
 const root=path.resolve(import.meta.dirname,'..'),product=JSON.parse(readFileSync(path.join(root,'product.manifest.json')));
-const shared=['scripts/tools/generation-quality.mjs','scripts/tools/rhythm-edit.mts','scripts/tools/rhythm-post.mts','scripts/tools/edit-entity.mts','scripts/tools/vision-entity.swift'];
+const shared=['scripts/tools/generation-quality.mjs','scripts/tools/lib/ai-production-defaults.ts','scripts/tools/rhythm-edit.mts','scripts/tools/rhythm-post.mts','scripts/tools/edit-entity.mts','scripts/tools/vision-entity.swift'];
 const video=['scripts/tools/edit-post.mts','scripts/tools/edit-cover.mts','scripts/tools/edit-package.mts','scripts/tools/lib/edit-rhythm.mts','scripts/tools/lib/frame-scan.mts','scripts/tools/lib/delivery-forms.mts'];
 const assets=[...shared,...(product.repository.endsWith('/WorkLoom-video-edit')?video:[])],hash=file=>createHash('sha256').update(readFileSync(file)).digest('hex');
 function temp(t){const directory=mkdtempSync(path.join(tmpdir(),'post runtime 中文 空格-'));t.after(()=>rmSync(directory,{recursive:true,force:true}));return directory;}

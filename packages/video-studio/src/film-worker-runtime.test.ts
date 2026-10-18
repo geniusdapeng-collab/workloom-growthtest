@@ -103,6 +103,7 @@ describe("frozen full-chain worker adapter", () => {
   });
   it("normalizes complete stage dependencies and rejects unknown stages, paths, code and bypass options", () => {
     expect(normalizeFilmJobRequest(["deliver"], { aspect: "16:9", maxAttempts: 2 }).stages).toEqual(["deliver", "master"]);
+    expect(normalizeFilmJobRequest(["master"], { autoDanmaku: true }).stages).toEqual(["master", "danmaku"]);
     expect(normalizeFilmJobRequest(["compose"], { assemblyMode: "post-only" }).stages).toEqual(["compose", "spec"]);
     for (const key of ["keys-file", "work-dir", "out", "shots", "worker", "execute-revision", "accept-rejected", "allow-fallback-approve"]) expect(() => normalizeFilmJobRequest(["plates"], { [key]: "secret" })).toThrow("不接受");
     expect(() => normalizeFilmJobRequest(["storyboard"], {})).toThrow("阶段");

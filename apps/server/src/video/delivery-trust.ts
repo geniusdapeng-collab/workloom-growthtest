@@ -256,8 +256,15 @@ export function inspectDeliveryTrust(packageDir: string, scope: DeliveryScope, e
       || payload.packageRealPath !== realpathSync(packageDir)) fail("交付封签归属、版本、配方或清单指纹不匹配");
     if (!Array.isArray(manifest.checks) || manifest.checks.length === 0 || manifest.checks.some((check) => check?.ok !== true)) fail("交付清单检查缺失或未显式通过");
     const registered = registeredDeliveryArtifacts(manifest);
-    if (!registered.some((row) => row.role === "master") || registered.filter((row) => row.role === "variant").length < 3
-      || (manifest.variants ?? []).some((variant) => !variant.video || !variant.cover)) fail("交付主件、三支变体或封面缺失");
+    const variantArtifacts = registered.filter((row) => row.role === "variant").length;
+    /**
+     * 普通 AI 生成允许零变体的单母版交付；一旦显式请求多版本，则仍要求完整的
+     * 三支变体包，拒绝 1–2 支半成品被签名发布。
+     */
+    if (!registered.some((row) => row.role === "master") || (variantArtifacts > 0 && variantArtifacts < 3)
+      || (manifest.variants ?? []).some((variant) => !variant.video || !variant.cover)) {
+      fail("交付主件缺失，或显式多版本交付不是完整三支");
+    }
     if (!Array.isArray(payload.artifacts) || payload.artifacts.length !== registered.length || !Array.isArray(payload.checks)) fail("交付封签产物集合不匹配");
     const actualFiles = new Map<string, string>();
     for (const row of registered) {

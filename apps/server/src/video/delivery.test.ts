@@ -180,12 +180,32 @@ describe("交付包读模型", () => {
     expect(detail.revisionBaseReason).toBeNull();
   });
 
-  it("清单缺变体时列表仍可读，失败项如实统计", () => {
-    seedPackage("VID-BAD-002", baseManifest({ variants: [], checks: [{ kind: "variants_distinct", ok: false }] }));
+  it("单母版交付无需伪造变体，读模型明确为零变体", () => {
+    seedPackage("VID-MASTER-ONLY", baseManifest({
+      masterOnly: true,
+      deliveryPolicy: "single-master",
+      variants: [],
+      divergence: [],
+      checks: [{ kind: "master_no_burn_in", ok: true }],
+    }));
+    const rows = listDeliveryPackages({ scope, env: env() });
+    const masterOnly = rows.find((row) => row.dir === "VID-MASTER-ONLY")!;
+    expect(masterOnly.passed).toBe(true);
+    expect(masterOnly.variantCount).toBe(0);
+    expect(masterOnly.variantIds).toEqual([]);
+    expect(masterOnly.failedChecks).toEqual([]);
+  });
+
+  it("显式多版本缺支时列表仍可读，失败项如实统计", () => {
+    const complete = baseManifest();
+    seedPackage("VID-BAD-002", baseManifest({
+      variants: (complete.variants as unknown[]).slice(0, 1),
+      checks: [],
+    }));
     const rows = listDeliveryPackages({ scope, env: env() });
     const bad = rows.find((row) => row.dir === "VID-BAD-002")!;
     expect(bad.passed).toBe(false);
-    expect(bad.failedChecks).toEqual(["variants_distinct", "delivery_trust"]);
+    expect(bad.failedChecks).toEqual(["delivery_trust"]);
   });
 });
 

@@ -57,6 +57,18 @@ async function emitInTx(
   return r.eventId;
 }
 
+/**
+ * Event-chain transactions and runtime step commits both acquire this lock before
+ * touching threads. Night-shift writes must use the same lock order; taking the
+ * thread row locks first can deadlock with a concurrent runtime append.
+ */
+async function lockNightEventChain(client: pg.PoolClient, scope: Scope): Promise<void> {
+  await client.query(
+    "SELECT pg_advisory_xact_lock(hashtext('event-chain:' || $1 || ':' || $2))",
+    [scope.tenantId, scope.workspaceId],
+  );
+}
+
 async function emit(
   gateway: pg.Pool,
   scope: Scope,
@@ -131,6 +143,7 @@ export async function confirmNight(
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+    await lockNightEventChain(client, scope);
     const cur = await client.query<{ status: NightStatus }>(
       `SELECT status FROM night_runs WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [runId, scope.workspaceId],
     );
@@ -189,6 +202,7 @@ export async function pauseAll(
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]); // D16：append_event_insert 双 GUC 校验要求
+    await lockNightEventChain(client, scope);
     const cur = await client.query<{ status: NightStatus }>(
       `SELECT status FROM night_runs WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [runId, scope.workspaceId],
     );
@@ -242,6 +256,7 @@ export async function resumeNight(
     await client.query("BEGIN");
     await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
     await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]); // D16：append_event_insert 双 GUC 校验要求
+    await lockNightEventChain(client, scope);
     const cur = await client.query<{ status: NightStatus }>(
       `SELECT status FROM night_runs WHERE id=$1 AND workspace_id=$2 FOR UPDATE`, [runId, scope.workspaceId],
     );
