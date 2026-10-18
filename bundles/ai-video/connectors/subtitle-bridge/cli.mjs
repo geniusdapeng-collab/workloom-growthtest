@@ -193,7 +193,8 @@ async function main() {
       line(`已烧录：${report.output.path}（${report.encoder}）`);
       line(`  字幕字体 ${report.fonts.字幕?.name ?? "-"} · 标题字体 ${report.fonts.标题?.name ?? "-"}`);
       line(`  时间轴回读 ${report.timeline.cues}/${report.timeline.sourceCues} 条（${report.timeline.ok ? "一致" : "不一致"}）`);
-      line("  已执行请求的字幕处理；未抽检原片画面或测量像素可现度。");
+      line("  源画面质量未复检；已核对真实渲染、时间轴、字体与输出轨道");
+      if (report.sharpness?.ratio != null) line(`  清晰度抽检：${report.sharpness.ratio}（前 ${report.sharpness.before} → 后 ${report.sharpness.after}，上半部拉普拉斯方差）`);
       line(`  标点体检 ${report.checks.punctuation_ok ? "ok" : "fail"}（口径：字幕不带标点；数字内的 . : - / 保留）`);
       line(`  版式体检：${report.layoutChecks.map((check) => `${check.kind}=${check.ok ? "ok" : "fail"}`).join(" ")}`);
       line(`  sha256 ${report.output.hash}`);

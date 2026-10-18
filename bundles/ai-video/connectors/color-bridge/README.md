@@ -114,9 +114,9 @@ node_modules/.bin/tsx bundles/ai-video/connectors/color-bridge/runtime-smoke.mts
 
 `grade` 对 SDR 输入按已知色域、转移函数、矩阵与范围转换到 Rec.709。PQ/HLG 默认恢复旧版像素处理路径，不隐式执行 HDR tone map；回执标为 `legacy-hdr-pass-through`，`toneMap=null`，并在 `assumptions` 明示兼容性边界。旧路径的 BT.709 输出标签不能证明完成了正确的 HDR→SDR 转换；有该要求的项目需先提供经核实的受控 SDR 母版。HDR 缺少可核实色域或遇到未支持标签仍返回 `unsupported_color_space`。未知 SDR 标签采用回执中列明的假设，调用方应核对。
 
-独立调色的默认值仍是 `clarity='off'`、`qualityGuard='off'`。`clarity='conservative'` 使用 3×3 亮度锐化、增益 0.25、色度增益 0；它保留输出尺寸，不承诺恢复源片已丢失的细节。`qualityGuard='report'` 返回同时间点归一化前后帧、源/输出 SHA、实际尺寸、局部最坏帧和阈值来源，出现处理损伤时保留产物并提示。`qualityGuard='block'` 仅在明确请求时删除不通过的本次后期产物并返回 `quality_regression`，不会触发付费源镜重生成。阈值是本地工程启发式，不能当作审美得分或整片保证。
+独立调色的默认值仍是 `clarity='off'`、`qualityGuard='off'`。`clarity='conservative'` 为兼容旧调用保留原 3×3/0.25 锐化；新的 `light/medium/strong` 三档才先用确定性色调曲线压回被雾气抬起的黑位，再用大半径局部对比与 CAS 恢复层次。它们保留输出尺寸，不承诺恢复源片已丢失的细节。`qualityGuard='report'` 返回同时间点归一化前后帧、源/输出 SHA、实际尺寸、局部最坏帧和阈值来源，出现处理损伤时保留产物并提示。`qualityGuard='block'` 仅在明确请求时删除不通过的本次后期产物并返回 `quality_regression`，不会触发付费源镜重生成。阈值是本地工程启发式，不能当作审美得分或整片保证。
 
-无需创作 look 的技术处理可调用 `grade({ input, output, profile:null, lutPath:null, corrections:{}, auto:false, clarity:'conservative', qualityGuard:'report' })`。输出不得指向源片及其软链/硬链别名。现有 `best/match/auto/denoise` 各仓默认策略保持原语义，新的工程证据与源镜采用相互独立。
+无需创作 look 的技术处理可调用 `grade({ input, output, profile:null, lutPath:null, corrections:{}, auto:false, clarity:'light', qualityGuard:'report' })`。输出不得指向源片及其软链/硬链别名。现有 `best/match/auto/denoise` 各仓默认策略保持原语义，新的工程证据与源镜采用相互独立。
 
 实体层适配器是 `entity-post.mjs` 的 `applyPostEntity({ input, output, workDir, fps, intensity, bins, env })`，用于最终创作 look 后、BGM 前。它通过本地 CLI 对每个当前帧产生掩膜，目标消失即清零；完成后核验源片不变、实际输出与逐帧掩膜 SHA、规格和应用数量。工位或 tsx 入口不可用时 `applied=0` 并返回原因，输出为输入的复制件，不能把跳过当成实体层已经执行。完整边界、命令和回执见 [实体调色说明](../../../../docs/ai-video-entity-color.md)。
 

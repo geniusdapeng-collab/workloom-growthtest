@@ -1,7 +1,7 @@
 /** AI-generated pictures keep their rendered look unless a separate variant requests a look. */
 import type { DeliveryVariant } from "./deliver.js";
 
-export const AI_COLOR_POLICY_VERSION = "2026-10-15.1";
+export const AI_COLOR_POLICY_VERSION = "2026-10-18.1";
 export type ColorCategory = "color-accurate" | "night" | "food" | "portrait" | "landscape" | "energetic" | "mixed" | "unknown";
 export interface ContentColorDecision {
   policyVersion: string;
@@ -73,9 +73,9 @@ export function defaultAiColorVariants(content?: unknown): DeliveryVariant[] {
   return [
     { id: "original", label: "原色", gradeProfile: null, gradeIntensity: 0, musicLevelDeltaDb: 0, copySuffix: "", coverAccent: "#E8E2D5",
       bgmGenre: "生活|自然", bgmMood: "安静舒缓|松弛平和", note: "保留渲染素材的创作色彩；后期共同源直接复制，不调用调色工位。" },
-    { id: "warm-story", label: "暖调故事", gradeProfile: "high-contrast-social", gradeLut: "look-warm-film.cube", gradeIntensity: 0.5,
+    { id: "warm-story", label: "暖心版", gradeProfile: "warm-film", gradeIntensity: 0.3,
       musicLevelDeltaDb: 1.5, copySuffix: "｜暖调", coverAccent: "#E8B44A", bgmGenre: "旅拍|生活", bgmMood: "温暖自在|松弛平和",
-      note: "D 组配方：high-contrast-social + look-warm-film.cube，强度 0.5；从未调色共同源独立派生。" },
+      note: "轻暖配方：warm-film 30%，不再叠加第二层暖 LUT；从未调色共同源独立派生。" },
     { id: "content-auto", label: "内容调色", gradeProfile: designed.profile, gradeIntensity: designed.intensity, colorDecision: designed.decision,
       musicLevelDeltaDb: 0.5, copySuffix: "", coverAccent: "#6FA8A4", bgmGenre: "生活|轻快", bgmMood: "松弛平和|明快愉悦",
       note: designed.decision.reasons.join(" ") },

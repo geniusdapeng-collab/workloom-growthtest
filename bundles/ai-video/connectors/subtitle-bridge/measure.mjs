@@ -106,6 +106,45 @@ export function runBin(bin, args, { timeoutMs = 300_000, label = "ffmpeg" } = {}
   });
 }
 
+/** 二进制 stdout 版本（rawvideo 抽帧用）；语义与 runBin 一致，但保留 Buffer 不做 utf8 解码。 */
+function runBinBuffer(bin, args, { timeoutMs = 300_000, label = "ffmpeg" } = {}) {
+  return new Promise((resolve, reject) => {
+    let child;
+    try {
+      child = spawn(bin, args, { stdio: ["ignore", "pipe", "pipe"] });
+    } catch (error) {
+      reject(new MeasureError(`${label} 无法启动：${error.message}`, "ffmpeg_not_installed", false));
+      return;
+    }
+    const stdout = [];
+    const stderr = [];
+    let settled = false;
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      child.kill("SIGKILL");
+      reject(new MeasureError(`${label} 超时（${timeoutMs}ms）`, "timeout", true));
+    }, timeoutMs);
+    child.stdout?.on("data", (chunk) => stdout.push(chunk));
+    child.stderr?.on("data", (chunk) => stderr.push(chunk));
+    child.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new MeasureError(`${label} 启动失败：${error.message}`, "engine_failed", true));
+    });
+    child.on("close", (code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      const out = Buffer.concat(stdout);
+      const err = Buffer.concat(stderr).toString("utf8");
+      if (code === 0) resolve({ stdout: out, stderr: err });
+      else reject(new MeasureError(`${label} 退出码 ${code}：${err.trim().split("\n").slice(-6).join(" | ").slice(0, 600)}`, "ffmpeg_failed", true));
+    });
+  });
+}
+
 export async function binaryVersion(bin, { timeoutMs = 20_000 } = {}) {
   try {
     const { stdout, stderr } = await runBin(bin, ["-version"], { timeoutMs, label: path.basename(bin) });
@@ -226,18 +265,66 @@ export async function probeMedia(input, { bins = resolveBinaries() } = {}) {
   };
 }
 
-/** 编码器探测：优先 libx264（生产完整 ffmpeg），退化到 libopenh264 / mpeg4，并如实回报。 */
-export async function pickVideoEncoder({ bins = resolveBinaries() } = {}) {
+/**
+ * 编码器探测：优先 libx264（生产完整 ffmpeg），退化到 libopenh264 / mpeg4，并如实回报。
+ * 字幕/弹幕烧录会成为最终发布件的最后一代编码，因此 1080P 默认 medium/CRF16，
+ * 4K 默认 medium/CRF14；旧 fast/CRF20 会放大文字边缘与纹理的额外损失。
+ */
+export async function pickVideoEncoder({ bins = resolveBinaries(), height = null, quality = null } = {}) {
   const { stdout } = await runBin(bins.ffmpeg, ["-hide_banner", "-encoders"], { label: "ffmpeg" });
+  const resolvedQuality = quality === "uhd" || quality === "hd"
+    ? quality
+    : Number.isFinite(Number(height)) && Number(height) >= 1600 ? "uhd" : "hd";
+  const uhd = resolvedQuality === "uhd";
+  const x264Args = ["-c:v", "libx264", "-preset", "medium", "-crf", uhd ? "14" : "16", "-threads", "0"];
   const candidates = [
-    { name: "libx264", args: ["-c:v", "libx264", "-preset", "fast", "-crf", "20"] },
-    { name: "libopenh264", args: ["-c:v", "libopenh264", "-b:v", "4M"] },
-    { name: "mpeg4", args: ["-c:v", "mpeg4", "-q:v", "3"] },
+    { name: "libx264", args: x264Args },
+    { name: "libopenh264", args: ["-c:v", "libopenh264", "-b:v", uhd ? "24M" : "8M"] },
+    { name: "mpeg4", args: ["-c:v", "mpeg4", "-q:v", uhd ? "2" : "3"] },
   ];
   for (const candidate of candidates) {
     if (new RegExp(`\\s${candidate.name}\\s`).test(stdout)) return candidate;
   }
   throw new MeasureError("未找到可用的视频编码器（libx264/libopenh264/mpeg4）", "ffmpeg_not_installed", false);
+}
+
+/**
+ * 清晰度代理：取 3 个时间点的画面**上半部**（避开字幕带），缩到 480 宽转灰度，
+ * 算拉普拉斯方差的中位数。只用于"烧字前后是否明显变糊"的回归断言，不做审美评分。
+ */
+export async function measureSharpness(file, { bins = resolveBinaries(), samples = [0.1, 0.3, 0.5, 0.7, 0.9] } = {}) {
+  const probe = await probeMedia(file, { bins });
+  const duration = Number(probe.videoDuration ?? probe.duration ?? 0);
+  if (!(duration > 0)) throw new MeasureError("无法读取时长，清晰度抽检失败", "bad_media", false);
+  const values = [];
+  for (const ratio of samples) {
+    const at = Math.max(0, Math.min(duration - 0.05, duration * ratio));
+    const { stdout } = await runBinBuffer(bins.ffmpeg, [
+      "-hide_banner", "-v", "error", "-ss", at.toFixed(3), "-i", file, "-frames:v", "1",
+      "-vf", "crop=iw:trunc(ih*0.6):0:0,scale=480:-2,format=gray",
+      "-f", "rawvideo", "-",
+    ], { label: "ffmpeg(sharpness)" });
+    const buffer = Buffer.isBuffer(stdout) ? stdout : Buffer.from(String(stdout ?? ""), "binary");
+    if (buffer.length < 480 * 40) continue;
+    /** 推断高度：rawvideo 灰度 480×H，H = 长度/480（取可行整除值）。 */
+    const width = 480;
+    const height = Math.floor(buffer.length / width);
+    if (height < 3) continue;
+    let sum = 0, sumSq = 0, count = 0;
+    for (let y = 1; y < height - 1; y += 1) {
+      for (let x = 1; x < width - 1; x += 1) {
+        const center = buffer[y * width + x];
+        const lap = 4 * center - buffer[(y - 1) * width + x] - buffer[(y + 1) * width + x] - buffer[y * width + x - 1] - buffer[y * width + x + 1];
+        sum += lap;
+        sumSq += lap * lap;
+        count += 1;
+      }
+    }
+    if (count > 0) values.push(sumSq / count - (sum / count) ** 2);
+  }
+  if (values.length === 0) throw new MeasureError(`清晰度抽检没有拿到帧：${file}`, "bad_media", false);
+  values.sort((a, b) => a - b);
+  return { medianVariance: Number(values[Math.floor(values.length / 2)].toFixed(3)), samples: values.length };
 }
 
 /** 字幕渲染滤镜探测：ass / subtitles 是否可用（libass 是否编进 ffmpeg）。 */

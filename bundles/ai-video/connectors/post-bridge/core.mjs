@@ -187,6 +187,7 @@ export function listVariantPacks() {
       positioning: pack.positioning,
       platforms: pack.platforms ?? [],
       color: pack.color ?? null,
+      colorPolicy: pack.colorPolicy ?? (pack.color ? "grade" : "preserve"),
       bgm: pack.bgm ?? null,
       transitions: pack.transitions ?? null,
       copy: pack.copy ?? null,
@@ -276,6 +277,22 @@ export function resolveQuality(project = {}) {
     throw new PostError(`未知清晰度档位：${quality}（可用：hd / uhd）`, "bad_request");
   }
   return quality;
+}
+
+const VARIANT_CLARITY_MODES = new Set(["off", "conservative", "light", "medium", "strong"]);
+
+/**
+ * 变体最终 look 层的清晰度口径。
+ * - 默认 `conservative` 保持历史调用行为；
+ * - `edit-post` 已在逐镜归一化时完成自动去雾时，显式传 `colorPipeline.variantClarity='off'`，
+ *   避免旧固定 3×3 锐化再次改变已经逐镜处理过的画面，也不让回执继续误报 conservative。
+ */
+export function resolveVariantClarity(project = {}) {
+  const value = project?.colorPipeline?.variantClarity ?? "conservative";
+  if (typeof value !== "string" || !VARIANT_CLARITY_MODES.has(value)) {
+    throw new PostError(`colorPipeline.variantClarity 只能为 ${[...VARIANT_CLARITY_MODES].join("/")}`, "bad_request");
+  }
+  return value;
 }
 
 export function resolveResolution(project = {}) {
@@ -564,8 +581,8 @@ export async function normaliseShots({
     else args.push("-map", "0:v:0", "-map", "1:a:0", "-shortest");
     const tempTarget = path.join(dir, `${fileId}-${key}.${process.pid}.${Date.now()}.tmp.mp4`);
     args.push(
-      "-c:v", "libx264", "-preset", quality === "uhd" ? "medium" : "veryfast",
-      "-crf", quality === "uhd" ? "16" : "18", "-threads", quality === "uhd" ? "2" : "0", "-pix_fmt", "yuv420p",
+      "-c:v", "libx264", "-preset", "medium",
+      "-crf", quality === "uhd" ? "14" : "16", "-threads", "0", "-pix_fmt", "yuv420p",
       "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-color_range", "tv",
       "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
       "-movflags", "+faststart", tempTarget,
@@ -703,9 +720,8 @@ async function assembleTimelineOwned({
   const fadeSec = Math.max(0.05, optionalNumber(transitions.fadeSec, 0.5));
   const [width, height] = resolution ?? [1080, 1920];
   if (!["hd", "uhd"].includes(quality)) throw new PostError(`未知清晰度档位：${quality}`, "bad_request");
-  const videoEncode = quality === "uhd"
-    ? ["-c:v", "libx264", "-preset", "medium", "-crf", "16", "-threads", "2", "-pix_fmt", "yuv420p"]
-    : ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p"];
+  const videoEncode = ["-c:v", "libx264", "-preset", "medium",
+    "-crf", quality === "uhd" ? "14" : "16", "-threads", "0", "-pix_fmt", "yuv420p"];
   for (const clip of clips) {
     if (!fs.existsSync(clip.path)) throw new PostError(`归一化产物缺失：${clip.path}`, "not_found");
   }
@@ -1319,6 +1335,7 @@ export async function buildDeliveryPackage({
   const packs = plan.variants.map((entry) => findVariantPack(entry.id));
   const [width, height] = plan.resolution;
   const quality = plan.quality;
+  const variantClarity = resolveVariantClarity(project);
   const existingManifestPath = path.join(target, "delivery-manifest.json");
   if (fs.existsSync(existingManifestPath)) {
     throw new PostError("交付目录已有完成工程，请走 reedit 创建新版本", "idempotency_conflict");
@@ -1413,6 +1430,16 @@ export async function buildDeliveryPackage({
   /* ③ 逐变体：拼接 → 调色 → 音频 → 封面 → 文案 →（可选）软字幕轨 / 硬字幕 */
   const variantsOut = [];
   const audioFailures = [];
+  const danmakuRequest = danmaku
+    ? {
+      items: parseDanmaku(Array.isArray(danmaku) ? danmaku : danmaku.items),
+      lanes: optionalNumber(danmaku.lanes, 4),
+      opacity: optionalNumber(danmaku.opacity, 0.85),
+    }
+    : null;
+  if (danmakuRequest && danmakuRequest.items.length === 0) {
+    throw new PostError("要求弹幕但条目为空", "bad_request");
+  }
   for (const pack of packs) {
     const variantDir = path.join(target, "variants", pack.id);
     await fsp.mkdir(variantDir, { recursive: true });
@@ -1462,7 +1489,7 @@ export async function buildDeliveryPackage({
       lutSha256: lutPath ? await sha256File(lutPath) : null,
       intensity: pack.color?.intensity ?? 0.8,
       quality,
-      clarity: "conservative", qualityGuard: "report", v: 3,
+      clarity: variantClarity, qualityGuard: "report", v: 4,
     });
     const gradedPath = path.join(workDir, "graded", `${pack.id}-${colorKey}.mp4`);
     const gradedMetaPath = `${gradedPath}.json`;
@@ -1490,7 +1517,7 @@ export async function buildDeliveryPackage({
           profile: pack.color?.profile ?? null,
           lutPath, auto: false,
           intensity: optionalNumber(pack.color?.intensity, 0.8),
-          quality, clarity: "conservative", qualityGuard: "report",
+          quality, clarity: variantClarity, qualityGuard: "report",
           bins,
         });
         const gradedProbe = await probeMedia(gradedPath, { bins });
@@ -1503,7 +1530,7 @@ export async function buildDeliveryPackage({
     }
     if (gradeReport) processing.push(await writeProcessingProof({ root: target, stage: "color", id: pack.id, inputs: colorInputs,
       outputs: [{ path: gradeReport.output, sha256: gradeReport.sha256 }],
-      parameters: { request: pack.color ?? { technicalOnly: true }, technicalOnly: !pack.color, profile: pack.color?.profile ?? null, lut: pack.color?.lut ?? null, intensity: pack.color?.intensity ?? 0.8, clarity: "conservative", qualityGuard: "report" },
+      parameters: { request: pack.color ?? { technicalOnly: true }, technicalOnly: !pack.color, profile: pack.color?.profile ?? null, lut: pack.color?.lut ?? null, intensity: pack.color?.intensity ?? 0.8, clarity: variantClarity, qualityGuard: "report" },
       execution: { outputSha256: gradeReport.sha256, colorManagement: gradeReport.colorManagement, processingQuality: gradeReport.processingQuality, reused: gradeReport.reused === true } }));
     let gradedInput = gradeReport?.output ?? assemblyPath;
     let entityReport = null;
@@ -1605,6 +1632,7 @@ export async function buildDeliveryPackage({
     // 软字幕轨（画面逐帧零改动）与可选硬字幕
     let softsub = null;
     let burned = null;
+    let textInputs = null;
     /** 变体字幕：从时间轴 cue 按**本变体**转场重映射（各变体 mode/fadeSec 可不同）。 */
     let variantSubtitles = null;
     let variantCues = null;
@@ -1633,6 +1661,7 @@ export async function buildDeliveryPackage({
       };
       subtitleTiming?.variants.push({ id: pack.id, ...variantSubtitles.timing });
     }
+
     if (softSubtitles && (variantSubtitles || sidecar)) {
       const softTarget = path.join(variantDir, `${pack.id}.softsub.mp4`);
       /**
@@ -1665,32 +1694,88 @@ export async function buildDeliveryPackage({
       processing.push(await writeProcessingProof({ root: target, stage: "subtitles", id: `${pack.id}-softsub`, inputs, outputs: [{ path: softsub.output, sha256: softsub.sha256 }], parameters: { mode: "softsub", languages: tracks.map(track => track.lang) }, execution: { cueCount: parseSrt(await fsp.readFile(tracks[0].path, "utf8")).length, checks: softsub.checks } }));
     }
     if (burnSubtitles && (variantCues || sidecar)) {
-      const zh = sidecar.files.find((file) => file.format === "srt" && file.lang === "chi");
-      const cues = variantCues ?? parseSrt(await fsp.readFile(zh.path, "utf8"));
-      const inputs = await captureProcessingInputs([scoredPath]);
+      const cues = variantCues ?? parseSrt(await fsp.readFile(
+        sidecar.files.find((file) => file.format === "srt" && file.lang === "chi").path, "utf8",
+      ));
+      textInputs = await captureProcessingInputs([scoredPath]);
+      const combineDanmaku = Boolean(danmakuRequest);
       burned = await renderWithSubtitles({
         mode: "subtitle",
         input: scoredPath,
-        output: path.join(variantDir, `${pack.id}.burned.mp4`),
+        output: path.join(variantDir, `${pack.id}${combineDanmaku ? ".burned.danmaku" : ".burned"}.mp4`),
         cues,
         platform,
         brief: { 平台: platform ?? "默认" },
         bins,
+        /** 交付形态的最后一次重编码：必须做清晰度回归（T-2026-1017） */
+        verifySharpness: true,
+        ...(combineDanmaku ? {
+          danmakuItems: danmakuRequest.items,
+          danmakuOptions: { lanes: danmakuRequest.lanes, opacity: danmakuRequest.opacity },
+        } : {}),
       });
-      processing.push(await writeProcessingProof({ root: target, stage: "subtitles", id: `${pack.id}-burned`, inputs, outputs: [{ path: burned.output.path, sha256: burned.output.hash }], parameters: { mode: "burned", cuesSha256: await contentKey(cues), platform }, execution: { cueCount: cues.length, checks: burned.checks } }));
+      processing.push(await writeProcessingProof({ root: target, stage: "subtitles", id: `${pack.id}-burned`, inputs: textInputs,
+        outputs: [{ path: burned.output.path, sha256: burned.output.hash }],
+        parameters: {
+          mode: combineDanmaku ? "subtitle+danmaku" : "burned",
+          cuesSha256: await contentKey(cues),
+          platform,
+          textEncodingPasses: 1,
+          combinedEncoding: combineDanmaku,
+          danmakuCount: combineDanmaku ? danmakuRequest.items.length : 0,
+        },
+        execution: {
+          cueCount: cues.length,
+          danmakuCount: combineDanmaku ? danmakuRequest.items.length : 0,
+          textEncodingPasses: 1,
+          checks: burned.checks,
+        } }));
     }
 
     let danmakuResult = null;
-    if (danmaku) {
-      const items = parseDanmaku(Array.isArray(danmaku) ? danmaku : danmaku.items);
-      if (!items.length) throw new PostError("要求弹幕但条目为空", "bad_request");
-      const source = burned?.output.path ?? scoredPath;
-      const inputs = await captureProcessingInputs([source]);
-      danmakuResult = await renderDanmaku({ input: source, output: path.join(variantDir, `${pack.id}${burned ? ".burned" : ""}.danmaku.mp4`),
-        items, platform, lanes: danmaku.lanes ?? 4, opacity: danmaku.opacity ?? 0.85, bins });
-      processing.push(await writeProcessingProof({ root: target, stage: "danmaku", id: String(variantsOut.length), inputs,
-        outputs: [{ path: danmakuResult.output.path, sha256: danmakuResult.output.hash }], parameters: { mode: "danmaku", items },
-        execution: { cueCount: items.length, checks: danmakuResult.checks } }));
+    if (danmakuRequest) {
+      if (burned?.danmaku) {
+        /** 字幕和弹幕共用同一份 ASS 与同一次 libx264 编码；两条 proof 绑定同一个输出字节。 */
+        const inputs = textInputs ?? await captureProcessingInputs([scoredPath]);
+        danmakuResult = burned.danmaku;
+        processing.push(await writeProcessingProof({
+          root: target,
+          stage: "danmaku",
+          id: String(variantsOut.length),
+          inputs,
+          outputs: [{ path: burned.output.path, sha256: burned.output.hash }],
+          parameters: {
+            mode: "subtitle+danmaku",
+            items: danmakuRequest.items,
+            lanes: danmakuRequest.lanes,
+            opacity: danmakuRequest.opacity,
+            textEncodingPasses: 1,
+            combinedEncoding: true,
+          },
+          execution: {
+            cueCount: danmakuRequest.items.length,
+            checks: burned.checks,
+            textEncodingPasses: 1,
+            sameOutputAsSubtitles: true,
+          },
+        }));
+      } else {
+        const inputs = await captureProcessingInputs([scoredPath]);
+        danmakuResult = await renderDanmaku({
+          input: scoredPath,
+          output: path.join(variantDir, `${pack.id}.danmaku.mp4`),
+          items: danmakuRequest.items,
+          platform,
+          lanes: danmakuRequest.lanes,
+          opacity: danmakuRequest.opacity,
+          bins,
+          verifySharpness: true,
+        });
+        processing.push(await writeProcessingProof({ root: target, stage: "danmaku", id: String(variantsOut.length), inputs,
+          outputs: [{ path: danmakuResult.output.path, sha256: danmakuResult.output.hash }],
+          parameters: { mode: "danmaku", items: danmakuRequest.items, lanes: danmakuRequest.lanes, opacity: danmakuRequest.opacity, textEncodingPasses: 1, combinedEncoding: false },
+           execution: { cueCount: danmakuRequest.items.length, checks: danmakuResult.checks, textEncodingPasses: 1 } }));
+      }
     }
     variantsOut.push({
       id: pack.id,
@@ -1700,8 +1785,14 @@ export async function buildDeliveryPackage({
       dir: variantDir,
       artifacts: {
         video: { path: scoredPath, sha256: await sha256File(scoredPath), duration: scoredProbe.duration, resolution: [scoredProbe.width, scoredProbe.height] },
-        softsub: softsub ? { path: softsub.output, sha256: softsub.sha256, tracks: softsub.tracks, checks: softsub.checks } : null,
-        burned: burned ? { path: burned.output.path, sha256: burned.output.hash, checks: burned.checks } : null,
+        softsub: softsub ? { path: softsub.output, sha256: softsub.sha256, tracks: softsub.tracks, checks: softsub.checks, clamps: softsub.clamps ?? null } : null,
+        burned: burned ? {
+          path: burned.output.path,
+          sha256: burned.output.hash,
+          checks: burned.checks,
+          combinedWithDanmaku: Boolean(burned.danmaku),
+          textEncodingPasses: 1,
+        } : null,
         cover: { path: cover.output, sha256: cover.sha256, at: cover.at, requestedAt: cover.requestedAt, background: cover.background, text: cover.text, checks: cover.checks },
         copy: { path: path.join(variantDir, "copy.md"), sha256: await sha256File(path.join(variantDir, "copy.md")),
           jsonPath: path.join(variantDir, "copy.json"), jsonSha256: await sha256File(path.join(variantDir, "copy.json")),
@@ -1967,8 +2058,13 @@ note: "计划口径 = 镜头卡/PRD 的目标总时长；实际口径 = 逐镜�
       positioning: variant.positioning,
       dir: path.relative(target, variant.dir),
       video: { path: path.relative(target, variant.artifacts.video.path), sha256: variant.artifacts.video.sha256, duration: variant.artifacts.video.duration, resolution: variant.artifacts.video.resolution },
-      softsub: variant.artifacts.softsub ? { path: path.relative(target, variant.artifacts.softsub.path), sha256: variant.artifacts.softsub.sha256, tracks: variant.artifacts.softsub.tracks.map((track) => ({ lang: track.lang, title: track.title })) } : null,
-      burned: variant.artifacts.burned ? { path: path.relative(target, variant.artifacts.burned.path), sha256: variant.artifacts.burned.sha256 } : null,
+      softsub: variant.artifacts.softsub ? { path: path.relative(target, variant.artifacts.softsub.path), sha256: variant.artifacts.softsub.sha256, tracks: variant.artifacts.softsub.tracks.map((track) => ({ lang: track.lang, title: track.title, clamped: track.clamped === true })), checks: variant.artifacts.softsub.checks } : null,
+      burned: variant.artifacts.burned ? {
+        path: path.relative(target, variant.artifacts.burned.path),
+        sha256: variant.artifacts.burned.sha256,
+        combinedWithDanmaku: variant.artifacts.burned.combinedWithDanmaku === true,
+        textEncodingPasses: variant.artifacts.burned.textEncodingPasses ?? null,
+      } : null,
       cover: {
         path: path.relative(target, variant.artifacts.cover.path),
         sha256: variant.artifacts.cover.sha256,
@@ -2544,6 +2640,7 @@ export async function reedit(options = {}) {
     }));
     const [width, height] = project.resolution ?? [1080, 1920];
     const quality = resolveQuality(project);
+    const variantClarity = resolveVariantClarity(project);
     const fps = Number(project.fps ?? 30);
     const workDir = path.join(base, "work");
     await fsp.mkdir(path.join(targetDir, "variants"));
@@ -2811,7 +2908,7 @@ export async function reedit(options = {}) {
           profile: pack.color?.profile ?? null,
           lutPath: pack.color?.lut ? resolveLut(pack.color.lut) : null,
           intensity: optionalNumber(pack.color?.intensity, 0.8), auto: false,
-          quality, clarity: "conservative", qualityGuard: "report",
+          quality, clarity: variantClarity, qualityGuard: "report",
           bins,
         });
         gradeReport = report;
@@ -2819,7 +2916,7 @@ export async function reedit(options = {}) {
           outputs: [{ path: report.output, sha256: report.sha256 }],
           parameters: { request: pack.color ?? { technicalOnly: true }, technicalOnly: !pack.color,
             profile: pack.color?.profile ?? null, lut: pack.color?.lut ?? null, intensity: pack.color?.intensity ?? 0.8,
-            clarity: "conservative", qualityGuard: "report" },
+            clarity: variantClarity, qualityGuard: "report" },
           execution: { outputSha256: report.sha256, colorManagement: report.colorManagement, processingQuality: report.processingQuality } }));
         gradedInput = gradedPath;
         colorReused = false;

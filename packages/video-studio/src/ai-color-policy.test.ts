@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { existsSync } from "node:fs";
 import { defaultAiColorVariants, designContentColor } from "./ai-color-policy.js";
 import { assessVariantAxes, buildVariantPlan, resolveDeliveryVariants } from "./deliver.js";
 
@@ -8,9 +7,9 @@ describe("AI color policy", () => {
     const plans = buildVariantPlan({ master: "/tmp/共同 源.mp4", outDir: "/out", projectId: "P", coverHook: "家人", content: { shots: [{ scene: "家庭人像", duration: 8 }] } });
     expect(plans.map(row => row.variant.id)).toEqual(["original", "warm-story", "content-auto"]);
     expect(plans[0]!.passthrough).toBe(true); expect(plans[0]!.gradeArgs).toEqual([]);
-    expect(plans[1]!.variant).toMatchObject({ gradeProfile: "high-contrast-social", gradeLut: "look-warm-film.cube", gradeIntensity: 0.5 });
+    expect(plans[1]!.variant).toMatchObject({ gradeProfile: "warm-film", gradeIntensity: 0.3 });
     for (const plan of plans.slice(1)) { expect(plan.gradeArgs[plan.gradeArgs.indexOf("--in") + 1]).toBe("/tmp/共同 源.mp4"); expect(plan.gradeArgs).toContain("--no-auto"); }
-    expect(existsSync(plans[1]!.gradeArgs.at(-1)!)).toBe(true);
+    expect(plans[1]!.gradeArgs).not.toContain("--lut");
     expect(plans[2]!.variant.colorDecision?.category).toBe("portrait");
   });
   it.each([
@@ -38,7 +37,7 @@ describe("AI color policy", () => {
   it("does not mutate shot data or let a caller change subsequent defaults", () => {
     const content = { shots: [{ scene: "family", lighting: "soft", color_palette: ["blue", "green"] }] }; const before = structuredClone(content);
     const variants = defaultAiColorVariants(content); variants[1]!.gradeIntensity = 1;
-    expect(content).toEqual(before); expect(defaultAiColorVariants(content)[1]!.gradeIntensity).toBe(0.5);
+    expect(content).toEqual(before); expect(defaultAiColorVariants(content)[1]!.gradeIntensity).toBe(0.3);
   });
   it("retains old recipe IDs when explicitly selected", () => {
     const plans = buildVariantPlan({ master: "m", outDir: "o", projectId: "p", coverHook: "h", variantIds: ["cool-tech", "warm-film", "punchy-social"] });

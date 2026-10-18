@@ -143,9 +143,10 @@ node bundles/ai-video/connectors/post-bridge/cli.mjs health
 
 | 变体 | 定位 | 差异轴（实测） |
 |---|---|---|
-| `warm-story` | 情感/文旅/民宿 | warm-film LUT 0.75 · fade 0.6s · acoustic-warm -23dB · 留白题签 · 温暖克制口吻 |
-| `clean-tech` | 产品/科技/知识 | cool-technical 0.7 · hard · corporate-clean -25dB · 参数卡封面 · 简洁理性口吻 |
-| `bold-promo` | 带货/本地生活 | high-contrast-social 0.9 · xfade 0.35s · sports-hype -21dB · 促销横幅 · 直接叫卖口吻 |
+| `warm-story` | 情感/文旅/民宿 | warm-film 0.3 · fade 0.6s · acoustic-warm -23dB · 留白题签 · 温暖克制口吻 |
+| `clean-tech` | 产品/科技/知识 | cool-technical 0.28 · hard · corporate-clean -25dB · 参数卡封面 · 简洁理性口吻 |
+| `bold-promo` | 带货/本地生活 | high-contrast-social 0.38 · xfade 0.35s · sports-hype -21dB · 促销横幅 · 直接叫卖口吻 |
+| `natural-clean` | 自然观感/清晰度核对 | 不调色 · hard · 保留原声 · 轻量留白封面 |
 
 配方给出明确风格意图；技术出口保证请求的文件和实际加工链成立。配方差异、像素差或曲目不同不等于观感出色，不能替代看过和听过后的审片结论。静黑、静音和单个版本仍按本仓请求数量合同处理；技术报告如实保留艺术未审状态。
 
@@ -157,6 +158,8 @@ node bundles/ai-video/connectors/post-bridge/cli.mjs health
 | 原生画布与明确导出 | 源显示宽高、目标每轴、实际成片画布与批准的换画幅/降采样 | 规格不符或未批准的降采样失败 |
 | 转场/调色/实体/配乐 | 实际输入 SHA、请求、加工结果与输出 SHA；每刀实际切点及音效放置 | 任意 JSON、旧回执或他变体凭证不能放行 |
 | 字幕与弹幕 | 所有条目的时间、字体解析和实际文件；软轨完整视频/音频编码包 SHA | 越片尾、空请求产物或丢台词失败 |
+
+字幕与弹幕同时烧录时必须走单次 ASS 合成：两条 processing proof 指向同一输出 SHA，`textEncodingPasses=1`；质量门禁拒绝旧的两代编码链。1080P 文字层编码为 `medium/CRF16`，UHD 为 `medium/CRF14`。
 | 声音 | 实际编码成片的响度/真峰值，默认 report；明确 block 合同按其阈值 | 留实测建议或按明确阈值失败，不自动再混/付费重生成 |
 | 返修与整理 | 复用层当前 SHA、版本前置条件、最终 copied 字节与当前报告一致 | 来源被换、旧文件混入或加工链缺失失败 |
 

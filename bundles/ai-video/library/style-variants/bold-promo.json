@@ -1,19 +1,35 @@
 {
   "schemaVersion": "workloom.style-variant/v1",
   "id": "bold-promo",
-  "name": "强推促销版",
+  "name": "欢快版",
   "positioning": "带货/本地生活/促销：高对比、快切、直给卖点文案",
-  "platforms": ["抖音/快手", "小红书", "美团", "大众点评"],
+  "colorPolicy": "grade",
+  "platforms": [
+    "抖音/快手",
+    "小红书",
+    "美团",
+    "大众点评"
+  ],
   "color": {
     "profile": "high-contrast-social",
-    "intensity": 0.9,
-    "lookLabel": "高对比社媒",
-    "note": "压黑提对比 + 提饱和，信息流里更抓眼；不改商品本色到失真"
+    "intensity": 0.38,
+    "lookLabel": "中高对比社媒",
+    "note": "2026-10-18 收敛：保留欢快版的对比与饱和倾向，但不再接近满档压黑；避免把清晰纹理推成硬边。商品事实与授权保持原来源，不因品质检测自动重生成。"
   },
   "transitions": {
     "mode": "xfade",
     "fadeSec": 0.35,
-    "note": "交叉溶解快切，制造节奏推进感；适合卡点卖点"
+    "note": "交叉溶解快切，制造节奏推进感；适合卡点卖点（整段口径；有逐切计划时按 intentMap 逐刀执行）",
+    "scale": 0.7,
+    "intentMap": {
+      "dissolve": { "type": "dissolve", "durationSec": 0.22 },
+      "fade_from_black": { "type": "fadeblack", "durationSec": 0.3 },
+      "fade_to_black": { "type": "fadeblack", "durationSec": 0.3 },
+      "wipe": { "type": "hlslice", "durationSec": 0.25 },
+      "whip_pan": { "type": "smoothleft", "durationSec": 0.22 },
+      "zoom_blur": { "type": "zoomin", "durationSec": 0.25 }
+    },
+    "intentNote": "欢快版：颗粒溶解 + 切片扫过，短促有力；不允许慢叠化拖节奏"
   },
   "bgm": {
     "mood": "激昂有力",

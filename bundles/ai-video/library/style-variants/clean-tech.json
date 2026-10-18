@@ -1,20 +1,35 @@
 {
   "schemaVersion": "workloom.style-variant/v1",
   "id": "clean-tech",
-  "name": "干净科技版",
+  "name": "标准版",
   "positioning": "产品/科技/知识：冷净调、硬切、信息优先文案",
-  "platforms": ["抖音/快手", "视频号", "B站", "官网"],
+  "colorPolicy": "grade",
+  "platforms": [
+    "抖音/快手",
+    "视频号",
+    "B站",
+    "官网"
+  ],
   "color": {
     "profile": "cool-technical",
-    "lut": "look-cool-technical.cube",
-    "intensity": 0.7,
-    "lookLabel": "冷净精密",
-    "note": "屏幕白必须仍读作白；去饱和不压暗"
+    "intensity": 0.28,
+    "lookLabel": "轻冷净",
+    "note": "2026-10-18 收敛：保留轻微冷净色温与克制对比，去掉第二层 LUT，避免与 1080P 成片后的字幕/弹幕编码叠加成明显处理感。"
   },
   "transitions": {
     "mode": "hard",
     "fadeSec": 0,
-    "note": "硬切不打断信息密度；卖点与数据段不加入场动画"
+    "note": "硬切不打断信息密度；卖点与数据段不加入场动画（整段口径；有逐切计划时按 intentMap 逐刀执行）",
+    "scale": 0.85,
+    "intentMap": {
+      "dissolve": { "type": "fade", "durationSec": 0.35 },
+      "fade_from_black": { "type": "fadeblack", "durationSec": 0.45 },
+      "fade_to_black": { "type": "fadeblack", "durationSec": 0.45 },
+      "wipe": { "type": "wipeleft", "durationSec": 0.3 },
+      "whip_pan": { "type": "smoothleft", "durationSec": 0.28 },
+      "zoom_blur": { "type": "zoomin", "durationSec": 0.3 }
+    },
+    "intentNote": "标准版：短促、方向明确；擦除优先硬边 wipeleft，避免情绪化的慢叠化"
   },
   "bgm": {
     "mood": "干净可信",
