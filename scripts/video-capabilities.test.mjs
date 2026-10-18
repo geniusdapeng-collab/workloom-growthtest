@@ -160,3 +160,67 @@ test("suggested POSIX command preserves every argument literally and supplies a 
   assert.throws(() => productionPlan({ projectId: platform }), /项目 ID/u);
   assert.throws(() => productionPlan({ projectId: "line\nbreak" }), /项目 ID/u);
 }));
+
+function publishedPointer(root, overrides = {}) {
+  const releaseDir = join(root, "out", "releases", "R1");
+  mkdirSync(releaseDir, { recursive: true });
+  const media = join(releaseDir, "main.mp4");
+  writeFileSync(media, "published master");
+  const manifest = join(releaseDir, "P1-delivery-manifest.json");
+  const bytes = JSON.stringify({ projectId: "P1", deliverable: { path: media, sha256: hash("published master") } });
+  writeFileSync(manifest, bytes);
+  const pointer = { schemaVersion: "workloom.uhd-release/v1", releaseId: "R1", releaseDir, manifest,
+    manifestSha256: hash(bytes), ...overrides };
+  const writePointer = (changes = {}) => writeFileSync(join(root, "out", "current.json"), JSON.stringify({ ...pointer, ...changes }));
+  writePointer();
+  return { media, manifest, pointer, writePointer };
+}
+
+test("published current pointer selects and verifies the pinned release without claiming media quality", () => fixture(({ root, save, inspect }) => {
+  publishedPointer(root);
+  save({ deliverable: { path: "out/obsolete.mp4", sha256: hash("obsolete") } });
+  const result = inspect();
+  assert.equal(result.found, true);
+  assert.equal(result.manifestPath, join("out", "releases", "R1", "P1-delivery-manifest.json"));
+  assert.equal(result.integrity, "sha256-verified");
+  assert.deepEqual(result.missing, []);
+  assert.equal(result.technicalQuality, "unverified");
+  assert.equal(result.complete, false);
+  assert.equal(result.requiredNextCapability, "growth.video.post.quality");
+}));
+
+test("published pointer rejects a changed manifest digest or mismatched release directory", () => fixture(({ root, inspect }) => {
+  const release = publishedPointer(root);
+  release.writePointer({ manifestSha256: "0".repeat(64) });
+  assert.throws(inspect, (error) => error.code === "CONFLICT" && /摘要\/目录/u.test(error.message));
+  release.writePointer({ releaseDir: join(root, "out", "releases", "wrong") });
+  assert.throws(inspect, (error) => error.code === "CONFLICT");
+  release.writePointer();
+  writeFileSync(release.manifest, JSON.stringify({ projectId: "P1", changed: true }));
+  assert.throws(inspect, (error) => error.code === "CONFLICT");
+}));
+
+test("published pointer detects later asset tampering while preserving the manifest binding", () => fixture(({ root, inspect }) => {
+  const release = publishedPointer(root);
+  assert.equal(inspect().integrity, "sha256-verified");
+  writeFileSync(release.media, "tampered published master");
+  const result = inspect();
+  assert.equal(result.integrity, "incomplete");
+  assert.ok(result.files.some((entry) => entry.label === "deliverable" && entry.state === "sha256-mismatch"));
+  assert.equal(result.complete, false);
+}));
+
+test("published pointer rejects traversal identities and manifests outside the artifact root", () => fixture(({ root, inspect }) => {
+  const release = publishedPointer(root);
+  for (const releaseId of ["..", "R1/../../escape", "R..1"]) {
+    release.writePointer({ releaseId });
+    assert.throws(inspect, /发布指针非法/u);
+  }
+  const outside = mkdtempSync(join(tmpdir(), "pointer-outside-"));
+  try {
+    const manifest = join(outside, "P1-delivery-manifest.json");
+    writeFileSync(manifest, "{\"projectId\":\"P1\"}");
+    release.writePointer({ manifest });
+    assert.throws(inspect, /越出产物根/u);
+  } finally { rmSync(outside, { recursive: true, force: true }); }
+}));
