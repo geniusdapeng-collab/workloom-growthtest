@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "workloom.style-variant/v1",
+  "id": "natural-clean",
+  "name": "自然高清版",
+  "positioning": "少调色、少处理、保留原节目声音：用于核对真实清晰度或需要自然观感的交付",
+  "colorPolicy": "preserve",
+  "platforms": [
+    "视频号",
+    "B站",
+    "官网",
+    "剪辑归档"
+  ],
+  "color": null,
+  "transitions": {
+    "mode": "hard",
+    "fadeSec": 0,
+    "note": "硬切保留原始镜头边界，不额外改变节奏。",
+    "scale": 1
+  },
+  "bgm": {
+    "enabled": false,
+    "policy": "preserve-program",
+    "note": "保留原节目声音，不添加新配乐；字幕与弹幕仍按发布形态烧录。"
+  },
+  "cover": {
+    "template": "自然留白",
+    "at": 0.42,
+    "alignment": 8,
+    "marginRatio": 0.08,
+    "note": "轻量留白标题，不改变主视觉颜色。"
+  },
+  "copy": {
+    "tone": "自然克制",
+    "titleTemplate": "{title}",
+    "opening": "保留现场声音与原始画面层次。",
+    "closing": "这版用于核对素材本身的清晰度与自然观感。",
+    "cta": "需要原声与自然清晰度时选这一版",
+    "hashtags": [
+      "#自然高清",
+      "#原声",
+      "#素材实拍"
+    ]
+  },
+  "subtitleStyle": {
+    "scene": "字幕",
+    "note": "中性细描边，不改变字幕文案与时间。"
+  }
+}

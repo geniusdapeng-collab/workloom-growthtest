@@ -433,6 +433,34 @@ export async function inspectDeliveryManifest({ root, manifest, bins, phase = "p
     const variant = variants.find((item) => item.id === form.variantId);
     checkChain(`danmaku:${index}`, Boolean(variant) && (consumes(proof, variant.burned?.sha256) || consumes(proof, variant.video?.sha256)) && outputHash(proof) === form.sha256);
   }
+  /**
+   * 字幕+弹幕的发布件必须是一次合并 ASS 编码：
+   * 两条 processing proof 指向同一输出字节，且都记录 textEncodingPasses=1。
+   * 这样后续即使有人把实现偷偷退回“先烧字再烧弹幕”，链级硬检查也会红灯。
+   */
+  if (manifest.postRequirements?.burnSubtitles === true && manifest.postRequirements?.danmaku === true) {
+    for (const variant of variants) {
+      const formIndex = (manifest.danmaku?.forms ?? []).findIndex((form) => form.variantId === variant.id);
+      const subtitle = find("subtitles", `${variant.id}-burned`);
+      const danmakuProof = find("danmaku", String(formIndex));
+      checkChain(
+        `${variant.id}:text-single-pass`,
+        variant.burned?.combinedWithDanmaku === true
+          && variant.burned?.textEncodingPasses === 1
+          && subtitle?.parameters?.combinedEncoding === true
+          && subtitle?.parameters?.textEncodingPasses === 1
+          && danmakuProof?.parameters?.combinedEncoding === true
+          && danmakuProof?.parameters?.textEncodingPasses === 1
+          && outputHash(subtitle) === variant.burned?.sha256
+          && outputHash(danmakuProof) === variant.burned?.sha256,
+        {
+          outputSha256: variant.burned?.sha256 ?? null,
+          subtitleProofPasses: subtitle?.parameters?.textEncodingPasses ?? null,
+          danmakuProofPasses: danmakuProof?.parameters?.textEncodingPasses ?? null,
+        },
+      );
+    }
+  }
   for (const [index, displayed] of (manifest.displaySet?.artifacts ?? []).entries()) {
     try {
       if (!displayed.path || !displayed.source || !hasHash(displayed.sha256) || !hasHash(displayed.sourceSha256)) throw new Error("中文交付文件缺当前字节证据");
@@ -442,6 +470,68 @@ export async function inspectDeliveryManifest({ root, manifest, bins, phase = "p
       if (displayed.role !== "preview" && !displayed.preview && !report.assets.some((asset) => asset.passed && path.resolve(root, asset.path) === source && asset.sha256 === currentSource)) throw new Error("中文交付文件没有绑定已验收产物");
       checkChain(`display-set:${index}`, true, { sha256: currentTarget });
     } catch (error) { checkChain(`display-set:${index}`, false, message(error)); }
+  }
+  // edit:post writes the requirement before the engine starts. A half-finished package
+  // cannot become publishable merely because the generic post phase completed first.
+  let rhythmRequired = null;
+  try { rhythmRequired = JSON.parse(await fs.readFile(path.join(root, "rhythm-direction-required.json"), "utf8")); }
+  catch (error) { if (error?.code !== "ENOENT") checkChain("rhythm-requirement", false, message(error)); }
+  if (manifest.rhythmDirection || rhythmRequired && phase !== "post") {
+    try {
+      const binding = manifest.rhythmDirection;
+      if (!binding?.path || !hasHash(binding.sha256) || binding.passed !== true) throw new Error("缺实际首尾节奏复验回执");
+      const base = await fs.realpath(root), file = await fs.realpath(path.resolve(base, binding.path));
+      if (!inside(base, file) || await sha256File(file) !== binding.sha256) throw new Error("节奏复验回执越界或已变化");
+      const receipt = JSON.parse(await fs.readFile(file, "utf8"));
+      if (receipt.schemaVersion !== "workloom.video-edit/rhythm-output-inspection/v1" || receipt.passed !== true
+          || receipt.timelineSha256 !== binding.timelineSha256 || receipt.direction?.timelineSha256 !== binding.timelineSha256
+          || rhythmRequired && rhythmRequired.timelineSha256 !== binding.timelineSha256
+          || !receipt.executionEvidence?.executions?.length || receipt.sourcePreserved !== true) throw new Error("节奏回执没有绑定当前时间轴与实际执行");
+      if (!Array.isArray(receipt.sources) || !receipt.sources.length) throw new Error("节奏回执缺当前源素材身份");
+      for (const source of receipt.sources) {
+        if (!source.path || !hasHash(source.sha256) || await sha256File(source.path) !== source.sha256) throw new Error("节奏源素材已变化");
+      }
+      const music = receipt.direction?.music;
+      if (music && (await sha256File(music.path) !== music.sha256 || await sha256File(music.source.path) !== music.source.sha256)) throw new Error("固定节奏音乐已变化");
+      for (const scope of receipt.executionEvidence.executions) {
+        const current = path.resolve(base, scope.proofPath);
+        if (!inside(base, await fs.realpath(current)) || await sha256File(current) !== scope.proofSha256) throw new Error("逐刀执行证据已变化");
+      }
+      const delivered = [manifest.master, ...variants.flatMap((v) => [v.video, v.burned, v.softsub]),
+        ...(manifest.danmaku?.forms ?? []).map((f) => ({ ...f, path: f.output ?? f.path })),
+        ...(manifest.coverIntro?.forms ?? []).map((f) => ({ ...f, path: f.output ?? f.path }))].filter((entry) => entry?.path);
+      const covered = receipt.outputs.filter((row) => row.passed === true && row.path && hasHash(row.sha256));
+      const coverDerivatives = (manifest.coverIntro?.forms ?? []).map((form, index) => ({
+        ...form,
+        path: form.output ?? form.path,
+        asset: report.assets.find((asset) => asset.id === `cover-intro:${index}`),
+      }));
+      const sameOutput = (left, right) => left?.sha256 === right?.sha256
+        && path.resolve(base, left?.path ?? "") === path.resolve(base, right?.path ?? "");
+      for (const item of delivered) {
+        if (covered.some((row) => sameOutput(row, item))) continue;
+        /**
+         * 烧封片头是已覆盖成片的派生形态：源文件必须逐字节命中节奏复验，
+         * 派生文件必须命中封面阶段资产回执、实际时长等于源片 + 片头，且有非零片头。
+         * 这不把未验证的任意新文件当成已覆盖。
+         */
+        const derivative = coverDerivatives.find((form) => sameOutput(form, item));
+        if (!derivative || !derivative.asset?.passed || !hasHash(derivative.sourceSha256)
+          || !Number.isFinite(derivative.introSeconds) || derivative.introSeconds <= 0
+          || !Number.isFinite(derivative.asset.probe?.videoDuration)) {
+          throw new Error("当前交付形态未被首尾节奏复验覆盖");
+        }
+        const sourceEvidence = receipt.outputs.find((row) => row.passed === true && row.sha256 === derivative.sourceSha256
+          && sameOutput(row, { path: derivative.source, sha256: derivative.sourceSha256 }));
+        const sourceAsset = report.assets.find((asset) => asset.path === derivative.source && asset.sha256 === derivative.sourceSha256 && asset.passed);
+        if (!sourceEvidence || !sourceAsset || !Number.isFinite(sourceAsset.probe?.videoDuration)
+          || Math.abs(derivative.asset.probe.videoDuration - sourceAsset.probe.videoDuration - derivative.introSeconds)
+            > Math.max(0.1, 2 / (derivative.asset.probe.fps || 25))) {
+          throw new Error("烧封片头派生形态未绑定已覆盖源片或实际时长不符");
+        }
+      }
+      checkChain("rhythm-direction", true, { sha256: binding.sha256, timelineSha256: binding.timelineSha256 });
+    } catch (error) { checkChain("rhythm-direction", false, message(error)); }
   }
   report.passed = report.checks.every((row) => !row.hard || row.ok);
   return report;

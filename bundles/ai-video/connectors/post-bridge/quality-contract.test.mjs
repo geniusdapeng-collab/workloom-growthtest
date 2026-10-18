@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { assembleTimeline } from "./core.mjs";
+import { assembleTimeline, resolveVariantClarity } from "./core.mjs";
 import { grade } from "../color-bridge/core.mjs";
 import { inspectDeliveryManifest, inspectPostQuality, captureProcessingInputs, writeProcessingProof, POST_QUALITY_STAGES } from "./quality-gate.mjs";
 const bins = { ffmpeg: process.env.WL_FFMPEG ?? "ffmpeg", ffprobe: process.env.WL_FFPROBE ?? "ffprobe" };
@@ -36,6 +36,12 @@ before(async () => {
 });
 after(async () => { if (root) await fs.rm(root, { recursive: true, force: true }); });
 const inspect = (value) => inspectDeliveryManifest({ root, manifest: value, bins });
+test("逐镜去雾已执行时，变体调色可关闭旧 conservative 二次锐化", () => {
+  assert.equal(resolveVariantClarity({}), "conservative");
+  assert.equal(resolveVariantClarity({ colorPipeline: { variantClarity: "off" } }), "off");
+  assert.equal(resolveVariantClarity({ colorPipeline: { variantClarity: "strong" } }), "strong");
+  assert.throws(() => resolveVariantClarity({ colorPipeline: { variantClarity: "extreme" } }), /variantClarity/);
+});
 test("真实本地拼接与技术调色的字节链可以交付，不需要模型调用", async () => { const report = await inspect(copy()); assert.equal(report.passed, true); assert.equal(report.paidCalls, 0); assert.equal(report.artisticQualityReviewed, false); });
 test("同短边的极宽原片不能冒充原生分辨率保留", async () => { const value = copy(); value.nativeResolution = [1000, 90]; assert.equal((await inspect(value)).passed, false); });
 test("换画幅必须显式批准并说明原因", async () => { const value = copy(); value.nativeResolution = [90, 160]; assert.equal((await inspect(value)).passed, false); value.resolutionPolicy = { reframeApproved: true, reframeReason: "项目明确将竖屏转横屏" }; assert.equal((await inspect(value)).passed, true); });

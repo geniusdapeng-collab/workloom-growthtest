@@ -1505,7 +1505,7 @@ function buildCorrections({ normalize, colorTemperature, colorBalance, curves, e
  * 顺序：conversion LUT（恒 100%，最前） → 可选降噪（恒 100%） → 校正（恒 100%） → 创作 look（按 intensity 混合）。
  */
 export function buildChain(spec = {}) {
-  const { profile = null, lutPath = null, corrections = {}, intensity = 1, conversionLuts = [], denoise = null } = spec;
+  const { profile = null, lutPath = null, corrections = {}, intensity = 1, conversionLuts = [], denoise = null, clarity = null } = spec;
   if (!Number.isFinite(intensity) || intensity <= 0 || intensity > 1) {
     throw new ColorError(`intensity 必须落在 (0,1]，收到 ${intensity}`, "bad_request");
   }
@@ -1527,8 +1527,8 @@ export function buildChain(spec = {}) {
   const lookParts = [];
   if (profile) lookParts.push(PROFILES[profile]);
   if (lutPath) lookParts.push(`lut3d='${escapeFilterPath(lutPath)}'`);
-  if (conversionParts.length === 0 && denoiseParts.length === 0 && correctionParts.length === 0 && lookParts.length === 0) {
-    throw new ColorError("未指定任何 profile / lut / corrections", "bad_request");
+  if (conversionParts.length === 0 && denoiseParts.length === 0 && correctionParts.length === 0 && lookParts.length === 0 && clarity === null) {
+    throw new ColorError("未指定任何 profile / lut / corrections / clarity", "bad_request");
   }
 
   const conversionChain = conversionParts.join(",");
@@ -1647,10 +1647,19 @@ export async function grade({
   const requestedChain = profile || lutPath || Object.keys(corrections ?? {}).length || conversion.luts.length || denoise ? buildChain({ profile, lutPath, corrections, intensity, conversionLuts: conversion.luts,
     denoise: denoise ? { lumaSpatial: 1.5 } : null }) : "null";
   const chain = [colorManagement.chain, requestedChain, clarityChain, "format=gbrp16le,zscale=primariesin=bt709:transferin=bt709:matrixin=gbr:rangein=full:primaries=bt709:transfer=bt709:matrix=bt709:range=limited:dither=error_diffusion,format=yuv420p"].filter(Boolean).join(",");
-  await runBin(bins.ffmpeg, ["-hide_banner", "-v", "error", "-y", "-i", input, "-vf", chain,
-    "-c:v", "libx264", "-preset", "medium", "-crf", quality === "uhd" ? "16" : "20", "-threads", "2", "-filter_threads", "1", "-pix_fmt", "yuv420p",
+
+  const args = [
+    "-hide_banner", "-v", "error", "-y",
+    "-i", input,
+    "-vf", chain,
+    "-c:v", "libx264", "-preset", "medium", "-crf", quality === "uhd" ? "14" : "16",
+    /** 2026-10-11：uhd 调色不再人为限 2 线程（画质参数不变），4K 交付提速。 */
+    ...(quality === "uhd" ? ["-threads", "0", "-filter_threads", "0"] : []), "-pix_fmt", "yuv420p",
+    // 交付元数据（T-04）：显式打 Rec.709 三标签，避免下游平台按容器默认值误判色域。
     "-color_primaries", "bt709", "-color_trc", "bt709", "-colorspace", "bt709", "-color_range", "tv",
-    ...(probe.audio ? ["-c:a", "copy"] : ["-an"]), "-movflags", "+faststart", output], { label: "ffmpeg(grade)", timeoutMs: 900_000 });
+    ...(probe.audio ? ["-c:a", "copy"] : ["-an"]), "-movflags", "+faststart", output,
+  ];
+  await runBin(bins.ffmpeg, args, { label: "ffmpeg(grade)", timeoutMs: 900_000 });
   if (!fs.existsSync(output)) throw new ColorError("ffmpeg 未产出文件", "ffmpeg_failed", true);
   const outProbe = await probeMedia(output, { bins });
   await verifyGradeIntegrity({ input, output, sourceSha256, probe, outProbe });

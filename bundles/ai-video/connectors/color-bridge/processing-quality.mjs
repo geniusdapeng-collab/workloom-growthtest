@@ -50,9 +50,25 @@ export function resolveColorManagement({ probe, sourceTransfer = null, sourceGam
     kind: log ? "log-lut" : hdr ? "legacy-hdr-pass-through" : primaries !== "bt709" || transfer !== "bt709" ? "sdr-conversion" : "range-normalization",
     chain, assumptions, removedHdrSideData: [], toneMap: null };
 }
+/**
+ * 镜头级清晰度/去雾链（2026-10-18）。
+ * 有效档位：off / light / medium / strong；conservative 保留旧 3×3/0.25 语义。
+ * 链路与 packages/video-studio/src/edit/clarity.ts#CLARITY_CHAINS 保持一致；
+ * FFmpeg 没有原生 dehaze，这里用 curves（压回抬起的黑位）+ unsharp（大半径局部对比）
+ * + cas（自适应锐化）组合。
+ */
+export const LEGACY_CONSERVATIVE_CLARITY = "unsharp=luma_msize_x=3:luma_msize_y=3:luma_amount=0.25:chroma_amount=0";
+export const CLARITY_CHAINS = Object.freeze({
+  light: "curves=all='0/0 0.20/0.18 0.50/0.50 0.80/0.81 1/1',unsharp=3:3:0.18",
+  medium: "curves=all='0/0 0.18/0.13 0.40/0.36 0.70/0.72 0.92/0.94 1/1',unsharp=5:5:0.30:5:5:0.03,cas=strength=0.15",
+  strong: "curves=all='0/0 0.15/0.09 0.35/0.30 0.65/0.67 0.90/0.92 1/1',unsharp=7:7:0.45:5:5:0.04,cas=strength=0.25",
+});
 export function clarityFilter(mode = "off", ErrorClass = Error) {
-  if (!["off", "conservative"].includes(mode)) throw new ErrorClass("clarity 只能为 off/conservative", "bad_request");
-  return mode === "conservative" ? "unsharp=luma_msize_x=3:luma_msize_y=3:luma_amount=0.25:chroma_amount=0" : null;
+  if (mode === "conservative") return LEGACY_CONSERVATIVE_CLARITY;
+  if (!["off", "light", "medium", "strong"].includes(mode)) {
+    throw new ErrorClass("clarity 只能为 off/light/medium/strong（兼容 conservative）", "bad_request");
+  }
+  return mode === "off" ? null : CLARITY_CHAINS[mode];
 }
 /** Calibrated starting guardrails; percentages are percentage points, compared at identical normalized sample times. */
 export const PROCESSING_THRESHOLDS = Object.freeze({

@@ -189,8 +189,8 @@ describe("后期工位桥（工具面与连接器纪律）", () => {
 describe("风格变体包（library/style-variants）", () => {
   const packs = listVariantPacks();
 
-  it("索引列出 3 个默认变体，且每包可独立解析、id 一致", () => {
-    expect(packs.map((pack) => pack.id)).toEqual(["warm-story", "clean-tech", "bold-promo"]);
+  it("索引列出 4 个默认变体，且每包可独立解析、id 一致", () => {
+    expect(packs.map((pack) => pack.id)).toEqual(["warm-story", "clean-tech", "bold-promo", "natural-clean"]);
     for (const pack of packs) {
       const full = findVariantPack(pack.id);
       expect(full.id).toBe(pack.id);
@@ -201,7 +201,9 @@ describe("风格变体包（library/style-variants）", () => {
 
   it("每个变体在五个轴上都有明确取值（调色/BGM/转场/封面/文案）", () => {
     for (const pack of packs) {
-      expect(pack.color, `${pack.id} 缺调色轴`).toBeTruthy();
+      expect(["grade", "preserve"], `${pack.id} 缺调色策略`).toContain(pack.colorPolicy);
+      if (pack.colorPolicy === "grade") expect(pack.color, `${pack.id} 缺调色轴`).toBeTruthy();
+      if (pack.colorPolicy === "preserve") expect(pack.color, `${pack.id} 应显式保留原色`).toBeNull();
       expect(pack.bgm, `${pack.id} 缺配乐轴`).toBeTruthy();
       expect(pack.transitions, `${pack.id} 缺转场轴`).toBeTruthy();
       expect(pack.cover, `${pack.id} 缺封面轴`).toBeTruthy();
@@ -212,9 +214,13 @@ describe("风格变体包（library/style-variants）", () => {
   });
 
   it("变体之间在配方层面确有差异（不是同一套参数换名字）", () => {
-    const colorKeys = packs.map((pack) => `${pack.color.profile ?? ""}|${pack.color.lut ?? ""}`);
+    const colorKeys = packs.map((pack) => pack.colorPolicy === "preserve"
+      ? "preserve-source-color"
+      : `${pack.color.profile ?? ""}|${pack.color.lut ?? ""}`);
     expect(new Set(colorKeys).size).toBe(packs.length);
-    const bgmKeys = packs.map((pack) => `${pack.bgm.mood ?? ""}|${pack.bgm.style ?? ""}|${pack.bgm.musicLevelDb ?? ""}`);
+    const bgmKeys = packs.map((pack) => pack.bgm.enabled === false
+      ? `disabled|${pack.bgm.policy}`
+      : `${pack.bgm.mood ?? ""}|${pack.bgm.style ?? ""}|${pack.bgm.musicLevelDb ?? ""}`);
     expect(new Set(bgmKeys).size).toBe(packs.length);
     const transitionModes = packs.map((pack) => pack.transitions.mode);
     expect(new Set(transitionModes).size).toBeGreaterThanOrEqual(2);
@@ -230,10 +236,12 @@ describe("风格变体包（library/style-variants）", () => {
     };
     const moods = new Set(tracksDoc.tracks.map((track) => track.mood));
     for (const pack of packs) {
-      if (pack.color.lut) {
+      if (pack.color?.lut) {
         expect(() => resolveLut(pack.color.lut), `${pack.id} 的 LUT ${pack.color.lut} 不存在`).not.toThrow();
       }
-      expect(moods.has(pack.bgm.mood), `${pack.id} 的曲库情绪「${pack.bgm.mood}」在随仓曲库里没有曲目`).toBe(true);
+      if (pack.bgm.enabled !== false) {
+        expect(moods.has(pack.bgm.mood), `${pack.id} 的曲库情绪「${pack.bgm.mood}」在随仓曲库里没有曲目`).toBe(true);
+      }
     }
     // 路径监狱：LUT 只能取仓内 library/luts 下的 .cube
     expect(() => resolveLut("../../../../etc/passwd")).toThrow();

@@ -1,8 +1,9 @@
 {
   "schemaVersion": "workloom.style-variant/v1",
   "id": "warm-story",
-  "name": "暖调故事版",
+  "name": "暖心版",
   "positioning": "情感/文旅/民宿/人物：暖调胶片、慢转场、留白文案",
+  "colorPolicy": "grade",
   "platforms": [
     "抖音/快手",
     "视频号",
@@ -10,16 +11,43 @@
     "B站"
   ],
   "color": {
-    "profile": "high-contrast-social",
-    "lut": "look-warm-film.cube",
-    "intensity": 0.5,
-    "lookLabel": "暖调故事（对比打底 + 暖调胶片 50%）",
-    "note": "2026-10-13 客户实测重定标：原 warm-film@0.75 的提黑会把灰雾/平光镜头压得更灰（山路/日出段实测动态范围仅 76–93）。改为高对比打底 + 暖调 LUT 50%。"
+    "profile": "warm-film",
+    "intensity": 0.3,
+    "lookLabel": "暖心版（轻暖胶片 30%）",
+    "note": "2026-10-18 清晰度审计后收敛：旧 high-contrast-social + 暖 LUT 50% 同时压黑、提对比和提饱和，叠加逐镜去雾后处理感过强。本版只保留 warm-film 的轻暖色与微弱层次，不再叠第二层暖 LUT；单镜灰雾继续走共享 clarity 或显式 --color-map。"
   },
   "transitions": {
     "mode": "fade",
     "fadeSec": 0.6,
-    "note": "慢入慢出，情绪连贯；适合叙事线"
+    "note": "慢入慢出，情绪连贯；适合叙事线（整段口径；有逐切计划时按 intentMap 逐刀执行）",
+    "scale": 1.15,
+    "intentMap": {
+      "dissolve": {
+        "type": "fadeslow",
+        "durationSec": 0.65
+      },
+      "fade_from_black": {
+        "type": "fadeblack",
+        "durationSec": 0.7
+      },
+      "fade_to_black": {
+        "type": "fadeblack",
+        "durationSec": 0.7
+      },
+      "wipe": {
+        "type": "smoothleft",
+        "durationSec": 0.55
+      },
+      "whip_pan": {
+        "type": "smoothright",
+        "durationSec": 0.35
+      },
+      "zoom_blur": {
+        "type": "zoomin",
+        "durationSec": 0.4
+      }
+    },
+    "intentNote": "暖心版：叠化用 fadeslow（自带慢入曲线）拉长情绪，擦除用柔边推移，不用硬边切片"
   },
   "bgm": {
     "mood": "温暖自在",

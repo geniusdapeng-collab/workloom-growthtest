@@ -37,7 +37,10 @@ const toolExecutor = createSubtitleBridgeExecutor({
 
 ## 默认回执与技术检查
 
-每次处理核对实际输入与 SHA、合法字幕时间、字体文件/许可、ASS 条数与起止、实际 libass 字体解析、实际输出画布/有无音轨和源字节未变。缺字体或字体回落、非法 SRT、路径、磁盘、真实编码或输出不符明确失败，不能用文件存在冒充完成。
+生产后期在同时请求字幕与弹幕时使用内核的单次合成路径：两类事件写入同一份 ASS，只编码一次。最终文字层 1080P 为 `libx264 medium/CRF16`，UHD 为 `medium/CRF14`；不再接受“先烧字再烧弹幕”的两代编码发布链。
+
+**纪律**：弹幕密度与安全区不允许用参数绕过（`allow_flood` / `ignore_density` / `skip_safe_area` 被 G-SUB6 一票否决）；
+卡拉OK 的均分时间轴必须标注口径，不得当真实对齐交付。
 
 品质未测时 `qualityReviewed=false`、`qualityReview="not-reviewed"`、样本/证据帧为空、品质指标为 null。`verify=false` 或 `skip_verify` 不关闭这些实际技术检查，也不挂起普通后期。显式 analyze 报告独立保留，不能把未诊断说成合格。
 

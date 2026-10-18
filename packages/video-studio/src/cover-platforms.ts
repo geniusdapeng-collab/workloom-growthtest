@@ -217,6 +217,9 @@ export const PLATFORM_ALIASES: Record<string, string> = {
   "B站": "bilibili",
   "哔哩哔哩": "bilibili",
   "b站": "bilibili",
+  /** README / 交付报告里常见的组合写法（T-2026-1017 修复：此前会静默落到抖音竖版口径） */
+  "B站（哔哩哔哩）": "bilibili",
+  "哔哩哔哩（B站）": "bilibili",
   "油管": "youtube",
   "ins": "instagram-reels",
   "ig": "instagram-reels",

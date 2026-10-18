@@ -62,9 +62,10 @@
 
 | 变体 | 定位 | 配方差异 |
 |---|---|---|
-| `warm-story` 暖调故事版 | 情感/文旅/民宿 | warm-film LUT @0.75 · fade 0.6s · acoustic-warm −23dB · 留白题签封面 · 温暖克制口吻 |
-| `clean-tech` 干净科技版 | 产品/科技/知识 | cool-technical @0.7 · hard · corporate-clean −25dB · 参数卡封面 · 简洁理性口吻 |
-| `bold-promo` 强推促销版 | 带货/本地生活 | high-contrast-social @0.9 · xfade 0.35s · sports-hype −21dB · 促销横幅 · 直接叫卖口吻 |
+| `warm-story` 暖调故事版 | 情感/文旅/民宿 | warm-film @0.3 · fade 0.6s · acoustic-warm −23dB · 留白题签封面 · 温暖克制口吻 |
+| `clean-tech` 干净科技版 | 产品/科技/知识 | cool-technical @0.28 · hard · corporate-clean −25dB · 参数卡封面 · 简洁理性口吻 |
+| `bold-promo` 强推促销版 | 带货/本地生活 | high-contrast-social @0.38 · xfade 0.35s · sports-hype −21dB · 促销横幅 · 直接叫卖口吻 |
+| `natural-clean` 自然高清版 | 自然观感/清晰度核对 | 不调色 · hard · 保留原声 · 轻量留白封面 |
 
 **差异必须实测**（而不是"配方不同"）：画面用平均像素差（`>=4/255` visible、`2–4` subtle、`<2` negligible）、
 音轨用曲目/分层是否不同、封面两两像素差。任一对变体"画面与音轨同时测不出差别"→ **拒绝交付**（G-DLV1）。
@@ -72,6 +73,10 @@
 ## 5. 关键机制
 
 ### 5.1 母版不烧字 + 三条落地方式同源
+
+同一变体同时请求烧字幕和烧弹幕时，字幕与弹幕事件合并进**同一份 ASS**，只做一次 libass 渲染和一次 H.264 编码，输出 `<id>.burned.danmaku.mp4`。字幕 proof 与弹幕 proof 绑定同一输出 SHA，并记录 `textEncodingPasses=1`；质量门禁会拒绝退回“先烧字幕再烧弹幕”的两代链。
+
+1080P 文字层编码固定为 `libx264 medium / CRF16`，UHD 为 `medium / CRF14`。封面片头仍以 stream copy 拼接，不额外重编码正片。
 
 字幕师先用 `subtitlewrite.sidecar` 出旁挂文件（`srt` / 带版式 `ass` / `vtt` + `subtitle-manifest.json`），
 三条落地路径共用同一份 ASS 生成器与字体选型，因此观感一致：

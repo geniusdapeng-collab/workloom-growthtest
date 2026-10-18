@@ -25,7 +25,7 @@ import { parseRootList } from "../../library/root-list.mjs";
 
 import {
   MeasureError, binaryVersion, detectRenderCapabilities, escapeFilterPath, extractFrame,
-  measureInkExtent, parseFontSelections, pickVideoEncoder, probeMedia, regionStats, resolveBinaries,
+  measureInkExtent, measureSharpness, parseFontSelections, pickVideoEncoder, probeMedia, regionStats, resolveBinaries,
   round, runBin, sha256File, tempDir,
 } from "./measure.mjs";
 
@@ -1363,11 +1363,22 @@ export const FONT_SOURCE = {
 
 /* ============================ 烧录与复检 ============================ */
 
-/** Render the declared ASS once; verify actual outputs, fonts and source bytes without source quality sampling. */
-async function encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, extraFilter = ",format=yuv420p", allowClippedEnd = false }) {
+/**
+ * 字幕/标题烧录：方案（plan）→ ffmpeg libass 烧录 → 核对时间轴、字体、输出轨道和哈希。
+ * mode: subtitle（只需 SRT）| title（只需标题）| both。
+ *
+ * 时间轴、实际字体解析、画布与原音轨属于处理合同；失败明确报错。
+ * 字号、行宽、墨迹占位与对比度建议随报告保留，不拒收成片、不删减用户文字。
+ */
+/**
+ * ASS → 成片编码（新渲染器共用）：扁平字体目录 → ffmpeg libass → 回读输出规格与 fontselect。
+ * 关键纪律：字体必须命中仓内/工位字体目录，静默回落系统字体一律判失败。
+ */
+async function encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, extraFilter = ",format=yuv420p", allowClippedEnd = false, verifySharpness = false }) {
   assertRenderable({ input, output });
-  const encoder = await pickVideoEncoder({ bins });
   const probe = await probeMedia(input, { bins });
+  const quality = Math.min(probe.displayWidth ?? probe.width, probe.displayHeight ?? probe.height) >= 2160 ? "uhd" : "hd";
+  const encoder = await pickVideoEncoder({ bins, quality });
   const assText = await fsp.readFile(assPath, "utf8");
   const textTimeline = validateTextEvents(parseAssEvents(assText), probe, { allowClippedEnd });
   const sourceSha256 = await sha256File(input);
@@ -1398,14 +1409,53 @@ async function encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, 
     await removeOnFailure(output);
     throw new SubtitleError("渲染期间源片或 ASS 字节发生变化：候选输出已删除", "verify_failed", false);
   }
-  return { encoder, probe, outputProbe, hash, fontResolution, flatFonts, sourceSha256, assSha256, textTimeline };
+  /**
+   * 清晰度回归断言（T-2026-1017）：烧字是最后一次重编码，必须证明"没有明显变糊"。
+   * 取上半部（避开字幕带）的拉普拉斯方差中位数比值：<0.55 硬失败（明显掉清晰度），<0.8 记咨询项。
+   */
+  let sharpness = null;
+  if (verifySharpness) try {
+    const before = await measureSharpness(input, { bins });
+    const after = await measureSharpness(output, { bins });
+    const ratio = before.medianVariance > 0 ? Number((after.medianVariance / before.medianVariance).toFixed(4)) : null;
+    sharpness = { before: before.medianVariance, after: after.medianVariance, ratio, samples: Math.min(before.samples, after.samples) };
+    if (ratio !== null && ratio < 0.55) {
+      await removeOnFailure(output);
+      throw new SubtitleError(`烧字后清晰度明显下降（拉普拉斯方差比 ${ratio} < 0.55）：检查编码档/滤镜链，候选输出已删除`, "verify_failed", false);
+    }
+  } catch (error) {
+    if (error instanceof SubtitleError) throw error;
+    /** 抽帧失败只记录，不把已成功的渲染判死（清晰度抽检是回归护栏，不是渲染前提）。 */
+    sharpness = { error: error instanceof Error ? error.message : String(error) };
+  }
+  return { encoder, probe, outputProbe, hash, fontResolution, flatFonts, sourceSha256, assSha256, textTimeline, sharpness };
 }
 
 export async function renderWithSubtitles({
-  mode = "subtitle", input, output, cues = [], titleText = "", titleDurationSec = null,
-  secondaryCues = [], secondaryLabel = "EN", brief = {}, platform = null,
-  fontsDir = null, evidenceDir = null, bins = resolveBinaries(), catalog = loadFontCatalog(),
-  styleOverrides = {}, skipVerify = false,
+  mode = "subtitle",
+  input,
+  output,
+  cues = [],
+  titleText = "",
+  titleDurationSec = null,
+  secondaryCues = [],
+  secondaryLabel = "EN",
+  brief = {},
+  platform = null,
+  fontsDir = null,
+  evidenceDir = null,
+  bins = resolveBinaries(),
+  catalog = loadFontCatalog(),
+  styleOverrides = {},
+  skipVerify = false,
+  presenceMinDelta = 0.004,
+  verifySharpness = false,
+  /**
+   * 单次合成扩展（2026-10-18）：把字幕和弹幕同时写进同一份 ASS、只编码一次。
+   * 不传时为原有纯字幕路径，零行为变化。
+   */
+  danmakuItems = null,
+  danmakuOptions = {},
 }) {
   fontsDir = fontsDir ?? fontsRoot();
   assertRenderable({ input, output, skipVerify });
@@ -1426,48 +1476,205 @@ export async function renderWithSubtitles({
   const started = Date.now();
   const sourceSha256 = await sha256File(input);
   const scenes = mode === "title" ? ["标题"] : mode === "subtitle" ? ["字幕"] : ["标题", "字幕"];
-  const planOutcome = await plan({ input, brief, platform, titleText: mode === "subtitle" ? "" : titleText,
-    titleDurationSec, cues: mode === "title" ? [] : cues,
-    secondaryCues: mode === "title" ? [] : secondaryCues, secondaryLabel, scenes, catalog, fontsDir, bins,
-    evidenceDir, styleOverrides, analyze: false });
-  const encoded = await encodeWithAss({ input, output, assPath: planOutcome.assPath, fontsDir, catalog, bins });
-  const assEvents = parseAssEvents(await fsp.readFile(planOutcome.assPath, "utf8"));
-  const subEvents = assEvents.filter(event => event.style === "Sub");
-  const titleEvents = assEvents.filter(event => event.style === "Title");
-  const timelineOk = mode === "title" ? titleEvents.length === 1 : subEvents.length === cues.length
-    && subEvents.every((event, index) => event.start === cues[index].start && event.end === cues[index].end);
-  const checks = { timeline_ok: timelineOk,
-    timeline_within_video: encoded.textTimeline.ok,
-    punctuation_ok: subEvents.every(event => findSubtitlePunctuation(event.text).length === 0),
-    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir === true && encoded.fontResolution.selections.length > 0,
-    resolution_preserved: encoded.outputProbe.width === (encoded.probe.displayWidth ?? encoded.probe.width) && encoded.outputProbe.height === (encoded.probe.displayHeight ?? encoded.probe.height),
-    audio_preserved: encoded.outputProbe.hasAudio === encoded.probe.hasAudio,
-    source_bytes_unchanged: await sha256File(input) === sourceSha256,
-    output_present: (await fsp.stat(output)).size > 0 };
-  const report = { schemaVersion: "workloom.subtitle-report/v1", mode, input,
-    sourceSha256, assSha256: encoded.assSha256, textTimeline: encoded.textTimeline, output: { path: output, hash: encoded.hash, bytes: (await fsp.stat(output)).size },
-    encoder: encoded.encoder.name, elapsedMs: Date.now() - started,
-    duration: { input: encoded.probe.duration, output: encoded.outputProbe.duration },
-    resolution: [encoded.outputProbe.width, encoded.outputProbe.height], platform: planOutcome.plan.platform,
-    firstCue: mode === "title" ? { start: srtSecondsToAss(0), end: srtSecondsToAss(titleDurationSec), text: titleText } : cues[0],
-    styles: planOutcome.styles.map(entry => ({ name: entry.name, ...entry.style })),
+  const planOutcome = await plan({
+    input,
+    brief,
+    platform,
+    titleText: mode === "subtitle" ? "" : titleText,
+    titleDurationSec,
+    cues: mode === "title" ? [] : cues,
+    secondaryCues: mode === "title" ? [] : secondaryCues,
+    secondaryLabel,
+    scenes,
+    catalog,
+    fontsDir,
+    bins,
+    evidenceDir,
+  });
+  let { styles } = planOutcome;
+  if (styleOverrides && Object.keys(styleOverrides).length) {
+    styles = styles.map((entry) => {
+      const override = styleOverrides[entry.name];
+      return override ? { name: entry.name, style: { ...entry.style, ...override } } : entry;
+    });
+    const assText = buildAssDocument({ resolution: planOutcome.plan.resolution, styles, events: planOutcome.events });
+    await fsp.writeFile(planOutcome.assPath, assText, "utf8");
+    planOutcome.assText = assText;
+  }
+
+  let danmaku = null;
+  if (danmakuItems !== null && danmakuItems !== undefined) {
+    const inputProbe = await probeMedia(input, { bins });
+    danmaku = await prepareDanmakuOverlay({
+      probe: inputProbe,
+      items: danmakuItems,
+      platform,
+      brief,
+      fontsDir,
+      catalog,
+      opacity: danmakuOptions.opacity ?? 0.85,
+      maxChars: danmakuOptions.maxChars ?? null,
+      maxConcurrent: danmakuOptions.maxConcurrent ?? null,
+      windowSec: danmakuOptions.windowSec ?? 1,
+      lanes: danmakuOptions.lanes ?? 8,
+    });
+    const combinedAss = buildAssDocument({
+      resolution: planOutcome.plan.resolution,
+      styles: [...styles, ...danmaku.styles],
+      events: [...planOutcome.events, ...danmaku.events],
+    });
+    await fsp.writeFile(planOutcome.assPath, combinedAss, "utf8");
+    planOutcome.assText = combinedAss;
+  }
+
+  const encoded = await encodeWithAss({
+    input,
+    output,
+    assPath: planOutcome.assPath,
+    fontsDir,
+    catalog,
+    bins,
+    allowClippedEnd: Boolean(danmaku),
+    verifySharpness,
+  });
+  const { encoder, probe, outputProbe, fontResolution, flatFonts } = encoded;
+  const outputHash = encoded.hash;
+  const assEvents = parseAssEvents(planOutcome.assText);
+  const subEvents = assEvents.filter((event) => event.style === "Sub");
+  const titleEvents = assEvents.filter((event) => event.style === "Title");
+  const danmakuEvents = assEvents.filter((event) => event.style.startsWith("Danmaku"));
+
+  // ① 时间轴回读：写出的 ASS 必须与源字幕逐条一致
+  const timelineOk = mode === "title"
+    ? titleEvents.length === (titleText ? 1 : 0)
+    : subEvents.length === cues.length
+      && subEvents.every((event, index) => event.start === cues[index].start && event.end === cues[index].end);
+  const danmakuTimelineOk = !danmaku
+    || (danmakuEvents.length === danmaku.events.length
+      && danmakuEvents.every((event, index) => event.start === danmaku.events[index].start
+        && event.end === danmaku.events[index].end
+        && event.text === danmaku.events[index].text));
+
+  const resolution = [outputProbe.width, outputProbe.height];
+  const checks = checkSummary(planOutcome.checks).map((check) => ({ ...check, hard: check.kind === "font_resolution" }));
+  const layoutOk = checks.every((check) => check.ok);
+  const presence = { reviewed: false, at: null, delta: null, threshold: null, ok: null };
+  const evidence = [];
+
+  const report = {
+    schemaVersion: "workloom.subtitle-report/v1",
+    mode: danmaku ? "subtitle+danmaku" : mode,
+    input,
+    sourceSha256: encoded.sourceSha256,
+    assSha256: encoded.assSha256,
+    textTimeline: encoded.textTimeline,
+    output: { path: output, hash: outputHash, bytes: fs.statSync(output).size },
+    encoder: encoder.name,
+    elapsedMs: Date.now() - started,
+    duration: { input: probe.duration, output: outputProbe.duration },
+    resolution,
+    platform: planOutcome.plan.platform,
+    firstCue: mode === "title"
+      ? { start: srtSecondsToAss(0), end: srtSecondsToAss(Number(titleDurationSec) || 3), text: titleText }
+      : cues[0],
+    styles: styles.map((entry) => ({ name: entry.name, ...entry.style })),
     fonts: Object.fromEntries(Object.entries(planOutcome.plan.selection).map(([scene, entry]) => [scene, {
-      id: entry.chosen?.id ?? null, name: entry.chosen?.name ?? null, file: entry.chosen?.file ?? null,
-      license: entry.chosen?.license ?? null, sha256: entry.chosen?.sha256 ?? null,
-      score: null, reasons: entry.chosen?.reasons ?? [] }])),
-    layoutChecks: checkSummary(planOutcome.checks), layoutReview: "not-reviewed",
-    timeline: { ok: timelineOk, cues: subEvents.length, titleEvents: titleEvents.length, sourceCues: cues.length,
-      first: subEvents[0] ?? null, last: subEvents.at(-1) ?? null },
-    presence: { status: "not-reviewed", delta: null, threshold: null },
-    fontResolution: { basis: "actual libass render log", fontsDir: encoded.flatFonts.flat,
-      fontsLinked: encoded.flatFonts.linked, allFromFontsDir: encoded.fontResolution.allFromFontsDir,
-      fallbackFamilies: encoded.fontResolution.fallbackFamilies, selections: encoded.fontResolution.selections },
-    evidence: [], assPath: planOutcome.assPath, planPath: planOutcome.planPath, diagnosis: null,
-    qualityReviewed: false, qualityReview: "not-reviewed", checks };
-  const failed = Object.entries(checks).filter(([, ok]) => !ok).map(([key]) => key);
-  if (failed.length) {
-    await removeOnFailure(output);
-    throw new SubtitleError(`字幕处理产物不符合请求（${failed.join("/")}）`, "verify_failed", false);
+      id: entry.chosen?.id ?? null,
+      name: entry.chosen?.name ?? null,
+      file: entry.chosen?.file ?? null,
+      license: entry.chosen?.license ?? null,
+      sha256: entry.chosen?.sha256 ?? null,
+      score: entry.chosen?.score ?? null,
+      reasons: entry.chosen?.reasons ?? [],
+    }])),
+    layoutChecks: checks,
+    timeline: {
+      ok: timelineOk,
+      cues: subEvents.length,
+      titleEvents: titleEvents.length,
+      sourceCues: cues.length,
+      first: subEvents[0] ?? null,
+      last: subEvents[subEvents.length - 1] ?? null,
+    },
+    danmaku: danmaku ? {
+      ...danmaku.report,
+      output: { path: output, hash: outputHash, bytes: fs.statSync(output).size },
+      encoder: encoder.name,
+      assPath: planOutcome.assPath,
+      assSha256: encoded.assSha256,
+      timeline: {
+        ok: danmakuTimelineOk,
+        events: danmakuEvents.length,
+        sourceEvents: danmaku.events.length,
+      },
+      fontResolution: {
+        allFromFontsDir: fontResolution.allFromFontsDir,
+        fallbackFamilies: fontResolution.fallbackFamilies,
+        selections: fontResolution.selections.filter((entry) => String(entry.family ?? entry.name ?? "").toLowerCase().includes(String(danmaku.font.name ?? "").toLowerCase())),
+      },
+    } : null,
+    pipeline: {
+      textLayers: danmaku ? ["subtitles", "danmaku"] : ["subtitles"],
+      textEncodingPasses: 1,
+      sourceEncodingPolicy: "single-pass-combined-ass",
+    },
+    qualityReviewed: false,
+    qualityScore: null,
+    presence,
+    fontResolution: {
+      basis: "libass fontselect 日志（真实渲染调用）",
+      fontsDir: flatFonts.flat,
+      fontsLinked: flatFonts.linked,
+      allFromFontsDir: fontResolution.allFromFontsDir,
+      fallbackFamilies: fontResolution.fallbackFamilies,
+      selections: fontResolution.selections,
+    },
+    evidence,
+    assPath: planOutcome.assPath,
+    planPath: planOutcome.planPath,
+    diagnosis: planOutcome.diagnosis
+      ? { summary: planOutcome.diagnosis.summary, evidenceDir: planOutcome.diagnosis.evidenceDir }
+      : null,
+  };
+  report.checks = {
+    timeline_ok: timelineOk,
+    timeline_within_video: encoded.textTimeline.ok,
+    source_bytes_unchanged: await sha256File(input) === encoded.sourceSha256,
+    layout_ok: layoutOk,
+    /**
+     * 标点口径（2026-09-25）：烧录/软轨用的 cues 必须已经去过标点。
+     * 这里对**写进画面的 ASS 事件文本**再查一遍（而不是只查入参），
+     * 因为"入参干净、事件脏"只有在这一层能看到。
+     */
+    punctuation_ok: subEvents.every((event) => findSubtitlePunctuation(String(event.text ?? "")).length === 0),
+    danmaku_timeline_ok: danmakuTimelineOk,
+    font_resolved_from_fonts_dir: fontResolution.allFromFontsDir === true && fontResolution.selections.length > 0,
+    resolution_preserved: outputProbe.width === (probe.displayWidth ?? probe.width) && outputProbe.height === (probe.displayHeight ?? probe.height),
+    audio_preserved: outputProbe.hasAudio === probe.hasAudio,
+  };
+
+  /** 清晰度回归体检（T-2026-1017）：烧字前后上半部画面的拉普拉斯方差比，随回执交付。 */
+  report.sharpness = encoded.sharpness ?? null;
+
+  report.processingChecks = Object.fromEntries(Object.entries(report.checks).filter(([key]) => key !== "layout_ok"));
+  if (!Object.values(report.processingChecks).every(Boolean)) {
+    const failed = Object.entries(report.processingChecks).filter(([, ok]) => !ok).map(([key]) => key);
+    /**
+     * 诊断信息要能定位到"哪一项版式检查失败、实测值多少"（2026-09-25 真机）：
+     * 早先只报 `layout_ok` 一个词，产物还当场删了——排查只能靠猜。
+     * 现在把失败项对应的 layoutChecks 明细拼进错误消息（保留 checks 前缀，不改变对外语义）。
+     */
+    const failedDetails = report.layoutChecks
+      .filter((check) => !check.ok)
+      .map((check) => `${check.kind}：${JSON.stringify(check.detail ?? check.note ?? null)}`)
+      .join("；");
+    if (typeof fsp.rm === "function") await fsp.rm(output, { force: true });
+    else fs.unlinkSync(output);
+    throw new SubtitleError(
+      `字幕复检未通过（${failed.join("/")}）${failedDetails ? `：${failedDetails}` : ""}：产物已删除，不进入入库/发布队列`,
+      "verify_failed",
+      false,
+    );
   }
   return report;
 }
@@ -1689,35 +1896,41 @@ async function removeOnFailure(output) {
 }
 
 /**
- * 弹幕轨渲染：滚动（顶部 1/4 轨道）+ 顶部/底部固定。
- * 默认保留请求的全部弹幕；调用方明确指定 maxChars/maxConcurrent 才应用该排版配方。
- * 渲染回读条数、实际字体、分辨率、音轨与源字节，不抽检画面品质。
+ * 弹幕 ASS 计划：字幕+弹幕合并路径与纯弹幕路径共用同一套轨道、字体和事件算法。
+ * 只生成可复算的计划，不编码；调用方决定是一次编码还是独立弹幕编码。
  */
-export async function renderDanmaku({
-  input,
-  output,
+async function prepareDanmakuOverlay({
+  probe,
   items = [],
   platform = null,
   brief = {},
   fontsDir = null,
-  evidenceDir = null,
-  bins = resolveBinaries(),
   catalog = loadFontCatalog(),
   opacity = 0.85,
   maxChars = null,
   maxConcurrent = null,
   windowSec = 1,
   lanes = 8,
-  skipVerify = false,
 }) {
-  fontsDir = fontsDir ?? fontsRoot();
-  assertRenderable({ input, output, skipVerify });
+  for (const [name, value] of [["maxChars", maxChars], ["maxConcurrent", maxConcurrent]]) {
+    if (value !== null && (!Number.isInteger(value) || value <= 0)) {
+      throw new SubtitleError(`${name} 必须是正整数或省略`, "bad_request", false);
+    }
+  }
+  if (!Number.isFinite(windowSec) || windowSec <= 0 || !Number.isInteger(lanes) || lanes <= 0) {
+    throw new SubtitleError("windowSec 与 lanes 必须是合法正值", "bad_request", false);
+  }
   const parsed = parseDanmaku(items);
-  const inputTiming = await probeMedia(input, { bins });
-  validateTextEvents(parsed.map(item => ({ start: srtSecondsToAss(item.at),
-    end: srtSecondsToAss(item.at + 1), text: item.text })), inputTiming, { allowClippedEnd: true });
-  const tooLong = Number.isFinite(maxChars) && maxChars > 0
-    ? parsed.filter((item) => Array.from(item.text).length > maxChars) : [];
+  validateTextEvents(
+    parsed.map((item) => ({
+      start: srtSecondsToAss(item.at),
+      end: srtSecondsToAss(item.at + 1),
+      text: item.text,
+    })),
+    probe,
+    { allowClippedEnd: true },
+  );
+  const tooLong = maxChars === null ? [] : parsed.filter((item) => Array.from(item.text).length > maxChars);
   if (tooLong.length) {
     throw new SubtitleError(
       `${tooLong.length} 条弹幕超过单条 ${maxChars} 字上限（示例：${tooLong[0].text.slice(0, 12)}…）：请改写或拆条`,
@@ -1725,11 +1938,17 @@ export async function renderDanmaku({
       false,
     );
   }
-  const densityRequested = Number.isFinite(maxConcurrent) && maxConcurrent > 0;
-  const trimming = densityRequested ? trimDanmaku(parsed, { windowSec, maxConcurrent }) : { kept: parsed, dropped: [], trimmed: 0 };
-  const densityBefore = densityRequested ? checkDanmakuDensity(parsed, { windowSec, maxConcurrent }) : null;
-  const sourceSha256 = await sha256File(input);
-  const probe = await probeMedia(input, { bins });
+  const trimming = maxConcurrent === null
+    ? { kept: parsed, dropped: [], trimmed: 0 }
+    : trimDanmaku(parsed, { windowSec, maxConcurrent });
+  const densityLimit = maxConcurrent ?? Math.max(1, parsed.length);
+  const densityBefore = {
+    ...checkDanmakuDensity(parsed, { windowSec, maxConcurrent: densityLimit }),
+    maxConcurrent,
+    requested: maxConcurrent !== null,
+    note: maxConcurrent === null ? "未请求并发限制，完整保留传入弹幕" : null,
+  };
+  const densityAfter = checkDanmakuDensity(trimming.kept, { windowSec, maxConcurrent: densityLimit });
   const platformKey = platform ?? brief.平台 ?? "默认";
   const { key: layoutKey, layout } = layoutFor(platformKey, catalog);
   const resolution = [probe.displayWidth ?? probe.width, probe.displayHeight ?? probe.height];
@@ -1786,37 +2005,19 @@ export async function renderDanmaku({
       text: `${overrides}${escapeAssText(item.text)}`,
     };
   });
-  const dir = evidenceDir ?? (await tempDir("workloom-subtitle-danmaku-"));
-  await fsp.mkdir(dir, { recursive: true });
-  const assPath = path.join(dir, "danmaku-plan.ass");
-  const assText = buildAssDocument({ resolution, styles, events });
-  await fsp.writeFile(assPath, assText, "utf8");
-  const encoded = await encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, allowClippedEnd: true });
-  const presence = { status: "not-reviewed", delta: null };
-  const evidence = [];
-  const backRead = parseAssEvents(assText).filter((event) => event.style.startsWith("Danmaku"));
-  const checks = {
-    timeline_within_video: encoded.textTimeline.ok,
-    event_count_ok: backRead.length === tracks.length,
-    declared_density_applied: !densityRequested || checkDanmakuDensity(trimming.kept, { windowSec, maxConcurrent }).ok,
-    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir === true && encoded.fontResolution.selections.length > 0,
-    resolution_preserved: encoded.outputProbe.width === (probe.displayWidth ?? probe.width) && encoded.outputProbe.height === (probe.displayHeight ?? probe.height),
-    audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
-    source_bytes_unchanged: await sha256File(input) === sourceSha256,
-  };
-  const report = {
-    schemaVersion: "workloom.subtitle-report/v1",
-    mode: "danmaku",
-    qualityReviewed: false, qualityReview: "not-reviewed",
-    input,
-    sourceSha256,
-    assSha256: encoded.assSha256,
-    textTimeline: encoded.textTimeline,
-    output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
-    encoder: encoded.encoder.name,
-    platform: layoutKey,
-    resolution,
-    font: { id: pick.id, name: pick.字体名称 ?? pick.name, file: pick.file, license: pick.license, sha256: pick.sha256 },
+  return {
+    parsed,
+    tracks,
+    styles,
+    events,
+    font: {
+      id: pick.id,
+      name: pick.字体名称 ?? pick.name,
+      file: pick.file,
+      license: pick.license,
+      sha256: pick.sha256,
+    },
+    style: baseStyle,
     opacity,
     maxChars,
     density: {
@@ -1824,10 +2025,120 @@ export async function renderDanmaku({
       kept: trimming.kept.length,
       trimmed: trimming.trimmed,
       trimmedItems: trimming.dropped.map((item) => item.text),
+      peakConcurrentAfter: densityAfter.peakConcurrent,
+      withinCap: maxConcurrent === null || densityAfter.ok,
     },
-    tracks: tracks.map((item) => ({ text: item.text, mode: item.mode, at: item.at, y: item.y, durationSec: round(item.durationSec, 2) })),
-    style: baseStyle,
+    layoutKey,
     textStyleDecision: decision,
+    report: {
+      platform: layoutKey,
+      resolution,
+      opacity,
+      maxChars,
+      density: {
+        ...densityBefore,
+        kept: trimming.kept.length,
+        trimmed: trimming.trimmed,
+        trimmedItems: trimming.dropped.map((item) => item.text),
+        peakConcurrentAfter: densityAfter.peakConcurrent,
+      },
+      tracks: tracks.map((item) => ({
+        text: item.text,
+        mode: item.mode,
+        at: item.at,
+        y: item.y,
+        durationSec: round(item.durationSec, 2),
+      })),
+      style: baseStyle,
+      textStyleDecision: decision,
+      font: {
+        id: pick.id,
+        name: pick.字体名称 ?? pick.name,
+        file: pick.file,
+        license: pick.license,
+        sha256: pick.sha256,
+      },
+    },
+  };
+}
+
+/**
+ * 弹幕轨渲染：滚动（顶部 1/4 轨道）+ 顶部/底部固定。
+ * 默认保留完整文字与全部条目；只有明确传入 maxChars/maxConcurrent 才约束或抽稀。
+ * 透明度默认 0.85，核对实际事件、字体、画布和音轨，不做源片品质复检。
+ */
+export async function renderDanmaku({
+  input,
+  output,
+  items = [],
+  platform = null,
+  brief = {},
+  fontsDir = null,
+  evidenceDir = null,
+  bins = resolveBinaries(),
+  catalog = loadFontCatalog(),
+  opacity = 0.85,
+  maxChars = null,
+  maxConcurrent = null,
+  windowSec = 1,
+  lanes = 8,
+  skipVerify = false,
+  verifySharpness = false,
+}) {
+  fontsDir = fontsDir ?? fontsRoot();
+  assertRenderable({ input, output, skipVerify });
+  const probe = await probeMedia(input, { bins });
+  const overlay = await prepareDanmakuOverlay({
+    probe,
+    items,
+    platform,
+    brief,
+    fontsDir,
+    catalog,
+    opacity,
+    maxChars,
+    maxConcurrent,
+    windowSec,
+    lanes,
+  });
+  const dir = evidenceDir ?? (await tempDir("workloom-subtitle-danmaku-"));
+  await fsp.mkdir(dir, { recursive: true });
+  const assPath = path.join(dir, "danmaku-plan.ass");
+  const assText = buildAssDocument({ resolution: overlay.report.resolution, styles: overlay.styles, events: overlay.events });
+  await fsp.writeFile(assPath, assText, "utf8");
+  const encoded = await encodeWithAss({ input, output, assPath, fontsDir, catalog, bins, allowClippedEnd: true, verifySharpness });
+  // 抽样优先取滚动弹幕的「屏幕中段时刻」（位移中点最可靠），没有滚动条就取固定条
+  const presence = { reviewed: false, at: null, delta: null, threshold: null, ok: null };
+  const evidence = [];
+  const backRead = parseAssEvents(assText).filter((event) => event.style.startsWith("Danmaku"));
+  const checks = {
+    timeline_within_video: encoded.textTimeline.ok,
+    source_bytes_unchanged: await sha256File(input) === encoded.sourceSha256,
+    event_count_ok: backRead.length === overlay.tracks.length,
+    density_within_cap: maxConcurrent === null || overlay.density.withinCap,
+    font_resolved_from_fonts_dir: encoded.fontResolution.allFromFontsDir === true && encoded.fontResolution.selections.length > 0,
+    resolution_preserved: encoded.outputProbe.width === (probe.displayWidth ?? probe.width) && encoded.outputProbe.height === (probe.displayHeight ?? probe.height),
+    audio_preserved: encoded.outputProbe.hasAudio === probe.hasAudio,
+  };
+  const report = {
+    schemaVersion: "workloom.subtitle-report/v1",
+    mode: "danmaku",
+    qualityReviewed: false, qualityReview: "not-reviewed",
+    input,
+    sourceSha256: encoded.sourceSha256,
+    assSha256: encoded.assSha256,
+    textTimeline: encoded.textTimeline,
+    output: { path: output, hash: encoded.hash, bytes: fs.statSync(output).size },
+    encoder: encoded.encoder.name,
+    platform: overlay.report.platform,
+    resolution: overlay.report.resolution,
+    font: overlay.report.font,
+    opacity: overlay.report.opacity,
+    maxChars: overlay.report.maxChars,
+    density: overlay.report.density,
+    tracks: overlay.report.tracks,
+    style: overlay.report.style,
+    textStyleDecision: overlay.report.textStyleDecision,
     presence,
     evidence,
     assPath,
