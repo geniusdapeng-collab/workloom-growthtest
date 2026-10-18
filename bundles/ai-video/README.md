@@ -76,8 +76,12 @@ pnpm exec tsx scripts/tools/video-doctor.mts   # 出片环境自检（缺什么�
 
 ```
 cine-kb → continuity → micromotion → spec（25 字段交付闸）→ plates → material-gen → videos
-        → voice（同文件原声核实，禁止补旁白）→ compose → color → subtitle → bgm → cover → mux → master → deliver
+        → voice（同文件原声核实，禁止补旁白）→ compose → color → subtitle（默认烧录）
+        → bgm → cover（默认烧封面）→ mux → master
 ```
+
+> 普通 AI 视频默认只交付一支母版，`deliver` 不进入缺省阶段。需要多风格版本时，调用方必须显式把
+> `deliver` 放进 `--stages`；弹幕也只有显式提供 `--danmaku` 或 `--auto-danmaku` 时才执行。
 
 > **完整原片原声后期**：使用 [标准后期入口](../../docs/video-standard-post.md) 的
 > `--standard-post <规范原片清单> --post-settings <设置> --out <新目录>`，固定全部原镜、原顺序与原声。

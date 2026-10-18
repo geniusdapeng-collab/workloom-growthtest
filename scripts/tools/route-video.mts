@@ -113,8 +113,8 @@ const commands: Record<VideoPipelineKind, string> = {
     "  --work-dir work/vm-VID-XXXX --out work/out-VID-XXXX --brief work/film/brief.json \\",
     "  --route work/route.json \\",
     "  --keys-file ~/.workloom/live.env --platform 抖音 --fps 24 \\",
-    "  --stages cine-kb,continuity,micromotion,spec,material-gen,videos,voice,compose,color,subtitle,bgm,cover,mux,master,deliver \\",
-    "  --subtitle-mode both --review-policy off",
+    "  --stages cine-kb,continuity,micromotion,spec,material-gen,videos,voice,compose,color,subtitle,bgm,cover,mux,master \\",
+    "  --subtitle-mode burn --review-policy off",
       "# 商品档案：work/film/library/products/<档案>；G-PROD1 会逐镜校验真实商品绑定",
   ].join("\n"),
   narrative: [
@@ -124,8 +124,8 @@ const commands: Record<VideoPipelineKind, string> = {
     "  --work-dir work/vm-VID-XXXX --out work/out-VID-XXXX --brief work/film/brief.json \\",
     "  --route work/route.json \\",
     "  --keys-file ~/.workloom/live.env --platform 抖音 --fps 24 \\",
-    "  --stages cine-kb,continuity,micromotion,spec,plates,videos,voice,compose,color,subtitle,bgm,cover,mux,master,deliver \\",
-    "  --subtitle-mode both --review-policy off",
+    "  --stages cine-kb,continuity,micromotion,spec,plates,videos,voice,compose,color,subtitle,bgm,cover,mux,master \\",
+    "  --subtitle-mode burn --review-policy off",
   ].join("\n"),
   explainer: [
     "# 口播解说片（图文成片，不跑逐镜生成）：一份口播稿 + 一条配音",

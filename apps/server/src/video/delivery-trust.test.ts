@@ -73,12 +73,20 @@ describe("service seal and real bytes", () => {
     writeFixtureJson(join(pkg, "delivery-manifest.json"), { ...manifest, title: "mutated" });
     expect(verdict().reason).toMatch(/清单指纹/);
   });
-  it.each([0, 1, 2])("cannot sign an incomplete required variant set (%s)", (count) => {
+  it("accepts a sealed single-master package without inventing variants", () => {
+    const manifest = readDeliveryManifestFile(pkg).manifest;
+    manifest.variants = [];
+    writeFixtureJson(join(pkg, "delivery-manifest.json"), manifest);
+    sealTestPackage(pkg, scope);
+    expect(verdict().status).toBe("verified");
+    expect(readDeliveryPackage("PKG-1", scope, env)).toMatchObject({ variantCount: 0, variants: [] });
+  });
+  it.each([1, 2])("cannot sign an incomplete explicit multi-variant set (%s)", (count) => {
     const manifest = readDeliveryManifestFile(pkg).manifest;
     manifest.variants = manifest.variants!.slice(0, count);
     writeFixtureJson(join(pkg, "delivery-manifest.json"), manifest);
     sealTestPackage(pkg, scope);
-    expect(verdict().reason).toMatch(/三支变体/);
+    expect(verdict().reason).toMatch(/完整三支/);
   });
   it.each([{ checks: [] }, { checks: [{ kind: "foo" }] }, { checks: [{ kind: "foo", ok: false }] }])("does not treat absent or false manifest checks as approval %#", ({ checks }) => {
     const manifest = readDeliveryManifestFile(pkg).manifest;
