@@ -94,7 +94,7 @@
       "node-pty"
     ],
     "overrides": {
-      "@workloom/ui@0.1.19": "https://cnb.cool/workloom-ai/workloom-im/-/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz",
+      "@workloom/ui@0.1.19": "https://github.com/geniusdapeng-collab/workloom-im/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz",
       "pixi-live2d-display@0.4.0>gh-pages": "-"
     }
   },
