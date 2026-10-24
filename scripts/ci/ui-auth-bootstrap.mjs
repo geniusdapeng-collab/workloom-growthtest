@@ -11,12 +11,20 @@ import { fileURLToPath } from 'node:url';
 export const PIN = Object.freeze({
   package: '@workloom/ui', version: '0.1.19', producer: 'workloom-ai/workloom-im',
   tag: 'ui-v0.1.19', assetName: 'workloom-ui-0.1.19.tgz', bytes: 90041,
-  canonicalUrl: 'https://cnb.cool/workloom-ai/workloom-im/-/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz',
-  apiUrl: 'https://api.cnb.cool/workloom-ai/workloom-im/-/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz',
-  releaseUrl: 'https://api.cnb.cool/workloom-ai/workloom-im/-/releases/tags/ui-v0.1.19',
+  canonicalUrl: 'https://github.com/geniusdapeng-collab/workloom-im/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz',
+  apiUrl: 'https://api.github.com/repos/geniusdapeng-collab/workloom-im/releases/assets/670901023',
+  releaseUrl: 'https://api.github.com/repos/geniusdapeng-collab/workloom-im/releases/tags/ui-v0.1.19',
+  releaseId: 422438050, assetId: 670901023,
   sha256: '42bf2e483cbd2665fda74f0e64cff7266184db7844801b27b5078f0082a3b262',
   sri: 'sha512-kplOLAtovega6BLpBwtFM1DfBS3q4ZjLp9yA942o+v9QlbREm/VsYNK/Jz7f/9ytDWSFXCvmh10C3ZHrPHkcSA==',
   pnpmVersion: '10.14.0',
+});
+
+export const LEGACY_PIN = Object.freeze({
+  ...PIN,
+  canonicalUrl: 'https://cnb.cool/workloom-ai/workloom-im/-/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz',
+  apiUrl: 'https://api.cnb.cool/workloom-ai/workloom-im/-/releases/download/ui-v0.1.19/workloom-ui-0.1.19.tgz',
+  releaseUrl: 'https://api.cnb.cool/workloom-ai/workloom-im/-/releases/tags/ui-v0.1.19',
 });
 
 export class BootstrapError extends Error {
@@ -30,7 +38,10 @@ function sameDigest(a, b) { const x = Buffer.from(a); const y = Buffer.from(b); 
 export function validateState(state) {
   requireFact(state?.schemaVersion === 'workloom.ui-consumer-state/v1', 'UI_STATE_SCHEMA');
   requireFact(state.package === PIN.package && state.version === PIN.version && state.source === PIN.producer, 'UI_STATE_IDENTITY');
-  requireFact(state.artifact?.assetName === PIN.assetName && state.artifact.url === PIN.canonicalUrl && state.artifact.sha512 === PIN.sri, 'UI_STATE_ARTIFACT');
+  const artifact = state.artifact;
+  const github = artifact?.platform === 'github' && artifact.url === PIN.canonicalUrl;
+  const legacy = (artifact?.platform === undefined || artifact.platform === 'cnb') && artifact?.url === LEGACY_PIN.canonicalUrl;
+  requireFact(artifact?.type === 'github-release-tarball' && artifact.assetName === PIN.assetName && (github || legacy) && artifact.sha512 === PIN.sri, 'UI_STATE_ARTIFACT');
   requireFact(state.releaseChannel === 'stable' && state.updatePolicy === 'upgrade-pr-only', 'UI_STATE_POLICY');
   return state;
 }
@@ -108,31 +119,64 @@ async function safeFetch(fetchImplementation, url, options, code) {
   try { return await fetchImplementation(url, options); }
   catch { throw new BootstrapError(code); }
 }
-export function validateAssetRedirect(location) {
+export function validateAssetRedirect(location, platform = 'cnb') {
   let url;
   try { url = new URL(location); } catch { throw new BootstrapError('UI_ASSET_REDIRECT_URL'); }
-  requireFact(url.protocol === 'https:' && url.hostname === 'asset.cnb.cool' && (!url.port || url.port === '443') && !url.username && !url.password, 'UI_ASSET_REDIRECT_ORIGIN');
+  const host = platform === 'github' ? 'release-assets.githubusercontent.com' : platform === 'cnb' ? 'asset.cnb.cool' : '';
+  requireFact(host && url.protocol === 'https:' && url.hostname === host && (!url.port || url.port === '443') && !url.username && !url.password, 'UI_ASSET_REDIRECT_ORIGIN');
   return url;
 }
 
-/** Only this function receives the credential. No child process receives it. */
+async function downloadPublicGithubArchive(fetchImplementation) {
+  // Public mirror reads never receive the optional legacy CNB credential.
+  const headers = { Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10' };
+  const releaseResponse = await safeFetch(fetchImplementation, PIN.releaseUrl, { method: 'GET', headers, credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(30000) }, 'UI_RELEASE_REQUEST');
+  requireFact(releaseResponse.status === 200, 'UI_RELEASE_HTTP_' + releaseResponse.status);
+  let release;
+  try { release = JSON.parse((await boundedBody(releaseResponse, 512 * 1024, 'UI_RELEASE_BODY_SIZE')).toString('utf8')); }
+  catch (error) { if (error instanceof BootstrapError) throw error; throw new BootstrapError('UI_RELEASE_JSON'); }
+  requireFact(release?.id === PIN.releaseId && release.tag_name === PIN.tag && release.draft === false && release.prerelease === false, 'UI_RELEASE_IDENTITY');
+  requireFact(Array.isArray(release.assets), 'UI_RELEASE_ASSETS');
+  const assets = release.assets.filter(asset => asset?.name === PIN.assetName);
+  requireFact(assets.length === 1, 'UI_RELEASE_ASSET_CARDINALITY');
+  const asset = assets[0];
+  requireFact(asset.id === PIN.assetId && asset.state === 'uploaded' && asset.size === PIN.bytes && asset.digest === 'sha256:' + PIN.sha256, 'UI_RELEASE_ASSET_HASH');
+  requireFact(asset.browser_download_url === PIN.canonicalUrl && asset.url === PIN.apiUrl, 'UI_RELEASE_ASSET_URL');
+  const options = { method: 'GET', headers: { Accept: 'application/octet-stream', 'X-GitHub-Api-Version': '2026-03-10' }, credentials: 'omit', redirect: 'manual', signal: AbortSignal.timeout(60000) };
+  let response = await safeFetch(fetchImplementation, PIN.apiUrl, options, 'UI_ASSET_REQUEST');
+  let assetOrigin = 'https://api.github.com';
+  if (response.status === 302) {
+    const url = validateAssetRedirect(response.headers.get('location'), 'github');
+    // The signed CDN URL stays in memory. Neither API credentials nor cookies are forwarded.
+    assetOrigin = url.origin;
+    response = await safeFetch(fetchImplementation, url, { method: 'GET', headers: { Accept: 'application/octet-stream' }, credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(60000) }, 'UI_ASSET_DOWNLOAD');
+  }
+  requireFact(response.status === 200, 'UI_ASSET_DOWNLOAD_HTTP_' + response.status);
+  const bytes = await boundedBody(response, PIN.bytes, 'UI_ASSET_DOWNLOAD_SIZE');
+  const proof = verifyArchive(bytes);
+  return { bytes, proof: { ...proof, platform: 'github', authenticatedApi: false, credentialsForwardedToCdn: false, apiOrigin: 'https://api.github.com', assetOrigin, releaseId: String(release.id), assetId: String(asset.id) } };
+}
+
+/** Only the explicit legacy CNB branch receives the credential. No child receives it. */
 export async function downloadPinnedArchive({ releaseReadToken, state, fetchImplementation = fetch }) {
   validateState(state);
+  if (state.artifact.platform === 'github') return downloadPublicGithubArchive(fetchImplementation);
+  const pin = LEGACY_PIN;
   requireFact(typeof releaseReadToken === 'string' && releaseReadToken.length > 0 && releaseReadToken.length < 4096 && !/\s/.test(releaseReadToken), 'MISSING_UI_RELEASE_TOKEN');
   const headers = { Authorization: 'Bearer ' + releaseReadToken, Accept: 'application/vnd.cnb.api+json' };
-  const releaseResponse = await safeFetch(fetchImplementation, PIN.releaseUrl, { method: 'GET', headers, redirect: 'error', signal: AbortSignal.timeout(30000) }, 'UI_RELEASE_REQUEST');
+  const releaseResponse = await safeFetch(fetchImplementation, pin.releaseUrl, { method: 'GET', headers, redirect: 'error', signal: AbortSignal.timeout(30000) }, 'UI_RELEASE_REQUEST');
   requireFact(releaseResponse.status === 200, 'UI_RELEASE_HTTP_' + releaseResponse.status);
   let release;
   try { release = JSON.parse((await boundedBody(releaseResponse, 512 * 1024, 'UI_RELEASE_BODY_SIZE')).toString('utf8')); }
   catch (error) { if (error instanceof BootstrapError) throw error; throw new BootstrapError('UI_RELEASE_JSON'); }
   requireFact(release.tag_name === PIN.tag && release.draft === false && release.prerelease === false, 'UI_RELEASE_IDENTITY');
   requireFact(Array.isArray(release.assets), 'UI_RELEASE_ASSETS');
-  const assets = release.assets.filter(asset => asset.name === PIN.assetName);
+  const assets = release.assets.filter(asset => asset?.name === PIN.assetName);
   requireFact(assets.length === 1, 'UI_RELEASE_ASSET_CARDINALITY');
   const asset = assets[0];
   requireFact(asset.size === PIN.bytes && asset.hash_algo === 'sha256' && sameDigest(String(asset.hash_value), PIN.sha256), 'UI_RELEASE_ASSET_HASH');
-  requireFact(asset.browser_download_url === PIN.canonicalUrl && asset.url === PIN.apiUrl, 'UI_RELEASE_ASSET_URL');
-  const response = await safeFetch(fetchImplementation, PIN.apiUrl, { method: 'GET', headers, redirect: 'manual', signal: AbortSignal.timeout(30000) }, 'UI_ASSET_REQUEST');
+  requireFact(asset.browser_download_url === pin.canonicalUrl && asset.url === pin.apiUrl, 'UI_RELEASE_ASSET_URL');
+  const response = await safeFetch(fetchImplementation, pin.apiUrl, { method: 'GET', headers, redirect: 'manual', signal: AbortSignal.timeout(30000) }, 'UI_ASSET_REQUEST');
   requireFact(response.status === 302, 'UI_ASSET_HTTP_' + response.status);
   const url = validateAssetRedirect(response.headers.get('location'));
   // The signed CDN URL stays only in memory; no Authorization or cookies are forwarded.
@@ -261,7 +305,7 @@ export async function validateCanonicalIndex(storeRoot, archiveBytes) {
   return { path, sha256: digest(bytes), name: index.name, version: index.version, fileCount: Object.keys(index.files).length, manifestIntegrity: index.files['package.json'].integrity, archiveEntriesVerified: Boolean(archiveBytes) };
 }
 
-/** Authenticated bytes use a private loopback transport only while official pnpm fetch runs. */
+/** Verified bytes use a private loopback transport only while official pnpm fetch runs. */
 export async function warmCanonicalStore({ repoRoot, archiveBytes, storeDir, pnpmCommand = 'pnpm', pnpmPrefixArgs = [], stagingRoot = tmpdir(), environment = process.env }) {
   const repo = await realpath(repoRoot); const files = await sourceSnapshot(repo); const archive = verifyArchive(archiveBytes);
   await mkdir(stagingRoot, { recursive: true });

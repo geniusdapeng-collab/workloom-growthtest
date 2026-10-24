@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "workloom.repository/v1",
+  "logicalId": "workloom-growthtest",
+  "productId": "workloom-ai-growth",
+  "lane": "isolated",
+  "primaryPlatform": "github",
+  "github": {
+    "repository": "geniusdapeng-collab/workloom-growthtest",
+    "url": "https://github.com/geniusdapeng-collab/workloom-growthtest",
+    "branch": "main"
+  },
+  "cnb": {
+    "repository": "workloom-ai/workloom-growthtest",
+    "url": "https://cnb.cool/workloom-ai/workloom-growthtest",
+    "branch": "main"
+  },
+  "mirrorPolicy": {
+    "platform": "cnb",
+    "mode": "deferred",
+    "automaticProductSync": false,
+    "configBackupBranchPrefix": "workloom/config-backup/"
+  },
+  "baseSync": {
+    "receive": "none",
+    "reflux": "none"
+  },
+  "registry": {
+    "repository": "geniusdapeng-collab/workloom-im",
+    "path": "sync/repository-registry.json"
+  }
+}

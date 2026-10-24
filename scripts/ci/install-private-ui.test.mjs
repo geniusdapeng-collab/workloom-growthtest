@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { spawnSync } from 'node:child_process';
 import { parseArguments, externalOutput, installPrivateUi } from './install-private-ui.mjs';
-import { PIN, BootstrapError, digest, verifyArchive } from './ui-auth-bootstrap.mjs';
+import { PIN, LEGACY_PIN, BootstrapError, digest, verifyArchive } from './ui-auth-bootstrap.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const source = resolve(here, '../..');
@@ -17,6 +17,7 @@ if (!process.env.WORKLOOM_UI_TEST_ARCHIVE_PATH) throw new BootstrapError('MISSIN
 const archive = await readFile(resolve(process.env.WORKLOOM_UI_TEST_ARCHIVE_PATH));
 verifyArchive(archive);
 const stateBytes = await readFile(join(source, '.workloom-ui.json'));
+const legacyStateBytes = Buffer.from(JSON.stringify({ ...JSON.parse(stateBytes), artifact: { ...JSON.parse(stateBytes).artifact, platform: 'cnb', url: LEGACY_PIN.canonicalUrl } }));
 const areas = await mkdtemp(join(tmpdir(), 'workloom-private-ui-wrapper-test-'));
 after(async () => { await rm(areas, { recursive: true, force: true }); });
 const errorCode = code => error => error instanceof BootstrapError && error.code === code;
@@ -33,8 +34,8 @@ function mockFetch({ denied = false } = {}) {
   const calls = [];
   const fetchImplementation = async (url, options) => {
     calls.push({ url: String(url), options });
-    if (calls.length === 1) return new Response(JSON.stringify({ tag_name: PIN.tag, draft: false, prerelease: false, id: 'wrapper-fixture-release', assets: [{ name: PIN.assetName, size: PIN.bytes, hash_algo: 'sha256', hash_value: PIN.sha256, browser_download_url: PIN.canonicalUrl, url: PIN.apiUrl, id: 'wrapper-fixture-asset' }] }), { status: denied ? 401 : 200 });
-    if (calls.length === 2) return new Response(null, { status: 302, headers: { Location: 'https://asset.cnb.cool/wrapper-fixture?signature=synthetic' } });
+    if (calls.length === 1) return new Response(JSON.stringify({ tag_name: PIN.tag, draft: false, prerelease: false, id: PIN.releaseId, assets: [{ name: PIN.assetName, size: PIN.bytes, state: 'uploaded', digest: 'sha256:' + PIN.sha256, browser_download_url: PIN.canonicalUrl, url: PIN.apiUrl, id: PIN.assetId }] }), { status: denied ? 401 : 200 });
+    if (calls.length === 2) return new Response(null, { status: 302, headers: { Location: 'https://release-assets.githubusercontent.com/wrapper-fixture?signature=synthetic' } });
     assert.equal(calls.length, 3, 'an unexpected fourth network call is a failure');
     return new Response(archive, { status: 200 });
   };
@@ -49,7 +50,7 @@ async function boundaryFixture() {
   await writeFile(join(modules, 'install-private-ui.mjs'), wrapperBytes);
   assert.equal(digest(await readFile(join(modules, 'install-private-ui.mjs'))), digest(wrapperBytes));
   await writeFile(join(modules, 'ui-auth-bootstrap.mjs'), `
-import { PIN, BootstrapError, downloadPinnedArchive, digest } from ${JSON.stringify(coreUrl)};
+import { PIN, LEGACY_PIN, BootstrapError, downloadPinnedArchive, digest } from ${JSON.stringify(coreUrl)};
 export { PIN, BootstrapError, downloadPinnedArchive };
 export const control = { trace: [], failure: null };
 export async function warmCanonicalStore(options) {
@@ -104,6 +105,7 @@ test('output collision including normalized aliases fails before network', async
 });
 test('real wrapper rejects missing credentials before network, archive and report', async () => {
   const f = await fixture(); const mock = mockFetch();
+  await writeFile(join(f.repo, '.workloom-ui.json'), legacyStateBytes);
   await assert.rejects(installPrivateUi({ args: f.args, environment: {}, ...mock }), errorCode('MISSING_UI_RELEASE_TOKEN'));
   assert.equal(mock.calls.length, 0); await absent(f.archive); await absent(f.report);
 });
@@ -114,7 +116,7 @@ test('real wrapper resolves a repo alias before enforcing source output boundari
   assert.equal(mock.calls.length, 0); await absent(join(f.repo, 'output.tgz')); await absent(f.report);
 });
 test('real CLI reports a safe explicit credential failure without creating outputs', async () => {
-  const f = await fixture(); const result = spawnSync(process.execPath, [wrapperPath, ...f.args], { cwd: source, env: { PATH: process.env.PATH ?? '', HOME: f.outside }, encoding: 'utf8', timeout: 10000 });
+  const f = await fixture(); await writeFile(join(f.repo, '.workloom-ui.json'), legacyStateBytes); const result = spawnSync(process.execPath, [wrapperPath, ...f.args], { cwd: source, env: { PATH: process.env.PATH ?? '', HOME: f.outside }, encoding: 'utf8', timeout: 10000 });
   assert.equal(result.error, undefined); assert.equal(result.status, 1); assert.equal(result.stdout, '');
   assert.deepEqual(JSON.parse(result.stderr), { code: 'MISSING_UI_RELEASE_TOKEN', message: 'MISSING_UI_RELEASE_TOKEN' });
   await absent(f.archive); await absent(f.report);
@@ -129,7 +131,7 @@ test('invalid consumer identity and denied download leave no archive or report',
 });
 test('wrapper boundary success keeps original bytes and private file modes and links the actual warm proof', async () => {
   const f = await boundaryFixture(); const mock = mockFetch();
-  const result = await f.module.installPrivateUi({ args: f.args, environment: syntheticEnvironment, ...mock });
+  const result = await f.module.installPrivateUi({ args: f.args, environment: {}, ...mock });
   assert.equal(result.scope, 'wrapper-boundary-fixture'); assert.deepEqual(await readFile(f.archive), archive);
   assert.equal((await stat(f.archive)).mode & 0o777, 0o600); assert.equal((await stat(f.report)).mode & 0o777, 0o600);
   assert.equal(result.originalArchive.sha256, PIN.sha256); assert.equal(result.originalArchive.publicArtifactUploaded, false);
@@ -138,7 +140,9 @@ test('wrapper boundary success keeps original bytes and private file modes and l
     { phase: 'warm', repoRoot: await realpath(f.repo), storeDir: f.store, stagingRoot: f.outside, archiveSha256: PIN.sha256 },
     { phase: 'install', repoRoot: await realpath(f.repo), storeDir: f.store, stagingRoot: f.outside, proofScope: 'wrapper-boundary-fixture' },
   ]);
-  assert.equal(mock.calls.length, 3); assert.equal(JSON.stringify(result).includes('wrapper-fixture-token'), false); assert.equal(JSON.stringify(result).includes('?signature='), false);
+  assert.equal(mock.calls.length, 3); assert.equal(result.download.authenticatedApi, false);
+  for (const call of mock.calls) { assert.equal(call.options.headers.Authorization, undefined); assert.equal(call.options.credentials, 'omit'); }
+  assert.equal(JSON.stringify(result).includes('wrapper-fixture-token'), false); assert.equal(JSON.stringify(result).includes('?signature='), false);
   assert.deepEqual(mock.calls[2].options.headers, { Accept: 'application/octet-stream' });
 });
 for (const type of ['file', 'symlink', 'hardlink']) test('archive wx rejects an existing ' + type + ' and preserves its target', async () => {
