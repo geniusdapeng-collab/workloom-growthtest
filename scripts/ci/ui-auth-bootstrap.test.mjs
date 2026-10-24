@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import {
-  PIN, BootstrapError, digest, verifyArchive, readArchiveManifest, validateState,
+  PIN, LEGACY_PIN, BootstrapError, digest, verifyArchive, readArchiveManifest, validateState,
   validateAssetRedirect, downloadPinnedArchive, canonicalLockBinding, transportLock,
   childEnvironment, runProcess, expectedIndexPath, validateCanonicalIndex,
   warmCanonicalStore, installCanonicalFrozen,
@@ -18,16 +18,17 @@ function requiredArchivePath(environment = process.env) {
   if (!environment.WORKLOOM_UI_TEST_ARCHIVE_PATH) throw new BootstrapError('MISSING_UI_TEST_ARCHIVE_PATH');
   return resolve(environment.WORKLOOM_UI_TEST_ARCHIVE_PATH);
 }
-// CI provides the verified original bytes outside the checkout. No private archive
-// is committed, downloaded anonymously, or silently omitted from this suite.
+// CI provides the verified original bytes outside the checkout. No archive
+// is committed or silently omitted from this suite.
 const archive = await readFile(requiredArchivePath());
 verifyArchive(archive);
 const state = JSON.parse(await readFile(join(source, '.workloom-ui.json'), 'utf8'));
+const legacyState = { ...state, artifact: { ...state.artifact, platform: 'cnb', url: LEGACY_PIN.canonicalUrl } };
 const lock = await readFile(join(source, 'pnpm-lock.yaml'), 'utf8');
 const areas = await mkdtemp(join(tmpdir(), 'workloom-ui-bootstrap-test-'));
 after(async () => { await rm(areas, { recursive: true, force: true }); });
 const errorCode = code => error => error instanceof BootstrapError && error.code === code;
-const release = () => ({ tag_name: PIN.tag, draft: false, prerelease: false, id: 'fixture-release', assets: [{ name: PIN.assetName, size: PIN.bytes, hash_algo: 'sha256', hash_value: PIN.sha256, browser_download_url: PIN.canonicalUrl, url: PIN.apiUrl, id: 'fixture-asset' }] });
+const release = () => ({ tag_name: PIN.tag, draft: false, prerelease: false, id: 'fixture-release', assets: [{ name: PIN.assetName, size: PIN.bytes, hash_algo: 'sha256', hash_value: PIN.sha256, browser_download_url: LEGACY_PIN.canonicalUrl, url: LEGACY_PIN.apiUrl, id: 'fixture-asset' }] });
 function mockFetch({ releaseValue = release(), releaseStatus = 200, redirect = 'https://asset.cnb.cool/fixture?signature=private-fixture', finalStatus = 200, finalBytes = archive, failAt } = {}) {
   const calls = [];
   const fetchImplementation = async (url, options) => {
@@ -118,6 +119,8 @@ test('consumer state keeps canonical version, URL, digest and policy', () => {
   assert.throws(() => validateState({ ...state, version: '0.1.20' }), errorCode('UI_STATE_IDENTITY'));
   assert.throws(() => validateState({ ...state, artifact: { ...state.artifact, url: 'https://example.com/pkg.tgz' } }), errorCode('UI_STATE_ARTIFACT'));
   assert.throws(() => validateState({ ...state, updatePolicy: 'floating' }), errorCode('UI_STATE_POLICY'));
+  assert.throws(() => validateState({ ...state, artifact: undefined }), errorCode('UI_STATE_ARTIFACT'));
+  const noPlatform = structuredClone(legacyState); delete noPlatform.artifact.platform; assert.equal(validateState(noPlatform), noPlatform);
 });
 test('canonical lock binding distinguishes the lock package key from actual pnpm URL package ID', () => {
   const binding = canonicalLockBinding(lock);
@@ -140,20 +143,20 @@ for (const [label, mutate, code] of [
 ]) test('lock rejects ' + label, () => assert.throws(() => canonicalLockBinding(mutate(lock)), errorCode(code)));
 for (const url of ['https://127.0.0.1:45678/' + PIN.assetName, 'http://localhost:45678/' + PIN.assetName, 'http://user@127.0.0.1:45678/' + PIN.assetName, 'http://127.0.0.1:45678/' + PIN.assetName + '?token=fixture', 'http://127.0.0.1:45678/other.tgz']) test('loopback prefetch rejects uncontrolled transport ' + url.split('?')[0], () => assert.throws(() => transportLock(lock, url), errorCode('UI_LOCAL_TRANSPORT')));
 test('API credential is restricted to two exact API calls and absent from CDN', async () => {
-  const mock = mockFetch(); const result = await downloadPinnedArchive({ releaseReadToken: 'fixture-token-never-leak', state, ...mock });
+  const mock = mockFetch(); const result = await downloadPinnedArchive({ releaseReadToken: 'fixture-token-never-leak', state: legacyState, ...mock });
   assert.equal(result.proof.sha256, PIN.sha256); assert.equal(mock.calls.length, 3);
-  assert.deepEqual(mock.calls.slice(0, 2).map(call => call.url), [PIN.releaseUrl, PIN.apiUrl]);
-  for (const call of mock.calls.slice(0, 2)) assert.equal(call.options.headers.Authorization, 'Bearer fixture-token-never-leak');
+  assert.deepEqual(mock.calls.slice(0, 2).map(call => call.url), [LEGACY_PIN.releaseUrl, LEGACY_PIN.apiUrl]);
+  for (const call of mock.calls.slice(0, 2)) assert.equal(call.options.headers.Authorization, 'Bearer ' + 'fixture-token-never-leak');
   assert.deepEqual(mock.calls[2].options.headers, { Accept: 'application/octet-stream' });
   assert.equal(mock.calls[2].options.redirect, 'error'); assert.equal(result.proof.credentialsForwardedToCdn, false);
   assert.equal(JSON.stringify(result.proof).includes('fixture-token-never-leak'), false);
 });
 test('missing credential fails before any network call', async () => {
-  const mock = mockFetch(); await assert.rejects(downloadPinnedArchive({ state, ...mock }), errorCode('MISSING_UI_RELEASE_TOKEN')); assert.equal(mock.calls.length, 0);
+  const mock = mockFetch(); await assert.rejects(downloadPinnedArchive({ state: legacyState, ...mock }), errorCode('MISSING_UI_RELEASE_TOKEN')); assert.equal(mock.calls.length, 0);
 });
 test('expired or denied credential is a specific safe 401 failure', async () => {
   const mock = mockFetch({ releaseStatus: 401, releaseValue: { message: 'fixture-token-never-leak' } });
-  await assert.rejects(downloadPinnedArchive({ state, releaseReadToken: 'fixture-token-never-leak', ...mock }), error => errorCode('UI_RELEASE_HTTP_401')(error) && !error.message.includes('fixture-token'));
+  await assert.rejects(downloadPinnedArchive({ state: legacyState, releaseReadToken: 'fixture-token-never-leak', ...mock }), error => errorCode('UI_RELEASE_HTTP_401')(error) && !error.message.includes('fixture-token'));
 });
 for (const [label, change, code] of [
   ['wrong tag', x => { x.tag_name = 'other'; }, 'UI_RELEASE_IDENTITY'],
@@ -164,18 +167,18 @@ for (const [label, change, code] of [
   ['wrong URL', x => { x.assets[0].url = 'https://api.cnb.cool/other'; }, 'UI_RELEASE_ASSET_URL'],
 ]) test('release response rejects ' + label, async () => {
   const value = release(); change(value); const mock = mockFetch({ releaseValue: value });
-  await assert.rejects(downloadPinnedArchive({ state, releaseReadToken: 'fixture-token-never-leak', ...mock }), errorCode(code));
+  await assert.rejects(downloadPinnedArchive({ state: legacyState, releaseReadToken: 'fixture-token-never-leak', ...mock }), errorCode(code));
   assert.equal(mock.calls.length, 1);
 });
 for (const url of ['http://asset.cnb.cool/pkg', 'https://asset.cnb.cool.evil.example/pkg', 'https://evil.example/pkg', 'https://asset.cnb.cool:444/pkg', 'https://user@asset.cnb.cool/pkg']) test('CDN redirect rejects ' + url, () => assert.throws(() => validateAssetRedirect(url), errorCode('UI_ASSET_REDIRECT_ORIGIN')));
 test('redirect, truncated/oversized payload and repeated redirect cannot bypass pin', async () => {
   for (const [options, code] of [[{ finalStatus: 302 }, 'UI_ASSET_DOWNLOAD_HTTP_302'], [{ finalBytes: archive.subarray(1) }, 'UI_ARCHIVE_SIZE'], [{ finalBytes: Buffer.concat([archive, Buffer.alloc(1)]) }, 'UI_ASSET_DOWNLOAD_SIZE']]) {
-    await assert.rejects(downloadPinnedArchive({ state, releaseReadToken: 'fixture-token-never-leak', ...mockFetch(options) }), errorCode(code));
+    await assert.rejects(downloadPinnedArchive({ state: legacyState, releaseReadToken: 'fixture-token-never-leak', ...mockFetch(options) }), errorCode(code));
   }
 });
 test('network exceptions are safe coded errors without signed URLs or credentials', async () => {
   for (const [failAt, code] of [[1, 'UI_RELEASE_REQUEST'], [2, 'UI_ASSET_REQUEST'], [3, 'UI_ASSET_DOWNLOAD']]) {
-    await assert.rejects(downloadPinnedArchive({ state, releaseReadToken: 'fixture-token-never-leak', ...mockFetch({ failAt }) }), error => errorCode(code)(error) && !error.message.includes('fixture-token') && !error.message.includes('?signature'));
+    await assert.rejects(downloadPinnedArchive({ state: legacyState, releaseReadToken: 'fixture-token-never-leak', ...mockFetch({ failAt }) }), error => errorCode(code)(error) && !error.message.includes('fixture-token') && !error.message.includes('?signature'));
   }
 });
 test('body stream failures remain safe coded errors', async () => {
@@ -185,7 +188,7 @@ test('body stream failures remain safe coded errors', async () => {
     if (calls === 1) return new Response(new ReadableStream({ start(controller) { controller.error(new Error('fixture-token-never-leak')); } }), { status: 200 });
     throw Error('must not continue');
   };
-  await assert.rejects(downloadPinnedArchive({ state, releaseReadToken: 'fixture-token-never-leak', fetchImplementation }), error => errorCode('UI_RELEASE_BODY_SIZE')(error) && !error.message.includes('fixture-token'));
+  await assert.rejects(downloadPinnedArchive({ state: legacyState, releaseReadToken: 'fixture-token-never-leak', fetchImplementation }), error => errorCode('UI_RELEASE_BODY_SIZE')(error) && !error.message.includes('fixture-token'));
   assert.equal(calls, 1);
 });
 test('child processes receive an allowlisted environment and empty npm config, including no AWS key', () => {
@@ -250,4 +253,89 @@ test('install rejects a source script change occurring after store warmup', asyn
     pkg.scripts.postinstall = 'node -e "process.exit(0)"'; await writeFile(pkgPath, JSON.stringify(pkg));
     await assert.rejects(installCanonicalFrozen({ repoRoot: fixture.repo, storeDir: fixture.store, warmProof, pnpmCommand: 'must-not-launch' }), errorCode('UI_WARM_SOURCE_CHANGED'));
   } finally { await rm(fixture.dir, { recursive: true, force: true }); }
+});
+
+const githubRelease = () => ({ id: PIN.releaseId, tag_name: PIN.tag, draft: false, prerelease: false, assets: [{ id: PIN.assetId, name: PIN.assetName, state: 'uploaded', size: PIN.bytes, digest: 'sha256:' + PIN.sha256, browser_download_url: PIN.canonicalUrl, url: PIN.apiUrl }] });
+function githubFetch({ releaseValue = githubRelease(), releaseStatus = 200, assetStatus = 302, redirect = 'https://release-assets.githubusercontent.com/fixture?signature=synthetic', finalStatus = 200, finalBytes = archive, failAt } = {}) {
+  const calls = [];
+  const fetchImplementation = async (url, options) => {
+    calls.push({ url: String(url), options });
+    if (calls.length === failAt) throw Error('legacy-fixture-token https://release-assets.githubusercontent.com/?signature=synthetic');
+    if (calls.length === 1) return new Response(typeof releaseValue === 'string' ? releaseValue : JSON.stringify(releaseValue), { status: releaseStatus });
+    if (calls.length === 2) return assetStatus === 302 ? new Response(null, { status: 302, headers: { Location: redirect } }) : new Response(finalBytes, { status: assetStatus });
+    assert.equal(calls.length, 3);
+    return new Response(finalBytes, { status: finalStatus });
+  };
+  return { calls, fetchImplementation };
+}
+test('GitHub public archive accepts official 200 and 302 binary responses without receiving any legacy credential', async () => {
+  for (const assetStatus of [200, 302]) {
+    const mock = githubFetch({ assetStatus });
+    const result = await downloadPinnedArchive({ state, releaseReadToken: 'legacy-fixture-token', ...mock });
+    assert.deepEqual(result.bytes, archive); assert.equal(result.proof.sha256, PIN.sha256); assert.equal(result.proof.sri, PIN.sri);
+    assert.equal(result.proof.authenticatedApi, false); assert.equal(result.proof.platform, 'github');
+    assert.equal(result.proof.releaseId, String(PIN.releaseId)); assert.equal(result.proof.assetId, String(PIN.assetId));
+    assert.equal(mock.calls.length, assetStatus === 200 ? 2 : 3);
+    assert.deepEqual(mock.calls.slice(0, 2).map(call => call.url), [PIN.releaseUrl, PIN.apiUrl]);
+    for (const call of mock.calls) { assert.equal(call.options.headers.Authorization, undefined); assert.equal(call.options.headers.Cookie, undefined); assert.equal(call.options.credentials, 'omit'); }
+    assert.equal(mock.calls[0].options.redirect, 'error'); assert.equal(mock.calls[1].options.redirect, 'manual');
+    if (assetStatus === 302) assert.equal(mock.calls[2].options.redirect, 'error');
+    assert.doesNotMatch(JSON.stringify(result.proof), /legacy-fixture-token|signature=/);
+  }
+});
+test('GitHub public archive requires no token and binds identical original bytes', async () => {
+  const mock = githubFetch(); const result = await downloadPinnedArchive({ state, ...mock });
+  assert.equal(result.proof.bytes, PIN.bytes); assert.equal(result.proof.entries, 81);
+});
+for (const [label, mutate] of [
+  ['missing platform', x => { delete x.artifact.platform; }],
+  ['wrong platform', x => { x.artifact.platform = 'cnb'; }],
+  ['missing artifact type', x => { delete x.artifact.type; }],
+  ['wrong owner', x => { x.artifact.url = x.artifact.url.replace('geniusdapeng-collab', 'other-owner'); }],
+  ['wrong tag', x => { x.artifact.url = x.artifact.url.replace('/ui-v0.1.19/', '/ui-v0.1.20/'); }],
+  ['URL suffix', x => { x.artifact.url += '?download=1'; }],
+  ['URL credentials', x => { x.artifact.url = x.artifact.url.replace('https://', 'https://fixture@'); }],
+  ['platform URL mismatch', x => { x.artifact.url = LEGACY_PIN.canonicalUrl; }],
+]) test('GitHub state rejects ' + label + ' before network', async () => {
+  const value = structuredClone(state); mutate(value); const mock = githubFetch();
+  await assert.rejects(downloadPinnedArchive({ state: value, ...mock }), errorCode('UI_STATE_ARTIFACT')); assert.equal(mock.calls.length, 0);
+});
+for (const [label, mutate, code] of [
+  ['release ID', x => { x.id++; }, 'UI_RELEASE_IDENTITY'],
+  ['tag', x => { x.tag_name = 'ui-v0.1.20'; }, 'UI_RELEASE_IDENTITY'],
+  ['draft', x => { x.draft = true; }, 'UI_RELEASE_IDENTITY'],
+  ['prerelease', x => { x.prerelease = true; }, 'UI_RELEASE_IDENTITY'],
+  ['missing assets', x => { delete x.assets; }, 'UI_RELEASE_ASSETS'],
+  ['missing asset', x => { x.assets = []; }, 'UI_RELEASE_ASSET_CARDINALITY'],
+  ['duplicate asset', x => { x.assets.push({ ...x.assets[0] }); }, 'UI_RELEASE_ASSET_CARDINALITY'],
+  ['asset ID', x => { x.assets[0].id++; }, 'UI_RELEASE_ASSET_HASH'],
+  ['asset state', x => { x.assets[0].state = 'new'; }, 'UI_RELEASE_ASSET_HASH'],
+  ['asset size', x => { x.assets[0].size++; }, 'UI_RELEASE_ASSET_HASH'],
+  ['asset digest', x => { x.assets[0].digest = 'sha256:' + '0'.repeat(64); }, 'UI_RELEASE_ASSET_HASH'],
+  ['missing digest', x => { x.assets[0].digest = null; }, 'UI_RELEASE_ASSET_HASH'],
+  ['browser URL', x => { x.assets[0].browser_download_url = LEGACY_PIN.canonicalUrl; }, 'UI_RELEASE_ASSET_URL'],
+  ['API URL', x => { x.assets[0].url = x.assets[0].url.replace('geniusdapeng-collab', 'other-owner'); }, 'UI_RELEASE_ASSET_URL'],
+]) test('GitHub release rejects ' + label + ' before binary request', async () => {
+  const value = githubRelease(); mutate(value); const mock = githubFetch({ releaseValue: value });
+  await assert.rejects(downloadPinnedArchive({ state, ...mock }), errorCode(code)); assert.equal(mock.calls.length, 1);
+});
+for (const url of ['http://release-assets.githubusercontent.com/pkg', 'https://release-assets.githubusercontent.com.evil.example/pkg', 'https://asset.cnb.cool/pkg', 'https://release-assets.githubusercontent.com:444/pkg', 'https://fixture@release-assets.githubusercontent.com/pkg']) test('GitHub redirect rejects uncontrolled origin ' + url, async () => {
+  const mock = githubFetch({ redirect: url });
+  await assert.rejects(downloadPinnedArchive({ state, ...mock }), errorCode('UI_ASSET_REDIRECT_ORIGIN')); assert.equal(mock.calls.length, 2);
+});
+test('GitHub HTTP, bounded bodies, hash corruption and repeated redirects remain hard failures', async () => {
+  const corrupt = Buffer.from(archive); corrupt[100] ^= 1;
+  for (const [options, code] of [
+    [{ releaseStatus: 401 }, 'UI_RELEASE_HTTP_401'], [{ releaseValue: '{bad' }, 'UI_RELEASE_JSON'],
+    [{ releaseValue: 'null' }, 'UI_RELEASE_IDENTITY'],
+    [{ releaseValue: ' '.repeat(512 * 1024 + 1) }, 'UI_RELEASE_BODY_SIZE'],
+    [{ assetStatus: 404 }, 'UI_ASSET_DOWNLOAD_HTTP_404'], [{ finalStatus: 302 }, 'UI_ASSET_DOWNLOAD_HTTP_302'],
+    [{ finalBytes: archive.subarray(1) }, 'UI_ARCHIVE_SIZE'], [{ finalBytes: Buffer.concat([archive, Buffer.alloc(1)]) }, 'UI_ASSET_DOWNLOAD_SIZE'],
+    [{ finalBytes: corrupt }, 'UI_ARCHIVE_SHA256'],
+  ]) await assert.rejects(downloadPinnedArchive({ state, ...githubFetch(options) }), errorCode(code));
+});
+test('GitHub safe network failures cannot disclose supplied legacy tokens or signed URLs', async () => {
+  for (const [failAt, code] of [[1, 'UI_RELEASE_REQUEST'], [2, 'UI_ASSET_REQUEST'], [3, 'UI_ASSET_DOWNLOAD']]) {
+    await assert.rejects(downloadPinnedArchive({ state, releaseReadToken: 'legacy-fixture-token', ...githubFetch({ failAt }) }), error => errorCode(code)(error) && !/legacy-fixture-token|signature=/.test(error.message));
+  }
 });
