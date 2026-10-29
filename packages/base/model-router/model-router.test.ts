@@ -155,6 +155,7 @@ d("PG 集成（GatewayEventSink 计量落库）", async () => {
     await route(task(), providers({ failFirst: 99 }), sink);
     const page = await searchEvents(app, scope, { action: "model.degraded" }, { limit: 10 });
     expect(page.events.length).toBeGreaterThan(0);
-    expect(page.events[0]!.decision.after).toMatchObject({ from: "deepseek-flash", to: null });
+    expect(page.events[0]!.decision.before).toMatchObject({ model: "deepseek-flash" });
+    expect(page.events[0]!.decision.after).toMatchObject({ model: null, task: "price.adjust" });
   });
 });
