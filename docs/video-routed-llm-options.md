@@ -140,3 +140,11 @@ Repository validation covers:
 
 Local HTTP tests prove request bytes and failure behavior. A successful HTTP
 call alone is not a production video-quality receipt.
+
+## Isolated repository receipt
+
+This repository independently verified the canonical routing contract, media
+adapter paths, workbench capabilities, changed-file secret scan and real
+DeepSeek disabled/enabled-high JSON calls. It remains `none-in-none-out`; none
+of its experimental behavior is distributed to or asserted as evidence for the
+base fleet.
