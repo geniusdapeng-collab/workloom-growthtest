@@ -11,7 +11,7 @@ import { submitGenJob } from "./gen/submit.js";
 
 vi.mock("@workloom/base/workdata", () => ({ gatewayAppendOnClient: vi.fn() }));
 const env = { WORKLOOM_RENDER_SIGNING_SECRET: "unit-test-render-signing-key-with-32-bytes", VOLCENGINE_ARK_API_KEY: "unit-test-provider",
-  LLM_BASE_URL: "https://judge.example.test", LLM_API_KEY: "unit-test-judge", LLM_MODEL: "test-judge" };
+  LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "unit-deepseek-flash", LLM_MODEL: "deepseek-flash" };
 const scope = { tenantId: "tenant-a", workspaceId: "ws-a" };
 const gates = ["G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"];
 type Row = Record<string, any>;
@@ -126,7 +126,7 @@ beforeEach(async () => {
   for (const gate of gates) {
     const file = path.join(dir, "workspaces", scope.workspaceId, "gates", "P1", "attempt-1", `${gate}.md`);
     await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, "真实的完整门内容。".repeat(30));
-    proofs.push({ gate, status: "passed", approved: true, via: "llm", degraded: false, model: "test-judge",
+    proofs.push({ gate, status: "passed", approved: true, via: "llm", degraded: false, model: "deepseek-flash",
       evidence: [{ path: file, sha256: renderSha256(await readFile(file)), scope: "complete-text" }] });
   }
   proofs[3] = { gate: "G5_PORTRAIT", status: "not_applicable", approved: true, basis: "no-characters-or-products" };
@@ -137,7 +137,17 @@ beforeEach(async () => {
       projectId: "P1", runId: "RUN1", attempt: 1, pipelineKind: "narrative", gates: proofs } };
   await persist(); calls = []; judge = { approved: true, score: 95, issues: [], suggestions: [], reason: "完整内容符合镜头计划" };
   vi.stubGlobal("fetch", vi.fn(async (url, init) => { calls.push({ url: String(url), body: JSON.parse(String(init.body)) });
-    return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(judge) } }] })); }));
+    return new Response(JSON.stringify({
+      id: "production-authority-judge",
+      model: "deepseek-flash",
+      choices: [{ finish_reason: "stop", message: { content: JSON.stringify(judge) } }],
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 30,
+        total_tokens: 130,
+        completion_tokens_details: { reasoning_tokens: 10 },
+      },
+    })); }));
 });
 afterEach(async () => { vi.unstubAllGlobals(); vi.restoreAllMocks(); await rm(dir, { recursive: true, force: true }); });
 
@@ -146,7 +156,7 @@ describe("正式资格的正常路径和来源边界", () => {
     const result = await issue();
     expect(result).toMatchObject({ scriptVersion: 1, params: { durationSec: 5, aspectRatio: "16:9" } });
     expect(pool.qualifications).toHaveLength(1); expect(pool.qualifications[0]?.status).toBe("passed");
-    expect(calls).toHaveLength(1); expect(calls[0]?.url).toBe("https://judge.example.test/chat/completions");
+    expect(calls).toHaveLength(1); expect(calls[0]?.url).toBe("https://api.deepseek.com/chat/completions");
     const content = JSON.stringify(calls[0]?.body.messages);
     expect(content).toContain("bodyJson"); expect(content).toContain("contents/generations/tasks"); expect(content).toContain(prompts.shots[0].prompt);
     const fullEvidence = calls[0]!.body.messages[0].content.find((item: Row) => item.text?.startsWith("以下是产物正文（完整）：")).text;
@@ -299,7 +309,17 @@ describe("资格失效、最新裁决与补账边界", () => {
   });
   it("审核期间产物变化拒绝签发，不能用审核开始时旧hash发证", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => { await writeFile(path.join(root, output.promptsRef), "changed-during-review");
-      return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(judge) } }] })); }));
+      return new Response(JSON.stringify({
+        id: "production-authority-judge",
+        model: "deepseek-flash",
+        choices: [{ finish_reason: "stop", message: { content: JSON.stringify(judge) } }],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 30,
+          total_tokens: 130,
+          completion_tokens_details: { reasoning_tokens: 10 },
+        },
+      })); }));
     await expect(issue()).rejects.toThrow("SOURCE_HASH_MISMATCH"); expect(pool.qualifications).toHaveLength(0);
   });
   it("已accepted任务过期后可原内容补账，不再要求新源；改内容仍拒绝", async () => {

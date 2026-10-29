@@ -224,25 +224,11 @@ class LLMGateway {
    */
   _fallback(prompt, options, startTime) {
     this.stats.fallbackCalls++;
-    console.log('[LLMGateway] 🛡️ 触发兜底');
-
-    // 如果外部注入了兜底生成器，使用它
-    if (this.fallbackGenerator && typeof this.fallbackGenerator === 'function') {
-      const fallbackResult = this.fallbackGenerator(prompt, options);
-      return {
-        success: true,
-        data: fallbackResult,
-        source: 'fallback-custom',
-        latency: Date.now() - startTime,
-        isFallback: true
-      };
-    }
-
-    // 默认兜底：返回空对象，不返回任何具体业务内容
+    console.error('[LLMGateway] text model failed; deterministic semantic fallback is forbidden');
     return {
-      success: true,
-      data: {},
-      source: 'fallback-empty',
+      success: false,
+      error: 'MODEL_UNAVAILABLE: same-model dispatch required; rule/semantic fallback disabled',
+      source: 'unavailable',
       latency: Date.now() - startTime,
       isFallback: true
     };

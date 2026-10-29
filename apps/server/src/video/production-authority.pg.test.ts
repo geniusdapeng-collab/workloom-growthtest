@@ -36,11 +36,30 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
   beforeEach(async () => {
     projectId = `P-${suffix}-${++seq}`; sourceId = `SR-${suffix}-${seq}`;
     env = { HR_WORK_DIR: dir, WORKLOOM_RENDER_SIGNING_SECRET: "pg-test-render-signing-secret-more-than-32-bytes",
-      VOLCENGINE_ARK_API_KEY: "pg-test-provider", LLM_BASE_URL: "https://judge.example.test", LLM_API_KEY: "pg-test-judge", LLM_MODEL: "test-judge" };
+      VOLCENGINE_ARK_API_KEY: "pg-test-provider", LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "pg-test-deepseek-flash", LLM_MODEL: "deepseek-flash" };
     approved = true; providerCalls = 0; calls = [];
     vi.stubGlobal("fetch", vi.fn(async (url, init) => {
       calls.push({ url: String(url), body: String(init.body) });
-      if (String(url).endsWith("/chat/completions")) return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ approved, score: approved ? 95 : 30, issues: approved ? [] : ["不合格"], suggestions: [], reason: "测试裁决" }) } }] }));
+      if (String(url).endsWith("/chat/completions")) return new Response(JSON.stringify({
+        id: `judge-${suffix}-${seq}`,
+        model: "deepseek-flash",
+        choices: [{
+          finish_reason: "stop",
+          message: { content: JSON.stringify({
+            approved,
+            score: approved ? 95 : 30,
+            issues: approved ? [] : ["不合格"],
+            suggestions: [],
+            reason: "测试裁决",
+          }) },
+        }],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 30,
+          total_tokens: 130,
+          completion_tokens_details: { reasoning_tokens: 10 },
+        },
+      }));
       providerCalls++;
       return new Response(JSON.stringify({ id: `provider-${suffix}-${seq}` }));
     }));
@@ -52,7 +71,7 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
       const file = path.join(dir, "workspaces", scope.workspaceId, "gates", projectId, "attempt-1", `${gate}.md`);
       await mkdir(path.dirname(file), { recursive: true }); await writeFile(file, "完整预生产门内容");
       proofs.push(gate === "G5_PORTRAIT" ? { gate, status: "not_applicable", approved: true, basis: "no-characters-or-products" }
-        : { gate, status: "passed", approved: true, via: "llm", degraded: false, model: "test-judge", evidence: [{ path: file, sha256: renderSha256("完整预生产门内容"), scope: "complete-text" }] });
+        : { gate, status: "passed", approved: true, via: "llm", degraded: false, model: "deepseek-flash", evidence: [{ path: file, sha256: renderSha256("完整预生产门内容"), scope: "complete-text" }] });
     }
     const prompts = JSON.stringify({ stageId: "preproduction", attempt: 1, pipelineKind: "narrative", shots: [
       { shotId: "S1", durationSec: 5, degraded: false, prompt: "固定机位拍摄窗边玻璃杯。", fields: { durationSec: 5 } },
@@ -115,7 +134,7 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
     await writeFile(g1File, prepared.g1Content);
     const output = JSON.parse(await readFile(outputFile, "utf8"));
     output.marketingFactsRef = saved.ref; output.marketingFactsSha256 = saved.sha256;
-    output.productionEvidence.pipelineKind = "marketing"; output.productionEvidence.gates.unshift({ gate: "G1_DOSSIER", status: "passed", approved: true, via: "llm", degraded: false, model: "test-judge", evidence: [{ path: g1File, sha256: renderSha256(prepared.g1Content), scope: "complete-text" }] });
+    output.productionEvidence.pipelineKind = "marketing"; output.productionEvidence.gates.unshift({ gate: "G1_DOSSIER", status: "passed", approved: true, via: "llm", degraded: false, model: "deepseek-flash", evidence: [{ path: g1File, sha256: renderSha256(prepared.g1Content), scope: "complete-text" }] });
     const promptBytes = JSON.stringify(prompts); await writeFile(promptsFile, promptBytes); output.promptsSha256 = renderSha256(promptBytes);
     const bytes = JSON.stringify(output); await writeFile(outputFile, bytes);
     await owner.query("UPDATE video_projects SET kind='marketing' WHERE id=$1", [projectId]);

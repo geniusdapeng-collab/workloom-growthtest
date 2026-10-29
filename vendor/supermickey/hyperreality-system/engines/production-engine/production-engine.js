@@ -33,8 +33,8 @@ const DEFAULT_AGENT_CONFIG = {
   enableLLMAgents: true,
   llmTimeout: 300000,        // 【v2.1.9-fix】180秒→300秒，匹配PromptFusion实际耗时
   llmMaxRetries: 2,          // 【v2.1.8-fix】恢复2次重试（时间预算增加后）
-  llmModel: process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6',
-  fastModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6',
+  llmModel: process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
+  fastModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
   totalDeadlineMs: parseInt(process.env.STORMAXE_TOTAL_DEADLINE_MS || '3600000'), // 【v2.1.8-fix】从环境变量读取，默认 60 分钟
   memThresholdMB: 1800,
   promptFusionConcurrency: 1, // 【v2.1.8-fix】串行模式（预算增加后更稳定）
@@ -380,7 +380,7 @@ class ProductionEngine {
       llmMaxRetries: this.agentConfig.llmMaxRetries,
       enabled: this.agentConfig.enableLLMAgents
     };
-    const deepModel = this.agentConfig.llmModel || 'kimi-k2p6';
+    const deepModel = this.agentConfig.llmModel || 'deepseek-flash';
     const fastModel = this.agentConfig.fastModel || deepModel;
 
     this.agents = {

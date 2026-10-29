@@ -24,9 +24,19 @@ const baseContext = {
 };
 
 const jsonResponse = (payload: unknown, ok = true, status = 200) =>
-  new Response(JSON.stringify(ok ? { choices: [{ message: { content: JSON.stringify(payload) } }] } : payload), { status });
+  new Response(JSON.stringify(ok ? {
+    id: "plausibility-response",
+    model: "deepseek-flash",
+    choices: [{ finish_reason: "stop", message: { content: JSON.stringify(payload) } }],
+    usage: {
+      prompt_tokens: 100,
+      completion_tokens: 30,
+      total_tokens: 130,
+      completion_tokens_details: { reasoning_tokens: 10 },
+    },
+  } : payload), { status });
 
-const llmEnv = { LLM_PROVIDER: "deepseek", LLM_API_KEY: "test-key", LLM_BASE_URL: "https://api.example.com/v1", LLM_MODEL: "test-model" };
+const llmEnv = { LLM_PROVIDER: "deepseek", LLM_API_KEY: "test-key", LLM_BASE_URL: "https://api.deepseek.com", LLM_MODEL: "deepseek-flash" };
 
 /**
  * 通用性验收（T-2026-1011-0001）：
@@ -43,17 +53,18 @@ describe("实体与物理常识审核 agent", () => {
     expect(rubric).not.toMatch(/头盔|安全带|饺子|相机/);
   });
 
-  it("送审上下文携带事实（商品档案尺寸/角度、角色、逐镜卡片与提示词），且超预算即拒绝", () => {
+  it("送审上下文完整携带事实，不做字符截断", () => {
     const context = buildPlausibilityContext(baseContext);
     const serialized = JSON.stringify(context);
     expect(serialized).toContain("lengthMm");
     expect(serialized).toContain("three-quarter");
     expect(serialized).toContain("Track only.");
     expect(serialized).toContain("身高约 166cm");
-    expect(() => buildPlausibilityContext({
+    const large = buildPlausibilityContext({
       ...baseContext,
       shots: Array.from({ length: 40 }, (_, index) => ({ shotId: `S-${index}`, scene: "长".repeat(2000) })),
-    })).toThrow(/PLAUSIBILITY_CONTEXT_TOO_LARGE/);
+    });
+    expect(JSON.stringify(large)).toContain("长".repeat(2_000));
   });
 
   it("解析模型输出：blocker/warning 与提示词补丁；结构非法即抛错（上层 fail-closed）", () => {
@@ -81,7 +92,13 @@ describe("实体与物理常识审核 agent", () => {
     });
     expect(blocked.verdict).toBe("block");
     expect(blocked.findings.filter((finding) => finding.severity === "blocker")).toHaveLength(1);
-    expect(blocked.model).toBe("test-model");
+    expect(blocked.model).toBe("deepseek-flash");
+    expect(blocked.receipt).toMatchObject({
+      inputTokens: 100,
+      outputTokens: 30,
+      reasoningTokens: 10,
+      finishReason: "stop",
+    });
 
     const passed = await reviewPlausibility(baseContext, {
       env: llmEnv,
@@ -95,7 +112,7 @@ describe("实体与物理常识审核 agent", () => {
     expect(passed.findings).toHaveLength(1);
   });
 
-  it("Flash text review pins canonical JSON and non-thinking mode", async () => {
+  it("Flash 文本评审锁定官方模型、JSON 输出与 high thinking", async () => {
     let body: Record<string, unknown> | null = null;
     const result = await reviewPlausibility(baseContext, {
       env: {
@@ -106,15 +123,15 @@ describe("实体与物理常识审核 agent", () => {
       },
       fetchImpl: (async (_input: string | URL | Request, init?: RequestInit) => {
         body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
-        return jsonResponse({ verdict: "pass", findings: [], promptPatches: [], reason: "ok" });
+        return jsonResponse({ verdict: "pass", findings: [], promptPatches: [], reason: "通过" });
       }) as typeof fetch,
     });
     expect(result.verdict).toBe("pass");
     expect(body).toMatchObject({
       model: "deepseek-flash",
       response_format: { type: "json_object" },
-      max_tokens: 16_384,
-      thinking: { type: "disabled" },
+      thinking: { type: "enabled" },
+      reasoning_effort: "high",
     });
   });
 

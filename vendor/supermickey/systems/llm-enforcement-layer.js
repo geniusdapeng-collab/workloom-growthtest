@@ -124,25 +124,15 @@ class LLMEnforcementLayer {
       throw error;
     }
 
-    // 非关键链路：降级到规则
-    this.log(`[LLM-ENFORCE] ${stageId} ⚠️ 降级到规则执行`);
-    this.stats.fallbackCalls++;
-    
-    try {
-      const result = await fallbackFn();
-      return {
-        result,
-        driver: 'rule',
-        attempts: maxRetries,
-        success: true,
-        error: null
-      };
-    } catch (fallbackErr) {
-      this.stats.failures++;
-      throw new Error(
-        `[LLM-ENFORCE] ${stageId} LLM失败且规则降级也失败: ${fallbackErr.message}`
-      );
-    }
+    // WorkLoom forbids semantic rule fallbacks. Optional stages differ only
+    // in criticality, never in whether a fabricated model result is allowed.
+    this.stats.failures++;
+    void fallbackFn;
+    const error = new Error(`[LLM-ENFORCE] ${stageId} LLM失败，禁止规则/模板语义兜底`);
+    error.stageId = stageId;
+    error.attempts = maxRetries;
+    error.driver = 'none';
+    throw error;
   }
 
   /**
@@ -169,7 +159,7 @@ class LLMEnforcementLayer {
   _createDefaultLLMEngine() {
     const { LLMEngine } = require('./llm-reasoning-engine');
     return new LLMEngine({
-      model: 'kimi-k2p6',
+      model: 'deepseek-flash',
       mode: 'production',
       maxRetries: 1, // 外层已处理重试
       maxTokens: 4096,

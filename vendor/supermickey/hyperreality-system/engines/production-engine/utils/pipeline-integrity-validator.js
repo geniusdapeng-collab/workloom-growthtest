@@ -23,7 +23,7 @@ class PipelineIntegrityValidator {
     this.errors = [];
     this.warnings = [];
     this.checks = [];
-    this.llm = new LLMEngine({ model: 'kimi-k2p6' });
+    this.llm = new LLMEngine({ model: 'deepseek-flash' });
     this.mode = options.mode || 'nirath'; // v6.37-fix: 支持 generic 模式跳过片头检查
   }
 
@@ -66,8 +66,8 @@ Prompt: ${item.prompt?.slice(0, 300) || '空'}
       console.error('[SemanticCheck] LLM调用失败:', e.message);
     }
 
-    // 失败时全部返回 true（不阻塞，避免误报）
-    return items.reduce((acc, item) => { acc[item.id] = true; return acc; }, {});
+    // Semantic checks are review gates; a failed model call cannot become a pass.
+    return items.reduce((acc, item) => { acc[item.id] = false; return acc; }, {});
   }
 
   // ========== 主入口：验证完整链路 ==========

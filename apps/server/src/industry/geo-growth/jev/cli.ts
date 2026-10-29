@@ -7,13 +7,10 @@
  *   pnpm tsx apps/server/src/industry/geo-growth/jev/cli.ts --scene comment-classify --exam          # 内置考卷
  *   pnpm tsx apps/server/src/industry/geo-growth/jev/cli.ts --scene lead-qualify --mock              # 离线全链路
  *
- * 通道 2（默认，TypeSafe 官方直连）：
- *   TYPESAFE_API_KEY=<key> pnpm tsx .../cli.ts --scene comment-classify --dataset <file.jsonl>
+ * 统一通道：WorkLoom text.primary -> deepseek-flash。
+ *   DEEPSEEK_API_KEY=<key> pnpm tsx .../cli.ts --scene comment-classify --dataset <file.jsonl>
  *
- * 通道 1（备选，Vercel AI Gateway）：
- *   JEV_PROVIDER=vercel-gateway AI_GATEWAY_API_KEY=<key> pnpm tsx .../cli.ts --scene comment-classify --dataset <file.jsonl>
- *
- * 通道判定：--provider > JEV_PROVIDER > 按键推断（TYPESAFE_API_KEY / AI_GATEWAY_API_KEY）> 默认直连。
+ * 旧 JEV_PROVIDER/TypeSafe/Vercel 通道不再允许；--provider 只接受 deepseek。
  * 真 key 首次接入必须带 --capture-raw --limit 3，先钉死解析口径再全量跑。
  *
  * 纪律：只读评估；只写 --out 目录；数据集必须已脱敏（程序不落库、不外发消息）。
@@ -22,9 +19,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  GATEWAY_BASE_URL,
   JevClient,
-  TYPESAFE_BASE_URL,
   apiKeyFromEnv,
   defaultBaseUrl,
   defaultModel,
@@ -68,9 +63,9 @@ export function defaultArgs(env: NodeJS.ProcessEnv = process.env): CliArgs {
     mock: false,
     captureRaw: false,
     exam: false,
-    model: env["JEV_MODEL"] ?? defaultModel(provider),
-    baseUrl: env["JEV_BASE_URL"] ?? defaultBaseUrl(provider),
-    timeoutMs: env["JEV_TIMEOUT_MS"] ? Number(env["JEV_TIMEOUT_MS"]) : 20_000,
+    model: env["LLM_MODEL"] ?? env["DEEPSEEK_MODEL"] ?? defaultModel(provider),
+    baseUrl: env["LLM_BASE_URL"] ?? env["DEEPSEEK_BASE_URL"] ?? defaultBaseUrl(provider),
+    timeoutMs: env["JEV_TIMEOUT_MS"] ? Number(env["JEV_TIMEOUT_MS"]) : 600_000,
     help: false,
   };
 }
@@ -94,7 +89,7 @@ export function parseArgs(argv: readonly string[], env: NodeJS.ProcessEnv = proc
         args.provider = resolveProvider({ JEV_PROVIDER: value });
         // 通道变了 → 未显式给出的 baseUrl/model 跟随通道默认值
         if (!argv.includes("--base-url")) args.baseUrl = defaultBaseUrl(args.provider);
-        if (!argv.includes("--model")) args.model = env["JEV_MODEL"] ?? defaultModel(args.provider);
+        if (!argv.includes("--model")) args.model = env["LLM_MODEL"] ?? env["DEEPSEEK_MODEL"] ?? defaultModel(args.provider);
         break;
       }
       case "--dataset":
@@ -185,7 +180,7 @@ function helpText(): string {
     "Jev 影子评估 CLI（growth）",
     "",
     "  --scene <key>          comment-classify | lead-qualify | fact-precheck（默认 comment-classify）",
-    "  --provider <kind>      typesafe（默认，官方直连 /v1/systemone）| vercel-gateway（evaluation v4）",
+    "  --provider <kind>      只接受 deepseek（text.primary）",
     "  --dataset <path>       JSONL 数据集（每行 {id, text, expected?, context?, officialClaims?}）",
     "  --exam                 使用随包的考卷（apps/server/src/industry/geo-growth/jev/exam/<scene>.jsonl）",
     "  --out <dir>            报告输出目录（默认 artifacts/jev-shadow/<时间戳>）",
@@ -194,11 +189,11 @@ function helpText(): string {
     "  --max-cost-usd <n>     成本熔断阈值（默认 1 美元）",
     "  --mock                 使用本地模拟网关（离线；无 key 时的默认演练方式）",
     "  --capture-raw          保存原始响应（首次接真 key 时用来钉死解析口径）",
-    `  --model <id>           默认 ${defaultModel("typesafe")}（直连）/ ${defaultModel("vercel-gateway")}（网关），或 JEV_MODEL`,
-    `  --base-url <url>       默认 ${TYPESAFE_BASE_URL}（直连）/ ${GATEWAY_BASE_URL}（网关），或 JEV_BASE_URL`,
+    `  --model <id>           默认 ${defaultModel("deepseek")}；其他模型 fail-closed`,
+    `  --base-url <url>       默认 ${defaultBaseUrl("deepseek")}，或 LLM_BASE_URL/DEEPSEEK_BASE_URL`,
     "  --timeout-ms <n>       单次请求超时（默认 20000）",
     "",
-    "环境变量：TYPESAFE_API_KEY（通道 2 必需）｜AI_GATEWAY_API_KEY（通道 1 必需）｜JEV_PROVIDER｜--mock 不需要 key",
+    "环境变量：DEEPSEEK_API_KEY 或 LLM_API_KEY｜--mock 不需要 key",
   ].join("\n");
 }
 
@@ -247,15 +242,12 @@ export async function main(argv: readonly string[] = process.argv.slice(2)): Pro
   const apiKey = apiKeyFromEnv(process.env, args.provider);
   const useMock = args.mock || !apiKey;
   if (!args.mock && !apiKey) {
-    const keyName = args.provider === "typesafe" ? "TYPESAFE_API_KEY" : "AI_GATEWAY_API_KEY";
+    const keyName = "DEEPSEEK_API_KEY / LLM_API_KEY";
     console.error(
       [
         `未检测到 ${keyName}（当前通道：${args.provider}）。`,
         "  · 离线演练：加 --mock",
-        "  · 通道 2（官方直连，默认）：在 console.typesafe.ai/keys 创建 key 后：",
-        "      TYPESAFE_API_KEY=<key> pnpm tsx apps/server/src/industry/geo-growth/jev/cli.ts --scene <scene> --dataset <file>",
-        "  · 通道 1（Vercel AI Gateway，--provider vercel-gateway）：",
-        "      AI_GATEWAY_API_KEY=<key> pnpm tsx apps/server/src/industry/geo-growth/jev/cli.ts --scene <scene> --dataset <file>",
+        "      DEEPSEEK_API_KEY=<key> pnpm tsx apps/server/src/industry/geo-growth/jev/cli.ts --scene <scene> --dataset <file>",
         "    key 只从环境注入，不要写进任何文件。",
       ].join("\n"),
     );

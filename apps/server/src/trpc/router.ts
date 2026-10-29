@@ -34,8 +34,8 @@ import {
 } from "@workloom/base/review-console";
 import { routeIntent, runAsk, runQuest } from "@workloom/runtime";
 import { LlmIntentClassifier, type IntentClassifier } from "@workloom/runtime";
-import { providerFromEnv, OpenAiCompatibleProvider } from "@workloom/base/model-router";
-import { routedLlmCall, resetLlmAssembly } from "../service/llm.js";
+import { canonicalDeepSeekModel, OpenAiCompatibleProvider } from "@workloom/base/model-router";
+import { llmCall as defaultLlmCall, routedLlmCall, resetLlmAssembly } from "../service/llm.js";
 import { loadDeploymentToolExecutor } from "../runtime/tool-executor.js";
 import {
   loadGoalArchive,
@@ -274,7 +274,6 @@ function persistLlmEnv(cfg: { provider: string; baseUrl: string; apiKey: string;
   set("LLM_API_KEY", cfg.apiKey);
   set("LLM_MODEL", cfg.model);
   writeFileSync(file, lines.filter((l, i) => l !== "" || i < lines.length - 1).join("\n"));
-  cachedLlmCall = undefined; // 复位装配缓存（见 llmCall()/intentClassifier()）
   cachedClassifier = undefined;
   industryCache.clear(); // A-04：行业缓存按工作区分桶后整体复位
   resetLlmAssembly(); // v3.0：模型池与行业策略缓存同步复位（写盘即全链生效免重启）
@@ -294,12 +293,16 @@ function llmAssembly(): { provider: string; model: string; baseUrl: string; real
 
 /** 真实试调探针（落地向导「测试连接」：真实 round-trip 通过才允许保存） */
 async function probeLlm(cfg: { baseUrl: string; apiKey?: string; model: string }): Promise<{ reply: string; latencyMs: number }> {
-  const provider = new OpenAiCompatibleProvider(cfg.model, { baseUrl: cfg.baseUrl, apiKey: cfg.apiKey || undefined });
+  const model = canonicalDeepSeekModel(cfg.model);
+  const provider = new OpenAiCompatibleProvider(model, {
+    baseUrl: cfg.baseUrl,
+    apiKey: cfg.apiKey || undefined,
+  });
   const t0 = Date.now();
-  const res = await Promise.race([
-    provider.chat([{ role: "user", content: "你是企业经营系统的数字员工。请用一句中文回答：你已在线，可以开始工作。" }]),
-    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("模型响应超时（25s）")), 25_000)),
-  ]);
+  const res = await provider.chat(
+    [{ role: "user", content: "你是企业经营系统的数字员工。请用一句中文回答：你已在线，可以开始工作。" }],
+    { scene: "generic", timeoutMs: 25_000, retries: 0 },
+  );
   if (!res.text.trim()) throw new Error("模型返回为空");
   return { reply: res.text.trim().slice(0, 200), latencyMs: Date.now() - t0 };
 }
@@ -437,6 +440,12 @@ const onboardingRouter = router({
     .mutation(async ({ ctx, input }) => {
       const scope = scopeOf(ctx.identity);
       if (input.provider !== "mock") {
+        if (input.provider !== "deepseek") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "文本模型只能配置 deepseek，并解析到 text.primary=deepseek-flash",
+          });
+        }
         if (!z.string().url().safeParse(input.baseUrl).success || !input.model) {
           throw new TRPCError({ code: "BAD_REQUEST", message: "真实模型装配需要合法的 baseUrl 与 model" });
         }
@@ -446,7 +455,11 @@ const onboardingRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: `模型实测未通过，未保存：${err instanceof Error ? err.message : err}` });
         }
       }
-      persistLlmEnv(input);
+      const configuredModel = input.provider === "mock" ? "" : canonicalDeepSeekModel(input.model);
+      persistLlmEnv({
+        ...input,
+        model: configuredModel,
+      });
       // D16（#1/A）：事件写入并入显式事务（.env 落盘不可回滚，故事件写在其成功后同一 COMMIT 提交）
       const llmClient = await getAppPool().connect();
       try {
@@ -462,7 +475,7 @@ const onboardingRouter = router({
           decision: {
             action: "onboarding.llm_configured",
             params: {
-              provider: input.provider, base_url: input.baseUrl, model: input.model,
+              provider: input.provider, base_url: input.baseUrl, model: configuredModel,
               key_mask: input.apiKey ? `***${input.apiKey.slice(-4)}` : "(免 key 网关)",
             },
             after: { real: input.provider !== "mock" },
@@ -3351,7 +3364,6 @@ const bundlesRouter = router({
  * 模型出站强制脱敏（L6.2，OpenAiCompatibleProvider 内建不可绕过）。
  * 落地向导契约：写入 LLM_PROVIDER/LLM_BASE_URL/LLM_API_KEY/LLM_MODEL 四 env 即全链真实化。
  */
-let cachedLlmCall: ((prompt: string) => Promise<string>) | null | undefined;
 /**
  * 统一 LLM 调用面（v3.0 收口）：带 scope 时经 routedLlmCall 走 routeSmart 全链路
  * （场景表 × 套餐映射 × 降级链 × 真实计量 × model.call 事件留痕）；
@@ -3365,22 +3377,7 @@ function llmCall(scene = "generic", scope?: { tenantId: string; workspaceId: str
     });
     if (routed) return routed;
   }
-  if (cachedLlmCall !== undefined) return cachedLlmCall ?? undefined;
-  try {
-    if ((process.env.LLM_PROVIDER ?? "mock") === "mock") {
-      cachedLlmCall = null;
-      return undefined;
-    }
-    const provider = providerFromEnv(process.env.LLM_MODEL ?? "deepseek-chat");
-    cachedLlmCall = async (prompt: string) => {
-      const res = await provider.chat([{ role: "user", content: prompt }]);
-      return res.text;
-    };
-    return cachedLlmCall;
-  } catch {
-    cachedLlmCall = null; // 配置缺失 → 兜底（via=rule 留痕）
-    return undefined;
-  }
+  return defaultLlmCall(scene);
 }
 
 /** 工作区行业（bundle 第⑦槽 model-policy.yml 按行业加载；进程级缓存） */

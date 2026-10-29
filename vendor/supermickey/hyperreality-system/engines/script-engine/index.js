@@ -15,7 +15,7 @@ class ScriptEngine {
     this.intentParser = new IntentParser(options.intentParser);
     this.scriptGenerator = new ScriptGenerator({
       ...options.scriptGenerator,
-      model: options.scriptGenerator?.model || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6'
+      model: options.scriptGenerator?.model || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash'
     });
     this.scriptValidator = new ScriptValidator(options.scriptValidator);
     this.adapter = new ScriptBlueprintAdapter(options.adapter);

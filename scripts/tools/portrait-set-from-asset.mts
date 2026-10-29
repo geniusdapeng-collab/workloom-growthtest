@@ -35,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { assessLikenessBatch } from "../../packages/video-studio/src/likeness-policy.js";
 import { generationRequestHash, isDefiniteGenerationRejection, readGenerationSubmissionState,
   submitGenerationOnce } from "../../packages/video-studio/src/generation-submission.mjs";
+import { OpenAiCompatibleProvider } from "../../packages/base/model-router/providers.js";
 
 function arg(name: string, fallback = ""): string {
   const index = process.argv.indexOf(name);
@@ -254,13 +255,11 @@ if (verifyAnchorDataUrl && !judgeKey) {
 async function likenessCheck(png: Buffer, angle: string): Promise<{ ok: boolean; same: boolean; score: number | null; reason: string }> {
   if (!verifyAnchorDataUrl) return { ok: true, same: true, score: null, reason: "未启用自动校验（--verify-against 未提供）" };
   const imageDataUrl = `data:image/png;base64,${png.toString("base64")}`;
-  const response = await fetch(`${judgeBase}/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${judgeKey}` },
-    body: JSON.stringify({
-      model: judgeModel, temperature: 0,
-      response_format: { type: "json_object" },
-      messages: [{
+  const provider = new OpenAiCompatibleProvider(judgeModel, {
+    baseUrl: judgeBase,
+    apiKey: judgeKey,
+  });
+  const result = await provider.chat([{
         role: "user",
         content: [
           { type: "text", text: "图1 = 已通过验收的成片帧（认证真人的事实锚）；图2 = 新生成的定妆照。"
@@ -269,20 +268,19 @@ async function likenessCheck(png: Buffer, angle: string): Promise<{ ok: boolean;
           { type: "image_url", image_url: { url: verifyAnchorDataUrl } },
           { type: "image_url", image_url: { url: imageDataUrl } },
         ],
-      }],
-    }),
-    signal: AbortSignal.timeout(180_000),
+  }], {
+    scene: "video.quality.plausibility-review",
+    timeoutMs: 600_000,
+    temperature: 0,
+    retries: 0,
   });
-  const text = await response.text();
-  if (!response.ok) return { ok: false, same: false, score: null, reason: `校验模型调用失败 HTTP ${response.status}：${text.slice(0, 160)}` };
   try {
-    const raw = (JSON.parse(text) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
-    const parsed = JSON.parse(raw.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim()) as { same?: boolean; score?: number; reason?: string };
+    const parsed = JSON.parse(result.text.trim()) as { same?: boolean; score?: number; reason?: string };
     const score = Number.isFinite(Number(parsed.score)) ? Number(parsed.score) : null;
     const same = parsed.same === true && (score === null || score >= (Number.isFinite(minLikeness) ? minLikeness : 88));
     return { ok: same, same: parsed.same === true, score, reason: String(parsed.reason ?? "").slice(0, 200) };
   } catch {
-    return { ok: false, same: false, score: null, reason: `校验结论结构非法：${text.slice(0, 160)}` };
+    return { ok: false, same: false, score: null, reason: `校验结论结构非法：${result.text.slice(0, 160)}` };
   }
 }
 const perAngle: Array<{ angle: string; file: string; sha256: string; bytes: number; refs: string[]; likeness: { ok: boolean; same: boolean; score: number | null; reason: string } }> = [];

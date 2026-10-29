@@ -451,8 +451,8 @@ async function harvest(workspaceId: string, taskId: string, sessionId: string, r
 
   // —— 第二关：LLM 评审（任务书 vs diff 对照；缺配置走确定性摘要兜底并标 mock） ——
   let llmReview: { ok: boolean; report: string; mock: boolean };
-  const llm = llmCall("dev-review");
-  const diffBrief = `任务：${task.title}\n机床自总结：${changeset.selfSummary.slice(0, 800)}\n变更统计：\n${diff.diffStat.slice(0, 1500)}\n未跟踪新文件：${diff.untracked.join("、") || "无"}`;
+  const llm = llmCall("workloom.evaluation");
+  const diffBrief = `任务：${task.title}\n机床自总结：${changeset.selfSummary}\n完整变更统计：\n${diff.diffStat}\n未跟踪新文件：${diff.untracked.join("、") || "无"}`;
   if (llm) {
     try {
       const report = await llm(
@@ -461,10 +461,10 @@ async function harvest(workspaceId: string, taskId: string, sessionId: string, r
       const pass = /^\s*PASS/i.test(report);
       llmReview = { ok: pass, report: report.slice(0, 3000), mock: false };
     } catch (e) {
-      llmReview = { ok: true, report: `（LLM 评审调用失败，降级放行由人工把关：${(e as Error).message.slice(0, 120)}）`, mock: true };
+      llmReview = { ok: false, report: `LLM 评审调用失败，按 fail-closed 阻断：${(e as Error).message}`, mock: false };
     }
   } else {
-    llmReview = { ok: true, report: `（模型未配置，跳过 LLM 评审——硬门禁结果与 diff 请人工过目）`, mock: true };
+    llmReview = { ok: false, report: "模型未配置；不能跳过必需的独立代码评审", mock: false };
   }
 
   // —— 第三关：上线考（eval-core 复用：变更即考，fail 才拦） ——

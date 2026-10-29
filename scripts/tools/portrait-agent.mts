@@ -32,6 +32,7 @@ import {
   appendGateEvent, assertCharacterComponent, buildGateEvent, buildPortraitPlan, loadCharacterEntry, resolveProducerLlm,
   reviewStage, runPortraitAgent
 } from "../../packages/video-studio/src/index.js";
+import { OpenAiCompatibleProvider } from "../../packages/base/model-router/providers.js";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const LIBRARY_ROOT = resolve(REPO_ROOT, process.env.HR_CHARACTER_LIBRARY ?? "var/media/characters");
@@ -349,6 +350,10 @@ async function main(): Promise<void> {
       if (!Number.isFinite(minLikeness) || minLikeness < 0 || minLikeness > 100) throw new Error("--min-likeness 非法（0–100）");
       const llm = resolveProducerLlm(ENV);
       if (!llm) throw new Error("--with-likeness 需要评审模型（LLM_BASE_URL / LLM_API_KEY 或 DEEPSEEK_*）");
+      const provider = new OpenAiCompatibleProvider(llm.model, {
+        baseUrl: llm.baseUrl,
+        apiKey: llm.apiKey,
+      });
       const tmpDir = mkdtempSync(join(homedir(), ".workloom-portrait-"));
       try {
         /** 基准同样压到可发包再送（真机：5.9MB PNG 直接 base64 会被端点拒或断连） */
@@ -359,13 +364,7 @@ async function main(): Promise<void> {
         for (const [angle, file] of Object.entries(selected!.files)) {
         const jpeg = toJudgeJpeg(file, tmpDir, angle);
         if (!jpeg) throw new Error(`送审图压缩失败：${file}`);
-        const response = await fetch(`${llm.baseUrl}/chat/completions`, {
-          method: "POST",
-          headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
-          body: JSON.stringify({
-            model: llm.model, temperature: 0,
-            response_format: { type: "json_object" },
-            messages: [{
+        const result = await provider.chat([{
               role: "user",
               content: [
                 { type: "text", text: "图1 = 已通过验收的成片帧（认证真人的事实锚）；图2 = 定妆照候选。" +
@@ -374,14 +373,13 @@ async function main(): Promise<void> {
                 { type: "image_url", image_url: { url: anchorDataUrl } },
                 { type: "image_url", image_url: { url: `data:image/jpeg;base64,${readFileSync(jpeg).toString("base64")}` } }
               ]
-            }]
-          }),
-          signal: AbortSignal.timeout(180_000)
+        }], {
+          scene: "video.quality.plausibility-review",
+          timeoutMs: 600_000,
+          temperature: 0,
+          retries: 0,
         });
-        const body = await response.text();
-        if (!response.ok) throw new Error(`像不像校验调用失败 HTTP ${response.status}：${body.slice(0, 160)}`);
-        const content = (JSON.parse(body) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
-        const parsed = JSON.parse(content.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim()) as { same?: boolean; score?: number; reason?: string };
+        const parsed = JSON.parse(result.text.trim()) as { same?: boolean; score?: number; reason?: string };
         const score = Number.isFinite(Number(parsed.score)) ? Number(parsed.score) : null;
         const same = parsed.same === true;
         const ok = same && (score === null || score >= minLikeness);

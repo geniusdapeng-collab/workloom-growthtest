@@ -33,6 +33,7 @@ import os
 import re
 import threading
 import time
+import urllib.request
 import uuid
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field, asdict
@@ -52,12 +53,6 @@ try:
     _HAS_YAML = True
 except Exception:
     _HAS_YAML = False
-
-try:
-    from openai import OpenAI  # type: ignore
-    _HAS_OPENAI = True
-except Exception:
-    _HAS_OPENAI = False
 
 try:
     from jsonschema import Draft202012Validator  # type: ignore
@@ -540,24 +535,22 @@ COLD_FORGE_MATRIX: List[Dict] = [
 # ============================================================
 
 class LLMClient:
-    """统一的 LLM 调用封装。无 OPENAI 依赖时降级为占位实现，便于离线索引/召回。"""
+    """Host-dispatched LLM facade.
+
+    PandaCineForge is a disabled vendor extension. It must never choose a text
+    model or vendor on its own. The host may expose a complete OpenAI-compatible
+    bridge, but the model identity, thinking mode and full-window budget remain
+    outside this Python process.
+    """
 
     def __init__(self, model: Optional[str] = None, base_url: Optional[str] = None, api_key: Optional[str] = None,
                  timeout: Optional[float] = None):
-        self.model = model or os.getenv("OPENAI_MODEL", "gpt-4.1")
-        self.base_url = base_url or os.getenv("OPENAI_BASE_URL")
-        self.api_key = api_key or os.getenv("OPENAI_API_KEY")
+        self.model = "deepseek-flash"
+        self.base_url = (base_url or os.getenv("WORKLOOM_MODEL_DISPATCH_URL", "")).rstrip("/")
+        self.api_key = api_key or os.getenv("WORKLOOM_MODEL_DISPATCH_TOKEN")
         # 统一超时（秒），避免网络卡死；默认 60s，可通过 OPENAI_TIMEOUT 环境变量调整
         self.timeout = timeout or float(os.getenv("OPENAI_TIMEOUT", "60"))
-        self._client = None
-        if _HAS_OPENAI and self.api_key:
-            kwargs: Dict[str, Any] = {"api_key": self.api_key, "timeout": self.timeout}
-            if self.base_url:
-                kwargs["base_url"] = self.base_url
-            try:
-                self._client = OpenAI(**kwargs)
-            except Exception:
-                self._client = None
+        self._client = True if self.base_url else None
 
     @property
     def available(self) -> bool:
@@ -565,32 +558,34 @@ class LLMClient:
 
     def chat(self, system_message: str, user_message: str, temperature: float = 0.2, json_mode: bool = False) -> str:
         if not self.available:
-            return ""
+            raise RuntimeError("HOST_MODEL_DISPATCH_REQUIRED: PandaCineForge text model is not bridged")
         messages = [{"role": "system", "content": system_message}, {"role": "user", "content": user_message}]
-        kwargs: Dict[str, Any] = {"model": self.model, "messages": messages, "temperature": temperature, "timeout": self.timeout}
+        payload: Dict[str, Any] = {"model": self.model, "messages": messages, "stream": False}
         if json_mode:
-            kwargs["response_format"] = {"type": "json_object"}
+            payload["response_format"] = {"type": "json_object"}
         try:
-            resp = self._client.chat.completions.create(**kwargs)
-        except Exception:
-            kwargs.pop("response_format", None)
-            try:
-                resp = self._client.chat.completions.create(**kwargs)
-            except Exception:
-                return ""
-        try:
-            return resp.choices[0].message.content or ""
-        except Exception:
-            return ""
+            request = urllib.request.Request(
+                f"{self.base_url}/chat/completions",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={
+                    "content-type": "application/json",
+                    **({"authorization": f"Bearer {self.api_key}"} if self.api_key else {}),
+                },
+                method="POST",
+            )
+            with urllib.request.urlopen(request, timeout=self.timeout) as response:
+                body = json.loads(response.read().decode("utf-8"))
+            content = body.get("choices", [{}])[0].get("message", {}).get("content")
+            if not isinstance(content, str) or not content.strip():
+                raise RuntimeError("HOST_MODEL_DISPATCH_EMPTY")
+            return content
+        except Exception as error:
+            raise RuntimeError(f"HOST_MODEL_DISPATCH_FAILED: {error}") from error
 
     def embed(self, text: str) -> List[float]:
-        if not self.available:
-            return []
-        try:
-            resp = self._client.embeddings.create(model=os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small"), input=text, timeout=self.timeout)
-            return list(resp.data[0].embedding)
-        except Exception:
-            return []
+        # Embeddings are a separate capability registry and are not bridged by
+        # the text dispatcher used here.
+        return []
 
 
 # ============================================================

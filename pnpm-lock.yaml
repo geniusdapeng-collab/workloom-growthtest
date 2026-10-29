@@ -299,6 +299,9 @@ importers:
       pg:
         specifier: 8.23.0
         version: 8.23.0
+      tokenizers:
+        specifier: 0.23.2
+        version: 0.23.2
       yaml:
         specifier: 2.9.0
         version: 2.9.0
@@ -3398,6 +3401,10 @@ packages:
   tinyglobby@0.2.17:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
+
+  tokenizers@0.23.2:
+    resolution: {integrity: sha512-OS99VXTXuGuyUncICcS0hEawgKQlrFVKNU+UlzRsTN03RpOeJiCmcai5nKg3JrdIvUDo7/RC5puVEjlJd2e5oA==}
+    engines: {node: '>= 10'}
 
   tinypool@1.1.1:
     resolution: {integrity: sha512-Zba82s87IFq9A9XmjiX5uZA/ARWDrB03OHlq+Vw1fSdt0I+4/Kutwy8BP4Y/y/aORMo61FQ0vIb5j44vSo5Pkg==}
@@ -6685,6 +6692,8 @@ snapshots:
     dependencies:
       fdir: 6.5.0(picomatch@4.0.7)
       picomatch: 4.0.7
+
+  tokenizers@0.23.2: {}
 
   tinypool@1.1.1: {}
 

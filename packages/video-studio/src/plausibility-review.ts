@@ -18,11 +18,16 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolveProducerLlm } from "./producer-gate.js";
-import { DEEPSEEK_FLASH_MODEL, DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS } from "./llm-config.js";
+import {
+  DEEPSEEK_IMAGE_LIMIT_BYTES,
+  OpenAiCompatibleProvider,
+  type ModelContentPart,
+} from "@workloom/base/model-router";
 
 export const PLAUSIBILITY_POLICY_VERSION = "workloom.plausibility-review/v1" as const;
+/** @deprecated Character budgets are not a model context unit. */
 export const PLAUSIBILITY_CONTEXT_BUDGET = 60_000;
-export const PLAUSIBILITY_IMAGE_BUDGET_BYTES = 4 * 1024 * 1024;
+export const PLAUSIBILITY_IMAGE_BUDGET_BYTES = DEEPSEEK_IMAGE_LIMIT_BYTES;
 
 /**
  * 通用审核 rubric（品类无关）：
@@ -103,6 +108,18 @@ export interface PlausibilityResult {
   ms: number;
   /** 评审模型调用次数（T-2026-1013-0001：解析失败/5xx 时最多重试一次） */
   attempts?: number;
+  receipt?: {
+    inputTokens: number;
+    outputTokens: number;
+    reasoningTokens: number;
+    outputCeiling: number;
+    finishReason: string;
+    requestHash: string;
+    responseHash: string;
+    responseId: string | null;
+    policyVersion: string;
+    registryVersion: string;
+  };
 }
 
 /** 组装送审上下文：把"事实"给足（档案/角色/平台/卡片/提示词），不作任何品类规则注入。 */
@@ -119,7 +136,7 @@ export function buildPlausibilityContext(input: PlausibilityContextInput): Recor
       id: product.id, displayName: product.displayName ?? null, brand: product.brand ?? null,
       category: product.category ?? null, sourceKind: product.sourceKind ?? null, reviewStatus: product.reviewStatus ?? null,
       dimensions: product.dimensions ?? null, photoAngles: product.photoAngles ?? [], appearance: product.appearance ?? null,
-      features: product.features ?? [], parameters: (product.parameters ?? []).slice(0, 20),
+      features: product.features ?? [], parameters: product.parameters ?? [],
     })),
     shots: input.shots.map((shot) => ({
       shotId: shot.shotId, durationSec: shot.durationSec ?? null,
@@ -127,13 +144,11 @@ export function buildPlausibilityContext(input: PlausibilityContextInput): Recor
       action: shot.action ?? null, props: shot.props ?? null, character: shot.character ?? null,
       dialogue: shot.dialogue ?? null, dialogueFree: shot.dialogueFree === true,
       product: shot.product ?? null,
-      promptText: (shot.promptText ?? "").slice(0, 4000) || null,
+      promptText: shot.promptText ?? null,
     })),
   };
   const serialized = JSON.stringify(context);
-  if (serialized.length > PLAUSIBILITY_CONTEXT_BUDGET) {
-    throw new Error(`PLAUSIBILITY_CONTEXT_TOO_LARGE: ${serialized.length} > ${PLAUSIBILITY_CONTEXT_BUDGET}（禁止截断事实，请拆批送审）`);
-  }
+  void serialized;
   return context;
 }
 
@@ -204,8 +219,8 @@ export function parsePlausibilityAnswer(raw: string): { verdict: "pass" | "block
   return { verdict, findings, promptPatches: patches, reason: trim(value.reason) || (verdict === "block" ? "存在不成立的事实/常识" : "实体与物理常识通过") };
 }
 
-function encodeImages(images: Array<{ label: string; path: string }>): Array<Record<string, unknown>> {
-  const parts: Array<Record<string, unknown>> = [];
+function encodeImages(images: Array<{ label: string; path: string }>): ModelContentPart[] {
+  const parts: ModelContentPart[] = [];
   for (const image of images) {
     if (!existsSync(image.path) || !statSync(image.path).isFile()) throw new Error(`PLAUSIBILITY_IMAGE_MISSING: ${image.path}`);
     const bytes = readFileSync(image.path);
@@ -246,13 +261,13 @@ export async function reviewPlausibility(
   if (!llm) {
     return { ...base, verdict: "unverified", reason: "无可用评审模型（需配置评审模型密钥）；实体与物理常识审核 fail-closed", ms: Date.now() - started };
   }
-  let images: Array<Record<string, unknown>> = [];
+  let images: ModelContentPart[] = [];
   try {
     images = encodeImages(input.images ?? []);
   } catch (error) {
     return { ...base, verdict: "unverified", reason: error instanceof Error ? error.message : String(error), ms: Date.now() - started };
   }
-  const content = [
+  const content: ModelContentPart[] = [
     {
       type: "text",
       text: [
@@ -270,46 +285,37 @@ export async function reviewPlausibility(
     ...images,
   ];
   try {
-    let parsedAnswer: ReturnType<typeof parsePlausibilityAnswer> | null = null;
-    let unverifiedReason: string | null = null;
-    let attempts = 0;
-    for (let attempt = 1; attempt <= 2 && !parsedAnswer; attempt += 1) {
-      attempts = attempt;
-    const response = await (options.fetchImpl ?? fetch)(`${llm.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
-      body: JSON.stringify({
-        model: llm.model,
-        messages: [{ role: "user", content }],
-        temperature: 0.1,
-        response_format: { type: "json_object" },
-        ...(llm.model === DEEPSEEK_FLASH_MODEL ? { max_tokens: DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS } : {}),
-        ...(llm.nonThinking ? { thinking: { type: "disabled" } } : {}),
-      }),
-      signal: AbortSignal.timeout(240_000),
+    const provider = new OpenAiCompatibleProvider(llm.model, {
+      baseUrl: llm.baseUrl,
+      apiKey: llm.apiKey,
+      fetchImpl: options.fetchImpl,
     });
-    const bodyText = await response.text();
-    if (!response.ok) {
-      unverifiedReason = `评审模型 HTTP ${response.status}：${bodyText.slice(0, 200)}`;
-      if (attempt < 2 && (response.status >= 500 || response.status === 429)) continue;
-      break;
-    }
-    const raw = JSON.parse(bodyText).choices?.[0]?.message?.content;
-    if (typeof raw !== "string") { unverifiedReason = "评审模型缺少文本结果"; break; }
-    try { parsedAnswer = parsePlausibilityAnswer(raw); }
-    catch (error) {
-      unverifiedReason = `评审输出解析失败：${error instanceof Error ? error.message : String(error)}`;
-      if (attempt >= 2) break;
-    }
-    }
-    if (!parsedAnswer) return { ...base, verdict: "unverified", reason: unverifiedReason ?? "评审模型不可用", ms: Date.now() - started, attempts };
-    const parsed = parsedAnswer;
+    const result = await provider.chat([{ role: "user", content }], {
+      scene: "video.quality.plausibility-review",
+      timeoutMs: 600_000,
+      temperature: 0.1,
+      retries: 1,
+    });
+    const parsed = parsePlausibilityAnswer(result.text);
     const blockers = parsed.findings.filter((finding) => finding.severity === "blocker");
     const verdict = parsed.verdict === "block" && blockers.length > 0 ? "block" : "pass";
     log(`[plausibility][${input.stage}] ${verdict}：blocker ${blockers.length} · warning ${parsed.findings.length - blockers.length}`);
     return {
       ...base, verdict, findings: parsed.findings, promptPatches: parsed.promptPatches,
-      reason: parsed.reason, model: llm.model, ms: Date.now() - started,
+      reason: parsed.reason, model: result.modelId, ms: Date.now() - started,
+      attempts: 1 + result.attempts.length,
+      receipt: {
+        inputTokens: result.promptTokens,
+        outputTokens: result.completionTokens,
+        reasoningTokens: result.reasoningTokens,
+        outputCeiling: result.outputCeiling,
+        finishReason: result.finishReason,
+        requestHash: result.requestHash,
+        responseHash: result.responseHash,
+        responseId: result.responseId,
+        policyVersion: result.policyVersion,
+        registryVersion: result.registryVersion,
+      },
     };
   } catch (error) {
     return { ...base, verdict: "unverified", reason: `评审调用/解析失败：${error instanceof Error ? error.message : String(error)}`, ms: Date.now() - started };

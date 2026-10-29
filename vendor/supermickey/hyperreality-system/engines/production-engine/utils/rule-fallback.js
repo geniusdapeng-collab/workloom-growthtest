@@ -15,7 +15,7 @@ class RuleFallbackEngine {
     this.log = options.logFn || console.log;
     this.config = options.config || { maxPromptLength: 2000 };
     this.agents = options.agents || {};
-    this.llmModel = options.llmModel || 'kimi-k2p6';
+    this.llmModel = options.llmModel || 'deepseek-flash';
   }
 
   /**

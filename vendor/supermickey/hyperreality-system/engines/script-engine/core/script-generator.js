@@ -47,12 +47,9 @@ class ScriptGenerator {
       console.warn('[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model');
     }
     this.config = {
-      llmEndpoint: options.llmEndpoint || process.env.LLM_ENDPOINT || 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',
-      apiKey: options.apiKey || process.env.VOLCENGINE_ARK_API_KEY,
       // 【v2.1.4-fix13-审计修复】从环境变量读取，消除硬编码
       model: model,
       maxTokens: options.maxTokens || 32000, // 【v2.1.8-fix14】maxTokens提升到32000，覆盖reasoning+content
-      temperature: options.temperature || 1,
       promptTemplateDir: options.promptTemplateDir || path.join(__dirname, '../prompts'),
       templateDir: options.templateDir || path.join(__dirname, '../templates'),
       timeout: options.timeout || 300000,
@@ -376,7 +373,7 @@ ${meta._directorStyle}` : ''}
 
   /**
    * 调用 LLM API
-   * v1.1: 优先使用LLMEngine (kimi-k2p6)
+   * v1.1: 优先使用LLMEngine (deepseek-flash)
    */
   async _callLLM(prompt) {
     // 【v2.1.4-fix13-审计修复】增加 Promise.race 超时保护，防止 LLM 调用 hang 住
@@ -431,6 +428,23 @@ ${meta._directorStyle}` : ''}
           console.error('[ScriptGenerator] LLM引擎返回失败:', result.error);
           throw new Error(`LLM引擎错误: ${result.error}`);
         }
+
+        // The host dispatcher owns JSON mode and returns final content only.
+        // Hidden reasoning is never a business result, and malformed JSON fails
+        // closed instead of being repaired by another provider or rule model.
+        const finalContent = typeof result.content === 'string' ? result.content.trim() : '';
+        if (!finalContent) throw new Error('SCRIPT_MODEL_CONTENT_EMPTY');
+        let finalJson;
+        try {
+          finalJson = JSON.parse(finalContent);
+        } catch (error) {
+          throw new Error(`SCRIPT_MODEL_JSON_INVALID: ${error.message}`);
+        }
+        if (!finalJson?.meta || !finalJson?.structure
+          || !Array.isArray(finalJson.structure.scenes) || finalJson.structure.scenes.length === 0) {
+          throw new Error('SCRIPT_MODEL_SCHEMA_INVALID');
+        }
+        return finalContent;
         
         // 【v2.1.6-fix14】增强JSON提取：从content和reasoning中智能提取
         let extractedJson = null;
@@ -535,55 +549,7 @@ ${meta._directorStyle}` : ''}
       }
     }
     
-    // 降级：直接HTTP调用（保留旧逻辑作为fallback）
-    const axios = require('axios');
-    let lastError = null;
-
-    for (let attempt = 1; attempt <= this.config.maxRetries; attempt++) {
-      try {
-        console.log(`[ScriptGenerator] LLM 直接调用尝试 ${attempt}/${this.config.maxRetries}`);
-
-        const response = await axios.post(
-          this.config.llmEndpoint,
-          {
-            model: this.config.model,
-            messages: [
-              { role: 'system', content: '你是一位专业的AI视频编剧，只输出严格格式的JSON。' },
-              { role: 'user', content: prompt }
-            ],
-            max_tokens: this.config.maxTokens,
-            temperature: 1,
-            top_p: 0.95,
-            thinking: { type: 'disabled' } // 【v2.1.8-fix13】禁用reasoning，释放token配额给content
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${this.config.apiKey}`,
-              'Content-Type': 'application/json'
-            },
-            timeout: timeoutMs
-          }
-        );
-
-        const content = response.data.choices?.[0]?.message?.content;
-        if (!content) {
-          throw new Error('LLM 返回内容为空');
-        }
-
-        return content;
-
-      } catch (error) {
-        lastError = error;
-        console.warn(`[ScriptGenerator] LLM 调用失败 (${attempt}/${this.config.maxRetries}): ${error.message}`);
-
-        if (attempt < this.config.maxRetries) {
-          const delay = Math.pow(2, attempt) * 1000; // 指数退避
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      }
-    }
-
-    throw new Error(`LLM 调用失败，已重试 ${this.config.maxRetries} 次: ${lastError?.message}`);
+    throw new Error('HOST_MODEL_DISPATCH_REQUIRED: ScriptGenerator has no WorkloomLLMEngine bridge');
   }
 
   /**

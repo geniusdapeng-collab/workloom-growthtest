@@ -6,8 +6,8 @@
  * 唯一实现，落在行业侧（apps/server/src/industry/**，base-sync 排除路径），不改基座契约。
  *
  * 证据与边界（详见 README.md）：
- *   - 接入通道：① TypeSafe 官方直连（`POST /v1/systemone`，默认）；② Vercel AI Gateway
- *     （`typesafe-ai/jev`，evaluation 协议 v4，备选）；
+ *   - 接入通道：WorkLoom `text.primary` -> `deepseek-flash`；类型化问答只是场景协议，
+ *     不再是跨模型通道；
  *   - 官方 jaggedness（docs.typesafe.ai/model-jaggedness/jev-1.13）：字面理解、不做算术与日期比较、
  *     对抗性内容可移动答案、CJK 支持弱于英文 —— 因此 instructions 一律用英文短句直述，
  *     state 只放决策必需的字段，任何算术/日期/逐字比对留在代码里；
@@ -15,12 +15,10 @@
  */
 
 /**
- * 通道（provider）：
- *   - `typesafe`：TypeSafe 官方直连（官方 API v1，`/v1/systemone`；问题原语用官方名 `noul`）；
- *   - `vercel-gateway`：Vercel AI Gateway（evaluation 协议 v4，模型 id `typesafe-ai/jev`）。
- * 两条通道共用同一解析/校验/分流层，只有「URL + 鉴权头 + 请求体 + 问题类型名」不同。
+ * WorkLoom 文本模型只有一个 provider key。保留名称是为了报告兼容，
+ * 但真正的模型和端点始终由 `text.primary` registry 决定。
  */
-export type JevProvider = "typesafe" | "vercel-gateway";
+export type JevProvider = "deepseek";
 
 /** 问题类型：与 TypeSafe 三种原语（boolean≈Noul / choice≈Choice / score≈Score）一一对应 */
 export type QuestionType = "boolean" | "choice" | "score";

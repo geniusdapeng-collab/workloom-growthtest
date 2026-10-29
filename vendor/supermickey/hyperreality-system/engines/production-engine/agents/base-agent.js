@@ -1,6 +1,6 @@
 /**
  * LLM Agent 基类（v2.1.0 智能重试版）
- * - 模型按 Agent 透传（修复原 loadLLMEngine 写死 kimi-k2p6 的 bug）
+ * - 模型按 Agent 透传（修复原 loadLLMEngine 写死 deepseek-flash 的 bug）
  * - 全局截止时间（deadline）感知：单次超时 = min(自身超时, 剩余预算)
  * - 【v2.1.0】集成错误分类器，智能重试策略
  * - 【v2.1.0】镜头级独立预算，互不侵占
@@ -10,7 +10,7 @@ const { ErrorClassifier } = require('./error-classifier');
 const { globalLLMLimiter } = require('../../../core/llm-concurrency-limiter');
 
 // 从环境变量读取模型配置，消除硬编码
-const DEFAULT_MODEL = process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6';
+const DEFAULT_MODEL = process.env.STORMAXE_LLM_MODEL || 'deepseek-flash';
 const DEFAULT_FAST_MODEL = process.env.STORMAXE_LLM_FAST_MODEL || DEFAULT_MODEL;
 
 /**

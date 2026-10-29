@@ -1,5 +1,5 @@
 /**
- * producer-gate —— 前期监制与成功素材的事实性后期处理回执
+ * producer-gate —— AI 监制（制片人）门：把"人工确认"换成"机器评审 + 打回重跑"
  *
  * 背景（T-2026-0924-0001）：
  *   视频链路上原有 G1–G7 七个确认门。早先实现是两道极端：要么挂人工审批卡等人点（停线），
@@ -12,10 +12,8 @@
  *   2. 确定性硬闸（调用方传入 ffprobe/文件校验结果）—— 硬失败直接打回，不消耗模型额度；
  *   3. 可选的 LLM 评审（含图像）—— 打分 + 问题清单 + 修改建议；模型不可用时**如实降级**并标注。
  *
- * 当前纪律：前期仍核对作者合同与真实生成前提。POST_RENDER_STAGES 直接交给
- * postProcessingVerdict：真实文件或处理失败仍失败，旧品质评分、模型不可用或缺质量
- * 样本不构成二次否决。后期分数为 null，质量保持 unverified，不作身份或语音认证。
- * 非后期的模型/证据不可用仍 fail-closed；旧 allowFallbackApprove 不补造品质通过。
+ * 纪律：默认 fail-closed —— 硬闸失败必打回；LLM 不可用且无硬闸结论时**不放行**（返回 rerun），
+ * 模型/证据不可用时保持 unverified；旧 allowFallbackApprove 参数不再授予正式通过资格。
  */
 
 export type ProducerStage =
@@ -42,16 +40,16 @@ import { randomUUID, createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 
 import {
-  DEEPSEEK_FLASH_MODEL,
-  DEEPSEEK_FLASH_INPUT_TOKEN_BUDGET,
-  DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS,
-  estimateDeepSeekTokens,
   resolveOpenAiCompatibleBaseUrl,
   resolveVideoApiKey,
   resolveVideoModel,
-  resolveVideoNonThinking,
 } from "./llm-config.js";
 import { POST_RENDER_STAGES, postProcessingVerdict } from "./post-render-acceptance.js";
+import {
+  OpenAiCompatibleProvider,
+  type ChatResult,
+  type ModelContentPart,
+} from "@workloom/base/model-router";
 import type { QualityStatus } from "./quality-evidence.js";
 import { normalizeShotIntent, shotIntentHash, type ShotIntentStatus } from "./shot-intent.js";
 import { devicePolicyPromptLines } from "./device-policy.js";
@@ -70,6 +68,8 @@ export interface DeterministicCheck {
 export interface ProducerArtifact {
   path: string;
   kind: "image" | "video" | "audio" | "text" | "json";
+  /** 宿主已接受证据的原始字节摘要；不匹配时必须在模型调用前拒绝。 */
+  expectedSha256?: string;
   bytes?: number;
   /** ffprobe 摘要（video/audio）：width/height/duration/loudness 等 */
   probe?: Record<string, unknown>;
@@ -83,8 +83,9 @@ export interface ProducerVerdict {
   evidence?: Array<{ path: string; sha256: string; scope: string }>;
   stage: ProducerStage;
   approved: boolean;
-  /** Creative reviews use 0–100; factual post-processing receipts have no quality score. */
+  /** 0–100 for an actual quality review; null when no quality review applies. */
   score: number | null;
+  /** Factual/deterministic post receipts distinguish acceptance from creative review. */
   qualityReviewed?: boolean;
   qualityStatus?: "unverified" | "reviewed";
   hardFailures: string[];
@@ -94,6 +95,19 @@ export interface ProducerVerdict {
   rerun: boolean;
   via: "deterministic" | "llm" | "fallback";
   model?: string;
+  receipts?: Array<{
+    modelId: string;
+    inputTokens: number;
+    outputTokens: number;
+    reasoningTokens: number;
+    outputCeiling: number;
+    finishReason: string;
+    requestHash: string;
+    responseHash: string;
+    responseId: string | null;
+    policyVersion: string;
+    registryVersion: string;
+  }>;
   ms: number;
   reason: string;
   /** 证据或模型不可用；degraded 不具备放行资格。 */
@@ -106,7 +120,7 @@ export interface ProducerVerdict {
  */
 export const PRODUCER_RUBRICS: Record<ProducerStage, string[]> = {
   script: [
-    "高完成度作品优先：完整动作、整句台词和收束高于名义秒数；总时长是软目标，只有显式硬上限约束时长，不为凑秒截句或压速",
+    "台词速率和时长符合明确交付合同，无台词镜头不添加对白；总时长与目标一致",
     "动作、静止、情绪与每镜叙事目的相符，不强迫空镜或克制表演产生动作变化",
     "开场、推进和收尾服务当前 brief；年代、主体、人数与原镜头合同一致"
   ],
@@ -147,7 +161,7 @@ export const PRODUCER_RUBRICS: Record<ProducerStage, string[]> = {
   mux: ["软字幕版可播放且字幕轨可开关，视频和音频与审核母版保持一致", "旁挂字幕及语言清单齐备，软轨内容与旁挂文件一致，时长符合合同"],
   danmaku: ["按本片明确启用的弹幕规格检查内容、密度、分层和遮挡", "未启用或不适用时不为了凑后期能力添加弹幕"],
   bgm: ["响度、真峰值及音乐与人声的关系符合明确音频交付合同", "曲风、节拍、唱词适用性与本片brief一致；实际听音证据独立提供，图像模型不冒充听音"],
-  sfx: ["音效落点、持续时间、响度与本片动作和剪辑合同一致", "实际听音与音轨守恒由音频工位回执支持，视觉模型不能证明听音质量"],
+  sfx: ["核对用户请求的音效工具执行、实际文件和原视频字节回执；不再评判已渲染镜头品质"],
   cover: ["文案与成片一致并在平台安全区内可读，避免遮挡本片关键主体", "封面风格和色彩符合成片与平台规格；主体不必是人脸"],
   master: [
     "整片播放、时长、画幅、帧率、字幕和音轨符合交付合同，无黑帧或编码事故",
@@ -247,13 +261,6 @@ interface LlmConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
-  nonThinking?: boolean;
-}
-
-function textEvidenceMeter(model: string): { count: (text: string) => number; limit: number; maxOutputTokens?: number } {
-  return model === DEEPSEEK_FLASH_MODEL
-    ? { count: estimateDeepSeekTokens, limit: DEEPSEEK_FLASH_INPUT_TOKEN_BUDGET, maxOutputTokens: DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS }
-    : { count: (text) => text.length, limit: 100_000 };
 }
 
 /** 解析评审模型（与 model-router 的 LLM_* 口径一致，兼容 DEEPSEEK_* 秘密文件） */
@@ -262,7 +269,7 @@ export function resolveProducerLlm(env: Record<string, string | undefined> = pro
   const apiKey = resolveVideoApiKey(env);
   const model = resolveVideoModel(env);
   if (!baseUrl || !apiKey || !model) return null;
-  return { baseUrl, apiKey, model, nonThinking: resolveVideoNonThinking(model, env) };
+  return { baseUrl, apiKey, model };
 }
 
 function summarizeArtifacts(artifacts: ProducerArtifact[]): string {
@@ -296,58 +303,13 @@ function shrinkImageWithFfmpeg(path: string): string | null {
   return out;
 }
 
-/**
- * 解析评审模型输出的 JSON：
- *   ① 直接解析（剥掉可能的 ``` 包裹）；
- *   ② 取第一个 `{` 到最后一个 `}` 的片段再解析（裁掉解释性前后缀）；
- *   ③ 仍失败 → 让模型"只重发合法 JSON"自修复一次；
- *   ④ 还失败 → 抛错（调用方按"评审不可用"fail-closed 处理）。
- */
-async function parseJudgeJson(
-  raw: string,
-  llm: LlmConfig,
-  fetchImpl: typeof fetch,
-  log: (line: string) => void,
-  stage: ProducerStage
-): Promise<Record<string, unknown>> {
-  const stripped = raw.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim();
-  const tryParse = (text: string): Record<string, unknown> | null => {
-    try {
-      return JSON.parse(text) as Record<string, unknown>;
-    } catch {
-      return null;
-    }
-  };
-  const direct = tryParse(stripped);
-  if (direct) return direct;
-  const start = stripped.indexOf("{");
-  const end = stripped.lastIndexOf("}");
-  if (start >= 0 && end > start) {
-    const sliced = tryParse(stripped.slice(start, end + 1));
-    if (sliced) return sliced;
+/** Structured review must return exactly one JSON value. No hidden repair call. */
+function parseJudgeJson(raw: string): Record<string, unknown> {
+  const parsed = JSON.parse(raw.trim()) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("评审模型未返回 JSON 对象");
   }
-  log(`[producer][${stage}] 评审输出不是合法 JSON，要求模型自修复一次`);
-  const repair = await fetchImpl(`${llm.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
-    body: JSON.stringify({
-      model: llm.model,
-      messages: [
-        { role: "user", content: "把下面这段内容整理成**严格合法**的 JSON（只输出 JSON，不要任何解释、不要 markdown）：\n\n" + raw.slice(0, 4000) }
-      ],
-      temperature: 0,
-      response_format: { type: "json_object" },
-      ...(llm.model === DEEPSEEK_FLASH_MODEL ? { max_tokens: DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS } : {}),
-      ...(llm.nonThinking ? { thinking: { type: "disabled" } } : {}),
-    }),
-    signal: AbortSignal.timeout(120_000)
-  });
-  const repairText = await repair.text();
-  if (!repair.ok) throw new Error(`评审 JSON 修复失败：HTTP ${repair.status} ${repairText.slice(0, 160)}`);
-  const repaired = (JSON.parse(repairText) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
-  const fixed = tryParse(repaired.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim());
-  if (!fixed) throw new Error(`评审 JSON 修复后仍非法：${repaired.slice(0, 160)}`);
-  return fixed;
+  return parsed as Record<string, unknown>;
 }
 
 type JudgeResult = { approved: boolean; score: number; issues: string[]; suggestions: string[]; reason: string };
@@ -385,44 +347,6 @@ export function coerceJudgeResult(json: unknown): JudgeResult | null {
   const reason = typeof reasonRaw === "string" ? reasonRaw : "";
   if (approved === null || score === null || score < 0 || score > 100 || !issues || !suggestions) return null;
   return { approved, score, issues, suggestions, reason };
-}
-
-/** 结构自修复：把形状不对的 JSON 交给模型按 schema 重排（只整理结构，不得新增事实）。 */
-async function repairJudgeShape(
-  parsed: Record<string, unknown>,
-  llm: LlmConfig,
-  fetchImpl: typeof fetch,
-  log: (line: string) => void,
-  stage: ProducerStage
-): Promise<JudgeResult | null> {
-  log(`[producer][${stage}] 评审结果结构不合规，要求模型按 schema 自修复一次`);
-  const res = await fetchImpl(`${llm.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
-    body: JSON.stringify({
-      model: llm.model,
-      messages: [{
-        role: "user",
-        content: "把下面这份评审结论**只整理成结构**，不得新增或改变任何事实、分数与结论：\n"
-          + '只输出 JSON：{"approved":true|false,"score":0-100,"issues":["..."],"suggestions":["..."],"reason":"结论"}\n\n'
-          + JSON.stringify(parsed)
-      }],
-      temperature: 0,
-      response_format: { type: "json_object" },
-      ...(llm.model === DEEPSEEK_FLASH_MODEL ? { max_tokens: DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS } : {}),
-      ...(llm.nonThinking ? { thinking: { type: "disabled" } } : {}),
-    }),
-    signal: AbortSignal.timeout(120_000)
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`评审结构修复失败：HTTP ${res.status} ${text.slice(0, 160)}`);
-  const content = (JSON.parse(text) as { choices?: Array<{ message?: { content?: string } }> }).choices?.[0]?.message?.content ?? "";
-  const stripped = content.replace(/^```(?:json)?/m, "").replace(/```\s*$/m, "").trim();
-  try {
-    return coerceJudgeResult(JSON.parse(stripped));
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -479,27 +403,29 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
   if (options.deterministic.some((c) => c.hard && (c.status === "unverified" || (c.status !== "not_applicable" && c.pass !== true)))) return reject("必需质量检查未验证");
   const llm = resolveProducerLlm(options.env ?? process.env);
   if (!llm) return reject("无可用评审模型；降级只能预览，不能作为合格交付", "fallback");
-  const textMeter = textEvidenceMeter(llm.model);
   const minScore = options.minScore ?? 70;
   if (!Number.isFinite(minScore) || minScore < 0 || minScore > 100) return reject("评审分数阈值非法");
   const tempPaths: string[] = [];
-  const textContent: Array<Record<string, unknown>> = [];
+  const textContent: ModelContentPart[] = [];
   const images: Array<{ path: string; label: string }> = [];
-  let totalText = 0;
   try {
     if (options.artifacts.length === 0) throw new Error("缺少待评审产物");
     for (const artifact of options.artifacts) {
+      if (artifact.expectedSha256 !== undefined && (typeof artifact.expectedSha256 !== "string" || !/^[a-f0-9]{64}$/.test(artifact.expectedSha256))) {
+        throw new Error(`产物的预期摘要非法：${artifact.path}`);
+      }
       const stat = statSync(artifact.path);
       if (!stat.isFile() || stat.size === 0) throw new Error(`产物为空或不是文件：${artifact.path}`);
       if (stat.size > 1_000_000_000) throw new Error(`产物超过单次评审资源上限：${artifact.path}`);
       const bytes = readFileSync(artifact.path);
       const sha256 = createHash("sha256").update(bytes).digest("hex");
+      if (artifact.expectedSha256 !== undefined && sha256 !== artifact.expectedSha256) {
+        throw new Error(`产物摘要与本次绑定的已接受证据不一致：${artifact.path}`);
+      }
       if (artifact.kind === "audio") throw new Error(`当前评审适配器不支持音频内容：${artifact.path}；需要音频评审组件`);
       if (artifact.kind === "text" || artifact.kind === "json") {
         const raw = bytes.toString("utf8");
         if (artifact.kind === "json") JSON.parse(raw);
-        totalText += textMeter.count(raw);
-        if (totalText > textMeter.limit) throw new Error("文本证据超出本次完整评审预算；需拆分评审，禁止截断后通过");
         textContent.push({ type: "text", text: `以下是产物正文（完整）：${artifact.path}\n${raw}` });
         evidence.push({ path: artifact.path, sha256, scope: "complete-text" });
       } else if (artifact.kind === "image") {
@@ -522,16 +448,14 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
       }
     }
     const artifactImages = images.length;
-    if ((options.referenceImages?.length ?? 0) > 6) throw new Error("基准图超过单次对比预算，需按角色拆分评审");
     for (const path of options.referenceImages ?? []) {
       const bytes = readFileSync(path);
       evidence.push({ path, sha256: createHash("sha256").update(bytes).digest("hex"), scope: "reference-image" });
       images.push({ path, label: "基准图" });
     }
-    if (images.length > 60) throw new Error("图像证据超过完整评审预算，需按镜头拆分；禁止静默丢图");
     const visualStages = ["keyframe", "shot", "compose", "color", "subtitle", "mux", "danmaku", "cover", "master"];
     if (visualStages.includes(stage) && !artifactImages) throw new Error("画面评审缺少实际图像或可抽帧视频");
-    const encoded: Array<Record<string, unknown>[]> = [];
+    const encoded: ModelContentPart[][] = [];
     for (const image of images) {
       let path = image.path;
       let bytes = readFileSync(path);
@@ -549,16 +473,23 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
     }
     const context = options.context ? JSON.stringify(options.context) : "";
     const contractText = contract ? JSON.stringify(contract) : "未提供结构化镜头合同；不得宣称已核实年代、人数、空间或设备型号。";
-    if (context.length + contractText.length > REVIEW_CONTEXT_BUDGET) throw new Error("评审上下文超预算，禁止截断事实");
     /**
      * 批次大小：默认 6 张/批；成套定妆照（同一角色的多角度）必须能一批看完再判"是不是同一个人"。
      * 非法/缺省值回落到 6（调小只会切得更碎，不构成风险；调大由调用方自证上下文预算）。
      */
-    const batchSize = Number.isInteger(options.batchSize) && (options.batchSize as number) > 0 ? options.batchSize as number : 6;
+    const batchSize = Number.isInteger(options.batchSize) && (options.batchSize as number) > 0
+      ? options.batchSize as number
+      : Math.max(1, artifactImages);
     const batches = Math.max(1, Math.ceil(artifactImages / batchSize));
     const answers: Array<{ approved: boolean; score: number; issues: string[]; suggestions: string[]; reason: string }> = [];
+    const receipts: NonNullable<ProducerVerdict["receipts"]> = [];
+    const provider = new OpenAiCompatibleProvider(llm.model, {
+      baseUrl: llm.baseUrl,
+      apiKey: llm.apiKey,
+      fetchImpl: options.fetchImpl,
+    });
     for (let batch = 0; batch < batches; batch += 1) {
-      const content = [{ type: "text", text: [
+      const content: ModelContentPart[] = [{ type: "text", text: [
         `你是视频监制。项目 ${options.projectId}，环节 ${stage}，证据批次 ${batch + 1}/${batches}。`,
         ...rubric.map((r, i) => `${i + 1}. ${r}`),
         "只评审实际收到的证据，视频为带时间戳抽帧，不代表逐帧、口型或听音验证。缺证据必须拒绝，不能猜测。",
@@ -568,29 +499,27 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         "结构化原镜头合同优先于通用rubric；只对实际适用项目评审，不得把合同当产物质量证明。", contractText,
         '只输出 JSON: {"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}'
       ].join("\n") }, ...textContent, ...encoded.slice(batch * batchSize, Math.min(artifactImages, (batch + 1) * batchSize)).flat(), ...encoded.slice(artifactImages).flat()];
-      const res = await (options.fetchImpl ?? fetch)(`${llm.baseUrl}/chat/completions`, {
-        method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
-        body: JSON.stringify({
-          model: llm.model,
-          messages: [{ role: "user", content }],
-          temperature: 0.2,
-          response_format: { type: "json_object" },
-          ...(textMeter.maxOutputTokens === undefined ? {} : { max_tokens: textMeter.maxOutputTokens }),
-          ...(llm.nonThinking ? { thinking: { type: "disabled" } } : {}),
-        }),
-        signal: AbortSignal.timeout(180_000)
+      const result: ChatResult = await provider.chat([{ role: "user", content }], {
+        scene: "video.quality.producer-review",
+        timeoutMs: 600_000,
+        temperature: 0.2,
+        retries: 0,
       });
-      const rawBody = await res.text();
-      if (!res.ok) throw new Error(`HTTP ${res.status} ${rawBody.slice(0, 160)}`);
-      const raw = JSON.parse(rawBody).choices?.[0]?.message?.content;
-      if (typeof raw !== "string") throw new Error("评审模型缺少文本结果");
-      const json = await parseJudgeJson(raw, llm, options.fetchImpl ?? fetch, log, stage);
-      /**
-       * 结构归一 → 仍不合规则按 schema 自修复一次 → 还不行才判"结构非法"。
-       * 2026-09-28 T1 真机：旧实现在这一步直接判死，10 镜里有 2 镜因形状偏差被要求整环节重跑。
-       */
-      const normalizedResult = coerceJudgeResult(json)
-        ?? await repairJudgeShape(json, llm, options.fetchImpl ?? fetch, log, stage);
+      receipts.push({
+        modelId: result.modelId,
+        inputTokens: result.promptTokens,
+        outputTokens: result.completionTokens,
+        reasoningTokens: result.reasoningTokens,
+        outputCeiling: result.outputCeiling,
+        finishReason: result.finishReason,
+        requestHash: result.requestHash,
+        responseHash: result.responseHash,
+        responseId: result.responseId,
+        policyVersion: result.policyVersion,
+        registryVersion: result.registryVersion,
+      });
+      const json = parseJudgeJson(result.text);
+      const normalizedResult = coerceJudgeResult(json);
       if (!normalizedResult) throw new Error("评审结果结构非法");
       answers.push(normalizedResult);
     }
@@ -603,7 +532,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
     return { stage, status: approved ? "passed" : "failed", approved, contractHash: contract?.contractHash, score: Math.min(...answers.map((a) => a.score)),
       hardFailures: [], issues: [...softFailures, ...answers.flatMap((a) => a.issues)], suggestions: answers.flatMap((a) => a.suggestions),
       rerun: !approved, via: "llm", model: llm.model, ms: Date.now() - started,
-      reason: answers.map((a) => a.reason).join("；") + (approved ? "" : `（所有证据批次需通过且评分≥${minScore}）`), degraded: false, evidence };
+      reason: answers.map((a) => a.reason).join("；") + (approved ? "" : `（所有证据批次需通过且评分≥${minScore}）`), degraded: false, evidence, receipts };
   } catch (err) {
     return reject(err instanceof Error ? err.message : String(err), "fallback", llm.model);
   } finally {

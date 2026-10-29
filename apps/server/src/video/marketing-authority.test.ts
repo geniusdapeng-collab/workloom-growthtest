@@ -8,7 +8,7 @@ import { prepareMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts, ty
 import { fetchMarketingSource, requestSource } from "./marketing-source-fetcher.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 const scope = { tenantId: "tenant-a", workspaceId: "ws-a", projectId: "P1", runId: "RUN1", attempt: 1 };
-const env = { LLM_BASE_URL: "https://judge.example.test", LLM_API_KEY: "test-only", LLM_MODEL: "test-judge" };
+const env = { LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "test-only", LLM_MODEL: "deepseek-flash" };
 const sourceUrl = "https://source.example.com/f3";
 const sourceText = "星野 F3 是一款风扇，风量 9 档。尾部注意：9 档是风量档位，不是能耗等级；不得声称静音或市场第一。";
 let server: Server, origin: string, root: string, modelCalls: any[], rejectJudge: boolean, extractionCalls: string[];
@@ -19,7 +19,29 @@ beforeAll(async () => {
 afterAll(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
 beforeEach(async () => {
   root = await realpath(await mkdtemp(path.join(tmpdir(), "marketing-authority-"))); modelCalls = []; extractionCalls = []; rejectJudge = false;
-  vi.stubGlobal("fetch", vi.fn(async (_url, init) => { modelCalls.push(JSON.parse(String(init.body))); return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ approved: !rejectJudge, score: rejectJudge ? 10 : 96, issues: rejectJudge ? ["来源不支持此主张"] : [], suggestions: [], reason: rejectJudge ? "原文限定相冲突" : "逐项原文支持" }) } }] })); }));
+  vi.stubGlobal("fetch", vi.fn(async (_url, init) => {
+    modelCalls.push(JSON.parse(String(init.body)));
+    return new Response(JSON.stringify({
+      id: "marketing-authority-judge",
+      model: "deepseek-flash",
+      choices: [{
+        finish_reason: "stop",
+        message: { content: JSON.stringify({
+          approved: !rejectJudge,
+          score: rejectJudge ? 10 : 96,
+          issues: rejectJudge ? ["来源不支持此主张"] : [],
+          suggestions: [],
+          reason: rejectJudge ? "原文限定相冲突" : "逐项原文支持",
+        }) },
+      }],
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 30,
+        total_tokens: 130,
+        completion_tokens_details: { reasoning_tokens: 10 },
+      },
+    }));
+  }));
 });
 afterEach(async () => { vi.unstubAllGlobals(); await rm(root, { recursive: true, force: true }); });
 async function prepare(options: { noSearch?: boolean; noAux?: boolean; badQuote?: boolean; modelFailure?: boolean; mode?: string; attempt?: number } = {}): Promise<PreparedMarketingFacts> {

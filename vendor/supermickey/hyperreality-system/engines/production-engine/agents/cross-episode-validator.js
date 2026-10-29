@@ -12,7 +12,7 @@ class CrossEpisodeValidator {
     this.config = {
       // LLM配置
       llmEngine: options.llmEngine || null,
-      model: options.model || 'kimi-k2p6',
+      model: options.model || 'deepseek-flash',
       timeout: options.timeout || 120000,
       // 置信度阈值
       confidence: {
