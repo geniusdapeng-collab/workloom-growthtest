@@ -44,6 +44,7 @@ import {
   resolveVideoApiKey,
   resolveVideoModel,
 } from "./llm-config.js";
+import { POST_RENDER_STAGES, postProcessingVerdict } from "./post-render-acceptance.js";
 import {
   OpenAiCompatibleProvider,
   type ChatResult,
@@ -352,6 +353,7 @@ export function coerceJudgeResult(json: unknown): JudgeResult | null {
  * 评审一个环节。返回裁决；调用方按 `approved` 决定放行或重跑。
  */
 export async function reviewStage(options: ProducerGateOptions): Promise<ProducerVerdict> {
+  if (POST_RENDER_STAGES.has(options.stage)) return postProcessingVerdict(options);
   const started = Date.now();
   const log = options.log ?? (() => undefined);
   const stage = options.stage;
