@@ -14,12 +14,21 @@ import { videoRuntimeRoot } from "./runtime-root.js";
  * 真实计量 + model.call 事件留痕 + 降级链），vendor 只读纪律不破。
  */
 import {
+  deepSeekInputTokenBudget,
+  estimateDeepSeekTokens,
+  isDeepSeekFlashModel,
   routeSmart, OpenAiCompatibleProvider, type EventSink, type ModelPolicy, type ModelProvider, type PlanId,
 } from "@workloom/base/model-router";
 import { existsSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  resolveOpenAiCompatibleBaseUrl,
+  resolveVideoApiKey,
+  resolveVideoModel,
+  resolveVideoNonThinking,
+} from "./llm-config.js";
 
 export interface LLMReasonOptions {
   signal?: AbortSignal;
@@ -67,6 +76,10 @@ export interface WorkloomLLMEngineConfig {
     scene?: string;
     /** Deployment assembly only; actual model IDs remain in metering events. */
     modelChain?: string[];
+    /** Pin the video text model and disable vendor substitution. */
+    forceModel?: string;
+    /** Video text reasoning policy; Flash defaults to non-thinking. */
+    nonThinking?: boolean;
   };
 }
 
@@ -112,16 +125,35 @@ export class WorkloomLLMEngine {
 
   /** 从底座四环境变量构建（LLM_BASE_URL/LLM_API_KEY/LLM_MODEL，LLM_PROVIDER 仅作记录） */
   static fromEnv(env: NodeJS.ProcessEnv = process.env): WorkloomLLMEngine | null {
-    const baseUrl = env.LLM_BASE_URL;
-    const apiKey = env.LLM_API_KEY;
-    const model = env.LLM_MODEL;
+    const baseUrl = resolveOpenAiCompatibleBaseUrl(env);
+    const apiKey = resolveVideoApiKey(env);
+    const model = resolveVideoModel(env);
     if (!baseUrl || !apiKey || !model) return null;
     const toggle=env.WORKLOOM_LLM_THINKING;
+    const thinking = ["enabled","disabled"].includes(toggle??"")
+      ? { type: toggle }
+      : resolveVideoNonThinking(model, env) ? { type: "disabled" } : undefined;
     return new WorkloomLLMEngine({ baseUrl, apiKey, model,
-      ...(["enabled","disabled"].includes(toggle??"")?{thinking:{type:toggle}}:{}) });
+      ...(thinking ? { thinking } : {}) });
   }
 
   private async callChat(prompt: string, opts: LLMReasonOptions): Promise<LLMReasonResult> {
+    const activeModel = opts.model ?? this.cfg.model;
+    if (isDeepSeekFlashModel(activeModel)) {
+      const outputTokens = opts.maxTokens ?? this.cfg.maxTokens;
+      const inputTokens = estimateDeepSeekTokens([opts.systemPrompt ?? "", prompt].join("\n"));
+      try {
+        if (inputTokens > deepSeekInputTokenBudget(outputTokens)) {
+          return {
+            success: false,
+            error: `DEEPSEEK_CONTEXT_EXCEEDED: estimated ${inputTokens} input tokens + ${outputTokens} output tokens`,
+            retryable: false,
+          };
+        }
+      } catch (error) {
+        return { success: false, error: error instanceof Error ? error.message : String(error), retryable: false };
+      }
+    }
     // v3.0 收口：router 注入 → 经 routeSmart（场景 preproduction；fastModel 快速调用强制 L1）
     if (this.cfg.router) {
       const scene = this.cfg.router.scene ?? "preproduction";
@@ -132,6 +164,16 @@ export class WorkloomLLMEngine {
             action: scene, scene, plan: this.cfg.router.plan,
             signal: opts.signal, timeoutMs: opts.timeoutMs,
             forceTier: isFast ? "L1" : undefined,
+            ...(this.cfg.router.forceModel ? { forceModel: this.cfg.router.forceModel } : {}),
+            generation: {
+              temperature: opts.temperature ?? 1,
+              topP: opts.topP ?? 0.95,
+              maxTokens: opts.maxTokens ?? this.cfg.maxTokens,
+              responseFormat: opts.forceJson ? { type: "json_object" } : opts.responseFormat,
+              thinking: this.cfg.router.nonThinking ?? this.cfg.thinking?.type === "disabled"
+                ? { type: "disabled" }
+                : opts.thinking && typeof opts.thinking === "object" ? opts.thinking : this.cfg.thinking,
+            },
             messages: [
               {
                 role: "system",

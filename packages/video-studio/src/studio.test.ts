@@ -203,6 +203,17 @@ describe("LLM 适配器", () => {
     expect(engine?.model).toBe("m");
   });
 
+  it("DeepSeek deployment accepts DEEPSEEK_* and canonicalizes the Flash alias", () => {
+    const engine = WorkloomLLMEngine.fromEnv({
+      DEEPSEEK_BASE_URL: "https://api.deepseek.com/anthropic",
+      LLM_BASE_URL: "https://api.deepseek.com",
+      DEEPSEEK_API_KEY: "test-only",
+      DEEPSEEK_MODEL: "deepseek-v4-flash",
+    });
+    expect(engine).not.toBeNull();
+    expect(engine?.model).toBe("deepseek-flash");
+  });
+
   it("JSON 提取容错：围栏/前后噪声", () => {
     const extract = (WorkloomLLMEngine as unknown as { extractJson(t: string): unknown })
       .extractJson;

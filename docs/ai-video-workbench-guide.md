@@ -1,7 +1,7 @@
 # Growthtest 视频调用指南：AI 工作台先读，再制作
 
 > guideVersion: 2026-10-15.2
-> 适用仓库：`workloom-ai/workloom-growthtest`（隔离副本）；本次引导改动前生产基线：`c28f11cd3d200770ee15d21c4ed98176d2e6bbb9`。
+> 适用仓库：`geniusdapeng-collab/workloom-growthtest`（隔离副本）；本次引导改动前生产基线：`c28f11cd3d200770ee15d21c4ed98176d2e6bbb9`。
 > 读者：Codex、DeepSeek Harness 桌面端及其它可调用本仓 CLI / stdio MCP 的 AI 工作台。
 
 目标是把用户原话变成符合约束的作品：人、商品、平台、时长、账号调性、声音和特殊要求始终有依据。工作台负责组织调用与解释回执；剧本、提示词、渲染和后期使用本仓正式执行器。已交付作品的经验应进入本指南和生产机制，不能依赖某次对话记忆。

@@ -26,6 +26,12 @@ import {
   routeVideoPipeline,
   type VideoPipelineKind,
 } from "../../packages/video-studio/src/pipeline-router.js";
+import {
+  resolveOpenAiCompatibleBaseUrl,
+  resolveVideoApiKey,
+  resolveVideoModel,
+  resolveVideoNonThinking,
+} from "../../packages/video-studio/src/llm-config.js";
 
 function arg(name: string, fallback = ""): string {
   const index = process.argv.indexOf(name);
@@ -81,9 +87,11 @@ if (flag("--llm")) {
       if (match && match[2]!.trim()) env[match[1]!] = match[2]!.trim();
     }
   }
-  const key = process.env.DEEPSEEK_API_KEY || env.DEEPSEEK_API_KEY;
-  const baseUrl = (process.env.DEEPSEEK_BASE_URL || env.DEEPSEEK_BASE_URL || "https://api.deepseek.com").replace(/\/$/, "");
-  const model = process.env.DEEPSEEK_MODEL || env.DEEPSEEK_MODEL || "deepseek-chat";
+  const combined = { ...env, ...process.env };
+  const key = resolveVideoApiKey(combined);
+  const baseUrl = resolveOpenAiCompatibleBaseUrl(combined) || "https://api.deepseek.com";
+  const model = resolveVideoModel(combined) || "deepseek-flash";
+  const nonThinking = resolveVideoNonThinking(model, combined);
   if (!key) {
     llmNote = `未启用（${envFile} 里没有 DEEPSEEK_API_KEY → 降级为纯规则）`;
   } else {
@@ -92,7 +100,13 @@ if (flag("--llm")) {
       const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-        body: JSON.stringify({ model, messages: [{ role: "user", content: prompt }], temperature: 0, response_format: { type: "json_object" } }),
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          temperature: 0,
+          response_format: { type: "json_object" },
+          ...(nonThinking ? { thinking: { type: "disabled" } } : {}),
+        }),
         signal: AbortSignal.timeout(20_000),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);

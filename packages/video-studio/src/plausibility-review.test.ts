@@ -95,6 +95,29 @@ describe("实体与物理常识审核 agent", () => {
     expect(passed.findings).toHaveLength(1);
   });
 
+  it("Flash text review pins canonical JSON and non-thinking mode", async () => {
+    let body: Record<string, unknown> | null = null;
+    const result = await reviewPlausibility(baseContext, {
+      env: {
+        LLM_BASE_URL: "https://api.deepseek.com",
+        DEEPSEEK_BASE_URL: "https://api.deepseek.com/anthropic",
+        DEEPSEEK_API_KEY: "test-only",
+        DEEPSEEK_MODEL: "deepseek-flash",
+      },
+      fetchImpl: (async (_input: string | URL | Request, init?: RequestInit) => {
+        body = JSON.parse(String(init?.body ?? "{}")) as Record<string, unknown>;
+        return jsonResponse({ verdict: "pass", findings: [], promptPatches: [], reason: "ok" });
+      }) as typeof fetch,
+    });
+    expect(result.verdict).toBe("pass");
+    expect(body).toMatchObject({
+      model: "deepseek-flash",
+      response_format: { type: "json_object" },
+      max_tokens: 16_384,
+      thinking: { type: "disabled" },
+    });
+  });
+
   it("无模型 / HTTP 失败 / 输出不可解析 → unverified（调用方 fail-closed）", async () => {
     const noModel = await reviewPlausibility(baseContext, { env: {}, fetchImpl: (async () => jsonResponse({})) as unknown as typeof fetch });
     expect(noModel.verdict).toBe("unverified");

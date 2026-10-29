@@ -116,6 +116,7 @@ describe("固定影片工位通道（T-2026-0927-0039）", () => {
     expect(() => parseFilmWorkerJobContext({ ...env, FILM_JOB_ID: "FJ-2" })).toThrow(/不一致/);
     expect(() => parseFilmWorkerJobContext({ ...env, FILM_JOB_CONTEXT: "{}" })).toThrow(/缺失或格式非法/);
     expect(() => parseFilmWorkerJobContext({ ...env, VOLCENGINE_ARK_API_KEY: "leaked" })).toThrow(/不得携带/);
+    expect(() => parseFilmWorkerJobContext({ ...env, DEEPSEEK_API_KEY: "leaked" })).toThrow(/不得携带/);
     expect(() => parseFilmWorkerJobContext({ ...env, WORKLOOM_AUDIO_STEM_SIGNING_SECRET: "leaked" })).toThrow(/不得携带/);
     expect(() => parseFilmWorkerJobContext({ ...env, FILM_JOB_CONTEXT: JSON.stringify({ ...context, allowedMethods: ["exec"] }) })).toThrow(/缺失或格式非法/);
   });

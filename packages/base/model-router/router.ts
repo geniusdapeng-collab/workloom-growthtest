@@ -13,13 +13,20 @@
  *   账单 = 事件投影，不重算（L6.3）
  */
 import { OFF_PEAK_RATE_RATIO, OFF_PEAK_WINDOW } from "@workloom/shared";
-import { mockCredits, type ChatMessage, type ChatResult, type ModelProvider } from "./providers.js";
+import { mockCredits, type ChatGenerationOptions, type ChatMessage, type ChatResult, type ModelProvider } from "./providers.js";
 import {
   DEFAULT_MODEL_POLICY, resolveScene, resolveTier, tierUp,
   type ModelPolicy, type PlanId, type Tier3,
 } from "./policy.js";
 import { chainFor } from "./pool.js";
 import { computeCredits } from "./credits.js";
+import {
+  DEEPSEEK_FLASH_CONTEXT_TOKENS,
+  DEFAULT_JSON_OUTPUT_TOKENS,
+  LONG_CONTEXT_TOKENS,
+  deepSeekInputTokenBudget,
+  estimateDeepSeekTokens,
+} from "./token-budget.js";
 
 /* ================= 峰谷窗口（F6.3，Asia/Shanghai） ================= */
 
@@ -270,18 +277,24 @@ export function projectBill(events: Array<{ model_trace?: { model_id: string; ti
 
 /* ================= v3.0 通用调度：routeSmart（场景 × 套餐 × 复杂度 × 真实计量） ================= */
 
-/** 长文路由条件：输入字符超阈值 → 档内长文款前置（≈32K tokens 粗估） */
-export const LONG_CONTEXT_CHARS = 24_000;
-/** 档内 token 天花板：估算超限 → 自动升一档（复杂度信号，规则引擎零成本） */
-export const TIER_TOKEN_CEILING: Record<Tier3, number> = { L1: 4000, L2: 24_000, L3: Number.POSITIVE_INFINITY };
+/** System limits use tokens, not characters. */
+export const TIER_TOKEN_CEILING: Record<Tier3, number> = {
+  L1: DEEPSEEK_FLASH_CONTEXT_TOKENS - DEFAULT_JSON_OUTPUT_TOKENS,
+  L2: DEEPSEEK_FLASH_CONTEXT_TOKENS - DEFAULT_JSON_OUTPUT_TOKENS,
+  L3: Number.POSITIVE_INFINITY,
+};
 
 export interface SmartTask extends RouteTask {
+  /** OpenAI-compatible generation controls, never model/accounting overrides. */
+  generation?: ChatGenerationOptions;
   /** 场景标识（model-policy.yml 的 scenes key；缺省 generic） */
   scene?: string;
   /** 租户套餐（缺省 standard） */
   plan?: PlanId;
   /** 强制档位（升级重答用；跳过场景表与套餐映射） */
   forceTier?: Tier3;
+  /** Current deployment model pin; no same/cross-tier substitution. */
+  forceModel?: string;
   /**
    * v3.0 轻量复杂度分类器（自由输入场景）：仅 scene=generic 且无 forceTier 时启用——
    * 规则启发式打不准时，用 L1 小模型做 3 分类（simple/medium/complex，单次 ~0.2 积分）。
@@ -343,7 +356,10 @@ export async function routeSmart(
   const scene = task.scene ?? "generic";
   const plan = task.plan ?? "standard";
   const sp = resolveScene(policy, scene);
-  let tier = task.forceTier ?? resolveTier(policy, scene, plan);
+  const forcedModel = task.forceModel?.trim();
+  let tier = forcedModel
+    ? (/flash/i.test(forcedModel) ? "L1" : /pro|max/i.test(forcedModel) ? "L2" : task.forceTier ?? resolveTier(policy, scene, plan))
+    : task.forceTier ?? resolveTier(policy, scene, plan);
   const callTimeoutMs = task.timeoutMs && task.timeoutMs > 0
     ? task.timeoutMs
     : (DEFAULT_SCENE_TIMEOUTS[scene] ?? DEFAULT_CALL_TIMEOUT_MS);
@@ -367,7 +383,7 @@ export async function routeSmart(
 
   // v3.0 轻量复杂度分类（自由输入场景）：generic + 无强制档 → 启发式定档；
   // 启发式拿不准（medium）且挂了分类器 → L1 小模型 3 分类复核（单次 ~0.2 积分）
-  if (!task.forceTier && scene === "generic") {
+  if (!task.forceTier && !forcedModel && scene === "generic") {
     const text = task.messages.map((m) => m.content).join("\n").slice(0, 2000);
     let c = heuristicComplexity(text);
     if (c === "medium" && task.complexityClassifier) {
@@ -378,10 +394,16 @@ export async function routeSmart(
     // medium：保持场景表/套餐映射结果（默认 L2）
   }
 
-  // 复杂度信号（确定性规则，零模型成本）：输入超档内天花板 → 升一档
-  const inputChars = task.messages.reduce((n, m) => n + m.content.length, 0);
-  if (inputChars > TIER_TOKEN_CEILING[tier]) tier = tierUp(tier) ?? tier;
-  const longContext = inputChars > LONG_CONTEXT_CHARS;
+  const inputTokens = estimateDeepSeekTokens(task.messages.map((message) => message.content).join("\n"));
+  if (!forcedModel && inputTokens > TIER_TOKEN_CEILING[tier]) tier = tierUp(tier) ?? tier;
+  const longContext = inputTokens > LONG_CONTEXT_TOKENS;
+  const outputTokens = task.generation?.maxTokens ?? DEFAULT_JSON_OUTPUT_TOKENS;
+  if (inputTokens > deepSeekInputTokenBudget(outputTokens)) {
+    const reason = `DEEPSEEK_CONTEXT_EXCEEDED: estimated ${inputTokens} input tokens + ${outputTokens} output tokens > ${DEEPSEEK_FLASH_CONTEXT_TOKENS}`;
+    const from = forcedModel ?? tier;
+    await sink.recordDegradation({ from, to: null, reason, action: task.action });
+    return { kind: "unavailable", degraded: [{ from, to: null, reason }], tier, scene };
+  }
 
   // F6.1 记忆复用：命中零消耗直返（留痕）
   if (task.memoryLookup) {
@@ -404,7 +426,7 @@ export async function routeSmart(
 
   const window = currentWindow(now);
   // 降级链：noDowngrade（金融/体检等质量红线）截断跨档段，只允许同档互备
-  const chain = opts.modelChain ?? chainFor(tier, { longContext, allowCrossTier: !sp.noDowngrade });
+  const chain = forcedModel ? [forcedModel] : opts.modelChain ?? chainFor(tier, { longContext, allowCrossTier: !sp.noDowngrade });
   const degraded: Array<{ from: string; to: string | null; reason: string }> = [];
 
   for (let i = 0; i < chain.length; i++) {
@@ -418,7 +440,11 @@ export async function routeSmart(
     }
     try {
       // GR-04：超时 + 外部取消信号真正下传到 fetch（此前 signal 在装配层丢失、"取消"只赢了 Promise.race）
-      const result: ChatResult = await provider.chat(task.messages, { signal: task.signal, timeoutMs: callTimeoutMs });
+      const result: ChatResult = await provider.chat(task.messages, {
+        ...task.generation,
+        signal: task.signal,
+        timeoutMs: callTimeoutMs,
+      });
       // 成功即清零该场景的连续失败计数（半开恢复）
       sceneCircuits.delete(scene);
       const credits = computeCredits({

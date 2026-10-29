@@ -78,6 +78,31 @@ describe("AI producer evidence gate", () => {
     expect((await reviewStage(textOptions({ artifacts: [{ path: file("large.txt", "a".repeat(100001)), kind: "text" }] }))).status).toBe("unverified");
     expect((await reviewStage(textOptions({ context: { large: "a".repeat(30001) } }))).status).toBe("unverified");
   });
+  it("DeepSeek Flash converts context to tokens and fails closed above its input budget", async () => {
+    const flashEnv = { LLM_BASE_URL: "https://api.deepseek.com", DEEPSEEK_API_KEY: "test-only", DEEPSEEK_MODEL: "deepseek-flash" };
+    const bodies: string[] = [];
+    const accepted = await reviewStage(textOptions({
+      env: flashEnv,
+      artifacts: [{ path: file("flash-1.7m-cjk.txt", "汉".repeat(1_700_000)), kind: "text" }],
+      fetchImpl: judge(good, bodies),
+    }));
+    expect(accepted.approved).toBe(true);
+    expect(JSON.parse(bodies[0]!)).toMatchObject({
+      model: "deepseek-flash",
+      response_format: { type: "json_object" },
+      max_tokens: 16_384,
+      thinking: { type: "disabled" },
+    });
+    const rejectedBodies: string[] = [];
+    const rejected = await reviewStage(textOptions({
+      env: flashEnv,
+      artifacts: [{ path: file("flash-over-context.txt", "汉".repeat(1_720_321)), kind: "text" }],
+      fetchImpl: judge(good, rejectedBodies),
+    }));
+    expect(rejected.status).toBe("unverified");
+    expect(rejected.reason).toContain("完整评审预算");
+    expect(rejectedBodies).toHaveLength(0);
+  });
   it("all seven images are reviewed in batches and a later reject wins", async () => {
     const images = Array.from({ length: 7 }, (_, i) => ({ path: file(`image-${i}.png`, png), kind: "image" as const }));
     const bodies: string[] = [];
@@ -140,6 +165,11 @@ describe("AI producer evidence gate", () => {
   it("credentials need all three fields", () => {
     expect(resolveProducerLlm({})).toBeNull(); expect(resolveProducerLlm({ LLM_BASE_URL: "x", LLM_API_KEY: "y" })).toBeNull();
     expect(resolveProducerLlm({ DEEPSEEK_BASE_URL: "https://api.example.com", DEEPSEEK_API_KEY: "k", DEEPSEEK_MODEL: "test" })?.model).toBe("test");
+    expect(resolveProducerLlm({
+      LLM_BASE_URL: "https://api.deepseek.com",
+      DEEPSEEK_API_KEY: "k",
+      DEEPSEEK_MODEL: "deepseek-flash",
+    })).toMatchObject({ model: "deepseek-flash", nonThinking: true });
   });
 });
 
