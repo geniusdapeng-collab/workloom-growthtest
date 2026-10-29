@@ -24,11 +24,11 @@ class FieldQualityPipeline {
   constructor(options = {}) {
     this.maxRounds = options.maxRounds ?? 2;
     this.checker = new FieldCheckAgent({
-      llmModel: options.llmModel || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6',
+      llmModel: options.llmModel || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
       llmTimeout: options.checkerTimeout || 120000,
     });
     this.repairer = new FieldRepairAgent({
-      llmModel: options.llmModel || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6',
+      llmModel: options.llmModel || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
       llmTimeout: options.repairerTimeout || 180000,
     });
 

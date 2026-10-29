@@ -19,11 +19,11 @@
  *   - options.failFirstRequests 可注入前 N 次 429/529，用于重试验证。
  */
 import { createServer, type Server } from "node:http";
-import { GATEWAY_MODEL, TYPESAFE_PATH, TYPESAFE_MODEL } from "./client.js";
+import { DEEPSEEK_FLASH_MODEL_ID } from "@workloom/base/model-router";
 import type { JevProvider } from "./types.js";
 
 /** 官方直连返回的是**具体版本号**（请求用别名 jev-latest，回答里是解析后的 id） */
-export const TYPESAFE_RESPONSE_MODEL = "jev-1.13.0";
+export const TYPESAFE_RESPONSE_MODEL = DEEPSEEK_FLASH_MODEL_ID;
 
 export interface MockGatewayOptions {
   /** 前 N 次请求返回限流/过载（按 statuses 轮转），用于重试与退避路径验证 */
@@ -157,7 +157,7 @@ export function mockResponse(
   options: { provider?: JevProvider; model?: string } = {},
 ): Record<string, unknown> {
   if (typeof body !== "object" || body === null) throw new Error("mock: 请求体不是对象");
-  const provider: JevProvider = options.provider ?? "typesafe";
+  void options.provider;
   const record = body as Record<string, unknown>;
   const state = (record["state"] ?? {}) as Record<string, unknown>;
   const questions = (record["questions"] ?? {}) as Record<string, Record<string, unknown>>;
@@ -200,38 +200,67 @@ export function mockResponse(
     if (conf !== undefined) confidence[id] = conf;
   }
 
-  if (provider === "typesafe") {
-    // 官方直连形状：模型回具体的版本化 id；choice/score 的置信度直接挂在回答上；
-    // Noul 没有置信度字段（协议层据此走派生置信度 → 分流更保守）。
-    for (const [id, answer] of Object.entries(answers)) {
-      const recordAnswer = answer as Record<string, unknown>;
-      if (recordAnswer["type"] !== "noul" && confidence[id] !== undefined) {
-        recordAnswer["confidence"] = confidence[id];
-      }
-    }
-    return {
-      model: options.model ?? (record["model"] === TYPESAFE_MODEL ? TYPESAFE_RESPONSE_MODEL : String(record["model"] ?? TYPESAFE_RESPONSE_MODEL)),
-      answers,
-      usage: {
-        input_tokens: Math.max(1, Math.round(inputChars / 4)),
-        output_tokens: questionCount * 12 + 6,
-      },
-    };
+  for (const [id, answer] of Object.entries(answers)) {
+    const recordAnswer = answer as Record<string, unknown>;
+    if (confidence[id] !== undefined) recordAnswer["confidence"] = confidence[id];
   }
-
   return {
-    model: options.model ?? GATEWAY_MODEL,
+    model: options.model ?? TYPESAFE_RESPONSE_MODEL,
     answers,
-    providerMetadata: { typesafe: { confidence } },
-    usage: { inputTokens: Math.max(1, Math.round(inputChars / 4)), outputTokens: 0 },
+    usage: {
+      prompt_tokens: Math.max(1, Math.round(inputChars / 4)),
+      completion_tokens: questionCount * 12 + 6,
+      total_tokens: Math.max(1, Math.round(inputChars / 4)) + questionCount * 12 + 6,
+    },
   };
 }
 
 /** 按请求路径判定通道（与真实世界的两条 URL 一一对应） */
 function providerOf(url: string, fallback: JevProvider | undefined): JevProvider {
-  if (url.includes(TYPESAFE_PATH)) return "typesafe";
-  if (url.includes("/v4/ai/evaluation-model")) return "vercel-gateway";
-  return fallback ?? "typesafe";
+  void url;
+  return fallback ?? "deepseek";
+}
+
+function requestFromChatBody(body: Record<string, unknown>): Record<string, unknown> {
+  const messages = Array.isArray(body.messages) ? body.messages : [];
+  const text = messages
+    .map((message) => {
+      if (!message || typeof message !== "object") return "";
+      const content = (message as Record<string, unknown>).content;
+      if (typeof content === "string") return content;
+      if (!Array.isArray(content)) return "";
+      return content.map((part) => (
+        part && typeof part === "object" && (part as Record<string, unknown>).type === "text"
+          ? String((part as Record<string, unknown>).text ?? "")
+          : ""
+      )).join("");
+    })
+    .join("\n");
+  const marker = text.match(/^WORKLOOM_JEV_REQUEST=(.+)$/m)?.[1];
+  if (!marker) throw new Error("mock: chat prompt 缺少 WORKLOOM_JEV_REQUEST");
+  return JSON.parse(marker) as Record<string, unknown>;
+}
+
+function responseForBody(url: string, body: Record<string, unknown>, options: MockGatewayOptions): Record<string, unknown> {
+  if (url.includes("/chat/completions") || Array.isArray(body.messages)) {
+    const core = mockResponse(requestFromChatBody(body), {
+      provider: "deepseek",
+      model: options.model,
+    });
+    return {
+      id: `chatcmpl-mock-${Date.now()}`,
+      model: core.model,
+      choices: [{
+        finish_reason: "stop",
+        message: {
+          role: "assistant",
+          content: JSON.stringify({ answers: core.answers }),
+        },
+      }],
+      usage: core.usage,
+    };
+  }
+  return mockResponse(body, { provider: "deepseek", model: options.model });
 }
 
 function makeFetch(options: MockGatewayOptions, state: MockState): typeof fetch {
@@ -247,8 +276,7 @@ function makeFetch(options: MockGatewayOptions, state: MockState): typeof fetch 
       });
     }
     const body = init?.body ? JSON.parse(String(init.body)) : {};
-    const provider = options.provider ?? providerOf(String(input), undefined);
-    return new Response(JSON.stringify(mockResponse(body, { provider, model: options.model })), {
+    return new Response(JSON.stringify(responseForBody(String(input), body, options)), {
       status: 200,
       headers: { "content-type": "application/json" },
     });
@@ -287,7 +315,7 @@ export async function startMockServer(options: MockGatewayOptions = {}): Promise
       try {
         const body = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify(mockResponse(body, { provider, model: options.model })));
+        response.end(JSON.stringify(responseForBody(request.url ?? "", body, { ...options, provider })));
       } catch (error) {
         response.writeHead(400, { "content-type": "application/json" });
         response.end(JSON.stringify({ error: { message: String(error) } }));

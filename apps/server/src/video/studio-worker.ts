@@ -32,7 +32,6 @@ import {
   installVendorPortraitBindingBridge,
   installVendorRenderCompatBridge,
   resolveVideoModel,
-  resolveVideoNonThinking,
   reviewStage,
   updateContextBundle,
   buildDirectorDefaults, directorGuidance, resolveDeliveryTargets, compilePersonPresentation, shotPresentationGuidance,
@@ -597,7 +596,6 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     policy: modelPolicyFor("ai-video"),
     scene: "preproduction",
     forceModel,
-    nonThinking: forceModel ? resolveVideoNonThinking(forceModel, process.env) : false,
   };
   if(directorMode)llm.attachConfiguredRouter(studioRouter);else llm.attachRouter(studioRouter);
 

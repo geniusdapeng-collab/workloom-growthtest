@@ -18,11 +18,7 @@ import { Icon, clientChineseText } from "@workloom/ui";
 import { modelTestReplyText, onboardingStatusSystemText, publicationSystemText } from "./systemText";
 
 const PROVIDERS: Array<{ key: string; label: string; baseUrl: string; model: string }> = [
-  { key: "deepseek", label: "DeepSeek（深度求索）", baseUrl: "https://api.deepseek.com/v1", model: "deepseek-chat" },
-  { key: "moonshot", label: "Moonshot Kimi", baseUrl: "https://api.moonshot.cn/v1", model: "moonshot-v1-8k" },
-  { key: "zhipu", label: "智谱 GLM", baseUrl: "https://open.bigmodel.cn/api/paas/v4", model: "glm-4-flash" },
-  { key: "openai", label: "OpenAI", baseUrl: "https://api.openai.com/v1", model: "gpt-4o-mini" },
-  { key: "custom", label: "自定义（OpenAI 兼容网关）", baseUrl: "", model: "" },
+  { key: "deepseek", label: "DeepSeek text.primary", baseUrl: "https://api.deepseek.com", model: "deepseek-flash" },
 ];
 
 const STEPS = ["环境自检", "真实大模型", "经营主体", "启用真实模式", "AI 服务前台"] as const;
@@ -431,13 +427,13 @@ export default function Onboarding() {
               ))}
             </div>
             <label className="block text-body text-ink3">模型接口地址
-              <input className={`${inputCls} mt-1`} value={baseUrl} onChange={(e) => { setBaseUrl(e.target.value); setTestResult(null); }} placeholder="https://api.deepseek.com/v1" />
+              <input className={`${inputCls} mt-1`} value={baseUrl} onChange={(e) => { setBaseUrl(e.target.value); setTestResult(null); }} placeholder="https://api.deepseek.com" />
             </label>
             <label className="block text-body text-ink3">接口密钥 <span className="text-ink3/70">（只落盘到本机环境配置，事件留痕仅记掩码后 4 位）</span>
               <input className={`${inputCls} mt-1`} type="password" value={apiKey} onChange={(e) => { setApiKey(e.target.value); setTestResult(null); }} placeholder="sk-……" />
             </label>
             <label className="block text-body text-ink3">模型
-              <input className={`${inputCls} mt-1`} value={model} onChange={(e) => { setModel(e.target.value); setTestResult(null); }} placeholder="deepseek-chat" />
+              <input className={`${inputCls} mt-1`} value={model} onChange={(e) => { setModel(e.target.value); setTestResult(null); }} placeholder="deepseek-flash" />
             </label>
             {testResult && (
               <div className={`break-words rounded-lg border px-3 py-2 text-body ${testResult.ok ? "border-go/50 bg-go/10 text-go" : "border-warn/50 bg-warn/10 text-warn"}`}>

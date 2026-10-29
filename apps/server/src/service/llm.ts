@@ -60,27 +60,31 @@ export function routedLlmCall(deps: {
   industryResolver?: () => Promise<string | null>;
 }): LlmCall | undefined {
   if ((process.env.LLM_PROVIDER ?? "mock") === "mock") return undefined;
-  try {
-    const sink = new GatewayEventSink(deps.gateway, deps.scope);
-    return async (prompt: string, signal?: AbortSignal) => {
-      const industry = deps.industryResolver ? await deps.industryResolver() : deps.industry;
-      const policy = modelPolicyFor(industry);
-      const r = await routeSmart(
-        {
-          action: deps.scene, scene: deps.scene, plan: deps.plan,
-          messages: [{ role: "user", content: prompt }],
-          // GR-04：signal 下传 + 场景化超时（intent-classify 3s / quest-plan 120s / ask 45s…）
-          ...(signal ? { signal } : {}),
-        },
-        pool(), sink, { policy },
-      );
-      if ((r.kind === "answered" || r.kind === "circuit_broken") && r.text !== undefined) return r.text;
-      if (r.kind === "reused" && r.text !== undefined) return r.text;
-      throw new Error(`模型路由不可用（${r.kind}${r.passthrough ? "/passthrough" : ""}）`);
-    };
-  } catch {
-    return undefined; // 装配失败 → 确定性兜底（via=rule 留痕）
-  }
+  const sink = new GatewayEventSink(deps.gateway, deps.scope);
+  return async (prompt: string, signal?: AbortSignal) => {
+    const industry = deps.industryResolver ? await deps.industryResolver() : deps.industry;
+    const policy = modelPolicyFor(industry);
+    const r = await routeSmart(
+      {
+        action: deps.scene,
+        scene: deps.scene,
+        plan: deps.plan,
+        messages: [{ role: "user", content: prompt }],
+        ...(signal ? { signal } : {}),
+      },
+      pool(),
+      sink,
+      { policy },
+    );
+    if ((r.kind === "answered" || r.kind === "circuit_broken" || r.kind === "reused")
+      && r.text !== undefined) {
+      return r.text;
+    }
+    throw new Error(
+      r.failure?.reason
+        ?? `模型路由不可用（${r.kind}${r.passthrough ? "/passthrough" : ""}）`,
+    );
+  };
 }
 
 /* ---------- 向后兼容：无场景旧接口（等价于 scene=generic 的无 sink 轻量路径） ---------- */
@@ -90,32 +94,32 @@ let cachedScene = "generic";
 
 export function llmCall(scene = "generic"): LlmCall | undefined {
   if (cached !== undefined && cachedScene === scene) return cached ?? undefined;
-  try {
-    if ((process.env.LLM_PROVIDER ?? "mock") === "mock") {
-      cached = null;
-      return undefined;
-    }
-    // 旧路径仍可用但已标注：新代码一律用 routedLlmCall(scene)（计量/路由纪律）
-    const providers = pool();
-    cachedScene = scene;
-    cached = async (prompt: string, signal?: AbortSignal) => {
-      const { routeSmart: rs } = await import("@workloom/base/model-router");
-      const traces: unknown[] = [];
-      const r = await rs(
-        { action: scene, scene, messages: [{ role: "user", content: prompt }], ...(signal ? { signal } : {}) },
-        providers,
-        {
-          recordModelTrace: async (t) => { traces.push(t); },
-          recordDegradation: async () => undefined,
-          recordCircuitBreak: async () => undefined,
-        },
-      );
-      if ((r.kind === "answered" || r.kind === "reused" || r.kind === "circuit_broken") && r.text !== undefined) return r.text;
-      throw new Error(`模型路由不可用（${r.kind}）`);
-    };
-    return cached;
-  } catch {
+  if ((process.env.LLM_PROVIDER ?? "mock") === "mock") {
     cached = null;
     return undefined;
   }
+  const providers = pool();
+  cachedScene = scene;
+  cached = async (prompt: string, signal?: AbortSignal) => {
+    const r = await routeSmart(
+      {
+        action: scene,
+        scene,
+        messages: [{ role: "user", content: prompt }],
+        ...(signal ? { signal } : {}),
+      },
+      providers,
+      {
+        recordModelTrace: async () => undefined,
+        recordDegradation: async () => undefined,
+        recordCircuitBreak: async () => undefined,
+      },
+    );
+    if ((r.kind === "answered" || r.kind === "reused" || r.kind === "circuit_broken")
+      && r.text !== undefined) {
+      return r.text;
+    }
+    throw new Error(r.failure?.reason ?? `模型路由不可用（${r.kind}）`);
+  };
+  return cached;
 }

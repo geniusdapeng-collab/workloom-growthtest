@@ -11,6 +11,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import YAML from "yaml";
+import { TEXT_SCENE_POLICIES } from "./deepseek-policy.js";
 
 /* ================= 三档模型体系 ================= */
 
@@ -68,6 +69,16 @@ export interface ScenePolicy {
   billTo?: "tenant" | "platform";
   /** 调度窗口偏好：any / off-peak-only（非实时批量，可排队等谷时） */
   window?: "any" | "off-peak-only";
+  /** v3.1 text.primary scene controls. Tiers remain billing/analytics only. */
+  type?: "deterministic" | "structured_generation" | "reasoning_review" | "critical_decision";
+  thinking?: {
+    type: "enabled" | "disabled";
+    effort?: "low" | "high" | "max";
+  };
+  responseFormat?: "json_object" | "text";
+  outputBudget?: "maximum";
+  generationReviewGroup?: string;
+  sameModelAs?: string;
 }
 
 /* ================= 套餐策略 ================= */
@@ -147,6 +158,10 @@ export function resolveTier(policy: ModelPolicy, scene: string, plan: PlanId): T
 const VALID_TIERS: readonly string[] = TIER3_ORDER;
 const VALID_FALLBACKS: readonly FallbackMode[] = ["downgrade", "passthrough-disclose", "queue", "rule-template"];
 const VALID_SIGNALS: readonly EscalateSignal[] = ["low-confidence", "thumbs-down", "redteam-fail", "parse-fail", "gate-blocked"];
+const VALID_TEXT_TYPES = ["deterministic", "structured_generation", "reasoning_review", "critical_decision"];
+const VALID_THINKING_TYPES = ["enabled", "disabled"];
+const VALID_EFFORTS = ["low", "high", "max"];
+const VALID_RESPONSE_FORMATS = ["json_object", "text"];
 
 /** 解析并校验 model-policy.yml 文本；issues 为空即合法（纯函数，装配校验器复用） */
 export function parseModelPolicy(text: string): { policy: ModelPolicy | null; issues: string[] } {
@@ -160,6 +175,7 @@ export function parseModelPolicy(text: string): { policy: ModelPolicy | null; is
   const doc = raw as Partial<ModelPolicy> | null;
   if (!doc || typeof doc !== "object") return { policy: null, issues: ["model-policy.yml 内容为空或不是对象"] };
   const scenes = (doc.scenes ?? {}) as Record<string, ScenePolicy>;
+  const mergedScenes = { ...DEFAULT_MODEL_POLICY.scenes, ...scenes };
   for (const [name, sp] of Object.entries(scenes)) {
     if (!sp || typeof sp !== "object") { issues.push(`场景「${name}」定义非法`); continue; }
     if (!VALID_TIERS.includes(sp.tier)) issues.push(`场景「${name}」tier 非法：${String(sp.tier)}（须为 L1/L2/L3）`);
@@ -169,20 +185,41 @@ export function parseModelPolicy(text: string): { policy: ModelPolicy | null; is
     }
     if (sp.billTo && !["tenant", "platform"].includes(sp.billTo)) issues.push(`场景「${name}」billTo 非法：${String(sp.billTo)}`);
     if (sp.window && !["any", "off-peak-only"].includes(sp.window)) issues.push(`场景「${name}」window 非法：${String(sp.window)}`);
+    if (sp.type && !VALID_TEXT_TYPES.includes(sp.type)) {
+      issues.push(`场景「${name}」type 非法：${String(sp.type)}`);
+    }
+    if (sp.thinking) {
+      if (!VALID_THINKING_TYPES.includes(sp.thinking.type)) {
+        issues.push(`场景「${name}」thinking.type 非法：${String(sp.thinking.type)}`);
+      }
+      if (sp.thinking.type === "enabled" && !VALID_EFFORTS.includes(sp.thinking.effort ?? "")) {
+        issues.push(`场景「${name}」thinking.effort 非法：${String(sp.thinking.effort)}`);
+      }
+    }
+    if (sp.responseFormat && !VALID_RESPONSE_FORMATS.includes(sp.responseFormat)) {
+      issues.push(`场景「${name}」responseFormat 非法：${String(sp.responseFormat)}`);
+    }
+    if (sp.outputBudget && sp.outputBudget !== "maximum") {
+      issues.push(`场景「${name}」outputBudget 只能为 maximum`);
+    }
+    if (sp.sameModelAs && !mergedScenes[sp.sameModelAs]
+      && !(sp.sameModelAs in TEXT_SCENE_POLICIES)) {
+      issues.push(`场景「${name}」sameModelAs 指向未定义场景「${sp.sameModelAs}」`);
+    }
   }
   const plans = (doc.plans ?? DEFAULT_MODEL_POLICY.plans) as Record<PlanId, PlanStrategy>;
   for (const [pid, ps] of Object.entries(plans)) {
     if (!["lite", "standard", "smart"].includes(pid)) { issues.push(`套餐「${pid}」非法（须为 lite/standard/smart）`); continue; }
     for (const [scene, tier] of Object.entries(ps.tierOverrides ?? {})) {
       if (!VALID_TIERS.includes(tier)) issues.push(`套餐「${pid}」覆盖场景「${scene}」tier 非法：${String(tier)}`);
-      if (!scenes[scene]) issues.push(`套餐「${pid}」覆盖了未定义场景「${scene}」`);
+      if (!mergedScenes[scene]) issues.push(`套餐「${pid}」覆盖了未定义场景「${scene}」`);
     }
   }
   if (issues.length > 0) return { policy: null, issues };
   return {
     policy: {
       version: String(doc.version ?? "v3.0"),
-      scenes: { ...DEFAULT_MODEL_POLICY.scenes, ...scenes }, // 行业场景覆盖底座默认，未点名场景继承
+      scenes: mergedScenes, // 行业场景覆盖底座默认，未点名场景继承
       plans: { ...DEFAULT_MODEL_POLICY.plans, ...plans },
     },
     issues: [],

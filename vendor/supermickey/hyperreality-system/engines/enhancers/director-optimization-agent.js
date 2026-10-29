@@ -25,7 +25,7 @@ class DirectorOptimizationAgent {
 
     // LLM 配置（降级保护）
     this.llmEnabled = options.llmEnabled !== false;
-    this.llmModel = options.llmModel || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6';
+    this.llmModel = options.llmModel || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash';
     this.llmTimeout = options.llmTimeout || 180000;
     this.llmMaxRetries = options.llmMaxRetries || 2;
   }

@@ -27,13 +27,9 @@ function memSink() {
   return { sink, traces, degrades, breaks_ };
 }
 
-const providers = (over: Record<string, ConstructorParameters<typeof MockProvider>[1]> = {}) =>
+const providers = (over: ConstructorParameters<typeof MockProvider>[1] = {}) =>
   new Map([
-    ["mock-flagship-a", new MockProvider("mock-flagship-a", over.a)],
-    ["mock-flagship-b", new MockProvider("mock-flagship-b", over.b)],
-    ["mock-standard-c", new MockProvider("mock-standard-c", over.c)],
-    ["mock-standard-a", new MockProvider("mock-standard-a", over.sa)],
-    ["mock-standard-b", new MockProvider("mock-standard-b", over.sb)],
+    ["deepseek-flash", new MockProvider("deepseek-flash", over)],
   ]);
 
 const task = (over: Partial<RouteTask> = {}): RouteTask => ({
@@ -68,21 +64,21 @@ describe("调度主链路", () => {
     expect(traces[0]).toMatchObject({ credits: 0, reused: true });
   });
 
-  it("F6.4/L6.1 主模型故障 → 按链切换且每次降级写事件（禁止静默）", async () => {
+  it("F6.4/L6.1 主模型故障 → 同模型失败关闭，不跨厂商切换", async () => {
     const { sink, degrades, traces } = memSink();
-    const r = await route(task({ action: "content.publish" }), providers({ a: { down: true } }), sink);
-    expect(r.kind).toBe("answered");
-    expect(r.modelTrace?.model_id).toBe("mock-flagship-b"); // 链：A→B→C
-    expect(degrades).toEqual([{ from: "mock-flagship-a", to: "mock-flagship-b", reason: "unhealthy", action: "content.publish" }]);
-    expect(traces.length).toBe(1); // 计量只有实际调用
+    const r = await route(task({ action: "content.publish" }), providers({ failFirst: 99 }), sink);
+    expect(r.kind).toBe("unavailable");
+    expect(r.degraded?.[0]).toMatchObject({ from: "deepseek-flash", to: null });
+    expect(degrades).toHaveLength(1);
+    expect(traces).toHaveLength(0);
   });
 
   it("E6.1 全链不可用 → queueable 排队 / 否则转需介入", async () => {
     const { sink } = memSink();
-    const allDown = providers({ sa: { down: true }, sb: { down: true } });
+    const allDown = providers({ failFirst: 99 });
     const q = await route(task({ queueable: true }), allDown, sink);
     expect(q.kind).toBe("queued");
-    const u = await route(task(), providers({ sa: { down: true }, sb: { down: true } }), memSink().sink);
+    const u = await route(task(), providers({ failFirst: 99 }), memSink().sink);
     expect(u.kind).toBe("unavailable");
   });
 
@@ -108,14 +104,13 @@ describe("调度主链路", () => {
 describe("出站脱敏（F6.6/L6.2）", () => {
   it("发往模型的内容无 PII 明文（Mock 应答回显入参佐证）", async () => {
     const { sink } = memSink();
-    const p = new MockProvider("mock-standard-a");
     const r = await route(
       task({ messages: [{ role: "user", content: "客人 13812345678 要求..." }] }),
-      new Map([["mock-standard-a", p], ["mock-standard-b", new MockProvider("mock-standard-b")]]),
+      providers(),
       sink,
     );
-    // OpenAI 兼容提供方内部强制 maskDeep；Mock 路径由 router 层保证口径一致（B8 统一封装后mock亦过脱敏）
     expect(r.kind).toBe("answered");
+    expect(r.text).not.toContain("13812345678");
   });
 });
 
@@ -157,9 +152,9 @@ d("PG 集成（GatewayEventSink 计量落库）", async () => {
 
   it("降级事件落库（L6.1 可审计）", async () => {
     const sink = new GatewayEventSink(gw, scope);
-    await route(task(), providers({ sa: { down: true } }), sink);
+    await route(task(), providers({ failFirst: 99 }), sink);
     const page = await searchEvents(app, scope, { action: "model.degraded" }, { limit: 10 });
     expect(page.events.length).toBeGreaterThan(0);
-    expect(page.events[0]!.decision.after).toMatchObject({ model: "mock-standard-b" });
+    expect(page.events[0]!.decision.after).toMatchObject({ from: "deepseek-flash", to: null });
   });
 });

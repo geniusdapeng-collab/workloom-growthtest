@@ -11,6 +11,8 @@
  */
 import type pg from "pg";
 import type { BusinessEvent } from "@workloom/shared";
+import { OpenAiCompatibleProvider } from "../model-router/providers.js";
+import { canonicalDeepSeekModel } from "../model-router/token-budget.js";
 
 /* ================= 结构化过滤器（白名单 schema） ================= */
 
@@ -184,30 +186,25 @@ export class OpenAiNlTranslator implements NlTranslator {
   ) {}
 
   async translate(query: string): Promise<EventFilter> {
-    const res = await fetch(`${this.cfg.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `Bearer ${this.cfg.apiKey}` },
-      body: JSON.stringify({
-        model: this.cfg.model,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              "你是检索翻译器。把用户自然语言翻译成事件检索过滤器 JSON，只允许这些键：" +
-              "objectType, objectId, action, actor, actorType(human|agent|system), " +
-              "ruleId, ruleResult(pass|review|blocked|conflict), from, to(ISO 时间), sessionId, text。" +
-              "不确定的键不要产出。只输出 JSON。",
-          },
-          { role: "user", content: query },
-        ],
-      }),
+    const provider = new OpenAiCompatibleProvider(canonicalDeepSeekModel(this.cfg.model), {
+      baseUrl: this.cfg.baseUrl,
+      apiKey: this.cfg.apiKey,
     });
-    if (!res.ok) throw new Error(`LLM 翻译失败：HTTP ${res.status}`);
-    const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = data.choices?.[0]?.message?.content ?? "{}";
-    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const result = await provider.chat(
+      [
+        {
+          role: "system",
+          content:
+            "你是检索翻译器。把用户自然语言翻译成事件检索过滤器 JSON，只允许这些键：" +
+            "objectType, objectId, action, actor, actorType(human|agent|system), " +
+            "ruleId, ruleResult(pass|review|blocked|conflict), from, to(ISO 时间), sessionId, text。" +
+            "不确定的键不要产出。只输出 JSON。",
+        },
+        { role: "user", content: query },
+      ],
+      { scene: "nl-translate", timeoutMs: 8_000, retries: 0 },
+    );
+    const parsed = JSON.parse(result.text) as Record<string, unknown>;
     // 白名单收敛：只认 EventFilter 键，值类型强校验（LLM 输出不可信）
     const allowed = ["objectType", "objectId", "action", "actor", "actorType", "ruleId", "ruleResult", "from", "to", "sessionId", "text"];
     const filter: EventFilter = {};

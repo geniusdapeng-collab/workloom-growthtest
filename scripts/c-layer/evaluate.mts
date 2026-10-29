@@ -9,6 +9,7 @@
  */
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { OpenAiCompatibleProvider } from "../../packages/base/model-router/providers.js";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 const OUT = join(ROOT, "outputs", "c-layer");
@@ -64,22 +65,17 @@ const isDry = provider === "dry" || args.includes("--dry-run");
 async function callGateway(prompt: string): Promise<string> {
   const base = process.env.LLM_BASE_URL;
   const key = process.env.LLM_API_KEY;
-  const model = process.env.LLM_MODEL ?? "gpt-4o-mini";
+  const model = process.env.LLM_MODEL ?? "deepseek-flash";
   if (!base || !key) throw new Error("真实模型评测需要 LLM_BASE_URL 与 LLM_API_KEY（当前为空，fail-closed）");
-  const res = await fetch(`${base.replace(/\/$/, "")}/chat/completions`, {
-    method: "POST",
-    headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
-    body: JSON.stringify({
-      model,
-      messages: [
+  const providerClient = new OpenAiCompatibleProvider(model, { baseUrl: base, apiKey: key });
+  const result = await providerClient.chat(
+    [
         { role: "system", content: "你是 WorkLoom 获客用增系统的资深运营。回答必须：判断有依据、证据标强度、边界该请示就请示、产出可直接使用。" },
         { role: "user", content: prompt },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`LLM 网关 ${res.status}`);
-  const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-  return json.choices?.[0]?.message?.content ?? "";
+    ],
+    { scene: "workloom.evaluation", timeoutMs: 600_000, retries: 0 },
+  );
+  return result.text;
 }
 
 const results: Array<{ id: string; dimension: string; mode: string; answer: string }> = [];

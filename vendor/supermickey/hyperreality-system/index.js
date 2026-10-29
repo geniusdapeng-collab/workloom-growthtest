@@ -141,8 +141,8 @@ class HyperrealitySystem {
     // 🛡️ v2.1.5-shield: 三层稳定性护盾
     this.stabilityShield = new StabilityShield({
       baselineRegistryDir: options.baselineRegistryDir || path.join(__dirname, './shields/baseline-registry/templates'),
-      primaryModel: options.primaryModel || 'kimi-k2p6',
-      backupModel: options.backupModel || 'kimi-k2p5',
+      primaryModel: options.primaryModel || 'deepseek-flash',
+      backupModel: options.backupModel || 'deepseek-flash',
       cacheEnabled: options.cacheEnabled !== false,
       llmTimeout: options.llmTimeout || 300000
     });
@@ -2457,7 +2457,7 @@ class HyperrealitySystem {
               const optimizer = new OpeningTitleOptimizer({
                 llmTimeout: 120000,
                 llmMaxRetries: 2,
-                llmModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6'
+                llmModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash'
               });
               // 【P2-10 修复】下发 deadline,防止不受控挂起
               optimizer.setDeadline(Date.now() + 180000); // 3分钟总体预算
@@ -3338,7 +3338,7 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
     const optimizer = new OpeningTitleOptimizer({
       llmTimeout: 120000,
       llmMaxRetries: 2,
-      llmModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6'
+      llmModel: process.env.STORMAXE_LLM_FAST_MODEL || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash'
     });
     optimizer.setDeadline(Date.now() + 180000);
     const themeMeta = metadata?._creativeTheme || {};
@@ -3410,15 +3410,13 @@ ${line('动作', actions, '（动作以镜头卡 action 字段为准）')}
     try {
       const { LLMEngine } = require('../systems/llm-reasoning-engine');
       const fs = require('fs');
-      const hasKey = !!(process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY
-        || process.env.KIMI_PLUGIN_API_KEY || process.env.OPENCLAW_CONFIG
-        || fs.existsSync('/root/.openclaw/openclaw.json'));
+      const hasKey = !!(process.env.DEEPSEEK_API_KEY || process.env.LLM_API_KEY);
       if (!hasKey) {
         console.warn('⚠️ [LLM接线] 未检测到任何 LLM 凭据，LLM 驱动环节将显式降级');
         return null;
       }
       const engine = new LLMEngine({
-        model: process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6',
+        model: process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
         maxTokens: 32000,
         timeoutMs: 600000
       });

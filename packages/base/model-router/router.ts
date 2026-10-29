@@ -1,69 +1,72 @@
 /**
- * model-router · 模型与资源调度（B7，M6/F6.1–F6.8）
+ * WorkLoom text routing.
  *
- * 调度伪代码（PRD 图 M6-1 逐字落码）：
- *   hit = 组织记忆.lookup(task)；命中可复用 → 零/低消耗直接复用（F6.1，留痕）
- *   tier = classify(task)（standard|flagship，确定性代码 F6.2）
- *   window = 22:00-08:00 ? off-peak : peak（F6.3/G9：谷时旗舰费率 ≤ 标准 20%）
- *   chain = 策略.chainFor(tier, window)（F6.4 降级链；F6.7 可按工作区配置）
- *   for m in chain：healthy(m) → 调用；否则写 model.degraded 事件（L6.1 禁止静默换模型）
- *   全链不可用 → 排队等谷时 / 转需介入（E6.1）
- *   单任务消耗熔断：超限挂起+告警（F6.5/L6.4）
- *   每次调用（含切换与降级）写事件 model_trace {model_id, tier, window, credits}（F6.5）
- *   账单 = 事件投影，不重算（L6.3）
+ * Tier/plan information remains for billing and product analytics. It no
+ * longer selects a model. Every text task uses `text.primary` ->
+ * `deepseek-flash`, with scene policy controlling thinking, format and
+ * evidence.
  */
 import { OFF_PEAK_RATE_RATIO, OFF_PEAK_WINDOW } from "@workloom/shared";
-import { mockCredits, type ChatGenerationOptions, type ChatMessage, type ChatResult, type ModelProvider } from "./providers.js";
 import {
-  DEFAULT_MODEL_POLICY, resolveScene, resolveTier, tierUp,
-  type ModelPolicy, type PlanId, type Tier3,
-} from "./policy.js";
-import { chainFor } from "./pool.js";
-import { computeCredits } from "./credits.js";
-import {
+  canonicalDeepSeekModel,
   DEEPSEEK_FLASH_CONTEXT_TOKENS,
-  DEFAULT_JSON_OUTPUT_TOKENS,
-  LONG_CONTEXT_TOKENS,
-  deepSeekInputTokenBudget,
-  estimateDeepSeekTokens,
+  DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+  DEEPSEEK_FLASH_MODEL_ID,
 } from "./token-budget.js";
-
-/* ================= 峰谷窗口（F6.3，Asia/Shanghai） ================= */
+import {
+  resolveTextScenePolicy,
+  textScenePolicyReceipt,
+  type TextScenePolicyOverride,
+  type ThinkingEffort,
+} from "./deepseek-policy.js";
+import {
+  mockCredits,
+  ModelProviderError,
+  type ChatGenerationOptions,
+  type ChatMessage,
+  type ChatResult,
+  type ModelProvider,
+} from "./providers.js";
+import {
+  DEFAULT_MODEL_POLICY,
+  resolveScene,
+  resolveTier,
+  type ModelPolicy,
+  type PlanId,
+  type Tier3,
+} from "./policy.js";
+import { computeCredits } from "./credits.js";
 
 export type Window = "peak" | "off-peak";
 
 export function currentWindow(now = new Date()): Window {
   const parts = new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai", hour: "numeric", minute: "numeric", hour12: false,
+    timeZone: "Asia/Shanghai",
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
   }).formatToParts(now);
-  const hh = Number(parts.find((p) => p.type === "hour")!.value);
-  const mm = Number(parts.find((p) => p.type === "minute")!.value);
-  const [sh, sm] = OFF_PEAK_WINDOW.start.split(":").map(Number);
-  const [eh, em] = OFF_PEAK_WINDOW.end.split(":").map(Number);
-  const t = hh * 60 + mm;
-  const start = sh! * 60 + sm!;
-  const end = eh! * 60 + em!;
-  // #19 修复：支持跨午夜（start > end，如 22:00-08:00）和非跨午夜（start < end，如 09:00-17:00）两种窗口
-  if (start > end) {
-    // 跨午夜窗口：t >= start 或 t < end 时为 off-peak
-    return t >= start || t < end ? "off-peak" : "peak";
-  }
-  // 非跨午夜窗口：start <= t < end 时为 off-peak
-  return t >= start && t < end ? "off-peak" : "peak";
+  const hour = Number(parts.find((part) => part.type === "hour")!.value);
+  const minute = Number(parts.find((part) => part.type === "minute")!.value);
+  const [startHour, startMinute] = OFF_PEAK_WINDOW.start.split(":").map(Number);
+  const [endHour, endMinute] = OFF_PEAK_WINDOW.end.split(":").map(Number);
+  const value = hour * 60 + minute;
+  const start = startHour! * 60 + startMinute!;
+  const end = endHour! * 60 + endMinute!;
+  return start > end
+    ? value >= start || value < end ? "off-peak" : "peak"
+    : value >= start && value < end ? "off-peak" : "peak";
 }
-
-/* ================= 分级路由（F6.2 确定性分类） ================= */
 
 export type Tier = "standard" | "flagship";
 
-/** 任务分类规则表（确定性代码；行业可经 bundle 覆盖，L2.6） */
 const TASK_TIER_TABLE: Record<string, Tier> = {
   "price.adjust": "standard",
   "order.reconcile": "standard",
   "review.reply": "standard",
   "inspection.scan": "standard",
   "competitor.fetch": "standard",
-  "content.publish": "flagship", // 内容生产上旗舰
+  "content.publish": "flagship",
   "content.draft": "flagship",
 };
 
@@ -72,44 +75,68 @@ export function classify(task: { action: string; depthHint?: "deep" | "normal" }
   return TASK_TIER_TABLE[task.action] ?? "standard";
 }
 
-/* ================= 降级链（F6.4/F6.7） ================= */
-
 export interface RouterPolicy {
-  /** 每档降级链（model_id 有序） */
   chains: Record<Tier, string[]>;
-  /** 单任务积分熔断上限（L6.4；默认按工作区套餐配置，此处为机制默认值） */
   taskCreditLimit: number;
 }
 
-/** 默认策略（内置演示口径；工作区覆盖经 F6.7 机制位 policy 参数） */
 export const DEFAULT_POLICY: RouterPolicy = {
   chains: {
-    flagship: ["mock-flagship-a", "mock-flagship-b", "mock-standard-c"],
-    standard: ["mock-standard-a", "mock-standard-b"],
+    flagship: [DEEPSEEK_FLASH_MODEL_ID],
+    standard: [DEEPSEEK_FLASH_MODEL_ID],
   },
   taskCreditLimit: 500,
 };
 
-/* ================= 事件汇（计量/降级留痕出口，L6.1/L6.3） ================= */
-
-/** 事件汇接口：计量与降级事件的唯一出口（测试注入内存汇；生产接安全网关） */
-export interface EventSink {
-  recordModelTrace(trace: {
-    model_id: string; tier: Tier | string; window: Window; credits: number; action: string; reused?: boolean;
-    /** v3.0：场景标识 + 计费归属（platform=售前体检等平台成本，不扣客户积分） */
-    scene?: string; bill_to?: "tenant" | "platform";
-  }): Promise<void>;
-  recordDegradation(d: { from: string; to: string | null; reason: string; action: string }): Promise<void>;
-  /** 熔断挂起告警（F6.5/L6.4） */
-  recordCircuitBreak(d: { action: string; creditsUsed: number; limit: number }): Promise<void>;
-  /** v3.0 反馈环：👍/👎 质量信号（model.feedback 事件） */
-  recordFeedback?(fb: {
-    scene: string; action: string; thumbs: "up" | "down";
-    original_tier: string; escalated_tier?: string; adopted?: boolean; signal?: string;
-  }): Promise<void>;
+export interface ModelTrace {
+  model_id: string;
+  tier: Tier | Tier3 | string;
+  window: Window;
+  credits: number;
+  action: string;
+  reused?: boolean;
+  scene?: string;
+  bill_to?: "tenant" | "platform";
+  mode?: "enabled" | "disabled";
+  effort?: "low" | "high" | "max";
+  finishReason?: string;
+  requestHash?: string;
+  responseHash?: string;
+  responseId?: string | null;
+  inputTokens?: number;
+  outputTokens?: number;
+  reasoningTokens?: number;
+  outputCeiling?: number;
+  inputTokenEstimate?: number;
+  imageCount?: number;
+  policyVersion?: string;
+  registryVersion?: string;
+  attempts?: ChatResult["attempts"];
 }
 
-/* ================= 记忆复用（F6.1） ================= */
+export interface EventSink {
+  recordModelTrace(trace: ModelTrace): Promise<void>;
+  recordDegradation(event: {
+    from: string;
+    to: string | null;
+    reason: string;
+    action: string;
+  }): Promise<void>;
+  recordCircuitBreak(event: {
+    action: string;
+    creditsUsed: number;
+    limit: number;
+  }): Promise<void>;
+  recordFeedback?(feedback: {
+    scene: string;
+    action: string;
+    thumbs: "up" | "down";
+    original_tier: string;
+    escalated_tier?: string;
+    adopted?: boolean;
+    signal?: string;
+  }): Promise<void>;
+}
 
 export interface MemoryLookupHit {
   reusable: boolean;
@@ -117,71 +144,129 @@ export interface MemoryLookupHit {
   memoryId?: string;
 }
 
-/* ================= 主调度 ================= */
-
 export interface RouteTask {
   action: string;
   messages: ChatMessage[];
   depthHint?: "deep" | "normal";
-  /** 非紧急深度任务可排队等谷时（F6.3；本版只标记不阻塞，调度器在 B9） */
   queueable?: boolean;
-  /** 记忆复用查询（F6.1；由 workdata 供给） */
   memoryLookup?: () => Promise<MemoryLookupHit | null>;
-  /** 本任务已消耗积分（多步任务累计传入；熔断判定依据，L6.4） */
   creditsUsedSoFar?: number;
 }
 
-/**
- * GR-04：场景化超时表（毫秒）。设计口径：
- *  - 同步交互路径（意图分类/翻译）必须秒级返回 → 3s 上限（超时走规则兜底，不阻塞用户）；
- *  - 规划类（quest-plan）允许长思考，但必须有天花板 → 120s；
- *  - ask 合成 45s（人工等待还能接受）；管线分流 60s；其余场景 60s。
- * 行业可用 model-policy.yml 的 sceneTimeouts 覆盖（loadModelPolicy 解析见 policy.ts）。
- */
 export const DEFAULT_SCENE_TIMEOUTS: Record<string, number> = {
-  /**
-   * 意图分类：**场景超时 ≠ 用户感知超时**。同步对话路径由 routeIntent 的 race 在 3s 处截断
-   * （signal 现在能真正 abort fetch）；但交付型派遣给的是 12s 预算，
-   * 场景超时若还是 3s，就会把 3~12s 的正常模型回答一律判失败 → 连续失败触发熔断
-   * → 规则兜底把问句误判成交付任务（2026-09-28 真机实测：连问"情况怎么样"都去派活）。
-   */
   "intent-classify": 8_000,
   "nl-translate": 8_000,
   "ask-synthesize": 45_000,
   "quest-plan": 120_000,
   "pipeline-route": 60_000,
-  "producer-review": 90_000,
-  "content-generate": 120_000,
-  generic: 60_000,
+  "producer-review": 600_000,
+  "content-generate": 600_000,
+  generic: 180_000,
 };
-export const DEFAULT_CALL_TIMEOUT_MS = 60_000;
+export const DEFAULT_CALL_TIMEOUT_MS = 180_000;
 
-/**
- * GR-05：全链熔断（快速失败）。
- * 实测：同一场景连续多家失败后仍逐家串行重试——6 次调用 5 分 25 秒才落兜底。
- * 口径：同一场景连续失败达阈值（默认 3）→ 冷却窗口（默认 60s）内直接返回 unavailable，
- * 不再逐家试；冷却结束后自动恢复（半开态由下一次调用探活）。
- */
-export interface CircuitState { failures: number; openUntil: number }
+export interface CircuitState {
+  failures: number;
+  openUntil: number;
+}
+
 const sceneCircuits = new Map<string, CircuitState>();
 export const CIRCUIT_FAILURE_THRESHOLD = 3;
 export const CIRCUIT_COOLDOWN_MS = 60_000;
 
-export function circuitSnapshot(scene: string, now = Date.now()): CircuitState | undefined {
-  return sceneCircuits.get(scene) ? { ...sceneCircuits.get(scene)! , openUntil: sceneCircuits.get(scene)!.openUntil } : undefined;
+export function circuitSnapshot(scene: string): CircuitState | undefined {
+  const state = sceneCircuits.get(scene);
+  return state ? { ...state } : undefined;
 }
+
 export function resetCircuit(scene?: string): void {
-  if (scene) sceneCircuits.delete(scene); else sceneCircuits.clear();
+  if (scene) sceneCircuits.delete(scene);
+  else sceneCircuits.clear();
+}
+
+export type RouteFailureKind =
+  | "timeout"
+  | "network"
+  | "http"
+  | "protocol"
+  | "empty"
+  | "unhealthy"
+  | "circuit"
+  | "cancelled"
+  | "unknown";
+
+export interface RouteFailure {
+  kind: RouteFailureKind;
+  reason: string;
+  retryable: boolean;
+  attempted: string[];
 }
 
 export interface RouteResult {
   kind: "answered" | "reused" | "queued" | "circuit_broken" | "unavailable";
   text?: string;
-  modelTrace?: { model_id: string; tier: Tier; window: Window; credits: number };
+  modelTrace?: {
+    model_id: string;
+    tier: Tier;
+    window: Window;
+    credits: number;
+  };
   reusedMemoryId?: string;
   degraded?: Array<{ from: string; to: string | null; reason: string }>;
-  /** #12 修复：熔断时仍返回已产出的答案，避免白烧 token */
   budgetExceeded?: boolean;
+  failure?: RouteFailure;
+  providerResult?: ChatResult;
+}
+
+function canonicalProvider(providers: Map<string, ModelProvider>): ModelProvider {
+  const provider = providers.get(DEEPSEEK_FLASH_MODEL_ID);
+  if (!provider) throw new Error("TEXT_PRIMARY_PROVIDER_MISSING");
+  canonicalDeepSeekModel(provider.modelId);
+  return provider;
+}
+
+function providerFailure(error: unknown): ModelProviderError {
+  if (error instanceof ModelProviderError) return error;
+  return new ModelProviderError(
+    error instanceof Error ? error.message : String(error),
+    "unknown",
+    { retryable: false, cause: error },
+  );
+}
+
+function traceFromResult(
+  result: ChatResult,
+  tier: Tier | Tier3,
+  window: Window,
+  credits: number,
+  task: RouteTask,
+  scene: string,
+  billTo: "tenant" | "platform",
+): ModelTrace {
+  return {
+    model_id: result.modelId,
+    tier,
+    window,
+    credits,
+    action: task.action,
+    scene,
+    bill_to: billTo,
+    mode: result.mode,
+    effort: result.effort,
+    finishReason: result.finishReason,
+    requestHash: result.requestHash,
+    responseHash: result.responseHash,
+    responseId: result.responseId,
+    inputTokens: result.promptTokens,
+    outputTokens: result.completionTokens,
+    reasoningTokens: result.reasoningTokens,
+    outputCeiling: result.outputCeiling,
+    inputTokenEstimate: result.inputTokenEstimate,
+    imageCount: result.imageCount,
+    policyVersion: result.policyVersion,
+    registryVersion: result.registryVersion,
+    attempts: result.attempts,
+  };
 }
 
 export async function route(
@@ -191,66 +276,84 @@ export async function route(
   policy: RouterPolicy = DEFAULT_POLICY,
   now = new Date(),
 ): Promise<RouteResult> {
-  // F6.1 记忆优先复用：命中可复用结论 → 零消耗直返（留痕经 sink.recordModelTrace reused）
   if (task.memoryLookup) {
     const hit = await task.memoryLookup();
     if (hit?.reusable && hit.answer !== undefined) {
       await sink.recordModelTrace({
-        model_id: "memory-reuse", tier: "standard", window: currentWindow(now),
-        credits: 0, action: task.action, reused: true,
+        model_id: "memory-reuse",
+        tier: "standard",
+        window: currentWindow(now),
+        credits: 0,
+        action: task.action,
+        reused: true,
       });
       return { kind: "reused", text: hit.answer, reusedMemoryId: hit.memoryId };
     }
   }
-
-  // L6.4 单任务熔断：超限挂起+告警
   const used = task.creditsUsedSoFar ?? 0;
   if (used >= policy.taskCreditLimit) {
-    await sink.recordCircuitBreak({ action: task.action, creditsUsed: used, limit: policy.taskCreditLimit });
+    await sink.recordCircuitBreak({
+      action: task.action,
+      creditsUsed: used,
+      limit: policy.taskCreditLimit,
+    });
     return { kind: "circuit_broken" };
   }
-
   const tier = classify(task);
   const window = currentWindow(now);
-  const chain = policy.chains[tier];
-  const degraded: Array<{ from: string; to: string | null; reason: string }> = [];
-
-  for (let i = 0; i < chain.length; i++) {
-    const modelId = chain[i]!;
-    const provider = providers.get(modelId);
-    if (!provider || !(await provider.healthy())) {
-      const to = chain[i + 1] ?? null;
-      degraded.push({ from: modelId, to, reason: "unhealthy" });
-      await sink.recordDegradation({ from: modelId, to, reason: "unhealthy", action: task.action }); // L6.1
-      continue;
-    }
-    try {
-      const result: ChatResult = await provider.chat(task.messages);
-      const credits = window === "off-peak" && tier === "flagship"
-        ? Math.max(1, Math.round(mockCredits(modelId, result) * OFF_PEAK_RATE_RATIO)) // G9/L6.5
-        : mockCredits(modelId, result);
-      const trace = { model_id: modelId, tier, window, credits, action: task.action };
-      await sink.recordModelTrace(trace); // F6.5 逐事件计量
-      // 熔断复检：本次消耗后超限 → 标记熔断但仍返回已产出答案（#12 修复：不丢弃已付费产出）
-      if (used + credits >= policy.taskCreditLimit) {
-        await sink.recordCircuitBreak({ action: task.action, creditsUsed: used + credits, limit: policy.taskCreditLimit });
-        return { kind: "circuit_broken", text: result.text, modelTrace: trace, degraded, budgetExceeded: true };
-      }
-      return { kind: "answered", text: result.text, modelTrace: trace, degraded };
-    } catch (err) {
-      const to = chain[i + 1] ?? null;
-      const reason = err instanceof Error ? err.message : String(err);
-      degraded.push({ from: modelId, to, reason });
-      await sink.recordDegradation({ from: modelId, to, reason, action: task.action }); // L6.1
-    }
+  try {
+    const provider = canonicalProvider(providers);
+    const result = await provider.chat(task.messages, {
+      scene: "generic",
+      thinking: { type: "disabled" },
+      responseFormat: { type: "text" },
+    });
+    const credits = window === "off-peak" && tier === "flagship"
+      ? Math.max(1, Math.round(mockCredits(result.modelId, result) * OFF_PEAK_RATE_RATIO))
+      : mockCredits(result.modelId, result);
+    const modelTrace = {
+      model_id: result.modelId,
+      tier,
+      window,
+      credits,
+    };
+    await sink.recordModelTrace({
+      ...modelTrace,
+      action: task.action,
+      mode: result.mode,
+      finishReason: result.finishReason,
+      requestHash: result.requestHash,
+      responseHash: result.responseHash,
+      inputTokens: result.promptTokens,
+      outputTokens: result.completionTokens,
+      reasoningTokens: result.reasoningTokens,
+    });
+    return {
+      kind: "answered",
+      text: result.text,
+      modelTrace,
+      providerResult: result,
+    };
+  } catch (error) {
+    const failure = providerFailure(error);
+    const degradation = {
+      from: DEEPSEEK_FLASH_MODEL_ID,
+      to: null,
+      reason: failure.message,
+    };
+    await sink.recordDegradation({ ...degradation, action: task.action });
+    return {
+      kind: task.queueable ? "queued" : "unavailable",
+      degraded: [degradation],
+      failure: {
+        kind: failure.kind === "unknown" ? "unknown" : failure.kind,
+        reason: failure.message,
+        retryable: failure.retryable,
+        attempted: [DEEPSEEK_FLASH_MODEL_ID],
+      },
+    };
   }
-
-  // E6.1：全链不可用 → 非紧急深度任务排队等谷时；否则转需介入
-  if (task.queueable) return { kind: "queued", degraded };
-  return { kind: "unavailable", degraded };
 }
-
-/* ================= 账单投影（L6.3：只从事件投影，不重算） ================= */
 
 export interface BillRow {
   model_id: string;
@@ -260,67 +363,60 @@ export interface BillRow {
   credits: number;
 }
 
-/** 从事件 payloads 的 model_trace 聚合账单（纯函数；数据源=事件库投影） */
-export function projectBill(events: Array<{ model_trace?: { model_id: string; tier?: string; window?: string; credits?: number } }>): BillRow[] {
-  const acc = new Map<string, BillRow>();
-  for (const e of events) {
-    const mt = e.model_trace;
-    if (!mt) continue;
-    const key = `${mt.model_id}|${mt.tier ?? ""}|${mt.window ?? ""}`;
-    const row = acc.get(key) ?? { model_id: mt.model_id, tier: mt.tier ?? "", window: mt.window ?? "", calls: 0, credits: 0 };
+export function projectBill(events: Array<{
+  model_trace?: {
+    model_id: string;
+    tier?: string;
+    window?: string;
+    credits?: number;
+  };
+}>): BillRow[] {
+  const rows = new Map<string, BillRow>();
+  for (const event of events) {
+    const trace = event.model_trace;
+    if (!trace) continue;
+    const key = `${trace.model_id}|${trace.tier ?? ""}|${trace.window ?? ""}`;
+    const row = rows.get(key) ?? {
+      model_id: trace.model_id,
+      tier: trace.tier ?? "",
+      window: trace.window ?? "",
+      calls: 0,
+      credits: 0,
+    };
     row.calls += 1;
-    row.credits += mt.credits ?? 0;
-    acc.set(key, row);
+    row.credits += trace.credits ?? 0;
+    rows.set(key, row);
   }
-  return [...acc.values()].sort((a, b) => b.credits - a.credits);
+  return [...rows.values()].sort((a, b) => b.credits - a.credits);
 }
 
-/* ================= v3.0 通用调度：routeSmart（场景 × 套餐 × 复杂度 × 真实计量） ================= */
-
-/** System limits use tokens, not characters. */
 export const TIER_TOKEN_CEILING: Record<Tier3, number> = {
-  L1: DEEPSEEK_FLASH_CONTEXT_TOKENS - DEFAULT_JSON_OUTPUT_TOKENS,
-  L2: DEEPSEEK_FLASH_CONTEXT_TOKENS - DEFAULT_JSON_OUTPUT_TOKENS,
-  L3: Number.POSITIVE_INFINITY,
+  L1: DEEPSEEK_FLASH_CONTEXT_TOKENS - DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+  L2: DEEPSEEK_FLASH_CONTEXT_TOKENS - DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+  L3: DEEPSEEK_FLASH_CONTEXT_TOKENS - DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
 };
 
 export interface SmartTask extends RouteTask {
-  /** OpenAI-compatible generation controls, never model/accounting overrides. */
   generation?: ChatGenerationOptions;
-  /** 场景标识（model-policy.yml 的 scenes key；缺省 generic） */
   scene?: string;
-  /** 租户套餐（缺省 standard） */
   plan?: PlanId;
-  /** 强制档位（升级重答用；跳过场景表与套餐映射） */
   forceTier?: Tier3;
-  /** Current deployment model pin; no same/cross-tier substitution. */
   forceModel?: string;
-  /**
-   * v3.0 轻量复杂度分类器（自由输入场景）：仅 scene=generic 且无 forceTier 时启用——
-   * 规则启发式打不准时，用 L1 小模型做 3 分类（simple/medium/complex，单次 ~0.2 积分）。
-   * 返回 null 表示打不准（落规则结果）。
-   */
   complexityClassifier?: (text: string) => Promise<"simple" | "medium" | "complex" | null>;
-  /** GR-04：调用方取消信号（意图分类超时 abort、服务端请求中止等） */
   signal?: AbortSignal;
-  /** GR-04：本场景超时（缺省取 DEFAULT_SCENE_TIMEOUTS[scene] ?? 60s） */
   timeoutMs?: number;
 }
 
-/** 复杂度启发式（规则层零成本；自由文本 → 档位建议） */
 export function heuristicComplexity(text: string): "simple" | "medium" | "complex" {
-  const t = text.trim();
-  // 复杂信号：长输入 / 分析归因 / 方案对比 / 深度推理关键词
-  if (t.length > 200) return "complex";
-  if (/(分析|归因|对比|方案|策略|预测|推理|复盘|诊断)/.test(t)) return "complex";
-  // 简单信号：短问句 / 事实查询 / 单动作
-  if (t.length <= 30 || /^(查询|查一下|看看|几点|多少|是不是|有没有)/.test(t)) return "simple";
+  const value = text.trim();
+  if (value.length > 200) return "complex";
+  if (/(分析|归因|对比|方案|策略|预测|推理|复盘|诊断)/.test(value)) return "complex";
+  if (value.length <= 30 || /^(查询|查一下|看看|几点|多少|是不是|有没有)/.test(value)) return "simple";
   return "medium";
 }
 
-export interface SmartModelTrace {
-  model_id: string; tier: Tier3; window: Window; credits: number;
-  action?: string; scene?: string; bill_to?: "tenant" | "platform";
+export interface SmartModelTrace extends ModelTrace {
+  tier: Tier3;
 }
 
 export interface SmartRouteResult extends Omit<RouteResult, "modelTrace"> {
@@ -328,162 +424,207 @@ export interface SmartRouteResult extends Omit<RouteResult, "modelTrace"> {
   tier?: Tier3;
   scene?: string;
   billTo?: "tenant" | "platform";
-  /** 金融口径：LLM 不可用 → 透传披露（禁止降档重答） */
   passthrough?: boolean;
 }
 
-/**
- * 通用路由主入口（v3.0）：
- *   场景表（bundle 第⑦槽）→ 套餐默认映射 → 复杂度信号（长文/超天花板升档）→
- *   降级链（noDowngrade 截断跨档段）→ 真实计量（computeCredits，谷时 ×0.2）→ 事件留痕。
- * 旧 route()（两档）保留向后兼容；新链路一律走本函数。
- */
+function sceneOverride(policy: ModelPolicy, scene: string): TextScenePolicyOverride {
+  const value = resolveScene(policy, scene);
+  return {
+    ...(value.type ? { type: value.type } : {}),
+    ...(value.thinking ? { thinking: { ...value.thinking } } : {}),
+    ...(value.responseFormat ? { responseFormat: value.responseFormat } : {}),
+    ...(value.outputBudget ? { outputBudget: value.outputBudget } : {}),
+    ...(value.generationReviewGroup ? { generationReviewGroup: value.generationReviewGroup } : {}),
+    ...(value.sameModelAs ? { sameModelAs: value.sameModelAs } : {}),
+  };
+}
+
+function cancelResult(
+  task: SmartTask,
+  scene: string,
+  tier: Tier3,
+  passthrough: boolean,
+  previous: Array<{ from: string; to: string | null; reason: string }> = [],
+): SmartRouteResult {
+  return {
+    kind: "unavailable",
+    degraded: [
+      ...previous,
+      { from: DEEPSEEK_FLASH_MODEL_ID, to: null, reason: "模型调用已取消（调用方 abort）" },
+    ],
+    tier,
+    scene,
+    passthrough,
+  };
+}
+
 export async function routeSmart(
   task: SmartTask,
   providers: Map<string, ModelProvider>,
   sink: EventSink,
-  opts: { policy?: ModelPolicy; taskCreditLimit?: number; modelChain?: string[] } = {},
+  options: { policy?: ModelPolicy; taskCreditLimit?: number; modelChain?: string[] } = {},
   now = new Date(),
 ): Promise<SmartRouteResult> {
-  const policy = opts.policy ?? DEFAULT_MODEL_POLICY;
-  // This chain comes only from trusted deployment assembly. Every entry must
-  // name the actual registered provider; no catalog alias is billed as a model.
-  if (opts.modelChain && (opts.modelChain.length<1 || opts.modelChain.length>9
-    || new Set(opts.modelChain).size!==opts.modelChain.length
-    || opts.modelChain.some(id=>typeof id!=="string"||!id.trim()||id.length>200||!providers.has(id))))
-    throw new Error("Configured model chain must contain 1–9 distinct registered providers");
-  const limit = opts.taskCreditLimit ?? 500;
+  if (options.modelChain !== undefined) {
+    if (!options.modelChain.length
+      || new Set(options.modelChain).size !== options.modelChain.length
+      || options.modelChain.some((model) => !providers.has(model))) {
+      throw new Error("registered providers required");
+    }
+  }
+  const policy = options.policy ?? DEFAULT_MODEL_POLICY;
+  const limit = options.taskCreditLimit ?? 500;
   const scene = task.scene ?? "generic";
   const plan = task.plan ?? "standard";
-  const sp = resolveScene(policy, scene);
-  const forcedModel = task.forceModel?.trim();
-  let tier = forcedModel
-    ? (/flash/i.test(forcedModel) ? "L1" : /pro|max/i.test(forcedModel) ? "L2" : task.forceTier ?? resolveTier(policy, scene, plan))
-    : task.forceTier ?? resolveTier(policy, scene, plan);
-  const callTimeoutMs = task.timeoutMs && task.timeoutMs > 0
+  const scenePolicy = resolveTextScenePolicy(scene, sceneOverride(policy, scene));
+  if (task.forceModel) canonicalDeepSeekModel(task.forceModel);
+  const tier = task.forceTier ?? resolveTier(policy, scene, plan);
+  const timeoutMs = task.timeoutMs && task.timeoutMs > 0
     ? task.timeoutMs
-    : (DEFAULT_SCENE_TIMEOUTS[scene] ?? DEFAULT_CALL_TIMEOUT_MS);
+    : DEFAULT_SCENE_TIMEOUTS[scene] ?? DEFAULT_CALL_TIMEOUT_MS;
+  const passthrough = resolveScene(policy, scene).fallback === "passthrough-disclose";
 
-  /**
-   * GR-05：全链熔断快速失败——同一场景连续失败达阈值后，冷却期内不再逐家试。
-   * 返回 unavailable（调用方走确定性兜底），并保留熔断原因供前端可见降级。
-   */
+  if (task.signal?.aborted) return cancelResult(task, scene, tier, passthrough);
   const circuit = sceneCircuits.get(scene);
-  if (circuit && circuit.failures >= CIRCUIT_FAILURE_THRESHOLD && circuit.openUntil > now.getTime()) {
-    await sink.recordDegradation({
-      from: `${scene}:circuit`, to: null,
-      reason: `全链熔断冷却中（连续失败 ${circuit.failures} 次，${Math.ceil((circuit.openUntil - now.getTime()) / 1000)}s 后半开）`,
-      action: task.action,
-    });
+  if (circuit
+    && circuit.failures >= CIRCUIT_FAILURE_THRESHOLD
+    && circuit.openUntil > now.getTime()) {
     return {
-      kind: "unavailable", degraded: [{ from: scene, to: null, reason: "circuit-open" }],
-      tier, scene, passthrough: sp.fallback === "passthrough-disclose",
+      kind: "unavailable",
+      degraded: [{ from: scene, to: null, reason: "circuit-open" }],
+      tier,
+      scene,
+      passthrough,
+      failure: {
+        kind: "circuit",
+        reason: "模型场景熔断冷却中",
+        retryable: false,
+        attempted: [DEEPSEEK_FLASH_MODEL_ID],
+      },
     };
   }
 
-  // v3.0 轻量复杂度分类（自由输入场景）：generic + 无强制档 → 启发式定档；
-  // 启发式拿不准（medium）且挂了分类器 → L1 小模型 3 分类复核（单次 ~0.2 积分）
-  if (!task.forceTier && !forcedModel && scene === "generic") {
-    const text = task.messages.map((m) => m.content).join("\n").slice(0, 2000);
-    let c = heuristicComplexity(text);
-    if (c === "medium" && task.complexityClassifier) {
-      c = (await task.complexityClassifier(text)) ?? c;
-    }
-    if (c === "simple") tier = "L1";
-    else if (c === "complex") tier = "L3";
-    // medium：保持场景表/套餐映射结果（默认 L2）
-  }
-
-  const inputTokens = estimateDeepSeekTokens(task.messages.map((message) => message.content).join("\n"));
-  if (!forcedModel && inputTokens > TIER_TOKEN_CEILING[tier]) tier = tierUp(tier) ?? tier;
-  const longContext = inputTokens > LONG_CONTEXT_TOKENS;
-  const outputTokens = task.generation?.maxTokens ?? DEFAULT_JSON_OUTPUT_TOKENS;
-  if (inputTokens > deepSeekInputTokenBudget(outputTokens)) {
-    const reason = `DEEPSEEK_CONTEXT_EXCEEDED: estimated ${inputTokens} input tokens + ${outputTokens} output tokens > ${DEEPSEEK_FLASH_CONTEXT_TOKENS}`;
-    const from = forcedModel ?? tier;
-    await sink.recordDegradation({ from, to: null, reason, action: task.action });
-    return { kind: "unavailable", degraded: [{ from, to: null, reason }], tier, scene };
-  }
-
-  // F6.1 记忆复用：命中零消耗直返（留痕）
   if (task.memoryLookup) {
     const hit = await task.memoryLookup();
     if (hit?.reusable && hit.answer !== undefined) {
       await sink.recordModelTrace({
-        model_id: "memory-reuse", tier, window: currentWindow(now),
-        credits: 0, action: task.action, reused: true, scene, bill_to: sp.billTo ?? "tenant",
+        model_id: "memory-reuse",
+        tier,
+        window: currentWindow(now),
+        credits: 0,
+        action: task.action,
+        reused: true,
+        scene,
+        bill_to: resolveScene(policy, scene).billTo ?? "tenant",
       });
-      return { kind: "reused", text: hit.answer, reusedMemoryId: hit.memoryId, tier, scene, billTo: sp.billTo ?? "tenant" };
+      return {
+        kind: "reused",
+        text: hit.answer,
+        reusedMemoryId: hit.memoryId,
+        tier,
+        scene,
+        billTo: resolveScene(policy, scene).billTo ?? "tenant",
+      };
     }
   }
-
-  // L6.4 单任务熔断
   const used = task.creditsUsedSoFar ?? 0;
   if (used >= limit) {
     await sink.recordCircuitBreak({ action: task.action, creditsUsed: used, limit });
     return { kind: "circuit_broken", tier, scene };
   }
 
+  const provider = canonicalProvider(providers);
   const window = currentWindow(now);
-  // 降级链：noDowngrade（金融/体检等质量红线）截断跨档段，只允许同档互备
-  const chain = forcedModel ? [forcedModel] : opts.modelChain ?? chainFor(tier, { longContext, allowCrossTier: !sp.noDowngrade });
-  const degraded: Array<{ from: string; to: string | null; reason: string }> = [];
-
-  for (let i = 0; i < chain.length; i++) {
-    const modelId = chain[i]!;
-    const provider = providers.get(modelId);
-    if (!provider || !(await provider.healthy())) {
-      const to = chain[i + 1] ?? null;
-      degraded.push({ from: modelId, to, reason: "unhealthy" });
-      await sink.recordDegradation({ from: modelId, to, reason: "unhealthy", action: task.action }); // L6.1
-      continue;
-    }
-    try {
-      // GR-04：超时 + 外部取消信号真正下传到 fetch（此前 signal 在装配层丢失、"取消"只赢了 Promise.race）
-      const result: ChatResult = await provider.chat(task.messages, {
-        ...task.generation,
-        signal: task.signal,
-        timeoutMs: callTimeoutMs,
+  try {
+    const result = await provider.chat(task.messages, {
+      scene,
+      signal: task.signal,
+      timeoutMs,
+      responseFormat: { type: scenePolicy.responseFormat },
+      thinking: { ...scenePolicy.thinking },
+      ...(scenePolicy.thinking.type === "enabled"
+        ? {
+            reasoningEffort: scenePolicy.thinking.effort as ThinkingEffort,
+            topP: task.generation?.topP,
+          }
+        : {
+            temperature: task.generation?.temperature ?? scenePolicy.temperature,
+            topP: task.generation?.topP,
+          }),
+      retries: task.generation?.maxTokens === undefined ? 0 : 0,
+    });
+    sceneCircuits.delete(scene);
+    const credits = computeCredits({
+      tier,
+      promptTokens: result.promptTokens,
+      completionTokens: result.completionTokens,
+      window,
+    });
+    const trace = traceFromResult(
+      result,
+      tier,
+      window,
+      credits,
+      task,
+      scene,
+      resolveScene(policy, scene).billTo ?? "tenant",
+    ) as SmartModelTrace;
+    await sink.recordModelTrace(trace);
+    if (used + credits >= limit) {
+      await sink.recordCircuitBreak({
+        action: task.action,
+        creditsUsed: used + credits,
+        limit,
       });
-      // 成功即清零该场景的连续失败计数（半开恢复）
-      sceneCircuits.delete(scene);
-      const credits = computeCredits({
-        tier, promptTokens: result.promptTokens, completionTokens: result.completionTokens, window,
-      });
-      const trace = {
-        model_id: modelId, tier, window, credits, action: task.action,
-        scene, bill_to: sp.billTo ?? "tenant" as "tenant" | "platform",
+      return {
+        kind: "circuit_broken",
+        text: result.text,
+        modelTrace: trace,
+        budgetExceeded: true,
+        tier,
+        scene,
+        billTo: trace.bill_to,
+        providerResult: result,
       };
-      await sink.recordModelTrace(trace); // F6.5 逐事件真实计量
-      if (used + credits >= limit) {
-        await sink.recordCircuitBreak({ action: task.action, creditsUsed: used + credits, limit });
-        return { kind: "circuit_broken", text: result.text, modelTrace: trace, degraded, budgetExceeded: true, tier, scene, billTo: sp.billTo ?? "tenant" };
-      }
-      return { kind: "answered", text: result.text, modelTrace: trace, degraded, tier, scene, billTo: sp.billTo ?? "tenant" };
-    } catch (err) {
-      const to = chain[i + 1] ?? null;
-      const reason = err instanceof Error ? err.message : String(err);
-      degraded.push({ from: modelId, to, reason });
-      await sink.recordDegradation({ from: modelId, to, reason, action: task.action }); // L6.1
-      // GR-05：累计连续失败，达阈值即开启熔断冷却窗口（本轮剩余链路也不再逐家试）
-      const state = sceneCircuits.get(scene) ?? { failures: 0, openUntil: 0 };
-      state.failures += 1;
-      if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) state.openUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
-      sceneCircuits.set(scene, state);
-      if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) {
-        await sink.recordCircuitBreak({ action: task.action, creditsUsed: used, limit: limit }).catch(() => undefined);
-        break;
-      }
     }
+    return {
+      kind: "answered",
+      text: result.text,
+      modelTrace: trace,
+      tier,
+      scene,
+      billTo: trace.bill_to,
+      providerResult: result,
+    };
+  } catch (error) {
+    if (task.signal?.aborted) return cancelResult(task, scene, tier, passthrough);
+    const failure = providerFailure(error);
+    await sink.recordDegradation({
+      from: DEEPSEEK_FLASH_MODEL_ID,
+      to: null,
+      reason: failure.message,
+      action: task.action,
+    });
+    const state = sceneCircuits.get(scene) ?? { failures: 0, openUntil: 0 };
+    state.failures += 1;
+    if (state.failures >= CIRCUIT_FAILURE_THRESHOLD) {
+      state.openUntil = Date.now() + CIRCUIT_COOLDOWN_MS;
+    }
+    sceneCircuits.set(scene, state);
+    return {
+      kind: "unavailable",
+      degraded: [{ from: DEEPSEEK_FLASH_MODEL_ID, to: null, reason: failure.message }],
+      tier,
+      scene,
+      passthrough,
+      failure: {
+        kind: failure.kind,
+        reason: failure.message,
+        retryable: failure.retryable,
+        attempted: [DEEPSEEK_FLASH_MODEL_ID],
+      },
+    };
   }
-
-  // 全链不可用：按行业降级语义收口
-  if (sp.fallback === "passthrough-disclose") {
-    // 金融铁律：宁可不答不可错答——透传披露，不降档、不猜测
-    return { kind: "unavailable", degraded, tier, scene, passthrough: true };
-  }
-  if (sp.fallback === "queue" || sp.window === "off-peak-only" || task.queueable) {
-    return { kind: "queued", degraded, tier, scene };
-  }
-  return { kind: "unavailable", degraded, tier, scene };
 }
+
+export { textScenePolicyReceipt };

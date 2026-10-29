@@ -43,7 +43,7 @@ const { LLMEngine } = require('./llm-reasoning-engine');
 
 // 创建 LLM 引擎（使用较小maxTokens，避免reasoning耗尽）
 const llm = new LLMEngine({
-  model: 'kimi-k2p6',
+  model: 'deepseek-flash',
   mode: 'production',
   maxRetries: 3,
   maxTokens: 16000,

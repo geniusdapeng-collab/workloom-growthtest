@@ -14,7 +14,7 @@ const { PhaseExecutor } = require('./phase-executor');
 class Phase35FieldQuality extends PhaseExecutor {
   constructor(options) {
     super({ name: 'Phase3.5-FieldQuality', ...options });
-    this.llmModel = options.llmModel || 'kimi-k2p6';
+    this.llmModel = options.llmModel || 'deepseek-flash';
     this.globalDeadline = options.globalDeadline || null;
   }
 

@@ -1,368 +1,199 @@
-/**
- * v3.0 通用模型路由系统测试：
- * 三档体系与套餐映射 / model-policy.yml 解析校验 / 模型池与降级链 / 真实积分计量 /
- * 三池账本 / routeSmart 全链路（场景×套餐×复杂度×降级语义）/ 升级重答与配额 / 自动调表
- */
 import { describe, expect, it } from "vitest";
-import { MockProvider } from "./providers.js";
 import {
-  DEFAULT_MODEL_POLICY, legacyTierToTier3, parseModelPolicy, resolveTier, shiftTier,
-  tierDown, tierUp, type ModelPolicy,
+  DEFAULT_MODEL_POLICY,
+  parseModelPolicy,
+  resolveTier,
 } from "./policy.js";
-import { MODEL_CATALOG, catalogByTier, chainFor, poolFromEnv } from "./pool.js";
-import { balance, computeCredits, deduct, grant, projectLedger, type CreditLedger } from "./credits.js";
-import { MemoryQuotaStore, autoTuneScenes, escalate, tierAfterEscalation } from "./feedback.js";
+import {
+  MODEL_CATALOG,
+  catalogByTier,
+  chainFor,
+  poolFromEnv,
+} from "./pool.js";
+import { resolveTextScenePolicy } from "./deepseek-policy.js";
+import {
+  MockProvider,
+  type ChatResult,
+  type ModelProvider,
+} from "./providers.js";
 import { routeSmart, type EventSink, type SmartTask } from "./router.js";
+import { computeCredits } from "./credits.js";
+import {
+  DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+  TEXT_PRIMARY_POLICY_VERSION,
+  TEXT_PRIMARY_REGISTRY_VERSION,
+} from "./token-budget.js";
 
-function memSink() {
-  const traces: any[] = [];
-  const degrades: any[] = [];
-  const breaks_: any[] = [];
-  const feedbacks: any[] = [];
-  const sink: EventSink = {
-    recordModelTrace: async (t) => { traces.push(t); },
-    recordDegradation: async (d) => { degrades.push(d); },
-    recordCircuitBreak: async (d) => { breaks_.push(d); },
-    recordFeedback: async (f) => { feedbacks.push(f); },
+function chatResult(text: string, modelId = "deepseek-flash"): ChatResult {
+  return {
+    text,
+    promptTokens: 100,
+    completionTokens: 30,
+    modelId,
+    finishReason: "stop",
+    reasoningTokens: 0,
+    requestHash: "a".repeat(64),
+    responseHash: "b".repeat(64),
+    responseId: "response-1",
+    scene: "generic",
+    mode: "enabled",
+    effort: "high",
+    outputCeiling: DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+    inputTokenEstimate: 100,
+    imageCount: 0,
+    policyVersion: TEXT_PRIMARY_POLICY_VERSION,
+    registryVersion: TEXT_PRIMARY_REGISTRY_VERSION,
+    attempts: [],
   };
-  return { sink, traces, degrades, breaks_, feedbacks };
 }
 
-const mockPool = (over: Record<string, { failFirst?: number; down?: boolean }> = {}) =>
-  new Map(MODEL_CATALOG.map((m) => [m.id, new MockProvider(m.id, over[m.id])]));
+function sink(): EventSink & { traces: unknown[]; degrades: unknown[] } {
+  const traces: unknown[] = [];
+  const degrades: unknown[] = [];
+  return {
+    traces,
+    degrades,
+    recordModelTrace: async (trace) => { traces.push(trace); },
+    recordDegradation: async (event) => { degrades.push(event); },
+    recordCircuitBreak: async () => undefined,
+  };
+}
 
-const task = (over: Partial<SmartTask> = {}): SmartTask => ({
-  action: "cs-answer", scene: "cs-answer",
-  messages: [{ role: "user", content: "WiFi 密码是多少？" }],
-  ...over,
-});
-
-/* ================= 三档体系与套餐映射 ================= */
-
-describe("三档体系（L1/L2/L3）与套餐默认映射", () => {
-  it("档位代数：升/降/位移，越界截断", () => {
-    expect(tierUp("L1")).toBe("L2");
-    expect(tierUp("L3")).toBeNull();
-    expect(tierDown("L2")).toBe("L1");
-    expect(shiftTier("L2", -1)).toBe("L1");
-    expect(shiftTier("L1", -1)).toBe("L1");
-    expect(shiftTier("L2", 1)).toBe("L3");
-    expect(legacyTierToTier3("flagship")).toBe("L3");
-    expect(legacyTierToTier3("standard")).toBe("L2");
+describe("canonical text model catalog", () => {
+  it("contains one model and every billing tier resolves to it", () => {
+    expect(MODEL_CATALOG).toHaveLength(1);
+    expect(MODEL_CATALOG[0]).toMatchObject({
+      id: "deepseek-flash",
+      vendor: "deepseek",
+      longContext: true,
+    });
+    expect(catalogByTier("L2")).toEqual([]);
+    expect(chainFor("L1")).toEqual(["deepseek-flash"]);
+    expect(chainFor("L2", { allowCrossTier: false })).toEqual(["deepseek-flash"]);
+    expect(chainFor("L3")).toEqual(["deepseek-flash"]);
   });
 
-  it("套餐映射：智享压一档 / 标准原位 / 智能抬一档；点名覆盖优先", () => {
-    const p = DEFAULT_MODEL_POLICY;
-    expect(resolveTier(p, "quest-plan", "lite")).toBe("L1");      // L2 → 压一档
-    expect(resolveTier(p, "quest-plan", "standard")).toBe("L2");
-    expect(resolveTier(p, "quest-plan", "smart")).toBe("L3");      // L2 → 抬一档
-    expect(resolveTier(p, "cs-answer", "smart")).toBe("L2");       // 智能版点名：客服保底 L2
-    expect(resolveTier(p, "intent-classify", "smart")).toBe("L1"); // 延迟红线保持 L1
-  });
-
-  it("noDowngrade 质量红线：套餐下压不得生效", () => {
-    expect(resolveTier(DEFAULT_MODEL_POLICY, "ceo-deep-analysis", "lite")).toBe("L3");
-    expect(resolveTier(DEFAULT_MODEL_POLICY, "fast-scan-report", "lite")).toBe("L3");
-  });
-});
-
-/* ================= model-policy.yml 解析与校验 ================= */
-
-describe("model-policy.yml（bundle 第⑦槽）解析校验", () => {
-  it("合法文件：行业场景覆盖底座默认，未点名场景继承", () => {
-    const { policy, issues } = parseModelPolicy(`
-version: "v3.0"
-scenes:
-  cs-answer: { tier: L1, escalateOn: [low-confidence, thumbs-down] }
-  debate: { tier: L3, noDowngrade: true, fallback: passthrough-disclose }
-plans:
-  smart: { defaultShift: 1, tierOverrides: { cs-answer: L2 } }
-`);
-    expect(issues).toEqual([]);
-    expect(policy!.scenes["debate"]!.fallback).toBe("passthrough-disclose");
-    expect(policy!.scenes["quest-plan"]).toBeDefined(); // 继承底座
-    expect(resolveTier(policy!, "cs-answer", "smart")).toBe("L2");
-  });
-
-  it("非法 tier / 非法 fallback / 覆盖未定义场景 → 逐条报错", () => {
-    const { policy, issues } = parseModelPolicy(`
-scenes:
-  a: { tier: L9 }
-  b: { tier: L1, fallback: whatever }
-plans:
-  smart: { defaultShift: 1, tierOverrides: { ghost: L2 } }
-`);
-    expect(policy).toBeNull();
-    expect(issues.length).toBe(3);
-    expect(issues.join()).toContain("L9");
-    expect(issues.join()).toContain("ghost");
-  });
-});
-
-/* ================= 模型池与降级链 ================= */
-
-describe("国产三档模型池", () => {
-  it("目录：每档三家互备（L1/L2/L3 各 3 款）", () => {
-    expect(catalogByTier("L1").length).toBe(3);
-    expect(catalogByTier("L2").length).toBe(3);
-    expect(catalogByTier("L3").length).toBe(3);
-  });
-
-  it("降级链：同档优先，跨档兜底；长文需求长文款前置；禁跨档时截断", () => {
-    const l2 = chainFor("L2");
-    expect(l2.slice(0, 3)).toEqual(["deepseek-v4-pro", "glm-5.2", "minimax-m3"]);
-    expect(l2.length).toBeGreaterThan(3); // 跨档兜底 L1
-    const noCross = chainFor("L3", { allowCrossTier: false });
-    expect(noCross).toEqual(["glm-5.3", "kimi-k3", "qwen-3.8-max"]);
-    const longFirst = chainFor("L1", { longContext: true });
-    expect(longFirst.length).toBe(3 + 0); // L1 无 longContext 标记，顺序不变
-  });
-
-  it("mock 模式全池确定性可跑（D4 离线保险丝）", () => {
-    const pool = poolFromEnv();
-    expect(pool.size).toBe(MODEL_CATALOG.length);
-  });
-
-  it("DeepSeek provider never sends GLM/Kimi model IDs to the same gateway", () => {
-    const keys = ["LLM_PROVIDER", "LLM_BASE_URL", "LLM_API_KEY", "DEEPSEEK_API_KEY", "LLM_FORCE_MODEL"] as const;
-    const previous = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  it("mock pool also contains only the canonical model", () => {
+    const previous = process.env.LLM_PROVIDER;
+    process.env.LLM_PROVIDER = "mock";
     try {
-      process.env.LLM_PROVIDER = "deepseek";
-      process.env.LLM_BASE_URL = "https://api.deepseek.com";
-      process.env.LLM_API_KEY = "";
-      process.env.DEEPSEEK_API_KEY = "test-only";
-      process.env.LLM_FORCE_MODEL = "";
-      const models = [...poolFromEnv().keys()];
-      expect(models).toContain("deepseek-flash");
-      expect(models.every((model) => model.startsWith("deepseek-"))).toBe(true);
-      expect(models.some((model) => /glm|kimi|qwen|minimax/i.test(model))).toBe(false);
+      const pool = poolFromEnv();
+      expect([...pool.keys()]).toEqual(["deepseek-flash"]);
+      expect(pool.get("deepseek-flash")).toBeInstanceOf(MockProvider);
     } finally {
-      for (const key of keys) {
-        if (previous[key] === undefined) delete process.env[key];
-        else process.env[key] = previous[key];
+      if (previous === undefined) delete process.env.LLM_PROVIDER;
+      else process.env.LLM_PROVIDER = previous;
+    }
+  });
+
+  it.each(["moonshot", "zhipu", "openai"])(
+    "rejects legacy provider %s",
+    (provider) => {
+      const previous = process.env.LLM_PROVIDER;
+      process.env.LLM_PROVIDER = provider;
+      try {
+        expect(() => poolFromEnv()).toThrow("text.primary registry");
+      } finally {
+        if (previous === undefined) delete process.env.LLM_PROVIDER;
+        else process.env.LLM_PROVIDER = previous;
       }
+    },
+  );
+
+  it("rejects any non-canonical model pin", () => {
+    const previousProvider = process.env.LLM_PROVIDER;
+    const previousForce = process.env.LLM_FORCE_MODEL;
+    process.env.LLM_PROVIDER = "mock";
+    process.env.LLM_FORCE_MODEL = "glm-5.3";
+    try {
+      expect(() => poolFromEnv()).toThrow("MODEL_ID_NOT_ALLOWED");
+    } finally {
+      if (previousProvider === undefined) delete process.env.LLM_PROVIDER;
+      else process.env.LLM_PROVIDER = previousProvider;
+      if (previousForce === undefined) delete process.env.LLM_FORCE_MODEL;
+      else process.env.LLM_FORCE_MODEL = previousForce;
     }
   });
 });
 
-/* ================= 积分计量与三池账本 ================= */
-
-describe("积分计量（1 积分 = 1,000 tokens L2 基准）", () => {
-  it("倍率：L1 0.2× / L2 1× / L3 3×；谷时再 ×0.2", () => {
-    expect(computeCredits({ tier: "L2", promptTokens: 2000, completionTokens: 1000, window: "peak" })).toBe(3);
-    expect(computeCredits({ tier: "L1", promptTokens: 2000, completionTokens: 1000, window: "peak" })).toBe(0.6);
-    expect(computeCredits({ tier: "L3", promptTokens: 2000, completionTokens: 1000, window: "peak" })).toBe(9);
-    expect(computeCredits({ tier: "L3", promptTokens: 2000, completionTokens: 1000, window: "off-peak" })).toBe(1.8);
-    expect(computeCredits({ tier: "L1", promptTokens: 1, completionTokens: 1, window: "peak" })).toBe(0.01); // 下限
-  });
-});
-
-describe("三池账本（赠送→加油包→本金，先扣先到期）", () => {
-  const at = new Date("2026-08-31T00:00:00Z");
-  it("扣减顺序与过期冻结", () => {
-    let ledger: CreditLedger = [];
-    ledger = grant(ledger, "principal", 20000, at);
-    ledger = grant(ledger, "pack", 5000, at);
-    ledger = grant(ledger, "gift", 5000, at);
-    expect(ledger.map((p) => p.name)).toEqual(["gift", "pack", "principal"]);
-    const r = deduct(ledger, 7000, at);
-    expect(r.deductions).toEqual([{ pool: "gift", amount: 5000 }, { pool: "pack", amount: 2000 }]);
-    expect(r.shortfall).toBe(0);
-    expect(balance(r.ledger, at)).toBe(23000);
-  });
-
-  it("欠费出缺口；过期池不扣", () => {
-    let ledger: CreditLedger = [{ name: "gift", amount: 100, expiresAt: "2026-01-01T00:00:00Z" }];
-    const r = deduct(ledger, 500, at);
-    expect(r.shortfall).toBe(500); // gift 已过期冻结
-    expect(balance(ledger, at)).toBe(0);
-  });
-
-  it("账本=事件投影（grant/purchase 入，model.call 出），不重算", () => {
-    const mid = new Date("2026-08-15T00:00:00Z"); // 赠送池 30 天有效期内
-    const ledger = projectLedger([
-      { action: "credits.grant", after: { amount: 5000 }, time: "2026-08-01T00:00:00Z" },
-      { action: "credits.purchase", after: { amount: 20000, pool: "principal" }, time: "2026-08-02T00:00:00Z" },
-      { action: "model.call", model_trace: { credits: 3000 } },
-      { action: "model.call", model_trace: { credits: 2500 } },
-    ], mid);
-    // 先扣赠送 5000，再扣本金 500
-    expect(balance(ledger, mid)).toBe(19500);
-  });
-});
-
-/* ================= routeSmart 全链路 ================= */
-
-describe("routeSmart（场景 × 套餐 × 复杂度 × 真实计量）", () => {
-  it("场景表路由：cs-answer 走 L1 档模型，真实 token 计量", async () => {
-    const { sink, traces } = memSink();
-    const r = await routeSmart(task(), mockPool(), sink);
-    expect(r.kind).toBe("answered");
-    expect(r.tier).toBe("L1");
-    expect(catalogByTier("L1").map((m) => m.id)).toContain(r.modelTrace!.model_id);
-    expect(traces[0].credits).toBeGreaterThan(0);
-    expect(traces[0].scene).toBe("cs-answer");
-  });
-
-  it("套餐映射生效：智享版 quest-plan 压到 L1，智能版抬到 L3", async () => {
-    const { sink: s1 } = memSink();
-    const lite = await routeSmart(task({ action: "quest-plan", scene: "quest-plan", plan: "lite" }), mockPool(), s1);
-    expect(lite.tier).toBe("L1");
-    const { sink: s2 } = memSink();
-    const smart = await routeSmart(task({ action: "quest-plan", scene: "quest-plan", plan: "smart" }), mockPool(), s2);
-    expect(smart.tier).toBe("L3");
-  });
-
-  it("noDowngrade 场景（ceo-deep-analysis）：智享版仍 L3，降级链截断跨档段", async () => {
-    const { sink, degrades } = memSink();
-    const pool = mockPool({ "glm-5.3": { down: true }, "kimi-k3": { down: true } });
-    const r = await routeSmart(
-      task({ action: "ceo-deep-analysis", scene: "ceo-deep-analysis", plan: "lite" }), pool, sink);
-    expect(r.tier).toBe("L3");
-    expect(r.modelTrace!.model_id).toBe("qwen-3.8-max"); // 同档第三互备，未降档
-    expect(degrades.every((d) => catalogByTier("L3").some((m) => m.id === d.from))).toBe(true);
-  });
-
-  it("金融口径 passthrough-disclose：全链不可用 → 透传披露，不降档不猜测", async () => {
-    const policy: ModelPolicy = {
-      ...DEFAULT_MODEL_POLICY,
-      scenes: { ...DEFAULT_MODEL_POLICY.scenes, debate: { tier: "L3", noDowngrade: true, fallback: "passthrough-disclose" } },
-    };
-    const { sink } = memSink();
-    const pool = mockPool({ "glm-5.3": { down: true }, "kimi-k3": { down: true }, "qwen-3.8-max": { down: true } });
-    const r = await routeSmart(task({ action: "debate", scene: "debate" }), pool, sink, { policy });
-    expect(r.kind).toBe("unavailable");
-    expect(r.passthrough).toBe(true);
-  });
-
-  it("token 长文信号在百万级预算内使用长上下文 Flash", async () => {
-    const { sink, traces } = memSink();
-    const big = "长".repeat(70_000);
-    const r = await routeSmart(task({ messages: [{ role: "user", content: big }] }), mockPool(), sink);
-    expect(r.tier).toBe("L1");
-    expect(traces[0].model_id).toBe("deepseek-flash");
-  });
-
-  it("超出官方 context 与 output 组合预算时失败关闭", async () => {
-    const { sink, traces } = memSink();
-    const big = "长".repeat(1_800_000);
-    const r = await routeSmart(task({ forceModel: "deepseek-flash", messages: [{ role: "user", content: big }] }), mockPool(), sink);
-    expect(r.kind).toBe("unavailable");
-    expect(r.degraded?.at(-1)?.reason).toContain("DEEPSEEK_CONTEXT_EXCEEDED");
-    expect(traces).toHaveLength(0);
-  });
-
-  it("谷时计量 ×0.2 且 bill_to=platform 场景留痕计费归属", async () => {
-    const { sink, traces } = memSink();
-    const r = await routeSmart(
-      task({ action: "fast-scan-report", scene: "fast-scan-report" }),
-      mockPool(), sink, {}, new Date("2026-08-16T23:30:00+08:00"));
-    expect(r.billTo).toBe("platform");
-    expect(traces[0].bill_to).toBe("platform");
-    expect(traces[0].window).toBe("off-peak");
-  });
-
-  it("降级留痕：主模型故障按链切换且每次写事件（L6.1 禁止静默）", async () => {
-    const { sink, degrades, traces } = memSink();
-    const pool = mockPool({ "deepseek-flash": { down: true } });
-    const r = await routeSmart(task(), pool, sink);
-    expect(r.kind).toBe("answered");
-    expect(r.modelTrace!.model_id).toBe("glm-5.3-flash");
-    expect(degrades[0]).toMatchObject({ from: "deepseek-flash", to: "glm-5.3-flash", reason: "unhealthy" });
-    expect(traces.length).toBe(1);
-  });
-});
-
-/* ================= 升级重答与反馈环 ================= */
-
-describe("一键升级重答（👎 → 升一档重新生成）", () => {
-  it("L1→L2 升级重答，首次免费并记 model.feedback 事件", async () => {
-    const { sink, feedbacks } = memSink();
-    const quota = new MemoryQuotaStore(1);
-    const r = await escalate({
-      task: task(), fromTier: "L1", providers: mockPool(), sink, quota,
+describe("scene policy", () => {
+  it("keeps generation and review explicit and on the same canonical model", () => {
+    const generation = resolveTextScenePolicy("video.preproduction.plan");
+    const producer = resolveTextScenePolicy("video.quality.producer-review");
+    const plausibility = resolveTextScenePolicy("video.quality.plausibility-review");
+    const finalReview = resolveTextScenePolicy("video.quality.final-review");
+    expect(generation).toMatchObject({
+      modelId: "deepseek-flash",
+      thinking: { type: "enabled", effort: "high" },
+      responseFormat: "json_object",
     });
-    expect(r.escalated).toBe(true);
-    expect(r.toTier).toBe("L2");
-    expect(r.freeEscalation).toBe(true);
-    expect(r.kind).toBe("answered");
-    expect(feedbacks[0]).toMatchObject({ thumbs: "down", original_tier: "L1", escalated_tier: "L2" });
+    expect(producer.generationReviewGroup).toBe(generation.generationReviewGroup);
+    expect(plausibility.generationReviewGroup).toBe(generation.generationReviewGroup);
+    expect(finalReview.thinking).toEqual({ type: "enabled", effort: "max" });
   });
 
-  it("配额 24h 限免 1 次：第二次重答免费额度耗尽（仍允许，实扣）", async () => {
-    const { sink } = memSink();
-    const quota = new MemoryQuotaStore(1);
-    const t = task();
-    const r1 = await escalate({ task: t, fromTier: "L1", providers: mockPool(), sink, quota });
-    const r2 = await escalate({ task: t, fromTier: "L1", providers: mockPool(), sink, quota });
-    expect(r1.freeEscalation).toBe(true);
-    expect(r2.freeEscalation).toBe(false);
+  it("uses non-thinking for deterministic scenes", () => {
+    expect(resolveTextScenePolicy("intent-classify").thinking).toEqual({ type: "disabled" });
+    expect(resolveTextScenePolicy("video.schema.repair").thinking).toEqual({ type: "disabled" });
   });
 
-  it("L3 已是天花板 → 不升级（调用方转人工/工单）", async () => {
-    const { sink } = memSink();
-    const r = await escalate({ task: task(), fromTier: "L3", providers: mockPool(), sink });
-    expect(r.escalated).toBe(false);
-    expect(tierAfterEscalation("L3")).toBeNull();
-  });
-});
-
-describe("路由质量周报：场景升级率 >15% 自动建议调表", () => {
-  it("autoTuneScenes：超阈值场景建议上调默认档", () => {
-    const recs = autoTuneScenes([
-      { scene: "cs-answer", generations: 100, escalations: 20 },   // 20% → 调
-      { scene: "quest-plan", generations: 100, escalations: 5 },   // 5% → 留
-      { scene: "briefing", generations: 0, escalations: 0 },       // 无数据 → 留
-    ]);
-    expect(recs[0]).toMatchObject({ scene: "cs-answer", recommendation: "raise-tier" });
-    expect(recs.find((r) => r.scene === "quest-plan")!.recommendation).toBe("keep");
-    expect(recs.find((r) => r.scene === "briefing")!.recommendation).toBe("keep");
+  it("bundle policy can override thinking without changing the model", () => {
+    const parsed = parseModelPolicy(`
+scenes:
+  producer-review:
+    tier: L3
+    type: reasoning_review
+    thinking: { type: enabled, effort: max }
+    responseFormat: json_object
+    generationReviewGroup: video.preproduction
+    sameModelAs: video.preproduction.plan
+`);
+    expect(parsed.issues).toEqual([]);
+    const policy = resolveTextScenePolicy("producer-review", parsed.policy?.scenes["producer-review"]);
+    expect(policy.modelId).toBe("deepseek-flash");
+    expect(policy.thinking).toEqual({ type: "enabled", effort: "max" });
   });
 });
 
-
-describe("轻量复杂度分类（自由输入场景，v3.0 下一迭代）", () => {
-  it("启发式：短问句→simple(L1)；分析归因→complex(L3)；中等保持套餐默认", async () => {
-    const { sink: s1, traces: t1 } = memSink();
-    await routeSmart({ action: "q", scene: "generic", messages: [{ role: "user", content: "现在几点" }] }, mockPool(), s1);
-    expect(t1[0].tier).toBe("L1");
-    const { sink: s2, traces: t2 } = memSink();
-    await routeSmart({ action: "q", scene: "generic", messages: [{ role: "user", content: "帮我分析一下上个季度营收下滑的归因并给出三个整改方案" }] }, mockPool(), s2);
-    expect(t2[0].tier).toBe("L3");
-    const { sink: s3, traces: t3 } = memSink();
-    await routeSmart({ action: "q", scene: "generic", messages: [{ role: "user", content: "把今天的订单情况和昨天的变化汇总成一段文字发给我看一下大概就行" }] }, mockPool(), s3);
-    expect(t3[0].tier).toBe("L2"); // medium 保持场景默认
+describe("billing tiers keep analytics but do not select models", () => {
+  it("plan mapping still resolves for billing", () => {
+    expect(resolveTier(DEFAULT_MODEL_POLICY, "quest-plan", "lite")).toBe("L1");
+    expect(resolveTier(DEFAULT_MODEL_POLICY, "quest-plan", "standard")).toBe("L2");
+    expect(resolveTier(DEFAULT_MODEL_POLICY, "quest-plan", "smart")).toBe("L3");
   });
 
-  it("启发式 medium → 挂分类器时 L1 小模型复核（可改判 complex→L3）", async () => {
-    const { sink, traces } = memSink();
-    await routeSmart(
-      {
-        action: "q", scene: "generic",
-        messages: [{ role: "user", content: "把今天的订单情况和昨天的变化汇总成一段文字发给我看一下大概就行" }],
-        complexityClassifier: async () => "complex",
+  it("credits remain a deterministic projection", () => {
+    expect(computeCredits({
+      tier: "L2",
+      promptTokens: 2_000,
+      completionTokens: 1_000,
+      window: "peak",
+    })).toBe(3);
+  });
+
+  it("every plan calls the same provider", async () => {
+    const calls: string[] = [];
+    const provider: ModelProvider = {
+      modelId: "deepseek-flash",
+      healthy: async () => true,
+      chat: async (_messages, opts) => {
+        calls.push(opts?.scene ?? "");
+        return chatResult("same answer");
       },
-      mockPool(), sink,
-    );
-    expect(traces[0].tier).toBe("L3");
-  });
-
-  it("分类器打不准（null）→ 落规则结果不阻断", async () => {
-    const { sink, traces } = memSink();
-    await routeSmart(
-      {
-        action: "q", scene: "generic",
-        messages: [{ role: "user", content: "把今天的订单情况和昨天的变化汇总成一段文字发给我看一下大概就行" }],
-        complexityClassifier: async () => null,
-      },
-      mockPool(), sink,
-    );
-    expect(traces[0].tier).toBe("L2");
-  });
-
-  it("非 generic 场景不启用分类（场景表优先）", async () => {
-    const { sink, traces } = memSink();
-    await routeSmart(task(), mockPool(), sink); // cs-answer 场景
-    expect(traces[0].tier).toBe("L1");
+    };
+    const providers = new Map([["deepseek-flash", provider]]);
+    const eventSink = sink();
+    for (const plan of ["lite", "standard", "smart"] as const) {
+      const task: SmartTask = {
+        action: "quest-plan",
+        scene: "quest-plan",
+        plan,
+        messages: [{ role: "user", content: "plan" }],
+      };
+      expect((await routeSmart(task, providers, eventSink)).kind).toBe("answered");
+    }
+    expect(calls).toEqual(["quest-plan", "quest-plan", "quest-plan"]);
+    expect(eventSink.traces.every((trace) =>
+      (trace as { model_id?: string }).model_id === "deepseek-flash")).toBe(true);
   });
 });

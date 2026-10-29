@@ -7,8 +7,8 @@ const { LLMGateway } = require('./llm-gateway');
 class LLMGatewayAdapter {
   constructor(options = {}) {
     this.gateway = new LLMGateway({
-      primaryModel: options.primaryModel || process.env.STORMAXE_LLM_MODEL || 'kimi-k2p6',
-      backupModel: options.backupModel || 'kimi-k2p6',
+      primaryModel: options.primaryModel || process.env.STORMAXE_LLM_MODEL || 'deepseek-flash',
+      backupModel: options.backupModel || 'deepseek-flash',
       failureThreshold: 3,
       recoveryTimeout: 30000,
       cacheEnabled: true,
@@ -36,8 +36,7 @@ class LLMGatewayAdapter {
 
     if (!result.success) {
       this.stats.failures++;
-      console.warn(`[LLMGatewayAdapter] 网关失败，降级到直接调用: ${result.error}`);
-      return directCallFn(prompt, options);
+      throw new Error(`MODEL_UNAVAILABLE: ${result.error || 'all same-model attempts failed'}`);
     }
 
     return result.data;

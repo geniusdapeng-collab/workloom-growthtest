@@ -27,7 +27,7 @@ class StoryCraftIntegration {
     // v6.2-patch70: LLM 推理引擎
     // v6.7.0-fix1: timeoutMs 300000 (5分钟) — 32k token输出量大，120s频繁超时
     this.llmEngine = new LLMEngine({
-      model: options.llmModel || 'kimi-k2p6',
+      model: options.llmModel || 'deepseek-flash',
       mode: 'production',
       maxRetries: 3,
       timeoutMs: 300000, // 5分钟：32k token剧本创作需要充足时间

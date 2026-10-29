@@ -101,7 +101,7 @@ describe("确认门桥", () => {
 
 function studio(onApproval: ApprovalCallback, onEvent?: EventSink): VideoStudio {
   return new VideoStudio({
-    llm: new WorkloomLLMEngine({ baseUrl: "https://example.invalid", apiKey: "test-only", model: "test" }),
+    llm: new WorkloomLLMEngine({ baseUrl: "https://example.invalid", apiKey: "test-only", model: "deepseek-flash" }),
     workDir: "/unused/confirmation-scope-test",
     onApproval,
     onEvent,
@@ -197,28 +197,35 @@ describe("LLM 适配器", () => {
     const engine = WorkloomLLMEngine.fromEnv({
       LLM_BASE_URL: "https://example.invalid/v1",
       LLM_API_KEY: "k",
-      LLM_MODEL: "m"
-    });
-    expect(engine).not.toBeNull();
-    expect(engine?.model).toBe("m");
-  });
-
-  it("DeepSeek deployment accepts DEEPSEEK_* and canonicalizes the Flash alias", () => {
-    const engine = WorkloomLLMEngine.fromEnv({
-      DEEPSEEK_BASE_URL: "https://api.deepseek.com/anthropic",
-      LLM_BASE_URL: "https://api.deepseek.com",
-      DEEPSEEK_API_KEY: "test-only",
-      DEEPSEEK_MODEL: "deepseek-v4-flash",
+      LLM_MODEL: "deepseek-flash"
     });
     expect(engine).not.toBeNull();
     expect(engine?.model).toBe("deepseek-flash");
   });
 
-  it("JSON 提取容错：围栏/前后噪声", () => {
+  it("DeepSeek deployment accepts the canonical model and rejects the legacy alias", () => {
+    const engine = WorkloomLLMEngine.fromEnv({
+      DEEPSEEK_BASE_URL: "https://api.deepseek.com/anthropic",
+      LLM_BASE_URL: "https://api.deepseek.com",
+      DEEPSEEK_API_KEY: "test-only",
+      DEEPSEEK_MODEL: "deepseek-flash",
+    });
+    expect(engine).not.toBeNull();
+    expect(engine?.model).toBe("deepseek-flash");
+    expect(engine?.getStats()).toMatchObject({ model: "deepseek-flash" });
+    expect(() => WorkloomLLMEngine.fromEnv({
+      LLM_BASE_URL: "https://api.deepseek.com",
+      LLM_API_KEY: "test-only",
+      LLM_MODEL: "deepseek-v4-flash",
+    })).toThrow("MODEL_ID_NOT_ALLOWED");
+  });
+
+  it("JSON extraction is strict and does not repair model prose", () => {
     const extract = (WorkloomLLMEngine as unknown as { extractJson(t: string): unknown })
       .extractJson;
-    expect(extract('```json\n{"a":1}\n```')).toEqual({ a: 1 });
-    expect(extract('前言{"b":2}')).toEqual({ b: 2 });
+    expect(extract('{"a":1}')).toEqual({ a: 1 });
+    expect(() => extract('```json\n{"a":1}\n```')).toThrow();
+    expect(() => extract('前言{"b":2}')).toThrow();
   });
 
   /** 真机 2026-09-22：requirement-discovery 直接调 llmEngine._extractJsonObject → 我们缺该方法 → SceneArchitect 全失败兜底 */
@@ -226,7 +233,7 @@ describe("LLM 适配器", () => {
     const engine = WorkloomLLMEngine.fromEnv({
       LLM_BASE_URL: "https://example.invalid/v1",
       LLM_API_KEY: "k",
-      LLM_MODEL: "m"
+      LLM_MODEL: "deepseek-flash"
     })!;
     const extract = (engine as unknown as { _extractJsonObject(text: unknown): unknown })._extractJsonObject;
     // 与 vendor 同语义：返回 JSON 文本（调用方自行 JSON.parse）；非字符串输入返回 null
@@ -238,7 +245,7 @@ describe("LLM 适配器", () => {
     expect(extract("没有 JSON 的文本")).toBeNull();
     expect(extract("")).toBeNull();
     const stats = (engine as unknown as { getStats(): { totalCalls: number; model: string } }).getStats();
-    expect(stats.model).toBe("m");
+    expect(stats.model).toBe("deepseek-flash");
     expect(stats.totalCalls).toBe(0);
     await expect((engine as unknown as { close(): Promise<void> }).close()).resolves.toBeUndefined();
   });
@@ -297,7 +304,7 @@ describe("vendor 核心可加载", () => {
   const rawJson = JSON.stringify({ A1: { identity: { name: "本次商品" } }, A2: { reviews: [] }, A3: { competitors: [] } });
   const sha256 = createHash("sha256").update(rawJson).digest("hex");
   function marketing(verifiedRaw?: { projectId: string; rawJson: string; sha256: string; productQuery: Record<string, unknown> }) {
-    return new VideoStudio({ llm: new WorkloomLLMEngine({ baseUrl: "https://example.invalid", apiKey: "test-only", model: "test" }),
+    return new VideoStudio({ llm: new WorkloomLLMEngine({ baseUrl: "https://example.invalid", apiKey: "test-only", model: "deepseek-flash" }),
       workDir: "/unused/marketing-test", onApproval: async () => ({ approved: true }), log: () => undefined,
       dataMining: { mode: "api", raw: { A1: { identity: { name: "旧缓存商品" } } }, storeRoot: "/unused/current-attempt", verifiedRaw } });
   }

@@ -3,10 +3,10 @@
 <!-- 自动生成，请勿手改：node scripts/oss-inventory.mjs --write -->
 
 > 生成器：`scripts/oss-inventory.mjs`（离线事实）＋ `scripts/oss-watch.sh`（上游最新版本）
-> 仓库：workloom-ai/workloom-growthtest ｜ 最近一次成功扫描：尚未记录已核实成功（运行 `pnpm oss:watch`） ｜ 最近尝试：未记录
+> 仓库：geniusdapeng-collab/workloom-growthtest ｜ 最近一次成功扫描：尚未记录已核实成功（运行 `pnpm oss:watch`） ｜ 最近尝试：未记录
 > 历史全量扫描/尝试（未核实）：2026-09-19T10:10:43.000Z
 > 每项上游版本按成功时间、查询状态和 TTL 单独判定；历史缓存与失败查询不作本次最新版本结论。
-> 统计：登记组件 98 个 ｜ npm 直接依赖 172 个 ｜ Python 依赖 5 个 ｜ 容器镜像 2 个
+> 统计：登记组件 98 个 ｜ npm 直接依赖 173 个 ｜ Python 依赖 5 个 ｜ 容器镜像 2 个
 
 ## 0. 维护机制（四件事）
 
@@ -124,7 +124,7 @@
 
 ## 2. 全量直接依赖（本仓事实，含上游最新）
 
-### 2.1 npm 直接依赖（172 个，解析自 pnpm-lock.yaml）
+### 2.1 npm 直接依赖（173 个，解析自 pnpm-lock.yaml）
 
 | 包 | 当前版本 | 声明 | 类型 | 出现位置 | 上游最新 |
 |---|---|---|---|---|---|
@@ -291,6 +291,7 @@
 | `tailwindcss` | 4.3.3（声明） | 4.3.3 | 开发 | apps/web/package.json、apps/webc/package.json | 4.3.3（历史记录；未核实或已过期） |
 | `three` | 0.186.0（声明） | ^0.186.0 | 生产 | apps/web/package.json | 0.186.0（历史记录；未核实或已过期） |
 | `three-stdlib` | 2.36.1（声明） | ^2.36.1 | 生产 | apps/web/package.json | 2.36.1（历史记录；未核实或已过期） |
+| `tokenizers` | 0.23.2（声明） | 0.23.2 | 生产 | packages/base/package.json | —（未扫描） |
 | `tsx` | 4.23.12 / 4.23.13 | 4.23.12 / ^4.23.12 / ^4.23.13 | 开发/生产 | .workloom-runtime-deps/package.json、apps/server/package.json、package.json 等 4 处 | 4.23.13（历史记录；未核实或已过期） |
 | `typescript` | 5.9.0 / 7.0.2 | ^5.9.0 / ^7.0.2 | 开发 | apps/server/package.json、apps/web/package.json、apps/webb/package.json 等 12 处 | 7.0.2（历史记录；未核实或已过期） |
 | `typescript-governance → npm:typescript` | 5.9.3 | npm:typescript@5.9.3 | 开发 | package.json | 7.0.2（历史记录；未核实或已过期） |

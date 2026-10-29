@@ -11,7 +11,7 @@ class ContinuityReviewAgent extends BaseAgent {
     // 【v2.1.4-fix13-审计修复】把 BaseAgent 的 LLM 引擎传给 CrossEpisodeValidator
     this.crossEpisodeValidator = new CrossEpisodeValidator({
       llmEngine: this._getLLMEngine(),
-      model: options.llmModel || 'kimi-k2p6',
+      model: options.llmModel || 'deepseek-flash',
       timeout: options.llmTimeout || 120000,
       ...options.crossEpisode
     });

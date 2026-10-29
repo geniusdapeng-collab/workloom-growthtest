@@ -83,8 +83,21 @@ describe("full source contracts reach each review", () => {
     const file = join(directory(), "script.json"); writeFileSync(file, JSON.stringify(s.shots));
     let body = "";
     const v = await reviewFilmStage(s, { ...options(), artifacts: [{ path: file, kind: "json" }],
-      env: { LLM_BASE_URL: "https://judge.invalid", LLM_API_KEY: "test", LLM_MODEL: "judge" },
-      fetchImpl: (async (_url: unknown, init: RequestInit) => { body = String(init.body); return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ approved: true, score: 90, issues: [], suggestions: [], reason: "actual body captured" }) } }] })); }) as typeof fetch });
+      env: { LLM_BASE_URL: "https://api.deepseek.com", LLM_API_KEY: "test-only", LLM_MODEL: "deepseek-flash" },
+      fetchImpl: (async (_url: unknown, init: RequestInit) => {
+        body = String(init.body);
+        return new Response(JSON.stringify({
+          id: "film-review",
+          model: "deepseek-flash",
+          choices: [{ finish_reason: "stop", message: { content: JSON.stringify({ approved: true, score: 90, issues: [], suggestions: [], reason: "actual body captured" }) } }],
+          usage: {
+            prompt_tokens: 100,
+            completion_tokens: 30,
+            total_tokens: 130,
+            completion_tokens_details: { reasoning_tokens: 10 },
+          },
+        }));
+      }) as typeof fetch });
     expect(v.approved, v.reason).toBe(true); expect(body).toContain("原稿尾部不能遗漏的约束"); expect(body).toContain("authorContracts");
     expect(v.contractHash).toBe(buildProducerReviewContract(filmReviewContracts(s)).contractHash);
   });
@@ -107,20 +120,15 @@ describe("full source contracts reach each review", () => {
     const v = await reviewFilmStage(s, options(), async (o) => { expect(o.contracts!.shots).toHaveLength(2); return { ...approved(o), approved: false, status: "failed", reason: "original reject" }; });
     expect(v.reason).toBe("original reject"); expect(v.approved).toBe(false);
   });
-  /**
-   * 长合同（真机 2026-09-29：6 镜富字段片）会把「原稿合同 + 结构化合同」的上下文翻倍撞穿 30k 预算，
-   * 导致全片评审环节无法运行。装不下时省略原稿、并在上下文里写明省略原因与替代证据（产物正文）。
-   */
-  it("omits the duplicate raw contract when the review budget cannot hold both copies", async () => {
+  it("always carries the complete raw contract into review", async () => {
     const s = source();
     const filler = "场景与材质的事实描述".repeat(400);
     s.shots = Array.from({ length: 6 }, (_, index) => ({ ...structuredClone(empty), shotId: `S${index + 1}`, scene: `${empty.scene}；${filler}${index}` }));
     let captured: Record<string, unknown> | undefined;
     const v = await reviewFilmStage(s, options(), async (o) => { captured = o.context as Record<string, unknown>; return approved(o); });
     expect(v.approved, v.reason).toBe(true);
-    expect(captured?.authorContracts).toBeUndefined();
-    expect(String(captured?.authorContractsOmitted)).toContain("完整原稿见本环节送审产物正文");
-    // 短合同仍然带上原稿（既有行为不回退）
+    expect(captured?.authorContracts).toBeDefined();
+    expect(captured?.authorContractsOmitted).toBeUndefined();
     let small: Record<string, unknown> | undefined;
     await reviewFilmStage(source(), options(), async (o) => { small = o.context as Record<string, unknown>; return approved(o); });
     expect(small?.authorContracts).toBeDefined();

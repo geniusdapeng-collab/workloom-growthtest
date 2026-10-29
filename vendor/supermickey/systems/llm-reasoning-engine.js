@@ -6,8 +6,8 @@ const { normalizeLLMOutput } = require('./llm-output-normalizer');
 
 class LLMEngine {
   constructor(options = {}) {
-    this.model = options.model || 'kimi-k2p6';
-    this.maxTokens = options.maxTokens || 8192; // 【v2.1.4-fix10-P25-fix3】提到8192，防25字段×详细描述被截断
+    this.model = 'deepseek-flash';
+    this.maxTokens = options.maxTokens || 393216;
     this.timeoutMs = options.timeoutMs || 600000;
     this.temperature = 1;
     this.topP = 0.95;
@@ -16,26 +16,24 @@ class LLMEngine {
     this.conversationHistory = [];
     this.stats = { totalCalls: 0, totalTokens: 0, totalDuration: 0, errors: 0 };
     this.mode = options.mode || 'production';
-    this.baseUrl = options.baseUrl || process.env.LLM_ENDPOINT || 'https://agent-gw.kimi.com/coding/v1/chat/completions';
-    this.apiKey = options.apiKey || process.env.KIMI_API_KEY || process.env.MOONSHOT_API_KEY || process.env.KIMI_PLUGIN_API_KEY;
+    // This vendored class is a compatibility facade only. The host installs
+    // WorkloomLLMEngine.prototype bridges before production calls are made.
+    this.baseUrl = '';
+    this.apiKey = '';
 
     // 【P0-13 修复】apiKey 缺失时标记为不可用，避免 401 无意义重试
-    this._noApiKey = !this.apiKey;
-    if (this._noApiKey) {
-      console.error('[LLMEngine] ❌ 未检测到 API Key，请确认环境变量 KIMI_API_KEY / MOONSHOT_API_KEY / KIMI_PLUGIN_API_KEY');
-    }
+    this._noApiKey = true;
   }
 
   _buildHeaders() {
     return {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`,
-      'User-Agent': 'Kimi Claw Plugin',
-      'X-Msh-Device-Name': 'openclaw-kimi-embedding'
+      'Authorization': `Bearer ${this.apiKey}`
     };
   }
 
   async _fetchWithTimeout(url, options, timeoutMs) {
+    throw new Error('HOST_MODEL_DISPATCH_REQUIRED: vendor LLMEngine must be bound to WorkloomLLMEngine');
     console.log(`[LLMEngine._fetchWithTimeout] 发起请求 | url=${url} | timeout=${timeoutMs}ms`);
     const controller = new AbortController();
     // 【v2.1.8-fix2】增加5秒缓冲，避免边界超时竞争条件

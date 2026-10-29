@@ -40,15 +40,27 @@ import {
 import { runInspectionScan, dispatchFromAnomaly, resolveAnomaly } from "@workloom/base/inspection";
 // 巡检基座只认装配好的行业适配器（行业中立）：套件用随服务端制品审核的酒店适配器
 import { hotelInspectionAdapter } from "../apps/server/src/industry/hotel/inspection-adapter.js";
-import { route as modelRoute, currentWindow, classify, projectBill, DEFAULT_POLICY, type EventSink, type ModelProvider } from "@workloom/base/model-router";
+import {
+  route as modelRoute,
+  currentWindow,
+  classify,
+  projectBill,
+  DEFAULT_POLICY,
+  DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+  TEXT_PRIMARY_POLICY_VERSION,
+  TEXT_PRIMARY_REGISTRY_VERSION,
+  type EventSink,
+  type ModelProvider,
+} from "@workloom/base/model-router";
 import { signDemoToken, verifyToken } from "@workloom/base/tenancy";
 import { createHash } from "node:crypto";
 
 /* ================= 基础设施 ================= */
 
 const SFX = `st${Date.now().toString(36)}`;
-const APP_URL = process.env.DATABASE_APP_URL ?? "postgres://workloom_app:workloom_dev_app@localhost:5432/workloom";
-const GW_URL = process.env.DATABASE_GATEWAY_URL ?? "postgres://workloom_gateway:workloom_dev_gateway@localhost:5432/workloom";
+const APP_URL = process.env.DATABASE_APP_URL;
+const GW_URL = process.env.DATABASE_GATEWAY_URL;
+if (!APP_URL || !GW_URL) throw new Error("SUITE_DATABASE_URLS_REQUIRED");
 const app = new pg.Pool({ connectionString: APP_URL, max: 40 });
 const gw = new pg.Pool({ connectionString: GW_URL, max: 25 });
 const scope = { tenantId: "tenant-demo", workspaceId: "ws-yunqi" };
@@ -1532,8 +1544,28 @@ j("派单事件 links 回异常事件", async () => {
 /* ================= K · 模型路由（10 条） ================= */
 const k = C("K");
 const mkProvider = (id: string, healthy = true): ModelProvider => ({
+  modelId: "deepseek-flash",
   healthy: async () => healthy,
-  chat: async (msgs) => ({ text: `${id} 回答：${msgs[msgs.length - 1]?.content ?? ""}`, tokens: 100 }),
+  chat: async (msgs, opts = {}) => ({
+    text: `${id} 回答：${String(msgs[msgs.length - 1]?.content ?? "")}`,
+    promptTokens: 80,
+    completionTokens: 20,
+    modelId: "deepseek-flash",
+    finishReason: "stop",
+    reasoningTokens: 0,
+    requestHash: createHash("sha256").update(JSON.stringify(msgs)).digest("hex"),
+    responseHash: createHash("sha256").update(id).digest("hex"),
+    responseId: `suite-${id}`,
+    scene: opts.scene ?? "generic",
+    mode: opts.thinking?.type === "enabled" ? "enabled" : "disabled",
+    effort: opts.reasoningEffort,
+    outputCeiling: DEEPSEEK_FLASH_MAX_OUTPUT_TOKENS,
+    inputTokenEstimate: 80,
+    imageCount: 0,
+    policyVersion: TEXT_PRIMARY_POLICY_VERSION,
+    registryVersion: TEXT_PRIMARY_REGISTRY_VERSION,
+    attempts: [],
+  }),
 });
 const mkSink = (): EventSink & { traces: unknown[] } => ({
   traces: [] as unknown[],
@@ -1547,15 +1579,19 @@ k("任务分类：depthHint=deep → flagship", () => eq(classify({ action: "任
 k("峰谷窗口判定函数可调用", () => assert(["peak", "off-peak"].includes(currentWindow()), "窗口枚举"));
 k("主调度：健康模型直答 + 计量", async () => {
   const sink = mkSink();
-  const r = await modelRoute({ action: "price.adjust", messages: [{ role: "user", content: "调价吗" }] }, new Map([["mock-standard-a", mkProvider("A")], ["mock-standard-b", mkProvider("B")]]), sink, DEFAULT_POLICY);
+  const r = await modelRoute({ action: "price.adjust", messages: [{ role: "user", content: "调价吗" }] }, new Map([["deepseek-flash", mkProvider("A")]]), sink, DEFAULT_POLICY);
   eq(r.kind, "answered", "直答");
   assert((sink.traces as unknown[]).length === 1, "计量留痕");
 });
-k("降级链：首选不健康 → 次选 + 降级留痕（L6.1 不静默）", async () => {
+k("唯一规范模型调用失败 → 失败关闭并留痕（禁止跨模型降级）", async () => {
   const degraded: unknown[] = [];
   const sink: EventSink = { async recordModelTrace() {}, async recordDegradation(d) { degraded.push(d); }, async recordCircuitBreak() {} };
-  const r = await modelRoute({ action: "price.adjust", messages: [{ role: "user", content: "x" }] }, new Map([["mock-standard-a", mkProvider("A", false)], ["mock-standard-b", mkProvider("B")]]), sink, DEFAULT_POLICY);
-  eq(r.kind, "answered", "降级后仍答");
+  const failing: ModelProvider = {
+    ...mkProvider("A"),
+    chat: async () => { throw new Error("canonical provider failed"); },
+  };
+  const r = await modelRoute({ action: "price.adjust", messages: [{ role: "user", content: "x" }] }, new Map([["deepseek-flash", failing]]), sink, DEFAULT_POLICY);
+  eq(r.kind, "unavailable", "调用失败关闭");
   eq(degraded.length, 1, "降级留痕");
 });
 k("全链不可用 → unavailable/queued", async () => {
@@ -3102,6 +3138,17 @@ function defineE2E(): void {
 /* ---- D24 落地向导 E2E：模拟态横幅事实源 → 真实模型装配 → ask 真实推理 → 真实模式 ---- */
 let llmStub: Server | null = null;
 const STUB_PORT = 8791;
+const llmStubResponse = (content: string, promptTokens = 10) => ({
+  id: `suite-llm-${Date.now().toString(36)}`,
+  model: "deepseek-flash",
+  choices: [{ finish_reason: "stop", message: { role: "assistant", content } }],
+  usage: {
+    prompt_tokens: promptTokens,
+    completion_tokens: 20,
+    total_tokens: promptTokens + 20,
+    completion_tokens_details: { reasoning_tokens: 0 },
+  },
+});
 h2("onboarding.status 全模拟运行态（横幅事实源：simulated + mock）", async () => {
   const { data } = await api<{ result?: { data?: { dataMode?: string; llm?: { real?: boolean }; workspace?: { events?: number; agents?: number } } } }>("/trpc/onboarding.status", { token: tokenOwner });
   eq(data.result?.data?.dataMode, "simulated", "种子库默认模拟态");
@@ -3125,10 +3172,7 @@ h2("onboarding.saveLlmConfig 真实试调 → 落盘生效（OpenAI 兼容 stub 
       req.on("end", () => {
         const mark = `E2E-LLM-MARK-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({
-          choices: [{ message: { content: `在线确认 ${mark}` } }],
-          usage: { prompt_tokens: body.length, completion_tokens: 20 },
-        }));
+        res.end(JSON.stringify(llmStubResponse(`在线确认 ${mark}`, body.length)));
       });
     } else {
       res.writeHead(404); res.end();
@@ -3137,12 +3181,12 @@ h2("onboarding.saveLlmConfig 真实试调 → 落盘生效（OpenAI 兼容 stub 
   await new Promise<void>((r) => llmStub!.listen(STUB_PORT, "127.0.0.1", () => r()));
   const { data } = await api<{ result?: { data?: { ok?: boolean; real?: boolean } }; error?: { message?: string } }>("/trpc/onboarding.saveLlmConfig", {
     method: "POST", token: tokenOwner,
-    body: { provider: "e2e-stub", baseUrl: `http://127.0.0.1:${STUB_PORT}/v1`, apiKey: "sk-e2e-dummy-1234567890", model: "stub-real-1" },
+    body: { provider: "deepseek", baseUrl: `http://127.0.0.1:${STUB_PORT}/v1`, apiKey: "test-only", model: "deepseek-flash" },
   });
   eq(data.result?.data?.ok, true, `保存成功（${data.error?.message ?? ""}）`);
   const { data: st } = await api<{ result?: { data?: { llm?: { real?: boolean; model?: string } } } }>("/trpc/onboarding.status", { token: tokenOwner });
   eq(st.result?.data?.llm?.real, true, "status 实时反映真实装配（无需重启）");
-  eq(st.result?.data?.llm?.model, "stub-real-1", "模型号就位");
+  eq(st.result?.data?.llm?.model, "deepseek-flash", "模型号就位");
 });
 h2("onboarding 装配后 ask 问询走真实推理（via=llm + 动态应答）", async () => {
   const { data } = await api<{ result?: { data?: { mode?: string; answer?: string } } }>("/trpc/threads.dispatch", {
@@ -3200,12 +3244,12 @@ h2("融合·LLM 装配后节拍真实推理（runBeat via=llm）→ 还原", asy
       req.on("data", () => undefined);
       req.on("end", () => {
         res.writeHead(200, { "content-type": "application/json" });
-        res.end(JSON.stringify({ choices: [{ message: { content: `晨报：今日经营稳中向好 E2E-BEAT-MARK-${Date.now().toString(36)}` } }], usage: { prompt_tokens: 10, completion_tokens: 20 } }));
+        res.end(JSON.stringify(llmStubResponse(`晨报：今日经营稳中向好 E2E-BEAT-MARK-${Date.now().toString(36)}`)));
       });
     } else { res.writeHead(404); res.end(); }
   });
   await new Promise<void>((r) => llmStub!.listen(STUB_PORT, "127.0.0.1", () => r()));
-  await api("/trpc/onboarding.saveLlmConfig", { method: "POST", token: tokenOwner, body: { provider: "e2e-stub", baseUrl: `http://127.0.0.1:${STUB_PORT}/v1`, apiKey: "sk-e2e-dummy", model: "stub-real-1" } });
+  await api("/trpc/onboarding.saveLlmConfig", { method: "POST", token: tokenOwner, body: { provider: "deepseek", baseUrl: `http://127.0.0.1:${STUB_PORT}/v1`, apiKey: "sk-e2e-dummy", model: "deepseek-flash" } });
   const { data } = await api<{ result?: { data?: { eventId?: string; via?: string } } }>("/trpc/captain.runBeat", { method: "POST", token: tokenOwner, body: { beat: "daily" } });
   eq(data.result?.data?.via, "llm", "节拍走真实模型");
   await api("/trpc/onboarding.saveLlmConfig", { method: "POST", token: tokenOwner, body: { provider: "mock", baseUrl: "", apiKey: "", model: "" } });
