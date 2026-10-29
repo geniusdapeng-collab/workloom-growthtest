@@ -148,3 +148,6 @@ adapter paths, workbench capabilities, changed-file secret scan and real
 DeepSeek disabled/enabled-high JSON calls. It remains `none-in-none-out`; none
 of its experimental behavior is distributed to or asserted as evidence for the
 base fleet.
+
+The native GitHub pull-request gates remain authoritative for repository
+compatibility; local receipts do not replace their platform readback.
