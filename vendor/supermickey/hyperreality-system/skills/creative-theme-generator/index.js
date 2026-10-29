@@ -1532,33 +1532,58 @@ ${text}`;
      * （正是 VID-AUDIT-M2 类型判成「旅游推广」、G2 打回的直接原因）。
      */
     const callOnce = async (opts) => {
+      let result;
       if (typeof this.llmEngine.generate === 'function') {
-        const r = await this.llmEngine.generate(prompt, opts);
-        return r.content || '';
+        result = await this.llmEngine.generate(prompt, opts);
+      } else if (typeof this.llmEngine.reason === 'function') {
+        result = await this.llmEngine.reason(prompt, opts);
+      } else if (typeof this.llmEngine.chat === 'function') {
+        result = await this.llmEngine.chat('你是严格输出 JSON 的结构化提取器，只输出 JSON。', prompt, 0.3);
+      } else {
+        throw new Error('LLM 引擎无可用调用方法');
       }
-      if (typeof this.llmEngine.reason === 'function') {
-        const r = await this.llmEngine.reason(prompt, opts);
-        return r.content || '';
+      if (typeof result === 'string') return result;
+      const content = result && typeof result.content === 'string' ? result.content : '';
+      if (!content && result && result.success === false) {
+        throw new Error(result.error || 'LLM 结构化提取失败');
       }
-      if (typeof this.llmEngine.chat === 'function') {
-        const r = await this.llmEngine.chat('你是严格输出 JSON 的结构化提取器，只输出 JSON。', prompt, 0.3);
-        return (typeof r === 'string' ? r : (r && (r.content || r.data)) || '');
-      }
-      throw new Error('LLM 引擎无可用调用方法');
+      return content;
     };
-    let content = await callOnce({ maxTokens: 2000, temperature: 0.3, forceJson: true });
-    if (!/\{[\s\S]*\}/.test(content)) {
-      console.warn('[CreativeThemeGenerator] ⚠️ 首次提取未返回 JSON，按「只输出 JSON」重试一次');
-      content = await callOnce({
-        maxTokens: 2000,
+
+    const decode = (content) => {
+      const nativeCandidate = typeof this.llmEngine._extractJsonObject === 'function'
+        ? this.llmEngine._extractJsonObject(content)
+        : null;
+      const match = String(content || '').match(/\{[\s\S]*\}/);
+      const candidate = typeof nativeCandidate === 'string' ? nativeCandidate : match && match[0];
+      if (!candidate) throw new Error('LLM 输出中未找到 JSON');
+      return JSON.parse(candidate);
+    };
+
+    const attempts = [
+      { maxTokens: 16384, temperature: 0.3, forceJson: true },
+      {
+        maxTokens: 16384,
         temperature: 0.2,
         forceJson: true,
         systemPrompt: '你是严格输出 JSON 的结构化提取器。只输出一个合法 JSON 对象，不要 markdown、不要解释。'
-      });
+      }
+    ];
+    let parsed, lastFailure;
+    for (const [index, options] of attempts.entries()) {
+      try {
+        parsed = decode(await callOnce(options));
+        break;
+      } catch (error) {
+        lastFailure = error;
+        if (index === 0) {
+          console.warn(`[CreativeThemeGenerator] ⚠️ 首次提取未返回可解析 JSON（${error.message}），按「只输出 JSON」重试一次`);
+        }
+      }
     }
-    const m = content.match(/\{[\s\S]*\}/);
-    if (!m) throw new Error('LLM 输出中未找到 JSON');
-    const parsed = JSON.parse(m[0]);
+    if (!parsed) {
+      throw new Error(`LLM 输出中未找到合法 JSON：${lastFailure && lastFailure.message ? lastFailure.message : '未知解析错误'}`);
+    }
     if (parsed.duration_sec) parsed.duration_sec = parseInt(parsed.duration_sec, 10) || 60;
     if (parsed.creative_style) parsed.creative_style = Math.min(0.95, Math.max(0.3, parseFloat(parsed.creative_style) || 0.6));
     return parsed;

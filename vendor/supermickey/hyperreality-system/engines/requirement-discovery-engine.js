@@ -243,15 +243,16 @@ class BaseDiscoveryAgent {
         const useSchema = this.name === 'SceneArchitect' ? null : schema;
         console.log(`[DEBUG] Agent=${this.name}, useSchema=${useSchema === null ? 'null' : 'provided'}, schemaSize=${useSchema ? JSON.stringify(useSchema).length : 0}`);
         
-        // 【v2.1.9-fix2】SceneArchitect 在 JSON mode 下 content 始终为 0
-        // 改用普通 mode + 手动解析 JSON
+        // Require structured JSON and disable reasoning so completion tokens
+        // are spent on the scene contract rather than hidden reasoning.
         if (this.name === 'SceneArchitect') {
           const result = await Promise.race([
             this.llmEngine.reason(fullPrompt, { 
-              maxTokens: 4000, 
-              temperature: 1.0,
+              maxTokens: 16384,
+              temperature: 0.4,
               timeoutMs: this.timeoutMs,
-              forceJson: false
+              forceJson: true,
+              thinking: { type: 'disabled' }
             }),
             timeoutPromise
           ]);

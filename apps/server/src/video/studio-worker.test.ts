@@ -34,7 +34,8 @@ const doubles = vi.hoisted(() => ({
 }));
 
 vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: doubles.connect }), getGatewayPool: () => ({}) }));
-vi.mock("@workloom/base/model-router", () => ({
+vi.mock("@workloom/base/model-router", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@workloom/base/model-router")>(),
   GatewayEventSink: class {}, poolFromEnv: () => new Map(),
 }));
 /**

@@ -27,7 +27,7 @@ export interface ModelSpec {
 /** 国产三档模型目录（平台预置；客户不可见不可配） */
 export const MODEL_CATALOG: readonly ModelSpec[] = [
   // L1 轻量档
-  { id: "deepseek-v4-flash", tier: "L1", vendor: "deepseek", baseUrlEnv: "DEEPSEEK_BASE_URL" },
+  { id: "deepseek-flash", tier: "L1", vendor: "deepseek", longContext: true, baseUrlEnv: "DEEPSEEK_BASE_URL" },
   { id: "glm-5.3-flash", tier: "L1", vendor: "zhipu", baseUrlEnv: "ZHIPU_BASE_URL" },
   { id: "qwen-3.8-flash", tier: "L1", vendor: "aliyun", baseUrlEnv: "DASHSCOPE_BASE_URL" },
   // L2 中坚档
@@ -62,14 +62,37 @@ export function chainFor(tier: Tier3, opts: { longContext?: boolean; allowCrossT
 /** 按 .env 装配模型池（mock → 全池 MockProvider；真实 → 按 vendor 环境变量装配 OpenAI 兼容 Provider） */
 export function poolFromEnv(opts: { mockOpts?: Record<string, { failFirst?: number; down?: boolean }> } = {}): Map<string, ModelProvider> {
   const pool = new Map<string, ModelProvider>();
-  if ((process.env.LLM_PROVIDER ?? "mock") === "mock") {
+  const declaredProvider = process.env.LLM_PROVIDER?.trim().toLowerCase();
+  const inferredProvider = (() => {
+    try {
+      return new URL(process.env.LLM_BASE_URL ?? "").hostname === "api.deepseek.com" ? "deepseek" : "mock";
+    } catch {
+      return "mock";
+    }
+  })();
+  const provider = declaredProvider || inferredProvider;
+  if (provider === "mock") {
     for (const m of MODEL_CATALOG) pool.set(m.id, new MockProvider(m.id, opts.mockOpts?.[m.id]));
     return pool;
   }
+  const pinnedVendors = new Set<ModelSpec["vendor"]>(["deepseek", "zhipu", "aliyun", "moonshot", "minimax"]);
   for (const m of MODEL_CATALOG) {
-    const baseUrl = process.env[m.baseUrlEnv] ?? process.env.LLM_BASE_URL;
+    if (pinnedVendors.has(provider as ModelSpec["vendor"]) && m.vendor !== provider) continue;
+    const baseUrl = process.env.LLM_BASE_URL ?? process.env[m.baseUrlEnv];
     if (!baseUrl) continue; // 该 vendor 未配置 → 池内缺位，降级链自动跳过（healthy=false 语义）
-    pool.set(m.id, new OpenAiCompatibleProvider(m.id, { baseUrl, apiKey: process.env.LLM_API_KEY || undefined }));
+    const apiKey = process.env.LLM_API_KEY
+      || (m.vendor === "deepseek" ? process.env.DEEPSEEK_API_KEY : undefined);
+    pool.set(m.id, new OpenAiCompatibleProvider(m.id, { baseUrl, apiKey: apiKey || undefined }));
+  }
+  const forced = process.env.LLM_FORCE_MODEL?.trim();
+  if (forced && !pool.has(forced)) {
+    const baseUrl = process.env.LLM_BASE_URL
+      ?? process.env.DEEPSEEK_BASE_URL?.replace(/\/+$/, "").replace(/\/anthropic$/i, "");
+    if (!baseUrl) throw new Error(`LLM_FORCE_MODEL=${forced} 但缺少 OpenAI 兼容端点`);
+    pool.set(forced, new OpenAiCompatibleProvider(forced, {
+      baseUrl,
+      apiKey: process.env.LLM_API_KEY ?? process.env.DEEPSEEK_API_KEY,
+    }));
   }
   return pool;
 }

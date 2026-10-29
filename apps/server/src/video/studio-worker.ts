@@ -31,6 +31,8 @@ import {
   installVendorEngineBridge,
   installVendorPortraitBindingBridge,
   installVendorRenderCompatBridge,
+  resolveVideoModel,
+  resolveVideoNonThinking,
   reviewStage,
   updateContextBundle,
   buildDirectorDefaults, directorGuidance, resolveDeliveryTargets, compilePersonPresentation, shotPresentationGuidance,
@@ -588,11 +590,14 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   }
   // v3.0 收口：注入路由配置——预生产全部 LLM 调用经 routeSmart
   // （preproduction 场景 × 降级链 × 真实计量 × model.call 事件留痕，fastModel 快速调用强制 L1）
+  const forceModel = resolveVideoModel(process.env) || undefined;
   const studioRouter={
     providers: poolFromEnv(),
     sink: new GatewayEventSink(getGatewayPool(), scope, { id: "video-studio" }),
     policy: modelPolicyFor("ai-video"),
     scene: "preproduction",
+    forceModel,
+    nonThinking: forceModel ? resolveVideoNonThinking(forceModel, process.env) : false,
   };
   if(directorMode)llm.attachConfiguredRouter(studioRouter);else llm.attachRouter(studioRouter);
 

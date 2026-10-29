@@ -17,6 +17,20 @@ export interface ChatResult {
   completionTokens: number;
 }
 
+/** Generation controls only; model selection and accounting stay in the router. */
+export interface ChatGenerationOptions {
+  temperature?: number;
+  topP?: number;
+  maxTokens?: number;
+  responseFormat?: { type: string };
+  thinking?: Record<string, unknown>;
+}
+
+export interface ChatOptions extends ChatGenerationOptions {
+  signal?: AbortSignal;
+  timeoutMs?: number;
+}
+
 export interface ModelProvider {
   readonly modelId: string;
   /** 健康探针（降级链判定用） */
@@ -26,7 +40,7 @@ export interface ModelProvider {
    * 此前 fetch 既无 AbortSignal 也无超时，实测一次 quest-plan 挂 53 秒
    * （IM 侧更糟：慢模型把 dispatch 挂满 3 分 49 秒），整条请求链被单个模型拖死。
    */
-  chat(messages: ChatMessage[], opts?: { signal?: AbortSignal; timeoutMs?: number }): Promise<ChatResult>;
+  chat(messages: ChatMessage[], opts?: ChatOptions): Promise<ChatResult>;
 }
 
 /** Mock 定价（演示口径：积分=token 千分位取整，旗舰 ×4） */
@@ -48,7 +62,7 @@ export class MockProvider implements ModelProvider {
   async healthy(): Promise<boolean> {
     return !this.opts.down;
   }
-  async chat(messages: ChatMessage[], opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<ChatResult> {
+  async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
     if (opts.signal?.aborted) throw new Error("模型调用已取消");
     this.calls += 1;
     if (this.opts.failFirst && this.calls <= this.opts.failFirst) {
@@ -69,6 +83,22 @@ export class OpenAiCompatibleProvider implements ModelProvider {
   private authHeaders(): Record<string, string> {
     return this.cfg.apiKey ? { authorization: `Bearer ${this.cfg.apiKey}` } : {};
   }
+  private static async failureDetail(response: Response): Promise<string> {
+    const raw = await response.text().catch(() => "");
+    let detail = raw.trim();
+    try {
+      const value = JSON.parse(raw) as { error?: { message?: unknown; code?: unknown } };
+      detail = [value.error?.code, value.error?.message]
+        .filter(item => typeof item === "string" && item.trim())
+        .join(": ");
+    } catch {
+      /* Non-JSON provider errors retain bounded text. */
+    }
+    return detail
+      .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, "Bearer <redacted>")
+      .replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, "<redacted>")
+      .slice(0, 500);
+  }
   async healthy(): Promise<boolean> {
     try {
       const res = await fetch(`${this.cfg.baseUrl}/models`, {
@@ -82,7 +112,7 @@ export class OpenAiCompatibleProvider implements ModelProvider {
       return false;
     }
   }
-  async chat(messages: ChatMessage[], opts: { signal?: AbortSignal; timeoutMs?: number } = {}): Promise<ChatResult> {
+  async chat(messages: ChatMessage[], opts: ChatOptions = {}): Promise<ChatResult> {
     // L6.2 强制出站脱敏（任何调用路径都过这一层）
     const masked = messages.map((m) => ({ ...m, content: maskDeep(m.content).value }));
     // 场景超时（缺省 120s 兜底，避免"没有超时"这种结构性缺陷）+ 外部取消信号合并
@@ -94,8 +124,15 @@ export class OpenAiCompatibleProvider implements ModelProvider {
       res = await fetch(`${this.cfg.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { "content-type": "application/json", ...this.authHeaders() },
-        body: JSON.stringify({ model: this.modelId, messages: masked, temperature: 0.2,
-          ...(this.cfg.maxTokens?{max_tokens:this.cfg.maxTokens}:{}),...(this.cfg.thinking?{thinking:this.cfg.thinking}:{}) }),
+        body: JSON.stringify({
+          model: this.modelId,
+          messages: masked,
+          temperature: opts.temperature ?? 0.2,
+          ...(opts.topP === undefined ? {} : { top_p: opts.topP }),
+          ...((opts.maxTokens ?? this.cfg.maxTokens) === undefined ? {} : { max_tokens: opts.maxTokens ?? this.cfg.maxTokens }),
+          ...(opts.responseFormat === undefined ? {} : { response_format: opts.responseFormat }),
+          ...((opts.thinking ?? this.cfg.thinking) === undefined ? {} : { thinking: opts.thinking ?? this.cfg.thinking }),
+        }),
         signal,
       });
     } catch (err) {
@@ -104,7 +141,10 @@ export class OpenAiCompatibleProvider implements ModelProvider {
       if (timeoutSignal.aborted) throw new Error(`模型调用超时（>${Math.round(timeoutMs / 1000)}s）`);
       throw err instanceof Error ? err : new Error(String(err));
     }
-    if (!res.ok) throw new Error(`模型调用失败：HTTP ${res.status}`);
+    if (!res.ok) {
+      const detail = await OpenAiCompatibleProvider.failureDetail(res);
+      throw new Error(`模型调用失败：HTTP ${res.status}${detail ? `（${detail}）` : ""}`);
+    }
     const data = (await res.json()) as {
       choices?: Array<{ message?: { content?: string } }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number };

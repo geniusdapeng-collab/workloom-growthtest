@@ -18,6 +18,7 @@
  */
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolveProducerLlm } from "./producer-gate.js";
+import { DEEPSEEK_FLASH_MODEL, DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS } from "./llm-config.js";
 
 export const PLAUSIBILITY_POLICY_VERSION = "workloom.plausibility-review/v1" as const;
 export const PLAUSIBILITY_CONTEXT_BUDGET = 60_000;
@@ -277,7 +278,14 @@ export async function reviewPlausibility(
     const response = await (options.fetchImpl ?? fetch)(`${llm.baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${llm.apiKey}` },
-      body: JSON.stringify({ model: llm.model, messages: [{ role: "user", content }], temperature: 0.1, response_format: { type: "json_object" } }),
+      body: JSON.stringify({
+        model: llm.model,
+        messages: [{ role: "user", content }],
+        temperature: 0.1,
+        response_format: { type: "json_object" },
+        ...(llm.model === DEEPSEEK_FLASH_MODEL ? { max_tokens: DEEPSEEK_VIDEO_JSON_OUTPUT_TOKENS } : {}),
+        ...(llm.nonThinking ? { thinking: { type: "disabled" } } : {}),
+      }),
       signal: AbortSignal.timeout(240_000),
     });
     const bodyText = await response.text();
