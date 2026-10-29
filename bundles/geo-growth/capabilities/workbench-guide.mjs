@@ -5,7 +5,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 
 export const VIDEO_WORKBENCH_GUIDE_PATH = 'docs/ai-video-workbench-guide.md';
 export const VIDEO_WORKBENCH_GUIDE_VERSION = '2026-10-15.2';
-const REPOSITORY = 'workloom-ai/workloom-growthtest';
+const REPOSITORY = 'geniusdapeng-collab/workloom-growthtest';
 const MAX_BYTES = 256 * 1024;
 
 export class VideoWorkbenchGuideError extends Error {

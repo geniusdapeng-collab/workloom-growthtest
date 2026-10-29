@@ -26,7 +26,7 @@ function fixture(t) {
 
 test('fixed guide returns actual full UTF-8 bytes, identity and SHA without a network call', async () => {
   const direct = readVideoWorkbenchGuide({});
-  assert.equal(direct.repository, 'workloom-ai/workloom-growthtest');
+  assert.equal(direct.repository, 'geniusdapeng-collab/workloom-growthtest');
   assert.equal(direct.guideVersion, VIDEO_WORKBENCH_GUIDE_VERSION);
   assert.equal(direct.path, ref); assert.equal(direct.markdown, bytes.toString('utf8'));
   assert.equal(direct.sha256, digest(bytes)); assert.equal(direct.bytes, bytes.length);
