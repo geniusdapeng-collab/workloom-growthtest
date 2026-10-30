@@ -30,6 +30,7 @@ import {
   filmReviewContracts,
   buildProducerReviewContract,
   normalizeFilmJobRequest,
+  pipelineSha256,
   assertFilmStageCoverage,
   resolveEraProfile,
   storyDateAt,
@@ -56,6 +57,7 @@ import {
   type FilmContractSource,
   type ProducerGateOptions,
   type ProducerVerdict,
+  type PipelineShadowSession,
 } from "@hyperreality/video-studio";
 import { routedLlmCall } from "../service/llm.js";
 import { acquireProjectLease, archiveWorkDir, type ProjectLease } from "./archive-host.js";
@@ -65,6 +67,7 @@ import type { Scope } from "./gen/db.js";
 import { ArkImageProvider, ArkVideoProvider } from "./gen/providers.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 import { assertFilmAudioPreflight, resolveFilmAudioContract } from "../../../../scripts/tools/film-audio-policy.mjs";
+import { createShadowSession, ignorePipelineShadow } from "./pipeline-control-plane.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 /** 仓库根（apps/server/src/video → 上溯四级）。 */
@@ -232,6 +235,8 @@ export interface RunContext {
   send: (frame: FilmChannelFrame) => void;
   signal: AbortSignal;
   deadlineAt: number;
+  shadow?: PipelineShadowSession | null;
+  shadowQueue?: Promise<void>;
 }
 
 function registeredCharactersFor(ctx: RunContext): RegisteredCharacterReleaseSource {
@@ -452,8 +457,23 @@ export async function startFilmJob(input: StartFilmJobInput): Promise<FilmJobSta
     await lease.release().catch(() => undefined);
     throw error;
   }
+  const shadow = await ignorePipelineShadow("film-shadow-start", () => createShadowSession({
+    scope: input.scope,
+    projectId: input.projectId,
+    planKey: project.kind === "marketing" ? "marketing-film" : "narrative-film",
+    facts: {
+      projectId: input.projectId,
+      jobId: job.id,
+      inputSha256: job.input_sha256,
+      stages: job.stages,
+    },
+    sourceSystem: "film-worker",
+    sourceRunId: job.run_id,
+    createdBy: input.actor,
+    idempotencyKey: `film:${job.id}`,
+  }));
   // 作业已由服务认领，后台执行；最终结果必须通过 status 的真实进程与文件回执核对。
-  void runFilmJob({ scope: input.scope, env, ledger, job, worker, frozen: frozen.document, archiveRoot: frozen.root, lease })
+  void runFilmJob({ scope: input.scope, env, ledger, job, worker, frozen: frozen.document, archiveRoot: frozen.root, lease, shadow })
     .catch(async (error) => {
       console.error(`[film-worker ${job.id}] 运行编排异常：${error instanceof Error ? error.message : String(error)}`);
       await lease.release().catch(() => undefined);
@@ -474,7 +494,7 @@ export async function startFilmJob(input: StartFilmJobInput): Promise<FilmJobSta
 
 async function runFilmJob(args: {
   scope: Scope; env: NodeJS.ProcessEnv; ledger: FilmLedger; job: FilmJobRow; worker: FilmWorkerRow;
-  frozen: Record<string, unknown>; archiveRoot: string; lease: ProjectLease;
+  frozen: Record<string, unknown>; archiveRoot: string; lease: ProjectLease; shadow?: PipelineShadowSession | null;
 }): Promise<void> {
   const { scope, env, ledger, job, worker } = args;
   const workDir = path.join(args.archiveRoot, "stages", "film", `attempt-${job.attempt}`);
@@ -531,6 +551,7 @@ async function runFilmJob(args: {
     frozen: args.frozen, shots, contractSource,
     signal: controller.signal, deadlineAt: Date.parse(context.deadlineAt),
     issuedUrls: new Map(), videoFiles: new Map(), videoArtifacts: new Map(), identityEvidence: new Map(), ownerToken: `film-owner-${randomUUID()}`,
+    shadow: args.shadow,
     log: (line) => console.log(`[film-worker ${job.id}] ${line}`),
     send: (frame) => {
       try {
@@ -542,6 +563,16 @@ async function runFilmJob(args: {
       }
     },
   };
+  if (args.shadow) {
+    enqueueFilmShadow(ctx, "film-shadow-run-start", async () => {
+      await args.shadow!.start();
+      await args.shadow!.runEvent({
+        observationId: "run-start",
+        kind: "film.run.started",
+        payload: { jobId: job.id, attempt: job.attempt, stages: job.stages, inputSha256: job.input_sha256 },
+      });
+    });
+  }
   let timedOut = false;
   let forceKill: NodeJS.Timeout | undefined;
   const deadlineTimer = setTimeout(() => {
@@ -789,16 +820,90 @@ function reserveFor(frame: FilmChannelRequestFrame): number {
 }
 
 async function dispatchComponent(ctx: RunContext, frame: FilmChannelRequestFrame, componentId: string): Promise<unknown> {
-  switch (frame.method) {
-    case "llm.chat": return runLlm(ctx, frame, componentId);
-    case "image.generate": return runImage(ctx, frame, componentId);
-    case "media.fetch": return runMediaFetch(ctx, frame, componentId);
-    case "video.generate": return runVideo(ctx, frame, componentId);
-    case "gate.review": return runGateReview(ctx, frame, componentId);
-    case "voice.dub": return runVoiceDub(ctx, frame, componentId);
-    case "voice.verify": return runVoiceVerify(ctx, frame, componentId);
-    default: return fail("METHOD_NOT_ALLOWED", `通道方法未实现：${String(frame.method)}`);
+  const nodeKey = mapFilmStage(frame.stepKey);
+  const observationId = `${frame.id}:${frame.method}:${frame.stepKey ?? "project"}`;
+  if (ctx.shadow) {
+    enqueueFilmShadow(ctx, "film-stage-start", () => ctx.shadow!.stageStarted({ observationId: `${observationId}:start`, nodeKey }));
   }
+  try {
+    const result = await (async () => {
+      switch (frame.method) {
+        case "llm.chat": return runLlm(ctx, frame, componentId);
+        case "image.generate": return runImage(ctx, frame, componentId);
+        case "media.fetch": return runMediaFetch(ctx, frame, componentId);
+        case "video.generate": return runVideo(ctx, frame, componentId);
+        case "gate.review": return runGateReview(ctx, frame, componentId);
+        case "voice.dub": return runVoiceDub(ctx, frame, componentId);
+        case "voice.verify": return runVoiceVerify(ctx, frame, componentId);
+        default: return fail("METHOD_NOT_ALLOWED", `通道方法未实现：${String(frame.method)}`);
+      }
+    })();
+    if (ctx.shadow) {
+      const logicalHash = pipelineSha256(result);
+      enqueueFilmShadow(ctx, "film-stage-output", async () => {
+        await ctx.shadow!.stageOutput({
+          observationId: `${observationId}:output`,
+          nodeKey,
+          artifacts: [{
+            role: frame.method,
+            schemaVersion: "workloom.film-component-output/v1",
+            ref: `shadow/film/${ctx.job.id}/${componentId}/${logicalHash}.json`,
+            sha256: logicalHash,
+            logicalHash,
+            factsSnapshotHash: ctx.job.input_sha256,
+            contentType: "application/json",
+          }],
+          inputSha256: ctx.job.input_sha256,
+        });
+        await ctx.shadow!.stageFinished({
+          observationId: `${observationId}:finish`,
+          nodeKey,
+          status: "completed",
+        });
+      });
+    }
+    return result;
+  } catch (error) {
+    if (ctx.shadow) {
+      enqueueFilmShadow(ctx, "film-stage-failed", () => ctx.shadow!.stageFinished({
+        observationId: `${observationId}:failed`,
+        nodeKey,
+        status: "failed",
+        errorClass: error instanceof SubmissionError ? error.code : "FILM_COMPONENT_FAILED",
+        errorMessage: error instanceof Error ? error.message.slice(0, 500) : String(error).slice(0, 500),
+      }));
+    }
+    throw error;
+  }
+}
+
+function enqueueFilmShadow(ctx: RunContext, label: string, task: () => Promise<unknown>): void {
+  const previous = ctx.shadowQueue ?? Promise.resolve();
+  ctx.shadowQueue = previous.then(async () => {
+    await ignorePipelineShadow(label, async () => {
+      await task();
+      return null;
+    });
+  });
+}
+
+function mapFilmStage(stepKey: string): string {
+  const normalized = stepKey.trim().toLowerCase();
+  return ({
+    "material-gen": "material-generate",
+    "videos": "render",
+    "plates": "portrait",
+    "post": "post",
+    "color": "color",
+    "deliver": "deliver",
+    "archive": "archive",
+    "revise": "revise",
+    "script": "script",
+    "scene": "scene",
+    "prompt": "prompt-fuse",
+    "field-check": "field-check",
+    "gate.review": "g7-preproduction",
+  } as Record<string, string>)[normalized] ?? normalized;
 }
 
 /* ================= 组件实现 ================= */

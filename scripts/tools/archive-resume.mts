@@ -70,7 +70,7 @@ async function rowsForProject(projectId: string): Promise<RunRow[]> {
   const r = await owner.query<RunRow>(
     `SELECT workspace_id, project_id, stage_id, attempt, status, error_class, output_ref,
             duration_ms, started_at, finished_at, last_heartbeat_at
-       FROM production_stage_runs WHERE project_id=$1
+       FROM production_stage_runs WHERE project_id=$1 AND pipeline_run_id IS NULL
       ORDER BY started_at ASC, attempt ASC`,
     [projectId],
   );
@@ -85,7 +85,8 @@ async function cmdList(): Promise<void> {
             count(DISTINCT stage_id)::text AS stages,
             count(DISTINCT stage_id) FILTER (WHERE status IN ('running','failed','interrupted'))::text AS open_stages,
             max(started_at) AS last_at
-       FROM production_stage_runs GROUP BY project_id ORDER BY max(started_at) DESC LIMIT 100`,
+       FROM production_stage_runs WHERE pipeline_run_id IS NULL
+      GROUP BY project_id ORDER BY max(started_at) DESC LIMIT 100`,
   );
   const enriched = rows.rows.map((row) => {
     const dir = join(ARCHIVE_ROOT, row.workspace_id, row.project_id);
@@ -183,7 +184,7 @@ async function cmdMarkInterrupted(): Promise<void> {
   if (!projectId) throw new Error("mark-interrupted 需要 --project VID-xxx");
   const r = await owner.query(
     `UPDATE production_stage_runs SET status='interrupted', finished_at=now()
-      WHERE project_id=$1 AND status='running' RETURNING id, stage_id, attempt`,
+      WHERE project_id=$1 AND status='running' AND pipeline_run_id IS NULL RETURNING id, stage_id, attempt`,
     [projectId],
   );
   console.log(`已归位 ${r.rowCount ?? 0} 条 running → interrupted`);

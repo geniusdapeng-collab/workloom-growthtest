@@ -66,7 +66,7 @@ export async function readStageBreakpoints(scope: Scope, projectId: string): Pro
               row_number() OVER (PARTITION BY stage_id ORDER BY attempt DESC) AS rn,
               min(started_at) OVER (PARTITION BY stage_id) AS first_at
          FROM production_stage_runs
-        WHERE workspace_id=$1 AND project_id=$2
+        WHERE workspace_id=$1 AND project_id=$2 AND pipeline_run_id IS NULL
      ) latest
       WHERE rn=1 AND status = ANY($3::text[])
       ORDER BY first_at ASC, stage_id ASC`,
@@ -140,7 +140,7 @@ export async function resumeProject(
     /* 旧账归位：进程已死，状态不能继续撒谎 */
     const interrupted = await client.query(
       `UPDATE production_stage_runs SET status='interrupted', finished_at=now()
-        WHERE workspace_id=$1 AND project_id=$2 AND status='running' RETURNING id`,
+        WHERE workspace_id=$1 AND project_id=$2 AND status='running' AND pipeline_run_id IS NULL RETURNING id`,
       [scope.workspaceId, opts.projectId],
     );
     interruptedRows = interrupted.rowCount ?? 0;
@@ -288,7 +288,7 @@ export async function readArchiveSummary(scope: Scope, projectId: string): Promi
     `SELECT stage_id, attempt, status, error_class, error_msg, output_ref, output_sha256,
             duration_ms, cost, run_id, started_at, finished_at, last_heartbeat_at
        FROM production_stage_runs
-      WHERE workspace_id=$1 AND project_id=$2
+      WHERE workspace_id=$1 AND project_id=$2 AND pipeline_run_id IS NULL
       ORDER BY started_at ASC, attempt ASC`,
     [scope.workspaceId, projectId],
   );
@@ -357,7 +357,8 @@ export async function scanStaleRunsOnStartup(env: NodeJS.ProcessEnv = process.en
     `SELECT r.workspace_id, w.tenant_id, r.project_id, r.stage_id, r.attempt, r.started_at
        FROM production_stage_runs r
        JOIN workspaces w ON w.id = r.workspace_id
-      WHERE r.status='running' AND COALESCE(r.last_heartbeat_at, r.started_at) < now() - ($1 || ' minutes')::interval
+      WHERE r.status='running' AND r.pipeline_run_id IS NULL
+        AND COALESCE(r.last_heartbeat_at, r.started_at) < now() - ($1 || ' minutes')::interval
       ORDER BY r.started_at ASC
       LIMIT 100`,
     [String(staleAfterMinutes)],
@@ -392,6 +393,7 @@ export async function scanStaleRunsOnStartup(env: NodeJS.ProcessEnv = process.en
           const updated = await client.query(
             `UPDATE production_stage_runs SET status='interrupted', finished_at=now()
               WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$4 AND status='running'
+                AND pipeline_run_id IS NULL
                 AND COALESCE(last_heartbeat_at, started_at) < now() - ($5 || ' minutes')::interval
               RETURNING id`,
             [workspaceId, row.project_id, row.stage_id, row.attempt, String(staleAfterMinutes)],

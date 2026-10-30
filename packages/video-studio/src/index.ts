@@ -73,3 +73,4 @@ export * from "./film-completion.mjs";
 export * from "./runtime-root.js";
 export * from "./rhythm-plan.js";
 export * from "./cinematic-contract.js";
+export * from "./pipeline-control-plane/index.js";

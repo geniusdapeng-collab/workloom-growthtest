@@ -397,6 +397,9 @@ importers:
 
   packages/video-studio:
     dependencies:
+      yaml:
+        specifier: 2.9.0
+        version: 2.9.0
       zod:
         specifier: ^4.6.5
         version: 4.6.5

@@ -59,6 +59,7 @@ import { routedLlmCall } from "../service/llm.js";
 import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import { whiteboardRouter } from "./whiteboard/router.js";
 import { explainerRouter } from "./explainer/router.js";
+import { getPipelineCoordinator } from "./pipeline-control-plane.js";
 import { getExplainerRun } from "./explainer/runs.js";
 import { createExplainerDraft } from "./explainer/db.js";
 import {
@@ -1403,6 +1404,27 @@ export const videoRouter = router({
   media: mediaRouter,
   /** 口播解说片（T-2026-0926-0008）：立项/分镜/提交/收尾/版本链/引擎体检 */
   explainer: explainerRouter,
+  pipelineControl: router({
+    status: protectedProcedure
+      .input(z.object({ pipelineRunId: z.string().min(1).max(200) }))
+      .query(({ ctx, input }) =>
+        getPipelineCoordinator().readProjection(scopeOf(ctx.identity), input.pipelineRunId)),
+    events: protectedProcedure
+      .input(z.object({
+        pipelineRunId: z.string().min(1).max(200),
+        afterSequence: z.number().int().nonnegative().default(0),
+      }))
+      .query(({ ctx, input }) =>
+        getPipelineCoordinator().readEvents(scopeOf(ctx.identity), input.pipelineRunId, input.afterSequence)),
+    artifacts: protectedProcedure
+      .input(z.object({ stageRunId: z.string().min(1).max(200) }))
+      .query(({ ctx, input }) =>
+        getPipelineCoordinator().readArtifacts(scopeOf(ctx.identity), input.stageRunId)),
+    gates: protectedProcedure
+      .input(z.object({ stageRunId: z.string().min(1).max(200) }))
+      .query(({ ctx, input }) =>
+        getPipelineCoordinator().readGateDecisions(scopeOf(ctx.identity), input.stageRunId)),
+  }),
 });
 
 /**

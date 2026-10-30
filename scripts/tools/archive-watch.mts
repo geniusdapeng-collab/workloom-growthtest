@@ -154,7 +154,7 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
     /* ① 僵死（running 且心跳过旧：无心跳时退化为 started_at） */
     const stale = await stageRows(
       `SELECT * FROM production_stage_runs
-        WHERE workspace_id=$1 AND status='running'
+        WHERE workspace_id=$1 AND status='running' AND pipeline_run_id IS NULL
           AND COALESCE(last_heartbeat_at, started_at) < now() - ($2 || ' minutes')::interval`,
       [workspaceId, String(STALE_MIN)],
     );
@@ -186,7 +186,7 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
       `SELECT stage_id, error_class, COUNT(DISTINCT project_id)::int AS projects,
               COUNT(*)::int AS total, MAX(started_at) AS last_at
          FROM production_stage_runs
-        WHERE workspace_id=$1 AND status IN ('failed','interrupted')
+        WHERE workspace_id=$1 AND status IN ('failed','interrupted') AND pipeline_run_id IS NULL
           AND started_at > now() - interval '24 hours'
         GROUP BY stage_id, error_class
        HAVING COUNT(DISTINCT project_id) >= 3`,
@@ -219,7 +219,8 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
     /* ③ 成本异常 */
     const costly = await stageRows(
       `SELECT * FROM production_stage_runs
-        WHERE workspace_id=$1 AND NULLIF(cost->>'cashCny','')::numeric > $2
+        WHERE workspace_id=$1 AND pipeline_run_id IS NULL
+          AND NULLIF(cost->>'cashCny','')::numeric > $2
         ORDER BY NULLIF(cost->>'cashCny','')::numeric DESC LIMIT 20`,
       [workspaceId, COST_CAP],
     );
@@ -248,12 +249,14 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
     /* ④ interrupted 遗留（1 小时内新产生；已有更新 attempt 的行不算——那是被后一轮接续过的历史） */
     const interrupted = await stageRows(
       `SELECT * FROM production_stage_runs
-        WHERE workspace_id=$1 AND status='interrupted' AND finished_at > now() - interval '1 hour'
+        WHERE workspace_id=$1 AND status='interrupted' AND pipeline_run_id IS NULL
+          AND finished_at > now() - interval '1 hour'
           AND NOT EXISTS (
             SELECT 1 FROM production_stage_runs newer
              WHERE newer.workspace_id = production_stage_runs.workspace_id
                AND newer.project_id = production_stage_runs.project_id
                AND newer.stage_id = production_stage_runs.stage_id
+               AND newer.pipeline_run_id IS NULL
                AND newer.attempt > production_stage_runs.attempt)
         ORDER BY finished_at DESC LIMIT 20`,
       [workspaceId],
@@ -282,7 +285,7 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
     /* ⑤ 台账 vs 文件对账（文件是本体：台账指向的文件不存在 = 漂移） */
     const withOutput = await stageRows(
       `SELECT * FROM production_stage_runs
-        WHERE workspace_id=$1 AND output_ref IS NOT NULL
+        WHERE workspace_id=$1 AND output_ref IS NOT NULL AND pipeline_run_id IS NULL
         ORDER BY started_at DESC LIMIT 200`,
       [workspaceId],
     );
@@ -320,9 +323,11 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
            SELECT finished_at FROM production_stage_runs p
             WHERE p.workspace_id=r.workspace_id AND p.project_id=r.project_id
               AND p.stage_id=r.stage_id AND p.attempt < r.attempt
+              AND p.pipeline_run_id IS NULL
             ORDER BY p.attempt DESC LIMIT 1
          ) prev ON true
-        WHERE r.workspace_id=$1 AND r.attempt > 1 AND r.output_ref IS NOT NULL
+        WHERE r.workspace_id=$1 AND r.pipeline_run_id IS NULL
+          AND r.attempt > 1 AND r.output_ref IS NOT NULL
           AND r.started_at > now() - interval '7 days'
         ORDER BY r.started_at DESC LIMIT 100`,
       [workspaceId],
@@ -369,7 +374,8 @@ async function collectFindings(): Promise<{ findings: Finding[]; scanned: number
      * 与「manifest 里记录过的历史漂移」都作为工程发现上报。
      */
     const projectRows = await stageRows<{ project_id: string }>(
-      `SELECT DISTINCT project_id FROM production_stage_runs WHERE workspace_id=$1`,
+      `SELECT DISTINCT project_id FROM production_stage_runs
+        WHERE workspace_id=$1 AND pipeline_run_id IS NULL`,
       [workspaceId],
     );
     const kindRows = await stageRows<{ project_id: string; kind: string }>(

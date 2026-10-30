@@ -123,6 +123,7 @@ async function currentSource(app: AppPool, scope: Scope, projectId: string): Pro
       JOIN video_projects p ON p.id=r.project_id AND p.workspace_id=r.workspace_id
       JOIN workspaces w ON w.id=p.workspace_id AND w.tenant_id=$1
       WHERE r.workspace_id=$2 AND r.project_id=$3 AND r.stage_id='preproduction'
+        AND r.pipeline_run_id IS NULL
       ORDER BY r.attempt DESC LIMIT 1`, [scope.tenantId, scope.workspaceId, projectId]);
     const row = rows.rows[0];
     if (!row || row.status !== "done" || !/^[a-f0-9]{64}$/.test(row.output_sha256 ?? "")) fail("PREPRODUCTION_REQUIRED", "缺少当前作用域已完成且可核实的预生产执行回执");

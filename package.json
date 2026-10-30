@@ -45,6 +45,8 @@
     "preview:all": "bash scripts/preview-all.sh",
     "capabilities": "node scripts/generate-capabilities.mjs",
     "capabilities:check": "node scripts/generate-capabilities.mjs --check",
+    "pipelines:compile": "tsx scripts/tools/compile-video-pipelines.mts --write",
+    "pipelines:check": "tsx scripts/tools/compile-video-pipelines.mts",
     "acceptance:matrix": "tsx --env-file=.env scripts/acceptance-matrix.mts",
     "capabilities:pptx": "python3 scripts/build-capability-pptx.py",
     "postinstall": "pnpm -C packages/industry-contract build && (node scripts/postinstall-note.js || true)",

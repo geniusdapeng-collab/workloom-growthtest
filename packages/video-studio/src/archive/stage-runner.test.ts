@@ -195,6 +195,7 @@ describe("StageRunner", () => {
     const ledger = new FakeLedger();
     const runner = new StageRunner(store, ledger, null, {
       onStart: () => { throw new Error("observer-start"); },
+      onOutputReady: () => { throw new Error("observer-output"); },
       onFinish: () => { throw new Error("observer-finish"); },
     });
     await expect(runner.run("preproduction", {}, async () => ({ output: { ok: true } }))).resolves.toEqual({ ok: true });
