@@ -1,5 +1,16 @@
 # Changelog
 
+## [pipeline-control-plane-shadow] - 2026-10-30 · 视频管线持久化控制面一期上线（T-2026-1030-9001）
+
+- 新增 6 条 ai-video 管线的编译式计划：校验 owner、gate、StageAdapter、重复节点、自依赖与依赖环，并冻结 planHash / sourceDigest / StageContract。
+- 新增持久化控制面：video_pipeline_runs，扩展 production_stage_runs，新增 ArtifactVersion、StageEdge、GateDecision、append-only PipelineEvent 与命令幂等回执；全部走租户/工作区 RLS 和不可变证据触发器。
+- 状态拆为 executionStatus / verificationStatus / disposition 三轴，读模型提供 nextAction 与结构化 blocker；门请求支持 pending，GateDecision 绑定 artifactManifestHash，失败证据使用结构化 GateFinding。
+- Studio、FilmWorker、Explainer、Delivery revision 接入影子 StageAdapter；旧执行器仍是真实出片路径，影子失败只记日志，不改变 G1–G10、vendor、付费或审批语义。
+- Studio、Director、FilmWorker 统一使用 project-run 租约；控制面短事务使用独立 pipeline-control-state 锁，避免等待整条执行租约。
+- 旧 resume、archive watch、CLI 恢复与 ProductionAuthority 显式排除影子控制行；`PIPELINE_CONTROL_SHADOW=0` 可整体回滚新观察面。
+- 验证：video-studio 1,760 项、相关 server 395 项、隔离 PostgreSQL 17 的 58 迁移 / double seed / 131-event chain / 29 PG 契约全过；PR #22 的验收 head 与合并后 main 均通过 gate 和 ui-contract。
+- 边界：总制片人 Agent、RepairPlan、自动修复、真实媒体执行切换和 production qualification 新链路不在本版上线；必须另立任务并完成真实付费链路等价验收。
+
 ## [runtime-client-repair] - 2026-10-02 · 权限、审批、影片工位与客户首启整改（T-2026-1002-0901）
 
 - 外部写动作先检查角色、PII、围栏和绑定到实际参数的审批，再记录开始凭据并调用工具；同线程跨进程互斥，审批仅消费一次。开始后缺少最终回执的写动作停在未核实状态，普通重放不会重复发送。
