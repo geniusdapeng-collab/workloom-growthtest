@@ -1,0 +1,109 @@
+{
+  "schemaVersion": "workloom.compiled-pipeline-manifest/v1",
+  "generatedBy": "scripts/tools/compile-video-pipelines.mts",
+  "plans": [
+    {
+      "pipelineKey": "account-ops",
+      "name": "账号经营管线",
+      "version": 1,
+      "sourceDigest": "7fd461cdee8eeb73066ed96c2dd4c877ecb674df0edbe87de2676f66c9ad7826",
+      "planHash": "6417b8451ec12285ec9bf214cf47bfb71bac938a1192bd9242e25a3fa0f84a09",
+      "steps": 8,
+      "edges": 7,
+      "adapters": [
+        "operations"
+      ],
+      "gates": [
+        "G10"
+      ]
+    },
+    {
+      "pipelineKey": "ads-creative-factory",
+      "name": "投流素材工厂",
+      "version": 1,
+      "sourceDigest": "6f7baea9feae5e71bd82045107a9698fcbb9fa3337896fca9c884c5e9667d975",
+      "planHash": "d5aca4652d2b4c5d36a881101453917071ccfed5f028d254df93af435fda1f97",
+      "steps": 7,
+      "edges": 6,
+      "adapters": [
+        "operations"
+      ],
+      "gates": [
+        "G12"
+      ]
+    },
+    {
+      "pipelineKey": "explainer-film",
+      "name": "口播解说片管线",
+      "version": 1,
+      "sourceDigest": "3116872cc8bfbdc93340e81992372f7bf837ce9d77f9c9b7a95437c7a8e5fc6f",
+      "planHash": "7ab147ec2db5eda05d0ec9e893366f5eac43a5d97d1572901ae39befb59a0d22",
+      "steps": 16,
+      "edges": 20,
+      "adapters": [
+        "explainer"
+      ],
+      "gates": [
+        "G8",
+        "G9"
+      ]
+    },
+    {
+      "pipelineKey": "marketing-film",
+      "name": "营销片管线",
+      "version": 1,
+      "sourceDigest": "a39ab6087c51eabaf0d64a2f2d002377d5bc6923070068c96c8254a403f19413",
+      "planHash": "8ea9c0f3e18e6c5f9701a07fb41fac6ed616c54d3c70b9f3a1a9aa8023dd0115",
+      "steps": 19,
+      "edges": 20,
+      "adapters": [
+        "operations",
+        "render-post",
+        "vendor-preproduction"
+      ],
+      "gates": [
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G9"
+      ]
+    },
+    {
+      "pipelineKey": "narrative-film",
+      "name": "叙事片管线",
+      "version": 1,
+      "sourceDigest": "c6dcba54589a47fa0188c060ced4d51321ebb24e8906f5909ac0bf0819e05ebb",
+      "planHash": "39eeb04c075a97308a5cedd72e2c994455745460a08b0b149ba4b0a0a228d44b",
+      "steps": 26,
+      "edges": 37,
+      "adapters": [
+        "render-post",
+        "vendor-preproduction"
+      ],
+      "gates": [
+        "G-DLV1",
+        "G-MAT1",
+        "G5",
+        "G6",
+        "G7",
+        "G8"
+      ]
+    },
+    {
+      "pipelineKey": "settlement-recon",
+      "name": "分账对账管线",
+      "version": 1,
+      "sourceDigest": "aeee0ce3bebfb57e4e7047c240f4fa8ee6d91b9a66bc6b18db77463ea0844bd4",
+      "planHash": "654ea363ad90030f85c7e4265637a6fde9559b1571a503bf9e4c47e7e6509ecd",
+      "steps": 5,
+      "edges": 4,
+      "adapters": [
+        "operations"
+      ],
+      "gates": [
+        "G13"
+      ]
+    }
+  ]
+}

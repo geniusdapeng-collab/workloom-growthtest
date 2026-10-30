@@ -2,7 +2,7 @@
 import { getAppPool } from "@workloom/db";
 import { gatewayAppendOnClient, insertWithReadableId, VIDEO_PROJECT_ID_SOURCE } from "@workloom/base/workdata";
 import { newId } from "@workloom/shared";
-import { directorHash, type DirectorFilmPlan } from "@hyperreality/video-studio";
+import { directorHash, projectExecutionLeaseKey, type DirectorFilmPlan } from "@hyperreality/video-studio";
 import { directorTx, type CreativeScope } from "./director-store.js";
 
 export type DirectorJobStatus="queued"|"running"|"complete"|"partial"|"failed"|"interrupted"|"requires-generation-plan";
@@ -104,7 +104,7 @@ export async function latestDirectorPlan(scope:CreativeScope,projectId:string) {
 export async function acquireDirectorLease(scope:CreativeScope,projectId:string,onLost:(error:Error)=>void=()=>{}) {
   const client=await getAppPool().connect();
   try {
-    const key=`director-worker/${scope.tenantId}/${scope.workspaceId}/${projectId}`;
+    const key=projectExecutionLeaseKey(scope,projectId);
     const held=(await client.query<{held:boolean}>("SELECT pg_try_advisory_lock(hashtext($1)) AS held",[key])).rows[0]?.held;
     if(!held){client.release();return null;}
     let lost=false;

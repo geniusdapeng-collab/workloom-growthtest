@@ -112,9 +112,21 @@ export function classifyProviderError(err: unknown): string {
 
 export interface StageRunnerHooks {
   /** 环节开始（宿主可写结构化日志/事件，失败不影响主流程） */
-  onStart?(stageId: string, attempt: number, ts: string): void;
-  /** 环节终态（done/failed） */
-  onFinish?(stageId: string, attempt: number, status: "done" | "failed"): void;
+  onStart?(stageId: string, attempt: number, ts: string): void | Promise<void>;
+  /** 产物已落盘、但终态尚未提交；影子控制面只能观察，不得阻断主流程。 */
+  onOutputReady?(
+    stageId: string,
+    attempt: number,
+    receipt: { outputRef: string; sha256: string; cost?: Record<string, unknown> },
+  ): void | Promise<void>;
+  /** 环节终态（done/failed）；receipt 仅在 fn 正常返回且产物已落盘时存在。 */
+  onFinish?(
+    stageId: string,
+    attempt: number,
+    status: "done" | "failed",
+    receipt?: { outputRef: string; sha256: string; cost?: Record<string, unknown> },
+    outcome?: StageOutcome,
+  ): void | Promise<void>;
 }
 
 /**
@@ -156,7 +168,7 @@ export class StageRunner {
   ): Promise<Record<string, unknown>> {
     const startedAt = Date.now();
     const dir = `stages/${stageId}`;
-    const safe = async (op: () => Promise<unknown>): Promise<void> => {
+    const safe = async (op: () => unknown | Promise<unknown>): Promise<void> => {
       try {
         await op();
       } catch (err) {
@@ -246,6 +258,7 @@ export class StageRunner {
       const outputRef = `${dir}/attempt-${attempt}.output.json`;
       const { sha256 } = await this.store.writeJsonAtomic(outputRef, output);
       outputReceipt = { outputRef, sha256 };
+      await safe(() => this.hooks.onOutputReady?.(stageId, attempt, { outputRef, sha256, cost }));
       const finalStatus: StageStatus = outcome?.status ?? "done";
       /* 写盘点 ④ done/failed-outcome：状态后翻转（产物已在盘上，状态永远不撒谎） */
       await this.ledger.finishRun({
@@ -278,7 +291,13 @@ export class StageRunner {
             : { failedStage: stageId, errorClass: outcome?.errorClass ?? "BUG", errorMsg: outcome?.errorMsg ?? null }),
         }),
       );
-      await safe(async () => this.hooks.onFinish?.(stageId, attempt, finalStatus === "done" ? "done" : "failed"));
+      await safe(async () => this.hooks.onFinish?.(
+        stageId,
+        attempt,
+        finalStatus === "done" ? "done" : "failed",
+        { outputRef, sha256, cost },
+        outcome,
+      ));
       return output;
     } catch (err) {
       /* 写盘点 ⑤ failed：失败现场固化（分类 + 摘要进台账；堆栈只进 meta 文件） */

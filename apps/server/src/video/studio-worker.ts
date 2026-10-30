@@ -31,6 +31,7 @@ import {
   installVendorEngineBridge,
   installVendorPortraitBindingBridge,
   installVendorRenderCompatBridge,
+  pipelineSha256,
   resolveVideoModel,
   reviewStage,
   updateContextBundle,
@@ -42,6 +43,7 @@ import {
   type GateVerdict,
   type PipelineKind,
   type PortraitIndex,
+  type PipelineShadowSession,
   type ProducerStage,
   type ProducerVerdict,
   type RunInput,
@@ -72,6 +74,7 @@ import {
   writeGateArtifact,
   type ProducerMode,
 } from "./gate-policy.js";
+import { createShadowSession, ignorePipelineShadow } from "./pipeline-control-plane.js";
 
 /* ================= 可配项（环境变量） ================= */
 
@@ -659,10 +662,49 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   });
   /** 结构化日志镜像的"当前环节"（StageRunner 在环节边界更新；与文本 tee 并行） */
   const stageRef: { name: string | null; attempt: number } = { name: null, attempt: 0 };
+  let studioShadow: PipelineShadowSession | null = null;
+  let studioShadowQueue = Promise.resolve();
+  const enqueueStudioShadow = (label: string, task: (shadow: PipelineShadowSession) => Promise<unknown>): void => {
+    studioShadowQueue = studioShadowQueue.then(async () => {
+      const shadow = studioShadow;
+      if (!shadow) return;
+      await ignorePipelineShadow(label, async () => {
+        await task(shadow);
+        return null;
+      });
+    });
+  };
   const runner = new StageRunner(archive, makeLedgerWriter(scope), entry.runId, {
     onStart: (stageId, attempt) => {
       stageRef.name = stageId;
       stageRef.attempt = attempt;
+      enqueueStudioShadow("studio-stage-start", (shadow) => shadow.runEvent({
+        observationId: `stage-start:${stageId}:${attempt}`,
+        kind: "legacy.stage.started",
+        payload: { stageId, attempt },
+      }));
+    },
+    onOutputReady: (stageId, attempt, receipt) => {
+      enqueueStudioShadow("studio-stage-output", (shadow) => shadow.runEvent({
+        observationId: `stage-output:${stageId}:${attempt}:${receipt.sha256}`,
+        kind: "legacy.stage.output_ready",
+        payload: { stageId, attempt, ...receipt },
+      }));
+    },
+    onFinish: (stageId, attempt, status, receipt, outcome) => {
+      enqueueStudioShadow("studio-stage-finish", (shadow) => shadow.runEvent({
+        observationId: `stage-finish:${stageId}:${attempt}:${status}:${receipt?.sha256 ?? outcome?.errorClass ?? "no-output"}`,
+        kind: "legacy.stage.finished",
+        payload: {
+          stageId,
+          attempt,
+          status,
+          outputRef: receipt?.outputRef ?? null,
+          outputSha256: receipt?.sha256 ?? null,
+          errorClass: outcome?.errorClass ?? null,
+          errorMsg: outcome?.errorMsg ?? null,
+        },
+      }));
     },
   });
   /** 交接包线索（来自真实事件，不猜）：门裁决 + 时长投影 */
@@ -716,7 +758,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     });
   };
 
-  const onApproval: ApprovalCallback = async (req) => {
+  const decideApproval: ApprovalCallback = async (req) => {
     // ApprovalCallback.gate 声明为 string，但适配层（studio.ts）保证已 resolveGate 过，运行时为 GateKey
     const gate = req.gate as GateKey;
     const gateObj = gateObjectOf(gate, req.vendorType);
@@ -944,6 +986,46 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
     return verdict;
   };
 
+  /**
+   * 门禁影子观察：真实裁决仍由 decideApproval 完成；这里只把已经发生的裁决绑定到
+   * 内容摘要和计划节点。旁路在后台执行，失败不得改变预生产结果。
+   */
+  const onApproval: ApprovalCallback = async (req) => {
+    const verdict = await decideApproval(req);
+    if (studioShadow) {
+      const planGate = /^(G\d+)/u.exec(req.gate)?.[1] ?? req.gate;
+      const decision = verdict.approved
+        ? "passed" as const
+        : /unavailable|不可用/iu.test(verdict.reason ?? "")
+          ? "unverified" as const
+          : "rejected" as const;
+      enqueueStudioShadow("studio-gate-decision", (shadow) => shadow.gateResolved({
+        observationId: `gate:${req.runId ?? entry.runId}:${req.gate}:${pipelineSha256(req.contentMd ?? "")}`,
+        gateKey: planGate,
+        decision,
+        actor: `studio-worker:${effectiveProducerMode}`,
+        checkSetVersion: `studio-gate/v1:${req.vendorType}`,
+        content: req.contentMd ?? "",
+        issues: decision === "rejected" ? [String(verdict.reason ?? "gate rejected").slice(0, 2_000)] : [],
+        suggestions: Array.isArray(verdict.suggestions) ? verdict.suggestions.slice(0, 50).map(String) : [],
+        findings: decision === "passed" ? [] : [{
+          code: decision === "unverified" ? `${planGate}_UNVERIFIED` : `${planGate}_REJECTED`,
+          severity: "P1",
+          targetType: "stage",
+          targetId: planGate,
+          fieldPath: null,
+          expected: "passed",
+          actual: verdict.reason ?? decision,
+          evidenceRefs: [pipelineSha256(req.contentMd ?? "")],
+          repairClass: decision === "unverified" ? "human_input" : "semantic",
+          blocking: true,
+        }],
+        evidenceHashes: [pipelineSha256(req.contentMd ?? "")],
+      }));
+    }
+    return verdict;
+  };
+
   let marketingDossierRoot: string | undefined;
   let marketingDossierRef: string | undefined;
   const studioConfig: StudioConfig = {
@@ -979,6 +1061,33 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
       if (projectMeta.kind !== pipelineKind) throw new Error("PIPELINE_KIND_MISMATCH：预生产管线与服务项目类型不一致");
       if(directorMode) await verifyDirectorGrant({...scope,projectId:input.projectId,runId:entry.runId},input.creativeDelegation);
       await archive.ensure({ kind: projectMeta.kind, title: projectMeta.title, createdAt: projectMeta.createdAt });
+      studioShadow = await ignorePipelineShadow("studio-start", () => createShadowSession({
+        scope,
+        projectId: input.projectId,
+        planKey: pipelineKind === "marketing" ? "marketing-film" : "narrative-film",
+        facts: {
+          projectId: input.projectId,
+          intent: input.intent,
+          isMarketing: Boolean(input.isMarketing),
+          pipelineKind,
+          scenePolicy: selectedScenePolicy.decision,
+          platform: selectedPlatform.decision,
+        },
+        sourceSystem: "studio-worker",
+        sourceRunId: entry.runId,
+        createdBy: "studio-worker",
+        idempotencyKey: `studio:${entry.runId}`,
+      }));
+      if (studioShadow) {
+        enqueueStudioShadow("studio-shadow-start", async (shadow) => {
+          await shadow.start();
+          await shadow.runEvent({
+            observationId: "run-start",
+            kind: "legacy.preproduction.started",
+            payload: { runId: entry.runId, pipelineKind },
+          });
+        });
+      }
       // 既有项目补跑可能改用新的明确片型；manifest 保存当前决策，旧值留在追加事件中。
       const manifest = await archive.readManifest();
       if (!manifest) throw new Error(`项目 ${input.projectId} 制片档案 manifest 缺失`);

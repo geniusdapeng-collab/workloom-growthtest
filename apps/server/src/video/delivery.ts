@@ -20,12 +20,14 @@ import {
 } from "node:fs";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { pipelineSha256 } from "@hyperreality/video-studio";
 import {
   DeliveryError, assertDeliveryScope, assertManifestScope, assertScopedPackagePath,
   cleanDeliveryRef, inspectDeliveryFile, inspectDeliveryTrust, inspectRegisteredDeliveryArtifact,
   readDeliveryManifestFile, requireDeliveryTrust, safeDeliveryPath, scopedDeliveryRoot,
   type DeliveryScope, type DeliveryTrust,
 } from "./delivery-trust.js";
+import { createShadowSession, ignorePipelineShadow } from "./pipeline-control-plane.js";
 export { DeliveryError, type DeliveryScope } from "./delivery-trust.js";
 
 /**
@@ -951,6 +953,31 @@ export async function startDeliveryRevision({
     outDir: null,
   };
   jobs.set(jobId, job);
+  const shadowPromise = ignorePipelineShadow("delivery-shadow-start", async () => {
+    if (!projectId.trim()) return null;
+    const shadow = await createShadowSession({
+      scope: {
+        tenantId: job.scope.tenantId,
+        workspaceId: job.scope.workspaceId,
+      },
+      projectId,
+      planKey: "narrative-film",
+      facts: {
+        projectId,
+        expectedVersion,
+        expectedProjectSha256,
+        patch,
+      },
+      sourceSystem: "delivery-revision",
+      sourceRunId: jobId,
+      createdBy: by ?? "delivery-revision",
+      idempotencyKey: `delivery-revision:${jobId}`,
+    });
+    if (!shadow) return null;
+    await shadow.start();
+    await shadow.stageStarted({ observationId: "revise-start", nodeKey: "revise" });
+    return shadow;
+  });
   /** 完成回调只触发一次；但"打印了完成标记"不等于作业成功（深审：标记后仍可能非 0 退出） */
   let completedNotified = false;
   let markerSeen = false;
@@ -1023,6 +1050,43 @@ export async function startDeliveryRevision({
     job.finishedAt = job.finishedAt ?? new Date().toISOString();
     job.exitCode = code ?? -1;
     appendFileSync(logPath, `\n[${job.finishedAt}] 退出码 ${code}\n`, "utf8");
+    void shadowPromise.then((shadow) => {
+      if (!shadow) return;
+      const logicalHash = pipelineSha256({
+        jobId,
+        status: job.status,
+        exitCode: job.exitCode,
+        version: job.version,
+        outDir: job.outDir,
+        expectedVersion,
+        expectedProjectSha256,
+      });
+      void ignorePipelineShadow("delivery-shadow-finish", async () => {
+        if (code === 0) {
+          await shadow.stageOutput({
+            observationId: "revise-output",
+            nodeKey: "revise",
+            artifacts: [{
+              role: "revision_report",
+              schemaVersion: "workloom.delivery-revision-result/v1",
+              ref: `shadow/delivery/${jobId}/${logicalHash}.json`,
+              sha256: logicalHash,
+              logicalHash,
+              factsSnapshotHash: pipelineSha256({ expectedVersion, expectedProjectSha256 }),
+              contentType: "application/json",
+            }],
+            inputSha256: expectedProjectSha256,
+          });
+        }
+        await shadow.stageFinished({
+          observationId: "revise-finish",
+          nodeKey: "revise",
+          status: code === 0 ? "completed" : "failed",
+          errorClass: code === 0 ? null : "DELIVERY_REVISION_FAILED",
+          errorMessage: code === 0 ? null : `返修工位退出码 ${code ?? -1}`,
+        });
+      });
+    });
     if (code === 0) {
       notifyCompleted();
     } else if (markerSeen) {

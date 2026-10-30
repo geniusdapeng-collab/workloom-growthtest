@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import { getAppPool } from "@workloom/db";
 import {
   ArchiveStore,
+  projectExecutionLeaseKey,
   type StageLedgerWriter,
   type StageStatus,
 } from "@hyperreality/video-studio";
@@ -116,16 +117,17 @@ export function makeLedgerWriter(scope: Scope): StageLedgerWriter {
         ]);
         const r = await client.query<{ attempt: number; input_ref: string }>(
           `INSERT INTO production_stage_runs
-             (id, workspace_id, project_id, stage_id, attempt, input_ref, run_id, last_heartbeat_at)
-           SELECT $1, $2, $3, $4, COALESCE(MAX(r.attempt),0)+1,
+             (id, tenant_id, workspace_id, project_id, stage_id, attempt, input_ref, run_id, last_heartbeat_at)
+           SELECT $1, $7, $2, $3, $4, COALESCE(MAX(r.attempt),0)+1,
                   replace($5, '{attempt}', (COALESCE(MAX(r.attempt),0)+1)::text), $6, now()
              FROM video_projects p
              LEFT JOIN production_stage_runs r
                ON r.workspace_id=p.workspace_id AND r.project_id=p.id AND r.stage_id=$4
+              AND r.pipeline_run_id IS NULL
             WHERE p.workspace_id=$2 AND p.id=$3
             GROUP BY p.id
            RETURNING attempt, input_ref`,
-          [row.id, scope.workspaceId, row.projectId, row.stageId, row.inputRefTemplate, row.runId],
+          [row.id, scope.workspaceId, row.projectId, row.stageId, row.inputRefTemplate, row.runId, scope.tenantId],
         );
         const inserted = r.rows[0];
         if (!inserted) throw new Error(`台账认领失败：${row.projectId}/${row.stageId} 未返回行`);
@@ -145,6 +147,7 @@ export function makeLedgerWriter(scope: Scope): StageLedgerWriter {
               SET status=$4, output_ref=$5, output_sha256=$6, error_class=$7, error_msg=$8,
                   duration_ms=$9, cost=$10::jsonb, finished_at=now()
             WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$11 AND status='running'
+              AND pipeline_run_id IS NULL
             RETURNING id`,
           params,
         );
@@ -153,6 +156,7 @@ export function makeLedgerWriter(scope: Scope): StageLedgerWriter {
         const existing = await client.query(
           `SELECT id FROM production_stage_runs
             WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$11
+              AND pipeline_run_id IS NULL
               AND status=$4 AND output_ref IS NOT DISTINCT FROM $5
               AND output_sha256 IS NOT DISTINCT FROM $6 AND error_class IS NOT DISTINCT FROM $7
               AND error_msg IS NOT DISTINCT FROM $8 AND duration_ms IS NOT DISTINCT FROM $9
@@ -168,7 +172,8 @@ export function makeLedgerWriter(scope: Scope): StageLedgerWriter {
       withScopedTx(scope, async (client) => {
         await client.query(
           `UPDATE production_stage_runs SET last_heartbeat_at=now()
-            WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$4 AND status='running'`,
+            WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND attempt=$4 AND status='running'
+              AND pipeline_run_id IS NULL`,
           [scope.workspaceId, row.projectId, row.stageId, row.attempt],
         );
       }),
@@ -177,7 +182,7 @@ export function makeLedgerWriter(scope: Scope): StageLedgerWriter {
       withScopedTx(scope, async (client) => {
         const r = await client.query<{ n: number }>(
           `SELECT COALESCE(MAX(attempt),0)+1 AS n FROM production_stage_runs
-            WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3`,
+            WHERE workspace_id=$1 AND project_id=$2 AND stage_id=$3 AND pipeline_run_id IS NULL`,
           [scope.workspaceId, projectId, stageId],
         );
         return Number(r.rows[0]?.n ?? 1);
@@ -191,12 +196,9 @@ export interface ProjectLease {
   release(): Promise<void>;
 }
 
-/** 同一编码供执行者、恢复与启动扫描使用，字段分隔无歧义并包含租户/工作区。 */
+/** 同一编码供 Studio/Director/Film/恢复共用；namespace 固定为 project-run。 */
 export function projectRunLockKey(scope: Scope, projectId: string): string {
-  if (![scope.tenantId, scope.workspaceId, projectId].every((value) => typeof value === "string" && value.trim())) {
-    throw new Error("PROJECT_LEASE_SCOPE_INVALID");
-  }
-  return JSON.stringify(["archive-run", scope.tenantId, scope.workspaceId, projectId]);
+  return projectExecutionLeaseKey(scope, projectId);
 }
 
 /**
@@ -282,7 +284,7 @@ export async function markProjectInterrupted(scope: Scope, projectId: string): P
   const rows = await withScopedTx(scope, async (client) => {
     const r = await client.query(
       `UPDATE production_stage_runs SET status='interrupted', finished_at=now()
-        WHERE workspace_id=$1 AND project_id=$2 AND status='running' RETURNING id`,
+        WHERE workspace_id=$1 AND project_id=$2 AND status='running' AND pipeline_run_id IS NULL RETURNING id`,
       [scope.workspaceId, projectId],
     );
     return r.rowCount ?? 0;

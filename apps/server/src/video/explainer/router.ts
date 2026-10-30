@@ -11,6 +11,7 @@
  *   versions / engine → 版本链只读面 + 引擎体检
  */
 import { existsSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
@@ -27,6 +28,7 @@ import { buildCardRegistry } from "./card-registry.js";
 import { engineDirOf, engineStatus } from "./engine.js";
 import { runMachineGates } from "./qa-gates.js";
 import { deliverFilm } from "./deliver.js";
+import type { PipelineShadowSession } from "../pipeline-control-plane.js";
 import { runExplainerPipeline } from "./pipeline.js";
 import { generateShotbook, validateShotbook } from "./shotbook.js";
 import { annotateSemantics } from "./semantics.js";
@@ -41,6 +43,10 @@ import { ExplainerQualitySchema, explainerOutputSize, ExplainerScriptSchema, typ
 function renderKey(shotbookId: string, version: number, quality: ExplainerQuality): string {
   const base = `explainer:${shotbookId}:v${version}`;
   return quality === "hd" ? base : `${base}:uhd`;
+}
+
+function shadowHash(value: unknown): string {
+  return createHash("sha256").update(JSON.stringify(value ?? null), "utf8").digest("hex");
 }
 
 const explainerSavedParams = z.object({
@@ -270,6 +276,54 @@ export const explainerRouter = router({
         lowMatch = z.array(z.number().int()).parse(scriptRow.fields?.lowMatch);
       } else {
         const script = ExplainerScriptSchema.parse({ sentences: splitScript(row.script_text) });
+        const shadowTaskId = `${row.id}-v${row.version}${input.quality === "uhd" ? "-uhd" : ""}`;
+        let shadow: PipelineShadowSession | null = null;
+        let shadowQueue = Promise.resolve();
+        let enqueueShadow: (label: string, fn: () => Promise<unknown>) => void = () => {};
+        const shadowEnabled = (process.env.PIPELINE_CONTROL_SHADOW
+          ?? (process.env.NODE_ENV === "test" ? "0" : "1")) !== "0";
+        if (shadowEnabled) {
+          try {
+            const { createShadowSession, ignorePipelineShadow } = await import("../pipeline-control-plane.js");
+            shadow = await ignorePipelineShadow("explainer-shadow-start", () => createShadowSession({
+              scope,
+              projectId: input.projectId,
+              planKey: "explainer-film",
+              facts: {
+                projectId: input.projectId,
+                shotbookId: row.id,
+                shotbookVersion: row.version,
+                scriptSha256: row.script_sha256,
+                quality: input.quality,
+                renderScope: input.renderScope,
+              },
+              sourceSystem: "explainer-pipeline",
+              sourceRunId: shadowTaskId,
+              createdBy: ctx.identity.memberNo,
+              idempotencyKey: `explainer:${shadowTaskId}`,
+            }));
+            enqueueShadow = (label, fn) => {
+              shadowQueue = shadowQueue.then(async () => {
+                await ignorePipelineShadow(label, async () => { await fn(); return null; });
+              });
+            };
+          } catch (error) {
+            console.error(`[pipeline-shadow] explainer-start: ${error instanceof Error ? error.message : String(error)}`);
+          }
+        }
+        const mapStage = (stageId: string): string => ({
+          scriptIntake: "script-intake",
+          voiceProduce: "voice-produce",
+          voiceTrim: "voice-trim",
+          align: "align",
+          semantics: "semantics",
+          shotbook: "shotbook",
+          assemble: "assemble",
+          preflight: "preflight",
+          render: "render",
+          machineGates: "machine-gates",
+          deliver: "deliver",
+        })[stageId] ?? stageId;
 
         /* ---- 准备段（配音 → 对齐 → 语义 → 装配 → 素材体检） ---- */
         let prepared: Awaited<ReturnType<typeof runExplainerPipeline>>;
@@ -288,6 +342,42 @@ export const explainerRouter = router({
             hostAssets: input.hostAssets,
             assets: input.assets,
             stopAfterAssemble: true,
+            onStage: shadow ? (event) => {
+              const nodeKey = mapStage(event.stageId);
+              const observationId = `${nodeKey}:${event.status}:${shadowHash(event.output ?? {})}`;
+              if (event.status === "running") {
+                enqueueShadow("explainer-stage-start", () => shadow.stageStarted({ observationId, nodeKey }));
+              } else {
+                if (event.output !== undefined) {
+                  const hash = shadowHash(event.output);
+                  enqueueShadow("explainer-stage-output", () => shadow.stageOutput({
+                    observationId,
+                    nodeKey,
+                    artifacts: [{
+                      role: event.stageId,
+                      schemaVersion: "workloom.explainer-stage-output/v1",
+                      ref: `shadow/explainer/${shadowTaskId}/${nodeKey}/${hash}.json`,
+                      sha256: hash,
+                      logicalHash: hash,
+                      factsSnapshotHash: shadowHash({
+                        projectId: input.projectId,
+                        shotbookId: row.id,
+                        shotbookVersion: row.version,
+                      }),
+                      contentType: "application/json",
+                    }],
+                  }));
+                }
+                enqueueShadow("explainer-stage-finish", () => shadow.stageFinished({
+                  observationId: `${observationId}:finish`,
+                  nodeKey,
+                  status: event.status === "failed" ? "failed" : "completed",
+                  skipped: event.status === "skipped",
+                  errorClass: event.errorClass ?? null,
+                  errorMessage: event.errorMsg ?? null,
+                }));
+              }
+            } : undefined,
             onLog: (line) => console.log(`[explainer:prepare] ${line}`),
           });
         } catch (err) {

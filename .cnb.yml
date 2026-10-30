@@ -58,6 +58,8 @@
         # 默认模特可解析、四角度定妆照齐备、声明在首页/文档/能力清单/目录说明同步存在。
         # 背景：新下载项目的开发者与 AI Agent 常以为"仓库里没有人物资产"而重复建档（T-2026-0925-0004/0006）。
         node scripts/verify-builtin-character-assets.mjs
+        # 视频管线声明必须先编译为冻结 plan：缺 adapter/schema/gate/owner 或出现依赖环时直接红。
+        pnpm pipelines:check
 
     - name: 三端生产构建
       script: |
