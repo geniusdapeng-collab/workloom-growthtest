@@ -5,7 +5,7 @@
   "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
   "title": "AI 视频管线 M6 验收反查修复",
   "created_at": "2026-10-31T15:09:00.617Z",
-  "updated_at": "2026-10-31T15:18:31.283Z",
+  "updated_at": "2026-10-31T15:25:50.245Z",
   "baseline": {
     "audit": {
       "commit": "e5111931d59fa662ab81163fe909a2c89f7543ef",
@@ -16,7 +16,7 @@
       "notes": "本地 HEAD 不是 origin/main 最新（云端 6ba121b0 / 本地 e5111931）——按 §1.2 先对齐基线；工作树不干净（9 项未提交改动）：排雷结论只对已提交内容成立"
     },
     "repair": {
-      "commit": null,
+      "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999",
       "reverified_problem_ids": []
     },
     "acceptance": {
@@ -97,7 +97,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "finalizer 忽略未绑定人物与无效定妆照并将结果误判为可进 G8",
       "evidence": [
         {
@@ -135,15 +135,35 @@
               "scripts/tools/data-pipeline-finalize.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-009-0-1793460221821.json",
+            "sha256": "edbd617885a216dbe4b4558b83413859b4a4ecfc24e6abfebf49ae0c56041908",
+            "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999"
+          },
+          "evidence": {
+            "path": "evidence/MC-009-0-1793460221821.txt",
+            "sha256": "7965e1919e18279af96835ca328a878b31c07376586d14c651a8d3f8195dcb94",
+            "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run scripts/tools/data-pipeline-finalize.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a1927c",
       "verified_by": null,
-      "notes": "验收发现 A-001。"
+      "notes": "验收发现 A-001。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a1927c",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T15:23:41.816Z",
+        "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999",
+        "finished_at": "2026-10-31T15:23:42.692Z"
+      }
     },
     {
       "id": "MC-010",
@@ -151,7 +171,7 @@
       "level": "L3",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "包级标准测试因 cwd 相对路径产生不可复现失败",
       "evidence": [
         {
@@ -191,7 +211,17 @@
               "test"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-010-0-1793460226794.json",
+            "sha256": "eeefae34118b26ce8844a50ba575eea29a39aab7e8fe449f031ef43799b05225",
+            "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999"
+          },
+          "evidence": {
+            "path": "evidence/MC-010-0-1793460226794.txt",
+            "sha256": "8ca61d4032eed1dc26aafda98ce6ac8adab02e950ba85566105cb2c06eed87ce",
+            "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999"
+          }
         },
         {
           "kind": "sample",
@@ -212,15 +242,35 @@
               "30000"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-010-1-1793460330307.json",
+            "sha256": "f4c2b6e500203d65577385414d410dd3c8934208afa031dda9354e7a94c93576",
+            "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999"
+          },
+          "evidence": {
+            "path": "evidence/MC-010-1-1793460330307.txt",
+            "sha256": "a86305e2d41b79f8d04603cb3e41dcf7a83310fc53a22405b647448f0d0fa10f",
+            "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999"
+          }
         }
       ],
       "regression": {
         "command": "pnpm --config.verify-deps-before-run=false -C packages/video-studio test && pnpm --config.verify-deps-before-run=false -C apps/server exec vitest run src/video --testTimeout 30000"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a1927c",
       "verified_by": null,
-      "notes": "验收发现 A-002。"
+      "notes": "验收发现 A-002。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a1927c",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T15:23:46.789Z",
+        "commit": "bb297c6a26e9aca1c6f5ec9396be21b78bc1e999",
+        "finished_at": "2026-10-31T15:25:50.245Z"
+      }
     }
   ],
   "gates": []
