@@ -44,8 +44,8 @@
     },
     {
       "kind": "sample",
-      "given": "G10 review 已自动审批，但 ReplyGenerator 抛错且 sender 可用",
-      "expect": "sender 发送 0 次，评论状态 manual，回复状态 candidate，事件记录 generationFailed=true",
+      "given": "G10 review 已自动审批，但 ReplyGenerator 抛错且 sender 可用；另有两个并发重复派遣",
+      "expect": "生成失败时 sender 发送 0 次并保留 manual/candidate；并发重复派遣只有一个认领成功，sender 与回复均只写一次",
       "command": "vitest run --root packages/base social-listening/social-listening.test.ts",
       "exec": {
         "file": "node_modules/.bin/vitest",

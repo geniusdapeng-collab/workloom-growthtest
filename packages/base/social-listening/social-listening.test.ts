@@ -66,6 +66,15 @@ if (s.includes("append_event_insert")) {
       this.comments.push(row);
       return { rows: [row], rowCount: 1 };
     }
+    if (/UPDATE comments SET status='manual', route_level='review'/.test(s)) {
+      const row = this.comments.find(
+        (x) => x.workspace_id === params[0] && x.id === params[1] && x.status === "new",
+      );
+      if (!row) return { rows: [], rowCount: 0 };
+      row.status = "manual";
+      row.route_level = "review";
+      return { rows: [row], rowCount: 1 };
+    }
     if (/UPDATE comments SET intent=\$3/.test(s)) {
       const row = this.comments.find((x) => x.workspace_id === params[0] && x.id === params[1]);
       if (!row) return { rows: [], rowCount: 0 };
@@ -219,6 +228,23 @@ describe("G10 三级分流矩阵", () => {
     expect(db.replies[0]!.status).toBe("candidate");
     const event = db.events.find((item) => item.payload.decision.action === "comment.reply_manual")!;
     expect(event.payload.decision.after).toMatchObject({ generationFailed: true });
+  });
+
+  it("并发重复派遣只允许一个处理器认领评论并外发一次", async () => {
+    const { db, app, gateway } = fixture("这个多少钱？");
+    const sender = new FakeSender();
+    const deps = {
+      classifier: classifierOf("query"),
+      sender,
+      autoApproveReview: true,
+    } as const;
+    const [first, second] = await Promise.all([
+      processComment(app, gateway, scope, "cm-1", deps),
+      processComment(app, gateway, scope, "cm-1", deps),
+    ]);
+    expect(sender.sent).toHaveLength(1);
+    expect(db.replies).toHaveLength(1);
+    expect([first!.decision.level, second!.decision.level].sort()).toEqual(["auto", "review"]);
   });
 
   it("敏感词 → block：即使 LLM 判 praise 也熔断，不生成候选回复不外发 + 告警", async () => {

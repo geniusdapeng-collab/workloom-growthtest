@@ -66,6 +66,7 @@ import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import { whiteboardRouter } from "./whiteboard/router.js";
 import { explainerRouter } from "./explainer/router.js";
 import { getPipelineCoordinator } from "./pipeline-control-plane.js";
+import { configuredProjectComputeCap, projectComputeUsed } from "./project-compute-budget.js";
 import { getExplainerRun } from "./explainer/runs.js";
 import { createExplainerDraft } from "./explainer/db.js";
 import {
@@ -881,28 +882,6 @@ export function plannedDurationOf(script: { fields?: unknown; md?: string }): {
     if (Number.isFinite(value) && value > 0) return { seconds: Math.round(value), source: "script-md" };
   }
   return { seconds: null, source: null };
-}
-
-/** 单项目非 mock 渲染的已消耗算力秒数；完成回执优先，缺实际值才用提交预估。 */
-export async function projectComputeUsed(
-  app: AppPool,
-  scope: Scope,
-  projectId: string,
-): Promise<number> {
-  const rows = await scopedQuery<{ used: string | null }>(
-    app, scope,
-    `SELECT COALESCE(SUM(COALESCE(actual_seconds, est_seconds, 0)), 0)::text AS used
-       FROM render_jobs
-      WHERE workspace_id=$1 AND project_id=$2 AND mock=false`,
-    [scope.workspaceId, projectId],
-  );
-  const used = Number(rows[0]?.used ?? 0);
-  return Number.isFinite(used) && used > 0 ? used : 0;
-}
-
-function configuredProjectComputeCap(env: NodeJS.ProcessEnv = process.env): number {
-  const value = Number(env.WORKLOOM_PROJECT_COMPUTE_CAP ?? 0);
-  return Number.isFinite(value) && value > 0 ? value : Number.MAX_SAFE_INTEGER;
 }
 
 const renderRouter = router({

@@ -29,6 +29,7 @@ import { judge, loadActiveRulesInTx, type RuntimeRule } from "@workloom/base/fen
 import { approve as approveRenderScript, create as createRenderScript } from "@workloom/base/asset-cms";
 import { newId } from "@workloom/shared";
 import { renderSubmitAutoAllowed } from "../gate-policy.js";
+import { projectComputeBudget } from "../project-compute-budget.js";
 import { VIDEO_AUTO_APPROVAL_ACTOR_ID, VIDEO_AUTO_APPROVAL_POLICY_VERSION, autoApproveVideoFence, videoAutoApprovalEnabled } from "../auto-approval.js";
 import { writeFileSync } from "node:fs";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../../trpc/context.js";
@@ -621,6 +622,7 @@ export const whiteboardRouter = router({
         }
       }
       const actor = ctx.identity?.memberId ?? "whiteboard-operator";
+      const compute = await projectComputeBudget(app, scope, film.project_id);
 
       /* ---- G8 前置门：渲染提交烧算力，围栏判定与 renderRouter.submit 同口径 ---- */
       const fenceClient = await app.connect();
@@ -641,8 +643,18 @@ export const whiteboardRouter = router({
         action: "render.submit",
         params: { engine: "whiteboard-local", scenes: scenes.length, quality,
           capLongEdge, resolution: quality === "uhd" ? "3840x2160" : null },
-        context: { render_auto: renderSubmitAutoAllowed() },
+        context: {
+          render_auto: renderSubmitAutoAllowed(),
+          project_compute_used: compute.used,
+          project_compute_cap: compute.cap,
+        },
       }, rules, "review");
+      if (compute.used >= compute.cap) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `G11 项目算力预算已用尽（${compute.used}/${compute.cap} 秒）：停止继续提交白板渲染`,
+        });
+      }
       const autoReview = autoApproveVideoFence(rawVerdict, {
         scope: "ai-video",
         allowDefaultReview: true,

@@ -445,9 +445,11 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
   let lastCreated: ReturnType<typeof persisted> | null;
   let filmCapLongEdge = 1280;
   let fence = "auto";
+  let computeUsed = 0;
   const submitted = vi.fn();
   const approved = vi.fn();
   const created = vi.fn();
+  const judge = vi.fn((_input: { context?: Record<string, unknown> }) => ({ level: fence, impacts: [], triggeredBy: [] }));
   const query = vi.fn(async (sql: string) => ({ rows: [], rowCount: 0 }));
   const pool = { connect: async () => ({ query, release: vi.fn() }) };
   beforeAll(async () => {
@@ -458,13 +460,14 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
     vi.doMock("@workloom/db", () => ({ getAppPool: () => pool, getGatewayPool: () => pool }));
     vi.doMock("../gen/submit.js", () => ({ submitGenJob: submitted }));
     vi.doMock("@workloom/base/asset-cms", () => ({ create: created, approve: approved }));
-    vi.doMock("@workloom/base/fence-engine", () => ({ loadActiveRulesInTx: async () => [], judge: () => ({ level: fence, impacts: [], triggeredBy: [] }) }));
+    vi.doMock("@workloom/base/fence-engine", () => ({ loadActiveRulesInTx: async () => [], judge }));
     vi.doMock("./engine.js", async () => ({ ...await vi.importActual<any>("./engine.js"),
       whiteboardEngineReady: () => true, readImageSize: () => ({ width: 1672, height: 941 }) }));
     vi.doMock("../gen/db.js", () => ({ scopedQuery: async (_pool: unknown, actualScope: unknown, sql: string, params: unknown[]) => {
       expect(actualScope).toEqual(scope);
       if (sql.includes("FROM whiteboard_films")) return [{ id: "film-wb", project_id: "project-wb", script_md: "口播原文", render_fps: 30, cap_long_edge: filmCapLongEdge }];
       if (sql.includes("FROM whiteboard_scenes")) return [{ scene_no: 1, lineart_path: "lineart.png", annotation: { elements: [{}] }, duration_ms: 5000 }];
+      if (sql.includes("FROM render_jobs")) return [{ used: String(computeUsed) }];
       if (sql.includes("SELECT s.* FROM render_scripts")) {
         expect(params).toEqual([scope.workspaceId, "whiteboard-project-wb", scope.tenantId, "project-wb"]);
         return current ? [current] : [];
@@ -475,7 +478,8 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
     caller = (await import("./router.js")).whiteboardRouter.createCaller({ identity: { ...scope, memberId: "MEM-WB" } } as any);
   });
   beforeEach(() => {
-    current = persisted(); lastCreated = null; filmCapLongEdge = 1280; fence = "auto"; submitted.mockReset().mockResolvedValue({ taskId: "task" }); created.mockReset();
+    current = persisted(); lastCreated = null; filmCapLongEdge = 1280; fence = "auto"; computeUsed = 0;
+    submitted.mockReset().mockResolvedValue({ taskId: "task" }); created.mockReset(); judge.mockClear();
     approved.mockReset().mockImplementation(async (_app, _gateway, _scope, _key, _version, input) => {
       const script = current ?? lastCreated ?? { ...persisted(), id: "script-v1", version: 1, status: "draft" };
       return { script: { ...script, status: "approved", approved_event_id: "E-WB-AUTO" }, approvalId: `apr-${input.by}` };
@@ -516,5 +520,22 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
     expect(approved).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(),
       "whiteboard-project-wb", 7, { by: "video-auto-approval", policyVersion: "workloom.video-auto-approval/v1" });
     expect(submitted.mock.calls[0]?.[0].script).toMatchObject({ status: "approved", version: 7 });
+  });
+  it("G11 使用真实项目用量和上限，达到上限时在供应商提交前确定性停止", async () => {
+    const previous = process.env.WORKLOOM_PROJECT_COMPUTE_CAP;
+    process.env.WORKLOOM_PROJECT_COMPUTE_CAP = "5";
+    computeUsed = 5;
+    try {
+      await expect(caller.render({ filmId: "film-wb" }))
+        .rejects.toThrow("G11 项目算力预算已用尽（5/5 秒）：停止继续提交白板渲染");
+      expect(judge.mock.calls[0]?.[0].context).toMatchObject({
+        project_compute_used: 5,
+        project_compute_cap: 5,
+      });
+      expect(submitted).not.toHaveBeenCalled();
+    } finally {
+      if (previous === undefined) delete process.env.WORKLOOM_PROJECT_COMPUTE_CAP;
+      else process.env.WORKLOOM_PROJECT_COMPUTE_CAP = previous;
+    }
   });
 });

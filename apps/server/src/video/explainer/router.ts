@@ -24,6 +24,7 @@ import { submitGenJob, type RenderScriptLike } from "../gen/submit.js";
 import { submissionRequestHash } from "../gen/submission-ledger.js";
 import { registerLocalAsset } from "../media/register-local.js";
 import { loadActiveRules } from "../router.js";
+import { projectComputeBudget } from "../project-compute-budget.js";
 import { buildCardRegistry } from "./card-registry.js";
 import { engineDirOf, engineStatus } from "./engine.js";
 import { runMachineGates } from "./qa-gates.js";
@@ -274,6 +275,13 @@ export const explainerRouter = router({
       if (row.shotbook.shots.some((s) => s.card === "placeholder")) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "该版本还是占位分镜（card=placeholder）——先生成 SHOTBOOK" });
       }
+      const compute = await projectComputeBudget(getAppPool(), scope, input.projectId);
+      if (compute.used >= compute.cap) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `G11 项目算力预算已用尽（${compute.used}/${compute.cap} 秒）：停止继续提交解说片渲染`,
+        });
+      }
       const idempotencyKey = renderKey(row.id, row.version, input.quality);
       // HD retains its existing script identity; UHD has a separate immutable request.
       const scriptKey = `explainer-${row.id}${input.quality === "uhd" ? "-uhd" : ""}`;
@@ -448,7 +456,12 @@ export const explainerRouter = router({
         {
           action: "render.submit",
           object: { type: "video_project", id: input.projectId },
-          context: { render_auto: videoAutoApprovalEnabled(), duration_sec: durationSec },
+          context: {
+            render_auto: videoAutoApprovalEnabled(),
+            duration_sec: durationSec,
+            project_compute_used: compute.used,
+            project_compute_cap: compute.cap,
+          },
         },
         active.rules as RuntimeRule[],
         active.defaultLevel,

@@ -224,19 +224,34 @@ export async function processComment(
   commentId: string,
   deps: ProcessDeps = {},
 ): Promise<ProcessResult | null> {
-  /* ---- 读取 + 分类 + 分流（纯计算段，先拿行） ---- */
+  /* ---- 原子认领 + 分类 + 分流（并发重复派遣不能重复外发） ---- */
   let comment: CommentRow | null = null;
+  let claimed = false;
   {
     const client = await app.connect();
     try {
       // 事务级 RLS 上下文必须在显式事务内设置：autocommit 下 set_config(...,true) 语句结束即失效
       await client.query("BEGIN");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-      const r = await client.query<CommentRow>(
-        `SELECT * FROM comments WHERE workspace_id=$1 AND id=$2`,
+      /**
+       * 先认领再走外部发送。若进程在发送中崩溃，评论保持 manual 可见并由人处理；
+       * 并发第二个调用看到 manual 后幂等返回，绝不重复调用 ReplySender。
+       */
+      const claimedRow = await client.query<CommentRow>(
+        `UPDATE comments SET status='manual', route_level='review'
+          WHERE workspace_id=$1 AND id=$2 AND status='new'
+          RETURNING *`,
         [scope.workspaceId, commentId],
       );
-      comment = r.rows[0] ?? null;
+      comment = claimedRow.rows[0] ?? null;
+      claimed = Boolean(comment);
+      if (!comment) {
+        const r = await client.query<CommentRow>(
+          `SELECT * FROM comments WHERE workspace_id=$1 AND id=$2`,
+          [scope.workspaceId, commentId],
+        );
+        comment = r.rows[0] ?? null;
+      }
       await client.query("COMMIT");
     } catch (err) {
       await client.query("ROLLBACK").catch(() => undefined);
@@ -246,7 +261,7 @@ export async function processComment(
     }
   }
   if (!comment) return null;
-  if (comment.status !== "new") {
+  if (!claimed) {
     return {
       commentId,
       intent: comment.intent ?? "other",
