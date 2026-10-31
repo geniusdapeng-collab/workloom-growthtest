@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "workloom.acceptance-regression/v2",
+  "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c",
+  "at": "2026-10-31T16:10:08.406Z",
+  "status": "pass",
+  "required": [
+    "suite",
+    "suite:hotel",
+    "suite:geo",
+    "db:verify-chain",
+    "typecheck",
+    "release:gate"
+  ],
+  "commands": {
+    "suite": "通过（实际 exit 0）",
+    "suite:hotel": "通过（实际 exit 0）",
+    "suite:geo": "通过（实际 exit 0）",
+    "db:verify-chain": "通过（实际 exit 0）",
+    "typecheck": "通过（实际 exit 0）",
+    "release:gate": "通过（实际 exit 0）"
+  },
+  "executions": {
+    "suite": {
+      "status": "pass",
+      "run": {
+        "path": "runs/regression-suite-25997-1793462987502-03987305.json",
+        "sha256": "a870e440a166d72afa634f12a30bb2a994c14c75aa2afd4b1989ae9496afbeef",
+        "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+      },
+      "exit_code": 0,
+      "signal": null,
+      "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"suite\"",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "suite"
+        ]
+      },
+      "started_at": "2026-10-31T16:09:39.053Z",
+      "finished_at": "2026-10-31T16:09:47.502Z"
+    },
+    "suite:hotel": {
+      "status": "pass",
+      "run": {
+        "path": "runs/regression-suite-hotel-25997-1793462988288-b5cdef97.json",
+        "sha256": "dcac1d4544be85e20b143a5082414791dfba58bba5af8e644146384b9bafefdc",
+        "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+      },
+      "exit_code": 0,
+      "signal": null,
+      "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"suite:hotel\"",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "suite:hotel"
+        ]
+      },
+      "started_at": "2026-10-31T16:09:47.624Z",
+      "finished_at": "2026-10-31T16:09:48.288Z"
+    },
+    "suite:geo": {
+      "status": "pass",
+      "run": {
+        "path": "runs/regression-suite-geo-25997-1793462990632-8cd592f9.json",
+        "sha256": "e1d16c62cae4a938e65d0996c24ae19514b80656b4177526350ff87355d8c9ac",
+        "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+      },
+      "exit_code": 0,
+      "signal": null,
+      "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"suite:geo\"",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "suite:geo"
+        ]
+      },
+      "started_at": "2026-10-31T16:09:48.337Z",
+      "finished_at": "2026-10-31T16:09:50.632Z"
+    },
+    "db:verify-chain": {
+      "status": "pass",
+      "run": {
+        "path": "runs/regression-db-verify-chain-25997-1793462991094-ad0ec1c7.json",
+        "sha256": "93294d5e36c93fb7139bde2b2a2e0675bd80e8de26e78de73215f4f97aa6fdb5",
+        "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+      },
+      "exit_code": 0,
+      "signal": null,
+      "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"db:verify-chain\"",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "db:verify-chain"
+        ]
+      },
+      "started_at": "2026-10-31T16:09:50.675Z",
+      "finished_at": "2026-10-31T16:09:51.094Z"
+    },
+    "typecheck": {
+      "status": "pass",
+      "run": {
+        "path": "runs/regression-typecheck-25997-1793462997680-894afb1f.json",
+        "sha256": "971886359bfe2cab32aa33f080e5c4a292927e595ac2e5f34ab8484b2012d9d5",
+        "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+      },
+      "exit_code": 0,
+      "signal": null,
+      "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"typecheck\"",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "typecheck"
+        ]
+      },
+      "started_at": "2026-10-31T16:09:51.136Z",
+      "finished_at": "2026-10-31T16:09:57.680Z"
+    },
+    "release:gate": {
+      "status": "pass",
+      "run": {
+        "path": "runs/release-gate-25997-1793463008146-35b7cdfb.json",
+        "sha256": "4cd89444773c77e5a7c681184ca9d096d1d7b9f19f0ec5e2e24b0e94b4d9cc61",
+        "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+      },
+      "exit_code": 0,
+      "signal": null,
+      "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"release:gate\"",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "release:gate"
+        ]
+      },
+      "started_at": "2026-10-31T16:10:07.115Z",
+      "finished_at": "2026-10-31T16:10:08.146Z"
+    }
+  },
+  "errors": []
+}

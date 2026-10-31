@@ -1,0 +1,152 @@
+{
+ "repo": "workloom-growthtest-stress-9004",
+ "repoDir": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+ "startedAt": "2026-10-31T16:09:33.156Z",
+ "steps": {
+  "environment": {
+   "ok": true,
+   "status": "pass",
+   "detail": "local-preview"
+  },
+  "prepare": {
+   "ok": true,
+   "status": "pass",
+   "detail": "HEAD@0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+  },
+  "install": {
+   "ok": true,
+   "status": "pass",
+   "detail": "显式不安装；已检查 tsx 存在"
+  },
+  "env": {
+   "ok": true,
+   "status": "pass",
+   "detail": ".env 已存在，补齐 DATABASE_URL#db/DATABASE_APP_URL#db/DATABASE_GATEWAY_URL#db"
+  },
+  "seed": {
+   "ok": true,
+   "status": "pass",
+   "detail": "db:seed + db:seed:video + db:seed:geo + db:seed:acq"
+  },
+  "regression": {
+   "ok": true,
+   "status": "pass",
+   "detail": "suite=通过（实际 exit 0）；suite:hotel=通过（实际 exit 0）；suite:geo=通过（实际 exit 0）；db:verify-chain=通过（实际 exit 0）；typecheck=通过（实际 exit 0）",
+   "run": {
+    "path": "runs/regression-summary-25997-1793463008409-b3f60cdd.json",
+    "sha256": "3cc961d2e7cea440be359acd716f7f82ec78cc8a7401f2d11babef93edbbadf0",
+    "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+   }
+  },
+  "preview": {
+   "ok": true,
+   "status": "pass",
+   "detail": "4/4 端口就绪"
+  },
+  "profile": {
+   "ok": true,
+   "status": "pass",
+   "detail": "本仓已有 profile"
+  },
+  "releaseGate": {
+   "ok": true,
+   "status": "pass",
+   "detail": "通过（✅ 三条主链路全部通过（ASK ×2 / QUEST ×2 / 编排 ×3），准许发布。环境：沙箱环境（内置 AI 模型驱动） [WARN] The \"pnpm\" field in package.json is no longer read by pnpm. The following keys were ignor）",
+   "run": {
+    "path": "runs/regression-summary-25997-1793463008409-b3f60cdd.json",
+    "sha256": "3cc961d2e7cea440be359acd716f7f82ec78cc8a7401f2d11babef93edbbadf0",
+    "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+   }
+  },
+  "matrix": {
+   "ok": true,
+   "status": "pass",
+   "detail": "exit 0",
+   "exit": 0,
+   "tail": "[acceptance:matrix] 员工 82/82；技能 95/95；警告 10\n[acceptance:matrix] 输出：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/matrix\n",
+   "run": {
+    "path": "runs/matrix-25997-1793463009385-73bd8ac2.json",
+    "sha256": "d32e7efeb22162494550a59784fd8a9450470ebdb22c7cc1f4a6b790e0c0d289",
+    "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+   }
+  },
+  "ui": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "本次执行开始，旧通过状态已失效"
+  }
+ },
+ "ok": false,
+ "status": "unverified",
+ "notes": [
+  "按 --target-commit 固定被测源码：0d7d6aa196b3409e692d59d678a1f55f01f69d0c",
+  ".env 已补齐弱项：DATABASE_URL#db/DATABASE_APP_URL#db/DATABASE_GATEWAY_URL#db",
+  "跳过 db:seed:aipm（本仓不含 bundles/ai-pm）"
+ ],
+ "environment": {
+  "kind": "local-preview",
+  "production": false,
+  "allowWrites": false,
+  "urls": {
+   "pc": "http://localhost:3000",
+   "bMobile": "http://localhost:3001",
+   "cMobile": "http://localhost:3002",
+   "api": "http://127.0.0.1:8787"
+  }
+ },
+ "revision": {
+  "branch": "HEAD",
+  "head": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+ },
+ "executor": {
+  "root": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+  "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c",
+  "dirty": false
+ },
+ "regressionEvidence": {
+  "suite": {
+   "path": "runs/regression-suite-25997-1793462987502-03987305.json",
+   "sha256": "a870e440a166d72afa634f12a30bb2a994c14c75aa2afd4b1989ae9496afbeef",
+   "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+  },
+  "suite:hotel": {
+   "path": "runs/regression-suite-hotel-25997-1793462988288-b5cdef97.json",
+   "sha256": "dcac1d4544be85e20b143a5082414791dfba58bba5af8e644146384b9bafefdc",
+   "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+  },
+  "suite:geo": {
+   "path": "runs/regression-suite-geo-25997-1793462990632-8cd592f9.json",
+   "sha256": "e1d16c62cae4a938e65d0996c24ae19514b80656b4177526350ff87355d8c9ac",
+   "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+  },
+  "db:verify-chain": {
+   "path": "runs/regression-db-verify-chain-25997-1793462991094-ad0ec1c7.json",
+   "sha256": "93294d5e36c93fb7139bde2b2a2e0675bd80e8de26e78de73215f4f97aa6fdb5",
+   "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+  },
+  "typecheck": {
+   "path": "runs/regression-typecheck-25997-1793462997680-894afb1f.json",
+   "sha256": "971886359bfe2cab32aa33f080e5c4a292927e595ac2e5f34ab8484b2012d9d5",
+   "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+  },
+  "release:gate": {
+   "path": "runs/release-gate-25997-1793463008146-35b7cdfb.json",
+   "sha256": "4cd89444773c77e5a7c681184ca9d096d1d7b9f19f0ec5e2e24b0e94b4d9cc61",
+   "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+  }
+ },
+ "regression": {
+  "suite": "通过（实际 exit 0）",
+  "suite:hotel": "通过（实际 exit 0）",
+  "suite:geo": "通过（实际 exit 0）",
+  "db:verify-chain": "通过（实际 exit 0）",
+  "typecheck": "通过（实际 exit 0）",
+  "release:gate": "通过（实际 exit 0）"
+ },
+ "regressionAggregate": {
+  "path": "runs/regression-summary-25997-1793463008409-b3f60cdd.json",
+  "sha256": "3cc961d2e7cea440be359acd716f7f82ec78cc8a7401f2d11babef93edbbadf0",
+  "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+ },
+ "previewLog": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/preview.log"
+}

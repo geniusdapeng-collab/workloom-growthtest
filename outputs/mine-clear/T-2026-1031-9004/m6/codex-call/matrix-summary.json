@@ -1,0 +1,104 @@
+{
+ "generatedAt": "2026-10-31T16:10:09.373Z",
+ "spec": "docs/REAL-DEVICE-ACCEPTANCE-SPEC.md@rdas/v1",
+ "primaryBundle": "geo-growth",
+ "bundles": [
+  "hotel",
+  "ai-video",
+  "geo-growth"
+ ],
+ "compositionSource": "compose-api",
+ "compositionWarnings": [],
+ "workspaceId": "ws-geo",
+ "profileWarnings": [],
+ "runtimeConnected": true,
+ "runtimeError": null,
+ "counts": {
+  "agents": 82,
+  "agentsPass": 82,
+  "skills": 95,
+  "skillsPass": 95,
+  "warnings": 10,
+  "fenceRulesMerged": 121,
+  "fenceRulesActiveInWorkspace": 121,
+  "shadowedPresets": 4,
+  "perBundle": {
+   "geo-growth": 26,
+   "hotel": 16,
+   "ai-video": 40
+  }
+ },
+ "capabilityLayer": {
+  "status": "not-run",
+  "reason": "L8 能力层需要真实模型 + 专业场景评分卡；本脚本只覆盖 L0 契约层与 L1 运行层。"
+ },
+ "failures": {
+  "agents": [],
+  "skills": []
+ },
+ "warnings": {
+  "agents": [],
+  "skills": [
+   {
+    "skill": "ai-live-assistant",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "content-marketing",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "fast-scan",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "inspection-suite",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "ota-operations",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "overbooking-parity-guard",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "pricing-matrix",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "review-asset-mining",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "safety-compliance",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   },
+   {
+    "skill": "staff-scheduler",
+    "warnings": [
+     "装备库预留：当前组合编制内没有岗位引用它"
+    ]
+   }
+  ]
+ }
+}

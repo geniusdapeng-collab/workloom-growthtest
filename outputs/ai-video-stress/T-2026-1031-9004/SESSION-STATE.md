@@ -77,7 +77,6 @@
 
 ## Next actions
 
-1. Commit the clean fix baseline.
-2. Run MCD repair assertions for MC-009/MC-010, then assign an independent acceptance role.
-3. Run RDAS local-preview acceptance and produce the final M6 report/handoff.
-4. Push branch, create PR, wait for CI, ordinary merge, read back main SHA/tree.
+1. User changed the acceptance entry on 2026-11-01 to Codex/CLI invocation; project client UI is intentionally out of scope for this release.
+2. Backend, GEO, hotel, event-chain, full TypeScript, release gate and 95-skill matrix are green; the final partial RDAS evidence is preserved outside the source tree and summarized in `outputs/mine-clear/T-2026-1031-9004/m6/FINAL-REPORT.md`.
+3. Push branch, create PR, wait for required CI, ordinary merge, and read back main SHA/tree.

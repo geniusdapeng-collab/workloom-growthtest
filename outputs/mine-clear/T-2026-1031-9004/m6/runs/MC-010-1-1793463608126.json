@@ -1,0 +1,43 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-010-1-1793463608126",
+  "command": "pnpm --config.verify-deps-before-run=false -C apps/server exec vitest run src/video --testTimeout 30000",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "-C",
+      "apps/server",
+      "exec",
+      "vitest",
+      "run",
+      "src/video",
+      "--testTimeout",
+      "30000"
+    ]
+  },
+  "actor": "codex-postrepair-final-01a1927c",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-010",
+    "assertion_index": 1
+  },
+  "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T16:20:08.126Z",
+  "finished_at": "2026-10-31T16:20:27.299Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-010-1-1793463608126.txt",
+      "sha256": "4b9a0987ab0afbd44f13ce998e13be46bc1dfc400e76eb6a9aaab75217a1f727",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    }
+  ]
+}
