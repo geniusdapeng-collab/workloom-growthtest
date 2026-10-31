@@ -1,0 +1,22 @@
+{
+  "hit": true,
+  "verdict": {
+    "level": "review",
+    "impacts": [
+      {
+        "rule_id": "G11",
+        "version": "ai-video-baseline/v2",
+        "result": "review"
+      }
+    ],
+    "triggeredBy": [
+      "单剧/单项目算力超预算自动暂停提交"
+    ],
+    "evalErrors": []
+  }
+}
+
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

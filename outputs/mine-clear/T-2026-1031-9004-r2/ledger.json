@@ -5,7 +5,7 @@
   "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
   "title": "视频自动审批二次独立验收修复",
   "created_at": "2026-10-31T16:48:38.387Z",
-  "updated_at": "2026-10-31T17:08:06.675Z",
+  "updated_at": "2026-10-31T17:10:21.556Z",
   "baseline": {
     "audit": {
       "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
@@ -20,8 +20,8 @@
       "reverified_problem_ids": []
     },
     "acceptance": {
-      "commit": null,
-      "is_descendant_of_repair": null
+      "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+      "is_descendant_of_repair": true
     }
   },
   "environment": {
@@ -97,7 +97,7 @@
       "level": "L3",
       "severity": "P0",
       "batch": 0,
-      "state": "fixed",
+      "state": "verified",
       "title": "视频自动审批越过组合工作区边界，可放行 GEO 发布、评论与加投",
       "evidence": [
         {
@@ -149,14 +149,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-011-0-1793466470034.json",
-            "sha256": "5be7d4e8b51e012608c4679cca334c679f69b058d291fe02abf7c4339d708c75",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-011-0-1793466612929.json",
+            "sha256": "35c27f2352e3afa044083e6b2c62990cc6c090984060d950efb82f8a1f9dadca",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-011-0-1793466470034.txt",
-            "sha256": "5bd1d19a435cfcb0e81ae37cd12921ec6033f5b5ab53988e4d9efdfee8cc3724",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "evidence/MC-011-0-1793466612929.txt",
+            "sha256": "0e71bbd4b811bbed5685670ae2c893ea3ed86544ab0e1cd51eb161f90ec07b25",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         }
       ],
@@ -164,17 +164,33 @@
         "command": "node_modules/.bin/vitest run --root apps/server src/video/auto-approval.test.ts"
       },
       "fixed_by": "codex-root-repair-9dbc85c",
-      "verified_by": null,
+      "verified_by": "verifier_r2-independent-2026-11-01",
       "notes": "独立验收发现：视频授权可覆盖 GEO 的公网发布、评论和追加投放预算。",
-      "verified_at": null,
-      "verification_evidence": null,
+      "verified_at": "2026-10-31T17:10:13.445Z",
+      "verification_evidence": {
+        "path": "runs/MC-011-0-1793466612929.json",
+        "sha256": "35c27f2352e3afa044083e6b2c62990cc6c090984060d950efb82f8a1f9dadca",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
       "last_assertion_attempt": {
-        "actor": "codex-root-repair-9dbc85c",
-        "role": "repair",
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
         "result": "pass",
-        "at": "2026-10-31T17:07:50.030Z",
-        "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017",
-        "finished_at": "2026-10-31T17:07:50.568Z"
+        "at": "2026-10-31T17:10:12.925Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:13.445Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:13.445Z",
+        "runs": [
+          {
+            "path": "runs/MC-011-0-1793466612929.json",
+            "sha256": "35c27f2352e3afa044083e6b2c62990cc6c090984060d950efb82f8a1f9dadca",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
       }
     },
     {
@@ -183,7 +199,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "fixed",
+      "state": "verified",
       "title": "G11 项目算力预算门未匹配 render_script 且固定 used=0",
       "evidence": [
         {
@@ -223,14 +239,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-012-0-1793466475672.json",
-            "sha256": "36b5253b1315c46c8321af2115fc95f2d0692b6546a342a2e4989871e25ba60b",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-012-0-1793466613574.json",
+            "sha256": "32eb52df5a072975ab7f6d7593e095f299cbbff0f23c06ef7c307e909e61ff5f",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-012-0-1793466475672.txt",
-            "sha256": "84c6c43cba9d81c0328109b2cdfe52a443eb89f9fc9642edd3c179fba1304f4f",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "evidence/MC-012-0-1793466613574.txt",
+            "sha256": "02a925e9a90ef59b4b94a6bb5e4912b62c8e501a5d941a64111cf45c88cd7598",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         },
         {
@@ -246,14 +262,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-012-1-1793466477532.json",
-            "sha256": "727e9fb530d332018bf0a661bf79e4b6f896397e6640530e6a770873173765b0",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-012-1-1793466615197.json",
+            "sha256": "b94d20286b1c86e4af07a0c8a2aea1c3d3fc88642c00883117ec6300b9609f4c",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-012-1-1793466477532.txt",
+            "path": "evidence/MC-012-1-1793466615197.txt",
             "sha256": "c64d48985aaa38184f3c377a0e1e99b96d86f814941510e777f876109981d654",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         },
         {
@@ -273,14 +289,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-012-2-1793466478059.json",
-            "sha256": "a8126fff43077ac83bd3bc1da13029defa2186f52e7228e2b3a187b05cae83d4",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-012-2-1793466615552.json",
+            "sha256": "d6d095f4d0334bb1ec66c8bece1a6fe8d1d9b5d4d41644ea0fec25816692f554",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-012-2-1793466478059.txt",
-            "sha256": "a7c4d40491fb27598b80795d7b85fa1cc387704239cbaf39278bd3a3f5a79c5f",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "evidence/MC-012-2-1793466615552.txt",
+            "sha256": "110cabe88595e2fd6bce3b329b85785570e42d2950deaa3c88a86db1e7693461",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         }
       ],
@@ -288,17 +304,43 @@
         "command": "node_modules/.bin/vitest run --root apps/server src/video/production-router.test.ts"
       },
       "fixed_by": "codex-root-repair-9dbc85c",
-      "verified_by": null,
+      "verified_by": "verifier_r2-independent-2026-11-01",
       "notes": "独立验收复现：used=999、cap=1 的 render_script 视图没有任何 G11 impact。",
-      "verified_at": null,
-      "verification_evidence": null,
+      "verified_at": "2026-10-31T17:10:17.245Z",
+      "verification_evidence": {
+        "path": "runs/MC-012-0-1793466613574.json",
+        "sha256": "32eb52df5a072975ab7f6d7593e095f299cbbff0f23c06ef7c307e909e61ff5f",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
       "last_assertion_attempt": {
-        "actor": "codex-root-repair-9dbc85c",
-        "role": "repair",
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
         "result": "pass",
-        "at": "2026-10-31T17:07:55.671Z",
-        "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017",
-        "finished_at": "2026-10-31T17:08:00.399Z"
+        "at": "2026-10-31T17:10:13.573Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:17.245Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:17.245Z",
+        "runs": [
+          {
+            "path": "runs/MC-012-0-1793466613574.json",
+            "sha256": "32eb52df5a072975ab7f6d7593e095f299cbbff0f23c06ef7c307e909e61ff5f",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          {
+            "path": "runs/MC-012-1-1793466615197.json",
+            "sha256": "b94d20286b1c86e4af07a0c8a2aea1c3d3fc88642c00883117ec6300b9609f4c",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          {
+            "path": "runs/MC-012-2-1793466615552.json",
+            "sha256": "d6d095f4d0334bb1ec66c8bece1a6fe8d1d9b5d4d41644ea0fec25816692f554",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
       }
     },
     {
@@ -307,7 +349,7 @@
       "level": "L3",
       "severity": "P1",
       "batch": 2,
-      "state": "fixed",
+      "state": "verified",
       "title": "G10 自动评论没有生产入口，人工草稿消失且生成失败仍用兜底话术外发",
       "evidence": [
         {
@@ -353,14 +395,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-013-0-1793466480525.json",
-            "sha256": "ae971064e34f705a65e476ff5b08cb279635a2a31abc8373cbf7e09bbe049a67",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-013-0-1793466617384.json",
+            "sha256": "57a6456278267fa93960aaad952747d2da1e657c33285b95fbf4dce43aa982e9",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-013-0-1793466480525.txt",
-            "sha256": "b5f906f0d7789e4401fa21e1ae6bff89945c8ef5475cf526af5e379f30fb582a",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "evidence/MC-013-0-1793466617384.txt",
+            "sha256": "5c361fb15912cec99d5cfb9d184ac7904b696440665f502fda84e10e04241700",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         },
         {
@@ -379,14 +421,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-013-1-1793466483550.json",
-            "sha256": "5c01c24981d54f6fcfa84d078549e8f061b616851329b6d9196d2d7317bbd7d7",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-013-1-1793466618896.json",
+            "sha256": "04947bfb3a23ebc6a65611a5853d30dc6383242168db0cc3c82403b56b150e9a",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-013-1-1793466483550.txt",
-            "sha256": "d8d9751202394317cfe4ecdee2cf5a6c7e887319728131580667aab3a86c35b3",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "evidence/MC-013-1-1793466618896.txt",
+            "sha256": "c7d3a8f19d6fb0f152ea8832c74d8277d438c191d521f67561cd5f5916949eaa",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         }
       ],
@@ -394,17 +436,38 @@
         "command": "node_modules/.bin/vitest run --root apps/server src/video/comments-router.test.ts --root packages/base social-listening/social-listening.test.ts"
       },
       "fixed_by": "codex-root-repair-9dbc85c",
-      "verified_by": null,
+      "verified_by": "verifier_r2-independent-2026-11-01",
       "notes": "独立验收发现 G10 生产接线、manual 可见性和生成失败语义不一致。",
-      "verified_at": null,
-      "verification_evidence": null,
+      "verified_at": "2026-10-31T17:10:19.411Z",
+      "verification_evidence": {
+        "path": "runs/MC-013-0-1793466617384.json",
+        "sha256": "57a6456278267fa93960aaad952747d2da1e657c33285b95fbf4dce43aa982e9",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
       "last_assertion_attempt": {
-        "actor": "codex-root-repair-9dbc85c",
-        "role": "repair",
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
         "result": "pass",
-        "at": "2026-10-31T17:08:00.525Z",
-        "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017",
-        "finished_at": "2026-10-31T17:08:04.294Z"
+        "at": "2026-10-31T17:10:17.384Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:19.411Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:19.411Z",
+        "runs": [
+          {
+            "path": "runs/MC-013-0-1793466617384.json",
+            "sha256": "57a6456278267fa93960aaad952747d2da1e657c33285b95fbf4dce43aa982e9",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          {
+            "path": "runs/MC-013-1-1793466618896.json",
+            "sha256": "04947bfb3a23ebc6a65611a5853d30dc6383242168db0cc3c82403b56b150e9a",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
       }
     },
     {
@@ -413,7 +476,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 0,
-      "state": "fixed",
+      "state": "verified",
       "title": "VIDEO_AUTO_APPROVAL=0 时 explainer 仍用当前成员身份自动批准 draft",
       "evidence": [
         {
@@ -452,14 +515,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-014-0-1793466484446.json",
-            "sha256": "a036a6060d2d8a7e55e13d6cc3911aa9cc3b49f6ecf9d992baf3218c94ab49f3",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-014-0-1793466619551.json",
+            "sha256": "0cc04dcc0ac09e66ea0f32e109c8fc1bdcf966e9b78dafa15d0aea04c50d8604",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-014-0-1793466484446.txt",
-            "sha256": "8883304986fd69ad1adc2d91fbb68a0d4e5686edf5a4a4c6f0dc0ece24691dfd",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "evidence/MC-014-0-1793466619551.txt",
+            "sha256": "a24256746dd263dd67b34dbef89e5a83e7f3294a1c36ad4b96ef57cec8850e8c",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         }
       ],
@@ -467,17 +530,33 @@
         "command": "node_modules/.bin/vitest run --root apps/server src/video/explainer/explainer.test.ts"
       },
       "fixed_by": "codex-root-repair-9dbc85c",
-      "verified_by": null,
+      "verified_by": "verifier_r2-independent-2026-11-01",
       "notes": "本轮按产品所有者 2026-11-01 Codex/CLI 验收口径修复后端回滚入口；项目三端 UI 仍不在本轮放行范围。",
-      "verified_at": null,
-      "verification_evidence": null,
+      "verified_at": "2026-10-31T17:10:20.200Z",
+      "verification_evidence": {
+        "path": "runs/MC-014-0-1793466619551.json",
+        "sha256": "0cc04dcc0ac09e66ea0f32e109c8fc1bdcf966e9b78dafa15d0aea04c50d8604",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
       "last_assertion_attempt": {
-        "actor": "codex-root-repair-9dbc85c",
-        "role": "repair",
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
         "result": "pass",
-        "at": "2026-10-31T17:08:04.445Z",
-        "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017",
-        "finished_at": "2026-10-31T17:08:05.155Z"
+        "at": "2026-10-31T17:10:19.550Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:20.200Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:20.200Z",
+        "runs": [
+          {
+            "path": "runs/MC-014-0-1793466619551.json",
+            "sha256": "0cc04dcc0ac09e66ea0f32e109c8fc1bdcf966e9b78dafa15d0aea04c50d8604",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
       }
     },
     {
@@ -486,7 +565,7 @@
       "level": "L2",
       "severity": "P2",
       "batch": 1,
-      "state": "fixed",
+      "state": "verified",
       "title": "控制面自动通过只校验 gateKey，不校验当前阶段的真实门产物",
       "evidence": [
         {
@@ -526,14 +605,14 @@
           },
           "last_result": "pass",
           "run": {
-            "path": "runs/MC-015-0-1793466485281.json",
-            "sha256": "e2b389c1a5d16741d1b7ac9a137742b4e294644b10f16a5e9907bab48dc14655",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "runs/MC-015-0-1793466620349.json",
+            "sha256": "4846bf9e1e208bbbe00dc1cdb67d1b039708a959939d7eeb1b9c47a54da47c18",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           },
           "evidence": {
-            "path": "evidence/MC-015-0-1793466485281.txt",
-            "sha256": "a66a2575e2af27b442d84d62453058738bd95f95e78006ae66f024c5d77fd1d5",
-            "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+            "path": "evidence/MC-015-0-1793466620349.txt",
+            "sha256": "c109a2c9445599d599388e05730325e85bc1fa74127f605ada2eb1aae0dfa64b",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
           }
         }
       ],
@@ -541,17 +620,33 @@
         "command": "node_modules/.bin/vitest run --root apps/server src/video/pipeline-auto-approval.test.ts"
       },
       "fixed_by": "codex-root-repair-9dbc85c",
-      "verified_by": null,
+      "verified_by": "verifier_r2-independent-2026-11-01",
       "notes": "当前控制面仍为影子模式，本卡按未来接管真实出片前的硬闸修复。",
-      "verified_at": null,
-      "verification_evidence": null,
+      "verified_at": "2026-10-31T17:10:21.556Z",
+      "verification_evidence": {
+        "path": "runs/MC-015-0-1793466620349.json",
+        "sha256": "4846bf9e1e208bbbe00dc1cdb67d1b039708a959939d7eeb1b9c47a54da47c18",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
       "last_assertion_attempt": {
-        "actor": "codex-root-repair-9dbc85c",
-        "role": "repair",
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
         "result": "pass",
-        "at": "2026-10-31T17:08:05.281Z",
-        "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017",
-        "finished_at": "2026-10-31T17:08:06.675Z"
+        "at": "2026-10-31T17:10:20.348Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:21.556Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:21.556Z",
+        "runs": [
+          {
+            "path": "runs/MC-015-0-1793466620349.json",
+            "sha256": "4846bf9e1e208bbbe00dc1cdb67d1b039708a959939d7eeb1b9c47a54da47c18",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
       }
     }
   ],
