@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-013-1-1793465388905",
+  "command": "vitest run --root packages/base social-listening/social-listening.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "--root",
+      "packages/base",
+      "social-listening/social-listening.test.ts"
+    ]
+  },
+  "actor": "codex-root-repair-25b5b3b",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-013",
+    "assertion_index": 1
+  },
+  "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T16:49:48.905Z",
+  "finished_at": "2026-10-31T16:49:49.363Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-013-1-1793465388905.txt",
+      "sha256": "d58b3210682319705772d4eab1540010701f3b349896d7f19eec2367654f6ce9",
+      "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+    }
+  ]
+}

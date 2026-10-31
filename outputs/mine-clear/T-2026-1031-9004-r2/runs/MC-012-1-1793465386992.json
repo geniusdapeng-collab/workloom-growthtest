@@ -1,0 +1,35 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-012-1-1793465386992",
+  "command": "tsx scripts/tools/ai-video-g11-replay.mts",
+  "exec": {
+    "file": "node_modules/.bin/tsx",
+    "args": [
+      "scripts/tools/ai-video-g11-replay.mts"
+    ]
+  },
+  "actor": "codex-root-repair-25b5b3b",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-012",
+    "assertion_index": 1
+  },
+  "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T16:49:46.992Z",
+  "finished_at": "2026-10-31T16:49:47.280Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-012-1-1793465386992.txt",
+      "sha256": "c64d48985aaa38184f3c377a0e1e99b96d86f814941510e777f876109981d654",
+      "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+    }
+  ]
+}

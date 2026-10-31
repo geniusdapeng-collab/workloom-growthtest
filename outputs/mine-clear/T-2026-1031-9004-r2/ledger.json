@@ -5,7 +5,7 @@
   "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
   "title": "视频自动审批二次独立验收修复",
   "created_at": "2026-10-31T16:48:38.387Z",
-  "updated_at": "2026-10-31T16:49:12.501Z",
+  "updated_at": "2026-10-31T16:49:51.425Z",
   "baseline": {
     "audit": {
       "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
@@ -16,7 +16,7 @@
       "notes": "本地 HEAD 不是 origin/main 最新（云端 6ba121b0 / 本地 342a8b3f）——按 §1.2 先对齐基线；工作树不干净（24 项未提交改动）：排雷结论只对已提交内容成立"
     },
     "repair": {
-      "commit": null,
+      "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
       "reverified_problem_ids": []
     },
     "acceptance": {
@@ -97,7 +97,7 @@
       "level": "L3",
       "severity": "P0",
       "batch": 0,
-      "state": "open",
+      "state": "fixed",
       "title": "视频自动审批越过组合工作区边界，可放行 GEO 发布、评论与加投",
       "evidence": [
         {
@@ -147,15 +147,35 @@
               "src/video/auto-approval.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-011-0-1793465380055.json",
+            "sha256": "fd2c7598d089c8354ef040c0704eda847685d2bc2d515a625473302a86262e3b",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          },
+          "evidence": {
+            "path": "evidence/MC-011-0-1793465380055.txt",
+            "sha256": "a73659ad8bb9e2ccee45b4b8a92db88c3d875c4ba39513b9ff2e11c88fcbf5c6",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run --root apps/server src/video/auto-approval.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-25b5b3b",
       "verified_by": null,
-      "notes": "独立验收发现：视频授权可覆盖 GEO 的公网发布、评论和追加投放预算。"
+      "notes": "独立验收发现：视频授权可覆盖 GEO 的公网发布、评论和追加投放预算。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-25b5b3b",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T16:49:40.054Z",
+        "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
+        "finished_at": "2026-10-31T16:49:40.545Z"
+      }
     },
     {
       "id": "MC-012",
@@ -163,7 +183,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "G11 项目算力预算门未匹配 render_script 且固定 used=0",
       "evidence": [
         {
@@ -201,7 +221,17 @@
               "src/video/production-router.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-012-0-1793465385388.json",
+            "sha256": "7dadb4c2f2552e21ba3808bf9479942894dbcfa4134f92ce7112eed318472f56",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          },
+          "evidence": {
+            "path": "evidence/MC-012-0-1793465385388.txt",
+            "sha256": "15f5d5e1fc20c8b4be0cb0ca363a446e34017d1738695d26038fd3b7325462ca",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          }
         },
         {
           "kind": "sample",
@@ -214,15 +244,35 @@
               "scripts/tools/ai-video-g11-replay.mts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-012-1-1793465386992.json",
+            "sha256": "d2324855953fe1c17f0545d1913bb4d19c0ed880ebd56e32f65e056260c89d91",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          },
+          "evidence": {
+            "path": "evidence/MC-012-1-1793465386992.txt",
+            "sha256": "c64d48985aaa38184f3c377a0e1e99b96d86f814941510e777f876109981d654",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run --root apps/server src/video/production-router.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-25b5b3b",
       "verified_by": null,
-      "notes": "独立验收复现：used=999、cap=1 的 render_script 视图没有任何 G11 impact。"
+      "notes": "独立验收复现：used=999、cap=1 的 render_script 视图没有任何 G11 impact。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-25b5b3b",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T16:49:45.387Z",
+        "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
+        "finished_at": "2026-10-31T16:49:47.322Z"
+      }
     },
     {
       "id": "MC-013",
@@ -230,7 +280,7 @@
       "level": "L3",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "G10 自动评论没有生产入口，人工草稿消失且生成失败仍用兜底话术外发",
       "evidence": [
         {
@@ -274,7 +324,17 @@
               "src/video/comments-router.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-013-0-1793465387433.json",
+            "sha256": "6e90bea213968f0f8a0fd28f8863badba7a86bad9d8f72768ea6f8a6edd63ac3",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          },
+          "evidence": {
+            "path": "evidence/MC-013-0-1793465387433.txt",
+            "sha256": "2070af9ad5e6c1071016e8a2ab99afbb56d2f1feb085004898a09e84cc95b049",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          }
         },
         {
           "kind": "sample",
@@ -290,15 +350,35 @@
               "social-listening/social-listening.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-013-1-1793465388905.json",
+            "sha256": "12a1b4cfa24673af988c8e42fc70ea21e85c0d3e6c4d21deca80652a677d6249",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          },
+          "evidence": {
+            "path": "evidence/MC-013-1-1793465388905.txt",
+            "sha256": "d58b3210682319705772d4eab1540010701f3b349896d7f19eec2367654f6ce9",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run --root apps/server src/video/comments-router.test.ts --root packages/base social-listening/social-listening.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-25b5b3b",
       "verified_by": null,
-      "notes": "独立验收发现 G10 生产接线、manual 可见性和生成失败语义不一致。"
+      "notes": "独立验收发现 G10 生产接线、manual 可见性和生成失败语义不一致。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-25b5b3b",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T16:49:47.433Z",
+        "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
+        "finished_at": "2026-10-31T16:49:49.405Z"
+      }
     },
     {
       "id": "MC-014",
@@ -306,7 +386,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 0,
-      "state": "open",
+      "state": "fixed",
       "title": "VIDEO_AUTO_APPROVAL=0 时 explainer 仍用当前成员身份自动批准 draft",
       "evidence": [
         {
@@ -343,15 +423,35 @@
               "src/video/explainer/explainer.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-014-0-1793465389521.json",
+            "sha256": "df78b6cbf31ff2cd3c8cf7ad3a2543390c6423b44dae3da42ed98cbed513a1e7",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          },
+          "evidence": {
+            "path": "evidence/MC-014-0-1793465389521.txt",
+            "sha256": "cda12d3a1da75095b5975553c1adb06d5bd5fd5aab167cafb525b7c68a77d97f",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run --root apps/server src/video/explainer/explainer.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-25b5b3b",
       "verified_by": null,
-      "notes": "本轮按产品所有者 2026-11-01 Codex/CLI 验收口径修复后端回滚入口；项目三端 UI 仍不在本轮放行范围。"
+      "notes": "本轮按产品所有者 2026-11-01 Codex/CLI 验收口径修复后端回滚入口；项目三端 UI 仍不在本轮放行范围。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-25b5b3b",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T16:49:49.521Z",
+        "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
+        "finished_at": "2026-10-31T16:49:50.145Z"
+      }
     },
     {
       "id": "MC-015",
@@ -359,7 +459,7 @@
       "level": "L2",
       "severity": "P2",
       "batch": 1,
-      "state": "open",
+      "state": "fixed",
       "title": "控制面自动通过只校验 gateKey，不校验当前阶段的真实门产物",
       "evidence": [
         {
@@ -397,15 +497,35 @@
               "src/video/pipeline-auto-approval.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-015-0-1793465390259.json",
+            "sha256": "19937b9603f619115b4cb31dacec71d3d4604788df78831735dd045150fa1655",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          },
+          "evidence": {
+            "path": "evidence/MC-015-0-1793465390259.txt",
+            "sha256": "795f0ee2d9ad949fccd08b0bcadf86ab30d0772d04804ed945a1fe283d56776f",
+            "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run --root apps/server src/video/pipeline-auto-approval.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-25b5b3b",
       "verified_by": null,
-      "notes": "当前控制面仍为影子模式，本卡按未来接管真实出片前的硬闸修复。"
+      "notes": "当前控制面仍为影子模式，本卡按未来接管真实出片前的硬闸修复。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-25b5b3b",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T16:49:50.258Z",
+        "commit": "25b5b3b21758e3576fee56d481baf5492922bb2b",
+        "finished_at": "2026-10-31T16:49:51.425Z"
+      }
     }
   ],
   "gates": []
