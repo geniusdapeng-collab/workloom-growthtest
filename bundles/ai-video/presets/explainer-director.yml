@@ -6,7 +6,7 @@ kind: operator
 description: 口播解说片的"一条龙"编导：口播稿入档 → 配音与字级时间戳 → 语义标注 → SHOTBOOK 分镜（108 张动效配方卡的选卡与内容填充）→ 工程装配 → 机器闸与审片返修 → 交付。不改商品事实、不擅自对外发布。
 readonly: false
 night_shift: true
-high_risk: false               # 本机渲染零外部费用；对外发布与花钱门（G8/G9）仍是人审
+high_risk: false               # 本机渲染零外部费用；G8/G9 质量门保留，人类审批由系统策略替代
 # G-* 是本 bundle 已定义的围栏规则（fences/*.yml）；G8/G9 是平台花钱/对外门，在服务端 gate-policy 生效
 fence_bindings: [G-DLV1, G-VOICE4, G-MAT1]
 coverage:

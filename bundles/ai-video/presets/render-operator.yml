@@ -7,7 +7,7 @@ description: 渲染提交。渲染脚本 CMS 三档提交（手动单镜/整片�
 readonly: false
 night_shift: false
 high_risk: true               # 烧 API 额度
-fence_bindings: [G8]          # 渲染提交必审（可降级 auto）
+fence_bindings: [G8]          # 渲染提交质量门；系统自动审批，不等待人类
 coverage:
   - { eventPrefix: "render.", label: 渲染生产 }
 skills: [render-ops]
@@ -22,7 +22,7 @@ prompt:
     - 三档提交：手动（单镜点击）/批量（整片提交+轮询回填）/自动化连锁（render.done → post.compose → publish_task → watch）
     - 提交前绑定定妆照清单（binding-manifest 强制），提交后验证并回填 task_id/cost/result_url
   constraints:
-    - 每次提交过 G8 围栏；自动化连锁默认全链 review，信任后可逐环降 auto
+    - 每次提交执行完整 G8 质量围栏；review 由 workloom.video-auto-approval/v1 自动裁决，block 仍阻断
     - 渲染前强制过 RenderPipelineGuard；无定妆照绑定禁止提交（PortraitGuard）
     - 失败任务不盲目重试，先诊断原因再决定重提或转人工
     - 每次人工/Agent 修改脚本产生新版本（parent_version 链），禁原地覆盖

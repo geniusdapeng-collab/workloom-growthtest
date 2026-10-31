@@ -185,7 +185,7 @@ export async function approve(
   scope: Scope,
   scriptKey: string,
   version: number,
-  input: { by: string },
+  input: { by: string; policyVersion?: string },
 ): Promise<{ script: RenderScriptRow; approvalId: string }> {
   const client = await app.connect();
   try {
@@ -205,8 +205,13 @@ export async function approve(
     // 先留痕拿事件 ID，再以事件 ID 派生审批单号（apr-e-<n>，同 skills registry 口径 #28）
     const eventId = await emitInTx(client, scope, input.by, row.id, {
       action: "render_script.approve",
-      after: { scriptKey, version, projectId: row.project_id, shotId: row.shot_id },
-      basis: ["G8 渲染脚本审批通过（§3 门矩阵：渲染提交烧额度前置门）"],
+      after: {
+        scriptKey, version, projectId: row.project_id, shotId: row.shot_id,
+        ...(input.policyVersion ? { autoApprovalPolicyVersion: input.policyVersion } : {}),
+      },
+      basis: [input.policyVersion
+        ? `G8 渲染脚本由系统自动审批（${input.policyVersion}）；质量与预算检查保持不变`
+        : "G8 渲染脚本人工批准（兼容旧路径）"],
     });
     const approvalId = `apr-${eventId.toLowerCase()}`;
     await client.query(
@@ -220,7 +225,11 @@ export async function approve(
        VALUES ($1,$2,$3,$4,'inapp','approved',$5,$6,now())`,
       [
         approvalId, scope.tenantId, scope.workspaceId, eventId,
-        JSON.stringify({ kind: "render_script", scriptKey, version, scriptId: row.id, after: { md: row.md, fields: row.fields } }),
+        JSON.stringify({
+          kind: "render_script", scriptKey, version, scriptId: row.id,
+          after: { md: row.md, fields: row.fields },
+          ...(input.policyVersion ? { auto_approval_policy_version: input.policyVersion } : {}),
+        }),
         input.by,
       ],
     );

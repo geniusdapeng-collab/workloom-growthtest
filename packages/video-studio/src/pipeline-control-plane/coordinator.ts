@@ -51,10 +51,37 @@ export interface PipelineRuntimeIds {
   eventId(): string;
 }
 
+export interface GateAutoApprovalInput {
+  gateKey: string;
+  checkSetVersion: string;
+  artifactHashes: string[];
+  artifactManifestHash: string;
+  run: PipelineRun;
+  stage: StageRun;
+}
+
+export interface GateAutoApprovalResult {
+  decision: "passed" | "rejected" | "unverified";
+  actor: string;
+  policyVersion: string;
+  reason: string;
+  issues?: string[];
+  suggestions?: string[];
+  findings?: GateFinding[];
+  evidenceHashes?: string[];
+}
+
 export interface PipelineCoordinatorOptions {
   now?: () => string;
   ids?: Partial<PipelineRuntimeIds>;
   resolvePlan?: (planKey: string) => CompiledPipelinePlan | Promise<CompiledPipelinePlan>;
+  /**
+   * 产品所有者授权的系统审批策略。返回 null 时保持兼容的持久化待审批状态；
+   * 返回结果时立即落 GateDecision，不创建 wait_human 状态。
+   */
+  autoApproveGate?: (
+    input: GateAutoApprovalInput,
+  ) => Promise<GateAutoApprovalResult | null> | GateAutoApprovalResult | null;
 }
 
 function defaultIds(prefix: string): string {
@@ -117,6 +144,7 @@ export class PipelineCoordinator {
   private readonly now: () => string;
   private readonly ids: PipelineRuntimeIds;
   private readonly resolvePlan?: PipelineCoordinatorOptions["resolvePlan"];
+  private readonly autoApproveGate?: PipelineCoordinatorOptions["autoApproveGate"];
 
   constructor(
     private readonly repository: PipelineRepository,
@@ -124,6 +152,7 @@ export class PipelineCoordinator {
   ) {
     this.now = options.now ?? (() => new Date().toISOString());
     this.resolvePlan = options.resolvePlan;
+    this.autoApproveGate = options.autoApproveGate;
     this.ids = {
       runId: options.ids?.runId ?? (() => defaultIds("PR")),
       stageRunId: options.ids?.stageRunId ?? (() => defaultIds("SR")),
@@ -668,6 +697,70 @@ export class PipelineCoordinator {
       }
       const boundArtifacts = artifacts.filter((artifact) => input.artifactHashes.includes(artifact.sha256));
       const manifestHash = artifactManifestHash(boundArtifacts);
+      const autoApproval = this.autoApproveGate
+        ? await this.autoApproveGate({
+            gateKey: input.gateKey,
+            checkSetVersion: input.checkSetVersion,
+            artifactHashes: input.artifactHashes,
+            artifactManifestHash: manifestHash,
+            run,
+            stage,
+          })
+        : null;
+      if (autoApproval) {
+        const contract = run.plan.steps.find((entry) => entry.stageKey === stage.nodeKey);
+        if (!contract) throw new PipelineCommandError("STAGE_CONTRACT_NOT_FOUND", stage.nodeKey);
+        assertVerificationTransition(stage.verificationStatus, autoApproval.decision);
+        const now = this.now();
+        const gate: GateDecision = GateDecisionSchema.parse({
+          id: this.ids.gateDecisionId(),
+          pipelineRunId: run.id,
+          stageRunId: stage.id,
+          gateKey: input.gateKey,
+          checkSetVersion: input.checkSetVersion,
+          artifactManifestHash: manifestHash,
+          decision: autoApproval.decision,
+          actor: autoApproval.actor,
+          artifactHashes: input.artifactHashes,
+          issues: autoApproval.issues ?? [],
+          suggestions: autoApproval.suggestions ?? [],
+          findings: autoApproval.findings ?? [],
+          evidenceHashes: autoApproval.evidenceHashes ?? input.artifactHashes,
+          approvalId: null,
+          expiresAt: null,
+          createdAt: now,
+        });
+        await tx.insertGateDecision(gate);
+        const updated: StageRun = {
+          ...stage,
+          verificationStatus: autoApproval.decision,
+          disposition: deriveStageDisposition({
+            executionStatus: stage.executionStatus,
+            verificationStatus: autoApproval.decision,
+            sideEffect: contract.sideEffect,
+            hasGate: Boolean(contract.verify.gate),
+          }),
+          revision: stage.revision + 1,
+          updatedAt: now,
+        };
+        const saved = await tx.updateStage(updated, stage.revision);
+        await tx.appendEvent(this.event({
+          pipelineRunId: run.id,
+          stageRunId: stage.id,
+          kind: "gate.auto_approved",
+          idempotencyKey: `${input.idempotencyKey}:event`,
+          payload: {
+            gateDecisionId: gate.id,
+            gateKey: gate.gateKey,
+            decision: gate.decision,
+            actor: gate.actor,
+            policyVersion: autoApproval.policyVersion,
+            reason: autoApproval.reason,
+            artifactManifestHash: manifestHash,
+          },
+        }));
+        return saved;
+      }
       if (stage.verificationStatus === "pending") {
         const priorRequest = (await tx.listEvents(scope, run.id)).find((event) =>
           event.stageRunId === stage.id

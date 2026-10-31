@@ -20,6 +20,7 @@ import { llmCall } from "../service/llm.js";
 import { acquisitionQuestPlanner } from "../industry/hotel/acquisition-planner.js";
 import { loadDeploymentToolExecutor, describeToolCoverage } from "./tool-executor.js";
 import { preferredDispatchPresets } from "./dispatch-routing.js";
+import { videoAutoReviewPolicy } from "../video/auto-approval.js";
 
 export interface Scope { tenantId: string; workspaceId: string }
 
@@ -294,6 +295,31 @@ export async function runQuestForThread(scope: Scope, input: ThreadQuestInput): 
     fallbackPlanner: acquisitionQuestPlanner(input.goal),
     ...(toolExecutor ? { toolExecutor } : {}),
     ...(planVocabulary.objectTypes.length ? { planVocabulary } : {}),
+    autoReview: ({ presetKey: resolvedPresetKey, step, qualityEligible, verdict }) => {
+      const policy = videoAutoReviewPolicy({
+        presetKey: resolvedPresetKey,
+        action: step.action,
+        objectType: step.objectType,
+        reviewRuleIds: verdict.impacts
+          .filter((impact) => impact.result === "review")
+          .map((impact) => impact.rule_id),
+      });
+      if (policy.status === "not_applicable") return { status: "not_applicable" as const };
+      if (!qualityEligible) {
+        return {
+          status: "rejected",
+          actorId: policy.actorId!,
+          policyVersion: policy.policyVersion!,
+          reason: "视频质量、参数完整性或围栏求值未通过；自动审批不会绕过质量检查",
+        };
+      }
+      return {
+        status: "approved",
+        actorId: policy.actorId!,
+        policyVersion: policy.policyVersion!,
+        reason: policy.reason!,
+      };
+    },
   });
   return { ...result, ...(warnings.length ? { warnings } : {}), presetKey };
 }

@@ -281,6 +281,33 @@ describe("GR-07：确定性兜底计划必须人工裁决（不被自动执行�
     expect(execute).not.toHaveBeenCalled();
     expect(result.pendingApprovalId).toBeTruthy();
   });
+
+  it("启用自动审批策略但质量参数不完整时失败关闭，不挂起等待人类", async () => {
+    const execute = vi.fn(async () => verifiedResult());
+    const result = await runQuest(pool, pool, scope, {
+      threadId: "thread-a",
+      goal: "提交并核验",
+      presetKey: "operator",
+      toolExecutor: execute,
+      autoReview: ({ qualityEligible }) => qualityEligible
+        ? {
+            status: "approved",
+            actorId: "video-auto-approval",
+            policyVersion: "workloom.video-auto-approval/v1",
+            reason: "ok",
+          }
+        : {
+            status: "rejected",
+            actorId: "video-auto-approval",
+            policyVersion: "workloom.video-auto-approval/v1",
+            reason: "参数不完整",
+          },
+    });
+    expect(result.status).toBe("failed");
+    expect(result.error).toContain("参数不完整");
+    expect(result.pendingApprovalId).toBeUndefined();
+    expect(execute).not.toHaveBeenCalled();
+  });
 });
 
 describe("MC-006：逐工具覆盖与模拟证据不可换绑", () => {

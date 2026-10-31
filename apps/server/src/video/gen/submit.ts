@@ -46,6 +46,9 @@ export interface SubmitGenJobInput {
   mode: "manual" | "batch" | "auto";
   idempotencyKey?: string | null;
   fenceLevel: string;
+  /** 系统自动审批前的原质量级别（review/auto/block）。 */
+  qualityFenceLevel?: string;
+  autoApprovalPolicyVersion?: string;
   fenceImpacts: RuleImpact[];
   budgetOverageSeconds?: number;
   env?: NodeJS.ProcessEnv;
@@ -256,6 +259,8 @@ async function submitWithLedger(input: SubmitGenJobInput, authorization: Awaited
         est_usd: est.usd, est_cny: est.cny, provider: selected.provider, provider_model: selected.providerModel,
         idempotency_key: key, request_hash: requestHash,
         budget_overage_seconds: input.budgetOverageSeconds ?? 0, fence_level: input.fenceLevel,
+        quality_fence_level: input.qualityFenceLevel ?? input.fenceLevel,
+        auto_approval_policy_version: input.autoApprovalPolicyVersion ?? null,
         request: { durationSec: params.durationSec ?? null, aspectRatio: params.aspectRatio ?? null,
           resolution: params.resolution ?? null, generateAudio: params.generateAudio ?? null,
           firstFrame: Boolean(params.firstFrameUrl), referenceCount: params.referenceImageUrls?.length ?? 0 },

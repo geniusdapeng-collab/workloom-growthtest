@@ -12,7 +12,7 @@
 import { buildGateEvent, type GateEvent, type PipelineGateStepKey } from "@hyperreality/video-studio";
 import type { GateKey } from "@hyperreality/video-studio";
 
-/** 平台门 → 管线 step_key（只有能一一对应的才映射；G8 渲染提交在平台属高风险人审，暂不映射） */
+/** 平台门 → 管线 step_key（只有能一一对应的才映射；G8 渲染提交走独立路由，暂不映射） */
 export const SERVER_GATE_STEP_KEY: Partial<Record<GateKey, PipelineGateStepKey>> = {
   /**
    * 【T-2026-0926-0117】营销片前置门补齐：vendor 的 dossier/theme/requirement/prd 确认单
@@ -30,7 +30,7 @@ export const SERVER_GATE_STEP_KEY: Partial<Record<GateKey, PipelineGateStepKey>>
 
 /**
  * 不映射的门（如实登记，避免"看起来都对齐了"的错觉）：
- *   · `g8-render-submit`：平台侧属高风险人审，平台只报门处置结果，与 CLI 的分项提交判据不同构；
+ *   · `g8-render-submit`：平台侧由独立渲染路由处理 G8 质量/预算门，与 CLI 的分项提交判据不同构；
  *   · `material-generate`（G-MAT1，2026-09-25 素材用途门）：**平台侧暂无对应 vendor 门**——
  *     素材镜的"用途声明 + 生成溯源 + 非静态直出"三条判据只在 CLI 管线（`full-chain-film.mts`）里可执行，
  *     平台管线要走这条路必须先补 vendor 门类型；在那之前**不猜映射**（宁可缺，不要假对齐）。

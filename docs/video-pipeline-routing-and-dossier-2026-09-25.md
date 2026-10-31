@@ -170,7 +170,7 @@
 - 应急开关：
   - `VM_DATA_MINING=0` → 关闭情报层装配（回到无档案运行）；
   - `VM_DATA_MINING_MODE=spec` → 只出采集任务书（旧口径）；
-  - `HR_AUTO_GATES=`（空）→ 内部门恢复人审；默认表不含 `G5_PORTRAIT`（T-2026-1001-0007：定妆照默认人审）；
-  - `HR_AUTO_GATES` 显式包含 `G5_PORTRAIT` → 恢复 G5 的 AI 自动裁决（不推荐，机器像不像判据不稳定）；
+  - `VIDEO_AUTO_APPROVAL=0` → 全部视频 review 恢复旧的人类等待路径；
+  - `VIDEO_AUTO_APPROVAL=1`（默认）→ 保留质量/围栏审核，由系统自动审批；G5 只按实际图片事实通过；
   - `VM_PRODUCER_RETRY=1`（或更大）→ 恢复旧的有上限自动重跑；默认 **0 = 打回即停**；
   - `WL_SEARCH_PROVIDERS=...` / `--prime-search` → 切换检索通道。

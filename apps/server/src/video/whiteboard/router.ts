@@ -18,7 +18,7 @@
  *      本实现改为 `analyze` 从像素反推，并在 `annotate` 里过 Zod 契约校验 + 自愈重生成。
  *
  * 纪律：全部 workspace 作用域 + 事务级 RLS；渲染烧算力前置门沿用 G8
- * （T-2026-1001-0007 起 `render_auto` 默认关闭：脚本须先 approved；`WORKLOOM_RENDER_AUTO=1` 才恢复自动放行）。
+ * （T-2026-1031-9003 起默认由视频系统自动审批；`VIDEO_AUTO_APPROVAL=0` 才回滚旧的 approved 人审路径）。
  */
 import { z } from "zod";
 import { createHash } from "node:crypto";
@@ -26,9 +26,10 @@ import { TRPCError } from "@trpc/server";
 import { getAppPool, getGatewayPool } from "@workloom/db";
 import { gatewayAppendOnClient } from "@workloom/base/workdata";
 import { judge, loadActiveRulesInTx, type RuntimeRule } from "@workloom/base/fence-engine";
-import { create as createRenderScript } from "@workloom/base/asset-cms";
+import { approve as approveRenderScript, create as createRenderScript } from "@workloom/base/asset-cms";
 import { newId } from "@workloom/shared";
 import { renderSubmitAutoAllowed } from "../gate-policy.js";
+import { VIDEO_AUTO_APPROVAL_ACTOR_ID, VIDEO_AUTO_APPROVAL_POLICY_VERSION, autoApproveVideoFence, videoAutoApprovalEnabled } from "../auto-approval.js";
 import { writeFileSync } from "node:fs";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../../trpc/context.js";
 import { scopedQuery, type Scope } from "../gen/db.js";
@@ -635,13 +636,15 @@ export const whiteboardRouter = router({
       } finally {
         fenceClient.release();
       }
-      const verdict = judge({
+      const rawVerdict = judge({
         object: { type: "render_script", id: `whiteboard:${film.project_id}` },
         action: "render.submit",
         params: { engine: "whiteboard-local", scenes: scenes.length, quality,
           capLongEdge, resolution: quality === "uhd" ? "3840x2160" : null },
         context: { render_auto: renderSubmitAutoAllowed() },
       }, rules, "review");
+      const autoReview = autoApproveVideoFence(rawVerdict);
+      const verdict = autoReview.verdict;
       if (verdict.level === "block") {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -673,6 +676,13 @@ export const whiteboardRouter = router({
           },
           by: actor,
         });
+      }
+      if (videoAutoApprovalEnabled() && scriptRow.status === "draft") {
+        const autoApproved = await approveRenderScript(app, gateway, scope, scriptRow.script_key, scriptRow.version, {
+          by: VIDEO_AUTO_APPROVAL_ACTOR_ID,
+          policyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+        });
+        scriptRow = autoApproved.script;
       }
       if (verdict.level === "review") {
         const cur = await scopedQuery<{ status: string }>(
@@ -732,6 +742,8 @@ export const whiteboardRouter = router({
         mode: "manual",
         idempotencyKey: `whiteboard:${film.id}:${customKey}${fingerprint}`,
         fenceLevel: verdict.level,
+        qualityFenceLevel: rawVerdict.level,
+        ...(autoReview.autoApproved ? { autoApprovalPolicyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION } : {}),
         fenceImpacts: verdict.impacts as never,
         budgetOverageSeconds: input.allowOverage ? Math.max(0, Math.round(totalDurationMs / 1000)) : 0,
       });

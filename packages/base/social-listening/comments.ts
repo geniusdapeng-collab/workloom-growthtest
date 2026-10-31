@@ -122,13 +122,17 @@ async function emitInTx(
   objectType: string,
   objectId: string,
   decision: Record<string, unknown>,
-  opts: { receipt?: { synced: boolean; snapshot_uri?: string; verified_at?: string } } = {},
+  opts: {
+    receipt?: { synced: boolean; snapshot_uri?: string; verified_at?: string };
+    actor?: { id: string; type: "system" };
+  } = {},
 ): Promise<string> {
+  const actor = opts.actor ?? { id: "comment-operator", type: "system" as const };
   const r = await gatewayAppendOnClient(client, {
     tenantId: scope.tenantId, workspaceId: scope.workspaceId,
-    actor: { id: "comment-operator", type: "system" },
+    actor,
   }, {
-    who: { type: "system", id: "comment-operator" },
+    who: actor,
     context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },
     object: { type: objectType, id: objectId },
     decision: decision as never,
@@ -192,6 +196,11 @@ export interface ProcessDeps {
   sender?: ReplySender;
   /** 敏感词表（G10 block 级；行业包/工作区配置供给，默认空） */
   sensitiveWords?: string[];
+  /**
+   * 视频/GrowthTest 的系统自动审批。默认遵循 VIDEO_AUTO_APPROVAL 开关；
+   * 只取消 review 的人类等待，原意图分类、敏感词 block、候选回复与告警全部保留。
+   */
+  autoApproveReview?: boolean;
 }
 
 export interface ProcessResult {
@@ -199,6 +208,8 @@ export interface ProcessResult {
   intent: CommentIntent;
   classifySource: "llm" | "rules";
   decision: RouteDecision;
+  qualityRouteLevel?: FenceLevel;
+  autoApproved?: boolean;
   replyId?: string;
 }
 
@@ -246,10 +257,19 @@ export async function processComment(
 
   const { intent, source } = await classifyIntent(comment.text, deps.classifier);
   const decision = routeComment(intent, comment.text, deps.sensitiveWords ?? []);
+  const autoApproved = decision.level === "review"
+    && (deps.autoApproveReview ?? process.env.VIDEO_AUTO_APPROVAL !== "0");
+  const executionDecision: RouteDecision = autoApproved
+    ? {
+        ...decision,
+        level: "auto",
+        reason: `系统自动审批（workloom.video-auto-approval/v1）：保留原质量分流 review；${decision.reason}`,
+      }
+    : decision;
 
   /* ---- 候选回复（review/auto 都需要；block 不生成） ---- */
   let candidate: string | null = null;
-  if (decision.level !== "block") {
+  if (executionDecision.level !== "block") {
     try {
       candidate = deps.generator ? await deps.generator.generate(comment) : fallbackReply({ ...comment, intent });
     } catch {
@@ -260,19 +280,25 @@ export async function processComment(
   /* ---- auto 级外发（须 sender 注入；未注入按 review 挂起，不静默丢弃） ---- */
   let receipt: { synced: boolean; receiptId?: string; evidenceUri?: string } | null = null;
   let sendFailed: string | null = null;
-  if (decision.level === "auto" && candidate !== null && deps.sender) {
+  if (executionDecision.level === "auto" && candidate !== null && deps.sender) {
     try {
       receipt = await deps.sender.send({ ...comment, intent }, candidate);
     } catch (err) {
       sendFailed = err instanceof Error ? err.message : String(err); // 外发失败 → 转人工
     }
   }
-  const effective: RouteDecision = decision.level === "auto" && (!deps.sender || sendFailed)
-    ? { level: "review", alert: decision.alert, reason: sendFailed ? `外发失败转人工：${sendFailed}` : "外发通道未注入，auto 降级 review 挂起（不静默丢弃）" }
-    : decision;
+  const effective: RouteDecision = executionDecision.level === "auto" && (!deps.sender || sendFailed)
+    ? {
+        level: "auto",
+        alert: executionDecision.alert,
+        reason: sendFailed
+          ? `外发失败转人工处理（不重新审批）：${sendFailed}`
+          : "系统已自动审批；外发通道未注入，回复草稿转人工处理（不重新审批）",
+      }
+    : executionDecision;
 
   /* ---- 落库 + 留痕（同一 COMMIT） ---- */
-  const status = effective.level === "block" ? "blocked"
+  const status = decision.level === "block" ? "blocked"
     : effective.level === "review" ? "pending_review"
     : receipt?.synced ? "replied" : "manual";
   const client = await app.connect();
@@ -300,16 +326,21 @@ export async function processComment(
     }
     const action = effective.level === "block" ? "comment.blocked"
       : effective.level === "review" ? "comment.reply_review"
-      : "comment.replied";
+      : receipt?.synced ? "comment.replied"
+      : "comment.reply_manual";
     const eventId = await emitInTx(client, scope, "comment_reply", commentId, {
       action,
       after: {
         commentId, intent, classifySource: source, routeLevel: effective.level,
+        qualityRouteLevel: decision.level, autoApproved,
         alert: effective.alert, reason: effective.reason, replyId: replyId ?? null,
         candidate: candidate ?? null, sendFailed,
       },
       basis: [effective.reason],
-    }, receipt ? { receipt: { synced: receipt.synced, snapshot_uri: receipt.evidenceUri, verified_at: new Date().toISOString() } } : {});
+    }, {
+      ...(receipt ? { receipt: { synced: receipt.synced, snapshot_uri: receipt.evidenceUri, verified_at: new Date().toISOString() } } : {}),
+      ...(autoApproved ? { actor: { id: "video-auto-approval", type: "system" as const } } : {}),
+    });
     // 危机/敏感词附带告警事件（G10：review+alert / block+alert）
     if (effective.alert) {
       await emitInTx(client, scope, "comment_reply", commentId, {
@@ -319,7 +350,7 @@ export async function processComment(
       });
     }
     await client.query("COMMIT");
-    return { commentId, intent, classifySource: source, decision: effective, replyId };
+    return { commentId, intent, classifySource: source, decision: effective, qualityRouteLevel: decision.level, autoApproved, replyId };
   } catch (err) {
     await client.query("ROLLBACK").catch(() => undefined);
     throw err;

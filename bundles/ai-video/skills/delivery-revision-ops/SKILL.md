@@ -17,7 +17,7 @@ description: 返修闭环官方套件（后期交付与返修工位）：用户�
 | "转场太生硬/节奏拖/顺序调一下" | `rev.edit.pacing` | assemble → color → audio → text | 否 |
 | "封面字太小/换个首图" | `rev.cover.layout` | cover | 否 |
 | "标题不够抓人/话题标签换掉/口吻太硬" | `rev.copy.tone` | copy | 否 |
-| "第 3 个镜头人物走形了/这个镜头穿帮/画面太糊" | `rev.shot.content` | shots → …（全链重算） | **是**（点名镜头 + G8 人审） |
+| "第 3 个镜头人物走形了/这个镜头穿帮/画面太糊" | `rev.shot.content` | shots → …（全链重算） | **是**（点名镜头 + G8 质量门 + 系统自动审批） |
 
 分诊引擎是**确定性规则表**（`post-bridge/core.mjs#REVISION_RULES`），不依赖 LLM：可复算、可考试、可回归。
 认不出是哪一类时返回 `unclear` 并列出可选轴，**不猜**。
@@ -63,7 +63,7 @@ post-cli reedit --project <交付包>/film-project.json --patch patch.json
 2. `reedit` 返回需要新增镜头的计划：按用户明确范围、真实预算及渲染前 G8 授权只执行被点名镜头；渲染成功后默认采用，不追加身份、服装或模型品质验收；
 3. 拿到新镜头产物后，带 `--shot SC-03=<新文件>` 再调 `reedit`：这一步就回到本地合成，未被点名的镜头与全部后期层照旧复用。
 
-**红线**：说不出是第几个镜头就不许整片重跑（G-DLV4 block）；重生成镜头必须人审（G-DLV5 review）。
+**红线**：说不出是第几个镜头就不许整片重跑（G-DLV4 block）；重生成镜头必须通过 G-DLV5 质量审查并由系统自动审批。
 
 ## 五、返修回执（无回执不算完成）
 

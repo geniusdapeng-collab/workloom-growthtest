@@ -266,6 +266,25 @@ describe("渲染脚本管理（版本即审批对象，G8 联动）", () => {
     await expect(newVersion(app, gateway, scope, "rs-ghost", { md: "#", diffSummary: "d", by: "x" }))
       .rejects.toThrow(RenderScriptError);
   });
+
+  it("系统自动审批保留策略版本并生成 approved 记录，不进入 pending 队列", async () => {
+    const { db, app, gateway } = fixture();
+    await create(app, gateway, scope, {
+      scriptKey: "rs-auto", projectId: "vp-1", shotId: "shot-auto", md: "# 自动审批镜头", by: "render-operator",
+    });
+    const result = await approve(app, gateway, scope, "rs-auto", 1, {
+      by: "video-auto-approval",
+      policyVersion: "workloom.video-auto-approval/v1",
+    });
+    expect(result.script.status).toBe("approved");
+    expect(db.approvals.at(-1)).toMatchObject({
+      status: "approved",
+      decided_by: "video-auto-approval",
+      snapshot: { auto_approval_policy_version: "workloom.video-auto-approval/v1" },
+    });
+    expect(db.events.at(-1)?.payload.decision.after.autoApprovalPolicyVersion)
+      .toBe("workloom.video-auto-approval/v1");
+  });
 });
 
 /* ================= 成片：状态机 + 内容日历 ================= */

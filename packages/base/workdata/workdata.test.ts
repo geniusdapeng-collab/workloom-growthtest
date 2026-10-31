@@ -93,7 +93,7 @@ describe("权限段①（F2.10/L9.1 复查位）", () => {
     });
     // 白名单内已知系统组件（night-shift/captain/service-c 等）走系统通道
     expect(SYSTEM_ACTOR_WHITELIST).toEqual(
-      expect.arrayContaining(["system", "model-router", "im-channels", "review-console", "night-shift", "captain", "service-c"]),
+      expect.arrayContaining(["system", "model-router", "im-channels", "review-console", "night-shift", "captain", "service-c", "video-auto-approval"]),
     );
     expect(() => checkPermission({ id: "night-shift", type: "system" }, sysDraft("night-shift"))).not.toThrow();
     // 伪造 system 身份（不在白名单）写动作：按普通身份全检查——无 fence_bindings 必拒

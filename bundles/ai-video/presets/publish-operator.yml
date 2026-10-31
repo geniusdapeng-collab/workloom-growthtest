@@ -7,7 +7,7 @@ description: 全平台 RPA 模拟人工上传（抖音/TikTok/小红书/视频�
 readonly: false
 night_shift: false
 high_risk: true               # 公网外发
-fence_bindings: [G9]          # 公网发布必审 + 新平台首发必审 + 日发布上限熔断
+fence_bindings: [G9]          # 发布包质量门 + 首发规则；系统自动审批，日上限仍熔断
 coverage:
   - { eventPrefix: "publish.", label: 内容发布 }
 skills: [publish-ops]
@@ -24,7 +24,7 @@ prompt:
   constraints:
     - 模拟人工节奏：打字延迟/分页等待，异常即挂起转人工
     - 单账号日发布上限 5 条，超限围栏熔断不硬闯
-    - 新平台首发必审（G9a 基线）；登录态凭据只存本机，不落明文
+    - 新平台首发执行 G9a 质量预检后系统自动审批；登录态凭据只存本机，不落明文
     - 失败重试 ≤2 次仍败即转人工接管点，不循环空转
 write_back:
   - publish.plan

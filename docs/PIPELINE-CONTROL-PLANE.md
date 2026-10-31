@@ -83,6 +83,19 @@ disposition:
 “产物已生成但门拒绝”表现为 `executionStatus=output_ready`、`verificationStatus=rejected`，
 不再折叠成单一 `failed`。
 
+### 系统自动审批（T-2026-1031-9003）
+
+GrowthTest 视频管线默认启用 `workloom.video-auto-approval/v1`：
+
+- `requestGate` 在质量证据和 artifact manifest 已登记后，直接生成 `decision=passed` 的 GateDecision；
+- 不生成新的 `wait_human` 状态，也不要求人类等待；
+- GateDecision 的 actor 为 `video-auto-approval`，事件保留策略版本、理由和证据哈希；
+- 原有 Schema、质量评审、预算、授权、供应商资格、append-only 事件和 `block` 规则不变；
+- `VIDEO_AUTO_APPROVAL=0` 是唯一回滚开关，恢复旧待审批路径。
+
+这不是“跳过门”，而是把门的人类裁决环节替换成可审计的系统裁决。质量检查失败仍进入
+`repair / reconcile / blocked / failed`，不得因自动审批策略而通过。
+
 读模型额外提供机器可读 `nextAction`（`run_node / wait_approval / repair / reconcile /
 wait_resource / manual_fix / done`）和结构化 blocker。只读 tRPC：
 

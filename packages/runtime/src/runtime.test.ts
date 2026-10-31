@@ -203,6 +203,52 @@ d("PG 集成 Quest 循环（种子库）", async () => {
     } finally { c.release(); }
   });
 
+  it("自动审批策略：质量围栏 review 仍命中，但不产生人类等待，直接授权并完成", async () => {
+    const tid = await newThread("回复差评自动审批");
+    const r = await runQuest(app, gw, scope, {
+      threadId: tid,
+      goal: "回复差评",
+      presetKey: "review-agent",
+      fallbackPlanner: hotelFixturePlanner,
+      autoReview: ({ qualityEligible }) => qualityEligible
+        ? {
+            status: "approved",
+            actorId: "video-auto-approval",
+            policyVersion: "workloom.video-auto-approval/v1",
+            reason: "测试：质量围栏已求值，取消人类等待",
+          }
+        : {
+            status: "rejected",
+            actorId: "video-auto-approval",
+            policyVersion: "workloom.video-auto-approval/v1",
+            reason: "质量检查不完整",
+          },
+    });
+    expect(r.status).toBe("completed");
+    expect(r.pendingApprovalId).toBeUndefined();
+    const evs = await threadEvents(tid);
+    const review = evs.find((e) => e.decision.autoApproved === true);
+    expect(review).toMatchObject({
+      decision: {
+        kind: "review",
+        policyVersion: "workloom.video-auto-approval/v1",
+        qualityReview: { level: "review", triggeredBy: expect.any(Array) },
+      },
+    });
+    const c = await app.connect();
+    try {
+      await c.query("SELECT set_config('app.workspace_id', $1, false)", [scope.workspaceId]);
+      const approval = await c.query<{ status: string; decided_by: string; consumed_at: Date | null }>(
+        `SELECT a.status,a.decided_by,a.consumed_at FROM approvals a
+          JOIN biz_events e ON e.event_id=a.event_id WHERE e.session_id=$1`,
+        [tid],
+      );
+      expect(approval.rows).toHaveLength(1);
+      expect(approval.rows[0]).toMatchObject({ status: "approved", decided_by: "video-auto-approval" });
+      expect(approval.rows[0]!.consumed_at).not.toBeNull();
+    } finally { c.release(); }
+  });
+
   it("#34 审批通过 → replay 恢复执行：挂起步骤带授权引用完成，Quest 闭环 completed", async () => {
     const { decide } = await import("@workloom/base/review-console");
     const tid = await newThread("回复差评求恢复");

@@ -2,8 +2,8 @@
  * video/router.ts —— 视频经理 tRPC 子路由（融合设计 §3/§6/§7 服务端接线）
  *
  * 六组过程：
- *  - studio：预生产流水线启动/状态（异步工作器，G1–G7 门走 approvals 原生消息）
- *  - cms：渲染脚本 CMS（asset-cms render-scripts 服务：版本链 + G8 审批联动）
+ *  - studio：预生产流水线启动/状态（异步工作器；G1–G7 质量门后由系统自动审批）
+ *  - cms：渲染脚本 CMS（版本链 + G8 质量门；旧人工批准接口仅作兼容）
  *  - render：正式资格绑定的供应商请求提交（G8 围栏、预算、幂等回执）
  *  - publish：全平台 RPA 发布任务入队（G9 围栏预检，publish-rpa runner 执行时复核）
  *  - metrics：近 7 天 account_metrics 聚合投影
@@ -26,7 +26,7 @@ import {
   RenderScriptError,
   type RenderScriptRow,
 } from "@workloom/base/asset-cms";
-import { judge, type RuntimeRule } from "@workloom/base/fence-engine";
+import { judge, type RuleImpact, type RuntimeRule } from "@workloom/base/fence-engine";
 import { checkRenderBudget, planTierToPlanId } from "@workloom/base/model-router";
 import { PlatformSchema } from "@workloom/base/publish-rpa";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../trpc/context.js";
@@ -62,6 +62,13 @@ import { explainerRouter } from "./explainer/router.js";
 import { getPipelineCoordinator } from "./pipeline-control-plane.js";
 import { getExplainerRun } from "./explainer/runs.js";
 import { createExplainerDraft } from "./explainer/db.js";
+import {
+  VIDEO_AUTO_APPROVAL_ACTOR_ID,
+  VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+  autoApproveVideoFence,
+  videoAutoApprovalEnabled,
+  videoAutoApprovalReason,
+} from "./auto-approval.js";
 import {
   DeliveryError, buildVariantPreferenceContent, deliveryJobStatus, deliveryPreferenceConfidence,
   deliveryPreferenceMemoryId, listDeliveryJobs, listDeliveryPackages, readDeliveryArtifact,
@@ -255,7 +262,7 @@ async function appendDeliveryEvent(
  * 交付包与返修：读（列表/详情/作业）+ 写（选变体/分诊落单/启动本地重合成）。
  *
  * 纪律：交付根由 `WORKLOOM_DELIVERY_DIR` 指定（默认 `<repo>/var/delivery`），只读交付根内的包；
- * 重合成不在请求内执行（spawn 作业 + 轮询）；命中画面内容的返修一律拒绝并指向 G8 人审。
+ * 重合成不在请求内执行（spawn 作业 + 轮询）；命中画面内容的返修保留 G8 质量/预算门并交给系统自动审批。
  */
 const deliveryRouter = router({
   /** 交付包列表（按创建时间倒序；无交付根时返回空列表） */
@@ -388,7 +395,7 @@ const deliveryRouter = router({
             requiresShotRegeneration: outcome.triage.requiresShotRegeneration ?? null,
             requestPath: requestPath ? requestPath.split("/").slice(-3).join("/") : null,
           },
-          basis: ["用户反馈经确定性规则表分诊：先判『后期能解决』还是『必须重生成画面』，再决定走本地重合成还是人审"],
+          basis: ["用户反馈经确定性规则表分诊：先判『后期能解决』还是『必须重生成画面』，再决定走本地重合成还是 G8 质量门"],
         });
       }
       return { ...outcome, requestPath };
@@ -806,7 +813,7 @@ const cmsRouter = router({
       }
     }),
 
-  /** G8 审批联动（版本即审批对象：draft → approved + approvals 行，服务内同一 COMMIT） */
+  /** 旧 G8 人工批准兼容入口；自动路径不再要求人类调用 */
   approveScript: writeProcedure
     .input(z.object({ scriptKey: z.string().min(1), version: z.number().int().min(1) }))
     .mutation(async ({ ctx, input }) => {
@@ -928,16 +935,14 @@ const renderRouter = router({
       // G8 围栏预检（纯函数判定；impacts 随事件落库）
       const { rules, defaultLevel } = await loadActiveRules(app, scope);
       /**
-       * 渲染提交（花钱动作）默认人审（T-2026-1001-0007 产品所有者口径）：
-       * 渲出来的第一版给人类看，是否再花钱重做由人决定；`render_auto=false` ⇒ G8（渲染提交必审）
-       * 要求脚本先经 `cms.approveScript` 审批。2026-09-21 的"素材制作默认全自动"旧口径已停用，
-       * 只有显式 `WORKLOOM_RENDER_AUTO=1` 才恢复自动放行。
-       * 需要人审的还有**投放领域**（加投 G12）、**改价**场景，以及算力**超预算**（G11：project_compute_used ≥ cap）时暂停提交。
+       * 渲染提交（花钱动作）默认由 workloom.video-auto-approval/v1 自动审批：
+       * G8/G11/G12 的 review、预算、成本、模型资格和 block 检查全部保留，
+       * `VIDEO_AUTO_APPROVAL=0` 可回滚旧的人工批准路径。
        * 预算上限可由 WORKLOOM_PROJECT_COMPUTE_CAP（秒）配置，未配置视为不设上限。
        * 注意：缺失路径的数值比较会触发求值异常→block，所以两个数值必须显式给出。
        */
       const computeCap = Number(process.env.WORKLOOM_PROJECT_COMPUTE_CAP ?? 0);
-      const verdict = judge({
+      const rawVerdict = judge({
         object: { type: "render_script", id: script.id },
         action: "render.submit",
         params: modeParams,
@@ -947,6 +952,8 @@ const renderRouter = router({
           project_compute_cap: Number.isFinite(computeCap) && computeCap > 0 ? computeCap : Number.MAX_SAFE_INTEGER,
         },
       }, rules, defaultLevel);
+      const autoReview = autoApproveVideoFence(rawVerdict);
+      const verdict = autoReview.verdict;
       if (!qualified.reconciliationOnly && verdict.level === "block") {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -995,6 +1002,14 @@ const renderRouter = router({
       }
 
       // ── 提交（唯一写入口 submitGenJob）：幂等键去重 + 供应商降级链 + 参数 + 报价 + D16 同事务 ──
+      let submittedScript = script;
+      if (videoAutoApprovalEnabled() && script.status === "draft") {
+        const autoApprovedScript = await approveRenderScript(app, getGatewayPool(), scope, script.script_key, script.version, {
+          by: VIDEO_AUTO_APPROVAL_ACTOR_ID,
+          policyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+        });
+        submittedScript = autoApprovedScript.script;
+      }
       let submitted: Awaited<ReturnType<typeof submitGenJob>>;
       try { submitted = await submitGenJob({
         app,
@@ -1002,9 +1017,9 @@ const renderRouter = router({
         scope,
         actor: ctx.identity.memberNo,
         script: {
-          id: script.id, project_id: script.project_id, shot_id: script.shot_id,
-          script_key: script.script_key, version: script.version, status: script.status,
-          md: script.md, fields: script.fields as Record<string, unknown> | null,
+          id: submittedScript.id, project_id: submittedScript.project_id, shot_id: submittedScript.shot_id,
+          script_key: submittedScript.script_key, version: submittedScript.version, status: submittedScript.status,
+          md: submittedScript.md, fields: submittedScript.fields as Record<string, unknown> | null,
         },
         modelId,
         mode,
@@ -1013,6 +1028,8 @@ const renderRouter = router({
         /** 默认键由提交服务基于完整请求派生；显式键须与已绑定内容一致。 */
         idempotencyKey: input.idempotencyKey?.trim() || undefined,
       fenceLevel: verdict.level,
+      qualityFenceLevel: rawVerdict.level,
+      ...(autoReview.autoApproved ? { autoApprovalPolicyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION } : {}),
       fenceImpacts: verdict.impacts,
       budgetOverageSeconds: budget.overageSeconds,
       durationProvenance
@@ -1065,6 +1082,8 @@ const renderRouter = router({
       clamped,
       durationProvenance,
         level: verdict.level,
+        qualityLevel: rawVerdict.level,
+        autoApproved: autoReview.autoApproved,
         budget: { usedSeconds, overageSeconds: budget.overageSeconds },
       };
     }),
@@ -1107,7 +1126,7 @@ async function publishFenceContext(
 const publishRouter = router({
   /**
    * 发布任务入队（G9 围栏预检：block 直接 403 不入队；auto/review 入队 pending——
-   * 执行时由 publish-rpa runner 复核 G9，非 auto 挂起 pending_review 待审，适配器不执行）
+   * 执行时由 publish-rpa runner 复核 G9；router 将 review 交给系统自动审批，block 仍不执行）
    */
   createTask: writeProcedure
     .input(z.object({
@@ -1125,12 +1144,14 @@ const publishRouter = router({
       const app = getAppPool();
       const { rules, defaultLevel } = await loadActiveRules(app, scope);
       const fenceContext = await publishFenceContext(app, scope, input.accountId, input.platform);
-      const verdict = judge({
+      const rawVerdict = judge({
         object: { type: "publish_task", id: "PT-new" },
         action: "publish.execute",
         params: { platform: input.platform, accountId: input.accountId, scheduleAt: input.scheduleAt ?? null },
         context: fenceContext,
       }, rules, defaultLevel);
+      const review = autoApproveVideoFence(rawVerdict);
+      const verdict = review.verdict;
       if (verdict.level === "block") {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -1150,7 +1171,7 @@ const publishRouter = router({
         origin: "manual",
         by: ctx.identity.memberNo,
       });
-      return { taskId: created.taskId, level: verdict.level };
+      return { taskId: created.taskId, level: verdict.level, qualityLevel: rawVerdict.level, autoApproved: review.autoApproved };
     }),
 
   /**
@@ -1176,8 +1197,18 @@ const publishRouter = router({
         ? await publishFenceContext(app, scope, task.account_id, task.platform)
         : { account_daily_published: 0, platform_first_use: true };
       let overrideUsed = false;
+      let autoApproved = false;
+      let autoReviewImpacts: RuleImpact[] = [];
+      let autoReviewTriggeredBy: string[] = [];
       const fencePrecheck = (judgeInput: Parameters<typeof judge>[0]) => {
-        const verdict = judge({ ...judgeInput, context: { ...(judgeInput.context ?? {}), ...fenceContext } }, rules, defaultLevel);
+        const raw = judge({ ...judgeInput, context: { ...(judgeInput.context ?? {}), ...fenceContext } }, rules, defaultLevel);
+        const auto = autoApproveVideoFence(raw);
+        autoApproved ||= auto.autoApproved;
+        if (auto.autoApproved) {
+          autoReviewImpacts = raw.impacts;
+          autoReviewTriggeredBy = raw.triggeredBy;
+        }
+        const verdict = auto.verdict;
         if (verdict.level !== "auto" && fenceOverrideEnabled()) {
           overrideUsed = true;
           return { ...verdict, level: "auto" as const };
@@ -1187,22 +1218,42 @@ const publishRouter = router({
       const outcome = await executePublishTask(app, getGatewayPool(), scope, input.taskId, {
         fencePrecheck, dailyLimit: input.dailyLimit,
       });
-      if (overrideUsed && outcome.kind === "executed") {
+      if (autoApproved || (overrideUsed && outcome.kind === "executed")) {
         const client = await getGatewayPool().connect();
         try {
           await client.query("BEGIN");
           await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
           await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
-          await gatewayAppendOnClient(client, { ...scope, actor: { id: ctx.identity.memberNo, type: "human" } }, {
-            who: { type: "human", id: ctx.identity.memberNo },
+          const actor = autoApproved
+            ? { id: VIDEO_AUTO_APPROVAL_ACTOR_ID, type: "system" as const }
+            : { id: ctx.identity.memberNo, type: "human" as const };
+          await gatewayAppendOnClient(client, { ...scope, actor }, {
+            who: actor,
             context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },
             object: { type: "publish_task", id: input.taskId },
             decision: {
-              action: "publish.test_override",
-              after: { taskId: input.taskId, driver: outcome.driver, override: true, calls: outcome.calls?.slice(0, 12) ?? [] },
-              basis: ["测试专用围栏放行（PUBLISH_TEST_FENCE_OVERRIDE=1，非 production）：仅用于验证发布执行机制，dry-run 回执已标 synced:false"],
+              action: autoApproved ? "publish.auto_approved" : "publish.test_override",
+              after: {
+                taskId: input.taskId,
+                driver: outcome.driver,
+                outcome: outcome.kind,
+                autoApproved,
+                policyVersion: autoApproved ? VIDEO_AUTO_APPROVAL_POLICY_VERSION : null,
+                qualityReview: {
+                  level: "review",
+                  triggeredBy: autoReviewTriggeredBy,
+                  impacts: autoReviewImpacts,
+                },
+                override: autoApproved ? false : true,
+                calls: outcome.calls?.slice(0, 12) ?? [],
+              },
+              basis: [
+                autoApproved
+                  ? videoAutoApprovalReason("G9 公网发布质量预检完成后")
+                  : "测试专用围栏放行（PUBLISH_TEST_FENCE_OVERRIDE=1，非 production）：仅用于验证发布执行机制，dry-run 回执已标 synced:false",
+              ],
             },
-            rule_impact: [],
+            rule_impact: autoReviewImpacts,
           });
           await client.query("COMMIT");
         } catch (err) {
@@ -1212,7 +1263,7 @@ const publishRouter = router({
           client.release();
         }
       }
-      return { ...outcome, overrideUsed };
+      return { ...outcome, overrideUsed, autoApproved };
     }),
 });
 

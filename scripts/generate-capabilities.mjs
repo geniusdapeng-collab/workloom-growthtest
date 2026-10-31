@@ -198,6 +198,9 @@ const previewDescriptions = {
   "员工移动工作台": "React 员工移动应用，与静态原型分开",
   "客户 H5 服务前台": "preview 默认使用酒店夹具；增长前台需按 README 单独配置",
 };
+const repositoryUrl = productManifest.repository.startsWith("workloom-ai/")
+  ? `https://cnb.cool/${productManifest.repository}`
+  : `https://github.com/${productManifest.repository}`;
 const previewAppTable = appEntrypoints.length
   ? `| 端 | 地址 | 看什么 |\n|---|---|---|\n${appEntrypoints.map((entry) => `| ${cell(entry.name)} | ${cell(entry.how.replace("隔离演示启动后：", ""))} | ${cell(previewDescriptions[entry.name])} |`).join("\n")}`
   : "本仓未发现应用 package.json 入口，本导览没有应用演示地址。";
@@ -207,7 +210,7 @@ const md = `# ${productManifest.displayName || repoName} · 代码与能力入�
 > ${desc}
 > 本文件由 [generate-capabilities.mjs](../scripts/generate-capabilities.mjs) 自动生成（${data.generatedAt.slice(0, 10)}）。请修改生成器或事实输入后重新生成，不手改本文件。
 > ${evidenceNotice}
-> 产品身份：\`${productManifest.productId}\`；默认包：\`${productManifest.defaultBundle}\`；仓库：[${productManifest.repository}](https://cnb.cool/${productManifest.repository})。
+> 产品身份：\`${productManifest.productId}\`；默认包：\`${productManifest.defaultBundle}\`；仓库：[${productManifest.repository}](${repositoryUrl})。
 
 ## 从哪里开始
 

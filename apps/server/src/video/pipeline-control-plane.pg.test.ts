@@ -33,7 +33,14 @@ describe.runIf(RUN_DB)("视频管线持久化控制面", () => {
     adapterRegistry: [{ id: "vendor-preproduction", pipelineKeys: ["pg-control-plane"] }],
     knownGates: new Set(["G1"]),
   });
-  const coordinator = new PipelineCoordinator(new PostgresPipelineRepository(app));
+  const coordinator = new PipelineCoordinator(new PostgresPipelineRepository(app), {
+    autoApproveGate: () => ({
+      decision: "passed",
+      actor: "video-auto-approval",
+      policyVersion: "workloom.video-auto-approval/v1",
+      reason: "PG test video auto approval after quality review",
+    }),
+  });
   let pipelineRunId = "";
 
   beforeAll(async () => {
@@ -121,7 +128,7 @@ describe.runIf(RUN_DB)("视频管线持久化控制面", () => {
       checkSetVersion: "pg-test/v1",
       artifactHashes: [hash],
     });
-    expect(pending.verificationStatus).toBe("pending");
+    expect(pending.verificationStatus).toBe("passed");
 
     const decision = await coordinator.recordGateDecision(scope, {
       pipelineRunId: run.id,
@@ -252,5 +259,74 @@ describe.runIf(RUN_DB)("视频管线持久化控制面", () => {
       [scope.tenantId, scope.workspaceId, `SHADOW-${suffix}`],
     );
     expect(rows.rows[0]?.count).toBe("1");
+  });
+
+  it("server coordinator wires video auto approval without a human wait", async () => {
+    const { getPipelineCoordinator } = await import("./pipeline-control-plane.js");
+    const server = getPipelineCoordinator();
+    const autoPlan = compilePipeline({
+      quest: "pg-auto-approval",
+      name: "PG 自动审批",
+      version: "v1",
+      steps: [{ step_key: "script", name: "剧本", owner: "scriptwriter", gate: "G1", outputs: ["script_blueprint"] }],
+    }, {
+      adapterRegistry: [{ id: "vendor-preproduction", pipelineKeys: ["pg-auto-approval"] }],
+      knownGates: new Set(["G1"]),
+    });
+    const autoProject = `VID-AUTO-${suffix}`;
+    await owner.query(
+      `INSERT INTO video_projects (id,workspace_id,title,kind,created_by)
+       VALUES ($1,$2,'控制面自动审批','narrative','MEM-PIPE')`,
+      [autoProject, scope.workspaceId],
+    );
+    const started = await server.startCompiledPipeline(scope, autoPlan, {
+      projectId: autoProject,
+      planKey: autoPlan.pipelineKey,
+      factsSnapshotHash: facts,
+      budgetGrantId: null,
+      expectedProjectRevision: 0,
+      idempotencyKey: `auto-start-${suffix}`,
+      createdBy: "MEM-PIPE",
+      sourceSystem: "pg-auto",
+      sourceRunId: `AUTO-${suffix}`,
+    });
+    await server.beginStage(scope, {
+      pipelineRunId: started.pipelineRunId,
+      nodeKey: "script",
+      idempotencyKey: `auto-begin-${suffix}`,
+    });
+    const hash = pipelineSha256({ script: "auto-approved" });
+    const output = await server.recordStageOutput(scope, {
+      pipelineRunId: started.pipelineRunId,
+      nodeKey: "script",
+      idempotencyKey: `auto-output-${suffix}`,
+      artifacts: [{
+        role: "script_blueprint",
+        schemaVersion: "workloom.script/v1",
+        ref: `pg-auto/${suffix}/script.json`,
+        sha256: hash,
+        logicalHash: hash,
+        factsSnapshotHash: facts,
+        contentType: "application/json",
+      }],
+    });
+    const decided = await server.requestGate(scope, {
+      pipelineRunId: started.pipelineRunId,
+      nodeKey: "script",
+      idempotencyKey: `auto-gate-${suffix}`,
+      gateKey: "G1",
+      checkSetVersion: "pg-auto/v1",
+      artifactHashes: [output.artifacts[0]!.sha256],
+    });
+    expect(decided).toMatchObject({ executionStatus: "output_ready", verificationStatus: "passed", disposition: "continue" });
+    const projection = await server.readProjection(scope, started.pipelineRunId);
+    expect(projection?.nextAction).not.toBe("wait_approval");
+    const event = await owner.query<{ actor: string; policy_version: string }>(
+      `SELECT payload->>'actor' AS actor,payload->>'policyVersion' AS policy_version
+         FROM video_pipeline_events
+        WHERE tenant_id=$1 AND workspace_id=$2 AND pipeline_run_id=$3 AND kind='gate.auto_approved'`,
+      [scope.tenantId, scope.workspaceId, started.pipelineRunId],
+    );
+    expect(event.rows[0]).toEqual({ actor: "video-auto-approval", policy_version: "workloom.video-auto-approval/v1" });
   });
 });

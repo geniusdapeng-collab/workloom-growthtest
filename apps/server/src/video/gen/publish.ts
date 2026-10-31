@@ -2,7 +2,7 @@
  * video/gen/publish.ts —— 发布链（T-2026-0921-0002）
  *
  * 链路：成片入库 → 发布任务入队（G9 预检；公网发布必审基线，任务落 pending）→
- *      执行器复核 G9（review → pending_review 挂起，适配器不执行）→ 人审放行后由桌面端
+ *      执行器复核 G9（底层 runner 保留 pending_review 兼容能力，视频 router 默认将其交给系统自动审批）→ 桌面端
  *      Playwright 驱动真实上传（本进程以 dry-run 驱动验证机制；**不冒充真实发布**）。
  *
  * 演示与真实分明（不变量 9）：
