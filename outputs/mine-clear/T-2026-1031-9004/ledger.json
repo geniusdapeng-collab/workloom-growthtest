@@ -5,7 +5,7 @@
   "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
   "title": "AI 视频营销/通用数据管线 60 场景压测与修复",
   "created_at": "2026-10-31T04:00:26.711Z",
-  "updated_at": "2026-10-31T14:35:30.308Z",
+  "updated_at": "2026-10-31T14:36:58.472Z",
   "baseline": {
     "audit": {
       "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
@@ -16,7 +16,7 @@
       "notes": "本地 HEAD 不是 origin/main 最新（云端 6484e4f9 / 本地 67786d35）——按 §1.2 先对齐基线；工作树不干净（1 项未提交改动）：排雷结论只对已提交内容成立"
     },
     "repair": {
-      "commit": null,
+      "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91",
       "reverified_problem_ids": []
     },
     "acceptance": {
@@ -97,7 +97,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "叙事片携带营销 brief 时会被 vendor 改写成商业广告",
       "evidence": [
         {
@@ -139,7 +139,17 @@
               "packages/video-studio/src/studio.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-001-0-1793457416972.json",
+            "sha256": "07c95c6fc38c466154ce88c3d305b741716fc7a89ed506f9fc2d95d6e222ff3b",
+            "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91"
+          },
+          "evidence": {
+            "path": "evidence/MC-001-0-1793457416972.txt",
+            "sha256": "b14d0a2a04f6cf49d9b20d7b49d250e9317c856b97b229b74c9d658c1070700c",
+            "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91"
+          }
         },
         {
           "kind": "property",
@@ -154,15 +164,35 @@
               "outputs/mine-clear/T-2026-1031-9004/matrix"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-001-1-1793457417722.json",
+            "sha256": "b378e000d74068ecf3f02856c720c5de78272faccc9ed21091945352e7385881",
+            "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91"
+          },
+          "evidence": {
+            "path": "evidence/MC-001-1-1793457417722.txt",
+            "sha256": "2c7d1c1845704108e3af715cdf4c6b56c3bb1b7a71f9f735e15c8e004f8d7b21",
+            "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run packages/video-studio/src/pipeline-router.test.ts packages/video-studio/src/studio.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "审计发现来自 canary-n 被错误标记为商业广告。"
+      "notes": "审计发现来自 canary-n 被错误标记为商业广告。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:36:56.971Z",
+        "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91",
+        "finished_at": "2026-10-31T14:36:58.472Z"
+      }
     },
     {
       "id": "MC-002",
