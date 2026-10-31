@@ -157,7 +157,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "b890e94306cc0745f82f05afec9002f82c7050ee80699c922c4ba1dc1ff9e9e1",
+    "digest": "50d88e53b02bfbaa400ab9aeb0d320eafc99d905a6011d97df2fdcf038867568",
     "assets": {
       "connectors/connectors.json": "da242e8b9584c76bd95a5de798983fd6d8a401590f34944c64c5dd0eae86b863",
       "eval/questions.json": "072a979d79275ca4c57e84e59f9c802d802c9386fabc54fbc3af823e4589ce13",
@@ -185,7 +185,7 @@
       "presets/reconcile-agent.yml": "c9f854d64a1d297eb3643c5d7a61ed4b42c48a37d8c3bff23e0b2fabb0e7fc69",
       "presets/review-agent.yml": "cc1c6b087f7b1e593b3951f2d56565a3a8b820a221d4742bea82439740061834",
       "schemas/archive.schema.json": "fd35d52bee183ffc77652ba9c2e09b865ccc2148319d30bbb3f895adaf092991",
-      "schemas/objects.json": "c4963d1534cd120f2ad5ed85c2d35c9f943e8b8bbdd320b007d5b102400ff358",
+      "schemas/objects.json": "4def0f4ee97a6bcda624138f5ad57dde0b0d4bc3cad1f8db1d50bb830b8217f2",
       "schemas/stages.json": "a5ab6830c3c2bc22d7661f168c0a21447b675df2d65feb3a30eeb5c4acad9118",
       "segment-defaults.yml": "437e7df6f4ee30c906d4b7f4d2cbb86221b3c50851f35204857d4e55236ff049",
       "skills/ai-live-assistant/SKILL.md": "76db679a8a2eec3d6a90c9ef52b5ad28ed626e7ce6b8ff514d67cc0e2263b677",

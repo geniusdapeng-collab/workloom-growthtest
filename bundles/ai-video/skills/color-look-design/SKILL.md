@@ -1,6 +1,6 @@
 ---
 name: color-look-design
-description: 题材×场景→色调设计（调色师专业套件）：以 colorread.recipes 配方库为唯一选型来源，按题材/场景/平台定 profile、LUT 与强度，含情绪-色彩映射、平台适配、禁忌清单与"先校正后创作"的选型纪律。安装后被调色师调用；绑定围栏 G-COL0..G-COL4，卸载即撤销。
+description: 题材×场景→色调设计（调色师专业套件）：以 colorread.recipes 配方库为唯一选型来源，按题材/场景/平台定 profile、LUT 与强度，含情绪-色彩映射、平台适配、禁忌清单与"先校正后创作"的选型纪律。安装后被调色师调用；围栏由 colorist 岗位绑定 G-COL0..G-COL4，技能本身不单独授予。
 ---
 
 # 题材×场景调色设计

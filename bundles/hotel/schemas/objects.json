@@ -55,6 +55,11 @@
       "label": "发票账单"
     },
     {
+      "type": "payment",
+      "label": "支付流水",
+      "note": "订单收款、退款与渠道结算的支付事实；与 order 的履约状态、invoice 的票账状态分开记录"
+    },
+    {
       "type": "campaign",
       "label": "营销活动"
     },
