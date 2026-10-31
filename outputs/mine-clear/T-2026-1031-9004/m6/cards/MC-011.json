@@ -1,0 +1,58 @@
+{
+  "id": "MC-011",
+  "kind": "problem",
+  "level": "L3",
+  "severity": "P0",
+  "batch": 0,
+  "state": "open",
+  "title": "视频自动审批越过组合工作区边界，可放行 GEO 发布、评论与加投",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/auto-approval.ts:46@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "009e57c140346be5716619750cd7a2b00ac97c94eee24391a8017a5249d0945e",
+      "note": "视频动作判定把 publish/comment/ads/deal 等跨行业对象与动作前缀直接视为视频域。"
+    },
+    {
+      "type": "code",
+      "ref": "apps/server/src/runtime/thread-runner.ts:298@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "20d1402d96d02a1952f21307a2ede891265571803da9fa8d9bc7c718dd7a881b",
+      "note": "通用 Quest 只传语义 action 与对象，不传实际 tool 或 agents.meta.sourceBundleId；同名 GEO 岗位可进入视频策略。"
+    },
+    {
+      "type": "code",
+      "ref": "bundles/geo-growth/fences/geo-growth-baseline.yml:22@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "4a06d0a472be51a3e8922bc77e8834ef9f1f31e752b4ef3d345058ca908970c7",
+      "note": "GEO 基线仍要求公网发布、评论与投放相关动作按原围栏审批。"
+    }
+  ],
+  "root_cause": {
+    "file": "apps/server/src/video/auto-approval.ts",
+    "line": 46,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "isAiVideoAction"
+  },
+  "trigger_path": "组合工作区装配 geo-growth 主包与 ai-video 依赖包；同名 publish-operator/ads-optimizer 由 GEO 权威提供，Quest 步骤命中 G9/G12 后被视频 autoReview 转为 approved。",
+  "fix_plan": "自动审批按 agents.meta.sourceBundleId=ai-video、实际执行 tool 与显式视频门三重绑定；GEO 来源岗位保持 not_applicable，未登记来源 fail-closed。",
+  "blast_radius": "只收紧通用 Quest 的视频自动审批分支；AI 视频单包和由 ai-video 权威提供的岗位继续按显式门自动审批，GEO 原围栏不变。",
+  "conflict_paths": ["apps/server/src/runtime/thread-runner.ts", "apps/server/src/video/auto-approval.ts"],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "sourceBundleId=geo-growth 的 publish-operator/ads-optimizer 命中 G9/G12；sourceBundleId=ai-video 的同类视频岗位作负向对照",
+      "expect": "GEO 两项均为 not_applicable，AI 视频显式动作与门仍 approved",
+      "command": "vitest run --root apps/server src/video/auto-approval.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": ["run", "--root", "apps/server", "src/video/auto-approval.test.ts"]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run --root apps/server src/video/auto-approval.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "独立验收发现：视频授权可覆盖 GEO 的公网发布、评论和追加投放预算。"
+}

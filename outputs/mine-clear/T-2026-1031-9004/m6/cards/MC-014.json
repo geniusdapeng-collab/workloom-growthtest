@@ -1,0 +1,46 @@
+{
+  "id": "MC-014",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 0,
+  "state": "open",
+  "title": "VIDEO_AUTO_APPROVAL=0 时 explainer 仍用当前成员身份自动批准 draft",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/explainer/router.ts:438@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "146af7afdc6c3b90fd05803af42c93616bfde8eac1347b4d4b559fddf56b0949",
+      "note": "关闭自动审批后仍把 ctx.identity.memberNo 传给 approveRenderScript，且代码路径无需人类调用审批接口。"
+    }
+  ],
+  "root_cause": {
+    "file": "apps/server/src/video/explainer/router.ts",
+    "line": 443,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "explainer.submit"
+  },
+  "trigger_path": "设置 VIDEO_AUTO_APPROVAL=0 后调用 explainer.submit；新建 draft 被同一请求以当前成员身份批准并继续渲染。",
+  "fix_plan": "开关关闭时 submit 对 draft 返回可操作的前置条件错误；新增 video.explainer.approveScript 人工入口，只由当前成员显式调用后再次 submit。",
+  "blast_radius": "只影响回滚路径中的 explainer 脚本审批；默认自动审批路径不变，预算与准备段逻辑不变。",
+  "conflict_paths": ["apps/server/src/video/explainer/router.ts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "VIDEO_AUTO_APPROVAL=0，首次 submit 生成 draft",
+      "expect": "submit 拒绝且 approve 调用 0 次；调用 approveScript 后保存 approved，再 submit 才调用生成入口",
+      "command": "vitest run --root apps/server src/video/explainer/explainer.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": ["run", "--root", "apps/server", "src/video/explainer/explainer.test.ts"]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run --root apps/server src/video/explainer/explainer.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "本轮按产品所有者 2026-11-01 Codex/CLI 验收口径修复后端回滚入口；项目三端 UI 仍不在本轮放行范围。"
+}

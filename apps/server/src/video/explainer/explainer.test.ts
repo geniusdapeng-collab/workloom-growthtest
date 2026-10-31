@@ -453,6 +453,25 @@ describe("解说片 submit 路由不可变请求复放", () => {
     expect(create).toHaveBeenCalledTimes(1);
     expect(approve).toHaveBeenCalledTimes(1);
   });
+  it("关闭自动审批后 draft 不再冒充人工批准；必须由当前成员显式调用 approveScript", async () => {
+    const previous = process.env.VIDEO_AUTO_APPROVAL;
+    process.env.VIDEO_AUTO_APPROVAL = "0";
+    try {
+      await expect(caller.submit({ projectId: "project-ex" })).rejects.toThrow(/video\.explainer\.approveScript/);
+      expect(saved.status).toBe("draft");
+      expect(approve).not.toHaveBeenCalled();
+      await caller.approveScript({ projectId: "project-ex" });
+      expect(approve).toHaveBeenCalledWith(
+        expect.anything(), expect.anything(), scope, "explainer-shotbook", 1,
+        { by: "MEM-EX" },
+      );
+      await caller.submit({ projectId: "project-ex" });
+      expect(submit).toHaveBeenCalledTimes(1);
+    } finally {
+      if (previous === undefined) delete process.env.VIDEO_AUTO_APPROVAL;
+      else process.env.VIDEO_AUTO_APPROVAL = previous;
+    }
+  });
   it("另一清晰度仍在渲染时拒绝覆盖分镜的工程目录", async () => {
     renderJob.mockImplementation(async (_scope, key) => key === "explainer:shotbook:v3:uhd" ? { status: "running" } : null);
     await expect(caller.submit({ projectId: "project-ex" })).rejects.toThrow("仍在运行");

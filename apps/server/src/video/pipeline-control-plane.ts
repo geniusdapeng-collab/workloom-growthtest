@@ -16,6 +16,7 @@ import {
   type ArtifactVersion,
   type CompiledPipelinePlan,
   type GateDecision,
+  type GateAutoApprovalInput,
   type PipelineCommandReceipt,
   type PipelineEvent,
   type PipelineRepository,
@@ -675,12 +676,100 @@ export async function loadCompiledVideoPipeline(planKey: string): Promise<Compil
   return plan;
 }
 
+const AUTO_GATE_REQUIRED_OUTPUT: Readonly<Record<string, string>> = {
+  G1: "dossier",
+  G2: "theme",
+  G3: "insight",
+  G4: "prd",
+  G5: "portrait_set",
+  G6: "prompt_package",
+  G7: "video_project",
+  G8: "render_job",
+  G9: "publish_task",
+  G10: "comment_reply",
+  G12: "ads_campaign",
+  G15: "deal_order",
+};
+
+function normalizedGateKey(gateKey: string): string {
+  return gateKey
+    .replace(/^G1_DOSSIER$/u, "G1")
+    .replace(/^G2_THEME$/u, "G2")
+    .replace(/^G3_INSIGHT$/u, "G3")
+    .replace(/^G4_PRD$/u, "G4")
+    .replace(/^G5_PORTRAIT$/u, "G5")
+    .replace(/^G6_PROMPT$/u, "G6")
+    .replace(/^G7_FINAL$/u, "G7")
+    .replace(/^G10[a-d]?$/u, "G10");
+}
+
+/**
+ * 控制面自动通过必须绑定“门所属阶段 + 当前事实快照 + 阶段输出契约 + 具体门产物”。
+ * 仅凭 gateKey 命中白名单不能证明 G1/G5/G8 等门真的跑了质量检查。
+ */
+export function validatePipelineGateAutoApproval(input: GateAutoApprovalInput): {
+  valid: boolean;
+  reason: string;
+} {
+  const contract = input.run.plan.steps.find((step) => step.stageKey === input.stage.nodeKey);
+  if (!contract) return { valid: false, reason: `门阶段 ${input.stage.nodeKey} 不在当前计划中` };
+  const normalizedGate = normalizedGateKey(input.gateKey);
+  if (!contract.verify.gate || normalizedGateKey(contract.verify.gate) !== normalizedGate) {
+    return { valid: false, reason: `门 ${input.gateKey} 未声明在阶段 ${input.stage.nodeKey}` };
+  }
+  const requiredRole = AUTO_GATE_REQUIRED_OUTPUT[normalizedGate];
+  if (!requiredRole) return { valid: false, reason: `门 ${input.gateKey} 没有登记自动审批产物契约` };
+  const outputContract = contract.outputContract.find((output) => output.role === requiredRole);
+  if (!outputContract) {
+    return { valid: false, reason: `阶段 ${input.stage.nodeKey} 未声明 ${requiredRole} 输出` };
+  }
+  if (input.artifacts.some((artifact) => artifact.factsSnapshotHash !== input.run.factsSnapshotHash)) {
+    return { valid: false, reason: "门产物不是当前事实快照生成的版本" };
+  }
+  const evidence = input.artifacts.find((artifact) => artifact.role === requiredRole);
+  if (!evidence) return { valid: false, reason: `门 ${input.gateKey} 缺少 ${requiredRole} 门产物` };
+  if (evidence.schemaVersion !== outputContract.schema) {
+    return {
+      valid: false,
+      reason: `门 ${input.gateKey} 产物 schema 不符：${evidence.schemaVersion} != ${outputContract.schema}`,
+    };
+  }
+  return { valid: true, reason: `${requiredRole} 产物、schema 与事实快照均已绑定` };
+}
+
 export function getPipelineCoordinator(): PipelineCoordinator {
   if (!coordinator) {
     coordinator = new PipelineCoordinator(new PostgresPipelineRepository(), {
       resolvePlan: (planKey) => loadCompiledVideoPipeline(planKey),
       autoApproveGate: (input) => {
         if (!videoAutoApprovalEnabled() || !isVideoApprovalGate(input.gateKey)) return null;
+        const validation = validatePipelineGateAutoApproval(input);
+        if (!validation.valid) {
+          return {
+            decision: "unverified",
+            actor: VIDEO_AUTO_APPROVAL_ACTOR_ID,
+            policyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+            reason: `控制面自动审批证据不足：${validation.reason}`,
+            issues: [validation.reason],
+            findings: [{
+              code: "AUTO_GATE_EVIDENCE_INVALID",
+              severity: "P1",
+              targetType: "stage",
+              targetId: input.stage.id,
+              fieldPath: "artifacts",
+              expected: "当前事实快照下的契约产物",
+              actual: input.artifacts.map((artifact) => ({
+                role: artifact.role,
+                schemaVersion: artifact.schemaVersion,
+                factsSnapshotHash: artifact.factsSnapshotHash,
+              })),
+              evidenceRefs: input.artifactHashes,
+              repairClass: "no_repair",
+              blocking: true,
+            }],
+            evidenceHashes: input.artifactHashes,
+          };
+        }
         return {
           decision: "passed",
           actor: VIDEO_AUTO_APPROVAL_ACTOR_ID,

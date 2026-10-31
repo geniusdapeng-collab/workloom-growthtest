@@ -1,0 +1,46 @@
+{
+  "id": "MC-015",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P2",
+  "batch": 1,
+  "state": "open",
+  "title": "控制面自动通过只校验 gateKey，不校验当前阶段的真实门产物",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/pipeline-control-plane.ts:682@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "41ce0e6c749bcff3d1a81311944c3f48b5a1b3de88172a9d01294c57fa1f42ee",
+      "note": "autoApproveGate 只检查开关与 isVideoApprovalGate(gateKey)，随后无条件写 passed 并回填 artifact hash。"
+    }
+  ],
+  "root_cause": {
+    "file": "apps/server/src/video/pipeline-control-plane.ts",
+    "line": 682,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "getPipelineCoordinator.autoApproveGate"
+  },
+  "trigger_path": "任何请求只要 gateKey 命中 G1/G5/G8 白名单，即使产物角色、schema 或事实快照不属于该门，也会被控制面自动写 passed。",
+  "fix_plan": "把当前阶段产物传入自动审批；校验门声明在阶段、门对应产物角色、产物 schema、factsSnapshotHash 与当前 run 一致；不成立时写 unverified 和结构化 finding。",
+  "blast_radius": "只影响控制面自动通过；人工 GateDecision 与影子观察保留原状态机。控制面仍为影子模式，不接管真实出片。",
+  "conflict_paths": ["packages/video-studio/src/pipeline-control-plane/coordinator.ts", "apps/server/src/video/pipeline-control-plane.ts"],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "G1 门产物分别使用正确 dossier、错误 role、旧 factsSnapshotHash、错误 schema，以及门未声明在阶段",
+      "expect": "只有完整匹配才 valid；其余均失败关闭并给出具体原因",
+      "command": "vitest run --root apps/server src/video/pipeline-auto-approval.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": ["run", "--root", "apps/server", "src/video/pipeline-auto-approval.test.ts"]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run --root apps/server src/video/pipeline-auto-approval.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "当前控制面仍为影子模式，本卡按未来接管真实出片前的硬闸修复。"
+}

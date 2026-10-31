@@ -53,6 +53,10 @@ describe("生产入口正常可达且不能覆盖已审核请求", () => {
       qualificationToken: "test-token", modelId: "doubao-seedance-2-5", mode: "manual", durationProvenance: { source: "script-fields", planSeconds: 5, requestedSeconds: 5, mismatchSeconds: 0, strict: true } }));
     expect(d.autoApproveScript).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(),
       "qualified:PQ-1", 1, { by: "video-auto-approval", policyVersion: "workloom.video-auto-approval/v1" });
+    expect(d.judge.mock.calls[0]![0].context).toMatchObject({
+      project_compute_used: 0,
+      project_compute_cap: Number.MAX_SAFE_INTEGER,
+    });
   });
   it("没有token的旧CMS approved直提在查脚本/供应商之前拒绝", async () => {
     await expect(caller().render.submit({ scriptId: "RS-handmade", mode: "auto" })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
@@ -84,6 +88,20 @@ describe("生产入口正常可达且不能覆盖已审核请求", () => {
     await expect(caller().render.submit({ qualificationToken: "test-token" })).resolves.toMatchObject({ jobId: "RJ-1" });
     expect(d.judge.mock.calls[0]![0].context.render_auto).toBe(true);
     expect(d.submit).toHaveBeenCalledTimes(1);
+  });
+  it("G11 使用项目真实非 mock 算力用量，达到上限时确定性停止提交", async () => {
+    vi.stubEnv("WORKLOOM_PROJECT_COMPUTE_CAP", "5");
+    d.query.mockImplementation(async (sql: string) => {
+      if (sql.includes("FROM render_jobs")) return { rows: [{ used: "5" }], rowCount: 1 };
+      return { rows: [], rowCount: 0 };
+    });
+    await expect(caller().render.submit({ qualificationToken: "test-token" }))
+      .rejects.toThrow("G11 项目算力预算已用尽（5/5 秒）");
+    expect(d.judge.mock.calls[0]![0].context).toMatchObject({
+      project_compute_used: 5,
+      project_compute_cap: 5,
+    });
+    expect(d.submit).not.toHaveBeenCalled();
   });
   it.each(["block", "budget", "cost"])("%s 不允许新外部动作", async kind => {
     if (kind === "block") d.judge.mockReturnValue({ level: "block", impacts: [], triggeredBy: ["G8"] });

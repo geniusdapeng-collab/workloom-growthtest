@@ -767,7 +767,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "a76771a4f09a940f308ffeebae420daf651b7213f05adb6b919d5d970beecdff",
+    "digest": "799d6964d46d90b83d9148468c763eaf9747585c697a8d593376525913356a26",
     "assets": {
       "connectors/bgm-bridge/audio-stems-trust.mjs": "701b20e1705b16b026be2900bb49430ef875c8f01f83515f297a5b0b9a50cf93",
       "connectors/bgm-bridge/audio-stems.mjs": "d83bc554f015115ed0f4ea71ac6ced4cf5bd8f44d61094489776e3d2a5ffa751",
@@ -826,7 +826,7 @@
       "connectors/subtitle-bridge/server-adapter.mts": "f09160b620a5f96cf61480e855c758a773280c1399ecb25035bc342bf3a52f04",
       "connectors/subtitle-bridge/server.mjs": "77be6773cb3f5a25ea4ff191f4971684fe0f7026de92c4d7b39e7b2e800bf839",
       "eval/questions.json": "98a0c74488f28f7be090d768243d38680c75a79ce82ffeb3fdeb6fd8050bbe94",
-      "fences/ai-video-baseline.yml": "3d4aa78bff9458972abff4173cd4cc685461b56dc731aea5d7b0aab1be86580b",
+      "fences/ai-video-baseline.yml": "125db6a21ae797f089c1f84a83e383c8c2886653a4869d9de39df8dc64def3d7",
       "fences/ai-video-bgm.yml": "274d498e5fee1f86bb52fdda706995059a733443a4a6ba86e9b48433c5d3804a",
       "fences/ai-video-cine-kb.yml": "93e9b8fb8b812e29892b2889a66777c2ee6335ac4fbd11fe841007df651730e6",
       "fences/ai-video-color.yml": "290b85774fe48c9122c53d28a7716446f4a77eb48c82bfe8fb1edf934850f08e",

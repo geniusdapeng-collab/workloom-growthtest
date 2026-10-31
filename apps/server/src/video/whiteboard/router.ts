@@ -643,7 +643,10 @@ export const whiteboardRouter = router({
           capLongEdge, resolution: quality === "uhd" ? "3840x2160" : null },
         context: { render_auto: renderSubmitAutoAllowed() },
       }, rules, "review");
-      const autoReview = autoApproveVideoFence(rawVerdict);
+      const autoReview = autoApproveVideoFence(rawVerdict, {
+        scope: "ai-video",
+        allowDefaultReview: true,
+      });
       const verdict = autoReview.verdict;
       if (verdict.level === "block") {
         throw new TRPCError({
