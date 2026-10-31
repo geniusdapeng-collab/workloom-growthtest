@@ -47,7 +47,11 @@
       "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
       "exec": {
         "file": "node_modules/.bin/tsx",
-        "args": ["scripts/tools/ai-video-stress-matrix.mts"]
+        "args": [
+          "scripts/tools/ai-video-stress-matrix.mts",
+          "--out",
+          "outputs/mine-clear/T-2026-1031-9004/matrix"
+        ]
       },
       "last_result": "not-run"
     }

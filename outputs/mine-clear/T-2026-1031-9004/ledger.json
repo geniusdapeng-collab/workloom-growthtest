@@ -5,7 +5,7 @@
   "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
   "title": "AI 视频营销/通用数据管线 60 场景压测与修复",
   "created_at": "2026-10-31T04:00:26.711Z",
-  "updated_at": "2026-10-31T14:30:40.562Z",
+  "updated_at": "2026-10-31T14:35:30.308Z",
   "baseline": {
     "audit": {
       "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
@@ -149,7 +149,9 @@
           "exec": {
             "file": "node_modules/.bin/tsx",
             "args": [
-              "scripts/tools/ai-video-stress-matrix.mts"
+              "scripts/tools/ai-video-stress-matrix.mts",
+              "--out",
+              "outputs/mine-clear/T-2026-1031-9004/matrix"
             ]
           },
           "last_result": "not-run"
@@ -330,7 +332,9 @@
           "exec": {
             "file": "node_modules/.bin/tsx",
             "args": [
-              "scripts/tools/ai-video-stress-matrix.mts"
+              "scripts/tools/ai-video-stress-matrix.mts",
+              "--out",
+              "outputs/mine-clear/T-2026-1031-9004/matrix"
             ]
           },
           "last_result": "not-run"
@@ -503,7 +507,9 @@
           "exec": {
             "file": "node_modules/.bin/tsx",
             "args": [
-              "scripts/tools/ai-video-stress-matrix.mts"
+              "scripts/tools/ai-video-stress-matrix.mts",
+              "--out",
+              "outputs/mine-clear/T-2026-1031-9004/matrix"
             ]
           },
           "last_result": "not-run"
