@@ -1,0 +1,44 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "regression-suite-geo-26271-1793461612821-e082191b",
+  "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"suite:geo\"",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "suite:geo"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "regression-suite:geo",
+    "commandName": "suite:geo",
+    "kind": "regression",
+    "environmentKind": "local-preview",
+    "executorCommit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+  },
+  "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:46:48.702Z",
+  "finished_at": "2026-10-31T15:46:52.821Z",
+  "exit_code": 1,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "fail",
+  "outputs": [
+    {
+      "path": "execution/regression-suite-geo-26271-1793461612821-e082191b.log",
+      "sha256": "ac17dc8dd75dc150536fb1a33c85038258eb7db03d00a43e76b7b99ea25db566",
+      "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+    },
+    {
+      "path": "execution/regression-suite-geo-26271-1793461612821-e082191b-command.json",
+      "sha256": "89c75b801c128da1239498f3734d310de91fbc72402dc21d1aff1054b99ac6a0",
+      "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+    }
+  ]
+}

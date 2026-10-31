@@ -1,0 +1,93 @@
+{
+ "at": "2026-10-31T15:46:59.242Z",
+ "repo": "geniusdapeng-collab/workloom-growthtest",
+ "productName": "WorkLoom 获客增长系统（实验车道）",
+ "head": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16",
+ "branch": "main",
+ "dataMode": "simulated",
+ "llmProvider": "mock",
+ "verdict": "未验证（L=未验证 / U=未验证 / O=未验证 / P=未验证；证据不完整）",
+ "status": "unverified",
+ "reportGenerated": true,
+ "acceptancePassed": false,
+ "validationErrors": [
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/matrix/matrix-summary.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/ui/ui-probe.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/experience/experience-report.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/ux/ux-report.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/outcome/outcome-report.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/autonomy/autonomy-report.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/redteam/redteam-report.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/soak/soak-report.json",
+  "缺文件：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/live/live-report.json",
+  "缺有效 evidence-index（完整 commit + 实际运行记录）",
+  "regression/summary.json 必须含 path/sha256/commit，裸路径不是执行证据",
+  "regression/summary.json 不属于任何实际执行输出",
+  "被测源码有未提交改动，完整 commit 不能代表实际执行代码",
+  "L 矩阵缺非零岗位/技能样本（0/0 不能通过）",
+  "L 页面域缺非零路由样本",
+  "缺体验走查检查结果",
+  "U 域缺检查结果，空 checks 不能通过",
+  "O 域缺真实任务尝试样本",
+  "ADR 缺非零交付样本",
+  "红队缺实际用例",
+  "长跑缺实际采样",
+  "P.budget-summary 必须含 path/sha256/commit，裸路径不是执行证据",
+  "P.budget-summary 文件未绑定到通过的实际生产执行",
+  "P.budget-ledger 必须含 path/sha256/commit，裸路径不是执行证据",
+  "P.budget-ledger 文件未绑定到通过的实际生产执行",
+  "P 域没有真实客户端/部署环境实测（缺输入/预览/自检均未验证）",
+  "P 域 fingerprint commit 未知或与验收 HEAD 不同",
+  "P 域缺通过的实际目标探测",
+  "P 域未有就绪真实模型清单",
+  "P 域零任务：生产能力未验证",
+  "U/体验检查必须逐项有 ID/name 和实际 pass 布尔值",
+  "O 域 LLM provider 为替身/未知：真实业务能力未验证"
+ ],
+ "failedStages": [],
+ "layers": {
+  "L": "未验证",
+  "U": "未验证",
+  "O": "未验证",
+  "P": "未验证"
+ },
+ "redLines": [],
+ "coverage": {
+  "items": 276,
+  "byStatus": {
+   "unverified": 276
+  },
+  "byTier": {
+   "T2": {
+    "total": 201,
+    "pass": 0,
+    "fail": 0,
+    "notRun": 201,
+    "manualMissing": 0,
+    "unverified": 201,
+    "notApplicable": 0
+   },
+   "T1": {
+    "total": 52,
+    "pass": 0,
+    "fail": 0,
+    "notRun": 52,
+    "manualMissing": 0,
+    "unverified": 52,
+    "notApplicable": 0
+   },
+   "T3": {
+    "total": 23,
+    "pass": 0,
+    "fail": 0,
+    "notRun": 23,
+    "manualMissing": 0,
+    "unverified": 23,
+    "notApplicable": 0
+   }
+  }
+ },
+ "adr": null,
+ "live": null,
+ "report": "./outputs/acceptance/REPORT.md"
+}

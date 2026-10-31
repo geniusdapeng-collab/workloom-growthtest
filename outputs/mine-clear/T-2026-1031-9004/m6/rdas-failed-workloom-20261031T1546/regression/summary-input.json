@@ -1,0 +1,13 @@
+{
+  "schema": "workloom.acceptance-regression-input/v1",
+  "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16",
+  "required": [
+    "suite",
+    "suite:hotel",
+    "suite:geo",
+    "db:verify-chain",
+    "typecheck",
+    "release:gate"
+  ],
+  "executions": {}
+}
