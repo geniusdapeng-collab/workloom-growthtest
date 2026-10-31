@@ -122,13 +122,17 @@ async function emitInTx(
   objectType: string,
   objectId: string,
   decision: Record<string, unknown>,
-  opts: { receipt?: { synced: boolean; snapshot_uri?: string; verified_at?: string } } = {},
+  opts: {
+    receipt?: { synced: boolean; snapshot_uri?: string; verified_at?: string };
+    actor?: { id: string; type: "system" };
+  } = {},
 ): Promise<string> {
+  const actor = opts.actor ?? { id: "comment-operator", type: "system" as const };
   const r = await gatewayAppendOnClient(client, {
     tenantId: scope.tenantId, workspaceId: scope.workspaceId,
-    actor: { id: "comment-operator", type: "system" },
+    actor,
   }, {
-    who: { type: "system", id: "comment-operator" },
+    who: actor,
     context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },
     object: { type: objectType, id: objectId },
     decision: decision as never,
@@ -333,7 +337,10 @@ export async function processComment(
         candidate: candidate ?? null, sendFailed,
       },
       basis: [effective.reason],
-    }, receipt ? { receipt: { synced: receipt.synced, snapshot_uri: receipt.evidenceUri, verified_at: new Date().toISOString() } } : {});
+    }, {
+      ...(receipt ? { receipt: { synced: receipt.synced, snapshot_uri: receipt.evidenceUri, verified_at: new Date().toISOString() } } : {}),
+      ...(autoApproved ? { actor: { id: "video-auto-approval", type: "system" as const } } : {}),
+    });
     // 危机/敏感词附带告警事件（G10：review+alert / block+alert）
     if (effective.alert) {
       await emitInTx(client, scope, "comment_reply", commentId, {

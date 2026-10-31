@@ -179,7 +179,13 @@ describe("G10 三级分流矩阵", () => {
     expect(sender.sent.length).toBe(1);
     expect(db.comments[0]!.status).toBe("replied");
     expect(db.replies[0]!.status).toBe("sent");
-    expect(db.events.some((e) => e.payload.decision.action === "comment.replied" && e.payload.decision.after.autoApproved === true)).toBe(true);
+    const replied = db.events.find((e) => e.payload.decision.action === "comment.replied");
+    expect(replied).toMatchObject({
+      payload: {
+        who: { type: "system", id: "video-auto-approval" },
+        decision: { after: { autoApproved: true, qualityRouteLevel: "review" } },
+      },
+    });
   });
 
   it("危机（LLM crisis）→ 质量分流 review + 告警保留，系统自动审批后外发", async () => {

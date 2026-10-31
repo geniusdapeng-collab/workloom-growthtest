@@ -62,7 +62,7 @@ function artifact(factsSnapshotHash = FACTS) {
   };
 }
 
-function coordinator(): PipelineCoordinator {
+function coordinator(options: { autoApproveGate?: boolean } = {}): PipelineCoordinator {
   const sequence = new Map<string, () => string>();
   const id = (prefix: string) => (sequence.get(prefix) ?? sequence.set(prefix, ids(prefix)).get(prefix)!);
   return new PipelineCoordinator(new InMemoryPipelineRepository(), {
@@ -74,12 +74,14 @@ function coordinator(): PipelineCoordinator {
       gateDecisionId: id("GD"),
       eventId: id("EV"),
     },
-    autoApproveGate: () => ({
-      decision: "passed",
-      actor: "video-auto-approval",
-      policyVersion: "workloom.video-auto-approval/v1",
-      reason: "test auto approval after quality review",
-      evidenceHashes: ["a".repeat(64)],
+    ...(options.autoApproveGate === false ? {} : {
+      autoApproveGate: () => ({
+        decision: "passed" as const,
+        actor: "video-auto-approval",
+        policyVersion: "workloom.video-auto-approval/v1",
+        reason: "test auto approval after quality review",
+        evidenceHashes: ["a".repeat(64)],
+      }),
     }),
   });
 }
@@ -330,6 +332,45 @@ describe("PipelineCoordinator", () => {
     const projection = await c.readProjection(SCOPE, started.pipelineRunId);
     expect(projection?.nextAction).toBe("run_node");
     expect(projection?.blocker).toBeNull();
+  });
+
+  it("keeps the legacy human wait when the auto-approval policy is disabled", async () => {
+    const c = coordinator({ autoApproveGate: false });
+    const plan = testPlan();
+    const started = await c.startCompiledPipeline(SCOPE, plan, {
+      projectId: "VID-HUMAN-ROLLBACK",
+      planKey: plan.pipelineKey,
+      factsSnapshotHash: FACTS,
+      budgetGrantId: null,
+      expectedProjectRevision: 0,
+      idempotencyKey: "start-human-rollback",
+      createdBy: "test",
+      sourceSystem: "unit",
+      sourceRunId: "run-human-rollback",
+    });
+    await c.beginStage(SCOPE, {
+      pipelineRunId: started.pipelineRunId,
+      nodeKey: "script",
+      idempotencyKey: "begin-human-rollback",
+    });
+    const output = await c.recordStageOutput(SCOPE, {
+      pipelineRunId: started.pipelineRunId,
+      nodeKey: "script",
+      idempotencyKey: "output-human-rollback",
+      artifacts: [artifact()],
+    });
+    const waiting = await c.requestGate(SCOPE, {
+      pipelineRunId: started.pipelineRunId,
+      nodeKey: "script",
+      idempotencyKey: "request-human-rollback",
+      gateKey: "G1",
+      checkSetVersion: "v1",
+      artifactHashes: [output.artifacts[0]!.sha256],
+    });
+    expect(waiting.verificationStatus).toBe("pending");
+    const projection = await c.readProjection(SCOPE, started.pipelineRunId);
+    expect(projection?.nextAction).toBe("wait_approval");
+    expect(projection?.blocker?.kind).toBe("approval");
   });
 
   it("rejects invalid state jumps", () => {

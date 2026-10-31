@@ -42,9 +42,8 @@ export function isAiVideoPreset(presetKey: string): boolean {
     || existsSync(path.join(VIDEO_PRESET_DIR, `${presetKey}.yaml`));
 }
 
-/** 视频动作的显式作用域；用于没有 preset_key 的评论、发布、渲染和商单入口。 */
+/** 视频动作/对象是否具有显式作用域；岗位归属只在确认门能够证明视频范围时参与判断。 */
 export function isAiVideoAction(input: { action: string; objectType?: string; presetKey?: string }): boolean {
-  if (input.presetKey && isAiVideoPreset(input.presetKey)) return true;
   if (input.objectType === "video_project" || input.objectType === "render_script"
     || input.objectType === "publish_task" || input.objectType === "comment_reply"
     || input.objectType === "ads_campaign" || input.objectType === "budget_ledger"
@@ -72,11 +71,19 @@ export function videoAutoReviewPolicy(input: {
   reviewRuleIds?: string[];
   env?: NodeJS.ProcessEnv;
 }): AutoReviewPolicyResult {
-  if (!videoAutoApprovalEnabled(input.env) || !isAiVideoAction(input)) return { status: "not_applicable" };
-  if ((input.reviewRuleIds?.length ?? 0) > 0
-    && input.reviewRuleIds!.some((ruleId) => !isVideoApprovalGate(ruleId))) {
+  if (!videoAutoApprovalEnabled(input.env)) return { status: "not_applicable" };
+  const reviewRuleIds = input.reviewRuleIds ?? [];
+  const hasReviewRules = reviewRuleIds.length > 0;
+  if (hasReviewRules && reviewRuleIds.some((ruleId) => !isVideoApprovalGate(ruleId))) {
     return { status: "not_applicable" };
   }
+  /**
+   * 视频岗位本身不能证明动作属于视频域：同一岗位可能执行通用复盘、素材整理等
+   * default-review 步骤。只有显式视频动作/对象，或命中已登记的视频确认门时才生效。
+   */
+  const videoPreset = Boolean(input.presetKey && isAiVideoPreset(input.presetKey));
+  const videoGate = hasReviewRules && reviewRuleIds.every(isVideoApprovalGate);
+  if (!isAiVideoAction(input) && !(videoPreset && videoGate)) return { status: "not_applicable" };
   return {
     status: "approved",
     actorId: VIDEO_AUTO_APPROVAL_ACTOR_ID,
@@ -94,7 +101,15 @@ export function autoApproveVideoFence<T extends JudgeVerdict>(
   verdict: T,
   env: NodeJS.ProcessEnv = process.env,
 ): { verdict: T; autoApproved: boolean } {
-  if (verdict.level !== "review" || !videoAutoApprovalEnabled(env)) {
+  /**
+   * 只转换可自动审批门触发的 review。质量/许可类 review 必须保持原级，
+   * 否则带 G-DLV5/G-BGM1 等规则的 render.submit 会在直连路由里绕过其人工裁决。
+   * 围栏求值异常也不得被系统审批掩盖。
+   */
+  const hasProtectedReview = (verdict.impacts ?? []).some((impact) =>
+    impact.result === "review" && !isVideoApprovalGate(impact.rule_id));
+  if (verdict.level !== "review" || (verdict.evalErrors?.length ?? 0) > 0
+    || hasProtectedReview || !videoAutoApprovalEnabled(env)) {
     return { verdict, autoApproved: false };
   }
   return {
