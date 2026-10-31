@@ -1,0 +1,37 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-001-0-1793458448723",
+  "command": "vitest run pipeline-router.test.ts studio.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/pipeline-router.test.ts",
+      "packages/video-studio/src/studio.test.ts"
+    ]
+  },
+  "actor": "codex-acceptance-v2-01a19273",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-001",
+    "assertion_index": 0
+  },
+  "commit": "8c57de7ba748a8b5a3a4ede39d0a6115571e5d41",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T14:54:08.723Z",
+  "finished_at": "2026-10-31T14:54:08.833Z",
+  "exit_code": 127,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "fail",
+  "outputs": [
+    {
+      "path": "evidence/MC-001-0-1793458448723.txt",
+      "sha256": "2e53a692ca78f5479f34c737ca23fae8d2e0f35fafdee3e22a2ab4672037cb67",
+      "commit": "8c57de7ba748a8b5a3a4ede39d0a6115571e5d41"
+    }
+  ]
+}

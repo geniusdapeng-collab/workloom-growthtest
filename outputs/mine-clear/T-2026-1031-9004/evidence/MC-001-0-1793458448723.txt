@@ -1,0 +1,5 @@
+
+node_modules/.bin/vitest: line 53: exec: node: not found
+
+exit_code=127 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}
