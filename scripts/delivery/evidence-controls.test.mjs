@@ -152,6 +152,9 @@ test("G01 explicit repair and acceptance can run consecutively with a tracked MC
   assert.equal(cli(mcd, f.dir, [...args, "--actor", "repair-session", "--role", "repair"]).status, 0);
   assert.equal(cli(mcd, f.dir, [...args, "--actor", "independent-session", "--role", "acceptance"]).status, 0);
   assert.equal(JSON.parse(readFileSync(f.ledgerPath, "utf8")).cards[0].state, "verified");
+  git(f.dir, ["add", "-f", relative(f.dir, f.ledgerPath)]);
+  git(f.dir, ["commit", "-qm", "record independent acceptance"]);
+  assert.equal(cli(mcd, f.dir, ["gate", "--ledger", f.ledgerPath, "--repo", f.dir]).status, 0);
 });
 test("G01 tracked MCD artifact mutations never dirty the tested source revision", () => {
   const f = fixture();
