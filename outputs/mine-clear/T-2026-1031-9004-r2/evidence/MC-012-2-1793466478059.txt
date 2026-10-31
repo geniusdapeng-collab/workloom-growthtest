@@ -1,0 +1,17 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/apps/server
+
+
+ Test Files  2 passed (2)
+      Tests  73 passed | 1 skipped (74)
+   Start at  01:07:58
+   Duration  1.91s (transform 1.01s, setup 0ms, import 1.51s, tests 226ms, environment 0ms)
+
+
+字幕条: 11  总时长: 88.0s  建议场景: 3
+  幕 1     0.0-  32.1s (32.1s, 字幕1-4): 做过生意的人都懂这三笔账：流量越来越贵，询盘接不住，利润被平台抽走。 还有一笔正
+  幕 2    32.4-  64.0s (31.6s, 字幕5-8): WorkLoom 是系统化班组：老板一句话，系统自动分工、协作、交付。 它交付的
+  幕 3    64.3-  88.0s (23.7s, 字幕9-11): 断点档案让超长链路永不白跑，媒资库让素材越攒越值钱。 围栏治理、人审、事件账本，
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}
