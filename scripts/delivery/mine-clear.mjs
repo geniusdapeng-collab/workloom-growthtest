@@ -594,7 +594,7 @@ function commandRunAssertions() {
   if (!actor || !["repair", "acceptance"].includes(role)) die("需要 --actor 与 --role repair|acceptance", 2);
   const timeoutMs = Number(arg("--timeout-ms", "60000"));
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 3_600_000) die("--timeout-ms 必须为 1–3600000", 2);
-  const revision = revisionOf(context.repoRoot);
+  const revision = revisionOf(context.repoRoot, { ignorePaths: [context.artifactRoot] });
   if (revision.dirty) die("断言执行前必须提交被测源码", 1);
   if (!isAncestor(context.repoRoot, ledger.baseline?.audit?.commit, revision.commit)) die("当前 HEAD 不包含审计基线", 1);
   if (role === "acceptance") {

@@ -72,7 +72,11 @@ export function resolveCommit(repoRoot, value) {
 }
 
 function pathInside(candidate, root) {
-  const rel = relative(resolve(root), resolve(candidate));
+  const canonical = (value) => {
+    try { return realpathSync(value); }
+    catch { return resolve(value); }
+  };
+  const rel = relative(canonical(root), canonical(candidate));
   return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 }
 

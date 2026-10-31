@@ -141,6 +141,18 @@ test("G01 explicit runner captures repair and independent acceptance from actual
   assert.equal(cli(mcd, f.dir, ["gate", "--ledger", f.ledgerPath, "--repo", f.dir]).status, 0);
   const acceptedRun = JSON.parse(readFileSync(join(f.root, ledger.cards[0].assertions[0].run.path))); assert.equal(acceptedRun.actor, "independent-session"); assert.equal(acceptedRun.role, "acceptance");
 });
+test("G01 explicit repair and acceptance can run consecutively with a tracked MCD ledger", () => {
+  const f = mcdFixture();
+  f.ledger.cards[0].state = "open";
+  f.ledger.cards[0].assertions[0].last_result = "not-run";
+  json(f.ledgerPath, f.ledger);
+  git(f.dir, ["add", "-f", relative(f.dir, f.ledgerPath)]);
+  git(f.dir, ["commit", "-qm", "track MCD ledger fixture"]);
+  const args = ["run-assertions", "--ledger", f.ledgerPath, "--card", f.card.id, "--repo", f.dir];
+  assert.equal(cli(mcd, f.dir, [...args, "--actor", "repair-session", "--role", "repair"]).status, 0);
+  assert.equal(cli(mcd, f.dir, [...args, "--actor", "independent-session", "--role", "acceptance"]).status, 0);
+  assert.equal(JSON.parse(readFileSync(f.ledgerPath, "utf8")).cards[0].state, "verified");
+});
 test("G01 tracked MCD artifact mutations never dirty the tested source revision", () => {
   const f = fixture();
   const trackedLedger = join(f.root, "ledger.json");
