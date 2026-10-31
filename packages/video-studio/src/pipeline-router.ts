@@ -556,6 +556,8 @@ export function applyRouteToMetadata(
     delete next.dataMining;
     delete brief.product;
     delete brief.products;
+    // 保留时长/画幅/平台等需求口径供 G3/PRD 消费；vendor 的主题入口由
+    // installVendorDiscoveryNarrativeBridge 在运行时屏蔽营销语义。
     if (Object.keys(brief).length > 0) next.brief = brief;
     else delete next.brief;
     next.pipelineRoute = { kind: "narrative", via: decision.via, confidence: decision.confidence };
@@ -600,6 +602,69 @@ export interface PipelineIntentProfile {
   aspectRatio?: string;
   platform?: string;
   goal?: string;
+}
+
+export type PipelineRequestErrorCode =
+  | "INTENT_REQUIRED"
+  | "PRODUCT_INVALID"
+  | "DURATION_INVALID"
+  | "ASPECT_INVALID";
+
+export class PipelineRequestError extends Error {
+  constructor(readonly code: PipelineRequestErrorCode, message: string) {
+    super(`${code}: ${message}`);
+    this.name = "PipelineRequestError";
+  }
+}
+
+export interface PipelineRequestInput {
+  intent?: string;
+  product?: string;
+  durationSec?: number;
+  aspectRatio?: string;
+  platform?: string;
+  goal?: string;
+}
+
+/**
+ * 预生产请求的确定性入口闸。CLI/API 可以在分流前复用同一口径，
+ * 避免 0/-5/9999 秒或注入式商品名被下游默认值悄悄吞掉。
+ */
+export function validatePipelineRequest(input: PipelineRequestInput): Required<Pick<PipelineRequestInput, "intent">> & PipelineRequestInput {
+  const intent = String(input.intent ?? "").trim();
+  if (!intent) throw new PipelineRequestError("INTENT_REQUIRED", "请描述要制作的视频");
+
+  const product = String(input.product ?? "").trim();
+  if (product && (product.length > 160 || /[\u0000-\u001f<>\\/]|\.\./u.test(product))) {
+    throw new PipelineRequestError("PRODUCT_INVALID", "商品名包含路径、控制字符或 HTML 标记");
+  }
+
+  if (input.durationSec !== undefined) {
+    const duration = Number(input.durationSec);
+    if (!Number.isInteger(duration) || duration < 1 || duration > 300) {
+      throw new PipelineRequestError("DURATION_INVALID", "总时长必须是 1–300 秒之间的整数");
+    }
+  }
+
+  const aspect = String(input.aspectRatio ?? "").trim();
+  if (input.aspectRatio !== undefined) {
+    const match = /^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/u.exec(aspect);
+    const width = Number(match?.[1]);
+    const height = Number(match?.[2]);
+    if (!match || !Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0
+      || width / height > 10 || height / width > 10) {
+      throw new PipelineRequestError("ASPECT_INVALID", `画幅必须是有界宽高比，收到 ${aspect || "空值"}`);
+    }
+  }
+
+  return {
+    intent,
+    ...(product ? { product } : {}),
+    ...(input.durationSec !== undefined ? { durationSec: Number(input.durationSec) } : {}),
+    ...(aspect ? { aspectRatio: aspect } : {}),
+    ...(input.platform ? { platform: input.platform } : {}),
+    ...(input.goal ? { goal: input.goal } : {}),
+  };
 }
 
 /**

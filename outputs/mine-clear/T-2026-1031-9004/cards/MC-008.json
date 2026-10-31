@@ -1,0 +1,46 @@
+{
+  "id": "MC-008",
+  "kind": "problem",
+  "level": "L4",
+  "severity": "P2",
+  "batch": 3,
+  "state": "open",
+  "title": "video-doctor 把不存在的默认曲库根判成路径监狱失败",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/tools/video-doctor.mts:99@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "fe58e2842518406919a26bfde28c30ed695bde1604cd8c70b232316aaae7faf0",
+      "note": "白名单集合只纳入实际存在的 home 目录，但 outside 判定遍历全部注册曲库根，包括不存在的 ~/.workloom-bgm/library。"
+    }
+  ],
+  "root_cause": {
+    "file": "scripts/tools/video-doctor.mts",
+    "line": 99,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "bgm-library-jail"
+  },
+  "trigger_path": "本机只有随仓精选曲库、没有 ~/.workloom-bgm；doctor 仍报告该不存在根不在白名单并 exit 1。",
+  "fix_plan": "仅对实际存在的曲库根做路径监狱判定；不存在按未安装处理，不制造失败。",
+  "blast_radius": "只影响环境自检误报，不放宽 bgm-bridge 的真实路径监狱。",
+  "conflict_paths": ["bundles/ai-video/connectors/bgm-bridge/core.mjs"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "~/.workloom-bgm 不存在，随仓精选曲库存在",
+      "expect": "video-doctor 的 bgm-library-jail 通过且命令 exit 0",
+      "command": "tsx scripts/tools/video-doctor.mts",
+      "exec": {
+        "file": "node_modules/.bin/tsx",
+        "args": ["scripts/tools/video-doctor.mts"]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/tsx scripts/tools/video-doctor.mts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "修复后 16 pass / 2 warn / 0 fail；受保护的真实商用曲库未做任何改动。"
+}

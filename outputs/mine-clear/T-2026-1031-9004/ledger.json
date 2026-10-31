@@ -1,0 +1,586 @@
+{
+  "schema": "workloom.mine-clear/ledger@1",
+  "task_id": "T-2026-1031-9004",
+  "repo": "workloom-growthtest-stress-9004",
+  "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+  "title": "AI 视频营销/通用数据管线 60 场景压测与修复",
+  "created_at": "2026-10-31T04:00:26.711Z",
+  "updated_at": "2026-10-31T14:30:40.562Z",
+  "baseline": {
+    "audit": {
+      "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+      "branch": "task/T-2026-1031-9004",
+      "remote": "origin",
+      "fetched_at": null,
+      "fetch_status": "skipped",
+      "notes": "本地 HEAD 不是 origin/main 最新（云端 6484e4f9 / 本地 67786d35）——按 §1.2 先对齐基线；工作树不干净（1 项未提交改动）：排雷结论只对已提交内容成立"
+    },
+    "repair": {
+      "commit": null,
+      "reverified_problem_ids": []
+    },
+    "acceptance": {
+      "commit": null,
+      "is_descendant_of_repair": null
+    }
+  },
+  "environment": {
+    "kind": "local-preview",
+    "notes": ""
+  },
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "cards": [
+    {
+      "id": "MC-001",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 2,
+      "state": "open",
+      "title": "叙事片携带营销 brief 时会被 vendor 改写成商业广告",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/pipeline-router.ts:555@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "670bcd4409a265ae887bb9b1203537c12e1f12b30e822f2fb92698d99555f012",
+          "note": "叙事分支只删除 product/products，仍把 platform/goal/category/sellingPoints 等营销字段传给下游。"
+        },
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/index.js:3067@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "acb46563f99b61babb1156858fb83c083a258b052ff21169d3b3e7d5bddec5cf",
+          "note": "vendor 仅按 brief 中存在商品/品类/平台/转化目标就追加商业广告提示块。"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/video-studio/src/pipeline-router.ts",
+        "line": 555,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "applyRouteToMetadata"
+      },
+      "trigger_path": "同一 metadata 曾被营销页填充，随后调用方显式选择叙事片；applyRouteToMetadata 保留 brief.platform/goal，vendor _buildThemeInput 命中商品提示块。",
+      "fix_plan": "在 vendor 主题入口按 pipelineRoute.kind=narrative 屏蔽全部营销字段，并保留独立的时长/画幅口径。",
+      "blast_radius": "只影响叙事片主题入口；营销片继续消费已审 brief。",
+      "conflict_paths": [
+        "packages/video-studio/src/vendor-compat.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "营销 metadata 被显式改道 narrative",
+          "expect": "applyRouteToMetadata 清除商品锚点，runtime _buildThemeInput 输出不包含营销 Brief 块",
+          "command": "vitest run pipeline-router.test.ts studio.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/pipeline-router.test.ts",
+              "packages/video-studio/src/studio.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "property",
+          "given": "20 条叙事主题矩阵每次注入营销占位 metadata",
+          "expect": "60 例矩阵的 20 条 narrative 全部通过 runtime bridge 隔离",
+          "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/ai-video-stress-matrix.mts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run packages/video-studio/src/pipeline-router.test.ts packages/video-studio/src/studio.test.ts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "审计发现来自 canary-n 被错误标记为商业广告。"
+    },
+    {
+      "id": "MC-002",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 2,
+      "state": "open",
+      "title": "需求合同与 PRD 角色系统互相矛盾",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/index.js:2838@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "acb46563f99b61babb1156858fb83c083a258b052ff21169d3b3e7d5bddec5cf",
+          "note": "发现结果转需求时把 characters 固定为空数组，场景却可包含主角。"
+        },
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/engines/prd-generator/prd-generator.js:284@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "7a155f4d33d091b94c24ed88416f7b4609c83a286cc7ba43ebfbd87c3a9305a6",
+          "note": "PRD fallback 也固定 characters 为空，不能携带明确角色、肖像和授权锚点。"
+        }
+      ],
+      "root_cause": {
+        "file": "vendor/supermickey/hyperreality-system/index.js",
+        "line": 2838,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "_convertDiscoveryToRequirementList"
+      },
+      "trigger_path": "叙事片明确使用默认模特，但发现层场景出现人物时，需求合同写“无真人角色”，PRD 又生成女孩，提示词阶段无法绑定授权肖像。",
+      "fix_plan": "只从明确人物证据补 canonical character；把角色 ID、默认模特肖像路径、授权和 PRD 角色系统统一。",
+      "blast_radius": "影响所有含明确人物或空镜的叙事片；不得给纯商品/纯空镜虚构人物。",
+      "conflict_paths": [
+        "packages/video-studio/src/studio.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "内置默认模特请求 + 场景出现年轻人",
+          "expect": "角色合同与 PRD 都绑定 chen-zhuo、真实 portraitRef 和授权，不再写无真人角色",
+          "command": "vitest run vendor-compat.test.ts studio.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "packages/video-studio/src/studio.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/studio.test.ts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "审计发现来自 canary-n2 至 n6 的角色双轨。"
+    },
+    {
+      "id": "MC-003",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 2,
+      "state": "open",
+      "title": "发现 JSON 尾随文本被贪婪解析并静默回退规则",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js:296@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "9732b1debc526cc2dce0ab2cf1c7e8044bf0a780cff1c6bb9b66aac6978e1fad",
+          "note": "包含多个 JSON/尾随解释时使用贪婪匹配，合法首个对象也可能解析失败。"
+        },
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/llm-adapter.ts:306@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "0e1633d96bec8a080ec7b9a6f73b56ef9a307fce82019f096484877157064922",
+          "note": "reasonStructured 强依赖 forceJson，未接收首个平衡 JSON 后追加解释的合法回包。"
+        }
+      ],
+      "root_cause": {
+        "file": "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js",
+        "line": 296,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "BaseDiscoveryAgent._callLLM"
+      },
+      "trigger_path": "模型返回首个完整 JSON 后追加“补充说明”；贪婪正则跨对象失配，失败后走兜底规则，下游继续消费不完整发现。",
+      "fix_plan": "统一提取首个平衡 JSON；结构化输出失败时显式失败关闭，不把规则兜底伪装为模型结果。",
+      "blast_radius": "影响发现、风险、PRD 与 Phase3 的结构化模型回包；成功回包语义不变。",
+      "conflict_paths": [
+        "apps/server/src/video/data-mining-executor.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "合法 JSON 后追加散文的模型响应",
+          "expect": "reasonStructured 解析首个平衡 JSON；vendor discovery 不降级",
+          "command": "vitest run configured-llm.test.ts vendor-compat.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/configured-llm.test.ts",
+              "packages/video-studio/src/vendor-compat.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run packages/video-studio/src/configured-llm.test.ts packages/video-studio/src/vendor-compat.test.ts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "审计发现来自 canary-n3 至 n21 的 JSON 尾随文本。"
+    },
+    {
+      "id": "MC-004",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 2,
+      "state": "open",
+      "title": "Phase3 降级不重试且最终 prompt 违反台词、长度和画幅合同",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/vendor-compat.ts:1944@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "d0a4f461a498ed0f6629191d005e6f5dfb079c95a68b8d9fdc8509fea17a6bce",
+          "note": "融合后任意降级直接整批失败；没有单镜重试、无台词清理、长度压缩或交付约束覆盖。"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/video-studio/src/vendor-compat.ts",
+        "line": 1944,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "installVendorPhase3FusionBridge"
+      },
+      "trigger_path": "真实模型融合漏字段、生成台词或 prompt >3000 字符；bridge 不接受部分重试，最终 PipelineGuard 拦截渲染。",
+      "fix_plan": "按 shot 单次真实重试仍降级则失败关闭；统一清理无台词字段、压缩到 3000、覆盖 9:16/1080x1920/30fps 并做 final-shot contract。",
+      "blast_radius": "影响 Phase3 最终产物与渲染资格；不改变支付/供应商提交边界。",
+      "conflict_paths": [
+        "scripts/tools/data-pipeline-finalize.mts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "n21 真实模型 6 镜产物及 m3 营销 6 镜产物",
+          "expect": "单镜重试通过、无台词、prompt≤3000、9:16、PipelineGuard 0/0，状态 eligible_pending_G8",
+          "command": "vitest run vendor-compat.test.ts final-shot-contract.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "packages/video-studio/src/final-shot-contract.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "property",
+          "given": "60 例矩阵中的最终镜头合成",
+          "expect": "所有镜头满足最终合同，空镜、占位符、重复 ID 和超长 prompt 均失败关闭",
+          "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/ai-video-stress-matrix.mts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/final-shot-contract.test.ts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "审计发现来自 canary-n21 与 canary-m3 的 PipelineGuard 失败。"
+    },
+    {
+      "id": "MC-005",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 2,
+      "state": "open",
+      "title": "营销 CLI 绕过宿主事实权威，缓存与官方来源无法进入 canary",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "scripts/tools/data-pipeline-run.mts:253@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "1a4449d435e52b155a38cd6e8dc43b33339a6209ecb85a312b0b23b0369263c1",
+          "note": "CLI 直接创建 dataMining executor，从未调用 prepareMarketingFacts 逐主张审核。"
+        },
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/marketing-authority.ts:117@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "42be22aee4c0a66a33dd1bf054c07a8ad769210b193af1ed6a17a12124cba8a9",
+          "note": "createDataMiningExecutor 未注入 searchCacheFile，CLI 预置的真实检索结果无法被读取。"
+        },
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/marketing-source-fetcher.ts:54@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "3ec2f8729b5779b279488c8c2e745153b11346a01f9c5a771a3f4075e98c9d1b",
+          "note": "官方公开只读 API 因无同源 Referer 返回 406，正式来源不可复现。"
+        }
+      ],
+      "root_cause": {
+        "file": "scripts/tools/data-pipeline-run.mts",
+        "line": 253,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "dataMining"
+      },
+      "trigger_path": "营销 canary 首次以 MARKETING_A1_UNVERIFIED 失败；补 fixture 后仍因 searchCacheFile 未接线得到零正文。",
+      "fix_plan": "CLI 先调用 prepareMarketingFacts + G1，再传 hash-bound verifiedRaw；宿主支持 searchCacheFile；来源请求携带同源 Referer。",
+      "blast_radius": "营销预生产来源链；叙事片不受影响，所有供应商提交仍禁止。",
+      "conflict_paths": [
+        "apps/server/src/video/marketing-facts.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "CLI 预置 7 条真实查询缓存，官方 API 需 Referer",
+          "expect": "A1 获取并归档官方正文，G1 和逐镜事实审核通过",
+          "command": "vitest run marketing-authority.test.ts marketing-source-fetcher.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "apps/server/src/video/marketing-authority.test.ts",
+              "apps/server/src/video/marketing-source-fetcher.test.ts",
+              "apps/server/src/video/data-mining-executor.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-authority.test.ts apps/server/src/video/marketing-source-fetcher.test.ts apps/server/src/video/data-mining-executor.test.ts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "审计发现来自 canary-m / m2 / m3。"
+    },
+    {
+      "id": "MC-006",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P2",
+      "batch": 3,
+      "state": "open",
+      "title": "监制 JSON 无一次格式修复，CLI 失败会遗留 vendor 定时器",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/producer-gate.ts:306@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "d0ad66ca43e27bb906a345956e3bb7c2d41b851af4540aca3fce865274d5ff2b",
+          "note": "结构化评审严格 JSON.parse；模型仅少一个括号时整门失败，没有仅修复格式的单次重试。"
+        },
+        {
+          "type": "code",
+          "ref": "scripts/tools/data-pipeline-run.mts:406@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "1a4449d435e52b155a38cd6e8dc43b33339a6209ecb85a312b0b23b0369263c1",
+          "note": "失败路径输出摘要后未显式退出，HealthMonitor/ProcessGuard 定时器与 .preproduction.lock 会残留。"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/video-studio/src/producer-gate.ts",
+        "line": 306,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "parseJudgeJson"
+      },
+      "trigger_path": "监制模型返回尾字段损坏 JSON；评审直接失败。CLI 失败 run 随后被长定时器持有单实例锁，下一批误判重复启动。",
+      "fix_plan": "仅对非法 JSON 做一次“只修格式、不得重新判定”的重试并记录双回执；结果落盘后显式 process.exit。",
+      "blast_radius": "监制费用和回执链；修复不得改变 approved/score 语义。",
+      "conflict_paths": [
+        "packages/video-studio/src/producer-gate.test.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "首次监制回包缺右括号，第二次是同一语义的合法 JSON",
+          "expect": "只进行一次格式修复，保留两个 receipt，最终 verdict 语义不变",
+          "command": "vitest run producer-gate.test.ts configured-llm.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/producer-gate.test.ts",
+              "packages/video-studio/src/configured-llm.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run packages/video-studio/src/producer-gate.test.ts packages/video-studio/src/configured-llm.test.ts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "canary-n21 之后连续跑批暴露锁残留。"
+    },
+    {
+      "id": "MC-007",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P2",
+      "batch": 3,
+      "state": "open",
+      "title": "请求边界与 60 场景矩阵缺失，非法时长/画幅会静默丢失",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/pipeline-router.ts:612@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "670bcd4409a265ae887bb9b1203537c12e1f12b30e822f2fb92698d99555f012",
+          "note": "buildPipelineIntent 仅在 duration>0 时写口径，0/-5/9999 或非法画幅都没有统一失败信号。"
+        }
+      ],
+      "root_cause": {
+        "file": "packages/video-studio/src/pipeline-router.ts",
+        "line": 612,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "buildPipelineIntent"
+      },
+      "trigger_path": "CLI/API 传入 0、负数、9999 秒或注入式画幅；参数被默认值或字符串直接吞下，没有在分流前阻断。",
+      "fix_plan": "增加 validatePipelineRequest 统一闸；提供 20 营销 + 20 叙事 + 20 异常的确定性矩阵并记录每例证据。",
+      "blast_radius": "所有视频预生产入口；合法默认值保持 30s / 9:16。",
+      "conflict_paths": [
+        "scripts/tools/data-pipeline-run.mts"
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "60 条营销、叙事和异常输入",
+          "expect": "60/60 通过，付费生成请求 0、providerSubmission=false，每例证据 hash 可回读",
+          "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/ai-video-stress-matrix.mts"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "sample",
+          "given": "空意图、路径注入商品名、0/-5/9999 秒、非法画幅",
+          "expect": "分别抛出 INTENT_REQUIRED、PRODUCT_INVALID、DURATION_INVALID、ASPECT_INVALID",
+          "command": "vitest run pipeline-router.test.ts final-shot-contract.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/pipeline-router.test.ts",
+              "packages/video-studio/src/final-shot-contract.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/tsx scripts/tools/ai-video-stress-matrix.mts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "首轮矩阵 59/60，A16 暴露 PLATE_ASPECT_INVALID 与入口 ASPECT_INVALID 口径分叉；统一后 60/60。"
+    },
+    {
+      "id": "MC-008",
+      "kind": "problem",
+      "level": "L4",
+      "severity": "P2",
+      "batch": 3,
+      "state": "open",
+      "title": "video-doctor 把不存在的默认曲库根判成路径监狱失败",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "scripts/tools/video-doctor.mts:99@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "fe58e2842518406919a26bfde28c30ed695bde1604cd8c70b232316aaae7faf0",
+          "note": "白名单集合只纳入实际存在的 home 目录，但 outside 判定遍历全部注册曲库根，包括不存在的 ~/.workloom-bgm/library。"
+        }
+      ],
+      "root_cause": {
+        "file": "scripts/tools/video-doctor.mts",
+        "line": 99,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "bgm-library-jail"
+      },
+      "trigger_path": "本机只有随仓精选曲库、没有 ~/.workloom-bgm；doctor 仍报告该不存在根不在白名单并 exit 1。",
+      "fix_plan": "仅对实际存在的曲库根做路径监狱判定；不存在按未安装处理，不制造失败。",
+      "blast_radius": "只影响环境自检误报，不放宽 bgm-bridge 的真实路径监狱。",
+      "conflict_paths": [
+        "bundles/ai-video/connectors/bgm-bridge/core.mjs"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "~/.workloom-bgm 不存在，随仓精选曲库存在",
+          "expect": "video-doctor 的 bgm-library-jail 通过且命令 exit 0",
+          "command": "tsx scripts/tools/video-doctor.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/video-doctor.mts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/tsx scripts/tools/video-doctor.mts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "修复后 16 pass / 2 warn / 0 fail；受保护的真实商用曲库未做任何改动。"
+    }
+  ],
+  "gates": []
+}

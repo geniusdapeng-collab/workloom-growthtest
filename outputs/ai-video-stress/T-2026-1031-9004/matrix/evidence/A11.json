@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A11",
+  "category": "abnormal",
+  "expected": "MARKETING_FACTS_EXPIRED",
+  "actual": "MARKETING_FACTS_EXPIRED",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "stale-facts",
+    "caseHash": "03d4aaeb5b2bcc52defa6a74d8d4b4ae451eaf1af4a2a0bc7da1d91c0587c57a"
+  },
+  "output": {
+    "error": "MARKETING_FACTS_EXPIRED: 营销事实来源超过24小时有效期，请刷新来源后重新预生产"
+  },
+  "capturedAt": "2026-10-31T14:31:10.519Z"
+}

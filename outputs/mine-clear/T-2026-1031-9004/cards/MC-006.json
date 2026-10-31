@@ -1,0 +1,56 @@
+{
+  "id": "MC-006",
+  "kind": "problem",
+  "level": "L3",
+  "severity": "P2",
+  "batch": 3,
+  "state": "open",
+  "title": "监制 JSON 无一次格式修复，CLI 失败会遗留 vendor 定时器",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/producer-gate.ts:306@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "d0ad66ca43e27bb906a345956e3bb7c2d41b851af4540aca3fce865274d5ff2b",
+      "note": "结构化评审严格 JSON.parse；模型仅少一个括号时整门失败，没有仅修复格式的单次重试。"
+    },
+    {
+      "type": "code",
+      "ref": "scripts/tools/data-pipeline-run.mts:406@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "1a4449d435e52b155a38cd6e8dc43b33339a6209ecb85a312b0b23b0369263c1",
+      "note": "失败路径输出摘要后未显式退出，HealthMonitor/ProcessGuard 定时器与 .preproduction.lock 会残留。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/producer-gate.ts",
+    "line": 306,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "parseJudgeJson"
+  },
+  "trigger_path": "监制模型返回尾字段损坏 JSON；评审直接失败。CLI 失败 run 随后被长定时器持有单实例锁，下一批误判重复启动。",
+  "fix_plan": "仅对非法 JSON 做一次“只修格式、不得重新判定”的重试并记录双回执；结果落盘后显式 process.exit。",
+  "blast_radius": "监制费用和回执链；修复不得改变 approved/score 语义。",
+  "conflict_paths": ["packages/video-studio/src/producer-gate.test.ts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "首次监制回包缺右括号，第二次是同一语义的合法 JSON",
+      "expect": "只进行一次格式修复，保留两个 receipt，最终 verdict 语义不变",
+      "command": "vitest run producer-gate.test.ts configured-llm.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/producer-gate.test.ts",
+          "packages/video-studio/src/configured-llm.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/producer-gate.test.ts packages/video-studio/src/configured-llm.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "canary-n21 之后连续跑批暴露锁残留。"
+}

@@ -8,6 +8,7 @@ import {
   routeVideoPipeline,
   scoreRoute,
   stripRoutingDirective,
+  validatePipelineRequest,
 } from "./pipeline-router.js";
 
 /**
@@ -136,11 +137,35 @@ describe("视频管线自动化分流", () => {
   it("叙事判定显式清除 dataMining / brief.product（防情报层误触发）", async () => {
     const d = await routeVideoPipeline({ text: "走叙事片，讲讲这座桥" });
     const md = applyRouteToMetadata(
-      { dataMining: { name: "星野空气循环扇" }, brief: { product: "星野空气循环扇", duration: 30 } },
+      {
+        dataMining: { name: "星野空气循环扇" },
+        brief: {
+          product: "星野空气循环扇",
+          products: [{ name: "星野空气循环扇" }],
+          brand: { name: "星野" },
+          category: "小家电",
+          sellingPoints: ["静音"],
+          audience: "租房年轻人",
+          platform: "douyin",
+          goal: "seeding",
+          aspectRatio: "9:16",
+          duration: 30,
+        },
+      },
       d,
     );
     expect(md.dataMining).toBeUndefined();
     expect((md.brief as Record<string, unknown>).product).toBeUndefined();
+    expect(md.brief).toEqual({
+      brand: { name: "星野" },
+      category: "小家电",
+      sellingPoints: ["静音"],
+      audience: "租房年轻人",
+      platform: "douyin",
+      goal: "seeding",
+      aspectRatio: "9:16",
+      duration: 30,
+    });
     expect((md.brief as Record<string, unknown>).duration).toBe(30);
     expect(md.pipelineRoute).toMatchObject({ kind: "narrative" });
   });
@@ -187,6 +212,37 @@ describe("视频管线自动化分流", () => {
     expect(intent).toContain("时长：30秒");
     expect(intent).toContain("画幅：9:16");
     expect(intent).not.toContain("走营销片");
+  });
+
+  it.each([
+    [{ intent: " " }, "INTENT_REQUIRED"],
+    [{ intent: "做视频", product: "../../秘密" }, "PRODUCT_INVALID"],
+    [{ intent: "做视频", product: "<script>x</script>" }, "PRODUCT_INVALID"],
+    [{ intent: "做视频", durationSec: 0 }, "DURATION_INVALID"],
+    [{ intent: "做视频", durationSec: -5 }, "DURATION_INVALID"],
+    [{ intent: "做视频", durationSec: 9999 }, "DURATION_INVALID"],
+    [{ intent: "做视频", aspectRatio: "9:16<script>" }, "ASPECT_INVALID"],
+    [{ intent: "做视频", aspectRatio: "100:1" }, "ASPECT_INVALID"],
+  ])("请求入口硬闸 %j → %s", (input, code) => {
+    expect(() => validatePipelineRequest(input)).toThrow(code);
+  });
+
+  it("请求入口接受常规营销口径并返回规范化值", () => {
+    expect(validatePipelineRequest({
+      intent: " 给米家空气净化器 4 Lite 做一条抖音种草视频 ",
+      product: "米家空气净化器 4 Lite",
+      durationSec: 30,
+      aspectRatio: "9:16",
+      platform: "douyin",
+      goal: "seeding",
+    })).toEqual({
+      intent: "给米家空气净化器 4 Lite 做一条抖音种草视频",
+      product: "米家空气净化器 4 Lite",
+      durationSec: 30,
+      aspectRatio: "9:16",
+      platform: "douyin",
+      goal: "seeding",
+    });
   });
 
   /* ================= T-2026-0926-0008：第三条线（口播解说片） ================= */

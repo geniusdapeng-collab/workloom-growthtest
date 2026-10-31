@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M01",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "05bf7a6ef27fd8337919119b958320b6e9833aeec12e820feccf46916b00df0c"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "澄风 AirOne 空气净化器",
+        "brand": "澄风",
+        "category": "空气净化器",
+        "model": "AirOne",
+        "sellingPoints": [
+          "低档运行安静",
+          "适合小卧室",
+          "滤芯更换简单"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "澄风 AirOne 空气净化器",
+        "brand": {
+          "name": "澄风"
+        },
+        "category": "空气净化器"
+      },
+      "dataMining": {
+        "name": "澄风 AirOne 空气净化器",
+        "brand": "澄风",
+        "category": "空气净化器",
+        "model": "AirOne",
+        "sellingPointCandidates": [
+          "低档运行安静",
+          "适合小卧室",
+          "滤芯更换简单"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给澄风 AirOne 卧室空气净化器做一条抖音种草短片，突出低档运行安静、适合小卧室和滤芯更换简单\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "澄风 AirOne 空气净化器",
+    "queries": [
+      {
+        "q": "澄风 AirOne 空气净化器 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "澄风 AirOne 空气净化器 空气净化器 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "澄风 AirOne 空气净化器 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "澄风 AirOne 空气净化器 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "澄风 AirOne 空气净化器 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "澄风 AirOne 空气净化器 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "澄风 AirOne 空气净化器 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "澄风 AirOne 空气净化器 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "e5d834fa896ce1acb94f52337f5c98c1035253c22d77d7094054921f8e20f1cf"
+    }
+  },
+  "capturedAt": "2026-10-31T14:31:10.122Z"
+}

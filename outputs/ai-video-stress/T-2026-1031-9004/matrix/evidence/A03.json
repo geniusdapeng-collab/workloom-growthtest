@@ -1,0 +1,42 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A03",
+  "category": "abnormal",
+  "expected": "CLARIFY_ROUTE",
+  "actual": "CLARIFY_ROUTE",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "ambiguous-route",
+    "caseHash": "9a9bc89152ff2d4a41cb722bf9127b4567b5345c6f2e97d876f26dd3670648c0"
+  },
+  "output": {
+    "route": "clarify",
+    "confidence": 0.3,
+    "via": "rule",
+    "rationale": "营销线索 0 条 / 叙事线索 0 条，不足以判定管线",
+    "signals": {
+      "marketing": [],
+      "narrative": [],
+      "explainer": []
+    },
+    "clarify": {
+      "question": "这条片子走哪条管线？三条管线的成本与产物差别很大，先确认再开工：\n① 营销片：面向带货/种草/开箱/测评/商品与品牌推广。开跑前先过商品情报五站（联网采集商品事实、真实评价、竞品，含人工/AI 确认门 G1），全流程门更多、耗时更长。\n② 叙事片（通用）：面向故事/剧情/知识/人文/品牌形象。直接进创意主题 → 洞察 → PRD → 预生产，不跑情报层。\n③ 口播解说片：面向讲解/科普/解读/教程/盘点——一份口播稿 + 一条配音，出字级同步的图文解说成片（不跑情报/剧本/逐镜生成）。\n请回复「走营销片」「走叙事片」或「走口播片」；若走营销片，请一并给出商品名（例：走营销片，商品名：星野空气循环扇）。",
+      "missing": [
+        "route"
+      ],
+      "options": [
+        {
+          "key": "marketing",
+          "label": "营销片（带货/种草/商品与品牌推广）"
+        },
+        {
+          "key": "narrative",
+          "label": "叙事片（故事/知识/人文/形象，通用管线）"
+        }
+      ]
+    }
+  },
+  "capturedAt": "2026-10-31T14:31:10.517Z"
+}

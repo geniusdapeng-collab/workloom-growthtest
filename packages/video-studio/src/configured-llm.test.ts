@@ -19,6 +19,17 @@ it("configured assembly uses the canonical model and private data crosses the PI
   const sent=requests.find(r=>r.body)!;expect(sent.body.model).toBe("deepseek-flash");expect(sent.body.thinking).toEqual({type:"enabled"});
   expect(JSON.stringify(sent.body.messages)).not.toContain("13800000000");expect(JSON.stringify(sent.body.messages)).toContain("[PII:PHONE:");
 });
+it("structured output accepts the first balanced JSON even when the provider appends prose",async()=>{
+  vi.stubGlobal("fetch",vi.fn(async()=>new Response(JSON.stringify({
+    model:"deepseek-flash",
+    choices:[{finish_reason:"stop",message:{content:'{"technicalRisks":[{"risk":"手部","level":"medium","impact":"重拍"}]}\n补充说明：不是 JSON'}}],
+    usage:{prompt_tokens:10,completion_tokens:10,total_tokens:20},
+  }))));
+  const engine=new WorkloomLLMEngine({baseUrl:"https://configured.example.test/v1/",apiKey:"test-only",model:"deepseek-flash"});
+  const result=await engine.reasonStructured("只输出 JSON",{});
+  expect(result.success).toBe(true);
+  expect(result.data).toEqual({technicalRisks:[{risk:"手部",level:"medium",impact:"重拍"}]});
+});
 it("unregistered, empty and duplicate host chains fail before a provider can run",async()=>{
   const chat=vi.spyOn(MockProvider.prototype,"chat"),provider=new MockProvider("registered");
   const pool=new Map([[provider.modelId,provider]]),sink:EventSink={recordModelTrace:async()=>{},recordDegradation:async()=>{},recordCircuitBreak:async()=>{}};

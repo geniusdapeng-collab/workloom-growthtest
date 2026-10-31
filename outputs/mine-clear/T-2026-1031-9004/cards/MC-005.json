@@ -1,0 +1,63 @@
+{
+  "id": "MC-005",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "营销 CLI 绕过宿主事实权威，缓存与官方来源无法进入 canary",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/tools/data-pipeline-run.mts:253@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "1a4449d435e52b155a38cd6e8dc43b33339a6209ecb85a312b0b23b0369263c1",
+      "note": "CLI 直接创建 dataMining executor，从未调用 prepareMarketingFacts 逐主张审核。"
+    },
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/marketing-authority.ts:117@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "42be22aee4c0a66a33dd1bf054c07a8ad769210b193af1ed6a17a12124cba8a9",
+      "note": "createDataMiningExecutor 未注入 searchCacheFile，CLI 预置的真实检索结果无法被读取。"
+    },
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/marketing-source-fetcher.ts:54@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "3ec2f8729b5779b279488c8c2e745153b11346a01f9c5a771a3f4075e98c9d1b",
+      "note": "官方公开只读 API 因无同源 Referer 返回 406，正式来源不可复现。"
+    }
+  ],
+  "root_cause": {
+    "file": "scripts/tools/data-pipeline-run.mts",
+    "line": 253,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "dataMining"
+  },
+  "trigger_path": "营销 canary 首次以 MARKETING_A1_UNVERIFIED 失败；补 fixture 后仍因 searchCacheFile 未接线得到零正文。",
+  "fix_plan": "CLI 先调用 prepareMarketingFacts + G1，再传 hash-bound verifiedRaw；宿主支持 searchCacheFile；来源请求携带同源 Referer。",
+  "blast_radius": "营销预生产来源链；叙事片不受影响，所有供应商提交仍禁止。",
+  "conflict_paths": ["apps/server/src/video/marketing-facts.ts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "CLI 预置 7 条真实查询缓存，官方 API 需 Referer",
+      "expect": "A1 获取并归档官方正文，G1 和逐镜事实审核通过",
+      "command": "vitest run marketing-authority.test.ts marketing-source-fetcher.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "apps/server/src/video/marketing-authority.test.ts",
+          "apps/server/src/video/marketing-source-fetcher.test.ts",
+          "apps/server/src/video/data-mining-executor.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-authority.test.ts apps/server/src/video/marketing-source-fetcher.test.ts apps/server/src/video/data-mining-executor.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "审计发现来自 canary-m / m2 / m3。"
+}

@@ -1,3 +1,5 @@
+import { createRequire } from "node:module";
+import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   createApiSearchRunner,
@@ -8,6 +10,19 @@ import {
   validateStagePayload,
   type SearchHit,
 } from "./data-mining-executor.js";
+
+const vendorRequire = createRequire(import.meta.url);
+const { ProductInfoCollector } = vendorRequire(resolve(
+  "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
+)) as {
+  ProductInfoCollector: {
+    queryBase(input: Record<string, unknown>): string;
+    new (): { plan(input: Record<string, unknown>): { queries: Array<{ q: string; intent: string }> } };
+  };
+};
+const { _identityLabel } = vendorRequire(resolve(
+  "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/confirmation-sheet.js",
+)) as { _identityLabel(identity: Record<string, unknown>): string };
 
 /**
  * T-2026-0925-0002：情报执行器「反虚构」硬闸。
@@ -23,6 +38,23 @@ describe("商品情报执行器", () => {
     { title: "知乎测评", url: "https://www.zhihu.com/p/123", snippet: "实测噪音表现一般" },
   ];
   const fakeSearch = async (): Promise<SearchHit[]> => hits;
+
+  it("品名已含品牌和型号时不重复拼进 A1 查询矩阵", () => {
+    const input = {
+      name: "米家空气净化器 4 Lite",
+      brand: "米家",
+      category: "空气净化器",
+      model: "4 Lite",
+    };
+    expect(ProductInfoCollector.queryBase(input)).toBe("米家空气净化器 4 Lite");
+    const plan = new ProductInfoCollector().plan(input);
+    expect(plan.queries.map((query) => query.q)).not.toEqual(expect.arrayContaining([
+      expect.stringMatching(/4 Lite 4 Lite/),
+    ]));
+    expect(plan.queries.find((query) => query.intent === "model_verify")?.q)
+      .toBe("米家空气净化器 4 Lite 发布 上市 时间");
+    expect(_identityLabel(input)).toBe("米家空气净化器 4 Lite");
+  });
 
   it("URL 白名单：非检索命中的链接一律剔除", () => {
     const allowed = new Set(hits.map((h) => normalizeUrl(h.url)));

@@ -1,0 +1,17 @@
+{
+  "route": "marketing",
+  "confidence": 1,
+  "via": "metadata",
+  "rationale": "调用方显式指定 marketing",
+  "signals": {
+    "marketing": [],
+    "narrative": [],
+    "explainer": []
+  },
+  "product": {
+    "name": "米家空气净化器 4 Lite",
+    "brand": "米家",
+    "category": "空气净化器",
+    "source": "metadata"
+  }
+}

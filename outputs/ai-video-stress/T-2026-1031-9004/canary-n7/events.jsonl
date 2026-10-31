@@ -1,0 +1,8 @@
+{"at":"2026-10-31T05:16:37.652Z","kind":"pipeline.started","projectId":"VID-STRESS-CANARY-N7","runId":null}
+{"at":"2026-10-31T05:16:48.176Z","kind":"pipeline.gate.requested","projectId":"VID-STRESS-CANARY-N7","runId":"run-20261031-131637-7ffce9","gate":"G2_THEME","payload":{"vendorType":"creative-theme"}}
+{"at":"2026-10-31T05:16:59.674Z","kind":"pipeline.gate.resolved","projectId":"VID-STRESS-CANARY-N7","runId":"run-20261031-131637-7ffce9","gate":"G2_THEME","payload":{"approved":true,"reason":"producer-approved(G2_THEME · score=88)"}}
+{"at":"2026-10-31T05:18:47.470Z","kind":"pipeline.gate.requested","projectId":"VID-STRESS-CANARY-N7","runId":"run-20261031-131637-7ffce9","gate":"G3_INSIGHT","payload":{"vendorType":"requirement"}}
+{"at":"2026-10-31T05:19:05.518Z","kind":"pipeline.gate.resolved","projectId":"VID-STRESS-CANARY-N7","runId":"run-20261031-131637-7ffce9","gate":"G3_INSIGHT","payload":{"approved":true,"reason":"producer-approved(G3_INSIGHT · score=80)"}}
+{"at":"2026-10-31T05:19:34.827Z","kind":"pipeline.gate.requested","projectId":"VID-STRESS-CANARY-N7","runId":"run-20261031-131637-7ffce9","gate":"G4_PRD","payload":{"vendorType":"prd"}}
+{"at":"2026-10-31T05:19:51.475Z","kind":"pipeline.gate.resolved","projectId":"VID-STRESS-CANARY-N7","runId":"run-20261031-131637-7ffce9","gate":"G4_PRD","payload":{"approved":false,"reason":"producer-rejected(G4_PRD · score=55)"}}
+{"at":"2026-10-31T05:19:51.503Z","kind":"pipeline.failed","projectId":"VID-STRESS-CANARY-N7","runId":null,"payload":{"stages":["creativeTheme","dossierEvidence","requirementDiscovery","emotionIntent","creativeIntensity","prdGeneration","prdReview"]}}

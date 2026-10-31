@@ -1,0 +1,60 @@
+{
+  "decision": {
+    "route": "marketing",
+    "confidence": 1,
+    "via": "metadata",
+    "rationale": "调用方显式指定 marketing",
+    "signals": {
+      "marketing": [],
+      "narrative": [],
+      "explainer": []
+    },
+    "product": {
+      "name": "米家空气净化器 4 Lite",
+      "brand": "米家",
+      "category": "空气净化器",
+      "source": "metadata"
+    }
+  },
+  "seeded": {
+    "brief": {
+      "duration": 30,
+      "aspectRatio": "9:16",
+      "platform": "douyin",
+      "goal": "seeding",
+      "product": "米家空气净化器 4 Lite",
+      "brand": {
+        "name": "米家"
+      },
+      "category": "空气净化器",
+      "sellingPoints": [
+        "适用面积26-45㎡",
+        "颗粒物CADR 380m³/h",
+        "99.99%抗菌率"
+      ]
+    },
+    "dataMining": {
+      "name": "米家空气净化器 4 Lite",
+      "brand": "米家",
+      "category": "空气净化器",
+      "model": "4 Lite",
+      "sellingPointCandidates": [
+        "适用面积26-45㎡",
+        "颗粒物CADR 380m³/h",
+        "99.99%抗菌率"
+      ]
+    },
+    "pipelineRoute": {
+      "kind": "marketing",
+      "via": "metadata",
+      "confidence": 1,
+      "productSource": "metadata"
+    },
+    "platform": "douyin",
+    "platformSelection": {
+      "id": "douyin",
+      "aspectRatio": "9:16",
+      "source": "cli"
+    }
+  }
+}

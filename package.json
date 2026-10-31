@@ -62,6 +62,7 @@
     "computer:mcp": "tsx packages/base/computer-use/mcp.ts",
     "computer:smoke": "tsx packages/base/computer-use/smoke.ts",
     "video:doctor": "tsx scripts/tools/video-doctor.mts",
+    "test:ai-video-stress": "tsx scripts/tools/ai-video-stress-matrix.mts",
     "video:assets": "tsx scripts/tools/real-person-assets.mts",
     "setup": "bash scripts/bootstrap.sh",
     "setup:full": "bash scripts/bootstrap.sh --with-computer",

@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A10",
+  "category": "abnormal",
+  "expected": "COMPETITOR_CLAIM_REJECTED",
+  "actual": "COMPETITOR_CLAIM_REJECTED",
+  "pass": true,
+  "mode": "deterministic-replay",
+  "invocation": {
+    "function": "unsupported-competitor",
+    "caseHash": "78383ae6b7e9ae1050ff43822ffbb0f3d80d201431729f678d2c76d06f6633ca"
+  },
+  "output": {
+    "error": "COMPETITOR_CLAIM_REJECTED: 引文不能被该主张语义使用"
+  },
+  "capturedAt": "2026-10-31T14:31:10.519Z"
+}

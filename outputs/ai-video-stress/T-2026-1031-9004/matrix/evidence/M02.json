@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M02",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "b45cdea22e3939cd7385c3740fcb83a8ad85ab02f0ef11a5d26ca109ffaa2676"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "暖芽小鹿儿童保温杯",
+        "brand": "暖芽",
+        "category": "儿童水杯",
+        "model": "小鹿 350",
+        "sellingPoints": [
+          "轻量杯身",
+          "吸管防呛",
+          "容易拆洗"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "暖芽小鹿儿童保温杯",
+        "brand": {
+          "name": "暖芽"
+        },
+        "category": "儿童水杯"
+      },
+      "dataMining": {
+        "name": "暖芽小鹿儿童保温杯",
+        "brand": "暖芽",
+        "category": "儿童水杯",
+        "model": "小鹿 350",
+        "sellingPointCandidates": [
+          "轻量杯身",
+          "吸管防呛",
+          "容易拆洗"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给暖芽小鹿儿童保温杯做一条小红书种草视频，突出轻量杯身、吸管防呛和家长易清洗\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "暖芽小鹿儿童保温杯 小鹿 350",
+    "queries": [
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 儿童水杯 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "暖芽小鹿儿童保温杯 小鹿 350 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "82a078154ebd5e6e5a775fa504271c7aeabe843fa02360278d2b3ec067b90438"
+    }
+  },
+  "capturedAt": "2026-10-31T14:31:10.123Z"
+}

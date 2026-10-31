@@ -1,0 +1,11 @@
+{
+  "route": "narrative",
+  "confidence": 1,
+  "via": "metadata",
+  "rationale": "调用方显式指定 narrative",
+  "signals": {
+    "marketing": [],
+    "narrative": [],
+    "explainer": []
+  }
+}

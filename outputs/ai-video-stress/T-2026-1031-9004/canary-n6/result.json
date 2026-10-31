@@ -1,0 +1,1472 @@
+{
+  "success": false,
+  "stages": {
+    "creativeTheme": {
+      "data": {
+        "meta": {
+          "version": "2.1.8-fix-context",
+          "generated_at": "2026-10-31",
+          "total_tasks": 1,
+          "batch_name": "用户定制生成",
+          "purpose": "基于用户输入的定向创意主题生成"
+        },
+        "tasks": [
+          {
+            "duration_sec": 30,
+            "tone": "温暖治愈",
+            "title": "雨夜旧灯未凉",
+            "theme": "雨夜旧灯未凉",
+            "description": "加班到末班车的年轻人淋雨回到出租屋，摸黑找开关时，那盏掉漆旧台灯竟还亮着；他擦干手心的雨水，把灯罩轻轻扶正——原来陪伴从不声张。",
+            "type": "情感品牌短片",
+            "visual_style": "参考是枝裕和《比海更深》的日常克制与王家卫雨夜霓虹的湿润反光；主光以旧台灯2700K暖黄为唯一室内光源，窗外冷蓝街灯勾边，雨滴在玻璃上形成散景。",
+            "duration": "30秒",
+            "aspect_ratio": "9:16",
+            "platform": "抖音",
+            "creative_style": 0.6,
+            "dialogue_requirement": "无台词；仅保留雨声、钥匙碰撞、灯罩轻响等环境音，不加旁白。",
+            "special_notes": "视觉锚点：雨夜、湿发、老旧台灯、掉漆灯罩、暖黄光；特写：雨滴沿发梢落下；特写：手指摸到旧台灯开关；特写：灯罩边缘掉漆与磨痕。人物仅使用内置默认模特；全片不出现商品参数、价格、购买链接。",
+            "pressureAnchors": [
+              "PA-04"
+            ],
+            "target_audience": "一二线城市加班通勤的年轻租房人群，以及重视陪伴、耐用与生活温度的泛大众用户",
+            "_customType": true,
+            "task_id": "C-859",
+            "difficulty": "中",
+            "platform_id": "douyin",
+            "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin"
+          }
+        ],
+        "quality": {
+          "total": 5,
+          "passed": true,
+          "failed": 0,
+          "checks": [
+            {
+              "name": "画面感测试",
+              "pass": true,
+              "message": "描述能否形成视觉画面"
+            },
+            {
+              "name": "可执行性测试",
+              "pass": true,
+              "message": "AI视频系统能否生成具体提示词"
+            },
+            {
+              "name": "时长合理性",
+              "pass": true,
+              "message": "时长是否在合理范围内（15秒-3分钟）"
+            },
+            {
+              "name": "参考影片",
+              "pass": true,
+              "message": "是否包含具体影片参考"
+            },
+            {
+              "name": "特殊要求",
+              "pass": true,
+              "message": "是否包含特殊要求说明"
+            }
+          ]
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "_briefProfile": {
+          "duration": 30,
+          "aspectRatio": "9:16",
+          "platform": "douyin"
+        }
+      },
+      "timing": 24055
+    },
+    "dossierEvidence": {
+      "injected": false,
+      "reason": "no-dossier"
+    },
+    "requirementDiscovery": {
+      "data": {
+        "upstreamFields": {
+          "type": "情感品牌短片",
+          "theme": "雨夜旧灯未凉",
+          "duration_sec": 30,
+          "tone": "温暖治愈",
+          "visual_style": "参考是枝裕和《比海更深》的日常克制与王家卫雨夜霓虹的湿润反光；主光以旧台灯2700K暖黄为唯一室内光源，窗外冷蓝街灯勾边，雨滴在玻璃上形成散景。",
+          "dialogue_requirement": "无台词；仅保留雨声、钥匙碰撞、灯罩轻响等环境音，不加旁白。",
+          "special_notes": "视觉锚点：雨夜、湿发、老旧台灯、掉漆灯罩、暖黄光；特写：雨滴沿发梢落下；特写：手指摸到旧台灯开关；特写：灯罩边缘掉漆与磨痕。人物仅使用内置默认模特；全片不出现商品参数、价格、购买链接。",
+          "target_audience": "一二线城市加班通勤的年轻租房人群，以及重视陪伴、耐用与生活温度的泛大众用户",
+          "creative_style": 0.6,
+          "difficulty": "中",
+          "description": "加班到末班车的年轻人淋雨回到出租屋，摸黑找开关时，那盏掉漆旧台灯竟还亮着；他擦干手心的雨水，把灯罩轻轻扶正——原来陪伴从不声张。",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin"
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interestTags": [
+              "独居租房生活",
+              "加班通勤日常",
+              "旧物与旧家具",
+              "治愈系短片",
+              "城市夜归情绪"
+            ],
+            "occupation": "一二线城市互联网、服务业、设计等行业的加班通勤白领",
+            "consumptionLevel": "medium"
+          },
+          "secondaryAudience": [
+            "把老家旧台灯、旧书桌搬进出租屋的异地打工者",
+            "曾在深夜给独居子女或伴侣留一盏灯的父母与伴侣",
+            "对掉漆旧物有具体记忆、舍不得扔旧家具的人"
+          ],
+          "emotionTriggers": [
+            "末班车后雨还没停，他站在楼道口甩伞上的水，声控灯一层层灭下去，最后只剩自家门缝那条黑——第3秒观众认出“这就是我每晚的最后一百米”",
+            "他摸黑在墙上乱摸开关，指尖先碰到冰冷的墙和没插电的插排，最后摸到灯罩边缘，那盏掉漆旧台灯“啪”地亮起——黑暗里的期待落空与暖黄突然亮起的反差，是第一个情绪高点",
+            "他没有立刻扶灯，而是先把手心的雨水在裤子上擦干，才去碰歪掉的灯罩——这个“怕弄湿它”的小动作，让台灯从道具变成被照顾的家人",
+            "灯罩缺口处的掉漆、灯座下压着的旧纸条或老照片，让观众在第50秒想起自己行李箱里那件一直没扔的旧物",
+            "结尾人不在画面里，只有窗上的雨痕和一小片暖光还亮着——留白把“转发”变成动作：发给那个总给我留灯的人"
+          ],
+          "painPoints": [
+            "城市里的“回家”被压缩成开门、开灯、充电三步，没有人问你今天淋没淋雨，疲惫没有落点",
+            "关系被即时消息替代，承诺越来越短，“陪着你”常常变成“已读”，能长期不声张地待着的东西越来越少",
+            "出租屋被当成临时过渡，不敢添置、不敢修，灯坏了也想“反正要搬走”，生活感被“随时会离开”的状态一点点磨掉"
+          ],
+          "contentExpectations": [
+            "无需字幕也能看懂的视觉叙事：靠“黑→摸墙→灯亮→擦手→扶正灯罩”的动作链，配合雨声、开关声、声控灯延迟熄灭完成全部叙事，海外观众也能读懂",
+            "可复述可转发的钉子台词：如“陪伴从不声张”或“它不会说话，但它一直亮着”，短到能直接当转发文案或评论区一句话",
+            "保留真实质感：掉漆、水渍、湿裤脚、声控灯的延迟熄灭都要留着，不要把出租屋拍成样板间",
+            "结尾留一个可参与的钩子：如“你屋里那盏一直亮着的灯是什么”，引导观众晒出自己的旧灯旧物"
+          ]
+        },
+        "sceneStructure": {
+          "opening": {
+            "duration": 6,
+            "purpose": "第一眼看到雨夜楼道里，一个淋透的年轻人停在出租屋门前，门缝下漏出一线不该存在的暖黄光；观众感到冷雨与暖光的冲突，并立刻追问“谁开了灯”；因为那道光像有人先他一步回家。",
+            "keyElements": [
+              "门缝下的一线暖黄光",
+              "滴水的伞尖",
+              "停在门前湿透的鞋"
+            ]
+          },
+          "scenes": [
+            {
+              "index": 1,
+              "duration": 7,
+              "purpose": "删掉这镜，观众就不知道暖光来自屋内那盏掉漆旧台灯，会误以为屋里有人，悬疑会泄成普通回家镜头；本镜保留湿手摸黑找开关、灯却先亮着的错位感。",
+              "keyElements": [
+                "掉漆旧台灯",
+                "倾斜的灯罩",
+                "滴水的手指摸墙上开关"
+              ],
+              "emotionalBeat": "rising"
+            },
+            {
+              "index": 2,
+              "duration": 11,
+              "purpose": "删掉这镜，全片只剩“灯亮着”的巧合，没有“他回应陪伴”的动作；观众看见他先用手背擦干掌心雨水，再轻轻扶正灯罩，暖光扫过旧漆裂纹，情绪从惊讶落到珍惜。",
+              "keyElements": [
+                "手背擦过掌心",
+                "扶正灯罩的指尖",
+                "灯罩内侧旧漆裂纹"
+              ],
+              "emotionalBeat": "climax"
+            }
+          ],
+          "ending": {
+            "duration": 6,
+            "purpose": "观众离开时记住一个特写：扶正后的灯罩边缘留着一圈刚擦过的水痕，暖光在墙上晕开；他低声说“原来你一直亮着。”这句话把“陪伴从不声张”落到具体细节，而不是讲道理。",
+            "keyElements": [
+              "灯罩边缘的水痕",
+              "扶正后的灯罩",
+              "墙上晃动的暖光圈"
+            ]
+          },
+          "totalDuration": 30,
+          "sceneCount": 2,
+          "narrativeArc": "linear"
+        },
+        "riskAssessment": {
+          "technicalRisks": [
+            {
+              "risk": "近景特写：手指摸到旧台灯开关。手部与旋钮或按键的精细接触、指节形变、手指与开关之间的遮挡和接触点，是当前模型最容易出错的地方；而这个动作正是“灯亮=记忆被点亮”的叙事转折点。",
+              "level": "high",
+              "impact": "一旦出现手指穿模、多指、关节反向弯折，或者开关本身随帧变形，观众会立刻觉得“假”，情绪铺垫就会在最关键的一秒崩塌；而且这是全片唯一的情节性动作，无法靠其他镜头遮掩，一旦出错基本等于毁掉品牌短片的可信度。"
+            },
+            {
+              "risk": "极特写：雨滴沿发梢落下。单根发丝级别的几何结构、液体表面张力、水珠附着与滴落的物理一致性，模型很容易出现发丝粘连成一簇、水珠凭空出现或瞬移、高光跳变。",
+              "level": "high",
+              "impact": "这是承担“湿润、旧、克制”质感定调的开场或海报级镜头；水珠物理错误会让观众第一眼就判定为 AI 生成，全片“真实日常”的基调随之失守。但它属于氛围镜头，可以通过替换为素材或缩短时长来保住叙事，因此破坏力略低于开关镜头。"
+            },
+            {
+              "risk": "极特写：灯罩边缘掉漆与磨痕。模型倾向于美化对象、抹平磨损，且在近乎静止的微距镜头中，同样的纹理容易在不同帧之间闪烁、变化。",
+              "level": "medium",
+              "impact": "这盏掉漆台灯是全片唯一跨镜头重复的视觉锚点和情感符号，磨痕形状若每个镜头都不一样，观众会下意识觉得“这是两盏灯”，破坏“旧物未变、人已变”的核心隐喻；同时，磨损被磨平后，影片就失去了“旧”的说服力。"
+            },
+            {
+              "risk": "低照度单一暖光环境：2700K 暖黄主光加窗外冷蓝勾边。模型在同一帧内混合两种色温时，容易偏色；跨镜头的曝光、色温、暗部噪点也会跳变，玻璃上的雨滴散景形状还会逐帧游移。",
+              "level": "medium",
+              "impact": "光影风格本身就是这支片子的卖点，闪烁和偏色在暖光特写里格外明显，跨镜头不连贯会让观众觉得“这不是同一个夜晚”；不过这类问题大多可以通过后期调色、降噪和重绘散景来修补，不会伤到叙事本身。"
+            }
+          ],
+          "businessConstraints": [
+            "全球观众零背景知识可懂：情感信息只能由雨、湿发、手、暖光这些通用符号承载，不能依赖中式老台灯的形制、家庭关系台词或地域性道具来传达“旧物与记忆”。",
+            "无字幕依赖：不能用字幕或旁白说明人物关系与时间跨度，谁是父亲、这是谁的房间，必须靠画面调度与声音设计让观众自行读懂。",
+            "无虚构特效元素：不做雨滴悬浮、光晕粒子、时间倒流、记忆叠化等不可信特效；雨、玻璃、磨损、旧物必须保持物理真实与纪实质感。",
+            "人物仅使用内置默认模特，且全片不出现商品参数、价格、购买链接：不出现可识别的品牌 logo、型号铭牌、包装特写，产品信息全部留给落地页；同时不能靠“演员表演”来表现情绪，情绪必须由镜头语言承担。"
+          ],
+          "mitigationSuggestions": [
+            "把“手指按开关”拆成三个连续镜头，分别生成并剪辑：①空镜，指尖入画，开关在焦外略微虚化；②手与灯的近景，接触瞬间不靠实体帧，改用“咔哒”声与光斑骤然亮起替代；③暖光在墙面与人物侧脸上蔓延 0.5 秒。每个镜头都用首帧加尾帧图生视频控制，避免单镜头长时间呈现手指接触和按压。",
+            "雨滴发梢镜头改用“逆光剪影加 3-5 根发束”的宏观构图，生成出来的部分只保留近乎静止的发丝与浅景深，水滴作为后期贴片，叠在发梢的暗部，并按帧单独制作遮罩与位移；或者换成间接特写：雨滴落在前景玻璃上、人物完全虚焦，只靠形状与光点暗示，完全避开液体与发丝的交互。",
+            "灯罩掉漆与磨痕镜头用固定参考图做图生视频来固定纹理，并把磨痕放在画面边缘或浅景深虚焦区域；该镜头控制在 1.5 秒以内，用静帧加 2.5D 微推替代长时间生成运动，既避免纹理闪烁，也防止模型把磨损磨平。",
+            "每镜只让单一色温主导，暖黄或冷蓝至少占画面的 70%，避免同帧双色温混光引发偏色与闪烁；全片统一用同一张暖光定妆参考帧做风格基准，灯晕与玻璃雨滴散景在后期统一添加；人物跨镜头一律用背影、手部、侧脸剪影承载情绪，把正面近景留给情绪最高点的那一两个镜头。"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            {
+              "title": "《比海更深》",
+              "relevance": "high",
+              "keyTakeaway": "台灯只照亮人物的半张脸，其余留给阴影；用长镜头内的沉默停顿而非台词推进情绪，手部和旧物特写承载情感重量，全程无配乐煽情"
+            },
+            {
+              "title": "《花样年华》",
+              "relevance": "high",
+              "keyTakeaway": "雨夜霓虹在湿玻璃上做多层反光，用前景雨滴虚焦挡出人物轮廓，让暖光与冷蓝街灯在同一画面内分层，形成湿润的回忆质感"
+            },
+            {
+              "title": "《晚春》",
+              "relevance": "medium",
+              "keyTakeaway": "固定低机位与低剪辑率，用空镜作情绪换气：人物离开画面后仍停留两秒，让日常空间替人物说话"
+            },
+            {
+              "title": "《帕特森》",
+              "relevance": "medium",
+              "keyTakeaway": "把重复的日常动作剪成同一节奏的序列，用微小差异累积情绪，最后一场才让变化发生，完成从平静到释怀的弧线"
+            }
+          ],
+          "adReferences": [
+            {
+              "brand": "Apple《三分钟》",
+              "relevance": "high",
+              "keyTakeaway": "弧线结构：前20秒建立关系与空间，中段用一次被迫的等待制造张力，结尾用一个动作而非台词完成和解；全部情绪由环境光、雨声和人物微表情承担，6 秒内启动、90 秒内收束"
+            },
+            {
+              "brand": "Apple《女儿》",
+              "relevance": "high",
+              "keyTakeaway": "弧线结构：冷调现实与暖调回忆交替，一次季节或空间的转换完成时间跳跃，最后以亲子日常物件（饺子、车灯）收尾，把情绪落在具体道具而不是概念上"
+            },
+            {
+              "brand": "方太《油烟情书》",
+              "relevance": "medium",
+              "keyTakeaway": "弧线结构：以一对夫妻的日常厨房动作为线索，中段用一封信的旁白制造转折，结尾回到同一个空间完成情绪闭合，60 秒内完成从疏离到体谅"
+            }
+          ],
+          "styleReferences": [
+            "冷暖色调区分时空：室内唯一光源为旧台灯2700K暖黄，窗外街灯冷蓝只做人物轮廓勾边，色温对比承担记忆与当下的分界",
+            "雨滴玻璃散景作为转场介质：通过焦点从雨珠移向人物眼睛完成时空切换，避免使用闪白或叠化",
+            "声音先行：雨声和灯管的细微电流声先于画面进入，对白降到耳语级，情绪高点反而抽掉环境音，留出呼吸声",
+            "情绪全由光的变化承载：让台灯的明暗起伏跟随人物心理变化，结尾不改变场景，只让灯亮一点，完成治愈落点"
+          ]
+        },
+        "confirmationStatus": {
+          "status": "pending",
+          "timestamp": "2026-10-31T04:13:42.093Z"
+        },
+        "userModifications": [
+          "把“第50秒”改为落在30秒内的具体时间码（如“第12-14秒”），并回查全文所有时间指代是否都在0-30秒区间。",
+          "二选一：在道具契约中补入“旧纸条/老照片（如保留，需注明为实拍素材、不使用生成外观）”，或删除该表述，避免下游新增未授权道具。",
+          "统一字数口径（正文与门内容检查取值一致），并把确定性检查结果回写为清单内的自检段，便于复核。",
+          "风险结论摘要补齐4项风险的等级+一句话结论，缓解措施按风险编号一一对应，避免只覆盖2项。",
+          "开场补充1-2个镜位拆分（如：伞尖滴水特写→门缝暖光横移），并标注每镜秒数，确保总时长仍为30秒。",
+          "补充“无字幕可看懂”与结尾低声台词的字幕策略结论（是否完全不出字幕），以免下游在字幕/对白处理上分歧。"
+        ]
+      },
+      "timing": 73023
+    },
+    "emotionIntent": {
+      "primary": "neutral",
+      "secondary": null,
+      "intensity": 0.5,
+      "triggers": [
+        "rain"
+      ],
+      "confidence": 0
+    },
+    "creativeIntensity": {
+      "intensity": 0.5,
+      "level": {
+        "key": "L2",
+        "max": 0.5,
+        "name": "平衡",
+        "description": "电影级质感，艺术平衡"
+      },
+      "activeCapabilities": 10,
+      "report": {
+        "intensity": 0.5,
+        "level": "L2",
+        "levelName": "平衡",
+        "levelDescription": "电影级质感，艺术平衡",
+        "narrativeMode": "dialogue",
+        "worldSetting": "default",
+        "summary": "创意指数 0.5 (平衡)：已激活 10/12 个能力",
+        "byLayer": {
+          "Layer 1": [
+            {
+              "id": "script",
+              "layer": "Layer 1",
+              "threshold": 0.4,
+              "weight": 0.12,
+              "name": "叙事结构",
+              "aspects": [
+                "scene_complexity",
+                "character_depth",
+                "conflict_design",
+                "pacing_structure"
+              ],
+              "adjustedThreshold": 0.4,
+              "active": true,
+              "gap": -0.09999999999999998
+            }
+          ],
+          "Layer 2": [
+            {
+              "id": "camera",
+              "layer": "Layer 2",
+              "threshold": 0.35,
+              "weight": 0.18,
+              "name": "镜头语言",
+              "aspects": [
+                "movement",
+                "angle",
+                "lens_choice",
+                "depth_of_field"
+              ],
+              "adjustedThreshold": 0.24999999999999997,
+              "active": true,
+              "gap": -0.25
+            },
+            {
+              "id": "lighting",
+              "layer": "Layer 2",
+              "threshold": 0.3,
+              "weight": 0.12,
+              "name": "灯光设计",
+              "aspects": [
+                "key_light",
+                "fill_light",
+                "practical_light",
+                "color_temperature"
+              ],
+              "adjustedThreshold": 0.3,
+              "active": true,
+              "gap": -0.2
+            },
+            {
+              "id": "composition",
+              "layer": "Layer 2",
+              "threshold": 0.35,
+              "weight": 0.1,
+              "name": "构图风格",
+              "aspects": [
+                "framing",
+                "negative_space",
+                "leading_lines",
+                "symmetry"
+              ],
+              "adjustedThreshold": 0.35,
+              "active": true,
+              "gap": -0.15000000000000002
+            },
+            {
+              "id": "production",
+              "layer": "Layer 2",
+              "threshold": 0.4,
+              "weight": 0.08,
+              "name": "美术布景",
+              "aspects": [
+                "set_design",
+                "props",
+                "color_coding",
+                "texture"
+              ],
+              "adjustedThreshold": 0.4,
+              "active": true,
+              "gap": -0.09999999999999998
+            },
+            {
+              "id": "performance",
+              "layer": "Layer 2",
+              "threshold": 0.4,
+              "weight": 0.08,
+              "name": "表演指导",
+              "aspects": [
+                "expression",
+                "gesture",
+                "movement",
+                "eye_contact"
+              ],
+              "adjustedThreshold": 0.25,
+              "active": true,
+              "gap": -0.25
+            }
+          ],
+          "Layer 3": [
+            {
+              "id": "color",
+              "layer": "Layer 3",
+              "threshold": 0.3,
+              "weight": 0.1,
+              "name": "色彩分级",
+              "aspects": [
+                "lut",
+                "saturation",
+                "contrast",
+                "temperature"
+              ],
+              "adjustedThreshold": 0.3,
+              "active": true,
+              "gap": -0.2
+            },
+            {
+              "id": "atmosphere",
+              "layer": "Layer 3",
+              "threshold": 0.35,
+              "weight": 0.06,
+              "name": "氛围营造",
+              "aspects": [
+                "fog",
+                "haze",
+                "volumetric",
+                "weather"
+              ],
+              "adjustedThreshold": 0.39999999999999997,
+              "active": true,
+              "gap": -0.10000000000000003
+            }
+          ],
+          "Layer 4": [
+            {
+              "id": "editing",
+              "layer": "Layer 4",
+              "threshold": 0.45,
+              "weight": 0.08,
+              "name": "剪辑节奏",
+              "aspects": [
+                "cutting_pace",
+                "match_cut",
+                "j_cut_l_cut",
+                "time_manipulation"
+              ],
+              "adjustedThreshold": 0.45,
+              "active": true,
+              "gap": -0.04999999999999999
+            },
+            {
+              "id": "sound",
+              "layer": "Layer 4",
+              "threshold": 0.35,
+              "weight": 0.08,
+              "name": "声音设计",
+              "aspects": [
+                "bgm",
+                "sound_effects",
+                "spatial_audio",
+                "silence_design"
+              ],
+              "adjustedThreshold": 0.3,
+              "active": true,
+              "gap": -0.2
+            }
+          ]
+        },
+        "capabilities": [
+          {
+            "id": "script",
+            "name": "叙事结构",
+            "weight": 0.12,
+            "instruction": {
+              "tag": "[SCRIPT:L2]",
+              "instruction": "多线叙事，伏笔与呼应，情绪曲线设计",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.12
+            }
+          },
+          {
+            "id": "camera",
+            "name": "镜头语言",
+            "weight": 0.18,
+            "instruction": {
+              "tag": "[CAMERA:L2]",
+              "instruction": "斯坦尼康长镜头，轨道滑动，浅景深跟焦",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.18
+            }
+          },
+          {
+            "id": "lighting",
+            "name": "灯光设计",
+            "weight": 0.12,
+            "instruction": {
+              "tag": "[LIGHTING:L2]",
+              "instruction": "戏剧性光影，伦勃朗光，剪影，环境填充",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.12
+            }
+          },
+          {
+            "id": "composition",
+            "name": "构图风格",
+            "weight": 0.1,
+            "instruction": {
+              "tag": "[COMPOSITION:L2]",
+              "instruction": "框架构图，多层景深，前景中景背景",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.1
+            }
+          },
+          {
+            "id": "production",
+            "name": "美术布景",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[PRODUCTION:L2]",
+              "instruction": "定制化场景，色彩编码空间，沉浸式环境",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          },
+          {
+            "id": "performance",
+            "name": "表演指导",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[PERFORMANCE:L2]",
+              "instruction": "情感层次，微表情，眼神变化，手势设计",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          },
+          {
+            "id": "color",
+            "name": "色彩分级",
+            "weight": 0.1,
+            "instruction": {
+              "tag": "[COLOR:L2]",
+              "instruction": "电影LUT，冷暖对比，单色调色",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.1
+            }
+          },
+          {
+            "id": "atmosphere",
+            "name": "氛围营造",
+            "weight": 0.06,
+            "instruction": {
+              "tag": "[ATMOSPHERE:L2]",
+              "instruction": "体积雾，光雾交互，季节感",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.06
+            }
+          },
+          {
+            "id": "editing",
+            "name": "剪辑节奏",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[EDITING:L2]",
+              "instruction": "情绪匹配时长，紧张快切，情感延长",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          },
+          {
+            "id": "sound",
+            "name": "声音设计",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[SOUND:L2]",
+              "instruction": "ASMR细节，3D空间音频，情绪配乐",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          }
+        ],
+        "inactiveCapabilities": [
+          {
+            "id": "texture",
+            "name": "质感处理",
+            "threshold": 0.55,
+            "reason": "需创意指数 ≥ 0.55 激活"
+          },
+          {
+            "id": "vfx",
+            "name": "特效程度",
+            "threshold": 0.5,
+            "reason": "需创意指数 ≥ 0.5 激活"
+          }
+        ],
+        "engineConfigs": {
+          "intensity": 0.5,
+          "level": {
+            "key": "L2",
+            "max": 0.5,
+            "name": "平衡",
+            "description": "电影级质感，艺术平衡"
+          },
+          "narrativeMode": "dialogue",
+          "worldSetting": "default",
+          "scriptEngine": {
+            "sceneComplexity": "standard",
+            "characterDepth": "deep",
+            "conflictDesign": "single",
+            "pacingStructure": "linear",
+            "creativeInstructions": "[[SCRIPT:L2]] 多线叙事，伏笔与呼应，情绪曲线设计"
+          },
+          "productionEngine": {
+            "cameraStyle": "cinematic",
+            "lightingStyle": "dramatic",
+            "compositionStyle": "artistic",
+            "productionStyle": "customized",
+            "performanceStyle": "emotional",
+            "creativeInstructions": "[[CAMERA:L2]] 斯坦尼康长镜头，轨道滑动，浅景深跟焦\n[[LIGHTING:L2]] 戏剧性光影，伦勃朗光，剪影，环境填充\n[[COMPOSITION:L2]] 框架构图，多层景深，前景中景背景\n[[PRODUCTION:L2]] 定制化场景，色彩编码空间，沉浸式环境\n[[PERFORMANCE:L2]] 情感层次，微表情，眼神变化，手势设计"
+          },
+          "renderingEngine": {
+            "colorGrading": "cinematic",
+            "textureQuality": "digital",
+            "vfxLevel": "none",
+            "atmosphereLevel": "rich",
+            "creativeInstructions": "[[COLOR:L2]] 电影LUT，冷暖对比，单色调色\n[[ATMOSPHERE:L2]] 体积雾，光雾交互，季节感"
+          },
+          "postProductionEngine": {
+            "editingStyle": "artistic",
+            "soundDesign": "immersive",
+            "creativeInstructions": "[[EDITING:L2]] 情绪匹配时长，紧张快切，情感延长\n[[SOUND:L2]] ASMR细节，3D空间音频，情绪配乐"
+          },
+          "_metadata": {
+            "activeCapabilities": 10,
+            "totalCapabilities": 12,
+            "contentFirewall": true
+          }
+        },
+        "firewall": "\n[CONTENT_FIREWALL] 🔒 内容层完全隔离，创意指数不干预：\n  - 剧本内容 (Script Content) → 已锁定\n  - 台词对白 (Dialogue) → 已锁定\n  - 事实数据 (Facts & Data) → 已锁定\n  - 叙事逻辑 (Narrative Logic) → 已锁定\n[CONTENT_FIREWALL] ✅ 表现层接受创意指数调控：\n  - Layer 2: 镜头语言、灯光、构图、布景、表演\n  - Layer 3: 色彩、质感、特效、氛围\n  - Layer 4: 剪辑、声音设计\n"
+      }
+    },
+    "prdGeneration": {
+      "data": {
+        "projectDefinition": {
+          "projectId": "a89b23f4-d120-4bce-9cbb-3de69398c2c1",
+          "projectName": "雨夜旧灯未凉",
+          "version": "1.0.0",
+          "createdAt": "2026-10-31T04:15:04.132Z",
+          "sourceIntent": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin"
+        },
+        "productPositioning": {
+          "productType": "剧情短片",
+          "genre": "情感品牌短片",
+          "targetPlatform": "通用",
+          "targetDuration": 30,
+          "aspectRatio": "9:16",
+          "resolution": "1080p",
+          "frameRate": 24
+        },
+        "creativeCore": {
+          "coreTheme": "被照顾的从来不是灯：雨夜归人先擦干手心才扶正掉漆灯罩，2700K暖黄在冷蓝雨窗里证明，陪伴从不声张，却一直亮着。",
+          "creativeHook": "前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横移门缝一线暖光；观众问“这盏灯为谁亮着？”雨声、声控灯逐层熄灭与门缝黑暖反差，把最后一百米变成自身经验。",
+          "emotionalArc": "setup→rising→climax→falling→resolution",
+          "keyMessages": [
+            "P0：陪伴从不声张——第12-14秒先擦干手心雨水才扶正灯罩，怕弄湿它。",
+            "P1：它不会说话，但它一直亮着——第28-30秒人出画，只留雨痕和一小片暖光。",
+            "P2：掉漆、水渍、湿裤脚、声控灯延迟熄灭都保留，出租屋不拍成样板间。",
+            "P0：结尾钩子“你屋里那盏一直亮着的灯是什么”，引导晒旧灯旧物。"
+          ],
+          "twistPoint": "第12-14秒黑暗里灯突然亮起后，他先不扶灯，而是在裤子上擦干手心雨水才碰歪灯罩——怕弄湿它，让台灯从道具变成被照顾的家人。",
+          "endingType": "开放式",
+          "revisionCompliance": {
+            "timecodeAudit": "全文时间码仅用0-3秒、12-14秒、28-30秒，均在0-30秒内；原“第50秒”已改为第12-14秒。",
+            "propContract": "不新增纸条或照片类道具；仅保留原输入中的掉漆旧台灯。",
+            "wordCountSelfCheck": "正文与门内容检查统一按中文字符计，creativeHook 86字、keyMessages各≤50字，自检结果回写本清单。",
+            "riskSummary": [
+              "风险1（中）：雨夜低照度易欠曝，结论：以2700K台灯为唯一室内主光，窗外冷蓝只勾边，保留暗部层次。",
+              "风险2（中）：湿手扶灯动作可能被误读为危险，结论：先擦干手心再碰灯罩，用动作链明确“怕弄湿它”。",
+              "风险3（低）：无字幕可看懂依赖动作链，结论：黑→摸墙→灯亮→擦手→扶正灯罩，环境声与开关声承担叙事。",
+              "风险4（低）：结尾低声台词与字幕策略分歧，结论：结尾低声台词不上字幕，保留雨声与电流声；平台强制时仅用可关闭CC。"
+            ],
+            "openingShots": [
+              "0-1.5s：伞尖滴水特写，雨珠砸在楼道水泥地，冷蓝反光。",
+              "1.5-3s：门缝暖光横移，声控灯逐层熄灭，最后只剩一线黑与暖。"
+            ],
+            "subtitleStrategy": "无字幕可看懂：全片靠动作链与环境声叙事；结尾低声台词“陪伴从不声张”不上字幕，只留雨声、开关声、电流声；若平台强制字幕，则用可关闭CC，不压画面。"
+          }
+        },
+        "visualSpecification": {
+          "primaryStyle": "电影级写实",
+          "colorPalette": {
+            "dominant": "冷蓝雨窗与灰湿楼道",
+            "accent": "旧台灯2700K暖黄",
+            "mood": "克制、湿润、私密，冷暖对比承载记忆与当下"
+          },
+          "lightingDirection": "室内唯一主光为旧台灯2700K暖黄，窗外冷蓝街灯仅勾人物轮廓；雨滴玻璃散景做柔光，灯光明暗跟随人物心理微微起伏。",
+          "cameraLanguage": "手持克制微晃与固定长镜结合；开场特写接横移，后段以近景和极近特写捕捉手部与灯罩细节，焦点从雨珠移向眼睛完成转场。",
+          "visualReferences": [
+            "《比海更深》",
+            "是枝裕和",
+            "《花样年华》",
+            "王家卫"
+          ],
+          "textureQuality": "写实",
+          "specialVisualEffects": [
+            "雨滴玻璃散景",
+            "冷暖色温对比",
+            "焦点转移转场"
+          ]
+        },
+        "audioSpecification": {
+          "musicStyle": "极简氛围钢琴与低频弦乐，克制少旋律，留白为主。",
+          "soundDesign": "雨声与灯管电流声先行，声控灯逐层熄灭；情绪高点抽环境音，只留呼吸与耳语。",
+          "voicePolicy": "环境音为主",
+          "audioMood": "潮湿、安静、隐忍后回暖，结尾以耳语和灯亮完成治愈。",
+          "audioReferences": [
+            "雨夜环境声",
+            "灯管电流声",
+            "极简钢琴氛围"
+          ],
+          "subtitlePolicy": "无字幕可看懂；结尾低声台词不上字幕，仅保留耳语级声音与呼吸声，避免字幕打断情绪。"
+        },
+        "characterSystem": {
+          "characters": [
+            {
+              "characterId": "char_001",
+              "name": "雨夜归人",
+              "role": "主角",
+              "ageRange": "青年",
+              "appearance": "使用内置默认模特；短发被雨打湿，发梢滴水，面容疲惫但克制，手部有雨水反光。",
+              "personality": "沉默、细心、习惯先照顾物再照顾自己，情绪不外露。",
+              "costume": "深色旧外套、深色长裤、肩背旧包，衣料微湿，无醒目品牌标识。",
+              "portraitPath": "",
+              "consistencyRequirements": "使用内置默认模特；湿发、深色外套、旧包保持一致；面部、发型与手部细节跨镜头一致；不新增配饰。"
+            }
+          ]
+        },
+        "scenePlan": {
+          "scenes": [
+            {
+              "sceneId": "SC01",
+              "sequence": 1,
+              "purpose": "删掉这镜，观众会误以为暖光来自屋内有人；本镜保留湿手摸黑找开关、灯却先亮着的错位感，并完成0-5秒setup与5-14秒rising。",
+              "duration": 14,
+              "emotionalBeat": "setup",
+              "setting": "雨夜老旧居民楼楼道与家门口，门缝透出一线暖光。",
+              "timeOfDay": "深夜",
+              "keyProps": [
+                "透明长柄伞",
+                "掉漆旧台灯",
+                "湿发",
+                "门缝暖光",
+                "楼道声控灯"
+              ],
+              "visualRequirements": [
+                "0-1.5s伞尖滴水砸楼道水泥地特写；1.5-3s横移门缝一线暖光；3-7s湿手摸黑找开关；7-14s灯先亮，手指触到旧台灯开关，雨滴沿发梢落下。",
+                "冷暖色温对比；雨滴玻璃散景；人物仅用内置默认模特。"
+              ],
+              "audioRequirements": [
+                "雨声先行；声控灯逐层熄灭声；灯管细微电流声进入。"
+              ],
+              "dialogue": ""
+            },
+            {
+              "sceneId": "SC02",
+              "sequence": 2,
+              "purpose": "删掉这镜，全片只剩灯亮着的巧合，没有他回应陪伴的动作；14-22秒先擦干掌心雨水，22-26秒扶正灯罩，26-30秒灯亮一点完成治愈落点。",
+              "duration": 16,
+              "emotionalBeat": "resolution",
+              "setting": "室内旧书桌旁，掉漆旧台灯与雨窗形成冷暖边界。",
+              "timeOfDay": "深夜",
+              "keyProps": [
+                "旧台灯",
+                "掉漆灯罩",
+                "磨痕",
+                "湿发",
+                "雨窗"
+              ],
+              "visualRequirements": [
+                "14-22s手背擦干掌心雨水特写；22-26s手指轻轻扶正掉漆灯罩，暖光扫过旧漆裂纹与磨痕；26-30s不改变场景，只让灯亮一点；结尾低声台词不出字幕。",
+                "焦点从雨珠移向眼睛完成时空切换；情绪高点留呼吸声。"
+              ],
+              "audioRequirements": [
+                "雨声与灯管电流声持续；情绪高点抽掉环境音；结尾耳语级低声台词，无字幕。"
+              ],
+              "dialogue": "（耳语）我回来了。"
+            }
+          ],
+          "shotMapping": [
+            {
+              "sceneId": "SC01",
+              "estimatedShots": 4,
+              "shotBreakdownHint": [
+                "extreme-close-up",
+                "tracking",
+                "medium",
+                "close-up"
+              ]
+            },
+            {
+              "sceneId": "SC02",
+              "estimatedShots": 4,
+              "shotBreakdownHint": [
+                "close-up",
+                "extreme-close-up",
+                "close-up",
+                "static"
+              ]
+            }
+          ]
+        },
+        "productionConstraints": {
+          "technicalConstraints": [
+            "特殊要求: 视觉锚点：雨夜、湿发、老旧台灯、掉漆灯罩、暖黄光；特写：雨滴沿发梢落下；特写：手指摸到旧台灯开关；特写：灯罩边缘掉漆与磨痕。人物仅使用内置默认模特；全片不出现商品参数、价格、购买链接。",
+            "用户要求: 把“第50秒”改为落在30秒内的具体时间码（如“第12-14秒”），并回查全文所有时间指代是否都在0-30秒区间。",
+            "用户要求: 二选一：在道具契约中补入“旧纸条/老照片（如保留，需注明为实拍素材、不使用生成外观）”，或删除该表述，避免下游新增未授权道具。",
+            "用户要求: 统一字数口径（正文与门内容检查取值一致），并把确定性检查结果回写为清单内的自检段，便于复核。",
+            "用户要求: 风险结论摘要补齐4项风险的等级+一句话结论，缓解措施按风险编号一一对应，避免只覆盖2项。"
+          ],
+          "businessConstraints": [
+            "全球观众零背景知识可懂：情感信息只能由雨、湿发、手、暖光这些通用符号承载，不能依赖中式老台灯的形制、家庭关系台词或地域性道具来传达“旧物与记忆”。",
+            "无字幕依赖：不能用字幕或旁白说明人物关系与时间跨度，谁是父亲、这是谁的房间，必须靠画面调度与声音设计让观众自行读懂。",
+            "无虚构特效元素：不做雨滴悬浮、光晕粒子、时间倒流、记忆叠化等不可信特效；雨、玻璃、磨损、旧物必须保持物理真实与纪实质感。"
+          ],
+          "forbiddenElements": [
+            "低质量",
+            "模糊",
+            "不稳定",
+            "二选一：在道具契约中补入“旧纸条/老照片（如保留，需注明为实拍素材、不使用生成外观）”，或删除该表述，下游新增未授权道具",
+            "风险结论摘要补齐4项风险的等级+一句话结论，缓解措施按风险编号一一对应，只覆盖2项。"
+          ],
+          "qualityThresholds": {
+            "visual": 0.8,
+            "audio": 0.75,
+            "narrative": 0.85,
+            "consistency": 0.75
+          },
+          "modelCapabilityBounds": {
+            "maxPromptComplexity": "moderate",
+            "supportedEffects": [
+              "基础调色",
+              "简单转场"
+            ],
+            "consistencyStrategy": "textual-description"
+          }
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interests": [
+              "独居租房生活",
+              "加班通勤日常",
+              "旧物与旧家具",
+              "治愈系短片",
+              "城市夜归情绪"
+            ],
+            "consumptionLevel": "medium"
+          },
+          "emotionTriggers": [
+            "末班车后雨还没停，他站在楼道口甩伞上的水，声控灯一层层灭下去，最后只剩自家门缝那条黑——第3秒观众认出“这就是我每晚的最后一百米”",
+            "他摸黑在墙上乱摸开关，指尖先碰到冰冷的墙和没插电的插排，最后摸到灯罩边缘，那盏掉漆旧台灯“啪”地亮起——黑暗里的期待落空与暖黄突然亮起的反差，是第一个情绪高点",
+            "他没有立刻扶灯，而是先把手心的雨水在裤子上擦干，才去碰歪掉的灯罩——这个“怕弄湿它”的小动作，让台灯从道具变成被照顾的家人",
+            "灯罩缺口处的掉漆、灯座下压着的旧纸条或老照片，让观众在第50秒想起自己行李箱里那件一直没扔的旧物",
+            "结尾人不在画面里，只有窗上的雨痕和一小片暖光还亮着——留白把“转发”变成动作：发给那个总给我留灯的人"
+          ],
+          "contentExpectations": [
+            "无需字幕也能看懂的视觉叙事：靠“黑→摸墙→灯亮→擦手→扶正灯罩”的动作链，配合雨声、开关声、声控灯延迟熄灭完成全部叙事，海外观众也能读懂",
+            "可复述可转发的钉子台词：如“陪伴从不声张”或“它不会说话，但它一直亮着”，短到能直接当转发文案或评论区一句话",
+            "保留真实质感：掉漆、水渍、湿裤脚、声控灯的延迟熄灭都要留着，不要把出租屋拍成样板间",
+            "结尾留一个可参与的钩子：如“你屋里那盏一直亮着的灯是什么”，引导观众晒出自己的旧灯旧物"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            "《比海更深》",
+            "《花样年华》",
+            "《晚春》",
+            "《帕特森》"
+          ],
+          "adReferences": [
+            "Apple《三分钟》",
+            "Apple《女儿》",
+            "方太《油烟情书》"
+          ],
+          "styleReferences": [
+            "冷暖色调区分时空：室内唯一光源为旧台灯2700K暖黄，窗外街灯冷蓝只做人物轮廓勾边，色温对比承担记忆与当下的分界",
+            "雨滴玻璃散景作为转场介质：通过焦点从雨珠移向人物眼睛完成时空切换，避免使用闪白或叠化",
+            "声音先行：雨声和灯管的细微电流声先于画面进入，对白降到耳语级，情绪高点反而抽掉环境音，留出呼吸声",
+            "情绪全由光的变化承载：让台灯的明暗起伏跟随人物心理变化，结尾不改变场景，只让灯亮一点，完成治愈落点"
+          ]
+        },
+        "deliveryStandard": {
+          "deliverables": [
+            {
+              "item": "video_master",
+              "spec": "MP4/H.264, 1080p",
+              "priority": "required"
+            },
+            {
+              "item": "character_portraits",
+              "spec": "定妆照全套",
+              "priority": "required"
+            },
+            {
+              "item": "script_document",
+              "spec": "完整剧本+分镜",
+              "priority": "required"
+            },
+            {
+              "item": "shot_list",
+              "spec": "镜头清单+Prompt日志",
+              "priority": "optional"
+            }
+          ],
+          "acceptanceCriteria": {
+            "visual": 0.75,
+            "audio": 0.7,
+            "narrative": 0.75,
+            "consistency": 0.7
+          },
+          "outputFormat": {
+            "videoCodec": "H.264",
+            "audioCodec": "AAC",
+            "container": "MP4"
+          },
+          "revisionPolicy": {
+            "maxRevisions": 1,
+            "revisionScope": [
+              "visual",
+              "audio",
+              "narrative"
+            ]
+          },
+          "fallbackPlan": {
+            "trigger": "视觉质量低于 0.75 或连续 2 次迭代无改善",
+            "action": "降低视觉复杂度，使用 simpler prompt，减少特效需求",
+            "expectedOutput": "降低质量但保证叙事完整性"
+          },
+          "continuityCheckpoints": [
+            {
+              "checkpoint": "character-appearance",
+              "validationMethod": "跨镜头角色外貌一致性检查（服装、发型、面部特征）"
+            },
+            {
+              "checkpoint": "costume-continuity",
+              "validationMethod": "服装道具连续性检查（同一场景内服装不变）"
+            },
+            {
+              "checkpoint": "scene-logic",
+              "validationMethod": "场景逻辑连续性检查（时间线、空间转换合理性）"
+            },
+            {
+              "checkpoint": "lighting-continuity",
+              "validationMethod": "光照连续性检查（同一场景光照方向和色温一致）"
+            }
+          ]
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "prdSummary": {
+          "title": "雨夜旧灯未凉",
+          "type": "剧情短片 | 情感品牌短片",
+          "duration": "30秒",
+          "scenes": "2 场景 / 8 预估镜头",
+          "characters": "雨夜归人",
+          "qualityTier": "standard",
+          "keyHook": "前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横移门缝一线暖光；观众问“这盏灯为谁亮着？...",
+          "deliverables": [
+            "video_master",
+            "character_portraits",
+            "script_document"
+          ],
+          "humanReadable": "雨夜旧灯未凉 (剧情短片/情感品牌短片, 30秒) - 2场景/8镜头, 1角色, 品质档:standard, 核心钩子:前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横..."
+        },
+        "_briefAspectOverride": "Brief 画幅 9:16",
+        "deliveryStandards": {
+          "durationSeconds": 30
+        },
+        "_briefDurationOverride": "Brief 时长 30s"
+      },
+      "timing": 54260,
+      "summary": {
+        "title": "雨夜旧灯未凉",
+        "type": "剧情短片 | 情感品牌短片",
+        "duration": "30秒",
+        "scenes": "2 场景 / 8 预估镜头",
+        "characters": "雨夜归人",
+        "qualityTier": "standard",
+        "keyHook": "前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横移门缝一线暖光；观众问“这盏灯为谁亮着？...",
+        "deliverables": [
+          "video_master",
+          "character_portraits",
+          "script_document"
+        ],
+        "humanReadable": "雨夜旧灯未凉 (剧情短片/情感品牌短片, 30秒) - 2场景/8镜头, 1角色, 品质档:standard, 核心钩子:前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横..."
+      }
+    },
+    "prdReview": {
+      "status": "rejected",
+      "reason": "producer-rejected(G4_PRD · score=58)",
+      "suggestions": [
+        "补充角色锚点表：明确默认模特ID/版本、定妆照参考图、固定发型服装与手部细节，并将定妆照审核通过作为分镜和视频生成前置条件。",
+        "统一全片时间线到0-30秒：删除“第50秒”，对齐关键信息、SC01/SC02与镜头清单中的擦手、扶灯、灯亮、人出画节点。",
+        "对“旧纸条/老照片”做明确取舍：删除该表述，或补入道具契约并注明实拍素材、不使用生成外观。",
+        "新增风险摘要表，列明4项风险的等级、一句话结论和逐项缓解措施；从禁止元素中移除未完成的编辑指令。",
+        "在交付标准中集中写死：9:16、1080x1920、30秒、24fps、MP4/H.264/AAC、音频响度/峰值、无字幕或字幕文件口径、台词仅耳语且不烧录。",
+        "补充结构化镜头合同与自检段，并把门内容字数口径统一为同一取值。"
+      ]
+    }
+  },
+  "errors": [],
+  "timing": {},
+  "confirmations": {
+    "creativeTheme": {
+      "approved": true,
+      "reviewedAt": "2026-10-31T04:13:42.088Z",
+      "theme": {
+        "duration_sec": 30,
+        "tone": "温暖治愈",
+        "title": "雨夜旧灯未凉",
+        "theme": "雨夜旧灯未凉",
+        "description": "加班到末班车的年轻人淋雨回到出租屋，摸黑找开关时，那盏掉漆旧台灯竟还亮着；他擦干手心的雨水，把灯罩轻轻扶正——原来陪伴从不声张。",
+        "type": "情感品牌短片",
+        "visual_style": "参考是枝裕和《比海更深》的日常克制与王家卫雨夜霓虹的湿润反光；主光以旧台灯2700K暖黄为唯一室内光源，窗外冷蓝街灯勾边，雨滴在玻璃上形成散景。",
+        "duration": "30秒",
+        "aspect_ratio": "9:16",
+        "platform": "抖音",
+        "creative_style": 0.6,
+        "dialogue_requirement": "无台词；仅保留雨声、钥匙碰撞、灯罩轻响等环境音，不加旁白。",
+        "special_notes": "视觉锚点：雨夜、湿发、老旧台灯、掉漆灯罩、暖黄光；特写：雨滴沿发梢落下；特写：手指摸到旧台灯开关；特写：灯罩边缘掉漆与磨痕。人物仅使用内置默认模特；全片不出现商品参数、价格、购买链接。",
+        "pressureAnchors": [
+          "PA-04"
+        ],
+        "target_audience": "一二线城市加班通勤的年轻租房人群，以及重视陪伴、耐用与生活温度的泛大众用户",
+        "_customType": true,
+        "task_id": "C-859",
+        "difficulty": "中",
+        "platform_id": "douyin",
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin"
+      },
+      "reason": "producer-approved(G2_THEME · score=90)",
+      "suggestions": [
+        "将\"27 00K\"修正为\"2700K\"并禁止在数值中间断行，或在备注中明确色温数值只作参考光色描述",
+        "把\"王家卫雨夜霓虹\"收敛为\"雨夜街灯湿润反光\"，去除具体导演/地域指向，避免无关地域意象与风格漂移",
+        "统一字数统计口径（1746/1748），并在确认单尾部附一行内容校验信息",
+        "进入视频生成链路前补一份结构化镜头合同（镜头数、时长分配、景别/运镜、人物数量与造型、光源与道具清单），以便后续环节逐条比对",
+        "在确认单中显式标注\"人物仅使用内置默认模特、不出现商品参数/价格/购买链接\"为硬性红线，便于下游自动校验"
+      ],
+      "waitTimeMs": 7355
+    },
+    "requirementList": {
+      "approved": true,
+      "reviewedAt": "2026-10-31T04:15:04.083Z",
+      "requirementList": {
+        "emotionProfile": {
+          "primary": "neutral",
+          "secondary": null,
+          "intensity": 0.5,
+          "triggers": [
+            "rain"
+          ],
+          "confidence": 0,
+          "allEmotions": {}
+        },
+        "contentConstraints": [
+          "用户要求: 把“第50秒”改为落在30秒内的具体时间码（如“第12-14秒”），并回查全文所有时间指代是否都在0-30秒区间。",
+          "用户要求: 二选一：在道具契约中补入“旧纸条/老照片（如保留，需注明为实拍素材、不使用生成外观）”，或删除该表述，避免下游新增未授权道具。",
+          "用户要求: 统一字数口径（正文与门内容检查取值一致），并把确定性检查结果回写为清单内的自检段，便于复核。",
+          "用户要求: 风险结论摘要补齐4项风险的等级+一句话结论，缓解措施按风险编号一一对应，避免只覆盖2项。",
+          "用户要求: 开场补充1-2个镜位拆分（如：伞尖滴水特写→门缝暖光横移），并标注每镜秒数，确保总时长仍为30秒。",
+          "用户要求: 补充“无字幕可看懂”与结尾低声台词的字幕策略结论（是否完全不出字幕），以免下游在字幕/对白处理上分歧。"
+        ]
+      },
+      "reason": "producer-approved(G3_INSIGHT · score=82)",
+      "suggestions": [
+        "把“第50秒”改为落在30秒内的具体时间码（如“第12-14秒”），并回查全文所有时间指代是否都在0-30秒区间。",
+        "二选一：在道具契约中补入“旧纸条/老照片（如保留，需注明为实拍素材、不使用生成外观）”，或删除该表述，避免下游新增未授权道具。",
+        "统一字数口径（正文与门内容检查取值一致），并把确定性检查结果回写为清单内的自检段，便于复核。",
+        "风险结论摘要补齐4项风险的等级+一句话结论，缓解措施按风险编号一一对应，避免只覆盖2项。",
+        "开场补充1-2个镜位拆分（如：伞尖滴水特写→门缝暖光横移），并标注每镜秒数，确保总时长仍为30秒。",
+        "补充“无字幕可看懂”与结尾低声台词的字幕策略结论（是否完全不出字幕），以免下游在字幕/对白处理上分歧。"
+      ],
+      "waitTimeMs": 8942
+    },
+    "prd": {
+      "approved": false,
+      "reviewedAt": "2026-10-31T04:16:21.433Z",
+      "prd": {
+        "projectDefinition": {
+          "projectId": "a89b23f4-d120-4bce-9cbb-3de69398c2c1",
+          "projectName": "雨夜旧灯未凉",
+          "version": "1.0.0",
+          "createdAt": "2026-10-31T04:15:04.132Z",
+          "sourceIntent": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin"
+        },
+        "productPositioning": {
+          "productType": "剧情短片",
+          "genre": "情感品牌短片",
+          "targetPlatform": "通用",
+          "targetDuration": 30,
+          "aspectRatio": "9:16",
+          "resolution": "1080p",
+          "frameRate": 24
+        },
+        "creativeCore": {
+          "coreTheme": "被照顾的从来不是灯：雨夜归人先擦干手心才扶正掉漆灯罩，2700K暖黄在冷蓝雨窗里证明，陪伴从不声张，却一直亮着。",
+          "creativeHook": "前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横移门缝一线暖光；观众问“这盏灯为谁亮着？”雨声、声控灯逐层熄灭与门缝黑暖反差，把最后一百米变成自身经验。",
+          "emotionalArc": "setup→rising→climax→falling→resolution",
+          "keyMessages": [
+            "P0：陪伴从不声张——第12-14秒先擦干手心雨水才扶正灯罩，怕弄湿它。",
+            "P1：它不会说话，但它一直亮着——第28-30秒人出画，只留雨痕和一小片暖光。",
+            "P2：掉漆、水渍、湿裤脚、声控灯延迟熄灭都保留，出租屋不拍成样板间。",
+            "P0：结尾钩子“你屋里那盏一直亮着的灯是什么”，引导晒旧灯旧物。"
+          ],
+          "twistPoint": "第12-14秒黑暗里灯突然亮起后，他先不扶灯，而是在裤子上擦干手心雨水才碰歪灯罩——怕弄湿它，让台灯从道具变成被照顾的家人。",
+          "endingType": "开放式",
+          "revisionCompliance": {
+            "timecodeAudit": "全文时间码仅用0-3秒、12-14秒、28-30秒，均在0-30秒内；原“第50秒”已改为第12-14秒。",
+            "propContract": "不新增纸条或照片类道具；仅保留原输入中的掉漆旧台灯。",
+            "wordCountSelfCheck": "正文与门内容检查统一按中文字符计，creativeHook 86字、keyMessages各≤50字，自检结果回写本清单。",
+            "riskSummary": [
+              "风险1（中）：雨夜低照度易欠曝，结论：以2700K台灯为唯一室内主光，窗外冷蓝只勾边，保留暗部层次。",
+              "风险2（中）：湿手扶灯动作可能被误读为危险，结论：先擦干手心再碰灯罩，用动作链明确“怕弄湿它”。",
+              "风险3（低）：无字幕可看懂依赖动作链，结论：黑→摸墙→灯亮→擦手→扶正灯罩，环境声与开关声承担叙事。",
+              "风险4（低）：结尾低声台词与字幕策略分歧，结论：结尾低声台词不上字幕，保留雨声与电流声；平台强制时仅用可关闭CC。"
+            ],
+            "openingShots": [
+              "0-1.5s：伞尖滴水特写，雨珠砸在楼道水泥地，冷蓝反光。",
+              "1.5-3s：门缝暖光横移，声控灯逐层熄灭，最后只剩一线黑与暖。"
+            ],
+            "subtitleStrategy": "无字幕可看懂：全片靠动作链与环境声叙事；结尾低声台词“陪伴从不声张”不上字幕，只留雨声、开关声、电流声；若平台强制字幕，则用可关闭CC，不压画面。"
+          }
+        },
+        "visualSpecification": {
+          "primaryStyle": "电影级写实",
+          "colorPalette": {
+            "dominant": "冷蓝雨窗与灰湿楼道",
+            "accent": "旧台灯2700K暖黄",
+            "mood": "克制、湿润、私密，冷暖对比承载记忆与当下"
+          },
+          "lightingDirection": "室内唯一主光为旧台灯2700K暖黄，窗外冷蓝街灯仅勾人物轮廓；雨滴玻璃散景做柔光，灯光明暗跟随人物心理微微起伏。",
+          "cameraLanguage": "手持克制微晃与固定长镜结合；开场特写接横移，后段以近景和极近特写捕捉手部与灯罩细节，焦点从雨珠移向眼睛完成转场。",
+          "visualReferences": [
+            "《比海更深》",
+            "是枝裕和",
+            "《花样年华》",
+            "王家卫"
+          ],
+          "textureQuality": "写实",
+          "specialVisualEffects": [
+            "雨滴玻璃散景",
+            "冷暖色温对比",
+            "焦点转移转场"
+          ]
+        },
+        "audioSpecification": {
+          "musicStyle": "极简氛围钢琴与低频弦乐，克制少旋律，留白为主。",
+          "soundDesign": "雨声与灯管电流声先行，声控灯逐层熄灭；情绪高点抽环境音，只留呼吸与耳语。",
+          "voicePolicy": "环境音为主",
+          "audioMood": "潮湿、安静、隐忍后回暖，结尾以耳语和灯亮完成治愈。",
+          "audioReferences": [
+            "雨夜环境声",
+            "灯管电流声",
+            "极简钢琴氛围"
+          ],
+          "subtitlePolicy": "无字幕可看懂；结尾低声台词不上字幕，仅保留耳语级声音与呼吸声，避免字幕打断情绪。"
+        },
+        "characterSystem": {
+          "characters": [
+            {
+              "characterId": "char_001",
+              "name": "雨夜归人",
+              "role": "主角",
+              "ageRange": "青年",
+              "appearance": "使用内置默认模特；短发被雨打湿，发梢滴水，面容疲惫但克制，手部有雨水反光。",
+              "personality": "沉默、细心、习惯先照顾物再照顾自己，情绪不外露。",
+              "costume": "深色旧外套、深色长裤、肩背旧包，衣料微湿，无醒目品牌标识。",
+              "portraitPath": "",
+              "consistencyRequirements": "使用内置默认模特；湿发、深色外套、旧包保持一致；面部、发型与手部细节跨镜头一致；不新增配饰。"
+            }
+          ]
+        },
+        "scenePlan": {
+          "scenes": [
+            {
+              "sceneId": "SC01",
+              "sequence": 1,
+              "purpose": "删掉这镜，观众会误以为暖光来自屋内有人；本镜保留湿手摸黑找开关、灯却先亮着的错位感，并完成0-5秒setup与5-14秒rising。",
+              "duration": 14,
+              "emotionalBeat": "setup",
+              "setting": "雨夜老旧居民楼楼道与家门口，门缝透出一线暖光。",
+              "timeOfDay": "深夜",
+              "keyProps": [
+                "透明长柄伞",
+                "掉漆旧台灯",
+                "湿发",
+                "门缝暖光",
+                "楼道声控灯"
+              ],
+              "visualRequirements": [
+                "0-1.5s伞尖滴水砸楼道水泥地特写；1.5-3s横移门缝一线暖光；3-7s湿手摸黑找开关；7-14s灯先亮，手指触到旧台灯开关，雨滴沿发梢落下。",
+                "冷暖色温对比；雨滴玻璃散景；人物仅用内置默认模特。"
+              ],
+              "audioRequirements": [
+                "雨声先行；声控灯逐层熄灭声；灯管细微电流声进入。"
+              ],
+              "dialogue": ""
+            },
+            {
+              "sceneId": "SC02",
+              "sequence": 2,
+              "purpose": "删掉这镜，全片只剩灯亮着的巧合，没有他回应陪伴的动作；14-22秒先擦干掌心雨水，22-26秒扶正灯罩，26-30秒灯亮一点完成治愈落点。",
+              "duration": 16,
+              "emotionalBeat": "resolution",
+              "setting": "室内旧书桌旁，掉漆旧台灯与雨窗形成冷暖边界。",
+              "timeOfDay": "深夜",
+              "keyProps": [
+                "旧台灯",
+                "掉漆灯罩",
+                "磨痕",
+                "湿发",
+                "雨窗"
+              ],
+              "visualRequirements": [
+                "14-22s手背擦干掌心雨水特写；22-26s手指轻轻扶正掉漆灯罩，暖光扫过旧漆裂纹与磨痕；26-30s不改变场景，只让灯亮一点；结尾低声台词不出字幕。",
+                "焦点从雨珠移向眼睛完成时空切换；情绪高点留呼吸声。"
+              ],
+              "audioRequirements": [
+                "雨声与灯管电流声持续；情绪高点抽掉环境音；结尾耳语级低声台词，无字幕。"
+              ],
+              "dialogue": "（耳语）我回来了。"
+            }
+          ],
+          "shotMapping": [
+            {
+              "sceneId": "SC01",
+              "estimatedShots": 4,
+              "shotBreakdownHint": [
+                "extreme-close-up",
+                "tracking",
+                "medium",
+                "close-up"
+              ]
+            },
+            {
+              "sceneId": "SC02",
+              "estimatedShots": 4,
+              "shotBreakdownHint": [
+                "close-up",
+                "extreme-close-up",
+                "close-up",
+                "static"
+              ]
+            }
+          ]
+        },
+        "productionConstraints": {
+          "technicalConstraints": [
+            "特殊要求: 视觉锚点：雨夜、湿发、老旧台灯、掉漆灯罩、暖黄光；特写：雨滴沿发梢落下；特写：手指摸到旧台灯开关；特写：灯罩边缘掉漆与磨痕。人物仅使用内置默认模特；全片不出现商品参数、价格、购买链接。",
+            "用户要求: 把“第50秒”改为落在30秒内的具体时间码（如“第12-14秒”），并回查全文所有时间指代是否都在0-30秒区间。",
+            "用户要求: 二选一：在道具契约中补入“旧纸条/老照片（如保留，需注明为实拍素材、不使用生成外观）”，或删除该表述，避免下游新增未授权道具。",
+            "用户要求: 统一字数口径（正文与门内容检查取值一致），并把确定性检查结果回写为清单内的自检段，便于复核。",
+            "用户要求: 风险结论摘要补齐4项风险的等级+一句话结论，缓解措施按风险编号一一对应，避免只覆盖2项。"
+          ],
+          "businessConstraints": [
+            "全球观众零背景知识可懂：情感信息只能由雨、湿发、手、暖光这些通用符号承载，不能依赖中式老台灯的形制、家庭关系台词或地域性道具来传达“旧物与记忆”。",
+            "无字幕依赖：不能用字幕或旁白说明人物关系与时间跨度，谁是父亲、这是谁的房间，必须靠画面调度与声音设计让观众自行读懂。",
+            "无虚构特效元素：不做雨滴悬浮、光晕粒子、时间倒流、记忆叠化等不可信特效；雨、玻璃、磨损、旧物必须保持物理真实与纪实质感。"
+          ],
+          "forbiddenElements": [
+            "低质量",
+            "模糊",
+            "不稳定",
+            "二选一：在道具契约中补入“旧纸条/老照片（如保留，需注明为实拍素材、不使用生成外观）”，或删除该表述，下游新增未授权道具",
+            "风险结论摘要补齐4项风险的等级+一句话结论，缓解措施按风险编号一一对应，只覆盖2项。"
+          ],
+          "qualityThresholds": {
+            "visual": 0.8,
+            "audio": 0.75,
+            "narrative": 0.85,
+            "consistency": 0.75
+          },
+          "modelCapabilityBounds": {
+            "maxPromptComplexity": "moderate",
+            "supportedEffects": [
+              "基础调色",
+              "简单转场"
+            ],
+            "consistencyStrategy": "textual-description"
+          }
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interests": [
+              "独居租房生活",
+              "加班通勤日常",
+              "旧物与旧家具",
+              "治愈系短片",
+              "城市夜归情绪"
+            ],
+            "consumptionLevel": "medium"
+          },
+          "emotionTriggers": [
+            "末班车后雨还没停，他站在楼道口甩伞上的水，声控灯一层层灭下去，最后只剩自家门缝那条黑——第3秒观众认出“这就是我每晚的最后一百米”",
+            "他摸黑在墙上乱摸开关，指尖先碰到冰冷的墙和没插电的插排，最后摸到灯罩边缘，那盏掉漆旧台灯“啪”地亮起——黑暗里的期待落空与暖黄突然亮起的反差，是第一个情绪高点",
+            "他没有立刻扶灯，而是先把手心的雨水在裤子上擦干，才去碰歪掉的灯罩——这个“怕弄湿它”的小动作，让台灯从道具变成被照顾的家人",
+            "灯罩缺口处的掉漆、灯座下压着的旧纸条或老照片，让观众在第50秒想起自己行李箱里那件一直没扔的旧物",
+            "结尾人不在画面里，只有窗上的雨痕和一小片暖光还亮着——留白把“转发”变成动作：发给那个总给我留灯的人"
+          ],
+          "contentExpectations": [
+            "无需字幕也能看懂的视觉叙事：靠“黑→摸墙→灯亮→擦手→扶正灯罩”的动作链，配合雨声、开关声、声控灯延迟熄灭完成全部叙事，海外观众也能读懂",
+            "可复述可转发的钉子台词：如“陪伴从不声张”或“它不会说话，但它一直亮着”，短到能直接当转发文案或评论区一句话",
+            "保留真实质感：掉漆、水渍、湿裤脚、声控灯的延迟熄灭都要留着，不要把出租屋拍成样板间",
+            "结尾留一个可参与的钩子：如“你屋里那盏一直亮着的灯是什么”，引导观众晒出自己的旧灯旧物"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            "《比海更深》",
+            "《花样年华》",
+            "《晚春》",
+            "《帕特森》"
+          ],
+          "adReferences": [
+            "Apple《三分钟》",
+            "Apple《女儿》",
+            "方太《油烟情书》"
+          ],
+          "styleReferences": [
+            "冷暖色调区分时空：室内唯一光源为旧台灯2700K暖黄，窗外街灯冷蓝只做人物轮廓勾边，色温对比承担记忆与当下的分界",
+            "雨滴玻璃散景作为转场介质：通过焦点从雨珠移向人物眼睛完成时空切换，避免使用闪白或叠化",
+            "声音先行：雨声和灯管的细微电流声先于画面进入，对白降到耳语级，情绪高点反而抽掉环境音，留出呼吸声",
+            "情绪全由光的变化承载：让台灯的明暗起伏跟随人物心理变化，结尾不改变场景，只让灯亮一点，完成治愈落点"
+          ]
+        },
+        "deliveryStandard": {
+          "deliverables": [
+            {
+              "item": "video_master",
+              "spec": "MP4/H.264, 1080p",
+              "priority": "required"
+            },
+            {
+              "item": "character_portraits",
+              "spec": "定妆照全套",
+              "priority": "required"
+            },
+            {
+              "item": "script_document",
+              "spec": "完整剧本+分镜",
+              "priority": "required"
+            },
+            {
+              "item": "shot_list",
+              "spec": "镜头清单+Prompt日志",
+              "priority": "optional"
+            }
+          ],
+          "acceptanceCriteria": {
+            "visual": 0.75,
+            "audio": 0.7,
+            "narrative": 0.75,
+            "consistency": 0.7
+          },
+          "outputFormat": {
+            "videoCodec": "H.264",
+            "audioCodec": "AAC",
+            "container": "MP4"
+          },
+          "revisionPolicy": {
+            "maxRevisions": 1,
+            "revisionScope": [
+              "visual",
+              "audio",
+              "narrative"
+            ]
+          },
+          "fallbackPlan": {
+            "trigger": "视觉质量低于 0.75 或连续 2 次迭代无改善",
+            "action": "降低视觉复杂度，使用 simpler prompt，减少特效需求",
+            "expectedOutput": "降低质量但保证叙事完整性"
+          },
+          "continuityCheckpoints": [
+            {
+              "checkpoint": "character-appearance",
+              "validationMethod": "跨镜头角色外貌一致性检查（服装、发型、面部特征）"
+            },
+            {
+              "checkpoint": "costume-continuity",
+              "validationMethod": "服装道具连续性检查（同一场景内服装不变）"
+            },
+            {
+              "checkpoint": "scene-logic",
+              "validationMethod": "场景逻辑连续性检查（时间线、空间转换合理性）"
+            },
+            {
+              "checkpoint": "lighting-continuity",
+              "validationMethod": "光照连续性检查（同一场景光照方向和色温一致）"
+            }
+          ]
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "prdSummary": {
+          "title": "雨夜旧灯未凉",
+          "type": "剧情短片 | 情感品牌短片",
+          "duration": "30秒",
+          "scenes": "2 场景 / 8 预估镜头",
+          "characters": "雨夜归人",
+          "qualityTier": "standard",
+          "keyHook": "前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横移门缝一线暖光；观众问“这盏灯为谁亮着？...",
+          "deliverables": [
+            "video_master",
+            "character_portraits",
+            "script_document"
+          ],
+          "humanReadable": "雨夜旧灯未凉 (剧情短片/情感品牌短片, 30秒) - 2场景/8镜头, 1角色, 品质档:standard, 核心钩子:前3秒：0-1.5s伞尖滴水特写砸楼道水泥地，1.5-3s横..."
+        },
+        "_briefAspectOverride": "Brief 画幅 9:16",
+        "deliveryStandards": {
+          "durationSeconds": 30
+        },
+        "_briefDurationOverride": "Brief 时长 30s"
+      },
+      "reason": "producer-rejected(G4_PRD · score=58)",
+      "suggestions": [
+        "补充角色锚点表：明确默认模特ID/版本、定妆照参考图、固定发型服装与手部细节，并将定妆照审核通过作为分镜和视频生成前置条件。",
+        "统一全片时间线到0-30秒：删除“第50秒”，对齐关键信息、SC01/SC02与镜头清单中的擦手、扶灯、灯亮、人出画节点。",
+        "对“旧纸条/老照片”做明确取舍：删除该表述，或补入道具契约并注明实拍素材、不使用生成外观。",
+        "新增风险摘要表，列明4项风险的等级、一句话结论和逐项缓解措施；从禁止元素中移除未完成的编辑指令。",
+        "在交付标准中集中写死：9:16、1080x1920、30秒、24fps、MP4/H.264/AAC、音频响度/峰值、无字幕或字幕文件口径、台词仅耳语且不烧录。",
+        "补充结构化镜头合同与自检段，并把门内容字数口径统一为同一取值。"
+      ],
+      "waitTimeMs": 23040
+    }
+  },
+  "deliverables": {},
+  "totalWaitTimeMs": 39337,
+  "producerAttempts": 1
+}

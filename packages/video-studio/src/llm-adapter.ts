@@ -306,7 +306,29 @@ export class WorkloomLLMEngine {
       "【目标JSON结构示例】",
       schemaText,
     ].join("\n");
-    return this.reason(structuredPrompt, { ...options, forceJson: true });
+    const result = await this.reason(structuredPrompt, { ...options, forceJson: false });
+    if (!result.success || !result.content) return result;
+    const extracted = this._extractJsonObject(result.content);
+    if (!extracted) {
+      this.stats.totalFailures++;
+      return {
+        ...result,
+        success: false,
+        error: "JSON 解析失败: 未找到首个完整 JSON",
+        retryable: false,
+      };
+    }
+    try {
+      return { ...result, data: JSON.parse(extracted) };
+    } catch (error) {
+      this.stats.totalFailures++;
+      return {
+        ...result,
+        success: false,
+        error: `JSON 解析失败: ${error instanceof Error ? error.message : String(error)}`,
+        retryable: false,
+      };
+    }
   }
 
   /**

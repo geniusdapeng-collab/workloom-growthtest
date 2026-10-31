@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M05",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "7407388d70c94045485aa7144d7fc87992bc1537d48cfb41b383af366b9aabd2"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "野萃 Go 便携咖啡机",
+        "brand": "野萃",
+        "category": "便携咖啡器具",
+        "model": "Go",
+        "sellingPoints": [
+          "免电源",
+          "单手压杆",
+          "收纳体积小"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "野萃 Go 便携咖啡机",
+        "brand": {
+          "name": "野萃"
+        },
+        "category": "便携咖啡器具"
+      },
+      "dataMining": {
+        "name": "野萃 Go 便携咖啡机",
+        "brand": "野萃",
+        "category": "便携咖啡器具",
+        "model": "Go",
+        "sellingPointCandidates": [
+          "免电源",
+          "单手压杆",
+          "收纳体积小"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给野萃 Go 便携咖啡机做一条小红书露营场景种草，突出免电源、单手压杆和收纳体积\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "野萃 Go 便携咖啡机",
+    "queries": [
+      {
+        "q": "野萃 Go 便携咖啡机 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "野萃 Go 便携咖啡机 便携咖啡器具 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "野萃 Go 便携咖啡机 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "野萃 Go 便携咖啡机 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "野萃 Go 便携咖啡机 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "野萃 Go 便携咖啡机 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "野萃 Go 便携咖啡机 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "野萃 Go 便携咖啡机 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "74929222947b754ba1bb82c03cc910b2cba5a06b279999b9a1a5117bc7ded298"
+    }
+  },
+  "capturedAt": "2026-10-31T14:31:10.124Z"
+}

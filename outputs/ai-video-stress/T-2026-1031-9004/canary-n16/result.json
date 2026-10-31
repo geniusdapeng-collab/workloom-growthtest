@@ -1,0 +1,2818 @@
+{
+  "success": false,
+  "stages": {
+    "creativeTheme": {
+      "data": {
+        "meta": {
+          "version": "2.1.8-fix-context",
+          "generated_at": "2026-10-31",
+          "total_tasks": 1,
+          "batch_name": "用户定制生成",
+          "purpose": "基于用户输入的定向创意主题生成"
+        },
+        "tasks": [
+          {
+            "duration_sec": 30,
+            "tone": "温暖治愈",
+            "theme": "旧灯没断电",
+            "description": "雨夜，陈卓拖着湿透的步子回到出租屋，摸黑找钥匙时，发现那盏老旧台灯还亮着；他伸手轻触灯罩，余温像有人先说了一句“回来了”。",
+            "type": "品牌情感短片",
+            "visual_style": "参考是枝裕和的日常静观与王家卫雨夜霓虹：冷蓝雨光包裹楼道，室内用低照度钨丝暖光，浅景深与手持微晃，结尾定格灯罩余温。",
+            "dialogue_requirement": "无台词；仅保留雨声、钥匙碰撞、门轴轻响与台灯开关声。不出现商品参数或价格口播。",
+            "special_notes": "原文未给“特写：”与物理细节；视觉锚点建议：特写雨珠沿伞骨坠落、钥匙插入旧锁孔、指尖按下台灯开关、灯罩边缘细裂纹与积灰、钨丝渐亮；物理细节：门轴轻响、灯罩微热、旧木桌面烫痕、湿冷雨夜与室内暖光对比。全片不出现商品参数或价格。",
+            "duration": "30秒",
+            "aspect_ratio": "9:16",
+            "platform": "抖音",
+            "character_ref": {
+              "id": "chen-zhuo",
+              "name": "陈卓",
+              "portrait_ref": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+              "authorization": "real-authorized",
+              "usage": "仅使用内置默认模特"
+            },
+            "creative_style": 0.6,
+            "pressureAnchors": [
+              "PA-05"
+            ],
+            "target_audience": "20-35岁城市青年、独居租房人群、注重情感共鸣与生活质感品牌的消费者",
+            "_customType": true,
+            "task_id": "C-439",
+            "difficulty": "中",
+            "platform_id": "douyin",
+            "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+          }
+        ],
+        "quality": {
+          "total": 5,
+          "passed": false,
+          "failed": 1,
+          "checks": [
+            {
+              "name": "画面感测试",
+              "pass": true,
+              "message": "描述能否形成视觉画面"
+            },
+            {
+              "name": "可执行性测试",
+              "pass": true,
+              "message": "AI视频系统能否生成具体提示词"
+            },
+            {
+              "name": "时长合理性",
+              "pass": true,
+              "message": "时长是否在合理范围内（15秒-3分钟）"
+            },
+            {
+              "name": "参考影片",
+              "pass": false,
+              "message": "是否包含具体影片参考"
+            },
+            {
+              "name": "特殊要求",
+              "pass": true,
+              "message": "是否包含特殊要求说明"
+            }
+          ]
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+        "_briefProfile": {
+          "duration": 30,
+          "aspectRatio": "9:16",
+          "platform": "douyin"
+        }
+      },
+      "timing": 11887
+    },
+    "dossierEvidence": {
+      "injected": false,
+      "reason": "no-dossier"
+    },
+    "requirementDiscovery": {
+      "data": {
+        "upstreamFields": {
+          "type": "品牌情感短片",
+          "theme": "旧灯没断电",
+          "duration_sec": 30,
+          "tone": "温暖治愈",
+          "visual_style": "参考是枝裕和的日常静观与王家卫雨夜霓虹：冷蓝雨光包裹楼道，室内用低照度钨丝暖光，浅景深与手持微晃，结尾定格灯罩余温。",
+          "dialogue_requirement": "无台词；仅保留雨声、钥匙碰撞、门轴轻响与台灯开关声。不出现商品参数或价格口播。",
+          "special_notes": "原文未给“特写：”与物理细节；视觉锚点建议：特写雨珠沿伞骨坠落、钥匙插入旧锁孔、指尖按下台灯开关、灯罩边缘细裂纹与积灰、钨丝渐亮；物理细节：门轴轻响、灯罩微热、旧木桌面烫痕、湿冷雨夜与室内暖光对比。全片不出现商品参数或价格。",
+          "target_audience": "20-35岁城市青年、独居租房人群、注重情感共鸣与生活质感品牌的消费者",
+          "creative_style": 0.6,
+          "difficulty": "中",
+          "description": "雨夜，陈卓拖着湿透的步子回到出租屋，摸黑找钥匙时，发现那盏老旧台灯还亮着；他伸手轻触灯罩，余温像有人先说了一句“回来了”。",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+          "platform": "douyin",
+          "platform_id": "douyin",
+          "aspect_ratio": "9:16"
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interestTags": [
+              "独居生活",
+              "租房改造",
+              "城市夜归",
+              "情感短片",
+              "生活质感家居"
+            ],
+            "occupation": "城市白领、互联网与创意行业从业者",
+            "consumptionLevel": "medium"
+          },
+          "secondaryAudience": [
+            "曾在出租屋被家人或室友留过一盏灯的人",
+            "有旧台灯陪伴备考、加班或搬家记忆的人",
+            "在雨夜加班后收到过“到了说一声”的人"
+          ],
+          "emotionTriggers": [
+            "雨夜里陈卓浑身湿透、钥匙在手里打滑，门缝下先漏出一线暖黄灯光——外面越冷越黑，那盏没断电的旧台灯越像有人在屋里等他。",
+            "他伸手摸到灯罩时指尖停住：灯罩还有余温，镜头从指尖推到灯罩纹理，观众会自己补出“有人刚离开”或“有人替他开过灯”的故事。",
+            "那句“像有人先说了一句‘回来了’”不拍人、只拍灯和空房间，把独居者最想听到的问候变成可触摸的温度，适合在深夜被转发给那个会留灯的人。"
+          ],
+          "painPoints": [
+            "独居租房的下班时刻：开门前没有一句“回来了”，只有摸黑找钥匙、雨声和空房间，关心常常迟到或只停在手机里。",
+            "城市节奏把照顾压成备注和表情包，缺的是灯罩余温这种不说出口、但能摸到的在意。",
+            "出租屋被当成临时落脚点，旧灯旧物难被保留，生活质感和归属感容易断掉。"
+          ],
+          "contentExpectations": [
+            "视觉叙事无需字幕也能懂：湿发滴水、摸黑找钥匙、门缝暖光、指尖触灯罩、余温特写，五个镜头完成“有人留灯”的全球通用表达。",
+            "有一句可复述可转发的钉子台词：保留“余温像有人先说了一句‘回来了’”，让它成为深夜发给家人、室友或伴侣的转发理由。",
+            "品牌或产品露出像情节证据而不是广告：旧台灯只负责亮着和被摸到余温，不抢在情绪前解释卖点。"
+          ]
+        },
+        "sceneStructure": {
+          "opening": {
+            "duration": 8,
+            "purpose": "第一眼：暴雨夜，陈卓湿透的手指停在出租屋锁孔前，钥匙串滴水，门缝下漏出一条暖黄光。他为什么停住？这盏灯是谁留的？",
+            "keyElements": [
+              "滴水的钥匙串",
+              "门缝下的暖黄光带",
+              "湿透的袖口"
+            ]
+          },
+          "scenes": [
+            {
+              "index": 1,
+              "duration": 14,
+              "purpose": "他指尖碰到灯罩，停住——余温说明有人刚开过。",
+              "keyElements": [
+                "亮着的老式台灯",
+                "陈卓停在灯罩上的手指",
+                "暖黄灯丝"
+              ],
+              "emotionalBeat": "climax"
+            }
+          ],
+          "ending": {
+            "duration": 8,
+            "purpose": "以动作与环境声回应。情绪从被等待落到回应，治愈闭合——灯没断电，是因为有人把‘回来’提前留在了屋里。",
+            "keyElements": [
+              "手指按住灯罩的特写",
+              "指缝漏出的暖黄光",
+              "陈卓微微张开的嘴唇"
+            ]
+          },
+          "totalDuration": 30,
+          "sceneCount": 1,
+          "narrativeArc": "linear"
+        },
+        "riskAssessment": {
+          "type": "object",
+          "technicalRisks": [
+            {
+              "risk": "钥匙插入旧锁孔并对准、旋转的精细手部动作特写：模型极易出现钥匙与锁孔错位、手指数量或指节变形、金属件在帧间“融化”重绘",
+              "level": "high",
+              "impact": "这是全片的“开启／回家”情绪支点，若该镜头穿帮，观众立刻出戏，品牌短片的可信度与情感铺垫同时崩塌，属于会毁掉全片的致命镜头"
+            },
+            {
+              "risk": "指尖按下台灯开关并伴随钨丝由暗到渐亮的连续镜头：微小接触点、手指与开关的物理咬合、以及亮度非线性渐变的帧间一致性都是模型弱项，易出现手指穿过开关、灯光跳变闪烁、色温忽冷忽热",
+              "level": "high",
+              "impact": "“旧灯没断电”的核心命题完全压在这一下开灯上，闪烁或跳变会让观众误读为灯坏了，直接反转主题含义；灯光不连续还会破坏全片低照度暖光的统一影调"
+            },
+            {
+              "risk": "雨珠沿伞骨滑落坠下的流体特写：细金属骨与水滴的表面张力、重力方向、水滴合并与拉丝在所有模型中都不稳定，易产生水滴悬浮、逆流、体积突变",
+              "level": "medium",
+              "impact": "该镜头是雨夜氛围的视觉锚点，穿帮不会毁掉叙事，但会拉低质感，让观众感到“AI 味”，削弱是枝裕和式的日常静观可信度"
+            },
+            {
+              "risk": "结尾定格“灯罩余温”与灯罩边缘细裂纹、积灰的极近距离特写：温度不可见，模型只能用热扰动、薄雾、微粒等方式生成，容易生成噪点状伪影或把细裂纹画成随机爬行纹理，且在定格帧上会被放大检视",
+              "level": "medium",
+              "impact": "结尾定格是全片记忆点与品牌情绪落点，伪影或裂纹跳变会让收尾显得廉价；但由于无动作、无连续性要求，属于可替换、可降级处理的镜头"
+            },
+            {
+              "risk": "全片统一的手持微晃加浅景深低照度影调在多镜头间保持一致性：模型对同场景不同镜次的色温、曝光、景深、颗粒与轻微晃动手感难以稳定复现，易出现镜头间影调断层",
+              "level": "medium",
+              "impact": "影调断裂会让短片看起来像素材拼接而非一部片子，破坏作者性视觉风格，但不会造成单点穿帮式灾难"
+            }
+          ],
+          "businessConstraints": [
+            "全球观众零背景知识可懂：旧灯、旧锁、雨夜、暖光等意象须依靠普适的身体动作与光影关系传达，不使用任何需要地域或文化解释的道具、祭仪、服饰符号",
+            "无字幕依赖：画面内不得出现可读文字信息（门牌、报纸、手机屏幕、包装标签、品牌 logo 文字），叙事不依赖对白语义即可成立，以适配多语言配音与无声播放场景",
+            "无虚构特效元素：雨、尘埃、热气、灯光均为可控的真实物理现象，不得添加魔法光效、发光粒子、超现实转场，保持纪实日常质感",
+            "品牌信息仅通过产品本体与光线存在感呈现，全片不出现商品参数、价格、功能说明与任何促销性字卡"
+          ],
+          "mitigationSuggestions": [
+            "将“开门”拆为 2–3 个连续特写降低单镜头动作复杂度：镜头 A 钥匙尖端贴近锁孔（手部半出画，浅景深虚化锁体）、镜头 B 钥匙已插入一半仅拍旋转手腕、镜头 C 门缝透出的暖光扩大；钥匙与锁孔的精确对准交给剪辑点而非模型生成",
+            "开灯动作改为“手入画按下 + 硬切灯亮”两段式：开关特写只保留指尖与开关边缘的局部接触，钨丝渐亮单独用一个不含手部、机位固定的空镜生成，渐变通过后期调光曲线控制而非依赖模型逐帧推断",
+            "雨珠镜头替换为低风险等效表达：静态附着在伞骨上的串珠状水珠配合缓慢横移与轻微手持，或先以实拍微距素材为底图做局部生成，避免让模型从零计算水滴的下落与合并物理",
+            "结尾“余温”用可见物理替身承载而不生成热效应：灯罩上方空气中缓慢飘浮的尘埃微粒、玻璃罩内壁一层极淡薄雾、指尖轻触灯罩后短暂停留再收回、旧木桌烫痕特写，最后以定格帧加轻微暗角收束，全部由实拍或固定机位素材完成"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            {
+              "title": "《步履不停》",
+              "relevance": "high",
+              "keyTakeaway": "用固定长镜的静观＋门框、走廊形成的纵深构图，让人物被家居环境包裹；对白刻意留白，情绪全部交给日常动作（添饭、擦桌、起身离去）承载，全程不用配乐煽情。"
+            },
+            {
+              "title": "《花样年华》",
+              "relevance": "high",
+              "keyTakeaway": "在楼道、楼梯间做分层布光：雨夜霓虹青蓝打在墙面与地面积水上形成流动反光，室内只留一盏低照度钨丝灯，形成冷暖交替的色温切换；浅景深把人物从环境中分离出来，用重复的日常动作（提灯、走过同一段楼梯）代替台词推进情绪。"
+            },
+            {
+              "title": "《咖啡时光》",
+              "relevance": "medium",
+              "keyTakeaway": "声音先行的处理：电车、雨声、室内电流底噪先入画，人物后入画，把环境声当作时空转换的方式，让静默段落自然积累情绪，不需要解释性台词。"
+            },
+            {
+              "title": "《我在故宫修文物》",
+              "relevance": "medium",
+              "keyTakeaway": "大量手部与器物微距特写承载情感重量，低角度单一光源下拍灯具、灯丝、擦拭的手，不提一句“情怀”，只拍手上的动作细节。"
+            }
+          ],
+          "adReferences": [
+            {
+              "brand": "Apple《三分钟》",
+              "relevance": "high",
+              "keyTakeaway": "弧线结构：倒计时式悬念开场→陌生人对峙与误解→一次靠近→肢体动作完成和解，全程无煽情台词，在90秒内完成“冷—紧—暖”的完整情感转变，结尾用一个动作定格收束。"
+            },
+            {
+              "brand": "Apple《一个桶》",
+              "relevance": "medium",
+              "keyTakeaway": "弧线结构：以一个具体物件作为承载情感的容器，一路只拍过程与沉默，结尾打开物件才揭晓情感，把情绪落点压到最后三秒，前面全部克制。"
+            },
+            {
+              "brand": "台湾大众银行《梦骑士》",
+              "relevance": "medium",
+              "keyTakeaway": "弧线结构：用黑白或去色的记忆闪回建立动机，切回现实彩色的一刻完成情绪转折，最后一个集体动作把个人情感放大成共鸣，时长严格控制在90秒内。"
+            }
+          ],
+          "styleReferences": [
+            "冷暖色调切分时空：闪回或记忆段用冷蓝雨光与青绿霓虹，现实室内用2700K钨丝暖光，两者刻意让色温切换并让灯罩光斑在交界处过渡，使暖不渐变、冷暖分明",
+            "声音先行：声控灯“啪”的一声、灯丝电流嗡鸣、雨打铁窗声承担叙事节奏，环境声先入画、人声后置，全片只在结尾灯罩定格的瞬间进一件乐器（钢琴或口琴）",
+            "浅景深＋手持微晃：中近景浅景深拍人物，隔着雨窗、门框拍失焦的人影；日常段落用固定机位静观，情绪临界点才切手持微晃，让摄影机的抖动只出现在最需要的地方",
+            "结尾定格设计：镜头缓慢推近灯罩上残留的手印或余温的织物表面，画面静下来，让光斑在画面里最后一秒才停止晃动"
+          ]
+        },
+        "confirmationStatus": {
+          "status": "pending",
+          "timestamp": "2026-10-31T05:51:36.242Z"
+        },
+        "_canonicalCharacters": [
+          {
+            "id": "chen-zhuo",
+            "characterId": "chen-zhuo",
+            "name": "陈卓",
+            "role": "protagonist",
+            "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "portraitPath": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "authorization": "real-authorized",
+            "description": "本次显式指定的授权模特；所有镜头必须绑定该 ID、当前定妆照与授权范围"
+          }
+        ]
+      },
+      "timing": 85085
+    },
+    "emotionIntent": {
+      "primary": "neutral",
+      "secondary": null,
+      "intensity": 0.5,
+      "triggers": [
+        "rain"
+      ],
+      "confidence": 0
+    },
+    "creativeIntensity": {
+      "intensity": 0.5,
+      "level": {
+        "key": "L2",
+        "max": 0.5,
+        "name": "平衡",
+        "description": "电影级质感，艺术平衡"
+      },
+      "activeCapabilities": 10,
+      "report": {
+        "intensity": 0.5,
+        "level": "L2",
+        "levelName": "平衡",
+        "levelDescription": "电影级质感，艺术平衡",
+        "narrativeMode": "dialogue",
+        "worldSetting": "default",
+        "summary": "创意指数 0.5 (平衡)：已激活 10/12 个能力",
+        "byLayer": {
+          "Layer 1": [
+            {
+              "id": "script",
+              "layer": "Layer 1",
+              "threshold": 0.4,
+              "weight": 0.12,
+              "name": "叙事结构",
+              "aspects": [
+                "scene_complexity",
+                "character_depth",
+                "conflict_design",
+                "pacing_structure"
+              ],
+              "adjustedThreshold": 0.4,
+              "active": true,
+              "gap": -0.09999999999999998
+            }
+          ],
+          "Layer 2": [
+            {
+              "id": "camera",
+              "layer": "Layer 2",
+              "threshold": 0.35,
+              "weight": 0.18,
+              "name": "镜头语言",
+              "aspects": [
+                "movement",
+                "angle",
+                "lens_choice",
+                "depth_of_field"
+              ],
+              "adjustedThreshold": 0.24999999999999997,
+              "active": true,
+              "gap": -0.25
+            },
+            {
+              "id": "lighting",
+              "layer": "Layer 2",
+              "threshold": 0.3,
+              "weight": 0.12,
+              "name": "灯光设计",
+              "aspects": [
+                "key_light",
+                "fill_light",
+                "practical_light",
+                "color_temperature"
+              ],
+              "adjustedThreshold": 0.3,
+              "active": true,
+              "gap": -0.2
+            },
+            {
+              "id": "composition",
+              "layer": "Layer 2",
+              "threshold": 0.35,
+              "weight": 0.1,
+              "name": "构图风格",
+              "aspects": [
+                "framing",
+                "negative_space",
+                "leading_lines",
+                "symmetry"
+              ],
+              "adjustedThreshold": 0.35,
+              "active": true,
+              "gap": -0.15000000000000002
+            },
+            {
+              "id": "production",
+              "layer": "Layer 2",
+              "threshold": 0.4,
+              "weight": 0.08,
+              "name": "美术布景",
+              "aspects": [
+                "set_design",
+                "props",
+                "color_coding",
+                "texture"
+              ],
+              "adjustedThreshold": 0.4,
+              "active": true,
+              "gap": -0.09999999999999998
+            },
+            {
+              "id": "performance",
+              "layer": "Layer 2",
+              "threshold": 0.4,
+              "weight": 0.08,
+              "name": "表演指导",
+              "aspects": [
+                "expression",
+                "gesture",
+                "movement",
+                "eye_contact"
+              ],
+              "adjustedThreshold": 0.25,
+              "active": true,
+              "gap": -0.25
+            }
+          ],
+          "Layer 3": [
+            {
+              "id": "color",
+              "layer": "Layer 3",
+              "threshold": 0.3,
+              "weight": 0.1,
+              "name": "色彩分级",
+              "aspects": [
+                "lut",
+                "saturation",
+                "contrast",
+                "temperature"
+              ],
+              "adjustedThreshold": 0.3,
+              "active": true,
+              "gap": -0.2
+            },
+            {
+              "id": "atmosphere",
+              "layer": "Layer 3",
+              "threshold": 0.35,
+              "weight": 0.06,
+              "name": "氛围营造",
+              "aspects": [
+                "fog",
+                "haze",
+                "volumetric",
+                "weather"
+              ],
+              "adjustedThreshold": 0.39999999999999997,
+              "active": true,
+              "gap": -0.10000000000000003
+            }
+          ],
+          "Layer 4": [
+            {
+              "id": "editing",
+              "layer": "Layer 4",
+              "threshold": 0.45,
+              "weight": 0.08,
+              "name": "剪辑节奏",
+              "aspects": [
+                "cutting_pace",
+                "match_cut",
+                "j_cut_l_cut",
+                "time_manipulation"
+              ],
+              "adjustedThreshold": 0.45,
+              "active": true,
+              "gap": -0.04999999999999999
+            },
+            {
+              "id": "sound",
+              "layer": "Layer 4",
+              "threshold": 0.35,
+              "weight": 0.08,
+              "name": "声音设计",
+              "aspects": [
+                "bgm",
+                "sound_effects",
+                "spatial_audio",
+                "silence_design"
+              ],
+              "adjustedThreshold": 0.3,
+              "active": true,
+              "gap": -0.2
+            }
+          ]
+        },
+        "capabilities": [
+          {
+            "id": "script",
+            "name": "叙事结构",
+            "weight": 0.12,
+            "instruction": {
+              "tag": "[SCRIPT:L2]",
+              "instruction": "多线叙事，伏笔与呼应，情绪曲线设计",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.12
+            }
+          },
+          {
+            "id": "camera",
+            "name": "镜头语言",
+            "weight": 0.18,
+            "instruction": {
+              "tag": "[CAMERA:L2]",
+              "instruction": "斯坦尼康长镜头，轨道滑动，浅景深跟焦",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.18
+            }
+          },
+          {
+            "id": "lighting",
+            "name": "灯光设计",
+            "weight": 0.12,
+            "instruction": {
+              "tag": "[LIGHTING:L2]",
+              "instruction": "戏剧性光影，伦勃朗光，剪影，环境填充",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.12
+            }
+          },
+          {
+            "id": "composition",
+            "name": "构图风格",
+            "weight": 0.1,
+            "instruction": {
+              "tag": "[COMPOSITION:L2]",
+              "instruction": "框架构图，多层景深，前景中景背景",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.1
+            }
+          },
+          {
+            "id": "production",
+            "name": "美术布景",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[PRODUCTION:L2]",
+              "instruction": "定制化场景，色彩编码空间，沉浸式环境",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          },
+          {
+            "id": "performance",
+            "name": "表演指导",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[PERFORMANCE:L2]",
+              "instruction": "情感层次，微表情，眼神变化，手势设计",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          },
+          {
+            "id": "color",
+            "name": "色彩分级",
+            "weight": 0.1,
+            "instruction": {
+              "tag": "[COLOR:L2]",
+              "instruction": "电影LUT，冷暖对比，单色调色",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.1
+            }
+          },
+          {
+            "id": "atmosphere",
+            "name": "氛围营造",
+            "weight": 0.06,
+            "instruction": {
+              "tag": "[ATMOSPHERE:L2]",
+              "instruction": "体积雾，光雾交互，季节感",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.06
+            }
+          },
+          {
+            "id": "editing",
+            "name": "剪辑节奏",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[EDITING:L2]",
+              "instruction": "情绪匹配时长，紧张快切，情感延长",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          },
+          {
+            "id": "sound",
+            "name": "声音设计",
+            "weight": 0.08,
+            "instruction": {
+              "tag": "[SOUND:L2]",
+              "instruction": "ASMR细节，3D空间音频，情绪配乐",
+              "level": "L2",
+              "levelName": "平衡",
+              "intensity": 0.5,
+              "weight": 0.08
+            }
+          }
+        ],
+        "inactiveCapabilities": [
+          {
+            "id": "texture",
+            "name": "质感处理",
+            "threshold": 0.55,
+            "reason": "需创意指数 ≥ 0.55 激活"
+          },
+          {
+            "id": "vfx",
+            "name": "特效程度",
+            "threshold": 0.5,
+            "reason": "需创意指数 ≥ 0.5 激活"
+          }
+        ],
+        "engineConfigs": {
+          "intensity": 0.5,
+          "level": {
+            "key": "L2",
+            "max": 0.5,
+            "name": "平衡",
+            "description": "电影级质感，艺术平衡"
+          },
+          "narrativeMode": "dialogue",
+          "worldSetting": "default",
+          "scriptEngine": {
+            "sceneComplexity": "standard",
+            "characterDepth": "deep",
+            "conflictDesign": "single",
+            "pacingStructure": "linear",
+            "creativeInstructions": "[[SCRIPT:L2]] 多线叙事，伏笔与呼应，情绪曲线设计"
+          },
+          "productionEngine": {
+            "cameraStyle": "cinematic",
+            "lightingStyle": "dramatic",
+            "compositionStyle": "artistic",
+            "productionStyle": "customized",
+            "performanceStyle": "emotional",
+            "creativeInstructions": "[[CAMERA:L2]] 斯坦尼康长镜头，轨道滑动，浅景深跟焦\n[[LIGHTING:L2]] 戏剧性光影，伦勃朗光，剪影，环境填充\n[[COMPOSITION:L2]] 框架构图，多层景深，前景中景背景\n[[PRODUCTION:L2]] 定制化场景，色彩编码空间，沉浸式环境\n[[PERFORMANCE:L2]] 情感层次，微表情，眼神变化，手势设计"
+          },
+          "renderingEngine": {
+            "colorGrading": "cinematic",
+            "textureQuality": "digital",
+            "vfxLevel": "none",
+            "atmosphereLevel": "rich",
+            "creativeInstructions": "[[COLOR:L2]] 电影LUT，冷暖对比，单色调色\n[[ATMOSPHERE:L2]] 体积雾，光雾交互，季节感"
+          },
+          "postProductionEngine": {
+            "editingStyle": "artistic",
+            "soundDesign": "immersive",
+            "creativeInstructions": "[[EDITING:L2]] 情绪匹配时长，紧张快切，情感延长\n[[SOUND:L2]] ASMR细节，3D空间音频，情绪配乐"
+          },
+          "_metadata": {
+            "activeCapabilities": 10,
+            "totalCapabilities": 12,
+            "contentFirewall": true
+          }
+        },
+        "firewall": "\n[CONTENT_FIREWALL] 🔒 内容层完全隔离，创意指数不干预：\n  - 剧本内容 (Script Content) → 已锁定\n  - 台词对白 (Dialogue) → 已锁定\n  - 事实数据 (Facts & Data) → 已锁定\n  - 叙事逻辑 (Narrative Logic) → 已锁定\n[CONTENT_FIREWALL] ✅ 表现层接受创意指数调控：\n  - Layer 2: 镜头语言、灯光、构图、布景、表演\n  - Layer 3: 色彩、质感、特效、氛围\n  - Layer 4: 剪辑、声音设计\n"
+      }
+    },
+    "prdGeneration": {
+      "data": {
+        "projectDefinition": {
+          "projectId": "3e24c583-647c-4168-ac33-67a65f685b0b",
+          "projectName": "旧灯没断电",
+          "version": "1.0.0",
+          "createdAt": "2026-10-31T05:53:15.324Z",
+          "sourceIntent": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+        },
+        "productPositioning": {
+          "productType": "剧情短片",
+          "genre": "品牌情感短片",
+          "targetPlatform": "douyin",
+          "targetDuration": 30,
+          "aspectRatio": "9:16",
+          "resolution": "1080x1920",
+          "frameRate": 24
+        },
+        "creativeCore": {
+          "coreTheme": "冷雨把城市关在门外，一盏没断电的旧台灯却替某个人留住了余温：独居者最深的渴望，不是有人等，而是有人先替他说了“回来了”。",
+          "creativeHook": "第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻自问“谁在里面？为什么灯还亮着？”；第三秒湿发滴水、钥匙打滑的特写跟上，把答案继续藏住，只让观众替陈卓着急。",
+          "emotionalArc": "setup→rising→climax→falling→resolution",
+          "keyMessages": [
+            "P0：余温像有人先说了一句“回来了”——不拍人、只拍灯罩与空房间，让问候变成可以摸到的温度。",
+            "P1：旧台灯只负责亮着与被摸到，不做卖点解释，让品牌成为情节证据。",
+            "P1：湿发滴水、摸黑找钥匙、门缝暖光、指尖停住、灯罩纹理五镜完成无字幕的全球表达。"
+          ],
+          "twistPoint": "陈卓以为屋里没人，指尖却在灯罩上停住——余温先于任何人出现。绝境处显形的不是情节诡计，而是那个“可能刚有人离开、也可能有人替他开过灯”的微小证据，让孤独突然有了被照顾过的痕迹。",
+          "endingType": "升华式"
+        },
+        "visualSpecification": {
+          "primaryStyle": "电影级写实",
+          "colorPalette": {
+            "dominant": "冷蓝雨夜青灰",
+            "accent": "2700K钨丝暖黄",
+            "mood": "冷暖分明、克制而温情，冷色包裹孤独，暖色只留给灯罩与手部"
+          },
+          "lightingDirection": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+          "cameraLanguage": "中近景浅景深＋手持微晃，隔雨窗与门框拍失焦人影；日常段落固定机位静观，情绪临界点切手持；结尾缓慢推近灯罩余温与残留手印，光斑最后一秒才停止晃动。",
+          "visualReferences": [
+            "《步履不停》",
+            "是枝裕和",
+            "《花样年华》",
+            "王家卫"
+          ],
+          "textureQuality": "超写实8K",
+          "specialVisualEffects": [
+            "雨珠沿伞骨坠落的慢速微距",
+            "钨丝渐亮与电流嗡鸣同步的光晕呼吸"
+          ]
+        },
+        "audioSpecification": {
+          "musicStyle": "极简钢琴单音，仅在结尾灯罩定格时进入，克制不煽情",
+          "soundDesign": "声音先行：声控灯啪声、灯丝电流嗡鸣、雨打铁窗、门轴轻响、钥匙插入旧锁孔；环境声先入画，人声后置",
+          "voicePolicy": "环境音为主",
+          "audioMood": "湿冷孤寂中透出一丝被留住的暖意，静默比言语更响",
+          "audioReferences": [
+            "雨打铁窗环境声",
+            "钨丝台灯电流嗡鸣"
+          ]
+        },
+        "characterSystem": {
+          "characters": [
+            {
+              "characterId": "chen-zhuo",
+              "name": "陈卓",
+              "role": "protagonist",
+              "ageRange": "三十岁上下",
+              "appearance": "female；三十岁上下；东亚女性面孔，鹅蛋脸偏小圆，下颌线柔和，颧骨不突出，下巴圆润微尖，三庭均衡而中庭略长，自然平眉微挑且毛流感细，鼻梁直而窄、鼻头圆润小巧、鼻翼窄，唇形饱满、唇峰清晰、自然玫瑰豆沙唇色；深栗棕色及肩锁骨发（室内接近黑、日光下见棕调），中分偏左，顺直带自然微卷、发尾自然内扣，发量中等偏多、发丝有真实碎发；纤细挺拔，肩窄腰细，比例自然偏修长，站姿肩背打开、放松；模特ID=chen-zhuo；定妆照=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；授权=real-authorized",
+              "personality": "寡言、习惯把情绪收进细节里；对旧物有执念，敏感于他人留下的痕迹。",
+              "costume": "立领盘扣、七分袖、及踝开衩，面料为有垂坠感的哑光缎面，配素色中跟绣花鞋与一粒珍珠耳饰",
+              "portraitPath": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+              "consistencyRequirements": "所有镜头绑定 chen-zhuo 的当前定妆照与指纹；不得替换为未登记人物",
+              "gender": "female",
+              "authorization": "real-authorized"
+            }
+          ]
+        },
+        "scenePlan": {
+          "scenes": [
+            {
+              "sceneId": "SC01",
+              "sequence": 1,
+              "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+              "duration": 30,
+              "emotionalBeat": "climax",
+              "setting": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+              "timeOfDay": "深夜",
+              "keyProps": [
+                "旧台灯（灯罩有细裂纹与积灰）",
+                "湿透的深色雨伞",
+                "旧锁孔与黄铜钥匙",
+                "有烫痕的旧木桌",
+                "帆布包"
+              ],
+              "visualRequirements": [
+                "第一帧特写门缝下漏出一线暖黄，冷蓝楼道包裹",
+                "特写雨珠沿伞骨坠落、湿发滴水",
+                "特写钥匙插入旧锁孔、门轴轻响",
+                "指尖按下台灯开关，钨丝渐亮",
+                "指尖碰到灯罩停住，浅景深定格灯罩余温与微尘"
+              ],
+              "audioRequirements": [
+                "声控灯啪声先入",
+                "雨打铁窗与伞骨滴水声",
+                "钥匙入锁孔与门轴轻响",
+                "灯丝电流嗡鸣渐起",
+                "结尾单件钢琴音进入"
+              ],
+              "dialogue": ""
+            }
+          ],
+          "shotMapping": [
+            {
+              "sceneId": "SC01",
+              "estimatedShots": 5,
+              "shotBreakdownHint": [
+                "extreme-close-up",
+                "close-up",
+                "medium",
+                "close-up",
+                "extreme-close-up"
+              ]
+            }
+          ]
+        },
+        "productionConstraints": {
+          "technicalConstraints": [
+            "特殊要求: 原文未给“特写：”与物理细节；视觉锚点建议：特写雨珠沿伞骨坠落、钥匙插入旧锁孔、指尖按下台灯开关、灯罩边缘细裂纹与积灰、钨丝渐亮；物理细节：门轴轻响、灯罩微热、旧木桌面烫痕、湿冷雨夜与室内暖光对比。全片不出现商品参数或价格。"
+          ],
+          "businessConstraints": [
+            "全球观众零背景知识可懂：旧灯、旧锁、雨夜、暖光等意象须依靠普适的身体动作与光影关系传达，不使用任何需要地域或文化解释的道具、祭仪、服饰符号",
+            "无字幕依赖：画面内不得出现可读文字信息（门牌、报纸、手机屏幕、包装标签、品牌 logo 文字），叙事不依赖对白语义即可成立，以适配多语言配音与无声播放场景",
+            "无虚构特效元素：雨、尘埃、热气、灯光均为可控的真实物理现象，不得添加魔法光效、发光粒子、超现实转场，保持纪实日常质感"
+          ],
+          "forbiddenElements": [
+            "低质量",
+            "模糊",
+            "不稳定"
+          ],
+          "qualityThresholds": {
+            "visual": 0.8,
+            "audio": 0.75,
+            "narrative": 0.85,
+            "consistency": 0.75
+          },
+          "modelCapabilityBounds": {
+            "maxPromptComplexity": "moderate",
+            "supportedEffects": [
+              "基础调色",
+              "简单转场"
+            ],
+            "consistencyStrategy": "textual-description"
+          }
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interests": [
+              "独居生活",
+              "租房改造",
+              "城市夜归",
+              "情感短片",
+              "生活质感家居"
+            ],
+            "consumptionLevel": "medium"
+          },
+          "emotionTriggers": [
+            "雨夜里陈卓浑身湿透、钥匙在手里打滑，门缝下先漏出一线暖黄灯光——外面越冷越黑，那盏没断电的旧台灯越像有人在屋里等他。",
+            "他伸手摸到灯罩时指尖停住：灯罩还有余温，镜头从指尖推到灯罩纹理，观众会自己补出“有人刚离开”或“有人替他开过灯”的故事。",
+            "那句“像有人先说了一句‘回来了’”不拍人、只拍灯和空房间，把独居者最想听到的问候变成可触摸的温度，适合在深夜被转发给那个会留灯的人。"
+          ],
+          "contentExpectations": [
+            "视觉叙事无需字幕也能懂：湿发滴水、摸黑找钥匙、门缝暖光、指尖触灯罩、余温特写，五个镜头完成“有人留灯”的全球通用表达。",
+            "有一句可复述可转发的钉子台词：保留“余温像有人先说了一句‘回来了’”，让它成为深夜发给家人、室友或伴侣的转发理由。",
+            "品牌或产品露出像情节证据而不是广告：旧台灯只负责亮着和被摸到余温，不抢在情绪前解释卖点。"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            "《步履不停》",
+            "《花样年华》",
+            "《咖啡时光》",
+            "《我在故宫修文物》"
+          ],
+          "adReferences": [
+            "Apple《三分钟》",
+            "Apple《一个桶》",
+            "台湾大众银行《梦骑士》"
+          ],
+          "styleReferences": [
+            "冷暖色调切分时空：闪回或记忆段用冷蓝雨光与青绿霓虹，现实室内用2700K钨丝暖光，两者刻意让色温切换并让灯罩光斑在交界处过渡，使暖不渐变、冷暖分明",
+            "声音先行：声控灯“啪”的一声、灯丝电流嗡鸣、雨打铁窗声承担叙事节奏，环境声先入画、人声后置，全片只在结尾灯罩定格的瞬间进一件乐器（钢琴或口琴）",
+            "浅景深＋手持微晃：中近景浅景深拍人物，隔着雨窗、门框拍失焦的人影；日常段落用固定机位静观，情绪临界点才切手持微晃，让摄影机的抖动只出现在最需要的地方",
+            "结尾定格设计：镜头缓慢推近灯罩上残留的手印或余温的织物表面，画面静下来，让光斑在画面里最后一秒才停止晃动"
+          ]
+        },
+        "deliveryStandard": {
+          "deliverables": [
+            {
+              "item": "video_master",
+              "spec": "1080x1920, 9:16, 30s ±0.3s, 24fps, MP4/H.264/AAC",
+              "priority": "required"
+            },
+            {
+              "item": "character_portraits",
+              "spec": "定妆照全套",
+              "priority": "required"
+            },
+            {
+              "item": "script_document",
+              "spec": "完整剧本+分镜",
+              "priority": "required"
+            },
+            {
+              "item": "shot_list",
+              "spec": "镜头清单+Prompt日志",
+              "priority": "optional"
+            }
+          ],
+          "acceptanceCriteria": {
+            "visual": 0.8,
+            "audio": 0.75,
+            "narrative": 0.85,
+            "consistency": 0.75
+          },
+          "outputFormat": {
+            "videoCodec": "H.264",
+            "audioCodec": "AAC",
+            "container": "MP4",
+            "platform": "douyin",
+            "width": 1080,
+            "height": 1920,
+            "aspectRatio": "9:16",
+            "durationSeconds": 30,
+            "durationToleranceSeconds": 0.3,
+            "frameRate": 24,
+            "audioSampleRate": 48000,
+            "audioChannels": 2,
+            "audioLoudnessLufs": -14,
+            "audioTruePeakDbtp": -1
+          },
+          "revisionPolicy": {
+            "maxRevisions": 1,
+            "revisionScope": [
+              "visual",
+              "audio",
+              "narrative"
+            ]
+          },
+          "fallbackPlan": {
+            "trigger": "视觉质量低于 0.75 或连续 2 次迭代无改善",
+            "action": "降低视觉复杂度，使用 simpler prompt，减少特效需求",
+            "expectedOutput": "降低质量但保证叙事完整性"
+          },
+          "continuityCheckpoints": [
+            {
+              "checkpoint": "character-appearance",
+              "validationMethod": "跨镜头角色外貌一致性检查（服装、发型、面部特征）"
+            },
+            {
+              "checkpoint": "costume-continuity",
+              "validationMethod": "服装道具连续性检查（同一场景内服装不变）"
+            },
+            {
+              "checkpoint": "scene-logic",
+              "validationMethod": "场景逻辑连续性检查（时间线、空间转换合理性）"
+            },
+            {
+              "checkpoint": "lighting-continuity",
+              "validationMethod": "光照连续性检查（同一场景光照方向和色温一致）"
+            }
+          ],
+          "subtitles": {
+            "mode": "none",
+            "burned": false,
+            "sidecar": false
+          },
+          "platformConstraints": {
+            "platform": "douyin",
+            "safeArea": true,
+            "firstFrameReview": true,
+            "canvasVerified": true
+          },
+          "visualVerification": {
+            "warmAreaMaxRatio": null,
+            "firstMiddleLastFrameReviewRequired": true,
+            "artisticQuality": "unverified"
+          },
+          "audioVerification": {
+            "streamProbe": true,
+            "loudnessTargetLufs": -14,
+            "truePeakTargetDbtp": -1,
+            "contentAnchorsRequired": true,
+            "listeningVerified": false
+          },
+          "listeningVerification": {
+            "verified": false,
+            "reason": "ffprobe 只核验音频流与响度参数，不证明旋钮声、雨声等内容锚点已被人工听审"
+          }
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+        "prdSummary": {
+          "title": "旧灯没断电",
+          "type": "剧情短片 | 品牌情感短片",
+          "duration": "30秒",
+          "scenes": "1 场景 / 5 预估镜头",
+          "characters": "陈卓",
+          "qualityTier": "standard",
+          "keyHook": "第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻自问“谁在里面？为什么灯还亮着？”；第三...",
+          "deliverables": [
+            "video_master",
+            "character_portraits",
+            "script_document"
+          ],
+          "humanReadable": "旧灯没断电 (剧情短片/品牌情感短片, 30秒) - 1场景/5镜头, 1角色, 品质档:standard, 核心钩子:第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻..."
+        },
+        "shotContract": [
+          {
+            "shotId": "SC01-S01",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 0,
+            "endSeconds": 6,
+            "durationSeconds": 6,
+            "shotSize": "extreme-close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "extreme-close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S02",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 6,
+            "endSeconds": 12,
+            "durationSeconds": 6,
+            "shotSize": "close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S03",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 12,
+            "endSeconds": 18,
+            "durationSeconds": 6,
+            "shotSize": "medium",
+            "cameraMovement": "locked",
+            "cameraHint": "medium",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S04",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 18,
+            "endSeconds": 24,
+            "durationSeconds": 6,
+            "shotSize": "close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S05",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 24,
+            "endSeconds": 30,
+            "durationSeconds": 6,
+            "shotSize": "extreme-close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "extreme-close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          }
+        ],
+        "deliveryStandards": {
+          "durationSeconds": 30
+        },
+        "_briefDurationOverride": "Brief 时长 30s"
+      },
+      "timing": 9479,
+      "summary": {
+        "title": "旧灯没断电",
+        "type": "剧情短片 | 品牌情感短片",
+        "duration": "30秒",
+        "scenes": "1 场景 / 5 预估镜头",
+        "characters": "陈卓",
+        "qualityTier": "standard",
+        "keyHook": "第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻自问“谁在里面？为什么灯还亮着？”；第三...",
+        "deliverables": [
+          "video_master",
+          "character_portraits",
+          "script_document"
+        ],
+        "humanReadable": "旧灯没断电 (剧情短片/品牌情感短片, 30秒) - 1场景/5镜头, 1角色, 品质档:standard, 核心钩子:第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻..."
+      }
+    },
+    "scriptEngine": {
+      "blueprint": {
+        "title": "留一盏",
+        "narrative_mode": "hybrid",
+        "target_duration": 30,
+        "acts_count": 3,
+        "scenes_count": 6,
+        "total_duration": 30,
+        "_metadata": {
+          "voiceoverAllowed": false,
+          "dialogueRequirement": "无台词；仅保留雨声、钥匙碰撞、门轴轻响与台灯开关声。不出现商品参数或价格口播。",
+          "isSeries": false,
+          "episodeNumber": 1,
+          "totalEpisodes": 1,
+          "hasOpening": true,
+          "noNextEpisodePreview": false,
+          "aspectRatio": "16:9",
+          "seriesContentPlan": null,
+          "_prd": {
+            "projectDefinition": {
+              "projectId": "3e24c583-647c-4168-ac33-67a65f685b0b",
+              "projectName": "旧灯没断电",
+              "version": "1.0.0",
+              "createdAt": "2026-10-31T05:53:15.324Z",
+              "sourceIntent": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+              "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+            },
+            "productPositioning": {
+              "productType": "剧情短片",
+              "genre": "品牌情感短片",
+              "targetPlatform": "douyin",
+              "targetDuration": 30,
+              "aspectRatio": "9:16",
+              "resolution": "1080x1920",
+              "frameRate": 24
+            },
+            "creativeCore": {
+              "coreTheme": "冷雨把城市关在门外，一盏没断电的旧台灯却替某个人留住了余温：独居者最深的渴望，不是有人等，而是有人先替他说了“回来了”。",
+              "creativeHook": "第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻自问“谁在里面？为什么灯还亮着？”；第三秒湿发滴水、钥匙打滑的特写跟上，把答案继续藏住，只让观众替陈卓着急。",
+              "emotionalArc": "setup→rising→climax→falling→resolution",
+              "keyMessages": [
+                "P0：余温像有人先说了一句“回来了”——不拍人、只拍灯罩与空房间，让问候变成可以摸到的温度。",
+                "P1：旧台灯只负责亮着与被摸到，不做卖点解释，让品牌成为情节证据。",
+                "P1：湿发滴水、摸黑找钥匙、门缝暖光、指尖停住、灯罩纹理五镜完成无字幕的全球表达。"
+              ],
+              "twistPoint": "陈卓以为屋里没人，指尖却在灯罩上停住——余温先于任何人出现。绝境处显形的不是情节诡计，而是那个“可能刚有人离开、也可能有人替他开过灯”的微小证据，让孤独突然有了被照顾过的痕迹。",
+              "endingType": "升华式"
+            },
+            "visualSpecification": {
+              "primaryStyle": "电影级写实",
+              "colorPalette": {
+                "dominant": "冷蓝雨夜青灰",
+                "accent": "2700K钨丝暖黄",
+                "mood": "冷暖分明、克制而温情，冷色包裹孤独，暖色只留给灯罩与手部"
+              },
+              "lightingDirection": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+              "cameraLanguage": "中近景浅景深＋手持微晃，隔雨窗与门框拍失焦人影；日常段落固定机位静观，情绪临界点切手持；结尾缓慢推近灯罩余温与残留手印，光斑最后一秒才停止晃动。",
+              "visualReferences": [
+                "《步履不停》",
+                "是枝裕和",
+                "《花样年华》",
+                "王家卫"
+              ],
+              "textureQuality": "超写实8K",
+              "specialVisualEffects": [
+                "雨珠沿伞骨坠落的慢速微距",
+                "钨丝渐亮与电流嗡鸣同步的光晕呼吸"
+              ]
+            },
+            "audioSpecification": {
+              "musicStyle": "极简钢琴单音，仅在结尾灯罩定格时进入，克制不煽情",
+              "soundDesign": "声音先行：声控灯啪声、灯丝电流嗡鸣、雨打铁窗、门轴轻响、钥匙插入旧锁孔；环境声先入画，人声后置",
+              "voicePolicy": "环境音为主",
+              "audioMood": "湿冷孤寂中透出一丝被留住的暖意，静默比言语更响",
+              "audioReferences": [
+                "雨打铁窗环境声",
+                "钨丝台灯电流嗡鸣"
+              ]
+            },
+            "characterSystem": {
+              "characters": [
+                {
+                  "characterId": "chen-zhuo",
+                  "name": "陈卓",
+                  "role": "protagonist",
+                  "ageRange": "三十岁上下",
+                  "appearance": "female；三十岁上下；东亚女性面孔，鹅蛋脸偏小圆，下颌线柔和，颧骨不突出，下巴圆润微尖，三庭均衡而中庭略长，自然平眉微挑且毛流感细，鼻梁直而窄、鼻头圆润小巧、鼻翼窄，唇形饱满、唇峰清晰、自然玫瑰豆沙唇色；深栗棕色及肩锁骨发（室内接近黑、日光下见棕调），中分偏左，顺直带自然微卷、发尾自然内扣，发量中等偏多、发丝有真实碎发；纤细挺拔，肩窄腰细，比例自然偏修长，站姿肩背打开、放松；模特ID=chen-zhuo；定妆照=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；授权=real-authorized",
+                  "personality": "寡言、习惯把情绪收进细节里；对旧物有执念，敏感于他人留下的痕迹。",
+                  "costume": "立领盘扣、七分袖、及踝开衩，面料为有垂坠感的哑光缎面，配素色中跟绣花鞋与一粒珍珠耳饰",
+                  "portraitPath": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+                  "consistencyRequirements": "所有镜头绑定 chen-zhuo 的当前定妆照与指纹；不得替换为未登记人物",
+                  "gender": "female",
+                  "authorization": "real-authorized"
+                }
+              ]
+            },
+            "scenePlan": {
+              "scenes": [
+                {
+                  "sceneId": "SC01",
+                  "sequence": 1,
+                  "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+                  "duration": 30,
+                  "emotionalBeat": "climax",
+                  "setting": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+                  "timeOfDay": "深夜",
+                  "keyProps": [
+                    "旧台灯（灯罩有细裂纹与积灰）",
+                    "湿透的深色雨伞",
+                    "旧锁孔与黄铜钥匙",
+                    "有烫痕的旧木桌",
+                    "帆布包"
+                  ],
+                  "visualRequirements": [
+                    "第一帧特写门缝下漏出一线暖黄，冷蓝楼道包裹",
+                    "特写雨珠沿伞骨坠落、湿发滴水",
+                    "特写钥匙插入旧锁孔、门轴轻响",
+                    "指尖按下台灯开关，钨丝渐亮",
+                    "指尖碰到灯罩停住，浅景深定格灯罩余温与微尘"
+                  ],
+                  "audioRequirements": [
+                    "声控灯啪声先入",
+                    "雨打铁窗与伞骨滴水声",
+                    "钥匙入锁孔与门轴轻响",
+                    "灯丝电流嗡鸣渐起",
+                    "结尾单件钢琴音进入"
+                  ],
+                  "dialogue": ""
+                }
+              ],
+              "shotMapping": [
+                {
+                  "sceneId": "SC01",
+                  "estimatedShots": 5,
+                  "shotBreakdownHint": [
+                    "extreme-close-up",
+                    "close-up",
+                    "medium",
+                    "close-up",
+                    "extreme-close-up"
+                  ]
+                }
+              ]
+            },
+            "productionConstraints": {
+              "technicalConstraints": [
+                "特殊要求: 原文未给“特写：”与物理细节；视觉锚点建议：特写雨珠沿伞骨坠落、钥匙插入旧锁孔、指尖按下台灯开关、灯罩边缘细裂纹与积灰、钨丝渐亮；物理细节：门轴轻响、灯罩微热、旧木桌面烫痕、湿冷雨夜与室内暖光对比。全片不出现商品参数或价格。"
+              ],
+              "businessConstraints": [
+                "全球观众零背景知识可懂：旧灯、旧锁、雨夜、暖光等意象须依靠普适的身体动作与光影关系传达，不使用任何需要地域或文化解释的道具、祭仪、服饰符号",
+                "无字幕依赖：画面内不得出现可读文字信息（门牌、报纸、手机屏幕、包装标签、品牌 logo 文字），叙事不依赖对白语义即可成立，以适配多语言配音与无声播放场景",
+                "无虚构特效元素：雨、尘埃、热气、灯光均为可控的真实物理现象，不得添加魔法光效、发光粒子、超现实转场，保持纪实日常质感"
+              ],
+              "forbiddenElements": [
+                "低质量",
+                "模糊",
+                "不稳定"
+              ],
+              "qualityThresholds": {
+                "visual": 0.8,
+                "audio": 0.75,
+                "narrative": 0.85,
+                "consistency": 0.75
+              },
+              "modelCapabilityBounds": {
+                "maxPromptComplexity": "moderate",
+                "supportedEffects": [
+                  "基础调色",
+                  "简单转场"
+                ],
+                "consistencyStrategy": "textual-description"
+              }
+            },
+            "audienceProfile": {
+              "primaryAudience": {
+                "ageRange": "25-30",
+                "gender": "all",
+                "interests": [
+                  "独居生活",
+                  "租房改造",
+                  "城市夜归",
+                  "情感短片",
+                  "生活质感家居"
+                ],
+                "consumptionLevel": "medium"
+              },
+              "emotionTriggers": [
+                "雨夜里陈卓浑身湿透、钥匙在手里打滑，门缝下先漏出一线暖黄灯光——外面越冷越黑，那盏没断电的旧台灯越像有人在屋里等他。",
+                "他伸手摸到灯罩时指尖停住：灯罩还有余温，镜头从指尖推到灯罩纹理，观众会自己补出“有人刚离开”或“有人替他开过灯”的故事。",
+                "那句“像有人先说了一句‘回来了’”不拍人、只拍灯和空房间，把独居者最想听到的问候变成可触摸的温度，适合在深夜被转发给那个会留灯的人。"
+              ],
+              "contentExpectations": [
+                "视觉叙事无需字幕也能懂：湿发滴水、摸黑找钥匙、门缝暖光、指尖触灯罩、余温特写，五个镜头完成“有人留灯”的全球通用表达。",
+                "有一句可复述可转发的钉子台词：保留“余温像有人先说了一句‘回来了’”，让它成为深夜发给家人、室友或伴侣的转发理由。",
+                "品牌或产品露出像情节证据而不是广告：旧台灯只负责亮着和被摸到余温，不抢在情绪前解释卖点。"
+              ]
+            },
+            "referenceCases": {
+              "filmReferences": [
+                "《步履不停》",
+                "《花样年华》",
+                "《咖啡时光》",
+                "《我在故宫修文物》"
+              ],
+              "adReferences": [
+                "Apple《三分钟》",
+                "Apple《一个桶》",
+                "台湾大众银行《梦骑士》"
+              ],
+              "styleReferences": [
+                "冷暖色调切分时空：闪回或记忆段用冷蓝雨光与青绿霓虹，现实室内用2700K钨丝暖光，两者刻意让色温切换并让灯罩光斑在交界处过渡，使暖不渐变、冷暖分明",
+                "声音先行：声控灯“啪”的一声、灯丝电流嗡鸣、雨打铁窗声承担叙事节奏，环境声先入画、人声后置，全片只在结尾灯罩定格的瞬间进一件乐器（钢琴或口琴）",
+                "浅景深＋手持微晃：中近景浅景深拍人物，隔着雨窗、门框拍失焦的人影；日常段落用固定机位静观，情绪临界点才切手持微晃，让摄影机的抖动只出现在最需要的地方",
+                "结尾定格设计：镜头缓慢推近灯罩上残留的手印或余温的织物表面，画面静下来，让光斑在画面里最后一秒才停止晃动"
+              ]
+            },
+            "deliveryStandard": {
+              "deliverables": [
+                {
+                  "item": "video_master",
+                  "spec": "1080x1920, 9:16, 30s ±0.3s, 24fps, MP4/H.264/AAC",
+                  "priority": "required"
+                },
+                {
+                  "item": "character_portraits",
+                  "spec": "定妆照全套",
+                  "priority": "required"
+                },
+                {
+                  "item": "script_document",
+                  "spec": "完整剧本+分镜",
+                  "priority": "required"
+                },
+                {
+                  "item": "shot_list",
+                  "spec": "镜头清单+Prompt日志",
+                  "priority": "optional"
+                }
+              ],
+              "acceptanceCriteria": {
+                "visual": 0.8,
+                "audio": 0.75,
+                "narrative": 0.85,
+                "consistency": 0.75
+              },
+              "outputFormat": {
+                "videoCodec": "H.264",
+                "audioCodec": "AAC",
+                "container": "MP4",
+                "platform": "douyin",
+                "width": 1080,
+                "height": 1920,
+                "aspectRatio": "9:16",
+                "durationSeconds": 30,
+                "durationToleranceSeconds": 0.3,
+                "frameRate": 24,
+                "audioSampleRate": 48000,
+                "audioChannels": 2,
+                "audioLoudnessLufs": -14,
+                "audioTruePeakDbtp": -1
+              },
+              "revisionPolicy": {
+                "maxRevisions": 1,
+                "revisionScope": [
+                  "visual",
+                  "audio",
+                  "narrative"
+                ]
+              },
+              "fallbackPlan": {
+                "trigger": "视觉质量低于 0.75 或连续 2 次迭代无改善",
+                "action": "降低视觉复杂度，使用 simpler prompt，减少特效需求",
+                "expectedOutput": "降低质量但保证叙事完整性"
+              },
+              "continuityCheckpoints": [
+                {
+                  "checkpoint": "character-appearance",
+                  "validationMethod": "跨镜头角色外貌一致性检查（服装、发型、面部特征）"
+                },
+                {
+                  "checkpoint": "costume-continuity",
+                  "validationMethod": "服装道具连续性检查（同一场景内服装不变）"
+                },
+                {
+                  "checkpoint": "scene-logic",
+                  "validationMethod": "场景逻辑连续性检查（时间线、空间转换合理性）"
+                },
+                {
+                  "checkpoint": "lighting-continuity",
+                  "validationMethod": "光照连续性检查（同一场景光照方向和色温一致）"
+                }
+              ],
+              "subtitles": {
+                "mode": "none",
+                "burned": false,
+                "sidecar": false
+              },
+              "platformConstraints": {
+                "platform": "douyin",
+                "safeArea": true,
+                "firstFrameReview": true,
+                "canvasVerified": true
+              },
+              "visualVerification": {
+                "warmAreaMaxRatio": null,
+                "firstMiddleLastFrameReviewRequired": true,
+                "artisticQuality": "unverified"
+              },
+              "audioVerification": {
+                "streamProbe": true,
+                "loudnessTargetLufs": -14,
+                "truePeakTargetDbtp": -1,
+                "contentAnchorsRequired": true,
+                "listeningVerified": false
+              },
+              "listeningVerification": {
+                "verified": false,
+                "reason": "ffprobe 只核验音频流与响度参数，不证明旋钮声、雨声等内容锚点已被人工听审"
+              }
+            },
+            "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+            "prdSummary": {
+              "title": "旧灯没断电",
+              "type": "剧情短片 | 品牌情感短片",
+              "duration": "30秒",
+              "scenes": "1 场景 / 5 预估镜头",
+              "characters": "陈卓",
+              "qualityTier": "standard",
+              "keyHook": "第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻自问“谁在里面？为什么灯还亮着？”；第三...",
+              "deliverables": [
+                "video_master",
+                "character_portraits",
+                "script_document"
+              ],
+              "humanReadable": "旧灯没断电 (剧情短片/品牌情感短片, 30秒) - 1场景/5镜头, 1角色, 品质档:standard, 核心钩子:第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻..."
+            },
+            "shotContract": [
+              {
+                "shotId": "SC01-S01",
+                "sceneId": "SC01",
+                "status": "planned",
+                "startSeconds": 0,
+                "endSeconds": 6,
+                "durationSeconds": 6,
+                "shotSize": "extreme-close-up",
+                "cameraMovement": "locked",
+                "cameraHint": "extreme-close-up",
+                "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+                "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+                "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+                "colorTemperature": null,
+                "warmAreaMaxRatio": null,
+                "subjectIds": [
+                  "chen-zhuo"
+                ],
+                "subjectCount": 1,
+                "keyProps": [
+                  "旧台灯（灯罩有细裂纹与积灰）",
+                  "湿透的深色雨伞",
+                  "旧锁孔与黄铜钥匙",
+                  "有烫痕的旧木桌",
+                  "帆布包"
+                ],
+                "dialogue": "",
+                "audio": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "audioAnchors": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "safeArea": true,
+                "listeningVerified": false
+              },
+              {
+                "shotId": "SC01-S02",
+                "sceneId": "SC01",
+                "status": "planned",
+                "startSeconds": 6,
+                "endSeconds": 12,
+                "durationSeconds": 6,
+                "shotSize": "close-up",
+                "cameraMovement": "locked",
+                "cameraHint": "close-up",
+                "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+                "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+                "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+                "colorTemperature": null,
+                "warmAreaMaxRatio": null,
+                "subjectIds": [
+                  "chen-zhuo"
+                ],
+                "subjectCount": 1,
+                "keyProps": [
+                  "旧台灯（灯罩有细裂纹与积灰）",
+                  "湿透的深色雨伞",
+                  "旧锁孔与黄铜钥匙",
+                  "有烫痕的旧木桌",
+                  "帆布包"
+                ],
+                "dialogue": "",
+                "audio": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "audioAnchors": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "safeArea": true,
+                "listeningVerified": false
+              },
+              {
+                "shotId": "SC01-S03",
+                "sceneId": "SC01",
+                "status": "planned",
+                "startSeconds": 12,
+                "endSeconds": 18,
+                "durationSeconds": 6,
+                "shotSize": "medium",
+                "cameraMovement": "locked",
+                "cameraHint": "medium",
+                "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+                "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+                "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+                "colorTemperature": null,
+                "warmAreaMaxRatio": null,
+                "subjectIds": [
+                  "chen-zhuo"
+                ],
+                "subjectCount": 1,
+                "keyProps": [
+                  "旧台灯（灯罩有细裂纹与积灰）",
+                  "湿透的深色雨伞",
+                  "旧锁孔与黄铜钥匙",
+                  "有烫痕的旧木桌",
+                  "帆布包"
+                ],
+                "dialogue": "",
+                "audio": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "audioAnchors": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "safeArea": true,
+                "listeningVerified": false
+              },
+              {
+                "shotId": "SC01-S04",
+                "sceneId": "SC01",
+                "status": "planned",
+                "startSeconds": 18,
+                "endSeconds": 24,
+                "durationSeconds": 6,
+                "shotSize": "close-up",
+                "cameraMovement": "locked",
+                "cameraHint": "close-up",
+                "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+                "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+                "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+                "colorTemperature": null,
+                "warmAreaMaxRatio": null,
+                "subjectIds": [
+                  "chen-zhuo"
+                ],
+                "subjectCount": 1,
+                "keyProps": [
+                  "旧台灯（灯罩有细裂纹与积灰）",
+                  "湿透的深色雨伞",
+                  "旧锁孔与黄铜钥匙",
+                  "有烫痕的旧木桌",
+                  "帆布包"
+                ],
+                "dialogue": "",
+                "audio": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "audioAnchors": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "safeArea": true,
+                "listeningVerified": false
+              },
+              {
+                "shotId": "SC01-S05",
+                "sceneId": "SC01",
+                "status": "planned",
+                "startSeconds": 24,
+                "endSeconds": 30,
+                "durationSeconds": 6,
+                "shotSize": "extreme-close-up",
+                "cameraMovement": "locked",
+                "cameraHint": "extreme-close-up",
+                "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+                "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+                "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+                "colorTemperature": null,
+                "warmAreaMaxRatio": null,
+                "subjectIds": [
+                  "chen-zhuo"
+                ],
+                "subjectCount": 1,
+                "keyProps": [
+                  "旧台灯（灯罩有细裂纹与积灰）",
+                  "湿透的深色雨伞",
+                  "旧锁孔与黄铜钥匙",
+                  "有烫痕的旧木桌",
+                  "帆布包"
+                ],
+                "dialogue": "",
+                "audio": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "audioAnchors": [
+                  "声控灯啪声先入",
+                  "雨打铁窗与伞骨滴水声",
+                  "钥匙入锁孔与门轴轻响",
+                  "灯丝电流嗡鸣渐起",
+                  "结尾单件钢琴音进入"
+                ],
+                "safeArea": true,
+                "listeningVerified": false
+              }
+            ],
+            "deliveryStandards": {
+              "durationSeconds": 30
+            },
+            "_briefDurationOverride": "Brief 时长 30s"
+          },
+          "creativeIntensity": 0.5
+        }
+      },
+      "validation": {
+        "blueprint_id": "228eedb6-9d5f-4678-86a2-6a05a9375a78",
+        "passed": true,
+        "overall_score": 98,
+        "checks": [
+          {
+            "category": "structure",
+            "name": "acts_exist",
+            "passed": true,
+            "severity": "critical",
+            "message": "有 3 幕",
+            "suggestion": "必须至少包含 1 幕"
+          },
+          {
+            "category": "structure",
+            "name": "scene_count",
+            "passed": true,
+            "severity": "critical",
+            "message": "有 6 个场景",
+            "suggestion": "场景数量应在 3-10 之间"
+          },
+          {
+            "category": "structure",
+            "name": "first_scene_opening",
+            "passed": true,
+            "severity": "warning",
+            "message": "第一个场景为 opening 类型 ✓",
+            "suggestion": "scene_type 合法取值：opening/establishing/conflict/emotional_climax/resolution，第一个场景必须是 opening"
+          },
+          {
+            "category": "structure",
+            "name": "scene_type_whitelist",
+            "passed": true,
+            "severity": "warning",
+            "message": "全部场景类型命中标准五型白名单 ✓",
+            "suggestion": "scene_type 必须是：opening, establishing, conflict, emotional_climax, resolution"
+          },
+          {
+            "category": "structure",
+            "name": "scene_continuity",
+            "passed": true,
+            "severity": "warning",
+            "message": "场景时序连续",
+            "suggestion": "确保场景时间轴连续无断层，每个场景都有 timing"
+          },
+          {
+            "category": "structure",
+            "name": "scene_id_unique",
+            "passed": true,
+            "severity": "critical",
+            "message": "场景 ID 唯一",
+            "suggestion": "确保每个场景 ID 唯一"
+          },
+          {
+            "category": "duration",
+            "name": "total_duration_match",
+            "passed": true,
+            "severity": "critical",
+            "message": "目标时长 30s, 实际时长 30s",
+            "suggestion": "总时长应与目标时长一致（误差≤5s）"
+          },
+          {
+            "category": "duration",
+            "name": "duration_in_range",
+            "passed": true,
+            "severity": "critical",
+            "message": "实际时长 30s",
+            "suggestion": "时长应在 15-300s 之间"
+          },
+          {
+            "category": "duration",
+            "name": "scene_S1_duration",
+            "passed": true,
+            "severity": "warning",
+            "message": "场景 S1 时长 4s",
+            "suggestion": "单个场景时长应在 8-60s 之间（过渡8-10s，核心12-15s）"
+          },
+          {
+            "category": "duration",
+            "name": "scene_S2_duration",
+            "passed": true,
+            "severity": "warning",
+            "message": "场景 S2 时长 4s",
+            "suggestion": "单个场景时长应在 8-60s 之间（过渡8-10s，核心12-15s）"
+          },
+          {
+            "category": "duration",
+            "name": "scene_S3_duration",
+            "passed": true,
+            "severity": "warning",
+            "message": "场景 S3 时长 5s",
+            "suggestion": "单个场景时长应在 8-60s 之间（过渡8-10s，核心12-15s）"
+          },
+          {
+            "category": "duration",
+            "name": "scene_S4_duration",
+            "passed": true,
+            "severity": "warning",
+            "message": "场景 S4 时长 9s",
+            "suggestion": "单个场景时长应在 8-60s 之间（过渡8-10s，核心12-15s）"
+          },
+          {
+            "category": "duration",
+            "name": "scene_S5_duration",
+            "passed": true,
+            "severity": "warning",
+            "message": "场景 S5 时长 4s",
+            "suggestion": "单个场景时长应在 8-60s 之间（过渡8-10s，核心12-15s）"
+          },
+          {
+            "category": "duration",
+            "name": "scene_S6_duration",
+            "passed": true,
+            "severity": "warning",
+            "message": "场景 S6 时长 4s",
+            "suggestion": "单个场景时长应在 8-60s 之间（过渡8-10s，核心12-15s）"
+          },
+          {
+            "category": "dialogue",
+            "name": "has_dialogue",
+            "passed": true,
+            "severity": "critical",
+            "message": "6/6 场景有台词",
+            "suggestion": "必须至少包含台词的场景"
+          },
+          {
+            "category": "dialogue",
+            "name": "line_length",
+            "passed": true,
+            "severity": "warning",
+            "message": "所有台词长度合规",
+            "suggestion": "台词每句不超过 50 字"
+          },
+          {
+            "category": "dialogue",
+            "name": "no_voiceover",
+            "passed": true,
+            "severity": "critical",
+            "message": "无旁白，合规",
+            "suggestion": "本片未要求旁白，只保留角色对话；如确需旁白请在主题/PRD中声明"
+          },
+          {
+            "category": "character",
+            "name": "has_protagonist",
+            "passed": true,
+            "severity": "critical",
+            "message": "主角已定义",
+            "suggestion": "必须定义 protagonist 角色"
+          },
+          {
+            "category": "character",
+            "name": "character_chen-zhuo_features",
+            "passed": false,
+            "severity": "warning",
+            "message": "角色 chen-zhuo 有 1 个核心特征",
+            "suggestion": "核心特征应在 2-5 个之间"
+          },
+          {
+            "category": "character",
+            "name": "scene_S1_character_chen-zhuo",
+            "passed": true,
+            "severity": "critical",
+            "message": "角色 chen-zhuo 已定义",
+            "suggestion": "场景中引用的角色必须在 character_system 中定义"
+          },
+          {
+            "category": "character",
+            "name": "scene_S2_character_chen-zhuo",
+            "passed": true,
+            "severity": "critical",
+            "message": "角色 chen-zhuo 已定义",
+            "suggestion": "场景中引用的角色必须在 character_system 中定义"
+          },
+          {
+            "category": "character",
+            "name": "scene_S3_character_chen-zhuo",
+            "passed": true,
+            "severity": "critical",
+            "message": "角色 chen-zhuo 已定义",
+            "suggestion": "场景中引用的角色必须在 character_system 中定义"
+          },
+          {
+            "category": "character",
+            "name": "scene_S4_character_chen-zhuo",
+            "passed": true,
+            "severity": "critical",
+            "message": "角色 chen-zhuo 已定义",
+            "suggestion": "场景中引用的角色必须在 character_system 中定义"
+          },
+          {
+            "category": "character",
+            "name": "scene_S5_character_chen-zhuo",
+            "passed": true,
+            "severity": "critical",
+            "message": "角色 chen-zhuo 已定义",
+            "suggestion": "场景中引用的角色必须在 character_system 中定义"
+          },
+          {
+            "category": "character",
+            "name": "scene_S6_character_chen-zhuo",
+            "passed": true,
+            "severity": "critical",
+            "message": "角色 chen-zhuo 已定义",
+            "suggestion": "场景中引用的角色必须在 character_system 中定义"
+          },
+          {
+            "category": "dialogue_timing",
+            "name": "dialogue_timing_summary",
+            "passed": true,
+            "severity": "ok",
+            "message": "所有镜头台词时长校验通过",
+            "suggestion": null
+          },
+          {
+            "category": "forbidden",
+            "name": "forbidden_旁白",
+            "passed": true,
+            "severity": "critical",
+            "message": "无 \"旁白\"",
+            "suggestion": "全局禁止 \"旁白\""
+          },
+          {
+            "category": "forbidden",
+            "name": "forbidden_voiceover",
+            "passed": true,
+            "severity": "critical",
+            "message": "无 \"voiceover\"",
+            "suggestion": "全局禁止 \"voiceover\""
+          },
+          {
+            "category": "forbidden",
+            "name": "forbidden_金属光泽",
+            "passed": true,
+            "severity": "critical",
+            "message": "无 \"金属光泽\"",
+            "suggestion": "全局禁止 \"金属光泽\""
+          },
+          {
+            "category": "forbidden",
+            "name": "forbidden_unnatural_eye_color",
+            "passed": true,
+            "severity": "critical",
+            "message": "无 \"unnatural_eye_color\"",
+            "suggestion": "全局禁止 \"unnatural_eye_color\""
+          }
+        ],
+        "scores": {
+          "detailed": {
+            "structural_integrity": 100,
+            "duration_compliance": 100,
+            "dialogue_quality": 100,
+            "character_consistency": 88,
+            "nirath_compliance": 100
+          },
+          "summary": {
+            "total_checks": 30,
+            "passed_checks": 29,
+            "failed_checks": 1,
+            "critical_issues": 0
+          }
+        },
+        "issues": [
+          {
+            "category": "character",
+            "severity": "warning",
+            "message": "角色 chen-zhuo 有 1 个核心特征",
+            "suggestion": "核心特征应在 2-5 个之间"
+          }
+        ],
+        "timestamp": "2026-10-31T05:54:30.328Z"
+      },
+      "report": {
+        "blueprint_id": "228eedb6-9d5f-4678-86a2-6a05a9375a78",
+        "adaptation_status": "success",
+        "scenes_count": 6,
+        "characters_count": 1,
+        "dialogues_count": 6,
+        "total_duration": 30,
+        "warnings": [
+          {
+            "type": "missing_portraits",
+            "message": "角色 陈卓 没有定妆照",
+            "severity": "warning"
+          }
+        ],
+        "timestamp": "2026-10-31T05:54:30.332Z"
+      },
+      "timing": 50091
+    },
+    "emotionArc": {
+      "curveType": "build",
+      "description": "渐进式情绪累积",
+      "targets": [
+        {
+          "sceneIndex": 0,
+          "emotion": "calm",
+          "intensity": 0.2,
+          "descriptor": "平静的"
+        },
+        {
+          "sceneIndex": 1,
+          "emotion": "curiosity",
+          "intensity": 0.3,
+          "descriptor": "好奇的"
+        },
+        {
+          "sceneIndex": 2,
+          "emotion": "tension",
+          "intensity": 0.5,
+          "descriptor": "紧张的"
+        },
+        {
+          "sceneIndex": 3,
+          "emotion": "anticipation",
+          "intensity": 0.7,
+          "descriptor": "期待的"
+        },
+        {
+          "sceneIndex": 4,
+          "emotion": "peak",
+          "intensity": 0.9,
+          "descriptor": "极致的"
+        },
+        {
+          "sceneIndex": 5,
+          "emotion": "catharsis",
+          "intensity": 1,
+          "descriptor": "宣泄的"
+        }
+      ]
+    },
+    "narrativeRhythm": {
+      "curveType": "build",
+      "dynamicMode": "",
+      "beatInterval": 2.5,
+      "rhythmProfile": "emotion arc: build | [0s] 建立，安静进入 → [1s] 发展，信息积累 → [3s] 转折，节奏变化 → [5s] 加速，张力上升 → [7s] 高潮，峰值体验 → [9s] 定格，余韵 | narrative structure: SETUP[0s-4s] low → DEVELOP[3s-7s] medium to high → CLIMAX[6s-10s] peak then freeze | breathing: tensionRelease"
+    },
+    "requirementAlignment": {
+      "pass": true,
+      "score": 1,
+      "missing": [
+        "角色: 陈卓",
+        "场景: ai"
+      ],
+      "report": {
+        "contract": {
+          "characters": [
+            "陈卓"
+          ],
+          "scenes": [
+            "ai"
+          ],
+          "actions": [],
+          "props": [],
+          "emotion": null,
+          "style": null,
+          "elementsCount": 2
+        },
+        "foundCharacters": {
+          "found": 0,
+          "missing": [
+            "陈卓"
+          ],
+          "total": 1
+        },
+        "foundScenes": {
+          "found": 0,
+          "missing": [
+            "ai"
+          ],
+          "total": 1
+        },
+        "foundActions": {
+          "found": 0,
+          "missing": [],
+          "total": 0
+        },
+        "foundProps": {
+          "found": 0,
+          "missing": [],
+          "total": 0
+        },
+        "foundEmotion": true,
+        "foundStyle": true
+      }
+    }
+  },
+  "errors": [
+    {
+      "stage": "HYPERREALITY_SYSTEM",
+      "message": "PHASE3_FUSION_UNVERIFIED: Phase3 未通过，拒绝规则恢复/提示词重建后的出片",
+      "stack": "CinematicSkillError: PHASE3_FUSION_UNVERIFIED: Phase3 未通过，拒绝规则恢复/提示词重建后的出片\n    at ProductionEngine.guardedProduce (/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/packages/video-studio/src/vendor-compat.ts:3230:15)\n    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)\n    at async HyperrealitySystem.create (/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/vendor/supermickey/hyperreality-system/index.js:1313:26)\n    at async <anonymous> (/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/packages/video-studio/src/studio.ts:519:24)\n    at async <anonymous> (/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/packages/video-studio/src/confirmation.ts:60:14)\n    at async <anonymous> (/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/tools/data-pipeline-run.mts:358:12)"
+    }
+  ],
+  "timing": {},
+  "confirmations": {
+    "creativeTheme": {
+      "approved": true,
+      "reviewedAt": "2026-10-31T05:51:36.221Z",
+      "theme": {
+        "duration_sec": 30,
+        "tone": "温暖治愈",
+        "theme": "旧灯没断电",
+        "description": "雨夜，陈卓拖着湿透的步子回到出租屋，摸黑找钥匙时，发现那盏老旧台灯还亮着；他伸手轻触灯罩，余温像有人先说了一句“回来了”。",
+        "type": "品牌情感短片",
+        "visual_style": "参考是枝裕和的日常静观与王家卫雨夜霓虹：冷蓝雨光包裹楼道，室内用低照度钨丝暖光，浅景深与手持微晃，结尾定格灯罩余温。",
+        "dialogue_requirement": "无台词；仅保留雨声、钥匙碰撞、门轴轻响与台灯开关声。不出现商品参数或价格口播。",
+        "special_notes": "原文未给“特写：”与物理细节；视觉锚点建议：特写雨珠沿伞骨坠落、钥匙插入旧锁孔、指尖按下台灯开关、灯罩边缘细裂纹与积灰、钨丝渐亮；物理细节：门轴轻响、灯罩微热、旧木桌面烫痕、湿冷雨夜与室内暖光对比。全片不出现商品参数或价格。",
+        "duration": "30秒",
+        "aspect_ratio": "9:16",
+        "platform": "抖音",
+        "character_ref": {
+          "id": "chen-zhuo",
+          "name": "陈卓",
+          "portrait_ref": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+          "authorization": "real-authorized",
+          "usage": "仅使用内置默认模特"
+        },
+        "creative_style": 0.6,
+        "pressureAnchors": [
+          "PA-05"
+        ],
+        "target_audience": "20-35岁城市青年、独居租房人群、注重情感共鸣与生活质感品牌的消费者",
+        "_customType": true,
+        "task_id": "C-439",
+        "difficulty": "中",
+        "platform_id": "douyin",
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+      },
+      "reason": "producer-approved(G2_THEME · score=88)",
+      "suggestions": [],
+      "waitTimeMs": 7645
+    },
+    "requirementList": {
+      "approved": true,
+      "reviewedAt": "2026-10-31T05:53:15.315Z",
+      "requirementList": {
+        "emotionProfile": {
+          "primary": "neutral",
+          "secondary": null,
+          "intensity": 0.5,
+          "triggers": [
+            "rain"
+          ],
+          "confidence": 0,
+          "allEmotions": {}
+        }
+      },
+      "reason": "producer-approved(G3_INSIGHT · score=86)",
+      "suggestions": [],
+      "waitTimeMs": 13940
+    },
+    "prd": {
+      "approved": true,
+      "reviewedAt": "2026-10-31T05:53:40.241Z",
+      "prd": {
+        "projectDefinition": {
+          "projectId": "3e24c583-647c-4168-ac33-67a65f685b0b",
+          "projectName": "旧灯没断电",
+          "version": "1.0.0",
+          "createdAt": "2026-10-31T05:53:15.324Z",
+          "sourceIntent": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+        },
+        "productPositioning": {
+          "productType": "剧情短片",
+          "genre": "品牌情感短片",
+          "targetPlatform": "douyin",
+          "targetDuration": 30,
+          "aspectRatio": "9:16",
+          "resolution": "1080x1920",
+          "frameRate": 24
+        },
+        "creativeCore": {
+          "coreTheme": "冷雨把城市关在门外，一盏没断电的旧台灯却替某个人留住了余温：独居者最深的渴望，不是有人等，而是有人先替他说了“回来了”。",
+          "creativeHook": "第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻自问“谁在里面？为什么灯还亮着？”；第三秒湿发滴水、钥匙打滑的特写跟上，把答案继续藏住，只让观众替陈卓着急。",
+          "emotionalArc": "setup→rising→climax→falling→resolution",
+          "keyMessages": [
+            "P0：余温像有人先说了一句“回来了”——不拍人、只拍灯罩与空房间，让问候变成可以摸到的温度。",
+            "P1：旧台灯只负责亮着与被摸到，不做卖点解释，让品牌成为情节证据。",
+            "P1：湿发滴水、摸黑找钥匙、门缝暖光、指尖停住、灯罩纹理五镜完成无字幕的全球表达。"
+          ],
+          "twistPoint": "陈卓以为屋里没人，指尖却在灯罩上停住——余温先于任何人出现。绝境处显形的不是情节诡计，而是那个“可能刚有人离开、也可能有人替他开过灯”的微小证据，让孤独突然有了被照顾过的痕迹。",
+          "endingType": "升华式"
+        },
+        "visualSpecification": {
+          "primaryStyle": "电影级写实",
+          "colorPalette": {
+            "dominant": "冷蓝雨夜青灰",
+            "accent": "2700K钨丝暖黄",
+            "mood": "冷暖分明、克制而温情，冷色包裹孤独，暖色只留给灯罩与手部"
+          },
+          "lightingDirection": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+          "cameraLanguage": "中近景浅景深＋手持微晃，隔雨窗与门框拍失焦人影；日常段落固定机位静观，情绪临界点切手持；结尾缓慢推近灯罩余温与残留手印，光斑最后一秒才停止晃动。",
+          "visualReferences": [
+            "《步履不停》",
+            "是枝裕和",
+            "《花样年华》",
+            "王家卫"
+          ],
+          "textureQuality": "超写实8K",
+          "specialVisualEffects": [
+            "雨珠沿伞骨坠落的慢速微距",
+            "钨丝渐亮与电流嗡鸣同步的光晕呼吸"
+          ]
+        },
+        "audioSpecification": {
+          "musicStyle": "极简钢琴单音，仅在结尾灯罩定格时进入，克制不煽情",
+          "soundDesign": "声音先行：声控灯啪声、灯丝电流嗡鸣、雨打铁窗、门轴轻响、钥匙插入旧锁孔；环境声先入画，人声后置",
+          "voicePolicy": "环境音为主",
+          "audioMood": "湿冷孤寂中透出一丝被留住的暖意，静默比言语更响",
+          "audioReferences": [
+            "雨打铁窗环境声",
+            "钨丝台灯电流嗡鸣"
+          ]
+        },
+        "characterSystem": {
+          "characters": [
+            {
+              "characterId": "chen-zhuo",
+              "name": "陈卓",
+              "role": "protagonist",
+              "ageRange": "三十岁上下",
+              "appearance": "female；三十岁上下；东亚女性面孔，鹅蛋脸偏小圆，下颌线柔和，颧骨不突出，下巴圆润微尖，三庭均衡而中庭略长，自然平眉微挑且毛流感细，鼻梁直而窄、鼻头圆润小巧、鼻翼窄，唇形饱满、唇峰清晰、自然玫瑰豆沙唇色；深栗棕色及肩锁骨发（室内接近黑、日光下见棕调），中分偏左，顺直带自然微卷、发尾自然内扣，发量中等偏多、发丝有真实碎发；纤细挺拔，肩窄腰细，比例自然偏修长，站姿肩背打开、放松；模特ID=chen-zhuo；定妆照=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；授权=real-authorized",
+              "personality": "寡言、习惯把情绪收进细节里；对旧物有执念，敏感于他人留下的痕迹。",
+              "costume": "立领盘扣、七分袖、及踝开衩，面料为有垂坠感的哑光缎面，配素色中跟绣花鞋与一粒珍珠耳饰",
+              "portraitPath": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+              "consistencyRequirements": "所有镜头绑定 chen-zhuo 的当前定妆照与指纹；不得替换为未登记人物",
+              "gender": "female",
+              "authorization": "real-authorized"
+            }
+          ]
+        },
+        "scenePlan": {
+          "scenes": [
+            {
+              "sceneId": "SC01",
+              "sequence": 1,
+              "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+              "duration": 30,
+              "emotionalBeat": "climax",
+              "setting": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+              "timeOfDay": "深夜",
+              "keyProps": [
+                "旧台灯（灯罩有细裂纹与积灰）",
+                "湿透的深色雨伞",
+                "旧锁孔与黄铜钥匙",
+                "有烫痕的旧木桌",
+                "帆布包"
+              ],
+              "visualRequirements": [
+                "第一帧特写门缝下漏出一线暖黄，冷蓝楼道包裹",
+                "特写雨珠沿伞骨坠落、湿发滴水",
+                "特写钥匙插入旧锁孔、门轴轻响",
+                "指尖按下台灯开关，钨丝渐亮",
+                "指尖碰到灯罩停住，浅景深定格灯罩余温与微尘"
+              ],
+              "audioRequirements": [
+                "声控灯啪声先入",
+                "雨打铁窗与伞骨滴水声",
+                "钥匙入锁孔与门轴轻响",
+                "灯丝电流嗡鸣渐起",
+                "结尾单件钢琴音进入"
+              ],
+              "dialogue": ""
+            }
+          ],
+          "shotMapping": [
+            {
+              "sceneId": "SC01",
+              "estimatedShots": 5,
+              "shotBreakdownHint": [
+                "extreme-close-up",
+                "close-up",
+                "medium",
+                "close-up",
+                "extreme-close-up"
+              ]
+            }
+          ]
+        },
+        "productionConstraints": {
+          "technicalConstraints": [
+            "特殊要求: 原文未给“特写：”与物理细节；视觉锚点建议：特写雨珠沿伞骨坠落、钥匙插入旧锁孔、指尖按下台灯开关、灯罩边缘细裂纹与积灰、钨丝渐亮；物理细节：门轴轻响、灯罩微热、旧木桌面烫痕、湿冷雨夜与室内暖光对比。全片不出现商品参数或价格。"
+          ],
+          "businessConstraints": [
+            "全球观众零背景知识可懂：旧灯、旧锁、雨夜、暖光等意象须依靠普适的身体动作与光影关系传达，不使用任何需要地域或文化解释的道具、祭仪、服饰符号",
+            "无字幕依赖：画面内不得出现可读文字信息（门牌、报纸、手机屏幕、包装标签、品牌 logo 文字），叙事不依赖对白语义即可成立，以适配多语言配音与无声播放场景",
+            "无虚构特效元素：雨、尘埃、热气、灯光均为可控的真实物理现象，不得添加魔法光效、发光粒子、超现实转场，保持纪实日常质感"
+          ],
+          "forbiddenElements": [
+            "低质量",
+            "模糊",
+            "不稳定"
+          ],
+          "qualityThresholds": {
+            "visual": 0.8,
+            "audio": 0.75,
+            "narrative": 0.85,
+            "consistency": 0.75
+          },
+          "modelCapabilityBounds": {
+            "maxPromptComplexity": "moderate",
+            "supportedEffects": [
+              "基础调色",
+              "简单转场"
+            ],
+            "consistencyStrategy": "textual-description"
+          }
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interests": [
+              "独居生活",
+              "租房改造",
+              "城市夜归",
+              "情感短片",
+              "生活质感家居"
+            ],
+            "consumptionLevel": "medium"
+          },
+          "emotionTriggers": [
+            "雨夜里陈卓浑身湿透、钥匙在手里打滑，门缝下先漏出一线暖黄灯光——外面越冷越黑，那盏没断电的旧台灯越像有人在屋里等他。",
+            "他伸手摸到灯罩时指尖停住：灯罩还有余温，镜头从指尖推到灯罩纹理，观众会自己补出“有人刚离开”或“有人替他开过灯”的故事。",
+            "那句“像有人先说了一句‘回来了’”不拍人、只拍灯和空房间，把独居者最想听到的问候变成可触摸的温度，适合在深夜被转发给那个会留灯的人。"
+          ],
+          "contentExpectations": [
+            "视觉叙事无需字幕也能懂：湿发滴水、摸黑找钥匙、门缝暖光、指尖触灯罩、余温特写，五个镜头完成“有人留灯”的全球通用表达。",
+            "有一句可复述可转发的钉子台词：保留“余温像有人先说了一句‘回来了’”，让它成为深夜发给家人、室友或伴侣的转发理由。",
+            "品牌或产品露出像情节证据而不是广告：旧台灯只负责亮着和被摸到余温，不抢在情绪前解释卖点。"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            "《步履不停》",
+            "《花样年华》",
+            "《咖啡时光》",
+            "《我在故宫修文物》"
+          ],
+          "adReferences": [
+            "Apple《三分钟》",
+            "Apple《一个桶》",
+            "台湾大众银行《梦骑士》"
+          ],
+          "styleReferences": [
+            "冷暖色调切分时空：闪回或记忆段用冷蓝雨光与青绿霓虹，现实室内用2700K钨丝暖光，两者刻意让色温切换并让灯罩光斑在交界处过渡，使暖不渐变、冷暖分明",
+            "声音先行：声控灯“啪”的一声、灯丝电流嗡鸣、雨打铁窗声承担叙事节奏，环境声先入画、人声后置，全片只在结尾灯罩定格的瞬间进一件乐器（钢琴或口琴）",
+            "浅景深＋手持微晃：中近景浅景深拍人物，隔着雨窗、门框拍失焦的人影；日常段落用固定机位静观，情绪临界点才切手持微晃，让摄影机的抖动只出现在最需要的地方",
+            "结尾定格设计：镜头缓慢推近灯罩上残留的手印或余温的织物表面，画面静下来，让光斑在画面里最后一秒才停止晃动"
+          ]
+        },
+        "deliveryStandard": {
+          "deliverables": [
+            {
+              "item": "video_master",
+              "spec": "1080x1920, 9:16, 30s ±0.3s, 24fps, MP4/H.264/AAC",
+              "priority": "required"
+            },
+            {
+              "item": "character_portraits",
+              "spec": "定妆照全套",
+              "priority": "required"
+            },
+            {
+              "item": "script_document",
+              "spec": "完整剧本+分镜",
+              "priority": "required"
+            },
+            {
+              "item": "shot_list",
+              "spec": "镜头清单+Prompt日志",
+              "priority": "optional"
+            }
+          ],
+          "acceptanceCriteria": {
+            "visual": 0.8,
+            "audio": 0.75,
+            "narrative": 0.85,
+            "consistency": 0.75
+          },
+          "outputFormat": {
+            "videoCodec": "H.264",
+            "audioCodec": "AAC",
+            "container": "MP4",
+            "platform": "douyin",
+            "width": 1080,
+            "height": 1920,
+            "aspectRatio": "9:16",
+            "durationSeconds": 30,
+            "durationToleranceSeconds": 0.3,
+            "frameRate": 24,
+            "audioSampleRate": 48000,
+            "audioChannels": 2,
+            "audioLoudnessLufs": -14,
+            "audioTruePeakDbtp": -1
+          },
+          "revisionPolicy": {
+            "maxRevisions": 1,
+            "revisionScope": [
+              "visual",
+              "audio",
+              "narrative"
+            ]
+          },
+          "fallbackPlan": {
+            "trigger": "视觉质量低于 0.75 或连续 2 次迭代无改善",
+            "action": "降低视觉复杂度，使用 simpler prompt，减少特效需求",
+            "expectedOutput": "降低质量但保证叙事完整性"
+          },
+          "continuityCheckpoints": [
+            {
+              "checkpoint": "character-appearance",
+              "validationMethod": "跨镜头角色外貌一致性检查（服装、发型、面部特征）"
+            },
+            {
+              "checkpoint": "costume-continuity",
+              "validationMethod": "服装道具连续性检查（同一场景内服装不变）"
+            },
+            {
+              "checkpoint": "scene-logic",
+              "validationMethod": "场景逻辑连续性检查（时间线、空间转换合理性）"
+            },
+            {
+              "checkpoint": "lighting-continuity",
+              "validationMethod": "光照连续性检查（同一场景光照方向和色温一致）"
+            }
+          ],
+          "subtitles": {
+            "mode": "none",
+            "burned": false,
+            "sidecar": false
+          },
+          "platformConstraints": {
+            "platform": "douyin",
+            "safeArea": true,
+            "firstFrameReview": true,
+            "canvasVerified": true
+          },
+          "visualVerification": {
+            "warmAreaMaxRatio": null,
+            "firstMiddleLastFrameReviewRequired": true,
+            "artisticQuality": "unverified"
+          },
+          "audioVerification": {
+            "streamProbe": true,
+            "loudnessTargetLufs": -14,
+            "truePeakTargetDbtp": -1,
+            "contentAnchorsRequired": true,
+            "listeningVerified": false
+          },
+          "listeningVerification": {
+            "verified": false,
+            "reason": "ffprobe 只核验音频流与响度参数，不证明旋钮声、雨声等内容锚点已被人工听审"
+          }
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+        "prdSummary": {
+          "title": "旧灯没断电",
+          "type": "剧情短片 | 品牌情感短片",
+          "duration": "30秒",
+          "scenes": "1 场景 / 5 预估镜头",
+          "characters": "陈卓",
+          "qualityTier": "standard",
+          "keyHook": "第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻自问“谁在里面？为什么灯还亮着？”；第三...",
+          "deliverables": [
+            "video_master",
+            "character_portraits",
+            "script_document"
+          ],
+          "humanReadable": "旧灯没断电 (剧情短片/品牌情感短片, 30秒) - 1场景/5镜头, 1角色, 品质档:standard, 核心钩子:第一帧即物证：雨夜楼道冷蓝，门缝下先漏出一线暖黄——观众立刻..."
+        },
+        "shotContract": [
+          {
+            "shotId": "SC01-S01",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 0,
+            "endSeconds": 6,
+            "durationSeconds": 6,
+            "shotSize": "extreme-close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "extreme-close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S02",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 6,
+            "endSeconds": 12,
+            "durationSeconds": 6,
+            "shotSize": "close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S03",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 12,
+            "endSeconds": 18,
+            "durationSeconds": 6,
+            "shotSize": "medium",
+            "cameraMovement": "locked",
+            "cameraHint": "medium",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S04",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 18,
+            "endSeconds": 24,
+            "durationSeconds": 6,
+            "shotSize": "close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          },
+          {
+            "shotId": "SC01-S05",
+            "sceneId": "SC01",
+            "status": "planned",
+            "startSeconds": 24,
+            "endSeconds": 30,
+            "durationSeconds": 6,
+            "shotSize": "extreme-close-up",
+            "cameraMovement": "locked",
+            "cameraHint": "extreme-close-up",
+            "purpose": "以门缝暖黄与湿发钥匙为钩子，把观众留在答案之外；当他指尖碰到灯罩停住，用余温揭晓“有人先替他说了回来了”，完成从冷到暖的情绪落点。",
+            "location": "雨夜老式居民楼楼道与独居室内：铁窗、声控灯、旧木桌与一盏未断电的旧台灯，门缝下漏出一线暖黄。",
+            "lighting": "楼道用冷蓝雨光与青绿霓虹侧逆光，室内低照度钨丝暖光从灯罩下方溢出；门缝漏出一线暖黄作视觉钩子，色温在门框交界处硬切不渐变，灯罩边缘保留细裂纹与积灰的质感高光。",
+            "colorTemperature": null,
+            "warmAreaMaxRatio": null,
+            "subjectIds": [
+              "chen-zhuo"
+            ],
+            "subjectCount": 1,
+            "keyProps": [
+              "旧台灯（灯罩有细裂纹与积灰）",
+              "湿透的深色雨伞",
+              "旧锁孔与黄铜钥匙",
+              "有烫痕的旧木桌",
+              "帆布包"
+            ],
+            "dialogue": "",
+            "audio": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "audioAnchors": [
+              "声控灯啪声先入",
+              "雨打铁窗与伞骨滴水声",
+              "钥匙入锁孔与门轴轻响",
+              "灯丝电流嗡鸣渐起",
+              "结尾单件钢琴音进入"
+            ],
+            "safeArea": true,
+            "listeningVerified": false
+          }
+        ],
+        "deliveryStandards": {
+          "durationSeconds": 30
+        },
+        "_briefDurationOverride": "Brief 时长 30s"
+      },
+      "reason": "producer-approved(G4_PRD · score=78)",
+      "suggestions": [],
+      "waitTimeMs": 15435
+    },
+    "script": {
+      "approved": true,
+      "skipped": true,
+      "reason": "剧本确认环节已移除,需求确认后直接生产"
+    }
+  },
+  "deliverables": {},
+  "totalWaitTimeMs": 37020,
+  "producerAttempts": 1
+}

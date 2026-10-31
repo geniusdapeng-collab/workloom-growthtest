@@ -12,6 +12,18 @@ function _yn(flag, trueText, falseText) {
   return flag ? (trueText || '是') : (falseText || '否');
 }
 
+function _identityLabel(identity = {}) {
+  const name = String(identity.name || '').trim();
+  const brand = String(identity.brand || '').trim();
+  const model = String(identity.model || '').trim();
+  const lowerName = name.toLowerCase();
+  return [
+    brand && !lowerName.includes(brand.toLowerCase()) ? brand : '',
+    name,
+    model && !lowerName.includes(model.toLowerCase()) ? model : '',
+  ].filter(Boolean).join(' ') || '未命名';
+}
+
 /**
  * 生成盒式确认单文本
  * @param {object} dossier 商品情报档案
@@ -31,7 +43,7 @@ function generateDossierConfirmationSheet(dossier, cards = {}, opts = {}) {
     '║      🧵 商品情报档案确认单（珍妮纺织机） ║',
     '╠══════════════════════════════════════════╣',
     L('档案编号', d.product_id || '未登记'),
-    L('商品', [id.brand, id.name, id.model].filter(Boolean).join(' ') || '未命名'),
+    L('商品', _identityLabel(id)),
     L('品类', id.category || '未分类'),
     L('价格带', id.price_band ? `${id.price_band}${id.price_confidence ? `（${id.price_confidence}）` : ''}` : '未采集'),
     L('商品图', `${imgs.length} 张${imgs[0] ? `，英雄照 ${imgs[0].id}` : ''}${d.visual_assets && d.visual_assets.needs_more_reference ? ' ⚠️低于参考图门槛' : ''}`),
@@ -66,4 +78,4 @@ function generateDossierConfirmationSheet(dossier, cards = {}, opts = {}) {
   return lines.join('\n');
 }
 
-module.exports = { generateDossierConfirmationSheet };
+module.exports = { generateDossierConfirmationSheet, _identityLabel };

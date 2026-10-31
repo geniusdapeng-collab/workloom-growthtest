@@ -1,0 +1,56 @@
+{
+  "id": "MC-002",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "需求合同与 PRD 角色系统互相矛盾",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "vendor/supermickey/hyperreality-system/index.js:2838@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "acb46563f99b61babb1156858fb83c083a258b052ff21169d3b3e7d5bddec5cf",
+      "note": "发现结果转需求时把 characters 固定为空数组，场景却可包含主角。"
+    },
+    {
+      "type": "code",
+      "ref": "vendor/supermickey/hyperreality-system/engines/prd-generator/prd-generator.js:284@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "7a155f4d33d091b94c24ed88416f7b4609c83a286cc7ba43ebfbd87c3a9305a6",
+      "note": "PRD fallback 也固定 characters 为空，不能携带明确角色、肖像和授权锚点。"
+    }
+  ],
+  "root_cause": {
+    "file": "vendor/supermickey/hyperreality-system/index.js",
+    "line": 2838,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "_convertDiscoveryToRequirementList"
+  },
+  "trigger_path": "叙事片明确使用默认模特，但发现层场景出现人物时，需求合同写“无真人角色”，PRD 又生成女孩，提示词阶段无法绑定授权肖像。",
+  "fix_plan": "只从明确人物证据补 canonical character；把角色 ID、默认模特肖像路径、授权和 PRD 角色系统统一。",
+  "blast_radius": "影响所有含明确人物或空镜的叙事片；不得给纯商品/纯空镜虚构人物。",
+  "conflict_paths": ["packages/video-studio/src/studio.ts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "内置默认模特请求 + 场景出现年轻人",
+      "expect": "角色合同与 PRD 都绑定 chen-zhuo、真实 portraitRef 和授权，不再写无真人角色",
+      "command": "vitest run vendor-compat.test.ts studio.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "packages/video-studio/src/studio.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/studio.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "审计发现来自 canary-n2 至 n6 的角色双轨。"
+}

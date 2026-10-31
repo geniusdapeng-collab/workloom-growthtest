@@ -141,6 +141,30 @@ describe("AI producer evidence gate", () => {
     expect(verdict.reason).toContain("HTTP 500");
   });
 
+  it("repairs malformed judge JSON once without re-evaluating the artifact", async () => {
+    const bodies: string[] = [];
+    let call = 0;
+    const fetchImpl = (async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      bodies.push(String(init?.body));
+      call += 1;
+      const content = call === 1
+        ? '{"approved":true,"score":85,"issues":[],"suggestions":["unterminated"}'
+        : JSON.stringify(good);
+      return new Response(JSON.stringify({
+        id: `repair-${call}`,
+        model: "deepseek-flash",
+        choices: [{ finish_reason: "stop", message: { content } }],
+        usage: { prompt_tokens: 100, completion_tokens: 30, total_tokens: 130 },
+      }));
+    }) as typeof fetch;
+    const verdict = await reviewStage(textOptions({ fetchImpl }));
+    expect(verdict).toMatchObject({ approved: true, status: "passed", score: 85 });
+    expect(bodies).toHaveLength(2);
+    expect(bodies[1]).toContain("仅修复 JSON");
+    expect(bodies[1]).toContain("不得重新判定");
+    expect(verdict.receipts).toHaveLength(2);
+  });
+
   it("wrong model, truncation, empty content and non-JSON fail closed", async () => {
     const payloads = [
       {

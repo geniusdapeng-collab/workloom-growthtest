@@ -1,10 +1,11 @@
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveGate } from "./gates.js";
 import { autoApproveHandler, runWithConfirmationHandler } from "./confirmation.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { buildRenderScript, loadPromptLengthSpec } from "./render-scripts.js";
-import { VideoStudio, type ApprovalCallback, type EventSink } from "./studio.js";
+import { VideoStudio, attachDefaultCharacterAnchor, type ApprovalCallback, type EventSink } from "./studio.js";
 
 const studioMocks = vi.hoisted(() => ({
   construct: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock("./vendor-compat.js", () => {
     installVendorContractBridge: install("contract"),
     installVendorPromptRebuildBridge: install("prompt"),
     installVendorDiscoveryFixBridge: install("discovery"),
+    installVendorDiscoveryNarrativeBridge: install("discovery-narrative"),
     installVendorPhaseInternalsDiagnostics: install("inner"),
     installVendorAudioDisciplineBridge: install("audio"),
     installVendorDurationPolicyBridge: install("duration"),
@@ -77,6 +79,27 @@ beforeEach(() => {
 });
 
 describe("gates 映射", () => {
+  it("默认模特请求追加可执行 ID、肖像引用和授权锚点", () => {
+    const anchored = attachDefaultCharacterAnchor(
+      "雨夜归家的年轻人，使用内置默认模特，不出现商品价格",
+      {},
+    );
+    expect(anchored.intent).toContain("id=chen-zhuo");
+    expect(anchored.intent).toContain("portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo");
+    expect(anchored.metadata).toMatchObject({
+      defaultCharacterId: "chen-zhuo",
+      characters: [expect.objectContaining({ id: "chen-zhuo", role: "protagonist" })],
+    });
+    const anchoredCharacter = (anchored.metadata.characters as Array<{ portraitRef: string }>)[0]!;
+    expect(existsSync(anchoredCharacter.portraitRef)).toBe(true);
+    expect(attachDefaultCharacterAnchor("纯空镜，不出现人物", {}).intent).toBe("纯空镜，不出现人物");
+  });
+
+  it("普通人物泛称不会偷换成默认模特，只有显式要求默认模特才绑定", () => {
+    const intent = "雨夜归家的年轻人发现旧台灯依然温暖，主题是陪伴";
+    expect(attachDefaultCharacterAnchor(intent, {})).toEqual({ intent, metadata: {} });
+  });
+
   it("vendor 确认门 type 映射到业务门", () => {
     expect(resolveGate("creative-theme")).toBe("G2_THEME");
     expect(resolveGate("prd")).toBe("G4_PRD");

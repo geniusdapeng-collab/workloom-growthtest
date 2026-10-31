@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { prepareMarketingFacts, finalizeMarketingFacts, verifyMarketingFacts, type PreparedMarketingFacts } from "./marketing-authority.js";
+import { primeSearchCache } from "./data-mining-executor.js";
 import { fetchMarketingSource, requestSource } from "./marketing-source-fetcher.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 const scope = { tenantId: "tenant-a", workspaceId: "ws-a", projectId: "P1", runId: "RUN1", attempt: 1 };
@@ -44,7 +45,15 @@ beforeEach(async () => {
   }));
 });
 afterEach(async () => { vi.unstubAllGlobals(); await rm(root, { recursive: true, force: true }); });
-async function prepare(options: { noSearch?: boolean; noAux?: boolean; badQuote?: boolean; modelFailure?: boolean; mode?: string; attempt?: number } = {}): Promise<PreparedMarketingFacts> {
+async function prepare(options: {
+  noSearch?: boolean;
+  noAux?: boolean;
+  badQuote?: boolean;
+  modelFailure?: boolean;
+  mode?: string;
+  attempt?: number;
+  searchCacheFile?: string;
+} = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
   return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" } }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
     llm: { reason: async prompt => {
@@ -53,16 +62,41 @@ async function prepare(options: { noSearch?: boolean; noAux?: boolean; badQuote?
       if (match[1] !== "A1") return { success: true, data: { payload: match[1] === "A2" ? { reviews: [] } : { competitors: [] }, citations: [], noEvidenceReason: "页面仅商品规格，无可核实评价或竞品" } };
       return { success: true, data: { payload: { identity: { name: "星野 F3", specs: { 风量: "9 档" }, official_selling_points: [{ point: "风量 9 档", source_url: sourceUrl }] }, images: [] }, citations: ["/identity/name", "/identity/specs/风量", "/identity/official_selling_points/0/point"].map(pointer => ({ pointer, sourceId: source.sourceId, quote: options.badQuote ? "不存在的事实" : sourceText })) } };
     } }, dependencies: {
-      search: async () => (++searches, options.noSearch || options.noAux && searches > 20 ? [] : [{ title: "星野规格", url: sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
+      ...(options.searchCacheFile
+        ? { searchCacheFile: options.searchCacheFile }
+        : {
+            search: async () => (++searches, options.noSearch || options.noAux && searches > 20
+              ? []
+              : [{ title: "星野规格", url: sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
+          }),
       fetchSource: async url => fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (_url, _address, signal) => requestSource(new URL(origin), { address: "127.0.0.1", family: 4 }, signal) }),
     } });
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("CLI 预置检索缓存可直接注入宿主，不需要调用方另造检索函数", async () => {
+    const cacheFile = path.join(root, "search-cache.json");
+    primeSearchCache(cacheFile, {
+      "星野 F3 官网": [{ title: "星野规格", url: sourceUrl, snippet: "公开规格页" }],
+    });
+    const previous = process.env.WL_SEARCH_PROVIDERS;
+    process.env.WL_SEARCH_PROVIDERS = "api";
+    try {
+      const prepared = await prepare({ searchCacheFile: cacheFile });
+      expect(prepared.bundle.stages[0]).toMatchObject({ stage: "A1", facts: { status: "source_bound" } });
+      expect(prepared.bundle.sources).toHaveLength(1);
+    } finally {
+      if (previous === undefined) delete process.env.WL_SEARCH_PROVIDERS;
+      else process.env.WL_SEARCH_PROVIDERS = previous;
+    }
+  });
+
   it("真实HTTP正文→三站提取/完整支持审核→A1–A5→逐最终镜头事实审核→复读", async () => {
     const prepared = await prepare();
     expect(prepared.bundle.stages.map(stage => [stage.stage, stage.facts.status])).toEqual([["A1", "source_bound"], ["A2", "no_evidence"], ["A3", "no_evidence"]]);
     expect(prepared.bundle.sources).toHaveLength(1); expect(prepared.bundle.restrictions).toHaveLength(2); expect(extractionCalls).toHaveLength(3);
+    expect((prepared.bundle.dossier.provenance as Array<{ claim_ref?: string }>).some(item => item.claim_ref === "identity.specs.风量")).toBe(true);
+    expect(JSON.stringify(prepared.bundle.dossier.gaps)).not.toContain("规格 \"风量\" 无来源");
     expect(prepared.g1Content).toContain('"schemaVersion":"workloom.marketing-facts/v1"'); expect(modelCalls).toHaveLength(3);
     expect(JSON.stringify(modelCalls)).toContain("不得声称静音或市场第一"); expect(JSON.stringify(modelCalls)).not.toContain("999档");
     const saved = await finalizeMarketingFacts(prepared, shots, env); expect(modelCalls).toHaveLength(4);

@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M04",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "6739b69578a4ae6471547d335ee8ae06356abf8c7b22a95f8d4944a59640e937"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "汪泉 Loop 宠物饮水机",
+        "brand": "汪泉",
+        "category": "宠物饮水设备",
+        "model": "Loop",
+        "sellingPoints": [
+          "循环水流",
+          "毛发过滤",
+          "夜间低噪"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "汪泉 Loop 宠物饮水机",
+        "brand": {
+          "name": "汪泉"
+        },
+        "category": "宠物饮水设备"
+      },
+      "dataMining": {
+        "name": "汪泉 Loop 宠物饮水机",
+        "brand": "汪泉",
+        "category": "宠物饮水设备",
+        "model": "Loop",
+        "sellingPointCandidates": [
+          "循环水流",
+          "毛发过滤",
+          "夜间低噪"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给汪泉 Loop 宠物饮水机做一条抖音种草视频，突出循环水流、毛发过滤和低噪夜间运行\n[需求口径] 时长：25秒；画幅：9:16；平台：douyin；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "汪泉 Loop 宠物饮水机",
+    "queries": [
+      {
+        "q": "汪泉 Loop 宠物饮水机 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "汪泉 Loop 宠物饮水机 宠物饮水设备 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "汪泉 Loop 宠物饮水机 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "汪泉 Loop 宠物饮水机 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "汪泉 Loop 宠物饮水机 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "汪泉 Loop 宠物饮水机 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "汪泉 Loop 宠物饮水机 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "汪泉 Loop 宠物饮水机 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "17a84edd21afa8f69f32ddf7dee6440abb307e52ef10d97289b7ac443cca10f9"
+    }
+  },
+  "capturedAt": "2026-10-31T14:31:10.124Z"
+}

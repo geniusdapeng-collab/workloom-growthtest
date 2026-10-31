@@ -90,7 +90,7 @@ class ProductInfoCollector {
     // 型号甄别（系列化产品纪律）
     const seriesVersionCheck = Boolean(input.model);
     if (seriesVersionCheck) {
-      queries.push({ q: `${base} ${input.model} 发布 上市 时间`, intent: 'model_verify', channel: '官网/新闻' });
+      queries.push({ q: `${base} 发布 上市 时间`, intent: 'model_verify', channel: '官网/新闻' });
     }
 
     return {
@@ -130,13 +130,14 @@ class ProductInfoCollector {
     };
   }
 
-  /** 检索词基底：品牌 + 品名 + 型号，且不重复品牌（品牌已在品名里时只用品名） */
+  /** 检索词基底：品牌 + 品名 + 型号；品牌或型号已含在品名里时不再重复。 */
   static queryBase(input = {}) {
     const brand = String(input.brand || '').trim();
     const name = String(input.name || '').trim();
     const model = String(input.model || '').trim();
     const nameHasBrand = Boolean(brand) && name.toLowerCase().includes(brand.toLowerCase());
-    return [nameHasBrand ? '' : brand, name, model].filter(Boolean).join(' ');
+    const nameHasModel = Boolean(model) && name.toLowerCase().includes(model.toLowerCase());
+    return [nameHasBrand ? '' : brand, name, nameHasModel ? '' : model].filter(Boolean).join(' ');
   }
 
   /**

@@ -1,0 +1,170 @@
+{
+  "projectId": "VID-STRESS-CANARY-M3",
+  "pipeline": "marketing",
+  "success": false,
+  "elapsedMs": 940152,
+  "stages": [
+    {
+      "name": "dataMining",
+      "present": true,
+      "timingMs": 1
+    },
+    {
+      "name": "creativeTheme",
+      "present": true,
+      "timingMs": 10243
+    },
+    {
+      "name": "dossierEvidence",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "truthCheck",
+      "present": true,
+      "timingMs": 4
+    },
+    {
+      "name": "requirementDiscovery",
+      "present": true,
+      "timingMs": 49345
+    },
+    {
+      "name": "emotionIntent",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "creativeIntensity",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "prdGeneration",
+      "present": true,
+      "timingMs": 8748
+    },
+    {
+      "name": "scriptEngine",
+      "present": true,
+      "timingMs": 20662
+    },
+    {
+      "name": "emotionArc",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "narrativeRhythm",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "productionEngine",
+      "present": true,
+      "timingMs": 837338
+    },
+    {
+      "name": "sceneNumberMap",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "emotionShotSyntax",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "shotQuality",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "directorSkills",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "directorOptimization",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "microMotion",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "promptGuardian",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "portraitStudio",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "portraitResolver",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "pipelineGuard",
+      "present": true,
+      "timingMs": null
+    }
+  ],
+  "dataMining": {
+    "status": "confirmed",
+    "productId": "4LIT-ZFNKQN",
+    "ok": true,
+    "reused": null,
+    "chainOk": true,
+    "evidenceCount": 3,
+    "gapCount": 27,
+    "imageCount": 0,
+    "heroImageId": null,
+    "sellingPoints": [],
+    "errors": []
+  },
+  "shots": 6,
+  "prompts": 6,
+  "gates": [
+    {
+      "gate": "G1_DOSSIER",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G2_THEME",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G3_INSIGHT",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G4_PRD",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G5_PORTRAIT",
+      "approved": false,
+      "score": null
+    },
+    {
+      "gate": "G6_PROMPT",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G7_FINAL",
+      "approved": true,
+      "score": null
+    }
+  ]
+}

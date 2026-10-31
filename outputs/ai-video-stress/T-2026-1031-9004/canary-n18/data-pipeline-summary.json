@@ -1,0 +1,63 @@
+{
+  "projectId": "VID-STRESS-CANARY-N18",
+  "pipeline": "narrative",
+  "success": false,
+  "elapsedMs": 101845,
+  "stages": [
+    {
+      "name": "creativeTheme",
+      "present": true,
+      "timingMs": 16783
+    },
+    {
+      "name": "dossierEvidence",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "requirementDiscovery",
+      "present": true,
+      "timingMs": 37693
+    },
+    {
+      "name": "emotionIntent",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "creativeIntensity",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "prdGeneration",
+      "present": true,
+      "timingMs": 8659
+    },
+    {
+      "name": "prdReview",
+      "present": true,
+      "timingMs": null
+    }
+  ],
+  "dataMining": null,
+  "shots": 0,
+  "prompts": 0,
+  "gates": [
+    {
+      "gate": "G2_THEME",
+      "approved": true,
+      "score": 92
+    },
+    {
+      "gate": "G3_INSIGHT",
+      "approved": true,
+      "score": 80
+    },
+    {
+      "gate": "G4_PRD",
+      "approved": false,
+      "score": 72
+    }
+  ]
+}

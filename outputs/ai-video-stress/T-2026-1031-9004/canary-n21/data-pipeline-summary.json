@@ -1,0 +1,143 @@
+{
+  "projectId": "VID-STRESS-CANARY-N21",
+  "pipeline": "narrative",
+  "success": false,
+  "elapsedMs": 1142336,
+  "stages": [
+    {
+      "name": "creativeTheme",
+      "present": true,
+      "timingMs": 15198
+    },
+    {
+      "name": "dossierEvidence",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "requirementDiscovery",
+      "present": true,
+      "timingMs": 50046
+    },
+    {
+      "name": "emotionIntent",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "creativeIntensity",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "prdGeneration",
+      "present": true,
+      "timingMs": 14235
+    },
+    {
+      "name": "scriptEngine",
+      "present": true,
+      "timingMs": 20999
+    },
+    {
+      "name": "emotionArc",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "narrativeRhythm",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "productionEngine",
+      "present": true,
+      "timingMs": 1035011
+    },
+    {
+      "name": "sceneNumberMap",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "emotionShotSyntax",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "shotQuality",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "directorSkills",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "directorOptimization",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "microMotion",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "promptGuardian",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "portraitStudio",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "portraitResolver",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "pipelineGuard",
+      "present": true,
+      "timingMs": null
+    }
+  ],
+  "dataMining": null,
+  "shots": 6,
+  "prompts": 6,
+  "gates": [
+    {
+      "gate": "G2_THEME",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G3_INSIGHT",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G4_PRD",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G5_PORTRAIT",
+      "approved": false,
+      "score": null
+    },
+    {
+      "gate": "G6_PROMPT",
+      "approved": true,
+      "score": null
+    },
+    {
+      "gate": "G7_FINAL",
+      "approved": true,
+      "score": null
+    }
+  ]
+}

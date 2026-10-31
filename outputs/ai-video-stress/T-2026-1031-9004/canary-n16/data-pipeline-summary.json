@@ -1,0 +1,78 @@
+{
+  "projectId": "VID-STRESS-CANARY-N16",
+  "pipeline": "narrative",
+  "success": false,
+  "elapsedMs": 728013,
+  "stages": [
+    {
+      "name": "creativeTheme",
+      "present": true,
+      "timingMs": 11887
+    },
+    {
+      "name": "dossierEvidence",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "requirementDiscovery",
+      "present": true,
+      "timingMs": 85085
+    },
+    {
+      "name": "emotionIntent",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "creativeIntensity",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "prdGeneration",
+      "present": true,
+      "timingMs": 9479
+    },
+    {
+      "name": "scriptEngine",
+      "present": true,
+      "timingMs": 50091
+    },
+    {
+      "name": "emotionArc",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "narrativeRhythm",
+      "present": true,
+      "timingMs": null
+    },
+    {
+      "name": "requirementAlignment",
+      "present": true,
+      "timingMs": null
+    }
+  ],
+  "dataMining": null,
+  "shots": 0,
+  "prompts": 0,
+  "gates": [
+    {
+      "gate": "G2_THEME",
+      "approved": true,
+      "score": 88
+    },
+    {
+      "gate": "G3_INSIGHT",
+      "approved": true,
+      "score": 86
+    },
+    {
+      "gate": "G4_PRD",
+      "approved": true,
+      "score": 78
+    }
+  ]
+}

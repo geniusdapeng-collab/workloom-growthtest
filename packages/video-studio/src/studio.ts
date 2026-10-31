@@ -13,6 +13,7 @@ import { videoRuntimeRoot } from "./runtime-root.js";
 
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { runWithConfirmationHandler, type ConfirmationHandler } from "./confirmation.js";
@@ -29,6 +30,7 @@ import {
   installVendorFieldQualityBridge,
   installVendorMicroMotionBridge,
   installVendorDiscoveryFixBridge,
+  installVendorDiscoveryNarrativeBridge,
   installVendorPhaseInternalsDiagnostics,
   installVendorPhaseDiagnosticsBridge,
   installVendorPromptRebuildBridge,
@@ -149,6 +151,72 @@ export interface RunInput {
   isMarketing?: boolean;
 }
 
+export function attachDefaultCharacterAnchor(
+  intent: string,
+  metadata: Record<string, unknown>,
+): { intent: string; metadata: Record<string, unknown> } {
+  const existing = Array.isArray(metadata.characters) ? metadata.characters : [];
+  const explicitlyUsesDefault = /(?:使用|采用|启用|使用系统|使用仓库)?\s*(?:内置)?默认模特/u.test(intent)
+    && !/(?:不使用|不要|无需|禁止|拒绝)\s*(?:内置)?默认模特/u.test(intent);
+  if (existing.length > 0 || !explicitlyUsesDefault) {
+    return { intent, metadata };
+  }
+  try {
+    const repoRoot = videoRuntimeRoot(import.meta.url);
+    const charactersRoot = path.resolve(repoRoot, "bundles/ai-video/library/characters");
+    const registryPath = path.join(charactersRoot, "registry.json");
+    const registry = JSON.parse(readFileSync(registryPath, "utf8")) as {
+      defaultModel?: string;
+      models?: Array<{ id?: string; name?: string; aliases?: string[]; archive?: string; authorization?: string }>;
+    };
+    const model = registry.models?.find((item) => item.id === registry.defaultModel);
+    if (!model?.id || !model.name || !model.archive) return { intent, metadata };
+    const archive = path.resolve(repoRoot, model.archive);
+    const profilePath = path.join(archive, "profile.json");
+    const profile = JSON.parse(readFileSync(profilePath, "utf8")) as {
+      id?: string;
+      name?: string;
+      authorization?: { status?: string; expiresAt?: string };
+      portraitSets?: Array<{ version?: number; dir?: string; active?: boolean }>;
+    };
+    if (profile.id !== model.id || !profile.name) {
+      throw new Error(`默认模特档案身份不一致：${model.id}`);
+    }
+    const activeSet = profile.portraitSets?.find((item) => item.active && item.dir);
+    if (!activeSet?.dir) throw new Error(`默认模特缺少活动定妆照版本：${model.id}`);
+    const portraitDir = path.resolve(archive, activeSet.dir);
+    const frontPortrait = readdirSync(portraitDir)
+      .filter((name) => /-front\.(?:png|jpe?g|webp)$/iu.test(name))
+      .sort()[0];
+    if (!frontPortrait) throw new Error(`默认模特缺少 front 定妆照：${model.id}`);
+    const portraitAbs = path.join(portraitDir, frontPortrait);
+    if (!existsSync(portraitAbs)) throw new Error(`默认模特 front 定妆照不存在：${portraitAbs}`);
+    const portraitRef = path.relative(repoRoot, portraitAbs).split(path.sep).join("/");
+    const authorization = profile.authorization?.status ?? model.authorization ?? "unknown";
+    return {
+      intent: `${intent}\n[默认模特锚点] id=${model.id}；name=${profile.name}；portraitRef=${portraitRef}；authorization=${authorization}`,
+      metadata: {
+        ...metadata,
+        defaultCharacterId: model.id,
+        characters: [{
+          id: model.id,
+          name: profile.name,
+          aliases: model.aliases ?? [],
+          role: "protagonist",
+          archive: model.archive,
+          portraitRef,
+          authorization,
+        }],
+      },
+    };
+  } catch (error) {
+    throw new Error(
+      `DEFAULT_CHARACTER_ANCHOR_UNAVAILABLE：${error instanceof Error ? error.message : String(error)}`,
+      { cause: error },
+    );
+  }
+}
+
 function resolveVendorEntry(): string {
   const here = path.dirname(fileURLToPath(import.meta.url));
   // src/ 运行（tsx）与 dist/ 运行（构建产物）两种布局都尝试
@@ -181,7 +249,9 @@ export class VideoStudio {
    */
   async runPreproduction(input: RunInput): Promise<PreproductionResult> {
     const { cfg } = this;
-    const metadata = structuredClone(input.metadata ?? {});
+    const anchored = attachDefaultCharacterAnchor(input.intent, structuredClone(input.metadata ?? {}));
+    const metadata = anchored.metadata;
+    const effectiveIntent = anchored.intent;
     delete metadata._dataDossier;
     const verified = cfg.dataMining?.verifiedRaw;
     let verifiedRaw: Record<string, unknown> | undefined;
@@ -232,7 +302,12 @@ export class VideoStudio {
         gate,
         payload: { approved: verdict.approved, reason: verdict.reason }
       });
-      return verdict;
+      /**
+       * Approved 门的 suggestions 是复盘建议，不是“用户修改意见”。
+       * Vendor 的 `_confirmRequirementList` 会在 suggestions 非空时重新生成，
+       * 曾把已通过的 G3 建议误写进 PRD 的“用户要求/禁止元素”。只在未通过时回传建议。
+       */
+      return verdict.approved ? { ...verdict, suggestions: [] } : verdict;
     };
 
     return runWithConfirmationHandler(handler, async () => {
@@ -271,6 +346,8 @@ export class VideoStudio {
         keep(installVendorPromptRebuildBridge({ log }));
         /** 需求洞察 _fillDefaults 修复（数组保形 + 消除 const 重赋值，静态审计发现） */
         keep(installVendorDiscoveryFixBridge({ log }));
+        /** 叙事/营销隔离、人物契约补全与需求洞察首个 JSON 修复 */
+        keep(installVendorDiscoveryNarrativeBridge({ log }));
         /** Phase 3 后融合链路深栈诊断（vendor 内部 catch 会吞掉栈帧） */
         keep(installVendorPhaseInternalsDiagnostics({ log }));
         /** 镜头内音频纪律（禁止 BGM）与时长策略（模型能力 4–30s）两条产品口径 */
@@ -439,7 +516,7 @@ export class VideoStudio {
           const modelName = portraitCfg && portraitCfg.enabled !== false ? portraitCfg.model : "未指定模型";
           log(`[studio] 定妆照真实出图已启用（${modelName}，产物根 ${charactersDir}）`);
         }
-        const result = await system.create(input.intent, metadata, createOptions);
+        const result = await system.create(effectiveIntent, metadata, createOptions);
         if (portraitRuntime) {
           const index = portraitRuntime.snapshot();
           const characters = Object.keys(index.characters).length;
