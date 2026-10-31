@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A05",
+  "category": "abnormal",
+  "expected": "PRODUCT_INVALID",
+  "actual": "PRODUCT_INVALID",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "unsafe-product",
+    "caseHash": "d549ef0b244acdea54f2c02ebc21c91f43864791cce82c3578e1dae202eceb43"
+  },
+  "output": {
+    "error": "PRODUCT_INVALID: 商品名包含路径、控制字符或 HTML 标记"
+  },
+  "capturedAt": "2026-10-31T15:22:04.674Z"
+}

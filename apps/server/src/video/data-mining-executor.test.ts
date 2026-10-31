@@ -12,7 +12,9 @@ import {
 } from "./data-mining-executor.js";
 
 const vendorRequire = createRequire(import.meta.url);
+const repoRoot = resolve(import.meta.dirname, "../../../..");
 const { ProductInfoCollector } = vendorRequire(resolve(
+  repoRoot,
   "vendor/supermickey/hyperreality-system/engines/data-mining-engine/agents/product-info-collector.js",
 )) as {
   ProductInfoCollector: {
@@ -21,6 +23,7 @@ const { ProductInfoCollector } = vendorRequire(resolve(
   };
 };
 const { _identityLabel } = vendorRequire(resolve(
+  repoRoot,
   "vendor/supermickey/hyperreality-system/engines/data-mining-engine/contracts/confirmation-sheet.js",
 )) as { _identityLabel(identity: Record<string, unknown>): string };
 
@@ -166,7 +169,7 @@ describe("商品情报执行器", () => {
     let capturedBody = "";
     const runner = createApiSearchRunner({
       provider: "tavily",
-      apiKey: "tvly-test",
+      apiKey: "tvly-test-only",
       apiUrl: "https://api.tavily.com/search",
       fetchImpl: (async (_url: string, init: RequestInit) => {
         capturedBody = String(init.body ?? "");
@@ -186,7 +189,7 @@ describe("商品情报执行器", () => {
     expect(hits).toHaveLength(2);
     expect(hits[0]!.snippet).toContain("26-45㎡");
     const body = JSON.parse(capturedBody) as Record<string, unknown>;
-    expect(body.api_key).toBe("tvly-test");
+    expect(body.api_key).toBe("tvly-test-only");
     expect(body.search_depth).toBe("basic");
   });
 

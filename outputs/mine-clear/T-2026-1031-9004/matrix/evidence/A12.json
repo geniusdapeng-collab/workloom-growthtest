@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A12",
+  "category": "abnormal",
+  "expected": "MARKETING_FACTS_CHANGED",
+  "actual": "MARKETING_FACTS_CHANGED",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "tampered-source",
+    "caseHash": "5bbc97c5492950ef41319bac64a5b40a660e85856c9d2c4fc6e8206022ab8024"
+  },
+  "output": {
+    "error": "MARKETING_FACTS_CHANGED：主张引用的正文摘要已变化"
+  },
+  "capturedAt": "2026-10-31T15:22:04.676Z"
+}

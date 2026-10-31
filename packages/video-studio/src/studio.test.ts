@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
+import { resolve } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveGate } from "./gates.js";
 import { autoApproveHandler, runWithConfirmationHandler } from "./confirmation.js";
@@ -7,6 +8,7 @@ import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { buildRenderScript, loadPromptLengthSpec } from "./render-scripts.js";
 import { VideoStudio, attachDefaultCharacterAnchor, type ApprovalCallback, type EventSink } from "./studio.js";
 
+const repoRoot = resolve(import.meta.dirname, "../../..");
 const studioMocks = vi.hoisted(() => ({
   construct: vi.fn(),
   create: vi.fn(),
@@ -91,7 +93,7 @@ describe("gates 映射", () => {
       characters: [expect.objectContaining({ id: "chen-zhuo", role: "protagonist" })],
     });
     const anchoredCharacter = (anchored.metadata.characters as Array<{ portraitRef: string }>)[0]!;
-    expect(existsSync(anchoredCharacter.portraitRef)).toBe(true);
+    expect(existsSync(resolve(repoRoot, anchoredCharacter.portraitRef))).toBe(true);
     expect(attachDefaultCharacterAnchor("纯空镜，不出现人物", {}).intent).toBe("纯空镜，不出现人物");
   });
 

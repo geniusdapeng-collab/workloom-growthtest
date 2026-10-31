@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import { join, resolve } from "node:path";
 import { applyNarrativeFinalPromptContract } from "../../packages/video-studio/src/vendor-compat.js";
 import { inspectFinalShotContract } from "../../packages/video-studio/src/final-shot-contract.js";
+import { inspectFinalCharacterQualification } from "../../packages/video-studio/src/final-shot-character-qualification.js";
 
 const arg = (name: string, fallback = ""): string => {
   const index = process.argv.indexOf(name);
@@ -24,6 +25,11 @@ if (!existsSync(resultPath)) throw new Error(`RESULT_NOT_FOUND: ${resultPath}`);
 const result = JSON.parse(readFileSync(resultPath, "utf8")) as {
   success?: boolean;
   stages?: {
+    portraitStudio?: Record<string, unknown>;
+    portraitResolver?: Record<string, unknown>;
+    prdGeneration?: {
+      data?: Record<string, unknown>;
+    };
     productionEngine?: {
       shots?: Array<Record<string, unknown>>;
       prompts?: Array<Record<string, unknown>>;
@@ -57,6 +63,17 @@ const finalized = sourceShots.map((shot) =>
     ...(deliveryConstraint ? { deliveryConstraint } : {}),
   }));
 const contract = inspectFinalShotContract(finalized, { maxPromptLength: maxLength, noDialogue });
+const prdData = result.stages?.prdGeneration?.data;
+const characterSystem = prdData?.characterSystem && typeof prdData.characterSystem === "object"
+  ? prdData.characterSystem as Record<string, unknown>
+  : undefined;
+const characterQualification = inspectFinalCharacterQualification({
+  repoRoot,
+  shots: finalized,
+  portraitStudio: result.stages?.portraitStudio,
+  portraitResolver: result.stages?.portraitResolver,
+  ...(characterSystem ? { characterSystem } : {}),
+});
 
 const guardPath = join(
   repoRoot,
@@ -113,8 +130,10 @@ const qualification = {
   prompts,
   pipelineGuard: guardResult,
   finalShotContract: contract,
+  characterQualification,
   status: guardResult.pass
     && contract.pass
+    && characterQualification.pass
     && prompts.length > 0
     && prompts.every((item) => item.prompt.trim() && item.promptChars <= maxLength && !item.degraded)
     ? "eligible_pending_G8"

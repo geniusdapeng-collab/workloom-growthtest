@@ -87,7 +87,269 @@
     "pass": true,
     "issues": []
   },
-  "status": "eligible_pending_G8",
+  "characterQualification": {
+    "pass": false,
+    "issues": [
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S1",
+        "message": "人物 C1 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S1",
+        "message": "人物 小满: PENDING_GENERATION 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S1",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S1",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S1",
+        "message": "image://characters/xiaoman/portrait_01.png：定妆照文件不存在或不可读"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S1",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S2",
+        "message": "人物 C1 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S2",
+        "message": "人物 小满: PENDING_GENERATION 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S2",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S2",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S2",
+        "message": "image://characters/xiaoman/portrait_01.png：定妆照文件不存在或不可读"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S2",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S3",
+        "message": "人物 C1 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S3",
+        "message": "人物 小满: PENDING_GENERATION 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S3",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S3",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S3",
+        "message": "image://characters/xiaoman/home_night.png：定妆照文件不存在或不可读"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S3",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S4",
+        "message": "人物 C1 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S4",
+        "message": "人物 小满: PENDING_GENERATION 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S4",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S4",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S4",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S5",
+        "message": "人物 C1 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ID_UNREGISTERED",
+        "shotId": "S5",
+        "message": "人物 小满: PENDING_GENERATION 不在当前注册表或没有通过核验的活动定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S5",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S5",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S5",
+        "message": "image://characters/xiaoman/portrait.png：定妆照文件不存在或不可读"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S5",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "PORTRAIT_STAGE_SKIPPED",
+        "shotId": null,
+        "message": "存在出镜人物，但 G5 定妆照阶段被跳过：auto(G5_PORTRAIT)"
+      },
+      {
+        "code": "PORTRAIT_SOURCE_TEXT_ONLY",
+        "shotId": null,
+        "message": "portraitResolver 只有文字定妆，没有任何真实定妆照来源"
+      }
+    ],
+    "shots": [
+      {
+        "shotId": "S1",
+        "characters": [],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          },
+          {
+            "reference": "image://characters/xiaoman/portrait_01.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "定妆照文件不存在或不可读"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S2",
+        "characters": [],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          },
+          {
+            "reference": "image://characters/xiaoman/portrait_01.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "定妆照文件不存在或不可读"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S3",
+        "characters": [],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          },
+          {
+            "reference": "image://characters/xiaoman/home_night.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "定妆照文件不存在或不可读"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S4",
+        "characters": [],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S5",
+        "characters": [],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          },
+          {
+            "reference": "image://characters/xiaoman/portrait.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "定妆照文件不存在或不可读"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S6",
+        "characters": [],
+        "portraitReferences": [],
+        "pass": true
+      }
+    ],
+    "resolver": {
+      "studioCount": 0,
+      "uploadedCount": 0,
+      "textCount": 1
+    }
+  },
+  "status": "blocked",
   "remainingAuthority": [
     "G8 预算与围栏",
     "供应商模型资格",

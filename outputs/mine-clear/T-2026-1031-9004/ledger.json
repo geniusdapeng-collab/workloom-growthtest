@@ -5,7 +5,7 @@
   "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
   "title": "AI 视频营销/通用数据管线 60 场景压测与修复",
   "created_at": "2026-10-31T04:00:26.711Z",
-  "updated_at": "2026-10-31T14:55:27.860Z",
+  "updated_at": "2026-10-31T15:02:26.814Z",
   "baseline": {
     "audit": {
       "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
@@ -921,5 +921,10 @@
       }
     }
   ],
-  "gates": []
+  "gates": [],
+  "handoff": {
+    "generated_at": "2026-10-31T15:02:26.808Z",
+    "acceptance_command": "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest-stress-9004 --env local-preview",
+    "open_problem_ids": []
+  }
 }

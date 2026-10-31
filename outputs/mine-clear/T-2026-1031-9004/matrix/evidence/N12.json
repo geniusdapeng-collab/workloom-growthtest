@@ -1,0 +1,66 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "N12",
+  "category": "narrative",
+  "expected": "NARRATIVE_READY",
+  "actual": "NARRATIVE_READY",
+  "pass": true,
+  "mode": "runtime-bridge",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+    "caseHash": "2189a6e49833199889fb9ca891383b4c101aee11a6b0bd543e159ce6fe97e86f"
+  },
+  "output": {
+    "route": {
+      "route": "narrative",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 narrative",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "不应出现的商品",
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "brand": {
+          "name": "不应出现的品牌"
+        },
+        "category": "不应出现的品类",
+        "sellingPoints": [
+          "不应出现的卖点"
+        ],
+        "audience": "不应出现的人群",
+        "platform": "c",
+        "goal": "seeding",
+        "duration": 30,
+        "aspectRatio": "9:16"
+      },
+      "pipelineRoute": {
+        "kind": "narrative",
+        "via": "metadata",
+        "confidence": 1
+      }
+    },
+    "effectiveIntent": "做一条30秒舞蹈短片：听障舞者在排练厅通过地板震动感受节拍，人物为内置默认模特，避免真实人物身份\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+    "themeInput": "做一条30秒舞蹈短片：听障舞者在排练厅通过地板震动感受节拍，人物为内置默认模特，避免真实人物身份\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+    "shots": 6,
+    "totalDurationSeconds": 30,
+    "finalShotContract": {
+      "pass": true,
+      "issues": []
+    },
+    "pipelineGuard": {
+      "pass": true,
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.545Z"
+}

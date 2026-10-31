@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M14",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "989d63760d7c312227e1e5dacd30b4479b1d5cdc70206130e6d3799800b7609f"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "晨厨 Mini 空气炸锅",
+        "brand": "晨厨",
+        "category": "厨房电器",
+        "model": "Mini",
+        "sellingPoints": [
+          "快速预热",
+          "可视窗口",
+          "小容量"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "晨厨 Mini 空气炸锅",
+        "brand": {
+          "name": "晨厨"
+        },
+        "category": "厨房电器"
+      },
+      "dataMining": {
+        "name": "晨厨 Mini 空气炸锅",
+        "brand": "晨厨",
+        "category": "厨房电器",
+        "model": "Mini",
+        "sellingPointCandidates": [
+          "快速预热",
+          "可视窗口",
+          "小容量"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给晨厨 Mini 空气炸锅做一条小红书早餐场景种草，突出快速预热、可视窗口和小容量\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "晨厨 Mini 空气炸锅",
+    "queries": [
+      {
+        "q": "晨厨 Mini 空气炸锅 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "晨厨 Mini 空气炸锅 厨房电器 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "晨厨 Mini 空气炸锅 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "晨厨 Mini 空气炸锅 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "晨厨 Mini 空气炸锅 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "晨厨 Mini 空气炸锅 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "晨厨 Mini 空气炸锅 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "晨厨 Mini 空气炸锅 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "c6e0c8e1b69e9c459ae029067176a94ea914e457a1b8a8311b63e2589481d615"
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.287Z"
+}

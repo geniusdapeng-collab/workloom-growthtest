@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M03",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "13a3bb2729fa090b2de0b17e800c957f81ed976b1069297a841e139a3701779f"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "驰衡 Mini 筋膜枪",
+        "brand": "驰衡",
+        "category": "运动恢复设备",
+        "model": "Mini",
+        "sellingPoints": [
+          "口袋尺寸",
+          "四档力度",
+          "训练后放松"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "驰衡 Mini 筋膜枪",
+        "brand": {
+          "name": "驰衡"
+        },
+        "category": "运动恢复设备"
+      },
+      "dataMining": {
+        "name": "驰衡 Mini 筋膜枪",
+        "brand": "驰衡",
+        "category": "运动恢复设备",
+        "model": "Mini",
+        "sellingPointCandidates": [
+          "口袋尺寸",
+          "四档力度",
+          "训练后放松"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给驰衡 Mini 筋膜枪做一条抖音运动恢复短片，突出口袋尺寸、四档力度和训练后放松\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "驰衡 Mini 筋膜枪",
+    "queries": [
+      {
+        "q": "驰衡 Mini 筋膜枪 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "驰衡 Mini 筋膜枪 运动恢复设备 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "驰衡 Mini 筋膜枪 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "驰衡 Mini 筋膜枪 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "驰衡 Mini 筋膜枪 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "驰衡 Mini 筋膜枪 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "驰衡 Mini 筋膜枪 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "驰衡 Mini 筋膜枪 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "1dff210bd1b085adb83464b4a4d40513951da03e3518537e5f199fb194204245"
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.281Z"
+}

@@ -1,0 +1,66 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "N14",
+  "category": "narrative",
+  "expected": "NARRATIVE_READY",
+  "actual": "NARRATIVE_READY",
+  "pass": true,
+  "mode": "runtime-bridge",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+    "caseHash": "bb93f7c8635a2ac97431377afbac9b7f3440bec5e01dcab5b9a4472269e53fc1"
+  },
+  "output": {
+    "route": {
+      "route": "narrative",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 narrative",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "不应出现的商品",
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "brand": {
+          "name": "不应出现的品牌"
+        },
+        "category": "不应出现的品类",
+        "sellingPoints": [
+          "不应出现的卖点"
+        ],
+        "audience": "不应出现的人群",
+        "platform": "c",
+        "goal": "seeding",
+        "duration": 30,
+        "aspectRatio": "9:16"
+      },
+      "pipelineRoute": {
+        "kind": "narrative",
+        "via": "metadata",
+        "confidence": 1
+      }
+    },
+    "effectiveIntent": "做一条30秒美食记忆短片：热气、汤面、筷子与窗外雨声唤起回家记忆，人物只出现手部\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu",
+    "themeInput": "做一条30秒美食记忆短片：热气、汤面、筷子与窗外雨声唤起回家记忆，人物只出现手部\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu",
+    "shots": 6,
+    "totalDurationSeconds": 30,
+    "finalShotContract": {
+      "pass": true,
+      "issues": []
+    },
+    "pipelineGuard": {
+      "pass": true,
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.577Z"
+}

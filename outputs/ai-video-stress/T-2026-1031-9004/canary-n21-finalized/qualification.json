@@ -87,7 +87,221 @@
     "pass": true,
     "issues": []
   },
-  "status": "eligible_pending_G8",
+  "characterQualification": {
+    "pass": false,
+    "issues": [
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S1",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S1",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ASSERTION_CONFLICT",
+        "shotId": "S1",
+        "message": "镜头声明了人物，同时人物约束又要求空镜/无人，两者不能同时放行"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S2",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S2",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S2",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ASSERTION_CONFLICT",
+        "shotId": "S2",
+        "message": "镜头声明了人物，同时人物约束又要求空镜/无人，两者不能同时放行"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S3",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S3",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S4",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S4",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S4",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ASSERTION_CONFLICT",
+        "shotId": "S4",
+        "message": "镜头声明了人物，同时人物约束又要求空镜/无人，两者不能同时放行"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S5",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S5",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S5",
+        "message": "本镜声明了人物，但没有绑定任何已注册角色的当前活动定妆照"
+      },
+      {
+        "code": "CHARACTER_ASSERTION_CONFLICT",
+        "shotId": "S5",
+        "message": "镜头声明了人物，同时人物约束又要求空镜/无人，两者不能同时放行"
+      },
+      {
+        "code": "PORTRAIT_BINDING_REQUIRED",
+        "shotId": "S6",
+        "message": "人物仍是 PENDING_GENERATION，不能进入 G8"
+      },
+      {
+        "code": "PORTRAIT_REFERENCE_INVALID",
+        "shotId": "S6",
+        "message": "/characters/character/portrait_v1.png：厂商占位路径 /characters/… 不是已登记的当前定妆照"
+      },
+      {
+        "code": "PORTRAIT_STAGE_SKIPPED",
+        "shotId": null,
+        "message": "存在出镜人物，但 G5 定妆照阶段被跳过：auto(G5_PORTRAIT)"
+      }
+    ],
+    "shots": [
+      {
+        "shotId": "S1",
+        "characters": [
+          "chen-zhuo"
+        ],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S2",
+        "characters": [
+          "chen-zhuo"
+        ],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S3",
+        "characters": [
+          "chen-zhuo"
+        ],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          },
+          {
+            "reference": "image://characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "valid": true,
+            "characterId": "chen-zhuo",
+            "reason": null
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S4",
+        "characters": [
+          "chen-zhuo"
+        ],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S5",
+        "characters": [
+          "chen-zhuo"
+        ],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          }
+        ],
+        "pass": false
+      },
+      {
+        "shotId": "S6",
+        "characters": [
+          "chen-zhuo"
+        ],
+        "portraitReferences": [
+          {
+            "reference": "/characters/character/portrait_v1.png",
+            "valid": false,
+            "characterId": null,
+            "reason": "厂商占位路径 /characters/… 不是已登记的当前定妆照"
+          },
+          {
+            "reference": "image://characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "valid": true,
+            "characterId": "chen-zhuo",
+            "reason": null
+          }
+        ],
+        "pass": false
+      }
+    ],
+    "resolver": {
+      "studioCount": 0,
+      "uploadedCount": 0,
+      "textCount": 1
+    }
+  },
+  "status": "blocked",
   "remainingAuthority": [
     "G8 预算与围栏",
     "供应商模型资格",

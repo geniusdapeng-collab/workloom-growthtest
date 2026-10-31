@@ -1,0 +1,227 @@
+{
+  "schema": "workloom.mine-clear/ledger@1",
+  "task_id": "T-2026-1031-9004",
+  "repo": "workloom-growthtest-stress-9004",
+  "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+  "title": "AI 视频管线 M6 验收反查修复",
+  "created_at": "2026-10-31T15:09:00.617Z",
+  "updated_at": "2026-10-31T15:18:31.283Z",
+  "baseline": {
+    "audit": {
+      "commit": "e5111931d59fa662ab81163fe909a2c89f7543ef",
+      "branch": "task/T-2026-1031-9004",
+      "remote": "origin",
+      "fetched_at": null,
+      "fetch_status": "skipped",
+      "notes": "本地 HEAD 不是 origin/main 最新（云端 6ba121b0 / 本地 e5111931）——按 §1.2 先对齐基线；工作树不干净（9 项未提交改动）：排雷结论只对已提交内容成立"
+    },
+    "repair": {
+      "commit": null,
+      "reverified_problem_ids": []
+    },
+    "acceptance": {
+      "commit": null,
+      "is_descendant_of_repair": null
+    }
+  },
+  "environment": {
+    "kind": "local-preview",
+    "notes": ""
+  },
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "cards": [
+    {
+      "id": "MC-009",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 2,
+      "state": "open",
+      "title": "finalizer 忽略未绑定人物与无效定妆照并将结果误判为可进 G8",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "scripts/tools/data-pipeline-finalize.mts:116@e5111931d59fa662ab81163fe909a2c89f7543ef",
+          "sha256": "244dfc12eaf6c3934a6ede679a9b8cc3ccd138e0172baf6a71e5ae319edd4a0e",
+          "note": "G8 资格只聚合 PipelineGuard、prompt 长度/降级与最终镜头合同，没有读取 portraitStudio、portraitResolver、PRD 角色授权或镜头人物绑定。"
+        },
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/final-shot-contract.ts:40@e5111931d59fa662ab81163fe909a2c89f7543ef",
+          "sha256": "854db440565e26eaf68fc8dffd9f3b6f6fd205187c87fc8b704240f517a0d962",
+          "note": "最终镜头合同只检查 prompt、shotId、时长、降级与台词；不检查人物ID、PENDING_GENERATION、定妆照文件、授权或 PRD 一致性。真实 m3/n21 结果分别为 b7f64a6f…、ace78585…，旧 finalizer 均误返回 eligible_pending_G8。"
+        }
+      ],
+      "root_cause": {
+        "file": "scripts/tools/data-pipeline-finalize.mts",
+        "line": 116,
+        "commit": "e5111931d59fa662ab81163fe909a2c89f7543ef",
+        "symbol": "qualification.status"
+      },
+      "trigger_path": "真实 preproduction 结果已经产出 prompt，但 G5 被跳过、人物解析只有文字、镜头肖像字段仍是占位路径时，finalizer 仍按 prompt 合同返回 eligible_pending_G8。",
+      "fix_plan": "增加人物资格独立合同：读取人物注册表与当前活动定妆照，逐镜核验人物ID、PENDING 状态、有效文件/摘要、授权、PRD 一致性和 G5 跳过原因；任何一项未闭合均 blocked。",
+      "blast_radius": "只收紧 preproduction 到 G8 的资格边界，不改变 prompt 自愈、质量门、预算门或供应商提交；合法绑定当前注册人物与定妆照的结果仍可进入 G8。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "真实营销 m3 与叙事 n21 preproduction 结果，均缺人物定妆照绑定",
+          "expect": "finalizer exit 4，qualification.status=blocked，characterQualification.pass=false 且含 PORTRAIT_STAGE_SKIPPED / PORTRAIT_BINDING_REQUIRED，providerSubmission 与 renderSubmitted 均为 false",
+          "command": "vitest run scripts/tools/data-pipeline-finalize.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "scripts/tools/data-pipeline-finalize.test.ts"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run scripts/tools/data-pipeline-finalize.test.ts"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "验收发现 A-001。"
+    },
+    {
+      "id": "MC-010",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "open",
+      "title": "包级标准测试因 cwd 相对路径产生不可复现失败",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "packages/video-studio/src/studio.test.ts:94@e5111931d59fa662ab81163fe909a2c89f7543ef",
+          "sha256": "1bc3f75bd721866266d401d957a4310c356faab99c92248d009ec1b10638336f",
+          "note": "测试直接 existsSync(portraitRef)；portraitRef 是仓内相对路径，在 packages/video-studio cwd 下解析错误。"
+        },
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/data-mining-executor.test.ts:15@e5111931d59fa662ab81163fe909a2c89f7543ef",
+          "sha256": "88ed31986da2c0996ac4d5f5baae643f99f1abf2d2f2615be85a360ce86dfa21",
+          "note": "vendorRequire(resolve('vendor/...')) 依赖进程 cwd；在 apps/server 标准包级测试中解析为 apps/server/vendor，模块加载失败。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/data-mining-executor.test.ts",
+        "line": 15,
+        "commit": "e5111931d59fa662ab81163fe909a2c89f7543ef",
+        "symbol": "vendorRequire"
+      },
+      "trigger_path": "从根目录运行测试时路径偶然正确；执行 pnpm -C packages/video-studio test 或 pnpm -C apps/server exec vitest run src/video 时，进程 cwd 改变，仓库相对路径失效。",
+      "fix_plan": "所有测试资源路径从 import.meta.dirname 推导仓库根，再拼 vendor 与人物资产绝对路径；不使用 process cwd。",
+      "blast_radius": "只影响测试定位，不改生产代码行为；覆盖根级递归测试和两个包级标准命令。",
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "从 packages/video-studio 目录运行该包标准测试",
+          "expect": "全部测试文件通过，且 studio.test.ts 的默认模特文件断言从仓库根解析成功",
+          "command": "pnpm --config.verify-deps-before-run=false -C packages/video-studio test",
+          "exec": {
+            "file": "pnpm",
+            "args": [
+              "--config.verify-deps-before-run=false",
+              "-C",
+              "packages/video-studio",
+              "test"
+            ]
+          },
+          "last_result": "not-run"
+        },
+        {
+          "kind": "sample",
+          "given": "从 apps/server 目录运行视频标准测试",
+          "expect": "全部测试文件通过，data-mining-executor.test.ts 从仓库根加载 vendor 模块",
+          "command": "pnpm --config.verify-deps-before-run=false -C apps/server exec vitest run src/video --testTimeout 30000",
+          "exec": {
+            "file": "pnpm",
+            "args": [
+              "--config.verify-deps-before-run=false",
+              "-C",
+              "apps/server",
+              "exec",
+              "vitest",
+              "run",
+              "src/video",
+              "--testTimeout",
+              "30000"
+            ]
+          },
+          "last_result": "not-run"
+        }
+      ],
+      "regression": {
+        "command": "pnpm --config.verify-deps-before-run=false -C packages/video-studio test && pnpm --config.verify-deps-before-run=false -C apps/server exec vitest run src/video --testTimeout 30000"
+      },
+      "fixed_by": null,
+      "verified_by": null,
+      "notes": "验收发现 A-002。"
+    }
+  ],
+  "gates": []
+}

@@ -44,6 +44,14 @@
 8. Process lifecycle:
    - Failed data-pipeline runs left vendor timers alive and held `.preproduction.lock`; explicit `process.exit` was added after summary output.
 
+9. Finalization accepted unbound people:
+   - The replay only checked prompt/duration/PipelineGuard and ignored `PENDING_GENERATION`, text-only portrait resolution, placeholder portrait paths and skipped G5.
+   - `final-shot-character-qualification.ts` now validates the current character registry, active portrait bytes, authorization, PRD mapping and no-person conflicts before G8.
+
+10. Package tests depended on process cwd:
+    - video-studio and server tests resolved repository assets from the caller directory.
+    - Tests now derive the repository root from `import.meta.dirname`.
+
 ## Case plan
 
 - 20 marketing themes: product/brand/category/platform/claims in a machine-readable matrix.
@@ -57,18 +65,19 @@
 - `canary-m/`: pre-fix live marketing failure; `MARKETING_G1_REQUIRED` reproduced.
 - `canary-n` through `canary-n19/`: live narrative repair sequence. G3 and G4 were each accepted in separate runs; n16 reached Phase 3 and exposed downstream contract/dialogue failures; n19 was rejected by G4 on PRD semantic conflicts only.
 - `canary-n21/`: producer=auto live model chain reached 6 shots / 6 prompts; it stopped at PipelineGuard on one hallucinated dialogue and S1 prompt length.
-- `canary-n21-finalized/qualification.json`: deterministic replay of the current finalizer over n21. PipelineGuard passes 0/0; 6 prompts are <=3000 chars, no dialogue, total 30s, `providerSubmission=false`, status `eligible_pending_G8`.
+- `canary-n21-finalized/qualification.json`: deterministic replay of the current finalizer over n21. Prompt/PipelineGuard checks pass, but `characterQualification.pass=false` because the production shots retain `PENDING_GENERATION` and placeholder portraits; status is `blocked`.
 - `canary-m3/`: live marketing canary uses the official Xiaomi product API through a real fetched source and a reproducible seven-query fixture. It reached 6 shots / 6 prompts; the live run itself failed final PipelineGuard on one dialogue separator and two prompts over 3000 chars.
-- `canary-m3-finalized/qualification.json`: deterministic finalization over the live m3 output passes PipelineGuard 0/0 and the final-shot contract; all 6 prompts are <=3000 chars, no dialogue, 9:16, 1080x1920, 30fps, total 30s, `providerSubmission=false`, status `eligible_pending_G8`.
+- `canary-m3-finalized/qualification.json`: deterministic finalization over the live m3 output passes prompt/PipelineGuard checks, but G5 is skipped, the resolver has zero studio/uploaded portraits and the shots reference unregistered `xiaoman` portraits; status is `blocked`.
 - `matrix/report.json`: 60/60 cases pass (20 marketing, 20 narrative, 20 abnormal); 4 semantic cases use labelled deterministic replay, the other 56 execute production routing/contract/runtime helpers. Provider submissions 0.
-- `producer-gate.test.ts`, `studio.test.ts`, `pipeline-router.test.ts`, `vendor-compat.test.ts`, `configured-llm.test.ts`: 114 targeted assertions passing after current repairs.
-- Current expanded targeted suites pass 123 assertions across router, final-shot contract, data mining, marketing facts and source fetch; package/server typechecks pass.
-- `outputs/mine-clear/T-2026-1031-9004/ledger.json`: 7 audit cards registered (5 P1, 2 P2) with code evidence at audit commit and executable assertions.
-- Current worktree is intentionally dirty and must be committed before PR/CI/merge. The task branch tree equaled GitHub main tree at audit start.
+- `packages/video-studio` standard suite: 101 files / 1,812 tests passed from package cwd.
+- `apps/server/src/video`: 29 files / 884 passed / 87 skipped from apps/server cwd.
+- `test:scripts`: 415 Vitest + 118 Node + 80 post-quality Vitest + 91 post-quality Node + 162 desktop tests passed after runtime lock refresh.
+- `outputs/mine-clear/T-2026-1031-9004/ledger.json`: original 8 cards independently verified.
+- `outputs/mine-clear/T-2026-1031-9004/m6/ledger.json`: two P1 acceptance findings remain open until repair and independent re-verification complete.
 
 ## Next actions
 
-1. Run full relevant tests/typecheck/release gates/secret scan.
-2. Commit the clean fix baseline.
-3. Run MCD repair assertions, commit evidence, then assign an independent acceptance role for acceptance runs and gate.
+1. Commit the clean fix baseline.
+2. Run MCD repair assertions for MC-009/MC-010, then assign an independent acceptance role.
+3. Run RDAS local-preview acceptance and produce the final M6 report/handoff.
 4. Push branch, create PR, wait for CI, ordinary merge, read back main SHA/tree.

@@ -1,0 +1,42 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A02",
+  "category": "abnormal",
+  "expected": "CLARIFY_PRODUCT",
+  "actual": "CLARIFY_PRODUCT",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "marketing-missing-product",
+    "caseHash": "c2ed15f19e660bb3dfee3d5cfe01ed3c869a20621697bf3c0bef3593a4664a04"
+  },
+  "output": {
+    "route": "clarify",
+    "confidence": 0.5,
+    "via": "metadata",
+    "rationale": "调用方显式指定 marketing；但缺商品名，情报五站无法开工",
+    "signals": {
+      "marketing": [],
+      "narrative": [],
+      "explainer": []
+    },
+    "clarify": {
+      "question": "已判定走营销片管线，但缺商品锚点——情报五站（采集/评价/竞品/核验/装订）以商品为锚，没有商品名无法开工。\n请补充：商品名（必填）；品牌 / 品类 / 型号 / 价格带（可选，越全检索越准）。\n例：商品名：星野空气循环扇；品牌：星野；品类：小家电。\n若这条片子其实不涉及商品，请直接回复「走叙事片」，我按通用管线重排。",
+      "missing": [
+        "product"
+      ],
+      "options": [
+        {
+          "key": "marketing",
+          "label": "营销片（我会补商品名）"
+        },
+        {
+          "key": "narrative",
+          "label": "其实是不涉及商品的叙事片"
+        }
+      ]
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.673Z"
+}
