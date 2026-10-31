@@ -7,7 +7,7 @@ import { mkdir, open, realpath, writeFile } from "node:fs/promises";
 import { reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
 import { createDataMiningExecutor, type DataMiningStagePlan, type ExecutorLlm, type IntelStage, type SearchFn, type SearchHit } from "./data-mining-executor.js";
 import { fetchMarketingSource, type SourceSnapshot } from "./marketing-source-fetcher.js";
-import { validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
+import { assertMarketingFactsFresh, validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
 import { canonicalRenderJson, renderSha256 } from "./gen/compiled-request.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 
@@ -101,7 +101,14 @@ const extractionContract = [
 
 export async function prepareMarketingFacts(input: {
   scope: MarketingScope; root: string; metadata: RecordValue; intent: string; llm: ExecutorLlm; env?: NodeJS.ProcessEnv;
-  dependencies?: { search?: SearchFn; fetchSource?: typeof fetchMarketingSource; review?: typeof reviewStage };
+  dependencies?: {
+    search?: SearchFn;
+    /** 复用 CLI 预置的真实检索缓存；A1 有命中时其它查询不会继续轰击线上引擎。 */
+    searchCacheFile?: string;
+    fetchSource?: typeof fetchMarketingSource;
+    review?: typeof reviewStage;
+    log?: (line: string) => void;
+  };
 }): Promise<PreparedMarketingFacts> {
   const env = input.env ?? process.env;
   if (env.VM_DATA_MINING === "0" || env.VM_DATA_MINING_MODE === "spec") fail("MARKETING_SOURCE_REQUIRED", "正式营销不支持跳过来源采集或用任务书代替事实证据");
@@ -114,7 +121,11 @@ export async function prepareMarketingFacts(input: {
   const cache = new Map<string, SourceSnapshot>();
   const sourceFetch = input.dependencies?.fetchSource ?? fetchMarketingSource;
   const review = input.dependencies?.review ?? reviewStage;
-  const executor = createDataMiningExecutor({ llm: input.llm, search: input.dependencies?.search,
+  const executor = createDataMiningExecutor({
+    llm: input.llm,
+    search: input.dependencies?.search,
+    searchCacheFile: input.dependencies?.searchCacheFile,
+    log: input.dependencies?.log,
     evidenceCollector: async (stage, stagePlan, hits: SearchHit[]) => {
       const pages: SourceSnapshot[] = [], failures: Array<{ url: string; reason: string }> = [];
       const candidates = [...new Map(hits.map(hit => [hit.url, hit])).values()]; let attempted = 0;
@@ -176,7 +187,27 @@ export async function prepareMarketingFacts(input: {
     if (!payload) fail("MARKETING_STAGE_UNVERIFIED", `${stage}没有受控事实回填`);
     raw[stage] = payload;
   }
-  const assembled = collector.assemble(plan.trace_id, product, raw);
+  /**
+   * Vendor 的 distill 只给对象形态的 spec 登记来源。宿主逐条审核得到的
+   * claims 已经绑定到原文；装订时把这些来源附着到临时副本，避免档案把
+   * 已审规格误报成“无来源”。rawByAgent 仍保留原始提取形状，审计哈希不漂移。
+   */
+  const assemblyRaw = structuredClone(raw);
+  const a1Facts = reports.find((report) => report.stage === "A1")?.facts;
+  if (a1Facts && assemblyRaw.A1?.identity && typeof assemblyRaw.A1.identity === "object") {
+    const identity = assemblyRaw.A1.identity as RecordValue;
+    const specs = identity.specs && typeof identity.specs === "object" && !Array.isArray(identity.specs)
+      ? identity.specs as RecordValue
+      : {};
+    for (const [key, value] of Object.entries(specs)) {
+      const pointer = `/identity/specs/${key.replace(/~/g, "~0").replace(/\//g, "~1")}`;
+      const claim = a1Facts.claims.find((item) => item.pointer === pointer);
+      const source = claim ? sources.find((item) => item.sourceId === claim.sourceId) : undefined;
+      if (source) specs[key] = { value, source_url: source.requestedUrl };
+    }
+    identity.specs = specs;
+  }
+  const assembled = collector.assemble(plan.trace_id, product, assemblyRaw);
   if (assembled.ok !== true || assembled.chain?.ok !== true || !assembled.dossier || !assembled.cards) fail("MARKETING_DOSSIER_UNVERIFIED", "情报五站未完成有效档案装订");
   const restrictions = reports.filter(report => report.facts.status === "no_evidence").map(report => report.stage === "A2"
     ? "没有可核实用户评价：禁止用户口碑、评分、人数、销量或使用效果共识主张" : "没有可核实竞品证据：禁止对比、竞品弱点或市场领先主张");
@@ -228,8 +259,7 @@ export async function verifyMarketingFacts(input: {
   if (bundle.schemaVersion !== "workloom.marketing-facts/v1" || bundle.issuer !== "workloom.marketing-authority" || bundle.policyVersion !== "source-claims/v1"
     || canonicalRenderJson(bundle.scope) !== canonicalRenderJson(input.scope) || !Array.isArray(bundle.sources) || !Array.isArray(bundle.stages)
     || !Array.isArray(bundle.outputReviews) || !/^[a-f0-9]{64}$/.test(bundle.g1ContentSha256)) fail("MARKETING_FACTS_INVALID", "营销事实包身份或结构无效");
-  const age = Date.now() - Date.parse(bundle.collectedAt);
-  if (!Number.isFinite(age) || age < -30_000 || age > 24 * 3600_000) fail("MARKETING_FACTS_EXPIRED", "营销事实来源超过24小时有效期，请刷新来源后重新预生产");
+  assertMarketingFactsFresh(bundle.collectedAt);
   const pages: SourceSnapshot[] = [];
   if (new Set(bundle.sources.map(source => source.sourceId)).size !== bundle.sources.length) fail("MARKETING_SOURCE_INVALID", "营销来源ID重复");
   for (const source of bundle.sources) {

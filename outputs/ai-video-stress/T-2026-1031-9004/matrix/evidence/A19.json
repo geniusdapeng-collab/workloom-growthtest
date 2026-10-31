@@ -1,0 +1,25 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A19",
+  "category": "abnormal",
+  "expected": "SHOT_PLACEHOLDER",
+  "actual": "SHOT_PLACEHOLDER",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "placeholder-shot",
+    "caseHash": "88026fe98f9006c74bcc8ee1ad2daccd9a6930c716e5c0ae8bf02f564fab6570"
+  },
+  "output": {
+    "pass": false,
+    "issues": [
+      {
+        "code": "SHOT_PLACEHOLDER",
+        "shotId": "S1",
+        "message": "最终 prompt 含对象/未定义占位符"
+      }
+    ]
+  },
+  "capturedAt": "2026-10-31T14:31:10.520Z"
+}

@@ -24,7 +24,7 @@
  * 退出码：0=跑通；2=缺 LLM 配置；3=分流判定为"需澄清"（这是**正确行为**，不是失败）；
  *        4=运行失败（vendor 抛错）。
  */
-import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import {
@@ -36,6 +36,7 @@ import {
   applyRouteToMetadata,
   buildPipelineIntent,
   describeRouteDecision,
+  validatePipelineRequest,
   type ApprovalCallback,
   type EventSink,
   type GateKey,
@@ -51,11 +52,12 @@ import {
   type ProducerMode,
 } from "../../apps/server/src/video/gate-policy.js";
 import {
-  createDataMiningExecutor,
   primeSearchCache,
   type ExecutorLlm,
   type SearchHit,
 } from "../../apps/server/src/video/data-mining-executor.js";
+import { prepareMarketingFacts } from "../../apps/server/src/video/marketing-authority.js";
+import { canonicalRenderJson, renderSha256 } from "../../apps/server/src/video/gen/compiled-request.js";
 
 const REPO_ROOT = resolve(import.meta.dirname ?? process.cwd(), "../..");
 
@@ -88,8 +90,7 @@ function loadKeys(file: string): number {
 
 /* ================= 参数 ================= */
 
-const INTENT = arg("--intent");
-if (!INTENT) throw new Error("需要 --intent <创作意图原文>");
+const REQUESTED_INTENT = arg("--intent");
 const PROJECT = arg("--project", `VID-AUDIT-${new Date().toISOString().slice(5, 10).replace("-", "")}`);
 const WORK_DIR = resolve(REPO_ROOT, arg("--work-dir", ".vm-work"));
 const OUT_DIR = resolve(REPO_ROOT, arg("--out", join("outputs", PROJECT)));
@@ -98,11 +99,20 @@ const ROUTE_ARG = arg("--route", "auto");
 const PRODUCER = (arg("--producer", "review").toLowerCase() === "auto" ? "auto" : "review") as ProducerMode;
 const PORTRAITS_ENABLED = !flag("--no-portraits") && (process.env.HR_PORTRAIT_ENABLED ?? "1") !== "0";
 /** 需求口径（写进意图块，供生成器与 G2 监制核对；缺省与本仓 marketing brief 默认一致） */
-const PROFILE = {
-  durationSec: Number(arg("--duration", "30")) || 30,
+const REQUEST = validatePipelineRequest({
+  intent: REQUESTED_INTENT,
+  product: arg("--product") || undefined,
+  durationSec: Number(arg("--duration", "30")),
   aspectRatio: arg("--aspect", "9:16"),
   platform: arg("--platform", "douyin"),
   goal: arg("--goal", "seeding"),
+});
+const INTENT = REQUEST.intent;
+const PROFILE = {
+  durationSec: REQUEST.durationSec!,
+  aspectRatio: REQUEST.aspectRatio!,
+  platform: REQUEST.platform!,
+  goal: REQUEST.goal!,
 };
 
 const loadedKeys = loadKeys(KEYS_FILE);
@@ -171,10 +181,17 @@ if (decision.route === "clarify") {
 
 const brief: Record<string, unknown> = {
   duration: Number(arg("--duration", "30")) || 30,
+  aspectRatio: arg("--aspect", "9:16"),
   platform: arg("--platform", "douyin"),
   goal: arg("--goal", "seeding"),
 };
 const seeded = applyRouteToMetadata({ brief }, decision);
+seeded.platform = arg("--platform", "douyin");
+seeded.platformSelection = {
+  id: arg("--platform", "douyin"),
+  aspectRatio: arg("--aspect", "9:16"),
+  source: "cli",
+};
 if (arg("--product") && decision.product) {
   // CLI 显式给出的商品信息优先（用户口径 > 抽取结果）
   seeded.dataMining = {
@@ -250,21 +267,60 @@ const onEvent: EventSink = (e) => {
 
 /* ================= ④ 跑批（不提交渲染） ================= */
 
-const dataMining: StudioConfig["dataMining"] = decision.route === "marketing"
+let marketingFacts: Awaited<ReturnType<typeof prepareMarketingFacts>> | undefined;
+if (decision.route === "marketing") {
+  try {
+    const archiveRoot = join(WORK_DIR, "archive", "audit", PROJECT);
+    mkdirSync(archiveRoot, { recursive: true });
+    marketingFacts = await prepareMarketingFacts({
+      scope: { tenantId: "audit", workspaceId: "audit", projectId: PROJECT, runId: `stress-${Date.now()}`, attempt: 1 },
+      root: realpathSync(archiveRoot),
+      metadata: seeded,
+      intent: buildPipelineIntent(INTENT, PROFILE),
+      llm: llm as unknown as ExecutorLlm,
+      dependencies: {
+        searchCacheFile: SEARCH_CACHE_FILE,
+        log,
+      },
+    });
+    const g1 = await onApproval({
+      gate: "G1_DOSSIER",
+      vendorType: "host-source-dossier",
+      title: "本次营销来源正文与逐主张事实审核",
+      contentMd: marketingFacts.g1Content,
+    });
+    if (!g1.approved) throw new Error(`MARKETING_G1_REJECTED：${g1.reason}`);
+    const verifiedRawJson = canonicalRenderJson(marketingFacts.raw);
+    if (renderSha256(verifiedRawJson) !== marketingFacts.bundle.rawSha256) {
+      throw new Error("MARKETING_G1_RAW_HASH_MISMATCH：事实回填摘要不一致");
+    }
+    writeFileSync(join(OUT_DIR, "marketing-facts.json"), `${JSON.stringify({
+      schemaVersion: marketingFacts.bundle.schemaVersion,
+      collectedAt: marketingFacts.bundle.collectedAt,
+      productQuery: marketingFacts.bundle.productQuery,
+      rawSha256: marketingFacts.bundle.rawSha256,
+      dossierSha256: marketingFacts.bundle.dossierSha256,
+      g1ContentSha256: marketingFacts.bundle.g1ContentSha256,
+      sourceCount: marketingFacts.bundle.sources.length,
+      restrictions: marketingFacts.bundle.restrictions,
+    }, null, 2)}\n`, "utf8");
+  } catch (error) {
+    log(`❌ 营销 G1 事实准备失败：${error instanceof Error ? error.message : String(error)}`);
+    process.exit(4);
+  }
+}
+
+const dataMining: StudioConfig["dataMining"] = decision.route === "marketing" && marketingFacts
   ? {
       mode: "api",
-      executor: createDataMiningExecutor({
-        llm: llm as unknown as ExecutorLlm,
-        log,
-        searchCacheFile: SEARCH_CACHE_FILE,
-        searchPaceMs: Number(arg("--search-pace-ms", "1200")) || 1_200,
-      }) as unknown as (
-        stage: string,
-        plan: Record<string, unknown>,
-      ) => Promise<Record<string, unknown> | null>,
-      refresh: flag("--refresh-dossier"),
-      storeRoot: join(WORK_DIR, "dossiers", "audit"),
-      staleAfterDays: 30,
+      refresh: true,
+      storeRoot: marketingFacts.storeRoot,
+      verifiedRaw: {
+        projectId: PROJECT,
+        rawJson: canonicalRenderJson(marketingFacts.raw),
+        sha256: marketingFacts.bundle.rawSha256,
+        productQuery: marketingFacts.bundle.productQuery,
+      },
     }
   : undefined;
 
@@ -284,8 +340,11 @@ const portraits: StudioConfig["portraits"] = PORTRAITS_ENABLED && process.env.VO
     }
   : { enabled: false };
 
-/** 创作意图：清掉分流行指令 + 写入需求口径（时长/画幅/平台/目标） */
-const PIPELINE_INTENT = buildPipelineIntent(INTENT, PROFILE);
+/** 创作意图：清掉分流行指令 + 写入需求口径（营销才携带转化目标，叙事不注入商业语义）。 */
+const PIPELINE_PROFILE = decision.route === "marketing"
+  ? PROFILE
+  : { durationSec: PROFILE.durationSec, aspectRatio: PROFILE.aspectRatio, platform: PROFILE.platform };
+const PIPELINE_INTENT = buildPipelineIntent(INTENT, PIPELINE_PROFILE);
 log(`创作意图（下行）：${PIPELINE_INTENT.replace(/\n/g, " ")}`);
 
 installVendorEngineBridge(llm);
@@ -305,7 +364,7 @@ log(`启动数据管线：project=${PROJECT} | 管线=${decision.route} | 定妆
 const startedAt = Date.now();
 let result: Awaited<ReturnType<VideoStudio["runPreproduction"]>>;
 try {
-  const maxAttempts = Math.max(1, Number(arg("--producer-retry", "1")) + 1);
+  const maxAttempts = Math.max(1, Number(arg("--producer-retry", "0")) + 1);
   result = await studio.runPreproduction({
     projectId: PROJECT,
     intent: PIPELINE_INTENT,
@@ -404,3 +463,9 @@ else {
   log(`  镜头卡 ${summary.shots} 张 / 提示词 ${summary.prompts} 条 / 门记录 ${summary.gates.length} 条`);
   log(`产物目录：${OUT_DIR.replace(REPO_ROOT + "/", "")}（result.json / shots.json / meta.json / gates.jsonl / events.jsonl）`);
 }
+
+/**
+ * Vendor 的 HealthMonitor/ProcessGuard 使用长定时器；结果落盘后必须显式退出，
+ * 否则失败 run 会继续持有全局单实例锁，后续压测被误判为重复启动。
+ */
+process.exit(result.success ? 0 : 4);

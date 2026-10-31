@@ -99,11 +99,13 @@ try {
   const pipelineRoots = [join(homedir(), ".workloom-bgm"), join(homedir(), "Downloads"), join(homedir(), "Music")]
     .filter((dir) => existsSync(dir));
   const effectiveAllowed = [...allowed, ...pipelineRoots];
-  const outside = roots.filter((root) => !effectiveAllowed.some((base) => root.dir === base || root.dir.startsWith(`${base}/`)));
-  jailLevel = roots.length === 0 ? "warn" : outside.length === 0 ? "pass" : "fail";
-  jailDetail = roots.length === 0
+  // A registered default root that does not exist is not a jail violation.
+  const existingRoots = roots.filter((root) => existsSync(root.dir));
+  const outside = existingRoots.filter((root) => !effectiveAllowed.some((base) => root.dir === base || root.dir.startsWith(`${base}/`)));
+  jailLevel = existingRoots.length === 0 ? "warn" : outside.length === 0 ? "pass" : "fail";
+  jailDetail = existingRoots.length === 0
     ? "没有发现任何本地曲库（随仓精选也会算一个，说明仓库结构异常）"
-    : `${roots.length} 个曲库根；${outside.length === 0
+    : `${existingRoots.length} 个存在曲库根；${outside.length === 0
       ? `按管线口径（含追加白名单 ${pipelineRoots.length} 个）全部放行`
       : `有 ${outside.length} 个不在白名单：${outside.map((r) => r.dir).join("、")}`}`
       + `（裸调 bgm-bridge 时的白名单根：${allowed.length} 个——手工直调需自行设 WORKLOOM_BGM_ALLOWED_ROOTS）`;

@@ -1,0 +1,78 @@
+[ProcessGuard] 实例 default 安装完成（含SIGTERM/SIGINT处理）
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+🛡️ 【PipelineGuard】启动渲染管线检查...
+✅ 【PipelineGuard】检查完成: 0 错误, 0 警告
+{
+  "schema": "workloom.ai-video-stress-report/v1",
+  "taskId": "T-2026-1031-9004",
+  "generatedAt": "2026-10-31T14:39:42.527Z",
+  "providerSubmission": false,
+  "paidGenerationRequests": 0,
+  "total": 60,
+  "passed": 60,
+  "failed": 0,
+  "byCategory": {
+    "marketing": {
+      "total": 20,
+      "passed": 20
+    },
+    "narrative": {
+      "total": 20,
+      "passed": 20
+    },
+    "abnormal": {
+      "total": 20,
+      "passed": 20
+    }
+  },
+  "byMode": {
+    "production-router": 22,
+    "runtime-bridge": 20,
+    "production-contract": 14,
+    "deterministic-replay": 4
+  }
+}
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

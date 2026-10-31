@@ -1,0 +1,54 @@
+{
+  "id": "MC-009",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "finalizer 忽略未绑定人物与无效定妆照并将结果误判为可进 G8",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "scripts/tools/data-pipeline-finalize.mts:116@e5111931d59fa662ab81163fe909a2c89f7543ef",
+      "sha256": "244dfc12eaf6c3934a6ede679a9b8cc3ccd138e0172baf6a71e5ae319edd4a0e",
+      "note": "G8 资格只聚合 PipelineGuard、prompt 长度/降级与最终镜头合同，没有读取 portraitStudio、portraitResolver、PRD 角色授权或镜头人物绑定。"
+    },
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/final-shot-contract.ts:40@e5111931d59fa662ab81163fe909a2c89f7543ef",
+      "sha256": "854db440565e26eaf68fc8dffd9f3b6f6fd205187c87fc8b704240f517a0d962",
+      "note": "最终镜头合同只检查 prompt、shotId、时长、降级与台词；不检查人物ID、PENDING_GENERATION、定妆照文件、授权或 PRD 一致性。真实 m3/n21 结果分别为 b7f64a6f…、ace78585…，旧 finalizer 均误返回 eligible_pending_G8。"
+    }
+  ],
+  "root_cause": {
+    "file": "scripts/tools/data-pipeline-finalize.mts",
+    "line": 116,
+    "commit": "e5111931d59fa662ab81163fe909a2c89f7543ef",
+    "symbol": "qualification.status"
+  },
+  "trigger_path": "真实 preproduction 结果已经产出 prompt，但 G5 被跳过、人物解析只有文字、镜头肖像字段仍是占位路径时，finalizer 仍按 prompt 合同返回 eligible_pending_G8。",
+  "fix_plan": "增加人物资格独立合同：读取人物注册表与当前活动定妆照，逐镜核验人物ID、PENDING 状态、有效文件/摘要、授权、PRD 一致性和 G5 跳过原因；任何一项未闭合均 blocked。",
+  "blast_radius": "只收紧 preproduction 到 G8 的资格边界，不改变 prompt 自愈、质量门、预算门或供应商提交；合法绑定当前注册人物与定妆照的结果仍可进入 G8。",
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "真实营销 m3 与叙事 n21 preproduction 结果，均缺人物定妆照绑定",
+      "expect": "finalizer exit 4，qualification.status=blocked，characterQualification.pass=false 且含 PORTRAIT_STAGE_SKIPPED / PORTRAIT_BINDING_REQUIRED，providerSubmission 与 renderSubmitted 均为 false",
+      "command": "vitest run scripts/tools/data-pipeline-finalize.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "scripts/tools/data-pipeline-finalize.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run scripts/tools/data-pipeline-finalize.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "验收发现 A-001。"
+}

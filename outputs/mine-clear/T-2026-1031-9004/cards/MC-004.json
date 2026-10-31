@@ -1,0 +1,65 @@
+{
+  "id": "MC-004",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "Phase3 降级不重试且最终 prompt 违反台词、长度和画幅合同",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:1944@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "d0a4f461a498ed0f6629191d005e6f5dfb079c95a68b8d9fdc8509fea17a6bce",
+      "note": "融合后任意降级直接整批失败；没有单镜重试、无台词清理、长度压缩或交付约束覆盖。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 1944,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "installVendorPhase3FusionBridge"
+  },
+  "trigger_path": "真实模型融合漏字段、生成台词或 prompt >3000 字符；bridge 不接受部分重试，最终 PipelineGuard 拦截渲染。",
+  "fix_plan": "按 shot 单次真实重试仍降级则失败关闭；统一清理无台词字段、压缩到 3000、覆盖 9:16/1080x1920/30fps 并做 final-shot contract。",
+  "blast_radius": "影响 Phase3 最终产物与渲染资格；不改变支付/供应商提交边界。",
+  "conflict_paths": ["scripts/tools/data-pipeline-finalize.mts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "n21 真实模型 6 镜产物及 m3 营销 6 镜产物",
+      "expect": "单镜重试通过、无台词、prompt≤3000、9:16、PipelineGuard 0/0，状态 eligible_pending_G8",
+      "command": "vitest run vendor-compat.test.ts final-shot-contract.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "packages/video-studio/src/final-shot-contract.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "60 例矩阵中的最终镜头合成",
+      "expect": "所有镜头满足最终合同，空镜、占位符、重复 ID 和超长 prompt 均失败关闭",
+      "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+      "exec": {
+        "file": "node_modules/.bin/tsx",
+        "args": [
+          "scripts/tools/ai-video-stress-matrix.mts",
+          "--out",
+          "outputs/mine-clear/T-2026-1031-9004/matrix"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/final-shot-contract.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "审计发现来自 canary-n21 与 canary-m3 的 PipelineGuard 失败。"
+}

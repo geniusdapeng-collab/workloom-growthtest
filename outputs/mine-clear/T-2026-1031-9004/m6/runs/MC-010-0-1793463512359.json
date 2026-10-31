@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-010-0-1793463512359",
+  "command": "pnpm --config.verify-deps-before-run=false -C packages/video-studio test",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "-C",
+      "packages/video-studio",
+      "test"
+    ]
+  },
+  "actor": "codex-postrepair-final-01a1927c",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-010",
+    "assertion_index": 0
+  },
+  "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T16:18:32.360Z",
+  "finished_at": "2026-10-31T16:20:08.071Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-010-0-1793463512359.txt",
+      "sha256": "e4bc68e72c772450f497c6d45f6a76dc87020284765306a6ab3a1626765ad2a9",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    }
+  ]
+}

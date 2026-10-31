@@ -1,0 +1,66 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "N07",
+  "category": "narrative",
+  "expected": "NARRATIVE_READY",
+  "actual": "NARRATIVE_READY",
+  "pass": true,
+  "mode": "runtime-bridge",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+    "caseHash": "debbb7987a55dd8dfdee80ccbc740ed110c4ff3c25301a1885abdf3fa636345b"
+  },
+  "output": {
+    "route": {
+      "route": "narrative",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 narrative",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "不应出现的商品",
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "brand": {
+          "name": "不应出现的品牌"
+        },
+        "category": "不应出现的品类",
+        "sellingPoints": [
+          "不应出现的卖点"
+        ],
+        "audience": "不应出现的人群",
+        "platform": "c",
+        "goal": "seeding",
+        "duration": 20,
+        "aspectRatio": "9:16"
+      },
+      "pipelineRoute": {
+        "kind": "narrative",
+        "via": "metadata",
+        "confidence": 1
+      }
+    },
+    "effectiveIntent": "做一条20秒童话短片：纸船从水洼出发，经过落叶和石缝，最后漂进孩子的梦里\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin",
+    "themeInput": "做一条20秒童话短片：纸船从水洼出发，经过落叶和石缝，最后漂进孩子的梦里\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin",
+    "shots": 5,
+    "totalDurationSeconds": 20,
+    "finalShotContract": {
+      "pass": true,
+      "issues": []
+    },
+    "pipelineGuard": {
+      "pass": true,
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.462Z"
+}

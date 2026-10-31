@@ -1,0 +1,37 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-001-0-1793457406416",
+  "command": "vitest run pipeline-router.test.ts studio.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/pipeline-router.test.ts",
+      "packages/video-studio/src/studio.test.ts"
+    ]
+  },
+  "actor": "codex-root-repair-01a190b3",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-001",
+    "assertion_index": 0
+  },
+  "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T14:36:46.417Z",
+  "finished_at": "2026-10-31T14:36:47.173Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-001-0-1793457406416.txt",
+      "sha256": "763f2d410fa31ac468155393153f4c977771b9111f17f4276b0a8475353c1d0c",
+      "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91"
+    }
+  ]
+}

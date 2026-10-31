@@ -1,0 +1,42 @@
+{
+  "schema": "workloom.outcome-report/v2",
+  "spec": "docs/REAL-DEVICE-ACCEPTANCE-SPEC.md@rdas/v3.1",
+  "startedAt": "2026-10-31T15:51:30.926Z",
+  "configured": true,
+  "mode": "runtime",
+  "status": "unverified",
+  "verified": false,
+  "called": false,
+  "environmentKind": "local-preview",
+  "dataMode": "simulated",
+  "provider": "mock",
+  "suites": [
+    "acceptance/outcomes/industry.yaml"
+  ],
+  "errors": [
+    "O 域不透明产品派单缺少可信服务端逐请求预算契约；在登录、派单、数据库或模型调用前阻断。simulated/provider/试验次数声明不能代替总输入、输出、重试与上下文的硬上界"
+  ],
+  "warnings": [],
+  "trials": [],
+  "checks": [],
+  "revision": {
+    "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+    "dirty": false
+  },
+  "executor": {
+    "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+    "dirty": false
+  },
+  "finishedAt": "2026-10-31T15:51:31.124Z",
+  "stats": {
+    "tasks": 0,
+    "trials": 0,
+    "passAt1": null,
+    "passAtK": null,
+    "k": 0,
+    "passed": 0,
+    "falseSuccess": 0,
+    "clarify": 0,
+    "interventions": 0
+  }
+}

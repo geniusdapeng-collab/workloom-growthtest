@@ -1,0 +1,1328 @@
+{
+  "phase": "phase2",
+  "shots": [
+    {
+      "shotId": "S1",
+      "sceneType": "opening",
+      "sceneFunction": "3秒抛出悬念：谁留了灯",
+      "timing": {
+        "start": 0,
+        "duration": 4,
+        "end": 4
+      },
+      "duration": 4,
+      "scene": "场景A: 室内主场景，自然光/顶灯照明，墙面材质真实，核心家具摆放有序，地面材质清晰可见",
+      "mood": "calm, epic, mysterious, awe-inspiring",
+      "emotionArcTarget": {
+        "sceneIndex": 0,
+        "position": 0,
+        "intensity": 0.2,
+        "label": "establish",
+        "emotion": "calm",
+        "descriptor": "平静的"
+      },
+      "character": "陈卓: human, 写实人物",
+      "characterRef": "陈卓: PENDING_GENERATION",
+      "action": "speaking to camera, clear hand gestures, professional delivery",
+      "dialogue": "chen-zhuo|monologue|anxiously|别滑。|LIP_SYNC:YES",
+      "dialogueBlocks": [
+        {
+          "speaker": "chen-zhuo",
+          "line": "别滑。",
+          "emotion": "anxiously",
+          "trigger": "湿手指捏住钥匙，指节发白",
+          "manner": "咬着气声",
+          "type": "monologue"
+        }
+      ],
+      "characters": [
+        "chen-zhuo"
+      ],
+      "characterDescs": "陈卓: human, 写实人物",
+      "dialogueText": "别滑。",
+      "emotionalTarget": {
+        "valence": -0.2,
+        "arousal": 0.6,
+        "dominance": 0.3
+      },
+      "visualDirection": {
+        "shot_type": "wide",
+        "camera_movement": "缓慢推进",
+        "lighting": "自然光+环境光",
+        "color_temperature": "neutral"
+      },
+      "promptBase": "电影级镜头，超写实，雨夜老旧楼道，冷蓝霓虹反光，门缝下先漏出一线暖黄；陈卓湿发滴水，钥匙在锁孔边打滑。，陈卓（写实人物），wide，缓慢推进，台词：「别滑。」",
+      "worldId": "real-world-rain-night",
+      "status": "pending",
+      "timeline": [
+        {
+          "segment": 1,
+          "timeRange": "0s-1.2s",
+          "cameraMovement": "固定起幅，机位稳定不晃",
+          "shotType": "LS",
+          "purpose": "交代雨窗、空房与书桌的空间关系"
+        },
+        {
+          "segment": 2,
+          "timeRange": "1.2s-2.6s",
+          "cameraMovement": "缓推穿过前景椅背",
+          "shotType": "LS",
+          "purpose": "借前景遮挡制造窥视感，逼近主体"
+        },
+        {
+          "segment": 3,
+          "timeRange": "2.6s-3.5s",
+          "cameraMovement": "继续慢推，台灯进入画面中心",
+          "shotType": "LS",
+          "purpose": "把唯一光源立为视觉锚点"
+        },
+        {
+          "segment": 4,
+          "timeRange": "3.5s-4s",
+          "cameraMovement": "推势收住，落幅微停",
+          "shotType": "LS",
+          "purpose": "留白等台词「别滑」落下，为下一镜门开蓄势"
+        }
+      ],
+      "allocation": {
+        "baseDuration": 4,
+        "dialogueFactor": 1.5,
+        "typeWeight": 1.2,
+        "preserved": true
+      },
+      "title": "留一盏，等你回家",
+      "subtitle": "旧灯没断电，总有一束光为你留着",
+      "titleOverlay": {
+        "main_title": "留一盏，等你回家",
+        "sub_title": "旧灯没断电，总有一束光为你留着",
+        "style": "标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。",
+        "animation_pattern": "light_projection"
+      },
+      "audioLayer": {
+        "bgm": "以温暖钢琴分解和弦为底，弦乐弱音器铺在下方，全程无鼓点；1.5秒起加入低频弦乐drone托底，4.5秒加入每分钟60拍的低频脉冲作为隐性节奏，6.5秒后乐器逐层撤出，只留钢琴单音与电流底噪，整体情绪由悬念收束到安定",
+        "sound_effects": "0-1秒：老式拉线开关“咔哒”声先行，紧接着一记深沉低频轰鸣，像老楼里电路接通的震颤，尾音带空间混响"
+      },
+      "lightingString": "左侧窗光6500K冷调铺底，台灯2700K暖光自右前方低处补入，光比4:1低调，暗部留蓝",
+      "cameraString": "机位压低压稳，极缓前推穿过前景椅背，把书桌旧台灯从暗部里推出来",
+      "cinematic": {
+        "title_content": "留一盏，等你回家",
+        "subtitle_content": "旧灯没断电，总有一束光为你留着",
+        "animation_pattern_id": "light_projection",
+        "beats": [
+          {
+            "tStart": 0,
+            "tEnd": 1.5,
+            "phase": "hook",
+            "visual": "全黑画面中，一道暖黄主光束从右上斜切入画，照在粗糙墙面；光柱内浮尘缓慢翻滚，墙面露出一枚旧开关的轮廓",
+            "camera": "低机位仰拍，镜头极缓向前推进约10厘米",
+            "audio": "第一帧即响：老式拉线开关的清脆“咔哒”声，随后一记深沉低频轰鸣，空气震颤尾音铺开"
+          },
+          {
+            "tStart": 1.5,
+            "tEnd": 4.5,
+            "phase": "reveal",
+            "visual": "光束在墙面投射出“留一盏”三个字的暖光轮廓，字形由虚到实渐次清晰，笔画间尘埃粒子沿光线方向流动，灯丝般明灭",
+            "camera": "镜头由仰拍缓慢转为平视，向右横移半米，让光斑落在画面黄金分割点",
+            "audio": "弦乐长音渐起，字迹成型瞬间叠加一层低音量人声合唱，尘埃流动处配细碎空气声"
+          },
+          {
+            "tStart": 4.5,
+            "tEnd": 6.5,
+            "phase": "reveal",
+            "visual": "第二束偏冷的月光从左下角切入，与暖光交汇成双色温夹光；副标题在“留一盏”下方以较弱的投影光显现，灯影投在桌面上",
+            "camera": "镜头微微下沉，景别略收紧，双色温交界线沿桌面划过",
+            "audio": "低频脉冲以节拍器节奏稳定加入，约每拍一秒，与副标题逐字显现逐拍对齐"
+          },
+          {
+            "tStart": 6.5,
+            "tEnd": 8,
+            "phase": "freeze",
+            "phaseNote": "",
+            "visual": "两束光同时收拢到最亮后微微回暗，标题轮廓边缘残留一圈不散的光晕，画面右后方一张空椅的轮廓被余光勾出，暗示有人即将坐下",
+            "camera": "镜头完全静止定格，焦点由墙面缓慢拉到前景空气尘埃",
+            "audio": "高音弦乐渐弱收尾，最后一拍全静默约0.4秒，只留灯丝的细微电流嗡声"
+          }
+        ],
+        "typography": {
+          "structure": "geometric_sans",
+          "material": "polished_metal",
+          "lighting": "dual_tone",
+          "motion": "breathing",
+          "description": "标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。"
+        },
+        "entrance": {
+          "character": "陈卓",
+          "stages": [
+            {
+              "stage": "foreshadow",
+              "tStart": 0,
+              "tEnd": 2.4,
+              "style": "shadow_cast",
+              "name": "影子先行",
+              "description": "角色的影子先投射进画面，本体未现，影子透露体型与气质。",
+              "audio": "环境音变化+悬念铺底"
+            },
+            {
+              "stage": "emerge",
+              "tStart": 2.4,
+              "tEnd": 5.6,
+              "style": "walk_in",
+              "name": "步入画面",
+              "description": "陈卓以「步入画面」方式登场：角色从景深中/画面侧缘自然步入，步伐节奏匹配性格",
+              "camera": "固定或缓慢横移跟拍，保持角色全身在黄金分割点",
+              "audio": "主题动机渐强"
+            },
+            {
+              "stage": "settle",
+              "tStart": 5.6,
+              "tEnd": 8,
+              "style": "settle",
+              "name": "定格",
+              "description": "定格建立人物气质与职业/身份暗示，视线方向指向正片；角色与标题形成构图关系（角色让出标题视觉重心或与之互动）",
+              "audio": "音乐收束，保留角色环境声作为过渡"
+            }
+          ]
+        },
+        "audio": {
+          "signature": "0-1秒：老式拉线开关“咔哒”声先行，紧接着一记深沉低频轰鸣，像老楼里电路接通的震颤，尾音带空间混响",
+          "bgm": "以温暖钢琴分解和弦为底，弦乐弱音器铺在下方，全程无鼓点；1.5秒起加入低频弦乐drone托底，4.5秒加入每分钟60拍的低频脉冲作为隐性节奏，6.5秒后乐器逐层撤出，只留钢琴单音与电流底噪，整体情绪由悬念收束到安定",
+          "syncNotes": "第1.5秒光束破开与低频轰鸣同帧；第4.5秒“留一盏”完全成型与人声合唱进入严格对齐；副标题每显现一个字对应一次低频脉冲；陈卓第三步落地与副标题显形同拍；最后开关“咔哒”声与音乐收尾、定格画面三者同帧，之后留0.4秒静默",
+          "layers": [
+            {
+              "layer": "L1-signature",
+              "tStart": 0,
+              "tEnd": 1,
+              "content": "声音签名：金属轰鸣或铜管齐鸣，庄严宣告感",
+              "purpose": "第一帧抓住注意力，建立本片/本系列听觉识别度"
+            },
+            {
+              "layer": "L1-voice",
+              "tStart": 0.5,
+              "tEnd": 2,
+              "content": "角色声音签名：陈卓 的标志性发声（一句话/一声鸣叫/一段笑声），与画面同步",
+              "purpose": "角色未完全现身前，先用声音建立存在感"
+            },
+            {
+              "layer": "L2-bed",
+              "tStart": 0,
+              "tEnd": 8,
+              "content": "氛围铺底：低频弦乐群 drone + 远雷声般的空间混响",
+              "purpose": "建立情绪基调，贯穿全程"
+            },
+            {
+              "layer": "L3-rhythm",
+              "tStart": 1.6,
+              "tEnd": 6.8,
+              "content": "节奏驱动：定音鼓与大鼓的心跳式脉冲，60-72BPM",
+              "purpose": "与视觉节拍对齐，推动能量曲线"
+            },
+            {
+              "layer": "L4-sfx",
+              "tStart": 0,
+              "tEnd": 8,
+              "content": "动作音效：与每个画面事件一一对应（见同步表）",
+              "purpose": "让画面事件\"听得见\"，增强真实感与冲击力"
+            },
+            {
+              "layer": "L5-resolve",
+              "tStart": 6.8,
+              "tEnd": 8,
+              "content": "收束与过渡：音乐在最后一拍收束或骤停，留 0.3-0.5 秒静默拍，随后正片声音淡入",
+              "purpose": "给正片让位，制造\"交接棒\"的呼吸感"
+            }
+          ],
+          "syncMap": [
+            {
+              "tStart": 0,
+              "tEnd": 1.5,
+              "phase": "hook",
+              "visualEvent": "全黑画面中，一道暖黄主光束从右上斜切入画，照在粗糙墙面；光柱内浮尘缓慢翻滚，墙面露出一枚旧开关的轮廓",
+              "audioEvent": "悬念音效起（金属轰鸣或铜管齐鸣，庄严宣告感），铺底渐入"
+            },
+            {
+              "tStart": 1.5,
+              "tEnd": 4.5,
+              "phase": "reveal",
+              "visualEvent": "光束在墙面投射出“留一盏”三个字的暖光轮廓，字形由虚到实渐次清晰，笔画间尘埃粒子沿光线方向流动，灯丝般明灭",
+              "audioEvent": "动作音效与画面对齐（材质/运动/文字成形声），节奏层推进"
+            },
+            {
+              "tStart": 4.5,
+              "tEnd": 6.5,
+              "phase": "reveal",
+              "visualEvent": "第二束偏冷的月光从左下角切入，与暖光交汇成双色温夹光；副标题在“留一盏”下方以较弱的投影光显现，灯影投在桌面上",
+              "audioEvent": "动作音效与画面对齐（材质/运动/文字成形声），节奏层推进"
+            },
+            {
+              "tStart": 6.5,
+              "tEnd": 8,
+              "phase": "freeze",
+              "visualEvent": "两束光同时收拢到最亮后微微回暗，标题轮廓边缘残留一圈不散的光晕，画面右后方一张空椅的轮廓被余光勾出，暗示有人即将坐下",
+              "audioEvent": "一记收束音（金属尾音/鼓点急停/余韵），留静默拍"
+            }
+          ]
+        },
+        "duration": 8
+      },
+      "title_content": "留一盏，等你回家",
+      "subtitle_content": "旧灯没断电，总有一束光为你留着",
+      "title_font_design": "标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。",
+      "opening_audio_design": "0-1秒：老式拉线开关“咔哒”声先行，紧接着一记深沉低频轰鸣，像老楼里电路接通的震颤，尾音带空间混响；以温暖钢琴分解和弦为底，弦乐弱音器铺在下方，全程无鼓点；1.5秒起加入低频弦乐drone托底，4.5秒加入每分钟60拍的低频脉冲作为隐性节奏，6.5秒后乐器逐层撤出，只留钢琴单音与电流底噪，整体情绪由悬念收束到安定；第1.5秒光束破开与低频轰鸣同帧；第4.5秒“留一盏”完全成型与人声合唱进入严格对齐；副标题每显现一个字对应一次低频脉冲；陈卓第三步落地与副标题显形同拍；最后开关“咔哒”声与音乐收尾、定格画面三者同帧，之后留0.4秒静默",
+      "promptTimeline": "T00:00-00:02 [hook] 全黑画面中，一道暖黄主光束从右上斜切入画，照在粗糙墙面；光柱内浮尘缓慢翻滚，墙面露出一枚旧开关的轮廓（运镜:低机位仰拍，镜头极缓向前推进约10厘米）（音效:第一帧即响：老式拉线开关的清脆“咔哒”声，随后一记深沉低频轰鸣，空气震颤尾音铺开）\nT00:02-00:05 [reveal] 光束在墙面投射出“留一盏”三个字的暖光轮廓，字形由虚到实渐次清晰，笔画间尘埃粒子沿光线方向流动，灯丝般明灭（运镜:镜头由仰拍缓慢转为平视，向右横移半米，让光斑落在画面黄金分割点）（音效:弦乐长音渐起，字迹成型瞬间叠加一层低音量人声合唱，尘埃流动处配细碎空气声）\nT00:05-00:07 [reveal] 第二束偏冷的月光从左下角切入，与暖光交汇成双色温夹光；副标题在“留一盏”下方以较弱的投影光显现，灯影投在桌面上（运镜:镜头微微下沉，景别略收紧，双色温交界线沿桌面划过）（音效:低频脉冲以节拍器节奏稳定加入，约每拍一秒，与副标题逐字显现逐拍对齐）\nT00:07-00:08 [freeze] 两束光同时收拢到最亮后微微回暗，标题轮廓边缘残留一圈不散的光晕，画面右后方一张空椅的轮廓被余光勾出，暗示有人即将坐下（运镜:镜头完全静止定格，焦点由墙面缓慢拉到前景空气尘埃）（音效:高音弦乐渐弱收尾，最后一拍全静默约0.4秒，只留灯丝的细微电流嗡声）\n--- 角色入场编舞 ---\nT00:00-00:02 [foreshadow] 角色的影子先投射进画面，本体未现，影子透露体型与气质。（音效:环境音变化+悬念铺底）\nT00:02-00:06 [emerge] 陈卓以「步入画面」方式登场：角色从景深中/画面侧缘自然步入，步伐节奏匹配性格（运镜:固定或缓慢横移跟拍，保持角色全身在黄金分割点）（音效:主题动机渐强）\nT00:06-00:08 [settle] 定格建立人物气质与职业/身份暗示，视线方向指向正片；角色与标题形成构图关系（角色让出标题视觉重心或与之互动）（音效:音乐收束，保留角色环境声作为过渡）\n--- 标题呈现 ---\n主标题「留一盏，等你回家」 / 副标题「旧灯没断电，总有一束光为你留着」\n字体: 标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。",
+      "camera": {
+        "shot_size": "LS",
+        "movement": "push_in",
+        "angle": "low",
+        "lens": "35mm",
+        "speed": "slow"
+      },
+      "cameraMovement": {
+        "timeline": [
+          {
+            "segment": 1,
+            "timeRange": "0s-1.2s",
+            "cameraMovement": "固定起幅，机位稳定不晃",
+            "shotType": "LS",
+            "purpose": "交代雨窗、空房与书桌的空间关系"
+          },
+          {
+            "segment": 2,
+            "timeRange": "1.2s-2.6s",
+            "cameraMovement": "缓推穿过前景椅背",
+            "shotType": "LS",
+            "purpose": "借前景遮挡制造窥视感，逼近主体"
+          },
+          {
+            "segment": 3,
+            "timeRange": "2.6s-3.5s",
+            "cameraMovement": "继续慢推，台灯进入画面中心",
+            "shotType": "LS",
+            "purpose": "把唯一光源立为视觉锚点"
+          },
+          {
+            "segment": 4,
+            "timeRange": "3.5s-4s",
+            "cameraMovement": "推势收住，落幅微停",
+            "shotType": "LS",
+            "purpose": "留白等台词「别滑」落下，为下一镜门开蓄势"
+          }
+        ]
+      },
+      "lighting": {
+        "key_light": "窗外阴雨散射冷光6500K，自左侧窗漫入铺满墙面",
+        "fill_light": "书桌旧台灯2700K暖光作点缀辅光，仅照亮桌面一小片",
+        "time_of_day": "blue_hour",
+        "atmosphere": "雨声隔在窗外的潮湿冷寂，屋里只有一点未熄的暖"
+      },
+      "composition": "远景，机位低于房间中轴偏左，前景椅背作暗框，地板与墙缝的透视线引向书桌台灯，右侧留大片空墙与雨窗",
+      "color_palette": "主色青灰冷蓝，辅色琥珀暖点，肤色压暗偏青，整体低饱和，明暗对比中高，暗部保留蓝调层次",
+      "depth_of_field": "焦点落在书桌与空椅之间约3.5米处，f/8深景深，前景椅背与窗框轻微虚化，背景墙面纹理仍可读",
+      "audio": "屋子先发出一声极轻的'呼吸'——冰箱低鸣与远处雨脚压在极低的音量上，像给这场戏留白；气声台词贴耳极干，环境只在前景之外轻轻托住，不抢一个音节。",
+      "backgroundSound": {
+        "environment": "indoor_living_room",
+        "description": "室内底噪极轻，隔窗雨声退居背景层，低频如一薄雾铺底，为那口咬着的气声留出整片安静",
+        "intensity": "low",
+        "spatialLayer": "midground",
+        "frequencySignature": "low"
+      },
+      "backgroundSoundString": "屋子先发出一声极轻的'呼吸'——冰箱低鸣与远处雨脚压在极低的音量上，像给这场戏留白；气声台词贴耳极干，环境只在前景之外轻轻托住，不抢一个音节。"
+    },
+    {
+      "shotId": "S2",
+      "sceneType": "establishing",
+      "sceneFunction": "确认空房与旧灯，建立独居状态",
+      "timing": {
+        "start": 4,
+        "duration": 4,
+        "end": 8
+      },
+      "duration": 4,
+      "scene": "门开，屋内暗，只有书桌上的旧台灯亮着；空椅、空杯、湿门槛，雨声隔在门外。",
+      "mood": "curiosity, mysterious, anticipation, wonder",
+      "emotionArcTarget": {
+        "sceneIndex": 1,
+        "position": 0.2,
+        "intensity": 0.3,
+        "label": "develop",
+        "emotion": "curiosity",
+        "descriptor": "好奇的"
+      },
+      "character": "陈卓: human, 写实人物",
+      "characterRef": "陈卓: PENDING_GENERATION",
+      "action": "speaking to camera, clear hand gestures, professional delivery",
+      "dialogue": "chen-zhuo|monologue|incredulously|真没关。|LIP_SYNC:YES",
+      "dialogueBlocks": [
+        {
+          "speaker": "chen-zhuo",
+          "line": "真没关。",
+          "emotion": "incredulously",
+          "trigger": "手扶门框，水珠从发梢滴到门槛",
+          "manner": "低声",
+          "type": "monologue"
+        }
+      ],
+      "characters": [
+        "chen-zhuo"
+      ],
+      "characterDescs": "陈卓: human, 写实人物",
+      "dialogueText": "真没关。",
+      "emotionalTarget": {
+        "valence": 0.2,
+        "arousal": 0.5,
+        "dominance": 0.4
+      },
+      "visualDirection": {
+        "shot_type": "medium",
+        "camera_movement": "稳定机位",
+        "lighting": "均匀明亮",
+        "color_temperature": "neutral"
+      },
+      "promptBase": "电影级镜头，超写实，门开，屋内暗，只有书桌上的旧台灯亮着；空椅、空杯、湿门槛，雨声隔在门外。，陈卓（写实人物），medium，稳定机位，台词：「真没关。」",
+      "worldId": "real-world-rain-night",
+      "status": "pending",
+      "timeline": [
+        {
+          "segment": 1,
+          "timeRange": "0s-1.3s",
+          "cameraMovement": "门缝光切入，机位贴门框起幅",
+          "shotType": "MS",
+          "purpose": "用一道光揭示门已开，制造好奇"
+        },
+        {
+          "segment": 2,
+          "timeRange": "1.3s-2.5s",
+          "cameraMovement": "缓推入门内，暗部向两侧退开",
+          "shotType": "MS",
+          "purpose": "空间被逐步打开，悬念加深"
+        },
+        {
+          "segment": 3,
+          "timeRange": "2.5s-3.4s",
+          "cameraMovement": "推至台灯为唯一亮区",
+          "shotType": "MS",
+          "purpose": "把观众视线钉在那盏没关的灯上"
+        },
+        {
+          "segment": 4,
+          "timeRange": "3.4s-4s",
+          "cameraMovement": "落幅稳定，停在空椅前",
+          "shotType": "MS",
+          "purpose": "台词「真没关」落在空椅上，接下一镜近切"
+        }
+      ],
+      "allocation": {
+        "baseDuration": 4,
+        "dialogueFactor": 1.5,
+        "typeWeight": 1,
+        "preserved": true
+      },
+      "_rawTimeline": {
+        "object": {
+          "start": "T00:04",
+          "end": "T00:08",
+          "duration": 4,
+          "type": "establishing",
+          "mood": "curiosity, mysterious, anticipation, wonder"
+        },
+        "string": "T00:04-T00:08 / duration: 4s / type: establishing / mood: curiosity, mysterious, anticipation, wonder"
+      },
+      "camera": {
+        "shot_size": "MS",
+        "movement": "dolly_in",
+        "angle": "eye_level",
+        "lens": "50mm",
+        "speed": "slow"
+      },
+      "cameraString": "顺着门缝漏出的暖光缓推入门内，两侧暗部向后退开，停在空椅与湿门槛前",
+      "cameraMovement": {
+        "timeline": [
+          {
+            "segment": 1,
+            "timeRange": "0s-1.3s",
+            "cameraMovement": "门缝光切入，机位贴门框起幅",
+            "shotType": "MS",
+            "purpose": "用一道光揭示门已开，制造好奇"
+          },
+          {
+            "segment": 2,
+            "timeRange": "1.3s-2.5s",
+            "cameraMovement": "缓推入门内，暗部向两侧退开",
+            "shotType": "MS",
+            "purpose": "空间被逐步打开，悬念加深"
+          },
+          {
+            "segment": 3,
+            "timeRange": "2.5s-3.4s",
+            "cameraMovement": "推至台灯为唯一亮区",
+            "shotType": "MS",
+            "purpose": "把观众视线钉在那盏没关的灯上"
+          },
+          {
+            "segment": 4,
+            "timeRange": "3.4s-4s",
+            "cameraMovement": "落幅稳定，停在空椅前",
+            "shotType": "MS",
+            "purpose": "台词「真没关」落在空椅上，接下一镜近切"
+          }
+        ]
+      },
+      "lighting": {
+        "key_light": "门外走廊灯4200K从门缝斜切进来，在湿门槛上拉出一道窄亮带",
+        "fill_light": "屋内仅书桌旧台灯2700K单光源，无其他补光",
+        "time_of_day": "night",
+        "atmosphere": "门一开，暖光被巨大的黑吞住，只剩一盏灯在等一个人"
+      },
+      "lightingString": "门缝走廊光4200K斜切入画作过渡，主光为台灯2700K右后方单点，光比8:1极低调，四周近全黑",
+      "composition": "中景，门框作天然画框占左侧三分之一，台灯暖区落在右三分点，中间大片黑留白给空椅、空杯与湿门槛",
+      "color_palette": "主色墨黑与深褐，辅色台灯橙黄，肤色隐没于暗部，饱和度极低，对比强烈，仅亮区保留暖色",
+      "depth_of_field": "焦点锁在台灯暖区约4米处，f/4中深景深，门框前景压暗并虚化成画框，背景暗部融成一片无细节的黑",
+      "audio": "门开的一线，木轴'吱——'在中景拉开一道缝，湿门槛上一滴水砸下，清脆得过分；雨被留在门外成为一层虚化的背景墙，屋内安静得像有人刚刚离开。低声台词干贴耳边，只有灯丝在远处嗡嗡作答。",
+      "backgroundSound": {
+        "environment": "indoor_dark_room",
+        "description": "门轴细响推到中景，门槛滴水贴前景高频，屋外雨声退回背景，高频细节撑起悬疑",
+        "intensity": "low",
+        "spatialLayer": "foreground",
+        "frequencySignature": "high"
+      },
+      "backgroundSoundString": "门开的一线，木轴'吱——'在中景拉开一道缝，湿门槛上一滴水砸下，清脆得过分；雨被留在门外成为一层虚化的背景墙，屋内安静得像有人刚刚离开。低声台词干贴耳边，只有灯丝在远处嗡嗡作答。"
+    },
+    {
+      "shotId": "S3",
+      "sceneType": "conflict",
+      "sceneFunction": "指尖触到灯罩裂纹，耐用与陪伴变成可摸到的物证",
+      "timing": {
+        "start": 8,
+        "duration": 5,
+        "end": 13
+      },
+      "duration": 5,
+      "scene": "书桌旁，旧台灯灯罩有细裂纹，暖光从纹理里透出；陈卓湿袖口滴水，手悬在开关前又停住。",
+      "mood": "tension, tense, determined, brave, confrontational",
+      "emotionArcTarget": {
+        "sceneIndex": 2,
+        "position": 0.4,
+        "intensity": 0.5,
+        "label": "escalate",
+        "emotion": "tension",
+        "descriptor": "紧张的"
+      },
+      "character": "陈卓: human, 写实人物",
+      "characterRef": "陈卓: PENDING_GENERATION",
+      "action": "speaking to camera, clear hand gestures, professional delivery",
+      "dialogue": "chen-zhuo|monologue|tenderly|你也老了。|LIP_SYNC:YES",
+      "dialogueBlocks": [
+        {
+          "speaker": "chen-zhuo",
+          "line": "你也老了。",
+          "emotion": "tenderly",
+          "trigger": "指尖停在一道细裂纹上",
+          "manner": "几乎听不见",
+          "type": "monologue"
+        }
+      ],
+      "characters": [
+        "chen-zhuo"
+      ],
+      "characterDescs": "陈卓: human, 写实人物",
+      "dialogueText": "你也老了。",
+      "emotionalTarget": {
+        "valence": 0.4,
+        "arousal": 0.4,
+        "dominance": 0.5
+      },
+      "visualDirection": {
+        "shot_type": "close_up",
+        "camera_movement": "手持晃动",
+        "lighting": "戏剧性明暗对比",
+        "color_temperature": "neutral"
+      },
+      "promptBase": "电影级镜头，超写实，书桌旁，旧台灯灯罩有细裂纹，暖光从纹理里透出；陈卓湿袖口滴水，手悬在开关前又停住。，陈卓（写实人物），close_up，手持晃动，台词：「你也老了。」",
+      "worldId": "real-world-rain-night",
+      "status": "pending",
+      "timeline": [
+        {
+          "segment": 1,
+          "timeRange": "0s-1.5s",
+          "cameraMovement": "手持轻晃，跟随滴水的袖口",
+          "shotType": "MCU",
+          "purpose": "用晃动的呼吸感外化犹疑与紧张"
+        },
+        {
+          "segment": 2,
+          "timeRange": "1.5s-3s",
+          "cameraMovement": "手入画，机位极缓前移贴近",
+          "shotType": "MCU",
+          "purpose": "把注意力收到悬在开关前的那只手上"
+        },
+        {
+          "segment": 3,
+          "timeRange": "3s-4.2s",
+          "cameraMovement": "晃动幅度渐收，几乎屏息静止",
+          "shotType": "MCU",
+          "purpose": "停顿即决心的重量，为台词让出空间"
+        },
+        {
+          "segment": 4,
+          "timeRange": "4.2s-5s",
+          "cameraMovement": "落幅定在指尖与裂纹灯罩",
+          "shotType": "MCU",
+          "purpose": "「你也老了」落在灯罩裂纹上，接高潮大特写"
+        }
+      ],
+      "allocation": {
+        "baseDuration": 5,
+        "dialogueFactor": 1.5,
+        "typeWeight": 1.3,
+        "preserved": true
+      },
+      "_rawTimeline": {
+        "object": {
+          "start": "T00:08",
+          "end": "T00:13",
+          "duration": 5,
+          "type": "conflict",
+          "mood": "tension, tense, determined, brave, confrontational"
+        },
+        "string": "T00:08-T00:13 / duration: 5s / type: conflict / mood: tension, tense, determined, brave, confrontational"
+      },
+      "camera": {
+        "shot_size": "MCU",
+        "movement": "handheld",
+        "angle": "eye_level",
+        "lens": "85mm",
+        "speed": "normal"
+      },
+      "cameraString": "手持贴近，随湿袖口滴水的节奏轻轻呼吸晃动，手悬在开关上方时晃动收住",
+      "cameraMovement": {
+        "timeline": [
+          {
+            "segment": 1,
+            "timeRange": "0s-1.5s",
+            "cameraMovement": "手持轻晃，跟随滴水的袖口",
+            "shotType": "MCU",
+            "purpose": "用晃动的呼吸感外化犹疑与紧张"
+          },
+          {
+            "segment": 2,
+            "timeRange": "1.5s-3s",
+            "cameraMovement": "手入画，机位极缓前移贴近",
+            "shotType": "MCU",
+            "purpose": "把注意力收到悬在开关前的那只手上"
+          },
+          {
+            "segment": 3,
+            "timeRange": "3s-4.2s",
+            "cameraMovement": "晃动幅度渐收，几乎屏息静止",
+            "shotType": "MCU",
+            "purpose": "停顿即决心的重量，为台词让出空间"
+          },
+          {
+            "segment": 4,
+            "timeRange": "4.2s-5s",
+            "cameraMovement": "落幅定在指尖与裂纹灯罩",
+            "shotType": "MCU",
+            "purpose": "「你也老了」落在灯罩裂纹上，接高潮大特写"
+          }
+        ]
+      },
+      "lighting": {
+        "key_light": "旧台灯2700K从下方斜上打亮手背、指尖与灯罩裂纹",
+        "fill_light": "无辅光，仅靠墙面反弹的极弱暖光勾出肩线",
+        "time_of_day": "night",
+        "atmosphere": "暖光从裂纹里渗出，像有人隔着伤口还在发光"
+      },
+      "lightingString": "台灯2700K自画面下方斜上作主光，打出灯罩裂纹的透光纹理，无补光，光比6:1低调硬质，暗部全黑",
+      "composition": "近景，人物肩线压画面右缘，手与开关落在下三分线上，裂纹灯罩占左三分之一，其余全部留给黑",
+      "color_palette": "主色暖褐与裂纹透出的橙金，辅色湿布深灰蓝，肤色偏暖带潮湿高光，饱和中低，局部高对比",
+      "depth_of_field": "焦点紧咬悬停的指尖与灯罩裂纹，f/2.8浅景深，湿袖口在前景轻微虚化，背景房间完全溶黑",
+      "audio": "声音缩到最小：水滴一下一下砸在地板，是前景最锋利的针；旧台灯的低频嗡鸣像心跳，在中景隐隐顶住；雨在很远的地方压成一层背景。手悬在开关前，连空气都像被绷紧了一格——几乎听不见的那句话，反而最响。",
+      "backgroundSound": {
+        "environment": "indoor_desk",
+        "description": "袖口滴水贴前景高频，灯丝低频脉冲伏在中景，雨声压到背景，三频挤压出紧绷",
+        "intensity": "low",
+        "spatialLayer": "foreground",
+        "frequencySignature": "full-spectrum"
+      },
+      "backgroundSoundString": "声音缩到最小：水滴一下一下砸在地板，是前景最锋利的针；旧台灯的低频嗡鸣像心跳，在中景隐隐顶住；雨在很远的地方压成一层背景。手悬在开关前，连空气都像被绷紧了一格——几乎听不见的那句话，反而最响。"
+    },
+    {
+      "shotId": "S4",
+      "sceneType": "emotional_climax",
+      "sceneFunction": "高潮：他对灯说出回来了，问候与余温完成交换",
+      "timing": {
+        "start": 13,
+        "duration": 9,
+        "end": 22
+      },
+      "duration": 9,
+      "scene": "他半蹲在桌前，掌心贴上灯罩；暖光从指缝漏出，雨声退远，空房间像被一句话填满。",
+      "mood": "anticipation, epic, emotional, powerful, cathartic",
+      "emotionArcTarget": {
+        "sceneIndex": 3,
+        "position": 0.6,
+        "intensity": 0.7,
+        "label": "intensify",
+        "emotion": "anticipation",
+        "descriptor": "期待的"
+      },
+      "character": "陈卓: human, 写实人物",
+      "characterRef": "陈卓: PENDING_GENERATION",
+      "action": "speaking to camera, clear hand gestures, professional delivery",
+      "dialogue": "chen-zhuo|monologue|softly|回来了。|LIP_SYNC:YES",
+      "dialogueBlocks": [
+        {
+          "speaker": "chen-zhuo",
+          "line": "回来了。",
+          "emotion": "softly",
+          "trigger": "掌心压住灯罩，停住",
+          "manner": "像回答屋里的人",
+          "type": "monologue"
+        }
+      ],
+      "characters": [
+        "chen-zhuo"
+      ],
+      "characterDescs": "陈卓: human, 写实人物",
+      "dialogueText": "回来了。",
+      "emotionalTarget": {
+        "valence": 0.8,
+        "arousal": 0.5,
+        "dominance": 0.6
+      },
+      "visualDirection": {
+        "shot_type": "extreme_close_up",
+        "camera_movement": "快速推近",
+        "lighting": "伦勃朗光",
+        "color_temperature": "warm"
+      },
+      "promptBase": "电影级镜头，超写实，他半蹲在桌前，掌心贴上灯罩；暖光从指缝漏出，雨声退远，空房间像被一句话填满。，陈卓（写实人物），extreme_close_up，快速推近，台词：「回来了。」",
+      "worldId": "real-world-rain-night",
+      "status": "pending",
+      "timeline": [
+        {
+          "segment": 1,
+          "timeRange": "0s-2.5s",
+          "cameraMovement": "极缓推近，起幅含滴水袖口与悬停的手",
+          "shotType": "MCU",
+          "purpose": "承接上一镜的犹豫，把注意力收到手上"
+        },
+        {
+          "segment": 2,
+          "timeRange": "2.5s-5.5s",
+          "cameraMovement": "匀速续推，掌心压实灯罩，暖光从指缝挤出",
+          "shotType": "CU",
+          "purpose": "动作落定，情绪开始上顶"
+        },
+        {
+          "segment": 3,
+          "timeRange": "5.5s-7.5s",
+          "cameraMovement": "推到最近后几乎停住，只留呼吸级微颤",
+          "shotType": "CU",
+          "purpose": "峰值凝视，让观众无处可逃"
+        },
+        {
+          "segment": 4,
+          "timeRange": "7.5s-9s",
+          "cameraMovement": "完全静止落幅，光斑在指缝间明暗呼吸",
+          "shotType": "CU",
+          "purpose": "留白收束，为下一镜稳定起幅做接点"
+        }
+      ],
+      "allocation": {
+        "baseDuration": 9,
+        "dialogueFactor": 1.4666666666666666,
+        "typeWeight": 1.5,
+        "preserved": true
+      },
+      "_rawTimeline": {
+        "object": {
+          "start": "T00:13",
+          "end": "T00:22",
+          "duration": 9,
+          "type": "emotional_climax",
+          "mood": "anticipation, epic, emotional, powerful, cathartic"
+        },
+        "string": "T00:13-T00:22 / duration: 9s / type: emotional_climax / mood: anticipation, epic, emotional, powerful, cathartic"
+      },
+      "camera": {
+        "shot_size": "CU",
+        "movement": "dolly_in",
+        "angle": "low",
+        "lens": "85mm",
+        "speed": "slow"
+      },
+      "cameraString": "低角度85mm极缓推近，从滴水袖口一路推到掌心贴住灯罩，末段几乎停死不再动",
+      "cameraMovement": {
+        "timeline": [
+          {
+            "segment": 1,
+            "timeRange": "0s-2.5s",
+            "cameraMovement": "极缓推近，起幅含滴水袖口与悬停的手",
+            "shotType": "MCU",
+            "purpose": "承接上一镜的犹豫，把注意力收到手上"
+          },
+          {
+            "segment": 2,
+            "timeRange": "2.5s-5.5s",
+            "cameraMovement": "匀速续推，掌心压实灯罩，暖光从指缝挤出",
+            "shotType": "CU",
+            "purpose": "动作落定，情绪开始上顶"
+          },
+          {
+            "segment": 3,
+            "timeRange": "5.5s-7.5s",
+            "cameraMovement": "推到最近后几乎停住，只留呼吸级微颤",
+            "shotType": "CU",
+            "purpose": "峰值凝视，让观众无处可逃"
+          },
+          {
+            "segment": 4,
+            "timeRange": "7.5s-9s",
+            "cameraMovement": "完全静止落幅，光斑在指缝间明暗呼吸",
+            "shotType": "CU",
+            "purpose": "留白收束，为下一镜稳定起幅做接点"
+          }
+        ]
+      },
+      "lighting": {
+        "key_light": "桌上旧台灯2700K钨丝暖光，自下而上斜打，勾亮指缝、下颌与灯罩内壁",
+        "fill_light": "窗外雨夜天光5600K，极弱冷补，仅托住肩线轮廓",
+        "time_of_day": "night",
+        "atmosphere": "暖光从指缝溢出，房间其余部分沉入黑，雨声在光里退远"
+      },
+      "lightingString": "旧台灯2700K暖光自下方打亮指缝与下颌，雨夜窗光5600K仅作极弱冷补，光比8:1低调",
+      "composition": "近景偏右三分之一，掌心与灯罩压在画面中下黄金点，指缝光束成向left上方的引导线，左半幅大面积空黑留白",
+      "color_palette": "主色暖琥珀（灯罩透光高光），辅色冷青灰（雨夜暗部与湿衣），肤色偏暖橙、被暖光染透，饱和度中低，对比度高",
+      "depth_of_field": "焦点死锁在掌心与灯罩的接触点上，f/2.8浅景深，前景湿袖口虚成色块，背景房间完全化开为暗团",
+      "audio": "掌心贴上去的一瞬，窗外的雨被推远了一整条街——只剩灯罩里那点电流的嗡鸣，从高频细丝慢慢长出低频的胸腔共鸣，像整间空屋被人一句话填满；弦乐只在这里进一次，浅浅一层，不压过那口回答的气息。",
+      "backgroundSound": {
+        "environment": "indoor_room",
+        "description": "掌心贴上灯罩，雨声骤然退远，灯丝嗡鸣自中景升起为全频，低频渐强承托史诗",
+        "intensity": "medium",
+        "spatialLayer": "midground",
+        "frequencySignature": "full-spectrum"
+      },
+      "backgroundSoundString": "掌心贴上去的一瞬，窗外的雨被推远了一整条街——只剩灯罩里那点电流的嗡鸣，从高频细丝慢慢长出低频的胸腔共鸣，像整间空屋被人一句话填满；弦乐只在这里进一次，浅浅一层，不压过那口回答的气息。"
+    },
+    {
+      "shotId": "S5",
+      "sceneType": "resolution",
+      "sceneFunction": "高潮后喘息：雨声、椅子、湿外套，让情绪落地",
+      "timing": {
+        "start": 22,
+        "duration": 4,
+        "end": 26
+      },
+      "duration": 4,
+      "scene": "他把湿外套搭上椅背，拖椅坐下；灯仍亮着，桌面空，窗外雨声重新进来。",
+      "mood": "peak, neutral, calm, peaceful, gentle",
+      "emotionArcTarget": {
+        "sceneIndex": 4,
+        "position": 0.8,
+        "intensity": 0.9,
+        "label": "climax",
+        "emotion": "peak",
+        "descriptor": "极致的"
+      },
+      "character": "陈卓: human, 写实人物",
+      "characterRef": "陈卓: PENDING_GENERATION",
+      "action": "speaking to camera, clear hand gestures, professional delivery",
+      "dialogue": "chen-zhuo|monologue|wearily|再亮一晚。|LIP_SYNC:YES",
+      "dialogueBlocks": [
+        {
+          "speaker": "chen-zhuo",
+          "line": "再亮一晚。",
+          "emotion": "wearily",
+          "trigger": "把湿外套甩上椅背",
+          "manner": "累极后的轻",
+          "type": "monologue"
+        }
+      ],
+      "characters": [
+        "chen-zhuo"
+      ],
+      "characterDescs": "陈卓: human, 写实人物",
+      "dialogueText": "再亮一晚。",
+      "emotionalTarget": {
+        "valence": 0.5,
+        "arousal": 0.2,
+        "dominance": 0.5
+      },
+      "visualDirection": {
+        "shot_type": "medium",
+        "camera_movement": "缓慢后拉",
+        "lighting": "温暖柔光",
+        "color_temperature": "neutral"
+      },
+      "promptBase": "电影级镜头，超写实，他把湿外套搭上椅背，拖椅坐下；灯仍亮着，桌面空，窗外雨声重新进来。，陈卓（写实人物），medium，缓慢后拉，台词：「再亮一晚。」",
+      "worldId": "real-world-rain-night",
+      "status": "pending",
+      "timeline": [
+        {
+          "segment": 1,
+          "timeRange": "0s-0.8s",
+          "cameraMovement": "静止起幅，先稳住画面避免推拉硬反转",
+          "shotType": "FS",
+          "purpose": "给上一镜的推一个呼吸的落点"
+        },
+        {
+          "segment": 2,
+          "timeRange": "0.8s-2.2s",
+          "cameraMovement": "极缓后拉，湿外套搭上椅背",
+          "shotType": "FS",
+          "purpose": "用退让的机位外化松弛与疲惫"
+        },
+        {
+          "segment": 3,
+          "timeRange": "2.2s-3.4s",
+          "cameraMovement": "continue后拉，他拖椅坐下，空桌面入画",
+          "shotType": "FS",
+          "purpose": "把'空'放进构图，交代房间的静"
+        },
+        {
+          "segment": 4,
+          "timeRange": "3.4s-4s",
+          "cameraMovement": "稳定落幅定格，雨声归位",
+          "shotType": "FS",
+          "purpose": "为下一镜的大特写留下静止呼吸口"
+        }
+      ],
+      "allocation": {
+        "baseDuration": 4,
+        "dialogueFactor": 1.5,
+        "typeWeight": 1,
+        "preserved": true
+      },
+      "_rawTimeline": {
+        "object": {
+          "start": "T00:22",
+          "end": "T00:26",
+          "duration": 4,
+          "type": "resolution",
+          "mood": "peak, neutral, calm, peaceful, gentle"
+        },
+        "string": "T00:22-T00:26 / duration: 4s / type: resolution / mood: peak, neutral, calm, peaceful, gentle"
+      },
+      "camera": {
+        "shot_size": "FS",
+        "movement": "pull_back",
+        "angle": "eye_level",
+        "lens": "35mm",
+        "speed": "slow"
+      },
+      "cameraString": "固定0.8秒后极缓后拉，外套搭上椅背、拖椅坐下，空桌面与整间房一点点被让出来",
+      "cameraMovement": {
+        "timeline": [
+          {
+            "segment": 1,
+            "timeRange": "0s-0.8s",
+            "cameraMovement": "静止起幅，先稳住画面避免推拉硬反转",
+            "shotType": "FS",
+            "purpose": "给上一镜的推一个呼吸的落点"
+          },
+          {
+            "segment": 2,
+            "timeRange": "0.8s-2.2s",
+            "cameraMovement": "极缓后拉，湿外套搭上椅背",
+            "shotType": "FS",
+            "purpose": "用退让的机位外化松弛与疲惫"
+          },
+          {
+            "segment": 3,
+            "timeRange": "2.2s-3.4s",
+            "cameraMovement": "continue后拉，他拖椅坐下，空桌面入画",
+            "shotType": "FS",
+            "purpose": "把'空'放进构图，交代房间的静"
+          },
+          {
+            "segment": 4,
+            "timeRange": "3.4s-4s",
+            "cameraMovement": "稳定落幅定格，雨声归位",
+            "shotType": "FS",
+            "purpose": "为下一镜的大特写留下静止呼吸口"
+          }
+        ]
+      },
+      "lighting": {
+        "key_light": "旧台灯2700K暖光侧前方罩住椅背、桌面与坐下的膝头",
+        "fill_light": "窗外雨光5600K微补墙面与地面，冷调极淡不抢暖区",
+        "time_of_day": "night",
+        "atmosphere": "暖区缩成桌面一小片，其余退为安静暗部，雨声重新进屋"
+      },
+      "lightingString": "台灯2700K暖光自侧前方罩住椅背与空桌面，窗外雨光5600K微补墙地，光比6:1偏低调",
+      "composition": "全景，人物坐在右三分之一，湿外套的斜线把视线引向空桌面，桌面留大片空白，台灯是唯一亮点",
+      "color_palette": "主色暖橙褐（桌面、椅背、灯光），辅色青蓝灰（墙面与窗影），肤色回落为自然暖调，饱和度低，对比度中",
+      "depth_of_field": "焦点落在坐下的人与桌面台灯之间，f/5.6中深景深，前景椅背轻微虚化，背景暗墙仍留可辨层次",
+      "audio": "外套搭上椅背'啪'地一声湿响，椅脚在地板上拖出半秒粗粝的摩擦——这是全片唯一一次允许的疲惫；随后雨声从背景重新涌进来，一层层把人包住，灯还在轻轻嗡，情绪从峰顶缓缓落回地面。",
+      "backgroundSound": {
+        "environment": "indoor_room",
+        "description": "湿外套落椅背的闷响、拖椅声占中景，灯仍轻嗡，窗外雨声由背景重新涌回",
+        "intensity": "medium",
+        "spatialLayer": "midground",
+        "frequencySignature": "mid"
+      },
+      "backgroundSoundString": "外套搭上椅背'啪'地一声湿响，椅脚在地板上拖出半秒粗粝的摩擦——这是全片唯一一次允许的疲惫；随后雨声从背景重新涌进来，一层层把人包住，灯还在轻轻嗡，情绪从峰顶缓缓落回地面。"
+    },
+    {
+      "shotId": "S6",
+      "sceneType": "resolution",
+      "sceneFunction": "收尾：手离开灯罩，灯继续亮，余温定格",
+      "timing": {
+        "start": 26,
+        "duration": 4,
+        "end": 30
+      },
+      "duration": 4,
+      "scene": "特写旧台灯灯罩，余温让纹理发亮；陈卓的手从灯罩上移开，悬在半空，灯不动。",
+      "mood": "catharsis, hopeful, positive, peaceful, gentle",
+      "emotionArcTarget": {
+        "sceneIndex": 5,
+        "position": 1,
+        "intensity": 1,
+        "label": "release",
+        "emotion": "catharsis",
+        "descriptor": "宣泄的"
+      },
+      "character": "陈卓: human, 写实人物",
+      "characterRef": "陈卓: PENDING_GENERATION",
+      "action": "speaking to camera, clear hand gestures, professional delivery",
+      "dialogue": "chen-zhuo|monologue|quietly|明早关。|LIP_SYNC:YES",
+      "dialogueBlocks": [
+        {
+          "speaker": "chen-zhuo",
+          "line": "明早关。",
+          "emotion": "quietly",
+          "trigger": "指尖离开灯罩，悬在半空",
+          "manner": "对自己说",
+          "type": "monologue"
+        }
+      ],
+      "characters": [
+        "chen-zhuo"
+      ],
+      "characterDescs": "陈卓: human, 写实人物",
+      "dialogueText": "明早关。",
+      "emotionalTarget": {
+        "valence": 0.6,
+        "arousal": 0.2,
+        "dominance": 0.5
+      },
+      "visualDirection": {
+        "shot_type": "medium",
+        "camera_movement": "缓慢后拉",
+        "lighting": "温暖柔光",
+        "color_temperature": "warm"
+      },
+      "promptBase": "电影级镜头，超写实，特写旧台灯灯罩，余温让纹理发亮；陈卓的手从灯罩上移开，悬在半空，灯不动。，陈卓（写实人物），medium，缓慢后拉，台词：「明早关。」",
+      "worldId": "real-world-rain-night",
+      "status": "pending",
+      "timeline": [
+        {
+          "segment": 1,
+          "timeRange": "0s-1.2s",
+          "cameraMovement": "完全静止，纹理由亮渐透",
+          "shotType": "ECU",
+          "purpose": "极近凝视，收束全片情绪"
+        },
+        {
+          "segment": 2,
+          "timeRange": "1.2s-2.6s",
+          "cameraMovement": "静止中手掌缓缓离罩，指影划过画面",
+          "shotType": "ECU",
+          "purpose": "放手即放下，动作替代台词"
+        },
+        {
+          "segment": 3,
+          "timeRange": "2.6s-3.6s",
+          "cameraMovement": "手悬半空停住，画面纹丝不动",
+          "shotType": "ECU",
+          "purpose": "把'不舍'悬在空气里"
+        },
+        {
+          "segment": 4,
+          "timeRange": "3.6s-4s",
+          "cameraMovement": "定格收尾，灯不动不闪",
+          "shotType": "ECU",
+          "purpose": "与开场远景形成对撞式呼应"
+        }
+      ],
+      "allocation": {
+        "baseDuration": 4,
+        "dialogueFactor": 1.5,
+        "typeWeight": 1,
+        "preserved": true
+      },
+      "_rawTimeline": {
+        "object": {
+          "start": "T00:26",
+          "end": "T00:30",
+          "duration": 4,
+          "type": "resolution",
+          "mood": "catharsis, hopeful, positive, peaceful, gentle"
+        },
+        "string": "T00:26-T00:30 / duration: 4s / type: resolution / mood: catharsis, hopeful, positive, peaceful, gentle"
+      },
+      "camera": {
+        "shot_size": "ECU",
+        "movement": "static",
+        "angle": "eye_level",
+        "lens": "85mm",
+        "speed": "slow"
+      },
+      "cameraString": "机位彻底不动，只等手从灯罩上缓缓移开、悬在半空，灯一直亮着不闪",
+      "cameraMovement": {
+        "timeline": [
+          {
+            "segment": 1,
+            "timeRange": "0s-1.2s",
+            "cameraMovement": "完全静止，纹理由亮渐透",
+            "shotType": "ECU",
+            "purpose": "极近凝视，收束全片情绪"
+          },
+          {
+            "segment": 2,
+            "timeRange": "1.2s-2.6s",
+            "cameraMovement": "静止中手掌缓缓离罩，指影划过画面",
+            "shotType": "ECU",
+            "purpose": "放手即放下，动作替代台词"
+          },
+          {
+            "segment": 3,
+            "timeRange": "2.6s-3.6s",
+            "cameraMovement": "手悬半空停住，画面纹丝不动",
+            "shotType": "ECU",
+            "purpose": "把'不舍'悬在空气里"
+          },
+          {
+            "segment": 4,
+            "timeRange": "3.6s-4s",
+            "cameraMovement": "定格收尾，灯不动不闪",
+            "shotType": "ECU",
+            "purpose": "与开场远景形成对撞式呼应"
+          }
+        ]
+      },
+      "lighting": {
+        "key_light": "灯罩内2700K钨丝暖光自内向外透出，纹理被余温顶亮",
+        "fill_light": "无人工补光，仅房间反射的极弱余光",
+        "time_of_day": "night",
+        "atmosphere": "四周全暗，只剩灯罩发亮的一小块暖，安静得像呼吸"
+      },
+      "lightingString": "灯罩内2700K钨丝暖光自内往外透亮纹理，无补光，光比12:1极低调，只剩余温",
+      "composition": "大特写，灯罩裂纹纹理居中吃满画面，手自右上入画后向右离开，四角压死为黑，纹理是唯一亮部与留白",
+      "color_palette": "主色琥珀金（纹理透光），辅色深褐近黑（暗部与手影），肤色仅在指缘一现、被烤成暖橙，饱和度中，对比度极高",
+      "depth_of_field": "焦点紧贴灯罩裂纹纹理，f/2.8浅景深，手只要进出画即虚，背景全黑不留层次",
+      "audio": "镜头贴近灯罩，声音也被拉到最近：一丝电流的细鸣、灯罩纹理受热后极轻的'嗒'，其余全部退场——雨、屋子、呼吸都被关在画外。对自己说的那句话干得没有一点混响，手停在半空，灯没有动，一切安静得像刚刚原谅了什么。",
+      "backgroundSound": {
+        "environment": "indoor_closeup",
+        "description": "只剩灯罩余温的极细嗡鸣贴在前景，高频微亮，背景近乎真空，留白收束情绪",
+        "intensity": "low",
+        "spatialLayer": "foreground",
+        "frequencySignature": "high"
+      },
+      "backgroundSoundString": "镜头贴近灯罩，声音也被拉到最近：一丝电流的细鸣、灯罩纹理受热后极轻的'嗒'，其余全部退场——雨、屋子、呼吸都被关在画外。对自己说的那句话干得没有一点混响，手停在半空，灯没有动，一切安静得像刚刚原谅了什么。"
+    }
+  ],
+  "opening": {
+    "shotId": "S00",
+    "scene": "全黑画面中，一道暖黄主光束从右上斜切入画，照在粗糙墙面；光柱内浮尘缓慢翻滚，墙面露出一枚旧开关的轮廓",
+    "mood": "温暖治愈",
+    "camera": {
+      "shot_size": "wide",
+      "movement": "per_beats",
+      "angle": "per_beats"
+    },
+    "cameraString": "0-1.5s:低机位仰拍，镜头极缓向前推进约10厘米；1.5-4.5s:镜头由仰拍缓慢转为平视，向右横移半米，让光斑落在画面黄金分割点；4.5-6.5s:镜头微微下沉，景别略收紧，双色温交界线沿桌面划过；6.5-8s:镜头完全静止定格，焦点由墙面缓慢拉到前景空气尘埃",
+    "lighting": {
+      "key_light": "per_plan",
+      "atmosphere": "温暖治愈"
+    },
+    "lightingString": "标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。",
+    "audioLayer": {
+      "bgm": "以温暖钢琴分解和弦为底，弦乐弱音器铺在下方，全程无鼓点；1.5秒起加入低频弦乐drone托底，4.5秒加入每分钟60拍的低频脉冲作为隐性节奏，6.5秒后乐器逐层撤出，只留钢琴单音与电流底噪，整体情绪由悬念收束到安定",
+      "sound_effects": "0-1秒：老式拉线开关“咔哒”声先行，紧接着一记深沉低频轰鸣，像老楼里电路接通的震颤，尾音带空间混响"
+    },
+    "audioLayerString": "0-1秒：老式拉线开关“咔哒”声先行，紧接着一记深沉低频轰鸣，像老楼里电路接通的震颤，尾音带空间混响；以温暖钢琴分解和弦为底，弦乐弱音器铺在下方，全程无鼓点；1.5秒起加入低频弦乐drone托底，4.5秒加入每分钟60拍的低频脉冲作为隐性节奏，6.5秒后乐器逐层撤出，只留钢琴单音与电流底噪，整体情绪由悬念收束到安定；第1.5秒光束破开与低频轰鸣同帧；第4.5秒“留一盏”完全成型与人声合唱进入严格对齐；副标题每显现一个字对应一次低频脉冲；陈卓第三步落地与副标题显形同拍；最后开关“咔哒”声与音乐收尾、定格画面三者同帧，之后留0.4秒静默",
+    "titleOverlay": {
+      "main_title": "留一盏，等你回家",
+      "sub_title": "旧灯没断电，总有一束光为你留着",
+      "style": "标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。",
+      "animation_pattern": "light_projection"
+    },
+    "titleOverlayString": "留一盏，等你回家 / 旧灯没断电，总有一束光为你留着",
+    "duration": 8,
+    "cinematic": {
+      "title_content": "留一盏，等你回家",
+      "subtitle_content": "旧灯没断电，总有一束光为你留着",
+      "animation_pattern_id": "light_projection",
+      "beats": [
+        {
+          "tStart": 0,
+          "tEnd": 1.5,
+          "phase": "hook",
+          "visual": "全黑画面中，一道暖黄主光束从右上斜切入画，照在粗糙墙面；光柱内浮尘缓慢翻滚，墙面露出一枚旧开关的轮廓",
+          "camera": "低机位仰拍，镜头极缓向前推进约10厘米",
+          "audio": "第一帧即响：老式拉线开关的清脆“咔哒”声，随后一记深沉低频轰鸣，空气震颤尾音铺开"
+        },
+        {
+          "tStart": 1.5,
+          "tEnd": 4.5,
+          "phase": "reveal",
+          "visual": "光束在墙面投射出“留一盏”三个字的暖光轮廓，字形由虚到实渐次清晰，笔画间尘埃粒子沿光线方向流动，灯丝般明灭",
+          "camera": "镜头由仰拍缓慢转为平视，向右横移半米，让光斑落在画面黄金分割点",
+          "audio": "弦乐长音渐起，字迹成型瞬间叠加一层低音量人声合唱，尘埃流动处配细碎空气声"
+        },
+        {
+          "tStart": 4.5,
+          "tEnd": 6.5,
+          "phase": "reveal",
+          "visual": "第二束偏冷的月光从左下角切入，与暖光交汇成双色温夹光；副标题在“留一盏”下方以较弱的投影光显现，灯影投在桌面上",
+          "camera": "镜头微微下沉，景别略收紧，双色温交界线沿桌面划过",
+          "audio": "低频脉冲以节拍器节奏稳定加入，约每拍一秒，与副标题逐字显现逐拍对齐"
+        },
+        {
+          "tStart": 6.5,
+          "tEnd": 8,
+          "phase": "freeze",
+          "phaseNote": "",
+          "visual": "两束光同时收拢到最亮后微微回暗，标题轮廓边缘残留一圈不散的光晕，画面右后方一张空椅的轮廓被余光勾出，暗示有人即将坐下",
+          "camera": "镜头完全静止定格，焦点由墙面缓慢拉到前景空气尘埃",
+          "audio": "高音弦乐渐弱收尾，最后一拍全静默约0.4秒，只留灯丝的细微电流嗡声"
+        }
+      ],
+      "typography": {
+        "structure": "geometric_sans",
+        "material": "polished_metal",
+        "lighting": "dual_tone",
+        "motion": "breathing",
+        "description": "标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。"
+      },
+      "entrance": {
+        "character": "陈卓",
+        "stages": [
+          {
+            "stage": "foreshadow",
+            "tStart": 0,
+            "tEnd": 2.4,
+            "style": "shadow_cast",
+            "name": "影子先行",
+            "description": "角色的影子先投射进画面，本体未现，影子透露体型与气质。",
+            "audio": "环境音变化+悬念铺底"
+          },
+          {
+            "stage": "emerge",
+            "tStart": 2.4,
+            "tEnd": 5.6,
+            "style": "walk_in",
+            "name": "步入画面",
+            "description": "陈卓以「步入画面」方式登场：角色从景深中/画面侧缘自然步入，步伐节奏匹配性格",
+            "camera": "固定或缓慢横移跟拍，保持角色全身在黄金分割点",
+            "audio": "主题动机渐强"
+          },
+          {
+            "stage": "settle",
+            "tStart": 5.6,
+            "tEnd": 8,
+            "style": "settle",
+            "name": "定格",
+            "description": "定格建立人物气质与职业/身份暗示，视线方向指向正片；角色与标题形成构图关系（角色让出标题视觉重心或与之互动）",
+            "audio": "音乐收束，保留角色环境声作为过渡"
+          }
+        ]
+      },
+      "audio": {
+        "signature": "0-1秒：老式拉线开关“咔哒”声先行，紧接着一记深沉低频轰鸣，像老楼里电路接通的震颤，尾音带空间混响",
+        "bgm": "以温暖钢琴分解和弦为底，弦乐弱音器铺在下方，全程无鼓点；1.5秒起加入低频弦乐drone托底，4.5秒加入每分钟60拍的低频脉冲作为隐性节奏，6.5秒后乐器逐层撤出，只留钢琴单音与电流底噪，整体情绪由悬念收束到安定",
+        "syncNotes": "第1.5秒光束破开与低频轰鸣同帧；第4.5秒“留一盏”完全成型与人声合唱进入严格对齐；副标题每显现一个字对应一次低频脉冲；陈卓第三步落地与副标题显形同拍；最后开关“咔哒”声与音乐收尾、定格画面三者同帧，之后留0.4秒静默",
+        "layers": [
+          {
+            "layer": "L1-signature",
+            "tStart": 0,
+            "tEnd": 1,
+            "content": "声音签名：金属轰鸣或铜管齐鸣，庄严宣告感",
+            "purpose": "第一帧抓住注意力，建立本片/本系列听觉识别度"
+          },
+          {
+            "layer": "L1-voice",
+            "tStart": 0.5,
+            "tEnd": 2,
+            "content": "角色声音签名：陈卓 的标志性发声（一句话/一声鸣叫/一段笑声），与画面同步",
+            "purpose": "角色未完全现身前，先用声音建立存在感"
+          },
+          {
+            "layer": "L2-bed",
+            "tStart": 0,
+            "tEnd": 8,
+            "content": "氛围铺底：低频弦乐群 drone + 远雷声般的空间混响",
+            "purpose": "建立情绪基调，贯穿全程"
+          },
+          {
+            "layer": "L3-rhythm",
+            "tStart": 1.6,
+            "tEnd": 6.8,
+            "content": "节奏驱动：定音鼓与大鼓的心跳式脉冲，60-72BPM",
+            "purpose": "与视觉节拍对齐，推动能量曲线"
+          },
+          {
+            "layer": "L4-sfx",
+            "tStart": 0,
+            "tEnd": 8,
+            "content": "动作音效：与每个画面事件一一对应（见同步表）",
+            "purpose": "让画面事件\"听得见\"，增强真实感与冲击力"
+          },
+          {
+            "layer": "L5-resolve",
+            "tStart": 6.8,
+            "tEnd": 8,
+            "content": "收束与过渡：音乐在最后一拍收束或骤停，留 0.3-0.5 秒静默拍，随后正片声音淡入",
+            "purpose": "给正片让位，制造\"交接棒\"的呼吸感"
+          }
+        ],
+        "syncMap": [
+          {
+            "tStart": 0,
+            "tEnd": 1.5,
+            "phase": "hook",
+            "visualEvent": "全黑画面中，一道暖黄主光束从右上斜切入画，照在粗糙墙面；光柱内浮尘缓慢翻滚，墙面露出一枚旧开关的轮廓",
+            "audioEvent": "悬念音效起（金属轰鸣或铜管齐鸣，庄严宣告感），铺底渐入"
+          },
+          {
+            "tStart": 1.5,
+            "tEnd": 4.5,
+            "phase": "reveal",
+            "visualEvent": "光束在墙面投射出“留一盏”三个字的暖光轮廓，字形由虚到实渐次清晰，笔画间尘埃粒子沿光线方向流动，灯丝般明灭",
+            "audioEvent": "动作音效与画面对齐（材质/运动/文字成形声），节奏层推进"
+          },
+          {
+            "tStart": 4.5,
+            "tEnd": 6.5,
+            "phase": "reveal",
+            "visualEvent": "第二束偏冷的月光从左下角切入，与暖光交汇成双色温夹光；副标题在“留一盏”下方以较弱的投影光显现，灯影投在桌面上",
+            "audioEvent": "动作音效与画面对齐（材质/运动/文字成形声），节奏层推进"
+          },
+          {
+            "tStart": 6.5,
+            "tEnd": 8,
+            "phase": "freeze",
+            "visualEvent": "两束光同时收拢到最亮后微微回暗，标题轮廓边缘残留一圈不散的光晕，画面右后方一张空椅的轮廓被余光勾出，暗示有人即将坐下",
+            "audioEvent": "一记收束音（金属尾音/鼓点急停/余韵），留静默拍"
+          }
+        ]
+      },
+      "duration": 8
+    },
+    "promptTimeline": "T00:00-00:02 [hook] 全黑画面中，一道暖黄主光束从右上斜切入画，照在粗糙墙面；光柱内浮尘缓慢翻滚，墙面露出一枚旧开关的轮廓（运镜:低机位仰拍，镜头极缓向前推进约10厘米）（音效:第一帧即响：老式拉线开关的清脆“咔哒”声，随后一记深沉低频轰鸣，空气震颤尾音铺开）\nT00:02-00:05 [reveal] 光束在墙面投射出“留一盏”三个字的暖光轮廓，字形由虚到实渐次清晰，笔画间尘埃粒子沿光线方向流动，灯丝般明灭（运镜:镜头由仰拍缓慢转为平视，向右横移半米，让光斑落在画面黄金分割点）（音效:弦乐长音渐起，字迹成型瞬间叠加一层低音量人声合唱，尘埃流动处配细碎空气声）\nT00:05-00:07 [reveal] 第二束偏冷的月光从左下角切入，与暖光交汇成双色温夹光；副标题在“留一盏”下方以较弱的投影光显现，灯影投在桌面上（运镜:镜头微微下沉，景别略收紧，双色温交界线沿桌面划过）（音效:低频脉冲以节拍器节奏稳定加入，约每拍一秒，与副标题逐字显现逐拍对齐）\nT00:07-00:08 [freeze] 两束光同时收拢到最亮后微微回暗，标题轮廓边缘残留一圈不散的光晕，画面右后方一张空椅的轮廓被余光勾出，暗示有人即将坐下（运镜:镜头完全静止定格，焦点由墙面缓慢拉到前景空气尘埃）（音效:高音弦乐渐弱收尾，最后一拍全静默约0.4秒，只留灯丝的细微电流嗡声）\n--- 角色入场编舞 ---\nT00:00-00:02 [foreshadow] 角色的影子先投射进画面，本体未现，影子透露体型与气质。（音效:环境音变化+悬念铺底）\nT00:02-00:06 [emerge] 陈卓以「步入画面」方式登场：角色从景深中/画面侧缘自然步入，步伐节奏匹配性格（运镜:固定或缓慢横移跟拍，保持角色全身在黄金分割点）（音效:主题动机渐强）\nT00:06-00:08 [settle] 定格建立人物气质与职业/身份暗示，视线方向指向正片；角色与标题形成构图关系（角色让出标题视觉重心或与之互动）（音效:音乐收束，保留角色环境声作为过渡）\n--- 标题呈现 ---\n主标题「留一盏，等你回家」 / 副标题「旧灯没断电，总有一束光为你留着」\n字体: 标题采用几何无衬线字形，笔画收口干净、字腔开阔，便于光影投射时保持辨识度。材质以拉丝抛光金属为底，表面带细腻的横向纹理与轻微氧化痕迹，模拟被长期使用过的旧灯具质感。光照采用双色温：右上方暖黄光为主轮廓，左下方冷月光勾边，两色在笔画中段自然过渡交汇。动态为呼吸明灭，亮度在2%到5%之间缓慢起伏，如同灯泡通电后尚未完全稳定的状态，边缘保留一圈不散的光晕，与“旧灯没断电”的主题形成直接对应。"
+  },
+  "llmStats": {},
+  "blueprintFingerprint": {
+    "sceneCount": 6,
+    "shotIds": "S1,S2,S3,S4,S5,S6",
+    "hash": "90989806"
+  },
+  "savedAt": "2026-10-31T05:56:19.091Z",
+  "_validation": {
+    "valid": true,
+    "count": 6,
+    "issues": []
+  }
+}

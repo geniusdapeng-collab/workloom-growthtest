@@ -1,0 +1,44 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "regression-suite-hotel-98467-1793461867444-dffc7b35",
+  "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"suite:hotel\"",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "suite:hotel"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "regression-suite:hotel",
+    "commandName": "suite:hotel",
+    "kind": "regression",
+    "environmentKind": "local-preview",
+    "executorCommit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+  },
+  "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:51:06.304Z",
+  "finished_at": "2026-10-31T15:51:07.444Z",
+  "exit_code": 1,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "fail",
+  "outputs": [
+    {
+      "path": "execution/regression-suite-hotel-98467-1793461867444-dffc7b35.log",
+      "sha256": "5d674af87a70c0cefb362824f96c6e43fb566306f908b3224ec4aa4b2600a173",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "execution/regression-suite-hotel-98467-1793461867444-dffc7b35-command.json",
+      "sha256": "c782dbb7c6edebe98da0f9ac253a2d98ed9eb7e00cca6b79e3d73de139fba027",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    }
+  ]
+}

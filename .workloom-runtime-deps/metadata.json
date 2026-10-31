@@ -3,7 +3,7 @@
   "product": {
     "productId": "workloom-ai-growth",
     "role": "industry",
-    "repository": "workloom-ai/workloom-growthtest",
+    "repository": "geniusdapeng-collab/workloom-growthtest",
     "includePlatformOps": false
   },
   "npmVersion": "11.17.0",
@@ -32,7 +32,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "80dae9d4e7d9fad51e291eb26c074acbae83354cc3d537a3bdf5ec24f050cea2"
+      "sha256": "042303a5081e236daf3f1c90ba9587a9af847723dacf5842766b7885d01f22b9"
     },
     {
       "path": "packages/audit-engine/package.json",
@@ -40,7 +40,7 @@
     },
     {
       "path": "packages/base/package.json",
-      "sha256": "d6b309b67a0a23b7465b758210e3647194c44489ad2b9a3e19d68af8ebfe6e2a"
+      "sha256": "28e8e733a0308cf1221e4dafb294c55e8b92dd01c0061fb317d3ea18cbcda7d8"
     },
     {
       "path": "packages/db/package.json",
@@ -60,15 +60,15 @@
     },
     {
       "path": "packages/video-studio/package.json",
-      "sha256": "04d675f0518aabf2b8983c17c9ea79e6e9a8ac545239261f94ab92bfd4200826"
+      "sha256": "085e3c497081cf3dc868dca6774e46a2ec3bb0ff63c279adf4aab7916ee84d10"
     },
     {
       "path": "pnpm-lock.yaml",
-      "sha256": "834833a61b50ff153fd0ed456a306d5fe0a3d2bffb51b8665fc0cf8b85d684e8"
+      "sha256": "990c6c90e2f6313acac01178e5d839379820314f3e544daaa6304e411a3b94fc"
     },
     {
       "path": "product.manifest.json",
-      "sha256": "df2b071de5a7975e67e47026ee1b5e5fe90f3dae85f184e06337369d15d9aaba"
+      "sha256": "04c2e79888ccdad612aca9dfcc4d37d402d2cf2ad026334cca066a6a2438a86e"
     },
     {
       "path": "scripts/pack-nm-merge.mjs",
@@ -87,6 +87,6 @@
       "sha256": "38d5eba21ae509aec4de97000bda055ca632f0216473e1d1000eeba6b5e0a475"
     }
   ],
-  "manifestSha256": "e0340ff5a9ac4cb175dfe90c7af0507a3ff10bd9e77e0bd5e7ebc72443180502",
-  "packageLockSha256": "19e76e75fe640adc59a09f405e24c9ed92fae2f24e3ead6c85d86b5430ea9118"
+  "manifestSha256": "cef66b65ded2bea84850e8321780e8acf6ac6540225352581f79a907f75a0080",
+  "packageLockSha256": "e4e09d08c6802a334b7bc121beae58e3cd5c3d2bf57e71e0d8c1e65f9dd57f1e"
 }

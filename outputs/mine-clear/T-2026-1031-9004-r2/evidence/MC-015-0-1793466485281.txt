@@ -1,0 +1,13 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/apps/server
+
+
+ Test Files  1 passed (1)
+      Tests  5 passed (5)
+   Start at  01:08:05
+   Duration  1.01s (transform 504ms, setup 0ms, import 895ms, tests 7ms, environment 0ms)
+
+
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

@@ -1,0 +1,71 @@
+{
+  "id": "MC-001",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "叙事片携带营销 brief 时会被 vendor 改写成商业广告",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/pipeline-router.ts:555@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "670bcd4409a265ae887bb9b1203537c12e1f12b30e822f2fb92698d99555f012",
+      "note": "叙事分支只删除 product/products，仍把 platform/goal/category/sellingPoints 等营销字段传给下游。"
+    },
+    {
+      "type": "code",
+      "ref": "vendor/supermickey/hyperreality-system/index.js:3067@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "acb46563f99b61babb1156858fb83c083a258b052ff21169d3b3e7d5bddec5cf",
+      "note": "vendor 仅按 brief 中存在商品/品类/平台/转化目标就追加商业广告提示块。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/pipeline-router.ts",
+    "line": 555,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "applyRouteToMetadata"
+  },
+  "trigger_path": "同一 metadata 曾被营销页填充，随后调用方显式选择叙事片；applyRouteToMetadata 保留 brief.platform/goal，vendor _buildThemeInput 命中商品提示块。",
+  "fix_plan": "在 vendor 主题入口按 pipelineRoute.kind=narrative 屏蔽全部营销字段，并保留独立的时长/画幅口径。",
+  "blast_radius": "只影响叙事片主题入口；营销片继续消费已审 brief。",
+  "conflict_paths": ["packages/video-studio/src/vendor-compat.ts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "营销 metadata 被显式改道 narrative",
+      "expect": "applyRouteToMetadata 清除商品锚点，runtime _buildThemeInput 输出不包含营销 Brief 块",
+      "command": "vitest run pipeline-router.test.ts studio.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/pipeline-router.test.ts",
+          "packages/video-studio/src/studio.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "20 条叙事主题矩阵每次注入营销占位 metadata",
+      "expect": "60 例矩阵的 20 条 narrative 全部通过 runtime bridge 隔离",
+      "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+      "exec": {
+        "file": "node_modules/.bin/tsx",
+        "args": [
+          "scripts/tools/ai-video-stress-matrix.mts",
+          "--out",
+          "outputs/mine-clear/T-2026-1031-9004/matrix"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/pipeline-router.test.ts packages/video-studio/src/studio.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "审计发现来自 canary-n 被错误标记为商业广告。"
+}

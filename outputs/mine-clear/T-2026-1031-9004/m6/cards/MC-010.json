@@ -1,0 +1,77 @@
+{
+  "id": "MC-010",
+  "kind": "problem",
+  "level": "L3",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "包级标准测试因 cwd 相对路径产生不可复现失败",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/studio.test.ts:94@e5111931d59fa662ab81163fe909a2c89f7543ef",
+      "sha256": "1bc3f75bd721866266d401d957a4310c356faab99c92248d009ec1b10638336f",
+      "note": "测试直接 existsSync(portraitRef)；portraitRef 是仓内相对路径，在 packages/video-studio cwd 下解析错误。"
+    },
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/data-mining-executor.test.ts:15@e5111931d59fa662ab81163fe909a2c89f7543ef",
+      "sha256": "88ed31986da2c0996ac4d5f5baae643f99f1abf2d2f2615be85a360ce86dfa21",
+      "note": "vendorRequire(resolve('vendor/...')) 依赖进程 cwd；在 apps/server 标准包级测试中解析为 apps/server/vendor，模块加载失败。"
+    }
+  ],
+  "root_cause": {
+    "file": "apps/server/src/video/data-mining-executor.test.ts",
+    "line": 15,
+    "commit": "e5111931d59fa662ab81163fe909a2c89f7543ef",
+    "symbol": "vendorRequire"
+  },
+  "trigger_path": "从根目录运行测试时路径偶然正确；执行 pnpm -C packages/video-studio test 或 pnpm -C apps/server exec vitest run src/video 时，进程 cwd 改变，仓库相对路径失效。",
+  "fix_plan": "所有测试资源路径从 import.meta.dirname 推导仓库根，再拼 vendor 与人物资产绝对路径；不使用 process cwd。",
+  "blast_radius": "只影响测试定位，不改生产代码行为；覆盖根级递归测试和两个包级标准命令。",
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "从 packages/video-studio 目录运行该包标准测试",
+      "expect": "全部测试文件通过，且 studio.test.ts 的默认模特文件断言从仓库根解析成功",
+      "command": "pnpm --config.verify-deps-before-run=false -C packages/video-studio test",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "-C",
+          "packages/video-studio",
+          "test"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "sample",
+      "given": "从 apps/server 目录运行视频标准测试",
+      "expect": "全部测试文件通过，data-mining-executor.test.ts 从仓库根加载 vendor 模块",
+      "command": "pnpm --config.verify-deps-before-run=false -C apps/server exec vitest run src/video --testTimeout 30000",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "-C",
+          "apps/server",
+          "exec",
+          "vitest",
+          "run",
+          "src/video",
+          "--testTimeout",
+          "30000"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "pnpm --config.verify-deps-before-run=false -C packages/video-studio test && pnpm --config.verify-deps-before-run=false -C apps/server exec vitest run src/video --testTimeout 30000"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "验收发现 A-002。"
+}

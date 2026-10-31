@@ -27,8 +27,8 @@
  * 独立审读的本仓修复，未启用 base-sync 接收。后续修改按本仓任务卡评审与回归。
  */
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join, resolve } from "node:path";
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { captureEvidenceRun, hashBytes, isAncestor, resolveCommit, revisionOf, validateExecSpec, verifyApproval, verifyArtifact, verifyRun } from "./evidence.mjs";
 
 const SCHEMA_ID = "workloom.mine-clear/ledger@1";
@@ -281,9 +281,19 @@ function verifyBaselines(ledger, context) {
     catch { errors.push(`baseline.${name}.commit 缺失/null/未知提交：不能证明三基线对齐`); }
   }
   try {
-    const revision = revisionOf(context.repoRoot);
+    const revision = revisionOf(context.repoRoot, { ignorePaths: [context.artifactRoot] });
     if (revision.dirty) errors.push("被测工作树存在未提交源码：不能用旧 commit 的证据放行");
-    if (commits.acceptance && commits.acceptance !== revision.commit) errors.push("验收基线不是当前 HEAD（过期验收证据）");
+    if (commits.acceptance && commits.acceptance !== revision.commit && isAncestor(context.repoRoot, commits.acceptance, revision.commit)) {
+      const canonical = (path) => {
+        try { return realpathSync(path); }
+        catch { return resolve(path); }
+      };
+      const artifactRel = relative(canonical(context.repoRoot), canonical(context.artifactRoot)).split(sep).join("/");
+      const changed = git(context.repoRoot, ["diff", "--name-only", `${commits.acceptance}..${revision.commit}`], { allowFailure: true });
+      const sourceChanges = (changed ?? "").split("\n").filter(Boolean)
+        .filter((path) => path !== artifactRel && !path.startsWith(`${artifactRel}/`));
+      if (sourceChanges.length > 0) errors.push(`验收基线不是当前 HEAD，且其后存在源码变化：${sourceChanges.slice(0, 5).join("、")}`);
+    } else if (commits.acceptance && commits.acceptance !== revision.commit) errors.push("验收基线不是当前 HEAD（过期验收证据）");
     if (commits.audit && commits.repair && !isAncestor(context.repoRoot, commits.audit, commits.repair)) errors.push("修复基线不是审计基线的后代");
     if (commits.repair && commits.acceptance && !isAncestor(context.repoRoot, commits.repair, commits.acceptance)) errors.push("验收基线不是修复基线的后代");
   } catch (error) { errors.push(`三基线 Git 核验失败：${error.message}`); }
@@ -594,7 +604,7 @@ function commandRunAssertions() {
   if (!actor || !["repair", "acceptance"].includes(role)) die("需要 --actor 与 --role repair|acceptance", 2);
   const timeoutMs = Number(arg("--timeout-ms", "60000"));
   if (!Number.isInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 3_600_000) die("--timeout-ms 必须为 1–3600000", 2);
-  const revision = revisionOf(context.repoRoot);
+  const revision = revisionOf(context.repoRoot, { ignorePaths: [context.artifactRoot] });
   if (revision.dirty) die("断言执行前必须提交被测源码", 1);
   if (!isAncestor(context.repoRoot, ledger.baseline?.audit?.commit, revision.commit)) die("当前 HEAD 不包含审计基线", 1);
   if (role === "acceptance") {

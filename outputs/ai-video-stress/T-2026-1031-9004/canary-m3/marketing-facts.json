@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "workloom.marketing-facts/v1",
+  "collectedAt": "2026-10-31T14:04:20.602Z",
+  "productQuery": {
+    "name": "米家空气净化器 4 Lite",
+    "brand": "米家",
+    "category": "空气净化器",
+    "model": "4 Lite"
+  },
+  "rawSha256": "870d793d9f6982d6b8b975f0b5d819260a6388fbadecf335dbdfe0c4879189fc",
+  "dossierSha256": "e89163418f262ac0edc9053a7c90f47a457b6e28f45fd21468d63610a81c20b6",
+  "g1ContentSha256": "5ed011ec7cba6f511a9fbb5f3131f0f8dcef635a2d52a125de17621fea3e713c",
+  "sourceCount": 1,
+  "restrictions": [
+    "没有可核实用户评价：禁止用户口碑、评分、人数、销量或使用效果共识主张",
+    "没有可核实竞品证据：禁止对比、竞品弱点或市场领先主张"
+  ]
+}

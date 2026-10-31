@@ -1,0 +1,373 @@
+
+ RUN  v3.2.7 /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/packages/video-studio
+
+stdout | src/portrait-derived-entrypoint.test.ts > 肖像派生实际入口防重复付费 > accepted video polling failure resumes its same task ID, including a previously rejected missing ref
+  ↻ 参考素材失效（asset-invalid）→ 剔除后重试（剩余 1 张参考）
+
+stdout | src/director-completion-bridge.test.ts > actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > keeps all 180 frames, tail and original sound without new audio work through the actual worker bridge
+{"fixture":"director-worker-real-picture-bridge","workerSource":"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/apps/server/src/video/director-worker.ts","workerSha256":"76724e3337c0bd8e5950c9e3789f3d795c962bbbb2604b56ea0d4b43c7dbb6b8","plannedLockTrim":true,"loadedLockTrim":true,"audioLockTrim":true,"manifestLockTrim":true,"sourceFrames":180,"edl":[{"sourceId":"SC-1","sourceSha256":"307aa8cb9281eb4bfa03f4166c7aab02d2afece4efa3469e362b4658126e043d","inFrame":0,"outFrame":180,"startFrame":0,"role":"action","sourceIndex":0,"segmentId":"douyin-impact-1","dialogueProtected":true,"crop":"preserve-subject","transition":"hard"}],"actualFrames":180}
+
+stdout | src/director-completion-bridge.test.ts > actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > keeps all 180 frames, tail and original sound without new audio work through the actual worker bridge
+{"fixture":"director-native-audio-tail-before-assertions","originalTone":{"samples":24000,"rms":2045.4388775598584,"frequency":734},"programTone":{"samples":24000,"rms":2044.620788557135,"frequency":734}}
+
+stdout | src/director-completion-bridge.test.ts > actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > keeps all 180 frames, tail and original sound without new audio work through the actual worker bridge
+{"fixture":"director-native-source-tail-readback","sourceSha256":"307aa8cb9281eb4bfa03f4166c7aab02d2afece4efa3469e362b4658126e043d","actualFrames":180,"tailPixels":[{"file":"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/director-worker-bridge-JTWfsT/source.mp4","frame":179,"red":252,"green":0,"blue":0},{"file":"/private/var/folders/dj/mkh6fwbd4mb6ycp933xfty4h0000gn/T/director-worker-bridge-JTWfsT/picture/picture.mp4","frame":179,"red":255,"green":23,"blue":0}],"originalTone":{"samples":24000,"rms":2045.4388775598584,"frequency":734},"programTone":{"samples":24000,"rms":2044.620788557135,"frequency":734},"audioBoundaryCalls":{"assets":1,"connectors":0,"describeAudio":0,"issueAudio":0,"renderAudio":0,"forbidden":[],"audioIssueInputs":[],"audioRenderInputs":[]}}
+
+stdout | src/director-completion-bridge.test.ts > actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > retains an unlocked legacy control that really renders the 104-frame recipe interval
+{"fixture":"director-worker-real-picture-bridge","workerSource":"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/apps/server/src/video/director-worker.ts","workerSha256":"76724e3337c0bd8e5950c9e3789f3d795c962bbbb2604b56ea0d4b43c7dbb6b8","plannedLockTrim":false,"loadedLockTrim":false,"audioLockTrim":false,"manifestLockTrim":false,"sourceFrames":180,"edl":[{"sourceId":"SC-1","sourceSha256":"307aa8cb9281eb4bfa03f4166c7aab02d2afece4efa3469e362b4658126e043d","inFrame":42,"outFrame":146,"startFrame":0,"role":"action","sourceIndex":0,"segmentId":"douyin-impact-1","dialogueProtected":false,"crop":"preserve-subject","transition":"hard"}],"actualFrames":104}
+
+ ✓ src/character-archive.test.ts (28 tests) 5801ms
+   ✓ 激活、pin与文件版本的真实消费 > 真实CLI bind --pin和activate使用指定版本，并创建准确项目文件  2260ms
+   ✓ 激活、pin与文件版本的真实消费 > 真实生成CLI plan消费指定服装和锚点，缺失锚点或参数拒绝规划  2071ms
+   ✓ 激活、pin与文件版本的真实消费 > 真实绑定CLI拒绝目录别名、档案身份错配及保留项目标识  1404ms
+ ✓ src/cover-assembly.test.ts (17 tests) 7565ms
+   ✓ official publication cover assembly > replaces only the first frame of a 30s film without shifting audio or subtitles  863ms
+   ✓ official publication cover assembly > prepends one cover frame and preserves every moving body picture, source bytes and original AAC/subtitle timestamps  1284ms
+   ✓ official publication cover assembly > resizes a differently shaped cover into the actual video canvas without source-quality scans  2035ms
+   ✓ official publication cover assembly > rejects a successful encoder that alters the audio even when video duration and frame count are unchanged  1251ms
+ ✓ src/portrait-agent.test.ts (22 tests) 1781ms
+   ✓ 定妆照生成 Agent：执行 > 模型、size、endpoint、seed零值、锚点字节均是版本请求的一部分  381ms
+ ✓ src/director-completion-bridge.test.ts (9 tests) 9017ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > keeps all 180 frames, tail and original sound without new audio work through the actual worker bridge  2407ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > retains an unlocked legacy control that really renders the 104-frame recipe interval  1434ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > an explicit dubbing request still fails before voice work when independent audio authority is unavailable  381ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > a real missing FFmpeg process rejects picture work without a success readback or rewritten source  1494ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > actual source reconstruction rejects empty before audio or picture work  360ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > actual source reconstruction rejects unknown before audio or picture work  456ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > actual source reconstruction rejects canonical-duplicate before audio or picture work  452ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > actual source reconstruction rejects missing before audio or picture work  397ms
+   ✓ actual director worker -> audio -> prepared source -> EDL -> ffmpeg picture bridge > actual source reconstruction rejects license before audio or picture work  499ms
+ ✓ src/portrait-runtime.test.ts (31 tests) 1435ms
+   ✓ 完整请求与产物绑定的定妆照缓存 > 真实独立进程共享磁盘锁，第二进程读取已提交receipt而不重复出图  421ms
+ ✓ src/film-contracts.test.ts (15 tests) 1464ms
+   ✓ first-authored frozen film context > independent first-author processes observe one complete frozen context  1049ms
+   ✓ full source contracts reach each review > passes complete raw facts to the actual producer model body and binds the result hash  313ms
+ ✓ src/film-worker-runtime.test.ts (109 tests) 1097ms
+ ✓ src/av-sync.test.ts (16 tests) 1117ms
+   ✓ crossCorrelationLag > 零偏移时给出 0ms 且相关性接近 1  619ms
+   ✓ crossCorrelationLag > 整体后移 80 个样点 → 识别为 +5ms  489ms
+ ✓ src/character-release-contract.integration.test.ts (4 tests) 603ms
+ ✓ src/generation-submission.test.ts (8 tests) 581ms
+   ✓ 持久化生成提交 > 真实独立Node进程重启只复用受理响应，连接中断后的重启不重发POST  449ms
+ ✓ src/production-client.test.ts (29 tests) 1862ms
+   ✓ real render-project CLI over authenticated HTTP > normal service entry uses only token submit, saves safe receipt, and never creates CMS or calls a provider  1842ms
+ ✓ src/producer-gate.test.ts (13 tests) 510ms
+   ✓ AI producer evidence gate > sends complete text evidence to one canonical thinking review  405ms
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 实际 SC-05 与全部 25 个字段模板抵达 provider，一次真实消费返回非降级结果
+[PromptFusionAgent] _callLLM 进入 | perCallTimeout=300000ms maxTokens=12288 retries=1 budget=300000ms ceiling=300000ms (镜头独立预算)
+[PromptFusionAgent] 尝试 1/1 | timeout=300000ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 实际 SC-05 与全部 25 个字段模板抵达 provider，一次真实消费返回非降级结果
+[[PromptFusionAgent] attempt 1/1] ✅ 正常完成，耗时≈0ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 实际 SC-05 与全部 25 个字段模板抵达 provider，一次真实消费返回非降级结果
+[PromptFusionAgent] LLM调用成功 ✓ | 耗时=2ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 实际 SC-05 与全部 25 个字段模板抵达 provider，一次真实消费返回非降级结果
+  warning: dialogue ↔ audio: 有台词但音频没有包含人声/对话描述
+[PromptFusionAgent] SC-05 字段一致性: 1 issues, 自动修复中...
+  warning: dialogue ↔ audio: 有台词但音频没有包含人声/对话描述
+[FieldConsistencyChecker] SC-05 自动修复: 有台词但音频没有包含人声/对话描述
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 模板示例镜号 的非空模型结果仍降级，不改写镜号过关
+[PromptFusionAgent] _callLLM 进入 | perCallTimeout=300000ms maxTokens=12288 retries=1 budget=300000ms ceiling=300000ms (镜头独立预算)
+[PromptFusionAgent] 尝试 1/1 | timeout=300000ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 模板示例镜号 的非空模型结果仍降级，不改写镜号过关
+[[PromptFusionAgent] attempt 1/1] ✅ 正常完成，耗时≈0ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 模板示例镜号 的非空模型结果仍降级，不改写镜号过关
+[PromptFusionAgent] LLM调用成功 ✓ | 耗时=1ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 缺失镜号 的非空模型结果仍降级，不改写镜号过关
+[PromptFusionAgent] _callLLM 进入 | perCallTimeout=300000ms maxTokens=12288 retries=1 budget=300000ms ceiling=300000ms (镜头独立预算)
+[PromptFusionAgent] 尝试 1/1 | timeout=300000ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 缺失镜号 的非空模型结果仍降级，不改写镜号过关
+[[PromptFusionAgent] attempt 1/1] ✅ 正常完成，耗时≈0ms
+
+stdout | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 缺失镜号 的非空模型结果仍降级，不改写镜号过关
+[PromptFusionAgent] LLM调用成功 ✓ | 耗时=1ms
+
+ ✓ src/routed-adapter.test.ts (16 tests) 501ms
+   ✓ 结构化调用保留调用方真实输出合同 > 直连路径传递相同完整结构及实际 model，保留原始 content/usage  443ms
+ ✓ src/archive/store.test.ts (12 tests) 136ms
+ ✓ src/character-release-source.test.ts (95 tests) 442ms
+ ✓ src/duration-rules.test.ts (9 tests) 676ms
+ ✓ src/routed-generation.test.ts (7 tests) 825ms
+   ✓ video adapter canonical dispatch > uses the canonical model, scene thinking, JSON mode and full legal output window  580ms
+ ✓ src/plausibility-review.test.ts (7 tests) 564ms
+   ✓ 实体与物理常识审核 agent > 模型给出 blocker → block；给出 pass → pass（同一条代码路径适配任意品类）  543ms
+ ✓ src/vendor-compat.test.ts (53 tests) 14917ms
+   ✓ 当前定妆照版本的真实消费链 > 真实runtime两版四角度→manifest→provider payload只消费索引最新字节，历史目录顺序无效  926ms
+   ✓ 当前定妆照版本的真实消费链 > 篡改、缺收据、symlink、越界和重复角度均不能进入vendor提交  834ms
+   ✓ 当前定妆照版本的真实消费链 > 清单生成后改索引/产物/清单均阻断，最终payload字节也再次核对  593ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 角色四角度齐备后，vendor 绑定清单校验通过（不再 BINDING_MANIFEST_INVALID）  393ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 索引里没有四角度齐备角色时不注入（渲染门照常报错，不伪造绑定）  439ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 配置隔离保活注入的类实例（LLM 引擎方法不再丢失）  477ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 字段质检桥：结构化 timeline 不再崩，单镜异常也有 reports 数组  448ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 微动作桥：camera_movement 参与距离推断，neutral 模板补齐（不再 0/6）  392ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 契约桥：对象型字段不再产生 [object Object]，并输出契约账本行  557ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 需求洞察字段填充桥：数组保形（原实现会 {0:…} 展平且 const 重赋值）  362ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 叙事兼容桥：阻断营销 Brief 污染、补人物契约，并容忍首个 JSON 后的尾随文本  810ms
+   ✓ 定妆照绑定桥（真机故障复现 → 修复） > 无台词剧本在下游保持零台词，契约接受生产实际字符串 dialogue  625ms
+   ✓ 音频纪律桥与时长策略桥（真机口径 2026-09-23） > 音频纪律桥：组装器出口追加【音频纪律】+ 清洗 audio 字段里的音乐指令，摘除后复原  499ms
+   ✓ 音频纪律桥与时长策略桥（真机口径 2026-09-23） > 时长策略桥：5 处在用口径统一放宽到模型上限 30s，摘除后精确还原  339ms
+   ✓ Phase3 宿主融合桥（C1） > 原 const 重赋坏例被修复：真实 Phase3 完成融合、字段合并、台词检查与 checkpoint  556ms
+   ✓ Phase3 宿主融合桥（C1） > 模型 picks=[] 真正不匹配，清除旧 _skillContext 后仍按原镜头融合  603ms
+   ✓ Phase3 宿主融合桥（C1） > 真实 vendor 的融合请求生成器收到实际技能正文，负面禁词不被误判  1052ms
+   ✓ Phase3 宿主融合桥（C1） > 预算拒绝或未知预算在任何路由模型/融合调用之前停止  369ms
+   ✓ Phase3 宿主融合桥（C1） > 提供商边界再次核预算：第一次返回后耗尽，第二次绝不发出；原 agent 未被改写  441ms
+   ✓ Phase3 宿主融合桥（C1） > 运行中预算变未知与 health 清理失败不会落通过 checkpoint  523ms
+   ✓ Phase3 宿主融合桥（C1） > 真实 BaseAgent 的 critical 备用模型与最终缩短重试也遵守外调预算  482ms
+   ✓ Phase3 宿主融合桥（C1） > 融合异常/降级/空 prompt/错 id/checkpoint 失败都不能成功返回  626ms
+   ✓ Phase3 宿主融合桥（C1） > 同一进程重复安装采用引用计数，最后卸载精确复原  404ms
+   ✓ Phase3 宿主融合桥（C1） > 安装日志抛错也还原原型且不遗留共享引用  440ms
+   ✓ Phase3 宿主融合桥（C1） > vendor RECOVERY 宣称成功也被外层拦下；未知旧断点不能伪过  570ms
+   ✓ VideoStudio 的 C1 实际安装入口 > runPreproduction 经现有兼容入口安装并消费 Phase3，失败与成功均卸载还原  1107ms
+ ✓ src/configured-llm.test.ts (3 tests) 447ms
+   ✓ configured assembly uses the canonical model and private data crosses the PII boundary  441ms
+ ✓ src/archive/stage-runner.test.ts (17 tests) 525ms
+ ✓ src/archive/stage-log.test.ts (4 tests) 64ms
+ ✓ src/studio.test.ts (24 tests) 160ms
+ ✓ src/confirmation.test.ts (13 tests) 145ms
+ ✓ src/pipeline-control-plane/pipeline-control-plane.test.ts (15 tests) 318ms
+ ✓ src/uhd-delivery.test.ts (5 tests) 208ms
+ ✓ src/final-shot-character-qualification.test.ts (5 tests) 80ms
+ ✓ src/archive/context-bundle.test.ts (3 tests) 56ms
+ ✓ src/standard-post-contract.test.ts (75 tests) 74ms
+ ✓ src/character-release-contract.test.ts (37 tests) 96ms
+ ✓ src/post-render-fence-policy.test.ts (65 tests) 25ms
+ ✓ src/scene-policy.test.ts (37 tests) 60ms
+ ✓ src/film-delivery-rgb-entrypoint.test.ts (17 tests) 163ms
+ ✓ src/beat-verify.test.ts (7 tests) 21ms
+ ✓ src/builtin-character-library.test.ts (3 tests) 41ms
+ ✓ src/shot-spec.test.ts (29 tests) 65ms
+ ✓ src/duration-projection.test.ts (11 tests) 64ms
+ ✓ src/data-mining-engine.test.ts (5 tests) 33ms
+ ✓ src/director-planner.test.ts (10 tests) 49ms
+ ✓ src/portrait-binding.test.ts (18 tests) 25ms
+ ✓ src/film-worker-provenance.test.ts (33 tests) 29ms
+ ✓ src/film-worker-channel.test.ts (8 tests) 31ms
+ ✓ src/revision-executor.test.ts (12 tests) 42ms
+ ✓ src/production-lineage.test.ts (20 tests) 122ms
+ ✓ src/shot-intent.test.ts (45 tests) 19ms
+ ✓ src/product-archive.test.ts (9 tests) 82ms
+ ✓ src/cover-composition-entrypoint.test.ts (15 tests) 94ms
+ ✓ src/director-v2.test.ts (13 tests) 160ms
+ ✓ src/revise.test.ts (52 tests) 27ms
+ ✓ src/micromotion.test.ts (23 tests) 53ms
+ ✓ src/duration-projection-bridge.test.ts (6 tests) 27ms
+ ✓ src/material-policy.test.ts (37 tests) 141ms
+ ✓ src/device-policy.test.ts (19 tests) 16ms
+ ✓ src/plate-prompt.test.ts (19 tests) 67ms
+ ✓ src/scene-bible.test.ts (21 tests) 17ms
+ ✓ src/product-archive.multitype.test.ts (5 tests) 20ms
+ ✓ src/film-service-client.test.ts (6 tests) 18ms
+ ✓ src/pipeline-router.test.ts (34 tests) 20ms
+ ✓ src/real-person-asset-sync.test.ts (8 tests) 43ms
+ ✓ src/ai-color-policy.test.ts (20 tests) 11ms
+ ✓ src/rhythm-plan.test.ts (21 tests) 61ms
+ ✓ src/cinematic-skill-policy.test.ts (31 tests) 39ms
+ ✓ src/cover-design.test.ts (29 tests) 15ms
+ ✓ src/cover-platforms.test.ts (9 tests) 7ms
+ ✓ src/film-completion-entrypoint.test.ts (6 tests) 8ms
+ ✓ src/gate-ledger.test.ts (6 tests) 6ms
+ ✓ src/edit/entity-color.test.ts (14 tests) 33ms
+ ✓ src/continuity.test.ts (9 tests) 5ms
+ ✓ src/deliver-revise.test.ts (8 tests) 45ms
+ ✓ src/prompt-language.test.ts (11 tests) 6ms
+ ✓ src/cinematic-contract.test.ts (12 tests) 10ms
+ ✓ src/final-shot-contract.test.ts (11 tests) 4ms
+ ✓ src/sfx-synth.test.ts (15 tests) 5ms
+ ✓ src/film-completion.test.ts (13 tests) 7ms
+ ✓ src/first-pass.test.ts (5 tests) 7ms
+ ✓ src/dialogue-contract.test.ts (8 tests) 7ms
+ ✓ src/deliver-validation.test.ts (15 tests) 4ms
+ ✓ src/real-person-asset.test.ts (7 tests) 4ms
+ ✓ src/portrait-decision.test.ts (7 tests) 3ms
+ ✓ src/era-profile.test.ts (29 tests) 13ms
+ ✓ src/platform-intent.test.ts (13 tests) 20ms
+ ✓ src/opening-hook.test.ts (13 tests) 31ms
+ ✓ src/gate-ledger-marketing.test.ts (4 tests) 4ms
+ ✓ src/library-bpm.test.ts (11 tests) 5ms
+ ✓ src/pronunciation.test.ts (10 tests) 4ms
+ ✓ src/llm-config.test.ts (5 tests) 6ms
+ ✓ src/character-consistency.test.ts (8 tests) 3ms
+ ✓ src/prompt-redlines.test.ts (5 tests) 9ms
+ ✓ src/route-preflight.test.ts (11 tests) 33ms
+ ✓ src/deliverable-naming.test.ts (5 tests) 4ms
+stdout | src/vendor-requirement-entry.test.ts > isolated SceneArchitect transport > requests one complete non-thinking JSON response instead of a 4k prose response
+[DEBUG] Agent=SceneArchitect, useSchema=null, schemaSize=0
+
+ ✓ src/vendor-requirement-entry.test.ts (1 test) 6ms
+ ✓ src/quality-evidence.test.ts (2 tests) 2ms
+ ✓ src/plate-cache.test.ts (16 tests) 4ms
+ ✓ src/narration.test.ts (10 tests) 2ms
+ ✓ src/gate-ledger-audit.test.ts (5 tests) 4ms
+ ✓ src/shot-order.test.ts (4 tests) 2ms
+ ✓ src/variant-axes.test.ts (5 tests) 3ms
+ ✓ src/likeness-policy.test.ts (3 tests) 2ms
+stdout | src/portrait-derived-entrypoint.test.ts > 肖像派生实际入口防重复付费 > same-angle peer cannot POST during the explicit image-rejection to video-fallback gap
+  ↻ side：图片端点明确拒绝asset参考 → 退到视频路（保持同一角度准入锁）
+
+ ✓ src/portrait-derived-entrypoint.test.ts (25 tests) 35328ms
+   ✓ 肖像派生实际入口防重复付费 > accepted video polling failure resumes its same task ID, including a previously rejected missing ref  452ms
+   ✓ 肖像派生实际入口防重复付费 > real CLI network failure never retries image POST or falls back to video across processes  626ms
+   ✓ 肖像派生实际入口防重复付费 > real CLI server failure never retries image POST or falls back to video across processes  382ms
+   ✓ 肖像派生实际入口防重复付费 > real CLI malformed failure never retries image POST or falls back to video across processes  489ms
+   ✓ 肖像派生实际入口防重复付费 > real CLI accepted image download failure never starts a video fallback  518ms
+   ✓ 肖像派生实际入口防重复付费 > auto restart recovers accepted video before another image attempt  20635ms
+   ✓ 肖像派生实际入口防重复付费 > auto restart blocks every engine after unknown video acceptance  506ms
+   ✓ 肖像派生实际入口防重复付费 > real CLI changed video input after auto acceptance sends no POST or GET  10383ms
+ ✓ src/local-cover-render.test.ts (79 tests) 39146ms
+   ✓ local-only cover renderer: actual media and copy > accepts original without grading the already styled cover frame again  1078ms
+   ✓ local-only cover renderer: actual media and copy > accepts warm-story without grading the already styled cover frame again  868ms
+   ✓ local-only cover renderer: actual media and copy > accepts content-auto without grading the already styled cover frame again  768ms
+   ✓ local-only cover renderer: actual media and copy > renders CJK title/subtitle pixels and current file/font/recipe proofs with zero network calls  744ms
+   ✓ local-only cover renderer: actual media and copy > extracts the requested nonzero video frame instead of the opening frame  1604ms
+   ✓ local-only cover renderer: actual media and copy > produces repeatable decoded pixels for the same frozen local recipe  1884ms
+   ✓ local-only cover renderer: actual media and copy > creates a new regular output directory and removes its private writer files  651ms
+   ✓ local-only cover renderer: actual media and copy > renders the actual registered smiley-sans font and Unicode cmap glyphs  662ms
+   ✓ local-only cover renderer: actual media and copy > renders the actual registered source-han-heavy font and Unicode cmap glyphs  634ms
+   ✓ local-only cover renderer: actual media and copy > renders the actual registered zcool-qingke font and Unicode cmap glyphs  1069ms
+   ✓ local-only cover renderer: actual media and copy > renders the actual registered noto-serif font and Unicode cmap glyphs  658ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in douyin platform bounds  2219ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in kuaishou platform bounds  2252ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in xiaohongshu platform bounds  1883ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in wechat-channels platform bounds  2563ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in bilibili platform bounds  2196ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in tiktok platform bounds  2475ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in youtube platform bounds  1084ms
+   ✓ local-only cover renderer: actual media and copy > fits actual text pixels and distinct styles in instagram-reels platform bounds  1283ms
+   ✓ local-only cover renderer: actual media and copy > renders literal quotes, colon, backslash, dollar and percent without filter/shell expansion  614ms
+   ✓ local-only cover renderer: input/refusal boundaries > preserves creative AI subject copy while rejecting false source and film-duration claims  313ms
+   ✓ local-only cover renderer: input/refusal boundaries > refuses URLs, missing files, directories, symlinks, empty files and corrupt media  431ms
+   ✓ local-only cover renderer: input/refusal boundaries > rejects animated image, excessive decoded pixels and excessive source file bytes  471ms
+   ✓ local-only cover renderer: input/refusal boundaries > refuses source/font hardlink and symlink output aliases, wrong extensions and directory targets  605ms
+   ✓ local-only cover renderer: input/refusal boundaries > refuses missing/symlink/wrong-pin/corrupt fonts and unsupported or missing Unicode glyphs  399ms
+   ✓ local-only cover renderer: process and concurrent publication > preserves a prior output on failure encoder behavior  405ms
+   ✓ local-only cover renderer: process and concurrent publication > preserves a prior output on timeout encoder behavior  806ms
+   ✓ local-only cover renderer: process and concurrent publication > preserves a prior output on corrupt encoder behavior  697ms
+   ✓ local-only cover renderer: process and concurrent publication > preserves a prior output on wrong-size encoder behavior  667ms
+   ✓ local-only cover renderer: process and concurrent publication > preserves a prior output on empty-text encoder behavior  413ms
+   ✓ local-only cover renderer: process and concurrent publication > preserves a prior output on no-op encoder behavior  711ms
+   ✓ local-only cover renderer: process and concurrent publication > rejects source byte changes during rendering before publication  1026ms
+   ✓ local-only cover renderer: process and concurrent publication > rejects font byte changes during rendering before publication  914ms
+   ✓ local-only cover renderer: process and concurrent publication > rejects binary byte changes during rendering before publication  754ms
+   ✓ local-only cover renderer: process and concurrent publication > serializes simultaneous writers with exactly one valid publication  322ms
+   ✓ local-only cover renderer: process and concurrent publication > preserves another writer's changed output and refuses a stale publication snapshot  961ms
+   ✓ local-only cover renderer: process and concurrent publication > does not erase a replaced writer lock when refusing output publication  915ms
+ ✓ src/director-post-default.integration.test.ts (3 tests) 107996ms
+   ✓ Director 已完成镜头默认后期（真实本地处理） > 黑帧、奇数原始画布和无音轨经过真实技术质检交付，不声称人物审美通过  58837ms
+   ✓ Director 已完成镜头默认后期（真实本地处理） > 同输入回放核对真实字节后复用；文案返修与幂等回放保留实际成片  6183ms
+   ✓ Director 已完成镜头默认后期（真实本地处理） > 源字节漂移、错误版本和实际 FFmpeg 故障仍失败，不能伪造完整交付  42880ms
+
+ Test Files  101 passed (101)
+      Tests  1812 passed (1812)
+   Start at  23:27:10
+   Duration  110.06s (transform 5.12s, setup 0ms, collect 15.12s, tests 237.55s, environment 17ms, prepare 10.28s)
+
+
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies", "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+$ vitest run
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+参数缺少值：--pin
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 596 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+stderr | src/film-contracts.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+stderr | src/character-release-contract.integration.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+stderr | src/producer-gate.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+stderr | src/routed-adapter.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+stderr | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 实际 SC-05 与全部 25 个字段模板抵达 provider，一次真实消费返回非降级结果
+[FieldConsistencyChecker] SC-05: 1 issues (0 errors, 1 warnings)
+[FieldConsistencyChecker] SC-05: 1 issues (0 errors, 1 warnings)
+
+stderr | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 模板示例镜号 的非空模型结果仍降级，不改写镜号过关
+[PromptFusion] SC-05 LLM返回字段全空,直接降级
+[PromptFusionAgent] 未知字段的默认值: depth_of_field
+[PromptFusionAgent] 未知字段的默认值: dialogue
+
+stderr | src/archive/store.test.ts > ArchiveStore > ensure(identity)：档案夹被另一代 DB 的同名 projectId 复用时留痕并校正 kind（D1 修复）
+[archive] 档案身份漂移 ws-test/VID-001：pipelineKind narrative→marketing（项目身份指纹不一致：档案夹可能被另一代数据库的同名 ID 复用）
+
+stderr | src/routed-adapter.test.ts > 真实 PromptFusion 消费宿主结构化接口 > 缺失镜号 的非空模型结果仍降级，不改写镜号过关
+[PromptFusion] SC-05 LLM返回字段全空,直接降级
+[PromptFusionAgent] 未知字段的默认值: depth_of_field
+[PromptFusionAgent] 未知字段的默认值: dialogue
+
+stderr | src/routed-generation.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+stderr | src/plausibility-review.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+stderr | src/configured-llm.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+stderr | src/studio.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+[RenderingEngine] 无法加载现有渲染核心: Cannot find module './prompt-guardian'
+Require stack:
+- /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/packages/video-studio/[eval]
+[RenderingEngine] 将使用内置模拟模式
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+stderr | src/post-render-fence-policy.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+stderr | src/scene-policy.test.ts > T1 商业真人出镜知识条目 > 提示注入保留台词、构图、机位和时长，并进入关键帧与视频共用的 sceneDescription
+[PromptFusionAgent] ⚠️ 镜头 CZ-01 精炼后仅 962 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+
+stderr | src/shot-spec.test.ts > 【场景】写实校验替换检测 > 真机链路：卡片场景含「霓虹」→ 报告显式标记 sceneSubstituted，并保留前后文本
+[PromptFusionAgent] ⚠️ 镜头 S9 场景含禁止词汇(校验强度=realistic): "打烊后的店铺前厅，柜台、玻璃门与门外虚化的街道霓虹...",强制替换为写实场景
+
+stderr | src/cover-platforms.test.ts > 封面平台规格：抖音回归基线 > 缺省/未知平台落 douyin 且不抛错（旧调用零影响）
+[cover-platforms] 未知平台 "某不存在的平台"，按 douyin 口径处理
+
+stderr | src/llm-config.test.ts
+[pii] PII_SALT 未配置，使用 dev 占位盐（仅限开发/测试，生产必须注入 PII_SALT）
+
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

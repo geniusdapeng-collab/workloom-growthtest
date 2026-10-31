@@ -1,0 +1,54 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "report-26271-1793461619266-e30af511",
+  "command": "\"/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/report-v3.mjs\" \"--root\" \"outputs/acceptance\" \"--env\" \"local-preview\" \"--profile\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json\" \"--evidence-root\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance\"",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/report-v3.mjs",
+      "--root",
+      "outputs/acceptance",
+      "--env",
+      "local-preview",
+      "--profile",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json",
+      "--evidence-root",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "report",
+    "environmentKind": "local-preview",
+    "executorCommit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+  },
+  "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16",
+  "working_tree_dirty": true,
+  "started_at": "2026-10-31T15:46:59.118Z",
+  "finished_at": "2026-10-31T15:46:59.266Z",
+  "exit_code": 2,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "fail",
+  "outputs": [
+    {
+      "path": "execution/report-26271-1793461619266-e30af511.log",
+      "sha256": "86bc7ad18d0497496b6aac804f55d0772b6bce813cc474a53dec01458f4ccf8a",
+      "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+    },
+    {
+      "path": "report-summary.json",
+      "sha256": "7a320a48caf7ceade44b8be97b162beee4aed3f41b86581b1c05aea65984f35f",
+      "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+    },
+    {
+      "path": "REPORT.md",
+      "sha256": "27c1620777046d9d57d85738854a852890e3ecf478976f212d6ceab7ba02b45a",
+      "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+    }
+  ]
+}

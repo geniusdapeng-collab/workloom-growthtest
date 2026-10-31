@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M12",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "6e019ee90e4dab64be1301df55578da37a59e715bfa748129ca9d225b2d139fe"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "安隅 S2 智能门锁",
+        "brand": "安隅",
+        "category": "智能家居",
+        "model": "S2",
+        "sellingPoints": [
+          "临时密码",
+          "门铃联动",
+          "机械应急钥匙"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "安隅 S2 智能门锁",
+        "brand": {
+          "name": "安隅"
+        },
+        "category": "智能家居"
+      },
+      "dataMining": {
+        "name": "安隅 S2 智能门锁",
+        "brand": "安隅",
+        "category": "智能家居",
+        "model": "S2",
+        "sellingPointCandidates": [
+          "临时密码",
+          "门铃联动",
+          "机械应急钥匙"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给安隅 S2 智能门锁做一条抖音独居安全种草，突出临时密码、门铃联动和机械应急钥匙\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "安隅 S2 智能门锁",
+    "queries": [
+      {
+        "q": "安隅 S2 智能门锁 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "安隅 S2 智能门锁 智能家居 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "安隅 S2 智能门锁 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "安隅 S2 智能门锁 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "安隅 S2 智能门锁 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "安隅 S2 智能门锁 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "安隅 S2 智能门锁 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "安隅 S2 智能门锁 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "9b43e83dbb66157a9b069d1325def8a2c3035fba8dff6728e110a20cf5acb5be"
+    }
+  },
+  "capturedAt": "2026-10-31T14:31:10.128Z"
+}

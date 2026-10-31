@@ -303,13 +303,9 @@ function shrinkImageWithFfmpeg(path: string): string | null {
   return out;
 }
 
-/** Structured review must return exactly one JSON value. No hidden repair call. */
-function parseJudgeJson(raw: string): Record<string, unknown> {
-  const parsed = JSON.parse(raw.trim()) as unknown;
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    throw new Error("评审模型未返回 JSON 对象");
-  }
-  return parsed as Record<string, unknown>;
+/** Parse one JSON value. Structural validation remains in coerceJudgeResult. */
+function parseJudgeJson(raw: string): unknown {
+  return JSON.parse(raw.trim()) as unknown;
 }
 
 type JudgeResult = { approved: boolean; score: number; issues: string[]; suggestions: string[]; reason: string };
@@ -499,7 +495,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         "结构化原镜头合同优先于通用rubric；只对实际适用项目评审，不得把合同当产物质量证明。", contractText,
         '只输出 JSON: {"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}'
       ].join("\n") }, ...textContent, ...encoded.slice(batch * batchSize, Math.min(artifactImages, (batch + 1) * batchSize)).flat(), ...encoded.slice(artifactImages).flat()];
-      const result: ChatResult = await provider.chat([{ role: "user", content }], {
+      let result: ChatResult = await provider.chat([{ role: "user", content }], {
         scene: "video.quality.producer-review",
         timeoutMs: 600_000,
         temperature: 0.2,
@@ -518,7 +514,43 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         policyVersion: result.policyVersion,
         registryVersion: result.registryVersion,
       });
-      const json = parseJudgeJson(result.text);
+      let json: unknown;
+      try {
+        json = parseJudgeJson(result.text);
+      } catch (parseError) {
+        const malformed = result.text.slice(0, 80_000);
+        log(`[producer][${stage}] 评审 JSON 非法，执行一次仅修复格式的重试：${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        result = await provider.chat([{
+          role: "user",
+          content: [
+            "仅修复 JSON，不得重新判定，不得改变 approved、score、issues、suggestions 或 reason 的语义。",
+            "只输出一个可被 JSON.parse 直接解析的对象。",
+            "<malformed_result>",
+            malformed,
+            "</malformed_result>",
+          ].join("\n"),
+        }], {
+          scene: "video.quality.producer-review",
+          timeoutMs: 120_000,
+          temperature: 0,
+          retries: 0,
+          responseFormat: { type: "json_object" },
+        });
+        receipts.push({
+          modelId: result.modelId,
+          inputTokens: result.promptTokens,
+          outputTokens: result.completionTokens,
+          reasoningTokens: result.reasoningTokens,
+          outputCeiling: result.outputCeiling,
+          finishReason: result.finishReason,
+          requestHash: result.requestHash,
+          responseHash: result.responseHash,
+          responseId: result.responseId,
+          policyVersion: result.policyVersion,
+          registryVersion: result.registryVersion,
+        });
+        json = parseJudgeJson(result.text);
+      }
       const normalizedResult = coerceJudgeResult(json);
       if (!normalizedResult) throw new Error("评审结果结构非法");
       answers.push(normalizedResult);

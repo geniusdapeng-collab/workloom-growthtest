@@ -1,0 +1,63 @@
+{
+  "id": "MC-013",
+  "kind": "problem",
+  "level": "L3",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "G10 自动评论没有生产入口，人工草稿消失且生成失败仍用兜底话术外发",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/router.ts:1298@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "6d02f05e7c173bbe69c7f9e72e1409c479f1c6a8a1fd16284e3c7148509525f2",
+      "note": "commentsRouter 只有 pending 查询，没有 processComment 的生产入口；待处理 SQL 只查 new/pending_review。"
+    },
+    {
+      "type": "code",
+      "ref": "packages/base/social-listening/comments.ts:260@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "a854c68999f0391e972b398ef6bf659c3b4371fae497f9d95312f4f713ed8c37",
+      "note": "基础包默认按环境变量自动审批，且生成器异常后使用兜底模板继续外发；未外发草稿状态为 manual 但待处理查询不可见。"
+    }
+  ],
+  "root_cause": {
+    "file": "apps/server/src/video/router.ts",
+    "line": 1298,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "commentsRouter"
+  },
+  "trigger_path": "调用方没有生产 tRPC 入口触发 processComment；即使底层产生 manual 草稿，pending 查询也不返回；generator 抛错时 fallbackReply 被当作成功候选并由 sender 外发。",
+  "fix_plan": "新增 video.comments.process 生产入口并注入分类器、敏感词与显式视频自动审批；基础包默认不自动审批；生成失败只保留 manual 草稿不外发；pending 纳入 manual。",
+  "blast_radius": "只影响视频评论处理与待处理投影；真实 sender 未接入时仍以 manual 保存，不伪造 replied 或外发回执。",
+  "conflict_paths": ["apps/server/src/video/router.ts", "packages/base/social-listening/comments.ts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "评论生产入口带 forbidden 词表；人工草稿状态为 manual",
+      "expect": "process 调用 processComment 并传 autoApproveReview=true；pending SQL 包含 new/pending_review/manual",
+      "command": "vitest run --root apps/server src/video/comments-router.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": ["run", "--root", "apps/server", "src/video/comments-router.test.ts"]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "sample",
+      "given": "G10 review 已自动审批，但 ReplyGenerator 抛错且 sender 可用；另有两个并发重复派遣",
+      "expect": "生成失败时 sender 发送 0 次并保留 manual/candidate；并发重复派遣只有一个认领成功，sender 与回复均只写一次",
+      "command": "vitest run --root packages/base social-listening/social-listening.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": ["run", "--root", "packages/base", "social-listening/social-listening.test.ts"]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run --root apps/server src/video/comments-router.test.ts --root packages/base social-listening/social-listening.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "独立验收发现 G10 生产接线、manual 可见性和生成失败语义不一致。"
+}

@@ -1,0 +1,19 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A04",
+  "category": "abnormal",
+  "expected": "CLARIFY_ROUTE",
+  "actual": "CLARIFY_ROUTE",
+  "pass": true,
+  "mode": "deterministic-replay",
+  "invocation": {
+    "function": "route-conflict",
+    "caseHash": "31840a7a66699436fc3474cc602d2883edb0a23dd13993df31ea0b43e873b7f1"
+  },
+  "output": {
+    "route": "clarify",
+    "reason": "deterministic-replay: 同时含不要营销片与按营销片带货，继续开工会产生方向性冲突"
+  },
+  "capturedAt": "2026-10-31T15:22:04.674Z"
+}

@@ -1,0 +1,459 @@
+{
+  "schema": "workloom.mine-clear/handoff@1",
+  "task_id": "T-2026-1031-9004",
+  "repo": "workloom-growthtest-stress-9004",
+  "generated_at": "2026-10-31T15:02:26.808Z",
+  "audit_baseline": "67786d35a9e5a051a60df491e24a6892e8033f96",
+  "repair_baseline": "22eabebc5573e3d4394bd3ee891634193dbeef09",
+  "acceptance_baseline": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1",
+  "environment_claim": "local-preview",
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "closed_problems": [
+    {
+      "id": "MC-001",
+      "title": "叙事片携带营销 brief 时会被 vendor 改写成商业广告",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:01.832Z",
+      "verification_evidence": {
+        "path": "runs/MC-001-0-1793458499923.json",
+        "sha256": "2d8dc7cad7563b4f35b3d7c782dc8f868bdf50c0128c0046b892c3d2464161d9",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "营销 metadata 被显式改道 narrative",
+          "expect": "applyRouteToMetadata 清除商品锚点，runtime _buildThemeInput 输出不包含营销 Brief 块",
+          "command": "vitest run pipeline-router.test.ts studio.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/pipeline-router.test.ts",
+              "packages/video-studio/src/studio.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-001-0-1793458499923.txt",
+            "sha256": "fe30eb35e8edcedeb62cf492e370afef8436ea6309eaeb445269d6e29acb32ea",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-001-0-1793458499923.json",
+            "sha256": "2d8dc7cad7563b4f35b3d7c782dc8f868bdf50c0128c0046b892c3d2464161d9",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "20 条叙事主题矩阵每次注入营销占位 metadata",
+          "expect": "60 例矩阵的 20 条 narrative 全部通过 runtime bridge 隔离",
+          "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/ai-video-stress-matrix.mts",
+              "--out",
+              "outputs/mine-clear/T-2026-1031-9004/matrix"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-001-1-1793458501060.txt",
+            "sha256": "249741d88e76a577aebfd5b35ea3661c92e5c240ce004a4c5fc53bdd4ec48bb4",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-001-1-1793458501060.json",
+            "sha256": "c886dc30542ca8d11bc1fec4258822cedec27b4a4922bfe770c56ff2c1c47398",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-002",
+      "title": "需求合同与 PRD 角色系统互相矛盾",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:12.360Z",
+      "verification_evidence": {
+        "path": "runs/MC-002-0-1793458506315.json",
+        "sha256": "011f5dd3d5b0d2d7964c9ccb58e07fde14b3c41b656b19f0e017af67a65f1ee1",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "内置默认模特请求 + 场景出现年轻人",
+          "expect": "角色合同与 PRD 都绑定 chen-zhuo、真实 portraitRef 和授权，不再写无真人角色",
+          "command": "vitest run vendor-compat.test.ts studio.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "packages/video-studio/src/studio.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-002-0-1793458506315.txt",
+            "sha256": "58afba95dc40d80ab63a1c48f456027127de9af4302df0bee7d891ec72a5f86d",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-002-0-1793458506315.json",
+            "sha256": "011f5dd3d5b0d2d7964c9ccb58e07fde14b3c41b656b19f0e017af67a65f1ee1",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-003",
+      "title": "发现 JSON 尾随文本被贪婪解析并静默回退规则",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:17.693Z",
+      "verification_evidence": {
+        "path": "runs/MC-003-0-1793458512488.json",
+        "sha256": "feafa9edea79fd685ed2f5ad58a75d67ae48a28ef525c216a4e41c9ea85f9412",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "合法 JSON 后追加散文的模型响应",
+          "expect": "reasonStructured 解析首个平衡 JSON；vendor discovery 不降级",
+          "command": "vitest run configured-llm.test.ts vendor-compat.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/configured-llm.test.ts",
+              "packages/video-studio/src/vendor-compat.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-003-0-1793458512488.txt",
+            "sha256": "7eb9c5bbba7ee1b0e0e46a8dbca84ac5ded291d4aa059f1a8d0f789bf080bc29",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-003-0-1793458512488.json",
+            "sha256": "feafa9edea79fd685ed2f5ad58a75d67ae48a28ef525c216a4e41c9ea85f9412",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-004",
+      "title": "Phase3 降级不重试且最终 prompt 违反台词、长度和画幅合同",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:23.540Z",
+      "verification_evidence": {
+        "path": "runs/MC-004-0-1793458517816.json",
+        "sha256": "2107a152c51e3b929896848b04de16ee6527d4589608160b282e98b4fd13cf3c",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "n21 真实模型 6 镜产物及 m3 营销 6 镜产物",
+          "expect": "单镜重试通过、无台词、prompt≤3000、9:16、PipelineGuard 0/0，状态 eligible_pending_G8",
+          "command": "vitest run vendor-compat.test.ts final-shot-contract.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "packages/video-studio/src/final-shot-contract.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-004-0-1793458517816.txt",
+            "sha256": "ca70dcf176813e246645c3dd36135d7fab4a978c942366e413e9650c5ad280ad",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-004-0-1793458517816.json",
+            "sha256": "2107a152c51e3b929896848b04de16ee6527d4589608160b282e98b4fd13cf3c",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "60 例矩阵中的最终镜头合成",
+          "expect": "所有镜头满足最终合同，空镜、占位符、重复 ID 和超长 prompt 均失败关闭",
+          "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/ai-video-stress-matrix.mts",
+              "--out",
+              "outputs/mine-clear/T-2026-1031-9004/matrix"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-004-1-1793458522865.txt",
+            "sha256": "b0bd1d0922493b1ac89a8fff8ef6498afb3490cddc8dbc7f3c89017903b08534",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-004-1-1793458522865.json",
+            "sha256": "422f251ef6e442e5b59cdd539db4bfe4077cbba5a175a8a0a423f485bdf77afe",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-005",
+      "title": "营销 CLI 绕过宿主事实权威，缓存与官方来源无法进入 canary",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:24.990Z",
+      "verification_evidence": {
+        "path": "runs/MC-005-0-1793458523666.json",
+        "sha256": "4eb9c9c298294307de8d90538c95496238aee0832d577b7d51f30312e4e5b46e",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "CLI 预置 7 条真实查询缓存，官方 API 需 Referer",
+          "expect": "A1 获取并归档官方正文，G1 和逐镜事实审核通过",
+          "command": "vitest run marketing-authority.test.ts marketing-source-fetcher.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "apps/server/src/video/marketing-authority.test.ts",
+              "apps/server/src/video/marketing-source-fetcher.test.ts",
+              "apps/server/src/video/data-mining-executor.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-005-0-1793458523666.txt",
+            "sha256": "9b5fc745dd151391394e2f255027ef1aa6ecee7fac620cb1c1eb3d1d961a3aa9",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-005-0-1793458523666.json",
+            "sha256": "4eb9c9c298294307de8d90538c95496238aee0832d577b7d51f30312e4e5b46e",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-006",
+      "title": "监制 JSON 无一次格式修复，CLI 失败会遗留 vendor 定时器",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:25.822Z",
+      "verification_evidence": {
+        "path": "runs/MC-006-0-1793458525124.json",
+        "sha256": "d6c8dd43a4b32f1154af388dfd65e535a16985df9e1419bbc9b32af6c1566b02",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "首次监制回包缺右括号，第二次是同一语义的合法 JSON",
+          "expect": "只进行一次格式修复，保留两个 receipt，最终 verdict 语义不变",
+          "command": "vitest run producer-gate.test.ts configured-llm.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/producer-gate.test.ts",
+              "packages/video-studio/src/configured-llm.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-0-1793458525124.txt",
+            "sha256": "1795256469015f7dc4302bdbcf46a8205a48e90cd4eaa4378c1e622852327a62",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-006-0-1793458525124.json",
+            "sha256": "d6c8dd43a4b32f1154af388dfd65e535a16985df9e1419bbc9b32af6c1566b02",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-007",
+      "title": "请求边界与 60 场景矩阵缺失，非法时长/画幅会静默丢失",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:27.038Z",
+      "verification_evidence": {
+        "path": "runs/MC-007-0-1793458525949.json",
+        "sha256": "c6e8944df273a3f45a0482fec0b88aab6b6ac10c88002ec8eaa5a9a224002307",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "60 条营销、叙事和异常输入",
+          "expect": "60/60 通过，付费生成请求 0、providerSubmission=false，每例证据 hash 可回读",
+          "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/ai-video-stress-matrix.mts",
+              "--out",
+              "outputs/mine-clear/T-2026-1031-9004/matrix"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-007-0-1793458525949.txt",
+            "sha256": "4e54a3c24fa9e8229e94f6f95238bf2b3858ae85dd87776fb81bb0f71948d4f1",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-007-0-1793458525949.json",
+            "sha256": "c6e8944df273a3f45a0482fec0b88aab6b6ac10c88002ec8eaa5a9a224002307",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        },
+        {
+          "kind": "sample",
+          "given": "空意图、路径注入商品名、0/-5/9999 秒、非法画幅",
+          "expect": "分别抛出 INTENT_REQUIRED、PRODUCT_INVALID、DURATION_INVALID、ASPECT_INVALID",
+          "command": "vitest run pipeline-router.test.ts final-shot-contract.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/pipeline-router.test.ts",
+              "packages/video-studio/src/final-shot-contract.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-007-1-1793458526620.txt",
+            "sha256": "5df295f511bfa39ebefe7d39d4e62eda52a7a2e7af8e82c582dc1c9a1847f350",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-007-1-1793458526620.json",
+            "sha256": "5138d1b47cca5dae72fff0fc70049c4c1647ecd3f34f71e87146078e005ab38b",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-008",
+      "title": "video-doctor 把不存在的默认曲库根判成路径监狱失败",
+      "verified_by": "codex-acceptance-v2-01a19273",
+      "verified_at": "2026-10-31T14:55:27.860Z",
+      "verification_evidence": {
+        "path": "runs/MC-008-0-1793458527162.json",
+        "sha256": "793364a328da1c173826ecdc39cf582f30a2ccea87f5490a830800c22547a9f5",
+        "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "~/.workloom-bgm 不存在，随仓精选曲库存在",
+          "expect": "video-doctor 的 bgm-library-jail 通过且命令 exit 0",
+          "command": "tsx scripts/tools/video-doctor.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/video-doctor.mts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-008-0-1793458527162.txt",
+            "sha256": "1c7c83ee201448fe7ef05434bf5749961f192d6c72d75c4a3fd990e180058703",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          },
+          "run": {
+            "path": "runs/MC-008-0-1793458527162.json",
+            "sha256": "793364a328da1c173826ecdc39cf582f30a2ccea87f5490a830800c22547a9f5",
+            "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+          }
+        }
+      ]
+    }
+  ],
+  "open_problems": [],
+  "acceptance_commands": [
+    "pnpm acceptance:profile:check",
+    "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest-stress-9004 --env local-preview",
+    "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest-stress-9004 --env local-preview --live-only   # 生产最小侵入档"
+  ],
+  "notes": "环境档位为 local-preview：报告只能写『本机预览结构验收』，不得写『生产实测通过』（RDAS v3.1 §0）"
+}

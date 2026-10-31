@@ -1,0 +1,40 @@
+
+ RUN  v4.1.11 /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004
+
+
+ Test Files  2 passed (2)
+      Tests  56 passed (56)
+   Start at  22:37:31
+   Duration  4.74s (transform 214ms, setup 0ms, import 357ms, tests 4.76s, environment 0ms)
+
+
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+[ScriptGenerator] ⚠️ 未配置模型名，请设置 SUPERMICKEY_LLM_MODEL（兼容旧名 STORMAXE_LLM_MODEL）或传入 options.model
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 596 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 精炼后仅 557 字符，低于精炼后下限 1200，请检查上游字段是否过薄
+[PromptFusionAgent] ⚠️ 镜头 S1 中文占比过低(28.5%), 尝试修正为中文输出
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 尝试 1/3 失败: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture | type=NETWORK | retryable=false
+[PromptFusionAgent] 🔴 不可重试错误(NETWORK)，停止重试: 底层判定不可重试
+[PromptFusionAgent] 所有 1 次尝试均失败，最后错误: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+[PromptFusionAgent] 备用模型也失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 极限重试失败: PHASE3_BUDGET_EXHAUSTED: 提供商调用前剩余预算不足 5 秒
+[PromptFusionAgent] 降级结果为null/undefined: LLM failed after 1 attempts: [BudgetExhausted] LLM引擎返回失败: offline-budget-fixture
+⚠️ [confirmation-crypto] HUMAN_CONFIRMATION_SECRET 未设置
+ 人工确认环节将不可用（无法生成/验证签名），但系统其余功能正常
+ 配置方法: export HUMAN_CONFIRMATION_SECRET=$(openssl rand -hex 32)，或写入 .env
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

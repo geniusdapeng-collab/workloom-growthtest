@@ -1,0 +1,66 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "N19",
+  "category": "narrative",
+  "expected": "NARRATIVE_READY",
+  "actual": "NARRATIVE_READY",
+  "pass": true,
+  "mode": "runtime-bridge",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+    "caseHash": "deb36ad7bf748b831bbbda3d0d70218eff09715302ecd4b3224d526e3c487209"
+  },
+  "output": {
+    "route": {
+      "route": "narrative",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 narrative",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "不应出现的商品",
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "brand": {
+          "name": "不应出现的品牌"
+        },
+        "category": "不应出现的品类",
+        "sellingPoints": [
+          "不应出现的卖点"
+        ],
+        "audience": "不应出现的人群",
+        "platform": "c",
+        "goal": "seeding",
+        "duration": 35,
+        "aspectRatio": "9:16"
+      },
+      "pipelineRoute": {
+        "kind": "narrative",
+        "via": "metadata",
+        "confidence": 1
+      }
+    },
+    "effectiveIntent": "拍一条35秒旅行叙事：冬日列车穿过雪原，旅客在窗边读信，结尾列车驶入暮色\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+    "themeInput": "拍一条35秒旅行叙事：冬日列车穿过雪原，旅客在窗边读信，结尾列车驶入暮色\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+    "shots": 6,
+    "totalDurationSeconds": 35,
+    "finalShotContract": {
+      "pass": true,
+      "issues": []
+    },
+    "pipelineGuard": {
+      "pass": true,
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.657Z"
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A01",
+  "category": "abnormal",
+  "expected": "INTENT_REQUIRED",
+  "actual": "INTENT_REQUIRED",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "empty-intent",
+    "caseHash": "275f5acd9c57a84ac41ad53a77571ba34b8a5522284cea73b560f76359d89a98"
+  },
+  "output": {
+    "error": "INTENT_REQUIRED: 请描述要制作的视频"
+  },
+  "capturedAt": "2026-10-31T14:31:10.516Z"
+}

@@ -1,0 +1,132 @@
+{
+ "repo": "workloom-growthtest-stress-9004",
+ "repoDir": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+ "startedAt": "2026-10-31T15:45:24.883Z",
+ "steps": {
+  "environment": {
+   "ok": true,
+   "status": "pass",
+   "detail": "local-preview"
+  },
+  "prepare": {
+   "ok": true,
+   "status": "pass",
+   "detail": "main@6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+  },
+  "install": {
+   "ok": true,
+   "status": "pass",
+   "detail": "显式不安装；已检查 tsx 存在"
+  },
+  "env": {
+   "ok": true,
+   "status": "pass",
+   "detail": "由 .env.example 生成"
+  },
+  "seed": {
+   "ok": false,
+   "status": "fail",
+   "detail": "pnpm db:migrate → exit 1\n✓ 角色就绪: workloom_app\n✓ 角色就绪: workloom_gateway\n– 跳过（已应用）: 0001_init.sql\n– 跳过（已应用）: 0002_bugfix.sql\n– 跳过（已应用）: 0003_im_inbound_dedupe.sql\n– 跳过（已应用）: 0004_biz_events_no_truncate.sql\n– 跳过（已应用）: 0005_fence_baseline_guard.sql\n– 跳过（已应用）: 0006_industry_publish_gate.sql\n– 跳过（已应用）: 0007_append_event_function.sql\n– 跳过（已应用）: 0008_publish_reviews_rls.sql\n✓ 已应用: 0009_video_studio.sql\n✓ 已应用: 0010_captain.sql\n✓ 已应用: 0011_biz_expansion.sql\n[ELIFECYCLE] Command failed with exit code 1.\n[WARN] The \"pnpm\" field in package.json is no longer read by pnpm. The following keys were ignored: \"pnpm.onlyBuiltDependencies\", \"pnpm.overrides\". See https://pnpm.io/settings for the new home of each setting.\n$ tsx --env-file=.env scripts/migrate.ts\n迁移失败： relation \"kb_collections\" already exists\n"
+  },
+  "regression": {
+   "ok": false,
+   "status": "fail",
+   "detail": "汇总执行失败：不能混写不同提交的 evidence-index"
+  },
+  "preview": {
+   "ok": false,
+   "status": "fail",
+   "detail": "预览进程已退出：1"
+  },
+  "profile": {
+   "ok": true,
+   "status": "pass",
+   "detail": "已生成默认 profile"
+  },
+  "releaseGate": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "目标未就绪，必需 release:gate 未运行"
+  },
+  "matrix": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "前置：目标未就绪，未运行"
+  },
+  "ui": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "前置：目标未就绪，未运行"
+  },
+  "experience": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "前置：目标未就绪，未运行"
+  },
+  "ux": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "前置：目标未就绪，未运行"
+  },
+  "outcome": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "前置：目标未就绪，未运行"
+  },
+  "autonomy": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "前置：目标未就绪，未运行"
+  },
+  "coverage": {
+   "ok": false,
+   "status": "fail",
+   "detail": "不能混写不同提交的 evidence-index"
+  },
+  "report": {
+   "ok": false,
+   "status": "fail",
+   "detail": "不能混写不同提交的 evidence-index"
+  },
+  "teardown": {
+   "ok": true,
+   "status": "pass",
+   "detail": "预览已关停"
+  }
+ },
+ "ok": false,
+ "status": "fail",
+ "notes": [
+  ".env 由 .env.example 生成（数据库连接值不进入证据）",
+  "生成默认 acceptance/profile.json（bundle=geo-growth slug=geo-growth）"
+ ],
+ "environment": {
+  "kind": "local-preview",
+  "production": false,
+  "allowWrites": false,
+  "urls": {
+   "pc": "http://localhost:3000",
+   "bMobile": "http://localhost:3001",
+   "cMobile": "http://localhost:3002",
+   "api": "http://127.0.0.1:8787"
+  }
+ },
+ "revision": {
+  "branch": "main",
+  "head": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+ },
+ "executor": {
+  "root": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+  "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16",
+  "dirty": false
+ },
+ "regression": {
+  "suite": "失败：不能混写不同提交的 evidence-index",
+  "suite:hotel": "失败：不能混写不同提交的 evidence-index",
+  "suite:geo": "失败：不能混写不同提交的 evidence-index",
+  "db:verify-chain": "失败：不能混写不同提交的 evidence-index",
+  "typecheck": "失败：不能混写不同提交的 evidence-index"
+ },
+ "regressionError": "不能混写不同提交的 evidence-index",
+ "finishedAt": "2026-10-31T15:46:59.367Z"
+}

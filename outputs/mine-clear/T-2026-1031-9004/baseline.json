@@ -1,0 +1,25 @@
+{
+  "schema": "workloom.mine-clear/baseline@1",
+  "task_id": "T-2026-1031-9004",
+  "repo": "workloom-growthtest-stress-9004",
+  "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+  "remote": "origin",
+  "audit": {
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "branch": "task/T-2026-1031-9004",
+    "remote": "origin",
+    "remote_main": "6484e4f9f5a6dec7672e588ec77c0dbf22558934",
+    "fetched_at": null,
+    "fetch_status": "skipped",
+    "dirty_count": 1,
+    "notes": [
+      "本地 HEAD 不是 origin/main 最新（云端 6484e4f9 / 本地 67786d35）——按 §1.2 先对齐基线",
+      "工作树不干净（1 项未提交改动）：排雷结论只对已提交内容成立"
+    ]
+  },
+  "smoke": {
+    "status": "not-run",
+    "notes": "M0 冒烟：健康检查 + 一条核心业务链路，跑完回填这里"
+  },
+  "created_at": "2026-10-31T04:00:26.711Z"
+}

@@ -66,6 +66,15 @@ if (s.includes("append_event_insert")) {
       this.comments.push(row);
       return { rows: [row], rowCount: 1 };
     }
+    if (/UPDATE comments SET status='manual', route_level='review'/.test(s)) {
+      const row = this.comments.find(
+        (x) => x.workspace_id === params[0] && x.id === params[1] && x.status === "new",
+      );
+      if (!row) return { rows: [], rowCount: 0 };
+      row.status = "manual";
+      row.route_level = "review";
+      return { rows: [row], rowCount: 1 };
+    }
     if (/UPDATE comments SET intent=\$3/.test(s)) {
       const row = this.comments.find((x) => x.workspace_id === params[0] && x.id === params[1]);
       if (!row) return { rows: [], rowCount: 0 };
@@ -204,6 +213,40 @@ describe("G10 三级分流矩阵", () => {
     expect(alert.payload.decision.after.level).toBe("p1");
   });
 
+  it("自动审批后生成失败保留人工草稿，不用兜底话术冒充生成结果外发", async () => {
+    const { db, app, gateway } = fixture("这个多少钱？");
+    const sender = new FakeSender();
+    const r = await processComment(app, gateway, scope, "cm-1", {
+      classifier: classifierOf("query"),
+      generator: { generate: async () => { throw new Error("model unavailable"); } },
+      sender,
+      autoApproveReview: true,
+    });
+    expect(r!.decision.level).toBe("auto");
+    expect(sender.sent).toHaveLength(0);
+    expect(db.comments[0]!.status).toBe("manual");
+    expect(db.replies[0]!.status).toBe("candidate");
+    const event = db.events.find((item) => item.payload.decision.action === "comment.reply_manual")!;
+    expect(event.payload.decision.after).toMatchObject({ generationFailed: true });
+  });
+
+  it("并发重复派遣只允许一个处理器认领评论并外发一次", async () => {
+    const { db, app, gateway } = fixture("这个多少钱？");
+    const sender = new FakeSender();
+    const deps = {
+      classifier: classifierOf("query"),
+      sender,
+      autoApproveReview: true,
+    } as const;
+    const [first, second] = await Promise.all([
+      processComment(app, gateway, scope, "cm-1", deps),
+      processComment(app, gateway, scope, "cm-1", deps),
+    ]);
+    expect(sender.sent).toHaveLength(1);
+    expect(db.replies).toHaveLength(1);
+    expect([first!.decision.level, second!.decision.level].sort()).toEqual(["auto", "review"]);
+  });
+
   it("敏感词 → block：即使 LLM 判 praise 也熔断，不生成候选回复不外发 + 告警", async () => {
     const { db, app, gateway } = fixture("太赞了，顺便说说违禁词");
     const sender = new FakeSender();
@@ -240,6 +283,16 @@ describe("意图分类与采集", () => {
     expect(r!.qualityRouteLevel).toBe("review");
     expect(db.comments[0]!.status).toBe("pending_review");
     expect(db.events.some((e) => e.payload.decision.action === "comment.reply_review")).toBe(true);
+  });
+
+  it("基础包默认不自动审批；AI 视频生产入口必须显式启用作用域", async () => {
+    const { db, app, gateway } = fixture("这个多少钱？");
+    const r = await processComment(app, gateway, scope, "cm-1", {
+      classifier: classifierOf("query"), sender: new FakeSender(),
+    });
+    expect(r!.decision.level).toBe("review");
+    expect(r!.autoApproved).toBe(false);
+    expect(db.comments[0]!.status).toBe("pending_review");
   });
 
   it("规则兜底关键词：危机/负面/夸赞/其他", () => {

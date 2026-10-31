@@ -1,0 +1,44 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "regression-db-verify-chain-26271-1793461614162-86a7cc91",
+  "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"db:verify-chain\"",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "db:verify-chain"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "regression-db:verify-chain",
+    "commandName": "db:verify-chain",
+    "kind": "regression",
+    "environmentKind": "local-preview",
+    "executorCommit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+  },
+  "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:46:53.631Z",
+  "finished_at": "2026-10-31T15:46:54.162Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "execution/regression-db-verify-chain-26271-1793461614162-86a7cc91.log",
+      "sha256": "8880b36d5cd383db2e3355bdc70907d79e5f4621d1da0d30301a7f0b62150200",
+      "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+    },
+    {
+      "path": "execution/regression-db-verify-chain-26271-1793461614162-86a7cc91-command.json",
+      "sha256": "322d1fe2907e8006e81b7b05f5a308d20f2e9e4e3fc9f63d5129eafbd29a3ab9",
+      "commit": "6ba121b0cd3391a03b4b728ff1e95299fcd1ed16"
+    }
+  ]
+}

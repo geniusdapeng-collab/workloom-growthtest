@@ -1,0 +1,654 @@
+{
+  "schema": "workloom.mine-clear/ledger@1",
+  "task_id": "T-2026-1031-9004",
+  "repo": "workloom-growthtest-stress-9004",
+  "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+  "title": "视频自动审批二次独立验收修复",
+  "created_at": "2026-10-31T16:48:38.387Z",
+  "updated_at": "2026-10-31T17:10:21.556Z",
+  "baseline": {
+    "audit": {
+      "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+      "branch": "task/T-2026-1031-9004",
+      "remote": "origin",
+      "fetched_at": null,
+      "fetch_status": "skipped",
+      "notes": "本地 HEAD 不是 origin/main 最新（云端 6ba121b0 / 本地 342a8b3f）——按 §1.2 先对齐基线；工作树不干净（24 项未提交改动）：排雷结论只对已提交内容成立"
+    },
+    "repair": {
+      "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017",
+      "reverified_problem_ids": []
+    },
+    "acceptance": {
+      "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+      "is_descendant_of_repair": true
+    }
+  },
+  "environment": {
+    "kind": "local-preview",
+    "notes": ""
+  },
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "cards": [
+    {
+      "id": "MC-011",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P0",
+      "batch": 0,
+      "state": "verified",
+      "title": "视频自动审批越过组合工作区边界，可放行 GEO 发布、评论与加投",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/auto-approval.ts:46@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "009e57c140346be5716619750cd7a2b00ac97c94eee24391a8017a5249d0945e",
+          "note": "视频动作判定把 publish/comment/ads/deal 等跨行业对象与动作前缀直接视为视频域。"
+        },
+        {
+          "type": "code",
+          "ref": "apps/server/src/runtime/thread-runner.ts:298@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "20d1402d96d02a1952f21307a2ede891265571803da9fa8d9bc7c718dd7a881b",
+          "note": "通用 Quest 只传语义 action 与对象，不传实际 tool 或 agents.meta.sourceBundleId；同名 GEO 岗位可进入视频策略。"
+        },
+        {
+          "type": "code",
+          "ref": "bundles/geo-growth/fences/geo-growth-baseline.yml:22@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "4a06d0a472be51a3e8922bc77e8834ef9f1f31e752b4ef3d345058ca908970c7",
+          "note": "GEO 基线仍要求公网发布、评论与投放相关动作按原围栏审批。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/auto-approval.ts",
+        "line": 46,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "isAiVideoAction"
+      },
+      "trigger_path": "组合工作区装配 geo-growth 主包与 ai-video 依赖包；同名 publish-operator/ads-optimizer 由 GEO 权威提供，Quest 步骤命中 G9/G12 后被视频 autoReview 转为 approved。",
+      "fix_plan": "自动审批按 agents.meta.sourceBundleId=ai-video、实际执行 tool 与显式视频门三重绑定；GEO 来源岗位保持 not_applicable，未登记来源 fail-closed。",
+      "blast_radius": "只收紧通用 Quest 的视频自动审批分支；AI 视频单包和由 ai-video 权威提供的岗位继续按显式门自动审批，GEO 原围栏不变。",
+      "conflict_paths": [
+        "apps/server/src/runtime/thread-runner.ts",
+        "apps/server/src/video/auto-approval.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "sourceBundleId=geo-growth 的 publish-operator/ads-optimizer 命中 G9/G12；sourceBundleId=ai-video 的同类视频岗位作负向对照",
+          "expect": "GEO 两项均为 not_applicable，AI 视频显式动作与门仍 approved",
+          "command": "vitest run --root apps/server src/video/auto-approval.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "--root",
+              "apps/server",
+              "src/video/auto-approval.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-011-0-1793466612929.json",
+            "sha256": "35c27f2352e3afa044083e6b2c62990cc6c090984060d950efb82f8a1f9dadca",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-011-0-1793466612929.txt",
+            "sha256": "0e71bbd4b811bbed5685670ae2c893ea3ed86544ab0e1cd51eb161f90ec07b25",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run --root apps/server src/video/auto-approval.test.ts"
+      },
+      "fixed_by": "codex-root-repair-9dbc85c",
+      "verified_by": "verifier_r2-independent-2026-11-01",
+      "notes": "独立验收发现：视频授权可覆盖 GEO 的公网发布、评论和追加投放预算。",
+      "verified_at": "2026-10-31T17:10:13.445Z",
+      "verification_evidence": {
+        "path": "runs/MC-011-0-1793466612929.json",
+        "sha256": "35c27f2352e3afa044083e6b2c62990cc6c090984060d950efb82f8a1f9dadca",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
+      "last_assertion_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-10-31T17:10:12.925Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:13.445Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:13.445Z",
+        "runs": [
+          {
+            "path": "runs/MC-011-0-1793466612929.json",
+            "sha256": "35c27f2352e3afa044083e6b2c62990cc6c090984060d950efb82f8a1f9dadca",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-012",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "G11 项目算力预算门未匹配 render_script 且固定 used=0",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/router.ts:944@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "6d02f05e7c173bbe69c7f9e72e1409c479f1c6a8a1fd16284e3c7148509525f2",
+          "note": "渲染提交以 render_script 求值，但传入 project_compute_used=0；G11 规则只匹配 budget_ledger，因此预算门不会触发。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/router.ts",
+        "line": 944,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "render.submit"
+      },
+      "trigger_path": "项目已有非 mock 渲染用量且达到 WORKLOOM_PROJECT_COMPUTE_CAP 后，router 仍向围栏传 0，G11 永不命中。",
+      "fix_plan": "按项目聚合 render_jobs 的 actual_seconds（缺失回落 est_seconds）并排除 mock；G11 同时匹配 render_script/budget_ledger；达到上限时路由确定性拒绝，不允许自动审批降级。",
+      "blast_radius": "只影响 G11 预算门与 render.submit 的提交前检查；未配置上限时仍视为不设限，reconciliationOnly 补账保持不受阻断。",
+      "conflict_paths": [
+        "apps/server/src/video/router.ts",
+        "bundles/ai-video/fences/ai-video-baseline.yml"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "项目非 mock render_jobs 用量 5 秒，WORKLOOM_PROJECT_COMPUTE_CAP=5",
+          "expect": "judge 收到 used=5/cap=5，提交返回 G11 PRECONDITION_FAILED，submitGenJob 调用 0 次",
+          "command": "vitest run --root apps/server src/video/production-router.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "--root",
+              "apps/server",
+              "src/video/production-router.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-012-0-1793466613574.json",
+            "sha256": "32eb52df5a072975ab7f6d7593e095f299cbbff0f23c06ef7c307e909e61ff5f",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-012-0-1793466613574.txt",
+            "sha256": "02a925e9a90ef59b4b94a6bb5e4912b62c8e501a5d941a64111cf45c88cd7598",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        },
+        {
+          "kind": "sample",
+          "given": "使用真实 ai-video-baseline 的 G11 规则，object=render_script，used=999，cap=1",
+          "expect": "围栏产生 G11 review impact",
+          "command": "tsx scripts/tools/ai-video-g11-replay.mts",
+          "exec": {
+            "file": "node_modules/.bin/tsx",
+            "args": [
+              "scripts/tools/ai-video-g11-replay.mts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-012-1-1793466615197.json",
+            "sha256": "b94d20286b1c86e4af07a0c8a2aea1c3d3fc88642c00883117ec6300b9609f4c",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-012-1-1793466615197.txt",
+            "sha256": "c64d48985aaa38184f3c377a0e1e99b96d86f814941510e777f876109981d654",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        },
+        {
+          "kind": "sample",
+          "given": "白板片项目 compute used=5/cap=5；explainer 项目 compute used=5/cap=5",
+          "expect": "两个入口都在 submitGenJob/准备段之前返回 G11 PRECONDITION_FAILED，生成调用 0 次",
+          "command": "vitest run --root apps/server src/video/whiteboard/whiteboard.test.ts src/video/explainer/explainer.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "--root",
+              "apps/server",
+              "src/video/whiteboard/whiteboard.test.ts",
+              "src/video/explainer/explainer.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-012-2-1793466615552.json",
+            "sha256": "d6d095f4d0334bb1ec66c8bece1a6fe8d1d9b5d4d41644ea0fec25816692f554",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-012-2-1793466615552.txt",
+            "sha256": "110cabe88595e2fd6bce3b329b85785570e42d2950deaa3c88a86db1e7693461",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run --root apps/server src/video/production-router.test.ts"
+      },
+      "fixed_by": "codex-root-repair-9dbc85c",
+      "verified_by": "verifier_r2-independent-2026-11-01",
+      "notes": "独立验收复现：used=999、cap=1 的 render_script 视图没有任何 G11 impact。",
+      "verified_at": "2026-10-31T17:10:17.245Z",
+      "verification_evidence": {
+        "path": "runs/MC-012-0-1793466613574.json",
+        "sha256": "32eb52df5a072975ab7f6d7593e095f299cbbff0f23c06ef7c307e909e61ff5f",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
+      "last_assertion_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-10-31T17:10:13.573Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:17.245Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:17.245Z",
+        "runs": [
+          {
+            "path": "runs/MC-012-0-1793466613574.json",
+            "sha256": "32eb52df5a072975ab7f6d7593e095f299cbbff0f23c06ef7c307e909e61ff5f",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          {
+            "path": "runs/MC-012-1-1793466615197.json",
+            "sha256": "b94d20286b1c86e4af07a0c8a2aea1c3d3fc88642c00883117ec6300b9609f4c",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          {
+            "path": "runs/MC-012-2-1793466615552.json",
+            "sha256": "d6d095f4d0334bb1ec66c8bece1a6fe8d1d9b5d4d41644ea0fec25816692f554",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-013",
+      "kind": "problem",
+      "level": "L3",
+      "severity": "P1",
+      "batch": 2,
+      "state": "verified",
+      "title": "G10 自动评论没有生产入口，人工草稿消失且生成失败仍用兜底话术外发",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/router.ts:1298@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "6d02f05e7c173bbe69c7f9e72e1409c479f1c6a8a1fd16284e3c7148509525f2",
+          "note": "commentsRouter 只有 pending 查询，没有 processComment 的生产入口；待处理 SQL 只查 new/pending_review。"
+        },
+        {
+          "type": "code",
+          "ref": "packages/base/social-listening/comments.ts:260@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "a854c68999f0391e972b398ef6bf659c3b4371fae497f9d95312f4f713ed8c37",
+          "note": "基础包默认按环境变量自动审批，且生成器异常后使用兜底模板继续外发；未外发草稿状态为 manual 但待处理查询不可见。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/router.ts",
+        "line": 1298,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "commentsRouter"
+      },
+      "trigger_path": "调用方没有生产 tRPC 入口触发 processComment；即使底层产生 manual 草稿，pending 查询也不返回；generator 抛错时 fallbackReply 被当作成功候选并由 sender 外发。",
+      "fix_plan": "新增 video.comments.process 生产入口并注入分类器、敏感词与显式视频自动审批；基础包默认不自动审批；生成失败只保留 manual 草稿不外发；pending 纳入 manual。",
+      "blast_radius": "只影响视频评论处理与待处理投影；真实 sender 未接入时仍以 manual 保存，不伪造 replied 或外发回执。",
+      "conflict_paths": [
+        "apps/server/src/video/router.ts",
+        "packages/base/social-listening/comments.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "评论生产入口带 forbidden 词表；人工草稿状态为 manual",
+          "expect": "process 调用 processComment 并传 autoApproveReview=true；pending SQL 包含 new/pending_review/manual",
+          "command": "vitest run --root apps/server src/video/comments-router.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "--root",
+              "apps/server",
+              "src/video/comments-router.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-013-0-1793466617384.json",
+            "sha256": "57a6456278267fa93960aaad952747d2da1e657c33285b95fbf4dce43aa982e9",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-013-0-1793466617384.txt",
+            "sha256": "5c361fb15912cec99d5cfb9d184ac7904b696440665f502fda84e10e04241700",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        },
+        {
+          "kind": "sample",
+          "given": "G10 review 已自动审批，但 ReplyGenerator 抛错且 sender 可用；另有两个并发重复派遣",
+          "expect": "生成失败时 sender 发送 0 次并保留 manual/candidate；并发重复派遣只有一个认领成功，sender 与回复均只写一次",
+          "command": "vitest run --root packages/base social-listening/social-listening.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "--root",
+              "packages/base",
+              "social-listening/social-listening.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-013-1-1793466618896.json",
+            "sha256": "04947bfb3a23ebc6a65611a5853d30dc6383242168db0cc3c82403b56b150e9a",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-013-1-1793466618896.txt",
+            "sha256": "c7d3a8f19d6fb0f152ea8832c74d8277d438c191d521f67561cd5f5916949eaa",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run --root apps/server src/video/comments-router.test.ts --root packages/base social-listening/social-listening.test.ts"
+      },
+      "fixed_by": "codex-root-repair-9dbc85c",
+      "verified_by": "verifier_r2-independent-2026-11-01",
+      "notes": "独立验收发现 G10 生产接线、manual 可见性和生成失败语义不一致。",
+      "verified_at": "2026-10-31T17:10:19.411Z",
+      "verification_evidence": {
+        "path": "runs/MC-013-0-1793466617384.json",
+        "sha256": "57a6456278267fa93960aaad952747d2da1e657c33285b95fbf4dce43aa982e9",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
+      "last_assertion_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-10-31T17:10:17.384Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:19.411Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:19.411Z",
+        "runs": [
+          {
+            "path": "runs/MC-013-0-1793466617384.json",
+            "sha256": "57a6456278267fa93960aaad952747d2da1e657c33285b95fbf4dce43aa982e9",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          {
+            "path": "runs/MC-013-1-1793466618896.json",
+            "sha256": "04947bfb3a23ebc6a65611a5853d30dc6383242168db0cc3c82403b56b150e9a",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-014",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P1",
+      "batch": 0,
+      "state": "verified",
+      "title": "VIDEO_AUTO_APPROVAL=0 时 explainer 仍用当前成员身份自动批准 draft",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/explainer/router.ts:438@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "146af7afdc6c3b90fd05803af42c93616bfde8eac1347b4d4b559fddf56b0949",
+          "note": "关闭自动审批后仍把 ctx.identity.memberNo 传给 approveRenderScript，且代码路径无需人类调用审批接口。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/explainer/router.ts",
+        "line": 443,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "explainer.submit"
+      },
+      "trigger_path": "设置 VIDEO_AUTO_APPROVAL=0 后调用 explainer.submit；新建 draft 被同一请求以当前成员身份批准并继续渲染。",
+      "fix_plan": "开关关闭时 submit 对 draft 返回可操作的前置条件错误；新增 video.explainer.approveScript 人工入口，只由当前成员显式调用后再次 submit。",
+      "blast_radius": "只影响回滚路径中的 explainer 脚本审批；默认自动审批路径不变，预算与准备段逻辑不变。",
+      "conflict_paths": [
+        "apps/server/src/video/explainer/router.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "VIDEO_AUTO_APPROVAL=0，首次 submit 生成 draft",
+          "expect": "submit 拒绝且 approve 调用 0 次；调用 approveScript 后保存 approved，再 submit 才调用生成入口",
+          "command": "vitest run --root apps/server src/video/explainer/explainer.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "--root",
+              "apps/server",
+              "src/video/explainer/explainer.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-014-0-1793466619551.json",
+            "sha256": "0cc04dcc0ac09e66ea0f32e109c8fc1bdcf966e9b78dafa15d0aea04c50d8604",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-014-0-1793466619551.txt",
+            "sha256": "a24256746dd263dd67b34dbef89e5a83e7f3294a1c36ad4b96ef57cec8850e8c",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run --root apps/server src/video/explainer/explainer.test.ts"
+      },
+      "fixed_by": "codex-root-repair-9dbc85c",
+      "verified_by": "verifier_r2-independent-2026-11-01",
+      "notes": "本轮按产品所有者 2026-11-01 Codex/CLI 验收口径修复后端回滚入口；项目三端 UI 仍不在本轮放行范围。",
+      "verified_at": "2026-10-31T17:10:20.200Z",
+      "verification_evidence": {
+        "path": "runs/MC-014-0-1793466619551.json",
+        "sha256": "0cc04dcc0ac09e66ea0f32e109c8fc1bdcf966e9b78dafa15d0aea04c50d8604",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
+      "last_assertion_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-10-31T17:10:19.550Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:20.200Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:20.200Z",
+        "runs": [
+          {
+            "path": "runs/MC-014-0-1793466619551.json",
+            "sha256": "0cc04dcc0ac09e66ea0f32e109c8fc1bdcf966e9b78dafa15d0aea04c50d8604",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
+      }
+    },
+    {
+      "id": "MC-015",
+      "kind": "problem",
+      "level": "L2",
+      "severity": "P2",
+      "batch": 1,
+      "state": "verified",
+      "title": "控制面自动通过只校验 gateKey，不校验当前阶段的真实门产物",
+      "evidence": [
+        {
+          "type": "code",
+          "ref": "apps/server/src/video/pipeline-control-plane.ts:682@67786d35a9e5a051a60df491e24a6892e8033f96",
+          "sha256": "41ce0e6c749bcff3d1a81311944c3f48b5a1b3de88172a9d01294c57fa1f42ee",
+          "note": "autoApproveGate 只检查开关与 isVideoApprovalGate(gateKey)，随后无条件写 passed 并回填 artifact hash。"
+        }
+      ],
+      "root_cause": {
+        "file": "apps/server/src/video/pipeline-control-plane.ts",
+        "line": 682,
+        "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+        "symbol": "getPipelineCoordinator.autoApproveGate"
+      },
+      "trigger_path": "任何请求只要 gateKey 命中 G1/G5/G8 白名单，即使产物角色、schema 或事实快照不属于该门，也会被控制面自动写 passed。",
+      "fix_plan": "把当前阶段产物传入自动审批；校验门声明在阶段、门对应产物角色、产物 schema、factsSnapshotHash 与当前 run 一致；不成立时写 unverified 和结构化 finding。",
+      "blast_radius": "只影响控制面自动通过；人工 GateDecision 与影子观察保留原状态机。控制面仍为影子模式，不接管真实出片。",
+      "conflict_paths": [
+        "packages/video-studio/src/pipeline-control-plane/coordinator.ts",
+        "apps/server/src/video/pipeline-control-plane.ts"
+      ],
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "G1 门产物分别使用正确 dossier、错误 role、旧 factsSnapshotHash、错误 schema，以及门未声明在阶段",
+          "expect": "只有完整匹配才 valid；其余均失败关闭并给出具体原因",
+          "command": "vitest run --root apps/server src/video/pipeline-auto-approval.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "--root",
+              "apps/server",
+              "src/video/pipeline-auto-approval.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-015-0-1793466620349.json",
+            "sha256": "4846bf9e1e208bbbe00dc1cdb67d1b039708a959939d7eeb1b9c47a54da47c18",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          },
+          "evidence": {
+            "path": "evidence/MC-015-0-1793466620349.txt",
+            "sha256": "c109a2c9445599d599388e05730325e85bc1fa74127f605ada2eb1aae0dfa64b",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        }
+      ],
+      "regression": {
+        "command": "node_modules/.bin/vitest run --root apps/server src/video/pipeline-auto-approval.test.ts"
+      },
+      "fixed_by": "codex-root-repair-9dbc85c",
+      "verified_by": "verifier_r2-independent-2026-11-01",
+      "notes": "当前控制面仍为影子模式，本卡按未来接管真实出片前的硬闸修复。",
+      "verified_at": "2026-10-31T17:10:21.556Z",
+      "verification_evidence": {
+        "path": "runs/MC-015-0-1793466620349.json",
+        "sha256": "4846bf9e1e208bbbe00dc1cdb67d1b039708a959939d7eeb1b9c47a54da47c18",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+      },
+      "last_assertion_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "role": "acceptance",
+        "result": "pass",
+        "at": "2026-10-31T17:10:20.348Z",
+        "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+        "finished_at": "2026-10-31T17:10:21.556Z"
+      },
+      "last_verification_attempt": {
+        "actor": "verifier_r2-independent-2026-11-01",
+        "result": "pass",
+        "at": "2026-10-31T17:10:21.556Z",
+        "runs": [
+          {
+            "path": "runs/MC-015-0-1793466620349.json",
+            "sha256": "4846bf9e1e208bbbe00dc1cdb67d1b039708a959939d7eeb1b9c47a54da47c18",
+            "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+          }
+        ]
+      }
+    }
+  ],
+  "gates": []
+}

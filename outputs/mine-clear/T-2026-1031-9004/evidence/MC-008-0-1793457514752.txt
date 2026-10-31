@@ -1,0 +1,30 @@
+出片环境自检（video-doctor）· /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004
+
+✅ node                   Node 24.22.1（要求 ≥ 24）
+✅ pnpm                   pnpm 11.25.0
+✅ deps                   node_modules 已安装
+✅ ffmpeg                 ffmpeg（ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg develo）
+✅ ffprobe                ffprobe
+✅ ark-key                火山方舟密钥已配置（/Users/mac/.workloom/live.env）
+✅ llm-key                评审/仲裁模型密钥已配置
+⚠️ audio-stem-signer      未配置签发者 → 配乐走**声明式直混**（本地无版权曲库可用，回执标注 declared-unverified/stemsVerified=false）
+✅ voice-station          配音工位目录存在：/Users/mac/.workloom/voice-station
+✅ bgm-library-jail       1 个存在曲库根；按管线口径（含追加白名单 2 个）全部放行（裸调 bgm-bridge 时的白名单根：2 个——手工直调需自行设 WORKLOOM_BGM_ALLOWED_ROOTS）
+⚠️ library:real-person-assets 缺 /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/bundles/ai-video/library/real-person-assets（认证真人主档（asset:// 出镜链路必需））
+✅ library:products       真实商品档案（营销片 G-PROD1 逐镜绑定）：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/bundles/ai-video/library/products
+✅ library:scene-policies 片型知识条目（T1 商业真人出镜等）：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/bundles/ai-video/library/scene-policies
+✅ library:cover-kb       封面知识库（cover-kb 注入）：/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/bundles/ai-video/library/cover-kb
+✅ entry:route            分流 CLI（出片前必须先跑）：scripts/tools/route-video.mts
+✅ entry:film             出片 CLI：scripts/tools/full-chain-film.mts
+✅ entry:explainer        口播解说片 CLI：scripts/tools/explainer-run.mts
+✅ runbook                Agent 安装/执行 runbook：bundles/ai-video/README.md
+
+通过 16 · 告警 2 · 失败 0
+
+可先忽略的 WARN（会影响体验/降级能力）：
+- audio-stem-signer：未配置签发者 → 配乐走**声明式直混**（本地无版权曲库可用，回执标注 declared-unverified/stemsVerified=false）
+- library:real-person-assets：缺 /Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/bundles/ai-video/library/real-person-assets（认证真人主档（asset:// 出镜链路必需））
+
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

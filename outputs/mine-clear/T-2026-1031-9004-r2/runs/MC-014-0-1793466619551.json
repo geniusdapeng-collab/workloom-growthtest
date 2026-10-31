@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-014-0-1793466619551",
+  "command": "vitest run --root apps/server src/video/explainer/explainer.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "--root",
+      "apps/server",
+      "src/video/explainer/explainer.test.ts"
+    ]
+  },
+  "actor": "verifier_r2-independent-2026-11-01",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-014",
+    "assertion_index": 0
+  },
+  "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T17:10:19.551Z",
+  "finished_at": "2026-10-31T17:10:20.155Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-014-0-1793466619551.txt",
+      "sha256": "a24256746dd263dd67b34dbef89e5a83e7f3294a1c36ad4b96ef57cec8850e8c",
+      "commit": "7c767ae24d5231310ab38ec89fd5e9febca3dfcb"
+    }
+  ]
+}

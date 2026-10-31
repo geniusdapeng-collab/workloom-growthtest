@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-014-0-1793466484446",
+  "command": "vitest run --root apps/server src/video/explainer/explainer.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "--root",
+      "apps/server",
+      "src/video/explainer/explainer.test.ts"
+    ]
+  },
+  "actor": "codex-root-repair-9dbc85c",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-014",
+    "assertion_index": 0
+  },
+  "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T17:08:04.446Z",
+  "finished_at": "2026-10-31T17:08:05.111Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-014-0-1793466484446.txt",
+      "sha256": "8883304986fd69ad1adc2d91fbb68a0d4e5686edf5a4a4c6f0dc0ece24691dfd",
+      "commit": "9dbc85c6ed20ffb429dc842cc3fa1d2deed6c017"
+    }
+  ]
+}

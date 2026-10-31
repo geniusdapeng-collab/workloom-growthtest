@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A14",
+  "category": "abnormal",
+  "expected": "DURATION_INVALID",
+  "actual": "DURATION_INVALID",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "invalid-duration",
+    "caseHash": "9433a6670455322dbe30863b044514a646a8dda99c2d8d0c719d4d562b57bbf5"
+  },
+  "output": {
+    "error": "DURATION_INVALID: 总时长必须是 1–300 秒之间的整数"
+  },
+  "capturedAt": "2026-10-31T15:22:04.676Z"
+}

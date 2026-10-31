@@ -1,0 +1,25 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A18",
+  "category": "abnormal",
+  "expected": "SHOT_DUPLICATE",
+  "actual": "SHOT_DUPLICATE",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "duplicate-shot",
+    "caseHash": "f9bf027940e27b3e8b97ba354cb33f3a1106071e88567f36171b120f0020c13f"
+  },
+  "output": {
+    "pass": false,
+    "issues": [
+      {
+        "code": "SHOT_DUPLICATE",
+        "shotId": "S1",
+        "message": "镜头 ID 重复：S1"
+      }
+    ]
+  },
+  "capturedAt": "2026-10-31T15:22:04.677Z"
+}

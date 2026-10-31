@@ -89,6 +89,20 @@ test('G07: production avoids checkout/pull/install/seed/local probes and propaga
     assert.ok(step.argv.includes('--evidence-root'));
   }
 });
+test('G07: local target commit pins detached source without fetch/checkout main/pull', async (t) => {
+  const f = fixture(t);
+  const result = await run(f, ['--target-commit', 'a'.repeat(40), '--skip-regression']);
+  assert.notEqual(result.code, 1, result.out);
+  const commands = readLog(f.commandLog).filter((command) => command.name === 'git');
+  assert.equal(commands.some((command) => command.args.includes('fetch')), false, JSON.stringify(commands));
+  assert.equal(commands.some((command) => command.args.includes('pull')), false, JSON.stringify(commands));
+  assert.equal(commands.some((command) => command.args.includes('checkout') && command.args.includes('main')), false, JSON.stringify(commands));
+  assert.deepEqual(
+    commands.find((command) => command.args.includes('checkout'))?.args,
+    ['checkout', '--detach', 'a'.repeat(40)],
+  );
+  assert.equal(result.state.notes.some((line) => line.includes('--target-commit')), true);
+});
 test('G06: report unverified exit 2 is preserved in aggregate result', async (t) => {
   const f = fixture(t, { reportExit: 2 });
   const result = await run(f, ['--skip-regression']);

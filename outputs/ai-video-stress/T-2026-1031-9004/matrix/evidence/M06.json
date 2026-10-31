@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M06",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "91cba48c1145f1b999ffe0bb4d95d203a3576516546462095cb0456f1e7cc6db"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "眠云真丝枕套",
+        "brand": "眠云",
+        "category": "床品",
+        "model": "云感 19",
+        "sellingPoints": [
+          "柔软触感",
+          "可拆洗护理",
+          "礼盒包装"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "眠云真丝枕套",
+        "brand": {
+          "name": "眠云"
+        },
+        "category": "床品"
+      },
+      "dataMining": {
+        "name": "眠云真丝枕套",
+        "brand": "眠云",
+        "category": "床品",
+        "model": "云感 19",
+        "sellingPointCandidates": [
+          "柔软触感",
+          "可拆洗护理",
+          "礼盒包装"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给眠云真丝枕套做一条小红书种草视频，突出柔软触感、可拆洗护理和礼盒包装\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "眠云真丝枕套 云感 19",
+    "queries": [
+      {
+        "q": "眠云真丝枕套 云感 19 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "眠云真丝枕套 云感 19 床品 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "眠云真丝枕套 云感 19 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "眠云真丝枕套 云感 19 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "眠云真丝枕套 云感 19 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "眠云真丝枕套 云感 19 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "眠云真丝枕套 云感 19 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "眠云真丝枕套 云感 19 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "18cd9c85ee2d82b3caadac7181fbef6e9be14eb95e729c000a1f36cd56c4ebe0"
+    }
+  },
+  "capturedAt": "2026-10-31T14:31:10.125Z"
+}

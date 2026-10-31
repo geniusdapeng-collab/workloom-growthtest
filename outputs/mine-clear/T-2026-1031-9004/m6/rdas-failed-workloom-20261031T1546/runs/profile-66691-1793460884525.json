@@ -1,0 +1,41 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "profile-66691-1793460884525",
+  "command": "\"/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/profile-check.mjs\" \"--repo\" \".\" \"--profile\" \"acceptance/profile.local-preview.json\" \"--env\" \"local-preview\"",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/profile-check.mjs",
+      "--repo",
+      ".",
+      "--profile",
+      "acceptance/profile.local-preview.json",
+      "--env",
+      "local-preview"
+    ]
+  },
+  "actor": "acceptance:profile-check",
+  "role": "acceptance",
+  "subject": {
+    "mode": "contract-validation",
+    "configurationStatus": "valid"
+  },
+  "commit": "b292b8d7371c45bdc80683821b03f4f58775e0a0",
+  "working_tree_dirty": true,
+  "started_at": "2026-10-31T15:34:44.338Z",
+  "finished_at": "2026-10-31T15:34:44.525Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "profile/profile-validation.json",
+      "sha256": "76f804c35ef8ecc55f10b2540a7bf581d14c592770344286ae59bc4abfa3cd46",
+      "commit": "b292b8d7371c45bdc80683821b03f4f58775e0a0"
+    }
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "regression-summary-98467-1793461888965-56c5719d",
+  "command": "\"/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/lib/regression-evidence.mjs\" \"--repo\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004\" \"--root\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance\" \"--input\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/regression/summary-input.json\" \"--out\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/regression/summary.json\"",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/lib/regression-evidence.mjs",
+      "--repo",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+      "--root",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance",
+      "--input",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/regression/summary-input.json",
+      "--out",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/regression/summary.json"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "regression-summary",
+    "environmentKind": "local-preview",
+    "executorCommit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+  },
+  "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:51:28.653Z",
+  "finished_at": "2026-10-31T15:51:28.965Z",
+  "exit_code": 1,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "fail",
+  "outputs": [
+    {
+      "path": "execution/regression-summary-98467-1793461888965-56c5719d.log",
+      "sha256": "3377dd822a6f3047bf2e34933a6be8d4488aa4c3ad576f65a35f95ed9d6558a9",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "regression/summary-input.json",
+      "sha256": "ed71213992439af72b956424055ac2af74db5b3255b2ebcd4ef52175b3c91b34",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "regression/summary.json",
+      "sha256": "bdd7897159269a84a8a0bb9f0877b018048bb6cb68e6d47c1e038498c0da16a3",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A07",
+  "category": "abnormal",
+  "expected": "SOURCE_URL_INVALID",
+  "actual": "SOURCE_URL_INVALID",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "credential-source",
+    "caseHash": "5407c476f6489daf3d2910b30895adedf38fd7e1d23cebd470d943ba36cbeb7c"
+  },
+  "output": {
+    "error": "SOURCE_URL_INVALID：来源只接受无凭据的标准 HTTP/HTTPS 公网页面"
+  },
+  "capturedAt": "2026-10-31T14:31:10.518Z"
+}

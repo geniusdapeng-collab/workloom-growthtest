@@ -1,0 +1,35 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-008-0-1793457603115",
+  "command": "tsx scripts/tools/video-doctor.mts",
+  "exec": {
+    "file": "node_modules/.bin/tsx",
+    "args": [
+      "scripts/tools/video-doctor.mts"
+    ]
+  },
+  "actor": "codex-root-repair-01a190b3",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-008",
+    "assertion_index": 0
+  },
+  "commit": "22eabebc5573e3d4394bd3ee891634193dbeef09",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T14:40:03.115Z",
+  "finished_at": "2026-10-31T14:40:03.731Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-008-0-1793457603115.txt",
+      "sha256": "1c7c83ee201448fe7ef05434bf5749961f192d6c72d75c4a3fd990e180058703",
+      "commit": "22eabebc5573e3d4394bd3ee891634193dbeef09"
+    }
+  ]
+}

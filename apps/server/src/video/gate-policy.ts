@@ -8,7 +8,8 @@
  *   抽成共享模块后，服务端与审计脚本消费同一份定义。
  *
  * 产品口径（2026-10-31）：视频管线取消人类审批等待；内部门继续 AI 质量评审，
- * G8/G9/G10/G11/G12/G15 继续执行原有 review/block 检查后交给系统自动裁决。
+ * G8/G9/G10/G12/G15 继续执行原有 review/block 检查后交给系统自动裁决；
+ * G11 项目算力预算门触发后确定性暂停，不进入自动放行。
  */
 import type { GateKey } from "@hyperreality/video-studio";
 import type { ProducerStage } from "@hyperreality/video-studio";

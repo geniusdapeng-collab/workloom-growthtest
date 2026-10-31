@@ -1,0 +1,68 @@
+{
+  "id": "MC-012",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "G11 项目算力预算门未匹配 render_script 且固定 used=0",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/router.ts:944@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "6d02f05e7c173bbe69c7f9e72e1409c479f1c6a8a1fd16284e3c7148509525f2",
+      "note": "渲染提交以 render_script 求值，但传入 project_compute_used=0；G11 规则只匹配 budget_ledger，因此预算门不会触发。"
+    }
+  ],
+  "root_cause": {
+    "file": "apps/server/src/video/router.ts",
+    "line": 944,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "render.submit"
+  },
+  "trigger_path": "项目已有非 mock 渲染用量且达到 WORKLOOM_PROJECT_COMPUTE_CAP 后，router 仍向围栏传 0，G11 永不命中。",
+  "fix_plan": "按项目聚合 render_jobs 的 actual_seconds（缺失回落 est_seconds）并排除 mock；G11 同时匹配 render_script/budget_ledger；达到上限时路由确定性拒绝，不允许自动审批降级。",
+  "blast_radius": "只影响 G11 预算门与 render.submit 的提交前检查；未配置上限时仍视为不设限，reconciliationOnly 补账保持不受阻断。",
+  "conflict_paths": ["apps/server/src/video/router.ts", "bundles/ai-video/fences/ai-video-baseline.yml"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "项目非 mock render_jobs 用量 5 秒，WORKLOOM_PROJECT_COMPUTE_CAP=5",
+      "expect": "judge 收到 used=5/cap=5，提交返回 G11 PRECONDITION_FAILED，submitGenJob 调用 0 次",
+      "command": "vitest run --root apps/server src/video/production-router.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": ["run", "--root", "apps/server", "src/video/production-router.test.ts"]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "sample",
+      "given": "使用真实 ai-video-baseline 的 G11 规则，object=render_script，used=999，cap=1",
+      "expect": "围栏产生 G11 review impact",
+      "command": "tsx scripts/tools/ai-video-g11-replay.mts",
+      "exec": {
+        "file": "node_modules/.bin/tsx",
+        "args": ["scripts/tools/ai-video-g11-replay.mts"]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "sample",
+      "given": "白板片项目 compute used=5/cap=5；explainer 项目 compute used=5/cap=5",
+      "expect": "两个入口都在 submitGenJob/准备段之前返回 G11 PRECONDITION_FAILED，生成调用 0 次",
+      "command": "vitest run --root apps/server src/video/whiteboard/whiteboard.test.ts src/video/explainer/explainer.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": ["run", "--root", "apps/server", "src/video/whiteboard/whiteboard.test.ts", "src/video/explainer/explainer.test.ts"]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run --root apps/server src/video/production-router.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "独立验收复现：used=999、cap=1 的 render_script 视图没有任何 G11 impact。"
+}

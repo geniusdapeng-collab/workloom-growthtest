@@ -1,0 +1,25 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A17",
+  "category": "abnormal",
+  "expected": "SHOT_PROMPT_REQUIRED",
+  "actual": "SHOT_PROMPT_REQUIRED",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "empty-shot",
+    "caseHash": "91950b63af163717a11a63ed7f19c5d2112647e3ad5008752b99cd43092d790a"
+  },
+  "output": {
+    "pass": false,
+    "issues": [
+      {
+        "code": "SHOT_PROMPT_REQUIRED",
+        "shotId": "S1",
+        "message": "最终 prompt 为空"
+      }
+    ]
+  },
+  "capturedAt": "2026-10-31T15:22:04.677Z"
+}

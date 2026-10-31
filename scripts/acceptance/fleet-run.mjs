@@ -9,6 +9,7 @@
  *   node scripts/acceptance/fleet-run.mjs --repo WorkLoom-growth --db workloom_growth
  *   [--fleet-dir ~/WorkLoom-fleet] [--skip-install] [--skip-seed] [--skip-regression] [--keep-running]
  *   [--regression "suite,suite:hotel,db:verify-chain,typecheck"] [--timeout-min 40]
+ *   [--target-commit <完整SHA>]
  *   [--env local-preview|client-runtime|deployed] [--live] [--live-only] [--require-live] [--allow-prod-writes]
  *
  * 纪律：只跑本机克隆（不改远端）；本地预览可生成缺失 .env、补齐弱密钥及显式 --db 库名，探针改写会还原；
@@ -51,6 +52,7 @@ const SKIP_SEED = has("--skip-seed");
 const SKIP_REGRESSION = has("--skip-regression");
 const KEEP_RUNNING = has("--keep-running");
 const TIMEOUT_MIN = Number(arg("--timeout-min", "40"));
+const TARGET_COMMIT = arg("--target-commit", null);
 const WITH_REDTEAM = has("--with-redteam");
 const SOAK_HOURS = arg("--soak-hours", null);
 let ENV_KIND = arg("--env", null);
@@ -61,6 +63,11 @@ const ALLOW_PROD_WRITES = has("--allow-prod-writes");
 const LIVE_ENV_FILE = arg("--keys-file", null) ?? arg("--env-file", null);
 let PRODUCTION = false;
 let PORTS = { pc: 3000, bMobile: 3001, cMobile: 3002, server: 8787 };
+
+if (TARGET_COMMIT !== null && !/^[0-9a-f]{40}$/i.test(TARGET_COMMIT)) {
+  console.error("✗ --target-commit 必须是完整 40 位 Git SHA");
+  process.exit(2);
+}
 
 if (!existsSync(join(REPO_DIR, "package.json"))) {
   console.error(`✗ 找不到仓库：${REPO_DIR}`);
@@ -274,6 +281,12 @@ try {
   const dirty = run("git", ["status", "--porcelain"]).out.trim();
   if (PRODUCTION) {
     state.notes.push("生产档位：prepare 仅记录 Git 身份，不 fetch/checkout/pull");
+  } else if (TARGET_COMMIT) {
+    if (dirty) throw new Error("--target-commit 要求工作树 clean，禁止把未提交文件混入固定提交");
+    const resolved = run("git", ["rev-parse", "--verify", `${TARGET_COMMIT}^{commit}`]).out.trim();
+    if (resolved.toLowerCase() !== TARGET_COMMIT.toLowerCase()) throw new Error("--target-commit 无法解析为同一完整提交");
+    run("git", ["checkout", "--detach", resolved]);
+    state.notes.push(`按 --target-commit 固定被测源码：${resolved}`);
   } else if (dirty) {
     state.notes.push(`工作树不干净（${dirty.split("\n").length} 项），跳过 pull，按当前内容验收`);
   } else {

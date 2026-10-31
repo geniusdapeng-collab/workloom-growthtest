@@ -1,0 +1,66 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "N06",
+  "category": "narrative",
+  "expected": "NARRATIVE_READY",
+  "actual": "NARRATIVE_READY",
+  "pass": true,
+  "mode": "runtime-bridge",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+    "caseHash": "0b044c8f6d96b91c80063453c0c0cfa599360bb218ac0e73531acc36a699ae32"
+  },
+  "output": {
+    "route": {
+      "route": "narrative",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 narrative",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "不应出现的商品",
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "brand": {
+          "name": "不应出现的品牌"
+        },
+        "category": "不应出现的品类",
+        "sellingPoints": [
+          "不应出现的卖点"
+        ],
+        "audience": "不应出现的人群",
+        "platform": "c",
+        "goal": "seeding",
+        "duration": 35,
+        "aspectRatio": "9:16"
+      },
+      "pipelineRoute": {
+        "kind": "narrative",
+        "via": "metadata",
+        "confidence": 1
+      }
+    },
+    "effectiveIntent": "拍一条35秒时间流转短片：同一座石桥在晨雨、正午、黄昏和夜色中的四时变化，无人物正脸\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+    "themeInput": "拍一条35秒时间流转短片：同一座石桥在晨雨、正午、黄昏和夜色中的四时变化，无人物正脸\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+    "shots": 6,
+    "totalDurationSeconds": 35,
+    "finalShotContract": {
+      "pass": true,
+      "issues": []
+    },
+    "pipelineGuard": {
+      "pass": true,
+      "errors": [],
+      "warnings": []
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.447Z"
+}

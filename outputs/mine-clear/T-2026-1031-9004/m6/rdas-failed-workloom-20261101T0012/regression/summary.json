@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "workloom.acceptance-regression/v2",
+  "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d",
+  "at": "2026-10-31T16:07:43.842Z",
+  "status": "unverified",
+  "required": [
+    "suite",
+    "suite:hotel",
+    "suite:geo",
+    "db:verify-chain",
+    "typecheck",
+    "release:gate"
+  ],
+  "commands": {
+    "suite": "未验证：必需命令未执行",
+    "suite:hotel": "未验证：必需命令未执行",
+    "suite:geo": "未验证：必需命令未执行",
+    "db:verify-chain": "未验证：必需命令未执行",
+    "typecheck": "未验证：必需命令未执行",
+    "release:gate": "未验证：必需命令未执行"
+  },
+  "executions": {
+    "suite": {
+      "status": "unverified",
+      "run": null
+    },
+    "suite:hotel": {
+      "status": "unverified",
+      "run": null
+    },
+    "suite:geo": {
+      "status": "unverified",
+      "run": null
+    },
+    "db:verify-chain": {
+      "status": "unverified",
+      "run": null
+    },
+    "typecheck": {
+      "status": "unverified",
+      "run": null
+    },
+    "release:gate": {
+      "status": "unverified",
+      "run": null
+    }
+  },
+  "errors": [
+    "suite 必需命令没有实际运行记录",
+    "suite:hotel 必需命令没有实际运行记录",
+    "suite:geo 必需命令没有实际运行记录",
+    "db:verify-chain 必需命令没有实际运行记录",
+    "typecheck 必需命令没有实际运行记录",
+    "release:gate 必需命令没有实际运行记录"
+  ]
+}

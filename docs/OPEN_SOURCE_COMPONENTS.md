@@ -291,7 +291,7 @@
 | `tailwindcss` | 4.3.3（声明） | 4.3.3 | 开发 | apps/web/package.json、apps/webc/package.json | 4.3.3（历史记录；未核实或已过期） |
 | `three` | 0.186.0（声明） | ^0.186.0 | 生产 | apps/web/package.json | 0.186.0（历史记录；未核实或已过期） |
 | `three-stdlib` | 2.36.1（声明） | ^2.36.1 | 生产 | apps/web/package.json | 2.36.1（历史记录；未核实或已过期） |
-| `tokenizers` | 0.23.2（声明） | 0.23.2 | 生产 | packages/base/package.json | —（未扫描） |
+| `tokenizers` | 0.23.2（声明） | 0.23.2 | 生产 | .workloom-runtime-deps/package.json、packages/base/package.json | —（未扫描） |
 | `tsx` | 4.23.12 / 4.23.13 | 4.23.12 / ^4.23.12 / ^4.23.13 | 开发/生产 | .workloom-runtime-deps/package.json、apps/server/package.json、package.json 等 4 处 | 4.23.13（历史记录；未核实或已过期） |
 | `typescript` | 5.9.0 / 7.0.2 | ^5.9.0 / ^7.0.2 | 开发 | apps/server/package.json、apps/web/package.json、apps/webb/package.json 等 12 处 | 7.0.2（历史记录；未核实或已过期） |
 | `typescript-governance → npm:typescript` | 5.9.3 | npm:typescript@5.9.3 | 开发 | package.json | 7.0.2（历史记录；未核实或已过期） |

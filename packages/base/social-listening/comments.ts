@@ -197,8 +197,8 @@ export interface ProcessDeps {
   /** 敏感词表（G10 block 级；行业包/工作区配置供给，默认空） */
   sensitiveWords?: string[];
   /**
-   * 视频/GrowthTest 的系统自动审批。默认遵循 VIDEO_AUTO_APPROVAL 开关；
-   * 只取消 review 的人类等待，原意图分类、敏感词 block、候选回复与告警全部保留。
+   * 视频/GrowthTest 的系统自动审批。基础包默认关闭，只有已经证明调用方处于
+   * AI 视频域的入口才能显式打开；原意图分类、敏感词 block、候选回复与告警全部保留。
    */
   autoApproveReview?: boolean;
 }
@@ -224,19 +224,34 @@ export async function processComment(
   commentId: string,
   deps: ProcessDeps = {},
 ): Promise<ProcessResult | null> {
-  /* ---- 读取 + 分类 + 分流（纯计算段，先拿行） ---- */
+  /* ---- 原子认领 + 分类 + 分流（并发重复派遣不能重复外发） ---- */
   let comment: CommentRow | null = null;
+  let claimed = false;
   {
     const client = await app.connect();
     try {
       // 事务级 RLS 上下文必须在显式事务内设置：autocommit 下 set_config(...,true) 语句结束即失效
       await client.query("BEGIN");
       await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
-      const r = await client.query<CommentRow>(
-        `SELECT * FROM comments WHERE workspace_id=$1 AND id=$2`,
+      /**
+       * 先认领再走外部发送。若进程在发送中崩溃，评论保持 manual 可见并由人处理；
+       * 并发第二个调用看到 manual 后幂等返回，绝不重复调用 ReplySender。
+       */
+      const claimedRow = await client.query<CommentRow>(
+        `UPDATE comments SET status='manual', route_level='review'
+          WHERE workspace_id=$1 AND id=$2 AND status='new'
+          RETURNING *`,
         [scope.workspaceId, commentId],
       );
-      comment = r.rows[0] ?? null;
+      comment = claimedRow.rows[0] ?? null;
+      claimed = Boolean(comment);
+      if (!comment) {
+        const r = await client.query<CommentRow>(
+          `SELECT * FROM comments WHERE workspace_id=$1 AND id=$2`,
+          [scope.workspaceId, commentId],
+        );
+        comment = r.rows[0] ?? null;
+      }
       await client.query("COMMIT");
     } catch (err) {
       await client.query("ROLLBACK").catch(() => undefined);
@@ -246,7 +261,7 @@ export async function processComment(
     }
   }
   if (!comment) return null;
-  if (comment.status !== "new") {
+  if (!claimed) {
     return {
       commentId,
       intent: comment.intent ?? "other",
@@ -258,7 +273,7 @@ export async function processComment(
   const { intent, source } = await classifyIntent(comment.text, deps.classifier);
   const decision = routeComment(intent, comment.text, deps.sensitiveWords ?? []);
   const autoApproved = decision.level === "review"
-    && (deps.autoApproveReview ?? process.env.VIDEO_AUTO_APPROVAL !== "0");
+    && deps.autoApproveReview === true;
   const executionDecision: RouteDecision = autoApproved
     ? {
         ...decision,
@@ -269,29 +284,35 @@ export async function processComment(
 
   /* ---- 候选回复（review/auto 都需要；block 不生成） ---- */
   let candidate: string | null = null;
+  let generationFailed = false;
   if (executionDecision.level !== "block") {
     try {
       candidate = deps.generator ? await deps.generator.generate(comment) : fallbackReply({ ...comment, intent });
     } catch {
-      candidate = fallbackReply({ ...comment, intent }); // 生成失败 → 兜底模板（降级不伪造）
+      // 生成失败保留保守草稿供人工处理，但不把兜底模板冒充生成结果自动外发。
+      candidate = fallbackReply({ ...comment, intent });
+      generationFailed = true;
     }
   }
 
   /* ---- auto 级外发（须 sender 注入；未注入按 review 挂起，不静默丢弃） ---- */
   let receipt: { synced: boolean; receiptId?: string; evidenceUri?: string } | null = null;
   let sendFailed: string | null = null;
-  if (executionDecision.level === "auto" && candidate !== null && deps.sender) {
+  if (executionDecision.level === "auto" && candidate !== null && deps.sender && !generationFailed) {
     try {
       receipt = await deps.sender.send({ ...comment, intent }, candidate);
     } catch (err) {
       sendFailed = err instanceof Error ? err.message : String(err); // 外发失败 → 转人工
     }
   }
-  const effective: RouteDecision = executionDecision.level === "auto" && (!deps.sender || sendFailed)
+  const effective: RouteDecision = executionDecision.level === "auto"
+    && (generationFailed || !deps.sender || sendFailed)
     ? {
         level: "auto",
         alert: executionDecision.alert,
-        reason: sendFailed
+        reason: generationFailed
+          ? "候选回复生成失败，保守草稿转人工处理（不自动外发）"
+          : sendFailed
           ? `外发失败转人工处理（不重新审批）：${sendFailed}`
           : "系统已自动审批；外发通道未注入，回复草稿转人工处理（不重新审批）",
       }
@@ -334,7 +355,7 @@ export async function processComment(
         commentId, intent, classifySource: source, routeLevel: effective.level,
         qualityRouteLevel: decision.level, autoApproved,
         alert: effective.alert, reason: effective.reason, replyId: replyId ?? null,
-        candidate: candidate ?? null, sendFailed,
+        candidate: candidate ?? null, sendFailed, generationFailed,
       },
       basis: [effective.reason],
     }, {

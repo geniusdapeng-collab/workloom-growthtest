@@ -1,5 +1,15 @@
 # Changelog
 
+## [video-pipeline-stress-repair] - 2026-10-31 · AI 视频预生产收口与 60 场景排雷（T-2026-1031-9004）
+
+- 新增真实预生产最终化资格合同：除 prompt、时长、画幅和 PipelineGuard 外，逐镜核验人物 ID、`PENDING_GENERATION`、当前活动定妆照、授权、空镜冲突、PRD 角色映射与 G5 跳过原因；任何缺口均阻断 G8。
+- `data-pipeline-finalize.mts` 现输出 `characterQualification`，真实 m3 / n21 样例因未完成人物绑定返回 `blocked` 与 exit 4，不再误报 `eligible_pending_G8`。
+- 自动审批按装配器记录的岗位来源包、实际工具与显式视频门三重绑定；组合工作区中的 GEO 发布、评论和投放不再被视频策略放行。
+- G11 改用真实项目非 mock 算力用量，并在标准渲染、白板与解说片三个提交入口确定性停机；G10 接通生产处理入口，生成/外发失败保留为可见人工草稿，并发重复派遣只允许一个处理器认领；控制面自动门必须绑定当前阶段、事实快照、产物角色与 schema。
+- 修复包级标准测试依赖进程 cwd 的问题；video-studio 101 个测试文件 / 1,812 项、server video 29 个文件 / 884 项通过。
+- 新增 20 营销 + 20 叙事 + 20 异常的可复跑确定性矩阵；全程零视频供应商提交、零付费生成请求。
+- 刷新每产品 runtime 依赖锁，使 `tokenizers` 与当前 pnpm 精确依赖闭包一致。
+
 ## [video-auto-approval] - 2026-10-31 · 视频管线取消人类审批等待（T-2026-1031-9003）
 
 - 新增 `workloom.video-auto-approval/v1`：视频管线 review 在原有质量检查完成后由系统自动裁决，不再生成新的 `wait_human` / `pending_review`。

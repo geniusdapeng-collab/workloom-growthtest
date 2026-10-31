@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M11",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "973eba5e7df4ff5a5d141030deaf45f1161ef46845521e1d12f118600a961ef2"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "闻声 Air 降噪耳机",
+        "brand": "闻声",
+        "category": "消费电子",
+        "model": "Air",
+        "sellingPoints": [
+          "降噪模式",
+          "轻量佩戴",
+          "双设备连接"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "闻声 Air 降噪耳机",
+        "brand": {
+          "name": "闻声"
+        },
+        "category": "消费电子"
+      },
+      "dataMining": {
+        "name": "闻声 Air 降噪耳机",
+        "brand": "闻声",
+        "category": "消费电子",
+        "model": "Air",
+        "sellingPointCandidates": [
+          "降噪模式",
+          "轻量佩戴",
+          "双设备连接"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给闻声 Air 降噪耳机做一条 B 站地铁通勤评测短片，突出降噪模式、轻量佩戴和双设备连接\n[需求口径] 时长：30秒；画幅：9:16；平台：bilibili；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "闻声 Air 降噪耳机",
+    "queries": [
+      {
+        "q": "闻声 Air 降噪耳机 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "闻声 Air 降噪耳机 消费电子 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "闻声 Air 降噪耳机 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "闻声 Air 降噪耳机 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "闻声 Air 降噪耳机 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "闻声 Air 降噪耳机 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "闻声 Air 降噪耳机 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "闻声 Air 降噪耳机 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "e7ff9ec854c74db53a533c3bd752b8726c574cc87532884e899cf1189c86edff"
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.286Z"
+}

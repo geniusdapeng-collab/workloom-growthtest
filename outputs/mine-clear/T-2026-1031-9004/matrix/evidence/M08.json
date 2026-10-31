@@ -1,0 +1,115 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "M08",
+  "category": "marketing",
+  "expected": "MARKETING_READY",
+  "actual": "MARKETING_READY",
+  "pass": true,
+  "mode": "production-router",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+    "caseHash": "0e6be50dfcc55e13ce36c3067a36bb428d400fde5e00ae7cbe1fbe5f18d4d6d4"
+  },
+  "output": {
+    "route": {
+      "route": "marketing",
+      "confidence": 1,
+      "via": "metadata",
+      "rationale": "调用方显式指定 marketing",
+      "signals": {
+        "marketing": [],
+        "narrative": [],
+        "explainer": []
+      },
+      "product": {
+        "name": "山岚 CityShell 冲锋衣",
+        "brand": "山岚",
+        "category": "户外服装",
+        "model": "CityShell",
+        "sellingPoints": [
+          "防风",
+          "轻量",
+          "可折叠收纳"
+        ],
+        "source": "metadata"
+      }
+    },
+    "metadata": {
+      "brief": {
+        "product": "山岚 CityShell 冲锋衣",
+        "brand": {
+          "name": "山岚"
+        },
+        "category": "户外服装"
+      },
+      "dataMining": {
+        "name": "山岚 CityShell 冲锋衣",
+        "brand": "山岚",
+        "category": "户外服装",
+        "model": "CityShell",
+        "sellingPointCandidates": [
+          "防风",
+          "轻量",
+          "可折叠收纳"
+        ]
+      },
+      "pipelineRoute": {
+        "kind": "marketing",
+        "via": "metadata",
+        "confidence": 1,
+        "productSource": "metadata"
+      }
+    },
+    "effectiveIntent": "给山岚 CityShell 冲锋衣做一条抖音城市通勤种草，突出防风、轻量和可折叠收纳\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+    "themeInputContainsProduct": true,
+    "queryBase": "山岚 CityShell 冲锋衣",
+    "queries": [
+      {
+        "q": "山岚 CityShell 冲锋衣 官网",
+        "intent": "official_site",
+        "channel": "官网"
+      },
+      {
+        "q": "山岚 CityShell 冲锋衣 户外服装 旗舰店 商品页",
+        "intent": "flagship_page",
+        "channel": "电商旗舰店"
+      },
+      {
+        "q": "山岚 CityShell 冲锋衣 参数 规格",
+        "intent": "specs",
+        "channel": "官网/电商详情"
+      },
+      {
+        "q": "山岚 CityShell 冲锋衣 价格",
+        "intent": "price",
+        "channel": "电商"
+      },
+      {
+        "q": "山岚 CityShell 冲锋衣 官方产品图 高清",
+        "intent": "official_images",
+        "channel": "官网/旗舰店"
+      },
+      {
+        "q": "山岚 CityShell 冲锋衣 实拍 开箱",
+        "intent": "real_shots",
+        "channel": "社媒/评测"
+      },
+      {
+        "q": "山岚 CityShell 冲锋衣 白底图",
+        "intent": "white_bg",
+        "channel": "电商详情"
+      },
+      {
+        "q": "山岚 CityShell 冲锋衣 发布 上市 时间",
+        "intent": "model_verify",
+        "channel": "官网/新闻"
+      }
+    ],
+    "facts": {
+      "claims": 9,
+      "factHash": "80a0baac225139897015b48800a68786cfb3b4f5638f0d586cb831d7f969bc8a"
+    }
+  },
+  "capturedAt": "2026-10-31T15:22:04.283Z"
+}

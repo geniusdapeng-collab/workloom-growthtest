@@ -1,6 +1,6 @@
 ---
 name: bgm-vocal-separation
-description: 人声分离纪律官方套件（随 bundles/ai-video 分发）：什么时候真需要分轨、两档引擎链（demucs/audio-separator → ffmpeg 中心声道近似）、质量等级与诚实标注、单声道与失败处理、与 UVR/Spleeter 的关系。安装后被 BGM 配乐师调用；绑定围栏 G-BGM0..G-BGM5，卸载即撤销。
+description: 人声分离纪律官方套件（随 bundles/ai-video 分发）：什么时候真需要分轨、两档引擎链（demucs/audio-separator → ffmpeg 中心声道近似）、质量等级与诚实标注、单声道与失败处理、与 UVR/Spleeter 的关系。安装后被 BGM 配乐师调用；绑定围栏：G-BGM0/G-BGM3，卸载即撤销。
 ---
 
 # 人声分离（什么时候要、怎么要、怎么不吹）

@@ -1,0 +1,368 @@
+{
+  "success": false,
+  "stages": {
+    "creativeTheme": {
+      "data": {
+        "meta": {
+          "version": "2.1.8-fix-context",
+          "generated_at": "2026-10-31",
+          "total_tasks": 1,
+          "batch_name": "用户定制生成",
+          "purpose": "基于用户输入的定向创意主题生成"
+        },
+        "tasks": [
+          {
+            "duration_sec": 30,
+            "tone": "温暖治愈",
+            "theme": "雨夜旧灯未凉",
+            "description": "雨夜加班淋雨归来的陈卓，面对冷清出租屋；他拧亮掉漆旧台灯，暖光铺开，像有人一直替他留门。",
+            "type": "温情品牌故事短片",
+            "visual_style": "参考《海街日记》是枝裕和式生活流写实，低照度暖钨丝光与雨夜冷蓝环境光对切，手持轻晃贴近人物呼吸",
+            "dialogue_requirement": "无台词；仅保留雨声、钥匙转动、灯钮咔哒与呼吸声，禁止商品参数或价格口播。",
+            "special_notes": "特写：雨珠沿伞骨滑落；特写：陈卓指腹擦过灯罩旧划痕；特写：松涩旋钮被拧亮；特写：暖光映亮他眼里的水汽。物理细节：老旧台灯漆面磨损、灯罩边缘掉漆、旋钮松涩、外套肩头湿痕、门锁旧痕；全片不出现商品参数、价格与购物车口播。",
+            "duration": "30秒",
+            "aspect_ratio": "9:16",
+            "platform": "抖音",
+            "creative_style": 0.6,
+            "model_anchor": {
+              "id": "chen-zhuo",
+              "name": "陈卓",
+              "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+              "authorization": "real-authorized"
+            },
+            "pressureAnchors": [
+              "PA-09"
+            ],
+            "target_audience": "18-35岁在一二线城市租房打拼的青年上班族，夜归人群，重视生活质感与情感共鸣的抖音用户",
+            "_customType": true,
+            "task_id": "C-658",
+            "difficulty": "中",
+            "platform_id": "douyin",
+            "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+          }
+        ],
+        "quality": {
+          "total": 5,
+          "passed": true,
+          "failed": 0,
+          "checks": [
+            {
+              "name": "画面感测试",
+              "pass": true,
+              "message": "描述能否形成视觉画面"
+            },
+            {
+              "name": "可执行性测试",
+              "pass": true,
+              "message": "AI视频系统能否生成具体提示词"
+            },
+            {
+              "name": "时长合理性",
+              "pass": true,
+              "message": "时长是否在合理范围内（15秒-3分钟）"
+            },
+            {
+              "name": "参考影片",
+              "pass": true,
+              "message": "是否包含具体影片参考"
+            },
+            {
+              "name": "特殊要求",
+              "pass": true,
+              "message": "是否包含特殊要求说明"
+            }
+          ]
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+        "_briefProfile": {
+          "duration": 30,
+          "aspectRatio": "9:16",
+          "platform": "douyin"
+        }
+      },
+      "timing": 15659
+    },
+    "dossierEvidence": {
+      "injected": false,
+      "reason": "no-dossier"
+    },
+    "requirementDiscovery": {
+      "data": {
+        "upstreamFields": {
+          "type": "温情品牌故事短片",
+          "theme": "雨夜旧灯未凉",
+          "duration_sec": 30,
+          "tone": "温暖治愈",
+          "visual_style": "参考《海街日记》是枝裕和式生活流写实，低照度暖钨丝光与雨夜冷蓝环境光对切，手持轻晃贴近人物呼吸",
+          "dialogue_requirement": "无台词；仅保留雨声、钥匙转动、灯钮咔哒与呼吸声，禁止商品参数或价格口播。",
+          "special_notes": "特写：雨珠沿伞骨滑落；特写：陈卓指腹擦过灯罩旧划痕；特写：松涩旋钮被拧亮；特写：暖光映亮他眼里的水汽。物理细节：老旧台灯漆面磨损、灯罩边缘掉漆、旋钮松涩、外套肩头湿痕、门锁旧痕；全片不出现商品参数、价格与购物车口播。",
+          "target_audience": "18-35岁在一二线城市租房打拼的青年上班族，夜归人群，重视生活质感与情感共鸣的抖音用户",
+          "creative_style": 0.6,
+          "difficulty": "中",
+          "description": "雨夜加班淋雨归来的陈卓，面对冷清出租屋；他拧亮掉漆旧台灯，暖光铺开，像有人一直替他留门。",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+          "platform": "douyin",
+          "platform_id": "douyin",
+          "aspect_ratio": "9:16"
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interestTags": [
+              "深夜情绪短片",
+              "独居租房生活",
+              "出租屋改造与灯光",
+              "治愈系夜景vlog"
+            ],
+            "occupation": "一二线城市互联网、广告、服务业中长期加班、深夜通勤的租房上班族",
+            "consumptionLevel": "medium"
+          },
+          "secondaryAudience": [
+            "毕业后住过第一间出租屋、屋里也有一盏没换过的旧台灯的人",
+            "孩子在外地独居、习惯在老家替他们留一盏灯的父母",
+            "合租或同居中总是最后一个睡、习惯给晚归的人留灯的那个人"
+          ],
+          "emotionTriggers": [
+            "陈卓湿透的外套挂上门后挂钩，雨水顺着袖口一滴滴砸在地板上的两三秒：观众在这几秒里确认“这就是我今晚的样子”，代入发生在剧情开始前",
+            "手指拧动掉漆灯罩上那个磨白的旋钮，“啪”一声后暖光从灯泡边缘一圈一圈铺到墙上的过程：光比人先到，像有人替他应了门",
+            "镜头从灯下那块暖黄的小圈缓慢拉远，露出整间黑着、只有窗外雨声的出租屋：一个人守着一小块“被等待”的地方，反差瞬间击中独居者",
+            "掉漆的灯座、灯罩上一道旧划痕、被摸得发亮的开关特写：这盏灯不是道具，是上一位住客或家人留下的手温，逼观众想起自己家那盏一直没换的灯"
+          ],
+          "painPoints": [
+            "加班到深夜推开门，门后永远是黑的、没人问一句“到哪了”——在城市里“被等待”是极度稀缺的体验",
+            "房子是租来的，所以不敢投入、不愿布置，生活被压缩成“一个睡觉的地方”，质感与归属感同时缺席",
+            "关系被效率化：消息可以秒回，却没有人替你留一盏灯；承诺很多，守候很少"
+          ],
+          "contentExpectations": [
+            "无需字幕也能看懂的视觉叙事：雨夜、湿袖、黑屋、拧灯、暖光铺墙五步讲完“有人替我留门”，出海版本零台词零字幕也成立",
+            "一句可复述、可转发、可被抄去当自己配文的钉子台词，例如“灯亮着，就是有人在等你”，让观众拍下自家那盏灯时顺手带上",
+            "前3秒不出现品牌和logo，先给雨声与拧灯的手，品牌信息延后到暖光铺满整面墙之后自然落地",
+            "结尾留一个可模仿的具体动作（今晚给晚归的人留一盏灯、拍下自己那盏旧灯），把情绪直接转化成UGC参与"
+          ]
+        },
+        "sceneStructure": {
+          "opening": {
+            "duration": 6,
+            "purpose": "第一帧：雨珠从陈卓湿透的发梢滴到掉漆台灯座，灯罩歪着像闭着的眼；他站在漆黑出租屋门口，手指悬在开关前。会想知道这盏灯还能不能亮。",
+            "keyElements": [
+              "湿透的雨衣肩线",
+              "掉漆旧台灯",
+              "悬在开关上的手指"
+            ],
+            "emotionalBeat": "setup"
+          },
+          "scenes": [
+            {
+              "index": 1,
+              "duration": 5,
+              "purpose": "",
+              "keyElements": [
+                "滴水的塑料袋",
+                "灯罩裂痕",
+                "晃动的灯绳"
+              ],
+              "emotionalBeat": "rising"
+            },
+            {
+              "index": 2,
+              "duration": 13,
+              "purpose": "陈卓僵着的肩慢慢塌下，",
+              "keyElements": [
+                "亮起的暖黄灯泡",
+                "墙上的旧海报",
+                "搪瓷杯口热气"
+              ],
+              "emotionalBeat": "climax"
+            }
+          ],
+          "ending": {
+            "duration": 6,
+            "purpose": "以动作与环境声回应情绪从紧绷落到酸软，明白冷清出租屋里也有一盏灯替他守夜。",
+            "keyElements": [
+              "灯座上的发黄旧胶布",
+              "陈卓手背未干的雨珠",
+              "搪瓷杯口的热气"
+            ],
+            "emotionalBeat": "resolution"
+          },
+          "totalDuration": 30,
+          "sceneCount": 2,
+          "narrativeArc": "linear"
+        },
+        "riskAssessment": {
+          "technicalRisks": [
+            {
+              "risk": "手部精细触觉特写：陈卓指腹擦过灯罩旧划痕、松涩旋钮被拧亮——手指数量、关节弯折、指腹与漆面接触时的形变与遮挡是模型弱项，且这两个动作正是情感峰值",
+              "level": "high",
+              "impact": "一旦手指穿模、多指或划痕在指腹下'自我修复'，观众瞬间出戏，全片'旧物被温柔对待'的泪点直接垮塌，且该镜头无法用剪辑遮掩"
+            },
+            {
+              "risk": "雨夜低照度下的水物理：雨珠沿伞骨滑落的连续滑移动画，涉及表面张力、折射与伞骨接触边界，模型易生成糊状粘连液体、水珠穿模、雨丝方向与风向不一致",
+              "level": "high",
+              "impact": "这是片头定调意象镜头，若水珠呈现'果冻感'或方向错乱，写实生活流质感在第一秒就崩，观众对后续所有细节的信任度下降"
+            },
+            {
+              "risk": "眼部水汽大特写：暖光映亮他眼里的水汽，需瞳孔形状稳定、湿润高光与微表情同步，模型常出现眼球玻璃化、瞳孔变形、高光位置漂移",
+              "level": "high",
+              "impact": "情绪落点镜头，眼睛'死掉'会让全片情感归零，且观众对眼神异常极其敏感，无法靠配乐或剪辑挽救"
+            },
+            {
+              "risk": "跨镜头物理细节一致性：外套肩头湿痕、灯罩边缘掉漆缺口、门锁旧痕需在多个近景中位置与形态统一，且旋钮拧亮带来暗到暖的光线连续变化",
+              "level": "medium",
+              "impact": "湿痕忽左忽右或掉漆缺口形状跳变，会破坏'同一盏旧灯被岁月使用过'的真实感，单镜头内连续调光还易出现闪烁与色温跳变"
+            }
+          ],
+          "businessConstraints": [
+            "全球观众零背景知识可懂：情感必须由'擦拭旧划痕—拧亮灯—暖光映眼'的纯视觉动作链自明，不依赖中文语境、地域记忆或品牌历史预设",
+            "无字幕依赖：对白降至最低或全部留白，情绪由特写动作与环境声（雨声、旋钮涩响、灯丝轻鸣）承载，确保静音观看仍可读懂",
+            "无虚构特效元素：所有光源必须来自画面内实景灯具，禁止添加产品并不具备的奇幻光晕、光束或夸张雨幕特效，写实生活流不可破",
+            "品牌信息不得以参数、价格、购物车口播出现，须由道具磨损痕迹与人物使用动作自然承载，产品只作为'被用旧的日常物'存在"
+          ],
+          "mitigationSuggestions": [
+            "手部触觉拆为2-3个连续短特写：镜一仅指尖入画触碰灯罩边缘、镜二指腹贴划痕的局部框取（只露指腹与漆面，不露完整手型）、镜三手离开后划痕留在画面中；每镜单一动作、单一接触点，并用侧逆暖光剪影压低手指细节暴露",
+            "伞骨水珠改为'静态挂珠+镜头语言模拟滑落'：先给一颗已成形水珠的静止浅景深特写，再以缓慢下摇或轻微变焦制造滑落感，水珠始终处于前景虚化，回避模型生成连续流体滑移动画",
+            "眼部镜头用侧逆暖光勾边+眼睑半垂的3/4侧角度，避免正面直视大特写；以睫毛与下眼睑的湿润反光代替眼球内部反射，必要时用'湿眼—转头'两个半秒镜头组接，回避长时间眼球特写",
+            "以'参照定帧'锚定一致性：为外套湿痕、灯罩掉漆缺口、门锁旧痕各拍一张定帧作为每个镜头首帧图生视频，湿痕固定在靠近门的一侧肩；把'拧旋钮'与'灯罩透光'拆成两个硬切镜头，避免单镜头内连续调光造成的闪烁与色温跳变"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            {
+              "title": "《海街日记》",
+              "relevance": "high",
+              "keyTakeaway": "用固定机位的低机位长镜头拍摄吃饭、晾衣、点灯等日常动作，靠环境声与器物声（雨声、水壶、灯泡嗡鸣）承担情绪，让台词退到生活流之后"
+            },
+            {
+              "title": "《东京物语》",
+              "relevance": "high",
+              "keyTakeaway": "人物对坐时大量留白与空镜过渡（走廊、雨檐、熄灯后的窗），用静默的间隙替代直给的抒情，情绪落在人物未说完的半句话里"
+            },
+            {
+              "title": "《帕特森》",
+              "relevance": "medium",
+              "keyTakeaway": "以同一空间内重复出现的日常动作为节奏骨架，用细微变化（一盏灯的位置、一次额外的注视）标记情感递进，不靠事件推动"
+            },
+            {
+              "title": "《光》",
+              "relevance": "medium",
+              "keyTakeaway": "用手部特写与局部光斑（灯泡、水面反光）承载记忆线索，闪回不切时空而是叠化在同一光区里完成"
+            }
+          ],
+          "adReferences": [
+            {
+              "brand": "Apple《女儿》",
+              "relevance": "high",
+              "keyTakeaway": "60-90秒内用'误解—沉默—一个物件揭开真相'完成完整情感弧线：前15秒建立冷蓝雨夜困境，中段靠细节累积，最后10秒用一次拥抱或一句轻台词收束，不煽情"
+            },
+            {
+              "brand": "Apple《三分钟》",
+              "relevance": "high",
+              "keyTakeaway": "弧线结构：以倒计时的外部时间压力压缩情感，把全部情感押在最后一分钟的一次对视上；限制空间（车厢/站台）反而放大亲密感"
+            },
+            {
+              "brand": "宝矿力水特《雨》",
+              "relevance": "medium",
+              "keyTakeaway": "全片用雨声与手持跟拍的呼吸感建立情绪基底，对白极少，靠身体动作（擦水、递伞、点灯）完成关系转折"
+            }
+          ],
+          "styleReferences": [
+            "冷暖对切：雨夜外景统一压向冷蓝，室内与灯下用低照度钨丝暖光，不混色，靠人物进出与开关灯完成时空与情绪的切换",
+            "声音先行：雨声、灯泡嗡鸣、灯绳晃动、锅盖轻响构成叙事声场，配乐仅在情感落点进入或全程缺席",
+            "手持轻晃贴近人物呼吸：肩扛近身跟拍，机位低于视线，呼吸式轻微晃动，固定在人物半步之后，禁止炫技式运动",
+            "用手部与器物特写承载情感重量：拧灯泡、擦水渍、递热毛巾，让情感落在一个具体物件的传递上，不给脸部特写的答案"
+          ]
+        },
+        "confirmationStatus": {
+          "status": "pending",
+          "timestamp": "2026-10-31T05:34:32.966Z"
+        },
+        "_canonicalCharacters": [
+          {
+            "id": "chen-zhuo",
+            "characterId": "chen-zhuo",
+            "name": "陈卓",
+            "role": "protagonist",
+            "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "portraitPath": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "authorization": "real-authorized",
+            "description": "本次显式指定的授权模特；所有镜头必须绑定该 ID、当前定妆照与授权范围"
+          }
+        ]
+      },
+      "timing": 67591
+    },
+    "requirementReview": {
+      "status": "rejected",
+      "reason": "producer-rejected(G3_INSIGHT · score=64)",
+      "suggestions": [
+        "补齐动作契约：至少列出 3-4 个不可删动作（指尖触灯罩边缘、指腹贴划痕、拧旋钮至亮、肩线放松），按 2.3 缓解方案标注拆镜方式与单一接触点，供镜头卡 action 字段逐项继承。",
+        "重写四条场景契约：统一为“场景名、空间、时间与光线、目的、关键元素”五段式，删除“主体场景 1：”这类空字段，结尾改写为具体空间（如灯下桌面小圈），不再用情绪句替代场景定义。",
+        "统一场景计数：明确是 2 个空间（门口、灯下）还是 4 个叙事段，并在 2.2 与第四节使用同一口径。",
+        "清理 2.1 节：移除评审口径模板句与本地文件路径，仅保留受众画像与情绪触发点；模板说明应归入门说明区而非洞察正文。",
+        "对齐字数口径：以门自检实测值为准回填元数据，避免 4762 与 4763 并存导致核对歧义。",
+        "将禁止项拆为独立可校验条目（价格、商品参数、购物车口播、品牌露出时点），并写明前 3 秒不出现 logo 这类可判定约束。",
+        "补充竖屏 9:16 的构图与平台要求（douyin 安全区、首帧可读性），使 30s、9:16、douyin 三条要求落到可执行的契约项。"
+      ]
+    }
+  },
+  "errors": [],
+  "timing": {},
+  "confirmations": {
+    "creativeTheme": {
+      "approved": true,
+      "reviewedAt": "2026-10-31T05:34:32.950Z",
+      "theme": {
+        "duration_sec": 30,
+        "tone": "温暖治愈",
+        "theme": "雨夜旧灯未凉",
+        "description": "雨夜加班淋雨归来的陈卓，面对冷清出租屋；他拧亮掉漆旧台灯，暖光铺开，像有人一直替他留门。",
+        "type": "温情品牌故事短片",
+        "visual_style": "参考《海街日记》是枝裕和式生活流写实，低照度暖钨丝光与雨夜冷蓝环境光对切，手持轻晃贴近人物呼吸",
+        "dialogue_requirement": "无台词；仅保留雨声、钥匙转动、灯钮咔哒与呼吸声，禁止商品参数或价格口播。",
+        "special_notes": "特写：雨珠沿伞骨滑落；特写：陈卓指腹擦过灯罩旧划痕；特写：松涩旋钮被拧亮；特写：暖光映亮他眼里的水汽。物理细节：老旧台灯漆面磨损、灯罩边缘掉漆、旋钮松涩、外套肩头湿痕、门锁旧痕；全片不出现商品参数、价格与购物车口播。",
+        "duration": "30秒",
+        "aspect_ratio": "9:16",
+        "platform": "抖音",
+        "creative_style": 0.6,
+        "model_anchor": {
+          "id": "chen-zhuo",
+          "name": "陈卓",
+          "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+          "authorization": "real-authorized"
+        },
+        "pressureAnchors": [
+          "PA-09"
+        ],
+        "target_audience": "18-35岁在一二线城市租房打拼的青年上班族，夜归人群，重视生活质感与情感共鸣的抖音用户",
+        "_customType": true,
+        "task_id": "C-658",
+        "difficulty": "中",
+        "platform_id": "douyin",
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+      },
+      "reason": "producer-approved(G2_THEME · score=88)",
+      "suggestions": [],
+      "waitTimeMs": 8715
+    },
+    "requirementList": {
+      "approved": false,
+      "reviewedAt": "2026-10-31T05:35:55.094Z",
+      "requirementList": {},
+      "reason": "producer-rejected(G3_INSIGHT · score=64)",
+      "suggestions": [
+        "补齐动作契约：至少列出 3-4 个不可删动作（指尖触灯罩边缘、指腹贴划痕、拧旋钮至亮、肩线放松），按 2.3 缓解方案标注拆镜方式与单一接触点，供镜头卡 action 字段逐项继承。",
+        "重写四条场景契约：统一为“场景名、空间、时间与光线、目的、关键元素”五段式，删除“主体场景 1：”这类空字段，结尾改写为具体空间（如灯下桌面小圈），不再用情绪句替代场景定义。",
+        "统一场景计数：明确是 2 个空间（门口、灯下）还是 4 个叙事段，并在 2.2 与第四节使用同一口径。",
+        "清理 2.1 节：移除评审口径模板句与本地文件路径，仅保留受众画像与情绪触发点；模板说明应归入门说明区而非洞察正文。",
+        "对齐字数口径：以门自检实测值为准回填元数据，避免 4762 与 4763 并存导致核对歧义。",
+        "将禁止项拆为独立可校验条目（价格、商品参数、购物车口播、品牌露出时点），并写明前 3 秒不出现 logo 这类可判定约束。",
+        "补充竖屏 9:16 的构图与平台要求（douyin 安全区、首帧可读性），使 30s、9:16、douyin 三条要求落到可执行的契约项。"
+      ],
+      "waitTimeMs": 14519
+    }
+  },
+  "deliverables": {},
+  "totalWaitTimeMs": 23234,
+  "producerAttempts": 1
+}

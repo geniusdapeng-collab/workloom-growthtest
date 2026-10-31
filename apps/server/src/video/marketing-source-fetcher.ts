@@ -37,12 +37,13 @@ export function publicSourceAddress(address: string): boolean {
 export function sourceUrl(raw: string): URL {
   let url: URL;
   try { url = new URL(raw); } catch { throw new Error("SOURCE_URL_INVALID：来源不是有效网址"); }
-  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password || url.port) {
+  if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
     throw new Error("SOURCE_URL_INVALID：来源只接受无凭据的标准 HTTP/HTTPS 公网页面");
   }
   const host = url.hostname.replace(/^\[|\]$/g, "").toLowerCase();
   if (host === "localhost" || /\.(localhost|local|internal|test|invalid)$/.test(host)) throw new Error("SOURCE_URL_PRIVATE：内部或测试域名不能作正式来源");
   if (isIP(host) && !publicSourceAddress(host)) throw new Error("SOURCE_URL_PRIVATE：来源不能使用非公网IP");
+  if (url.port) throw new Error("SOURCE_URL_INVALID：来源只接受标准 HTTP/HTTPS 端口");
   url.hash = "";
   return url;
 }
@@ -51,7 +52,13 @@ export function sourceUrl(raw: string): URL {
 export const requestSource: SourceTransport = (url, address, signal) => new Promise((resolve, reject) => {
   const options: RequestOptions = {
     method: "GET", agent: false, signal, family: address.family,
-    headers: { "user-agent": "WorkLoom-FactSource/1.0", accept: "text/html,text/plain,application/json", "accept-encoding": "identity" },
+    headers: {
+      "user-agent": "WorkLoom-FactSource/1.0",
+      accept: "text/html,text/plain,application/json",
+      "accept-encoding": "identity",
+      // 部分官方只读 API 会拒绝空来源。固定为当前 URL 的同源根，不携带搜索页或其它站点信息。
+      referer: `${url.protocol}//${url.host}/`,
+    },
     lookup: ((_hostname: string, options: { all?: boolean }, done: (...args: unknown[]) => void) => {
       if (options.all) done(null, [address]); else done(null, address.address, address.family);
     }) as RequestOptions["lookup"],

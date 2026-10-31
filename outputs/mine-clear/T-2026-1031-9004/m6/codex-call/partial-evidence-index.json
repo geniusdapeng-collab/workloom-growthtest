@@ -1,0 +1,158 @@
+{
+  "schema": "workloom.evidence-index/v1",
+  "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c",
+  "runs": [
+    {
+      "path": "runs/regression-suite-25997-1793462987502-03987305.json",
+      "sha256": "a870e440a166d72afa634f12a30bb2a994c14c75aa2afd4b1989ae9496afbeef",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "runs/regression-suite-hotel-25997-1793462988288-b5cdef97.json",
+      "sha256": "dcac1d4544be85e20b143a5082414791dfba58bba5af8e644146384b9bafefdc",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "runs/regression-suite-geo-25997-1793462990632-8cd592f9.json",
+      "sha256": "e1d16c62cae4a938e65d0996c24ae19514b80656b4177526350ff87355d8c9ac",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "runs/regression-db-verify-chain-25997-1793462991094-ad0ec1c7.json",
+      "sha256": "93294d5e36c93fb7139bde2b2a2e0675bd80e8de26e78de73215f4f97aa6fdb5",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "runs/regression-typecheck-25997-1793462997680-894afb1f.json",
+      "sha256": "971886359bfe2cab32aa33f080e5c4a292927e595ac2e5f34ab8484b2012d9d5",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "runs/release-gate-25997-1793463008146-35b7cdfb.json",
+      "sha256": "4cd89444773c77e5a7c681184ca9d096d1d7b9f19f0ec5e2e24b0e94b4d9cc61",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "runs/regression-summary-25997-1793463008409-b3f60cdd.json",
+      "sha256": "3cc961d2e7cea440be359acd716f7f82ec78cc8a7401f2d11babef93edbbadf0",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "runs/matrix-25997-1793463009385-73bd8ac2.json",
+      "sha256": "d32e7efeb22162494550a59784fd8a9450470ebdb22c7cc1f4a6b790e0c0d289",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "execution/regression-suite-25997-1793462987502-03987305.log",
+      "sha256": "0b4ba758eced13d0282c122668d603b8a693ac82e185dfcc83b92281f356f0af",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-suite-25997-1793462987502-03987305-command.json",
+      "sha256": "41316d93797842bdcdd31075cdb144cb0f86c60eaf802b95ac4951bd8c64b4d0",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-suite-hotel-25997-1793462988288-b5cdef97.log",
+      "sha256": "1d00cad15fbc344bf9596d16fab19e066372969639cfa2e188abfb0653fa0be6",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-suite-hotel-25997-1793462988288-b5cdef97-command.json",
+      "sha256": "9c9f694a9a516a2c9454bd56ed100e067f0dc0436cf60c32977161774aff0bc7",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-suite-geo-25997-1793462990632-8cd592f9.log",
+      "sha256": "a34107037a322c0cca122491ec287b1d258362fc00d8bc95958c3b58d4bc8091",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-suite-geo-25997-1793462990632-8cd592f9-command.json",
+      "sha256": "4118d727c73c2ac0476c1bc4ea808b974fe0bc1a580c8926c077168c032de20a",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-db-verify-chain-25997-1793462991094-ad0ec1c7.log",
+      "sha256": "2d74176d5050e05d962e7f5f5aaedfd9323477adb9d324cdf93612fcf145bde5",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-db-verify-chain-25997-1793462991094-ad0ec1c7-command.json",
+      "sha256": "ef474e1e442c40d4793b421969bb80a9916de65dfcf6d58f2158d477ba91b698",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-typecheck-25997-1793462997680-894afb1f.log",
+      "sha256": "170f201a35087fc5e29e5726c17e99dd2841c9b3dc70ab18aeea65cebf24abfd",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-typecheck-25997-1793462997680-894afb1f-command.json",
+      "sha256": "522b2956f477ed2977b69163272a104f78aad45c448d8c3a68f7d1d6dc194270",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/release-gate-25997-1793463008146-35b7cdfb.log",
+      "sha256": "ec5a3511cf6805dc3d4ad233e71621ee4103fbf1796fbef815e4daf32765dfbd",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/release-gate-25997-1793463008146-35b7cdfb-command.json",
+      "sha256": "c7da6d836ce1864e5474a7d14ed563d8f1d2bc8351cc0844c4d75279c326f15d",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/regression-summary-25997-1793463008409-b3f60cdd.log",
+      "sha256": "71c8052fd21c6d05aa92aedb844be41a2c8d5ab7f4048f73f2e308a9da3cbfaa",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "regression/summary-input.json",
+      "sha256": "155398cf163574de5bca373db3ee38c69310b09f2081e99cf4d6de56f2e4d53d",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "regression/summary.json",
+      "sha256": "3c59b2f7bb89745c0586171f8d4ce50269c0937c24f49d037309c1a91fb4cade",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "execution/matrix-25997-1793463009385-73bd8ac2.log",
+      "sha256": "1bca27bafd01df944a7473bc41632499eb97abfbb826b37e900659e13f0c8f67",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "matrix/agent-matrix.csv",
+      "sha256": "1dd11207a2e366aa88f036f0cfa75a58811389ce335eb7a2110fccb92a82ff7d",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "matrix/agent-matrix.json",
+      "sha256": "f59f082b62de559290ddc30b3cea644295b7ea50c66f631c857050f9d0c01dcd",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "matrix/matrix-summary.json",
+      "sha256": "2eb59c880c29ad7430e151609c5d5689bce527445c1c75d36bdc60145a16a5b4",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "matrix/matrix-summary.md",
+      "sha256": "e9f5d46f5edeaefb5f9a19fbebab5ce6a0d3b0826cda52690f41a5346d381037",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "matrix/skill-matrix.csv",
+      "sha256": "19671fa1c378f231289b37b9727e34869312c02b491f0b3039c9dc87e6e885d6",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    },
+    {
+      "path": "matrix/skill-matrix.json",
+      "sha256": "377d2be70feb1d2e20253c904283f05d0ad8061c56a785dee984f63a91a70516",
+      "commit": "0d7d6aa196b3409e692d59d678a1f55f01f69d0c"
+    }
+  ]
+}

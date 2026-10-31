@@ -1,0 +1,65 @@
+{
+  "id": "MC-007",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P2",
+  "batch": 3,
+  "state": "open",
+  "title": "请求边界与 60 场景矩阵缺失，非法时长/画幅会静默丢失",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/pipeline-router.ts:612@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "670bcd4409a265ae887bb9b1203537c12e1f12b30e822f2fb92698d99555f012",
+      "note": "buildPipelineIntent 仅在 duration>0 时写口径，0/-5/9999 或非法画幅都没有统一失败信号。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/pipeline-router.ts",
+    "line": 612,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "buildPipelineIntent"
+  },
+  "trigger_path": "CLI/API 传入 0、负数、9999 秒或注入式画幅；参数被默认值或字符串直接吞下，没有在分流前阻断。",
+  "fix_plan": "增加 validatePipelineRequest 统一闸；提供 20 营销 + 20 叙事 + 20 异常的确定性矩阵并记录每例证据。",
+  "blast_radius": "所有视频预生产入口；合法默认值保持 30s / 9:16。",
+  "conflict_paths": ["scripts/tools/data-pipeline-run.mts"],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "60 条营销、叙事和异常输入",
+      "expect": "60/60 通过，付费生成请求 0、providerSubmission=false，每例证据 hash 可回读",
+      "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+      "exec": {
+        "file": "node_modules/.bin/tsx",
+        "args": [
+          "scripts/tools/ai-video-stress-matrix.mts",
+          "--out",
+          "outputs/mine-clear/T-2026-1031-9004/matrix"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "sample",
+      "given": "空意图、路径注入商品名、0/-5/9999 秒、非法画幅",
+      "expect": "分别抛出 INTENT_REQUIRED、PRODUCT_INVALID、DURATION_INVALID、ASPECT_INVALID",
+      "command": "vitest run pipeline-router.test.ts final-shot-contract.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/pipeline-router.test.ts",
+          "packages/video-studio/src/final-shot-contract.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/tsx scripts/tools/ai-video-stress-matrix.mts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "首轮矩阵 59/60，A16 暴露 PLATE_ASPECT_INVALID 与入口 ASPECT_INVALID 口径分叉；统一后 60/60。"
+}

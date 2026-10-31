@@ -1,0 +1,326 @@
+{
+ "at": "2026-10-31T15:51:31.332Z",
+ "spec": "docs/REAL-DEVICE-ACCEPTANCE-SPEC.md@rdas/v3.1",
+ "workspace": {
+  "id": "ws-geo",
+  "slug": "geo-growth",
+  "bundle": "geo-growth"
+ },
+ "window": {
+  "since": "2026-10-03T15:51:31.313Z",
+  "until": "2026-10-31T15:51:31.332Z"
+ },
+ "filters": {
+  "patterns": [
+   "suite.",
+   "suite-",
+   "apr-suite-",
+   "apr-e-",
+   "T-suite",
+   "suite.rdas."
+  ],
+  "rawThreads": 6,
+  "fixtureThreads": 0,
+  "rawApprovals": 4,
+  "fixtureApprovals": 1
+ },
+ "counts": {
+  "terminal": 3,
+  "delivered": 3,
+  "approvals": 3,
+  "unlinkedApprovals": 3
+ },
+ "overall": {
+  "delivered": {
+   "n": 3,
+   "adr0": {
+    "p": 1,
+    "lo": 0.4385,
+    "hi": 1,
+    "n": 3
+   },
+   "adr1": {
+    "p": 1,
+    "lo": 0.4385,
+    "hi": 1,
+    "n": 3
+   },
+   "adr2": {
+    "p": 1,
+    "lo": 0.4385,
+    "hi": 1,
+    "n": 3
+   },
+   "hir": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.5615,
+    "n": 3
+   },
+   "hirNi": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.5615,
+    "n": 3
+   },
+   "h34": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.5615,
+    "n": 3
+   },
+   "h1Count": 0,
+   "h2Count": 0,
+   "h3Count": 0,
+   "h4Count": 0,
+   "receiptCoverage": 0.3333333333333333,
+   "hmpoEstimateMs": 0,
+   "humanTouchThreads": 0
+  },
+  "terminal": {
+   "n": 3,
+   "adr0": {
+    "p": 1,
+    "lo": 0.4385,
+    "hi": 1,
+    "n": 3
+   },
+   "adr1": {
+    "p": 1,
+    "lo": 0.4385,
+    "hi": 1,
+    "n": 3
+   },
+   "adr2": {
+    "p": 1,
+    "lo": 0.4385,
+    "hi": 1,
+    "n": 3
+   },
+   "hir": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.5615,
+    "n": 3
+   },
+   "hirNi": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.5615,
+    "n": 3
+   },
+   "h34": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.5615,
+    "n": 3
+   },
+   "h1Count": 0,
+   "h2Count": 0,
+   "h3Count": 0,
+   "h4Count": 0,
+   "receiptCoverage": 0.3333333333333333,
+   "hmpoEstimateMs": 0,
+   "humanTouchThreads": 0
+  }
+ },
+ "byRole": {
+  "ads-optimizer": {
+   "n": 2,
+   "adr0": {
+    "p": 1,
+    "lo": 0.3424,
+    "hi": 1,
+    "n": 2
+   },
+   "adr1": {
+    "p": 1,
+    "lo": 0.3424,
+    "hi": 1,
+    "n": 2
+   },
+   "adr2": {
+    "p": 1,
+    "lo": 0.3424,
+    "hi": 1,
+    "n": 2
+   },
+   "hir": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.6576,
+    "n": 2
+   },
+   "hirNi": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.6576,
+    "n": 2
+   },
+   "h34": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.6576,
+    "n": 2
+   },
+   "h1Count": 0,
+   "h2Count": 0,
+   "h3Count": 0,
+   "h4Count": 0,
+   "receiptCoverage": 0,
+   "hmpoEstimateMs": 0,
+   "humanTouchThreads": 0
+  },
+  "review-analyst": {
+   "n": 1,
+   "adr0": {
+    "p": 1,
+    "lo": 0.2065,
+    "hi": 1,
+    "n": 1
+   },
+   "adr1": {
+    "p": 1,
+    "lo": 0.2065,
+    "hi": 1,
+    "n": 1
+   },
+   "adr2": {
+    "p": 1,
+    "lo": 0.2065,
+    "hi": 1,
+    "n": 1
+   },
+   "hir": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.7935,
+    "n": 1
+   },
+   "hirNi": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.7935,
+    "n": 1
+   },
+   "h34": {
+    "p": 0,
+    "lo": 0,
+    "hi": 0.7935,
+    "n": 1
+   },
+   "h1Count": 0,
+   "h2Count": 0,
+   "h3Count": 0,
+   "h4Count": 0,
+   "receiptCoverage": 1,
+   "hmpoEstimateMs": 0,
+   "humanTouchThreads": 0
+  }
+ },
+ "approveRate": {
+  "decided": 0,
+  "approve": {
+   "p": null,
+   "lo": null,
+   "hi": null,
+   "n": 0
+  },
+  "editRate": null
+ },
+ "anomalies": {
+  "deliveredWithoutReceipt": 2,
+  "pendingApprovalsOnDelivered": 0,
+  "nearZeroApprovals": 0,
+  "unlinkedApprovals": 3,
+  "failedThreads": 0,
+  "pausedThreads": 0,
+  "externalActionThreads": 0,
+  "externalWithoutReceipt": 0
+ },
+ "profileWarnings": [],
+ "method": {
+  "deliverable": "terminal thread（completed/failed/paused）；ADR 分母默认 completed",
+  "h1": "approval.status=approved 且无修改/驳回/接管",
+  "h2": "approval.status=edited 或 thread 内人类动作",
+  "h3": "approval.status=rejected 或 thread.paused_by 或 failed+人类动作",
+  "h4": "c_tickets payload 关联到 thread（返工线索）",
+  "hmpo": "approval latency proxy（decided_at-created_at）；缺少人工工时登记，覆盖不足时只作下限估计"
+ },
+ "dataQuality": [
+  "夹具过滤：threads 0/6；approvals 1/4（近零时长 0）",
+  "回执证据覆盖：33.33333333333333% 的 completed thread 有回执线索；覆盖不足时 ADR 不能等同于“结果已对账”",
+  "未关联审批：3（无法归因到交付件）",
+  "完成但无回执：2",
+  "外部动作线索：0 个交付链有外部动作事件；其中 0 个无回执证据（有则按“无回执宣告完成”红线候选复核）",
+  "橡皮图章信号：近零时长审批 0 件"
+ ],
+ "rows": [
+  {
+   "id": "T-128",
+   "mode": "ask",
+   "status": "completed",
+   "role": "ads-optimizer",
+   "title": "请问现在有哪些事项需要我决定？",
+   "classes": [
+    "H0"
+   ],
+   "adr0": true,
+   "adr1": true,
+   "adr2": true,
+   "h1": 0,
+   "h2": 0,
+   "h3": 0,
+   "h4": 0,
+   "humanTouches": 0,
+   "reworkTickets": 0,
+   "receiptEvents": 0,
+   "externalActions": 0,
+   "approvalLatencyMs": 0
+  },
+  {
+   "id": "T-127",
+   "mode": "ask",
+   "status": "completed",
+   "role": "ads-optimizer",
+   "title": "请问当前工作区最近有哪些关键进展？",
+   "classes": [
+    "H0"
+   ],
+   "adr0": true,
+   "adr1": true,
+   "adr2": true,
+   "h1": 0,
+   "h2": 0,
+   "h3": 0,
+   "h4": 0,
+   "humanTouches": 0,
+   "reworkTickets": 0,
+   "receiptEvents": 0,
+   "externalActions": 0,
+   "approvalLatencyMs": 0
+  },
+  {
+   "id": "T-G03",
+   "mode": "ask",
+   "status": "completed",
+   "role": "review-analyst",
+   "title": "周一全网存在感战报",
+   "classes": [
+    "H0"
+   ],
+   "adr0": true,
+   "adr1": true,
+   "adr2": true,
+   "h1": 0,
+   "h2": 0,
+   "h3": 0,
+   "h4": 0,
+   "humanTouches": 0,
+   "reworkTickets": 0,
+   "receiptEvents": 6,
+   "externalActions": 0,
+   "approvalLatencyMs": 0
+  }
+ ]
+}

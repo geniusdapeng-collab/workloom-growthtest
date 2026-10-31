@@ -1,0 +1,53 @@
+{
+  "projectId": "VID-STRESS-CANARY-M3",
+  "intent": "给米家空气净化器 4 Lite 做一条抖音种草视频，突出小户型适用、颗粒物净化和抗菌能力，不夸大销量或市场排名\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+  "intentRaw": "给米家空气净化器 4 Lite 做一条抖音种草视频，突出小户型适用、颗粒物净化和抗菌能力，不夸大销量或市场排名",
+  "pipeline": "marketing",
+  "routeDecision": {
+    "route": "marketing",
+    "confidence": 1,
+    "via": "metadata",
+    "rationale": "调用方显式指定 marketing",
+    "signals": {
+      "marketing": [],
+      "narrative": [],
+      "explainer": []
+    },
+    "product": {
+      "name": "米家空气净化器 4 Lite",
+      "brand": "米家",
+      "category": "空气净化器",
+      "source": "metadata"
+    }
+  },
+  "producerMode": "auto",
+  "portraitsEnabled": false,
+  "renderSubmitted": false,
+  "startedAt": "2026-10-31T14:04:20.618Z",
+  "finishedAt": "2026-10-31T14:20:00.770Z",
+  "elapsedMs": 940152,
+  "stages": [
+    "dataMining",
+    "creativeTheme",
+    "dossierEvidence",
+    "truthCheck",
+    "requirementDiscovery",
+    "emotionIntent",
+    "creativeIntensity",
+    "prdGeneration",
+    "scriptEngine",
+    "emotionArc",
+    "narrativeRhythm",
+    "productionEngine",
+    "sceneNumberMap",
+    "emotionShotSyntax",
+    "shotQuality",
+    "directorSkills",
+    "directorOptimization",
+    "microMotion",
+    "promptGuardian",
+    "portraitStudio",
+    "portraitResolver",
+    "pipelineGuard"
+  ]
+}

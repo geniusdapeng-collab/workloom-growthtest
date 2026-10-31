@@ -1,0 +1,16 @@
+{
+  "schema": "workloom.command-observation/v1",
+  "name": "suite",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "suite"
+    ]
+  },
+  "exit_code": 1,
+  "process_exit_code": 1,
+  "signal": null,
+  "started_at": "2026-10-31T15:46:39.903Z",
+  "finished_at": "2026-10-31T15:46:47.318Z"
+}

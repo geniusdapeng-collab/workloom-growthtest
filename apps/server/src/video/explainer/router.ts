@@ -24,6 +24,7 @@ import { submitGenJob, type RenderScriptLike } from "../gen/submit.js";
 import { submissionRequestHash } from "../gen/submission-ledger.js";
 import { registerLocalAsset } from "../media/register-local.js";
 import { loadActiveRules } from "../router.js";
+import { projectComputeBudget } from "../project-compute-budget.js";
 import { buildCardRegistry } from "./card-registry.js";
 import { engineDirOf, engineStatus } from "./engine.js";
 import { runMachineGates } from "./qa-gates.js";
@@ -206,6 +207,45 @@ export const explainerRouter = router({
       };
     }),
 
+  /** 回滚路径：关闭系统自动审批后，由当前人类成员显式批准当前清晰度的渲染脚本。 */
+  approveScript: writeProcedure
+    .input(z.object({
+      projectId: z.string().min(1).max(120),
+      shotbookId: z.string().min(1).max(120).optional(),
+      quality: ExplainerQualitySchema.default("hd"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      const row = input.shotbookId
+        ? await shotbookById(scope, input.shotbookId)
+        : await latestShotbook(scope, input.projectId);
+      if (!row || row.project_id !== input.projectId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "没有当前项目可批准的分镜版本" });
+      }
+      const scriptKey = `explainer-${row.id}${input.quality === "uhd" ? "-uhd" : ""}`;
+      const rows = await scopedQuery<RenderScriptLike>(
+        `SELECT s.* FROM render_scripts s JOIN workspaces w ON w.id=s.workspace_id
+          WHERE s.workspace_id=$1 AND s.script_key=$2 AND w.tenant_id=$3 AND s.project_id=$4
+          ORDER BY s.version DESC LIMIT 1`,
+        [scope.workspaceId, scriptKey, scope.tenantId, input.projectId], scope,
+      );
+      const script = rows[0];
+      if (!script) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "当前清晰度还没有待审渲染脚本；请先调用 submit 生成准备段与请求" });
+      }
+      try {
+        return await approveRenderScript(
+          getAppPool(), getGatewayPool(), scope, script.script_key, script.version,
+          { by: ctx.identity.memberNo },
+        );
+      } catch (error) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }),
+
   /** 提交渲染：准备段 + G8 + 生成任务（轮询由 render-poller 接管） */
   submit: writeProcedure
     .input(z.object({
@@ -234,6 +274,13 @@ export const explainerRouter = router({
       }
       if (row.shotbook.shots.some((s) => s.card === "placeholder")) {
         throw new TRPCError({ code: "PRECONDITION_FAILED", message: "该版本还是占位分镜（card=placeholder）——先生成 SHOTBOOK" });
+      }
+      const compute = await projectComputeBudget(getAppPool(), scope, input.projectId);
+      if (compute.used >= compute.cap) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `G11 项目算力预算已用尽（${compute.used}/${compute.cap} 秒）：停止继续提交解说片渲染`,
+        });
       }
       const idempotencyKey = renderKey(row.id, row.version, input.quality);
       // HD retains its existing script identity; UHD has a separate immutable request.
@@ -409,12 +456,20 @@ export const explainerRouter = router({
         {
           action: "render.submit",
           object: { type: "video_project", id: input.projectId },
-          context: { render_auto: videoAutoApprovalEnabled(), duration_sec: durationSec },
+          context: {
+            render_auto: videoAutoApprovalEnabled(),
+            duration_sec: durationSec,
+            project_compute_used: compute.used,
+            project_compute_cap: compute.cap,
+          },
         },
         active.rules as RuntimeRule[],
         active.defaultLevel,
       );
-      const autoReview = autoApproveVideoFence(rawVerdict);
+      const autoReview = autoApproveVideoFence(rawVerdict, {
+        scope: "ai-video",
+        allowDefaultReview: true,
+      });
       const verdict = autoReview.verdict;
       if (verdict.level === "block") {
         throw new TRPCError({
@@ -441,9 +496,15 @@ export const explainerRouter = router({
         });
       }
       if (scriptRow.status === "draft") {
+        if (!videoAutoApprovalEnabled()) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: "VIDEO_AUTO_APPROVAL=0：渲染脚本已生成但未批准；请由当前成员调用 video.explainer.approveScript 后重新提交",
+          });
+        }
         const approved = await approveRenderScript(getAppPool(), getGatewayPool(), scope, scriptKey, scriptRow.version, {
-          by: videoAutoApprovalEnabled() ? VIDEO_AUTO_APPROVAL_ACTOR_ID : ctx.identity.memberNo,
-          ...(videoAutoApprovalEnabled() ? { policyVersion: "workloom.video-auto-approval/v1" } : {}),
+          by: VIDEO_AUTO_APPROVAL_ACTOR_ID,
+          policyVersion: "workloom.video-auto-approval/v1",
         });
         scriptRow = approved.script;
       }

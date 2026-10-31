@@ -1,0 +1,75 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "matrix-98467-1793461890405-c26d36e1",
+  "command": "\"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/node_modules/.bin/tsx\" \"--env-file=.env\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/matrix.mts\" \"--out\" \"outputs/acceptance/matrix\" \"--env\" \"local-preview\" \"--profile\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json\" \"--evidence-root\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance\"",
+  "exec": {
+    "file": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/node_modules/.bin/tsx",
+    "args": [
+      "--env-file=.env",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/matrix.mts",
+      "--out",
+      "outputs/acceptance/matrix",
+      "--env",
+      "local-preview",
+      "--profile",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json",
+      "--evidence-root",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "matrix",
+    "environmentKind": "local-preview",
+    "executorCommit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+  },
+  "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:51:29.038Z",
+  "finished_at": "2026-10-31T15:51:30.405Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "execution/matrix-98467-1793461890405-c26d36e1.log",
+      "sha256": "6bc70a4aca160eda8bbb6c78d208604948ec50f2d68f6540add32797f3e9db8e",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "matrix/agent-matrix.csv",
+      "sha256": "1dd11207a2e366aa88f036f0cfa75a58811389ce335eb7a2110fccb92a82ff7d",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "matrix/agent-matrix.json",
+      "sha256": "da6aa9ba97093e37e2b06c2c2e41f3a7a70388344ae2f1746f46134bc0c9e84d",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "matrix/matrix-summary.json",
+      "sha256": "839142f13fe6f046ed81d3eb334478ec701f2a6f86b7b7ff9d182de4cf225874",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "matrix/matrix-summary.md",
+      "sha256": "18e4e5865b186725dff2436bae8c1e4def9582e699d19b15587258fd5bf39885",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "matrix/skill-matrix.csv",
+      "sha256": "4239f8db3dd4560ccd218eee4bf54573719cd50f0a38af2fc1259a965cc62079",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "matrix/skill-matrix.json",
+      "sha256": "5edd75db84919b364c2bc3734486894e4453caac3dce045f2de7d2980234149a",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "workloom.command-observation/v1",
+  "name": "typecheck",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "typecheck"
+    ]
+  },
+  "exit_code": 1,
+  "process_exit_code": 1,
+  "signal": null,
+  "started_at": "2026-10-31T15:51:12.235Z",
+  "finished_at": "2026-10-31T15:51:14.191Z"
+}

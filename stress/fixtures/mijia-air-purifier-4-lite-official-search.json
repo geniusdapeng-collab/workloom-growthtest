@@ -1,0 +1,55 @@
+{
+  "source": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+  "collectedAt": "2026-10-31T14:00:10+08:00",
+  "queries": {
+    "米家空气净化器 4 Lite 官网": [
+      {
+        "title": "米家空气净化器 4 Lite 官方商品数据",
+        "url": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+        "snippet": "小米商城公开商品接口：商品名称、价格、关键参数和官方图片"
+      }
+    ],
+    "米家空气净化器 4 Lite 空气净化器 旗舰店 商品页": [
+      {
+        "title": "米家空气净化器 4 Lite 官方商品数据",
+        "url": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+        "snippet": "小米商城公开商品接口：商品名称、价格、关键参数和官方图片"
+      }
+    ],
+    "米家空气净化器 4 Lite 参数 规格": [
+      {
+        "title": "米家空气净化器 4 Lite 官方商品数据",
+        "url": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+        "snippet": "小米商城公开商品接口：商品名称、价格、关键参数和官方图片"
+      }
+    ],
+    "米家空气净化器 4 Lite 价格": [
+      {
+        "title": "米家空气净化器 4 Lite 官方商品数据",
+        "url": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+        "snippet": "小米商城公开商品接口：商品名称、价格、关键参数和官方图片"
+      }
+    ],
+    "米家空气净化器 4 Lite 官方产品图 高清": [
+      {
+        "title": "米家空气净化器 4 Lite 官方商品数据",
+        "url": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+        "snippet": "小米商城公开商品接口：商品名称、价格、关键参数和官方图片"
+      }
+    ],
+    "米家空气净化器 4 Lite 实拍 开箱": [
+      {
+        "title": "米家空气净化器 4 Lite 官方商品数据",
+        "url": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+        "snippet": "小米商城公开商品接口：商品名称、价格、关键参数和官方图片"
+      }
+    ],
+    "米家空气净化器 4 Lite 白底图": [
+      {
+        "title": "米家空气净化器 4 Lite 官方商品数据",
+        "url": "https://api2.order.mi.com/product/view?product_id=15061&version=2",
+        "snippet": "小米商城公开商品接口：商品名称、价格、关键参数和官方图片"
+      }
+    ]
+  }
+}

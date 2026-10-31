@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A20",
+  "category": "abnormal",
+  "expected": "RENDER_SUBMIT_BLOCKED",
+  "actual": "RENDER_SUBMIT_BLOCKED",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "render-boundary",
+    "caseHash": "7410030768fbfece2f24298ab6b848e28aa878855fdf5168e90426a36eb85ab5"
+  },
+  "output": {
+    "error": "RENDER_SUBMIT_BLOCKED: status=blocked, providerSubmission=false, contractPass=false"
+  },
+  "capturedAt": "2026-10-31T15:22:04.677Z"
+}

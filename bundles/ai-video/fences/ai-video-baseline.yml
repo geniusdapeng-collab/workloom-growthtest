@@ -175,10 +175,10 @@ rules:
     level: review
     is_baseline: true
     match:
-      object_types: [budget_ledger]
+      object_types: [render_script, budget_ledger]
       actions: [render.submit]
     when: "context.project_compute_used >= context.project_compute_cap"
-    note: 单项目算力消耗达预算上限自动暂停后续渲染提交；review 人工裁决放行或砍需求，可升级为 block
+    note: 单项目算力消耗达预算上限时系统确定性暂停后续渲染提交；不得由自动审批降级放行，需调额或缩减需求后重试
 
   - rule_id: G12
     name: 投放加投必审

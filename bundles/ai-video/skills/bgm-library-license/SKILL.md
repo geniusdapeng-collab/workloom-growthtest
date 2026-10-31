@@ -1,6 +1,6 @@
 ---
 name: bgm-library-license
-description: 曲库与许可合规官方套件（随 bundles/ai-video 分发）：无版权曲库怎么接、许可白名单与商用红线、TASL 署名怎么出、AI 生成音乐的许可陷阱（MusicGen 权重 CC-BY-NC）、自算作曲为什么是默认路径。安装后被 BGM 配乐师调用；绑定围栏 G-BGM0..G-BGM5，卸载即撤销。
+description: 曲库与许可合规官方套件（随 bundles/ai-video 分发）：无版权曲库怎么接、许可白名单与商用红线、TASL 署名怎么出、AI 生成音乐的许可陷阱（MusicGen 权重 CC-BY-NC）、自算作曲为什么是默认路径。安装后被 BGM 配乐师调用；绑定围栏：G-BGM1/G-BGM5，卸载即撤销。
 ---
 
 # 曲库与许可（能不能商用，取决于许可，不取决于"是不是 AI 生成的"）

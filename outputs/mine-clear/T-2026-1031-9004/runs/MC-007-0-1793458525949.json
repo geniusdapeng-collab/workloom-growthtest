@@ -1,0 +1,37 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-007-0-1793458525949",
+  "command": "tsx scripts/tools/ai-video-stress-matrix.mts",
+  "exec": {
+    "file": "node_modules/.bin/tsx",
+    "args": [
+      "scripts/tools/ai-video-stress-matrix.mts",
+      "--out",
+      "outputs/mine-clear/T-2026-1031-9004/matrix"
+    ]
+  },
+  "actor": "codex-acceptance-v2-01a19273",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-007",
+    "assertion_index": 0
+  },
+  "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T14:55:25.949Z",
+  "finished_at": "2026-10-31T14:55:26.581Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-007-0-1793458525949.txt",
+      "sha256": "4e54a3c24fa9e8229e94f6f95238bf2b3858ae85dd87776fb81bb0f71948d4f1",
+      "commit": "783c929b47ecd8d7ff79c4a77cd286b040bd95c1"
+    }
+  ]
+}

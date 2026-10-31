@@ -35,6 +35,14 @@ export interface ValidatedStageFacts {
   stage: IntelStage; status: "source_bound" | "no_evidence"; payload: Record<string, unknown>;
   claims: ClaimEvidence[]; noEvidenceReason?: string;
 }
+
+export function assertMarketingFactsFresh(collectedAt: string, now = Date.now()): void {
+  const age = now - Date.parse(collectedAt);
+  if (!Number.isFinite(age) || age < -30_000 || age > 24 * 3600_000) {
+    throw new Error("MARKETING_FACTS_EXPIRED: 营销事实来源超过24小时有效期，请刷新来源后重新预生产");
+  }
+}
+
 const escapePointer = (value: string) => value.replace(/~/g, "~0").replace(/\//g, "~1");
 const sourceFields = new Set(["url", "source_url", "page_url", "price_source_url", "visual_source_url", "source", "channel", "suspect"]);
 function factLeaves(value: unknown, pointer = "", out = new Map<string, string | number | boolean>()): Map<string, string | number | boolean> {
@@ -59,7 +67,8 @@ export function validateStageFacts(stage: IntelStage, raw: unknown, sources: Sou
   for (const citation of extraction.citations) {
     if (!leaves.has(citation.pointer) || covered.has(citation.pointer)) throw new Error(`MARKETING_CITATION_INVALID：主张路径不存在或重复 ${citation.pointer}`);
     const source = sourceMap.get(citation.sourceId);
-    if (!source || renderSha256(source.text) !== source.textSha256) throw new Error("MARKETING_CITATION_INVALID：主张引用的正文不可核实");
+    if (!source) throw new Error("MARKETING_CITATION_INVALID：主张引用了未知来源");
+    if (renderSha256(source.text) !== source.textSha256) throw new Error("MARKETING_FACTS_CHANGED：主张引用的正文摘要已变化");
     const quoteStart = source.text.indexOf(citation.quote);
     if (quoteStart < 0) throw new Error("MARKETING_CITATION_INVALID：引文不是保存正文的连续原文");
     const value = leaves.get(citation.pointer)!;

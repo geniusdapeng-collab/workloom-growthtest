@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "A16",
+  "category": "abnormal",
+  "expected": "ASPECT_INVALID",
+  "actual": "ASPECT_INVALID",
+  "pass": true,
+  "mode": "production-contract",
+  "invocation": {
+    "function": "invalid-aspect",
+    "caseHash": "6c952a6ab31d5dee5d91d183948c0ed89d0c4d1d624aeac38208cc969b715ecd"
+  },
+  "output": {
+    "error": "ASPECT_INVALID: 画幅必须是有界宽高比，收到 9:16<script>"
+  },
+  "capturedAt": "2026-10-31T14:31:10.519Z"
+}

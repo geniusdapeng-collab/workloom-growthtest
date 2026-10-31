@@ -1,0 +1,56 @@
+{
+  "id": "MC-003",
+  "kind": "problem",
+  "level": "L2",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "发现 JSON 尾随文本被贪婪解析并静默回退规则",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js:296@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "9732b1debc526cc2dce0ab2cf1c7e8044bf0a780cff1c6bb9b66aac6978e1fad",
+      "note": "包含多个 JSON/尾随解释时使用贪婪匹配，合法首个对象也可能解析失败。"
+    },
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/llm-adapter.ts:306@67786d35a9e5a051a60df491e24a6892e8033f96",
+      "sha256": "0e1633d96bec8a080ec7b9a6f73b56ef9a307fce82019f096484877157064922",
+      "note": "reasonStructured 强依赖 forceJson，未接收首个平衡 JSON 后追加解释的合法回包。"
+    }
+  ],
+  "root_cause": {
+    "file": "vendor/supermickey/hyperreality-system/engines/requirement-discovery-engine.js",
+    "line": 296,
+    "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
+    "symbol": "BaseDiscoveryAgent._callLLM"
+  },
+  "trigger_path": "模型返回首个完整 JSON 后追加“补充说明”；贪婪正则跨对象失配，失败后走兜底规则，下游继续消费不完整发现。",
+  "fix_plan": "统一提取首个平衡 JSON；结构化输出失败时显式失败关闭，不把规则兜底伪装为模型结果。",
+  "blast_radius": "影响发现、风险、PRD 与 Phase3 的结构化模型回包；成功回包语义不变。",
+  "conflict_paths": ["apps/server/src/video/data-mining-executor.ts"],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "合法 JSON 后追加散文的模型响应",
+      "expect": "reasonStructured 解析首个平衡 JSON；vendor discovery 不降级",
+      "command": "vitest run configured-llm.test.ts vendor-compat.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/configured-llm.test.ts",
+          "packages/video-studio/src/vendor-compat.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/configured-llm.test.ts packages/video-studio/src/vendor-compat.test.ts"
+  },
+  "fixed_by": null,
+  "verified_by": null,
+  "notes": "审计发现来自 canary-n3 至 n21 的 JSON 尾随文本。"
+}

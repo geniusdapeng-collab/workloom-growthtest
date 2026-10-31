@@ -1,0 +1,7828 @@
+{
+ "summary": {
+  "generatedAt": "2026-10-31T16:07:45.627Z",
+  "spec": "docs/REAL-DEVICE-ACCEPTANCE-SPEC.md@rdas/v1",
+  "primaryBundle": "geo-growth",
+  "bundles": [
+   "hotel",
+   "ai-video",
+   "geo-growth"
+  ],
+  "compositionSource": "compose-api",
+  "compositionWarnings": [],
+  "workspaceId": "ws-geo",
+  "profileWarnings": [],
+  "runtimeConnected": true,
+  "runtimeError": null,
+  "counts": {
+   "agents": 82,
+   "agentsPass": 82,
+   "skills": 95,
+   "skillsPass": 95,
+   "warnings": 10,
+   "fenceRulesMerged": 121,
+   "fenceRulesActiveInWorkspace": 121,
+   "shadowedPresets": 4,
+   "perBundle": {
+    "geo-growth": 26,
+    "hotel": 16,
+    "ai-video": 40
+   }
+  },
+  "capabilityLayer": {
+   "status": "not-run",
+   "reason": "L8 能力层需要真实模型 + 专业场景评分卡；本脚本只覆盖 L0 契约层与 L1 运行层。"
+  },
+  "failures": {
+   "agents": [],
+   "skills": []
+  },
+  "warnings": {
+   "agents": [],
+   "skills": [
+    {
+     "skill": "ai-live-assistant",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "content-marketing",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "fast-scan",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "inspection-suite",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "ota-operations",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "overbooking-parity-guard",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "pricing-matrix",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "review-asset-mining",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "safety-compliance",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "staff-scheduler",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    }
+   ]
+  }
+ },
+ "rows": [
+  {
+   "preset_key": "ads-optimizer",
+   "name": "投放优化师",
+   "bundle": "geo-growth",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G12"
+   ],
+   "fences_effective": [
+    "G12"
+   ],
+   "skills": [],
+   "shadowed_from": [
+    "ai-video"
+   ],
+   "event_prefixes": [
+    "ads."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "权威=geo-growth，遮蔽=ai-video（已声明 presetOwners）"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 ads. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G12:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "被遮蔽包围栏已并入（G12）"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-ads-optimizer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "投放优化师 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth，遮蔽留痕=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G12:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "ai-receptionist",
+   "name": "AI接待员",
+   "bundle": "hotel",
+   "kind": "receptionist",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R21",
+    "R23",
+    "R24",
+    "R25"
+   ],
+   "fences_effective": [
+    "R21",
+    "R23",
+    "R24",
+    "R25"
+   ],
+   "skills": [
+    "lead-concierge"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "lead."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 lead. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（R21:review R23:review R24:block R25:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-ai-receptionist-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "AI接待员 v1.0 receptionist 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R21:review R23:review R24:block R25:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "audio-designer",
+   "name": "音频设计师",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6"
+   ],
+   "fences_effective": [
+    "G6"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "audio."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 audio. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-audio-designer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "音频设计师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "bgm-composer",
+   "name": "BGM配乐师",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-BGM0",
+    "G-BGM1",
+    "G-BGM2",
+    "G-BGM3",
+    "G-BGM4",
+    "G-BGM5",
+    "G-BGM6",
+    "G-BGM7",
+    "G-BGM8",
+    "G-BGM9"
+   ],
+   "fences_effective": [
+    "G-BGM0",
+    "G-BGM1",
+    "G-BGM2",
+    "G-BGM3",
+    "G-BGM4",
+    "G-BGM5",
+    "G-BGM6",
+    "G-BGM7",
+    "G-BGM8",
+    "G-BGM9"
+   ],
+   "skills": [
+    "bgm-score-design",
+    "bgm-audio-layering",
+    "bgm-vocal-separation",
+    "bgm-library-license",
+    "bgm-delivery-spec"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "bgm."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 bgm. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "10 条绑定全部存在于组合围栏并集（G-BGM0:auto G-BGM1:review G-BGM2:block G-BGM3:block G-BGM4:block G-BGM5:block G-BGM6:review G-BGM7:block G-BGM8:block G-BGM9:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "5 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 7 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=10"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-bgm-composer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "BGM配乐师 v1.1 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 10 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 5 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-BGM0:auto G-BGM1:review G-BGM2:block G-BGM3:block G-BGM4:block G-BGM5:block G-BGM6:review G-BGM7:block G-BGM8:block G-BGM9:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "channel-watcher",
+   "name": "渠道哨兵官",
+   "bundle": "hotel",
+   "kind": "intelligence",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R25"
+   ],
+   "fences_effective": [
+    "R25"
+   ],
+   "skills": [
+    "intent-radar",
+    "hotel-geo-content"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "intent."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 intent. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（R25:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-channel-watcher-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "渠道哨兵官 v1.0 intelligence 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R25:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "cinematographer",
+   "name": "摄影指导",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-KB0",
+    "G-KB1",
+    "G-KB2",
+    "G-KB3",
+    "G-KB4"
+   ],
+   "fences_effective": [
+    "G-KB0",
+    "G-KB1",
+    "G-KB2",
+    "G-KB3",
+    "G-KB4"
+   ],
+   "skills": [
+    "cinematography-kb"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "cine."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 cine. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "5 条绑定全部存在于组合围栏并集（G-KB0:auto G-KB1:auto G-KB2:review G-KB3:block G-KB4:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=5"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-cinematographer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "摄影指导 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 5 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-KB0:auto G-KB1:auto G-KB2:review G-KB3:block G-KB4:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "citation-analyst",
+   "name": "引用源分析师",
+   "bundle": "geo-growth",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GEO3"
+   ],
+   "fences_effective": [
+    "G-GEO3"
+   ],
+   "skills": [
+    "citation-reverse"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "citation."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 citation. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G-GEO3:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-citation-analyst）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "引用源分析师 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO3:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "colorist",
+   "name": "调色师",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-COL0",
+    "G-COL1",
+    "G-COL2",
+    "G-COL3",
+    "G-COL4"
+   ],
+   "fences_effective": [
+    "G-COL0",
+    "G-COL1",
+    "G-COL2",
+    "G-COL3",
+    "G-COL4"
+   ],
+   "skills": [
+    "color-grade",
+    "color-look-design",
+    "color-shot-matching",
+    "color-delivery-spec"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "color."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 color. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "5 条绑定全部存在于组合围栏并集（G-COL0:auto G-COL1:review G-COL2:block G-COL3:block G-COL4:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "4 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=5"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-colorist-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "调色师 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 5 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 4 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-COL0:auto G-COL1:review G-COL2:block G-COL3:block G-COL4:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "comment-operator",
+   "name": "评论区运营",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G10a",
+    "G10b",
+    "G10c",
+    "G10d"
+   ],
+   "fences_effective": [
+    "G10a",
+    "G10b",
+    "G10c",
+    "G10d"
+   ],
+   "skills": [
+    "comment-ops"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "comment."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 comment. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（G10a:auto G10b:review G10c:review G10d:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-comment-operator-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "评论区运营 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G10a:auto G10b:review G10c:review G10d:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "company-ceo",
+   "name": "公司CEO",
+   "bundle": "hotel",
+   "kind": "commander",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R17",
+    "R18",
+    "R19"
+   ],
+   "fences_effective": [
+    "G17",
+    "G18",
+    "R17",
+    "R18",
+    "R19"
+   ],
+   "skills": [
+    "morning-briefing"
+   ],
+   "shadowed_from": [
+    "geo-growth"
+   ],
+   "event_prefixes": [
+    "ceo."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "权威=hotel，遮蔽=geo-growth（已声明 presetOwners）"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 ceo. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "5 条绑定全部存在于组合围栏并集（G17:block G18:auto R17:block R18:block R19:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=5"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "被遮蔽包围栏已并入（G17,G18,R17,R18,R19）"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-company-ceo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "公司CEO v1.0 commander 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 5 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel，遮蔽留痕=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G17:block G18:auto R17:block R18:block R19:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "competitor-agent",
+   "name": "市场侦察官",
+   "bundle": "hotel",
+   "kind": "competitor",
+   "readonly": true,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [],
+   "fences_effective": [],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 无（只读岗位） 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "0 条绑定全部存在于组合围栏并集（无）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "只读岗位，写工具 0 个"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=0"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-competitor-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "市场侦察官 v1.1 competitor（只读） 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 0 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（无）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "compliance-officer",
+   "name": "合规审核员",
+   "bundle": "ai-video",
+   "kind": "reviewer",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G14"
+   ],
+   "fences_effective": [
+    "G14"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "compliance."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 compliance. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G14:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-compliance-officer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "合规审核员 v1.0 reviewer 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G14:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "content-agent",
+   "name": "内容主笔官",
+   "bundle": "hotel",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "R3"
+   ],
+   "fences_effective": [
+    "R3"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "content."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 content. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（R3:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-content-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "内容主笔官 v1.5 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R3:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "continuity-reviewer",
+   "name": "连贯审查官",
+   "bundle": "ai-video",
+   "kind": "reviewer",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6"
+   ],
+   "fences_effective": [
+    "G6"
+   ],
+   "skills": [
+    "director-review"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "continuity."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 continuity. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-continuity-reviewer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "连贯审查官 v1.0 reviewer 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "coupon-operator",
+   "name": "团购运营官",
+   "bundle": "hotel",
+   "kind": "coupon-ops",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "R22",
+    "R26",
+    "R2",
+    "R25"
+   ],
+   "fences_effective": [
+    "R2",
+    "R22",
+    "R25",
+    "R26"
+   ],
+   "skills": [
+    "coupon-ops"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "coupon."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 coupon. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（R2:block R22:block R25:review R26:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-coupon-operator-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "团购运营官 v1.0 coupon-ops 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R2:block R22:block R25:review R26:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "cover-designer",
+   "name": "封面设计师",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-SUB2",
+    "G-SUB3",
+    "G-MAT1"
+   ],
+   "fences_effective": [
+    "G-MAT1",
+    "G-SUB2",
+    "G-SUB3"
+   ],
+   "skills": [
+    "cover-design",
+    "cover-kb",
+    "font-selection",
+    "subtitle-layout-design",
+    "delivery-package-ops"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "cover."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 cover. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "3 条绑定全部存在于组合围栏并集（G-MAT1:block G-SUB2:block G-SUB3:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "5 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=3"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-cover-designer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "封面设计师 v1.1 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 3 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 5 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-MAT1:block G-SUB2:block G-SUB3:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "creative-planner",
+   "name": "创意策划",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G2"
+   ],
+   "fences_effective": [
+    "G2"
+   ],
+   "skills": [
+    "marketing-brief-parser"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "theme."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 theme. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G2:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-creative-planner-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "创意策划 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G2:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "creator-partner",
+   "name": "达人合作专员",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G15"
+   ],
+   "fences_effective": [
+    "G15"
+   ],
+   "skills": [
+    "deal-flow"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "creator."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 creator. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G15:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：deal-flow）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-creator-partner-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "达人合作专员 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G15:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "cro-designer",
+   "name": "承接转化设计师",
+   "bundle": "geo-growth",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GROW2",
+    "G15",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW2",
+    "G15",
+    "G18"
+   ],
+   "skills": [
+    "cro-playbook",
+    "lead-scoring"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.cro."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.cro. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "3 条绑定全部存在于组合围栏并集（G-GROW2:review G15:review G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=3"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-cro-designer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "承接转化设计师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 3 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW2:review G15:review G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "customer-success",
+   "name": "客户成功专员",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G15"
+   ],
+   "fences_effective": [
+    "G15"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "customer."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 customer. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G15:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-customer-success）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "客户成功专员 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G15:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "data-board-officer",
+   "name": "数据看板官",
+   "bundle": "geo-growth",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G18"
+   ],
+   "fences_effective": [
+    "G18"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.metrics."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.metrics. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-data-board-officer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "数据看板官 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "deal-manager",
+   "name": "商单经理",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G15"
+   ],
+   "fences_effective": [
+    "G15"
+   ],
+   "skills": [
+    "deal-flow"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "deal."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 deal. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G15:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：deal-flow）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 4（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-deal-manager-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "商单经理 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G15:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "desktop-agent",
+   "name": "数字执行官",
+   "bundle": "hotel",
+   "kind": "desktop",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "R2"
+   ],
+   "fences_effective": [
+    "R2"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "desktop."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 desktop. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（R2:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-desktop-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "数字执行官 v0.9 desktop 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R2:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "director",
+   "name": "总导演",
+   "bundle": "ai-video",
+   "kind": "orchestrator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7"
+   ],
+   "fences_effective": [
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7"
+   ],
+   "skills": [
+    "shot-prompt-craft"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "project."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 project. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "6 条绑定全部存在于组合围栏并集（G2:review G3:review G4:review G5:review G6:review G7:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=6"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-director-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "总导演 v1.0 orchestrator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 6 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G2:review G3:review G4:review G5:review G6:review G7:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "distribution-operator",
+   "name": "多平台分发专员",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G9"
+   ],
+   "fences_effective": [
+    "G9"
+   ],
+   "skills": [
+    "publish-ops"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "distribution."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 distribution. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G9:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-distribution-operator-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "多平台分发专员 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G9:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "entity-inspector",
+   "name": "实体一致性管理员",
+   "bundle": "geo-growth",
+   "kind": "reviewer",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-GEO2"
+   ],
+   "fences_effective": [
+    "G-GEO2"
+   ],
+   "skills": [
+    "entity-consistency-check"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "entity."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 entity. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G-GEO2:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-entity-inspector）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "实体一致性管理员 v1.0 reviewer 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO2:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "explainer-director",
+   "name": "口播编导",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-DLV1",
+    "G-VOICE4",
+    "G-MAT1"
+   ],
+   "fences_effective": [
+    "G-DLV1",
+    "G-MAT1",
+    "G-VOICE4"
+   ],
+   "skills": [
+    "talkcraft-ops",
+    "shot-prompt-craft",
+    "subtitle-layout-design",
+    "director-review"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "explainer.",
+    "explainer.render."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 explainer.,explainer.render. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "3 条绑定全部存在于组合围栏并集（G-DLV1:block G-MAT1:block G-VOICE4:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "4 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 7 / write_back 0（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=3"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-explainer-director-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "口播编导 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 3 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 4 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-DLV1:block G-MAT1:block G-VOICE4:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "field-inspector",
+   "name": "字段质检员",
+   "bundle": "ai-video",
+   "kind": "reviewer",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G7"
+   ],
+   "fences_effective": [
+    "G7"
+   ],
+   "skills": [
+    "shot-prompt-craft"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "field."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 field. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G7:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-field-inspector-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "字段质检员 v1.0 reviewer 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G7:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "frontdesk-agent",
+   "name": "前台接待官",
+   "bundle": "hotel",
+   "kind": "frontdesk",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R4",
+    "R13",
+    "R16"
+   ],
+   "fences_effective": [
+    "R13",
+    "R16",
+    "R4"
+   ],
+   "skills": [
+    "checkin-checkout",
+    "customer-service",
+    "handover-manager",
+    "night-audit-suite"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "frontdesk."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 frontdesk. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "3 条绑定全部存在于组合围栏并集（R13:review R16:block R4:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "4 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 4（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=3"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-frontdesk-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "前台接待官 v1.0 frontdesk 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 3 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 4 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R13:review R16:block R4:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "geo-content-planner",
+   "name": "GEO 内容策划",
+   "bundle": "geo-growth",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GEO1",
+    "G-GEO2",
+    "G-GEO3",
+    "G20"
+   ],
+   "fences_effective": [
+    "G-GEO1",
+    "G-GEO2",
+    "G-GEO3",
+    "G20"
+   ],
+   "skills": [
+    "ai-answer-rewrite"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "geo.content."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 geo.content. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（G-GEO1:review G-GEO2:block G-GEO3:block G20:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-geo-content-planner）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "GEO 内容策划 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO1:review G-GEO2:block G-GEO3:block G20:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "geo-researcher",
+   "name": "调研员",
+   "bundle": "geo-growth",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GEO2"
+   ],
+   "fences_effective": [
+    "G-GEO2"
+   ],
+   "skills": [
+    "geo-query-craft"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "geo.research."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 geo.research. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G-GEO2:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-geo-researcher）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "调研员 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO2:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "geo-scriptwriter",
+   "name": "脚本师",
+   "bundle": "geo-growth",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GEO2",
+    "G20"
+   ],
+   "fences_effective": [
+    "G-GEO2",
+    "G20"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.script."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.script. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（G-GEO2:block G20:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-geo-scriptwriter）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "脚本师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO2:block G20:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "group-ceo",
+   "name": "集团CEO",
+   "bundle": "geo-growth",
+   "kind": "orchestrator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G17",
+    "G18"
+   ],
+   "fences_effective": [
+    "G17",
+    "G18"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "ceo.group."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 ceo.group. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（G17:block G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-group-ceo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "集团CEO v1.0 orchestrator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G17:block G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "growth-experimenter",
+   "name": "增长实验官",
+   "bundle": "geo-growth",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-GROW3",
+    "G-GROW4",
+    "G12",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW3",
+    "G-GROW4",
+    "G12",
+    "G18"
+   ],
+   "skills": [
+    "experiment-design",
+    "incrementality-measurement"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.experiment."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.experiment. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（G-GROW3:block G-GROW4:auto G12:review G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-growth-experimenter）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "增长实验官 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW3:block G-GROW4:auto G12:review G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "growth-lead",
+   "name": "增长负责人",
+   "bundle": "geo-growth",
+   "kind": "orchestrator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-GROW1",
+    "G-GROW2",
+    "G12",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW1",
+    "G-GROW2",
+    "G12",
+    "G18"
+   ],
+   "skills": [
+    "budget-portfolio",
+    "growth-review"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.lead."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.lead. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（G-GROW1:review G-GROW2:review G12:review G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 4（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-growth-lead）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "增长负责人 v1.0 orchestrator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW1:review G-GROW2:review G12:review G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "growth-partnership-officer",
+   "name": "渠道增长官",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GROW2",
+    "G-GROW8",
+    "G15",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW2",
+    "G-GROW8",
+    "G15",
+    "G18"
+   ],
+   "skills": [
+    "growth-partnership"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.partnership."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.partnership. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（G-GROW2:review G-GROW8:block G15:review G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 4（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-growth-partnership-officer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "渠道增长官 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW2:review G-GROW8:block G15:review G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "growth-strategist",
+   "name": "增长策略师",
+   "bundle": "geo-growth",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GROW3",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW3",
+    "G18"
+   ],
+   "skills": [
+    "experiment-design",
+    "growth-review"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.strategy."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.strategy. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（G-GROW3:block G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-growth-strategist）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "增长策略师 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW3:block G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "guest-success",
+   "name": "住客满意官",
+   "bundle": "hotel",
+   "kind": "guest-success",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "R9",
+    "R24"
+   ],
+   "fences_effective": [
+    "R24",
+    "R9"
+   ],
+   "skills": [
+    "guest-profile-crm",
+    "retention-manager"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "guest."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 guest. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（R24:block R9:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-guest-success-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "住客满意官 v1.0 guest-success 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R24:block R9:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "hook-designer",
+   "name": "开场钩子设计师",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6",
+    "G7"
+   ],
+   "fences_effective": [
+    "G6",
+    "G7"
+   ],
+   "skills": [
+    "opening-hook-craft"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "hook."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 hook. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（G6:review G7:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-hook-designer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "开场钩子设计师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review G7:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "housekeeper-agent",
+   "name": "客房管家官",
+   "bundle": "hotel",
+   "kind": "housekeeper",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "R11",
+    "R14"
+   ],
+   "fences_effective": [
+    "R11",
+    "R14"
+   ],
+   "skills": [
+    "room-service-dispatch",
+    "maintenance-dispatch",
+    "inventory-procurement"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "housekeeping."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 housekeeping. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（R11:review R14:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "3 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-housekeeper-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "客房管家官 v1.0 housekeeper 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 3 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R11:review R14:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "insight-analyst",
+   "name": "策略分析师",
+   "bundle": "ai-video",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G3"
+   ],
+   "fences_effective": [
+    "G3"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "insight."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 insight. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G3:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-insight-analyst-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "策略分析师 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G3:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "inspection-agent",
+   "name": "品质巡检官",
+   "bundle": "hotel",
+   "kind": "inspection",
+   "readonly": true,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [],
+   "fences_effective": [],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 无（只读岗位） 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "0 条绑定全部存在于组合围栏并集（无）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "只读岗位，写工具 0 个"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=0"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-inspection-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "品质巡检官 v1.2 inspection（只读） 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 0 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（无）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "intel-binder",
+   "name": "情报官·装订",
+   "bundle": "ai-video",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G1"
+   ],
+   "fences_effective": [
+    "G1"
+   ],
+   "skills": [
+    "jenny-loom-research"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "dossier.bind."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 dossier.bind. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G1:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-intel-binder-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "情报官·装订 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G1:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "intel-collector",
+   "name": "情报官·采集",
+   "bundle": "ai-video",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G1"
+   ],
+   "fences_effective": [
+    "G1"
+   ],
+   "skills": [
+    "jenny-loom-research"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "dossier.collect."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 dossier.collect. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G1:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-intel-collector-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "情报官·采集 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G1:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "intel-competitor",
+   "name": "情报官·竞品",
+   "bundle": "ai-video",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G1"
+   ],
+   "fences_effective": [
+    "G1"
+   ],
+   "skills": [
+    "jenny-loom-research"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "dossier.competitor."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 dossier.competitor. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G1:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-intel-competitor-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "情报官·竞品 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G1:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "intel-reviewer",
+   "name": "情报官·评价",
+   "bundle": "ai-video",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G1"
+   ],
+   "fences_effective": [
+    "G1"
+   ],
+   "skills": [
+    "jenny-loom-research"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "dossier.review."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 dossier.review. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G1:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-intel-reviewer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "情报官·评价 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G1:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "intel-verifier",
+   "name": "情报官·核验",
+   "bundle": "ai-video",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G1"
+   ],
+   "fences_effective": [
+    "G1"
+   ],
+   "skills": [
+    "jenny-loom-research"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "dossier.verify."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 dossier.verify. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G1:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-intel-verifier-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "情报官·核验 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G1:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "ip-curator",
+   "name": "版权管理员",
+   "bundle": "ai-video",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G14"
+   ],
+   "fences_effective": [
+    "G14"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "ip."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 ip. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G14:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-ip-curator-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "版权管理员 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G14:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "lead-conversion-officer",
+   "name": "线索转化官",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-GROW2",
+    "G15",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW2",
+    "G15",
+    "G18"
+   ],
+   "skills": [
+    "lead-scoring",
+    "cro-playbook"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.conversion."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.conversion. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "3 条绑定全部存在于组合围栏并集（G-GROW2:review G15:review G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 4（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=3"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-lead-conversion-officer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "线索转化官 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 3 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW2:review G15:review G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "lifecycle-growth-officer",
+   "name": "生命周期增长官",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GROW2",
+    "G-GROW5",
+    "G-GROW7",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW2",
+    "G-GROW5",
+    "G-GROW7",
+    "G18"
+   ],
+   "skills": [
+    "lifecycle-growth",
+    "lead-scoring"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.lifecycle."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.lifecycle. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "4 条绑定全部存在于组合围栏并集（G-GROW2:review G-GROW5:block G-GROW7:block G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 4（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=4"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-lifecycle-growth-officer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "生命周期增长官 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 4 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW2:review G-GROW5:block G-GROW7:block G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "live-producer",
+   "name": "直播操盘手",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-GROW2",
+    "G-GROW4",
+    "G9",
+    "G12",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW2",
+    "G-GROW4",
+    "G12",
+    "G18",
+    "G9"
+   ],
+   "skills": [
+    "live-commerce",
+    "cro-playbook"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.live."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.live. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "5 条绑定全部存在于组合围栏并集（G-GROW2:review G-GROW4:auto G12:review G18:auto G9:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 4（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=5"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-live-producer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "直播操盘手 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 5 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW2:review G-GROW4:auto G12:review G18:auto G9:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "material-scout",
+   "name": "素材寻源员",
+   "bundle": "geo-growth",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-VIS1",
+    "G-VIS2"
+   ],
+   "fences_effective": [
+    "G-VIS1",
+    "G-VIS2"
+   ],
+   "skills": [
+    "material-scout",
+    "art-direction"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "material."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 material. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（G-VIS1:review G-VIS2:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-material-scout）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "素材寻源员 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-VIS1:review G-VIS2:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "media-portfolio-manager",
+   "name": "投放组合经理",
+   "bundle": "geo-growth",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GROW1",
+    "G12",
+    "G18"
+   ],
+   "fences_effective": [
+    "G-GROW1",
+    "G12",
+    "G18"
+   ],
+   "skills": [
+    "budget-portfolio",
+    "incrementality-measurement"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "growth.media."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 growth.media. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "3 条绑定全部存在于组合围栏并集（G-GROW1:review G12:review G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=3"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-media-portfolio-manager）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "投放组合经理 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 3 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GROW1:review G12:review G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "metrics-watcher",
+   "name": "数据看板官",
+   "bundle": "ai-video",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G13"
+   ],
+   "fences_effective": [
+    "G13"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "metrics."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 metrics. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G13:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-metrics-watcher-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "数据看板官 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G13:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "micromotion-stylist",
+   "name": "微动作增强师",
+   "bundle": "ai-video",
+   "kind": "artist",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6"
+   ],
+   "fences_effective": [
+    "G6"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "motion."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 motion. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-micromotion-stylist-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "微动作增强师 v1.0 artist 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "opening-designer",
+   "name": "片头设计师",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6"
+   ],
+   "fences_effective": [
+    "G6"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "opening."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 opening. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-opening-designer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "片头设计师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "owner-cockpit",
+   "name": "业主驾驶舱",
+   "bundle": "hotel",
+   "kind": "owner-cockpit",
+   "readonly": true,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [],
+   "fences_effective": [],
+   "skills": [
+    "finance-reporting",
+    "morning-briefing",
+    "incident-postmortem"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 无（只读岗位） 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "0 条绑定全部存在于组合围栏并集（无）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "3 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "只读岗位，写工具 0 个"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=0"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-owner-cockpit-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "业主驾驶舱 v1.0 owner-cockpit（只读） 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 0 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 3 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（无）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "phone-agent",
+   "name": "语音前台官",
+   "bundle": "hotel",
+   "kind": "phone",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R9",
+    "R13",
+    "R16"
+   ],
+   "fences_effective": [
+    "R13",
+    "R16",
+    "R9"
+   ],
+   "skills": [
+    "phone-concierge",
+    "customer-service"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "phone."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 phone. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "3 条绑定全部存在于组合围栏并集（R13:review R16:block R9:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "2 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=3"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-phone-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "语音前台官 v1.0 phone 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 3 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 2 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R13:review R16:block R9:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "portrait-artist",
+   "name": "定妆照美术指导",
+   "bundle": "ai-video",
+   "kind": "artist",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G5"
+   ],
+   "fences_effective": [
+    "G5"
+   ],
+   "skills": [
+    "portrait-studio"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "portrait."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 portrait. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G5:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-portrait-artist-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "定妆照美术指导 v1.0 artist 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G5:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "post-editor",
+   "name": "剪辑师",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G8",
+    "G-DLV0",
+    "G-DLV1",
+    "G-DLV2",
+    "G-DLV3",
+    "G-DLV4",
+    "G-DLV5",
+    "G-DLV6",
+    "G-DLV7",
+    "G-DLV8",
+    "G-DLV9"
+   ],
+   "fences_effective": [
+    "G-DLV0",
+    "G-DLV1",
+    "G-DLV2",
+    "G-DLV3",
+    "G-DLV4",
+    "G-DLV5",
+    "G-DLV6",
+    "G-DLV7",
+    "G-DLV8",
+    "G-DLV9",
+    "G8"
+   ],
+   "skills": [
+    "delivery-package-ops",
+    "delivery-revision-ops",
+    "post-quality-inspection"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "post.",
+    "delivery."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 post.,delivery. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "11 条绑定全部存在于组合围栏并集（G-DLV0:auto G-DLV1:block G-DLV2:block G-DLV3:block G-DLV4:block G-DLV5:review G-DLV6:block G-DLV7:block G-DLV8:block G-DLV9:block G8:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "3 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 7 / write_back 5（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=11"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-post-editor-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "剪辑师 v1.2 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 11 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 3 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-DLV0:auto G-DLV1:block G-DLV2:block G-DLV3:block G-DLV4:block G-DLV5:review G-DLV6:block G-DLV7:block G-DLV8:block G-DLV9:block G8:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "post-quality-inspector",
+   "name": "后期质检员",
+   "bundle": "ai-video",
+   "kind": "reviewer",
+   "readonly": true,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-DLV0",
+    "G-DLV1",
+    "G-DLV6",
+    "G-DLV7",
+    "G-DLV8",
+    "G-DLV9"
+   ],
+   "fences_effective": [
+    "G-DLV0",
+    "G-DLV1",
+    "G-DLV6",
+    "G-DLV7",
+    "G-DLV8",
+    "G-DLV9"
+   ],
+   "skills": [
+    "post-quality-inspection"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "post.quality."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 post.quality. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "6 条绑定全部存在于组合围栏并集（G-DLV0:auto G-DLV1:block G-DLV6:block G-DLV7:block G-DLV8:block G-DLV9:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "只读岗位，写工具 0 个"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=6"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-post-quality-inspector-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "后期质检员 v1.0 reviewer（只读） 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 6 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-DLV0:auto G-DLV1:block G-DLV6:block G-DLV7:block G-DLV8:block G-DLV9:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "prd-specialist",
+   "name": "制片人",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G4"
+   ],
+   "fences_effective": [
+    "G4"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "prd."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 prd. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G4:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-prd-specialist-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "制片人 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G4:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "pricing-agent",
+   "name": "收益定价官",
+   "bundle": "hotel",
+   "kind": "pricing",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R1",
+    "R2"
+   ],
+   "fences_effective": [
+    "R1",
+    "R2"
+   ],
+   "skills": [
+    "revenue-manager"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "price."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 price. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（R1:auto R2:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-pricing-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "收益定价官 v2.3 pricing 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R1:auto R2:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "private-domain-operator",
+   "name": "私域承接专员",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G10a",
+    "G10b",
+    "G10c",
+    "G10d",
+    "G15",
+    "G20"
+   ],
+   "fences_effective": [
+    "G10a",
+    "G10b",
+    "G10c",
+    "G10d",
+    "G15",
+    "G20"
+   ],
+   "skills": [
+    "dual-entry-inquiry"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "inquiry."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 inquiry. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "6 条绑定全部存在于组合围栏并集（G10a:auto G10b:review G10c:review G10d:block G15:review G20:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=6"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-private-domain-operator）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "私域承接专员 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 6 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G10a:auto G10b:review G10c:review G10d:block G15:review G20:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "producer",
+   "name": "制片人",
+   "bundle": "ai-video",
+   "kind": "reviewer",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G1",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7"
+   ],
+   "fences_effective": [
+    "G1",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7"
+   ],
+   "skills": [
+    "producer-gate-review"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "pipeline.gate.",
+    "producer."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 pipeline.gate.,producer. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "7 条绑定全部存在于组合围栏并集（G1:review G2:review G3:review G4:review G5:review G6:review G7:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=7"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-producer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "制片人 v1.0 reviewer 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 7 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G1:review G2:review G3:review G4:review G5:review G6:review G7:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "production-planner",
+   "name": "生产编排员",
+   "bundle": "geo-growth",
+   "kind": "orchestrator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G-GEO2"
+   ],
+   "fences_effective": [
+    "G-GEO2"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "production."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 production. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G-GEO2:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-production-planner）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "生产编排员 v1.0 orchestrator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO2:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "prompt-fuser",
+   "name": "提示词工程师",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6"
+   ],
+   "fences_effective": [
+    "G6"
+   ],
+   "skills": [
+    "shot-prompt-craft"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "prompt."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 prompt. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-prompt-fuser-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "提示词工程师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "publish-operator",
+   "name": "发布专员",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G9",
+    "G9a",
+    "G9b",
+    "G16",
+    "G20"
+   ],
+   "fences_effective": [
+    "G16",
+    "G20",
+    "G9",
+    "G9a",
+    "G9b"
+   ],
+   "skills": [],
+   "shadowed_from": [
+    "ai-video"
+   ],
+   "event_prefixes": [
+    "publish."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "权威=geo-growth，遮蔽=ai-video（已声明 presetOwners）"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 publish. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "5 条绑定全部存在于组合围栏并集（G16:block G20:block G9:review G9a:review G9b:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=5"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "被遮蔽包围栏已并入（G16,G20,G9,G9a,G9b）"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-publish-operator）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "发布专员 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 5 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth，遮蔽留痕=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G16:block G20:block G9:review G9a:review G9b:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "reconcile-agent",
+   "name": "财务司库官",
+   "bundle": "hotel",
+   "kind": "reconcile",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R4",
+    "R5"
+   ],
+   "fences_effective": [
+    "R4",
+    "R5"
+   ],
+   "skills": [
+    "channel-reconciler"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "order."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 order. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（R4:review R5:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-reconcile-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "财务司库官 v2.0 reconcile 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R4:review R5:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "render-operator",
+   "name": "渲染师",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G8"
+   ],
+   "fences_effective": [
+    "G8"
+   ],
+   "skills": [
+    "render-ops"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "render."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 render. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G8:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-render-operator-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "渲染师 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G8:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "review-agent",
+   "name": "口碑公关官",
+   "bundle": "hotel",
+   "kind": "review",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "R6"
+   ],
+   "fences_effective": [
+    "R6"
+   ],
+   "skills": [
+    "review-crisis"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "review."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 review. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（R6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-review-agent-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "口碑公关官 v1.8 review 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=hotel"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（R6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "review-analyst",
+   "name": "复盘分析师",
+   "bundle": "geo-growth",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G18"
+   ],
+   "fences_effective": [
+    "G13",
+    "G18"
+   ],
+   "skills": [
+    "dual-entry-inquiry"
+   ],
+   "shadowed_from": [
+    "ai-video"
+   ],
+   "event_prefixes": [
+    "report."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "权威=geo-growth，遮蔽=ai-video（已声明 presetOwners）"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 report. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（G13:auto G18:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 2 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "被遮蔽包围栏已并入（G13,G18）"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-review-analyst）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "复盘分析师 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth，遮蔽留痕=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G13:auto G18:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "scene-designer",
+   "name": "场景设计师",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6"
+   ],
+   "fences_effective": [
+    "G6"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "scene."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 scene. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-scene-designer-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "场景设计师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "scriptwriter",
+   "name": "剧本师",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G2",
+    "G6"
+   ],
+   "fences_effective": [
+    "G2",
+    "G6"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "script."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 script. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "2 条绑定全部存在于组合围栏并集（G2:review G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=2"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-scriptwriter-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "剧本师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 2 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G2:review G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "settlement-clerk",
+   "name": "分账对账员",
+   "bundle": "ai-video",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G13"
+   ],
+   "fences_effective": [
+    "G13"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "settlement."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 settlement. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G13:auto）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 3（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-settlement-clerk-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "分账对账员 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G13:auto）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "source-distributor",
+   "name": "信源分发专员",
+   "bundle": "geo-growth",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": true,
+   "fences": [
+    "G-GEO1",
+    "G-GEO2",
+    "G-GEO3",
+    "G16",
+    "G20"
+   ],
+   "fences_effective": [
+    "G-GEO1",
+    "G-GEO2",
+    "G-GEO3",
+    "G16",
+    "G20"
+   ],
+   "skills": [],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "source."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 source. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "5 条绑定全部存在于组合围栏并集（G-GEO1:review G-GEO2:block G-GEO3:block G16:block G20:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "0 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=true 围栏=5"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-source-distributor）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "信源分发专员 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 5 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 0 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO1:review G-GEO2:block G-GEO3:block G16:block G20:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "subtitle-stylist",
+   "name": "字幕师",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-SUB0",
+    "G-SUB1",
+    "G-SUB2",
+    "G-SUB3",
+    "G-SUB4",
+    "G-SUB5",
+    "G-SUB6"
+   ],
+   "fences_effective": [
+    "G-SUB0",
+    "G-SUB1",
+    "G-SUB2",
+    "G-SUB3",
+    "G-SUB4",
+    "G-SUB5",
+    "G-SUB6"
+   ],
+   "skills": [
+    "font-selection",
+    "subtitle-layout-design",
+    "caption-burnin-ops",
+    "font-license-compliance",
+    "subtitle-delivery-spec"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "subtitle."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 subtitle. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "7 条绑定全部存在于组合围栏并集（G-SUB0:auto G-SUB1:review G-SUB2:block G-SUB3:block G-SUB4:block G-SUB5:block G-SUB6:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "5 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 9 / write_back 7（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=7"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-subtitle-stylist-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "字幕师 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 7 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 5 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-SUB0:auto G-SUB1:review G-SUB2:block G-SUB3:block G-SUB4:block G-SUB5:block G-SUB6:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "trend-researcher",
+   "name": "调研员",
+   "bundle": "ai-video",
+   "kind": "research",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G1"
+   ],
+   "fences_effective": [
+    "G1"
+   ],
+   "skills": [
+    "jenny-loom-research"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "trend."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 trend. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G1:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-trend-researcher-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "调研员 v1.0 research 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G1:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "visibility-watcher",
+   "name": "AI 能见度监测官",
+   "bundle": "geo-growth",
+   "kind": "analyst",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-GEO3"
+   ],
+   "fences_effective": [
+    "G-GEO3"
+   ],
+   "skills": [
+    "visibility-monitor"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "visibility."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 visibility. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G-GEO3:block）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 3 / write_back 2（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-visibility-watcher）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "AI 能见度监测官 v1.0 analyst 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO3:block）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "visual-designer",
+   "name": "视觉设计师",
+   "bundle": "geo-growth",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-GEO2",
+    "G-VIS1",
+    "G-VIS2",
+    "G-VIS3",
+    "G-VIS4"
+   ],
+   "fences_effective": [
+    "G-GEO2",
+    "G-VIS1",
+    "G-VIS2",
+    "G-VIS3",
+    "G-VIS4"
+   ],
+   "skills": [
+    "compositor-designer",
+    "product-poster",
+    "video-cover",
+    "moments-post",
+    "promo-banner",
+    "geo-answer-card",
+    "image-retouch",
+    "asset-variant-forge",
+    "brand-guard",
+    "poster-series",
+    "design-brief",
+    "art-direction",
+    "design-critique",
+    "material-scout"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "visualdesign."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 visualdesign. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "5 条绑定全部存在于组合围栏并集（G-GEO2:block G-VIS1:review G-VIS2:block G-VIS3:block G-VIS4:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "14 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 4 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=5"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-geo-visual-designer）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "视觉设计师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 5 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 14 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=geo-growth"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-GEO2:block G-VIS1:review G-VIS2:block G-VIS3:block G-VIS4:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "visual-director",
+   "name": "视觉语言师",
+   "bundle": "ai-video",
+   "kind": "content",
+   "readonly": false,
+   "night_shift": false,
+   "high_risk": false,
+   "fences": [
+    "G6"
+   ],
+   "fences_effective": [
+    "G6"
+   ],
+   "skills": [
+    "shot-prompt-craft"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "visual."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 visual. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "1 条绑定全部存在于组合围栏并集（G6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "1 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 1 / write_back 1（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=false high_risk=false 围栏=1"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-visual-director-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "视觉语言师 v1.0 content 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 1 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 1 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=false）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "preset_key": "voice-artist",
+   "name": "配音师",
+   "bundle": "ai-video",
+   "kind": "operator",
+   "readonly": false,
+   "night_shift": true,
+   "high_risk": false,
+   "fences": [
+    "G-VOICE0",
+    "G-VOICE1",
+    "G-VOICE2",
+    "G-VOICE3",
+    "G-VOICE4",
+    "G-VOICE5",
+    "G-VOICE6"
+   ],
+   "fences_effective": [
+    "G-VOICE0",
+    "G-VOICE1",
+    "G-VOICE2",
+    "G-VOICE3",
+    "G-VOICE4",
+    "G-VOICE5",
+    "G-VOICE6"
+   ],
+   "skills": [
+    "voice-clone-consent",
+    "voice-reference-craft",
+    "voice-profile-craft",
+    "voice-dubbing-sync",
+    "voice-delivery-spec"
+   ],
+   "shadowed_from": [],
+   "event_prefixes": [
+    "voice."
+   ],
+   "checks": {
+    "A1_contract": {
+     "ok": true,
+     "detail": "字段完整（industry-contract schema 通过）"
+    },
+    "A2_unique": {
+     "ok": true,
+     "detail": "组合内唯一权威定义"
+    },
+    "A3_event_prefix": {
+     "ok": true,
+     "detail": "事件前缀 voice. 组合层唯一"
+    },
+    "A4_fences_exist": {
+     "ok": true,
+     "detail": "7 条绑定全部存在于组合围栏并集（G-VOICE0:auto G-VOICE1:review G-VOICE2:block G-VOICE3:block G-VOICE4:block G-VOICE5:block G-VOICE6:review）"
+    },
+    "A5_skills_exist": {
+     "ok": true,
+     "detail": "5 个技能资产可解析（包外官方：无）"
+    },
+    "A6_write_read": {
+     "ok": true,
+     "detail": "写工具 6 / write_back 5（未声明动作 无）"
+    },
+    "A7_governance": {
+     "ok": true,
+     "detail": "night_shift=true high_risk=false 围栏=7"
+    },
+    "A8_union_monotonic": {
+     "ok": true,
+     "detail": "无遮蔽定义，单包围栏即组合围栏"
+    },
+    "B1_roster": {
+     "ok": true,
+     "detail": "status=ready（agt-voice-artist-ws-geo）"
+    },
+    "B2_identity": {
+     "ok": true,
+     "detail": "配音师 v1.0 operator 与 preset 一致"
+    },
+    "B3_fences": {
+     "ok": true,
+     "detail": "组合有效围栏 7 条与 DB 一致"
+    },
+    "B4_skills": {
+     "ok": true,
+     "detail": "技能 5 项与 DB 一致"
+    },
+    "B5_source": {
+     "ok": true,
+     "detail": "来源包=ai-video"
+    },
+    "B6_fence_live": {
+     "ok": true,
+     "detail": "DB 围栏绑定全部有 active 规则（G-VOICE0:auto G-VOICE1:review G-VOICE2:block G-VOICE3:block G-VOICE4:block G-VOICE5:block G-VOICE6:review）"
+    },
+    "B7_skill_installed": {
+     "ok": true,
+     "detail": "声明技能均在本工作区安装"
+    },
+    "B8_night": {
+     "ok": true,
+     "detail": "夜班声明一致（night_shift=true）"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  }
+ ]
+}

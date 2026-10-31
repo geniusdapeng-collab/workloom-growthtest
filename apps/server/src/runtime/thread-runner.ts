@@ -130,6 +130,42 @@ export async function resolveThreadPresetKey(scope: Scope, ref: string | null | 
 }
 
 /**
+ * 自动审批作用域以装配器写入的 `agents.meta.sourceBundleId` 为准。
+ * 旧 ai-video 单包种子没有该字段时，只允许以工作区行业 `ai-video` 做强兜底；
+ * 组合工作区（例如 geo-growth + ai-video）缺来源记录时保持 fail-closed。
+ */
+async function resolvePresetSourceBundle(
+  scope: Scope,
+  presetKey: string,
+): Promise<string | null> {
+  const client = await getAppPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("SELECT set_config('app.workspace_id', $1, true)", [scope.workspaceId]);
+    await client.query("SELECT set_config('app.tenant_id', $1, true)", [scope.tenantId]);
+    const result = await client.query<{
+      source_bundle_id: string | null;
+      industry: string | null;
+    }>(
+      `SELECT a.meta->>'sourceBundleId' AS source_bundle_id, w.industry
+         FROM agents a
+         JOIN workspaces w ON w.id = a.workspace_id
+        WHERE a.workspace_id=$1 AND a.preset_key=$2 AND w.tenant_id=$3
+        LIMIT 1`,
+      [scope.workspaceId, presetKey, scope.tenantId],
+    );
+    await client.query("COMMIT");
+    const row = result.rows[0];
+    return row?.source_bundle_id ?? (row?.industry === "ai-video" ? "ai-video" : null);
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * GR-15 第③条：派遣前覆盖度提示——preset 声明的写工具里，哪些没有可路由的执行桥。
  * 返回给客户端任务卡展示（"将以未核实收尾"），避免跑完才发现无连接器。
  */
@@ -279,6 +315,7 @@ export async function runQuestForThread(scope: Scope, input: ThreadQuestInput): 
     }
   }
   const presetKey = await resolveThreadPresetKey(scope, input.presetRef, input.goal);
+  const presetSourceBundle = await resolvePresetSourceBundle(scope, presetKey);
   const toolExecutor = await loadDeploymentToolExecutor(scope);
   const visualGoal = VISUAL_GOAL_PATTERN.test(input.goal);
   const warnings = await questCoverageWarnings(scope, presetKey, input.goal);
@@ -298,13 +335,23 @@ export async function runQuestForThread(scope: Scope, input: ThreadQuestInput): 
     autoReview: ({ presetKey: resolvedPresetKey, step, qualityEligible, verdict }) => {
       const policy = videoAutoReviewPolicy({
         presetKey: resolvedPresetKey,
+        sourceBundleId: presetSourceBundle,
         action: step.action,
+        tool: step.tool,
         objectType: step.objectType,
         reviewRuleIds: verdict.impacts
           .filter((impact) => impact.result === "review")
           .map((impact) => impact.rule_id),
       });
       if (policy.status === "not_applicable") return { status: "not_applicable" as const };
+      if (policy.status === "rejected") {
+        return {
+          status: "rejected",
+          actorId: policy.actorId!,
+          policyVersion: policy.policyVersion!,
+          reason: policy.reason!,
+        };
+      }
       if (!qualityEligible) {
         return {
           status: "rejected",

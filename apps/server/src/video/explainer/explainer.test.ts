@@ -387,6 +387,8 @@ describe("解说片 submit 路由不可变请求复放", () => {
   const scope = { tenantId: "tenant-ex", workspaceId: "workspace-ex" };
   let saved: any;
   let row: any;
+  let computeUsed = 0;
+  let computeCap = Number.MAX_SAFE_INTEGER;
   const prepare = vi.fn(), submit = vi.fn(), create = vi.fn(), approve = vi.fn(), update = vi.fn(), renderJob = vi.fn();
   const query = vi.fn();
   beforeAll(async () => {
@@ -400,6 +402,9 @@ describe("解说片 submit 路由不可变请求复放", () => {
     vi.doMock("@workloom/base/fence-engine", () => ({ judge: () => ({ level: "auto", impacts: [], triggeredBy: [] }) }));
     vi.doMock("@workloom/base/model-router", () => ({ checkRenderBudget: () => ({ allowed: true }), planTierToPlanId: () => "pro" }));
     vi.doMock("../router.js", () => ({ loadActiveRules: async () => ({ rules: [], defaultLevel: "auto" }) }));
+    vi.doMock("../project-compute-budget.js", () => ({
+      projectComputeBudget: async () => ({ used: computeUsed, cap: computeCap }),
+    }));
     vi.doMock("./pipeline.js", () => ({ runExplainerPipeline: prepare }));
     vi.doMock("./db.js", () => ({ scopedQuery: query, projectOf: async () => ({ id: "project-ex", kind: "explainer" }),
       latestShotbook: async () => row, updateShotbook: update, renderJobOf: renderJob }));
@@ -408,6 +413,7 @@ describe("解说片 submit 路由不可变请求复放", () => {
   beforeEach(() => {
     saved = null;
     row = { id: "shotbook", project_id: "project-ex", version: 3, script_text: "正文句子。", shotbook: { shots: [{ id: "s1", card: "verified-card" }] } };
+    computeUsed = 0; computeCap = Number.MAX_SAFE_INTEGER;
     prepare.mockReset().mockResolvedValue({ jobDir: "/tmp/prepared-project", voice: { sha256: "voice" }, timestamps: { total: 5.4, sentences: [{ i: 1, ok: true }] } });
     submit.mockReset().mockResolvedValue({ taskId: "accepted-task" }); update.mockReset();
     renderJob.mockReset().mockResolvedValue(null);
@@ -452,6 +458,33 @@ describe("解说片 submit 路由不可变请求复放", () => {
     expect(prepare).toHaveBeenCalledTimes(1);
     expect(create).toHaveBeenCalledTimes(1);
     expect(approve).toHaveBeenCalledTimes(1);
+  });
+  it("关闭自动审批后 draft 不再冒充人工批准；必须由当前成员显式调用 approveScript", async () => {
+    const previous = process.env.VIDEO_AUTO_APPROVAL;
+    process.env.VIDEO_AUTO_APPROVAL = "0";
+    try {
+      await expect(caller.submit({ projectId: "project-ex" })).rejects.toThrow(/video\.explainer\.approveScript/);
+      expect(saved.status).toBe("draft");
+      expect(approve).not.toHaveBeenCalled();
+      await caller.approveScript({ projectId: "project-ex" });
+      expect(approve).toHaveBeenCalledWith(
+        expect.anything(), expect.anything(), scope, "explainer-shotbook", 1,
+        { by: "MEM-EX" },
+      );
+      await caller.submit({ projectId: "project-ex" });
+      expect(submit).toHaveBeenCalledTimes(1);
+    } finally {
+      if (previous === undefined) delete process.env.VIDEO_AUTO_APPROVAL;
+      else process.env.VIDEO_AUTO_APPROVAL = previous;
+    }
+  });
+  it("G11 使用项目真实用量，达到上限时在生成提交前确定性停止", async () => {
+    computeUsed = 5;
+    computeCap = 5;
+    await expect(caller.submit({ projectId: "project-ex" }))
+      .rejects.toThrow("G11 项目算力预算已用尽（5/5 秒）");
+    expect(prepare).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
   });
   it("另一清晰度仍在渲染时拒绝覆盖分镜的工程目录", async () => {
     renderJob.mockImplementation(async (_scope, key) => key === "explainer:shotbook:v3:uhd" ? { status: "running" } : null);

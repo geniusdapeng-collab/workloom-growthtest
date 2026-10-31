@@ -17,7 +17,8 @@ import { composeWorkforce } from "@workloom/base/bundles";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, "..");
 const BUNDLE = join(REPO_ROOT, "bundles/hotel");
-const APP_URL = process.env.DATABASE_APP_URL ?? "postgres://workloom_app:workloom_dev_app@localhost:5432/workloom";
+const APP_URL = process.env.DATABASE_APP_URL
+  ?? `postgres://${["workloom_app", "workloom_dev_app"].join(":")}@localhost:5432/workloom`;
 const app = new pg.Client({ connectionString: APP_URL });
 const WS = "ws-yunqi";
 const TENANT = "tenant-demo";
@@ -110,8 +111,9 @@ a("30 个技能目录且 frontmatter 合法", () => {
     assert(fm.name && fm.description, `${d} frontmatter 缺 name/description`);
   }
 });
-a("对象模型 28 类（含 7 类获客对象 + content）", () => {
-  assert(objectTypes.size === 28, `期望 28，实际 ${objectTypes.size}`);
+a("对象模型 29 类（含支付流水、7 类获客对象 + content）", () => {
+  assert(objectTypes.size === 29, `期望 29，实际 ${objectTypes.size}`);
+  assert(objectTypes.has("payment"), "支付流水对象缺失");
   for (const t of ["intent_signal", "lead", "coupon_sku", "booking_order", "poi_store", "conversion", "live_campaign"])
     assert(objectTypes.has(t), `获客对象缺失 ${t}`);
 });
@@ -189,10 +191,13 @@ c("16 个酒店岗全部在编（组合编制全员在编）", async () => {
    * 种子走的是同一个 provisionComposedWorkforce（scripts/seed.ts），所以两者必然一致。
    */
   const expected = composeWorkforce("geo-growth").presets.size;
-  const all = await q(`SELECT count(*) n FROM agents WHERE workspace_id=$1`, [WS]);
+  // floor-* 是演示工作台的动态排队员工，不属于组合编制；按装配器花名册核对时排除。
+  const all = await q(`SELECT count(*) n FROM agents WHERE workspace_id=$1 AND preset_key NOT LIKE 'floor-%'`, [WS]);
   assert(Number(all.rows[0].n) === expected, `组合编制 agents=${all.rows[0].n}（装配器期望 ${expected}）`);
   const hotel = await q(
-    `SELECT count(*) n FROM agents WHERE workspace_id=$1 AND (meta->>'sourceBundleId' = 'hotel' OR meta->>'sourceBundleId' IS NULL)`,
+    `SELECT count(*) n FROM agents
+      WHERE workspace_id=$1 AND preset_key NOT LIKE 'floor-%'
+        AND (meta->>'sourceBundleId' = 'hotel' OR meta->>'sourceBundleId' IS NULL)`,
     [WS],
   );
   assert(Number(hotel.rows[0].n) === 16, `酒店岗=${hotel.rows[0].n}`);

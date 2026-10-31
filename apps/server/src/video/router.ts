@@ -27,6 +27,12 @@ import {
   type RenderScriptRow,
 } from "@workloom/base/asset-cms";
 import { judge, type RuleImpact, type RuntimeRule } from "@workloom/base/fence-engine";
+import {
+  COMMENT_INTENTS,
+  processComment,
+  type CommentIntent,
+  type IntentClassifier,
+} from "@workloom/base/social-listening";
 import { checkRenderBudget, planTierToPlanId } from "@workloom/base/model-router";
 import { PlatformSchema } from "@workloom/base/publish-rpa";
 import { protectedProcedure, router, scopeOf, writeProcedure } from "../trpc/context.js";
@@ -60,6 +66,7 @@ import { deliveryIngestHook, mediaRouter } from "./media/index.js";
 import { whiteboardRouter } from "./whiteboard/router.js";
 import { explainerRouter } from "./explainer/router.js";
 import { getPipelineCoordinator } from "./pipeline-control-plane.js";
+import { configuredProjectComputeCap, projectComputeUsed } from "./project-compute-budget.js";
 import { getExplainerRun } from "./explainer/runs.js";
 import { createExplainerDraft } from "./explainer/db.js";
 import {
@@ -83,6 +90,23 @@ interface Scope { tenantId: string; workspaceId: string }
  */
 function routeLlmCall(scope: Scope): ((prompt: string) => Promise<string>) | undefined {
   return routedLlmCall({ gateway: getGatewayPool(), scope, scene: "pipeline-route" });
+}
+
+function routedCommentClassifier(scope: Scope): IntentClassifier | undefined {
+  const call = routedLlmCall({ gateway: getGatewayPool(), scope, scene: "comment-classify" });
+  if (!call) return undefined;
+  return {
+    async classify(text: string): Promise<CommentIntent | null> {
+      const raw = await call(
+        `将评论归入且仅归入以下一类：${COMMENT_INTENTS.join(" / ")}。只输出一个英文标签。\n评论：${text}`,
+      );
+      const normalized = raw.trim().toLowerCase();
+      const match = /\b(praise|query|complaint|crisis|other)\b/u.exec(normalized)?.[1];
+      return match && (COMMENT_INTENTS as readonly string[]).includes(match)
+        ? match as CommentIntent
+        : null;
+    },
+  };
 }
 
 /** pg.Pool 结构类型（server 不直接依赖 @types/pg，从 db 包入口推导） */
@@ -725,6 +749,12 @@ const studioRouter = router({
 /* ================= cms：渲染脚本 CMS（§6） ================= */
 
 const cmsRouter = router({
+  /** 客户端据此决定显示“系统自动放行”还是兼容的人工批准入口。 */
+  approvalPolicy: protectedProcedure.query(() => ({
+    policyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+    autoApprovalEnabled: videoAutoApprovalEnabled(),
+  })),
+
   /**
    * 创建初版脚本（v1，draft）：预生产镜头卡 → 渲染脚本的第一步。
    *
@@ -941,18 +971,28 @@ const renderRouter = router({
        * 预算上限可由 WORKLOOM_PROJECT_COMPUTE_CAP（秒）配置，未配置视为不设上限。
        * 注意：缺失路径的数值比较会触发求值异常→block，所以两个数值必须显式给出。
        */
-      const computeCap = Number(process.env.WORKLOOM_PROJECT_COMPUTE_CAP ?? 0);
+      const computeCap = configuredProjectComputeCap();
+      const computeUsed = await projectComputeUsed(app, scope, script.project_id);
       const rawVerdict = judge({
         object: { type: "render_script", id: script.id },
         action: "render.submit",
         params: modeParams,
         context: {
           render_auto: renderSubmitAutoAllowed(),
-          project_compute_used: 0,
-          project_compute_cap: Number.isFinite(computeCap) && computeCap > 0 ? computeCap : Number.MAX_SAFE_INTEGER,
+          project_compute_used: computeUsed,
+          project_compute_cap: computeCap,
         },
       }, rules, defaultLevel);
-      const autoReview = autoApproveVideoFence(rawVerdict);
+      if (!qualified.reconciliationOnly && computeUsed >= computeCap) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: `G11 项目算力预算已用尽（${computeUsed}/${computeCap} 秒）：停止继续提交渲染`,
+        });
+      }
+      const autoReview = autoApproveVideoFence(rawVerdict, {
+        scope: "ai-video",
+        allowDefaultReview: true,
+      });
       const verdict = autoReview.verdict;
       if (!qualified.reconciliationOnly && verdict.level === "block") {
         throw new TRPCError({
@@ -1150,7 +1190,10 @@ const publishRouter = router({
         params: { platform: input.platform, accountId: input.accountId, scheduleAt: input.scheduleAt ?? null },
         context: fenceContext,
       }, rules, defaultLevel);
-      const review = autoApproveVideoFence(rawVerdict);
+      const review = autoApproveVideoFence(rawVerdict, {
+        scope: "ai-video",
+        allowDefaultReview: true,
+      });
       const verdict = review.verdict;
       if (verdict.level === "block") {
         throw new TRPCError({
@@ -1202,7 +1245,7 @@ const publishRouter = router({
       let autoReviewTriggeredBy: string[] = [];
       const fencePrecheck = (judgeInput: Parameters<typeof judge>[0]) => {
         const raw = judge({ ...judgeInput, context: { ...(judgeInput.context ?? {}), ...fenceContext } }, rules, defaultLevel);
-        const auto = autoApproveVideoFence(raw);
+        const auto = autoApproveVideoFence(raw, { scope: "ai-video", allowDefaultReview: true });
         autoApproved ||= auto.autoApproved;
         if (auto.autoApproved) {
           autoReviewImpacts = raw.impacts;
@@ -1296,7 +1339,40 @@ const metricsRouter = router({
 /* ================= comments：待处理评论队列（G10） ================= */
 
 const commentsRouter = router({
-  /** 待处理评论队列（new/pending_review）+ G10 分流级别随行（route_level） */
+  /**
+   * 处理一条评论：生产入口复用基础包分类/G10 分流/事务留痕。
+   * 当前未注入平台外发 sender，因此系统审批后的候选回复以 manual 待处理态落库，
+   * 不把“未外发”冒充 replied。
+   */
+  process: writeProcedure
+    .input(z.object({ commentId: z.string().min(1).max(160) }))
+    .mutation(async ({ ctx, input }) => {
+      const scope = scopeOf(ctx.identity);
+      const forbiddenRows = await scopedQuery<{ forbidden: unknown }>(
+        getAppPool(), scope,
+        `SELECT forbidden FROM profiles WHERE workspace_id=$1`,
+        [scope.workspaceId],
+      );
+      const forbidden = forbiddenRows[0]?.forbidden;
+      const sensitiveWords = Array.isArray(forbidden)
+        ? forbidden.filter((value): value is string => typeof value === "string")
+        : [];
+      const result = await processComment(
+        getAppPool(),
+        getGatewayPool(),
+        scope,
+        input.commentId,
+        {
+          classifier: routedCommentClassifier(scope),
+          sensitiveWords,
+          autoApproveReview: videoAutoApprovalEnabled(),
+        },
+      );
+      if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "评论不存在或不属于当前工作区" });
+      return result;
+    }),
+
+  /** 待处理评论队列（new/pending_review/manual）+ G10 分流级别随行（route_level） */
   pending: protectedProcedure
     .input(z.object({ limit: z.number().int().min(1).max(200).default(100) }))
     .query(async ({ ctx, input }) => {
@@ -1309,7 +1385,7 @@ const commentsRouter = router({
         getAppPool(), scope,
         `SELECT id, platform, account_id, video_id, author, text, intent, route_level, status, collected_at
          FROM comments
-         WHERE workspace_id=$1 AND status IN ('new','pending_review')
+         WHERE workspace_id=$1 AND status IN ('new','pending_review','manual')
          ORDER BY collected_at DESC
          LIMIT $2`,
         [scope.workspaceId, input.limit],

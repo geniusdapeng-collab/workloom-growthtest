@@ -1,0 +1,396 @@
+{
+  "success": false,
+  "stages": {
+    "creativeTheme": {
+      "data": {
+        "meta": {
+          "version": "2.1.8-fix-context",
+          "generated_at": "2026-10-31",
+          "total_tasks": 1,
+          "batch_name": "用户定制生成",
+          "purpose": "基于用户输入的定向创意主题生成"
+        },
+        "tasks": [
+          {
+            "duration_sec": 30,
+            "tone": "温暖治愈",
+            "theme": "旧灯暖归人",
+            "description": "雨夜，陈卓拖着加班后的疲惫回家，钥匙转动时看见老旧台灯仍亮着暖光；他伸手触碰灯罩，像被旧日陪伴接住。原来耐用不是冷数字，是有人一直等你。",
+            "type": "情感品牌短片",
+            "visual_style": "参考是枝裕和《比海更深》的日常低照度写实，叠王家卫雨夜霓虹反光；主光用台灯2700K暖钨丝作实景光源，环境压冷蓝，手部与灯罩给柔和高光。",
+            "dialogue_requirement": "原文未给台词；全片无对白，仅保留雨声、钥匙声、开关轻响与台灯电流微鸣；结尾字幕可写“有些陪伴，一直亮着”。",
+            "special_notes": "原文无“特写：”标注；视觉锚点：雨夜窗面水痕、老旧台灯微黄灯罩与磨损开关、暖光落在陈卓手背、钥匙与门锁反光；物理细节：雨滴、手部纹理、灯罩旧痕；人物仅用默认模特陈卓（id=chen-zhuo；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized）；不出现商品参数或价格。",
+            "duration": "30秒",
+            "aspect_ratio": "9:16",
+            "platform": "抖音",
+            "creative_style": 0.6,
+            "character": {
+              "id": "chen-zhuo",
+              "name": "陈卓",
+              "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+              "authorization": "real-authorized"
+            },
+            "pressureAnchors": [
+              "PA-12",
+              "PA-08"
+            ],
+            "target_audience": "一二线城市加班通勤的年轻租房人群，以及重视陪伴、耐用与生活温度的泛大众用户",
+            "_customType": true,
+            "task_id": "C-328",
+            "difficulty": "高",
+            "platform_id": "douyin",
+            "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+          }
+        ],
+        "quality": {
+          "total": 5,
+          "passed": true,
+          "failed": 0,
+          "checks": [
+            {
+              "name": "画面感测试",
+              "pass": true,
+              "message": "描述能否形成视觉画面"
+            },
+            {
+              "name": "可执行性测试",
+              "pass": true,
+              "message": "AI视频系统能否生成具体提示词"
+            },
+            {
+              "name": "时长合理性",
+              "pass": true,
+              "message": "时长是否在合理范围内（15秒-3分钟）"
+            },
+            {
+              "name": "参考影片",
+              "pass": true,
+              "message": "是否包含具体影片参考"
+            },
+            {
+              "name": "特殊要求",
+              "pass": true,
+              "message": "是否包含特殊要求说明"
+            }
+          ]
+        },
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+        "_briefProfile": {
+          "duration": 30,
+          "aspectRatio": "9:16",
+          "platform": "douyin"
+        }
+      },
+      "timing": 13522
+    },
+    "dossierEvidence": {
+      "injected": false,
+      "reason": "no-dossier"
+    },
+    "requirementDiscovery": {
+      "data": {
+        "upstreamFields": {
+          "type": "情感品牌短片",
+          "theme": "旧灯暖归人",
+          "duration_sec": 30,
+          "tone": "温暖治愈",
+          "visual_style": "参考是枝裕和《比海更深》的日常低照度写实，叠王家卫雨夜霓虹反光；主光用台灯2700K暖钨丝作实景光源，环境压冷蓝，手部与灯罩给柔和高光。",
+          "dialogue_requirement": "原文未给台词；全片无对白，仅保留雨声、钥匙声、开关轻响与台灯电流微鸣；结尾字幕可写“有些陪伴，一直亮着”。",
+          "special_notes": "原文无“特写：”标注；视觉锚点：雨夜窗面水痕、老旧台灯微黄灯罩与磨损开关、暖光落在陈卓手背、钥匙与门锁反光；物理细节：雨滴、手部纹理、灯罩旧痕；人物仅用默认模特陈卓（id=chen-zhuo；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized）；不出现商品参数或价格。",
+          "target_audience": "一二线城市加班通勤的年轻租房人群，以及重视陪伴、耐用与生活温度的泛大众用户",
+          "creative_style": 0.6,
+          "difficulty": "高",
+          "description": "雨夜，陈卓拖着加班后的疲惫回家，钥匙转动时看见老旧台灯仍亮着暖光；他伸手触碰灯罩，像被旧日陪伴接住。原来耐用不是冷数字，是有人一直等你。",
+          "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized",
+          "platform": "douyin",
+          "platform_id": "douyin",
+          "aspect_ratio": "9:16",
+          "character": {
+            "id": "chen-zhuo",
+            "name": "陈卓",
+            "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "authorization": "real-authorized"
+          }
+        },
+        "audienceProfile": {
+          "primaryAudience": {
+            "ageRange": "25-30",
+            "gender": "all",
+            "interestTags": [
+              "城市独居租房生活",
+              "深夜加班通勤日常",
+              "家居暖光/旧物氛围感",
+              "治愈系短片与慢内容",
+              "耐用国货与老物件"
+            ],
+            "occupation": "一二线城市互联网、金融、广告、设计等行业的通勤上班族，租房独居青年",
+            "consumptionLevel": "medium"
+          },
+          "secondaryAudience": [
+            "小时候在祖辈家台灯下写作业、那盏灯十几年没换过的人——看到灯罩磨亮的边缘会立刻想起自家那盏",
+            "给父母老房子换过灯泡、拉过灯绳、修过旧开关的人，对“灯还亮着”有具体的手上记忆",
+            "在异地工作、每次回家先看窗户有没有亮灯的返乡青年，对“有人先你一步开了灯”这一秒有生理反应"
+          ],
+          "emotionTriggers": [
+            "雨夜楼道里钥匙插进锁孔的那一下转动，门缝先漏出一线暖黄——他还没开灯，灯却已经亮着，这一秒的错愕直接把“有人在等你”拍成了画面",
+            "手掌贴上旧灯罩的特写：指腹蹭过磨得发亮的罩沿和被按白了的开关按键，肩膀在画面里第一次垮下来，疲惫不是被说出来而是被灯接住",
+            "冷白与暖黄的色彩对切：写字楼惨白的顶灯、电梯镜面里的黑眼圈，切到家里那团只够照亮一张桌子的暖光，色温差就是全部台词",
+            "湿伞滴水、鞋跟带泥的狼狈，与台灯下那块干净暖光并置——旧物比任何人更早记住他的作息，不用一句解释",
+            "他触碰灯罩后灯没有闪、没有灭，仍然是那束稳稳的光——“耐用”被演成一次没有中断的陪伴，而不是一个参数"
+          ],
+          "painPoints": [
+            "回到出租屋时灯是黑的、屋是冷的，没有人为你留一盏灯，“家”只剩下一个地址和一张床",
+            "生活被快节奏切成加班与通勤两段，所有关系都在赶时间，连问候都变成消息列表里的一句“早点睡”",
+            "一切都被快速替换——手机、房子、关系，耐用和长期承诺变成稀缺品，人不敢指望任何东西“一直都在”"
+          ],
+          "contentExpectations": [
+            "无需字幕也能看懂的视觉叙事：雨—钥匙—门缝暖光—手掌贴灯罩—肩膀垮下，五拍之内完成情绪递进，海外观众零文化门槛也能读懂",
+            "一句能被截图、能被复述的钉子台词，例如“有些陪伴，一直亮着”，短到可以当转发文案，重到能当弹幕刷屏",
+            "前3秒必须是声音钩子：雨声、钥匙串碰撞、锁芯转动，画面还是冷调的，让加班人群在刷到的第一秒就认出“这是我今晚”",
+            "结尾不要煽情独白，把镜头留在那盏灯和空着的另一把椅子上，留白给观众自己去填“谁在等我”"
+          ]
+        },
+        "sceneStructure": {
+          "opening": {
+            "duration": 9,
+            "purpose": "雨夜楼道第一眼：陈卓湿透的肩背被冷蓝雨幕压在画面右侧，门缝下漏出一线暖黄灯光，像黑水里唯一的坐标。他钥匙插了两次才对准锈锁孔，金属颤响让那线光更近。",
+            "keyElements": [
+              "门缝下漏出的暖黄灯光",
+              "陈卓湿透的肩背与发抖的钥匙",
+              "防盗门猫眼和锈迹锁孔"
+            ],
+            "emotionalBeat": "setup"
+          },
+          "scenes": [
+            {
+              "index": 1,
+              "duration": 13,
+              "purpose": "删掉这镜，暖光就只是灯，不是“被接住”：门内近景，陈卓从冷湿袖口伸出的手指碰到旧台灯罩上一道细裂痕，暖光从指缝溢上他疲惫的脸，他肩膀第一次松下来。观众从“看见灯”转为“感到有人等”；继续看，是因为灯罩划痕和便签暗示这盏灯被用了很多年，陪伴的来历正要露出来。",
+              "keyElements": [
+                "旧台灯罩上的细裂痕",
+                "陈卓从湿袖口伸出的手指",
+                "从指缝溢到脸上的暖光"
+              ],
+              "emotionalBeat": "climax"
+            }
+          ],
+          "ending": {
+            "duration": 8,
+            "purpose": "”暖光只照亮便签和指腹，把“耐用”收束成有人一直等你的细节；删掉这句，",
+            "keyElements": [
+              "灯罩内侧泛黄手写便签“等你回家”",
+              "陈卓指尖停在字迹边缘",
+              "陈卓嘴唇近景轻动"
+            ],
+            "emotionalBeat": "resolution"
+          },
+          "totalDuration": 30,
+          "sceneCount": 1,
+          "narrativeArc": "linear"
+        },
+        "riskAssessment": {
+          "type": "object",
+          "required": [
+            "technicalRisks",
+            "businessConstraints",
+            "mitigationSuggestions"
+          ],
+          "properties": {
+            "technicalRisks": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "risk",
+                  "level",
+                  "impact"
+                ],
+                "properties": {
+                  "risk": {
+                    "type": "string"
+                  },
+                  "level": {
+                    "type": "string",
+                    "enum": [
+                      "high",
+                      "medium",
+                      "low"
+                    ]
+                  },
+                  "impact": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "minItems": 1,
+              "maxItems": 5
+            },
+            "businessConstraints": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            },
+            "mitigationSuggestions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "minItems": 1,
+              "maxItems": 4
+            }
+          },
+          "additionalProperties": false,
+          "technicalRisks": [
+            {
+              "risk": "AI生成质量不确定性",
+              "level": "medium",
+              "impact": "可能需要多次迭代"
+            },
+            {
+              "risk": "时长控制",
+              "level": "low",
+              "impact": "需要精确的镜头时长分配"
+            }
+          ],
+          "businessConstraints": [
+            "目标时长限制",
+            "平台画幅要求"
+          ],
+          "mitigationSuggestions": [
+            "预留重试时间",
+            "准备备选方案"
+          ]
+        },
+        "referenceCases": {
+          "filmReferences": [
+            {
+              "title": "《比海更深》",
+              "relevance": "high",
+              "keyTakeaway": "用2700K台灯做唯一实景主光，环境压到冷蓝，人物面部留半暗；情感高潮不靠台词，靠手部动作（翻找、递物）与灯罩高光承载，全程克制无配乐煽情。"
+            },
+            {
+              "title": "《东京物语》",
+              "relevance": "high",
+              "keyTakeaway": "用固定低机位与留白构图拍日常动作，人物出入画不追不摇，让空间空镜（走廊、灯下空椅）替角色说完未说出口的话，东方克制系情绪结构范本。"
+            },
+            {
+              "title": "《花样年华》",
+              "relevance": "medium",
+              "keyTakeaway": "雨夜霓虹反光作为环境色层：湿地面、玻璃、金属灯罩反射暖光，形成冷蓝底上的暖色光斑，让'旧灯'成为画面唯一暖源，闪回段落用同一光源不同色温区分时空。"
+            },
+            {
+              "title": "《德州巴黎》",
+              "relevance": "medium",
+              "keyTakeaway": "不同文化语境下的同情绪结构：用单一暖光源与长时间静默对视完成和解，证明'等一个归人'的感动不依赖语言，可用于跨文化情绪验证。"
+            }
+          ],
+          "adReferences": [
+            {
+              "brand": "Apple《三分钟》",
+              "relevance": "high",
+              "keyTakeaway": "60-90秒情感弧线结构：用倒计时压力建立悬念—母亲与孩子在站台奔走累积情绪—结尾列车短暂停靠完成释放；全片一个实景光源动机贯穿，结尾留白不解释。"
+            },
+            {
+              "brand": "Apple《一个桶》",
+              "relevance": "high",
+              "keyTakeaway": "弧线结构：物件（桶）作为情感载体，从出发的笨重尴尬—途中疲惫—开启瞬间的暖意反转，60秒内完成'嫌它麻烦到懂它重量'的完整情绪转向，可移植为'旧灯'的物件叙事。"
+            },
+            {
+              "brand": "苹果新春短片《女儿》",
+              "relevance": "medium",
+              "keyTakeaway": "以单一温暖光源（车内/出租屋台灯）串联闪回与当下，用冷暖色调区分时空，结尾归家场景以环境音先行、无台词收束，是品牌短片级的情感弧线控制参考。"
+            }
+          ],
+          "styleReferences": [
+            "冷暖色调区分闪回时空：归人段落用2700K钨丝暖光做唯一主光，回忆段落同一灯具但环境冷蓝压得更深、高光更柔，用色温差标示时间层。",
+            "声音先行：旧灯的电流嗡鸣、开关咔哒声、门外脚步与雨声承担叙事，先出声后给画面，配乐只在最后15秒极轻进入。",
+            "手部特写承载情感重量：开灯、擦灯罩、递钥匙等手部动作占据近景，人物面部保持半暗，让观众从触感而非表情读情绪。",
+            "实景光动机统一：所有光线必须能在画面内找到来源（台灯、窗外霓虹、门缝漏光），禁止无动机补光，湿地面与玻璃反射制造王家卫式雨夜光斑。"
+          ]
+        },
+        "confirmationStatus": {
+          "status": "pending",
+          "timestamp": "2026-10-31T06:07:16.354Z"
+        },
+        "_canonicalCharacters": [
+          {
+            "id": "chen-zhuo",
+            "characterId": "chen-zhuo",
+            "name": "陈卓",
+            "role": "protagonist",
+            "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "portraitPath": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+            "authorization": "real-authorized",
+            "description": "本次显式指定的授权模特；所有镜头必须绑定该 ID、当前定妆照与授权范围"
+          }
+        ]
+      },
+      "timing": 72903
+    },
+    "requirementReview": {
+      "status": "rejected",
+      "reason": "producer-rejected(G3_INSIGHT · score=0)",
+      "suggestions": [
+        "补齐有效证据或修复评审组件后重跑本环节"
+      ]
+    }
+  },
+  "errors": [],
+  "timing": {},
+  "confirmations": {
+    "creativeTheme": {
+      "approved": true,
+      "reviewedAt": "2026-10-31T06:07:16.347Z",
+      "theme": {
+        "duration_sec": 30,
+        "tone": "温暖治愈",
+        "theme": "旧灯暖归人",
+        "description": "雨夜，陈卓拖着加班后的疲惫回家，钥匙转动时看见老旧台灯仍亮着暖光；他伸手触碰灯罩，像被旧日陪伴接住。原来耐用不是冷数字，是有人一直等你。",
+        "type": "情感品牌短片",
+        "visual_style": "参考是枝裕和《比海更深》的日常低照度写实，叠王家卫雨夜霓虹反光；主光用台灯2700K暖钨丝作实景光源，环境压冷蓝，手部与灯罩给柔和高光。",
+        "dialogue_requirement": "原文未给台词；全片无对白，仅保留雨声、钥匙声、开关轻响与台灯电流微鸣；结尾字幕可写“有些陪伴，一直亮着”。",
+        "special_notes": "原文无“特写：”标注；视觉锚点：雨夜窗面水痕、老旧台灯微黄灯罩与磨损开关、暖光落在陈卓手背、钥匙与门锁反光；物理细节：雨滴、手部纹理、灯罩旧痕；人物仅用默认模特陈卓（id=chen-zhuo；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized）；不出现商品参数或价格。",
+        "duration": "30秒",
+        "aspect_ratio": "9:16",
+        "platform": "抖音",
+        "creative_style": 0.6,
+        "character": {
+          "id": "chen-zhuo",
+          "name": "陈卓",
+          "portraitRef": "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+          "authorization": "real-authorized"
+        },
+        "pressureAnchors": [
+          "PA-12",
+          "PA-08"
+        ],
+        "target_audience": "一二线城市加班通勤的年轻租房人群，以及重视陪伴、耐用与生活温度的泛大众用户",
+        "_customType": true,
+        "task_id": "C-328",
+        "difficulty": "高",
+        "platform_id": "douyin",
+        "_originalStoryText": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin\n[默认模特锚点] id=chen-zhuo；name=陈卓；portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png；authorization=real-authorized"
+      },
+      "reason": "producer-approved(G2_THEME · score=90)",
+      "suggestions": [],
+      "waitTimeMs": 10087
+    },
+    "requirementList": {
+      "approved": false,
+      "reviewedAt": "2026-10-31T06:08:51.719Z",
+      "requirementList": {},
+      "reason": "producer-rejected(G3_INSIGHT · score=0)",
+      "suggestions": [
+        "补齐有效证据或修复评审组件后重跑本环节"
+      ],
+      "waitTimeMs": 22429
+    }
+  },
+  "deliverables": {},
+  "totalWaitTimeMs": 32516,
+  "producerAttempts": 1
+}

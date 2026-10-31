@@ -56,6 +56,7 @@ export interface GateAutoApprovalInput {
   checkSetVersion: string;
   artifactHashes: string[];
   artifactManifestHash: string;
+  artifacts: ArtifactVersion[];
   run: PipelineRun;
   stage: StageRun;
 }
@@ -703,6 +704,7 @@ export class PipelineCoordinator {
             checkSetVersion: input.checkSetVersion,
             artifactHashes: input.artifactHashes,
             artifactManifestHash: manifestHash,
+            artifacts: boundArtifacts,
             run,
             stage,
           })

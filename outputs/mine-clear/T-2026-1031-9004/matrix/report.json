@@ -1,0 +1,4144 @@
+{
+  "summary": {
+    "schema": "workloom.ai-video-stress-report/v1",
+    "taskId": "T-2026-1031-9004",
+    "generatedAt": "2026-10-31T15:22:04.677Z",
+    "providerSubmission": false,
+    "paidGenerationRequests": 0,
+    "total": 60,
+    "passed": 60,
+    "failed": 0,
+    "byCategory": {
+      "marketing": {
+        "total": 20,
+        "passed": 20
+      },
+      "narrative": {
+        "total": 20,
+        "passed": 20
+      },
+      "abnormal": {
+        "total": 20,
+        "passed": 20
+      }
+    },
+    "byMode": {
+      "production-router": 22,
+      "runtime-bridge": 20,
+      "production-contract": 14,
+      "deterministic-replay": 4
+    }
+  },
+  "results": [
+    {
+      "id": "M01",
+      "category": "marketing",
+      "title": "卧室空气净化器静音种草",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "05bf7a6ef27fd8337919119b958320b6e9833aeec12e820feccf46916b00df0c"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "澄风 AirOne 空气净化器",
+            "brand": "澄风",
+            "category": "空气净化器",
+            "model": "AirOne",
+            "sellingPoints": [
+              "低档运行安静",
+              "适合小卧室",
+              "滤芯更换简单"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "澄风 AirOne 空气净化器",
+            "brand": {
+              "name": "澄风"
+            },
+            "category": "空气净化器"
+          },
+          "dataMining": {
+            "name": "澄风 AirOne 空气净化器",
+            "brand": "澄风",
+            "category": "空气净化器",
+            "model": "AirOne",
+            "sellingPointCandidates": [
+              "低档运行安静",
+              "适合小卧室",
+              "滤芯更换简单"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给澄风 AirOne 卧室空气净化器做一条抖音种草短片，突出低档运行安静、适合小卧室和滤芯更换简单\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "澄风 AirOne 空气净化器",
+        "queries": [
+          {
+            "q": "澄风 AirOne 空气净化器 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "澄风 AirOne 空气净化器 空气净化器 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "澄风 AirOne 空气净化器 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "澄风 AirOne 空气净化器 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "澄风 AirOne 空气净化器 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "澄风 AirOne 空气净化器 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "澄风 AirOne 空气净化器 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "澄风 AirOne 空气净化器 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "e5d834fa896ce1acb94f52337f5c98c1035253c22d77d7094054921f8e20f1cf"
+        }
+      },
+      "durationMs": 5,
+      "evidence": "evidence/M01.json",
+      "evidenceSha256": "1c27a642be72b9345b27a5240e925cbf40f32d0a83d15794ceae1e43c99fabd2"
+    },
+    {
+      "id": "M02",
+      "category": "marketing",
+      "title": "儿童保温杯通勤",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "b45cdea22e3939cd7385c3740fcb83a8ad85ab02f0ef11a5d26ca109ffaa2676"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "暖芽小鹿儿童保温杯",
+            "brand": "暖芽",
+            "category": "儿童水杯",
+            "model": "小鹿 350",
+            "sellingPoints": [
+              "轻量杯身",
+              "吸管防呛",
+              "容易拆洗"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "暖芽小鹿儿童保温杯",
+            "brand": {
+              "name": "暖芽"
+            },
+            "category": "儿童水杯"
+          },
+          "dataMining": {
+            "name": "暖芽小鹿儿童保温杯",
+            "brand": "暖芽",
+            "category": "儿童水杯",
+            "model": "小鹿 350",
+            "sellingPointCandidates": [
+              "轻量杯身",
+              "吸管防呛",
+              "容易拆洗"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给暖芽小鹿儿童保温杯做一条小红书种草视频，突出轻量杯身、吸管防呛和家长易清洗\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "暖芽小鹿儿童保温杯 小鹿 350",
+        "queries": [
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 儿童水杯 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "暖芽小鹿儿童保温杯 小鹿 350 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "82a078154ebd5e6e5a775fa504271c7aeabe843fa02360278d2b3ec067b90438"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M02.json",
+      "evidenceSha256": "38d800a35442341c05c062914844a37f05dae8accfbbed9bd8efbcb02b99f616"
+    },
+    {
+      "id": "M03",
+      "category": "marketing",
+      "title": "筋膜枪运动恢复",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "13a3bb2729fa090b2de0b17e800c957f81ed976b1069297a841e139a3701779f"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "驰衡 Mini 筋膜枪",
+            "brand": "驰衡",
+            "category": "运动恢复设备",
+            "model": "Mini",
+            "sellingPoints": [
+              "口袋尺寸",
+              "四档力度",
+              "训练后放松"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "驰衡 Mini 筋膜枪",
+            "brand": {
+              "name": "驰衡"
+            },
+            "category": "运动恢复设备"
+          },
+          "dataMining": {
+            "name": "驰衡 Mini 筋膜枪",
+            "brand": "驰衡",
+            "category": "运动恢复设备",
+            "model": "Mini",
+            "sellingPointCandidates": [
+              "口袋尺寸",
+              "四档力度",
+              "训练后放松"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给驰衡 Mini 筋膜枪做一条抖音运动恢复短片，突出口袋尺寸、四档力度和训练后放松\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "驰衡 Mini 筋膜枪",
+        "queries": [
+          {
+            "q": "驰衡 Mini 筋膜枪 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "驰衡 Mini 筋膜枪 运动恢复设备 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "驰衡 Mini 筋膜枪 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "驰衡 Mini 筋膜枪 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "驰衡 Mini 筋膜枪 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "驰衡 Mini 筋膜枪 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "驰衡 Mini 筋膜枪 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "驰衡 Mini 筋膜枪 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "1dff210bd1b085adb83464b4a4d40513951da03e3518537e5f199fb194204245"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M03.json",
+      "evidenceSha256": "2c888bbaa9493b3ecb99e48af4714bb37141487d1409632759b516eb99255145"
+    },
+    {
+      "id": "M04",
+      "category": "marketing",
+      "title": "宠物饮水机除毛",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "6739b69578a4ae6471547d335ee8ae06356abf8c7b22a95f8d4944a59640e937"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "汪泉 Loop 宠物饮水机",
+            "brand": "汪泉",
+            "category": "宠物饮水设备",
+            "model": "Loop",
+            "sellingPoints": [
+              "循环水流",
+              "毛发过滤",
+              "夜间低噪"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "汪泉 Loop 宠物饮水机",
+            "brand": {
+              "name": "汪泉"
+            },
+            "category": "宠物饮水设备"
+          },
+          "dataMining": {
+            "name": "汪泉 Loop 宠物饮水机",
+            "brand": "汪泉",
+            "category": "宠物饮水设备",
+            "model": "Loop",
+            "sellingPointCandidates": [
+              "循环水流",
+              "毛发过滤",
+              "夜间低噪"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给汪泉 Loop 宠物饮水机做一条抖音种草视频，突出循环水流、毛发过滤和低噪夜间运行\n[需求口径] 时长：25秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "汪泉 Loop 宠物饮水机",
+        "queries": [
+          {
+            "q": "汪泉 Loop 宠物饮水机 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "汪泉 Loop 宠物饮水机 宠物饮水设备 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "汪泉 Loop 宠物饮水机 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "汪泉 Loop 宠物饮水机 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "汪泉 Loop 宠物饮水机 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "汪泉 Loop 宠物饮水机 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "汪泉 Loop 宠物饮水机 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "汪泉 Loop 宠物饮水机 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "17a84edd21afa8f69f32ddf7dee6440abb307e52ef10d97289b7ac443cca10f9"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M04.json",
+      "evidenceSha256": "7dd9d3d07d1de56510a031fbb2e9c3394213ebe90e9a4305198eea2cd9e4f402"
+    },
+    {
+      "id": "M05",
+      "category": "marketing",
+      "title": "便携咖啡机露营",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "7407388d70c94045485aa7144d7fc87992bc1537d48cfb41b383af366b9aabd2"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "野萃 Go 便携咖啡机",
+            "brand": "野萃",
+            "category": "便携咖啡器具",
+            "model": "Go",
+            "sellingPoints": [
+              "免电源",
+              "单手压杆",
+              "收纳体积小"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "野萃 Go 便携咖啡机",
+            "brand": {
+              "name": "野萃"
+            },
+            "category": "便携咖啡器具"
+          },
+          "dataMining": {
+            "name": "野萃 Go 便携咖啡机",
+            "brand": "野萃",
+            "category": "便携咖啡器具",
+            "model": "Go",
+            "sellingPointCandidates": [
+              "免电源",
+              "单手压杆",
+              "收纳体积小"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给野萃 Go 便携咖啡机做一条小红书露营场景种草，突出免电源、单手压杆和收纳体积\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "野萃 Go 便携咖啡机",
+        "queries": [
+          {
+            "q": "野萃 Go 便携咖啡机 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "野萃 Go 便携咖啡机 便携咖啡器具 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "野萃 Go 便携咖啡机 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "野萃 Go 便携咖啡机 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "野萃 Go 便携咖啡机 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "野萃 Go 便携咖啡机 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "野萃 Go 便携咖啡机 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "野萃 Go 便携咖啡机 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "74929222947b754ba1bb82c03cc910b2cba5a06b279999b9a1a5117bc7ded298"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M05.json",
+      "evidenceSha256": "cb09159bb71c3756d14496c92e97c5c887857eefa4ee226acbb46f67eadf69e6"
+    },
+    {
+      "id": "M06",
+      "category": "marketing",
+      "title": "真丝枕套睡眠",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "91cba48c1145f1b999ffe0bb4d95d203a3576516546462095cb0456f1e7cc6db"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "眠云真丝枕套",
+            "brand": "眠云",
+            "category": "床品",
+            "model": "云感 19",
+            "sellingPoints": [
+              "柔软触感",
+              "可拆洗护理",
+              "礼盒包装"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "眠云真丝枕套",
+            "brand": {
+              "name": "眠云"
+            },
+            "category": "床品"
+          },
+          "dataMining": {
+            "name": "眠云真丝枕套",
+            "brand": "眠云",
+            "category": "床品",
+            "model": "云感 19",
+            "sellingPointCandidates": [
+              "柔软触感",
+              "可拆洗护理",
+              "礼盒包装"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给眠云真丝枕套做一条小红书种草视频，突出柔软触感、可拆洗护理和礼盒包装\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "眠云真丝枕套 云感 19",
+        "queries": [
+          {
+            "q": "眠云真丝枕套 云感 19 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "眠云真丝枕套 云感 19 床品 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "眠云真丝枕套 云感 19 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "眠云真丝枕套 云感 19 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "眠云真丝枕套 云感 19 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "眠云真丝枕套 云感 19 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "眠云真丝枕套 云感 19 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "眠云真丝枕套 云感 19 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "18cd9c85ee2d82b3caadac7181fbef6e9be14eb95e729c000a1f36cd56c4ebe0"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M06.json",
+      "evidenceSha256": "5004f2b4897de8ef637d9ae6a14af3e1c4cb9b4c0b067f780576bcd18c2bfbcf"
+    },
+    {
+      "id": "M07",
+      "category": "marketing",
+      "title": "护眼台灯学习",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "81e97d74430a14c981f754cd5f8a5ac8bdceb4a1f6611bee0cf0934d48e91243"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "澄阅 Pro 护眼台灯",
+            "brand": "澄阅",
+            "category": "桌面照明",
+            "model": "Pro",
+            "sellingPoints": [
+              "无频闪",
+              "广覆盖",
+              "三档色温"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "澄阅 Pro 护眼台灯",
+            "brand": {
+              "name": "澄阅"
+            },
+            "category": "桌面照明"
+          },
+          "dataMining": {
+            "name": "澄阅 Pro 护眼台灯",
+            "brand": "澄阅",
+            "category": "桌面照明",
+            "model": "Pro",
+            "sellingPointCandidates": [
+              "无频闪",
+              "广覆盖",
+              "三档色温"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给澄阅 Pro 护眼台灯做一条 B 站学习场景短片，突出无频闪、广覆盖和三档色温\n[需求口径] 时长：30秒；画幅：9:16；平台：bilibili；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "澄阅 Pro 护眼台灯",
+        "queries": [
+          {
+            "q": "澄阅 Pro 护眼台灯 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "澄阅 Pro 护眼台灯 桌面照明 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "澄阅 Pro 护眼台灯 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "澄阅 Pro 护眼台灯 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "澄阅 Pro 护眼台灯 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "澄阅 Pro 护眼台灯 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "澄阅 Pro 护眼台灯 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "澄阅 Pro 护眼台灯 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "f68df6bd706147870bf6ab19283ca5d7532e0182416d509d9b7a7ff5711e0ec3"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M07.json",
+      "evidenceSha256": "0711369c6cd93362093e4c3381435dae5dc5c1a3f1300ea253a8281b0b1c0c90"
+    },
+    {
+      "id": "M08",
+      "category": "marketing",
+      "title": "冲锋衣城市通勤",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "0e6be50dfcc55e13ce36c3067a36bb428d400fde5e00ae7cbe1fbe5f18d4d6d4"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "山岚 CityShell 冲锋衣",
+            "brand": "山岚",
+            "category": "户外服装",
+            "model": "CityShell",
+            "sellingPoints": [
+              "防风",
+              "轻量",
+              "可折叠收纳"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "山岚 CityShell 冲锋衣",
+            "brand": {
+              "name": "山岚"
+            },
+            "category": "户外服装"
+          },
+          "dataMining": {
+            "name": "山岚 CityShell 冲锋衣",
+            "brand": "山岚",
+            "category": "户外服装",
+            "model": "CityShell",
+            "sellingPointCandidates": [
+              "防风",
+              "轻量",
+              "可折叠收纳"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给山岚 CityShell 冲锋衣做一条抖音城市通勤种草，突出防风、轻量和可折叠收纳\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "山岚 CityShell 冲锋衣",
+        "queries": [
+          {
+            "q": "山岚 CityShell 冲锋衣 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "山岚 CityShell 冲锋衣 户外服装 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "山岚 CityShell 冲锋衣 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "山岚 CityShell 冲锋衣 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "山岚 CityShell 冲锋衣 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "山岚 CityShell 冲锋衣 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "山岚 CityShell 冲锋衣 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "山岚 CityShell 冲锋衣 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "80a0baac225139897015b48800a68786cfb3b4f5638f0d586cb831d7f969bc8a"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M08.json",
+      "evidenceSha256": "4db6a579d7b50dc621e5b23704ca7ca990c626c069374d3b464afcf669644952"
+    },
+    {
+      "id": "M09",
+      "category": "marketing",
+      "title": "扫地机器人养宠家庭",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "dcd63f6f99bc3ee45bec24800e6cd161952559b21a352f59a89c21d6bab40383"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "净界 R3 扫地机器人",
+            "brand": "净界",
+            "category": "清洁电器",
+            "model": "R3",
+            "sellingPoints": [
+              "毛发清扫",
+              "边角清洁",
+              "地图分区"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "净界 R3 扫地机器人",
+            "brand": {
+              "name": "净界"
+            },
+            "category": "清洁电器"
+          },
+          "dataMining": {
+            "name": "净界 R3 扫地机器人",
+            "brand": "净界",
+            "category": "清洁电器",
+            "model": "R3",
+            "sellingPointCandidates": [
+              "毛发清扫",
+              "边角清洁",
+              "地图分区"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给净界 R3 扫地机器人做一条小红书养宠家庭种草，突出毛发清扫、边角清洁和地图分区\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "净界 R3 扫地机器人",
+        "queries": [
+          {
+            "q": "净界 R3 扫地机器人 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "净界 R3 扫地机器人 清洁电器 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "净界 R3 扫地机器人 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "净界 R3 扫地机器人 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "净界 R3 扫地机器人 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "净界 R3 扫地机器人 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "净界 R3 扫地机器人 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "净界 R3 扫地机器人 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "b1e8366026e1b75ac0807866cf53cfdb40bbde355e1cd771bf57636eae9ce981"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M09.json",
+      "evidenceSha256": "ddf063b45ccccb50cd05a1319a2c8f6d4336eaccab19ed6ef524fd08e2528c8e"
+    },
+    {
+      "id": "M10",
+      "category": "marketing",
+      "title": "防晒霜通勤",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "3e7fac21a2390ab5dcb62822e2cd52fcd96be1693396f1f4b6085d970677b6e9"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "清屿通勤防晒乳",
+            "brand": "清屿",
+            "category": "防晒护肤",
+            "model": "通勤款",
+            "sellingPoints": [
+              "轻薄成膜",
+              "日常通勤",
+              "不易搓泥"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "清屿通勤防晒乳",
+            "brand": {
+              "name": "清屿"
+            },
+            "category": "防晒护肤"
+          },
+          "dataMining": {
+            "name": "清屿通勤防晒乳",
+            "brand": "清屿",
+            "category": "防晒护肤",
+            "model": "通勤款",
+            "sellingPointCandidates": [
+              "轻薄成膜",
+              "日常通勤",
+              "不易搓泥"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给清屿通勤防晒乳做一条抖音种草短片，突出轻薄成膜、日常通勤和不易搓泥\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "清屿通勤防晒乳 通勤款",
+        "queries": [
+          {
+            "q": "清屿通勤防晒乳 通勤款 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "清屿通勤防晒乳 通勤款 防晒护肤 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "清屿通勤防晒乳 通勤款 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "清屿通勤防晒乳 通勤款 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "清屿通勤防晒乳 通勤款 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "清屿通勤防晒乳 通勤款 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "清屿通勤防晒乳 通勤款 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "清屿通勤防晒乳 通勤款 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "0259f0c1c854270a1f25f0c96084fe61c57600ffcbcbc5af29913021eb60e237"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M10.json",
+      "evidenceSha256": "4e9a86c2dbec50bc0c3d5f2bb3d983a55f5dbba46e5fd5e412f2546f3cf32f37"
+    },
+    {
+      "id": "M11",
+      "category": "marketing",
+      "title": "降噪耳机地铁",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "973eba5e7df4ff5a5d141030deaf45f1161ef46845521e1d12f118600a961ef2"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "闻声 Air 降噪耳机",
+            "brand": "闻声",
+            "category": "消费电子",
+            "model": "Air",
+            "sellingPoints": [
+              "降噪模式",
+              "轻量佩戴",
+              "双设备连接"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "闻声 Air 降噪耳机",
+            "brand": {
+              "name": "闻声"
+            },
+            "category": "消费电子"
+          },
+          "dataMining": {
+            "name": "闻声 Air 降噪耳机",
+            "brand": "闻声",
+            "category": "消费电子",
+            "model": "Air",
+            "sellingPointCandidates": [
+              "降噪模式",
+              "轻量佩戴",
+              "双设备连接"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给闻声 Air 降噪耳机做一条 B 站地铁通勤评测短片，突出降噪模式、轻量佩戴和双设备连接\n[需求口径] 时长：30秒；画幅：9:16；平台：bilibili；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "闻声 Air 降噪耳机",
+        "queries": [
+          {
+            "q": "闻声 Air 降噪耳机 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "闻声 Air 降噪耳机 消费电子 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "闻声 Air 降噪耳机 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "闻声 Air 降噪耳机 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "闻声 Air 降噪耳机 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "闻声 Air 降噪耳机 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "闻声 Air 降噪耳机 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "闻声 Air 降噪耳机 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "e7ff9ec854c74db53a533c3bd752b8726c574cc87532884e899cf1189c86edff"
+        }
+      },
+      "durationMs": 2,
+      "evidence": "evidence/M11.json",
+      "evidenceSha256": "26a4643b20b7526cd3a59782a9291881e0cd32a7287662214828336f97133f27"
+    },
+    {
+      "id": "M12",
+      "category": "marketing",
+      "title": "智能门锁独居",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "6e019ee90e4dab64be1301df55578da37a59e715bfa748129ca9d225b2d139fe"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "安隅 S2 智能门锁",
+            "brand": "安隅",
+            "category": "智能家居",
+            "model": "S2",
+            "sellingPoints": [
+              "临时密码",
+              "门铃联动",
+              "机械应急钥匙"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "安隅 S2 智能门锁",
+            "brand": {
+              "name": "安隅"
+            },
+            "category": "智能家居"
+          },
+          "dataMining": {
+            "name": "安隅 S2 智能门锁",
+            "brand": "安隅",
+            "category": "智能家居",
+            "model": "S2",
+            "sellingPointCandidates": [
+              "临时密码",
+              "门铃联动",
+              "机械应急钥匙"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给安隅 S2 智能门锁做一条抖音独居安全种草，突出临时密码、门铃联动和机械应急钥匙\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "安隅 S2 智能门锁",
+        "queries": [
+          {
+            "q": "安隅 S2 智能门锁 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "安隅 S2 智能门锁 智能家居 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "安隅 S2 智能门锁 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "安隅 S2 智能门锁 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "安隅 S2 智能门锁 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "安隅 S2 智能门锁 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "安隅 S2 智能门锁 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "安隅 S2 智能门锁 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "9b43e83dbb66157a9b069d1325def8a2c3035fba8dff6728e110a20cf5acb5be"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M12.json",
+      "evidenceSha256": "b9e3b467360ce4bf6ba53abf923e7e70fe052fdd3a23c5c3278c58c893399d96"
+    },
+    {
+      "id": "M13",
+      "category": "marketing",
+      "title": "老人手环紧急提醒",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "e8bd24df9fd6076723e2342b43b7d3c9cad6eef1248333a41c938871c642ad23"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "守望 CareBand 老人手环",
+            "brand": "守望",
+            "category": "智能穿戴",
+            "model": "CareBand",
+            "sellingPoints": [
+              "跌倒提醒",
+              "长续航",
+              "联系人通知"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "守望 CareBand 老人手环",
+            "brand": {
+              "name": "守望"
+            },
+            "category": "智能穿戴"
+          },
+          "dataMining": {
+            "name": "守望 CareBand 老人手环",
+            "brand": "守望",
+            "category": "智能穿戴",
+            "model": "CareBand",
+            "sellingPointCandidates": [
+              "跌倒提醒",
+              "长续航",
+              "联系人通知"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给守望 CareBand 老人手环做一条视频号种草，突出跌倒提醒、长续航和家属联系人通知\n[需求口径] 时长：30秒；画幅：9:16；平台：wechat-channel；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "守望 CareBand 老人手环",
+        "queries": [
+          {
+            "q": "守望 CareBand 老人手环 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "守望 CareBand 老人手环 智能穿戴 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "守望 CareBand 老人手环 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "守望 CareBand 老人手环 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "守望 CareBand 老人手环 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "守望 CareBand 老人手环 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "守望 CareBand 老人手环 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "守望 CareBand 老人手环 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "94026f1b1696fbed68051ebfe89148067c0cb12f19e6439344170575ab1220cd"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M13.json",
+      "evidenceSha256": "761ed05597f273514a4de427bd7127e1e44aa5e3422865d97c2b2dcb892b75f2"
+    },
+    {
+      "id": "M14",
+      "category": "marketing",
+      "title": "空气炸锅早餐",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "989d63760d7c312227e1e5dacd30b4479b1d5cdc70206130e6d3799800b7609f"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "晨厨 Mini 空气炸锅",
+            "brand": "晨厨",
+            "category": "厨房电器",
+            "model": "Mini",
+            "sellingPoints": [
+              "快速预热",
+              "可视窗口",
+              "小容量"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "晨厨 Mini 空气炸锅",
+            "brand": {
+              "name": "晨厨"
+            },
+            "category": "厨房电器"
+          },
+          "dataMining": {
+            "name": "晨厨 Mini 空气炸锅",
+            "brand": "晨厨",
+            "category": "厨房电器",
+            "model": "Mini",
+            "sellingPointCandidates": [
+              "快速预热",
+              "可视窗口",
+              "小容量"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给晨厨 Mini 空气炸锅做一条小红书早餐场景种草，突出快速预热、可视窗口和小容量\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "晨厨 Mini 空气炸锅",
+        "queries": [
+          {
+            "q": "晨厨 Mini 空气炸锅 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "晨厨 Mini 空气炸锅 厨房电器 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "晨厨 Mini 空气炸锅 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "晨厨 Mini 空气炸锅 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "晨厨 Mini 空气炸锅 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "晨厨 Mini 空气炸锅 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "晨厨 Mini 空气炸锅 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "晨厨 Mini 空气炸锅 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "c6e0c8e1b69e9c459ae029067176a94ea914e457a1b8a8311b63e2589481d615"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M14.json",
+      "evidenceSha256": "12fdade8069a49b9e8c4db30383b22ae03afc1505e6396dcf406536aa4fd9e56"
+    },
+    {
+      "id": "M15",
+      "category": "marketing",
+      "title": "保温饭盒办公",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "703025feed4c44bb7da3015e193c001947be8101212f4bddb91b10f8728e2fb3"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "温格 Round 保温饭盒",
+            "brand": "温格",
+            "category": "餐厨用品",
+            "model": "Round",
+            "sellingPoints": [
+              "分层密封",
+              "汤饭分装",
+              "提手便携"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "温格 Round 保温饭盒",
+            "brand": {
+              "name": "温格"
+            },
+            "category": "餐厨用品"
+          },
+          "dataMining": {
+            "name": "温格 Round 保温饭盒",
+            "brand": "温格",
+            "category": "餐厨用品",
+            "model": "Round",
+            "sellingPointCandidates": [
+              "分层密封",
+              "汤饭分装",
+              "提手便携"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给温格 Round 保温饭盒做一条抖音办公午餐种草，突出分层密封、汤饭分装和提手便携\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "温格 Round 保温饭盒",
+        "queries": [
+          {
+            "q": "温格 Round 保温饭盒 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "温格 Round 保温饭盒 餐厨用品 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "温格 Round 保温饭盒 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "温格 Round 保温饭盒 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "温格 Round 保温饭盒 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "温格 Round 保温饭盒 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "温格 Round 保温饭盒 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "温格 Round 保温饭盒 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "ca02d370a8b3e8dd9cc3e9df9df9d8d32783af3445e5eb9b8d7267ffc6bb3036"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M15.json",
+      "evidenceSha256": "8f659a1a70d8214746d36314611ce9d859ec953a5cfed58e9be86ae85a10346e"
+    },
+    {
+      "id": "M16",
+      "category": "marketing",
+      "title": "机械键盘办公",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "b0b31c5965c3998b958d6eda534595b624f515004ddac4cefba2f05c12a48884"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "键界 75 机械键盘",
+            "brand": "键界",
+            "category": "电脑外设",
+            "model": "75",
+            "sellingPoints": [
+              "75% 配列",
+              "热插拔",
+              "三模连接"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "键界 75 机械键盘",
+            "brand": {
+              "name": "键界"
+            },
+            "category": "电脑外设"
+          },
+          "dataMining": {
+            "name": "键界 75 机械键盘",
+            "brand": "键界",
+            "category": "电脑外设",
+            "model": "75",
+            "sellingPointCandidates": [
+              "75% 配列",
+              "热插拔",
+              "三模连接"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给键界 75 机械键盘做一条 B 站办公桌面短片，突出 75% 配列、热插拔和三模连接\n[需求口径] 时长：30秒；画幅：9:16；平台：bilibili；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "键界 75 机械键盘",
+        "queries": [
+          {
+            "q": "键界 75 机械键盘 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "键界 75 机械键盘 电脑外设 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "键界 75 机械键盘 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "键界 75 机械键盘 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "键界 75 机械键盘 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "键界 75 机械键盘 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "键界 75 机械键盘 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "键界 75 机械键盘 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "b4609478b15f90fc9ccf5ebddc86b386dd5f9e9a6d0fbf780d03dbe96eab3776"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M16.json",
+      "evidenceSha256": "86685bf51ffafccb2ae6d1c8bfb730eef6f6be11b69401856583c3136faa9c0e"
+    },
+    {
+      "id": "M17",
+      "category": "marketing",
+      "title": "猫砂盆除味",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "33991c6368bc01aab32379b89b12bbc32c400ef75f4b30373d4b0646f5da9668"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "净砂 Cube 猫砂盆",
+            "brand": "净砂",
+            "category": "宠物用品",
+            "model": "Cube",
+            "sellingPoints": [
+              "封闭除味",
+              "前抽式",
+              "易清洁"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "净砂 Cube 猫砂盆",
+            "brand": {
+              "name": "净砂"
+            },
+            "category": "宠物用品"
+          },
+          "dataMining": {
+            "name": "净砂 Cube 猫砂盆",
+            "brand": "净砂",
+            "category": "宠物用品",
+            "model": "Cube",
+            "sellingPointCandidates": [
+              "封闭除味",
+              "前抽式",
+              "易清洁"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给净砂 Cube 猫砂盆做一条小红书养猫家庭种草，突出封闭除味、前抽式和易清洁\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "净砂 Cube 猫砂盆",
+        "queries": [
+          {
+            "q": "净砂 Cube 猫砂盆 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "净砂 Cube 猫砂盆 宠物用品 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "净砂 Cube 猫砂盆 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "净砂 Cube 猫砂盆 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "净砂 Cube 猫砂盆 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "净砂 Cube 猫砂盆 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "净砂 Cube 猫砂盆 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "净砂 Cube 猫砂盆 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "725a5c3e8494f8267bb99e54e1a538389e64a71d4e643ef0edbceff8ab3213b1"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M17.json",
+      "evidenceSha256": "25d4f531a4c574afde5bd895cab7fc482f5772113c13e6571a152633644f7ec8"
+    },
+    {
+      "id": "M18",
+      "category": "marketing",
+      "title": "便携投影仪卧室",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "51dfb366b584e838f70be868b3501612d6d00e9035604e37bedf32faeb4c629f"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "映舟 Pico 投影仪",
+            "brand": "映舟",
+            "category": "影音设备",
+            "model": "Pico",
+            "sellingPoints": [
+              "自动对焦",
+              "梯形校正",
+              "低噪风扇"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "映舟 Pico 投影仪",
+            "brand": {
+              "name": "映舟"
+            },
+            "category": "影音设备"
+          },
+          "dataMining": {
+            "name": "映舟 Pico 投影仪",
+            "brand": "映舟",
+            "category": "影音设备",
+            "model": "Pico",
+            "sellingPointCandidates": [
+              "自动对焦",
+              "梯形校正",
+              "低噪风扇"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给映舟 Pico 投影仪做一条抖音卧室观影种草，突出自动对焦、梯形校正和低噪风扇\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "映舟 Pico 投影仪",
+        "queries": [
+          {
+            "q": "映舟 Pico 投影仪 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "映舟 Pico 投影仪 影音设备 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "映舟 Pico 投影仪 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "映舟 Pico 投影仪 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "映舟 Pico 投影仪 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "映舟 Pico 投影仪 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "映舟 Pico 投影仪 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "映舟 Pico 投影仪 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "322b4979090634e1b2b463537876c48b89677253aa801d0086c81760d725db03"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M18.json",
+      "evidenceSha256": "122f75d91022793800a6e2bc953d13f0885788ec5af9d8b9a5d51a06580095c5"
+    },
+    {
+      "id": "M19",
+      "category": "marketing",
+      "title": "旅行收纳箱出差",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "97db9b34379ba72f8fdcb7af34945675d22f61e697ce089d93c7be56ada3b397"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "行序 Pack 旅行收纳箱",
+            "brand": "行序",
+            "category": "旅行用品",
+            "model": "Pack",
+            "sellingPoints": [
+              "分区收纳",
+              "压缩网袋",
+              "可折叠"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "行序 Pack 旅行收纳箱",
+            "brand": {
+              "name": "行序"
+            },
+            "category": "旅行用品"
+          },
+          "dataMining": {
+            "name": "行序 Pack 旅行收纳箱",
+            "brand": "行序",
+            "category": "旅行用品",
+            "model": "Pack",
+            "sellingPointCandidates": [
+              "分区收纳",
+              "压缩网袋",
+              "可折叠"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给行序 Pack 收纳箱做一条小红书出差场景种草，突出分区收纳、压缩网袋和可折叠\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "行序 Pack 旅行收纳箱",
+        "queries": [
+          {
+            "q": "行序 Pack 旅行收纳箱 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "行序 Pack 旅行收纳箱 旅行用品 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "行序 Pack 旅行收纳箱 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "行序 Pack 旅行收纳箱 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "行序 Pack 旅行收纳箱 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "行序 Pack 旅行收纳箱 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "行序 Pack 旅行收纳箱 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "行序 Pack 旅行收纳箱 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "c3c20eb479bfa37159132953b2f5c1bcd22e427caa3f95b3e565fc58e3dc12df"
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/M19.json",
+      "evidenceSha256": "d4e22f296eabc51cfb6e39b04003e02f425189226606d4a0b431c9d980ca168a"
+    },
+    {
+      "id": "M20",
+      "category": "marketing",
+      "title": "运动水壶跑步",
+      "expected": "MARKETING_READY",
+      "actual": "MARKETING_READY",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+ProductInfoCollector.plan+validateStageFacts",
+        "caseHash": "316106cf49715803aa2ca0732671727cbfd1a1962d02e305794469bed1af7c9b"
+      },
+      "output": {
+        "route": {
+          "route": "marketing",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 marketing",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "疾饮 Run 运动水壶",
+            "brand": "疾饮",
+            "category": "运动水具",
+            "model": "Run",
+            "sellingPoints": [
+              "单手开合",
+              "防漏",
+              "握持凹槽"
+            ],
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "product": "疾饮 Run 运动水壶",
+            "brand": {
+              "name": "疾饮"
+            },
+            "category": "运动水具"
+          },
+          "dataMining": {
+            "name": "疾饮 Run 运动水壶",
+            "brand": "疾饮",
+            "category": "运动水具",
+            "model": "Run",
+            "sellingPointCandidates": [
+              "单手开合",
+              "防漏",
+              "握持凹槽"
+            ]
+          },
+          "pipelineRoute": {
+            "kind": "marketing",
+            "via": "metadata",
+            "confidence": 1,
+            "productSource": "metadata"
+          }
+        },
+        "effectiveIntent": "给疾饮 Run 运动水壶做一条抖音跑步场景种草，突出单手开合、防漏和握持凹槽\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin；目标：seeding",
+        "themeInputContainsProduct": true,
+        "queryBase": "疾饮 Run 运动水壶",
+        "queries": [
+          {
+            "q": "疾饮 Run 运动水壶 官网",
+            "intent": "official_site",
+            "channel": "官网"
+          },
+          {
+            "q": "疾饮 Run 运动水壶 运动水具 旗舰店 商品页",
+            "intent": "flagship_page",
+            "channel": "电商旗舰店"
+          },
+          {
+            "q": "疾饮 Run 运动水壶 参数 规格",
+            "intent": "specs",
+            "channel": "官网/电商详情"
+          },
+          {
+            "q": "疾饮 Run 运动水壶 价格",
+            "intent": "price",
+            "channel": "电商"
+          },
+          {
+            "q": "疾饮 Run 运动水壶 官方产品图 高清",
+            "intent": "official_images",
+            "channel": "官网/旗舰店"
+          },
+          {
+            "q": "疾饮 Run 运动水壶 实拍 开箱",
+            "intent": "real_shots",
+            "channel": "社媒/评测"
+          },
+          {
+            "q": "疾饮 Run 运动水壶 白底图",
+            "intent": "white_bg",
+            "channel": "电商详情"
+          },
+          {
+            "q": "疾饮 Run 运动水壶 发布 上市 时间",
+            "intent": "model_verify",
+            "channel": "官网/新闻"
+          }
+        ],
+        "facts": {
+          "claims": 9,
+          "factHash": "c4a403aca3308814eb4f47e28940370e89494922737025c0b950fa9cdd500960"
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/M20.json",
+      "evidenceSha256": "d3b395e3684aede36f256f943a856c404935f7c2b953435da756381c61b88e80"
+    },
+    {
+      "id": "N01",
+      "category": "narrative",
+      "title": "雨夜旧灯",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "240b7d79197aad0b84a7401e0b6d7180d44c6dbb35d67495d87c3d15258ac487"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "themeInput": "做一条30秒竖屏品牌故事：雨夜归家的年轻人发现老旧台灯依然温暖，主题是陪伴与耐用，人物仅使用内置默认模特，不出现商品参数或价格\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 74,
+      "evidence": "evidence/N01.json",
+      "evidenceSha256": "3a2b22123d6f18c262a6d3751a63aabd7af34601bcb7c3c3307a392ca8622cd5"
+    },
+    {
+      "id": "N02",
+      "category": "narrative",
+      "title": "末班公交",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "b9a0715f1016a92f8050be6637ea7471d8ef6cd1d7bde8a13e09acdeba1ed631"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 25,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条25秒城市情感短片：末班公交上两位陌生人因一把遗落的伞短暂相遇，结尾各自回到自己的生活\n[需求口径] 时长：25秒；画幅：9:16；平台：douyin",
+        "themeInput": "拍一条25秒城市情感短片：末班公交上两位陌生人因一把遗落的伞短暂相遇，结尾各自回到自己的生活\n[需求口径] 时长：25秒；画幅：9:16；平台：douyin",
+        "shots": 6,
+        "totalDurationSeconds": 25,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 17,
+      "evidence": "evidence/N02.json",
+      "evidenceSha256": "93fa75fb0426de2175cd68b19700d909e37706baa4f1b609b4e95a8fda530d25"
+    },
+    {
+      "id": "N03",
+      "category": "narrative",
+      "title": "书法与时间",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "ad2bfa2844d1b1e947c609bd4e8364ec1e8e66a8cdcece62329683586df9b682"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条30秒东方美学短片：老书法家在晨光中磨墨、落笔、收笔，展现耐心如何穿过时间\n[需求口径] 时长：30秒；画幅：9:16；平台：bilibili",
+        "themeInput": "做一条30秒东方美学短片：老书法家在晨光中磨墨、落笔、收笔，展现耐心如何穿过时间\n[需求口径] 时长：30秒；画幅：9:16；平台：bilibili",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N03.json",
+      "evidenceSha256": "b807c3920dc53c7009f7de29058898e48afee251f16c0b53fd47773266527643"
+    },
+    {
+      "id": "N04",
+      "category": "narrative",
+      "title": "山路纪录片",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "73a7d997d7b55a412aa1a99109e2d17ba1badca8c02f208ba6a2a14b11af66e6"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 40,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条40秒纪实风短片：清晨山路上的挑担人穿过薄雾抵达集市，无旁白，只保留环境声\n[需求口径] 时长：40秒；画幅：9:16；平台：bilibili",
+        "themeInput": "拍一条40秒纪实风短片：清晨山路上的挑担人穿过薄雾抵达集市，无旁白，只保留环境声\n[需求口径] 时长：40秒；画幅：9:16；平台：bilibili",
+        "shots": 6,
+        "totalDurationSeconds": 40,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N04.json",
+      "evidenceSha256": "d6c85a55e8bf2a74cf8e05f82a610b0439dc9943c6f1c33102c811eb7de648c6"
+    },
+    {
+      "id": "N05",
+      "category": "narrative",
+      "title": "机器人装配线",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "77b8b1b6f3a0826a4c63f9bbc43038116f77c47ee23f0b5af3f1c0877681873e"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条30秒工业美学短片：机器臂在洁净车间精准装配微型零件，突出秩序与节奏，不出现真实品牌\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "themeInput": "做一条30秒工业美学短片：机器臂在洁净车间精准装配微型零件，突出秩序与节奏，不出现真实品牌\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 17,
+      "evidence": "evidence/N05.json",
+      "evidenceSha256": "b11b6491ccd351b753a197afe9a8bddcce31d4f3ec4240cea505995fabccaab8"
+    },
+    {
+      "id": "N06",
+      "category": "narrative",
+      "title": "石桥四时",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "0b044c8f6d96b91c80063453c0c0cfa599360bb218ac0e73531acc36a699ae32"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 35,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条35秒时间流转短片：同一座石桥在晨雨、正午、黄昏和夜色中的四时变化，无人物正脸\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+        "themeInput": "拍一条35秒时间流转短片：同一座石桥在晨雨、正午、黄昏和夜色中的四时变化，无人物正脸\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+        "shots": 6,
+        "totalDurationSeconds": 35,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N06.json",
+      "evidenceSha256": "e8be4a0290b66732c892e23efaf2747a5ff9649e63c834525319c206aa02a7ef"
+    },
+    {
+      "id": "N07",
+      "category": "narrative",
+      "title": "纸船与孩子",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "debbb7987a55dd8dfdee80ccbc740ed110c4ff3c25301a1885abdf3fa636345b"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 20,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条20秒童话短片：纸船从水洼出发，经过落叶和石缝，最后漂进孩子的梦里\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin",
+        "themeInput": "做一条20秒童话短片：纸船从水洼出发，经过落叶和石缝，最后漂进孩子的梦里\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin",
+        "shots": 5,
+        "totalDurationSeconds": 20,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 15,
+      "evidence": "evidence/N07.json",
+      "evidenceSha256": "3a9b35e31f87f92df94285fbf5b1415a09667e2c2d225b0e5056a5156c30fa2d"
+    },
+    {
+      "id": "N08",
+      "category": "narrative",
+      "title": "无人海面",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "4be310ac45196ae2208c7e8777fe0477d6cc9b9d72ca14ccfdf53cb256983675"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 20,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条20秒纯空镜短片：黎明前的海面从深灰转为金色，只有潮汐、海鸟和远帆，不出现人物\n[需求口径] 时长：20秒；画幅：9:16；平台：bilibili",
+        "themeInput": "做一条20秒纯空镜短片：黎明前的海面从深灰转为金色，只有潮汐、海鸟和远帆，不出现人物\n[需求口径] 时长：20秒；画幅：9:16；平台：bilibili",
+        "shots": 5,
+        "totalDurationSeconds": 20,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N08.json",
+      "evidenceSha256": "e0e80e3f18e4f40b680340ed7091142ecea900d1c43b41d180cdfd92729d74c2"
+    },
+    {
+      "id": "N09",
+      "category": "narrative",
+      "title": "雨夜动物救援",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "2e91f743351fac3fb7502f430f2945f2e08fe476fe342a9d400a88404b4722c7"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条30秒温暖叙事：年轻人在雨夜发现纸箱里的小猫，把它带回家擦干并安置，人物为内置默认模特\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "themeInput": "拍一条30秒温暖叙事：年轻人在雨夜发现纸箱里的小猫，把它带回家擦干并安置，人物为内置默认模特\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N09.json",
+      "evidenceSha256": "75c7d0e1730e0e7d0f04810bd4cae380ca3f9ee6c79a2a2ba950657dcb76bf14"
+    },
+    {
+      "id": "N10",
+      "category": "narrative",
+      "title": "一盏茶的等待",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "c55734c19cd56224718ee49980fed453060d41b640e7fe260127056cd88b3d9f"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条30秒静物叙事：茶叶在水中舒展，茶汽升起，窗外从阴到晴，主题是等待与松弛\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu",
+        "themeInput": "做一条30秒静物叙事：茶叶在水中舒展，茶汽升起，窗外从阴到晴，主题是等待与松弛\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 20,
+      "evidence": "evidence/N10.json",
+      "evidenceSha256": "2ead44c71a5d77d1d1447a4a42d6a696c0c047ffc91b03209e6ab6363217adf7"
+    },
+    {
+      "id": "N11",
+      "category": "narrative",
+      "title": "空间站日出",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "e994023c524baa6491cd31898b8c7828c19dbb189851ad25f1c70535879d8c34"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 25,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条25秒科幻概念短片：空间站舷窗外地球日出，宇航员无声注视，强调孤独与希望\n[需求口径] 时长：25秒；画幅：9:16；平台：bilibili",
+        "themeInput": "拍一条25秒科幻概念短片：空间站舷窗外地球日出，宇航员无声注视，强调孤独与希望\n[需求口径] 时长：25秒；画幅：9:16；平台：bilibili",
+        "shots": 6,
+        "totalDurationSeconds": 25,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 15,
+      "evidence": "evidence/N11.json",
+      "evidenceSha256": "c731f7a6ddea67c8c30728aa7c9dd158c79c14e2dfc60c00f694c9337aa852c1"
+    },
+    {
+      "id": "N12",
+      "category": "narrative",
+      "title": "无声舞者",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "2189a6e49833199889fb9ca891383b4c101aee11a6b0bd543e159ce6fe97e86f"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条30秒舞蹈短片：听障舞者在排练厅通过地板震动感受节拍，人物为内置默认模特，避免真实人物身份\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "themeInput": "做一条30秒舞蹈短片：听障舞者在排练厅通过地板震动感受节拍，人物为内置默认模特，避免真实人物身份\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N12.json",
+      "evidenceSha256": "85148cfd0bfe1d59ee1cfd9ccdbbb305c7c173a98b486d9c9601b99ffd4ab53f"
+    },
+    {
+      "id": "N13",
+      "category": "narrative",
+      "title": "老理发店",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "c87981941b57a53ba465c10c6f4aad5917918481dedfa93a341e0a3c4c575b4f"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 35,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条35秒怀旧短片：老街理发店在黄昏迎来最后一位客人，镜子里映出街景变化，无商品推广\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+        "themeInput": "拍一条35秒怀旧短片：老街理发店在黄昏迎来最后一位客人，镜子里映出街景变化，无商品推广\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+        "shots": 6,
+        "totalDurationSeconds": 35,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 17,
+      "evidence": "evidence/N13.json",
+      "evidenceSha256": "0eb464003588db381d8f2f715c97fbf56bed782474d4f9a2983f59bd24efaf56"
+    },
+    {
+      "id": "N14",
+      "category": "narrative",
+      "title": "面馆记忆",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "bb93f7c8635a2ac97431377afbac9b7f3440bec5e01dcab5b9a4472269e53fc1"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条30秒美食记忆短片：热气、汤面、筷子与窗外雨声唤起回家记忆，人物只出现手部\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu",
+        "themeInput": "做一条30秒美食记忆短片：热气、汤面、筷子与窗外雨声唤起回家记忆，人物只出现手部\n[需求口径] 时长：30秒；画幅：9:16；平台：xiaohongshu",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 15,
+      "evidence": "evidence/N14.json",
+      "evidenceSha256": "8c6ace1c43077b165222ba1bec01250578a2e459d15d9a81ebb21e1b1da45e9b"
+    },
+    {
+      "id": "N15",
+      "category": "narrative",
+      "title": "城市骑行",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "a746712abd565acd7dcc65a71149b3a6bef0df27a1eea820a659b48d08ebc9d6"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 20,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条20秒城市运动短片：凌晨骑行者穿过空旷街道，红绿灯和路面反光构成节奏，不出现品牌\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin",
+        "themeInput": "拍一条20秒城市运动短片：凌晨骑行者穿过空旷街道，红绿灯和路面反光构成节奏，不出现品牌\n[需求口径] 时长：20秒；画幅：9:16；平台：douyin",
+        "shots": 5,
+        "totalDurationSeconds": 20,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N15.json",
+      "evidenceSha256": "5e98bc88365c157134afbb86851c5169e1eedf69c6fb46a74bdba81630b0a8a6"
+    },
+    {
+      "id": "N16",
+      "category": "narrative",
+      "title": "文物修复",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "770382278cc28d3df6ae4601890fa6eb83048216ef4b27e8858fe5a298e57b07"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 40,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条40秒纪录片式短片：修复师用毛刷和镊子处理一件残缺陶器，强调专注与时间，不出现真实文物编号\n[需求口径] 时长：40秒；画幅：9:16；平台：bilibili",
+        "themeInput": "做一条40秒纪录片式短片：修复师用毛刷和镊子处理一件残缺陶器，强调专注与时间，不出现真实文物编号\n[需求口径] 时长：40秒；画幅：9:16；平台：bilibili",
+        "shots": 6,
+        "totalDurationSeconds": 40,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N16.json",
+      "evidenceSha256": "2bf9b3e16f40aed55bd748a41fb15517ff5512068d9c45ef653c4700f684e5d8"
+    },
+    {
+      "id": "N17",
+      "category": "narrative",
+      "title": "山村课堂",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "78d8dee37f7b584dbbd23a3e6a711700ed364ee9bfdc86da666aea37addabee2"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 30,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条30秒公益短片：山村里一间小教室里孩子们朗读后奔向操场，人物为群像且使用内置默认模特\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "themeInput": "拍一条30秒公益短片：山村里一间小教室里孩子们朗读后奔向操场，人物为群像且使用内置默认模特\n[需求口径] 时长：30秒；画幅：9:16；平台：douyin",
+        "shots": 6,
+        "totalDurationSeconds": 30,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N17.json",
+      "evidenceSha256": "58508b47157617dca8f89eb222375a9eddd4e9eb0ee5ffc3a49b048c25312c68"
+    },
+    {
+      "id": "N18",
+      "category": "narrative",
+      "title": "植物生长",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "04363997dc4fdd696acb958529afc063549ed4124a3f48df627a171af8ab8c01"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 20,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条20秒微距短片：种子破土、叶片舒展、晨露滑落，不出现人物和商品\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu",
+        "themeInput": "做一条20秒微距短片：种子破土、叶片舒展、晨露滑落，不出现人物和商品\n[需求口径] 时长：20秒；画幅：9:16；平台：xiaohongshu",
+        "shots": 5,
+        "totalDurationSeconds": 20,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N18.json",
+      "evidenceSha256": "66eb6cde639d2ab537d1e45b1a8a08ab4783d2f5c13e5824e60381e0f229fa76"
+    },
+    {
+      "id": "N19",
+      "category": "narrative",
+      "title": "冬日列车",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "deb36ad7bf748b831bbbda3d0d70218eff09715302ecd4b3224d526e3c487209"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 35,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "拍一条35秒旅行叙事：冬日列车穿过雪原，旅客在窗边读信，结尾列车驶入暮色\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+        "themeInput": "拍一条35秒旅行叙事：冬日列车穿过雪原，旅客在窗边读信，结尾列车驶入暮色\n[需求口径] 时长：35秒；画幅：9:16；平台：bilibili",
+        "shots": 6,
+        "totalDurationSeconds": 35,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 15,
+      "evidence": "evidence/N19.json",
+      "evidenceSha256": "e9055b376ef0d0e731045b9a2066ff5f64586c260c66c6621eccda73a92eb36b"
+    },
+    {
+      "id": "N20",
+      "category": "narrative",
+      "title": "街头大提琴",
+      "expected": "NARRATIVE_READY",
+      "actual": "NARRATIVE_READY",
+      "pass": true,
+      "mode": "runtime-bridge",
+      "invocation": {
+        "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+        "caseHash": "105fffcd480f1a1637ac58425aa234acee2f395fa307f831043cf82ebd846ddc"
+      },
+      "output": {
+        "route": {
+          "route": "narrative",
+          "confidence": 1,
+          "via": "metadata",
+          "rationale": "调用方显式指定 narrative",
+          "signals": {
+            "marketing": [],
+            "narrative": [],
+            "explainer": []
+          },
+          "product": {
+            "name": "不应出现的商品",
+            "source": "metadata"
+          }
+        },
+        "metadata": {
+          "brief": {
+            "brand": {
+              "name": "不应出现的品牌"
+            },
+            "category": "不应出现的品类",
+            "sellingPoints": [
+              "不应出现的卖点"
+            ],
+            "audience": "不应出现的人群",
+            "platform": "c",
+            "goal": "seeding",
+            "duration": 25,
+            "aspectRatio": "9:16"
+          },
+          "pipelineRoute": {
+            "kind": "narrative",
+            "via": "metadata",
+            "confidence": 1
+          }
+        },
+        "effectiveIntent": "做一条25秒音乐短片：街头大提琴手在黄昏演奏，行人短暂停留又离开，声音与城市空间形成叙事\n[需求口径] 时长：25秒；画幅：9:16；平台：douyin",
+        "themeInput": "做一条25秒音乐短片：街头大提琴手在黄昏演奏，行人短暂停留又离开，声音与城市空间形成叙事\n[需求口径] 时长：25秒；画幅：9:16；平台：douyin",
+        "shots": 6,
+        "totalDurationSeconds": 25,
+        "finalShotContract": {
+          "pass": true,
+          "issues": []
+        },
+        "pipelineGuard": {
+          "pass": true,
+          "errors": [],
+          "warnings": []
+        }
+      },
+      "durationMs": 16,
+      "evidence": "evidence/N20.json",
+      "evidenceSha256": "54676c50ae8876adb1e84c91988ac5d5ff40ebade89caf50ee5896a1fb94c7cc"
+    },
+    {
+      "id": "A01",
+      "category": "abnormal",
+      "title": "空意图",
+      "expected": "INTENT_REQUIRED",
+      "actual": "INTENT_REQUIRED",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "empty-intent",
+        "caseHash": "275f5acd9c57a84ac41ad53a77571ba34b8a5522284cea73b560f76359d89a98"
+      },
+      "output": {
+        "error": "INTENT_REQUIRED: 请描述要制作的视频"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A01.json",
+      "evidenceSha256": "ae13533e6aeee4a344a6e9b1278400334b8dd5ecb9b5b28033e020ad966a409e"
+    },
+    {
+      "id": "A02",
+      "category": "abnormal",
+      "title": "营销缺商品",
+      "expected": "CLARIFY_PRODUCT",
+      "actual": "CLARIFY_PRODUCT",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "marketing-missing-product",
+        "caseHash": "c2ed15f19e660bb3dfee3d5cfe01ed3c869a20621697bf3c0bef3593a4664a04"
+      },
+      "output": {
+        "route": "clarify",
+        "confidence": 0.5,
+        "via": "metadata",
+        "rationale": "调用方显式指定 marketing；但缺商品名，情报五站无法开工",
+        "signals": {
+          "marketing": [],
+          "narrative": [],
+          "explainer": []
+        },
+        "clarify": {
+          "question": "已判定走营销片管线，但缺商品锚点——情报五站（采集/评价/竞品/核验/装订）以商品为锚，没有商品名无法开工。\n请补充：商品名（必填）；品牌 / 品类 / 型号 / 价格带（可选，越全检索越准）。\n例：商品名：星野空气循环扇；品牌：星野；品类：小家电。\n若这条片子其实不涉及商品，请直接回复「走叙事片」，我按通用管线重排。",
+          "missing": [
+            "product"
+          ],
+          "options": [
+            {
+              "key": "marketing",
+              "label": "营销片（我会补商品名）"
+            },
+            {
+              "key": "narrative",
+              "label": "其实是不涉及商品的叙事片"
+            }
+          ]
+        }
+      },
+      "durationMs": 1,
+      "evidence": "evidence/A02.json",
+      "evidenceSha256": "4f9b47b7d2bf666102d17e3142e108937340ada070ac5f77c053f6e56264e4a8"
+    },
+    {
+      "id": "A03",
+      "category": "abnormal",
+      "title": "无商品也无主题",
+      "expected": "CLARIFY_ROUTE",
+      "actual": "CLARIFY_ROUTE",
+      "pass": true,
+      "mode": "production-router",
+      "invocation": {
+        "function": "ambiguous-route",
+        "caseHash": "9a9bc89152ff2d4a41cb722bf9127b4567b5345c6f2e97d876f26dd3670648c0"
+      },
+      "output": {
+        "route": "clarify",
+        "confidence": 0.3,
+        "via": "rule",
+        "rationale": "营销线索 0 条 / 叙事线索 0 条，不足以判定管线",
+        "signals": {
+          "marketing": [],
+          "narrative": [],
+          "explainer": []
+        },
+        "clarify": {
+          "question": "这条片子走哪条管线？三条管线的成本与产物差别很大，先确认再开工：\n① 营销片：面向带货/种草/开箱/测评/商品与品牌推广。开跑前先过商品情报五站（联网采集商品事实、真实评价、竞品，含人工/AI 确认门 G1），全流程门更多、耗时更长。\n② 叙事片（通用）：面向故事/剧情/知识/人文/品牌形象。直接进创意主题 → 洞察 → PRD → 预生产，不跑情报层。\n③ 口播解说片：面向讲解/科普/解读/教程/盘点——一份口播稿 + 一条配音，出字级同步的图文解说成片（不跑情报/剧本/逐镜生成）。\n请回复「走营销片」「走叙事片」或「走口播片」；若走营销片，请一并给出商品名（例：走营销片，商品名：星野空气循环扇）。",
+          "missing": [
+            "route"
+          ],
+          "options": [
+            {
+              "key": "marketing",
+              "label": "营销片（带货/种草/商品与品牌推广）"
+            },
+            {
+              "key": "narrative",
+              "label": "叙事片（故事/知识/人文/形象，通用管线）"
+            }
+          ]
+        }
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A03.json",
+      "evidenceSha256": "33a7014baf91bfb329566c406b159c5a75039ae48f6d302d22b16a4bc1701864"
+    },
+    {
+      "id": "A04",
+      "category": "abnormal",
+      "title": "正负指令冲突",
+      "expected": "CLARIFY_ROUTE",
+      "actual": "CLARIFY_ROUTE",
+      "pass": true,
+      "mode": "deterministic-replay",
+      "invocation": {
+        "function": "route-conflict",
+        "caseHash": "31840a7a66699436fc3474cc602d2883edb0a23dd13993df31ea0b43e873b7f1"
+      },
+      "output": {
+        "route": "clarify",
+        "reason": "deterministic-replay: 同时含不要营销片与按营销片带货，继续开工会产生方向性冲突"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A04.json",
+      "evidenceSha256": "c5ec4e64f7d67519f14fd384f9e3ea60f4af168a368761ecbe339a996dd89092"
+    },
+    {
+      "id": "A05",
+      "category": "abnormal",
+      "title": "产品名路径注入",
+      "expected": "PRODUCT_INVALID",
+      "actual": "PRODUCT_INVALID",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "unsafe-product",
+        "caseHash": "d549ef0b244acdea54f2c02ebc21c91f43864791cce82c3578e1dae202eceb43"
+      },
+      "output": {
+        "error": "PRODUCT_INVALID: 商品名包含路径、控制字符或 HTML 标记"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A05.json",
+      "evidenceSha256": "e1756fa7d80f8bcd9efd43962bf331b67d8ce90b7cfc9db41f9cdb1f12f706c1"
+    },
+    {
+      "id": "A06",
+      "category": "abnormal",
+      "title": "localhost 来源",
+      "expected": "SOURCE_URL_PRIVATE",
+      "actual": "SOURCE_URL_PRIVATE",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "private-source",
+        "caseHash": "1584a29f2508b6dc9a569b4b110980cc81162c363711b67dbf20b46b041567f8"
+      },
+      "output": {
+        "error": "SOURCE_URL_PRIVATE：来源不能使用非公网IP"
+      },
+      "durationMs": 1,
+      "evidence": "evidence/A06.json",
+      "evidenceSha256": "fe90eaaff4bc088f899b5ae95c5382993ac170f316ce565f22093d53a175c75c"
+    },
+    {
+      "id": "A07",
+      "category": "abnormal",
+      "title": "带凭据来源",
+      "expected": "SOURCE_URL_INVALID",
+      "actual": "SOURCE_URL_INVALID",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "credential-source",
+        "caseHash": "5407c476f6489daf3d2910b30895adedf38fd7e1d23cebd470d943ba36cbeb7c"
+      },
+      "output": {
+        "error": "SOURCE_URL_INVALID：来源只接受无凭据的标准 HTTP/HTTPS 公网页面"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A07.json",
+      "evidenceSha256": "2a799de2de6ed0af8f252f4c53eee1dc2085cee19b4d60cbe918933a70712713"
+    },
+    {
+      "id": "A08",
+      "category": "abnormal",
+      "title": "来源提示词注入",
+      "expected": "SOURCE_INSTRUCTION_NOT_FOLLOWED",
+      "actual": "SOURCE_INSTRUCTION_NOT_FOLLOWED",
+      "pass": true,
+      "mode": "deterministic-replay",
+      "invocation": {
+        "function": "source-prompt-injection",
+        "caseHash": "15445945279bbc2ad729f6a6e48f8392f35d2ef0931db434183b36ada1a29795"
+      },
+      "output": {
+        "error": "SOURCE_INSTRUCTION_NOT_FOLLOWED: 来源中的注入指令没有改变事实边界"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A08.json",
+      "evidenceSha256": "c5ee44d18fa1c7ffa67f32bb237fd3f8ca6c5213adfeead6df1a76f1a47e8406"
+    },
+    {
+      "id": "A09",
+      "category": "abnormal",
+      "title": "幻觉引用",
+      "expected": "CITATION_REJECTED",
+      "actual": "CITATION_REJECTED",
+      "pass": true,
+      "mode": "deterministic-replay",
+      "invocation": {
+        "function": "hallucinated-citation",
+        "caseHash": "2e80aa2cf524eeb0eff267463f00bede5473b7f005625c74a361d66435b554d2"
+      },
+      "output": {
+        "error": "CITATION_REJECTED: 引文不能被该主张语义使用"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A09.json",
+      "evidenceSha256": "d64c9bc26eb1f84c417d3a4b909d91f9d45195f6d6791be61544aefff4a422b6"
+    },
+    {
+      "id": "A10",
+      "category": "abnormal",
+      "title": "无证据竞品短板",
+      "expected": "COMPETITOR_CLAIM_REJECTED",
+      "actual": "COMPETITOR_CLAIM_REJECTED",
+      "pass": true,
+      "mode": "deterministic-replay",
+      "invocation": {
+        "function": "unsupported-competitor",
+        "caseHash": "78383ae6b7e9ae1050ff43822ffbb0f3d80d201431729f678d2c76d06f6633ca"
+      },
+      "output": {
+        "error": "COMPETITOR_CLAIM_REJECTED: 引文不能被该主张语义使用"
+      },
+      "durationMs": 1,
+      "evidence": "evidence/A10.json",
+      "evidenceSha256": "0bf17f2e139552d5a51a10a16fa730af8a042e3576d6cb420d886915963ed999"
+    },
+    {
+      "id": "A11",
+      "category": "abnormal",
+      "title": "过期事实包",
+      "expected": "MARKETING_FACTS_EXPIRED",
+      "actual": "MARKETING_FACTS_EXPIRED",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "stale-facts",
+        "caseHash": "03d4aaeb5b2bcc52defa6a74d8d4b4ae451eaf1af4a2a0bc7da1d91c0587c57a"
+      },
+      "output": {
+        "error": "MARKETING_FACTS_EXPIRED: 营销事实来源超过24小时有效期，请刷新来源后重新预生产"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A11.json",
+      "evidenceSha256": "593e1ba10caa139eecd573cb76bc15ecf57547cf4f36491e58828ebce13f433d"
+    },
+    {
+      "id": "A12",
+      "category": "abnormal",
+      "title": "事实字节篡改",
+      "expected": "MARKETING_FACTS_CHANGED",
+      "actual": "MARKETING_FACTS_CHANGED",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "tampered-source",
+        "caseHash": "5bbc97c5492950ef41319bac64a5b40a660e85856c9d2c4fc6e8206022ab8024"
+      },
+      "output": {
+        "error": "MARKETING_FACTS_CHANGED：主张引用的正文摘要已变化"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A12.json",
+      "evidenceSha256": "f8d54e62934c63c0ff2b5870bc16cce07de5e5b9fabbad605c9d38542dc8810d"
+    },
+    {
+      "id": "A13",
+      "category": "abnormal",
+      "title": "零时长",
+      "expected": "DURATION_INVALID",
+      "actual": "DURATION_INVALID",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "invalid-duration",
+        "caseHash": "b497d5349ecccfdd61f36b4a440bbfef9a7fa1b07f8d35f2cb74919351320c4b"
+      },
+      "output": {
+        "error": "DURATION_INVALID: 总时长必须是 1–300 秒之间的整数"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A13.json",
+      "evidenceSha256": "a8c8d1a7747dded5ad2ed9e77699e0b59a91b558d670e7726f72caf00d12e3c1"
+    },
+    {
+      "id": "A14",
+      "category": "abnormal",
+      "title": "负时长",
+      "expected": "DURATION_INVALID",
+      "actual": "DURATION_INVALID",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "invalid-duration",
+        "caseHash": "9433a6670455322dbe30863b044514a646a8dda99c2d8d0c719d4d562b57bbf5"
+      },
+      "output": {
+        "error": "DURATION_INVALID: 总时长必须是 1–300 秒之间的整数"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A14.json",
+      "evidenceSha256": "46e4456397c545394e0147740c0c81de58a941f2d4b4e8ca004bbe0b652753a4"
+    },
+    {
+      "id": "A15",
+      "category": "abnormal",
+      "title": "超长时长",
+      "expected": "DURATION_INVALID",
+      "actual": "DURATION_INVALID",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "invalid-duration",
+        "caseHash": "f23343068f38a74f20a92d97f3c926cc6f5628526976dd9e0df5cd4727a9aed5"
+      },
+      "output": {
+        "error": "DURATION_INVALID: 总时长必须是 1–300 秒之间的整数"
+      },
+      "durationMs": 1,
+      "evidence": "evidence/A15.json",
+      "evidenceSha256": "42732bd67c55ec5f109a3cf36dc399adbf06f2b0fdffe8d506da02e313e23eec"
+    },
+    {
+      "id": "A16",
+      "category": "abnormal",
+      "title": "非法画幅",
+      "expected": "ASPECT_INVALID",
+      "actual": "ASPECT_INVALID",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "invalid-aspect",
+        "caseHash": "6c952a6ab31d5dee5d91d183948c0ed89d0c4d1d624aeac38208cc969b715ecd"
+      },
+      "output": {
+        "error": "ASPECT_INVALID: 画幅必须是有界宽高比，收到 9:16<script>"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A16.json",
+      "evidenceSha256": "d6879fb1f2541527728d395242c4646dc53e6b97a6b05c860cab5e7b61d2c926"
+    },
+    {
+      "id": "A17",
+      "category": "abnormal",
+      "title": "空镜头",
+      "expected": "SHOT_PROMPT_REQUIRED",
+      "actual": "SHOT_PROMPT_REQUIRED",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "empty-shot",
+        "caseHash": "91950b63af163717a11a63ed7f19c5d2112647e3ad5008752b99cd43092d790a"
+      },
+      "output": {
+        "pass": false,
+        "issues": [
+          {
+            "code": "SHOT_PROMPT_REQUIRED",
+            "shotId": "S1",
+            "message": "最终 prompt 为空"
+          }
+        ]
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A17.json",
+      "evidenceSha256": "33fdf4452e272aea404ecf284803c20e968ca09791343158a1ba129d6c08f7e5"
+    },
+    {
+      "id": "A18",
+      "category": "abnormal",
+      "title": "重复镜头",
+      "expected": "SHOT_DUPLICATE",
+      "actual": "SHOT_DUPLICATE",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "duplicate-shot",
+        "caseHash": "f9bf027940e27b3e8b97ba354cb33f3a1106071e88567f36171b120f0020c13f"
+      },
+      "output": {
+        "pass": false,
+        "issues": [
+          {
+            "code": "SHOT_DUPLICATE",
+            "shotId": "S1",
+            "message": "镜头 ID 重复：S1"
+          }
+        ]
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A18.json",
+      "evidenceSha256": "ea8795be015fed7ad684af35b4123e8c87a68df216cdedede50319cb1d9f89d2"
+    },
+    {
+      "id": "A19",
+      "category": "abnormal",
+      "title": "占位符镜头",
+      "expected": "SHOT_PLACEHOLDER",
+      "actual": "SHOT_PLACEHOLDER",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "placeholder-shot",
+        "caseHash": "88026fe98f9006c74bcc8ee1ad2daccd9a6930c716e5c0ae8bf02f564fab6570"
+      },
+      "output": {
+        "pass": false,
+        "issues": [
+          {
+            "code": "SHOT_PLACEHOLDER",
+            "shotId": "S1",
+            "message": "最终 prompt 含对象/未定义占位符"
+          }
+        ]
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A19.json",
+      "evidenceSha256": "98cc5025620e20154f9b67d6a0544e4e8e0e4a64537578b36f8ec47adf01dfcb"
+    },
+    {
+      "id": "A20",
+      "category": "abnormal",
+      "title": "无资格提交",
+      "expected": "RENDER_SUBMIT_BLOCKED",
+      "actual": "RENDER_SUBMIT_BLOCKED",
+      "pass": true,
+      "mode": "production-contract",
+      "invocation": {
+        "function": "render-boundary",
+        "caseHash": "7410030768fbfece2f24298ab6b848e28aa878855fdf5168e90426a36eb85ab5"
+      },
+      "output": {
+        "error": "RENDER_SUBMIT_BLOCKED: status=blocked, providerSubmission=false, contractPass=false"
+      },
+      "durationMs": 0,
+      "evidence": "evidence/A20.json",
+      "evidenceSha256": "88791da491420b0f7dd0dbcf1924443c6280e39c9191f5bf60c720437a9ff6ba"
+    }
+  ]
+}
