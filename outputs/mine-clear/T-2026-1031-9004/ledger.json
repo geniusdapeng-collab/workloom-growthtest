@@ -5,7 +5,7 @@
   "repo_path": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
   "title": "AI 视频营销/通用数据管线 60 场景压测与修复",
   "created_at": "2026-10-31T04:00:26.711Z",
-  "updated_at": "2026-10-31T14:36:58.472Z",
+  "updated_at": "2026-10-31T14:37:46.710Z",
   "baseline": {
     "audit": {
       "commit": "67786d35a9e5a051a60df491e24a6892e8033f96",
@@ -16,7 +16,7 @@
       "notes": "本地 HEAD 不是 origin/main 最新（云端 6484e4f9 / 本地 67786d35）——按 §1.2 先对齐基线；工作树不干净（1 项未提交改动）：排雷结论只对已提交内容成立"
     },
     "repair": {
-      "commit": "f8c67e14df3863ff4a163356b1b77855f83ada91",
+      "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
       "reverified_problem_ids": []
     },
     "acceptance": {
@@ -200,7 +200,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "需求合同与 PRD 角色系统互相矛盾",
       "evidence": [
         {
@@ -242,15 +242,35 @@
               "packages/video-studio/src/studio.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-002-0-1793457445805.json",
+            "sha256": "024f111d8fcc23a854164644fd87912341cd59dcd6830fa41b66f2384fc86b6e",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-002-0-1793457445805.txt",
+            "sha256": "c44cfdb2eb38cdd232925cf9d421d70b64af873d39afeb9e418e650a858d9438",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/studio.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "审计发现来自 canary-n2 至 n6 的角色双轨。"
+      "notes": "审计发现来自 canary-n2 至 n6 的角色双轨。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:37:25.800Z",
+        "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+        "finished_at": "2026-10-31T14:37:31.028Z"
+      }
     },
     {
       "id": "MC-003",
@@ -258,7 +278,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "发现 JSON 尾随文本被贪婪解析并静默回退规则",
       "evidence": [
         {
@@ -300,15 +320,35 @@
               "packages/video-studio/src/vendor-compat.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-003-0-1793457451140.json",
+            "sha256": "34e5833a8be131e0ec2eccc50ece3eeac4af9e45bba6726aab71a96b77a36778",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-003-0-1793457451140.txt",
+            "sha256": "38775dba65784c5d6c24a240ace0e7c6c6300d9300b130c30253ff5155557ef3",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run packages/video-studio/src/configured-llm.test.ts packages/video-studio/src/vendor-compat.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "审计发现来自 canary-n3 至 n21 的 JSON 尾随文本。"
+      "notes": "审计发现来自 canary-n3 至 n21 的 JSON 尾随文本。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:37:31.139Z",
+        "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+        "finished_at": "2026-10-31T14:37:36.188Z"
+      }
     },
     {
       "id": "MC-004",
@@ -316,7 +356,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "Phase3 降级不重试且最终 prompt 违反台词、长度和画幅合同",
       "evidence": [
         {
@@ -352,7 +392,17 @@
               "packages/video-studio/src/final-shot-contract.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-004-0-1793457456300.json",
+            "sha256": "778cfaaa96dabfcb2a8d065a963363d2b107df3cfc2972d6e0e212a07a7d4b56",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-004-0-1793457456300.txt",
+            "sha256": "066e818f1beedc9d4144b7e11d476914c2b45d98bc1a7fa04513434cdd6bed14",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         },
         {
           "kind": "property",
@@ -367,15 +417,35 @@
               "outputs/mine-clear/T-2026-1031-9004/matrix"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-004-1-1793457461814.json",
+            "sha256": "5a25d333f0054a716c6872e83d2fbe715a01a72f516fed4150d1a13fa1f03a78",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-004-1-1793457461814.txt",
+            "sha256": "105c570b321337d15481d029f9c0bc883774072bab89280389bb4b42a8b0c240",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts packages/video-studio/src/final-shot-contract.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "审计发现来自 canary-n21 与 canary-m3 的 PipelineGuard 失败。"
+      "notes": "审计发现来自 canary-n21 与 canary-m3 的 PipelineGuard 失败。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:37:36.300Z",
+        "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+        "finished_at": "2026-10-31T14:37:42.503Z"
+      }
     },
     {
       "id": "MC-005",
@@ -383,7 +453,7 @@
       "level": "L2",
       "severity": "P1",
       "batch": 2,
-      "state": "open",
+      "state": "fixed",
       "title": "营销 CLI 绕过宿主事实权威，缓存与官方来源无法进入 canary",
       "evidence": [
         {
@@ -432,15 +502,35 @@
               "apps/server/src/video/data-mining-executor.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-005-0-1793457462621.json",
+            "sha256": "a2335e725a2d5afa864d44280c8c974aa3e4b36c3cd39916505d6ec5f0a07f93",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-005-0-1793457462621.txt",
+            "sha256": "7c0e9b7dad1968499d837b5f5f8bd1f768b118276023dc8447541a7bec25f54b",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-authority.test.ts apps/server/src/video/marketing-source-fetcher.test.ts apps/server/src/video/data-mining-executor.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "审计发现来自 canary-m / m2 / m3。"
+      "notes": "审计发现来自 canary-m / m2 / m3。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:37:42.620Z",
+        "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+        "finished_at": "2026-10-31T14:37:43.953Z"
+      }
     },
     {
       "id": "MC-006",
@@ -448,7 +538,7 @@
       "level": "L3",
       "severity": "P2",
       "batch": 3,
-      "state": "open",
+      "state": "fixed",
       "title": "监制 JSON 无一次格式修复，CLI 失败会遗留 vendor 定时器",
       "evidence": [
         {
@@ -490,15 +580,35 @@
               "packages/video-studio/src/configured-llm.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-006-0-1793457464068.json",
+            "sha256": "b33b24b2d7d56d62b69590e706a5b5fc1cde3ea20a6d20ec2752b6c669a66f85",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-006-0-1793457464068.txt",
+            "sha256": "95918d446560173827ba20db6f9256ec9cc22addc9dc892660c8d91a85d8cb9f",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/vitest run packages/video-studio/src/producer-gate.test.ts packages/video-studio/src/configured-llm.test.ts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "canary-n21 之后连续跑批暴露锁残留。"
+      "notes": "canary-n21 之后连续跑批暴露锁残留。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:37:44.067Z",
+        "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+        "finished_at": "2026-10-31T14:37:44.793Z"
+      }
     },
     {
       "id": "MC-007",
@@ -506,7 +616,7 @@
       "level": "L2",
       "severity": "P2",
       "batch": 3,
-      "state": "open",
+      "state": "fixed",
       "title": "请求边界与 60 场景矩阵缺失，非法时长/画幅会静默丢失",
       "evidence": [
         {
@@ -542,7 +652,17 @@
               "outputs/mine-clear/T-2026-1031-9004/matrix"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-007-0-1793457464912.json",
+            "sha256": "f5e5734f6a5c4d79032d3763ccbbd7419ee1183c0b04e04ecaadd6919cb6026b",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-007-0-1793457464912.txt",
+            "sha256": "aab24a25a5bbdce7a1206aeb12224adae5402a9ed026add40343e73ea28e0fdb",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         },
         {
           "kind": "sample",
@@ -557,15 +677,35 @@
               "packages/video-studio/src/final-shot-contract.test.ts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-007-1-1793457465581.json",
+            "sha256": "e172b5a72f664f658b85a3389611e3f9a8b8466f949156ac1b182f0c85731066",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-007-1-1793457465581.txt",
+            "sha256": "8e360d0c13e6903ce15d0fec874adb3fe3d72ea60647b8cca89ce1712e965644",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/tsx scripts/tools/ai-video-stress-matrix.mts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "首轮矩阵 59/60，A16 暴露 PLATE_ASPECT_INVALID 与入口 ASPECT_INVALID 口径分叉；统一后 60/60。"
+      "notes": "首轮矩阵 59/60，A16 暴露 PLATE_ASPECT_INVALID 与入口 ASPECT_INVALID 口径分叉；统一后 60/60。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:37:44.911Z",
+        "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+        "finished_at": "2026-10-31T14:37:46.008Z"
+      }
     },
     {
       "id": "MC-008",
@@ -573,7 +713,7 @@
       "level": "L4",
       "severity": "P2",
       "batch": 3,
-      "state": "open",
+      "state": "fixed",
       "title": "video-doctor 把不存在的默认曲库根判成路径监狱失败",
       "evidence": [
         {
@@ -607,15 +747,35 @@
               "scripts/tools/video-doctor.mts"
             ]
           },
-          "last_result": "not-run"
+          "last_result": "pass",
+          "run": {
+            "path": "runs/MC-008-0-1793457466116.json",
+            "sha256": "e3a0b325a591a390697fdb45416ec409f88309be0024b2dc9aeb39f12550f6c9",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          },
+          "evidence": {
+            "path": "evidence/MC-008-0-1793457466116.txt",
+            "sha256": "1c7c83ee201448fe7ef05434bf5749961f192d6c72d75c4a3fd990e180058703",
+            "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+          }
         }
       ],
       "regression": {
         "command": "node_modules/.bin/tsx scripts/tools/video-doctor.mts"
       },
-      "fixed_by": null,
+      "fixed_by": "codex-root-repair-01a190b3",
       "verified_by": null,
-      "notes": "修复后 16 pass / 2 warn / 0 fail；受保护的真实商用曲库未做任何改动。"
+      "notes": "修复后 16 pass / 2 warn / 0 fail；受保护的真实商用曲库未做任何改动。",
+      "verified_at": null,
+      "verification_evidence": null,
+      "last_assertion_attempt": {
+        "actor": "codex-root-repair-01a190b3",
+        "role": "repair",
+        "result": "pass",
+        "at": "2026-10-31T14:37:46.116Z",
+        "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+        "finished_at": "2026-10-31T14:37:46.710Z"
+      }
     }
   ],
   "gates": []

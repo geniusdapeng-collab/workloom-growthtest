@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-005-0-1793457462621",
+  "command": "vitest run marketing-authority.test.ts marketing-source-fetcher.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "apps/server/src/video/marketing-authority.test.ts",
+      "apps/server/src/video/marketing-source-fetcher.test.ts",
+      "apps/server/src/video/data-mining-executor.test.ts"
+    ]
+  },
+  "actor": "codex-root-repair-01a190b3",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-005",
+    "assertion_index": 0
+  },
+  "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T14:37:42.621Z",
+  "finished_at": "2026-10-31T14:37:43.912Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-005-0-1793457462621.txt",
+      "sha256": "7c0e9b7dad1968499d837b5f5f8bd1f768b118276023dc8447541a7bec25f54b",
+      "commit": "469664f90b6ae12aa0fdb27211d5c327a0e34061"
+    }
+  ]
+}
