@@ -63,6 +63,10 @@ bundles/ai-video/          # ★ 行业 Bundle：25 数码员工 preset + 围栏
 
 ## 3. 审批点矩阵（10 门 → approvals 原生消息）
 
+> GrowthTest 视频管线自 `T-2026-1031-9003` 起取消人类审批等待。下表的 `review`
+> 是质量档位，仍执行对应的确定性/语义检查；检查完成后由
+> `workloom.video-auto-approval/v1` 自动签发裁决。`block` 与三级分流不变。
+
 | 门 | 对象类型 | 触发动作 | 默认级别 | 说明 |
 |---|---|---|---|---|
 | G1 | dossier | dossier.confirm | review | 商品情报档案确认（可配 batchMode 自动） |

@@ -166,28 +166,34 @@ describe("G10 三级分流矩阵", () => {
     expect(db.events.some((e) => e.payload.decision.action === "comment.crisis_alert")).toBe(false);
   });
 
-  it("咨询（LLM query）→ review：生成候选回复挂起待审，不外发", async () => {
+  it("咨询（LLM query）→ 原质量分流仍为 review，但系统自动审批后立即外发", async () => {
     const { db, app, gateway } = fixture("这个多少钱？怎么买");
     const sender = new FakeSender();
     const r = await processComment(app, gateway, scope, "cm-1", {
-      classifier: classifierOf("query"), sender,
+      classifier: classifierOf("query"), sender, autoApproveReview: true,
     });
-    expect(r!.decision.level).toBe("review");
+    expect(r!.decision.level).toBe("auto");
+    expect(r!.qualityRouteLevel).toBe("review");
+    expect(r!.autoApproved).toBe(true);
     expect(r!.decision.alert).toBe(false);
-    expect(sender.sent.length).toBe(0); // 审批前不外发
-    expect(db.comments[0]!.status).toBe("pending_review");
-    expect(db.replies[0]!.status).toBe("candidate"); // 候选回复已生成
-    expect(db.events.some((e) => e.payload.decision.action === "comment.reply_review")).toBe(true);
+    expect(sender.sent.length).toBe(1);
+    expect(db.comments[0]!.status).toBe("replied");
+    expect(db.replies[0]!.status).toBe("sent");
+    expect(db.events.some((e) => e.payload.decision.action === "comment.replied" && e.payload.decision.after.autoApproved === true)).toBe(true);
   });
 
-  it("危机（LLM crisis）→ review + alert：挂起待审且写 comment.crisis_alert 告警事件", async () => {
+  it("危机（LLM crisis）→ 质量分流 review + 告警保留，系统自动审批后外发", async () => {
     const { db, app, gateway } = fixture("我要找媒体曝光你们");
+    const sender = new FakeSender();
     const r = await processComment(app, gateway, scope, "cm-1", {
-      classifier: classifierOf("crisis"), sender: new FakeSender(),
+      classifier: classifierOf("crisis"), sender, autoApproveReview: true,
     });
-    expect(r!.decision.level).toBe("review");
+    expect(r!.decision.level).toBe("auto");
+    expect(r!.qualityRouteLevel).toBe("review");
+    expect(r!.autoApproved).toBe(true);
     expect(r!.decision.alert).toBe(true);
-    expect(db.comments[0]!.status).toBe("pending_review");
+    expect(sender.sent.length).toBe(1);
+    expect(db.comments[0]!.status).toBe("replied");
     const alert = db.events.find((e) => e.payload.decision.action === "comment.crisis_alert")!;
     expect(alert.payload.decision.after.level).toBe("p1");
   });
@@ -210,11 +216,24 @@ describe("G10 三级分流矩阵", () => {
 describe("意图分类与采集", () => {
   it("LLM 不可用（返回 null）→ 规则兜底：疑问句归 query → review", async () => {
     const { db, app, gateway } = fixture("这个怎么使用？");
-    const r = await processComment(app, gateway, scope, "cm-1", { classifier: classifierOf(null) });
+    const r = await processComment(app, gateway, scope, "cm-1", { classifier: classifierOf(null), autoApproveReview: true });
     expect(r!.intent).toBe("query");
     expect(r!.classifySource).toBe("rules");
-    expect(r!.decision.level).toBe("review");
+    expect(r!.decision.level).toBe("auto");
+    expect(r!.qualityRouteLevel).toBe("review");
+    expect(db.comments[0]!.status).toBe("manual");
     expect(db.comments[0]!.intent).toBe("query");
+  });
+
+  it("VIDEO_AUTO_APPROVAL=0 回滚时恢复 review 待审路径", async () => {
+    const { db, app, gateway } = fixture("这个多少钱？");
+    const r = await processComment(app, gateway, scope, "cm-1", {
+      classifier: classifierOf("query"), sender: new FakeSender(), autoApproveReview: false,
+    });
+    expect(r!.decision.level).toBe("review");
+    expect(r!.qualityRouteLevel).toBe("review");
+    expect(db.comments[0]!.status).toBe("pending_review");
+    expect(db.events.some((e) => e.payload.decision.action === "comment.reply_review")).toBe(true);
   });
 
   it("规则兜底关键词：危机/负面/夸赞/其他", () => {

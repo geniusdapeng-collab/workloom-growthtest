@@ -2,7 +2,7 @@
  * T-2026-0927-0013：真实 startRun + StageRunner + ArchiveStore 回归。
  * vendor、PG、媒体登记用边界替身；档案写盘与重试/终态/商品摘要走实际代码。
  */
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -504,6 +504,47 @@ describe("预生产原始结果与诚实终态", () => {
     expect(entry.error).toMatch(/portrait-evidence-failed|定妆照未完整生成/);
     /** T-2026-1001-0007：G5 不再走 AI 监制自动裁决，也不自动重出 */
     expect(doubles.review.mock.calls.some(([options]) => options.context.gate === "G5_PORTRAIT")).toBe(false);
+  });
+
+  it("G5 真实四角度图片通过事实核验后由系统自动批准，不创建人类审批行", async () => {
+    useNarrativeProject();
+    const projectId = `VID-g5-auto-${++projectSequence}`;
+    const portraitRoot = path.join(doubles.workDir, "workspaces", scope.workspaceId, "characters", projectId);
+    await mkdir(portraitRoot, { recursive: true });
+    const files: Record<string, string> = {};
+    for (const angle of ["front", "threeQuarter", "closeup", "side"]) {
+      const file = path.join(portraitRoot, `${angle}.png`);
+      await writeFile(file, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2, 3]));
+      files[angle] = file;
+    }
+    await writeFile(path.join(portraitRoot, "portrait-index.json"), JSON.stringify({
+      schemaVersion: "workloom.portrait-index/v1",
+      projectId,
+      characters: { chen: { kind: "character", id: "chen", files } },
+      products: {},
+    }));
+    doubles.runPreproduction.mockResolvedValue({
+      ...success(),
+      stages: {
+        ...success().stages,
+        portraitStudio: { status: "completed", characters: 1, products: 0, completedPortraits: 4, pendingPortraits: 0 },
+        scriptEngine: { report: { characters_count: 1 } },
+      },
+    });
+    const runId = worker.startRun(scope, { projectId, intent: "山间日出的完整叙事短片" });
+    await vi.waitFor(() => expect(worker.getRun(runId, scope.workspaceId)?.finishedAt).not.toBeNull(), { timeout: 3_000, interval: 10 });
+    expect(worker.getRun(runId, scope.workspaceId)?.error).toBeNull();
+    expect(worker.getRun(runId, scope.workspaceId)?.status).toBe("finished");
+    expect(doubles.query.mock.calls.some(([sql]) => String(sql).includes("INSERT INTO approvals"))).toBe(false);
+    const output = await archiveOutput(projectId, 1);
+    const proofs = (output.productionEvidence as { gates: Array<Record<string, unknown>> }).gates;
+    expect(proofs.find(item => item.gate === "G5_PORTRAIT")).toMatchObject({
+      approved: true,
+      status: "passed",
+      via: "system-auto-approval",
+      policyVersion: "workloom.video-auto-approval/v1",
+      approvalId: null,
+    });
   });
 
 });

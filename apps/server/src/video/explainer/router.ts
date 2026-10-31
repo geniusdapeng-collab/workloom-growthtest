@@ -34,6 +34,7 @@ import { generateShotbook, validateShotbook } from "./shotbook.js";
 import { annotateSemantics } from "./semantics.js";
 import { templateDirOf } from "./project-builder.js";
 import { textFingerprint } from "./voice-prep.js";
+import { VIDEO_AUTO_APPROVAL_ACTOR_ID, VIDEO_AUTO_APPROVAL_POLICY_VERSION, autoApproveVideoFence, videoAutoApprovalEnabled } from "../auto-approval.js";
 import {
   createExplainerProject, insertShotbook, latestShotbook, projectOf, renderJobOf, scopedQuery, updateShotbook,
   type ShotbookRow,
@@ -404,15 +405,17 @@ export const explainerRouter = router({
 
       /* ---- G8 围栏 + 渲染额度预算（与 video.render.submit 同口径） ---- */
       const active = await loadActiveRules(getAppPool(), scope);
-      const verdict = judge(
+      const rawVerdict = judge(
         {
           action: "render.submit",
           object: { type: "video_project", id: input.projectId },
-          context: { render_auto: false, duration_sec: durationSec },
+          context: { render_auto: videoAutoApprovalEnabled(), duration_sec: durationSec },
         },
         active.rules as RuntimeRule[],
         active.defaultLevel,
       );
+      const autoReview = autoApproveVideoFence(rawVerdict);
+      const verdict = autoReview.verdict;
       if (verdict.level === "block") {
         throw new TRPCError({
           code: "FORBIDDEN",
@@ -438,7 +441,10 @@ export const explainerRouter = router({
         });
       }
       if (scriptRow.status === "draft") {
-        const approved = await approveRenderScript(getAppPool(), getGatewayPool(), scope, scriptKey, scriptRow.version, { by: ctx.identity.memberNo });
+        const approved = await approveRenderScript(getAppPool(), getGatewayPool(), scope, scriptKey, scriptRow.version, {
+          by: videoAutoApprovalEnabled() ? VIDEO_AUTO_APPROVAL_ACTOR_ID : ctx.identity.memberNo,
+          ...(videoAutoApprovalEnabled() ? { policyVersion: "workloom.video-auto-approval/v1" } : {}),
+        });
         scriptRow = approved.script;
       }
 
@@ -452,6 +458,8 @@ export const explainerRouter = router({
         mode: "manual",
         idempotencyKey,
         fenceLevel: verdict.level,
+        qualityFenceLevel: rawVerdict.level,
+        ...(autoReview.autoApproved ? { autoApprovalPolicyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION } : {}),
         fenceImpacts: verdict.impacts,
         env: process.env,
       });

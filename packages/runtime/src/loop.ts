@@ -328,6 +328,31 @@ export interface QuestRunResult {
   planRelevance?: { relevant: boolean; matched: string[] };
 }
 
+export interface AutoReviewPolicyInput {
+  presetKey: string;
+  step: QuestStep;
+  mode: "quest" | "agent";
+  toolAccess: "read" | "write";
+  verdict: {
+    level: "auto" | "review" | "block";
+    triggeredBy: string[];
+    impacts: RuleImpact[];
+    evalErrors: string[];
+  };
+  /** false 表示质量/参数校验不完整：调用方不得自动放行。 */
+  qualityEligible: boolean;
+}
+
+export type AutoReviewPolicyResult =
+  | {
+      status: "approved";
+      actorId: string;
+      policyVersion: string;
+      reason: string;
+    }
+  | { status: "rejected"; actorId: string; policyVersion: string; reason: string }
+  | { status: "not_applicable" };
+
 async function existingStepReceipts(
   gateway: pg.Pool,
   scope: { tenantId: string; workspaceId: string },
@@ -710,6 +735,11 @@ async function runQuestOwned(
      * 与 fence_rules 装载后传入；缺省时只用工具派生词，行为与旧版一致。
      */
     planVocabulary?: { objectTypes?: string[]; actions?: string[] };
+    /**
+     * 产品所有者显式授权的自动审批策略。只替换 review 的人类等待，
+     * `qualityEligible=false` 时调用方必须拒绝，不得绕过质量或参数校验。
+     */
+    autoReview?: (input: AutoReviewPolicyInput) => Promise<AutoReviewPolicyResult> | AutoReviewPolicyResult;
   },
 ): Promise<QuestRunResult> {
   const { threadId } = input;
@@ -931,6 +961,56 @@ async function runQuestOwned(
       return { threadId, status: "paused", stepsDone: done.size, stepsTotal: steps.length, unverified, blockedBy: verdict.triggeredBy.join("、"), planVersion, planReused, planRelevance };
     }
 
+    const qualityEligible = !needsHumanCheck && !fenceUnevaluable;
+    const autoReview = input.autoReview
+      ? await input.autoReview({
+          presetKey: preset.presetKey,
+          step,
+          mode: input.mode === "agent" ? "agent" : "quest",
+          toolAccess,
+          verdict,
+          qualityEligible,
+        })
+      : { status: "not_applicable" as const };
+    if (autoReview.status === "rejected") {
+      const error = `自动审批拒绝：${autoReview.reason}`.slice(0, 500);
+      await inTx(app, scope, async (c) => {
+        await gatewayAppendOnClient(c, {
+          ...scope,
+          actor: { id: autoReview.actorId, type: "system" },
+          sessionId: threadId,
+        }, {
+          who: { type: "system", id: autoReview.actorId },
+          context: { tenant_id: scope.tenantId, workspace_id: scope.workspaceId, time: new Date().toISOString(), channel: "inapp" },
+          object: { type: step.objectType, id: step.objectId },
+          decision: {
+            kind: "review",
+            autoApproved: false,
+            action: step.action,
+            step_id: step.stepId,
+            tool: step.tool,
+            effect: effectOf(step.tool),
+            params: step.params,
+            fingerprint,
+            policyVersion: autoReview.policyVersion,
+            qualityReview: { level: verdict.level, triggeredBy: verdict.triggeredBy, impacts: verdict.impacts },
+            basis: [autoReview.reason],
+            error,
+          },
+          rule_impact: verdict.impacts,
+        });
+        await c.query(
+          `UPDATE threads SET status='failed', error=$3, updated_at=now() WHERE id=$1 AND workspace_id=$2 AND status='running'`,
+          [threadId, scope.workspaceId, error],
+        );
+      });
+      return {
+        threadId, status: "failed", stepsDone: done.size, stepsTotal: steps.length, unverified,
+        error,
+        planVersion, planReused, planRelevance,
+      };
+    }
+
     // agent 模式（F3.3 逐步商量）：非 block 步骤一律视为 review——每步操作前挂起等人类确认
     //（block 已在上方提前 return；此处重新取宽类型避免控制流收窄误判）
     //（block 已在上方提前 return，此处 level ∈ {auto, review}；agent 模式一律 review）
@@ -953,7 +1033,93 @@ async function runQuestOwned(
     // GR-01：批准必须与**当前步骤指纹**一致；LLM 重规划换了动作/参数 → 旧审批失效，重新挂起
     const approvalRecord = candidateApproval;
     const approvalDrifted = approvalRecord ? !approvalMatches : false;
-    const approvalRef = approvalRecord && !approvalDrifted && !paramsIncomplete && !fenceUnevaluable ? approvalRecord.approvalId : undefined;
+    let approvalRef = approvalRecord && !approvalDrifted && !paramsIncomplete && !fenceUnevaluable ? approvalRecord.approvalId : undefined;
+
+    if (effectiveLevel === "review" && !approvalRef && autoReview.status === "approved") {
+      if (!qualityEligible) {
+        throw new Error("AUTO_REVIEW_QUALITY_GATE_FAILED：质量或参数校验未通过，禁止自动审批");
+      }
+      const decided = await inTx(app, scope, async (c) => {
+        const ev = await gatewayAppendOnClient(c, {
+          ...scope,
+          actor: { id: autoReview.actorId, type: "system" },
+          sessionId: threadId,
+        }, {
+          who: { type: "system", id: autoReview.actorId },
+          context: {
+            tenant_id: scope.tenantId,
+            workspace_id: scope.workspaceId,
+            time: new Date().toISOString(),
+            channel: "inapp",
+          },
+          object: { type: step.objectType, id: step.objectId },
+          decision: {
+            kind: "review",
+            autoApproved: true,
+            action: step.action,
+            step_id: step.stepId,
+            tool: step.tool,
+            effect: effectOf(step.tool),
+            params: step.params,
+            fingerprint,
+            policyVersion: autoReview.policyVersion,
+            qualityReview: {
+              level: verdict.level,
+              triggeredBy: verdict.triggeredBy,
+              impacts: verdict.impacts,
+            },
+            basis: [autoReview.reason],
+            ...(prefUsageRecorded ? {} : { memory_refs: preferenceMemoryRefs(prefs) }),
+          },
+          rule_impact: verdict.impacts,
+        });
+        if (!prefUsageRecorded) {
+          await recordPreferenceUsageInTx(c, scope, prefs, ev.eventId);
+          prefUsageRecorded = true;
+        }
+        const approvalId = `apr-${ev.eventId.toLowerCase()}`;
+        await c.query(
+          `INSERT INTO approvals
+             (approval_id, tenant_id, workspace_id, event_id, channel, status, snapshot, tier,
+              decided_by, decided_at)
+           VALUES ($1,$2,$3,$4,'inapp','approved',$5,'l2_captain',$6,now())
+           ON CONFLICT (event_id, channel) DO NOTHING`,
+          [
+            approvalId,
+            scope.tenantId,
+            scope.workspaceId,
+            ev.eventId,
+            JSON.stringify({
+              step_fingerprint: fingerprint,
+              object_type: step.objectType,
+              object_id: step.objectId,
+              step_id: step.stepId,
+              tool: step.tool,
+              before: step.before ?? null,
+              after: step.after ?? step.params ?? null,
+              action: step.action,
+              params: step.params,
+              high_risk: preset.highRisk || step.context?.irreversible === true,
+              irreversible: step.context?.irreversible === true,
+              auto_approval: {
+                actor: autoReview.actorId,
+                policy_version: autoReview.policyVersion,
+                reason: autoReview.reason,
+                quality_review: {
+                  level: verdict.level,
+                  triggered_by: verdict.triggeredBy,
+                  impacts: verdict.impacts,
+                },
+              },
+              expires_at: new Date(Date.now() + 24 * 3600e3).toISOString(),
+            }),
+            autoReview.actorId,
+          ],
+        );
+        return approvalId;
+      });
+      approvalRef = decided;
+    }
 
     if (effectiveLevel === "review" && !approvalRef) {
       /**

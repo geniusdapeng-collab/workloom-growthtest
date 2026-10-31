@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "../trpc/context.js";
 const d = vi.hoisted(() => ({ query: vi.fn(), qualify: vi.fn(), shots: vi.fn(), load: vi.fn(), submit: vi.fn(),
-  judge: vi.fn(), budget: vi.fn(), cap: vi.fn(), writable: true }));
+  judge: vi.fn(), budget: vi.fn(), cap: vi.fn(), autoApproveScript: vi.fn(), writable: true }));
 vi.mock("@workloom/db", () => ({ getAppPool: () => ({ connect: async () => ({ query: d.query, release: vi.fn() }) }), getGatewayPool: () => ({}) }));
 vi.mock("../service/access-authority.js", async original => ({ ...await original<Record<string, unknown>>(),
   currentMemberAuthority: async (identity: unknown) => ({ identity, permissions: {} }),
@@ -14,6 +14,10 @@ vi.mock("./archive-host.js", async original => ({ ...await original<Record<strin
 vi.mock("@workloom/base/fence-engine", async original => ({ ...await original<Record<string, unknown>>(), judge: d.judge }));
 vi.mock("@workloom/base/model-router", async original => ({ ...await original<Record<string, unknown>>(), checkRenderBudget: d.budget }));
 vi.mock("./gen/cost.js", async original => ({ ...await original<Record<string, unknown>>(), checkCostCaps: d.cap, renderSpendCny: async () => ({ day: 0, month: 0 }) }));
+vi.mock("@workloom/base/asset-cms", async original => ({
+  ...await original<Record<string, unknown>>(),
+  approve: d.autoApproveScript,
+}));
 import { videoRouter } from "./router.js";
 import { SubmissionError } from "./gen/submission-ledger.js";
 const identity = { tenantId: "tenant-router", workspaceId: "ws-router", memberNo: "MEM-T", plan: "pro", role: "owner" } as NonNullable<TrpcContext["identity"]>;
@@ -30,6 +34,10 @@ beforeEach(() => {
   d.load.mockResolvedValue(canonical());
   d.judge.mockReturnValue({ level: "auto", impacts: [], triggeredBy: [] });
   d.budget.mockReturnValue({ allowed: true, overageSeconds: 0 }); d.cap.mockReturnValue({ allowed: true });
+  d.autoApproveScript.mockImplementation(async (_app, _gateway, _scope, _key, _version, input) => ({
+    script: { ...canonical().script, status: "approved", approved_event_id: "E-AUTO-G8" },
+    approvalId: `apr-${input.by}`,
+  }));
   d.submit.mockResolvedValue({ jobId: "RJ-1", taskId: "remote-1", mock: false, provider: "seedance", providerModel: "m", estUsd: 1, estCny: 7, deduped: false });
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -41,8 +49,10 @@ describe("生产入口正常可达且不能覆盖已审核请求", () => {
     expect(d.qualify).toHaveBeenCalledWith(expect.objectContaining({ scope: { tenantId: identity.tenantId, workspaceId: identity.workspaceId }, actor: "MEM-T", projectId: "P1", shotId: "S1" }));
     const result = await caller().render.submit({ qualificationToken: qualification.qualificationToken });
     expect(result).toMatchObject({ mock: false, durationSec: 5, clamped: false });
-    expect(d.submit).toHaveBeenCalledWith(expect.objectContaining({ script: canonical().script, params: canonical().params,
+    expect(d.submit).toHaveBeenCalledWith(expect.objectContaining({ script: { ...canonical().script, status: "approved" }, params: canonical().params,
       qualificationToken: "test-token", modelId: "doubao-seedance-2-5", mode: "manual", durationProvenance: { source: "script-fields", planSeconds: 5, requestedSeconds: 5, mismatchSeconds: 0, strict: true } }));
+    expect(d.autoApproveScript).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(),
+      "qualified:PQ-1", 1, { by: "video-auto-approval", policyVersion: "workloom.video-auto-approval/v1" });
   });
   it("没有token的旧CMS approved直提在查脚本/供应商之前拒绝", async () => {
     await expect(caller().render.submit({ scriptId: "RS-handmade", mode: "auto" })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
@@ -62,25 +72,18 @@ describe("生产入口正常可达且不能覆盖已审核请求", () => {
     await caller().render.submit({ qualificationToken: "test-token", scriptId: "RS-CANONICAL", mode: "manual", durationSec: 5, aspectRatio: "16:9" });
     expect(d.submit.mock.calls[0]![0].params).toEqual(canonical().params);
   });
-  it("内容资格不代替成本围栏；auto模式不能绕开服务禁用的自动审批", async () => {
-    vi.stubEnv("WORKLOOM_RENDER_AUTO", "0"); d.load.mockResolvedValue({ ...canonical(), mode: "auto" });
+  it("内容资格不代替成本围栏；VIDEO_AUTO_APPROVAL=0 回滚后恢复人工批准约束", async () => {
+    vi.stubEnv("VIDEO_AUTO_APPROVAL", "0"); d.load.mockResolvedValue({ ...canonical(), mode: "auto" });
     d.judge.mockReturnValue({ level: "review", impacts: [], triggeredBy: ["G8"] });
     await expect(caller().render.submit({ qualificationToken: "test-token" })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
     expect(d.judge.mock.calls[0]![0].context.render_auto).toBe(false); expect(d.submit).not.toHaveBeenCalled();
   });
-  it("默认即人审（T-2026-1001-0007）：未设 WORKLOOM_RENDER_AUTO 时 render_auto=false，未审批脚本不得提交", async () => {
-    const previous = process.env.WORKLOOM_RENDER_AUTO;
-    delete process.env.WORKLOOM_RENDER_AUTO;
-    try {
-      d.load.mockResolvedValue({ ...canonical(), mode: "auto" });
-      d.judge.mockReturnValue({ level: "review", impacts: [], triggeredBy: ["G8"] });
-      await expect(caller().render.submit({ qualificationToken: "test-token" })).rejects.toMatchObject({ code: "PRECONDITION_FAILED" });
-      expect(d.judge.mock.calls[0]![0].context.render_auto).toBe(false);
-      expect(d.submit).not.toHaveBeenCalled();
-    } finally {
-      if (previous === undefined) delete process.env.WORKLOOM_RENDER_AUTO;
-      else process.env.WORKLOOM_RENDER_AUTO = previous;
-    }
+  it("默认系统自动审批：G8 质量围栏保留，但不再要求人类批准 draft 脚本", async () => {
+    d.load.mockResolvedValue({ ...canonical(), mode: "auto" });
+    d.judge.mockReturnValue({ level: "review", impacts: [], triggeredBy: ["G8"] });
+    await expect(caller().render.submit({ qualificationToken: "test-token" })).resolves.toMatchObject({ jobId: "RJ-1" });
+    expect(d.judge.mock.calls[0]![0].context.render_auto).toBe(true);
+    expect(d.submit).toHaveBeenCalledTimes(1);
   });
   it.each(["block", "budget", "cost"])("%s 不允许新外部动作", async kind => {
     if (kind === "block") d.judge.mockReturnValue({ level: "block", impacts: [], triggeredBy: ["G8"] });

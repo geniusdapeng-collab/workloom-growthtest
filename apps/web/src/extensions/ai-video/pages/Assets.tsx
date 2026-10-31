@@ -3,8 +3,8 @@
  *  - 脚本列表：按项目分组（script_key 链聚合）、状态 chip（draft/approved/submitted/rendering/done/failed）、版本链
  *  - MD 详情：工作台展示（getScript）+ contentEditable 本地编辑（§6 本地编辑纪律：保存即新版本，不原地改）
  *  - 保存为新版本（cms.saveScriptVersion：parent_version 链 + diff 摘要 + 字数校验快照 2470-3000 口径）
- *  - G8 审批（cms.approveScript：仅 draft 可审；版本即审批对象，approved 不继承）
- *  - 三档提交（render.submit mode=manual/batch/auto）：G8 烧额度门——review 级须先 approved，block 级 403
+ *  - G8 质量门由服务端系统自动审批（workloom.video-auto-approval/v1），页面不提供人工放行按钮
+ *  - 三档提交（render.submit mode=manual/batch/auto）：review 自动裁决，block 级 403
  *  - 服务预生产档案 → 完整请求审核 → 正式渲染；无模型配置或资格时明确拒绝
  * 状态变体：加载骨架 G10 / 空态（无脚本引导）/ 错误横幅（围栏拒绝原因展示）
  * 轮询口径（D6）：脚本列表 15s 静默刷新
@@ -25,7 +25,7 @@ interface ScriptRow {
 /** 状态 chip 口径（语义四色 §2.2：青=进行中/信息，绿=已完成，琥珀=待审，红=失败，灰=草稿） */
 const STATUS_META: Record<string, { label: string; cls: string }> = {
   draft: { label: "草稿", cls: "border-line text-ink3" },
-  approved: { label: "已审批", cls: "border-go/45 text-go" },
+  approved: { label: "系统已放行", cls: "border-go/45 text-go" },
   submitted: { label: "已提交", cls: "border-holo/45 text-holo" },
   rendering: { label: "渲染中", cls: "border-holo/45 text-holo" },
   done: { label: "已完成", cls: "border-go/45 text-go" },
@@ -36,7 +36,7 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
 const SUBMIT_MODES = [
   { key: "manual", label: "🖱 手动单镜", hint: "当前镜头通过完整请求审核后提交生成" },
   { key: "batch", label: "📦 批量任务", hint: "为当前镜头记录批量任务模式；其余镜头分别审核提交" },
-  { key: "auto", label: "⚡ 自动模式", hint: "为当前镜头记录自动模式；成本上限和审批规则仍然生效" },
+  { key: "auto", label: "⚡ 自动模式", hint: "为当前镜头记录自动模式；成本上限与系统自动审批规则仍然生效" },
 ] as const;
 type SubmitMode = (typeof SUBMIT_MODES)[number]["key"];
 
@@ -115,7 +115,7 @@ export default function P10() {
   const charCount = useMemo(() => (detail?.md ?? "").length, [detail]);
   const withinSpec = charCount >= CHAR_MIN && charCount <= CHAR_MAX;
 
-  /** 保存即新版本（§6：parent_version 链 + diff 摘要；新版本回 draft，approved 不继承须重新过 G8） */
+  /** 保存即新版本（§6：parent_version 链 + diff 摘要；新版本回 draft，须重新通过 G8 质量与自动审批） */
   const saveVersion = useCallback(async () => {
     if (!detail) return;
     const md = mdRef.current?.innerText ?? detail.md;
@@ -127,28 +127,12 @@ export default function P10() {
         charCheck: { charCount: md.length, withinSpec: md.length >= CHAR_MIN && md.length <= CHAR_MAX },
         diffSummary: "工作台手工编辑",
       }) as unknown as ScriptRow;
-      setBanner({ level: "info", text: `已保存为第 ${r.version} 版（父版本为第 ${r.parent_version} 版；新版本须重新通过 G8 审批）` });
+      setBanner({ level: "info", text: `已保存为第 ${r.version} 版（父版本为第 ${r.parent_version} 版；新版本须重新通过 G8 质量检查，系统自动审批）` });
       setDirty(false);
       await load(true);
       await selectChain(detail.script_key);
     } catch (e) {
       setBanner({ level: "alert", text: `保存失败：${e instanceof Error ? e.message : String(e)}` });
-    } finally {
-      setBusy(null);
-    }
-  }, [detail, load, selectChain]);
-
-  /** G8 审批（仅 draft 可审；approvals 行随版本同一 COMMIT） */
-  const approve = useCallback(async () => {
-    if (!detail) return;
-    setBusy("approve");
-    try {
-      await trpc.video.cms.approveScript.mutate({ scriptKey: detail.script_key, version: detail.version });
-      setBanner({ level: "info", text: `G8 审批通过：第 ${detail.version} 版脚本已放行，渲染额度门已开启。` });
-      await load(true);
-      await selectChain(detail.script_key);
-    } catch (e) {
-      setBanner({ level: "alert", text: `审批失败：${e instanceof Error ? e.message : String(e)}` });
     } finally {
       setBusy(null);
     }
@@ -246,14 +230,14 @@ export default function P10() {
     <>
       <div className="mb-2 px-1 text-[11px] tracking-[.2em] text-ink3">提交纪律</div>
       <div className="rounded-lg border border-line bg-card p-3 text-caption leading-relaxed text-ink2">
-        保存即新版本；版本即审批对象——新版本不继承既有审批结果，须重新通过 G8。
+        保存即新版本；新版本须重新通过 G8 质量检查。审批由系统自动完成，不进入人工等待。
       </div>
       <div className="mt-2.5 rounded-lg border border-line bg-card p-3 text-caption leading-relaxed text-ink3">
         <div className="mb-1 text-micro font-bold text-ink2">G8 烧额度门</div>
         先核对当前预生产镜头，再审核完整生成请求<br />
         禁止 → 直接熔断<br />
-        人工复核 → 须先完成脚本审批<br />
-        自动放行 → 达到信任条件后执行<br />
+        质量检查 → 预算、资格与脚本内容逐项核验<br />
+        系统审批 → workloom.video-auto-approval/v1 自动放行或阻断<br />
         预生产镜头与最终请求审核通过后才提交；未配置生成服务会明确提示
       </div>
       <div className="mt-2.5 rounded-lg border border-line bg-card p-3 text-caption text-ink3">
@@ -337,16 +321,6 @@ export default function P10() {
                   >
                     ✎ 保存为新版本
                   </button>
-                  {detail.status === "draft" && (
-                    <button
-                      type="button"
-                      disabled={busy !== null}
-                      onClick={() => void approve()}
-                      className="cursor-pointer rounded-md border border-go/50 px-3 py-1.5 text-caption font-bold text-go hover:bg-go/10 disabled:opacity-40"
-                    >
-                      ✓ G8 审批通过
-                    </button>
-                  )}
                   <button
                     type="button"
                     disabled={busy !== null || dirty}

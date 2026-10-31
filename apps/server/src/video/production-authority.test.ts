@@ -170,6 +170,28 @@ describe("正式资格的正常路径和来源边界", () => {
     pool.source.kind = "marketing"; output.productionEvidence.pipelineKind = "marketing"; prompts.pipelineKind = "marketing";
     await persist(); await expect(issue()).rejects.toThrow("PREPRODUCTION_GATES_UNVERIFIED"); expect(calls).toHaveLength(0);
   });
+  it("G5 系统自动审批必须绑定版本化策略和实际图像，合法时可签发", async () => {
+    const image = path.join(dir, "workspaces", scope.workspaceId, "gates", "P1", "attempt-1", "portrait.png");
+    await writeFile(image, Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 1]));
+    output.productionEvidence.gates[3] = {
+      gate: "G5_PORTRAIT",
+      status: "passed",
+      approved: true,
+      via: "system-auto-approval",
+      degraded: false,
+      model: null,
+      policyVersion: "workloom.video-auto-approval/v1",
+      approvalId: null,
+      evidence: [{ path: image, sha256: renderSha256(await readFile(image)), scope: "image" }],
+    };
+    await persist();
+    await expect(issue()).resolves.toMatchObject({ scriptVersion: 1 });
+    expect(pool.qualifications).toHaveLength(1);
+
+    delete output.productionEvidence.gates[3].policyVersion;
+    await persist();
+    await expect(issue()).rejects.toThrow("G5 系统自动审批缺少版本化策略");
+  });
   it("当前服务镜头列表无需 CMS 行；按完整档案读取 prompt/fields/时长及摘要", async () => {
     const listed = await listProductionShots({ app: pool.asPool(), scope, projectId: "P1", workDir: dir });
     expect(listed).toMatchObject({ projectId: "P1", sourceStageRunId: "SR1", sourceAttempt: 1,

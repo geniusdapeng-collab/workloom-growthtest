@@ -442,9 +442,11 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
   const persisted = () => ({ id: "script-v7", project_id: "project-wb", shot_id: "WHITEBOARD",
     script_key: "whiteboard-project-wb", version: 7, status: "approved", md: "数据库精确正文及备注", fields: { durationMs: 5000, engine: "whiteboard-local" } });
   let current: ReturnType<typeof persisted> | null;
+  let lastCreated: ReturnType<typeof persisted> | null;
   let filmCapLongEdge = 1280;
   let fence = "auto";
   const submitted = vi.fn();
+  const approved = vi.fn();
   const created = vi.fn();
   const query = vi.fn(async (sql: string) => ({ rows: [], rowCount: 0 }));
   const pool = { connect: async () => ({ query, release: vi.fn() }) };
@@ -455,7 +457,7 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
       writeProcedure: t.procedure, scopeOf: (identity: any) => ({ tenantId: identity.tenantId, workspaceId: identity.workspaceId }) }));
     vi.doMock("@workloom/db", () => ({ getAppPool: () => pool, getGatewayPool: () => pool }));
     vi.doMock("../gen/submit.js", () => ({ submitGenJob: submitted }));
-    vi.doMock("@workloom/base/asset-cms", () => ({ create: created }));
+    vi.doMock("@workloom/base/asset-cms", () => ({ create: created, approve: approved }));
     vi.doMock("@workloom/base/fence-engine", () => ({ loadActiveRulesInTx: async () => [], judge: () => ({ level: fence, impacts: [], triggeredBy: [] }) }));
     vi.doMock("./engine.js", async () => ({ ...await vi.importActual<any>("./engine.js"),
       whiteboardEngineReady: () => true, readImageSize: () => ({ width: 1672, height: 941 }) }));
@@ -473,8 +475,15 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
     caller = (await import("./router.js")).whiteboardRouter.createCaller({ identity: { ...scope, memberId: "MEM-WB" } } as any);
   });
   beforeEach(() => {
-    current = persisted(); filmCapLongEdge = 1280; fence = "auto"; submitted.mockReset().mockResolvedValue({ taskId: "task" }); created.mockReset();
-    created.mockImplementation(async (_a, _g, _scope, input) => ({ ...persisted(), id: "script-v1", version: 1, status: "draft", md: input.md, fields: input.fields }));
+    current = persisted(); lastCreated = null; filmCapLongEdge = 1280; fence = "auto"; submitted.mockReset().mockResolvedValue({ taskId: "task" }); created.mockReset();
+    approved.mockReset().mockImplementation(async (_app, _gateway, _scope, _key, _version, input) => {
+      const script = current ?? lastCreated ?? { ...persisted(), id: "script-v1", version: 1, status: "draft" };
+      return { script: { ...script, status: "approved", approved_event_id: "E-WB-AUTO" }, approvalId: `apr-${input.by}` };
+    });
+    created.mockImplementation(async (_a, _g, _scope, input) => {
+      lastCreated = { ...persisted(), id: "script-v1", version: 1, status: "draft", md: input.md, fields: input.fields };
+      return lastCreated;
+    });
   });
   it("已有 v7 的正文、字段、状态原样交给唯一提交入口，不伪造 v1", async () => {
     await caller.render({ filmId: "film-wb" });
@@ -501,9 +510,11 @@ describe("白板 render 路由提交脚本的数据库版本", () => {
     expect(actual.params.resolution).toBe("3840x2160");
     expect(actual.params.extra.whiteboard).toMatchObject({ quality: "uhd", capLongEdge: 3840 });
   });
-  it("review 未批准时仍在唯一提交入口前拒绝", async () => {
+  it("review 质量围栏保留，但 draft 脚本由系统自动批准后提交", async () => {
     fence = "review"; current!.status = "draft";
-    await expect(caller.render({ filmId: "film-wb" })).rejects.toThrow("须先经");
-    expect(submitted).not.toHaveBeenCalled();
+    await expect(caller.render({ filmId: "film-wb" })).resolves.toMatchObject({ taskId: "task" });
+    expect(approved).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(),
+      "whiteboard-project-wb", 7, { by: "video-auto-approval", policyVersion: "workloom.video-auto-approval/v1" });
+    expect(submitted.mock.calls[0]?.[0].script).toMatchObject({ status: "approved", version: 7 });
   });
 });

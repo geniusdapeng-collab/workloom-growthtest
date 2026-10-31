@@ -1,7 +1,7 @@
 {
   "schemaVersion": "workloom.bundle/v1",
   "name": "@workloom/geo-growth",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "workloom": {
     "industry": "geo-growth",
     "displayName": "WorkLoom GEO · 社媒短视频营销 × GEO 双域融合经营系统",
@@ -21,7 +21,7 @@
       },
       {
         "bundleId": "ai-video",
-        "version": "1.0.0"
+        "version": "1.0.1"
       }
     ],
     "composition": {
@@ -224,7 +224,7 @@
   },
   "integrity": {
     "algorithm": "sha256",
-    "digest": "67e52ee2f34cc9ea83e7c056cc8d9e859b8ee406ccda898bb9420781e3959593",
+    "digest": "e4156f62e240b79682d8accf00e08b0ed74b9d74a5153a2837537ffe1e4b3078",
     "assets": {
       "eval/questions.json": "49e7b69803ac4c398b812e93758d136332c9312041d894ca7b74a8a1623e7993",
       "fences/geo-growth-baseline.yml": "4a06d0a472be51a3e8922bc77e8834ef9f1f31e752b4ef3d345058ca908970c7",

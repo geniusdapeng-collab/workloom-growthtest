@@ -7,8 +7,8 @@
  *   如果审计脚本自己抄一份门口径，就会立刻出现"审计过的门 ≠ 生产的门"的漂移。
  *   抽成共享模块后，服务端与审计脚本消费同一份定义。
  *
- * 产品口径（2026-09-21 产品所有者）：内部门全自动（AI 监制评审），人审只留
- * ① 业务决策（说什么、长什么样）② 花钱或对外（渲染提交 G8 / 公网发布 G9 / 对外评论 G10）。
+ * 产品口径（2026-10-31）：视频管线取消人类审批等待；内部门继续 AI 质量评审，
+ * G8/G9/G10/G11/G12/G15 继续执行原有 review/block 检查后交给系统自动裁决。
  */
 import type { GateKey } from "@hyperreality/video-studio";
 import type { ProducerStage } from "@hyperreality/video-studio";
@@ -16,13 +16,14 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, realpathSync, statS
 import { createHash } from "node:crypto";
 import { join, resolve, relative, sep } from "node:path";
 import type { ProducerArtifact, DeterministicCheck, PortraitIndex } from "@hyperreality/video-studio";
+import { videoAutoApprovalEnabled } from "./auto-approval.js";
 
 /**
- * 自动放行的「内部准备门」。默认包含 G1–G4 / G6 / G7；**G5 定妆照默认人审**（T-2026-1001-0007）。
- * `HR_AUTO_GATES` 可覆盖（逗号分隔；设为空字符串即"全部门人审"；显式把 G5_PORTRAIT 加回来即恢复旧口径，不推荐）。
+ * 自动放行的「内部准备门」。默认包含 G1–G4/G6/G7；G5 由视频自动审批策略在真实图片事实核验后放行。
+ * `VIDEO_AUTO_APPROVAL=0` 可整体恢复旧的人工等待路径；`HR_AUTO_GATES` 仅在回滚路径下生效。
  *
- * 为什么 G5 不再默认自动：机器像不像判据本身不稳定（同一批文件实测 92 / 15 / 86），
- * 让 AI 监制裁决会误杀或误放，还会触发"打回 → 自动重出"重复烧钱；定妆照是否可用必须由人类看过原图决定。
+ * 产品所有者 2026-10-31 明确取消视频管线人类审批：G5 自动通过只依据本次真实出图、
+ * 必需角度、文件字节和作用域核验；不新增“像不像”审美模型，也不触发自动重出。
  */
 export const AUTO_GATES = new Set(
   (process.env.HR_AUTO_GATES
@@ -31,11 +32,11 @@ export const AUTO_GATES = new Set(
 );
 
 /**
- * 渲染提交（花钱动作）默认要求人审（T-2026-1001-0007）：
- * 缺省 **不自动放行**，脚本必须先经 `cms.approveScript` 审批；`WORKLOOM_RENDER_AUTO=1` 才恢复旧的自动放行口径。
+ * 渲染提交（花钱动作）默认由视频自动审批策略放行；`VIDEO_AUTO_APPROVAL=0`
+ * 才恢复旧的人工批准路径。预算、成本、模型资格和围栏 block 继续独立校验。
  */
 export function renderSubmitAutoAllowed(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.WORKLOOM_RENDER_AUTO === "1";
+  return videoAutoApprovalEnabled(env);
 }
 
 /** 内部门三档处置：review=AI 监制（默认）/ auto=无条件放行（应急）/ human=等人点 */
@@ -67,7 +68,7 @@ export const GATE_RUBRIC: Partial<Record<GateKey, string[]>> = {
   G4_PRD: ["角色系统有可执行的外观锚点（定妆照前置）", "交付标准可验证（画幅/时长/音频/字幕口径）"],
   G5_PORTRAIT: ["定妆照必须真出图（completedPortraits>0），不接受只有规格包的 pending 状态", "必需角度 front/threeQuarter/closeup/side 齐备", "人物与角色档案一致（授权真人须与本人照片同一张脸）"],
   G6_PROMPT: ["每镜提示词达到交付口径（≥1200 字）且 25/30 字段齐备", "台词速率与占比合规，无红线词"],
-  G7_FINAL: ["预生产收口：镜头卡/定妆照/提示词三件套齐备且互相引用一致", "渲染提交前的花额度动作仍需人审（本门只放行内部准备）"]
+  G7_FINAL: ["预生产收口：镜头卡/定妆照/提示词三件套齐备且互相引用一致", "渲染提交前仍须通过 G8 预算、资格和质量围栏；人类审批等待已取消"]
 };
 
 /**

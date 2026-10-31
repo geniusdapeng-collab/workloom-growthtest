@@ -1,5 +1,13 @@
 # Changelog
 
+## [video-auto-approval] - 2026-10-31 · 视频管线取消人类审批等待（T-2026-1031-9003）
+
+- 新增 `workloom.video-auto-approval/v1`：视频管线 review 在原有质量检查完成后由系统自动裁决，不再生成新的 `wait_human` / `pending_review`。
+- Studio G1–G7、控制面 GateDecision、通用 Quest、G8 渲染、G9 发布、G10 评论、G11/G12/G15 统一接入；`block`、预算、资格、事实、敏感内容、登录态和真实回执硬闸全部保留。
+- G5 只有在本次真实图片、四角度、文件字节和项目作用域核验通过后自动批准；不使用“像不像”模型替代事实。
+- 默认开启；`VIDEO_AUTO_APPROVAL=0` 是唯一回滚开关，恢复旧人工等待路径，不改历史审批和事件。
+- 新增自动审批策略、运行时一次授权、评论分流、Studio 事实证据与控制面 PG 回归。
+
 ## [pipeline-control-plane-shadow] - 2026-10-30 · 视频管线持久化控制面一期上线（T-2026-1030-9001）
 
 - 新增 6 条 ai-video 管线的编译式计划：校验 owner、gate、StageAdapter、重复节点、自依赖与依赖环，并冻结 planHash / sourceDigest / StageContract。

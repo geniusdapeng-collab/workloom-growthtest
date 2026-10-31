@@ -49,16 +49,16 @@ describe("服务预生产 G5/G7", () => {
   });
 });
 
-describe("默认门策略（T-2026-1001-0007）：机器不替人类做决定", () => {
-  it("G5 定妆照默认人审：不在 AUTO_GATES 默认表里", () => {
+describe("默认门策略（T-2026-1031-9003）：取消人类审批，质量审核不变", () => {
+  it("G5 不走旧的 AUTO_GATES 开关，由自动审批策略在真实图片事实核验后放行", () => {
     expect(AUTO_GATES.has("G5_PORTRAIT")).toBe(false);
     expect(AUTO_GATES.has("G2_THEME")).toBe(true);
   });
 
-  it("渲染提交默认人审：只有显式 WORKLOOM_RENDER_AUTO=1 才自动放行", () => {
-    expect(renderSubmitAutoAllowed({})).toBe(false);
-    expect(renderSubmitAutoAllowed({ WORKLOOM_RENDER_AUTO: "0" })).toBe(false);
-    expect(renderSubmitAutoAllowed({ WORKLOOM_RENDER_AUTO: "1" })).toBe(true);
+  it("渲染提交默认由视频自动审批放行，VIDEO_AUTO_APPROVAL=0 才回滚", () => {
+    expect(renderSubmitAutoAllowed({})).toBe(true);
+    expect(renderSubmitAutoAllowed({ VIDEO_AUTO_APPROVAL: "0" })).toBe(false);
+    expect(renderSubmitAutoAllowed({ VIDEO_AUTO_APPROVAL: "1" })).toBe(true);
   });
 
   it("人类验收清单逐张列出定妆照文件与指纹（放行前可核对原图）", () => {

@@ -5,7 +5,7 @@
  *   ① 读：列出交付包、读单个包（母版/旁挂字幕/变体/差异实测/检查结论/返修历史）；
  *   ② 选：用户在几个风格变体里点一个 → 落 `selection.json` + 事件留痕（谁、什么时候、选了哪个、为什么）；
  *   ③ 修：用户提意见 → 调分诊（确定性规则表）→ 生成 patch → **本地层增量重合成**（spawn 工位 CLI，
- *      不重新生成镜头；点名到画面内容时只出计划、要求人审）。
+ *      不重新生成镜头；点名到画面内容时只出计划，进入受控 G8 重生成流程）。
  *
  * 纪律：
  * - **路径监狱**：只允许访问交付根（`WORKLOOM_DELIVERY_DIR`，默认 `<repo>/var/delivery`）内的包；
@@ -761,13 +761,13 @@ export function deliveryPreferenceMemoryId(workspaceId: string, variantId: strin
   return `mem-pref-delivery-${safe(workspaceId)}-${safe(variantId)}`;
 }
 
-/** 选择次数 → 偏好置信度（0.5 起、每次 +0.05、上限 0.9：留出人审上调空间，不自动封顶）。 */
+/** 选择次数 → 偏好置信度（0.5 起、每次 +0.05、上限 0.9：留出人工复核空间，不自动封顶）。 */
 export function deliveryPreferenceConfidence(selectionCount: number): number {
   const count = Number.isFinite(selectionCount) ? Math.max(1, Math.floor(selectionCount)) : 1;
   return Math.min(0.9, Math.round((0.5 + 0.05 * (count - 1)) * 100) / 100);
 }
 
-/** 落返修单（用户意见 + 分诊 + patch 提示）：工位/CLI 与人审都从这份单据接手。 */
+/** 落返修单（用户意见 + 分诊 + patch 提示）：工位/CLI 与复核流程都从这份单据接手。 */
 export function recordRevisionRequest({
   dir, feedback, triage, scope, patchHint = null, by = null, env = process.env,
 }: {
@@ -858,7 +858,7 @@ export function listDeliveryJobs(scope: DeliveryScope, dir?: string): RevisionJo
  *
  * 为什么不在请求里等：一次重合成要跑 ffmpeg（秒级到分钟级），HTTP 长事务会把 UI 与网关一起拖住；
  * 这里改为"作业 + 轮询"，并把 stdout/stderr 落到 `revision-jobs/<jobId>.log`（事后可审计）。
- * **不在本接口里重生成镜头**：patch 命中画面内容时直接拒绝（先去过 G8 人审 + 只重跑点名镜头）。
+ * **不在本接口里重生成镜头**：patch 命中画面内容时直接拒绝（先进入 G8 质量/预算和系统自动审批流程，只重跑点名镜头）。
  */
 export async function startDeliveryRevision({
   dir, patch, scope, expectedVersion, expectedProjectSha256, by = null, env = process.env, onCompleted,
@@ -910,7 +910,7 @@ export async function startDeliveryRevision({
   if (regeneration.required === true) {
     throw new DeliveryError(
       "该返修点名到画面内容"
-      + `（${regeneration.shotIds?.join("、") || "未点名"}）：需要先过 G8 人审并重生成点名镜头，`
+      + `（${regeneration.shotIds?.join("、") || "未点名"}）：需要先进入 G8 质量/预算与系统自动审批流程，只重生成点名镜头，`
       + "再回到本地重合成（本接口不自动烧渲染额度）",
       "shot_regeneration_required",
     );

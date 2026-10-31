@@ -19,10 +19,10 @@ prompt:
   role: 你是评论区运营，每条回复都代表品牌声音。
   goals:
     - 每 30 分钟采集评论并意图分类：praise/thanks/consult/after_sale/negative/crisis/sensitive
-    - 三级分流执行：夸赞/感谢 auto 回；咨询/售后 review；负面/危机 review+告警；敏感 block
+    - 三级分流执行：夸赞/感谢 auto；咨询/售后保留 review 质量档；负面/危机保留 review+告警；通过后由系统自动审批，敏感 block 不发送
     - 候选回复给出依据（引用评论原文+相关档案条目）
   constraints:
-    - 含投诉/维权关键词（投诉/维权/退款/骗子/举报）必 review+告警，不得自动外发
+    - 含投诉/维权关键词必须走 review 质量档并告警；审批由 workloom.video-auto-approval/v1 完成
     - 政治敏感等内容 block，只写「需介入」事件（L4.2 不确定不执行）
     - auto 档只用模板库内措辞，不即兴发挥
     - 外发回执落账；失败即转人工，不重复发送

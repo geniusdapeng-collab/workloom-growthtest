@@ -63,10 +63,11 @@ export function deriveStageDisposition(input: {
   if (verificationStatus === "unverified") return "reconcile";
   if (verificationStatus === "pending") return hasGate ? "wait_human" : "reconcile";
   if (executionStatus === "output_ready" && hasGate && verificationStatus === "not_run") return "wait_human";
+  if (executionStatus === "output_ready" && hasGate && ["passed", "not_applicable"].includes(verificationStatus)) return "continue";
   if (executionStatus === "output_ready" && hasGate) return "blocked";
   if (executionStatus === "completed") return "done";
   if (executionStatus === "ready" || executionStatus === "running") return "continue";
-  if (executionStatus === "output_ready" && ["passed", "not_applicable", "not_run"].includes(verificationStatus)) {
+  if (executionStatus === "output_ready" && ["passed", "not_applicable"].includes(verificationStatus)) {
     return "continue";
   }
   return "blocked";

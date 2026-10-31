@@ -34,6 +34,10 @@
 
 ## 二、21 条基线围栏（ai-video-baseline/v2，is_baseline 只紧不松）
 
+> GrowthTest 视频管线自 `T-2026-1031-9003` 起，下表 `review` 表示**保留质量审核级别**，
+> 不代表等待人类审批；审核完成后由 `workloom.video-auto-approval/v1` 自动裁决。
+> `block` 规则完全不变。
+
 | 规则 | 级别 | 对象/动作 | 要点 |
 |---|---|---|---|
 | G1 | review | dossier.confirm | 情报档案确认必审（无源不入库） |

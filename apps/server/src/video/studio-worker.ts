@@ -3,8 +3,7 @@
  *
  * 职责：
  *  1. 内存 run 注册表（runId → 运行投影），studio.start 异步启动不阻塞 tRPC 响应
- *  2. onApproval：确认门 → gatewayAppendOnClient 落门动作事件 + INSERT approvals（pending）
- *     → 轮询审批状态（HR_APPROVAL_POLL_MS / HR_APPROVAL_TIMEOUT_MS）→ 映射 GateVerdict
+ *  2. onApproval：确认门 → 质量审查 → 系统自动审批（默认）或回滚的人审轮询 → 映射 GateVerdict
  *  3. onEvent：pipeline.* 生命周期事件经 gatewayAppend 落五元事件库
  *  4. LLM engine：WorkloomLLMEngine.fromEnv()；为 null 拒绝启动（禁止静默降级，vendor 纪律）
  *
@@ -75,6 +74,12 @@ import {
   type ProducerMode,
 } from "./gate-policy.js";
 import { createShadowSession, ignorePipelineShadow } from "./pipeline-control-plane.js";
+import {
+  VIDEO_AUTO_APPROVAL_ACTOR_ID,
+  VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+  videoAutoApprovalEnabled,
+  videoAutoApprovalReason,
+} from "./auto-approval.js";
 
 /* ================= 可配项（环境变量） ================= */
 
@@ -88,7 +93,7 @@ const TOTAL_DEADLINE_MS = Number(process.env.VM_TOTAL_DEADLINE_MS ?? 3_600_000);
 /**
  * 内部门三档处置与逐门口径见 `./gate-policy.js`（服务端与本地审计跑批共用同一份定义，
  * 避免"审计过的门 ≠ 生产的门"漂移）。花钱/对外门（G8 渲染提交、G9 发布、G10 对外评论）
- * 不在 AUTO_GATES 内，仍按高风险走人审。
+ * G8/G9/G10/G11/G12/G15 保留原围栏质量级别，由系统自动审批替代人类等待。
  */
 const PRODUCER_MODE: ProducerMode = producerModeFromEnv();
 
@@ -298,7 +303,7 @@ export function getRun(runId: string, workspaceId: string): RunEntry | null {
 export interface WorkspaceRunSummary {
   /** 正在执行的 run 数 */
   running: number;
-  /** 停在人审门上的 run 数 */
+  /** 停在旧人审回滚路径上的 run 数 */
   awaitingApproval: number;
   /** 最近失败（窗口内）的 run 数 */
   failedRecent: number;
@@ -549,7 +554,9 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
   if (input.directorIdentityImages !== undefined && !directorMode) {
     throw new StudioWorkerError("DELEGATION_REQUIRED", "内部图片参数必须绑定当前项目真实导演委托");
   }
-  const effectiveProducerMode:ProducerMode=directorMode?"review":PRODUCER_MODE;
+  const effectiveProducerMode:ProducerMode=videoAutoApprovalEnabled()
+    ? "review"
+    : (directorMode?"review":PRODUCER_MODE);
   const directorProfile=directorMode?buildDirectorDefaults({intent:input.rawIntent??input.intent,
     identityAssets:input.creativeDelegation!.identityAssetRefs,
     history:Array.isArray(input.metadata?.directorPreferences)?input.metadata!.directorPreferences as Array<Record<string,unknown>>:[],
@@ -771,7 +778,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
      * 裁决三类：① 评审放行 → approved；② 评审打回 → approved:false（vendor 中止本 run，由发起方重跑）；
      * ③ `HR_PRODUCER=auto` → 旧的无条件放行（应急口径，事件里标注 autoApproved 以便审计）。
      */
-    if (AUTO_GATES.has(gate) && effectiveProducerMode !== "human" && gate!=="G5_PORTRAIT") {
+    if ((AUTO_GATES.has(gate) || videoAutoApprovalEnabled()) && effectiveProducerMode !== "human" && gate!=="G5_PORTRAIT") {
       const producerStage = GATE_PRODUCER_STAGE[gate] ?? "script";
       let producerVerdict: Awaited<ReturnType<typeof reviewStage>> | null = null;
       if (effectiveProducerMode === "review") {
@@ -839,7 +846,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
             }, gateRecord),
             basis: effectiveProducerMode === "auto"
               ? ["HR_PRODUCER=auto（应急口径）：内部准备门无条件放行，产出作为过程与时间线留痕"]
-              : [`AI 监制门（${producerStage}）：确定性硬闸 + 模型评审后${approved ? "放行" : "打回重跑"}；人审只保留给花钱与对外动作`],
+              : [`AI 监制门（${producerStage}）：确定性硬闸 + 模型评审后${approved ? "放行" : "打回重跑"}；系统自动审批不降低质量门槛`],
           },
           rule_impact: [],
         });
@@ -869,9 +876,9 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
         : { approved: false, reason: `producer-unavailable(${req.gate})`, fatal: "producer_unavailable" };
     }
     /**
-     * G5 定妆照：**默认人审**（T-2026-1001-0007，G5 已移出 AUTO_GATES 默认表）。
+     * G5 定妆照：默认系统自动审批；必须先通过实际出图、四角度、字节和项目作用域核验。
      * ① 事实核验先行：实际出图 / 必需角度 / 文件可读，不成立即 fail-closed（不占用人类时间，也不自动重出）；
-     * ② 事实成立 → 把逐张文件清单写进审批内容，交给人类看过原图后放行或退回；
+     * ② 事实成立 → 写入系统自动审批事件与逐张文件证据，不进入人类等待；
      * ③ 机器像不像/监制判据不参与这里的决策，也不会触发自动重做。
      */
     let humanContentMd = req.contentMd ?? "";
@@ -918,8 +925,59 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
               profileHash:directorProfile!.profileHash,evidence},basis:["当前项目真实委托内的创作选择；实际图片事实已核实，机器美感分不触发付费重出"]},rule_impact:[]});
         return {approved:true,reason:"delegated-creative-review",suggestions:[]};
       }
+      if (videoAutoApprovalEnabled()) {
+        const evidence = [
+          ...portraitFiles.map(file => ({
+            scope: "image" as const,
+            path: file.file,
+            sha256: file.sha256,
+            subject: file.subject,
+            angle: file.angle,
+          })),
+        ];
+        gateProofs.set(gate, {
+          gate,
+          approved: true,
+          status: "passed",
+          via: "system-auto-approval",
+          degraded: false,
+          model: null,
+          evidence,
+          policyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+          approvalId: null,
+        });
+        await gatewayAppend(getGatewayPool(), {
+          ...scope,
+          actor: { id: VIDEO_AUTO_APPROVAL_ACTOR_ID, type: "system" },
+        }, {
+          who: { type: "system", id: VIDEO_AUTO_APPROVAL_ACTOR_ID },
+          context: {
+            tenant_id: scope.tenantId,
+            workspace_id: scope.workspaceId,
+            time: new Date().toISOString(),
+            channel: "inapp",
+          },
+          object: { type: gateObj.type, id: objectId },
+          decision: {
+            action: "video.gate.auto_approved",
+            after: {
+              runId: entry.runId,
+              gate,
+              policyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+              evidence: evidence.map(item => ({ path: item.path, sha256: item.sha256 })),
+            },
+            basis: [videoAutoApprovalReason(`G5 定妆照事实核验通过；${portraitFiles.length} 张当前项目图片`)],
+          },
+          rule_impact: [],
+        });
+        return {
+          approved: true,
+          reason: `system-auto-approved(${gate} · ${VIDEO_AUTO_APPROVAL_POLICY_VERSION})`,
+          suggestions: [],
+        };
+      }
     }
-    /* HR_PRODUCER=human 或门不在 AUTO_GATES 内 → 落到下面的人工审批分支（插 approvals 行等人点） */
+    /* 仅 VIDEO_AUTO_APPROVAL=0 的兼容回滚路径会落到旧人工审批分支 */
     // D16（#1/A）：门动作事件与 approvals 行同一事务同一 COMMIT（模仿 fence.confirmDryRun 口径）
     const client = await getAppPool().connect();
     let approvalId: string;
@@ -950,7 +1008,7 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
           approvalId, scope.tenantId, scope.workspaceId, ev.eventId,
           /**
            * W-04 举一反三：这一支是"人工确认门"（HR_PRODUCER=human 或门不在 AUTO_GATES 内），
-           * 按模块自述"人审只保留给花钱与对外动作"——必须在快照上显式声明高危，
+           * 旧回滚路径仍须在快照上显式声明高危，
            * 否则批量采纳入口会把"逐门确认"降级成一键放行（第三方实测同类的 l4 种子审批即被批量放行）。
            */
           // B-01 修复：G8 渲染提交/G9 发布/G10 对外评论均为花钱/对外门，快照必须显式携带高危标记——
@@ -1202,8 +1260,15 @@ export function startRun(scope: Scope, input: StudioRunInput): string {
             if (r.success) {
               const missing = [...(input.isMarketing ? ["G1_DOSSIER"] : []), "G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"].filter(gate => {
                 const proof = gateProofs.get(gate);
+                const g5SystemAuto = gate === "G5_PORTRAIT"
+                  && proof?.via === "system-auto-approval"
+                  && proof.degraded === false
+                  && proof.policyVersion === VIDEO_AUTO_APPROVAL_POLICY_VERSION
+                  && Array.isArray(proof.evidence)
+                  && proof.evidence.some((item) => item?.scope === "image");
                 return !(proof?.approved === true && (proof.status === "passed" && ((proof.via === "llm" && proof.degraded === false)
                   || (gate === "G5_PORTRAIT" && ["owner-acceptance","delegated-creative-review"].includes(String(proof.via)) && proof.degraded === false))
+                  || g5SystemAuto
                   || gate === "G5_PORTRAIT" && proof.status === "not_applicable" && proof.basis === "no-characters-or-products"));
               });
               if (missing.length) {

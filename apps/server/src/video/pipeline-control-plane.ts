@@ -24,6 +24,13 @@ import {
   type PipelineTransaction,
   type StageRun,
 } from "@hyperreality/video-studio";
+import {
+  VIDEO_AUTO_APPROVAL_ACTOR_ID,
+  VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+  isVideoApprovalGate,
+  videoAutoApprovalEnabled,
+  videoAutoApprovalReason,
+} from "./auto-approval.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(here, "../../../..");
@@ -672,6 +679,16 @@ export function getPipelineCoordinator(): PipelineCoordinator {
   if (!coordinator) {
     coordinator = new PipelineCoordinator(new PostgresPipelineRepository(), {
       resolvePlan: (planKey) => loadCompiledVideoPipeline(planKey),
+      autoApproveGate: (input) => {
+        if (!videoAutoApprovalEnabled() || !isVideoApprovalGate(input.gateKey)) return null;
+        return {
+          decision: "passed",
+          actor: VIDEO_AUTO_APPROVAL_ACTOR_ID,
+          policyVersion: VIDEO_AUTO_APPROVAL_POLICY_VERSION,
+          reason: videoAutoApprovalReason(`${input.run.plan.pipelineKey}/${input.stage.nodeKey}/${input.gateKey}`),
+          evidenceHashes: input.artifactHashes,
+        };
+      },
     });
   }
   return coordinator;

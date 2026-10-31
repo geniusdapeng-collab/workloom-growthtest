@@ -74,6 +74,13 @@ function coordinator(): PipelineCoordinator {
       gateDecisionId: id("GD"),
       eventId: id("EV"),
     },
+    autoApproveGate: () => ({
+      decision: "passed",
+      actor: "video-auto-approval",
+      policyVersion: "workloom.video-auto-approval/v1",
+      reason: "test auto approval after quality review",
+      evidenceHashes: ["a".repeat(64)],
+    }),
   });
 }
 
@@ -286,7 +293,7 @@ describe("PipelineCoordinator", () => {
     })).rejects.toThrow(/GATE_MANIFEST_MISMATCH/);
   });
 
-  it("persists a pending gate request as a machine-readable approval blocker", async () => {
+  it("auto-approves a video gate after quality evidence without creating a human wait", async () => {
     const c = coordinator();
     const plan = testPlan();
     const started = await c.startCompiledPipeline(SCOPE, plan, {
@@ -319,10 +326,10 @@ describe("PipelineCoordinator", () => {
       checkSetVersion: "v1",
       artifactHashes: [output.artifacts[0]!.sha256],
     });
-    expect(pending.verificationStatus).toBe("pending");
+    expect(pending.verificationStatus).toBe("passed");
     const projection = await c.readProjection(SCOPE, started.pipelineRunId);
-    expect(projection?.nextAction).toBe("wait_approval");
-    expect(projection?.blocker?.kind).toBe("approval");
+    expect(projection?.nextAction).toBe("run_node");
+    expect(projection?.blocker).toBeNull();
   });
 
   it("rejects invalid state jumps", () => {

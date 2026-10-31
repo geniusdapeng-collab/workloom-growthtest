@@ -43,6 +43,8 @@ WorkLoom Growthtest 是面向企业增长与内容运营团队的隔离实验副
 
 **当前 PC 通用审批、服务前台、成员管理、伙伴授权和个人账号管理入口已移除。** 底层 API 和业务专用关卡可以继续存在，但旧 `/approvals`、`/service` 等截图不再代表当前产品入口。具体路由与权限以 [App.tsx](apps/web/src/App.tsx)、[NavigationAccess.tsx](apps/web/src/shell/NavigationAccess.tsx) 和 [视频行业路由](apps/web/src/extensions/ai-video/routes.tsx) 为准。
 
+视频行业包的 G1–G15 `review` 门已改为 `workloom.video-auto-approval/v1` 系统自动裁决：质量检查、预算、资格、敏感内容与 `block` 硬闸保留，但不再生成人类审批等待。设计边界见 [VIDEO-AUTO-APPROVAL.md](docs/VIDEO-AUTO-APPROVAL.md)。
+
 ## 产品架构
 
 ```mermaid
@@ -104,7 +106,7 @@ NATS/Redis 的事件总线库可在源码中找到，但当前主业务入口未
 同名岗位由主包 `composition.presetOwners` 裁决：`ads-optimizer`、`publish-operator`、`review-analyst` 归 `geo-growth`，`company-ceo` 归 `hotel`。下方数量从 manifest 和岗位标识自动派生，避免手工维护另一套总数。当前三包均为 `candidate`；稳定包签名校验能力的存在不能变成“这些候选包已经完成生产验收”的结论。
 
 <!-- CAPABILITIES:BEGIN -->
-<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-10-15），请勿手改；重跑 pnpm capabilities 更新 -->
+<!-- 本区块由 scripts/generate-capabilities.mjs 自动生成（2026-10-31），请勿手改；重跑 pnpm capabilities 更新 -->
 
 ## 代码与资产速览（自动生成）
 

@@ -116,6 +116,7 @@ export const SYSTEM_ACTOR_WHITELIST = [
   "captain",
   "service-c",
   "trigger-engine",
+  "video-auto-approval",
 ] as const;
 
 export function isWhitelistedSystemActor(actor: ActorInfo): boolean {

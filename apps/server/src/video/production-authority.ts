@@ -162,19 +162,21 @@ async function sourceForShot(app: AppPool, scope: Scope, projectId: string, shot
     const na = key === "G5_PORTRAIT" && gate?.status === "not_applicable" && gate?.basis === "no-characters-or-products";
     const creative=key==="G5_PORTRAIT" && gate?.via==="delegated-creative-review";
     const human=key==="G5_PORTRAIT" && gate?.via==="owner-acceptance";
-    if (matches.length !== 1 || (!na && (gate?.status !== "passed" || gate?.approved !== true || (!creative && !human && gate?.via !== "llm") || gate?.degraded !== false))) fail("PREPRODUCTION_GATES_UNVERIFIED", `当前执行缺少有效 ${key} 裁决`);
+    const systemAuto=key==="G5_PORTRAIT" && gate?.via==="system-auto-approval";
+    if (matches.length !== 1 || (!na && (gate?.status !== "passed" || gate?.approved !== true || (!creative && !human && !systemAuto && gate?.via !== "llm") || gate?.degraded !== false))) fail("PREPRODUCTION_GATES_UNVERIFIED", `当前执行缺少有效 ${key} 裁决`);
+    if(systemAuto && (gate.policyVersion!=="workloom.video-auto-approval/v1" || !Array.isArray(gate.evidence) || !(gate.evidence as JsonRecord[]).some(item=>item.scope==="image"))) fail("PREPRODUCTION_GATES_UNVERIFIED","G5 系统自动审批缺少版本化策略或实际图像证据");
     if(creative) {
       await verifyDirectorGrant({...scope,projectId,runId:row.run_id},gate.delegation);
       if(typeof gate.profileHash!=="string" || !/^[a-f0-9]{64}$/.test(gate.profileHash)) fail("DELEGATION_INVALID","人物呈现档案摘要缺失");
     }
     if(human) {
-      if(typeof gate.approvalId!=="string") fail("PREPRODUCTION_GATES_UNVERIFIED","G5 人审审批号缺失");
+      if(typeof gate.approvalId!=="string") fail("PREPRODUCTION_GATES_UNVERIFIED","G5 旧人审回滚路径缺少审批号");
       const approved=await scopedTx(app,scope,async client=>(await client.query<{approval_id:string}>(`SELECT a.approval_id FROM approvals a
         JOIN biz_events e ON e.tenant_id=a.tenant_id AND e.workspace_id=a.workspace_id AND e.event_id=a.event_id
         WHERE a.tenant_id=$1 AND a.workspace_id=$2 AND a.approval_id=$3 AND a.status IN ('approved','edited')
           AND a.snapshot->>'gate'='G5_PORTRAIT' AND e.payload->'decision'->'after'->>'runId'=$4
           AND e.payload->'object'->>'id'=$5`,[scope.tenantId,scope.workspaceId,gate.approvalId,row.run_id,`${projectId}:g5_portrait`])).rows);
-      if(approved.length!==1) fail("PREPRODUCTION_GATES_UNVERIFIED","G5 人审缺当前项目和执行的真实批准事件");
+      if(approved.length!==1) fail("PREPRODUCTION_GATES_UNVERIFIED","G5 旧人审回滚路径缺少当前项目和执行的批准事件");
     }
     if (!na && (!Array.isArray(gate.evidence) || gate.evidence.length === 0)) fail("PREPRODUCTION_GATES_UNVERIFIED", `${key} 缺少实际审核证据摘要`);
     if (!na) {

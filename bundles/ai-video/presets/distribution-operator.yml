@@ -7,7 +7,7 @@ description: 一片多发：成片拆分为平台变体（画幅、时长、文�
 readonly: false
 night_shift: false
 high_risk: true               # 公网外发
-fence_bindings: [G9]          # 公网发布必审
+fence_bindings: [G9]          # 公网发布质量门；系统自动审批
 coverage:
   - { eventPrefix: "distribution.", label: 内容分发 }
 skills: [publish-ops]

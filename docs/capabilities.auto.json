@@ -2,15 +2,15 @@
  "schema": "workloom.capabilities/v2",
  "repo": "workloom-ai-acquisition",
  "productId": "workloom-ai-growth",
- "repository": "workloom-ai/workloom-growthtest",
+ "repository": "geniusdapeng-collab/workloom-growthtest",
  "displayName": "WorkLoom 获客增长系统（实验车道）",
  "description": "企业获客与内容运营工作系统：工作台、行业包声明、内容生产工位与共享治理组件。",
- "generatedAt": "2026-10-15T07:56:52.724Z",
+ "generatedAt": "2026-10-31T02:13:10.331Z",
  "evidenceNotice": "本导览检查 manifest、脚本和文件入口。目录可发现、实际可调用、结果已验证分别记录；缺少同提交独立运行证据时后两项为未验证。岗位、技能与管线数是声明资产数，不是生产实测通过数。",
  "bundleDeclarations": [
   {
    "bundle": "ai-video",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "status": "candidate",
    "presets": 43,
    "skills": 36,
@@ -64,7 +64,7 @@
   },
   {
    "bundle": "geo-growth",
-   "version": "1.0.0",
+   "version": "1.0.1",
    "status": "candidate",
    "presets": 27,
    "skills": 29,
@@ -234,7 +234,7 @@
     {
      "name": "bundles/ai-video/",
      "how": "[manifest](../bundles/ai-video/bundle.json)",
-     "desc": "43 条岗位定义 / 36 项技能路径 / 6 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数",
+     "desc": "43 条岗位定义 / 36 项技能路径 / 6 条管线；版本 1.0.1，状态 candidate；不等于已接通功能数",
      "sourcePaths": [
       "bundles/ai-video/bundle.json",
       "bundles/geo-growth/bundle.json",
@@ -254,7 +254,7 @@
     {
      "name": "bundles/geo-growth/",
      "how": "[manifest](../bundles/geo-growth/bundle.json)",
-     "desc": "27 条岗位定义 / 29 项技能路径 / 4 条管线；版本 1.0.0，状态 candidate；不等于已接通功能数",
+     "desc": "27 条岗位定义 / 29 项技能路径 / 4 条管线；版本 1.0.1，状态 candidate；不等于已接通功能数",
      "sourcePaths": [
       "bundles/ai-video/bundle.json",
       "bundles/geo-growth/bundle.json",
