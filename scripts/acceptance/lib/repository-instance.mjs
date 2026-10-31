@@ -10,7 +10,7 @@ function canonicalRepository(value) {
 }
 function repositoryFromOrigin(value) {
   // Validate the original bytes before URL parsing could normalize dot segments or userinfo.
-  const match = typeof value === 'string' && /^https:\/\/cnb\.cool\/([A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)+)\/?$/i.exec(value);
+  const match = typeof value === 'string' && /^https:\/\/(?:github\.com|cnb\.cool)\/([A-Za-z0-9][A-Za-z0-9._-]*(?:\/[A-Za-z0-9][A-Za-z0-9._-]*)+)\/?$/i.exec(value);
   if (!match) throw invalidIdentity();
   const path = match[1].endsWith('.git') ? match[1].slice(0, -4) : match[1];
   return canonicalRepository(path);

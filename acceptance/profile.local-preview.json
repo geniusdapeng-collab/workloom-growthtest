@@ -1,0 +1,454 @@
+{
+  "schemaVersion": "workloom.acceptance-profile/v2",
+  "repo": "geniusdapeng-collab/workloom-growthtest",
+  "productName": "WorkLoom 获客增长系统（实验车道）",
+  "lane": "industry",
+  "primaryBundle": "geo-growth",
+  "workspaceId": null,
+  "dataMode": "simulated",
+  "identity": {
+    "workspaceSlug": "geo-growth",
+    "human": "MEM-G01",
+    "guest": "demo-direct",
+    "authTokenEnv": "ACCEPTANCE_AUTH_TOKEN"
+  },
+  "startup": {
+    "command": "pnpm preview:all",
+    "ports": {
+      "pc": 3000,
+      "bMobile": 3001,
+      "cMobile": 3002,
+      "server": 8787
+    }
+  },
+  "surfaces": {
+    "pcRoutes": [
+      "/",
+      "/inbox",
+      "/tasks",
+      "/reports",
+      "/service",
+      "/executive",
+      "/guardrails",
+      "/exams",
+      "/memory",
+      "/night",
+      "/skills",
+      "/members",
+      "/partners",
+      "/account",
+      "/workspaces",
+      "/customize",
+      "/configuration",
+      "/assembly",
+      "/agents",
+      "/portfolio",
+      "/events",
+      "/models",
+      "/onboarding"
+    ],
+    "bMobileRoutes": [
+      "/",
+      "/inbox",
+      "/tasks",
+      "/operations",
+      "/account"
+    ],
+    "cRoutes": [
+      "#chat",
+      "#service",
+      "#tickets",
+      "#messages",
+      "#me"
+    ]
+  },
+  "thresholds": {
+    "firstValueMs": 20000,
+    "dispatchMs": 60000,
+    "approvalMs": 30000,
+    "traceClicks": 2,
+    "guestFirstReplyMs": 30000,
+    "decisionQuota": 7,
+    "minContrastRatio": 4.5,
+    "idleInterruptionWindowS": 20
+  },
+  "ux": {
+    "personas": [
+      {
+        "id": "owner",
+        "jtbd": [
+          "看到隔离社媒指标核查的事实、缺失项与待决事项"
+        ],
+        "criticality": "P0"
+      },
+      {
+        "id": "manager",
+        "jtbd": [
+          "核对隔离社媒指标核查的来源与责任岗位"
+        ],
+        "criticality": "P0"
+      },
+      {
+        "id": "staff",
+        "jtbd": [
+          "完成隔离社媒指标核查并看到结果回执"
+        ],
+        "criticality": "P0"
+      },
+      {
+        "id": "partner",
+        "jtbd": [
+          "看到授权边界与越权拒绝原因"
+        ],
+        "criticality": "P1"
+      },
+      {
+        "id": "guest",
+        "jtbd": [
+          "得到清晰回答与转人工入口"
+        ],
+        "criticality": "P0"
+      }
+    ],
+    "journeys": [
+      {
+        "id": "U-01",
+        "persona": "owner",
+        "stage": "daily",
+        "title": "隔离社媒指标核查：事实与待决项",
+        "mot": true
+      },
+      {
+        "id": "U-02",
+        "persona": "manager",
+        "stage": "daily",
+        "title": "隔离社媒指标核查：来源核查与结果回执",
+        "mot": true
+      },
+      {
+        "id": "U-03",
+        "persona": "owner",
+        "stage": "exception",
+        "title": "隔离社媒指标核查：数据缺失与权限拒绝",
+        "mot": true
+      }
+    ],
+    "tasks": [
+      {
+        "id": "U2-T01",
+        "persona": "manager",
+        "criticality": "P0",
+        "budgetMs": 60000,
+        "paths": [
+          "normal",
+          "empty",
+          "error",
+          "permission",
+          "offline"
+        ]
+      }
+    ],
+    "research": {
+      "participants": [],
+      "methods": [
+        "think-aloud",
+        "first-click",
+        "five-second"
+      ],
+      "instruments": [
+        "SUS",
+        "SEQ"
+      ]
+    }
+  },
+  "outcome": {
+    "roles": [
+      {
+        "role": "data-board-officer",
+        "agentPreset": "data-board-officer",
+        "al": "AL3",
+        "deliverableUnit": "隔离社媒指标核查清单",
+        "minSubstance": "四项指标来源、基线、异常线索与未核实项；模拟数据不进入真实增长指标",
+        "kpis": [
+          {
+            "name": "已核实来源完整性",
+            "source": "threads.events/ask.answer",
+            "baseline": null,
+            "target": null
+          }
+        ],
+        "attribution": "observational",
+        "guardrails": [
+          "无依据结论",
+          "越权写入",
+          "模拟数据污染"
+        ]
+      }
+    ],
+    "taskSuites": [
+      "acceptance/outcomes/industry.yaml"
+    ],
+    "receipts": [],
+    "fixtureMarker": "suite.rdas.workloom-growthtest",
+    "residualDisclosure": "隔离社媒指标核查验收会保留带 suite.rdas.workloom-growthtest 标记的线程和事件；不会删除审计事件，需单独列入残留清单并排除 ADR/HIR 与经营指标。"
+  },
+  "autonomy": {
+    "interventionTaxonomy": "H0-H4",
+    "fixtureFilters": [
+      "suite.",
+      "suite-",
+      "apr-suite-",
+      "apr-e-",
+      "T-suite",
+      "suite.rdas."
+    ],
+    "windows": [
+      "4w"
+    ],
+    "targetPrecisionPp": 10,
+    "offlineAuditSample": 10
+  },
+  "soak": {
+    "hours": [
+      24,
+      168,
+      672
+    ],
+    "metrics": [
+      "success",
+      "latency",
+      "cost",
+      "drift"
+    ]
+  },
+  "journeys": [
+    {
+      "id": "EXP-01",
+      "persona": "owner",
+      "title": "隔离社媒指标核查：首启事实与待决项",
+      "script": "builtin:first-value"
+    },
+    {
+      "id": "EXP-02",
+      "persona": "owner",
+      "title": "隔离社媒指标核查：授权边界与审批留痕",
+      "script": "builtin:approval"
+    },
+    {
+      "id": "EXP-03",
+      "persona": "manager",
+      "title": "隔离社媒指标核查：结果与来源核对",
+      "script": "builtin:traceability"
+    },
+    {
+      "id": "EXP-04",
+      "persona": "staff",
+      "title": "隔离社媒指标核查：派活与结果读回",
+      "script": "builtin:dispatch"
+    },
+    {
+      "id": "EXP-05",
+      "persona": "partner",
+      "title": "隔离社媒指标核查：越权拒绝可见",
+      "script": "builtin:partner-scope"
+    },
+    {
+      "id": "EXP-06",
+      "persona": "guest",
+      "title": "隔离社媒指标核查：首响与转人工",
+      "script": "builtin:guest-service"
+    }
+  ],
+  "notes": "本仓代表任务是隔离社媒指标核查：正常结果（P0 k=5）、输入错误、无身份权限三路径。profile-check/outcome --validate-only 仅校验配置；真实行业结果、体验、长跑和完整276项仍须独立验收。",
+  "environment": {
+    "kind": "local-preview",
+    "allowWrites": false,
+    "supportDir": null,
+    "target": {},
+    "notes": "本机预览结构验收；不触发真实模型、供应商、付费或生产写入。生产档位继续使用 acceptance/profile.json。"
+  },
+  "live": {
+    "enabled": false,
+    "requireRealModels": false,
+    "allowDb": false,
+    "budgets": {
+      "maxLlmCalls": 40,
+      "maxLlmTokens": 300000,
+      "maxImages": 8,
+      "maxVideoClips": 3,
+      "minVideoSeconds": 10,
+      "maxVideoSeconds": 15,
+      "maxVideoSecondsTotal": 45,
+      "maxCostCny": 120,
+      "maxWallClockMin": 45
+    },
+    "models": [
+      {
+        "id": "deepseek-v4.1-flash",
+        "kind": "llm",
+        "model": "deepseek-flash",
+        "adapter": "dsh-harness",
+        "apiKeyEnv": "DEEPSEEK_API_KEY",
+        "baseUrlEnv": "DEEPSEEK_BASE_URL"
+      },
+      {
+        "id": "deepseek-v4.1-flash-gateway",
+        "kind": "llm",
+        "model": "deepseek-flash",
+        "adapter": "model-gateway",
+        "apiKeyEnv": "DEEPSEEK_API_KEY",
+        "baseUrlEnv": "LLM_BASE_URL"
+      },
+      {
+        "id": "seedream-5.0",
+        "kind": "image",
+        "model": "doubao-seedream-5-0-pro-260628",
+        "adapter": "gen-http",
+        "apiKeyEnv": "VOLCENGINE_ARK_API_KEY",
+        "baseUrlEnv": "SEEDREAM_ENDPOINT"
+      },
+      {
+        "id": "seedance-2.5",
+        "kind": "video",
+        "model": "doubao-seedance-2-5-260628",
+        "adapter": "gen-http",
+        "apiKeyEnv": "VOLCENGINE_ARK_API_KEY",
+        "baseUrlEnv": "SEEDANCE_ENDPOINT"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "LLM-R1",
+        "kind": "llm",
+        "chain": "dsh-harness",
+        "model": "deepseek-v4.1-flash",
+        "criticality": "P0",
+        "title": "内置模型 · 获客策略推理（dsh harness + 围栏 + 账本）",
+        "prompt": "背景：一家社区手冲咖啡馆，开业 3 个月，日均 60 杯，客单价 28 元，线上几乎零曝光，预算每月 3000 元。请给出：① 优先做的两个获客动作与理由 ② 一个 7 天可执行的发布节奏 ③ 最大的风险。要求：先结论后依据，最后另起一行输出 TASK_COMPLETE。",
+        "expect": [
+          "获客|曝光|内容|团购|核销|复购|毛利|风险|预算"
+        ],
+        "expectAll": [
+          "TASK_COMPLETE"
+        ]
+      },
+      {
+        "id": "LLM-T1",
+        "kind": "llm",
+        "chain": "dsh-harness",
+        "model": "deepseek-v4.1-flash",
+        "criticality": "P0",
+        "title": "内置模型 · 工具循环（工具调用过围栏瀑布 + 事件落账）",
+        "prompt": "请调用 bash 工具执行 `echo workloom-geo-live`，把命令输出原样贴出来，然后另起一行输出 TASK_COMPLETE。",
+        "expect": [
+          "workloom-geo-live|TASK_COMPLETE"
+        ],
+        "expectAll": [
+          "TASK_COMPLETE"
+        ]
+      },
+      {
+        "id": "LLM-M1",
+        "kind": "llm",
+        "chain": "dsh-harness",
+        "model": "deepseek-v4.1-flash",
+        "criticality": "P1",
+        "fixture": "auto",
+        "title": "内置模型 · 多模态理解（图片到达模型）",
+        "prompt": "请打开随附图片，用一句话说明图中主体内容，并原样念出图中徽标里的那串字符。最后另起一行输出 TASK_COMPLETE。",
+        "expect": [
+          "WORKLOOM|验收|夹具"
+        ],
+        "expectAll": [
+          "TASK_COMPLETE"
+        ]
+      },
+      {
+        "id": "LLM-G1",
+        "kind": "llm",
+        "chain": "model-gateway",
+        "model": "deepseek-v4.1-flash-gateway",
+        "criticality": "P1",
+        "title": "模型网关 · 结构化输出",
+        "prompt": "只输出一行 JSON：{\"verdict\":\"ok\",\"risk\":\"low\",\"reason\":\"<20 字内>\"}。不要输出任何其他内容。",
+        "expect": [
+          "verdict"
+        ]
+      },
+      {
+        "id": "IMG-01",
+        "kind": "image",
+        "model": "seedream-5.0",
+        "criticality": "P1",
+        "images": 2,
+        "title": "生图 · 手冲咖啡馆主视觉（2 张）",
+        "prompt": "手冲咖啡馆主视觉：木质吧台上白色陶瓷手冲杯与细口手冲壶，热水细流注入咖啡粉，粉层微微鼓起，蒸汽轻扬；暖色侧逆光，浅景深，背景虚化的咖啡馆窗景与绿植；胶片质感；构图留出上下文字区；无人物、无文字、无 logo。",
+        "expect": [
+          "png"
+        ],
+        "minArtifacts": 1
+      },
+      {
+        "id": "IMG-02",
+        "kind": "image",
+        "model": "seedream-5.0",
+        "criticality": "P2",
+        "images": 1,
+        "title": "生图 · 获客素材（朋友圈方图）",
+        "prompt": "方形获客素材：一杯拉花拿铁的俯拍，深色木桌、杂志与咖啡豆点缀，暖色调，留出右侧文字留白，无人物、无文字。",
+        "expect": [
+          "png"
+        ],
+        "minArtifacts": 1
+      },
+      {
+        "id": "VID-01",
+        "kind": "video",
+        "model": "seedance-2.5",
+        "criticality": "P1",
+        "durationSeconds": 12,
+        "title": "生视频 · 12s 门店短视频镜头",
+        "prompt": "清晨的手冲咖啡馆：镜头从吧台左侧缓慢横移到手冲壶注水的特写，蒸汽升腾，暖色灯光，画面干净，无人物，无文字。",
+        "expect": [
+          "mp4"
+        ],
+        "durationRange": [
+          10,
+          15
+        ]
+      },
+      {
+        "id": "PROD-01",
+        "kind": "product",
+        "criticality": "P0",
+        "title": "隔离社媒指标核查（经产品入口与线程事件读回）",
+        "input": "suite.rdas.workloom-growthtest：当前隔离实验中的社媒播放、涨粉、互动、询盘四项指标如何核查基线和工具回执？请用“社媒”标注未核实数字与异常线索，只回答检查清单，不处置告警或改动投放。",
+        "presetKey": "data-board-officer",
+        "workspaceSlug": "geo-growth",
+        "requireModel": true,
+        "fixtureMarker": "suite.rdas.workloom-growthtest",
+        "residualDisclosure": "隔离社媒指标核查验收会保留带 suite.rdas.workloom-growthtest 标记的线程和事件；不会删除审计事件，需单独列入残留清单并排除 ADR/HIR 与经营指标。",
+        "state_asserts": [
+          {
+            "event": {
+              "action": "ask.answer",
+              "field": "decision.after.text",
+              "contains": "社媒",
+              "minLength": 12
+            }
+          }
+        ]
+      }
+    ],
+    "notes": "local-preview 不执行 P 域生产实测；P0-P3 保持未验证。"
+  },
+  "repositoryInstance": "geniusdapeng-collab/workloom-growthtest",
+  "isolation": {
+    "isolated": true,
+    "sourceProductRepository": "workloom-ai/WorkLoom-growth",
+    "sourceProductCommit": "a6dc89a87e95eab86e202199335aecbf7fc4925b",
+    "adoptedProductRepository": "geniusdapeng-collab/workloom-growthtest",
+    "preserveSourceLineage": true,
+    "notes": "保留建仓时冻结的 Growth 仓库与完整来源提交；本产品发布及验收采用 Growthtest 实例身份。本仓仍双向隔离，不自动同步、不回流、不公共化实验业务语义。"
+  }
+}

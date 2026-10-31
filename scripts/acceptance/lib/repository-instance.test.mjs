@@ -41,6 +41,10 @@ test('G14 repository identity: canonical local origin is read from the actual wo
   const f = fixture(t); origin(f, 'https://cnb.cool/Reviewed-Org/Subgroup/Isolated-Repo.git');
   assert.deepEqual(identify(f), { repository: 'reviewed-org/subgroup/isolated-repo', source: 'git:remote.origin.url' });
 });
+test('G14 repository identity: canonical GitHub origin is read from the actual workspace repository', (t) => {
+  const f = fixture(t); origin(f, 'https://github.com/Reviewed-Org/Isolated-Repo.git');
+  assert.deepEqual(identify(f), { repository: 'reviewed-org/isolated-repo', source: 'git:remote.origin.url' });
+});
 test('G14 repository identity: an unmarked CNB variable cannot replace local Git identity', (t) => {
   const f = fixture(t); origin(f, 'https://cnb.cool/workloom-ai/isolated-repo');
   assert.equal(identify(f, { ...localEnv(), CNB: 'false', CNB_REPO_SLUG: 'other-org/isolated-repo' }).repository, 'workloom-ai/isolated-repo');
@@ -63,6 +67,7 @@ const credentialed = new URL('https://cnb.cool/workloom-ai/isolated-repo'); cred
 for (const [name, url] of [
   ['userinfo', credentialed.href], ['query', 'https://cnb.cool/workloom-ai/isolated-repo?testonly=opaque'],
   ['fragment', 'https://cnb.cool/workloom-ai/isolated-repo#testonly-opaque'], ['different host', 'https://example.test/workloom-ai/isolated-repo'],
+  ['github suffix', 'https://github.com.example.test/workloom-ai/isolated-repo'],
   ['host suffix', 'https://cnb.cool.example.test/workloom-ai/isolated-repo'], ['unsupported protocol', 'file:///workloom-ai/isolated-repo'],
   ['port', 'https://cnb.cool:8443/workloom-ai/isolated-repo'], ['dot segments', 'https://cnb.cool/workloom-ai/other/../isolated-repo'],
   ['encoded path', 'https://cnb.cool/workloom-ai/%69solated-repo'], ['duplicate separators', 'https://cnb.cool/workloom-ai//isolated-repo'],
