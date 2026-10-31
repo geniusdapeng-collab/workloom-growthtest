@@ -4,7 +4,7 @@ import { spawnSync, execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { after, test } from "node:test";
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, copyFileSync, existsSync, symlinkSync } from "node:fs";
-import { join, dirname, basename } from "node:path";
+import { join, dirname, basename, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { createBudget, normalizeBudgets } from "../acceptance/lib/live/budget.mjs";
@@ -140,6 +140,34 @@ test("G01 explicit runner captures repair and independent acceptance from actual
   ledger = JSON.parse(readFileSync(f.ledgerPath)); assert.equal(ledger.cards[0].state, "verified");
   assert.equal(cli(mcd, f.dir, ["gate", "--ledger", f.ledgerPath, "--repo", f.dir]).status, 0);
   const acceptedRun = JSON.parse(readFileSync(join(f.root, ledger.cards[0].assertions[0].run.path))); assert.equal(acceptedRun.actor, "independent-session"); assert.equal(acceptedRun.role, "acceptance");
+});
+test("G01 tracked MCD artifact mutations never dirty the tested source revision", () => {
+  const f = fixture();
+  const trackedLedger = join(f.root, "ledger.json");
+  json(trackedLedger, { status: "committed" });
+  git(f.dir, ["add", "-f", relative(f.dir, trackedLedger)]);
+  git(f.dir, ["commit", "-qm", "track MCD artifacts"]);
+  writeFileSync(trackedLedger, "{\"status\":\"running\"}\n");
+  const run = captureEvidenceRun({
+    repoRoot: f.dir,
+    artifactRoot: f.root,
+    runId: "tracked-artifact-mutation",
+    command: "synthetic tracked artifact isolation",
+    actor: "verify-session",
+    role: "acceptance",
+    exec: { file: process.execPath, args: ["-e", "console.log('artifact isolation')"] },
+  });
+  assert.equal(run.working_tree_dirty, false);
+  writeFileSync(join(f.dir, "source-change.mjs"), "export const changed = true;\n");
+  assert.throws(() => captureEvidenceRun({
+    repoRoot: f.dir,
+    artifactRoot: f.root,
+    runId: "source-mutation-must-fail",
+    command: "synthetic source dirtiness",
+    actor: "verify-session",
+    role: "acceptance",
+    exec: { file: process.execPath, args: ["-e", "console.log('must not run')"] },
+  }), /提交被测源码/u);
 });
 for (const role of ["repair", "acceptance"]) test(`G01 ${role} rerun invalidates old green before evidence publication fails`, () => {
   const f = mcdFixture(); json(f.ledgerPath, f.ledger);
