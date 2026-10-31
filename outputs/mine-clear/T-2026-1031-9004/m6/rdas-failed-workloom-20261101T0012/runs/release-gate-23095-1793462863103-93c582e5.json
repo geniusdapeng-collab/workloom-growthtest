@@ -1,0 +1,44 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "release-gate-23095-1793462863103-93c582e5",
+  "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"release:gate\"",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "release:gate"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "release-gate",
+    "commandName": "release:gate",
+    "kind": "release-gate",
+    "environmentKind": "local-preview",
+    "executorCommit": "4db9db470c73f9687d14f018350c24bb6c0e400d"
+  },
+  "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T16:07:41.073Z",
+  "finished_at": "2026-10-31T16:07:43.103Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "execution/release-gate-23095-1793462863103-93c582e5.log",
+      "sha256": "0cdca85030ff1ae369380b5174a1c43258321c10dda8ec91d5639a0958e4039c",
+      "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d"
+    },
+    {
+      "path": "execution/release-gate-23095-1793462863103-93c582e5-command.json",
+      "sha256": "882d813e6188751ad53c51225ddfe54705dc4a1b7f004eef6ca3f8cf515809a6",
+      "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d"
+    }
+  ]
+}

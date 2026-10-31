@@ -1,0 +1,4535 @@
+{
+ "summary": {
+  "generatedAt": "2026-10-31T16:07:45.627Z",
+  "spec": "docs/REAL-DEVICE-ACCEPTANCE-SPEC.md@rdas/v1",
+  "primaryBundle": "geo-growth",
+  "bundles": [
+   "hotel",
+   "ai-video",
+   "geo-growth"
+  ],
+  "compositionSource": "compose-api",
+  "compositionWarnings": [],
+  "workspaceId": "ws-geo",
+  "profileWarnings": [],
+  "runtimeConnected": true,
+  "runtimeError": null,
+  "counts": {
+   "agents": 82,
+   "agentsPass": 82,
+   "skills": 95,
+   "skillsPass": 95,
+   "warnings": 10,
+   "fenceRulesMerged": 121,
+   "fenceRulesActiveInWorkspace": 121,
+   "shadowedPresets": 4,
+   "perBundle": {
+    "geo-growth": 26,
+    "hotel": 16,
+    "ai-video": 40
+   }
+  },
+  "capabilityLayer": {
+   "status": "not-run",
+   "reason": "L8 能力层需要真实模型 + 专业场景评分卡；本脚本只覆盖 L0 契约层与 L1 运行层。"
+  },
+  "failures": {
+   "agents": [],
+   "skills": []
+  },
+  "warnings": {
+   "agents": [],
+   "skills": [
+    {
+     "skill": "ai-live-assistant",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "content-marketing",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "fast-scan",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "inspection-suite",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "ota-operations",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "overbooking-parity-guard",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "pricing-matrix",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "review-asset-mining",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "safety-compliance",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    },
+    {
+     "skill": "staff-scheduler",
+     "warnings": [
+      "装备库预留：当前组合编制内没有岗位引用它"
+     ]
+    }
+   ]
+  }
+ },
+ "rows": [
+  {
+   "skill": "bgm-audio-layering",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-BGM0",
+    "G-BGM2",
+    "G-BGM3",
+    "G-BGM4"
+   ],
+   "doc_declared_fences": [
+    "G-BGM0",
+    "G-BGM2",
+    "G-BGM3",
+    "G-BGM4"
+   ],
+   "referenced_by": [
+    "bgm-composer"
+   ],
+   "body_chars": 1049,
+   "description_chars": 129,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 129 字 / 正文 1049 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-BGM0,G-BGM2,G-BGM3,G-BGM4；显式声明=G-BGM0,G-BGM2,G-BGM3,G-BGM4；正文提及=G-BGM0,G-BGM2,G-BGM3,G-BGM4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-bgm-audio-layering level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-BGM0,G-BGM2,G-BGM3,G-BGM4 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：bgm-composer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "bgm-delivery-spec",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-BGM0",
+    "G-BGM1",
+    "G-BGM2",
+    "G-BGM3",
+    "G-BGM4",
+    "G-BGM5"
+   ],
+   "doc_declared_fences": [
+    "G-BGM0",
+    "G-BGM1",
+    "G-BGM2",
+    "G-BGM3",
+    "G-BGM4",
+    "G-BGM5",
+    "G-BGM8",
+    "G-BGM9"
+   ],
+   "referenced_by": [
+    "bgm-composer"
+   ],
+   "body_chars": 906,
+   "description_chars": 148,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 148 字 / 正文 906 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-BGM0,G-BGM1,G-BGM2,G-BGM3,G-BGM4,G-BGM5；显式声明=G-BGM0,G-BGM1,G-BGM2,G-BGM3,G-BGM4,G-BGM5；正文提及=G-BGM0,G-BGM1,G-BGM2,G-BGM3,G-BGM4,G-BGM5,G-BGM8,G-BGM9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-bgm-delivery-spec level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-BGM0,G-BGM1,G-BGM2,G-BGM3,G-BGM4,G-BGM5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：bgm-composer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "bgm-library-license",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-BGM1",
+    "G-BGM5"
+   ],
+   "doc_declared_fences": [
+    "G-BGM1",
+    "G-BGM5",
+    "G-BGM6",
+    "G-BGM7",
+    "G-BGM8",
+    "G-BGM9"
+   ],
+   "referenced_by": [
+    "bgm-composer"
+   ],
+   "body_chars": 5611,
+   "description_chars": 154,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 154 字 / 正文 5611 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-BGM1,G-BGM5；显式声明=G-BGM1,G-BGM5；正文提及=G-BGM1,G-BGM5,G-BGM6,G-BGM7,G-BGM8,G-BGM9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-bgm-library-license level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-BGM1,G-BGM5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：bgm-composer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "bgm-score-design",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-BGM0",
+    "G-BGM1",
+    "G-BGM3",
+    "G-BGM5"
+   ],
+   "doc_declared_fences": [
+    "G-BGM0",
+    "G-BGM5"
+   ],
+   "referenced_by": [
+    "bgm-composer"
+   ],
+   "body_chars": 5227,
+   "description_chars": 170,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 170 字 / 正文 5227 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-BGM0,G-BGM1,G-BGM3,G-BGM5；显式声明=G-BGM0,G-BGM5；正文提及=G-BGM0,G-BGM5"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-bgm-score-design level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-BGM0,G-BGM1,G-BGM3,G-BGM5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：bgm-composer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "bgm-vocal-separation",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-BGM0",
+    "G-BGM3"
+   ],
+   "doc_declared_fences": [
+    "G-BGM0",
+    "G-BGM3",
+    "GUI"
+   ],
+   "referenced_by": [
+    "bgm-composer"
+   ],
+   "body_chars": 2778,
+   "description_chars": 168,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 168 字 / 正文 2778 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-BGM0,G-BGM3；显式声明=G-BGM0,G-BGM3；正文提及=G-BGM0,G-BGM3,GUI"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-bgm-vocal-separation level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-BGM0,G-BGM3 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：bgm-composer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "caption-burnin-ops",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-SUB0",
+    "G-SUB2",
+    "G-SUB3",
+    "G-SUB6"
+   ],
+   "doc_declared_fences": [
+    "G-SUB0",
+    "G-SUB2",
+    "G-SUB3",
+    "G-SUB6"
+   ],
+   "referenced_by": [
+    "subtitle-stylist"
+   ],
+   "body_chars": 1921,
+   "description_chars": 140,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 140 字 / 正文 1921 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-SUB0,G-SUB2,G-SUB3,G-SUB6；显式声明=G-SUB0,G-SUB2,G-SUB3,G-SUB6；正文提及=G-SUB0,G-SUB2,G-SUB3,G-SUB6"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-caption-burnin-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-SUB0,G-SUB2,G-SUB3,G-SUB6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：subtitle-stylist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "cinematography-kb",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-KB0",
+    "G-KB4"
+   ],
+   "referenced_by": [
+    "cinematographer"
+   ],
+   "body_chars": 2900,
+   "description_chars": 167,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 167 字 / 正文 2900 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-KB0,G-KB4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-cinematography-kb level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：cinematographer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "color-delivery-spec",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-COL0",
+    "G-COL1",
+    "G-COL2",
+    "G-COL3",
+    "G-COL4"
+   ],
+   "referenced_by": [
+    "colorist"
+   ],
+   "body_chars": 768,
+   "description_chars": 138,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 138 字 / 正文 768 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-COL0,G-COL1,G-COL2,G-COL3,G-COL4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-color-delivery-spec level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：colorist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "color-grade",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-COL0",
+    "G-COL1",
+    "G-COL2",
+    "G-COL3",
+    "G-COL4"
+   ],
+   "referenced_by": [
+    "colorist"
+   ],
+   "body_chars": 1690,
+   "description_chars": 139,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 139 字 / 正文 1690 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-COL0,G-COL1,G-COL2,G-COL3,G-COL4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-color-grade level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：colorist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "color-look-design",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-COL0",
+    "G-COL4"
+   ],
+   "referenced_by": [
+    "colorist"
+   ],
+   "body_chars": 4097,
+   "description_chars": 164,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 164 字 / 正文 4097 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-COL0,G-COL4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-color-look-design level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：colorist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "color-shot-matching",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-COL0",
+    "G-COL4"
+   ],
+   "referenced_by": [
+    "colorist"
+   ],
+   "body_chars": 741,
+   "description_chars": 129,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 129 字 / 正文 741 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-COL0,G-COL4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-color-shot-matching level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：colorist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "comment-ops",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G10a",
+    "G10b",
+    "G10c",
+    "G10d"
+   ],
+   "doc_declared_fences": [
+    "G10"
+   ],
+   "referenced_by": [
+    "comment-operator"
+   ],
+   "body_chars": 1380,
+   "description_chars": 164,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 164 字 / 正文 1380 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G10a,G10b,G10c,G10d；显式声明=G10；正文提及=G10"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-comment-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G10a,G10b,G10c,G10d / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：comment-operator"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "cover-design",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-MAT1",
+    "G-SUB3"
+   ],
+   "referenced_by": [
+    "cover-designer"
+   ],
+   "body_chars": 730,
+   "description_chars": 138,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 138 字 / 正文 730 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-MAT1,G-SUB3"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-cover-design level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：cover-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "cover-kb",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-MAT1",
+    "G-SUB2",
+    "G-SUB3"
+   ],
+   "referenced_by": [
+    "cover-designer"
+   ],
+   "body_chars": 3516,
+   "description_chars": 155,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 155 字 / 正文 3516 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-MAT1,G-SUB2,G-SUB3"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-cover-kb level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：cover-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "delivery-package-ops",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-DLV0",
+    "G-DLV9"
+   ],
+   "referenced_by": [
+    "cover-designer",
+    "post-editor"
+   ],
+   "body_chars": 4828,
+   "description_chars": 179,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 179 字 / 正文 4828 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-DLV0,G-DLV9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-delivery-package-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：cover-designer,post-editor"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "delivery-revision-ops",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-DLV4",
+    "G-DLV5",
+    "G-DLV7",
+    "G8"
+   ],
+   "referenced_by": [
+    "post-editor"
+   ],
+   "body_chars": 4553,
+   "description_chars": 197,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 197 字 / 正文 4553 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-DLV4,G-DLV5,G-DLV7,G8"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-delivery-revision-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：post-editor"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "director-review",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G6"
+   ],
+   "doc_declared_fences": [
+    "G6",
+    "G7",
+    "G8",
+    "G9"
+   ],
+   "referenced_by": [
+    "continuity-reviewer",
+    "explainer-director"
+   ],
+   "body_chars": 3111,
+   "description_chars": 186,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 186 字 / 正文 3111 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G6；显式声明=G6；正文提及=G6,G7,G8,G9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-director-review level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：continuity-reviewer,explainer-director"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "font-license-compliance",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-SUB1",
+    "G-SUB5"
+   ],
+   "doc_declared_fences": [
+    "G-SUB1",
+    "G-SUB5"
+   ],
+   "referenced_by": [
+    "subtitle-stylist"
+   ],
+   "body_chars": 2376,
+   "description_chars": 159,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 159 字 / 正文 2376 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-SUB1,G-SUB5；显式声明=G-SUB1,G-SUB5；正文提及=G-SUB1,G-SUB5"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-font-license-compliance level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-SUB1,G-SUB5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：subtitle-stylist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "font-selection",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-SUB0",
+    "G-SUB1",
+    "G-SUB3",
+    "G-SUB5"
+   ],
+   "doc_declared_fences": [
+    "G-SUB0",
+    "G-SUB1",
+    "G-SUB3",
+    "G-SUB5"
+   ],
+   "referenced_by": [
+    "cover-designer",
+    "subtitle-stylist"
+   ],
+   "body_chars": 2523,
+   "description_chars": 150,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 150 字 / 正文 2523 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-SUB0,G-SUB1,G-SUB3,G-SUB5；显式声明=G-SUB0,G-SUB1,G-SUB3,G-SUB5；正文提及=G-SUB0,G-SUB1,G-SUB3,G-SUB5"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-font-selection level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-SUB0,G-SUB1,G-SUB3,G-SUB5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：cover-designer,subtitle-stylist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "jenny-loom-research",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G1"
+   ],
+   "doc_declared_fences": [
+    "G1"
+   ],
+   "referenced_by": [
+    "intel-binder",
+    "intel-collector",
+    "intel-competitor",
+    "intel-reviewer",
+    "intel-verifier",
+    "trend-researcher"
+   ],
+   "body_chars": 3227,
+   "description_chars": 186,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 186 字 / 正文 3227 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G1；显式声明=G1；正文提及=G1"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-jenny-loom-research level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G1 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 6 个岗位引用：intel-binder,intel-collector,intel-competitor,intel-reviewer,intel-verifier,trend-researcher"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "marketing-brief-parser",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G2"
+   ],
+   "doc_declared_fences": [
+    "G1",
+    "G2",
+    "G8"
+   ],
+   "referenced_by": [
+    "creative-planner"
+   ],
+   "body_chars": 2943,
+   "description_chars": 185,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 185 字 / 正文 2943 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G2；显式声明=G2；正文提及=G1,G2,G8"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-marketing-brief-parser level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：creative-planner"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "opening-hook-craft",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G6",
+    "G7"
+   ],
+   "referenced_by": [
+    "hook-designer"
+   ],
+   "body_chars": 5163,
+   "description_chars": 206,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 206 字 / 正文 5163 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G6,G7"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-opening-hook-craft level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：hook-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "portrait-studio",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G5"
+   ],
+   "doc_declared_fences": [
+    "G5"
+   ],
+   "referenced_by": [
+    "portrait-artist"
+   ],
+   "body_chars": 2522,
+   "description_chars": 215,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 215 字 / 正文 2522 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G5；显式声明=G5；正文提及=G5"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-portrait-studio level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：portrait-artist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "post-quality-inspection",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-DLV1",
+    "G-DLV7",
+    "G-DLV8"
+   ],
+   "referenced_by": [
+    "post-editor",
+    "post-quality-inspector"
+   ],
+   "body_chars": 1726,
+   "description_chars": 149,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 149 字 / 正文 1726 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-DLV1,G-DLV7,G-DLV8"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-post-quality-inspection level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：post-editor,post-quality-inspector"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "producer-gate-review",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G1",
+    "G2",
+    "G3",
+    "G4",
+    "G5",
+    "G6",
+    "G7"
+   ],
+   "referenced_by": [
+    "producer"
+   ],
+   "body_chars": 3286,
+   "description_chars": 83,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 83 字 / 正文 3286 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G1,G2,G3,G4,G5,G6,G7"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-producer-gate-review level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：producer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "publish-ops",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G9",
+    "G9a"
+   ],
+   "doc_declared_fences": [
+    "G16",
+    "G9",
+    "G9a",
+    "G9b"
+   ],
+   "referenced_by": [
+    "distribution-operator"
+   ],
+   "body_chars": 1970,
+   "description_chars": 72,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 72 字 / 正文 1970 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G9,G9a；显式声明=无；正文提及=G16,G9,G9a,G9b"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-publish-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G9,G9a / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：distribution-operator"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "render-ops",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G8"
+   ],
+   "doc_declared_fences": [
+    "G-MAT1",
+    "G11",
+    "G5",
+    "G8"
+   ],
+   "referenced_by": [
+    "render-operator"
+   ],
+   "body_chars": 1950,
+   "description_chars": 167,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 167 字 / 正文 1950 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G8；显式声明=G8；正文提及=G-MAT1,G11,G5,G8"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-render-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G8 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：render-operator"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "shot-prompt-craft",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G6"
+   ],
+   "doc_declared_fences": [
+    "G6"
+   ],
+   "referenced_by": [
+    "director",
+    "field-inspector",
+    "prompt-fuser",
+    "visual-director",
+    "explainer-director"
+   ],
+   "body_chars": 5843,
+   "description_chars": 211,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 211 字 / 正文 5843 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G6；显式声明=G6；正文提及=G6"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-shot-prompt-craft level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 5 个岗位引用：director,field-inspector,prompt-fuser,visual-director,explainer-director"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "subtitle-delivery-spec",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-SUB0",
+    "G-SUB1",
+    "G-SUB2",
+    "G-SUB3",
+    "G-SUB4",
+    "G-SUB5",
+    "G-SUB6"
+   ],
+   "doc_declared_fences": [
+    "G-SUB0",
+    "G-SUB1",
+    "G-SUB2",
+    "G-SUB3",
+    "G-SUB4",
+    "G-SUB5",
+    "G-SUB6"
+   ],
+   "referenced_by": [
+    "subtitle-stylist"
+   ],
+   "body_chars": 1089,
+   "description_chars": 115,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 115 字 / 正文 1089 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-SUB0,G-SUB1,G-SUB2,G-SUB3,G-SUB4,G-SUB5,G-SUB6；显式声明=G-SUB0,G-SUB6；正文提及=G-SUB0,G-SUB1,G-SUB2,G-SUB3,G-SUB4,G-SUB5,G-SUB6"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-subtitle-delivery-spec level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-SUB0,G-SUB1,G-SUB2,G-SUB3,G-SUB4,G-SUB5,G-SUB6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：subtitle-stylist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "subtitle-layout-design",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-SUB0",
+    "G-SUB3",
+    "G-SUB6"
+   ],
+   "doc_declared_fences": [
+    "G-SUB0",
+    "G-SUB3"
+   ],
+   "referenced_by": [
+    "cover-designer",
+    "subtitle-stylist",
+    "explainer-director"
+   ],
+   "body_chars": 1913,
+   "description_chars": 115,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 115 字 / 正文 1913 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-SUB0,G-SUB3,G-SUB6；显式声明=G-SUB0,G-SUB3；正文提及=G-SUB0,G-SUB3"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-subtitle-layout-design level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-SUB0,G-SUB3,G-SUB6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 3 个岗位引用：cover-designer,subtitle-stylist,explainer-director"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "talkcraft-ops",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-",
+    "G-DLV1",
+    "G-MAT1",
+    "G0",
+    "GRANT"
+   ],
+   "referenced_by": [
+    "explainer-director"
+   ],
+   "body_chars": 3725,
+   "description_chars": 149,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 149 字 / 正文 3725 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-,G-DLV1,G-MAT1,G0,GRANT"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-talkcraft-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：explainer-director"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "voice-clone-consent",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-VOICE1",
+    "G-VOICE5",
+    "G-VOICE6"
+   ],
+   "doc_declared_fences": [
+    "G-"
+   ],
+   "referenced_by": [
+    "voice-artist"
+   ],
+   "body_chars": 2879,
+   "description_chars": 146,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 146 字 / 正文 2879 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-VOICE1,G-VOICE5,G-VOICE6；显式声明=G-VOIC；正文提及=G-"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-voice-clone-consent level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-VOICE1,G-VOICE5,G-VOICE6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：voice-artist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "voice-delivery-spec",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-VOICE0",
+    "G-VOICE1",
+    "G-VOICE2",
+    "G-VOICE3",
+    "G-VOICE4",
+    "G-VOICE5",
+    "G-VOICE6"
+   ],
+   "doc_declared_fences": [
+    "G-"
+   ],
+   "referenced_by": [
+    "voice-artist"
+   ],
+   "body_chars": 909,
+   "description_chars": 118,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 118 字 / 正文 909 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-VOICE0,G-VOICE1,G-VOICE2,G-VOICE3,G-VOICE4,G-VOICE5,G-VOICE6；显式声明=G-VOIC；正文提及=G-"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-voice-delivery-spec level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-VOICE0,G-VOICE1,G-VOICE2,G-VOICE3,G-VOICE4,G-VOICE5,G-VOICE6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：voice-artist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "voice-dubbing-sync",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-VOICE2",
+    "G-VOICE3",
+    "G-VOICE4"
+   ],
+   "doc_declared_fences": [
+    "G-"
+   ],
+   "referenced_by": [
+    "voice-artist"
+   ],
+   "body_chars": 1972,
+   "description_chars": 169,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 169 字 / 正文 1972 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-VOICE2,G-VOICE3,G-VOICE4；显式声明=G-VOIC；正文提及=G-"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-voice-dubbing-sync level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-VOICE2,G-VOICE3,G-VOICE4 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：voice-artist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "voice-profile-craft",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-VOICE0",
+    "G-VOICE1",
+    "G-VOICE2",
+    "G-VOICE5",
+    "G-VOICE6"
+   ],
+   "doc_declared_fences": [
+    "G-",
+    "GPT"
+   ],
+   "referenced_by": [
+    "voice-artist"
+   ],
+   "body_chars": 2430,
+   "description_chars": 193,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 193 字 / 正文 2430 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-VOICE0,G-VOICE1,G-VOICE2,G-VOICE5,G-VOICE6；显式声明=G-VOIC；正文提及=G-,GPT"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-voice-profile-craft level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-VOICE0,G-VOICE1,G-VOICE2,G-VOICE5,G-VOICE6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：voice-artist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "voice-reference-craft",
+   "bundle": "ai-video",
+   "version": "1.0.0",
+   "fences": [
+    "G-VOICE0",
+    "G-VOICE1",
+    "G-VOICE5"
+   ],
+   "doc_declared_fences": [
+    "G-"
+   ],
+   "referenced_by": [
+    "voice-artist"
+   ],
+   "body_chars": 1584,
+   "description_chars": 145,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 145 字 / 正文 1584 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=ai-video / 注册表包=ai-video"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-VOICE0,G-VOICE1,G-VOICE5；显式声明=G-VOIC；正文提及=G-"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-voice-reference-craft level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-VOICE0,G-VOICE1,G-VOICE5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：voice-artist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "ai-answer-rewrite",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GEO1",
+    "G-GEO2"
+   ],
+   "doc_declared_fences": [
+    "G-GEO1",
+    "G-GEO2",
+    "G20",
+    "GEO"
+   ],
+   "referenced_by": [
+    "geo-content-planner"
+   ],
+   "body_chars": 1540,
+   "description_chars": 129,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 129 字 / 正文 1540 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GEO1,G-GEO2；显式声明=G-GEO1,G-GEO2；正文提及=G-GEO1,G-GEO2,G20,GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-ai-answer-rewrite level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GEO1,G-GEO2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：geo-content-planner"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "art-direction",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-VIS1"
+   ],
+   "referenced_by": [
+    "visual-designer",
+    "material-scout"
+   ],
+   "body_chars": 1912,
+   "description_chars": 74,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 74 字 / 正文 1912 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-VIS1"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-art-direction level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：visual-designer,material-scout"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "asset-variant-forge",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-VIS3"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1538,
+   "description_chars": 70,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 70 字 / 正文 1538 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-VIS3"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-asset-variant-forge level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "brand-guard",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-VIS1",
+    "G-VIS2",
+    "G-VIS5"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1735,
+   "description_chars": 58,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 58 字 / 正文 1735 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-VIS1,G-VIS2,G-VIS5"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-brand-guard level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "budget-portfolio",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW1"
+   ],
+   "doc_declared_fences": [
+    "G-GROW1",
+    "G18"
+   ],
+   "referenced_by": [
+    "growth-lead",
+    "media-portfolio-manager"
+   ],
+   "body_chars": 1450,
+   "description_chars": 97,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 97 字 / 正文 1450 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW1；显式声明=G-GROW1；正文提及=G-GROW1,G18"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-budget-portfolio level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW1 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：growth-lead,media-portfolio-manager"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "citation-reverse",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-GEO3",
+    "GEO"
+   ],
+   "referenced_by": [
+    "citation-analyst"
+   ],
+   "body_chars": 1451,
+   "description_chars": 113,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 113 字 / 正文 1451 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-GEO3,GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-citation-reverse level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：citation-analyst"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "compositor-designer",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-GEO1",
+    "G-VIS0",
+    "G-VIS1",
+    "G-VIS2",
+    "G-VIS3",
+    "G-VIS4",
+    "G-VIS5",
+    "G-VIS6",
+    "G9",
+    "GEO"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 3744,
+   "description_chars": 91,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 91 字 / 正文 3744 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-GEO1,G-VIS0,G-VIS1,G-VIS2,G-VIS3,G-VIS4,G-VIS5,G-VIS6,G9,GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-compositor-designer level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "cro-playbook",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW2"
+   ],
+   "doc_declared_fences": [
+    "G-GEO2",
+    "G-GROW2"
+   ],
+   "referenced_by": [
+    "lead-conversion-officer",
+    "cro-designer",
+    "live-producer"
+   ],
+   "body_chars": 1375,
+   "description_chars": 113,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 113 字 / 正文 1375 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW2；显式声明=G-GROW2；正文提及=G-GEO2,G-GROW2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-cro-playbook level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 3 个岗位引用：lead-conversion-officer,cro-designer,live-producer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "design-brief",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1914,
+   "description_chars": 63,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 63 字 / 正文 1914 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-design-brief level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "design-critique",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 2547,
+   "description_chars": 71,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 71 字 / 正文 2547 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-design-critique level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "dual-entry-inquiry",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-GROW6",
+    "GEO"
+   ],
+   "referenced_by": [
+    "review-analyst",
+    "private-domain-operator"
+   ],
+   "body_chars": 1550,
+   "description_chars": 115,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 115 字 / 正文 1550 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-GROW6,GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-dual-entry-inquiry level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：review-analyst,private-domain-operator"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "entity-consistency-check",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GEO2"
+   ],
+   "doc_declared_fences": [
+    "G-GEO2",
+    "GEO"
+   ],
+   "referenced_by": [
+    "entity-inspector"
+   ],
+   "body_chars": 1416,
+   "description_chars": 109,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 109 字 / 正文 1416 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GEO2；显式声明=G-GEO2；正文提及=G-GEO2,GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-entity-consistency-check level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GEO2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：entity-inspector"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "experiment-design",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW3",
+    "G-GROW4"
+   ],
+   "doc_declared_fences": [
+    "G-GROW2",
+    "G-GROW3",
+    "G-GROW4"
+   ],
+   "referenced_by": [
+    "growth-strategist",
+    "growth-experimenter"
+   ],
+   "body_chars": 1516,
+   "description_chars": 117,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 117 字 / 正文 1516 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW3,G-GROW4；显式声明=G-GROW3,G-GROW4；正文提及=G-GROW2,G-GROW3,G-GROW4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-experiment-design level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW3,G-GROW4 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：growth-strategist,growth-experimenter"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "geo-answer-card",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-GEO1",
+    "G-GEO2",
+    "G-VIS2",
+    "GEO"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1497,
+   "description_chars": 60,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 60 字 / 正文 1497 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-GEO1,G-GEO2,G-VIS2,GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-geo-answer-card level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "geo-query-craft",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "GEO"
+   ],
+   "referenced_by": [
+    "geo-researcher"
+   ],
+   "body_chars": 1619,
+   "description_chars": 133,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 133 字 / 正文 1619 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-geo-query-craft level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：geo-researcher"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "growth-partnership",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW8",
+    "G-GROW2"
+   ],
+   "doc_declared_fences": [
+    "G-GROW2",
+    "G-GROW8",
+    "G15"
+   ],
+   "referenced_by": [
+    "growth-partnership-officer"
+   ],
+   "body_chars": 1432,
+   "description_chars": 103,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 103 字 / 正文 1432 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW8,G-GROW2；显式声明=无；正文提及=G-GROW2,G-GROW8,G15"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-growth-partnership level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW8,G-GROW2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：growth-partnership-officer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "growth-review",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [
+    "growth-lead",
+    "growth-strategist"
+   ],
+   "body_chars": 1433,
+   "description_chars": 89,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 89 字 / 正文 1433 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-growth-review level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：growth-lead,growth-strategist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "image-retouch",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-VIS1"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1598,
+   "description_chars": 65,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 65 字 / 正文 1598 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-VIS1"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-image-retouch level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "incrementality-measurement",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW6"
+   ],
+   "doc_declared_fences": [
+    "G-GROW6"
+   ],
+   "referenced_by": [
+    "growth-experimenter",
+    "media-portfolio-manager"
+   ],
+   "body_chars": 1367,
+   "description_chars": 99,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 99 字 / 正文 1367 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW6；显式声明=G-GROW6；正文提及=G-GROW6"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-incrementality-measurement level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：growth-experimenter,media-portfolio-manager"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "lead-scoring",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW6"
+   ],
+   "doc_declared_fences": [
+    "G-GROW6"
+   ],
+   "referenced_by": [
+    "lead-conversion-officer",
+    "cro-designer",
+    "lifecycle-growth-officer"
+   ],
+   "body_chars": 1449,
+   "description_chars": 92,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 92 字 / 正文 1449 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW6；显式声明=无；正文提及=G-GROW6"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-lead-scoring level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 3 个岗位引用：lead-conversion-officer,cro-designer,lifecycle-growth-officer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "lifecycle-growth",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW7",
+    "G-GROW2"
+   ],
+   "doc_declared_fences": [
+    "G-GROW1",
+    "G-GROW2",
+    "G-GROW5",
+    "G-GROW6",
+    "G-GROW7"
+   ],
+   "referenced_by": [
+    "lifecycle-growth-officer"
+   ],
+   "body_chars": 1543,
+   "description_chars": 108,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 108 字 / 正文 1543 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW7,G-GROW2；显式声明=无；正文提及=G-GROW1,G-GROW2,G-GROW5,G-GROW6,G-GROW7"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-lifecycle-growth level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW7,G-GROW2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：lifecycle-growth-officer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "live-commerce",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [
+    "G-GROW2",
+    "G-GROW4"
+   ],
+   "doc_declared_fences": [
+    "G-GROW2",
+    "G-GROW4",
+    "G12",
+    "G9",
+    "GMV"
+   ],
+   "referenced_by": [
+    "live-producer"
+   ],
+   "body_chars": 1418,
+   "description_chars": 103,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 103 字 / 正文 1418 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=G-GROW2,G-GROW4；显式声明=G-GROW2,G-GROW4；正文提及=G-GROW2,G-GROW4,G12,G9,GMV"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-live-commerce level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=G-GROW2,G-GROW4 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：live-producer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "material-scout",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [
+    "visual-designer",
+    "material-scout"
+   ],
+   "body_chars": 2588,
+   "description_chars": 63,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 63 字 / 正文 2588 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-material-scout level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：visual-designer,material-scout"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "moments-post",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-VIS1",
+    "G-VIS2"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1527,
+   "description_chars": 63,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 63 字 / 正文 1527 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-VIS1,G-VIS2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-moments-post level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "poster-series",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1346,
+   "description_chars": 50,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 50 字 / 正文 1346 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-poster-series level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "product-poster",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-GEO1",
+    "G-VIS0",
+    "G-VIS1",
+    "G-VIS2",
+    "G-VIS4",
+    "G9"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 2001,
+   "description_chars": 85,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 85 字 / 正文 2001 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-GEO1,G-VIS0,G-VIS1,G-VIS2,G-VIS4,G9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-product-poster level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "promo-banner",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-VIS1",
+    "G-VIS2"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1498,
+   "description_chars": 60,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 60 字 / 正文 1498 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-VIS1,G-VIS2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-promo-banner level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "video-cover",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-SUB5",
+    "G-VIS2"
+   ],
+   "referenced_by": [
+    "visual-designer"
+   ],
+   "body_chars": 1630,
+   "description_chars": 62,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 62 字 / 正文 1630 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-SUB5,G-VIS2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-video-cover level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visual-designer"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "visibility-monitor",
+   "bundle": "geo-growth",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [
+    "visibility-watcher"
+   ],
+   "body_chars": 1490,
+   "description_chars": 126,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 126 字 / 正文 1490 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=geo-growth / 注册表包=geo-growth"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-visibility-monitor level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：visibility-watcher"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "ai-live-assistant",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R15",
+    "R2"
+   ],
+   "doc_declared_fences": [
+    "R15",
+    "R2"
+   ],
+   "referenced_by": [],
+   "body_chars": 666,
+   "description_chars": 118,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 118 字 / 正文 666 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R15,R2；显式声明=无；正文提及=R15,R2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-ai-live-assistant level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R15,R2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "channel-reconciler",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R4",
+    "R5"
+   ],
+   "doc_declared_fences": [
+    "G8",
+    "R4",
+    "R5"
+   ],
+   "referenced_by": [
+    "reconcile-agent"
+   ],
+   "body_chars": 730,
+   "description_chars": 125,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 125 字 / 正文 730 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R4,R5；显式声明=无；正文提及=G8,R4,R5"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-channel-reconciler level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R4,R5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：reconcile-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "checkin-checkout",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R4",
+    "R14"
+   ],
+   "doc_declared_fences": [
+    "R14",
+    "R4"
+   ],
+   "referenced_by": [
+    "frontdesk-agent"
+   ],
+   "body_chars": 812,
+   "description_chars": 125,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 125 字 / 正文 812 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R4,R14；显式声明=无；正文提及=R14,R4"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-checkin-checkout level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R4,R14 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：frontdesk-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "content-marketing",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R3",
+    "R15"
+   ],
+   "doc_declared_fences": [
+    "R15",
+    "R3"
+   ],
+   "referenced_by": [],
+   "body_chars": 704,
+   "description_chars": 118,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 118 字 / 正文 704 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R3,R15；显式声明=无；正文提及=R15,R3"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-content-marketing level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R3,R15 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "coupon-ops",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R22",
+    "R26"
+   ],
+   "doc_declared_fences": [
+    "R22",
+    "R25",
+    "R26"
+   ],
+   "referenced_by": [
+    "coupon-operator"
+   ],
+   "body_chars": 1041,
+   "description_chars": 52,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 52 字 / 正文 1041 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R22,R26；显式声明=无；正文提及=R22,R25,R26"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-coupon-ops level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R22,R26 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：coupon-operator"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "customer-service",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R13"
+   ],
+   "doc_declared_fences": [
+    "R13",
+    "R9"
+   ],
+   "referenced_by": [
+    "frontdesk-agent",
+    "phone-agent"
+   ],
+   "body_chars": 1065,
+   "description_chars": 135,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 135 字 / 正文 1065 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R13；显式声明=无；正文提及=R13,R9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-customer-service level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R13 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：frontdesk-agent,phone-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "fast-scan",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G-GEO",
+    "G10",
+    "G16",
+    "G9",
+    "GEO",
+    "R1",
+    "R17",
+    "R18",
+    "R19",
+    "R2",
+    "R24",
+    "R5",
+    "R6"
+   ],
+   "referenced_by": [],
+   "body_chars": 5290,
+   "description_chars": 264,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 264 字 / 正文 5290 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G-GEO,G10,G16,G9,GEO,R1,R17,R18,R19,R2,R24,R5,R6"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-fast-scan level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "finance-reporting",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [
+    "owner-cockpit"
+   ],
+   "body_chars": 632,
+   "description_chars": 116,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 116 字 / 正文 632 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-finance-reporting level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：owner-cockpit"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "guest-profile-crm",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "R23",
+    "R24",
+    "R9"
+   ],
+   "referenced_by": [
+    "guest-success"
+   ],
+   "body_chars": 636,
+   "description_chars": 112,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 112 字 / 正文 636 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=R23,R24,R9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-guest-profile-crm level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：guest-success"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "handover-manager",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "R14"
+   ],
+   "referenced_by": [
+    "frontdesk-agent"
+   ],
+   "body_chars": 566,
+   "description_chars": 100,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 100 字 / 正文 566 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=R14"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-handover-manager level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：frontdesk-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "hotel-geo-content",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R25"
+   ],
+   "doc_declared_fences": [
+    "GEO",
+    "R25"
+   ],
+   "referenced_by": [
+    "channel-watcher"
+   ],
+   "body_chars": 1188,
+   "description_chars": 73,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 73 字 / 正文 1188 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R25；显式声明=无；正文提及=GEO,R25"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-hotel-geo-content level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R25 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：channel-watcher"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "incident-postmortem",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R10"
+   ],
+   "doc_declared_fences": [
+    "R10"
+   ],
+   "referenced_by": [
+    "owner-cockpit"
+   ],
+   "body_chars": 1282,
+   "description_chars": 149,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 149 字 / 正文 1282 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R10；显式声明=无；正文提及=R10"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-incident-postmortem level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R10 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：owner-cockpit"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "inspection-suite",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "G8",
+    "R10"
+   ],
+   "referenced_by": [],
+   "body_chars": 695,
+   "description_chars": 138,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 138 字 / 正文 695 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=G8,R10"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-inspection-suite level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "intent-radar",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "GEO"
+   ],
+   "referenced_by": [
+    "channel-watcher"
+   ],
+   "body_chars": 1153,
+   "description_chars": 60,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 60 字 / 正文 1153 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=GEO"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-intent-radar level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：channel-watcher"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "inventory-procurement",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R11"
+   ],
+   "doc_declared_fences": [
+    "R11",
+    "R20"
+   ],
+   "referenced_by": [
+    "housekeeper-agent"
+   ],
+   "body_chars": 1145,
+   "description_chars": 155,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 155 字 / 正文 1145 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R11；显式声明=无；正文提及=R11,R20"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-inventory-procurement level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R11 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：housekeeper-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "lead-concierge",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R21",
+    "R23",
+    "R24",
+    "R25"
+   ],
+   "doc_declared_fences": [
+    "GEO",
+    "R21",
+    "R23",
+    "R24",
+    "R25",
+    "R9"
+   ],
+   "referenced_by": [
+    "ai-receptionist"
+   ],
+   "body_chars": 1152,
+   "description_chars": 67,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 67 字 / 正文 1152 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R21,R23,R24,R25；显式声明=无；正文提及=GEO,R21,R23,R24,R25,R9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-lead-concierge level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R21,R23,R24,R25 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：ai-receptionist"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "maintenance-dispatch",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "R10"
+   ],
+   "referenced_by": [
+    "housekeeper-agent"
+   ],
+   "body_chars": 648,
+   "description_chars": 117,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 117 字 / 正文 648 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=R10"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-maintenance-dispatch level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：housekeeper-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "morning-briefing",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "R16"
+   ],
+   "referenced_by": [
+    "owner-cockpit",
+    "company-ceo"
+   ],
+   "body_chars": 661,
+   "description_chars": 123,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 123 字 / 正文 661 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=R16"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-morning-briefing level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 2 个岗位引用：owner-cockpit,company-ceo"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "night-audit-suite",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R5"
+   ],
+   "doc_declared_fences": [
+    "R5"
+   ],
+   "referenced_by": [
+    "frontdesk-agent"
+   ],
+   "body_chars": 870,
+   "description_chars": 118,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 118 字 / 正文 870 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R5；显式声明=无；正文提及=R5"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-night-audit-suite level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R5 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：frontdesk-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "ota-operations",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [
+    "R1",
+    "R2"
+   ],
+   "referenced_by": [],
+   "body_chars": 599,
+   "description_chars": 127,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 127 字 / 正文 599 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=R1,R2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-ota-operations level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "overbooking-parity-guard",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R17",
+    "R18",
+    "R2"
+   ],
+   "doc_declared_fences": [
+    "R17",
+    "R18",
+    "R2"
+   ],
+   "referenced_by": [],
+   "body_chars": 1085,
+   "description_chars": 147,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 147 字 / 正文 1085 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R17,R18,R2；显式声明=无；正文提及=R17,R18,R2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-overbooking-parity-guard level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R17,R18,R2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "phone-concierge",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R9",
+    "R13"
+   ],
+   "doc_declared_fences": [
+    "R13",
+    "R9"
+   ],
+   "referenced_by": [
+    "phone-agent"
+   ],
+   "body_chars": 1118,
+   "description_chars": 173,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 173 字 / 正文 1118 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R9,R13；显式声明=无；正文提及=R13,R9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-phone-concierge level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R9,R13 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：phone-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "pricing-matrix",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R1",
+    "R2"
+   ],
+   "doc_declared_fences": [
+    "R1",
+    "R2"
+   ],
+   "referenced_by": [],
+   "body_chars": 711,
+   "description_chars": 124,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 124 字 / 正文 711 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R1,R2；显式声明=R1,R2；正文提及=R1,R2"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-pricing-matrix level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R1,R2 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "retention-manager",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R9"
+   ],
+   "doc_declared_fences": [
+    "R9"
+   ],
+   "referenced_by": [
+    "guest-success"
+   ],
+   "body_chars": 674,
+   "description_chars": 108,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 108 字 / 正文 674 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R9；显式声明=无；正文提及=R9"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-retention-manager level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R9 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：guest-success"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "revenue-manager",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R1",
+    "R2",
+    "R7",
+    "R8"
+   ],
+   "doc_declared_fences": [
+    "R1",
+    "R2",
+    "R7",
+    "R8"
+   ],
+   "referenced_by": [
+    "pricing-agent"
+   ],
+   "body_chars": 1173,
+   "description_chars": 154,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 154 字 / 正文 1173 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R1,R2,R7,R8；显式声明=R1,R2,R7,R8；正文提及=R1,R2,R7,R8"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-revenue-manager level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R1,R2,R7,R8 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：pricing-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "review-asset-mining",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [],
+   "doc_declared_fences": [],
+   "referenced_by": [],
+   "body_chars": 633,
+   "description_chars": 98,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 98 字 / 正文 633 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=无；显式声明=无；正文提及=无"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-review-asset-mining level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=无 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "review-crisis",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R6"
+   ],
+   "doc_declared_fences": [
+    "R10",
+    "R6"
+   ],
+   "referenced_by": [
+    "review-agent"
+   ],
+   "body_chars": 939,
+   "description_chars": 125,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 125 字 / 正文 939 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R6；显式声明=R6；正文提及=R10,R6"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-review-crisis level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R6 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：review-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "room-service-dispatch",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R14"
+   ],
+   "doc_declared_fences": [
+    "R14"
+   ],
+   "referenced_by": [
+    "housekeeper-agent"
+   ],
+   "body_chars": 645,
+   "description_chars": 107,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 107 字 / 正文 645 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R14；显式声明=无；正文提及=R14"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-room-service-dispatch level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R14 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "被 1 个岗位引用：housekeeper-agent"
+    }
+   },
+   "failures": [],
+   "warnings": [],
+   "status": "pass"
+  },
+  {
+   "skill": "safety-compliance",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R10"
+   ],
+   "doc_declared_fences": [
+    "R10"
+   ],
+   "referenced_by": [],
+   "body_chars": 518,
+   "description_chars": 114,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 114 字 / 正文 518 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R10；显式声明=无；正文提及=R10"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-safety-compliance level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R10 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  },
+  {
+   "skill": "staff-scheduler",
+   "bundle": "hotel",
+   "version": "1.0.0",
+   "fences": [
+    "R12"
+   ],
+   "doc_declared_fences": [
+    "R12"
+   ],
+   "referenced_by": [],
+   "body_chars": 586,
+   "description_chars": 110,
+   "checks": {
+    "SA1_doc": {
+     "ok": true,
+     "detail": "description 110 字 / 正文 586 字"
+    },
+    "SA2_bundle": {
+     "ok": true,
+     "detail": "目录包=hotel / 注册表包=hotel"
+    },
+    "SA3_fences": {
+     "ok": true,
+     "detail": "绑定=R12；显式声明=无；正文提及=R12"
+    },
+    "SA4_registry": {
+     "ok": true,
+     "detail": "注册表 id=skill-staff-scheduler level=official version=1.0.0"
+    },
+    "SA5_install": {
+     "ok": true,
+     "detail": "安装快照=R12 / 版本 1.0.0（与注册表一致）"
+    },
+    "SA6_referenced": {
+     "ok": true,
+     "detail": "未被本组合编制引用（已记警告）"
+    }
+   },
+   "failures": [],
+   "warnings": [
+    "装备库预留：当前组合编制内没有岗位引用它"
+   ],
+   "status": "pass"
+  }
+ ]
+}

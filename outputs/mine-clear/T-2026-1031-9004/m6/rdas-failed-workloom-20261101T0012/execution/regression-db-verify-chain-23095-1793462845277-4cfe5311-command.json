@@ -1,0 +1,16 @@
+{
+  "schema": "workloom.command-observation/v1",
+  "name": "db:verify-chain",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "db:verify-chain"
+    ]
+  },
+  "exit_code": 0,
+  "process_exit_code": 0,
+  "signal": null,
+  "started_at": "2026-10-31T16:07:24.859Z",
+  "finished_at": "2026-10-31T16:07:25.277Z"
+}

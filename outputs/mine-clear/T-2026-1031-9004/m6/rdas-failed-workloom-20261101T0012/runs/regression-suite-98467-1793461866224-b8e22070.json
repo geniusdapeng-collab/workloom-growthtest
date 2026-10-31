@@ -1,0 +1,44 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "regression-suite-98467-1793461866224-b8e22070",
+  "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"suite\"",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "suite"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "regression-suite",
+    "commandName": "suite",
+    "kind": "regression",
+    "environmentKind": "local-preview",
+    "executorCommit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+  },
+  "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:50:55.346Z",
+  "finished_at": "2026-10-31T15:51:06.224Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "execution/regression-suite-98467-1793461866224-b8e22070.log",
+      "sha256": "6d5ba0cee5fab11ccf80cb3d2b56faa9df8afb1328d3fbeb41e49bfd8d2fde65",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "execution/regression-suite-98467-1793461866224-b8e22070-command.json",
+      "sha256": "a25b645a83c753e87ec6a84895070c077b2217e043a892409b9681f9a45a1da8",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    }
+  ]
+}

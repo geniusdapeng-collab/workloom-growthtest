@@ -1,0 +1,99 @@
+{
+ "repo": "workloom-growthtest-stress-9004",
+ "repoDir": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+ "startedAt": "2026-10-31T16:07:06.835Z",
+ "steps": {
+  "environment": {
+   "ok": true,
+   "status": "pass",
+   "detail": "local-preview"
+  },
+  "prepare": {
+   "ok": true,
+   "status": "pass",
+   "detail": "HEAD@4db9db470c73f9687d14f018350c24bb6c0e400d"
+  },
+  "install": {
+   "ok": true,
+   "status": "pass",
+   "detail": "显式不安装；已检查 tsx 存在"
+  },
+  "env": {
+   "ok": true,
+   "status": "pass",
+   "detail": ".env 已存在，补齐 DATABASE_URL#db/DATABASE_APP_URL#db/DATABASE_GATEWAY_URL#db"
+  },
+  "seed": {
+   "ok": true,
+   "status": "pass",
+   "detail": "db:seed + db:seed:video + db:seed:geo + db:seed:acq"
+  },
+  "regression": {
+   "ok": false,
+   "status": "fail",
+   "detail": "汇总执行失败：不能混写不同提交的 evidence-index"
+  },
+  "preview": {
+   "ok": true,
+   "status": "pass",
+   "detail": "4/4 端口就绪"
+  },
+  "profile": {
+   "ok": true,
+   "status": "pass",
+   "detail": "本仓已有 profile"
+  },
+  "releaseGate": {
+   "ok": false,
+   "status": "fail",
+   "detail": "失败：不能混写不同提交的 evidence-index"
+  },
+  "matrix": {
+   "ok": false,
+   "status": "fail",
+   "detail": "不能混写不同提交的 evidence-index"
+  },
+  "ui": {
+   "ok": false,
+   "status": "unverified",
+   "detail": "本次执行开始，旧通过状态已失效"
+  }
+ },
+ "ok": false,
+ "status": "fail",
+ "notes": [
+  "按 --target-commit 固定被测源码：4db9db470c73f9687d14f018350c24bb6c0e400d",
+  ".env 已补齐弱项：DATABASE_URL#db/DATABASE_APP_URL#db/DATABASE_GATEWAY_URL#db",
+  "跳过 db:seed:aipm（本仓不含 bundles/ai-pm）"
+ ],
+ "environment": {
+  "kind": "local-preview",
+  "production": false,
+  "allowWrites": false,
+  "urls": {
+   "pc": "http://localhost:3000",
+   "bMobile": "http://localhost:3001",
+   "cMobile": "http://localhost:3002",
+   "api": "http://127.0.0.1:8787"
+  }
+ },
+ "revision": {
+  "branch": "HEAD",
+  "head": "4db9db470c73f9687d14f018350c24bb6c0e400d"
+ },
+ "executor": {
+  "root": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004",
+  "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d",
+  "dirty": false
+ },
+ "regression": {
+  "suite": "失败：不能混写不同提交的 evidence-index",
+  "suite:hotel": "失败：不能混写不同提交的 evidence-index",
+  "suite:geo": "失败：不能混写不同提交的 evidence-index",
+  "db:verify-chain": "失败：不能混写不同提交的 evidence-index",
+  "typecheck": "失败：不能混写不同提交的 evidence-index",
+  "release:gate": "失败：不能混写不同提交的 evidence-index"
+ },
+ "regressionError": "不能混写不同提交的 evidence-index",
+ "previewLog": "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance/preview.log"
+}

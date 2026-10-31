@@ -1,0 +1,54 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "autonomy-98467-1793461891337-c0007026",
+  "command": "\"/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/autonomy.mjs\" \"--out\" \"outputs/acceptance/autonomy\" \"--env\" \"local-preview\" \"--profile\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json\" \"--evidence-root\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance\"",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/autonomy.mjs",
+      "--out",
+      "outputs/acceptance/autonomy",
+      "--env",
+      "local-preview",
+      "--profile",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json",
+      "--evidence-root",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "autonomy",
+    "environmentKind": "local-preview",
+    "executorCommit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+  },
+  "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:51:31.260Z",
+  "finished_at": "2026-10-31T15:51:31.337Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "execution/autonomy-98467-1793461891337-c0007026.log",
+      "sha256": "e9190426665dfa42d5068b57e9b096628a0238aaf7b013fac9160bf12b547a1d",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "autonomy/autonomy-report.json",
+      "sha256": "7f7669257b4acab9a5836d9b51be2c1d65b91361a266fc80453ff953ce957dbe",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "autonomy/autonomy-report.md",
+      "sha256": "735567254a17bda07ce2864a81b4e537179fc986674327c90ce70c550abab56e",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    }
+  ]
+}

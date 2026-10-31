@@ -1,0 +1,51 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "coverage-98467-1793461891576-e6dd75bd",
+  "command": "\"/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/coverage.mjs\" \"--root\" \"outputs/acceptance\" \"--out\" \"outputs/acceptance/coverage.json\" \"--env\" \"local-preview\" \"--profile\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json\" \"--evidence-root\" \"/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance\"",
+  "exec": {
+    "file": "/Users/mac/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node",
+    "args": [
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/scripts/acceptance/coverage.mjs",
+      "--root",
+      "outputs/acceptance",
+      "--out",
+      "outputs/acceptance/coverage.json",
+      "--env",
+      "local-preview",
+      "--profile",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/acceptance/profile.local-preview.json",
+      "--evidence-root",
+      "/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/acceptance"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "coverage",
+    "environmentKind": "local-preview",
+    "executorCommit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+  },
+  "commit": "1577a8fb454c4e9c8adba7878d29080b60880990",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T15:51:31.408Z",
+  "finished_at": "2026-10-31T15:51:31.576Z",
+  "exit_code": 2,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "fail",
+  "outputs": [
+    {
+      "path": "execution/coverage-98467-1793461891576-e6dd75bd.log",
+      "sha256": "10c1fabc910e306d743d78426ee145b5bbd4a52752bdfe095edb14654b71a68f",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    },
+    {
+      "path": "coverage.json",
+      "sha256": "d770c84a356ee233a58719fc94d7af82c923fe964f2e2b029dae17c0fc74f302",
+      "commit": "1577a8fb454c4e9c8adba7878d29080b60880990"
+    }
+  ]
+}

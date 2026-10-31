@@ -1,0 +1,16 @@
+{
+  "schema": "workloom.command-observation/v1",
+  "name": "release:gate",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "release:gate"
+    ]
+  },
+  "exit_code": 0,
+  "process_exit_code": 0,
+  "signal": null,
+  "started_at": "2026-10-31T15:51:27.022Z",
+  "finished_at": "2026-10-31T15:51:28.541Z"
+}

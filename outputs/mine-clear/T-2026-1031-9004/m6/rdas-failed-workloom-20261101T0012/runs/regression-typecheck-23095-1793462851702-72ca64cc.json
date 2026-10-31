@@ -1,0 +1,44 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "regression-typecheck-23095-1793462851702-72ca64cc",
+  "command": "\"pnpm\" \"--config.verify-deps-before-run=false\" \"typecheck\"",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "--config.verify-deps-before-run=false",
+      "typecheck"
+    ]
+  },
+  "actor": "acceptance:fleet",
+  "role": "automation",
+  "subject": {
+    "step": "regression-typecheck",
+    "commandName": "typecheck",
+    "kind": "regression",
+    "environmentKind": "local-preview",
+    "executorCommit": "4db9db470c73f9687d14f018350c24bb6c0e400d"
+  },
+  "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d",
+  "working_tree_dirty": false,
+  "started_at": "2026-10-31T16:07:25.322Z",
+  "finished_at": "2026-10-31T16:07:31.702Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "execution/regression-typecheck-23095-1793462851702-72ca64cc.log",
+      "sha256": "2beca6955b59dfb5496bf2f4efd96a5ed7740fa2bc531f7c4f00794c457a42a1",
+      "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d"
+    },
+    {
+      "path": "execution/regression-typecheck-23095-1793462851702-72ca64cc-command.json",
+      "sha256": "443b359a72d3135a8f50605406a0f1fa41289d9b1e2cc455d4eb558ad038aeab",
+      "commit": "4db9db470c73f9687d14f018350c24bb6c0e400d"
+    }
+  ]
+}
