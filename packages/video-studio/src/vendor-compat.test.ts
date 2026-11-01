@@ -551,6 +551,24 @@ console.log("RESULT " + JSON.stringify({
     })).toEqual([]);
   });
 
+  it("叙事角色推断识别厨师等职业主体，避免双人作业片被误判为空镜", () => {
+    expect(inferNarrativeCharacters({
+      intent: "两位厨师连续配合，一人拉面、一人看火并递碗，最后同时把两碗面放到窗口。允许简短对白。",
+      discovery: {
+        sceneStructure: {
+          opening: { purpose: "两位厨师在面馆后厨连续配合" },
+          scenes: [{ purpose: "一人拉面，另一人看火并递碗" }],
+        },
+      },
+    })).toEqual([
+      expect.objectContaining({
+        name: "厨师",
+        role: "protagonist",
+        description: expect.stringContaining("两位"),
+      }),
+    ]);
+  });
+
   it("叙事确认单归一：时间不越过总时长、场景计数含开场结尾、动作短语可执行", () => {
     const discovery: Record<string, unknown> = {
       sceneStructure: {

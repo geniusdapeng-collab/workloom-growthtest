@@ -1043,6 +1043,7 @@ const NARRATIVE_ROLE_TERMS: Array<{
   { pattern: /女主/u, name: "女主", role: "protagonist" },
   { pattern: /男主/u, name: "男主", role: "protagonist" },
   { pattern: /妻子|丈夫/u, name: "伴侣", role: "supporting" },
+  { pattern: /两位厨师|两名厨师|两个厨师|面馆师傅|厨师/u, name: "厨师", role: "protagonist" },
   { pattern: /店员|客服/u, name: "店员", role: "supporting" },
   { pattern: /顾客|消费者/u, name: "顾客", role: "supporting" },
   { pattern: /学生|白领|上班族|通勤族/u, name: "年轻职场人", role: "protagonist" },
@@ -1153,6 +1154,8 @@ export function inferNarrativeCharacters(input: {
       : [];
     const description = animal
       ? `${physicalAnchors.join("；")}；跨镜锁定同一品种、体型、毛色、湿度和面部特征；肖像登记仅适用于平台授权动物素材，不得替换物种`
+      : entry.name === "厨师"
+        ? `${/(?:两位|两名|两个).{0,3}厨师/u.test(sceneText) ? "同场两位厨师" : "厨师主体"}；分别锁定发型、脸型、身高、服装颜色与岗位分工，不得合并成同一个人或增减人数`
       : entry.name === "默认模特角色" || usesDefaultModel
         ? "使用仓库内置默认模特；出镜前仍需按当前角色档案绑定真实图像与授权范围"
         : "叙事片明确人物；出镜前需绑定角色档案与授权范围";
