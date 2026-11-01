@@ -1362,6 +1362,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/涟漪.*(?:方向|频率)|风.*涟漪|无风自动|波纹.*重复/u.test(text)) {
       return "把风源与水面运动绑定：芦苇摆动方向决定涟漪扩散方向，每段只允许一个持续风源；目标帧核对涟漪频率、方向与芦苇摆动一致，无风段落必须保持静水，失败只重做该段。";
     }
+    if (/芦苇|杆状|前景.*(?:抖动|分叉|数量跳变)/u.test(text)) {
+      return "把芦苇拆成独立的实拍前景层，固定杆数、间距、朝向和焦点；生成层只负责远山、雾和水面，合成前逐帧核对杆体无抖动、分叉或增殖，异常只重做前景层。";
+    }
     if (/划痕|积尘|指纹|磨白|发黄|塑料|颗粒|灰尘|微质感|磨砂|裂纹|磨痕|材质|纹理|道具/u.test(text)) {
       return "把微质感锚点拆成固定机位微距短镜头，单镜不超过2秒，锁定同一参考帧、侧向硬光和非重复磨损路径；不在运动长镜中生成精细纹理。";
     }
@@ -1599,7 +1602,7 @@ export function normalizeNarrativeRequirementMarkdown(
     intent: String(upstream?._originalStoryText ?? ""),
     discovery,
     upstream,
-  });
+  }).filter((item) => !["薄雾", "远山", "水面", "涟漪"].includes(item));
   if (props.length > 0) {
     normalized = normalized.replace(
       /- \*\*道具\*\*（\d+）：[^\n]*/u,
@@ -1699,6 +1702,7 @@ export function normalizeNarrativeDiscovery(
       .replace(/^(?:如果删掉|删掉这)[^：。；]*[：。；]?/gu, "")
       .replace(/^故事会失去[^：。；]*[：。；]?/gu, "")
       .replace(/删掉这(?:镜|场)[^：；，。]*[：；]?/gu, "")
+      .replace(/^(?:若|如果|假如)[，,：:\s]+/u, "")
       .replace(/^[\s，,；;。]+/gu, "")
       .replace(/^(?:全片|整个片子)[^。]*[。]?/gu, "")
       .replace(/观众[^。；]*[。；]?/gu, "")
