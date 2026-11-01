@@ -4067,6 +4067,8 @@ export function applyNarrativeFinalPromptContract(
     resolution?: string;
     colorTemperature?: string;
     isLastShot?: boolean;
+    characterNames?: string[];
+    noTitles?: boolean;
   },
 ): FusionRecord {
   const next: FusionRecord = {
@@ -4081,7 +4083,11 @@ export function applyNarrativeFinalPromptContract(
     .replace(/清晨的清晨/gu, "清晨")
     .replace(/清�晰/gu, "清晰")
     .replace(/�/gu, "")
-    .replace(/\bCG\b/giu, "计算机生成");
+    .replace(/\bCG\b/giu, "计算机生成")
+    .replace(/\bcinematic\b/giu, "电影感")
+    .replace(/\bphotorealistic\b/giu, "写实摄影")
+    .replace(/Camera增强/gu, "运镜增强")
+    .replace(/Mood增强/gu, "情绪增强");
   const escapeLabel = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const replaceField = (label: string, value: string): void => {
     const line = /^\s*\d+\.【[^】]+】/u;
@@ -4105,6 +4111,11 @@ export function applyNarrativeFinalPromptContract(
   if (options.chineseOnly) {
     replaceField("语言约束", "全部字段必须使用中文；画幅、分辨率、帧率、编码、时间码与格式名等制作标记可作为受控例外；不输出英文叙事标签、英文风格词或英文负面词。");
   }
+  if (options.noTitles) {
+    for (const label of ["主标题内容", "副标题内容", "标题动画设计", "标题字体设计", "开场音频设计"]) {
+      replaceField(label, "不适用：成片无文字、无字幕、无标题卡。");
+    }
+  }
   prompt = prompt.replace(
     /(【台词】)([\s\S]*?)(?=\s*\|\s*【|$)/gu,
     (_all, label: string, body: string) => `${label}${body.replace(/\|/gu, "，")}`,
@@ -4115,6 +4126,12 @@ export function applyNarrativeFinalPromptContract(
     next.dialogueBlocks = [];
     (next.fields as FusionRecord).dialogue = "";
     replaceField("台词", "不适用：本片无台词、无旁白、无口播。");
+  }
+  const characterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
+  if (!options.noCharacters && characterNames.length > 0) {
+    replaceField("角色", `${characterNames.join("、")}；保持当前授权角色档案、同一发型脸型、身高体型与服装，动作以本镜动作字段为准，不套用无关人物模板。`);
+    replaceField("微动作", "微动作只服务于本镜动作与情绪：手部、呼吸、视线和重心做小幅连续变化，不使用固定微笑、张开双臂或其他无关模板。");
+    replaceField("角色一致性", `所有镜头分别绑定 ${characterNames.join("、")} 的当前外观与服装锚点；不得合并、替换或增减人物。`);
   }
   if (options.noCharacters) {
     prompt = prompt
@@ -4189,7 +4206,11 @@ export function applyNarrativeFinalPromptContract(
   }
   prompt = prompt
     .split("\n")
-    .map((line) => line.replace(/\s*\|\s*【音频纪律】[\s\S]*$/u, "").trimEnd())
+    .map((line) => line
+      .replace(/\s*\|\s*(?:【音频纪律】|\[CINEMATIC_SKILL\])[\s\S]*$/u, "")
+      .replace(/\b(?:no non-diegetic music|no background music|no bgm|no soundtrack|no music score|no musical bed)\b/giu, "")
+      .replace(/[ \t]{2,}/gu, " ")
+      .trimEnd())
     .filter((line, index, lines) => line.length > 0 || index < lines.length - 1)
     .join("\n");
   const renumber = (value: string): string => {
@@ -4477,6 +4498,12 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         );
         const promptResolution = String(policyPositioning.resolution ?? (promptAspect === "9:16" ? "1080x1920" : ""));
         const promptColorTemperature = colorTemperatureFromText(JSON.stringify(policyPrd.visualSpecification)) ?? undefined;
+        const promptCharacters = Array.isArray(recordValue(policyPrd.characterSystem).characters)
+          ? (recordValue(policyPrd.characterSystem).characters as unknown[]).map(recordValue)
+            .map((item) => String(item.name ?? "").trim()).filter(Boolean)
+          : [];
+        const promptSubtitles = recordValue(recordValue(policyPrd.deliveryStandard).subtitles);
+        const promptNoTitles = promptSubtitles.mode === "none" || /(?:无字幕|无文字)/u.test(promptPolicyText);
         const promptLimit = Number(
           (vendorRequire(resolvePath(
             repoRoot,
@@ -4496,6 +4523,8 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             resolution: promptResolution,
             colorTemperature: promptColorTemperature,
             isLastShot: shotIndex === allShots.length - 1,
+            characterNames: promptCharacters,
+            noTitles: promptNoTitles,
           }));
         const outputIds = new Set<string>();
         for (const row of updated) {

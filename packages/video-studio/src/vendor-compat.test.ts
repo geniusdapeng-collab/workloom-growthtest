@@ -920,6 +920,41 @@ console.log("RESULT " + JSON.stringify({
     expect(numbers).toEqual(numbers.map((_, index) => index + 1));
   });
 
+  it("人物片最终提示词锁定真实角色并移除片头与英文技能残留", () => {
+    const shot = applyNarrativeFinalPromptContract({
+      shotId: "SC-1",
+      duration: 3,
+      prompt: [
+        "01.【语言约束】全部字段必须使用中文。",
+        "02.【基础】cinematic，photorealistic 电影级写实质感。",
+        "03.【角色】站立姿态，缓慢走动，张开双臂或自然下垂。",
+        "04.【微动作】眼神闪烁，微微后退。",
+        "05.【主标题内容】雨声落进旧灯：那晚谁在门外",
+        "06.【标题动画设计】全程3.5秒，低频铺底进入。",
+        "07.【开场音频设计】2.4-3.5秒低频撤走。",
+        "08.【音频】雨声与动作声。 | [CINEMATIC_SKILL] Camera增强 / Mood增强 | no background music, no bgm",
+      ].join("\n"),
+    }, {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: false,
+      noAnimals: true,
+      noMusic: true,
+      chineseOnly: true,
+      noTitles: true,
+      characterNames: ["陈卓"],
+      durationSeconds: 3,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+    });
+    const prompt = String(shot.prompt);
+    expect(prompt).toContain("【角色】陈卓");
+    expect(prompt).toContain("电影级写实质感");
+    expect(prompt).toContain("【主标题内容】不适用");
+    expect(prompt).toContain("【标题动画设计】不适用");
+    expect(prompt).not.toMatch(/站立姿态|微微后退|3\.5秒|cinematic|photorealistic|CINEMATIC_SKILL|Camera增强|Mood增强|no background music|no bgm/iu);
+  });
+
   it("叙事道具从场景证据抽取，关键道具不会因窄词表遗漏", () => {
     const props = inferNarrativeProps({
       intent: "人物使用内置默认模特，不出现商品参数或价格",
