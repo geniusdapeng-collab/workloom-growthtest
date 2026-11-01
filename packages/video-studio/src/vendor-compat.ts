@@ -1323,6 +1323,8 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     "雨珠", "伞骨", "液体", "水珠", "湿发", "发丝", "面部",
     "划痕", "积尘", "材质", "纹理", "手指", "开关", "穿模",
     "台灯", "道具", "身份", "模特", "定妆", "角色",
+    "爪心", "猫爪", "指甲", "肉垫", "爪尖", "溅花", "水花", "缩爪",
+    "尾巴", "尾尖", "盘成", "蜷缩", "收束", "箱内",
   ];
   const featureGroups = [
     ["雨珠", "雨具", "雨伞", "伞骨", "雨丝"],
@@ -1331,6 +1333,8 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     ["指纹", "磨白", "发黄", "塑料", "颗粒", "灰尘", "微质感", "磨砂", "材质", "纹理"],
     ["低照度", "曝光", "色温", "光比", "胶片颗粒"],
     ["身份", "面部", "模特", "定妆照", "角色一致"],
+    ["爪心", "猫爪", "爪尖", "指甲", "肉垫", "溅花", "水花", "缩爪"],
+    ["尾巴", "尾尖", "盘成", "蜷缩", "收束", "箱内"],
   ];
   const generic = /(?:预留重试|准备备选|待针对|补齐缓解|降低复杂度|保持视觉一致|提升质量)/u;
   const fallback = (text: string): string => {
@@ -1339,6 +1343,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     }
     if (/钨丝|灯丝|暗转亮|由暗到亮|起亮/u.test(text)) {
       return "把钨丝起亮拆成暗态静帧、微亮插入、暖光稳定三个短镜，锁定灯丝形状与亮度曲线；连续光色变化交由后期曲线控制，不用单镜猜测。";
+    }
+    if (/尾巴|尾尖|盘成|蜷缩|收束/u.test(text)) {
+      return "把结尾收束拆为低头、尾尖扫入遮鼻、固定中近景三个短镜；用箱沿前景遮挡尾部与身体连接处，锁定同一机型与光位，尾尖稳定贴合鼻头后再进入下一阶段。";
     }
     if (/手部|手指|指腹|指尖|关节|穿模|开关|旋钮/u.test(text)) {
       return "将手部动作拆成固定机位的短特写，分别拍悬停、局部接触和离开；用遮挡与剪辑规避完整手指接触，并为每镜锁定同一参考帧。";
@@ -1358,6 +1365,16 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     return "将风险镜头拆为更短的单动作镜头，锁定首帧、角色、道具与光位；每镜生成前复核参考帧，失败时改用已批准素材，不做规则兜底。";
   };
   const specificMitigations = mitigations.filter((item) => !generic.test(item));
+  const tokens = (value: string): Set<string> => {
+    const out = new Set<string>();
+    const normalized = value.replace(/[^\p{Script=Han}A-Za-z0-9]+/gu, " ").replace(/\s+/gu, " ").trim();
+    for (const chunk of normalized.split(" ")) {
+      for (const size of [2, 3, 4]) {
+        for (let index = 0; index <= chunk.length - size; index += 1) out.add(chunk.slice(index, index + size));
+      }
+    }
+    return out;
+  };
   return risks.map((risk) => {
     const text = `${String(risk.risk ?? "")} ${String(risk.impact ?? "")}`;
     if (/钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(text)
@@ -1366,6 +1383,7 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     }
     let best = "";
     let bestScore = 0;
+    const riskTokens = tokens(text);
     for (const mitigation of specificMitigations) {
       const score = groups.reduce((sum, group) =>
         sum + (group.pattern.test(text) && group.pattern.test(mitigation) ? group.weight : 0), 0);
@@ -1373,9 +1391,12 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
         sum + (text.includes(feature) && mitigation.includes(feature) ? 20 : 0), 0);
       const aliasScore = featureGroups.reduce((sum, group) =>
         sum + (group.some((feature) => text.includes(feature)) && group.some((feature) => mitigation.includes(feature)) ? 20 : 0), 0);
-      if (score + featureScore + aliasScore > bestScore) {
+      const mitigationTokens = tokens(mitigation);
+      const lexicalScore = [...riskTokens].reduce((sum, token) =>
+        sum + (mitigationTokens.has(token) ? (token.length === 4 ? 8 : token.length === 3 ? 5 : 2) : 0), 0);
+      if (score + featureScore + aliasScore + lexicalScore > bestScore) {
         best = mitigation;
-        bestScore = score + featureScore + aliasScore;
+        bestScore = score + featureScore + aliasScore + lexicalScore;
       }
     }
     return bestScore >= 15 && best ? best : fallback(text);
@@ -1460,6 +1481,7 @@ export function normalizeNarrativeRequirementMarkdown(
       ...elements,
       String(upstream.special_notes ?? ""),
       String(upstream.visual_style ?? ""),
+      JSON.stringify(recordValue(discovery.audienceProfile)),
     ].join(" ");
     const pick = (pattern: RegExp): string => context.match(pattern)?.[0] ?? "";
     const durationText = Number(node.duration) > 0 ? `${Number(node.duration)}秒` : "";
@@ -1467,7 +1489,10 @@ export function normalizeNarrativeRequirementMarkdown(
     const space = elements[0] ?? pick(/(?:纸箱里|纸箱内|屋檐下|窗边|门口|室内|街口|河边|树林里|桌面上)/u);
     const lighting = pick(/(?:单一暖黄钨丝光|暖黄钨丝光|逆光|侧光|顶光|环境光|暖光|冷光|月光|自然光)/u);
     const camera = pick(/(?:低机位|高机位|平视|俯拍|仰拍|近景|中景|广角|特写|微距)/u);
-    return `${label}：目的=${purpose}${durationText ? `；时长=${durationText}` : ""}${time ? `；时间=${time}` : ""}${space ? `；空间=${space}` : ""}${lighting ? `；光位=${lighting}` : ""}${camera ? `；机位=${camera}` : ""}；关键元素=${elements.length > 0 ? elements.join("、") : "未提取"}`;
+    const endingStill = label === "结尾" && /(?:半秒|0\.5秒)[^。；\n]{0,12}(?:静止|空镜)|(?:静止|空镜)[^。；\n]{0,12}(?:半秒|0\.5秒)/u.test(context)
+      ? "；片尾静止=0.5秒"
+      : "";
+    return `${label}：目的=${purpose}${durationText ? `；时长=${durationText}` : ""}${time ? `；时间=${time}` : ""}${space ? `；空间=${space}` : ""}${lighting ? `；光位=${lighting}` : ""}${camera ? `；机位=${camera}` : ""}${endingStill}；关键元素=${elements.length > 0 ? elements.join("、") : "未提取"}`;
   };
   const scenePurposes = [
     scene.opening && typeof scene.opening === "object"
@@ -1494,11 +1519,15 @@ export function normalizeNarrativeRequirementMarkdown(
     discovery,
     upstream,
   });
+  const animalOnly = inferredRoles.length > 0 && inferredRoles.every((role) => ["猫", "狗", "鸟"].includes(role.name));
   if (inferredRoles.length > 0) {
     normalized = normalized.replace(
       /- \*\*角色\*\*（\d+）：[^\n]*/u,
       `- **角色**（${inferredRoles.length}）：${inferredRoles.map((role) => `${role.name}（${role.description}）`).join("；")}`,
     );
+    if (animalOnly) {
+      normalized = normalized.replace(/人物动作/gu, "主体动作");
+    }
   }
   const risk = discovery?.riskAssessment && typeof discovery.riskAssessment === "object"
     ? discovery.riskAssessment as Record<string, unknown>
@@ -1512,6 +1541,12 @@ export function normalizeNarrativeRequirementMarkdown(
       `风险${index + 1}（${item.level === "high" ? "高" : item.level === "medium" ? "中" : "低"}）：${String(item.risk ?? "")}；缓解：${pairedMitigations[index] ?? "见技术难点正文"}`).join("；")}`
     : "";
   if (riskText) normalized = normalized.replace(/- \*\*风险结论\*\*：[^\n]*/u, `- **风险结论**：${riskText}`);
+  if (risks.length > 0 && pairedMitigations.length > 0) {
+    normalized = normalized.replace(
+      /\*\*缓解建议\*\*[\s\S]*?(?=\n---|\n###|\n## |\n- \*\*|$)/u,
+      `**缓解建议**\n${pairedMitigations.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n`,
+    );
+  }
   const props = inferNarrativeProps({
     intent: String(upstream?._originalStoryText ?? ""),
     discovery,
@@ -1541,6 +1576,17 @@ export function normalizeNarrativeRequirementMarkdown(
     /\*\*缓解建议\*\*\s*(?=\n+(?:###|---|$))/u,
     "**缓解建议**：见“风险结论”中的逐项具体缓解。\n",
   );
+  const anchorDefinitions = String(upstream.special_notes ?? "")
+    .match(/[①②③④⑤⑥⑦⑧⑨⑩]\s*[^；;\n]+/gu)
+    ?.map((item) => item.trim())
+    .filter(Boolean) ?? [];
+  if (anchorDefinitions.length > 0 && !normalized.includes("视觉锚点定义")) {
+    normalized = `${normalized.trimEnd()}\n\n### 视觉锚点定义\n${anchorDefinitions.map((item) => `- ${item}`).join("\n")}\n`;
+  }
+  normalized = normalized.replace(
+    /(##\s*三、最终业务需求确认)/u,
+    "> 设备型号、光照参数与实拍可行性未在本轮核实；相关摄影参数仅为创作参考，正式执行以结构化镜头合同为准。\n\n$1",
+  );
   const dialogue = String(upstream?.dialogue_requirement ?? "").trim();
   if (dialogue && !normalized.includes("- **台词/字幕口径**")) {
     normalized = normalized.replace(
@@ -1550,7 +1596,7 @@ export function normalizeNarrativeRequirementMarkdown(
   }
   if (narrativeSpeechPolicy(dialogue).allSpeechForbidden) {
     normalized = normalized
-      .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, "仅保留人物动作与画外环境声。")
+      .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
       .replace(/[^。；\n]{0,24}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’][。；]?/gu, "以动作与环境声完成回应。")
       .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。")
       .replace(/^.*(?:关键台词|片内台词)[^\n]*$/gmu, (line) => {

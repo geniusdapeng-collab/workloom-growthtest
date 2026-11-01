@@ -941,6 +941,22 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[1]).toContain("暗态");
   });
 
+  it("爪心空接与结尾收束风险按语义配对，不串用缓解", () => {
+    const pairs = pairRiskMitigations({
+      technicalRisks: [
+        { risk: "橘猫爪心空接雨滴并溅起水花，指甲和肉垫容易穿模", level: "high" },
+        { risk: "橘猫缩回箱内盘成一团，尾巴穿模且尾尖无法贴合鼻头", level: "high" },
+      ],
+      mitigationSuggestions: [
+        "把爪心空接、溅花和缩爪拆成三个微距镜头，真实水花用高速实拍插入",
+        "把结尾收束拆成低头、尾尖扫入遮鼻、固定中近景静止三镜",
+      ],
+    });
+    expect(pairs[0]).toContain("爪心空接");
+    expect(pairs[0]).not.toContain("结尾收束");
+    expect(pairs[1]).toContain("结尾收束");
+  });
+
   it("无台词口径与场景动作冲突时，保留旁白的画外属性并移除口型台词", () => {
     const discovery = {
       sceneStructure: {
@@ -1063,6 +1079,7 @@ console.log("RESULT " + JSON.stringify({
         contentExpectations: [
           "无需字幕与六个连续动作完成完整情绪弧",
           "有一句关键台词，例如“它没接到那滴水，就把整个雨夜圈进了尾巴里”",
+          "结尾留半秒静止空镜",
         ],
       },
       sceneStructure: {
@@ -1131,6 +1148,9 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).not.toContain("预留重试时间");
     expect(markdown).not.toContain("准备备选方案");
     expect(markdown).toContain(`${actions.length}个连续动作`);
+    expect(markdown).toContain("主体动作与画外环境声");
+    expect(markdown).toContain("### 视觉锚点定义");
+    expect(markdown).toContain("片尾静止=0.5秒");
   });
 
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
