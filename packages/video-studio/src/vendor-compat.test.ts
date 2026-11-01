@@ -815,7 +815,7 @@ console.log("RESULT " + JSON.stringify({
     expect(shot.dialogue).toBe("");
     expect(shot.dialogueText).toBe("");
     expect(shot.dialogueBlocks).toEqual([]);
-    expect(String(shot.prompt)).not.toContain("【台词】");
+    expect(String(shot.prompt)).toContain("【台词】不适用：本片无台词、无旁白、无口播。");
     expect(String(shot.prompt)).not.toContain("你还在啊");
     expect(String(shot.prompt).length).toBeLessThanOrEqual(3000);
     expect(String(shot.prompt)).toContain("【场景】");
@@ -849,9 +849,52 @@ console.log("RESULT " + JSON.stringify({
       maxLength: 3000,
       deliveryConstraint: "9:16画幅，1080x1920分辨率，30fps，MP4格式。",
     });
-    expect(String(shot.prompt)).toContain("04.【约束】9:16画幅，1080x1920分辨率，30fps，MP4格式。");
-    expect(String(shot.prompt)).not.toContain("04.【约束】16:9画幅");
-    expect(String(shot.prompt)).toContain("05.【场景】");
+    expect(String(shot.prompt)).toContain("02.【约束】9:16画幅，1080x1920分辨率，30fps，MP4格式。");
+    expect(String(shot.prompt)).not.toContain("02.【约束】16:9画幅");
+    expect(String(shot.prompt)).toContain("03.【场景】");
+  });
+
+  it("无角色空镜最终提示词清除人物模板、人声与配乐，并保持编号连续", () => {
+    const shot = applyNarrativeFinalPromptContract({
+      shotId: "SC-1",
+      duration: 5,
+      audio: "人声对话清晰可辨；风声；音乐为极简弦乐长音铺底，BPM约50；no bgm",
+      prompt: [
+        "01.【语言约束】全部字段必须使用中文输出,禁止出现英文单词、英文短语、英文描述。",
+        "04.【约束】16:9画幅，8K分辨率，24fps，MP4格式。",
+        "07.【明亮约束】主体面部明亮清晰，阴影保留层次不死黑。",
+        "12.【角色】无人物出场，不适用。",
+        "13.【服装】无角色出场，本字段不适用。",
+        "18.【台词】无。",
+        "19.【时间轴】T00:00-T00:20 建立场景。",
+        "20.【情绪】quiet, 站立姿态，微笑或点头。",
+        "23.【音频】人声对话清晰可辨；音乐为极简弦乐长音铺底，BPM约50。",
+        "24.【负面约束】no text, no watermark, no people。",
+        "25.【角色约束】画面无人物，禁止任何人物入镜。",
+        "26.【角色一致性】本镜头无角色。 | 【音频纪律】允许台词人声与配乐 | no bgm",
+      ].join("\n"),
+    }, {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: true,
+      noAnimals: true,
+      noMusic: true,
+      chineseOnly: true,
+      durationSeconds: 5,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+    });
+    const prompt = String(shot.prompt);
+    expect(prompt).toContain("09:16画幅".replace("09:16", "9:16"));
+    expect(prompt).toContain("1080x1920");
+    expect(prompt).toContain("无人物");
+    expect(prompt).toContain("不要求人物表情");
+    expect(prompt).toContain("【台词】不适用");
+    expect(prompt).toContain("无人物声、无旁白、无音乐");
+    expect(prompt).toContain("无文字、无字幕、无水印");
+    expect(prompt).not.toMatch(/面部明亮|站立姿态|微笑或点头|人声对话|弦乐|BPM|no text|no bgm/u);
+    const numbers = prompt.split("\n").map((line) => Number(/^(\d{2})\.【/u.exec(line)?.[1] ?? 0)).filter(Boolean);
+    expect(numbers).toEqual(numbers.map((_, index) => index + 1));
   });
 
   it("叙事道具从场景证据抽取，关键道具不会因窄词表遗漏", () => {
@@ -1184,6 +1227,96 @@ console.log("RESULT " + JSON.stringify({
     const shots = prd.shotContract as Array<Record<string, unknown>>;
     expect(shots.every((shot) => (shot.subjectIds as string[]).includes("char_1"))).toBe(true);
     expect(JSON.stringify(prd)).not.toContain("人物动作");
+  });
+
+  it("无台词归家片从原始动作重建空间、道具与收束，不把说话幻觉或无关声音当成缓解", () => {
+    const upstream = {
+      _originalStoryText: "雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      visual_style: "旧台灯单一暖光源与窗外冷蓝雨光对撞",
+    };
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { duration: 3, purpose: "湿伞尖顶到镜头前，水珠砸在门槛上", keyElements: ["台灯", "门"] },
+        scenes: [
+          { duration: 4, purpose: "他单脚蹭掉皮鞋，湿袜子在地板上留下半个脚印", keyElements: ["鞋"] },
+          { duration: 4, purpose: "他拧亮旧台灯，坐下听雨", keyElements: ["门", "鞋"] },
+        ],
+        ending: { duration: 4, purpose: "全片的湿冷在这句几乎听不见的话里化开，收束在光和指尖上", keyElements: ["台灯"] },
+      },
+      riskAssessment: {
+        technicalRisks: [
+          { risk: "门锁开启、换鞋和台灯开关的精细手部动作容易穿模", level: "high" },
+          { risk: "同一出租屋与湿外套在不同镜头间布局和造型漂移", level: "medium" },
+        ],
+        mitigationSuggestions: [
+          "开门声先于画面出现，换鞋声配合脚踝局部构图，台灯开关声配钨丝特写",
+          "固定曝光、白平衡、主辅光比与 LUT，按场景隔离冷暖光",
+        ],
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, upstream);
+    const scene = discovery.sceneStructure as any;
+    const actions = extractNarrativeActions(discovery, upstream);
+    expect(actions).toEqual(expect.arrayContaining(["收伞回到出租屋", "开门", "换鞋", "拧亮旧台灯", "坐下听雨"]));
+    expect(String(scene.ending.purpose)).not.toContain("这句话");
+    const markdown = normalizeNarrativeRequirementMarkdown(
+      "- **场景**（4）：错误空间\n- **动作**（1）：错误动作\n- **风险结论**：待补",
+      discovery,
+      15,
+      upstream,
+    );
+    expect(markdown).toContain("空间=出租屋");
+    expect(markdown).toContain("雨伞");
+    expect(markdown).not.toContain("空间=台灯");
+    expect(markdown).toContain("仅保留动作与环境声");
+    const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(pairs[1]).toContain("参考帧");
+    expect(pairs[1]).not.toContain("声音");
+  });
+
+  it("无人物但有动物的合同保留动物主体，不要求人像定妆照，并清除环境声合同中的配乐", () => {
+    const discovery: Record<string, unknown> = {
+      upstreamFields: {
+        duration_sec: 15,
+        platform_id: "douyin",
+        aspect_ratio: "9:16",
+        dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+        _originalStoryText: "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。",
+      },
+      _canonicalCharacters: [{ id: "char_1", name: "橘猫", role: "protagonist", appearance: "湿毛成缕，爪垫粉色" }],
+    };
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: "橘猫雨夜接水" },
+      productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
+      characterSystem: { characters: [{ characterId: "char_1", name: "橘猫", role: "protagonist", appearance: "湿毛成缕，爪垫粉色" }] },
+      visualSpecification: { lightingDirection: "屋檐暖黄路灯逆光，冷青蓝环境光" },
+      scenePlan: {
+        scenes: [{ sceneId: "SC01", purpose: "橘猫探头、伸爪接水、缩回纸箱", duration: 15, keyProps: ["纸箱", "屋檐", "水滴"] }],
+        shotMapping: [{ sceneId: "SC01", estimatedShots: 3, shotBreakdownHint: ["close-up", "extreme-close-up", "medium"] }],
+      },
+      audioSpecification: { musicStyle: "极简钢琴单音，结尾进入", soundEffects: ["雨声", "结尾单一钢琴音"] },
+      audienceProfile: { contentExpectations: ["仅保留人物动作与画外环境声"] },
+      productionConstraints: { technicalConstraints: ["仅保留人物动作与画外环境声"] },
+      deliveryStandard: {
+        deliverables: [
+          { item: "video_master", spec: "MP4" },
+          { item: "character_portraits", spec: "定妆照全套" },
+        ],
+        outputFormat: {},
+      },
+    }, discovery);
+    const characters = (prd.characterSystem as any).characters;
+    const shots = prd.shotContract as any[];
+    const delivery = prd.deliveryStandard as any;
+    expect(characters).toHaveLength(1);
+    expect(characters[0]).toMatchObject({ characterId: "char_1", name: "橘猫" });
+    expect(String(characters[0].consistencyRequirements)).not.toContain("定妆照");
+    expect(shots.every((shot) => shot.subjectIds.includes("char_1"))).toBe(true);
+    expect(delivery.deliverables.map((item: Record<string, unknown>) => item.item)).toEqual(["video_master"]);
+    expect(delivery.characterAssets).toMatchObject({ required: false });
+    expect(JSON.stringify(prd)).not.toMatch(/钢琴|旋律|人物动作/);
+    expect(JSON.stringify(prd)).toContain("不使用配乐");
   });
 
   it("无角色空镜 PRD 删除定妆照硬要求，并收敛无配乐与色温冲突", () => {
