@@ -2219,6 +2219,8 @@ function rebalanceSceneDurations(scenePlan: Record<string, unknown>, target: num
 }
 
 function sanitizePrdText(value: unknown, duration: number, speechForbidden = false): unknown {
+  if (value === null || value === undefined) return "不适用";
+  if (typeof value === "number" && !Number.isFinite(value)) return "不适用";
   if (typeof value === "string") {
     let text = value
       .replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>

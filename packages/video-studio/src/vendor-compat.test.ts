@@ -1425,7 +1425,7 @@ console.log("RESULT " + JSON.stringify({
         dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
         _originalStoryText: "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。",
       },
-      _canonicalCharacters: [{ id: "char_1", name: "橘猫", role: "protagonist", appearance: "湿毛成缕，爪垫粉色" }],
+      _canonicalCharacters: [{ id: "char_1", name: "橘猫", role: "protagonist", appearance: "湿毛成缕，爪垫粉色", gender: null, ageRange: null }],
     };
     const prd = normalizeNarrativePrdContract({
       projectDefinition: { sourceIntent: "橘猫雨夜接水" },
@@ -1457,6 +1457,7 @@ console.log("RESULT " + JSON.stringify({
     expect(delivery.deliverables.map((item: Record<string, unknown>) => item.item)).toEqual(["video_master"]);
     expect(delivery.characterAssets).toMatchObject({ required: false });
     expect(JSON.stringify(prd)).not.toMatch(/钢琴|旋律|人物动作/);
+    expect(JSON.stringify(prd)).not.toMatch(/null|undefined|NaN|\[object Object\]/u);
     expect(JSON.stringify(prd)).toContain("不使用配乐");
   });
 
