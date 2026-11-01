@@ -1373,6 +1373,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/手持|微晃|浅景深人物.*稳/u.test(text)) {
       return "将本镜改为三脚架固定机位，锁定镜头高度、轴线与焦平面；用稳定器或后期轻微稳像补偿呼吸，不改变人物动作和构图。";
     }
+    if (/旧台灯.*(?:色温|灯罩.*旧痕|暖光斑)|灯罩.*旧痕/u.test(text)) {
+      return "锁定旧台灯2700K主光、灯罩旧痕位置和墙面暖光斑轮廓，使用同一灯具参考帧与固定LUT；逐镜检查色温和光斑不漂移，异常只重做该镜照明。";
+    }
     if (/窗外|雨幕|玻璃.*(?:雨光|反射)/u.test(text)) {
       return "把窗外雨幕设为独立背景板，锁定雨线方向、密度和反射强度；室内人物与玻璃保持固定焦平面，逐镜对照同一参考帧，异常只重做雨幕层，不改变主体动作。";
     }
@@ -1459,6 +1462,10 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     }
     if (/手持|微晃|浅景深人物.*稳/u.test(text)
       && !specificMitigations.some((item) => /三脚架|稳定器|固定机位/u.test(item))) {
+      return fallback(text);
+    }
+    if (/旧台灯.*(?:色温|灯罩.*旧痕|暖光斑)|灯罩.*旧痕/u.test(text)
+      && !specificMitigations.some((item) => /旧台灯.*(?:色温|灯罩.*旧痕|暖光斑)|2700K|固定LUT/u.test(item))) {
       return fallback(text);
     }
     if (/窗外|雨幕|玻璃.*(?:雨光|反射)/u.test(text)

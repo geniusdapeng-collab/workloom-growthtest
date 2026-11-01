@@ -1467,11 +1467,17 @@ console.log("RESULT " + JSON.stringify({
       sceneStructure: {
         opening: { duration: 3, purpose: "收伞回到出租屋、开门、换鞋、拧旧台灯旋钮、坐下听雨", keyElements: ["台灯", "门"] },
         scenes: [],
-        ending: { duration: 12, purpose: "灯下听雨", keyElements: ["台灯", "窗"] },
+        ending: { duration: 12, purpose: "灯下听雨，紧接一句低声台词“雨再大，也有一盏灯接着。”", keyElements: ["台灯", "窗"] },
       },
       riskAssessment: {
-        technicalRisks: [{ risk: "手持微晃与9:16浅景深人物均稳", level: "low" }],
-        mitigationSuggestions: ["手部动作拆成固定机位短特写"],
+        technicalRisks: [
+          { risk: "手持微晃与9:16浅景深人物均稳", level: "low" },
+          { risk: "旧台灯单一暖光源的跨镜头色温、灯罩旧痕位置和墙面暖光斑一致性", level: "high" },
+        ],
+        mitigationSuggestions: [
+          "手部动作拆成固定机位短特写",
+          "把窗外雨幕设为独立背景板，固定雨线方向与反射强度",
+        ],
       },
     };
     normalizeNarrativeDiscovery(discovery, 15, upstream);
@@ -1482,6 +1488,7 @@ console.log("RESULT " + JSON.stringify({
     expect(purposes).toContain("换鞋");
     expect(purposes).toContain("坐下");
     expect(purposes).not.toContain("片尾");
+    expect(purposes).not.toContain("雨再大");
     expect(scene.ending.keyElements.length).toBeGreaterThan(0);
     expect(inferNarrativeProps({
       intent: upstream._originalStoryText,
@@ -1489,15 +1496,19 @@ console.log("RESULT " + JSON.stringify({
       upstream,
     })).toContain("雨伞");
     const markdown = normalizeNarrativeRequirementMarkdown(
-      "- **道具**（1）：台灯\n- **场景**（1）：错误\n- **动作**（1）：错误",
+      "- **道具**（1）：台灯\n- **场景**（1）：错误\n- **动作**（1）：收伞/开门/换鞋/台灯开关等动作声与环境底噪",
       discovery,
       15,
       upstream,
     );
     expect(markdown).toContain("雨伞");
+    expect(markdown).toContain("换鞋");
+    expect(markdown).not.toContain("动作声与环境底噪");
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(pairs[0]).toMatch(/三脚架|机位|稳定/u);
     expect(pairs[0]).not.toContain("手部动作拆成");
+    expect(pairs[1]).toMatch(/旧台灯|2700K|灯罩.*旧痕|暖光斑/u);
+    expect(pairs[1]).not.toContain("窗外雨幕");
   });
 
   it("无人物但有动物的合同保留动物主体，不要求人像定妆照，并清除环境声合同中的配乐", () => {
