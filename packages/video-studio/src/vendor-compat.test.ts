@@ -1225,10 +1225,10 @@ console.log("RESULT " + JSON.stringify({
       sceneStructure: {
         opening: { duration: 3, purpose: "建立场景氛围，引入主题", keyElements: ["环境展示", "主题暗示"] },
         scenes: [
-          { duration: 12, purpose: "场景1：推动叙事发展", keyElements: ["核心动作", "情绪表达"] },
+          { duration: 12, purpose: "黑天鹅颈部与倒影重合，推动叙事发展", keyElements: ["黑天鹅", "倒影"] },
           { duration: 12, purpose: "场景2：推动叙事发展", keyElements: ["核心动作", "情绪表达"] },
         ],
-        ending: { duration: 3, purpose: "总结收尾，留下印象", keyElements: ["情绪收束", "主题呼应"] },
+        ending: { duration: 3, purpose: "总结收尾，叠一句低字幕", keyElements: ["情绪收束", "主题呼应"] },
       },
       audienceProfile: { contentExpectations: ["仅保留环境声"] },
       riskAssessment: {
@@ -1252,7 +1252,7 @@ console.log("RESULT " + JSON.stringify({
     expect(scenes.scenes[1].purpose).toContain("涟漪");
     expect(scenes.ending.purpose).toContain("薄雾缓慢散开");
     expect(JSON.stringify(scenes)).toContain("远山");
-    expect(JSON.stringify(scenes)).not.toMatch(/建立场景氛围|推动叙事发展|核心动作|情绪表达|主题暗示/u);
+    expect(JSON.stringify(scenes)).not.toMatch(/建立场景氛围|推动叙事发展|核心动作|情绪表达|主题暗示|黑天鹅|低字幕/u);
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(pairs[0]).not.toBe(pairs[1]);
     expect(pairs[0]).toContain("固定机位短镜");
@@ -1261,6 +1261,8 @@ console.log("RESULT " + JSON.stringify({
       "### 2.4 对标参考",
       "- 《星际穿越》《布达佩斯大饭店》",
       "---",
+      "> 设备型号、光照参数与实拍可行性未在本轮核实；相关摄影参数仅为创作参考，正式执行以结构化镜头合同为准。",
+      "> 设备型号、光照参数与实拍可行性未在本轮核实；相关摄影参数仅为创作参考，正式执行以结构化镜头合同为准。",
       "## 三、最终业务需求确认",
       "- **角色**（1）：无真人角色",
       "- **动作**（1）：压在上三分之一",
@@ -1269,6 +1271,7 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).toContain("- **动作**（0）：无角色动作");
     expect(markdown).not.toContain("《星际穿越》");
     expect(markdown).toContain("日出前蓝灰散射光");
+    expect((markdown.match(/> 设备型号、光照参数与实拍可行性未在本轮核实/gu) ?? []).length).toBe(1);
   });
 
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {

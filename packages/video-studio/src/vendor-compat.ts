@@ -1350,6 +1350,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/时长|节奏|镜头时长分配/u.test(text)) {
       return "先按场景建立硬时间预算并写入镜头合同，再逐镜实测 durationSeconds；场景加总必须等于目标总时长，超差只重分配同场景镜头，不压缩有明确动作的镜头。";
     }
+    if (/低饱和|青灰|水面质感|水面.*高光|高光过强|暗部.*糊|质感控制/u.test(text)) {
+      return "把低照度质感单独做技术样片：锁定青灰白平衡、暗部抬升与高光滚降，水面只保留低强度反射；每镜检查塑料感、频闪、色带与暗部断层，不达标只重做该镜的质感参数。";
+    }
     if (/划痕|积尘|指纹|磨白|发黄|塑料|颗粒|灰尘|微质感|磨砂|裂纹|磨痕|材质|纹理|道具/u.test(text)) {
       return "把微质感锚点拆成固定机位微距短镜头，单镜不超过2秒，锁定同一参考帧、侧向硬光和非重复磨损路径；不在运动长镜中生成精细纹理。";
     }
@@ -1612,6 +1615,10 @@ export function normalizeNarrativeRequirementMarkdown(
     /(##\s*三、最终业务需求确认)/u,
     "> 设备型号、光照参数与实拍可行性未在本轮核实；相关摄影参数仅为创作参考，正式执行以结构化镜头合同为准。\n\n$1",
   );
+  normalized = normalized.replace(
+    /(> 设备型号、光照参数与实拍可行性未在本轮核实；[^\n]*\n)(?:\s*\1)+/gu,
+    "$1",
+  );
   const dialogue = String(upstream?.dialogue_requirement ?? "").trim();
   if (dialogue && !normalized.includes("- **台词/字幕口径**")) {
     normalized = normalized.replace(
@@ -1621,7 +1628,8 @@ export function normalizeNarrativeRequirementMarkdown(
   }
   if (narrativeSpeechPolicy(dialogue).allSpeechForbidden) {
     normalized = normalized
-      .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
+      .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu,
+        noCharacterContract ? "仅保留画外环境声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
       .replace(/[^。；\n]{0,24}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’][。；]?/gu, "以动作与环境声完成回应。")
       .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。")
       .replace(/^.*(?:关键台词|片内台词)[^\n]*$/gmu, (line) => {
@@ -1703,13 +1711,27 @@ export function normalizeNarrativeDiscovery(
     return text;
   };
   const scene = recordValue(discovery.sceneStructure);
+  const storyPolicy = [
+    upstream._originalStoryText,
+    upstream.special_notes,
+    upstream.dialogue_requirement,
+  ].map(String).join(" ");
+  const noAnimals = /无动物|不出现动物|无宠物/u.test(storyPolicy);
+  const noPeople = /无人物|无真人|不出现人物/u.test(storyPolicy);
+  const noText = /无文字|无字幕|不出现文字/u.test(storyPolicy);
   const sceneNodes = [
     recordValue(scene.opening),
     ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
     recordValue(scene.ending),
   ].filter((node) => Object.keys(node).length > 0);
   const genericScene = /(?:建立场景|引入主题|推动叙事|核心动作|情绪表达|总结收尾|留下印象|环境展示|主题暗示|情绪收束|主题呼应)/u;
-  if (sceneNodes.some((node) => genericScene.test(`${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`))) {
+  const sceneViolation = (node: Record<string, unknown>): boolean => {
+    const value = `${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`;
+    return (noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(value))
+      || (noPeople && /(?:人物|真人|人类|路人|游客)/u.test(value))
+      || (noText && /(?:字幕|水印|文字)/u.test(value));
+  };
+  if (sceneNodes.some((node) => genericScene.test(`${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`) || sceneViolation(node))) {
     const evidenceClauses = [
       String(upstream._originalStoryText ?? ""),
       String(upstream.description ?? ""),
@@ -1727,7 +1749,7 @@ export function normalizeNarrativeDiscovery(
     let propIndex = 0;
     for (const node of sceneNodes) {
       const current = `${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`;
-      if (!genericScene.test(current)) continue;
+      if (!genericScene.test(current) && !sceneViolation(node)) continue;
       const purpose = evidenceClauses[clauseIndex++];
       if (purpose) node.purpose = purpose;
       if (visualProps.length > 0) {
