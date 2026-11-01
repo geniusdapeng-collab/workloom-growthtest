@@ -1141,6 +1141,19 @@ export function inferNarrativeCharacters(input: {
   for (const entry of selected) {
     const usesDefaultModel = /内置默认模特|默认模特/u.test(input.intent);
     const animal = isNarrativeAnimal(entry.name);
+    if (entry.name === "厨师" && /(?:两位|两名|两个).{0,3}厨师/u.test(sceneText)) {
+      unique.set("厨师 A", {
+        name: "厨师 A",
+        role: "protagonist",
+        description: "同场两位厨师之一；锁定拉面岗位、发型脸型、身高、服装颜色与手部外观，不得与厨师 B 合并",
+      });
+      unique.set("厨师 B", {
+        name: "厨师 B",
+        role: "protagonist",
+        description: "同场两位厨师之一；锁定看火递碗岗位、发型脸型、身高、服装颜色与手部外观，不得与厨师 A 合并",
+      });
+      continue;
+    }
     const animalCue = animal
       ? sceneText.match(new RegExp(`(?:橘|黑|白|灰|花|三花|狸花)?${entry.name}`, "u"))?.[0] ?? entry.name
       : "";
@@ -1155,7 +1168,7 @@ export function inferNarrativeCharacters(input: {
     const description = animal
       ? `${physicalAnchors.join("；")}；跨镜锁定同一品种、体型、毛色、湿度和面部特征；肖像登记仅适用于平台授权动物素材，不得替换物种`
       : entry.name === "厨师"
-        ? `${/(?:两位|两名|两个).{0,3}厨师/u.test(sceneText) ? "同场两位厨师" : "厨师主体"}；分别锁定发型、脸型、身高、服装颜色与岗位分工，不得合并成同一个人或增减人数`
+        ? "厨师主体；锁定发型、脸型、身高、服装颜色与岗位分工，不得增减人数"
       : entry.name === "默认模特角色" || usesDefaultModel
         ? "使用仓库内置默认模特；出镜前仍需按当前角色档案绑定真实图像与授权范围"
         : "叙事片明确人物；出镜前需绑定角色档案与授权范围";

@@ -562,7 +562,12 @@ console.log("RESULT " + JSON.stringify({
       },
     })).toEqual([
       expect.objectContaining({
-        name: "厨师",
+        name: "厨师 A",
+        role: "protagonist",
+        description: expect.stringContaining("两位"),
+      }),
+      expect.objectContaining({
+        name: "厨师 B",
         role: "protagonist",
         description: expect.stringContaining("两位"),
       }),
