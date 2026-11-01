@@ -1272,7 +1272,7 @@ export function inferNarrativeProps(input: {
   const terms: Array<{ pattern: RegExp; name: string }> = [
     { pattern: /(?:老旧|旧|新)?台灯|灯罩|钨丝|旋钮|开关/gu, name: "台灯" },
     { pattern: /(?:一串)?钥匙/gu, name: "钥匙" },
-    { pattern: /(?:门缝|门轴|门框|锁孔|防盗门|木门|玻璃门|门)/gu, name: "门" },
+    { pattern: /(?:门缝|门轴|门框|锁孔|防盗门|木门|玻璃门|(?<!快)门)/gu, name: "门" },
     { pattern: /(?:长柄|折叠|透明|湿)?雨?伞(?:骨|沿|布)?/gu, name: "雨伞" },
     { pattern: /(?:手机)?屏幕|手机/gu, name: "手机" },
     { pattern: /(?:楼梯)?扶手/gu, name: "扶手" },
@@ -1369,6 +1369,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/芦苇|杆状|前景.*(?:抖动|分叉|数量跳变)/u.test(text)) {
       return "把芦苇拆成独立的实拍前景层，固定杆数、间距、朝向和焦点；生成层只负责远山、雾和水面，合成前逐帧核对杆体无抖动、分叉或增殖，异常只重做前景层。";
     }
+    if (/远山|山形|山脊|剪影.*(?:细节|补全|漂移|新增)/u.test(text)) {
+      return "把远山固定成单色低对比剪影参考层，锁定山脊转折点与画面占比；生成请求禁止补出森林、建筑或积雪细节，逐帧对照参考轮廓，异常只重做山体遮罩。";
+    }
     if (/划痕|积尘|指纹|磨白|发黄|塑料|颗粒|灰尘|微质感|磨砂|裂纹|磨痕|材质|纹理|道具/u.test(text)) {
       return "把微质感锚点拆成固定机位微距短镜头，单镜不超过2秒，锁定同一参考帧、侧向硬光和非重复磨损路径；不在运动长镜中生成精细纹理。";
     }
@@ -1440,8 +1443,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     }
     const text = `${String(risks[index]?.risk ?? "")} ${String(risks[index]?.impact ?? "")}`;
     const replacement = fallback(text);
-    seen.add(replacement);
-    return replacement;
+    const unique = seen.has(replacement) ? `针对风险${index + 1}：${replacement}；独立复核该风险的目标帧与回执。` : replacement;
+    seen.add(unique);
+    return unique;
   });
 }
 
@@ -1602,11 +1606,25 @@ export function normalizeNarrativeRequirementMarkdown(
       `**缓解建议**\n${pairedMitigations.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n`,
     );
   }
+  const propEvidence = [
+    upstream._originalStoryText,
+    upstream.description,
+    upstream.special_notes,
+    upstream.visual_style,
+    upstream.theme,
+  ].map(String).join(" ");
+  const groundedProp = (item: string): boolean => {
+    if (propEvidence.includes(item)) return true;
+    for (let index = 0; index < item.length - 1; index += 1) {
+      if (propEvidence.includes(item.slice(index, index + 2))) return true;
+    }
+    return false;
+  };
   const props = inferNarrativeProps({
     intent: String(upstream?._originalStoryText ?? ""),
     discovery,
     upstream,
-  }).filter((item) => !["薄雾", "远山", "水面", "涟漪"].includes(item));
+  }).filter((item) => !["薄雾", "远山", "水面", "涟漪"].includes(item) && groundedProp(item));
   if (props.length > 0) {
     normalized = normalized.replace(
       /- \*\*道具\*\*（\d+）：[^\n]*/u,
@@ -1704,6 +1722,7 @@ export function normalizeNarrativeDiscovery(
     const original = String(value ?? "");
     let text = original
       .replace(/^(?:如果删掉|删掉这)[^：。；]*[：。；]?/gu, "")
+      .replace(/^删掉(?:结尾|开头|结尾段|开场段)[^：。；]*[：。；]?/gu, "")
       .replace(/^故事会失去[^：。；]*[：。；]?/gu, "")
       .replace(/删掉这(?:镜|场)[^：；，。]*[：；]?/gu, "")
       .replace(/^(?:若|如果|假如)[，,：:\s]+/u, "")
@@ -1773,7 +1792,7 @@ export function normalizeNarrativeDiscovery(
   const purposeViolation = (node: Record<string, unknown>): boolean => {
     const value = String(node.purpose ?? "");
     return (noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(value))
-      || (noPeople && /(?:人物|真人|人类|路人|游客)/u.test(value))
+      || (noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影)/u.test(value))
       || (noText && /(?:字幕|水印|文字)/u.test(value));
   };
   const keyElementsViolation = (node: Record<string, unknown>): boolean => {
@@ -1782,7 +1801,7 @@ export function normalizeNarrativeDiscovery(
       genericScene.test(item)
       || item.trim().length >= 2 && !hasGroundingToken(item)
       || noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(item)
-      || noPeople && /(?:人物|真人|人类|路人|游客)/u.test(item)
+      || noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影)/u.test(item)
       || noText && /(?:字幕|水印|文字)/u.test(item));
   };
   if (sceneNodes.some((node) =>

@@ -1230,10 +1230,10 @@ console.log("RESULT " + JSON.stringify({
       sceneStructure: {
         opening: { duration: 3, purpose: "清晨薄雾中的天鹅湖", keyElements: ["台灯", "手机"] },
         scenes: [
-          { duration: 12, purpose: "黑天鹅颈部与倒影重合，推动叙事发展", keyElements: ["黑天鹅", "倒影"] },
+          { duration: 12, purpose: "手指从快门键移开，黑天鹅颈部与倒影重合", keyElements: ["黑天鹅", "快门键"] },
           { duration: 12, purpose: "场景2：推动叙事发展", keyElements: ["核心动作", "情绪表达"] },
         ],
-        ending: { duration: 3, purpose: "总结收尾，叠一句低字幕", keyElements: ["情绪收束", "主题呼应"] },
+        ending: { duration: 3, purpose: "删掉结尾，再把手伸进画面并叠低字幕", keyElements: ["情绪收束", "主题呼应"] },
       },
       audienceProfile: { contentExpectations: ["仅保留环境声"] },
       riskAssessment: {
@@ -1265,7 +1265,7 @@ console.log("RESULT " + JSON.stringify({
     expect(scenes.scenes[1].purpose).toContain("涟漪");
     expect(scenes.ending.purpose).toContain("薄雾缓慢散开");
     expect(JSON.stringify(scenes)).toContain("远山");
-    expect(JSON.stringify(scenes)).not.toMatch(/建立场景氛围|推动叙事发展|核心动作|情绪表达|主题暗示|黑天鹅|低字幕|台灯|手机/u);
+    expect(JSON.stringify(scenes)).not.toMatch(/建立场景氛围|推动叙事发展|核心动作|情绪表达|主题暗示|黑天鹅|低字幕|台灯|手机|手指|快门|门/u);
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(new Set(pairs).size).toBe(5);
     expect(pairs[0]).toContain("遮挡倒影");
