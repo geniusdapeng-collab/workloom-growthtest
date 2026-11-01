@@ -1,0 +1,18 @@
+{
+  "schema": "workloom.ai-video-stress-evidence/v1",
+  "taskId": "T-2026-1031-9004",
+  "caseId": "N07",
+  "category": "narrative",
+  "expected": "NARRATIVE_READY",
+  "actual": "NARRATIVE_FINAL_CONTRACT_FAILED",
+  "pass": false,
+  "mode": "runtime-bridge",
+  "invocation": {
+    "function": "routeVideoPipeline+applyRouteToMetadata+installVendorDiscoveryNarrativeBridge+final-shot-contract+RenderPipelineGuard",
+    "caseHash": "debbb7987a55dd8dfdee80ccbc740ed110c4ff3c25301a1885abdf3fa636345b"
+  },
+  "output": {
+    "error": "NARRATIVE_FINAL_CONTRACT_FAILED: [{\"code\":\"DIALOGUE_FORBIDDEN\",\"message\":\"无台词口径仍残留台词\",\"shotId\":\"S1\"},{\"code\":\"DIALOGUE_FORBIDDEN\",\"message\":\"无台词口径仍残留台词\",\"shotId\":\"S2\"},{\"code\":\"DIALOGUE_FORBIDDEN\",\"message\":\"无台词口径仍残留台词\",\"shotId\":\"S3\"},{\"code\":\"DIALOGUE_FORBIDDEN\",\"message\":\"无台词口径仍残留台词\",\"shotId\":\"S4\"},{\"code\":\"DIALOGUE_FORBIDDEN\",\"message\":\"无台词口径仍残留台词\",\"shotId\":\"S5\"}]"
+  },
+  "capturedAt": "2026-11-01T16:10:43.494Z"
+}

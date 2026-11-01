@@ -31,10 +31,21 @@ function text(value: unknown): string {
   return "";
 }
 
+function declaresNoSpeech(value: unknown): boolean {
+  const content = text(value).trim();
+  if (!content) return true;
+  return /^(?:不适用(?:[：:；;。\s]|$)|(?:本片|本镜|全片)?无(?:任何)?(?:台词|对白|旁白|口播)(?:[、，,；;。\s]|$))/u.test(content);
+}
+
 function hasDialogue(shot: ShotRecord, prompt: string): boolean {
-  if (/【台词】/u.test(prompt)) return true;
-  if (text(shot.dialogue).trim() || text(shot.dialogueText).trim()) return true;
-  return Array.isArray(shot.dialogueBlocks) && shot.dialogueBlocks.length > 0;
+  if ([...prompt.matchAll(/【台词】([^\n]*)/gu)].some((match) => !declaresNoSpeech(match[1]))) return true;
+  if (!declaresNoSpeech(shot.dialogue) || !declaresNoSpeech(shot.dialogueText)) return true;
+  return Array.isArray(shot.dialogueBlocks) && shot.dialogueBlocks.some((block) => {
+    if (typeof block === "string") return !declaresNoSpeech(block);
+    if (!block || typeof block !== "object") return false;
+    const record = block as ShotRecord;
+    return !declaresNoSpeech(record.line ?? record.text ?? record.content);
+  });
 }
 
 export function inspectFinalShotContract(

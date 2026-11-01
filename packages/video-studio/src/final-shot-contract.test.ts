@@ -16,6 +16,22 @@ describe("final shot contract", () => {
     });
   });
 
+  it("treats the normalized no-dialogue declaration as absence, not residual dialogue", () => {
+    const normalized = {
+      ...shot,
+      prompt: "01.【场景】完整画面\n18.【台词】不适用：本片无台词、无旁白、无口播。",
+      dialogueText: "",
+      dialogueBlocks: [],
+    };
+    expect(inspectFinalShotContract([normalized], { maxPromptLength: 3000, noDialogue: true })).toEqual({
+      pass: true,
+      issues: [],
+    });
+    const residual = { ...normalized, prompt: "01.【场景】完整画面\n18.【台词】小满说：还在吗？" };
+    expect(inspectFinalShotContract([residual], { maxPromptLength: 3000, noDialogue: true }).issues)
+      .toContainEqual(expect.objectContaining({ code: "DIALOGUE_FORBIDDEN" }));
+  });
+
   it.each([
     [[], "SHOTS_REQUIRED", { maxPromptLength: 3000 }],
     [[{ ...shot, prompt: " " }], "SHOT_PROMPT_REQUIRED", { maxPromptLength: 3000 }],
