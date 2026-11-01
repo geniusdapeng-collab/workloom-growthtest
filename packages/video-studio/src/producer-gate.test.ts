@@ -206,6 +206,8 @@ describe("AI producer evidence gate", () => {
       { ...good, issues: "bad" },
       { ...good, score: "88" },
       { approved: true, score: 85, summary: "ok" },
+      { result: { 通过: "通过", 评分: "88分", 问题: [{ message: "待修复" }], 建议: [{ suggestion: "补证据" }], 结论: "ok" } },
+      { verdict: JSON.stringify(good) },
     ]) {
       const verdict = await reviewStage(textOptions({ fetchImpl: judge(answer) }));
       expect(verdict).toMatchObject({ approved: true, status: "passed" });
