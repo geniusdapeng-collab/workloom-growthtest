@@ -1792,7 +1792,7 @@ export function normalizeNarrativeDiscovery(
   const purposeViolation = (node: Record<string, unknown>): boolean => {
     const value = String(node.purpose ?? "");
     return (noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(value))
-      || (noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影)/u.test(value))
+      || (noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声)/u.test(value))
       || (noText && /(?:字幕|水印|文字)/u.test(value));
   };
   const keyElementsViolation = (node: Record<string, unknown>): boolean => {
@@ -1801,7 +1801,7 @@ export function normalizeNarrativeDiscovery(
       genericScene.test(item)
       || item.trim().length >= 2 && !hasGroundingToken(item)
       || noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(item)
-      || noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影)/u.test(item)
+      || noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声)/u.test(item)
       || noText && /(?:字幕|水印|文字)/u.test(item));
   };
   if (sceneNodes.some((node) =>
@@ -1936,6 +1936,42 @@ export function normalizeNarrativeDiscovery(
       }
     }
   };
+  const prohibitedAudiencePattern = [
+    noPeople ? /(?:手机取景框|红色录音点|按下录制|按下快门|屏息|呼吸声|耳边[^。；\n]{0,8}憋气|手伸进|手指|手掌)/u : null,
+    noAnimals ? /(?:黑天鹅|水鸟|飞鸟|鸟鸣|猫|狗)/u : null,
+    noText ? /(?:字幕|水印|文字卡)/u : null,
+  ].filter((pattern): pattern is RegExp => pattern instanceof RegExp);
+  if (prohibitedAudiencePattern.length > 0) {
+    const sanitizeAudience = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index += 1) {
+          const item = value[index];
+          if (typeof item === "string") {
+            const kept = item.split(/[。；\n]+/u).map((part) => part.trim()).filter(Boolean)
+              .filter((part) => /(?:不进入成片|不生成字幕|无字幕|不得出现|禁止出现|仅保留环境声)/u.test(part)
+                || !prohibitedAudiencePattern.some((pattern) => pattern.test(part)));
+            value[index] = kept.length > 0 ? kept.join("；") : "只记录自然环境与环境声的缓慢变化";
+          } else {
+            sanitizeAudience(item);
+          }
+        }
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      const record = value as Record<string, unknown>;
+      for (const [key, item] of Object.entries(record)) {
+        if (typeof item === "string") {
+          const kept = item.split(/[。；\n]+/u).map((part) => part.trim()).filter(Boolean)
+            .filter((part) => /(?:不进入成片|不生成字幕|无字幕|不得出现|禁止出现|仅保留环境声)/u.test(part)
+              || !prohibitedAudiencePattern.some((pattern) => pattern.test(part)));
+          record[key] = kept.length > 0 ? kept.join("；") : "只记录自然环境与环境声的缓慢变化";
+        } else {
+          sanitizeAudience(item);
+        }
+      }
+    };
+    sanitizeAudience(discovery.audienceProfile);
+  }
   visit(discovery);
   discovery._contractRepairs = repairs.filter((item, index, list) =>
     list.findIndex((candidate) => candidate.code === item.code && candidate.detail === item.detail) === index);

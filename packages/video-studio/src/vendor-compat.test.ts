@@ -1235,7 +1235,14 @@ console.log("RESULT " + JSON.stringify({
         ],
         ending: { duration: 3, purpose: "删掉结尾，再把手伸进画面并叠低字幕", keyElements: ["情绪收束", "主题呼应"] },
       },
-      audienceProfile: { contentExpectations: ["仅保留环境声"] },
+      audienceProfile: {
+        emotionTriggers: [
+          "手机取景框亮起，按下录制后手指离开快门",
+          "观众先听见一声极轻的屏息",
+          "黑天鹅从雾中游过，水鸟鸣叫",
+        ],
+        contentExpectations: ["仅保留环境声"],
+      },
       riskAssessment: {
         technicalRisks: [
           { risk: "湖面倒影几何漂移", level: "high", impact: "远山倒影重复变形" },
@@ -1266,6 +1273,7 @@ console.log("RESULT " + JSON.stringify({
     expect(scenes.ending.purpose).toContain("薄雾缓慢散开");
     expect(JSON.stringify(scenes)).toContain("远山");
     expect(JSON.stringify(scenes)).not.toMatch(/建立场景氛围|推动叙事发展|核心动作|情绪表达|主题暗示|黑天鹅|低字幕|台灯|手机|手指|快门|门/u);
+    expect(JSON.stringify(discovery.audienceProfile)).not.toMatch(/手机|录制|手指|快门|屏息|黑天鹅|水鸟/u);
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(new Set(pairs).size).toBe(5);
     expect(pairs[0]).toContain("遮挡倒影");
