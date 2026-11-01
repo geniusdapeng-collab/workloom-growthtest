@@ -2095,14 +2095,27 @@ export function normalizeNarrativePrdContract(
   ].map(String).join(" ");
   const speechForbidden = narrativeSpeechPolicy(dialoguePolicy).allSpeechForbidden;
 
-  const canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
+  let canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
     ? discovery._canonicalCharacters.map(recordValue)
     : [];
+  const characterSystem = recordValue(prd.characterSystem);
+  const generated = Array.isArray(characterSystem.characters)
+    ? characterSystem.characters.map(recordValue)
+    : [];
+  if (canonicalCharacters.length === 0 && generated.length > 0) {
+    canonicalCharacters = generated.map((item, index) => {
+      const id = String(item.characterId ?? item.id ?? item.character_id ?? `char_${index + 1}`);
+      return { ...item, id, characterId: id };
+    });
+  }
+  if (canonicalCharacters.length === 0) {
+    canonicalCharacters = inferNarrativeCharacters({
+      intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
+      discovery,
+      upstream,
+    }).map((item, index) => ({ ...item, id: `char_${index + 1}`, characterId: `char_${index + 1}` }));
+  }
   if (canonicalCharacters.length > 0) {
-    const characterSystem = recordValue(prd.characterSystem);
-    const generated = Array.isArray(characterSystem.characters)
-      ? characterSystem.characters.map(recordValue)
-      : [];
     characterSystem.characters = canonicalCharacters.map((item, index) => {
       const id = String(item.id ?? item.characterId ?? `char_${index + 1}`);
       const portrait = String(item.portraitRef ?? item.portraitPath ?? generated[index]?.portraitPath ?? "");
@@ -2290,6 +2303,26 @@ export function normalizeNarrativePrdContract(
     normalizedScenePlan.scenes = scenes;
     prd.scenePlan = normalizedScenePlan;
   }
+  const animalOnly = canonicalCharacters.length > 0
+    && canonicalCharacters.every((item) => ["猫", "狗", "鸟"].includes(String(item.name ?? "")));
+  if (animalOnly) {
+    const replaceActionSubject = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index += 1) {
+          if (typeof value[index] === "string") value[index] = String(value[index]).replace(/人物动作/gu, "主体动作");
+          else replaceActionSubject(value[index]);
+        }
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      const record = value as Record<string, unknown>;
+      for (const [key, item] of Object.entries(record)) {
+        if (typeof item === "string") record[key] = item.replace(/人物动作/gu, "主体动作");
+        else replaceActionSubject(item);
+      }
+    };
+    replaceActionSubject(prd);
+  }
   return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
 }
 
@@ -2386,7 +2419,7 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
         const platform = canonicalPlatformId(upstream?.platform_id ?? upstream?.platform);
         const canonical = canonicalCharacterFromEvidence(upstream);
         const existing = Array.isArray(result.characters) ? result.characters : [];
-        const inferred = canonical.length > 0
+        const rawInferred = canonical.length > 0
           ? canonical
           : existing.length > 0
             ? existing
@@ -2395,6 +2428,11 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
               discovery,
               upstream,
             });
+        const inferred = rawInferred.map((item, index) => {
+          const record = recordValue(item);
+          const id = String(record.id ?? record.characterId ?? record.character_id ?? `char_${index + 1}`);
+          return { ...record, id, characterId: id };
+        });
         discovery._canonicalCharacters = inferred;
         const discoveryUpstream = recordValue(discovery.upstreamFields);
         discovery.upstreamFields = {
@@ -2415,7 +2453,7 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
           },
         };
         if (inferred.length > existing.length) {
-          log(`[vendor-compat] 角色契约补全：${inferred.map((item) => item.name).join("、")}`);
+          log(`[vendor-compat] 角色契约补全：${inferred.map((item) => String(recordValue(item).name ?? "")).join("、")}`);
         }
         return withEvidence;
       };

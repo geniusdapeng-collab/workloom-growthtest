@@ -1118,11 +1118,12 @@ console.log("RESULT " + JSON.stringify({
     expect(actions).toEqual(expect.arrayContaining(["探出半身", "抬起", "缩回箱内盘成一团"]));
     expect(actions.join("")).not.toContain("仅一");
     expect(actions).not.toContain("盘成一团");
-    expect(inferNarrativeCharacters({
+    const inferredRoles = inferNarrativeCharacters({
       intent: upstream._originalStoryText,
       discovery,
       upstream,
-    })[0]).toMatchObject({ name: "猫", description: expect.stringContaining("被打湿成缕") });
+    });
+    expect(inferredRoles[0]).toMatchObject({ name: "猫", description: expect.stringContaining("被打湿成缕") });
     const markdown = normalizeNarrativeRequirementMarkdown([
       "2.1 内容期望：无需字幕与六个连续动作完成完整情绪弧",
       "有一句关键台词，例如“它没接到那滴水”。",
@@ -1151,6 +1152,26 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).toContain("主体动作与画外环境声");
     expect(markdown).toContain("### 视觉锚点定义");
     expect(markdown).toContain("片尾静止=0.5秒");
+    discovery._canonicalCharacters = inferredRoles.map((role, index) => ({
+      ...role,
+      id: `char_${index + 1}`,
+      characterId: `char_${index + 1}`,
+    }));
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: "橘猫雨夜接水" },
+      productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
+      characterSystem: { characters: [] },
+      scenePlan: {
+        scenes: [{ sceneId: "SC01", purpose: "橘猫探爪接水后缩回纸箱", duration: 15 }],
+        shotMapping: [{ sceneId: "SC01", estimatedShots: 3, shotBreakdownHint: ["close-up", "close-up", "medium"] }],
+      },
+      productionConstraints: { technicalConstraints: ["仅保留人物动作与画外环境声"] },
+      audienceProfile: { contentExpectations: ["仅保留人物动作与画外环境声"] },
+      deliveryStandard: { deliverables: [{ item: "video_master", spec: "MP4" }], outputFormat: {} },
+    }, discovery);
+    const shots = prd.shotContract as Array<Record<string, unknown>>;
+    expect(shots.every((shot) => (shot.subjectIds as string[]).includes("char_1"))).toBe(true);
+    expect(JSON.stringify(prd)).not.toContain("人物动作");
   });
 
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
