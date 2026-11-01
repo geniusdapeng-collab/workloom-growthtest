@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-005-0-1793492212757",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '动物是角色而非道具'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "动物是角色而非道具"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-005",
+    "assertion_index": 0
+  },
+  "commit": "9d3aea887092e8e48f403c8ec90e01e6506e2ff1",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T00:16:52.757Z",
+  "finished_at": "2026-11-01T00:16:53.320Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-005-0-1793492212757.txt",
+      "sha256": "3e9d10c39bd2c9ee79ae5ee5bca14c2e053bf7541a936f27a507506496044e2c",
+      "commit": "9d3aea887092e8e48f403c8ec90e01e6506e2ff1"
+    }
+  ]
+}

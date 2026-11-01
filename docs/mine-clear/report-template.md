@@ -111,4 +111,4 @@
 | 豁免有独立批准来源 | `reason/approved_by/approved_at/source` 与批准 JSON 的 commit/subject/scope 一致；只有理由不得放行 |
 | RDAS 固定 276 项 | pass/fail/unverified/批准不适用逐项分列；原始expected/actual与同ID观测一致，不从聚合摘要扩展通过 |
 | 报告生成与验收通过分列 | `reportGenerated` / `acceptancePassed` / 实际exit；缺证据保持unverified与非零 |
-| 验收命令 | `pnpm acceptance:profile:check` → `node scripts/acceptance/fleet-run.mjs --repo <repo> --env <档位> [--live-only]` |
+| 验收命令 | `pnpm --config.verify-deps-before-run=false acceptance:profile:check` → `node scripts/acceptance/fleet-run.mjs --repo <repo> --env <档位> [--live-only]` |

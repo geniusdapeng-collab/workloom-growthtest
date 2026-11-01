@@ -1,0 +1,36 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-002-0-1793546933956",
+  "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-facts.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "apps/server/src/video/marketing-facts.test.ts"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-002",
+    "assertion_index": 0
+  },
+  "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T15:28:53.956Z",
+  "finished_at": "2026-11-01T15:28:54.407Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-002-0-1793546933956.txt",
+      "sha256": "2d37260734c8c0991efdf497e13a1247545c58311032770bab6e9ec4dd798235",
+      "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918"
+    }
+  ]
+}

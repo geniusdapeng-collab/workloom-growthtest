@@ -288,6 +288,7 @@ test("handoff 拒绝无回归路径的未闭环项，通过后生成 RDAS 交接
   const handoff = JSON.parse(readFileSync(join(dir, "outputs", "mine-clear", TASK, "handoff.json"), "utf8"));
   assert.equal(handoff.environment_claim, "client-runtime");
   assert.equal(handoff.open_problems.length, 1);
+  assert.equal(handoff.acceptance_commands[0], "pnpm --config.verify-deps-before-run=false acceptance:profile:check");
   assert.match(handoff.acceptance_commands[1], /fleet-run\.mjs/);
   assert.equal(JSON.parse(readFileSync(ledgerPath, "utf8")).handoff.open_problem_ids[0], "MC-009");
 });

@@ -6,7 +6,7 @@ import { resolveGate } from "./gates.js";
 import { autoApproveHandler, runWithConfirmationHandler } from "./confirmation.js";
 import { WorkloomLLMEngine } from "./llm-adapter.js";
 import { buildRenderScript, loadPromptLengthSpec } from "./render-scripts.js";
-import { VideoStudio, attachDefaultCharacterAnchor, type ApprovalCallback, type EventSink } from "./studio.js";
+import { VideoStudio, attachDefaultCharacterAnchor, sanitizeGateContent, type ApprovalCallback, type EventSink } from "./studio.js";
 
 const repoRoot = resolve(import.meta.dirname, "../../..");
 const studioMocks = vi.hoisted(() => ({
@@ -109,6 +109,21 @@ describe("gates 映射", () => {
     expect(resolveGate("prompt")).toBe("G6_PROMPT");
     expect(resolveGate("dossier")).toBe("G1_DOSSIER");
     expect(resolveGate("nonexistent")).toBe("UNKNOWN");
+  });
+
+  it("创意主题门不把角色资产路径和授权元数据当创意正文", () => {
+    const content = [
+      "雨夜归家的都市故事。无台词、无旁白、仅环境声。",
+      "║ id=chen-zhuo;name=陈卓;portraitRef=bun  ║",
+      "║ -01-chen-zhuo/portraits/v3/平江路讲述   ║",
+      "║ 人-front.png;authorization=real-author  ║",
+    ].join("\n");
+    const sanitized = sanitizeGateContent("G2_THEME", content);
+    expect(sanitized).toContain("授权角色：陈卓");
+    expect(sanitized).toContain("系统内部绑定");
+    expect(sanitized).not.toContain("平江路讲述人");
+    expect(sanitized).not.toContain("portraitRef=");
+    expect(sanitized).not.toContain("authorization=");
   });
 });
 

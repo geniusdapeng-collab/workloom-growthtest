@@ -320,29 +320,59 @@ type JudgeResult = { approved: boolean; score: number; issues: string[]; suggest
  */
 export function coerceJudgeResult(json: unknown): JudgeResult | null {
   if (!json || typeof json !== "object" || Array.isArray(json)) return null;
-  const record = json as Record<string, unknown>;
+  const root = json as Record<string, unknown>;
+  const candidates: Record<string, unknown>[] = [root];
+  for (const key of ["result", "review", "verdict", "data", "judgement", "judgment"]) {
+    const value = root[key];
+    if (typeof value === "string") {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) candidates.push(parsed as Record<string, unknown>);
+      } catch {
+        /* The outer object is still evaluated below. */
+      }
+    } else if (value && typeof value === "object" && !Array.isArray(value)) {
+      candidates.push(value as Record<string, unknown>);
+    }
+  }
   const list = (value: unknown): string[] | null => {
     if (value === undefined || value === null) return [];
     if (typeof value === "string") return value.trim() ? [value.trim()] : [];
     if (Array.isArray(value) && value.every((item) => typeof item === "string")) return value as string[];
+    if (Array.isArray(value)) {
+      const normalized = value.map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (!item || typeof item !== "object" || Array.isArray(item)) return "";
+        const record = item as Record<string, unknown>;
+        const text = record.message ?? record.issue ?? record.problem ?? record.description
+          ?? record.suggestion ?? record.reason ?? record.text;
+        return typeof text === "string" ? text.trim() : "";
+      });
+      if (normalized.every(Boolean)) return normalized;
+    }
     return null;
   };
-  const approved = typeof record.approved === "boolean"
-    ? record.approved
-    : typeof record.approved === "string" && /^(?:true|false)$/i.test(record.approved.trim())
-      ? record.approved.trim().toLowerCase() === "true"
-      : null;
-  const score = typeof record.score === "number" && Number.isFinite(record.score)
-    ? record.score
-    : typeof record.score === "string" && record.score.trim() !== "" && Number.isFinite(Number(record.score))
-      ? Number(record.score)
-      : null;
-  const issues = list(record.issues);
-  const suggestions = list(record.suggestions);
-  const reasonRaw = record.reason ?? record.summary ?? record.conclusion;
-  const reason = typeof reasonRaw === "string" ? reasonRaw : "";
-  if (approved === null || score === null || score < 0 || score > 100 || !issues || !suggestions) return null;
-  return { approved, score, issues, suggestions, reason };
+  for (const record of candidates) {
+    const approvedRaw = record.approved ?? record.pass ?? record.ok ?? record.accepted ?? record["通过"];
+    const approved = typeof approvedRaw === "boolean"
+      ? approvedRaw
+      : typeof approvedRaw === "string" && /^(?:true|false|yes|no|approve|approved|reject|rejected|通过|拒绝)$/i.test(approvedRaw.trim())
+        ? /^(?:true|yes|approve|approved|通过)$/i.test(approvedRaw.trim())
+        : null;
+    const scoreRaw = record.score ?? record["总分"] ?? record["评分"] ?? record["分数"];
+    const score = typeof scoreRaw === "number" && Number.isFinite(scoreRaw)
+      ? scoreRaw
+      : typeof scoreRaw === "string" && /^-?\d+(?:\.\d+)?\s*(?:分|\/100)?$/u.test(scoreRaw.trim())
+        ? Number.parseFloat(scoreRaw)
+        : null;
+    const issues = list(record.issues ?? record.problems ?? record["问题"] ?? record["风险"]);
+    const suggestions = list(record.suggestions ?? record["建议"] ?? record["修改建议"]);
+    const reasonRaw = record.reason ?? record.summary ?? record.conclusion ?? record["理由"] ?? record["结论"];
+    const reason = typeof reasonRaw === "string" ? reasonRaw : "";
+    if (approved === null || score === null || !Number.isFinite(score) || score < 0 || score > 100 || !issues || !suggestions) continue;
+    return { approved, score, issues, suggestions, reason };
+  }
+  return null;
 }
 
 /**
@@ -500,6 +530,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         timeoutMs: 600_000,
         temperature: 0.2,
         retries: 0,
+        responseFormat: { type: "json_object" },
       });
       receipts.push({
         modelId: result.modelId,
@@ -515,16 +546,27 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         registryVersion: result.registryVersion,
       });
       let json: unknown;
+      let parseError: unknown = null;
       try {
         json = parseJudgeJson(result.text);
-      } catch (parseError) {
+      } catch (error) {
+        parseError = error;
+      }
+      let normalizedResult = parseError ? null : coerceJudgeResult(json);
+      if (!parseError && !normalizedResult) {
+        throw new Error("评审结果结构或语义非法；合法 JSON 不做语义重写，必须重新评审");
+      }
+      if (parseError) {
         const malformed = result.text.slice(0, 80_000);
-        log(`[producer][${stage}] 评审 JSON 非法，执行一次仅修复格式的重试：${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        const issue = parseError instanceof Error ? parseError.message : String(parseError);
+        log(`[producer][${stage}] 评审 JSON 语法非法，执行一次仅修复语法与字段结构的重试：${issue}`);
         result = await provider.chat([{
           role: "user",
           content: [
-            "仅修复 JSON，不得重新判定，不得改变 approved、score、issues、suggestions 或 reason 的语义。",
-            "只输出一个可被 JSON.parse 直接解析的对象。",
+            "仅修复 JSON 的语法和字段结构，不得重新判定证据，不得改变 approved、score、issues、suggestions 或 reason 的语义。",
+            "只输出一个可被 JSON.parse 直接解析的对象，且严格满足：",
+            '{"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}',
+            "issues 和 suggestions 必须是字符串数组；approved 必须是布尔值；score 必须是数字。",
             "<malformed_result>",
             malformed,
             "</malformed_result>",
@@ -550,8 +592,8 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
           registryVersion: result.registryVersion,
         });
         json = parseJudgeJson(result.text);
+        normalizedResult = coerceJudgeResult(json);
       }
-      const normalizedResult = coerceJudgeResult(json);
       if (!normalizedResult) throw new Error("评审结果结构非法");
       answers.push(normalizedResult);
     }

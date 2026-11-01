@@ -1,0 +1,36 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-002-0-1793550871306",
+  "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-facts.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "apps/server/src/video/marketing-facts.test.ts"
+    ]
+  },
+  "actor": "final_verifier_9005_r2",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-002",
+    "assertion_index": 0
+  },
+  "commit": "7acb40ce74b11264e23de606b4e37009100fb03b",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T16:34:31.306Z",
+  "finished_at": "2026-11-01T16:34:31.849Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-002-0-1793550871306.txt",
+      "sha256": "46302ae833fb66373cf806bf9041f159ba2790782bb87b08600acef9f1bf22ad",
+      "commit": "7acb40ce74b11264e23de606b4e37009100fb03b"
+    }
+  ]
+}

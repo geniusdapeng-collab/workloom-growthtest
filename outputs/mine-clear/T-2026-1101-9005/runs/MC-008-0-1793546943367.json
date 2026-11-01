@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-008-0-1793546943367",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '厨师等职业主体'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "厨师等职业主体"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-008",
+    "assertion_index": 0
+  },
+  "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T15:29:03.367Z",
+  "finished_at": "2026-11-01T15:29:03.880Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-008-0-1793546943367.txt",
+      "sha256": "fc6ac1693cd7ad485ee88030baa3ca7e74040f73cf96a560bc1b539c48070cec",
+      "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918"
+    }
+  ]
+}

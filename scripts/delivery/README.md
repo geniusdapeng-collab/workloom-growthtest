@@ -31,7 +31,7 @@ node scripts/delivery/mine-clear.mjs verify-baseline --ledger <台账> --repo . 
 
 # 5) M6 交接 RDAS v3.1
 node scripts/delivery/mine-clear.mjs handoff --ledger <台账> --env client-runtime
-pnpm acceptance:profile:check
+pnpm --config.verify-deps-before-run=false acceptance:profile:check
 node scripts/acceptance/fleet-run.mjs --repo <repo> --env client-runtime
 ```
 

@@ -1,0 +1,35 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-009-0-1793549285136",
+  "command": "pnpm acceptance:profile:check",
+  "exec": {
+    "file": "pnpm",
+    "args": [
+      "acceptance:profile:check"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-009",
+    "assertion_index": 0
+  },
+  "commit": "4bc4c7c70e9f77ab20d24e577eee6c5e141d56ea",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T16:08:05.136Z",
+  "finished_at": "2026-11-01T16:08:06.813Z",
+  "exit_code": 1,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "fail",
+  "outputs": [
+    {
+      "path": "evidence/MC-009-0-1793549285136.txt",
+      "sha256": "67e308ec38d2260b284a311bafdfe845ef4392f163e9fc8f0a09f8eb3df28672",
+      "commit": "4bc4c7c70e9f77ab20d24e577eee6c5e141d56ea"
+    }
+  ]
+}

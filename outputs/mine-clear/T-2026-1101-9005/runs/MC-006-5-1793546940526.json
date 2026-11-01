@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-5-1793546940526",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '归家片开场过载'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "归家片开场过载"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 5
+  },
+  "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T15:29:00.526Z",
+  "finished_at": "2026-11-01T15:29:01.053Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-5-1793546940526.txt",
+      "sha256": "12e26cb3ebf56afa311cd3db2000243c68061e4e5087908cb1b07a706c9f2e89",
+      "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918"
+    }
+  ]
+}

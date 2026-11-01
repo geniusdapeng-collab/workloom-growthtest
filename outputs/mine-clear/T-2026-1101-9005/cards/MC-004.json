@@ -1,0 +1,61 @@
+{
+  "id": "MC-004",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "叙事发现与需求确认单没有把分镜时长守恒投影到目标总时长",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:1500@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "旧实现只把 discovery 中已有的开场/场景/结尾时长相加，超出目标时也不会重投影。"
+    },
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:1358@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "需求 Markdown 不按 discovery 的节点时长修正总分镜，导致文字合同与结构化合同不一致。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 1500,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "normalizeNarrativeDiscovery"
+  },
+  "trigger_path": "15 秒目标但开场 6s、场景 6s+9s、结尾 9s，合计 30s；G3 读到分镜总和超限且确认单仍复用旧时长。",
+  "fix_plan": "按开场/主体场景/结尾原比例投影到目标时长，最后一段吸收舍入差；同步刷新 scene.totalDuration、Markdown 的总时长和每个节点括号秒数。",
+  "blast_radius": "影响叙事 discovery 和需求确认单的时长字段；无 duration 或总时长为 0 时保持原值，不改变镜头数或场景顺序。",
+  "conflict_paths": [
+    "packages/video-studio/src/vendor-compat.ts",
+    "packages/video-studio/src/vendor-compat.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "目标 15s，发现节点合计 30s，Markdown 同时含有旧总时长与各节点旧值",
+      "expect": "节点加总精确为 15s，Markdown 总时长和开场/场景/结尾秒数同步收敛，且留下 SCENE_DURATION_REBALANCED 修复记录",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词且明确无旁白'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "无台词且明确无旁白"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词且明确无旁白'",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中场景时长重投影相关提交",
+  "fixed_by": null,
+  "verified_by": null
+}

@@ -1,0 +1,157 @@
+{
+  "id": "MC-006",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "空镜与无角色 PRD 会继承模板场景、幻觉主体、错误定妆照要求和冲突的制作口径",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:1860@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "旧 PRD 归一直接信任生成的角色与场景字段；无角色项目仍可带入未出镜观者、手机/相机/飞鸟、模板道具和 character_portraits 必交付。"
+    },
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:3345@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "旧最终提示词合同只处理台词与长度，未清理人物面部模板、人声/配乐、英文负面词和字段编号跳号；真实空镜在 G6 仅得 42 分。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 1860,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "normalizeNarrativePrdContract"
+  },
+  "trigger_path": "空镜 brief 明确无人物、无动物、无文字、无配乐时，模型仍生成观者、动物、手机/相机、字幕、低频音乐、模板场景或默认色温；旧归一不会从源证据重建或删除这些冲突项。",
+  "fix_plan": "对无角色项目强制清空生成角色，按上游证据重建场景节点；删除 character_portraits 必交付；剥离人物/动物/文字/音乐线索；统一单色温；按源证据过滤道具；风险缓解按语义去重并确保每项可执行。最终提示词出口继续重建无角色/无动物字段、清除人物表演模板与人声配乐、统一中文负面约束并按镜头时长重排连续编号。",
+  "blast_radius": "影响叙事空镜和动物/人物项目的 PRD 投影与最终提示词；有明确角色与有源证据的字段继续保留，缺失证据不回填。",
+  "conflict_paths": [
+    "packages/video-studio/src/vendor-compat.ts",
+    "packages/video-studio/src/vendor-compat.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "模板场景、黑天鹅/飞鸟、手机/相机、字幕、音乐、默认暖色温、无角色但 character_portraits 必交付，以及普通猫片有角色对照",
+      "expect": "无角色合同不生成主体/定妆照/禁用线索，场景和道具来自源证据，风险和缓解一一对应；猫片仍保留橘猫 ID 与动作",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无角色空镜|真实猫片 G3'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "无角色空镜|真实猫片 G3"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "真实空镜 G6 回包含人物面部模板、人声对白、弦乐/BPM、英文负面词、30 秒总时长与断号字段",
+      "expect": "最终提示词只保留自然景物字段，台词显式为不适用，音频无人物/配乐，负面约束全中文，字段连续，约束使用本镜时长",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无角色空镜最终提示词'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "无角色空镜最终提示词"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "人物片最终提示词含无关站立/张臂模板、片头标题动画超本镜时长、英文 cinematic/photorealistic 与技能尾标",
+      "expect": "角色字段绑定真实角色名，微动作不套模板，片头字段显式不适用，英文风格与技能残留清除",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '人物片最终提示词锁定真实角色'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "人物片最终提示词锁定真实角色"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "动物角色 gender/ageRange 为 null，PRD 同时存在非有限暖区比例字段",
+      "expect": "结构化 PRD 与渲染 Markdown 不出现 null/undefined/NaN/[object Object]，空值统一为不适用",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无人物但有动物'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "无人物但有动物"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "底层镜头字段含冲突角色、杂散标题、错误化妆槽位、英文风格词和漂移编号",
+      "expect": "canonical 投影从可信字段重建固定 26 栏，角色、动作、定妆照、时间和负面约束一致",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t 'canonical 最终合同'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "canonical 最终合同"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "15 秒归家片把收伞、开门、换鞋、拧灯、坐下全部挤在开场并把主体场景留空",
+      "expect": "按源动作重分配为开场/主体/结尾，关键元素和道具合同与场景逐项一致，雨伞进入道具",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '归家片开场过载'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "归家片开场过载"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "G2 创意主题正文混入 id/name/portraitRef/authorization 内部资产行，路径含无关地域词",
+      "expect": "审批内容仅保留授权角色姓名与系统内部绑定声明，不暴露资产路径或授权元数据",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/studio.test.ts -t '创意主题门不把角色资产路径'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/studio.test.ts",
+          "-t",
+          "创意主题门不把角色资产路径"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无角色空镜|真实猫片 G3|无角色空镜最终提示词'",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中 PRD 空镜归一相关提交",
+  "fixed_by": null,
+  "verified_by": null
+}

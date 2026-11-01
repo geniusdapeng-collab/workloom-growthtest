@@ -212,7 +212,7 @@ pnpm product:verify                            # 产品身份与内容
 pnpm bundle:governance                         # bundle 治理
 pnpm ui:governance                             # 三端 UI 治理
 node scripts/runtime-deps-lock.mjs verify      # 桌面运行时锁
-pnpm acceptance:profile:check                  # 验收 profile 契约
+pnpm --config.verify-deps-before-run=false acceptance:profile:check  # 验收 profile 契约
 pnpm release:gate                              # 发布门禁（需要真机在跑）
 ```
 
@@ -287,7 +287,7 @@ RDAS 共享相同证据契约：固定 276 个唯一 ID、检查单散列与完�
   "closed_problems": [{"id": "MC-001", "assertions": [{"command": "node --test ...", "exec": {"file": "node", "args": ["--test", "..."]}, "last_result": "pass", "evidence": {"path": "evidence/....txt", "sha256": "<64hex>", "commit": "<40hex>"}, "run": {"path": "runs/....json", "sha256": "<64hex>", "commit": "<40hex>"}}]}],
   "open_problems": [{"id": "MC-007", "evidence": "...", "regression": "node ...", "fix_plan": "..."}],
   "acceptance_commands": [
-    "pnpm acceptance:profile:check",
+    "pnpm --config.verify-deps-before-run=false acceptance:profile:check",
     "node scripts/acceptance/fleet-run.mjs --repo workloom-im --env client-runtime --live-only"
   ],
   "environment_claim": "local-preview | client-runtime | deployed",

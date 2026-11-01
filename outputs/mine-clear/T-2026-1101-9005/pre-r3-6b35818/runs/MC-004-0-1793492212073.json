@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-004-0-1793492212073",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词且明确无旁白'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "无台词且明确无旁白"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-004",
+    "assertion_index": 0
+  },
+  "commit": "9d3aea887092e8e48f403c8ec90e01e6506e2ff1",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T00:16:52.073Z",
+  "finished_at": "2026-11-01T00:16:52.584Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-004-0-1793492212073.txt",
+      "sha256": "9bba725dc603ec1eba68abe944ef99cd6d0ad86aae222716124cf4f7056f0961",
+      "commit": "9d3aea887092e8e48f403c8ec90e01e6506e2ff1"
+    }
+  ]
+}

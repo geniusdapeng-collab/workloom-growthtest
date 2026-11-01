@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-4-1793550195957",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t 'canonical 最终合同'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "canonical 最终合同"
+    ]
+  },
+  "actor": "final_verifier_9005_r2",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 4
+  },
+  "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T16:23:15.957Z",
+  "finished_at": "2026-11-01T16:23:16.474Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-4-1793550195957.txt",
+      "sha256": "cf7c82594efe11d105d0e09393d78e74a1d6c95403355d4f95c51c65d0d5d87a",
+      "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+    }
+  ]
+}

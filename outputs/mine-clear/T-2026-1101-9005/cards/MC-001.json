@@ -1,0 +1,53 @@
+{
+  "id": "MC-001",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "真实营销 A1 评审对合法但形状漂移的回包不稳定，且错误结构可能被二次语义重写",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/producer-gate.ts:517@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "9d4889e3ab0fb3389a029651aac1fdca98db35591da772afa111e4b8edd096c0",
+      "note": "真实米家净化器 A1 在监制阶段报“评审结果结构非法”；旧实现首次请求未要求 JSON 模式，只在 JSON.parse 失败后重试，合法的语义非法结果缺少稳定 fail-closed 断言。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/producer-gate.ts",
+    "line": 517,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "reviewStage"
+  },
+  "trigger_path": "模型返回可解析 JSON，但 approved/score/issues/suggestions 结构或取值范围不合契约；旧代码无法稳定区分可无损归一与必须失败关闭的结果。",
+  "fix_plan": "首次评审显式请求 json_object；仅对 JSON 语法损坏执行一次 schema-only 修复；合法 JSON 中缺少布尔裁决、0-100 分数或字符串数组时直接 unverified，禁止模型把语义非法结果改写成通过。",
+  "blast_radius": "影响所有调用 reviewStage 的视频门监制；正常结构不增加调用，坏 JSON 最多增加一次修复调用，语义非法结果从可能被改写改为失败关闭。",
+  "conflict_paths": [
+    "packages/video-studio/src/producer-gate.ts",
+    "packages/video-studio/src/producer-gate.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "首次监制回包分别是合法 unsafe shape、score=101/null、数组或 null",
+      "expect": "首次请求包含 response_format=json_object；语义非法时不发第二次修复调用并返回 unverified",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/producer-gate.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/producer-gate.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/producer-gate.test.ts",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中 producer-gate 相关提交",
+  "fixed_by": null,
+  "verified_by": null
+}

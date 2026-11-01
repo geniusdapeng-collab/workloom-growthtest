@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-004-0-1793550873714",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词且明确无旁白'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "无台词且明确无旁白"
+    ]
+  },
+  "actor": "final_verifier_9005_r2",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-004",
+    "assertion_index": 0
+  },
+  "commit": "7acb40ce74b11264e23de606b4e37009100fb03b",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T16:34:33.714Z",
+  "finished_at": "2026-11-01T16:34:34.322Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-004-0-1793550873714.txt",
+      "sha256": "80f6243d9894fb94cb8baf891069df2af9059a5edcead8d193339d70b12e9c96",
+      "commit": "7acb40ce74b11264e23de606b4e37009100fb03b"
+    }
+  ]
+}

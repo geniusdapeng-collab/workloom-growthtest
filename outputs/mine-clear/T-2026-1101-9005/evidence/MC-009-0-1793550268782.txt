@@ -1,0 +1,8 @@
+[acceptance:profile] configuration=valid business=unverified suites=1 tasks=3
+  说明：结构校验不连接服务、数据库或模型；行业结果、生产环境和完整 276 项仍须实际执行并绑定证据。
+
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.onlyBuiltDependencies", "pnpm.overrides". See https://pnpm.io/settings for the new home of each setting.
+$ node scripts/acceptance/profile-check.mjs
+
+exit_code=0 signal=none error=none
+assertion_validation={"ok":true,"errors":[]}

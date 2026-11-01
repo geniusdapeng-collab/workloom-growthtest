@@ -1,0 +1,58 @@
+{
+  "id": "MC-011",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "人物片声明无动物时被误判为无角色，PRD 与最终提示词会清空合法人物",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:2541@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "explicitNoCharacters 把 explicitNoAnimals 并入；人物片只写“无动物”时角色仍存在，但镜头 subjectIds 被清空，角色资产声明无角色。最终提示词路径在后续代码重复同一错误。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 2541,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "normalizeNarrativePrdContract"
+  },
+  "trigger_path": "明确人物和“无动物”同时出现 → explicitNoAnimals=true → explicitNoCharacters=true → canonicalCharacters 被清空，但 characterSystem 原记录仍在；最终提示词同样将人物清空。",
+  "fix_plan": "把无角色只绑定无人物/无角色/纯空镜语义；无动物只过滤动物。PRD 与最终提示词共用同一判断，角色仍在时保留角色主体和镜头绑定。",
+  "blast_radius": "影响含“无动物”的人物片和动物片；真正无人物、无角色、纯空镜仍清空人物。",
+  "conflict_paths": [
+    "packages/video-studio/src/vendor-compat.ts",
+    "packages/video-studio/src/vendor-compat.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "上游明确陈卓为人物主角，同时声明无动物并要求简短对白",
+      "expect": "PRD 保留陈卓角色，所有镜头 subjectIds 继续绑定 char_1；无动物不得触发无人物分支",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无动物不等于无人物'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "无动物不等于无人物"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无动物不等于无人物'",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中无动物/无角色解耦修复和对应回归用例",
+  "fixed_by": "codex-root-repair-T-2026-1101-9005",
+  "verified_by": null,
+  "verified_at": null,
+  "verification_evidence": null,
+  "notes": "由独立验收实际调用生产 PRD 归一函数发现。"
+}

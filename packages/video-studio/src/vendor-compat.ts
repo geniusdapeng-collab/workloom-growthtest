@@ -1043,6 +1043,7 @@ const NARRATIVE_ROLE_TERMS: Array<{
   { pattern: /女主/u, name: "女主", role: "protagonist" },
   { pattern: /男主/u, name: "男主", role: "protagonist" },
   { pattern: /妻子|丈夫/u, name: "伴侣", role: "supporting" },
+  { pattern: /两位厨师|两名厨师|两个厨师|面馆师傅|厨师/u, name: "厨师", role: "protagonist" },
   { pattern: /店员|客服/u, name: "店员", role: "supporting" },
   { pattern: /顾客|消费者/u, name: "顾客", role: "supporting" },
   { pattern: /学生|白领|上班族|通勤族/u, name: "年轻职场人", role: "protagonist" },
@@ -1050,7 +1051,14 @@ const NARRATIVE_ROLE_TERMS: Array<{
   { pattern: /年轻男性|男生|男人/u, name: "年轻男性", role: "protagonist" },
   { pattern: /年轻人|青年/u, name: "年轻人", role: "protagonist" },
   { pattern: /主角/u, name: "主角", role: "protagonist" },
+  { pattern: /橘猫|猫咪|小猫|猫/u, name: "猫", role: "protagonist" },
+  { pattern: /小狗|狗狗|狗/u, name: "狗", role: "protagonist" },
+  { pattern: /小鸟|鸟儿|鸟/u, name: "鸟", role: "protagonist" },
 ];
+
+function isNarrativeAnimal(name: unknown): boolean {
+  return /(?:橘猫|猫咪|猫|小狗|狗狗|狗|小鸟|鸟儿|鸟|马|羊|牛|鹿|兔|鱼)/u.test(String(name ?? ""));
+}
 
 function canonicalCharacterFromEvidence(upstream: Record<string, unknown>): Array<Record<string, unknown>> {
   const explicit = upstream?.character && typeof upstream.character === "object"
@@ -1115,28 +1123,89 @@ export function inferNarrativeCharacters(input: {
     : {};
   const sceneText = [
     input.intent,
+    String(input.upstream?.special_notes ?? ""),
+    String(input.upstream?.visual_style ?? ""),
     typeof scene.opening === "object" ? JSON.stringify(scene.opening) : "",
     Array.isArray(scene.scenes) ? JSON.stringify(scene.scenes) : "",
     typeof scene.ending === "object" ? JSON.stringify(scene.ending) : "",
   ].join(" ");
-  if (/(?:无|没有|不出现)(?:真人|人物|角色|模特|演员)|纯空镜|商品为主|场景为主体/u.test(sceneText)) {
-    return [];
-  }
   const found = NARRATIVE_ROLE_TERMS.filter((entry) => entry.pattern.test(sceneText));
-  const specific = found.filter((entry) => entry.name !== "默认模特角色");
-  const selected = specific.length > 0 ? specific : found.slice(0, 1);
+  const animals = found.filter((entry) => isNarrativeAnimal(entry.name));
+  if (animals.length > 0 && /(?:无动物|不出现动物|禁止动物|不得出现[^。；\n]{0,8}动物)/u.test(sceneText)) return [];
+  if (animals.length === 0
+    && /(?:无|没有|不出现)(?:真人|人物|角色|模特|演员)|纯空镜|商品为主|场景为主体/u.test(sceneText)) return [];
+  const candidates = animals.length > 0 ? animals : found;
+  const specific = candidates.filter((entry) => entry.name !== "默认模特角色");
+  const selected = specific.length > 0 ? specific : candidates.slice(0, 1);
   const unique = new Map<string, { name: string; role: "protagonist" | "supporting"; description: string }>();
   for (const entry of selected) {
     const usesDefaultModel = /内置默认模特|默认模特/u.test(input.intent);
-    const description = entry.name === "默认模特角色" || usesDefaultModel
-      ? "使用仓库内置默认模特；出镜前仍需按当前角色档案绑定真实图像与授权范围"
-      : "叙事片明确人物；出镜前需绑定角色档案与授权范围";
+    const animal = isNarrativeAnimal(entry.name);
+    if (entry.name === "厨师" && /(?:两位|两名|两个).{0,3}厨师/u.test(sceneText)) {
+      unique.set("厨师 A", {
+        name: "厨师 A",
+        role: "protagonist",
+        description: "同场两位厨师之一；锁定拉面岗位、发型脸型、身高、服装颜色与手部外观，不得与厨师 B 合并",
+      });
+      unique.set("厨师 B", {
+        name: "厨师 B",
+        role: "protagonist",
+        description: "同场两位厨师之一；锁定看火递碗岗位、发型脸型、身高、服装颜色与手部外观，不得与厨师 A 合并",
+      });
+      continue;
+    }
+    const animalCue = animal
+      ? sceneText.match(new RegExp(`(?:橘|黑|白|灰|花|三花|狸花)?${entry.name}`, "u"))?.[0] ?? entry.name
+      : "";
+    const physicalAnchors = animal
+      ? [
+          animalCue,
+          /湿毛成缕|毛(?:发)?被打湿/u.test(sceneText) ? "毛发被打湿成缕" : "",
+          /耳尖挂水珠/u.test(sceneText) ? "耳尖挂水珠" : "",
+          /盘成一团|蜷缩/u.test(sceneText) ? "体型与盘卧姿态固定" : "",
+        ].filter(Boolean)
+      : [];
+    const description = animal
+      ? `${physicalAnchors.join("；")}；跨镜锁定同一品种、体型、毛色、湿度和面部特征；肖像登记仅适用于平台授权动物素材，不得替换物种`
+      : entry.name === "厨师"
+        ? "厨师主体；锁定发型、脸型、身高、服装颜色与岗位分工，不得增减人数"
+      : entry.name === "默认模特角色" || usesDefaultModel
+        ? "使用仓库内置默认模特；出镜前仍需按当前角色档案绑定真实图像与授权范围"
+        : "叙事片明确人物；出镜前需绑定角色档案与授权范围";
     unique.set(entry.name, { name: entry.name, role: entry.role, description });
   }
   return [...unique.values()];
 }
 
-const NARRATIVE_ACTION_PATTERN = /(摸索|摸向|摸到|碰到|触碰|擦过|擦拭|打滑|扫过|滑落|对准|插入|拧亮|被拧|拧动|拧|旋动|按压|按下|按动|压(?=开关|按钮|下|住|向|在)|磕出|贴上|贴在|推开|打开|关闭|走到|走进|拿起|放下|放到|举起|塌下|看向|抚摸|收伞|抖落|摸黑|贴住)/gu;
+function narrativeSpeechPolicy(value: unknown): {
+  noLipSyncDialogue: boolean;
+  voiceoverMentioned: boolean;
+  voiceoverDenied: boolean;
+  voiceoverAllowed: boolean;
+  dialogueAllowed: boolean;
+  allSpeechForbidden: boolean;
+} {
+  const text = String(value ?? "");
+  const noLipSyncDialogue = /(?:无.{0,2}台词|无对白|不建议加对白|不做口型|纯画面无对白)/u.test(text);
+  const voiceoverMentioned = /(?:旁白|画外音|画外)/u.test(text);
+  const voiceoverDenied = text.split(/[。；;\n]/u).some((clause) => {
+    const compact = clause.replace(/\s+/gu, "");
+    return /(?:禁止|不得|不要|不加|不添加|不允许|避免)(?:任何|额外)?(?:使用|添加|加入|保留|有|出现|存在)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)/u.test(compact)
+      || /(?:无|没有|零)(?:任何|额外)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)/u.test(compact)
+      || /(?:字幕|文字)(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)(?:都|均|也)?(?:不要|禁止|禁用|去掉|删除)/u.test(compact);
+  });
+  const voiceoverAllowed = voiceoverMentioned && !voiceoverDenied;
+  return {
+    noLipSyncDialogue,
+    voiceoverMentioned,
+    voiceoverDenied,
+    voiceoverAllowed,
+    dialogueAllowed: !noLipSyncDialogue,
+    allSpeechForbidden: noLipSyncDialogue && !voiceoverAllowed,
+  };
+}
+
+const NARRATIVE_ACTION_PATTERN = /(摸索|摸向|摸到|碰到|触碰|擦过|擦拭|打滑|扫过|滑落|对准|插入|拧亮|被拧|拧动|拧|旋动|按压|按下|按动|压(?=开关|按钮|下|住|向|在)|磕出|贴上|贴在|推开|开门|打开|关闭|换鞋|走到|走进|拿起|放下|放到|举起|抬起|塌下|看向|抚摸|收伞|抖落|摸黑|贴住|探头|伸出|伸爪|接水|缩回|蜷缩|盘成|坐回|坐下|坐在|舔|蹭|跃过|跑过|回头|抬头|低头|奔跑|慢跑|沿河|停下|转身|跳到|钻回|探出)/gu;
 
 export function extractNarrativeActions(
   discovery: Record<string, unknown>,
@@ -1145,41 +1214,63 @@ export function extractNarrativeActions(
   const scene = discovery?.sceneStructure && typeof discovery.sceneStructure === "object"
     ? discovery.sceneStructure as Record<string, unknown>
     : {};
-  const purposes = [
+  const scenePurposes = [
     scene.opening && typeof scene.opening === "object" ? String((scene.opening as Record<string, unknown>).purpose ?? "") : "",
     ...(Array.isArray(scene.scenes)
       ? scene.scenes.map((item) => item && typeof item === "object" ? String((item as Record<string, unknown>).purpose ?? "") : "")
       : []),
     scene.ending && typeof scene.ending === "object" ? String((scene.ending as Record<string, unknown>).purpose ?? "") : "",
-    String(upstream.special_notes ?? ""),
+  ].filter(Boolean);
+  const purposes = [
+    ...scenePurposes,
     String(upstream._originalStoryText ?? upstream.original_story_text ?? ""),
+    String(upstream.special_notes ?? ""),
   ].filter(Boolean);
   const actions: string[] = [];
-  const actionKeys = new Set<string>();
+  const actionFamilies = new Set<string>();
+  const actionKey = (verb: string, phrase: string): string => {
+    if (/探出|探头/u.test(verb)) return "probe";
+    if (/缩回|蜷缩|盘成|坐回|钻回/u.test(verb)) return "retreat";
+    if (/伸爪|伸出|接水/u.test(verb)) return "reach";
+    if (/举起|抬起/u.test(verb)) return "lift";
+    if (/跑过|奔跑|慢跑/u.test(verb)) return "run";
+    if (/停下|转身/u.test(verb)) return "turn";
+    return phrase
+      .replace(/^(?:他|她|陈卓|人物|橘猫|猫|狗|鸟)/u, "")
+      .replace(/旧|老旧/gu, "")
+      .replace(/灯罩(?:上|下)?/gu, "灯罩")
+      .replace(/贴在/u, "贴上");
+  };
   for (const purpose of purposes) {
     for (const match of purpose.matchAll(NARRATIVE_ACTION_PATTERN)) {
       const index = match.index ?? 0;
       const before = purpose.slice(Math.max(0, index - 6), index).replace(/^.*[，。；、：]/u, "");
-      const after = purpose.slice(index + match[0].length, index + match[0].length + 8).split(/[，。；、：]/u)[0] ?? "";
+      const after = purpose.slice(index + match[0].length, index + match[0].length + 16).split(/[，。；、：]/u)[0] ?? "";
       const locationPrefix = /摸索|摸向|摸黑/u.test(match[0]) && /沿墙|扶墙|贴墙/u.test(before)
         ? (before.match(/沿墙|扶墙|贴墙/u)?.[0] ?? "")
         : "";
-      const phrase = `${locationPrefix}${match[0]}${after}`
+      let phrase = `${locationPrefix}${match[0]}${after}`
         .replace(/的?(?:特写|镜头)/gu, "")
         .replace(/^贴[在到]/u, "贴上")
         .trim();
-      const key = phrase
-        .replace(/^(?:他|她|陈卓|人物)/u, "")
-        .replace(/旧|老旧/gu, "")
-        .replace(/灯罩(?:上|下)?/gu, "灯罩")
-        .replace(/贴在/u, "贴上");
-      if (phrase.length >= 2 && !actionKeys.has(key)) {
-        actionKeys.add(key);
+      if (/^坐在.*听雨/u.test(phrase)) phrase = "坐下听雨";
+      const key = actionKey(match[0], phrase);
+      const malformed = /(?:绒毛|骨上|undefined|null|未标注|关键词|标签|对象|待补|省略)/iu.test(phrase)
+        || /(?:仅一|离水珠|悬停瞬间|收束动作)$/u.test(phrase)
+        || /(?:爪垫|尾巴).*(?:瞬间|动作)$/u.test(phrase)
+        || /(?:画面|构图|景别|机位|上三分之一|下三分之一)/u.test(phrase)
+        || /^[\d\s，。；、：]/u.test(phrase);
+      if (phrase.length >= 2 && !malformed && !actionFamilies.has(key)) {
+        actionFamilies.add(key);
         actions.push(phrase);
       }
     }
   }
-  return actions.slice(0, 8);
+  const normalized = actions
+    .map((phrase) => phrase.replace(/[。；，、\s]+$/u, ""))
+    .filter((phrase, index, list) => !list.some((other, otherIndex) =>
+      otherIndex !== index && other.length > phrase.length && other.includes(phrase)));
+  return normalized.slice(0, 8);
 }
 
 export function inferNarrativeProps(input: {
@@ -1207,7 +1298,7 @@ export function inferNarrativeProps(input: {
   const terms: Array<{ pattern: RegExp; name: string }> = [
     { pattern: /(?:老旧|旧|新)?台灯|灯罩|钨丝|旋钮|开关/gu, name: "台灯" },
     { pattern: /(?:一串)?钥匙/gu, name: "钥匙" },
-    { pattern: /(?:门缝|门轴|门框|锁孔|防盗门|木门|玻璃门|门)/gu, name: "门" },
+    { pattern: /(?:门缝|门轴|门框|锁孔|防盗门|木门|玻璃门|(?<!快)门)/gu, name: "门" },
     { pattern: /(?:长柄|折叠|透明|湿)?雨?伞(?:骨|沿|布)?/gu, name: "雨伞" },
     { pattern: /(?:手机)?屏幕|手机/gu, name: "手机" },
     { pattern: /(?:楼梯)?扶手/gu, name: "扶手" },
@@ -1223,8 +1314,16 @@ export function inferNarrativeProps(input: {
     { pattern: /纸箱/gu, name: "纸箱" },
     { pattern: /(?:纸船|纸条|照片|信封)/gu, name: "纸质道具" },
     { pattern: /(?:自行|公交|列|汽|火)车/gu, name: "车" },
-    { pattern: /(?:猫|狗|鸟|宠物)/gu, name: "动物" },
     { pattern: /(?:陶器|瓷器|文物|石碑|石桥|桥)/gu, name: "场景器物" },
+    { pattern: /(?:便利店)?灯箱/gu, name: "灯箱" },
+    { pattern: /屋檐|檐口/gu, name: "屋檐" },
+    { pattern: /积水|水洼/gu, name: "积水" },
+    { pattern: /水滴|水珠/gu, name: "水滴" },
+    { pattern: /薄雾|雾气|雾层|晨雾/gu, name: "薄雾" },
+    { pattern: /远山|山形|山脉/gu, name: "远山" },
+    { pattern: /芦苇|芦花/gu, name: "芦苇" },
+    { pattern: /湖面|水面|海面/gu, name: "水面" },
+    { pattern: /涟漪|波纹/gu, name: "涟漪" },
   ];
   const props: string[] = [];
   for (const term of terms) {
@@ -1243,6 +1342,7 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     ? riskAssessment.mitigationSuggestions.map(String).filter(Boolean)
     : [];
   const groups = [
+    { pattern: /(?:空间|布局|场景|角色|服装|造型)[^。；]{0,20}(?:一致|漂移)|跨镜头[^。；]{0,20}(?:空间|布局|角色|服装|造型)(?:一致|漂移)/u, weight: 24 },
     { pattern: /手部|手指|指腹|指尖|关节|触碰|接触|穿模|握|按键|开关/u, weight: 12 },
     { pattern: /台灯|道具|纹理|缺口|磨痕|物理一致/u, weight: 8 },
     { pattern: /低照度|曝光|色温|胶片颗粒|光源|光比|光影/u, weight: 6 },
@@ -1257,6 +1357,8 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     "雨珠", "伞骨", "液体", "水珠", "湿发", "发丝", "面部",
     "划痕", "积尘", "材质", "纹理", "手指", "开关", "穿模",
     "台灯", "道具", "身份", "模特", "定妆", "角色",
+    "爪心", "猫爪", "指甲", "肉垫", "爪尖", "溅花", "水花", "缩爪",
+    "尾巴", "尾尖", "盘成", "蜷缩", "收束", "箱内",
   ];
   const featureGroups = [
     ["雨珠", "雨具", "雨伞", "伞骨", "雨丝"],
@@ -1265,14 +1367,70 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     ["指纹", "磨白", "发黄", "塑料", "颗粒", "灰尘", "微质感", "磨砂", "材质", "纹理"],
     ["低照度", "曝光", "色温", "光比", "胶片颗粒"],
     ["身份", "面部", "模特", "定妆照", "角色一致"],
+    ["爪心", "猫爪", "爪尖", "指甲", "肉垫", "溅花", "水花", "缩爪"],
+    ["尾巴", "尾尖", "盘成", "蜷缩", "收束", "箱内"],
   ];
   const generic = /(?:预留重试|准备备选|待针对|补齐缓解|降低复杂度|保持视觉一致|提升质量)/u;
   const fallback = (text: string): string => {
+    if (/(?:空间|布局|场景|角色|服装|造型)[^。；]{0,20}(?:一致|漂移)|跨镜头[^。；]{0,20}(?:空间|布局|角色|服装|造型)(?:一致|漂移)/u.test(text)) {
+      return "锁定同一角色参考帧、服装与场景平面图，固定门、桌面和主光位置；逐镜检查角色轮廓、道具比例与空间连线，异常只重做该镜，不改动已确认场景结构。";
+    }
+    if (/手持|微晃|浅景深人物.*稳/u.test(text)) {
+      return "将本镜改为三脚架固定机位，锁定镜头高度、轴线与焦平面；用稳定器或后期轻微稳像补偿呼吸，不改变人物动作和构图。";
+    }
+    if (/旧台灯.*(?:色温|灯罩.*旧痕|暖光斑)|灯罩.*旧痕/u.test(text)) {
+      return "锁定旧台灯2700K主光、灯罩旧痕位置和墙面暖光斑轮廓，使用同一灯具参考帧与固定LUT；逐镜检查色温和光斑不漂移，异常只重做该镜照明。";
+    }
+    if (/窗外|雨幕|玻璃.*(?:雨光|反射)/u.test(text)) {
+      return "把窗外雨幕设为独立背景板，锁定雨线方向、密度和反射强度；室内人物与玻璃保持固定焦平面，逐镜对照同一参考帧，异常只重做雨幕层，不改变主体动作。";
+    }
+    if (/猫爪|爪心|爪尖|肉垫|爪形|多趾/u.test(text)) {
+      return "把猫爪接水拆成爪尖伸入、水滴下坠、爪垫接水三个固定微距短镜，锁定四趾轮廓、肉垫位置和爪毛湿度；水花用已批准实拍素材插入，出现多趾、粘连或穿模只重做该镜。";
+    }
+    if (/湿毛|毛发.*(?:干湿|连续|跳变)|干湿状态/u.test(text)) {
+      return "按镜头锁定单一干湿度，写清湿毛成缕方向和爪垫泥水状态；跨镜用同一参考帧与光位复核，不允许同镜内干湿跳变，异常只重做相邻镜。";
+    }
+    if (/(?:猫头|纸箱).*(?:穿模|边界)|(?:箱沿|纸箱).*毛发/u.test(text)) {
+      return "用箱沿遮挡猫头与纸箱交界，固定机位、焦距和暖光边缘；逐镜检查毛发穿透、边界闪烁和纸板形变，失败只重做该遮挡镜，不整段重生成。";
+    }
+    if (/蜷缩|肢体数量|尾巴.*(?:穿模|漂移)|盘成/u.test(text)) {
+      return "把蜷缩拆成低头、尾巴扫入遮鼻、身体盘紧三个固定短镜；用箱沿前景遮住尾部连接处，锁定同一体型与光位，逐镜核对肢体数量，异常只重做该收束镜。";
+    }
+    if (/AI生成质量|生成质量不确定|质量不确定|多次迭代/u.test(text)) {
+      return "把高风险画面拆成固定机位短镜，逐镜锁定首帧、主体外观、光源方向和接触关系；每镜生成后检查结构、材质与连续性，失败只重做该镜，不整条管线重跑。";
+    }
+    if (/时长|节奏|镜头时长分配/u.test(text)) {
+      return "先按场景建立硬时间预算并写入镜头合同，再逐镜实测 durationSeconds；场景加总必须等于目标总时长，超差只重分配同场景镜头，不压缩有明确动作的镜头。";
+    }
+    if (/薄雾|雾层|雾散|时序.*(?:闪烁|连贯|一致)|回卷|局部重复/u.test(text)) {
+      return "把雾散改为分层透明度递减：近景、中景和远景各锁一层漂移速度与透明度曲线，每镜只允许单调散开；逐镜检查回卷、闪断和贴图撕裂，失败只重做该雾层。";
+    }
+    if (/涟漪|波纹|水面.*(?:质感|运动)/u.test(text)) {
+      return "把水面运动独立成一层：锁定风向、涟漪起点、扩频率和消失边界，用水面参考帧与芦苇摆动方向交叉核对；高频纹理只在局部特写内生成，必要时替换为实拍水面，异常只重做该层。";
+    }
+    if (/低饱和|青灰|水面.*高光|高光过强|暗部.*糊|质感控制/u.test(text)) {
+      return "把低照度质感单独做技术样片：锁定青灰白平衡、暗部抬升与高光滚降，水面只保留低强度反射；每镜检查塑料感、频闪、色带与暗部断层，不达标只重做该镜的质感参数。";
+    }
+    if (/无主体|空镜.*幻觉|生成人物|人物、动物|船只|水印/u.test(text)) {
+      return "为每个镜头建立唯一负面清单：无人物、无动物、无船、无品牌、无文字、无水印；生成前写入请求负面词，生成后检查首中尾帧和画面四角，出现任一元素只重做该镜，禁止用裁切掩盖。";
+    }
+    if (/涟漪.*(?:方向|频率)|风.*涟漪|无风自动|波纹.*重复/u.test(text)) {
+      return "把风源与水面运动绑定：芦苇摆动方向决定涟漪扩散方向，每段只允许一个持续风源；目标帧核对涟漪频率、方向与芦苇摆动一致，无风段落必须保持静水，失败只重做该段。";
+    }
+    if (/芦苇|杆状|前景.*(?:抖动|分叉|数量跳变)/u.test(text)) {
+      return "把芦苇拆成独立的实拍前景层，固定杆数、间距、朝向和焦点；生成层只负责远山、雾和水面，合成前逐帧核对杆体无抖动、分叉或增殖，异常只重做前景层。";
+    }
+    if (/远山|山形|山脊|剪影.*(?:细节|补全|漂移|新增)/u.test(text)) {
+      return "把远山固定成单色低对比剪影参考层，锁定山脊转折点与画面占比；生成请求禁止补出森林、建筑或积雪细节，逐帧对照参考轮廓，异常只重做山体遮罩。";
+    }
     if (/划痕|积尘|指纹|磨白|发黄|塑料|颗粒|灰尘|微质感|磨砂|裂纹|磨痕|材质|纹理|道具/u.test(text)) {
       return "把微质感锚点拆成固定机位微距短镜头，单镜不超过2秒，锁定同一参考帧、侧向硬光和非重复磨损路径；不在运动长镜中生成精细纹理。";
     }
     if (/钨丝|灯丝|暗转亮|由暗到亮|起亮/u.test(text)) {
       return "把钨丝起亮拆成暗态静帧、微亮插入、暖光稳定三个短镜，锁定灯丝形状与亮度曲线；连续光色变化交由后期曲线控制，不用单镜猜测。";
+    }
+    if (/尾巴|尾尖|盘成|蜷缩|收束/u.test(text)) {
+      return "把结尾收束拆为低头、尾尖扫入遮鼻、固定中近景三个短镜；用箱沿前景遮挡尾部与身体连接处，锁定同一机型与光位，尾尖稳定贴合鼻头后再进入下一阶段。";
     }
     if (/手部|手指|指腹|指尖|关节|穿模|开关|旋钮/u.test(text)) {
       return "将手部动作拆成固定机位的短特写，分别拍悬停、局部接触和离开；用遮挡与剪辑规避完整手指接触，并为每镜锁定同一参考帧。";
@@ -1292,14 +1450,56 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     return "将风险镜头拆为更短的单动作镜头，锁定首帧、角色、道具与光位；每镜生成前复核参考帧，失败时改用已批准素材，不做规则兜底。";
   };
   const specificMitigations = mitigations.filter((item) => !generic.test(item));
-  return risks.map((risk) => {
+  const tokens = (value: string): Set<string> => {
+    const out = new Set<string>();
+    const normalized = value.replace(/[^\p{Script=Han}A-Za-z0-9]+/gu, " ").replace(/\s+/gu, " ").trim();
+    for (const chunk of normalized.split(" ")) {
+      for (const size of [2, 3, 4]) {
+        for (let index = 0; index <= chunk.length - size; index += 1) out.add(chunk.slice(index, index + size));
+      }
+    }
+    return out;
+  };
+  const paired = risks.map((risk) => {
     const text = `${String(risk.risk ?? "")} ${String(risk.impact ?? "")}`;
+    if (/(?:空间|布局|场景|角色|服装|造型)[^。；]{0,20}(?:一致|漂移)|跨镜头[^。；]{0,20}(?:空间|布局|角色|服装|造型)(?:一致|漂移)/u.test(text)) {
+      return fallback(text);
+    }
+    if (/手持|微晃|浅景深人物.*稳/u.test(text)
+      && !specificMitigations.some((item) => /三脚架|稳定器|固定机位/u.test(item))) {
+      return fallback(text);
+    }
+    if (/旧台灯.*(?:色温|灯罩.*旧痕|暖光斑)|灯罩.*旧痕/u.test(text)
+      && !specificMitigations.some((item) => /旧台灯.*(?:色温|灯罩.*旧痕|暖光斑)|2700K|固定LUT/u.test(item))) {
+      return fallback(text);
+    }
+    if (/窗外|雨幕|玻璃.*(?:雨光|反射)/u.test(text)
+      && !specificMitigations.some((item) => /窗外|雨幕|玻璃.*(?:雨光|反射)/u.test(item))) {
+      return fallback(text);
+    }
     if (/钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(text)
       && !specificMitigations.some((item) => /钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(item))) {
       return fallback(text);
     }
+    if (/猫爪|爪心|爪尖|肉垫|爪形|多趾/u.test(text)
+      && !specificMitigations.some((item) => /猫爪|爪心|爪尖|肉垫|爪形|多趾/u.test(item))) {
+      return fallback(text);
+    }
+    if (/湿毛|毛发.*(?:干湿|连续|跳变)|干湿状态/u.test(text)
+      && !specificMitigations.some((item) => /湿毛|毛发.*(?:干湿|连续|跳变)|干湿状态/u.test(item))) {
+      return fallback(text);
+    }
+    if (/(?:猫头|纸箱).*(?:穿模|边界)|(?:箱沿|纸箱).*毛发/u.test(text)
+      && !specificMitigations.some((item) => /箱沿|纸箱.*遮挡|毛发穿模/u.test(item))) {
+      return fallback(text);
+    }
+    if (/蜷缩|肢体数量|尾巴.*(?:穿模|漂移)|盘成/u.test(text)
+      && !specificMitigations.some((item) => /蜷缩|肢体|尾巴/u.test(item))) {
+      return fallback(text);
+    }
     let best = "";
     let bestScore = 0;
+    const riskTokens = tokens(text);
     for (const mitigation of specificMitigations) {
       const score = groups.reduce((sum, group) =>
         sum + (group.pattern.test(text) && group.pattern.test(mitigation) ? group.weight : 0), 0);
@@ -1307,12 +1507,27 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
         sum + (text.includes(feature) && mitigation.includes(feature) ? 20 : 0), 0);
       const aliasScore = featureGroups.reduce((sum, group) =>
         sum + (group.some((feature) => text.includes(feature)) && group.some((feature) => mitigation.includes(feature)) ? 20 : 0), 0);
-      if (score + featureScore + aliasScore > bestScore) {
+      const mitigationTokens = tokens(mitigation);
+      const lexicalScore = [...riskTokens].reduce((sum, token) =>
+        sum + (mitigationTokens.has(token) ? (token.length === 4 ? 8 : token.length === 3 ? 5 : 2) : 0), 0);
+      if (score + featureScore + aliasScore + lexicalScore > bestScore) {
         best = mitigation;
-        bestScore = score + featureScore + aliasScore;
+        bestScore = score + featureScore + aliasScore + lexicalScore;
       }
     }
     return bestScore >= 15 && best ? best : fallback(text);
+  });
+  const seen = new Set<string>();
+  return paired.map((item, index) => {
+    if (!seen.has(item)) {
+      seen.add(item);
+      return item;
+    }
+    const text = `${String(risks[index]?.risk ?? "")} ${String(risks[index]?.impact ?? "")}`;
+    const replacement = fallback(text);
+    const unique = seen.has(replacement) ? `针对风险${index + 1}：${replacement}；独立复核该风险的目标帧与回执。` : replacement;
+    seen.add(unique);
+    return unique;
   });
 }
 
@@ -1345,6 +1560,7 @@ export function normalizeNarrativeRequirementMarkdown(
   const sceneCount = Array.isArray(scene.scenes) ? scene.scenes.length : Number(scene.sceneCount ?? 0);
   const segmentCount = sceneCount + (scene.opening ? 1 : 0) + (scene.ending ? 1 : 0);
   const hasSceneStructure = Boolean(scene.opening || scene.ending || (Array.isArray(scene.scenes) && scene.scenes.length > 0));
+  const speechFullyForbidden = narrativeSpeechPolicy(String(upstream.dialogue_requirement ?? "")).allSpeechForbidden;
   let normalized = hasSceneStructure
     ? markdown.replace(
       /\*\*总场景数\*\*:\s*(\d+)个/u,
@@ -1356,17 +1572,64 @@ export function normalizeNarrativeRequirementMarkdown(
     .replace(/\bundefined\b/giu, "未标注")
     .replace(/\bnull\b/giu, "未标注");
   if (Number.isFinite(duration) && duration > 0) {
+    normalized = normalized
+      .replace(/\*\*总时长\*\*:\s*[^\n]+/u, `**总时长**: ${duration}秒`);
+    const openingDuration = Number(recordValue(scene.opening).duration ?? 0);
+    if (openingDuration > 0) {
+      normalized = normalized.replace(/\*\*开场\*\*\s*\([^)]*秒\)/u, `**开场** (${openingDuration}秒)`);
+    }
+    if (Array.isArray(scene.scenes)) {
+      scene.scenes.forEach((item, index) => {
+        const sceneDuration = Number(recordValue(item).duration ?? 0);
+        if (sceneDuration > 0) {
+          normalized = normalized.replace(
+            new RegExp(`\\*\\*场景\\s*${index + 1}\\s*\\*\\*\\s*\\([^)]*秒\\)`, "u"),
+            `**场景 ${index + 1}** (${sceneDuration}秒)`,
+          );
+        }
+      });
+    }
+    const endingDuration = Number(recordValue(scene.ending).duration ?? 0);
+    if (endingDuration > 0) {
+      normalized = normalized.replace(/\*\*结尾\*\*\s*\([^)]*秒\)/u, `**结尾** (${endingDuration}秒)`);
+    }
     normalized = normalized.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, value: string) =>
       Number(value) > duration ? `片尾（${duration}秒内）` : whole);
+    normalized = normalized.replace(/\d+\s*[—~\-至]\s*片尾（(\d+)秒内）/gu, "片尾≤$1秒");
   }
   const contractScene = (label: string, node: Record<string, unknown>): string => {
     const purpose = String(node.purpose ?? "").trim();
     const substantive = purpose.replace(/[\s，。；、：]/gu, "");
-    if (substantive.length >= 4) return `${label}：${purpose}`;
-    const elements = Array.isArray(node.keyElements)
+    const existingElements = Array.isArray(node.keyElements)
       ? node.keyElements.map(String).map((item) => item.trim()).filter(Boolean)
       : [];
-    return `${label}：关键元素：${elements.length > 0 ? elements.join("、") : "未提取到可拍元素"}`;
+    const purposeProps = inferNarrativeProps({
+      intent: purpose,
+      discovery: { sceneStructure: { opening: { purpose } } },
+      upstream: {},
+    });
+    const elements = purposeProps.length > 0 ? purposeProps : existingElements;
+    if (substantive.length < 4) {
+      return `${label}：关键元素：${elements.length > 0 ? elements.join("、") : "未提取到可拍元素"}`;
+    }
+    const context = [
+      purpose,
+      ...elements,
+      String(upstream._originalStoryText ?? ""),
+      String(upstream.special_notes ?? ""),
+      String(upstream.visual_style ?? ""),
+      JSON.stringify(recordValue(discovery.audienceProfile)),
+    ].join(" ");
+    const pick = (pattern: RegExp): string => context.match(pattern)?.[0] ?? "";
+    const durationText = Number(node.duration) > 0 ? `${Number(node.duration)}秒` : "";
+    const time = pick(/(?:雨夜|深夜|夜晚|清晨|黎明|白天|午后|傍晚|黄昏|春天|夏天|秋天|冬天)/u);
+    const space = pick(/(?:出租屋|小面馆|厨房|森林|海边|木栈道|城市路面|湖面|纸箱里|纸箱内|屋檐下|窗边|门口|室内|街口|河边|树林里|桌面上)/u);
+    const lighting = pick(/(?:单一暖黄钨丝光|暖黄钨丝光|逆光|侧光|顶光|环境光|暖光|冷光|月光|自然光)/u);
+    const camera = pick(/(?:低机位|高机位|平视|俯拍|仰拍|近景|中景|广角|特写|微距)/u);
+    const endingStill = label === "结尾" && /(?:半秒|0\.5秒)[^。；\n]{0,12}(?:静止|空镜)|(?:静止|空镜)[^。；\n]{0,12}(?:半秒|0\.5秒)/u.test(context)
+      ? "；片尾静止=0.5秒"
+      : "";
+    return `${label}：目的=${purpose}${durationText ? `；时长=${durationText}` : ""}${time ? `；时间=${time}` : ""}${space ? `；空间=${space}` : ""}${lighting ? `；光位=${lighting}` : ""}${camera ? `；机位=${camera}` : ""}${endingStill}；关键元素=${elements.length > 0 ? elements.join("、") : "未提取"}`;
   };
   const scenePurposes = [
     scene.opening && typeof scene.opening === "object"
@@ -1383,9 +1646,53 @@ export function normalizeNarrativeRequirementMarkdown(
   if (hasSceneStructure && scenePurposes.length > 0) {
     normalized = normalized.replace(/- \*\*场景\*\*（\d+）：[^\n]*/u, `- **场景**（${scenePurposes.length}）：${scenePurposes.join("；")}`);
   }
-  const actions = extractNarrativeActions(discovery, upstream);
+  if (hasSceneStructure) {
+    const sceneKeys = [
+      recordValue(scene.opening),
+      ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+      recordValue(scene.ending),
+    ].filter((item) => Object.keys(item).length > 0)
+      .map((item) => Array.isArray(item.keyElements) ? item.keyElements.map(String).join("、") : "");
+    let keyIndex = 0;
+    normalized = normalized.replace(/^- 关键元素:\s*[^\n]*$/gmu, (line) => {
+      const value = sceneKeys[keyIndex++];
+      return value ? `- 关键元素: ${value}` : line;
+    });
+  }
+  const actions = extractNarrativeActions(discovery, upstream)
+    .filter((item) => !/(?:动作声|环境底噪|等动作声|[，,].*[，,]|\/$)/u.test(item))
+    .slice(0, 8);
   if (actions.length > 0) {
     normalized = normalized.replace(/- \*\*动作\*\*（\d+）：[^\n]*/u, `- **动作**（${actions.length}）：${actions.join("；")}`);
+    normalized = normalized.replace(/(?:[一二三四五六七八九十]+|\d+)个连续动作/gu, `${actions.length}个连续动作`);
+  }
+  normalized = normalized.replace(/仅保留(?:人物|主体)?动作与画外环境声/gu, "仅保留动作与环境声");
+  const inferredRoles = inferNarrativeCharacters({
+    intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
+    discovery,
+    upstream,
+  });
+  const animalOnly = inferredRoles.length > 0 && inferredRoles.every((role) => isNarrativeAnimal(role.name));
+  const noCharacterContract = inferredRoles.length === 0
+    && /(?:无人物|无动物|无角色|纯空镜|场景为主体)/u.test([
+      upstream._originalStoryText,
+      upstream.description,
+      upstream.special_notes,
+    ].map(String).join(" "));
+  if (inferredRoles.length > 0) {
+    normalized = normalized.replace(
+      /- \*\*角色\*\*（\d+）：[^\n]*/u,
+      `- **角色**（${inferredRoles.length}）：${inferredRoles.map((role) => `${role.name}（${role.description}）`).join("；")}`,
+    );
+    if (animalOnly) {
+      normalized = normalized.replace(/人物动作/gu, "主体动作");
+    }
+  }
+  if (noCharacterContract) {
+    normalized = normalized
+      .replace(/- \*\*角色\*\*（\d+）：[^\n]*/u, "- **角色**（0）：无角色（环境/场景空镜）")
+      .replace(/- \*\*动作\*\*（\d+）：[^\n]*/u, "- **动作**（0）：无角色动作；以风、雾、光线和水面变化推进")
+      .replace(/人物动作与画外环境声/gu, "画外环境声");
   }
   const risk = discovery?.riskAssessment && typeof discovery.riskAssessment === "object"
     ? discovery.riskAssessment as Record<string, unknown>
@@ -1399,11 +1706,32 @@ export function normalizeNarrativeRequirementMarkdown(
       `风险${index + 1}（${item.level === "high" ? "高" : item.level === "medium" ? "中" : "低"}）：${String(item.risk ?? "")}；缓解：${pairedMitigations[index] ?? "见技术难点正文"}`).join("；")}`
     : "";
   if (riskText) normalized = normalized.replace(/- \*\*风险结论\*\*：[^\n]*/u, `- **风险结论**：${riskText}`);
+  if (risks.length > 0 && pairedMitigations.length > 0) {
+    normalized = normalized.replace(
+      /\*\*缓解建议\*\*[\s\S]*?(?=\n---|\n###|\n## |\n- \*\*|$)/u,
+      `**缓解建议**\n${pairedMitigations.map((item, index) => `${index + 1}. ${item}`).join("\n")}\n`,
+    );
+  }
+  const propEvidence = [
+    upstream._originalStoryText,
+    upstream.description,
+    upstream.special_notes,
+    upstream.visual_style,
+    upstream.theme,
+  ].map(String).join(" ");
+  const groundedProp = (item: string): boolean => {
+    if (propEvidence.includes(item)) return true;
+    if (item === "雨伞" && /伞/u.test(propEvidence)) return true;
+    for (let index = 0; index < item.length - 1; index += 1) {
+      if (propEvidence.includes(item.slice(index, index + 2))) return true;
+    }
+    return false;
+  };
   const props = inferNarrativeProps({
     intent: String(upstream?._originalStoryText ?? ""),
     discovery,
     upstream,
-  });
+  }).filter((item) => !["薄雾", "远山", "水面", "涟漪"].includes(item) && groundedProp(item));
   if (props.length > 0) {
     normalized = normalized.replace(
       /- \*\*道具\*\*（\d+）：[^\n]*/u,
@@ -1420,11 +1748,68 @@ export function normalizeNarrativeRequirementMarkdown(
       normalized = normalized.replace(/(- \*\*动作\*\*（\d+）：[^\n]*)/u, `$1\n${line}`);
     }
   }
+  normalized = normalized.replace(
+    /^\s*\d+[.、]\s*(?:预留重试时间|准备备选方案|保持视觉一致|提升质量|待针对补齐|补齐缓解|降低复杂度)\s*$/gmu,
+    "",
+  );
+  normalized = normalized.replace(
+    /\*\*缓解建议\*\*\s*(?=\n+(?:###|---|$))/u,
+    "**缓解建议**：见“风险结论”中的逐项具体缓解。\n",
+  );
+  const anchorDefinitions = String(upstream.special_notes ?? "")
+    .match(/[①②③④⑤⑥⑦⑧⑨⑩]\s*[^；;\n]+/gu)
+    ?.map((item) => item.trim())
+    .filter(Boolean) ?? [];
+  if (anchorDefinitions.length > 0 && !normalized.includes("视觉锚点定义")) {
+    normalized = `${normalized.trimEnd()}\n\n### 视觉锚点定义\n${anchorDefinitions.map((item) => `- ${item}`).join("\n")}\n`;
+  }
+  normalized = normalized.replace(
+    /(##\s*三、最终业务需求确认)/u,
+    "> 设备型号、光照参数与实拍可行性未在本轮核实；相关摄影参数仅为创作参考，正式执行以结构化镜头合同为准。\n\n$1",
+  );
+  normalized = normalized.replace(
+    /(> 设备型号、光照参数与实拍可行性未在本轮核实；[^\n]*\n)(?:\s*\1)+/gu,
+    "$1",
+  );
   const dialogue = String(upstream?.dialogue_requirement ?? "").trim();
   if (dialogue && !normalized.includes("- **台词/字幕口径**")) {
     normalized = normalized.replace(
       /- \*\*动作\*\*（\d+）：[^\n]*/u,
       (line) => `${line}\n- **台词/字幕口径**：${dialogue}`,
+    );
+  }
+  if (narrativeSpeechPolicy(dialogue).allSpeechForbidden) {
+    normalized = normalized
+      .replace(/(?:画外旁白|画外音|旁白)\s*[：:]\s*[^。；\n]+[。；]?/gu,
+        noCharacterContract ? "仅保留画外环境声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
+      .replace(/[^。；\n]{0,30}(?:紧接)?(?:一句)?(?:轻声|低声)?台词\s*[：:]?\s*[“「][^”」]+[”」][^。；\n]*[。；]?/gu,
+        noCharacterContract ? "仅保留画外环境声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
+      .replace(/[^。；\n]{0,24}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’][。；]?/gu, "以动作与环境声完成回应。")
+      .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。")
+      .replace(/^.*(?:关键台词|片内台词)[^\n]*$/gmu, (line) => {
+        const quote = line.match(/[“"'「]([^”"'」]+)[”"'」]/u)?.[1]?.trim();
+        return quote
+          ? `站外转发文案候选：“${quote}”；不进入成片，不生成字幕、旁白或口播。`
+          : "站外转发文案候选仅用于发布文案，不进入成片，不生成字幕、旁白或口播。";
+      });
+  }
+  normalized = normalized.replace(
+    /仅保留人物动作与画外环境声/gu,
+    noCharacterContract ? "仅保留画外环境声" : animalOnly ? "仅保留主体动作与画外环境声" : "仅保留动作与环境声",
+  );
+  const actionAudioClause = noCharacterContract
+    ? "仅保留画外环境声"
+    : animalOnly
+      ? "仅保留主体动作与画外环境声"
+      : "仅保留动作与环境声";
+  if (speechFullyForbidden && !normalized.includes(actionAudioClause)) {
+    normalized = `${normalized.trimEnd()}\n\n- **可执行动作/声音口径**：${actionAudioClause}。\n`;
+  }
+  const visualStyle = String(upstream.visual_style ?? "").trim();
+  if (visualStyle) {
+    normalized = normalized.replace(
+      /###\s*2\.4\s*对标参考[\s\S]*?(?=\n---|\n##\s*三)/u,
+      `### 2.4 对标参考\n\n- 仅作影调与镜头策略参考，不引入片名对应的地域、品牌、人物或情节：${visualStyle}\n`,
     );
   }
   return normalized;
@@ -1436,22 +1821,43 @@ export function normalizeNarrativeDiscovery(
   upstream: Record<string, unknown> = {},
 ): void {
   const dialoguePolicy = String(upstream.dialogue_requirement ?? "");
-  const canonicalDialogue = dialoguePolicy.match(
-    /(?:旁白|画外音|人声)[^。；\n]{0,24}?[“"'‘]([^”"'’]+)[”"'’]/u,
-  )?.[1]?.trim()
-    ?? dialoguePolicy.match(/气声[^。；\n]{0,24}?[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
-    ?? dialoguePolicy.match(/[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
-    ?? null;
-  const noLipSyncDialogue = /(?:无.{0,2}台词|无对白|不建议加对白|不做口型)/u.test(dialoguePolicy);
-  const voiceoverMentioned = /(?:旁白|画外音|画外)/u.test(dialoguePolicy);
-  const voiceoverDenied = /(?:禁止|不要|不加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)/u.test(dialoguePolicy);
-  const voiceoverAllowed = voiceoverMentioned && !voiceoverDenied;
+  const speech = narrativeSpeechPolicy(dialoguePolicy);
+  const { noLipSyncDialogue, voiceoverDenied, voiceoverAllowed, dialogueAllowed, allSpeechForbidden: speechFullyForbidden } = speech;
+  const canonicalDialogue = dialogueAllowed || voiceoverAllowed
+    ? dialoguePolicy.match(/(?:旁白|画外音|人声|气声)[^。；\n]{0,24}?[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
+      ?? dialoguePolicy.match(/[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
+      ?? null
+    : null;
+  const repairs: Array<{ code: string; detail: string }> = [];
+  const stripDisallowedSpeech = (value: string): string => {
+    if (!speechFullyForbidden) return value;
+    return value
+      .replace(/(?:画外音?|旁白)[^。；\n]*?[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
+      .replace(/(?:画外音?|旁白)[^。；\n]*(?:一句|低语|台词)[^。；\n]*/gu, "")
+      .replace(/[^，。；\n]{0,24}(?:轻声)?台词\s*[「“][^」”]+[」”][^。；\n]*/gu, "")
+      .replace(/[^，。；\n]{0,20}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
+      .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
+      .replace(/这(?:一)?句(?:几乎听不见的)?话/gu, "动作与环境声的停顿")
+      .replace(/^[\s，,；;。]+/u, "")
+      .replace(/[\s，,；;]+$/u, "");
+  };
+  const stripDisallowedVoiceover = (value: string): string => {
+    if (!voiceoverDenied) return value;
+    return value
+      .replace(/(?:画外音?|旁白)[^。；\n]*?[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
+      .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
+      .replace(/(?:画外音?|旁白)[^。；\n]*(?:一句|低语)[^。；\n]*/gu, "")
+      .replace(/^[\s，,；;。]+/u, "")
+      .replace(/[\s，,；;]+$/u, "");
+  };
   const cleanPurpose = (value: unknown): string => {
     const original = String(value ?? "");
     let text = original
-      .replace(/^(?:如果删掉|删掉这)[^。；]*[。；]?/gu, "")
-      .replace(/^故事会失去[^：；。]*[：；]?/gu, "")
+      .replace(/^(?:如果删掉|删掉这)[^：。；]*[：。；]?/gu, "")
+      .replace(/^删掉(?:结尾|开头|结尾段|开场段)[^：。；]*[：。；]?/gu, "")
+      .replace(/^故事会失去[^：。；]*[：。；]?/gu, "")
       .replace(/删掉这(?:镜|场)[^：；，。]*[：；]?/gu, "")
+      .replace(/^(?:若|如果|假如)[，,：:\s]+/u, "")
       .replace(/^[\s，,；;。]+/gu, "")
       .replace(/^(?:全片|整个片子)[^。]*[。]?/gu, "")
       .replace(/观众[^。；]*[。；]?/gu, "")
@@ -1460,26 +1866,167 @@ export function normalizeNarrativeDiscovery(
       .replace(/最后记住[：:]?/gu, "")
       .trim();
     if (text.replace(/[\s，。；、：]/gu, "").length < 4) text = original;
-    if (noLipSyncDialogue) {
-      if (voiceoverAllowed) {
-        text = text.replace(
-          /[\u4e00-\u9fff]{0,8}(?:轻声|低声|开口)?说[：:]?\s*([“"'‘][^”"'’]+[”"'’])/gu,
-          `画外旁白：$1`,
-        );
-      } else {
-        text = text.replace(
-          /[^，。；\n]{0,12}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu,
-          "以动作与环境声回应",
-        );
+    if (noLipSyncDialogue && voiceoverAllowed) {
+      const converted = text.replace(
+        /[\u4e00-\u9fff]{0,8}(?:轻声|低声|开口)?说[：:]?\s*([“"'‘][^”"'’]+[”"'’])/gu,
+        (_all, quoted: string) => `画外旁白：${canonicalDialogue ? `“${canonicalDialogue}”` : quoted}`,
+      );
+      if (converted !== text) {
+        repairs.push({ code: "LIP_SYNC_DIALOGUE_CONVERTED_TO_VOICEOVER", detail: "把口型台词改为合同允许的画外旁白" });
       }
+      text = converted;
+    } else if (speechFullyForbidden) {
+      const stripped = stripDisallowedSpeech(text);
+      if (stripped !== text) repairs.push({ code: "DISALLOWED_SPEECH_REMOVED", detail: "移除与无台词/无旁白合同冲突的台词或旁白" });
+      text = stripped;
+    } else if (voiceoverDenied) {
+      const stripped = stripDisallowedVoiceover(text);
+      if (stripped !== text) repairs.push({ code: "DISALLOWED_VOICEOVER_REMOVED", detail: "保留合法对白并移除合同禁止的旁白" });
+      text = stripped;
     }
     if (Number.isFinite(duration) && duration > 0) {
       text = text.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole);
     }
+    if (text.replace(/[\s，。；、：]/gu, "").length < 4) {
+      text = "以动作与画外环境声完成情绪转折";
+    }
     return text;
   };
   const scene = recordValue(discovery.sceneStructure);
+  const storyPolicy = [
+    upstream._originalStoryText,
+    upstream.special_notes,
+    upstream.dialogue_requirement,
+  ].map(String).join(" ");
+  const noAnimals = /无动物|不出现动物|无宠物/u.test(storyPolicy);
+  const noPeople = /无人物|无真人|不出现人物/u.test(storyPolicy);
+  const noText = /无文字|无字幕|不出现文字/u.test(storyPolicy);
+  const groundingText = [
+    upstream._originalStoryText,
+    upstream.description,
+    upstream.special_notes,
+    upstream.visual_style,
+    upstream.theme,
+  ].map(String).join(" ");
+  const hasGroundingToken = (item: string): boolean => {
+    if (groundingText.includes(item)) return true;
+    for (let index = 0; index < item.length - 2; index += 1) {
+      if (groundingText.includes(item.slice(index, index + 3))) return true;
+    }
+    for (let index = 0; index < item.length - 1; index += 1) {
+      if (groundingText.includes(item.slice(index, index + 2))) return true;
+    }
+    return false;
+  };
+  const sourceActionClauses = String(upstream._originalStoryText ?? "")
+    .split(/[，。；\n]+/u)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length >= 2)
+    .filter((clause) => !/(?:无人物|无动物|无品牌|无文字|无字幕|无旁白|仅保留环境声|需求口径)/u.test(clause))
+    .filter((clause) => extractNarrativeActions({}, { _originalStoryText: clause }).length > 0)
+    .filter((clause, index, list) => list.indexOf(clause) === index);
+  const sourceActionPhrases = extractNarrativeActions({}, {
+    _originalStoryText: String(upstream._originalStoryText ?? ""),
+  });
+  const splitActionPurposes = sourceActionPhrases.length >= 3 ? sourceActionPhrases : sourceActionClauses;
+  const openingActionCount = extractNarrativeActions(
+    { sceneStructure: { opening: scene.opening } },
+    upstream,
+  ).length;
+  if (splitActionPurposes.length >= 3
+    && (!Array.isArray(scene.scenes) || scene.scenes.length === 0)
+    && openingActionCount >= 2) {
+    const middlePurposes = splitActionPurposes.slice(1, -1);
+    const groupedPurposes = splitActionPurposes.length >= 4
+      ? [splitActionPurposes[0]!, middlePurposes.join("；"), splitActionPurposes[splitActionPurposes.length - 1]!]
+      : splitActionPurposes;
+    const globalProps = inferNarrativeProps({
+      intent: String(upstream._originalStoryText ?? ""),
+      discovery: { sceneStructure: {} },
+      upstream: {},
+    });
+    const nodes = groupedPurposes.map((purpose) => {
+      const localProps = inferNarrativeProps({
+        intent: purpose,
+        discovery: { sceneStructure: { opening: { purpose } } },
+        upstream: {},
+      });
+      const props = [...new Set([...localProps, ...globalProps])].slice(0, 4);
+      return {
+        duration: Number((duration / groupedPurposes.length).toFixed(3)),
+        purpose,
+        keyElements: props,
+      };
+    });
+    const bodyScenes = nodes.slice(1, -1);
+    scene.opening = nodes[0];
+    scene.scenes = bodyScenes;
+    scene.ending = nodes[nodes.length - 1];
+    scene.sceneCount = bodyScenes.length;
+    repairs.push({
+      code: "OVERSTUFFED_OPENING_SPLIT",
+      detail: `把开场中的 ${splitActionPurposes.length} 个源动作拆为 1 个开场、${bodyScenes.length} 个主体场景和 1 个结尾`,
+    });
+  }
+  const sceneNodes = [
+    recordValue(scene.opening),
+    ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+    recordValue(scene.ending),
+  ].filter((node) => Object.keys(node).length > 0);
+  const genericScene = /(?:建立场景|引入主题|推动叙事|核心动作|情绪表达|场景器物|总结收尾|留下印象|环境展示|主题暗示|情绪收束|主题呼应|纸质道具)/u;
+  const purposeViolation = (node: Record<string, unknown>): boolean => {
+    const value = String(node.purpose ?? "");
+    return (noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(value))
+      || (noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声)/u.test(value))
+      || (noText && /(?:字幕|水印|文字)/u.test(value));
+  };
+  const keyElementsViolation = (node: Record<string, unknown>): boolean => {
+    const values = Array.isArray(node.keyElements) ? node.keyElements.map(String) : [];
+    return values.some((item) =>
+      genericScene.test(item)
+      || item.trim().length >= 2 && !hasGroundingToken(item)
+      || noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(item)
+      || noPeople && /(?:人物|真人|人类|路人|游客|手部|手指|手臂|肩膀|身体|人影|手机|相机|快门|录制|取景框|屏幕|屏息|呼吸声)/u.test(item)
+      || noText && /(?:字幕|水印|文字)/u.test(item));
+  };
+  if (sceneNodes.some((node) =>
+    genericScene.test(String(node.purpose ?? ""))
+    || purposeViolation(node)
+    || keyElementsViolation(node))) {
+    const evidenceClauses = [
+      String(upstream._originalStoryText ?? ""),
+      String(upstream.description ?? ""),
+    ].join("，")
+      .split(/[，。；\n]+/u)
+      .map((item) => item.replace(/^\[需求口径\].*$/u, "").trim())
+      .filter((item) => item.length >= 4)
+      .filter((item) => !/(?:无人物|无动物|无品牌|无文字|无字幕|无旁白|仅保留环境声)/u.test(item));
+    const visualProps = inferNarrativeProps({
+      intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
+      discovery: { sceneStructure: {} },
+      upstream,
+    }).filter(hasGroundingToken);
+    let clauseIndex = 0;
+    let propIndex = 0;
+    for (const node of sceneNodes) {
+      const mappedPurpose = evidenceClauses[clauseIndex++];
+      const replacePurpose = genericScene.test(String(node.purpose ?? "")) || purposeViolation(node);
+      const replaceElements = keyElementsViolation(node);
+      if (!replacePurpose && !replaceElements) continue;
+      if (replacePurpose) {
+        if (mappedPurpose) node.purpose = mappedPurpose;
+      }
+      if (replaceElements && visualProps.length > 0) {
+        const elements: string[] = [];
+        for (let count = 0; count < 2; count += 1) {
+          const item = visualProps[propIndex++ % visualProps.length]!;
+          if (!elements.includes(item)) elements.push(item);
+        }
+        node.keyElements = elements;
+      }
+    }
+  }
   if (scene.opening && typeof scene.opening === "object") {
     const node = scene.opening as Record<string, unknown>;
     node.purpose = cleanPurpose(node.purpose);
@@ -1496,20 +2043,96 @@ export function normalizeNarrativeDiscovery(
     const node = scene.ending as Record<string, unknown>;
     node.purpose = cleanPurpose(node.purpose);
   }
+  const globalNodeProps = inferNarrativeProps({
+    intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
+    discovery: { sceneStructure: {} },
+    upstream: {},
+  });
+  for (const node of [
+    recordValue(scene.opening),
+    ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+    recordValue(scene.ending),
+  ].filter((item) => Object.keys(item).length > 0)) {
+    const purpose = String(node.purpose ?? "");
+    const local = inferNarrativeProps({
+      intent: purpose,
+      discovery: { sceneStructure: { opening: { purpose } } },
+      upstream: {},
+    });
+    node.keyElements = [...new Set([...local, ...globalNodeProps])].slice(0, 4);
+  }
   if (Array.isArray(scene.scenes)) scene.sceneCount = scene.scenes.length;
-  const totalDuration = [
-    scene.opening && typeof scene.opening === "object" ? Number((scene.opening as Record<string, unknown>).duration ?? 0) : 0,
-    ...(Array.isArray(scene.scenes)
-      ? scene.scenes.map((item) => Number(recordValue(item).duration ?? 0))
-      : []),
-    scene.ending && typeof scene.ending === "object" ? Number((scene.ending as Record<string, unknown>).duration ?? 0) : 0,
-  ].reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
-  if (totalDuration > 0) scene.totalDuration = totalDuration;
-  else if (Number.isFinite(duration) && duration > 0) scene.totalDuration = duration;
+  const nodes = [
+    scene.opening,
+    ...(Array.isArray(scene.scenes) ? scene.scenes : []),
+    scene.ending,
+  ].map(recordValue).filter((node) => Object.keys(node).length > 0);
+  const requiredActions = extractNarrativeActions(discovery, upstream);
+  for (const action of requiredActions) {
+    if (nodes.some((node) => String(node.purpose ?? "").includes(action))) continue;
+    const actionPrefix = action.slice(0, Math.min(4, action.length));
+    if (actionPrefix.length >= 3 && nodes.some((node) => String(node.purpose ?? "").includes(actionPrefix))) continue;
+    const bigrams = (value: string): Set<string> => new Set(
+      value.match(/[\p{Script=Han}]{2}/gu) ?? [],
+    );
+    const actionGrams = bigrams(action);
+    const ranked = nodes.map((node) => {
+      const purposeGrams = bigrams(String(node.purpose ?? ""));
+      return {
+        node,
+        score: [...actionGrams].filter((gram) => purposeGrams.has(gram)).length,
+      };
+    }).sort((left, right) => right.score - left.score);
+    const target = ranked[0]?.node;
+    if (target) {
+      const purpose = String(target.purpose ?? "").trim();
+      target.purpose = `${purpose}${purpose ? "；" : ""}${action}`;
+      repairs.push({ code: "ACTION_COVERAGE_ADDED", detail: `把漏掉的动作“${action}”补入最相关场景` });
+    }
+  }
+  const totalDuration = nodes
+    .map((node) => Number(node.duration ?? 0))
+    .reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+  if (Number.isFinite(duration) && duration > 0 && nodes.length > 0 && totalDuration > 0
+    && Math.abs(totalDuration - duration) > 0.001) {
+    let assigned = 0;
+    nodes.forEach((node, index) => {
+      const base = Math.max(0, Number(node.duration ?? 0));
+      const next = index === nodes.length - 1
+        ? Number((duration - assigned).toFixed(3))
+        : Number((base / totalDuration * duration).toFixed(3));
+      node.duration = next;
+      assigned += next;
+    });
+    repairs.push({ code: "SCENE_DURATION_REBALANCED", detail: `${totalDuration}s 按比例投影到目标 ${duration}s` });
+  }
+  scene.totalDuration = Number.isFinite(duration) && duration > 0 ? duration : totalDuration;
+  if (Number.isFinite(duration) && duration > 0) {
+    const audience = recordValue(discovery.audienceProfile);
+    if (Array.isArray(audience.contentExpectations)) {
+      audience.contentExpectations = (audience.contentExpectations as unknown[]).map((item) => {
+        const text = String(item);
+        if (speechFullyForbidden
+          && /(?:钉子台词|片内台词|关键台词|画外旁白|人声|口播)/u.test(text)) {
+          repairs.push({ code: "EXTERNAL_COPY_SEPARATED", detail: "把可转发文案移出成片台词/字幕合同" });
+          const quote = text.match(/[“"'「]([^”"'」]+)[”"'」]/u)?.[1]?.trim();
+          return `${quote ? `站外转发文案候选：“${quote}”；` : "站外转发文案候选"}仅用于发布文案，不进入成片，不生成字幕、旁白或口播。`;
+        }
+        return stripDisallowedSpeech(text);
+      });
+      discovery.audienceProfile = audience;
+    }
+  }
   const normalizeText = (item: string): string => {
     let text = item
       .replace(/\bundefined\b/giu, "未标注")
       .replace(/\bnull\b/giu, "未标注");
+    if (noLipSyncDialogue && voiceoverAllowed) {
+      text = text.replace(
+        /[\u4e00-\u9fff]{0,8}(?:轻声|低声|开口)?说[：:]?\s*([“"'‘][^”"'’]+[”"'’])/gu,
+        (_all, quoted: string) => `画外旁白：${canonicalDialogue ? `“${canonicalDialogue}”` : quoted}`,
+      );
+    }
     if (canonicalDialogue && /(?:台词|人声|气声|旁白|画外|轻声说|低声说|说[：:]?\s*[“"'‘])/u.test(text)) {
       text = text.replace(/[“"'‘][^”"'’]+[”"'’]/gu, `“${canonicalDialogue}”`);
       text = text.replace(/(“[^”]+”|‘[^’]+’)\s*或\s*\1/gu, "$1");
@@ -1518,6 +2141,8 @@ export function normalizeNarrativeDiscovery(
       text = text.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole);
     }
+    if (speechFullyForbidden) text = stripDisallowedSpeech(text);
+    else if (voiceoverDenied) text = stripDisallowedVoiceover(text);
     return text;
   };
   const visit = (value: unknown): void => {
@@ -1539,7 +2164,45 @@ export function normalizeNarrativeDiscovery(
       }
     }
   };
+  const prohibitedAudiencePattern = [
+    noPeople ? /(?:手机取景框|红色录音点|按下录制|按下快门|屏息|呼吸声|耳边[^。；\n]{0,8}憋气|手伸进|手指|手掌)/u : null,
+    noAnimals ? /(?:黑天鹅|水鸟|飞鸟|鸟鸣|猫|狗)/u : null,
+    noText ? /(?:字幕|水印|文字卡)/u : null,
+  ].filter((pattern): pattern is RegExp => pattern instanceof RegExp);
+  if (prohibitedAudiencePattern.length > 0) {
+    const sanitizeAudience = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        for (let index = 0; index < value.length; index += 1) {
+          const item = value[index];
+          if (typeof item === "string") {
+            const kept = item.split(/[。；\n]+/u).map((part) => part.trim()).filter(Boolean)
+              .filter((part) => /(?:不进入成片|不生成字幕|无字幕|不得出现|禁止出现|仅保留环境声)/u.test(part)
+                || !prohibitedAudiencePattern.some((pattern) => pattern.test(part)));
+            value[index] = kept.length > 0 ? kept.join("；") : "只记录自然环境与环境声的缓慢变化";
+          } else {
+            sanitizeAudience(item);
+          }
+        }
+        return;
+      }
+      if (!value || typeof value !== "object") return;
+      const record = value as Record<string, unknown>;
+      for (const [key, item] of Object.entries(record)) {
+        if (typeof item === "string") {
+          const kept = item.split(/[。；\n]+/u).map((part) => part.trim()).filter(Boolean)
+            .filter((part) => /(?:不进入成片|不生成字幕|无字幕|不得出现|禁止出现|仅保留环境声)/u.test(part)
+              || !prohibitedAudiencePattern.some((pattern) => pattern.test(part)));
+          record[key] = kept.length > 0 ? kept.join("；") : "只记录自然环境与环境声的缓慢变化";
+        } else {
+          sanitizeAudience(item);
+        }
+      }
+    };
+    sanitizeAudience(discovery.audienceProfile);
+  }
   visit(discovery);
+  discovery._contractRepairs = repairs.filter((item, index, list) =>
+    list.findIndex((candidate) => candidate.code === item.code && candidate.detail === item.detail) === index);
 }
 
 function recordValue(value: unknown): Record<string, unknown> {
@@ -1589,12 +2252,8 @@ function subtitleContract(upstream: Record<string, unknown>): Record<string, unk
   if (/(?:软字幕|SRT|srt|字幕文件)/u.test(policyText)) {
     return { mode: "sidecar", burned: false, sidecar: true };
   }
-  const noDialogue = /(?:无.{0,2}台词|无对白)/u.test(policyText);
-  const voiceoverDenied = /(?:禁止|不要|不加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)/u.test(policyText);
-  if (noDialogue && !/(?:旁白|画外音|画外)/u.test(policyText.replace(/(?:禁止|不要|不加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)/gu, ""))) {
-    return { mode: "none", burned: false, sidecar: false };
-  }
-  if (noDialogue && voiceoverDenied) {
+  const speech = narrativeSpeechPolicy(policyText);
+  if (speech.allSpeechForbidden) {
     return { mode: "none", burned: false, sidecar: false };
   }
   return { mode: "unverified", burned: false, sidecar: false };
@@ -1723,25 +2382,41 @@ function rebalanceSceneDurations(scenePlan: Record<string, unknown>, target: num
   return target;
 }
 
-function sanitizePrdText(value: unknown, duration: number): unknown {
+function sanitizePrdText(value: unknown, duration: number, speechForbidden = false): unknown {
+  if (value === null || value === undefined) return "不适用";
+  if (typeof value === "number" && !Number.isFinite(value)) return "不适用";
   if (typeof value === "string") {
-    return value
+    let text = value
       .replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole)
+      .replace(/\d+\s*[—~\-至]\s*片尾（(\d+)秒内）/gu, "片尾≤$1秒")
       .replace(/\bundefined\b/giu, "未标注")
       .replace(/\bnull\b/giu, "未标注");
+    if (speechForbidden) {
+      text = text
+        .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, "仅保留人物动作与画外环境声。")
+        .replace(/[^。；\n]{0,24}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’][。；]?/gu, "以动作与环境声完成回应。")
+        .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。");
+    }
+    return text;
   }
   if (Array.isArray(value)) {
     return value
       .filter((item) => !(typeof item === "string"
         && /^(?:用户要求|二选一|风险结论摘要补齐|统一字数口径|请(?:补充|删除|统一|修正|明确|按))/u.test(item.trim())))
-      .map((item) => sanitizePrdText(item, duration));
+      .map((item) => sanitizePrdText(item, duration, speechForbidden));
   }
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
-    for (const [key, item] of Object.entries(record)) record[key] = sanitizePrdText(item, duration);
+    for (const [key, item] of Object.entries(record)) record[key] = sanitizePrdText(item, duration, speechForbidden);
   }
   return value;
+}
+
+function colorTemperatureFromText(value: unknown): string | null {
+  const matches = [...String(value ?? "").matchAll(/(\d{4})(?:\s*[-—~至]\s*(\d{4}))?\s*K/giu)]
+    .map((match) => `${match[1]}${match[2] ? `-${match[2]}` : ""}K`);
+  return [...new Set(matches)].join(" / ") || null;
 }
 
 function buildShotContract(
@@ -1757,17 +2432,16 @@ function buildShotContract(
     : [];
   const visual = recordValue(prd.visualSpecification);
   const globalLighting = String(visual.lightingDirection ?? "按已确认视觉方案执行");
+  const visualTemperatureText = Object.values(visual).filter((value) => typeof value === "string").join(" ");
   const constraintText = (Array.isArray(recordValue(prd.productionConstraints).technicalConstraints)
     ? recordValue(prd.productionConstraints).technicalConstraints as unknown[]
     : []).map(String).join(" ");
   const warmRatio = /暖区[^。；]{0,12}(?:不超过|≤)[^。；]{0,4}(?:三分之一|1\/3)/u.test(constraintText)
     ? 1 / 3
     : null;
-  const globalColorTemperature = /(\d{4})\s*K/u.exec(globalLighting)?.[1]
-    ? `${/(\d{4})\s*K/u.exec(globalLighting)![1]}K`
-    : /暖|冷/u.test(globalLighting)
-      ? "暖光2700K / 冷光5600K（默认执行基准）"
-      : "5600K（默认执行基准）";
+  const globalColorTemperature = colorTemperatureFromText(visualTemperatureText)
+    ?? colorTemperatureFromText(globalLighting)
+    ?? "色温按已确认视觉方案执行";
   const rows: Array<Record<string, unknown>> = [];
   let cursor = 0;
   for (const mapping of mappings) {
@@ -1782,15 +2456,12 @@ function buildShotContract(
     const sceneLightingText = visualRequirements.find((item) =>
       /(?:\d{4}\s*K|色温|冷光|暖光|冷暖|全暗|近乎全暗)/u.test(item)) ?? "";
     const lighting = sceneLightingText || globalLighting;
-    const colorTemperature = sceneLightingText
-      ? /(\d{4})\s*K/u.exec(sceneLightingText)?.[1]
-        ? `${/(\d{4})\s*K/u.exec(sceneLightingText)![1]}K`
-        : /暖/u.test(sceneLightingText) && /冷/u.test(sceneLightingText)
-          ? "暖光2700K / 冷光5600K"
-          : /暖/u.test(sceneLightingText)
-            ? "暖光2700K（场景本地基准）"
-            : "冷光5600K（场景本地基准）"
-      : globalColorTemperature;
+    const colorTemperature = colorTemperatureFromText(sceneLightingText)
+      ?? (/冷/u.test(sceneLightingText)
+        ? "5600K（场景本地基准）"
+        : /暖/u.test(sceneLightingText)
+          ? "2700K（场景本地基准）"
+          : globalColorTemperature);
     const sceneStart = cursor;
     for (let index = 0; index < count; index += 1) {
       const start = Number((sceneStart + sceneDuration * (index / count)).toFixed(2));
@@ -1856,15 +2527,47 @@ export function normalizeNarrativePrdContract(
   const scenePlan = recordValue(prd.scenePlan);
   rebalanceSceneDurations(scenePlan, duration);
   prd.scenePlan = scenePlan;
+  const dialoguePolicy = [
+    upstream.dialogue_requirement,
+    upstream.special_notes,
+    upstream.subtitle_policy,
+  ].map(String).join(" ");
+  const speechForbidden = narrativeSpeechPolicy(dialoguePolicy).allSpeechForbidden;
+  const storyPolicy = [
+    upstream._originalStoryText,
+    upstream.description,
+    upstream.special_notes,
+    upstream.audio_design,
+    upstream.dialogue_requirement,
+  ].map(String).join(" ");
+  const musicForbidden = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(storyPolicy);
 
-  const canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
+  const explicitNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(storyPolicy);
+  const explicitNoCharacters = /(?:无角色|纯空镜|场景为主体)/u.test(storyPolicy);
+  let canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
     ? discovery._canonicalCharacters.map(recordValue)
     : [];
+  if (explicitNoCharacters) canonicalCharacters = [];
+  else if (explicitNoAnimals) canonicalCharacters = canonicalCharacters.filter((item) => !isNarrativeAnimal(item.name));
+  const characterSystem = recordValue(prd.characterSystem);
+  const generated = Array.isArray(characterSystem.characters)
+    ? characterSystem.characters.map(recordValue)
+    : [];
+  if (!explicitNoCharacters && canonicalCharacters.length === 0 && generated.length > 0) {
+    canonicalCharacters = generated.filter((item) => !explicitNoAnimals || !isNarrativeAnimal(item.name)).map((item, index) => {
+      const id = String(item.characterId ?? item.id ?? item.character_id ?? `char_${index + 1}`);
+      return { ...item, id, characterId: id };
+    });
+  }
+  if (!explicitNoCharacters && canonicalCharacters.length === 0) {
+    canonicalCharacters = inferNarrativeCharacters({
+      intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
+      discovery,
+      upstream,
+    }).map((item, index) => ({ ...item, id: `char_${index + 1}`, characterId: `char_${index + 1}` }));
+  }
+  const noCharacters = canonicalCharacters.length === 0;
   if (canonicalCharacters.length > 0) {
-    const characterSystem = recordValue(prd.characterSystem);
-    const generated = Array.isArray(characterSystem.characters)
-      ? characterSystem.characters.map(recordValue)
-      : [];
     characterSystem.characters = canonicalCharacters.map((item, index) => {
       const id = String(item.id ?? item.characterId ?? `char_${index + 1}`);
       const portrait = String(item.portraitRef ?? item.portraitPath ?? generated[index]?.portraitPath ?? "");
@@ -1891,10 +2594,28 @@ export function normalizeNarrativePrdContract(
         ?? wardrobeEntries.find((entry) => entry.scene)
         ?? wardrobeEntries[0]
         ?? {};
+      const name = String(authoritative?.name ?? item.name ?? generated[index]?.name ?? `角色${index + 1}`);
+      const animal = isNarrativeAnimal(name);
+      if (animal) {
+        return {
+          ...(generated[index] ?? {}),
+          characterId: id,
+          name,
+          role: String(item.role ?? generated[index]?.role ?? "protagonist"),
+          gender: null,
+          ageRange: null,
+          appearance: `${authoritativeAppearance || baseAppearance}；角色ID=${id}；动物外观由文字锚点与跨镜参考帧锁定`,
+          costume: "不适用（动物自然外观）",
+          portraitPath: "",
+          portraitEvidence: { exists: false, reason: "animal-character-no-human-portrait" },
+          authorization: "not-applicable",
+          consistencyRequirements: `所有镜头绑定 ${id} 的品种、体型、毛色、湿度与动作指纹；不得变更物种或替换为未登记人物`,
+        };
+      }
       return {
         ...(generated[index] ?? {}),
         characterId: id,
-        name: String(authoritative?.name ?? item.name ?? generated[index]?.name ?? `角色${index + 1}`),
+        name,
         role: String(item.role ?? generated[index]?.role ?? "protagonist"),
         gender: authoritative?.gender ?? generated[index]?.gender ?? null,
         ageRange: authoritative?.age ?? generated[index]?.ageRange ?? null,
@@ -1912,10 +2633,11 @@ export function normalizeNarrativePrdContract(
     });
     prd.characterSystem = characterSystem;
   }
+  const requiresPortraits = canonicalCharacters.some((item) => !isNarrativeAnimal(item.name));
 
   const constraints = recordValue(prd.productionConstraints);
   for (const key of ["technicalConstraints", "businessConstraints", "forbiddenElements"]) {
-    if (Array.isArray(constraints[key])) constraints[key] = sanitizePrdText(constraints[key], duration);
+    if (Array.isArray(constraints[key])) constraints[key] = sanitizePrdText(constraints[key], duration, speechForbidden);
   }
   const qualityThresholds = recordValue(constraints.qualityThresholds);
   prd.productionConstraints = constraints;
@@ -1978,7 +2700,7 @@ export function normalizeNarrativePrdContract(
         const text = String(item);
         return /(?:字幕|旁白|人声|气声)/u.test(text)
           ? "可复述文案仅用于站外发布，不进入成片；成片无字幕、无旁白。"
-          : sanitizePrdText(text, duration);
+          : sanitizePrdText(text, duration, speechForbidden);
       });
     }
     prd.audienceProfile = audience;
@@ -1997,13 +2719,33 @@ export function normalizeNarrativePrdContract(
   const deliverables = Array.isArray(delivery.deliverables)
     ? delivery.deliverables.map(recordValue)
     : [];
-  delivery.deliverables = deliverables.map((item) => item.item === "video_master"
-    ? {
-        ...item,
-        spec: `${size.width}x${size.height}, ${aspect}, ${duration}s ±0.3s, ${Number(positioning.frameRate ?? 24)}fps, MP4/H.264/AAC`,
-      }
-    : item);
+  delivery.deliverables = deliverables
+    .filter((item) => !(!requiresPortraits && /(?:character_portraits|portraits?)/iu.test(String(item.item ?? ""))))
+    .map((item) => item.item === "video_master"
+      ? {
+          ...item,
+          spec: `${size.width}x${size.height}, ${aspect}, ${duration}s ±0.3s, ${Number(positioning.frameRate ?? 24)}fps, MP4/H.264/AAC`,
+        }
+      : item);
+  if (noCharacters) {
+    delivery.characterAssets = { required: false, reason: "本次结构化合同没有角色，不得生成或交付定妆照" };
+  } else if (!requiresPortraits) {
+    delivery.characterAssets = {
+      required: false,
+      reason: "动物角色以文字外观、动作与跨镜参考帧锁定；不要求人像定妆照",
+    };
+  }
   prd.deliveryStandard = delivery;
+  const upstreamKs = [...new Set(String(upstream.visual_style ?? "").match(/\b\d{4}\s*K\b/giu)?.map((item) => item.replace(/\s+/gu, "").toUpperCase()) ?? [])];
+  const canonicalK = upstreamKs.length === 1 ? upstreamKs[0]! : null;
+  if (canonicalK) {
+    const visual = recordValue(prd.visualSpecification);
+    const current = String(visual.lightingDirection ?? "");
+    visual.lightingDirection = current
+      ? current.replace(/\b\d{4}\s*K\b/giu, canonicalK)
+      : `色温基准 ${canonicalK}`;
+    prd.visualSpecification = visual;
+  }
   prd.shotContract = buildShotContract(prd, canonicalCharacters);
   const normalizedCharacters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
@@ -2037,7 +2779,64 @@ export function normalizeNarrativePrdContract(
     };
     applyPronoun(prd);
   }
-  return sanitizePrdText(prd, duration || 30) as Record<string, unknown>;
+  if (speechForbidden) {
+    const normalizedScenePlan = recordValue(prd.scenePlan);
+    const scenes = Array.isArray(normalizedScenePlan.scenes)
+      ? normalizedScenePlan.scenes.map(recordValue)
+      : [];
+    for (const scene of scenes) {
+      scene.dialogue = "";
+      if (Array.isArray(scene.audioRequirements)) {
+        scene.audioRequirements = scene.audioRequirements.filter((item) =>
+          !/(?:人声|旁白|对白|口播|气声)/u.test(String(item)));
+      }
+    }
+    normalizedScenePlan.scenes = scenes;
+    prd.scenePlan = normalizedScenePlan;
+  }
+  const animalOnly = canonicalCharacters.length > 0
+    && canonicalCharacters.every((item) => isNarrativeAnimal(item.name));
+  const normalizeContractText = (text: string): string => {
+    let value = text;
+    if (animalOnly) value = value.replace(/人物动作/gu, "主体动作");
+    if (noCharacters) {
+      value = value
+        .replace(/(?:人物|主体)动作与画外环境声/gu, "画外环境声")
+        .replace(/(?:人物|主体)动作/gu, "画外环境声")
+        .replace(/[^，。；\n]{0,20}(?:未出镜的观者|人物手部|呼吸入画|衣料摩擦|手指|手掌|呼吸声)[^，。；\n]*/gu, "仅保留自然光、水面与环境声");
+    }
+    if (explicitNoAnimals) {
+      value = value.replace(/[^，。；\n]{0,20}(?:黑天鹅|白天鹅|飞鸟|水鸟|鸟鸣|远鸟|猫|狗)[^，。；\n]*/gu, "仅保留自然环境声");
+    }
+    if (canonicalK) value = value.replace(/\b\d{4}\s*K\b/giu, canonicalK);
+    if (musicForbidden && /(?:配乐|音乐|旋律|钢琴|歌曲|低频嗡鸣|低频持续音|BGM)/iu.test(value)) {
+      const kept = value
+        .split(/[。；\n]+/u)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .filter((item) => !/(?:配乐|音乐|旋律|钢琴|歌曲|低频嗡鸣|低频持续音|BGM)/iu.test(item));
+      value = `${kept.length > 0 ? `${kept.join("；")}；` : ""}不使用配乐，仅保留环境声与动作声。`;
+    }
+    value = value.replace(/([^。；\n]+。)(?:[、；\s]*\1)+/gu, "$1");
+    return value;
+  };
+  const normalizePrdStrings = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (typeof value[index] === "string") value[index] = normalizeContractText(String(value[index]));
+        else normalizePrdStrings(value[index]);
+      }
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    for (const [key, item] of Object.entries(record)) {
+      if (typeof item === "string") record[key] = normalizeContractText(item);
+      else normalizePrdStrings(item);
+    }
+  };
+  if (animalOnly || noCharacters || musicForbidden || canonicalK) normalizePrdStrings(prd);
+  return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
 }
 
 export function renderPrdContractMarkdown(prd: Record<string, unknown>): string {
@@ -2067,6 +2866,9 @@ export function renderPrdContractMarkdown(prd: Record<string, unknown>): string 
     ...(characters.length > 0
       ? characters.map((item) => {
         const evidence = recordValue(item.portraitEvidence);
+        if (evidence.reason === "animal-character-no-human-portrait") {
+          return `- ${String(item.name ?? "未命名")}：ID=${String(item.characterId ?? "未指定")}；动物角色不适用人像定妆照；外观锚点=${String(item.appearance ?? "未指定")}`;
+        }
         return `- ${String(item.name ?? "未命名")}：ID=${String(item.characterId ?? "未指定")}；定妆照=${String(item.portraitPath ?? "未指定")}；授权=${String(item.authorization ?? "unknown")}；文件存在=${String(evidence.exists ?? false)}；尺寸=${evidence.width ?? "?"}x${evidence.height ?? "?"}；sha256=${String(evidence.sha256 ?? "未核验")}`;
       })
       : ["- 本次无角色或角色锚点未提供，不得生成真人主体。"]),
@@ -2132,8 +2934,13 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
         const result = await original.call(this, discovery, upstream);
         const platform = canonicalPlatformId(upstream?.platform_id ?? upstream?.platform);
         const canonical = canonicalCharacterFromEvidence(upstream);
-        const existing = Array.isArray(result.characters) ? result.characters : [];
-        const inferred = canonical.length > 0
+        const existing = Array.isArray(result.characters)
+          ? result.characters.filter((item) => {
+              const name = String(recordValue(item).name ?? "").trim();
+              return !/^(?:无|没有)(?:真人|人物|角色|模特)|^(?:none|n\/a)$/iu.test(name);
+            })
+          : [];
+        const rawInferred = canonical.length > 0
           ? canonical
           : existing.length > 0
             ? existing
@@ -2142,6 +2949,11 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
               discovery,
               upstream,
             });
+        const inferred = rawInferred.map((item, index) => {
+          const record = recordValue(item);
+          const id = String(record.id ?? record.characterId ?? record.character_id ?? `char_${index + 1}`);
+          return { ...record, id, characterId: id };
+        });
         discovery._canonicalCharacters = inferred;
         const discoveryUpstream = recordValue(discovery.upstreamFields);
         discovery.upstreamFields = {
@@ -2154,7 +2966,7 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
         const withEvidence = {
           ...result,
           ...(platform ? { platform } : {}),
-          ...(inferred.length > 0 ? { characters: inferred } : {}),
+          characters: inferred,
           _discoveryEvidence: {
             sceneStructure: discovery?.sceneStructure ?? null,
             riskAssessment: discovery?.riskAssessment ?? null,
@@ -2162,7 +2974,7 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
           },
         };
         if (inferred.length > existing.length) {
-          log(`[vendor-compat] 角色契约补全：${inferred.map((item) => item.name).join("、")}`);
+          log(`[vendor-compat] 角色契约补全：${inferred.map((item) => String(recordValue(item).name ?? "")).join("、")}`);
         }
         return withEvidence;
       };
@@ -2358,8 +3170,13 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
         ) {
           const original = originalPolicy.call(this, userIntent);
           const requirement = String(original.dialogueRequirement ?? "");
-          const dialogueAllowed = !/(?:无.{0,2}台词|无对白|不做口型|纯画面无对白)/u.test(requirement);
-          const policy = { ...original, dialogueAllowed };
+          const speech = narrativeSpeechPolicy(requirement);
+          const policy = {
+            ...original,
+            dialogueAllowed: speech.dialogueAllowed,
+            voiceoverAllowed: speech.voiceoverAllowed,
+            allSpeechForbidden: speech.allSpeechForbidden,
+          };
           this._workloomNarrativePolicy = policy;
           return policy;
         };
@@ -2379,21 +3196,25 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
           const policy = this._workloomNarrativePolicy && typeof this._workloomNarrativePolicy === "object"
             ? this._workloomNarrativePolicy as Record<string, unknown>
             : {};
-          const noDialogue = policy.dialogueAllowed === false;
+          const noLipSyncDialogue = policy.dialogueAllowed === false;
+          const allSpeechForbidden = policy.allSpeechForbidden === true
+            || (noLipSyncDialogue && policy.voiceoverAllowed !== true);
           const structure = parsed?.structure && typeof parsed.structure === "object"
             ? parsed.structure as Record<string, unknown>
             : {};
-          if (noDialogue && Array.isArray(structure.scenes)) {
+          if (noLipSyncDialogue && Array.isArray(structure.scenes)) {
             for (const scene of structure.scenes) {
               if (!scene || typeof scene !== "object") continue;
               const record = scene as Record<string, unknown>;
               record.dialogue = { has_dialogue: false, lines: [], blocks: [] };
-              delete record.narration;
-              delete record.voice_over;
-              delete record.voiceover;
+              if (allSpeechForbidden) {
+                delete record.narration;
+                delete record.voice_over;
+                delete record.voiceover;
+              }
             }
           }
-          return originalNormalize.call(this, parsed, noDialogue ? false : voiceoverAllowed);
+          return originalNormalize.call(this, parsed, allSpeechForbidden ? false : voiceoverAllowed);
         };
         restores.push(() => { generatorPrototype._normalizeScenesDialogue = originalNormalize; });
       }
@@ -2424,8 +3245,63 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
             ? meta._metadata as Record<string, unknown>
             : {};
           const requirement = String(metadata.dialogueRequirement ?? "");
-          if (!/(?:无.{0,2}台词|无对白|不做口型|纯画面无对白)/u.test(requirement)) {
+          const speech = narrativeSpeechPolicy(requirement);
+          if (!speech.noLipSyncDialogue) {
             return originalCheck.call(this, blueprint);
+          }
+          if (!speech.allSpeechForbidden) {
+            const scenes = Array.isArray(recordValue(blueprint.structure).scenes)
+              ? recordValue(blueprint.structure).scenes as unknown[]
+              : [];
+            const voiceovers = new Set<string>();
+            const spokenLines: string[] = [];
+            for (const scene of scenes.map(recordValue)) {
+              for (const value of [scene.narration, scene.voice_over, scene.voiceover]) {
+                const text = String(value ?? "").trim();
+                if (text) voiceovers.add(text);
+              }
+              const dialogue = recordValue(scene.dialogue);
+              const rows = Array.isArray(dialogue.lines) && dialogue.lines.length > 0
+                ? dialogue.lines
+                : Array.isArray(dialogue.blocks) ? dialogue.blocks : [];
+              for (const raw of rows) {
+                const row = recordValue(raw);
+                const text = String(row.text ?? row.line ?? "").trim();
+                if (!text) continue;
+                if (/^(?:旁白|voiceover)$/iu.test(String(row.speaker ?? "")) || /^narration$/iu.test(String(row.type ?? ""))) {
+                  voiceovers.add(text);
+                } else {
+                  spokenLines.push(text);
+                }
+              }
+            }
+            const lineCount = spokenLines.length;
+            return [
+              {
+                category: "dialogue",
+                name: "has_dialogue",
+                passed: lineCount === 0,
+                severity: lineCount === 0 ? "ok" : "error",
+                message: lineCount === 0 ? "不适用：本片明确无口型对白；允许已声明的画外旁白" : "无口型合同中出现对白行",
+                suggestion: lineCount === 0 ? null : "移除对白行，只保留合同允许的一句画外旁白",
+              },
+              {
+                category: "dialogue",
+                name: "line_length",
+                passed: true,
+                severity: "ok",
+                message: "不适用：无口型对白",
+                suggestion: null,
+              },
+              {
+                category: "dialogue",
+                name: "no_voiceover",
+                passed: voiceovers.size <= 1,
+                severity: voiceovers.size <= 1 ? "ok" : "error",
+                message: voiceovers.size <= 1 ? "允许且仅允许一条画外旁白" : `明确要求最多一句旁白，实际发现 ${voiceovers.size} 条`,
+                suggestion: voiceovers.size <= 1 ? null : "合并或删除多余旁白",
+              },
+            ];
           }
           return [
             {
@@ -3344,20 +4220,81 @@ export async function repairPhase3FusionRows(input: Phase3RepairInput): Promise<
 
 export function applyNarrativeFinalPromptContract(
   shot: FusionRecord,
-  options: { noDialogue: boolean; maxLength: number; deliveryConstraint?: string },
+  options: {
+    noDialogue: boolean;
+    maxLength: number;
+    deliveryConstraint?: string;
+    noCharacters?: boolean;
+    noAnimals?: boolean;
+    noMusic?: boolean;
+    chineseOnly?: boolean;
+    durationSeconds?: number;
+    aspectRatio?: string;
+    resolution?: string;
+    colorTemperature?: string;
+    isLastShot?: boolean;
+    characterNames?: string[];
+    noTitles?: boolean;
+    canonicalize?: boolean;
+    characterPortraits?: Array<{ name: string; path: string; appearance?: string; costume?: string }>;
+    projectScene?: string;
+    projectLighting?: string;
+    projectColor?: string;
+    projectProps?: string[];
+    projectActions?: string[];
+    shotIndex?: number;
+  },
 ): FusionRecord {
   const next: FusionRecord = {
     ...shot,
     fields: { ...(shot.fields && typeof shot.fields === "object" ? shot.fields as FusionRecord : {}) },
   };
   let prompt = typeof next.prompt === "string" ? next.prompt : "";
-  if (options.deliveryConstraint?.trim()) {
-    const constraint = options.deliveryConstraint.trim();
-    const constraintLine = /^(\s*\d+\.【约束】)[^\n]*(?=\n|$)/mu;
-    if (constraintLine.test(prompt)) {
-      prompt = prompt.replace(constraintLine, `$1${constraint}`);
-    } else {
-      prompt = `${prompt.trimEnd()}\n04.【约束】${constraint}`;
+  prompt = prompt
+    .replace(/(?:是枝裕和|侯孝贤|塔可夫斯基|阿巴斯|岩井俊二)/gu, "克制写实的自然长镜风格")
+    .replace(/(?:清晨六点前后|清晨五点半|日出前)/gu, "清晨")
+    .replace(/(?:约半人高|约一掌高|半人高|一掌高)/gu, "贴水高度")
+    .replace(/清晨的清晨/gu, "清晨")
+    .replace(/清�晰/gu, "清晰")
+    .replace(/�/gu, "")
+    .replace(/\bCG\b/giu, "计算机生成")
+    .replace(/\bcinematic\b/giu, "电影感")
+    .replace(/\bphotorealistic\b/giu, "写实摄影")
+    .replace(/Camera增强/gu, "运镜增强")
+    .replace(/Mood增强/gu, "情绪增强")
+    .replace(/\b(?:cold|weary|quiet|tender|relieved|lonely|warm|serene|calm)\b/giu, (word) => ({
+      cold: "清冷", weary: "疲惫", quiet: "安静", tender: "温柔", relieved: "释然",
+      lonely: "孤独", warm: "温暖", serene: "宁静", calm: "平静",
+    } as Record<string, string>)[word.toLowerCase()] ?? word)
+    .replace(/\b(?:cameraHint|description|label|time)\b/giu, (word) => ({
+      camerahint: "运镜提示", description: "描述", label: "标签", time: "时间",
+    } as Record<string, string>)[word.toLowerCase()] ?? word);
+  const escapeLabel = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+  const replaceField = (label: string, value: string): void => {
+    const line = /^\s*\d+\.【[^】]+】/u;
+    const pattern = new RegExp(`^(\\s*\\d+\\.【${escapeLabel(label)}】)[^\\n]*$`, "mu");
+    if (pattern.test(prompt)) {
+      prompt = prompt.replace(pattern, `$1${value}`);
+    } else if (line.test(prompt)) {
+      prompt = `${prompt.trimEnd()}\n99.【${label}】${value}`;
+    }
+  };
+  const fieldValue = (label: string): string =>
+    new RegExp(`^\\s*\\d+\\.【${escapeLabel(label)}】([^\\n]*)$`, "mu").exec(prompt)?.[1]?.trim() ?? "";
+  const duration = Math.max(0, Number(shot.duration ?? (shot.timing as FusionRecord | undefined)?.duration ?? options.durationSeconds ?? 0));
+  const aspect = String(options.aspectRatio ?? "9:16");
+  const resolution = String(options.resolution ?? (aspect === "9:16" ? "1080x1920" : ""));
+  const constraint = (options.deliveryConstraint?.trim()
+    || [`${aspect}画幅`, resolution, duration > 0 ? `${duration}秒` : "", "24fps", "MP4格式"]
+      .filter(Boolean).join("，"))
+    .replace(/[。；;]+$/u, "");
+  replaceField("约束", `${constraint}。`);
+  if (options.chineseOnly) {
+    replaceField("语言约束", "全部字段必须使用中文；画幅、分辨率、帧率、编码、时间码与格式名等制作标记可作为受控例外；不输出英文叙事标签、英文风格词或英文负面词。");
+  }
+  if (options.noTitles) {
+    for (const label of ["主标题内容", "副标题内容", "标题动画设计", "标题字体设计", "开场音频设计"]) {
+      replaceField(label, "不适用：成片无文字、无字幕、无标题卡。");
     }
   }
   prompt = prompt.replace(
@@ -3369,10 +4306,133 @@ export function applyNarrativeFinalPromptContract(
     next.dialogueText = "";
     next.dialogueBlocks = [];
     (next.fields as FusionRecord).dialogue = "";
-    prompt = prompt
-      .replace(/^\s*\d+\.【台词】[^\n]*(?:\n|$)/gmu, "")
-      .replace(/【台词】[^|\n]*(?=\s*\||\n|$)/gu, "");
+    replaceField("台词", "不适用：本片无台词、无旁白、无口播。");
   }
+  const characterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
+  const shotCharacterEvidence = promptFieldText(next.character ?? (next.fields as FusionRecord).character);
+  const shotCharacterRef = promptFieldText(next.characterRef);
+  const explicitNoPersonInShot = /^(?:无|none|n\/a)$/iu.test(shotCharacterRef)
+    || /(?:空镜无角色|无角色出场|不出现[^。；\n]{0,8}(?:人物|人手|身影|面部|陈卓)|画面主体仅[^。；\n]{0,12}(?:陈设|物件)|无人物出场)/u.test(shotCharacterEvidence);
+  const shotNoPerson = Boolean(options.noCharacters) || explicitNoPersonInShot;
+  if (!shotNoPerson && characterNames.length > 0) {
+    replaceField("角色", `${characterNames.join("、")}；保持当前授权角色档案、同一发型脸型、身高体型与服装，动作以本镜动作字段为准，不套用无关人物模板。`);
+    replaceField("微动作", "微动作只服务于本镜动作与情绪：手部、呼吸、视线和重心做小幅连续变化，不使用固定微笑、张开双臂或其他无关模板。");
+    replaceField("角色约束", `本镜仅允许 ${characterNames.join("、")} 入画；不得合并、替换或增加其他人物。`);
+    replaceField("角色一致性", `所有镜头分别绑定 ${characterNames.join("、")} 的当前外观与服装锚点；不得合并、替换或增减人物。`);
+    if (characterNames.length === 1) {
+      prompt = prompt.replace(
+        /[^。；\n]{0,24}(?:门外走廊有一道人影|一道人影|有人正走到这扇门前|走近的身体重量)[^。；\n]*[。；]?/gu,
+        "",
+      );
+    }
+  } else if (!options.noCharacters && explicitNoPersonInShot) {
+    replaceField("角色", "本镜为空镜或局部插入，无人物、无人影、无人体局部入画。");
+    replaceField("微动作", "不适用：本镜无人物。");
+    replaceField("角色约束", "画面禁止人物、人影、人体局部和拟人化表演模板。");
+    replaceField("角色一致性", "本镜无人物；锁定同一场景、道具、光源和空间关系，不追加其他人物。");
+  }
+  const actionSource = promptFieldText(next.action ?? (next.fields as FusionRecord).action)
+    || fieldValue("动作")
+    || "只执行画面中可见的连续动作，动作主体、先后顺序和结束姿态与场景字段一致。";
+  replaceField("动作", actionSource);
+  const makeupSource = promptFieldText(next.makeup ?? (next.fields as FusionRecord).makeup);
+  replaceField("化妆", shotNoPerson ? "不适用：本镜无人物。" : makeupSource || "自然写实妆，保持同一角色肤色与面部细节，不新增无关妆造。");
+  if (duration > 0) {
+    replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 起幅建立本镜空间，中段只执行动作字段中的连续变化，落幅保持同一光位并接到下一镜。`);
+  }
+  if (options.noCharacters) {
+    prompt = prompt
+      .replace(/[^。；\n]{0,20}(?:机器后撤|镜头同步后撤|镜头后撤|后拉|后撤)[^。；\n]*/gu, "镜位保持稳定")
+      .replace(/约?[零一二三四五六七八九十百\d.]+厘米/gu, "低机位高度")
+      .replace(/比上一镜[^，。；\n]*/gu, "按统一景别序列执行");
+    if (options.colorTemperature) {
+      prompt = prompt.replace(/\b\d{4}\s*K\b/giu, options.colorTemperature);
+    }
+    replaceField("场景", fieldValue("场景")
+      .replace(/清晨\s*/gu, "清晨")
+      .replace(/(?:海拔|六点|五点半|日出前)[^，。；\s]*/gu, "")
+      .replace(/，{2,}/gu, "，"));
+    const colorTemperature = String(options.colorTemperature ?? "统一自然晨光");
+    replaceField("灯光设计", `${colorTemperature}；低角度自然侧逆光经薄雾柔化，无人工光源；全片保持同一主光方向、白平衡与光比，不自行切换冷暖基调。`);
+    replaceField("明亮约束", "自然景物高光不过曝，暗部保留材质细节；本镜不涉及人物面部或肤色。");
+    replaceField("角色", "无人物、无人影、无动物入画；主体仅来自源证据中的湖面、芦苇、山体、雾、水痕等自然景物。");
+    replaceField("服装", "不适用：无人物出场。");
+    replaceField("化妆", "不适用：无人物出场。");
+    replaceField("定妆照", "不适用：无人物出场，不生成也不引用人像定妆照。");
+    const action = fieldValue("动作")
+      .replace(/[^；。\n]*(?:水黾|飞鸟|鸟鸣|动物|猫|狗|鱼|站立姿态|缓慢走动|张开双臂|指向|握拳|抱头|微笑|点头|人物动作)[^；。\n]*[；。]?/gu, "")
+      .replace(/^[；。\s]+|[；。\s]+$/gu, "");
+    replaceField("动作", action || "画面内仅有源证据中的自然物理运动：薄雾慢移、水面细涟漪、芦苇与草叶随风轻摆；无人物、无动物。");
+    const props = promptFieldText((next.fields as FusionRecord).props ?? next.props)
+      .replace(/[^；。\n]*(?:动物|人物|角色)[^；。\n]*[；。]?/gu, "")
+      .trim();
+    replaceField("道具", `${props || "源证据中的自然物"}；不添加人工道具、人物或动物。`);
+    const movement = promptFieldText((next.fields as FusionRecord).camera_movement ?? next.camera_movement);
+    const normalizedMovement = /(?:固定|锁死|locked|static|零位移)/iu.test(movement)
+      ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
+      : /推近|推镜/u.test(movement)
+        ? "极缓单次推近，速度连续且逐渐减速停稳，不跨越景别等级"
+        : /横移|平移/u.test(movement)
+          ? "极缓单次横移，速度连续且停稳，不跨越景别等级"
+          : "固定机位，不做推拉摇移或变焦";
+    replaceField("运镜", `${normalizedMovement}；从起幅到落幅连续稳定，不写厘米、米每秒或其他无法兑现的位移参数。`);
+    replaceField("情绪", "平静、克制；仅通过光线、水面、雾层和芦苇的节奏表达，不要求人物表情。");
+    replaceField("节奏", "整体节奏依据源证据中的自然变化连续推进，不使用人工强转折或情绪性加速。");
+    replaceField("角色约束", "画面禁止人物、人影、人体局部和拟人化表演模板；仅允许源证据中的自然景物。");
+    replaceField("角色一致性", "本镜无角色；场景、自然物位置、光源方向与时间阶段以源证据和统一视觉方案为准，不追加未经核实的参数。");
+    replaceField("转场", options.isLastShot
+      ? "本镜为全片最后一镜；落幅定格0.5秒后淡出至黑，持续1秒，无其他转场特效。"
+      : "本镜落幅后硬切至下一镜；不使用叠化、黑场或其他转场特效。");
+    if (duration > 0) {
+      replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 从静止起幅开始，风、雾、水、光在连续物理范围内完成变化；落幅保持同一空间与光源方向，不跨越下一镜。`);
+    }
+  }
+  if (options.noMusic || options.noDialogue) {
+    const rawAudio = promptFieldText((next.fields as FusionRecord).audio ?? next.audio);
+    const prohibited = /(?:音乐|配乐|旋律|弦乐|钢琴|氛围音|铺底|BPM|BGM|soundtrack|music|score|台词|人声|对话|旁白|口播|voiceover)/iu;
+    const forbiddenAnimal = options.noAnimals ? /(?:鸟|虫|动物|水黾)/u : null;
+    const anchors = rawAudio
+      .split(/[；;。，,、|\n]+/u)
+      .map((item) => item.trim())
+      .filter((item) => item.length >= 2 && !prohibited.test(item) && !forbiddenAnimal?.test(item))
+      .filter((item) => !/(?:音效上加入|拟音|后期|叠加)/u.test(item))
+      .map((item) => item.replace(/^(?:仅有|只有|仅保留|只保留)+/u, "").trim())
+      .filter((item) => /(?:风|水|波|涟漪|雾|芦苇|雨|环境|动作|呼吸|草|叶|石|泥)/u.test(item));
+    const fallbackAudio = options.noCharacters ? "风声、水面涟漪声、芦苇摩擦声" : "与画面同步的环境声和主体动作声";
+    const audio = anchors.length > 0 ? [...new Set(anchors)].slice(0, 6).join("、") : fallbackAudio;
+    replaceField("音频", `仅有${audio}；无人物声、无旁白、无音乐、无配乐、无音乐节拍。`);
+  }
+  if (options.chineseOnly) {
+    const forbidden = [
+      "无文字", "无字幕", "无水印", "无品牌标识",
+      ...(options.noCharacters ? ["无人物", "无人影", "无人体局部"] : []),
+      ...(shotNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
+      ...(options.noAnimals || options.noCharacters ? ["无动物", "无飞鸟"] : []),
+      ...(options.noCharacters ? ["无船只", "无建筑", "无现代设备"] : []),
+      "无镜头光晕伪影", "无生成特效", "无模糊", "无过曝",
+    ];
+    replaceField("负面约束", [...new Set(forbidden)].join("、"));
+  }
+  prompt = prompt
+    .split("\n")
+    .map((line) => line
+      .replace(/\s*\|\s*(?:【音频纪律】|\[CINEMATIC_SKILL\])[\s\S]*$/u, "")
+      .replace(/\b(?:no non-diegetic music|no background music|no bgm|no soundtrack|no music score|no musical bed)\b/giu, "")
+      .replace(/[ \t]{2,}/gu, " ")
+      .trimEnd())
+    .filter((line) => !line.includes("【音频纪律】"))
+    .filter((line, index, lines) => line.length > 0 || index < lines.length - 1)
+    .join("\n");
+  const renumber = (value: string): string => {
+    let number = 0;
+    return value.split("\n").map((line) => {
+      if (!/^\s*\d+\.【[^】]+】/u.test(line)) return line;
+      number += 1;
+      return line.replace(/^(\s*)\d+(\.)(【)/u, (_all, indent: string, dot: string, bracket: string) =>
+        `${indent}${String(number).padStart(2, "0")}${dot}${bracket}`);
+    }).join("\n");
+  };
+  prompt = renumber(prompt);
   if (prompt.length > options.maxLength) {
     const lines: string[] = prompt.split("\n");
     let guard = 0;
@@ -3400,13 +4460,132 @@ export function applyNarrativeFinalPromptContract(
         : `${body.slice(0, Math.max(1, keep - 1))}…`;
       lines[candidate.index] = `${prefix}${shortened}`;
     }
-    prompt = lines
-      .map((line, index) => line.replace(/^(\s*)(\d+)\.(【)/u, (_all, indent: string, _number: string, bracket: string) =>
-        `${indent}${String(index + 1).padStart(2, "0")}.${bracket}`))
-      .join("\n");
+    prompt = renumber(lines.join("\n"));
     if (prompt.length > options.maxLength) {
       throw new Error(`FINAL_PROMPT_UNCOMPRESSIBLE: 结构化字段裁剪后仍为 ${prompt.length} 字符`);
     }
+  }
+  if (options.canonicalize) {
+    const cleanText = (value: string): string => value
+      .replace(/(?:^|\n)\s*(?:id|name|portraitRef|authorization)=[^\n]*/gu, " ")
+      .replace(/\[需求口径\]/gu, " ")
+      .replace(/[{}\[\]]/gu, " ")
+      .replace(/["“”]/gu, " ")
+      .replace(/\b(?:scene_id|scene_name|scene_description|characters|props|dialogue|lighting|composition|environment|action)\b\s*[:：]?/giu, " ")
+      .replace(/\s+/gu, " ")
+      .trim();
+    const source = (label: string, ...keys: string[]): string => {
+      for (const key of keys) {
+        const value = promptFieldText(next[key] ?? (next.fields as FusionRecord)[key]);
+        if (value) return cleanText(value);
+      }
+      return cleanText(fieldValue(label)) || "按本镜源证据执行";
+    };
+    const profiles = (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name));
+    const profileAppearance = profiles.map((item) => item.appearance).filter(Boolean).join("；")
+      .replace(/\bfemale\b/giu, "女性")
+      .replace(/\bmale\b/giu, "男性");
+    const canonicalNoPerson = Boolean(options.noCharacters);
+    const roles = canonicalNoPerson
+      ? "无人物、无人影、无人体局部入画。"
+      : characterNames.length > 0
+        ? `${characterNames.join("、")}入画；${profileAppearance || "保持当前授权角色档案中的发型脸型、身高体型与服装一致"}`
+        : cleanText(shotCharacterEvidence) || "按本镜源证据执行";
+    const profileCostume = profiles.map((item) => item.costume).filter(Boolean).join("；");
+    const costume = canonicalNoPerson
+      ? "不适用：本镜无人物。"
+      : profileCostume || source("服装", "costume").replace(/(?:无角色出场|不适用)/gu, "") || "按已审核角色档案服装执行";
+    const makeup = canonicalNoPerson
+      ? "不适用：本镜无人物。"
+      : "自然写实妆，保持同一角色肤色、眉眼与面部细节，不新增无关妆造。";
+    const portraitText = canonicalNoPerson
+      ? "不适用：本镜无人物，不生成也不引用人像定妆照。"
+      : (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name) && item.path)
+        .map((item) => `${item.name}=${item.path}`).join("；")
+        || fieldValue("定妆照")
+        || "使用本次已审核角色档案中的当前定妆照，不得替换为未登记人物。";
+    const dialogueText = options.noDialogue
+      ? "不适用：本片无台词、无旁白、无口播。"
+      : promptFieldText(next.dialogue ?? (next.fields as FusionRecord).dialogue) || "按已确认台词合同执行。";
+    const audioText = options.noMusic || options.noDialogue
+      ? "仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。"
+      : fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。";
+    const rawAction = cleanText(actionSource)
+      .replace(/[^；。\n]*(?:画面内无人物|没有实体肢体入画|无角色出场|空镜无角色)[^；。\n]*[；。]?/gu, "")
+      .trim();
+    let visibleAction = !canonicalNoPerson && rawAction.length < 12
+      ? cleanText(promptFieldText(next.purpose) || promptFieldText(next.description)) || "按人物在本镜中的连续动作执行，主体与结束姿态清楚可见"
+      : rawAction || actionSource;
+    if (!canonicalNoPerson && characterNames.length > 0 && !characterNames.some((name) => visibleAction.includes(name))) {
+      visibleAction = `${characterNames.join("、")}在本镜保持同一外观，${visibleAction}`;
+    }
+    const actions = options.projectActions ?? [];
+    const assignedAction = canonicalNoPerson
+      ? "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作。"
+      : actions.length > 0
+        ? actions[Math.min(options.shotIndex ?? 0, actions.length - 1)]!
+        : visibleAction;
+    const actionText = canonicalNoPerson || characterNames.length === 0 || characterNames.some((name) => assignedAction.includes(name))
+      ? assignedAction
+      : `${characterNames.join("、")}在本镜保持同一外观，${assignedAction}`;
+    const shotSizeRaw = promptFieldText(next.shotSize ?? (next.fields as FusionRecord).shotSize)
+      || promptFieldText(next.cameraHint ?? (next.fields as FusionRecord).cameraHint)
+      || "中景";
+    const shotSize = shotSizeRaw.replace(/景别$/u, "");
+    const compositionText = canonicalNoPerson
+      ? `${shotSize}景别，9:16竖构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
+      : `${shotSize}景别，9:16竖构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
+    const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
+    const cameraText = /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
+      ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
+      : /后拉/u.test(cameraSource)
+        ? "固定轴线极缓后拉，速度连续，末段减速停稳，不改变场景与背景"
+        : /推近|推镜/u.test(cameraSource)
+          ? "固定轴线极缓推近，速度连续，末段减速停稳，不跨越景别等级"
+          : /横移|平移/u.test(cameraSource)
+            ? "固定高度极缓横移，速度连续并停稳，不改变场景与背景"
+            : "固定机位，不做推拉摇移或变焦";
+    const emotionText = canonicalNoPerson
+      ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
+      : "克制、内敛；面部保持自然，眼神沿当前动作目标移动，呼吸和吞咽幅度轻微，嘴角放松，不使用固定微笑或夸张表情。";
+    const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
+      .replace(/\b(?:8K|4K)\b/giu, "电影级");
+    const forbidden = [
+      "无文字", "无字幕", "无水印", "无品牌标识",
+      ...(canonicalNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
+      ...(options.noAnimals || options.noCharacters ? ["无动物", "无飞鸟"] : []),
+      ...(canonicalNoPerson ? ["无船只", "无建筑", "无现代设备"] : []),
+      "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
+    ];
+    const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
+    prompt = [
+      "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
+      "02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。",
+      `03.【基础】${baseText}`,
+      `04.【约束】${constraint}。`,
+      `05.【场景】${cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription")}`,
+      `06.【灯光设计】${cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting")}`,
+      `07.【明亮约束】${canonicalNoPerson ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。" : "人物与主体轮廓可辨，不强制正面补光；按灯光设计保留明暗层次，环境高光不过曝。"}`,
+      `08.【构图】${compositionText}`,
+      `09.【色彩/色调】${cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette")}`,
+      `10.【景深】${canonicalNoPerson ? "自然景物近中远景层次连续，主体与倒影可辨；不依赖极端虚化。" : "人物与当前动作清晰可辨，环境前后景自然虚化；不对人物面部作强制补光。"}`,
+      `11.【运镜】${cameraText}`,
+      `12.【角色】${roles}`,
+      `13.【服装】${costume}`,
+      `14.【化妆】${makeup}`,
+      `15.【动作】${actionText}`,
+      `16.【道具】${(options.projectProps ?? []).join("、") || source("道具", "props").replace(/本镜为空镜|无角色使用道具/gu, "")}`,
+      `17.【定妆照】${portraitLine}`,
+      `18.【台词】${dialogueText}`,
+      `19.【时间轴】${duration > 0 ? `T00:00-T00:${duration.toFixed(1).padStart(4, "0")} 起幅、连续动作与落幅均在本镜内完成，不跨越下一镜。` : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。"}`,
+      `20.【情绪】${emotionText}`,
+      "21.【节奏】节奏依据源证据连续推进，起幅、动作与落幅完整，不增加无关加速或人工强转折。",
+      `22.【转场】${options.isLastShot ? "本镜为全片最后一镜；最后一帧直接硬切黑，不追加超出镜长的淡出。" : "本镜落幅后硬切至下一镜；不使用其他转场特效。"}`,
+      `23.【音频】${audioText}`,
+      `24.【负面约束】${[...new Set([...forbidden, "无暗黑风调色", "无塑料或金属感高光"])].join("、")}。`,
+      `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
+      `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
+    ].join("\n");
   }
   next.prompt = prompt;
   return next;
@@ -3446,7 +4625,16 @@ function scopedFusionAgent(agent: FusionAgent, remaining: () => number, deadline
         ...opts, timeoutMs: Math.min(Number.isFinite(requested) && requested > 0 ? requested : budget, budget), shotBudget: budget,
         ...(opts.altModel && typeof opts.altModel === "object" ? { altModel: guardEngine(opts.altModel as FusionRecord) } : {}),
       };
-      const response = await originalCall.apply(scoped, args);
+      let response: unknown;
+      try {
+        response = await originalCall.apply(scoped, args);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/(?:JSON\s*解析失败|未找到首个完整\s*JSON)/iu.test(message) || remaining() < 5000) throw error;
+        const retryArgs = [...args];
+        retryArgs[0] = `${String(retryArgs[0] ?? "")}\n严格只输出一个完整合法 JSON 对象；不要 Markdown 代码围栏、解释、前后缀或尾随文本。`;
+        response = await originalCall.apply(scoped, retryArgs);
+      }
       if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "LLM 返回时阶段预算已耗尽");
       return response;
     };
@@ -3616,15 +4804,91 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const policyMeta = blueprint.meta && typeof blueprint.meta === "object"
           ? (blueprint.meta as FusionRecord)._metadata as FusionRecord | undefined
           : undefined;
-        const noDialogue = /(?:无.{0,2}台词|无对白|不做口型)/u.test(String(policyMeta?.dialogueRequirement ?? ""));
+        const dialogueRequirement = String(policyMeta?.dialogueRequirement ?? "");
+        const speechFullyForbidden = narrativeSpeechPolicy(dialogueRequirement).allSpeechForbidden;
+        const policyPrd = recordValue(policyMeta?._prd);
+        const policyPositioning = recordValue(policyPrd.productPositioning);
+        const promptPolicyText = [
+          dialogueRequirement,
+          (blueprint.meta as FusionRecord | undefined)?._originalStoryText,
+          recordValue(policyPrd.projectDefinition).sourceIntent,
+          policyMeta?.special_notes,
+        ].map(String).join(" ");
+        const promptNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(promptPolicyText);
+        const promptNoCharacters = /(?:无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
+        const promptNoMusic = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(promptPolicyText);
+        const promptDuration = Number(
+          policyPositioning.targetDuration
+          ?? recordValue(blueprint.config).target_duration
+          ?? (blueprint.meta as FusionRecord | undefined)?.target_duration
+          ?? 0,
+        );
+        const promptAspect = String(
+          policyPositioning.aspectRatio
+          ?? recordValue(blueprint.meta).aspectRatio
+          ?? "9:16",
+        );
+        const promptResolution = String(policyPositioning.resolution ?? (promptAspect === "9:16" ? "1080x1920" : ""));
+        const promptColorTemperature = colorTemperatureFromText(JSON.stringify(policyPrd.visualSpecification)) ?? undefined;
+        const promptCharacterRecords = Array.isArray(recordValue(policyPrd.characterSystem).characters)
+          ? (recordValue(policyPrd.characterSystem).characters as unknown[]).map(recordValue)
+          : [];
+        const promptCharacters = promptCharacterRecords.map((item) => String(item.name ?? "").trim()).filter(Boolean);
+        const promptCharacterPortraits = promptCharacterRecords.map((item) => ({
+          name: String(item.name ?? "").trim(),
+          path: String(item.portraitPath ?? item.portraitRef ?? "").trim(),
+          appearance: String(item.appearance ?? "").trim(),
+          costume: String(item.costume ?? "").trim(),
+        })).filter((item) => item.name);
+        const promptSubtitles = recordValue(recordValue(policyPrd.deliveryStandard).subtitles);
+        const promptNoTitles = promptSubtitles.mode === "none" || /(?:无字幕|无文字)/u.test(promptPolicyText);
+        const promptScenePlan = recordValue(policyPrd.scenePlan);
+        const promptVisual = recordValue(policyPrd.visualSpecification);
+        const promptSceneSettings = (Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
+          .map((scene) => scene.setting).map(String).filter(Boolean);
+        const promptScene = promptSceneSettings.length > 0
+          ? [...new Set(promptSceneSettings)].join("；")
+          : String(recordValue(policyPrd.projectDefinition).sourceIntent ?? "");
+        const promptProps = [...new Set([
+          ...(Array.isArray(policyPrd.shotContract) ? policyPrd.shotContract.map(recordValue) : [])
+            .flatMap((shot) => Array.isArray(shot.keyProps) ? shot.keyProps.map(String) : []),
+          ...(Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
+            .flatMap((scene) => Array.isArray(scene.keyProps) ? scene.keyProps.map(String) : []),
+        ].filter(Boolean))];
+        const promptActions = extractNarrativeActions({}, {
+          _originalStoryText: String(policyPrd._originalStoryText ?? promptScene),
+          special_notes: String(policyMeta?.special_notes ?? ""),
+        });
         const promptLimit = Number(
           (vendorRequire(resolvePath(
             repoRoot,
             "vendor/supermickey/hyperreality-system/config/prompt-length.js",
           )) as { HARD_MAX?: number }).HARD_MAX ?? 3000,
         );
-        updated = updated.map((shot) =>
-          applyNarrativeFinalPromptContract(shot, { noDialogue, maxLength: promptLimit }));
+        updated = updated.map((shot, shotIndex, allShots) =>
+          applyNarrativeFinalPromptContract(shot, {
+            noDialogue: speechFullyForbidden,
+            maxLength: promptLimit,
+            noCharacters: promptNoCharacters,
+            noAnimals: promptNoAnimals,
+            noMusic: promptNoMusic,
+            chineseOnly: true,
+            durationSeconds: Number.isFinite(promptDuration) && promptDuration > 0 ? promptDuration : undefined,
+            aspectRatio: promptAspect,
+            resolution: promptResolution,
+            colorTemperature: promptColorTemperature,
+            isLastShot: shotIndex === allShots.length - 1,
+            characterNames: promptCharacters,
+            noTitles: promptNoTitles,
+            canonicalize: true,
+            characterPortraits: promptCharacterPortraits,
+            projectScene: promptScene,
+            projectLighting: promptFieldText(promptVisual.lightingDirection),
+            projectColor: promptFieldText(promptVisual.colorPalette ?? promptVisual.colorGrading),
+            projectProps: promptProps,
+            projectActions: promptActions,
+            shotIndex,
+          }));
         const outputIds = new Set<string>();
         for (const row of updated) {
           const shot = fusionRecord(row, "融合镜头");

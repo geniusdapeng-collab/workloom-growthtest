@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-0-1793539874498",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无角色空镜|真实猫片 G3'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "无角色空镜|真实猫片 G3"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 0
+  },
+  "commit": "6b3581810477be07200a300c9e16bc854cb7f0df",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T13:31:14.498Z",
+  "finished_at": "2026-11-01T13:31:15.637Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-0-1793539874498.txt",
+      "sha256": "a63019c93bb76b60473951ce93b06ff6f945295ddddc7ed5329a789e7a3c7ed7",
+      "commit": "6b3581810477be07200a300c9e16bc854cb7f0df"
+    }
+  ]
+}

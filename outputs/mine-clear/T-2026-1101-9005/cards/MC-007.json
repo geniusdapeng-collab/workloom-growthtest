@@ -1,0 +1,55 @@
+{
+  "id": "MC-007",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "Phase3 单次模型 JSON 语法失败被当作不可恢复错误，导致已有镜头产出整体失败关闭",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:3440@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "宿主包装 _callLLM 只转发预算，没有处理模型偶发返回非 JSON；后续真实空镜在 S1 第二次单镜重试时报 PHASE3_FUSION_RETRY_UNVERIFIED，前一阶段 6 个镜头的有效产出无法收口。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 3440,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "scopedFusionAgent"
+  },
+  "trigger_path": "真实模型返回自然语言、Markdown 或空文本；vendor 报 JSON 解析失败并把 UNKNOWN 标为不可重试，宿主只收到异常，导致整条 Phase3 失败。",
+  "fix_plan": "在同一阶段预算内仅对明确的 JSON 语法失败重发一次，追加严格的单 JSON 对象约束；预算不足仍失败关闭，第二次仍非 JSON 继续原错上抛，不把语义非法或降级结果改写为通过。",
+  "blast_radius": "仅作用于 Phase3 技能精选、完整融合和单镜修复的 _callLLM 调用；网络错误、权限错误、空业务裁决、预算未知和语义降级保持原失败路径。",
+  "conflict_paths": [
+    "packages/video-studio/src/vendor-compat.ts",
+    "packages/video-studio/src/vendor-compat.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "第一次 Phase3 调用抛出“JSON 解析失败”，第二次返回合法 JSON 且预算足够",
+      "expect": "同一阶段内重发一次，第二次请求带严格单一 JSON 对象约束，随后完整融合成功",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t 'Phase3 首次 JSON 解析失败'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "Phase3 首次 JSON 解析失败"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t 'Phase3 首次 JSON 解析失败'",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中 Phase3 JSON 语法重试相关提交",
+  "fixed_by": null,
+  "verified_by": null
+}

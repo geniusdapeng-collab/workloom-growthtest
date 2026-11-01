@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-005-0-1793550874498",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '动物是角色而非道具'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "动物是角色而非道具"
+    ]
+  },
+  "actor": "final_verifier_9005_r2",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-005",
+    "assertion_index": 0
+  },
+  "commit": "7acb40ce74b11264e23de606b4e37009100fb03b",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T16:34:34.498Z",
+  "finished_at": "2026-11-01T16:34:35.227Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-005-0-1793550874498.txt",
+      "sha256": "31135d01e4bcfc3c95820c4bdb59d31e990ba51d9b8866e715697ccefe85a608",
+      "commit": "7acb40ce74b11264e23de606b4e37009100fb03b"
+    }
+  ]
+}

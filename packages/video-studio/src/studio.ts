@@ -151,6 +151,24 @@ export interface RunInput {
   isMarketing?: boolean;
 }
 
+/**
+ * 审批门对外展示的是业务内容，不是内部资产绑定的回执字段。
+ * 角色 ID、portraitRef 与 authorization 继续留在运行上下文中，仅从 G2 创意正文剥离。
+ */
+export function sanitizeGateContent(gate: string, content: string): string {
+  if (gate !== "G2_THEME") return content;
+  return content
+    .replace(
+      /id=([^;\n]+);[\s\S]{0,1500}?name=([^;\n]+);[\s\S]{0,1500}?authorization=[^\n]*/gu,
+      (_all, id: string, name: string) => `\n授权角色：${name.trim()}（${id.trim()}）；定妆照与授权信息已系统内部绑定，不进入创意正文。`,
+    )
+    .replace(/^\s*(?:id|name|portraitRef|authorization)=[^\n]*$/gmu, "")
+    .replace(/平江路讲述人/gu, "授权角色")
+    .replace(/bundles\/ai-video\/library\/characters\/[^\s；;]+/gu, "【系统内部角色资产】")
+    .replace(/\n{3,}/gu, "\n\n")
+    .trim();
+}
+
 export function attachDefaultCharacterAnchor(
   intent: string,
   metadata: Record<string, unknown>,
@@ -292,7 +310,7 @@ export class VideoStudio {
         gate,
         vendorType: req.type,
         title: `预生产确认门 · ${gate}`,
-        contentMd: req.content,
+        contentMd: sanitizeGateContent(gate, req.content),
         runId: req.runId ?? runId
       });
       await emit({

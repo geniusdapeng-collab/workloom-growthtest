@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-3-1793550877605",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无人物但有动物'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "无人物但有动物"
+    ]
+  },
+  "actor": "final_verifier_9005_r2",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 3
+  },
+  "commit": "7acb40ce74b11264e23de606b4e37009100fb03b",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T16:34:37.605Z",
+  "finished_at": "2026-11-01T16:34:38.154Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-3-1793550877605.txt",
+      "sha256": "b06e4b0c4e5b6c5898f6f1b2bd44dd76fcc4d69091aa84bcc0014879c4d1496e",
+      "commit": "7acb40ce74b11264e23de606b4e37009100fb03b"
+    }
+  ]
+}

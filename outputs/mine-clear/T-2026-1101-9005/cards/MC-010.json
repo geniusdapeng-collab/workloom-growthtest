@@ -1,0 +1,74 @@
+{
+  "id": "MC-010",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "无台词标准声明被最终镜头合同误判为残留台词，20 个叙事压测全部失败",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/final-shot-contract.ts:35@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "854db440565e26eaf68fc8dffd9f3b6f6fd205187c87fc8b704240f517a0d962",
+      "note": "hasDialogue 只检查 prompt 是否含【台词】标签；applyNarrativeFinalPromptContract 在 noDialogue=true 时仍规范化为【台词】不适用：本片无台词、无旁白、无口播，因而 6 镜均被判 DIALOGUE_FORBIDDEN。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/final-shot-contract.ts",
+    "line": 35,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "hasDialogue"
+  },
+  "trigger_path": "叙事请求 noDialogue=true → 最终合同写入不适用声明 → inspectFinalShotContract 只看到【台词】标签 → NARRATIVE_FINAL_CONTRACT_FAILED。",
+  "fix_plan": "按台词字段的实际语义判断：不适用/无台词/无旁白/无口播的规范声明不算台词；只有对话内容、非空台词字段或非空 dialogueBlocks 才失败。",
+  "blast_radius": "仅影响 noDialogue=true 时最终镜头合同的台词残留判断；真实台词、旁白和口型合同继续失败关闭。",
+  "conflict_paths": [
+    "packages/video-studio/src/final-shot-contract.ts",
+    "packages/video-studio/src/final-shot-contract.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "最终合同按 noDialogue 写入【台词】不适用声明，且结构化台词字段为空",
+      "expect": "合同通过；写入真实台词正文或非空 dialogueBlocks 时仍返回 DIALOGUE_FORBIDDEN",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/final-shot-contract.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/final-shot-contract.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "sample",
+      "given": "60 个营销、叙事与异常场景调用当前生产路由、最终镜头合同和 render boundary",
+      "expect": "60/60 通过，20/20 叙事恢复，providerSubmission=false 且付费生成请求为 0",
+      "command": "pnpm --config.verify-deps-before-run=false exec tsx scripts/tools/ai-video-stress-matrix.mts --out outputs/mine-clear/T-2026-1101-9005/matrix",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "exec",
+          "tsx",
+          "scripts/tools/ai-video-stress-matrix.mts",
+          "--out",
+          "outputs/mine-clear/T-2026-1101-9005/matrix"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/final-shot-contract.test.ts && pnpm test:ai-video-stress",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中 hasDialogue 对标准无台词声明的修复及新增回归用例",
+  "fixed_by": "codex-root-repair-T-2026-1101-9005",
+  "verified_by": null,
+  "verified_at": null,
+  "verification_evidence": null,
+  "notes": "由 60 场景矩阵复跑发现：marketing 20/20、abnormal 20/20、narrative 0/20。"
+}
