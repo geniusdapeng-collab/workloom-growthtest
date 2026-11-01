@@ -2307,20 +2307,27 @@ export function normalizeNarrativePrdContract(
     upstream.audio_design,
   ].map(String).join(" "));
 
+  const explicitNoCharacters = /(?:无人物|无动物|无角色|纯空镜|场景为主体)/u.test([
+    upstream._originalStoryText,
+    upstream.description,
+    upstream.special_notes,
+    upstream.dialogue_requirement,
+  ].map(String).join(" "));
   let canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
     ? discovery._canonicalCharacters.map(recordValue)
     : [];
+  if (explicitNoCharacters) canonicalCharacters = [];
   const characterSystem = recordValue(prd.characterSystem);
   const generated = Array.isArray(characterSystem.characters)
     ? characterSystem.characters.map(recordValue)
     : [];
-  if (canonicalCharacters.length === 0 && generated.length > 0) {
+  if (!explicitNoCharacters && canonicalCharacters.length === 0 && generated.length > 0) {
     canonicalCharacters = generated.map((item, index) => {
       const id = String(item.characterId ?? item.id ?? item.character_id ?? `char_${index + 1}`);
       return { ...item, id, characterId: id };
     });
   }
-  if (canonicalCharacters.length === 0) {
+  if (!explicitNoCharacters && canonicalCharacters.length === 0) {
     canonicalCharacters = inferNarrativeCharacters({
       intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
       discovery,
@@ -2533,13 +2540,23 @@ export function normalizeNarrativePrdContract(
   }
   const animalOnly = canonicalCharacters.length > 0
     && canonicalCharacters.every((item) => ["猫", "狗", "鸟"].includes(String(item.name ?? "")));
+  const explicitNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test([
+    upstream._originalStoryText,
+    upstream.description,
+    upstream.special_notes,
+    upstream.dialogue_requirement,
+  ].map(String).join(" "));
   const normalizeContractText = (text: string): string => {
     let value = text;
     if (animalOnly) value = value.replace(/人物动作/gu, "主体动作");
     if (noCharacters) {
       value = value
         .replace(/(?:人物|主体)动作与画外环境声/gu, "画外环境声")
-        .replace(/(?:人物|主体)动作/gu, "画外环境声");
+        .replace(/(?:人物|主体)动作/gu, "画外环境声")
+        .replace(/[^，。；\n]{0,20}(?:未出镜的观者|人物手部|呼吸入画|衣料摩擦|手指|手掌|呼吸声)[^，。；\n]*/gu, "仅保留自然光、水面与环境声");
+    }
+    if (explicitNoAnimals) {
+      value = value.replace(/[^，。；\n]{0,20}(?:黑天鹅|白天鹅|飞鸟|水鸟|鸟鸣|远鸟|猫|狗)[^，。；\n]*/gu, "仅保留自然环境声");
     }
     if (canonicalK) value = value.replace(/\b\d{4}\s*K\b/giu, canonicalK);
     if (musicForbidden && /(?:配乐|音乐|旋律|低频嗡鸣|低频持续音)/u.test(value)) {

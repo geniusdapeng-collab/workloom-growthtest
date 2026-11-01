@@ -1165,7 +1165,14 @@ console.log("RESULT " + JSON.stringify({
     const prd = normalizeNarrativePrdContract({
       projectDefinition: { sourceIntent: "橘猫雨夜接水" },
       productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
-      characterSystem: { characters: [] },
+      characterSystem: {
+        characters: [{
+          characterId: "char_hallucinated",
+          name: "未出镜的观者",
+          role: "protagonist",
+          appearance: "画面外一次呼吸声与衣料摩擦",
+        }],
+      },
       scenePlan: {
         scenes: [{ sceneId: "SC01", purpose: "橘猫探爪接水后缩回纸箱", duration: 15 }],
         shotMapping: [{ sceneId: "SC01", estimatedShots: 3, shotBreakdownHint: ["close-up", "close-up", "medium"] }],
@@ -1204,7 +1211,7 @@ console.log("RESULT " + JSON.stringify({
       audienceProfile: { contentExpectations: ["仅保留主体动作与画外环境声"] },
       audioSpecification: {
         musicStyle: "片尾仅入低频持续音",
-        soundEffects: ["水声", "芦苇摩擦声", "片尾旋律渐入", "片尾旋律渐入"],
+        soundEffects: ["水声", "芦苇摩擦声", "片尾旋律渐入", "片尾旋律渐入", "雾中远鸟与结尾一次呼吸声"],
       },
       deliveryStandard: {
         deliverables: [
@@ -1218,10 +1225,11 @@ console.log("RESULT " + JSON.stringify({
     const deliverables = delivery.deliverables as Array<Record<string, unknown>>;
     expect(deliverables.map((item) => item.item)).toEqual(["video_master"]);
     expect(delivery.characterAssets).toMatchObject({ required: false });
+    expect((prd.characterSystem as Record<string, unknown>).characters).toEqual([]);
     const shots = prd.shotContract as Array<Record<string, unknown>>;
     expect(shots[0]!.subjectIds).toEqual([]);
     expect(JSON.stringify(prd)).toContain("7000K");
-    expect(JSON.stringify(prd)).not.toMatch(/2700K|低频持续音|旋律渐入|人物动作|主体动作与画外环境声/u);
+    expect(JSON.stringify(prd)).not.toMatch(/2700K|低频持续音|旋律渐入|人物动作|主体动作与画外环境声|未出镜的观者|呼吸声|衣料摩擦|远鸟/u);
     expect(JSON.stringify(prd)).toContain("不使用配乐");
   });
 
