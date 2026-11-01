@@ -4069,6 +4069,14 @@ export function applyNarrativeFinalPromptContract(
     isLastShot?: boolean;
     characterNames?: string[];
     noTitles?: boolean;
+    canonicalize?: boolean;
+    characterPortraits?: Array<{ name: string; path: string; appearance?: string; costume?: string }>;
+    projectScene?: string;
+    projectLighting?: string;
+    projectColor?: string;
+    projectProps?: string[];
+    projectActions?: string[];
+    shotIndex?: number;
   },
 ): FusionRecord {
   const next: FusionRecord = {
@@ -4087,7 +4095,14 @@ export function applyNarrativeFinalPromptContract(
     .replace(/\bcinematic\b/giu, "电影感")
     .replace(/\bphotorealistic\b/giu, "写实摄影")
     .replace(/Camera增强/gu, "运镜增强")
-    .replace(/Mood增强/gu, "情绪增强");
+    .replace(/Mood增强/gu, "情绪增强")
+    .replace(/\b(?:cold|weary|quiet|tender|relieved|lonely|warm|serene|calm)\b/giu, (word) => ({
+      cold: "清冷", weary: "疲惫", quiet: "安静", tender: "温柔", relieved: "释然",
+      lonely: "孤独", warm: "温暖", serene: "宁静", calm: "平静",
+    } as Record<string, string>)[word.toLowerCase()] ?? word)
+    .replace(/\b(?:cameraHint|description|label|time)\b/giu, (word) => ({
+      camerahint: "运镜提示", description: "描述", label: "标签", time: "时间",
+    } as Record<string, string>)[word.toLowerCase()] ?? word);
   const escapeLabel = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&");
   const replaceField = (label: string, value: string): void => {
     const line = /^\s*\d+\.【[^】]+】/u;
@@ -4128,10 +4143,36 @@ export function applyNarrativeFinalPromptContract(
     replaceField("台词", "不适用：本片无台词、无旁白、无口播。");
   }
   const characterNames = (options.characterNames ?? []).map((name) => String(name).trim()).filter(Boolean);
-  if (!options.noCharacters && characterNames.length > 0) {
+  const shotCharacterEvidence = promptFieldText(next.character ?? (next.fields as FusionRecord).character);
+  const shotCharacterRef = promptFieldText(next.characterRef);
+  const explicitNoPersonInShot = /^(?:无|none|n\/a)$/iu.test(shotCharacterRef)
+    || /(?:空镜无角色|无角色出场|不出现[^。；\n]{0,8}(?:人物|人手|身影|面部|陈卓)|画面主体仅[^。；\n]{0,12}(?:陈设|物件)|无人物出场)/u.test(shotCharacterEvidence);
+  const shotNoPerson = Boolean(options.noCharacters) || explicitNoPersonInShot;
+  if (!shotNoPerson && characterNames.length > 0) {
     replaceField("角色", `${characterNames.join("、")}；保持当前授权角色档案、同一发型脸型、身高体型与服装，动作以本镜动作字段为准，不套用无关人物模板。`);
     replaceField("微动作", "微动作只服务于本镜动作与情绪：手部、呼吸、视线和重心做小幅连续变化，不使用固定微笑、张开双臂或其他无关模板。");
+    replaceField("角色约束", `本镜仅允许 ${characterNames.join("、")} 入画；不得合并、替换或增加其他人物。`);
     replaceField("角色一致性", `所有镜头分别绑定 ${characterNames.join("、")} 的当前外观与服装锚点；不得合并、替换或增减人物。`);
+    if (characterNames.length === 1) {
+      prompt = prompt.replace(
+        /[^。；\n]{0,24}(?:门外走廊有一道人影|一道人影|有人正走到这扇门前|走近的身体重量)[^。；\n]*[。；]?/gu,
+        "",
+      );
+    }
+  } else if (!options.noCharacters && explicitNoPersonInShot) {
+    replaceField("角色", "本镜为空镜或局部插入，无人物、无人影、无人体局部入画。");
+    replaceField("微动作", "不适用：本镜无人物。");
+    replaceField("角色约束", "画面禁止人物、人影、人体局部和拟人化表演模板。");
+    replaceField("角色一致性", "本镜无人物；锁定同一场景、道具、光源和空间关系，不追加其他人物。");
+  }
+  const actionSource = promptFieldText(next.action ?? (next.fields as FusionRecord).action)
+    || fieldValue("动作")
+    || "只执行画面中可见的连续动作，动作主体、先后顺序和结束姿态与场景字段一致。";
+  replaceField("动作", actionSource);
+  const makeupSource = promptFieldText(next.makeup ?? (next.fields as FusionRecord).makeup);
+  replaceField("化妆", shotNoPerson ? "不适用：本镜无人物。" : makeupSource || "自然写实妆，保持同一角色肤色与面部细节，不新增无关妆造。");
+  if (duration > 0) {
+    replaceField("时间轴", `T00:00-T00:${duration.toFixed(1)} 起幅建立本镜空间，中段只执行动作字段中的连续变化，落幅保持同一光位并接到下一镜。`);
   }
   if (options.noCharacters) {
     prompt = prompt
@@ -4199,8 +4240,10 @@ export function applyNarrativeFinalPromptContract(
     const forbidden = [
       "无文字", "无字幕", "无水印", "无品牌标识",
       ...(options.noCharacters ? ["无人物", "无人影", "无人体局部"] : []),
+      ...(shotNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
       ...(options.noAnimals || options.noCharacters ? ["无动物", "无飞鸟"] : []),
-      "无船只", "无建筑", "无现代设备", "无镜头光晕伪影", "无CG特效", "无模糊", "无过曝",
+      ...(options.noCharacters ? ["无船只", "无建筑", "无现代设备"] : []),
+      "无镜头光晕伪影", "无生成特效", "无模糊", "无过曝",
     ];
     replaceField("负面约束", [...new Set(forbidden)].join("、"));
   }
@@ -4211,6 +4254,7 @@ export function applyNarrativeFinalPromptContract(
       .replace(/\b(?:no non-diegetic music|no background music|no bgm|no soundtrack|no music score|no musical bed)\b/giu, "")
       .replace(/[ \t]{2,}/gu, " ")
       .trimEnd())
+    .filter((line) => !line.includes("【音频纪律】"))
     .filter((line, index, lines) => line.length > 0 || index < lines.length - 1)
     .join("\n");
   const renumber = (value: string): string => {
@@ -4254,6 +4298,116 @@ export function applyNarrativeFinalPromptContract(
     if (prompt.length > options.maxLength) {
       throw new Error(`FINAL_PROMPT_UNCOMPRESSIBLE: 结构化字段裁剪后仍为 ${prompt.length} 字符`);
     }
+  }
+  if (options.canonicalize) {
+    const cleanText = (value: string): string => value
+      .replace(/(?:^|\n)\s*(?:id|name|portraitRef|authorization)=[^\n]*/gu, " ")
+      .replace(/\[需求口径\]/gu, " ")
+      .replace(/[{}\[\]]/gu, " ")
+      .replace(/["“”]/gu, " ")
+      .replace(/\b(?:scene_id|scene_name|scene_description|characters|props|dialogue|lighting|composition|environment|action)\b\s*[:：]?/giu, " ")
+      .replace(/\s+/gu, " ")
+      .trim();
+    const source = (label: string, ...keys: string[]): string => {
+      for (const key of keys) {
+        const value = promptFieldText(next[key] ?? (next.fields as FusionRecord)[key]);
+        if (value) return cleanText(value);
+      }
+      return cleanText(fieldValue(label)) || "按本镜源证据执行";
+    };
+    const profiles = (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name));
+    const profileAppearance = profiles.map((item) => item.appearance).filter(Boolean).join("；");
+    const canonicalNoPerson = Boolean(options.noCharacters);
+    const roles = canonicalNoPerson
+      ? "无人物、无人影、无人体局部入画。"
+      : characterNames.length > 0
+        ? `${characterNames.join("、")}入画；${profileAppearance || "保持当前授权角色档案中的发型脸型、身高体型与服装一致"}`
+        : cleanText(shotCharacterEvidence) || "按本镜源证据执行";
+    const profileCostume = profiles.map((item) => item.costume).filter(Boolean).join("；");
+    const costume = canonicalNoPerson
+      ? "不适用：本镜无人物。"
+      : profileCostume || source("服装", "costume").replace(/(?:无角色出场|不适用)/gu, "") || "按已审核角色档案服装执行";
+    const makeup = canonicalNoPerson
+      ? "不适用：本镜无人物。"
+      : "自然写实妆，保持同一角色肤色、眉眼与面部细节，不新增无关妆造。";
+    const portraitText = canonicalNoPerson
+      ? "不适用：本镜无人物，不生成也不引用人像定妆照。"
+      : (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name) && item.path)
+        .map((item) => `${item.name}=${item.path}`).join("；")
+        || fieldValue("定妆照")
+        || "使用本次已审核角色档案中的当前定妆照，不得替换为未登记人物。";
+    const dialogueText = options.noDialogue
+      ? "不适用：本片无台词、无旁白、无口播。"
+      : promptFieldText(next.dialogue ?? (next.fields as FusionRecord).dialogue) || "按已确认台词合同执行。";
+    const audioText = options.noMusic || options.noDialogue
+      ? "仅保留真实环境声与主体动作声；无人物声、无旁白、无音乐、无配乐、无节拍。"
+      : fieldValue("音频") || "环境声、主体动作声与合同允许的人声同步；无未声明配乐。";
+    const rawAction = cleanText(actionSource)
+      .replace(/[^；。\n]*(?:画面内无人物|没有实体肢体入画|无角色出场|空镜无角色)[^；。\n]*[；。]?/gu, "")
+      .trim();
+    let visibleAction = !canonicalNoPerson && rawAction.length < 12
+      ? cleanText(promptFieldText(next.purpose) || promptFieldText(next.description)) || "按人物在本镜中的连续动作执行，主体与结束姿态清楚可见"
+      : rawAction || actionSource;
+    if (!canonicalNoPerson && characterNames.length > 0 && !characterNames.some((name) => visibleAction.includes(name))) {
+      visibleAction = `${characterNames.join("、")}在本镜保持同一外观，${visibleAction}`;
+    }
+    const actions = options.projectActions ?? [];
+    const assignedAction = canonicalNoPerson
+      ? "风、雾、水面、光线与植物在连续物理范围内完成本镜自然变化，无人物动作。"
+      : actions.length > 0
+        ? actions[Math.min(options.shotIndex ?? 0, actions.length - 1)]!
+        : visibleAction;
+    const actionText = canonicalNoPerson || characterNames.length === 0 || characterNames.some((name) => assignedAction.includes(name))
+      ? assignedAction
+      : `${characterNames.join("、")}在本镜保持同一外观，${assignedAction}`;
+    const shotSize = promptFieldText(next.shotSize ?? (next.fields as FusionRecord).shotSize)
+      || promptFieldText(next.cameraHint ?? (next.fields as FusionRecord).cameraHint)
+      || "按本镜已确认景别";
+    const compositionText = canonicalNoPerson
+      ? `${shotSize}景别，9:16竖构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
+      : `${shotSize}景别，9:16竖构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
+    const cameraText = fieldValue("运镜") || promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
+    const emotionText = canonicalNoPerson
+      ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
+      : "克制、内敛；情绪通过人物连续动作、视线和呼吸变化表达，不使用固定表情模板。";
+    const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
+      .replace(/\b(?:8K|4K)\b/giu, "电影级");
+    const forbidden = [
+      "无文字", "无字幕", "无水印", "无品牌标识",
+      ...(canonicalNoPerson ? ["无人物", "无人影", "无人体局部"] : []),
+      ...(options.noAnimals || options.noCharacters ? ["无动物", "无飞鸟"] : []),
+      ...(canonicalNoPerson ? ["无船只", "无建筑", "无现代设备"] : []),
+      "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
+    ];
+    const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
+    prompt = [
+      "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
+      `02.【导演意图】${cleanText(fieldValue("导演意图")) || "写实克制；以源证据中的动作、空间和自然光推进，不增加无关叙事。"}`,
+      `03.【基础】${baseText}`,
+      `04.【约束】${constraint}。`,
+      `05.【场景】${cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription")}`,
+      `06.【灯光设计】${cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting")}`,
+      `07.【明亮约束】${canonicalNoPerson ? "自然景物高光不过曝，暗部保留材质细节；不涉及人物面部。" : "人物与主体轮廓可辨，不强制正面补光；按灯光设计保留明暗层次，环境高光不过曝。"}`,
+      `08.【构图】${compositionText}`,
+      `09.【色彩/色调】${cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette")}`,
+      `10.【景深】${canonicalNoPerson ? "自然景物近中远景层次连续，主体与倒影可辨；不依赖极端虚化。" : "人物与当前动作清晰可辨，环境前后景自然虚化；不对人物面部作强制补光。"}`,
+      `11.【运镜】${cameraText}`,
+      `12.【角色】${roles}`,
+      `13.【服装】${costume}`,
+      `14.【化妆】${makeup}`,
+      `15.【动作】${actionText}`,
+      `16.【道具】${(options.projectProps ?? []).join("、") || source("道具", "props").replace(/本镜为空镜|无角色使用道具/gu, "")}`,
+      `17.【定妆照】${portraitLine}`,
+      `18.【台词】${dialogueText}`,
+      `19.【时间轴】${duration > 0 ? `T00:00-T00:${duration.toFixed(1).padStart(4, "0")} 起幅、连续动作与落幅均在本镜内完成，不跨越下一镜。` : fieldValue("时间轴") || "按本镜合同执行完整起幅、动作与落幅。"}`,
+      `20.【情绪】${emotionText}`,
+      "21.【节奏】节奏依据源证据连续推进，起幅、动作与落幅完整，不增加无关加速或人工强转折。",
+      `22.【转场】${options.isLastShot ? "本镜为全片最后一镜；最后一帧直接硬切黑，不追加超出镜长的淡出。" : "本镜落幅后硬切至下一镜；不使用其他转场特效。"}`,
+      `23.【音频】${audioText}`,
+      `24.【负面约束】${[...new Set(forbidden)].join("、")}。`,
+      `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
+      `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
+    ].join("\n");
   }
   next.prompt = prompt;
   return next;
@@ -4498,12 +4652,35 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         );
         const promptResolution = String(policyPositioning.resolution ?? (promptAspect === "9:16" ? "1080x1920" : ""));
         const promptColorTemperature = colorTemperatureFromText(JSON.stringify(policyPrd.visualSpecification)) ?? undefined;
-        const promptCharacters = Array.isArray(recordValue(policyPrd.characterSystem).characters)
+        const promptCharacterRecords = Array.isArray(recordValue(policyPrd.characterSystem).characters)
           ? (recordValue(policyPrd.characterSystem).characters as unknown[]).map(recordValue)
-            .map((item) => String(item.name ?? "").trim()).filter(Boolean)
           : [];
+        const promptCharacters = promptCharacterRecords.map((item) => String(item.name ?? "").trim()).filter(Boolean);
+        const promptCharacterPortraits = promptCharacterRecords.map((item) => ({
+          name: String(item.name ?? "").trim(),
+          path: String(item.portraitPath ?? item.portraitRef ?? "").trim(),
+          appearance: String(item.appearance ?? "").trim(),
+          costume: String(item.costume ?? "").trim(),
+        })).filter((item) => item.name);
         const promptSubtitles = recordValue(recordValue(policyPrd.deliveryStandard).subtitles);
         const promptNoTitles = promptSubtitles.mode === "none" || /(?:无字幕|无文字)/u.test(promptPolicyText);
+        const promptScenePlan = recordValue(policyPrd.scenePlan);
+        const promptVisual = recordValue(policyPrd.visualSpecification);
+        const promptSceneSettings = (Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
+          .map((scene) => scene.setting).map(String).filter(Boolean);
+        const promptScene = promptSceneSettings.length > 0
+          ? [...new Set(promptSceneSettings)].join("；")
+          : String(recordValue(policyPrd.projectDefinition).sourceIntent ?? "");
+        const promptProps = [...new Set([
+          ...(Array.isArray(policyPrd.shotContract) ? policyPrd.shotContract.map(recordValue) : [])
+            .flatMap((shot) => Array.isArray(shot.keyProps) ? shot.keyProps.map(String) : []),
+          ...(Array.isArray(promptScenePlan.scenes) ? promptScenePlan.scenes.map(recordValue) : [])
+            .flatMap((scene) => Array.isArray(scene.keyProps) ? scene.keyProps.map(String) : []),
+        ].filter(Boolean))];
+        const promptActions = extractNarrativeActions({}, {
+          _originalStoryText: String(policyPrd._originalStoryText ?? promptScene),
+          special_notes: String(policyMeta?.special_notes ?? ""),
+        });
         const promptLimit = Number(
           (vendorRequire(resolvePath(
             repoRoot,
@@ -4525,6 +4702,14 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
             isLastShot: shotIndex === allShots.length - 1,
             characterNames: promptCharacters,
             noTitles: promptNoTitles,
+            canonicalize: true,
+            characterPortraits: promptCharacterPortraits,
+            projectScene: promptScene,
+            projectLighting: promptFieldText(promptVisual.lightingDirection),
+            projectColor: promptFieldText(promptVisual.colorPalette ?? promptVisual.colorGrading),
+            projectProps: promptProps,
+            projectActions: promptActions,
+            shotIndex,
           }));
         const outputIds = new Set<string>();
         for (const row of updated) {

@@ -955,6 +955,53 @@ console.log("RESULT " + JSON.stringify({
     expect(prompt).not.toMatch(/站立姿态|微微后退|3\.5秒|cinematic|photorealistic|CINEMATIC_SKILL|Camera增强|Mood增强|no background music|no bgm/iu);
   });
 
+  it("canonical 最终合同从可信字段重建固定26栏，不继承模型字段漂移", () => {
+    const shot = applyNarrativeFinalPromptContract({
+      shotId: "SC-7",
+      duration: 3,
+      scene: "雨夜出租屋玄关，湿伞、门框与旧台灯形成同一空间",
+      lighting: "玄关冷蓝雨光与台灯2800K局部暖光分区锁定",
+      composition: "9:16竖构图，人物半身靠门框，前景留湿伞",
+      color_palette: "冷青蓝环境色，局部暖黄",
+      depth_of_field: "人物与门框清晰，窗外雨幕轻微虚化",
+      camera_movement: "固定机位",
+      action: "陈卓收伞、关门，目光短暂落在旧台灯上",
+      props: "湿伞、旧木门、旧台灯",
+      character: "陈卓，保持授权外观与当前服装一致",
+      costume: "深灰连帽外套、深色长裤与湿鞋",
+      makeup: "雨夜自然裸妆，保持同一肤色",
+      mood: "疲惫后的安静",
+      prompt: "01.【角色】站立姿态，张开双臂\n02.【化妆】地面积水反光\n03.【主标题】无关标题\n04.【音频】弦乐BPM50",
+      fields: {},
+    }, {
+      noDialogue: true,
+      maxLength: 3000,
+      noCharacters: false,
+      noAnimals: true,
+      noMusic: true,
+      chineseOnly: true,
+      noTitles: true,
+      canonicalize: true,
+      characterNames: ["陈卓"],
+      characterPortraits: [{
+        name: "陈卓",
+        path: "bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png",
+      }],
+      durationSeconds: 3,
+      aspectRatio: "9:16",
+      resolution: "1080x1920",
+      colorTemperature: "2800K / 5600K",
+    });
+    const prompt = String(shot.prompt);
+    const fields = prompt.split("\n").map((line) => /^(\d{2})\.【([^】]+)】/u.exec(line)).filter(Boolean) as RegExpExecArray[];
+    expect(fields.map((field) => Number(field[1]))).toEqual(Array.from({ length: 26 }, (_, index) => index + 1));
+    expect(prompt).toContain("【角色】陈卓入画");
+    expect(prompt).toContain("【化妆】自然写实妆");
+    expect(prompt).toContain("【动作】陈卓收伞、关门");
+    expect(prompt).toContain("平江路讲述人-front.png");
+    expect(prompt).not.toMatch(/站立姿态|地面积水反光|无关标题|弦乐|BPM|张开双臂/u);
+  });
+
   it("叙事道具从场景证据抽取，关键道具不会因窄词表遗漏", () => {
     const props = inferNarrativeProps({
       intent: "人物使用内置默认模特，不出现商品参数或价格",
