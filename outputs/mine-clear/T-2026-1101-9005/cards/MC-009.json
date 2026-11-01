@@ -1,0 +1,55 @@
+{
+  "id": "MC-009",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P2",
+  "batch": 2,
+  "state": "open",
+  "title": "MCD 交接单给出的验收 profile 命令在本仓没有对应脚本入口",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "package.json:19@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "042303a5081e236daf3f1c90ba9587a9af847723dacf5842766b7885d01f22b9",
+      "note": "package.json#scripts 没有 acceptance:profile:check；mine-clear handoff 的 acceptance_commands[0] 却固定输出 pnpm acceptance:profile:check，实际执行为 ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL。"
+    }
+  ],
+  "root_cause": {
+    "file": "package.json",
+    "line": 19,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "scripts"
+  },
+  "trigger_path": "生成 MCD handoff 后直接执行交接单中的第一条 acceptance command；pnpm 找不到 acceptance:profile:check。",
+  "fix_plan": "在根 package.json 增加 acceptance:profile:check 脚本，调用现有 scripts/acceptance/profile-check.mjs；保持命令只做结构 profile 校验，不把 business 标成已验证。",
+  "blast_radius": "仅补齐交接单已承诺的 pnpm 入口；不改验收器逻辑、不连接服务、数据库或模型。",
+  "conflict_paths": [
+    "package.json"
+  ],
+  "assertions": [
+    {
+      "kind": "sample",
+      "given": "执行 MCD 交接单固定给出的第一条验收命令",
+      "expect": "pnpm --config.verify-deps-before-run=false acceptance:profile:check 退出 0，configuration=valid、business=unverified",
+      "command": "pnpm --config.verify-deps-before-run=false acceptance:profile:check",
+      "exec": {
+        "file": "pnpm",
+        "args": [
+          "--config.verify-deps-before-run=false",
+          "acceptance:profile:check"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "pnpm --config.verify-deps-before-run=false acceptance:profile:check",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中 package.json 的 acceptance:profile:check 脚本条目",
+  "fixed_by": "codex-root-repair-T-2026-1101-9005",
+  "verified_by": null,
+  "verified_at": null,
+  "verification_evidence": null,
+  "notes": "由实际执行 MCD handoff acceptance_commands[0] 发现。"
+}

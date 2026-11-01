@@ -1,0 +1,77 @@
+{
+  "id": "MC-003",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "无口型合同与画外旁白语义混淆，下游会删除明确允许的唯一旁白",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:1447@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "旧 voiceoverDenied 只识别“禁止/不加”等前缀，未识别“无旁白/没有旁白/零旁白”，明确禁旁白的合同仍被视为允许旁白。"
+    },
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:2361@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "下游剧本生成把“无对白”直接等同于“所有语音禁止”，会把合同明确允许的一句画外旁白一并删除。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 1447,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "normalizeNarrativeDiscovery"
+  },
+  "trigger_path": "用户写“全片无对白；结尾可加一句气声旁白”或“无台词、无旁白”；旧实现无法区分无口型、禁旁白、允许一条旁白三种合同。",
+  "fix_plan": "显式区分 noLipSyncDialogue、voiceoverDenied、voiceoverAllowed、speechFullyForbidden；仅把口型台词改为画外旁白，禁旁白时统一清除；允许对白但禁止旁白时保留合法对白。剧本生成、校验、Phase3 和最终 prompt 共用同一语义。",
+  "blast_radius": "影响叙事片台词归一、脚本生成、ScriptValidator、Phase3 最终 prompt；普通角色对白与完全无语音合同保持原有拒绝/保留语义。",
+  "conflict_paths": [
+    "packages/video-studio/src/vendor-compat.ts",
+    "packages/video-studio/src/vendor-compat.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "无对白但允许一句指定旁白；无台词且明确无旁白；两者分别进入 discovery 与下游剧本生成",
+      "expect": "允许的旁白被保留并标 narration，口型台词被移除；禁旁白合同全部清除且无画外句",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "无台词"
+        ]
+      },
+      "last_result": "not-run"
+    },
+    {
+      "kind": "property",
+      "given": "两位厨师的正片允许简短对白但不得添加字幕和旁白，模型场景中同时出现合法对白与幻觉画外旁白",
+      "expect": "合法对白及其音频锚点保留，画外旁白被移除，PRD 不进入全语音禁止路径",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '允许简短对白但禁止旁白'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "允许简短对白但禁止旁白"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词'",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中叙事语音合同相关提交",
+  "fixed_by": null,
+  "verified_by": null
+}

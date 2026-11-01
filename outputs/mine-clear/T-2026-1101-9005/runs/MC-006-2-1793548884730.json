@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-2-1793548884730",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '人物片最终提示词锁定真实角色'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "人物片最终提示词锁定真实角色"
+    ]
+  },
+  "actor": "final_verifier_9005",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 2
+  },
+  "commit": "4bc4c7c70e9f77ab20d24e577eee6c5e141d56ea",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T16:01:24.730Z",
+  "finished_at": "2026-11-01T16:01:25.376Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-2-1793548884730.txt",
+      "sha256": "e671c9ec5bc74e66039bcd0b9d96b81077c59a78b9489c8a21209713752b4a65",
+      "commit": "4bc4c7c70e9f77ab20d24e577eee6c5e141d56ea"
+    }
+  ]
+}

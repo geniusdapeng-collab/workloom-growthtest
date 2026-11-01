@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-006-6-1793546941099",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/studio.test.ts -t '创意主题门不把角色资产路径'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/studio.test.ts",
+      "-t",
+      "创意主题门不把角色资产路径"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-006",
+    "assertion_index": 6
+  },
+  "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T15:29:01.099Z",
+  "finished_at": "2026-11-01T15:29:01.910Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-006-6-1793546941099.txt",
+      "sha256": "9d2143071bf0a319aeea1d54d96ca674e2a4b9c41ea2f938dff7828408e27bb5",
+      "commit": "7c17e2a6753cd016881d68a5c61fddc1052d2918"
+    }
+  ]
+}

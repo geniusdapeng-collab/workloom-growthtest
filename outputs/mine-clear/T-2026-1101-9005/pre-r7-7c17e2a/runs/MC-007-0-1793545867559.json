@@ -1,0 +1,38 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-007-0-1793545867559",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t 'Phase3 首次 JSON 解析失败'",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/vendor-compat.test.ts",
+      "-t",
+      "Phase3 首次 JSON 解析失败"
+    ]
+  },
+  "actor": "codex-root-repair-T-2026-1101-9005",
+  "role": "repair",
+  "subject": {
+    "card_id": "MC-007",
+    "assertion_index": 0
+  },
+  "commit": "e9eb40c289419d414d2fbaed751a5267ecdb05a4",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T15:11:07.559Z",
+  "finished_at": "2026-11-01T15:11:08.262Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-007-0-1793545867559.txt",
+      "sha256": "f03cc76a42bc18964649ea7c59b77067bf31ace84d25bb5a328d76135392c181",
+      "commit": "e9eb40c289419d414d2fbaed751a5267ecdb05a4"
+    }
+  ]
+}

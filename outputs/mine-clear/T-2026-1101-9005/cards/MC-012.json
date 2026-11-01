@@ -1,0 +1,58 @@
+{
+  "id": "MC-012",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "不加字幕被错误解释为禁止旁白，会删除用户明确保留的唯一画外旁白",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "packages/video-studio/src/vendor-compat.ts:1191@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "7c1422403ba5c593897ff3df5a13c972637e9de27ba5ed0b0bfceff4df5c07ff",
+      "note": "voiceoverDenied 用任意否定词后八个字符内出现旁白即判禁；“不加字幕，保留一句画外旁白”被误判，下游记录 DISALLOWED_VOICEOVER_REMOVED 并删除合法旁白。"
+    }
+  ],
+  "root_cause": {
+    "file": "packages/video-studio/src/vendor-compat.ts",
+    "line": 1191,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "narrativeSpeechPolicy"
+  },
+  "trigger_path": "合同写“不加字幕”并紧接“保留一句画外旁白” → 邻近字符匹配把不加字幕扩散成禁旁白 → normalizeNarrativeDiscovery 删除旁白。",
+  "fix_plan": "按分句和目标对象解析否定：不加字幕只禁字幕；只有否定词直接约束旁白/画外音/画外，或明确“字幕和旁白都不要”时才禁旁白。",
+  "blast_radius": "影响叙事语音合同和下游发现、确认单、PRD、Phase3；明确禁旁白和完全无语音仍失败关闭。",
+  "conflict_paths": [
+    "packages/video-studio/src/vendor-compat.ts",
+    "packages/video-studio/src/vendor-compat.test.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "合同同时写“不加字幕”和“保留一句画外旁白”，以及“不得添加字幕和旁白”的对照",
+      "expect": "前者保留唯一旁白且不记录 DISALLOWED_VOICEOVER_REMOVED；后者仍删除旁白并保留真实禁止记录",
+      "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '不加字幕|允许简短对白但禁止旁白'",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "packages/video-studio/src/vendor-compat.test.ts",
+          "-t",
+          "不加字幕|允许简短对白但禁止旁白"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '不加字幕|允许简短对白但禁止旁白'",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中按分句/对象解析旁白否定的修复和对应正反对照用例",
+  "fixed_by": "codex-root-repair-T-2026-1101-9005",
+  "verified_by": null,
+  "verified_at": null,
+  "verification_evidence": null,
+  "notes": "由独立验收实际调用生产语音合同解析发现。"
+}

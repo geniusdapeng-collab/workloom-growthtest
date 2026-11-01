@@ -1,0 +1,751 @@
+{
+  "schema": "workloom.mine-clear/handoff@1",
+  "task_id": "T-2026-1101-9005",
+  "repo": "workloom-growthtest-stress-9004",
+  "generated_at": "2026-11-01T16:24:37.830Z",
+  "audit_baseline": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+  "repair_baseline": "8a24ace9c3f835a398db41f32c485272bcbbc402",
+  "acceptance_baseline": "8a24ace9c3f835a398db41f32c485272bcbbc402",
+  "environment_claim": "local-preview",
+  "invariants": [
+    {
+      "id": "INV-1",
+      "text": "租户边界覆盖数据库 RLS、运行时上下文、事件、缓存和外部连接器。",
+      "source": "AGENTS.md#4.1"
+    },
+    {
+      "id": "INV-2",
+      "text": "经营事件、审批和关键回执只增不改；纠正通过新事件表达，不静默覆盖证据。",
+      "source": "AGENTS.md#4.2"
+    },
+    {
+      "id": "INV-3",
+      "text": "所有外部或变更性动作及其子调用，统一经过权限、PII、围栏和审批链路。",
+      "source": "AGENTS.md#4.3"
+    },
+    {
+      "id": "INV-4",
+      "text": "涉钱、敏感数据、群发、公开发布、交易和破坏性变更必须按高风险处理并由人审批。",
+      "source": "AGENTS.md#4.4"
+    },
+    {
+      "id": "INV-5",
+      "text": "没有真实回执就不能标记完成；mock、模拟和体验模式在数据结构与界面上都要明确区分。",
+      "source": "AGENTS.md#4.5"
+    },
+    {
+      "id": "INV-6",
+      "text": "客户原始经营数据不得上行；蜂群只接受白名单化、最小化、匿名化且可审计的元数据或派生经验。",
+      "source": "AGENTS.md#4.6"
+    },
+    {
+      "id": "INV-7",
+      "text": "租户覆盖层只能收紧围栏，不能放宽平台不可变红线。",
+      "source": "AGENTS.md#4.7"
+    },
+    {
+      "id": "INV-8",
+      "text": "模型、提示词、技能、bundle、策略和热更新必须先评测再灰度，且始终可回滚。",
+      "source": "AGENTS.md#4.8"
+    },
+    {
+      "id": "INV-9",
+      "text": "platform-ops、平台账户运营和平台秘密只属于 Andromeda。",
+      "source": "AGENTS.md#4.9"
+    },
+    {
+      "id": "INV-10",
+      "text": "Tiger 在获得单独的合规审查和用户明确授权前，只能模拟或纸面交易。",
+      "source": "AGENTS.md#4.10"
+    },
+    {
+      "id": "INV-11",
+      "text": "令牌、密码、API key、私钥、客户凭证和私密客户数据不得进入源码、文档、上下文、提示词、日志或提交。",
+      "source": "AGENTS.md#4.11"
+    },
+    {
+      "id": "INV-12",
+      "text": "个性化与行业扩展不得形成公共机制的第二事实源。",
+      "source": "AGENTS.md#4.12"
+    }
+  ],
+  "closed_problems": [
+    {
+      "id": "MC-001",
+      "title": "真实营销 A1 评审对合法但形状漂移的回包不稳定，且错误结构可能被二次语义重写",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:09.317Z",
+      "verification_evidence": {
+        "path": "runs/MC-001-0-1793550188415.json",
+        "sha256": "b11024a4d952db9686447f37ac3595db09d7df735111f98d1a85135a3153921d",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "首次监制回包分别是合法 unsafe shape、score=101/null、数组或 null",
+          "expect": "首次请求包含 response_format=json_object；语义非法时不发第二次修复调用并返回 unverified",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/producer-gate.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/producer-gate.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-001-0-1793550188415.txt",
+            "sha256": "968388ab9f5e6084f6b480d68507fd38b4aac4eb395781c01535e12a7f8e9115",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-001-0-1793550188415.json",
+            "sha256": "b11024a4d952db9686447f37ac3595db09d7df735111f98d1a85135a3153921d",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-002",
+      "title": "营销价格事实无法把金额、币种、来源和抓取时点作为同一可回放证据闭环",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:09.956Z",
+      "verification_evidence": {
+        "path": "runs/MC-002-0-1793550189449.json",
+        "sha256": "3e00f235d68b0748e3c9fae70ea80a661510e5e03d6248f9b1d789d16c29f3fd",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "合法 599 元；跨价格 599 美元+运费 100 元；币种引证来自另一来源；以及与 source_url 相同的正常对照",
+          "expect": "正常证据可复读；跨价格与跨来源币种均在监制前确定性拒绝",
+          "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-facts.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "apps/server/src/video/marketing-facts.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-002-0-1793550189449.txt",
+            "sha256": "b0b2df9b9f157b9a43025ccb2a3dd8071af473130cd55d0bd1f87849e10631ea",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-002-0-1793550189449.json",
+            "sha256": "3e00f235d68b0748e3c9fae70ea80a661510e5e03d6248f9b1d789d16c29f3fd",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-003",
+      "title": "无口型合同与画外旁白语义混淆，下游会删除明确允许的唯一旁白",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:11.686Z",
+      "verification_evidence": {
+        "path": "runs/MC-003-0-1793550190088.json",
+        "sha256": "039a025b18c1946a055db11b1f38c98b0438eccb097d6d126364988a5f64971e",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "无对白但允许一句指定旁白；无台词且明确无旁白；两者分别进入 discovery 与下游剧本生成",
+          "expect": "允许的旁白被保留并标 narration，口型台词被移除；禁旁白合同全部清除且无画外句",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "无台词"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-003-0-1793550190088.txt",
+            "sha256": "cc51f791d83762a517d4c8348ae31e997516c824de55a0c6a81e7dabc3fd63c8",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-003-0-1793550190088.json",
+            "sha256": "039a025b18c1946a055db11b1f38c98b0438eccb097d6d126364988a5f64971e",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "两位厨师的正片允许简短对白但不得添加字幕和旁白，模型场景中同时出现合法对白与幻觉画外旁白",
+          "expect": "合法对白及其音频锚点保留，画外旁白被移除，PRD 不进入全语音禁止路径",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '允许简短对白但禁止旁白'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "允许简短对白但禁止旁白"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-003-1-1793550191113.txt",
+            "sha256": "a3ab7f8a981b55670a7865f5ebbf244bb44f254c7874a59cfa1cb2b5e6b54f64",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-003-1-1793550191113.json",
+            "sha256": "18f6f06c78848ae169a9cd9099507bb9a22af4cb101a99e323153d78d2a9c15e",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-004",
+      "title": "叙事发现与需求确认单没有把分镜时长守恒投影到目标总时长",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:12.395Z",
+      "verification_evidence": {
+        "path": "runs/MC-004-0-1793550191833.json",
+        "sha256": "2f7a11f25febbf0690b740b65ee3680d42a331590f0dbfb711ceb9fef3d4f1fc",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "目标 15s，发现节点合计 30s，Markdown 同时含有旧总时长与各节点旧值",
+          "expect": "节点加总精确为 15s，Markdown 总时长和开场/场景/结尾秒数同步收敛，且留下 SCENE_DURATION_REBALANCED 修复记录",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无台词且明确无旁白'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "无台词且明确无旁白"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-004-0-1793550191833.txt",
+            "sha256": "ee9eb133f9d230ae5b6fbd4fbd00beeb0a40cb063b889f3fe6cc8b016c27aab0",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-004-0-1793550191833.json",
+            "sha256": "2f7a11f25febbf0690b740b65ee3680d42a331590f0dbfb711ceb9fef3d4f1fc",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-005",
+      "title": "动物与细微动作被错误归入道具/遗漏动作，场景契约无法执行",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:13.115Z",
+      "verification_evidence": {
+        "path": "runs/MC-005-0-1793550192527.json",
+        "sha256": "4799c920b66a79e326030f682f94539402b5d287f7e0c46c21e87c743b4d9404",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "橘猫从纸箱探头、伸爪接屋檐滴水、缩回纸箱盘成一团",
+          "expect": "道具含纸箱且不含“动物”，动作含探头/伸爪/缩回，错误碎片不进入需求 Markdown",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '动物是角色而非道具'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "动物是角色而非道具"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-005-0-1793550192527.txt",
+            "sha256": "219943f8d95a66c46b525bd0ac4a9b0cb1fac3995641e2480e9ff977437088a8",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-005-0-1793550192527.json",
+            "sha256": "4799c920b66a79e326030f682f94539402b5d287f7e0c46c21e87c743b4d9404",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-006",
+      "title": "空镜与无角色 PRD 会继承模板场景、幻觉主体、错误定妆照要求和冲突的制作口径",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:17.761Z",
+      "verification_evidence": {
+        "path": "runs/MC-006-0-1793550193250.json",
+        "sha256": "69384b800f2305ccd952c74e94799984fa8216591dbdad1bff4a1109fbc8c8f8",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "模板场景、黑天鹅/飞鸟、手机/相机、字幕、音乐、默认暖色温、无角色但 character_portraits 必交付，以及普通猫片有角色对照",
+          "expect": "无角色合同不生成主体/定妆照/禁用线索，场景和道具来自源证据，风险和缓解一一对应；猫片仍保留橘猫 ID 与动作",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无角色空镜|真实猫片 G3'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "无角色空镜|真实猫片 G3"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-0-1793550193250.txt",
+            "sha256": "f4c58c4a44907d3899c1ba6e8f42700f1239e26debd17fc5792165ca122e3565",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-006-0-1793550193250.json",
+            "sha256": "69384b800f2305ccd952c74e94799984fa8216591dbdad1bff4a1109fbc8c8f8",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "真实空镜 G6 回包含人物面部模板、人声对白、弦乐/BPM、英文负面词、30 秒总时长与断号字段",
+          "expect": "最终提示词只保留自然景物字段，台词显式为不适用，音频无人物/配乐，负面约束全中文，字段连续，约束使用本镜时长",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无角色空镜最终提示词'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "无角色空镜最终提示词"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-1-1793550193863.txt",
+            "sha256": "01351ca2fb8a040016784ab69f9bab265dd6899a8d36cd00f978b57e3b60a8aa",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-006-1-1793550193863.json",
+            "sha256": "777539e3646279298eeb552395069d4f5456622f487567dd8d97ac160c965212",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "人物片最终提示词含无关站立/张臂模板、片头标题动画超本镜时长、英文 cinematic/photorealistic 与技能尾标",
+          "expect": "角色字段绑定真实角色名，微动作不套模板，片头字段显式不适用，英文风格与技能残留清除",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '人物片最终提示词锁定真实角色'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "人物片最终提示词锁定真实角色"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-2-1793550194425.txt",
+            "sha256": "15de77aa8d4d30eba71ff5825da9fe09119038c4456ffbaf6e18d88598181880",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-006-2-1793550194425.json",
+            "sha256": "e06575edcf3437e26b2b2fb059ae93039208ac20fdd658ec29f9da724b507248",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "动物角色 gender/ageRange 为 null，PRD 同时存在非有限暖区比例字段",
+          "expect": "结构化 PRD 与渲染 Markdown 不出现 null/undefined/NaN/[object Object]，空值统一为不适用",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无人物但有动物'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "无人物但有动物"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-3-1793550195369.txt",
+            "sha256": "4f24a4099c01d47cf55c93b1d627f7c90ba1238d9e98956c5d5ff1db1de857ef",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-006-3-1793550195369.json",
+            "sha256": "ef6fa731783f263631690ed754c1206447c2e74fb8f9fe1969b59171e49ac16c",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "底层镜头字段含冲突角色、杂散标题、错误化妆槽位、英文风格词和漂移编号",
+          "expect": "canonical 投影从可信字段重建固定 26 栏，角色、动作、定妆照、时间和负面约束一致",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t 'canonical 最终合同'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "canonical 最终合同"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-4-1793550195957.txt",
+            "sha256": "cf7c82594efe11d105d0e09393d78e74a1d6c95403355d4f95c51c65d0d5d87a",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-006-4-1793550195957.json",
+            "sha256": "e2d17ca96e7e5fd0a401702c421e25ff3a1e94dff24e7553c0ff1b6119092270",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "15 秒归家片把收伞、开门、换鞋、拧灯、坐下全部挤在开场并把主体场景留空",
+          "expect": "按源动作重分配为开场/主体/结尾，关键元素和道具合同与场景逐项一致，雨伞进入道具",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '归家片开场过载'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "归家片开场过载"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-5-1793550196513.txt",
+            "sha256": "8a548cb8bb42256019000410293f119d513e0d262dae7276624f52b1a8dcee5d",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-006-5-1793550196513.json",
+            "sha256": "71d1d65b932f3383a643fdbfcd335d7f302daebbe65d61aed2329d94b6373c12",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "property",
+          "given": "G2 创意主题正文混入 id/name/portraitRef/authorization 内部资产行，路径含无关地域词",
+          "expect": "审批内容仅保留授权角色姓名与系统内部绑定声明，不暴露资产路径或授权元数据",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/studio.test.ts -t '创意主题门不把角色资产路径'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/studio.test.ts",
+              "-t",
+              "创意主题门不把角色资产路径"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-006-6-1793550197143.txt",
+            "sha256": "276ca08879384ed290593494f9273d4305ba294a2108c7d7cc7869382c07eec2",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-006-6-1793550197143.json",
+            "sha256": "d41b4ed4b58ddb2de8b6a968fbbcf0279bd4d91d5760f0f727e5d94378d3f13d",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-007",
+      "title": "Phase3 单次模型 JSON 语法失败被当作不可恢复错误，导致已有镜头产出整体失败关闭",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:18.728Z",
+      "verification_evidence": {
+        "path": "runs/MC-007-0-1793550197912.json",
+        "sha256": "4760e4f4e0ec4e4531fce7e19334cdfaa983a2a0afcae1edf5b3804e41ba9a82",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "第一次 Phase3 调用抛出“JSON 解析失败”，第二次返回合法 JSON 且预算足够",
+          "expect": "同一阶段内重发一次，第二次请求带严格单一 JSON 对象约束，随后完整融合成功",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t 'Phase3 首次 JSON 解析失败'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "Phase3 首次 JSON 解析失败"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-007-0-1793550197912.txt",
+            "sha256": "35b8f7f775d2900f9d62293d58dd80c90a4bf937d08c030a91046fe9b99b2054",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-007-0-1793550197912.json",
+            "sha256": "4760e4f4e0ec4e4531fce7e19334cdfaa983a2a0afcae1edf5b3804e41ba9a82",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-008",
+      "title": "双厨师等职业主体未被角色推断识别，合法人物片会被误判为空镜",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:19.468Z",
+      "verification_evidence": {
+        "path": "runs/MC-008-0-1793550198912.json",
+        "sha256": "5a5279a528d35cb526c6d1219d577c51d1e7b4edc1dfc3998b2bc753aef8a790",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "两位厨师连续配合，一人拉面、一人看火并递碗",
+          "expect": "角色推断返回厨师主角，描述包含同场两位及外观/分工锁定",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '厨师等职业主体'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "厨师等职业主体"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-008-0-1793550198912.txt",
+            "sha256": "b241338dff4a836b8537c8a2361b87f63225886d764380a3ad997a360a88dc42",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-008-0-1793550198912.json",
+            "sha256": "5a5279a528d35cb526c6d1219d577c51d1e7b4edc1dfc3998b2bc753aef8a790",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-009",
+      "title": "MCD 交接单给出的验收 profile 命令在本仓没有对应脚本入口",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:24:29.331Z",
+      "verification_evidence": {
+        "path": "runs/MC-009-0-1793550268782.json",
+        "sha256": "fac8c929c2b0a53af0c2155504ec44741e265c31dc5670b9f953ef6ddde20dcf",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "sample",
+          "given": "执行 MCD 交接单固定给出的第一条验收命令",
+          "expect": "pnpm --config.verify-deps-before-run=false acceptance:profile:check 退出 0，configuration=valid、business=unverified",
+          "command": "pnpm --config.verify-deps-before-run=false acceptance:profile:check",
+          "exec": {
+            "file": "pnpm",
+            "args": [
+              "--config.verify-deps-before-run=false",
+              "acceptance:profile:check"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-009-0-1793550268782.txt",
+            "sha256": "d965d9ee70d4ecf58b32d80e4821c13af8dd67674bcb408b1d32ed06c8242e45",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-009-0-1793550268782.json",
+            "sha256": "fac8c929c2b0a53af0c2155504ec44741e265c31dc5670b9f953ef6ddde20dcf",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-010",
+      "title": "无台词标准声明被最终镜头合同误判为残留台词，20 个叙事压测全部失败",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:44.927Z",
+      "verification_evidence": {
+        "path": "runs/MC-010-0-1793550223107.json",
+        "sha256": "6cd9b0f4084d89fea4dd74000a9eb834a543e330e9ba9e5d0ae9d478d6da0252",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "最终合同按 noDialogue 写入【台词】不适用声明，且结构化台词字段为空",
+          "expect": "合同通过；写入真实台词正文或非空 dialogueBlocks 时仍返回 DIALOGUE_FORBIDDEN",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/final-shot-contract.test.ts",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/final-shot-contract.test.ts"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-010-0-1793550223107.txt",
+            "sha256": "b8ee5856be959e7b4c32dfeaa1f5deb97dd9670018689f3edcb189c68ba08fae",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-010-0-1793550223107.json",
+            "sha256": "6cd9b0f4084d89fea4dd74000a9eb834a543e330e9ba9e5d0ae9d478d6da0252",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        },
+        {
+          "kind": "sample",
+          "given": "60 个营销、叙事与异常场景调用当前生产路由、最终镜头合同和 render boundary",
+          "expect": "60/60 通过，20/20 叙事恢复，providerSubmission=false 且付费生成请求为 0",
+          "command": "pnpm --config.verify-deps-before-run=false exec tsx scripts/tools/ai-video-stress-matrix.mts --out outputs/mine-clear/T-2026-1101-9005/matrix",
+          "exec": {
+            "file": "pnpm",
+            "args": [
+              "--config.verify-deps-before-run=false",
+              "exec",
+              "tsx",
+              "scripts/tools/ai-video-stress-matrix.mts",
+              "--out",
+              "outputs/mine-clear/T-2026-1101-9005/matrix"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-010-1-1793550223802.txt",
+            "sha256": "d3ed48e978943c9e9ac6ed1ea6cd4edb97c125e2f4f92667e9c15768081574f6",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-010-1-1793550223802.json",
+            "sha256": "e4b6692873fb023ffc062234c1a66c587229ce960bfbdf827e6d31320747475f",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-011",
+      "title": "人物片声明无动物时被误判为无角色，PRD 与最终提示词会清空合法人物",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:45.818Z",
+      "verification_evidence": {
+        "path": "runs/MC-011-0-1793550225087.json",
+        "sha256": "4ea9446e04a4a91a3309aafe8cb3358388743a386fd9ef6cbe88f760062461a8",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "上游明确陈卓为人物主角，同时声明无动物并要求简短对白",
+          "expect": "PRD 保留陈卓角色，所有镜头 subjectIds 继续绑定 char_1；无动物不得触发无人物分支",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '无动物不等于无人物'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "无动物不等于无人物"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-011-0-1793550225087.txt",
+            "sha256": "275dad4452c73909844aa82d41086a1d5017e5d15548acd5312e335289086b7a",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-011-0-1793550225087.json",
+            "sha256": "4ea9446e04a4a91a3309aafe8cb3358388743a386fd9ef6cbe88f760062461a8",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    },
+    {
+      "id": "MC-012",
+      "title": "不加字幕被错误解释为禁止旁白，会删除用户明确保留的唯一画外旁白",
+      "verified_by": "final_verifier_9005_r2",
+      "verified_at": "2026-11-01T16:23:46.576Z",
+      "verification_evidence": {
+        "path": "runs/MC-012-0-1793550225963.json",
+        "sha256": "a4a902b8960ec387bd2557a8c92861a37f09fd9cafcc8e14b63d37633f9a8451",
+        "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+      },
+      "assertions": [
+        {
+          "kind": "property",
+          "given": "合同同时写“不加字幕”和“保留一句画外旁白”，以及“不得添加字幕和旁白”的对照",
+          "expect": "前者保留唯一旁白且不记录 DISALLOWED_VOICEOVER_REMOVED；后者仍删除旁白并保留真实禁止记录",
+          "command": "node_modules/.bin/vitest run packages/video-studio/src/vendor-compat.test.ts -t '不加字幕|允许简短对白但禁止旁白'",
+          "exec": {
+            "file": "node_modules/.bin/vitest",
+            "args": [
+              "run",
+              "packages/video-studio/src/vendor-compat.test.ts",
+              "-t",
+              "不加字幕|允许简短对白但禁止旁白"
+            ]
+          },
+          "last_result": "pass",
+          "evidence": {
+            "path": "evidence/MC-012-0-1793550225963.txt",
+            "sha256": "3856c717e59e29db1968b130cb7f6e7eef3a9cd59d818a399c2941ac50df85d7",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          },
+          "run": {
+            "path": "runs/MC-012-0-1793550225963.json",
+            "sha256": "a4a902b8960ec387bd2557a8c92861a37f09fd9cafcc8e14b63d37633f9a8451",
+            "commit": "8a24ace9c3f835a398db41f32c485272bcbbc402"
+          }
+        }
+      ]
+    }
+  ],
+  "open_problems": [],
+  "acceptance_commands": [
+    "pnpm --config.verify-deps-before-run=false acceptance:profile:check",
+    "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest-stress-9004 --env local-preview",
+    "node scripts/acceptance/fleet-run.mjs --repo workloom-growthtest-stress-9004 --env local-preview --live-only   # 生产最小侵入档"
+  ],
+  "notes": "环境档位为 local-preview：报告只能写『本机预览结构验收』，不得写『生产实测通过』（RDAS v3.1 §0）"
+}

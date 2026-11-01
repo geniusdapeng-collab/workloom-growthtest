@@ -1,0 +1,59 @@
+{
+  "id": "MC-002",
+  "kind": "problem",
+  "level": "L1",
+  "severity": "P1",
+  "batch": 2,
+  "state": "open",
+  "title": "营销价格事实无法把金额、币种、来源和抓取时点作为同一可回放证据闭环",
+  "evidence": [
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/marketing-facts.ts:72@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "f580064f81e18be56e5a108e12f35a8b96c6015a8f83c5d5acf4d6bbe8b43e0b",
+      "note": "旧实现要求每个叶子都有逐字引文，却没有金额币种归一证据、价格字段与 source_url 同源校验，也没有系统抓取时点。"
+    },
+    {
+      "type": "code",
+      "ref": "apps/server/src/video/marketing-facts.ts:79@f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+      "sha256": "f580064f81e18be56e5a108e12f35a8b96c6015a8f83c5d5acf4d6bbe8b43e0b",
+      "note": "claimId 只绑定原始引文；若归一后扩展连续原文，归档复读会漂移。"
+    }
+  ],
+  "root_cause": {
+    "file": "apps/server/src/video/marketing-facts.ts",
+    "line": 72,
+    "commit": "f822fd623ba08c4f4ba8c01d352e9d5b3d8c6cfb",
+    "symbol": "validateStageFacts"
+  },
+  "trigger_path": "官方来源只写“价格 599 元”或币种符号分开出现；模型将币种规范为 CNY 后，旧实现无法证明金额和币种属于同一价格，也可能把不同价格的货币符号拼在一起。",
+  "fix_plan": "为价格注入系统 observedAt；币种代码按金额附近 48 字符内同一价格窗口寻找符号并排除“美元”等误匹配；金额/币种/备注必须与 source_url 同一来源；claimId 绑定最终扩展后的连续引文。",
+  "blast_radius": "只收紧 A1 价格事实；已有逐字 CNY/USD 引文继续有效；普通规格、卖点、评价与竞品证据路径不变。",
+  "conflict_paths": [
+    "apps/server/src/video/marketing-facts.ts",
+    "apps/server/src/video/marketing-authority.ts"
+  ],
+  "assertions": [
+    {
+      "kind": "property",
+      "given": "合法 599 元；跨价格 599 美元+运费 100 元；币种引证来自另一来源；以及与 source_url 相同的正常对照",
+      "expect": "正常证据可复读；跨价格与跨来源币种均在监制前确定性拒绝",
+      "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-facts.test.ts",
+      "exec": {
+        "file": "node_modules/.bin/vitest",
+        "args": [
+          "run",
+          "apps/server/src/video/marketing-facts.test.ts"
+        ]
+      },
+      "last_result": "not-run"
+    }
+  ],
+  "regression": {
+    "command": "node_modules/.bin/vitest run apps/server/src/video/marketing-facts.test.ts",
+    "evidence": null
+  },
+  "rollback": "revert T-2026-1101-9005 中 marketing-facts 相关提交",
+  "fixed_by": null,
+  "verified_by": null
+}

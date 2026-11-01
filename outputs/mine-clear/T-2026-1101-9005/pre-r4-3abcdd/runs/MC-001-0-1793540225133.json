@@ -1,0 +1,36 @@
+{
+  "schema": "workloom.evidence-run/v1",
+  "id": "MC-001-0-1793540225133",
+  "command": "node_modules/.bin/vitest run packages/video-studio/src/producer-gate.test.ts",
+  "exec": {
+    "file": "node_modules/.bin/vitest",
+    "args": [
+      "run",
+      "packages/video-studio/src/producer-gate.test.ts"
+    ]
+  },
+  "actor": "codex-independent-verifier-T-2026-1101-9005c",
+  "role": "acceptance",
+  "subject": {
+    "card_id": "MC-001",
+    "assertion_index": 0
+  },
+  "commit": "6b3581810477be07200a300c9e16bc854cb7f0df",
+  "working_tree_dirty": false,
+  "started_at": "2026-11-01T13:37:05.133Z",
+  "finished_at": "2026-11-01T13:37:05.903Z",
+  "exit_code": 0,
+  "signal": null,
+  "validation": {
+    "ok": true,
+    "errors": []
+  },
+  "result": "pass",
+  "outputs": [
+    {
+      "path": "evidence/MC-001-0-1793540225133.txt",
+      "sha256": "7fc8f8b0d705d96480cf19e19495b8f600dc9d1206e56e35de58f068d9960c37",
+      "commit": "6b3581810477be07200a300c9e16bc854cb7f0df"
+    }
+  ]
+}
