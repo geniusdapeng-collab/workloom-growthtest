@@ -21,7 +21,7 @@
 
 - MCD 台账：[ledger.json](/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/mine-clear/T-2026-1101-9005/ledger.json)
 - 交接单：[handoff.json](/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/mine-clear/T-2026-1101-9005/handoff.json)
-- 当前候选 60-case：[SUMMARY.md](/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/mine-clear/T-2026-1101-9005/matrix-8a24ace/SUMMARY.md)
+- 当前候选 60-case：[SUMMARY.md](/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/mine-clear/T-2026-1101-9005/matrix/SUMMARY.md)
 - 真实 14-case 状态：[matrix-status.json](/Users/mac/Documents/Codex/2026-10-30/growthtest-https-cnb-cool-workloom-ai/work/workloom-growthtest-stress-9004/outputs/live-r3-20261101/matrix-status.json)
 
 ## 重跑结果

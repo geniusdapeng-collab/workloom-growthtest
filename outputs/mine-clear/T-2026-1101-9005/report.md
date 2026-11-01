@@ -44,7 +44,7 @@ Codex/CLI 视频预生产链路本轮修复通过 MCD 独立门槛。
 - 自主追加事项及理由：补齐 MCD 交接命令的根级脚本别名并加入防回归断言；复跑 60 场景矩阵，发现并修复无台词标准声明被误判的问题。
 - 采用的假设：用户 2026-11-01 指定的 Codex/CLI 放行面继续有效，项目三端客户端不是本轮验收入口。
 - 置信度：高。核心修复有 A 级代码与组合回归证据，发布面有 B 级全量执行回读；未覆盖边界已明确。
-- 建议复核：`ledger.json`、`handoff.json`、`matrix-8a24ace/report.json`、`packages/video-studio/src/vendor-compat.test.ts` 中的人物/旁白正反用例。
+- 建议复核：`ledger.json`、`handoff.json`、`matrix/report.json`、`packages/video-studio/src/vendor-compat.test.ts` 中的人物/旁白正反用例。
 
 ## 自检表
 
