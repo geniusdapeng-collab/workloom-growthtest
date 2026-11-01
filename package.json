@@ -31,6 +31,7 @@
     "db:seed:geo": "tsx --env-file=.env scripts/seed-geo.ts",
     "onboarding": "tsx --env-file=.env scripts/onboarding.mts",
     "acceptance:onboarding": "tsx --env-file=.env scripts/acceptance/onboarding.mts",
+    "acceptance:profile:check": "node scripts/acceptance/profile-check.mjs",
     "scan:fences": "tsx scripts/tools/fence-alias-scan.mts",
     "metrics": "tsx --env-file=.env scripts/metrics.mts",
     "scan:knowhow": "tsx scripts/tools/knowhow-depth.mts",
