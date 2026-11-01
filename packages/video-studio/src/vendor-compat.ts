@@ -1231,6 +1231,7 @@ export function extractNarrativeActions(
       const malformed = /(?:绒毛|骨上|undefined|null|未标注|关键词|标签|对象|待补|省略)/iu.test(phrase)
         || /(?:仅一|离水珠|悬停瞬间|收束动作)$/u.test(phrase)
         || /(?:爪垫|尾巴).*(?:瞬间|动作)$/u.test(phrase)
+        || /(?:画面|构图|景别|机位|上三分之一|下三分之一)/u.test(phrase)
         || /^[\d\s，。；、：]/u.test(phrase);
       if (phrase.length >= 2 && !malformed && !actionFamilies.has(key)) {
         actionFamilies.add(key);
@@ -1291,6 +1292,11 @@ export function inferNarrativeProps(input: {
     { pattern: /屋檐|檐口/gu, name: "屋檐" },
     { pattern: /积水|水洼/gu, name: "积水" },
     { pattern: /水滴|水珠/gu, name: "水滴" },
+    { pattern: /薄雾|雾气|雾层|晨雾/gu, name: "薄雾" },
+    { pattern: /远山|山形|山脉/gu, name: "远山" },
+    { pattern: /芦苇|芦花/gu, name: "芦苇" },
+    { pattern: /湖面|水面|海面/gu, name: "水面" },
+    { pattern: /涟漪|波纹/gu, name: "涟漪" },
   ];
   const props: string[] = [];
   for (const term of terms) {
@@ -1338,6 +1344,12 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
   ];
   const generic = /(?:预留重试|准备备选|待针对|补齐缓解|降低复杂度|保持视觉一致|提升质量)/u;
   const fallback = (text: string): string => {
+    if (/AI生成质量|生成质量不确定|质量不确定|多次迭代/u.test(text)) {
+      return "把高风险画面拆成固定机位短镜，逐镜锁定首帧、主体外观、光源方向和接触关系；每镜生成后检查结构、材质与连续性，失败只重做该镜，不整条管线重跑。";
+    }
+    if (/时长|节奏|镜头时长分配/u.test(text)) {
+      return "先按场景建立硬时间预算并写入镜头合同，再逐镜实测 durationSeconds；场景加总必须等于目标总时长，超差只重分配同场景镜头，不压缩有明确动作的镜头。";
+    }
     if (/划痕|积尘|指纹|磨白|发黄|塑料|颗粒|灰尘|微质感|磨砂|裂纹|磨痕|材质|纹理|道具/u.test(text)) {
       return "把微质感锚点拆成固定机位微距短镜头，单镜不超过2秒，锁定同一参考帧、侧向硬光和非重复磨损路径；不在运动长镜中生成精细纹理。";
     }
@@ -1521,6 +1533,12 @@ export function normalizeNarrativeRequirementMarkdown(
     upstream,
   });
   const animalOnly = inferredRoles.length > 0 && inferredRoles.every((role) => ["猫", "狗", "鸟"].includes(role.name));
+  const noCharacterContract = inferredRoles.length === 0
+    && /(?:无人物|无动物|无角色|纯空镜|场景为主体)/u.test([
+      upstream._originalStoryText,
+      upstream.description,
+      upstream.special_notes,
+    ].map(String).join(" "));
   if (inferredRoles.length > 0) {
     normalized = normalized.replace(
       /- \*\*角色\*\*（\d+）：[^\n]*/u,
@@ -1529,6 +1547,12 @@ export function normalizeNarrativeRequirementMarkdown(
     if (animalOnly) {
       normalized = normalized.replace(/人物动作/gu, "主体动作");
     }
+  }
+  if (noCharacterContract) {
+    normalized = normalized
+      .replace(/- \*\*角色\*\*（\d+）：[^\n]*/u, "- **角色**（0）：无角色（环境/场景空镜）")
+      .replace(/- \*\*动作\*\*（\d+）：[^\n]*/u, "- **动作**（0）：无角色动作；以风、雾、光线和水面变化推进")
+      .replace(/人物动作与画外环境声/gu, "画外环境声");
   }
   const risk = discovery?.riskAssessment && typeof discovery.riskAssessment === "object"
     ? discovery.riskAssessment as Record<string, unknown>
@@ -1607,6 +1631,13 @@ export function normalizeNarrativeRequirementMarkdown(
           : "站外转发文案候选仅用于发布文案，不进入成片，不生成字幕、旁白或口播。";
       });
   }
+  const visualStyle = String(upstream.visual_style ?? "").trim();
+  if (visualStyle) {
+    normalized = normalized.replace(
+      /###\s*2\.4\s*对标参考[\s\S]*?(?=\n---|\n##\s*三)/u,
+      `### 2.4 对标参考\n\n- 仅作影调与镜头策略参考，不引入片名对应的地域、品牌、人物或情节：${visualStyle}\n`,
+    );
+  }
   return normalized;
 }
 
@@ -1672,6 +1703,43 @@ export function normalizeNarrativeDiscovery(
     return text;
   };
   const scene = recordValue(discovery.sceneStructure);
+  const sceneNodes = [
+    recordValue(scene.opening),
+    ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+    recordValue(scene.ending),
+  ].filter((node) => Object.keys(node).length > 0);
+  const genericScene = /(?:建立场景|引入主题|推动叙事|核心动作|情绪表达|总结收尾|留下印象|环境展示|主题暗示|情绪收束|主题呼应)/u;
+  if (sceneNodes.some((node) => genericScene.test(`${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`))) {
+    const evidenceClauses = [
+      String(upstream._originalStoryText ?? ""),
+      String(upstream.description ?? ""),
+    ].join("，")
+      .split(/[，。；\n]+/u)
+      .map((item) => item.replace(/^\[需求口径\].*$/u, "").trim())
+      .filter((item) => item.length >= 4)
+      .filter((item) => !/(?:无人物|无动物|无品牌|无文字|无字幕|无旁白|仅保留环境声)/u.test(item));
+    const visualProps = inferNarrativeProps({
+      intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
+      discovery,
+      upstream,
+    });
+    let clauseIndex = 0;
+    let propIndex = 0;
+    for (const node of sceneNodes) {
+      const current = `${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`;
+      if (!genericScene.test(current)) continue;
+      const purpose = evidenceClauses[clauseIndex++];
+      if (purpose) node.purpose = purpose;
+      if (visualProps.length > 0) {
+        const elements: string[] = [];
+        for (let count = 0; count < 2; count += 1) {
+          const item = visualProps[propIndex++ % visualProps.length]!;
+          if (!elements.includes(item)) elements.push(item);
+        }
+        node.keyElements = elements;
+      }
+    }
+  }
   if (scene.opening && typeof scene.opening === "object") {
     const node = scene.opening as Record<string, unknown>;
     node.purpose = cleanPurpose(node.purpose);
@@ -2454,7 +2522,12 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
         const result = await original.call(this, discovery, upstream);
         const platform = canonicalPlatformId(upstream?.platform_id ?? upstream?.platform);
         const canonical = canonicalCharacterFromEvidence(upstream);
-        const existing = Array.isArray(result.characters) ? result.characters : [];
+        const existing = Array.isArray(result.characters)
+          ? result.characters.filter((item) => {
+              const name = String(recordValue(item).name ?? "").trim();
+              return !/^(?:无|没有)(?:真人|人物|角色|模特)|^(?:none|n\/a)$/iu.test(name);
+            })
+          : [];
         const rawInferred = canonical.length > 0
           ? canonical
           : existing.length > 0
@@ -2481,7 +2554,7 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
         const withEvidence = {
           ...result,
           ...(platform ? { platform } : {}),
-          ...(inferred.length > 0 ? { characters: inferred } : {}),
+          characters: inferred,
           _discoveryEvidence: {
             sceneStructure: discovery?.sceneStructure ?? null,
             riskAssessment: discovery?.riskAssessment ?? null,

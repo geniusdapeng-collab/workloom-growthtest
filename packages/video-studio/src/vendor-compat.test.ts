@@ -1220,6 +1220,57 @@ console.log("RESULT " + JSON.stringify({
     expect(JSON.stringify(prd)).toContain("不使用配乐");
   });
 
+  it("无角色空镜的模板场景、角色和风险缓解被源证据替换", () => {
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { duration: 3, purpose: "建立场景氛围，引入主题", keyElements: ["环境展示", "主题暗示"] },
+        scenes: [
+          { duration: 12, purpose: "场景1：推动叙事发展", keyElements: ["核心动作", "情绪表达"] },
+          { duration: 12, purpose: "场景2：推动叙事发展", keyElements: ["核心动作", "情绪表达"] },
+        ],
+        ending: { duration: 3, purpose: "总结收尾，留下印象", keyElements: ["情绪收束", "主题呼应"] },
+      },
+      audienceProfile: { contentExpectations: ["仅保留环境声"] },
+      riskAssessment: {
+        technicalRisks: [
+          { risk: "AI生成质量不确定性", level: "medium", impact: "可能需要多次迭代" },
+          { risk: "时长控制", level: "low", impact: "需要精确的镜头时长分配" },
+        ],
+        mitigationSuggestions: ["预留重试时间", "准备备选方案"],
+      },
+    };
+    const upstream = {
+      _originalStoryText: "清晨薄雾中的天鹅湖，湖面只倒映远山和芦苇，风吹起细小涟漪，薄雾缓慢散开。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。",
+      dialogue_requirement: "无人物、无动物，仅保留环境声",
+      visual_style: "日出前蓝灰散射光，逆光雾层，浅景深远山，9:16竖幅",
+      special_notes: "湖面倒映远山和芦苇；涟漪边缘见碎光；远山压在上三分之一，芦苇在下缘作前景。",
+    };
+    normalizeNarrativeDiscovery(discovery, 30, upstream);
+    const scenes = discovery.sceneStructure as any;
+    expect(scenes.opening.purpose).toContain("天鹅湖");
+    expect(scenes.scenes[0].purpose).toContain("远山和芦苇");
+    expect(scenes.scenes[1].purpose).toContain("涟漪");
+    expect(scenes.ending.purpose).toContain("薄雾缓慢散开");
+    expect(JSON.stringify(scenes)).toContain("远山");
+    expect(JSON.stringify(scenes)).not.toMatch(/建立场景氛围|推动叙事发展|核心动作|情绪表达|主题暗示/u);
+    const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(pairs[0]).not.toBe(pairs[1]);
+    expect(pairs[0]).toContain("固定机位短镜");
+    expect(pairs[1]).toContain("硬时间预算");
+    const markdown = normalizeNarrativeRequirementMarkdown([
+      "### 2.4 对标参考",
+      "- 《星际穿越》《布达佩斯大饭店》",
+      "---",
+      "## 三、最终业务需求确认",
+      "- **角色**（1）：无真人角色",
+      "- **动作**（1）：压在上三分之一",
+    ].join("\n"), discovery, 30, upstream);
+    expect(markdown).toContain("- **角色**（0）：无角色");
+    expect(markdown).toContain("- **动作**（0）：无角色动作");
+    expect(markdown).not.toContain("《星际穿越》");
+    expect(markdown).toContain("日出前蓝灰散射光");
+  });
+
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
     const discovery = {
       sceneStructure: {
