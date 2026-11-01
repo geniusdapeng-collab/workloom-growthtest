@@ -13,6 +13,11 @@ beforeAll(async () => {
       return;
     }
     if (req.url === "/redirect") { res.writeHead(302, { location: "/page" }); res.end(); return; }
+    if (req.url === "/meta-redirect") {
+      res.writeHead(200, { "content-type": "text/html; charset=utf-8" });
+      res.end('<html><head><meta http-equiv="refresh" content="0;URL=\'/page\'"></head></html>');
+      return;
+    }
     if (req.url === "/private") { res.writeHead(302, { location: "http://127.0.0.1/secret" }); res.end(); return; }
     if (req.url === "/loop") { res.writeHead(302, { location: "/loop" }); res.end(); return; }
     if (req.url === "/slow") return;
@@ -40,6 +45,15 @@ describe("来源公网地址与真实HTTP读取", () => {
     expect(result.snapshot).toMatchObject({ finalUrl: "https://source.example.com/page", redirectChain: ["https://source.example.com/redirect"], text: "星野 F3 & 风量 9 档\n完整尾部 中文", assetUrls: ["https://source.example.com/hero.jpg"] });
     expect(result.snapshot.rawSha256).toMatch(/^[a-f0-9]{64}$/); expect(result.snapshot.textSha256).not.toBe(result.snapshot.rawSha256);
     expect(result.rawBytes.toString()).toContain("伪造事实"); expect(result.snapshot.text).not.toContain("伪造事实");
+  });
+  it("HTML meta refresh 跳转页跟随后只保存目标正文，并保留完整跳转链", async () => {
+    const result = await fetchPage("/meta-redirect");
+    expect(result.snapshot).toMatchObject({
+      finalUrl: "https://source.example.com/page",
+      redirectChain: ["https://source.example.com/meta-redirect"],
+      text: "星野 F3 & 风量 9 档\n完整尾部 中文",
+    });
+    expect(result.snapshot.text).not.toContain("<meta");
   });
   it("公开只读 API 收到同源 Referer，不因空来源被 406 拒绝", async () => {
     const result = await fetchPage("/requires-referer");

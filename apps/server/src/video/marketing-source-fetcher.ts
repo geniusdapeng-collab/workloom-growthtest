@@ -89,6 +89,25 @@ function decodeEntities(text: string): string {
     return named[entity.toLowerCase()] ?? all;
   });
 }
+
+/**
+ * Some search engines return a 200 HTML interstitial whose visible body is empty and whose
+ * only navigation is a meta refresh in `<noscript>`. Treat that as an ordinary redirect hop
+ * before extracting source text; JavaScript-only navigation is deliberately not executed.
+ */
+function metaRefreshTarget(raw: string): string | null {
+  for (const match of raw.matchAll(/<meta\b[^>]*>/giu)) {
+    const tag = match[0];
+    if (!/\bhttp-equiv\s*=\s*["']?refresh\b/iu.test(tag)) continue;
+    const content = /\bcontent\s*=\s*(["'])([\s\S]*?)\1/iu.exec(tag)?.[2];
+    if (!content) continue;
+    const target = /(?:^|;)\s*url\s*=\s*(?:(["'])(.*?)\1|([^"';\s>]+))/iu.exec(content);
+    const value = decodeEntities((target?.[2] ?? target?.[3] ?? "").trim());
+    if (value) return value;
+  }
+  return null;
+}
+
 export function sourceDocument(raw: string, contentType: string, finalUrl: string): { text: string; assetUrls: string[] } {
   const html = /(?:html|xhtml)/i.test(contentType);
   const assetUrls = new Set<string>();
@@ -146,6 +165,13 @@ export async function fetchMarketingSource(rawUrl: string, options: {
     if (!decoded.length || decoded.length > SOURCE_MAX_BYTES) throw new Error("SOURCE_TOO_LARGE：来源字节为空或超过上限");
     const charset = /charset\s*=\s*["']?([^;\s"']+)/i.exec(contentType)?.[1] ?? "utf-8";
     const raw = new TextDecoder(charset, { fatal: true }).decode(decoded);
+    const metaTarget = /(?:html|xhtml)/i.test(contentType) ? metaRefreshTarget(raw) : null;
+    if (metaTarget) {
+      if (hop === 4) throw new Error("SOURCE_REDIRECT_INVALID：来源重定向过多");
+      chain.push(current.href);
+      current = sourceUrl(new URL(metaTarget, current).href);
+      continue;
+    }
     const document = sourceDocument(raw, contentType, current.href);
     const hash = (bytes: string | Buffer) => createHash("sha256").update(bytes).digest("hex");
     const rawSha256 = hash(decoded), textSha256 = hash(document.text);
