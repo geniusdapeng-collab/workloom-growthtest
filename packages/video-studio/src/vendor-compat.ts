@@ -1370,6 +1370,9 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/(?:空间|布局|场景|角色|服装|造型)[^。；]{0,20}(?:一致|漂移)|跨镜头[^。；]{0,20}(?:空间|布局|角色|服装|造型)(?:一致|漂移)/u.test(text)) {
       return "锁定同一角色参考帧、服装与场景平面图，固定门、桌面和主光位置；逐镜检查角色轮廓、道具比例与空间连线，异常只重做该镜，不改动已确认场景结构。";
     }
+    if (/手持|微晃|浅景深人物.*稳/u.test(text)) {
+      return "将本镜改为三脚架固定机位，锁定镜头高度、轴线与焦平面；用稳定器或后期轻微稳像补偿呼吸，不改变人物动作和构图。";
+    }
     if (/猫爪|爪心|爪尖|肉垫|爪形|多趾/u.test(text)) {
       return "把猫爪接水拆成爪尖伸入、水滴下坠、爪垫接水三个固定微距短镜，锁定四趾轮廓、肉垫位置和爪毛湿度；水花用已批准实拍素材插入，出现多趾、粘连或穿模只重做该镜。";
     }
@@ -1449,6 +1452,10 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
   const paired = risks.map((risk) => {
     const text = `${String(risk.risk ?? "")} ${String(risk.impact ?? "")}`;
     if (/(?:空间|布局|场景|角色|服装|造型)[^。；]{0,20}(?:一致|漂移)|跨镜头[^。；]{0,20}(?:空间|布局|角色|服装|造型)(?:一致|漂移)/u.test(text)) {
+      return fallback(text);
+    }
+    if (/手持|微晃|浅景深人物.*稳/u.test(text)
+      && !specificMitigations.some((item) => /三脚架|稳定器|固定机位/u.test(item))) {
       return fallback(text);
     }
     if (/钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(text)
@@ -1680,6 +1687,7 @@ export function normalizeNarrativeRequirementMarkdown(
   ].map(String).join(" ");
   const groundedProp = (item: string): boolean => {
     if (propEvidence.includes(item)) return true;
+    if (item === "雨伞" && /伞/u.test(propEvidence)) return true;
     for (let index = 0; index < item.length - 1; index += 1) {
       if (propEvidence.includes(item.slice(index, index + 2))) return true;
     }
@@ -1875,6 +1883,44 @@ export function normalizeNarrativeDiscovery(
     }
     return false;
   };
+  const sourceActionClauses = String(upstream._originalStoryText ?? "")
+    .split(/[，。；\n]+/u)
+    .map((clause) => clause.trim())
+    .filter((clause) => clause.length >= 2)
+    .filter((clause) => !/(?:无人物|无动物|无品牌|无文字|无字幕|无旁白|仅保留环境声|需求口径)/u.test(clause))
+    .filter((clause) => extractNarrativeActions({}, { _originalStoryText: clause }).length > 0)
+    .filter((clause, index, list) => list.indexOf(clause) === index);
+  const sourceActionPhrases = extractNarrativeActions({}, upstream);
+  const splitActionPurposes = sourceActionPhrases.length >= 3 ? sourceActionPhrases : sourceActionClauses;
+  const openingActionCount = extractNarrativeActions(
+    { sceneStructure: { opening: scene.opening } },
+    upstream,
+  ).length;
+  if (splitActionPurposes.length >= 3
+    && (!Array.isArray(scene.scenes) || scene.scenes.length === 0)
+    && openingActionCount >= 2) {
+    const nodes = splitActionPurposes.map((purpose) => {
+      const props = inferNarrativeProps({
+        intent: purpose,
+        discovery: { sceneStructure: { opening: { purpose } } },
+        upstream: {},
+      }).slice(0, 3);
+      return {
+        duration: Number((duration / splitActionPurposes.length).toFixed(3)),
+        purpose,
+        keyElements: props,
+      };
+    });
+    const bodyScenes = nodes.slice(1, -1);
+    scene.opening = nodes[0];
+    scene.scenes = bodyScenes;
+    scene.ending = nodes[nodes.length - 1];
+    scene.sceneCount = bodyScenes.length;
+    repairs.push({
+      code: "OVERSTUFFED_OPENING_SPLIT",
+      detail: `把开场中的 ${splitActionPurposes.length} 个源动作拆为 1 个开场、${bodyScenes.length} 个主体场景和 1 个结尾`,
+    });
+  }
   const sceneNodes = [
     recordValue(scene.opening),
     ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),

@@ -1458,6 +1458,46 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[1]).not.toContain("声音");
   });
 
+  it("归家片开场过载时按源句拆成可执行场景，并把收伞归入雨伞道具", () => {
+    const upstream = {
+      _originalStoryText: "雨夜，一个年轻人收伞回到出租屋，开门、换鞋、拧亮旧台灯，随后坐在灯下安静地听雨。全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+      dialogue_requirement: "全片无台词、无旁白、无字幕，仅保留动作与环境声。",
+    };
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { duration: 3, purpose: "收伞回到出租屋、开门、换鞋、拧旧台灯旋钮、坐下听雨", keyElements: ["台灯", "门"] },
+        scenes: [],
+        ending: { duration: 12, purpose: "灯下听雨", keyElements: ["台灯", "窗"] },
+      },
+      riskAssessment: {
+        technicalRisks: [{ risk: "手持微晃与9:16浅景深人物均稳", level: "low" }],
+        mitigationSuggestions: ["手部动作拆成固定机位短特写"],
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, upstream);
+    const scene = discovery.sceneStructure as any;
+    expect(scene.scenes.length).toBeGreaterThanOrEqual(2);
+    const purposes = [scene.opening, ...scene.scenes, scene.ending].map((node: any) => node.purpose).join("；");
+    expect(purposes).toContain("开门");
+    expect(purposes).toContain("换鞋");
+    expect(purposes).toContain("坐下");
+    expect(inferNarrativeProps({
+      intent: upstream._originalStoryText,
+      discovery,
+      upstream,
+    })).toContain("雨伞");
+    const markdown = normalizeNarrativeRequirementMarkdown(
+      "- **道具**（1）：台灯\n- **场景**（1）：错误\n- **动作**（1）：错误",
+      discovery,
+      15,
+      upstream,
+    );
+    expect(markdown).toContain("雨伞");
+    const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(pairs[0]).toMatch(/三脚架|机位|稳定/u);
+    expect(pairs[0]).not.toContain("手部动作拆成");
+  });
+
   it("无人物但有动物的合同保留动物主体，不要求人像定妆照，并清除环境声合同中的配乐", () => {
     const discovery: Record<string, unknown> = {
       upstreamFields: {
