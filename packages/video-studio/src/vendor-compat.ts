@@ -1641,7 +1641,22 @@ export function normalizeNarrativeRequirementMarkdown(
   if (hasSceneStructure && scenePurposes.length > 0) {
     normalized = normalized.replace(/- \*\*场景\*\*（\d+）：[^\n]*/u, `- **场景**（${scenePurposes.length}）：${scenePurposes.join("；")}`);
   }
-  const actions = extractNarrativeActions(discovery, upstream);
+  if (hasSceneStructure) {
+    const sceneKeys = [
+      recordValue(scene.opening),
+      ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+      recordValue(scene.ending),
+    ].filter((item) => Object.keys(item).length > 0)
+      .map((item) => Array.isArray(item.keyElements) ? item.keyElements.map(String).join("、") : "");
+    let keyIndex = 0;
+    normalized = normalized.replace(/^- 关键元素:\s*[^\n]*$/gmu, (line) => {
+      const value = sceneKeys[keyIndex++];
+      return value ? `- 关键元素: ${value}` : line;
+    });
+  }
+  const actions = extractNarrativeActions(discovery, upstream)
+    .filter((item) => !/(?:动作声|环境底噪|等动作声|[，,].*[，,]|\/$)/u.test(item))
+    .slice(0, 8);
   if (actions.length > 0) {
     normalized = normalized.replace(/- \*\*动作\*\*（\d+）：[^\n]*/u, `- **动作**（${actions.length}）：${actions.join("；")}`);
     normalized = normalized.replace(/(?:[一二三四五六七八九十]+|\d+)个连续动作/gu, `${actions.length}个连续动作`);
@@ -1761,6 +1776,8 @@ export function normalizeNarrativeRequirementMarkdown(
   if (narrativeSpeechPolicy(dialogue).allSpeechForbidden) {
     normalized = normalized
       .replace(/(?:画外旁白|画外音|旁白)\s*[：:]\s*[^。；\n]+[。；]?/gu,
+        noCharacterContract ? "仅保留画外环境声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
+      .replace(/[^。；\n]{0,30}(?:紧接)?(?:一句)?(?:轻声|低声)?台词\s*[：:]?\s*[“「][^”」]+[”」][^。；\n]*[。；]?/gu,
         noCharacterContract ? "仅保留画外环境声。" : `仅保留${animalOnly ? "主体" : "人物"}动作与画外环境声。`)
       .replace(/[^。；\n]{0,24}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’][。；]?/gu, "以动作与环境声完成回应。")
       .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。")
@@ -2020,6 +2037,24 @@ export function normalizeNarrativeDiscovery(
   if (scene.ending && typeof scene.ending === "object") {
     const node = scene.ending as Record<string, unknown>;
     node.purpose = cleanPurpose(node.purpose);
+  }
+  const globalNodeProps = inferNarrativeProps({
+    intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
+    discovery: { sceneStructure: {} },
+    upstream: {},
+  });
+  for (const node of [
+    recordValue(scene.opening),
+    ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+    recordValue(scene.ending),
+  ].filter((item) => Object.keys(item).length > 0)) {
+    const purpose = String(node.purpose ?? "");
+    const local = inferNarrativeProps({
+      intent: purpose,
+      discovery: { sceneStructure: { opening: { purpose } } },
+      upstream: {},
+    });
+    node.keyElements = [...new Set([...local, ...globalNodeProps])].slice(0, 4);
   }
   if (Array.isArray(scene.scenes)) scene.sceneCount = scene.scenes.length;
   const nodes = [
