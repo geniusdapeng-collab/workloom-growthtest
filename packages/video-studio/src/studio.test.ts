@@ -114,7 +114,9 @@ describe("gates 映射", () => {
   it("创意主题门不把角色资产路径和授权元数据当创意正文", () => {
     const content = [
       "雨夜归家的都市故事。无台词、无旁白、仅环境声。",
-      "id=chen-zhuo;name=陈卓;portraitRef=bundles/ai-video/library/characters/model-01-chen-zhuo/portraits/v3/平江路讲述人-front.png;authorization=real-authorized",
+      "║ id=chen-zhuo;name=陈卓;portraitRef=bun  ║",
+      "║ -01-chen-zhuo/portraits/v3/平江路讲述   ║",
+      "║ 人-front.png;authorization=real-author  ║",
     ].join("\n");
     const sanitized = sanitizeGateContent("G2_THEME", content);
     expect(sanitized).toContain("授权角色：陈卓");

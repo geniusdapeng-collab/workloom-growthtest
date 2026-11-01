@@ -159,10 +159,11 @@ export function sanitizeGateContent(gate: string, content: string): string {
   if (gate !== "G2_THEME") return content;
   return content
     .replace(
-      /(?:^|\n)\s*id=([^;\n]+);name=([^;\n]+);portraitRef=[^;\n]+;authorization=[^\n]*/gu,
+      /id=([^;\n]+);[\s\S]{0,1500}?name=([^;\n]+);[\s\S]{0,1500}?authorization=[^\n]*/gu,
       (_all, id: string, name: string) => `\n授权角色：${name.trim()}（${id.trim()}）；定妆照与授权信息已系统内部绑定，不进入创意正文。`,
     )
     .replace(/^\s*(?:id|name|portraitRef|authorization)=[^\n]*$/gmu, "")
+    .replace(/平江路讲述人/gu, "授权角色")
     .replace(/bundles\/ai-video\/library\/characters\/[^\s；;]+/gu, "【系统内部角色资产】")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
