@@ -1057,6 +1057,82 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).toContain("伸爪");
   });
 
+  it("真实猫片 G3 不把视觉锚点切碎，并把角色、场景、台词与占位缓解收敛成可执行合同", () => {
+    const discovery: Record<string, unknown> = {
+      audienceProfile: {
+        contentExpectations: [
+          "无需字幕与六个连续动作完成完整情绪弧",
+          "有一句关键台词，例如“它没接到那滴水，就把整个雨夜圈进了尾巴里”",
+        ],
+      },
+      sceneStructure: {
+        opening: {
+          duration: 3,
+          purpose: "第一帧是低机位雨夜：塌软纸箱里橘猫只探出半身，屋檐水珠胀大悬在它鼻尖前",
+          keyElements: ["塌软纸箱", "橘猫半身", "屋檐将落水珠"],
+        },
+        scenes: [
+          {
+            duration: 4,
+            purpose: "删掉这镜会失去第一次接空：猫爪抬起，水珠砸在爪垫边缘溅成细水花，猫耳后压。",
+            keyElements: ["抬起的猫爪", "砸在爪边的水珠", "湿纸箱边缘"],
+          },
+          {
+            duration: 6,
+            purpose: "猫缩回箱内盘成一团，尾巴尖把最后一滴雨声圈在身侧。",
+            keyElements: ["橘猫盘成团", "圈住身体的尾巴尖"],
+          },
+        ],
+        ending: { duration: 2, purpose: "最后一帧停在尾巴尖与纸箱破口：一滴水沿檐角悬而未落", keyElements: ["纸箱破口"] },
+      },
+      riskAssessment: {
+        technicalRisks: [{ risk: "猫爪接水时可能粘连", level: "high" }],
+        mitigationSuggestions: ["预留重试时间", "准备备选方案"],
+      },
+    };
+    const upstream = {
+      _originalStoryText: "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。",
+      dialogue_requirement: "无台词、无旁白、无字幕，只保留环境声",
+      visual_style: "低照度雨夜，单一暖黄钨丝光逆光，低机位贴近地面，浅景深",
+      special_notes: "视觉锚点：①橘猫毛被打湿成缕、耳尖挂水珠；②伸爪接水的爪垫离水珠仅一寸的悬停瞬间；③缩回时尾巴一圈圈收拢压住身体的收束动作。",
+    };
+    normalizeNarrativeDiscovery(discovery, 15, upstream);
+    const actions = extractNarrativeActions(discovery, upstream);
+    expect(actions).toEqual(expect.arrayContaining(["探出半身", "抬起", "缩回箱内盘成一团"]));
+    expect(actions.join("")).not.toContain("仅一");
+    expect(actions).not.toContain("盘成一团");
+    expect(inferNarrativeCharacters({
+      intent: upstream._originalStoryText,
+      discovery,
+      upstream,
+    })[0]).toMatchObject({ name: "猫", description: expect.stringContaining("被打湿成缕") });
+    const markdown = normalizeNarrativeRequirementMarkdown([
+      "2.1 内容期望：无需字幕与六个连续动作完成完整情绪弧",
+      "有一句关键台词，例如“它没接到那滴水”。",
+      "**开场** (3秒)",
+      "**场景 1** (4秒)",
+      "**场景 2** (6秒)",
+      "**结尾** (2秒)",
+      "**缓解建议**",
+      "1. 预留重试时间",
+      "2. 准备备选方案",
+      "- **角色**（1）：猫（须登记肖像授权）",
+      "- **场景**（1）：旧段落",
+      "- **道具**（1）：动物",
+      "- **动作**（1）：仅一",
+      "- **风险结论**：待补",
+    ].join("\n"), discovery, 15, upstream);
+    expect(markdown).toContain("目的=");
+    expect(markdown).toContain("时间=雨夜");
+    expect(markdown).toContain("光位=单一暖黄钨丝光");
+    expect(markdown).toContain("机位=低机位");
+    expect(markdown).toContain("橘猫");
+    expect(markdown).not.toContain("关键台词");
+    expect(markdown).not.toContain("预留重试时间");
+    expect(markdown).not.toContain("准备备选方案");
+    expect(markdown).toContain(`${actions.length}个连续动作`);
+  });
+
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
     const discovery = {
       sceneStructure: {
