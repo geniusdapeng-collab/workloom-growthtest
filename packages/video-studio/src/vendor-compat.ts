@@ -2445,7 +2445,11 @@ export function normalizeNarrativePrdContract(
   const normalizeContractText = (text: string): string => {
     let value = text;
     if (animalOnly) value = value.replace(/人物动作/gu, "主体动作");
-    if (noCharacters) value = value.replace(/(?:人物|主体)动作与画外环境声/gu, "画外环境声");
+    if (noCharacters) {
+      value = value
+        .replace(/(?:人物|主体)动作与画外环境声/gu, "画外环境声")
+        .replace(/(?:人物|主体)动作/gu, "画外环境声");
+    }
     if (canonicalK) value = value.replace(/\b\d{4}\s*K\b/giu, canonicalK);
     if (musicForbidden && /(?:配乐|音乐|旋律|低频嗡鸣|低频持续音)/u.test(value)) {
       const kept = value
@@ -2455,6 +2459,7 @@ export function normalizeNarrativePrdContract(
         .filter((item) => !/(?:配乐|音乐|旋律|低频嗡鸣|低频持续音)/u.test(item));
       value = `${kept.length > 0 ? `${kept.join("；")}；` : ""}不使用配乐，仅保留环境声与动作声。`;
     }
+    value = value.replace(/([^。；\n]+。)(?:[、；\s]*\1)+/gu, "$1");
     return value;
   };
   const normalizePrdStrings = (value: unknown): void => {

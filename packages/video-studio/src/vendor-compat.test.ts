@@ -1195,11 +1195,11 @@ console.log("RESULT " + JSON.stringify({
         scenes: [{ sceneId: "SC01", purpose: "薄雾散开", duration: 30 }],
         shotMapping: [{ sceneId: "SC01", estimatedShots: 1, shotBreakdownHint: ["tracking"] }],
       },
-      productionConstraints: { technicalConstraints: ["仅保留主体动作与画外环境声"] },
+      productionConstraints: { technicalConstraints: ["仅保留主体动作与画外环境声", "仅保留人物动作"] },
       audienceProfile: { contentExpectations: ["仅保留主体动作与画外环境声"] },
       audioSpecification: {
         musicStyle: "片尾仅入低频持续音",
-        soundEffects: ["水声", "芦苇摩擦声", "片尾旋律渐入"],
+        soundEffects: ["水声", "芦苇摩擦声", "片尾旋律渐入", "片尾旋律渐入"],
       },
       deliveryStandard: {
         deliverables: [
