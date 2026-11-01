@@ -1233,10 +1233,18 @@ console.log("RESULT " + JSON.stringify({
       audienceProfile: { contentExpectations: ["仅保留环境声"] },
       riskAssessment: {
         technicalRisks: [
-          { risk: "AI生成质量不确定性", level: "medium", impact: "可能需要多次迭代" },
-          { risk: "时长控制", level: "low", impact: "需要精确的镜头时长分配" },
+          { risk: "湖面倒影几何漂移", level: "high", impact: "远山倒影重复变形" },
+          { risk: "薄雾时序闪烁", level: "high", impact: "雾层回卷或突然消失" },
+          { risk: "低照度水面塑料高光", level: "medium", impact: "暗部色带和过曝" },
+          { risk: "无主体空镜生成人物、动物、船只和水印", level: "high", impact: "违反硬约束" },
+          { risk: "风与涟漪方向和频率不一致", level: "medium", impact: "无风自动波纹" },
         ],
-        mitigationSuggestions: ["预留重试时间", "准备备选方案"],
+        mitigationSuggestions: [
+          "把雾散长镜拆成三个连续镜位，每段只承担一个运动",
+          "用芦苇前景遮挡倒影复杂度，固定低机位和中轴构图",
+          "雾的散开改为分层透明度递减，不做单镜体积模拟",
+          "低照度只保留芦苇轮廓光和水面碎光，固定曝光与青灰白平衡",
+        ],
       },
     };
     const upstream = {
@@ -1254,9 +1262,12 @@ console.log("RESULT " + JSON.stringify({
     expect(JSON.stringify(scenes)).toContain("远山");
     expect(JSON.stringify(scenes)).not.toMatch(/建立场景氛围|推动叙事发展|核心动作|情绪表达|主题暗示|黑天鹅|低字幕/u);
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
-    expect(pairs[0]).not.toBe(pairs[1]);
-    expect(pairs[0]).toContain("固定机位短镜");
-    expect(pairs[1]).toContain("硬时间预算");
+    expect(new Set(pairs).size).toBe(5);
+    expect(pairs[0]).toContain("遮挡倒影");
+    expect(pairs[1]).toContain("分层透明度");
+    expect(pairs[2]).toContain("青灰");
+    expect(pairs[3]).toContain("唯一负面清单");
+    expect(pairs[4]).toContain("风源");
     const markdown = normalizeNarrativeRequirementMarkdown([
       "### 2.4 对标参考",
       "- 《星际穿越》《布达佩斯大饭店》",

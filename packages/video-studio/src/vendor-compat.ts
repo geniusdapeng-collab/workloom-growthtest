@@ -1350,8 +1350,17 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/时长|节奏|镜头时长分配/u.test(text)) {
       return "先按场景建立硬时间预算并写入镜头合同，再逐镜实测 durationSeconds；场景加总必须等于目标总时长，超差只重分配同场景镜头，不压缩有明确动作的镜头。";
     }
+    if (/薄雾|雾层|雾散|时序.*(?:闪烁|连贯|一致)|回卷|局部重复/u.test(text)) {
+      return "把雾散改为分层透明度递减：近景、中景和远景各锁一层漂移速度与透明度曲线，每镜只允许单调散开；逐镜检查回卷、闪断和贴图撕裂，失败只重做该雾层。";
+    }
     if (/低饱和|青灰|水面质感|水面.*高光|高光过强|暗部.*糊|质感控制/u.test(text)) {
       return "把低照度质感单独做技术样片：锁定青灰白平衡、暗部抬升与高光滚降，水面只保留低强度反射；每镜检查塑料感、频闪、色带与暗部断层，不达标只重做该镜的质感参数。";
+    }
+    if (/无主体|空镜.*幻觉|生成人物|人物、动物|船只|水印/u.test(text)) {
+      return "为每个镜头建立唯一负面清单：无人物、无动物、无船、无品牌、无文字、无水印；生成前写入请求负面词，生成后检查首中尾帧和画面四角，出现任一元素只重做该镜，禁止用裁切掩盖。";
+    }
+    if (/涟漪.*(?:方向|频率)|风.*涟漪|无风自动|波纹.*重复/u.test(text)) {
+      return "把风源与水面运动绑定：芦苇摆动方向决定涟漪扩散方向，每段只允许一个持续风源；目标帧核对涟漪频率、方向与芦苇摆动一致，无风段落必须保持静水，失败只重做该段。";
     }
     if (/划痕|积尘|指纹|磨白|发黄|塑料|颗粒|灰尘|微质感|磨砂|裂纹|磨痕|材质|纹理|道具/u.test(text)) {
       return "把微质感锚点拆成固定机位微距短镜头，单镜不超过2秒，锁定同一参考帧、侧向硬光和非重复磨损路径；不在运动长镜中生成精细纹理。";
@@ -1390,7 +1399,7 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     }
     return out;
   };
-  return risks.map((risk) => {
+  const paired = risks.map((risk) => {
     const text = `${String(risk.risk ?? "")} ${String(risk.impact ?? "")}`;
     if (/钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(text)
       && !specificMitigations.some((item) => /钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(item))) {
@@ -1415,6 +1424,17 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
       }
     }
     return bestScore >= 15 && best ? best : fallback(text);
+  });
+  const seen = new Set<string>();
+  return paired.map((item, index) => {
+    if (!seen.has(item)) {
+      seen.add(item);
+      return item;
+    }
+    const text = `${String(risks[index]?.risk ?? "")} ${String(risks[index]?.impact ?? "")}`;
+    const replacement = fallback(text);
+    seen.add(replacement);
+    return replacement;
   });
 }
 
@@ -1724,7 +1744,7 @@ export function normalizeNarrativeDiscovery(
     ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
     recordValue(scene.ending),
   ].filter((node) => Object.keys(node).length > 0);
-  const genericScene = /(?:建立场景|引入主题|推动叙事|核心动作|情绪表达|总结收尾|留下印象|环境展示|主题暗示|情绪收束|主题呼应)/u;
+  const genericScene = /(?:建立场景|引入主题|推动叙事|核心动作|情绪表达|总结收尾|留下印象|环境展示|主题暗示|情绪收束|主题呼应|纸质道具)/u;
   const sceneViolation = (node: Record<string, unknown>): boolean => {
     const value = `${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`;
     return (noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(value))
