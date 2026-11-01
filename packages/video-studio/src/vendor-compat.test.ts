@@ -1899,6 +1899,33 @@ console.log("RESULT " + JSON.stringify({ success: output.success, containsActual
     expect(result.promptHash).toMatch(/^[a-f\d]{64}$/);
   }, 90_000);
 
+  it("Phase3 首次 JSON 解析失败时在同一预算内重发一次严格 JSON 请求", () => {
+    const result = runInChild(phase3Fixture(`
+const uninstall = installVendorPhase3FusionBridge();
+let calls = 0;
+let retryPrompt = "";
+const phase = makePhase({
+ _callLLM: async (prompt) => {
+  calls++;
+  if (calls === 1) throw new Error("LLM引擎返回失败: JSON 解析失败: 未找到首个完整 JSON");
+  retryPrompt = String(prompt);
+  return { result: { picks: [] }, degraded: false };
+ },
+ process: async function (shots) {
+  await this._callLLM("原始镜头请求", { required: [] }, () => null, { critical: true });
+  return { shots: shots.map(s => ({ ...s, prompt: "【场景】湖面薄雾缓慢散开，固定机位连续记录水面涟漪与远山倒影。" })), degraded: false, stats: { failed: 0 } };
+ }
+});
+const output = await phase.execute(makeState());
+uninstall();
+console.log("RESULT " + JSON.stringify({ success: output.success, calls, retryPrompt, counters }));
+`));
+    expect(result.success).toBe(true);
+    expect(result.calls).toBe(2);
+    expect(String(result.retryPrompt)).toContain("只输出一个完整合法 JSON 对象");
+    expect(result.counters).toEqual(expect.objectContaining({ checkpoints: 1, timing: 1 }));
+  }, 90_000);
+
   it("预算拒绝或未知预算在任何路由模型/融合调用之前停止", () => {
     const result = runInChild(phase3Fixture(`
 const uninstall = installVendorPhase3FusionBridge();

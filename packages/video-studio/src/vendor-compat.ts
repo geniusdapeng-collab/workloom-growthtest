@@ -4242,7 +4242,16 @@ function scopedFusionAgent(agent: FusionAgent, remaining: () => number, deadline
         ...opts, timeoutMs: Math.min(Number.isFinite(requested) && requested > 0 ? requested : budget, budget), shotBudget: budget,
         ...(opts.altModel && typeof opts.altModel === "object" ? { altModel: guardEngine(opts.altModel as FusionRecord) } : {}),
       };
-      const response = await originalCall.apply(scoped, args);
+      let response: unknown;
+      try {
+        response = await originalCall.apply(scoped, args);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (!/(?:JSON\s*解析失败|未找到首个完整\s*JSON)/iu.test(message) || remaining() < 5000) throw error;
+        const retryArgs = [...args];
+        retryArgs[0] = `${String(retryArgs[0] ?? "")}\n严格只输出一个完整合法 JSON 对象；不要 Markdown 代码围栏、解释、前后缀或尾随文本。`;
+        response = await originalCall.apply(scoped, retryArgs);
+      }
       if (remaining() <= 0) throw new CinematicSkillError("PHASE3_BUDGET_EXHAUSTED", "LLM 返回时阶段预算已耗尽");
       return response;
     };
