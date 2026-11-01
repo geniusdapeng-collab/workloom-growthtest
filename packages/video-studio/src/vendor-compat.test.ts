@@ -1107,7 +1107,7 @@ console.log("RESULT " + JSON.stringify({
     });
     expect(pairs[0]).toContain("爪心空接");
     expect(pairs[0]).not.toContain("结尾收束");
-    expect(pairs[1]).toContain("结尾收束");
+    expect(pairs[1]).toMatch(/结尾收束|蜷缩|尾巴/u);
   });
 
   it("无台词口径与场景动作冲突时，保留旁白的画外属性并移除口型台词", () => {
@@ -1368,6 +1368,48 @@ console.log("RESULT " + JSON.stringify({
     const shots = prd.shotContract as Array<Record<string, unknown>>;
     expect(shots.every((shot) => (shot.subjectIds as string[]).includes("char_1"))).toBe(true);
     expect(JSON.stringify(prd)).not.toContain("人物动作");
+  });
+
+  it("真实猫片缺核心接水动作时补入场景，并清除尾声台词和跨物种缓解模板", () => {
+    const upstream = {
+      _originalStoryText: "雨后夜晚，一只橘猫从纸箱探头，伸爪接屋檐滴水，最后缩回纸箱盘成一团。无人物、无品牌、无字幕、无旁白，仅保留环境声。",
+      dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+      visual_style: "低照度雨夜，屋檐暖黄路灯逆光，低机位浅景深",
+    };
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { duration: 5, purpose: "橘猫从纸箱探头", keyElements: ["纸箱"] },
+        scenes: [
+          { duration: 5, purpose: "猫爪收回，水珠滑落", keyElements: ["水滴"] },
+          { duration: 3, purpose: "猫缩回纸箱", keyElements: ["纸箱"] },
+        ],
+        ending: { duration: 2, purpose: "一句轻声台词「一滴接住了，整夜的冷还在」把冷暖写在脸上", keyElements: ["纸箱"] },
+      },
+      riskAssessment: {
+        technicalRisks: [
+          { risk: "猫爪多趾结构在小尺度微距下爪形粘连、趾数错误", level: "high" },
+          { risk: "湿毛跨镜干湿状态跳变，水珠高光漂移", level: "high" },
+          { risk: "猫头穿越纸箱边界时毛发穿模，暖光包边闪烁", level: "medium" },
+          { risk: "蜷缩时肢体数量漂移，尾巴穿模", level: "medium" },
+        ],
+        mitigationSuggestions: [
+          "把手指动作拆成固定机位短特写，用遮挡规避完整手指接触",
+          "按场景建立硬时间预算并写入镜头合同",
+        ],
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, upstream);
+    const renderedScenes = JSON.stringify(discovery.sceneStructure);
+    expect(renderedScenes).toContain("伸爪接屋檐滴水");
+    expect(renderedScenes).not.toContain("一滴接住了");
+    expect(renderedScenes).not.toContain("轻声台词");
+    const mitigations = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(mitigations[0]).toMatch(/猫爪|肉垫|爪形/u);
+    expect(mitigations[1]).toMatch(/湿毛|干湿状态|水珠/u);
+    expect(mitigations[2]).toMatch(/纸箱.*遮挡|箱沿/u);
+    expect(mitigations[3]).toMatch(/蜷缩|尾巴|肢体/u);
+    expect(mitigations.join("")).not.toContain("手指动作");
+    expect(mitigations.join("")).not.toContain("硬时间预算");
   });
 
   it("无台词归家片从原始动作重建空间、道具与收束，不把说话幻觉或无关声音当成缓解", () => {

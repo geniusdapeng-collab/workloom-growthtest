@@ -1370,6 +1370,18 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/(?:空间|布局|场景|角色|服装|造型)[^。；]{0,20}(?:一致|漂移)|跨镜头[^。；]{0,20}(?:空间|布局|角色|服装|造型)(?:一致|漂移)/u.test(text)) {
       return "锁定同一角色参考帧、服装与场景平面图，固定门、桌面和主光位置；逐镜检查角色轮廓、道具比例与空间连线，异常只重做该镜，不改动已确认场景结构。";
     }
+    if (/猫爪|爪心|爪尖|肉垫|爪形|多趾/u.test(text)) {
+      return "把猫爪接水拆成爪尖伸入、水滴下坠、爪垫接水三个固定微距短镜，锁定四趾轮廓、肉垫位置和爪毛湿度；水花用已批准实拍素材插入，出现多趾、粘连或穿模只重做该镜。";
+    }
+    if (/湿毛|毛发.*(?:干湿|连续|跳变)|干湿状态/u.test(text)) {
+      return "按镜头锁定单一干湿度，写清湿毛成缕方向和爪垫泥水状态；跨镜用同一参考帧与光位复核，不允许同镜内干湿跳变，异常只重做相邻镜。";
+    }
+    if (/(?:猫头|纸箱).*(?:穿模|边界)|(?:箱沿|纸箱).*毛发/u.test(text)) {
+      return "用箱沿遮挡猫头与纸箱交界，固定机位、焦距和暖光边缘；逐镜检查毛发穿透、边界闪烁和纸板形变，失败只重做该遮挡镜，不整段重生成。";
+    }
+    if (/蜷缩|肢体数量|尾巴.*(?:穿模|漂移)|盘成/u.test(text)) {
+      return "把蜷缩拆成低头、尾巴扫入遮鼻、身体盘紧三个固定短镜；用箱沿前景遮住尾部连接处，锁定同一体型与光位，逐镜核对肢体数量，异常只重做该收束镜。";
+    }
     if (/AI生成质量|生成质量不确定|质量不确定|多次迭代/u.test(text)) {
       return "把高风险画面拆成固定机位短镜，逐镜锁定首帧、主体外观、光源方向和接触关系；每镜生成后检查结构、材质与连续性，失败只重做该镜，不整条管线重跑。";
     }
@@ -1441,6 +1453,22 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     }
     if (/钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(text)
       && !specificMitigations.some((item) => /钨丝|灯丝|起亮|由暗到亮|暗转亮/u.test(item))) {
+      return fallback(text);
+    }
+    if (/猫爪|爪心|爪尖|肉垫|爪形|多趾/u.test(text)
+      && !specificMitigations.some((item) => /猫爪|爪心|爪尖|肉垫|爪形|多趾/u.test(item))) {
+      return fallback(text);
+    }
+    if (/湿毛|毛发.*(?:干湿|连续|跳变)|干湿状态/u.test(text)
+      && !specificMitigations.some((item) => /湿毛|毛发.*(?:干湿|连续|跳变)|干湿状态/u.test(item))) {
+      return fallback(text);
+    }
+    if (/(?:猫头|纸箱).*(?:穿模|边界)|(?:箱沿|纸箱).*毛发/u.test(text)
+      && !specificMitigations.some((item) => /箱沿|纸箱.*遮挡|毛发穿模/u.test(item))) {
+      return fallback(text);
+    }
+    if (/蜷缩|肢体数量|尾巴.*(?:穿模|漂移)|盘成/u.test(text)
+      && !specificMitigations.some((item) => /蜷缩|肢体|尾巴/u.test(item))) {
       return fallback(text);
     }
     let best = "";
@@ -1762,6 +1790,7 @@ export function normalizeNarrativeDiscovery(
     return value
       .replace(/(?:画外音?|旁白)[^。；\n]*?[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
       .replace(/(?:画外音?|旁白)[^。；\n]*(?:一句|低语|台词)[^。；\n]*/gu, "")
+      .replace(/[^，。；\n]{0,24}(?:轻声)?台词\s*[「“][^」”]+[」”][^。；\n]*/gu, "")
       .replace(/[^，。；\n]{0,20}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
       .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
       .replace(/这(?:一)?句(?:几乎听不见的)?话/gu, "动作与环境声的停顿")
@@ -1926,6 +1955,29 @@ export function normalizeNarrativeDiscovery(
     ...(Array.isArray(scene.scenes) ? scene.scenes : []),
     scene.ending,
   ].map(recordValue).filter((node) => Object.keys(node).length > 0);
+  const requiredActions = extractNarrativeActions(discovery, upstream);
+  for (const action of requiredActions) {
+    if (nodes.some((node) => String(node.purpose ?? "").includes(action))) continue;
+    const actionPrefix = action.slice(0, Math.min(4, action.length));
+    if (actionPrefix.length >= 3 && nodes.some((node) => String(node.purpose ?? "").includes(actionPrefix))) continue;
+    const bigrams = (value: string): Set<string> => new Set(
+      value.match(/[\p{Script=Han}]{2}/gu) ?? [],
+    );
+    const actionGrams = bigrams(action);
+    const ranked = nodes.map((node) => {
+      const purposeGrams = bigrams(String(node.purpose ?? ""));
+      return {
+        node,
+        score: [...actionGrams].filter((gram) => purposeGrams.has(gram)).length,
+      };
+    }).sort((left, right) => right.score - left.score);
+    const target = ranked[0]?.node;
+    if (target) {
+      const purpose = String(target.purpose ?? "").trim();
+      target.purpose = `${purpose}${purpose ? "；" : ""}${action}`;
+      repairs.push({ code: "ACTION_COVERAGE_ADDED", detail: `把漏掉的动作“${action}”补入最相关场景` });
+    }
+  }
   const totalDuration = nodes
     .map((node) => Number(node.duration ?? 0))
     .reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
