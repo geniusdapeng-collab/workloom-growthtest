@@ -895,7 +895,7 @@
 
 | 命令 | 作用 | 产物 |
 |---|---|---|
-| `pnpm acceptance:profile:check` | 校验 profile v2 完整性与阈值下限 | 控制台 + 退出码 |
+| `pnpm --config.verify-deps-before-run=false acceptance:profile:check` | 校验 profile v2 完整性与阈值下限 | 控制台 + 退出码 |
 | `pnpm acceptance:matrix` | L0/L1 矩阵 | `outputs/acceptance/matrix/*` |
 | `pnpm acceptance:ui` | L3/L4 页面与入口探针 | `outputs/acceptance/ui/*` |
 | `pnpm acceptance:experience` | v2 走查（保留） | `outputs/acceptance/experience/*` |
@@ -1237,7 +1237,7 @@ T-01 门禁误伤内部写路径；T-02 按钮存在但点不动；T-03 控制�
 ```bash
 # 单仓一轮（示例）
 pnpm install
-pnpm acceptance:profile:check
+pnpm --config.verify-deps-before-run=false acceptance:profile:check
 pnpm preview:all
 pnpm acceptance:matrix    --out outputs/acceptance/matrix
 pnpm acceptance:ui        --out outputs/acceptance/ui

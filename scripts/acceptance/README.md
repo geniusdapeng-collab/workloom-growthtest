@@ -6,7 +6,7 @@
 ## 命令
 
 ```bash
-pnpm acceptance:profile:check     # 校验本仓 acceptance/profile.json（缺字段直接失败）
+pnpm --config.verify-deps-before-run=false acceptance:profile:check     # 校验本仓 acceptance/profile.json（缺字段直接失败）
 pnpm preview:all                  # 起真机（可用 profile.startup.command 覆盖）
 pnpm acceptance:matrix            # L0 契约层 + L1 运行层：员工/技能/围栏矩阵
 pnpm acceptance:ui                # L3 页面层：路由 + 岗位档案页 + 技能中心 + 控制台

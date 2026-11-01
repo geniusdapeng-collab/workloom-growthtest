@@ -855,7 +855,7 @@ function commandHandoff() {
       regression: card.regression?.command ?? null,
     })),
     acceptance_commands: [
-      "pnpm acceptance:profile:check",
+      "pnpm --config.verify-deps-before-run=false acceptance:profile:check",
       `node scripts/acceptance/fleet-run.mjs --repo ${repo} --env ${env}`,
       `node scripts/acceptance/fleet-run.mjs --repo ${repo} --env ${env} --live-only   # 生产最小侵入档`,
     ],

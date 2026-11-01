@@ -175,7 +175,7 @@
 - 失败/未验证退出码必须传给上层调用器，禁止报告写成功而流水线吞掉非零。
 【执行器】本阶段由 RDAS v3.1 承担：
   `node scripts/delivery/mine-clear.mjs handoff --ledger <台账>` →
-  `pnpm acceptance:profile:check` →
+  `pnpm --config.verify-deps-before-run=false acceptance:profile:check` →
   `node scripts/acceptance/fleet-run.mjs --repo {{repo}} --env {{档位}}`（生产最小侵入加 `--live-only`）
 【输出】《独立验收报告》，按 docs/acceptance/report-template.md 结构：
 验收结论（分级 + 一句话判定依据）/ 验收基本信息（三基线）/ 过程实录 / 通过项详表 /
