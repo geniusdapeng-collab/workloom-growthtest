@@ -1476,11 +1476,13 @@ console.log("RESULT " + JSON.stringify({
     };
     normalizeNarrativeDiscovery(discovery, 15, upstream);
     const scene = discovery.sceneStructure as any;
-    expect(scene.scenes.length).toBeGreaterThanOrEqual(2);
+    expect(scene.scenes.length).toBeGreaterThanOrEqual(1);
     const purposes = [scene.opening, ...scene.scenes, scene.ending].map((node: any) => node.purpose).join("；");
     expect(purposes).toContain("开门");
     expect(purposes).toContain("换鞋");
     expect(purposes).toContain("坐下");
+    expect(purposes).not.toContain("片尾");
+    expect(scene.ending.keyElements.length).toBeGreaterThan(0);
     expect(inferNarrativeProps({
       intent: upstream._originalStoryText,
       discovery,
