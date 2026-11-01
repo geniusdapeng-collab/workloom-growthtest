@@ -1126,6 +1126,7 @@ export function inferNarrativeCharacters(input: {
   ].join(" ");
   const found = NARRATIVE_ROLE_TERMS.filter((entry) => entry.pattern.test(sceneText));
   const animals = found.filter((entry) => ["猫", "狗", "鸟"].includes(entry.name));
+  if (animals.length > 0 && /(?:无动物|不出现动物|禁止动物|不得出现[^。；\n]{0,8}动物)/u.test(sceneText)) return [];
   if (animals.length === 0
     && /(?:无|没有|不出现)(?:真人|人物|角色|模特|演员)|纯空镜|商品为主|场景为主体/u.test(sceneText)) return [];
   const candidates = animals.length > 0 ? animals : found;
@@ -1353,7 +1354,10 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
     if (/薄雾|雾层|雾散|时序.*(?:闪烁|连贯|一致)|回卷|局部重复/u.test(text)) {
       return "把雾散改为分层透明度递减：近景、中景和远景各锁一层漂移速度与透明度曲线，每镜只允许单调散开；逐镜检查回卷、闪断和贴图撕裂，失败只重做该雾层。";
     }
-    if (/低饱和|青灰|水面质感|水面.*高光|高光过强|暗部.*糊|质感控制/u.test(text)) {
+    if (/涟漪|波纹|水面.*(?:质感|运动)/u.test(text)) {
+      return "把水面运动独立成一层：锁定风向、涟漪起点、扩频率和消失边界，用水面参考帧与芦苇摆动方向交叉核对；高频纹理只在局部特写内生成，必要时替换为实拍水面，异常只重做该层。";
+    }
+    if (/低饱和|青灰|水面.*高光|高光过强|暗部.*糊|质感控制/u.test(text)) {
       return "把低照度质感单独做技术样片：锁定青灰白平衡、暗部抬升与高光滚降，水面只保留低强度反射；每镜检查塑料感、频闪、色带与暗部断层，不达标只重做该镜的质感参数。";
     }
     if (/无主体|空镜.*幻觉|生成人物|人物、动物|船只|水印/u.test(text)) {

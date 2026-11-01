@@ -544,6 +544,11 @@ console.log("RESULT " + JSON.stringify({
       intent: "纯商品展示，商品为主体，不出现人物",
       discovery: { sceneStructure: { opening: { purpose: "商品静物空镜" } } },
     })).toEqual([]);
+    expect(inferNarrativeCharacters({
+      intent: "清晨湖面空镜，无动物，仅保留环境声",
+      discovery: { sceneStructure: { opening: { purpose: "一只飞鸟掠过，但硬性要求无动物" } } },
+      upstream: { special_notes: "禁止动物、飞鸟、船只和人物" },
+    })).toEqual([]);
   });
 
   it("叙事确认单归一：时间不越过总时长、场景计数含开场结尾、动作短语可执行", () => {
@@ -1267,7 +1272,7 @@ console.log("RESULT " + JSON.stringify({
     expect(pairs[1]).toContain("分层透明度");
     expect(pairs[2]).toContain("青灰");
     expect(pairs[3]).toContain("唯一负面清单");
-    expect(pairs[4]).toContain("风源");
+    expect(pairs[4]).toContain("水面运动");
     const markdown = normalizeNarrativeRequirementMarkdown([
       "### 2.4 对标参考",
       "- 《星际穿越》《布达佩斯大饭店》",
