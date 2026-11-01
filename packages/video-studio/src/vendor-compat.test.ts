@@ -969,6 +969,94 @@ console.log("RESULT " + JSON.stringify({
     expect(sceneStructure.scenes[0]!.purpose).not.toContain("观众会失去");
   });
 
+  it("无台词且明确无旁白时删除画外句，并把超时分镜按目标时长重投影", () => {
+    const discovery: Record<string, unknown> = {
+      audienceProfile: { contentExpectations: ["钉子台词在第50秒以旁白出现"] },
+      sceneStructure: {
+        opening: { purpose: "雨夜街口，橘猫从纸箱探头", duration: 6, keyElements: ["纸箱"] },
+        scenes: [
+          { purpose: "橘猫伸爪接屋檐滴水", duration: 6, keyElements: ["屋檐", "水滴"] },
+          { purpose: "橘猫缩回纸箱", duration: 9, keyElements: ["纸箱"] },
+        ],
+        ending: { purpose: "画外极轻一句“最后一滴，也算等过。”它盘成一团。", duration: 9, keyElements: ["橘猫"] },
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 15, {
+      _originalStoryText: "雨后夜晚，一只橘猫从纸箱探头，伸爪接水，最后坐回纸箱。无人物，无品牌，无字幕，无旁白。",
+      dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+    });
+    const scene = discovery.sceneStructure as any;
+    expect(scene.opening.duration + scene.scenes[0].duration + scene.scenes[1].duration + scene.ending.duration).toBeCloseTo(15, 3);
+    expect(scene.ending.purpose).not.toContain("画外");
+    expect(scene.ending.purpose).not.toContain("最后一滴");
+    expect((discovery.audienceProfile as any).contentExpectations[0]).toContain("站外转发文案");
+    expect(discovery._contractRepairs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "DISALLOWED_SPEECH_REMOVED" }),
+      expect.objectContaining({ code: "SCENE_DURATION_REBALANCED" }),
+      expect.objectContaining({ code: "EXTERNAL_COPY_SEPARATED" }),
+    ]));
+  });
+
+  it("无台词且未声明旁白时仍按全语音禁止处理", () => {
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { purpose: "人物推门", duration: 5 },
+        scenes: [],
+        ending: { purpose: "人物轻声说：“我回来了”", duration: 5 },
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 10, { dialogue_requirement: "无台词" });
+    expect(String((discovery.sceneStructure as any).ending.purpose)).not.toContain("我回来了");
+    expect(discovery._contractRepairs).toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "DISALLOWED_SPEECH_REMOVED" }),
+    ]));
+    const markdown = normalizeNarrativeRequirementMarkdown(
+      "01.【结尾】人物轻声说：“我回来了”",
+      discovery,
+      10,
+      { dialogue_requirement: "无台词" },
+    );
+    expect(markdown).not.toContain("我回来了");
+  });
+
+  it("动物是角色而非道具；探头、伸爪、缩回等动作进入可执行契约", () => {
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { purpose: "橘猫从纸箱探头", keyElements: ["纸箱"] },
+        scenes: [{ purpose: "橘猫伸爪接屋檐滴水", keyElements: ["水滴"] }],
+        ending: { purpose: "橘猫缩回纸箱盘成一团", keyElements: ["纸箱"] },
+      },
+      riskAssessment: { technicalRisks: [], mitigationSuggestions: [] },
+    };
+    const props = inferNarrativeProps({
+      intent: "雨后夜晚，一只橘猫从纸箱探头，伸爪接水，最后坐回纸箱。无人物，无品牌，无字幕，无旁白。",
+      discovery,
+    });
+    const actions = extractNarrativeActions(discovery);
+    expect(props).toContain("纸箱");
+    expect(props).not.toContain("动物");
+    expect(actions.some(action => action.startsWith("探头"))).toBe(true);
+    expect(actions.some(action => action.startsWith("伸爪"))).toBe(true);
+    expect(actions.some(action => action.startsWith("缩回"))).toBe(true);
+    const markdown = normalizeNarrativeRequirementMarkdown([
+      "**总时长**: 片尾（15秒内）",
+      "**开场** (6秒)",
+      "**场景 1** (6秒)",
+      "**场景 2** (9秒)",
+      "**结尾** (9秒)",
+      "- **动作**（1）：贴上骨上的绒毛",
+      "- **道具**（2）：动物、门",
+    ].join("\n"), discovery, 15, {
+      _originalStoryText: "雨后夜晚，一只橘猫从纸箱探头，伸爪接水，最后坐回纸箱。无人物，无品牌，无字幕，无旁白。",
+      dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+    });
+    expect(markdown).toContain("**总时长**: 15秒");
+    expect(markdown).not.toContain("贴上骨上的绒毛");
+    expect(markdown).not.toContain("- **道具**（2）：动物、门");
+    expect(markdown).toContain("探头");
+    expect(markdown).toContain("伸爪");
+  });
+
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
     const discovery = {
       sceneStructure: {
@@ -1119,7 +1207,7 @@ console.log("RESULT " + JSON.stringify({
     expect(result.renderedCharacters).toEqual([expect.objectContaining({ name: "年轻人", role: "protagonist" })]);
   }, 60_000);
 
-  it("无台词剧本在下游保持零台词，契约接受生产实际字符串 dialogue", () => {
+  it("无台词剧本在下游保持零口型台词，允许的旁白不被一并删除", () => {
     const script = `
 import { createRequire } from "node:module";
 import { installVendorDiscoveryNarrativeBridge } from ${JSON.stringify(resolve(here, "vendor-compat.ts"))};
@@ -1129,13 +1217,18 @@ const validatorMod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey
 const contractMod = require(${JSON.stringify(join(repoRoot, "vendor/supermickey/hyperreality-system/engines/production-engine/utils/agent-contract-validator.js"))});
 const uninstall = installVendorDiscoveryNarrativeBridge({ log: () => undefined });
 const generator = new generatorMod.ScriptGenerator({ llmEngine: null });
-generator._workloomNarrativePolicy = { dialogueAllowed: false, dialogueRequirement: "无台词；仅保留环境声" };
-const parsed = { structure: { scenes: [{ dialogue: { has_dialogue: true, lines: [{ speaker: "陈卓", text: "我回来了" }], blocks: [] }, narration: "旁白" }] } };
-generator._normalizeScenesDialogue(parsed, false);
+generator._workloomNarrativePolicy = {
+  dialogueAllowed: false,
+  voiceoverAllowed: true,
+  allSpeechForbidden: false,
+  dialogueRequirement: "全片无对白；结尾可加一句气声旁白“原来你还在”"
+};
+const parsed = { structure: { scenes: [{ dialogue: { has_dialogue: true, lines: [{ speaker: "陈卓", text: "我回来了" }], blocks: [] }, narration: "画外旁白：“原来你还在”" }] } };
+generator._normalizeScenesDialogue(parsed, true);
 const checker = new validatorMod.ScriptValidator();
 const checks = checker._checkDialogue({
-  structure: { scenes: [{ dialogue: { has_dialogue: false, lines: [], blocks: [] } }] },
-  meta: { target_duration: 30, _metadata: { dialogueRequirement: "无台词；仅保留环境声" } }
+  structure: { scenes: [{ dialogue: parsed.structure.scenes[0].dialogue }] },
+  meta: { target_duration: 30, _metadata: { dialogueRequirement: "全片无对白；结尾可加一句气声旁白“原来你还在”" } }
 });
 const hasDialogueCheck = checks.find(item => item.name === "has_dialogue");
 const contractCheck = new contractMod.AgentContractValidator().validate("phase1-phase2", {
@@ -1153,8 +1246,12 @@ console.log("RESULT " + JSON.stringify({
 }));
 `;
     const result = runInChild(script);
-    expect(result.dialogue).toEqual({ has_dialogue: false, lines: [], blocks: [] });
-    expect(result.narration).toBeNull();
+    expect(result.dialogue).toMatchObject({
+      has_dialogue: true,
+      lines: [expect.objectContaining({ speaker: "旁白", text: expect.stringContaining("原来你还在") })],
+      blocks: [expect.objectContaining({ speaker: "旁白", type: "narration" })],
+    });
+    expect(JSON.stringify(result.dialogue)).not.toContain("我回来了");
     expect(result.hasDialoguePassed).toBe(true);
     expect(String(result.hasDialogueMessage)).toContain("不适用");
     expect(result.contractDialogueAccepted).toBe(true);

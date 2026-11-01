@@ -49,6 +49,103 @@ describe("逐事实叶子的正文绑定", () => {
     expect(validateStageFacts("A1", value, [source]).claims).toHaveLength(3);
     value.payload.images[0].url = "https://other.example.com/fake.png"; expect(() => validateStageFacts("A1", value, [source])).toThrow("MARKETING_URL_UNVERIFIED");
   });
+  it("金额、币种和抓取时间分别有可回放证据", () => {
+    const priceBody = "星野 F3 商品价格 599 元，拍下立减 100 元。规格 9 档。";
+    const priceSource = { ...source, text: priceBody, textSha256: renderSha256(priceBody), bytes: Buffer.byteLength(priceBody) };
+    const payload = {
+      payload: {
+        identity: {
+          name: "星野 F3",
+          specs: { 风量: "9 档" },
+          prices: [{ amount: 599, currency: "CNY", source_url: priceSource.finalUrl }],
+        },
+        images: [],
+      },
+      citations: [
+        citation("/identity/name", "星野 F3"),
+        citation("/identity/specs/风量", "9 档"),
+        citation("/identity/prices/0/amount", "599"),
+        citation("/identity/prices/0/currency", "599"),
+      ],
+    };
+    const facts = validateStageFacts("A1", payload, [priceSource]);
+    const identity = facts.payload.identity as { prices: Array<Record<string, unknown>> };
+    expect(identity.prices[0]).toMatchObject({
+      amount: 599,
+      currency: "CNY",
+      observedAt: priceSource.fetchedAt,
+    });
+    const currencyClaim = facts.claims.find(claim => claim.pointer === "/identity/prices/0/currency")!;
+    expect(currencyClaim.quote).toContain("599");
+    expect(currencyClaim.quote).toContain("元");
+    expect(() => revalidateStageFacts(facts, [priceSource])).not.toThrow();
+  });
+  it("币种归一不能借用邻近其他价格的货币符号", () => {
+    const priceBody = "星野 F3 售价 599 美元；运费 100 元。规格 9 档。";
+    const priceSource = { ...source, text: priceBody, textSha256: renderSha256(priceBody), bytes: Buffer.byteLength(priceBody) };
+    const payload = {
+      payload: {
+        identity: {
+          name: "星野 F3",
+          specs: { 风量: "9 档" },
+          prices: [{ amount: 599, currency: "CNY", source_url: priceSource.finalUrl }],
+        },
+        images: [],
+      },
+      citations: [
+        citation("/identity/name", "星野 F3"),
+        citation("/identity/specs/风量", "9 档"),
+        citation("/identity/prices/0/amount", "599 美元"),
+        citation("/identity/prices/0/currency", "599 美元"),
+      ],
+    };
+    expect(() => validateStageFacts("A1", payload, [priceSource]))
+      .toThrow("MARKETING_CLAIM_UNSUPPORTED_NORMALIZATION");
+  });
+  it("价格引证必须和 source_url 指向同一来源", () => {
+    const otherBody = "星野 F3 商品价格 599 元。";
+    const otherSource = {
+      ...source,
+      sourceId: "SRC-2",
+      requestedUrl: "https://other.example.com/f3",
+      finalUrl: "https://other.example.com/f3",
+      text: otherBody,
+      textSha256: renderSha256(otherBody),
+      bytes: Buffer.byteLength(otherBody),
+    };
+    const payload = fixture();
+    Object.assign(payload.payload.identity, {
+      prices: [{ amount: 399, currency: "CNY", source_url: source.finalUrl }],
+    });
+    payload.citations.push(
+      citation("/identity/prices/0/amount", "399 CNY"),
+      { ...citation("/identity/prices/0/currency", "399 CNY"), sourceId: otherSource.sourceId },
+    );
+    expect(() => validateStageFacts("A1", payload, [source, otherSource]))
+      .toThrow("MARKETING_PRICE_SOURCE_MISMATCH");
+  });
+  it("同源折扣文案不能让价格金额借用其单位", () => {
+    const priceBody = "{\"name\":\"星野 F3\",\"price\":\"599\",\"market_price\":\"699\",\"reduce_price\":\"直降100元\",\"spec\":\"9 档\"}";
+    const priceSource = { ...source, text: priceBody, textSha256: renderSha256(priceBody), bytes: Buffer.byteLength(priceBody) };
+    const payload = {
+      payload: {
+        identity: {
+          name: "星野 F3",
+          specs: { 风量: "9 档" },
+          prices: [{ amount: 599, currency: "元", source_url: priceSource.finalUrl }],
+        },
+        images: [],
+      },
+      citations: [
+        citation("/identity/name", "星野 F3"),
+        citation("/identity/specs/风量", "9 档"),
+        citation("/identity/prices/0/amount", "\"price\":\"599\""),
+        citation("/identity/prices/0/currency", "直降100元"),
+      ],
+    };
+    expect(() => validateStageFacts("A1", payload, [priceSource]))
+      .toThrow("MARKETING_CLAIM_UNSUPPORTED_NORMALIZATION");
+  });
   it.each(["value", "offset", "hash", "status"])("已保存%s变化复读必须拒绝", kind => {
     const facts: any = validateStageFacts("A1", fixture(), [source]);
     if (kind === "value") facts.claims[0].value = "changed";

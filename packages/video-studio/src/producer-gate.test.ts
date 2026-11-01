@@ -212,11 +212,29 @@ describe("AI producer evidence gate", () => {
     }
   });
 
-  it("invalid shape and score are unverified without a repair call", async () => {
+  it("valid JSON with unsafe field semantics fails closed without a repair call", async () => {
+    const bodies: string[] = [];
+    const fetchImpl = (async (_url: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+      bodies.push(String(init?.body));
+      return new Response(JSON.stringify({
+        id: "unsafe-shape",
+        model: "deepseek-flash",
+        choices: [{
+          finish_reason: "stop",
+          message: { content: JSON.stringify({ approved: true, score: 85, issues: "需要修复", suggestions: [false] }) },
+        }],
+        usage: { prompt_tokens: 100, completion_tokens: 30, total_tokens: 130 },
+      }));
+    }) as typeof fetch;
+    const verdict = await reviewStage(textOptions({ fetchImpl }));
+    expect(verdict).toMatchObject({ approved: false, status: "unverified" });
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("invalid score and impossible shape still fail closed without schema repair", async () => {
     for (const answer of [
       { ...good, score: 101 },
       { ...good, score: null },
-      { ...good, suggestions: [false] },
       [],
       null,
     ]) {

@@ -500,6 +500,7 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         timeoutMs: 600_000,
         temperature: 0.2,
         retries: 0,
+        responseFormat: { type: "json_object" },
       });
       receipts.push({
         modelId: result.modelId,
@@ -515,16 +516,27 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
         registryVersion: result.registryVersion,
       });
       let json: unknown;
+      let parseError: unknown = null;
       try {
         json = parseJudgeJson(result.text);
-      } catch (parseError) {
+      } catch (error) {
+        parseError = error;
+      }
+      let normalizedResult = parseError ? null : coerceJudgeResult(json);
+      if (!parseError && !normalizedResult) {
+        throw new Error("评审结果结构或语义非法；合法 JSON 不做语义重写，必须重新评审");
+      }
+      if (parseError) {
         const malformed = result.text.slice(0, 80_000);
-        log(`[producer][${stage}] 评审 JSON 非法，执行一次仅修复格式的重试：${parseError instanceof Error ? parseError.message : String(parseError)}`);
+        const issue = parseError instanceof Error ? parseError.message : String(parseError);
+        log(`[producer][${stage}] 评审 JSON 语法非法，执行一次仅修复语法与字段结构的重试：${issue}`);
         result = await provider.chat([{
           role: "user",
           content: [
-            "仅修复 JSON，不得重新判定，不得改变 approved、score、issues、suggestions 或 reason 的语义。",
-            "只输出一个可被 JSON.parse 直接解析的对象。",
+            "仅修复 JSON 的语法和字段结构，不得重新判定证据，不得改变 approved、score、issues、suggestions 或 reason 的语义。",
+            "只输出一个可被 JSON.parse 直接解析的对象，且严格满足：",
+            '{"approved":true|false,"score":0-100,"issues":[],"suggestions":[],"reason":"结论"}',
+            "issues 和 suggestions 必须是字符串数组；approved 必须是布尔值；score 必须是数字。",
             "<malformed_result>",
             malformed,
             "</malformed_result>",
@@ -550,8 +562,8 @@ export async function reviewStage(options: ProducerGateOptions): Promise<Produce
           registryVersion: result.registryVersion,
         });
         json = parseJudgeJson(result.text);
+        normalizedResult = coerceJudgeResult(json);
       }
-      const normalizedResult = coerceJudgeResult(json);
       if (!normalizedResult) throw new Error("评审结果结构非法");
       answers.push(normalizedResult);
     }

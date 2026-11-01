@@ -10,7 +10,7 @@ const factValue = z.union([text, z.number().finite(), z.boolean()]);
 const point = z.object({ point: text, source_url: url, channel: z.string().max(200).optional() }).strict();
 const a1 = z.object({ identity: z.object({ name: text, brand: text.optional(), category: text.optional(), model: text.optional(),
   specs: z.record(z.string().min(1).max(100), factValue).default({}),
-  prices: z.array(z.object({ amount: z.number().finite().nonnegative(), currency: z.string().min(1).max(10), note: text.optional(), source_url: url }).strict()).max(30).default([]),
+  prices: z.array(z.object({ amount: z.number().finite().nonnegative(), currency: z.string().min(1).max(10), note: text.optional(), observedAt: z.string().datetime().optional(), source_url: url }).strict()).max(30).default([]),
   official_selling_points: z.array(point).max(30).default([]),
 }).strict(), images: z.array(z.object({ url, page_url: url, source: z.string().max(200).optional(), angle: text.optional() }).strict()).max(20).default([]),
   inferred_notes: z.array(z.unknown()).max(0).optional(),
@@ -44,7 +44,53 @@ export function assertMarketingFactsFresh(collectedAt: string, now = Date.now())
 }
 
 const escapePointer = (value: string) => value.replace(/~/g, "~0").replace(/\//g, "~1");
-const sourceFields = new Set(["url", "source_url", "page_url", "price_source_url", "visual_source_url", "source", "channel", "suspect"]);
+const sourceFields = new Set(["url", "source_url", "page_url", "price_source_url", "visual_source_url", "source", "channel", "suspect", "observedAt"]);
+function currencyEvidence(
+  sourceText: string,
+  quoteStart: number,
+  quoteEnd: number,
+  amount: number,
+  currency: string,
+): { quoteStart: number; quoteEnd: number } | null {
+  const normalized = currency.toUpperCase();
+  const aliases = normalized === "CNY" || normalized === "RMB"
+    ? ["CNY", "RMB", "人民币", "元", "￥", "¥"]
+    : normalized === "USD"
+      ? ["USD", "美元", "US$", "$"]
+      : [currency];
+  const amountText = Number.isInteger(amount) ? String(amount) : String(amount);
+  const escaped = amountText.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const amountPattern = new RegExp(`(?<![\\d.])${escaped}(?:\\.0+)?(?![\\d.])`, "u");
+  const quotedAmount = amountPattern.exec(sourceText.slice(quoteStart, quoteEnd));
+  if (!quotedAmount) return null;
+  const amountStart = quoteStart + quotedAmount.index;
+  const amountEnd = amountStart + quotedAmount[0].length;
+  const windowStart = Math.max(0, amountStart - 48);
+  const windowEnd = Math.min(sourceText.length, amountEnd + 48);
+  const candidates: Array<{ index: number; length: number; gap: string; distance: number }> = [];
+  for (const alias of aliases) {
+    for (let index = sourceText.indexOf(alias, windowStart); index >= 0 && index < windowEnd;
+      index = sourceText.indexOf(alias, index + alias.length)) {
+      if (alias === "元" && /[美日欧港澳韩加]/u.test(sourceText[index - 1] ?? "")) continue;
+      const gap = index >= amountEnd
+        ? sourceText.slice(amountEnd, index)
+        : sourceText.slice(index + alias.length, amountStart);
+      if (gap.length > 24 || /[0-9；;\n]/u.test(gap)) continue;
+      candidates.push({
+        index,
+        length: alias.length,
+        gap,
+        distance: index >= amountEnd ? index - amountEnd : amountStart - (index + alias.length),
+      });
+    }
+  }
+  const best = candidates.sort((left, right) => left.distance - right.distance)[0];
+  if (!best) return null;
+  return {
+    quoteStart: Math.min(quoteStart, best.index),
+    quoteEnd: Math.max(quoteEnd, best.index + best.length),
+  };
+}
 function factLeaves(value: unknown, pointer = "", out = new Map<string, string | number | boolean>()): Map<string, string | number | boolean> {
   if (Array.isArray(value)) value.forEach((entry, i) => factLeaves(entry, `${pointer}/${i}`, out));
   else if (value && typeof value === "object") for (const [key, entry] of Object.entries(value)) {
@@ -63,22 +109,75 @@ export function validateStageFacts(stage: IntelStage, raw: unknown, sources: Sou
   const payload = stagePayloadShape(stage, extraction.payload);
   const sourceMap = new Map(sources.map(source => [source.sourceId, source]));
   if (sourceMap.size !== sources.length) throw new Error("MARKETING_SOURCE_INVALID：来源ID重复");
+  if (stage === "A1") {
+    const identity = payload.identity as { prices?: Array<Record<string, unknown>> };
+    const actualUrls = new Map(sources.flatMap(source => [[source.requestedUrl, source], [source.finalUrl, source]] as const));
+    const citations = new Map(extraction.citations.map(citation => [citation.pointer, citation]));
+    for (const [index, price] of (identity.prices ?? []).entries()) {
+      const source = typeof price.source_url === "string" ? actualUrls.get(price.source_url) : undefined;
+      if (source) price.observedAt = source.fetchedAt;
+      const amountCitation = citations.get(`/identity/prices/${index}/amount`);
+      const currencyCitation = citations.get(`/identity/prices/${index}/currency`);
+      if (amountCitation && currencyCitation && amountCitation.sourceId !== currencyCitation.sourceId) {
+        throw new Error("MARKETING_PRICE_SOURCE_MISMATCH：同一价格的金额与币种必须引用同一来源");
+      }
+      if (source) {
+        for (const field of ["amount", "currency", "note"]) {
+          const citation = citations.get(`/identity/prices/${index}/${field}`);
+          if (citation && citation.sourceId !== source.sourceId) {
+            throw new Error(`MARKETING_PRICE_SOURCE_MISMATCH：价格${field}引证与source_url不是同一来源`);
+          }
+        }
+      }
+    }
+  }
   const leaves = factLeaves(payload); const covered = new Set<string>(); const claims: ClaimEvidence[] = [];
   for (const citation of extraction.citations) {
     if (!leaves.has(citation.pointer) || covered.has(citation.pointer)) throw new Error(`MARKETING_CITATION_INVALID：主张路径不存在或重复 ${citation.pointer}`);
     const source = sourceMap.get(citation.sourceId);
     if (!source) throw new Error("MARKETING_CITATION_INVALID：主张引用了未知来源");
     if (renderSha256(source.text) !== source.textSha256) throw new Error("MARKETING_FACTS_CHANGED：主张引用的正文摘要已变化");
-    const quoteStart = source.text.indexOf(citation.quote);
+    let quote = citation.quote;
+    let quoteStart = source.text.indexOf(quote);
     if (quoteStart < 0) throw new Error("MARKETING_CITATION_INVALID：引文不是保存正文的连续原文");
+    let quoteEnd = quoteStart + quote.length;
     const value = leaves.get(citation.pointer)!;
+    /**
+     * 归一值需要可回放的证据扩展。例如原文只写“价格 599 元”时，金额和 CNY
+     * 来自同一有限窗口；不能要求正文出现系统内部枚举字符串“CNY”。
+     */
+    if (/^\/identity\/prices\/\d+\/currency$/u.test(citation.pointer)) {
+      const priceIndex = Number(citation.pointer.split("/")[3]);
+      const identity = payload.identity as { prices?: Array<Record<string, unknown>> };
+      const amount = Number(identity.prices?.[priceIndex]?.amount);
+      if (!Number.isFinite(amount)) throw new Error("MARKETING_CLAIM_UNSUPPORTED_NORMALIZATION：币种归一缺少同一价格金额");
+      const amountCitation = extraction.citations.find((item) => item.pointer === `/identity/prices/${priceIndex}/amount`);
+      if (!amountCitation) throw new Error("MARKETING_CLAIM_UNSUPPORTED_NORMALIZATION：币种归一缺少同一价格金额引文");
+      const amountStart = source.text.indexOf(amountCitation.quote);
+      if (amountStart < 0) throw new Error("MARKETING_CITATION_INVALID：金额引文不是保存正文的连续原文");
+      const evidence = currencyEvidence(
+        source.text,
+        amountStart,
+        amountStart + amountCitation.quote.length,
+        amount,
+        String(value),
+      );
+      if (!evidence) throw new Error("MARKETING_CLAIM_UNSUPPORTED_NORMALIZATION：金额归一币种缺少同一价格窗口内的币种证据");
+      const evidenceQuote = source.text.slice(evidence.quoteStart, evidence.quoteEnd);
+      if (!evidenceQuote.includes(citation.quote)) {
+        throw new Error("MARKETING_CLAIM_UNSUPPORTED_NORMALIZATION：币种引文不属于同一价格证据窗口");
+      }
+      quoteStart = evidence.quoteStart;
+      quoteEnd = evidence.quoteEnd;
+      quote = evidenceQuote;
+    }
     if (stage === "A2" && /^\/reviews\/\d+\/text$/.test(citation.pointer) && (typeof value !== "string" || !citation.quote.includes(value))) {
       throw new Error("MARKETING_REVIEW_PARAPHRASED：用户评价必须保留原话，不能改写后宣称引文");
     }
     covered.add(citation.pointer);
-    claims.push({ claimId: `CL-${renderSha256(canonicalRenderJson({ stage, pointer: citation.pointer, value, sourceId: source.sourceId, quote: citation.quote })).slice(0, 24)}`,
+    claims.push({ claimId: `CL-${renderSha256(canonicalRenderJson({ stage, pointer: citation.pointer, value, sourceId: source.sourceId, quote })).slice(0, 24)}`,
       stage, pointer: citation.pointer, value, sourceId: source.sourceId, textSha256: source.textSha256,
-      quote: citation.quote, quoteStart, quoteEnd: quoteStart + citation.quote.length, status: "source-bound" });
+      quote, quoteStart, quoteEnd, status: "source-bound" });
   }
   const missing = [...leaves.keys()].filter(pointer => !covered.has(pointer));
   if (missing.length) throw new Error(`MARKETING_CLAIM_UNSOURCED：${stage} 缺少逐项原文引用 ${missing.join(",")}`);

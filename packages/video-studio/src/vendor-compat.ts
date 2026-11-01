@@ -1136,7 +1136,30 @@ export function inferNarrativeCharacters(input: {
   return [...unique.values()];
 }
 
-const NARRATIVE_ACTION_PATTERN = /(摸索|摸向|摸到|碰到|触碰|擦过|擦拭|打滑|扫过|滑落|对准|插入|拧亮|被拧|拧动|拧|旋动|按压|按下|按动|压(?=开关|按钮|下|住|向|在)|磕出|贴上|贴在|推开|打开|关闭|走到|走进|拿起|放下|放到|举起|塌下|看向|抚摸|收伞|抖落|摸黑|贴住)/gu;
+function narrativeSpeechPolicy(value: unknown): {
+  noLipSyncDialogue: boolean;
+  voiceoverMentioned: boolean;
+  voiceoverDenied: boolean;
+  voiceoverAllowed: boolean;
+  dialogueAllowed: boolean;
+  allSpeechForbidden: boolean;
+} {
+  const text = String(value ?? "");
+  const noLipSyncDialogue = /(?:无.{0,2}台词|无对白|不建议加对白|不做口型|纯画面无对白)/u.test(text);
+  const voiceoverMentioned = /(?:旁白|画外音|画外)/u.test(text);
+  const voiceoverDenied = /(?:禁止|不要|不加|不添加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)|(?:无|没有|零)(?:旁白|画外音|画外)/u.test(text);
+  const voiceoverAllowed = voiceoverMentioned && !voiceoverDenied;
+  return {
+    noLipSyncDialogue,
+    voiceoverMentioned,
+    voiceoverDenied,
+    voiceoverAllowed,
+    dialogueAllowed: !noLipSyncDialogue && !voiceoverDenied,
+    allSpeechForbidden: voiceoverDenied || (noLipSyncDialogue && !voiceoverAllowed),
+  };
+}
+
+const NARRATIVE_ACTION_PATTERN = /(摸索|摸向|摸到|碰到|触碰|擦过|擦拭|打滑|扫过|滑落|对准|插入|拧亮|被拧|拧动|拧|旋动|按压|按下|按动|压(?=开关|按钮|下|住|向|在)|磕出|贴上|贴在|推开|打开|关闭|走到|走进|拿起|放下|放到|举起|塌下|看向|抚摸|收伞|抖落|摸黑|贴住|探头|伸出|伸爪|接水|缩回|蜷缩|盘成|坐回|舔|蹭|跃过|跑过|回头|抬头|低头|奔跑|慢跑|沿河|停下|转身|跳到|钻回|探出)/gu;
 
 export function extractNarrativeActions(
   discovery: Record<string, unknown>,
@@ -1173,7 +1196,9 @@ export function extractNarrativeActions(
         .replace(/旧|老旧/gu, "")
         .replace(/灯罩(?:上|下)?/gu, "灯罩")
         .replace(/贴在/u, "贴上");
-      if (phrase.length >= 2 && !actionKeys.has(key)) {
+      const malformed = /(?:绒毛|骨上|undefined|null|未标注|关键词|标签|对象|待补|省略)/iu.test(phrase)
+        || /^[\d\s，。；、：]/u.test(phrase);
+      if (phrase.length >= 2 && !malformed && !actionKeys.has(key)) {
         actionKeys.add(key);
         actions.push(phrase);
       }
@@ -1223,8 +1248,11 @@ export function inferNarrativeProps(input: {
     { pattern: /纸箱/gu, name: "纸箱" },
     { pattern: /(?:纸船|纸条|照片|信封)/gu, name: "纸质道具" },
     { pattern: /(?:自行|公交|列|汽|火)车/gu, name: "车" },
-    { pattern: /(?:猫|狗|鸟|宠物)/gu, name: "动物" },
     { pattern: /(?:陶器|瓷器|文物|石碑|石桥|桥)/gu, name: "场景器物" },
+    { pattern: /(?:便利店)?灯箱/gu, name: "灯箱" },
+    { pattern: /屋檐|檐口/gu, name: "屋檐" },
+    { pattern: /积水|水洼/gu, name: "积水" },
+    { pattern: /水滴|水珠/gu, name: "水滴" },
   ];
   const props: string[] = [];
   for (const term of terms) {
@@ -1356,6 +1384,27 @@ export function normalizeNarrativeRequirementMarkdown(
     .replace(/\bundefined\b/giu, "未标注")
     .replace(/\bnull\b/giu, "未标注");
   if (Number.isFinite(duration) && duration > 0) {
+    normalized = normalized
+      .replace(/\*\*总时长\*\*:\s*[^\n]+/u, `**总时长**: ${duration}秒`);
+    const openingDuration = Number(recordValue(scene.opening).duration ?? 0);
+    if (openingDuration > 0) {
+      normalized = normalized.replace(/\*\*开场\*\*\s*\([^)]*秒\)/u, `**开场** (${openingDuration}秒)`);
+    }
+    if (Array.isArray(scene.scenes)) {
+      scene.scenes.forEach((item, index) => {
+        const sceneDuration = Number(recordValue(item).duration ?? 0);
+        if (sceneDuration > 0) {
+          normalized = normalized.replace(
+            new RegExp(`\\*\\*场景\\s*${index + 1}\\s*\\*\\*\\s*\\([^)]*秒\\)`, "u"),
+            `**场景 ${index + 1}** (${sceneDuration}秒)`,
+          );
+        }
+      });
+    }
+    const endingDuration = Number(recordValue(scene.ending).duration ?? 0);
+    if (endingDuration > 0) {
+      normalized = normalized.replace(/\*\*结尾\*\*\s*\([^)]*秒\)/u, `**结尾** (${endingDuration}秒)`);
+    }
     normalized = normalized.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, value: string) =>
       Number(value) > duration ? `片尾（${duration}秒内）` : whole);
   }
@@ -1427,6 +1476,12 @@ export function normalizeNarrativeRequirementMarkdown(
       (line) => `${line}\n- **台词/字幕口径**：${dialogue}`,
     );
   }
+  if (narrativeSpeechPolicy(dialogue).allSpeechForbidden) {
+    normalized = normalized
+      .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, "仅保留人物动作与画外环境声。")
+      .replace(/[^。；\n]{0,24}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’][。；]?/gu, "以动作与环境声完成回应。")
+      .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。");
+  }
   return normalized;
 }
 
@@ -1436,16 +1491,24 @@ export function normalizeNarrativeDiscovery(
   upstream: Record<string, unknown> = {},
 ): void {
   const dialoguePolicy = String(upstream.dialogue_requirement ?? "");
-  const canonicalDialogue = dialoguePolicy.match(
-    /(?:旁白|画外音|人声)[^。；\n]{0,24}?[“"'‘]([^”"'’]+)[”"'’]/u,
-  )?.[1]?.trim()
-    ?? dialoguePolicy.match(/气声[^。；\n]{0,24}?[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
-    ?? dialoguePolicy.match(/[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
-    ?? null;
-  const noLipSyncDialogue = /(?:无.{0,2}台词|无对白|不建议加对白|不做口型)/u.test(dialoguePolicy);
-  const voiceoverMentioned = /(?:旁白|画外音|画外)/u.test(dialoguePolicy);
-  const voiceoverDenied = /(?:禁止|不要|不加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)/u.test(dialoguePolicy);
-  const voiceoverAllowed = voiceoverMentioned && !voiceoverDenied;
+  const speech = narrativeSpeechPolicy(dialoguePolicy);
+  const { noLipSyncDialogue, voiceoverAllowed, dialogueAllowed, allSpeechForbidden: speechFullyForbidden } = speech;
+  const canonicalDialogue = dialogueAllowed || voiceoverAllowed
+    ? dialoguePolicy.match(/(?:旁白|画外音|人声|气声)[^。；\n]{0,24}?[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
+      ?? dialoguePolicy.match(/[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
+      ?? null
+    : null;
+  const repairs: Array<{ code: string; detail: string }> = [];
+  const stripDisallowedSpeech = (value: string): string => {
+    if (!speechFullyForbidden) return value;
+    return value
+      .replace(/(?:画外音?|旁白)[^。；\n]*?[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
+      .replace(/(?:画外音?|旁白)[^。；\n]*(?:一句|低语|台词)[^。；\n]*/gu, "")
+      .replace(/[^，。；\n]{0,20}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
+      .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
+      .replace(/^[\s，,；;。]+/u, "")
+      .replace(/[\s，,；;]+$/u, "");
+  };
   const cleanPurpose = (value: unknown): string => {
     const original = String(value ?? "");
     let text = original
@@ -1460,22 +1523,26 @@ export function normalizeNarrativeDiscovery(
       .replace(/最后记住[：:]?/gu, "")
       .trim();
     if (text.replace(/[\s，。；、：]/gu, "").length < 4) text = original;
-    if (noLipSyncDialogue) {
-      if (voiceoverAllowed) {
-        text = text.replace(
-          /[\u4e00-\u9fff]{0,8}(?:轻声|低声|开口)?说[：:]?\s*([“"'‘][^”"'’]+[”"'’])/gu,
-          `画外旁白：$1`,
-        );
-      } else {
-        text = text.replace(
-          /[^，。；\n]{0,12}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu,
-          "以动作与环境声回应",
-        );
+    if (noLipSyncDialogue && voiceoverAllowed) {
+      const converted = text.replace(
+        /[\u4e00-\u9fff]{0,8}(?:轻声|低声|开口)?说[：:]?\s*([“"'‘][^”"'’]+[”"'’])/gu,
+        (_all, quoted: string) => `画外旁白：${canonicalDialogue ? `“${canonicalDialogue}”` : quoted}`,
+      );
+      if (converted !== text) {
+        repairs.push({ code: "LIP_SYNC_DIALOGUE_CONVERTED_TO_VOICEOVER", detail: "把口型台词改为合同允许的画外旁白" });
       }
+      text = converted;
+    } else if (speechFullyForbidden) {
+      const stripped = stripDisallowedSpeech(text);
+      if (stripped !== text) repairs.push({ code: "DISALLOWED_SPEECH_REMOVED", detail: "移除与无台词/无旁白合同冲突的台词或旁白" });
+      text = stripped;
     }
     if (Number.isFinite(duration) && duration > 0) {
       text = text.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole);
+    }
+    if (text.replace(/[\s，。；、：]/gu, "").length < 4) {
+      text = "以动作与画外环境声完成情绪转折";
     }
     return text;
   };
@@ -1497,19 +1564,53 @@ export function normalizeNarrativeDiscovery(
     node.purpose = cleanPurpose(node.purpose);
   }
   if (Array.isArray(scene.scenes)) scene.sceneCount = scene.scenes.length;
-  const totalDuration = [
-    scene.opening && typeof scene.opening === "object" ? Number((scene.opening as Record<string, unknown>).duration ?? 0) : 0,
-    ...(Array.isArray(scene.scenes)
-      ? scene.scenes.map((item) => Number(recordValue(item).duration ?? 0))
-      : []),
-    scene.ending && typeof scene.ending === "object" ? Number((scene.ending as Record<string, unknown>).duration ?? 0) : 0,
-  ].reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
-  if (totalDuration > 0) scene.totalDuration = totalDuration;
-  else if (Number.isFinite(duration) && duration > 0) scene.totalDuration = duration;
+  const nodes = [
+    scene.opening,
+    ...(Array.isArray(scene.scenes) ? scene.scenes : []),
+    scene.ending,
+  ].map(recordValue).filter((node) => Object.keys(node).length > 0);
+  const totalDuration = nodes
+    .map((node) => Number(node.duration ?? 0))
+    .reduce((sum, value) => sum + (Number.isFinite(value) ? value : 0), 0);
+  if (Number.isFinite(duration) && duration > 0 && nodes.length > 0 && totalDuration > 0
+    && Math.abs(totalDuration - duration) > 0.001) {
+    let assigned = 0;
+    nodes.forEach((node, index) => {
+      const base = Math.max(0, Number(node.duration ?? 0));
+      const next = index === nodes.length - 1
+        ? Number((duration - assigned).toFixed(3))
+        : Number((base / totalDuration * duration).toFixed(3));
+      node.duration = next;
+      assigned += next;
+    });
+    repairs.push({ code: "SCENE_DURATION_REBALANCED", detail: `${totalDuration}s 按比例投影到目标 ${duration}s` });
+  }
+  scene.totalDuration = Number.isFinite(duration) && duration > 0 ? duration : totalDuration;
+  if (Number.isFinite(duration) && duration > 0) {
+    const audience = recordValue(discovery.audienceProfile);
+    if (Array.isArray(audience.contentExpectations)) {
+      audience.contentExpectations = (audience.contentExpectations as unknown[]).map((item) => {
+        const text = String(item);
+        if (speechFullyForbidden
+          && /(?:钉子台词|片内台词|画外旁白|人声|口播)/u.test(text)) {
+          repairs.push({ code: "EXTERNAL_COPY_SEPARATED", detail: "把可转发文案移出成片台词/字幕合同" });
+          return "站外转发文案候选仅用于发布文案，不进入成片，不生成字幕、旁白或口播。";
+        }
+        return stripDisallowedSpeech(text);
+      });
+      discovery.audienceProfile = audience;
+    }
+  }
   const normalizeText = (item: string): string => {
     let text = item
       .replace(/\bundefined\b/giu, "未标注")
       .replace(/\bnull\b/giu, "未标注");
+    if (noLipSyncDialogue && voiceoverAllowed) {
+      text = text.replace(
+        /[\u4e00-\u9fff]{0,8}(?:轻声|低声|开口)?说[：:]?\s*([“"'‘][^”"'’]+[”"'’])/gu,
+        (_all, quoted: string) => `画外旁白：${canonicalDialogue ? `“${canonicalDialogue}”` : quoted}`,
+      );
+    }
     if (canonicalDialogue && /(?:台词|人声|气声|旁白|画外|轻声说|低声说|说[：:]?\s*[“"'‘])/u.test(text)) {
       text = text.replace(/[“"'‘][^”"'’]+[”"'’]/gu, `“${canonicalDialogue}”`);
       text = text.replace(/(“[^”]+”|‘[^’]+’)\s*或\s*\1/gu, "$1");
@@ -1518,6 +1619,7 @@ export function normalizeNarrativeDiscovery(
       text = text.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole);
     }
+    if (speechFullyForbidden) text = stripDisallowedSpeech(text);
     return text;
   };
   const visit = (value: unknown): void => {
@@ -1540,6 +1642,8 @@ export function normalizeNarrativeDiscovery(
     }
   };
   visit(discovery);
+  discovery._contractRepairs = repairs.filter((item, index, list) =>
+    list.findIndex((candidate) => candidate.code === item.code && candidate.detail === item.detail) === index);
 }
 
 function recordValue(value: unknown): Record<string, unknown> {
@@ -1589,12 +1693,8 @@ function subtitleContract(upstream: Record<string, unknown>): Record<string, unk
   if (/(?:软字幕|SRT|srt|字幕文件)/u.test(policyText)) {
     return { mode: "sidecar", burned: false, sidecar: true };
   }
-  const noDialogue = /(?:无.{0,2}台词|无对白)/u.test(policyText);
-  const voiceoverDenied = /(?:禁止|不要|不加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)/u.test(policyText);
-  if (noDialogue && !/(?:旁白|画外音|画外)/u.test(policyText.replace(/(?:禁止|不要|不加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)/gu, ""))) {
-    return { mode: "none", burned: false, sidecar: false };
-  }
-  if (noDialogue && voiceoverDenied) {
+  const speech = narrativeSpeechPolicy(policyText);
+  if (speech.allSpeechForbidden) {
     return { mode: "none", burned: false, sidecar: false };
   }
   return { mode: "unverified", burned: false, sidecar: false };
@@ -1723,23 +1823,30 @@ function rebalanceSceneDurations(scenePlan: Record<string, unknown>, target: num
   return target;
 }
 
-function sanitizePrdText(value: unknown, duration: number): unknown {
+function sanitizePrdText(value: unknown, duration: number, speechForbidden = false): unknown {
   if (typeof value === "string") {
-    return value
+    let text = value
       .replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole)
       .replace(/\bundefined\b/giu, "未标注")
       .replace(/\bnull\b/giu, "未标注");
+    if (speechForbidden) {
+      text = text
+        .replace(/[^。；\n]{0,30}(?:画外旁白|画外音|旁白)[^。；\n]*[。；]?/gu, "仅保留人物动作与画外环境声。")
+        .replace(/[^。；\n]{0,24}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’][。；]?/gu, "以动作与环境声完成回应。")
+        .replace(/钉子台词[^。；\n]*[。；]?/gu, "站外转发文案不进入成片。");
+    }
+    return text;
   }
   if (Array.isArray(value)) {
     return value
       .filter((item) => !(typeof item === "string"
         && /^(?:用户要求|二选一|风险结论摘要补齐|统一字数口径|请(?:补充|删除|统一|修正|明确|按))/u.test(item.trim())))
-      .map((item) => sanitizePrdText(item, duration));
+      .map((item) => sanitizePrdText(item, duration, speechForbidden));
   }
   if (value && typeof value === "object") {
     const record = value as Record<string, unknown>;
-    for (const [key, item] of Object.entries(record)) record[key] = sanitizePrdText(item, duration);
+    for (const [key, item] of Object.entries(record)) record[key] = sanitizePrdText(item, duration, speechForbidden);
   }
   return value;
 }
@@ -1856,6 +1963,12 @@ export function normalizeNarrativePrdContract(
   const scenePlan = recordValue(prd.scenePlan);
   rebalanceSceneDurations(scenePlan, duration);
   prd.scenePlan = scenePlan;
+  const dialoguePolicy = [
+    upstream.dialogue_requirement,
+    upstream.special_notes,
+    upstream.subtitle_policy,
+  ].map(String).join(" ");
+  const speechForbidden = narrativeSpeechPolicy(dialoguePolicy).allSpeechForbidden;
 
   const canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
     ? discovery._canonicalCharacters.map(recordValue)
@@ -1915,7 +2028,7 @@ export function normalizeNarrativePrdContract(
 
   const constraints = recordValue(prd.productionConstraints);
   for (const key of ["technicalConstraints", "businessConstraints", "forbiddenElements"]) {
-    if (Array.isArray(constraints[key])) constraints[key] = sanitizePrdText(constraints[key], duration);
+    if (Array.isArray(constraints[key])) constraints[key] = sanitizePrdText(constraints[key], duration, speechForbidden);
   }
   const qualityThresholds = recordValue(constraints.qualityThresholds);
   prd.productionConstraints = constraints;
@@ -1978,7 +2091,7 @@ export function normalizeNarrativePrdContract(
         const text = String(item);
         return /(?:字幕|旁白|人声|气声)/u.test(text)
           ? "可复述文案仅用于站外发布，不进入成片；成片无字幕、无旁白。"
-          : sanitizePrdText(text, duration);
+          : sanitizePrdText(text, duration, speechForbidden);
       });
     }
     prd.audienceProfile = audience;
@@ -2037,7 +2150,22 @@ export function normalizeNarrativePrdContract(
     };
     applyPronoun(prd);
   }
-  return sanitizePrdText(prd, duration || 30) as Record<string, unknown>;
+  if (speechForbidden) {
+    const normalizedScenePlan = recordValue(prd.scenePlan);
+    const scenes = Array.isArray(normalizedScenePlan.scenes)
+      ? normalizedScenePlan.scenes.map(recordValue)
+      : [];
+    for (const scene of scenes) {
+      scene.dialogue = "";
+      if (Array.isArray(scene.audioRequirements)) {
+        scene.audioRequirements = scene.audioRequirements.filter((item) =>
+          !/(?:人声|旁白|对白|口播|气声)/u.test(String(item)));
+      }
+    }
+    normalizedScenePlan.scenes = scenes;
+    prd.scenePlan = normalizedScenePlan;
+  }
+  return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
 }
 
 export function renderPrdContractMarkdown(prd: Record<string, unknown>): string {
@@ -2358,8 +2486,13 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
         ) {
           const original = originalPolicy.call(this, userIntent);
           const requirement = String(original.dialogueRequirement ?? "");
-          const dialogueAllowed = !/(?:无.{0,2}台词|无对白|不做口型|纯画面无对白)/u.test(requirement);
-          const policy = { ...original, dialogueAllowed };
+          const speech = narrativeSpeechPolicy(requirement);
+          const policy = {
+            ...original,
+            dialogueAllowed: speech.dialogueAllowed,
+            voiceoverAllowed: speech.voiceoverAllowed,
+            allSpeechForbidden: speech.allSpeechForbidden,
+          };
           this._workloomNarrativePolicy = policy;
           return policy;
         };
@@ -2379,21 +2512,25 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
           const policy = this._workloomNarrativePolicy && typeof this._workloomNarrativePolicy === "object"
             ? this._workloomNarrativePolicy as Record<string, unknown>
             : {};
-          const noDialogue = policy.dialogueAllowed === false;
+          const noLipSyncDialogue = policy.dialogueAllowed === false;
+          const allSpeechForbidden = policy.allSpeechForbidden === true
+            || (noLipSyncDialogue && policy.voiceoverAllowed !== true);
           const structure = parsed?.structure && typeof parsed.structure === "object"
             ? parsed.structure as Record<string, unknown>
             : {};
-          if (noDialogue && Array.isArray(structure.scenes)) {
+          if (noLipSyncDialogue && Array.isArray(structure.scenes)) {
             for (const scene of structure.scenes) {
               if (!scene || typeof scene !== "object") continue;
               const record = scene as Record<string, unknown>;
               record.dialogue = { has_dialogue: false, lines: [], blocks: [] };
-              delete record.narration;
-              delete record.voice_over;
-              delete record.voiceover;
+              if (allSpeechForbidden) {
+                delete record.narration;
+                delete record.voice_over;
+                delete record.voiceover;
+              }
             }
           }
-          return originalNormalize.call(this, parsed, noDialogue ? false : voiceoverAllowed);
+          return originalNormalize.call(this, parsed, allSpeechForbidden ? false : voiceoverAllowed);
         };
         restores.push(() => { generatorPrototype._normalizeScenesDialogue = originalNormalize; });
       }
@@ -2424,8 +2561,63 @@ export function installVendorDiscoveryNarrativeBridge(options: { log?: (line: st
             ? meta._metadata as Record<string, unknown>
             : {};
           const requirement = String(metadata.dialogueRequirement ?? "");
-          if (!/(?:无.{0,2}台词|无对白|不做口型|纯画面无对白)/u.test(requirement)) {
+          const speech = narrativeSpeechPolicy(requirement);
+          if (!speech.noLipSyncDialogue) {
             return originalCheck.call(this, blueprint);
+          }
+          if (!speech.allSpeechForbidden) {
+            const scenes = Array.isArray(recordValue(blueprint.structure).scenes)
+              ? recordValue(blueprint.structure).scenes as unknown[]
+              : [];
+            const voiceovers = new Set<string>();
+            const spokenLines: string[] = [];
+            for (const scene of scenes.map(recordValue)) {
+              for (const value of [scene.narration, scene.voice_over, scene.voiceover]) {
+                const text = String(value ?? "").trim();
+                if (text) voiceovers.add(text);
+              }
+              const dialogue = recordValue(scene.dialogue);
+              const rows = Array.isArray(dialogue.lines) && dialogue.lines.length > 0
+                ? dialogue.lines
+                : Array.isArray(dialogue.blocks) ? dialogue.blocks : [];
+              for (const raw of rows) {
+                const row = recordValue(raw);
+                const text = String(row.text ?? row.line ?? "").trim();
+                if (!text) continue;
+                if (/^(?:旁白|voiceover)$/iu.test(String(row.speaker ?? "")) || /^narration$/iu.test(String(row.type ?? ""))) {
+                  voiceovers.add(text);
+                } else {
+                  spokenLines.push(text);
+                }
+              }
+            }
+            const lineCount = spokenLines.length;
+            return [
+              {
+                category: "dialogue",
+                name: "has_dialogue",
+                passed: lineCount === 0,
+                severity: lineCount === 0 ? "ok" : "error",
+                message: lineCount === 0 ? "不适用：本片明确无口型对白；允许已声明的画外旁白" : "无口型合同中出现对白行",
+                suggestion: lineCount === 0 ? null : "移除对白行，只保留合同允许的一句画外旁白",
+              },
+              {
+                category: "dialogue",
+                name: "line_length",
+                passed: true,
+                severity: "ok",
+                message: "不适用：无口型对白",
+                suggestion: null,
+              },
+              {
+                category: "dialogue",
+                name: "no_voiceover",
+                passed: voiceovers.size <= 1,
+                severity: voiceovers.size <= 1 ? "ok" : "error",
+                message: voiceovers.size <= 1 ? "允许且仅允许一条画外旁白" : `明确要求最多一句旁白，实际发现 ${voiceovers.size} 条`,
+                suggestion: voiceovers.size <= 1 ? null : "合并或删除多余旁白",
+              },
+            ];
           }
           return [
             {
@@ -3616,7 +3808,8 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
         const policyMeta = blueprint.meta && typeof blueprint.meta === "object"
           ? (blueprint.meta as FusionRecord)._metadata as FusionRecord | undefined
           : undefined;
-        const noDialogue = /(?:无.{0,2}台词|无对白|不做口型)/u.test(String(policyMeta?.dialogueRequirement ?? ""));
+        const dialogueRequirement = String(policyMeta?.dialogueRequirement ?? "");
+        const speechFullyForbidden = narrativeSpeechPolicy(dialogueRequirement).allSpeechForbidden;
         const promptLimit = Number(
           (vendorRequire(resolvePath(
             repoRoot,
@@ -3624,7 +3817,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           )) as { HARD_MAX?: number }).HARD_MAX ?? 3000,
         );
         updated = updated.map((shot) =>
-          applyNarrativeFinalPromptContract(shot, { noDialogue, maxLength: promptLimit }));
+          applyNarrativeFinalPromptContract(shot, { noDialogue: speechFullyForbidden, maxLength: promptLimit }));
         const outputIds = new Set<string>();
         for (const row of updated) {
           const shot = fusionRecord(row, "融合镜头");
