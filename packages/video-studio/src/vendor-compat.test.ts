@@ -1174,6 +1174,52 @@ console.log("RESULT " + JSON.stringify({
     expect(JSON.stringify(prd)).not.toContain("人物动作");
   });
 
+  it("无角色空镜 PRD 删除定妆照硬要求，并收敛无配乐与色温冲突", () => {
+    const discovery: Record<string, unknown> = {
+      upstreamFields: {
+        duration_sec: 30,
+        platform_id: "douyin",
+        aspect_ratio: "9:16",
+        dialogue_requirement: "无人物、无动物、无旁白，仅保留环境声",
+        visual_style: "青灰7000K冷调，远山与湖面保持同一白平衡",
+        _originalStoryText: "清晨天鹅湖薄雾散开，无人物、无动物，仅保留环境声。",
+      },
+      _canonicalCharacters: [],
+    };
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: "清晨天鹅湖薄雾散开，仅保留环境声" },
+      productPositioning: { targetDuration: 30, aspectRatio: "9:16", targetPlatform: "douyin" },
+      characterSystem: { characters: [] },
+      visualSpecification: { lightingDirection: "暖光2700K作主光" },
+      scenePlan: {
+        scenes: [{ sceneId: "SC01", purpose: "薄雾散开", duration: 30 }],
+        shotMapping: [{ sceneId: "SC01", estimatedShots: 1, shotBreakdownHint: ["tracking"] }],
+      },
+      productionConstraints: { technicalConstraints: ["仅保留主体动作与画外环境声"] },
+      audienceProfile: { contentExpectations: ["仅保留主体动作与画外环境声"] },
+      audioSpecification: {
+        musicStyle: "片尾仅入低频持续音",
+        soundEffects: ["水声", "芦苇摩擦声", "片尾旋律渐入"],
+      },
+      deliveryStandard: {
+        deliverables: [
+          { item: "video_master", spec: "MP4" },
+          { item: "character_portraits", spec: "定妆照全套" },
+        ],
+        outputFormat: {},
+      },
+    }, discovery);
+    const delivery = prd.deliveryStandard as Record<string, unknown>;
+    const deliverables = delivery.deliverables as Array<Record<string, unknown>>;
+    expect(deliverables.map((item) => item.item)).toEqual(["video_master"]);
+    expect(delivery.characterAssets).toMatchObject({ required: false });
+    const shots = prd.shotContract as Array<Record<string, unknown>>;
+    expect(shots[0]!.subjectIds).toEqual([]);
+    expect(JSON.stringify(prd)).toContain("7000K");
+    expect(JSON.stringify(prd)).not.toMatch(/2700K|低频持续音|旋律渐入|人物动作|主体动作与画外环境声/u);
+    expect(JSON.stringify(prd)).toContain("不使用配乐");
+  });
+
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
     const discovery = {
       sceneStructure: {

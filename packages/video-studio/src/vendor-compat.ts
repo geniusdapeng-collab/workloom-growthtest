@@ -1466,6 +1466,7 @@ export function normalizeNarrativeRequirementMarkdown(
     }
     normalized = normalized.replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, value: string) =>
       Number(value) > duration ? `片尾（${duration}秒内）` : whole);
+    normalized = normalized.replace(/\d+\s*[—~\-至]\s*片尾（(\d+)秒内）/gu, "片尾≤$1秒");
   }
   const contractScene = (label: string, node: Record<string, unknown>): string => {
     const purpose = String(node.purpose ?? "").trim();
@@ -1953,6 +1954,7 @@ function sanitizePrdText(value: unknown, duration: number, speechForbidden = fal
     let text = value
       .replace(/(?:第\s*)?(\d+)\s*秒(?:前后)?/gu, (whole, seconds: string) =>
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole)
+      .replace(/\d+\s*[—~\-至]\s*片尾（(\d+)秒内）/gu, "片尾≤$1秒")
       .replace(/\bundefined\b/giu, "未标注")
       .replace(/\bnull\b/giu, "未标注");
     if (speechForbidden) {
@@ -2094,6 +2096,11 @@ export function normalizeNarrativePrdContract(
     upstream.subtitle_policy,
   ].map(String).join(" ");
   const speechForbidden = narrativeSpeechPolicy(dialoguePolicy).allSpeechForbidden;
+  const musicForbidden = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留[^。；\n]{0,12}(?:环境声|实拍声)/u.test([
+    upstream._originalStoryText,
+    upstream.special_notes,
+    upstream.audio_design,
+  ].map(String).join(" "));
 
   let canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
     ? discovery._canonicalCharacters.map(recordValue)
@@ -2115,6 +2122,7 @@ export function normalizeNarrativePrdContract(
       upstream,
     }).map((item, index) => ({ ...item, id: `char_${index + 1}`, characterId: `char_${index + 1}` }));
   }
+  const noCharacters = canonicalCharacters.length === 0;
   if (canonicalCharacters.length > 0) {
     characterSystem.characters = canonicalCharacters.map((item, index) => {
       const id = String(item.id ?? item.characterId ?? `char_${index + 1}`);
@@ -2248,13 +2256,28 @@ export function normalizeNarrativePrdContract(
   const deliverables = Array.isArray(delivery.deliverables)
     ? delivery.deliverables.map(recordValue)
     : [];
-  delivery.deliverables = deliverables.map((item) => item.item === "video_master"
-    ? {
-        ...item,
-        spec: `${size.width}x${size.height}, ${aspect}, ${duration}s ±0.3s, ${Number(positioning.frameRate ?? 24)}fps, MP4/H.264/AAC`,
-      }
-    : item);
+  delivery.deliverables = deliverables
+    .filter((item) => !(noCharacters && /(?:character_portraits|portraits?)/iu.test(String(item.item ?? ""))))
+    .map((item) => item.item === "video_master"
+      ? {
+          ...item,
+          spec: `${size.width}x${size.height}, ${aspect}, ${duration}s ±0.3s, ${Number(positioning.frameRate ?? 24)}fps, MP4/H.264/AAC`,
+        }
+      : item);
+  if (noCharacters) {
+    delivery.characterAssets = { required: false, reason: "本次结构化合同没有角色，不得生成或交付定妆照" };
+  }
   prd.deliveryStandard = delivery;
+  const upstreamKs = [...new Set(String(upstream.visual_style ?? "").match(/\b\d{4}\s*K\b/giu)?.map((item) => item.replace(/\s+/gu, "").toUpperCase()) ?? [])];
+  const canonicalK = upstreamKs.length === 1 ? upstreamKs[0]! : null;
+  if (canonicalK) {
+    const visual = recordValue(prd.visualSpecification);
+    const current = String(visual.lightingDirection ?? "");
+    visual.lightingDirection = current
+      ? current.replace(/\b\d{4}\s*K\b/giu, canonicalK)
+      : `色温基准 ${canonicalK}`;
+    prd.visualSpecification = visual;
+  }
   prd.shotContract = buildShotContract(prd, canonicalCharacters);
   const normalizedCharacters = Array.isArray(recordValue(prd.characterSystem).characters)
     ? (recordValue(prd.characterSystem).characters as unknown[]).map(recordValue)
@@ -2305,24 +2328,37 @@ export function normalizeNarrativePrdContract(
   }
   const animalOnly = canonicalCharacters.length > 0
     && canonicalCharacters.every((item) => ["猫", "狗", "鸟"].includes(String(item.name ?? "")));
-  if (animalOnly) {
-    const replaceActionSubject = (value: unknown): void => {
-      if (Array.isArray(value)) {
-        for (let index = 0; index < value.length; index += 1) {
-          if (typeof value[index] === "string") value[index] = String(value[index]).replace(/人物动作/gu, "主体动作");
-          else replaceActionSubject(value[index]);
-        }
-        return;
+  const normalizeContractText = (text: string): string => {
+    let value = text;
+    if (animalOnly) value = value.replace(/人物动作/gu, "主体动作");
+    if (noCharacters) value = value.replace(/(?:人物|主体)动作与画外环境声/gu, "画外环境声");
+    if (canonicalK) value = value.replace(/\b\d{4}\s*K\b/giu, canonicalK);
+    if (musicForbidden && /(?:配乐|音乐|旋律|低频嗡鸣|低频持续音)/u.test(value)) {
+      const kept = value
+        .split(/[。；\n]+/u)
+        .map((item) => item.trim())
+        .filter(Boolean)
+        .filter((item) => !/(?:配乐|音乐|旋律|低频嗡鸣|低频持续音)/u.test(item));
+      value = `${kept.length > 0 ? `${kept.join("；")}；` : ""}不使用配乐，仅保留环境声与动作声。`;
+    }
+    return value;
+  };
+  const normalizePrdStrings = (value: unknown): void => {
+    if (Array.isArray(value)) {
+      for (let index = 0; index < value.length; index += 1) {
+        if (typeof value[index] === "string") value[index] = normalizeContractText(String(value[index]));
+        else normalizePrdStrings(value[index]);
       }
-      if (!value || typeof value !== "object") return;
-      const record = value as Record<string, unknown>;
-      for (const [key, item] of Object.entries(record)) {
-        if (typeof item === "string") record[key] = item.replace(/人物动作/gu, "主体动作");
-        else replaceActionSubject(item);
-      }
-    };
-    replaceActionSubject(prd);
-  }
+      return;
+    }
+    if (!value || typeof value !== "object") return;
+    const record = value as Record<string, unknown>;
+    for (const [key, item] of Object.entries(record)) {
+      if (typeof item === "string") record[key] = normalizeContractText(item);
+      else normalizePrdStrings(item);
+    }
+  };
+  if (animalOnly || noCharacters || musicForbidden || canonicalK) normalizePrdStrings(prd);
   return sanitizePrdText(prd, duration || 30, speechForbidden) as Record<string, unknown>;
 }
 
