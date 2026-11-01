@@ -1138,6 +1138,25 @@ console.log("RESULT " + JSON.stringify({
     expect(sceneStructure.scenes[0]!.purpose).not.toContain("观众会失去");
   });
 
+  it("不加字幕不会误删明确保留的画外旁白", () => {
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { purpose: "陈卓收起雨伞，走进昏暗的客厅", duration: 14 },
+        scenes: [],
+        ending: { purpose: "画外旁白：“雨停了，该回家了。”陈卓按下台灯开关", duration: 16 },
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 30, {
+      dialogue_requirement: "不加字幕，保留一句画外旁白：“雨停了，该回家了。”",
+    });
+    const ending = String((discovery.sceneStructure as any).ending.purpose);
+    expect(ending).toContain("画外旁白");
+    expect(ending).toContain("雨停了，该回家了");
+    expect(discovery._contractRepairs ?? []).not.toEqual(expect.arrayContaining([
+      expect.objectContaining({ code: "DISALLOWED_VOICEOVER_REMOVED" }),
+    ]));
+  });
+
   it("无台词且明确无旁白时删除画外句，并把超时分镜按目标时长重投影", () => {
     const discovery: Record<string, unknown> = {
       audienceProfile: { contentExpectations: ["钉子台词在第50秒以旁白出现"] },
@@ -1222,6 +1241,30 @@ console.log("RESULT " + JSON.stringify({
     const scene = (prd.scenePlan as any).scenes[0];
     expect(scene.dialogue).toBe("面好了");
     expect(scene.audioRequirements).toContain("简短对白");
+  });
+
+  it("无动物不等于无人物，人物片仍保留角色与镜头主体绑定", () => {
+    const upstream = {
+      _originalStoryText: "陈卓在雨夜归家，发现旧台灯依然温暖；无动物，保留简短对白。",
+      dialogue_requirement: "保留简短对白，无动物。",
+    };
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: upstream._originalStoryText },
+      productPositioning: { targetDuration: 15, aspectRatio: "9:16", targetPlatform: "douyin" },
+      characterSystem: { characters: [{ characterId: "char_1", name: "陈卓", role: "protagonist" }] },
+      scenePlan: {
+        scenes: [{ sceneId: "SC01", duration: 15, purpose: "陈卓推门回家并拧亮台灯" }],
+        shotMapping: [{ sceneId: "SC01", estimatedShots: 3, shotBreakdownHint: ["medium", "close-up", "wide"] }],
+      },
+      deliveryStandard: { deliverables: [{ item: "video_master" }], outputFormat: {} },
+    }, {
+      upstreamFields: upstream,
+      _canonicalCharacters: [{ id: "char_1", name: "陈卓", role: "protagonist" }],
+    });
+    expect((prd.characterSystem as any).characters).toEqual([
+      expect.objectContaining({ characterId: "char_1", name: "陈卓" }),
+    ]);
+    expect((prd.shotContract as any[]).every((shot) => shot.subjectIds.includes("char_1"))).toBe(true);
   });
 
   it("动物是角色而非道具；探头、伸爪、缩回等动作进入可执行契约", () => {

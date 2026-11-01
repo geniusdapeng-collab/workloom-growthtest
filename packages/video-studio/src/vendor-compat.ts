@@ -1188,7 +1188,12 @@ function narrativeSpeechPolicy(value: unknown): {
   const text = String(value ?? "");
   const noLipSyncDialogue = /(?:无.{0,2}台词|无对白|不建议加对白|不做口型|纯画面无对白)/u.test(text);
   const voiceoverMentioned = /(?:旁白|画外音|画外)/u.test(text);
-  const voiceoverDenied = /(?:禁止|不得|不要|不加|不添加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)|(?:无|没有|零)(?:旁白|画外音|画外)/u.test(text);
+  const voiceoverDenied = text.split(/[。；;\n]/u).some((clause) => {
+    const compact = clause.replace(/\s+/gu, "");
+    return /(?:禁止|不得|不要|不加|不添加|不允许|避免)(?:任何|额外)?(?:使用|添加|加入|保留|有|出现|存在)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)/u.test(compact)
+      || /(?:无|没有|零)(?:任何|额外)?(?:字幕|文字)?(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)/u.test(compact)
+      || /(?:字幕|文字)(?:和|及|与|、|,|，|\/)?(?:旁白|画外音|画外)(?:都|均|也)?(?:不要|禁止|禁用|去掉|删除)/u.test(compact);
+  });
   const voiceoverAllowed = voiceoverMentioned && !voiceoverDenied;
   return {
     noLipSyncDialogue,
@@ -2538,7 +2543,7 @@ export function normalizeNarrativePrdContract(
   const musicForbidden = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(storyPolicy);
 
   const explicitNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(storyPolicy);
-  const explicitNoCharacters = explicitNoAnimals || /(?:无角色|纯空镜|场景为主体)/u.test(storyPolicy);
+  const explicitNoCharacters = /(?:无角色|纯空镜|场景为主体)/u.test(storyPolicy);
   let canonicalCharacters = Array.isArray(discovery._canonicalCharacters)
     ? discovery._canonicalCharacters.map(recordValue)
     : [];
@@ -4810,7 +4815,7 @@ export function installVendorPhase3FusionBridge(options: { log?: (line: string) 
           policyMeta?.special_notes,
         ].map(String).join(" ");
         const promptNoAnimals = /(?:无动物|不出现动物|禁止动物)/u.test(promptPolicyText);
-        const promptNoCharacters = promptNoAnimals || /(?:无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
+        const promptNoCharacters = /(?:无角色|纯空镜|场景为主体)/u.test(promptPolicyText);
         const promptNoMusic = /(?:无|不加|不要|禁止|不出现)[^。；\n]{0,8}(?:配乐|音乐|旋律)|(?:仅|只)保留(?:人物|主体)?(?:动作)?(?:与)?(?:画外)?(?:环境声|实拍声)/u.test(promptPolicyText);
         const promptDuration = Number(
           policyPositioning.targetDuration
