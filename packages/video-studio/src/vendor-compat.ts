@@ -4477,7 +4477,9 @@ export function applyNarrativeFinalPromptContract(
       return cleanText(fieldValue(label)) || "按本镜源证据执行";
     };
     const profiles = (options.characterPortraits ?? []).filter((item) => characterNames.includes(item.name));
-    const profileAppearance = profiles.map((item) => item.appearance).filter(Boolean).join("；");
+    const profileAppearance = profiles.map((item) => item.appearance).filter(Boolean).join("；")
+      .replace(/\bfemale\b/giu, "女性")
+      .replace(/\bmale\b/giu, "男性");
     const canonicalNoPerson = Boolean(options.noCharacters);
     const roles = canonicalNoPerson
       ? "无人物、无人影、无人体局部入画。"
@@ -4521,16 +4523,26 @@ export function applyNarrativeFinalPromptContract(
     const actionText = canonicalNoPerson || characterNames.length === 0 || characterNames.some((name) => assignedAction.includes(name))
       ? assignedAction
       : `${characterNames.join("、")}在本镜保持同一外观，${assignedAction}`;
-    const shotSize = promptFieldText(next.shotSize ?? (next.fields as FusionRecord).shotSize)
+    const shotSizeRaw = promptFieldText(next.shotSize ?? (next.fields as FusionRecord).shotSize)
       || promptFieldText(next.cameraHint ?? (next.fields as FusionRecord).cameraHint)
-      || "按本镜已确认景别";
+      || "中景";
+    const shotSize = shotSizeRaw.replace(/景别$/u, "");
     const compositionText = canonicalNoPerson
       ? `${shotSize}景别，9:16竖构图；自然景物主体清晰，画面边缘保留安全区，不增加人物或动物。`
       : `${shotSize}景别，9:16竖构图；${characterNames.join("、") || "已登记角色"}位于可执行表演区并保持可辨轮廓，为其动作和视线保留空间。`;
-    const cameraText = fieldValue("运镜") || promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
+    const cameraSource = promptFieldText(next.camera_movement ?? (next.fields as FusionRecord).camera_movement) || "固定机位";
+    const cameraText = /(?:固定|锁死|locked|static|零位移)/iu.test(cameraSource)
+      ? "固定机位，三脚架锁死，全镜零推拉零横移零变焦"
+      : /后拉/u.test(cameraSource)
+        ? "固定轴线极缓后拉，速度连续，末段减速停稳，不改变场景与背景"
+        : /推近|推镜/u.test(cameraSource)
+          ? "固定轴线极缓推近，速度连续，末段减速停稳，不跨越景别等级"
+          : /横移|平移/u.test(cameraSource)
+            ? "固定高度极缓横移，速度连续并停稳，不改变场景与背景"
+            : "固定机位，不做推拉摇移或变焦";
     const emotionText = canonicalNoPerson
       ? "平静、克制；情绪只通过自然变化、光线与空间关系表达。"
-      : "克制、内敛；情绪通过人物连续动作、视线和呼吸变化表达，不使用固定表情模板。";
+      : "克制、内敛；面部保持自然，眼神沿当前动作目标移动，呼吸和吞咽幅度轻微，嘴角放松，不使用固定微笑或夸张表情。";
     const baseText = cleanText(fieldValue("基础") || "电影级写实质感；保留真实材质、自然颗粒与连续物理运动。")
       .replace(/\b(?:8K|4K)\b/giu, "电影级");
     const forbidden = [
@@ -4543,7 +4555,7 @@ export function applyNarrativeFinalPromptContract(
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
     prompt = [
       "01.【语言约束】全部字段使用中文；画幅、分辨率、帧率、编码、时间码与资产路径可作为受控制作标记。",
-      `02.【导演意图】${cleanText(fieldValue("导演意图")) || "写实克制；以源证据中的动作、空间和自然光推进，不增加无关叙事。"}`,
+      "02.【导演意图】克制写实的自然长镜或稳定短镜；以人物动作、空间关系和真实光线推进，不增加无关叙事、特效或模板表演。",
       `03.【基础】${baseText}`,
       `04.【约束】${constraint}。`,
       `05.【场景】${cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription")}`,
@@ -4565,7 +4577,7 @@ export function applyNarrativeFinalPromptContract(
       "21.【节奏】节奏依据源证据连续推进，起幅、动作与落幅完整，不增加无关加速或人工强转折。",
       `22.【转场】${options.isLastShot ? "本镜为全片最后一镜；最后一帧直接硬切黑，不追加超出镜长的淡出。" : "本镜落幅后硬切至下一镜；不使用其他转场特效。"}`,
       `23.【音频】${audioText}`,
-      `24.【负面约束】${[...new Set(forbidden)].join("、")}。`,
+      `24.【负面约束】${[...new Set([...forbidden, "无暗黑风调色", "无塑料或金属感高光"])].join("、")}。`,
       `25.【角色约束】${canonicalNoPerson ? "画面禁止人物、人影、人体局部和拟人化表演模板。" : `本镜仅允许 ${characterNames.join("、") || "已登记角色"} 入画；不得增加未声明人物。`}`,
       `26.【角色一致性】${canonicalNoPerson ? "本镜无人物；锁定同一场景、道具、光源与空间关系。" : `分别绑定 ${characterNames.join("、") || "当前角色"} 的授权外观、服装与发型；不得合并、替换或增减人物。`}`,
     ].join("\n");
