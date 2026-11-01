@@ -1747,19 +1747,48 @@ export function normalizeNarrativeDiscovery(
   const noAnimals = /无动物|不出现动物|无宠物/u.test(storyPolicy);
   const noPeople = /无人物|无真人|不出现人物/u.test(storyPolicy);
   const noText = /无文字|无字幕|不出现文字/u.test(storyPolicy);
+  const groundingText = [
+    upstream._originalStoryText,
+    upstream.description,
+    upstream.special_notes,
+    upstream.visual_style,
+    upstream.theme,
+  ].map(String).join(" ");
+  const hasGroundingToken = (item: string): boolean => {
+    if (groundingText.includes(item)) return true;
+    for (let index = 0; index < item.length - 2; index += 1) {
+      if (groundingText.includes(item.slice(index, index + 3))) return true;
+    }
+    for (let index = 0; index < item.length - 1; index += 1) {
+      if (groundingText.includes(item.slice(index, index + 2))) return true;
+    }
+    return false;
+  };
   const sceneNodes = [
     recordValue(scene.opening),
     ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
     recordValue(scene.ending),
   ].filter((node) => Object.keys(node).length > 0);
-  const genericScene = /(?:建立场景|引入主题|推动叙事|核心动作|情绪表达|总结收尾|留下印象|环境展示|主题暗示|情绪收束|主题呼应|纸质道具)/u;
-  const sceneViolation = (node: Record<string, unknown>): boolean => {
-    const value = `${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`;
+  const genericScene = /(?:建立场景|引入主题|推动叙事|核心动作|情绪表达|场景器物|总结收尾|留下印象|环境展示|主题暗示|情绪收束|主题呼应|纸质道具)/u;
+  const purposeViolation = (node: Record<string, unknown>): boolean => {
+    const value = String(node.purpose ?? "");
     return (noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(value))
       || (noPeople && /(?:人物|真人|人类|路人|游客)/u.test(value))
       || (noText && /(?:字幕|水印|文字)/u.test(value));
   };
-  if (sceneNodes.some((node) => genericScene.test(`${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`) || sceneViolation(node))) {
+  const keyElementsViolation = (node: Record<string, unknown>): boolean => {
+    const values = Array.isArray(node.keyElements) ? node.keyElements.map(String) : [];
+    return values.some((item) =>
+      genericScene.test(item)
+      || item.trim().length >= 2 && !hasGroundingToken(item)
+      || noAnimals && /(?:黑|白|灰|小|一只)?(?:天鹅(?!湖)|水鸟|鸟|猫|狗|鱼|动物)/u.test(item)
+      || noPeople && /(?:人物|真人|人类|路人|游客)/u.test(item)
+      || noText && /(?:字幕|水印|文字)/u.test(item));
+  };
+  if (sceneNodes.some((node) =>
+    genericScene.test(String(node.purpose ?? ""))
+    || purposeViolation(node)
+    || keyElementsViolation(node))) {
     const evidenceClauses = [
       String(upstream._originalStoryText ?? ""),
       String(upstream.description ?? ""),
@@ -1770,17 +1799,20 @@ export function normalizeNarrativeDiscovery(
       .filter((item) => !/(?:无人物|无动物|无品牌|无文字|无字幕|无旁白|仅保留环境声)/u.test(item));
     const visualProps = inferNarrativeProps({
       intent: String(upstream._originalStoryText ?? upstream.description ?? upstream.theme ?? ""),
-      discovery,
+      discovery: { sceneStructure: {} },
       upstream,
-    });
+    }).filter(hasGroundingToken);
     let clauseIndex = 0;
     let propIndex = 0;
     for (const node of sceneNodes) {
-      const current = `${String(node.purpose ?? "")} ${Array.isArray(node.keyElements) ? node.keyElements.join(" ") : ""}`;
-      if (!genericScene.test(current) && !sceneViolation(node)) continue;
-      const purpose = evidenceClauses[clauseIndex++];
-      if (purpose) node.purpose = purpose;
-      if (visualProps.length > 0) {
+      const mappedPurpose = evidenceClauses[clauseIndex++];
+      const replacePurpose = genericScene.test(String(node.purpose ?? "")) || purposeViolation(node);
+      const replaceElements = keyElementsViolation(node);
+      if (!replacePurpose && !replaceElements) continue;
+      if (replacePurpose) {
+        if (mappedPurpose) node.purpose = mappedPurpose;
+      }
+      if (replaceElements && visualProps.length > 0) {
         const elements: string[] = [];
         for (let count = 0; count < 2; count += 1) {
           const item = visualProps[propIndex++ % visualProps.length]!;
