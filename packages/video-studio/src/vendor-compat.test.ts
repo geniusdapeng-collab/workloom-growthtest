@@ -1083,6 +1083,42 @@ console.log("RESULT " + JSON.stringify({
     expect(markdown).not.toContain("我回来了");
   });
 
+  it("允许简短对白但禁止旁白时不会把合法对白当成全语音禁止", () => {
+    const upstream = {
+      _originalStoryText: "两位厨师连续配合，一人拉面、一人看火并递碗，最后同时把两碗面放到窗口。允许简短对白，但不得添加字幕和旁白。",
+      dialogue_requirement: "允许简短对白，但不得添加字幕和旁白。",
+    };
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { purpose: "两位厨师同时说：“面好了。”然后把碗放到窗口", keyElements: ["碗"] },
+        scenes: [{ purpose: "画外旁白：“面再煮一会儿。”镜头观察蒸汽", keyElements: ["蒸汽"] }],
+        ending: { purpose: "两人相视点头，环境声收束", keyElements: ["窗口"] },
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 30, upstream);
+    expect(String((discovery.sceneStructure as any).opening.purpose)).toContain("面好了");
+    expect(String((discovery.sceneStructure as any).scenes[0].purpose)).not.toContain("面再煮一会儿");
+    expect(normalizeNarrativeRequirementMarkdown(
+      "- **台词/字幕口径**：允许简短对白，但不得添加字幕和旁白",
+      discovery,
+      30,
+      upstream,
+    )).toContain("允许简短对白");
+    const prd = normalizeNarrativePrdContract({
+      projectDefinition: { sourceIntent: upstream._originalStoryText },
+      productPositioning: { targetDuration: 30, aspectRatio: "9:16", targetPlatform: "douyin" },
+      scenePlan: {
+        scenes: [{ sceneId: "SC01", duration: 30, purpose: "两位厨师配合出餐", dialogue: "面好了", audioRequirements: ["简短对白", "厨房环境声"] }],
+        shotMapping: [{ sceneId: "SC01", estimatedShots: 2, shotBreakdownHint: ["medium", "close"] }],
+      },
+      characterSystem: { characters: [{ name: "两位厨师", role: "protagonist" }] },
+      deliveryStandard: { deliverables: [{ item: "video_master" }], outputFormat: {} },
+    }, { upstreamFields: upstream, _canonicalCharacters: [{ id: "char_1", name: "两位厨师", role: "protagonist" }] });
+    const scene = (prd.scenePlan as any).scenes[0];
+    expect(scene.dialogue).toBe("面好了");
+    expect(scene.audioRequirements).toContain("简短对白");
+  });
+
   it("动物是角色而非道具；探头、伸爪、缩回等动作进入可执行契约", () => {
     const discovery: Record<string, unknown> = {
       sceneStructure: {

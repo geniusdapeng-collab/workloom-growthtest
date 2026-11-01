@@ -1172,15 +1172,15 @@ function narrativeSpeechPolicy(value: unknown): {
   const text = String(value ?? "");
   const noLipSyncDialogue = /(?:无.{0,2}台词|无对白|不建议加对白|不做口型|纯画面无对白)/u.test(text);
   const voiceoverMentioned = /(?:旁白|画外音|画外)/u.test(text);
-  const voiceoverDenied = /(?:禁止|不要|不加|不添加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)|(?:无|没有|零)(?:旁白|画外音|画外)/u.test(text);
+  const voiceoverDenied = /(?:禁止|不得|不要|不加|不添加|不允许|避免)[^。；]{0,8}(?:旁白|画外音|画外)|(?:无|没有|零)(?:旁白|画外音|画外)/u.test(text);
   const voiceoverAllowed = voiceoverMentioned && !voiceoverDenied;
   return {
     noLipSyncDialogue,
     voiceoverMentioned,
     voiceoverDenied,
     voiceoverAllowed,
-    dialogueAllowed: !noLipSyncDialogue && !voiceoverDenied,
-    allSpeechForbidden: voiceoverDenied || (noLipSyncDialogue && !voiceoverAllowed),
+    dialogueAllowed: !noLipSyncDialogue,
+    allSpeechForbidden: noLipSyncDialogue && !voiceoverAllowed,
   };
 }
 
@@ -1734,7 +1734,7 @@ export function normalizeNarrativeDiscovery(
 ): void {
   const dialoguePolicy = String(upstream.dialogue_requirement ?? "");
   const speech = narrativeSpeechPolicy(dialoguePolicy);
-  const { noLipSyncDialogue, voiceoverAllowed, dialogueAllowed, allSpeechForbidden: speechFullyForbidden } = speech;
+  const { noLipSyncDialogue, voiceoverDenied, voiceoverAllowed, dialogueAllowed, allSpeechForbidden: speechFullyForbidden } = speech;
   const canonicalDialogue = dialogueAllowed || voiceoverAllowed
     ? dialoguePolicy.match(/(?:旁白|画外音|人声|气声)[^。；\n]{0,24}?[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
       ?? dialoguePolicy.match(/[“"'‘]([^”"'’]+)[”"'’]/u)?.[1]?.trim()
@@ -1749,6 +1749,15 @@ export function normalizeNarrativeDiscovery(
       .replace(/[^，。；\n]{0,20}(?:轻声|低声|开口)?说[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
       .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
       .replace(/这(?:一)?句(?:几乎听不见的)?话/gu, "动作与环境声的停顿")
+      .replace(/^[\s，,；;。]+/u, "")
+      .replace(/[\s，,；;]+$/u, "");
+  };
+  const stripDisallowedVoiceover = (value: string): string => {
+    if (!voiceoverDenied) return value;
+    return value
+      .replace(/(?:画外音?|旁白)[^。；\n]*?[：:]?\s*[“"'‘][^”"'’]+[”"'’]/gu, "")
+      .replace(/(?:画外音?|旁白)[：:]\s*[^。；\n]+/gu, "")
+      .replace(/(?:画外音?|旁白)[^。；\n]*(?:一句|低语)[^。；\n]*/gu, "")
       .replace(/^[\s，,；;。]+/u, "")
       .replace(/[\s，,；;]+$/u, "");
   };
@@ -1780,6 +1789,10 @@ export function normalizeNarrativeDiscovery(
     } else if (speechFullyForbidden) {
       const stripped = stripDisallowedSpeech(text);
       if (stripped !== text) repairs.push({ code: "DISALLOWED_SPEECH_REMOVED", detail: "移除与无台词/无旁白合同冲突的台词或旁白" });
+      text = stripped;
+    } else if (voiceoverDenied) {
+      const stripped = stripDisallowedVoiceover(text);
+      if (stripped !== text) repairs.push({ code: "DISALLOWED_VOICEOVER_REMOVED", detail: "保留合法对白并移除合同禁止的旁白" });
       text = stripped;
     }
     if (Number.isFinite(duration) && duration > 0) {
@@ -1949,6 +1962,7 @@ export function normalizeNarrativeDiscovery(
         Number(seconds) > duration ? `片尾（${duration}秒内）` : whole);
     }
     if (speechFullyForbidden) text = stripDisallowedSpeech(text);
+    else if (voiceoverDenied) text = stripDisallowedVoiceover(text);
     return text;
   };
   const visit = (value: unknown): void => {
