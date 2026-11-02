@@ -204,6 +204,16 @@ describe.runIf(RUN_DB)("正式生成资格活库契约", () => {
     expect(providerCalls).toBe(0);
   });
 
+  it("历史已落账真实任务缺少计划与实测时长时拒绝新增付费POST", async () => {
+    const qualification = await issue(); env.WORKLOOM_PROJECT_COMPUTE_CAP = "30";
+    await owner.query(`INSERT INTO render_jobs (id,workspace_id,project_id,script_id,script_version,mock)
+      VALUES ($1,$2,$3,$4,1,false)`, [`RJ-legacy-no-seconds-${suffix}-${seq}`, scope.workspaceId, projectId, qualification.scriptId]);
+    await expect(submitGenJob(await input(qualification.qualificationToken))).rejects.toThrow("PROJECT_COMPUTE_BUDGET_UNVERIFIED");
+    await expect(projectComputeUsed(app, scope, projectId)).rejects.toThrow("PROJECT_COMPUTE_BUDGET_UNVERIFIED");
+    expect(await projectComputeUsed(app, other, projectId)).toBe(0);
+    expect(providerCalls).toBe(0);
+  });
+
   it("HTTP400含接受ID保留unknown，重签资格仍复用原请求而不再次付费", async () => {
     const qualification = await issue();
     const originalFetch = globalThis.fetch;

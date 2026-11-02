@@ -22,7 +22,7 @@ export async function projectComputeUsed(
     scope,
     `SELECT COALESCE(SUM(seconds), 0)::text AS used,
        COUNT(*) FILTER (WHERE seconds IS NULL)::text AS unverified FROM (
-       SELECT COALESCE(actual_seconds, est_seconds, 0) AS seconds
+       SELECT COALESCE(actual_seconds, est_seconds) AS seconds
        FROM render_jobs
        WHERE workspace_id=$1 AND project_id=$2 AND mock=false
        UNION ALL
@@ -39,7 +39,7 @@ export async function projectComputeUsed(
      ) committed_and_pending`,
     [scope.workspaceId, projectId, scope.tenantId, excludeRequestHash ?? null],
   );
-  if (Number(rows[0]?.unverified ?? 0) > 0) throw new SubmissionError("PROJECT_COMPUTE_BUDGET_UNVERIFIED", "在途渲染缺少可核实的冻结时长，核对已有任务前不能新增渲染");
+  if (Number(rows[0]?.unverified ?? 0) > 0) throw new SubmissionError("PROJECT_COMPUTE_BUDGET_UNVERIFIED", "已有或在途渲染缺少可核实的时长，核对已有任务前不能新增渲染");
   const used = Number(rows[0]?.used ?? 0);
   if (!Number.isFinite(used) || used < 0) throw new SubmissionError("PROJECT_COMPUTE_BUDGET_UNVERIFIED", "项目算力用量不可核实，拒绝新增渲染");
   return used;
