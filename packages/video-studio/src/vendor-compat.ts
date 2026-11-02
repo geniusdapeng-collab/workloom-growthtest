@@ -1670,7 +1670,14 @@ export function pairRiskMitigations(riskAssessment: Record<string, unknown>): st
       && !/(?:微表情|静坐|手部|手指|旋钮|开关|指纹|磨白|发黄|塑料)/u.test(text)) {
       return "固定低照度曝光、青灰白平衡、主辅光比与LUT，分别锁定室内外冷暖光源；逐镜检查暗部噪点、色温漂移、雨丝连续性及高光滚降，不使用跨场景复用的雨幕参数。";
     }
-    if (/(?:风.*涟漪|涟漪.*(?:方向|频率)|无风自动|波纹.*重复)/u.test(text)) {
+    if (/(?:湖面|水面).*(?:反射|倒影|几何|边缘)|(?:远山|芦苇).*(?:反射|倒影)/u.test(text)
+      && /(?:一致|连续|漂移|跳变|变形)/u.test(text)) {
+      return "锁定固定机位、湖岸参考线和远山轮廓，倒影只用同一静态参考层与单次风源驱动；逐段核对山脊转折、芦苇杆数和倒影占比，异常只重做水面或倒影层。";
+    }
+    if (/(?:体积光|光柱|光束|眩光|镜头光晕|逆光)/u.test(text)) {
+      return "体积光改用单侧窗光或实拍雾板遮光，锁定太阳画外方位、光柱角度和雾层厚度；禁止硬边上帝光和镜头光晕，逐段对照同一参考帧，异常只重做光柱遮罩。";
+    }
+    if (/(?:风.*涟漪|涟漪.*(?:方向|频率|尺度)|无风自动|波纹.*重复)/u.test(text)) {
       return "把风源与水面运动绑定：芦苇摆动方向决定涟漪扩散方向，每段只允许一个持续风源；目标帧核对涟漪频率、方向与芦苇摆动一致，无风段落必须保持静水，失败只重做该段。";
     }
     if (/(?:雨滴|雨珠|雨丝|涟漪|水渍).*(?:涟漪|反射|连续|方向|密度|因果|穿帮)|(?:雨落无涟漪|反光方向)/u.test(text)) {
@@ -2046,6 +2053,42 @@ export function normalizeNarrativeRequirementMarkdown(
         ].join("\n"),
       )
       .replace(/人物动作与画外环境声/gu, "画外环境声");
+    const ending = recordValue(scene.ending);
+    const lastEnvironmentChange = environmentActionPhrases.at(-1);
+    if (Object.keys(ending).length > 0
+      && lastEnvironmentChange
+      && !String(ending.purpose ?? "").includes(lastEnvironmentChange)) {
+      ending.purpose = `${String(ending.purpose ?? "").replace(/[。；]?\s*$/u, "")}；${lastEnvironmentChange}`;
+    }
+  }
+  if (hasSceneStructure) {
+    const finalScenePurposes = [
+      scene.opening && typeof scene.opening === "object"
+        ? contractScene("开场", scene.opening as Record<string, unknown>)
+        : "",
+      ...(Array.isArray(scene.scenes) ? scene.scenes.map((item, index) =>
+        item && typeof item === "object"
+          ? contractScene(`主体场景 ${index + 1}`, item as Record<string, unknown>)
+          : "") : []),
+      scene.ending && typeof scene.ending === "object"
+        ? contractScene("结尾", scene.ending as Record<string, unknown>)
+        : "",
+    ].filter(Boolean);
+    normalized = normalized.replace(
+      /- \*\*场景\*\*（\d+）：[^\n]*/u,
+      `- **场景**（${finalScenePurposes.length}）：${finalScenePurposes.join("；")}`,
+    );
+    const finalSceneKeys = [
+      recordValue(scene.opening),
+      ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+      recordValue(scene.ending),
+    ].filter((item) => Object.keys(item).length > 0)
+      .map((item) => Array.isArray(item.keyElements) ? item.keyElements.map(String).join("、") : "");
+    let finalKeyIndex = 0;
+    normalized = normalized.replace(/^- 关键元素:\s*[^\n]*$/gmu, (line) => {
+      const value = finalSceneKeys[finalKeyIndex++];
+      return value ? `- 关键元素: ${value}` : line;
+    });
   }
   const risk = discovery?.riskAssessment && typeof discovery.riskAssessment === "object"
     ? discovery.riskAssessment as Record<string, unknown>
@@ -2053,7 +2096,20 @@ export function normalizeNarrativeRequirementMarkdown(
   const risks = Array.isArray(risk.technicalRisks)
     ? risk.technicalRisks.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
     : [];
-  const pairedMitigations = pairRiskMitigations(risk);
+  const sceneDurationsForContract = [
+    recordValue(scene.opening),
+    ...(Array.isArray(scene.scenes) ? scene.scenes.map(recordValue) : []),
+    recordValue(scene.ending),
+  ].filter((item) => Object.keys(item).length > 0)
+    .map((item) => Number(item.duration ?? 0))
+    .filter((value) => Number.isFinite(value) && value > 0);
+  const pairedMitigations = pairRiskMitigations(risk).map((item) =>
+    sceneDurationsForContract.length > 0
+      ? item.replace(
+        /(?:把|将)?\s*\d+\s*秒[^。；]{0,24}(?:拆成|切成)[^。；]{0,24}秒[^。；]{0,12}镜(?:头|位)/gu,
+        `镜头切分以场景合同为准：${sceneDurationsForContract.join("/")}秒`,
+      )
+      : item);
   const riskText = risks.length > 0
     ? `${risks.length} 项技术风险：${risks.map((item, index) =>
       `风险${index + 1}（${item.level === "high" ? "高" : item.level === "medium" ? "中" : "低"}）：${String(item.risk ?? "")}；缓解：${pairedMitigations[index] ?? "见技术难点正文"}`).join("；")}`

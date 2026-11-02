@@ -2758,7 +2758,7 @@ console.log("RESULT " + JSON.stringify({
     expect(JSON.stringify(discovery.audienceProfile)).not.toMatch(/手机|录制|手指|快门|屏息|黑天鹅|水鸟/u);
     const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
     expect(new Set(pairs).size).toBe(5);
-    expect(pairs[0]).toContain("遮挡倒影");
+    expect(pairs[0]).toMatch(/遮挡倒影|湖岸参考线/u);
     expect(pairs[1]).toContain("分层透明度");
     expect(pairs[2]).toContain("青灰");
     expect(pairs[3]).toContain("唯一负面清单");
@@ -2909,6 +2909,48 @@ console.log("RESULT " + JSON.stringify({
     const scenePurposes = (discovery.sceneStructure as any).scenes.map((item: any) => String(item.purpose));
     expect(scenePurposes[0]).toContain("伸爪");
     expect(scenePurposes[1]).toContain("缩回");
+  });
+
+  it("高原湖空镜使用水面、体积光与固定机位专属缓解，并按场景合同统一时长", () => {
+    const upstream = {
+      _originalStoryText: "清晨薄雾中的无名高原湖，湖面只倒映远山和芦苇，风吹起细小涟漪，薄雾缓慢散开。无人物、无动物、无品牌、无文字、无字幕、无旁白，仅保留环境声。",
+      dialogue_requirement: "无台词、无旁白、无字幕，仅保留环境声。",
+      visual_style: "清晨侧逆光，低饱和青灰，薄雾体积光",
+    };
+    const discovery: Record<string, unknown> = {
+      sceneStructure: {
+        opening: { duration: 8, purpose: "湖面只倒映远山和芦苇", keyElements: ["湖面", "远山", "芦苇", "薄雾"] },
+        scenes: [{ duration: 13, purpose: "风吹起细小涟漪", keyElements: ["湖面", "涟漪", "芦苇"] }],
+        ending: { duration: 9, purpose: "涟漪缓慢扩散", keyElements: ["湖面", "远山", "芦苇", "薄雾"] },
+      },
+      audienceProfile: { emotionTriggers: [], contentExpectations: [] },
+      riskAssessment: {
+        technicalRisks: [
+          { risk: "湖面倒影与远山轮廓跨镜头漂移", level: "high" },
+          { risk: "涟漪方向、频率与尺度不连贯", level: "medium" },
+          { risk: "薄雾体积光出现硬边光柱与镜头光晕", level: "medium" },
+        ],
+        mitigationSuggestions: [
+          "把30秒拆成4个7–8秒镜头",
+          "预留重试时间",
+          "准备备选方案",
+        ],
+      },
+    };
+    normalizeNarrativeDiscovery(discovery, 30, upstream);
+    const pairs = pairRiskMitigations(discovery.riskAssessment as Record<string, unknown>);
+    expect(pairs[0]).toMatch(/湖岸参考线|固定机位/u);
+    expect(pairs[1]).toMatch(/风源|涟漪方向/u);
+    expect(pairs[2]).toMatch(/雾板|体积光/u);
+    const markdown = normalizeNarrativeRequirementMarkdown([
+      "**总场景数**: 7个",
+      "- **场景**（7）：损坏场景",
+      "- **动作**（1）：错误动作",
+      "- **道具**（1）：错误道具",
+      "- **台词/字幕口径**：无台词、无旁白、无字幕，仅保留环境声。",
+    ].join("\n"), discovery, 30, upstream);
+    expect(markdown).not.toContain("4个7–8秒镜头");
+    expect(markdown).toMatch(/结尾：目的=.*薄雾缓慢散开/u);
   });
 
   it("动作与禁止项抽取产出可执行短句，避免重复和整段原文", () => {
