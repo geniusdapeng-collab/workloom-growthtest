@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { constants } from "node:fs";
 import { mkdir, open, realpath, writeFile } from "node:fs/promises";
-import { reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
+import { installVendorMarketingPriceBridge, reviewStage, type ProducerVerdict } from "@hyperreality/video-studio";
 import { createDataMiningExecutor, type DataMiningStagePlan, type ExecutorLlm, type IntelStage, type SearchFn, type SearchHit } from "./data-mining-executor.js";
 import { fetchMarketingSource, type SourceSnapshot } from "./marketing-source-fetcher.js";
 import { assertMarketingFactsFresh, validateStageFacts, revalidateStageFacts, type ValidatedStageFacts } from "./marketing-facts.js";
@@ -208,7 +208,10 @@ export async function prepareMarketingFacts(input: {
     }
     identity.specs = specs;
   }
-  const assembled = collector.assemble(plan.trace_id, product, assemblyRaw);
+  const restorePriceBridge = installVendorMarketingPriceBridge();
+  let assembled: ReturnType<DossierEngine["assemble"]>;
+  try { assembled = collector.assemble(plan.trace_id, product, assemblyRaw); }
+  finally { restorePriceBridge(); }
   if (assembled.ok !== true || assembled.chain?.ok !== true || !assembled.dossier || !assembled.cards) fail("MARKETING_DOSSIER_UNVERIFIED", "情报五站未完成有效档案装订");
   const restrictions = reports.filter(report => report.facts.status === "no_evidence").map(report => report.stage === "A2"
     ? "没有可核实用户评价：禁止用户口碑、评分、人数、销量或使用效果共识主张" : "没有可核实竞品证据：禁止对比、竞品弱点或市场领先主张");

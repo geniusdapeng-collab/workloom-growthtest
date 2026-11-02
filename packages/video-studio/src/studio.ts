@@ -43,6 +43,7 @@ import {
 } from "./vendor-compat.js";
 import { AUDIO_DISCIPLINE_CLAUSE, AUDIO_NEGATIVE_TERMS } from "./shot-spec.js";
 import { loadDurationRules } from "./duration-rules.js";
+import { installVendorMarketingPriceBridge } from "./marketing-price-contract.js";
 
 /** vendor 引擎暴露的最小结构（HyperrealitySystem 实例方法） */
 interface HyperrealitySystemLike {
@@ -389,6 +390,7 @@ export class VideoStudio {
       const keep = (dispose: () => void): void => { disposers.push(dispose); };
       let runFailure: { error: unknown } | undefined;
       try {
+        keep(installVendorMarketingPriceBridge());
         /**
          * 注入依赖保活（vendor ConfigIsolator 会摊平类实例，见 vendor-compat.ts）：
          * 必须在本实例装配之前打上，否则注入的 LLM 引擎在隔离后变成"空心对象"，
