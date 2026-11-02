@@ -142,8 +142,8 @@ async function runCase(item) {
   const shotRows = Array.isArray(readJson(shotsPath)) ? readJson(shotsPath) : [];
   const rejectedGates = gates.filter((gate) => gate.approved !== true);
   const requiredGates = item.route === "marketing"
-    ? ["G1_DOSSIER", "G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT"]
-    : ["G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT"];
+    ? ["G1_DOSSIER", "G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"]
+    : ["G2_THEME", "G3_INSIGHT", "G4_PRD", "G5_PORTRAIT", "G6_PROMPT", "G7_FINAL"];
   const approvedGateNames = new Set(gates.filter((gate) => gate.approved === true).map((gate) => gate.gate));
   const missingGates = requiredGates.filter((gate) => !approvedGateNames.has(gate));
   const packageChecks = events.filter((event) => event?.kind === "pipeline.duration.package_check");
