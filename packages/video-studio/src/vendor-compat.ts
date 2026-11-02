@@ -6002,7 +6002,7 @@ export function renderPreproductionAuditReport(input: {
   });
   const blueprint = recordValue(input.scriptResult.blueprint);
   const characterSystem = recordValue(blueprint.character_system);
-  const characters = Array.isArray(characterSystem.characters)
+  const rawScriptCharacters = Array.isArray(characterSystem.characters)
     ? characterSystem.characters.map(recordValue)
     : [];
   const structure = recordValue(blueprint.structure);
@@ -6017,7 +6017,7 @@ export function renderPreproductionAuditReport(input: {
   const portraitConfirmation = recordValue(input.confirmations.portraitGeneration);
   const portraitReason = String(portraitConfirmation.reason ?? portraitConfirmation.status ?? "");
   const portraitsNotApplicable = /not[-_ ]?applicable|审计|audit-portrait/i.test(portraitReason);
-  const scriptPortraitAssets = characters.map((character) => {
+  const scriptPortraitAssets = rawScriptCharacters.map((character) => {
     const evidence = recordValue(character.portraitEvidence);
     return {
       name: character.name ?? character.characterId ?? null,
@@ -6039,22 +6039,74 @@ export function renderPreproductionAuditReport(input: {
       : null;
     return { name: match?.[1]?.trim() ?? null, path, authorization, sha256 };
   }).filter((item) => item.path);
-  const portraitAssets = [...new Set(shotCards.flatMap((shot) => {
+  const portraitAssetCandidates = shotCards.flatMap((shot) => {
     const prompt = promptById.get(String(shot.shotId ?? ""));
     const bound = prompt ? promptBoundShotContract(prompt) : {};
     const contract = Object.keys(bound).length > 0 ? bound : recordValue(shot.promptContract);
     const fromContract = Array.isArray(contract.portraitAssets) ? contract.portraitAssets : [];
     return [...fromContract, ...scriptPortraitAssets, ...promptPortraitAssets];
-  }).map(recordValue).map((item) => JSON.stringify({
-    name: item.name ?? null,
-    path: item.path ?? null,
-    authorization: item.authorization ?? null,
-    sha256: item.sha256 ?? null,
-  })))].map((item) => JSON.parse(item) as FusionRecord);
+  }).map(recordValue);
+  const validAuthorization = (value: unknown): boolean =>
+    Boolean(String(value ?? "").trim()) && !/^(?:unknown|unverified|空)?$/iu.test(String(value).trim());
+  const portraitAssetsByPath = new Map<string, FusionRecord>();
+  for (const item of portraitAssetCandidates) {
+    const path = String(item.path ?? item.portraitPath ?? "").trim();
+    if (!path) continue;
+    const current: FusionRecord = {
+      name: item.name ?? null,
+      path,
+      authorization: item.authorization ?? null,
+      sha256: item.sha256 ?? null,
+    };
+    const previous = portraitAssetsByPath.get(path);
+    if (!previous
+      || (!validAuthorization(previous.authorization) && validAuthorization(current.authorization))
+      || (!/^[a-f0-9]{64}$/iu.test(String(previous.sha256 ?? ""))
+        && /^[a-f0-9]{64}$/iu.test(String(current.sha256 ?? "")))) {
+      portraitAssetsByPath.set(path, current);
+    }
+  }
+  const portraitAssets = [...portraitAssetsByPath.values()];
   const portraitAssetsVerified = portraitAssets.length > 0 && portraitAssets.every((item) =>
     typeof item.path === "string" && item.path.length > 0
     && typeof item.sha256 === "string" && /^[a-f0-9]{64}$/u.test(item.sha256)
-    && !/^(?:unknown|unverified|空)?$/iu.test(String(item.authorization ?? "")));
+    && validAuthorization(item.authorization));
+  const promptCharacterNames = [...new Set([
+    ...shotCards.flatMap((shot) => {
+      const contract = recordValue(shot.promptContract);
+      const names = Array.isArray(contract.characterNames)
+        ? contract.characterNames.map((value) => String(value ?? "").trim()).filter(Boolean)
+        : [];
+      const assetNames = Array.isArray(contract.portraitAssets)
+        ? contract.portraitAssets.map(recordValue).map((item) => String(item.name ?? "").trim()).filter(Boolean)
+        : [];
+      return [...names, ...assetNames];
+    }),
+    ...promptPortraitAssets.map((item) => String(item.name ?? "").trim()).filter(Boolean),
+  ])];
+  const characters: FusionRecord[] = promptCharacterNames.length > 0
+    ? promptCharacterNames.map((name) => {
+      const rawMatches = rawScriptCharacters.filter((character) =>
+        [character.name, character.characterId, character.character_id, character.id]
+          .map((value) => String(value ?? "").trim())
+          .some((value) => value === name));
+      const preferredRaw = rawMatches.find((character) => validAuthorization(character.authorization))
+        ?? rawMatches[0]
+        ?? {};
+      const promptAsset = promptPortraitAssets.find((item) => String(item.name ?? "").trim() === name);
+      const characterIds = rawMatches.flatMap((character) =>
+        [character.characterId, character.character_id, character.id]
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean));
+      return {
+        name,
+        characterId: characterIds.find((id) => id !== name) ?? characterIds[0] ?? name,
+        authorization: promptAsset?.authorization
+          ?? (validAuthorization(preferredRaw.authorization) ? preferredRaw.authorization : null)
+          ?? "unknown",
+      } satisfies FusionRecord;
+    })
+    : rawScriptCharacters;
   const elapsedMs = Math.max(0, Number(input.effectiveMs) || 0);
   const artifacts = {
     script: evidenceHash(input.scriptResult),
@@ -6092,7 +6144,7 @@ export function renderPreproductionAuditReport(input: {
     `- 镜头卡：已内联，共 ${shotCards.length} 镜；全部场景与字段见下表，来源为最终提示词绑定合同`,
     `- 提示词：已内联，共 ${prompts.length} 条；正文见下方完整字段块`,
     portraitsNotApplicable
-      ? `- 定妆照生成：not_applicable（本轮审计显式关闭新图生成）；角色引用资产：${portraitAssetsVerified ? `verified，${portraitAssets.length} 个已登记源定妆照` : "unverified"}`
+      ? `- 定妆照生成：not_applicable（本轮未生成新定妆照，仅复用已登记源资产）；角色引用资产：${portraitAssetsVerified ? `verified，${portraitAssets.length} 个已登记源定妆照` : "unverified"}`
       : `- 定妆照：状态=${portraitReason || "unverified"}；未声明为已完成，除非另有真实图片回执`,
     ...portraitAssets.map((item) =>
       `- 源定妆照 ${String(item.name ?? "未命名")}：path=${String(item.path ?? "未指定")}；授权=${String(item.authorization ?? "unknown")}；sha256=${String(item.sha256 ?? "未核验")}`),

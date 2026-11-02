@@ -1977,7 +1977,12 @@ console.log("RESULT " + JSON.stringify({
       },
       scriptResult: {
         blueprint: {
-          character_system: { characters: [{ characterId: "chen-zhuo", name: "陈卓", authorization: "real-authorized" }] },
+          character_system: {
+            characters: [
+              { characterId: "chen-zhuo", name: "陈卓", authorization: "real-authorized" },
+              { characterId: "陈卓", name: "陈卓", authorization: "unknown", _auto_stub: true },
+            ],
+          },
           structure: { scenes: [{ sceneId: "SC01", purpose: "错误旧脚本动作", duration: 3 }] },
         },
       },
@@ -1999,6 +2004,11 @@ console.log("RESULT " + JSON.stringify({
     expect(report).toContain("定妆照生成：not_applicable");
     expect(report).toContain("源角色资产：verified");
     expect(report).toContain(portraitSha);
+    expect(report).toContain("角色数：1");
+    expect(report).toContain("授权=real-authorized");
+    expect(report).not.toContain("角色数：2");
+    expect(report).not.toContain("授权=unknown");
+    expect(report).toContain("本轮未生成新定妆照，仅复用已登记源资产");
     expect(report).toContain("workloom.preproduction-contract/v1");
     expect(report).toContain("镜头卡与提示词语义绑定：通过");
     expect(report).toContain("G8");
