@@ -14,7 +14,12 @@ const sourceUrl = "https://source.example.com/f3";
 const sourceText = "星野 F3 是一款风扇，风量 9 档。尾部注意：9 档是风量档位，不是能耗等级；不得声称静音或市场第一。";
 let server: Server, origin: string, root: string, modelCalls: any[], rejectJudge: boolean, extractionCalls: string[];
 beforeAll(async () => {
-  server = createServer((_req, res) => { res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }); res.end(sourceText); });
+  server = createServer((req, res) => {
+    if (req.url === "/redirect-a" || req.url === "/redirect-b") {
+      res.writeHead(302, { location: "/f3" }); res.end(); return;
+    }
+    res.writeHead(200, { "content-type": "text/plain; charset=utf-8" }); res.end(sourceText);
+  });
   await new Promise<void>(resolve => server.listen(0, "127.0.0.1", resolve)); origin = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 });
 afterAll(async () => { server.closeAllConnections(); await new Promise<void>(resolve => server.close(() => resolve())); });
@@ -53,6 +58,7 @@ async function prepare(options: {
   mode?: string;
   attempt?: number;
   searchCacheFile?: string;
+  redirectAliases?: boolean;
 } = {}): Promise<PreparedMarketingFacts> {
   let searches = 0;
   return prepareMarketingFacts({ scope: { ...scope, attempt: options.attempt ?? 1 }, root, intent: "做一条风扇介绍", metadata: { brief: { product: "星野 F3", brand: "星野" } }, env: { ...env, ...(options.mode ? { VM_DATA_MINING_MODE: options.mode } : {}) },
@@ -67,13 +73,27 @@ async function prepare(options: {
         : {
             search: async () => (++searches, options.noSearch || options.noAux && searches > 20
               ? []
-              : [{ title: "星野规格", url: sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
+              : [{ title: "星野规格", url: options.redirectAliases
+                ? `https://source.example.com/${searches <= 8 ? "redirect-a" : "redirect-b"}`
+                : sourceUrl, snippet: "故意错误摘要999档，不能当事实" }]),
           }),
-      fetchSource: async url => fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (_url, _address, signal) => requestSource(new URL(origin), { address: "127.0.0.1", family: 4 }, signal) }),
+      fetchSource: async url => fetchMarketingSource(url, { resolver: async () => [{ address: "93.184.216.34", family: 4 }], transport: async (requested, _address, signal) => requestSource(new URL(requested.pathname, origin), { address: "127.0.0.1", family: 4 }, signal) }),
     } });
 }
 const shots = [{ shotId: "S1", prompt: "窗边展示星野 F3 风扇，字幕说明风量 9 档。", fields: { 场景: "窗边", 产品: "星野 F3", 规格: "9 档" } }];
 describe("营销事实宿主完整执行", () => {
+  it("不同检索跳转指向同一正文时，逐站来源审核仍绑定其实际抓取快照", async () => {
+    const prepared = await prepare({ redirectAliases: true });
+    const saved = await finalizeMarketingFacts(prepared, shots, env);
+    const checked = await verifyMarketingFacts({ root, ...saved, scope, shots });
+    expect(checked.sources).toHaveLength(2);
+    expect(new Set(checked.sources.map(source => source.sourceId)).size).toBe(2);
+    expect(checked.sources.map(source => source.requestedUrl)).toEqual([
+      "https://source.example.com/redirect-a", "https://source.example.com/redirect-b",
+    ]);
+    expect(checked.sources.every(source => source.finalUrl === sourceUrl)).toBe(true);
+    expect(checked.sources[0]!.textSha256).toBe(checked.sources[1]!.textSha256);
+  });
   it("CLI 预置检索缓存可直接注入宿主，不需要调用方另造检索函数", async () => {
     const cacheFile = path.join(root, "search-cache.json");
     primeSearchCache(cacheFile, {
