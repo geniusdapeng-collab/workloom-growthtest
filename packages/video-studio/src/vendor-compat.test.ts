@@ -1784,6 +1784,14 @@ console.log("RESULT " + JSON.stringify({
       scene: expect.stringContaining("玄关内侧"),
       props: expect.arrayContaining(["白色湿便鞋", "室内拖鞋"]),
     });
+    expect(deriveNarrativeShotDirection({
+      action: "陈卓脱下白色湿便鞋，换穿室内拖鞋",
+      fallbackColor: "2700K",
+    })).toMatchObject({
+      scene: expect.stringContaining("门已关上"),
+      color: expect.stringContaining("冷蓝灰"),
+      props: expect.arrayContaining(["鞋架", "白色湿便鞋", "室内拖鞋"]),
+    });
     expect(deriveNarrativeShotDirection({ action: "拧亮旧台灯" })).toMatchObject({
       scene: expect.stringContaining("台灯"),
       lighting: expect.stringMatching(/起幅.*关闭.*2700K/),

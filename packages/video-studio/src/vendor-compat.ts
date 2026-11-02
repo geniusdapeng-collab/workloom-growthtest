@@ -5310,7 +5310,10 @@ export function applyNarrativeFinalPromptContract(
       "无生成特效", "无镜头光晕伪影", "无模糊", "无过曝", "无未声明角色",
     ];
     const portraitLine = portraitText.startsWith("不适用") ? portraitText : `使用 ${portraitText}；跨镜不得替换。`;
-    const sceneText = cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription");
+    const sceneText = sceneTextForAction(
+      assignedAction,
+      cleanText(options.projectScene ?? "") || source("场景", "scene", "sceneDescription"),
+    );
     const lightingText = cleanText(options.projectLighting ?? "") || source("灯光设计", "lighting");
     const colorText = cleanText(options.projectColor ?? "") || source("色彩/色调", "color_palette");
     const propsText = normalizeFootwearProps(
@@ -5462,7 +5465,7 @@ export function deriveNarrativeShotDirection(input: {
       props: ["旧防盗门", "门", "门把手", "门锁", "玄关", "鞋架", "地垫"],
     };
   }
-  if (/(?:换鞋|脱鞋|穿鞋)/u.test(action)) {
+  if (/(?:换鞋|脱鞋|穿鞋|脱下[^。；\n]*鞋|换穿[^。；\n]*拖鞋)/u.test(action)) {
     return {
       action,
       scene: "出租屋玄关内侧：鞋架、地垫与门后挂钩在同一空间，门已关上",
@@ -5649,6 +5652,19 @@ function brightnessTextForAction(action: string): string {
   return "人物与主体轮廓可辨，按灯光设计保留明暗层次，环境高光不过曝，不使用额外正面补光。";
 }
 
+function sceneTextForAction(action: string, scene: string): string {
+  let value = scene;
+  const kind = narrativeActionKind(action);
+  if (kind === "shoes" || kind === "close") value = value.replace(/鞋柜/gu, "鞋架");
+  if (kind === "shoes") {
+    value = value.replace(/旧台灯(?!.*关闭)[^，。；\n]*/gu, "旧台灯保持关闭");
+    if (/旧台灯/u.test(value) && !/旧台灯[^。；\n]*(?:关闭|未亮|熄灭)/u.test(value)) {
+      value = `${value.replace(/[。；]?\s*$/u, "")}；旧台灯保持关闭。`;
+    }
+  }
+  return value;
+}
+
 function depthTextForShotSize(shotSize: string, noCharacters: boolean): string {
   if (noCharacters) {
     return /(?:close|特写)/iu.test(shotSize)
@@ -5714,7 +5730,7 @@ function costumeTextForFootwear(base: string, action: string, shotIndex: number,
 }
 
 function normalizeFootwearProps(props: string[], action: string, shotIndex: number, shoeIndex: number): string[] {
-  const footwear = /(?:鞋|拖鞋|帆布鞋|便鞋)/u;
+  const footwear = /^(?:(?:白色|黑色|旧|湿|室内|日常|通勤)+)?(?:便鞋|皮鞋|帆布鞋|拖鞋|鞋)$/u;
   const base = props.map(String).map((item) => item.trim()).filter((item) => item && !footwear.test(item));
   const withoutSynonyms = (values: string[]): string[] => {
     const set = new Set(values);

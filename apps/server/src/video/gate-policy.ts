@@ -104,7 +104,14 @@ export function gateDeterministicChecks(gate: GateKey, content: string): Array<{
   const checks = [
     { id: "content-present", pass: trimmed.length > 0, hard: true, detail: trimmed.length > 0 ? `门内容 ${trimmed.length} 字` : "门内容为空（vendor 未产出该环节产物）" },
     { id: "no-placeholder", pass: !/undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed), hard: true, detail: /undefined|null(?![\w])|NaN|\[object Object\]/.test(trimmed) ? "门内容含 undefined/null/NaN/[object Object] 占位" : "无占位符泄漏" },
-    { id: "min-length", pass: trimmed.length >= 120, hard: true, detail: `内容长度 ${trimmed.length}（下限 120，过短通常意味着上游字段过薄）` }
+    {
+      id: "min-length",
+      pass: trimmed.length >= 120,
+      hard: true,
+      detail: trimmed.length >= 120
+        ? "有效内容已达到下限 120 字（统一按去掉首尾空白后的 Unicode 字符计数）"
+        : `有效内容仅 ${trimmed.length} 字（下限 120，过短通常意味着上游字段过薄）`,
+    }
   ];
   if (gate === "G5_PORTRAIT") {
     const pendingOnly = /completedPortraits["'\s:]+0/.test(trimmed) || /"pending"\s*:\s*true/.test(trimmed);
